@@ -622,6 +622,9 @@ class MetadataPanel(QWidget):
         self.edit_id = QLineEdit()
         self.edit_id.setToolTip(tr("稳定脚本标识；修改后已有引用不会自动更新"))
         self.edit_name = QLineEdit()
+        self.edit_group = QLineEdit()
+        self.edit_group.setPlaceholderText(tr("未分组"))
+        self.edit_group.setToolTip(tr("仅用于脚本展示分组，不改变脚本性质或执行顺序"))
         self.edit_note = ExpandableText()
         self.scope_row = QWidget()
         scope_layout = QHBoxLayout(self.scope_row)
@@ -639,6 +642,7 @@ class MetadataPanel(QWidget):
         form.addRow(tr("保存位置"), self.location_row)
         form.addRow("id", self.edit_id)
         form.addRow(tr("名称"), self.edit_name)
+        form.addRow(tr("分组"), self.edit_group)
         form.addRow(tr("说明"), self.edit_note)
         form.addRow(tr("脚本性质"), self.scope_row)
         self._env_row = QHBoxLayout()
@@ -718,7 +722,7 @@ class MetadataPanel(QWidget):
         try:
             meta = parse_metadata(text)
             raw = read_front_matter(text)
-            known = {"id", "name", "note", "env", "requires", "parameters", "scope",
+            known = {"id", "name", "group", "note", "env", "requires", "parameters", "scope",
                      "hidden", "runnable", "batchable", "batch_check", "batch_unit_prepare"}
             unknown = set(raw) - known
             if unknown:
@@ -753,6 +757,7 @@ class MetadataPanel(QWidget):
         self._set_enabled(editable)
         self.edit_id.setText(str(meta.get("id") or fallback_id))
         self.edit_name.setText(str(meta.get("name") or ""))
+        self.edit_group.setText(str(meta.get("group") or ""))
         self.edit_note.setText(str(meta.get("note") or ""))
         self.scope_radios.get(meta.get("scope") or "daily", self.scope_radios["daily"]).setChecked(True)
         self._set_env(list(meta.get("env") or []))
@@ -770,7 +775,7 @@ class MetadataPanel(QWidget):
         self.btn_reload.setToolTip("")
 
     def _set_enabled(self, enabled: bool) -> None:
-        for widget in (self.location_row, self.edit_id, self.edit_name, self.edit_note,
+        for widget in (self.location_row, self.edit_id, self.edit_name, self.edit_group, self.edit_note,
                        self.scope_row,
                        *self._env_checks.values(), self.capabilities, self.check_runnable,
                        self.check_batchable, self.check_hidden, self.check_batch_unit_prepare,
@@ -791,6 +796,7 @@ class MetadataPanel(QWidget):
         meta = deepcopy(self._raw)
         self._put(meta, "id", self.edit_id.text().strip(), self._fallback_id)
         self._put(meta, "name", self.edit_name.text(), "")
+        self._put(meta, "group", self.edit_group.text().strip(), "")
         self._put(meta, "note", self.edit_note.text(), "")
         self._put(meta, "scope", "dedicated" if self.scope_radios["dedicated"].isChecked()
                   else "daily", "daily")

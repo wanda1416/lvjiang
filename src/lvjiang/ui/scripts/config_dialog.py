@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from loguru import logger
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFontMetrics
+from PyQt6.QtGui import QBrush, QFontMetrics, QPalette
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -45,9 +45,10 @@ class ScriptConfigDialog(QDialog):
     # 列索引
     COL_EXPOSE = 0
     COL_NAME = 1
-    COL_SOURCE = 2
-    COL_ID = 3
-    COL_PARAMS = 4
+    COL_GROUP = 2
+    COL_SOURCE = 3
+    COL_ID = 4
+    COL_PARAMS = 5
 
     TAB_SCOPES = ("daily", "dedicated")
     REMOTE_PREFIX = "[远程] "
@@ -78,9 +79,9 @@ class ScriptConfigDialog(QDialog):
         self._tabs = QTabWidget()
         self._tables: dict[str, QTableWidget] = {}
         for scope, label in zip(self.TAB_SCOPES, (tr("日常"), tr("专用")), strict=True):
-            table = QTableWidget(0, 5)
+            table = QTableWidget(0, 6)
             table.setHorizontalHeaderLabels(
-                [tr("暴露"), tr("显示名"), tr("来源"), "id", tr("参数数")])
+                [tr("暴露"), tr("显示名"), tr("分组"), tr("来源"), "id", tr("参数数")])
             table.verticalHeader().setVisible(False)
             table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -173,6 +174,11 @@ class ScriptConfigDialog(QDialog):
         name_item = QTableWidgetItem(script_display_name(display_cfg))
         name_item.setData(Qt.ItemDataRole.UserRole, sid)  # 行标识：脚本 id
         table.setItem(row, self.COL_NAME, name_item)
+        self._style_name(table, name_item)
+
+        group_item = QTableWidgetItem(script.get("group") or tr("未分组"))
+        group_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+        table.setItem(row, self.COL_GROUP, group_item)
 
         if script.get("wf_file"):
             prefix = "[远程] " if script.get("is_remote") else ""
@@ -205,9 +211,26 @@ class ScriptConfigDialog(QDialog):
         self._table.setCurrentCell(target, self.COL_NAME)
         self._mark_dirty()
 
-    def _mark_dirty(self, *_args) -> None:
+    def _style_name(self, table: QTableWidget, item: QTableWidgetItem) -> None:
+        sid = str(item.data(Qt.ItemDataRole.UserRole))
+        original = self._base_names.get(sid, "")
+        display = self._raw_display(item.text(), sid).strip()
+        renamed = bool(display) and display != original
+        blocked = table.blockSignals(True)
+        font = item.font()
+        font.setBold(renamed)
+        item.setFont(font)
+        item.setForeground(table.palette().brush(QPalette.ColorRole.Link) if renamed else QBrush())
+        item.setToolTip(tr("已改名；原名：{name}").format(name=original) if renamed else "")
+        table.blockSignals(blocked)
+
+    def _mark_dirty(self, *args) -> None:
         if self._loading:
             return
+        if args and isinstance(args[0], QTableWidgetItem) and args[0].column() == self.COL_NAME:
+            table = args[0].tableWidget()
+            if table is not None:
+                self._style_name(table, args[0])
         self._dirty = True
         self._refresh_buttons()
 

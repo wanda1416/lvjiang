@@ -16,6 +16,7 @@ _META_LINE = re.compile(r"^\s*#%\s?(.*)$")
 _TOP_LEVEL_FIELDS = {
     "id",
     "name",
+    "group",
     "note",
     "env",
     "parameters",
@@ -233,7 +234,7 @@ def _validate_metadata(data: Any) -> dict:
     normalized = {key: value for key, value in data.items()
                   if key in _TOP_LEVEL_FIELDS}
 
-    for field in ("name", "note"):
+    for field in ("name", "note", "group"):
         if field in normalized and not isinstance(normalized[field], str):
             raise _error(field, "必须是字符串")
     if "name" in normalized and not normalized["name"].strip():
@@ -379,6 +380,7 @@ def build_flow_config(path: str | Path) -> dict:
         "batchable": False,    # 临时项不参与批量编排
         "batch_check": "",
         "scope": meta.get("scope") or "daily",
+        "group": (meta.get("group") or "").strip(),
         "parameters": meta.get("parameters") or [],
         "env": meta.get("env") or [],
         "requires": meta.get("requires") or [],

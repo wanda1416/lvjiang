@@ -852,7 +852,7 @@ class MainWindow(
         daily_layout.addWidget(self._daily_execution_user_selector)
 
         wf_group = QGroupBox(tr("脚本"))
-        wf_layout = QHBoxLayout(wf_group)
+        wf_layout = QVBoxLayout(wf_group)
         self.workflow_combo = AutoWidthComboBox()
         self.workflow_combo.setFixedHeight(34)
         # 脚本名可以很长，下拉框随左侧分栏一起变宽
@@ -860,14 +860,26 @@ class MainWindow(
             self.workflow_combo, 10, expanding=True)
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
         wf_layout.addWidget(self.workflow_combo)
+        from ..combo_box import ComboWidthMode
+        wf_actions = QHBoxLayout()
+        self.workflow_group_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+        self.workflow_group_combo.setMinimumHeight(34)
+        self.workflow_group_combo.setToolTip(tr("展示分组，仅筛选脚本列表"))
+        self.workflow_group_combo.addItem(tr("全部分组"), None)
+        self.workflow_group_combo.currentIndexChanged.connect(self._on_workflow_group_changed)
+        wf_actions.addWidget(self.workflow_group_combo, 1)
+        self.btn_refresh_workflows = QPushButton(tr("刷新"))
+        self.btn_refresh_workflows.setMinimumHeight(34)
+        self.btn_refresh_workflows.clicked.connect(self._on_refresh_workflows)
+        wf_actions.addWidget(self.btn_refresh_workflows)
         self.btn_load_workflow = QPushButton(tr("加载"))
-        self.btn_load_workflow.setFixedSize(68, 34)
+        self.btn_load_workflow.setMinimumHeight(34)
         self.btn_load_workflow.clicked.connect(self._on_load_workflow)
         self.btn_load_workflow.setStyleSheet(
             "background-color: #607D8B; color: white; font-weight: bold; padding: 6px;"
         )
-        wf_layout.addWidget(self.btn_load_workflow)
-        wf_layout.addStretch(1)
+        wf_actions.addWidget(self.btn_load_workflow)
+        wf_layout.addLayout(wf_actions)
         daily_layout.addWidget(wf_group)
 
         self._remote_workflow_warning = QLabel(tr(

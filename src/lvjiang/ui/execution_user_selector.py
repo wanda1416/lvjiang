@@ -10,6 +10,14 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 from ..i18n import tr
 
 
+def execution_context_label(text: str) -> QLabel:
+    """执行入口共用标签列尺寸，避免独立布局的选择框起点错位。"""
+    label = QLabel(text)
+    label.setFixedWidth(max(label.fontMetrics().horizontalAdvance(tr(name))
+                            for name in ("执行用户", "当前配置")))
+    return label
+
+
 class ExecutionUserSelector(QWidget):
     """Select a fixed execution user or resolve the active user at start time.
 
@@ -26,7 +34,7 @@ class ExecutionUserSelector(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
-        layout.addWidget(QLabel(tr("执行用户：")))
+        layout.addWidget(execution_context_label(tr("执行用户")))
         self.combo = AutoWidthComboBox()
         self.combo.setObjectName("execution_user_combo")
         self.combo.setMinimumHeight(32)

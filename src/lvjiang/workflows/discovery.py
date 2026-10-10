@@ -151,6 +151,7 @@ def _discover_wf_scripts(
         _merge_candidate(result, {
             "id": script_id,
             "name": meta.get("name") or Policy.default_id_for(rel),
+            "group": (meta.get("group") or "").strip(),
             "note": warning or meta.get("note") or "",
             "wf_file": rel,
             "class": "",
@@ -179,6 +180,7 @@ def _discover_class_scripts() -> dict[str, dict]:
         result[name] = {
             "id": name,
             "name": getattr(cls, "DISPLAY_NAME", None) or name,
+            "group": str(getattr(cls, "GROUP", "") or "").strip(),
             "note": getattr(cls, "NOTE", None) or "",
             "wf_file": "",
             "class": name,

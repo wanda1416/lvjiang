@@ -285,7 +285,7 @@ class MenuOpsMixin:
             "script_editor",
             lambda: ScriptEditorDialog(self),
             lambda dialog: (
-                self._load_workflow_configs() if dialog.changed else None
+                self._on_refresh_workflows() if dialog.changed else None
             ),
         )
 

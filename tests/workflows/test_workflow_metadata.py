@@ -63,6 +63,15 @@ def test_parse_options_value_label_pairs():
     assert m["parameters"][1]["options"] == ["1", "2", "3"]
 
 
+def test_group_is_optional_string_and_external_load_preserves_it(tmp_path):
+    assert "group" not in parse_metadata("#% name: 示例\n")
+    with pytest.raises(WorkflowMetadataError, match="group"):
+        parse_metadata("#% group: [周常]\n")
+    wf = tmp_path / "grouped.wf"
+    wf.write_text('#% group: " 周常 "\nlog "运行"\n', encoding="utf-8")
+    assert build_flow_config(wf)["group"] == "周常"
+
+
 def test_parameter_env_is_validated_and_filters_only_declared_parameters():
     text = """\
 #% parameters:

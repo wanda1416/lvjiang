@@ -15,6 +15,8 @@ def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp):
             start="F9", stop="F10", pause="F11")),
         _current_run_context=None, _run_state="idle", _running=False,
         btn_run_workflow=QPushButton(), btn_pause_resume=QPushButton(),
+        workflow_group_combo=QPushButton(), btn_refresh_workflows=QPushButton(),
+        btn_load_workflow=QPushButton(),
         _hotkey_label=hotkey_label, _backend_ready=lambda: True,
         _plan_allows_backend=lambda: True, start_denied_label=lambda: "",
         automation_state_changed=SimpleNamespace(emit=lambda state: None),
@@ -45,6 +47,8 @@ def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp):
         host._running = bool(scope)
         host._run_state = state
         RunControlMixin._refresh_run_button(host)
+        for control in (host.workflow_group_combo, host.btn_refresh_workflows, host.btn_load_workflow):
+            assert control.isEnabled() == (not bool(scope))
         BatchTab._refresh_run_button(batch, state)
         TuningTab._on_automation_state(tuning, state)
         for index, (start, pause) in enumerate(buttons):

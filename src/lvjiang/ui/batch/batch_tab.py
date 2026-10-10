@@ -252,7 +252,8 @@ class BatchTab(QWidget):
         config_row = QHBoxLayout()
         config_row.setContentsMargins(0, 0, 0, 0)
         config_row.setSpacing(8)
-        config_row.addWidget(QLabel(tr("当前配置：")))
+        from ..execution_user_selector import execution_context_label
+        config_row.addWidget(execution_context_label(tr("当前配置")))
         self._config_combo = AutoWidthComboBox()
         self._config_combo.setMinimumWidth(150)
         self._config_combo.setMinimumHeight(32)

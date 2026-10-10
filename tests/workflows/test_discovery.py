@@ -80,11 +80,12 @@ class TestDiscoverWfScripts:
 
     def test_batchable_implies_runnable(self, tmp_path, monkeypatch):
         """只写 batchable 也算有入口"""
-        wf = _write(tmp_path, "a.wf", "#% batchable: true\n")
+        wf = _write(tmp_path, "a.wf", '#% batchable: true\n#% group: " 周常 "\n')
         _patch_resolver(monkeypatch, {"a.wf": wf})
         result = _discover_wf_scripts()
         assert result["a"]["runnable"] is True
         assert result["a"]["batchable"] is True
+        assert result["a"]["group"] == "周常"
 
 
     def test_recursive_scan_any_depth(self, tmp_path, monkeypatch):

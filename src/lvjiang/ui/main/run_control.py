@@ -590,7 +590,6 @@ class RunControlMixin:
         from ...workflows.discovery import (
             last_discovery_problems,
             list_exposed_scripts,
-            script_display_name,
         )
 
         # 环境切换只会改变“不支持”提示，不应把用户选中的日常任务重置
@@ -598,14 +597,15 @@ class RunControlMixin:
         selected_workflow_id = self.workflow_combo.currentData()
         if selected_workflow_id is None:
             selected_workflow_id = getattr(self, "_displayed_script_id", None)
-        self._workflow_configs: list[dict] = []
-        self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
+        self._workflow_configs: list[dict] = getattr(self, "_workflow_configs", [])
+        temporary = next((cfg for cfg in self._workflow_configs
+                          if cfg["id"].startswith("__loaded__:")), None)
 
         current_env = self._selected_run_env()
         try:
             # env 是脚本级启动契约：不匹配的脚本不是“可选但
             # 不能跑”，而是根本不进入当前环境的候选集。
-            self._workflow_configs = list_exposed_scripts(current_env)
+            configs = list_exposed_scripts(current_env)
         except Exception as e:
             logger.error(f"发现脚本失败: {e}")
             # 发现结果已经不可用，上一次成功刷新留下的告警同样不能继续
@@ -613,11 +613,41 @@ class RunControlMixin:
             self._show_ignored_scripts([])
             return
         self._show_ignored_scripts(last_discovery_problems())
+        if temporary is not None:
+            configs.append(temporary)
+        self._workflow_configs = configs
+        self._refresh_workflow_groups()
+        self._fill_workflow_combo(selected_workflow_id)
+
+        # 批量刷新沿用本次顺序和勾选；不会重新加载配置组。
+        if self._batch_tab is not None:
+            self._batch_tab.refresh_scripts()
+        logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
+
+    def _refresh_workflow_groups(self):
+        combo = self.workflow_group_combo
+        selected = combo.currentData()
+        groups = sorted({cfg.get("group", "") for cfg in self._workflow_configs})
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem(tr("全部分组"), None)
+        for group in groups:
+            combo.addItem(group or tr("未分组"), group)
+        index = combo.findData(selected)
+        combo.setCurrentIndex(max(0, index))
+        combo.blockSignals(False)
+
+    def _fill_workflow_combo(self, selected_workflow_id=None):
+        """只更新展示；筛选导致的默认项变化不能写回持久化选择。"""
+        from ...workflows.discovery import script_display_name
 
         # 填充下拉列表（block 信号，避免 addItem 逐条触发 _on_workflow_combo_changed）
         self.workflow_combo.blockSignals(True)
         self.workflow_combo.clear()
+        group = self.workflow_group_combo.currentData()
         for cfg in self._workflow_configs:
+            if group is not None and cfg.get("group", "") != group:
+                continue
             full_display_name = script_display_name(cfg)
             # 放完整名字：窄的时候 Qt 自己按可用宽度省略（CE_ComboBoxLabel
             # 会 elide），分栏拉宽后就能完整显示。预先截断成定长会让「拉宽」
@@ -638,12 +668,16 @@ class RunControlMixin:
         current_cfg = self._get_selected_flow_config()
         self._displayed_script_id = current_cfg["id"] if current_cfg else None
 
-        # 批量页的脚本候选同源于 list_exposed_scripts()，必须一起刷新，
-        # 否则它会一直停留在启动时的快照（见 BatchTab.refresh_scripts）。
-        if self._batch_tab is not None:
-            self._batch_tab.refresh_scripts()
+    def _on_workflow_group_changed(self, _index: int):
+        selected = self.workflow_combo.currentData()
+        self._save_displayed_params()
+        self._fill_workflow_combo(selected)
+        self._rebuild_param_panel()
 
-        logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
+    def _on_refresh_workflows(self):
+        self._save_displayed_params()
+        self._load_workflow_configs()
+        self._rebuild_param_panel()
 
     def _show_ignored_scripts(self, problems) -> None:
         """把发现层忽略的 .wf 及原因显示在脚本下拉框下方。"""
@@ -678,33 +712,23 @@ class RunControlMixin:
             return
         p = Path(path)
         cfg = build_flow_config(p)
-        # 覆盖上一次加载的临时项，否则追加
-        if self._loaded_flow_index is not None and self._loaded_flow_index < len(self._workflow_configs):
-            idx = self._loaded_flow_index
-            self._workflow_configs[idx] = cfg
-            self.workflow_combo.setItemText(idx, cfg["name"])
-            self.workflow_combo.setItemData(idx, cfg["id"])
-            self.workflow_combo.setItemData(
-                idx, cfg["name"], Qt.ItemDataRole.ToolTipRole)
-        else:
-            self._workflow_configs.append(cfg)
-            self.workflow_combo.addItem(
-                cfg["name"], cfg["id"])
-            self._loaded_flow_index = len(self._workflow_configs) - 1
-            self.workflow_combo.setItemData(
-                self._loaded_flow_index,
-                cfg["name"],
-                Qt.ItemDataRole.ToolTipRole,
-            )
-        self.workflow_combo.setCurrentIndex(self._loaded_flow_index)
+        self._save_displayed_params()
+        self._workflow_configs = [item for item in self._workflow_configs
+                                  if not item["id"].startswith("__loaded__:")]
+        self._workflow_configs.append(cfg)
+        self._refresh_workflow_groups()
+        self.workflow_group_combo.blockSignals(True)
+        self.workflow_group_combo.setCurrentIndex(0)
+        self.workflow_group_combo.blockSignals(False)
+        self._fill_workflow_combo(cfg["id"])
+        self._rebuild_param_panel()
+        self._save_daily_config()
         self.log_text.append(f"[加载] 已加载工作流: {cfg['name']}")
 
     def _get_selected_flow_config(self) -> dict | None:
         """获取当前选中的工作流配置"""
-        idx = self.workflow_combo.currentIndex()
-        if idx < 0 or idx >= len(self._workflow_configs):
-            return None
-        return self._workflow_configs[idx]
+        selected_id = self.workflow_combo.currentData()
+        return next((cfg for cfg in self._workflow_configs if cfg["id"] == selected_id), None)
 
     def _collect_flow_params(self) -> dict:
         """从参数面板收集当前工作流的参数值"""
@@ -2209,9 +2233,11 @@ class RunControlMixin:
             setter = getattr(combo, "set_locked", None)
             if setter is not None:
                 setter(LOCK_REASON_RUNNING, self._running)
-        workflow_combo = getattr(self, "workflow_combo", None)
-        if workflow_combo is not None:
-            workflow_combo.setEnabled(not self._running)
+        for control_name in ("workflow_combo", "workflow_group_combo",
+                             "btn_refresh_workflows", "btn_load_workflow"):
+            control = getattr(self, control_name, None)
+            if control is not None:
+                control.setEnabled(not self._running)
         param_panel = getattr(self, "_param_panel", None)
         if param_panel is not None:
             param_panel.setEnabled(not self._running)

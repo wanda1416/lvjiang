@@ -11,7 +11,7 @@ from lvjiang.ui.scripts.config_dialog import ScriptConfigDialog
 @pytest.fixture
 def panel(qtbot, monkeypatch):
     scripts = [
-        {"id": sid, "name": name, "scope": scope, "class": "TestWorkflow"}
+        {"id": sid, "name": name, "scope": scope, "group": "周常", "class": "TestWorkflow"}
         for sid, name, scope in (
             ("a", "甲", "daily"), ("b", "乙", "dedicated"), ("c", "丙", "daily"),
         )
@@ -84,3 +84,27 @@ def test_save_merges_both_tabs_and_preserves_cross_scope_order(panel):
     assert _ids(dialog, "dedicated") == ["b"]
     assert dialog._tables["daily"].item(1, dialog.COL_NAME).text() == "改名"
     assert dialog._tables["dedicated"].item(0, dialog.COL_EXPOSE).checkState() == Qt.CheckState.Checked
+
+
+def test_group_is_readonly_and_rename_marker_follows_override_not_dirty_state(panel):
+    dialog, daily = panel
+    group = dialog._table.item(0, dialog.COL_GROUP)
+    assert group.text() == "周常"
+    assert not group.flags() & Qt.ItemFlag.ItemIsEditable
+    name = dialog._table.item(0, dialog.COL_NAME)
+    name.setText("另一个名称")
+    assert name.font().bold()
+    assert "甲" in name.toolTip()
+    dialog._table.setCurrentCell(0, dialog.COL_NAME)
+    dialog._move_row(1)
+    dialog._on_save()
+    dialog._load()
+    assert not dialog.dirty
+    name = dialog._table.item(1, dialog.COL_NAME)
+    assert name.font().bold()
+    assert "group" not in daily["scripts"]
+    name.setText("甲")
+    assert not name.font().bold()
+    assert not name.toolTip()
+    dialog._on_undo()
+    assert dialog._table.item(1, dialog.COL_NAME).font().bold()

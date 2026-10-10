@@ -874,7 +874,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     def _preferences_saved(self) -> None:
         self._changed_any = True
         if self._main is not None:
-            reload_configs = getattr(self._main, "_load_workflow_configs", None)
+            reload_configs = getattr(self._main, "_on_refresh_workflows", None)
             if callable(reload_configs):
                 reload_configs()
 

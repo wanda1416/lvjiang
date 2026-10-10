@@ -14,7 +14,7 @@ from typing import Any
 from packaging.version import Version
 
 from ..fs_util import atomic_write_bytes
-from .content_service import ServiceError, request_json, service_url
+from .content_service import CONTENT_SERVICE_URL, ServiceError, request_json
 from .protected_bundle import (
     MAX_BUNDLE_BYTES,
     decrypt,
@@ -46,22 +46,15 @@ class ProtectedAccess:
 
 def snapshot() -> ProtectedAccess | None:
     from ..license import current_serial, evaluate, load_code
-    from .resolver import LOCAL_CONFIG_DIR
     code = load_code()
     if not code:
         return None
     entitlement = evaluate(code, current_serial())
     if not eligible(entitlement):
         return None
-    settings = LOCAL_CONFIG_DIR / "remote_service.json"
-    if not settings.is_file():
-        return None
-    config = json.loads(settings.read_text(encoding="utf-8"))
-    if not isinstance(config, dict) or not isinstance(config.get("service_url"), str):
-        raise ValueError("remote_service.json 缺少 service_url")
-    url = service_url(config["service_url"])
     issued = entitlement.license
-    return ProtectedAccess(url, code, issued.expires.isoformat() if issued and issued.expires else None)
+    return ProtectedAccess(CONTENT_SERVICE_URL, code,
+                           issued.expires.isoformat() if issued and issued.expires else None)
 
 
 def eligible(entitlement) -> bool:
@@ -69,6 +62,56 @@ def eligible(entitlement) -> bool:
     return bool(issued and not issued.expired() and any(
         re.fullmatch(r"lv[1-9]\d*", feature)
         for feature in entitlement.features))
+
+
+def parse_manifest(manifest: Any) -> dict[str, Any]:
+    """校验保护包清单；保留顺序，包版本独立于整份清单修订号。"""
+    if not isinstance(manifest, dict):
+        raise ValueError("加密清单必须是对象")
+    version = manifest.get("config_version")
+    packages = manifest.get("packages")
+    if manifest.get("schema_version") != 1 or type(version) is not int or version < 1 \
+            or not isinstance(packages, list):
+        raise ValueError("加密清单协议无效")
+    normalized = []
+    ids = set()
+    for package in packages:
+        if not isinstance(package, dict):
+            raise ValueError("加密清单包定义无效")
+        key_id = package.get("key_id", "")
+        if not valid_key_id(key_id) or key_id in ids:
+            raise ValueError("加密清单 key_id 无效或重复")
+        ids.add(key_id)
+        expected_url = manifest_url().rsplit("/", 1)[0] + f"/packages/{key_id}.bin"
+        if package.get("url") != expected_url:
+            raise ValueError("加密包地址无效")
+        if not isinstance(package.get("sha256"), str) or not re.fullmatch(r"[a-f0-9]{64}", package["sha256"]):
+            raise ValueError("加密包摘要无效")
+        minimum = package.get("min_app_version", "0.0.0")
+        maximum = package.get("max_app_version_exclusive", "")
+        if not isinstance(minimum, str) or not isinstance(maximum, str):
+            raise ValueError("加密包客户端版本范围无效")
+        if maximum and Version(minimum) >= Version(maximum):
+            raise ValueError("加密包客户端版本范围为空")
+        Version(minimum)
+        package_version = package.get("config_version", version)
+        if type(package_version) is not int or not 1 <= package_version <= version:
+            raise ValueError("加密包修订号无效")
+        normalized.append({**package, "min_app_version": minimum,
+                           "max_app_version_exclusive": maximum, "config_version": package_version})
+    return {**manifest, "packages": normalized}
+
+
+def select_package(manifest: dict[str, Any], app_version: str) -> dict[str, Any] | None:
+    """从已校验清单中取第一个匹配当前客户端版本的包。"""
+    current = Version(app_version)
+    for package in manifest["packages"]:
+        if current < Version(package["min_app_version"]):
+            continue
+        maximum = package["max_app_version_exclusive"]
+        if not maximum or current < Version(maximum):
+            return package
+    return None
 
 
 def state(root: Path) -> dict[str, Any]:
@@ -141,38 +184,26 @@ def sync(access: ProtectedAccess | None, root: Path, app_version: str,
         remove_owned(root)
         previous = {}
     raw, _, _ = _fetch_bytes(manifest_url(), max_bytes=MAX_MANIFEST_BYTES, timeout=timeout)
-    manifest = json.loads(raw.decode("utf-8"))
-    if not isinstance(manifest, dict):
-        raise ValueError("加密清单必须是对象")
-    version = manifest.get("config_version")
-    packages = manifest.get("packages")
-    if manifest.get("schema_version") != 1 or type(version) is not int or version < 1 \
-            or not isinstance(packages, list) or len(packages) > 1:
-        raise ValueError("加密清单协议无效")
+    manifest = parse_manifest(json.loads(raw.decode("utf-8")))
+    version = manifest["config_version"]
     if version < previous.get("config_version", 0):
         raise ValueError("加密清单版本回退")
-    if not packages:
+    package = select_package(manifest, app_version)
+    if package is None:
         withdrawn = remove_owned(root)
         empty = {"config_version": version, "files": {}, "code_hash": access.code_hash,
                  "expires": access.expires}
         atomic_write_bytes(root / STATE_FILE, json.dumps(empty).encode("utf-8"), prefix=".protected-")
         return (), withdrawn
-    package = packages[0]
-    if not isinstance(package, dict):
-        raise ValueError("加密清单包定义无效")
-    key_id = package.get("key_id", "")
-    if not valid_key_id(key_id):
-        raise ValueError("加密清单 key_id 无效")
-    expected_url = manifest_url().rsplit("/", 1)[0] + f"/packages/{key_id}.bin"
-    if package.get("url") != expected_url:
-        raise ValueError("加密包地址无效")
+    key_id = package["key_id"]
+    expected_url = package["url"]
     try:
         grant = request_json(access.service, "/v1/key", {"code": access.code, "key_id": key_id}, timeout=timeout)
     except ServiceError as error:
         if error.status == 403 and error.code == "forbidden":
             return (), remove_owned(root)
         raise
-    if type(grant.get("config_version")) is not int or grant["config_version"] != version:
+    if type(grant.get("config_version")) is not int or grant["config_version"] != package["config_version"]:
         raise ValueError("加密清单与云端包版本不一致")
     if not isinstance(grant.get("min_app_version"), str) or not isinstance(grant.get("key"), str) \
             or not isinstance(grant.get("sha256"), str) or not re.fullmatch(r"[a-f0-9]{64}", grant["sha256"]):
@@ -202,7 +233,8 @@ def sync(access: ProtectedAccess | None, root: Path, app_version: str,
         files = decrypt(encrypted, base64.b64decode(grant["key"], validate=True))
     # 所有文件完成验证后才修改暂存层。启动前提升目录，运行中不热切换。
     removed = sorted(owned(root) - files.keys())
-    metadata = {"config_version": version, "code_hash": access.code_hash,
+    metadata = {"config_version": version, "package_version": package["config_version"],
+                "key_id": key_id, "code_hash": access.code_hash,
                 "expires": expires, "sha256": sha,
                 "files": {name: digest(data) for name, data in files.items()}}
     if unchanged:

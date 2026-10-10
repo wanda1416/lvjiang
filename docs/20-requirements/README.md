@@ -63,7 +63,7 @@
 | [08-android-task-settings.md](50-platform/08-android-task-settings.md) | 手机按用户编辑任务参数与自动调律设置 | 已实现 |
 | [10-ai-connection.md](50-platform/10-ai-connection.md) | AI 连接配置、系统凭据存储与后台连接测试 | 已实现（桌面端） |
 | [09-android-preset.md](50-platform/09-android-preset.md) | 官方预置、手机用户管理与同步参数保留 | 已实现 |
-| [11-protected-config.md](50-platform/11-protected-config.md) | Lv1 加密配置下发、云端授权与双来源 remote 同步 | 部分实现（真实云端链路已验证，正式内容待发布） |
+| [11-protected-config.md](50-platform/11-protected-config.md) | Lv1 加密配置下发、云端授权与双来源 remote 同步 | 桌面同步已实现（自动请求修正待安装包交付） |
 | [12-agent-mcp.md](50-platform/12-agent-mcp.md) | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 | 部分实现 |
 | [13-agent-docs-access.md](50-platform/13-agent-docs-access.md) | Agent 文档逐篇收录、目录拆分与配置文件访问清单 | 部分实现 |
 

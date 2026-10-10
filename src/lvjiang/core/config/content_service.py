@@ -8,6 +8,8 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 MAX_RESPONSE = 256 * 1024
+# 客户端的官方授权服务，由发布方随程序交付，不要求用户配置地址。
+CONTENT_SERVICE_URL = "https://lvjiang-content.wyxj.net"
 
 
 class ServiceError(RuntimeError):

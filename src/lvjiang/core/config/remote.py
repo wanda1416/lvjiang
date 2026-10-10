@@ -591,7 +591,7 @@ def build_sync_job() -> SyncJob:
     try:
         access = snapshot()
     except (ValueError, OSError) as error:
-        logger.warning(f"[在线配置] 加密服务配置无效: {error}")
+        logger.warning(f"[在线配置] 读取加密内容授权失败: {error}")
         access = None
     return SyncJob(protected=access, etag=get_cached_etag(), app_version=get_version(),
                    enabled=True, config_version=get_config_version())

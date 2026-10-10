@@ -12,7 +12,7 @@ import pytest
 
 from lvjiang.core.config import protected_remote as protected
 from lvjiang.core.config import remote
-from lvjiang.core.config.content_service import ServiceError
+from lvjiang.core.config.content_service import CONTENT_SERVICE_URL, ServiceError
 from lvjiang.core.config.protected_bundle import digest, encrypt, unpack
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.license.code import Entitlement, License
@@ -91,6 +91,72 @@ def test_no_authorization_makes_no_protected_requests(feed, monkeypatch):
     root, _, _, _, _, calls = feed
     monkeypatch.setattr(remote, "fetch_manifest", lambda **kwargs: (None, "public-etag"))
     remote.run_sync(remote.SyncJob(app_version="1.0.0"), remote_dir=root)
+    assert calls == []
+
+
+@pytest.fixture
+def license_snapshot(monkeypatch):
+    from lvjiang.core import license as licensing
+
+    def setup(features, expires=None, code="test-only-code"):
+        issued = License(1, "test", "none", None, features, expires)
+        monkeypatch.setattr(licensing, "load_code", lambda: code)
+        monkeypatch.setattr(licensing, "current_serial", lambda: None)
+        monkeypatch.setattr(licensing, "evaluate", lambda *_: Entitlement(
+            issued, features=frozenset(features)))
+
+    return setup
+
+
+def test_lv1_automatically_fetches_package_without_service_configuration(
+    feed, monkeypatch, license_snapshot,
+):
+    from lvjiang.core.config import resolver as config_resolver
+
+    root, _, _, _, grant, calls = feed
+    local = root.parent / "local"
+    monkeypatch.setattr(config_resolver, "LOCAL_CONFIG_DIR", local)
+    assert not local.exists()
+    license_snapshot(("lv1",))
+    access = protected.snapshot()
+    assert access is not None
+    assert access.service == CONTENT_SERVICE_URL
+    assert access.code == "test-only-code"
+    key_calls = []
+
+    def request(base, route, data, **kwargs):
+        key_calls.append((base, route))
+        return grant
+
+    monkeypatch.setattr(protected, "request_json", request)
+    monkeypatch.setattr(remote, "fetch_manifest", lambda **kwargs: (None, "public-etag"))
+    result = remote.run_sync(remote.SyncJob(app_version="1.0.0", protected=access), remote_dir=root)
+    assert result.updated == ("workflows/weekly_test.wf",)
+    assert protected.manifest_url() in calls
+    assert key_calls == [(CONTENT_SERVICE_URL, "/v1/key")]
+    assert (root / "workflows/weekly_test.wf").read_bytes() == b'log "first"\n'
+
+
+@pytest.mark.parametrize("features, expired, code", [
+    ((), False, "test-only-code"),
+    (("lv1",), True, "test-only-code"),
+    (("lv1",), False, None),
+])
+def test_ineligible_license_never_requests_protected_service(
+    feed, monkeypatch, license_snapshot, features, expired, code,
+):
+    root, _, _, _, _, calls = feed
+    expires = date.today() - timedelta(days=1) if expired else None
+    license_snapshot(features, expires, code)
+    access = protected.snapshot()
+    assert access is None
+    monkeypatch.setattr(remote, "fetch_manifest", lambda **kwargs: (None, "public-etag"))
+
+    def unexpected_request(*args, **kwargs):
+        pytest.fail("无有效 Lv1 授权时不应申请包密钥")
+
+    monkeypatch.setattr(protected, "request_json", unexpected_request)
+    remote.run_sync(remote.SyncJob(app_version="1.0.0", protected=access), remote_dir=root)
     assert calls == []
 
 
@@ -202,3 +268,55 @@ def test_edge_403_does_not_withdraw_valid_downloaded_content(feed, monkeypatch):
     result = remote.run_sync(remote.SyncJob(app_version="1.0.0", protected=access), remote_dir=root)
     assert not result.removed
     assert (root / "workflows/weekly_test.wf").is_file()
+
+
+@pytest.mark.parametrize("app_version, selected", [
+    ("1.0.9", "test-package"), ("1.1.0", "new-package"), ("0.9.0", None),
+])
+def test_version_ranges_select_first_match_and_preserve_old_package_revision(
+    feed, monkeypatch, app_version, selected,
+):
+    root, access, key, urls, grant, calls = feed
+    protected.sync(access, root, "1.0.0", 1)
+    old = json.loads(urls[protected.manifest_url()])["packages"][0]
+    old.update(min_app_version="1.0.0", max_app_version_exclusive="1.1.0", config_version=1)
+    blob = encrypt({"workflows/weekly_test.wf": b'log "new version"\n'}, key, os.urandom(12))
+    new = {"key_id": "new-package", "min_app_version": "1.1.0", "config_version": 3,
+           "url": protected.manifest_url().rsplit("/", 1)[0] + "/packages/new-package.bin",
+           "sha256": digest(blob)}
+    overlapping = {**old, "key_id": "other-package", "max_app_version_exclusive": "",
+                   "url": protected.manifest_url().rsplit("/", 1)[0] + "/packages/other-package.bin"}
+    urls[new["url"]] = blob
+    urls[protected.manifest_url()] = json.dumps({
+        "schema_version": 1, "config_version": 3,
+        "packages": [new, old, overlapping],
+    }).encode("utf-8")
+    requests = []
+
+    def request(base, route, data, **kwargs):
+        requests.append(data["key_id"])
+        assert data["key_id"] == selected
+        package = new if selected == "new-package" else old
+        return {**grant, "config_version": package["config_version"],
+                "min_app_version": package["min_app_version"], "sha256": package["sha256"]}
+
+    monkeypatch.setattr(protected, "request_json", request)
+    calls.clear()
+    updated, removed = protected.sync(access, root, app_version, 1)
+    assert requests == ([] if selected is None else [selected])
+    if selected is None:
+        assert calls == [protected.manifest_url()]
+        assert removed == ("workflows/weekly_test.wf",)
+    else:
+        metadata = protected.state(root)
+        assert metadata["config_version"] == 3
+        assert metadata["package_version"] == (3 if selected == "new-package" else 1)
+        assert metadata["key_id"] == selected
+        assert not removed
+        if selected == "test-package":
+            assert not updated
+            assert calls == [protected.manifest_url()]
+            assert (root / "workflows/weekly_test.wf").read_bytes() == b'log "first"\n'
+        else:
+            assert updated == ("workflows/weekly_test.wf",)
+            assert (root / "workflows/weekly_test.wf").read_bytes() == b'log "new version"\n'

@@ -155,14 +155,13 @@ class BatchConfigItem:
 
     @staticmethod
     def from_dict(name: str, data: object) -> "BatchConfigItem":
-        """读取一个配置组。
-
-        同时吃下 v1 的字段名：`selected_*` 当作默认勾选读进来（它在旧版本里
-        既是上次运行的勾选、又是下次打开的初始值，拆层后只保留后一半语义），
-        `rounds` / `unattended` 属于运行草稿，不再进定义层。写出去只有新格式，
-        所以这是一次性的单向读取，不是常驻兼容层。
-        """
+        """只读当前字段；旧 selected_* 由文档 v1 转换路径处理。"""
         source = data if isinstance(data, dict) else {}
+        obsolete = {"selected_task_ids", "selected_usernames", "selected_units"} & source.keys()
+        if obsolete:
+            logger.warning(
+                f"批量配置组 {name} 的旧字段 {', '.join(sorted(obsolete))} 不再读取；"
+                "v2 请使用 default_task_ids/default_usernames/default_units")
         raw_workflows = source.get("workflows")
         workflow_source = (
             raw_workflows if isinstance(raw_workflows, dict) else {}
@@ -172,14 +171,8 @@ class BatchConfigItem:
             if isinstance(source.get("workflow_params"), dict) else {}
         )
         default_tasks = source.get("default_task_ids")
-        if default_tasks is None:
-            default_tasks = source.get("selected_task_ids")
         default_users = source.get("default_usernames")
-        if default_users is None:
-            default_users = source.get("selected_usernames")
         default_units = source.get("default_units")
-        if default_units is None:
-            default_units = source.get("selected_units")
         item = BatchConfigItem(
             id=str(source.get("id") or "") or uuid4().hex,
             name=name,
@@ -289,6 +282,16 @@ class BatchConfig:
                     continue
                 # v1 的 key 是组名；v2 的 key 是稳定 ID，名称在组内部。
                 name = str(raw.get("name") or "") if version != 1 else key
+                if version == 1:
+                    raw = dict(raw)
+                    for old, current in (
+                        ("selected_task_ids", "default_task_ids"),
+                        ("selected_usernames", "default_usernames"),
+                        ("selected_units", "default_units"),
+                    ):
+                        if raw.get(current) is None:
+                            raw[current] = raw.get(old)
+                        raw.pop(old, None)
                 item = BatchConfigItem.from_dict(name or key, raw)
                 configs[item.id] = item
         return BatchConfig(configs=configs)

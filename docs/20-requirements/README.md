@@ -78,6 +78,7 @@
 | [05-runtime-find-area.md](60-editor/05-runtime-find-area.md) | 动态矩形识别区域、命中坐标与相邻文字读取 | 已实现 |
 | [06-runtime-drag-hold.md](60-editor/06-runtime-drag-hold.md) | 拖拽保持时长变量、区间与 timeline 校验 | 已实现 |
 | [07-dsl-parser-performance.md](60-editor/07-dsl-parser-performance.md) | DSL 解析性能与 AST、错误定位一致性 | 已实现 |
+| [08-config-schema-boundaries.md](60-editor/08-config-schema-boundaries.md) | 配置旧入口清理、当前增量与必要迁移边界 | 已实现 |
 
 待办事项与平台推进计划已移至 [00-meta](../00-meta/README.md)：
 [02-backlog.md](../00-meta/02-backlog.md)、

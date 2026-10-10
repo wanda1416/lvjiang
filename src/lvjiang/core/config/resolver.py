@@ -117,7 +117,7 @@ _REGISTRY_KEYS = (ADDED_KEY, REMOVED_KEY, ORDER_KEY)
 REGISTRY_LIST_PATHS: dict[str, tuple[str, ...]] = {
     # v1 路径保留给通用 resolver 的存量兼容；v2 的专用跨 schema 合并见
     # core.scene_config（必须先分别转换 system/local，不能直接混合结构）。
-    "scenes.yaml": ("layout_scenes.*", "scenes.*.items", "scenes.*.disabled"),
+    "scenes.yaml": ("scenes.*.items", "scenes.*.disabled"),
 }
 
 

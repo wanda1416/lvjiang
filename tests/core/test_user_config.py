@@ -161,7 +161,9 @@ class TestLoadUserConfig:
         assert config.delay_params["my_wait"].label == "自定义等待"
         assert config.delay_params["my_wait"].range == (1.5, 2.5)
 
-    def test_app_yaml_android_apps(self, session_env, monkeypatch):
+    def test_old_app_yaml_key_is_diagnosed_not_loaded(self, session_env, monkeypatch):
+        messages = []
+        monkeypatch.setattr("lvjiang.core.config.logger.warning", messages.append)
         monkeypatch.setattr(
             "lvjiang.core.config.load_app_config", lambda: {
                 "android_apps": {
@@ -175,9 +177,8 @@ class TestLoadUserConfig:
 
         config = load_user_config()
 
-        assert config.android_apps["game"].package == "com.example.game"
-        assert config.android_apps["game"].activity == ".MainActivity"
-        assert config.android_apps["game"].orientation == "landscape"
+        assert "game" not in config.android_apps
+        assert any("顶层 android_apps" in message for message in messages)
 
     def test_app_registry_supports_android_and_windows_bindings(
             self, session_env, monkeypatch):

@@ -590,3 +590,24 @@ class TestSaveLayoutScope:
         assert self._saved_scene_files(env) == {"scene_a.json"}
         data = json.loads((scene_dir / "scene_a.json").read_text(encoding="utf-8"))
         assert data["content_version"] == 2
+def test_old_central_disabled_section_is_rejected():
+    with pytest.raises(ValueError, match="旧集中 disabled 段不再兼容"):
+        Layout.from_dict("test", {"scenes": {"main": {"disabled": {"point": ["close"]}}}})
+
+
+def test_disk_layout_skips_old_scene_without_modifying_it(env, monkeypatch):
+    messages = []
+    monkeypatch.setattr(layout_manager.logger, "error", messages.append)
+    layout = _make_layout()
+    assert LayoutConfigManager().save_layout(layout)
+    path = env / "system/layouts/test_layout/scene_a.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["disabled"] = {"region": ["btn"]}
+    path.write_text(json.dumps(data), encoding="utf-8")
+    before = path.read_bytes()
+    loaded = load_layout_by_key("test_layout")
+    assert loaded is not None
+    assert not loaded.regions.get("scene_a")
+    assert loaded.panels["scene_b"]
+    assert path.read_bytes() == before
+    assert any("旧集中 disabled 段不再兼容" in message for message in messages)

@@ -917,7 +917,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
 
     承载 quality_thresholds + switches。历史上的 ``base_rules`` /
     ``tuning_rules`` 声明已迁到各规则文件的 ``order`` / ``disabled``，
-    这里遇到只忽略，由管理器负责一次性迁移。
+    这里不再解释旧声明；规则管理器给出手工调整诊断，不改写用户文件。
     """
     if not isinstance(data, dict):
         raise RuleValidationError(tr("tune_config 顶层必须是 dict"))

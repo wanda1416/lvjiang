@@ -69,40 +69,16 @@ def test_legacy_panel_calibration_fields_are_ignored_and_removed_on_save(tmp_pat
     assert saved["panels"] == [{"key": "grid", "name": "Renamed"}]
 
 
-def test_missing_version_is_v1_and_normalizes_to_v2():
-    old = {
-        "layout_scenes": {"general": ["main", "legacy"]},
-        "group_names": {"general": "通用"},
-    }
-    assert normalize_scene_doc(old) == {
-        "schema_version": 2,
-        "scenes": {
-            "general": {"name": "通用", "items": ["main", "legacy"]},
-        },
-    }
+def test_legacy_scene_structure_is_rejected():
+    with pytest.raises(ValueError, match="旧 v1 结构不再兼容"):
+        normalize_scene_doc({"layout_scenes": {"general": ["main"]}})
+    with pytest.raises(ValueError, match="旧 v1 结构不再兼容"):
+        normalize_scene_doc({"schema_version": 1})
 
 
-def test_explicit_v1_local_registry_delta_is_migrated():
-    old = {
-        "schema_version": 1,
-        "layout_scenes": {
-            "general": {
-                "__added__": ["mine"],
-                "__removed__": ["old"],
-                "__order__": ["main", "mine"],
-            },
-        },
-        "group_names": {"general": "我的通用"},
-    }
-    assert normalize_scene_doc(old) == {
-        "schema_version": 2,
-        "scenes": {
-            "general": {
-                "name": "我的通用",
-                "items": old["layout_scenes"]["general"],
-            },
-        },
-    }
+def test_current_scene_overrides_may_omit_version():
+    for doc in ({}, {"content_version": 3}, {"scenes": {"general": {"items": ["main"]}}}):
+        assert normalize_scene_doc(doc) == doc
 
 
 def test_v2_disabled_scene_is_hidden_but_kept_in_order(tmp_path):
@@ -160,7 +136,7 @@ def test_v2_disabled_must_reference_registered_item():
         parse_scene_manifest(load)
 
 
-def test_v2_system_merges_old_v1_user_overlay(tmp_path):
+def test_v2_system_merges_unversioned_current_user_overlay(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     _write(system / "scenes.yaml", {
@@ -173,14 +149,11 @@ def test_v2_system_merges_old_v1_user_overlay(tmp_path):
         },
     })
     _write(local / "scenes.yaml", {
-        "layout_scenes": {
-            "general": {
-                "__added__": ["mine"],
-                "__removed__": ["old"],
-                "__order__": ["main", "mine"],
-            },
-        },
-        "group_names": {"general": "自定义通用"},
+        "scenes": {"general": {
+            "name": "自定义通用",
+            "items": {"__added__": ["mine"], "__removed__": ["old"],
+                      "__order__": ["main", "mine"]},
+        }},
     })
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
     merged = load_scene_doc(resolver)
@@ -193,10 +166,10 @@ def test_v2_system_merges_old_v1_user_overlay(tmp_path):
 def test_user_save_uses_normalized_v2_base_and_does_not_freeze_registry(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
-    # 仓库/旧安装仍是隐含 v1，保存不得把完整 system 清单复制到 local。
+    # 保存不得把完整 system 清单复制到 local。
     _write(system / "scenes.yaml", {
-        "layout_scenes": {"general": ["main", "system_scene"]},
-        "group_names": {"general": "通用"},
+        "schema_version": 2,
+        "scenes": {"general": {"name": "通用", "items": ["main", "system_scene"]}},
     })
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
     desired = build_scene_doc(
@@ -248,21 +221,18 @@ def test_dev_save_keeps_local_only_group_and_scene_in_local(tmp_path):
     assert load_scene_manifest(resolver).groups["map"] == ["map_two"]
 
 
-def test_dev_save_converts_v1_file_to_v2(tmp_path):
+def test_save_rejects_old_scene_file_without_rewriting(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
-    _write(system / "scenes.yaml", {
-        "layout_scenes": {"general": ["main"]},
-        "group_names": {"general": "通用"},
-    })
-    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
-    save_scene_doc(resolver, build_scene_doc(
-        ["general"], {"general": ["main"]}, {"general": "通用"}, set()))
-    saved = yaml.safe_load((system / "scenes.yaml").read_text(encoding="utf-8"))
-    assert saved == {
-        "schema_version": 2,
-        "scenes": {"general": {"name": "通用", "items": ["main"]}},
-    }
+    path = local / "scenes.yaml"
+    _write(system / "scenes.yaml", {"schema_version": 2, "scenes": {}})
+    _write(path, {"layout_scenes": {"general": ["main"]}})
+    before = path.read_bytes()
+    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
+    with pytest.raises(ValueError, match="旧 v1 结构不再兼容"):
+        save_scene_doc(resolver, build_scene_doc(
+            ["general"], {"general": ["main"]}, {"general": "通用"}, set()))
+    assert path.read_bytes() == before
 
 
 def test_future_schema_is_rejected():

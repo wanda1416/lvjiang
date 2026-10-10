@@ -577,75 +577,6 @@ class SubsceneRef:
         )
 
 
-def _apply_legacy_disabled(
-    disabled_section: dict,
-    regions: dict[str, list[Region]],
-    points: dict[str, list[Point]],
-    arrows: dict[str, list[Arrow]],
-    panels: dict[str, list[Panel]],
-    scene_key: str,
-) -> None:
-    """向后兼容：将旧格式 disabled 段迁移到实例属性
-
-    旧格式中 disabled key 可能没有对应实例（仅存 key 名），
-    此时需创建占位实例（坐标归零）以保证静态检查能找到该 key。
-    """
-    for kind, keys in disabled_section.items():
-        if not isinstance(keys, list):
-            continue
-        key_set = set(keys)
-        if kind == "region":
-            ritems = regions.setdefault(scene_key, [])
-            for item in ritems:
-                if item.key in key_set:
-                    item.disabled = True
-            for key in key_set - {i.key for i in ritems}:
-                ritems.append(Region(
-                    key=key,
-                    x_ratio=0,
-                    y_ratio=0,
-                    w_ratio=0,
-                    h_ratio=0,
-                    disabled=True,
-                    has_position=False,
-                ))
-        elif kind == "point":
-            pitems = points.setdefault(scene_key, [])
-            for pi in pitems:
-                if pi.key in key_set:
-                    pi.disabled = True
-            for key in key_set - {i.key for i in pitems}:
-                pitems.append(Point(
-                    key=key,
-                    cx_ratio=0,
-                    cy_ratio=0,
-                    disabled=True,
-                    has_position=False,
-                ))
-        elif kind == "arrow":
-            aitems = arrows.setdefault(scene_key, [])
-            for ai in aitems:
-                if ai.key in key_set:
-                    ai.disabled = True
-            for key in key_set - {i.key for i in aitems}:
-                aitems.append(Arrow(key=key, from_key="", disabled=True))
-        elif kind == "panel":
-            pnitems = panels.setdefault(scene_key, [])
-            for ni in pnitems:
-                if ni.key in key_set:
-                    ni.disabled = True
-            for key in key_set - {i.key for i in pnitems}:
-                pnitems.append(Panel(
-                    key=key,
-                    x_ratio=0,
-                    y_ratio=0,
-                    w_ratio=0,
-                    h_ratio=0,
-                    disabled=True,
-                    has_position=False,
-                ))
-
-
 @dataclass
 class Layout:
     """一个布局：包含画布配置 + 所有场景的区域定义"""
@@ -768,6 +699,10 @@ class Layout:
         subscene_refs: dict[str, list[SubsceneRef]] = {}
 
         def _parse_scene_entry(scene_key: str, scene_data: dict):
+            if "disabled" in scene_data:
+                raise ValueError(
+                    f"场景 {scene_key} 的旧集中 disabled 段不再兼容；"
+                    "请将停用状态移到各实例的 disabled: true，保留原坐标")
             if "regions" in scene_data:
                 regions[scene_key] = [Region.from_dict(r) for r in scene_data["regions"]]
             if "points" in scene_data:
@@ -780,12 +715,6 @@ class Layout:
                 crop_canvases[scene_key] = CanvasConfig.from_dict(scene_data["crop_canvas"])
             if "subscene_refs" in scene_data:
                 subscene_refs[scene_key] = [SubsceneRef.from_dict(r) for r in scene_data["subscene_refs"]]
-            # 向后兼容：旧格式 disabled 段迁移到实例属性
-            if "disabled" in scene_data and isinstance(scene_data["disabled"], dict):
-                _apply_legacy_disabled(
-                    scene_data["disabled"],
-                    regions, points, arrows, panels, scene_key,
-                )
 
         scenes_data = d.get("scenes", {})
         if isinstance(scenes_data, dict):

@@ -24,7 +24,7 @@ from .scene_definition_models import (
 
 
 def _load_manifest():
-    """读取并兼容转换 scenes.yaml。"""
+    """读取当前格式 scenes.yaml。"""
     try:
         return load_scene_manifest(get_resolver())
     except Exception as e:

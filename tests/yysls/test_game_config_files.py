@@ -65,24 +65,22 @@ def test_save_routes_sections_to_their_owner_files(tmp_path):
     assert basic["content_version"] == equipment["content_version"] == 1
 
 
-def test_legacy_levels_and_seasons_file_is_renamed_in_local_and_remote(tmp_path: Path):
-    """levels_and_seasons.yaml 改名为 seasons.yaml：本地/远程层旧文件首次加载时
-    原地改名，用户自定义的等级/赛季不丢。"""
+def test_old_season_file_is_diagnosed_without_renaming(tmp_path: Path, monkeypatch):
     resolver = _resolver(tmp_path)
-    legacy = resolver.local_dir / "yysls/game_config/levels_and_seasons.yaml"
-    legacy.parent.mkdir(parents=True, exist_ok=True)
-    legacy.write_text(yaml.safe_dump({
-        "content_version": 1,
-        "season_configs": [{"season_number": 99, "start_date": "2030-01-01",
-                            "equip_level": 130}],
-    }, allow_unicode=True), encoding="utf-8")
-
-    data = load_game_config(resolver)
-
-    assert not legacy.exists()
-    assert (resolver.local_dir / "yysls/game_config/seasons.yaml").is_file()
-    assert any(int(item.get("season_number", 0)) == 99
-               for item in data["season_configs"])
+    messages = []
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.game_config_files.logger.warning", messages.append)
+    for root in (resolver.local_dir, resolver.remote_dir):
+        legacy = root / "yysls/game_config/levels_and_seasons.yaml"
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.write_text("season_configs: []\n", encoding="utf-8")
+    load_game_config(resolver)
+    for root in (resolver.local_dir, resolver.remote_dir):
+        assert (root / "yysls/game_config/levels_and_seasons.yaml").read_text(
+            encoding="utf-8") == "season_configs: []\n"
+        assert not (root / "yysls/game_config/seasons.yaml").exists()
+    assert len(messages) == 2
+    assert all("手工改名" in message and "勿直接覆盖" in message for message in messages)
 
 
 def test_equip_display_lives_in_session_settings_not_game_config(monkeypatch):

@@ -1,6 +1,6 @@
-"""``scenes.yaml`` 的结构版本、兼容加载与序列化。
+"""``scenes.yaml`` 的结构版本、加载与序列化。
 
-v1 没有显式版本，使用分离的 ``layout_scenes`` / ``group_names``；v2 与
+仅支持 v2；与
 ``layouts.yaml`` 一样由一个领域顶层键承载全部内容：
 
 .. code-block:: yaml
@@ -48,20 +48,15 @@ class SceneManifest:
 def _version_of(doc: dict) -> int:
     value = doc.get("schema_version")
     if value is None:
-        # local 增量通常不会重复保存与 system 相同的 schema_version；出现
-        # scenes 即可无歧义地判断它使用 v2 路径。其余无版本文档按 v1。
-        return 2 if "scenes" in doc else 1
+        # 空覆盖、仅元数据与当前 scenes 增量均可省略版本。
+        return SCENES_SCHEMA_VERSION
     if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError("scenes.yaml 的 schema_version 必须是整数")
     return value
 
 
 def normalize_scene_doc(doc: dict) -> dict:
-    """把一层 scenes.yaml（完整配置或 local 增量）标准化为 v2。
-
-    该函数不写文件。这样旧文件可直接验证兼容读取；真正发生场景结构保存
-    时，``save_scene_manifest`` 会自然写成 v2。
-    """
+    """验证一层当前场景配置，不转换旧结构，也不写文件。"""
     if not isinstance(doc, dict):
         return {}
     version = _version_of(doc)
@@ -69,42 +64,19 @@ def normalize_scene_doc(doc: dict) -> dict:
         raise ValueError(
             f"scenes.yaml schema_version={version}，当前只支持到 "
             f"{SCENES_SCHEMA_VERSION}")
-    if version < 1:
-        raise ValueError(f"不支持的 scenes.yaml schema_version={version}")
-    if version == 2:
-        result = deepcopy(doc)
-        v2_groups = result.get("scenes")
-        if v2_groups is not None and not isinstance(v2_groups, dict):
-            raise ValueError("scenes.yaml 的 scenes 必须是映射")
-        return result
-
-    raw_layout_scenes = doc.get("layout_scenes")
-    raw_group_names = doc.get("group_names")
-    if raw_layout_scenes is not None and not isinstance(raw_layout_scenes, dict):
-        raise ValueError("v1 scenes.yaml 的 layout_scenes 必须是映射")
-    if raw_group_names is not None and not isinstance(raw_group_names, dict):
-        raise ValueError("v1 scenes.yaml 的 group_names 必须是映射")
-    layout_scenes: dict = raw_layout_scenes or {}
-    group_names: dict = raw_group_names or {}
-
-    groups: dict = {}
-    group_keys = list(layout_scenes.keys())
-    for key in group_names:
-        if key not in group_keys:
-            group_keys.append(key)
-    for key in group_keys:
-        group: dict = {}
-        if key in group_names:
-            group["name"] = deepcopy(group_names[key])
-        if key in layout_scenes:
-            # 普通列表和 __added__/__removed__/__order__ 增量都原样迁到 items。
-            group["items"] = deepcopy(layout_scenes[key])
-        groups[key] = group
-    return {"schema_version": 2, "scenes": groups}
+    if version != SCENES_SCHEMA_VERSION or {"layout_scenes", "group_names"} & doc.keys():
+        raise ValueError(
+            "scenes.yaml 旧 v1 结构不再兼容；请使用 schema_version: 2 和 "
+            "scenes.<分组>.name/items 格式，保留原有列表增量")
+    result = deepcopy(doc)
+    v2_groups = result.get("scenes")
+    if v2_groups is not None and not isinstance(v2_groups, dict):
+        raise ValueError("scenes.yaml 的 scenes 必须是映射")
+    return result
 
 
 def load_scene_doc(resolver: ConfigResolver) -> dict:
-    """分别转换 system/local 后再合并，禁止跨 schema 直接深合并。"""
+    """分别验证 system/local 后再合并，禁止跨 schema 直接深合并。"""
     system = normalize_scene_doc(resolver.load_system("scenes.yaml"))
     if resolver.remote_supersedes("scenes.yaml"):
         protected = normalize_scene_doc(resolver._load_yaml(resolver.remote_dir / "scenes.yaml"))
@@ -177,14 +149,14 @@ def build_scene_doc(
 
 
 def save_scene_doc(resolver: ConfigResolver, doc: dict) -> None:
-    """保存 v2；用户模式相对“已转换的 system v2”计算增量。"""
+    """保存 v2；用户模式相对 system v2 计算增量。"""
     normalized = normalize_scene_doc(doc)
+    local = normalize_scene_doc(resolver.load_local("scenes.yaml"))
     system = normalize_scene_doc(resolver.load_system("scenes.yaml"))
     if resolver.remote_supersedes("scenes.yaml"):
         protected = normalize_scene_doc(resolver._load_yaml(resolver.remote_dir / "scenes.yaml"))
         system = merge_doc(system, protected, SCENES_REGISTRY_PATHS)
     if resolver.is_dev_mode():
-        local = normalize_scene_doc(resolver.load_local("scenes.yaml"))
         local_only = set(local.get("scenes", {})) - set(system.get("scenes", {}))
         if local_only:
             system_doc = deepcopy(normalized)

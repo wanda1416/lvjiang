@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from loguru import logger
 
 from .document_store import DocumentDirectoryStore
 from .interface import (
@@ -170,15 +171,11 @@ def load_user_config() -> UserConfig:
     params = app.get("delay_params")
     if isinstance(params, dict):
         data["delay_params"] = params
-    # 0.11.1 以前使用 android_apps；升级后与新 apps 合并，避免 system 已有
-    # apps 键时遮掉用户 local 层尚未来得及迁移的旧注册项。
-    legacy_apps = app.get("android_apps")
+    if "android_apps" in app:
+        logger.warning("app.yaml 不再支持顶层 android_apps；请将应用注册改为 apps 下的 android/windows 配置")
     registered_apps = app.get("apps")
-    if isinstance(legacy_apps, dict) or isinstance(registered_apps, dict):
-        data["android_apps"] = {
-            **(legacy_apps if isinstance(legacy_apps, dict) else {}),
-            **(registered_apps if isinstance(registered_apps, dict) else {}),
-        }
+    if isinstance(registered_apps, dict):
+        data["android_apps"] = registered_apps
 
     # 忽略未知字段（settings 节点可能含旧版本/其他模块写入的 key）
     known = {f.name for f in fields(UserConfig)}

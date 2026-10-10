@@ -215,3 +215,21 @@ def test_lifecycle_parameter_definitions_reads_workflow_metadata():
     assert stop_app[0]["type"] == "bool"
     assert stop_app[0]["default"] is False
     assert stop_app[0]["label"]
+def test_v2_does_not_interpret_v1_selection_fields(monkeypatch):
+    messages = []
+    monkeypatch.setattr("lvjiang.core.batch_config.logger.warning", messages.append)
+    config = BatchConfig.from_dict({
+        "document_type": BATCH_DOCUMENT_TYPE, "version": 2,
+        "groups": {"group": {
+            "id": "group", "name": "测试组", "task_ids": ["a", "b"],
+            "usernames": ["测试用户"], "selected_task_ids": ["a"],
+            "selected_usernames": ["测试用户"], "selected_units": {"user": ["旧选择"]},
+            "default_task_ids": ["b"],
+        }},
+    })
+    item = config.get("group")
+    assert item is not None
+    assert item.default_task_ids == ["b"]
+    assert item.default_usernames == []
+    assert item.default_units == {}
+    assert any("v2 请使用 default_" in message for message in messages)

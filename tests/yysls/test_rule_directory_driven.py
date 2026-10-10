@@ -9,7 +9,6 @@ import yaml
 
 from lvjiang.apps.yysls.core.tuning_rules import (
     RuleValidationError,
-    TuneConfigManager,
     TuningGroupManager,
     TuningRuleManager,
 )
@@ -137,38 +136,28 @@ class TestRulesFromDirectory:
         assert "my_rule" in manager.get_rules()
 
 
-class TestLegacyMigration:
-    def test_legacy_tuning_rules_declaration_migrates_to_files(self, tmp_path):
-        resolver = _layered(tmp_path, dev_mode=True)
-        config_path = tmp_path / "system/yysls/tune_config.yaml"
-        data = _read(config_path)
-        data["base_rules"] = ["default", "aggressive"]
-        data["tuning_rules"] = {"huiyi_general": True, "heal_pure": False}
-        config_path.write_text(yaml.safe_dump(data, allow_unicode=True), "utf-8")
-
-        manager = TuningRuleManager(resolver=resolver)
-
-        migrated = _read(config_path)
-        assert "tuning_rules" not in migrated and "base_rules" not in migrated
-        assert _read(tmp_path / "system/yysls/tuning_rules/heal_pure.yaml")["disabled"] is True
-        assert "heal_pure" not in manager.get_rules()
-        assert TuneConfigManager(resolver=resolver).get().switches
-
-    def test_legacy_user_diff_migrates_to_local_shadow(self, tmp_path):
+class TestLegacyDeclaration:
+    def test_old_declaration_is_diagnosed_without_writing_rules(self, tmp_path, monkeypatch):
         resolver = _layered(tmp_path, dev_mode=False)
         local_cfg = tmp_path / "local/yysls/tune_config.yaml"
         local_cfg.parent.mkdir(parents=True)
-        local_cfg.write_text(yaml.safe_dump({"tuning_rules": {"heal_pure": False}}), "utf-8")
+        local_cfg.write_text(yaml.safe_dump({
+            "tuning_rules": {"heal_pure": False}, "base_rules": ["default"],
+        }), encoding="utf-8")
+        before = local_cfg.read_bytes()
+        rule_path = tmp_path / "system/yysls/tuning_rules/heal_pure.yaml"
+        rule_before = rule_path.read_bytes()
+        messages = []
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.tuning_rules.manager.logger.warning", messages.append)
 
         manager = TuningRuleManager(resolver=resolver)
 
-        assert "heal_pure" not in manager.get_rules()
-        # 用户模式迁移写的是桩，不是整份影子
-        assert _read(tmp_path / "local/yysls/tuning_rules/heal_pure.yaml") == {
-            "key": "heal_pure", "disabled": True}
-        # local diff 里的旧声明被清掉；system 文件原样
-        assert "tuning_rules" not in (_read(local_cfg) if local_cfg.exists() else {})
-        assert "tuning_rules" not in _read(tmp_path / "system/yysls/tune_config.yaml")
+        assert "heal_pure" in manager.get_rules()
+        assert local_cfg.read_bytes() == before
+        assert rule_path.read_bytes() == rule_before
+        assert not (tmp_path / "local/yysls/tuning_rules/heal_pure.yaml").exists()
+        assert any("旧 tuning_rules/base_rules" in message for message in messages)
 
 
 class TestGroupsFromDirectory:

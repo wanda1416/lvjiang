@@ -81,9 +81,9 @@ scenes:
 ```
 
 `disabled` 场景只从场景管理 UI 隐藏，定义仍注册并可被旧布局、工作流引用。
-缺少 `schema_version`（或显式为 1）的旧 `layout_scenes + group_names` 文档按
-v1 读取。system 与 local 必须各自转换为 v2 后再合并，不能先把两种 schema
-深合并；旧文件在兼容读取时不落盘，下一次真正保存场景结构时统一写成 v2。
+仅接受当前 scenes 结构；无版本号的空覆盖、元数据与 scenes 增量仍有效。
+明确 v1 或旧 layout_scenes/group_names 字段报不兼容，不自动转换或落盘。
+system、remote、local 分层验证后合并，保存也验证旧 local 覆盖。
 
 `layouts.yaml` 也使用 schema v2，但不提供旧格式兼容或自动迁移：
 
@@ -159,7 +159,7 @@ system 层扫出的空间即**系统空间**（`is_system_space()`）：用户�
 
 | 文件 | 路径 | 声明方 |
 |------|------|--------|
-| `scenes.yaml` | `scenes.*.items` / `scenes.*.disabled`（兼容 v1 `layout_scenes.*`） | core（`resolver.py` 常量表） |
+| `scenes.yaml` | `scenes.*.items` / `scenes.*.disabled` | core（`resolver.py` 常量表） |
 | `yysls/tune_config.yaml` | `base_rules`（仅为兼容旧 local diff 保留，现已无此键） | 插件（`apps/yysls/config/merge_policy.py`） |
 
 local 形如：

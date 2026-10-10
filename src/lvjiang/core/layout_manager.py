@@ -798,7 +798,6 @@ def load_layout_by_key(name: str) -> Layout | None:
         Point,
         Region,
         SubsceneRef,
-        _apply_legacy_disabled,
     )
 
     resolver = get_resolver()
@@ -833,6 +832,11 @@ def load_layout_by_key(name: str) -> Layout | None:
         except Exception as e:  # noqa: BLE001
             logger.error(f"场景文件解析失败 {path}: {e}")
             continue
+        if "disabled" in data:
+            logger.error(
+                f"场景文件 {path} 的旧集中 disabled 段不再兼容，已跳过；"
+                "请将停用状态移到各实例的 disabled: true，保留原坐标")
+            continue
         if "regions" in data:
             regions[scene_key] = [Region.from_dict(r) for r in data["regions"]]
         if "points" in data:
@@ -853,12 +857,6 @@ def load_layout_by_key(name: str) -> Layout | None:
             if source and entity:
                 reference_positions[(scene_key, str(source), str(entity))] = (
                     float(position["x_ratio"]), float(position["y_ratio"]))
-        # 向后兼容：旧格式 disabled 段迁移到实例属性
-        if "disabled" in data and isinstance(data["disabled"], dict):
-            _apply_legacy_disabled(
-                data["disabled"],
-                regions, points, arrows, panels, scene_key,
-            )
 
     _drop_orphan_coords(regions, points)
     _expand_scene_references(regions, points, reference_positions)

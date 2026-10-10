@@ -100,7 +100,15 @@ class TuningRuleManager:
         self._all_raw.clear()
         self._all_files.clear()
         self._errors.clear()
-        self._migrate_legacy_declarations()
+        try:
+            config = self._resolver.load_merged(_CONFIG_REL_PATH)
+        except Exception as exc:
+            logger.error(f"调律配置读取失败，规则文件仍独立加载: {exc}")
+            config = {}
+        if {"tuning_rules", "base_rules"} & config.keys():
+            logger.warning(
+                "tune_config.yaml 旧 tuning_rules/base_rules 声明不再读取；"
+                "请在对应规则文件设置 disabled/order，备份后移除旧声明")
         switch_keys = self._switch_keys()
         loaded: dict[str, TuningRule] = {}
         self._stubs.clear()
@@ -137,50 +145,6 @@ class TuningRuleManager:
                 self._all_names,
                 key=lambda k: (int(self._all_raw[k].get("order", DEFAULT_ORDER)), k))
         }
-
-    def _migrate_legacy_declarations(self) -> None:
-        """一次性迁移：tune_config 里旧的 ``tuning_rules`` 启停声明 → 规则文件的
-        ``disabled``，然后把 ``tuning_rules`` / ``base_rules`` 两段从
-        tune_config 移除。声明里的顺序不迁移（预置规则已随包写好 order）。"""
-        try:
-            data = self._resolver.load_merged(_CONFIG_REL_PATH)
-        except Exception:  # noqa: BLE001 — 读不到就没有可迁的
-            return
-        if "tuning_rules" not in data and "base_rules" not in data:
-            return
-        legacy = data.get("tuning_rules") or {}
-        if isinstance(legacy, dict):
-            for key, enabled in legacy.items():
-                if enabled:
-                    continue
-                rel = self._rel(f"{key}.yaml")
-                path = self._resolver.resolve_read(rel)
-                if path is None:
-                    continue
-                try:
-                    raw = self._resolver._load_yaml(path)
-                except Exception:  # noqa: BLE001
-                    continue
-                if raw.get("disabled"):
-                    continue
-                if self._stub_applicable(rel):
-                    payload = {"key": key, "disabled": True}
-                else:
-                    raw["disabled"] = True
-                    payload = raw
-                self._resolver.write_entity(
-                    rel, yaml.dump(payload, allow_unicode=True, sort_keys=False),
-                    force=True)
-                logger.info(f"已把旧 tuning_rules 启停声明迁入规则文件: {key} → disabled")
-        data.pop("tuning_rules", None)
-        data.pop("base_rules", None)
-        try:
-            self._resolver.save_merged(_CONFIG_REL_PATH, data)
-            logger.info("tune_config.yaml 已移除旧的 tuning_rules / base_rules 声明")
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"移除 tune_config 旧声明失败: {e}")
-        if _tune_config_manager is not None:
-            _tune_config_manager.reload()
 
     def _base_path(self, rel: str):
         """越过 local 影子，取 remote/system 里实际的规则内容路径。"""

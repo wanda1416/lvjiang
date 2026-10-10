@@ -209,6 +209,7 @@ class ProfileColumnMixin:
             # 合计行开关按分组存放：每个分组的表格自己决定要不要这一行。
             menu.addSeparator()
             totals_action = menu.addAction(tr("展示总和行"))
+            assert totals_action is not None
             totals_action.setCheckable(True)
             totals_action.setChecked(get_overview_totals(group_name))
             totals_action.triggered.connect(

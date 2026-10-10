@@ -16,6 +16,7 @@ from .models import (
     INSUFFICIENT_ACTIONS,
     JUDGE_SCOPES,
     MAX_TUNE_RESETS,
+    PART_ALIAS,
     PART_KEYS,
     PCT_OPS,
     QUALITY_PARTS,
@@ -419,7 +420,12 @@ def parse_tuning_rule(data: dict,
     for raw_part, p_raw in (data.get("patterns") or {}).items():
         part = _normalize_part(raw_part, _PATTERN_PART_ALIASES)
         if part not in PART_KEYS:
-            raise RuleValidationError(f"未知部位 key {part!r}")
+            if part in PART_ALIAS:
+                target = PART_ALIAS[part]
+                raise RuleValidationError(
+                    f"patterns 部位 {part!r} 与 {target!r} 共用判定，请配置在 patterns.{target} 下；"
+                    f"行为条件 parts 仍可使用 {part!r}")
+            raise RuleValidationError(f"patterns 未知部位 key {part!r}，合法模式部位为 {list(PART_KEYS)}")
         patterns[part] = _parse_pattern(p_raw, vocab, f"patterns.{part}")
 
     rule = TuningRule(

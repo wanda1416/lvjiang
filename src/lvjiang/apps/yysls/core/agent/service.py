@@ -146,8 +146,9 @@ class AgentService:
                            for model in list_graduation_models()]}
 
     def get_tuning_config(self, user: str) -> dict:
-        """读用户选择和已有规则/基础组，仅作为生成新定义的参考。"""
+        """生成前先读取规则约定、用户选择和模板。rule_contract 区分 patterns 归并部位与行为 parts 实际部位；不得从模板猜测合法键。"""
         from ...config.auto_tuning_config import load_user_auto_tuning_config
+        from ..tuning_rules import PART_ALIAS, PART_KEYS, QUALITY_PARTS
         self._check(user)
         definitions = {}
         for directory in ("base_groups", "tuning_rules"):
@@ -157,6 +158,12 @@ class AgentService:
             ]
         config = load_user_auto_tuning_config(user, self.users_dir)
         return {"user_config": config, "revision": revision(config),
+                "rule_contract": {
+                    "pattern_parts": list(PART_KEYS),
+                    "pattern_part_aliases": dict(PART_ALIAS),
+                    "behavior_parts": list(QUALITY_PARTS),
+                    "instructions": "patterns 使用 pattern_parts 中的归并键；pattern_part_aliases 表示实际部位共用哪个模式。行为条件 parts 使用 behavior_parts 中的实际部位，不按 patterns 的映射合并。",
+                },
                 **definitions,
                 "tune_config": self.resolver.load_merged("yysls/tune_config.yaml")}
 

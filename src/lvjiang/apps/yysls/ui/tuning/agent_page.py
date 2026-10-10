@@ -440,6 +440,7 @@ class AgentTuningPage(QWidget):
                 "先调用 get_capabilities、list_users 和 read_doc('entry')。游戏机制读 10-game，操作指导读 60-userguide，DSL 与架构读 30-architecture，接口契约读 70-agent。"
                 "开启服务即可使用全部已开放能力；用户和目标按每次调用选择。"
                 "切换用户不需改连接配置；调用受限时向用户解释接口返回原因。"
+                "生成前先调用 get_tuning_config，遵守 rule_contract 中 patterns 部位归并与行为 parts 的区别；不要从模板或报错猜测合法部位。"
                 "生成新配置，不修改已有规则。"), port=self.connection.port, token=self.connection.token)
             docs.schema_provider = lambda: json.dumps(
                 [tool.model_dump(mode="json") for tool in asyncio.run(server.mcp.list_tools())],

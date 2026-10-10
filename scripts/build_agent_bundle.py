@@ -26,7 +26,8 @@ def build_bundle(output: Path, *, archive: Path | None = None) -> dict:
     schemas = json.dumps([tool.model_dump(mode="json") for tool in tools], ensure_ascii=False, indent=2)
     schema_path = output / AGENT_DOCUMENTS["tool-schema"]
     schema_path.parent.mkdir(parents=True, exist_ok=True)
-    schema_path.write_text(schemas + "\n", encoding="utf-8")
+    # The manifest hashes these exact UTF-8 bytes; Windows text I/O must not add CRLF.
+    schema_path.write_bytes((schemas + "\n").encode("utf-8"))
     source = AgentDocuments(source_root, source_mode=True,
                             schema_provider=lambda: schemas + "\n")
     manifest = source.list_docs()

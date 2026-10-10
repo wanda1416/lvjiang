@@ -14,7 +14,7 @@ from typing import Callable
 
 from loguru import logger
 
-from .models import DIR_NEG, DIR_POS, KeyDef, parse_sync_key
+from .models import KeyDef, parse_sync_key
 from .schema import get_profile_config
 
 # write_fn 签名：(user_name, model_type, key, delta, change_type, sync_from, source)
@@ -57,14 +57,7 @@ def fire_sync_targets(
     visited = visited | {source_id}
 
     for target in source_kd.sync_targets:
-        # ratio=0 显式禁用该目标
-        if target.ratio == 0:
-            continue
-
-        # 方向限定：仅当源变动方向匹配时触发
-        if target.direction == DIR_POS and delta <= 0:
-            continue
-        if target.direction == DIR_NEG and delta >= 0:
+        if not target.matches_delta(delta):
             continue
 
         model_type, key = parse_sync_key(target.key)

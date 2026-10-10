@@ -67,6 +67,16 @@ class SyncTargetDef:
     direction: str = DIR_BOTH
     source: str = ""
 
+    def matches_delta(self, delta: int | float) -> bool:
+        """源字段的实际变动是否满足此目标的倍率与方向条件。"""
+        if self.ratio == 0 or delta == 0:
+            return False
+        if self.direction == DIR_POS:
+            return delta > 0
+        if self.direction == DIR_NEG:
+            return delta < 0
+        return True
+
     @classmethod
     def from_raw(cls, raw) -> "SyncTargetDef":
         if isinstance(raw, cls):

@@ -76,8 +76,6 @@ def profile_history_undo_unavailable_reason(
     kd = get_profile_config().get_key(key, model_type=model_type)
     if kd is None:
         return tr("当前数据模型中已不存在此数据项")
-    if kd.sync_targets:
-        return tr("该数据项会同步其他数据，不能在此单独撤销")
     if kd.change_script:
         return tr("该数据项关联了变更脚本，不能在此单独撤销")
     if model_type == MODEL_REGEN and _is_continuous_regen(kd):
@@ -87,6 +85,13 @@ def profile_history_undo_unavailable_reason(
     new_value = record.get("new_value")
     if new_value is None:
         return tr("历史记录缺少新值")
+    # 判断原记录的方向，而非撤销方向；撤销直接恢复数据库，不经过同步管线。
+    if kd.sync_targets and (
+        model_type == MODEL_NOTE
+        or any(target.matches_delta(float(new_value) - float(old_value or 0))
+               for target in kd.sync_targets)
+    ):
+        return tr("该数据项会同步其他数据，不能在此单独撤销")
     old_text = record.get("old_value_text", "") or ""
     new_text = record.get("new_value_text", "") or ""
     if model_type == MODEL_NOTE:

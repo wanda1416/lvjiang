@@ -26,6 +26,7 @@ ANNOUNCEMENT_URL = "https://wanda1416.github.io/lvjiang/notices.json"
 ANNOUNCEMENT_SCHEMA_VERSION = 1
 MAX_RESPONSE_BYTES = 256 * 1024
 MAX_NOTICES = 20
+MAX_BODY_CHARS = 32_000
 _LEVELS = {"info", "warning", "critical"}
 
 
@@ -141,7 +142,7 @@ def parse_announcement_manifest(data: dict[str, Any]) -> AnnouncementManifest:
             id=notice_id,
             level=level,
             title=_required_string(raw, "title", max_length=200),
-            body=_required_string(raw, "body", max_length=32_000),
+            body=_required_string(raw, "body", max_length=MAX_BODY_CHARS),
             published_at=_optional_string(raw, "published_at", max_length=64),
             min_app_version=_optional_string(raw, "min_app_version", max_length=64),
             max_app_version_exclusive=_optional_string(

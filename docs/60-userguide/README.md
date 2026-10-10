@@ -56,3 +56,5 @@
 进群前请至少看完 [1. 快速开始](01-quick-start.md)；没看完快速开始就来提问的，一律不回复。
 
 ![微信交流群](../../data/image/feedback-qrcode.jpg)
+
+- [3.5 图像识别与模板匹配排查](03.05-visual-recognition-troubleshooting.md)：现场、模板、布局与实际任务结果的核对步骤。

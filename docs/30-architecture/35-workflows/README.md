@@ -36,3 +36,8 @@
 ## 输出
 <流程产出什么数据或结果>
 ```
+
+## 遍历与决策契约
+
+- [03-bag-traversal.md](03-bag-traversal.md)：背包遍历、指纹引用、去重与回收补位。
+- [04-tuning-decisions.md](04-tuning-decisions.md)：扫描、材料、调律、重置与回收的实际处理链。

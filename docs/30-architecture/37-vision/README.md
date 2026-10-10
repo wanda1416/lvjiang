@@ -12,7 +12,7 @@
 它们不该关心 OpenCV 用哪个 flag、单尺度还是金字塔、Region 归一化怎么算——
 这些属于**实现**，改起来比合同频繁得多。
 
-本文档目录承载"实现细节 + 调优经验 + 失败模式"三层内容，与文法层解耦：
+本文档目录保存算法、坐标、失败语义与编辑器/运行期的一致性契约，与文法层解耦：
 
 - 合同变化 → 改 `32-grammar/`
 - 实现变化 → 改本目录
@@ -26,8 +26,8 @@
 | [02-color-ops-internals.md](02-color-ops-internals.md) | 图色原语的算法（`color_ops.py` 展开） |
 | [03-template-matching.md](03-template-matching.md) | 模板匹配算法（`TM_CCOEFF_NORMED` · 单尺度 · `SEARCH_SLACK`） |
 | [04-coordinate-system.md](04-coordinate-system.md) | 画布 / Region / 归一化 / 取整一致性契约 |
-| [05-tuning-and-failures.md](05-tuning-and-failures.md) | 症状索引式调优手册与失败模式 |
-| [06-tooling-and-regression.md](06-tooling-and-regression.md) | 编辑器、脚本工作台、双目录截图回归 |
+| [05-tuning-and-failures.md](05-tuning-and-failures.md) | 视觉感知失败语义与能力边界 |
+| [06-tooling-and-regression.md](06-tooling-and-regression.md) | 编辑器与运行期的感知一致性契约 |
 
 ## 与相关文档的关系
 
@@ -42,8 +42,8 @@
                      └─────────────┬──────────────────────────┘
                                    ▼
                     37-vision/01-perception-channels.md（选型）
-                    37-vision/05-tuning-and-failures.md（排障）
-                    37-vision/06-tooling-and-regression.md（工具）
+                    37-vision/05-tuning-and-failures.md（失败契约）
+                    37-vision/06-tooling-and-regression.md（一致性契约）
 ```
 
 代码入口：
@@ -52,3 +52,5 @@
 - DSL 内置：`src/lvjiang/workflows/builtins/vision.py`
 - 引擎调用：`src/lvjiang/workflows/base/recognition.py`（`match_region_templates` / `find_image_in_region`）
 - 布局模型：`src/lvjiang/core/layout_models.py`（`TemplateBinding`、`RectCoordRef`、`CircleCoordRef`）
+
+用户排障见 [图像识别排查](../../60-userguide/03.05-visual-recognition-troubleshooting.md)，诊断与离线回归记录保存在 [开发档案](../../40-development/2026-10/2026-10-09-vision-tooling-regression.md)。

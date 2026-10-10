@@ -2,14 +2,14 @@
 
 > 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
 
-游戏场景的语义模型定义与编辑器操作手册。
+游戏场景的语义模型与编辑/运行状态契约。用户操作统一见 [场景管理](../../60-userguide/03.02-scene-management.md)。
 
 ## 文档索引
 
 | 文件 | 内容 |
 |------|------|
 | [01-scene-layout-definition.md](01-scene-layout-definition.md) | 场景与布局语义模型：Scene / Area / Layout 三层数据结构定义 |
-| [02-scene-layout-editing.md](02-scene-layout-editing.md) | 场景编辑器操作手册：可视化编辑、网格校准、脚本调试 |
+| [02-scene-layout-editing.md](02-scene-layout-editing.md) | 场景编辑器的配置、布局、引用与保存边界 |
 | [03-cross-scene-references.md](03-cross-scene-references.md) | 跨场景 area 引用：一块区域只留一处坐标真源，与子场景嵌套的区别 |
 | [04-page-transition-contract.md](04-page-transition-contract.md) | 页面结构与跳转契约：TAB/取景归属、调用方返回、全局入口与校验 |
 

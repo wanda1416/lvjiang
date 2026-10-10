@@ -117,7 +117,7 @@
 ## 扩展流程
 
 当 Excel 工作簿引入新函数时，需要按以下步骤扩展。
-完整操作指引与注意事项详见 [06-operations.md](06-operations.md#新增函数扩展)。
+完整操作指引与注意事项详见 [06-operations.md](../../40-development/2026-10/2026-10-09-graduation-maintenance.md#新增函数扩展)。
 
 1. **公式解析器**（`excel_formula.py`）：`FormulaParser` 自动为任意函数名生成 `call` AST 节点，通常无需修改
 2. **公式模型**（`excel_formula.py`）：在 `FormulaModel._call()` 中添加求值逻辑

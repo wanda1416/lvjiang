@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any
 
 LV1_REQUIRED_MESSAGE = "智能调律需要激活 Lv1，请在设置的「功能激活」中激活"
+DEFAULT_MCP_PORT = 18765
 
 
 def has_agent_access() -> bool:
@@ -22,10 +23,11 @@ def has_agent_access() -> bool:
 
 
 class LocalMCPServer:
-    """An explicitly enabled loopback server with a revocable per-session credential."""
+    """Explicitly enabled loopback server, owned by the main instance."""
 
     def __init__(self, tools: dict[str, Callable], *, instructions: str,
-                 lv1_check: Callable[[], bool] | None = None):
+                 lv1_check: Callable[[], bool] | None = None,
+                 port: int = DEFAULT_MCP_PORT, token: str | None = None):
         from mcp.server.fastmcp import FastMCP
 
         self.mcp = FastMCP(
@@ -34,8 +36,10 @@ class LocalMCPServer:
         )
         for name, function in tools.items():
             self.mcp.add_tool(self._async_tool(function), name=name)
-        self.token = secrets.token_urlsafe(32)
-        self.port = 0
+        if not 1 <= port <= 65535:
+            raise ValueError("MCP 端口需在 1–65535 之间")
+        self.token = token or secrets.token_urlsafe(32)
+        self.port = port
         self._server: Any = None
         self._thread: threading.Thread | None = None
         self._socket: socket.socket | None = None
@@ -57,6 +61,11 @@ class LocalMCPServer:
 
     def start(self) -> None:
         import uvicorn
+
+        from .access import is_readonly
+
+        if is_readonly():
+            raise PermissionError("只有主实例可以启动 MCP 服务")
 
         if self.running:
             return
@@ -103,7 +112,12 @@ class LocalMCPServer:
             await app(scope, receive, send)
 
         sock = socket.socket()
-        sock.bind(("127.0.0.1", 0))
+        try:
+            sock.bind(("127.0.0.1", self.port))
+        except OSError:
+            sock.close()
+            self._accepting = False
+            raise OSError(f"MCP 端口 {self.port} 无法使用，请检查占用并手动修改端口") from None
         sock.listen(32)
         self.port = sock.getsockname()[1]
         self._socket = sock

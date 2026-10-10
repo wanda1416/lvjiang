@@ -12,7 +12,7 @@ class Host(QWidget):
     user_changed = pyqtSignal(str)
 
 
-def test_page_service_connection_survives_user_changes_without_packaging(qtbot, tmp_path, monkeypatch):
+def test_page_service_connection_survives_user_changes_without_packaging(qtbot, tmp_path, monkeypatch, free_tcp_port):
     import asyncio
     import json
     import shutil
@@ -26,6 +26,11 @@ def test_page_service_connection_survives_user_changes_without_packaging(qtbot, 
     for directory in DOCUMENT_DIRECTORIES:
         shutil.copytree(root / "docs" / directory, tmp_path / "docs" / directory)
     monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path)
+    from lvjiang.core import agent_connection
+    monkeypatch.setattr(agent_connection, "settings_path", lambda _root: tmp_path / "mcp-settings.json")
+    from lvjiang.core.agent_settings import AgentSettings, AgentTarget
+    monkeypatch.setattr(agent_page, "load_agent_settings", lambda: AgentSettings((
+        AgentTarget("example", "Agent 示例", str(tmp_path / "workbuddy/mcp.json")),)))
     licensed = [True]
     monkeypatch.setattr(agent_page, "has_agent_access", lambda: licensed[0])
     host = Host()
@@ -40,6 +45,7 @@ def test_page_service_connection_survives_user_changes_without_packaging(qtbot, 
     qtbot.addWidget(page)
     assert not page.export.isEnabled()
     assert not page.stop_service.isEnabled()
+    page.port.setValue(free_tcp_port)
     page._start_service()
     assert page.server is not None, page.status.text()
     try:
@@ -140,3 +146,53 @@ def test_bridge_selects_requested_connected_target_and_reports_busy_at_call_time
     with pytest.raises(ValueError, match="未连接"):
         bridge.call("resolve_target", {"target_id": "target_b"})
     bridge.close()
+
+
+def test_menu_dialog_autostarts_persisted_service_and_close_keeps_it_running(qtbot, tmp_path, monkeypatch, free_tcp_port):
+    from lvjiang import constants
+    from lvjiang.apps.yysls.ui.tuning import agent_page
+    from lvjiang.core import access, agent_connection
+    from lvjiang.core.agent_connection import AgentConnection
+
+    monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(agent_connection, "settings_path", lambda _root: tmp_path / "connection.json")
+    from lvjiang.core.agent_settings import AgentSettings, AgentTarget
+    monkeypatch.setattr(agent_page, "load_agent_settings", lambda: AgentSettings((
+        AgentTarget("example", "Agent 示例", str(tmp_path / "workbuddy.json")),)))
+    monkeypatch.setattr(agent_page, "has_agent_access", lambda: True)
+    monkeypatch.setattr(agent_page.AgentDocuments, "list_docs", lambda _self: {"documents": []})
+    setting = AgentConnection(port=free_tcp_port, enabled=True)
+    setting.save(tmp_path)
+    host = Host()
+    qtbot.addWidget(host)
+    dialog = agent_page.AgentTuningDialog(host)
+    qtbot.addWidget(dialog)
+    page = dialog.page
+    try:
+        qtbot.waitUntil(lambda: page.server is not None and page.server.running)
+        first = page.server.connection_config()
+        assert (tmp_path / "workbuddy.json").is_file()
+        dialog.show()
+        dialog.close()
+        assert page.server.running
+        page._shutdown()
+        page.server._thread.join(timeout=5)
+        assert AgentConnection.load(tmp_path).enabled
+        again = agent_page.AgentTuningDialog(host)
+        qtbot.addWidget(again)
+        page = again.page
+        qtbot.waitUntil(lambda: page.server is not None and page.server.running)
+        assert page.server.connection_config() == first
+        page._stop_service()
+        assert not AgentConnection.load(tmp_path).enabled
+        monkeypatch.setattr(access, "is_readonly", lambda: True)
+        monkeypatch.setattr(agent_page, "is_readonly", lambda: True)
+        readonly = agent_page.AgentTuningDialog(host)
+        qtbot.addWidget(readonly)
+        readonly.page._start_service()
+        assert readonly.page.server is None
+        assert not readonly.page.start_service.isEnabled()
+    finally:
+        page._shutdown()
+        if page.server:
+            page.server._thread.join(timeout=5)

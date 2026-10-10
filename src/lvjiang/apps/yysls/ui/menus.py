@@ -13,6 +13,14 @@ from ....ui.plugin_menus import add_plugin_menu
 def build_menu(host, menubar) -> None:
     """在通用菜单栏上追加「燕云」菜单（host 作为对话框 parent）"""
     menu = add_plugin_menu(menubar, "yysls", tr("燕云"))
+    from .tuning.agent_page import AgentTuningDialog
+    agent_dialog = AgentTuningDialog(host)
+    host._agent_tuning_dialog = agent_dialog
+
+    def _open_agent_tuning():
+        agent_dialog.show()
+        agent_dialog.raise_()
+        agent_dialog.activateWindow()
 
     def _open_game_config():
         from .game_settings import GameConfigDialog
@@ -33,6 +41,7 @@ def build_menu(host, menubar) -> None:
         (tr("游戏配置"), _open_game_config, "F5"),
         (tr("调律配置"), _open_tuning_rules, "F6"),
         (tr("属性配置"), _open_attr_config, ""),
+        (tr("智能调律"), _open_agent_tuning, ""),
     ]
 
     for label, handler, shortcut in entries:

@@ -5,22 +5,34 @@ import copy
 import json
 import threading
 from concurrent.futures import Future, TimeoutError
+from pathlib import Path
 
-from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QSignalBlocker, Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from ..... import constants
+from .....core.access import is_readonly
+from .....core.agent_connection import AgentConnection, export_agent
 from .....core.agent_docs import AgentDocuments
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_access
+from .....core.agent_settings import AgentSettings, load_agent_settings
 from .....i18n import tr
+from .....ui.button_styles import apply_button_style
+from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
 from ...core.agent.service import AgentService, revision
 
 
@@ -252,6 +264,13 @@ class AgentTuningPage(QWidget):
     def __init__(self, host):
         super().__init__(host)
         self.host = host
+        self.root = constants.PROJECT_ROOT
+        settings_error = ""
+        try:
+            self.connection = AgentConnection.load(self.root)
+        except (OSError, ValueError) as exc:
+            self.connection = AgentConnection()
+            settings_error = str(exc)
         self.bridge = AgentTaskBridge(host)
         self.service = AgentService(constants.PROJECT_ROOT, dispatch=self.bridge.call)
         self.bridge.service = self.service
@@ -260,32 +279,62 @@ class AgentTuningPage(QWidget):
         description = QLabel(tr(
             "启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。"
             "AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。"
-            "切换用户或设备无需重新导出接入配置。"))
+            "启用后每次主实例启动时自动开启服务并同步接入配置。"))
         description.setWordWrap(True)
         layout.addWidget(description)
+        form = QFormLayout()
+        self.port = QSpinBox()
+        self.port.setRange(1, 65535)
+        self.port.setValue(self.connection.port)
+        self.port.valueChanged.connect(self._save_port)
+        form.addRow(tr("MCP 端口"), self.port)
+        self.agent = AutoWidthComboBox(width_mode=ComboWidthMode.STRETCH)
+        self.agent.currentIndexChanged.connect(self._select_agent)
+        form.addRow(tr("使用 Agent"), self.agent)
+        self.export_path = QLineEdit()
+        self.export_path.editingFinished.connect(self._save_export_path)
+        path_row = QHBoxLayout()
+        path_row.addWidget(self.export_path, 1)
+        self.choose_path = QPushButton(tr("选择文件"))
+        self.choose_path.clicked.connect(self._choose_export_file)
+        apply_button_style(self.choose_path, variant="neutral")
+        path_row.addWidget(self.choose_path)
+        form.addRow(tr("导出文件"), path_row)
+        layout.addLayout(form)
         actions = QHBoxLayout()
-        self.start_service = QPushButton(tr("启动 MCP 服务"))
+        self.start_service = QPushButton(tr("启用智能调律"))
         self.start_service.clicked.connect(self._start_service)
         actions.addWidget(self.start_service)
-        self.export = QPushButton(tr("导出 MCP 接入配置"))
+        self.export = QPushButton(tr("同步接入配置"))
         self.export.clicked.connect(self._export)
         actions.addWidget(self.export)
-        self.stop_service = QPushButton(tr("关闭 MCP 服务"))
+        self.download_agent = QPushButton(tr("下载 Agent"))
+        self.download_agent.clicked.connect(self._download_agent)
+        actions.addWidget(self.download_agent)
+        self.stop_service = QPushButton(tr("停用智能调律"))
         self.stop_service.clicked.connect(self._stop_service)
         actions.addWidget(self.stop_service)
         layout.addLayout(actions)
+        for button in (self.start_service, self.export, self.download_agent, self.stop_service):
+            apply_button_style(button, variant="action" if button is self.start_service else "neutral")
         self.entitlement = QLabel()
         self.entitlement.setWordWrap(True)
         layout.addWidget(self.entitlement)
         self.status = QLabel(tr("MCP 服务未启动。导出的配置包含私人连接令牌，请勿公开分享。"))
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.agent_settings = AgentSettings()
+        self.reload_agents()
         layout.addStretch()
         self.timer = QTimer(self)
         self.timer.setInterval(2000)
         self.timer.timeout.connect(self._refresh_state)
         self.timer.start()
         self._refresh_state()
+        if settings_error:
+            self.status.setText(tr("无法读取 MCP 接入配置：") + settings_error)
+        elif self.connection.enabled and not is_readonly():
+            QTimer.singleShot(0, self._start_service)
         app = QApplication.instance()
         if app is not None:
             app.aboutToQuit.connect(self._shutdown)
@@ -293,18 +342,94 @@ class AgentTuningPage(QWidget):
     def _refresh_state(self):
         licensed = has_agent_access()
         running = bool(self.server and self.server.running)
-        self.entitlement.setText("" if licensed else tr(LV1_REQUIRED_MESSAGE))
-        self.start_service.setEnabled(licensed and not running)
+        readonly = is_readonly()
+        self.entitlement.setText(tr("只读实例无法启用 MCP 服务，请使用主实例") if readonly
+                                 else "" if licensed else tr(LV1_REQUIRED_MESSAGE))
+        self.start_service.setEnabled(licensed and not running and not readonly)
         self.start_service.setToolTip("" if licensed else tr(LV1_REQUIRED_MESSAGE))
         self.export.setEnabled(running and self.service.enabled)
-        self.stop_service.setEnabled(running and self.service.enabled)
+        self.agent.setEnabled(not readonly)
+        self.export_path.setEnabled(not readonly)
+        self.choose_path.setEnabled(not readonly)
+        self.download_agent.setEnabled(bool(self.agent_settings.download_url))
+        self.stop_service.setEnabled((running or self.connection.enabled) and not readonly)
+        self.port.setEnabled(not running and not readonly)
+
+    def _save_port(self, port):
+        try:
+            self.connection.port = port
+            self.connection.save(self.root)
+        except (OSError, PermissionError) as exc:
+            self.status.setText(str(exc))
+
+    def reload_agents(self):
+        try:
+            settings = load_agent_settings()
+            with QSignalBlocker(self.agent):
+                self.agent.clear()
+                for item in settings.items:
+                    self.agent.addItem(item.name, item.key)
+                index = self.agent.findData(self.connection.agent_key)
+                self.agent.setCurrentIndex(index if index >= 0 else 0)
+            self.agent_settings = settings
+            self._show_export_path()
+        except (ValueError, OSError) as exc:
+            self.status.setText(tr("Agent 设置无法读取：") + str(exc))
+
+    def _selected_agent(self):
+        return next((item for item in self.agent_settings.items
+                     if item.key == self.agent.currentData()), None)
+
+    def _show_export_path(self):
+        target = self._selected_agent()
+        self.export_path.setText(self.connection.export_paths.get(target.key, target.export_path) if target else "")
+
+    def _select_agent(self):
+        if is_readonly():
+            return
+        self.connection.agent_key = self.agent.currentData() or ""
+        self._show_export_path()
+        try:
+            self.connection.save(self.root)
+            if self.server and self.server.running and self.service.enabled:
+                self._export()
+        except OSError as exc:
+            self.status.setText(str(exc))
+
+    def _save_export_path(self):
+        target = self._selected_agent()
+        if target is None or is_readonly():
+            return
+        try:
+            path = self.export_path.text().strip()
+            if not Path(path).expanduser().is_absolute():
+                raise ValueError(tr("导出路径需为绝对路径或以 ~/ 开头"))
+            if path == target.export_path:
+                self.connection.export_paths.pop(target.key, None)
+            else:
+                self.connection.export_paths[target.key] = path
+            self.connection.save(self.root)
+            if self.server and self.server.running and self.service.enabled:
+                self._export()
+        except (ValueError, OSError) as exc:
+            self.status.setText(str(exc))
+
+    def _download_agent(self):
+        if self.agent_settings.download_url:
+            QDesktopServices.openUrl(QUrl(self.agent_settings.download_url))
 
     def _start_service(self):
         try:
+            if is_readonly():
+                raise PermissionError(tr("只有主实例可以启动 MCP 服务"))
             if not has_agent_access():
                 raise PermissionError(tr(LV1_REQUIRED_MESSAGE))
             if self.server and self.server.running:
                 return
+            self.connection.enabled = True
+            self.connection.port = self.port.value()
+            self.connection.agent_key = self.agent.currentData() or ""
+            self.connection.save(self.root)
             import asyncio
             import sys
 
@@ -315,7 +440,7 @@ class AgentTuningPage(QWidget):
                 "先调用 get_capabilities、list_users 和 read_doc('entry')。游戏机制读 10-game，操作指导读 60-userguide，DSL 与架构读 30-architecture，接口契约读 70-agent。"
                 "开启服务即可使用全部已开放能力；用户和目标按每次调用选择。"
                 "切换用户不需改连接配置；调用受限时向用户解释接口返回原因。"
-                "生成新配置，不修改已有规则。"))
+                "生成新配置，不修改已有规则。"), port=self.connection.port, token=self.connection.token)
             docs.schema_provider = lambda: json.dumps(
                 [tool.model_dump(mode="json") for tool in asyncio.run(server.mcp.list_tools())],
                 ensure_ascii=False, indent=2) + "\n"
@@ -329,32 +454,77 @@ class AgentTuningPage(QWidget):
             server.start()
             self.server = server
             self.service.set_enabled(True)
-            self.status.setText(tr("MCP 服务已启动。导出配置到 WorkBuddy；用户和设备由 AI 通过接口发现，切换时无需重新导出。"))
+            self._export()
         except Exception as exc:  # noqa: BLE001 - show actionable local setup failure
             self.status.setText(str(exc))
         self._refresh_state()
 
     def _stop_service(self):
+        if is_readonly():
+            return
+        self.connection.enabled = False
+        try:
+            self.connection.save(self.root)
+        except OSError as exc:
+            self.status.setText(tr("停用状态未保存：") + str(exc))
+            return
         self.service.set_enabled(False)
         if self.server:
             self.server.stop()
-        self.status.setText(tr("MCP 服务已关闭；已启动的游戏任务继续运行，可在调律管理中停止。"))
+        self.status.setText(tr("智能调律已停用，下次启动不会开启 MCP；已启动的游戏任务继续运行。"))
         self._refresh_state()
 
     def _export(self):
         try:
             if self.server is None:
                 raise ValueError(tr("请先启动 MCP 服务"))
-            text = json.dumps(self.server.connection_config(), ensure_ascii=False, indent=2)
-            name, _ = QFileDialog.getSaveFileName(self, tr("导出私人接入配置"), "lvjiang-mcp.json", "JSON (*.json)")
-            if name:
-                from pathlib import Path
-                Path(name).write_text(text + "\n", encoding="utf-8")
+            config = self.server.connection_config()
+            target = self._selected_agent()
+            if target is None:
+                raise ValueError(tr("请先在 AI 设置的外部 Agent 中添加接入配置"))
+            path = Path(self.connection.export_paths.get(target.key, target.export_path)).expanduser()
+            export_agent(self.root, config, path, transport=target.transport)
+            self.status.setText(tr("MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。").format(agent=target.name))
         except (ValueError, OSError) as exc:
             self.status.setText(str(exc))
+
+    def _choose_export_file(self):
+        if is_readonly():
+            return
+        name, _ = QFileDialog.getSaveFileName(self, tr("选择 Agent 接入配置文件"),
+                                            self.export_path.text(), "JSON (*.json)")
+        if name:
+            self.export_path.setText(name)
+            self._save_export_path()
 
     def _shutdown(self):
         self.service.set_enabled(False)
         self.bridge.close()
         if self.server:
             self.server.stop()
+
+
+class AgentTuningDialog(QDialog):
+    """菜单对话框关闭只隐藏，服务生命周期属于主窗口。"""
+
+    def __init__(self, host):
+        super().__init__(host)
+        self.setWindowTitle(tr("智能调律"))
+        self.resize(760, 330)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMinimizeButtonHint
+                            | Qt.WindowType.WindowMaximizeButtonHint)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        self.page = AgentTuningPage(host)
+        layout.addWidget(self.page)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        button = buttons.button(QDialogButtonBox.StandardButton.Close)
+        if button is not None:
+            apply_button_style(button, variant="neutral")
+        layout.addWidget(buttons)
+
+    def showEvent(self, event):  # noqa: N802 - Qt API
+        self.page.reload_agents()
+        self.page._refresh_state()
+        super().showEvent(event)

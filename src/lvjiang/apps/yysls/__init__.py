@@ -48,11 +48,6 @@ def _build_tuning_management_tab(host):
     return TuningManagementWidget()
 
 
-def _build_agent_tuning_tab(host):
-    from .ui.tuning.agent_page import AgentTuningPage
-    return AgentTuningPage(host)
-
-
 def _build_menu(host, menubar):
     from .ui.menus import build_menu
     build_menu(host, menubar)
@@ -74,7 +69,6 @@ hooks = AppHooks(
     right_tab_builders=[
         (tr("备战方案"), _build_loadout_panel),
         (tr("调律管理"), _build_tuning_management_tab),
-        (tr("智能调律"), _build_agent_tuning_tab),
     ],
     menu_builders=[_build_menu],
     theme_stylesheet_builders=[_quality_stylesheet],

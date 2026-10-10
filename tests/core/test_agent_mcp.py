@@ -63,11 +63,11 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
         docs.read_doc("entry")
 
 
-def test_official_client_can_discover_and_call_with_token_and_reject_without():
+def test_official_client_can_discover_and_call_with_token_and_reject_without(free_tcp_port):
     def hello(name: str) -> dict:
         """Read a deterministic test value."""
         return {"name": name}
-    server = LocalMCPServer({"hello": hello}, instructions="Test transport only", lv1_check=lambda: True)
+    server = LocalMCPServer({"hello": hello}, instructions="Test transport only", lv1_check=lambda: True, port=free_tcp_port)
     server.start()
 
     async def exercise():
@@ -100,7 +100,7 @@ def test_official_client_can_discover_and_call_with_token_and_reject_without():
         assert not server.running
 
 
-def test_lv1_gates_whole_protocol_and_rechecks_existing_connections(monkeypatch):
+def test_lv1_gates_whole_protocol_and_rechecks_existing_connections(monkeypatch, free_tcp_port):
     from lvjiang.core import license
     from lvjiang.core.agent_mcp import LV1_REQUIRED_MESSAGE
 
@@ -117,7 +117,7 @@ def test_lv1_gates_whole_protocol_and_rechecks_existing_connections(monkeypatch)
         calls.append("tool")
         return "hello"
 
-    server = LocalMCPServer({"hello": hello}, instructions="Test Lv1 gate")
+    server = LocalMCPServer({"hello": hello}, instructions="Test Lv1 gate", port=free_tcp_port)
 
     @server.mcp.resource("lvjiang://test")
     def document() -> str:

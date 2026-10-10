@@ -4,7 +4,7 @@
 
 ## 服务与动态上下文
 
-AgentTuningPage 位于“调律管理”旁，仅管理启动、导出和关闭服务。页面不保存
+AgentTuningPage 由“燕云 → 智能调律”的非模态 AgentTuningDialog 承载，管理启用、端口、同步和停用。页面不保存
 固定用户、目标白名单、动作授予或独立生成结果编辑器。开启服务就开放已实现
 能力，服务关闭后 AgentService.set_enabled(False) 阻止排队中操作继续执行。
 
@@ -13,9 +13,9 @@ get_capabilities 和 list_users 经 Qt 桥读取现有 UserManager 的当前用�
 或编辑状态。每次工具明确指定 user；任务可指定 target_id，缺省解析当前目标。
 不存在的用户拒绝，目标选择沿用宿主草稿保存及运行视图投影，再调用现有执行器。
 
-LocalMCPServer 使用官方 FastMCP、Streamable HTTP 和 uvicorn，绑定本机动态
-端口与独立令牌。连接配置不含用户或目标，切换上下文无需重导；不同安装实例
-端口与令牌独立。关闭不停止已有游戏任务，退出关闭桥接并撤销未执行请求。
+LocalMCPServer 使用官方 FastMCP、Streamable HTTP 和 uvicorn，仅允许主实例启动，绑定本机固定端口（默认 18765）。AgentConnection 按安装目录的稳定摘要将端口、启用状态、令牌、所选 Agent 的稳定 key 及各 Agent 导出路径覆盖保存在 `~/.lvjiang/mcp/`。主窗口构建菜单时创建唯一控制器，已启用的服务延迟到 Qt 事件循环自动启动；关闭对话框不销毁控制器。退出撤销服务与桥接请求，但不修改持久化启用状态；显式停用才取消自启。
+
+AgentSettings 从 app.yaml 的 agents 节点读取目录与 download_agent.url，是全局名称、默认路径和协议格式的唯一来源。AI 设置编辑器只保存 agents 节点，保存时读取最新配置以保留其他设置。智能调律选择及路径覆盖属于安装级 AgentConnection，不写回全局默认；程序化刷新选择阻断信号，避免展示触发保存。运行中的导出使用选定 Agent 配置与覆盖路径，下载按钮打开配置链接。共享 JSON 合并在文件锁内读取最新内容，仅更新当前安装对应连接项，原子写回并保留其他服务及顶层设置。令牌跨重启保持稳定，端口冲突报错要求人工修改，不选择随机端口。读取或导出失败只报告本功能故障，不阻止应用启动。
 
 ## 调用时限制与线程
 

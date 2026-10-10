@@ -1,3 +1,15 @@
+agents:
+  download_agent:
+    url: https://www.workbuddy.cn/events/invite?inviteCode=4a8tfecmv97mi3j9
+  items:
+  - key: workbuddy
+    name: WorkBuddy
+    export_path: ~/.workbuddy/mcp.json
+    transport: streamableHttp
+  - key: qoderwork
+    name: QoderWork
+    export_path: ~/.qoderwork/mcp.json
+    transport: streamable-http
 input_simulation:
   before_click_wait:
   - 0.1

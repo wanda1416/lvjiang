@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -85,7 +86,15 @@ class AISettingsPage(QWidget):
         self._shown = False
         self._auto_allowed = True
         saved = self.store.settings()
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        tabs = QTabWidget()
+        model_page = QWidget()
+        layout = QVBoxLayout(model_page)
+        from .agent_settings import AgentSettingsPage
+        self.agents_page = AgentSettingsPage()
+        tabs.addTab(model_page, tr("模型接口"))
+        tabs.addTab(self.agents_page, tr("外部 Agent"))
+        outer.addWidget(tabs)
         intro = QLabel(tr("配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。"))
         intro.setWordWrap(True)
         layout.addWidget(intro)

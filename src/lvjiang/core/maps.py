@@ -30,7 +30,6 @@ from loguru import logger
 
 from ..i18n import tr
 from .config.resolver import LAYER_LOCAL, LAYER_REMOTE, ConfigResolver, get_resolver
-from .config.versioning import register_versioned_dir
 from .scene_definition_models import PointDef, RegionDef
 
 MAPS_DIR = "maps"
@@ -49,8 +48,6 @@ NAV_MODES = (NAV_MODE_PATHFIND, NAV_MODE_CLOSED_LOOP)
 DEFAULT_POI_KIND = "poi"
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-
-register_versioned_dir(MAPS_DIR, "map.yaml", depth=2)
 
 #: HUD 场景的固定实体集：(视图, 类别, key, 名称, 可点击)。
 #: - ``minimap``：小地图可视区域，箭头解析的搜索窗口

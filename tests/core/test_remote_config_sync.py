@@ -363,10 +363,23 @@ class TestStateTransition:
 
 
 def test_versioned_dirs_registered_for_core():
-    """core 自己的配置必须在注册表里，否则整个下发机制形同虚设。"""
+    """core 自己的配置必须在注册表里，否则整个下发机制形同虚设。
+
+    maps 单独点出来：它原先注册在 ``core/maps.py``，而那个模块只被地图管理器
+    对话框惰性导入（ui/main/menu_ops.py 点菜单才 import），启动期的加密包路径
+    校验看不到它，整个包会被判成"包含不支持的路径"而拒绝。本文件不导入
+    ``core.maps``，所以下面的断言只有在注册回到导入期时才会通过。
+    """
     assert "scenes" in versioning.VERSIONED_DIRS
     assert "layouts" in versioning.VERSIONED_DIRS
     assert versioning.spec_for("ocr.yaml") is not None
+
+    maps_spec = versioning.spec_for("maps/demo/map.yaml")
+    assert maps_spec is not None, "maps 必须随 versioning 导入即注册"
+    assert maps_spec.allow_remote_new is True
+
+    from lvjiang.core.config.protected_bundle import valid_path
+    assert valid_path("maps/demo/map.yaml")
 
 
 def test_yysls_online_config_paths_are_registered():

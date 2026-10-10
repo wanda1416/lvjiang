@@ -27,9 +27,13 @@
 
 ## 哪些目录参与
 
-core 只声明自己的（`scenes/`、`layouts/`）。插件私有目录和单文件由插件经
-`AppHooks.config_policy_modules` 自行注册——core.config 不认识任何插件领域
-词汇，理由同 `resolver.REGISTRY_LIST_PATHS`。
+core 只声明自己的（`scenes/`、`layouts/`、`maps/`、`workflows/`、`ocr.yaml`）。
+插件私有目录和单文件由插件经 `AppHooks.config_policy_modules` 自行注册——
+core.config 不认识任何插件领域词汇，理由同 `resolver.REGISTRY_LIST_PATHS`。
+
+注册必须发生在**模块导入期**，不能挂在惰性导入的业务模块上：加密包的路径
+校验（`protected_bundle.valid_path`）在启动早期的同步线程里执行，那时地图
+管理器一类 UI 模块还没被导入，晚注册的目录会被判成"不支持"。
 """
 from __future__ import annotations
 
@@ -100,9 +104,14 @@ def register_versioned_file(rel_path: str) -> None:
         rel_dir=path.parent.as_posix(), pattern=path.name, depth=1)
 
 
-# core 自己的两类：跨插件通用，不属于任何游戏领域
+# core 自己的几类：跨插件通用，不属于任何游戏领域
 register_versioned_dir("scenes", "*.yaml", depth=1)
 register_versioned_dir("layouts", "*.json", depth=2)
+# maps 必须在这里注册，不能放 core/maps.py：那个模块只被地图管理器对话框
+# 惰性导入（ui/main/menu_ops.py 点菜单才 import），而加密包路径校验发生在
+# 启动早期的同步线程里，那时注册表里没有 maps，整包会被判成"包含不支持的
+# 路径"而拒绝。allow_remote_new：地图定义不依赖发版，可以随下发新增。
+register_versioned_dir("maps", "map.yaml", depth=2, allow_remote_new=True)
 register_versioned_dir(
     "workflows", "*.wf", depth=0, allow_remote_new=True,
     remote_mode="append_only")

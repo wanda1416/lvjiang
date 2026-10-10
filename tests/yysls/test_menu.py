@@ -20,7 +20,7 @@ def test_menu_entries_are_available_to_everyone(qtbot, tmp_path, monkeypatch):
     assert actions["调律配置"].shortcut().toString() == "F6"
     assert actions["属性配置"].shortcut().isEmpty()
     assert "采集录制" not in actions
-    actions["智能调律 Agent（实验性）"].trigger()
+    actions["智能调律"].trigger()
     assert host._agent_tuning_dialog.isVisible()
     assert not host._agent_tuning_dialog.isModal()
     host._agent_tuning_dialog.close()

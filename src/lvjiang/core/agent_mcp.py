@@ -52,7 +52,9 @@ class LocalMCPServer:
         async def invoke(*args, **kwargs):
             return await asyncio.to_thread(function, *args, **kwargs)
 
-        invoke.__signature__ = inspect.signature(function)  # type: ignore[attr-defined]
+        # Resolve domain annotations in their original module before wrapping;
+        # the SDK otherwise resolves postponed names against this transport module.
+        invoke.__signature__ = inspect.signature(function, eval_str=True)  # type: ignore[attr-defined]
         return invoke
 
     @property

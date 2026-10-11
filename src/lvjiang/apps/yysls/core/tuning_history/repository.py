@@ -310,6 +310,16 @@ class TuningHistoryRepository:
             ).fetchone()
         return self._run_from_row(row) if row else None
 
+    def get_run_for_task(self, task_run_id: str, username: str) -> TuningRunSummary | None:
+        """按执行任务与用户直接关联调律历史，不受列表条数限制。"""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT r.*, " + _ANOMALY_SUBQUERY +
+                " FROM tuning_runs r WHERE r.task_run_id=? AND r.username=? ORDER BY r.started_at DESC LIMIT 1",
+                (*_ANOMALY_CODES, task_run_id, username),
+            ).fetchone()
+        return self._run_from_row(row) if row else None
+
     def get_results(self, run_id: str) -> tuple[TuningEquipmentResult, ...]:
         with self._connect() as conn:
             rows = conn.execute("""

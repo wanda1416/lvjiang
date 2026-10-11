@@ -11,6 +11,9 @@ Qt 自动经 QueuedConnection 投递到主线程槽函数，无需显式加锁�
 """
 from __future__ import annotations
 
+import copy
+from functools import partial
+
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from lvjiang.apps.yysls.config.tune_slots import SLOT_LABELS
@@ -99,3 +102,17 @@ class TuningProgressHub(QObject):
     # ─── 工作流状态消息（材料不足确认等交互事件）──────────
     status_message = pyqtSignal(str)
     # str: 状态说明文案（如“大律准石 14 < 基准 80，材料不足”）
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._latest: dict = {}
+        for name in ("operation_updated", "batch_progress", "smart_tuning_updated",
+                     "equipment_finished", "tuning_finished", "status_message"):
+            getattr(self, name).connect(partial(self._remember, name))
+
+    def _remember(self, name: str, value) -> None:
+        self._latest[name] = copy.deepcopy(value)
+
+    def snapshot(self) -> dict:
+        """主线程读取各类最新反馈，不累计日志或装备全文历史。"""
+        return copy.deepcopy(self._latest)

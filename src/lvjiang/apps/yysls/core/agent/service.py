@@ -19,6 +19,7 @@ from .....core.config.document_store import DocumentDirectoryStore
 from .....core.config.resolver import ConfigResolver
 from ..loadout import LoadoutRepository
 from ..tuning_rules import parse_tuning_group, parse_tuning_rule
+from .contracts import GenerationPayload, PlanOverrides, TuningPatch
 
 
 def revision(value) -> str:
@@ -123,10 +124,41 @@ class AgentService:
         from ...config.play_styles import get_play_styles
         from ..loadout.models import resolve_school
         school = resolve_school(plan.main_martial_art, plan.sub_martial_art, self.game_config.get_schools())
+        from ...config.equipment_slots import EQUIPMENT_SLOTS
+        from ..graduation.context import PlanContextError, PlanScoringContext
+        equipped = state.resolved_equipment(plan_id)
+        problems = []
+        missing_slots = [slot for slot in EQUIPMENT_SLOTS if slot not in equipped]
+        if missing_slots:
+            problems.append("备战装备不完整，请重新扫描")
+        try:
+            context = PlanScoringContext.from_plan(
+                plan, game_config=self.game_config, world_level=state.world_level or None)
+            model = {"level": context.model_level, "version": context.model_version}
+        except PlanContextError as exc:
+            problems.append(exc.reason)
+            model = None
         return {"plan": {"plan_id": plan.id, **plan.to_dict()}, "equipment": state.resolved_equipment(plan_id),
                 "base_attributes": get_play_styles(school).get(plan.base_attribute, {}) if school else {},
                 "revision": revision(state.to_dict()),
+                "completeness": {"ready": not problems, "missing_slots": missing_slots, "reasons": problems},
+                "model": model, "data_source": "saved_loadout_repository",
+                "freshness": "已有仓储快照，不代表当前游戏穿戴；需要刷新时重新扫描。",
                 "documents": ["equipment", "schools", "damage", "analysis", "generation"]}
+
+    def list_base_attributes(self, user: str, plan_id: str) -> dict:
+        """列出方案所属流派的共享基础属性候选；不限定为该用户已引用的名称。"""
+        from ...config.play_styles import get_play_styles
+        from ..loadout.models import resolve_school
+        self._check(user)
+        state = LoadoutRepository(user, self.users_dir).load()
+        plan = state.plans.get(plan_id)
+        if plan is None:
+            raise ValueError("备战方案不存在")
+        school = resolve_school(plan.main_martial_art, plan.sub_martial_art, self.game_config.get_schools())
+        values = get_play_styles(school) if school else {}
+        return {"school": school, "current": plan.base_attribute, "items": values,
+                "revision": revision(values), "scope": "shared_by_school"}
 
     def get_game_config(self, section: str = "playstyles") -> dict:
         """按主题读实际生效的游戏配置；不开放 app、场景、布局或任意路径。"""
@@ -167,7 +199,7 @@ class AgentService:
                 **definitions,
                 "tune_config": self.resolver.load_merged("yysls/tune_config.yaml")}
 
-    def update_tuning_config(self, user: str, expected_revision: str, patch: dict) -> dict:
+    def update_tuning_config(self, user: str, expected_revision: str, patch: TuningPatch) -> dict:
         """显式保存用户调律选择；字段级合并，不改共享定义或其他工作流，陈旧修订拒绝。"""
         from .....core.user_config import mutate_user_metadata
         from ...config.auto_tuning_config import default_auto_tuning_config
@@ -176,6 +208,7 @@ class AgentService:
         allowed = set(default_auto_tuning_config()) - {"skip_tuning"}
         if set(patch) - allowed:
             raise ValueError("设置补丁包含不开放的字段")
+        self._validate_switches(patch)
 
         def mutate(metadata):
             current = default_auto_tuning_config()
@@ -210,9 +243,8 @@ class AgentService:
         plan = copy.deepcopy(state.plans[plan_id])
         if set(overrides) - {"playstyle", "graduation_scheme", "base_attribute"}:
             raise ValueError("分析覆盖字段无效")
-        if "base_attribute" in overrides and overrides["base_attribute"] not in {
-                p.base_attribute for p in state.plans.values()}:
-            raise PermissionError("基础属性不属于该用户方案引用范围")
+        if "base_attribute" in overrides and overrides["base_attribute"] not in self.list_base_attributes(user, plan_id)["items"]:
+            raise ValueError("基础属性不属于该流派，请调用 list_base_attributes 查询")
         for key, value in overrides.items():
             if not isinstance(value, str):
                 raise ValueError("分析选择必须是有效名称")
@@ -249,7 +281,7 @@ class AgentService:
         threading.Thread(target=run, daemon=True, name="agent-analysis").start()
         return {"job_id": job_id, "state": "running"}
 
-    def analyze_cultivation(self, user: str, plan_id: str, overrides: dict | None = None) -> dict:
+    def analyze_cultivation(self, user: str, plan_id: str, overrides: PlanOverrides | None = None) -> dict:
         """用 list_plans 返回的 plan_id 异步分析毕业率和培养潜力；不写回、不操作游戏，无需设备空闲或调律配置结果 ID。"""
         from ..graduation.affix_impact import analyze_affix_impacts
         from ..graduation.assumptions import Assumptions
@@ -268,6 +300,7 @@ class AgentService:
             assumptions = Assumptions(full_level=context.world_level, full_chengyin=True,
                                       full_dingyin=True, playstyle=plan.playstyle)
             return {"plan_id": plan_id, "revision": revision(state.to_dict()),
+                    "model": {"level": context.model_level, "version": context.model_version},
                     "current_rate": scorer.rate(equipped),
                     "potential_rate": scorer.rate(assumptions.project(equipped, gc)),
                     "assumptions": asdict(assumptions),
@@ -281,7 +314,7 @@ class AgentService:
                     "policy": "建议不自动执行；潜力依赖所列培养假设，不代表概率或即时收益。"}
         return self._job(user, calculate)
 
-    def search_best_combo(self, user: str, plan_id: str, overrides: dict | None = None) -> dict:
+    def search_best_combo(self, user: str, plan_id: str, overrides: PlanOverrides | None = None) -> dict:
         """异步搜索指定用户装备库的真实组合；排除模拟装备，不应用结果。"""
         from ..combat.equipment import EquipmentInventory
         from ..graduation.candidate_pool import CandidateFilter, collect_candidates
@@ -297,17 +330,33 @@ class AgentService:
         )
         def calculate(cancel):
             import time
+            from types import SimpleNamespace
             deadline = time.monotonic() + 10
+            missing_slots = [slot for slot, items in candidates.items() if not items]
+            stop_reason = "missing_candidates" if missing_slots else ""
+            progress = SimpleNamespace(evaluated=0, total=0, message="")
             def stopped():
-                return cancel() or time.monotonic() >= deadline
-            results = search_optimal_combo(
+                nonlocal stop_reason
+                if cancel():
+                    stop_reason = "cancelled"
+                elif time.monotonic() >= deadline:
+                    stop_reason = "time_budget"
+                return bool(stop_reason)
+            results = [] if missing_slots else search_optimal_combo(
                 candidates, context.calculator, context.base_attrs,
                 graduation_context=context.attr_context,
                 cancel_flag=stopped, playstyle=plan.playstyle, max_per_slot=30,
+                progress_counter=progress,
             )
             return {"plan_id": plan_id, "revision": revision(state.to_dict()),
-                    "results": results, "search_complete": not stopped(),
-                    "candidate_limit_per_slot": 30}
+                    "results": results, "search_complete": not stop_reason,
+                    "stop_reason": stop_reason or "completed_bounded_search",
+                    "model": {"level": context.model_level, "version": context.model_version},
+                    "candidate_counts": {slot: len(items) for slot, items in candidates.items()},
+                    "missing_slots": missing_slots,
+                    "evaluated_combinations": progress.evaluated, "search_space": progress.total,
+                    "candidate_limit_per_slot": 30, "time_budget_seconds": 10,
+                    "scope": "真实仓储装备；支配剪枝后每槽至多 30 件，完成仅表示此范围搜索完成，不保证全库全局最优。"}
         return self._job(user, calculate)
 
     def get_analysis_job(self, user: str, job_id: str, cancel: bool = False) -> dict:
@@ -355,9 +404,10 @@ class AgentService:
             if "playstyle" in overrides and overrides["playstyle"] not in self.game_config.get_playstyles_for_arts(
                     [original.main_martial_art, original.sub_martial_art]):
                 raise ValueError("目标玩法与方案武学不符")
-            if "base_attribute" in overrides and overrides["base_attribute"] not in {
-                    p.base_attribute for p in state.plans.values()}:
-                raise PermissionError("基础属性不属于该用户方案引用范围")
+            if any(not isinstance(value, str) for value in overrides.values()):
+                raise ValueError("方案覆盖值必须为名称文本")
+            if "base_attribute" in overrides and overrides["base_attribute"] not in self.list_base_attributes(user, plan_id)["items"]:
+                raise ValueError("基础属性不属于该流派，请调用 list_base_attributes 查询")
         key = f"agent_{result_id}"
         group.update(key=key, name=str(payload.get("name") or "智能调律基础规则"))
         group.pop("content_version", None)
@@ -387,6 +437,7 @@ class AgentService:
         if any(key in supplied for key in ("rules", "base_group", "skip_tuning", "smart_tuning_enabled")):
             raise ValueError("规则绑定由生成接口创建；不能设置测试开关")
         run.update(supplied)
+        self._validate_switches(run)
         from .launch import validate_run_fields
         validate_run_fields(run)
         if not isinstance(run["selected_slots"], list) or not run["selected_slots"] or any(
@@ -396,13 +447,19 @@ class AgentService:
                    smart_tuning_enabled={key: True}, skip_tuning=False)
         return group, rules, run
 
-    def preview_generated_tuning(self, user: str, payload: dict) -> dict:
+    def _validate_switches(self, config: dict) -> None:
+        switches = config.get("switches", {})
+        registered = self.resolver.load_merged("yysls/tune_config.yaml").get("switches", {})
+        if not isinstance(switches, dict) or set(switches) - set(registered):
+            raise ValueError("运行开关未登记，请读取 get_tuning_config 的 tune_config.switches")
+
+    def preview_generated_tuning(self, user: str, payload: GenerationPayload) -> dict:
         """校验全新的基础组、规则与运行参数；不保存，不修改任何已有配置。"""
         group, rules, run = self._generated(user, payload, "preview")
         return {"base_group": group, "rules": rules, "run_config": run,
                 "policy": "将使用新 key 保存到 local；不会设为用户默认配置。"}
 
-    def create_generated_tuning(self, user: str, request_id: str, payload: dict) -> dict:
+    def create_generated_tuning(self, user: str, request_id: str, payload: GenerationPayload) -> dict:
         """成套创建新 local 配置和私人结果记录；重试幂等，已有定义永不覆盖。"""
         self._check(user)
         if not request_id or len(request_id) > 128:
@@ -443,8 +500,8 @@ class AgentService:
         self._check(user)
         return {"results": [r for r in self.store.load("results").values() if r["user"] == user]}
 
-    def validate_auto_tuning(self, user: str, result_id: str, target_id: str = "") -> dict:
-        """复核新配置修订及指定设备的运行前提；回收/重置等行为由配置定义。"""
+    def prepare_generated_tuning(self, user: str, result_id: str) -> dict:
+        """生成结果查看与启动共用的方案快照、配置修订和智能判定检查，不选择设备。"""
         self._check(user)
         record = self.store.load("results").get(result_id)
         if record is None or record["user"] != user or record["status"] != "ready":
@@ -454,8 +511,7 @@ class AgentService:
         rules = [self._entity(f"yysls/tuning_rules/{key}.yaml") for key in config["rules"]]
         if revision([group, rules]) != record["definitions_revision"]:
             raise ValueError("生成配置已被修改，请重新生成或重新核对后启动")
-        parse_tuning_group(group)
-        target_id = self._resolve_target(target_id)
+        parsed_group = parse_tuning_group(group)
         state = LoadoutRepository(user, self.users_dir).load()
         if record["plan_ids"]:
             selected = {key: state.plans[key] for key in record["plan_ids"] if key in state.plans}
@@ -466,21 +522,47 @@ class AgentService:
         for key, overrides in record.get("plan_targets", {}).items():
             for field, value in overrides.items():
                 setattr(state.plans[key], field, value)
-        self.dispatch("validate", {"user": user, "target_id": target_id, "config": config})
-        return {"ready": True, "result_id": result_id, "config": config,
-                "smart_state": state.to_dict(),
-                "target_id": target_id}
+        smart = {"required": parsed_group.smart_tuning.evaluation.enabled,
+                 "active": False, "plans": [], "reason": "基础组未启用毕业率判定"}
+        ready = True
+        if smart["required"]:
+            from ..graduation.smart_tuning import SmartTuningEvaluator
+            parsed_rules = {rule["key"]: parse_tuning_rule(rule) for rule in rules}
+            if parsed_group.smart_tuning.plan_scope == "all":
+                from ..tuning_rules import get_tuning_rule_manager
+                parsed_rules = {**get_tuning_rule_manager().get_rules(), **parsed_rules}
+            evaluator = SmartTuningEvaluator(
+                parsed_group.smart_tuning, username=user, incoming_rule_configs=config["rules"],
+                users_dir=self.users_dir, state=state, rules=parsed_rules, game_config=self.game_config)
+            infos = list(evaluator.plan_infos)
+            covered = {info["plan_id"] for info in infos if info["status"] == "ready"}
+            missing_targets = set(record["plan_ids"]) - covered
+            ready = evaluator.active and not missing_targets
+            smart = {"required": True, "active": evaluator.active, "plans": infos,
+                     "reason": evaluator.disabled_reason or ("指定方案未全部参与智能判定" if missing_targets else ""),
+                     "missing_target_ids": sorted(missing_targets)}
+        return {"ready": ready, "result_id": result_id, "config": config,
+                "smart_state": state.to_dict(), "smart_tuning": smart}
+
+    def validate_auto_tuning(self, user: str, result_id: str, target_id: str = "") -> dict:
+        """复核新配置修订及指定设备的运行前提；回收/重置等行为由配置定义。"""
+        result = {**self.prepare_generated_tuning(user, result_id), "target_id": target_id}
+        if not result["ready"]:
+            return result
+        target_id = self._resolve_target(target_id)
+        self.dispatch("validate", {"user": user, "target_id": target_id, "config": result["config"]})
+        return {**result, "target_id": target_id}
 
     def start_auto_tuning(self, user: str, result_id: str, request_id: str, target_id: str = "") -> dict:
         """按生成结果启动现有调律；本次参数不自动设为默认。"""
-        validated = self.validate_auto_tuning(user, result_id, target_id)
-        return self.dispatch("start_tuning", {**validated, "user": user, "request_id": request_id})
+        self._check(user)
+        return self.dispatch("start_tuning", {"result_id": result_id, "target_id": target_id,
+                                               "user": user, "request_id": request_id})
 
     def start_scan_all_loadouts(self, user: str, request_id: str, skip_existing: bool = False,
                                 target_id: str = "") -> dict:
         """采集游戏可见网格内方案，会切换游戏方案并写入方案/装备/基础属性；不会改应用活动方案。"""
         self._check(user)
-        target_id = self._resolve_target(target_id)
         return self.dispatch("scan", {"user": user, "target_id": target_id,
                                      "request_id": request_id, "skip_existing": skip_existing})
 
@@ -489,7 +571,15 @@ class AgentService:
         self._check(user)
         if action not in {"status", "pause", "resume", "stop"}:
             raise ValueError("任务操作无效")
-        return self.dispatch("task", {"user": user, "task_id": task_id, "action": action})
+        result = self.dispatch("task", {"user": user, "task_id": task_id, "action": action})
+        from ..tuning_history.repository import TuningHistoryRepository
+        path = self.root / "config/session/tuning_history.db"
+        if path.is_file():
+            run = TuningHistoryRepository(path).get_run_for_task(task_id, user)
+            if run is not None:
+                result["tuning_history"] = {key: value for key, value in asdict(run).items()
+                                             if key not in {"markdown_path", "config_snapshot"}}
+        return result
 
     def query_tuning_history(self, user: str, limit: int = 20) -> dict:
         """查询指定用户的实际调律历史，不返回私有日志路径。"""

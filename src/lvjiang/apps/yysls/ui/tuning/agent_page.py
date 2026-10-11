@@ -85,6 +85,17 @@ class AgentTaskBridge(QObject):
         except Exception as exc:  # noqa: BLE001 - resolve every cross-thread request
             future.set_exception(exc)
 
+    @staticmethod
+    def _feedback(run) -> dict:
+        hub = getattr(run.engine, "_progress_hub", None)
+        result = {"progress": hub.snapshot() if hub is not None else {}}
+        outcome = getattr(run.worker, "result_or_exception", None)
+        if isinstance(outcome, BaseException):
+            result["error"] = str(outcome)
+        elif isinstance(outcome, dict) and outcome.get("error"):
+            result["error"] = str(outcome["error"])
+        return result
+
     def perform(self, operation: str, args: dict) -> dict:
         if self.service is not None:
             self.service._ensure_enabled()
@@ -159,9 +170,13 @@ class AgentTaskBridge(QObject):
                     if str(active.state) != "paused":
                         raise ValueError("任务当前未暂停")
                     host._on_pause_resume()
-            result = {"task_id": run.task_run_id, "state": str(run.state), "kind": task["kind"]}
+            result = {"task_id": run.task_run_id, "state": str(run.state), "kind": task["kind"],
+                      **self._feedback(run)}
             if active is not None and getattr(run.ui_helper, "_active_dialog", None) is not None:
-                result.update(state="waiting_user", reason="请在律匠处理当前提示，停止入口仍可用")
+                dialog = run.ui_helper._active_dialog
+                message = dialog.text() if hasattr(dialog, "text") else dialog.windowTitle()
+                result.update(state="waiting_user", reason=message,
+                              recovery="请在律匠处理当前提示，停止入口仍可用")
             if active is None and task["kind"] == "scan":
                 variables = getattr(run.engine, "variables", {})
                 result["scan"] = {key: copy.deepcopy(variables.get(key)) for key in (
@@ -190,7 +205,14 @@ class AgentTaskBridge(QObject):
                             "note": "返回原任务，未重新启动。"}
             if operation == "start_tuning":
                 # Recheck configuration and user existence immediately before launch.
-                args = {**args, **self.service.validate_auto_tuning(args["user"], args["result_id"], args["target_id"])}
+                validated = self.service.validate_auto_tuning(args["user"], args["result_id"], args["target_id"])
+                if not validated["ready"]:
+                    details = validated["smart_tuning"]
+                    reasons = list(dict.fromkeys(info["reason"] for info in details["plans"] if info["reason"]))
+                    raise ValueError("智能判定未就绪：" + "；".join([details["reason"], *reasons]))
+                args = {**args, **validated}
+        if operation == "scan":
+            args = {**args, **self.perform("resolve_target", {"target_id": args["target_id"]})}
         target = host._execution_targets.get(args["target_id"])
         if target is None or not target.ready:
             raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看状态")
@@ -231,7 +253,7 @@ class AgentTaskBridge(QObject):
             self.service.store.mutate("tasks", lambda records: {**records, run.task_run_id: saved})
 
             def complete():
-                data = {**saved, "state": str(run.state)}
+                data = {**saved, "state": str(run.state), **self._feedback(run)}
                 if kind == "scan":
                     variables = getattr(run.engine, "variables", {})
                     data["scan"] = {key: copy.deepcopy(variables.get(key)) for key in (
@@ -315,6 +337,11 @@ class AgentTuningPage(QWidget):
         self.stop_service.clicked.connect(self._stop_service)
         actions.addWidget(self.stop_service)
         layout.addLayout(actions)
+        self.generated_results = QPushButton(tr("查看生成方案并启动"))
+        self.generated_results.clicked.connect(self._open_generated_results)
+        apply_button_style(self.generated_results, variant="neutral")
+        layout.addWidget(self.generated_results)
+        self._results_dialog = None
         for button in (self.start_service, self.export, self.download_agent, self.stop_service):
             apply_button_style(button, variant="action" if button is self.start_service else "neutral")
         self.entitlement = QLabel()
@@ -348,6 +375,7 @@ class AgentTuningPage(QWidget):
         self.start_service.setEnabled(licensed and not running and not readonly)
         self.start_service.setToolTip("" if licensed else tr(LV1_REQUIRED_MESSAGE))
         self.export.setEnabled(running and self.service.enabled)
+        self.generated_results.setEnabled(licensed and running and self.service.enabled and not readonly)
         self.agent.setEnabled(not readonly)
         self.export_path.setEnabled(not readonly)
         self.choose_path.setEnabled(not readonly)
@@ -361,6 +389,14 @@ class AgentTuningPage(QWidget):
             self.connection.save(self.root)
         except (OSError, PermissionError) as exc:
             self.status.setText(str(exc))
+
+    def _open_generated_results(self):
+        from .agent_results import AgentResultsDialog
+        if self._results_dialog is None:
+            self._results_dialog = AgentResultsDialog(self.service, self)
+        self._results_dialog.refresh()
+        self._results_dialog.show()
+        self._results_dialog.raise_()
 
     def reload_agents(self):
         try:

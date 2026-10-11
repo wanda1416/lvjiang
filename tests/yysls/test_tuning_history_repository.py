@@ -78,6 +78,8 @@ def test_results_round_trip_preserves_processing_order(tmp_path):
     assert summary.target_id == "adb:device-1"
     assert summary.target_kind == "adb"
     assert summary.target_label == "Pixel · USB"
+    assert repo.get_run_for_task("task-1", summary.username) == summary
+    assert repo.get_run_for_task("task-1", "another_user") is None
 
 
 def test_only_recent_unreported_telemetry_is_selected(tmp_path):

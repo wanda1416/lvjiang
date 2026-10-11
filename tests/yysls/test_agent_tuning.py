@@ -32,6 +32,9 @@ def setup_service(tmp_path):
     base["tune"]["rules"] = []
     base["tune"]["reset_exhausted_action"] = "skip"
     base["tune"]["lock_qualified"] = False
+    # These generation tests use no equipment/model fixture. Smart readiness has
+    # a dedicated test below; an explicitly ordinary rule remains runnable.
+    base["smart_tuning"]["evaluation"]["enabled"] = False
     rule = yaml.safe_load((system / "tuning_rules/huiyi_general.yaml").read_text(encoding="utf-8"))
     payload = {"name": "会意培养计划", "goal": "优先补齐首饰", "base_group": base,
                "rules": [rule], "run_config": {"selected_slots": ["ring"]}}
@@ -154,7 +157,8 @@ def test_discovered_plan_id_reaches_analysis_without_device_or_tuning_result(set
     before = copy.deepcopy(state.to_dict())
     monkeypatch.setattr(LoadoutRepository, "load", lambda _self: state)
     service._game_config = SimpleNamespace(get_schools=lambda: {})
-    monkeypatch.setattr(PlanScoringContext, "from_plan", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(PlanScoringContext, "from_plan", lambda *_args, **_kwargs:
+                        SimpleNamespace(model_level=115, model_version=1))
 
     def dispatch(operation, _arguments):
         if operation == "context":
@@ -202,3 +206,71 @@ def test_generation_contract_explains_pattern_aliases_without_merging_behavior_p
     with pytest.raises(RuleValidationError, match=r"佩.*环.*patterns\.环.*parts.*佩"):
         service.preview_generated_tuning("test_user", payload)
     assert not service.resolver.local_dir.exists()
+
+
+def test_smart_preflight_reports_missing_plans_before_device_execution(setup_service):
+    """AI 要求毕业率判定但用户未采集时，不得把普通调律宣称为就绪。"""
+    service, payload = setup_service
+    payload['base_group']['smart_tuning']['evaluation']['enabled'] = True
+    record = service.create_generated_tuning('test_user', 'smart', payload)
+    old_dispatch = service.dispatch
+
+    def dispatch(operation, args):
+        assert operation not in {'validate', 'resolve_target'}
+        return old_dispatch(operation, args)
+
+    service.dispatch = dispatch
+    checked = service.validate_auto_tuning('test_user', record['id'])
+    assert not checked['ready']
+    assert not checked['smart_tuning']['active']
+    assert checked['smart_tuning']['reason']
+    assert all(info['reason'] for info in checked['smart_tuning']['plans'])
+    assert service.prepare_generated_tuning('test_user', record['id']) == {
+        key: value for key, value in checked.items() if key != 'target_id'}
+
+
+def test_unknown_runtime_switch_rejected_for_generation_and_save(setup_service):
+    service, payload = setup_service
+    payload['run_config']['switches'] = {'unregistered_switch': True}
+    with pytest.raises(ValueError, match='未登记'):
+        service.preview_generated_tuning('test_user', payload)
+    with pytest.raises(ValueError, match='未登记'):
+        service.update_tuning_config('test_user', 'unused', {'switches': {'unregistered_switch': True}})
+    assert not service.users_dir.exists()
+
+
+def test_shared_base_attributes_can_be_selected_without_prior_user_reference(setup_service, monkeypatch):
+    from types import SimpleNamespace
+
+    from lvjiang.apps.yysls.config import play_styles
+    from lvjiang.apps.yysls.core.graduation.context import PlanScoringContext
+    from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+
+    service, _ = setup_service
+    plan = LoadoutRepository('test_user', service.users_dir).create_plan(
+        '测试方案', '无名剑法', '无名枪法', activate=False)
+    monkeypatch.setattr(play_styles, 'get_play_styles', lambda school: {'共享候选': {'crit_rate': 0.2}})
+    monkeypatch.setattr(PlanScoringContext, 'from_plan', lambda *_args, **_kwargs: SimpleNamespace())
+    choices = service.list_base_attributes('test_user', plan.id)
+    assert choices['scope'] == 'shared_by_school'
+    assert '共享候选' in choices['items']
+    _, derived, _ = service._plan('test_user', plan.id, {'base_attribute': '共享候选'})
+    assert derived.base_attribute == '共享候选'
+    assert LoadoutRepository('test_user', service.users_dir).load().plans[plan.id].base_attribute != '共享候选'
+
+
+def test_combo_search_reports_missing_slots_instead_of_partial_optimal_result(setup_service, monkeypatch):
+    from types import SimpleNamespace
+
+    from lvjiang.apps.yysls.core.loadout.models import LoadoutPlan, LoadoutState
+
+    service, _ = setup_service
+    service._game_config = SimpleNamespace(get_martial_art_weapon=lambda _art: '')
+    context = SimpleNamespace(model_level=115, model_version=1)
+    monkeypatch.setattr(service, '_plan', lambda *_args: (LoadoutState(), LoadoutPlan(id='p', name='测试方案'), context))
+    monkeypatch.setattr(service, '_job', lambda _user, calculate: calculate(lambda: False))
+    result = service.search_best_combo('test_user', 'p')
+    assert not result['search_complete']
+    assert result['stop_reason'] == 'missing_candidates'
+    assert len(result['missing_slots']) == 8
+    assert result['results'] == []

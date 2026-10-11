@@ -2030,6 +2030,9 @@ class RunControlMixin:
                     and getattr(run_context.engine, "return_value", None) == -1
                     and not run_context.stop_event.is_set()):
                 result = {**result, "error": tr("备战方案扫描失败，请查看逐方案结果和导航提示")}
+                # All consumers, including MCP persistence, read the normalized
+                # outcome rather than the DSL's raw return value.
+                worker.result_or_exception = result
             if isinstance(result, dict) and result.get("error"):
                 run_context.metadata["terminal_state"] = "failed"
                 self.log_text.append(f"[错误] {flow_name}: {result['error']}")

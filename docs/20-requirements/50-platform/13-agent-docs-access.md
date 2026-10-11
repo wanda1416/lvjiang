@@ -75,7 +75,7 @@ read_doc 与 lvjiang://docs/{doc_id} 资源提供相同正文，schema 来自实
 | config/{system,remote,local}/yysls/damage_model/*.yaml、attr_model/**/*.yaml、gear_sets/*.yaml | 可计算方案所需模型摘要与来源 | 无 | 按已领域分析接口投影，不开放任意模型文件浏览 |
 | config/session/users/{user}.json 的 workflow_params.auto_tuning | 指定用户的所选部位、规则/玩法、switches、base_group、smart_tuning_enabled 及运行选项 | 用户明确要求保存时修改上述公开字段 | 合并该节点；其他工作流、资料和 UI 状态不读写；字段补丁不等于整份替换 |
 | config/session/users/{user}.loadouts.json | 指定用户的方案、装备和计算所需关联数据 | 仅扫描任务按原采集契约更新 | LoadoutRepository 查询与采集写入；不开放通用编辑、删除、自动换装或培养结果应用 |
-| config/session/yysls/play_styles.json、attr_derivations.json 的方案关联条目 | 指定方案引用的基础属性与必要来源 | 扫描全部方案按既有可信度规则保存基础属性并维护其推导记录 | 由 save_play_style 等权威接口处理，基础属性引用关联回 loadouts JSON；不开放共享属性文件全文或任意编辑 |
+| config/session/yysls/play_styles.json、attr_derivations.json 的方案关联条目 | 指定方案引用的基础属性与必要来源；list_base_attributes 列出该方案流派的共享候选 | 扫描全部方案按既有可信度规则保存基础属性并维护其推导记录 | 由 save_play_style 等权威接口处理，基础属性引用关联回 loadouts JSON；候选不限定为该用户已引用名称，不开放任意文件读取或编辑 |
 | config/session 内 Agent 生成结果记录（results.json 与 tasks.json） | 指定用户的目标、建议、分析引用、配置引用和可启动状态 | 创建新生成结果及发布状态 | 与规则 YAML 分离；不包含凭据，禁止半套结果可启动；不随发行包分发 |
 | config/session/profile.db | 领域分析必需字段，如现有适用的世界等级，注明来源与时间 | 无 | 通过现有仓储/领域接口；无任意 SQL，不当作实时材料库存 |
 | config/session/tuning_history.db | 指定用户/目标任务的调律历史与结果 | 无 | 结构化分页；执行器按原生命周期正常写历史，不是 Agent 直接改 DB |

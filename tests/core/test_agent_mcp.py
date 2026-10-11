@@ -21,6 +21,13 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     spec.loader.exec_module(module)
     output = tmp_path / "installed/docs"
     module.build_bundle(output, archive=tmp_path / "agent.zip")
+    tools = json.loads((output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
+    generation = next(tool for tool in tools if tool["name"] == "create_generated_tuning")
+    payload = generation["inputSchema"]["properties"]["payload"]
+    assert payload["required"] == ["base_group", "rules"]
+    assert not payload["additionalProperties"]
+    assert "plan_targets" in payload["properties"]
+    assert "skip_tuning" not in payload["properties"]["run_config"]["properties"]
     docs = AgentDocuments(output)
     source = AgentDocuments(Path(__file__).parents[2] / "docs", source_mode=True,
                             schema_provider=lambda: (output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))

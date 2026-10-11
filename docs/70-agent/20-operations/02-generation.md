@@ -42,3 +42,52 @@ target_id) 复核配置与设备状态，再调用 start_auto_tuning；target_id
 如用户明确要求保存为以后默认使用的选择，可调用 update_tuning_config，并携带
 get_tuning_config 返回的修订。仅生成和启动不保存默认；保存后可从原自动调律
 入口启动。切换处理用户只改工具 user 参数，不改变 MCP 连接配置。
+
+## 预检结果与生成方案启动
+
+`validate_auto_tuning` 返回 `smart_tuning.required/active/plans/reason`。
+`plans` 包含参与与排除的方案、原因和可计算的基线。基础组启用毕业率判定却没有
+有效方案，或明确指定的目标方案未全部参与时，`ready=false`；先补齐数据或修正
+目标再启动。明确关闭基础组的毕业率判定代表普通规则调律，不得宣称具有智能收益保护。
+
+启动请求先按原始参数与 request_id 查询已有任务。重复请求即使设备忙、离线或
+当前选中目标已改变，也返回原任务；不会再次启动。修改结果或显式目标需换新 ID。
+
+用户也可在智能调律对话框点击“查看生成方案并启动”，选择带执行用户和创建时间的
+结果，查看目标及培养建议后启动。此入口与 MCP 使用同一结果准备逻辑，保留
+plan_ids 和 plan_targets。普通自动调律入口使用用户默认配置，不自动带入生成
+结果的临时目标覆盖；需要重现生成目标时使用生成方案入口。
+
+## 最小生成示例
+
+以下是会意首饰规则的完整结构示例，不是适用于所有用户的推荐策略。先通过
+get_tuning_config 和 get_game_config 核对词条、玩法及规则约定，再填写实际
+plan_ids 和目标。示例空 plan_ids 表示按规则匹配已有方案；缺少可用方案会在预检拒绝。
+
+```json
+{
+  "name": "会意首饰示例",
+  "goal": "示例：比较现有方案的首饰提升",
+  "plan_ids": [],
+  "base_group": {
+    "materials": {"food_rules": []},
+    "scan": {"rules": []},
+    "tune": {"rules": [], "max_resets": 0, "reset_exhausted_action": "skip", "lock_qualified": false},
+    "smart_tuning": {"plan_scope": "incoming", "evaluation": {"enabled": true}}
+  },
+  "rules": [{
+    "name": "会意首饰",
+    "playstyles": ["无名"],
+    "affix_pool": ["最大外功攻击", "势", "劲"],
+    "patterns": {"环": {
+      "first": ["最大外功攻击"],
+      "top_conditions": [{"contains_all": ["最大外功攻击", "势", "劲"]}]
+    }}
+  }],
+  "run_config": {"selected_slots": ["ring", "pendant"]}
+}
+```
+
+生成/覆盖/设置补丁的字段结构随工具 schema 发布。基础组与规则的完整业务语法
+仍由原解析器校验，不能只以 JSON schema 通过作为可执行依据。运行 switches
+必须来自有效注册表，未知开关在预览、创建和保存时拒绝。

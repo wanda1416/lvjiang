@@ -27,3 +27,8 @@ start_scan_all_loadouts 会切换游戏方案并更新装备库、方案及基�
 
 服务不开放任意路径、Shell、SQL、Python 或任意工作流执行。用户可经 MCP 读取
 所有用户的业务数据，不因此开放账号凭据或 API Key。未知材料库存不解释为可用。
+
+任务查询的 progress 提供各类最新阶段、批次与智能判定反馈；error 返回可取得的
+执行失败原因。waiting_user 的 reason 为当前人工提示，recovery 指明处理入口。
+有调律历史时 tuning_history 返回按 task_id 与执行用户精确关联的摘要，其中
+run_id 可直接传给 get_tuning_results。结束任务会保存最后反馈，重启后不会重放。

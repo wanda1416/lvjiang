@@ -12,6 +12,7 @@ App 能明确显示连接状态，设备端辅助已开启，并能真实执行�
 ## 2. 工具链
 
 - JDK 17 或 21；
+- 生成预置配置的宿主 Python 3.10 需安装 `packaging>=23,<27`，例如使用对应解释器执行 `python -m pip install "packaging>=23,<27"`。APK 内的 Chaquopy 依赖不会替宿主安装此模块。
 - Android SDK Platform 35、Build Tools 34.0.0、Platform Tools；
 - Android NDK 26.1.10909125、CMake 3.22.1（原生 OCR）；
 - Python 3.10 作为 Chaquopy `buildPython`；

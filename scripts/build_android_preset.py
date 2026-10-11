@@ -1,4 +1,4 @@
-"""为 Gradle 构建官方预置配置；仅依赖标准库和 core.system_preset。"""
+"""为 Gradle 构建官方预置配置；宿主需标准库、packaging 和 core.system_preset。"""
 from __future__ import annotations
 
 import argparse

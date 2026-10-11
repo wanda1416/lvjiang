@@ -78,9 +78,6 @@ def normalize_scene_doc(doc: dict) -> dict:
 def load_scene_doc(resolver: ConfigResolver) -> dict:
     """分别验证 system/local 后再合并，禁止跨 schema 直接深合并。"""
     system = normalize_scene_doc(resolver.load_system("scenes.yaml"))
-    if resolver.remote_supersedes("scenes.yaml"):
-        protected = normalize_scene_doc(resolver._load_yaml(resolver.remote_dir / "scenes.yaml"))
-        system = merge_doc(system, protected, SCENES_REGISTRY_PATHS)
     local = normalize_scene_doc(resolver.load_local("scenes.yaml"))
     return merge_doc(system, local, SCENES_REGISTRY_PATHS)
 
@@ -153,9 +150,6 @@ def save_scene_doc(resolver: ConfigResolver, doc: dict) -> None:
     normalized = normalize_scene_doc(doc)
     local = normalize_scene_doc(resolver.load_local("scenes.yaml"))
     system = normalize_scene_doc(resolver.load_system("scenes.yaml"))
-    if resolver.remote_supersedes("scenes.yaml"):
-        protected = normalize_scene_doc(resolver._load_yaml(resolver.remote_dir / "scenes.yaml"))
-        system = merge_doc(system, protected, SCENES_REGISTRY_PATHS)
     if resolver.is_dev_mode():
         local_only = set(local.get("scenes", {})) - set(system.get("scenes", {}))
         if local_only:

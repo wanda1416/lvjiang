@@ -78,7 +78,7 @@ def test_bundle_whitelist_preserves_runtime_assets_not_editor_files(bundle, tmp_
     included = {
         "local/workflows/custom.wf", "local/scenes/custom.yaml",
         "local/references/custom.yaml", "local/references/custom/bucket/reference.png",
-        "remote/templates/android/scene/match.png", "local/maps/custom/map.yaml",
+        "system/templates/android/scene/match.png", "local/maps/custom/map.yaml",
         "local/maps/custom/base.png", "local/yysls/tuning_rules/custom.yaml",
         "local/yysls/gear_sets/custom.yaml", "session/users/tester.session.json",
         "session/profile.yaml", "session/yysls/play_styles.json",
@@ -266,29 +266,24 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     assert (users.parent / "preset.json").exists()
 
 
-def test_protected_snapshot_keeps_phone_offline_and_does_not_export_invalid_content(bundle, tmp_path, monkeypatch):
-    from lvjiang.core.config import protected_remote
+def test_sync_uses_installed_system_and_retains_phone_archives(bundle, tmp_path):
     source, archive = bundle
     config = source / "config"
-    system = config / "system/workflows/shared.wf"
-    system.parent.mkdir(parents=True)
-    system.write_text('log "system"', encoding="utf-8")
-    remote = config / "remote/workflows/shared.wf"
-    remote.parent.mkdir(parents=True)
-    remote.write_text('log "protected"', encoding="utf-8")
-    marker = config / "remote/.protected.json"
-    marker.write_text(json.dumps({"files": {"workflows/shared.wf": "test"}}), encoding="utf-8")
-    monkeypatch.setattr(protected_remote, "authorized", lambda doc: True)
+    script = config / "system/workflows/shared.wf"
+    script.parent.mkdir(parents=True)
+    script.write_text('log "installed update"', encoding="utf-8")
+    old_remote = config / "remote/workflows/shared.wf"
+    old_remote.parent.mkdir(parents=True)
+    old_remote.write_text('log "obsolete"', encoding="utf-8")
     build_offline_bundle(source, archive, username="tester", layout="android")
     with zipfile.ZipFile(archive) as package:
-        assert package.read("config/system/workflows/shared.wf") == b'log "protected"'
-        assert "config/remote/workflows/shared.wf" not in package.namelist()
-        assert "config/remote/.protected.json" not in package.namelist()
+        assert package.read("config/system/workflows/shared.wf") == script.read_bytes()
+        assert not any(name.startswith("config/remote/") for name in package.namelist())
         assert "config/local/license.txt" not in package.namelist()
-        assert len(package.namelist()) == len(set(package.namelist()))
-    assert system.read_text(encoding="utf-8") == 'log "system"'
-    monkeypatch.setattr(protected_remote, "authorized", lambda doc: False)
-    build_offline_bundle(source, archive, username="tester", layout="android")
-    with zipfile.ZipFile(archive) as package:
-        assert package.read("config/system/workflows/shared.wf") == b'log "system"'
-        assert "config/remote/workflows/shared.wf" not in package.namelist()
+    phone = tmp_path / "phone"
+    baseline = phone / "config/updates/v0.15.0/r0.zip"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_bytes(b"phone official baseline")
+    install_offline_bundle(archive, phone)
+    assert baseline.read_bytes() == b"phone official baseline"
+    assert (phone / "config/system/workflows/shared.wf").read_bytes() == script.read_bytes()

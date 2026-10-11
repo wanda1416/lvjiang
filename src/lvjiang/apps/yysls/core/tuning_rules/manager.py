@@ -9,7 +9,12 @@ from pathlib import Path
 import yaml
 from loguru import logger
 
-from lvjiang.core.config.resolver import LAYER_LOCAL, ConfigResolver, get_resolver
+from lvjiang.core.config.resolver import (
+    LAYER_LOCAL,
+    ConfigResolver,
+    get_resolver,
+    get_root_resolver,
+)
 
 from .....i18n import tr
 from .models import (
@@ -147,9 +152,7 @@ class TuningRuleManager:
         }
 
     def _base_path(self, rel: str):
-        """越过 local 影子，取 remote/system 里实际的规则内容路径。"""
-        if self._resolver.remote_supersedes(rel):
-            return self._resolver.remote_dir / rel
+        """越过 local 影子，取已安装 system 里的规则内容路径。"""
         system = self._resolver.system_dir / rel
         return system if system.exists() else None
 
@@ -431,6 +434,9 @@ _instance: TuningRuleManager | None = None
 
 def get_tuning_rule_manager() -> TuningRuleManager:
     """获取全局 TuningRuleManager 单例"""
+    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        return scoped_value(TuningRuleManager, TuningRuleManager)
     global _instance
     if _instance is None:
         _instance = TuningRuleManager()
@@ -682,6 +688,9 @@ _group_manager: TuningGroupManager | None = None
 
 def get_tuning_group_manager() -> TuningGroupManager:
     """获取全局 TuningGroupManager 单例"""
+    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        return scoped_value(TuningGroupManager, TuningGroupManager)
     global _group_manager
     if _group_manager is None:
         _group_manager = TuningGroupManager()
@@ -797,6 +806,9 @@ _tune_config_manager: TuneConfigManager | None = None
 
 def get_tune_config_manager() -> TuneConfigManager:
     """获取全局 TuneConfigManager 单例"""
+    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        return scoped_value(TuneConfigManager, TuneConfigManager)
     global _tune_config_manager
     if _tune_config_manager is None:
         _tune_config_manager = TuneConfigManager()
@@ -808,15 +820,14 @@ def get_tune_config() -> TuneConfig:
     return get_tune_config_manager().get()
 
 
-def _on_config_change(rel_path: str):
+def _on_config_change(paths: tuple[str, ...]):
     """配置写入后的失效通知：已创建的单例缓存失效重载"""
-    if rel_path.startswith(_RULES_REL_DIR + "/") and _instance is not None:
+    if any(path.startswith(_RULES_REL_DIR + "/") for path in paths) and _instance is not None:
         _instance.reload()
-    elif rel_path.startswith(
-            _GROUPS_REL_DIR + "/") and _group_manager is not None:
+    if any(path.startswith(_GROUPS_REL_DIR + "/") for path in paths) and _group_manager is not None:
         _group_manager.reload()
-    elif rel_path == _CONFIG_REL_PATH and _tune_config_manager is not None:
+    if _CONFIG_REL_PATH in paths and _tune_config_manager is not None:
         _tune_config_manager.reload()
 
 
-get_resolver().add_change_listener(_on_config_change)
+get_root_resolver().add_batch_change_listener(_on_config_change)

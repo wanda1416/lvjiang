@@ -92,10 +92,12 @@ Release 标题，确保发布页面与历史版本维持一致。
 **注意 config 分层的三个坑**（这类问题在发布说明里不写清，用户永远排查不出来）：
 
 - `config/local` **无条件**优先于 system。用户自己改过 / 重画过的那份配置，系统修正**到不了他**。凡是修了系统配置的，都要提示「若你改过这项，需要手动同步或删除本地覆盖」。
-- `config/remote` 只在 `content_version` **严格大于** system 时才顶替。改了系统内容却不 bump 版本号，已下发过的用户拿不到修正。
-- **发布流程严禁自动或批量提升 `content_version`。** 应用发版、修改了 `config/system`、递增 Android `versionCode`，都不代表要创建新的远端下发代次；三者之间不存在自动联动。发布 Agent 只能检查并报告当前版本，不能因为“文件有改动”就修改该字段。只有开发者明确决定发布一代远端配置，并在编辑器中主动点击「提升至 vN / 提升」时，才允许改变 `content_version`。
-- **`content_version` 不再自动 +1**（0.9 起）。开发模式的普通保存只**保留**原版本号，提升必须在编辑器里显式操作：场景编辑器点「提升至 vN」再保存，调律规则点 key 行的「提升」按钮。这条以前是自动的，现在纯人工，本轮改过、要走在线下发的配置**逐个确认版本号**。
-- 开发模式下若线上版本正顶替某个文件，普通保存写进 system 也不会生效（版本号没超过线上那份）。编辑器保存后会明确提示「尚未生效」，看到就去点提升。
+- 新协议按三段正式系列选择累计增量，不再使用 content_version 仲裁。该字段暂留为 1，
+  发布不自动提升它；schema_version 与应用版本仍各自负责结构和代码兼容。
+- 新版预置必须包含当前线上公开修正或经过验证的替代方案。发布前核对 site/lvjiang/config
+  对应旧正式系列的最新累计包，不得把运行机器吸收会员后的 system 当作公开预置源。
+- `build_system_baseline.py` 从官方 system 完整复制生成安装目录、system-baseline.json 与
+  updates/vX.Y.Z/r0.zip。同系列第四段版本必须保持相同预置基底；改变基底须提升第三段。
 - Android 的 `versionCode` 仅用于应用升级；官方 system 预置以内容摘要更新，个人配置不入包。
 - **`config/system` 在升级时按通道清理，各通道能力不同**。它随包分发、用户侧只读
   （用户改动落 `config/local`），所以升级必须做到「与包内容完全一致」而不是「覆盖
@@ -106,7 +108,7 @@ Release 标题，确保发布页面与历史版本维持一致。
   | 通道 | 清理行为 |
   |------|---------|
   | Windows 安装器 | `[InstallDelete]` 在拷文件前清空 `{app}\config\system` 与 `{app}\_internal` |
-  | Android APK | 新预置代次整目录更新官方 system，保留 local/remote/session/DB；PC 同步校验后交换配置并保留备份 |
+  | Android APK | 新预置代次整目录更新官方 system，保留 local/updates/session/DB；PC 同步校验后交换配置并保留备份 |
   | Windows 便携版 ZIP | **不清理**，用户必须解压到新目录，见下方打包产物说明 |
 
   三条通道都不动 `config/local` 和 `config/session`——前者是用户覆盖，后者是运行

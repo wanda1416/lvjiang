@@ -1,4 +1,4 @@
-content_version: 2
+content_version: 1
 level_configs:
 - level: 91
   allow_reset: false

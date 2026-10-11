@@ -36,8 +36,8 @@ class WorkflowDiscoveryPolicy:
     #:
     #: - ``local`` 最高：用户自己的东西，任何在线下发都不该盖掉。
     #: - ``class`` 次之：内置实现，代码即事实。
-    #: - ``remote`` 最低：在线下发只新增，永不抢占随包或用户脚本。
-    SOURCE_PRIORITY: tuple[str, ...] = ("local", "class", "system", "remote")
+    #: - ``system``：预置与已安装在线更新统一的官方来源。
+    SOURCE_PRIORITY: tuple[str, ...] = ("local", "class", "system")
 
     @classmethod
     def is_internal(cls, rel_path: str) -> bool:

@@ -26,31 +26,32 @@ def test_package_is_deterministic_and_only_contains_official_configuration(offic
     build_system_preset(official, second)
     assert first.read_bytes() == second.read_bytes()
     with zipfile.ZipFile(first) as package:
-        assert set(package.namelist()) == {"app.yaml", "ocr.yaml", "layouts.yaml", "workflows/task.wf", "manifest.json"}
+        assert set(package.namelist()) == {"system/app.yaml", "system/ocr.yaml", "system/layouts.yaml", "system/workflows/task.wf", "manifest.json"}
 
 
-def test_upgrade_preserves_parameters_database_and_pc_sync_until_new_preset(official, tmp_path):
+def test_upgrade_preserves_parameters_database_and_pc_sync_until_new_preset(official, tmp_path, monkeypatch):
     archive = tmp_path / "preset.zip"
     build_system_preset(official, archive)
     phone = tmp_path / "phone"
     assert install_system_preset(archive, phone)
     session = phone / "config/session"
-    (session / "session.json").write_text('{"wf_configs":{"task":{"count":5}}}')
+    (session / "session.json").write_text('{"wf_configs":{"task":{"count":5}}}', encoding="utf-8")
     (session / "profile.db").write_bytes(b"unchanged database")
     (phone / "config/local").mkdir()
-    (phone / "config/local/override.yaml").write_text("local")
-    (phone / "config/system/workflows/task.wf").write_text("PC synced task")
+    (phone / "config/local/override.yaml").write_text("local", encoding="utf-8")
+    (phone / "config/system/workflows/task.wf").write_text("PC synced task", encoding="utf-8")
     assert not install_system_preset(archive, phone)
-    assert (phone / "config/system/workflows/task.wf").read_text() == "PC synced task"
+    assert (phone / "config/system/workflows/task.wf").read_text(encoding="utf-8") == "PC synced task"
     (official / "workflows/task.wf").unlink()
-    (official / "workflows/new.wf").write_text("wait 0.02")
+    (official / "workflows/new.wf").write_text("wait 0.02", encoding="utf-8")
+    monkeypatch.setattr("lvjiang.core.system_preset.__version__", "9.1.0")
     build_system_preset(official, archive)
     assert install_system_preset(archive, phone)
     assert not (phone / "config/system/workflows/task.wf").exists()
     assert (phone / "config/system/workflows/new.wf").is_file()
-    assert json.loads((session / "session.json").read_text())["wf_configs"]["task"]["count"] == 5
+    assert json.loads((session / "session.json").read_text(encoding="utf-8"))["wf_configs"]["task"]["count"] == 5
     assert (session / "profile.db").read_bytes() == b"unchanged database"
-    assert (phone / "config/local/override.yaml").read_text() == "local"
+    assert (phone / "config/local/override.yaml").read_text(encoding="utf-8") == "local"
 
 
 def test_failed_reload_restores_previous_system_and_install_marker(official, tmp_path):
@@ -59,11 +60,11 @@ def test_failed_reload_restores_previous_system_and_install_marker(official, tmp
     phone = tmp_path / "phone"
     install_system_preset(archive, phone)
     marker = (phone / "config/session/preset.json").read_bytes()
-    (official / "workflows/task.wf").write_text("wait 2")
+    (official / "workflows/task.wf").write_text("wait 2", encoding="utf-8")
     build_system_preset(official, archive)
     def fail():
         raise RuntimeError("reload failed")
     with pytest.raises(RuntimeError, match="reload failed"):
         install_system_preset(archive, phone, on_applied=fail)
-    assert (phone / "config/system/workflows/task.wf").read_text() == "wait 0.01"
+    assert (phone / "config/system/workflows/task.wf").read_text(encoding="utf-8") == "wait 0.01"
     assert (phone / "config/session/preset.json").read_bytes() == marker

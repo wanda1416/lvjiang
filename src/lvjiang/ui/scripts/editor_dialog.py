@@ -541,7 +541,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             (dir_items[parent_dir].addChild(node) if parent_dir
              else self.tree.addTopLevelItem(node))
         for e in self._entries:
-            visible_name = f"[远程] {e.name}" if e.file.is_remote else e.name
+            visible_name = e.name
             tooltip = f"{e.rel_path}\n{e.layer}: {e.path}"
             problem = problems.get(e.rel_path)
             if problem:
@@ -697,11 +697,11 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if not self._is_editable(entry):
             menu.addAction(tr("复制到本地以修改")).triggered.connect(
                 lambda: self._copy_to_local(entry))
-        elif (entry.file.overrides_system or entry.file.overrides_remote) \
+        elif entry.file.overrides_system \
                 and not get_resolver().is_dev_mode():
             # 覆盖了系统的影子：能还原，但不能删（删了这个实体就没了，
             # 而系统内容不允许用户删除）
-            target = tr("远程") if entry.file.overrides_remote else tr("系统")
+            target = tr("系统")
             menu.addAction(tr("还原为{target}").format(target=target)).triggered.connect(
                 lambda: self._revert_to_system(entry))
         else:
@@ -744,7 +744,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _revert_to_system(self, entry: ScriptEntry):
         """丢掉 local 影子，回到系统那一份——「复制到本地」的反向操作"""
-        target = tr("远程") if entry.file.overrides_remote else tr("系统")
+        target = tr("系统")
         ret = QMessageBox.question(
             self, tr("还原为{target}").format(target=target),
             tr("丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。")
@@ -787,9 +787,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self._apply_read_only(entry)
         self._set_status(
             "" if entry is None or self._is_editable(entry)
-            else (tr("远程脚本只读——右键「复制到本地以修改」后才能编辑")
-                  if entry.file.is_remote else
-                  tr("系统脚本只读——右键「复制到本地以修改」后才能编辑")))
+            else tr("系统脚本只读——右键「复制到本地以修改」后才能编辑"))
         self._refresh_buttons()
         self._metadata_source_text = None
         self._sync_metadata_panel(force=True)
@@ -802,15 +800,10 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self.lbl_layer.setText("")
             self.lbl_layer.setToolTip("")
             return
-        if entry.file.is_remote:
-            origin = tr("远程（只读）")
-        elif entry.file.is_system:
+        if entry.file.is_system:
             origin = tr("系统") if editable else tr("系统（只读）")
         else:
-            if entry.file.overrides_remote:
-                origin = tr("本地覆盖远程")
-            else:
-                origin = tr("本地覆盖系统") if entry.file.overrides_system else tr("本地")
+            origin = tr("本地覆盖系统") if entry.file.overrides_system else tr("本地")
         label = f"{origin} · {entry.path}"
         self.lbl_layer.setText(label)
         self.lbl_layer.setToolTip(label)
@@ -913,17 +906,15 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         # 系统脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
         # 请在本工作台的「脚本配置」页取消勾选。
         shadow = (cur is not None and editable
-                  and (cur.file.overrides_system or cur.file.overrides_remote)
+                  and cur.file.overrides_system
                   and not get_resolver().is_dev_mode())
         can_delete = editable and not shadow
         if cur is None or can_delete:
             hint = ""
         elif shadow:
-            target = tr("远程") if cur.file.overrides_remote else tr("系统")
+            target = tr("系统")
             hint = tr("这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改").format(
                 target=target)
-        elif cur.file.is_remote:
-            hint = tr("远程脚本不可直接修改或删除；可右键复制为本地副本后检查和修改")
         else:
             hint = tr("系统脚本不可删除；不想展示请在「脚本配置」取消勾选")
         self.btn_delete.setEnabled(can_delete)
@@ -1139,7 +1130,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             source_layer = self._current.layer
             source_root = ({LAYER_LOCAL: resolver.local_dir,
                             LAYER_SYSTEM: resolver.system_dir}.get(
-                                source_layer, resolver.remote_dir) / "workflows")
+                                source_layer, resolver.system_dir) / "workflows")
             try:
                 copy_trace_dependencies(text, source, target,
                                         source_root, target_root / "workflows")

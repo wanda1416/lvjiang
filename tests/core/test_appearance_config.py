@@ -15,7 +15,6 @@ def appearance_config(tmp_path, monkeypatch):
     resolver = ConfigResolver(
         system_dir=SYSTEM_CONFIG_DIR,
         local_dir=tmp_path / "local",
-        remote_dir=tmp_path / "remote",
         dev_mode=False,
     )
     monkeypatch.setattr(layout_manager, "get_resolver", lambda: resolver)

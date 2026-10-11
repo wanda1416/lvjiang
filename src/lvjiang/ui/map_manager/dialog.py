@@ -42,7 +42,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.config.resolver import LAYER_LOCAL, LAYER_REMOTE, SystemContentProtected
+from ...core.config.resolver import LAYER_LOCAL, SystemContentProtected
 from ...core.maps import (
     FULL_VIEW_KEY,
     NAV_MODE_CLOSED_LOOP,
@@ -66,7 +66,7 @@ _NAV_MODE_LABELS = (
     (NAV_MODE_PATHFIND, "游戏寻路（大世界）"),
 )
 _POI_COLUMNS = ("key", "kind", "name", "x", "y")
-_LAYER_LABELS = {LAYER_LOCAL: "本地", LAYER_REMOTE: "远程"}
+_LAYER_LABELS = {LAYER_LOCAL: "本地"}
 
 
 def _encode_png(img: np.ndarray) -> bytes:
@@ -527,7 +527,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         if self._current is None:
             return False
         if self._manager.resolver.is_dev_mode():
-            return not self._current.is_remote
+            return True
         return self._current.layer == LAYER_LOCAL
 
     def _show_map(self, map_def: MapDef | None) -> None:

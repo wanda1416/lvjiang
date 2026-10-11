@@ -26,7 +26,6 @@ def _resolver(tmp_path: Path) -> ConfigResolver:
     return ConfigResolver(
         system_dir=system,
         local_dir=local,
-        remote_dir=remote,
         dev_mode=True,
     )
 
@@ -70,16 +69,16 @@ def test_old_season_file_is_diagnosed_without_renaming(tmp_path: Path, monkeypat
     messages = []
     monkeypatch.setattr(
         "lvjiang.apps.yysls.config.game_config_files.logger.warning", messages.append)
-    for root in (resolver.local_dir, resolver.remote_dir):
+    for root in (resolver.local_dir,):
         legacy = root / "yysls/game_config/levels_and_seasons.yaml"
         legacy.parent.mkdir(parents=True, exist_ok=True)
         legacy.write_text("season_configs: []\n", encoding="utf-8")
     load_game_config(resolver)
-    for root in (resolver.local_dir, resolver.remote_dir):
+    for root in (resolver.local_dir,):
         assert (root / "yysls/game_config/levels_and_seasons.yaml").read_text(
             encoding="utf-8") == "season_configs: []\n"
         assert not (root / "yysls/game_config/seasons.yaml").exists()
-    assert len(messages) == 2
+    assert len(messages) == 1
     assert all("手工改名" in message and "勿直接覆盖" in message for message in messages)
 
 

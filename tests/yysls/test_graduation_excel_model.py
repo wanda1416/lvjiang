@@ -177,39 +177,6 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
         invalidate_graduation_cache()
 
 
-def test_runtime_loads_newer_remote_graduation_scheme(
-        tmp_path, monkeypatch) -> None:
-    import lvjiang.apps.yysls.core.graduation as graduation
-    import lvjiang.apps.yysls.core.graduation.model_registry as registry
-    from lvjiang.apps import load_config_policies
-    from lvjiang.core.config.resolver import ConfigResolver
-
-    load_config_policies()
-    rel_path = "yysls/graduation/110级/鸣金·虹_基础方案_v1.json"
-    source = _load("鸣金·虹")
-    for layer, version, marker in (
-        ("system", 1, "system"),
-        ("remote", 2, "remote"),
-    ):
-        path = tmp_path / layer / rel_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = dict(source)
-        data.update(content_version=version, marker=marker)
-        path.write_text(json.dumps(data), encoding="utf-8")
-    resolver = ConfigResolver(
-        system_dir=tmp_path / "system",
-        local_dir=tmp_path / "local",
-        remote_dir=tmp_path / "remote",
-    )
-    monkeypatch.setattr(registry, "get_resolver", lambda: resolver)
-    invalidate_graduation_cache()
-    try:
-        calculator = graduation.get_graduation_calculator(
-            "鸣金·虹", "基础方案", 110)
-        assert calculator is not None
-        assert registry.load_model(calculator.model.rel_path)["marker"] == "remote"
-    finally:
-        invalidate_graduation_cache()
 
 
 @case_matrix("school", SCHOOLS)

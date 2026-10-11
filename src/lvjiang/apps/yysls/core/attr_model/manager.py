@@ -469,6 +469,9 @@ _instance: AttrModelManager | None = None
 
 def get_attr_model_manager() -> AttrModelManager:
     """获取全局 AttrModelManager 单例"""
+    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        return scoped_value(AttrModelManager, AttrModelManager)
     global _instance
     if _instance is None:
         _instance = AttrModelManager()

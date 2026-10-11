@@ -21,6 +21,7 @@ from ...core.config import (
     parse_android_apps,
 )
 from ...core.config.resolver import get_resolver
+from ...core.config.runtime_snapshot import task_configuration
 from ...core.input_base import InputBackend, InputBackendKind
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
 from ...core.key_validation import validate_key_name
@@ -360,6 +361,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             if end is not None:
                 end()
 
+    @task_configuration
     def _execute_unlocked(self, source, *, initial_variables: dict | None = None,
                           _reset_context: bool = True) -> dict:
         """统一执行入口
@@ -576,14 +578,13 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
 
     @staticmethod
     def _workflows_root_for(base_dir: Path) -> Path | None:
-        """base_dir 所属的 workflows 根目录（local/remote/system 三选一）
+        """base_dir 所属的 workflows 根目录（local/system 三选一）
 
         未命中已知根（测试用任意目录、编辑器临时文件）时返回 None。
         """
         resolver = get_resolver()
         resolved_base = base_dir.resolve()
-        for root in (resolver.system_dir, resolver.local_dir,
-                     resolver.remote_dir):
+        for root in (resolver.system_dir, resolver.local_dir):
             candidate = (root / "workflows").resolve()
             try:
                 resolved_base.relative_to(candidate)
@@ -782,12 +783,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
     def _workflows_rel_dir(path: Path) -> str | None:
         """计算 wf 文件所在目录相对 workflows 根的 posix 路径
 
-        命中 local/remote/system 任一层的 workflows 目录时返回相对目录
+        命中 local/system 任一层的 workflows 目录时返回相对目录
         （顶层为 ""），否则 None（编辑器临时文件、外部绝对路径执行）。
         """
         resolver = get_resolver()
-        for root in (resolver.system_dir, resolver.local_dir,
-                     resolver.remote_dir):
+        for root in (resolver.system_dir, resolver.local_dir):
             try:
                 rel = path.resolve().relative_to((root / "workflows").resolve())
             except (ValueError, OSError):
@@ -840,7 +840,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             if resolved is None:
                 raise WorkflowUserError(
                     f"import 找不到文件: {rel}"
-                    f"（config/local、config/remote、config/system 的 "
+                    f"（config/local、config/system 的 "
                     f"workflows/ 下都没有它）")
             imp_path = Path(resolved)
             imp_resolved = str(imp_path.resolve())

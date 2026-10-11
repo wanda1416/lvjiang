@@ -4,7 +4,7 @@
 导航模式，以及它在屏幕上的入口——这些入口只引用界面场景实体 key，屏幕坐标
 永远在布局层，由场景编辑器标定。
 
-每张地图对应四类文件（均在 system/local/remote 三层内，规则同其它实体）：
+每张地图对应四类文件（均在 system/local 两层内，规则同其它实体）：
 
     maps/{key}/map.yaml              地图定义（本模块读写）
     maps/{key}/base.png              底图
@@ -29,7 +29,7 @@ import yaml
 from loguru import logger
 
 from ..i18n import tr
-from .config.resolver import LAYER_LOCAL, LAYER_REMOTE, ConfigResolver, get_resolver
+from .config.resolver import LAYER_LOCAL, ConfigResolver, get_resolver
 from .scene_definition_models import PointDef, RegionDef
 
 MAPS_DIR = "maps"
@@ -217,11 +217,7 @@ class MapDef:
 
     @property
     def is_system(self) -> bool:
-        return self.layer not in (LAYER_LOCAL, LAYER_REMOTE)
-
-    @property
-    def is_remote(self) -> bool:
-        return self.layer == LAYER_REMOTE
+        return self.layer != LAYER_LOCAL
 
     def poi(self, key: str) -> MapPoi | None:
         return next((p for p in self.pois if p.key == key), None)
@@ -386,15 +382,10 @@ class MapManager:
         rel = base_image_rel_path(map_def.key, map_def.base_image)
         roots = {
             LAYER_LOCAL: self._resolver.local_dir,
-            LAYER_REMOTE: self._resolver.remote_dir,
         }
         preferred = roots.get(map_def.layer, self._resolver.system_dir) / rel
-        if map_def.layer == LAYER_REMOTE and not map_def.base_image_sha256:
-            logger.error(
-                f"远程地图缺少底图摘要，已拒绝加载底图: {map_def.key}")
-            return None
         candidates = [preferred]
-        # 本地影子可继续复用随包底图；remote 也只允许在摘要一致时退回随包图。
+        # 本地影子可继续复用随包底图，并校验摘要。
         system = self._resolver.system_dir / rel
         if system != preferred:
             candidates.append(system)
@@ -478,7 +469,6 @@ class MapManager:
             local_resolver = ConfigResolver(
                 system_dir=self._resolver.system_dir,
                 local_dir=self._resolver.local_dir,
-                remote_dir=self._resolver.remote_dir,
                 dev_mode=False,
             )
             writer = MapManager(local_resolver, registry=self._scene_registry())

@@ -173,7 +173,7 @@ class BatchStageResult:
     #: 对「只做事不返回」的阶段无所谓，但属性单元的条目准备必须回传 username，
     #: 这时要能把「没返回」和「返回了但内容不对」分开报。
     returned: bool = True
-    #: 实际加载的 wf 路径。config/local 与 config/remote 会顶替 system，
+    #: 实际加载的 wf 路径。config/local 会顶替 system，
     #: 报错时带上它，本地覆盖这类问题一眼可见，不用去翻编辑器。
     source: str = ""
 
@@ -323,7 +323,9 @@ class BatchWorker(QThread):
         self._user_scope = ExitStack()
         self._batch_run = None
         try:
-            self._run_locked()
+            from ...core.config.runtime_snapshot import configuration_snapshot
+            with configuration_snapshot():
+                self._run_locked()
         except Exception as exc:
             logger.exception("批量执行失败")
             self.log.emit(f"[批量] 执行或保存失败: {exc}")
@@ -1109,7 +1111,7 @@ class BatchWorker(QThread):
 
         「wf 一次 return 都没走」和「返回了但 username 不对」是两种完全不同的
         排查方向，混成一句话会把人带到错误的地方；实际加载路径一并带上，因为
-        config/local 与 config/remote 会顶替 system，用户自己改过的那份会永久生效。
+        config/local 会顶替 system，用户自己改过的那份会永久生效。
         """
         wf_name = self._spec.workflows.prepare_item
         where = f"（实际加载 {prepared.source}）" if prepared.source else ""
@@ -1117,7 +1119,7 @@ class BatchWorker(QThread):
             return (
                 f"条目准备工作流 {wf_name!r}{where} 没有返回任何值：属性单元要求它"
                 f"返回 {{status, state, username}}。请检查该 wf 是否有顶层 return，"
-                f"以及是否被 config/local 或 config/remote 顶替成了旧版本")
+                f"以及是否被 config/local 顶替成了旧版本")
         return (
             f"条目准备工作流 {wf_name!r}{where} 未返回本单元可执行的用户名"
             f"（得到 {prepared.username!r}）：属性单元必须由它选定成员并回传"

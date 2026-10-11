@@ -5,8 +5,7 @@
 成功还是失败都必须推进下一步，任何一环的网络故障都不能卡住启动流程。
 
 在线配置同步和统计上报一样没有 UI，也放在链尾；两者互不依赖，各自起线程
-即可，不必再串一层。它拉下来的配置**下次启动才生效**（不热切换），
-理由见 `core/config/remote.py`。
+即可，不必再串一层。候选后台校验后由主线程安装并刷新，当前任务持有独立快照。
 
 各 checker/reporter/syncer 都要挂在 self 上防止被 GC（Qt 对象的 Python 端
 引用一旦释放，底层线程还没跑完就会被回收）。
@@ -96,32 +95,79 @@ class StartupOpsMixin:
         self._start_remote_config_sync_on_startup()
 
     def _start_remote_config_sync_on_startup(self):
-        """启动期拉取在线配置（无 UI，失败静默）。
+        """后台获取候选，在主线程提交安装、刷新控件；任务读取独立快照。"""
+        from loguru import logger
+        from PyQt6.QtCore import QTimer
 
-        job 在主线程构造、状态回写在主线程的槽里做——worker 线程绝对不能
-        写 SessionStore，见 core/remote_config_sync.py 模块 docstring。
-
-        拉下来的配置**不热切换**：下载落在暂存层（``config/remote.staging/``），
-        由 ``__main__`` 在下次启动早期经 ``promote_pending()`` 提升为生效层。
-        光靠约定做不到这点——工作流每次启动都会重新 ``load_layout()``
-        （见 run_control.py），会立刻读到写进生效层的新布局，而场景注册表
-        只在进程启动时加载一次，半新半旧配在一起出的问题极难查。
-        """
-        from ...core.config.remote import apply_outcome
+        from ...core.config.remote import apply_outcome, build_sync_job
+        from ...core.config.update_activation import activate_configuration
+        from ...core.config.update_observer import InstallationObserver
+        from ...core.config.update_store import UpdateStore
         from ...core.remote_config_sync import RemoteConfigSyncer
 
-        syncer = RemoteConfigSyncer(self)
-
+        running = getattr(self, "_startup_remote_config_syncer", None)
+        if running is not None and running.isRunning():
+            self._config_sync_again = True
+            return
+        try:
+            job = build_sync_job()
+            if job.is_empty:
+                return
+            observer = getattr(self, "_config_install_observer", None)
+            if observer is None:
+                observer = InstallationObserver(UpdateStore(job.config, job.app_version, job.baseline_sha256))
+                self._config_install_observer = observer
+                timer = QTimer(self)
+                timer.setInterval(2000)
+                def poll():
+                    try:
+                        def activate(changed):
+                            activate_configuration(observer.store.system, changed)
+                            self._refresh_installed_configuration(changed)
+                        observer.poll(activate)
+                    except Exception as error:
+                        logger.warning("配置更新感知失败，下次重试: {}", error)
+                timer.timeout.connect(poll)
+                timer.start()
+                self._config_install_timer = timer
+        except Exception as error:
+            logger.warning("无法初始化配置更新，保留当前配置: {}", error)
+            return
+        syncer = RemoteConfigSyncer(self, job=job)
         def on_finished_ok(result):
-            apply_outcome(result)
-
-        def on_failed(_message: str):
-            pass  # 静默：拿不到在线配置就用系统配置，本来就是可用状态
-
+            try:
+                changed = apply_outcome(result)
+                observer.accept()
+                self._refresh_installed_configuration(changed)
+            except Exception as error:
+                logger.warning("配置更新未完成，保留可用配置: {}", error)
         syncer.finished_ok.connect(on_finished_ok)
-        syncer.failed.connect(on_failed)
+        def completed():
+            if getattr(self, "_config_sync_again", False):
+                self._config_sync_again = False
+                self._start_remote_config_sync_on_startup()
+        syncer.finished.connect(completed)
         syncer.start()
-        self._startup_remote_config_syncer = syncer  # 防止被 GC
+        self._startup_remote_config_syncer = syncer
+
+    def _refresh_installed_configuration(self, changed: tuple[str, ...]):
+        if not changed:
+            return
+        if any(name.startswith("workflows/") for name in changed):
+            # 不重建当前参数编辑区，保留用户尚未保存的草稿及本次批量顺序。
+            self._load_workflow_configs()
+        if any(name.startswith("references/") for name in changed):
+            self._refresh_reference_space_combo()
+        if any(name == "layouts.yaml" or name.startswith("layouts/") for name in changed):
+            self._refresh_layout_combo(self.layout_combo.currentData() or "")
+        if "app.yaml" in changed:
+            from ...core.config import load_user_config
+            # 替换主页面默认快照，不原地修改运行中的引擎/批量上下文。
+            active_hotkeys = self._user_config.hotkeys
+            self._user_config = load_user_config()
+            self._user_config.hotkeys = active_hotkeys
+            self._refresh_plan_combo()
+        self.statusBar().showMessage("官方配置已更新；已打开的编辑器保留草稿，保存前请核对新配置。", 15000)
 
     def _start_telemetry_report_on_startup(self):
         """启动期的统计上报：心跳（若今天还没发过）+ 积压的调律批次。

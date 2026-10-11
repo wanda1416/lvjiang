@@ -109,7 +109,7 @@ def _workflows_rel(path: Path | None) -> str:
         return ""
     resolved = path.resolve()
     resolver = get_resolver()
-    for root in (resolver.local_dir, resolver.remote_dir, resolver.system_dir):
+    for root in (resolver.local_dir, resolver.system_dir):
         base = (root / WORKFLOWS_DIR).resolve()
         try:
             return resolved.relative_to(base).as_posix()

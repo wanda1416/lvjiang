@@ -1,15 +1,8 @@
-"""配置解析器 —— system/remote/local 多层配置的唯一读写咽喉
+"""配置解析器 —— local 与 system 两层配置的唯一读写入口。
 
-目录职责：
-- config/system  系统默认（进 git，用户模式下只读）
-- config/remote  在线下发层（不进 git，见 core.config.remote）：只对实体
-  文件生效，且只在 content_version 严格新于 system 时才顶替 system
-- config/local   用户覆盖层：影子文件 + 键级 diff（目录结构镜像 system）
-- config/session 纯运行态（不经本模块，见 core.config.session.SessionStore）
-
-读语义（两模式一致）：local > remote（版本更新才生效）> system。
-写语义（按模式路由）：开发模式写 system，用户模式写 local；
-**任何模式都不写 remote**——那层是下发下来的，本地改动一律落 local。
+system 为已经安装的官方内容；local 为用户覆盖；updates 仅负责更新归档。
+session 为运行与用户数据，不经过此模块。读取 local > system；
+开发模式写 system，用户模式写 local。在线安装器独立负责 system 的事务替换。
 
 模式判定：LVJIANG_DEV_MODE 环境变量（1/0）强制覆盖 > PROJECT_ROOT/.git 探测。
 
@@ -42,7 +35,7 @@ import os
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import yaml
 from loguru import logger
@@ -54,12 +47,6 @@ from . import versioning
 # 层根目录：ConfigResolver 内部持有，外部经 ConfigResolver API 访问
 SYSTEM_CONFIG_DIR = constants.CONFIG_DIR / "system"
 LOCAL_CONFIG_DIR = constants.CONFIG_DIR / "local"
-REMOTE_CONFIG_DIR = constants.CONFIG_DIR / "remote"
-#: 在线配置的**暂存**层：本次会话下载的内容先落在这里，下次启动才提升为
-#: 生效层（见 core.config.remote.promote_pending / stage_dir_for）。
-#: 直接写生效层会让本次会话就读到新配置——工作流每次启动都会重新
-#: load_layout，而场景注册表只在启动时加载一次，于是出现半新半旧。
-REMOTE_STAGE_DIR = constants.CONFIG_DIR / "remote.staging"
 
 # 聚合 diff 中的删除键标记
 DELETED_KEY = "__deleted__"
@@ -67,7 +54,6 @@ DELETED_KEY = "__deleted__"
 #: 实体来源层标识（见 ConfigResolver.describe_entity）。展示用的中文标签留给
 #: UI 层做 i18n，core 只给稳定的 key。
 LAYER_LOCAL = "local"
-LAYER_REMOTE = "remote"
 LAYER_SYSTEM = "system"
 
 
@@ -75,7 +61,7 @@ LAYER_SYSTEM = "system"
 class EntityOrigin:
     """某个实体文件实际生效的来源层与内容版本。
 
-    ``layer`` 为空串表示该实体不存在（三层都没有）；``version`` 为 None
+    ``layer`` 为空串表示该实体不存在（两层都没有）；``version`` 为 None
     表示这一层的文件没有 content_version（未参与在线下发的类型都是如此）。
     """
 
@@ -351,13 +337,10 @@ def compute_diff(base: dict, desired: dict,
 # ─── 解析器 ──────────────────────────────────────────────
 
 class ConfigResolver:
-    """system/remote/local 三层配置解析器
+    """system/local 两层配置解析器
 
     不带参构造时各层根目录动态取自 constants（monkeypatch 友好）；
     测试可显式传入 tmp_path 与 dev_mode 构造隔离实例。
-
-    remote 层只对**实体文件**生效，且只在版本更新时顶替 system，
-    见 :meth:`resolve_read`。聚合键值文件（app.yaml 等）不走 remote。
     """
 
     def __init__(
@@ -365,20 +348,17 @@ class ConfigResolver:
         system_dir: Path | str | None = None,
         local_dir: Path | str | None = None,
         dev_mode: bool | None = None,
-        remote_dir: Path | str | None = None,
     ):
         self._system_dir = Path(system_dir) if system_dir else None
         self._local_dir = Path(local_dir) if local_dir else None
-        self._remote_dir = Path(remote_dir) if remote_dir else None
         self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
         self._listeners: list[Callable[[str], None]] = []
+        self._batch_listeners: list[Callable[[tuple[str, ...]], None]] = []
         # YAML 解析结果按文件缓存；返回时必须深拷贝，因为
         # save_merged 等调用方会就地修改读到的文档。
         self._yaml_cache: dict[
             str, tuple[tuple[int, int], dict]
         ] = {}
-        #: 已记过「远程顶替系统」日志的 (rel_path, 远程版本)，见 _log_supersede
-        self._logged_supersedes: set[tuple[str, int]] = set()
 
     @staticmethod
     def _compute_dev_mode() -> bool:
@@ -404,12 +384,6 @@ class ConfigResolver:
             return self._local_dir
         return LOCAL_CONFIG_DIR
 
-    @property
-    def remote_dir(self) -> Path:
-        if self._remote_dir is not None:
-            return self._remote_dir
-        return REMOTE_CONFIG_DIR
-
     def is_dev_mode(self) -> bool:
         """开发模式（写 system）or 用户模式（写 local）
 
@@ -429,7 +403,6 @@ class ConfigResolver:
     def clear_read_cache(self) -> None:
         """外部完整配置快照应用后使读取缓存失效，不改变层优先级或监听器。"""
         self._yaml_cache.clear()
-        self._logged_supersedes.clear()
 
     def add_change_listener(self, cb: Callable[[str], None]):
         if cb not in self._listeners:
@@ -439,114 +412,39 @@ class ConfigResolver:
         if cb in self._listeners:
             self._listeners.remove(cb)
 
-    def _notify(self, rel_path: str):
+    def add_batch_change_listener(self, cb: Callable[[tuple[str, ...]], None]):
+        if cb not in self._batch_listeners:
+            self._batch_listeners.append(cb)
+
+    def _notify(self, rel_path: str, *, strict: bool = False):
+        self.notify_changes((rel_path,), strict=strict)
+
+    def notify_changes(self, paths: tuple[str, ...], *, strict: bool = False):
         # 写入路径主动失效，补上“同一 mtime tick 内写入了
         # 同尺寸内容”这个 stat 印记无法区分的极端情况。
-        for root in (self.system_dir, self.local_dir, self.remote_dir):
-            self._yaml_cache.pop(str(root / rel_path), None)
-        for cb in list(self._listeners):
+        for rel_path in paths:
+            for root in (self.system_dir, self.local_dir):
+                self._yaml_cache.pop(str(root / rel_path), None)
+        callbacks: list[tuple[Callable[..., None], Any]] = [(cb, paths) for cb in self._batch_listeners]
+        callbacks.extend((cb, path) for path in paths for cb in self._listeners)
+        for cb, argument in callbacks:
             try:
-                cb(rel_path)
+                cb(argument)
             except Exception as e:  # noqa: BLE001 监听器异常不阻断写入方
+                if strict:
+                    raise
                 logger.warning(f"配置变更监听器异常: {e}")
 
     # ─── 实体文件（整文件影子）───────────────────────────
 
-    def remote_supersedes(self, rel_path: str) -> bool:
-        """remote 层该文件是否该顶替 system —— 版本更新才算数。
-
-        **不是「remote 优先」**：用户升了 App，system 带来 v5 的场景坐标，
-        而远程还停在给旧版本热修的 v3，无脑覆盖会把配置静默回退成旧的，
-        没有报错，只表现为"识别又坏了"。所以恒要求 remote 严格新于 system。
-
-        三道闸门，任一不过就用 system：
-        1. 该路径参与在线下发（versioning 注册表里声明过）
-        2. system 侧版本号可读——**缺失即拒绝**（fail-safe，见 versioning
-           模块文档）；system 没有该文件时只有声明了 allow_remote_new 的
-           目录才接受远程新增
-        3. remote 侧版本号可读且严格大于 system
-        """
-        from .protected_remote import path_status
-        protected = path_status(self.remote_dir, rel_path)
-        if protected is False:
-            return False
-        spec = versioning.spec_for(rel_path)
-        if protected and (spec is None or spec.remote_mode == "append_only"
-                          or not (self.system_dir / rel_path).exists()):
-            return (self.remote_dir / rel_path).is_file()
-        if spec is None:
-            return False
-        remote = self.remote_dir / rel_path
-        if not remote.exists():
-            return False
-        system = self.system_dir / rel_path
-        if spec.remote_mode == "append_only":
-            # 无内容版本的实体只允许补充：永远不能覆盖随包 system 文件。
-            if system.exists():
-                token = (rel_path, -1)
-                if token not in self._logged_supersedes:
-                    self._logged_supersedes.add(token)
-                    logger.warning(
-                        f"remote 只新增文件与 system 冲突，已忽略: {rel_path}")
-                return False
-            self._log_supersede(rel_path, None, 0)
-            return True
-        remote_version = versioning.read_version(remote)
-        if remote_version is None:
-            logger.warning(f"remote 配置缺 content_version，已忽略: {rel_path}")
-            return False
-
-        if not system.exists():
-            # 系统没有这个文件 = 远程新增。只有明确允许的目录才接受，
-            # 否则远程凭空多出的场景/布局是死的（没在 scenes.yaml 登记）。
-            if not spec.allow_remote_new:
-                logger.warning(
-                    f"remote 下发了系统不存在的文件，该目录未允许新增，已忽略: "
-                    f"{rel_path}")
-                return False
-            self._log_supersede(rel_path, None, remote_version)
-            return True
-
-        system_version = versioning.read_version(system)
-        if system_version is None:
-            logger.warning(
-                f"系统配置缺 content_version，拒绝 remote 替换: {rel_path}")
-            return False
-        if remote_version <= system_version:
-            return False
-        self._log_supersede(rel_path, system_version, remote_version)
-        return True
-
-    def _log_supersede(self, rel_path: str, system_version: int | None,
-                       remote_version: int) -> None:
-        """远程顶替系统时记一条，同一文件同一版本只记一次。
-
-        没有这条日志，远程配置生效是**完全静默**的：开发者本地跑出来的行为
-        和用户不一样却毫不知情，用户报"识别坏了"时根本复现不出来——而这
-        恰恰是在线下发最需要被排查的一类问题。
-
-        去重是必须的：resolve_read 是热路径，enumerate_entities 还会对整个
-        目录逐个调用，不去重会刷屏到没人看日志。
-        """
-        token = (rel_path, remote_version)
-        if token in self._logged_supersedes:
-            return
-        self._logged_supersedes.add(token)
-        origin = "系统无此文件" if system_version is None else f"系统 v{system_version}"
-        remote_label = ("远程新增" if remote_version == 0
-                        else f"远程 v{remote_version}")
-        logger.info(f"[在线配置] 生效：{rel_path}（{origin} → {remote_label}）")
-
     def resolve_read(self, rel_path: str) -> Path | None:
-        """实体读解析：local 影子 → remote（版本更新才生效）→ system
+        """实体读解析：local 影子 → system
 
         local 恒为最高优先级——用户自己改过的东西，任何在线下发都不该盖掉。
         """
         local = self.local_dir / rel_path
         if local.exists():
             return local
-        if self.remote_supersedes(rel_path):
-            return self.remote_dir / rel_path
         system = self.system_dir / rel_path
         return system if system.exists() else None
 
@@ -562,8 +460,6 @@ class ConfigResolver:
             return EntityOrigin(layer="", version=None)
         if path == self.local_dir / rel_path:
             layer = LAYER_LOCAL
-        elif path == self.remote_dir / rel_path:
-            layer = LAYER_REMOTE
         else:
             layer = LAYER_SYSTEM
         return EntityOrigin(layer=layer, version=versioning.read_version(path))
@@ -572,11 +468,10 @@ class ConfigResolver:
         """列出实体在各配置层实际存在的副本，按读取优先级排序。
 
         与 :meth:`describe_entity` 的区别是：后者只回答当前生效的是谁；本方法
-        同时保留被遮蔽的 remote/system 副本，供界面解释完整版本关系。
+        同时保留被遮蔽的 system 副本，供界面解释完整版本关系。
         """
         candidates = (
             (LAYER_LOCAL, self.local_dir / rel_path),
-            (LAYER_REMOTE, self.remote_dir / rel_path),
             (LAYER_SYSTEM, self.system_dir / rel_path),
         )
         return tuple(
@@ -587,19 +482,12 @@ class ConfigResolver:
 
     def enumerate_entities(self, rel_dir: str, pattern: str, *,
                            include_internal: bool = False) -> list[str]:
-        """枚举实体文件名：system ∪ local ∪ remote 并集，跳过 _ 前缀
+        """枚举实体文件名：system ∪ local 并集，跳过 _ 前缀
 
         ``include_internal=True`` 时保留 ``_`` 前缀文件。发现层要跳过它们
         （编辑器临时运行、录制产物不该注册成脚本），但文件树是「磁盘上有
         什么就显示什么」，藏起来反而让人找不到自己刚录的东西。
 
-        remote 侧只有通过 :meth:`remote_supersedes` 闸门的文件才计入——
-        否则远程一份版本更旧、或落在不允许新增的目录里的文件，会在编辑器
-        列表里冒出来却永远读不到（resolve_read 会解析回 system），
-        列表和实际内容对不上比少一个条目更难查。
-
-        Returns:
-            排序后的文件名列表（不含目录），local 遮盖同名天然成立。
         """
         names: set[str] = set()
         for root in (self.system_dir, self.local_dir):
@@ -609,16 +497,6 @@ class ConfigResolver:
             for p in base.glob(pattern):
                 if p.is_file() and (include_internal
                                     or not p.name.startswith("_")):
-                    names.add(p.name)
-        remote_base = self.remote_dir / rel_dir if rel_dir else self.remote_dir
-        if remote_base.is_dir():
-            for p in remote_base.glob(pattern):
-                if not p.is_file():
-                    continue
-                if not include_internal and p.name.startswith("_"):
-                    continue
-                rel = f"{rel_dir}/{p.name}" if rel_dir else p.name
-                if self.remote_supersedes(rel):
                     names.add(p.name)
         return sorted(names)
 
@@ -646,7 +524,7 @@ class ConfigResolver:
                 results.append(f"{sub}/{name}" if sub else name)
             # 子目录同样取并集：local 可以新建 system 没有的目录
             child_names: set[str] = set()
-            for root in (self.system_dir, self.local_dir, self.remote_dir):
+            for root in (self.system_dir, self.local_dir):
                 base = root / full
                 if not base.is_dir():
                     continue
@@ -664,15 +542,13 @@ class ConfigResolver:
     def next_entity_version(self, rel_path: str) -> int:
         """返回实体下一发布版本号，不写盘。
 
-        system 与已下载 remote 取较大值，避免作者基于在线热修继续编辑时生成
-        同号异内容。只允许参与在线下发的实体路径调用。
+        保留既有编辑器的字段操作；该字段不再参与在线更新仲裁。
         """
         spec = versioning.spec_for(rel_path)
-        if spec is None or spec.remote_mode != "content":
+        if spec is None or not spec.has_content_version:
             raise ValueError(f"实体不参与版本管理: {rel_path}")
         versions = [
             versioning.read_version(self.system_dir / rel_path) or 0,
-            versioning.read_version(self.remote_dir / rel_path) or 0,
         ]
         return max(versions) + 1
 
@@ -711,8 +587,7 @@ class ConfigResolver:
         在用户显式请求提升、并最终确认保存时才传 ``content_version``；点击
         提升链接本身不写盘，因此放弃编辑不会留下版本变更。
 
-        用户模式写 local 不动版本号：版本号是 system 与 remote 之间的仲裁
-        依据，local 影子恒为最高优先级，不参与比较。
+        用户模式写 local 不动暂留的内容版本号；local 影子恒为最高优先级。
         ``force`` 关掉下面的空操作检测，用于「用户明确要求生成 local 影子」
         （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与系统一致，
         不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
@@ -723,7 +598,7 @@ class ConfigResolver:
         writing_system = root == self.system_dir
         spec = versioning.spec_for(rel_path)
         if (isinstance(data, str) and writing_system
-                and spec is not None and spec.remote_mode == "content"):
+                and spec is not None and spec.has_content_version):
             if content_version is None:
                 data = versioning.preserve_version_for_write(
                     rel_path, data, target)
@@ -742,7 +617,7 @@ class ConfigResolver:
             #
             # 用户模式下这一步尤其要紧：照写会给一个其实没改过的文件生成
             # local 影子，而实体文件是**整文件影子**（local 有就完全顶掉
-            # system/remote，不合并），于是这个文件从此收不到任何系统更新
+            # system，不合并），于是这个文件从此收不到任何系统更新
             # 与在线下发。场景编辑器里"什么都没改、随手点一下保存"就会
             # 把整个布局的场景全冻住，代价与操作的随意程度完全不匹配。
             return target
@@ -763,7 +638,7 @@ class ConfigResolver:
 
         1. 目标文件已存在：与它比对，相同即纯粹的空操作。
         2. 目标文件不存在：只有**用户模式**才比较——此时目标是 local 影子，
-           跳过写入后 resolve_read 仍会解析到当前那一层（system 或 remote），
+           跳过写入后 resolve_read 仍会解析到当前那一层（system），
            内容一致则读到的东西不变。开发模式不能这样判：目标是 system，
            而 resolve_read 可能解析到 local 影子，拿它比对会把"作者要新建
            系统文件"这件事误判成空操作。
@@ -798,8 +673,7 @@ class ConfigResolver:
         默认禁止」相关文档）。否则远程新增的调律规则会变成用户可删，
         删掉之后下次同步又回来，行为莫名其妙。
         """
-        return ((self.system_dir / rel_path).exists()
-                or self.remote_supersedes(rel_path))
+        return (self.system_dir / rel_path).exists()
 
     def ensure_entity_deletable(self, rel_path: str) -> None:
         """在删除或重命名实体前校验当前身份是否有权限。
@@ -893,17 +767,8 @@ class ConfigResolver:
         return self._load_yaml(self.local_dir / rel_path)
 
     def load_merged(self, rel_path: str) -> dict:
-        """聚合读：system/remote 有效基底 ← local diff 深合并。"""
-        base_path = (
-            self.remote_dir / rel_path
-            if self.remote_supersedes(rel_path)
-            else self.system_dir / rel_path
-        )
-        base = self._load_yaml(base_path)
-        from .protected_bundle import REGISTRIES
-        if rel_path in REGISTRIES and base_path.parent == self.remote_dir:
-            base = merge_doc(self._load_yaml(self.system_dir / rel_path), base,
-                             REGISTRY_LIST_PATHS.get(rel_path, ()))
+        """聚合读：system 有效基底 ← local diff 深合并。"""
+        base = self._load_yaml(self.system_dir / rel_path)
         overlay_path = self.local_dir / rel_path
         if not overlay_path.exists():
             return base
@@ -945,9 +810,7 @@ class ConfigResolver:
         else:
             base = (deepcopy(base_doc) if base_doc is not None
                     else self._load_yaml(
-                        self.remote_dir / rel_path
-                        if self.remote_supersedes(rel_path)
-                        else self.system_dir / rel_path))
+                        self.system_dir / rel_path))
             diff = compute_diff(
                 base, full_doc, (registry if registry is not None
                                  else REGISTRY_LIST_PATHS.get(rel_path, ())),
@@ -974,6 +837,15 @@ _resolver: ConfigResolver | None = None
 
 
 def get_resolver() -> ConfigResolver:
+    from .runtime_snapshot import current_snapshot
+    snapshot = current_snapshot()
+    if snapshot is not None:
+        return snapshot.resolver
+    return get_root_resolver()
+
+
+def get_root_resolver() -> ConfigResolver:
+    """仅用于进程级单例初始化与监听注册；任务读取必须使用 get_resolver。"""
     global _resolver
     if _resolver is None:
         _resolver = ConfigResolver()

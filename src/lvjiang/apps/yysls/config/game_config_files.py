@@ -56,7 +56,7 @@ def game_config_file_for(section: str) -> str | None:
 def load_game_config(resolver: ConfigResolver | None = None) -> dict:
     """读取七份分层配置并合并为业务层使用的扁平文档。"""
     resolver = resolver or get_resolver()
-    for root in (resolver.local_dir, resolver.remote_dir):
+    for root in (resolver.local_dir,):
         old_path = root / GAME_CONFIG_DIR / "levels_and_seasons.yaml"
         if old_path.is_file():
             logger.warning(

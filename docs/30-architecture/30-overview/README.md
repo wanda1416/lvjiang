@@ -12,4 +12,4 @@
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南 |
 | [03-graduation-formula-model.md](03-graduation-formula-model.md) | 毕业率公式模型（导航至 36-graduation） |
 | [04-config-layering.md](04-config-layering.md) | 配置分层：system/remote/local/session、合并语义、删除白名单 |
-| [05-config-update-architecture.md](05-config-update-architecture.md) | 待实施架构：公开累计增量、会员包、updates 归档与即时生效 |
+| [05-config-update-architecture.md](05-config-update-architecture.md) | 0.15.0 已实现、待发布：公开累计增量、会员包、updates 归档与即时生效 |

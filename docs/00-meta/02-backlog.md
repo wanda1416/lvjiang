@@ -23,9 +23,9 @@
 
 ## 功能待办
 
-待实施：[官方配置增量更新需求](../20-requirements/50-platform/14-official-config-publication.md)及
+已实现、待发布：[官方配置增量更新需求](../20-requirements/50-platform/14-official-config-publication.md)及
 [架构调整方案](../30-architecture/30-overview/05-config-update-architecture.md)。
-目标为按应用系列发布公开累计增量、会员包独立发布、统一归档与即时安装；当前代码尚未切换。
+已接入按应用系列发布公开累计增量、会员包独立发布、统一归档与即时安装；待 0.15.0 正式发布。
 
 1. **OCR 三态语义分层**：`to_equipment` 的两条失败路径（输入为空、解析异常）
    **都返回 `{}`**，于是「OCR 失败但有装备」与「空槽位」无法区分：后者应正常

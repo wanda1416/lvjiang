@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from . import versioning
-from .resolver import ConfigResolver
+from .resolver import REGISTRY_LIST_PATHS, ConfigResolver, compute_diff, merge_doc
 
 
 class ConfigEditSession:
@@ -28,26 +28,26 @@ class ConfigEditSession:
         root = Path(self._tmp.name)
         system = root / "system"
         local = root / "local"
-        remote = root / "remote"
         system.mkdir(parents=True)
         local.mkdir()
-        remote.mkdir()
         self.resolver = ConfigResolver(
             system_dir=system,
             local_dir=local,
-            remote_dir=remote,
             dev_mode=source.is_dev_mode(),
         )
         self._closed = False
+        self._baseline_merged: dict[str, dict] = {}
         self._materialize()
         self._baseline_entities = self._entity_snapshot()
 
     def _materialize(self) -> None:
         for rel_path in self._merged_paths:
+            data = self._source.load_merged(rel_path)
+            self._baseline_merged[rel_path] = data
             target = self.resolver.system_dir / rel_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(yaml.dump(
-                self._source.load_merged(rel_path), allow_unicode=True,
+                data, allow_unicode=True,
                 sort_keys=False), encoding="utf-8")
         for rel_dir in self._entity_dirs:
             for name in self._source.enumerate_entities(
@@ -55,16 +55,7 @@ class ConfigEditSession:
                 rel_path = f"{rel_dir}/{name}"
                 system_source = self._source.system_dir / rel_path
                 local_source = self._source.local_dir / rel_path
-                remote_source = self._source.remote_dir / rel_path
-                # 临时 system 层代表真实的有效基底：remote 只有通过版本
-                # 仲裁时才替换 system；local 仍作为完整影子保持最高优先级。
-                # 不能只因 system 文件存在就复制它，否则会把正在生效的
-                # remote 新版本降回旧 system 版本。
-                base_source = (
-                    remote_source
-                    if self._source.remote_supersedes(rel_path)
-                    else system_source
-                )
+                base_source = system_source
                 if base_source.is_file():
                     target = self.resolver.system_dir / rel_path
                     target.parent.mkdir(parents=True, exist_ok=True)
@@ -107,7 +98,13 @@ class ConfigEditSession:
             raise RuntimeError("配置编辑会话已经关闭")
         for rel_path in self._merged_paths:
             data = self.resolver.load_merged(rel_path)
-            self._source.save_merged(rel_path, data)
+            registry = REGISTRY_LIST_PATHS.get(rel_path, ())
+            changes = compute_diff(self._baseline_merged[rel_path], data, registry)
+            if changes:
+                # 编辑期间官方配置或别的窗口可能更新；只提交草稿实际改过的字段。
+                self._source.save_merged(rel_path, merge_doc(
+                    self._source.load_merged(rel_path), changes, registry))
+            self._baseline_merged[rel_path] = data
 
         current = self._entity_snapshot()
         # 先写目标层，再删源层；搬移过程中失败时至少保留一份文件。
@@ -125,10 +122,7 @@ class ConfigEditSession:
             content_version = None
             if (layer == "system" and self._source.is_dev_mode()
                     and versioning.spec_for(rel_path)):
-                # 会话的 system 基底可能是正在生效的 remote 新版本。普通
-                # 编辑必须像直接通过真实 resolver 保存一样，保留真实 system
-                # 的旧版本，让 remote 继续生效；只有用户在会话里显式提升过
-                # 版本时，才把新版本号一并提交到真实 system。
+                # 只在草稿显式修改字段时提交版本，普通编辑保留源文件字段。
                 draft_version = self._payload_version(rel_path, payload)
                 baseline_version = self._payload_version(
                     rel_path, self._baseline_entities.get((rel_path, layer)))
@@ -148,7 +142,6 @@ class ConfigEditSession:
         for root in (
             self.resolver.system_dir,
             self.resolver.local_dir,
-            self.resolver.remote_dir,
         ):
             shutil.rmtree(root)
             root.mkdir(parents=True)

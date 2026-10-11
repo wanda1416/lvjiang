@@ -22,7 +22,7 @@ from .config.resolver import ConfigResolver
 from .layout_config import load_layout_doc
 from .user_config import is_valid_username
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 MAX_BUNDLE_BYTES = 256 << 20
 # 同步契约按消费者登记；新增目录默认不下发，不能递归复制整个配置层。
 _LAYER_PATTERNS = (
@@ -39,7 +39,7 @@ def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[Path]
     hooks = [load_app(name) for name in get_registered_app_ids()]
     patterns = (*_LAYER_PATTERNS, *(
         pattern for app in hooks for pattern in app.offline_configuration_patterns))
-    for layer in ("system", "local", "remote"):
+    for layer in ("system", "local"):
         root = config / layer
         paths = {path for pattern in patterns for path in root.glob(pattern)}
         for layout in layout_scope:
@@ -58,19 +58,11 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
     config = root / "config"
-    from .config import protected_remote
-    protected_paths = protected_remote.owned(config / "remote")
-    resolver = ConfigResolver(system_dir=config / "system", local_dir=config / "local",
-                              remote_dir=config / "remote")
-    effective_protected = {name for name in protected_paths if resolver.remote_supersedes(name)}
-    # 手机继续离线运行，不复制 PC 激活码或授权状态。把已授权的有效基底冻结
-    # 为手机 system 快照，保留 local 覆盖；不改变 PC 的任何配置层。
-    baseline = ConfigResolver(system_dir=config / "system", local_dir=config / ".bundle-no-local",
-                              remote_dir=config / "remote")
+    # PC 已安装的有效 system 直接作为手机离线快照，local 保持独立覆盖层。
     from .config.interface import InterfaceStore
     InterfaceStore(config / "session/interface.json")
     layout_doc = load_layout_doc(ConfigResolver(
-        system_dir=config / "system", local_dir=config / "local", remote_dir=config / "remote",
+        system_dir=config / "system", local_dir=config / "local",
     ))
     entries = layout_doc["layouts"]
     if layout not in entries:
@@ -109,23 +101,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
                     continue
-                name = Path(*rel.parts[1:]).as_posix()
-                if rel.parts[0] == "system" and name in effective_protected:
-                    continue
-                if rel.parts[0] == "remote" and name in protected_paths:
-                    if name not in effective_protected:
-                        continue
-                    rel = Path("system") / name
                 data = path.read_bytes()
-                if name in effective_protected and rel.parts[0] == "system":
-                    if name == "scenes.yaml":
-                        from .scene_config import load_scene_doc
-                        data = yaml.safe_dump(load_scene_doc(baseline), allow_unicode=True,
-                                              sort_keys=False).encode("utf-8")
-                    elif name == "layouts.yaml":
-                        data = yaml.safe_dump(baseline.load_merged(name), allow_unicode=True,
-                                              sort_keys=False).encode("utf-8")
-                if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml", "remote/layouts.yaml"}:
+                if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml"}:
                     doc = yaml.safe_load(data) or {}
                     layouts = doc.get("layouts") or {}
                     doc["layouts"] = {key: value for key, value in layouts.items() if key in layout_scope}
@@ -178,7 +155,7 @@ def install_offline_bundle(
                 rel = PurePosixPath(name)
                 if (rel.is_absolute() or ".." in rel.parts or "\\" in name
                         or len(rel.parts) < 3 or rel.parts[0] != "config"
-                        or rel.parts[1] not in {"system", "local", "remote", "session"}
+                        or rel.parts[1] not in {"system", "local", "session"}
                         or rel.as_posix() != name):
                     raise ValueError("同步包包含非法路径")
                 data = archive.read(name)
@@ -201,6 +178,14 @@ def install_offline_bundle(
                     raise ValueError(f"数据库快照校验失败：{name}")
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
+        # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
+        # 预置归档；它不成为新 r0，也不携带 PC 的更新身份、会员凭据或归档。
+        for name in ("updates", "system-baseline.json"):
+            existing = target / name
+            if existing.is_dir():
+                shutil.copytree(existing, staged_config / name)
+            elif existing.is_file():
+                shutil.copyfile(existing, staged_config / name)
         # 此标记只记录 APK 官方代次，与是否覆盖用户参数无关。
         marker = target / "session/preset.json"
         if marker.is_file():

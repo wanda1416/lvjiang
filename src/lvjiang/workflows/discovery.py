@@ -3,7 +3,7 @@
 统一从两个来源自动发现「脚本」（对外称谓，内部仍为 workflow/wf）：
 
 1. **.wf 来源**：**递归**扫描 ``workflows/`` 全树的 ``*.wf``（system ∪ local
-   ∪ remote 合并视图），跳过 ``_`` 前缀的文件与目录（``_editor_run.wf`` /
+   合并视图），跳过 ``_`` 前缀的文件与目录（``_editor_run.wf`` /
    ``_recorded.wf``）。**是否注册为脚本由文件自己的 front-matter 决定**——
    见 :func:`~.metadata.script_traits`：未声明 ``runnable`` / ``batchable``
    的一律不注册。被 import 的过程库、批量生命周期钩子、归档文件因此和正式
@@ -11,13 +11,12 @@
 2. **class 来源**：``implementations.list_workflows()`` 中已注册的内置类实现，
    name/parameters 取自类属性，id = 注册名，恒为可运行且可批量。
 
-同 id 时按来源优先级仲裁：**local > class > system > remote**
+同 id 时按来源优先级仲裁：**local > class > system**
 （见 :class:`.policy.WorkflowDiscoveryPolicy.SOURCE_PRIORITY`）——local 恒
-最高是因为用户自己的东西任何在线下发都不该盖掉；remote 恒最低是因为在线
-下发只新增、永不抢占随包或用户脚本。
+最高是因为用户自己的配置不能被官方更新覆盖；在线安装后的官方脚本属于 system。
 
 每项统一 shape：``{id, name, note, wf_file|class, parameters, runnable,
-batchable, batch_check, scope, hidden, source_layer, is_remote}``。
+batchable, batch_check, scope, hidden, source_layer}``。
 """
 from __future__ import annotations
 
@@ -163,7 +162,6 @@ def _discover_wf_scripts(
             "scope": traits["scope"],
             "hidden": traits["hidden"],
             "source_layer": source_layer,
-            "is_remote": source_layer == "remote",
         }, problems)
     return result
 
@@ -195,15 +193,13 @@ def _discover_class_scripts() -> dict[str, dict]:
             "hidden": bool(getattr(cls, Policy.HIDDEN_CLASS_ATTR, False)),
             "device_visible": bool(getattr(cls, "DEVICE_VISIBLE", False)),
             "source_layer": "class",
-            "is_remote": False,
         }
     return result
 
 
 def script_display_name(config: dict) -> str:
-    """返回面向用户的脚本名；远程来源标记不可被显示名偏好移除。"""
-    name = str(config.get("name") or config.get("id") or "")
-    return f"[远程] {name}" if config.get("is_remote") else name
+    """返回面向用户的脚本名；在线内容已作为系统配置安装。"""
+    return str(config.get("name") or config.get("id") or "")
 
 
 def discover_scripts() -> list[dict]:

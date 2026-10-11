@@ -165,6 +165,9 @@ _manager: DamageModelManager | None = None
 
 
 def get_damage_model_manager() -> DamageModelManager:
+    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        return scoped_value(DamageModelManager, DamageModelManager)
     global _manager
     if _manager is None:
         _manager = DamageModelManager()

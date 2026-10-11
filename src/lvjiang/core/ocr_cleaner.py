@@ -2,8 +2,7 @@
 
 配置通过 ConfigResolver 多层合并读写：
 - config/system/ocr.yaml  系统默认配置（随代码分发）
-- config/remote/ocr.yaml  在线更新配置（版本较新时生效）
-- config/local/ocr.yaml   用户自定义配置（覆盖前两层）
+- config/local/ocr.yaml   用户自定义配置（覆盖系统）
 开发模式写入 system，用户模式写入 local diff。
 
 ``normalization.default`` 是所有 OCR 都会执行的安全规范化规则；每个
@@ -28,6 +27,13 @@ class OCRCleaner:
     _instance: OCRCleaner | None = None
 
     def __new__(cls):
+        from .config.runtime_snapshot import current_snapshot, scoped_value
+        if current_snapshot() is not None:
+            def create():
+                instance = object.__new__(cls)
+                instance._initialized = False
+                return instance
+            return scoped_value(cls, create)
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False

@@ -12,7 +12,6 @@ from lvjiang.workflows.discovery import (
     _discover_wf_scripts,
     discover_scripts,
     last_discovery_problems,
-    script_display_name,
 )
 from lvjiang.workflows.metadata import METADATA_WARNING
 
@@ -105,17 +104,6 @@ class TestDiscoverWfScripts:
         _patch_resolver(monkeypatch, {"_editor_run.wf": wf})
         assert _discover_wf_scripts() == {}
 
-    def test_remote_source_is_preserved_for_forced_display_marker(
-            self, tmp_path, monkeypatch):
-        wf = _write(tmp_path, "remote_test.wf",
-                    "#% name: 实验脚本\n#% runnable: true\n")
-        _patch_resolver(monkeypatch, {"remote_test.wf": wf},
-                        {"remote_test.wf": "remote"})
-        config = _discover_wf_scripts()["remote_test"]
-        assert config["is_remote"] is True
-        assert script_display_name(config) == "[远程] 实验脚本"
-        assert script_display_name({**config, "name": "自定义名"}) == (
-            "[远程] 自定义名")
 
     def test_bad_metadata_logs_error_and_skips_only_its_own_script(
             self, tmp_path, monkeypatch):
@@ -217,28 +205,7 @@ class TestSourcePriority:
         assert _discover_wf_scripts()["same"]["source_layer"] == "local"
         assert system.exists()  # 仅确保构造过，未参与本断言
 
-    def test_system_beats_remote(self, tmp_path, monkeypatch):
-        """远程只新增，同 id 时不能抢占随包脚本"""
-        system = _write(tmp_path, "system/same.wf",
-                        "#% name: 系统\n#% runnable: true\n")
-        remote = _write(tmp_path, "remote/same.wf",
-                        "#% name: 远程\n#% runnable: true\n")
-        # 两个候选都以 same 为 id：用不同的相对路径模拟不同层
-        files = {"same.wf": system, "vendor/same.wf": remote}
-        layers = {"same.wf": "system", "vendor/same.wf": "remote"}
-        _patch_resolver(monkeypatch, files, layers)
 
-        result = _discover_wf_scripts()
-        assert result["same"]["name"] == "系统"
-        assert result["same"]["is_remote"] is False
-
-    def test_remote_wins_when_alone(self, tmp_path, monkeypatch):
-        remote = _write(tmp_path, "remote/new.wf",
-                        "#% name: 远程新增\n#% runnable: true\n")
-        _patch_resolver(monkeypatch, {"new.wf": remote}, {"new.wf": "remote"})
-        config = _discover_wf_scripts()["new"]
-        assert config["name"] == "远程新增"
-        assert config["is_remote"] is True
 
 
 class TestDiscoverClassScripts:

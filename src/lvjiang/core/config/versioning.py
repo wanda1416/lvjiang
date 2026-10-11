@@ -1,39 +1,8 @@
-"""实体配置的 ``content_version`` —— remote 与 system 谁为主的唯一判据。
+"""已知配置类型登记与暂留的 content_version 读写工具。
 
-## 为什么需要它
-
-`config/remote/`（在线下发层）插在 local 与 system 之间之后，"remote 优先"
-是错的：用户升了 App，system 带来 v5 的场景坐标，而远程还停在给旧版本热
-修的 v3——无脑覆盖会把配置**静默回退**，没有报错，只表现为"识别又坏了"。
-所以 remote 只在 ``remote.content_version > system.content_version`` 时才
-生效，见 `resolver.ConfigResolver.resolve_read`。
-
-## 语义
-
-- 整数，从 1 起，**内容变一次加一**（不是 App 版本号，也不是结构版本号）
-- system 侧**缺失即拒绝任何 remote 替换**（fail-safe）：将来漏给某个新文件
-  加字段时，后果是"这个文件收不到在线更新"，而不是"这个文件被远程悄悄
-  接管"。前者能被人发现，后者不能。
-- 与 `graduation/*.json` 的 ``schema_version``（**结构**版本，决定怎么解析）
-  是两回事，两者可以并存；也和 `references/*.yaml` 那个从未被消费的
-  ``version: 1`` 无关——加了不读的字段迟早会烂，这个字段是真的被读的。
-
-## 谁维护它
-
-开发模式普通保存只**保留当前版本号**，版本提升由编辑器中的显式操作请求，
-并和其他编辑状态一起在保存时落盘。这样一次完整编辑只产生一个发布版本，
-不会把每次自动保存都误算成新的内容代次。新文件仍自动从 1 起步。
-`scripts/add_content_version.py` 负责给存量/新增文件补齐初始值。
-
-## 哪些目录参与
-
-core 只声明自己的（`scenes/`、`layouts/`、`maps/`、`workflows/`、`ocr.yaml`）。
-插件私有目录和单文件由插件经 `AppHooks.config_policy_modules` 自行注册——
-core.config 不认识任何插件领域词汇，理由同 `resolver.REGISTRY_LIST_PATHS`。
-
-注册必须发生在**模块导入期**，不能挂在惰性导入的业务模块上：加密包的路径
-校验（`protected_bundle.valid_path`）在启动早期的同步线程里执行，那时地图
-管理器一类 UI 模块还没被导入，晚注册的目录会被判成"不支持"。
+登记用于已有消费者校验、编辑器及字段维护，不限制在线包可携带的文件。
+在线更新按应用系列及 rN 修订安装，content_version 不再参与来源选择。
+此字段暂留待后续格式清理；结构 schema_version 不受影响。
 """
 from __future__ import annotations
 
@@ -50,31 +19,12 @@ CONTENT_VERSION_KEY = "content_version"
 
 @dataclass(frozen=True)
 class VersionedDir:
-    """一类参与 remote 下发的实体文件。
-
-    Attributes:
-        rel_dir: 相对 config 层根的目录（如 ``"layouts"``）
-        pattern: 文件名 glob（如 ``"*.json"``）
-        depth: rel_dir 之下的层数——``scenes/a.yaml`` 是 1，
-            ``layouts/{布局}/{场景}.json`` 是 2；0 表示任意正深度
-        allow_remote_new: remote 是否可以下发 system 里**不存在**的新文件。
-
-            默认 False：新场景/新布局要在 `scenes.yaml` 注册表里登记才有意义，
-            而注册表本身走发版不走 remote（改注册表通常伴随代码改动），远程
-            凭空多一个场景文件是死的，只会让编辑器列表里冒出一个用不了的条目。
-            `yysls/tuning_rules/` 是例外并声明为 True：规则管理器对"未在
-            tune_config.tuning_rules 里声明的规则"是追加到末尾而非报错
-            （见 `tuning_rules/manager.py` 的 _reload），所以远程新增一条
-            调律规则能直接生效——这恰是最有价值的在线下发场景。
-    """
+    """已知实体的路径、深度及是否保留内容版本字段；不是分发白名单。"""
 
     rel_dir: str
     pattern: str
     depth: int = 1
-    allow_remote_new: bool = False
-    #: ``content``：文件内 content_version 仲裁；``append_only``：无文件内
-    #: 版本，只允许远程补充 system 不存在的新实体，已下载内容不可改写。
-    remote_mode: str = "content"
+    has_content_version: bool = True
 
 
 #: rel_dir → VersionedDir。core 只放自己的；插件经 register_versioned_dir 注册。
@@ -84,21 +34,13 @@ VERSIONED_FILES: dict[str, VersionedDir] = {}
 
 
 def register_versioned_dir(rel_dir: str, pattern: str, *, depth: int = 1,
-                           allow_remote_new: bool = False,
-                           remote_mode: str = "content") -> None:
-    """声明一类参与 remote 下发 / content_version 自动维护的实体文件。
-
-    插件在自己的配置策略模块顶层调用（见模块文档「哪些目录参与」）。
-    """
-    if remote_mode not in {"content", "append_only"}:
-        raise ValueError(f"未知 remote_mode: {remote_mode}")
-    VERSIONED_DIRS[rel_dir] = VersionedDir(
-        rel_dir=rel_dir, pattern=pattern, depth=depth,
-        allow_remote_new=allow_remote_new, remote_mode=remote_mode)
+                           has_content_version: bool = True) -> None:
+    """登记已有加载器认识的配置类型；插件在配置策略模块导入时注册。"""
+    VERSIONED_DIRS[rel_dir] = VersionedDir(rel_dir, pattern, depth, has_content_version)
 
 
 def register_versioned_file(rel_path: str) -> None:
-    """声明一个参与 remote 下发的聚合配置文件。"""
+    """登记一个已有加载器认识的聚合配置文件。"""
     path = Path(rel_path)
     VERSIONED_FILES[rel_path] = VersionedDir(
         rel_dir=path.parent.as_posix(), pattern=path.name, depth=1)
@@ -107,14 +49,8 @@ def register_versioned_file(rel_path: str) -> None:
 # core 自己的几类：跨插件通用，不属于任何游戏领域
 register_versioned_dir("scenes", "*.yaml", depth=1)
 register_versioned_dir("layouts", "*.json", depth=2)
-# maps 必须在这里注册，不能放 core/maps.py：那个模块只被地图管理器对话框
-# 惰性导入（ui/main/menu_ops.py 点菜单才 import），而加密包路径校验发生在
-# 启动早期的同步线程里，那时注册表里没有 maps，整包会被判成"包含不支持的
-# 路径"而拒绝。allow_remote_new：地图定义不依赖发版，可以随下发新增。
-register_versioned_dir("maps", "map.yaml", depth=2, allow_remote_new=True)
-register_versioned_dir(
-    "workflows", "*.wf", depth=0, allow_remote_new=True,
-    remote_mode="append_only")
+register_versioned_dir("maps", "map.yaml", depth=2)
+register_versioned_dir("workflows", "*.wf", depth=0, has_content_version=False)
 register_versioned_file("ocr.yaml")
 
 
@@ -156,8 +92,7 @@ def _version_from_json(text: str) -> int | None:
 def _version_from_yaml(text: str) -> int | None:
     """只扫顶层的那一行，不整份 yaml.safe_load。
 
-    resolve_read 是热路径（每次读实体都要判一次 remote 是否更新），为一个
-    整数解析整份规则文件不划算；顶层键必然顶格，扫行足够可靠。
+    编辑器展示来源时只需读取这个字段；顶层键必然顶格，无需解析全文。
     """
     for line in text.splitlines():
         if not line.startswith(f"{CONTENT_VERSION_KEY}:"):
@@ -262,7 +197,7 @@ def iter_versioned_files(layer_root: Path) -> Iterator[Path]:
             yielded.add(path)
             yield path
     for spec in VERSIONED_DIRS.values():
-        if spec.remote_mode != "content":
+        if not spec.has_content_version:
             continue
         base = layer_root / spec.rel_dir
         if not base.is_dir():

@@ -2,7 +2,7 @@
 
 core.config 是通用引擎模块，不认识任何游戏领域词汇——`base_rules` 是登记表
 还是枚举设定、`weapon_types` 该按哪个字段判断"是不是同一个武器类型"、
-`yysls/tuning_rules/` 参不参与在线下发，都是纯燕云业务知识，不该写进
+`yysls/tuning_rules/` 的加载与校验类型，都是纯燕云业务知识，不该写进
 `core/config/` 的常量表。
 
 本模块经 `AppHooks.config_policy_modules`「import 即注册」触发（同
@@ -37,31 +37,22 @@ register_protected_list_paths("yysls/game_config/seasons.yaml", {
     "season_configs": "season_number",
 })
 
-# 两份聚合业务配置也允许在线更新。读取时 remote 作为系统基底，用户已有的
+# 两份聚合业务配置也允许在线更新。读取时已安装 system 作为系统基底，用户已有的
 # local diff 继续叠加在它上面，因此不会覆盖用户自己的设置。
 for _game_config_file in GAME_CONFIG_FILES:
     register_versioned_file(_game_config_file)
 register_versioned_file("yysls/tune_config.yaml")
-register_versioned_dir(GEAR_SETS_DIR, "*.yaml", depth=1, allow_remote_new=True)
+register_versioned_dir(GEAR_SETS_DIR, "*.yaml", depth=1)
 
-# 调律规则参与 remote 在线下发（带 content_version、可被远程更新）。
-#
-# allow_remote_new=True 是这三类里唯一的例外：规则管理器对「未在
-# tune_config.tuning_rules 里声明的规则」是追加到末尾而不是报错（见
-# tuning_rules/manager.py 的 _reload），所以远程下发一条全新规则能直接
-# 生效，不用等发版——这正是在线下发最有价值的场景。scenes/layouts 则
-# 相反：新增文件要在 scenes.yaml 注册表里登记才有意义，而注册表走发版。
-register_versioned_dir("yysls/tuning_rules", "*.yaml", depth=1,
-                       allow_remote_new=True)
+# 已知实体登记仅服务加载校验和编辑器，不限制分发。
+register_versioned_dir("yysls/tuning_rules", "*.yaml", depth=1)
 # 基础规则组同样目录驱动（存在性由目录决定、order 排序），远程可以直接
 # 下发一套新组。
-register_versioned_dir("yysls/base_groups", "*.yaml", depth=1,
-                       allow_remote_new=True)
+register_versioned_dir("yysls/base_groups", "*.yaml", depth=1)
 
 # 毕业率模型的身份写在文件自己里（schema_version + 流派/方案/等级/版本），
 # 发现层只认当前 schema 且四项齐全的实体，所以可随远程下发全新方案文件，
 # 不需要另在 game_config 里登记一份方案名清单。
 # 模型按等级分子目录（graduation/<等级>级/<流派>_<方案>_v<版本>.json），
 # 所以深度是 2：等级膨胀时不至于把一个目录堆到几十个文件。
-register_versioned_dir("yysls/graduation", "*.json", depth=2,
-                       allow_remote_new=True)
+register_versioned_dir("yysls/graduation", "*.json", depth=2)

@@ -51,7 +51,6 @@ class ScriptConfigDialog(QDialog):
     COL_PARAMS = 5
 
     TAB_SCOPES = ("daily", "dedicated")
-    REMOTE_PREFIX = "[远程] "
 
     preferences_saved = pyqtSignal()
 
@@ -181,8 +180,7 @@ class ScriptConfigDialog(QDialog):
         table.setItem(row, self.COL_GROUP, group_item)
 
         if script.get("wf_file"):
-            prefix = "[远程] " if script.get("is_remote") else ""
-            source = f"{prefix}.wf: {script['wf_file']}"
+            source = f".wf: {script['wf_file']}"
         else:
             source = f"内置类: {script['class']}"
         source_item = QTableWidgetItem(source)
@@ -266,10 +264,7 @@ class ScriptConfigDialog(QDialog):
         )
 
     def _raw_display(self, text: str, sid: str) -> str:
-        """展示前缀不是用户改名的一部分，保存/换行时必须剥离。"""
-        if (self._scripts.get(sid) or {}).get("is_remote") \
-                and text.startswith(self.REMOTE_PREFIX):
-            return text[len(self.REMOTE_PREFIX):]
+        """脚本显示名不含安装来源前缀。"""
         return text
 
     def _restore_row(

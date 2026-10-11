@@ -1,35 +1,23 @@
-"""受保护来源同步到同一 remote 暂存层，沿用现有加载器。"""
+"""会员索引与授权契约；归档、合成和安装由统一更新服务负责。"""
 from __future__ import annotations
 
-import base64
-import json
 import re
-import shutil
-import tempfile
 from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 from packaging.version import Version
 
-from ..fs_util import atomic_write_bytes
-from .content_service import CONTENT_SERVICE_URL, ServiceError, request_json
+from .content_service import CONTENT_SERVICE_URL
 from .protected_bundle import (
-    MAX_BUNDLE_BYTES,
-    decrypt,
     digest,
-    safe_path,
     valid_key_id,
 )
 
 
 def manifest_url() -> str:
-    from .remote import REMOTE_CONFIG_URL
-    return REMOTE_CONFIG_URL.rsplit("/config/", 1)[0] + "/protected/config.json"
-
-
-STATE_FILE = ".protected.json"
+    from ..update_bundle import MEMBER_INDEX_URL
+    return MEMBER_INDEX_URL
 
 
 @dataclass(frozen=True)
@@ -97,8 +85,15 @@ def parse_manifest(manifest: Any) -> dict[str, Any]:
         package_version = package.get("config_version", version)
         if type(package_version) is not int or not 1 <= package_version <= version:
             raise ValueError("加密包修订号无效")
+        from ..update_bundle import series
+        dependencies = package.get("public_revisions", {})
+        if not isinstance(dependencies, dict) or any(
+                not isinstance(key, str) or series(key) != key or type(value) is not int or value < 0
+                for key, value in dependencies.items()):
+            raise ValueError("会员包公开修订依赖无效")
         normalized.append({**package, "min_app_version": minimum,
-                           "max_app_version_exclusive": maximum, "config_version": package_version})
+                           "max_app_version_exclusive": maximum, "config_version": package_version,
+                           "public_revisions": dependencies})
     return {**manifest, "packages": normalized}
 
 
@@ -112,23 +107,6 @@ def select_package(manifest: dict[str, Any], app_version: str) -> dict[str, Any]
         if not maximum or current < Version(maximum):
             return package
     return None
-
-
-def state(root: Path) -> dict[str, Any]:
-    path = root / STATE_FILE
-    if not path.is_file():
-        return {}
-    try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(doc, dict) or not isinstance(doc.get("files"), dict):
-            return {}
-        return doc
-    except (ValueError, OSError):
-        return {}
-
-
-def owned(root: Path) -> set[str]:
-    return {name for name in state(root).get("files", {}) if safe_path(name)}
 
 
 def authorized(doc: dict[str, Any]) -> bool:
@@ -147,135 +125,3 @@ def authorized(doc: dict[str, Any]) -> bool:
         except ValueError:
             return False
     return digest(normalize_code(load_code() or "").upper().encode("utf-8")) == doc.get("code_hash")
-
-
-def path_status(root: Path, name: str) -> bool | None:
-    """None 为公开来源；False 为失效受保护文件，True 为已授权文件。"""
-    doc = state(root)
-    if name not in doc.get("files", {}):
-        return None
-    return authorized(doc)
-
-
-def remove_owned(root: Path) -> tuple[str, ...]:
-    removed = sorted(owned(root))
-    for name in removed:
-        (root / name).unlink(missing_ok=True)
-    (root / STATE_FILE).unlink(missing_ok=True)
-    return tuple(removed)
-
-
-def purge_invalid(root: Path) -> bool:
-    doc = state(root)
-    if doc and not authorized(doc):
-        remove_owned(root)
-        return True
-    return False
-
-
-def sync(access: ProtectedAccess | None, root: Path, app_version: str,
-         timeout: float) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    from .remote import MAX_MANIFEST_BYTES, _fetch_bytes
-    recover(root)
-    previous = state(root)
-    if access is None:
-        return (), remove_owned(root)
-    if previous and previous.get("code_hash") != access.code_hash:
-        remove_owned(root)
-        previous = {}
-    raw, _, _ = _fetch_bytes(manifest_url(), max_bytes=MAX_MANIFEST_BYTES, timeout=timeout)
-    manifest = parse_manifest(json.loads(raw.decode("utf-8")))
-    version = manifest["config_version"]
-    if version < previous.get("config_version", 0):
-        raise ValueError("加密清单版本回退")
-    package = select_package(manifest, app_version)
-    if package is None:
-        withdrawn = remove_owned(root)
-        empty = {"config_version": version, "files": {}, "code_hash": access.code_hash,
-                 "expires": access.expires}
-        atomic_write_bytes(root / STATE_FILE, json.dumps(empty).encode("utf-8"), prefix=".protected-")
-        return (), withdrawn
-    key_id = package["key_id"]
-    expected_url = package["url"]
-    try:
-        grant = request_json(access.service, "/v1/key", {"code": access.code, "key_id": key_id}, timeout=timeout)
-    except ServiceError as error:
-        if error.status == 403 and error.code == "forbidden":
-            return (), remove_owned(root)
-        raise
-    if type(grant.get("config_version")) is not int or grant["config_version"] != package["config_version"]:
-        raise ValueError("加密清单与云端包版本不一致")
-    if not isinstance(grant.get("min_app_version"), str) or not isinstance(grant.get("key"), str) \
-            or not isinstance(grant.get("sha256"), str) or not re.fullmatch(r"[a-f0-9]{64}", grant["sha256"]):
-        raise ValueError("云端密钥响应格式无效")
-    expiry = grant.get("expires")
-    if expiry is not None:
-        if not isinstance(expiry, str) or date.fromisoformat(expiry).isoformat() != expiry:
-            raise ValueError("云端密钥有效期无效")
-        if expiry < date.today().isoformat():
-            return (), remove_owned(root)
-    if Version(app_version) < Version(grant["min_app_version"]):
-        return (), remove_owned(root)
-    sha = grant["sha256"]
-    if package.get("sha256") != sha:
-        raise ValueError("加密清单与云端包摘要不一致")
-    files: dict[str, bytes]
-    unchanged = previous.get("sha256") == sha and all(
-        (root / name).is_file() and digest((root / name).read_bytes()) == expected
-        for name, expected in previous.get("files", {}).items())
-    expires = min(filter(None, (access.expires, grant.get("expires"))), default=None)
-    if unchanged:
-        files = {name: (root / name).read_bytes() for name in owned(root)}
-    else:
-        encrypted, _, _ = _fetch_bytes(expected_url, max_bytes=MAX_BUNDLE_BYTES, timeout=timeout)
-        if digest(encrypted) != sha:
-            raise ValueError("加密包摘要不匹配")
-        files = decrypt(encrypted, base64.b64decode(grant["key"], validate=True))
-    # 所有文件完成验证后才修改暂存层。启动前提升目录，运行中不热切换。
-    removed = sorted(owned(root) - files.keys())
-    metadata = {"config_version": version, "package_version": package["config_version"],
-                "key_id": key_id, "code_hash": access.code_hash,
-                "expires": expires, "sha256": sha,
-                "files": {name: digest(data) for name, data in files.items()}}
-    if unchanged:
-        atomic_write_bytes(root / STATE_FILE, json.dumps(metadata, ensure_ascii=False).encode("utf-8"), prefix=".protected-")
-    else:
-        commit_bundle(root, files, metadata, removed)
-    return (() if unchanged else tuple(files)), tuple(removed)
-
-
-def recover(root: Path) -> None:
-    """恢复目录替换中断；只处理同步器自己拥有的备份。"""
-    retired = root.with_name(root.name + ".protected-old")
-    if retired.is_dir():
-        if not root.exists():
-            retired.rename(root)
-        else:
-            shutil.rmtree(retired)
-
-
-def commit_bundle(root: Path, files: dict[str, bytes], metadata: dict[str, Any],
-                  removed: list[str]) -> None:
-    root.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(dir=root.parent, prefix=root.name + ".bundle-"))
-    retired = root.with_name(root.name + ".protected-old")
-    try:
-        if root.is_dir():
-            shutil.copytree(root, temporary, dirs_exist_ok=True)
-        for name, data in files.items():
-            atomic_write_bytes(temporary / name, data, prefix=".protected-")
-        for name in removed:
-            (temporary / name).unlink(missing_ok=True)
-        atomic_write_bytes(temporary / STATE_FILE,
-                           json.dumps(metadata, ensure_ascii=False).encode("utf-8"), prefix=".protected-")
-        if root.exists():
-            root.rename(retired)
-        try:
-            temporary.rename(root)
-        except OSError:
-            if retired.exists():
-                retired.rename(root)
-            raise
-        shutil.rmtree(retired, ignore_errors=True)
-    finally:
-        shutil.rmtree(temporary, ignore_errors=True)

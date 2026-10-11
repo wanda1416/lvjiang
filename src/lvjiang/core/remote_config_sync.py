@@ -12,8 +12,8 @@
    里首次触发这些模块的懒加载。
 2. **worker 内绝对不写 SessionStore**：``main_window`` 给 SessionStore 注册
    了 UI 回调，写锁超时会从调用线程弹 QMessageBox，非主线程弹原生模态框是
-   未定义行为。etag / config_version 的写回由主线程在 ``finished`` 槽里经
-   ``apply_outcome()`` 完成。
+   未定义行为。更新状态独立写入 updates；主线程在 ``finished`` 槽里经
+   ``apply_outcome()`` 安装并通知配置消费者。
 3. **不阻塞启动**：失败只记日志、发 error 信号。拿不到在线配置的后果是
    "用系统配置"，本来就是可用状态，绝不该因此卡住或弹窗打断用户。
 """

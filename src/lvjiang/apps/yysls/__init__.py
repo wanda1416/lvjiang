@@ -20,11 +20,36 @@ def _initialize_session_storage() -> None:
 def _reload_configuration() -> None:
     from .config.manager import reset_game_config
     from .config.session_node import reset_session_storage
+    from .core.attr_model.manager import invalidate_attr_model_cache
+    from .core.damage.manager import invalidate_damage_model_cache
     from .core.graduation.model_registry import invalidate_model_registry
 
     reset_game_config()
     reset_session_storage()
     invalidate_model_registry()
+    invalidate_attr_model_cache()
+    invalidate_damage_model_cache()
+
+
+def _validate_configuration() -> None:
+    from .config.manager import get_game_config
+    from .core.attr_model.manager import get_attr_model_manager
+    from .core.damage.manager import get_damage_model_manager
+    from .core.graduation.model_registry import list_graduation_models, load_model
+    from .core.tuning_rules.manager import (
+        get_tune_config_manager,
+        get_tuning_group_manager,
+        get_tuning_rule_manager,
+    )
+    get_game_config()
+    get_tune_config_manager()
+    get_tuning_group_manager()
+    for manager in (get_attr_model_manager(), get_damage_model_manager(), get_tuning_rule_manager()):
+        errors = manager.errors() if callable(manager.errors) else manager.errors
+        if errors:
+            raise ValueError("领域配置加载失败: " + str(errors))
+    for model in list_graduation_models():
+        load_model(model.rel_path)
 
 
 def _offline_session_files() -> tuple[str, ...]:
@@ -117,6 +142,7 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.config.merge_policy",
     ],
     configuration_reload_callbacks=[_reload_configuration],
+    configuration_validation_callbacks=[_validate_configuration],
     offline_configuration_patterns=(
         "yysls/tune_config.yaml", "yysls/game_config/*.yaml",
         "yysls/tuning_rules/*.yaml", "yysls/gear_sets/*.yaml",

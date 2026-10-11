@@ -15,7 +15,7 @@ from tests.yysls.test_build_calculator import allocate, counts
 
 
 def repositories(tmp_path):
-    roots = dict(system_dir=tmp_path / "system", local_dir=tmp_path / "local", remote_dir=tmp_path / "remote")
+    roots = dict(system_dir=tmp_path / "system", local_dir=tmp_path / "local")
     return (BuildRepository(ConfigResolver(**roots, dev_mode=True)),
             BuildRepository(ConfigResolver(**roots, dev_mode=False)))
 

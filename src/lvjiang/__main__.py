@@ -140,16 +140,15 @@ def main() -> int:
     # 延迟导入 PyQt6 / 内部模块，确保 logging 先配置好
     from lvjiang.apps import load_app, register_hooks
 
-    from .app import run_app
-
-    # 应用上次下载的在线配置。必须在**任何配置读取之前**：场景注册表与布局
-    # 都在启动时加载，晚一步这次启动就还是旧配置。失败不阻断启动——用系统
-    # 配置本来就是可用状态。
+    # 恢复未完成的安装事务、撤下明确失效的会员内容，再加载场景与布局缓存。
+    # 这里不联网，也不提升旧协议暂存目录。
     try:
-        from lvjiang.core.config.remote import promote_pending
-        promote_pending()
+        from lvjiang.core.config.remote import recover_installation
+        recover_installation()
     except Exception:  # noqa: BLE001
         logger.exception("应用在线配置失败，本次使用现有配置")
+
+    from .app import run_app
 
     hooks_list = []
     for name in args.apps or []:

@@ -9,6 +9,7 @@ from typing import Any
 from loguru import logger
 
 from .....core.config.resolver import get_resolver
+from .....core.config.runtime_snapshot import scoped_cache
 
 DATA_REL_DIR = "yysls/graduation"
 MODEL_SCHEMA_VERSION = 3
@@ -77,6 +78,7 @@ def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
     return GraduationModelRef(school, scheme, level, version, rel_path)
 
 
+@scoped_cache
 @lru_cache(maxsize=1)
 def list_graduation_models() -> tuple[GraduationModelRef, ...]:
     """枚举当前配置分层中所有新格式模型。"""
@@ -159,6 +161,7 @@ def describe_missing_model(school: str, scheme: str, world_level: int) -> str:
         f"等级 {world_level}；请调高世界等级，或导入该等级可用的模型")
 
 
+@scoped_cache
 @lru_cache(maxsize=None)
 def load_model(rel_path: str) -> dict[str, Any]:
     path = get_resolver().resolve_read(rel_path)

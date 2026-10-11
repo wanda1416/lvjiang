@@ -10,7 +10,8 @@ from pathlib import PurePosixPath
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from . import versioning
+from ..update_bundle import safe_path as configuration_path
+from ..update_bundle import validate_names
 
 AAD = b"lvjiang-protected-bundle-v1"
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
@@ -31,17 +32,8 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def safe_path(name: str) -> bool:
-    parts = PurePosixPath(name).parts
-    return bool(parts) and not name.startswith("/") and "\\" not in name and ":" not in name \
-        and all(part and part not in {".", ".."} and not part.startswith(".")
-                and not part.endswith((".", " ")) and not re.search(r'[<>"|?*\x00]', part)
-                and not re.fullmatch(r"(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])", part.split(".")[0])
-                for part in name.split("/"))
-
-
 def valid_path(name: str) -> bool:
-    return safe_path(name) and (name in REGISTRIES or is_asset(name) or versioning.spec_for(name) is not None)
+    return configuration_path(name)
 
 
 def valid_key_id(value: str) -> bool:
@@ -54,6 +46,7 @@ def unpack(payload: bytes) -> dict[str, bytes]:
             members = archive.infolist()
             if not members or len(members) > MAX_MEMBERS:
                 raise ValueError("包文件数量无效")
+            validate_names(member.filename for member in members)
             result: dict[str, bytes] = {}
             total = 0
             seen: set[str] = set()
@@ -66,8 +59,6 @@ def unpack(payload: bytes) -> dict[str, bytes]:
                 if member.file_size > MAX_MEMBER_BYTES or total > MAX_EXPANDED_BYTES:
                     raise ValueError("包解压大小超限")
                 data = archive.read(member)
-                if not is_asset(member.filename):
-                    data.decode("utf-8")
                 seen.add(member.filename.casefold())
                 result[member.filename] = data
             return result

@@ -1,14 +1,12 @@
-# 配置分层：system / remote / local / session
+# 配置分层：system / local 与更新归档
 
-> 本文描述现行实现。后续目标见 [官方配置增量更新架构调整方案](05-config-update-architecture.md)
-> （2026-10-11，待实施）；在代码切换前，仍以本文的分层和内容版本规则为准。
-
-律匠的配置分四层，读写咽喉是 `src/lvjiang/core/config/resolver.py`。
+配置读取只有 system/local 两层；session 存运行数据，updates 存更新归档与事务状态。
+读写入口为 `core/config/resolver.py`，安装架构见 [官方配置增量更新](05-config-update-architecture.md)。
 
 | 层 | 目录 | 职责 | 进 git |
 |----|------|------|--------|
-| system | `config/system/` | 系统默认，开发者提供的初始内容 | ✅ |
-| remote | `config/remote/` | 在线下发层：只对实体文件生效，且只在版本更新时顶替 system（见第七节） | ❌ |
+| system | `config/system/` | 已安装的官方预置、累计增量和有效会员内容；开发仓库仅维护公开源 | 仅源文件 ✅ |
+| updates | `config/updates/` | r0/rN、会员密文及安装记录，不参与配置读取 | ❌ |
 | local | `config/local/` | 用户覆盖层：影子文件 + 键级 diff | ❌ |
 | session | `config/session/` | 纯运行态，不经 resolver（见 `core.config.session`） | ❌ |
 
@@ -17,10 +15,9 @@
 仍把同一路径用作用户覆盖层。`config/session/` 是另一份独立的运行数据仓库。
 匿名安装标识虽然落在 local 路径下，仍只属于单机运行态，应排除在 Git 跟踪之外。
 
-**读**：`local > remote（版本更新才生效）> system`，两种模式一致。
+**读**：`local > system`，两种模式一致。
 **写**：按模式路由——开发模式（`.git` 存在或 `LVJIANG_DEV_MODE=1`）写 system 全量；
-用户模式写 local diff。**任何模式都不写 remote**——那层是下发下来的，
-本地改动一律落 local。
+用户模式写 local diff。在线安装器单独负责 system 的事务替换，不写 local。
 
 ---
 
@@ -29,7 +26,7 @@
 ### 实体文件（一物一文件）
 
 整文件影子：local 存在同名文件即整个顶掉 system。用户自建的
-local 文件可直接删除；system/remote 预置文件不允许用户删除，也不再使用
+local 文件可直接删除；system 官方文件不允许用户删除，也不再使用
 `.deleted` 墓碑隐藏。
 
 | 位置 | 内容 |
@@ -86,7 +83,7 @@ scenes:
 `disabled` 场景只从场景管理 UI 隐藏，定义仍注册并可被旧布局、工作流引用。
 仅接受当前 scenes 结构；无版本号的空覆盖、元数据与 scenes 增量仍有效。
 明确 v1 或旧 layout_scenes/group_names 字段报不兼容，不自动转换或落盘。
-system、remote、local 分层验证后合并，保存也验证旧 local 覆盖。
+system、local 分层验证后合并，保存也验证旧 local 覆盖。
 
 `layouts.yaml` 也使用 schema v2，但不提供旧格式兼容或自动迁移：
 
@@ -345,246 +342,23 @@ hooks = AppHooks(
 
 ---
 
-## 七、remote：在线配置下发
+## 七、在线配置安装
 
-### 为什么需要 `content_version`
+所有官方 system 文件均可通过累计增量下发，包括未知格式与已有 WF。客户端使用精确
+应用系列索引，校验后事务替换 system，local 仍按前述领域语义优先。content_version
+不再仲裁文件来源；当前 system 的该字段统一为 1，结构 schema_version 继续保留。
 
-插一层 remote 之后，"remote 优先"是**错的**：用户升了 App，system 带来 v5
-的场景坐标，而远程还停在给旧版本热修的 v3——无脑覆盖会把配置**静默回退**，
-没有报错，只表现为"识别又坏了"。
+配置下载成功后即时安装并刷新相关缓存。正在执行的任务持有独立配置副本，整个批量任务
+保持同一快照；多实例通过安装锁和生效代次协调。失败保留上一完整可用版本，不要求重启。
+设置里的“接收在线配置更新”控制公开及会员两渠道，关闭后恢复 r0，不修改用户 local。
 
-所以每个参与下发的文件带一个顶层 `content_version`（整数，内容变一次加一），
-remote 只在**严格新于** system 时才生效：
+开发源码目录不接受自动在线安装。正式构建写入可信基底身份及 r0.zip；会员完整包独立
+授权，明文只进入有效 system，密文归档于 updates/member。
 
-```
-remote 生效 ⟺ remote.content_version > system.content_version
-```
+手机使用 APK 预置或 PC 同步的 system/local，本轮不自行检查线上配置；PC 同步保留手机
+updates 和原始基底身份，不把 PC 快照转换成 local，也不将其记录为官方 r0。
 
-这个字段和 `graduation/*.json` 的 `schema_version`（**结构**版本，决定怎么
-解析）是两回事，可以并存；也和 `references/*.yaml` 里那个从未被消费的
-`version: 1` 无关——**加了不读的字段迟早会烂**（`config/i18n/*.yaml` 的
-`version: 0.2.5` 至今停在旧版本没人管），这个字段是真的被 resolver 读来做
-仲裁的。定义在 `core/config/versioning.py`。
-
-**system 侧缺失即拒绝任何 remote 替换**（fail-safe）：将来漏给某个新文件加
-字段，后果是"这个文件收不到在线更新"，而不是"这个文件被远程悄悄接管"。
-前者能被人发现，后者不能。
-
-### 谁维护版本号
-
-开发模式普通保存只**保留当前版本号**，不再随每次编辑自动 +1。版本号代表
-一次发布代次，不是编辑次数；调律规则在一次对话框编辑中可能发生多次控件
-变化，若每次变化都提升，很快就失去维护意义。
-
-提升由编辑器提供显式操作，但不要求手写整数：
-
-- 场景编辑器在视图行分别显示当前场景与当前布局版本；点击链接只进入待保存
-  状态，和布局修改一起保存才落盘，Discard 则不生效。
-- 调律规则在规则 key 右侧显示版本与「提升」按钮；提升和规则改动一起暂存，
-  随调律配置对话框右下角的「保存」提交并 reload 生效。
-
-新文件仍从 v1 自动起步。`write_entity` 会在普通保存时把现有版本字段重新附加
-到编辑器序列化结果，避免业务模型不携带 `content_version` 时把字段写丢。
-`scripts/add_content_version.py` 负责给存量/新增文件补初始值（幂等，
-`--check` 供 CI 用）。
-
-### 哪些文件参与
-
-同合并策略，core 只声明自己的，插件声明自己的：
-
-| 路径 | 允许远程新增 | 声明方 |
-|------|--------------|--------|
-| `scenes/*.yaml` | ❌ | core |
-| `layouts/{布局}/{场景}.json` | ❌ | core |
-| `ocr.yaml` | ❌ | core |
-| `yysls/game_config/*.yaml` | ❌ | 插件 |
-| `yysls/tune_config.yaml` | ❌ | 插件 |
-| `yysls/tuning_rules/*.yaml` | ✅ | 插件 |
-| `yysls/base_groups/*.yaml` | ✅ | 插件 |
-| `yysls/graduation/*.json` | ✅ | 插件 |
-| `workflows/**/*.wf` | ✅（仅新增） | core |
-
-**`allow_remote_new` 的不对称是有意的**：新场景/新布局要在 `scenes.yaml`
-注册表里登记才有意义，而注册表本身走发版（改它通常伴随代码改动），远程凭空
-多一个场景文件是死的，只会让编辑器列表里冒出用不了的条目。调律规则和基础
-规则组相反——存在性就是目录里有没有这个文件，所以远程下发一条全新规则或
-一套新规则组能直接生效。毕业方案由可同步的
-`game_config/schools.yaml` 登记方案名，因此两者同时下发时也允许新增方案文件。
-
-`ocr.yaml`、`game_config/*.yaml` 与 `tune_config.yaml` 是聚合配置：生效的
-remote 文件替代 system 成为合并基底，用户已有的 local diff 继续叠加在
-上面。
-
-顶层的 `scenes.yaml`/`layouts.yaml` **不参与**：那是注册表，改动伴随代码，
-走发版。参与的只有它们名下的实体文件。
-
-#### WF 的无版本只新增模式
-
-WF 文件没有 `content_version`，不能使用“远端版本严格大于系统版本”的覆盖
-仲裁。`workflows/**/*.wf` 因此使用 `append_only` 策略，manifest 中固定写
-`content_version: 0`：system 同路径存在时远程永不生效；local 同路径存在时
-仍由 local 优先；已经下载的远程 WF 若 SHA256 发生变化，客户端拒绝覆盖并
-保留旧内容。修订实验脚本必须换文件名/脚本 ID，撤回则从全量 manifest 删除。
-
-实际生效的远程脚本在桌面端和设备端各脚本列表强制带 `[远程]`，日常页同时
-显示不可由脚本元数据隐藏的来源警告。脚本编辑器将其视为只读内容；需要修改
-时必须先复制为本地副本。
-
-### manifest 与四道闸门
-
-`core/config/remote.py`，形态与公告（`core/announcement.py`）、群二维码同款：
-GitHub Pages 静态 JSON，不依赖 GitHub API、不需要服务端。
-
-```
-https://wanda1416.github.io/lvjiang/config/config.json
-```
-
-```json
-{
-  "schema_version": 1,
-  "config_version": 12,
-  "updated_at": "2026-08-27T00:00:00Z",
-  "files": [
-    {
-      "rel_path": "layouts/desktop/game_login_page.json",
-      "url": "https://wanda1416.github.io/lvjiang/config/remote/layouts/%E6%A1%8C%E9%9D%A2%E5%B8%83%E5%B1%80/game_login_page.json",
-      "sha256": "…",
-      "content_version": 3,
-      "min_app_version": "0.7.0",
-      "max_app_version_exclusive": "0.9.0"
-    }
-  ]
-}
-```
-
-> 布局目录名是中文，URL 必须 percent-encode。manifest 里 `url` 存**已编码
-> 的完整地址**、`rel_path` 单独存本地相对路径，不让客户端自己拼——不同平台
-> 的编码行为不一致。
-
-四道闸门：
-
-1. **协议版本**：`schema_version` 对不上整份拒绝，不做旧协议兼容
-2. **客户端版本区间**：`min_app_version` / `max_app_version_exclusive`。
-   这是"远程配置和本地代码对不上"的唯一防线——布局里的 region key 被 `.wf`
-   脚本按名字引用（`[场景].[区域]`），代码改了 key 而远程还在下发老配置，
-   脚本会直接崩。改了就抬门槛。
-3. **sha256**：逐文件校验，半截/被篡改的文件不落盘；先写 `.part` 再
-   `replace()`，中途崩溃不会留下半截配置被 resolver 读到
-4. **路径合法性**：拒绝 `..`、绝对路径、盘符、反斜杠，且只接受
-   `versioning` 注册表里声明过的目录——manifest 是远程内容，不能让它决定
-   往哪写盘
-
-其中 WF 的 `content_version: 0` 是只新增模式标记，不代表 WF 内容版本；
-下载后以 SHA256 判断是否为同一份不可变内容。
-
-### 撤回
-
-manifest 是**全量声明**：本地 `config/remote/` 里存在、但本轮 manifest 没列
-（或版本区间不适用）的文件一律删除。推错了配置，从 manifest 移除该条目即可
-撤回，不用发明 `revoked: true` 之类的标志位。
-
-注意撤回**不能靠把 `content_version` 改小**：闸门要求远程严格大于 system，
-调小只会让它不生效，文件还留在本地；只有从 manifest 移除才会真正删掉。
-
-### 拒绝倒退
-
-同步侧对"版本变小"一律不采信，两个层级各一道：
-
-- **单文件**：清单声称的 `content_version` 比本地已有的旧就不下载
-  （比较是 `>=` 而非 `==`）
-- **整份清单**：`config_version` 比本地已同步过的旧，整轮忽略
-
-拿到旧清单的成因不止一种——CDN 缓存没失效、发布目录被回滚、甚至是重放；
-照做就是把配置静默降级回旧版，正是 `content_version` 这套机制要防的事故。
-
-### 失败重试
-
-有文件没拿到（网络/校验失败）时**不记 ETag**。记了的话下次带
-`If-None-Match` 会收到 304、整轮直接跳过，这些文件就永远停在旧版或缺失，
-直到作者恰好又发一版新清单为止。宁可下次多拉一次清单（几 KB）。
-
-### 开发模式照常参与——而且必须看得见
-
-**开发模式不豁免 remote 层**。曾经考虑过让开发模式跳过在线配置（"作者是
-配置源头，不该被自己发布的东西盖住"），但那是错的：开发者本地跑出来的行为
-一旦和每一个用户都不一样，用户报"识别坏了"时他**永远复现不出来**——而这
-恰恰是在线下发最需要被排查的一类问题。
-
-代价是必须让人**随时意识到**自己在看哪一份，否则远程顶替是完全静默的。
-两处可见性：
-
-- **日志**：`ConfigResolver._log_supersede` 在远程顶替系统时记一条
-  `[在线配置] 生效：scenes/xxx.yaml（系统 v1 → 远程 v4）`。按
-  (文件, 远程版本) 去重——`resolve_read` 是热路径，`enumerate_entities`
-  还会逐个调，不去重会刷屏到没人看日志。
-- **界面**：场景编辑器的「视图」行分别显示
-  `场景版本号：v4 [提升至 v5]`与`布局版本号：v1 [提升至 v2]`；游戏配置
-  在左下角显示游戏配置版本，调律配置在右上角显示调律总配置版本，单条
-  调律规则继续在规则页显示自身版本。版本值以颜色区分来源：系统灰色、
-  用户蓝色、远程橙色，悬停时统一列出 local、system、remote 各层现存版本
-  以及当前生效层。数据统一来自 `ConfigResolver.describe_entity()` 和
-  `list_entity_origins()`。
-
-**场景与布局分别标注**：场景编辑器实际在编辑两个文件（`scenes/{key}.yaml`
-的定义、`layouts/{布局}/{key}.json` 的坐标），两者能被远程独立顶替，只标
-一个就正好留下盲点。
-
-### 显式提升：版本号以远程为下限
-
-开发者在编辑器里看到的可能是远程 v3 的内容。这时提升若只看系统 v2，会写出
-同为 v3、内容却不同的文件。故编辑器通过 `next_entity_version` 计算
-`max(系统, 远程) + 1`；普通保存仍保持原号，只有显式提升操作使用这个目标值。
-
-### 线程与生效时机
-
-同步走后台线程（`core/remote_config_sync.py`），三段式拆分，逐条对应
-`core/telemetry/reporter.py` 那三条硬约束——尤其**worker 线程绝对不能写
-SessionStore**（`main_window` 给它注册了 UI 回调，写锁超时会从调用线程弹
-QMessageBox，非主线程弹原生模态框是未定义行为）。所以 `build_sync_job()`
-在主线程读状态，worker 只做网络与磁盘，`apply_outcome()` 回主线程写状态。
-
-拉下来的配置**不热切换**，下次启动生效——而且这是**机制保证**的，不是靠
-约定：下载落在暂存层 `config/remote.staging/`，由 `__main__` 在启动早期
-（任何配置读取之前）经 `promote_pending()` 整目录提升为 `config/remote/`。
-
-光写在注释里做不到：工作流每次启动都会重新 `load_layout()`
-（`ui/main/run_control.py`），会立刻读到写进生效层的新布局，而场景注册表
-只在进程启动时加载一次——半新半旧配在一起，出的问题极难查。
-
-暂存层以生效层的当前内容为基线（`prepare_stage()` 先整份复制），否则提升
-上去等于把本轮没变的文件全删了；"清单没列的一律删"那条差集也需要看到完整
-现状才成立。提升用「先挪开现役、再改名暂存、最后删挪开那份」，中途崩溃最坏
-留一个 `.old` 残留（下次启动清掉），不会出现生效层缺失的窗口。
-
-### 用户开关
-
-并入已有的 `settings.network`（与公告/更新同层），**不另立开关**——否则
-"完全离线模式"这个总闸管不到在线配置，用户勾了离线却还在后台拉配置。
-默认**开**，与统计的"默认关 + 首启询问"相反：统计是把数据传出去，在线配置
-是把修复拿回来。设置页「网络与隐私」标签页可关闭。
-
-关闭的语义是**回到系统配置**，不只是停止下载：下次启动时
-`promote_pending()` 会把暂存层与生效层一并清掉。只停下载是不够的——已下发
-的配置会一直顶替系统内容，用户遇到一份有问题的远程配置就没有退路了。
-重新打开会重新同步，删掉没有损失。
-
-> 状态展示要区分"已生效"和"已下载待生效"：配置落在暂存层时显示
-> 「已下载在线配置 vN，重启后生效」，直接报"当前版本 vN"是错的——本次会话
-> 跑的还是上一版。
-
-`UserConfig` 解析 `settings.network` 时按 **dataclass 字段名**过滤未知键，
-不另写白名单：手写白名单漏同步新字段会把用户存下的值静默丢掉、回退成默认值
-（`remote_config` 就这么漏过一次，表现为"关掉了，重启又自己打开"）。
-
-### 尚未覆盖
-
-- **设备端（Android）**：APK 不携带业务配置；PC 将 system/local/remote/session
-  完整快照下发，手机不单独下载远端配置。同步后重建 resolver 与插件缓存，应用升级
-  不解压或覆盖已同步数据。版本码只用于应用升级，与配置下发独立。
-- 其余配置（`app.yaml`、`workflows/`、`references/`）暂不参与，机制已就位，
-  需要时按上表加一行注册即可。
-
----
+全部文件读取策略、目录及人工恢复说明见 [更新架构](05-config-update-architecture.md)。
 
 ## 关联文档
 

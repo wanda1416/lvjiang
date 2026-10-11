@@ -87,6 +87,8 @@ class AppHooks:
 
     # 外部完整配置快照应用后清理插件自己的只读缓存，不重注册 UI 或执行任务。
     configuration_reload_callbacks: list[Callable[[], None]] = field(default_factory=list)
+    # 在隔离配置上下文中执行，只校验模型，不写入用户配置或运行任务。
+    configuration_validation_callbacks: list[Callable[[], None]] = field(default_factory=list)
 
     # PC→手机同步白名单；模式相对 system/local/remote，会话文件相对 session。
     offline_configuration_patterns: tuple[str, ...] = ()

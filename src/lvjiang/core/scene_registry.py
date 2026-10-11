@@ -10,7 +10,7 @@ from dataclasses import replace
 from loguru import logger
 
 from ..i18n import tr
-from .config.resolver import get_resolver
+from .config.resolver import get_resolver, get_root_resolver
 from .scene_config import load_scene_manifest
 from .scene_definition import SceneRegistry
 from .scene_definition_models import (
@@ -26,7 +26,7 @@ from .scene_definition_models import (
 def _load_manifest():
     """读取当前格式 scenes.yaml。"""
     try:
-        return load_scene_manifest(get_resolver())
+        return load_scene_manifest(get_root_resolver())
     except Exception as e:
         logger.warning(f"读取 scenes.yaml 失败: {e}")
         return None
@@ -36,6 +36,7 @@ def _load_manifest():
 
 _manifest = _load_manifest()
 _registry = SceneRegistry(
+    resolver=get_root_resolver(),
     scene_order=_manifest.order if _manifest else None,
     group_config=_manifest.groups if _manifest else None,
     group_names=_manifest.group_names if _manifest else None,
@@ -96,6 +97,14 @@ if not _registry.get_groups():
 
 def get_registry() -> SceneRegistry:
     """获取场景注册表实例（供 UI 层调用 CRUD 方法）"""
+    from .config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        def create():
+            manifest = load_scene_manifest(get_resolver())
+            return SceneRegistry(resolver=get_resolver(), scene_order=manifest.order,
+                                 group_config=manifest.groups, group_names=manifest.group_names,
+                                 disabled_scenes=manifest.disabled)
+        return scoped_value(SceneRegistry, create)
     return _registry
 
 
@@ -103,6 +112,7 @@ def reload_scene_registry():
     """原位重新加载注册表，避免已打开编辑器持有失效对象。"""
     manifest = _load_manifest()
     refreshed = SceneRegistry(
+        resolver=get_root_resolver(),
         scene_order=manifest.order if manifest else None,
         group_config=manifest.groups if manifest else None,
         group_names=manifest.group_names if manifest else None,
@@ -116,26 +126,26 @@ def reload_scene_registry():
     _rebuild_scene_globals()
 
 
-def _on_config_change(rel_path: str):
+def _on_config_change(paths: tuple[str, ...]):
     """配置写入后的失效通知：场景相关文件变更时重载注册表"""
-    if rel_path == "scenes.yaml" or rel_path.startswith("scenes/"):
+    if any(path == "scenes.yaml" or path.startswith("scenes/") for path in paths):
         reload_scene_registry()
 
 
-get_resolver().add_change_listener(_on_config_change)
+get_root_resolver().add_batch_change_listener(_on_config_change)
 
 
 
 
 def get_group_name(group_key: str) -> str:
     """获取分组名称"""
-    return SCENE_GROUPS_META.get(group_key, group_key)
+    return dict(get_registry().get_groups()).get(group_key, group_key)
 
 
 def get_scene_group(scene_key: str) -> str | None:
     """获取场景所在分组 key"""
-    for gk, scenes in GROUP_SCENES.items():
-        if scene_key in scenes:
+    for gk, _name in get_registry().get_groups():
+        if scene_key in get_registry().get_group_scenes(gk):
             return gk
     return None
 
@@ -143,7 +153,7 @@ def get_scene_group(scene_key: str) -> str | None:
 def sync_scene_cache(scene_key: str):
     """仅刷新单个场景的全局缓存（区域/坐标/面板编辑后调用，避免全量重载）"""
     global SCENE_REGIONS, SCENE_POINTS, SCENE_PANELS
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if scene:
         SCENE_REGIONS[scene_key] = (
             scene.name,
@@ -158,16 +168,14 @@ def sync_scene_cache(scene_key: str):
 
 
 def get_scene_name(scene_key: str) -> str:
-    if scene_key in SCENE_REGIONS:
-        return SCENE_REGIONS[scene_key][0]
-    return scene_key
+    scene = get_registry().get_scene(scene_key)
+    return scene.name if scene else scene_key
 
 
 def get_scene_regions(scene_key: str) -> list[tuple[str, str]]:
     """获取场景的 (key, name) 区域列表"""
-    if scene_key in SCENE_REGIONS:
-        return SCENE_REGIONS[scene_key][1]
-    return []
+    scene = get_registry().get_scene(scene_key)
+    return [(region.key, region.name) for region in scene.regions] if scene else []
 
 
 
@@ -181,7 +189,7 @@ def _referenced_entity_name(scene, entity_key: str) -> str | None:
     for ref in getattr(scene, "references", ()):
         if ref.entity != entity_key:
             continue
-        source = _registry.get_scene(ref.scene)
+        source = get_registry().get_scene(ref.scene)
         if source is None:
             continue
         entity = next(
@@ -194,7 +202,7 @@ def _referenced_entity_name(scene, entity_key: str) -> str | None:
 
 def get_region_name(scene_key: str, region_key: str) -> str:
     """通过 scene_key + region_key 查找区域中文名（含跨场景引用）"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if scene:
         for r in scene.regions:
             if r.key == region_key:
@@ -207,7 +215,7 @@ def get_region_name(scene_key: str, region_key: str) -> str:
 
 def get_point_name(scene_key: str, point_key: str) -> str:
     """通过 scene_key + point_key 查找坐标点中文名（含跨场景引用）"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if scene:
         for p in scene.points:
             if p.key == point_key:
@@ -220,7 +228,7 @@ def get_point_name(scene_key: str, point_key: str) -> str:
 
 def get_panel_name(scene_key: str, panel_key: str) -> str:
     """通过 scene_key + panel_key 查找网格面板中文名。"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if scene:
         for panel in scene.panels:
             if panel.key == panel_key:
@@ -230,7 +238,7 @@ def get_panel_name(scene_key: str, panel_key: str) -> str:
 
 def get_region_defs(scene_key: str) -> list[RegionDef]:
     """获取场景的完整区域定义列表"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if not scene:
         return []
     return list(scene.regions)
@@ -245,7 +253,7 @@ def get_effective_region_defs(
     引用实体沿用源场景的类型、文字识别等属性，但视图归属属于目标场景，
     因而以 ``SceneRefDef.views`` 覆盖源定义。``current_view`` 为空表示“全部”。
     """
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if scene is None:
         return []
     definitions = [
@@ -255,7 +263,7 @@ def get_effective_region_defs(
     for ref in scene.references:
         if not is_view_visible(ref.views, current_view):
             continue
-        source = _registry.get_scene(ref.scene)
+        source = get_registry().get_scene(ref.scene)
         if source is None:
             continue
         source_def = next(
@@ -269,20 +277,20 @@ def get_effective_region_defs(
 
 
 def is_subscene(scene_key: str) -> bool:
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     return bool(scene and scene.is_subscene)
 
 
 def get_region_def(scene_key: str, region_key: str) -> RegionDef | None:
     """获取场景内指定 region 的类型定义（与 get_point_def 对称）"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if not scene:
         return None
     return next((r for r in scene.regions if r.key == region_key), None)
 
 
 def get_subscene_ref_defs(scene_key: str) -> list[SubsceneRefDef]:
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     return list(scene.subscene_refs) if scene else []
 
 
@@ -291,7 +299,7 @@ def get_subscene_ref_def(scene_key: str, ref_key: str) -> SubsceneRefDef | None:
 
 
 def get_subscene_scenes() -> list[tuple[str, str]]:
-    return [(key, scene.name) for key, scene in _registry.all_scenes().items()
+    return [(key, scene.name) for key, scene in get_registry().all_scenes().items()
             if scene.is_subscene]
 
 
@@ -299,7 +307,7 @@ def get_subscene_scenes() -> list[tuple[str, str]]:
 
 def get_scene_views(scene_key: str) -> list[ViewDef]:
     """获取场景视图列表（空 = 未开启多视图）"""
-    return _registry.get_scene_views(scene_key)
+    return get_registry().get_scene_views(scene_key)
 
 
 def is_view_visible(item_view: str | list[str], current_view: str) -> bool:
@@ -326,7 +334,7 @@ def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:
     """当前视图下可见的全部定义 key（看全部时返回 None 表示不过滤）"""
     if not current_view:
         return None
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if not scene:
         return set()
     return {
@@ -342,12 +350,13 @@ def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:
 
 def get_scene_point_pairs(scene_key: str) -> list[tuple[str, str]]:
     """获取场景的 (key, name) 坐标点列表（来自 YAML 定义）"""
-    return SCENE_POINTS.get(scene_key, [])
+    scene = get_registry().get_scene(scene_key)
+    return [(point.key, point.name) for point in scene.points] if scene else []
 
 
 def get_point_defs(scene_key: str) -> list[PointDef]:
     """获取场景的完整坐标点定义列表"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if not scene:
         return []
     return list(scene.points)
@@ -355,7 +364,7 @@ def get_point_defs(scene_key: str) -> list[PointDef]:
 
 def get_point_def(scene_key: str, point_key: str) -> PointDef | None:
     """获取场景内指定 point 的类型定义"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if not scene:
         return None
     return next((p for p in scene.points if p.key == point_key), None)
@@ -365,7 +374,7 @@ def get_point_def(scene_key: str, point_key: str) -> PointDef | None:
 
 def get_panel_defs(scene_key: str) -> list[PanelDef]:
     """获取场景的完整面板定义列表"""
-    scene = _registry.get_scene(scene_key)
+    scene = get_registry().get_scene(scene_key)
     if not scene:
         return []
     return list(scene.panels)

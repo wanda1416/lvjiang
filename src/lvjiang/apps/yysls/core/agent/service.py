@@ -33,7 +33,6 @@ class AgentService:
         self.root = root
         self.resolver = ConfigResolver(
             root / "config/system", root / "config/local", dev_mode=False,
-            remote_dir=root / "config/remote",
         )
         self.users_dir = root / "config/session/users"
         self.store = DocumentDirectoryStore(

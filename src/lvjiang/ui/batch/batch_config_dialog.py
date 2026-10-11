@@ -358,8 +358,7 @@ class BatchConfigDialog(QDialog):
         # workflows/{value} 再 resolve_read。三层根目录都可能被选中，逐个
         # 试；都不匹配就拒绝——存下绝对路径的话拼进去必然解析失败。
         chosen = Path(path).resolve()
-        for layer_root in (resolver.local_dir, resolver.remote_dir,
-                           resolver.system_dir):
+        for layer_root in (resolver.local_dir, resolver.system_dir):
             base = (layer_root / "workflows").resolve()
             try:
                 value = chosen.relative_to(base).as_posix()

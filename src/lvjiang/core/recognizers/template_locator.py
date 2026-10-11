@@ -354,6 +354,9 @@ _STORE: TemplateStore | None = None
 
 def get_template_store() -> TemplateStore:
     """进程级模板缓存（走 ConfigResolver 路径）"""
+    from ..config.runtime_snapshot import current_snapshot, scoped_value
+    if current_snapshot() is not None:
+        return scoped_value(TemplateStore, TemplateStore)
     global _STORE
     if _STORE is None:
         _STORE = TemplateStore()

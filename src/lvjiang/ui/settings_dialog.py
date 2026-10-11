@@ -1268,6 +1268,9 @@ class SettingsDialog(QDialog):
         if result.active:
             self._license_edit.clear()
             self._refresh_license_status()
+            starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
+            if callable(starter):
+                starter()
             QMessageBox.information(
                 self, tr("激活"),
                 tr("激活成功。部分功能需要重新定位窗口后生效。"))
@@ -1285,6 +1288,9 @@ class SettingsDialog(QDialog):
         clear_code()
         refresh_entitlement()
         self._refresh_license_status()
+        starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
+        if callable(starter):
+            starter()
 
     def _build_privacy_tab(self) -> QWidget:
         tab = QWidget()
@@ -1324,9 +1330,9 @@ class SettingsDialog(QDialog):
         sub_box.addWidget(self._remote_config_check)
 
         remote_caption = QLabel(
-            tr("只下发识别所需的配置（场景与布局坐标、插件规则），用于在不发"
-               "新版的情况下修复识别问题；你自己改过的配置始终优先，不会被"
-               "覆盖。拉取到的配置下次启动生效。"))
+            tr("接收与当前应用版本匹配的官方配置和任务更新，校验通过后立即生效。"
+               "你的本地配置始终优先；运行中的任务继续使用启动时的配置。"
+               "关闭此选项或进入离线模式会恢复预置并撤下会员内容，不影响本地数据。"))
         remote_caption.setWordWrap(True)
         remote_caption.setStyleSheet("color: palette(mid);")
         sub_box.addWidget(remote_caption)
@@ -1407,38 +1413,35 @@ class SettingsDialog(QDialog):
                 + ((" " + " ".join(history_notices)) if history_notices else ""))
 
     def _refresh_remote_config_status(self):
-        """展示在线配置版本——用户得能知道自己在跑哪一版。
-
-        已下载但尚未生效的要说清楚：配置落在暂存层、下次启动才提升
-        （见 core/config/remote.py），此时直接报"当前版本 vN"是错的——
-        本次会话跑的还是上一版。
-        """
+        """展示已经安装的公开修订，而非下载中的候选。"""
         from ..core.config.remote import (
             get_config_version,
             get_last_synced_at,
-            stage_dir,
         )
         version = get_config_version()
         if not version:
-            self._remote_config_status.setText(tr("尚未获取过在线配置"))
-            return
-        if stage_dir().is_dir():
-            self._remote_config_status.setText(
-                tr("已下载在线配置 v{version}，重启后生效").format(version=version))
+            self._remote_config_status.setText(tr("公开配置：预置 r0"))
             return
         synced = (get_last_synced_at() or "")[:10]
         self._remote_config_status.setText(
-            tr("当前在线配置版本 v{version}（{date} 同步）").format(
+            tr("公开配置修订 r{version}（{date} 同步）").format(
                 version=version, date=synced or tr("未知日期")))
 
     def _on_offline_toggled(self, checked: bool):
         from ..core.telemetry.settings import set_network_feature
         set_network_feature("offline", checked)
         self._refresh_privacy_tab_state()
+        starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
+        if callable(starter):
+            starter()
 
     def _on_net_feature_toggled(self, feature: str, checked: bool):
         from ..core.telemetry.settings import set_network_feature
         set_network_feature(feature, checked)
+        if feature == "remote_config":
+            starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
+            if callable(starter):
+                starter()
 
     def _on_telemetry_toggled(self, checked: bool):
         from ..core.telemetry.settings import set_telemetry_enabled

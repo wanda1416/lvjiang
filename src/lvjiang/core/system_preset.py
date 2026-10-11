@@ -10,35 +10,34 @@ from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 
 from .._version import __version__
+from .fs_util import atomic_write_bytes
+from .update_bundle import (
+    json_bytes,
+    pack,
+    read_tree,
+    series,
+    tree_digest,
+    validate_names,
+)
 
-PRESET_FORMAT = 1
+PRESET_FORMAT = 2
 MAX_PRESET_BYTES = 256 << 20
 
 
 def build_system_preset(system_dir: Path, destination: Path) -> dict:
     """输入仅为官方 system 根；文件顺序和 ZIP 时间固定，便于复核内容摘要。"""
-    files = {}
-    contents = {}
-    for path in sorted(system_dir.rglob("*")):
-        if path.is_symlink():
-            raise ValueError("官方预置包不允许符号链接")
-        rel = path.relative_to(system_dir)
-        if not path.is_file() or any(part.startswith(".") or part == "__pycache__" for part in rel.parts):
-            continue
-        if path.suffix in {".db", ".lock", ".tmp", ".py", ".pyc"}:
-            raise ValueError(f"官方预置目录包含非配置文件：{rel}")
-        data = path.read_bytes()
-        contents[rel.as_posix()] = data
-        files[rel.as_posix()] = hashlib.sha256(data).hexdigest()
+    contents = read_tree(system_dir)
+    files = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
     if not {"app.yaml", "ocr.yaml", "layouts.yaml"} <= files.keys():
         raise ValueError("官方预置包缺少应用、OCR 或布局定义")
     if sum(map(len, contents.values())) > MAX_PRESET_BYTES:
         raise ValueError("官方预置包展开后超过限制")
-    preset_id = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+    preset_id = tree_digest(contents)
     manifest = {"format": PRESET_FORMAT, "app_version": __version__, "preset_id": preset_id, "files": files}
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name, data in {**contents, "manifest.json": json.dumps(manifest, ensure_ascii=False).encode()}.items():
+        payload = {f"system/{name}": data for name, data in contents.items()}
+        for name, data in {**payload, "manifest.json": json_bytes(manifest)}.items():
             info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, data)
@@ -54,9 +53,10 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
     with zipfile.ZipFile(archive_path) as archive:
         manifest = json.loads(archive.read("manifest.json"))
         files = manifest["files"]
+        validate_names(files)
         if manifest.get("format") != PRESET_FORMAT or manifest.get("app_version") != __version__:
             raise ValueError("预置包格式或应用版本不一致")
-        digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+        digest = hashlib.sha256(json_bytes(files)).hexdigest()
         if digest != manifest.get("preset_id"):
             raise ValueError("预置清单摘要不一致")
         if marker.exists() and all((target / name).is_file() for name in ("app.yaml", "ocr.yaml", "layouts.yaml")):
@@ -64,7 +64,7 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
             if saved.get("preset_id") == digest:
                 return False
         names = archive.namelist()
-        if len(names) != len(set(names)) or set(names) != {*files, "manifest.json"}:
+        if len(names) != len(set(names)) or set(names) != {*(f"system/{name}" for name in files), "manifest.json"}:
             raise ValueError("预置包文件清单不一致")
         if sum(info.file_size for info in archive.infolist()) > MAX_PRESET_BYTES:
             raise ValueError("预置包展开后超过限制")
@@ -78,25 +78,32 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 rel = PurePosixPath(name)
                 if rel.is_absolute() or ".." in rel.parts or "\\" in name or rel.as_posix() != name:
                     raise ValueError("预置包包含非法路径")
-                data = archive.read(name)
+                data = archive.read(f"system/{name}")
                 if hashlib.sha256(data).hexdigest() != expected:
                     raise ValueError("预置文件校验失败")
                 path = new.joinpath(*rel.parts)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
             old = stage / "old"
+            identity = config / "system-baseline.json"
+            old_identity = identity.read_bytes() if identity.exists() else None
             if target.exists():
                 target.rename(old)
             try:
                 new.rename(target)
                 if on_applied:
                     on_applied()
+                write_baseline_identity(target, __version__)
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 # 只记录最后安装的官方代次，不代表当前 system 来自 PC 还是 APK。
                 pending = stage / "preset.json"
                 pending.write_text(json.dumps({"preset_id": digest, "app_version": __version__}), encoding="utf-8")
                 pending.replace(marker)
             except Exception:
+                if old_identity is None:
+                    identity.unlink(missing_ok=True)
+                else:
+                    atomic_write_bytes(identity, old_identity, prefix=".baseline-")
                 if target.exists():
                     target.rename(stage / "failed")
                 if old.exists():
@@ -109,3 +116,19 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                     shutil.rmtree(backup)
                 old.rename(backup)
     return True
+
+
+def write_baseline_identity(system_dir: Path, app_version: str) -> dict:
+    """只用于可信打包/预置安装，不从已在线更新的用户 system 推导 r0。"""
+    files = read_tree(system_dir)
+    version = series(app_version)
+    identity = {"app_series": version, "sha256": tree_digest(files)}
+    root = system_dir.parent
+    archive = root / "updates" / f"v{version}" / "r0.zip"
+    payload = pack(files)
+    if archive.exists() and archive.read_bytes() != payload:
+        raise ValueError("同一应用系列出现不同预置基底，请提升第三段版本号")
+    if not archive.exists():
+        atomic_write_bytes(archive, payload, prefix=".baseline-", fsync=True)
+    atomic_write_bytes(root / "system-baseline.json", json_bytes(identity), prefix=".baseline-", fsync=True)
+    return identity

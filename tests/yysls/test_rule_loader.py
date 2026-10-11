@@ -517,58 +517,6 @@ class TestSaveAndRaw:
         raw["affix_pool"].append("神速")
         assert "神速" not in mgr.get_raw("t1")["affix_pool"]
 
-    def test_rule_version_bump_is_explicit_and_immediate(
-            self, tmp_path, monkeypatch):
-        monkeypatch.setitem(
-            versioning.VERSIONED_DIRS,
-            "yysls/tuning_rules",
-            versioning.VersionedDir(
-                "yysls/tuning_rules", "*.yaml", 1, allow_remote_new=True),
-        )
-        system = tmp_path / "system"
-        local = tmp_path / "local"
-        remote = tmp_path / "remote"
-        rules = system / "yysls" / "tuning_rules"
-        rules.mkdir(parents=True)
-        data = {"content_version": 1, **minimal_rule()}
-        (rules / "t1.yaml").write_text(
-            yaml.dump(data, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-        remote_rules = remote / "yysls" / "tuning_rules"
-        remote_rules.mkdir(parents=True)
-        remote_data = {"content_version": 3, **minimal_rule(name="远程规则")}
-        (remote_rules / "t1.yaml").write_text(
-            yaml.dump(remote_data, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-
-        scratch = tmp_path / "scratch"
-        scratch.mkdir()
-        mgr = TuningRuleManager(rules_dir=scratch)
-        mgr._resolver = ConfigResolver(  # type: ignore[attr-defined]
-            system_dir=system, local_dir=local, remote_dir=remote,
-            dev_mode=True)
-        mgr._rel_dir = "yysls/tuning_rules"  # type: ignore[attr-defined]
-        mgr.reload()
-
-        edited = mgr.get_raw("t1")
-        edited["name"] = "普通保存"
-        mgr.save_rule("t1", edited)
-        assert versioning.read_version(rules / "t1.yaml") == 1
-        assert mgr.get_rule("t1").name == "远程规则"
-
-        # 普通保存写进 system 了，但线上版本更高、reload 读回的仍是线上那份，
-        # 规则实际没生效。UI 必须能问出这个状态，否则只会报「已保存并生效」，
-        # 作者对着没变化的界面白排查。
-        override = mgr.system_save_override("t1")
-        assert override is not None
-        assert (override.layer, override.version) == ("remote", 3)
-
-        assert mgr.bump_rule_version("t1", edited) == 4
-        assert versioning.read_version(rules / "t1.yaml") == 4
-        assert mgr.get_rule("t1").name == "普通保存"
-        assert mgr.system_save_override("t1") is None      # 提升后真生效了
 
     def test_not_superseded_without_remote(self, tmp_path):
         mgr = TuningRuleManager(rules_dir=tmp_path)
@@ -588,7 +536,7 @@ class TestSaveAndRaw:
         scratch.mkdir()
         mgr = TuningRuleManager(rules_dir=scratch)
         mgr._resolver = ConfigResolver(  # type: ignore[attr-defined]
-            system_dir=system, local_dir=local, remote_dir=remote,
+            system_dir=system, local_dir=local,
             dev_mode=True)
         mgr._rel_dir = "yysls/tuning_rules"  # type: ignore[attr-defined]
         mgr.reload()
@@ -603,7 +551,7 @@ class TestSaveAndRaw:
             versioning.VERSIONED_DIRS,
             "yysls/tuning_rules",
             versioning.VersionedDir(
-                "yysls/tuning_rules", "*.yaml", 1, allow_remote_new=True),
+                "yysls/tuning_rules", "*.yaml", 1),
         )
         system, local, remote = (tmp_path / n for n in ("system", "local", "remote"))
         for root, ver, name in ((system, 1, "系统规则"), (remote, 3, "远程规则")):
@@ -617,7 +565,7 @@ class TestSaveAndRaw:
         scratch.mkdir()
         mgr = TuningRuleManager(rules_dir=scratch)
         mgr._resolver = ConfigResolver(  # type: ignore[attr-defined]
-            system_dir=system, local_dir=local, remote_dir=remote,
+            system_dir=system, local_dir=local,
             dev_mode=False)
         mgr._rel_dir = "yysls/tuning_rules"  # type: ignore[attr-defined]
         mgr.reload()

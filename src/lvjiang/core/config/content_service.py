@@ -13,10 +13,11 @@ CONTENT_SERVICE_URL = "https://lvjiang-content.wyxj.net"
 
 
 class ServiceError(RuntimeError):
-    def __init__(self, message: str, status: int = 0, *, code: str = ""):
+    def __init__(self, message: str, status: int = 0, *, code: str = "", reason: str = ""):
         super().__init__(message)
         self.status = status
         self.code = code
+        self.reason = reason
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -46,14 +47,18 @@ def request_json(base: str, route: str, data: dict[str, Any], *,
             raw = response.read(MAX_RESPONSE + 1)
     except HTTPError as error:
         code = ""
+        reason = ""
         try:
             details = json.loads(error.read(MAX_RESPONSE + 1).decode("utf-8"))
             candidate = details.get("error") if isinstance(details, dict) else None
             if isinstance(candidate, str) and len(candidate) <= 64:
                 code = candidate
+            candidate = details.get("reason") if isinstance(details, dict) else None
+            if isinstance(candidate, str) and len(candidate) <= 64:
+                reason = candidate
         except (ValueError, UnicodeDecodeError, OSError):
             pass
-        raise ServiceError(f"内容服务请求失败 HTTP {error.code}", error.code, code=code) from None
+        raise ServiceError(f"内容服务请求失败 HTTP {error.code}", error.code, code=code, reason=reason) from None
     except (URLError, TimeoutError, OSError):
         raise ServiceError("内容服务暂时无法连接") from None
     if len(raw) > MAX_RESPONSE:

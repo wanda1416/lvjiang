@@ -8,7 +8,7 @@ system ← local 合并），保存后以配置文件为准覆盖代码默认值
 的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
 """
 
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QCursor, QDesktopServices
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -1172,6 +1172,14 @@ class SettingsDialog(QDialog):
         self._license_status = QLabel()
         self._license_status.setWordWrap(True)
         vbox.addWidget(self._license_status)
+        self._online_license_status = QLabel()
+        self._online_license_status.setWordWrap(True)
+        vbox.addWidget(self._online_license_status)
+        self._license_status_timer = QTimer(tab)
+        self._license_status_timer.setInterval(1000)
+        self._license_status_timer.timeout.connect(self._refresh_online_license_status)
+        self.finished.connect(self._license_status_timer.stop)
+        self._license_status_timer.start()
 
         # ── 本机序列号 ──
         serial_box = QGroupBox(tr("本机序列号"))
@@ -1231,10 +1239,11 @@ class SettingsDialog(QDialog):
         from ..core.license import current_entitlement
 
         result = current_entitlement()
+        self._refresh_online_license_status()
         issued = result.license
         if issued is None:
             self._license_status.setText(
-                tr("当前未激活，高级功能不可用。") + f"（{result.reason}）")
+                tr("本地激活：未激活，高级功能不可用。") + f"（{result.reason}）")
             self._license_status.setStyleSheet("color: palette(mid);")
             self._clear_license_btn.setEnabled(False)
             return
@@ -1242,10 +1251,20 @@ class SettingsDialog(QDialog):
         expires = issued.expires.isoformat() if issued.expires else tr("永久")
         feats = "、".join(sorted(result.features)) or tr("无")
         self._license_status.setText(
-            tr("已激活") + f"：{issued.code_id} | {bind} | "
+            tr("本地激活：已激活") + f"：{issued.code_id} | {bind} | "
             + tr("有效期") + f" {expires}\n" + tr("已开放") + f"：{feats}")
         self._license_status.setStyleSheet("color: #2e7d32;")
         self._clear_license_btn.setEnabled(True)
+
+    def _refresh_online_license_status(self):
+        from ..core.config.protected_remote import member_access_status
+
+        status = member_access_status()
+        text = tr("在线会员授权") + "：" + tr(status.reason)
+        if self._online_license_status.text() != text:
+            self._online_license_status.setText(text)
+            color = {"allowed": "#2e7d32", "denied": "#c62828"}.get(status.state, "palette(mid)")
+            self._online_license_status.setStyleSheet(f"color: {color};")
 
     def _on_copy_serial(self):
         from PyQt6.QtWidgets import QApplication
@@ -1282,7 +1301,7 @@ class SettingsDialog(QDialog):
 
         confirm = QMessageBox.question(
             self, tr("清除激活"),
-            tr("清除后高级功能将不可用，激活码本身仍然有效，可以再次填入。"))
+            tr("清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。"))
         if confirm != QMessageBox.StandardButton.Yes:
             return
         clear_code()

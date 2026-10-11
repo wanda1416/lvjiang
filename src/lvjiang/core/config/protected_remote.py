@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from loguru import logger
 from packaging.version import Version
 
 from .content_service import CONTENT_SERVICE_URL
@@ -32,13 +33,44 @@ class ProtectedAccess:
         return digest(normalize_code(self.code).upper().encode("utf-8"))
 
 
+@dataclass(frozen=True)
+class MemberAccessStatus:
+    """本次进程的在线检查结果，不参与离线功能门禁或配置持久化。"""
+
+    code_hash: str = field(default="", repr=False)
+    state: str = "unchecked"
+    reason: str = "尚未检查，不代表云端授权有效"
+
+
+_access_status = MemberAccessStatus()
+
+
+def report_access_status(access: ProtectedAccess, state: str, reason: str) -> None:
+    global _access_status
+    _access_status = MemberAccessStatus(access.code_hash, state, reason)
+
+
+def member_access_status(code_hash: str | None = None) -> MemberAccessStatus:
+    """换码后不展示上一张码的在线结果；UI 只读缓存，不同步请求网络。"""
+    from ..license import load_code
+    from ..license.code import normalize_code
+    if code_hash is None:
+        code = load_code()
+        code_hash = digest(normalize_code(code).upper().encode("utf-8")) if code else ""
+    current = code_hash
+    return _access_status if current and current == _access_status.code_hash else MemberAccessStatus()
+
+
 def snapshot() -> ProtectedAccess | None:
     from ..license import current_serial, evaluate, load_code
     code = load_code()
     if not code:
+        logger.debug("[在线配置] 未填写激活码，不检查云端会员授权")
         return None
     entitlement = evaluate(code, current_serial())
     if not eligible(entitlement):
+        reason = entitlement.reason if entitlement.license is None else "本地授权未达到会员等级或已过期"
+        logger.debug("[在线配置] 不检查云端会员授权：{}", reason)
         return None
     issued = entitlement.license
     return ProtectedAccess(CONTENT_SERVICE_URL, code,

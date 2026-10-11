@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from loguru import logger
 from packaging.version import Version
 
 from ..update_bundle import json_bytes
@@ -16,7 +17,9 @@ from .protected_bundle import MAX_BUNDLE_BYTES, decrypt, digest
 from .protected_remote import (
     ProtectedAccess,
     manifest_url,
+    member_access_status,
     parse_manifest,
+    report_access_status,
     select_package,
 )
 
@@ -34,19 +37,45 @@ def fetch_member_update(access: ProtectedAccess | None, app_version: str, *,
                         fetch: Callable[..., tuple[bytes, str, bool]], timeout: float = 10,
                         cache_index: Callable[[bytes], None] | None = None) -> MemberDownload:
     if access is None:
+        logger.debug("[在线配置] 跳过会员更新：未取得有效的本地会员激活码")
         return MemberDownload({}, {})
+    report_access_status(access, "checking", "正在检查云端会员授权")
+    try:
+        return _fetch_member_update(access, app_version, fetch=fetch, timeout=timeout, cache_index=cache_index)
+    except Exception as error:
+        if member_access_status(access.code_hash).state != "allowed":
+            report_access_status(access, "unavailable", "在线检查未完成，请查看配置同步日志并重试")
+        logger.debug("[在线配置] 会员更新未完成：{}；保留已知授权结论，不将下载失败误判为授权拒绝", error)
+        raise
+
+
+def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
+                         fetch: Callable[..., tuple[bytes, str, bool]], timeout: float,
+                         cache_index: Callable[[bytes], None] | None) -> MemberDownload:
     raw, _, _ = fetch(manifest_url(), max_bytes=256 * 1024, timeout=timeout)
     index = parse_manifest(json.loads(raw))
     if cache_index is not None:
         cache_index(raw)
     package = select_package(index, app_version)
     if package is None:
+        report_access_status(access, "unchecked", "没有适用当前版本的会员包，尚未验证云端授权")
+        logger.debug("[在线配置] 跳过会员更新：没有适用客户端 {} 的会员包", app_version)
         return MemberDownload({}, {"config_version": index["config_version"]}, index_json=raw)
     try:
         grant = request_json(access.service, "/v1/key", {"code": access.code, "key_id": package["key_id"]},
                              timeout=timeout)
     except ServiceError as error:
         if error.status == 403 and error.code == "forbidden":
+            reason = {
+                "license_unregistered": "激活码尚未在云端登记",
+                "license_disabled": "激活码已在云端停用",
+                "license_expired": "激活码的云端授权已过期",
+                "insufficient_level": "激活码等级不足以获取此会员包",
+                "package_unavailable": "会员包不存在或已停用",
+                "invalid_request": "会员授权请求无效",
+            }.get(error.reason, "云端拒绝授权，可能未登记、已停用、已过期或等级不足")
+            report_access_status(access, "denied", reason)
+            logger.debug("[在线配置] 跳过会员更新：{}（HTTP 403）；本地激活有效不代表云端授权有效", reason)
             return MemberDownload({}, {}, index_json=raw)
         raise
     if grant.get("sha256") != package["sha256"] or grant.get("config_version") != package["config_version"] \
@@ -54,10 +83,16 @@ def fetch_member_update(access: ProtectedAccess | None, app_version: str, *,
         raise ValueError("会员授权响应与公开密文清单不一致")
     expires = min(filter(None, (access.expires, grant.get("expires"))), default=None)
     if expires is not None and date.fromisoformat(expires) < date.today():
+        report_access_status(access, "denied", "会员授权已过期")
+        logger.debug("[在线配置] 跳过会员更新：会员授权已过期")
         return MemberDownload({}, {}, index_json=raw)
     from ..versioning import config_version
     if config_version(app_version) < Version(grant["min_app_version"]):
+        report_access_status(access, "unchecked", "应用版本未满足会员包要求")
+        logger.debug("[在线配置] 跳过会员更新：应用版本未满足会员包要求")
         return MemberDownload({}, {}, index_json=raw)
+    report_access_status(access, "allowed", "最近检查通过")
+    logger.debug("[在线配置] 云端会员授权检查通过，开始获取会员包 r{}", package["config_version"])
     encrypted, _, _ = fetch(package["url"], max_bytes=MAX_BUNDLE_BYTES, timeout=timeout)
     if digest(encrypted) != package["sha256"]:
         raise ValueError("会员密文包摘要不匹配")

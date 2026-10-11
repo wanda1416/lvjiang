@@ -23,7 +23,8 @@ def test_identifies_application_and_distinguishes_edge_from_authorization_error(
     with pytest.raises(content_service.ServiceError) as edge:
         content_service.request_json("https://service.example.invalid", "/v1/key", {})
     assert edge.value.status == 403 and edge.value.code == ""
-    response = json.dumps({"error": "forbidden"}).encode("utf-8")
+    response = json.dumps({"error": "forbidden", "reason": "license_disabled"}).encode("utf-8")
     with pytest.raises(content_service.ServiceError) as denial:
         content_service.request_json("https://service.example.invalid", "/v1/key", {})
     assert denial.value.code == "forbidden"
+    assert denial.value.reason == "license_disabled"

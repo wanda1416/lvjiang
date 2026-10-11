@@ -10,6 +10,14 @@ from lvjiang.workflows.grammar.parser import api
 from tests.workflows.conftest import make_engine
 
 
+@pytest.fixture(autouse=True)
+def isolated_file_cache():
+    # 内容缓存跨路径共享；解析次数断言不能继承其他测试已解析的相同文本。
+    api._parse_cached_file.cache_clear()
+    yield
+    api._parse_cached_file.cache_clear()
+
+
 def test_concurrent_file_loads_reuse_parse_but_isolate_nested_ast(tmp_path, monkeypatch):
     """多个任务加载公共脚本只解析一次，修改返回值不影响其他执行。"""
     path = tmp_path / "shared.wf"

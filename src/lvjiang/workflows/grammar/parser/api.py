@@ -112,13 +112,14 @@ def parse_file(path: Path | str) -> Program:
     # lru_cache 自身允许并发 miss 重复计算；显式锁避免多个任务同时解析
     # 同一文件。读取和副本构造不持锁，缓存内容不会交给调用方修改。
     with _file_parse_lock:
-        program = _parse_cached_file(str(path.resolve()), text)
+        program = _parse_cached_file(text)
     return replace(deepcopy(program), source=str(path))
 
 
 @lru_cache(maxsize=128)
-def _parse_cached_file(source: str, text: str) -> Program:
-    return parse_text(text, source=source)
+def _parse_cached_file(text: str) -> Program:
+    # 文件来源仅在返回的 Program 上绑定。任务快照目录不同不代表脚本内容变化。
+    return parse_text(text)
 
 
 def parse_text(text: str, source: str = "<text>") -> Program:

@@ -10,6 +10,9 @@
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QGridLayout, QLabel, QSizePolicy, QVBoxLayout
 
 # 显示模式常量
@@ -65,6 +68,15 @@ class CardLayoutStrategy:
 
     def deactivate(self, tab) -> None:
         """离开当前策略前清理其专属布局状态。默认 no-op。"""
+
+    @staticmethod
+    def defer_resize_check(tab, callback: Callable[[], None]) -> None:
+        """随页面管理延迟检查，页面销毁时取消尚未执行的回调。"""
+        timer = QTimer(tab)
+        timer.setSingleShot(True)
+        timer.timeout.connect(callback)
+        timer.timeout.connect(timer.deleteLater)
+        timer.start(0)
 
     # ── 公共工具 ──
 
@@ -149,8 +161,7 @@ class HalfCardLayout(CardLayoutStrategy):
 
     def on_resize(self, tab) -> None:
         """检查宽度，决定是否切换到退化模式。"""
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(0, lambda: self._check_compact(tab))
+        self.defer_resize_check(tab, lambda: self._check_compact(tab))
 
     @staticmethod
     def _check_compact(tab) -> None:
@@ -178,8 +189,7 @@ class HalfCompactCardLayout(CardLayoutStrategy):
 
     def on_resize(self, tab) -> None:
         """检查宽度，决定是否从退化模式恢复到半屏完整模式。"""
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(0, lambda: self._check_recover(tab))
+        self.defer_resize_check(tab, lambda: self._check_recover(tab))
 
     def on_refresh_display(self, tab) -> None:
         """刷新显示后重新应用退化布局（恢复 + 重应用）。"""

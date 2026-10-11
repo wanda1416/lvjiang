@@ -1,6 +1,7 @@
 """战斗属性聚合与动态抗性测试。"""
 
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -18,6 +19,33 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import (
 )
 from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
 from tests.case_matrix import case_matrix
+
+
+def test_deferred_layout_checks_are_cancelled_when_page_is_destroyed(qapp, monkeypatch):
+    """退出/关闭页面不能留下访问已销毁 Qt 控件的布局检查。"""
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QWidget
+
+    from lvjiang.apps.yysls.ui.loadout.combat.layout_strategies import (
+        HalfCardLayout,
+        HalfCompactCardLayout,
+    )
+
+    for strategy, method in (
+        (HalfCardLayout(), '_check_compact'),
+        (HalfCompactCardLayout(), '_check_recover'),
+    ):
+        check = Mock(side_effect=lambda tab: tab.width())
+        monkeypatch.setattr(strategy, method, check)
+        live, closing = QWidget(), QWidget()
+        strategy.on_resize(live)
+        strategy.on_resize(closing)
+        check.assert_not_called()  # 保持延迟检查，不能改为 resize 内同步重排。
+        sip.delete(closing)
+        qapp.processEvents()
+        check.assert_called_once_with(live)
+        sip.delete(live)
+        qapp.processEvents()
 
 
 def test_gain_card_slots_never_share_a_grid_cell(qtbot) -> None:

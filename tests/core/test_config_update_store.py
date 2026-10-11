@@ -76,8 +76,7 @@ def test_untrusted_baseline_and_wrong_series_are_rejected(tmp_path):
     with pytest.raises(ValueError, match="系列"):
         store.install(manifest, archive, validate=lambda path: None, activate=lambda *args: None)
     assert series("0.15.0.3") == "0.15.0"
-    with pytest.raises(ValueError):
-        series("0.15.0rc1")
+    assert series("0.15.0rc1") == "0.15.0"
 
 
 def test_archive_rejects_escape_and_case_collisions():
@@ -101,6 +100,27 @@ def test_recovery_rolls_back_interrupted_swap(tmp_path):
     store.recover()
     assert (tmp_path / "system/app.yaml").read_bytes() == b"old"
     assert json.loads((tmp_path / "updates/v0.15.0/state.json").read_text(encoding="utf-8"))["revision"] == 1
+
+
+def test_prerelease_baseline_and_recovery_do_not_touch_final_archives(tmp_path):
+    beta = {"app.yaml": b"beta"}
+    final = {"app.yaml": b"final"}
+    write_files(tmp_path / "system", beta)
+    beta_store = UpdateStore(tmp_path, "0.15.0b1", tree_digest(beta))
+    beta_store.baseline()
+    write_files(tmp_path / "system", final)
+    final_store = UpdateStore(tmp_path, "0.15.0", tree_digest(final))
+    final_store.baseline()
+    assert unpack((beta_store.root / "r0.zip").read_bytes()) == beta
+    assert unpack((final_store.root / "r0.zip").read_bytes()) == final
+    token = "b" * 32
+    write_files(tmp_path / f"updates/previous-{token}", beta)
+    journal = {"token": token, "app_series": "0.15.0", "app_version": "0.15.0b1",
+               "previous_state": {"revision": 1}}
+    (tmp_path / "updates/transaction.json").write_bytes(json_bytes(journal))
+    final_store.recover()
+    assert json.loads(beta_store.state_path.read_bytes())["revision"] == 1
+    assert not final_store.state_path.exists()
 
 
 def test_task_snapshot_keeps_lazy_files_while_next_task_sees_update(tmp_path, monkeypatch):

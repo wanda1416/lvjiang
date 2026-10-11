@@ -6,7 +6,11 @@ import pytest
 from lvjiang.core.config import member_download
 from lvjiang.core.config.content_service import ServiceError
 from lvjiang.core.config.protected_bundle import digest, encrypt
-from lvjiang.core.config.protected_remote import ProtectedAccess, manifest_url
+from lvjiang.core.config.protected_remote import (
+    ProtectedAccess,
+    manifest_url,
+    parse_manifest,
+)
 from lvjiang.core.update_bundle import json_bytes
 
 
@@ -23,9 +27,12 @@ def test_member_integrity_and_authorization_failure_semantics(monkeypatch):
     access = ProtectedAccess("https://example.invalid", "synthetic-license")
     def fetch(url, **kwargs):
         return (index if url == manifest_url() else encrypted), "", False
-    result = member_download.fetch_member_update(access, "0.15.0", fetch=fetch)
+    result = member_download.fetch_member_update(access, "0.15.0b1", fetch=fetch)
     assert result.files == contents
     assert result.encrypted == encrypted
+    with pytest.raises(ValueError, match="三段版本号"):
+        parse_manifest({"schema_version": 1, "config_version": 3,
+                        "packages": [{**package, "min_app_version": "0.15.0rc1"}]})
     grant["sha256"] = "0" * 64
     with pytest.raises(ValueError, match="不一致"):
         member_download.fetch_member_update(access, "0.15.0", fetch=fetch)

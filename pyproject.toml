@@ -8,6 +8,7 @@ version = "0.15.0"
 description = "通用视觉 RPA 引擎（支持插件扩展，燕云十六声装备调律工具）"
 requires-python = ">=3.11,<3.13"  # RapidOCR 1.4.4 要求 Python <3.13；3.11+ 才有 Windows 高精度 sleep（core.timing 依赖）；开发/发布使用 3.12
 dependencies = [
+    "packaging>=23,<27",  # PEP 440 应用版本比较（桌面和手机共用）
     "PyQt6>=6.6,<6.8; sys_platform == 'darwin'",  # 6.8+ 需 macOS 13+
     "PyQt6>=6.6; sys_platform != 'darwin'",
     "mss>=9.0",

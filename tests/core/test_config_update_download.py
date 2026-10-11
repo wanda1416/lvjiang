@@ -27,6 +27,7 @@ def test_exact_series_selection_and_consistent_artifacts():
 
     result = fetch_public_update("0.15.0.1", fetch=fetch)
     assert result is not None and result.archive == archive
+    assert fetch_public_update("0.15.0b1", fetch=fetch).archive == archive
     calls.clear()
     assert fetch_public_update("0.15.1", fetch=fetch).manifest is None
     assert calls == [f"{root}/index.json"]

@@ -16,6 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from loguru import logger
+from packaging.version import InvalidVersion
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ..i18n import tr
@@ -32,6 +33,7 @@ from .version_info import (
 from .version_info import (
     parse_version as parse_version,
 )
+from .versioning import application_version
 
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -85,6 +87,13 @@ def parse_release_info(data: dict[str, Any], platform: str | None = None) -> Rel
         return None
 
     version = tag_name[1:] if tag_name[:1].lower() == "v" else tag_name
+    if data.get("draft") or data.get("prerelease"):
+        return None
+    try:
+        if application_version(version).is_prerelease:
+            return None
+    except InvalidVersion:
+        return None
     release_url = str(data.get("html_url") or GITHUB_RELEASES_URL)
     return ReleaseInfo(
         version=version,
@@ -98,7 +107,11 @@ def parse_release_info(data: dict[str, Any], platform: str | None = None) -> Rel
 
 def is_newer_version(latest: str, current: str) -> bool:
     """判断 latest 是否比 current 更新"""
-    return parse_version(latest) > parse_version(current)
+    try:
+        return application_version(latest) > application_version(current)
+    except InvalidVersion as error:
+        logger.warning("无法比较升级版本：{}", error)
+        return False
 
 
 # ─── 跳过版本管理（存储于 session.json 的 server_config 节点）────────────

@@ -29,6 +29,7 @@ from ..update_bundle import (
     validate_names,
     verify_archive,
 )
+from ..versioning import update_namespace
 from .member_composition import REGISTRIES, compose
 
 _MUTEXES: dict[Path, Any] = {}
@@ -42,8 +43,10 @@ class UpdateStore:
         self.system = self.config / "system"
         self.updates = self.config / "updates"
         self.version = series(app_version)
+        self.app_version = app_version
+        self.namespace = update_namespace(app_version)
         self.baseline_sha256 = baseline_sha256
-        self.root = self.updates / f"v{self.version}"
+        self.root = self.updates / f"v{self.namespace}"
         self.state_path = self.root / "state.json"
 
     @contextmanager
@@ -85,7 +88,7 @@ class UpdateStore:
             if self.system.exists():
                 self.system.rename(rejected)
             previous.rename(self.system)
-        version = series(data["app_series"])
+        version = update_namespace(data.get("app_version", data["app_series"]))
         self._write(self.updates / f"v{version}" / "state.json", json_bytes(data["previous_state"]))
         journal.unlink()
         # rejected 保留用于诊断；不递归删除来源不明目录。
@@ -95,7 +98,7 @@ class UpdateStore:
             self._recover()
 
     def _baseline(self) -> dict[str, bytes]:
-        path = self.updates / f"v{self.version}" / "r0.zip"
+        path = self.root / "r0.zip"
         if path.is_file():
             files = unpack(path.read_bytes())
         else:
@@ -161,7 +164,7 @@ class UpdateStore:
                         if entry:
                             keep[channel].add((entry["revision"], entry["sha256"]))
                     else:
-                        package = select_package(parse_member(doc), self.version)
+                        package = select_package(parse_member(doc), self.app_version)
                         if package:
                             keep[channel].add((package["config_version"], digest(json_bytes(package))))
                 root = self.root / channel
@@ -307,7 +310,8 @@ class UpdateStore:
                         retain_candidate(owner)
                         retained = True
                     return changed
-                self._write(journal, json_bytes({"token": token, "app_series": self.version, "previous_state": previous_state}))
+                self._write(journal, json_bytes({"token": token, "app_series": self.version,
+                                                 "app_version": self.app_version, "previous_state": previous_state}))
                 try:
                     self.system.rename(retired)
                     temporary.rename(self.system)

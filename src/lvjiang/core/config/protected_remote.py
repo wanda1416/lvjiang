@@ -81,13 +81,15 @@ def parse_manifest(manifest: Any) -> dict[str, Any]:
         maximum = package.get("max_app_version_exclusive", "")
         if not isinstance(minimum, str) or not isinstance(maximum, str):
             raise ValueError("加密包客户端版本范围无效")
+        from ..update_bundle import series
+        if series(minimum) != minimum or maximum and series(maximum) != maximum:
+            raise ValueError("加密包客户端版本范围只允许三段版本号")
         if maximum and Version(minimum) >= Version(maximum):
             raise ValueError("加密包客户端版本范围为空")
         Version(minimum)
         package_version = package.get("config_version", version)
         if type(package_version) is not int or not 1 <= package_version <= version:
             raise ValueError("加密包修订号无效")
-        from ..update_bundle import series
         dependencies = package.get("public_revisions", {})
         if not isinstance(dependencies, dict) or any(
                 not isinstance(key, str) or series(key) != key or type(value) is not int or value < 0
@@ -106,7 +108,8 @@ def parse_manifest(manifest: Any) -> dict[str, Any]:
 
 def select_package(manifest: dict[str, Any], app_version: str) -> dict[str, Any] | None:
     """从已校验清单中取第一个匹配当前客户端版本的包。"""
-    current = Version(app_version)
+    from ..versioning import config_version
+    current = config_version(app_version)
     for package in manifest["packages"]:
         if current < Version(package["min_app_version"]):
             continue

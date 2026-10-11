@@ -1,4 +1,4 @@
-"""标准库实现的 0.15 配置包协议；构建 APK 时也无需导入配置运行时。"""
+"""0.15 配置包协议；构建 APK 时无需导入配置运行时。"""
 from __future__ import annotations
 
 import hashlib
@@ -10,6 +10,8 @@ import zipfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
+from .versioning import application_series
 
 SCHEMA_VERSION = 1
 MANIFEST_SCHEMA_VERSION = 2
@@ -31,10 +33,8 @@ def json_bytes(value: object) -> bytes:
 
 
 def series(version: str) -> str:
-    """仅接受三段正式版或同系列第四段修订；不猜测预发布版本归属。"""
-    if not isinstance(version, str) or not re.fullmatch(r"(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){2,3}", version):
-        raise ValueError("配置更新需要三段正式版本或四段修订版本")
-    return ".".join(version.split(".")[:3])
+    """应用映射到目标三段系列；清单 key 仍必须是三段正式系列。"""
+    return application_series(version)
 
 
 def next_series(version: str) -> str:

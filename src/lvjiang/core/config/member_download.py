@@ -55,7 +55,8 @@ def fetch_member_update(access: ProtectedAccess | None, app_version: str, *,
     expires = min(filter(None, (access.expires, grant.get("expires"))), default=None)
     if expires is not None and date.fromisoformat(expires) < date.today():
         return MemberDownload({}, {}, index_json=raw)
-    if Version(app_version) < Version(grant["min_app_version"]):
+    from ..versioning import config_version
+    if config_version(app_version) < Version(grant["min_app_version"]):
         return MemberDownload({}, {}, index_json=raw)
     encrypted, _, _ = fetch(package["url"], max_bytes=MAX_BUNDLE_BYTES, timeout=timeout)
     if digest(encrypted) != package["sha256"]:

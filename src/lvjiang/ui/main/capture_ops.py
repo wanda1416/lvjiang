@@ -16,7 +16,15 @@ from datetime import datetime
 
 from loguru import logger
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PyQt6.QtGui import QImage
+from PyQt6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from ...constants import PICTURE_DIR, VIDEO_DIR
 from ...i18n import tr
@@ -134,6 +142,11 @@ class CaptureOpsMixin:
         self.btn_snap.clicked.connect(self._on_snap)
         lay.addWidget(self.btn_snap)
 
+        self.btn_copy_capture = QPushButton(tr("复制"))
+        self.btn_copy_capture.setStyleSheet(_STYLE_SNAP)
+        self.btn_copy_capture.clicked.connect(self._on_copy_capture)
+        lay.addWidget(self.btn_copy_capture)
+
         lay.addWidget(_cap_divider())
 
         # 处置组：保存 | 放弃（仅待保存状态可用）
@@ -208,6 +221,11 @@ class CaptureOpsMixin:
 
         self.btn_snap.setEnabled(connected)
         self.btn_refresh_preview.setEnabled(connected)
+        can_copy = connected and self._get_last_capture() is not None
+        self.btn_copy_capture.setEnabled(can_copy)
+        self.btn_copy_capture.setToolTip(
+            tr("复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件") if can_copy
+            else tr("暂无可复制的画面，请先连接目标并刷新或截屏"))
         self._refresh_rec_time()
 
     def _refresh_rec_time(self):
@@ -333,6 +351,21 @@ class CaptureOpsMixin:
             return
         self._show_preview_image(img)
         self.statusBar().showMessage(tr("预览已刷新"), 2000)
+
+    def _on_copy_capture(self):
+        """复制已显示帧的原图，不抓新帧、不复制缩放后的 QLabel 图像。"""
+        import numpy as np
+
+        img = self._get_last_capture()
+        clipboard = QApplication.clipboard()
+        if img is None or clipboard is None:
+            self.statusBar().showMessage(tr("暂无可复制的画面，请先刷新或截屏"), 3000)
+            return
+        bgr = np.ascontiguousarray(img)
+        height, width = bgr.shape[:2]
+        image = QImage(bgr.data, width, height, bgr.strides[0], QImage.Format.Format_BGR888).copy()
+        clipboard.setImage(image)
+        self.statusBar().showMessage(tr("图像已复制到剪贴板，可用 Ctrl+V 粘贴"), 3000)
 
     def _on_snap(self):
         """截屏：更新预览并把这一帧保存到 data/capture/picture"""

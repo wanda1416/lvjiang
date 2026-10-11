@@ -1707,6 +1707,10 @@ class WindowOpsMixin:
                 Qt.TransformationMode.SmoothTransformation,
             )
             self.preview_label.setPixmap(scaled)
+            copy_button = getattr(self, "btn_copy_capture", None)
+            if copy_button is not None:
+                copy_button.setEnabled(True)
+                copy_button.setToolTip(tr("复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件"))
             logger.info(f"截屏预览成功 ({w_img}x{h})")
         except Exception as e:
             logger.error(f"截屏预览失败: {e}")

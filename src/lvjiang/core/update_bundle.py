@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-PUBLIC_INDEX_URL = "https://wanda1416.github.io/lvjiang/config/index.json"
+PUBLIC_INDEX_URL = "https://wanda1416.github.io/lvjiang/public/index.json"
 MEMBER_INDEX_URL = "https://wanda1416.github.io/lvjiang/member/index.json"
 MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_EXPANDED_BYTES = 256 * 1024 * 1024

@@ -114,7 +114,7 @@
 
 ```text
 site/lvjiang/
-├─ config/
+├─ public/
 │  ├─ index.json
 │  ├─ v0.15.0/
 │  │  ├─ r1/
@@ -131,10 +131,12 @@ site/lvjiang/
 │  ├─ index.json
 │  └─ packages/
 │     └─ <包ID>.bin
+├─ config/                    旧应用专用，原有文件保持不动
+├─ protected/                 旧应用专用，原有文件保持不动
 └─ … 公告等现有内容
 ```
 
-config/index.json 按三段应用版本记录当前修订、对应 manifest 相对地址和摘要。
+public/index.json 按三段应用版本记录当前修订、对应 manifest 相对地址和摘要。
 公开 manifest 记录所属版本、修订、预置基底摘要、更新包摘要以及包内文件清单和摘要。
 公开包携带完整文件内容，路径相对 system，不携带 config、system 等外层目录。
 
@@ -280,8 +282,8 @@ system 必须带有与所安装内容一致的身份标记或可验证摘要。�
 
 ## 10 新协议切换与实施范围
 
-以计划中的 0.15.0 作为新协议边界，跳过 0.14；功能开发不提前修改应用版本。
-新客户端只读 config/index.json 与 member/index.json，不继续以旧
+以 0.15.0 作为新协议边界，跳过 0.14；维护版本号已提前同步，不代表正式发布完成。
+新客户端只读 public/index.json 与 member/index.json，不继续以旧
 config/config.json、protected/config.json 或 config/remote 参与配置加载。
 旧站点入口可冻结保留供旧客户端使用，新代码不新增永久兼容分支。
 

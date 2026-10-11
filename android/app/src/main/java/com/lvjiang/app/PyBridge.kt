@@ -155,6 +155,20 @@ object PyBridge {
         }
     }
 
+    private const val WORKBENCH_MODULE = "lvjiang.core.ondevice.workbench"
+    fun taskCatalog(context: Context, username: String): JSONObject =
+        callJson(context, "task_catalog", username, moduleName = WORKBENCH_MODULE)
+    fun profileView(context: Context, username: String): JSONObject =
+        callJson(context, "profile_view", username, moduleName = WORKBENCH_MODULE)
+    fun profileHistory(context: Context, username: String, model: String, key: String, offset: Int): JSONObject =
+        callJson(context, "profile_history", username, model, key, offset, moduleName = WORKBENCH_MODULE)
+    fun taskHistory(context: Context, runId: String = ""): JSONObject =
+        callJson(context, "task_history", runId, moduleName = WORKBENCH_MODULE)
+    fun publicContent(context: Context, kind: String): JSONObject =
+        callJson(context, "public_content", kind, moduleName = WORKBENCH_MODULE)
+    fun respondInteraction(context: Context, requestId: String, accepted: Boolean): JSONObject =
+        callJson(context, "respond_interaction", requestId, accepted)
+
     /** 屏幕标定接口（CalibActivity 用）：calib_info / calib_capture / calib_locate / calib_solve / calib_save / … */
     fun calib(context: Context, fn: String, vararg args: Any?): JSONObject =
         callJson(context, fn, *args, moduleName = CALIB_MODULE)

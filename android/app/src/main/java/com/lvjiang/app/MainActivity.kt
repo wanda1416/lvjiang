@@ -19,6 +19,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.activity.OnBackPressedCallback
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButton
 import java.util.concurrent.Executors
 
 /**
@@ -40,7 +42,11 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
-    private enum class Page { HOME, PERMISSIONS, ADVANCED, DIAGNOSTICS }
+    private lateinit var shareReportButton: Button
+    private enum class Page { HOME, TASKS, USERS, SETTINGS, PERMISSIONS, ADVANCED, DIAGNOSTICS }
+    private lateinit var workbench: WorkbenchUi
+    private var statusPending = false
+    private var refreshWorkbenchOnResume = false
     private var page = Page.HOME
     private lateinit var backToHome: OnBackPressedCallback
     private var runtimeReport = "尚未检查运行环境"
@@ -59,6 +65,38 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        val root = findViewById<View>(R.id.main_root)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        root.fitsSystemWindows = false
+        SettingsUi.applySystemBarAppearance(this, root)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            val imeVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, if (imeVisible) insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom else 0)
+            findViewById<BottomNavigationView>(R.id.main_navigation).apply {
+                visibility = if (imeVisible) View.GONE else View.VISIBLE
+                setPadding(0, 0, 0, bars.bottom)
+                layoutParams.height = (80 * resources.displayMetrics.density).toInt() + bars.bottom
+            }
+            androidx.core.view.WindowInsetsCompat.CONSUMED
+        }
+        androidx.core.view.ViewCompat.requestApplyInsets(root)
+        workbench = WorkbenchUi(this, findViewById(R.id.workbench_host),
+            openTools = { target -> showPage(Page.valueOf(target)) }, toggleFloat = { onFloatToggle() })
+        workbench.restore(savedInstanceState)
+        val navigation = findViewById<BottomNavigationView>(R.id.main_navigation)
+        navigation.setOnItemSelectedListener { item ->
+            val target = when (item.itemId) {
+                R.id.nav_home -> Page.HOME
+                R.id.nav_tasks -> Page.TASKS
+                R.id.nav_users -> Page.USERS
+                R.id.nav_settings -> Page.SETTINGS
+                else -> return@setOnItemSelectedListener false
+            }
+            if (page != target) showPage(target)
+            true
+        }
+        navigation.setOnItemReselectedListener { findViewById<ScrollView>(R.id.main_scroll).smoothScrollTo(0, 0) }
         setSupportActionBar(findViewById<Toolbar>(R.id.main_toolbar))
         backToHome = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() { showPage(Page.HOME) }
@@ -69,6 +107,17 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_home_permissions).setOnClickListener { showPage(Page.PERMISSIONS) }
         findViewById<Button>(R.id.btn_copy_report).isEnabled = false
 
+        val diagnostics = findViewById<android.widget.LinearLayout>(R.id.diagnostics_panel)
+        shareReportButton = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.ThemeOverlay_Lvjiang_TextButton)).apply {
+            text = "分享诊断报告"
+            isEnabled = false
+            setOnClickListener {
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"; putExtra(Intent.EXTRA_TEXT, runtimeReport)
+                }, "分享诊断报告"))
+            }
+        }
+        diagnostics.addView(shareReportButton)
         // 诊断与首页操作：仅点击时执行，导航不会触发自检。
         findViewById<Button>(R.id.btn_runtime_check).setOnClickListener { checkRuntime() }
         findViewById<Button>(R.id.btn_copy_report).setOnClickListener {
@@ -174,24 +223,36 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("main_page", page.name)
+        workbench.save(outState)
         super.onSaveInstanceState(outState)
     }
 
     private fun showPage(next: Page) {
         page = next
-        findViewById<View>(R.id.features_section).visibility = if (next == Page.HOME) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.features_section).visibility = if (next == Page.ADVANCED) View.VISIBLE else View.GONE
         findViewById<View>(R.id.guide_card).visibility = if (next == Page.PERMISSIONS) View.VISIBLE else View.GONE
         findViewById<View>(R.id.advanced_panel).visibility =
             if (next == Page.ADVANCED || next == Page.DIAGNOSTICS) View.VISIBLE else View.GONE
         findViewById<View>(R.id.advanced_tools).visibility = if (next == Page.ADVANCED) View.VISIBLE else View.GONE
         findViewById<View>(R.id.diagnostics_panel).visibility = if (next == Page.DIAGNOSTICS) View.VISIBLE else View.GONE
-        supportActionBar?.setTitle(when (next) {
-            Page.HOME -> R.string.app_name
-            Page.PERMISSIONS -> R.string.menu_permissions
-            Page.ADVANCED -> R.string.menu_advanced
-            Page.DIAGNOSTICS -> R.string.menu_diagnostics
-        })
-        supportActionBar?.setDisplayHomeAsUpEnabled(next != Page.HOME)
+        workbench.show(next.name)
+        val navId = when (next) {
+            Page.HOME -> R.id.nav_home
+            Page.TASKS -> R.id.nav_tasks
+            Page.USERS -> R.id.nav_users
+            else -> R.id.nav_settings
+        }
+        findViewById<BottomNavigationView>(R.id.main_navigation).menu.findItem(navId).isChecked = true
+        supportActionBar?.title = when (next) {
+            Page.HOME -> "工作台"
+            Page.TASKS -> "任务"
+            Page.USERS -> "用户"
+            Page.SETTINGS -> "设置"
+            Page.PERMISSIONS -> getString(R.string.menu_permissions)
+            Page.ADVANCED -> getString(R.string.menu_advanced)
+            Page.DIAGNOSTICS -> getString(R.string.menu_diagnostics)
+        }
+        supportActionBar?.setDisplayHomeAsUpEnabled(next in setOf(Page.PERMISSIONS, Page.ADVANCED, Page.DIAGNOSTICS))
         backToHome.isEnabled = next != Page.HOME
         findViewById<ScrollView>(R.id.main_scroll).scrollTo(0, 0)
     }
@@ -312,6 +373,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (refreshWorkbenchOnResume && page in setOf(Page.TASKS, Page.USERS)) workbench.show(page.name)
+        refreshWorkbenchOnResume = false
         // 自检期间不刷状态：刷一下就会把「点击已生效」或报告正文覆掉，
         // 而闭环自检正是靠读屏幕上的这些字来判定的
         if (!isSelfTest()) {
@@ -323,13 +386,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        refreshWorkbenchOnResume = true
         ui.removeCallbacks(statusPoller)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        workbench.close()
+        executor.shutdown()
+        super.onDestroy()
     }
 
     private fun isSelfTest(): Boolean = intent?.getStringExtra("selftest") != null
 
     private fun refreshStatus() {
+        if (statusPending || isDestroyed) return
+        statusPending = true
         val overlay = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
         val a11y = if (A11yBridge.isReady()) "已开启" else "未开启（本机任务输入必需）"
         val shizuku = when {
@@ -354,7 +426,13 @@ class MainActivity : AppCompatActivity() {
             } else {
                 sync?.optString("message")?.ifEmpty { "预置配置未就绪" } ?: status.optString("message")
             }
-            ui.post { findViewById<TextView>(R.id.offline_status).text = text }
+            ui.post {
+                statusPending = false
+                if (!isDestroyed) {
+                    findViewById<TextView>(R.id.offline_status).let { if (it.text.toString() != text) it.text = text }
+                    workbench.updateStatus(status)
+                }
+            }
         }
     }
 
@@ -370,6 +448,7 @@ class MainActivity : AppCompatActivity() {
                 runtimeStatus.text = result.optString("message")
                 button.isEnabled = true
                 findViewById<Button>(R.id.btn_copy_report).isEnabled = true
+                shareReportButton.isEnabled = true
             }
         }
     }

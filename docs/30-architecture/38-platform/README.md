@@ -16,3 +16,5 @@
 | [07-agent-mcp.md](07-agent-mcp.md) | 外部 Agent 本机 MCP、授权、独立配置生成与发行文档包 |
 
 - [08-i18n.md](08-i18n.md)：翻译模块、核心/插件合并、回退与内容一致性契约。
+
+- [09-android-workbench.md](09-android-workbench.md)：Android 四页工作台、确认交互、任务历史与只读用户数据。

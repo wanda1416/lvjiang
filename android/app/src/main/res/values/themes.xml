@@ -1,7 +1,43 @@
 <resources>
     <!-- 深浅色自适应；引导页自带大标题，系统 ActionBar 只会叠在上面重复一遍应用名 —— 去掉 -->
-    <style name="Theme.Lvjiang" parent="Theme.AppCompat.DayNight.NoActionBar" />
-    <style name="Theme.Lvjiang.Settings" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.Lvjiang" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/app_primary</item>
+        <item name="colorOnPrimary">@color/app_on_primary</item>
+        <item name="colorPrimaryContainer">@color/app_secondary_container</item>
+        <item name="colorOnPrimaryContainer">@color/app_on_secondary_container</item>
+        <item name="colorSecondary">@color/app_primary</item>
+        <item name="colorOnSecondary">@color/app_on_primary</item>
+        <item name="colorSecondaryContainer">@color/app_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/app_on_secondary_container</item>
+        <item name="colorSurface">@color/app_surface</item>
+        <item name="colorSurfaceContainer">@color/app_surface_container</item>
+        <item name="colorSurfaceContainerLow">@color/app_surface_container_low</item>
+        <item name="colorSurfaceContainerHigh">@color/app_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/app_surface_container_highest</item>
+        <item name="colorSurfaceVariant">@color/app_surface_variant</item>
+        <item name="colorOnSurface">@color/settings_foreground</item>
+        <item name="colorOnSurfaceVariant">@color/settings_secondary_foreground</item>
+        <item name="colorOutline">@color/app_outline</item>
+        <item name="android:colorBackground">@color/app_surface</item>
+        <item name="colorOnBackground">@color/settings_foreground</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/app_surface_container</item>
+        <item name="bottomNavigationStyle">@style/Widget.Lvjiang.NavigationBar</item>
+    </style>
+    <style name="Widget.Lvjiang.NavigationBar" parent="Widget.Material3.BottomNavigationView">
+        <item name="backgroundTint">@color/app_surface_container</item>
+        <item name="elevation">0dp</item>
+        <item name="itemIconSize">24dp</item>
+        <item name="itemTextAppearanceActive">@style/TextAppearance.Lvjiang.NavigationLabel</item>
+        <item name="itemTextAppearanceInactive">@style/TextAppearance.Lvjiang.NavigationLabel</item>
+    </style>
+    <style name="TextAppearance.Lvjiang.NavigationLabel" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textSize">12sp</item>
+    </style>
+    <style name="ThemeOverlay.Lvjiang.TextButton" parent="">
+        <item name="materialButtonStyle">@style/Widget.Material3.Button.TextButton</item>
+    </style>
+    <style name="Theme.Lvjiang.Settings" parent="Theme.Lvjiang">
         <item name="colorOnSurface">@color/settings_foreground</item>
         <item name="colorControlNormal">@color/settings_foreground</item>
         <item name="android:textColorPrimary">@color/settings_primary_text</item>

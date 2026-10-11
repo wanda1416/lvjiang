@@ -1,17 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout android:id="@+id/main_root" xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:fitsSystemWindows="true">
-    <androidx.appcompat.widget.Toolbar
+    android:orientation="vertical" android:background="?attr/colorSurface" android:fitsSystemWindows="true">
+    <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/main_toolbar"
         android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
-        android:background="?android:attr/colorBackground"
-        android:elevation="4dp" />
+        android:background="?attr/colorSurface"
+        android:elevation="0dp" />
     <ScrollView android:id="@+id/main_scroll"
         android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:fillViewport="true">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="vertical" android:padding="16dp">
+            <LinearLayout android:id="@+id/workbench_host"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" />
             <LinearLayout android:id="@+id/features_section"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical">
@@ -88,11 +92,11 @@
                         android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_runtime_check" />
                     <TextView android:id="@+id/runtime_status"
                         android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/runtime_unchecked" android:textSize="14sp" />
-                    <Button android:id="@+id/btn_copy_report"
+                    <Button android:id="@+id/btn_copy_report" style="@style/Widget.Material3.Button.TextButton"
                         android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_copy_report" />
-                    <Button android:id="@+id/btn_test_shell"
+                    <Button android:id="@+id/btn_test_shell" style="@style/Widget.Material3.Button.TextButton"
                         android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_test_shell" />
-                    <Button android:id="@+id/btn_test_click"
+                    <Button android:id="@+id/btn_test_click" style="@style/Widget.Material3.Button.TextButton"
                         android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_test_click" />
                 </LinearLayout>
                 <TextView android:id="@+id/status_text"
@@ -101,4 +105,9 @@
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
+    <com.google.android.material.bottomnavigation.BottomNavigationView android:id="@+id/main_navigation"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        app:menu="@menu/main_navigation"
+        app:labelVisibilityMode="labeled"
+        app:itemHorizontalTranslationEnabled="false" />
 </LinearLayout>

@@ -20,6 +20,7 @@ from ...core import group_qrcode
 from ...core.update import GITHUB_REPO
 from ...i18n import tr
 from ..button_styles import apply_button_style
+from .qrcode_refresher import QrCodeRefresher
 
 ISSUE_GUIDE_URL = (
     f"https://github.com/{GITHUB_REPO}/blob/master/"
@@ -35,7 +36,7 @@ class GroupQrDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("扫码加群"))
         self.setFixedSize(420, 500)
-        self._refresher: group_qrcode.QrCodeRefresher | None = None
+        self._refresher: QrCodeRefresher | None = None
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -90,7 +91,7 @@ class GroupQrDialog(QDialog):
         self._refresh_btn.setText(tr("刷新中..."))
         self._status_label.setText(tr("正在获取最新二维码..."))
 
-        refresher = group_qrcode.QrCodeRefresher(self)
+        refresher = QrCodeRefresher(self)
         refresher.succeeded.connect(self._on_refresh_finished)
         refresher.error.connect(self._on_refresh_error)
         # deleteLater 只挂在 QThread.finished（线程真正退出后）上，成功与

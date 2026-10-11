@@ -33,6 +33,12 @@ def test_ondevice_entrypoints_import_without_pyqt6(tmp_path) -> None:
 
         from lvjiang.core.ondevice import task_runner
         from lvjiang.core.ondevice import offline, workflow_runner, plugins, task_settings, bootstrap, user_settings
+        from lvjiang.core.ondevice import workbench
+        from lvjiang.core import announcement, group_qrcode, version_info
+        assert callable(workbench.public_content)
+        assert callable(announcement.fetch_announcement_manifest)
+        assert callable(group_qrcode.fetch_qrcode_bytes)
+        assert version_info.get_version()
         from lvjiang.core.profile import service
         from lvjiang.apps.yysls.ondevice import tuning_config
 

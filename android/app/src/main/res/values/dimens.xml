@@ -1,0 +1,5 @@
+<resources>
+    <dimen name="page_horizontal_margin">16dp</dimen>
+    <dimen name="dialog_content_horizontal_padding">24dp</dimen>
+    <dimen name="dialog_content_vertical_padding">16dp</dimen>
+</resources>

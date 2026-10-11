@@ -1,0 +1,13 @@
+<resources>
+    <color name="app_primary">#006B5D</color>
+    <color name="app_on_primary">#FFFFFF</color>
+    <color name="app_secondary_container">#C1EDE1</color>
+    <color name="app_on_secondary_container">#002019</color>
+    <color name="app_surface">#F7FAF8</color>
+    <color name="app_surface_container">#EAF0EC</color>
+    <color name="app_surface_container_low">#F0F5F1</color>
+    <color name="app_surface_container_high">#E4ECE7</color>
+    <color name="app_surface_container_highest">#DEE5E0</color>
+    <color name="app_surface_variant">#DCE5DE</color>
+    <color name="app_outline">#707973</color>
+</resources>

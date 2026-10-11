@@ -17,10 +17,8 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from loguru import logger
-from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..i18n import tr
-from .update import get_version, network_access_error_message, parse_version
+from .version_info import get_version, network_access_error_message, parse_version
 
 ANNOUNCEMENT_URL = "https://wanda1416.github.io/lvjiang/notices.json"
 ANNOUNCEMENT_SCHEMA_VERSION = 1
@@ -321,29 +319,3 @@ def fetch_announcement_manifest(
         parse_announcement_manifest(data),
         etag=response_etag,
     )
-
-
-class AnnouncementChecker(QThread):
-    """后台获取 GitHub Pages 公告。"""
-
-    finished = pyqtSignal(object)  # AnnouncementFetchResult
-    error = pyqtSignal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._cached = load_cached_manifest()
-        self._etag = get_cached_etag()
-
-    def run(self):
-        try:
-            self.finished.emit(fetch_announcement_manifest(
-                etag=self._etag,
-                cached=self._cached,
-            ))
-        except AnnouncementNetworkError as exc:
-            # 常见网络故障只输出一行可操作说明，不泄漏 urllib/SSL 调用栈。
-            logger.warning(str(exc))
-            self.error.emit(str(exc))
-        except Exception as exc:  # noqa: BLE001 - 线程边界统一转成信号
-            logger.warning(f"[公告] 获取失败: {exc}")
-            self.error.emit(tr("获取公告失败: {error}").format(error=exc))

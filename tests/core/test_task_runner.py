@@ -65,6 +65,7 @@ def _clean_state(monkeypatch, tmp_path):
     monkeypatch.setattr(task_runner, "_ENGINE", None)
     monkeypatch.setattr(task_runner, "_PAUSE_GATE", task_runner._PauseGate())
     task_runner._PAUSE_GATE.set()
+    monkeypatch.setattr("lvjiang.core.daily_history.default_log_root", lambda: tmp_path / "logs")
     from lvjiang import constants
     from lvjiang.core.config.session import get_session_store
     from lvjiang.core.user_config import User, save_user_metadata
@@ -72,7 +73,7 @@ def _clean_state(monkeypatch, tmp_path):
     monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
     constants.SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     (constants.SESSION_CONFIG_DIR / "offline.json").write_text(
-        json.dumps({"username": "tester", "layout": "android"}))
+        json.dumps({"username": "tester", "layout": "android"}), encoding="utf-8")
     save_user_metadata(User("tester"), constants.USERS_DIR)
     get_session_store().set_active("user", "tester")
     # 默认放行无障碍检查，需要测「未就绪」的用例自己覆盖
@@ -330,8 +331,14 @@ def test_successful_run_reaches_done(monkeypatch):
     assert status["task_name"] == "冒烟"
     assert "冒烟" in status["message"]
     assert status["result"] == {"a": 1, "b": 2}
-    assert any("收集 2 项" in line for line in status["logs"])
+    assert any("请核对游戏内结果" in line for line in status["logs"])
     assert status["elapsed"] >= 0
+    task_runner._STATE._thread.join(2)
+    from lvjiang.core.daily_history import TaskHistoryRepository, resolve_history_path
+    record = TaskHistoryRepository().list_task_runs(source="ondevice")[0]
+    assert record.status == "completed" and record.username == "tester"
+    assert json.loads(resolve_history_path(record.result_path).read_text(encoding="utf-8")) == {"a": 1, "b": 2}
+    assert "已完成" in resolve_history_path(record.log_path).read_text(encoding="utf-8")
 
 
 def test_initial_variables_reach_engine(monkeypatch):
@@ -344,6 +351,9 @@ def test_initial_variables_reach_engine(monkeypatch):
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
 
     assert engine.variables == {"部位": "武器"}
+    task_runner._STATE._thread.join(2)
+    from lvjiang.core.daily_history import TaskHistoryRepository
+    assert TaskHistoryRepository().list_task_runs(source="ondevice")[0].params == {"部位": "武器"}
 
 
 def test_synced_user_and_parameter_override_are_bound_before_execution(monkeypatch):
@@ -428,6 +438,10 @@ def test_failure_is_captured_as_failed(monkeypatch):
     assert "RuntimeError" in status["message"]
     assert "boom" in status["message"]
     assert any("boom" in line for line in status["logs"])
+    task_runner._STATE._thread.join(2)
+    from lvjiang.core.daily_history import TaskHistoryRepository
+    record = TaskHistoryRepository().list_task_runs(source="ondevice")[0]
+    assert record.status == "failed" and "boom" in record.error_message
 
 
 def test_stop_marks_stopped(monkeypatch):
@@ -448,6 +462,9 @@ def test_stop_marks_stopped(monkeypatch):
 
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_STOPPED)
     assert "长任务" in _status()["message"]
+    task_runner._STATE._thread.join(2)
+    from lvjiang.core.daily_history import TaskHistoryRepository
+    assert TaskHistoryRepository().list_task_runs(source="ondevice")[0].status == "stopped"
 
 
 def test_stop_without_running_task():

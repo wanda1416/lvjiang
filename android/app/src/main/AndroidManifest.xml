@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 用户手动获取公告与反馈联系二维码。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- 悬浮窗 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 前台服务（Android 14+ 需声明类型） -->

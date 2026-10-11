@@ -84,6 +84,7 @@ class FloatService : Service() {
     private val ui by lazy { Handler(mainLooper) }
 
     /** 上一次拿到的状态，用于判断是否需要重建面板按钮区（空闲↔运行切换时才重建） */
+    private var interactionId = ""
     private var lastState = STATE_IDLE
 
     private val poller = object : Runnable {
@@ -449,7 +450,9 @@ class FloatService : Service() {
                 updateNotification(
                     if (state in activeStates) "${if (state == STATE_PAUSED) "已暂停" else "运行中"}：$taskName" else header.replace('\n', ' ')
                 )
-                if (state != lastState) {
+                val nextInteraction = status.optJSONObject("interaction")?.optString("id").orEmpty()
+                if (state != lastState || nextInteraction != interactionId) {
+                    interactionId = nextInteraction
                     lastState = state
                     rebuildActions(state)
                 }
@@ -523,6 +526,20 @@ class FloatService : Service() {
                 }
             }.apply { isEnabled = state != STATE_STOPPING },
                 LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+            if (interactionId.isNotEmpty() && state != STATE_STOPPING) {
+                val requestId = interactionId
+                for ((label, accepted) in listOf("确认" to true, "拒绝" to false)) {
+                    row.addView(smallButton(label) {
+                        executor.execute {
+                            val result = PyBridge.respondInteraction(this, requestId, accepted)
+                            toast(result.optString("message"))
+                            ui.post { refreshStatus() }
+                        }
+                    }, LinearLayout.LayoutParams(0, -2, 1f))
+                }
+                area.addView(row)
+                return
+            }
             row.addView(smallButton(if (state == STATE_PAUSED) "继续任务" else "暂停任务") {
                     executor.execute {
                         val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
@@ -737,6 +754,28 @@ class FloatService : Service() {
         private var starting: CompletableFuture<String?>? = null
         private var startupIcon: View? = null
         private var startupWindowManager: WindowManager? = null
+
+        /** 只准备入口，用户回到游戏后仍须显式点击启动。 */
+        fun prepareTask(context: Context, taskId: String, taskName: String, username: String): JSONObject =
+            synchronized(AgentServer.executionLock) {
+                if (AgentServer.pcControlsDevice() || PyBridge.status(context).optBoolean("busy")) {
+                    return@synchronized JSONObject().put("ok", false).put("message", "已有任务在执行，请先结束")
+                }
+                ensureStarted(context)?.let {
+                    return@synchronized JSONObject().put("ok", false).put("message", it)
+                }
+                val selected = PyBridge.selectUser(context, username)
+                if (!selected.optBoolean("ok")) return@synchronized selected
+                val service = instance ?: return@synchronized JSONObject().put("ok", false).put("message", "悬浮控制尚未就绪")
+                service.ui.post {
+                    service.selectedTaskId = taskId
+                    service.selectedTaskName = taskName
+                    service.getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", taskId).apply()
+                    service.taskLine?.text = "任务：$taskName"
+                    service.rebuildActions(service.lastState)
+                }
+                JSONObject().put("ok", true).put("message", "已准备，请回到对应游戏角色，点击悬浮图标启动任务")
+            }
 
         /** RPC 工作线程调用；只在图标与前台服务都就绪后允许启动任务。 */
         fun ensureStarted(context: Context): String? {

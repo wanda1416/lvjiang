@@ -67,6 +67,7 @@
 | [12-agent-mcp.md](50-platform/12-agent-mcp.md) | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 | 部分实现 |
 | [13-agent-docs-access.md](50-platform/13-agent-docs-access.md) | Agent 文档逐篇收录、目录拆分与配置文件访问清单 | 部分实现 |
 | [14-official-config-publication.md](50-platform/14-official-config-publication.md) | 官方公开增量与会员包安装、两层配置语义及即时生效 | 已实现，待 0.15.0 发布 |
+| [15-android-workbench.md](50-platform/15-android-workbench.md) | Android 四页工作台、确认交互、执行历史和只读用户数据 | 已实现，真机游戏验收待完成 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

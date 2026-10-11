@@ -22,6 +22,7 @@ import time
 import traceback
 from collections import deque
 from typing import Any
+from uuid import uuid4
 
 from ...i18n import tr
 from ...workflows.errors import WorkflowAbort
@@ -58,6 +59,9 @@ class _TaskState:
         self._state = STATE_IDLE
         self._task_id = ""
         self._task_name = ""
+        self._username = ""
+        self._interaction: dict[str, str] = {}
+        self._answer: bool | None = None
         self._message = ""
         self._started_at = 0.0
         self._finished_at = 0.0
@@ -71,7 +75,7 @@ class _TaskState:
 
     def is_running(self) -> bool:
         with self._lock:
-            return self._state in ACTIVE_STATES
+            return self._state in ACTIVE_STATES or bool(self._thread and self._thread.is_alive())
 
     def should_stop(self) -> bool:
         """交给引擎的 stop_check：不加锁，Event 自身线程安全"""
@@ -95,8 +99,11 @@ class _TaskState:
                 "state": self._state,
                 "task_id": self._task_id,
                 "task_name": self._task_name,
+                "username": self._username,
+                "interaction": dict(self._interaction),
                 "message": self._message,
                 "elapsed": round(elapsed, 1),
+                "busy": self.is_running(),
                 "stopping": self._stop_event.is_set() and self._state in ACTIVE_STATES,
                 "result": self._result,
                 "logs": list(self._logs),
@@ -104,12 +111,15 @@ class _TaskState:
                 "log_generation": self._log_generation,
             }
 
-    def begin(self, task_id: str, task_name: str) -> None:
+    def begin(self, task_id: str, task_name: str, username: str = "") -> None:
         with self._lock:
             self._stop_event.clear()
             self._state = STATE_RUNNING
             self._task_id = task_id
             self._task_name = task_name
+            self._username = username
+            self._interaction = {}
+            self._answer = None
             self._message = "正在启动"
             self._started_at = time.time()
             self._finished_at = 0.0
@@ -125,17 +135,21 @@ class _TaskState:
             self._message = message
             self._finished_at = time.time()
             self._result = result or {}
+            self._interaction = {}
 
     def set_message(self, message: str) -> None:
         with self._lock:
             self._message = message
 
-    def request_stop(self) -> None:
-        self._stop_event.set()
-        _PAUSE_GATE.set()
+    def request_stop(self) -> bool:
         with self._lock:
+            if self._state not in ACTIVE_STATES:
+                return False
+            self._stop_event.set()
+            _PAUSE_GATE.set()
             self._state = STATE_STOPPING
             self._message = "已请求结束，等当前步骤结束"
+            return True
 
     def request_pause(self, message: str = "") -> bool:
         with self._lock:
@@ -153,8 +167,29 @@ class _TaskState:
 
     def resume(self) -> bool:
         with self._lock:
-            if self._state not in {STATE_PAUSING, STATE_PAUSED}:
+            if self._interaction or self._state not in {STATE_PAUSING, STATE_PAUSED}:
                 return False
+            self._state = STATE_RUNNING
+            self._message = "执行中"
+            _PAUSE_GATE.set()
+            return True
+
+    def request_confirmation(self, message: str) -> None:
+        with self._lock:
+            if self.should_stop():
+                raise WorkflowAbort("用户已结束任务")
+            self._interaction = {"id": uuid4().hex, "kind": "confirm", "message": message}
+            self._answer = None
+            self._state = STATE_PAUSED
+            self._message = message
+            _PAUSE_GATE.clear()
+
+    def respond(self, request_id: str, accepted: bool) -> bool:
+        with self._lock:
+            if self.should_stop() or not self._interaction or self._interaction["id"] != request_id:
+                return False
+            self._answer = accepted
+            self._interaction = {}
             self._state = STATE_RUNNING
             self._message = "执行中"
             _PAUSE_GATE.set()
@@ -230,7 +265,7 @@ def _reset_engine_state(engine) -> None:
     from ... import constants
     from ..config.session import get_session_store
 
-    username = get_session_store().get_active("user", "")
+    username = _STATE.snapshot()["username"] or get_session_store().get_active("user", "")
     engine.run_username = username if isinstance(username, str) else ""
     engine.users_dir = constants.USERS_DIR
     if not engine.run_username:
@@ -253,13 +288,16 @@ def _task_ui(action: str, **kwargs):
         return None
     if action not in {"pause", "confirm"}:
         raise RuntimeError(f"手机暂不支持 {action} 交互，请在 PC 配置任务参数")
-    _STATE.request_pause(text)
+    if action == "confirm":
+        _STATE.request_confirmation(text)
+    else:
+        _STATE.request_pause(text)
     while not _PAUSE_GATE.wait(0.2):
         if _STATE.should_stop():
             break
     if _STATE.should_stop():
         raise WorkflowAbort("用户已结束任务")
-    return True if action == "confirm" else None
+    return _STATE._answer if action == "confirm" else None
 
 
 # ── 对外接口（返回 JSON 文本） ─────────────────────────────
@@ -365,7 +403,13 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
             get_session_store().set_active("user", username)
     except Exception as exc:
         return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
-    _STATE.begin(task_id, task["name"])
+    from ..daily_history import TaskHistoryRepository
+    from .workbench import recover_interrupted
+    try:
+        recover_interrupted(TaskHistoryRepository())
+    except Exception as exc:
+        return json.dumps({"ok": False, "message": f"任务历史暂不可用：{exc}"}, ensure_ascii=False)
+    _STATE.begin(task_id, task["name"], selected_user)
     thread = threading.Thread(
         target=_run_in_thread,
         args=(task, variables),
@@ -385,9 +429,8 @@ def stop_task() -> str:
     Returns:
         JSON 文本 ``{"ok": bool, "message": str}``
     """
-    if not _STATE.is_running():
+    if not _STATE.request_stop():
         return json.dumps({"ok": False, "message": "当前没有运行中的任务"}, ensure_ascii=False)
-    _STATE.request_stop()
     return json.dumps({"ok": True, "message": "已请求停止"}, ensure_ascii=False)
 
 
@@ -398,7 +441,14 @@ def pause_task() -> str:
 
 def resume_task() -> str:
     ok = _STATE.resume()
-    return json.dumps({"ok": ok, "message": "已继续" if ok else "当前没有暂停任务"}, ensure_ascii=False)
+    message = "已继续" if ok else (
+        "请在手机工作台或悬浮窗回答确认问题" if _STATE.snapshot()["interaction"] else "当前没有暂停任务")
+    return json.dumps({"ok": ok, "message": message}, ensure_ascii=False)
+
+
+def respond_interaction(request_id: str, accepted: bool) -> str:
+    ok = type(accepted) is bool and _STATE.respond(request_id, accepted)
+    return json.dumps({"ok": ok, "message": "已提交选择" if ok else "确认请求已失效，请刷新"}, ensure_ascii=False)
 
 
 def get_status() -> str:
@@ -486,6 +536,8 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
     """任务线程主体：任何异常都收进状态，绝不让线程带着栈自己消失"""
     name = task["name"]
     sink = None
+    history = None
+    history_logs = None
     try:
         from copy import deepcopy
 
@@ -499,6 +551,14 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         sink = logger.add(lambda message: _STATE.log(str(message).strip(), message.record["level"].name),
                           filter=lambda record: record["thread"].id == worker_id,
                           format="{message}", level="INFO")
+        from ..daily_history import TaskRunSession
+        from .workbench import SOURCE
+        history = TaskRunSession(username=_STATE.snapshot()["username"], task_id=task["id"],
+                                 task_name=name, task_scope=task.get("scope", "daily"), params={},
+                                 source=SOURCE, target_kind="android", target_id="ondevice",
+                                 target_label="本机独立执行", environment="android")
+        history_logs = history.capture_logs()
+        history_logs.__enter__()
         _STATE.set_message("正在初始化引擎")
         _STATE.log(f"任务开始：{name}")
         record("task_begin", task["id"])
@@ -515,6 +575,7 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         if variables:
             params.update(variables)
 
+        history.repository.update_task_params(history.task_run_id, params)
         source = _build_source(task, engine)
         _STATE.set_message("执行中")
         result = engine.execute(source, initial_variables=params)
@@ -530,8 +591,7 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
             _STATE.finish(STATE_FAILED, f"启动被拒绝：{result['error']}")
             return
 
-        collected = len(result or {})
-        _STATE.log(f"任务完成，收集 {collected} 项")
+        _STATE.log("任务流程已结束，请核对游戏内结果")
         _STATE.finish(STATE_DONE, f"已完成：{name}", dict(result or {}))
     except MemoryError as exc:
         _STATE.log(f"内存不足，任务已中止：{exc}", "ERROR")
@@ -561,6 +621,22 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         if _ENGINE is not None:
             _ENGINE.clear_capture_snapshot()
         record("task_end", json.dumps({"task": task["id"], "state": _STATE.snapshot()["state"]}, ensure_ascii=False))
+        if history is not None:
+            from ..fs_util import atomic_write_bytes
+            try:
+                snapshot = _STATE.snapshot()
+                logger.info(snapshot["message"])
+                result_path = history.log_path.with_suffix(".json")
+                payload = json.dumps(snapshot["result"], ensure_ascii=False, default=str)
+                if len(payload) > 32_000:
+                    payload = json.dumps({"message": "结果超过展示上限，请查看任务日志"}, ensure_ascii=False)
+                atomic_write_bytes(result_path, payload.encode("utf-8"), prefix="task-result-")
+                history.finish(status={STATE_DONE: "completed", STATE_STOPPED: "stopped"}.get(snapshot["state"], "failed"),
+                               result_path=result_path, error_message=snapshot["message"] if snapshot["state"] != STATE_DONE else "")
+            except Exception as exc:
+                _STATE.log(f"任务历史保存失败：{exc}", "ERROR")
+        if history_logs is not None:
+            history_logs.__exit__(None, None, None)
         if sink is not None:
             from loguru import logger
             logger.remove(sink)

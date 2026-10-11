@@ -255,10 +255,16 @@ class TaskHistoryRepository:
                 _stored_path(result_path), error_message, task_run_id,
             ))
 
+    def update_task_params(self, task_run_id: str, params: dict[str, Any]) -> None:
+        """引擎初始化后记录最终执行参数，终态记录不再修改。"""
+        with self._connect() as conn:
+            conn.execute("UPDATE task_runs SET params_json=? WHERE task_run_id=? AND status='running'",
+                         (_json(params), task_run_id))
+
     def list_task_runs(
         self, *, usernames: list[str] | None = None,
         task_ids: list[str] | None = None, batch_run_id: str | None = None,
-        target_kind: str | None = None, status: str | None = None,
+        target_kind: str | None = None, status: str | None = None, source: str | None = None,
         start_date: date | None = None, end_date: date | None = None,
         limit: int = 2000,
     ) -> list[TaskRunRecord]:
@@ -267,6 +273,9 @@ class TaskHistoryRepository:
         if status is not None:
             clauses.append("status=?")
             args.append(status)
+        if source is not None:
+            clauses.append("source=?")
+            args.append(source)
         if usernames:
             clauses.append("username IN (%s)" % ",".join("?" * len(usernames)))
             args.extend(usernames)

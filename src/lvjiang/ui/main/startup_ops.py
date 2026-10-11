@@ -20,7 +20,6 @@ class StartupOpsMixin:
     def check_update_on_startup(self):
         """启动时先检查公告，处理完成后再检查版本更新。"""
         from ...core.announcement import (
-            AnnouncementChecker,
             AnnouncementFetchResult,
             applicable_notices,
             cache_manifest,
@@ -28,6 +27,7 @@ class StartupOpsMixin:
             mark_notice_version,
             should_prompt_manifest,
         )
+        from ..notices.announcement_checker import AnnouncementChecker
 
         checker = AnnouncementChecker(self)
 

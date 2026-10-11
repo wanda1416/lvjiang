@@ -20,13 +20,13 @@ from PyQt6.QtWidgets import (
 
 from ...core.announcement import (
     Announcement,
-    AnnouncementChecker,
     AnnouncementFetchResult,
     AnnouncementManifest,
     cache_manifest,
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style
+from .announcement_checker import AnnouncementChecker
 
 _LEVEL_LABELS = {
     "critical": "严重",

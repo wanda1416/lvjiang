@@ -18,6 +18,7 @@
         <item name="colorOnSurface">@color/settings_foreground</item>
         <item name="colorOnSurfaceVariant">@color/settings_secondary_foreground</item>
         <item name="colorOutline">@color/app_outline</item>
+        <item name="colorOutlineVariant">@color/app_surface_variant</item>
         <item name="android:colorBackground">@color/app_surface</item>
         <item name="colorOnBackground">@color/settings_foreground</item>
         <item name="android:statusBarColor">@android:color/transparent</item>

@@ -41,6 +41,9 @@ def test_ondevice_entrypoints_import_without_pyqt6(tmp_path) -> None:
         assert version_info.get_version()
         from lvjiang.core.profile import service
         from lvjiang.apps.yysls.ondevice import tuning_config
+        from lvjiang.apps.yysls.ondevice import loadout_view
+        assert callable(loadout_view.plan_view)
+        assert not __import__('json').loads(loadout_view.plan_view("missing", "missing"))["ok"]
 
         plugins.configure_apps("yysls")
         plugins.ensure_loaded()

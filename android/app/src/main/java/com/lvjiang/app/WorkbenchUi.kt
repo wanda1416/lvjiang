@@ -20,6 +20,7 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.tabs.TabLayout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executors
@@ -30,6 +31,7 @@ class WorkbenchUi(
     private val host: LinearLayout,
     private val openTools: (String) -> Unit,
     private val toggleFloat: () -> Unit,
+    private val browseUserChanged: (String) -> Unit,
 ) {
     private val executor = Executors.newFixedThreadPool(2)
     private val controlExecutor = Executors.newSingleThreadExecutor()
@@ -41,6 +43,12 @@ class WorkbenchUi(
     private var page = ""
     private var taskUser = ""
     private var browseUser = ""
+    private var userSection = "DATA"
+    private var loadoutPlan = ""
+    private var loadoutScheme = ""
+    private var loadoutBase = ""
+    private var loadoutRequest = 0
+    private var loadoutAssumptions = JSONObject()
     private var query = ""
     private var group = ""
     private var status = JSONObject()
@@ -62,6 +70,11 @@ class WorkbenchUi(
     fun restore(bundle: Bundle?) {
         taskUser = bundle?.getString("task_user").orEmpty()
         browseUser = bundle?.getString("browse_user").orEmpty()
+        userSection = bundle?.getString("user_section") ?: "DATA"
+        loadoutPlan = bundle?.getString("loadout_plan").orEmpty()
+        loadoutScheme = bundle?.getString("loadout_scheme").orEmpty()
+        loadoutBase = bundle?.getString("loadout_base").orEmpty()
+        loadoutAssumptions = runCatching { JSONObject(bundle?.getString("loadout_assumptions") ?: "{}") }.getOrDefault(JSONObject())
         query = bundle?.getString("task_query").orEmpty()
         group = bundle?.getString("task_group").orEmpty()
         logsExpanded = bundle?.getBoolean("logs_expanded") ?: false
@@ -70,6 +83,11 @@ class WorkbenchUi(
     fun save(bundle: Bundle) {
         bundle.putString("task_user", taskUser)
         bundle.putString("browse_user", browseUser)
+        bundle.putString("user_section", userSection)
+        bundle.putString("loadout_plan", loadoutPlan)
+        bundle.putString("loadout_scheme", loadoutScheme)
+        bundle.putString("loadout_base", loadoutBase)
+        bundle.putString("loadout_assumptions", loadoutAssumptions.toString())
         bundle.putString("task_query", query)
         bundle.putString("task_group", group)
         bundle.putBoolean("logs_expanded", logsExpanded)
@@ -456,21 +474,37 @@ class WorkbenchUi(
         dialog.show()
     }
 
-    private fun users() {
-        val header = card()
-        text(header, "用户资料", 20f)
-        text(header, "此处只浏览已保存的数据，切换浏览用户不会改变执行用户。")
-        button(header, "用户管理与属性编辑") { activity.startActivity(Intent(activity, UserSettingsActivity::class.java)) }
-        val choices = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
+    fun browsingUsername(): String = browseUser
+    fun parameterUsername(): String = taskUser
+    fun switchBrowsingUser() {
+        chooseUser(browseUser) {
+            if (browseUser != it) { loadoutPlan = ""; loadoutScheme = ""; loadoutBase = ""; loadoutAssumptions = JSONObject() }
+            browseUser = it; browseUserChanged(it); show("USERS")
         }
-        header.addView(choices)
-        button(choices, "浏览用户：${SettingsUi.userLabel(browseUser).ifEmpty { "请选择" }}") {
-            chooseUser(browseUser) { browseUser = it; show("USERS") }
-        }.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-        button(choices, "刷新数据") { show("USERS") }.isEnabled = browseUser.isNotEmpty()
-        if (browseUser.isEmpty()) return
+    }
+
+    private fun users() {
+        if (browseUser.isEmpty()) browseUser = status.optJSONObject("sync")?.optString("execution_username").orEmpty()
+        browseUserChanged(browseUser)
+        val tabs = TabLayout(activity).apply {
+            addTab(newTab().setText("用户数据"))
+            addTab(newTab().setText("备战方案"))
+            addTab(newTab().setText("战斗属性"))
+            getTabAt(when (userSection) { "LOADOUT" -> 1; "COMBAT" -> 2; else -> 0 })?.select()
+        }
+        host.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = (12 * activity.resources.displayMetrics.density).toInt()
+        })
+        tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                userSection = when (tab.position) { 1 -> "LOADOUT"; 2 -> "COMBAT"; else -> "DATA" }
+                show("USERS")
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
+        if (browseUser.isEmpty()) { text(host, "选择用户后查看数据和备战。"); return }
+        if (userSection != "DATA") { loadouts(); return }
         val username = browseUser
         request({ PyBridge.profileView(activity, username) }) { result ->
             if (!result.optBoolean("ok")) { text(host, result.optString("message")); return@request }
@@ -482,11 +516,208 @@ class WorkbenchUi(
                 entries.forEach { entry ->
                     val value = if (!entry.optBoolean("collected")) "未采集" else entry.optString("value") +
                         if (entry.isNull("cap")) "" else "/${entry.optString("cap") }"
-                    section.addView(SettingsUi.row(activity, entry.optString("label"), "$value\n${entry.optString("updated_at")}").apply {
+                    val row = LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
+                        val pad = (10 * resources.displayMetrics.density).toInt()
+                        setPadding(0, pad, 0, pad)
+                        isClickable = true; isFocusable = true
+                        val ripple = android.util.TypedValue()
+                        activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                        setBackgroundResource(ripple.resourceId)
                         setOnClickListener { profileHistory(username, entry, 0) }
+                    }
+                    section.addView(row)
+                    val body = column()
+                    row.addView(body, LinearLayout.LayoutParams(0, -2, 1f))
+                    val heading = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+                    body.addView(heading)
+                    text(heading, entry.optString("label"), 14f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    text(heading, value, 16f).apply { gravity = android.view.Gravity.END }
+                        .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    val stamp = entry.optString("updated_at")
+                    val timestamp = runCatching {
+                        val date = runCatching { java.time.OffsetDateTime.parse(stamp).toLocalDateTime() }
+                            .getOrElse { java.time.LocalDateTime.parse(stamp) }
+                        date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                    }.getOrDefault(stamp)
+                    if (timestamp.isNotEmpty()) text(body, timestamp, 12f).apply {
+                        setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    }
+                    text(row, "›", 24f).apply { gravity = android.view.Gravity.CENTER }
+                        .layoutParams = LinearLayout.LayoutParams((24 * activity.resources.displayMetrics.density).toInt(), -2)
+                }
+            }
+        }
+    }
+
+    private fun loadouts() {
+        val username = browseUser
+        val loading = text(host, "正在读取备战…")
+        request({ PyBridge.loadoutPlans(activity, username) }) { data ->
+            host.removeView(loading)
+            if (!data.optBoolean("ok")) { text(host, data.optString("message")); return@request }
+            val plans = objects(data.optJSONArray("plans"))
+            if (plans.none { it.optString("id") == loadoutPlan }) {
+                loadoutPlan = data.optString("selected")
+                loadoutScheme = ""; loadoutBase = ""
+            }
+            val header = column().also { host.addView(it) }
+            val choices = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+            header.addView(choices)
+            val planButton = button(choices, "备战：${plans.firstOrNull { it.optString("id") == loadoutPlan }?.optString("name") ?: "请选择"}") {}
+            planButton.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            planButton.isEnabled = plans.isNotEmpty()
+            planButton.setOnClickListener {
+                MaterialAlertDialogBuilder(activity).setTitle("选择备战方案")
+                    .setSingleChoiceItems(plans.map { it.optString("name") }.toTypedArray(), plans.indexOfFirst { it.optString("id") == loadoutPlan }) { dialog, index ->
+                        dialog.dismiss(); loadoutPlan = plans[index].optString("id"); loadoutScheme = ""; loadoutBase = ""; show("USERS")
+                    }.setNegativeButton("取消", null).show()
+            }
+            button(choices, "扫描装备（${data.optInt("equipment_count")}）") { equipmentPool(username, 0) }
+            val content = column().also { host.addView(it) }
+            if (loadoutPlan.isEmpty()) { text(content, "尚无备战方案，请先扫描或从电脑同步。"); return@request }
+            val token = ++loadoutRequest
+            text(content, "正在计算毕业率…")
+            request({ PyBridge.loadoutView(activity, username, loadoutPlan, loadoutScheme, loadoutBase, loadoutAssumptions.toString()) }) { result ->
+                if (token != loadoutRequest) return@request
+                content.removeAllViews()
+                if (!result.optBoolean("ok")) { text(content, result.optString("message")); return@request }
+                if (userSection == "COMBAT") {
+                    val groups = objects(result.optJSONArray("combat_cards"))
+                    if (groups.isEmpty()) text(content, "请先在备战方案页选择有效的流派和基础属性。")
+                    groups.forEach { group ->
+                        val attributes = card(content)
+                        text(attributes, group.optString("title"), 18f)
+                        objects(group.optJSONArray("items")).forEach { item ->
+                            val row = LinearLayout(activity).apply {
+                                orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
+                                setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, (6 * resources.displayMetrics.density).toInt())
+                            }
+                            attributes.addView(row)
+                            text(row, item.optString("label"), 13f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                            text(row, if (item.optString("raw") == item.optString("effective")) item.optString("raw") else
+                                "${item.optString("raw")} → ${item.optString("effective")}", 13f).apply {
+                                gravity = android.view.Gravity.END
+                            }.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                        }
+                    }
+                    return@request
+                }
+                val summary = card(content)
+                val metrics = result.optJSONObject("result")
+                val metricsRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+                summary.addView(metricsRow)
+                text(metricsRow, if (metrics == null) "DPS —" else String.format(java.util.Locale.getDefault(), "DPS %,.0f", metrics.optDouble("dps")), 16f)
+                    .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                text(metricsRow, if (metrics == null) "毕业率暂不可计算" else String.format(java.util.Locale.getDefault(), "毕业率 %.2f%%", metrics.optDouble("graduation_rate") * 100), 16f)
+                    .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                val assumptions = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+                summary.addView(assumptions)
+                objects(result.optJSONArray("assumptions")).forEach { option ->
+                    assumptions.addView(MaterialButton(activity).apply {
+                        text = option.optString("label"); textSize = 12f; isAllCaps = false
+                        isCheckable = true; isChecked = option.optBoolean("checked")
+                        gravity = android.view.Gravity.CENTER; minWidth = 0
+                        setPadding(0, paddingTop, 0, paddingBottom)
+                        strokeWidth = if (isChecked) 0 else (1 * resources.displayMetrics.density).toInt()
+                        strokeColor = android.content.res.ColorStateList.valueOf(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutline))
+                        backgroundTintList = android.content.res.ColorStateList.valueOf(if (isChecked)
+                            MaterialColors.getColor(this, com.google.android.material.R.attr.colorSecondaryContainer) else android.graphics.Color.TRANSPARENT)
+                        setTextColor(MaterialColors.getColor(this, if (isChecked) com.google.android.material.R.attr.colorOnSecondaryContainer else com.google.android.material.R.attr.colorOnSurface))
+                        addOnCheckedChangeListener { _, checked ->
+                            loadoutAssumptions.put(option.optString("key"), checked); show("USERS")
+                        }
+                    }, LinearLayout.LayoutParams(0, (48 * activity.resources.displayMetrics.density).toInt(), 1f).apply {
+                        if (assumptions.childCount > 0) marginStart = (4 * activity.resources.displayMetrics.density).toInt()
+                    })
+                }
+                if (result.optBoolean("contains_mock")) text(summary, "包含模拟装备，结果为模拟毕业率。", 12f)
+                val reasons = result.optJSONArray("reasons") ?: JSONArray()
+                if (reasons.length() > 0) text(summary, (0 until reasons.length()).joinToString("\n") { reasons.optString(it) })
+                val selectors = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
+                summary.addView(selectors)
+                fun selector(label: String, current: String, values: JSONArray?, selected: (String) -> Unit) {
+                    val names = if (values == null) emptyList() else (0 until values.length()).map { values.optString(it) }
+                    button(selectors, current.ifEmpty { "选择$label" }) {
+                        MaterialAlertDialogBuilder(activity).setTitle(label).setSingleChoiceItems(names.toTypedArray(), names.indexOf(current)) { dialog, index ->
+                            dialog.dismiss(); selected(names[index]); show("USERS")
+                        }.setNegativeButton("取消", null).show()
+                    }.apply {
+                        isEnabled = names.isNotEmpty(); textSize = 12f
+                        setPadding((6 * resources.displayMetrics.density).toInt(), paddingTop, (6 * resources.displayMetrics.density).toInt(), paddingBottom)
+                        setSingleLine(); setAutoSizeTextTypeUniformWithConfiguration(10, 12, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    }
+                }
+                selector("计算方案", result.optString("scheme"), result.optJSONArray("schemes")) { loadoutScheme = it }
+                selector("基础属性", result.optString("base_attribute"), result.optJSONArray("base_attributes")) { loadoutBase = it }
+                if ((result.optJSONArray("schemes")?.length() ?: 0) == 0) text(summary, "请同步适用计算模型。", 12f)
+                val equipment = card(content)
+                text(equipment, "方案装备", 18f)
+                objects(result.optJSONArray("slots")).forEach { slot ->
+                    val item = slot.optJSONObject("equipment")
+                    val label = slot.optString("label")
+                    equipment.addView(SettingsUi.row(activity,
+                        if (item == null) label else "$label · ${item.optString("name")}",
+                        item?.optString("summary") ?: "尚未记录装备").apply {
+                        if (item != null) setOnClickListener {
+                            equipmentDetail(item)
+                        }
                     })
                 }
             }
+        }
+    }
+
+    private fun equipmentDetail(item: JSONObject) {
+        val content = SettingsUi.dialogContent(activity)
+        text(content, item.optString("summary"), 13f).apply {
+            setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
+        }
+        objects(item.optJSONArray("sections")).forEachIndexed { index, section ->
+            if (index > 0) content.addView(View(activity).apply {
+                setBackgroundColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant))
+            }, LinearLayout.LayoutParams(-1, (1 * activity.resources.displayMetrics.density).toInt()).apply {
+                topMargin = (4 * activity.resources.displayMetrics.density).toInt()
+                bottomMargin = (4 * activity.resources.displayMetrics.density).toInt()
+            })
+            objects(section.optJSONArray("items")).forEach { field ->
+                val row = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
+                    val pad = (5 * resources.displayMetrics.density).toInt()
+                    setPadding(0, pad, 0, pad)
+                }
+                content.addView(row)
+                val note = field.optString("note")
+                val label = field.optString("label") + if (note == "转" || note == "原") " [$note]" else ""
+                text(row, label, 14f).layoutParams = LinearLayout.LayoutParams(0, -2, 2f)
+                text(row, field.optString("value"), 15f).apply { gravity = android.view.Gravity.END }
+                    .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            }
+        }
+        val warnings = item.optJSONArray("warnings") ?: JSONArray()
+        if (warnings.length() > 0) text(content, (0 until warnings.length()).joinToString("\n") { warnings.optString(it) }, 12f)
+        if (item.optString("recorded_at").isNotEmpty()) text(content, "记录于 ${item.optString("recorded_at")}", 12f)
+        MaterialAlertDialogBuilder(activity).setTitle(item.optString("name"))
+            .setView(content).setPositiveButton("关闭", null).show()
+    }
+
+    private fun equipmentPool(username: String, offset: Int) {
+        request({ PyBridge.equipmentPool(activity, username, offset) }) { result ->
+            if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
+            val content = SettingsUi.dialogContent(activity)
+            val items = objects(result.optJSONArray("items"))
+            if (items.isEmpty()) text(content, "尚无扫描装备，请先扫描或同步装备数据。")
+            items.forEach { item ->
+                content.addView(SettingsUi.row(activity, item.optString("name"), item.optString("summary")).apply {
+                    setOnClickListener { equipmentDetail(item) }
+                })
+            }
+            val dialog = MaterialAlertDialogBuilder(activity).setTitle("扫描装备 · ${offset / 30 + 1} 页")
+                .setView(SettingsUi.dialogScroll(activity, content)).setNegativeButton("关闭", null)
+            if (offset > 0) dialog.setNeutralButton("上一页") { _, _ -> equipmentPool(username, maxOf(0, offset - 30)) }
+            if (offset + items.size < result.optInt("total")) dialog.setPositiveButton("下一页") { _, _ -> equipmentPool(username, offset + 30) }
+            dialog.show()
         }
     }
 
@@ -516,8 +747,8 @@ class WorkbenchUi(
             parent.addView(SettingsUi.row(activity, title, summary).apply { setOnClickListener { action() } })
         }
         entry(tools, "权限", "无障碍、悬浮窗与通知") { openTools("PERMISSIONS") }
-        entry(tools, "运行工具", "悬浮控制、电脑连接与屏幕标定") { openTools("ADVANCED") }
-        entry(tools, "运行诊断", "检查环境、复制与分享报告") { openTools("DIAGNOSTICS") }
+        entry(tools, "高级功能", "悬浮控制、电脑连接与屏幕标定") { openTools("ADVANCED") }
+        entry(tools, "自检与诊断", "检查环境、复制与分享报告") { openTools("DIAGNOSTICS") }
         val about = card()
         text(about, "关于与反馈", 18f)
         val versionRow = SettingsUi.row(activity, "版本与发布说明", "正在读取版本…")

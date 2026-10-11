@@ -156,6 +156,13 @@ object PyBridge {
     }
 
     private const val WORKBENCH_MODULE = "lvjiang.core.ondevice.workbench"
+    private const val LOADOUT_VIEW_MODULE = "lvjiang.apps.yysls.ondevice.loadout_view"
+    fun loadoutPlans(context: Context, username: String): JSONObject =
+        callJson(context, "list_plans", username, moduleName = LOADOUT_VIEW_MODULE)
+    fun loadoutView(context: Context, username: String, planId: String, scheme: String, base: String, assumptions: String): JSONObject =
+        callJson(context, "plan_view", username, planId, scheme, base, assumptions, moduleName = LOADOUT_VIEW_MODULE)
+    fun equipmentPool(context: Context, username: String, offset: Int): JSONObject =
+        callJson(context, "equipment_pool", username, offset, moduleName = LOADOUT_VIEW_MODULE)
     fun taskCatalog(context: Context, username: String): JSONObject =
         callJson(context, "task_catalog", username, moduleName = WORKBENCH_MODULE)
     fun profileView(context: Context, username: String): JSONObject =

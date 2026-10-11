@@ -1,5 +1,8 @@
 # 配置分层：system / remote / local / session
 
+> 本文描述现行实现。后续目标见 [官方配置增量更新架构调整方案](05-config-update-architecture.md)
+> （2026-10-11，待实施）；在代码切换前，仍以本文的分层和内容版本规则为准。
+
 律匠的配置分四层，读写咽喉是 `src/lvjiang/core/config/resolver.py`。
 
 | 层 | 目录 | 职责 | 进 git |
@@ -36,6 +39,7 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | `layouts/{布局}/{场景}.json` | 布局坐标 |
 | `yysls/tuning_rules/*.yaml` | 调律规则 |
 | `yysls/base_groups/*.yaml` | 基础规则组（材料/扫描处置） |
+| `yysls/gear_sets/*.yaml` | 一搭配一文件，约束随搭配保存，同路径 local 整体覆盖 |
 | `yysls/graduation/*.json` | 毕业率方案 |
 | `references/**/*.png` | 参考图 |
 
@@ -50,7 +54,6 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
 | `yysls/game_config/*.yaml` | 七份领域配置合并为统一视图 | `apps/yysls/config/game_config_files.py`、`manager.py` |
-| `yysls/gear_sets/*.yaml` | 一搭配一文件，约束随搭配保存，来源区分系统预置和本地 | `apps/yysls/config/builds.py` |
 | `yysls/tune_config.yaml` | `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
 
 游戏配置目录现有七个文件；出装搭配独立放在 `yysls/gear_sets/`，不并入统一视图，

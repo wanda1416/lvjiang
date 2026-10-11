@@ -71,6 +71,8 @@ class FloatService : Service() {
     private var selectionArea: LinearLayout? = null
     private var selectedTaskId = ""
     private var selectedTaskName = ""
+    private var preparedBatchGroup = ""
+    private var preparedBatchToken = ""
     private var tasks: List<Pair<String, String>> = emptyList()
     private var ready = false
     private var syncStamp = ""
@@ -92,6 +94,22 @@ class FloatService : Service() {
             refreshStatus()
             // 同步或远程启动也会改变面板；悬浮服务存活时持续刷新。
             if (isRunning) ui.postDelayed(this, POLL_INTERVAL_MS)
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        ui.post {
+            val (w, h) = ScreenMap.screenSize()
+            floatParams?.let { params ->
+                params.x = params.x.coerceIn(0, maxOf(0, w - params.width))
+                params.y = params.y.coerceIn(0, maxOf(0, h - params.height))
+                floatView?.let { windowManager.updateViewLayout(it, params) }
+            }
+            if (panelView != null) {
+                closePanel()
+                openPanel()
+            }
         }
     }
 
@@ -443,6 +461,9 @@ class FloatService : Service() {
                     closeTaskSelection()
                 }
                 taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
+                if (status.optJSONObject("batch")?.optString("group_id").orEmpty().isNotEmpty() && state in activeStates) {
+                    userLine?.text = "单元：${status.optJSONObject("batch")?.optString("current_entry").orEmpty()}"
+                }
                 selectButton?.isEnabled = ready && state !in activeStates
                 selectUserButton?.isEnabled = ready && state !in activeStates
                 appendLogs(status)
@@ -517,8 +538,9 @@ class FloatService : Service() {
         area.removeAllViews()
 
         if (state in activeStates) {
+            val subject = if (selectedTaskId.startsWith("batch:")) "批量" else "任务"
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            row.addView(smallButton("停止任务") {
+            row.addView(smallButton("结束$subject") {
                 executor.execute {
                     val r = PyBridge.stopTask(this)
                     toast(r.optString("message", "已请求停止"))
@@ -540,7 +562,7 @@ class FloatService : Service() {
                 area.addView(row)
                 return
             }
-            row.addView(smallButton(if (state == STATE_PAUSED) "继续任务" else "暂停任务") {
+            row.addView(smallButton(if (state == STATE_PAUSED) "继续$subject" else "暂停$subject") {
                     executor.execute {
                         val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
                         toast(r.optString("message"))
@@ -552,7 +574,7 @@ class FloatService : Service() {
             return
         }
 
-        area.addView(smallButton("启动任务") { launchTask(selectedTaskId, selectedTaskName) }
+        area.addView(smallButton(if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务") { launchTask(selectedTaskId, selectedTaskName) }
             .apply { isEnabled = ready && selectedTaskId.isNotEmpty() })
     }
 
@@ -578,10 +600,13 @@ class FloatService : Service() {
                     id to name
                 }
                 if (lastState in activeStates) return@post
+                if (preparedBatchGroup.isNotEmpty()) return@post
                 val previous = selectedTaskId.ifEmpty { getSharedPreferences("float_tasks", MODE_PRIVATE).getString("selected", "") ?: "" }
                 val selected = this@FloatService.tasks.firstOrNull { it.first == previous }
                 selectedTaskId = selected?.first ?: ""
                 selectedTaskName = selected?.second ?: ""
+                getSharedPreferences("float_tasks", MODE_PRIVATE).edit()
+                    .putString("selected_name", selectedTaskName).apply()
                 taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
                 rebuildActions(lastState)
                 if (selectionArea?.visibility == View.VISIBLE && !showingUsers) renderTaskSelection()
@@ -655,7 +680,8 @@ class FloatService : Service() {
                 if (lastState in activeStates) return@smallButton
                 selectedTaskId = id
                 selectedTaskName = name
-                getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", id).apply()
+                preparedBatchGroup = ""; preparedBatchToken = ""
+                getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", id).putString("selected_name", name).apply()
                 taskLine?.text = "任务：$name"
                 closeTaskSelection()
                 rebuildActions(lastState)
@@ -687,7 +713,7 @@ class FloatService : Service() {
             return
         }
         executor.execute {
-            val r = PyBridge.startTask(this, taskId)
+            val r = if (taskId.startsWith("batch:")) PyBridge.startBatch(this, preparedBatchGroup, preparedBatchToken) else PyBridge.startTask(this, taskId)
             val ok = r.optBoolean("ok", false)
             toast(r.optString("message", if (ok) "已启动：$taskName" else "启动失败"))
             report("task start $taskId -> ok=$ok ${r.optString("message")}")
@@ -751,11 +777,35 @@ class FloatService : Service() {
         (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        fun selectedTaskLabel(context: Context): String = instance?.selectedTaskName
+            ?: context.getSharedPreferences("float_tasks", Context.MODE_PRIVATE).getString("selected_name", "").orEmpty()
+
         private var starting: CompletableFuture<String?>? = null
         private var startupIcon: View? = null
         private var startupWindowManager: WindowManager? = null
 
         /** 只准备入口，用户回到游戏后仍须显式点击启动。 */
+        fun prepareBatch(context: Context, groupId: String): JSONObject = synchronized(AgentServer.executionLock) {
+            if (AgentServer.pcControlsDevice() || PyBridge.status(context).optBoolean("busy")) {
+                return@synchronized JSONObject().put("ok", false).put("message", "已有任务在执行，请先结束")
+            }
+            val result = PyBridge.prepareBatch(context, groupId)
+            if (!result.optBoolean("ok")) return@synchronized result
+            ensureStarted(context)?.let { return@synchronized JSONObject().put("ok", false).put("message", it) }
+            Handler(Looper.getMainLooper()).post {
+                instance?.let { service ->
+                    service.preparedBatchGroup = result.optString("group_id")
+                    service.preparedBatchToken = result.optString("token")
+                    service.selectedTaskId = "batch:" + result.optString("group_id")
+                    service.selectedTaskName = result.optString("name")
+                    service.taskLine?.text = "批量：${service.selectedTaskName}"
+                    service.lastState = ""
+                    service.refreshStatus()
+                }
+            }
+            result
+        }
+
         fun prepareTask(context: Context, taskId: String, taskName: String, username: String): JSONObject =
             synchronized(AgentServer.executionLock) {
                 if (AgentServer.pcControlsDevice() || PyBridge.status(context).optBoolean("busy")) {
@@ -768,9 +818,11 @@ class FloatService : Service() {
                 if (!selected.optBoolean("ok")) return@synchronized selected
                 val service = instance ?: return@synchronized JSONObject().put("ok", false).put("message", "悬浮控制尚未就绪")
                 service.ui.post {
+                    service.preparedBatchGroup = ""
+                    service.preparedBatchToken = ""
                     service.selectedTaskId = taskId
                     service.selectedTaskName = taskName
-                    service.getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", taskId).apply()
+                    service.getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", taskId).putString("selected_name", taskName).apply()
                     service.taskLine?.text = "任务：$taskName"
                     service.rebuildActions(service.lastState)
                 }

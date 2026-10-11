@@ -39,6 +39,7 @@ class CaptureSnapshotMixin:
         self._last_capture_frame = None
         self._last_capture_time_ns = 0
         self._last_capture_source = ""
+        self._reused_capture_frame = None
 
     def capture_frame(self, *, source: str = "") -> np.ndarray | None:
         """Capture a frame and make it the engine's latest snapshot.

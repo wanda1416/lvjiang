@@ -58,7 +58,7 @@ class _OfflineWorker(QThread):
             data: dict[str, Any] = {"serial": self.serial}
             if self.action == "sync":
                 if agent.status.get("offline_protocol") != 2:
-                    raise RuntimeError(tr("请先更新 APK：旧版本不支持保留手机任务参数"))
+                    raise RuntimeError(tr("请先更新 APK：旧版本不支持保留手机任务参数与批量配置"))
                 with tempfile.TemporaryDirectory(prefix="lvjiang-offline-sync-") as temp:
                     archive = Path(temp) / "snapshot.zip"
                     build_offline_bundle(PROJECT_ROOT, archive, username=self.username, layout=self.layout)
@@ -118,9 +118,9 @@ class OfflineControlPage(QWidget):
         scope = QLabel(tr("下发全部用户、任务配置和最新 DB，仅携带所选布局及其继承依赖。用户与任务在执行时选择。"))
         scope.setWordWrap(True)
         sync_layout.addWidget(scope)
-        self.preserve_task_params = QCheckBox(tr("保留手机任务参数"))
+        self.preserve_task_params = QCheckBox(tr("保留手机任务参数与批量配置"))
         self.preserve_task_params.setChecked(True)
-        self.preserve_task_params.setToolTip(tr("保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。"))
+        self.preserve_task_params.setToolTip(tr("保留各用户的任务设置（含自动调律）、手机批量配置和手机独有用户；脚本、布局和 Profile DB 仍更新。"))
         sync_layout.addWidget(self.preserve_task_params)
         root.addWidget(sync_group)
         execution_group = QGroupBox(tr("远程执行"))
@@ -196,9 +196,9 @@ class OfflineControlPage(QWidget):
             return
         if action == "sync" and QMessageBox.question(
             self, tr("同步到手机"),
-            tr("将更新脚本、布局和用户数据，保留手机任务参数及手机独有用户；Profile DB 仍由 PC 快照覆盖，离线结果不会回传。确认同步？")
+            tr("将更新脚本、布局和用户数据，保留手机任务参数与批量配置及手机独有用户；Profile DB 仍由 PC 快照覆盖，离线结果不会回传。确认同步？")
             if self.preserve_task_params.isChecked() else
-            tr("将用 PC 配置和最新 DB 替换手机配置及数据，包括手机任务参数和用户名册；手机此前的离线结果不会回传。确认同步？"),
+            tr("将用 PC 配置和最新 DB 替换手机配置及数据，包括手机任务参数、批量配置和用户名册；手机此前的离线结果不会回传。确认同步？"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:

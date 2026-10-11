@@ -34,6 +34,7 @@ class _GestureInput(InputBackend):
         self.background_mode = True
         self.target_hwnd = None
 
+        self.geometry_check = None
         self._inject_input_sim(self, input_sim)
 
     def _tap(self, x: int, y: int) -> None:
@@ -178,14 +179,20 @@ class A11yInput(_GestureInput):
     # 猜错一次就会把排查引到完全无关的方向。
 
     def _tap(self, x: int, y: int) -> None:
+        if self.geometry_check is not None:
+            self.geometry_check()
         if reason := a11y.tap(x, y):
             print(f"[{self.name}] 点击未成功：{reason}")
 
     def _swipe(self, x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> None:
+        if self.geometry_check is not None:
+            self.geometry_check()
         if reason := a11y.swipe(x1, y1, x2, y2, duration_ms):
             print(f"[{self.name}] 拖拽未成功：{reason}")
 
     def _long_press(self, x: int, y: int, duration_ms: int) -> None:
+        if self.geometry_check is not None:
+            self.geometry_check()
         if reason := a11y.long_press(x, y, duration_ms):
             print(f"[{self.name}] 长按未成功：{reason}")
 
@@ -194,6 +201,8 @@ class A11yInput(_GestureInput):
         if hold_ms <= 0:
             self._swipe(x1, y1, x2, y2, move_ms)
             return
+        if self.geometry_check is not None:
+            self.geometry_check()
         if reason := a11y.hold_move(x1, y1, x2, y2, move_ms, hold_ms):
             print(f"[{self.name}] 推住未成功：{reason}")
 

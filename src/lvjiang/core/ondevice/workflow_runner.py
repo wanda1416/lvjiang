@@ -115,6 +115,7 @@ def create_engine(
     # 输入模拟/延迟参数从 app.yaml（system ← local）加载，设备端与 PC 端同源
     user_config = load_user_config()
     input_ctrl = _create_input(user_config.input_sim)
+    input_ctrl.geometry_check = capture.validate_geometry
 
     engine = DeviceWorkflowEngineBuilder(
         capture=capture,

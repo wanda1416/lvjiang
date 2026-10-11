@@ -66,6 +66,7 @@ class _TaskState:
         self._started_at = 0.0
         self._finished_at = 0.0
         self._result: dict[str, Any] = {}
+        self._batch: dict[str, Any] = {}
         self._logs: deque[str] = deque(maxlen=_LOG_CAPACITY)
         self._log_records: deque[dict[str, Any]] = deque(maxlen=_LOG_CAPACITY)
         self._log_seq = 0
@@ -106,6 +107,7 @@ class _TaskState:
                 "busy": self.is_running(),
                 "stopping": self._stop_event.is_set() and self._state in ACTIVE_STATES,
                 "result": self._result,
+                "batch": dict(self._batch),
                 "logs": list(self._logs),
                 "log_records": [dict(record) for record in self._log_records],
                 "log_generation": self._log_generation,
@@ -113,6 +115,7 @@ class _TaskState:
 
     def begin(self, task_id: str, task_name: str, username: str = "") -> None:
         with self._lock:
+            self._batch = {}
             self._stop_event.clear()
             self._state = STATE_RUNNING
             self._task_id = task_id
@@ -140,6 +143,10 @@ class _TaskState:
     def set_message(self, message: str) -> None:
         with self._lock:
             self._message = message
+
+    def set_batch(self, value: dict) -> None:
+        with self._lock:
+            self._batch.update(value)
 
     def request_stop(self) -> bool:
         with self._lock:

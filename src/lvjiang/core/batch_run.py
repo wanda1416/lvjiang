@@ -1,12 +1,12 @@
 """批量的运行态：本次执行草稿。
 
-批量有三层状态，边界见 `docs/20-requirements/18-batch-state-layers.md`：
+批量有三层状态，边界见 `docs/20-requirements/30-batch/04-batch-state-layers.md`：
 
 - **配置组定义** `BatchConfigItem`（`batch.json`）——可见范围、初始顺序、默认勾选、
   调度单元、生命周期 wf 及其参数。只在「批量配置」窗口里改。
 - **运行草稿** `BatchRunDraft`（`interface.json` 根节点的 `batch`）——本次要跑哪些、
   按什么顺序、跑几轮、有没有人看守。主页面改它，**永不反写定义层**。
-- **执行快照** `BatchRunSpec`（内存，见 `ui/batch/batch_runner.py`）——点开始那一刻
+- **执行快照** `BatchRunSpec`（内存，见 `core/batch_scheduler.py`）——点开始那一刻
   把上面两层合成一份冻结数据，调度器只认它。
 
 草稿按配置组的**稳定 ID** 隔离：用名称做 key 的话，重命名要搬迁状态，删掉再建
@@ -248,3 +248,48 @@ def forget_drafts(keep_group_ids: list[str]) -> None:
         }
 
     _mutate_batch_node(_forget)
+
+
+def forget_draft(group_id: str, replacement_id: str = "") -> None:
+    """只删除所属配置组的草稿，并修复指向它的活动引用。"""
+    def _remove(section: dict) -> None:
+        drafts = dict(section.get("drafts", {}))
+        drafts.pop(group_id, None)
+        section["drafts"] = drafts
+        if section.get("active_group_id") == group_id:
+            section["active_group_id"] = replacement_id
+    _mutate_batch_node(_remove)
+
+
+def profile_user_order(order: list[str], key: str, direction: str) -> tuple[list[str], int]:
+    """按定义的 Profile 值做一次稳定排序，缺失值放末尾；不写配置。"""
+    import math
+
+    from loguru import logger
+
+    from .profile.models import MODEL_QUOTA
+    from .profile.schema import get_profile_config
+    from .profile.service import profile_read
+    schema = get_profile_config()
+    if schema.get_key(key) is None:
+        raise ValueError("指定排序的数据项已不可用，请在批量配置中重新选择")
+    quota = schema.get_model_type(key) == MODEL_QUOTA
+    values: dict[str, float | None] = {}
+    for username in order:
+        try:
+            value = profile_read(username, key)
+        except Exception as exc:
+            logger.warning(f"读取用户 Profile 排序值失败: {username}/{key}: {exc}")
+            values[username] = None
+            continue
+        if value is None and quota:
+            values[username] = 0.0
+            continue
+        try:
+            number = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            number = None
+        values[username] = number if number is not None and math.isfinite(number) else None
+    descending = direction == "desc"
+    result = sorted(order, key=lambda name: (values[name] is None, -(values[name] or 0) if descending else (values[name] or 0)))
+    return result, sum(value is None for value in values.values())

@@ -103,3 +103,9 @@ def back() -> bool:
 def home() -> bool:
     """系统 HOME（performGlobalAction）"""
     return bool(_bridge().globalHome())
+
+
+def display_geometry() -> tuple[int, int, int]:
+    """当前旋转与屏幕尺寸，供截图/手势验证同一坐标空间。"""
+    values = _bridge().displayGeometry()
+    return int(values[0]), int(values[1]), int(values[2])

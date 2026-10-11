@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import json
-import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -63,9 +62,7 @@ from ...core.batch_run import (
     save_draft,
     set_active_group_id,
 )
-from ...core.profile.models import MODEL_QUOTA
 from ...core.profile.schema import get_profile_config
-from ...core.profile.service import profile_read
 from ...i18n import tr
 from ..button_styles import (
     apply_button_style,
@@ -930,40 +927,14 @@ class BatchTab(QWidget):
             logger.warning(f"指定顺序排序已取消：Profile 定义不存在: {key}")
             return
         order = self._tree_order(self._user_list, self._user_name)
-        values: dict[str, float | None] = {}
-        quota = schema.get_model_type(key) == MODEL_QUOTA
-        for username in order:
-            try:
-                value = profile_read(username, key)
-            except Exception as exc:
-                logger.warning(f"读取用户 Profile 排序值失败: {username}/{key}: {exc}")
-                values[username] = None
-                continue
-            if value is None and quota:
-                # 配额尚无记录等于本周期尚未完成，按 0 排序。
-                values[username] = 0.0
-                continue
-            try:
-                number = float(value) if value is not None else None
-            except (TypeError, ValueError):
-                number = None
-            values[username] = number if number is not None and math.isfinite(number) else None
-        descending = group.profile_sort_direction == "desc"
-        # 缺失/非数字一律排末尾；Python 的稳定排序保留同值用户的原相对顺序。
-        sorted_order = sorted(
-            order,
-            key=lambda username: (
-                values[username] is None,
-                -(values[username] or 0) if descending else (values[username] or 0),
-            ),
-        )
+        from ...core.batch_run import profile_user_order
+        sorted_order, missing = profile_user_order(order, key, group.profile_sort_direction)
         self._updating_user_list = True
         try:
             self._apply_tree_order(self._user_list, sorted_order, self._user_name)
         finally:
             self._updating_user_list = False
         self._sync_user_order_from_rows()
-        missing = sum(value is None for value in values.values())
         message = tr("已按 Profile 排序用户") + f": {key} ({len(order)} " + tr("人") + ")"
         if missing:
             message += f"；{missing} " + tr("人无数值，置于末尾")

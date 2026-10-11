@@ -108,6 +108,9 @@ class AndroidAppController:
             lambda: self.is_running(name), timeout,
             f"启动安卓应用 {name!r} 超时：未检测到进程",
         )
+        if self.capture is not None:
+            logger.info(f"[AndroidApp] {name} 等待应用方向与画面恢复")
+            self.wait_stable_frame(name, timeout=timeout)
         return True
 
     def wait_stable_frame(

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ...core.about import about_content
 from ...core.update import (
     GITHUB_REPO,
     ReleaseInfo,
@@ -48,7 +49,8 @@ class AboutDialog(QDialog):
         layout.setSpacing(12)
 
         # ─── 标题与版本 ───
-        version = get_version()
+        content = about_content()
+        version = content["version"]
         title_label = QLabel(f"<h2>{tr('律匠')}</h2>")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
@@ -61,8 +63,8 @@ class AboutDialog(QDialog):
         # ─── 功能简介 ───
         desc_label = QLabel(
             "<p style='text-align: center;'>"
-            f"{tr('通用视觉 RPA 引擎')}<br>"
-            f"<small>{tr('窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行')}</small>"
+            f"{content['description']}<br>"
+            f"<small>{content['workflow']}</small>"
             "</p>"
         )
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -74,7 +76,7 @@ class AboutDialog(QDialog):
         # ─── 技术栈 ───
         tech_label = QLabel(
             "<p style='text-align: center; color: gray; font-size: 11px;'>"
-            "基于 PyQt6 · RapidOCR · OpenCV"
+            f"{content['technology']}"
             "</p>"
         )
         tech_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -85,7 +87,7 @@ class AboutDialog(QDialog):
         # 不符合 OSI 的开源定义。写成"源码公开、免费使用"才是事实。
         opensource_label = QLabel(
             f"<p style='text-align: center; font-size: 15px; font-weight: 600;'>"
-            f"{tr('本项目源码公开、免费使用')}"
+            f"{content['source_notice']}"
             f"</p>"
         )
         opensource_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -93,8 +95,8 @@ class AboutDialog(QDialog):
 
         license_label = QLabel(
             "<p style='text-align: center; font-size: 11px;'>"
-            f"{tr('许可证')}：PolyForm Noncommercial License 1.0.0"
-            f"<br><span style='color: gray;'>{tr('仅限非商业使用')}</span>"
+            f"{tr('许可证')}：{content['license']}"
+            f"<br><span style='color: gray;'>{content['license_notice']}</span>"
             "</p>"
         )
         license_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -104,11 +106,8 @@ class AboutDialog(QDialog):
         # ─── 免责声明 ───
         # 措辞与发布说明页脚保持一致，避免同一件事两种口径。
         # 提示语先算好再拼：f-string 替换字段里换行要 Python 3.12，本项目下限是 3.11
-        usage_notice = tr(
-            "本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的"
-            "用户协议，由此产生的后果由使用者自行承担。")
-        warranty_notice = tr(
-            "软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。")
+        usage_notice = content["usage_notice"]
+        warranty_notice = content["warranty_notice"]
         disclaimer_label = QLabel(
             "<p style='font-size: 11px;'>"
             f"<b>{tr('免责声明')}</b>：{usage_notice}{warranty_notice}"
@@ -148,7 +147,7 @@ class AboutDialog(QDialog):
         # ─── 版权信息 ───
         copyright_label = QLabel(
             "<p style='text-align: center; color: gray; font-size: 10px;'>"
-            "Copyright © 2024-2026 wanda1416"
+            f"{content['copyright']}"
             "</p>"
         )
         copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

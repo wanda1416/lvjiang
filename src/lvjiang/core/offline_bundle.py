@@ -31,7 +31,7 @@ _LAYER_PATTERNS = (
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",
 )
-_SESSION_FILES = ("session.json", "interface.json", "profile.yaml")
+_SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "batch.json")
 _DATABASE_FILES = ("profile.db", "daily_history.db", "tuning_history.db")
 
 
@@ -178,6 +178,16 @@ def install_offline_bundle(
                     raise ValueError(f"数据库快照校验失败：{name}")
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
+            mobile_batch = target / "session/batch.json"
+            if mobile_batch.is_file():
+                shutil.copyfile(mobile_batch, staged_config / "session/batch.json")
+        # 本次批量选择属于手机运行草稿，电脑仅同步配置组定义。
+        incoming_interface = staged_config / "session/interface.json"
+        interface_data = json.loads(incoming_interface.read_text(encoding="utf-8")) if incoming_interface.is_file() else {}
+        old_interface = target / "session/interface.json"
+        mobile_interface = json.loads(old_interface.read_text(encoding="utf-8")) if old_interface.is_file() else {}
+        interface_data["batch"] = mobile_interface.get("batch", {})
+        incoming_interface.write_text(json.dumps(interface_data, ensure_ascii=False), encoding="utf-8")
         # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
         # 预置归档；它不成为新 r0，也不携带 PC 的更新身份、会员凭据或归档。
         for name in ("updates", "system-baseline.json"):

@@ -98,9 +98,9 @@ def task_history(run_id: str = "") -> str:
         if not run_id:
             return _json({"ok": True, "records": [{k: v for k, v in asdict(r).items()
                                                    if k not in {"params", "log_path", "result_path"}} for r in records]})
-        record = next((r for r in records if r.task_run_id == run_id), None)
-        if record is None:
-            raise ValueError("记录已不在最近 100 条中，请刷新列表")
+        record = repository.get_task_run(run_id)
+        if record is None or record.source != SOURCE:
+            raise ValueError("任务记录不可用，请刷新列表")
         log = ""
         path = resolve_history_path(record.log_path)
         if path and path.is_file():
@@ -119,6 +119,9 @@ def task_history(run_id: str = "") -> str:
 def public_content(kind: str) -> str:
     """仅由用户手动刷新调用，复用桌面的校验和版本筛选。"""
     try:
+        if kind == "about":
+            from ..about import about_content
+            return _json({"ok": True, **about_content()})
         if kind == "notices":
             from ..announcement import (
                 applicable_notices,

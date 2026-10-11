@@ -15,6 +15,10 @@ import androidx.core.view.WindowInsetsCompat
 
 /** 设置页面共用安全区和文字层级，不包含用户选择或业务配置。 */
 object SettingsUi {
+    fun shortLabel(value: String, limit: Int): String =
+        if (value.codePointCount(0, value.length) <= limit) value
+        else value.substring(0, value.offsetByCodePoints(0, limit)) + "..."
+
     fun dialogContent(context: Context) = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         val horizontal = resources.getDimensionPixelSize(R.dimen.dialog_content_horizontal_padding)
@@ -59,7 +63,7 @@ object SettingsUi {
         setPadding(0, pad, 0, pad)
     }
 
-    fun row(context: Context, title: String, summary: String, summaryMaxLines: Int? = null): LinearLayout = LinearLayout(context).apply {
+    fun row(context: Context, title: String, summary: String, summaryMaxLines: Int? = null, indentSummary: Boolean = false): LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = android.view.Gravity.CENTER_VERTICAL
         minimumHeight = (72 * resources.displayMetrics.density).toInt()
@@ -67,6 +71,7 @@ object SettingsUi {
             orientation = LinearLayout.VERTICAL
             addView(label(context, title, 16f))
             addView(label(context, summary, 14f, secondary = true).apply {
+                if (indentSummary) setPadding(textSize.toInt(), 0, 0, 0)
                 summaryMaxLines?.let {
                     maxLines = it
                     ellipsize = android.text.TextUtils.TruncateAt.END

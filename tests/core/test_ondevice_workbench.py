@@ -100,3 +100,20 @@ def test_notices_fall_back_to_cached_applicable_content(monkeypatch):
     result = json.loads(workbench.public_content("notices"))
     assert result["ok"] and "显示缓存" in result["message"]
     assert [item["id"] for item in result["notices"]] == ["visible"]
+
+
+def test_batch_task_detail_is_available_outside_recent_page(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta
+
+    from lvjiang.core.daily_history import TaskHistoryRepository, TaskRunSession
+    repository = TaskHistoryRepository(tmp_path / "history.db")
+    oldest = None
+    for number in range(101):
+        run = TaskRunSession(username="viewer", task_id="task", task_name="测试任务", task_scope="daily", params={}, source="ondevice", repository=repository, log_root=tmp_path / "logs", started_at=datetime(2026, 1, 1) + timedelta(seconds=number))
+        run.finish(status="completed")
+        if number == 0:
+            oldest = run.task_run_id
+    monkeypatch.setattr(workbench, "TaskHistoryRepository", lambda: repository)
+    monkeypatch.setattr(task_runner, "_STATE", task_runner._TaskState())
+    assert len(json.loads(workbench.task_history())["records"]) == 100
+    assert json.loads(workbench.task_history(oldest))["record"]["task_run_id"] == oldest

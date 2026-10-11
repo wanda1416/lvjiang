@@ -287,6 +287,10 @@ object AgentServer {
             if (!result.has("ok")) result.put("ok", true)
             Pair(result, null)
         }
+        "offline_batch_view" -> Pair(PyBridge.batchView(requireNotNull(appContext), req.optString("group_id")), null)
+        "offline_batch_history" -> Pair(PyBridge.batchHistory(requireNotNull(appContext), req.optString("run_id")), null)
+        "offline_batch_prepare" -> Pair(FloatService.prepareBatch(requireNotNull(appContext), req.getString("group_id")), null)
+        "offline_batch_start" -> Pair(PyBridge.startBatch(requireNotNull(appContext), req.getString("group_id"), req.getString("token")), null)
         "offline_tasks" -> Pair(PyBridge.listTasks(requireNotNull(appContext)), null)
         "offline_users" -> Pair(PyBridge.listUsers(requireNotNull(appContext)), null)
         "offline_pause" -> Pair(PyBridge.pauseTask(requireNotNull(appContext)), null)

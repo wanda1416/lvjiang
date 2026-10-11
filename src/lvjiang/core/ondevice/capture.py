@@ -39,15 +39,23 @@ class A11yCapture(A11yScreenshotThrottle, CaptureBackend):
     _MAX_ATTEMPTS = 3
 
     def __init__(self):
+        self._geometry: tuple[int, int, int] | None = None
         self._size: tuple[int, int] | None = None
         self._init_throttle()
 
     def capture(self, timeout: float = 10.0) -> np.ndarray | None:
+        before = a11y.display_geometry()
         got = self._grab(timeout)
         if got is None:
             return None
 
         width, height, data = got
+        after = a11y.display_geometry()
+        if before != after or (width, height) != after[1:]:
+            self.invalidate_geometry()
+            logger.info("屏幕方向正在变化，丢弃过渡截图")
+            return None
+        self._geometry = after
         expect = width * height * 4
         if len(data) != expect:
             logger.error(f"[A11yCapture] 字节数不对：{len(data)} != {width}x{height}x4={expect}")
@@ -94,7 +102,18 @@ class A11yCapture(A11yScreenshotThrottle, CaptureBackend):
         logger.error(f"[A11yCapture] 截图连续 {self._MAX_ATTEMPTS} 次失败")
         return None
 
+    def invalidate_geometry(self) -> None:
+        self._size = None
+        self._geometry = None
+
+    def validate_geometry(self) -> None:
+        if self._geometry is None or self._geometry != a11y.display_geometry():
+            self.invalidate_geometry()
+            raise RuntimeError("屏幕方向已变化，旧识别坐标已失效，请重新识别或恢复任务")
+
     def get_capture_size(self) -> tuple[int, int]:
+        if self._geometry is not None:
+            self.validate_geometry()
         if self._size is None:
             self.capture()
         return self._size or (0, 0)

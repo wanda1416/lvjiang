@@ -143,3 +143,16 @@ def test_two_session_instances_merge_batch_fields_atomically(
     saved = InterfaceStore(path).get_node("batch")
     assert saved["active_group_id"] == "gid-1"
     assert saved["drafts"]["gid-1"]["rounds"] == 4
+
+
+def test_profile_sort_is_stable_and_distinguishes_missing_quota(monkeypatch):
+    from types import SimpleNamespace
+
+    from lvjiang.core.batch_run import profile_user_order
+    from lvjiang.core.profile import schema, service
+    from lvjiang.core.profile.models import MODEL_QUOTA
+    monkeypatch.setattr(schema, "get_profile_config", lambda: SimpleNamespace(get_key=lambda key: object(), get_model_type=lambda key: MODEL_QUOTA if key == "quota" else "stock"))
+    values = {"a": 2, "b": None, "c": 2}
+    monkeypatch.setattr(service, "profile_read", lambda name, key: values[name])
+    assert profile_user_order(["c", "b", "a"], "stock", "desc") == (["c", "a", "b"], 1)
+    assert profile_user_order(["c", "b", "a"], "quota", "asc") == (["b", "c", "a"], 0)

@@ -330,12 +330,17 @@ def _app_is_running(_engine, name: str = "") -> bool:
 
 @builtin_func("app_stop")
 def _app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
+    _engine.clear_capture_snapshot()
+    invalidate = getattr(_engine._capture, "invalidate_geometry", None)
+    if callable(invalidate):
+        invalidate()
     return _app_call(
         _engine, lambda controller: controller.stop(name, float(timeout)))
 
 
 @builtin_func("app_start")
 def _app_start(_engine, name: str = "", timeout: float = 30) -> bool:
+    _engine.clear_capture_snapshot()
     return _app_call(
         _engine, lambda controller: controller.start(name, float(timeout)))
 

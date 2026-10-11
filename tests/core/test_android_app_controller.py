@@ -309,3 +309,23 @@ def test_wait_ready_already_stopped_never_waits():
     with pytest.raises(AndroidAppError, match="用户已停止"):
         controller.wait_stable_frame("game")
     capture.wait_ready.assert_not_called()
+
+
+def test_launch_waits_through_portrait_until_registered_direction_is_stable(monkeypatch):
+    import lvjiang.core.android.app_controller as module
+    clock = [0.0]
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(module.time, "sleep", lambda delay: clock.__setitem__(0, clock[0] + delay))
+    class Capture:
+        calls = 0
+        def capture(self, timeout=10):
+            self.calls += 1
+            return np.zeros((8, 4, 3) if self.calls <= 3 else (4, 8, 3), dtype=np.uint8)
+    capture = Capture()
+    controller = _controller(capture=capture)
+    assert controller.start("game", timeout=5)
+    assert capture.calls > 3
+    assert clock[0] >= 1
+    controller.stop_check = lambda: True
+    with pytest.raises(AndroidAppError, match="停止"):
+        controller.wait_stable_frame("game")

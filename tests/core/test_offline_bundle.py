@@ -287,3 +287,38 @@ def test_sync_uses_installed_system_and_retains_phone_archives(bundle, tmp_path)
     install_offline_bundle(archive, phone)
     assert baseline.read_bytes() == b"phone official baseline"
     assert (phone / "config/system/workflows/shared.wf").read_bytes() == script.read_bytes()
+
+
+def test_sync_transfers_batch_definition_and_keeps_phone_run_draft(bundle, tmp_path):
+    source, archive = bundle
+    batch_definition = {"document_type": "lvjiang.batch", "version": 2, "groups": {}}
+    (source / "config/session/batch.json").write_text(json.dumps(batch_definition), encoding="utf-8")
+    interface = source / "config/session/interface.json"
+    pc = json.loads(interface.read_text(encoding="utf-8"))
+    pc["batch"] = {"active_group_id": "pc", "drafts": {"pc": {"rounds": 9}}}
+    interface.write_text(json.dumps(pc), encoding="utf-8")
+    build_offline_bundle(source, archive, username="tester", layout="android")
+    phone = tmp_path / "phone"
+    state = phone / "config/session/interface.json"
+    state.parent.mkdir(parents=True)
+    mobile = {"active_group_id": "phone", "drafts": {"phone": {"rounds": 2}}}
+    state.write_text(json.dumps({"batch": mobile}), encoding="utf-8")
+    install_offline_bundle(archive, phone, preserve_task_params=False)
+    assert json.loads((state.parent / "batch.json").read_text(encoding="utf-8")) == batch_definition
+    assert json.loads(state.read_text(encoding="utf-8"))["batch"] == mobile
+
+
+def test_batch_definition_preservation_uses_explicit_sync_choice(bundle, tmp_path):
+    source, archive = bundle
+    pc = {"document_type": "lvjiang.batch", "version": 2, "groups": {}}
+    (source / "config/session/batch.json").write_text(json.dumps(pc), encoding="utf-8")
+    build_offline_bundle(source, archive, username="tester", layout="android")
+    phone = tmp_path / "phone"
+    config = phone / "config/session/batch.json"
+    config.parent.mkdir(parents=True)
+    mobile = {"document_type": "lvjiang.batch", "version": 2, "groups": {"mobile": {"name": "手机配置"}}}
+    config.write_text(json.dumps(mobile), encoding="utf-8")
+    install_offline_bundle(archive, phone, preserve_task_params=True)
+    assert json.loads(config.read_text(encoding="utf-8")) == mobile
+    install_offline_bundle(archive, phone, preserve_task_params=False)
+    assert json.loads(config.read_text(encoding="utf-8")) == pc

@@ -155,6 +155,36 @@ object PyBridge {
         }
     }
 
+    private const val BATCH_MODULE = "lvjiang.core.ondevice.batch"
+    fun batchEditor(context: Context, groupId: String = ""): JSONObject = callJson(context, "editor", groupId, moduleName = BATCH_MODULE)
+    fun batchLifecycle(context: Context, workflows: String, values: String): JSONObject = callJson(context, "lifecycle_preview", workflows, values, moduleName = BATCH_MODULE)
+    fun saveBatchDefinition(context: Context, groupId: String, token: String, payload: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束")
+        else callJson(context, "save_definition", groupId, token, payload, moduleName = BATCH_MODULE)
+    }
+    fun deleteBatchDefinition(context: Context, groupId: String, token: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束")
+        else callJson(context, "delete_definition", groupId, token, moduleName = BATCH_MODULE)
+    }
+    fun batchView(context: Context, groupId: String = ""): JSONObject = callJson(context, "view", groupId, moduleName = BATCH_MODULE)
+    fun batchHistory(context: Context, runId: String = ""): JSONObject = callJson(context, "history", runId, moduleName = BATCH_MODULE)
+    fun sortBatchUsers(context: Context, groupId: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束")
+        else callJson(context, "sort_users", groupId, moduleName = BATCH_MODULE)
+    }
+    fun saveBatch(context: Context, groupId: String, payload: String, reset: Boolean = false): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束")
+        else callJson(context, "save", groupId, payload, reset, moduleName = BATCH_MODULE)
+    }
+    fun prepareBatch(context: Context, groupId: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束")
+        else callJson(context, "prepare", groupId, moduleName = BATCH_MODULE)
+    }
+    fun startBatch(context: Context, groupId: String, token: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束")
+        else callJson(context, "start", groupId, token, moduleName = BATCH_MODULE)
+    }
+
     private const val WORKBENCH_MODULE = "lvjiang.core.ondevice.workbench"
     private const val LOADOUT_VIEW_MODULE = "lvjiang.apps.yysls.ondevice.loadout_view"
     fun loadoutPlans(context: Context, username: String): JSONObject =

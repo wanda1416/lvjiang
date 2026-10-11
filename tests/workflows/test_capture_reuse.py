@@ -303,3 +303,18 @@ def test_equipment_capture_failure_does_not_reuse_old_frame_or_scan_more():
     assert engine._capture.capture.call_count == 3
     engine._ocr.ocr_scene_regions.assert_not_called()
     assert engine.get_last_capture_frame() is None
+
+
+def test_app_restart_invalidates_reused_frame_before_next_recognition():
+    from lvjiang.workflows.builtins.system import _app_start, _app_stop
+    engine, before = _engine()
+    engine.capture_frame(source="before restart")
+    engine._reused_capture_frame = before
+    engine._app_controller = SimpleNamespace(stop=lambda *args: True, start=lambda *args: True)
+    _app_stop(engine, "game")
+    _app_start(engine, "game")
+    after = np.zeros((40, 20, 3), dtype=np.uint8)
+    engine._capture.capture.return_value = after
+    assert engine._last_capture_frame is None
+    assert engine.capture_frame(source="after restart") is after
+    assert engine._capture.capture.call_count == 2

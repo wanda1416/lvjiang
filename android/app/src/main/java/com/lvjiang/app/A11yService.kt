@@ -134,6 +134,11 @@ object A11yBridge {
      * ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT（时间戳按服务连接记录，被限流的
      * 请求不更新它）。节拍由调用方补齐，Python 侧统一在截图后端里做。
      */
+    fun displayGeometry(): IntArray {
+        val (w, h) = ScreenMap.screenSize()
+        return intArrayOf(ScreenMap.rotation(), w, h)
+    }
+
     fun screenshotRgba(timeoutMs: Long = 5000): Array<Any>? {
         lastScreenshotError = null
         val service = A11yService.instance ?: run {

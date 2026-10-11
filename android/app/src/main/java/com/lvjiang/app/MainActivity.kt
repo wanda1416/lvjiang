@@ -83,7 +83,8 @@ class MainActivity : AppCompatActivity() {
         androidx.core.view.ViewCompat.requestApplyInsets(root)
         workbench = WorkbenchUi(this, findViewById(R.id.workbench_host),
             openTools = { target -> showPage(Page.valueOf(target)) }, toggleFloat = { onFloatToggle() },
-            browseUserChanged = { if (page == Page.USERS) updateUserTitle(it) })
+            browseUserChanged = { if (page == Page.USERS) updateUserTitle(it) },
+            selectedTaskChanged = { if (page == Page.TASKS) updateTaskTitle(it) })
         workbench.restore(savedInstanceState)
         val navigation = findViewById<BottomNavigationView>(R.id.main_navigation)
         navigation.setOnItemSelectedListener { item ->
@@ -203,6 +204,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(0, MENU_BATCH_SETTINGS, 1, "批量配置")
         menu.add(0, MENU_TASK_SETTINGS, 0, "任务设置")
         menu.add(0, MENU_USER_SETTINGS, 0, "用户管理")
         menu.add(0, MENU_SWITCH_USER, 1, "切换用户")
@@ -210,10 +212,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(MENU_BATCH_SETTINGS)?.isVisible = page == Page.TASKS && workbench.isBatchPage()
         menu.findItem(MENU_TASK_SETTINGS)?.isVisible = page == Page.TASKS
         menu.findItem(MENU_USER_SETTINGS)?.isVisible = page == Page.USERS
         menu.findItem(MENU_SWITCH_USER)?.isVisible = page == Page.USERS
         return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun updateTaskTitle(taskName: String) {
+        val name = SettingsUi.shortLabel(taskName, 6)
+        val title = android.text.SpannableString(if (name.isEmpty()) "任务" else "任务  $name")
+        if (name.isNotEmpty()) title.setSpan(android.text.style.RelativeSizeSpan(.65f), 4, title.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        supportActionBar?.title = title
     }
 
     private fun updateUserTitle(username: String) {
@@ -225,6 +235,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            MENU_BATCH_SETTINGS -> if (page == Page.TASKS) startActivity(Intent(this, BatchConfigActivity::class.java).putExtra("group_id", workbench.batchGroupId()))
             MENU_TASK_SETTINGS -> if (page == Page.TASKS) startActivity(Intent(this, TaskSettingsActivity::class.java)
                 .putExtra("username", workbench.parameterUsername()))
             MENU_USER_SETTINGS -> if (page == Page.USERS) startActivity(Intent(this, UserSettingsActivity::class.java))
@@ -268,6 +279,7 @@ class MainActivity : AppCompatActivity() {
         }
         supportActionBar?.setDisplayHomeAsUpEnabled(next in setOf(Page.PERMISSIONS, Page.ADVANCED, Page.DIAGNOSTICS))
         if (next == Page.USERS) updateUserTitle(workbench.browsingUsername())
+        if (next == Page.TASKS) updateTaskTitle(FloatService.selectedTaskLabel(this))
         invalidateOptionsMenu()
         backToHome.isEnabled = next != Page.HOME
         findViewById<ScrollView>(R.id.main_scroll).scrollTo(0, 0)
@@ -483,6 +495,7 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_PERMISSIONS = 1
         private const val MENU_ADVANCED = 2
         private const val MENU_DIAGNOSTICS = 3
+        private const val MENU_BATCH_SETTINGS = 7
         private const val MENU_TASK_SETTINGS = 4
         private const val MENU_USER_SETTINGS = 5
         private const val MENU_SWITCH_USER = 6

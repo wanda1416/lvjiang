@@ -302,6 +302,12 @@ class TaskHistoryRepository:
                 + " ORDER BY started_at DESC LIMIT ?", args).fetchall()
         return [self._task_from_row(row) for row in rows]
 
+    def get_task_run(self, task_run_id: str) -> TaskRunRecord | None:
+        """按稳定 ID 打开历史详情，不受最近列表分页限制。"""
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM task_runs WHERE task_run_id=?", (task_run_id,)).fetchone()
+        return self._task_from_row(row) if row is not None else None
+
     def create_batch_run(self, record: BatchRunRecord) -> None:
         with self._connect() as conn:
             conn.execute("""

@@ -32,6 +32,7 @@ class WorkbenchUi(
     private val openTools: (String) -> Unit,
     private val toggleFloat: () -> Unit,
     private val browseUserChanged: (String) -> Unit,
+    private val selectedTaskChanged: (String) -> Unit,
 ) {
     private val executor = Executors.newFixedThreadPool(2)
     private val controlExecutor = Executors.newSingleThreadExecutor()
@@ -49,6 +50,10 @@ class WorkbenchUi(
     private var loadoutBase = ""
     private var loadoutRequest = 0
     private var loadoutAssumptions = JSONObject()
+    private var taskSection = "SINGLE"
+    private var batchGroup = ""
+    private var batchData = JSONObject()
+    private var batchProgressText: TextView? = null
     private var query = ""
     private var group = ""
     private var status = JSONObject()
@@ -59,6 +64,7 @@ class WorkbenchUi(
     private var runtimeLog: TextView? = null
     private var logsButton: Button? = null
     private var logsExpanded = false
+    private var selectedTaskText: TextView? = null
     private var executionUserText: TextView? = null
     private var executionUserCard: MaterialCardView? = null
     private var floatingButton: MaterialButton? = null
@@ -68,6 +74,8 @@ class WorkbenchUi(
     private val active = setOf("running", "pausing", "paused", "stopping")
 
     fun restore(bundle: Bundle?) {
+        taskSection = bundle?.getString("task_section") ?: "SINGLE"
+        batchGroup = bundle?.getString("batch_group").orEmpty()
         taskUser = bundle?.getString("task_user").orEmpty()
         browseUser = bundle?.getString("browse_user").orEmpty()
         userSection = bundle?.getString("user_section") ?: "DATA"
@@ -81,6 +89,8 @@ class WorkbenchUi(
     }
 
     fun save(bundle: Bundle) {
+        bundle.putString("task_section", taskSection)
+        bundle.putString("batch_group", batchGroup)
         bundle.putString("task_user", taskUser)
         bundle.putString("browse_user", browseUser)
         bundle.putString("user_section", userSection)
@@ -147,7 +157,7 @@ class WorkbenchUi(
         host.removeAllViews()
         runtimeText = null; runtimeLog = null; controls = null; controlKey = ""; recentHistory = null
         runtimeMeta = null; runtimeMessage = null; runtimeStatus = null; logsButton = null
-        executionUserText = null; executionUserCard = null
+        executionUserText = null; executionUserCard = null; selectedTaskText = null
         floatingButton = null; floatingHint = null
         host.visibility = if (next in setOf("HOME", "TASKS", "USERS", "SETTINGS")) View.VISIBLE else View.GONE
         when (next) {
@@ -160,6 +170,9 @@ class WorkbenchUi(
 
     fun updateStatus(value: JSONObject) {
         status = value
+        val selectedTask = FloatService.selectedTaskLabel(activity)
+        selectedTaskChanged(selectedTask)
+        selectedTaskText?.text = SettingsUi.shortLabel(selectedTask.ifEmpty { "未选择任务" }, 6)
         if (page != "HOME") return
         val state = status.optString("state", "idle")
         val user = status.optString("username").ifEmpty {
@@ -183,6 +196,13 @@ class WorkbenchUi(
         val elapsed = status.optDouble("elapsed", 0.0).toLong()
         val metadata = if (hasTask) "${SettingsUi.userLabel(user).ifEmpty { "未选择用户" }} · ${elapsed / 60}分${elapsed % 60}秒" else ""
         runtimeMeta?.let { it.text = metadata; it.visibility = if (metadata.isEmpty()) View.GONE else View.VISIBLE }
+        val batch = status.optJSONObject("batch")
+        batchProgressText?.text = batchProgressSummary()
+        if (batch?.optString("group_id").orEmpty().isNotEmpty()) {
+            runtimeMeta?.text = "${batch?.optString("current_entry").orEmpty()} · ${batch?.optString("current_task").orEmpty()}\n已处理 ${batch?.optInt("processed", 0)} / ${batch?.optInt("total", 0)} 项"
+            runtimeMeta?.visibility = View.VISIBLE
+            runtimeText?.setOnClickListener { batchProgress() }
+        } else runtimeText?.setOnClickListener(null)
         runtimeMessage?.let {
             it.text = message.ifEmpty { if (hasTask) "" else "先选择用户和任务，再回到游戏启动。" }
             it.visibility = if (it.text.isEmpty()) View.GONE else View.VISIBLE
@@ -224,7 +244,8 @@ class WorkbenchUi(
             lastHistoryState = historyState
             recentHistory?.let { loadHistory(it) }
         }
-        val key = "$state/$id/$hasTask"
+        val subject = if (status.optString("task_id").startsWith("batch:")) "批量" else "任务"
+        val key = "$state/$id/$hasTask/$subject"
         if (key == controlKey) return
         controlKey = key
         controls?.let { area ->
@@ -241,13 +262,16 @@ class WorkbenchUi(
                     control("拒绝") { action { PyBridge.respondInteraction(activity, id, false) } }
                     text(area, interaction?.optString("message").orEmpty(), 16f)
                 } else if (state == "running" || state == "paused") {
-                    control(if (state == "paused") "继续任务" else "暂停任务") {
+                    control(if (state == "paused") "继续$subject" else "暂停$subject") {
                         action { if (state == "paused") PyBridge.resumeTask(activity) else PyBridge.pauseTask(activity) }
                     }
                 }
-                control("结束任务") { action { PyBridge.stopTask(activity) } }.isEnabled = state != "stopping"
+                control("结束$subject") { action { PyBridge.stopTask(activity) } }.isEnabled = state != "stopping"
             } else {
-                button(area, "查看本次结果") { detail("本次结果", status.optString("message") + "\n" + resultSummary(status.optJSONObject("result"))) }.isEnabled = status.optString("task_id").isNotEmpty()
+                button(area, if (subject == "批量") "查看批次结果" else "查看本次结果") {
+                    if (subject == "批量" && status.optJSONObject("result")?.optString("batch_run_id").orEmpty().isNotEmpty()) showBatchResult(status.getJSONObject("result").getString("batch_run_id"))
+                    else detail("本次结果", status.optString("message") + "\n" + resultSummary(status.optJSONObject("result")))
+                }.isEnabled = status.optString("task_id").isNotEmpty()
             }
         }
     }
@@ -298,10 +322,13 @@ class WorkbenchUi(
         }
         val userChoice = choice("选择用户", R.drawable.ic_nav_users, "正在读取用户…") { selectExecutionUser() }
         executionUserCard = userChoice.first; executionUserText = userChoice.second
-        choice("选择任务", R.drawable.ic_nav_tasks, "浏览任务与准备参数") {
+        val taskChoice = choice("选择任务", R.drawable.ic_nav_tasks,
+            SettingsUi.shortLabel(FloatService.selectedTaskLabel(activity).ifEmpty { "未选择任务" }, 6)) {
             taskUser = status.optJSONObject("sync")?.optString("execution_username").orEmpty()
             openTools("TASKS")
         }
+        selectedTaskText = taskChoice.second
+        button(host, "批量执行") { taskSection = "BATCH"; openTools("TASKS") }
         floatingButton = button(host, "启动悬浮窗", primary = true) { toggleFloat() }
         floatingHint = text(host, "开启后回到游戏，从悬浮图标启动任务。", 12f).apply {
             setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
@@ -374,7 +401,194 @@ class WorkbenchUi(
         }
     }
 
+    fun isBatchPage() = taskSection == "BATCH"
+    fun batchGroupId() = batchGroup
+
     private fun tasks() {
+        val tabs = TabLayout(activity).apply { tabMode = TabLayout.MODE_FIXED }
+        host.addView(tabs)
+        tabs.addTab(tabs.newTab().setText("日常任务"), taskSection == "SINGLE")
+        tabs.addTab(tabs.newTab().setText("批量执行"), taskSection == "BATCH")
+        tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) { taskSection = if (tab.position == 0) "SINGLE" else "BATCH"; activity.invalidateOptionsMenu(); show("TASKS") }
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
+        if (taskSection == "BATCH") { batchPage(); return }
+        singleTasks()
+    }
+
+    private fun batchPage() {
+        val loading = text(host, "正在读取批量配置…")
+        request({ PyBridge.batchView(activity, batchGroup) }) { data ->
+            host.removeView(loading)
+            if (!data.optBoolean("ok")) { text(host, data.optString("message")); if (taskSection == "BATCH") button(host, "新建批量配置") { activity.startActivity(Intent(activity, BatchConfigActivity::class.java)) }; return@request }
+            batchData = data; batchGroup = data.optString("group_id")
+            val summary = card()
+            val readonly = data.optBoolean("readonly") || AgentServer.pcControlsDevice()
+            if (readonly) text(summary, if (AgentServer.pcControlsDevice()) "设备由电脑控制，请先结束电脑任务。" else "执行中，结束后可修改本次选择。", 12f)
+            button(summary, data.optString("name") + "  ▾") {
+                val groups = objects(data.optJSONArray("groups"))
+                MaterialAlertDialogBuilder(activity).setTitle("选择配置组").setItems(groups.map { it.optString("name") }.toTypedArray()) { _, which ->
+                    batchGroup = groups[which].optString("id"); show("TASKS")
+                }.show()
+            }.isEnabled = !readonly
+            val draft = data.getJSONObject("draft")
+            val unitKey = data.optString("unit_key", "user")
+            fun selection(entries: Boolean): JSONObject = if (!entries) draft.getJSONObject("tasks") else if (unitKey == "user") draft.getJSONObject("users") else draft.getJSONObject("units").getJSONObject(unitKey)
+            fun line(label: String, value: String, action: () -> Unit) {
+                val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL; minimumHeight = (56 * resources.displayMetrics.density).toInt() }
+                text(row, label, 16f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                text(row, value, 14f)
+                text(row, "›", 24f).setPadding((16 * activity.resources.displayMetrics.density).toInt(), 0, 0, 0)
+                summary.addView(row)
+                row.isEnabled = !readonly; row.isClickable = true; row.isFocusable = true
+                val attr = android.util.TypedValue(); activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, attr, true); row.setBackgroundResource(attr.resourceId)
+                row.setOnClickListener { action() }
+            }
+            line("任务", "${selection(false).getJSONArray("checked").length()} 项") { batchSelection(false) }
+            line(if (unitKey == "user") "用户" else "单元", "${selection(true).getJSONArray("checked").length()} 项") { batchSelection(true) }
+            line("执行", "${draft.optInt("rounds", 1)} 轮 · ${if (draft.optBoolean("unattended")) "无人值守" else "有人值守"}") { batchOptions() }
+            button(summary, "生命周期") {
+                val names = mapOf("batch_setup" to "批次准备", "prepare_item" to "条目准备", "finish_item" to "条目收尾", "batch_teardown" to "批次收尾", "recover_unattended" to "异常恢复")
+                val workflows = data.getJSONObject("workflow_names")
+                detail("生命周期", names.entries.joinToString("\n") { "${it.value}：${workflows.optString(it.key).ifEmpty { "未设置" }}" } + "\n\n配置组定义在任务页菜单「批量配置」中编辑。")
+            }
+            if (data.optInt("unavailable_users") > 0 || (data.optJSONArray("unavailable_tasks")?.length() ?: 0) > 0) text(summary, "部分配置项在手机不可用，当前仅展示可执行项。", 12f)
+            val hasSelection = selection(false).getJSONArray("checked").length() > 0 && selection(true).getJSONArray("checked").length() > 0
+            if (!hasSelection) text(host, "请至少选择一个任务和一个执行单元。", 12f)
+            button(host, "准备批量执行", primary = true) {
+                request({ FloatService.prepareBatch(activity, batchGroup) }) { result -> toast(result.optString("message")) }
+            }.isEnabled = !readonly && hasSelection
+            button(host, "恢复默认选择") { request({ PyBridge.saveBatch(activity, batchGroup, "{}", true) }) { result ->
+                if (!result.optBoolean("ok")) toast(result.optString("message")) else show("TASKS")
+            } }.isEnabled = !readonly
+            button(host, "查看当前进度") { batchProgress() }.visibility = if (status.optJSONObject("batch")?.optString("group_id").orEmpty().isNotEmpty()) View.VISIBLE else View.GONE
+            val recent = card(); text(recent, "最近批次", 18f)
+            request({ PyBridge.batchHistory(activity) }) { history ->
+                if (!history.optBoolean("ok")) text(recent, history.optString("message"))
+                val records = objects(history.optJSONArray("records"))
+                if (records.isEmpty()) text(recent, "还没有手机批量记录")
+                records.forEach { record -> recent.addView(SettingsUi.row(activity, record.optString("config_name"), "${mapOf("completed" to "已完成", "failed" to "失败", "stopped" to "已结束", "running" to "运行中")[record.optString("status")] ?: record.optString("status")} · ${record.optString("started_at")}").apply {
+                    setOnClickListener { showBatchResult(record.optString("batch_run_id")) }
+                }) }
+            }
+        }
+    }
+
+    private fun showBatchResult(runId: String) {
+        request({ PyBridge.batchHistory(activity, runId) }) { result ->
+            if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
+            val content = SettingsUi.dialogContent(activity)
+            val record = result.optJSONObject("record") ?: JSONObject()
+            val labels = mapOf("completed" to "已完成", "failed" to "失败", "stopped" to "已结束", "running" to "运行中", "skipped" to "已跳过")
+            text(content, labels[record.optString("status")] ?: record.optString("status"), 16f)
+            if (record.optString("error_message").isNotEmpty()) text(content, record.optString("error_message"))
+            objects(result.optJSONArray("tasks")).groupBy { it.optString("username") }.forEach { (user, tasks) ->
+                text(content, SettingsUi.userLabel(user), 16f)
+                tasks.forEach { task ->
+                    content.addView(SettingsUi.row(activity, task.optString("task_name"), "${labels[task.optString("status")] ?: task.optString("status")} · ${task.optLong("duration_ms") / 1000} 秒").apply {
+                        setOnClickListener { request({ PyBridge.taskHistory(activity, task.optString("task_run_id")) }) { detail ->
+                            if (!detail.optBoolean("ok")) toast(detail.optString("message")) else this@WorkbenchUi.detail(task.optString("task_name"), task.optString("error_message") + "\n" + detail.optString("log"))
+                        } }
+                    })
+                }
+            }
+            if (result.optString("report").isNotEmpty()) button(content, "查看完整报告") { detail("批次报告", result.optString("report")) }
+            MaterialAlertDialogBuilder(activity).setTitle(record.optString("config_name").ifEmpty { "批次结果" }).setView(SettingsUi.dialogScroll(activity, content)).setPositiveButton("关闭", null).show()
+        }
+    }
+
+    private fun batchProgressSummary(): String {
+        val batch = status.optJSONObject("batch") ?: return "尚未启动批量"
+        return objects(batch.optJSONArray("rows")).groupBy { it.optString("entry") }.entries.joinToString("\n\n") { group ->
+            group.key + "\n" + group.value.joinToString("\n") { "${it.optString("task_name")}    ${it.optString("status")}" }
+        }.ifEmpty { status.optString("message") }
+    }
+
+    private fun batchProgress() {
+        val content = column().apply { val pad = (24 * resources.displayMetrics.density).toInt(); setPadding(pad, 0, pad, pad) }
+        batchProgressText = text(content, batchProgressSummary())
+        val scroll = ScrollView(activity).apply { addView(content) }
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle("批量进度").setView(scroll).setPositiveButton("关闭", null).create()
+        dialog.setOnDismissListener { batchProgressText = null }; dialog.show()
+    }
+
+    private fun saveBatchDraft(draft: JSONObject) {
+        request({ PyBridge.saveBatch(activity, batchGroup, draft.toString()) }) { result ->
+            if (!result.optBoolean("ok")) toast(result.optString("message")) else show("TASKS")
+        }
+    }
+
+    private fun batchOptions() {
+        val draft = JSONObject(batchData.getJSONObject("draft").toString())
+        val content = column().apply { setPadding(24, 8, 24, 8) }
+        val rounds = TextInputEditText(activity).apply { inputType = android.text.InputType.TYPE_CLASS_NUMBER; setText(draft.optInt("rounds", 1).toString()) }
+        val wrapper = TextInputLayout(activity).apply { hint = "执行轮数"; addView(rounds) }; content.addView(wrapper)
+        val unattended = com.google.android.material.checkbox.MaterialCheckBox(activity).apply {
+            text = "无人值守"; isChecked = draft.optBoolean("unattended"); isEnabled = batchData.optBoolean("can_unattended")
+        }; content.addView(unattended)
+        if (!unattended.isEnabled) text(content, "配置组未设置异常恢复工作流", 12f)
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle("执行").setView(content).setNegativeButton("取消", null).setPositiveButton("保存", null).create()
+        dialog.setOnShowListener { dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val value = rounds.text.toString().toIntOrNull()
+            if (value == null || value !in 1..999) { rounds.error = "请输入 1–999"; return@setOnClickListener }
+            draft.put("rounds", value).put("unattended", unattended.isChecked); saveBatchDraft(draft); dialog.dismiss()
+        } }; dialog.show()
+    }
+
+    private fun batchSelection(entries: Boolean) {
+        val draft = JSONObject(batchData.getJSONObject("draft").toString())
+        val unitKey = batchData.optString("unit_key", "user")
+        val selection = if (!entries) draft.getJSONObject("tasks") else if (unitKey == "user") draft.getJSONObject("users") else draft.getJSONObject("units").getJSONObject(unitKey)
+        val items = objects(batchData.optJSONArray(if (entries) "entries" else "tasks")).toMutableList()
+        val checked = (0 until selection.getJSONArray("checked").length()).map { selection.getJSONArray("checked").getString(it) }.toMutableSet()
+        val content = column().apply { val pad = (16 * resources.displayMetrics.density).toInt(); setPadding(pad, 0, pad, 0) }
+        val list = column(); content.addView(list)
+        fun render() {
+            list.removeAllViews()
+            items.forEachIndexed { index, item ->
+                val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+                val check = com.google.android.material.checkbox.MaterialCheckBox(activity).apply { text = item.optString("name"); isChecked = item.optString("id") in checked
+                    setOnCheckedChangeListener { _, selected -> if (selected) checked.add(item.optString("id")) else checked.remove(item.optString("id")) }
+                }; row.addView(check, LinearLayout.LayoutParams(0, -2, 1f))
+                if (!entries) button(row, "参数") {
+                    chooseUser(taskUser) { user -> taskUser = user; activity.startActivity(Intent(activity, TaskSettingsActivity::class.java).putExtra("username", user).putExtra("task_id", item.optString("id"))) }
+                }.apply { minWidth = 0; minimumWidth = 0; setPadding(0, 0, 0, 0); layoutParams = LinearLayout.LayoutParams((48 * resources.displayMetrics.density).toInt(), -2) }
+                fun move(delta: Int) { val next = index + delta; if (next in items.indices) { java.util.Collections.swap(items, index, next); render() } }
+                // Accessible ordering controls complement drag reordering.
+                button(row, "↑") { move(-1) }.apply { isEnabled = index > 0; contentDescription = "上移"; minWidth = 0; minimumWidth = 0; setPadding(0, 0, 0, 0); layoutParams = LinearLayout.LayoutParams((36 * resources.displayMetrics.density).toInt(), -2) }
+                button(row, "↓") { move(1) }.apply { isEnabled = index < items.lastIndex; contentDescription = "下移"; minWidth = 0; minimumWidth = 0; setPadding(0, 0, 0, 0); layoutParams = LinearLayout.LayoutParams((36 * resources.displayMetrics.density).toInt(), -2) }
+                row.setOnLongClickListener { view -> view.startDragAndDrop(android.content.ClipData.newPlainText("batch-order", item.optString("id")), View.DragShadowBuilder(view), item.optString("id"), 0); true }
+                check.setOnLongClickListener { row.startDragAndDrop(android.content.ClipData.newPlainText("batch-order", item.optString("id")), View.DragShadowBuilder(row), item.optString("id"), 0); true }
+                row.setOnDragListener { _, event ->
+                    if (event.action == android.view.DragEvent.ACTION_DROP) {
+                        val from = items.indexOfFirst { it.optString("id") == event.localState as? String }
+                        if (from >= 0 && from != index) { val moved = items.removeAt(from); items.add(index, moved); render() }
+                    }; true
+                }
+                list.addView(row)
+            }
+        }
+        render()
+        val scroll = ScrollView(activity).apply { addView(content) }
+        val builder = MaterialAlertDialogBuilder(activity).setTitle(if (entries) "执行单元" else "任务").setView(scroll).setNegativeButton("取消", null).setPositiveButton("保存") { _, _ ->
+            selection.put("order", JSONArray(items.map { it.optString("id") })).put("checked", JSONArray(items.map { it.optString("id") }.filter { it in checked })); saveBatchDraft(draft)
+        }
+        val sort = batchData.optJSONObject("profile_sort")
+        if (entries && sort != null) builder.setNeutralButton("按指定排序") { _, _ ->
+            val selectedGroup = batchGroup
+            selection.put("order", JSONArray(items.map { it.optString("id") })).put("checked", JSONArray(items.map { it.optString("id") }.filter { it in checked }))
+            request({ PyBridge.saveBatch(activity, selectedGroup, draft.toString()) }) { saved ->
+                if (!saved.optBoolean("ok")) toast(saved.optString("message")) else request({ PyBridge.sortBatchUsers(activity, selectedGroup) }) { result -> toast(result.optString("message")); if (result.optBoolean("ok")) show("TASKS") }
+            }
+        }
+        val dialog = builder.create()
+        dialog.setOnShowListener { if (entries && sort != null) { dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).isEnabled = sort.optBoolean("enabled"); if (!sort.optBoolean("enabled")) toast(sort.optString("label")) } }
+        dialog.show()
+    }
+
+    private fun singleTasks() {
         val header = card()
         text(header, "先准备任务，再回到游戏通过悬浮图标启动。")
         val choices = LinearLayout(activity).apply {
@@ -421,7 +635,7 @@ class WorkbenchUi(
                     val reason = task.optString("reason")
                     list.addView(SettingsUi.row(activity, task.optString("name"),
                         "${task.optString("group")} · ${if (task.optBoolean("configurable")) "可配置" else "无需参数"}\n${reason.ifEmpty { task.optString("note") }}",
-                        summaryMaxLines = if (reason.isEmpty()) 3 else null).apply {
+                        summaryMaxLines = if (reason.isEmpty()) 3 else null, indentSummary = true).apply {
                         setOnClickListener { taskDetail(task) }
                     })
                 }
@@ -767,7 +981,28 @@ class WorkbenchUi(
         }
         entry(about, "公告", "查看适用于当前版本的公告") { publicContent("notices") }
         entry(about, "反馈联系", "获取最新联系二维码") { publicContent("qrcode") }
-        text(host, "独立执行为 Beta。电脑同步会覆盖用户数据库，手机结果暂不自动回传。", 12f)
+        entry(about, "关于", "律匠 · ${BuildConfig.VERSION_NAME}") { showAbout() }
+    }
+
+    private fun showAbout() {
+        request({ PyBridge.publicContent(activity, "about") }) { result ->
+            if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
+            val content = SettingsUi.dialogContent(activity)
+            text(content, "${result.optString("name")}  ${result.optString("version")}", 20f).gravity = android.view.Gravity.CENTER
+            text(content, result.optString("description"), 16f).gravity = android.view.Gravity.CENTER
+            text(content, result.optString("workflow"), 12f).gravity = android.view.Gravity.CENTER
+            text(content, result.optString("technology"), 12f).gravity = android.view.Gravity.CENTER
+            text(content, result.optString("source_notice"), 16f).gravity = android.view.Gravity.CENTER
+            text(content, result.optString("license") + "\n" + result.optString("license_notice"), 12f).gravity = android.view.Gravity.CENTER
+            text(content, result.optString("usage_notice") + result.optString("warranty_notice"), 12f)
+            val links = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER }
+            content.addView(links)
+            for ((label, key) in listOf("检查更新" to "releases_url", "GitHub" to "repository_url", "许可证" to "license_url")) {
+                button(links, label) { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.optString(key)))) }.onFailure { toast("未找到可打开链接的浏览器") } }
+            }
+            text(content, result.optString("copyright"), 12f).gravity = android.view.Gravity.CENTER
+            MaterialAlertDialogBuilder(activity).setTitle("关于律匠").setView(SettingsUi.dialogScroll(activity, content)).setPositiveButton("关闭", null).show()
+        }
     }
 
     private fun publicContent(kind: String) {

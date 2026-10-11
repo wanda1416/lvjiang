@@ -37,6 +37,8 @@
             android:theme="@style/Theme.Lvjiang.Settings"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity android:name=".BatchConfigActivity" android:exported="false" android:theme="@style/Theme.Lvjiang.Settings" android:windowSoftInputMode="adjustResize" />
+
         <activity
             android:name=".UserSettingsActivity"
             android:exported="false"

@@ -1,6 +1,9 @@
 # AI Agent 协作规范
 
 本文件适用于整个仓库。目录内若存在更具体的 `AGENTS.md`，则以更具体的规则为准。
+工作区存在独立的 `admin/` 子仓库时，开始任务前还必须读取
+[`admin/AGENTS.md`](admin/AGENTS.md)，遵循其中的开发机凭据、Android 发行签名、
+真机调试通道和 SSH 访问规范。各仓库仍分别管理改动、提交和推送。
 发布细节以 [`packaging/readme.md`](packaging/readme.md) 为唯一完整操作手册；本文件规定
 AI Agent 的授权边界、提交组织和执行门禁。
 

@@ -132,7 +132,7 @@ Release 标题，确保发布页面与历史版本维持一致。
 |------|------|------|
 | `pyproject.toml` | `version = "X.Y.Z"` | Python 包版本号 |
 | `android/app/build.gradle.kts` | `versionName = "X.Y.Z"` | Android APK 版本名 |
-| `android/app/build.gradle.kts` | `versionCode = N` | Android 应用内部版本号，正式发布递增；与配置同步无关 |
+| `android/app/build.gradle.kts` | `versionCode = N` | 每次对外发布递增，含测试/预发布；与配置同步无关 |
 | `src/lvjiang/_version.py` | `__version__ = "X.Y.Z"` | 手动改成待发布版本号，与 `pyproject.toml` 一致 |
 
 > **关于 `_version.py`：** 这个文件手动维护并提交。约定是**进入新版本开发时就把三处
@@ -168,7 +168,7 @@ git push public X.Y.Z
 发布工作流。任一远端推送失败时都应停止并修复一致性，不能把只存在于单个远端的标签
 视为发布完成。
 
-Release 工作流分三个作业：Windows 与 Android 各自构建并上传 artifact，最后一个作业
+Release 工作流先统一校验，再由 Windows 与 Android 各自构建并上传 artifact，最后一个作业
 统一创建 Release。
 
 **为什么拆开发布**：如果让 Windows 作业先发布、Android 作业再补传 APK，APK 构建一失败
@@ -177,14 +177,14 @@ Release 工作流分三个作业：Windows 与 Android 各自构建并上传 art
 
 `build-windows`：
 
-1. 校验标签严格为 `X.Y.Z`，并与 `pyproject.toml` 版本一致；
-2. 确认 `docs/50-releases/vX.Y.Z.md` 存在、一级标题以 `vX.Y.Z` 开头，且标签提交属于远端 `master`；
+1. `validate` 作业使用 `scripts/check_release.py` 校验正式/测试标签与三份源码版本字段完全一致；
+2. 确认 `docs/50-releases/v<版本>.md` 存在、一级标题以 `v<版本>` 开头；正式标签提交必须属于远端 `master`；
 3. 检查配置 `content_version` 完整性，运行 Ruff、mypy 与全量 pytest；
 4. 执行 `packaging\\package.bat`，并强制检查 ZIP 和 Inno Setup 安装器均已生成。
 
 `build-android`（Ubuntu runner）：
 
-1. 校验 `versionName` 与标签一致，且 `versionCode` 严格大于上一个标签的值
+1. 校验 `versionName` 与标签一致；统一门禁要求 `versionCode` 严格大于全部已有应用标签记录的值（包括测试标签）
    （仅用于应用升级；配置另由 PC 下发）；
 2. 从 secret 还原 keystore 并写出 `keystore.properties`，缺 secret 立即失败；
 3. `:app:assembleRelease`；
@@ -195,7 +195,7 @@ Release 工作流分三个作业：Windows 与 Android 各自构建并上传 art
 
 1. 取两个作业的 artifact，确认四个产物（便携 ZIP / 安装器 / APK / Agent ZIP）都在且非空；
 2. 生成覆盖四者的 `SHA256SUMS.txt`；
-3. 创建 GitHub Release，使用版本发布文档的一级标题和正文，上传四个产物与校验和。
+3. 创建 GitHub Release，使用版本发布文档的一级标题和正文，上传四个产物与校验和；b/rc 包标记 Pre-release，正式包标记 Latest。
 
 任何一步失败都不会发布 GitHub Release。临时故障可直接重新运行该 workflow；
 需要修改代码时，只能在 Release 尚未发布的前提下删除失败标签，修复并合并后再
@@ -242,11 +242,37 @@ APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 
 ## 版本号规范
 
-遵循语义化版本（Semantic Versioning）：`MAJOR.MINOR.PATCH`
+版本发布与比较采用 PEP 440 的规范子集，正式版本使用 `MAJOR.MINOR.PATCH`。
+测试版为 `X.Y.ZbN`，预发布候选为 `X.Y.ZrcN`，N 从 1 开始。
+顺序示例：`0.15.0b2 < 0.15.0b10 < 0.15.0rc1 < 0.15.0`。
+既有四段正式修订继续支持运行时比较，不作为测试版命名，也不扩展自动正式发布入口。
 
 - **MAJOR**：不兼容的 API 变更
 - **MINOR**：向后兼容的功能新增
 - **PATCH**：向后兼容的问题修复
+
+### 测试与预发布入口
+
+测试发布也必须明确获得用户授权；普通功能实现不授权修改版本号、versionCode、
+创建标签或公开测试源码。测试准备同步三份版本字段、递增 versionCode，并提供
+`docs/50-releases/vX.Y.ZbN.md` 或 `vX.Y.ZrcN.md`，明确标注测试性质及已验证边界。
+不把测试版本说明冒充正式声明。
+
+测试标签可指向独立测试提交，不要求先合入 master，但需要把用户授权公开的源码
+提交及同名标签同步到相应远端，不能夹带私有内容。公开标签触发完整 Release 流水线。
+公开仓库支持手动运行 Release，输入已存在的测试标签；该入口拒绝正式版本。
+工作流文件需先存在于 GitHub 默认分支，网页才提供手动运行入口。
+
+`bN`/`rcN` 自动发布为 GitHub Pre-release，使用 `--prerelease --latest=false`；
+正式版维持 `--latest`。普通客户端仍只查询 releases/latest，不自动提示测试包；
+安装测试版的用户在同目标正式版上线后可收到升级提示。测试包仍需全部测试、
+Windows/Android 构建、签名核验及四项产物检查，不允许绕过失败门禁。
+已发布的测试标签也不能复用，修复后递增 b/rc 编号；正式版 APK 的 versionCode
+必须超过所有已发布测试包，不能直接沿用测试前的版本码。
+
+测试版本的配置仍按目标三段系列匹配，但 r0 与状态放在完整测试版本目录，
+例如 updates/v0.15.0b1，不能与 updates/v0.15.0 混用。详见
+[测试与预发布需求](../docs/20-requirements/50-platform/17-prerelease.md)。
 
 ---
 

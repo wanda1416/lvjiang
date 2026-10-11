@@ -4,31 +4,63 @@ on:
   push:
     tags:
       - "*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已存在的测试/预发布标签，例如 0.15.0b1 或 0.15.0rc1"
+        required: true
+        type: string
 
 # gh release create 需要创建 Release 和上传附件；其余权限保持只读。
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  # 三段式：两边各自构建并上传 artifact，最后一个作业统一创建 Release。
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      notes: ${{ steps.release.outputs.notes }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install version parser
+        run: python -m pip install 'packaging>=23,<27'
+      - name: Validate release tag, source and Android upgrade order
+        id: release
+        run: >-
+          python scripts/check_release.py --tag "$RELEASE_TAG"
+          --github-output "$GITHUB_OUTPUT"
+          ${{ github.event_name == 'workflow_dispatch' && '--test-only' || '' }}
+  # 门禁通过后，两边各自构建并上传 artifact，最后一个作业统一创建 Release。
   # 不让 Windows 作业直接发布再由 Android 作业补传——APK 构建一失败就会留下一个
   # 缺产物的已发布版本，而 Release 一旦发布就禁止移动标签（见 packaging/readme.md），
   # 只能递增补丁版本重发。
   build-windows:
+    needs: validate
     runs-on: windows-2022
     env:
       QT_QPA_PLATFORM: offscreen
       PYTHONIOENCODING: utf-8
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ needs.validate.outputs.version }}
 
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -36,42 +68,6 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-
-      - name: Validate release tag and source
-        id: release
-        shell: pwsh
-        run: |
-          if ($env:RELEASE_TAG -notmatch '^\d+\.\d+\.\d+$') {
-            throw "Release tag must look like 1.2.3: $env:RELEASE_TAG"
-          }
-          $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
-          if ($env:RELEASE_TAG -ne $version) {
-            throw "Tag $env:RELEASE_TAG does not match pyproject.toml version $version"
-          }
-          $notes = "docs/50-releases/v$env:RELEASE_TAG.md"
-          if (-not (Test-Path $notes -PathType Leaf)) {
-            throw "Missing release notes: $notes"
-          }
-          $titleLine = Get-Content -LiteralPath $notes -Encoding utf8 |
-            Where-Object { $_ -match '^#\s+\S' } |
-            Select-Object -First 1
-          if (-not $titleLine) {
-            throw "Release notes must start with a level-one title: $notes"
-          }
-          $title = ($titleLine -replace '^#\s+', '').Trim()
-          if ($title -notmatch ('^v' + [regex]::Escape($version) + '(?:\s|$)')) {
-            throw "Release title must start with v${version}: $title"
-          }
-
-          git fetch origin master --no-tags
-          git merge-base --is-ancestor $env:GITHUB_SHA origin/master
-          if ($LASTEXITCODE -ne 0) {
-            throw "Tagged commit $env:GITHUB_SHA is not contained in origin/master"
-          }
-
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "notes=$notes" >> $env:GITHUB_OUTPUT
-          "title=$title" >> $env:GITHUB_OUTPUT
 
       - name: Install test and build dependencies
         shell: pwsh
@@ -105,7 +101,7 @@ jobs:
         id: assets
         shell: pwsh
         run: |
-          $version = '${{ steps.release.outputs.version }}'
+          $version = '${{ needs.validate.outputs.version }}'
           $zip = "dist/lvjiang-v$version-win64.zip"
           $setup = "dist/lvjiang-v$version-win64-setup.exe"
           $agent = "dist/lvjiang-agent-v$version.zip"
@@ -150,17 +146,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-notes
-          path: ${{ steps.release.outputs.notes }}
+          path: ${{ needs.validate.outputs.notes }}
           if-no-files-found: error
 
   build-android:
+    needs: validate
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ needs.validate.outputs.version }}
 
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -196,16 +195,7 @@ jobs:
             echo "versionName $version_name 与标签 $RELEASE_TAG 不一致" >&2
             exit 1
           fi
-          # 正式发布递增应用版本码；业务配置由 PC 下发，不再由 APK 解压。
-          previous=$(git tag --sort=-v:refname | grep -v "^${RELEASE_TAG}$" | head -1 || true)
-          if [ -n "$previous" ]; then
-            prev_code=$(git show "$previous:$gradle_file" \
-              | grep -oP 'versionCode\s*=\s*\K[0-9]+')
-            if [ "$version_code" -le "$prev_code" ]; then
-              echo "versionCode $version_code 未超过上一标签 $previous 的 $prev_code" >&2
-              exit 1
-            fi
-          fi
+          # 包含测试标签的全局 versionCode 门禁已由 validate 作业执行。
           echo "versionName=$version_name versionCode=$version_code"
 
       # 密钥只以 secret 形式存在，解码后的文件不会落进任何 artifact
@@ -296,10 +286,11 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [build-windows, build-android]
+    needs: [validate, build-windows, build-android]
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ needs.validate.outputs.version }}
+      IS_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
 
     steps:
       - name: Download built packages
@@ -337,10 +328,14 @@ jobs:
           set -euo pipefail
           title=$(grep -m1 '^#[[:space:]]' "${{ steps.assets.outputs.notes }}" \
             | sed 's/^#[[:space:]]*//')
+          flags=(--latest)
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            flags=(--prerelease --latest=false)
+          fi
           gh release create "$RELEASE_TAG" \
             dist/*.zip dist/*.exe dist/*.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "$title" \
             --notes-file "${{ steps.assets.outputs.notes }}" \
-            --latest
+            "${flags[@]}"

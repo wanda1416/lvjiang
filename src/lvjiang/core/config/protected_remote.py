@@ -58,9 +58,11 @@ def parse_manifest(manifest: Any) -> dict[str, Any]:
         raise ValueError("加密清单必须是对象")
     version = manifest.get("config_version")
     packages = manifest.get("packages")
-    if manifest.get("schema_version") != 1 or type(version) is not int or version < 1 \
+    if manifest.get("schema_version") != 1 or type(version) is not int or version < 0 \
             or not isinstance(packages, list):
         raise ValueError("加密清单协议无效")
+    if version == 0 and packages:
+        raise ValueError("零修订会员索引必须为空")
     normalized = []
     ids = set()
     for package in packages:
@@ -91,6 +93,11 @@ def parse_manifest(manifest: Any) -> dict[str, Any]:
                 not isinstance(key, str) or series(key) != key or type(value) is not int or value < 0
                 for key, value in dependencies.items()):
             raise ValueError("会员包公开修订依赖无效")
+        hashes = package.get("public_manifests", {})
+        if not isinstance(hashes, dict) or set(hashes) - dependencies.keys() or any(
+                not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value)
+                for value in hashes.values()):
+            raise ValueError("会员包公开清单摘要依赖无效")
         normalized.append({**package, "min_app_version": minimum,
                            "max_app_version_exclusive": maximum, "config_version": package_version,
                            "public_revisions": dependencies})

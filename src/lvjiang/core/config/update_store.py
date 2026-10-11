@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 import threading
@@ -9,7 +10,7 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fasteners import InterProcessLock
@@ -42,6 +43,8 @@ class UpdateStore:
         self.updates = self.config / "updates"
         self.version = series(app_version)
         self.baseline_sha256 = baseline_sha256
+        self.root = self.updates / f"v{self.version}"
+        self.state_path = self.root / "state.json"
 
     @contextmanager
     def locked(self, *, blocking: bool = True) -> Iterator[bool]:
@@ -64,7 +67,7 @@ class UpdateStore:
         atomic_write_bytes(path, data, prefix=".update-", fsync=True)
 
     def _state(self) -> dict[str, Any]:
-        path = self.updates / "state.json"
+        path = self.state_path
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
     def _recover(self) -> None:
@@ -82,7 +85,8 @@ class UpdateStore:
             if self.system.exists():
                 self.system.rename(rejected)
             previous.rename(self.system)
-        self._write(self.updates / "state.json", json_bytes(data["previous_state"]))
+        version = series(data["app_series"])
+        self._write(self.updates / f"v{version}" / "state.json", json_bytes(data["previous_state"]))
         journal.unlink()
         # rejected 保留用于诊断；不递归删除来源不明目录。
 
@@ -110,12 +114,72 @@ class UpdateStore:
     def _archive(self, path: Path, data: bytes) -> None:
         if path.exists():
             if path.read_bytes() != data:
-                raise ValueError(f"同一修订出现不同内容: {path.name}")
+                raise ValueError(f"归档摘要对应不同内容: {path.name}")
             return
         self._write(path, data)
 
+    def cache_index(self, channel: str, raw: bytes) -> None:
+        if channel not in {"public", "member"}:
+            raise ValueError("更新渠道无效")
+        with self.locked():
+            self._write(self.root / channel / "index.json", raw)
+
+    def cache_member(self, metadata: Mapping[str, Any], manifest: bytes, encrypted: bytes) -> None:
+        if not manifest or digest(manifest) != metadata.get("manifest_sha256"):
+            raise ValueError("会员归档清单摘要不匹配")
+        if digest(encrypted) != metadata.get("sha256"):
+            raise ValueError("会员归档密文摘要不匹配")
+        revision = metadata["package_version"]
+        with self.locked():
+            root = self.root / "member" / f"r{revision}" / digest(manifest)
+            self._archive(root / "manifest.json", manifest)
+            self._archive(root / "package.bin", encrypted)
+
+    def prune_archives(self) -> None:
+        """只回收本系列未引用的完整归档，不动 r0、索引和事务资料。"""
+        with self.locked():
+            if (self.updates / "transaction.json").exists():
+                return
+            state = self._state()
+            keep: dict[str, set[tuple[int, str]]] = {"public": set(), "member": set()}
+            for selection in (state, state.get("previous_selection", {})):
+                if selection.get("revision") and selection.get("public_sha256"):
+                    keep["public"].add((selection["revision"], selection["public_sha256"]))
+                member = selection.get("member") or {}
+                if member.get("package_version") and member.get("manifest_sha256"):
+                    keep["member"].add((member["package_version"], member["manifest_sha256"]))
+            # 未成功安装的线上目标也保留，避免其他实例回收待安装候选。
+            from ..update_bundle import parse_index
+            from .protected_remote import parse_manifest as parse_member
+            from .protected_remote import select_package
+            for channel in keep:
+                index_path = self.root / channel / "index.json"
+                if index_path.is_file():
+                    doc = json.loads(index_path.read_bytes())
+                    if channel == "public":
+                        entry = parse_index(doc)["series"].get(self.version)
+                        if entry:
+                            keep[channel].add((entry["revision"], entry["sha256"]))
+                    else:
+                        package = select_package(parse_member(doc), self.version)
+                        if package:
+                            keep[channel].add((package["config_version"], digest(json_bytes(package))))
+                root = self.root / channel
+                if not root.exists():
+                    continue
+                for revision in root.iterdir():
+                    if revision.is_symlink() or not revision.is_dir() or not re.fullmatch(r"r[1-9]\d*", revision.name):
+                        continue
+                    for item in revision.iterdir():
+                        if item.is_symlink() or not item.is_dir() or not re.fullmatch(r"[a-f0-9]{64}", item.name):
+                            continue
+                        if (int(revision.name[1:]), item.name) not in keep[channel]:
+                            shutil.rmtree(item)
+
     def install(
         self, manifest: dict[str, Any] | None = None, archive: bytes | None = None, *,
+        manifest_json: bytes | None = None,
+        index_snapshots: Mapping[str, bytes] | None = None,
         reset_public: bool = False,
         member_files: Mapping[str, bytes] | None = None,
         member_metadata: Mapping[str, Any] | None = None,
@@ -135,6 +199,9 @@ class UpdateStore:
             if manifest["app_series"] != self.version or manifest["baseline_sha256"] != self.baseline_sha256:
                 raise ValueError("配置包与客户端系列或预置基底不匹配")
         with self.locked():
+            for channel, expected in (index_snapshots or {}).items():
+                if channel not in {"public", "member"} or (self.root / channel / "index.json").read_bytes() != expected:
+                    raise ValueError("更新索引已被其他同步改变，请重新同步")
             self._recover()
             baseline = self._baseline()
             previous_state = self._state()
@@ -147,14 +214,17 @@ class UpdateStore:
             if manifest is None:
                 revision = previous_state.get("revision", 0) if installed_matches and not reset_public else 0
                 if revision:
-                    root = self.updates / f"v{self.version}"
-                    manifest = parse_manifest(json.loads((root / f"r{revision}.json").read_bytes()))
-                    archive = (root / f"r{revision}.zip").read_bytes()
+                    root = self.root / "public" / f"r{revision}" / previous_state["public_sha256"]
+                    manifest_json = (root / "manifest.json").read_bytes()
+                    if digest(manifest_json) != previous_state["public_sha256"]:
+                        raise ValueError("已安装公开归档清单摘要不匹配")
+                    manifest = parse_manifest(json.loads(manifest_json))
+                    archive = (root / "update.zip").read_bytes()
                 else:
                     archive = pack({})
                     manifest = {"app_series": self.version, "revision": 0,
                                 "baseline_sha256": self.baseline_sha256,
-                                "archive_sha256": digest(archive), "files": {}}
+                                "archive_sha256": digest(archive), "files": {}, "delete_files": []}
             else:
                 manifest = parse_manifest(manifest)
             if archive is None:
@@ -162,8 +232,10 @@ class UpdateStore:
             if manifest["app_series"] != self.version or manifest["baseline_sha256"] != self.baseline_sha256:
                 raise ValueError("配置包与客户端系列或预置基底不匹配")
             public = verify_archive(manifest, archive)
-            if installed_matches and not reset_public and manifest["revision"] < previous_state.get("revision", 0):
-                raise ValueError("拒绝回退的公开更新索引")
+            manifest_json = manifest_json if manifest_json is not None else json_bytes(manifest)
+            if json.loads(manifest_json) != manifest:
+                raise ValueError("公开归档清单与安装清单不一致")
+            public_sha256 = digest(manifest_json) if manifest["revision"] else ""
             if member_files is None:
                 member_metadata = previous_state.get("member", {}) if installed_matches else {}
                 names = member_metadata.get("files", {})
@@ -175,25 +247,34 @@ class UpdateStore:
             required_revision = (member_metadata or {}).get("public_revisions", {}).get(self.version, 0)
             if members and manifest["revision"] < required_revision:
                 raise ValueError(f"会员包要求公开配置至少 r{required_revision}，请先获取对应公开更新")
+            required_hash = (member_metadata or {}).get("public_manifests", {}).get(self.version)
+            dependency_hash = (public_sha256 if manifest["revision"] == required_revision else
+                               manifest.get("ancestors", {}).get(str(required_revision)))
+            if members and required_hash and required_hash != dependency_hash:
+                raise ValueError("会员包依赖的公开清单摘要与当前选择不一致")
             old_member = previous_state.get("member", {}) if installed_matches else {}
             member_revision = previous_state.get("member_index_revision", old_member.get("config_version", 0)) if installed_matches else 0
             if member_metadata and "config_version" in member_metadata:
-                if member_metadata["config_version"] < member_revision:
-                    raise ValueError("拒绝回退的会员更新索引")
                 member_revision = member_metadata["config_version"]
             validate_names(members)
-            candidate = compose({**baseline, **public}, members)
+            deleted = set(manifest["delete_files"])
+            directories = {str(parent) for name in baseline for parent in PurePosixPath(name).parents}
+            if deleted & directories:
+                raise ValueError("删除指令不能指向目录")
+            official = {name: data for name, data in baseline.items() if name not in deleted}
+            candidate = compose({**official, **public}, members)
             validate_names(candidate)
             changed = tuple(sorted(name for name in previous_files.keys() | candidate.keys()
                                    if previous_files.get(name) != candidate.get(name)))
-            revision_dir = self.updates / f"v{self.version}"
             if manifest["revision"]:
-                self._archive(revision_dir / f"r{manifest['revision']}.zip", archive)
-                self._archive(revision_dir / f"r{manifest['revision']}.json", json_bytes(manifest))
+                revision_dir = self.root / "public" / f"r{manifest['revision']}" / public_sha256
+                self._archive(revision_dir / "update.zip", archive)
+                self._archive(revision_dir / "manifest.json", manifest_json)
             token = uuid.uuid4().hex
             new_state = {"app_series": self.version, "baseline_sha256": self.baseline_sha256,
                          "member_index_revision": member_revision,
                          "revision": manifest["revision"], "files": file_hashes(candidate),
+                         "public_sha256": public_sha256,
                          "generation": token, "installed_at": datetime.now(timezone.utc).isoformat(),
                          "member": {**(member_metadata or {}), "files": file_hashes(members),
                                     "registries": {name: value.decode("utf-8") for name, value in members.items()
@@ -204,8 +285,10 @@ class UpdateStore:
                 if preview:
                     return ()
                 if any(new_state[key] != previous_state.get(key)
-                       for key in ("app_series", "baseline_sha256", "revision", "files", "member", "member_index_revision")):
-                    self._write(self.updates / "state.json", json_bytes(new_state))
+                       for key in ("app_series", "baseline_sha256", "revision", "public_sha256", "files", "member", "member_index_revision")):
+                    new_state["previous_selection"] = {key: previous_state.get(key) for key in
+                                                        ("revision", "public_sha256", "member")}
+                    self._write(self.state_path, json_bytes(new_state))
                 return ()
             owner = prepared or tempfile.TemporaryDirectory(prefix="candidate-", dir=self.updates)
             temporary = Path(owner.name)
@@ -224,12 +307,14 @@ class UpdateStore:
                         retain_candidate(owner)
                         retained = True
                     return changed
-                self._write(journal, json_bytes({"token": token, "previous_state": previous_state}))
+                self._write(journal, json_bytes({"token": token, "app_series": self.version, "previous_state": previous_state}))
                 try:
                     self.system.rename(retired)
                     temporary.rename(self.system)
                     activate(self.system, changed)
-                    self._write(self.updates / "state.json", json_bytes(new_state))
+                    new_state["previous_selection"] = {key: previous_state.get(key) for key in
+                                                        ("revision", "public_sha256", "member")}
+                    self._write(self.state_path, json_bytes(new_state))
                     journal.unlink()
                 except BaseException:
                     self._recover()

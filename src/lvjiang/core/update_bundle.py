@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
 PUBLIC_INDEX_URL = "https://wanda1416.github.io/lvjiang/public/index.json"
 MEMBER_INDEX_URL = "https://wanda1416.github.io/lvjiang/member/index.json"
 MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
@@ -142,7 +143,7 @@ def _hash(value: Any) -> bool:
 
 
 def parse_manifest(data: Any) -> dict[str, Any]:
-    if not isinstance(data, dict) or data.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(data, dict) or data.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise ValueError("不支持的公开配置清单协议")
     version = data.get("app_series")
     if not isinstance(version, str) or series(version) != version:
@@ -156,16 +157,29 @@ def parse_manifest(data: Any) -> dict[str, Any]:
     if not isinstance(files, dict) or not all(_hash(value) for value in files.values()):
         raise ValueError("配置文件摘要表无效")
     validate_names(files)
+    deleted = data.get("delete_files")
+    if not isinstance(deleted, list) or not all(isinstance(name, str) for name in deleted) \
+            or len(deleted) != len(set(deleted)):
+        raise ValueError("配置删除文件清单无效")
+    validate_names(deleted)
+    validate_names([*files, *deleted])
+    ancestry = data.get("ancestors", {})
+    if not isinstance(ancestry, dict) or any(
+            not isinstance(key, str) or not re.fullmatch(r"[1-9]\d*", key) or int(key) >= revision or not _hash(value)
+            for key, value in ancestry.items()):
+        raise ValueError("公开修订来源摘要无效")
     return data
 
 
 def make_manifest(version: str, revision: int, baseline: Mapping[str, bytes],
-                  files: Mapping[str, bytes]) -> tuple[dict[str, Any], bytes]:
+                  files: Mapping[str, bytes], *, delete_files: tuple[str, ...] = (),
+                  ancestors: Mapping[str, str] | None = None) -> tuple[dict[str, Any], bytes]:
     archive = pack(files)
     manifest = parse_manifest({
-        "schema_version": SCHEMA_VERSION, "app_series": version, "revision": revision,
+        "schema_version": MANIFEST_SCHEMA_VERSION, "app_series": version, "revision": revision,
         "baseline_sha256": tree_digest(baseline), "archive_sha256": digest(archive),
-        "files": file_hashes(files),
+        "files": file_hashes(files), "delete_files": sorted(delete_files),
+        "ancestors": dict(ancestors or {}),
     })
     return manifest, archive
 

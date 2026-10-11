@@ -13,7 +13,6 @@ from .._version import __version__
 from .fs_util import atomic_write_bytes
 from .update_bundle import (
     json_bytes,
-    pack,
     read_tree,
     series,
     tree_digest,
@@ -94,6 +93,9 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 if on_applied:
                     on_applied()
                 write_baseline_identity(target, __version__)
+                # 手机初始化在 PC 同步之前保存可信预置；构建安装包不重复携带归档。
+                from .config.update_store import UpdateStore
+                UpdateStore(config, __version__, digest).baseline()
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 # 只记录最后安装的官方代次，不代表当前 system 来自 PC 还是 APK。
                 pending = stage / "preset.json"
@@ -124,11 +126,5 @@ def write_baseline_identity(system_dir: Path, app_version: str) -> dict:
     version = series(app_version)
     identity = {"app_series": version, "sha256": tree_digest(files)}
     root = system_dir.parent
-    archive = root / "updates" / f"v{version}" / "r0.zip"
-    payload = pack(files)
-    if archive.exists() and archive.read_bytes() != payload:
-        raise ValueError("同一应用系列出现不同预置基底，请提升第三段版本号")
-    if not archive.exists():
-        atomic_write_bytes(archive, payload, prefix=".baseline-", fsync=True)
     atomic_write_bytes(root / "system-baseline.json", json_bytes(identity), prefix=".baseline-", fsync=True)
     return identity

@@ -29,6 +29,21 @@ def test_package_is_deterministic_and_only_contains_official_configuration(offic
         assert set(package.namelist()) == {"system/app.yaml", "system/ocr.yaml", "system/layouts.yaml", "system/workflows/task.wf", "manifest.json"}
 
 
+def test_packaging_only_writes_identity_and_startup_creates_r0(official, monkeypatch):
+    from lvjiang.core.config import remote
+    from lvjiang.core.config.update_store import UpdateStore
+    from lvjiang.core.system_preset import write_baseline_identity
+    from lvjiang.core.update_bundle import read_tree, unpack
+    identity = write_baseline_identity(official, "0.15.0")
+    store = UpdateStore(official.parent, "0.15.0", identity["sha256"])
+    baseline = store.root / "r0.zip"
+    assert not baseline.exists()
+    monkeypatch.setattr(remote, "_installed_store", lambda: store)
+    remote.recover_installation()
+    assert unpack(baseline.read_bytes()) == read_tree(official)
+    assert store._state()["revision"] == 0
+
+
 def test_upgrade_preserves_parameters_database_and_pc_sync_until_new_preset(official, tmp_path, monkeypatch):
     archive = tmp_path / "preset.zip"
     build_system_preset(official, archive)

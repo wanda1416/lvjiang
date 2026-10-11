@@ -23,12 +23,12 @@ def test_exact_series_selection_and_consistent_artifacts():
 
     def fetch(url, **kwargs):
         calls.append(url)
-        return files[url], "", False
+        return files[url.split("?", 1)[0]], "", False
 
     result = fetch_public_update("0.15.0.1", fetch=fetch)
     assert result is not None and result.archive == archive
     calls.clear()
-    assert fetch_public_update("0.15.1", fetch=fetch) is None
+    assert fetch_public_update("0.15.1", fetch=fetch).manifest is None
     assert calls == [f"{root}/index.json"]
     files[f"{root}/v0.15.0/r2/update.zip"] = b"partial upload"
     with pytest.raises(ValueError, match="摘要"):

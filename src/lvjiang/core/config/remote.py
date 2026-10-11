@@ -141,10 +141,13 @@ def recover_installation() -> None:
         store.recover()
         from .protected_remote import authorized
         member = store._state().get("member", {})
-        if member.get("files") and not authorized(member):
+        invalid = member.get("files") and not authorized(member)
+        if invalid:
             # 在读取场景/工作流之前撤下失效会员内容，不依赖网络是否可用。
             store.install(member_files={}, member_metadata={},
                           validate=lambda _path: None, activate=lambda *_args: None)
+        else:
+            store.install(validate=lambda _path: None, activate=lambda *_args: None)
 
 
 def build_sync_job() -> SyncJob:
@@ -175,16 +178,23 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
     public = None
     member = None
     errors = []
+    store = UpdateStore(config, job.app_version, job.baseline_sha256)
+    try:
+        store.prune_archives()
+    except (OSError, ValueError) as error:
+        logger.warning("[在线配置] 归档暂未清理，继续本轮同步: {}", error)
     if job.enabled:
         try:
-            public = fetch_public_update(job.app_version, fetch=_fetch_bytes, timeout=timeout)
+            public = fetch_public_update(job.app_version, fetch=_fetch_bytes, timeout=timeout,
+                                         cache_index=lambda raw: store.cache_index("public", raw))
         except Exception as error:
             errors.append(f"公开更新未获取，保留已安装版本: {error}")
     if not job.enabled:
         member = MemberDownload({}, {})
     elif job.member_access_known:
         try:
-            member = fetch_member_update(job.protected, job.app_version, fetch=_fetch_bytes, timeout=timeout)
+            member = fetch_member_update(job.protected, job.app_version, fetch=_fetch_bytes, timeout=timeout,
+                                         cache_index=lambda raw: store.cache_index("member", raw))
         except Exception as error:
             errors.append(f"会员更新未获取，保留已安装版本: {error}")
     if public is None and member is None:
@@ -203,7 +213,10 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
         validate_candidate(path, config / "local", job.app_ids)
         validated = tree_digest(read_tree(path))
     store.install(public.manifest if public else None, public.archive if public else None,
-                  reset_public=not job.enabled, member_files=member.files if member else None,
+                  manifest_json=public.manifest_json if public and public.manifest_json else None,
+                  index_snapshots=_index_snapshots(public, member),
+                  reset_public=not job.enabled or bool(public is not None and public.manifest is None),
+                  member_files=member.files if member else None,
                   member_metadata=member.metadata if member else None,
                   preview=True, retain_candidate=retain, validate=validate, activate=lambda *_: None)
     if stamp != _local_stamp(config / "local"):
@@ -248,8 +261,7 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
         key_id = member.metadata.get("key_id")
         if not isinstance(key_id, str) or not valid_key_id(key_id):
             raise ValueError("会员归档标识非法")
-        with store.locked():
-            store._archive(store.updates / "member" / f"{key_id}.bin", member.encrypted)
+        store.cache_member(member.metadata, member.manifest_json, member.encrypted)
     public = result.public if enabled else None
     from ..update_bundle import read_tree, tree_digest
     def validate(path):
@@ -257,7 +269,9 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
             raise RemoteConfigError("候选或本地配置已变化，保留现有配置，请重新同步")
     changed = store.install(
         public.manifest if public else None, public.archive if public else None,
-        reset_public=not enabled,
+        manifest_json=public.manifest_json if public and public.manifest_json else None,
+        index_snapshots=_index_snapshots(public, member),
+        reset_public=not enabled or bool(public is not None and public.manifest is None),
         member_files=member.files if member is not None else None,
         member_metadata=member.metadata if member is not None else None,
         prepared=result.candidate,
@@ -272,3 +286,8 @@ def sync_now(*, timeout: float = 10.0) -> SyncResult:
     result = run_sync(build_sync_job(), timeout=timeout)
     apply_outcome(result)
     return result
+
+
+def _index_snapshots(public: PublicDownload | None, member: MemberDownload | None) -> dict[str, bytes]:
+    return {channel: download.index_json for channel, download in (("public", public), ("member", member))
+            if download is not None and download.index_json}

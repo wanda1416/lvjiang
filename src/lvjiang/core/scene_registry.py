@@ -9,7 +9,6 @@ from dataclasses import replace
 
 from loguru import logger
 
-from ..i18n import tr
 from .config.resolver import get_resolver, get_root_resolver
 from .scene_config import load_scene_manifest
 from .scene_definition import SceneRegistry
@@ -90,9 +89,9 @@ def _rebuild_scene_globals():
 # 初始化
 _rebuild_scene_globals()
 
-# 启动校验：至少存在一个分组
+# 配置可暂时没有场景分组，不能在模块导入阶段阻断应用启动。
 if not _registry.get_groups():
-    raise RuntimeError(tr("scenes.yaml 必须至少包含一个场景分组，请检查配置"))
+    logger.warning("未加载场景分组，场景相关功能暂不可用；请检查 scenes.yaml，不影响程序启动")
 
 
 def get_registry() -> SceneRegistry:

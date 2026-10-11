@@ -32,7 +32,7 @@ def test_cumulative_unknown_files_and_local_survive(tmp_path):
     update = {"app.yaml": b"delay: 2", "new/.future": b"\xff\x00"}
     manifest, archive = make_manifest("0.15.0", 5, base, update)
     seen = []
-    store.install(manifest, archive, validate=lambda path: None,
+    store.install(manifest, archive,
                   activate=lambda path, changed: seen.append((path / "app.yaml").read_bytes()))
     assert seen == [b"delay: 2"]
     assert (tmp_path / "system/new/.future").read_bytes() == b"\xff\x00"
@@ -41,12 +41,12 @@ def test_cumulative_unknown_files_and_local_survive(tmp_path):
     assert (tmp_path / f"updates/v0.15.0/public/r5/{digest(json_bytes(manifest))}/update.zip").read_bytes() == archive
     # 下一修订撤回全部覆盖，无需反向补丁链。
     manifest, archive = make_manifest("0.15.0", 6, base, {})
-    store.install(manifest, archive, validate=lambda path: None, activate=lambda *args: None)
+    store.install(manifest, archive, activate=lambda *args: None)
     assert (tmp_path / "system/app.yaml").read_bytes() == base["app.yaml"]
     assert not (tmp_path / "system/new/.future").exists()
 
 
-def test_activation_failure_restores_disk_and_memory(tmp_path):
+def test_activation_failure_does_not_revert_committed_installation(tmp_path):
     base = {"app.yaml": b"old"}
     write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
@@ -58,10 +58,10 @@ def test_activation_failure_restores_disk_and_memory(tmp_path):
         if activated[-1] == b"new":
             raise RuntimeError("模拟内存切换失败")
 
-    with pytest.raises(RuntimeError, match="内存切换失败"):
-        store.install(manifest, archive, validate=lambda path: None, activate=activate)
-    assert activated == [b"new", b"old"]
-    assert (tmp_path / "system/app.yaml").read_bytes() == b"old"
+    store.install(manifest, archive, activate=activate)
+    assert activated == [b"new"]
+    assert (tmp_path / "system/app.yaml").read_bytes() == b"new"
+    assert store._state()["revision"] == 1
     assert not (tmp_path / "updates/transaction.json").exists()
 
 
@@ -74,7 +74,7 @@ def test_untrusted_baseline_and_wrong_series_are_rejected(tmp_path):
     assert not (tmp_path / "updates/v0.15.0/r0.zip").exists()
     manifest, archive = make_manifest("0.15.1", 1, base, {})
     with pytest.raises(ValueError, match="系列"):
-        store.install(manifest, archive, validate=lambda path: None, activate=lambda *args: None)
+        store.install(manifest, archive, activate=lambda *args: None)
     assert series("0.15.0.3") == "0.15.0"
     assert series("0.15.0rc1") == "0.15.0"
 
@@ -154,7 +154,7 @@ def test_task_snapshot_keeps_lazy_files_while_next_task_sees_update(tmp_path, mo
     engine = Engine()
     with configuration_snapshot():
         frozen = resolver.get_resolver()
-        store.install(manifest, archive, validate=lambda path: None, activate=lambda *args: None)
+        store.install(manifest, archive, activate=lambda *args: None)
         assert frozen.resolve_read("templates/example.png").read_bytes() == b"old image"
         assert frozen.resolve_read("workflows/subcall/task.wf").read_bytes() == b"old"
         # 批量外层已有快照，内层引擎仍须用其重新构造布局与重定位源脚本。
@@ -173,10 +173,10 @@ def test_public_revision_preserves_member_registry_fragments(tmp_path):
     manifest, archive = make_manifest("0.15.0", 1, base, {})
     member = {"scenes.yaml": b"scenes:\n  basic:\n    items: [member]\n", "scenes/member.yaml": b"key: member"}
     store.install(manifest, archive, member_files=member,
-                  validate=lambda path: None, activate=lambda *args: None)
+                  activate=lambda *args: None)
     public = {"scenes.yaml": base["scenes.yaml"].replace(b"[base]", b"[base, new]")}
     manifest, archive = make_manifest("0.15.0", 2, base, public)
-    store.install(manifest, archive, validate=lambda path: None, activate=lambda *args: None)
+    store.install(manifest, archive, activate=lambda *args: None)
     import yaml
     data = yaml.safe_load((tmp_path / "system/scenes.yaml").read_text(encoding="utf-8"))
     assert data["scenes"]["basic"]["items"] == ["base", "new", "member"]
@@ -190,16 +190,16 @@ def test_member_dependency_and_authorization_survive_index_rollback(tmp_path, mo
     metadata = {"config_version": 4, "public_revisions": {"0.15.0": 2}}
     with pytest.raises(ValueError, match="至少 r2"):
         store.install(member_files=member, member_metadata=metadata,
-                      validate=lambda p: None, activate=lambda *a: None)
+                      activate=lambda *a: None)
     assert not (tmp_path / "system/member.bin").exists()
     manifest, archive = make_manifest("0.15.0", 2, base, {})
     store.install(manifest, archive, member_files=member, member_metadata=metadata,
-                  validate=lambda p: None, activate=lambda *a: None)
+                  activate=lambda *a: None)
     store.install(member_files={}, member_metadata={"config_version": 3},
-                  validate=lambda p: None, activate=lambda *a: None)
+                  activate=lambda *a: None)
     assert not (tmp_path / "system/member.bin").exists()
     store.install(member_files=member, member_metadata={**metadata, "config_version": 3},
-                  validate=lambda p: None, activate=lambda *a: None)
+                  activate=lambda *a: None)
     assert (tmp_path / "system/member.bin").read_bytes() == b"member"
     from lvjiang.core.config import protected_remote, resolver
     from lvjiang.core.config.runtime_snapshot import configuration_snapshot
@@ -221,7 +221,7 @@ def test_rollback_republish_and_manifest_deletion_rebuild_from_r0(tmp_path):
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
     def install(revision, files, deleted=()):
         manifest, archive = make_manifest("0.15.0", revision, base, files, delete_files=deleted)
-        store.install(manifest, archive, validate=lambda p: None, activate=lambda *a: None)
+        store.install(manifest, archive, activate=lambda *a: None)
         return manifest
     install(1, {"base.bin": b"first"})
     old = install(2, {"base.bin": b"second"}, ("old.bin",))
@@ -232,7 +232,7 @@ def test_rollback_republish_and_manifest_deletion_rebuild_from_r0(tmp_path):
     new = install(2, {"base.bin": b"replacement"})
     assert digest(json_bytes(old)) != digest(json_bytes(new))
     assert len(list((store.root / "public/r2").iterdir())) == 2
-    store.install(reset_public=True, validate=lambda p: None, activate=lambda *a: None)
+    store.install(reset_public=True, activate=lambda *a: None)
     assert (tmp_path / "system/base.bin").read_bytes() == b"base"
     assert store._state()["revision"] == 0
     store.prune_archives()
@@ -252,17 +252,17 @@ def test_manifest_rejects_unsafe_conflicting_deletion_and_member_wrong_digest(tm
     with pytest.raises(ValueError, match="摘要"):
         store.install(manifest, archive, member_files={"member.bin": b"member"},
                       member_metadata={"public_manifests": {"0.15.0": "0" * 64}},
-                      validate=lambda p: None, activate=lambda *a: None)
+                      activate=lambda *a: None)
     assert (tmp_path / "system/base.bin").read_bytes() == b"base"
     required = digest(json_bytes(manifest))
     metadata = {"public_revisions": {"0.15.0": 2}, "public_manifests": {"0.15.0": required}}
     member = {"member.bin": b"member"}
     store.install(manifest, archive, member_files=member, member_metadata=metadata,
-                  validate=lambda p: None, activate=lambda *a: None)
+                  activate=lambda *a: None)
     newer, newer_archive = make_manifest("0.15.0", 3, base, {}, ancestors={"2": required})
-    store.install(newer, newer_archive, validate=lambda p: None, activate=lambda *a: None)
+    store.install(newer, newer_archive, activate=lambda *a: None)
     assert (store.system / "member.bin").read_bytes() == b"member"
     replacement, replacement_archive = make_manifest("0.15.0", 2, base, {"base.bin": b"different"})
     with pytest.raises(ValueError, match="摘要"):
-        store.install(replacement, replacement_archive, validate=lambda p: None, activate=lambda *a: None)
+        store.install(replacement, replacement_archive, activate=lambda *a: None)
     assert store._state()["revision"] == 3

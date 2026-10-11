@@ -49,17 +49,6 @@ def configuration_roots(system: Path) -> set[str]:
     return roots
 
 
-@contextmanager
-def using_configuration(resolver) -> Iterator[RuntimeSnapshot]:
-    """校验候选的只读上下文，不替换全局解析器或主页面配置。"""
-    snapshot = RuntimeSnapshot(resolver, resolver.system_dir, resolver.local_dir)
-    token = _current.set(snapshot)
-    try:
-        yield snapshot
-    finally:
-        _current.reset(token)
-
-
 def scoped_value(key: object, factory: Callable[[], T]) -> T:
     snapshot = _current.get()
     if snapshot is None:
@@ -113,7 +102,7 @@ def configuration_snapshot() -> Iterator[RuntimeSnapshot | None]:
             # 快照不能让新任务绕过到期/换码；只撤会员，不依赖网络，不在工作线程触发 UI。
             # 本任务从下面的独立目录加载；其他实例/UI 通过安装代次刷新。
             store.install(member_files={}, member_metadata={},
-                          validate=lambda _path: None, activate=lambda *_args: None)
+                          activate=lambda *_args: None)
     with tempfile.TemporaryDirectory(prefix="lvjiang-task-config-") as temporary:
         root = Path(temporary)
         with store.locked():

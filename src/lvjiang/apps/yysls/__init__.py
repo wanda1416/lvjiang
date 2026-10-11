@@ -31,27 +31,6 @@ def _reload_configuration() -> None:
     invalidate_damage_model_cache()
 
 
-def _validate_configuration() -> None:
-    from .config.manager import get_game_config
-    from .core.attr_model.manager import get_attr_model_manager
-    from .core.damage.manager import get_damage_model_manager
-    from .core.graduation.model_registry import list_graduation_models, load_model
-    from .core.tuning_rules.manager import (
-        get_tune_config_manager,
-        get_tuning_group_manager,
-        get_tuning_rule_manager,
-    )
-    get_game_config()
-    get_tune_config_manager()
-    get_tuning_group_manager()
-    for manager in (get_attr_model_manager(), get_damage_model_manager(), get_tuning_rule_manager()):
-        errors = manager.errors() if callable(manager.errors) else manager.errors
-        if errors:
-            raise ValueError("领域配置加载失败: " + str(errors))
-    for model in list_graduation_models():
-        load_model(model.rel_path)
-
-
 def _offline_session_files() -> tuple[str, ...]:
     from .config.session_node import DOCUMENT_FILES
 
@@ -142,7 +121,6 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.config.merge_policy",
     ],
     configuration_reload_callbacks=[_reload_configuration],
-    configuration_validation_callbacks=[_validate_configuration],
     offline_configuration_patterns=(
         "yysls/tune_config.yaml", "yysls/game_config/*.yaml",
         "yysls/tuning_rules/*.yaml", "yysls/gear_sets/*.yaml",

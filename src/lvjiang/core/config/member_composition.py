@@ -1,56 +1,48 @@
-"""会员共享登记表只能补充公开内容；实体不能靠下载先后决定归属。"""
+"""r0/public 后叠加会员文件；共享登记表按 key 合并，不预检业务内容。"""
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
 
 import yaml
+from loguru import logger
+
+from .resolver import merge_doc, merge_registry_list
 
 REGISTRIES = frozenset({"scenes.yaml", "layouts.yaml"})
 
 
-def _new(value: Any, path: str) -> Any:
-    if isinstance(value, dict):
-        if "__added__" in value:
-            return _add([], value, path)
-        if any(key.startswith("__") for key in value):
-            raise ValueError(f"会员登记表包含不支持的删除或排序指令: {path}")
-        return {key: _new(item, f"{path}.{key}") for key, item in value.items()}
-    return deepcopy(value)
-
-
-def _add(base: Any, addition: Any, path: str) -> Any:
-    if isinstance(base, list) and isinstance(addition, dict):
-        if set(addition) - {"__added__", "__order__", "__removed__"} or addition.get("__removed__"):
-            raise ValueError(f"会员包不能移除公开登记项: {path}")
-        addition = addition.get("__added__", [])
+def _merge(base: Any, addition: Any) -> Any:
+    if isinstance(addition, dict) and any(key in addition for key in ("__added__", "__removed__", "__order__")):
+        return merge_registry_list(base if isinstance(base, list) else [], addition)
     if isinstance(base, list) and isinstance(addition, list):
         return base + [item for item in addition if item not in base]
-    if isinstance(base, dict) and isinstance(addition, dict):
-        result = deepcopy(base)
+    if isinstance(addition, dict):
+        original = base if isinstance(base, dict) else {}
+        result = merge_doc(original, addition)
         for key, value in addition.items():
-            if key == "content_version":
+            if key == "__deleted__":
                 continue
-            if key.startswith("__"):
-                raise ValueError(f"会员登记表不能修改公开条目顺序或删除条目: {path}")
-            result[key] = _add(result[key], value, f"{path}.{key}") if key in result else _new(value, f"{path}.{key}")
+            result[key] = _merge(original.get(key), value)
         return result
-    if base != addition:
-        raise ValueError(f"公开与会员登记项冲突: {path}")
-    return deepcopy(base)
+    return deepcopy(addition)
 
 
 def compose(official: dict[str, bytes], member: dict[str, bytes]) -> dict[str, bytes]:
     result = dict(official)
     for name, payload in member.items():
         if name in REGISTRIES:
-            base = yaml.safe_load(result[name].decode("utf-8")) if name in result else {}
-            addition = yaml.safe_load(payload.decode("utf-8"))
-            if not isinstance(base, dict) or not isinstance(addition, dict):
-                raise ValueError(f"登记表必须是映射: {name}")
-            result[name] = yaml.safe_dump(_add(base, addition, name), allow_unicode=True).encode("utf-8")
-        elif name not in result:
+            try:
+                base = yaml.safe_load(result[name].decode("utf-8")) if name in result else {}
+                addition = yaml.safe_load(payload.decode("utf-8"))
+                if isinstance(base, dict) and isinstance(addition, dict):
+                    result[name] = yaml.safe_dump(_merge(base, addition), allow_unicode=True).encode("utf-8")
+                    continue
+            except (yaml.YAMLError, UnicodeError, TypeError, ValueError):
+                pass
+            # 无法合并也不拒绝整包：保留后层原文，问题交给该文件的消费者。
+            logger.warning("登记表无法按 key 合并，按会员文件原文覆盖保存，仅影响对应配置：{}", name)
             result[name] = payload
         else:
-            raise ValueError(f"公开与会员文件归属冲突: {name}")
+            result[name] = payload
     return result

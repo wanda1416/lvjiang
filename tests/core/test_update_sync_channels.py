@@ -35,7 +35,7 @@ def test_unknown_authorization_does_not_withdraw_member(tmp_path, monkeypatch):
     assert not result.errors
 
 
-def test_background_validation_then_activation_and_other_instance_refresh(tmp_path, monkeypatch):
+def test_background_preparation_then_activation_and_other_instance_refresh(tmp_path, monkeypatch):
     from lvjiang.core.config import protected_remote, update_activation
     from lvjiang.core.config.update_download import PublicDownload
     from lvjiang.core.config.update_observer import InstallationObserver
@@ -54,23 +54,15 @@ def test_background_validation_then_activation_and_other_instance_refresh(tmp_pa
     monkeypatch.setattr(remote, "fetch_member_update", lambda *a, **kw: MemberDownload({}, {}))
     monkeypatch.setattr(remote, "is_enabled", lambda: True)
     monkeypatch.setattr(protected_remote, "snapshot", lambda: None)
-    checks = []
-    monkeypatch.setattr(update_activation, "validate_candidate",
-                        lambda path, *a: checks.append((path / "opaque.bin").read_bytes()))
     activated = []
     monkeypatch.setattr(update_activation, "activate_configuration", lambda path, changed: activated.append(changed))
     observer = InstallationObserver(UpdateStore(tmp_path, "0.15.0", tree_digest(baseline)))
     job = remote.SyncJob(tmp_path, "0.15.0", tree_digest(baseline))
     result = remote.run_sync(job)
-    assert checks == [b"new"]
+    assert result.candidate is not None
     assert (system / "opaque.bin").read_bytes() == b"old"
-    # 下载与安装之间发生本地编辑，不能使用过时校验结论。
+    # 安装不审查或修改 local，本地编辑不能阻断官方包安装。
     (local / "app.yaml").write_text("value: 99", encoding="utf-8")
-    with pytest.raises(remote.RemoteConfigError, match="已变化"):
-        remote.apply_outcome(result)
-    assert (system / "opaque.bin").read_bytes() == b"old"
-    assert not activated
-    result = remote.run_sync(job)
     (local / "diagnostics").mkdir()
     (local / "diagnostics/runtime.log").write_text("task is running", encoding="utf-8")
     assert remote.apply_outcome(result) == ("opaque.bin",)
@@ -82,7 +74,6 @@ def test_background_validation_then_activation_and_other_instance_refresh(tmp_pa
     assert (local / "app.yaml").read_text(encoding="utf-8") == "value: 99"
     # 同修订再次同步不重新解析或切换目录。
     remote.apply_outcome(remote.run_sync(job))
-    assert checks == [b"new", b"new"]
     assert activated == [("opaque.bin",)]
 
 
@@ -97,10 +88,9 @@ def test_successful_empty_index_withdraws_public_but_failure_preserves_it(tmp_pa
     (tmp_path / "system/opaque.bin").write_bytes(b"base")
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
     manifest, archive = make_manifest("0.15.0", 2, base, {"opaque.bin": b"updated"})
-    store.install(manifest, archive, validate=lambda p: None, activate=lambda *a: None)
+    store.install(manifest, archive, activate=lambda *a: None)
     monkeypatch.setattr(remote, "is_enabled", lambda: True)
     monkeypatch.setattr(protected_remote, "snapshot", lambda: None)
-    monkeypatch.setattr(update_activation, "validate_candidate", lambda *a: None)
     monkeypatch.setattr(update_activation, "activate_configuration", lambda *a: None)
     def unavailable(*a, **kw):
         raise OSError("offline")

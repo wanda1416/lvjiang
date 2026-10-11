@@ -31,7 +31,6 @@ class SyncJob:
     enabled: bool = True
     protected: ProtectedAccess | None = field(default=None, repr=False)
     member_access_known: bool = True
-    app_ids: tuple[str, ...] = ()
 
     @property
     def is_empty(self) -> bool:
@@ -45,23 +44,7 @@ class SyncResult:
     member: MemberDownload | None = None
     errors: tuple[str, ...] = ()
     performed: bool = True
-    validated_sha256: str = ""
-    local_stamp: tuple[tuple[str, int, int], ...] = ()
     candidate: tempfile.TemporaryDirectory[str] | None = field(default=None, repr=False, compare=False)
-
-
-def _local_stamp(root: Path) -> tuple[tuple[str, int, int], ...]:
-    """只对实际配置取印记，任务写日志或 Git 更新不能让候选校验作废。"""
-    from .runtime_snapshot import configuration_roots
-    files: list[Path] = []
-    for name in configuration_roots(root.parent / "system"):
-        source = root / name
-        if source.is_dir():
-            files.extend(path for path in source.rglob("*") if path.is_file())
-        elif source.is_file():
-            files.append(source)
-    return tuple((path.relative_to(root).as_posix(), stat.st_mtime_ns, stat.st_size)
-                 for path in sorted(files) for stat in (path.stat(),))
 
 
 def _fetch_bytes(url: str, *, max_bytes: int, timeout: float,
@@ -145,13 +128,12 @@ def recover_installation() -> None:
         if invalid:
             # 在读取场景/工作流之前撤下失效会员内容，不依赖网络是否可用。
             store.install(member_files={}, member_metadata={},
-                          validate=lambda _path: None, activate=lambda *_args: None)
+                          activate=lambda *_args: None)
         else:
-            store.install(validate=lambda _path: None, activate=lambda *_args: None)
+            store.install(activate=lambda *_args: None)
 
 
 def build_sync_job() -> SyncJob:
-    from ...apps import get_registered_app_ids
     from ..update import get_version
     from .protected_remote import snapshot
     store = _installed_store()
@@ -165,8 +147,7 @@ def build_sync_job() -> SyncJob:
         access, known = None, False
     return SyncJob(config=store.config, app_version=get_version(),
                    baseline_sha256=store.baseline_sha256, enabled=is_enabled(),
-                   protected=access, member_access_known=known,
-                   app_ids=get_registered_app_ids())
+                   protected=access, member_access_known=known)
 
 
 def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
@@ -199,30 +180,19 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
             errors.append(f"会员更新未获取，保留已安装版本: {error}")
     if public is None and member is None:
         return SyncResult(job, errors=tuple(errors))
-    from ..update_bundle import read_tree, tree_digest
-    from .update_activation import validate_candidate
     store = UpdateStore(config, job.app_version, job.baseline_sha256)
-    stamp = _local_stamp(config / "local")
-    validated = ""
     candidate = None
     def retain(owner):
         nonlocal candidate
         candidate = owner
-    def validate(path):
-        nonlocal validated
-        validate_candidate(path, config / "local", job.app_ids)
-        validated = tree_digest(read_tree(path))
     store.install(public.manifest if public else None, public.archive if public else None,
                   manifest_json=public.manifest_json if public and public.manifest_json else None,
                   index_snapshots=_index_snapshots(public, member),
                   reset_public=not job.enabled or bool(public is not None and public.manifest is None),
                   member_files=member.files if member else None,
                   member_metadata=member.metadata if member else None,
-                  preview=True, retain_candidate=retain, validate=validate, activate=lambda *_: None)
-    if stamp != _local_stamp(config / "local"):
-        raise RemoteConfigError("校验期间本地配置已变化，请重新同步")
-    return SyncResult(job, public, member, tuple(errors), validated_sha256=validated,
-                      local_stamp=stamp, candidate=candidate)
+                  preview=True, retain_candidate=retain, activate=lambda *_: None)
+    return SyncResult(job, public, member, tuple(errors), candidate=candidate)
 
 
 def apply_outcome(result: SyncResult) -> tuple[str, ...]:
@@ -263,10 +233,6 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
             raise ValueError("会员归档标识非法")
         store.cache_member(member.metadata, member.manifest_json, member.encrypted)
     public = result.public if enabled else None
-    from ..update_bundle import read_tree, tree_digest
-    def validate(path):
-        if tree_digest(read_tree(path)) != result.validated_sha256 or _local_stamp(config / "local") != result.local_stamp:
-            raise RemoteConfigError("候选或本地配置已变化，保留现有配置，请重新同步")
     changed = store.install(
         public.manifest if public else None, public.archive if public else None,
         manifest_json=public.manifest_json if public and public.manifest_json else None,
@@ -275,7 +241,6 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
         member_files=member.files if member is not None else None,
         member_metadata=member.metadata if member is not None else None,
         prepared=result.candidate,
-        validate=validate,
         activate=activate_configuration)
     if changed:
         logger.info("[在线配置] 已生效：{} 个文件；运行中的任务继续使用启动快照", len(changed))

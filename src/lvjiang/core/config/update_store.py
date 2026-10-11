@@ -190,10 +190,9 @@ class UpdateStore:
         preview: bool = False,
         retain_candidate: Callable[[tempfile.TemporaryDirectory[str]], None] | None = None,
         prepared: tempfile.TemporaryDirectory[str] | None = None,
-        validate: Callable[[Path], None],
         activate: Callable[[Path, tuple[str, ...]], None],
     ) -> tuple[str, ...]:
-        """候选校验后换盘及内存；activate 失败时恢复并再次通知旧内存视图。
+        """核验包完整性后提交文件；消费者刷新失败不能撤销已提交安装。
 
         member_files=None 表示保留已安装会员内容；空映射表示明确撤回。
         授权和会员清单检查由调用方完成，不能把网络失败转换为空映射。
@@ -305,7 +304,6 @@ class UpdateStore:
                         self._write(temporary / name, content)
                 elif file_hashes(read_tree(temporary)) != new_state["files"]:
                     raise ValueError("已准备配置与当前安装基底或候选不一致，请重新同步")
-                validate(temporary)
                 if preview:
                     if retain_candidate is not None:
                         retain_candidate(owner)
@@ -316,15 +314,18 @@ class UpdateStore:
                 try:
                     self.system.rename(retired)
                     temporary.rename(self.system)
-                    activate(self.system, changed)
                     new_state["previous_selection"] = {key: previous_state.get(key) for key in
                                                         ("revision", "public_sha256", "member")}
                     self._write(self.state_path, formatted_json_bytes(new_state))
                     journal.unlink()
                 except BaseException:
                     self._recover()
-                    activate(self.system, changed)
                     raise
+                try:
+                    activate(self.system, changed)
+                except Exception as error:
+                    from loguru import logger
+                    logger.warning("配置已安装，消费者刷新失败，不回滚配置文件：{}", error)
                 # 任务持有独立快照，不引用被替换的目录。只回收本事务创建的旧目录。
                 try:
                     shutil.rmtree(retired)

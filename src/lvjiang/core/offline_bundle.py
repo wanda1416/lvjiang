@@ -19,6 +19,7 @@ import yaml
 from .._version import __version__
 from ..apps import get_registered_app_ids, load_app
 from .config.resolver import ConfigResolver
+from .json_files import formatted_json, formatted_json_bytes
 from .layout_config import load_layout_doc
 from .user_config import is_valid_username
 
@@ -114,14 +115,14 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                     session = json.loads(data)
                     session.setdefault("actives", {}).update(user=username, layout=layout)
                     session.setdefault("settings", {})["env"] = "android"
-                    data = json.dumps(session, ensure_ascii=False).encode("utf-8")
+                    data = formatted_json_bytes(session)
                 add("config/" + rel.as_posix(), data)
             for snapshot in snapshots:
                 add("config/session/" + snapshot.name, snapshot.read_bytes())
             # 不携带 PC 旧的同步状态；此记录只属于这次单向快照。
             summary = {key: value for key, value in manifest.items() if key != "files"}
-            add("config/session/offline.json", json.dumps(summary, ensure_ascii=False).encode())
-            archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
+            add("config/session/offline.json", formatted_json_bytes(summary))
+            archive.writestr("manifest.json", formatted_json_bytes(manifest))
     if destination.stat().st_size > MAX_BUNDLE_BYTES:
         raise ValueError("同步包超过 256 MiB，请移除无关的大文件")
     return summary
@@ -187,7 +188,7 @@ def install_offline_bundle(
         old_interface = target / "session/interface.json"
         mobile_interface = json.loads(old_interface.read_text(encoding="utf-8")) if old_interface.is_file() else {}
         interface_data["batch"] = mobile_interface.get("batch", {})
-        incoming_interface.write_text(json.dumps(interface_data, ensure_ascii=False), encoding="utf-8")
+        incoming_interface.write_text(formatted_json(interface_data), encoding="utf-8")
         # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
         # 预置归档；它不成为新 r0，也不携带 PC 的更新身份、会员凭据或归档。
         for name in ("updates", "system-baseline.json"):
@@ -265,7 +266,7 @@ def _preserve_task_parameters(old: Path, incoming: Path) -> None:
             if not isinstance(pc_params, dict):
                 raise ValueError("同步用户任务参数格式不正确")
             pc["workflow_params"] = {**pc_params, **phone_params}
-            destination.write_text(json.dumps(pc, ensure_ascii=False), encoding="utf-8")
+            destination.write_text(formatted_json(pc), encoding="utf-8")
         else:
             shutil.copyfile(source, destination)
         if username not in names:
@@ -274,4 +275,4 @@ def _preserve_task_parameters(old: Path, incoming: Path) -> None:
     active = old_session.get("actives", {}).get("user")
     if active in names and (new_users / f"{active}.json").is_file():
         new_session.setdefault("actives", {})["user"] = active
-    new_path.write_text(json.dumps(new_session, ensure_ascii=False), encoding="utf-8")
+    new_path.write_text(formatted_json(new_session), encoding="utf-8")

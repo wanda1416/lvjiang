@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from loguru import logger
 
 from ..fs_util import atomic_write_text
+from ..json_files import formatted_json
 from .paths import identity_path, telemetry_dir
 
 
@@ -37,9 +38,7 @@ def _generate() -> Identity:
 
 def _write(identity: Identity) -> None:
     path = identity_path()
-    payload = json.dumps(
-        {"install_id": identity.install_id, "first_seen": identity.first_seen},
-        ensure_ascii=False)
+    payload = formatted_json({"install_id": identity.install_id, "first_seen": identity.first_seen})
     atomic_write_text(path, payload, prefix=".identity_")
 
 

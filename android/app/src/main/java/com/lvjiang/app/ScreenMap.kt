@@ -126,7 +126,7 @@ class ScreenMap(
                 if (f.exists()) f.delete()
             } else {
                 f.parentFile?.mkdirs()
-                f.writeText(map.toJson().toString())
+                f.writeText(map.toJson().toString(2) + "\n", Charsets.UTF_8)
             }
             cached = null
             Log.i(TAG, "标定已保存 ${f.name}: ${if (map.isIdentity) "恒等（文件已删）" else map.toJson()}")

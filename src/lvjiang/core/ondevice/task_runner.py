@@ -630,14 +630,15 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         record("task_end", json.dumps({"task": task["id"], "state": _STATE.snapshot()["state"]}, ensure_ascii=False))
         if history is not None:
             from ..fs_util import atomic_write_bytes
+            from ..json_files import formatted_json_bytes
             try:
                 snapshot = _STATE.snapshot()
                 logger.info(snapshot["message"])
                 result_path = history.log_path.with_suffix(".json")
-                payload = json.dumps(snapshot["result"], ensure_ascii=False, default=str)
-                if len(payload) > 32_000:
-                    payload = json.dumps({"message": "结果超过展示上限，请查看任务日志"}, ensure_ascii=False)
-                atomic_write_bytes(result_path, payload.encode("utf-8"), prefix="task-result-")
+                saved_result = snapshot["result"]
+                if len(json.dumps(saved_result, ensure_ascii=False, default=str)) > 32_000:
+                    saved_result = {"message": "结果超过展示上限，请查看任务日志"}
+                atomic_write_bytes(result_path, formatted_json_bytes(saved_result, default=str), prefix="task-result-")
                 history.finish(status={STATE_DONE: "completed", STATE_STOPPED: "stopped"}.get(snapshot["state"], "failed"),
                                result_path=result_path, error_message=snapshot["message"] if snapshot["state"] != STATE_DONE else "")
             except Exception as exc:

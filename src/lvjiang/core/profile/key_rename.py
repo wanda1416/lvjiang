@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from ..fs_util import atomic_write_bytes, atomic_write_text
+from ..json_files import formatted_json
 from .maintenance import profile_lock
 from .models import parse_sync_key
 
@@ -139,7 +140,7 @@ def save_renamed_definitions(
                       if path.exists() else None for path in paths},
         }
         journal_path = _journal_path(db)
-        atomic_write_text(journal_path, json.dumps(journal, ensure_ascii=False), prefix=".profile_rename_")
+        atomic_write_text(journal_path, formatted_json(journal), prefix=".profile_rename_")
 
         def save_references() -> None:
             schema_module.save_profile_config(new_schema)

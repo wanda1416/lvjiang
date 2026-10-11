@@ -16,6 +16,7 @@ from typing import Any
 from fasteners import InterProcessLock
 
 from ..fs_util import atomic_write_bytes
+from ..json_files import formatted_json_bytes
 from ..update_bundle import (
     digest,
     file_hashes,
@@ -89,7 +90,7 @@ class UpdateStore:
                 self.system.rename(rejected)
             previous.rename(self.system)
         version = update_namespace(data.get("app_version", data["app_series"]))
-        self._write(self.updates / f"v{version}" / "state.json", json_bytes(data["previous_state"]))
+        self._write(self.updates / f"v{version}" / "state.json", formatted_json_bytes(data["previous_state"]))
         journal.unlink()
         # rejected 保留用于诊断；不递归删除来源不明目录。
 
@@ -291,7 +292,7 @@ class UpdateStore:
                        for key in ("app_series", "baseline_sha256", "revision", "public_sha256", "files", "member", "member_index_revision")):
                     new_state["previous_selection"] = {key: previous_state.get(key) for key in
                                                         ("revision", "public_sha256", "member")}
-                    self._write(self.state_path, json_bytes(new_state))
+                    self._write(self.state_path, formatted_json_bytes(new_state))
                 return ()
             owner = prepared or tempfile.TemporaryDirectory(prefix="candidate-", dir=self.updates)
             temporary = Path(owner.name)
@@ -310,7 +311,7 @@ class UpdateStore:
                         retain_candidate(owner)
                         retained = True
                     return changed
-                self._write(journal, json_bytes({"token": token, "app_series": self.version,
+                self._write(journal, formatted_json_bytes({"token": token, "app_series": self.version,
                                                  "app_version": self.app_version, "previous_state": previous_state}))
                 try:
                     self.system.rename(retired)
@@ -318,7 +319,7 @@ class UpdateStore:
                     activate(self.system, changed)
                     new_state["previous_selection"] = {key: previous_state.get(key) for key in
                                                         ("revision", "public_sha256", "member")}
-                    self._write(self.state_path, json_bytes(new_state))
+                    self._write(self.state_path, formatted_json_bytes(new_state))
                     journal.unlink()
                 except BaseException:
                     self._recover()

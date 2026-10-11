@@ -11,6 +11,7 @@ from pathlib import Path, PurePosixPath
 
 from .._version import __version__
 from .fs_util import atomic_write_bytes
+from .json_files import formatted_json, formatted_json_bytes
 from .update_bundle import (
     json_bytes,
     read_tree,
@@ -36,7 +37,7 @@ def build_system_preset(system_dir: Path, destination: Path) -> dict:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         payload = {f"system/{name}": data for name, data in contents.items()}
-        for name, data in {**payload, "manifest.json": json_bytes(manifest)}.items():
+        for name, data in {**payload, "manifest.json": formatted_json_bytes(manifest)}.items():
             info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, data)
@@ -99,7 +100,7 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 # 只记录最后安装的官方代次，不代表当前 system 来自 PC 还是 APK。
                 pending = stage / "preset.json"
-                pending.write_text(json.dumps({"preset_id": digest, "app_version": __version__}), encoding="utf-8")
+                pending.write_text(formatted_json({"preset_id": digest, "app_version": __version__}), encoding="utf-8")
                 pending.replace(marker)
             except Exception:
                 if old_identity is None:
@@ -126,5 +127,5 @@ def write_baseline_identity(system_dir: Path, app_version: str) -> dict:
     version = series(app_version)
     identity = {"app_series": version, "sha256": tree_digest(files)}
     root = system_dir.parent
-    atomic_write_bytes(root / "system-baseline.json", json_bytes(identity), prefix=".baseline-", fsync=True)
+    atomic_write_bytes(root / "system-baseline.json", formatted_json_bytes(identity), prefix=".baseline-", fsync=True)
     return identity

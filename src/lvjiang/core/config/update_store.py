@@ -128,6 +128,26 @@ class UpdateStore:
         with self.locked():
             self._write(self.root / channel / "index.json", raw)
 
+    def _archive_directory(self, channel: str, revision: int, manifest_sha256: str) -> Path:
+        """短名称仅用于定位；归档身份以清单内容的完整摘要为准。调用方持锁。"""
+        parent = self.root / channel / f"r{revision}"
+        target = parent / manifest_sha256[:8]
+        matched = None
+        if parent.is_dir():
+            for item in parent.iterdir():
+                if item.is_symlink() or not item.is_dir():
+                    continue
+                manifest = item / "manifest.json"
+                if manifest.is_file() and digest(manifest.read_bytes()) == manifest_sha256:
+                    matched = item
+                    break
+        if matched is not None:
+            return matched
+        # 同修订允许重新发布，短名称碰撞不能覆盖另一份完整归档。
+        while target.exists():
+            target = parent / uuid.uuid4().hex[:8]
+        return target
+
     def cache_member(self, metadata: Mapping[str, Any], manifest: bytes, encrypted: bytes) -> None:
         if not manifest or digest(manifest) != metadata.get("manifest_sha256"):
             raise ValueError("会员归档清单摘要不匹配")
@@ -135,7 +155,7 @@ class UpdateStore:
             raise ValueError("会员归档密文摘要不匹配")
         revision = metadata["package_version"]
         with self.locked():
-            root = self.root / "member" / f"r{revision}" / digest(manifest)
+            root = self._archive_directory("member", revision, digest(manifest))
             self._archive(root / "manifest.json", manifest)
             self._archive(root / "package.bin", encrypted)
 
@@ -175,9 +195,13 @@ class UpdateStore:
                     if revision.is_symlink() or not revision.is_dir() or not re.fullmatch(r"r[1-9]\d*", revision.name):
                         continue
                     for item in revision.iterdir():
-                        if item.is_symlink() or not item.is_dir() or not re.fullmatch(r"[a-f0-9]{64}", item.name):
+                        if item.is_symlink() or not item.is_dir():
                             continue
-                        if (int(revision.name[1:]), item.name) not in keep[channel]:
+                        manifest = item / "manifest.json"
+                        if not manifest.is_file():
+                            continue
+                        full_digest = digest(manifest.read_bytes())
+                        if (int(revision.name[1:]), full_digest) not in keep[channel]:
                             shutil.rmtree(item)
 
     def install(
@@ -217,7 +241,7 @@ class UpdateStore:
             if manifest is None:
                 revision = previous_state.get("revision", 0) if installed_matches and not reset_public else 0
                 if revision:
-                    root = self.root / "public" / f"r{revision}" / previous_state["public_sha256"]
+                    root = self._archive_directory("public", revision, previous_state["public_sha256"])
                     manifest_json = (root / "manifest.json").read_bytes()
                     if digest(manifest_json) != previous_state["public_sha256"]:
                         raise ValueError("已安装公开归档清单摘要不匹配")
@@ -270,7 +294,7 @@ class UpdateStore:
             changed = tuple(sorted(name for name in previous_files.keys() | candidate.keys()
                                    if previous_files.get(name) != candidate.get(name)))
             if manifest["revision"]:
-                revision_dir = self.root / "public" / f"r{manifest['revision']}" / public_sha256
+                revision_dir = self._archive_directory("public", manifest['revision'], public_sha256)
                 self._archive(revision_dir / "update.zip", archive)
                 self._archive(revision_dir / "manifest.json", manifest_json)
             token = uuid.uuid4().hex

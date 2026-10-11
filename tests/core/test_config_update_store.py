@@ -38,7 +38,7 @@ def test_cumulative_unknown_files_and_local_survive(tmp_path):
     assert (tmp_path / "system/new/.future").read_bytes() == b"\xff\x00"
     assert (tmp_path / "local/app.yaml").read_bytes() == b"delay: 9"
     assert unpack((tmp_path / "updates/v0.15.0/r0.zip").read_bytes()) == base
-    assert (tmp_path / f"updates/v0.15.0/public/r5/{digest(json_bytes(manifest))}/update.zip").read_bytes() == archive
+    assert (tmp_path / f"updates/v0.15.0/public/r5/{digest(json_bytes(manifest))[:8]}/update.zip").read_bytes() == archive
     # 下一修订撤回全部覆盖，无需反向补丁链。
     manifest, archive = make_manifest("0.15.0", 6, base, {})
     store.install(manifest, archive, activate=lambda *args: None)
@@ -63,6 +63,39 @@ def test_activation_failure_does_not_revert_committed_installation(tmp_path):
     assert (tmp_path / "system/app.yaml").read_bytes() == b"new"
     assert store._state()["revision"] == 1
     assert not (tmp_path / "updates/transaction.json").exists()
+
+
+def test_archive_names_are_short_indexes_not_content_identity(tmp_path):
+    """归档改名和短索引碰撞都不能破坏重启恢复或清理保留判断。"""
+    base = {"app.yaml": b"old"}
+    write_files(tmp_path / "system", base)
+    store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
+    manifest, archive = make_manifest("0.15.0", 1, base, {"app.yaml": b"new"})
+    full_hash = digest(json_bytes(manifest))
+    revision = store.root / "public/r1"
+    occupied = revision / full_hash[:8]
+    write_files(occupied, {"manifest.json": b"other archive"})
+    store.install(manifest, archive, activate=lambda *args: None)
+    installed = next(item for item in revision.iterdir() if item != occupied)
+    assert len(installed.name) == 8
+    assert occupied.joinpath("manifest.json").read_bytes() == b"other archive"
+    assert store._state()["public_sha256"] == full_hash
+    renamed = revision / "index001"
+    installed.rename(renamed)
+    # 重启路径不按摘要拼出目录名，直接从清单内容找到已安装公开包。
+    store.install(activate=lambda *args: None)
+    store.prune_archives()
+    assert renamed.joinpath("update.zip").read_bytes() == archive
+    assert not occupied.exists()
+    member_manifest = json_bytes({"key_id": "example"})
+    encrypted = b"encrypted package"
+    metadata = {"package_version": 3, "manifest_sha256": digest(member_manifest),
+                "sha256": digest(encrypted)}
+    store.cache_member(metadata, member_manifest, encrypted)
+    member_dir = next((store.root / "member/r3").iterdir())
+    assert len(member_dir.name) == 8
+    assert member_dir.joinpath("manifest.json").read_bytes() == member_manifest
+    assert member_dir.joinpath("package.bin").read_bytes() == encrypted
 
 
 def test_untrusted_baseline_and_wrong_series_are_rejected(tmp_path):
@@ -237,8 +270,8 @@ def test_rollback_republish_and_manifest_deletion_rebuild_from_r0(tmp_path):
     assert store._state()["revision"] == 0
     store.prune_archives()
     assert (store.root / "r0.zip").exists()
-    assert (store.root / f"public/r2/{digest(json_bytes(new))}").is_dir()
-    assert not (store.root / f"public/r2/{digest(json_bytes(old))}").exists()
+    assert (store.root / f"public/r2/{digest(json_bytes(new))[:8]}").is_dir()
+    assert not (store.root / f"public/r2/{digest(json_bytes(old))[:8]}").exists()
 
 
 def test_manifest_rejects_unsafe_conflicting_deletion_and_member_wrong_digest(tmp_path):

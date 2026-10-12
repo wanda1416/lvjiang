@@ -197,7 +197,8 @@ def test_screenshot_failure_is_nonfatal_and_never_falls_back(tmp_path, monkeypat
     assert not list((tmp_path / "logs" / "image").glob("*.png"))
 
 
-def test_menu_navigation_records_failed_observation_before_pause(tmp_path, monkeypatch):
+@pytest.mark.parametrize("retry_succeeds", [True, False])
+def test_menu_navigation_rechecks_fresh_frame_before_pause(tmp_path, monkeypatch, retry_succeeds):
     monkeypatch.setattr("lvjiang.workflows.engine.core.PROJECT_ROOT", tmp_path)
     engine, frame = _engine()
     engine._layout.get_scene_regions.return_value = [
@@ -209,19 +210,27 @@ def test_menu_navigation_records_failed_observation_before_pause(tmp_path, monke
         engine._procs.update(parse_text((root / name).read_text(encoding="utf-8")).procs)
     monkeypatch.setattr(engine, "_exec_click", MagicMock())
     monkeypatch.setattr(engine, "_exec_wait", MagicMock())
+    retry_frame = np.full_like(frame, 30)
+    engine._capture.capture.side_effect = [frame, frame, retry_frame, frame]
+    engine._ocr.recognize.side_effect = lambda img, **kwargs: [SimpleNamespace(
+        text="包裹" if retry_succeeds and int(img[0, 0, 0]) == 30 else "",
+        confidence=1.0)]
     pauses = []
 
     def pause(action, **kwargs):
         assert action == "pause"
-        image, = (tmp_path / "logs" / "image").glob("*.png")
-        np.testing.assert_array_equal(cv2.imread(str(image)), frame)
+        images = list((tmp_path / "logs" / "image").glob("*.png"))
+        assert len(images) == 2
+        assert sorted(int(cv2.imread(str(image))[0, 0, 0]) for image in images) == [10, 30]
         pauses.append(kwargs["message"])
 
     engine._ui_callback = pause
     _run(engine, 'call $result = nav_main_to_menu()\n')
-    assert engine.variables["result"] == -1
-    assert len(pauses) == 1
-    assert engine._capture.capture.call_count == 3
+    assert engine.variables["result"] == (0 if retry_succeeds else -1)
+    assert len(pauses) == (0 if retry_succeeds else 1)
+    assert engine._capture.capture.call_count == (3 if retry_succeeds else 4)
+    assert [call.args[0].delay.value for call in engine._exec_wait.call_args_list] == [
+        "page_refresh", "secondary_confirm"]
     engine._exec_click.assert_called_once()
 
 

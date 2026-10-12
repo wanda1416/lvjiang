@@ -220,6 +220,12 @@ def nav_main_to_menu()
     if not $in_menu
         log error "打开菜单后未识别到包裹或培养"
         screenshot from last
+        wait @secondary_confirm
+        call $in_menu = is_in_menu_page()
+    end
+    if not $in_menu
+        log error "二次确认仍未识别到包裹或培养"
+        screenshot from last
         eval pause("未进入菜单页面，请手动导航后点击继续")
         call $in_menu = is_in_menu_page()
         if not $in_menu

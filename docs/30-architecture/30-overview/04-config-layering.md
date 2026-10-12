@@ -1,12 +1,11 @@
-# 配置分层：system / local 与更新归档
+# 配置分层：system / local
 
-配置读取只有 system/local 两层；session 存运行数据，updates 存更新归档与事务状态。
-读写入口为 `core/config/resolver.py`，安装架构见 [官方配置增量更新](05-config-update-architecture.md)。
+配置读取只有 system/local 两层；session 存运行数据。
+读写入口为 `core/config/resolver.py`。
 
 | 层 | 目录 | 职责 | 进 git |
 |----|------|------|--------|
-| system | `config/system/` | 已安装的官方预置、累计增量和有效会员内容；开发仓库仅维护公开源 | 仅源文件 ✅ |
-| updates | `config/updates/` | r0/rN、会员密文及安装记录，不参与配置读取 | ❌ |
+| system | `config/system/` | 已安装的官方配置；开发仓库维护官方源文件 | 仅源文件 ✅ |
 | local | `config/local/` | 用户覆盖层：影子文件 + 键级 diff | ❌ |
 | session | `config/session/` | 纯运行态，不经 resolver（见 `core.config.session`） | ❌ |
 
@@ -342,31 +341,13 @@ hooks = AppHooks(
 
 ---
 
-## 七、在线配置安装
-
-所有官方 system 文件均可通过累计增量下发，包括未知格式与已有 WF。客户端使用精确
-应用系列索引，校验后事务替换 system，local 仍按前述领域语义优先。content_version
-不再仲裁文件来源；当前 system 的该字段统一为 1，结构 schema_version 继续保留。
-
-配置下载成功后即时安装并刷新相关缓存。正在执行的任务持有独立配置副本，整个批量任务
-保持同一快照；多实例通过安装锁和生效代次协调。失败保留上一完整可用版本，不要求重启。
-设置里的“接收在线配置更新”控制公开及会员两渠道，关闭后恢复 r0，不修改用户 local。
-
-开发源码目录不接受自动在线安装。正式构建写入可信基底身份及 r0.zip；会员完整包独立
-授权，明文只进入有效 system，密文归档于 updates/member。
-
-手机使用 APK 预置或 PC 同步的 system/local，本轮不自行检查线上配置；PC 同步保留手机
-updates 和原始基底身份，不把 PC 快照转换成 local，也不将其记录为官方 r0。
-
-全部文件读取策略、目录及人工恢复说明见 [更新架构](05-config-update-architecture.md)。
-
 ## 关联文档
 
 - 实体模型与指纹：[31-models/01-equipment-models.md](../31-models/01-equipment-models.md)
 - 调律规则的启用与顺序：[10-game/10-tuning-rules/](../../10-game/10-tuning-rules/README.md)
 - 用户视角的脚本管理：[60-userguide/06-workflows.md](../../60-userguide/06-workflows.md)
 
-## 八、运行与界面状态分文件
+## 七、运行与界面状态分文件
 
 `config/session/session.json` 由 `SessionStore` 管理执行选择和设置等运行节点。
 `config/session/interface.json` 由 `InterfaceStore` 管理以下五个业务根节点：

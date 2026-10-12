@@ -92,13 +92,8 @@ Release 标题，确保发布页面与历史版本维持一致。
 **注意 config 分层的三个坑**（这类问题在发布说明里不写清，用户永远排查不出来）：
 
 - `config/local` **无条件**优先于 system。用户自己改过 / 重画过的那份配置，系统修正**到不了他**。凡是修了系统配置的，都要提示「若你改过这项，需要手动同步或删除本地覆盖」。
-- 新协议按三段正式系列选择累计增量，不再使用 content_version 仲裁。该字段暂留为 1，
-  发布不自动提升它；schema_version 与应用版本仍各自负责结构和代码兼容。
-- 新版预置必须包含当前线上公开修正或经过验证的替代方案。发布前核对 site/lvjiang/public
-  对应旧正式系列的最新累计包，不得把运行机器吸收会员后的 system 当作公开预置源。
-- `build_system_baseline.py` 从官方 system 完整复制生成安装目录与 system-baseline.json，
-  不在包内重复提供 r0.zip。客户端首次启动、应用更新或 PC 同步之前从可信预置创建
-  updates/vX.Y.Z/r0.zip。同系列第四段版本必须保持相同预置基底；改变基底须提升第三段。
+- 官方配置预置及在线内容的发布核对统一按独立 admin 仓库的
+  `docs/40-development/03-config-packaging.md` 执行。
 - Android 的 `versionCode` 仅用于应用升级；官方 system 预置以内容摘要更新，个人配置不入包。
 - **`config/system` 在升级时按通道清理，各通道能力不同**。它随包分发、用户侧只读
   （用户改动落 `config/local`），所以升级必须做到「与包内容完全一致」而不是「覆盖

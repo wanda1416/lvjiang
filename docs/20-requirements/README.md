@@ -63,12 +63,10 @@
 | [08-android-task-settings.md](50-platform/08-android-task-settings.md) | 手机按用户编辑任务参数与自动调律设置 | 已实现 |
 | [10-ai-connection.md](50-platform/10-ai-connection.md) | AI 连接配置、系统凭据存储与后台连接测试 | 已实现（桌面端） |
 | [09-android-preset.md](50-platform/09-android-preset.md) | 官方预置、手机用户管理与同步参数保留 | 已实现 |
-| [11-protected-config.md](50-platform/11-protected-config.md) | Lv1 加密配置下发、云端授权与双来源 remote 同步 | 桌面同步已实现（自动请求修正待安装包交付） |
 | [12-agent-mcp.md](50-platform/12-agent-mcp.md) | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 | 部分实现 |
 | [13-agent-docs-access.md](50-platform/13-agent-docs-access.md) | Agent 文档逐篇收录、目录拆分与配置文件访问清单 | 部分实现 |
-| [14-official-config-publication.md](50-platform/14-official-config-publication.md) | 官方公开增量与会员包安装、两层配置语义及即时生效 | 已实现，待 0.15.0 发布 |
 | [15-android-workbench.md](50-platform/15-android-workbench.md) | Android 四页工作台、确认交互、执行历史和只读用户数据 | 已实现，真机游戏验收待完成 |
-| [17-prerelease.md](50-platform/17-prerelease.md) | PEP 440 测试/候选版本、正式升级比较与配置基底隔离 | 已实现，本地验证通过；实际发布待验证 |
+| [17-prerelease.md](50-platform/17-prerelease.md) | PEP 440 测试/候选版本与正式升级比较 | 已实现，本地验证通过；实际发布待验证 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

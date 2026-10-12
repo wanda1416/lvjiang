@@ -554,7 +554,7 @@ wheels = [
 
 [[package]]
 name = "lvjiang"
-version = "0.15.0b2"
+version = "0.15.0b3"
 source = { editable = "." }
 dependencies = [
     { name = "av" },

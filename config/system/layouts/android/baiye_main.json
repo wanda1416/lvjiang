@@ -72,6 +72,13 @@
       "h_ratio": 0.10319444444444444
     },
     {
+      "key": "activity_recommend_tab",
+      "x_ratio": 0.353125,
+      "y_ratio": 0.1111111111111111,
+      "w_ratio": 0.14125,
+      "h_ratio": 0.0625
+    },
+    {
       "key": "activity_list_tab",
       "x_ratio": 0.5,
       "y_ratio": 0.1111111111111111,

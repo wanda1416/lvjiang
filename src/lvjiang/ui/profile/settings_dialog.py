@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QLabel,
+    QLayout,
     QLineEdit,
     QMenu,
     QMessageBox,
@@ -35,6 +36,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -215,11 +217,8 @@ class _SyncTargetsWidget(QWidget):
 
         header = self._table.horizontalHeader()
         assert header is not None
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._table.setColumnWidth(0, 300)
         self._table.setColumnWidth(1, 120)
         self._table.setColumnWidth(2, 90)
         self._table.setColumnWidth(3, 120)
@@ -337,19 +336,73 @@ class _SyncTargetsWidget(QWidget):
         return targets
 
 
-class _AmountTagInputWidget(TagInputWidget):
-    """一行内可录入多个正整数快捷数量。"""
+class _RuleTagInputWidget(TagInputWidget):
+    """规则单元格只使用当前列宽，新增标签不得扩展横向滚动区域。"""
 
     _COMPACT_HEIGHT = 36
 
-    def __init__(self, amounts: list[int], parent=None) -> None:
-        super().__init__([str(amount) for amount in amounts if amount > 0], parent)
+    def __init__(self, values: list[str], parent=None) -> None:
+        super().__init__(values, parent)
         # 普通词条输入框独占表单行，52px 的高度合理；快捷数量
         # 却是嵌在表格单元格内，复用该高度会把每条规则撑到近两行。
         self.setFixedHeight(self._COMPACT_HEIGHT)
         self._row.setContentsMargins(4, 1, 4, 1)
-        # 数量较多时仍可横向滚动；窄滚动条避免在紧凑行内挤压输入框。
-        self._scroll.setStyleSheet("QScrollBar:horizontal { height: 7px; }")
+        self._row.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        outer_layout = self.layout()
+        assert outer_layout is not None
+        self._scroll.takeWidget()
+        outer_layout.removeWidget(self._scroll)
+        self._scroll.hide()
+        self._scroll.deleteLater()
+        outer_layout.addWidget(self._content)
+
+    def add_tag(self, value: str) -> bool:
+        geometry = self._content.geometry()
+        added = super().add_tag(value)
+        self._content.setGeometry(geometry)
+        return added
+
+    def remove_tag(self, value: str) -> None:
+        geometry = self._content.geometry()
+        super().remove_tag(value)
+        self._content.setGeometry(geometry)
+
+    def _commit_input(self) -> None:
+        value = self._input.text().strip()
+        if not value or value in self.tags():
+            super()._commit_input()
+            return
+
+        # 程序化回填始终保留已有值；仅限制用户新录入，拒绝时保留输入。
+        blocked = self.blockSignals(True)
+        try:
+            self.add_tag(value)
+            self._chips[value].show()
+            chip_layout = self._chips[value].layout()
+            assert chip_layout is not None
+            chip_layout.activate()
+            self._row.invalidate()
+            fits = self._row.minimumSize().width() <= self._content.width()
+            if not fits:
+                self.remove_tag(value)
+        finally:
+            self.blockSignals(blocked)
+        if fits:
+            self._input.clear()
+            self.tags_changed.emit()
+        else:
+            QToolTip.showText(
+                self._input.mapToGlobal(self._input.rect().bottomLeft()),
+                tr("当前列宽不足，请放大对话框、拖宽此列或增加一行"),
+                self._input,
+            )
+
+
+class _AmountTagInputWidget(_RuleTagInputWidget):
+    """一行内可录入多个正整数快捷数量。"""
+
+    def __init__(self, amounts: list[int], parent=None) -> None:
+        super().__init__([str(amount) for amount in amounts if amount > 0], parent)
         self._input.setValidator(QIntValidator(1, 999999, self._input))
         self._input.setMinimumWidth(170)
 
@@ -357,19 +410,16 @@ class _AmountTagInputWidget(TagInputWidget):
         return [int(value) for value in self.tags()]
 
 
-class _RuleTermTagInputWidget(TagInputWidget):
+class _RuleTermTagInputWidget(_RuleTagInputWidget):
     """表格单元格内的多来源/用途输入。"""
 
     def __init__(self, terms: list[str], parent=None) -> None:
         super().__init__(terms, parent)
-        self.setFixedHeight(_AmountTagInputWidget._COMPACT_HEIGHT)
-        self._row.setContentsMargins(4, 1, 4, 1)
-        self._scroll.setStyleSheet("QScrollBar:horizontal { height: 7px; }")
         self._input.setMinimumWidth(140)
 
 
 class _ChangeRulesTable(QTableWidget):
-    """类型和删除列固定，来源与数量按 6:4 分配剩余空间。"""
+    """列宽可拖动；窗口缩放时按当前比例分配来源与数量列。"""
 
     _TYPE_WIDTH = 132
     _REMOVE_WIDTH = 40
@@ -380,13 +430,15 @@ class _ChangeRulesTable(QTableWidget):
         if viewport is None:
             return
         available = max(
-            0, viewport.width() - self._TYPE_WIDTH - self._REMOVE_WIDTH
+            0, viewport.width() - self.columnWidth(0) - self.columnWidth(3)
         )
-        name_width = available * 6 // 10
-        self.setColumnWidth(0, self._TYPE_WIDTH)
+        current_width = self.columnWidth(1) + self.columnWidth(2)
+        name_width = (
+            available * self.columnWidth(1) // current_width
+            if current_width else available * 6 // 10
+        )
         self.setColumnWidth(1, name_width)
         self.setColumnWidth(2, available - name_width)
-        self.setColumnWidth(3, self._REMOVE_WIDTH)
 
 
 def _fit_table_to_rows(table: QTableWidget) -> None:
@@ -448,14 +500,14 @@ class _ChangeRulesWidget(QWidget):
 
         header = self._table.horizontalHeader()
         assert header is not None
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self._table.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self._table.setColumnWidth(3, _ChangeRulesTable._REMOVE_WIDTH)
+        self._table.setColumnWidth(0, _ChangeRulesTable._TYPE_WIDTH)
+        self._table.setColumnWidth(1, 360)
+        self._table.setColumnWidth(2, 240)
         _fit_table_to_rows(self._table)
         layout.addWidget(self._table)
 

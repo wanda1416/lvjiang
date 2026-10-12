@@ -146,19 +146,9 @@ def public_content(kind: str) -> str:
         if kind == "qrcode":
             import base64
 
-            from ... import constants
-            from ..group_qrcode import fetch_qrcode_bytes, save_qrcode
-            path = constants.SESSION_CONFIG_DIR / "feedback-qrcode.jpg"
-            message = ""
-            try:
-                payload = fetch_qrcode_bytes()
-                save_qrcode(payload, path=path)
-            except Exception as exc:
-                if not path.is_file():
-                    raise
-                payload = path.read_bytes()
-                message = f"刷新失败，显示上次二维码：{exc}"
-            return _json({"ok": True, "message": message, "image": base64.b64encode(payload).decode("ascii")})
+            from ..group_qrcode import load_qrcode_bytes
+            payload = load_qrcode_bytes()
+            return _json({"ok": True, "message": "", "image": base64.b64encode(payload).decode("ascii")})
         if kind == "version":
             # 版本入口的站点与桌面共同维护。
             from ..public_links import RELEASES_URL

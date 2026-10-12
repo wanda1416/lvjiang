@@ -37,8 +37,6 @@ uv run python scripts\build_system_baseline.py dist\lvjiang\config
 if errorlevel 1 exit /b 1
 xcopy /e /i /y data\adb dist\lvjiang\data\adb >nul
 if errorlevel 1 exit /b 1
-xcopy /e /i /y data\image dist\lvjiang\data\image >nul
-if errorlevel 1 exit /b 1
 
 rem Publish game, architecture/DSL, user guide and Agent documentation with their original paths.
 uv run python scripts\build_agent_bundle.py --output dist\lvjiang\docs --zip dist\lvjiang-agent-v%APP_VERSION%.zip

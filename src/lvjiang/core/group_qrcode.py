@@ -1,24 +1,20 @@
-"""交流群二维码远程刷新。
-
-二维码图片是随安装包分发的磁盘文件（``data/image/feedback-qrcode.jpg``），
-过期后无法自行更新。本模块提供"从 GitHub Pages 拉取最新二维码并覆盖本地
-文件"的能力：用户在 ``GroupQrDialog`` 里点击"刷新二维码"时触发，下载与
-写盘都在后台线程完成；失败时保留本地原文件不清空，与
-``core/announcement.py`` 的刷新范式保持一致。
-"""
+"""交流群二维码：session 缓存优先，缺失时从站点获取。"""
 from __future__ import annotations
 
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from ..constants import DATA_DIR
 from .fs_util import atomic_write_bytes
+from .paths import session_directory
 
 # 与 announcement.py 的 notices.json 同域名，走 GitHub Pages 静态站点，
 # 不依赖 GitHub API，避免限流。
 QRCODE_URL = "https://wanda1416.github.io/lvjiang/feedback-qrcode.jpg"
-QRCODE_PATH = DATA_DIR / "image" / "feedback-qrcode.jpg"
+
+
+def qrcode_path() -> Path:
+    return session_directory() / "feedback-qrcode.jpg"
 
 # 二维码图片体积很小，超过该阈值视为异常响应（防止误下载到大文件）。
 MAX_QRCODE_BYTES = 2 * 1024 * 1024
@@ -47,11 +43,11 @@ def fetch_qrcode_bytes(*, timeout: float = 10.0) -> bytes:
                     pass
             payload = response.read(MAX_QRCODE_BYTES + 1)
     except HTTPError as exc:
-        raise QrCodeError(f"二维码请求失败: HTTP {exc.code}") from exc
+        raise QrCodeError(f"无法访问 {QRCODE_URL}，请检查网络（HTTP {exc.code}）") from exc
     except QrCodeError:
         raise
     except Exception as exc:
-        raise QrCodeError(f"二维码请求失败: {exc}") from exc
+        raise QrCodeError(f"无法访问 {QRCODE_URL}，请检查网络：{exc}") from exc
 
     if len(payload) > MAX_QRCODE_BYTES:
         raise QrCodeError("二维码文件超过 2MB")
@@ -61,17 +57,24 @@ def fetch_qrcode_bytes(*, timeout: float = 10.0) -> bytes:
 
 
 def save_qrcode(data: bytes, *, path: Path | None = None) -> None:
-    """原子写入本地二维码文件；写入过程失败不会影响原文件。
+    """原子写入 session 缓存；失败不影响原文件。"""
+    atomic_write_bytes(path or qrcode_path(), data, prefix="feedback-qrcode-")
 
-    ``path`` 默认惰性取模块级 ``QRCODE_PATH``（而非在函数签名里早绑定），
-    这样测试或未来的路径改造只需 monkeypatch 该模块属性即可生效。
-    """
-    atomic_write_bytes(path or QRCODE_PATH, data, prefix="feedback-qrcode-")
+
+def load_qrcode_bytes() -> bytes:
+    """缓存缺失时下载并落盘；调用者在后台线程执行。"""
+    path = qrcode_path()
+    if path.is_file():
+        return path.read_bytes()
+    payload = fetch_qrcode_bytes()
+    save_qrcode(payload, path=path)
+    return payload
 
 
 __all__ = [
     "QRCODE_URL",
-    "QRCODE_PATH",
+    "qrcode_path",
+    "load_qrcode_bytes",
     "MAX_QRCODE_BYTES",
     "QrCodeError",
     "fetch_qrcode_bytes",

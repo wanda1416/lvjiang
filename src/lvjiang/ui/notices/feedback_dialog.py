@@ -8,6 +8,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QGroupBox,
     QHBoxLayout,
@@ -70,11 +71,14 @@ class GroupQrDialog(QDialog):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
+        if not group_qrcode.qrcode_path().is_file():
+            self._refresh_qrcode()
+
     def _reload_pixmap(self) -> None:
         """从本地磁盘（重新）加载二维码图片。"""
-        pixmap = QPixmap(str(group_qrcode.QRCODE_PATH))
+        pixmap = QPixmap(str(group_qrcode.qrcode_path()))
         if pixmap.isNull():
-            self._image_label.setText(tr("交流群二维码加载失败"))
+            self._image_label.setText(tr("暂无二维码，请获取最新二维码"))
         else:
             self._image_label.setPixmap(pixmap.scaled(
                 360,
@@ -91,28 +95,32 @@ class GroupQrDialog(QDialog):
         self._refresh_btn.setText(tr("刷新中..."))
         self._status_label.setText(tr("正在获取最新二维码..."))
 
-        refresher = QrCodeRefresher(self)
+        # 对话框关闭不销毁尚在下载的线程，线程结束后自行释放。
+        refresher = QrCodeRefresher(QApplication.instance())
         refresher.succeeded.connect(self._on_refresh_finished)
         refresher.error.connect(self._on_refresh_error)
         # deleteLater 只挂在 QThread.finished（线程真正退出后）上，成功与
         # 失败两条路都会走到它；挂在 succeeded/error 上等于销毁还在跑的线程。
         refresher.finished.connect(refresher.deleteLater)
+        refresher.finished.connect(self._on_worker_finished)
         self._refresher = refresher
         refresher.start()
 
     def _on_refresh_finished(self, _data: bytes) -> None:
-        self._refresher = None
         self._refresh_btn.setEnabled(True)
         self._refresh_btn.setText(tr("刷新二维码"))
         self._status_label.setText(tr("二维码已更新"))
         self._reload_pixmap()
 
     def _on_refresh_error(self, message: str) -> None:
-        self._refresher = None
         self._refresh_btn.setEnabled(True)
         self._refresh_btn.setText(tr("刷新二维码"))
-        self._status_label.setText(
-            tr("刷新失败，已保留当前二维码：{error}").format(error=message))
+        if group_qrcode.qrcode_path().is_file():
+            message = tr("刷新失败，已保留当前二维码：{error}").format(error=message)
+        self._status_label.setText(message)
+
+    def _on_worker_finished(self) -> None:
+        self._refresher = None
 
 
 class FeedbackDialog(QDialog):

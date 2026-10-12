@@ -36,7 +36,6 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
-    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -348,6 +347,9 @@ class _RuleTagInputWidget(TagInputWidget):
         self.setFixedHeight(self._COMPACT_HEIGHT)
         self._row.setContentsMargins(4, 1, 4, 1)
         self._row.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        # 输入框随剩余空间收缩，避免固定预留大片空白。
+        self._input.ensurePolished()
+        self._input.setMinimumWidth(self._input.minimumSizeHint().width())
         outer_layout = self.layout()
         assert outer_layout is not None
         self._scroll.takeWidget()
@@ -367,36 +369,6 @@ class _RuleTagInputWidget(TagInputWidget):
         super().remove_tag(value)
         self._content.setGeometry(geometry)
 
-    def _commit_input(self) -> None:
-        value = self._input.text().strip()
-        if not value or value in self.tags():
-            super()._commit_input()
-            return
-
-        # 程序化回填始终保留已有值；仅限制用户新录入，拒绝时保留输入。
-        blocked = self.blockSignals(True)
-        try:
-            self.add_tag(value)
-            self._chips[value].show()
-            chip_layout = self._chips[value].layout()
-            assert chip_layout is not None
-            chip_layout.activate()
-            self._row.invalidate()
-            fits = self._row.minimumSize().width() <= self._content.width()
-            if not fits:
-                self.remove_tag(value)
-        finally:
-            self.blockSignals(blocked)
-        if fits:
-            self._input.clear()
-            self.tags_changed.emit()
-        else:
-            QToolTip.showText(
-                self._input.mapToGlobal(self._input.rect().bottomLeft()),
-                tr("当前列宽不足，请放大对话框、拖宽此列或增加一行"),
-                self._input,
-            )
-
 
 class _AmountTagInputWidget(_RuleTagInputWidget):
     """一行内可录入多个正整数快捷数量。"""
@@ -404,7 +376,6 @@ class _AmountTagInputWidget(_RuleTagInputWidget):
     def __init__(self, amounts: list[int], parent=None) -> None:
         super().__init__([str(amount) for amount in amounts if amount > 0], parent)
         self._input.setValidator(QIntValidator(1, 999999, self._input))
-        self._input.setMinimumWidth(170)
 
     def amounts(self) -> list[int]:
         return [int(value) for value in self.tags()]
@@ -412,10 +383,6 @@ class _AmountTagInputWidget(_RuleTagInputWidget):
 
 class _RuleTermTagInputWidget(_RuleTagInputWidget):
     """表格单元格内的多来源/用途输入。"""
-
-    def __init__(self, terms: list[str], parent=None) -> None:
-        super().__init__(terms, parent)
-        self._input.setMinimumWidth(140)
 
 
 class _ChangeRulesTable(QTableWidget):

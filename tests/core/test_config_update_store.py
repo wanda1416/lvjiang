@@ -169,7 +169,8 @@ def test_task_snapshot_keeps_lazy_files_while_next_task_sees_update(tmp_path, mo
     base = {"workflows/subcall/task.wf": b"old", "templates/example.png": b"old image"}
     write_files(tmp_path / "system", base)
     (tmp_path / "local").mkdir()
-    (tmp_path / "system-baseline.json").write_text(json.dumps({
+    (tmp_path / "session").mkdir(exist_ok=True)
+    (tmp_path / "session/baseline.json").write_text(json.dumps({
         "app_series": "0.15.0", "sha256": tree_digest(base)}), encoding="utf-8")
     monkeypatch.setattr(resolver, "_resolver", resolver.ConfigResolver(
         system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False))
@@ -193,7 +194,8 @@ def test_task_snapshot_keeps_lazy_files_while_next_task_sees_update(tmp_path, mo
         # 批量外层已有快照，内层引擎仍须用其重新构造布局与重定位源脚本。
         assert engine.run(tmp_path / "system/workflows/subcall/task.wf") == (b"old image", b"old")
         assert engine._layout.content == b"original"
-    assert not frozen.system_dir.exists()
+    # 本进程保留当前代次，后续相同修订任务复用；旧运行仍持有自己的代次。
+    assert frozen.system_dir.exists()
     with configuration_snapshot():
         assert resolver.get_resolver().resolve_read("templates/example.png").read_bytes() == b"new image"
         assert engine.run(tmp_path / "system/workflows/subcall/task.wf") == (b"new image", b"old")
@@ -216,6 +218,7 @@ def test_public_revision_preserves_member_registry_fragments(tmp_path):
 
 
 def test_member_dependency_and_authorization_survive_index_rollback(tmp_path, monkeypatch):
+    monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
     base = {"base.bin": b"base"}
     write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
@@ -236,7 +239,8 @@ def test_member_dependency_and_authorization_survive_index_rollback(tmp_path, mo
     assert (tmp_path / "system/member.bin").read_bytes() == b"member"
     from lvjiang.core.config import protected_remote, resolver
     from lvjiang.core.config.runtime_snapshot import configuration_snapshot
-    (tmp_path / "system-baseline.json").write_text(json.dumps({
+    (tmp_path / "session").mkdir(exist_ok=True)
+    (tmp_path / "session/baseline.json").write_text(json.dumps({
         "app_series": "0.15.0", "sha256": tree_digest(base)}), encoding="utf-8")
     monkeypatch.setattr(resolver, "_resolver", resolver.ConfigResolver(
         system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False))

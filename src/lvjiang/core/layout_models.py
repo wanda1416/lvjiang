@@ -580,6 +580,7 @@ class SubsceneRef:
 @dataclass
 class Layout:
     """一个布局：包含画布配置 + 所有场景的区域定义"""
+    _file_baselines: dict = field(default_factory=dict, repr=False, compare=False, init=False)
     key: str = ""
     name: str = ""
     desc: str = ""  # 描述性文本（来自 layouts.yaml，仅展示用）

@@ -192,12 +192,19 @@ def install_offline_bundle(
         incoming_interface.write_text(formatted_json(interface_data), encoding="utf-8")
         # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
         # 预置归档；它不成为新 r0，也不携带 PC 的更新身份、会员凭据或归档。
-        for name in ("updates", "system-baseline.json"):
+        for name in ("updates",):
             existing = target / name
             if existing.is_dir():
                 shutil.copytree(existing, staged_config / name)
             elif existing.is_file():
+                (staged_config / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(existing, staged_config / name)
+        from .paths import session_directory
+        baseline = session_directory(target) / "baseline.json"
+        if baseline.is_file():
+            destination = session_directory(staged_config) / "baseline.json"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(baseline, destination)
         # 此标记只记录 APK 官方代次，与是否覆盖用户参数无关。
         marker = target / "session/preset.json"
         if marker.is_file():
@@ -212,6 +219,9 @@ def install_offline_bundle(
             if old.exists():
                 old.rename(target)
             raise
+        from .config.content import rebuild_content
+        from .config.resolver import ConfigResolver
+        rebuild_content(ConfigResolver(target / "system", target / "local", dev_mode=False))
         if on_applied is not None:
             on_applied()
         if old.exists():

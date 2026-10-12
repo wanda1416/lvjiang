@@ -149,6 +149,9 @@ class BuildRepository:
             else:
                 self.resolver.write_entity(rel_path, yaml.safe_dump(value, allow_unicode=True, sort_keys=False),
                                            layer=build.storage, force=True)
+                from ....core.config.versioning import read_version
+                build.content_version = read_version(
+                    (self.resolver.local_dir if build.storage == "local" else self.resolver.system_dir) / rel_path) or 1
 
 
 def check_requirements(counts: dict[str, int], requirements: list[dict]) -> list[dict]:

@@ -233,6 +233,12 @@ class SceneEditorDialog(
         self._btn_edit.clicked.connect(self._on_edit_layout_info)
         top_bar.addWidget(self._btn_edit)
 
+        self._btn_reload_scenes = QPushButton(tr("刷新"))
+        self._btn_reload_scenes.setToolTip(
+            tr("清除场景和布局定义缓存，从磁盘重新加载；请先保存或放弃未保存的改动"))
+        self._btn_reload_scenes.clicked.connect(self._on_reload_scenes)
+        top_bar.addWidget(self._btn_reload_scenes)
+
         self._btn_new = QPushButton(tr("新建"))
         self._btn_new.clicked.connect(self._on_new_layout)
         top_bar.addWidget(self._btn_new)
@@ -310,6 +316,7 @@ class SceneEditorDialog(
         )
         apply_button_style(
             self._btn_edit,
+            self._btn_reload_scenes,
             self._btn_discard,
             self._btn_refresh,
             self._btn_add_screenshot,
@@ -533,7 +540,6 @@ class SceneEditorDialog(
         tab.on_scene_type_changed = self._on_scene_type_changed
         tab.on_scene_references_added = self._on_scene_references_added
         tab.on_scene_reference_removed = self._on_scene_reference_removed
-        tab.on_version_pending_changed = self._on_version_pending_changed
         tab.on_click_rect_mode_changed = self._on_toggle_click_rect_mode
         if self._current_layout is not None and not self._applying_layout:
             self._apply_layout_to_tab(scene_key, tab)
@@ -1041,19 +1047,10 @@ class SceneEditorDialog(
         self._btn_discard.setEnabled(True)
         self._update_scene_tab_title(scene_key, dirty=True)
 
-    def _on_version_pending_changed(self, scene_key: str):
-        """版本链接进入现有保存/放弃状态，但不冒充布局数据修改。"""
-        tab = self._tabs.get(scene_key)
-        dirty = scene_key in self._data_dirty_scenes or bool(
-            tab and tab.has_pending_version)
-        self._set_scene_dirty_visual(scene_key, dirty)
-
     def _mark_all_scenes_clean(self):
         """清除所有场景的变更标记"""
         for sk in self._dirty_scenes:
             self._update_scene_tab_title(sk, dirty=False)
-        for tab in self._tabs.values():
-            tab.clear_pending_versions()
         self._data_dirty_scenes.clear()
         self._dirty_scenes.clear()
         self._dirty_label.setVisible(False)

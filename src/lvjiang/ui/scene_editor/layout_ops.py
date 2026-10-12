@@ -446,25 +446,11 @@ class LayoutOpsMixin:
         # 影子（local 有就完全顶掉系统与在线下发，不合并），等于一次点击
         # 把整个布局永久冻住。
         changed = set(self._data_dirty_scenes)
-        layout_versions = {
-            scene_key: tab.pending_layout_version
-            for scene_key, tab in self._tabs.items()
-            if tab.pending_layout_version is not None
-        }
-        scene_versions = {
-            scene_key: tab.pending_scene_version
-            for scene_key, tab in self._tabs.items()
-            if tab.pending_scene_version is not None
-        }
         if not self._manager.save_layout(
                 self._current_layout,
-                changed_scenes=changed,
-                content_versions=layout_versions):
+                changed_scenes=changed):
             self._status_bar.showMessage(f"保存布局「{name}」失败，请检查日志")
             return
-        registry = get_registry()
-        for scene_key, version in scene_versions.items():
-            registry.save_scene_content_version(scene_key, version)
         self._update_ui_state()
         total_r = sum(len(items) for items in self._current_layout.regions.values())
         total_p = sum(len(items) for items in self._current_layout.points.values())
@@ -473,22 +459,14 @@ class LayoutOpsMixin:
         # changed 恒为集合；空集表示没有场景需要写盘（画布/描述等布局级
         # 改动仍会经 layouts.yaml 落盘），不再是"全部"的意思。
         saved_info = f"{len(changed)} 个场景" if changed else tr("无场景改动")
-        version_count = len(layout_versions) + len(scene_versions)
-        if version_count:
-            saved_info += tr("，提升 {count} 项版本").format(count=version_count)
         overrides = self._system_save_overrides(key, changed)
         if overrides:
             local_scenes = [key for key, origin in overrides.items()
                             if origin.layer == LAYER_LOCAL]
-            remote_scenes = [key for key, origin in overrides.items()
-                             if origin.layer != LAYER_LOCAL]
             reasons = []
             if local_scenes:
                 reasons.append(tr("{scenes} 仍由本地副本生效，请先还原本地覆盖")
                                .format(scenes="、".join(local_scenes)))
-            if remote_scenes:
-                reasons.append(tr("{scenes} 仍由远程版本生效，请提升版本后再保存")
-                               .format(scenes="、".join(remote_scenes)))
             self._status_bar.showMessage(tr(
                 "已保存布局「{name}」到系统层，但尚未生效：{reasons}"
             ).format(name=name, reasons="；".join(reasons)))
@@ -560,7 +538,6 @@ class LayoutOpsMixin:
             return
         for tab in self._tabs.values():
             tab.clear_pending_templates()
-            tab.clear_pending_versions()
         self._current_layout = layout
         self._apply_layout_to_tabs()
         self._update_ui_state()

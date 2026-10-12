@@ -29,6 +29,8 @@ from lvjiang.apps import load_config_policies  # noqa: E402
 from lvjiang.core.config.versioning import (  # noqa: E402
     CONTENT_VERSION_KEY,
     iter_versioned_files,
+    version_from_text,
+    with_version,
 )
 
 # 插件私有配置是插件自己注册的，不 import 就不在注册表里，会被本脚本漏掉。
@@ -79,6 +81,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true",
                         help="只报告缺失，不写盘；有缺失时退出码 1（CI 用）")
+    parser.add_argument("--reset", action="store_true", help="将维护中的 system 修订号重置为 1")
     args = parser.parse_args()
 
     missing: list[Path] = []
@@ -86,6 +89,9 @@ def main() -> int:
     for path in iter_versioned_files(_REPO_ROOT / "config" / "system"):
         text = path.read_bytes().decode("utf-8")  # newline= 是 3.13+
         if _has_version(path, text):
+            if args.reset and not args.check and version_from_text(text, path.suffix) != 1:
+                path.write_text(with_version(text, path.suffix, 1), encoding="utf-8", newline="")
+                written.append(path)
             continue
         missing.append(path)
         if args.check:

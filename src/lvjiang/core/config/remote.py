@@ -81,6 +81,7 @@ def is_enabled() -> bool:
 
 
 def _installed_store() -> UpdateStore | None:
+    from ..paths import session_directory
     from ..update import get_version
     from ..update_bundle import series
     from .resolver import get_resolver
@@ -88,14 +89,15 @@ def _installed_store() -> UpdateStore | None:
     # 开发工作区不允许在线安装器覆盖 git 管理的配置。
     if resolver.is_dev_mode():
         return None
-    path = resolver.system_dir.parent / "system-baseline.json"
+    config = resolver.system_dir.parent
+    path = session_directory(config) / "baseline.json"
     if not path.is_file():
         return None
     identity = json.loads(path.read_text(encoding="utf-8"))
     version = get_version()
     if identity.get("app_series") != series(version):
         raise ValueError("预置配置与当前应用版本不匹配，请重新安装完整应用")
-    return UpdateStore(path.parent, version, identity["sha256"])
+    return UpdateStore(config, version, identity["sha256"])
 
 
 def get_config_version() -> int:
@@ -131,6 +133,23 @@ def recover_installation() -> None:
                           activate=lambda *_args: None)
         else:
             store.install(activate=lambda *_args: None)
+
+
+def prepare_task_installation() -> None:
+    """任务前处理安装恢复及会员到期；不决定任务快照是否启用。"""
+    try:
+        store = _installed_store()
+        if store is None:
+            return
+        with store.locked():
+            store._recover()
+            member = store._state().get("member", {})
+        if member.get("files"):
+            from .protected_remote import authorized
+            if not authorized(member):
+                store.install(member_files={}, member_metadata={}, activate=lambda *_args: None)
+    except (OSError, ValueError) as error:
+        logger.debug("任务前安装状态暂不可恢复，仍加载当前磁盘配置：{}", error)
 
 
 def build_sync_job() -> SyncJob:

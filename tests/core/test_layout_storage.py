@@ -189,7 +189,9 @@ class TestSaveLoadRoundtrip:
         assert panels[0].cols == 6
 
 
-    def test_dev_save_keeps_local_only_scene_layout_in_local(self, env):
+    def test_dev_save_keeps_local_only_scene_layout_in_local(self, env, monkeypatch):
+        from lvjiang.core.config import conflicts
+        monkeypatch.setattr(conflicts, "_handler", lambda _files: True)
         mgr = LayoutConfigManager()
         assert mgr.save_layout(_make_layout())
         system_path = env / "system/layouts/test_layout/scene_a.json"
@@ -564,7 +566,9 @@ class TestSaveLayoutScope:
         mgr.save_layout(_make_layout("root_layout"), changed_scenes=None)
         assert self._saved_scene_files(env)
 
-    def test_subset_writes_only_that_scene(self, env):
+    def test_subset_writes_only_that_scene(self, env, monkeypatch):
+        from lvjiang.core.config import conflicts
+        monkeypatch.setattr(conflicts, "_handler", lambda _files: True)
         mgr = LayoutConfigManager()
         layout = _make_layout("root_layout")
         mgr.save_layout(layout)
@@ -573,21 +577,13 @@ class TestSaveLayoutScope:
         mgr.save_layout(layout, changed_scenes={"scene_a"})
         assert self._saved_scene_files(env) == {"scene_a.json"}
 
-    def test_explicit_version_alone_writes_selected_scene(self, env):
+    def test_actual_edit_increments_only_selected_scene(self, env):
         mgr = LayoutConfigManager()
         layout = _make_layout("root_layout")
         mgr.save_layout(layout)
         scene_dir = env / "system" / "layouts" / "root_layout"
-        for path in scene_dir.glob("*.json"):
-            path.unlink()
-
-        mgr.save_layout(
-            layout,
-            changed_scenes=set(),
-            content_versions={"scene_a": 2},
-        )
-
-        assert self._saved_scene_files(env) == {"scene_a.json"}
+        layout.regions["scene_a"][0].x_ratio += 0.1
+        mgr.save_layout(layout, changed_scenes={"scene_a"})
         data = json.loads((scene_dir / "scene_a.json").read_text(encoding="utf-8"))
         assert data["content_version"] == 2
 def test_old_central_disabled_section_is_rejected():

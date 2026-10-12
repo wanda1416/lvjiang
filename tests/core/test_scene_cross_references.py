@@ -28,6 +28,8 @@ class _Resolver:
 
     def __init__(self, root):
         self.root = root
+        self.system_dir = root.parent
+        self.local_dir = root.parent / "local"
 
     def enumerate_entities(self, _kind, _pattern):
         return sorted(p.name for p in self.root.glob("*.yaml"))

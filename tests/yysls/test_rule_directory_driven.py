@@ -67,7 +67,7 @@ class TestRulesFromDirectory:
         assert "disabled" not in _read(tmp_path / "system/yysls/tuning_rules/huixin_big.yaml")
         assert "huixin_big" in manager.get_rules()
 
-    def test_user_mode_disable_writes_a_stub_and_enable_removes_it(self, tmp_path):
+    def test_user_mode_disable_writes_a_stub_and_enable_removes_it(self, tmp_path, monkeypatch):
         """没改过的系统规则：停用只在 local 放一个 key + disabled 的桩，正文仍来自
         system；重新启用 = 删桩。用户一眼就知道这个 local 文件可以直接删。"""
         resolver = _layered(tmp_path, dev_mode=False)
@@ -76,7 +76,7 @@ class TestRulesFromDirectory:
         manager.set_rule_enabled("huixin_big", False)
 
         stub = tmp_path / "local/yysls/tuning_rules/huixin_big.yaml"
-        assert _read(stub) == {"key": "huixin_big", "disabled": True}
+        assert _read(stub) == {"content_version": 1, "key": "huixin_big", "disabled": True}
         assert "huixin_big" not in manager.get_rules()
         assert manager.is_rule_local_stub("huixin_big")
         # 导航仍能拿到规则名（正文来自 system）
@@ -92,6 +92,8 @@ class TestRulesFromDirectory:
         manager.reload()
         assert dict(manager.get_all_rule_keys_and_names())["huixin_big"] == "会心大外 v2"
 
+        from lvjiang.core.config import conflicts
+        monkeypatch.setattr(conflicts, "_handler", lambda _files: True)
         manager.set_rule_enabled("huixin_big", True)
         assert not stub.exists()
         assert "huixin_big" in manager.get_rules()

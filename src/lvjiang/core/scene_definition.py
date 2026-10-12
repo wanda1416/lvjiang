@@ -79,6 +79,7 @@ class SceneRegistry:
     ):
         self._resolver = resolver or get_resolver()
         self._scenes: dict[str, SceneDef] = {}
+        self._file_baselines: dict = {}
         self._order: list[str] = []
         # 分组数据
         self._groups: dict[str, str] = {}            # group_key -> group_name
@@ -101,6 +102,8 @@ class SceneRegistry:
             try:
                 scene = self._load_scene(yaml_file)
                 self._scenes[scene.key] = scene
+                from .config.conflicts import file_baseline
+                self._file_baselines[f"scenes/{name}"] = file_baseline(self._resolver, f"scenes/{name}")
                 logger.debug(f"已加载场景: {scene.key}（{len(scene.regions)} 个区域）")
             except Exception as e:
                 logger.error(f"加载场景配置失败 {yaml_file.name}: {e}")
@@ -1146,20 +1149,7 @@ class SceneRegistry:
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
 
-    def save_scene_content_version(self, scene_key: str,
-                                   content_version: int) -> None:
-        """按当前内存中的场景定义写入显式版本。
-
-        场景编辑器把版本提升作为待保存状态；只有用户确认保存时才调用这里，
-        因此关闭或切换时选择放弃不会改动磁盘版本。
-        """
-        scene = self._scenes.get(scene_key)
-        if scene is None:
-            raise ValueError(f"场景不存在: {scene_key}")
-        self._save_scene_yaml(scene, content_version=content_version)
-
     def _save_scene_yaml(self, scene: SceneDef,
-                         content_version: int | None = None,
                          layer: str | None = None):
         """将场景定义写入 YAML，保留 local 独有场景的所属层。"""
         data: dict[str, Any] = {"key": scene.key, "name": scene.name}
@@ -1220,9 +1210,20 @@ class SceneRegistry:
                 for r in scene.references
             ]
         rel_path = f"scenes/{scene.key}.yaml"
-        self._resolver.write_entity(
-            rel_path,
-            yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
-            content_version=content_version,
-            layer=layer or self._resolver.local_only_layer(rel_path),
-        )
+        from .config.conflicts import ConfigWriteConflict, checked_write, file_baseline
+        baseline = self._file_baselines.get(rel_path, file_baseline(self._resolver, rel_path))
+        try:
+            checked_write(self._resolver, {rel_path: baseline}, lambda: self._resolver.write_entity(
+                rel_path,
+                yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
+                layer=layer or self._resolver.local_only_layer(rel_path),
+            ))
+        except ConfigWriteConflict:
+            # 即时编辑先修改了对象；取消覆盖不能把这次未保存变更留在共享注册表。
+            source = self._resolver.resolve_read(rel_path)
+            if source is not None:
+                self._scenes[scene.key] = self._load_scene(source)
+            else:
+                self._scenes.pop(scene.key, None)
+            raise
+        self._file_baselines[rel_path] = file_baseline(self._resolver, rel_path)

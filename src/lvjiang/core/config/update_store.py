@@ -5,15 +5,12 @@ import json
 import re
 import shutil
 import tempfile
-import threading
 import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
-
-from fasteners import InterProcessLock
 
 from ..fs_util import atomic_write_bytes
 from ..json_files import formatted_json_bytes
@@ -31,9 +28,8 @@ from ..update_bundle import (
     verify_archive,
 )
 from ..versioning import update_namespace
+from .content import configuration_lock, content_changed
 from .member_composition import REGISTRIES, compose
-
-_MUTEXES: dict[Path, Any] = {}
 
 
 class UpdateStore:
@@ -52,20 +48,8 @@ class UpdateStore:
 
     @contextmanager
     def locked(self, *, blocking: bool = True) -> Iterator[bool]:
-        self.updates.mkdir(parents=True, exist_ok=True)
-        mutex = _MUTEXES.setdefault(self.config, threading.RLock())
-        if not mutex.acquire(blocking=blocking):
-            yield False
-            return
-        lease = InterProcessLock(self.updates / "install.lock")
-        acquired = False
-        try:
-            acquired = lease.acquire(blocking=blocking)
+        with configuration_lock(self.config, blocking=blocking) as acquired:
             yield acquired
-        finally:
-            if acquired:
-                lease.release()
-            mutex.release()
 
     def _write(self, path: Path, data: bytes) -> None:
         atomic_write_bytes(path, data, prefix=".update-", fsync=True)
@@ -346,6 +330,8 @@ class UpdateStore:
                     self._recover()
                     raise
                 try:
+                    from .resolver import ConfigResolver
+                    content_changed(ConfigResolver(self.system, self.config / "local", dev_mode=False))
                     activate(self.system, changed)
                 except Exception as error:
                     from loguru import logger

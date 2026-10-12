@@ -34,6 +34,7 @@ from __future__ import annotations
 import os
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
 
@@ -55,6 +56,24 @@ DELETED_KEY = "__deleted__"
 #: UI 层做 i18n，core 只给稳定的 key。
 LAYER_LOCAL = "local"
 LAYER_SYSTEM = "system"
+
+
+def _configuration_write(function):
+    @wraps(function)
+    def wrapped(self, *args, **kwargs):
+        from .conflicts import checked_write, file_baseline
+        from .content import configuration_lock
+        rel_path = args[0] if args else kwargs.get("rel_path")
+        def write():
+            result = function(self, *args, **kwargs)
+            if rel_path in self._read_baselines:
+                self._read_baselines[rel_path] = file_baseline(self, rel_path)
+            return result
+        if self.track_content and rel_path in self._read_baselines:
+            return checked_write(self, {rel_path: self._read_baselines[rel_path]}, write)
+        with configuration_lock(self.system_dir.parent):
+            return write()
+    return wrapped
 
 
 @dataclass(frozen=True)
@@ -348,10 +367,13 @@ class ConfigResolver:
         system_dir: Path | str | None = None,
         local_dir: Path | str | None = None,
         dev_mode: bool | None = None,
+        track_content: bool = True,
     ):
         self._system_dir = Path(system_dir) if system_dir else None
         self._local_dir = Path(local_dir) if local_dir else None
         self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
+        self.track_content = track_content
+        self._read_baselines: dict = {}
         self._listeners: list[Callable[[str], None]] = []
         self._batch_listeners: list[Callable[[tuple[str, ...]], None]] = []
         # YAML 解析结果按文件缓存；返回时必须深拷贝，因为
@@ -404,6 +426,10 @@ class ConfigResolver:
         """外部完整配置快照应用后使读取缓存失效，不改变层优先级或监听器。"""
         self._yaml_cache.clear()
 
+    def reset_edit_baselines(self) -> None:
+        """显式刷新编辑上下文时放弃旧读盘基线，不用于后台安装通知。"""
+        self._read_baselines.clear()
+
     def add_change_listener(self, cb: Callable[[str], None]):
         if cb not in self._listeners:
             self._listeners.append(cb)
@@ -420,6 +446,9 @@ class ConfigResolver:
         self.notify_changes((rel_path,), strict=strict)
 
     def notify_changes(self, paths: tuple[str, ...], *, strict: bool = False):
+        if paths and self.track_content:
+            from .content import content_changed
+            content_changed(self)
         # 写入路径主动失效，补上“同一 mtime tick 内写入了
         # 同尺寸内容”这个 stat 印记无法区分的极端情况。
         for rel_path in paths:
@@ -442,11 +471,18 @@ class ConfigResolver:
 
         local 恒为最高优先级——用户自己改过的东西，任何在线下发都不该盖掉。
         """
+        self._remember_baseline(rel_path)
         local = self.local_dir / rel_path
         if local.exists():
             return local
         system = self.system_dir / rel_path
         return system if system.exists() else None
+
+    def _remember_baseline(self, rel_path: str) -> None:
+        spec = versioning.spec_for(rel_path)
+        if self.track_content and spec is not None and spec.has_content_version and rel_path not in self._read_baselines:
+            from .conflicts import file_baseline
+            self._read_baselines[rel_path] = file_baseline(self, rel_path)
 
     def describe_entity(self, rel_path: str) -> EntityOrigin:
         """这个实体实际来自哪一层、版本多少——供编辑器把来源显示给人看。
@@ -539,19 +575,6 @@ class ConfigResolver:
         walk("")
         return sorted(results)
 
-    def next_entity_version(self, rel_path: str) -> int:
-        """返回实体下一发布版本号，不写盘。
-
-        保留既有编辑器的字段操作；该字段不再参与在线更新仲裁。
-        """
-        spec = versioning.spec_for(rel_path)
-        if spec is None or not spec.has_content_version:
-            raise ValueError(f"实体不参与版本管理: {rel_path}")
-        versions = [
-            versioning.read_version(self.system_dir / rel_path) or 0,
-        ]
-        return max(versions) + 1
-
     def _layer_root(self, layer: str | None, default: Path) -> Path:
         """把显式指定的层解析成根目录。
 
@@ -573,46 +596,34 @@ class ConfigResolver:
             return LAYER_LOCAL
         return None
 
+    @_configuration_write
     def write_entity(self, rel_path: str, data: str | bytes, *,
                      force: bool = False,
-                     content_version: int | None = None,
                      layer: str | None = None) -> Path:
         """按模式写实体文件（开发→system，用户→local 影子）
 
         ``layer`` 显式指定目标层：开发者可以把自己的私有规则组之类放进
         local 而不写进随包的 system（见 :meth:`_layer_root`）。
 
-        开发模式写 system 且该路径参与在线下发（见 core.config.versioning）
-        时，普通保存保留当前 content_version，新文件从 v1 起步。编辑器只有
-        在用户显式请求提升、并最终确认保存时才传 ``content_version``；点击
-        提升链接本身不写盘，因此放弃编辑不会留下版本变更。
-
-        用户模式写 local 不动暂留的内容版本号；local 影子恒为最高优先级。
+        实体实际修改时自动递增目标文件 content_version；新文件从 1 起步。
+        修订号不参与来源仲裁，local 影子恒为最高优先级。
         ``force`` 关掉下面的空操作检测，用于「用户明确要求生成 local 影子」
         （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与系统一致，
         不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
         """
+        from ...apps import load_config_policies
+        load_config_policies()
         root = self._layer_root(
             layer, self.system_dir if self.is_dev_mode() else self.local_dir)
         target = root / rel_path
-        writing_system = root == self.system_dir
         spec = versioning.spec_for(rel_path)
-        if (isinstance(data, str) and writing_system
-                and spec is not None and spec.has_content_version):
-            if content_version is None:
-                data = versioning.preserve_version_for_write(
-                    rel_path, data, target)
-            else:
-                if not isinstance(content_version, int) \
-                        or isinstance(content_version, bool) \
-                        or content_version < 1:
-                    raise ValueError("content_version 必须是大于 0 的整数")
-                data = versioning.with_version(
-                    data, Path(rel_path).suffix, content_version)
-        elif content_version is not None:
-            raise PermissionError("只有开发模式的版本化实体可以提升版本")
-
-        if not force and self._write_is_noop(rel_path, target, data):
+        if isinstance(data, str) and spec is not None and spec.has_content_version:
+            # 先对齐当前修订号检测空操作，再在真正修改时递增。
+            current = self.resolve_read(rel_path)
+            previous = target if target.exists() else current
+            version = (versioning.read_version(previous) if previous is not None else None) or 0
+            data = versioning.with_version(data, Path(rel_path).suffix, version or 1)
+        if (not force or target.exists()) and self._write_is_noop(rel_path, target, data):
             # 内容与「不写的话会读到的那一份」完全一致 —— 不落盘。
             #
             # 用户模式下这一步尤其要紧：照写会给一个其实没改过的文件生成
@@ -621,6 +632,10 @@ class ConfigResolver:
             # 与在线下发。场景编辑器里"什么都没改、随手点一下保存"就会
             # 把整个布局的场景全冻住，代价与操作的随意程度完全不匹配。
             return target
+
+        if isinstance(data, str) and spec is not None and spec.has_content_version:
+            next_version = (versioning.read_version(target) or 0) + 1 if target.exists() else 1
+            data = versioning.with_version(data, Path(rel_path).suffix, next_version)
 
         target.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(data, bytes):
@@ -654,7 +669,21 @@ class ConfigResolver:
             try:
                 if isinstance(data, bytes):
                     return path.read_bytes() == data
-                return path.read_text(encoding="utf-8") == data
+                previous = path.read_text(encoding="utf-8")
+                spec = versioning.spec_for(rel_path)
+                if spec is not None and spec.has_content_version:
+                    if path.suffix == ".json":
+                        import json
+                        before, after = json.loads(previous), json.loads(data)
+                        if isinstance(before, dict) and isinstance(after, dict):
+                            before.pop("content_version", None)
+                            after.pop("content_version", None)
+                            return before == after
+                    def payload(text):
+                        return "\n".join(line for line in text.splitlines()
+                                         if not line.startswith("content_version:")).strip()
+                    return payload(previous) == payload(data)
+                return previous == data
             except (OSError, UnicodeDecodeError):
                 return False
 
@@ -686,6 +715,7 @@ class ConfigResolver:
                 f"{rel_path} 由系统配置提供，用户模式下不可删除或重命名；"
                 f"如需停用请使用启用开关/展示勾选")
 
+    @_configuration_write
     def delete_entity(self, rel_path: str, *, layer: str | None = None):
         """按模式删实体：开发→直删 system；用户→只删自己的 local 影子
 
@@ -712,6 +742,7 @@ class ConfigResolver:
                 local.unlink()
         self._notify(rel_path)
 
+    @_configuration_write
     def revert_entity_to_system(self, rel_path: str) -> bool:
         """撤掉 local 影子，让实体回到系统那一份；返回是否真删了影子
 
@@ -736,6 +767,10 @@ class ConfigResolver:
     # ─── 聚合键值文件（键级 diff 深合并）──────────────────
 
     def _load_yaml(self, path: Path) -> dict:
+        for root in (self.system_dir, self.local_dir):
+            if path.is_relative_to(root):
+                self._remember_baseline(path.relative_to(root).as_posix())
+                break
         try:
             stat = path.stat()
         except OSError:
@@ -775,6 +810,7 @@ class ConfigResolver:
         registry = REGISTRY_LIST_PATHS.get(rel_path, ())
         return merge_doc(base, self._load_yaml(overlay_path), registry)
 
+    @_configuration_write
     def save_merged(self, rel_path: str, full_doc: dict, *,
                     base_doc: dict | None = None,
                     registry: tuple[str, ...] | None = None):
@@ -796,17 +832,8 @@ class ConfigResolver:
                              default_flow_style=False, sort_keys=False)
 
         if self.is_dev_mode():
-            target = self.system_dir / rel_path
-            text = _dump(full_doc)
-            if versioning.spec_for(rel_path) is not None:
-                text = versioning.preserve_version_for_write(
-                    rel_path, text, target if target.exists() else None)
-            # 内容没变就不落盘：反复重写只会刷 mtime，还会把整份文件卷进
-            # git diff（布局那批 JSON 就这么产生过一次上千行的无意义改动）。
-            if target.exists() and target.read_text(encoding="utf-8") == text:
-                return
-            target.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_text(target, text, prefix=".config_")
+            self.write_entity(rel_path, _dump(full_doc))
+            return
         else:
             base = (deepcopy(base_doc) if base_doc is not None
                     else self._load_yaml(
@@ -819,6 +846,9 @@ class ConfigResolver:
             overlay_path = self.local_dir / rel_path
             if diff:
                 text = _dump(diff)
+                if versioning.spec_for(rel_path) is not None:
+                    self.write_entity(rel_path, text)
+                    return
                 if (overlay_path.exists()
                         and overlay_path.read_text(encoding="utf-8") == text):
                     return

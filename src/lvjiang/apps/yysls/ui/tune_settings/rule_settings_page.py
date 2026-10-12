@@ -47,7 +47,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tune_config,
     standard_playstyle_attrs,
 )
-from lvjiang.core.config.resolver import LAYER_SYSTEM, EntityOrigin
+from lvjiang.core.config.resolver import EntityOrigin
 from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
@@ -83,7 +83,6 @@ class RuleSettingsPage(QWidget):
                  protected: bool = False,
                  version_origin: EntityOrigin | None = None,
                  version_origins: tuple[EntityOrigin, ...] = (),
-                 on_bump_version: Callable[[], int] | None = None,
                  parent=None):
         super().__init__(parent)
         self._data = data
@@ -95,7 +94,6 @@ class RuleSettingsPage(QWidget):
         self._version_origin = version_origin or EntityOrigin("", None)
         self._version_origins = version_origins or (
             (self._version_origin,) if self._version_origin.layer else ())
-        self._on_bump_version = on_bump_version
         self._loading = True
         # 武器/增伤词条候选来自游戏配置数据源（保存时已刷新单例）
         mgr = get_game_config()
@@ -137,25 +135,17 @@ class RuleSettingsPage(QWidget):
         apply_button_style(self._btn_rename_key, variant="neutral")
         key_row.addWidget(self._btn_rename_key)
 
-        # 版本号是另一码事（配置分发的代次，与 key 无关），拉开距离并用
-        # 竖线隔断，否则挨着 key 摆容易被读成「key 的版本」
+        # 来源与 key 分开展示，内部修订号不面向用户。
         key_row.addSpacing(28)
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setFrameShadow(QFrame.Shadow.Sunken)
         key_row.addWidget(sep)
         key_row.addSpacing(12)
-        self._version_title = QLabel(tr("规则版本："))
+        self._version_title = QLabel(tr("规则来源："))
         key_row.addWidget(self._version_title)
         self._version_label = QLabel()
         key_row.addWidget(self._version_label)
-        self._btn_bump_version = QPushButton(tr("提升"))
-        self._btn_bump_version.clicked.connect(self._bump_version)
-        self._btn_bump_version.setEnabled(self._on_bump_version is not None)
-        if self._on_bump_version is None:
-            self._btn_bump_version.setToolTip(tr("仅开发模式可以提升系统配置版本"))
-        apply_button_style(self._btn_bump_version, variant="neutral")
-        key_row.addWidget(self._btn_bump_version)
         key_row.addStretch()
         # 删除入口收在首行最右，避免与表格编辑区混排误触
         self._btn_delete = QPushButton(tr("删除本规则"))
@@ -419,35 +409,14 @@ class RuleSettingsPage(QWidget):
         self._name_label.setText(name)
 
     def _set_version_display(self, version: int | None, layer: str) -> None:
-        self._version_label.setText("-" if version is None else f"v{version}")
+        from .....ui.config_origin import layer_label
+        self._version_label.setText(layer_label(layer))
         self._version_label.setStyleSheet(layer_style(layer))
-        # 标题、数值、按钮都挂上说明：只给数值挂，用户悬停在「规则版本：」
-        # 上什么也看不到，等于没做
+        # 标题与来源都提供说明。
         current = EntityOrigin(layer, version)
         tip = origin_tooltip(current, self._version_origins)
-        for widget in (self._version_title, self._version_label,
-                       self._btn_bump_version):
-            if widget is self._btn_bump_version and not widget.isEnabled():
-                continue                      # 保留「仅开发模式可提升」那条
+        for widget in (self._version_title, self._version_label):
             widget.setToolTip(tip)
-
-    def _bump_version(self) -> None:
-        if self._on_bump_version is None:
-            return
-        try:
-            version = self._on_bump_version()
-        except Exception as e:  # noqa: BLE001
-            QMessageBox.warning(self, tr("版本提升失败"), str(e))
-            return
-        self._version_origins = tuple(
-            EntityOrigin(LAYER_SYSTEM, version)
-            if origin.layer == LAYER_SYSTEM else origin
-            for origin in self._version_origins
-        )
-        if not any(origin.layer == LAYER_SYSTEM
-                   for origin in self._version_origins):
-            self._version_origins += (EntityOrigin(LAYER_SYSTEM, version),)
-        self._set_version_display(version, LAYER_SYSTEM)
 
     def _show_playstyle_tips(self):
         btn = self._playstyle_tips_btn

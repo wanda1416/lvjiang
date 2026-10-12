@@ -199,6 +199,7 @@ class HeadingDetector:
 
 @dataclass
 class MapDef:
+    _file_baseline: Any = field(default=None, repr=False, compare=False, init=False)
     key: str
     name: str
     navigation_mode: str = NAV_MODE_CLOSED_LOOP
@@ -369,6 +370,8 @@ class MapManager:
         data.pop("content_version", None)
         origin = self._resolver.describe_entity(rel)
         map_def = MapDef.from_dict(data, layer=origin.layer)
+        from .config.conflicts import file_baseline
+        map_def._file_baseline = file_baseline(self._resolver, rel)
         if map_def.key != key:
             raise MapError(
                 tr("地图文件 {rel} 内的 key 为 {inner}，与文件名不一致")
@@ -409,6 +412,17 @@ class MapManager:
     # ─── 写入 ──────────────────────────────────────────────
 
     def save(self, map_def: MapDef, *, force: bool = False) -> Path:
+        from .config.conflicts import checked_write, file_baseline
+        rel_path = map_rel_path(map_def.key)
+        expected = map_def._file_baseline
+        if expected is None:
+            expected = file_baseline(self._resolver, rel_path)
+        result = checked_write(self._resolver, {rel_path: expected},
+                               lambda: self._save(map_def, force=force))
+        map_def._file_baseline = file_baseline(self._resolver, rel_path)
+        return result
+
+    def _save(self, map_def: MapDef, *, force: bool = False) -> Path:
         """保存地图定义；已有 local 地图在开发模式下仍写回 local。"""
         MapDef.from_dict(map_def.to_dict())  # 复用同一套校验
         duplicate = next(

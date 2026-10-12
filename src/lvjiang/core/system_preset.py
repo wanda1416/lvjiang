@@ -85,7 +85,8 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
             old = stage / "old"
-            identity = config / "system-baseline.json"
+            from .paths import session_directory
+            identity = session_directory(config) / "baseline.json"
             old_identity = identity.read_bytes() if identity.exists() else None
             if target.exists():
                 target.rename(old)
@@ -127,5 +128,6 @@ def write_baseline_identity(system_dir: Path, app_version: str) -> dict:
     version = series(app_version)
     identity = {"app_series": version, "sha256": tree_digest(files)}
     root = system_dir.parent
-    atomic_write_bytes(root / "system-baseline.json", formatted_json_bytes(identity), prefix=".baseline-", fsync=True)
+    from .paths import session_directory
+    atomic_write_bytes(session_directory(root) / "baseline.json", formatted_json_bytes(identity), prefix=".baseline-", fsync=True)
     return identity

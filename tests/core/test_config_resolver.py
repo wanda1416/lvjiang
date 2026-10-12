@@ -610,14 +610,14 @@ class TestWriteIsMinimal:
         (system / "scenes").mkdir()
         (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
         _user(dirs).write_entity("scenes/a.yaml", "key: a\n", force=True)
-        assert (local / "scenes" / "a.yaml").read_text(encoding="utf-8") == "key: a\n"
+        assert (local / "scenes" / "a.yaml").read_text(encoding="utf-8") == "content_version: 1\nkey: a\n"
 
     def test_real_change_still_written(self, dirs):
         system, local = dirs
         (system / "scenes").mkdir()
         (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
         _user(dirs).write_entity("scenes/a.yaml", "key: b\n")
-        assert (local / "scenes" / "a.yaml").read_text(encoding="utf-8") == "key: b\n"
+        assert (local / "scenes" / "a.yaml").read_text(encoding="utf-8") == "content_version: 1\nkey: b\n"
 
     def test_rewriting_identical_content_does_not_touch_file(self, dirs):
         _, local = dirs

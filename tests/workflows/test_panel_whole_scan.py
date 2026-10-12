@@ -178,7 +178,7 @@ def test_single_cell_recognize_returns_plain_type(tmp_path):
     workflow = MagicMock()
     workflow.reference_recognizer.recognize.return_value = SimpleNamespace(
         label="大律准石")
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     output = engine.execute(wf)
     assert output["mat"] == "大律准石"
     assert workflow.reference_recognizer.recognize.call_args.kwargs[
@@ -199,7 +199,7 @@ def test_whole_panel_recognize_nested_result(tmp_path):
         lambda img, group=None, include_output_ocr=True:
         SimpleNamespace(label=f"m{next(counter)}")
     )
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     output = engine.execute(wf)
     assert output["mats"] == {
         "1": {"1": "m1", "2": "m2"},
@@ -231,7 +231,7 @@ def test_single_cell_recognize_rich(tmp_path):
     )
     workflow.reference_recognizer.recognize.return_value = rich_info
     workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     output = engine.execute(wf)
     assert isinstance(output["cell"], dict)
     assert output["cell"]["label"] == "大律准石"
@@ -255,7 +255,7 @@ def test_single_cell_recognize_rich_empty_slot(tmp_path):
     engine = _make_engine()
     workflow = MagicMock()
     workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="")
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     output = engine.execute(wf)
     assert output["cell"] == {}
 
@@ -281,7 +281,7 @@ def test_whole_panel_recognize_rich(tmp_path):
             group="",
         ))
     workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     output = engine.execute(wf)
     assert isinstance(output["mats"], dict)
     # 每格都是扁平 base dict
@@ -338,7 +338,7 @@ def test_region_recognize_rich_e2e(tmp_path):
         {"slot_1": rich_slot1, "slot_2": rich_slot2},
         {"slot_1": r1, "slot_2": r2},
     )
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     output = engine.execute(wf)
     assert isinstance(output["mats"], dict)
     assert output["mats"]["slot_1"]["type"] == "大律准石"
@@ -379,7 +379,7 @@ def test_region_recognize_rich_with_func_e2e(tmp_path):
             {"slot_1": {**rich_slot1, "custom_field": "parsed"}, "slot_2": {}},
             {"slot_1": r1, "slot_2": r2},
         )
-        engine._workflow = workflow
+        engine._ensure_workflow = lambda: workflow
         output = engine.execute(wf)
         # 验证 recognize_references_rich 被调用时传了 with_func
         call_kwargs = workflow.recognize_references_rich.call_args
@@ -422,7 +422,7 @@ def test_single_cell_recognize_rich_with_func(tmp_path):
         )
         workflow.reference_recognizer.recognize.return_value = rich_info
         workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
-        engine._workflow = workflow
+        engine._ensure_workflow = lambda: workflow
         output = engine.execute(wf)
         assert output["cell"]["label"] == "大律准石"
         assert output["cell"]["real_level"] == 110
@@ -461,7 +461,7 @@ def test_whole_panel_recognize_rich_with_func(tmp_path):
                 group="",
             ))
         workflow.reference_recognizer.build_rich_base.side_effect = ReferenceRecognizer.build_rich_base
-        engine._workflow = workflow
+        engine._ensure_workflow = lambda: workflow
         output = engine.execute(wf)
         assert output["mats"]["1"]["1"]["label"] == "m1"
         assert output["mats"]["1"]["1"]["enriched"] is True
@@ -480,7 +480,7 @@ def test_recognize_rich_unknown_func_raises(tmp_path):
     engine = _make_region_engine()
     workflow = MagicMock()
     workflow.recognize_references_rich.side_effect = ValueError("未知内置函数: nonexistent_func")
-    engine._workflow = workflow
+    engine._ensure_workflow = lambda: workflow
     import pytest
     with pytest.raises(ValueError, match="未知内置函数"):
         engine.execute(wf)

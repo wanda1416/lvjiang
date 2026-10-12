@@ -156,7 +156,7 @@ class TuningRulesDialog(QDialog):
 
         version_row = QHBoxLayout()
         version_row.addStretch(1)
-        self._config_version_title = QLabel(tr("调律配置版本："))
+        self._config_version_title = QLabel(tr("调律配置来源："))
         self._config_version_value = QLabel()
         self._config_version_value.setObjectName("tune_config_version")
         version_row.addWidget(self._config_version_title)
@@ -626,8 +626,8 @@ class TuningRulesDialog(QDialog):
         resolver = get_resolver()
         current = resolver.describe_entity(_CONFIG_REL_PATH)
         available = resolver.list_entity_origins(_CONFIG_REL_PATH)
-        self._config_version_value.setText(
-            "-" if current.version is None else f"v{current.version}")
+        from .....ui.config_origin import layer_label
+        self._config_version_value.setText(layer_label(current.layer))
         self._config_version_value.setStyleSheet(layer_style(current.layer))
         tip = origin_tooltip(current, available)
         self._config_version_title.setToolTip(tip)

@@ -37,7 +37,6 @@ def test_discard_layout_changes_reloads_and_clears_pending(monkeypatch):
 
     host._manager.load_layout.assert_called_once_with("desktop")
     host._tabs["scene_a"].clear_pending_templates.assert_called_once_with()
-    host._tabs["scene_a"].clear_pending_versions.assert_called_once_with()
     assert host._current_layout is saved
     host._apply_layout_to_tabs.assert_called_once_with()
     host._update_ui_state.assert_called_once_with()

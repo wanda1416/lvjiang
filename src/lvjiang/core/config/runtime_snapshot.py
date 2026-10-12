@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -10,6 +11,8 @@ from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
 from typing import Any, TypeVar
+
+from loguru import logger
 
 T = TypeVar("T")
 
@@ -20,6 +23,8 @@ class RuntimeSnapshot:
     original_system: Path
     original_local: Path
     values: dict[object, Any] = field(default_factory=dict)
+    generation: Any = None
+    update_at: str = ""
 
     def relocate(self, path: Path) -> Path:
         for original, frozen in ((self.original_system, self.resolver.system_dir),
@@ -32,6 +37,26 @@ class RuntimeSnapshot:
 
 
 _current: ContextVar[RuntimeSnapshot | None] = ContextVar("runtime_configuration", default=None)
+
+
+@dataclass
+class _Generation:
+    identity: Any
+    owner: Any
+    system: Path
+    local: Path
+    values: dict[object, Any] = field(default_factory=dict)
+    parse_lock: Any = field(default_factory=threading.RLock)
+
+    def __del__(self):
+        shutil.rmtree(self.owner, ignore_errors=True)
+
+    def __deepcopy__(self, memo):
+        # 资源代次由引用计数共享，不能复制 TemporaryDirectory 的 finalizer。
+        return self
+
+
+_generations: dict[tuple[Path, Path], _Generation] = {}
 
 
 def current_snapshot() -> RuntimeSnapshot | None:
@@ -54,7 +79,17 @@ def scoped_value(key: object, factory: Callable[[], T]) -> T:
     if snapshot is None:
         return factory()
     if key not in snapshot.values:
-        snapshot.values[key] = factory()
+        from ..scene_definition import SceneRegistry
+        reusable = key is SceneRegistry or (isinstance(key, tuple) and key[0] == "layout")
+        if reusable and snapshot.generation is not None:
+            from copy import deepcopy
+            cached = snapshot.generation.values
+            with snapshot.generation.parse_lock:
+                if key not in cached:
+                    cached[key] = factory()
+                snapshot.values[key] = deepcopy(cached[key])
+        else:
+            snapshot.values[key] = factory()
     return snapshot.values[key]
 
 
@@ -76,8 +111,9 @@ def scoped_cache(function):
 @contextmanager
 def configuration_snapshot() -> Iterator[RuntimeSnapshot | None]:
     """与安装共用锁复制读取层；资源延迟读取也留在独立目录，退出任务后回收。"""
+    from .content import configuration_lock, load_content
+    from .remote import prepare_task_installation
     from .resolver import ConfigResolver, get_resolver
-    from .update_store import UpdateStore
 
     active = _current.get()
     if active is not None:
@@ -85,45 +121,52 @@ def configuration_snapshot() -> Iterator[RuntimeSnapshot | None]:
         return
     resolver = get_resolver()
     config = resolver.system_dir.parent
-    # 开发环境/独立测试没有安装基底，不引入隐式文件复制或真实 config 写入。
-    baseline = config / "system-baseline.json"
-    if not baseline.is_file():
-        yield None
-        return
-    import json
-    identity = json.loads(baseline.read_text(encoding="utf-8"))
-    store = UpdateStore(config, identity["app_series"], identity["sha256"])
-    if not resolver.is_dev_mode():
-        member = store._state().get("member", {})
-        if member.get("files"):
-            # APK 本轮不运行在线授权链，无会员安装记录时不导入桌面解密依赖。
-            from .protected_remote import authorized
-        if member.get("files") and not authorized(member):
-            # 快照不能让新任务绕过到期/换码；只撤会员，不依赖网络，不在工作线程触发 UI。
-            # 本任务从下面的独立目录加载；其他实例/UI 通过安装代次刷新。
-            store.install(member_files={}, member_metadata={},
-                          activate=lambda *_args: None)
-    with tempfile.TemporaryDirectory(prefix="lvjiang-task-config-") as temporary:
-        root = Path(temporary)
-        with store.locked():
-            store._recover()
-            shutil.copytree(resolver.system_dir, root / "system")
+    prepare_task_installation()
+    with configuration_lock(config):
+        content = load_content(resolver)
+        # 根目录 YAML 是任务输入，每次真正读盘；不依赖 content_version。
+        roots = tuple((layer, path.name, path.read_bytes())
+                      for layer, directory in (("system", resolver.system_dir), ("local", resolver.local_dir))
+                      if directory.is_dir() for path in sorted(directory.glob("*.yaml")))
+        # WF 没有 content_version，保留现有外部脚本编辑的热加载契约；只 stat，
+        # 不为判断变化读取脚本内容。导入链也必须固定到本次资源代次。
+        scripts = tuple((layer, str(path.relative_to(directory)), path.stat().st_mtime_ns, path.stat().st_size)
+                        for layer, directory in (("system", resolver.system_dir), ("local", resolver.local_dir))
+                        for path in sorted((directory / "workflows").rglob("*"))
+                        if path.is_file() and path.suffix in {".wf", ".lvtrace"})
+        cache_key = (resolver.system_dir.resolve(), resolver.local_dir.resolve())
+        identity = (content, roots, scripts)
+        generation = _generations.get(cache_key)
+        reused = generation is not None and generation.identity == identity
+        if not reused:
+            owner = Path(tempfile.mkdtemp(prefix="lvjiang-task-config-"))
+            root = owner
+            generation = _Generation(identity, owner, root / "system", root / "local")
+            if resolver.system_dir.is_dir():
+                shutil.copytree(resolver.system_dir, root / "system")
+            else:
+                (root / "system").mkdir()
             (root / "local").mkdir()
-            # local 的 scripts/data/telemetry 等不是配置层，不能把诊断与用户数据复制进快照。
             for name in configuration_roots(resolver.system_dir):
                 source = resolver.local_dir / name
                 if source.is_dir():
                     shutil.copytree(source, root / "local" / name)
                 elif source.is_file():
                     shutil.copy2(source, root / "local" / name)
+            _generations[cache_key] = generation
+        assert generation is not None
+        logger.debug("任务配置 content.json update_at={}，{}", content["update_at"],
+                     "复用解析缓存" if reused else "从磁盘加载新代次")
         snapshot = RuntimeSnapshot(
-            ConfigResolver(system_dir=root / "system", local_dir=root / "local", dev_mode=False),
-            resolver.system_dir, resolver.local_dir)
-        token = _current.set(snapshot)
-        try:
-            yield snapshot
-        finally:
-            _current.reset(token)
+            ConfigResolver(system_dir=generation.system, local_dir=generation.local,
+                           dev_mode=False, track_content=False),
+            resolver.system_dir, resolver.local_dir,
+            generation=generation, update_at=content["update_at"])
+    token = _current.set(snapshot)
+    try:
+        yield snapshot
+    finally:
+        _current.reset(token)
 
 
 def task_configuration(function):
@@ -131,6 +174,9 @@ def task_configuration(function):
     @wraps(function)
     def wrapped(self, source, *args, **kwargs):
         with configuration_snapshot() as snapshot:
+            if snapshot is not None:
+                self.configuration_update_at = snapshot.update_at
+                logger.info("任务配置修订时间 content.json update_at={}", snapshot.update_at)
             previous = (self._layout, self._reference_recognizer, self._workflow)
             source_layout = getattr(source, "_layout", None)
             try:
@@ -141,7 +187,10 @@ def task_configuration(function):
                     if isinstance(source, (str, Path)):
                         source = snapshot.relocate(Path(source))
                     layout_key = getattr(self._layout, "key", "")
-                    self._layout = (load_layout_by_key(layout_key) if layout_key else None) or deepcopy(self._layout)
+                    if not isinstance(layout_key, str):
+                        layout_key = ""
+                    loaded = scoped_value(("layout", layout_key), lambda: load_layout_by_key(layout_key)) if layout_key else None
+                    self._layout = deepcopy(loaded or self._layout)
                     self._workflow = None
                     # 引擎可复用；每次执行重建识别器，避免上一次任务持有旧图库元数据。
                     if self._ocr is not None:

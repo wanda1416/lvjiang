@@ -60,7 +60,9 @@ def test_close_discards_staged_changes(tmp_path):
     assert source.load_merged("config.yaml") == {"value": 1}
 
 
-def test_save_draft_does_not_restore_old_official_defaults_or_other_editors_changes(tmp_path):
+def test_save_draft_does_not_restore_old_official_defaults_or_other_editors_changes(tmp_path, monkeypatch):
+    from lvjiang.core.config import conflicts
+    monkeypatch.setattr(conflicts, "_handler", lambda _files: True)
     system = tmp_path / "system"
     local = tmp_path / "local"
     system.mkdir()

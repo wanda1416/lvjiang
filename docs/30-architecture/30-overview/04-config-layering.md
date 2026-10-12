@@ -18,6 +18,11 @@
 **写**：按模式路由——开发模式（`.git` 存在或 `LVJIANG_DEV_MODE=1`）写 system 全量；
 用户模式写 local diff。在线安装器单独负责 system 的事务替换，不写 local。
 
+实体修订缓存、任务快照与保存冲突检查见
+[配置修订缓存与运行快照](05-content-cache.md)。content_version 仅用于内部缓存失效，
+实际保存自动递增；界面只展示系统或本地来源。基底身份保存在 session/baseline.json，
+不作为任务快照的启用条件。
+
 ---
 
 ## 一、两类文件

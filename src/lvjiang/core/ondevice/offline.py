@@ -49,6 +49,9 @@ def reset_configuration() -> None:
     from . import plugins, task_runner
 
     task_runner.release_engine()
+    from ..config.content import rebuild_content
+    rebuild_content(get_resolver())
+    get_resolver().reset_edit_baselines()
     get_resolver().clear_read_cache()
     reset_session_store()
     from ..config.interface import initialize_state_stores

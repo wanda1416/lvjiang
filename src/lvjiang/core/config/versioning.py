@@ -1,8 +1,8 @@
-"""已知配置类型登记与暂留的 content_version 读写工具。
+"""已知配置类型登记与内部文件修订号读写工具。
 
 登记用于已有消费者校验、编辑器及字段维护，不限制在线包可携带的文件。
 在线更新按应用系列及 rN 修订安装，content_version 不再参与来源选择。
-此字段暂留待后续格式清理；结构 schema_version 不受影响。
+实际保存自动递增，修订号不在 UI 展示；结构 schema_version 不受影响。
 """
 from __future__ import annotations
 
@@ -10,8 +10,6 @@ import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-
-from loguru import logger
 
 #: 顶层字段名
 CONTENT_VERSION_KEY = "content_version"
@@ -165,24 +163,6 @@ def with_version(text: str, suffix: str, version: int) -> str:
         return _with_version_json(text, version)
     return _with_version_yaml(text, version)
 
-
-def preserve_version_for_write(rel_path: str, new_text: str,
-                               current_path: Path | None) -> str:
-    """普通开发保存：保留 system 当前版本，新文件从 v1 起步。
-
-    编辑器序列化场景、布局和插件配置时通常不会把 ``content_version`` 放进
-    业务模型，因此不能简单删除旧的自动 bump 逻辑，否则第一次保存就会把
-    顶层版本字段写没。这里把版本字段视为存储元数据：普通保存沿用旧号，
-    只有编辑器显式传入目标版本时才提升。
-    """
-    suffix = Path(rel_path).suffix
-    current_version = read_version(current_path) if current_path is not None else None
-    version = current_version if current_version is not None else 1
-    try:
-        return with_version(new_text, suffix, version)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        logger.warning(f"content_version 写入跳过（内容无法解析）{rel_path}: {exc}")
-        return new_text
 
 
 def iter_versioned_files(layer_root: Path) -> Iterator[Path]:

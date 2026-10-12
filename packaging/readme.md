@@ -107,8 +107,9 @@ Release 标题，确保发布页面与历史版本维持一致。
   | Android APK | 新预置代次整目录更新官方 system，保留 local/updates/session/DB；PC 同步校验后交换配置并保留备份 |
   | Windows 便携版 ZIP | **不清理**，用户必须解压到新目录，见下方打包产物说明 |
 
-  三条通道都不动 `config/local` 和 `config/session`——前者是用户覆盖，后者是运行
-  数据，都不随包分发。Android 的 PC 同步与应用升级不同：用户确认后会覆盖手机的
+  三条通道都保留 `config/local` 和 `config/session` 的个人数据。其中
+  `config/session/baseline.json` 是随官方预置生成的安装身份，新包更新它，
+  不是用户数据。Android 的 PC 同步与应用升级不同：用户确认后会覆盖手机的
   local/session 和 DB，默认保留手机任务参数及手机独有用户（可取消），不回传手机结果。
 
 **🔧 修复章节的收录原则：**
@@ -218,6 +219,8 @@ APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 > **便携版升级必须解压到新目录。** ZIP 由用户自行解压，没有任何一方能删除旧文件，
 > 就地覆盖会留下上一版已经删除或移动过的 `config/system` 内容。发布说明里给便携版
 > 用户的指引固定是「解压到新目录，再把 `config/local`、`config/session` 拷过去」。
+> 拷贝 session 时保留新包的 `baseline.json`，跳过旧 `content.json` 与 `config.lock`；
+> 它们不是个人数据，修订索引会在启动时重建。
 > 安装器和 APK 已各自清理，不需要这条提示。
 
 打包脚本会自动：
@@ -281,7 +284,7 @@ Windows/Android 构建、签名核验及四项产物检查，不允许绕过失�
 - [ ] `android/app/build.gradle.kts` versionCode 已按正式发布递增（与 config/布局下发独立）
 - [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
 - [ ] **不兼容变动已逐项排查**（对照上表八类），每条都写了「现象 / 原因 / 如何调整」；确认无不兼容时也已明确写出
-- [ ] 已确认本次是否有开发者**明确安排的远端配置下发**：没有则保持所有 `content_version` 原值不动；有则仅核对开发者已在编辑器里显式提升的目标文件。发布 Agent 不得自行提升；会被 `config/local` 遮蔽的内容已在发布说明里提示用户
+- [ ] 文件修订号由实际保存自动递增，不为发布批量提升；在线配置发布按应用系列及 rN 管理，与 content_version 无关。会被 `config/local` 遮蔽的内容已在发布说明里提示用户
 - [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全）
 - [ ] `uv.lock` 变更已纳入提交（如有）
 - [ ] 所有变更已提交并推送

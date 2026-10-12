@@ -163,7 +163,7 @@ def test_rename_scene_survives_in_place_hot_reload(tmp_path):
     assert registry._group_scenes["main"] == ["before", "new", "after"]
 
 
-def test_explicit_scene_version_is_written_only_when_saved(tmp_path):
+def test_scene_revision_increments_on_actual_edit(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
@@ -182,10 +182,9 @@ def test_explicit_scene_version_is_written_only_when_saved(tmp_path):
     )
     registry = SceneRegistry(resolver=resolver)
 
-    # 链接点击只在 UI 中记录 pending；对话框真正保存时才调这个 API。
     assert yaml.safe_load(path.read_text(encoding="utf-8"))[
         "content_version"] == 2
-    registry.save_scene_content_version("factory", 3)
+    registry.rename_scene("factory", "factory", "修改后的场景")
     assert yaml.safe_load(path.read_text(encoding="utf-8"))[
         "content_version"] == 3
 

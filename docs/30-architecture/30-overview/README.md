@@ -12,3 +12,4 @@
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南 |
 | [03-graduation-formula-model.md](03-graduation-formula-model.md) | 毕业率公式模型（导航至 36-graduation） |
 | [04-config-layering.md](04-config-layering.md) | 配置分层：system/remote/local/session、合并语义、删除白名单 |
+| [05-content-cache.md](05-content-cache.md) | 配置修订缓存、运行快照、保存冲突与基底状态路径 |

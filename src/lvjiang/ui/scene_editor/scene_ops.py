@@ -62,10 +62,54 @@ class SceneOpsMixin:
 
     # ─── Tab 重建 ────────────────────────────────────────
 
+    def _on_reload_scenes(self):
+        """失效定义缓存并从磁盘重建；未保存改动必须由用户先处理。"""
+        if self._dirty_scenes:
+            QMessageBox.information(
+                self, tr("请先处理未保存的改动"),
+                tr("以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。")
+                + "\n\n" + self._get_dirty_scene_names(),
+            )
+            return
+        scene_key = self._get_current_scene_key()
+        layout_key = (
+            self._current_layout.key if self._current_layout is not None
+            else self._layout_combo.currentData() or "")
+        try:
+            from ...core.config.content import rebuild_content
+            rebuild_content(get_resolver())
+            get_resolver().reset_edit_baselines()
+            reload_scene_registry()
+            # 必须先读定义再读坐标，否则新增区域会被旧定义当作孤儿过滤。
+            layout = self._manager.load_layout(layout_key) if layout_key else None
+        except Exception as exc:
+            logger.exception("重载场景失败")
+            QMessageBox.warning(self, tr("重载失败"), str(exc))
+            return
+
+        self._mark_all_scenes_clean()
+        self._img_cache.clear()
+        self._loaded_scenes.clear()
+        self._scene_layout_paths.clear()
+        self._current_layout = layout
+        self._rebuild_group_tabs()
+        self._select_scene(scene_key)
+        self._apply_layout_to_tabs()
+        self._update_ui_state()
+        self._update_info_label()
+        self._result_text.clear()
+        self._status_bar.showMessage(tr("已从磁盘重载全部场景及当前布局"))
+        logger.info("已重载全部场景定义及当前编辑布局: {}", layout_key)
+
     def _rebuild_group_tabs(self):
         """重建分组 Tab（一级 Tab）"""
         self._group_tab_widget.blockSignals(True)
+        old_widgets = [
+            self._group_tab_widget.widget(index)
+            for index in range(self._group_tab_widget.count())]
         self._group_tab_widget.clear()
+        for widget in old_widgets:
+            widget.deleteLater()
         self._group_tabs.clear()
         self._tabs.clear()
         registry = get_registry()

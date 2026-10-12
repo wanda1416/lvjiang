@@ -155,9 +155,7 @@ class RulePanel(QWidget):
             on_enable_changed=self._on_rule_enable_changed,
             protected=self._manager.is_system_rule(self._key),
             version_origin=self._manager.describe_rule_version(self._key),
-            version_origins=self._manager.list_rule_versions(self._key),
-            on_bump_version=(self._bump_rule_version
-                             if self._manager.can_bump_rule_version() else None))
+            version_origins=self._manager.list_rule_versions(self._key))
         # 回填启用状态（从 tune_config.tuning_rules 读取）
         self._settings_page.set_enabled(self._is_rule_enabled())
         self._stack.addWidget(self._wrap_scroll(self._settings_page))
@@ -229,28 +227,14 @@ class RulePanel(QWidget):
                 message = tr(
                     "已保存到系统层，但本地配置仍在生效；"
                     "系统修改尚未生效，请先还原本地覆盖（{now}）")
-            else:
-                message = tr(
-                    "已保存到系统层，但远程 v{version} 仍在生效；"
-                    "系统修改尚未生效，请点「提升」（{now}）")
             self._status_cb(message.format(
-                version=override.version, now=now), "warn")
+                now=now), "warn")
             return
         warn = self._soft_pool_warning()
         if warn:
             self._status_cb(tr("已保存并生效（{now}）").format(now=now) + "；" + warn, "warn")
         else:
             self._status_cb(tr("已保存并生效（{now}）").format(now=now), False)
-
-    def _bump_rule_version(self) -> int:
-        """规则版本提升是明确的即时操作，不进入对话框暂存状态。"""
-        version = self._manager.bump_rule_version(self._key, self._data)
-        self._data["content_version"] = version
-        self._status_cb(
-            tr("规则版本已提升至 v{version} 并生效").format(version=version),
-            False,
-        )
-        return version
 
     def _soft_pool_warning(self) -> str | None:
         """软校验（不阻止保存）：可用词条库同时含动态属攻与

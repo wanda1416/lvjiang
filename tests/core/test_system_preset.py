@@ -101,8 +101,9 @@ class BuildOnly(importlib.abc.MetaPathFinder):
             raise ImportError('Build host must not import runtime: ' + fullname)
 sys.meta_path.insert(0, BuildOnly())
 sys.path.insert(0, sys.argv[1])
-from lvjiang.core.system_preset import build_system_preset
+from lvjiang.core.system_preset import build_system_preset, write_baseline_identity
 build_system_preset(Path(sys.argv[2]), Path(sys.argv[3]))
+write_baseline_identity(Path(sys.argv[2]), '0.15.0')
 """
     output = tmp_path / "host-preset.zip"
     subprocess.run([sys.executable, "-c", script, str(source), str(official), str(output)],

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from . import versioning
+from .conflicts import checked_write, file_baseline
 from .resolver import REGISTRY_LIST_PATHS, ConfigResolver, compute_diff, merge_doc
 
 
@@ -34,11 +34,17 @@ class ConfigEditSession:
             system_dir=system,
             local_dir=local,
             dev_mode=source.is_dev_mode(),
+            track_content=False,
         )
         self._closed = False
         self._baseline_merged: dict[str, dict] = {}
         self._materialize()
         self._baseline_entities = self._entity_snapshot()
+        self._source_baselines = self._capture_baselines()
+
+    def _capture_baselines(self) -> dict:
+        paths = set(self._merged_paths) | {name for name, _layer in self._baseline_entities}
+        return {name: file_baseline(self._source, name) for name in paths}
 
     def _materialize(self) -> None:
         for rel_path in self._merged_paths:
@@ -81,21 +87,21 @@ class ConfigEditSession:
                         result[(rel_path, layer)] = path.read_bytes()
         return result
 
-    @staticmethod
-    def _payload_version(rel_path: str, payload: bytes | None) -> int | None:
-        """读取会话快照里的版本号，不依赖文件仍存在。"""
-        if payload is None:
-            return None
-        try:
-            text = payload.decode("utf-8")
-        except UnicodeDecodeError:
-            return None
-        return versioning.version_from_text(text, Path(rel_path).suffix)
-
     def commit(self) -> None:
         """通过真实 resolver 提交相对上次保存的全部差异。"""
         if self._closed:
             raise RuntimeError("配置编辑会话已经关闭")
+        current = self._entity_snapshot()
+        changed = {name for name, layer in current.keys() | self._baseline_entities.keys()
+                   if current.get((name, layer)) != self._baseline_entities.get((name, layer))}
+        changed.update(name for name in self._merged_paths
+                       if self.resolver.load_merged(name) != self._baseline_merged[name])
+        checked_write(self._source,
+                      {name: self._source_baselines.get(name, (None, None)) for name in changed},
+                      self._commit)
+        self._source_baselines = self._capture_baselines()
+
+    def _commit(self) -> None:
         for rel_path in self._merged_paths:
             data = self.resolver.load_merged(rel_path)
             registry = REGISTRY_LIST_PATHS.get(rel_path, ())
@@ -119,17 +125,8 @@ class ConfigEditSession:
                 # YAML 每行之间多出一个空行。真实写入前还原为逻辑换行，
                 # 最终落盘时只做一次平台换行转换。
                 text = text.replace("\r\n", "\n").replace("\r", "\n")
-            content_version = None
-            if (layer == "system" and self._source.is_dev_mode()
-                    and versioning.spec_for(rel_path)):
-                # 只在草稿显式修改字段时提交版本，普通编辑保留源文件字段。
-                draft_version = self._payload_version(rel_path, payload)
-                baseline_version = self._payload_version(
-                    rel_path, self._baseline_entities.get((rel_path, layer)))
-                if draft_version != baseline_version:
-                    content_version = draft_version
             self._source.write_entity(
-                rel_path, text, content_version=content_version, layer=layer)
+                rel_path, text, layer=layer)
         for rel_path, layer in sorted(
                 self._baseline_entities.keys() - current.keys()):
             self._source.delete_entity(rel_path, layer=layer)
@@ -147,6 +144,7 @@ class ConfigEditSession:
             root.mkdir(parents=True)
         self._materialize()
         self._baseline_entities = self._entity_snapshot()
+        self._source_baselines = self._capture_baselines()
 
     def close(self) -> None:
         if self._closed:

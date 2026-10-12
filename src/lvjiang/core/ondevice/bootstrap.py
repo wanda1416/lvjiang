@@ -18,6 +18,9 @@ def initialize(preset_path: str) -> str:
             if is_running():
                 raise ValueError("请先结束任务再初始化配置")
             updated = install_system_preset(Path(preset_path), constants.PROJECT_ROOT, on_applied=reset_configuration)
+            if not updated:
+                # 每次新进程启动仍重建修订记录，手工修改可通过重启生效。
+                reset_configuration()
             manager = UserConfigManager()
             store = get_session_store()
             if not store.get_active("user", ""):

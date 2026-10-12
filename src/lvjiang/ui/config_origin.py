@@ -23,8 +23,7 @@ def layer_style(layer: str) -> str:
 
 
 def _origin_text(origin: EntityOrigin) -> str:
-    version = "-" if origin.version is None else f"v{origin.version}"
-    return f"{layer_label(origin.layer)} · {version}"
+    return layer_label(origin.layer)
 
 
 def origin_tooltip(current: EntityOrigin,
@@ -42,7 +41,4 @@ def origin_tooltip(current: EntityOrigin,
     for origin in available:
         marker = " ✓" if origin.layer == current.layer else ""
         lines.append(f"{_origin_text(origin)}{marker}")
-    if pending is not None:
-        lines.extend(("", tr("待保存：系统将提升至 v{version}")
-                      .format(version=pending)))
     return "\n".join(lines)

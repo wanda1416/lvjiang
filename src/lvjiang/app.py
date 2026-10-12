@@ -110,7 +110,16 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     from .core.config.interface import initialize_state_stores
     initialize_state_stores()
+    from .core.config.content import rebuild_content
+    from .core.config.resolver import get_resolver
+    from .core.scene_registry import reload_scene_registry
+    rebuild_content(get_resolver())
+    get_resolver().reset_edit_baselines()
+    reload_scene_registry()
     _app = QApplication(sys.argv)
+    from .core.config.conflicts import set_conflict_handler
+    from .ui.config_conflicts import confirm_config_overwrite
+    set_conflict_handler(confirm_config_overwrite)
 
     # 窗口创建前应用主题，避免启动时先闪出系统浅色再切换。
     from .core.config import load_user_config

@@ -13,6 +13,7 @@ import json
 import re
 import shutil
 import uuid
+from functools import wraps
 from pathlib import Path
 from typing import Iterable
 
@@ -1056,6 +1057,28 @@ def expand_one_reference(regions: dict, points: dict, scene_key: str,
 
 # ─── 布局配置管理器 ──────────────────────────────────────
 
+def _checked_layout_save(function):
+    @wraps(function)
+    def wrapped(self, layout, changed_scenes=None, **kwargs):
+        from .config.conflicts import ConfigWriteConflict, checked_write, file_baseline
+        resolver = get_resolver()
+        names = scene_layout_rels(layout.key, changed_scenes or ()).values()
+        names = set(names) | {"layouts.yaml"}
+        baselines = {name: baseline for name, baseline in layout._file_baselines.items()
+                     if changed_scenes is None or name in names}
+        try:
+            result = checked_write(resolver, baselines,
+                                   lambda: function(self, layout, changed_scenes, **kwargs))
+        except ConfigWriteConflict as exc:
+            logger.info("布局未保存：{}", exc)
+            return False
+        if result:
+            layout._file_baselines = {
+                name: file_baseline(resolver, name) for name in layout._file_baselines}
+        return result
+    return wrapped
+
+
 class LayoutConfigManager:
     """管理布局配置的持久化
 
@@ -1188,10 +1211,14 @@ class LayoutConfigManager:
             logger.warning(f"布局不存在: {name}")
         else:
             logger.info(f"布局已加载: {name}")
+            from .config.conflicts import file_baseline
+            from .scene_registry import get_registry
+            paths = set(scene_layout_rels(name, get_registry().all_scene_keys()).values()) | {"layouts.yaml"}
+            layout._file_baselines = {path: file_baseline(get_resolver(), path) for path in paths}
         return layout
 
-    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None,
-                    content_versions: dict[str, int] | None = None) -> bool:
+    @_checked_layout_save
+    def save_layout(self, layout: Layout, changed_scenes: set[str] | None = None) -> bool:
         """保存布局
 
         Args:
@@ -1199,8 +1226,6 @@ class LayoutConfigManager:
             changed_scenes: 需要写盘的场景 key 集合。
                 None = 全量写盘（新建布局、另存为等场景）；
                 set = 增量写盘，只写指定场景的 JSON 文件。
-            content_versions: 场景 key → 显式目标版本。版本提升本身也会使对应
-                场景文件进入本次写盘集合；未提供的文件普通保存时保留旧版本。
 
         别名布局（yaml 条目带 extends）：保留 extends 字段，
         scene 文件写入根布局目录（别名自身不维护 scene）。
@@ -1267,9 +1292,8 @@ class LayoutConfigManager:
         all_scene_keys = (set(layout.regions) | set(layout.points) | set(layout.arrows)
                           | set(layout.panels) | set(layout.crop_canvases)
                           | set(layout.subscene_refs))
-        versions = content_versions or {}
         scene_keys = all_scene_keys if changed_scenes is None else (
-            (changed_scenes & all_scene_keys) | set(versions))
+            changed_scenes & all_scene_keys)
         for sk in scene_keys:
             entry: dict = {}
             # 按场景定义顺序排序 regions/points/panels，避免编辑顺序影响输出
@@ -1316,7 +1340,6 @@ class LayoutConfigManager:
             resolver.write_entity(
                 rel_path,
                 json.dumps(entry, ensure_ascii=False, indent=2),
-                content_version=versions.get(sk),
                 layer=resolver.local_only_layer(rel_path),
             )
         mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else tr("全量")

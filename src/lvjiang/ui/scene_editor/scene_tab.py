@@ -110,14 +110,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._layout_name: str = ""
         self._layout_display_name: str = ""
         self._layout_rel_path: str = ""
-        # 版本提升是编辑状态，不在点击链接时写盘。dialog 保存成功后统一清除；
-        # 切换/关闭选择 Discard 时控件随 Tab 状态一起丢弃。
-        self._pending_scene_version: int | None = None
-        self._pending_layout_version: int | None = None
         # 模板图片在用户保存布局前只驻留内存，关闭/切换布局不会留下孤儿文件。
         self._pending_templates: dict[str, tuple[np.ndarray, int, int]] = {}
         self._pending_template_deletes: set[str] = set()
-        self.on_version_pending_changed: Callable[[str], None] | None = None
         self.on_click_rect_mode_changed: Callable[[bool], None] | None = None
 
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -183,7 +178,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
     # ─── 面板构建 ────────────────────────────────────────
 
     def _build_canvas_toolbar(self) -> QHBoxLayout:
-        """画布顶部工具栏：视图选择器 + 管理入口 + 来源/版本标识"""
+        """画布顶部工具栏：视图选择器 + 管理入口 + 来源标识"""
         bar = QHBoxLayout()
         # 作为 SceneTab 内容的首行，保持与上方分组/场景 Tab 紧密衔接。
         bar.setContentsMargins(0, 0, 0, 0)
@@ -228,38 +223,30 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         bar.addWidget(self._btn_manage_screenshots)
         bar.addSpacing(12)
 
-        self._scene_version_title = QLabel(tr("场景版本："))
+        self._scene_version_title = QLabel(tr("场景来源："))
         self._scene_version_value = QLabel()
-        self._scene_version_link = QLabel()
         for label in (
                 self._scene_version_title,
-                self._scene_version_value,
-                self._scene_version_link):
+                self._scene_version_value):
             label.setSizePolicy(
                 QSizePolicy.Policy.Preferred,
                 QSizePolicy.Policy.Fixed,
             )
-        self._configure_version_link(self._scene_version_link, "scene")
         bar.addWidget(self._scene_version_title)
         bar.addWidget(self._scene_version_value)
-        bar.addWidget(self._scene_version_link)
         bar.addSpacing(18)
 
-        self._layout_version_title = QLabel(tr("布局版本："))
+        self._layout_version_title = QLabel(tr("布局来源："))
         self._layout_version_value = QLabel()
-        self._layout_version_link = QLabel()
         for label in (
                 self._layout_version_title,
-                self._layout_version_value,
-                self._layout_version_link):
+                self._layout_version_value):
             label.setSizePolicy(
                 QSizePolicy.Policy.Preferred,
                 QSizePolicy.Policy.Fixed,
             )
-        self._configure_version_link(self._layout_version_link, "layout")
         bar.addWidget(self._layout_version_title)
         bar.addWidget(self._layout_version_value)
-        bar.addWidget(self._layout_version_link)
         bar.addStretch()
 
         self._refresh_view_combo()
@@ -320,7 +307,6 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
                         display_name: str = ""):
         """由 dialog 注入布局 key、坐标文件来源和展示名。"""
         if layout_name != self._layout_name:
-            self._pending_layout_version = None
             self._pending_templates.clear()
             self._pending_template_deletes.clear()
         self._layout_name = layout_name
@@ -435,12 +421,6 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
                 scale=hit.scale if hit is not None else 0.0,
             ))
 
-    def _configure_version_link(self, label: QLabel, kind: str) -> None:
-        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-        label.setOpenExternalLinks(False)
-        label.linkActivated.connect(
-            lambda _href, k=kind: self._on_version_link(k))
-
     def _version_rel_path(self, kind: str) -> str:
         if kind == "scene":
             return f"scenes/{self._scene_key}.yaml"
@@ -451,84 +431,32 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         from ...core.layout_manager import scene_layout_rel
         return scene_layout_rel(self._layout_name, self._scene_key)
 
-    def _refresh_version_control(self, kind: str, value: QLabel,
-                                 link: QLabel, title: QLabel) -> None:
+    def _refresh_version_control(self, kind: str, value: QLabel, title: QLabel) -> None:
         from ...core.config.resolver import get_resolver
-        from ..config_origin import layer_style, origin_tooltip
+        from ..config_origin import layer_label, layer_style, origin_tooltip
 
         resolver = get_resolver()
         rel_path = self._version_rel_path(kind)
         origin = resolver.describe_entity(rel_path) if rel_path else None
         available = resolver.list_entity_origins(rel_path) if rel_path else ()
-        pending = (self._pending_scene_version if kind == "scene"
-                   else self._pending_layout_version)
         layer = origin.layer if origin else ""
-        version = origin.version if origin is not None else None
-        value.setText("-" if (pending or version) is None
-                      else f"v{pending if pending is not None else version}")
+        value.setText(layer_label(layer) if layer else tr("无"))
         value.setStyleSheet(layer_style(layer))
-        # 三个控件都挂同一份说明：没人知道非要悬停在数字上才有提示
         from ...core.config.resolver import EntityOrigin
         tip = origin_tooltip(
-            origin or EntityOrigin("", None), available, pending)
-        for widget in (title, value, link):
+            origin or EntityOrigin("", None), available)
+        for widget in (title, value):
             widget.setToolTip(tip)
-
-        if not rel_path or origin is None or origin.version is None \
-                or not resolver.is_dev_mode():
-            link.hide()
-            return
-        if pending is None:
-            target = resolver.next_entity_version(rel_path)
-            link.setText(f'<a href="bump">{tr("提升至 v{version}").format(version=target)}</a>')
-        else:
-            link.setText(f'<a href="cancel">{tr("撤销提升")}</a>')
-        link.show()
 
     def _refresh_version_info(self) -> None:
         if not hasattr(self, "_scene_version_value"):
             return
         self._refresh_version_control(
-            "scene", self._scene_version_value, self._scene_version_link,
+            "scene", self._scene_version_value,
             self._scene_version_title)
         self._refresh_version_control(
-            "layout", self._layout_version_value, self._layout_version_link,
+            "layout", self._layout_version_value,
             self._layout_version_title)
-
-    def _on_version_link(self, kind: str) -> None:
-        from ...core.config.resolver import get_resolver
-
-        rel_path = self._version_rel_path(kind)
-        if not rel_path:
-            return
-        attr = ("_pending_scene_version" if kind == "scene"
-                else "_pending_layout_version")
-        pending = getattr(self, attr)
-        setattr(self, attr, None if pending is not None
-                else get_resolver().next_entity_version(rel_path))
-        self._refresh_version_info()
-        if self.on_version_pending_changed is not None:
-            self.on_version_pending_changed(self._scene_key)
-
-    @property
-    def pending_scene_version(self) -> int | None:
-        return self._pending_scene_version
-
-    @property
-    def pending_layout_version(self) -> int | None:
-        return self._pending_layout_version
-
-    @property
-    def has_pending_version(self) -> bool:
-        return (self._pending_scene_version is not None
-                or self._pending_layout_version is not None)
-
-    def clear_pending_versions(self) -> None:
-        if not self.has_pending_version:
-            return
-        self._pending_scene_version = None
-        self._pending_layout_version = None
-        self._refresh_version_info()
 
     # ─── 视图 ────────────────────────────────────────────
 

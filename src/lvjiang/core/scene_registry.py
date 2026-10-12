@@ -109,6 +109,8 @@ def get_registry() -> SceneRegistry:
 
 def reload_scene_registry():
     """原位重新加载注册表，避免已打开编辑器持有失效对象。"""
+    # 显式重载也服务于 Git 拉取和外部编辑，不依赖写入通知或文件时间戳。
+    get_root_resolver().clear_read_cache()
     manifest = _load_manifest()
     refreshed = SceneRegistry(
         resolver=get_root_resolver(),

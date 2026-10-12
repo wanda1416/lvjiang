@@ -10,6 +10,7 @@ from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
+from ...core.config import load_user_config
 from ...i18n import tr
 from ..execution_feedback import clear_start_failures
 from ..mobile.device_scan import DeviceScanPanel
@@ -44,6 +45,7 @@ def _find_auto_connect_window_index(
 class _AdbConnSignalBridge(QObject):
     """工作流线程 → 主线程的 ADB 断连信号桥"""
     adb_lost = pyqtSignal(str, str)
+    adb_restored = pyqtSignal(str)
 
     def __init__(self, target_id: str):
         super().__init__()
@@ -51,6 +53,9 @@ class _AdbConnSignalBridge(QObject):
 
     def notify_lost(self, error_msg: str):
         self.adb_lost.emit(self._target_id, error_msg)
+
+    def notify_restored(self):
+        self.adb_restored.emit(self._target_id)
 
 
 class _DeviceWorker(QObject):
@@ -64,12 +69,14 @@ class _DeviceWorker(QObject):
     finished = pyqtSignal()
 
     def __init__(self, task: str, serial: str = "", capture_method: str = "",
-                 agent_mode: bool = False, subnets: list | None = None):
+                 agent_mode: bool = False, subnets: list | None = None,
+                 allow_adb_fallback: bool = True):
         super().__init__()
         self._task = task
         self._serial = serial
         self._capture_method = capture_method
         self._agent_mode = agent_mode
+        self._allow_adb_fallback = allow_adb_fallback
         self._subnets = subnets  # None = 扫描全部网卡
         self._cancelled = False
 
@@ -153,6 +160,9 @@ class _DeviceWorker(QObject):
         if self._agent_mode:
             agent = connect_agent(device)
             if agent is None:
+                if not self._allow_adb_fallback:
+                    self.error.emit(tr("设备端代理不可用，且高级设置已禁用 ADB 输入降级；请恢复手机代理后重新连接"))
+                    return
                 self.notice.emit(tr("[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input"))
             else:
                 self.notice.emit(f"[设备端执行] 已连接 {agent.describe()}")
@@ -358,8 +368,10 @@ class WindowOpsMixin:
         ``screencap`` / ``scrcpy`` / ``ADB`` 这些实现 key 原样摆给用户看。
         """
         if target.kind == "adb":
-            input_mode = tr("端侧执行") if target.agent is not None \
-                else tr("指令执行")
+            actual_kind = getattr(getattr(target, "input_ctrl", None), "kind", None)
+            device_input = (actual_kind == "agent" if actual_kind is not None
+                            else target.agent is not None)
+            input_mode = tr("端侧执行") if device_input else tr("指令执行")
             # 截图方式只可能是 scrcpy / screencap（UserConfig 有白名单校验）；
             # 设备端代理只接管输入，不改变截图命令
             capture_mode = tr("流式截图") \
@@ -1007,6 +1019,7 @@ class WindowOpsMixin:
             task="connect", serial=combo_data["serial"],
             capture_method=capture_method,
             agent_mode=device_execution,
+            allow_adb_fallback=load_user_config().android_recovery.allow_adb_fallback,
         )
         self._device_worker.moveToThread(self._device_thread)
         self._device_thread.started.connect(self._device_worker.run)
@@ -1092,7 +1105,9 @@ class WindowOpsMixin:
 
         bridge = _AdbConnSignalBridge(target_id)
         bridge.adb_lost.connect(self._on_adb_connection_lost)
+        bridge.adb_restored.connect(self._on_adb_connection_restored)
         device.on_connection_lost = bridge.notify_lost
+        device.on_connection_restored = bridge.notify_restored
         device.stop_check = lambda tid=target_id: bool(
             (run := self._run_manager.run_for_target(tid))
             and run.stop_event.is_set())

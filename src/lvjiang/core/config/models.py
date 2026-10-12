@@ -228,6 +228,22 @@ def _from_known(cls, raw: dict):
 
 
 @dataclass
+class AndroidRecoveryConfig:
+    """本机 Android 连接恢复策略，执行开始时固定。"""
+
+    allow_adb_fallback: bool = True
+    agent_attempts: int = 3
+    adb_attempts: int = 3
+    retry_interval: float = 2.0
+
+    def __post_init__(self):
+        self.allow_adb_fallback = bool(self.allow_adb_fallback)
+        self.agent_attempts = max(1, min(10, int(self.agent_attempts)))
+        self.adb_attempts = max(1, min(10, int(self.adb_attempts)))
+        self.retry_interval = max(0.0, min(30.0, float(self.retry_interval)))
+
+
+@dataclass
 class UserConfig:
     """用户配置（代码默认值 + session.json / app.yaml 覆盖，只读）
 
@@ -239,6 +255,7 @@ class UserConfig:
     theme: str = "light"                     # 界面主题（light / dark）
     android_capture_method: str = "scrcpy"  # scrcpy / screencap
     android_input_method: str = "adb"       # adb / device_gesture（Beta，需 App）
+    android_recovery: AndroidRecoveryConfig = field(default_factory=AndroidRecoveryConfig)
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
     # 桌面截图默认走后台截图（WGC，窗口被遮挡也能截）。默认关：mss 更快更稳，
@@ -261,6 +278,8 @@ class UserConfig:
             self.android_input_method = "adb"
         if isinstance(self.input_sim, dict):
             self.input_sim = InputSimConfig(**self.input_sim)
+        if isinstance(self.android_recovery, dict):
+            self.android_recovery = _from_known(AndroidRecoveryConfig, self.android_recovery)
         if isinstance(self.hotkeys, dict):
             self.hotkeys = _from_known(HotkeyConfig, self.hotkeys)
         if isinstance(self.network, dict):

@@ -1139,6 +1139,8 @@ class RunControlMixin:
             self._show_workflow_start_error(tr("当前没有可执行目标"), scope=execution_scope)
             return False
         target_snapshot = target.snapshot()
+        from ...core.config import load_user_config
+        recovery = load_user_config().android_recovery if target.kind == "adb" else None
         self._capture_launch_draft(target.id)
         run_username = str(
             getattr(self, "_execution_username_snapshot", "") or ""
@@ -1151,6 +1153,11 @@ class RunControlMixin:
             report_start_failure(self, decision.reason, execution_scope)
             return False
         self._current_run_context = run_context
+        if recovery is not None and target.device is not None:
+            target.device.recovery = recovery
+            configure = getattr(target.input_ctrl, "configure_recovery", None)
+            if configure is not None:
+                configure(recovery)
         run_context.metadata["execution_scope"] = execution_scope
         run_context.metadata["launch_draft"] = copy.deepcopy(target.launch_draft)
         run_context.lease = getattr(self, "_execution_lease", None)
@@ -1677,6 +1684,7 @@ class RunControlMixin:
             "若无法恢复，请按 F10 停止任务后重新连接: {error}").format(
                 name=target.display_name, error=error_msg)
         self.log_text.append(message)
+        self._show_connection_recovery_question(target, run_context, error_msg)
         if target_id != self._execution_targets.active_target_id:
             return
         self.statusBar().showMessage(tr(
@@ -1697,10 +1705,92 @@ class RunControlMixin:
                 btn.clicked.connect(self._resume_adb)
             banner.setVisible(True)
 
+    def _show_connection_recovery_question(self, target, run_context, error_msg):
+        """设备恢复属于安全交互，不走无人值守工作流弹窗自动处理。"""
+        from PyQt6.QtCore import Qt, QTimer
+        from PyQt6.QtWidgets import QMessageBox
+
+        dialogs = getattr(self, '_connection_recovery_dialogs', None)
+        if dialogs is None:
+            dialogs = self._connection_recovery_dialogs = {}
+        text = tr(
+            "{name} 的连接恢复未完成。\n{error}\n\n"
+            "请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。"
+        ).format(name=target.display_name, error=error_msg)
+        if target.id in dialogs:
+            dialogs[target.id].setText(text)
+            return
+        box = QMessageBox(QMessageBox.Icon.Warning, tr("等待设备恢复"), text,
+                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, self)
+        box.setDefaultButton(QMessageBox.StandardButton.No)
+        box.setWindowModality(Qt.WindowModality.NonModal)
+        dialogs[target.id] = box
+        timer = QTimer(box)
+        timer.setInterval(200)
+
+        def current():
+            return self._run_manager.run_for_target(target.id) is run_context
+
+        def finish(answer):
+            timer.stop()
+            dialogs.pop(target.id, None)
+            if current() and not run_context.stop_event.is_set():
+                from .execution_runs import RunState
+                if answer == QMessageBox.StandardButton.Yes:
+                    if target.resume_event is not None:
+                        target.resume_event.set()
+                    self.log_text.append(tr("[操作] 重新检查设备连接"))
+                else:
+                    run_context.stop_event.set()
+                    if run_context.pause_event is not None:
+                        run_context.pause_event.set()
+                    if target.resume_event is not None:
+                        target.resume_event.set()
+                    self._run_manager.set_state(run_context.task_run_id, RunState.STOPPING)
+                    self._emit_run_instance_state(run_context, RunState.STOPPING.value)
+                    self.log_text.append(tr("[操作] 停止等待恢复的设备任务"))
+            box.deleteLater()
+
+        def poll():
+            if not current() or run_context.stop_event.is_set():
+                box.done(QMessageBox.StandardButton.No)
+
+        box.finished.connect(finish)
+        timer.timeout.connect(poll)
+        timer.start()
+        box.show()
+
+    def _on_adb_connection_restored(self, target_id: str):
+        from .execution_runs import RunState
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        target.status = "connected"
+        target.input_kind = str(getattr(target.input_ctrl, "kind", "") or "")
+        run_context = self._run_manager.run_for_target(target_id)
+        if run_context is not None and run_context.state == RunState.WAITING_TARGET:
+            if not run_context.stop_event.is_set():
+                state = (RunState.PAUSED if run_context.pause_event is not None
+                         and not run_context.pause_event.is_set() else RunState.RUNNING)
+                self._run_manager.set_state(run_context.task_run_id, state)
+                self._emit_run_instance_state(run_context, state.value)
+        self._refresh_execution_targets_ui()
+        if target_id == self._execution_targets.active_target_id:
+            banner = getattr(self, '_adb_banner', None)
+            if banner is not None:
+                banner.setVisible(False)
+
     def _resume_adb(self):
         """用户点击「恢复」：唤醒工作流线程，重试失败的 ADB 命令"""
         # 横幅只为当前查看目标显示，因此唤醒的也必须是该目标的运行实例
         run_context = getattr(self, "_current_run_context", None)
+        if run_context is not None:
+            dialogs = getattr(self, '_connection_recovery_dialogs', {})
+            box = dialogs.get(run_context.target_id)
+            if box is not None:
+                from PyQt6.QtWidgets import QMessageBox
+                box.done(QMessageBox.StandardButton.Yes)
+                return
         resume_event = self._run_resume_event(run_context)
         if resume_event is not None:
             resume_event.set()

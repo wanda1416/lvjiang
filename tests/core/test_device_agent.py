@@ -6,7 +6,7 @@ AdbDevice 换成记录 forward/remove_forward 调用的桩。覆盖：
 - 握手：协议版本校验、连不上/假连接（连上即关）→ connect() 返回 False 且撤 forward
 - AgentCapture：RGBA → BGR、PNG 解码、节流 retryable 重试、尺寸缓存
 - AgentInput：tap / swipe / hold_move / key 分派与参数换算，设备端失败向工作流传播
-- 传输断开后自动重连一次
+- 传输断开后重建连接，响应不明的输入不自动重放
 - 工厂：有代理用 AgentInput/AgentCapture，无代理退回 Adb*
 """
 from __future__ import annotations
@@ -119,6 +119,9 @@ class _FakeDevice:
 
     def get_resolution(self):
         return (1080, 1920)
+
+    def wait_retry_interval(self):
+        pass
 
 
 @pytest.fixture
@@ -296,7 +299,7 @@ def test_call_raises_op_error_with_retryable(fake):
     client.close()
 
 
-def test_call_reconnects_once_after_server_drops(fake):
+def test_call_reconnects_but_does_not_replay_input_after_response_is_lost(fake):
     state = {"drops": 1}
 
     def handler(req):
@@ -309,9 +312,14 @@ def test_call_reconnects_once_after_server_drops(fake):
     srv, dev = fake(handler)
     client = AgentClient(dev)
     assert client.connect()
-    header, _ = client.call("tap", x=1, y=1)
-    assert header["echo"] == "tap" and srv.connections == 2
-    client.close()
+    try:
+        with pytest.raises(AgentTransportError) as raised:
+            client.call("tap", x=1, y=1)
+        assert raised.value.request_sent
+        assert sum(req['op'] == 'tap' for req in srv.requests) == 1
+        assert srv.connections == 2 and client.connected
+    finally:
+        client.close()
 
 
 # ─── 截图 ──────────────────────────────────────────────────

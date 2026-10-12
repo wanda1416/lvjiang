@@ -12,6 +12,7 @@ from typing import Callable
 from loguru import logger
 
 from ...constants import PROJECT_ROOT
+from ..config.models import AndroidRecoveryConfig
 from ..platforms import (
     SUBPROCESS_NO_WINDOW,
     SUBPROCESS_TEXT,
@@ -124,9 +125,11 @@ class AdbDevice:
         self._identity: AndroidDeviceIdentity | None = None
         # ── 断连暂停恢复 ──
         self.on_connection_lost: Callable[[str], None] | None = None
+        self.on_connection_restored: Callable[[], None] | None = None
         self.resume_event = threading.Event()
         self.resume_event.set()  # 初始为已恢复，不阻塞
         self.stop_check: Callable[[], bool] | None = None
+        self.recovery = AndroidRecoveryConfig()
 
     # ─── 命令前缀 ─────────────────────────────────────────
 
@@ -184,22 +187,69 @@ class AdbDevice:
 
     # ─── 基础执行 ─────────────────────────────────────────
 
+    def wait_retry_interval(self) -> None:
+        deadline = time.monotonic() + self.recovery.retry_interval
+        while True:
+            if self.stop_check and self.stop_check():
+                raise AdbConnectionError("连接恢复已停止")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.1, remaining))
+
+    def _reconnect_once(self) -> bool:
+        """只恢复当前 transport，不 kill-server，不发任何游戏输入。"""
+        def run(args):
+            return subprocess.run(args, capture_output=True, timeout=3.0,
+                                  **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW)
+        def probe():
+            result = run([*self._base(), "shell", "echo", "lvjiang-ready"])
+            return result.returncode == 0 and (result.stdout or "").strip() == "lvjiang-ready"
+        if probe():
+            return True
+        run([self.adb_path, "start-server"])
+        if self.serial and ":" in self.serial:
+            run([self.adb_path, "connect", self.serial])
+        else:
+            run([*self._base(), "reconnect"])
+        return probe()
+
+    def reconnect(self) -> bool:
+        for attempt in range(1, self.recovery.adb_attempts + 1):
+            if self.stop_check and self.stop_check():
+                raise AdbConnectionError("连接恢复已停止")
+            logger.info("[ADB] 检查并恢复连接 {}/{}", attempt, self.recovery.adb_attempts)
+            try:
+                if self._reconnect_once():
+                    if self.on_connection_restored:
+                        self.on_connection_restored()
+                    return True
+            except (subprocess.TimeoutExpired, OSError) as error:
+                logger.debug("[ADB] 本次恢复未完成：{}", error)
+            if attempt < self.recovery.adb_attempts:
+                self.wait_retry_interval()
+        return False
+
     def _handle_connection_error(self, error: Exception, cmd_desc: str):
-        """ADB 命令失败 → 通知 UI → 暂停工作流线程等待用户点「恢复」"""
+        """自动恢复耗尽后等待用户确认；调用方随后重试原命令。"""
+        if self.reconnect() and not isinstance(error, subprocess.TimeoutExpired):
+            return
+        if isinstance(error, subprocess.TimeoutExpired):
+            cmd_desc += "；命令可能已执行，确认继续将重新尝试"
+        self.wait_for_connection_recovery(error, cmd_desc)
+
+    def wait_for_connection_recovery(self, error: Exception, cmd_desc: str) -> None:
         err_msg = f"{cmd_desc} 失败: {error}"
-        logger.warning(f"ADB 连接异常: {err_msg}")
-        if self.on_connection_lost is None and self.stop_check is None:
+        logger.warning(f"连接恢复等待人工确认: {err_msg}")
+        if self.on_connection_lost is None:
             # 没人能收到通知去点「恢复」，也没人能喊停：等下去只会让调用线程
             # 永久卡住。没有恢复通道时失败必须可见，直接报错交回上层。
             raise AdbConnectionError(
                 f"{cmd_desc} 失败且无恢复通道: {error}"
             ) from None
-        if self.on_connection_lost:
-            try:
-                self.on_connection_lost(err_msg)
-            except Exception:
-                pass
+        # 先清事件再发通知，避免 UI 立即确认却被随后 clear 吞掉。
         self.resume_event.clear()
+        self.on_connection_lost(err_msg)
         while True:
             if self.stop_check and self.stop_check():
                 self.resume_event.set()
@@ -207,17 +257,8 @@ class AdbDevice:
                     f"{cmd_desc} 失败且用户停止: {error}"
                 ) from None
             if self.resume_event.wait(timeout=1.0):
-                logger.info("ADB 用户已恢复，等待设备稳定...")
+                logger.info("用户确认恢复，重新检查连接")
                 self.resume_event.clear()
-                # 给设备短暂稳定时间（scrcpy 重连后 adb 需要几秒就绪）
-                # 期间保持响应 F10 停止
-                for _ in range(6):
-                    if self.stop_check and self.stop_check():
-                        self.resume_event.set()
-                        raise AdbConnectionError(
-                            f"{cmd_desc} 恢复后用户停止: {error}"
-                        ) from None
-                    time.sleep(0.5)
                 return
 
     def shell(self, *args: str, timeout: float = 15.0) -> str:

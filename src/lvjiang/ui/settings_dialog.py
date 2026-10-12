@@ -1,8 +1,8 @@
 """配置管理对话框（多 Tab）
 
-基础配置（常规、字体、热键）、应用注册、执行参数（输入、等待）、方案设置、
+基础设置（常规、字体、热键）、高级设置、应用注册、执行参数（输入、等待）、方案设置、
 AI 设置、功能激活、网络与隐私。
-基础配置/字体/热键写 session.json（settings 节点）；应用注册、输入参数、等待参数和
+基础设置/高级设置/字体/热键写 session.json（settings 节点）；应用注册、输入参数、等待参数和
 方案设置的环境列表写 app.yaml（apps / input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。方案本身写 session.json
 的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
@@ -143,7 +143,10 @@ class SettingsDialog(QDialog):
             (tr("常规设置"), self._build_basic_tab()),
             (tr("字体设置"), self._build_font_tab()),
             (tr("热键设置"), self._build_hotkey_tab()),
-        ]), tr("基础配置"))
+        ]), tr("基础设置"))
+        self._tabs.addTab(self._build_grouped_tab([
+            (tr("Android 连接恢复"), self._build_recovery_tab()),
+        ]), tr("高级设置"))
         self._tabs.addTab(self._build_android_tab(), tr("应用注册"))
         self._tabs.addTab(self._build_grouped_tab([
             (tr("输入参数"), self._build_input_tab()),
@@ -228,6 +231,9 @@ class SettingsDialog(QDialog):
         self._offset_spin.valueChanged.connect(self._mark_dirty)
         self._jitter_spin.valueChanged.connect(self._mark_dirty)
         self._clamp_oob_cb.toggled.connect(self._mark_dirty)
+        self._adb_fallback_cb.toggled.connect(self._mark_dirty)
+        for spin in self._recovery_spins.values():
+            spin.valueChanged.connect(self._mark_dirty)
         for lo_spin, hi_spin in self._range_spins.values():
             lo_spin.valueChanged.connect(self._mark_dirty)
             hi_spin.valueChanged.connect(self._mark_dirty)
@@ -247,7 +253,39 @@ class SettingsDialog(QDialog):
         entry["lo"].valueChanged.connect(self._mark_dirty)
         entry["hi"].valueChanged.connect(self._mark_dirty)
 
-    # ─── Tab1 基础配置 ─────────────────────────────────────
+    def _build_recovery_tab(self) -> QWidget:
+        tab = QWidget()
+        form = QFormLayout(tab)
+        policy = self._config.android_recovery
+        self._adb_fallback_cb = QCheckBox(tr("代理不可用时允许降级为 ADB 输入"))
+        self._adb_fallback_cb.setChecked(policy.allow_adb_fallback)
+        form.addRow(self._adb_fallback_cb)
+        self._recovery_spins: dict[str, QSpinBox | QDoubleSpinBox] = {}
+        for name, label in (("agent_attempts", tr("代理重连次数")),
+                            ("adb_attempts", tr("ADB 重连次数"))):
+            spin = QSpinBox()
+            spin.setRange(1, 10)
+            spin.setValue(getattr(policy, name))
+            spin.setFixedWidth(_SPIN_WIDTH)
+            self._recovery_spins[name] = spin
+            form.addRow(label, spin)
+        interval = QDoubleSpinBox()
+        interval.setRange(0.0, 30.0)
+        interval.setDecimals(1)
+        interval.setValue(policy.retry_interval)
+        interval.setFixedWidth(_SPIN_WIDTH)
+        self._recovery_spins["retry_interval"] = interval
+        form.addRow(tr("重试间隔（秒）"), interval)
+        note = QLabel(tr(
+            "默认代理重连 3 次，失败后尝试 ADB 重连 3 次。仍不可用时等待人工恢复，"
+            "选择是重新检查、选择否停止对应任务；无人值守也会等待确认。\n"
+            "多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。"
+            "设置对后续启动的任务生效。"))
+        note.setWordWrap(True)
+        form.addRow(note)
+        return tab
+
+    # ─── Tab1 基础设置 ─────────────────────────────────────
 
     def _build_basic_tab(self) -> QWidget:
         """基础配置：语言 / 窗口（PC）/ 安卓，三组之间用分隔线断开。
@@ -1652,6 +1690,10 @@ class SettingsDialog(QDialog):
         if android_apps is None:
             return
         settings = {
+            "android_recovery": {
+                "allow_adb_fallback": self._adb_fallback_cb.isChecked(),
+                **{name: spin.value() for name, spin in self._recovery_spins.items()},
+            },
             "android_capture_method": (
                 "scrcpy" if self._capture_stream_radio.isChecked() else "screencap"),
             "android_input_method": (

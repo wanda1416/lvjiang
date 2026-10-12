@@ -349,6 +349,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """使用用户执行锁运行设备工作流。"""
         begin = getattr(self._input, "begin_execution", None) if _reset_context else None
         end = getattr(self._input, "end_execution", None) if _reset_context else None
+        if self._input is not None:
+            self._input.stop_check = self._stop_check
         if begin is not None:
             begin()
         try:

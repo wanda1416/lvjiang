@@ -21,6 +21,7 @@ import json
 import random
 import socket
 import struct
+import subprocess
 import threading
 import time
 from typing import Any
@@ -30,9 +31,10 @@ from loguru import logger
 
 from ...core.config import InputSimConfig
 from ..capture_base import A11yScreenshotThrottle, CaptureBackend
+from ..config.models import AndroidRecoveryConfig
 from ..input_base import InputBackend, InputBackendKind
 from .device import AdbDevice
-from .input import _KEY_TO_ANDROID_KEYCODE
+from .input import _KEY_TO_ANDROID_KEYCODE, AdbInput
 
 #: 设备端 LocalServerSocket 的 abstract 名（与 AgentServer.SOCKET_NAME 一致）
 AGENT_SOCKET_NAME = "lvjiang-agent"
@@ -55,6 +57,10 @@ class AgentError(RuntimeError):
 
 class AgentTransportError(AgentError):
     """socket 层失败（断线、超时、协议错位）——已尝试重连仍失败"""
+
+    def __init__(self, message: str, *, request_sent: bool = False):
+        super().__init__(message)
+        self.request_sent = request_sent
 
 
 class AgentOpError(AgentError):
@@ -111,7 +117,7 @@ class AgentClient:
     """与设备端 AgentServer 的单连接客户端（线程安全，调用串行）
 
     连接流程：挑一个本地端口做 adb forward → TCP 连 127.0.0.1:<port> → ping 校验协议版本。
-    传输层失败会就地重连一次（adb forward 仍在，设备端进程没死的话能直接接上）。
+    传输失败按执行策略完整重建连接；已发送的输入不自动重放。
     """
 
     def __init__(self, device: AdbDevice, socket_name: str = AGENT_SOCKET_NAME,
@@ -124,6 +130,7 @@ class AgentClient:
         self._lock = threading.RLock()
         self._status: dict = {}
         self._owns_execution = False
+        self.recovery = AndroidRecoveryConfig()
 
     @property
     def device(self) -> AdbDevice:
@@ -316,21 +323,32 @@ class AgentClient:
         return True
 
     def _reconnect(self) -> bool:
-        if self._sock is not None:
-            try:
-                self._sock.close()
-            except OSError:
-                pass
-            self._sock = None
-        if self._port is None:
-            return False
-        if not self._open_socket(3.0):
+        # 完整重建转发与握手，已 close 或代理进程退出也能恢复。
+        if not self.connect(3.0):
             return False
         if self._owns_execution:
             header, _ = self._roundtrip("control_begin")
             if not header.get("ok"):
                 raise AgentOpError(str(header.get("error") or "无法恢复设备执行占用"))
         return True
+
+    def _retry_connection(self) -> bool:
+        for attempt in range(1, self.recovery.agent_attempts + 1):
+            stopped = getattr(self._device, "stop_check", None)
+            if stopped and stopped():
+                raise AgentTransportError("代理连接恢复已停止")
+            logger.info("[Agent] 重建连接 {}/{}", attempt, self.recovery.agent_attempts)
+            try:
+                if self._reconnect():
+                    restored = getattr(self._device, "on_connection_restored", None)
+                    if restored:
+                        restored()
+                    return True
+            except (AgentError, OSError, subprocess.TimeoutExpired) as error:
+                logger.debug("[Agent] 本次重连未完成：{}", error)
+            if attempt < self.recovery.agent_attempts:
+                self._device.wait_retry_interval()
+        return False
 
     # ─── 调用 ─────────────────────────────────────────────
 
@@ -342,17 +360,19 @@ class AgentClient:
         try:
             sock.sendall(encode_request(op, **params))
             return read_response(sock)
-        except (OSError, struct.error) as e:
-            raise AgentTransportError(f"{op}: {e}") from e
+        except (AgentTransportError, OSError, struct.error) as e:
+            raise AgentTransportError(f"{op}: {e}", request_sent=True) from e
 
     def call(self, op: str, timeout: float | None = None, **params: Any) -> tuple[dict, bytes]:
-        """发一条请求并等结果；ok=false 抛 AgentOpError，传输失败重连一次后仍失败抛 AgentTransportError"""
+        """恢复连接后只自动重试读取或明确未发送的请求，避免重复输入。"""
         with self._lock:
             try:
                 header, payload = self._roundtrip(op, timeout, **params)
             except AgentTransportError as first:
                 logger.warning(f"[Agent] 传输失败，尝试重连: {first}")
-                if not self._reconnect():
+                if not self._retry_connection():
+                    raise
+                if first.request_sent and op not in {"ping", "status", "screenshot", "calib_get"}:
                     raise
                 header, payload = self._roundtrip(op, timeout, **params)
             if not header.get("ok"):
@@ -482,11 +502,22 @@ class AgentInput(InputBackend):
         self._client = client
         self.background_mode = True
         self.target_hwnd = None
+        self._adb: AdbInput | None = None
+        self._using_adb = False
+
+    def configure_recovery(self, policy: AndroidRecoveryConfig) -> None:
+        """宿主启动一次执行链时调用；批量内的脚本不重新读取设置。"""
+        self._client.recovery = policy
+        self._client.device.recovery = policy
+        self._using_adb = False
+        self.kind = InputBackendKind.AGENT
 
     def begin_execution(self) -> None:
+        if self._using_adb:
+            return
         if self._client.status.get("offline_protocol") in (1, 2):
-            self._client.call("control_begin")
-            self._client._owns_execution = True
+            self._call("control_begin", "取得执行占用")
+            self._client._owns_execution = not self._using_adb
 
     def end_execution(self) -> None:
         if self._client._owns_execution:
@@ -521,11 +552,65 @@ class AgentInput(InputBackend):
                 self._client.timeout,
                 gesture_ms / 1000 + self._GESTURE_TIMEOUT_MARGIN,
             )
-        try:
-            self._client.call(op, timeout=timeout, **params)
-        except AgentError as e:
-            logger.warning(f"[Agent] {what}未成功: {e}")
-            raise
+        while True:
+            if self.stop_check and self.stop_check():
+                raise AgentTransportError("输入恢复已停止")
+            if self._using_adb:
+                self._call_adb(op, **params)
+                return
+            try:
+                self._client.call(op, timeout=timeout, **params)
+                return
+            except AgentTransportError as error:
+                logger.warning("[Agent] {}未完成：{}", what, error)
+                device = self._client.device
+                adb_ready = device.reconnect()
+                if error.request_sent and op != "control_begin":
+                    device.wait_for_connection_recovery(
+                        error, f"{what}已发送但未取得响应，动作可能已经执行；确认继续将重新尝试当前动作")
+                    continue
+                supported = op in {"tap", "swipe", "hold_move", "key", "control_begin"}
+                if adb_ready and self._client.recovery.allow_adb_fallback and supported:
+                    self._using_adb = True
+                    self.kind = InputBackendKind.ADB
+                    self._client.close()
+                    self._client._owns_execution = False
+                    logger.warning("[输入] 代理恢复失败，已降级为 ADB；本次运行使用 ADB 输入")
+                    if device.on_connection_restored:
+                        device.on_connection_restored()
+                    continue
+                detail = "当前操作需要设备端代理，请恢复手机代理" if not supported else "请恢复代理或 ADB 连接"
+                device.wait_for_connection_recovery(error, detail)
+            except AgentOpError as error:
+                logger.warning("[Agent] {}未成功：{}", what, error)
+                raise
+
+    def _call_adb(self, op: str, **params: Any) -> None:
+        """复用 ADB 输入实现，不再次随机坐标或等待。并发手势不得降级。"""
+        if self._adb is None:
+            self._adb = AdbInput(self._client.device)
+        if op == "control_begin":
+            return
+        if op == "tap":
+            self._adb.click_screen(params["x"], params["y"], pre_delay=(0, 0),
+                                   post_delay=(0, 0), random_offset=False)
+        elif op in {"swipe", "hold_move"}:
+            move = params.get("move_ms", params.get("duration_ms", 100)) / 1000
+            hold = params.get("hold_ms", 0) / 1000
+            self._adb.drag_screen(params["x1"], params["y1"], params["x2"], params["y2"],
+                                  duration=move, hold=hold, pre_delay=(0, 0), post_delay=(0, 0))
+        elif op == "key":
+            code = params.get("keycode")
+            if code is None:
+                code = {"BACK": 4, "HOME": 3}[params["name"]]
+            self._client.device.shell("input", "keyevent", str(code))
+        else:
+            # 降级后遇到代理专有能力，等待恢复代理而不是顺序模拟并发输入。
+            self._client.device.wait_for_connection_recovery(
+                AgentTransportError("ADB 不支持并发或多指手势"), "请恢复手机代理后确认继续")
+            self._using_adb = False
+            self.kind = InputBackendKind.AGENT
+            self._call(op, "设备端手势", **params)
 
     # ─── 点击 ─────────────────────────────────────────────
 

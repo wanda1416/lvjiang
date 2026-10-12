@@ -203,6 +203,7 @@ class _SyncTargetsWidget(QWidget):
         self._exclude_key_input = exclude_key_input
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self._table = QTableWidget()
         self._table.setColumnCount(5)
@@ -433,6 +434,7 @@ class _ChangeRulesWidget(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self._table = _ChangeRulesTable()
         self._table.setColumnCount(4)
@@ -466,8 +468,8 @@ class _ChangeRulesWidget(QWidget):
         fit_button_width(add_use, add_source, minimum=96)
         add_use.clicked.connect(lambda: self.add_row(self._KIND_USE))
         add_source.clicked.connect(lambda: self.add_row(self._KIND_SOURCE))
-        buttons.addWidget(add_use)
         buttons.addWidget(add_source)
+        buttons.addWidget(add_use)
         buttons.addStretch()
         layout.addLayout(buttons)
 
@@ -1287,14 +1289,6 @@ class ProfileDefinitionDialog(QDialog):
         soft_check = QCheckBox(tr("软上限"))
         soft_check.setChecked(existing_soft)
 
-        cap_row = QHBoxLayout()
-        cap_row.addWidget(cap_spin)
-        cap_row.addWidget(soft_check)
-        cap_row.addStretch()
-        layout.addRow(tr("上限:"), cap_row)
-        widgets["cap"] = cap_spin
-        widgets["soft"] = soft_check
-
         show_cap_check = QCheckBox(tr("展示上限"))
         show_cap_check.setChecked(existing_show_cap)
 
@@ -1302,11 +1296,16 @@ class ProfileDefinitionDialog(QDialog):
         decimal_check.setChecked(existing_decimal)
         decimal_check.setToolTip(tr("开启后允许输入小数，UI 使用 DoubleValidator"))
 
-        cap_opts_row = QHBoxLayout()
-        cap_opts_row.addWidget(show_cap_check)
-        cap_opts_row.addWidget(decimal_check)
-        cap_opts_row.addStretch()
-        layout.addRow(cap_opts_row)
+        cap_row = QHBoxLayout()
+        cap_row.setSpacing(dialog.fontMetrics().horizontalAdvance("　") * 2)
+        cap_row.addWidget(cap_spin)
+        cap_row.addWidget(soft_check)
+        cap_row.addWidget(show_cap_check)
+        cap_row.addWidget(decimal_check)
+        cap_row.addStretch()
+        layout.addRow(tr("上限:"), cap_row)
+        widgets["cap"] = cap_spin
+        widgets["soft"] = soft_check
         widgets["show_cap"] = show_cap_check
         widgets["decimal"] = decimal_check
 

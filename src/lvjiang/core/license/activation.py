@@ -96,7 +96,7 @@ def activate_online(code: str, serial: str | None) -> Entitlement:
         return Entitlement(reason="读不到有效的本机序列号，无法在线绑定")
     try:
         receipt = request_json(CONTENT_SERVICE_URL, "/v1/activate",
-                               {"code": code, "serial": normalize_serial(serial), "nonce": nonce})
+                               {"code": normalize_code(code), "serial": normalize_serial(serial), "nonce": nonce})
         verify_receipt(code, serial, receipt, nonce=nonce)
         result = receipt_entitlement(code, serial, receipt)
         if result.active and not save_activation(code, receipt):
@@ -112,6 +112,15 @@ def accept_status(code: str, serial: str, receipt: Any, nonce: str) -> dict[str,
     """配置请求的可信状态；只更新仍选中本次原码的本地记录。"""
     data = verify_receipt(code, serial, receipt, nonce=nonce)
     if code_hash(load_code() or "") == code_hash(code):
+        if data["status"] == "active":
+            stored = load_activation() or {}
+            try:
+                previous = verify_receipt(code, serial, stored.get("receipt"))
+            except LicenseError:
+                previous = {}
+            fields = ("status", "features", "days", "activated_at", "expires_at")
+            if all(previous.get(key) == data.get(key) for key in fields):
+                return data
         if not save_activation(code, receipt):
             raise LicenseError("可信授权状态保存失败")
         from . import refresh_entitlement

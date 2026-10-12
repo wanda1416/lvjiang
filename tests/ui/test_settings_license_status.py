@@ -32,3 +32,28 @@ def test_local_activation_and_cloud_denial_are_shown_separately(qtbot, monkeypat
     monkeypatch.setattr(license, "load_code", lambda: "another-test-only-license")
     dialog._license_status_timer.timeout.emit()
     assert "尚未检查" in dialog._online_license_status.text()
+
+
+def test_corrupt_activation_remains_clearable_and_online_reason_is_translated(tmp_path, qtbot, monkeypatch):
+    from lvjiang import i18n
+    from lvjiang.core.license import store
+
+    monkeypatch.setattr("lvjiang.core.config.resolver.LOCAL_CONFIG_DIR", tmp_path)
+    store.activation_path().write_text("invalid record", encoding="utf-8")
+    monkeypatch.setattr(license, "current_serial", lambda: None)
+    monkeypatch.setattr(license, "current_entitlement", lambda: license.Entitlement(reason="invalid record"))
+    monkeypatch.setattr(settings_dialog, "load_user_config", UserConfig)
+    def setup(dialog):
+        QVBoxLayout(dialog).addWidget(dialog._build_license_tab())
+    monkeypatch.setattr(settings_dialog.SettingsDialog, "_setup_ui", setup)
+    monkeypatch.setattr(settings_dialog.SettingsDialog, "_connect_dirty_signals", lambda self: None)
+    dialog = settings_dialog.SettingsDialog()
+    qtbot.addWidget(dialog)
+    assert dialog._clear_license_btn.isEnabled()
+    assert store.load_code() is None
+    monkeypatch.setattr(i18n, "_current_language", "en_US")
+    monkeypatch.setattr(i18n, "_translations", i18n._load_translation_file("en_US"))
+    monkeypatch.setattr(protected_remote, "member_access_status", lambda: protected_remote.MemberAccessStatus(
+        state="denied", reason="激活码已被云端停用"))
+    dialog._refresh_online_license_status()
+    assert dialog._online_license_status.text() == "Online member authorization：License code has been disabled in the cloud"

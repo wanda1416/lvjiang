@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -27,6 +28,7 @@ class ProtectedAccess:
     code: str = field(repr=False)
     expires: str | None = None
     serial: str = field(default="", repr=False)
+    expires_at: int | None = None
 
     @property
     def code_hash(self) -> str:
@@ -79,7 +81,8 @@ def snapshot() -> ProtectedAccess | None:
     issued = entitlement.license
     return ProtectedAccess(CONTENT_SERVICE_URL, code,
                            issued.expires.isoformat() if issued and issued.expires else None,
-                           normalize_serial(serial or "") if issued and issued.bind == "claim" else "")
+                           normalize_serial(serial or "") if issued and issued.bind == "claim" else "",
+                           entitlement.expires_at)
 
 
 def eligible(entitlement) -> bool:
@@ -161,6 +164,9 @@ def authorized(doc: dict[str, Any]) -> bool:
     from ..license.code import normalize_code
     entitlement = current_entitlement()
     if not eligible(entitlement):
+        return False
+    expires_at = doc.get("expires_at")
+    if expires_at is not None and (type(expires_at) is not int or time.time() >= expires_at):
         return False
     expires = doc.get("expires")
     if expires is not None:

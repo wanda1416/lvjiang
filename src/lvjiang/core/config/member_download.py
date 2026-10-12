@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import secrets
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -64,7 +65,8 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
         logger.debug("[在线配置] 跳过会员更新：没有适用客户端 {} 的会员包", app_version)
         return MemberDownload({}, {"config_version": index["config_version"]}, index_json=raw)
     nonce = secrets.token_hex(16) if access.serial else ""
-    request = {"code": access.code, "key_id": package["key_id"]}
+    from ..license.code import normalize_code
+    request = {"code": normalize_code(access.code), "key_id": package["key_id"]}
     if access.serial:
         request.update(serial=access.serial, nonce=nonce)
     try:
@@ -84,12 +86,15 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
             logger.debug("[在线配置] 跳过会员更新：{}（HTTP 403）；本地激活有效不代表云端授权有效", reason)
             return MemberDownload({}, {}, index_json=raw)
         raise
+    expires_at = access.expires_at
     if access.serial:
         from ..license.activation import STATUS_REASON, accept_status
         data = accept_status(access.code, access.serial, grant.get("receipt"), nonce)
         if data["status"] != "active":
             report_access_status(access, "denied", STATUS_REASON[data["status"]])
             return MemberDownload({}, {}, index_json=raw)
+        expires_at = min(filter(lambda value: value is not None,
+                                (expires_at, data["expires_at"])))
         if data.get("package_key_id") != package["key_id"]:
             raise ValueError("会员包签名回复未关联本次请求的包")
         # Package-specific denial must itself be signed.
@@ -105,7 +110,8 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
             or grant.get("min_app_version") != package["min_app_version"]:
         raise ValueError("会员授权响应与公开密文清单不一致")
     expires = min(filter(None, (access.expires, grant.get("expires"))), default=None)
-    if expires is not None and date.fromisoformat(expires) < date.today():
+    if (expires is not None and date.fromisoformat(expires) < date.today()) \
+            or (expires_at is not None and time.time() >= expires_at):
         report_access_status(access, "denied", "会员授权已过期")
         logger.debug("[在线配置] 跳过会员更新：会员授权已过期")
         return MemberDownload({}, {}, index_json=raw)
@@ -128,5 +134,6 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
                                   "public_revisions": package["public_revisions"],
                                   "public_manifests": package.get("public_manifests", {}),
                                   "manifest_sha256": digest(json_bytes(package)),
-                                  "code_hash": access.code_hash, "expires": expires}, encrypted,
+                                  "code_hash": access.code_hash, "expires": expires,
+                                  "expires_at": expires_at}, encrypted,
                           json_bytes(package), raw)

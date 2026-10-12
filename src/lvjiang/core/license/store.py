@@ -19,6 +19,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from ..json_files import formatted_json
+
 _FILENAME = "license.txt"
 _ACTIVATION_FILENAME = "license-activation.json"
 
@@ -83,8 +85,9 @@ def load_activation() -> dict | None:
         data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return data
-    except (OSError, ValueError):
-        pass
+        logger.warning("激活记录格式无效：{}；请在设置中清除激活后同机重试", path)
+    except (OSError, ValueError) as error:
+        logger.warning("读取激活记录失败：{}；请在设置中清除激活后同机重试：{}", path, error)
     # Existing but invalid activation record must not restore a stale legacy license.
     return {}
 
@@ -104,11 +107,14 @@ def _atomic_write(path: Path, text: str) -> None:
 
 def save_activation(code: str, receipt: dict) -> bool:
     try:
-        _atomic_write(activation_path(), json.dumps(
-            {"code": code, "receipt": receipt}, ensure_ascii=False, separators=(",", ":")))
+        _atomic_write(activation_path(), formatted_json({"code": code, "receipt": receipt}))
     except OSError:
         logger.error("激活记录保存失败，原认证保留，可同机重试")
         return False
+    try:
+        license_path().unlink(missing_ok=True)
+    except OSError as error:
+        logger.warning("激活已保存，但旧激活码清理失败：{}；请删除旧 license.txt：{}", license_path(), error)
     return True
 
 

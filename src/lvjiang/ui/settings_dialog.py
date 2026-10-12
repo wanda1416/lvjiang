@@ -1299,8 +1299,10 @@ class SettingsDialog(QDialog):
             self._license_status.setText(
                 tr("本地激活：未激活，高级功能不可用。") + f"（{result.reason}）")
             self._license_status.setStyleSheet("color: palette(mid);")
-            from ..core.license import load_code
-            self._clear_license_btn.setEnabled(bool(load_code()) and not getattr(self, "_activation_busy", False))
+            from ..core.license.store import activation_path, license_path
+            self._clear_license_btn.setEnabled(
+                (activation_path().exists() or license_path().exists())
+                and not getattr(self, "_activation_busy", False))
             return
         bind = tr("已绑定本机") if issued.is_bound or issued.bind == "claim" else tr("免绑定")
         if result.expires_at is not None:
@@ -1352,6 +1354,7 @@ class SettingsDialog(QDialog):
         if getattr(self, "_activation_busy", False):
             return
         self._activation_busy = True
+        self._activation_message = ""
         self._activate_btn.setEnabled(False)
         self._clear_license_btn.setEnabled(False)
         self._license_edit.setEnabled(False)

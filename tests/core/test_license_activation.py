@@ -49,9 +49,10 @@ def test_first_activation_requires_fresh_signed_reply_and_save_failure_preserves
     assert store.load_code() is None
     def respond(base, route, data):
         assert route == "/v1/activate"
+        assert data["code"] == voucher
         return receipt(nonce=data["nonce"])
     monkeypatch.setattr("lvjiang.core.config.content_service.request_json", respond)
-    assert licensing.try_activate(voucher).active
+    assert licensing.try_activate("\x1c" + voucher + "\x85").active
     assert licensing.refresh_entitlement().has("lv1")
     original = store.activation_path().read_bytes()
     monkeypatch.setattr(activation, "save_activation", lambda *args: False)
@@ -101,11 +102,12 @@ def test_claim_snapshot_and_package_request_verify_signed_denial(grant, monkeypa
     from lvjiang.core.config import member_download, protected_remote
     from lvjiang.core.config.content_service import ServiceError
     from lvjiang.core.update_bundle import json_bytes
-    voucher, serial, receipt, _ = grant
+    voucher, serial, receipt, activated = grant
     store.save_activation(voucher, receipt())
     monkeypatch.setattr(licensing, "current_serial", lambda: serial)
     access = protected_remote.snapshot()
     assert access is not None and access.serial == hardware.normalize_serial(serial)
+    assert access.expires_at == activated + 2 * 86400
     package = {"key_id": "activation-test-package", "sha256": "a" * 64, "config_version": 1,
                "min_app_version": "0.15.0", "url": protected_remote.manifest_url().rsplit("/", 1)[0]
                + "/packages/activation-test-package.bin"}
@@ -133,7 +135,7 @@ def test_package_key_and_denial_cannot_be_modified_outside_signed_proof(grant, m
     from lvjiang.core.config import member_download, protected_remote
     from lvjiang.core.config.protected_bundle import digest, encrypt
     from lvjiang.core.update_bundle import json_bytes
-    voucher, serial, receipt, _ = grant
+    voucher, serial, receipt, activated = grant
     store.save_activation(voucher, receipt())
     key = b"k" * 32
     encrypted = encrypt({"test.bin": b"test"}, key, b"n" * 12)
@@ -156,7 +158,16 @@ def test_package_key_and_denial_cannot_be_modified_outside_signed_proof(grant, m
         response["error"] = "forbidden"
         return response
     monkeypatch.setattr(member_download, "request_json", respond)
-    assert member_download.fetch_member_update(access, "0.15.0", fetch=fetch).files == {"test.bin": b"test"}
+    result = member_download.fetch_member_update(access, "0.15.0", fetch=fetch)
+    assert result.files == {"test.bin": b"test"}
+    assert result.metadata["expires_at"] == activated + 2 * 86400
+    assert protected_remote.authorized(result.metadata)
+    # Metadata has its own boundary check even if the entitlement provider later changes.
+    cached = licensing.current_entitlement()
+    with monkeypatch.context() as scoped:
+        scoped.setattr(licensing, "current_entitlement", lambda: cached)
+        scoped.setattr(time, "time", lambda: activated + 2 * 86400)
+        assert not protected_remote.authorized(result.metadata)
     def tamper(*args, **kwargs):
         response = respond(*args, **kwargs)
         response["key"] = base64.b64encode(b"x" * 32).decode("ascii")
@@ -187,3 +198,40 @@ def test_activation_secrets_are_rejected_by_public_and_encrypted_bundle_contract
     with pytest.raises(ValueError, match="不安全"):
         encrypt({"license-activation.json": b"private-proof"}, b"k" * 32, b"n" * 12)
     assert safe_path("future/opaque.bin")  # Unknown configuration remains distributable.
+
+
+def test_positive_key_status_skips_unchanged_disk_write_but_recovers_revocation(grant, monkeypatch):
+    voucher, serial, receipt, _ = grant
+    assert store.save_activation(voucher, receipt())
+    original = store.activation_path().read_bytes()
+    with monkeypatch.context() as scoped:
+        scoped.setattr(activation, "save_activation", lambda *args: pytest.fail("unchanged grant must not write"))
+        activation.accept_status(voucher, serial, receipt(nonce="b" * 32), "b" * 32)
+    assert store.activation_path().read_bytes() == original
+    activation.accept_status(voucher, serial, receipt(status="disabled"), "a" * 32)
+    assert not licensing.current_entitlement().active
+    activation.accept_status(voucher, serial, receipt(), "a" * 32)
+    assert licensing.current_entitlement().active
+
+
+def test_activation_record_replaces_legacy_and_corruption_fails_closed(grant, monkeypatch):
+    voucher, _, receipt, _ = grant
+    store.save_code("previous-valid-selection")
+    with monkeypatch.context() as scoped:
+        def failed_write(*args):
+            raise OSError("test disk failure")
+        scoped.setattr(store, "_atomic_write", failed_write)
+        assert not store.save_activation(voucher, receipt())
+    assert store.license_path().read_text(encoding="utf-8").strip() == "previous-valid-selection"
+    assert store.save_activation(voucher, receipt())
+    assert not store.license_path().exists()
+    text = store.activation_path().read_text(encoding="utf-8")
+    assert text.endswith("\n") and '\n  "code":' in text
+    messages = []
+    handler = store.logger.add(lambda message: messages.append(str(message)))
+    try:
+        store.activation_path().write_text("broken", encoding="utf-8")
+        assert store.load_code() is None
+        assert any("清除激活" in message for message in messages)
+    finally:
+        store.logger.remove(handler)

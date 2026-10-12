@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -61,11 +63,15 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
         report_access_status(access, "unchecked", "没有适用当前版本的会员包，尚未验证云端授权")
         logger.debug("[在线配置] 跳过会员更新：没有适用客户端 {} 的会员包", app_version)
         return MemberDownload({}, {"config_version": index["config_version"]}, index_json=raw)
+    nonce = secrets.token_hex(16) if access.serial else ""
+    request = {"code": access.code, "key_id": package["key_id"]}
+    if access.serial:
+        request.update(serial=access.serial, nonce=nonce)
     try:
-        grant = request_json(access.service, "/v1/key", {"code": access.code, "key_id": package["key_id"]},
+        grant = request_json(access.service, "/v1/key", request,
                              timeout=timeout)
     except ServiceError as error:
-        if error.status == 403 and error.code == "forbidden":
+        if not access.serial and error.status == 403 and error.code == "forbidden":
             reason = {
                 "license_unregistered": "激活码尚未在云端登记",
                 "license_disabled": "激活码已在云端停用",
@@ -78,6 +84,23 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
             logger.debug("[在线配置] 跳过会员更新：{}（HTTP 403）；本地激活有效不代表云端授权有效", reason)
             return MemberDownload({}, {}, index_json=raw)
         raise
+    if access.serial:
+        from ..license.activation import STATUS_REASON, accept_status
+        data = accept_status(access.code, access.serial, grant.get("receipt"), nonce)
+        if data["status"] != "active":
+            report_access_status(access, "denied", STATUS_REASON[data["status"]])
+            return MemberDownload({}, {}, index_json=raw)
+        if data.get("package_key_id") != package["key_id"]:
+            raise ValueError("会员包签名回复未关联本次请求的包")
+        # Package-specific denial must itself be signed.
+        if data.get("package_status") in {"package_unavailable", "insufficient_level"}:
+            report_access_status(access, "denied", "云端会员包不可用或等级不足")
+            return MemberDownload({}, {}, index_json=raw)
+        proof = json.dumps([package["key_id"], grant.get("key"), grant.get("sha256"),
+                            grant.get("min_app_version"), grant.get("config_version"), grant.get("expires")],
+                           separators=(",", ":")).encode("utf-8")
+        if data.get("package_status") != "allowed" or data.get("package_grant_hash") != hashlib.sha256(proof).hexdigest():
+            raise ValueError("会员密钥响应不匹配服务器签名")
     if grant.get("sha256") != package["sha256"] or grant.get("config_version") != package["config_version"] \
             or grant.get("min_app_version") != package["min_app_version"]:
         raise ValueError("会员授权响应与公开密文清单不一致")

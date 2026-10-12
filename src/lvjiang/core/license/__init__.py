@@ -1,23 +1,8 @@
-"""高级功能授权 — 离线激活，无服务器
-
-一句话流程：**本机序列号（现算，不存）→ 你用私钥签出激活码 → 程序用内置公钥验签**。
-
-两种码：
-
-- **绑机码**：正文里带序列号，只在那台机器上生效，转发给别人无效；
-- **免绑定码**：正文里 ``bind="none"``，不看序列号，拿到即可用。发给特别用户，
-  建议一律带有效期——离线方案没有吊销手段，有效期是唯一的把手。
-
-模块边界：
-- :mod:`hardware` 只管「本机是谁」，派生序列号，不碰授权语义；
-- :mod:`code` 只管「这张码是不是真的、写了什么」，不碰硬件；
-- :mod:`store` 只管激活码存哪儿。
-
-三者都不做混淆或反调试：客户端校验必然可被绕过，这套东西挡的是随手转发，不挡逆向。
-"""
+"""高级功能授权：旧码离线验签，一次性码首次在线绑定后验证签名记录。"""
 
 from __future__ import annotations
 
+import time
 from datetime import date
 
 from .code import Entitlement, License, LicenseError, evaluate, verify_code
@@ -61,8 +46,9 @@ _cached: Entitlement | None = None
 def current_entitlement() -> Entitlement:
     """当前授权结论，进程内缓存。"""
     global _cached
-    if _cached is None:
-        _cached = evaluate(load_code(), current_serial())
+    if _cached is None or _cached.expires_at is not None and time.time() >= _cached.expires_at:
+        from .activation import stored_entitlement
+        _cached = stored_entitlement(current_serial())
         issued = _cached.license
         if issued is not None:
             feats = "、".join(sorted(_cached.features)) or "无"
@@ -85,9 +71,19 @@ def has_feature(feature: str) -> bool:
 
 def try_activate(code: str, today: date | None = None) -> Entitlement:
     """校验并保存一张激活码；校验不通过不写盘，返回结论供 UI 提示原因。"""
-    result = evaluate(code, current_serial(), today)
+    try:
+        issued = verify_code(code)
+    except LicenseError as error:
+        return Entitlement(reason=str(error))
+    serial = current_serial()
+    if issued.bind == "claim":
+        from .activation import activate_online
+        result = activate_online(code, serial)
+    else:
+        result = evaluate(code, serial, today)
+        if result.active and not save_code(code):
+            return Entitlement(reason="保存激活码失败，原认证保留")
     if result.active:
-        save_code(code)
         global _cached
         _cached = result
     return result

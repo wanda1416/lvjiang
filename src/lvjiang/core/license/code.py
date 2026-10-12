@@ -30,6 +30,9 @@ _PREFIX = "LVJ1"
 PUBLIC_KEY_B32 = "ZUZ4VUALCH5L5W2SEE7P3JFBDCBEGM5PQERJARZSVYY23FXOYAGA"
 
 
+ACTIVATION_PUBLIC_KEY_B32 = "OM2Z3MXW4J5LXVPSYGX5KUQKL2SBCKR66DMSMPPPXMHYLMXP7YPQ"
+
+
 class LicenseError(Exception):
     """激活码不可用（格式、签名、绑定或有效期任一不满足）"""
 
@@ -40,10 +43,11 @@ class License:
 
     version: int
     code_id: str
-    bind: str                       # "serial"（绑机）或 "none"（免绑定）
+    bind: str                       # serial（预绑定）、none（免绑定）、claim（首次在线绑定）
     serial: str | None              # bind="serial" 时为绑定的序列号
     features: tuple[str, ...] = ()
     expires: date | None = None
+    days: int | None = None
 
     @property
     def is_bound(self) -> bool:
@@ -81,12 +85,15 @@ def build_payload(
     features: list[str],
     serial: str | None = None,
     expires: date | None = None,
+    days: int | None = None,
 ) -> bytes:
     """构造待签名正文（签发工具用；顺序固定，保证同输入同字节）"""
-    if bind not in ("serial", "none"):
+    if bind not in ("serial", "none", "claim"):
         raise ValueError(f"未知的绑定模式: {bind!r}")
     if bind == "serial" and not serial:
         raise ValueError("绑机码必须提供序列号")
+    if bind == "claim" and (type(days) is not int or not 1 <= days <= 36500 or serial or expires):
+        raise ValueError("一次性码需要 1 至 36500 个有效天数，不允许预绑定或固定到期日")
     data: dict[str, object] = {
         "v": 1,
         "id": code_id,
@@ -95,6 +102,8 @@ def build_payload(
     }
     if bind == "serial":
         data["sn"] = serial
+    if bind == "claim":
+        data["days"] = days
     if expires is not None:
         data["exp"] = expires.isoformat()
     return json.dumps(data, separators=(",", ":"), sort_keys=True,
@@ -114,10 +123,14 @@ def _parse_payload(raw: bytes) -> License:
     if not isinstance(data, dict):
         raise LicenseError("激活码正文不是对象")
     bind = str(data.get("bind", ""))
-    if bind not in ("serial", "none"):
+    if bind not in ("serial", "none", "claim"):
         # 显式枚举而不是「sn 为空就当免绑定」：空值可能来自签发工具的 bug，
         # 免绑定必须是签发时明确写下的意图
         raise LicenseError(f"未知的绑定模式: {bind!r}")
+    days = data.get("days")
+    if bind == "claim" and (type(days) is not int or not 1 <= days <= 36500
+                            or "sn" in data or "exp" in data):
+        raise LicenseError("一次性激活码的有效天数或绑定字段无效")
     expires = None
     if data.get("exp"):
         try:
@@ -134,6 +147,7 @@ def _parse_payload(raw: bytes) -> License:
         serial=str(data["sn"]) if data.get("sn") else None,
         features=tuple(str(f) for f in features),
         expires=expires,
+        days=days if bind == "claim" else None,
     )
 
 
@@ -178,6 +192,7 @@ class Entitlement:
 
     license: License | None = None
     reason: str = ""
+    expires_at: int | None = None
     features: frozenset[str] = field(default_factory=frozenset)
 
     @property
@@ -205,6 +220,8 @@ def evaluate(
     except LicenseError as exc:
         logger.info(f"激活码校验未通过: {exc}")
         return Entitlement(reason=str(exc))
+    if license_.bind == "claim":
+        return Entitlement(reason="一次性激活码需要首次在线激活")
     if license_.expired(today):
         return Entitlement(reason=f"激活码已于 {license_.expires} 过期")
     if license_.is_bound:

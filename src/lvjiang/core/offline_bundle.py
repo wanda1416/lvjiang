@@ -45,7 +45,8 @@ def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[Path]
         paths = {path for pattern in patterns for path in root.glob(pattern)}
         for layout in layout_scope:
             paths.update((root / "layouts" / layout).glob("*.json"))
-        yield from sorted(paths)
+        from .license.store import is_private_license_file
+        yield from (path for path in sorted(paths) if not is_private_license_file(path.name))
     session = config / "session"
     yield from (session / name for name in _SESSION_FILES)
     yield from sorted((session / "users").glob("*.json"))

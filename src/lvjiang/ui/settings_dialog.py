@@ -8,7 +8,7 @@ system ← local 合并），保存后以配置文件为准覆盖代码默认值
 的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
 """
 
-from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QCursor, QDesktopServices
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -75,6 +75,22 @@ _SPIN_WIDTH = 90
 # 热键候选最长为 F10/F11/F12；显式定宽，避免“脚本录制”行与提示按钮
 # 共用子布局时 QComboBox 被压缩到只剩下部分文字。
 _HOTKEY_COMBO_WIDTH = 90
+
+
+class _ActivationWorker(QThread):
+    completed = pyqtSignal(object)
+
+    def __init__(self, code: str, parent):
+        super().__init__(parent)
+        self.code = code
+
+    def run(self):
+        from ..core.license import Entitlement, try_activate
+        try:
+            result = try_activate(self.code)
+        except Exception:
+            result = Entitlement(reason="激活未完成，请重试；原认证保留")
+        self.completed.emit(result)
 
 
 def _radio_row(*buttons: QRadioButton) -> QWidget:
@@ -1283,16 +1299,21 @@ class SettingsDialog(QDialog):
             self._license_status.setText(
                 tr("本地激活：未激活，高级功能不可用。") + f"（{result.reason}）")
             self._license_status.setStyleSheet("color: palette(mid);")
-            self._clear_license_btn.setEnabled(False)
+            from ..core.license import load_code
+            self._clear_license_btn.setEnabled(bool(load_code()) and not getattr(self, "_activation_busy", False))
             return
-        bind = tr("免绑定") if not issued.is_bound else tr("已绑定本机")
-        expires = issued.expires.isoformat() if issued.expires else tr("永久")
+        bind = tr("已绑定本机") if issued.is_bound or issued.bind == "claim" else tr("免绑定")
+        if result.expires_at is not None:
+            from datetime import datetime
+            expires = datetime.fromtimestamp(result.expires_at).strftime("%Y-%m-%d %H:%M")
+        else:
+            expires = issued.expires.isoformat() if issued.expires else tr("永久")
         feats = "、".join(sorted(result.features)) or tr("无")
         self._license_status.setText(
             tr("本地激活：已激活") + f"：{issued.code_id} | {bind} | "
             + tr("有效期") + f" {expires}\n" + tr("已开放") + f"：{feats}")
         self._license_status.setStyleSheet("color: #2e7d32;")
-        self._clear_license_btn.setEnabled(True)
+        self._clear_license_btn.setEnabled(not getattr(self, "_activation_busy", False))
 
     def _refresh_online_license_status(self):
         from ..core.config.protected_remote import member_access_status
@@ -1315,24 +1336,55 @@ class SettingsDialog(QDialog):
                 tr("已复制"), self._copy_serial_btn)
 
     def _on_activate_license(self):
-        from ..core.license import try_activate
-
         code = self._license_edit.toPlainText().strip()
         if not code:
             QMessageBox.information(self, tr("激活"), tr("请先粘贴激活码"))
             return
-        result = try_activate(code)
+        from ..core.license import LicenseError, verify_code
+        try:
+            issued = verify_code(code)
+        except LicenseError as error:
+            self._license_status.setText(tr("激活失败") + "：" + str(error))
+            return
+        if issued.bind == "claim" and load_user_config().network.offline:
+            self._license_status.setText(tr("一次性码首次激活需要联网，请先关闭完全离线模式。"))
+            return
+        if getattr(self, "_activation_busy", False):
+            return
+        self._activation_busy = True
+        self._activate_btn.setEnabled(False)
+        self._clear_license_btn.setEnabled(False)
+        self._license_edit.setEnabled(False)
+        self._license_status.setText(tr("正在验证激活码；一次性码将联网绑定本机…"))
+        self._activation_worker = _ActivationWorker(code, self)
+        self._activation_worker.completed.connect(self._activation_completed)
+        self._activation_worker.finished.connect(self._activation_finished)
+        self._activation_worker.start()
+
+    def done(self, result):
+        if getattr(self, "_activation_busy", False):
+            self._license_status.setText(tr("正在激活，请等待联网操作完成后关闭。"))
+            return
+        super().done(result)
+
+    def _activation_finished(self):
+        self._activation_busy = False
+        self._activate_btn.setEnabled(True)
+        self._license_edit.setEnabled(True)
+        self._refresh_license_status()
+        self._license_status.setText(self._license_status.text() + "\n" + self._activation_message)
+        self._activation_worker.deleteLater()
+
+    def _activation_completed(self, result):
         if result.active:
             self._license_edit.clear()
             self._refresh_license_status()
             starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
             if callable(starter):
                 starter()
-            QMessageBox.information(
-                self, tr("激活"),
-                tr("激活成功。部分功能需要重新定位窗口后生效。"))
+            self._activation_message = tr("激活成功。部分功能需要重新定位窗口后生效。")
         else:
-            QMessageBox.warning(self, tr("激活失败"), result.reason)
+            self._activation_message = tr("激活失败") + "：" + result.reason
 
     def _on_clear_license(self):
         from ..core.license import clear_code, refresh_entitlement

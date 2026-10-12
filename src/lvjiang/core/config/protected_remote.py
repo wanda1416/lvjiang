@@ -26,6 +26,7 @@ class ProtectedAccess:
     service: str
     code: str = field(repr=False)
     expires: str | None = None
+    serial: str = field(default="", repr=False)
 
     @property
     def code_hash(self) -> str:
@@ -62,19 +63,23 @@ def member_access_status(code_hash: str | None = None) -> MemberAccessStatus:
 
 
 def snapshot() -> ProtectedAccess | None:
-    from ..license import current_serial, evaluate, load_code
+    from ..license import current_serial, load_code
+    from ..license.activation import stored_entitlement
+    from ..license.hardware import normalize_serial
     code = load_code()
     if not code:
         logger.debug("[在线配置] 未填写激活码，不检查云端会员授权")
         return None
-    entitlement = evaluate(code, current_serial())
+    serial = current_serial()
+    entitlement = stored_entitlement(serial)
     if not eligible(entitlement):
         reason = entitlement.reason if entitlement.license is None else "本地授权未达到会员等级或已过期"
         logger.debug("[在线配置] 不检查云端会员授权：{}", reason)
         return None
     issued = entitlement.license
     return ProtectedAccess(CONTENT_SERVICE_URL, code,
-                           issued.expires.isoformat() if issued and issued.expires else None)
+                           issued.expires.isoformat() if issued and issued.expires else None,
+                           normalize_serial(serial or "") if issued and issued.bind == "claim" else "")
 
 
 def eligible(entitlement) -> bool:

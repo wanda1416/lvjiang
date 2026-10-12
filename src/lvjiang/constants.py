@@ -35,7 +35,7 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 CONFIG_DIR = PROJECT_ROOT / "config"
 
-# system/local 层根目录已收拢至 core.config.resolver，外部经 ConfigResolver API 访问
+# system/local/updates/i18n 的目录关系统一由 core.paths 声明。
 
 # 纯运行态（会话/用户/产出/截图，.gitignore）
 SESSION_CONFIG_DIR = CONFIG_DIR / "session"

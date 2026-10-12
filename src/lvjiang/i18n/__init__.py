@@ -16,14 +16,14 @@ import yaml
 if TYPE_CHECKING:
     from PyQt6.QtCore import QTranslator
 
-from ..constants import PROJECT_ROOT
+from ..core.paths import get_config_i18n_dir
 
 logger = logging.getLogger(__name__)
 
 # ── 全局状态 ──
 _translations: dict[str, str] = {}   # 扁平化翻译表：中文原文 → 译文
 _current_language: str = "zh_CN"
-_i18n_dir: Path = PROJECT_ROOT / "config" / "i18n"
+_i18n_dir: Path = get_config_i18n_dir()
 _loaded_app_i18n: set[str] = set()   # 已加载插件翻译的集合（幂等保护）
 _qt_translator: QTranslator | None = None
 

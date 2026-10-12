@@ -38,7 +38,7 @@ def test_corrupt_activation_remains_clearable_and_online_reason_is_translated(tm
     from lvjiang import i18n
     from lvjiang.core.license import store
 
-    monkeypatch.setattr("lvjiang.core.config.resolver.LOCAL_CONFIG_DIR", tmp_path)
+    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path)
     store.activation_path().write_text("invalid record", encoding="utf-8")
     monkeypatch.setattr(license, "current_serial", lambda: None)
     monkeypatch.setattr(license, "current_entitlement", lambda: license.Entitlement(reason="invalid record"))

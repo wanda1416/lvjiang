@@ -24,8 +24,8 @@ from ..license_files import ACTIVATION_FILENAME, LICENSE_FILENAME
 
 
 def license_path() -> Path:
-    from ..config.resolver import LOCAL_CONFIG_DIR
-    return LOCAL_CONFIG_DIR / LICENSE_FILENAME
+    from ..paths import get_config_local_dir
+    return get_config_local_dir() / LICENSE_FILENAME
 
 
 def load_code() -> str | None:

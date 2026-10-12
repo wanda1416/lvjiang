@@ -30,8 +30,8 @@ def isolated_config(tmp_path, monkeypatch):
     import lvjiang.core.config.resolver as cr
     dst = tmp_path / "system" / "yysls" / "game_config"
     shutil.copytree(ATTRS_FILE, dst)
-    monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
+    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
     monkeypatch.setattr(cr, "_resolver", None)
     return dst
 

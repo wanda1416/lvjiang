@@ -1,8 +1,6 @@
 """统计模块的本地路径解析。
 
-统一走这一层而不是散落各处拼路径，且必须动态读取 ``constants.CONFIG_DIR``
-（照抄 ``SessionStore.path`` 的写法，见 core/config/session.py:79-87）
-——延迟 import + 每次访问重新取值，测试才能 monkeypatch。
+统一使用公共目录入口，延迟读取本地配置目录。
 
 安全边界（不是实现细节，是设计约束）：这里落盘的 install_id/缓冲事件
 必须放在 ``config/local/`` 下，绝不能放进 ``config/session/``。用户指南
@@ -17,8 +15,8 @@ from pathlib import Path
 
 
 def telemetry_dir() -> Path:
-    from lvjiang import constants
-    return constants.CONFIG_DIR / "local" / "telemetry"
+    from ..paths import get_config_local_dir
+    return get_config_local_dir() / "telemetry"
 
 
 def identity_path() -> Path:

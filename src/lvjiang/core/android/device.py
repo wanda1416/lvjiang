@@ -11,8 +11,8 @@ from typing import Callable
 
 from loguru import logger
 
-from ...constants import PROJECT_ROOT
 from ..config.models import AndroidRecoveryConfig
+from ..paths import data_directory
 from ..platforms import (
     SUBPROCESS_NO_WINDOW,
     SUBPROCESS_TEXT,
@@ -42,7 +42,7 @@ def _resolve_adb_path() -> str:
     found = shutil.which("adb")
     if found:
         return found
-    bundled = PROJECT_ROOT / "data" / "adb" / ("adb.exe" if os.name == "nt" else "adb")
+    bundled = data_directory() / "adb" / ("adb.exe" if os.name == "nt" else "adb")
     if bundled.exists():
         return str(bundled)
     for c in adb_path_candidates():

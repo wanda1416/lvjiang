@@ -32,6 +32,7 @@ from lvjiang.core.config.versioning import (  # noqa: E402
     version_from_text,
     with_version,
 )
+from lvjiang.core.paths import get_config_system_dir  # noqa: E402
 
 # 插件私有配置是插件自己注册的，不 import 就不在注册表里，会被本脚本漏掉。
 load_config_policies()
@@ -86,7 +87,7 @@ def main() -> int:
 
     missing: list[Path] = []
     written: list[Path] = []
-    for path in iter_versioned_files(_REPO_ROOT / "config" / "system"):
+    for path in iter_versioned_files(get_config_system_dir()):
         text = path.read_bytes().decode("utf-8")  # newline= 是 3.13+
         if _has_version(path, text):
             if args.reset and not args.check and version_from_text(text, path.suffix) != 1:

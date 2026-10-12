@@ -28,7 +28,7 @@ def project(tmp_path, monkeypatch, *, dev):
         "content_version: 1\nkey: sample\nname: 示例\nregions: []\n", encoding="utf-8")
     (system / "layouts/phone/sample.json").write_text(
         '{"content_version":1,"regions":[]}', encoding="utf-8")
-    resolver = ConfigResolver(system, tmp_path / "local", dev_mode=dev)
+    resolver = ConfigResolver(system, tmp_path / "local", dev_mode=dev, config_dir=tmp_path)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
     monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
     return resolver
@@ -66,7 +66,7 @@ def test_missing_index_rebuilds_and_unchanged_tasks_reuse_parsed_scenes(tmp_path
 
 def test_development_skips_online_install_but_refresh_loads_external_scene(tmp_path, monkeypatch):
     resolver = project(tmp_path, monkeypatch, dev=True)
-    write_baseline_identity(resolver.system_dir, "0.15.0")
+    write_baseline_identity(resolver.system_dir, "0.15.0", config_dir=resolver.config_dir)
     monkeypatch.setattr(remote, "_fetch_bytes", lambda *_a, **_k: pytest.fail("开发版不应联网"))
     assert remote._installed_store() is None
     assert not remote.run_sync(remote.build_sync_job()).performed
@@ -117,7 +117,7 @@ def test_release_public_member_install_refreshes_next_task_not_running_task(tmp_
     from lvjiang.core.config.update_download import PublicDownload
     from lvjiang.core.update_bundle import read_tree
     resolver = project(tmp_path, monkeypatch, dev=False)
-    identity = write_baseline_identity(resolver.system_dir, "0.15.0")
+    identity = write_baseline_identity(resolver.system_dir, "0.15.0", config_dir=resolver.config_dir)
     assert (tmp_path / "session/baseline.json").is_file()
     assert not (tmp_path / "system-baseline.json").exists()
     assert remote._installed_store() is not None

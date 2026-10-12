@@ -19,6 +19,10 @@ def phone(tmp_path, monkeypatch):
     root = tmp_path / "phone"
     session = root / "config/session"
     monkeypatch.setattr(constants, "PROJECT_ROOT", root)
+    monkeypatch.setattr(constants, "CONFIG_DIR", root / "config")
+    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", root / "config/system")
+    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", root / "config/local")
+    monkeypatch.setattr("lvjiang.core.paths.UPDATES_CONFIG_DIR", root / "config/updates")
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", session)
     monkeypatch.setattr(constants, "SESSION_PATH", session / "session.json")
     monkeypatch.setattr(constants, "USERS_DIR", session / "users")

@@ -89,7 +89,7 @@ def _installed_store() -> UpdateStore | None:
     # 开发工作区不允许在线安装器覆盖 git 管理的配置。
     if resolver.is_dev_mode():
         return None
-    config = resolver.system_dir.parent
+    config = resolver.config_dir
     path = session_directory(config) / "baseline.json"
     if not path.is_file():
         return None

@@ -21,6 +21,13 @@ from ..apps import get_registered_app_ids, load_app
 from .config.resolver import ConfigResolver
 from .json_files import formatted_json, formatted_json_bytes
 from .layout_config import load_layout_doc
+from .paths import (
+    config_directory,
+    get_config_local_dir,
+    get_config_system_dir,
+    get_config_updates_dir,
+    session_directory,
+)
 from .user_config import is_valid_username
 
 FORMAT_VERSION = 2
@@ -36,43 +43,41 @@ _SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "batch.json"
 _DATABASE_FILES = ("profile.db", "daily_history.db", "tuning_history.db")
 
 
-def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[Path]:
+def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple[Path, Path]]:
     hooks = [load_app(name) for name in get_registered_app_ids()]
     patterns = (*_LAYER_PATTERNS, *(
         pattern for app in hooks for pattern in app.offline_configuration_patterns))
-    for layer in ("system", "local"):
-        root = config / layer
+    for layer, root in (("system", get_config_system_dir(config)), ("local", get_config_local_dir(config))):
         paths = {path for pattern in patterns for path in root.glob(pattern)}
         for layout in layout_scope:
             paths.update((root / "layouts" / layout).glob("*.json"))
         from .license_files import is_private_license_file
-        yield from (path for path in sorted(paths) if not is_private_license_file(path.name))
-    session = config / "session"
-    yield from (session / name for name in _SESSION_FILES)
-    yield from sorted((session / "users").glob("*.json"))
+        yield from ((Path(layer) / path.relative_to(root), path)
+                    for path in sorted(paths) if not is_private_license_file(path.name))
+    session = session_directory(config)
+    yield from ((Path("session") / name, session / name) for name in _SESSION_FILES)
+    yield from ((Path("session/users") / path.name, path) for path in sorted((session / "users").glob("*.json")))
     for app in hooks:
         if app.offline_session_files is not None:
-            yield from (session / name for name in app.offline_session_files())
+            yield from ((Path("session") / name, session / name) for name in app.offline_session_files())
 
 
 def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str) -> dict:
     """构造配置副本和 SQLite backup 快照；不修改 PC 的活动选择或数据库。"""
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
-    config = root / "config"
+    config = config_directory(root)
     # PC 已安装的有效 system 直接作为手机离线快照，local 保持独立覆盖层。
     from .config.interface import InterfaceStore
-    InterfaceStore(config / "session/interface.json")
-    layout_doc = load_layout_doc(ConfigResolver(
-        system_dir=config / "system", local_dir=config / "local",
-    ))
+    InterfaceStore(session_directory(config) / "interface.json")
+    layout_doc = load_layout_doc(ConfigResolver(config_dir=config))
     entries = layout_doc["layouts"]
     if layout not in entries:
         raise ValueError("所选同步布局不存在")
     layout_scope = {layout}
     if entries[layout].get("extends"):
         layout_scope.add(entries[layout]["extends"])
-    if not (config / "session/users" / f"{username}.json").is_file():
+    if not (session_directory(config) / "users" / f"{username}.json").is_file():
         raise ValueError("执行用户资料不存在")
     manifest: dict[str, Any] = {
         "format": FORMAT_VERSION, "app_version": __version__,
@@ -83,7 +88,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:
         snapshots = []
         for name in _DATABASE_FILES:
-            database = config / "session" / name
+            database = session_directory(config) / name
             snapshot = Path(temp) / name
             if not database.is_file() or database.is_symlink():
                 continue
@@ -98,8 +103,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                 manifest["files"][name] = hashlib.sha256(data).hexdigest()
                 archive.writestr(name, data)
 
-            for path in _configuration_files(config, layout_scope):
-                rel = path.relative_to(config)
+            for rel, path in _configuration_files(config, layout_scope):
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
                     continue
@@ -137,7 +141,7 @@ def install_offline_bundle(
     root = root.resolve()
     root.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".offline-stage-", dir=root))
-    target = root / "config"
+    target = config_directory(root)
     previous = root / "offline-backup/config"
     swapped = False
     try:
@@ -180,33 +184,32 @@ def install_offline_bundle(
                     raise ValueError(f"数据库快照校验失败：{name}")
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
-            mobile_batch = target / "session/batch.json"
+            mobile_batch = session_directory(target) / "batch.json"
             if mobile_batch.is_file():
                 shutil.copyfile(mobile_batch, staged_config / "session/batch.json")
         # 本次批量选择属于手机运行草稿，电脑仅同步配置组定义。
         incoming_interface = staged_config / "session/interface.json"
         interface_data = json.loads(incoming_interface.read_text(encoding="utf-8")) if incoming_interface.is_file() else {}
-        old_interface = target / "session/interface.json"
+        old_interface = session_directory(target) / "interface.json"
         mobile_interface = json.loads(old_interface.read_text(encoding="utf-8")) if old_interface.is_file() else {}
         interface_data["batch"] = mobile_interface.get("batch", {})
         incoming_interface.write_text(formatted_json(interface_data), encoding="utf-8")
         # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
         # 预置归档；它不成为新 r0，也不携带 PC 的更新身份、会员凭据或归档。
         for name in ("updates",):
-            existing = target / name
+            existing = get_config_updates_dir(target)
             if existing.is_dir():
                 shutil.copytree(existing, staged_config / name)
             elif existing.is_file():
                 (staged_config / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(existing, staged_config / name)
-        from .paths import session_directory
         baseline = session_directory(target) / "baseline.json"
         if baseline.is_file():
             destination = session_directory(staged_config) / "baseline.json"
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(baseline, destination)
         # 此标记只记录 APK 官方代次，与是否覆盖用户参数无关。
-        marker = target / "session/preset.json"
+        marker = session_directory(target) / "preset.json"
         if marker.is_file():
             shutil.copyfile(marker, staged_config / "session/preset.json")
         old = staging / "old-config"
@@ -221,7 +224,7 @@ def install_offline_bundle(
             raise
         from .config.content import rebuild_content
         from .config.resolver import ConfigResolver
-        rebuild_content(ConfigResolver(target / "system", target / "local", dev_mode=False))
+        rebuild_content(ConfigResolver(config_dir=target, dev_mode=False))
         if on_applied is not None:
             on_applied()
         if old.exists():
@@ -246,7 +249,7 @@ def install_offline_bundle(
 
 def _preserve_task_parameters(old: Path, incoming: Path) -> None:
     """在校验后的暂存区按任务整体保留；不拷贝 DB 或用户运行 session。"""
-    old_path = old / "session/session.json"
+    old_path = session_directory(old) / "session.json"
     if not old_path.is_file():
         return
     old_session = json.loads(old_path.read_text(encoding="utf-8"))
@@ -263,7 +266,7 @@ def _preserve_task_parameters(old: Path, incoming: Path) -> None:
     for username in old_session.get("users", []):
         if not isinstance(username, str) or not is_valid_username(username):
             continue
-        source = old / "session/users" / f"{username}.json"
+        source = session_directory(old) / "users" / f"{username}.json"
         if not source.is_file():
             continue
         destination = new_users / f"{username}.json"

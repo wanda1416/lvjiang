@@ -46,10 +46,11 @@ def build_system_preset(system_dir: Path, destination: Path) -> dict:
 
 def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callable[[], None] | None = None) -> bool:
     """只交换 system；按预置内容摘要去重，PC 同步后重启不反向覆盖。"""
-    config = root / "config"
+    from .paths import config_directory, get_config_system_dir, session_directory
+    config = config_directory(root)
     config.mkdir(parents=True, exist_ok=True)
-    marker = config / "session/preset.json"
-    target = config / "system"
+    marker = session_directory(config) / "preset.json"
+    target = get_config_system_dir(config)
     with zipfile.ZipFile(archive_path) as archive:
         manifest = json.loads(archive.read("manifest.json"))
         files = manifest["files"]
@@ -94,7 +95,7 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 new.rename(target)
                 if on_applied:
                     on_applied()
-                write_baseline_identity(target, __version__)
+                write_baseline_identity(target, __version__, config_dir=config)
                 # 手机初始化在 PC 同步之前保存可信预置；构建安装包不重复携带归档。
                 from .config.update_store import UpdateStore
                 UpdateStore(config, __version__, digest).baseline()
@@ -122,12 +123,11 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
     return True
 
 
-def write_baseline_identity(system_dir: Path, app_version: str) -> dict:
+def write_baseline_identity(system_dir: Path, app_version: str, *, config_dir: Path | None = None) -> dict:
     """只用于可信打包/预置安装，不从已在线更新的用户 system 推导 r0。"""
     files = read_tree(system_dir)
     version = series(app_version)
     identity = {"app_series": version, "sha256": tree_digest(files)}
-    root = system_dir.parent
     from .paths import session_directory
-    atomic_write_bytes(session_directory(root) / "baseline.json", formatted_json_bytes(identity), prefix=".baseline-", fsync=True)
+    atomic_write_bytes(session_directory(config_dir) / "baseline.json", formatted_json_bytes(identity), prefix=".baseline-", fsync=True)
     return identity

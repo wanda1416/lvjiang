@@ -37,7 +37,7 @@ def check_conflicts(resolver, baselines: dict[str, Baseline]) -> dict[str, Basel
 
 def checked_write(resolver, baselines: dict[str, Baseline], write):
     confirmed = check_conflicts(resolver, baselines)
-    with configuration_lock(resolver.system_dir.parent):
+    with configuration_lock(resolver.config_dir):
         if any(file_baseline(resolver, name) != expected for name, expected in confirmed.items()):
             raise ConfigWriteConflict("确认期间磁盘配置再次更新，请重新保存")
         if hasattr(resolver, "_read_baselines"):

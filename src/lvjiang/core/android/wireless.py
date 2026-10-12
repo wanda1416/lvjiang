@@ -38,8 +38,8 @@ def resolve_adb() -> str:
     if found:
         return found
 
-    from ...constants import PROJECT_ROOT
-    bundled = PROJECT_ROOT / "data" / "adb" / ("adb.exe" if os.name == "nt" else "adb")
+    from ..paths import data_directory
+    bundled = data_directory() / "adb" / ("adb.exe" if os.name == "nt" else "adb")
     if bundled.exists():
         return str(bundled)
     for c in adb_path_candidates():

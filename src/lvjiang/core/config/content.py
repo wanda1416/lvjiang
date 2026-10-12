@@ -81,8 +81,8 @@ def _lookup(data: dict, keys: tuple[str, ...]) -> Any:
 
 def rebuild_content(resolver) -> dict:
     """刷新和启动的强制路径；重建只读修订号，不修改配置文件。"""
-    with configuration_lock(resolver.system_dir.parent):
-        path = session_directory(resolver.system_dir.parent) / "content.json"
+    with configuration_lock(resolver.config_dir):
+        path = session_directory(resolver.config_dir) / "content.json"
         data: dict[str, Any] = {}
         now = datetime.now(timezone.utc)
         try:
@@ -105,7 +105,7 @@ def rebuild_content(resolver) -> dict:
 
 def load_content(resolver) -> dict:
     """不存在、损坏或 key 缺失一律重建，不阻断任务。"""
-    path = session_directory(resolver.system_dir.parent) / "content.json"
+    path = session_directory(resolver.config_dir) / "content.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or not isinstance(data.get("update_at"), str):
@@ -139,5 +139,5 @@ def content_changed(resolver) -> None:
         rebuild_content(resolver)
     except OSError as exc:
         # 不能保留一份可能让下次任务误用旧缓存的记录。
-        (session_directory(resolver.system_dir.parent) / "content.json").unlink(missing_ok=True)
+        (session_directory(resolver.config_dir) / "content.json").unlink(missing_ok=True)
         logger.warning("配置已写入，修订索引将在下次任务重建：{}", exc)

@@ -7,8 +7,8 @@
 import pytest
 
 from lvjiang.core.config import load_user_config
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import Return

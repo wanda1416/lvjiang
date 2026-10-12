@@ -11,10 +11,11 @@ from fasteners import InterProcessLock
 
 from .agent_mcp import DEFAULT_MCP_PORT
 from .fs_util import atomic_write_text
+from .paths import config_directory, session_directory
 
 
 def settings_path(root: Path) -> Path:
-    return root / "config" / "session" / "mcp.json"
+    return session_directory(config_directory(root)) / "mcp.json"
 
 
 @dataclass

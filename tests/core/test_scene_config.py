@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR, ConfigResolver
+from lvjiang.core.config.resolver import ConfigResolver
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.core.scene_config import (
     build_scene_doc,
     load_scene_doc,

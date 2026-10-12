@@ -173,7 +173,7 @@ def test_task_snapshot_keeps_lazy_files_while_next_task_sees_update(tmp_path, mo
     (tmp_path / "session/baseline.json").write_text(json.dumps({
         "app_series": "0.15.0", "sha256": tree_digest(base)}), encoding="utf-8")
     monkeypatch.setattr(resolver, "_resolver", resolver.ConfigResolver(
-        system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False))
+        system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False, config_dir=tmp_path))
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
     manifest, archive = make_manifest("0.15.0", 1, base, {"templates/example.png": b"new image"})
     monkeypatch.setattr(layout_manager, "load_layout_by_key", lambda key: SimpleNamespace(
@@ -243,7 +243,7 @@ def test_member_dependency_and_authorization_survive_index_rollback(tmp_path, mo
     (tmp_path / "session/baseline.json").write_text(json.dumps({
         "app_series": "0.15.0", "sha256": tree_digest(base)}), encoding="utf-8")
     monkeypatch.setattr(resolver, "_resolver", resolver.ConfigResolver(
-        system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False))
+        system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False, config_dir=tmp_path))
     monkeypatch.setattr(protected_remote, "authorized", lambda doc: False)
     with configuration_snapshot():
         assert resolver.get_resolver().resolve_read("member.bin") is None

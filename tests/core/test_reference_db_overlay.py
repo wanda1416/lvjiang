@@ -279,15 +279,14 @@ def space_env(tmp_path, monkeypatch):
     """图库空间相关路径全部重定向到 tmp_path（完整路由隔离）
 
     reference_db 的层路径经 ConfigResolver 派生，打层根
-    resolver.SYSTEM_CONFIG_DIR / resolver.LOCAL_CONFIG_DIR 即可（属性懒求值，monkeypatch 友好）。
+    core.paths 的层目录即可（属性懒求值，monkeypatch 友好）。
     """
-    import lvjiang.core.config.resolver as cr
     from lvjiang import constants
     system_root = tmp_path / "system"
     local_root = tmp_path / "local"
     session = tmp_path / "session" / "session.json"
-    monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", system_root)
-    monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", local_root)
+    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", system_root)
+    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", local_root)
     monkeypatch.setattr(constants, "SESSION_PATH", session)
     system_ref = system_root / "references"
     return {

@@ -17,6 +17,7 @@ from fasteners import InterProcessLock
 from ....._version import __version__
 from .....core.config.document_store import DocumentDirectoryStore
 from .....core.config.resolver import ConfigResolver
+from .....core.paths import config_directory, session_directory
 from ..loadout import LoadoutRepository
 from ..tuning_rules import parse_tuning_group, parse_tuning_rule
 from .contracts import GenerationPayload, PlanOverrides, TuningPatch
@@ -31,12 +32,11 @@ def revision(value) -> str:
 class AgentService:
     def __init__(self, root: Path, *, dispatch: Callable, game_config=None):
         self.root = root
-        self.resolver = ConfigResolver(
-            root / "config/system", root / "config/local", dev_mode=False,
-        )
-        self.users_dir = root / "config/session/users"
+        config = config_directory(root)
+        self.resolver = ConfigResolver(config_dir=config, dev_mode=False)
+        self.users_dir = session_directory(config) / "users"
         self.store = DocumentDirectoryStore(
-            root / "config/session/agent", {"results": "results.json", "tasks": "tasks.json"}, label="Agent 生成结果",
+            session_directory(config) / "agent", {"results": "results.json", "tasks": "tasks.json"}, label="Agent 生成结果",
         )
         self.dispatch = dispatch
         self._game_config = game_config

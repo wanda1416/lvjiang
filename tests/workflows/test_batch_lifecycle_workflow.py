@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 from lvjiang.core.config import load_user_config
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.metadata import parse_metadata_file

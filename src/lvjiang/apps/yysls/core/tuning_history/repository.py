@@ -8,8 +8,6 @@ from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from lvjiang import constants
-
 from .models import (
     RESET_ANOMALIES,
     TuningEquipmentResult,
@@ -20,7 +18,8 @@ _setup_lock = threading.Lock()
 
 
 def default_db_path() -> Path:
-    return constants.CONFIG_DIR / "session" / "tuning_history.db"
+    from .....core.paths import session_directory
+    return session_directory() / "tuning_history.db"
 
 
 class _ClosingConnection(sqlite3.Connection):

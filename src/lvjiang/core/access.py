@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fasteners import InterProcessLock
 
+from .paths import config_directory, session_directory
+
 
 class AccessDeniedError(RuntimeError):
     pass
@@ -64,7 +66,7 @@ def initialize_instance(root: Path, *, readonly: bool = False) -> None:
     global _instance, _readonly
     if _instance is not None:
         raise RuntimeError("实例权限已经初始化")
-    lease = Lease(root / "config" / "session" / ".locks" / "configuration.lock")
+    lease = Lease(session_directory(config_directory(root)) / ".locks" / "configuration.lock")
     _readonly = True  # Fail closed if lock acquisition raises.
     if not readonly:
         _readonly = not lease.acquire()

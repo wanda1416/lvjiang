@@ -29,11 +29,12 @@ import openpyxl
 import yaml
 
 from lvjiang.apps.yysls.core.graduation.model_registry import level_dirname
+from lvjiang.core.paths import data_directory, get_config_system_dir
 
 ROOT = Path(__file__).resolve().parents[1]
-EXCEL_DIR = ROOT / "data" / "excel"
-SCHEME_DIR = ROOT / "config" / "system" / "yysls" / "graduation"
-TARGET_DIR = ROOT / "config" / "system" / "yysls" / "damage_model"
+EXCEL_DIR = data_directory() / "excel"
+SCHEME_DIR = get_config_system_dir() / "yysls" / "graduation"
+TARGET_DIR = get_config_system_dir() / "yysls" / "damage_model"
 
 #: `武学奇术` / `增益` 两张表的表头名 → 配置字段。两张表用同一套词汇，
 #: 同名列共用词汇，不同增伤乘区分别保留。

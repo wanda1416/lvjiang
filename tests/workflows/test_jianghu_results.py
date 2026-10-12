@@ -3,7 +3,7 @@ from collections import Counter
 
 import pytest
 
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine

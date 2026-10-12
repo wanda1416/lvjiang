@@ -14,7 +14,7 @@ scan_get / find_cell 四个子过程（不复制粘贴实现），用事故当�
 
 from pathlib import Path
 
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 

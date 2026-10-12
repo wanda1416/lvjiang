@@ -269,7 +269,7 @@ class TestEvaluate:
 class TestStore:
     def test_roundtrip(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "lvjiang.core.config.resolver.LOCAL_CONFIG_DIR", tmp_path)
+            "lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path)
         assert store.load_code() is None
         assert store.save_code("LVJ1.AAA.BBB")
         assert store.load_code() == "LVJ1.AAA.BBB"
@@ -279,12 +279,12 @@ class TestStore:
     def test_lives_outside_the_upgrade_wiped_dir(self, monkeypatch, tmp_path):
         """必须落在 config/local：config/system 升级时会被整个清空。"""
         monkeypatch.setattr(
-            "lvjiang.core.config.resolver.LOCAL_CONFIG_DIR", tmp_path / "local")
+            "lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
         assert "local" in store.license_path().parts
 
     def test_missing_file_is_not_an_error(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "lvjiang.core.config.resolver.LOCAL_CONFIG_DIR", tmp_path / "nope")
+            "lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "nope")
         assert store.load_code() is None
 
 

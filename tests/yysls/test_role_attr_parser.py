@@ -20,7 +20,7 @@ from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     parse_detail2_outer_attack,
     parse_detail2_outer_pen,
 )
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import Eval
 from tests.workflows.conftest import make_engine

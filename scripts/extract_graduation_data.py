@@ -16,9 +16,10 @@ from lvjiang.apps.yysls.core.graduation.graduation_converter import (  # noqa: E
 from lvjiang.apps.yysls.core.graduation.model_registry import (  # noqa: E402
     model_filename,
 )
+from lvjiang.core.paths import data_directory, get_config_system_dir  # noqa: E402
 
-EXCEL_DIR = ROOT / "data" / "excel"
-OUTPUT_DIR = ROOT / "config" / "system" / "yysls" / "graduation"
+EXCEL_DIR = data_directory() / "excel"
+OUTPUT_DIR = get_config_system_dir() / "yysls" / "graduation"
 FILE_TO_SCHOOL = {
     "鸣金虹": "鸣金·虹", "鸣金影": "鸣金·影",
     "裂石威": "裂石·威", "裂石钧": "裂石·钧",

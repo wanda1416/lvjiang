@@ -2,8 +2,8 @@
 
 import pytest
 
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.builtins import _registry
 from lvjiang.workflows.grammar import parse_file, parse_text
 from tests.workflows.conftest import make_engine

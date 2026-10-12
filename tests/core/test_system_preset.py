@@ -37,7 +37,7 @@ def test_packaging_only_writes_identity_and_startup_creates_r0(official, monkeyp
     from lvjiang.core.config.update_store import UpdateStore
     from lvjiang.core.system_preset import write_baseline_identity
     from lvjiang.core.update_bundle import read_tree, unpack
-    identity = write_baseline_identity(official, "0.15.0")
+    identity = write_baseline_identity(official, "0.15.0", config_dir=official.parent)
     store = UpdateStore(official.parent, "0.15.0", identity["sha256"])
     baseline = store.root / "r0.zip"
     assert not baseline.exists()
@@ -103,7 +103,7 @@ sys.meta_path.insert(0, BuildOnly())
 sys.path.insert(0, sys.argv[1])
 from lvjiang.core.system_preset import build_system_preset, write_baseline_identity
 build_system_preset(Path(sys.argv[2]), Path(sys.argv[3]))
-write_baseline_identity(Path(sys.argv[2]), '0.15.0')
+write_baseline_identity(Path(sys.argv[2]), '0.15.0', config_dir=Path(sys.argv[2]).parent)
 """
     output = tmp_path / "host-preset.zip"
     subprocess.run([sys.executable, "-c", script, str(source), str(official), str(output)],

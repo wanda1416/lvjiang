@@ -32,9 +32,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from loguru import logger
 
-from ...constants import PROJECT_ROOT
 from ...i18n import tr
 from ..capture_base import CaptureBackend
+from ..paths import data_directory
 from ..platforms import SUBPROCESS_NO_WINDOW, SUBPROCESS_TEXT
 from .device import AdbDevice
 
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     import av
 
 # scrcpy server 与内置 adb 一起分发，避免为单个文件保留独立目录。
-_JAR_RELATIVE = Path("data") / "adb" / "scrcpy-server.jar"
+_JAR_RELATIVE = Path("adb") / "scrcpy-server.jar"
 # 设备端 jar 路径
 _REMOTE_JAR_PATH = "/data/local/tmp/scrcpy-server.jar"
 # scrcpy 4.1 协议：forward 连接先发 1 字节 dummy byte
@@ -91,9 +91,9 @@ class AndroidStreamCapture(CaptureBackend):
         if jar_path is not None:
             self._jar_local = Path(jar_path)
         else:
-            # 相对于项目根目录；根的定位统一由 constants.PROJECT_ROOT 负责，
+            # 资源根统一由公共目录入口定位，
             # 免得这里自己数 __file__ 的层级（目录一挪就错）
-            self._jar_local = PROJECT_ROOT / _JAR_RELATIVE
+            self._jar_local = data_directory() / _JAR_RELATIVE
 
         self._scid: int = 0
         self._socket_name: str = ""

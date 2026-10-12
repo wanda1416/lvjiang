@@ -3,6 +3,15 @@
 配置读取只有 system/local 两层；session 存运行数据。
 读写入口为 `core/config/resolver.py`。
 
+目录拓扑由 `core/paths.py` 单点声明。调用方使用 `get_config_system_dir()`、
+`get_config_local_dir()`、`get_config_updates_dir()`、`get_config_i18n_dir()`、
+`session_directory()` 和 `data_directory()`；不得从 system 的父目录推导其他目录。
+隔离实例通过 `config_directory(root)` 获得显式配置上下文，再传给路径入口及
+`ConfigResolver(config_dir=...)`。resolver 的配置上下文与实际层目录分开保存，
+配置锁、修订索引和基底身份按上下文定位，不受 system/local 存储位置影响。
+同步包内的逻辑路径仍固定为 config/system、config/local 和 config/session，
+打包时显式映射实际文件路径，不要求它们在磁盘上相邻。
+
 | 层 | 目录 | 职责 | 进 git |
 |----|------|------|--------|
 | system | `config/system/` | 已安装的官方配置；开发仓库维护官方源文件 | 仅源文件 ✅ |

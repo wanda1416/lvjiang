@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.static_check import check_refs

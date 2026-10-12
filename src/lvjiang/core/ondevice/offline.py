@@ -26,7 +26,8 @@ def configuration_status() -> dict:
     from ..config.session import get_session_store
     sync = sync_status()
     marker = constants.SESSION_CONFIG_DIR / "preset.json"
-    system = constants.SESSION_CONFIG_DIR.parent / "system"
+    from ..paths import get_config_system_dir
+    system = get_config_system_dir()
     preset_ready = marker.is_file() and all((system / name).is_file() for name in ("app.yaml", "ocr.yaml", "layouts.yaml"))
     ready = bool(sync.get("synced") or preset_ready)
     store = get_session_store()

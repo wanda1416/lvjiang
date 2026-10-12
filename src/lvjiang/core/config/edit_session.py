@@ -35,6 +35,7 @@ class ConfigEditSession:
             local_dir=local,
             dev_mode=source.is_dev_mode(),
             track_content=False,
+            config_dir=root,
         )
         self._closed = False
         self._baseline_merged: dict[str, dict] = {}

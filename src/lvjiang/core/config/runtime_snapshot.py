@@ -120,7 +120,7 @@ def configuration_snapshot() -> Iterator[RuntimeSnapshot | None]:
         yield active
         return
     resolver = get_resolver()
-    config = resolver.system_dir.parent
+    config = resolver.config_dir
     prepare_task_installation()
     with configuration_lock(config):
         content = load_content(resolver)
@@ -159,7 +159,7 @@ def configuration_snapshot() -> Iterator[RuntimeSnapshot | None]:
                      "复用解析缓存" if reused else "从磁盘加载新代次")
         snapshot = RuntimeSnapshot(
             ConfigResolver(system_dir=generation.system, local_dir=generation.local,
-                           dev_mode=False, track_content=False),
+                           dev_mode=False, track_content=False, config_dir=generation.owner),
             resolver.system_dir, resolver.local_dir,
             generation=generation, update_at=content["update_at"])
     token = _current.set(snapshot)

@@ -28,6 +28,7 @@ class _Resolver:
 
     def __init__(self, root):
         self.root = root
+        self.config_dir = root.parent
         self.system_dir = root.parent
         self.local_dir = root.parent / "local"
 
@@ -237,8 +238,8 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
     from lvjiang.core.layout_manager import LayoutConfigManager
     from lvjiang.core.layout_models import CanvasConfig, Layout
 
-    monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
+    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
     monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

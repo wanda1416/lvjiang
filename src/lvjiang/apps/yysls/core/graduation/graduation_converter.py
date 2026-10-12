@@ -13,8 +13,8 @@ import openpyxl
 import yaml
 from openpyxl.worksheet.formula import ArrayFormula
 
-from lvjiang.constants import PROJECT_ROOT
 from lvjiang.core.config.resolver import get_resolver
+from lvjiang.core.paths import get_config_system_dir
 
 from .excel_formula import FormulaError, FormulaModel, parse_formula
 from .graduation_program import ProgramCompiler, ProgramRuntime
@@ -27,8 +27,8 @@ from .model_registry import (
     model_rel_path,
 )
 
-GRADUATION_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "graduation"
-GAME_CONFIG_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "game_config"
+GRADUATION_DIR = get_config_system_dir() / "yysls" / "graduation"
+GAME_CONFIG_DIR = get_config_system_dir() / "yysls" / "game_config"
 
 INPUTS = {
     "min_outer": "期望!B2", "max_outer": "期望!C2",

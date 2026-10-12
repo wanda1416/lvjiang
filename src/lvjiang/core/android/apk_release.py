@@ -57,9 +57,9 @@ def default_download_dir() -> Path:
     （见 .gitignore）。下载和"启动时找回已下载的包"必须用同一个函数，
     否则路径在两处各写一遍，改一边就会出现"下载完重启又不认了"。
     """
-    from ... import constants
 
-    return Path(constants.DATA_DIR) / "apk"
+    from ..paths import data_directory
+    return data_directory() / "apk"
 
 
 def find_local_apk(version: str, dest_dir: Path | None = None) -> Path | None:

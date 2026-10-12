@@ -14,6 +14,7 @@ from typing import Any
 
 from ..fs_util import atomic_write_bytes
 from ..json_files import formatted_json_bytes
+from ..paths import get_config_local_dir, get_config_system_dir, get_config_updates_dir
 from ..update_bundle import (
     digest,
     file_hashes,
@@ -37,8 +38,8 @@ class UpdateStore:
 
     def __init__(self, config: Path, app_version: str, baseline_sha256: str):
         self.config = config.resolve()
-        self.system = self.config / "system"
-        self.updates = self.config / "updates"
+        self.system = get_config_system_dir(self.config)
+        self.updates = get_config_updates_dir(self.config)
         self.version = series(app_version)
         self.app_version = app_version
         self.namespace = update_namespace(app_version)
@@ -331,7 +332,7 @@ class UpdateStore:
                     raise
                 try:
                     from .resolver import ConfigResolver
-                    content_changed(ConfigResolver(self.system, self.config / "local", dev_mode=False))
+                    content_changed(ConfigResolver(self.system, get_config_local_dir(self.config), dev_mode=False, config_dir=self.config))
                     activate(self.system, changed)
                 except Exception as error:
                     from loguru import logger

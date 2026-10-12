@@ -93,13 +93,12 @@ class TestMigrateAcrossLayouts:
         """resolver 三层根指向 tmp_path 的独立管理器（开发模式写 system）"""
         import lvjiang.constants as constants
         import lvjiang.core.config.resolver as cr
-        monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-        monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
+        monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
+        monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
         monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
         # 重置 resolver 单例以使用新路径
-        import lvjiang.core.config.resolver as cr
         monkeypatch.setattr(cr, "_resolver", None)
         mgr = LayoutConfigManager()
         for name in ("layout_a", "layout_b"):
@@ -150,8 +149,8 @@ class TestDeleteAcrossLayouts:
     def manager(self, tmp_path, monkeypatch):
         import lvjiang.constants as constants
         import lvjiang.core.config.resolver as cr
-        monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
-        monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
+        monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
+        monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
         monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

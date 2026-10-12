@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang._version import __version__  # noqa: E402
+from lvjiang.core.paths import get_config_system_dir  # noqa: E402
 from lvjiang.core.system_preset import write_baseline_identity  # noqa: E402
 from lvjiang.core.update_bundle import read_tree  # noqa: E402
 
@@ -17,14 +18,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("destination", type=Path)
     args = parser.parse_args()
-    system = args.destination / "system"
+    system = get_config_system_dir(args.destination)
     if system.exists() and any(system.iterdir()):
         raise ValueError("请使用空的打包目标，不能覆盖用户 system")
-    for name, data in read_tree(ROOT / "config/system").items():
+    for name, data in read_tree(get_config_system_dir()).items():
         path = system / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
-    identity = write_baseline_identity(system, __version__)
+    identity = write_baseline_identity(system, __version__, config_dir=args.destination)
     print(f"预置基底 {identity['app_series']}: {identity['sha256']}")
 
 

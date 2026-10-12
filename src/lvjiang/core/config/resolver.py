@@ -43,11 +43,8 @@ from loguru import logger
 
 from ... import constants
 from ..fs_util import atomic_write_bytes, atomic_write_text
+from ..paths import get_config_local_dir, get_config_system_dir
 from . import versioning
-
-# 层根目录：ConfigResolver 内部持有，外部经 ConfigResolver API 访问
-SYSTEM_CONFIG_DIR = constants.CONFIG_DIR / "system"
-LOCAL_CONFIG_DIR = constants.CONFIG_DIR / "local"
 
 # 聚合 diff 中的删除键标记
 DELETED_KEY = "__deleted__"
@@ -71,7 +68,7 @@ def _configuration_write(function):
             return result
         if self.track_content and rel_path in self._read_baselines:
             return checked_write(self, {rel_path: self._read_baselines[rel_path]}, write)
-        with configuration_lock(self.system_dir.parent):
+        with configuration_lock(self.config_dir):
             return write()
     return wrapped
 
@@ -368,11 +365,14 @@ class ConfigResolver:
         local_dir: Path | str | None = None,
         dev_mode: bool | None = None,
         track_content: bool = True,
+        config_dir: Path | None = None,
     ):
         self._system_dir = Path(system_dir) if system_dir else None
         self._local_dir = Path(local_dir) if local_dir else None
         self._dev_mode = dev_mode if dev_mode is not None else self._compute_dev_mode()
         self.track_content = track_content
+        # 逻辑安装上下文与实际配置层位置分离；锁、索引和基底不反推父目录。
+        self.config_dir = config_dir if config_dir is not None else constants.CONFIG_DIR
         self._read_baselines: dict = {}
         self._listeners: list[Callable[[str], None]] = []
         self._batch_listeners: list[Callable[[tuple[str, ...]], None]] = []
@@ -398,13 +398,13 @@ class ConfigResolver:
     def system_dir(self) -> Path:
         if self._system_dir is not None:
             return self._system_dir
-        return SYSTEM_CONFIG_DIR
+        return get_config_system_dir(self.config_dir)
 
     @property
     def local_dir(self) -> Path:
         if self._local_dir is not None:
             return self._local_dir
-        return LOCAL_CONFIG_DIR
+        return get_config_local_dir(self.config_dir)
 
     def is_dev_mode(self) -> bool:
         """开发模式（写 system）or 用户模式（写 local）

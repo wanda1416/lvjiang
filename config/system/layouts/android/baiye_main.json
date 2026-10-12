@@ -18,9 +18,9 @@
     {
       "key": "baiye_menu",
       "x_ratio": 0.042332651437314885,
-      "y_ratio": 0.19021442956995596,
+      "y_ratio": 0.15660601281114578,
       "w_ratio": 0.10076086956521738,
-      "h_ratio": 0.6436824518190561
+      "h_ratio": 0.6772908685778662
     },
     {
       "key": "title",
@@ -74,16 +74,16 @@
     {
       "key": "activity_recommend_tab",
       "x_ratio": 0.353125,
-      "y_ratio": 0.1111111111111111,
-      "w_ratio": 0.14125,
-      "h_ratio": 0.0625
+      "y_ratio": 0.11620531648491948,
+      "w_ratio": 0.14228475468309454,
+      "h_ratio": 0.05740579462619162
     },
     {
       "key": "activity_list_tab",
       "x_ratio": 0.5,
-      "y_ratio": 0.1111111111111111,
-      "w_ratio": 0.1625,
-      "h_ratio": 0.0625
+      "y_ratio": 0.11620531648491948,
+      "w_ratio": 0.16249999999999998,
+      "h_ratio": 0.05740579462619162
     },
     {
       "key": "activity_list",
@@ -112,6 +112,27 @@
       "y_ratio": 0.22916666666666666,
       "w_ratio": 0.036875,
       "h_ratio": 0.2013888888888889
+    },
+    {
+      "key": "activity_detail_title",
+      "x_ratio": 0.703125,
+      "y_ratio": 0.018055555555555554,
+      "w_ratio": 0.13125,
+      "h_ratio": 0.07777777777777778
+    },
+    {
+      "key": "activity_track",
+      "x_ratio": 0.71,
+      "y_ratio": 0.8833333333333333,
+      "w_ratio": 0.2325,
+      "h_ratio": 0.06805555555555555
+    },
+    {
+      "key": "activity_detail_back",
+      "x_ratio": 0.920625,
+      "y_ratio": 0.02361111111111111,
+      "w_ratio": 0.03625,
+      "h_ratio": 0.06666666666666667
     },
     {
       "key": "shop_title",
@@ -203,27 +224,6 @@
       "y_ratio": 0.8888888888888888,
       "w_ratio": 0.160625,
       "h_ratio": 0.0875
-    },
-    {
-      "key": "activity_detail_title",
-      "x_ratio": 0.703125,
-      "y_ratio": 0.018055555555555554,
-      "w_ratio": 0.13125,
-      "h_ratio": 0.07777777777777778
-    },
-    {
-      "key": "activity_track",
-      "x_ratio": 0.71,
-      "y_ratio": 0.8833333333333333,
-      "w_ratio": 0.2325,
-      "h_ratio": 0.06805555555555555
-    },
-    {
-      "key": "activity_detail_back",
-      "x_ratio": 0.920625,
-      "y_ratio": 0.02361111111111111,
-      "w_ratio": 0.03625,
-      "h_ratio": 0.06666666666666667
     }
   ],
   "points": [

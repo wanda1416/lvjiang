@@ -1,5 +1,6 @@
 """接入跨重启保持稳定，多安装与其他 Agent 配置互不覆盖。"""
 import json
+import shutil
 
 import pytest
 
@@ -11,7 +12,9 @@ from lvjiang.core.agent_connection import (
 
 
 def test_connection_persists_enabled_port_token_and_isolates_installations(tmp_path, monkeypatch):
-    monkeypatch.setattr(agent_connection.Path, "home", lambda: tmp_path / "home")
+    def forbidden_home():
+        raise AssertionError("客户端自身配置不得访问用户主目录")
+    monkeypatch.setattr(agent_connection.Path, "home", forbidden_home)
     first, second = tmp_path / "first", tmp_path / "second"
     setting = AgentConnection(port=19001, enabled=True)
     setting.save(first)
@@ -22,6 +25,10 @@ def test_connection_persists_enabled_port_token_and_isolates_installations(tmp_p
     loaded.save(first)
     assert not AgentConnection.load(first).enabled
     assert AgentConnection.load(first).token == setting.token
+    assert (first / "config/session/mcp.json").is_file()
+    # 客户端整体复制/解压到另一个目录后，无需安装路径散列或主目录外部状态。
+    shutil.copytree(first, second)
+    assert AgentConnection.load(second) == loaded
 
 
 def test_exports_preserve_other_settings_and_use_configured_connection_names(tmp_path, monkeypatch):

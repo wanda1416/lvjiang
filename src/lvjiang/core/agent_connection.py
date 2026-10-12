@@ -1,7 +1,6 @@
 """按安装目录保存 MCP 接入，合并写入外部 Agent 的用户级配置。"""
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import secrets
@@ -14,12 +13,8 @@ from .agent_mcp import DEFAULT_MCP_PORT
 from .fs_util import atomic_write_text
 
 
-def installation_id(root: Path) -> str:
-    return hashlib.sha256(os.path.normcase(str(root.resolve())).encode("utf-8")).hexdigest()[:16]
-
-
 def settings_path(root: Path) -> Path:
-    return Path.home() / ".lvjiang" / "mcp" / f"{installation_id(root)}.json"
+    return root / "config" / "session" / "mcp.json"
 
 
 @dataclass

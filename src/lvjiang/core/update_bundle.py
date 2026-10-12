@@ -46,7 +46,7 @@ def safe_path(name: str) -> bool:
     """跨平台相对文件路径；不以扩展名或客户端类型注册表作为下发白名单。"""
     if not isinstance(name, str) or not name or name.startswith("/") or "\\" in name:
         return False
-    from .license.store import is_private_license_file
+    from .license_files import is_private_license_file
     if is_private_license_file(name):
         return False
     return all(part not in {"", ".", ".."} and not part.endswith((".", " "))

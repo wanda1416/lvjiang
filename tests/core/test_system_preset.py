@@ -1,6 +1,9 @@
 """官方预置的持续契约：可复核、无个人配置、升级只改 system、失败回滚。"""
 import json
+import subprocess
+import sys
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -83,3 +86,26 @@ def test_failed_reload_restores_previous_system_and_install_marker(official, tmp
         install_system_preset(archive, phone, on_applied=fail)
     assert (phone / "config/system/workflows/task.wf").read_text(encoding="utf-8") == "wait 0.01"
     assert (phone / "config/session/preset.json").read_bytes() == marker
+
+
+def test_build_host_does_not_require_authorization_or_application_runtime(official, tmp_path):
+    # APK 构建宿主只有 packaging；不能因分发过滤而要求完整客户端依赖。
+    source = Path(__file__).resolve().parents[2] / "src"
+    script = """
+import importlib.abc
+import sys
+from pathlib import Path
+class BuildOnly(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'loguru', 'yaml', 'cryptography', 'PyQt6'} or fullname == 'lvjiang.core.license' or fullname.startswith(('lvjiang.core.license.', 'lvjiang.core.config')):
+            raise ImportError('Build host must not import runtime: ' + fullname)
+sys.meta_path.insert(0, BuildOnly())
+sys.path.insert(0, sys.argv[1])
+from lvjiang.core.system_preset import build_system_preset
+build_system_preset(Path(sys.argv[2]), Path(sys.argv[3]))
+"""
+    output = tmp_path / "host-preset.zip"
+    subprocess.run([sys.executable, "-c", script, str(source), str(official), str(output)],
+                   check=True, capture_output=True, text=True, encoding="utf-8")
+    with zipfile.ZipFile(output) as package:
+        assert "system/workflows/task.wf" in package.namelist()

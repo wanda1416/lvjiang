@@ -20,14 +20,12 @@ from pathlib import Path
 from loguru import logger
 
 from ..json_files import formatted_json
-
-_FILENAME = "license.txt"
-_ACTIVATION_FILENAME = "license-activation.json"
+from ..license_files import ACTIVATION_FILENAME, LICENSE_FILENAME
 
 
 def license_path() -> Path:
     from ..config.resolver import LOCAL_CONFIG_DIR
-    return LOCAL_CONFIG_DIR / _FILENAME
+    return LOCAL_CONFIG_DIR / LICENSE_FILENAME
 
 
 def load_code() -> str | None:
@@ -74,7 +72,7 @@ def clear_code() -> bool:
 
 
 def activation_path() -> Path:
-    return license_path().with_name(_ACTIVATION_FILENAME)
+    return license_path().with_name(ACTIVATION_FILENAME)
 
 
 def load_activation() -> dict | None:
@@ -116,8 +114,3 @@ def save_activation(code: str, receipt: dict) -> bool:
     except OSError as error:
         logger.warning("激活已保存，但旧激活码清理失败：{}；请删除旧 license.txt：{}", license_path(), error)
     return True
-
-
-def is_private_license_file(name: str) -> bool:
-    filename = Path(name).name.casefold()
-    return filename in {_FILENAME, _ACTIVATION_FILENAME} or filename.startswith(".license-")

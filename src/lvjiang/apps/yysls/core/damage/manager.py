@@ -38,8 +38,7 @@ class DamageModelManager:
             self._resolver = get_resolver()
             self._rel_dir = _MODELS_REL_DIR
         else:
-            self._resolver = ConfigResolver(
-                system_dir=models_dir, local_dir=models_dir, dev_mode=True)
+            self._resolver = ConfigResolver.for_single_directory(models_dir)
             self._rel_dir = ""
         self._models: dict[str, DamageModel] = {}
         self._files: dict[str, str] = {}

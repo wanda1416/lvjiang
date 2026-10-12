@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QVBoxLayout
 
 from lvjiang.core import license
 from lvjiang.core.config import UserConfig, protected_remote
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.ui import settings_dialog
 
 
@@ -38,7 +39,7 @@ def test_corrupt_activation_remains_clearable_and_online_reason_is_translated(tm
     from lvjiang import i18n
     from lvjiang.core.license import store
 
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path)
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path)
     store.activation_path().write_text("invalid record", encoding="utf-8")
     monkeypatch.setattr(license, "current_serial", lambda: None)
     monkeypatch.setattr(license, "current_entitlement", lambda: license.Entitlement(reason="invalid record"))

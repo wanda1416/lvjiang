@@ -20,6 +20,7 @@ import time
 import pytest
 
 from lvjiang.core.ondevice import task_runner
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
 # ─── 测试替身 ────────────────────────────────────────────────
 
@@ -521,8 +522,8 @@ def test_is_running_reflects_state(monkeypatch):
 
 def test_build_source_missing_wf_file(monkeypatch, tmp_path):
     """.wf 不在盘上要报路径，别让引擎去解析一个不存在的文件"""
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
     with pytest.raises(FileNotFoundError, match="工作流文件不存在"):
         task_runner._build_source({"wf_file": "ghost.wf", "class": ""}, None)
 
@@ -532,8 +533,8 @@ def test_build_source_returns_existing_path(monkeypatch, tmp_path):
     wf_dir.mkdir(parents=True)
     wf = wf_dir / "real.wf"
     wf.write_text("log \"hi\"\n", encoding="utf-8")
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
 
     got = task_runner._build_source({"wf_file": "real.wf", "class": ""}, None)
     assert got == wf

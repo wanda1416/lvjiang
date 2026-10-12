@@ -3,12 +3,12 @@ from collections import Counter
 
 import pytest
 
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
-WORKFLOW = SYSTEM_CONFIG_DIR / "workflows/daily_jianghu.wf"
+WORKFLOW = get_config_system_dir() / "workflows/daily_jianghu.wf"
 
 
 def mixed_run(monkeypatch, source=None):

@@ -22,6 +22,7 @@ from lvjiang.core.layout_models import (
     Region,
     SubsceneRef,
 )
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from tests.case_matrix import case_matrix
 
 
@@ -50,8 +51,8 @@ def env(tmp_path, monkeypatch):
     import lvjiang.constants as constants
     import lvjiang.core.config.resolver as cr
 
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
     monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

@@ -116,8 +116,8 @@ def task_history(run_id: str = "") -> str:
         return _json({"ok": False, "message": str(exc)})
 
 
-def public_content(kind: str) -> str:
-    """仅由用户手动刷新调用，复用桌面的校验和版本筛选。"""
+def public_content(kind: str, refresh: bool = False) -> str:
+    """公开内容按需展示；二维码默认读缓存，用户可显式刷新。"""
     try:
         if kind == "about":
             from ..about import about_content
@@ -146,9 +146,25 @@ def public_content(kind: str) -> str:
         if kind == "qrcode":
             import base64
 
-            from ..group_qrcode import load_qrcode_bytes
-            payload = load_qrcode_bytes()
-            return _json({"ok": True, "message": "", "image": base64.b64encode(payload).decode("ascii")})
+            from ..group_qrcode import (
+                fetch_qrcode_bytes,
+                load_qrcode_bytes,
+                qrcode_path,
+                save_qrcode,
+            )
+            message = ""
+            try:
+                if refresh:
+                    payload = fetch_qrcode_bytes()
+                    save_qrcode(payload)
+                else:
+                    payload = load_qrcode_bytes()
+            except Exception as error:
+                if not qrcode_path().is_file():
+                    raise
+                payload = qrcode_path().read_bytes()
+                message = f"刷新失败，显示缓存：{error}"
+            return _json({"ok": True, "message": message, "image": base64.b64encode(payload).decode("ascii")})
         if kind == "version":
             # 版本入口的站点与桌面共同维护。
             from ..public_links import RELEASES_URL

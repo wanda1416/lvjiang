@@ -30,7 +30,7 @@ def _env(tmp_path, *, dev_mode=True):
         "schema_version": 2,
         "scenes": {"general": {"name": "通用", "items": []}},
     })
-    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=dev_mode)
+    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=dev_mode, config_dir=tmp_path)
     manifest = load_scene_manifest(resolver)
     registry = SceneRegistry(
         resolver=resolver, scene_order=manifest.order,
@@ -203,16 +203,23 @@ def test_user_mode_cannot_delete_system_map_but_can_copy_to_local(tmp_path):
     assert (tmp_path / "local/maps/duchenxu/base.png").read_bytes() == b"img"
 
 
-def test_copy_to_local_writes_local_even_in_dev_mode(tmp_path):
+def test_copy_to_local_writes_local_even_in_dev_mode(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    from lvjiang.core.config import content
     _, _, manager = _env(tmp_path)
     map_def = manager.create("duchenxu", "渡尘墟")
     manager.save_with_image(map_def, b"img")
+    changed = Mock(wraps=content.content_changed)
+    monkeypatch.setattr(content, "content_changed", changed)
 
     copied = manager.copy_to_local("duchenxu")
 
     assert copied.layer == "local"
     assert (tmp_path / "local/maps/duchenxu/map.yaml").is_file()
     assert (tmp_path / "local/maps/duchenxu/base.png").read_bytes() == b"img"
+    assert changed.call_count > 0
+    assert all(call.args[0].config_dir == tmp_path for call in changed.call_args_list)
 
 
 def test_heading_detector_round_trip_and_validation(tmp_path):

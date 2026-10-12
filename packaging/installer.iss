@@ -61,6 +61,7 @@ Type: filesandordirs; Name: "{app}\docs\60-userguide"
 Type: filesandordirs; Name: "{app}\docs\70-agent"
 Type: filesandordirs; Name: "{app}\data\scrcpy"
 Type: filesandordirs; Name: "{app}\data\image"
+Type: files; Name: "{app}\config\system-baseline.json"
 
 [Files]
 ; PyInstaller onedir 产物 + 运行时依赖（config/system, data/adb）

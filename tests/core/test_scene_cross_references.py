@@ -13,6 +13,7 @@ from lvjiang.core.layout_manager import (
     refresh_scene_references,
 )
 from lvjiang.core.layout_models import Layout, Point, Region
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.scene_definition import SceneRegistry
 
 
@@ -238,8 +239,8 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
     from lvjiang.core.layout_manager import LayoutConfigManager
     from lvjiang.core.layout_models import CanvasConfig, Layout
 
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
     monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

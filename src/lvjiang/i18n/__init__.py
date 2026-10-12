@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 # ── 全局状态 ──
 _translations: dict[str, str] = {}   # 扁平化翻译表：中文原文 → 译文
 _current_language: str = "zh_CN"
-_i18n_dir: Path = get_config_i18n_dir()
 _loaded_app_i18n: set[str] = set()   # 已加载插件翻译的集合（幂等保护）
 _qt_translator: QTranslator | None = None
 
@@ -78,7 +77,7 @@ def load_app_i18n(app_name: str) -> None:
     if app_name in _loaded_app_i18n:
         return
 
-    app_dir = _i18n_dir / "apps" / app_name
+    app_dir = get_config_i18n_dir() / "apps" / app_name
     if not app_dir.is_dir():
         return
 
@@ -132,10 +131,10 @@ def available_languages() -> list[dict[str, str]]:
         [{"code": "zh_CN", "name": "简体中文"}, ...]
     """
     languages = []
-    if not _i18n_dir.exists():
+    if not get_config_i18n_dir().exists():
         return [{"code": "zh_CN", "name": "简体中文"}]
 
-    for yaml_file in sorted(_i18n_dir.glob("*.yaml")):
+    for yaml_file in sorted(get_config_i18n_dir().glob("*.yaml")):
         code = yaml_file.stem
         try:
             with open(yaml_file, "r", encoding="utf-8") as f:
@@ -200,7 +199,7 @@ def _load_translation_file(language: str) -> dict[str, str]:
     if language == "zh_CN":
         # 中文是原文本身，tr() 直接返回；解析基准文件只会得到空表。
         return {}
-    yaml_file = _i18n_dir / f"{language}.yaml"
+    yaml_file = get_config_i18n_dir() / f"{language}.yaml"
     if not yaml_file.exists():
         logger.warning("[i18n] 翻译文件不存在: %s", yaml_file)
         return {}
@@ -213,7 +212,7 @@ def _load_translation_file(language: str) -> dict[str, str]:
         return {}
 
     # 加载中文基准文件，用于建立 原文 → 译文 映射
-    zh_file = _i18n_dir / "zh_CN.yaml"
+    zh_file = get_config_i18n_dir() / "zh_CN.yaml"
     zh_data: dict = {}
     if zh_file.exists() and language != "zh_CN":
         try:

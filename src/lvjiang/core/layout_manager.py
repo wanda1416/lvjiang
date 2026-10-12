@@ -1062,19 +1062,28 @@ def _checked_layout_save(function):
     def wrapped(self, layout, changed_scenes=None, **kwargs):
         from .config.conflicts import ConfigWriteConflict, checked_write, file_baseline
         resolver = get_resolver()
-        names = scene_layout_rels(layout.key, changed_scenes or ()).values()
+        self.last_save_error = ""
+        scenes = (set(layout.regions) | set(layout.points) | set(layout.arrows)
+                  | set(layout.panels) | set(layout.subscene_refs))
+        if changed_scenes is not None:
+            scenes &= changed_scenes
+        names = scene_layout_rels(layout.key, scenes).values()
         names = set(names) | {"layouts.yaml"}
-        baselines = {name: baseline for name, baseline in layout._file_baselines.items()
-                     if changed_scenes is None or name in names}
+        baselines = {name: layout._file_baselines.get(name, file_baseline(resolver, name))
+                     for name in names}
+        def save_batch():
+            with resolver.batch_changes():
+                result = function(self, layout, changed_scenes, **kwargs)
+                if result:
+                    # 在写锁内捕获本次写入基线；未写场景仍保留打开时的基线。
+                    layout._file_baselines.update({name: file_baseline(resolver, name) for name in names})
+                return result
         try:
-            result = checked_write(resolver, baselines,
-                                   lambda: function(self, layout, changed_scenes, **kwargs))
+            result = checked_write(resolver, baselines, save_batch)
         except ConfigWriteConflict as exc:
+            self.last_save_error = str(exc)
             logger.info("布局未保存：{}", exc)
             return False
-        if result:
-            layout._file_baselines = {
-                name: file_baseline(resolver, name) for name in layout._file_baselines}
         return result
     return wrapped
 
@@ -1090,6 +1099,7 @@ class LayoutConfigManager:
 
     def __init__(self):
         self._config = self._load_config()
+        self.last_save_error = ""
 
     def _load_config(self) -> dict:
         """从 session.json 读 actives.layout。
@@ -1136,7 +1146,8 @@ class LayoutConfigManager:
         layout = Layout(key=key, name=name)
         for scene_key in SCENE_REGIONS:
             layout.regions[scene_key] = []
-        self.save_layout(layout)
+        if not self.save_layout(layout):
+            raise ValueError(self.last_save_error or "布局未保存，请检查日志")
         if activate:
             self.set_active_layout(key)
         logger.info(f"布局已新建: {name} ({key})")

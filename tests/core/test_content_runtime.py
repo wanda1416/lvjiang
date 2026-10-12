@@ -86,6 +86,19 @@ def test_development_skips_online_install_but_refresh_loads_external_scene(tmp_p
         assert scene_registry.get_registry().get_scene("sample").name == "新名称"
 
 
+@pytest.mark.parametrize("identity", ['{"app_series":"0.15.0"}', '{"sha256":', '[]'])
+def test_damaged_baseline_skips_online_restore_not_task_loading(tmp_path, monkeypatch, identity):
+    resolver = project(tmp_path, monkeypatch, dev=False)
+    session = tmp_path / "session"
+    session.mkdir(exist_ok=True)
+    (session / "baseline.json").write_text(identity, encoding="utf-8")
+    monkeypatch.setattr(remote, "_fetch_bytes", lambda *_a, **_k: pytest.fail("损坏基底不应联网"))
+    with configuration_snapshot():
+        assert scene_registry.get_registry().get_scene("sample") is not None
+    assert not remote.run_sync(remote.build_sync_job()).performed
+    assert (resolver.system_dir / "scenes/sample.yaml").is_file()
+
+
 def test_task_entry_records_and_logs_content_timestamp(tmp_path, monkeypatch):
     from types import SimpleNamespace
 

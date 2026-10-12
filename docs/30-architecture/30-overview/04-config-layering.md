@@ -192,8 +192,9 @@ scenes:
 调律规则与基础规则组**不再有登记表**：存在性由 `yysls/tuning_rules/`、
 `yysls/base_groups/` 目录决定，顺序由各文件的 `order`（升序、同序按 key，
 预置项 10、20、…，新建默认 10）声明，规则的启停由文件自己的 `disabled`
-声明。旧版本 `tune_config.yaml` 里的 `tuning_rules` / `base_rules` 由规则
-管理器一次性迁移（禁用声明写进对应规则文件）后移除。
+声明。旧版本 `tune_config.yaml` 里的 `tuning_rules` / `base_rules` 不再读取，
+也不自动迁移或修改规则文件。用户应备份旧配置，在对应规则文件设置
+`disabled` / `order`，确认后手工移除旧声明；加载时会给出操作提示。
 
 存量 local 里的普通列表仍按整键替换处理——已无法区分「用户主动删了某条」
 和「那条当时还不存在」，硬转会误伤；用户下次保存时自动转成增量形式。

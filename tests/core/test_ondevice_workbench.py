@@ -1,7 +1,25 @@
 """工作台持续契约：只读浏览、任务可见性与历史来源隔离。"""
+import base64
 import json
 
 from lvjiang.core.ondevice import task_runner, workbench
+
+
+def test_qrcode_refresh_is_explicit_and_keeps_cache_on_failure(tmp_path, monkeypatch):
+    from lvjiang.core import group_qrcode
+    monkeypatch.setattr("lvjiang.constants.SESSION_CONFIG_DIR", tmp_path)
+    group_qrcode.save_qrcode(b"old")
+    monkeypatch.setattr(group_qrcode, "fetch_qrcode_bytes", lambda: b"latest")
+    cached = json.loads(workbench.public_content("qrcode"))
+    assert base64.b64decode(cached["image"]) == b"old"
+    refreshed = json.loads(workbench.public_content("qrcode", True))
+    assert base64.b64decode(refreshed["image"]) == b"latest"
+    def unavailable():
+        raise group_qrcode.QrCodeError("请检查网络")
+    monkeypatch.setattr(group_qrcode, "fetch_qrcode_bytes", unavailable)
+    failed = json.loads(workbench.public_content("qrcode", True))
+    assert failed["ok"] and "请检查网络" in failed["message"]
+    assert base64.b64decode(failed["image"]) == b"latest"
 
 
 def test_catalog_keeps_parameterless_and_invalid_tasks_without_selecting_user(monkeypatch):

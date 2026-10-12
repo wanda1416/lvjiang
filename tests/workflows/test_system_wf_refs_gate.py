@@ -14,7 +14,7 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.key_validation import validate_layout_activation_keys
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine import WorkflowEngine
 
 
@@ -24,7 +24,7 @@ def _system_wf_files() -> list:
     _editor_run.wf / _recorded.wf / _testwf/ 的内容随上一次编辑器操作变化，
     不是分发物，不作为门禁对象。
     """
-    workflows_dir = SYSTEM_CONFIG_DIR / "workflows"
+    workflows_dir = get_config_system_dir() / "workflows"
     return sorted(
         p for p in workflows_dir.rglob("*.wf")
         if not p.name.startswith("_")
@@ -35,7 +35,7 @@ def _system_wf_files() -> list:
 
 def _system_layouts() -> list[str]:
     """拥有独立场景文件的系统布局 key。"""
-    layouts_dir = SYSTEM_CONFIG_DIR / "layouts"
+    layouts_dir = get_config_system_dir() / "layouts"
     if not layouts_dir.is_dir():
         return []
     return sorted(
@@ -141,7 +141,7 @@ def test_desktop_layout_has_no_activation_key_conflicts():
 
 @pytest.mark.parametrize(
     "wf_path", _system_wf_files(),
-    ids=lambda p: p.relative_to(SYSTEM_CONFIG_DIR / "workflows").as_posix())
+    ids=lambda p: p.relative_to(get_config_system_dir() / "workflows").as_posix())
 def test_wf_refs_all_bound(wf_path):
     """每个系统 .wf 引用的场景/区域/坐标点/方向/面板都已在该布局绑定
 
@@ -173,6 +173,6 @@ def test_declared_envs_are_real_platform_keys():
     for path in _system_wf_files():
         unknown = set(_declared_envs(path)) - known
         assert not unknown, (
-            f"{path.relative_to(SYSTEM_CONFIG_DIR / 'workflows')} "
+            f"{path.relative_to(get_config_system_dir() / 'workflows')} "
             f"声明了未知运行环境: {sorted(unknown)}"
         )

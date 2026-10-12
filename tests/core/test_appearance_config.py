@@ -6,7 +6,7 @@ import pytest
 
 from lvjiang.core import layout_manager
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.core.scene_definition import SceneRegistry
 from lvjiang.core.scene_transitions import find_unreachable_views, validate_transitions
 
@@ -14,7 +14,7 @@ from lvjiang.core.scene_transitions import find_unreachable_views, validate_tran
 @pytest.fixture
 def appearance_config(tmp_path, monkeypatch):
     resolver = ConfigResolver(
-        system_dir=SYSTEM_CONFIG_DIR,
+        system_dir=get_config_system_dir(),
         local_dir=tmp_path / "local",
         dev_mode=False,
     )
@@ -96,7 +96,7 @@ def test_appearance_bindings_match_scene_definition(appearance_config):
                 assert bound[key].activation_key == "SPACE"
     # 实际存储文件也必须一对一绑定，不只依赖加载器可能做的去重。
     for name in ("android", "desktop"):
-        path = SYSTEM_CONFIG_DIR / "layouts" / name / "appearance_main.json"
+        path = get_config_system_dir() / "layouts" / name / "appearance_main.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         keys = [r["key"] for r in data["regions"]]
         assert len(keys) == len(set(keys)) == len(expected_keys)

@@ -980,7 +980,7 @@ class WorkbenchUi(
             }
         }
         entry(about, "公告", "查看适用于当前版本的公告") { publicContent("notices") }
-        entry(about, "反馈联系", "获取最新联系二维码") { publicContent("qrcode") }
+        entry(about, "反馈联系", "查看联系二维码，可手动刷新") { publicContent("qrcode") }
         entry(about, "关于", "律匠 · ${BuildConfig.VERSION_NAME}") { showAbout() }
     }
 
@@ -1005,9 +1005,9 @@ class WorkbenchUi(
         }
     }
 
-    private fun publicContent(kind: String) {
-        toast("正在获取最新内容…")
-        request({ PyBridge.publicContent(activity, kind) }) { result ->
+    private fun publicContent(kind: String, refresh: Boolean = false) {
+        toast(if (kind == "qrcode" && !refresh) "正在读取二维码…" else "正在获取最新内容…")
+        request({ PyBridge.publicContent(activity, kind, refresh) }) { result ->
             if (!result.optBoolean("ok")) { toast("刷新失败：${result.optString("message")}"); return@request }
             if (kind == "notices") {
                 val notices = objects(result.optJSONArray("notices")).joinToString("\n\n") {
@@ -1021,7 +1021,9 @@ class WorkbenchUi(
                 val content = SettingsUi.dialogContent(activity)
                 if (result.optString("message").isNotEmpty()) text(content, result.optString("message"))
                 content.addView(ImageView(activity).apply { setImageBitmap(bitmap); adjustViewBounds = true; contentDescription = "反馈联系二维码" })
-                MaterialAlertDialogBuilder(activity).setTitle("反馈联系").setView(SettingsUi.dialogScroll(activity, content)).setPositiveButton("关闭", null).show()
+                MaterialAlertDialogBuilder(activity).setTitle("反馈联系").setView(SettingsUi.dialogScroll(activity, content))
+                    .setNeutralButton("刷新二维码") { _, _ -> publicContent("qrcode", true) }
+                    .setPositiveButton("关闭", null).show()
             }
         }
     }

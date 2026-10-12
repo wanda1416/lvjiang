@@ -41,5 +41,8 @@ def checked_write(resolver, baselines: dict[str, Baseline], write):
         if any(file_baseline(resolver, name) != expected for name, expected in confirmed.items()):
             raise ConfigWriteConflict("确认期间磁盘配置再次更新，请重新保存")
         if hasattr(resolver, "_read_baselines"):
-            resolver._read_baselines.update(confirmed)
+            from .versioning import spec_for
+            resolver._read_baselines.update({
+                name: baseline for name, baseline in confirmed.items()
+                if (spec := spec_for(name)) is not None and spec.has_content_version})
         return write()

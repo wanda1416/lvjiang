@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lvjiang.core import license as licensing
 from lvjiang.core.license import activation, code, hardware, store
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
 
 def b32(raw):
@@ -21,7 +22,7 @@ def grant(tmp_path, monkeypatch):
     for name, private in (("PUBLIC_KEY_B32", issuer), ("ACTIVATION_PUBLIC_KEY_B32", server)):
         monkeypatch.setattr(code, name, b32(private.public_key().public_bytes(
             serialization.Encoding.Raw, serialization.PublicFormat.Raw)))
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path)
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path)
     serial = hardware.encode_serial("test-activation-machine")
     monkeypatch.setattr(licensing, "current_serial", lambda: serial)
     monkeypatch.setattr(licensing, "_cached", None)

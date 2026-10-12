@@ -10,6 +10,7 @@ import pytest
 from lvjiang.core import layout_manager
 from lvjiang.core.layout_manager import LayoutConfigManager, migrate_layout_item
 from lvjiang.core.layout_models import Arrow, Layout, Panel, Point, Region
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
 
 def _make_layout(name: str = "test") -> Layout:
@@ -93,8 +94,8 @@ class TestMigrateAcrossLayouts:
         """resolver 三层根指向 tmp_path 的独立管理器（开发模式写 system）"""
         import lvjiang.constants as constants
         import lvjiang.core.config.resolver as cr
-        monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-        monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+        monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+        monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
         monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
@@ -149,8 +150,8 @@ class TestDeleteAcrossLayouts:
     def manager(self, tmp_path, monkeypatch):
         import lvjiang.constants as constants
         import lvjiang.core.config.resolver as cr
-        monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-        monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+        monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+        monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
         monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")

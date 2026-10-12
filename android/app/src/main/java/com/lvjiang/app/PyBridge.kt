@@ -201,8 +201,8 @@ object PyBridge {
         callJson(context, "profile_history", username, model, key, offset, moduleName = WORKBENCH_MODULE)
     fun taskHistory(context: Context, runId: String = ""): JSONObject =
         callJson(context, "task_history", runId, moduleName = WORKBENCH_MODULE)
-    fun publicContent(context: Context, kind: String): JSONObject =
-        callJson(context, "public_content", kind, moduleName = WORKBENCH_MODULE)
+    fun publicContent(context: Context, kind: String, refresh: Boolean = false): JSONObject =
+        callJson(context, "public_content", kind, refresh, moduleName = WORKBENCH_MODULE)
     fun respondInteraction(context: Context, requestId: String, accepted: Boolean): JSONObject =
         callJson(context, "respond_interaction", requestId, accepted)
 

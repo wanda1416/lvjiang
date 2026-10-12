@@ -3,7 +3,7 @@
 import pytest
 
 from lvjiang.core.layout_manager import load_layout_by_key
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.builtins import _registry
 from lvjiang.workflows.grammar import parse_file, parse_text
 from tests.workflows.conftest import make_engine
@@ -14,7 +14,7 @@ def _run(monkeypatch, *, platform="android", trigger="role", recovery=False,
     engine = make_engine(run_env=platform, layout=load_layout_by_key(platform))
     for name in ("subcall/login.wf", "subcall/page_detection.wf",
                  "subcall/navigation.wf", "batch/recover_to_login.wf"):
-        engine._procs.update(parse_file(SYSTEM_CONFIG_DIR / "workflows" / name).procs)
+        engine._procs.update(parse_file(get_config_system_dir() / "workflows" / name).procs)
     state = {"account": "account", "role": "previous_role", "page_state": 1}
     engine.variables["batch_state"] = state
     engine.user_attributes_snapshot = {"user": {"role": "target_role", "role_index": 2}}

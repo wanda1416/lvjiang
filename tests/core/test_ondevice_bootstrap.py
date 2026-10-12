@@ -9,6 +9,7 @@ import pytest
 from lvjiang import constants
 from lvjiang.core.config.session import get_session_store, reset_session_store
 from lvjiang.core.ondevice import bootstrap, offline, task_runner, user_settings
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.profile import repository
 from lvjiang.core.system_preset import build_system_preset
 from lvjiang.core.user_config import get_user_workflow_params, set_user_workflow_params
@@ -20,9 +21,9 @@ def phone(tmp_path, monkeypatch):
     session = root / "config/session"
     monkeypatch.setattr(constants, "PROJECT_ROOT", root)
     monkeypatch.setattr(constants, "CONFIG_DIR", root / "config")
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", root / "config/system")
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", root / "config/local")
-    monkeypatch.setattr("lvjiang.core.paths.UPDATES_CONFIG_DIR", root / "config/updates")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", root / "config/system")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", root / "config/local")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "updates", root / "config/updates")
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", session)
     monkeypatch.setattr(constants, "SESSION_PATH", session / "session.json")
     monkeypatch.setattr(constants, "USERS_DIR", session / "users")

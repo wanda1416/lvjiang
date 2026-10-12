@@ -56,3 +56,53 @@ def test_cancelled_immediate_scene_edit_does_not_leak_into_registry(tmp_path, mo
         registry.rename_scene("sample", "sample", "未保存的名称")
     assert registry.get_scene("sample").name == "外部修改"
     assert "未保存的名称" not in path.read_text(encoding="utf-8")
+
+
+def test_new_layout_keeps_own_baselines_and_batches_multi_file_save(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    from lvjiang.core import layout_manager, scene_registry
+    from lvjiang.core.config import content
+    from lvjiang.core.config import resolver as resolver_module
+
+    resolver = ConfigResolver(config_dir=tmp_path, dev_mode=True)
+    monkeypatch.setattr(resolver_module, "_resolver", resolver)
+    monkeypatch.setattr(scene_registry, "SCENE_REGIONS", {"first": [], "second": []})
+    rebuild = Mock(wraps=content.content_changed)
+    monkeypatch.setattr(content, "content_changed", rebuild)
+    manager = layout_manager.LayoutConfigManager()
+    layout = manager.new_layout("sample", "示例", activate=False)
+    assert rebuild.call_count == 1
+    assert set(layout._file_baselines) == {
+        "layouts.yaml", "layouts/sample/first.json", "layouts/sample/second.json"}
+    # 另一个读取上下文重置全局基线，不能撤掉此对象的保存保护。
+    resolver.reset_edit_baselines()
+    path = resolver.system_dir / "layouts.yaml"
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    doc["layouts"]["sample"]["canvas"]["w_ratio"] = 0.5
+    path.write_text(yaml.safe_dump(doc), encoding="utf-8")
+    monkeypatch.setattr(conflicts, "_handler", lambda _files: False)
+    assert not manager.save_layout(layout)
+    assert "磁盘配置已更新" in manager.last_save_error
+    assert yaml.safe_load(path.read_text(encoding="utf-8"))["layouts"]["sample"]["canvas"]["w_ratio"] == 0.5
+    monkeypatch.setattr(conflicts, "_handler", lambda _files: True)
+    assert manager.save_layout(layout)
+    monkeypatch.setattr(conflicts, "_handler", lambda _files: pytest.fail("确认保存后应更新基线"))
+    assert manager.save_layout(layout)
+
+
+def test_failed_nested_write_batch_flushes_saved_changes_once(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    from lvjiang.core.config import content
+    resolver = ConfigResolver(config_dir=tmp_path, dev_mode=True)
+    rebuild = Mock(wraps=content.content_changed)
+    monkeypatch.setattr(content, "content_changed", rebuild)
+    with pytest.raises(RuntimeError, match="partial failure"):
+        with resolver.batch_changes():
+            resolver.write_entity("scenes/first.yaml", "key: first\nname: 示例\n")
+            with resolver.batch_changes():
+                resolver.write_entity("scenes/second.yaml", "key: second\nname: 示例\n")
+            raise RuntimeError("partial failure")
+    assert rebuild.call_count == 1
+    assert load_content(resolver)["scenes"] == {"first": 1, "second": 1}

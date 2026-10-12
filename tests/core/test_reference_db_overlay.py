@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import yaml
 
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.reference_db import (
     DEFAULT_MATCH_THRESHOLD,
     DEFAULT_SPACE,
@@ -285,8 +286,8 @@ def space_env(tmp_path, monkeypatch):
     system_root = tmp_path / "system"
     local_root = tmp_path / "local"
     session = tmp_path / "session" / "session.json"
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", system_root)
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", local_root)
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", system_root)
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", local_root)
     monkeypatch.setattr(constants, "SESSION_PATH", session)
     system_ref = system_root / "references"
     return {

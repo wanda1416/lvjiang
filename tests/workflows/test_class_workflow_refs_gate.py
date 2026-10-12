@@ -16,7 +16,7 @@ import pytest
 
 from lvjiang.apps import load_app
 from lvjiang.core.layout_manager import load_layout_by_key
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from tests.case_matrix import case_matrix
 
 # 方法名 → (场景参数位, region/key 参数位, kind)
@@ -102,7 +102,7 @@ def _class_workflows() -> list[tuple[str, type]]:
 
 
 def _system_layouts() -> list[str]:
-    layouts_dir = SYSTEM_CONFIG_DIR / "layouts"
+    layouts_dir = get_config_system_dir() / "layouts"
     if not layouts_dir.is_dir():
         return []
     return sorted(

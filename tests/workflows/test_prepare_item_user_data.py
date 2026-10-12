@@ -16,11 +16,11 @@ import pytest
 from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.core.layout_models import FoundRegion
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
-_LOGIN_WF: Path = SYSTEM_CONFIG_DIR / "workflows" / "subcall" / "login.wf"
+_LOGIN_WF: Path = get_config_system_dir() / "workflows" / "subcall" / "login.wf"
 
 _CANCEL = ("game_login_page", "cancel")
 _ENTRY = ("game_login_page", "switch_role")
@@ -177,7 +177,7 @@ def _all_procs() -> dict:
     procs = {}
     for name in ("subcall/page_detection.wf", "subcall/navigation.wf",
                  "subcall/login.wf"):
-        path = SYSTEM_CONFIG_DIR / "workflows" / name
+        path = get_config_system_dir() / "workflows" / name
         procs.update(parse_text(path.read_text(encoding="utf-8")).procs)
     return procs
 

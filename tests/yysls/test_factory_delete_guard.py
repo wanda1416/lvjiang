@@ -15,6 +15,7 @@ from lvjiang.apps.yysls.ui.game_settings.factory_guard import (
     deletable,
     factory_list_values,
 )
+from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
 ATTRS_FILE = Path("config/system/yysls/game_config")
 
@@ -30,8 +31,8 @@ def isolated_config(tmp_path, monkeypatch):
     import lvjiang.core.config.resolver as cr
     dst = tmp_path / "system" / "yysls" / "game_config"
     shutil.copytree(ATTRS_FILE, dst)
-    monkeypatch.setattr("lvjiang.core.paths.SYSTEM_CONFIG_DIR", tmp_path / "system")
-    monkeypatch.setattr("lvjiang.core.paths.LOCAL_CONFIG_DIR", tmp_path / "local")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
     monkeypatch.setattr(cr, "_resolver", None)
     return dst
 

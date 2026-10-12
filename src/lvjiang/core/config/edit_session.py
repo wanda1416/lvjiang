@@ -97,9 +97,12 @@ class ConfigEditSession:
                    if current.get((name, layer)) != self._baseline_entities.get((name, layer))}
         changed.update(name for name in self._merged_paths
                        if self.resolver.load_merged(name) != self._baseline_merged[name])
+        def commit_batch():
+            with self._source.batch_changes():
+                self._commit()
         checked_write(self._source,
                       {name: self._source_baselines.get(name, (None, None)) for name in changed},
-                      self._commit)
+                      commit_batch)
         self._source_baselines = self._capture_baselines()
 
     def _commit(self) -> None:

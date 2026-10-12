@@ -3,10 +3,13 @@ from pathlib import Path
 
 from .. import constants
 
-SYSTEM_CONFIG_DIR = constants.CONFIG_DIR / "system"
-LOCAL_CONFIG_DIR = constants.CONFIG_DIR / "local"
-UPDATES_CONFIG_DIR = constants.CONFIG_DIR / "updates"
-I18N_CONFIG_DIR = constants.CONFIG_DIR / "i18n"
+# 声明相对目录而非 import 时解析的绝对目录；集中修改挂载位置也由此完成。
+CONFIG_SUBDIRECTORIES: dict[str, Path] = {
+    "system": Path("system"),
+    "local": Path("local"),
+    "updates": Path("updates"),
+    "i18n": Path("i18n"),
+}
 
 
 def config_directory(root: Path | None = None) -> Path:
@@ -16,26 +19,27 @@ def config_directory(root: Path | None = None) -> Path:
     return root / "config"
 
 
-def _config_directory(config: Path | None, name: str, default: Path) -> Path:
+def _config_directory(config: Path | None, name: str) -> Path:
     if config is None or config.resolve() == constants.CONFIG_DIR.resolve():
-        return default
+        return constants.CONFIG_DIR / CONFIG_SUBDIRECTORIES[name]
+    # 显式隔离实例不继承默认实例的绝对挂载位置。
     return config / name
 
 
 def get_config_system_dir(config: Path | None = None) -> Path:
-    return _config_directory(config, "system", SYSTEM_CONFIG_DIR)
+    return _config_directory(config, "system")
 
 
 def get_config_local_dir(config: Path | None = None) -> Path:
-    return _config_directory(config, "local", LOCAL_CONFIG_DIR)
+    return _config_directory(config, "local")
 
 
 def get_config_updates_dir(config: Path | None = None) -> Path:
-    return _config_directory(config, "updates", UPDATES_CONFIG_DIR)
+    return _config_directory(config, "updates")
 
 
 def get_config_i18n_dir(config: Path | None = None) -> Path:
-    return _config_directory(config, "i18n", I18N_CONFIG_DIR)
+    return _config_directory(config, "i18n")
 
 
 def data_directory(root: Path | None = None) -> Path:
@@ -46,4 +50,6 @@ def data_directory(root: Path | None = None) -> Path:
 
 def session_directory(config: Path | None = None) -> Path:
     """默认使用客户端 session；隔离实例、打包和手机同步可指定配置根。"""
-    return _config_directory(config, "session", constants.SESSION_CONFIG_DIR)
+    if config is None or config.resolve() == constants.CONFIG_DIR.resolve():
+        return constants.SESSION_CONFIG_DIR
+    return config / "session"

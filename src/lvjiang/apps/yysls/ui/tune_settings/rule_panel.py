@@ -222,11 +222,9 @@ class RulePanel(QWidget):
         now = datetime.now().strftime("%H:%M:%S")
         override = self._manager.system_save_override(self._key)
         if override is not None:
-            from lvjiang.core.config.resolver import LAYER_LOCAL
-            if override.layer == LAYER_LOCAL:
-                message = tr(
-                    "已保存到系统层，但本地配置仍在生效；"
-                    "系统修改尚未生效，请先还原本地覆盖（{now}）")
+            message = tr(
+                "已保存到系统层，但本地配置仍在生效；"
+                "系统修改尚未生效，请先还原本地覆盖（{now}）")
             self._status_cb(message.format(
                 now=now), "warn")
             return

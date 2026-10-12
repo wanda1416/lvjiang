@@ -484,6 +484,7 @@ class MapManager:
                 system_dir=self._resolver.system_dir,
                 local_dir=self._resolver.local_dir,
                 dev_mode=False,
+                config_dir=self._resolver.config_dir,
             )
             writer = MapManager(local_resolver, registry=self._scene_registry())
         if image is not None:

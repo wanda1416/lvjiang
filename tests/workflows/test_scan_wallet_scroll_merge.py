@@ -14,11 +14,11 @@ scan_get / find_cell 四个子过程（不复制粘贴实现），用事故当�
 
 from pathlib import Path
 
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
-_WF_PATH: Path = SYSTEM_CONFIG_DIR / "workflows" / "scan_wallet.wf"
+_WF_PATH: Path = get_config_system_dir() / "workflows" / "scan_wallet.wf"
 
 # 事故当天的真实识别结果（见 issue 日志）：滚动前第 3 行有宝钱和长鸣玉，
 # 第 1 行是长鸣珠（不是目标货币），第 2 行全空。

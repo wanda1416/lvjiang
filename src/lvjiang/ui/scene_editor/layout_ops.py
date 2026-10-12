@@ -449,7 +449,8 @@ class LayoutOpsMixin:
         if not self._manager.save_layout(
                 self._current_layout,
                 changed_scenes=changed):
-            self._status_bar.showMessage(f"保存布局「{name}」失败，请检查日志")
+            reason = self._manager.last_save_error or tr("请检查日志")
+            self._status_bar.showMessage(tr("保存布局「{name}」失败：{reason}").format(name=name, reason=reason))
             return
         self._update_ui_state()
         total_r = sum(len(items) for items in self._current_layout.regions.values())
@@ -653,7 +654,8 @@ class LayoutOpsMixin:
             if not self._validate_layout_keys_for_save(temp):
                 return
             if not self._manager.save_layout(temp):
-                QMessageBox.warning(self, tr("另存为失败"), tr("布局写入失败，请检查日志。"))
+                QMessageBox.warning(self, tr("另存为失败"),
+                                    self._manager.last_save_error or tr("布局写入失败，请检查日志。"))
                 return
             copy_screenshots(self._current_layout.key, key)
             self._current_layout = temp

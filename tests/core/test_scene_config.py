@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.core.scene_config import (
     build_scene_doc,
     load_scene_doc,
@@ -24,7 +24,7 @@ def _write(path, doc):
 def test_system_general_combat_is_prominent_single_view_scene(tmp_path):
     """通用分组按设置、战斗、移动、控制排列，战斗实体不再混入控制。"""
     resolver = ConfigResolver(
-        system_dir=SYSTEM_CONFIG_DIR,
+        system_dir=get_config_system_dir(),
         local_dir=tmp_path / "local",
         dev_mode=False,
     )

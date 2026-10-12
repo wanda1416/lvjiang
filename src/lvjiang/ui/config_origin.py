@@ -27,8 +27,7 @@ def _origin_text(origin: EntityOrigin) -> str:
 
 
 def origin_tooltip(current: EntityOrigin,
-                   available: tuple[EntityOrigin, ...],
-                   pending: int | None = None) -> str:
+                   available: tuple[EntityOrigin, ...]) -> str:
     """展示当前生效副本，以及所有配置层现存的版本。"""
     current_text = _origin_text(current) if current.layer else tr("无")
     source_count = len({origin.layer for origin in available})

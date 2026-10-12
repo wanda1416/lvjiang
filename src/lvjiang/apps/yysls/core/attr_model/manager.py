@@ -101,8 +101,7 @@ class AttrModelManager:
                 self._martial_art_roster = _game_config_martial_arts
         else:
             # 测试/孤立目录：单层语义（system=local=sources_dir）
-            self._resolver = ConfigResolver(
-                system_dir=sources_dir, local_dir=sources_dir, dev_mode=True)
+            self._resolver = ConfigResolver.for_single_directory(sources_dir)
             self._rel_dir = ""
             # 孤立目录只认给定的文件，不去拉全局的武学注册表——否则
             # 一个只想验证解析的测试会凭空多出二十几条武学条目。

@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
+from ...core.config.conflicts import ConfigWriteConflict
 from ...core.config.resolver import LAYER_LOCAL, SystemContentProtected
 from ...core.maps import (
     FULL_VIEW_KEY,
@@ -903,6 +904,9 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
                 self._manager.save_with_image(self._current, self._pending_image)
             else:
                 self._manager.save(self._current)
+        except ConfigWriteConflict as exc:
+            QMessageBox.warning(self, tr("磁盘配置已更新"), str(exc))
+            return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, tr("保存失败"), str(exc))
             return

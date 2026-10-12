@@ -8,7 +8,7 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_key
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import Return
@@ -94,7 +94,7 @@ def test_real_nav_subcalls_loadable():
 
 def test_nav_subcalls_have_explicit_success_return():
     """除返回背包 tab 的基础过程外，导航过程统一以 0 表示成功。"""
-    nav_path = SYSTEM_CONFIG_DIR / "workflows/subcall/navigation.wf"
+    nav_path = get_config_system_dir() / "workflows/subcall/navigation.wf"
     program = parse_file(nav_path)
 
     for name in (
@@ -112,7 +112,7 @@ def test_nav_subcalls_have_explicit_success_return():
 
 def test_tune_navigation_uses_stable_page_label_detector():
     """调律页身份不能依赖会在满词条时变成「定音」的动作按钮。"""
-    workflows = SYSTEM_CONFIG_DIR / "workflows/subcall"
+    workflows = get_config_system_dir() / "workflows/subcall"
     navigation = (workflows / "navigation.wf").read_text(encoding="utf-8")
     detection = (workflows / "page_detection.wf").read_text(encoding="utf-8")
 

@@ -63,8 +63,7 @@ class TuningRuleManager:
             self._rel_dir = _RULES_REL_DIR
         else:
             # 测试/孤立目录：单层语义（system=local=rules_dir，直写直删）
-            self._resolver = ConfigResolver(
-                system_dir=rules_dir, local_dir=rules_dir, dev_mode=True)
+            self._resolver = ConfigResolver.for_single_directory(rules_dir)
             self._rel_dir = ""
         # 隔离编辑会话会把当前有效基底物化到临时 system，以便编辑后立即
         # 预览；版本来源展示不能因此把真实 remote 误标成 system。
@@ -432,8 +431,7 @@ class TuningGroupManager:
             self._rel_dir = _GROUPS_REL_DIR
         else:
             # 测试/孤立目录：单层语义（system=local=groups_dir，直写直删）
-            self._resolver = ConfigResolver(
-                system_dir=groups_dir, local_dir=groups_dir, dev_mode=True)
+            self._resolver = ConfigResolver.for_single_directory(groups_dir)
             self._rel_dir = ""
         self._groups: dict[str, TuningGroup] = {}
         self._raw: dict[str, dict] = {}

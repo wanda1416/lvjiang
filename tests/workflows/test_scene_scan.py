@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.static_check import check_refs
@@ -182,7 +182,7 @@ def test_ref_line_no_matches_source():
 ])
 def test_daily_jianghu_claim_guard_executes(reward_state, expected_clicks):
     """实际执行领奖过程，已领和不确定状态都不能点击。"""
-    text = (SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf").read_text(
+    text = (get_config_system_dir() / "workflows" / "daily_jianghu.wf").read_text(
         encoding="utf-8")
     claim = text[text.index("def claim_completed_reward("):
                  text.index("def sync_haoling_of_week(")]
@@ -223,7 +223,7 @@ def test_daily_jianghu_restores_single_mode_only_after_switching():
 
     单人 / 多人两个方向结构对称，只保留一个按目标参数化的切换过程。
     """
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
     text = wf.read_text(encoding="utf-8")
     assert "switch_to_multi_mode" not in text
     assert "def switch_game_mode($target)" in text
@@ -253,7 +253,7 @@ def test_daily_jianghu_restores_single_mode_only_after_switching():
 
 def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
     """未找到黄泉酿时先正常收尾，再跳过任务完成扫描与领奖。"""
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
     text = wf.read_text(encoding="utf-8")
     outer_loop = text[
         text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
@@ -280,7 +280,7 @@ def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
 
 def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
     """任务文字会保留；刷新按钮消失才表示完成，首轮至多触发一次补扫。"""
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
     text = wf.read_text(encoding="utf-8")
 
     outer_loop = text[
@@ -320,20 +320,20 @@ def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
         ("android", (766, 321)),
         ("desktop", (542, 250)),
     ):
-        layout_path = SYSTEM_CONFIG_DIR / "layouts" / platform / "jianghu_card.json"
+        layout_path = get_config_system_dir() / "layouts" / platform / "jianghu_card.json"
         layout = json.loads(layout_path.read_text(encoding="utf-8"))
         refresh = next(item for item in layout["regions"] if item["key"] == "refresh")
         binding = refresh["template"]
         assert binding["name"] == f"{platform}/jianghu_card/refresh"
         assert (binding["record_w"], binding["record_h"]) == record_size
         assert (
-            SYSTEM_CONFIG_DIR / "templates" / f"{binding['name']}.png"
+            get_config_system_dir() / "templates" / f"{binding['name']}.png"
         ).is_file()
 
 
 def test_daily_jianghu_uses_layer_specific_back_regions():
     """任务浮层/情境逐层返回；基底 back 只用于退出号令页。"""
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
     text = wf.read_text(encoding="utf-8")
 
     huanzhuang = text[

@@ -20,7 +20,7 @@ from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     parse_detail2_outer_attack,
     parse_detail2_outer_pen,
 )
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import Eval
 from tests.workflows.conftest import make_engine
@@ -210,7 +210,7 @@ class TestParseDetail2OuterAttack:
 def test_scan_reads_outer_attack_before_attribute_attack():
     """先保存不受食物影响的基础外功区间，再读取各流派属性攻击。"""
     workflow = (
-        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_attrs.wf"
+        get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
     ).read_text(encoding="utf-8")
 
     outer_find = 'by contains "外功攻击"'
@@ -222,7 +222,7 @@ def test_scan_reads_outer_attack_before_attribute_attack():
 
 def test_scan_failure_tells_user_to_create_base_attrs_manually():
     workflow = (
-        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_attrs.wf"
+        get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
     ).read_text(encoding="utf-8")
     assert "自动写基础属性失败，请用户手动新建属性" in workflow
 
@@ -242,7 +242,7 @@ def test_scan_failure_tells_user_to_create_base_attrs_manually():
 def test_scan_requires_parsed_school_attack_detail(attr_attack, expected):
     """运行生产 DSL 校验：无相或只有攻击标签，不能冒充流派属性攻击。"""
     proc = parse_file(
-        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_attrs.wf"
+        get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
     ).procs["capture_role_base_attrs"]
     parse_index = next(
         index for index, node in enumerate(proc.body)
@@ -262,7 +262,7 @@ def test_scan_requires_parsed_school_attack_detail(attr_attack, expected):
 def test_scan_reads_initial_role_page_before_scrolling():
     """角色面板进入时位于顶部，首次读取前不应预先滚动。"""
     workflow = (
-        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_attrs.wf"
+        get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
     ).read_text(encoding="utf-8")
     first_scan = workflow.index("scan [role_detail].[detail_1] as $r1")
     assert "scroll [role_detail].[detail_1]" not in workflow[:first_scan]
@@ -282,7 +282,7 @@ def test_role_scan_stops_on_identical_text_without_extra_drag(
 ):
     """运行生产 DSL 的扫描循环：重复文本立即退出，轮数耗尽不再拖动。"""
     proc = parse_file(
-        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_attrs.wf"
+        get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
     ).procs["capture_role_base_attrs"]
     parse_index = next(
         index for index, node in enumerate(proc.body)

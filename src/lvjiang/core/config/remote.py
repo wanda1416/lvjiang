@@ -92,11 +92,20 @@ def _installed_store() -> UpdateStore | None:
     config = resolver.config_dir
     path = session_directory(config) / "baseline.json"
     if not path.is_file():
+        logger.debug("在线配置基底记录不存在，跳过在线恢复；请使用完整安装包补齐 {}", path)
         return None
-    identity = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        identity = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        logger.debug("在线配置基底记录不可读，保留当前配置并跳过在线恢复：{}", error)
+        return None
+    if not isinstance(identity, dict) or not isinstance(identity.get("sha256"), str) or not identity["sha256"]:
+        logger.debug("在线配置基底记录缺少摘要，保留当前配置并跳过在线恢复：{}", path)
+        return None
     version = get_version()
     if identity.get("app_series") != series(version):
-        raise ValueError("预置配置与当前应用版本不匹配，请重新安装完整应用")
+        logger.debug("在线配置基底版本与应用版本不匹配，保留当前配置并跳过在线恢复")
+        return None
     return UpdateStore(config, version, identity["sha256"])
 
 

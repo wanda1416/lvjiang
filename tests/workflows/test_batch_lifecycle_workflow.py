@@ -13,15 +13,15 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.layout_manager import load_layout_by_key
-from lvjiang.core.paths import SYSTEM_CONFIG_DIR
+from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.metadata import parse_metadata_file
 from tests.workflows.conftest import make_engine
 
-_BATCH_DIR: Path = SYSTEM_CONFIG_DIR / "workflows" / "batch"
+_BATCH_DIR: Path = get_config_system_dir() / "workflows" / "batch"
 _PREPARE = _BATCH_DIR / "prepare_item.wf"
-_LOGIN = SYSTEM_CONFIG_DIR / "workflows" / "subcall" / "login.wf"
+_LOGIN = get_config_system_dir() / "workflows" / "subcall" / "login.wf"
 _FINISH = _BATCH_DIR / "finish_item.wf"
 
 # 角色选择由 login.wf 的专项用例覆盖；这里保留真实的准备与恢复过程。

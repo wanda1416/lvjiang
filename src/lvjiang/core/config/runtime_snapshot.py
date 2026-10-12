@@ -65,6 +65,8 @@ def current_snapshot() -> RuntimeSnapshot | None:
 
 def configuration_roots(system: Path) -> set[str]:
     """配置读取范围：官方目录与已登记消费者，不包含 local 里的仓库或诊断数据。"""
+    from ...apps import load_config_policies
+    load_config_policies()
     from ..ocr_config import _LEGACY_RULES_PATH
     from .versioning import VERSIONED_DIRS, VERSIONED_FILES
     roots = {path.name for path in system.iterdir()} if system.is_dir() else set()

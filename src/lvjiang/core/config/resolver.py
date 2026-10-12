@@ -32,6 +32,8 @@ register_registry_list_paths / register_protected_list_paths 注册，
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
@@ -53,6 +55,8 @@ DELETED_KEY = "__deleted__"
 #: UI 层做 i18n，core 只给稳定的 key。
 LAYER_LOCAL = "local"
 LAYER_SYSTEM = "system"
+
+_write_batches: ContextVar[dict[int, dict[str, None]] | None] = ContextVar("configuration_write_batches", default=None)
 
 
 def _configuration_write(function):
@@ -442,10 +446,26 @@ class ConfigResolver:
         if cb not in self._batch_listeners:
             self._batch_listeners.append(cb)
 
+    @classmethod
+    def for_single_directory(cls, directory: Path | str) -> ConfigResolver:
+        """独立模型/规则目录：单层直写，自己的锁，不参与客户端修订索引。"""
+        root = Path(directory)
+        return cls(system_dir=root, local_dir=root, dev_mode=True,
+                   config_dir=root, track_content=False)
+
     def _notify(self, rel_path: str, *, strict: bool = False):
         self.notify_changes((rel_path,), strict=strict)
 
     def notify_changes(self, paths: tuple[str, ...], *, strict: bool = False):
+        # 批次内读取仍需立即看到刚写入的文件；索引与监听通知在批次结束时合并。
+        batches = _write_batches.get()
+        batch = batches.get(id(self)) if batches is not None else None
+        if batch is not None:
+            batch.update(dict.fromkeys(paths))
+            for rel_path in paths:
+                for root in (self.system_dir, self.local_dir):
+                    self._yaml_cache.pop(str(root / rel_path), None)
+            return
         if paths and self.track_content:
             from .content import content_changed
             content_changed(self)
@@ -463,6 +483,24 @@ class ConfigResolver:
                 if strict:
                     raise
                 logger.warning(f"配置变更监听器异常: {e}")
+
+    @contextmanager
+    def batch_changes(self):
+        """一轮多文件保存只维护一次索引；部分写入后失败也必须通知失效。"""
+        from .content import configuration_lock
+        batches = _write_batches.get() or {}
+        if id(self) in batches:
+            yield
+            return
+        with configuration_lock(self.config_dir):
+            changed: dict[str, None] = {}
+            token = _write_batches.set({**batches, id(self): changed})
+            try:
+                yield
+            finally:
+                _write_batches.reset(token)
+                if changed:
+                    self.notify_changes(tuple(changed))
 
     # ─── 实体文件（整文件影子）───────────────────────────
 

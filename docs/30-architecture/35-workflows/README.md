@@ -1,6 +1,6 @@
 # 流程编排（Workflows）
 
-> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-10-12（基线 v0.15.0，预发布开发周期）。本层描述如与代码或配置不符，以代码与配置为准。
 
 流程编排描述如何组合多个场景来完成一个完整的业务目标。
 
@@ -41,3 +41,9 @@
 
 - [03-bag-traversal.md](03-bag-traversal.md)：背包遍历、指纹引用、去重与回收补位。
 - [04-tuning-decisions.md](04-tuning-decisions.md)：扫描、材料、调律、重置与回收的实际处理链。
+
+## 任务入口与参数编辑
+
+- [05-execution-feedback.md](05-execution-feedback.md)：任务入口的反馈归属、启动失败提示与参数保存边界。
+  需求见[任务入口状态与启动反馈](../../20-requirements/60-editor/11-execution-feedback.md)和
+  [日常参数保存边界](../../20-requirements/60-editor/12-parameter-save-boundaries.md)。

@@ -1,6 +1,6 @@
 # 律匠需求文档
 
-> 最后更新：2026-10-09（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-10-12（基线 v0.15.0，预发布开发周期）。本层描述如与代码或配置不符，以代码与配置为准。
 
 > 需求文档索引。游戏机制介绍见 [10-game](../10-game/README.md)，架构设计见 [30-architecture](../30-architecture/README.md)。
 
@@ -66,7 +66,9 @@
 | [12-agent-mcp.md](50-platform/12-agent-mcp.md) | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 | 部分实现 |
 | [13-agent-docs-access.md](50-platform/13-agent-docs-access.md) | Agent 文档逐篇收录、目录拆分与配置文件访问清单 | 部分实现 |
 | [15-android-workbench.md](50-platform/15-android-workbench.md) | Android 四页工作台、确认交互、执行历史和只读用户数据 | 已实现，真机游戏验收待完成 |
-| [17-prerelease.md](50-platform/17-prerelease.md) | PEP 440 测试/候选版本与正式升级比较 | 已实现，本地验证通过；实际发布待验证 |
+| [16-android-batch.md](50-platform/16-android-batch.md) | 手机批量配置、运行草稿、悬浮启动与方向过渡 | 已实现，真机验收范围按验证章节确认 |
+| [17-prerelease.md](50-platform/17-prerelease.md) | PEP 440 测试/候选版本与正式升级比较 | 已实现，具体发布结果以实际流水线为准 |
+| [18-android-connection-recovery.md](50-platform/18-android-connection-recovery.md) | 代理与 ADB 重连、输入降级及人工恢复边界 | 已实现，实机断线场景需单独验收 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 
@@ -81,6 +83,9 @@
 | [07-dsl-parser-performance.md](60-editor/07-dsl-parser-performance.md) | DSL 解析性能与 AST、错误定位一致性 | 已实现 |
 | [08-config-schema-boundaries.md](60-editor/08-config-schema-boundaries.md) | 配置旧入口清理、当前增量与必要迁移边界 | 已实现 |
 | [09-content-revisions.md](60-editor/09-content-revisions.md) | 文件修订索引、统一任务快照与保存冲突提示 | 已实现（本地验证，发行包待验证） |
+| [10-script-groups.md](60-editor/10-script-groups.md) | 脚本展示分组、刷新加载及名称覆盖标记 | 已实现 |
+| [11-execution-feedback.md](60-editor/11-execution-feedback.md) | 四类任务入口的就地状态与启动失败提示 | 已实现 |
+| [12-parameter-save-boundaries.md](60-editor/12-parameter-save-boundaries.md) | 日常参数字段合并、连续输入保存及运行快照边界 | 已实现 |
 
 待办事项与平台推进计划已移至 [00-meta](../00-meta/README.md)：
 [02-backlog.md](../00-meta/02-backlog.md)、

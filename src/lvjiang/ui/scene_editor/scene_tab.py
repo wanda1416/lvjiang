@@ -35,6 +35,7 @@ from ...core.layout_models import (
     Region,
     TemplateBinding,
 )
+from ...core.scene_definition_models import BASE_VIEW_KEY
 from ...core.scene_registry import (
     get_point_def,
     get_region_def,
@@ -160,6 +161,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(self._splitter)
 
+        self._apply_view_filter()
         self._refresh_region_list()
         self._refresh_point_list()
         self._refresh_arrow_list()
@@ -279,6 +281,13 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             checkbox.setEnabled(False)
             checkbox.setToolTip(tr("多视图场景不能转为子场景，请先取消多视图"))
         form.addRow(checkbox)
+        hide_all = QCheckBox(tr("隐藏全部视图"))
+        hide_all.setChecked(scene.hide_all_views)
+        hide_all.setEnabled(bool(scene.views) and not scene.is_subscene)
+        hide_all.setToolTip(
+            tr("隐藏「全部」选项，打开场景时直接展示基底视图")
+            if hide_all.isEnabled() else tr("仅多视图场景可设置"))
+        form.addRow(hide_all)
         box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel)
@@ -288,18 +297,25 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         form.addRow(box)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        old_type = scene.type
+        old_hide_all = scene.hide_all_views
         try:
             registry.set_scene_type(
-                self._scene_key, "subscene" if checkbox.isChecked() else "scene")
+                self._scene_key, "subscene" if checkbox.isChecked() else "scene",
+                hide_all_views=hide_all.isChecked())
         except ValueError as exc:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(self, tr("设置失败"), str(exc))
             return
-        self._current_view = ""
+        if scene.type != old_type:
+            self._current_view = ""
+        elif scene.hide_all_views and not old_hide_all and scene.views:
+            self._current_view = BASE_VIEW_KEY
         self._refresh_view_combo()
+        self._on_view_combo_changed(0)
         self._refresh_scene_type_ui()
         self._refresh_reference_list()
-        if self.on_scene_type_changed:
+        if self.on_scene_type_changed and scene.type != old_type:
             self.on_scene_type_changed(self._scene_key)
 
     def set_layout_name(self, layout_name: str,
@@ -475,16 +491,18 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             combo.setEnabled(False)
         else:
             combo.setEnabled(True)
-            combo.addItem(tr("全部"), userData="")
+            scene = get_registry().get_scene(self._scene_key)
+            hide_all = scene is not None and scene.hide_all_views
+            if not hide_all:
+                combo.addItem(tr("全部"), userData="")
             for v in views:
                 combo.addItem(v.name, userData=v.key)
             # 尽量保持当前选中视图
             idx = combo.findData(self._current_view)
-            combo.setCurrentIndex(idx if idx >= 0 else 0)
+            fallback = combo.findData(BASE_VIEW_KEY) if hide_all else 0
+            combo.setCurrentIndex(idx if idx >= 0 else max(0, fallback))
         combo.blockSignals(False)
-        # 若原选中视图已不存在（被删除/取消多视图），回落到全部
-        if combo.findData(self._current_view) < 0:
-            self._current_view = ""
+        self._current_view = combo.currentData() or ""
 
     def _on_view_combo_changed(self, _idx: int):
         self._current_view = self._view_combo.currentData() or ""

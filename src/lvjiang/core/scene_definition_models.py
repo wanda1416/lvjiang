@@ -244,6 +244,7 @@ class SceneDef:
     type: str = "scene"
     subscene_refs: list[SubsceneRefDef] = field(default_factory=list)
     references: list[SceneRefDef] = field(default_factory=list)
+    hide_all_views: bool = False
 
     @property
     def is_subscene(self) -> bool:

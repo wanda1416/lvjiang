@@ -288,7 +288,8 @@ class SceneRegistry:
 
         return SceneDef(key=key, name=name, regions=regions, points=points,
                         panels=panels, views=views, type=scene_type,
-                        subscene_refs=subscene_refs, references=references)
+                        subscene_refs=subscene_refs, references=references,
+                        hide_all_views=bool(data.get("hide_all_views", False)))
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""
@@ -756,8 +757,9 @@ class SceneRegistry:
             raise ValueError(f"场景不存在: {scene_key}")
         return scene
 
-    def set_scene_type(self, scene_key: str, scene_type: str) -> None:
-        """切换普通场景/子场景；子场景禁止多视图和嵌套引用。"""
+    def set_scene_type(self, scene_key: str, scene_type: str, *,
+                       hide_all_views: bool | None = None) -> None:
+        """保存场景管理选项；子场景禁止多视图和嵌套引用。"""
         scene = self._require_scene(scene_key)
         if scene_type not in ("scene", "subscene"):
             raise ValueError("场景类型必须为 scene 或 subscene")
@@ -773,6 +775,8 @@ class SceneRegistry:
                 raise ValueError(
                     f"该子场景仍被以下场景引用，不能取消: {', '.join(owners)}")
         scene.type = scene_type
+        if hide_all_views is not None:
+            scene.hide_all_views = hide_all_views
         self._save_scene_yaml(scene)
 
     def add_subscene_ref_to_scene(self, scene_key: str,
@@ -1157,6 +1161,8 @@ class SceneRegistry:
             data["type"] = scene.type
         if scene.views:
             data["views"] = [v.to_dict() for v in scene.views]
+        if scene.hide_all_views:
+            data["hide_all_views"] = True
         if scene.regions:
             data["regions"] = [
                 {

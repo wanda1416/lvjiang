@@ -12,3 +12,10 @@
 ## DSL 解析器
 
 [LALR 等价验证](lalr_parser/README.md) 对照指定 Git 基线的 Earley 语法与当前解析器。
+
+## Profile 变更脚本
+
+[示例验证](verify_profile_change_example.py) 手动读取 local 仓库的
+`workflows/profile/example.wf`，在独立临时客户端根和数据库中验证事件与混合触发链。
+运行 `python scripts/one_off/verify_profile_change_example.py`；示例中的循环与异常
+分支会有意产生错误日志，最终应输出 `PASS`。它不自动创建真实用户定义。

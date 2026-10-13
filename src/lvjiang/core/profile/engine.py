@@ -351,6 +351,7 @@ class ProfileEngine(QThread):
                     source="周期重置",
                     change_type="reset",
                     script=kd.change_script,
+                    synchronous=kd.change_script_sync,
                 )
                 modified = True
             else:
@@ -395,6 +396,7 @@ class ProfileEngine(QThread):
                         source="自动恢复",
                         change_type="tick",
                         script=kd.change_script,
+                        synchronous=kd.change_script_sync,
                     )
                     modified = True
                 else:

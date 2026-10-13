@@ -418,6 +418,7 @@ def profile_action(
             source=source,
             change_type="action" if is_action else "override",
             script=kd.change_script,
+            synchronous=kd.change_script_sync,
         )
         if event is None:
             return old_text or ""
@@ -490,6 +491,7 @@ def profile_action(
             source=source,
             change_type=change_type,
             script=kd.change_script if kd else "",
+            synchronous=kd.change_script_sync if kd else False,
         )
         if event is None:
             return current_value
@@ -595,6 +597,7 @@ def sync_write_adapter(
         source=source,
         change_type=change_type,
         script=kd.change_script if kd else "",
+        synchronous=kd.change_script_sync if kd else False,
     )
     if event is None:
         return current_value, 0

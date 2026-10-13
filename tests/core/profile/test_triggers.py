@@ -5,12 +5,13 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
+import pytest
 import yaml
 
 from lvjiang.core.profile.triggers import ProfileTriggerEvent
 
 
-def _configure_profile(tmp_path: Path, monkeypatch, *, script: str) -> None:
+def _configure_profile(tmp_path: Path, monkeypatch, *, script: str, synchronous: bool = False) -> None:
     from lvjiang.core.profile import repository, schema
 
     profile_path = tmp_path / "profile.yaml"
@@ -22,6 +23,7 @@ def _configure_profile(tmp_path: Path, monkeypatch, *, script: str) -> None:
                         "key": "source",
                         "label": "源",
                         "change_script": script,
+                        "change_script_sync": synchronous,
                     },
                     {"key": "target", "label": "目标"},
                 ]
@@ -113,6 +115,77 @@ def test_profile_write_enqueues_script_and_returns_before_execution(tmp_path, mo
 
     runner.request_stop()
     runner.join(timeout=3)
+
+
+def test_synchronous_script_completes_before_write_returns_without_user_lock(tmp_path, monkeypatch):
+    from lvjiang.core.profile.service import profile_action, profile_read
+
+    wf = tmp_path / 'inline.wf'
+    wf.write_text('eval profile_inc("target", 1, "example")\n', encoding='utf-8')
+    _configure_profile(tmp_path, monkeypatch, script='profile/example.wf', synchronous=True)
+    runner = _install_runner(tmp_path, monkeypatch, wf)
+    monkeypatch.setattr('lvjiang.core.access.acquire_user',
+                        lambda *_args, **_kwargs: pytest.fail('同步脚本不应获取用户执行锁'))
+    assert profile_action('tester', 'source', set_value=1) == 1
+    assert profile_read('tester', 'target') == 1
+    assert not runner.is_alive() and not runner.is_busy
+    runner.request_stop()
+
+
+def test_synchronous_script_failure_isolated_and_cycle_rejected(tmp_path, monkeypatch):
+    from lvjiang.core.profile.service import profile_action, profile_read
+
+    wf = tmp_path / 'inline.wf'
+    wf.write_text('eval profile_inc("source", 1, "cycle")\neval $bad = range("invalid")\n', encoding='utf-8')
+    _configure_profile(tmp_path, monkeypatch, script='profile/example.wf', synchronous=True)
+    runner = _install_runner(tmp_path, monkeypatch, wf)
+    errors = []
+    monkeypatch.setattr('lvjiang.core.profile.triggers.logger.exception', lambda *args: errors.append(args))
+    assert profile_action('tester', 'source', set_value=1) == 1
+    assert profile_read('tester', 'source') == 1
+    assert profile_action('tester', 'target', set_value=2) == 2
+    assert not runner.is_busy
+    assert len(errors) == 1
+    runner.request_stop()
+
+
+def test_mixed_chain_waits_for_sync_children_not_async_queue(tmp_path, monkeypatch):
+    from lvjiang.core.profile import schema
+    from lvjiang.core.profile.models import StockKeyDef
+    from lvjiang.core.profile.service import profile_action, profile_read
+
+    wf = tmp_path / 'mixed.wf'
+    wf.write_text('if $key equals "source"\n'
+                  '    eval profile_inc("target", 1)\n'
+                  '    eval profile_inc("later", 1)\nend\n', encoding='utf-8')
+    _configure_profile(tmp_path, monkeypatch, script='profile/example.wf', synchronous=True)
+    config = schema.get_profile_config()
+    config.get_key('target').change_script = 'profile/example.wf'
+    config.get_key('target').change_script_sync = True
+    config.keys_by_model['stock'].append(StockKeyDef(key='later', change_script='profile/example.wf'))
+    config._rebuild_index()
+    runner = _install_runner(tmp_path, monkeypatch, wf)
+    started, release = threading.Event(), threading.Event()
+    executed = []
+    original = runner._run_event
+    def run(event):
+        if event.key == 'later':
+            started.set()
+            assert release.wait(3)
+        executed.append((event.key, event.origin_key, event.path))
+        original(event)
+    monkeypatch.setattr(runner, '_run_event', run)
+    try:
+        assert profile_action('tester', 'source', set_value=1) == 1
+        assert started.wait(3)
+        assert [entry[0] for entry in executed] == ['source', 'target']
+        assert executed[1][1:] == ('source', ('stock:source', 'stock:target'))
+        assert profile_read('tester', 'target') == 1
+    finally:
+        release.set()
+        runner._queue.join()
+        runner.request_stop()
+        runner.join(3)
 
 
 def test_profile_script_cycle_is_rejected_before_second_write(tmp_path, monkeypatch):

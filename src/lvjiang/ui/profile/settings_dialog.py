@@ -75,7 +75,7 @@ _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]
 class _ChangeScriptFileField(QWidget):
     """Profile 变更脚本选择器，只保存 workflows 内的相对路径。"""
 
-    def __init__(self, value: str = "", parent: QWidget | None = None):
+    def __init__(self, value: str = "", parent: QWidget | None = None, *, synchronous: bool = False):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -83,7 +83,7 @@ class _ChangeScriptFileField(QWidget):
         self._input = QLineEdit(value)
         self._input.setReadOnly(True)
         self._input.setPlaceholderText(tr("未选择"))
-        self._input.setToolTip(tr("数值实际变化后异步执行；路径相对于 workflows 目录"))
+        self._input.setToolTip(tr("数据变化后执行；路径相对于 workflows 目录"))
         layout.addWidget(self._input, 1)
 
         self._select_button = QPushButton(tr("选择..."))
@@ -96,9 +96,24 @@ class _ChangeScriptFileField(QWidget):
             apply_button_style(button, variant="neutral")
             layout.addWidget(button)
 
+        self._sync_checkbox = QCheckBox(tr("同步修改"))
+        self._sync_checkbox.setToolTip(tr("勾选后当前写入等待脚本完成；不勾选则提交后台队列。同步脚本应短小，不用于长等待。"))
+        self._sync_checkbox.setEnabled(bool(value))
+        self._sync_checkbox.setChecked(bool(value) and synchronous)
+        layout.addWidget(self._sync_checkbox)
+        self._input.textChanged.connect(self._update_sync_enabled)
+
         self._select_button.clicked.connect(self._select_file)
         self._validate_button.clicked.connect(self._validate_file)
         self._clear_button.clicked.connect(self._input.clear)
+
+    def _update_sync_enabled(self, text: str) -> None:
+        self._sync_checkbox.setEnabled(bool(text.strip()))
+        if not text.strip():
+            self._sync_checkbox.setChecked(False)
+
+    def synchronous(self) -> bool:
+        return bool(self.text()) and self._sync_checkbox.isChecked()
 
     def text(self) -> str:
         return self._input.text().strip()
@@ -1287,7 +1302,8 @@ class ProfileDefinitionDialog(QDialog):
         layout.addRow(tr("标签:"), label_input)
 
         change_script_input = _ChangeScriptFileField(
-            existing.change_script if existing else ""
+            existing.change_script if existing else "",
+            synchronous=existing.change_script_sync if existing else False,
         )
         layout.addRow(tr("变更脚本:"), change_script_input)
 
@@ -1632,6 +1648,7 @@ class ProfileDefinitionDialog(QDialog):
                     uses=uses_list,
                     sync_targets=sync_targets_list,
                     change_script=change_script,
+                    change_script_sync=change_script_input.synchronous(),
                     period=widgets["period"].currentData(),
                     cap=cap_final,
                     soft=soft_final,
@@ -1651,6 +1668,7 @@ class ProfileDefinitionDialog(QDialog):
                     uses=uses_list,
                     sync_targets=sync_targets_list,
                     change_script=change_script,
+                    change_script_sync=change_script_input.synchronous(),
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
@@ -1673,6 +1691,7 @@ class ProfileDefinitionDialog(QDialog):
                     uses=uses_list,
                     sync_targets=sync_targets_list,
                     change_script=change_script,
+                    change_script_sync=change_script_input.synchronous(),
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
@@ -1686,6 +1705,7 @@ class ProfileDefinitionDialog(QDialog):
                     uses=uses_list,
                     sync_targets=sync_targets_list,
                     change_script=change_script,
+                    change_script_sync=change_script_input.synchronous(),
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
@@ -1696,6 +1716,7 @@ class ProfileDefinitionDialog(QDialog):
                     key=key, group=group, label=label,
                     sources=sources_list, uses=uses_list,
                     change_script=change_script,
+                    change_script_sync=change_script_input.synchronous(),
                 )
 
             if persisted_key is not None and persisted_key != kd.key:

@@ -1,4 +1,4 @@
-"""Profile 数据变更脚本的异步串行调度。"""
+"""Profile 变更脚本：默认异步 FIFO，按 key 可选择当前线程同步执行。"""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ class ProfileTriggerEvent:
     origin_key: str = ""
     origin_model: str = ""
     path: tuple[str, ...] = ()
+    synchronous: bool = False
 
     @property
     def node_id(self) -> str:
@@ -77,6 +78,7 @@ def prepare_trigger_event(
     source: str,
     change_type: str,
     script: str,
+    synchronous: bool = False,
 ) -> ProfileTriggerEvent | None:
     """继承当前触发链；检测到回环时在写入前返回 None。"""
     parent = current_trigger_event()
@@ -108,6 +110,7 @@ def prepare_trigger_event(
         origin_key=origin_key,
         origin_model=origin_model,
         path=path,
+        synchronous=synchronous,
     )
 
 
@@ -122,6 +125,7 @@ class ProfileScriptRunner(threading.Thread):
         self._accepting = True
         self._stop_requested = False
         self._active = False
+        self._inline_count = 0
         self._listeners: list[Callable[[bool, int], None]] = []
 
     def submit(self, event: ProfileTriggerEvent) -> bool:
@@ -137,7 +141,33 @@ class ProfileScriptRunner(threading.Thread):
 
     @property
     def pending_count(self) -> int:
-        return self._queue.qsize() + int(self._active)
+        return self._queue.qsize() + int(self._active) + self._inline_count
+
+    def run_inline(self, event: ProfileTriggerEvent) -> bool:
+        """不入队、不等待队列，避免持有 Profile 维护锁时跨线程互等。"""
+        with self._state_lock:
+            if not self._accepting or not event.script:
+                return False
+            self._inline_count += 1
+        self._emit_busy()
+        try:
+            self._execute_event(event)
+        finally:
+            with self._state_lock:
+                self._inline_count -= 1
+            self._emit_busy()
+        return True
+
+    def _execute_event(self, event: ProfileTriggerEvent) -> None:
+        mode = "同步" if event.synchronous else "异步"
+        logger.debug("Profile {}脚本开始: {}.{} -> {}", mode, event.model, event.key, event.script)
+        try:
+            self._run_event(event)
+        except Exception:  # noqa: BLE001 - 已落库的变更不回滚，无关事件继续执行
+            logger.exception("Profile {}变更脚本执行失败: {}.{} -> {}",
+                             mode, event.model, event.key, event.script)
+        else:
+            logger.debug("Profile {}脚本结束: {}.{} -> {}", mode, event.model, event.key, event.script)
 
     @property
     def is_busy(self) -> bool:
@@ -185,12 +215,7 @@ class ProfileScriptRunner(threading.Thread):
             self._active = True
             self._emit_busy()
             try:
-                self._run_event(event)
-            except Exception:  # noqa: BLE001 - 单个脚本失败不得中断队列
-                logger.exception(
-                    f"Profile 变更脚本执行失败: {event.username}."
-                    f"{event.model}.{event.key} -> {event.script}"
-                )
+                self._execute_event(event)
             finally:
                 self._active = False
                 self._queue.task_done()
@@ -231,7 +256,8 @@ def get_or_create_script_runner(users_dir: Path | None = None) -> ProfileScriptR
 def submit_profile_trigger(event: ProfileTriggerEvent) -> bool:
     if not event.script:
         return False
-    return get_or_create_script_runner().submit(event)
+    runner = get_or_create_script_runner()
+    return runner.run_inline(event) if event.synchronous else runner.submit(event)
 
 
 def enqueue_profile_change(
@@ -244,6 +270,7 @@ def enqueue_profile_change(
     source: str,
     change_type: str,
     script: str,
+    synchronous: bool = False,
 ) -> bool:
     """供 Profile 后台计算等非 service 写入路径提交触发事件。"""
     delta = (
@@ -262,6 +289,7 @@ def enqueue_profile_change(
         source=source,
         change_type=change_type,
         script=script,
+        synchronous=synchronous,
     )
     return event is not None and submit_profile_trigger(event)
 

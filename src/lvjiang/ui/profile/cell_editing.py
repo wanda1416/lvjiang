@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
+from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 from PyQt6.QtWidgets import (
     QInputDialog,
     QMessageBox,
@@ -51,6 +52,50 @@ if TYPE_CHECKING:
 
 # 哨兵值：表示解析失败
 _PARSE_ERROR = object()
+
+
+class _WriteSignals(QObject):
+    completed = pyqtSignal(object)
+
+
+class _ProfileWrite(QRunnable):
+    def __init__(self, operation: Callable[[], object]):
+        super().__init__()
+        self.operation = operation
+        self.signals = _WriteSignals()
+
+    def run(self) -> None:
+        error = None
+        try:
+            self.operation()
+        except Exception as exc:  # noqa: BLE001 - UI 在线程结束后处理写入错误
+            error = exc
+        self.signals.completed.emit(error)
+
+
+def _write_profile(owner, operation: Callable[[], object], completed: Callable) -> None:
+    """同步子链可能从其他 key 到达，不能只检查当前 key 的开关。"""
+    config = get_profile_config()
+    if not any(kd.change_script and kd.change_script_sync for kd in config.get_all_keys()):
+        error = None
+        try:
+            operation()
+        except Exception as exc:  # noqa: BLE001
+            error = exc
+        completed(error)
+        return
+    worker = _ProfileWrite(operation)
+    workers = getattr(owner, '_profile_writes', None)
+    if workers is None:
+        workers = owner._profile_writes = set()
+        owner._profile_write_pool = QThreadPool(owner)
+        owner._profile_write_pool.setMaxThreadCount(1)
+    workers.add(worker)
+    def finish(error):
+        workers.discard(worker)
+        completed(error)
+    worker.signals.completed.connect(finish)
+    owner._profile_write_pool.start(worker)
 
 
 def _is_continuous_regen(kd) -> bool:
@@ -170,16 +215,18 @@ class ProfileCellEditingMixin:
         # ── note 模型：直接写入文本，不走数值管线 ──
         if model_type == MODEL_NOTE:
             from ...core.profile.service import profile_action
-            try:
-                profile_action(
-                    user_name, key_str,
-                    model_type=model_type,
-                    set_value=raw_value,
-                    source="",
-                )
-            except Exception as e:
-                logger.error(f"note 写入失败: {e}")
-                QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=e))
+            def complete_note(error):
+                if error:
+                    logger.error(f"note 写入失败: {error}")
+                    QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
+                if group_name in self._tables:
+                    self._refresh_group(group_name, self._tables[group_name])
+            _write_profile(self, lambda: profile_action(
+                user_name, key_str,
+                model_type=model_type,
+                set_value=raw_value,
+                source="",
+            ), complete_note)
             return
 
         parsed_value = _parse_value(raw_value, model_type, kd)
@@ -386,6 +433,7 @@ class ProfileCellEditingMixin:
         use_cas: bool = True,
         regen_progress_source: str = "current",
         force_write: bool = False,
+        set_value: float | None = None,
     ):
         """增减数值并写回。
 
@@ -397,40 +445,33 @@ class ProfileCellEditingMixin:
             ProfileWriteConflict,
             profile_action,
         )
-        try:
-            profile_action(
-                user_name, key,
-                model_type=model_type,
-                delta=delta,
-                source=source,
-                current_value=current_value,
-                expected_entry=expected_entry,
-                is_action=is_action,
-                use_cas=use_cas,
-                regen_progress_source=regen_progress_source,
-                force_write=force_write,
-            )
-        except ProfileWriteConflict:
-            logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
-            QMessageBox.warning(
-                self, tr("写入冲突"),
-                tr("该数值已被其他进程更新，本次增减未写入。请刷新后重试。"),
-            )
+        def complete(error):
+            if isinstance(error, ProfileWriteConflict):
+                logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
+                QMessageBox.warning(self, tr("写入冲突"),
+                                    tr("该数值已被其他进程更新，本次增减未写入。请刷新后重试。"))
+            elif error:
+                logger.error(f"回写失败: {error}")
+                QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
             current_group = self._get_current_group_name()
             table = self._tables.get(current_group)
             if table:
                 self._refresh_group(current_group, table)
-            return
-        except Exception as e:
-            logger.error(f"回写失败: {e}")
-            QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=e))
-            return
 
-        # 刷新表格
-        current_group = self._get_current_group_name()
-        table = self._tables.get(current_group)
-        if table:
-            self._refresh_group(current_group, table)
+        _write_profile(self, lambda: profile_action(
+            user_name, key,
+            model_type=model_type,
+            delta=delta if set_value is None else None,
+            set_value=set_value,
+            source=source,
+            # 操作可能排队；增减按执行时当前值计算，覆写保留用户指定的目标值语义。
+            current_value=None if is_action else current_value,
+            expected_entry=expected_entry,
+            is_action=is_action,
+            use_cas=use_cas,
+            regen_progress_source=regen_progress_source,
+            force_write=force_write,
+        ), complete)
 
     def _register_new_source(self: ProfileTab, kd: KeyDef, source: str, vocab: list[str]) -> None:  # type: ignore[misc]
         """新词条自动追加到对应词表（来源/用途）并持久化到 profile.yaml
@@ -593,6 +634,7 @@ class ProfileCellEditingMixin:
             is_action=sync_checked, source=source, use_cas=False,
             regen_progress_source="target",
             force_write=force_target_write,
+            set_value=new_value,
         )
 
     def _edit_note_text(  # type: ignore[misc]
@@ -617,23 +659,20 @@ class ProfileCellEditingMixin:
         if not ok:
             return
 
-        try:
-            profile_action(
-                user_name, key,
-                model_type=model_type,
-                set_value=text,
-                source="",
-            )
-        except Exception as e:
-            logger.error(f"note 写入失败: {e}")
-            QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=e))
-            return
-
-        if not group_name:
-            group_name = self._get_current_group_name()
-            table = self._tables.get(group_name)
-        if table:
-            self._refresh_group(group_name, table)
+        def complete(error):
+            if error:
+                logger.error(f"note 写入失败: {error}")
+                QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
+            current_group = group_name or self._get_current_group_name()
+            current_table = self._tables.get(current_group)
+            if current_table:
+                self._refresh_group(current_group, current_table)
+        _write_profile(self, lambda: profile_action(
+            user_name, key,
+            model_type=model_type,
+            set_value=text,
+            source="",
+        ), complete)
 
     def _show_history_dialog(  # type: ignore[misc]
         self: ProfileTab,

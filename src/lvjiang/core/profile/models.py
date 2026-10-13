@@ -300,6 +300,7 @@ class KeyDef:
     uses: list[str] = field(default_factory=list)
     sync_targets: list[SyncTargetDef] = field(default_factory=list)
     change_script: str = ""
+    change_script_sync: bool = False
     #: 加载时的原始 dict。只用于写回时补齐**我们不认识的字段**——插件可能给
     #: 定义加了自己的字段，而 from_dict 只认已知字段，直接重写就等于替用户
     #: 删数据。不参与相等比较，也不出现在 repr 里。
@@ -321,6 +322,7 @@ class KeyDef:
             uses=[str(s).strip() for s in data.get("uses", []) if str(s).strip()],
             sync_targets=parse_sync_targets(data.get("sync_targets", [])),
             change_script=str(data.get("change_script", "")).strip(),
+            change_script_sync=bool(data.get("change_script_sync", False)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -415,6 +417,7 @@ class QuotaKeyDef(KeyDef):
             uses=base.uses,
             sync_targets=base.sync_targets,
             change_script=base.change_script,
+            change_script_sync=base.change_script_sync,
             period=data.get("period", "week"),
             steps=parse_steps(data.get("steps", [])),
             reset_time=data.get("reset_time", "05:00"),
@@ -464,6 +467,7 @@ class RegenKeyDef(KeyDef):
             uses=base.uses,
             sync_targets=base.sync_targets,
             change_script=base.change_script,
+            change_script_sync=base.change_script_sync,
             regen_type=data.get("regen_type", "realtime"),
             regen_rate_value=data.get("regen_rate_value", 0.0),
             regen_rate_unit=data.get("regen_rate_unit", "minute"),
@@ -504,6 +508,7 @@ class StockKeyDef(KeyDef):
             uses=base.uses,
             sync_targets=base.sync_targets,
             change_script=base.change_script,
+            change_script_sync=base.change_script_sync,
             steps=parse_steps(data.get("steps", [])),
         )
 
@@ -533,6 +538,7 @@ class NoteKeyDef(KeyDef):
             uses=base.uses,
             sync_targets=base.sync_targets,
             change_script=base.change_script,
+            change_script_sync=base.change_script_sync,
         )
 
 

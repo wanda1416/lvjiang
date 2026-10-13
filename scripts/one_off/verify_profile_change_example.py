@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -32,7 +33,8 @@ def main() -> None:
         wf = get_config_local_dir() / 'workflows/profile/example.wf'
         with tempfile.TemporaryDirectory(prefix='lvjiang-example-root-') as isolated_root:
             environment = dict(os.environ, LVJIANG_ROOT=isolated_root)
-            subprocess.run([sys.executable, str(Path(__file__).resolve()), str(wf)],
+            business = get_config_local_dir() / 'workflows/profile/chengyinshi_limit.wf'
+            subprocess.run([sys.executable, str(Path(__file__).resolve()), str(wf), str(business)],
                            env=environment, check=True, text=True, encoding='utf-8')
         return
     # 整个子进程（包括运行快照/content.json）均在临时根下，不能只隔离 DB。
@@ -145,11 +147,52 @@ def main() -> None:
                 assert profile_read(user, 'example_text_result') == 'after failure'
                 assert failures == ['example_direct_cycle', 'example_cycle_b', 'example_failure'], failures
                 print('PASS: 同步/异步/混合链、事件快照、同值、钳位、文本、reset/tick、声明式同步、防环、失败隔离')
+                verify_source_limits(Path(sys.argv[2]), runner)
             finally:
                 runner.request_stop()
                 if runner.is_alive():
                     runner.join(3)
                 repository.reset_profile_db()
+
+
+def verify_source_limits(wf: Path, runner: triggers.ProfileScriptRunner) -> None:
+    """真实执行来源限制脚本；参数仅从脚本读取，不复制另一份上限清单。"""
+    from lvjiang.core.profile.models import StockKeyDef
+
+    parameters = next(line for line in wf.read_text(encoding='utf-8').splitlines()
+                      if line.startswith('$source_limits = '))
+    limits = json.loads(parameters.split('=', 1)[1])
+    config = schema.get_profile_config()
+    key = 'peiyang_chengyinshi'
+    config.keys_by_model['stock'].append(StockKeyDef(
+        key=key, change_script='profile/chengyinshi_limit.wf', change_script_sync=True))
+    config._rebuild_index()
+    with patch('lvjiang.workflows.discovery.resolve_workflow_path', return_value=(wf, 'profile/chengyinshi_limit.wf')):
+        def denied(user, source, *, delta=1, set_value=None, is_action=True):
+            before = repository.db_read_entry(user, 'stock', key)
+            count = repository.db_count_history(user, 'stock', key)
+            try:
+                profile_action(user, key, delta=delta, source=source, set_value=set_value, is_action=is_action)
+            except ProfileWriteRejected:
+                pass
+            else:
+                raise AssertionError(f'应拒绝获取: {source}')
+            assert repository.db_read_entry(user, 'stock', key) == before
+            assert repository.db_count_history(user, 'stock', key) == count
+
+        for index, (source, cap) in enumerate(limits.items()):
+            user = f'example-limit-{index}'
+            profile_action(user, key, delta=cap - 1, source=source)
+            denied(user, source, delta=2)  # 跨越上限也必须拒绝，不能只比较旧累计。
+            profile_action(user, key, delta=1, source=source)
+            assert profile_read(user, key) == cap
+            denied(user, source)
+            profile_action(user, key, delta=-1, source='example consumption')
+            denied(user, source)  # 消耗不能释放获取额度。
+            denied(user, source, set_value=cap, is_action=False)  # 正向覆写不能绕过。
+        denied('example-invalid-source', 'unknown source')
+        assert not runner.is_busy
+    print('PASS: 五个来源上限、跨界拒绝、未知来源拒绝、消耗不退额度、覆写限制')
 
 
 if __name__ == '__main__':

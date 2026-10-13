@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 3,
   "regions": [
     {
       "key": "back",
@@ -39,9 +39,9 @@
     {
       "key": "modal_message",
       "x_ratio": 0.33,
-      "y_ratio": 0.4,
+      "y_ratio": 0.32719836400818,
       "w_ratio": 0.44,
-      "h_ratio": 0.14627667244325315
+      "h_ratio": 0.2903885480572597
     },
     {
       "key": "smart_fill",
@@ -49,6 +49,13 @@
       "y_ratio": 0.65,
       "w_ratio": 0.184,
       "h_ratio": 0.078
+    },
+    {
+      "key": "use_current",
+      "x_ratio": 0.6437303003548268,
+      "y_ratio": 0.6500123896092939,
+      "w_ratio": 0.09983758743982651,
+      "h_ratio": 0.07798761039070612
     }
   ],
   "panels": [

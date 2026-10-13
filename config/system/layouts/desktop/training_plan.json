@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 4,
   "regions": [
     {
       "key": "back",
@@ -40,10 +40,10 @@
     },
     {
       "key": "modal_message",
-      "x_ratio": 0.3331875557245575,
-      "y_ratio": 0.42002828497705136,
-      "w_ratio": 0.43906244427544255,
-      "h_ratio": 0.1139438642076228
+      "x_ratio": 0.31597925971389873,
+      "y_ratio": 0.39363585879656116,
+      "w_ratio": 0.4562707402861014,
+      "h_ratio": 0.13159051981969472
     },
     {
       "key": "smart_fill",
@@ -52,6 +52,14 @@
       "w_ratio": 0.10486666666666666,
       "h_ratio": 0.04029236240193474,
       "activation_key": "SPACE"
+    },
+    {
+      "key": "use_current",
+      "x_ratio": 0.4454985727163015,
+      "y_ratio": 0.5658322954852163,
+      "w_ratio": 0.09861605714064797,
+      "h_ratio": 0.04029236240193479,
+      "activation_key": "F"
     }
   ],
   "panels": [

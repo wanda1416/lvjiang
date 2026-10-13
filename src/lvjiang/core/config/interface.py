@@ -14,7 +14,9 @@ _MIGRATION = {"source": "session", "version": INTERFACE_VERSION}
 #: 合法的激活项 kind —— 「当前在用哪个」的选择。它们频繁变动，丢了重选一次
 #: 即可，所以和界面状态一起放在 interface.json；plan 是机器级方案（图库 +
 #: 环境 + 布局 + 模式的组合），env 是当前工作环境。
-#: 日常脚本与展示分组独立保存在 daily 节点。
+#: 日常脚本与展示分组独立保存在 daily 节点：本实例正在看的脚本与分组
+#: （workflow_id / group）在 interface.json，脚本顺序、显示名等偏好仍在
+#: session.json 的 daily.scripts。
 ACTIVE_KINDS = frozenset({
     "user", "layout", "space", "env", "plan",
 })

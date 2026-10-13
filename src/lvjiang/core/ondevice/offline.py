@@ -24,6 +24,7 @@ def sync_status() -> dict:
 def configuration_status() -> dict:
     """运行配置就绪与同步历史分开；预置初始化不伪造 PC 同步记录。"""
     from ..config.interface import get_interface_store
+    from ..user_config import resolve_active_username
     sync = sync_status()
     marker = constants.SESSION_CONFIG_DIR / "preset.json"
     from ..paths import get_config_system_dir
@@ -32,7 +33,7 @@ def configuration_status() -> dict:
     ready = bool(sync.get("synced") or preset_ready)
     store = get_interface_store()
     return {**sync, "ready": ready, "source": "pc" if sync.get("synced") else "preset",
-            "execution_username": store.get_active("user", ""),
+            "execution_username": resolve_active_username(),
             "layout": store.get_active("layout", sync.get("layout", "")),
             "message": "使用应用预置配置" if preset_ready and not sync.get("synced") else
                 sync.get("message", "") if ready else "预置配置未就绪，请重新打开或更新应用"}

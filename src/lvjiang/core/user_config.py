@@ -297,6 +297,39 @@ def set_graduation_analysis_settings(
         )
 
 
+def list_user_names() -> list[str]:
+    """用户名册顺序；界面用户列表的第一行就是它。"""
+    from .config.session import get_session_store
+
+    raw = get_session_store().get_node("users", [])
+    if not isinstance(raw, list):
+        return []
+    return [name for name in raw
+            if isinstance(name, str) and is_valid_username(name)]
+
+
+def resolve_active_username() -> str:
+    """当前执行用户；``actives.user`` 没记录时回退名册第一行。
+
+    「当前用户」只认这一处：界面顶部、备战方案、任务启动、离线同步都从这里
+    取。否则 actives 一旦丢了，顶部照常按名册第一行展示，别处却拿到空用户名
+    ——于是按空用户名去读 ``users/*.loadouts.json``，方案、装备这些数据就
+    「加载不出来」。
+
+    名册为空时不能反过来丢掉 actives 里已有的名字：手机端、离线包这类场景
+    本就没有 PC 名册，但执行用户是明确的。
+    """
+    from .config.interface import get_interface_store
+
+    active = get_interface_store().get_active("user", "")
+    names = list_user_names()
+    if not isinstance(active, str) or not active:
+        return names[0] if names else ""
+    if names and active not in names:
+        return names[0]
+    return active
+
+
 class UserConfigManager:
     """用户增删查改、顺序维护与当前用户切换。"""
 
@@ -330,6 +363,11 @@ class UserConfigManager:
             self._active_user = ""
         if not self._users:
             self._create_default_user()
+        # actives 没记录（或记的名字已不在名册）时，界面第一行就是当前用户。
+        # 不兜底就会分裂：顶部照常展示第一个用户，而只认 get_active_user_name()
+        # 的备战方案、装备页拿到空用户名，读 users/*.loadouts.json 自然为空。
+        if not self._active_user and self._users:
+            self._active_user = next(iter(self._users))
 
     def _save_order(self) -> None:
         from .config.interface import get_interface_store

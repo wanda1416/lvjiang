@@ -67,8 +67,7 @@ def save_user_auto_tuning_config(
 
 
 def active_username() -> str:
-    """返回当前实例选中的用户（interface.json 的 actives.user）。"""
-    from ....core.config.interface import get_interface_store
+    """当前执行用户；actives 缺记录时回退名册第一行，与界面保持一致。"""
+    from ....core.user_config import resolve_active_username
 
-    value = get_interface_store().get_active("user", "")
-    return value if isinstance(value, str) else ""
+    return resolve_active_username()

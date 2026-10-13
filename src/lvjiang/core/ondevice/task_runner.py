@@ -270,9 +270,9 @@ def _reset_engine_state(engine) -> None:
 
     # 每次任务启动绑定手机已选择的用户，不要求该资料来自 PC。
     from ... import constants
-    from ..config.interface import get_interface_store
+    from ..user_config import resolve_active_username
 
-    username = _STATE.snapshot()["username"] or get_interface_store().get_active("user", "")
+    username = _STATE.snapshot()["username"] or resolve_active_username()
     engine.run_username = username if isinstance(username, str) else ""
     engine.users_dir = constants.USERS_DIR
     if not engine.run_username:
@@ -401,8 +401,9 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
 
     try:
         from ..config.interface import get_interface_store
+        from ..user_config import resolve_active_username
         from .task_settings import validate_for_run
-        selected_user = username or get_interface_store().get_active("user", "")
+        selected_user = username or resolve_active_username()
         validate_for_run(task, selected_user, variables)
         if username:
             if username not in _local_user_names():
@@ -464,11 +465,11 @@ def get_status() -> str:
     Returns:
         JSON 文本，字段见 ``_TaskState.snapshot``
     """
-    from ..config.interface import get_interface_store
+    from ..user_config import resolve_active_username
     from .offline import configuration_status
     sync = configuration_status()
     if sync.get("ready"):
-        sync["execution_username"] = get_interface_store().get_active("user", sync.get("username", ""))
+        sync["execution_username"] = resolve_active_username() or sync.get("username", "")
     return json.dumps({**_STATE.snapshot(), "sync": sync}, ensure_ascii=False, default=str)
 
 
@@ -493,9 +494,9 @@ def _local_user_names() -> list[str]:
 def list_users() -> str:
     """只展示同步名册中有有效资料的用户，不创建/修复缺失资料。"""
     try:
-        from ..config.interface import get_interface_store
+        from ..user_config import resolve_active_username
         return json.dumps({"ok": True, "users": _local_user_names(),
-                           "selected": get_interface_store().get_active("user", "")}, ensure_ascii=False)
+                           "selected": resolve_active_username()}, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({"ok": False, "users": [], "message": str(exc)}, ensure_ascii=False)
 

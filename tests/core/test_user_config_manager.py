@@ -11,6 +11,7 @@ from lvjiang.core.user_config import (
     UserConfigManager,
     get_graduation_analysis_settings,
     load_user_metadata,
+    resolve_active_username,
     save_user_metadata,
     set_graduation_analysis_settings,
 )
@@ -70,15 +71,43 @@ class TestUser:
 class TestUserConfigManagerInit:
 
 
-    def test_active_user_reset_if_not_found(self, session_env):
+    def test_active_user_falls_back_to_first_row_when_actives_missing(
+            self, session_env):
+        """actives 没记用户时按名册第一行返回，不能留空。
+
+        顶部一直按名册第一行展示，若这里给出空串，只认 get_active_user_name()
+        的备战方案、装备页就会按空用户名去读 users/*.loadouts.json 而加载不出来。
+        """
         import json
-        session_env.write_text(json.dumps({
-            "users": ["用户A"],
-            "actives": {"user": "不存在的用户"},
-        }), encoding="utf-8")
+
+        from lvjiang import constants
+
+        constants.USERS_DIR.mkdir(parents=True, exist_ok=True)
+        save_user_metadata(User("用户A"), constants.USERS_DIR)
+        save_user_metadata(User("用户B"), constants.USERS_DIR)
+        session_env.write_text(
+            json.dumps({"users": ["用户A", "用户B"]}), encoding="utf-8")
         reset_session_store()
         mgr = UserConfigManager()
-        assert mgr.get_active_user_name() == ""
+        assert mgr.get_active_user_name() == "用户A"
+        assert resolve_active_username() == "用户A"
+
+    def test_active_user_falls_back_when_recorded_user_is_gone(self, session_env):
+        """actives 记的名字已不在名册时，同样回退名册第一行。"""
+        import json
+
+        from lvjiang import constants
+        from lvjiang.core.config.interface import get_interface_store
+
+        constants.USERS_DIR.mkdir(parents=True, exist_ok=True)
+        save_user_metadata(User("用户A"), constants.USERS_DIR)
+        session_env.write_text(json.dumps({"users": ["用户A"]}), encoding="utf-8")
+        reset_session_store()
+        get_interface_store().set_active("user", "不存在的用户")
+        reset_session_store()
+        mgr = UserConfigManager()
+        assert mgr.get_active_user_name() == "用户A"
+        assert resolve_active_username() == "用户A"
 
 
 class TestUserConfigManagerCRUD:

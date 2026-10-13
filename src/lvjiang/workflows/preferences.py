@@ -4,10 +4,14 @@
 偏好**，不是配置：系统配置由开发者提供，用户想改顺序、不想看某个脚本、
 想换个称呼，都不该写回系统文件（那会把系统后续新增的脚本冻住）。
 
-节点形状::
+``daily`` 按归属分成两块，别混：**偏好**（``scripts``，用户改过才有的东西）
+留在 session.json；**本实例正在看哪个**（``workflow_id`` 上次选中的脚本、
+``group`` 展示分组）归 interface.json，由日常页直接读写，只读实例可以临时
+切换而不落盘。本模块只管前一块。
+
+节点形状（session.json）::
 
     "daily": {
-      "workflow_id": "scan_wallet",          # 上次选中的脚本（既有）
       "scripts": {
         "order":   ["scan_wallet", ...],     # 用户调整过的顺序
         "visible": {"weekly_baiye_freight": true, "scan_wallet": false},

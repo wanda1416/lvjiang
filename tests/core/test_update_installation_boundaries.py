@@ -23,7 +23,9 @@ def test_member_installs_without_business_selfcheck_or_global_refresh_failure(tm
     (system / "workflows/existing.wf").write_bytes(baseline["workflows/existing.wf"])
     local = tmp_path / "local"
     local.mkdir()
-    config = resolver.ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
+    # 安装器与消费者必须属于同一临时安装实例，不能借用默认实例的锁/索引。
+    config = resolver.ConfigResolver(system_dir=system, local_dir=local, dev_mode=False,
+                                     config_dir=tmp_path)
     monkeypatch.setattr(resolver, "_resolver", config)
     access = protected_remote.ProtectedAccess("https://example.invalid", "test-only-license")
     member = MemberDownload({

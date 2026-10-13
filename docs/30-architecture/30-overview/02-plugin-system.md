@@ -231,6 +231,9 @@ class AutoFarmWorkflow(BaseWorkflow):
 别名及引用展开，`layout_screenshots` 负责截图资源，`layout_references` 协调跨布局键维护。
 管理器继续提供既有公开入口，实际实现只存在于各职责模块中。
 
+最优组合页面保留候选装配、后台任务与设置编排；候选行、详情、结果卡片和选择控件
+集中在 `optimal_widgets.py`。搜索算法仍由燕云领域核心提供。
+
 ### 完整插件注册
 
 插件加载时，`register_hooks()` 会自动：

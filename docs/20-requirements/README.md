@@ -75,7 +75,7 @@
 | [22-plugin-runtime.md](50-platform/22-plugin-runtime.md) | 插件宿主运行接口与公共事件契约 | 已实现 |
 | [23-service-boundaries.md](50-platform/23-service-boundaries.md) | 公共服务与桌面适配边界 | 已实现 |
 | [24-config-policy-bootstrap.md](50-platform/24-config-policy-bootstrap.md) | 插件配置策略显式装配 | 已实现 |
-| [25-configuration-modules.md](50-platform/25-configuration-modules.md) | 配置与布局职责拆分 | 已实现 |
+| [25-configuration-modules.md](50-platform/25-configuration-modules.md) | 配置、布局与组合展示职责拆分 | 已实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

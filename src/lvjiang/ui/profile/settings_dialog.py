@@ -97,7 +97,7 @@ class _ChangeScriptFileField(QWidget):
             layout.addWidget(button)
 
         self._sync_checkbox = QCheckBox(tr("同步修改"))
-        self._sync_checkbox.setToolTip(tr("勾选后当前写入等待脚本完成；不勾选则提交后台队列。同步脚本应短小，不用于长等待。"))
+        self._sync_checkbox.setToolTip(tr("勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。"))
         self._sync_checkbox.setEnabled(bool(value))
         self._sync_checkbox.setChecked(bool(value) and synchronous)
         layout.addWidget(self._sync_checkbox)

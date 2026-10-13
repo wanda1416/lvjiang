@@ -266,6 +266,7 @@ class ProfileCellEditingMixin:
             is_action=True, source=cell_source, expected_entry=dict(entry),
             regen_progress_source="target",
             force_write=force_target_write,
+            set_value=parsed_value,
         )
 
     def _on_cell_context_menu(self: ProfileTab, pos, group_name: str, table: QTableWidget):  # type: ignore[misc]
@@ -453,6 +454,8 @@ class ProfileCellEditingMixin:
             elif error:
                 logger.error(f"回写失败: {error}")
                 QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
+            elif kd is not None and source:
+                self._register_new_source(kd, source, kd.sources if delta > 0 else kd.uses)
             current_group = self._get_current_group_name()
             table = self._tables.get(current_group)
             if table:
@@ -559,12 +562,6 @@ class ProfileCellEditingMixin:
             )
             return
 
-        # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途
-        if delta > 0:
-            self._register_new_source(kd, source, kd.sources)
-        elif delta < 0:
-            self._register_new_source(kd, source, kd.uses)
-
         # 自定义增减属于 action，触发 sync_targets 同步
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
@@ -620,12 +617,6 @@ class ProfileCellEditingMixin:
                 return
         elif delta == 0:
             return
-
-        # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途
-        if delta > 0:
-            self._register_new_source(kd, source, kd.sources)
-        elif delta < 0:
-            self._register_new_source(kd, source, kd.uses)
 
         # sync_checked=True: 走 action 路径（触发 sync_targets 同步）
         # sync_checked=False: 纯覆写语义（change_type="override"，不触发同步）

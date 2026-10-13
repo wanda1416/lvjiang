@@ -23,6 +23,7 @@ from loguru import logger
 from lvjiang.constants import SESSION_CONFIG_DIR
 
 from .history_migration import migrate_structured_history
+from .transactions import current_transaction
 
 # 数据库路径
 _DB_PATH = SESSION_CONFIG_DIR / "profile.db"
@@ -181,6 +182,32 @@ class ProfileDB:
             raise
         return conn
 
+    def _shared_connection(self, conn: sqlite3.Connection) -> bool:
+        active = current_transaction()
+        return active is not None and active.db is self and active.connection is conn
+
+    def _borrow_connection(self) -> sqlite3.Connection:
+        active = current_transaction()
+        if active is not None and active.db is self:
+            return active.connection
+        return self._connect()
+
+    def _begin(self, conn: sqlite3.Connection) -> None:
+        if not self._shared_connection(conn):
+            conn.execute('BEGIN IMMEDIATE')
+
+    def _commit(self, conn: sqlite3.Connection) -> None:
+        if not self._shared_connection(conn):
+            conn.commit()
+
+    def _rollback(self, conn: sqlite3.Connection) -> None:
+        if not self._shared_connection(conn):
+            conn.rollback()
+
+    def _release_connection(self, conn: sqlite3.Connection) -> None:
+        if not self._shared_connection(conn):
+            conn.close()
+
     # ─── Schema 迁移 ───
 
     def _ensure_schema(self) -> None:
@@ -190,7 +217,7 @@ class ProfileDB:
         同时读到旧版本，并先后对同一列执行 ALTER TABLE。
         """
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             # backup 必须在 BEGIN 前执行，避免对已持有写事务的连接调用 backup。
             has_version = conn.execute(
@@ -204,7 +231,7 @@ class ProfileDB:
                         conn.backup(backup)
             # 在读取版本前取得写锁。并发初始化者会在 busy_timeout 范围内
             # 等待，取得锁后重新读取已经提交的新版本，不会重复执行迁移。
-            conn.execute("BEGIN IMMEDIATE")
+            self._begin(conn)
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
             )
@@ -220,12 +247,12 @@ class ProfileDB:
                     )
                     logger.info(f"ProfileDB 迁移 v{version}: {desc}")
 
-            conn.commit()
+            self._commit(conn)
         except Exception:
-            conn.rollback()
+            self._rollback(conn)
             raise
         finally:
-            conn.close()
+            self._release_connection(conn)
 
         from .key_rename import recover_rename
         recover_rename(self)
@@ -234,7 +261,7 @@ class ProfileDB:
 
     def get_entry(self, username: str, type_: str, key: str) -> dict:
         """读取单条 entry，不存在返回空 dict"""
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             row = conn.execute(
                 "SELECT value, value_text, updated_at, updated_time FROM profile_entries "
@@ -242,7 +269,7 @@ class ProfileDB:
                 (username, type_, key),
             ).fetchone()
         finally:
-            conn.close()
+            self._release_connection(conn)
 
         if row is None:
             return {}
@@ -254,7 +281,7 @@ class ProfileDB:
         Returns: {type: {key: {value, value_text, updated_at}}}
         格式与早期 user.json 的 profile 节点兼容。
         """
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             rows = conn.execute(
                 "SELECT type, key, value, value_text, updated_at, updated_time FROM profile_entries "
@@ -262,7 +289,7 @@ class ProfileDB:
                 (username,),
             ).fetchall()
         finally:
-            conn.close()
+            self._release_connection(conn)
 
         result: dict[str, dict[str, dict]] = {}
         for type_, key, value, value_text, updated_at, updated_time in rows:
@@ -299,9 +326,9 @@ class ProfileDB:
         """
         write_ts = datetime.now().isoformat(timespec="seconds")
         ts = updated_at or write_ts
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
-            conn.execute("BEGIN IMMEDIATE")
+            self._begin(conn)
 
             # 读取旧值（用于 history 对比）
             old_row = conn.execute(
@@ -344,9 +371,9 @@ class ProfileDB:
                          change_type, delta_value, source, sync_from),
                     )
 
-            conn.commit()
+            self._commit(conn)
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     def upsert_many(
         self, username: str, entries: list[tuple]
@@ -355,9 +382,9 @@ class ProfileDB:
 
         entries 元素: (type_, key, value, updated_at, change_type, delta_value[, source[, value_text[, sync_from]]])
         """
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
-            conn.execute("BEGIN IMMEDIATE")
+            self._begin(conn)
 
             for entry in entries:
                 source = entry[6] if len(entry) > 6 else ""
@@ -403,9 +430,9 @@ class ProfileDB:
                              change_type, delta_value, source, sync_from),
                         )
 
-            conn.commit()
+            self._commit(conn)
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     def update_if_current(
         self,
@@ -434,9 +461,9 @@ class ProfileDB:
         value = float(new_value)
         write_ts = datetime.now().isoformat(timespec="seconds")
         ts = new_updated_at or write_ts
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
-            conn.execute("BEGIN IMMEDIATE")
+            self._begin(conn)
             if expected_entry_exists:
                 cursor = conn.execute(
                     "UPDATE profile_entries "
@@ -459,7 +486,7 @@ class ProfileDB:
                 )
                 history_old_value = None
             if cursor.rowcount != 1:
-                conn.rollback()
+                self._rollback(conn)
                 return False
 
             if change_type is not None:
@@ -479,19 +506,19 @@ class ProfileDB:
                          change_type, delta_value, source, sync_from),
                     )
 
-            conn.commit()
+            self._commit(conn)
             return True
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     def rename_keys(
         self, renames: list[tuple[str, str, str]], *,
         operation_id: str, save_references: Callable[[], None],
     ) -> None:
         """全用户身份重命名；SQL 变化与审计共用事务，不触发数值事件。"""
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
-            conn.execute("BEGIN IMMEDIATE")
+            self._begin(conn)
             for model, old, new in renames:
                 if old == new or not new or not new.replace("_", "").isalnum():
                     raise ValueError("无效的 key 重命名")
@@ -529,23 +556,23 @@ class ProfileDB:
                      model, old, new, entries, history, sync),
                 )
             save_references()
-            conn.commit()
+            self._commit(conn)
         except BaseException:
-            conn.rollback()
+            self._rollback(conn)
             raise
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     def get_key_renames(self, type_: str, key: str) -> list[dict]:
         """按重命名链追溯曾用名，包括连续多次重命名。"""
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             rows = conn.execute(
                 "SELECT ts, old_key, new_key, entries_count, history_count, sync_count "
                 "FROM profile_key_renames WHERE type=? ORDER BY id DESC", (type_,),
             ).fetchall()
         finally:
-            conn.close()
+            self._release_connection(conn)
         result = []
         names = {key}
         for ts, old, new, entries, history, sync in rows:
@@ -568,7 +595,7 @@ class ProfileDB:
         """查询变更历史；username=None 时跨用户，按写入顺序倒序分页。"""
         where, params = self._history_filter(username, type_, key)
 
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             rows = conn.execute(
                 f"SELECT id, ts, username, type, key, old_value, new_value, "
@@ -578,7 +605,7 @@ class ProfileDB:
                 (*params, limit, offset),
             ).fetchall()
         finally:
-            conn.close()
+            self._release_connection(conn)
 
         return [
             {
@@ -593,7 +620,7 @@ class ProfileDB:
 
     def get_history_record(self, history_id: int) -> dict:
         """按稳定 id 读取单条变更历史；不存在返回空 dict。"""
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             row = conn.execute(
                 "SELECT id, ts, username, type, key, old_value, new_value, "
@@ -602,7 +629,7 @@ class ProfileDB:
                 (history_id,),
             ).fetchone()
         finally:
-            conn.close()
+            self._release_connection(conn)
         if row is None:
             return {}
         return {
@@ -618,17 +645,17 @@ class ProfileDB:
         self, history_id: int, *, expected_source: str, new_source: str,
     ) -> bool:
         """只修改指定历史记录的来源；原值已变化时拒绝覆盖。"""
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             cursor = conn.execute(
                 "UPDATE profile_history SET source=? "
                 "WHERE id=? AND COALESCE(source, '')=?",
                 (new_source, history_id, expected_source),
             )
-            conn.commit()
+            self._commit(conn)
             return cursor.rowcount == 1
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     def undo_history(self, history_id: int) -> bool:
         """原子撤销一条历史记录并追加 ``undo`` 审计记录。
@@ -637,9 +664,9 @@ class ProfileDB:
         的新值。更高层负责排除带同步、变更脚本或连续再生语义的 key。
         """
         write_ts = datetime.now().isoformat(timespec="seconds")
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
-            conn.execute("BEGIN IMMEDIATE")
+            self._begin(conn)
             row = conn.execute(
                 "SELECT username, type, key, old_value, new_value, "
                 "old_value_text, new_value_text, change_type, source, sync_from "
@@ -647,14 +674,14 @@ class ProfileDB:
                 (history_id,),
             ).fetchone()
             if row is None:
-                conn.rollback()
+                self._rollback(conn)
                 return False
             (
                 username, type_, key, old_value, new_value,
                 old_value_text, new_value_text, change_type, source, sync_from,
             ) = row
             if change_type not in ("action", "override") or sync_from:
-                conn.rollback()
+                self._rollback(conn)
                 return False
 
             latest = conn.execute(
@@ -663,7 +690,7 @@ class ProfileDB:
                 (username, type_, key),
             ).fetchone()
             if latest is None or latest[0] != history_id:
-                conn.rollback()
+                self._rollback(conn)
                 return False
 
             current = conn.execute(
@@ -677,7 +704,7 @@ class ProfileDB:
                 or float(current[0]) != float(new_value)
                 or (type_ == "note" and current_text != (new_value_text or ""))
             ):
-                conn.rollback()
+                self._rollback(conn)
                 return False
 
             restored_value = float(old_value) if old_value is not None else 0.0
@@ -706,13 +733,13 @@ class ProfileDB:
                     f"撤销：{source}" if source else "撤销",
                 ),
             )
-            conn.commit()
+            self._commit(conn)
             return True
         except BaseException:
-            conn.rollback()
+            self._rollback(conn)
             raise
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     def count_history(
         self,
@@ -722,14 +749,14 @@ class ProfileDB:
     ) -> int:
         """返回相同筛选条件下的历史记录总数。"""
         where, params = self._history_filter(username, type_, key)
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             row = conn.execute(
                 f"SELECT COUNT(*) FROM profile_history WHERE {where}", params,
             ).fetchone()
             return int(row[0]) if row else 0
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     @staticmethod
     def _history_filter(
@@ -747,15 +774,15 @@ class ProfileDB:
         """清理 N 天前的历史记录，返回删除行数"""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
 
-        conn = self._connect()
+        conn = self._borrow_connection()
         try:
             cursor = conn.execute(
                 "DELETE FROM profile_history WHERE ts < ?", (cutoff,)
             )
-            conn.commit()
+            self._commit(conn)
             deleted = cursor.rowcount
         finally:
-            conn.close()
+            self._release_connection(conn)
 
         if deleted > 0:
             logger.info(f"ProfileDB: 清理 {deleted} 条过期 history (>{days}天)")

@@ -18,7 +18,7 @@ from datetime import datetime
 from loguru import logger
 
 from ...i18n import tr
-from .maintenance import profile_operation
+from .maintenance import profile_operation, profile_write
 from .models import (
     MODEL_NOTE,
     MODEL_QUOTA,
@@ -342,7 +342,7 @@ def profile_observe(
 # ─── 共享写入管线 ─────────────────────────────────────────────
 
 
-@profile_operation
+@profile_write
 def profile_action(
     username: str,
     key: str,
@@ -422,6 +422,8 @@ def profile_action(
         )
         if event is None:
             return old_text or ""
+        if event.synchronous:
+            submit_profile_trigger(event)
         db_upsert(
             username, model_type, key, 0,
             change_type="action" if is_action else "override",
@@ -429,11 +431,12 @@ def profile_action(
             source=source,
         )
         with trigger_context(event):
-            submit_profile_trigger(event)
+            if not event.synchronous:
+                submit_profile_trigger(event)
         return text
 
     # ── 1. 读当前值 ──
-    if current_value is None:
+    if current_value is None or set_value is not None:
         _raw = _read_current_value(username, model_type, key, kd)
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
@@ -495,6 +498,8 @@ def profile_action(
         )
         if event is None:
             return current_value
+        if event.synchronous:
+            submit_profile_trigger(event)
     if is_action and use_cas and expected_entry is not None:
         updated = db_update_if_current(
             username, model_type, key,
@@ -525,7 +530,8 @@ def profile_action(
     # ── 8. 触发器同步 ──
     if event is not None:
         with trigger_context(event):
-            submit_profile_trigger(event)
+            if not event.synchronous:
+                submit_profile_trigger(event)
             if is_action and kd and kd.sync_targets:
                 from .sync import fire_sync_targets
                 fire_sync_targets(
@@ -542,7 +548,7 @@ def profile_action(
 # ─── sync_engine 独立写入适配器 ──────────────────────────────
 
 
-@profile_operation
+@profile_write
 def sync_write_adapter(
     user_name: str,
     model_type: str,
@@ -602,6 +608,9 @@ def sync_write_adapter(
     if event is None:
         return current_value, 0
 
+    if event.synchronous:
+        submit_profile_trigger(event)
+
     try:
         db_upsert(
             user_name, model_type, key, new_value,
@@ -613,8 +622,9 @@ def sync_write_adapter(
         )
     except Exception as e:
         logger.error(f"sync_write_adapter failed: {user_name}.{model_type}.{key}: {e}")
-        return None
+        raise
 
     with trigger_context(event):
-        submit_profile_trigger(event)
+        if not event.synchronous:
+            submit_profile_trigger(event)
     return semantic_new_value, actual_delta

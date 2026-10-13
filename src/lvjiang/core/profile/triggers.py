@@ -12,10 +12,12 @@ from typing import Callable, Iterator
 
 from loguru import logger
 
+from .transactions import after_commit, profile_transaction, reject_write
+
 
 @dataclass(frozen=True)
 class ProfileTriggerEvent:
-    """一次已经落库的 Profile 变化快照。"""
+    """同步候选变化或异步已提交变化的快照。"""
 
     username: str
     model: str
@@ -89,7 +91,7 @@ def prepare_trigger_event(
                 f"Profile 脚本触发循环，拒绝写入: "
                 f"{' -> '.join((*parent.path, node_id))}"
             )
-            return None
+            reject_write('Profile 脚本触发循环，拒绝写入: ' + ' -> '.join((*parent.path, node_id)))
         origin_key = parent.origin_key
         origin_model = parent.origin_model
         path = (*parent.path, node_id)
@@ -151,7 +153,7 @@ class ProfileScriptRunner(threading.Thread):
             self._inline_count += 1
         self._emit_busy()
         try:
-            self._execute_event(event)
+            self._run_event(event)
         finally:
             with self._state_lock:
                 self._inline_count -= 1
@@ -228,15 +230,19 @@ class ProfileScriptRunner(threading.Thread):
 
         path, _ = resolve_workflow_path(event.script)
         if path is None:
-            logger.error(f"Profile 变更脚本不存在: workflows/{event.script}")
-            return
+            raise FileNotFoundError(f"Profile 变更脚本不存在: workflows/{event.script}")
         runtime = ProfileWorkflowEngineBuilder(
             username=event.username,
             users_dir=self._users_dir,
             stop_check=lambda: self._stop_requested,
         ).build()
-        with trigger_context(event):
+        from .maintenance import profile_lock
+        from .repository import get_profile_db
+
+        with profile_lock, profile_transaction(get_profile_db()), trigger_context(event):
             runtime.execute(path, initial_variables=event.variables())
+            if self._stop_requested:
+                reject_write('Profile 脚本已停止，本次同步链未提交')
 
 
 _runner: ProfileScriptRunner | None = None
@@ -257,41 +263,12 @@ def submit_profile_trigger(event: ProfileTriggerEvent) -> bool:
     if not event.script:
         return False
     runner = get_or_create_script_runner()
-    return runner.run_inline(event) if event.synchronous else runner.submit(event)
-
-
-def enqueue_profile_change(
-    *,
-    username: str,
-    model: str,
-    key: str,
-    old_value: float | str | None,
-    new_value: float | str | None,
-    source: str,
-    change_type: str,
-    script: str,
-    synchronous: bool = False,
-) -> bool:
-    """供 Profile 后台计算等非 service 写入路径提交触发事件。"""
-    delta = (
-        float(new_value) - float(old_value or 0)
-        if isinstance(new_value, (int, float))
-        and (old_value is None or isinstance(old_value, (int, float)))
-        else None
-    )
-    event = prepare_trigger_event(
-        username=username,
-        model=model,
-        key=key,
-        old_value=old_value,
-        new_value=new_value,
-        delta=delta,
-        source=source,
-        change_type=change_type,
-        script=script,
-        synchronous=synchronous,
-    )
-    return event is not None and submit_profile_trigger(event)
+    if event.synchronous:
+        if not runner.run_inline(event):
+            reject_write('Profile 脚本执行器已停止，拒绝写入')
+        return True
+    after_commit(lambda: runner.submit(event))
+    return True
 
 
 def stop_script_runner() -> None:

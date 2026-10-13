@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 from lvjiang.core.paths import get_config_local_dir  # noqa: E402
 from lvjiang.core.profile import engine, repository, schema, triggers  # noqa: E402
 from lvjiang.core.profile.service import profile_action, profile_read  # noqa: E402
+from lvjiang.core.profile.transactions import ProfileWriteRejected  # noqa: E402
 from lvjiang.workflows.grammar import parse_file  # noqa: E402
 
 
@@ -123,16 +124,26 @@ def main() -> None:
                 profile_action(user, 'example_declared', set_value=9, is_action=False)
                 assert profile_read(user, 'example_sync') == before  # override 不触发声明式同步。
 
-                profile_action(user, 'example_direct_cycle', delta=1)
-                assert profile_read(user, 'example_direct_cycle') == 1
+                try:
+                    profile_action(user, 'example_direct_cycle', delta=1)
+                except ProfileWriteRejected:
+                    pass
+                else:
+                    raise AssertionError('直接循环应拒绝整链')
+                assert profile_read(user, 'example_direct_cycle') is None
                 profile_action(user, 'example_cycle_a', delta=1)
                 drain()
                 assert profile_read(user, 'example_cycle_a') == profile_read(user, 'example_cycle_b') == 1
-                profile_action(user, 'example_failure', delta=1)
-                assert profile_read(user, 'example_failure') == 1
+                try:
+                    profile_action(user, 'example_failure', delta=1)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError('同步异常应拒绝整链')
+                assert profile_read(user, 'example_failure') is None
                 profile_action(user, 'example_note', set_value='after failure')
                 assert profile_read(user, 'example_text_result') == 'after failure'
-                assert failures == ['example_failure'], failures
+                assert failures == ['example_direct_cycle', 'example_cycle_b', 'example_failure'], failures
                 print('PASS: 同步/异步/混合链、事件快照、同值、钳位、文本、reset/tick、声明式同步、防环、失败隔离')
             finally:
                 runner.request_stop()

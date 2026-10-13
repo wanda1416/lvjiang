@@ -21,7 +21,7 @@ from lvjiang.core.config.interface import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
 from ...i18n import tr
-from .maintenance import profile_operation
+from .maintenance import profile_operation, profile_write
 from .models import RegenKeyDef
 from .periods import (
     get_period_boundary as _get_period_boundary,
@@ -41,6 +41,39 @@ from .store import (
     set_alert_history,
     unmark_alert,
 )
+
+
+@profile_write
+def _write_background_change(user_name, model, kd, entry, new_value, delta, change_type, *, updated_at=None):
+    """周期重置/准点恢复也先执行同步脚本，CAS 和子链在同一事务内。"""
+    from .repository import db_read_entry
+    from .triggers import prepare_trigger_event, submit_profile_trigger
+
+    current = db_read_entry(user_name, model, kd.key)
+    if (current.get('value', 0), current.get('updated_at', '')) != (
+        entry.get('value', 0), entry.get('updated_at', ''),
+    ):
+        return False
+    event = prepare_trigger_event(
+        username=user_name, model=model, key=kd.key,
+        old_value=entry.get('value', 0), new_value=new_value, delta=delta,
+        source='周期重置' if change_type == 'reset' else '自动恢复',
+        change_type=change_type, script=kd.change_script, synchronous=kd.change_script_sync,
+    )
+    assert event is not None
+    if event.synchronous:
+        submit_profile_trigger(event)
+    updated = db_update_if_current(
+        user_name, model, kd.key, expected_value=entry.get('value', 0) or 0,
+        expected_updated_at=entry.get('updated_at', ''), expected_entry_exists=bool(current),
+        new_value=new_value, new_updated_at=updated_at, change_type=change_type, delta_value=delta,
+    )
+    if not updated:
+        from .service import ProfileWriteConflict
+        raise ProfileWriteConflict('Profile 后台计算写入冲突')
+    if not event.synchronous:
+        submit_profile_trigger(event)
+    return True
 
 # ─── 周期边界计算 ────────────────────────────────────────────
 
@@ -331,28 +364,13 @@ class ProfileEngine(QThread):
                 continue
 
             # 周期已过期，CAS 重置到 DB
-            updated = db_update_if_current(
-                user_name, "quota", kd.key,
-                expected_value=stored_value,
-                expected_updated_at=updated_at_str,
-                new_value=0,
-                change_type="reset",
-                delta_value=-stored_value,
-            )
+            try:
+                updated = _write_background_change(user_name, 'quota', kd, entry, 0, -stored_value, 'reset')
+            except Exception as error:  # noqa: BLE001 - 单字段拒绝不能中断其他周期字段
+                logger.warning('Profile 周期重置未提交 {}: {}', kd.key, error)
+                continue
             if updated:
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
-                from .triggers import enqueue_profile_change
-                enqueue_profile_change(
-                    username=user_name,
-                    model="quota",
-                    key=kd.key,
-                    old_value=stored_value,
-                    new_value=0,
-                    source="周期重置",
-                    change_type="reset",
-                    script=kd.change_script,
-                    synchronous=kd.change_script_sync,
-                )
                 modified = True
             else:
                 logger.warning(f"{user_name} quota.{kd.key} CAS 失败，放弃本轮")
@@ -376,28 +394,13 @@ class ProfileEngine(QThread):
             # boundary 经过准点边界后持久化，避免日/周等回复遗漏。
             if regen_result.persisted and int(computed) != int(stored_value):
                 delta = computed - (stored_value or 0)
-                updated = db_update_if_current(
-                    user_name, "regen", kd.key,
-                    expected_value=stored_value or 0,
-                    expected_updated_at=updated_at_str,
-                    new_value=computed,
-                    new_updated_at=regen_result.updated_at,
-                    change_type="tick",
-                    delta_value=delta,
-                )
+                try:
+                    updated = _write_background_change(
+                        user_name, 'regen', kd, entry, computed, delta, 'tick', updated_at=regen_result.updated_at)
+                except Exception as error:  # noqa: BLE001
+                    logger.warning('Profile 自动恢复未提交 {}: {}', kd.key, error)
+                    continue
                 if updated:
-                    from .triggers import enqueue_profile_change
-                    enqueue_profile_change(
-                        username=user_name,
-                        model="regen",
-                        key=kd.key,
-                        old_value=stored_value,
-                        new_value=computed,
-                        source="自动恢复",
-                        change_type="tick",
-                        script=kd.change_script,
-                        synchronous=kd.change_script_sync,
-                    )
                     modified = True
                 else:
                     logger.warning(f"{user_name} regen.{kd.key} CAS 失败，放弃本轮")

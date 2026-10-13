@@ -19,6 +19,18 @@ def _get_username(_engine) -> str:
     return username
 
 
+@builtin_func('profile_reject')
+def _profile_reject(_engine, message: str, *args):
+    """拒绝当前同步候选写入，包括所有关联数值、历史与异步事件。"""
+    from ...core.profile.transactions import current_transaction, reject_write
+    from ...core.profile.triggers import current_trigger_event
+
+    event = current_trigger_event()
+    if event is None or not event.synchronous or current_transaction() is None:
+        raise ValueError('profile_reject 只能在同步变更脚本中调用')
+    reject_write(str(message))
+
+
 @builtin_func("user_get")
 def _user_get(_engine, username: str, key: str, *args):
     """按内部用户名读取用户资料属性；不存在时返回 null。"""
@@ -233,6 +245,10 @@ def _profile_declare(
                 f"与声明的 {model_type} 不一致，保留现有定义不修改")
         return {"ok": True, "created": False, "key": key,
                 "reason": "already_defined"}
+
+    from ...core.profile.transactions import current_transaction, reject_write
+    if current_transaction() is not None:
+        reject_write('Profile 事务内不能创建文件中的模型定义；请在任务开始前声明依赖')
 
     try:
         key_def = parse_key_def(model_type, {"key": key, **definition})

@@ -132,20 +132,86 @@ def test_synchronous_script_completes_before_write_returns_without_user_lock(tmp
     runner.request_stop()
 
 
-def test_synchronous_script_failure_isolated_and_cycle_rejected(tmp_path, monkeypatch):
+def test_synchronous_cycle_rolls_back_and_unrelated_key_remains_writable(tmp_path, monkeypatch):
     from lvjiang.core.profile.service import profile_action, profile_read
+    from lvjiang.core.profile.transactions import ProfileWriteRejected
 
     wf = tmp_path / 'inline.wf'
     wf.write_text('eval profile_inc("source", 1, "cycle")\neval $bad = range("invalid")\n', encoding='utf-8')
     _configure_profile(tmp_path, monkeypatch, script='profile/example.wf', synchronous=True)
     runner = _install_runner(tmp_path, monkeypatch, wf)
-    errors = []
-    monkeypatch.setattr('lvjiang.core.profile.triggers.logger.exception', lambda *args: errors.append(args))
-    assert profile_action('tester', 'source', set_value=1) == 1
-    assert profile_read('tester', 'source') == 1
+    with pytest.raises(ProfileWriteRejected, match='循环'):
+        profile_action('tester', 'source', set_value=1)
+    assert profile_read('tester', 'source') is None
     assert profile_action('tester', 'target', set_value=2) == 2
     assert not runner.is_busy
-    assert len(errors) == 1
+    runner.request_stop()
+
+
+def test_sync_script_runs_before_parent_write_and_rejection_rolls_back_children(tmp_path, monkeypatch):
+    from lvjiang.core.profile import repository, schema
+    from lvjiang.core.profile.models import StockKeyDef
+    from lvjiang.core.profile.service import profile_action, profile_read
+    from lvjiang.core.profile.transactions import ProfileWriteRejected
+
+    wf = tmp_path / 'reject.wf'
+    wf.write_text('eval profile_inc("target", 1)\n'
+                  'eval profile_inc("later", 1)\n'
+                  'eval profile_reject("limit reached")\n', encoding='utf-8')
+    _configure_profile(tmp_path, monkeypatch, script='profile/reject.wf', synchronous=True)
+    config = schema.get_profile_config()
+    config.keys_by_model['stock'].append(StockKeyDef(key='later', change_script='profile/async.wf'))
+    config._rebuild_index()
+    runner = _install_runner(tmp_path, monkeypatch, wf)
+    original = runner._run_event
+    def run(event):
+        # 同步脚本看到候选变量，但主字段及其历史尚未写入。
+        assert event.new_value == 1 and profile_read('tester', 'source') is None
+        assert not repository.db_get_history('tester', 'stock', 'source')
+        original(event)
+    monkeypatch.setattr(runner, '_run_event', run)
+    with pytest.raises(ProfileWriteRejected, match='limit reached'):
+        profile_action('tester', 'source', delta=1)
+    assert all(profile_read('tester', name) is None for name in ('source', 'target', 'later'))
+    assert not repository.db_get_history('tester')
+    assert not runner.is_alive() and runner.pending_count == 0
+    runner.request_stop()
+
+
+def test_cas_conflict_rolls_back_synchronous_children(tmp_path, monkeypatch):
+    from lvjiang.core.profile import repository
+    from lvjiang.core.profile.service import (
+        ProfileWriteConflict,
+        profile_action,
+        profile_read,
+    )
+
+    wf = tmp_path / 'child.wf'
+    wf.write_text('eval profile_inc("target", 1)\n', encoding='utf-8')
+    _configure_profile(tmp_path, monkeypatch, script='profile/child.wf', synchronous=True)
+    runner = _install_runner(tmp_path, monkeypatch, wf)
+    with pytest.raises(ProfileWriteConflict):
+        profile_action('tester', 'source', delta=1, use_cas=True,
+                       expected_entry={'value': 0, 'updated_at': 'stale'})
+    assert profile_read('tester', 'target') is None
+    assert not repository.db_get_history('tester')
+    runner.request_stop()
+
+
+def test_dsl_catching_rejection_cannot_commit_the_transaction(tmp_path, monkeypatch):
+    from lvjiang.core.profile import repository
+    from lvjiang.core.profile.service import profile_action
+    from lvjiang.core.profile.transactions import ProfileWriteRejected
+
+    wf = tmp_path / 'caught.wf'
+    wf.write_text('try\n    eval profile_reject("deny")\ncatch $error\n'
+                  '    eval profile_inc("target", 1)\nend\n', encoding='utf-8')
+    _configure_profile(tmp_path, monkeypatch, script='profile/caught.wf', synchronous=True)
+    runner = _install_runner(tmp_path, monkeypatch, wf)
+    with pytest.raises(ProfileWriteRejected, match='deny'):
+        profile_action('tester', 'source', delta=1)
+    assert not repository.db_read_all('tester')
+    assert not repository.db_get_history('tester')
     runner.request_stop()
 
 

@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "back",
@@ -107,6 +107,13 @@
       "y_ratio": 9.83473590388039e-05,
       "w_ratio": 0.11238398780304007,
       "h_ratio": 0.10685079379667085
+    },
+    {
+      "key": "huaruizhi_view",
+      "x_ratio": 0.766472206532966,
+      "y_ratio": 0.035219257967138914,
+      "w_ratio": 0.06586544219437551,
+      "h_ratio": 0.039844213662579064
     }
   ],
   "panels": [

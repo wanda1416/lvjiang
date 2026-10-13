@@ -27,7 +27,7 @@ def declare_profiles($keys)
         "niaoniao_of_week": {"model": "quota", "definition": {"label": "袅袅本周", "cap": 2, "period": "week", "increment_only": true, "sources": ["商店精选"]}},
         "xinfa_of_week": {"model": "quota", "definition": {"label": "心法心得本周", "cap": 600, "period": "week", "increment_only": true, "sources": ["心得置换"]}},
         "haoling_of_week": {"model": "quota", "definition": {"label": "当周获取号令", "period": "week", "increment_only": true, "sources": ["江湖号令"]}},
-        "huaruizhi_of_week": {"model": "quota", "definition": {"label": "花蕊织本周", "cap": 4000, "period": "week", "increment_only": true, "sources": ["渡尘墟"]}},
+        "huaruizhi_of_week": {"model": "quota", "definition": {"label": "花蕊织本周", "cap": 4000, "period": "week", "increment_only": true, "sources": ["日常"], "sync_targets": [{"key": "stock:huaruizhi", "direction": "pos", "source": "日常"}]}},
         "huaruizhi": {"model": "stock", "definition": {"label": "花蕊织"}},
         "niaoniao": {"model": "stock", "definition": {"label": "袅袅之音", "sources": ["逐战商店"]}},
         "nn_of_halfseason": {"model": "quota", "definition": {"label": "逐战袅袅之音", "cap": 2, "period": "half_season", "reset_time": "05:00", "increment_only": true, "sources": ["逐战商店"], "sync_targets": [{"key": "stock:huaruizhi", "ratio": -3000, "direction": "pos", "source": "袅袅之音"}, {"key": "stock:niaoniao", "direction": "pos", "source": "逐战商店"}]}},

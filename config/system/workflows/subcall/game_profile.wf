@@ -41,7 +41,7 @@ def sync_weekly_progress($raw, $key, $last, $label, $source)
 
     eval $current = $progress.current
     if $current < $last
-        log warn $label + "识别到 " + $current + "/" + $progress.total + "，小于本轮上次有效值 " + $last + "，判定为脏数据并放弃同步"
+        log error $label + "识别到 " + $current + "/" + $progress.total + "，小于本轮上次有效值 " + $last + "，判定为脏数据并放弃同步"
         return $last
     end
 
@@ -60,7 +60,7 @@ def sync_weekly_progress($raw, $key, $last, $label, $source)
         if $observed.value < $last
             return $last
         end
-        log warn $label + "识别值 " + $current + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
+        log error $label + "识别值 " + $current + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
         return $observed.value
     end
 

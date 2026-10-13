@@ -40,14 +40,15 @@
 #     半列，需在类目栏滚动一次 0.5 对齐后点击（cat_7 布局直接按滚动后位置描述）
 #
 # 流程结构：
-#   1. 导航：首页 → 菜单 → 不肝 → 切换到不肝商店视图
+#   1. 导航：首页 → 菜单 → 不肝；先领取奖励，再查看不肝、花蕊织周进度，
+#      按本周期新增进度同步档案，之后切换到不肝商店视图。
 #   2. 战斗养成（类目1，进店默认选中）：进店先同步当前体力到 profile；
 #      依次处理两个商品面板（各 2 行 × 4 列），整面板 OCR 扫描 → 逐格判断
 #      是否命中购买关键词 → 命中则购买；商品1 处理完后，商品2 上滑 2 行再处理；
 #      购买了宝钱会消耗体力，买过就再同步一次最新值
 #   3. 逐战（类目4）：只查首页；花蕊织至少 1000 时先补齐每周 5 个惊喜礼盒，
 #      再用剩余花蕊织按每个 3000 补齐半赛季最多 2 个袅袅之音。
-#      详情名称与总价确认后购买，库存减少才更新配额；配额同步扣除花蕊织。
+#      确认详情名称后直接最大数量购买，库存减少才更新配额；配额同步扣除花蕊织。
 #   4. 营生（类目5）：两端均在 cat_5，滚动前就能点到；扫描 (1,1) 确认含
 #      「营生」后才购买
 #   5. 赛季（类目6）：按当前布局的 shangpin_1 行列各购买一次。类目位置两端不同——
@@ -98,7 +99,7 @@ import "subcall/profile_registry.wf"
 # ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
 global $record_category
 eval $record_category = "combat"
-call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili", "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason"])
+call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili", "huaruizhi_of_week", "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason"])
 if $profile_ok < 0
     call record_finish_if_open("failed", "Profile 声明失败")
     return -1
@@ -118,23 +119,8 @@ if not $nav_check
 end
 click [game_menu_page].[bugan] after wait @page_refresh
 
-# ─── 获取本周不肝进度 ─────────────────────────────────────────────
-click [bugan_detail].[bugan_view] after wait @step_interval
-scan [bugan_detail].[bugan_jindu] as $jindu_str
-call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
-call record_observation("bugan_of_week", $jindu_str.bugan_jindu, $bugan_of_week)
-
-# 领取不肝进度奖励
-scan [bugan_detail].[purchase] as $found by contains "全部领取"
-if $found
-    click [bugan_detail].[purchase] after wait @step_interval
-    # 关掉领奖展示后才会追问是否再去领另一份奖励（标准确认/取消弹窗），
-    # 本流程不接受。没有弹窗时 scan_and_cancel 直接返回 0，不影响后续步骤。
-    click [general_control].[blank_area] after wait @page_refresh
-    call scan_and_cancel("领取不肝奖励")
-    log "领取本周不肝奖励"
-    call record_item("progress_reward", "不肝周奖励", "claim_attempted", "已点击全部领取；未读取奖励凭据", {})
-end
+# ─── 先领奖，再读取不肝与花蕊织周进度 ──────────────────────────────
+call $bugan_of_week = claim_and_sync_bugan_progress()
 
 click [bugan_detail].[shop] after wait @page_refresh
 
@@ -266,6 +252,30 @@ click [game_menu_page].[back] after wait @step_interval
 log "不肝商店购买流程结束。"
 call record_finish("processed", "已按原流程处理购买；成交结果未额外读取")
 
+# 进入不肝后先领取奖励，再依次打开两个货币详情读取本周进度。
+# 花蕊织的已获取进度写入配额，新增量由同步目标累加到库存，不覆盖库存余额。
+def claim_and_sync_bugan_progress()
+    scan [bugan_detail].[purchase] as $found by contains "全部领取"
+    if $found
+        click [bugan_detail].[purchase] after wait @step_interval
+        click [general_control].[blank_area] after wait @page_refresh
+        call scan_and_cancel("领取不肝奖励")
+        log "领取本周不肝奖励"
+        call record_item("progress_reward", "不肝周奖励", "claim_attempted", "已点击全部领取；未读取奖励凭据", {})
+    end
+
+    click [bugan_detail].[bugan_view] after wait @step_interval
+    scan [bugan_detail].[bugan_jindu] as $jindu_str
+    call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
+    call record_observation("bugan_of_week", $jindu_str.bugan_jindu, $bugan_of_week)
+
+    click [bugan_detail].[huaruizhi_view] after wait @step_interval
+    scan [bugan_detail].[huaruizhi_jindu] as $huaruizhi_str
+    call $huaruizhi_of_week = sync_weekly_progress($huaruizhi_str.huaruizhi_jindu, "huaruizhi_of_week", -1, "本周花蕊织进度", "日常")
+    call record_observation("huaruizhi_of_week", $huaruizhi_str.huaruizhi_jindu, $huaruizhi_of_week)
+    return $bugan_of_week
+end
+
 # ─── match_keyword ────────────────────────────────────────
 # 在勾选的类目里找第一个命中的关键词（内部过程）。
 #
@@ -338,7 +348,7 @@ def buy_zhuzhan()
     else if $balance == null or $balance < 1000
         call record_item("zhuzhanbox", "逐战惊喜礼盒", "blocked", "花蕊织不足 1000", {"balance": $balance})
     else
-        call $bought = buy_zhuzhan_item("惊喜礼盒", "zhuzhanbox_of_halfseason", 5, 5 - $boxes, 200, "zhuzhanbox")
+        call $bought = buy_zhuzhan_item("惊喜礼盒", "zhuzhanbox_of_halfseason", 5, 5 - $boxes, "zhuzhanbox")
         if $bought < 0
             call record_item("zhuzhan_nn", "袅袅之音·绑", "skipped", "礼盒成交未确认，保留余额与现场", {})
             return -1
@@ -364,13 +374,13 @@ def buy_zhuzhan()
         call record_item("zhuzhan_nn", "袅袅之音·绑", "blocked", "花蕊织不足 3000 或余额未知", {})
         return 0
     end
-    call $bought = buy_zhuzhan_item("袅袅之音", "nn_of_halfseason", 2, $want, 3000, "zhuzhan_nn")
+    call $bought = buy_zhuzhan_item("袅袅之音", "nn_of_halfseason", 2, $want, "zhuzhan_nn")
     return $bought
 end
 
-# 复用通用购买的详情/库存区域、加一、总价和购买按钮。
+# 复用 general_purchase 的物资商店视图：详情/库存、最大数量与购买物资。
 # 返回实际确认的购买量；未命中/购买前跳过为 0，成交未确认为 -1。
-def buy_zhuzhan_item($query, $key, $limit, $want, $unit_price, $category)
+def buy_zhuzhan_item($query, $key, $limit, $want, $category)
     find [bugan_detail].[shangpin_1] as $item by contains $query
     if not $item
         call record_item($category, $query, "not_found", "逐战商店首页未命中商品", {})
@@ -384,28 +394,13 @@ def buy_zhuzhan_item($query, $key, $limit, $want, $unit_price, $category)
         return 0
     end
     eval $before = extract_progress($details.supply_stock)
-    if not $before.valid or $before.total != $limit
-        call record_item($category, $query, "not_read", "未确认商品剩余库存", {"raw": $details.supply_stock})
-        return 0
+    eval $previous = profile_get($key)
+    if $previous == null
+        eval $previous = 0
     end
-    if $before.current < $want
-        eval $want = $before.current
-    end
-    if $want <= 0
-        call record_item($category, $query, "already_done", "商店剩余库存为零", {})
-        return 0
-    end
-    # 切换商品后初始数量为 1；按计划添加，避免最大数量超出本次预算。
-    loop $want - 1
-        click [general_purchase].[add_one] after wait @step_interval
-    end
-    scan [general_purchase].[total_price] as $price
-    eval $cost = extract_num($price.total_price)
-    if $cost != $want * $unit_price
-        call record_item($category, $query, "rejected", "购买总价与计划数量不一致", {"raw": $price.total_price, "quantity": $want})
-        return 0
-    end
-    click [general_purchase].[purchase] after wait @page_refresh
+    # 余额与周期配额已在调用方检查，不用库存/数量/总价 OCR 阻止购买。
+    click [general_purchase].[supply_max] after wait @step_interval
+    click [general_purchase].[supply_buy] after wait @page_refresh
     call record_item($category, $query, "purchase_attempted", "已点击购买，等待库存确认", {"quantity": $want})
     call close_item_prompts()
     loop 3
@@ -413,7 +408,10 @@ def buy_zhuzhan_item($query, $key, $limit, $want, $unit_price, $category)
         if $after.supply_item_name contains $query
             eval $stock = extract_progress($after.supply_stock)
             if $stock.valid and $stock.total == $limit
-                eval $confirmed = $before.current - $stock.current
+                eval $confirmed = $limit - $stock.current - $previous
+                if $before.valid and $before.total == $limit
+                    eval $confirmed = $before.current - $stock.current
+                end
                 if $confirmed > 0 and $confirmed <= $want
                     eval profile_inc($key, $confirmed, "逐战商店")
                     call record_item($category, $query, "success", "库存确认购买数量", {"purchased": $confirmed, "remaining": $stock.current})

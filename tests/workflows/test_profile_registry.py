@@ -131,7 +131,7 @@ def test_profile_consumers_use_the_central_registry() -> None:
         ],
         "purchase_bugan.wf": [
             "bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili",
-            "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason",
+            "huaruizhi_of_week", "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason",
         ],
         "purchase_niaoniao.wf": ["niaoniao_of_week", "changmingyu"],
         "purchase_xinfa.wf": ["xinfa_of_week"],

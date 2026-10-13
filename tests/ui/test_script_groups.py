@@ -11,6 +11,7 @@ from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
 from lvjiang.ui.batch.batch_tab import BatchTab
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.main.run_control import RunControlMixin
+from lvjiang.ui.main.ui_state import UiStateMixin
 from lvjiang.ui.scripts.metadata_panel import MetadataPanel
 from lvjiang.workflows.metadata import parse_metadata
 
@@ -51,6 +52,46 @@ class Host(QWidget, RunControlMixin):
 
     def refresh_batch(self):
         self.batch_refreshes += 1
+
+
+class DailyHost(Host):
+    _save_daily_config = UiStateMixin._save_daily_config
+    _restore_daily_config = UiStateMixin._restore_daily_config
+
+    def persist_selection(self, _index):
+        self._save_daily_config()
+
+
+def test_daily_group_and_explicit_script_restore_without_persisting_filter_fallback(qtbot, monkeypatch):
+    from lvjiang.core.config.interface import get_interface_store
+
+    scripts = [
+        {"id": "a", "name": "甲", "group": "日常"},
+        {"id": "b", "name": "乙", "group": "周常"},
+        {"id": "c", "name": "丙", "group": "周常"},
+    ]
+    monkeypatch.setattr("lvjiang.workflows.discovery.list_exposed_scripts", lambda _env: deepcopy(scripts))
+    monkeypatch.setattr("lvjiang.workflows.discovery.last_discovery_problems", lambda: [])
+    store = get_interface_store()
+    store.set_node("daily", {"workflow_id": "a", "group": None})
+    first = DailyHost()
+    qtbot.addWidget(first)
+    first._load_workflow_configs()
+    first._restore_daily_config()
+    first.workflow_group_combo.setCurrentIndex(first.workflow_group_combo.findData("周常"))
+    first._save_daily_config(save_workflow=False)
+    assert store.get_node("daily") == {"workflow_id": "a", "group": "周常"}
+    first.workflow_combo.setCurrentIndex(first.workflow_combo.findData("c"))
+    assert store.get_node("daily") == {"workflow_id": "c", "group": "周常"}
+
+    second = DailyHost()
+    qtbot.addWidget(second)
+    second._load_workflow_configs()
+    second._restore_daily_config()
+    assert second.workflow_group_combo.currentData() == "周常"
+    assert second.workflow_combo.currentData() == "c"
+    second._on_refresh_workflows()
+    assert store.get_node("daily") == {"workflow_id": "c", "group": "周常"}
 
 
 def test_filter_and_refresh_use_stable_ids_without_persisting_fallback(qtbot, monkeypatch):

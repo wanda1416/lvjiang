@@ -294,6 +294,11 @@ local 改造来获得所需行为，不允许删除系统预置文件。历史 `
 > `interface.json` 的 `ui_state` 保存界面状态及批量运行草稿；日常脚本偏好仍放在
 > `session.json` 的 `daily.scripts`。
 
+日常页的选择单独保存在 `interface.json` 的 `daily` 节点：`workflow_id` 是明确
+选中的脚本 ID，`group` 是展示分组（`null` 为全部，空字符串为未分组）。启动时
+先恢复分组，再填充并恢复脚本；分组已不存在则展示全部。筛选或刷新产生的默认
+展示项不得反写脚本 ID，关闭窗口也不反写。只读实例的 `daily` 仅保留在内存。
+
 ---
 
 ## 五、`save_merged` 的调用约定

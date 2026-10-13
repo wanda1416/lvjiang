@@ -21,14 +21,12 @@ class TestActives:
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["actives"] == {"plan": "7f3a"}
 
-    def test_env_and_daily_workflow_are_active_kinds(self, tmp_path):
+    def test_env_is_an_active_kind(self, tmp_path):
         store = InterfaceStore(tmp_path / "interface.json")
 
         store.set_active("env", "android")
-        store.set_active("daily_workflow", "auto_tuning")
 
         assert store.get_active("env") == "android"
-        assert store.get_active("daily_workflow") == "auto_tuning"
 
     def test_unknown_active_kind_still_rejected(self, tmp_path):
         store = InterfaceStore(tmp_path / "interface.json")

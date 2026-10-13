@@ -1408,7 +1408,8 @@ class MainWindow(
             except Exception:
                 pass
         self._save_displayed_params()
-        self._save_daily_config()
+        # 退出时不能把分组筛选产生的默认展示项当成用户主动选择。
+        self._save_daily_config(save_workflow=False)
         self._save_ui_state()
         # 插件清理回调（如 ProfileEngine 停止）
         for cb in self._cleanup_callbacks:

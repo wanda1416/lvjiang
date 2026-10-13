@@ -1,9 +1,9 @@
-"""会话状态持久化混入类 - interface.json 的 ui_state 与 session.json 的 daily 节点
+"""界面状态持久化混入类 - interface.json 的 ui_state 与 daily 节点
 
 ``ui_state.main_page`` 存窗口尺寸、分栏比例与左右 Tab 页签；``daily`` 存
-日常页当前选中的脚本，脚本参数则按脚本 id 落在 wf_configs 里。
+日常页当前选中的脚本与展示分组，脚本参数则按脚本 id 落在 wf_configs 里。
 
-⚠️ 日常页只负责自己的 workflow_id：各工作流的参数由其专属页面管理，
+⚠️ 日常页只负责自己的脚本选择与展示分组：各工作流的参数由其专属页面管理，
 这里禁止遍历清理不归自己管的 wf_configs（详见 _save_daily_config）。
 同理，参数面板只对 scope=daily 的脚本绘制与读写。
 
@@ -248,23 +248,24 @@ class UiStateMixin:
             if feedback is not None:
                 feedback.show_failure(message)
 
-    def _save_daily_config(self):
-        """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘
+    def _save_daily_config(self, *, save_workflow: bool = True):
+        """保存日常页脚本选择与分组；关闭时仅保存分组，不反写筛选默认项。
+
+        参数由 _save_displayed_params 按脚本字段级落盘。
 
         ⚠️ 警告：禁止在此处添加遍历清理其他工作流 wf_configs 的逻辑。
-        各工作流的配置由其专属页面自行管理，日常页只负责自己的 workflow_id。
+        各工作流的配置由其专属页面自行管理，日常页只负责自己的选择与分组。
         擅自清理不归自己管理的配置会破坏其他工作流的数据完整性。
         """
         from ...core.config import get_interface_store
 
         flow_cfg = self._get_selected_flow_config()
-        if not flow_cfg:
-            return
-
-        # 当前选中的日常脚本属于「本实例在用哪个」，和其他激活项一起记在
-        # interface.json 的 actives；同名的 daily.scripts 才是脚本配置。
+        state = {"group": self.workflow_group_combo.currentData()}
+        if flow_cfg and save_workflow:
+            state["workflow_id"] = flow_cfg["id"]
+        # 只维护日常页选择；session.daily 中的脚本配置不属于这里。
         try:
-            get_interface_store().set_active("daily_workflow", flow_cfg["id"])
+            get_interface_store().update_node("daily", state)
         except Exception as e:
             logger.warning(f"保存日常配置失败: {e}")
 
@@ -273,7 +274,15 @@ class UiStateMixin:
         from ...core.config import get_interface_store
 
         # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
-        workflow_id = get_interface_store().get_active("daily_workflow", "")
+        state = get_interface_store().get_node("daily", {})
+        state = state if isinstance(state, dict) else {}
+        workflow_id = state.get("workflow_id", "")
+        group_index = self.workflow_group_combo.findData(state.get("group"))
+        self.workflow_group_combo.blockSignals(True)
+        self.workflow_group_combo.setCurrentIndex(max(0, group_index))
+        self.workflow_group_combo.blockSignals(False)
+        # 先恢复分组筛选，随后才能在可见候选中恢复脚本。
+        self._fill_workflow_combo(workflow_id)
 
         # 选中上次使用的脚本
         if workflow_id:

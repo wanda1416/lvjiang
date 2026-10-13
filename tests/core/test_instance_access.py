@@ -93,6 +93,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     session.set_node("daily", {"scripts": {"order": ["a"]}})
     interface = InterfaceStore(tmp_path / "interface.json")
     interface.set_active("plan", "original")
+    interface.set_node("daily", {"workflow_id": "a", "group": None})
     interface.set_node("profile", {
         "overview_active_group": "old",
         "overview_groups": {"old": {"columns": ["name"]}},
@@ -108,6 +109,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     # 白名单里的选择只在内存生效：激活项与界面状态都不落盘
     interface.set_active("plan", "temporary")
     interface.set_active("env", "android")
+    interface.update_node("daily", {"workflow_id": "b", "group": "周常"})
     interface.update_node("profile", {
         "overview_active_group": "new",
         "overview_groups": {"new": {"columns": ["progress"]}},
@@ -126,6 +128,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
 
     assert interface.get_active("plan") == "temporary"
     assert interface.get_active("env") == "android"
+    assert interface.get_node("daily") == {"workflow_id": "b", "group": "周常"}
     assert interface.get_node("profile")["overview_active_group"] == "new"
     assert interface.get_node("ui_state")["main_page"]["left_tab_index"] == 1
 
@@ -134,6 +137,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     assert disk["new_plugin"] == {"enabled": True}
     interface_disk = json.loads((tmp_path / "interface.json").read_text(encoding="utf-8"))
     assert interface_disk["actives"] == {"plan": "original"}
+    assert interface_disk["daily"] == {"workflow_id": "a", "group": None}
     assert interface_disk["profile"] == {
         "overview_active_group": "old",
         "overview_groups": {"new": {"columns": ["progress"]}},

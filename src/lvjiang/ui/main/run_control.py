@@ -686,6 +686,12 @@ class RunControlMixin:
         self._save_displayed_params()
         self._fill_workflow_combo(selected)
         self._rebuild_param_panel()
+        # 筛选产生的默认项不反写脚本选择，只保存用户主动选择的展示分组。
+        from ...core.config.interface import get_interface_store
+        try:
+            get_interface_store().update_node("daily", {"group": self.workflow_group_combo.currentData()})
+        except Exception as exc:
+            logger.warning("保存日常展示分组失败: {}", exc)
 
     def _on_refresh_workflows(self):
         self._save_displayed_params()

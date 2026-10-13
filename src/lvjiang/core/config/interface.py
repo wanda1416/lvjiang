@@ -13,10 +13,10 @@ _MIGRATION = {"source": "session", "version": INTERFACE_VERSION}
 
 #: 合法的激活项 kind —— 「当前在用哪个」的选择。它们频繁变动，丢了重选一次
 #: 即可，所以和界面状态一起放在 interface.json；plan 是机器级方案（图库 +
-#: 环境 + 布局 + 模式的组合），env 是当前工作环境，daily_workflow 是当前
-#: 选中的日常脚本。
+#: 环境 + 布局 + 模式的组合），env 是当前工作环境。
+#: 日常脚本与展示分组独立保存在 daily 节点。
 ACTIVE_KINDS = frozenset({
-    "user", "layout", "space", "env", "daily_workflow", "plan",
+    "user", "layout", "space", "env", "plan",
 })
 
 
@@ -33,6 +33,7 @@ class InterfaceStore(SessionStore):
         # 激活项整棵子树都是"本实例在用哪个"：只读实例可以临时切换，但不
         # 落盘，也不该影响持有写权限的实例。
         ("actives",),
+        ("daily",),
         ("profile", "overview_active_group"),
         ("ui_state", "main_page"),
         ("ui_state", "scene_editor"), ("ui_state", "reference_manager"),

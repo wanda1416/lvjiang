@@ -259,7 +259,8 @@ def process_jianghu_cards($is_rescan)
       if $jianghu_item
          eval $jianghu_item.initial_text = $task_text
       end
-      call $hit = is_target_task($task_text)
+      call $task = classify_jianghu_task($task_text)
+      eval $hit = $task
       if $hit
          log "任务 " + $idx + " 已是目标任务"
       else
@@ -281,6 +282,7 @@ def process_jianghu_cards($is_rescan)
          end
 
          if $refresh_status == "target"
+            eval $task = $refresh_result.task
             eval $hit = 1
          else
             log "任务 " + $idx + " 达到刷新上限仍未命中，跳过"
@@ -290,7 +292,8 @@ def process_jianghu_cards($is_rescan)
 
       # 命中目标任务 → 读取任务文本，分发执行对应动作
       if $hit
-         call $should_execute = should_execute_task($task_text)
+         call record_jianghu_task($task.key, $task.name)
+         call $should_execute = should_execute_task($task.key)
          call identify_jianghu_record($is_rescan, $idx, $task_text, $should_execute)
          if not $should_execute
             log "任务 " + $idx + "（" + $label + "）属于固定目标，但用户未勾选执行，保留任务并跳过动作与领奖"
@@ -301,7 +304,7 @@ def process_jianghu_cards($is_rescan)
          log "任务 " + $idx + "（" + $label + "）执行前：" + $task_text
 
          call record_jianghu_outcome("executing", "")
-         call $skip_reward_check = execute_target_task($task_text, $label, $idx)
+         call $skip_reward_check = execute_target_task($task.key, $label, $idx)
          if $skip_reward_check
             log "任务 " + $idx + " 未完成，跳过领奖检测"
             call record_jianghu_reward("task_incomplete", "action_blocked")
@@ -312,7 +315,7 @@ def process_jianghu_cards($is_rescan)
 
          # 领取奖励（勾选时）：完成后任务文字仍会保留，刷新按钮消失才
          # 表示任务已经真正完成。觉障林未实现，无论是否勾选均跳过领奖。
-         if $claim_reward and not $task_text contains "觉障林"
+         if $claim_reward and $task.key != "juezhanglin"
             call $task_completed = is_task_completed($label)
             if $task_completed
                call record_jianghu_completion("completed", false)
@@ -364,109 +367,90 @@ def has_selected_task()
    return $do_heying or $do_huanzhuang or $do_qingjing or $do_kanbao or $do_yinjiu or $do_juezhanglin
 end
 
-# ─── is_target_task ───────────────────────────────────────
-# 卡片文案是否属于六类目标任务。
+# ─── classify_jianghu_task ────────────────────────────────
+# 按卡片文案返回稳定任务 key 和展示名；不读执行开关、不记录结果。
 #
-# 参数：
-#   $text — 卡片 label 区域的 OCR 原文
+# 参数：$text — 卡片 label 区域的 OCR 原文
 # 前置：无。
 # 后置：无副作用。
-# 返回：1=属于六类之一；0=不是目标任务（应继续刷新）。
+# 返回：{key, name}；未命中返回 null。
 #
 # targets 领域约束：六类任务关键词由游戏文案保证互斥，一张任务卡片只会
-# 命中其中一个关键词，不存在多个目标关键词同时命中的正交情况。
-# 界面使用用户熟悉的“看报”和“饮酒”，OCR 仍分别匹配“东方”和“醉意”。
-# 六类是否属于目标是游戏领域事实，不受用户执行开关影响。
-def is_target_task($text)
-   if $text contains "合影"
-      return 1
+# 命中其中一个关键词。按原匹配优先级检查，候选不受用户执行开关影响。
+# 界面使用“看报”和“饮酒”，OCR 仍分别匹配“东方”和“醉意”。
+def classify_jianghu_task($text)
+   for task in [
+      {"keyword": "合影", "key": "heying", "name": "合影"},
+      {"keyword": "换装", "key": "huanzhuang", "name": "换装"},
+      {"keyword": "情境", "key": "qingjing", "name": "情境"},
+      {"keyword": "东方", "key": "kanbao", "name": "看报"},
+      {"keyword": "醉意", "key": "yinjiu", "name": "饮酒"},
+      {"keyword": "觉障林", "key": "juezhanglin", "name": "觉障林"}
+   ]
+      if $text contains $task.keyword
+         return {"key": $task.key, "name": $task.name}
+      end
    end
-   if $text contains "换装"
-      return 1
-   end
-   if $text contains "情境"
-      return 1
-   end
-   if $text contains "东方"
-      return 1
-   end
-   if $text contains "醉意"
-      return 1
-   end
-   if $text contains "觉障林"
-      return 1
-   end
-   return 0
+   return null
 end
 
 # ─── should_execute_task ──────────────────────────────────
-# 用户开关是否允许执行这个已命中的目标任务。
+# 用户开关是否允许执行这个已分类的任务；关闭时保留任务、不执行动作和领奖。
 #
-# 参数：
-#   $text — 卡片 label 区域的 OCR 原文
-# 前置：$text 已确认属于六类目标任务。
+# 参数：$task_key — classify_jianghu_task 返回的稳定 key
+# 前置：任务文案已分类。
 # 后置：无副作用。
-# 返回：1=对应开关已勾选，可以执行；0=开关关闭或不属于六类。
-#
-# 用户开关只控制已匹配目标是否执行；关闭时保留该任务，不执行动作和领奖。
-def should_execute_task($text)
-   if $text contains "合影"
-      call record_jianghu_task("heying", "合影")
+# 返回：对应执行开关；未知 key 返回 0。
+def should_execute_task($task_key)
+   if $task_key == "heying"
       return $do_heying
    end
-   if $text contains "换装"
-      call record_jianghu_task("huanzhuang", "换装")
+   if $task_key == "huanzhuang"
       return $do_huanzhuang
    end
-   if $text contains "情境"
-      call record_jianghu_task("qingjing", "情境")
+   if $task_key == "qingjing"
       return $do_qingjing
    end
-   if $text contains "东方"
-      call record_jianghu_task("kanbao", "看报")
+   if $task_key == "kanbao"
       return $do_kanbao
    end
-   if $text contains "醉意"
-      call record_jianghu_task("yinjiu", "饮酒")
+   if $task_key == "yinjiu"
       return $do_yinjiu
    end
-   if $text contains "觉障林"
-      call record_jianghu_task("juezhanglin", "觉障林")
+   if $task_key == "juezhanglin"
       return $do_juezhanglin
    end
    return 0
 end
 
 # ─── execute_target_task ──────────────────────────────────
-# 按 OCR 任务文字分发到对应动作。
+# 按稳定任务 key 分发到对应动作，不再匹配 OCR 原文。
 #
 # 参数：
-#   $task_text — 卡片 label 区域的 OCR 原文（决定执行哪个动作）
-#   $label     — 卡片 key（card_1 … card_6）
-#   $idx       — 任务序号，用于判断是否为末个任务
+#   $task_key — classify_jianghu_task 返回的稳定 key
+#   $label    — 卡片 key（card_1 … card_6）
+#   $idx      — 任务序号，用于判断是否为末个任务
 # 前置：已在号令页，且开关允许执行该任务。
-# 后置：对应动作已执行完；各动作自行负责把页面收回到号令页或首页。
-# 返回：1=动作明确无法完成，主流程应跳过领奖检测；0=可以继续判领奖。
-#
-# 当前仅饮酒未找到黄泉酿时返回 1。
-def execute_target_task($task_text, $label, $idx)
+# 后置：各动作自行把页面收回到号令页或首页。
+# 返回：1=饮酒未找到黄泉酿，主流程跳过领奖检测；0=沿用原流程继续判领奖。
+def execute_target_task($task_key, $label, $idx)
    eval $skip_reward_check = 0
-   if $task_text contains "换装"
+   if $task_key == "huanzhuang"
       call action_huanzhuang($label)
    end
-   if $task_text contains "合影"
+   if $task_key == "heying"
       call action_heying($label, $idx)
    end
-   if $task_text contains "情境"
+   if $task_key == "qingjing"
       call action_qingjing($label)
    end
-   if $task_text contains "东方"
+   if $task_key == "kanbao"
       call action_kanbao($label, $idx)
    end
-   if $task_text contains "醉意"
+   if $task_key == "yinjiu"
       call $skip_reward_check = action_yinjiu($label, $idx)
    end
-   if $task_text contains "觉障林"
+   if $task_key == "juezhanglin"
       call action_juezhanglin($label)
    end
    return $skip_reward_check
@@ -481,7 +465,7 @@ end
 #   $initial_text — 初次扫描到的任务文字（作为刷新前的基线）
 # 前置：在江湖号令页，且该卡片不是目标任务。
 # 后置：停在号令页，卡片内容为最后一轮刷新后的状态。
-# 返回：{"status": "target"|"completed"|"exhausted", "task_text": 最后一次 OCR}。
+# 返回：{status, task_text}；target 状态另带 task={key, name}，供后续直接使用。
 #
 # 三种终态：
 #   target    — 已刷新到目标任务，task_text 为命中的任务文字；
@@ -511,10 +495,10 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
       end
       log "任务 " + $idx + "（" + $label + "）刷新扫描：" + $task_text
 
-      call $hit = is_target_task($task_text)
-      if $hit
+      call $task = classify_jianghu_task($task_text)
+      if $task
          log "任务 " + $idx + " 刷新命中目标任务"
-         return {"status": "target", "task_text": $task_text}
+         return {"status": "target", "task_text": $task_text, "task": $task}
       end
 
       eval $previous_task_text = $task_text

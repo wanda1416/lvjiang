@@ -12,6 +12,8 @@ import io
 import pytest
 from loguru import logger
 
+# 执行生产 WF 时显式注册领域函数，不依赖其他测试模块的收集顺序。
+import lvjiang.apps.yysls.workflows.builtins.role_attr_ingest  # noqa: F401
 from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     RoleAttrParser,
     parse_detail1,
@@ -207,17 +209,51 @@ class TestParseDetail2OuterAttack:
         ) == {}
 
 
-def test_scan_reads_outer_attack_before_attribute_attack():
-    """先保存不受食物影响的基础外功区间，再读取各流派属性攻击。"""
-    workflow = (
+def test_scan_reads_outer_attack_before_attribute_attack(monkeypatch):
+    """执行生产 DSL：先保存基础外功，再读取各流派属性攻击，详情正确进入结果。"""
+    proc = parse_file(
         get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
-    ).read_text(encoding="utf-8")
+    ).procs["capture_role_base_attrs"]
+    engine = make_engine()
+    details = {
+        "外功攻击": RIGHT_OUTER_ATTACK,
+        "属性攻击": RIGHT_ATTR_ATTACK,
+        "外功穿透": RIGHT_OUTER_PEN,
+        "属攻穿透": RIGHT_ATTR_PEN,
+    }
+    events = []
+    selected = None
 
-    outer_find = 'by contains "外功攻击"'
-    attr_find = 'by contains "属性攻击"'
-    assert workflow.index(outer_find) < workflow.index(attr_find)
-    assert "eval $data.right_outer_attack = $r2.detail_2" in workflow
-    assert "eval $data.right_attr_attack = $r2.detail_2" in workflow
+    def find(node):
+        text = engine._resolve(node.by.target)
+        events.append(("find", text))
+        engine.variables[node.var_name] = text
+
+    def click(node):
+        nonlocal selected
+        selected = engine._resolve(node.target)
+        events.append(("click", selected))
+
+    def scan(node):
+        field = node.fields[0].value
+        if field == "detail_1":
+            text = "外功攻击 | 属性攻击 | 外功穿透 | 属攻穿透"
+        else:
+            events.append(("scan", selected))
+            text = details[selected]
+        engine.variables[node.target.name] = {field: text}
+
+    monkeypatch.setattr(engine, "_exec_find", find)
+    monkeypatch.setattr(engine, "_exec_click", click)
+    monkeypatch.setattr(engine, "_exec_scan", scan)
+    monkeypatch.setattr(engine, "_exec_wait_stable", lambda _node: None)
+    parsed, _ = engine._run_proc(proc, [1])
+
+    assert events == [(action, name) for name in details for action in ("find", "click", "scan")]
+    assert parsed["_right_outer_valid"] and parsed["_right_attr_attack_valid"]
+    assert parsed["_right_outer_pen_valid"] and parsed["_right_attr_pen_valid"]
+    assert parsed["min_outer"] == parse_detail2_outer_attack(RIGHT_OUTER_ATTACK)["min_outer"]
+    assert parsed["min_mingjin"] == parse_detail2_attr_attack(RIGHT_ATTR_ATTACK)["min_mingjin"]
 
 
 def test_scan_failure_tells_user_to_create_base_attrs_manually():

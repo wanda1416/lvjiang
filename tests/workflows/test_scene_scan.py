@@ -260,7 +260,7 @@ def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
         text.index('return {"ok": true, "found_precompleted"')
     ]
     dispatch = outer_loop.index(
-        "call $skip_reward_check = execute_target_task($task_text, $label, $idx)")
+        "call $skip_reward_check = execute_target_task($task.key, $label, $idx)")
     skip = outer_loop.index("if $skip_reward_check", dispatch)
     post_action_check = outer_loop.index(
         "call $task_completed = is_task_completed($label)", skip)

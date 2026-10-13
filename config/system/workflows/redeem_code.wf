@@ -78,11 +78,7 @@ else
 end
 
 # ─── 逐条兑换 ─────────────────────────────────────────────────
-global $record_code, $record_redeem_status, $record_redeem_reason
 for code in $codes
-    eval $record_code = $code
-    eval $record_redeem_status = "closed_by_user"
-    eval $record_redeem_reason = "用户已关闭窗口，兑换结果未知"
     click [game_settings].[redeem_code] after wait @page_refresh
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     if not $in_redeem
@@ -107,8 +103,8 @@ for code in $codes
     end
 
     call $closed = finish_redeem()
-    call record_item("codes", "兑换码", $record_redeem_status, $record_redeem_reason, {"code": $record_code})
-    if $closed < 0
+    call record_item("codes", "兑换码", $closed.status, $closed.reason, {"code": $code})
+    if $closed.result < 0
         call record_finish_if_open("failed", "兑换窗口收口失败")
         return -1
     end
@@ -138,31 +134,32 @@ call record_finish("processed", "兑换窗口处理完成，兑换是否成功�
 #
 # 参数：无
 # 前置：刚提交过一次兑换码，兑换窗口可能已经关闭。
-# 后置：0=兑换窗口已关闭；停在设置的其他 tab，不做导航。
-# 返回：0=窗口已关闭（含用户已手动关闭）；恒为 0，调用方靠页面判定确认流程。
+# 后置：兑换窗口已关闭；停在设置的其他 tab，不做导航。
+# 返回：{result, status, reason}；result 恒为 0，status/reason 仅描述处理记录。
 #
 # 确认后仍能读到「兑换奖励」只有两种可能：该码已被使用导致确认无效，或窗口
 # 没关掉。两种都按「再取消一次」处理，仍关不掉才交给人工。
 def finish_redeem()
+    eval $result = {"result": 0, "status": "closed_by_user", "reason": "用户已关闭窗口，兑换结果未知"}
     # 安卓用户可能已自行关闭弹窗；是否仍在兑换窗口只看“兑换奖励”。
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     if not $in_redeem
-        return 0
+        return $result
     end
 
     click [game_settings].[confirm] after wait @page_refresh
-    eval $record_redeem_status = "submit_attempted"
-    eval $record_redeem_reason = "已提交，兑换结果未确认"
+    eval $result.status = "submit_attempted"
+    eval $result.reason = "已提交，兑换结果未确认"
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     if not $in_redeem
-        return 0
+        return $result
     end
 
     # 已使用的兑换码会使 confirm 无效，标题仍为“兑换奖励”，需取消关闭。
     log warn "确认后兑换码弹窗仍在，按已兑换或确认无效处理，取消一次。"
     click [game_settings].[cancel] after wait @page_refresh
-    eval $record_redeem_status = "cancelled_fallback"
-    eval $record_redeem_reason = "确认无效后取消，具体原因见日志"
+    eval $result.status = "cancelled_fallback"
+    eval $result.reason = "确认无效后取消，具体原因见日志"
 
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     loop while $in_redeem
@@ -170,5 +167,5 @@ def finish_redeem()
         eval pause("兑换窗口还在，请手动取消，并检查修复兑换码任务。关闭兑换窗口后点击继续。")
         scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     end
-    return 0
+    return $result
 end

@@ -21,7 +21,7 @@
 # 流程结构：
 #   1. 参数校验：技能按键只允许 1-4；PC 后台模式直接拒绝执行
 #   2. 循环：安卓点击轻击 → 奇术；PC 按配置的技能键，启动一次炸鱼
-#   3. 每轮等待约 1 秒共 20 次，回到 zhayu 标号继续，直到跑满 $max_loops 轮
+#   3. 每轮等待约 1 秒共 20 次，直到跑满 $max_loops 轮
 #
 # PC 技能键必须由前台 SendInput 发送，PostMessage 后台模式不生效。
 
@@ -47,19 +47,17 @@ eval $loop_count = 0
 # ─── 主循环：循环炸鱼 ─────────────────────────────────────────────
 # 前置：技能按键合法且处于前台模式，角色已在炸鱼点。
 # 后置：跑满 $max_loops 轮后结束，不校验页面也不回收现场。
-@zhayu
-if env("android")
-   click [general_combat].[qingji] after wait @step_interval
-   click [general_combat].[qishu]
-else if env("desktop")
-   press $skill_key after wait @step_interval
-end
+loop $max_loops
+   if env("android")
+      click [general_combat].[qingji] after wait @step_interval
+      click [general_combat].[qishu]
+   else if env("desktop")
+      press $skill_key after wait @step_interval
+   end
 
-loop 20
-   wait (1.10,1.15)
-end
-eval $loop_count = $loop_count + 1
-if $loop_count < $max_loops
-   goto zhayu
+   loop 20
+      wait (1.10,1.15)
+   end
+   eval $loop_count = $loop_count + 1
 end
 log "太极炸鱼已完成 " + $loop_count + " 轮"

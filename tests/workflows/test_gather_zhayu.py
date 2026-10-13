@@ -7,6 +7,7 @@ from lvjiang.workflows.grammar import (
     If,
     Literal,
     Log,
+    Loop,
     Press,
     Return,
     VarRef,
@@ -51,14 +52,12 @@ def test_background_guard_precedes_actions_and_desktop_uses_variable_key():
     )
     action_index = next(
         index for index, node in enumerate(program.body)
-        if isinstance(node, If)
-        and isinstance(node.condition, FuncCall)
-        and node.condition.func_name == "env"
-        and any(isinstance(child, Press) for child in node.else_body[0].then_body)
+        if isinstance(node, Loop) and node.count == VarRef("max_loops")
     )
+    action = next(node for node in program.body[action_index].body if isinstance(node, If))
     press = next(
         child
-        for child in program.body[action_index].else_body[0].then_body
+        for child in action.else_body[0].then_body
         if isinstance(child, Press)
     )
 

@@ -139,14 +139,14 @@ if env("android")
     drag [bugan_detail].[shangpin_2][2] up 2 after wait @step_interval
     call $baoqian_2 = buy_panel("shangpin_2", $buy_keywords)
     call close_item_prompts()
-    eval $bought_baoqian = $baoqian_1 + $baoqian_2
+    eval $baoqian_attempted = $baoqian_1 + $baoqian_2
 else if env("desktop")
     # PC 端可以展示 3行，直接买全部即可
-    call $bought_baoqian = buy_panel("shangpin_1", $buy_keywords)
+    call $baoqian_attempted = buy_panel("shangpin_1", $buy_keywords)
 end
 
-# 购买宝钱会消耗体力，买过就再同步一次最新值
-if $bought_baoqian
+# 购买宝钱会消耗体力，尝试购买后再同步一次最新值
+if $baoqian_attempted
     call sync_current_tili("宝钱")
 end
 
@@ -461,12 +461,12 @@ end
 #   $keywords  — {类目名: 是否购买} 字典
 # 前置：面板已滚动到位、整面板可见。
 # 后置：命中且可购买的格子均已提交购买；库存不足/条件不足的格子跳过。
-# 返回：1=本次买到了宝钱（会消耗体力，主流程据此再同步一次体力）；0=没买到。
+# 返回：1=本次已尝试购买宝钱，主流程据此再同步一次体力；0=未尝试。
 #
 # 整面板 OCR 后逐格判断，行列数从面板实际布局读取（PC 端可显示 3×5）。
 def buy_panel($panel_key, $keywords)
     eval $record_category = "combat"
-    eval $bought_baoqian = 0
+    eval $baoqian_attempted = 0
     scan [bugan_detail].$panel_key as $grid
     eval $rows = panel_rows("bugan_detail", $panel_key)
     eval $cols = panel_cols("bugan_detail", $panel_key)
@@ -488,11 +488,11 @@ def buy_panel($panel_key, $keywords)
             call record_observation("combat_goods", $cell, {"keyword": $hit, "panel": $panel_key, "row": $r, "col": $c})
             # 字符串直接用 == 精确比较。
             if $hit == "宝钱"
-                eval $bought_baoqian = 1
+                eval $baoqian_attempted = 1
             end
         end
     end
-    return $bought_baoqian
+    return $baoqian_attempted
 end
 
 # ─── is_niaoniao_bind ─────────────────────────────────────

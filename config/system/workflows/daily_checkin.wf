@@ -82,10 +82,9 @@ for reward_line in $reward_lines
 end
 
 # 活动名是后续查找与领奖关键字配对的稳定 key，重复名称会产生歧义。
-for activity_name in $activities
-    eval $reward_head = slice($rewards, 0, 0)
-    eval $reward_keyword = $reward_head[0]
-    eval remove($rewards, $reward_keyword)
+for index in [0...len($activities) - 1]
+    eval $activity_name = $activities[$index]
+    eval $reward_keyword = $rewards[$index]
     if has_key($pending, $activity_name)
         log error "每日签到配置无效：左侧活动名称“" + $activity_name + "”重复。"
         call record_finish_if_open("failed", "活动配置校验不通过")

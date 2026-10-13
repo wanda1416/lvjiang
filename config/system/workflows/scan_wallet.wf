@@ -107,10 +107,9 @@ call safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)", "日常获�
 recognize [bag_wallet_detail].[money_2] as rich $money2 on group "货币资产" where confidence >= 0.6 with yysls_rich_parse
 eval $rows = panel_rows("bag_wallet_detail", "money_2")
 
-# 按目标货币反向遍历取最高置信度（三个 scan_get 合并进 scan_targets，
-# 避免补扫前后各写一遍）
+# 按目标货币取最高置信度，数量与么玉位置一起返回，补扫前后共用同一选择规则。
 call $vals = scan_targets($money2, $rows)
-call $bugan_pos = find_cell($money2, $rows, "么玉")
+eval $bugan_pos = $vals.bugan_pos
 
 # 安卓端专属：3 行×6 列=18 格装不下全部货币资产（约21种），
 # 目标货币若不在可视区域内，上拉整个面板 1 行，只需补扫新出现的最后一行。
@@ -148,7 +147,7 @@ if env("android")
 
             # 么玉的点击坐标只信任重建后的 $money2——它已经准确反映滚动后
             # 的当前画面，不需要再单独区分"是不是这次补扫才找到的"。
-            call $bugan_pos = find_cell($money2, $rows, "么玉")
+            eval $bugan_pos = $vals_rescan.bugan_pos
         end
     end
 end
@@ -217,88 +216,44 @@ def shift_rows_after_scroll($data, $fresh, $rows)
 end
 
 # ─── scan_targets ─────────────────────────────────────────
-# 一次性取出三个目标货币的数量（内部过程）。
+# 取出三个目标货币的数量，以及当前画面中么玉的位置。
 #
-# 参数：
-#   $data — 整面板数据（$rows 行 × 6 列）
-#   $rows — 面板行数
+# 参数：$data — 面板数据；$rows — 面板行数
 # 前置：面板数据已按当前画面重建过。
 # 后置：无副作用。
-# 返回：{"bugan", "baoqian", "changmingyu"}；某项没识别到时为 0。
-#
-# 把三次 scan_get 调用合并成一次，供补扫前后各调一遍。
+# 返回：{bugan, baoqian, changmingyu, bugan_pos}；未识别数量仍为 0，位置为空字典。
+# 数量与位置共用同一个最高置信度格子；滚动后重新调用，不沿用旧坐标。
 def scan_targets($data, $rows)
-    call $bugan = scan_get($data, $rows, "么玉")
-    call $baoqian = scan_get($data, $rows, "宝钱")
-    call $changmingyu = scan_get($data, $rows, "长鸣玉")
-    eval $result = {}
-    eval $result.bugan = $bugan
-    eval $result.baoqian = $baoqian
-    eval $result.changmingyu = $changmingyu
-    return $result
+    call $bugan = select_currency_cell($data, $rows, "么玉")
+    call $baoqian = select_currency_cell($data, $rows, "宝钱")
+    call $changmingyu = select_currency_cell($data, $rows, "长鸣玉")
+    eval $bugan_pos = {}
+    if $bugan.row > 0
+        eval $bugan_pos = {"row": $bugan.row, "col": $bugan.col}
+    end
+    return {"bugan": $bugan.value, "baoqian": $baoqian.value, "changmingyu": $changmingyu.value, "bugan_pos": $bugan_pos}
 end
 
-# ─── scan_get ─────────────────────────────────────────────
-# 取目标货币在最高置信度下的数量（内部过程）。
+# ─── select_currency_cell ─────────────────────────────────
+# 选择目标货币最高置信度的格子，相同置信度仍保留行列顺序中的第一个。
 #
-# 参数：
-#   $data   — 整面板数据（$rows 行 × 6 列）
-#   $rows   — 面板行数（由 panel_rows() 按环境动态取得，安卓 3 / 桌面 4）
-#   $target — 目标货币名（与 OCR label 精确相等）
+# 参数：$data — 面板数据；$rows — 行数；$target — OCR label 精确匹配的货币名
 # 前置：面板数据已按当前画面重建过。
 # 后置：无副作用。
-# 返回：最高置信度那一格的数量；没识别到返回 0。
-def scan_get($data, $rows, $target)
-    eval $best_val = 0
-    eval $best_conf = -1
+# 返回：{value, row, col, confidence}；未命中时 value/row/col 为 0。
+def select_currency_cell($data, $rows, $target)
+    eval $best = {"value": 0, "row": 0, "col": 0, "confidence": -1}
     for r in range(1, $rows)
         for c in range(1, 6)
             eval $cell = $data.$r.$c
-            eval $label = $cell.label
-            if $label == $target
-                eval $conf = $cell.confidence
-                if $conf > $best_conf
-                    eval $best_val = $cell.count
-                    eval $best_conf = $conf
+            if $cell.label == $target
+                if $cell.confidence > $best.confidence
+                    eval $best = {"value": $cell.count, "row": $r, "col": $c, "confidence": $cell.confidence}
                 end
             end
         end
     end
-    return $best_val
-end
-
-# ─── find_cell ────────────────────────────────────────────
-# 取目标货币最高置信度那一格的位置（内部过程）。
-#
-# 参数：
-#   $data   — 整面板数据（$rows 行 × 6 列）
-#   $rows   — 面板行数
-#   $target — 目标货币名（与 OCR label 精确相等）
-# 前置：面板数据已按当前画面重建过。
-# 后置：无副作用。
-# 返回：{"row", "col"}；没识别到返回空字典。
-def find_cell($data, $rows, $target)
-    eval $best_row = 0
-    eval $best_col = 0
-    eval $best_conf = -1
-    for r in range(1, $rows)
-        for c in range(1, 6)
-            eval $cell = $data.$r.$c
-            eval $label = $cell.label
-            if $label == $target
-                eval $conf = $cell.confidence
-                if $conf > $best_conf
-                    eval $best_row = $r
-                    eval $best_col = $c
-                    eval $best_conf = $conf
-                end
-            end
-        end
-    end
-    if $best_row > 0
-        return {"row": $best_row, "col": $best_col}
-    end
-    return {}
+    return $best
 end
 
 # ─── safe_set ─────────────────────────────────────────────

@@ -85,10 +85,13 @@ end
 # 属性攻击至少要识别一门流派的完整区间；仅识别无相攻击不算成功。
 def capture_role_base_attrs($scroll_count)
     eval $data = {}
-    eval $got_outer_attack = false
-    eval $got_attr_attack = false
-    eval $got_outer_pen = false
-    eval $got_attr_pen = false
+    eval $captured_details = {}
+    eval $detail_fields = [
+        {"text": "外功攻击", "key": "right_outer_attack"},
+        {"text": "属性攻击", "key": "right_attr_attack"},
+        {"text": "外功穿透", "key": "right_outer_pen"},
+        {"text": "属攻穿透", "key": "right_attr_pen"}
+    ]
     eval $previous = ""
     eval $i = 1
 
@@ -102,40 +105,17 @@ def capture_role_base_attrs($scroll_count)
         eval $key = "left_" + $i
         eval $data.$key = $current
         eval $previous = $current
-        if not $got_outer_attack
-            find [role_detail].[detail_1] as $f by contains "外功攻击"
-            if $f
-                click $f after wait stable @page_refresh
-                scan [role_detail].[detail_2] as $r2
-                eval $data.right_outer_attack = $r2.detail_2
-                eval $got_outer_attack = true
-            end
-        end
-        if not $got_attr_attack
-            find [role_detail].[detail_1] as $f by contains "属性攻击"
-            if $f
-                click $f after wait stable @page_refresh
-                scan [role_detail].[detail_2] as $r2
-                eval $data.right_attr_attack = $r2.detail_2
-                eval $got_attr_attack = true
-            end
-        end
-        if not $got_outer_pen
-            find [role_detail].[detail_1] as $f by contains "外功穿透"
-            if $f
-                click $f after wait stable @page_refresh
-                scan [role_detail].[detail_2] as $r2
-                eval $data.right_outer_pen = $r2.detail_2
-                eval $got_outer_pen = true
-            end
-        end
-        if not $got_attr_pen
-            find [role_detail].[detail_1] as $f by contains "属攻穿透"
-            if $f
-                click $f after wait stable @page_refresh
-                scan [role_detail].[detail_2] as $r2
-                eval $data.right_attr_pen = $r2.detail_2
-                eval $got_attr_pen = true
+        for detail in $detail_fields
+            eval $detail_key = $detail.key
+            if not has_key($captured_details, $detail_key)
+                eval $detail_text = $detail.text
+                find [role_detail].[detail_1] as $f by contains $detail_text
+                if $f
+                    click $f after wait stable @page_refresh
+                    scan [role_detail].[detail_2] as $r2
+                    eval $data.$detail_key = $r2.detail_2
+                    eval append($captured_details, $detail_key, true)
+                end
             end
         end
 

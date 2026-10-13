@@ -8,7 +8,7 @@
 导致 scan_get 再也找不到它们，宝钱/长鸣玉的 safe_set 日志一条都没打出来。
 
 本测试直接加载生产 .wf 里的 shift_rows_after_scroll / scan_targets /
-scan_get / find_cell 四个子过程（不复制粘贴实现），用事故当天的真实识别
+select_currency_cell 三个子过程（不复制粘贴实现），用事故当天的真实识别
 数据回放，锁定：位移合并正确、已找到的值不被冲掉、点击坐标取自重建后的数据。
 """
 
@@ -107,7 +107,7 @@ class TestIncidentReplay:
         'if $vals.changmingyu <= 0\n'
         '    eval $vals.changmingyu = $vals_rescan.changmingyu\n'
         'end\n'
-        'call $bugan_pos = find_cell($money2, $rows, "么玉")\n'
+        'eval $bugan_pos = $vals_rescan.bugan_pos\n'
     )
 
     def test_all_three_targets_survive_the_scroll(self):

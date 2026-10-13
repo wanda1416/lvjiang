@@ -240,3 +240,37 @@ def test_declared_parameters_match_the_variables_used(path):
     }
     for name in declared:
         assert f"${name}" in source, f"{path.name} 声明了 {name} 却没有使用"
+
+
+def test_recovery_restart_updates_original_batch_state(monkeypatch):
+    """未知页面重启后，选中的账号必须写回调度器原状态，供后续条目复用。"""
+    engine = make_engine(run_env="desktop")
+    program = parse_text((_BATCH_DIR / "recover_to_login.wf").read_text(encoding="utf-8"))
+    engine._procs = {**program.procs, **parse_text(_LOGIN.read_text(encoding="utf-8")).procs}
+    engine._procs.update(parse_text(
+        'def is_in_login_page()\nreturn 0\nend\n'
+        'def is_in_startup_page()\nreturn 0\nend\n'
+        'def wait_for_switch_users_page()\nreturn 1\nend\n'
+        'def select_account_and_login($tail, $max, $target)\nreturn 1\nend\n'
+        'def leave_startup_page()\nreturn 1\nend\n').procs)
+    state = {"account": "old_account", "role": "old_role", "page_state": 0}
+    engine.variables.update({"batch_state": state, "batch_recover_username": "user"})
+    engine.user_attributes_snapshot = {"user": {"account": "target_account", "tail": "1234"}}
+    workflow = engine._ensure_workflow()
+    original_call = workflow.call_function
+
+    def call_function(name, args, engine=None):
+        if name == "app_is_running":
+            return False
+        return original_call(name, args, engine=engine)
+
+    monkeypatch.setattr(workflow, "call_function", call_function)
+    actions = []
+    monkeypatch.setattr(engine, "_exec_android_app", lambda node: actions.append(node.action))
+    monkeypatch.setattr(engine, "_exec_screenshot", lambda **kwargs: None)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(program.body)
+    assert returned.value.value["status"] == "success"
+    assert returned.value.value["state"] is state
+    assert state == {"account": "target_account", "role": "", "page_state": 1}
+    assert actions == ["start"]

@@ -63,26 +63,20 @@ if $nav_result < 0
     return -1
 end
 
-if $slots.weapon
-    call scan_slot_bag("main_weapon", "weapon", "weapon", $min_level, $min_affix_count)
-end
-if $slots.ring
-    call scan_slot_bag("ring", "ring", "weapon", $min_level, $min_affix_count)
-end
-if $slots.pendant
-    call scan_slot_bag("pendant", "pendant", "weapon", $min_level, $min_affix_count)
-end
-if $slots.head
-    call scan_slot_bag("head", "head", "armor", $min_level, $min_affix_count)
-end
-if $slots.chest
-    call scan_slot_bag("chest", "chest", "armor", $min_level, $min_affix_count)
-end
-if $slots.leg
-    call scan_slot_bag("leg", "leg", "armor", $min_level, $min_affix_count)
-end
-if $slots.wrist
-    call scan_slot_bag("wrist", "wrist", "armor", $min_level, $min_affix_count)
+# 按原顺序扫描；武器背包仍只从主武器槽位进入一次。
+for entry in [
+    {"group": "weapon", "slot": "main_weapon", "detail": "weapon"},
+    {"group": "ring", "slot": "ring", "detail": "weapon"},
+    {"group": "pendant", "slot": "pendant", "detail": "weapon"},
+    {"group": "head", "slot": "head", "detail": "armor"},
+    {"group": "chest", "slot": "chest", "detail": "armor"},
+    {"group": "leg", "slot": "leg", "detail": "armor"},
+    {"group": "wrist", "slot": "wrist", "detail": "armor"}
+]
+    eval $group = $entry.group
+    if $slots.$group
+        call scan_slot_bag($entry.slot, $group, $entry.detail, $min_level, $min_affix_count)
+    end
 end
 
 call $nav_result = nav_back_to_main()

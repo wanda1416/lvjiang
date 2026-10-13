@@ -3,12 +3,15 @@
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
+import pytest
+
 from lvjiang.core.task_params import parameters_for_values
-from lvjiang.workflows.grammar import parse_file
+from lvjiang.workflows.builtins._registry import _FUNCTION_REGISTRY
+from lvjiang.workflows.engine.signals import _ReturnSignal
+from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.grammar.ast_nodes import (
     Break,
     CallProc,
-    If,
     PanelGridDrag,
     Recognize,
     Scan,
@@ -17,6 +20,7 @@ from lvjiang.workflows.grammar.ast_nodes import (
     WhileLoop,
 )
 from lvjiang.workflows.metadata import parse_metadata_file
+from tests.workflows.conftest import make_engine
 
 _WORKFLOW = (
     Path(__file__).parents[2]
@@ -59,25 +63,49 @@ def test_open_bag_xinfa_parameter_is_opt_in():
         metadata["parameters"], {"open_bag_xinfa": False})] == ["open_bag_xinfa"]
 
 
-def test_bag_xinfa_hit_branch_is_bounded():
-    """命中分支必须封顶：道具没被真正消耗时不能无限重扫同一个格子。
-
-    默认上限由 max_xinfa_boxes 参数给出（见上一个用例），这里只钉结构：
-    唯一的扫描循环里必须有一个以该参数为界、命中即 break 的守卫。
-    """
+def test_bag_xinfa_limit_stops_repeated_item_and_continues_purchase(monkeypatch):
+    """道具未消耗、同一格反复命中时，上限仍生效，并继续原心法置换流程。"""
     program = parse_file(_WORKFLOW)
-    nodes = list(_walk(program.procs["open_all_bag_xinfa"].body))
+    engine = make_engine(run_env="desktop")
+    engine.variables.update({"open_bag_xinfa": True, "max_xinfa_boxes": 1})
+    engine._procs = dict(program.procs)
+    helpers = _WORKFLOW.parent / "subcall/result_records.wf"
+    engine._procs.update(parse_file(helpers).procs)
+    engine._procs.update(parse_text(
+        'def declare_profiles($keys)\nreturn 0\nend\n'
+        'def nav_main_to_item()\nreturn 0\nend\n'
+        'def nav_back_to_main()\nreturn 0\nend\n'
+        'def nav_main_to_menu()\nreturn 0\nend\n'
+        'def sync_weekly_remaining($raw, $key, $last, $total, $label, $source)\n'
+        'return 0\nend\n').procs)
+    monkeypatch.setitem(_FUNCTION_REGISTRY, "profile_get", lambda key: 0)
+    monkeypatch.setitem(_FUNCTION_REGISTRY, "panel_rows", lambda *args: 3)
+    hits = iter([{"row": 1, "col": 1}, {"row": 1, "col": 1}, None, None])
+    clicks = []
 
-    loops = [node for node in nodes if isinstance(node, WhileLoop)]
-    assert len(loops) == 1
+    def scan(node):
+        key = node.fields[0].value
+        engine.variables[node.target.name] = {
+            "peiyang": "培养", "exchange": "置换",
+            "stock_of_week": {"stock_of_week": "600/600"},
+        }.get(key, "")
 
-    guards = [
-        node for node in _walk(loops[0].body)
-        if isinstance(node, If)
-        and VarRef("max_xinfa_boxes") in list(_walk(node.condition))
-        and any(isinstance(inner, Break) for inner in node.then_body)
-    ]
-    assert len(guards) == 1
+    monkeypatch.setattr(engine, "_exec_scan", scan)
+    monkeypatch.setattr(engine, "_exec_recognize",
+                        lambda node: engine.variables.__setitem__(node.target.name, next(hits)))
+    monkeypatch.setattr(engine, "_exec_find",
+                        lambda node: engine.variables.__setitem__(node.var_name, "打开"))
+    monkeypatch.setattr(engine, "_exec_click", lambda node: clicks.append(node.target))
+    monkeypatch.setattr(engine, "_exec_wait", lambda node: None)
+    monkeypatch.setattr(engine, "_exec_wait_stable", lambda node: None)
+    monkeypatch.setattr(engine, "_exec_drag", lambda node: None)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(program.body)
+    assert returned.value.value == -1  # 保留原正常收尾返回值
+    result = engine.output["purchase_xinfa"]
+    assert result["counts"]["box_open_attempts"] == 1
+    assert result["status"] == "processed"
+    assert any(getattr(target, "entity", None) == "exchange" for target in clicks)
 
 
 def test_bag_xinfa_uses_short_circuit_recognition_and_one_scroll_path():

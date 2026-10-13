@@ -77,7 +77,7 @@ if not $open_bag_xinfa
     call record_item("bag_xinfa", "背包心法心得", "disabled", "未启用打开背包心法", {})
 end
 if $open_bag_xinfa
-    call $open_result = open_all_bag_xinfa()
+    call $open_result = open_all_bag_xinfa($max_xinfa_boxes)
     if $open_result < 0
         call record_finish_if_open("failed", "打开背包心法失败")
         return -1
@@ -135,7 +135,7 @@ end
 # ─── open_all_bag_xinfa ───────────────────────────────────
 # 打开背包普通道具里的全部心法心得（内部过程）。
 #
-# 参数：无（上限由运行配置 $max_xinfa_boxes 决定）
+# 参数：$max_xinfa_boxes — 本轮最多打开的心法心得数量
 # 前置：在主页（内部走 nav_main_to_item 进背包道具页）。
 # 后置：0=已尽力打开并停在背包道具页；-1=导航失败或详情里找不到「打开」按钮。
 # 返回：0=正常结束；-1=导航失败或按钮识别失败。
@@ -145,7 +145,7 @@ end
 # 命中分支最多执行 max_xinfa_boxes 次：含滚动后的可见范围内一般不会有更多
 # 独立心法箱子，超出即说明本轮没有真正消耗掉道具（打开失败/确认点空/背包
 # 未补位），继续扫描只会对同一个格子反复点击。
-def open_all_bag_xinfa()
+def open_all_bag_xinfa($max_xinfa_boxes)
     call $nav_result = nav_main_to_item()
     if $nav_result < 0
         return -1

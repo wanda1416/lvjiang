@@ -45,18 +45,21 @@
 #      依次处理两个商品面板（各 2 行 × 4 列），整面板 OCR 扫描 → 逐格判断
 #      是否命中购买关键词 → 命中则购买；商品1 处理完后，商品2 上滑 2 行再处理；
 #      购买了宝钱会消耗体力，买过就再同步一次最新值
-#   3. 营生（类目5）：两端均在 cat_5，滚动前就能点到；扫描 (1,1) 确认含
+#   3. 逐战（类目4）：只查首页；花蕊织至少 1000 时先补齐每周 5 个惊喜礼盒，
+#      再用剩余花蕊织按每个 3000 补齐半赛季最多 2 个袅袅之音。
+#      详情名称与总价确认后购买，库存减少才更新配额；配额同步扣除花蕊织。
+#   4. 营生（类目5）：两端均在 cat_5，滚动前就能点到；扫描 (1,1) 确认含
 #      「营生」后才购买
-#   4. 赛季（类目6）：按当前布局的 shangpin_1 行列各购买一次。类目位置两端不同——
+#   5. 赛季（类目6）：按当前布局的 shangpin_1 行列各购买一次。类目位置两端不同——
 #      手机端可视 5 列，要在类目列表内滚动一次，滚动后赛季落到 cat_4（映射 4→6）；
 #      PC 端一屏能显示到 cat_6，赛季直接就在 cat_6，不滚动
-#   5. 外观（类目7）：只买 (1,1) 的袅袅之音——先过 profile 前置检查
+#   6. 外观（类目7）：只买 (1,1) 的袅袅之音——先过 profile 前置检查
 #      （waiguan_profile_skip：nn_bugan_of_week=1 已购标记、changmingyu<200
 #      资金不足，命中即整段跳过）；再按两端定位——安卓沿用赛季的滚动直接点
 #      cat_5（映射 5→7），PC 端在类目栏滚动一次 0.5 对齐后点 cat_7。购买资格：
 #      (1,1) 同含「音」与「绑」且本周不肝进度 ≥ 20000（purchase 按钮文案不能作为
 #      判定依据）；买后回写 nn_bugan_of_week=1（key 存在定义才写）
-#   6. 完成后返回主页
+#   7. 完成后返回主页
 #
 # 购买动作统一为：点击格子 → 全部添加 → 购买
 #
@@ -95,7 +98,7 @@ import "subcall/profile_registry.wf"
 # ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
 global $record_category
 eval $record_category = "combat"
-call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili"])
+call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili", "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason"])
 if $profile_ok < 0
     call record_finish_if_open("failed", "Profile 声明失败")
     return -1
@@ -160,6 +163,9 @@ end
 if $bought_baoqian
     call sync_current_tili("宝钱")
 end
+
+# ─── 逐战（类目4）：首页礼盒优先，再买剩余配额的袅袅之音 ───────────────
+call buy_zhuzhan()
 
 # ─── 营生（类目5）：只买第一格（先确认格子内容是营生） ────────────────────────────
 # 两端都在 cat_5，滚动前就能点到
@@ -313,6 +319,114 @@ def buy_cell($panel_key, $r, $c)
     click [bugan_detail].[add_all] after wait @step_interval
     click [bugan_detail].[purchase] after wait @step_interval
     call record_item($record_category, "不肝商店商品", "purchase_attempted", "已点击购买；未读取成交凭据", {"panel": $panel_key, "row": $r, "col": $c})
+end
+
+# 逐战商店只处理首页，不切赛季追赶、不滚动商品列表。
+# 礼盒 key 虽保留用户指定的 halfseason 名称，实际周期为 week。
+def buy_zhuzhan()
+    click [bugan_detail].[cat_4] after wait @page_refresh
+    eval $balance = profile_get("huaruizhi")
+    if $balance == null
+        eval $balance = 0
+    end
+    eval $boxes = profile_get("zhuzhanbox_of_halfseason")
+    if $boxes == null
+        eval $boxes = 0
+    end
+    if $boxes >= 5
+        call record_item("zhuzhanbox", "逐战惊喜礼盒", "already_done", "本周已买满", {})
+    else if $balance == null or $balance < 1000
+        call record_item("zhuzhanbox", "逐战惊喜礼盒", "blocked", "花蕊织不足 1000", {"balance": $balance})
+    else
+        call $bought = buy_zhuzhan_item("惊喜礼盒", "zhuzhanbox_of_halfseason", 5, 5 - $boxes, 200, "zhuzhanbox")
+        if $bought < 0
+            call record_item("zhuzhan_nn", "袅袅之音·绑", "skipped", "礼盒成交未确认，保留余额与现场", {})
+            return -1
+        end
+        # 用本轮已确认消费计算余额，不依赖用户是否自定义了配额同步目标。
+        eval $balance = $balance - $bought * 200
+    end
+
+    eval $nn = profile_get("nn_of_halfseason")
+    if $nn == null
+        eval $nn = 0
+    end
+    if $nn >= 2
+        call record_item("zhuzhan_nn", "袅袅之音·绑", "already_done", "本半赛季已买满", {})
+        return 0
+    end
+    eval $want = 0
+    loop while $want < 2 - $nn and $balance >= 3000
+        eval $want = $want + 1
+        eval $balance = $balance - 3000
+    end
+    if $want == 0
+        call record_item("zhuzhan_nn", "袅袅之音·绑", "blocked", "花蕊织不足 3000 或余额未知", {})
+        return 0
+    end
+    call $bought = buy_zhuzhan_item("袅袅之音", "nn_of_halfseason", 2, $want, 3000, "zhuzhan_nn")
+    return $bought
+end
+
+# 复用通用购买的详情/库存区域、加一、总价和购买按钮。
+# 返回实际确认的购买量；未命中/购买前跳过为 0，成交未确认为 -1。
+def buy_zhuzhan_item($query, $key, $limit, $want, $unit_price, $category)
+    find [bugan_detail].[shangpin_1] as $item by contains $query
+    if not $item
+        call record_item($category, $query, "not_found", "逐战商店首页未命中商品", {})
+        log "逐战商店首页未找到「" + $query + "」，跳过"
+        return 0
+    end
+    click $item after wait @page_refresh
+    scan [general_purchase].[supply_item_name, supply_stock] as $details
+    if not $details.supply_item_name contains $query
+        call record_item($category, $query, "rejected", "商品详情名称不匹配", {"raw": $details.supply_item_name})
+        return 0
+    end
+    eval $before = extract_progress($details.supply_stock)
+    if not $before.valid or $before.total != $limit
+        call record_item($category, $query, "not_read", "未确认商品剩余库存", {"raw": $details.supply_stock})
+        return 0
+    end
+    if $before.current < $want
+        eval $want = $before.current
+    end
+    if $want <= 0
+        call record_item($category, $query, "already_done", "商店剩余库存为零", {})
+        return 0
+    end
+    # 切换商品后初始数量为 1；按计划添加，避免最大数量超出本次预算。
+    loop $want - 1
+        click [general_purchase].[add_one] after wait @step_interval
+    end
+    scan [general_purchase].[total_price] as $price
+    eval $cost = extract_num($price.total_price)
+    if $cost != $want * $unit_price
+        call record_item($category, $query, "rejected", "购买总价与计划数量不一致", {"raw": $price.total_price, "quantity": $want})
+        return 0
+    end
+    click [general_purchase].[purchase] after wait @page_refresh
+    call record_item($category, $query, "purchase_attempted", "已点击购买，等待库存确认", {"quantity": $want})
+    call close_item_prompts()
+    loop 3
+        scan [general_purchase].[supply_item_name, supply_stock] as $after
+        if $after.supply_item_name contains $query
+            eval $stock = extract_progress($after.supply_stock)
+            if $stock.valid and $stock.total == $limit
+                eval $confirmed = $before.current - $stock.current
+                if $confirmed > 0 and $confirmed <= $want
+                    eval profile_inc($key, $confirmed, "逐战商店")
+                    call record_item($category, $query, "success", "库存确认购买数量", {"purchased": $confirmed, "remaining": $stock.current})
+                    log "逐战商店已购买「" + $query + "」" + $confirmed + " 个"
+                    return $confirmed
+                end
+            end
+        end
+        wait @page_refresh
+    end
+    call record_item($category, $query, "not_confirmed", "购买后未确认库存减少，不更新配额", {})
+    log "逐战商店「" + $query + "」成交未确认，不更新配额"
+    return -1
 end
 
 # ─── sync_current_tili ────────────────────────────────────

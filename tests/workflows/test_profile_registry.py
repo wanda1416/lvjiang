@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -76,6 +77,35 @@ def test_registry_validates_all_keys_before_writing(
     assert get_profile_config().get_key("tongbao") is None
 
 
+def test_zhuzhan_quotas_keep_distinct_periods_and_currency_costs(isolated_profile_config):
+    from lvjiang.core.profile.repository import db_get_history, get_profile_db
+    from lvjiang.core.profile.schema import get_profile_config
+    from lvjiang.core.profile.service import profile_action, profile_read
+
+    import_module("lvjiang.apps.yysls.core.season_periods")
+    assert _declare(["huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason"]) == 0
+    config = get_profile_config()
+    nn = config.get_key("nn_of_halfseason")
+    boxes = config.get_key("zhuzhanbox_of_halfseason")
+    assert (nn.cap, nn.period) == (2, "half_season")
+    assert (boxes.cap, boxes.period, boxes.reset_day) == (5, "week", 1)
+    assert nn.sync_targets[0].key == boxes.sync_targets[0].key == "stock:huaruizhi"
+    assert nn.sync_targets[0].ratio == -3000
+    assert boxes.sync_targets[0].ratio == -200
+
+    db = get_profile_db()
+    db.upsert("tester", "stock", "huaruizhi", 7000)
+    db.upsert("tester", "stock", "niaoniao", 2)
+    profile_action("tester", "zhuzhanbox_of_halfseason", delta=5, source="逐战商店")
+    profile_action("tester", "nn_of_halfseason", delta=2, source="逐战商店")
+    assert profile_read("tester", "huaruizhi") == 0
+    assert profile_read("tester", "niaoniao") == 4
+    spending = db_get_history("tester", "stock", "huaruizhi")
+    assert [row["source"] for row in spending] == ["袅袅之音", "逐战礼盒"]
+    incoming = db_get_history("tester", "stock", "niaoniao")
+    assert incoming[0]["source"] == "逐战商店"
+
+
 def test_registry_keeps_existing_definition_but_rejects_model_conflict(
     isolated_profile_config: Path,
 ) -> None:
@@ -101,6 +131,7 @@ def test_profile_consumers_use_the_central_registry() -> None:
         ],
         "purchase_bugan.wf": [
             "bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili",
+            "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason",
         ],
         "purchase_niaoniao.wf": ["niaoniao_of_week", "changmingyu"],
         "purchase_xinfa.wf": ["xinfa_of_week"],

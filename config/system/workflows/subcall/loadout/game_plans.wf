@@ -119,7 +119,16 @@ def select_game_plan($name)
         click [training_plan].[use_area] after wait @page_refresh
         loop 3
             scan [training_plan].[modal_message] as $message
-            if $message.modal_message contains "装备缺失"
+            if $message.modal_message contains "历史定音"
+                # 右侧确认会消耗玉，且与智能填充共用位置；只允许改用当前定音。
+                scan [training_plan].[use_current] as $action by contains "改用当前定音"
+                if not $action
+                    screenshot from last
+                    log error "历史定音弹窗未识别到改用当前定音按钮，停止扫描以避免消耗玉"
+                    return -2
+                end
+                click [training_plan].[use_current] after wait @page_refresh
+            else if $message.modal_message contains "装备缺失"
                 scan [training_plan].[smart_fill] as $action by contains "智能填充"
                 if not $action
                     screenshot from last
@@ -140,7 +149,7 @@ def select_game_plan($name)
             end
         end
         scan [training_plan].[modal_message] as $message
-        if $message.modal_message contains "装备缺失" or $message.modal_message contains "未保存"
+        if $message.modal_message contains "历史定音" or $message.modal_message contains "装备缺失" or $message.modal_message contains "未保存"
             log error "游戏方案切换补救后弹窗仍未关闭"
             screenshot from last
             return -2

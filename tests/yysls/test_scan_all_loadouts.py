@@ -450,6 +450,59 @@ def test_select_game_plan_does_not_use_button_text_as_success_check(
     assert len(clicked) == (2 if needs_switch else 1)
 
 
+@pytest.mark.parametrize("safe_button,closes", [(True, True), (False, False), (True, False)])
+def test_select_game_plan_history_tuning_never_uses_paid_confirmation(
+        monkeypatch, safe_button, closes):
+    """历史定音只能改用当前定音；安全按钮缺失或弹窗未关闭时停止扫描。"""
+    proc = parse_file(Path(
+        "config/system/workflows/subcall/loadout/game_plans.wf"
+    )).procs["select_game_plan"]
+    engine = make_engine()
+    engine.variables = {"name": "测试方案"}
+    messages = iter([
+        "当前备战方案中存在部分装备缺失，是否智能填充?",
+        "以下装备中存在历史定音，是否切换至历史定音并消耗20",
+        "当前搭配未保存，切换后无法找回，是否切换?",
+        "",
+    ])
+    clicked = []
+    screenshots = []
+
+    def fake_scan(node):
+        name = node.target.name
+        if name == "detail":
+            value = {"plan_title": "测试方案", "main_art": "武学甲", "sub_art": "武学乙"}
+        elif name == "use":
+            value = 1
+        elif name == "message":
+            value = {"modal_message": next(messages) if closes else "存在历史定音"}
+        else:
+            target = node.by.target.value
+            value = int(target != "改用当前定音" or safe_button)
+        engine.variables[name] = value
+
+    def fake_find(node):
+        engine.variables[node.var_name] = "测试方案"
+
+    monkeypatch.setattr(engine, "_exec_find", fake_find)
+    monkeypatch.setattr(engine, "_exec_scan", fake_scan)
+    monkeypatch.setattr(engine, "_exec_click", lambda node: clicked.append(node))
+    monkeypatch.setattr(engine, "_exec_wait", lambda _node: None)
+    monkeypatch.setattr(engine, "_exec_screenshot", lambda **kw: screenshots.append(kw))
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(proc.body)
+
+    keys = [node.target.entity for node in clicked[1:]]
+    if safe_button and closes:
+        assert returned.value.value["name"] == "测试方案"
+        assert keys == ["use_area", "smart_fill", "use_current", "confirm"]
+        assert not screenshots
+    else:
+        assert returned.value.value == -2
+        assert keys == ["use_area"] + (["use_current"] * 3 if safe_button else [])
+        assert screenshots
+
+
 @pytest.mark.parametrize(
     ("main_checks", "retry_answers", "expected", "prompt_count"),
     [

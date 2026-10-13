@@ -90,17 +90,41 @@ main() {
     local python_cmd
     local extra_apps=()
     local forwarded=()
+    local use_admin=0
+    local has_reg=0
     # 默认不加载任何插件：-reg/--register APP 逐个显式指定；--all 表示本仓库
     # 随包提供的全部插件（yysls 后 premium 的固定顺序），不按目录内容推断。
+    # --admin 启动 admin/ 下的管理控制台，它在包命名空间里是 lvjiang.admin，
+    # 与插件参数互斥——管理控制台不加载客户端插件。
     for arg in "$@"; do
-        if [[ "$arg" == "--all" ]]; then
-            extra_apps=(-reg yysls -reg premium)
-        else
-            forwarded+=("$arg")
-        fi
+        case "$arg" in
+            --admin)
+                use_admin=1
+                ;;
+            --all)
+                extra_apps=(-reg yysls -reg premium)
+                has_reg=1
+                ;;
+            -reg*|--register*)
+                has_reg=1
+                forwarded+=("$arg")
+                ;;
+            *)
+                forwarded+=("$arg")
+                ;;
+        esac
     done
+    if (( use_admin )) && (( has_reg )); then
+        error "--admin cannot be combined with -reg/--register/--all"
+        exit 1
+    fi
     if (( ${#extra_apps[@]} )) && [[ ! -f src/lvjiang/apps/premium/__init__.py ]]; then
         error "--all requires the premium repository at src/lvjiang/apps/premium"
+        exit 1
+    fi
+    if (( use_admin )) && [[ ! -f admin/src/lvjiang/admin/__init__.py ]]; then
+        error "admin module not installed, --admin requires a private admin checkout:"
+        error "  expected entry point admin/src/lvjiang/admin/__init__.py"
         exit 1
     fi
 
@@ -113,11 +137,20 @@ main() {
     # is not importable. Add the source root to PYTHONPATH explicitly — this
     # allows running bare python without pip install -e .
     export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+    # 管理控制台以 lvjiang.admin 子包并入主工程包命名空间：把 admin 源根也放进
+    # 搜索路径，由 src/lvjiang/__init__.py 的 extend_path 合并。
+    if (( use_admin )); then
+        export PYTHONPATH="$PWD/admin/src:$PYTHONPATH"
+    fi
     
     # 空数组在 bash 3.2 下直接展开会触发 set -u 的 unbound variable，而 macOS
     # 自带的就是 3.2；按长度逐个追加。args 本身恒非空。
     local args=(-m lvjiang)
-    if (( ${#extra_apps[@]} )); then args+=("${extra_apps[@]}"); fi
+    if (( use_admin )); then
+        args=(-m lvjiang.admin)
+    elif (( ${#extra_apps[@]} )); then
+        args+=("${extra_apps[@]}")
+    fi
     if (( ${#forwarded[@]} )); then args+=("${forwarded[@]}"); fi
     exec "$python_cmd" "${args[@]}"
 }

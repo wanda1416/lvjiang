@@ -18,22 +18,54 @@ if not exist "%PY%" set "PY=python"
 rem No plugin is loaded unless asked for: -reg/--register APP (repeatable)
 rem passes one through, --all means the whole roster this repo ships —
 rem yysls then premium, a fixed list in a fixed order, not whatever happens
-rem to be sitting in the apps directory.
+rem to be sitting in the apps directory. --admin instead starts the private
+rem admin console checked out at admin/, and cannot be combined with plugins.
 set "EXTRA_APPS="
 set "FORWARD_ARGS="
+set "USE_ADMIN="
+set "HAS_REG="
 :parse_args
 if "%~1"=="" goto launch
-if /I "%~1"=="--all" goto add_all
+set "ARG=%~1"
+if /I "%ARG%"=="--admin" goto set_admin
+if /I "%ARG%"=="--all" goto add_all
+if /I "%ARG:~0,4%"=="-reg" goto mark_reg
+if /I "%ARG:~0,10%"=="--register" goto mark_reg
 set "FORWARD_ARGS=%FORWARD_ARGS% %1"
 shift
 goto parse_args
 :add_all
 set "EXTRA_APPS=-reg yysls -reg premium"
+set "HAS_REG=1"
 shift
 goto parse_args
 :launch
+if defined USE_ADMIN if defined HAS_REG (
+    echo [ERROR] --admin cannot be combined with -reg/--register/--all 1>&2
+    exit /b 1
+)
+if defined USE_ADMIN goto launch_admin
 if defined EXTRA_APPS if not exist "%~dp0src\lvjiang\apps\premium\__init__.py" (
     echo [ERROR] --all requires the premium repository at src\lvjiang\apps\premium 1>&2
     exit /b 1
 )
 "%PY%" -m lvjiang %EXTRA_APPS% %FORWARD_ARGS%
+exit /b %ERRORLEVEL%
+
+:set_admin
+set "USE_ADMIN=1"
+shift
+goto parse_args
+:mark_reg
+set "HAS_REG=1"
+set "FORWARD_ARGS=%FORWARD_ARGS% %1"
+shift
+goto parse_args
+:launch_admin
+if not exist "%~dp0admin\src\lvjiang\admin\__init__.py" (
+    echo [ERROR] admin module not installed, --admin requires a private admin checkout: 1>&2
+    echo [ERROR]   expected entry point admin\src\lvjiang\admin\__init__.py 1>&2
+    exit /b 1
+)
+set "PYTHONPATH=%~dp0admin\src;%PYTHONPATH%"
+"%PY%" -m lvjiang.admin %FORWARD_ARGS%

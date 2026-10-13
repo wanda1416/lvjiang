@@ -36,7 +36,10 @@ from ..domain_labels import combat_type_label
 from ..game_settings.level_combo import LevelCombo
 from .plan_create_dialog import PlanCreateDialog
 from .plan_table_delegate import (
+    COL_MAIN_ART,
     COL_NAME,
+    COL_SCHOOL,
+    COL_SUB_ART,
     PlanFieldDelegate,
     locked_columns,
     locked_reason,
@@ -45,7 +48,7 @@ from .plan_table_delegate import (
 
 
 class PlanManagerDialog(QDialog):
-    """管理各用户的方案定义、显示顺序；方案内容双击后整体编辑。"""
+    """管理各用户的方案定义、显示顺序；方案内容双击后逐项编辑。"""
 
     def __init__(self, usernames: list[str], current_user: str,
                  users_dir: Path | None = None, parent=None,
@@ -133,7 +136,7 @@ class PlanManagerDialog(QDialog):
         notice_layout.setContentsMargins(12, 8, 12, 8)
         notice_layout.setSpacing(4)
         notice_layout.addWidget(QLabel(
-            tr("选中一行后再单击单元格即可逐项编辑；灰色单元格由流派决定")))
+            tr("双击单元格即可逐项编辑；灰色单元格由流派决定")))
         hint = QLabel(tr("PVP 方案不参与智能调律：目前没有 PVP 调律方案，"
                          "一起加载会让够不到 PVE 标准的装备被判成有提升"))
         hint.setWordWrap(True)
@@ -147,10 +150,12 @@ class PlanManagerDialog(QDialog):
             tr("对战类型")])
         header = self._table.horizontalHeader()
         assert header is not None
-        # 名称吃掉多余宽度，其余按内容收窄；六列平分会让「对战类型」和
-        # 「名称」一样宽，扫读时抓不到重点。
+        # 名称、流派和两门武学都是四到六字的扫读重点，长度相近，一起均分富余
+        # 宽度；玩法和对战类型文本固定很短，按内容收窄，不跟着窗口变宽。只把
+        # 名称设成 Stretch 会让它独占几百像素的空白，另外五列挤在右侧。
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.Stretch)
+        for col in (COL_NAME, COL_SCHOOL, COL_MAIN_ART, COL_SUB_ART):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
         vertical_header = self._table.verticalHeader()
         assert vertical_header is not None
         vertical_header.setVisible(False)
@@ -159,9 +164,11 @@ class PlanManagerDialog(QDialog):
         self._table.setAlternatingRowColors(True)
         self._table.setShowGrid(False)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        # 选中后再单击才进编辑：单击即编辑容易在挑行时误触。
+        # 双击才进编辑：单击只负责选中，挑行时不会误触进入编辑态。Qt 的双击
+        # 事件序列里第二次 press 被 DoubleClick 取代，只写 SelectedClicked
+        # 会让双击完全进不去编辑，必须显式声明 DoubleClicked。
         self._table.setEditTriggers(
-            QTableWidget.EditTrigger.SelectedClicked
+            QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.EditKeyPressed)
         self._table.setItemDelegate(PlanFieldDelegate(
             self._game_config, self._plan_at, self._commit_field, self._table))
@@ -268,9 +275,12 @@ class PlanManagerDialog(QDialog):
                     item.setFlags(flags)
                     if col == COL_NAME:
                         item.setData(Qt.ItemDataRole.UserRole, pid)
+                        # 名称列宽有限，被省略的长名字靠悬停提示看全。
+                        item.setToolTip(plan.name)
                         if pid == state.active_plan_id:
                             item.setText(f"★ {plan.name}")
-                            item.setToolTip(tr("该用户当前使用的方案"))
+                            item.setToolTip(
+                                f"{tr('该用户当前使用的方案')}\n{plan.name}")
                     self._table.setItem(row, col, item)
                 if pid == selected_id:
                     self._table.selectRow(row)

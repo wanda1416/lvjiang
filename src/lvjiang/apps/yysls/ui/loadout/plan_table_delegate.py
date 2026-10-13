@@ -12,10 +12,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PyQt6.QtCore import QModelIndex
+from PyQt6.QtCore import QModelIndex, QSize
 from PyQt6.QtWidgets import (
     QLineEdit,
     QStyledItemDelegate,
+    QStyleOptionViewItem,
     QWidget,
 )
 
@@ -42,6 +43,13 @@ COL_COMBAT = 5
 #: 自定义（即未绑定任何流派）在流派下拉里的稳定值。
 CUSTOM_SCHOOL = ""
 
+#: 内容极短列的显示下限（像素）：玩法、对战类型只有两三个字，纯按内容收窄
+#: 时与相邻的武学列并排会显得被挤扁。
+MIN_COLUMN_WIDTHS = {
+    COL_PLAYSTYLE: 96,
+    COL_COMBAT: 88,
+}
+
 
 class PlanFieldDelegate(QStyledItemDelegate):
     """按列给出编辑器，并把结果交给宿主提交。
@@ -61,6 +69,21 @@ class PlanFieldDelegate(QStyledItemDelegate):
         self._game_config = game_config
         self._plan_of = plan_of
         self._commit = commit
+
+    # ── 尺寸 ──
+
+    def sizeHint(self, option: QStyleOptionViewItem,  # noqa: N802 - Qt API
+                 index: QModelIndex) -> QSize:
+        """短文本列也要有可读宽度。
+
+        表头按内容收窄时玩法、对战类型只有几十像素，看起来像被挤扁；这里给
+        出下限，内容更长时仍按内容自适应。
+        """
+        hint = super().sizeHint(option, index)
+        minimum = MIN_COLUMN_WIDTHS.get(index.column())
+        if minimum is not None:
+            hint.setWidth(max(hint.width(), minimum))
+        return hint
 
     # ── 编辑器 ──
 

@@ -1,21 +1,19 @@
-"""用户 Profile 数据模型后台计算引擎
+"""用户 Profile 周期处理服务（不依赖 Qt）
 
-低频后台线程，每 60 秒 tick 一次，负责：
+调用方调度 tick，负责：
 1. 周期检查与重置（quota 的 period 到期清零）
 2. 再生计算（regen 显式区分实时恢复与准点恢复，封顶 cap）
 
-Signals:
-    alert_triggered(key, label, message): 提醒触发
-    data_updated(user_name): 数据已更新，UI 可刷新
+通知回调由调用方提供；数据处理与桌面线程、信号和调度分离。
 """
 
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from loguru import logger
-from PyQt6.QtCore import QThread, pyqtSignal
 
 from lvjiang.core.config.interface import add_alert
 from lvjiang.core.user_config import UserConfigManager
@@ -260,63 +258,28 @@ def _clean_old_alerts(current_keys: set[str]) -> None:
         set_alert_history(cleaned)
 
 
-# ─── ProfileEngine ───────────────────────────────────────────
+class ProfileProcessor:
+    """周期处理服务；调用方负责调度、取消和 UI 通知。"""
+    CLEAN_INTERVAL = 3600
 
-
-class ProfileEngine(QThread):
-    """后台低频计算引擎
-
-    Signals:
-        alert_triggered(key, label, message): 提醒触发
-        data_updated(user_name): 数据已更新，UI 可刷新
-    """
-
-    TICK_INTERVAL = 60  # 每 60 秒 tick 一次
-    CLEAN_INTERVAL = 3600  # 每 3600 秒清理一次过期提醒
-
-    alert_triggered = pyqtSignal(str, str, str)  # (key, label, message)
-    data_updated = pyqtSignal(str)  # (user_name)
-
-    def __init__(
-        self,
-        user_manager: UserConfigManager,
-        parent=None,
-    ):
-        super().__init__(parent)
+    def __init__(self, user_manager: UserConfigManager, *,
+                 should_stop: Callable[[], bool] = lambda: False,
+                 notify_alert: Callable[[str, str, str], None] = lambda *_: None,
+                 notify_updated: Callable[[str], None] = lambda _: None):
         self._user_manager = user_manager
-        self._engine_running = True
+        self._should_stop = should_stop
+        self._notify_alert = notify_alert
+        self._notify_updated = notify_updated
         self._last_clean = 0.0
 
-    def request_stop(self) -> None:
-        """请求引擎停止（线程安全）"""
-        self._engine_running = False
-
-    def run(self):
-        """主循环：每 60 秒 tick 一次，直到引擎被 request_stop"""
-        logger.info("ProfileEngine 已启动")
-
-        while self._engine_running:
-            try:
-                self._tick()
-            except Exception as e:
-                logger.error(f"ProfileEngine tick 异常: {e}")
-
-            # 分段睡眠，便于快速响应停止
-            for _ in range(self.TICK_INTERVAL):
-                if not self._engine_running:
-                    break
-                self.msleep(1000)
-
-        logger.info("ProfileEngine 已停止")
-
     @profile_operation
-    def _tick(self):
+    def tick(self):
         """单次 tick：遍历所有用户执行计算"""
         config = get_profile_config()
         user_names = self._user_manager.list_users()
 
         for user_name in user_names:
-            if not self._engine_running:
+            if self._should_stop():
                 return
             try:
                 self._tick_user(user_name, config)
@@ -422,7 +385,7 @@ class ProfileEngine(QThread):
                         add_alert(alert_id, message, datetime.now().isoformat())
                         mark_alert(alert_key, datetime.now().isoformat(timespec="seconds"))
                         # 信号仅用于通知 UI 刷新
-                        self.alert_triggered.emit(kd.key, kd.label, message)
+                        self._notify_alert(kd.key, kd.label, message)
                 else:
                     # 值低于阈值：如果已标记则清除（允许下次重新触发）
                     if is_alert_marked(alert_key):
@@ -431,33 +394,4 @@ class ProfileEngine(QThread):
 
         # ── 通知 UI 刷新 ──
         if modified:
-            self.data_updated.emit(user_name)
-
-
-# ─── 引擎单例管理 ────────────────────────────────────────────
-
-_engine: ProfileEngine | None = None
-
-
-def get_or_create_engine(
-    user_manager: UserConfigManager,
-) -> ProfileEngine:
-    """获取或创建 ProfileEngine 单例"""
-    global _engine
-    if _engine is None:
-        _engine = ProfileEngine(user_manager)
-    return _engine
-
-
-def stop_engine() -> None:
-    """停止并销毁 ProfileEngine"""
-    global _engine
-    if _engine is not None:
-        logger.info("正在停止 ProfileEngine...")
-        _engine.request_stop()
-        _engine.quit()
-        if not _engine.wait(5000):
-            logger.warning("ProfileEngine 5 秒内未退出，强制终止")
-            _engine.terminate()
-            _engine.wait(2000)
-        _engine = None
+            self._notify_updated(user_name)

@@ -230,7 +230,7 @@ class TestNoteEngineTick:
     def test_engine_tick_ignores_note(self, note_env):
         """ProfileEngine._tick_user 不处理 note"""
 
-        from lvjiang.core.profile.engine import ProfileEngine
+        from lvjiang.core.profile.engine import ProfileProcessor
         from lvjiang.core.profile.repository import (
             db_read_entry,
             db_upsert,
@@ -241,7 +241,7 @@ class TestNoteEngineTick:
 
         # 构造最小可用 engine，实际执行 tick
         config = _load_config()
-        engine = ProfileEngine.__new__(ProfileEngine)
+        engine = ProfileProcessor.__new__(ProfileProcessor)
         engine._tick_user(note_env.username, config)
 
         # tick 后 note 值不变

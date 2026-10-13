@@ -160,9 +160,8 @@ def save_renamed_definitions(
             recover_rename(db)
             get_interface_store().reload()
             schema_module.reload_profile_config()
-        from .engine import _engine
-        if _engine is not None:
-            with db._connect() as conn:
-                users = conn.execute("SELECT DISTINCT username FROM profile_entries").fetchall()
-            for (username,) in users:
-                _engine.data_updated.emit(username)
+        from .events import notify_updated
+        with db._connect() as conn:
+            users = conn.execute("SELECT DISTINCT username FROM profile_entries").fetchall()
+        for (username,) in users:
+            notify_updated(username)

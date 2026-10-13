@@ -23,11 +23,11 @@ from ...core.about import about_content
 from ...core.update import (
     GITHUB_REPO,
     ReleaseInfo,
-    UpdateChecker,
     get_version,
     is_newer_version,
 )
 from ...i18n import tr
+from ..background.update import UpdateChecker
 from ..button_styles import apply_button_style, exec_styled_message_box
 
 # 导出供外部使用

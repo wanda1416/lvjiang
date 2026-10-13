@@ -73,6 +73,7 @@
 | [20-world-map-catalog.md](50-platform/20-world-map-catalog.md) | 大世界地图与地域目录、探查底图保存与预览、重叠截图拼接 | 部分实现（地域选择和界碑传送运行时函数待实现） |
 | [21-plugin-data.md](50-platform/21-plugin-data.md) | 插件领域数据与同步数据库声明 | 已实现 |
 | [22-plugin-runtime.md](50-platform/22-plugin-runtime.md) | 插件宿主运行接口与公共事件契约 | 已实现 |
+| [23-service-boundaries.md](50-platform/23-service-boundaries.md) | 公共服务与桌面适配边界 | 已实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

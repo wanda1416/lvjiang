@@ -79,7 +79,7 @@ class UserInfoTab(QWidget):
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新当前用户详情。"""
         try:
-            from ...core.profile.engine import get_or_create_engine
+            from .engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager)
             engine.data_updated.connect(self._on_profile_data_updated)
             engine.alert_triggered.connect(self._on_alert_triggered)

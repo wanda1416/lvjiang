@@ -82,12 +82,12 @@ def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
     config = SimpleNamespace(get_keys_by_model=lambda model: [kd] if model == "quota" else [])
     events = []
     monkeypatch.setattr(triggers, "submit_profile_trigger", events.append)
-    worker = SimpleNamespace(data_updated=SimpleNamespace(emit=lambda _: None))
-    engine.ProfileEngine._tick_user(worker, "tester", config)
+    worker = SimpleNamespace(_notify_updated=lambda _: None)
+    engine.ProfileProcessor._tick_user(worker, "tester", config)
     assert len(events) == 1
     assert events[0].old_value == events[0].new_value == 0
     assert events[0].change_type == "reset"
-    engine.ProfileEngine._tick_user(worker, "tester", config)
+    engine.ProfileProcessor._tick_user(worker, "tester", config)
     assert len(events) == 1
 
 

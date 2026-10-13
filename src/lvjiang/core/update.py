@@ -17,7 +17,6 @@ from urllib.request import Request, urlopen
 
 from loguru import logger
 from packaging.version import InvalidVersion
-from PyQt6.QtCore import QThread, pyqtSignal
 
 from ..i18n import tr
 
@@ -152,43 +151,44 @@ def should_prompt_update(latest_version: str) -> bool:
     return True
 
 
-# ─── 更新检查线程 ─────────────────────────────────────────
+# ─── 更新检查服务 ─────────────────────────────────────────
 
 
-class UpdateChecker(QThread):
-    """后台线程检查 GitHub Release 更新"""
+class UpdateCheckError(RuntimeError):
+    """更新检查失败；界面或无 GUI 调用方自行展示。"""
 
-    finished = pyqtSignal(object)  # ReleaseInfo
-    error = pyqtSignal(str)
 
-    def run(self):
-        try:
-            req = Request(GITHUB_API_URL)
-            req.add_header("Accept", "application/vnd.github+json")
-            req.add_header("X-GitHub-Api-Version", "2022-11-28")
-            # 添加 User-Agent 避免被 GitHub 拒绝
-            req.add_header("User-Agent", "lvjiang-update-checker")
+def fetch_latest_release() -> ReleaseInfo:
+    """检查正式发行版本，不依赖线程或 GUI。"""
+    try:
+        req = Request(GITHUB_API_URL)
+        req.add_header("Accept", "application/vnd.github+json")
+        req.add_header("X-GitHub-Api-Version", "2022-11-28")
+        # 添加 User-Agent 避免被 GitHub 拒绝
+        req.add_header("User-Agent", "lvjiang-update-checker")
 
-            with urlopen(req, timeout=10) as response:
-                data = json.loads(response.read().decode())
+        with urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode())
 
-            release = parse_release_info(data)
-            if release:
-                self.finished.emit(release)
-            else:
-                self.error.emit(tr("无法获取版本信息"))
-        except HTTPError as e:
-            # HTTP 状态是明确的外部响应，不需要打印 urllib 调用栈。
-            message = tr("无法访问 {url} 获取更新：HTTP {code}").format(
-                url=GITHUB_API_URL, code=e.code)
-            logger.warning(message)
-            self.error.emit(message)
-        except (URLError, TimeoutError, ssl.SSLError, ConnectionError):
-            # DNS、连接、超时和 TLS 故障都是常见网络环境问题。调用栈对普通
-            # 用户没有帮助，只保留可操作的一行说明。
-            message = network_access_error_message(GITHUB_API_URL, "update")
-            logger.warning(message)
-            self.error.emit(message)
-        except Exception as e:
-            logger.exception("检查更新失败")
-            self.error.emit(f"检查更新失败: {e}")
+        release = parse_release_info(data)
+        if release:
+            return release
+        else:
+            raise UpdateCheckError(tr("无法获取版本信息"))
+    except HTTPError as e:
+        # HTTP 状态是明确的外部响应，不需要打印 urllib 调用栈。
+        message = tr("无法访问 {url} 获取更新：HTTP {code}").format(
+            url=GITHUB_API_URL, code=e.code)
+        logger.warning(message)
+        raise UpdateCheckError(message) from e
+    except (URLError, TimeoutError, ssl.SSLError, ConnectionError) as error:
+        # DNS、连接、超时和 TLS 故障都是常见网络环境问题。调用栈对普通
+        # 用户没有帮助，只保留可操作的一行说明。
+        message = network_access_error_message(GITHUB_API_URL, "update")
+        logger.warning(message)
+        raise UpdateCheckError(message) from error
+    except UpdateCheckError:
+        raise
+    except Exception as e:
+        logger.exception("检查更新失败")
+        raise UpdateCheckError(f"检查更新失败: {e}") from e

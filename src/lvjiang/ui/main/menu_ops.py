@@ -375,7 +375,8 @@ class MenuOpsMixin:
         """直接检查更新（帮助菜单 → 检查更新）"""
         from PyQt6.QtWidgets import QMessageBox
 
-        from ...core.update import UpdateChecker, get_version, is_newer_version
+        from ...core.update import get_version, is_newer_version
+        from ..background.update import UpdateChecker
         from ..notices.update_dialog import UpdateDialog
 
         checker = UpdateChecker(self)

@@ -22,7 +22,7 @@ from __future__ import annotations
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from .config.remote import SyncJob, SyncResult, build_sync_job, run_sync
+from ...core.config.remote import SyncJob, SyncResult, build_sync_job, run_sync
 
 
 class RemoteConfigSyncer(QThread):

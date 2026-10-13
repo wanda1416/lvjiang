@@ -62,7 +62,8 @@ class StartupOpsMixin:
 
     def _start_update_check_on_startup(self):
         """公告检查完成后执行原有的静默版本检查，再串上统计的同意提示与上报。"""
-        from ...core.update import UpdateChecker, should_prompt_update
+        from ...core.update import should_prompt_update
+        from ..background.update import UpdateChecker
 
         checker = UpdateChecker(self)
 
@@ -106,7 +107,7 @@ class StartupOpsMixin:
         from ...core.config.update_activation import activate_configuration
         from ...core.config.update_observer import InstallationObserver
         from ...core.config.update_store import UpdateStore
-        from ...core.remote_config_sync import RemoteConfigSyncer
+        from ..background.remote_config_sync import RemoteConfigSyncer
 
         running = getattr(self, "_startup_remote_config_syncer", None)
         if running is not None and running.isRunning():
@@ -195,10 +196,10 @@ class StartupOpsMixin:
         绝对不能写 SessionStore，见 core/telemetry/reporter.py 模块 docstring。
         """
         from ...core.telemetry.reporter import (
-            TelemetryReporter,
             apply_outcome,
             build_job,
         )
+        from ..background.telemetry import TelemetryReporter
 
         job = build_job()
         if job.is_empty:

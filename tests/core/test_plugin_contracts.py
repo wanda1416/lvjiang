@@ -13,6 +13,10 @@ def test_public_plugin_contracts_import_without_qt(tmp_path):
          "import sys; sys.modules['PyQt6'] = None; "
          "from lvjiang.core.app_events import AppEvent; "
          "from lvjiang.core.plugin_runtime import PluginRuntimePort; "
+         "from lvjiang.core.profile.engine import ProfileProcessor; "
+         "from lvjiang.core.update import fetch_latest_release; "
+         "from lvjiang.core.telemetry.reporter import run_report; "
+         "from lvjiang.core.config.remote import run_sync; "
          "assert AppEvent('sample', 'changed').app_id == 'sample'"],
         env=environment, capture_output=True, text=True, encoding="utf-8", timeout=10,
     )

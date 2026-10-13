@@ -178,7 +178,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新总览 UI。"""
         try:
-            from ...core.profile.engine import get_or_create_engine
+            from .engine import get_or_create_engine
             engine = get_or_create_engine(self._host.user_manager)
             engine.data_updated.connect(lambda _user_name: self._schedule_refresh())
         except Exception as e:

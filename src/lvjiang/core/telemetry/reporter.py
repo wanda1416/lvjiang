@@ -1,13 +1,9 @@
-"""通道 A/B 共用的启动期上报编排：TelemetryReporter(QThread)。
+"""无 GUI 的上报作业构造、执行与记账。
 
-三条硬约束（有真坑，逐条抄自现有 AnnouncementChecker 的先例）：
+调用方边界：
 
-1. **payload 在主线程构造**，作为不可变对象传进线程构造函数。构造 payload
-   要读 UserConfig/load_env()/i18n 等，不该在 worker 线程里首次触发懒加载。
-2. **worker 线程内绝对不能写 SessionStore**。``main_window.py`` 给
-   SessionStore 注册了 UI 回调，写锁超时会从调用线程弹 QMessageBox——
-   非主线程弹原生模态框是未定义行为。节流字段的更新必须放在主线程的
-   ``finished`` 槽里做。
+1. 构造不可变 ReportJob 后再交给执行器；桌面在主线程构造，避免后台首次懒加载配置。
+2. run_report 只负责 HTTP 与结果，不写 SessionStore；调用方通过 apply_outcome 记账。
 3. **响应体完全忽略**（见 transport.py），本模块不做任何基于响应内容的
    状态迁移。
 """
@@ -19,7 +15,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from loguru import logger
-from PyQt6.QtCore import QThread, pyqtSignal
 
 from . import spool as spool_mod
 from .sources import SourceBatch
@@ -149,48 +144,32 @@ def plan_requests(job: ReportJob) -> list[
     return plans
 
 
-class TelemetryReporter(QThread):
-    """一次启动期上报。只做 HTTP，不碰 SessionStore。"""
-
-    finished_ok = pyqtSignal(object)  # ReportOutcome
-    failed = pyqtSignal(str)
-
-    def __init__(self, job: ReportJob, parent=None):
-        super().__init__(parent)
-        self._job = job
-
-    def run(self) -> None:
-        job = self._job
-        if job.is_empty:
-            self.finished_ok.emit(
-                ReportOutcome(heartbeat_attempted=False, heartbeat_ok=False,
-                              sent_batches=(), sent_source_batches=()))
-            return
-        sent: list[SpoolChunk] = []
-        sent_sources: list[SourceBatch] = []
-        heartbeat_ok = False
-        try:
-            for heartbeat, chunks in plan_requests(job):
-                ok = post_report(_envelope(heartbeat, chunks))
-                if not ok:
-                    # 中途失败就停：剩余批次留在本地，下次启动重发。
-                    # 已成功的部分照常记账，不因后续失败被重复上报。
-                    break
-                if heartbeat is not None:
-                    heartbeat_ok = True
-                sent.extend(c for c in chunks if isinstance(c, SpoolChunk))
-                sent_sources.extend(
-                    c for c in chunks if isinstance(c, SourceBatch))
-        except Exception as e:  # noqa: BLE001 —— 见模块 docstring：探针出任何意外都不能外抛
-            self.failed.emit(str(e))
-            return
-        self.finished_ok.emit(
-            ReportOutcome(
-                heartbeat_attempted=job.heartbeat is not None,
-                heartbeat_ok=heartbeat_ok,
-                sent_batches=tuple(sent),
-                sent_source_batches=tuple(sent_sources),
-            ))
+def run_report(job: ReportJob) -> ReportOutcome:
+    if job.is_empty:
+        return (
+            ReportOutcome(heartbeat_attempted=False, heartbeat_ok=False,
+                          sent_batches=(), sent_source_batches=()))
+    sent: list[SpoolChunk] = []
+    sent_sources: list[SourceBatch] = []
+    heartbeat_ok = False
+    for heartbeat, chunks in plan_requests(job):
+        ok = post_report(_envelope(heartbeat, chunks))
+        if not ok:
+            # 中途失败就停：剩余批次留在本地，下次启动重发。
+            # 已成功的部分照常记账，不因后续失败被重复上报。
+            break
+        if heartbeat is not None:
+            heartbeat_ok = True
+        sent.extend(c for c in chunks if isinstance(c, SpoolChunk))
+        sent_sources.extend(
+            c for c in chunks if isinstance(c, SourceBatch))
+    return (
+        ReportOutcome(
+            heartbeat_attempted=job.heartbeat is not None,
+            heartbeat_ok=heartbeat_ok,
+            sent_batches=tuple(sent),
+            sent_source_batches=tuple(sent_sources),
+        ))
 
 
 def apply_outcome(outcome: ReportOutcome) -> None:

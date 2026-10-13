@@ -998,12 +998,12 @@ class MainWindow(
         self.tabs.addTab(log_container, tr("运行日志"))
 
         # Profile 是主引擎共享的用户档案能力，不由任何插件注入。
-        from ...core.profile.engine import get_or_create_engine, stop_engine
         from ...core.profile.triggers import (
             get_or_create_script_runner,
             stop_script_runner,
         )
         from ..profile import ProfileTab, UserInfoTab
+        from ..profile.engine import get_or_create_engine, stop_engine
 
         profile_engine = get_or_create_engine(self._user_manager)
         if not profile_engine.isRunning():

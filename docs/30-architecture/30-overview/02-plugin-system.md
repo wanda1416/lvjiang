@@ -220,6 +220,13 @@ class AutoFarmWorkflow(BaseWorkflow):
   `ui/profile/engine.py` 管理桌面线程、信号和生命周期。key 重命名通过无 GUI 更新通知
   发布已提交数据的变化，Qt 订阅在线程停止时解除。
 
+## 配置与布局内部职责
+
+燕云 `GameConfigManager` 保留唯一快照、加载入口、保存与查询门面；
+`game_config_parsers.py` 负责字段解析，`game_config_loader.py` 按领域阶段填充同一实例，
+`affix_queries`、`equipment_queries`、`arts_queries`、`progression_queries` 承担对应查询。
+不创建平行 manager 或缓存，来源优先级和运行快照仍由公共配置层维护。
+
 ### 完整插件注册
 
 插件加载时，`register_hooks()` 会自动：

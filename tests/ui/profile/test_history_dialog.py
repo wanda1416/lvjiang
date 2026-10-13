@@ -64,10 +64,31 @@ def test_history_source_double_click_edit_and_undo_confirmation(qapp, monkeypatc
     table.item(0, 5).setText("正确来源")
     assert source_updates == [(17, "误填来源", "正确来源")]
 
-    undo = table.cellWidget(0, 8)
-    assert isinstance(undo, QPushButton)
+    undo = next(button for button in table.cellWidget(0, 8).findChildren(QPushButton) if button.text() == '撤销')
     assert undo.text() == "撤销"
     undo.click()
     assert undo_calls == [17]
     assert dialog.values_changed
+    dialog.close()
+
+
+def test_history_delete_requires_confirmation_and_refreshes_without_value_change(qapp, monkeypatch):
+    from lvjiang.core.profile import repository
+
+    # 真实临时 DB 验证按钮只删除这一行，不写余额或删除审计。
+    repository.db_upsert('tester', 'stock', 'item', 2, change_type='action', delta_value=2, source='example')
+    repository.db_upsert('tester', 'stock', 'item', 3, change_type='action', delta_value=1, source='example')
+    # 未定义 key 不影响历史删除，按钮不复用撤销的限制。
+    dialog = dialogs.HistoryDialog('tester', 'stock', 'item', '示例')
+    table = dialog._table
+    first = repository.db_get_history('tester', 'stock', 'item')[0]['id']
+    monkeypatch.setattr(QMessageBox, 'question', lambda *a, **kw: QMessageBox.StandardButton.No)
+    next(b for b in table.cellWidget(0, 8).findChildren(QPushButton) if b.text() == '删除').click()
+    assert repository.db_count_history('tester', 'stock', 'item') == 2
+    monkeypatch.setattr(QMessageBox, 'question', lambda *a, **kw: QMessageBox.StandardButton.Yes)
+    next(b for b in table.cellWidget(0, 8).findChildren(QPushButton) if b.text() == '删除').click()
+    assert not repository.db_get_history_record(first)
+    assert repository.db_count_history('tester', 'stock', 'item') == 1
+    assert repository.db_read_entry('tester', 'stock', 'item')['value'] == 3
+    assert table.rowCount() == 1 and not dialog.values_changed
     dialog.close()

@@ -806,6 +806,19 @@ class ProfileDB:
                 params.append(value)
         return " AND ".join(conditions) or "1 = 1", params
 
+    def delete_history(self, history_id: int, username: str, type_: str, key: str) -> bool:
+        """只删除明确归属的这一条历史；不回写余额，不追加删除审计。"""
+        conn = self._borrow_connection()
+        try:
+            cursor = conn.execute(
+                'DELETE FROM profile_history WHERE id=? AND username=? AND type=? AND key=?',
+                (history_id, username, type_, key),
+            )
+            self._commit(conn)
+            return cursor.rowcount == 1
+        finally:
+            self._release_connection(conn)
+
     def cleanup_history(self, days: int = 90) -> int:
         """清理 N 天前的历史记录，返回删除行数"""
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")

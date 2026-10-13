@@ -120,6 +120,14 @@ def undo_profile_history(history_id: int) -> None:
         raise ProfileWriteConflict(tr("数据已发生变化，请刷新后重试"))
 
 
+@profile_write
+def delete_profile_history(history_id: int, username: str, model_type: str, key: str) -> None:
+    from .repository import get_profile_db
+
+    if not get_profile_db().delete_history(history_id, username, model_type, key):
+        raise ProfileWriteConflict(tr('该条历史已不存在或归属不匹配，请刷新后重试'))
+
+
 def _is_continuous_regen(kd) -> bool:
     return isinstance(kd, RegenKeyDef) and is_realtime_regen(kd)
 

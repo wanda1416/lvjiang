@@ -23,7 +23,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 
 from lvjiang.core.paths import get_config_local_dir  # noqa: E402
 from lvjiang.core.profile import engine, repository, schema, triggers  # noqa: E402
-from lvjiang.core.profile.service import profile_action, profile_read  # noqa: E402
+from lvjiang.core.profile.service import (  # noqa: E402
+    delete_profile_history,
+    profile_action,
+    profile_read,
+)
 from lvjiang.core.profile.transactions import ProfileWriteRejected  # noqa: E402
 from lvjiang.workflows.grammar import parse_file  # noqa: E402
 
@@ -190,9 +194,14 @@ def verify_source_limits(wf: Path, runner: triggers.ProfileScriptRunner) -> None
             profile_action(user, key, delta=-1, source='example consumption')
             denied(user, source)  # 消耗不能释放获取额度。
             denied(user, source, set_value=cap, is_action=False)  # 正向覆写不能绕过。
+            receipt = next(row for row in repository.db_get_history(user, 'stock', key)
+                           if row['delta_value'] == 1)
+            delete_profile_history(receipt['id'], user, 'stock', key)
+            assert profile_read(user, key) == cap - 1
+            profile_action(user, key, delta=1, source=source)  # 删除历史释放额度，但不改余额。
         denied('example-invalid-source', 'unknown source')
         assert not runner.is_busy
-    print('PASS: 五个来源上限、跨界拒绝、未知来源拒绝、消耗不退额度、覆写限制')
+    print('PASS: 五个来源上限、跨界拒绝、未知来源拒绝、消耗不退额度、覆写限制、删除历史释放额度')
 
 
 if __name__ == '__main__':

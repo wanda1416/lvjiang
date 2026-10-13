@@ -39,6 +39,7 @@ from ...core.profile.repository import (
 )
 from ...core.profile.service import (
     ProfileWriteConflict,
+    delete_profile_history,
     profile_history_undo_unavailable_reason,
     undo_profile_history,
 )
@@ -311,7 +312,18 @@ class HistoryDialog(QDialog):
                 lambda _checked=False, record=rec, old=old_str, new=new_str:
                 self._confirm_undo(record, old, new)
             )
-            table.setCellWidget(row, self._ACTION_COLUMN, undo_button)
+            delete_button = QPushButton(tr('删除'), table)
+            apply_button_style(delete_button, variant='neutral')
+            fit_button_width(undo_button, delete_button)
+            delete_button.setToolTip(tr('仅删除历史，不修改当前值；会影响按历史统计的额度'))
+            delete_button.clicked.connect(lambda _checked=False, record=rec: self._confirm_delete(record))
+            actions = QWidget(table)
+            action_layout = QHBoxLayout(actions)
+            action_layout.setContentsMargins(0, 0, 0, 0)
+            action_layout.addWidget(undo_button)
+            action_layout.addWidget(delete_button)
+            table.setCellWidget(row, self._ACTION_COLUMN, actions)
+            table.setColumnWidth(self._ACTION_COLUMN, actions.sizeHint().width())
         self._loading_history = False
 
         start = (self._page - 1) * self._page_size + 1 if total else 0
@@ -382,6 +394,25 @@ class HistoryDialog(QDialog):
             self._load_page()
             return
         self.values_changed = True
+        self._load_page()
+
+    def _confirm_delete(self, record: dict) -> None:
+        message = tr(
+            '确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n'
+            '时间：{time}\n来源：{source}\n变动量：{delta}\n\n'
+            '仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；'
+            '删除获取记录可能释放按历史累计的来源额度。'
+        ).format(username=record.get('username', ''), label=self._key_label,
+                 time=record.get('ts', ''), source=record.get('source', ''), delta=record.get('delta_value'))
+        answer = QMessageBox.question(self, tr('确认删除'), message,
+                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                      QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            delete_profile_history(int(record['id']), str(record['username']), self._model_type, self._key)
+        except Exception as error:  # noqa: BLE001 - 失败保留界面并给出可行动提示
+            QMessageBox.warning(self, tr('删除失败'), str(error))
         self._load_page()
 
 

@@ -35,6 +35,7 @@ from ..config.models import AndroidRecoveryConfig
 from ..input_base import InputBackend, InputBackendKind
 from .device import AdbDevice
 from .input import _KEY_TO_ANDROID_KEYCODE, AdbInput
+from .recovery import RecoveryAction
 
 #: 设备端 LocalServerSocket 的 abstract 名（与 AgentServer.SOCKET_NAME 一致）
 AGENT_SOCKET_NAME = "lvjiang-agent"
@@ -130,11 +131,18 @@ class AgentClient:
         self._lock = threading.RLock()
         self._status: dict = {}
         self._owns_execution = False
-        self.recovery = AndroidRecoveryConfig()
 
     @property
     def device(self) -> AdbDevice:
         return self._device
+
+    @property
+    def recovery(self) -> AndroidRecoveryConfig:
+        return self._device.recovery
+
+    @recovery.setter
+    def recovery(self, policy: AndroidRecoveryConfig) -> None:
+        self._device.recovery = policy
 
     @property
     def timeout(self) -> float:
@@ -333,22 +341,9 @@ class AgentClient:
         return True
 
     def _retry_connection(self) -> bool:
-        for attempt in range(1, self.recovery.agent_attempts + 1):
-            stopped = getattr(self._device, "stop_check", None)
-            if stopped and stopped():
-                raise AgentTransportError("代理连接恢复已停止")
-            logger.info("[Agent] 重建连接 {}/{}", attempt, self.recovery.agent_attempts)
-            try:
-                if self._reconnect():
-                    restored = getattr(self._device, "on_connection_restored", None)
-                    if restored:
-                        restored()
-                    return True
-            except (AgentError, OSError, subprocess.TimeoutExpired) as error:
-                logger.debug("[Agent] 本次重连未完成：{}", error)
-            if attempt < self.recovery.agent_attempts:
-                self._device.wait_retry_interval()
-        return False
+        return self._device.recovery_coordinator.retry(
+            "Agent", self._reconnect, self.recovery.agent_attempts,
+            (AgentTransportError, OSError, subprocess.TimeoutExpired))
 
     # ─── 调用 ─────────────────────────────────────────────
 
@@ -369,6 +364,7 @@ class AgentClient:
             try:
                 header, payload = self._roundtrip(op, timeout, **params)
             except AgentTransportError as first:
+                self._device.recovery_coordinator.recovering = True
                 logger.warning(f"[Agent] 传输失败，尝试重连: {first}")
                 if not self._retry_connection():
                     raise
@@ -378,6 +374,7 @@ class AgentClient:
             if not header.get("ok"):
                 raise AgentOpError(str(header.get("error") or header.get("message") or "设备端未说明原因"),
                                    retryable=bool(header.get("retryable")))
+            self._device.recovery_coordinator.succeeded()
             return header, payload
 
     def refresh_status(self) -> dict:
@@ -433,10 +430,7 @@ class AgentCapture(A11yScreenshotThrottle, CaptureBackend):
         for attempt in range(1, self._MAX_ATTEMPTS + 1):
             self._pace()
             try:
-                header, payload = self._client.call(
-                    "screenshot", timeout=timeout + 5.0,
-                    via=self._via, timeout_ms=int(timeout * 1000),
-                )
+                header, payload = self._request_frame(timeout)
             except AgentOpError as e:
                 if e.retryable and attempt < self._MAX_ATTEMPTS:
                     logger.debug(f"[Agent] 截图失败（{e}），{self._RETRY_DELAY}s 后重试 {attempt}/{self._MAX_ATTEMPTS - 1}")
@@ -455,6 +449,17 @@ class AgentCapture(A11yScreenshotThrottle, CaptureBackend):
             self._size = (w, h)
             return img
         return None
+
+    def _request_frame(self, timeout: float) -> tuple[dict, bytes]:
+        while True:
+            self._client.device.recovery_coordinator.check_stop()
+            try:
+                return self._client.call("screenshot", timeout=timeout + 5.0,
+                                         via=self._via, timeout_ms=int(timeout * 1000))
+            except AgentTransportError as error:
+                # 截图可安全重试；不把断线当作空 OCR，也不改变用户选定的截图方式。
+                self._client.device.recovery_coordinator.after_agent_failure(
+                    error, "代理截图", uncertain=False, fallback_supported=False)
 
     def get_capture_size(self) -> tuple[int, int]:
         if self._size is None and self.capture() is None:
@@ -496,6 +501,7 @@ class AgentInput(InputBackend):
     """
 
     kind = InputBackendKind.AGENT
+    _ADB_OPERATIONS = frozenset({"tap", "long_press", "swipe", "hold_move", "key", "control_begin"})
 
     def __init__(self, client: AgentClient, input_sim: InputSimConfig | None = None):
         self._inject_input_sim(self, input_sim)
@@ -508,7 +514,6 @@ class AgentInput(InputBackend):
     def configure_recovery(self, policy: AndroidRecoveryConfig) -> None:
         """宿主启动一次执行链时调用；批量内的脚本不重新读取设置。"""
         self._client.recovery = policy
-        self._client.device.recovery = policy
         self._using_adb = False
         self.kind = InputBackendKind.AGENT
 
@@ -535,8 +540,8 @@ class AgentInput(InputBackend):
         return self._client
 
     #: 手势 RPC 超时 = 手势自身时长 + 这段余量。默认 15s 超时对
-    #: ``click ... hold 20`` 这类长手势不够：客户端超时后 call() 会重连并
-    #: 原样重发，设备端会把同一个长按/推住再执行一遍。
+    #: ``click ... hold 20`` 这类长手势不够；避免手势尚未结束便因超时
+    #: 进入结果不确定的恢复确认流程。
     _GESTURE_TIMEOUT_MARGIN = 5.0
 
     def _call(self, op: str, what: str, *, gesture_ms: int = 0,
@@ -557,6 +562,7 @@ class AgentInput(InputBackend):
                 raise AgentTransportError("输入恢复已停止")
             if self._using_adb:
                 self._call_adb(op, **params)
+                self._client.device.recovery_coordinator.succeeded()
                 return
             try:
                 self._client.call(op, timeout=timeout, **params)
@@ -564,23 +570,15 @@ class AgentInput(InputBackend):
             except AgentTransportError as error:
                 logger.warning("[Agent] {}未完成：{}", what, error)
                 device = self._client.device
-                adb_ready = device.reconnect()
-                if error.request_sent and op != "control_begin":
-                    device.wait_for_connection_recovery(
-                        error, f"{what}已发送但未取得响应，动作可能已经执行；确认继续将重新尝试当前动作")
-                    continue
-                supported = op in {"tap", "swipe", "hold_move", "key", "control_begin"}
-                if adb_ready and self._client.recovery.allow_adb_fallback and supported:
+                action = device.recovery_coordinator.after_agent_failure(
+                    error, what, uncertain=error.request_sent and op != "control_begin",
+                    fallback_supported=op in self._ADB_OPERATIONS)
+                if action is RecoveryAction.FALLBACK:
                     self._using_adb = True
                     self.kind = InputBackendKind.ADB
                     self._client.close()
                     self._client._owns_execution = False
                     logger.warning("[输入] 代理恢复失败，已降级为 ADB；本次运行使用 ADB 输入")
-                    if device.on_connection_restored:
-                        device.on_connection_restored()
-                    continue
-                detail = "当前操作需要设备端代理，请恢复手机代理" if not supported else "请恢复代理或 ADB 连接"
-                device.wait_for_connection_recovery(error, detail)
             except AgentOpError as error:
                 logger.warning("[Agent] {}未成功：{}", what, error)
                 raise
@@ -591,9 +589,10 @@ class AgentInput(InputBackend):
             self._adb = AdbInput(self._client.device)
         if op == "control_begin":
             return
-        if op == "tap":
+        if op in {"tap", "long_press"}:
             self._adb.click_screen(params["x"], params["y"], pre_delay=(0, 0),
-                                   post_delay=(0, 0), random_offset=False)
+                                   post_delay=(0, 0), random_offset=False,
+                                   hold=params.get("duration_ms", 50) / 1000 if op == "long_press" else None)
         elif op in {"swipe", "hold_move"}:
             move = params.get("move_ms", params.get("duration_ms", 100)) / 1000
             hold = params.get("hold_ms", 0) / 1000

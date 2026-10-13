@@ -1657,14 +1657,15 @@ class RunControlMixin:
             btn.setEnabled(False)
             apply_execution_button_style(btn, "disabled")
 
-    # ─── ADB 断连暂停恢复 ────────────────────────────────
+    # ─── Android 执行通道恢复 ────────────────────────────
 
     def _on_adb_connection_lost(self, target_id: str, error_msg: str):
         """某台 ADB 设备断连；仅运行目标可以打断当前任务。"""
         target = self._execution_targets.get(target_id)
         if target is None:
             return
-        target.status = "offline"
+        coordinator = getattr(getattr(target, "device", None), "recovery_coordinator", None)
+        target.status = "connected" if getattr(coordinator, "waiting_kind", "") == "uncertain_action" else "offline"
         self._refresh_execution_targets_ui()
         run_context = self._run_manager.run_for_target(target_id)
         if run_context is None:
@@ -1680,7 +1681,7 @@ class RunControlMixin:
         self._emit_run_instance_state(
             run_context, RunState.WAITING_TARGET.value)
         message = tr(
-            "[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；"
+            "[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；"
             "若无法恢复，请按 F10 停止任务后重新连接: {error}").format(
                 name=target.display_name, error=error_msg)
         self.log_text.append(message)
@@ -1688,13 +1689,13 @@ class RunControlMixin:
         if target_id != self._execution_targets.active_target_id:
             return
         self.statusBar().showMessage(tr(
-            "ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止"))
+            "设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务"))
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
             label = getattr(self, '_adb_banner_label', None)
             if label is not None:
                 label.setText(tr(
-                    "⚠ ADB 连接异常：恢复设备连接后点击「恢复」；"
+                    "⚠ 执行通道等待确认：处理问题后点击「重新检查」；"
                     "无法恢复时请按 F10 停止任务"))
             btn = getattr(self, '_adb_banner_btn', None)
             if btn is not None:
@@ -1781,7 +1782,7 @@ class RunControlMixin:
                 banner.setVisible(False)
 
     def _resume_adb(self):
-        """用户点击「恢复」：唤醒工作流线程，重试失败的 ADB 命令"""
+        """唤醒对应线程重新检查；不能在尚未成功时宣告恢复。"""
         # 横幅只为当前查看目标显示，因此唤醒的也必须是该目标的运行实例
         run_context = getattr(self, "_current_run_context", None)
         if run_context is not None:
@@ -1794,20 +1795,8 @@ class RunControlMixin:
         resume_event = self._run_resume_event(run_context)
         if resume_event is not None:
             resume_event.set()
-            if run_context is not None:
-                from .execution_runs import RunState
-                next_state = (
-                    RunState.PAUSED
-                    if run_context.pause_event is not None
-                    and not run_context.pause_event.is_set()
-                    else RunState.RUNNING)
-                self._run_manager.set_state(run_context.task_run_id, next_state)
-                self._emit_run_instance_state(run_context, next_state.value)
-            self.statusBar().showMessage(tr("已恢复，继续执行..."))
-            self.log_text.append(tr("[操作] ADB 已恢复，工作流继续"))
-        banner = getattr(self, '_adb_banner', None)
-        if banner is not None:
-            banner.setVisible(False)
+            self.statusBar().showMessage(tr("正在重新检查设备执行通道..."))
+            self.log_text.append(tr("[操作] 重新检查设备执行通道"))
 
     # ─── 后端就绪判定 ──────────────────────────────────
 

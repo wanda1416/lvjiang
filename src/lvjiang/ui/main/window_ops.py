@@ -1108,6 +1108,7 @@ class WindowOpsMixin:
         bridge.adb_restored.connect(self._on_adb_connection_restored)
         device.on_connection_lost = bridge.notify_lost
         device.on_connection_restored = bridge.notify_restored
+        device.can_wait_for_recovery = lambda tid=target_id: self._run_manager.run_for_target(tid) is not None
         device.stop_check = lambda tid=target_id: bool(
             (run := self._run_manager.run_for_target(tid))
             and run.stop_event.is_set())

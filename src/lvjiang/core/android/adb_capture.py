@@ -13,7 +13,7 @@ import numpy as np
 from loguru import logger
 
 from ..capture_base import CaptureBackend
-from .device import AdbDevice
+from .device import AdbConnectionError, AdbDevice
 
 
 class AdbCapture(CaptureBackend):
@@ -56,7 +56,9 @@ class AdbCapture(CaptureBackend):
             timeout: 单次 screencap 超时秒数（默认 10s，screencap 比 minicap 慢）
         """
         try:
-            png_bytes = self._device.shell_bytes("exec-out", "screencap", "-p", timeout=timeout)
+            png_bytes = self._device.shell_bytes("exec-out", "screencap", "-p", timeout=timeout, retry_safe=True)
+        except AdbConnectionError:
+            raise  # 停止/无法恢复不能伪装为正常的空截图。
         except Exception as e:
             logger.error(f"adb screencap 执行异常: {e}")
             return None

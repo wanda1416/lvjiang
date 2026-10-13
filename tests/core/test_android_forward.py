@@ -57,9 +57,10 @@ def test_device_identity_is_independent_from_transport(monkeypatch):
     device = AdbDevice("192.168.1.20:5555", adb_path="adb")
     calls: list[tuple[str, ...]] = []
 
-    def fake_shell(*args: str, timeout: float = 0) -> str:
+    def fake_shell(*args: str, timeout: float = 0, retry_safe: bool = False) -> str:
         calls.append(args)
         assert timeout == 5.0
+        assert retry_safe
         return "stable-android-id\n"
 
     monkeypatch.setattr(device, "shell", fake_shell)
@@ -76,8 +77,9 @@ def test_device_identity_is_independent_from_transport(monkeypatch):
 def test_device_identity_falls_back_when_a_source_cannot_be_read(monkeypatch):
     device = AdbDevice("usb-transport", adb_path="adb")
 
-    def fake_shell(*args: str, timeout: float = 0) -> str:
+    def fake_shell(*args: str, timeout: float = 0, retry_safe: bool = False) -> str:
         assert timeout == 5.0
+        assert retry_safe
         if args[0] == "settings":
             raise RuntimeError("settings unavailable")
         return "hardware-serial\n"

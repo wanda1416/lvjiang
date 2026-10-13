@@ -535,7 +535,7 @@ class MainWindow(
         self._adb_banner_label = QLabel()
         self._adb_banner_label.setStyleSheet("color: white; font-weight: bold;")
         _bl.addWidget(self._adb_banner_label, stretch=1)
-        self._adb_banner_btn = QPushButton(tr("恢复"))
+        self._adb_banner_btn = QPushButton(tr("重新检查"))
         self._adb_banner_btn.setStyleSheet(
             "background-color: white; color: #d32f2f; font-weight: bold; "
             "padding: 2px 12px; border: none; font-size: 12px;"

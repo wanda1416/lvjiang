@@ -1,10 +1,17 @@
 """代理/ADB 故障恢复不能丢任务、重放不明输入或伪装并发能力。"""
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
-from lvjiang.core.android.agent import AgentClient, AgentInput, AgentTransportError
+from lvjiang.core.android.agent import (
+    AgentCapture,
+    AgentClient,
+    AgentInput,
+    AgentOpError,
+    AgentTransportError,
+)
 from lvjiang.core.android.device import AdbConnectionError, AdbDevice
 from lvjiang.core.config.models import AndroidRecoveryConfig
 
@@ -138,3 +145,92 @@ def test_adb_reconnect_restores_only_requested_transport_without_killing_server(
         ['test-adb', 'connect', 'test-host:5555'],
         ['test-adb', '-s', 'test-host:5555', 'shell', 'echo', 'lvjiang-ready'],
     ]
+
+
+@pytest.mark.parametrize('retry_safe', [True, False], ids=['read', 'input'])
+def test_adb_timeout_replays_only_safe_reads_without_confirmation(monkeypatch, retry_safe):
+    device = AdbDevice(serial='test-device', adb_path='test-adb')
+    device.recovery.retry_interval = 0
+    run = Mock(side_effect=[subprocess.TimeoutExpired('command', 1),
+                           SimpleNamespace(returncode=0, stdout='ok', stderr='')])
+    monkeypatch.setattr('lvjiang.core.android.device.subprocess.run', run)
+    restored = Mock()
+    device.on_connection_restored = restored
+    def probe():
+        restored.assert_not_called()
+        return True
+    monkeypatch.setattr(device, '_reconnect_once', probe)
+    prompts = []
+    def confirm(message):
+        assert not retry_safe
+        assert run.call_count == 1 and '可能已经执行' in message
+        restored.assert_not_called()
+        prompts.append(message)
+        device.resume_event.set()
+    device.on_connection_lost = confirm
+    assert device.shell('test-operation', retry_safe=retry_safe) == 'ok'
+    assert len(prompts) == (0 if retry_safe else 1)
+    restored.assert_called_once()
+
+
+def test_agent_capture_waits_for_recovery_without_empty_frame_or_capture_fallback(monkeypatch):
+    device, client, _, shell = setup_input(monkeypatch)
+    call = Mock(side_effect=[AgentTransportError('断线', request_sent=True),
+                            ({'ok': True, 'fmt': 'rgba', 'w': 1, 'h': 1}, bytes([1, 2, 3, 255]))])
+    monkeypatch.setattr(client, 'call', call)
+    monkeypatch.setattr(device, '_reconnect_once', lambda: True)
+    def confirm(message):
+        assert '代理截图' in message
+        assert call.call_count == 1
+        shell.assert_not_called()
+        device.resume_event.set()
+    device.on_connection_lost = confirm
+    frame = AgentCapture(client).capture()
+    assert frame is not None and frame[0, 0].tolist() == [3, 2, 1]
+    assert call.call_count == 2
+    shell.assert_not_called()
+
+
+def test_agent_long_press_can_fall_back_to_same_duration_adb_gesture(monkeypatch):
+    device, client, backend, shell = setup_input(monkeypatch)
+    monkeypatch.setattr(client, '_reconnect', lambda: False)
+    monkeypatch.setattr(device, '_reconnect_once', lambda: True)
+    backend._call('long_press', '长按', x=12, y=24, duration_ms=750)
+    assert backend._using_adb
+    assert shell.call_args.args == ('input', 'swipe', '12', '24', '12', '24', '750')
+
+
+def test_inactive_target_reports_failure_instead_of_waiting_forever(monkeypatch):
+    device = AdbDevice(serial='test-device', adb_path='test-adb')
+    device.on_connection_lost = Mock()
+    device.can_wait_for_recovery = lambda: False
+    with pytest.raises(AdbConnectionError, match='当前没有运行任务'):
+        device.wait_for_connection_recovery(OSError('offline'), '读取预览')
+    device.on_connection_lost.assert_called_once()
+
+
+def test_read_retry_budget_exhausts_even_when_transport_probe_succeeds(monkeypatch):
+    device = AdbDevice(serial='test-device', adb_path='test-adb')
+    device.recovery.retry_interval = 0
+    run = Mock(side_effect=[subprocess.TimeoutExpired('screencap', 1)] * 3 + [
+        SimpleNamespace(returncode=0, stdout=b'frame', stderr=b'')])
+    monkeypatch.setattr('lvjiang.core.android.device.subprocess.run', run)
+    monkeypatch.setattr(device, '_reconnect_once', lambda: True)
+    def confirm(message):
+        assert run.call_count == 3 and '读取重试耗尽' in message
+        device.resume_event.set()
+    device.on_connection_lost = confirm
+    assert device.shell_bytes('exec-out', 'screencap', '-p', retry_safe=True) == b'frame'
+    assert run.call_count == 4
+
+
+def test_execution_ownership_denial_does_not_bypass_agent_via_adb(monkeypatch):
+    device, client, backend, shell = setup_input(monkeypatch)
+    monkeypatch.setattr(client, '_reconnect', Mock(side_effect=AgentOpError('手机离线任务正在执行')))
+    adb = Mock(return_value=True)
+    monkeypatch.setattr(device, '_reconnect_once', adb)
+    with pytest.raises(AgentOpError, match='离线任务'):
+        backend._call('tap', '点击', x=12, y=24)
+    adb.assert_not_called()
+    shell.assert_not_called()
+    assert not backend._using_adb

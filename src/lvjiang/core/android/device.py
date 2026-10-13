@@ -18,10 +18,8 @@ from ..platforms import (
     SUBPROCESS_TEXT,
     adb_path_candidates,
 )
-
-
-class AdbConnectionError(RuntimeError):
-    """ADB 连接/通信异常，用户恢复后重试或停止后终止"""
+from .recovery import AdbConnectionError as AdbConnectionError
+from .recovery import AndroidRecovery
 
 
 @dataclass(frozen=True)
@@ -129,7 +127,9 @@ class AdbDevice:
         self.resume_event = threading.Event()
         self.resume_event.set()  # 初始为已恢复，不阻塞
         self.stop_check: Callable[[], bool] | None = None
+        self.can_wait_for_recovery: Callable[[], bool] | None = None
         self.recovery = AndroidRecoveryConfig()
+        self.recovery_coordinator = AndroidRecovery(self)
 
     # ─── 命令前缀 ─────────────────────────────────────────
 
@@ -165,7 +165,7 @@ class AdbDevice:
         )
         for source, command in candidates:
             try:
-                value = self.shell(*command, timeout=5.0).strip()
+                value = self.shell(*command, timeout=5.0, retry_safe=True).strip()
             except Exception as exc:  # noqa: BLE001
                 logger.debug(f"读取 Android 设备身份 {source} 失败，尝试下一来源: {exc}")
                 continue
@@ -188,14 +188,7 @@ class AdbDevice:
     # ─── 基础执行 ─────────────────────────────────────────
 
     def wait_retry_interval(self) -> None:
-        deadline = time.monotonic() + self.recovery.retry_interval
-        while True:
-            if self.stop_check and self.stop_check():
-                raise AdbConnectionError("连接恢复已停止")
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return
-            time.sleep(min(0.1, remaining))
+        self.recovery_coordinator.wait_interval()
 
     def _reconnect_once(self) -> bool:
         """只恢复当前 transport，不 kill-server，不发任何游戏输入。"""
@@ -215,58 +208,27 @@ class AdbDevice:
         return probe()
 
     def reconnect(self) -> bool:
-        for attempt in range(1, self.recovery.adb_attempts + 1):
-            if self.stop_check and self.stop_check():
-                raise AdbConnectionError("连接恢复已停止")
-            logger.info("[ADB] 检查并恢复连接 {}/{}", attempt, self.recovery.adb_attempts)
-            try:
-                if self._reconnect_once():
-                    if self.on_connection_restored:
-                        self.on_connection_restored()
-                    return True
-            except (subprocess.TimeoutExpired, OSError) as error:
-                logger.debug("[ADB] 本次恢复未完成：{}", error)
-            if attempt < self.recovery.adb_attempts:
-                self.wait_retry_interval()
-        return False
+        return self.recovery_coordinator.retry(
+            "ADB", self._reconnect_once, self.recovery.adb_attempts,
+            (subprocess.TimeoutExpired, OSError))
 
-    def _handle_connection_error(self, error: Exception, cmd_desc: str):
+    def _handle_connection_error(self, error: Exception, cmd_desc: str, *, retry_safe: bool = False,
+                                 failed_attempts: int = 1) -> bool:
         """自动恢复耗尽后等待用户确认；调用方随后重试原命令。"""
-        if self.reconnect() and not isinstance(error, subprocess.TimeoutExpired):
-            return
-        if isinstance(error, subprocess.TimeoutExpired):
-            cmd_desc += "；命令可能已执行，确认继续将重新尝试"
-        self.wait_for_connection_recovery(error, cmd_desc)
+        return self.recovery_coordinator.recover_adb(
+            error, cmd_desc, retry_safe=retry_safe, failed_attempts=failed_attempts)
 
     def wait_for_connection_recovery(self, error: Exception, cmd_desc: str) -> None:
-        err_msg = f"{cmd_desc} 失败: {error}"
-        logger.warning(f"连接恢复等待人工确认: {err_msg}")
-        if self.on_connection_lost is None:
-            # 没人能收到通知去点「恢复」，也没人能喊停：等下去只会让调用线程
-            # 永久卡住。没有恢复通道时失败必须可见，直接报错交回上层。
-            raise AdbConnectionError(
-                f"{cmd_desc} 失败且无恢复通道: {error}"
-            ) from None
-        # 先清事件再发通知，避免 UI 立即确认却被随后 clear 吞掉。
-        self.resume_event.clear()
-        self.on_connection_lost(err_msg)
-        while True:
-            if self.stop_check and self.stop_check():
-                self.resume_event.set()
-                raise AdbConnectionError(
-                    f"{cmd_desc} 失败且用户停止: {error}"
-                ) from None
-            if self.resume_event.wait(timeout=1.0):
-                logger.info("用户确认恢复，重新检查连接")
-                self.resume_event.clear()
-                return
+        self.recovery_coordinator.wait_for_user(error, cmd_desc)
 
-    def shell(self, *args: str, timeout: float = 15.0) -> str:
-        """执行 adb shell 命令，返回 stdout 文本"""
+    def shell(self, *args: str, timeout: float = 15.0, retry_safe: bool = False) -> str:
+        """执行 adb shell 命令；仅明确只读的调用方可声明 retry_safe。"""
         retried = False
+        failures = 0
         while True:
             try:
                 if retried:
+                    self.recovery_coordinator.check_stop()
                     logger.info(f"ADB 重试: adb shell {' '.join(args)}")
                 r = subprocess.run(
                     [*self._base(), "shell", *args],
@@ -281,17 +243,23 @@ class AdbDevice:
                     if self._is_disconnect_error(stderr_msg):
                         raise OSError(stderr_msg)
                     logger.debug(f"adb shell {args} 返回码 {r.returncode}: {stderr_msg}")
+                if r.returncode == 0:
+                    self.recovery_coordinator.succeeded()
                 return (r.stdout or "").strip()
             except (subprocess.TimeoutExpired, OSError) as e:
-                self._handle_connection_error(e, f"adb shell {args}")
+                failures += 1
+                if self._handle_connection_error(e, f"adb shell {args}", retry_safe=retry_safe, failed_attempts=failures):
+                    failures = 0
                 retried = True
 
-    def shell_bytes(self, *args: str, timeout: float = 15.0) -> bytes:
-        """执行 adb 命令返回原始字节流（如 exec-out screencap）"""
+    def shell_bytes(self, *args: str, timeout: float = 15.0, retry_safe: bool = False) -> bytes:
+        """执行 adb 命令返回字节流；仅明确只读的调用方可声明 retry_safe。"""
         retried = False
+        failures = 0
         while True:
             try:
                 if retried:
+                    self.recovery_coordinator.check_stop()
                     logger.info(f"ADB 重试: adb {' '.join(args)}")
                 r = subprocess.run(
                     [*self._base(), *args],
@@ -304,9 +272,13 @@ class AdbDevice:
                         stderr_msg = stderr_msg.decode(errors="replace")
                     if self._is_disconnect_error(stderr_msg):
                         raise OSError(stderr_msg)
+                if r.returncode == 0:
+                    self.recovery_coordinator.succeeded()
                 return r.stdout
             except (subprocess.TimeoutExpired, OSError) as e:
-                self._handle_connection_error(e, f"adb {args}")
+                failures += 1
+                if self._handle_connection_error(e, f"adb {args}", retry_safe=retry_safe, failed_attempts=failures):
+                    failures = 0
                 retried = True
 
     def forward(self, local: str, remote: str) -> bool:
@@ -428,7 +400,7 @@ class AdbDevice:
         """获取物理分辨率 (width, height)，解析 `wm size`"""
         if self._resolution is not None:
             return self._resolution
-        out = self.shell("wm", "size")
+        out = self.shell("wm", "size", retry_safe=True)
         # 优先 Physical size，其次 Override size
         w, h = 0, 0
         phys = re.search(r"Physical size:\s*(\d+)x(\d+)", out)
@@ -444,13 +416,13 @@ class AdbDevice:
     def get_abi(self) -> str:
         """获取主 abi（ro.product.cpu.abi）"""
         if self._abi is None:
-            self._abi = self.shell("getprop", "ro.product.cpu.abi") or "arm64-v8a"
+            self._abi = self.shell("getprop", "ro.product.cpu.abi", retry_safe=True) or "arm64-v8a"
         return self._abi
 
     def get_sdk(self) -> int:
         """获取 sdk 版本（ro.build.version.sdk）"""
         if self._sdk is None:
-            raw = self.shell("getprop", "ro.build.version.sdk")
+            raw = self.shell("getprop", "ro.build.version.sdk", retry_safe=True)
             try:
                 self._sdk = int(raw)
             except (ValueError, TypeError):

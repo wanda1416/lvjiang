@@ -32,6 +32,7 @@ from lvjiang.core.android.agent import (
     encode_request,
     read_response,
 )
+from lvjiang.core.android.device import AdbDevice
 from lvjiang.core.config import InputSimConfig
 
 _FRAME = struct.Struct(">I")
@@ -103,10 +104,12 @@ def _status(**over):
     return base
 
 
-class _FakeDevice:
+class _FakeDevice(AdbDevice):
     """只记录 forward 调用的 AdbDevice 桩"""
 
     def __init__(self):
+        super().__init__(serial="test-device", adb_path="test-adb")
+        self.recovery.retry_interval = 0
         self.forwards: list[tuple[str, str]] = []
         self.removed: list[str] = []
 

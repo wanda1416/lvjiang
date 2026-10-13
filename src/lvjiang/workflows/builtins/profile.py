@@ -31,6 +31,28 @@ def _profile_reject(_engine, message: str, *args):
     reject_write(str(message))
 
 
+@builtin_func('profile_history_aggregate')
+def _profile_history_aggregate(
+    _engine, key: str, operation: str = 'sum', source: str | None = None,
+    change_types=None, direction: str = 'all', since: str | None = None, until: str | None = None,
+) -> float:
+    """历史 delta 聚合，当前用户隔离；默认所有类型，可指定来源、类型、方向及时间范围。"""
+    from ...core.profile.models import parse_sync_key
+    from ...core.profile.repository import get_profile_db
+    from ...core.profile.schema import get_profile_config
+
+    model, name = parse_sync_key(key)
+    resolved_model = model or get_profile_config().get_model_type(name)
+    if resolved_model is None or resolved_model == 'note':
+        raise ValueError('历史数值聚合需要明确的数值模型 key')
+    if isinstance(change_types, str):
+        change_types = [change_types]
+    return get_profile_db().aggregate_history(
+        _get_username(_engine), resolved_model, name, operation=operation, source=source,
+        change_types=change_types, direction=direction, since=since, until=until,
+    )
+
+
 @builtin_func("user_get")
 def _user_get(_engine, username: str, key: str, *args):
     """按内部用户名读取用户资料属性；不存在时返回 null。"""

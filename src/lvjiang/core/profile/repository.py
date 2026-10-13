@@ -584,6 +584,42 @@ class ProfileDB:
 
     # ─── History 查询 ───
 
+    def aggregate_history(
+        self, username: str, type_: str, key: str, *, operation: str = 'sum',
+        source: str | None = None, change_types: list[str] | None = None,
+        direction: str = 'all', since: str | None = None, until: str | None = None,
+    ) -> float:
+        """按当前连接聚合实际变动量；事务内可见尚未提交的关联写入。"""
+        operations = {'sum': 'SUM', 'count': 'COUNT', 'min': 'MIN', 'max': 'MAX', 'avg': 'AVG'}
+        if operation not in operations:
+            raise ValueError(f'不支持的历史聚合方式: {operation}')
+        if direction not in {'all', 'pos', 'neg'}:
+            raise ValueError(f'不支持的历史变动方向: {direction}')
+        conditions = ['username=?', 'type=?', 'key=?']
+        params: list[object] = [username, type_, key]
+        # 老历史可能未记录 delta；由已有旧新值计算，不写回历史。
+        amount = 'COALESCE(delta_value, new_value - COALESCE(old_value, 0))'
+        for column, value, comparator in (('source', source, '='), ('ts', since, '>='), ('ts', until, '<')):
+            if value is not None:
+                conditions.append(f'{column}{comparator}?')
+                params.append(value)
+        if change_types is not None:
+            if not change_types:
+                return 0.0
+            conditions.append('change_type IN (' + ','.join('?' for _ in change_types) + ')')
+            params.extend(change_types)
+        if direction != 'all':
+            conditions.append(amount + (' > 0' if direction == 'pos' else ' < 0'))
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                f'SELECT {operations[operation]}({amount}) FROM profile_history WHERE ' + ' AND '.join(conditions),
+                params,
+            ).fetchone()
+            return float(row[0] or 0)
+        finally:
+            self._release_connection(conn)
+
     def get_history(
         self,
         username: str | None,

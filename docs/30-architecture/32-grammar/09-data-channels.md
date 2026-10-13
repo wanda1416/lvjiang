@@ -242,6 +242,7 @@ regen 模型区分两种刷新机制，DSL 函数自动处理：
 |------|------|------|
 | `profile_get` | `(key) -> float \| str \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值，note 返回文本 |
 | `profile_set` | `(key, value) -> float \| str` | 写入 profile 值；realtime regen 自动规范化时间锚点，note 直接写文本 |
+| `profile_history_aggregate` | `(key, operation?, source?, change_types?, direction?, since?, until?) -> float` | 当前用户历史 delta 聚合，事务内可见暂存的关联历史 |
 | `profile_reject` | `(message)` | 同步脚本拒绝候选写入，整个当前 Profile 事务回滚 |
 | `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值；note 不支持，仅记警告 |
 | `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` / `"note"`；key 未定义返回 `""` |

@@ -144,6 +144,14 @@ local 的 `workflows/profile/example.wf` 提供通用事件、混合链、防环
 手动复核示例运行 `python scripts/one_off/verify_profile_change_example.py`，
 验证进程的配置根、修订缓存、用户目录与 DB 均使用临时目录；循环与异常日志是预期结果。
 
+### 历史聚合与拒绝
+
+`profile_history_aggregate(key, operation="sum", source=null, change_types=null,
+direction="all", since=null, until=null)` 聚合当前执行用户的历史变动量。
+key 可以写成 `stock:key`；operation 支持 sum/count/min/max/avg，空结果为 0。
+direction 为 all/pos/neg；类型可用字符串或列表；时间范围为 `[since, until)`。
+查询使用参数化 SQL，事务内可见已暂存的历史，不受历史对话框分页上限影响。
+缺少 delta 的旧记录按新旧值之差读取，不修改原历史。
 `profile_reject(message)` 仅用于同步脚本，拒绝整个当前事务并给出可行动原因。
 
 工作流运行时只提供两种 Builder：设备 Builder 固定装配完整资源并使用用户锁，

@@ -15,7 +15,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **98 个**内置函数（core 71 个 + yysls 插件 27 个），按功能分为 14 类。
+共 **99 个**内置函数（core 72 个 + yysls 插件 27 个），按功能分为 14 类。
 
 > 本节列表与注册表一致，核对方式：
 >
@@ -198,7 +198,7 @@ end
 > 坐标入参是 `$ref = [scene].[region]` 的求值结果、4 元矩形字面量或 find 产出；
 > 距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
 
-### 玩家档案（9）
+### 玩家档案（10）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -210,4 +210,5 @@ end
 | `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值 |
 | `user_get` | `(username, key) -> any \| null` | 按内部用户名读取用户资料属性，取不到返回 null |
 | `profile_declare` | `(model_type, key, definition) -> dict` | 声明工作流依赖的 profile key，不存在时按 definition 创建（幂等）；返回 `{ok, created, key}` |
+| `profile_history_aggregate` | `(key, operation?, source?, change_types?, direction?, since?, until?) -> float` | 当前用户历史 delta 聚合；支持 sum/count/min/max/avg、来源/类型/方向过滤和时间区间 |
 | `profile_reject` | `(message)` | 同步变更脚本拒绝当前事务，原始写入及同步子链一起回滚 |

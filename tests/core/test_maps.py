@@ -313,3 +313,43 @@ def test_create_rolls_back_generated_scene_when_map_save_fails(
         manager.create("duchenxu", "渡尘墟")
 
     assert registry.get_scene("map_duchenxu") is None
+
+
+def test_region_surveys_save_reload_copy_and_delete(tmp_path):
+    """探查图片随地图复制和删除；缺失图片不得伪装成可用截图。"""
+    from lvjiang.core.maps import MapRegion, MapSurvey, image_sha256
+
+    resolver, registry, manager = _env(tmp_path)
+    definition = manager.create("north", "北部地图")
+    definition.regions = [MapRegion("east", "东部")]
+    data = b"survey image"
+    definition.surveys = [MapSurvey("focus", "东部定位", "east", image_sha256(data))]
+    manager.save_with_assets(definition, {"surveys/focus.png": data})
+    loaded = manager.load("north")
+    assert loaded.regions == definition.regions and loaded.surveys == definition.surveys
+    assert manager.survey_image_path(loaded, loaded.surveys[0]).read_bytes() == data
+    copied = manager.copy_to_local("north")
+    assert copied.layer == "local"
+    assert manager.survey_image_path(copied, copied.surveys[0]).parent.parent == resolver.local_dir / "maps/north"
+    manager.delete("north", delete_hud_scene=False)
+    assert not (resolver.local_dir / "maps/north/surveys/focus.png").exists()
+
+
+def test_survey_save_conflict_does_not_replace_image(tmp_path):
+    """窗口打开后配置被修改，保存截图草稿不能先覆盖旧图片。"""
+    from lvjiang.core.config.conflicts import ConfigWriteConflict
+    from lvjiang.core.maps import MapRegion, MapSurvey, image_sha256
+
+    _, _, manager = _env(tmp_path)
+    definition = manager.create("north", "北部地图")
+    definition.regions = [MapRegion("east", "东部")]
+    definition.surveys = [MapSurvey("focus", "定位", "east", image_sha256(b"old"))]
+    manager.save_with_assets(definition, {"surveys/focus.png": b"old"})
+    draft = manager.load("north")
+    changed = manager.load("north")
+    changed.name = "新名称"
+    manager.save(changed)
+    draft.surveys[0].image_sha256 = image_sha256(b"new")
+    with pytest.raises(ConfigWriteConflict):
+        manager.save_with_assets(draft, {"surveys/focus.png": b"new"})
+    assert manager.survey_image_path(changed, changed.surveys[0]).read_bytes() == b"old"

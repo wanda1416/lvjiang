@@ -3,7 +3,7 @@
 职责边界：
 
 - **管**：新建 / 复制到本地 / 删除地图；导入底图（文件或当前画面截取）；
-  在底图上标注 POI；地图基本信息与 HUD 场景/实体绑定。
+  地域目录与探查截图；在底图上标注 POI；地图基本信息与 HUD 场景/实体绑定。
 - **不管**：小地图、大地图、开关按钮在屏幕上的位置——那是布局层的坐标，
   只有场景编辑器一个入口。这里只提供"标定 HUD…"按钮跳过去。
 """
@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ...core.config.conflicts import ConfigWriteConflict
 from ...core.config.resolver import LAYER_LOCAL, SystemContentProtected
@@ -52,6 +52,9 @@ from ...core.maps import (
     MapError,
     MapManager,
     MapPoi,
+    MapRegion,
+    MapSurvey,
+    image_sha256,
     validate_map_key,
     validate_poi_key,
 )
@@ -88,7 +91,7 @@ def _decode_image(data: bytes) -> np.ndarray | None:
 
 
 class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
-    """地图管理：左栏地图列表，右栏底图/POI 与基本信息两个 Tab。"""
+    """地图管理：地图列表、底图/POI、地域探查、基本信息和朝向诊断。"""
 
     def __init__(
         self,
@@ -114,6 +117,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._current: MapDef | None = None
         self._base_image: np.ndarray | None = None
         self._pending_image: bytes | None = None   # 新导入、尚未保存的底图
+        self._pending_surveys: dict[str, bytes] = {}
         self._dirty = False
         self._loading = False
         self._restoring_selection = False
@@ -162,6 +166,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         right_layout.addWidget(self.lbl_header)
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_canvas_tab(), tr("底图与 POI"))
+        self.tabs.addTab(self._build_regions_tab(), tr("地域与探查"))
         self.tabs.addTab(self._build_info_tab(), tr("基本信息与绑定"))
         self.tabs.addTab(self._build_heading_tab(), tr("小地图朝向"))
         right_layout.addWidget(self.tabs, 1)
@@ -202,6 +207,14 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         hint.setStyleSheet("color: palette(mid);")
         toolbar.addWidget(hint)
         layout.addLayout(toolbar)
+        previews = QHBoxLayout()
+        previews.addWidget(QLabel(tr("展示")))
+        self.combo_preview = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+        self.combo_preview.currentIndexChanged.connect(self._on_preview_changed)
+        previews.addWidget(self.combo_preview, 1)
+        self.lbl_preview = QLabel(tr("探查截图用于查看；POI 只在底图上编辑。"))
+        previews.addWidget(self.lbl_preview)
+        layout.addLayout(previews)
 
         body = QSplitter(Qt.Orientation.Horizontal)
         self.canvas = PoiCanvas()
@@ -231,6 +244,181 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         layout.addWidget(body, 1)
         return page
 
+    def _build_regions_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        hint = QLabel(tr("按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。"))
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.region_table = QTableWidget(0, 2)
+        self.region_table.setHorizontalHeaderLabels([tr("标识"), tr("地域名称")])
+        self.region_table.itemChanged.connect(self._on_regions_changed)
+        layout.addWidget(self.region_table, 1)
+        buttons = QHBoxLayout()
+        self.btn_add_region = QPushButton(tr("添加地域"))
+        self.btn_remove_region = QPushButton(tr("删除选中地域"))
+        apply_button_style(self.btn_add_region)
+        apply_button_style(self.btn_remove_region, variant="danger")
+        self.btn_add_region.clicked.connect(self._on_add_region)
+        self.btn_remove_region.clicked.connect(self._on_remove_region)
+        buttons.addWidget(self.btn_add_region)
+        buttons.addWidget(self.btn_remove_region)
+        buttons.addStretch()
+        layout.addLayout(buttons)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(tr("截图所属地域")))
+        self.combo_survey_region = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        row.addWidget(self.combo_survey_region)
+        self.btn_survey_file = QPushButton(tr("添加探查图片…"))
+        self.btn_survey_capture = QPushButton(tr("保存当前画面为探查图片"))
+        apply_button_style(self.btn_survey_file, self.btn_survey_capture)
+        self.btn_survey_file.clicked.connect(self._on_survey_file)
+        self.btn_survey_capture.clicked.connect(self._on_survey_capture)
+        row.addWidget(self.btn_survey_file)
+        row.addWidget(self.btn_survey_capture)
+        row.addStretch()
+        layout.addLayout(row)
+        return page
+
+    def _fill_regions(self) -> None:
+        self.region_table.blockSignals(True)
+        regions = self._current.regions if self._current else []
+        self.region_table.setRowCount(len(regions))
+        for row, region in enumerate(regions):
+            self.region_table.setItem(row, 0, QTableWidgetItem(region.key))
+            self.region_table.setItem(row, 1, QTableWidgetItem(region.name))
+        self.region_table.blockSignals(False)
+        self._fill_survey_regions()
+        self._fill_previews()
+
+    def _fill_survey_regions(self) -> None:
+        selected = self.combo_survey_region.currentData()
+        self.combo_survey_region.clear()
+        for region in self._current.regions if self._current else []:
+            self.combo_survey_region.addItem(region.name, region.key)
+        index = self.combo_survey_region.findData(selected)
+        if index >= 0:
+            self.combo_survey_region.setCurrentIndex(index)
+
+    def _on_regions_changed(self) -> None:
+        if self._loading or self._current is None:
+            return
+        regions = []
+        for row in range(self.region_table.rowCount()):
+            key = self.region_table.item(row, 0)
+            name = self.region_table.item(row, 1)
+            if key is not None and name is not None:
+                regions.append(MapRegion(key.text().strip(), name.text().strip()))
+        self._current.regions = regions
+        self._fill_survey_regions()
+        self._set_dirty(True)
+
+    def _on_add_region(self) -> None:
+        if self._current is None or not self.editable:
+            return
+        number = 1
+        existing = {region.key for region in self._current.regions}
+        while f"region_{number}" in existing:
+            number += 1
+        self._current.regions.append(MapRegion(f"region_{number}", tr("新地域")))
+        self._fill_regions()
+        self._set_dirty(True)
+
+    def _on_remove_region(self) -> None:
+        row = self.region_table.currentRow()
+        if self._current is None or not self.editable or row < 0:
+            return
+        region = self._current.regions[row]
+        if any(survey.region == region.key for survey in self._current.surveys):
+            QMessageBox.information(self, tr("地域仍被使用"), tr("该地域已有探查图片，不能直接删除。"))
+            return
+        del self._current.regions[row]
+        self._fill_regions()
+        self._set_dirty(True)
+
+    def _fill_previews(self, selected: str = "") -> None:
+        self.combo_preview.blockSignals(True)
+        self.combo_preview.clear()
+        self.combo_preview.addItem(tr("大地图底图"), "")
+        if self._current:
+            for survey in self._current.surveys:
+                self.combo_preview.addItem(survey.name, survey.key)
+        index = self.combo_preview.findData(selected)
+        self.combo_preview.setCurrentIndex(max(index, 0))
+        self.combo_preview.blockSignals(False)
+        self._on_preview_changed()
+
+    def _on_preview_changed(self) -> None:
+        key = self.combo_preview.currentData()
+        image = self._base_image
+        if key and self._current:
+            survey = next((s for s in self._current.surveys if s.key == key), None)
+            image = None
+            if survey:
+                data = self._pending_surveys.get(survey.image)
+                path = self._manager.survey_image_path(self._current, survey) if data is None else None
+                if data is None and path:
+                    try:
+                        data = path.read_bytes()
+                    except OSError as exc:
+                        logger.error(f"读取地图探查图片失败 {survey.key}: {exc}")
+                image = _decode_image(data) if data else None
+        self.canvas.set_image(image)
+        self.canvas.set_pois(self._current.pois if self._current and not key else [], self._selected_poi)
+        self.canvas.set_editable(self.editable and not key)
+        self.poi_table.setEnabled(self.editable and not key)
+        self.btn_delete_poi.setEnabled(self.editable and not key)
+        note = tr("底图可标注 POI；空白部分尚未探查。")
+        if key:
+            note = tr("探查图片缺失或无法解码") if image is None else tr("探查图片仅供查看")
+        self.lbl_preview.setText(note)
+
+    def _add_survey_image(self, image: np.ndarray) -> None:
+        if self._current is None or not self.editable:
+            return
+        region = self.combo_survey_region.currentData()
+        if not region:
+            QMessageBox.information(self, tr("先登记地域"), tr("请选择截图所属地域。"))
+            return
+        existing = {survey.key for survey in self._current.surveys}
+        number = 1
+        while f"survey_{number}" in existing:
+            number += 1
+        data = _encode_png(image)
+        name = f"{self.combo_survey_region.currentText()} · {tr('探查')} {number}"
+        survey = MapSurvey(f"survey_{number}", name, region, image_sha256(data))
+        self._current.surveys.append(survey)
+        self._pending_surveys[survey.image] = data
+        self._fill_previews(survey.key)
+        self._set_dirty(True)
+        self.tabs.setCurrentIndex(0)
+
+    def _on_survey_file(self) -> None:
+        if self._current is None or not self.editable:
+            return
+        from pathlib import Path
+        files, _ = QFileDialog.getOpenFileNames(self, tr("添加探查图片"), "", "Images (*.png *.jpg *.jpeg)")
+        for filename in files:
+            try:
+                image = _decode_image(Path(filename).read_bytes())
+                if image is None:
+                    raise MapError(tr("无法读取图片"))
+                self._add_survey_image(image)
+            except (OSError, MapError) as exc:
+                QMessageBox.warning(self, tr("添加失败"), str(exc))
+
+    def _on_survey_capture(self) -> None:
+        if self._current is None or not self.editable or self._screenshot_callback is None:
+            return
+        try:
+            result = self._screenshot_callback()
+            frame, error = result if isinstance(result, tuple) else (result, None)
+            if frame is None:
+                raise MapError(error or tr("未取得当前画面"))
+            self._add_survey_image(frame)
+        except Exception as exc:  # noqa: BLE001 — 截图通道失败保留编辑状态
+            QMessageBox.warning(self, tr("截图失败"), str(exc))
+
     def _build_info_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -251,6 +439,10 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         form.addRow(tr("名称"), self.edit_name)
         form.addRow(tr("导航模式"), self.combo_mode)
         form.addRow("", self.check_north_up)
+        self.check_base_complete = QCheckBox(tr("底图已完成整图探查"))
+        self.check_base_complete.setToolTip(tr("只有实际补齐整张地图后才勾选；拼接成功不代表已采集整图。"))
+        self.check_base_complete.toggled.connect(self._mark_dirty)
+        form.addRow("", self.check_base_complete)
         layout.addWidget(basic)
 
         binding = QGroupBox(tr("HUD 场景绑定（坐标在场景编辑器里标定）"))
@@ -472,7 +664,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self.map_list.clear()
         for map_def in self._manager.list_maps():
             layer_tag = _LAYER_LABELS.get(map_def.layer, "系统")
-            item = QListWidgetItem(f"{map_def.name}  ({map_def.key})  [{tr(layer_tag)}]")
+            item = QListWidgetItem(f"{map_def.name}  [{tr(layer_tag)}]")
             item.setData(Qt.ItemDataRole.UserRole, map_def.key)
             self.map_list.addItem(item)
         self.map_list.blockSignals(False)
@@ -537,7 +729,9 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             self._current = map_def
             self._pending_image = None
             self._selected_poi = ""
+            self._pending_surveys = {}
             self._set_dirty(False)
+            self._fill_regions()
             if map_def is None:
                 self.lbl_header.setText(tr("没有地图。点击“新建”创建一张。"))
                 self._base_image = None
@@ -554,11 +748,13 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             index = self.combo_mode.findData(map_def.navigation_mode)
             self.combo_mode.setCurrentIndex(max(index, 0))
             self.check_north_up.setChecked(map_def.north_up)
+            self.check_base_complete.setChecked(map_def.base_image_complete)
             self._fill_scene_combo(map_def.ui.scene)
             self._fill_entity_combos(map_def)
             self._fill_heading_form(map_def)
             self._update_header()
             self._set_editing_enabled(self.editable)
+            self._on_preview_changed()
         finally:
             self._loading = False
 
@@ -574,6 +770,9 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
                 f'<span style="color:{tokens.warning}">'
                 + tr("只读，请先“复制到本地”再修改")
                 + "</span>")
+        if self._base_image is not None:
+            parts.append(tr("底图：整图探查已完成") if self._current.base_image_complete
+                         else tr("底图：局部探查，待补齐"))
         if self._base_image is None:
             parts.append(
                 f'<span style="color:{tokens.warning}">'
@@ -584,12 +783,15 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     def _set_editing_enabled(self, enabled: bool) -> None:
         for widget in (
             self.btn_import_file, self.btn_import_capture, self.btn_delete_poi,
-            self.edit_name, self.combo_mode, self.check_north_up, self.combo_scene,
+            self.region_table, self.btn_add_region, self.btn_remove_region,
+            self.btn_survey_file, self.combo_survey_region,
+            self.edit_name, self.combo_mode, self.check_north_up, self.check_base_complete, self.combo_scene,
             *self._entity_combos.values(),
             self.spin_window_ratio, self.spin_min_area,
             *self._hsv_spins["lower"], *self._hsv_spins["upper"],
         ):
             widget.setEnabled(enabled)
+        self.btn_survey_capture.setEnabled(enabled and self._screenshot_callback is not None)
         # 朝向识别是只读分析，系统地图也能试；参数改动才需要可编辑
         has_map = self._current is not None
         for widget in (self.btn_heading_file, self.btn_heading_capture, self.btn_heading_run):
@@ -704,7 +906,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
                     break
 
     def _on_canvas_clicked(self, rx: float, ry: float) -> None:
-        if self._current is None or not self.editable:
+        if self._current is None or not self.editable or self.combo_preview.currentData():
             return
         existing = {p.key for p in self._current.pois}
         index = 1
@@ -718,14 +920,14 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._fill_poi_table()
 
     def _select_poi(self, key: str) -> None:
-        if self._current is None:
+        if self._current is None or self.combo_preview.currentData():
             return
         self._selected_poi = key
         self.canvas.set_pois(self._current.pois, key)
         self._fill_poi_table()
 
     def _on_poi_row_selected(self) -> None:
-        if self._current is None:
+        if self._current is None or self.combo_preview.currentData():
             return
         rows = {item.row() for item in self.poi_table.selectedItems()}
         if len(rows) != 1:
@@ -873,9 +1075,11 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     def _apply_new_base_image(self, img: np.ndarray) -> None:
         self._base_image = img
         self._pending_image = _encode_png(img)
+        if self._current is not None:
+            self._current.base_image_complete = False
+            self.check_base_complete.setChecked(False)
         self._set_dirty(True)
-        self.canvas.set_image(img)
-        self.canvas.set_pois(self._current.pois if self._current else [], self._selected_poi)
+        self._fill_previews()
         self._update_header()
 
     # ─── 保存 / 新建 / 复制 / 删除 ─────────────────────────
@@ -885,6 +1089,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._current.name = self.edit_name.text().strip()
         self._current.navigation_mode = self.combo_mode.currentData()
         self._current.north_up = self.check_north_up.isChecked()
+        self._current.base_image_complete = self.check_base_complete.isChecked()
         self._current.ui.scene = self.combo_scene.currentData() or self._current.ui.scene
         for attr, combo in self._entity_combos.items():
             value = str(combo.currentData() or combo.currentText()).strip()
@@ -900,8 +1105,12 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             return
         self._collect_form()
         try:
+            assets = dict(self._pending_surveys)
             if self._pending_image is not None:
-                self._manager.save_with_image(self._current, self._pending_image)
+                assets[self._current.base_image] = self._pending_image
+                self._current.base_image_sha256 = image_sha256(self._pending_image)
+            if assets:
+                self._manager.save_with_assets(self._current, assets)
             else:
                 self._manager.save(self._current)
         except ConfigWriteConflict as exc:
@@ -911,6 +1120,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             QMessageBox.warning(self, tr("保存失败"), str(exc))
             return
         self._pending_image = None
+        self._pending_surveys = {}
         self._set_dirty(False)
         self.data_changed = True
         self._reload_list(self._current.key)

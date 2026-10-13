@@ -198,6 +198,35 @@ class HeadingDetector:
 
 
 @dataclass
+class MapRegion:
+    """游戏选择器中的地域；不表达道路连通关系。"""
+
+    key: str
+    name: str
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "name": self.name}
+
+
+@dataclass
+class MapSurvey:
+    """地域视口的探查图片；不是底图世界坐标。"""
+
+    key: str
+    name: str
+    region: str
+    image_sha256: str
+
+    @property
+    def image(self) -> str:
+        return f"surveys/{self.key}.png"
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "name": self.name, "region": self.region,
+                "image_sha256": self.image_sha256}
+
+
+@dataclass
 class MapDef:
     _file_baseline: Any = field(default=None, repr=False, compare=False, init=False)
     key: str
@@ -206,8 +235,11 @@ class MapDef:
     north_up: bool = True
     base_image: str = BASE_IMAGE_NAME
     base_image_sha256: str = ""
+    base_image_complete: bool = False
     ui: MapUiBinding = field(default_factory=lambda: MapUiBinding(scene=""))
     pois: list[MapPoi] = field(default_factory=list)
+    regions: list[MapRegion] = field(default_factory=list)
+    surveys: list[MapSurvey] = field(default_factory=list)
     heading: HeadingDetector = field(default_factory=HeadingDetector)
     #: 实际生效的来源层：system / local / remote（读取时填充，不序列化）
     layer: str = ""
@@ -230,11 +262,14 @@ class MapDef:
             "navigation": {"mode": self.navigation_mode},
             "north_up": bool(self.north_up),
             "base_image": self.base_image,
+            "base_image_complete": self.base_image_complete,
             **({"base_image_sha256": self.base_image_sha256}
                if self.base_image_sha256 else {}),
             "ui": self.ui.to_dict(),
             "detectors": {"player_heading": self.heading.to_dict()},
             "pois": [p.to_dict() for p in self.pois],
+            "regions": [r.to_dict() for r in self.regions],
+            "surveys": [s.to_dict() for s in self.surveys],
         }
 
     @classmethod
@@ -263,6 +298,31 @@ class MapDef:
             if not (0.0 <= poi.x <= 1.0 and 0.0 <= poi.y <= 1.0):
                 raise MapError(
                     tr("POI {key} 坐标超出底图范围").format(key=poi.key))
+        regions = []
+        region_keys: set[str] = set()
+        for item in d.get("regions") or []:
+            region = MapRegion(key=str(item["key"]), name=str(item["name"]))
+            validate_map_key(region.key)
+            if not region.name.strip() or region.key in region_keys:
+                raise MapError(tr("地域名称不能为空，且 key 不得重复"))
+            region_keys.add(region.key)
+            regions.append(region)
+        surveys = []
+        survey_keys: set[str] = set()
+        for item in d.get("surveys") or []:
+            survey = MapSurvey(key=str(item["key"]), name=str(item["name"]),
+                               region=str(item["region"]),
+                               image_sha256=str(item["image_sha256"]))
+            validate_map_key(survey.key)
+            if not survey.name.strip() or survey.key in survey_keys:
+                raise MapError(tr("探查图片名称不能为空，且 key 不得重复"))
+            if survey.region not in region_keys:
+                raise MapError(tr("探查图片引用了不存在的地域: {region}")
+                               .format(region=survey.region))
+            if not re.fullmatch(r"[0-9a-f]{64}", survey.image_sha256):
+                raise MapError(tr("探查图片必须有有效的 SHA256 摘要"))
+            survey_keys.add(survey.key)
+            surveys.append(survey)
         base_image = str(d.get("base_image") or BASE_IMAGE_NAME)
         if base_image != BASE_IMAGE_NAME:
             raise MapError(tr("底图文件名固定为 base.png"))
@@ -276,8 +336,11 @@ class MapDef:
             north_up=bool(d.get("north_up", True)),
             base_image=base_image,
             base_image_sha256=image_sha,
+            base_image_complete=bool(d.get("base_image_complete", False)),
             ui=MapUiBinding.from_dict(d.get("ui") or {}, hud_scene_key_for(key)),
             pois=pois,
+            regions=regions,
+            surveys=surveys,
             heading=HeadingDetector.from_dict(
                 (d.get("detectors") or {}).get("player_heading")),
             layer=layer,
@@ -382,7 +445,13 @@ class MapManager:
         return self._resolver.resolve_read(map_rel_path(key)) is not None
 
     def base_image_path(self, map_def: MapDef) -> Path | None:
-        rel = base_image_rel_path(map_def.key, map_def.base_image)
+        return self._image_path(map_def, map_def.base_image, map_def.base_image_sha256)
+
+    def survey_image_path(self, map_def: MapDef, survey: MapSurvey) -> Path | None:
+        return self._image_path(map_def, survey.image, survey.image_sha256)
+
+    def _image_path(self, map_def: MapDef, filename: str, digest: str) -> Path | None:
+        rel = f"{MAPS_DIR}/{map_def.key}/{filename}"
         roots = {
             LAYER_LOCAL: self._resolver.local_dir,
         }
@@ -395,16 +464,16 @@ class MapManager:
         for path in candidates:
             if not path.is_file():
                 continue
-            if map_def.base_image_sha256:
+            if digest:
                 try:
                     actual = image_sha256(path.read_bytes())
                 except OSError as exc:
-                    logger.warning(f"读取地图底图失败 {path}: {exc}")
+                    logger.warning(f"读取地图图片失败 {path}: {exc}")
                     continue
-                if actual != map_def.base_image_sha256:
+                if actual != digest:
                     logger.error(
-                        f"地图底图摘要不匹配，已拒绝加载: {map_def.key} "
-                        f"expected={map_def.base_image_sha256} actual={actual}")
+                        f"地图图片摘要不匹配，已拒绝加载: {map_def.key} "
+                        f"expected={digest} actual={actual}")
                     continue
             return path
         return None
@@ -472,6 +541,43 @@ class MapManager:
                 target.unlink()
             raise
 
+    def save_with_assets(self, map_def: MapDef, assets: dict[str, bytes], *, force: bool = False) -> Path:
+        """保存底图和探查图片；配置冲突或失败时回滚图片，保留编辑草稿。"""
+        from .config.conflicts import checked_write, file_baseline
+
+        allowed = {map_def.base_image: map_def.base_image_sha256,
+                   **{survey.image: survey.image_sha256 for survey in map_def.surveys}}
+        for filename, data in assets.items():
+            if filename not in allowed or image_sha256(data) != allowed[filename]:
+                raise MapError(tr("地图图片与定义摘要不一致"))
+        MapDef.from_dict(map_def.to_dict())
+        rel = map_rel_path(map_def.key)
+        expected = map_def._file_baseline or file_baseline(self._resolver, rel)
+        layer = LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None
+        root = (self._resolver.local_dir if layer == LAYER_LOCAL
+                or not self._resolver.is_dev_mode() else self._resolver.system_dir)
+
+        def write() -> Path:
+            previous: dict[str, bytes | None] = {}
+            try:
+                for filename, data in assets.items():
+                    path = f"{MAPS_DIR}/{map_def.key}/{filename}"
+                    target = root / path
+                    previous[path] = target.read_bytes() if target.is_file() else None
+                    self._resolver.write_entity(path, data, force=True, layer=layer)
+                return self._save(map_def, force=force)
+            except Exception:
+                for path, old_data in previous.items():
+                    if old_data is None:
+                        (root / path).unlink(missing_ok=True)
+                    else:
+                        self._resolver.write_entity(path, old_data, force=True, layer=layer)
+                raise
+
+        result = checked_write(self._resolver, {rel: expected}, write)
+        map_def._file_baseline = file_baseline(self._resolver, rel)
+        return result
+
     def copy_to_local(self, key: str) -> MapDef:
         """把 system/remote 地图复制为 local 影子（含底图），供用户修改。"""
         map_def = self.load(key)
@@ -487,10 +593,16 @@ class MapManager:
                 config_dir=self._resolver.config_dir,
             )
             writer = MapManager(local_resolver, registry=self._scene_registry())
+        assets = {}
         if image is not None:
-            writer.save_with_image(map_def, image.read_bytes(), force=True)
-        else:
-            writer.save(map_def, force=True)
+            assets[map_def.base_image] = image.read_bytes()
+            map_def.base_image_sha256 = image_sha256(assets[map_def.base_image])
+        for survey in map_def.surveys:
+            path = self.survey_image_path(map_def, survey)
+            if path is None:
+                raise MapError(tr("探查图片缺失或摘要不匹配: {name}").format(name=survey.name))
+            assets[survey.image] = path.read_bytes()
+        writer.save_with_assets(map_def, assets, force=True)
         return self.load(key)
 
     def create(self, key: str, name: str,
@@ -532,8 +644,14 @@ class MapManager:
         map_def = self.load(key)
         self._resolver.ensure_entity_deletable(map_rel_path(key))
         layer = LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None
-        self._resolver.delete_entity(map_rel_path(key), layer=layer)
+        from .config.conflicts import checked_write
+        checked_write(self._resolver, {map_rel_path(key): map_def._file_baseline},
+                      lambda: self._resolver.delete_entity(map_rel_path(key), layer=layer))
         image_rel = base_image_rel_path(key, map_def.base_image)
+        for survey in map_def.surveys:
+            survey_rel = f"{MAPS_DIR}/{key}/{survey.image}"
+            if self._resolver.resolve_read(survey_rel) is not None:
+                self._resolver.delete_entity(survey_rel, layer=layer)
         if self._resolver.resolve_read(image_rel) is not None:
             try:
                 self._resolver.delete_entity(image_rel, layer=layer)

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import numpy as np
-from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGraphicsEllipseItem,
@@ -87,6 +87,8 @@ class PoiCanvas(QGraphicsView):
         self._image_size = (pixmap.width(), pixmap.height())
         self._scene.setSceneRect(QRectF(0, 0, pixmap.width(), pixmap.height()))
         self.fit()
+        # 首次打开时布局尚未分配最终视口尺寸，下一轮事件后再适应窗口。
+        QTimer.singleShot(0, self.fit)
         self._redraw_markers()
 
     def set_pois(self, pois: list[MapPoi], selected_key: str = "") -> None:

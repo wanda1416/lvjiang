@@ -58,3 +58,5 @@
 ![微信交流群](https://wanda1416.github.io/lvjiang/feedback-qrcode.jpg)
 
 - [3.5 图像识别与模板匹配排查](03.05-visual-recognition-troubleshooting.md)：现场、模板、布局与实际任务结果的核对步骤。
+
+- [3.6 大世界地图管理](03.06-world-map-management.md)：大地图与地域目录、探查图片预览、拼接底图与覆盖范围。

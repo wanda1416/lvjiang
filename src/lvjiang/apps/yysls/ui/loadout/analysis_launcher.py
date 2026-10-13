@@ -109,7 +109,7 @@ class GraduationAnalysisLauncher:
             equipped = inventory.equipped
             plan = inventory.active_plan
             plan_id = inventory.active_plan_id
-            from lvjiang.core.user_config import (
+            from ...config.analysis_settings import (
                 get_graduation_analysis_settings,
                 set_graduation_analysis_settings,
             )

@@ -71,6 +71,7 @@
 | [18-android-connection-recovery.md](50-platform/18-android-connection-recovery.md) | 代理与 ADB 重连、输入降级及人工恢复边界 | 已实现，实机断线场景需单独验收 |
 | [19-write-ownership.md](50-platform/19-write-ownership.md) | 主节点写权限、用户占用和文件锁收敛 | 已实现 |
 | [20-world-map-catalog.md](50-platform/20-world-map-catalog.md) | 大世界地图与地域目录、探查底图保存与预览、重叠截图拼接 | 部分实现（地域选择和界碑传送运行时函数待实现） |
+| [21-plugin-data.md](50-platform/21-plugin-data.md) | 插件领域数据与同步数据库声明 | 已实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

@@ -78,11 +78,20 @@ src/lvjiang/apps/<name>/
 
 插件只保留领域规则和领域状态。已经稳定的通用机制由插件依赖公共层：
 
-- `core.config.document_store.DocumentDirectoryStore`：带目录锁、版本标记和
+- `core.config.document_store.DocumentDirectoryStore`：主节点写入、线程内互斥、版本标记和
   跨文档事务恢复的 JSON 文档目录；插件通过初始化钩子实现自己的旧数据迁移。
 - `workflows.ports`：工作流实现使用的场景自动化与子流程引擎 Protocol；插件端
   Protocol 组合这些能力并补充领域常量和状态。
 - `ui.layout_helpers`、`ui.presentation`：配置布局、主题判断和轻量展示组件。
+
+用户资料的 `User.extra_fields` 保留公共模型未解释的顶层扩展字段。燕云的
+`config/analysis_settings.py` 负责按方案 ID 读写毕业率设置；原用户文件位置和
+`graduation_analysis` 字段不变，不迁移、不维护另一份数据。公共资料编辑必须保留这些字段。
+
+手机同步的公共数据库只有 Profile 与日常执行历史。插件通过
+`AppHooks.offline_database_files` 声明额外数据库，路径相对 session；燕云声明
+`tuning_history.db`。公共同步器负责 SQLite backup，安装时按实际包内数据库检查完整性，
+不根据调律等领域名称决定需要哪些数据库。
 
 公共模块不得反向导入插件。装备、调律、地图等业务步骤及失败语义仍由插件定义；
 仅因代码位于插件的 `core` 目录，不构成迁入公共层的理由。

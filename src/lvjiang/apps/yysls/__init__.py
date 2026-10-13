@@ -128,4 +128,5 @@ hooks = AppHooks(
         "yysls/attr_model/**/*.yaml", "yysls/graduation/**/*.json",
     ),
     offline_session_files=_offline_session_files,
+    offline_database_files=("tuning_history.db",),
 )

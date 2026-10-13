@@ -40,7 +40,13 @@ _LAYER_PATTERNS = (
     "maps/*/map.yaml", "maps/*/*.png",
 )
 _SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "batch.json")
-_DATABASE_FILES = ("profile.db", "daily_history.db", "tuning_history.db")
+_DATABASE_FILES = ("profile.db", "daily_history.db")
+
+
+def _database_files() -> tuple[str, ...]:
+    return tuple(dict.fromkeys((*_DATABASE_FILES, *(
+        name for app_id in get_registered_app_ids()
+        for name in load_app(app_id).offline_database_files))))
 
 
 def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple[Path, Path]]:
@@ -87,9 +93,10 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     }
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:
         snapshots = []
-        for name in _DATABASE_FILES:
+        for name in _database_files():
             database = session_directory(config) / name
             snapshot = Path(temp) / name
+            snapshot.parent.mkdir(parents=True, exist_ok=True)
             if not database.is_file() or database.is_symlink():
                 continue
             # SQLite 的连接上下文只处理事务，不释放文件句柄。
@@ -97,7 +104,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
             with (closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as source,
                   closing(sqlite3.connect(snapshot)) as target):
                 source.backup(target)
-            snapshots.append(snapshot)
+            snapshots.append((name, snapshot))
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             def add(name: str, data: bytes) -> None:
                 manifest["files"][name] = hashlib.sha256(data).hexdigest()
@@ -124,8 +131,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                         user=username, layout=layout, env="android")
                     data = formatted_json_bytes(interface)
                 add("config/" + rel.as_posix(), data)
-            for snapshot in snapshots:
-                add("config/session/" + snapshot.name, snapshot.read_bytes())
+            for name, snapshot in snapshots:
+                add("config/session/" + name, snapshot.read_bytes())
             # 不携带 PC 旧的同步状态；此记录只属于这次单向快照。
             summary = {key: value for key, value in manifest.items() if key != "files"}
             add("config/session/offline.json", formatted_json_bytes(summary))
@@ -183,13 +190,10 @@ def install_offline_bundle(
         if (actives.get("user") != manifest["username"]
                 or actives.get("layout") != manifest["layout"]):
             raise ValueError("同步包活动选择与清单不一致")
-        for name in _DATABASE_FILES:
-            database = staged_config / "session" / name
-            if not database.exists():
-                continue
+        for database in (staged_config / "session").rglob("*.db"):
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                    raise ValueError(f"数据库快照校验失败：{name}")
+                    raise ValueError(f"数据库快照校验失败：{database.name}")
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
             mobile_batch = session_directory(target) / "batch.json"

@@ -88,6 +88,8 @@ class AppHooks:
     # 外部完整配置快照应用后清理插件自己的只读缓存，不重注册 UI 或执行任务。
     configuration_reload_callbacks: list[Callable[[], None]] = field(default_factory=list)
 
-    # PC→手机同步白名单；模式相对 system/local/remote，会话文件相对 session。
+    # PC→手机同步白名单；模式相对 system/local，会话文件相对 session。
     offline_configuration_patterns: tuple[str, ...] = ()
     offline_session_files: Callable[[], tuple[str, ...]] | None = None
+    # session 内的 SQLite 文件；公共同步器统一执行 backup 与完整性检查。
+    offline_database_files: tuple[str, ...] = ()

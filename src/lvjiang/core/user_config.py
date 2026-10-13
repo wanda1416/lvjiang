@@ -48,10 +48,12 @@ class User:
     attributes: dict[str, str] = field(default_factory=dict)
     workflow_params: dict[str, dict[str, Any]] = field(default_factory=dict)
     ui_state: dict[str, dict[str, Any]] = field(default_factory=dict)
-    graduation_analysis: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # 保留插件拥有的顶层字段；公共资料编辑不能丢弃未解释的数据。
+    extra_fields: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
+            **deepcopy(self.extra_fields),
             "document_type": USER_DOCUMENT_TYPE,
             "schema_version": USER_SCHEMA_VERSION,
             "username": self.name,
@@ -72,11 +74,6 @@ class User:
                 for key, value in self.ui_state.items()
                 if key and isinstance(value, dict)
             },
-            "graduation_analysis": {
-                str(plan_id): dict(settings)
-                for plan_id, settings in self.graduation_analysis.items()
-                if plan_id and isinstance(settings, dict)
-            },
         }
 
     @staticmethod
@@ -87,7 +84,6 @@ class User:
         raw_attributes = data.get("attributes", {})
         raw_workflow_params = data.get("workflow_params", {})
         raw_ui_state = data.get("ui_state", {})
-        raw_graduation_analysis = data.get("graduation_analysis", {})
         attributes = (
             {str(k): str(v) for k, v in raw_attributes.items() if k}
             if isinstance(raw_attributes, dict) else {}
@@ -110,12 +106,10 @@ class User:
                  if key and isinstance(value, dict)}
                 if isinstance(raw_ui_state, dict) else {}
             ),
-            graduation_analysis=(
-                {str(plan_id): dict(settings)
-                 for plan_id, settings in raw_graduation_analysis.items()
-                 if plan_id and isinstance(settings, dict)}
-                if isinstance(raw_graduation_analysis, dict) else {}
-            ),
+            extra_fields={key: deepcopy(value) for key, value in data.items()
+                          if key not in {"document_type", "schema_version", "username",
+                                         "created_at", "avatar", "attributes",
+                                         "workflow_params", "ui_state"}},
         )
 
 
@@ -252,42 +246,6 @@ def set_user_ui_state(
         if user.ui_state.get(key) == saved:
             return
         user.ui_state[key] = saved
-        atomic_write_text(
-            path,
-            json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
-            prefix=f".{username}_metadata_",
-        )
-
-
-def get_graduation_analysis_settings(
-    username: str,
-    plan_id: str,
-    users_dir: Path | None = None,
-) -> dict[str, Any]:
-    """读取用户资料中按备战方案 ID 隔离的毕业率分析选项。"""
-    user = load_user_metadata(username, users_dir)
-    if user is None:
-        return {}
-    value = user.graduation_analysis.get(plan_id)
-    return deepcopy(value) if isinstance(value, dict) else {}
-
-
-def set_graduation_analysis_settings(
-    username: str,
-    plan_id: str,
-    value: dict[str, Any],
-    users_dir: Path | None = None,
-) -> None:
-    """原子替换指定备战方案的毕业率分析选项。"""
-    saved = deepcopy(value)
-    path = user_metadata_path(username, users_dir)
-    with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
-        user = load_user_metadata(username, users_dir)
-        if user is None:
-            raise FileNotFoundError(f"用户资料不存在: {username}")
-        if user.graduation_analysis.get(plan_id) == saved:
-            return
-        user.graduation_analysis[plan_id] = saved
         atomic_write_text(
             path,
             json.dumps(user.to_dict(), ensure_ascii=False, indent=2),

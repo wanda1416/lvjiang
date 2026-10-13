@@ -22,6 +22,11 @@ from tests.pytest_resources import install_closed_directory_scan
 # 在收集测试模块前就封死真实 config；不能只依赖各用例自觉使用 tmp_path。
 install_project_config_write_guard(Path(__file__).parents[1] / "config")
 
+# 测试组合根显式装配配置声明；底层读取不再代替调用方发现插件。
+from lvjiang.apps import builtin_app_ids, load_config_policies  # noqa: E402
+
+load_config_policies(builtin_app_ids())
+
 # 收集阶段就修正 pytest 的目录句柄生命周期，覆盖 controller、worker 和会话收尾。
 # 用例级 monkeypatch 会在临时目录清理前撤销，不能在 fixture 里安装。
 install_closed_directory_scan()

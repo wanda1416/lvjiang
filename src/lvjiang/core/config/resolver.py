@@ -651,8 +651,6 @@ class ConfigResolver:
         （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与系统一致，
         不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
         """
-        from ...apps import load_config_policies
-        load_config_policies()
         root = self._layer_root(
             layer, self.system_dir if self.is_dev_mode() else self.local_dir)
         target = root / rel_path

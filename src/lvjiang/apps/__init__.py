@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Iterable
 from typing import Any
 
 from .base import AppHooks
@@ -63,6 +64,8 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
             f"插件 {hooks.id or hooks.name!r} 依赖尚未加载的插件: "
             f"{', '.join(missing)}；请先加载依赖插件"
         )
+
+    register_config_policies(hooks)
 
     logger.info("[plugin] 注册插件: %s", hooks.name or "<unnamed>")
 
@@ -161,18 +164,23 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     if hooks.config_policy_modules:
         registry.setdefault("config_policy_modules", []).extend(hooks.config_policy_modules)
-        # 实际导入模块触发 register_registry_list_paths /
-        # register_protected_list_paths 注册；单个插件的声明出错不该拖垮
-        # 整个插件加载，仅记日志跳过。
-        for mod_path in hooks.config_policy_modules:
-            try:
-                importlib.import_module(mod_path)
-                logger.info("[plugin]   config policy module 已加载: %s", mod_path)
-            except Exception:  # noqa: BLE001
-                logger.exception("[plugin] 配置合并策略模块加载失败: %s", mod_path)
 
 
-def load_config_policies() -> None:
+def builtin_app_ids() -> tuple[str, ...]:
+    """离线工具显式选择内置插件，不扫描安装目录。"""
+    return tuple(_APP_REGISTRY)
+
+
+def register_config_policies(hooks: AppHooks) -> None:
+    """装配已知插件的配置声明；不运行启动回调或 UI 构建器。"""
+    for module in hooks.config_policy_modules:
+        try:
+            importlib.import_module(module)
+        except Exception:  # noqa: BLE001
+            logger.exception("[plugin] 配置策略模块加载失败: %s", module)
+
+
+def load_config_policies(app_ids: Iterable[str]) -> None:
     """只加载各已登记插件的配置策略声明，不注入 Tab / 工作流 / 识别器。
 
     离线工具（`scripts/add_content_version.py`、配置层单测）需要完整的
@@ -182,21 +190,13 @@ def load_config_policies() -> None:
 
     单个插件声明出错只记日志跳过，理由同 register_hooks 里的处理。
     """
-    for name, module_path in _APP_REGISTRY.items():
+    for name in dict.fromkeys(app_ids):
         try:
-            module = importlib.import_module(module_path)
+            hooks = load_app(name)
         except Exception:  # noqa: BLE001
-            logger.exception("[plugin] 加载插件模块失败: %s", module_path)
+            logger.exception("[plugin] 加载配置声明失败: %s", name)
             continue
-        hooks = getattr(module, "hooks", None)
-        if not isinstance(hooks, AppHooks):
-            continue
-        for mod_path in hooks.config_policy_modules:
-            try:
-                importlib.import_module(mod_path)
-            except Exception:  # noqa: BLE001
-                logger.exception(
-                    "[plugin] 配置策略模块加载失败 (%s): %s", name, mod_path)
+        register_config_policies(hooks)
 
 
 # ── 全局注册表（内存中的插件扩展点汇总） ─────────────────────────────

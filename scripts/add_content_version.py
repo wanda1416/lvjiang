@@ -25,7 +25,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from lvjiang.apps import load_config_policies  # noqa: E402
+from lvjiang.apps import builtin_app_ids, load_config_policies  # noqa: E402
 from lvjiang.core.config.versioning import (  # noqa: E402
     CONTENT_VERSION_KEY,
     iter_versioned_files,
@@ -35,7 +35,7 @@ from lvjiang.core.config.versioning import (  # noqa: E402
 from lvjiang.core.paths import get_config_system_dir  # noqa: E402
 
 # 插件私有配置是插件自己注册的，不 import 就不在注册表里，会被本脚本漏掉。
-load_config_policies()
+load_config_policies(builtin_app_ids())
 
 _INITIAL_VERSION = 1
 

@@ -102,7 +102,8 @@ src/lvjiang/apps/<name>/
 `tuning_history.db`。公共同步器负责 SQLite backup，安装时按实际包内数据库检查完整性，
 不根据调律等领域名称决定需要哪些数据库。
 
-公共模块不得反向导入插件。装备、调律、地图等业务步骤及失败语义仍由插件定义；
+公共模块不直接导入具体业务插件；组合根通过通用注册接口装配声明。
+装备、调律、地图等业务步骤及失败语义仍由插件定义；
 仅因代码位于插件的 `core` 目录，不构成迁入公共层的理由。
 
 ## 开发新插件
@@ -200,6 +201,15 @@ class AutoFarmWorkflow(BaseWorkflow):
         pass
 ```
 
+## 注册机制
+
+配置策略由组合根显式装配：桌面在恢复在线配置前调用
+`apps.load_config_policies(app_ids)`，手机在声明 app 组合和应用配置时调用同一入口，
+离线字段工具显式选择 `builtin_app_ids()`。已有 hooks 对象可调用
+`register_config_policies(hooks)`；这两个轻量入口都不执行启动回调、不注入 UI。
+完整 `register_hooks` 在启动回调前装配策略；底层 resolver、修订索引和运行快照
+只消费登记结果，不自行发现或加载插件。
+
 ## 公共服务与桌面适配
 
 - `core.update.fetch_latest_release` 提供更新结果与错误，Qt 检查线程位于 `ui/background/update.py`。
@@ -210,7 +220,7 @@ class AutoFarmWorkflow(BaseWorkflow):
   `ui/profile/engine.py` 管理桌面线程、信号和生命周期。key 重命名通过无 GUI 更新通知
   发布已提交数据的变化，Qt 订阅在线程停止时解除。
 
-## 注册机制
+### 完整插件注册
 
 插件加载时，`register_hooks()` 会自动：
 

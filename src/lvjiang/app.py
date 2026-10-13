@@ -104,6 +104,9 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     global _app, _window, _hooks
 
     hooks_list = hooks_list or []
+    from .apps import register_config_policies
+    for hooks in hooks_list:
+        register_config_policies(hooks)
 
     logger.info("[app] 启动主窗口，已加载插件: %s",
                 [getattr(h, "name", "?") for h in hooks_list] or "无")

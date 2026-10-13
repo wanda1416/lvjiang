@@ -138,7 +138,11 @@ def main() -> int:
     install_crash_handler()
 
     # 延迟导入 PyQt6 / 内部模块，确保 logging 先配置好
-    from lvjiang.apps import load_app, register_hooks
+    from lvjiang.apps import load_app, load_config_policies, register_hooks
+
+    for name in args.apps or []:
+        load_app_i18n(name)
+    load_config_policies(args.apps or ())
 
     # 恢复未完成的安装事务、撤下明确失效的会员内容，再加载场景与布局缓存。
     # 这里不联网，也不提升旧协议暂存目录。

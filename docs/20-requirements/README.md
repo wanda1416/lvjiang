@@ -74,6 +74,7 @@
 | [21-plugin-data.md](50-platform/21-plugin-data.md) | 插件领域数据与同步数据库声明 | 已实现 |
 | [22-plugin-runtime.md](50-platform/22-plugin-runtime.md) | 插件宿主运行接口与公共事件契约 | 已实现 |
 | [23-service-boundaries.md](50-platform/23-service-boundaries.md) | 公共服务与桌面适配边界 | 已实现 |
+| [24-config-policy-bootstrap.md](50-platform/24-config-policy-bootstrap.md) | 插件配置策略显式装配 | 已实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

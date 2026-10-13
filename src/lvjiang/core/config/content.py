@@ -38,8 +38,6 @@ def configuration_lock(config: Path, *, blocking: bool = True) -> Iterator[bool]
 
 def indexed_paths(resolver) -> dict[tuple[str, ...], Path]:
     """只枚举名称；任务启动无需读取全部文件内容。"""
-    from ...apps import load_config_policies
-    load_config_policies()
     paths: dict[tuple[str, ...], Path] = {}
     for root in (resolver.system_dir, resolver.local_dir):
         for path in versioning.iter_versioned_files(root):

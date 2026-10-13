@@ -40,7 +40,7 @@ def configuration_status() -> dict:
 
 
 def reset_configuration() -> None:
-    from ...apps import load_app
+    from ...apps import load_app, load_config_policies
     from ..config.resolver import get_resolver
     from ..config.session import reset_session_store
     from ..ocr_cleaner import OCRCleaner
@@ -49,6 +49,8 @@ def reset_configuration() -> None:
     from ..recognizers.template_locator import get_template_store
     from ..scene_registry import reload_scene_registry
     from . import plugins, task_runner
+
+    load_config_policies(plugins.configured_apps())
 
     task_runner.release_engine()
     from ..config.content import rebuild_content

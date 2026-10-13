@@ -41,6 +41,8 @@ def configure_apps(app_ids: str | tuple[str, ...] | list[str]) -> None:
         _configured_app_ids = tuple(
             dict.fromkeys(str(item).strip() for item in values if str(item).strip())
         )
+        from ...apps import load_config_policies
+        load_config_policies(_configured_app_ids)
 
 
 def ensure_loaded(app_ids: tuple[str, ...] | list[str] | None = None) -> None:

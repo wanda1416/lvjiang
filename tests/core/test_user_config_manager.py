@@ -10,6 +10,7 @@ from lvjiang.core.user_config import (
     User,
     UserConfigManager,
     load_user_metadata,
+    mutate_user_metadata,
     resolve_active_username,
     save_user_metadata,
 )
@@ -50,6 +51,17 @@ class TestUser:
 
 
 # ─── UserConfigManager ────────────────────────────────────
+
+def test_metadata_mutation_saves_nested_workflow_parameter_changes(tmp_path):
+    save_user_metadata(User("tester", workflow_params={
+        "sample": {"rules": {"enabled": False}},
+    }), tmp_path)
+
+    def update(user):
+        user.workflow_params["sample"]["rules"]["enabled"] = True
+
+    mutate_user_metadata("tester", update, tmp_path)
+    assert load_user_metadata("tester", tmp_path).workflow_params["sample"]["rules"]["enabled"] is True
 
 class TestUserConfigManagerInit:
 

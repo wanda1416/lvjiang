@@ -112,10 +112,15 @@ def main() -> None:
                 repository.db_upsert(user, 'quota', 'example_period', 0, updated_at=old)
                 repository.db_upsert(user, 'regen', 'example_regen', 0, updated_at=old)
                 schema.get_profile_config().get_key('example_regen').regen_amount = 2
-                worker = SimpleNamespace(data_updated=SimpleNamespace(emit=lambda _: None))
-                engine.ProfileEngine._tick_user(worker, user, schema.get_profile_config())
+                updated_users = []
+                processor = engine.ProfileProcessor(
+                    SimpleNamespace(list_users=lambda: [user]),
+                    notify_updated=updated_users.append,
+                )
+                processor._tick_user(user, schema.get_profile_config())
                 assert any(e.change_type == 'reset' and e.old_value == e.new_value == 0 for e, _ in events)
                 assert any(e.change_type == 'tick' for e, _ in events)
+                assert updated_users == [user], '周期更新应通过服务回调通知消费者'
 
                 profile_action(user, 'example_inverse', set_value=5)
                 before = profile_read(user, 'example_sync')

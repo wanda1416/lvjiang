@@ -31,7 +31,7 @@ from .....core.agent_connection import AgentConnection, export_agent
 from .....core.agent_docs import AgentDocuments
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_access
 from .....core.agent_settings import AgentSettings, load_agent_settings
-from .....core.plugin_runtime import PluginRuntimePort
+from .....core.plugin_runtime import PluginRuntimePort, RuntimeTarget
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
 from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
@@ -99,6 +99,12 @@ class AgentTaskBridge(QObject):
             result["error"] = str(outcome["error"])
         return result
 
+    def _resolve_target(self, target_id: str) -> RuntimeTarget:
+        try:
+            return self.runtime.resolve_target(target_id)
+        except ValueError as exc:
+            raise ValueError(f"{exc}；请调用 list_targets 查看状态") from exc
+
     def perform(self, operation: str, args: dict) -> dict:
         if self.service is not None:
             self.service._ensure_enabled()
@@ -118,7 +124,7 @@ class AgentTaskBridge(QObject):
             return {"current_target_id": self.runtime.current_target_id,
                     "targets": [asdict(target) for target in self.runtime.targets()]}
         if operation == "resolve_target":
-            target = self.runtime.resolve_target(args.get("target_id") or "")
+            target = self._resolve_target(args.get("target_id") or "")
             return {"target_id": target.id}
         if operation == "validate":
             from ...core.agent.launch import prepare_tuning
@@ -190,7 +196,7 @@ class AgentTaskBridge(QObject):
                 args = {**args, **validated}
         if operation == "scan":
             args = {**args, **self.perform("resolve_target", {"target_id": args["target_id"]})}
-        target = self.runtime.resolve_target(args["target_id"])
+        target = self._resolve_target(args["target_id"])
         if target.busy:
             raise ValueError("执行目标正在运行任务")
         if args["user"] not in host.user_manager.list_users():

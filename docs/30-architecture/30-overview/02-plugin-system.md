@@ -56,7 +56,9 @@ builder 约定：
 - `host.plugin_runtime: PluginRuntimePort`：查询目标、预检启动、切换目标、启动工作流、
   查询运行记录与人工提示、暂停/恢复/停止任务，以及读取热键快照和插件页。
   契约位于 `core/plugin_runtime.py`，桌面适配位于 `ui/main/plugin_runtime.py`。
-  插件不访问宿主的目标登记表、运行管理器、当前运行对象或界面恢复私有方法；
+  插件通过适配器访问目标登记、运行管理与界面恢复，不直接读取这些宿主私有入口。
+  `run/current_run` 仍返回原运行对象，`engine/worker` 是供进度及结果读取的原对象引用；
+  `pages()` 返回全部左栏控件，由插件筛选自己的页面。目前统一的是访问入口，并未隔离对象。
   目标切换仍由宿主保存旧目标草稿并恢复新目标，不能改变默认用户。
   桌面接口在 UI 线程调用；MCP 请求通过 AgentTaskBridge 的队列信号转入 UI 线程。
 - `host.is_running` / `host.request_stop()`：自动化运行状态与停止

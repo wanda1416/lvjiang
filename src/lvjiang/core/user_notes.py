@@ -100,7 +100,6 @@ class UserNotesRepository:
             users_dir = USERS_DIR
         self.username = username
         self.path = users_dir / f"{username}.notes.json"
-        self.username = username
         self._thread_lock = _thread_lock(self.path)
 
     @staticmethod

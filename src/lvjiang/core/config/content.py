@@ -21,12 +21,10 @@ _mutexes: dict[Path, threading.RLock] = {}
 
 @contextmanager
 def configuration_lock(config: Path, *, blocking: bool = True) -> Iterator[bool]:
-    """主节点内协调保存、安装与任务快照，不产生文件锁。"""
+    """主节点内协调保存、安装与任务快照；阻塞调用等待完成，不设超时。"""
     config = config.resolve()
     mutex = _mutexes.setdefault(config, threading.RLock())
-    acquired = mutex.acquire(timeout=5) if blocking else mutex.acquire(blocking=False)
-    if not acquired and blocking:
-        raise TimeoutError("配置操作等待超过 5 秒，请等待当前保存或安装完成后重试")
+    acquired = mutex.acquire(blocking=blocking)
     if not acquired:
         yield False
         return

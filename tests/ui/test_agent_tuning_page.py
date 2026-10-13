@@ -155,7 +155,7 @@ def test_bridge_selects_requested_connected_target_and_reports_busy_at_call_time
     assert preserved == ["target_a"]
     assert host.user_manager.get_active_user_name() == "user_a"
     targets["target_b"].ready = False
-    with pytest.raises(ValueError, match="未连接"):
+    with pytest.raises(ValueError, match="list_targets"):
         bridge.call("resolve_target", {"target_id": "target_b"})
     bridge.close()
 

@@ -18,6 +18,7 @@ from loguru import logger
 
 from .access import user_write_access
 from .fs_util import atomic_write_text
+from .json_files import formatted_json
 
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
@@ -89,7 +90,7 @@ class User:
             if isinstance(raw_attributes, dict) else {}
         )
         name = str(data.get("username") or fallback_name)
-        return User(
+        user = User(
             name=name,
             created_at=str(data.get("created_at", "")),
             avatar=raw_avatar if is_safe_avatar_filename(raw_avatar) else "",
@@ -106,11 +107,12 @@ class User:
                  if key and isinstance(value, dict)}
                 if isinstance(raw_ui_state, dict) else {}
             ),
-            extra_fields={key: deepcopy(value) for key, value in data.items()
-                          if key not in {"document_type", "schema_version", "username",
-                                         "created_at", "avatar", "attributes",
-                                         "workflow_params", "ui_state"}},
         )
+        # 公共字段以序列化契约为准，避免另行维护排除列表。
+        known_fields = user.to_dict().keys()
+        user.extra_fields = {key: deepcopy(value) for key, value in data.items()
+                             if key not in known_fields}
+        return user
 
 
 def user_metadata_path(username: str, users_dir: Path | None = None) -> Path:
@@ -144,7 +146,7 @@ def save_user_metadata(user: User, users_dir: Path | None = None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_text(
             path,
-            json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
+            formatted_json(user.to_dict()),
             prefix=f".{user.name}_metadata_",
         )
 
@@ -154,16 +156,20 @@ def mutate_user_metadata(
     mutator,
     users_dir: Path | None = None,
 ) -> User:
-    """锁内读取最新资料并只提交 mutator 所做的修改。"""
+    """锁内读取最新资料并只提交实际变化；相同内容不重写文件。"""
     path = user_metadata_path(username, users_dir)
     with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
         user = load_user_metadata(username, users_dir)
         if user is None:
             raise FileNotFoundError(f"用户资料不存在: {username}")
+        before = deepcopy(user.to_dict())
         mutator(user)
+        after = user.to_dict()
+        if after == before:
+            return user
         atomic_write_text(
             path,
-            json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
+            formatted_json(after),
             prefix=f".{username}_metadata_",
         )
         return user

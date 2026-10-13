@@ -299,7 +299,7 @@ def _exercise_equipment_writes(repo, profile, users_dir):
         access.acquire_user("alice", users_dir)
 
 
-def test_equipment_transactions_from_another_process_preserve_latest_items(tmp_path):
+def test_equipment_write_from_another_process_is_rejected_while_user_is_occupied(tmp_path):
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
 
     config_source = Path(__file__).resolve().parents[2] / "config/system/yysls/game_config"

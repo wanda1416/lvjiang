@@ -1,6 +1,8 @@
 """用户资料编辑不能丢失按方案隔离的插件分析设置。"""
 import json
 
+import pytest
+
 from lvjiang.apps.yysls.config.analysis_settings import (
     get_graduation_analysis_settings,
     set_graduation_analysis_settings,
@@ -28,3 +30,18 @@ def test_analysis_settings_keep_file_shape_and_unrelated_fields(tmp_path):
     }
     assert disk["attributes"] == {"note": "preserved", "other": "new"}
     assert get_graduation_analysis_settings("tester", "missing", tmp_path) == {}
+
+
+def test_unchanged_analysis_settings_do_not_write_metadata(tmp_path, monkeypatch):
+    from lvjiang.core import user_config
+
+    save_user_metadata(User("tester"), tmp_path)
+    value = {"minimum_rating": "优秀"}
+    set_graduation_analysis_settings("tester", "a", value, tmp_path)
+
+    def unexpected_write(*args, **kwargs):
+        pytest.fail("保存相同分析选项不应重写用户资料")
+
+    monkeypatch.setattr(user_config, "atomic_write_text", unexpected_write)
+    set_graduation_analysis_settings("tester", "a", value, tmp_path)
+    assert get_graduation_analysis_settings("tester", "a", tmp_path) == value

@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ...core.batch_config import (
+    BatchConfigConflict,
     BatchConfigItem,
     BatchWorkflows,
     lifecycle_parameter_definitions,
@@ -852,6 +853,12 @@ class BatchConfigDialog(QDialog):
         这个窗口就是定义层的唯一入口。
         """
         self._save_current_config()
-        save_batch_config(self._cfg)
+        try:
+            save_batch_config(self._cfg)
+        except BatchConfigConflict:
+            from ..config_conflicts import confirm_config_overwrite
+            if not confirm_config_overwrite(tr("批量配置")):
+                return
+            save_batch_config(self._cfg, force=True)
         # 保存是应用当前全部配置，不关闭窗口，便于继续修改其他配置组。
         self.saved.emit()

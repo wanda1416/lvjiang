@@ -101,20 +101,20 @@ def test_readonly_record_dialog_ignores_application_hotkey(qtbot, readonly):
     assert dialog.calls == []
 
 
-def test_script_editor_write_controls_are_not_instance_disabled(
-        qtbot, readonly, tmp_path, monkeypatch):
+def test_script_editor_write_controls_are_disabled_for_readonly_node(
+        qtbot, tmp_path, monkeypatch):
     from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
 
     resolver = resolver_module.ConfigResolver(tmp_path / "system", tmp_path / "local", dev_mode=True)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
     resolver.write_entity("workflows/demo.wf", 'log info "demo"\n')
+    monkeypatch.setattr(access, "_readonly", True)
     widget = ScriptEditorDialog()
     qtbot.addWidget(widget)
     assert widget.tree.isEnabled()
     assert widget.btn_check.isEnabled()
     for button in (widget.btn_new, widget.btn_save, widget.btn_save_as, widget.btn_delete):
-        button.setEnabled(True)
-        assert button.isEnabled()
+        assert not button.isEnabled()
 
 
 def test_readonly_instance_does_not_start_main_global_hotkeys(
@@ -195,10 +195,10 @@ def test_equipment_slot_click_while_user_is_running(qtbot, tmp_path, monkeypatch
     from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
     from lvjiang.core.user_config import User, save_user_metadata
 
-    monkeypatch.setattr(access, "_readonly", readonly)
     save_user_metadata(User("alice"), tmp_path)
     repo = LoadoutRepository("alice", tmp_path)
     repo.upsert_item({"_fp": "ring", "type": "环"})
+    monkeypatch.setattr(access, "_readonly", readonly)
     before = repo.path.read_bytes()
     rebuilt = []
     tab = SimpleNamespace(

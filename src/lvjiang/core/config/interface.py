@@ -36,13 +36,9 @@ class InterfaceStore(SessionStore):
         # 落盘，也不该影响持有写权限的实例。
         ("actives",),
         ("daily",),
+        ("ui_state",),
+        ("batch",),
         ("profile", "overview_active_group"),
-        ("ui_state", "main_page"),
-        ("ui_state", "scene_editor"), ("ui_state", "reference_manager"),
-        ("ui_state", "task_history"),
-        # 批量节点的活动组是"本实例在看哪个组"；同一节点下的运行草稿是用户
-        # 一行行调出来的数据，必须落盘，所以只标这一个字段而不是整棵子树。
-        ("batch", "active_group_id"),
     })
 
     def __init__(self, path: Path | str | None = None, *, legacy_path: Path | None = None):
@@ -79,45 +75,43 @@ class InterfaceStore(SessionStore):
         self._mutate_disk(_set)
 
     def _migrate(self, legacy_path: Path) -> bool:
-        # 固定锁序 interface -> session。中间标记让崩溃后的旧节点清理可重试。
+        from ..access import is_readonly
+        if is_readonly():
+            return False  # 不在只读节点创建文件或处理历史迁移。
+        # 主节点初始化；中间标记让崩溃后的旧节点清理可重试。
         with self._thread_lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._acquire_write_lock()
-            try:
-                fresh = not self.path.exists()
-                current = self._read_disk(strict=True)
-                pending = current.get("migration") == _MIGRATION
-                if not fresh and not pending:
-                    self._data = current
-                    return False
-                legacy = SessionStore(legacy_path)
+            fresh = not self.path.exists()
+            current = self._read_disk(strict=True)
+            pending = current.get("migration") == _MIGRATION
+            if not fresh and not pending:
+                self._data = current
+                return False
+            legacy = SessionStore(legacy_path)
 
-                def transfer(data: dict) -> None:
-                    nonlocal current
-                    if fresh:
-                        current = {
-                            "version": INTERFACE_VERSION,
-                            "migration": deepcopy(_MIGRATION),
-                            "ui_state": deepcopy(data.get("ui_state", {})),
-                            "profile": deepcopy(data.get("profile", {})),
-                            "alert_info": deepcopy(data.get("alert_info", [])),
-                            "server_config": deepcopy(data.get("server_config", {})),
-                        }
-                        profile = current["profile"]
-                        current["alert_history"] = (
-                            profile.pop("alert_history", {}) if isinstance(profile, dict) else {})
-                        self._write_disk_atomic(current)
-                    for node in _MOVED_NODES:
-                        data.pop(node, None)
+            def transfer(data: dict) -> None:
+                nonlocal current
+                if fresh:
+                    current = {
+                        "version": INTERFACE_VERSION,
+                        "migration": deepcopy(_MIGRATION),
+                        "ui_state": deepcopy(data.get("ui_state", {})),
+                        "profile": deepcopy(data.get("profile", {})),
+                        "alert_info": deepcopy(data.get("alert_info", [])),
+                        "server_config": deepcopy(data.get("server_config", {})),
+                    }
+                    profile = current["profile"]
+                    current["alert_history"] = (
+                        profile.pop("alert_history", {}) if isinstance(profile, dict) else {})
+                    self._write_disk_atomic(current)
+                for node in _MOVED_NODES:
+                    data.pop(node, None)
 
-                # 严格读取源文件，坏文件不得被空默认值覆盖或清理。
-                legacy._mutate_disk(transfer, stamp_version=False, strict=True)
-                current.pop("migration", None)
-                self._write_disk_atomic(current)
-                self._data = deepcopy(current)
-                return True
-            finally:
-                self._file_lock.release()
+            legacy._mutate_disk(transfer, stamp_version=False, strict=True)
+            current.pop("migration", None)
+            self._write_disk_atomic(current)
+            self._data = deepcopy(current)
+            return True
 
 
 _store: InterfaceStore | None = None

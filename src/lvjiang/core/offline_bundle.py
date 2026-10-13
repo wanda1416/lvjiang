@@ -140,6 +140,8 @@ def install_offline_bundle(
     preserve_task_params: bool = True,
 ) -> dict:
     """校验后交换 config 目录；保留上一份备份，交换失败恢复原配置。"""
+    from .access import require_primary_write
+    require_primary_write()
     root = root.resolve()
     root.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".offline-stage-", dir=root))

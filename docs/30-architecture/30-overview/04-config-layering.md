@@ -369,25 +369,34 @@ hooks = AppHooks(
 
 ## 七、运行与界面状态分文件
 
-`config/session/session.json` 由 `SessionStore` 管理执行选择和设置等运行节点。
-`config/session/interface.json` 由 `InterfaceStore` 管理以下五个业务根节点：
+`config/session/session.json` 由 `SessionStore` 管理基础设置、用户名册与日常脚本偏好。
+`config/session/interface.json` 由 `InterfaceStore` 管理以下业务根节点：
 
 | 节点 | 内容 |
 |------|------|
-| `ui_state` | 窗口尺寸、分栏、页签、列宽，以及批量活动组和运行草稿 |
+| `actives` | 当前用户、布局、空间、环境和方案 |
+| `daily` | 当前工作流与展示分组 |
+| `ui_state` | 窗口尺寸、分栏、页签和列宽 |
+| `batch` | 批量活动组和运行草稿 |
 | `profile` | 总览分组、列定义、顺序和活动组 |
-| `alert_history` | Profile 提醒去重历史，原为 `profile.alert_history` |
 | `alert_info` | 告警面板消息列表 |
 | `server_config` | 更新提示、公告、在线配置与遥测状态 |
 
-新文件元数据 `version: 1` 表示首版格式。初始化入口 `initialize_state_stores()`
+提醒去重历史由独立告警存储管理，不属于界面配置。
+当前格式为 Session v3、Interface v2，不为残留选择节点增加兼容迁移。
+初始化入口 `initialize_state_stores()`
 必须在 QApplication 和页面构造前执行；读取与一次性迁移同步完成后才允许显示窗口。
 
-`InterfaceStore` 复用 `SessionStore` 的节点读写原语，并使用独立路径、文件锁、格式版本
+`InterfaceStore` 复用 `SessionStore` 的节点读写原语，并使用独立路径、进程内互斥、格式版本
 和只读实例临时字段清单。UI 页面继续统一通过 `load_ui_page_state` / `update_ui_page_state`
 读取和浅合并自己的子节点；业务消费者直接使用新存储对应节点，不维护平行缓存。
 
-仅新文件不存在时，迁移会在 interface → session 的固定锁序内读取旧格式。先原子写入
+共享配置只有主节点可以落盘。只读节点的 `actives`、`daily`、`ui_state`、`batch`
+和总览活动组仅保留在内存；不能保存配置定义、在线更新、迁移或修订索引。
+配置文件不再创建侧车锁。长期用户 Session 快照只合并本次修改，同字段冲突拒绝覆盖；
+批量定义保存比对加载基线，冲突交由用户确认是否覆盖。
+
+仅新文件不存在时，主节点迁移会在 interface → session 的固定线程锁序内读取旧格式。先原子写入
 新文件和 `migration: {source: session, version: 1}` 标记，再删除旧文件四个节点，最后
 移除标记。新文件已存在但标记尚在时只重试清理；不存在标记时不回读旧数据。
 旧文件损坏不会被空数据覆盖。更完整的边界见

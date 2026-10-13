@@ -81,6 +81,9 @@ def is_enabled() -> bool:
 
 
 def _installed_store() -> UpdateStore | None:
+    from ..access import is_readonly
+    if is_readonly():
+        return None  # 安装及归档写入只属于主节点。
     from ..paths import session_directory
     from ..update import get_version
     from ..update_bundle import series

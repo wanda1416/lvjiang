@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from fasteners import InterProcessLock
 from loguru import logger
 
 from ..fs_util import atomic_write_bytes
@@ -18,41 +17,22 @@ from ..paths import session_directory
 from . import versioning
 
 _mutexes: dict[Path, threading.RLock] = {}
-_depth = threading.local()
 
 
 @contextmanager
 def configuration_lock(config: Path, *, blocking: bool = True) -> Iterator[bool]:
-    """进程内可重入；与在线安装共用跨进程锁。"""
+    """主节点内协调保存、安装与任务快照，不产生文件锁。"""
     config = config.resolve()
     mutex = _mutexes.setdefault(config, threading.RLock())
-    if not mutex.acquire(blocking=blocking):
+    acquired = mutex.acquire(timeout=5) if blocking else mutex.acquire(blocking=False)
+    if not acquired and blocking:
+        raise TimeoutError("配置操作等待超过 5 秒，请等待当前保存或安装完成后重试")
+    if not acquired:
         yield False
         return
-    depths = getattr(_depth, "values", {})
-    _depth.values = depths
-    nested = depths.get(config, 0)
-    lease = None
-    acquired = False
     try:
-        if nested:
-            acquired = True
-        else:
-            directory = session_directory(config)
-            directory.mkdir(parents=True, exist_ok=True)
-            lease = InterProcessLock(directory / "config.lock")
-            acquired = lease.acquire(blocking=blocking)
-        if acquired:
-            depths[config] = nested + 1
-        yield acquired
+        yield True
     finally:
-        if acquired:
-            if nested:
-                depths[config] = nested
-            else:
-                depths.pop(config, None)
-                assert lease is not None
-                lease.release()
         mutex.release()
 
 
@@ -98,7 +78,9 @@ def rebuild_content(resolver) -> dict:
             for key in keys[:-1]:
                 node = node.setdefault(key, {})
             node[keys[-1]] = versioning.read_version(source) or 1
-        atomic_write_bytes(path, formatted_json_bytes(data), prefix=".content-")
+        from ..access import is_readonly
+        if not is_readonly():
+            atomic_write_bytes(path, formatted_json_bytes(data), prefix=".content-")
         resolver.clear_read_cache()
         return data
 
@@ -135,6 +117,10 @@ def load_content(resolver) -> dict:
 
 
 def content_changed(resolver) -> None:
+    from ..access import is_readonly
+    if is_readonly():
+        resolver.clear_read_cache()
+        return
     try:
         rebuild_content(resolver)
     except OSError as exc:

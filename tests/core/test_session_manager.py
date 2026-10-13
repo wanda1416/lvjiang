@@ -52,7 +52,7 @@ class TestSave:
         key, value = next(iter(counters.items()))
         assert value == int(key.removeprefix("counter_"))
 
-    def test_save_replaces_complete_session(self, mgr):
+    def test_save_merges_only_changed_snapshot_fields(self, mgr):
         mgr.save("用户", {"nested": {"a": 1, "b": 1}})
         first = mgr.load("用户")
         second = mgr.load("用户")
@@ -60,7 +60,7 @@ class TestSave:
         second["nested"]["b"] = 2
         mgr.save("用户", first)
         mgr.save("用户", second)
-        assert mgr.load("用户")["nested"] == {"a": 1, "b": 2}
+        assert mgr.load("用户")["nested"] == {"a": 2, "b": 2}
 
     def test_missing_keys_are_deleted_and_repeated_save_works(self, mgr):
         mgr.save("用户", {"keep": 1, "counter": 0})

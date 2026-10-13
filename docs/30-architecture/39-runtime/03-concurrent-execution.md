@@ -317,8 +317,8 @@ pages[task_run_id] -> TuningRunPage
 
 - OCR 若实现不保证并发安全，则每个 RunContext 使用独立实例；不能默认共享主窗口 `_ocr`。
 - Layout、ReferenceDatabase 等共享只读配置可复用不可变快照，运行中不读取活动 UI 状态。
-- SessionManager 继续使用增量 CAS；用户执行锁阻止同一用户任务并发，跨用户保存按现有
-  文件锁和数据库事务处理。
+- SessionManager 合并快照修改并检查同字段冲突；用户执行占用阻止同一用户任务并发，
+  用户文件写入复用该占用门禁与进程内互斥，数据库写入保留短事务。
 - 每个 RunContext 持有独立 UI helper 和待处理请求集合。请求携带
   `task_run_id/target_id`，UI 可以统一排队展示，但队列项仍归原 RunContext；一个任务结束
   只能关闭并完成自己的请求。停止、退出和交互取消都必须 set 对应等待事件，不能留下无限
@@ -468,8 +468,10 @@ run_workflow_implementation(..., target_id) -> task_run_id
 
 现状单任务结果只有任务名与微秒时间，批量报告只有秒级时间；并发后不能沿用。单任务结果
 文件名必须包含 `task_run_id`，批量报告必须包含 `batch_run_id`，时间只用于可读性。用户执行
-锁阻止同一用户的两个物理任务并发，但 profile 触发器、UI 编辑和外部实例仍可能同时写数据，
-因此 Session CAS、装备文件锁和 SQLite 短事务不能因进程内目标互斥而移除。
+占用阻止同一用户的两个物理任务并发，用户文件写入复用同一占用门禁。
+客户端内部跨进程锁只保留主节点所有权与用户占用；不为每个装备、资料或 Session 文件
+建锁。只读节点只能在已授权任务中写执行用户的数据；共享配置由主节点独占写入。
+Session 快照冲突检查、原子替换和 SQLite 短事务仍然保留。
 
 `daily_history.db`、调律历史库和 profile 数据库均要核对 WAL、busy timeout 与事务长度；
 工作线程不能持有数据库连接跨 OCR、等待用户或网络调用。

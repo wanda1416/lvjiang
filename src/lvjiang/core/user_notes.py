@@ -16,10 +16,8 @@ from pathlib import Path
 from typing import Callable, TypeVar
 from uuid import uuid4
 
-from fasteners import InterProcessLock
-
+from .access import user_write_access
 from .fs_util import atomic_write_text
-from .user_file_locks import user_file_lock_path
 
 SCHEMA_VERSION = 1
 MAX_NOTES = 200
@@ -102,7 +100,7 @@ class UserNotesRepository:
             users_dir = USERS_DIR
         self.username = username
         self.path = users_dir / f"{username}.notes.json"
-        self._lock_path = user_file_lock_path(self.path)
+        self.username = username
         self._thread_lock = _thread_lock(self.path)
 
     @staticmethod
@@ -140,18 +138,12 @@ class UserNotesRepository:
 
     def _mutate(self, fn: Callable[[dict], _T]) -> _T:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._thread_lock:
-            process_lock = InterProcessLock(str(self._lock_path))
-            if not process_lock.acquire(blocking=True, timeout=5):
-                raise TimeoutError("便利贴文件正在被其他进程修改")
-            try:
-                state = self._load_state()
-                result = fn(state)
-                state["revision"] += 1
-                self._save_state(state)
-                return result
-            finally:
-                process_lock.release()
+        with user_write_access(self.username, self.path.parent), self._thread_lock:
+            state = self._load_state()
+            result = fn(state)
+            state["revision"] += 1
+            self._save_state(state)
+            return result
 
     def list_notes(self) -> list[UserNote]:
         """Return notes in display order (newest first)."""
@@ -200,16 +192,10 @@ class UserNotesRepository:
 
     def delete_file(self) -> None:
         """Remove all sticky-note content for this user."""
-        with self._thread_lock:
+        with user_write_access(self.username, self.path.parent), self._thread_lock:
             if not self.path.exists():
                 return
-            process_lock = InterProcessLock(str(self._lock_path))
-            if not process_lock.acquire(blocking=True, timeout=5):
-                raise TimeoutError("便利贴文件正在被其他进程修改")
-            try:
-                self.path.unlink(missing_ok=True)
-            finally:
-                process_lock.release()
+            self.path.unlink(missing_ok=True)
 
 
 def delete_user_notes(username: str, users_dir: Path | None = None) -> None:

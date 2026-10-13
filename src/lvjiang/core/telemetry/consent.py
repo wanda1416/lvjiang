@@ -57,7 +57,8 @@ def needs_prompt() -> bool:
     只有「从未问过」才弹；dev 模式（仓库带 .git 或 LVJIANG_DEV_MODE=1）
     永远不弹，避免自己的调试环境污染统计，也避免开发时反复弹窗。
     """
-    if _is_dev_build():
+    from ..access import is_readonly
+    if is_readonly() or _is_dev_build():
         return False
     return get_consent_state() is ConsentState.UNKNOWN
 

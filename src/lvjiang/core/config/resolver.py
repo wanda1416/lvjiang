@@ -62,6 +62,8 @@ _write_batches: ContextVar[dict[int, dict[str, None]] | None] = ContextVar("conf
 def _configuration_write(function):
     @wraps(function)
     def wrapped(self, *args, **kwargs):
+        from ..access import require_primary_write
+        require_primary_write()
         from .conflicts import checked_write, file_baseline
         from .content import configuration_lock
         rel_path = args[0] if args else kwargs.get("rel_path")
@@ -456,7 +458,7 @@ class ConfigResolver:
     def _notify(self, rel_path: str, *, strict: bool = False):
         self.notify_changes((rel_path,), strict=strict)
 
-    def notify_changes(self, paths: tuple[str, ...], *, strict: bool = False):
+    def notify_changes(self, paths: tuple[str, ...], *, strict: bool = False, refresh_content: bool = True):
         # 批次内读取仍需立即看到刚写入的文件；索引与监听通知在批次结束时合并。
         batches = _write_batches.get()
         batch = batches.get(id(self)) if batches is not None else None
@@ -466,7 +468,7 @@ class ConfigResolver:
                 for root in (self.system_dir, self.local_dir):
                     self._yaml_cache.pop(str(root / rel_path), None)
             return
-        if paths and self.track_content:
+        if paths and self.track_content and refresh_content:
             from .content import content_changed
             content_changed(self)
         # 写入路径主动失效，补上“同一 mtime tick 内写入了

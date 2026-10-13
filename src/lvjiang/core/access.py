@@ -84,6 +84,35 @@ def is_readonly() -> bool:
     return _readonly
 
 
+def require_primary_write() -> None:
+    """共享配置只有主节点可以落盘；只读选择由界面存储留在内存。"""
+    if is_readonly():
+        raise AccessDeniedError("只读节点不能修改共享配置，请在主节点操作")
+
+
+@contextmanager
+def user_write_access(username: str, users_dir: Path | None = None):
+    """复用用户占用门禁，不创建数据文件锁。
+
+    同主节点内的 UI/任务共用已有占用；只读节点必须在任务授权上下文中。
+    主节点修改未占用用户时短暂取得同一门禁，不能撞上其它节点的用户任务。
+    """
+    lease = user_lease(username, users_dir)
+    # 检查与写回共用现有占用状态互斥；任务不能在写回中途释放/抢占用户。
+    with _mutex:
+        if lease.key in _held and (not is_readonly() or lease.key in _authorized.get()):
+            yield
+            return
+        if is_readonly():
+            raise AccessDeniedError("只读节点只能写入本节点正在执行任务的用户数据")
+        lease = acquire_user(username, users_dir)
+        try:
+            with lease.authorized():
+                yield
+        finally:
+            lease.release()
+
+
 def user_lease(username: str, users_dir: Path | None = None) -> Lease:
     if not username:
         raise ValueError("执行用户不能为空")

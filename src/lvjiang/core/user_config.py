@@ -8,18 +8,16 @@ from __future__ import annotations
 import json
 import re
 import threading
-from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fasteners import InterProcessLock
 from loguru import logger
 
+from .access import user_write_access
 from .fs_util import atomic_write_text
-from .user_file_locks import user_file_lock_path
 
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
@@ -127,17 +125,6 @@ def user_metadata_path(username: str, users_dir: Path | None = None) -> Path:
     return (users_dir or _users_dir()) / f"{username}.json"
 
 
-@contextmanager
-def _locked_metadata(path: Path):
-    lock = InterProcessLock(str(user_file_lock_path(path)))
-    if not lock.acquire(blocking=True, timeout=5):
-        raise TimeoutError(f"用户资料写入锁超时: {path.name}")
-    try:
-        yield
-    finally:
-        lock.release()
-
-
 def load_user_metadata(username: str, users_dir: Path | None = None) -> User | None:
     path = user_metadata_path(username, users_dir)
     if not path.exists():
@@ -159,8 +146,8 @@ def load_user_metadata(username: str, users_dir: Path | None = None) -> User | N
 
 def save_user_metadata(user: User, users_dir: Path | None = None) -> None:
     path = user_metadata_path(user.name, users_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with _METADATA_SAVE_LOCK, _locked_metadata(path):
+    with user_write_access(user.name, path.parent), _METADATA_SAVE_LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_text(
             path,
             json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
@@ -175,7 +162,7 @@ def mutate_user_metadata(
 ) -> User:
     """锁内读取最新资料并只提交 mutator 所做的修改。"""
     path = user_metadata_path(username, users_dir)
-    with _METADATA_SAVE_LOCK, _locked_metadata(path):
+    with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
         user = load_user_metadata(username, users_dir)
         if user is None:
             raise FileNotFoundError(f"用户资料不存在: {username}")
@@ -227,10 +214,17 @@ def delete_user_workflow_params(
     )
 
 
+_readonly_ui_states: dict[tuple[Path, str], dict[str, Any]] = {}
+
+
 def get_user_ui_state(
     username: str, key: str, users_dir: Path | None = None,
 ) -> dict[str, Any]:
     """读取 ``users/{username}.json`` 中一项用户界面状态。"""
+    from .access import is_readonly
+    path = user_metadata_path(username, users_dir).resolve()
+    if is_readonly() and (path, key) in _readonly_ui_states:
+        return deepcopy(_readonly_ui_states[path, key])
     user = load_user_metadata(username, users_dir)
     if user is None:
         return {}
@@ -247,7 +241,11 @@ def set_user_ui_state(
     """原子替换 ``users/{username}.json`` 中一项用户界面状态。"""
     saved = deepcopy(value)
     path = user_metadata_path(username, users_dir)
-    with _METADATA_SAVE_LOCK, _locked_metadata(path):
+    from .access import is_readonly
+    if is_readonly():
+        _readonly_ui_states[path.resolve(), key] = saved
+        return
+    with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
         user = load_user_metadata(username, users_dir)
         if user is None:
             raise FileNotFoundError(f"用户资料不存在: {username}")
@@ -283,7 +281,7 @@ def set_graduation_analysis_settings(
     """原子替换指定备战方案的毕业率分析选项。"""
     saved = deepcopy(value)
     path = user_metadata_path(username, users_dir)
-    with _METADATA_SAVE_LOCK, _locked_metadata(path):
+    with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
         user = load_user_metadata(username, users_dir)
         if user is None:
             raise FileNotFoundError(f"用户资料不存在: {username}")
@@ -353,6 +351,9 @@ class UserConfigManager:
                     continue
                 user = load_user_metadata(value, self._users_dir)
                 if user is None:
+                    from .access import is_readonly
+                    if is_readonly():
+                        continue
                     user = User(name=value, created_at=datetime.now().isoformat())
                     save_user_metadata(user, self._users_dir)
                 self._users[value] = user
@@ -385,6 +386,9 @@ class UserConfigManager:
         user = User(name="default", created_at=datetime.now().isoformat())
         self._users[user.name] = user
         self._active_user = user.name
+        from .access import is_readonly
+        if is_readonly():
+            return  # 空目录只读展示，不创建用户资料或名册。
         self._save_user(user)
         self._save_order()
         logger.info("已创建默认用户")

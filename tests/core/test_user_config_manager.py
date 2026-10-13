@@ -149,10 +149,11 @@ class TestUserConfigManagerCRUD:
         assert mgr.get_user("待删除").attributes == {"account": "保留账号"}
         assert [note.text for note in repo.list_notes()] == ["私人备忘"]
 
-    def test_user_metadata_lock_is_kept_in_hidden_lock_directory(self, session_env):
+    def test_user_metadata_reuses_user_occupancy_without_document_lock(self, session_env):
         UserConfigManager()
 
-        assert (session_env.parent / "users/.lock/default.json.lock").exists()
+        assert not (session_env.parent / "users/.lock/default.json.lock").exists()
+        assert list((session_env.parent / "users/.lock").glob("*.execution.lock"))
         assert not (session_env.parent / "users/default.json.lock").exists()
 
 

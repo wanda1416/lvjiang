@@ -8,13 +8,17 @@ from pathlib import Path
 from typing import Callable
 from uuid import uuid4
 
-from fasteners import InterProcessLock
 from loguru import logger
 
 from .fs_util import atomic_write_text
 
 BATCH_DOCUMENT_TYPE = "lvjiang.batch"
 BATCH_CONFIG_VERSION = 2
+_WRITE_LOCK = threading.RLock()
+
+
+class BatchConfigConflict(ValueError):
+    """编辑期间磁盘定义改变，需用户确认覆盖。"""
 _WORKFLOW_PHASES = (
     "batch_setup", "prepare_item", "finish_item", "batch_teardown",
     # 无人值守恢复：不在正常流程里排程，只在引擎撞到弹窗后由调度器调用。
@@ -247,6 +251,7 @@ class BatchConfig:
     """
 
     configs: dict[str, BatchConfigItem] = field(default_factory=dict)
+    _file_baseline: bytes | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         # 不变量：按稳定 ID 索引。调用方按名称拼出来的字典在这里自愈——
@@ -324,18 +329,12 @@ class BatchConfig:
 
 
 class BatchConfigStore:
-    LOCK_TIMEOUT = 5
-
     def __init__(self, path: Path | None = None):
         if path is None:
             from .. import constants
             path = constants.BATCH_CONFIG_PATH
         self.path = Path(path)
-        self._thread_lock = threading.RLock()
-        self._file_lock = InterProcessLock(str(self.path) + ".lock")
-
-    def _load_unlocked(self) -> BatchConfig:
-        return BatchConfig.from_dict(self._read_document_unlocked())
+        self._thread_lock = _WRITE_LOCK
 
     def _read_document_unlocked(self) -> object:
         if not self.path.exists():
@@ -354,61 +353,49 @@ class BatchConfigStore:
                 and document.get("document_type") == BATCH_DOCUMENT_TYPE
                 and document.get("version") == 1
             ):
-                return BatchConfig.from_dict(document)
+                config = BatchConfig.from_dict(document)
+                config._file_baseline = self.path.read_bytes() if self.path.exists() else None
+                return config
 
             # v1 没有稳定 ID。只在内存里补 uuid 会导致每次 load 都得到一组
             # 新 ID，主页面下拉框、活动组与运行草稿立即失去关联。迁移必须在
-            # 文件锁内重读最新磁盘并一次性写成 v2；另一个进程若已先迁移，
-            # 本进程直接使用它写出的结果。
-            self._acquire()
-            try:
-                latest = self._read_document_unlocked()
-                config = BatchConfig.from_dict(latest)
-                if (
-                    isinstance(latest, dict)
-                    and latest.get("document_type") == BATCH_DOCUMENT_TYPE
-                    and latest.get("version") == 1
-                ):
-                    text = json.dumps(
-                        config.to_dict(), ensure_ascii=False, indent=2)
-                    atomic_write_text(self.path, text, prefix=".batch_")
-                    logger.info("批量配置已从 v1 一次性迁移到 v2")
-                return config
-            finally:
-                self._file_lock.release()
-
-    def _acquire(self) -> None:
-        if not self._file_lock.acquire(blocking=True, timeout=self.LOCK_TIMEOUT):
-            raise TimeoutError(f"无法在 {self.LOCK_TIMEOUT}s 内获取 batch.json 写锁")
-
-    def save(self, config: BatchConfig) -> None:
-        with self._thread_lock:
-            self._acquire()
-            try:
+            # 主节点在进程内互斥区一次性写成 v2；只读节点不迁移落盘。
+            config = BatchConfig.from_dict(document)
+            from .access import is_readonly
+            if not is_readonly():
                 text = json.dumps(config.to_dict(), ensure_ascii=False, indent=2)
                 atomic_write_text(self.path, text, prefix=".batch_")
-            finally:
-                self._file_lock.release()
+                logger.info("批量配置已从 v1 一次性迁移到 v2")
+            config._file_baseline = self.path.read_bytes() if self.path.exists() else None
+            return config
+
+    def save(self, config: BatchConfig, *, force: bool = False) -> None:
+        from .access import require_primary_write
+        require_primary_write()
+        with self._thread_lock:
+            current = self.path.read_bytes() if self.path.exists() else None
+            if not force and current != config._file_baseline:
+                raise BatchConfigConflict("批量配置已在磁盘更新，请重新加载或确认覆盖；草稿未丢失")
+            text = json.dumps(config.to_dict(), ensure_ascii=False, indent=2)
+            atomic_write_text(self.path, text, prefix=".batch_")
+            config._file_baseline = self.path.read_bytes()
 
     def mutate(self, mutator: Callable[[BatchConfig], None]) -> BatchConfig:
+        from .access import require_primary_write
+        require_primary_write()
         with self._thread_lock:
-            self._acquire()
-            try:
-                config = self._load_unlocked()
-                mutator(config)
-                text = json.dumps(config.to_dict(), ensure_ascii=False, indent=2)
-                atomic_write_text(self.path, text, prefix=".batch_")
-                return config
-            finally:
-                self._file_lock.release()
+            config = self.load()
+            mutator(config)
+            self.save(config)
+            return config
 
 
 def load_batch_config() -> BatchConfig:
     return BatchConfigStore().load()
 
 
-def save_batch_config(config: BatchConfig) -> None:
-    BatchConfigStore().save(config)
+def save_batch_config(config: BatchConfig, *, force: bool = False) -> None:
+    BatchConfigStore().save(config, force=force)
     logger.info(f"批量配置已保存: {len(config.configs)} 个配置组")
 
 

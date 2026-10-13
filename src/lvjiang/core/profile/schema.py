@@ -283,6 +283,8 @@ def _carry_over_preserved(schema: ProfileSchema) -> ProfileSchema:
 
 def save_profile_config(schema: ProfileSchema) -> None:
     """保存配置到 profile.yaml"""
+    from ..access import require_primary_write
+    require_primary_write()
     try:
         # 只校验进了索引的定义——留底的那些本来就是核心解释不了的，拿它们
         # 去校验只会把用户锁在"存不进去"的状态里。

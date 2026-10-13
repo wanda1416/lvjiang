@@ -3,19 +3,15 @@
 纯运行态配置（config/session/session.json）统一经本模块读写：
 - 全量内存缓存：首次访问懒加载，此后所有读操作命中内存
 - 线程安全：RLock 保护单进程内的并发
-- 多进程安全：文件锁（fasteners）保护跨进程的并发写入（自动处理 Windows/Unix）
+- 写入所有权：共享配置只有主节点可以落盘，只读选择留在内存
 - 写即落盘：每次变更立即原子落盘（tmp + os.replace），杜绝半截文件
-- 写锁最小化：仅在磁盘写入时持有锁（6-14ms），不阻塞读操作
 
-节点语义：session.json 顶层 key 即节点（daily / settings /
-actives 等），各调用方只操作自己的节点。
+节点语义：session.json 顶层 key 即节点（daily / settings 等），
+各调用方只操作自己的节点。
 
 界面、Profile 总览、告警与服务器状态独立存于 interface.json，见 interface 模块。
 
-⚠️ 多进程约束：
-   1. 只在写入瞬间申请文件锁（不全程持有）
-   2. 文件锁只尝试一次，失败直接交给调用方处理
-   3. fasteners 库自动处理跨平台锁定（Windows/Linux/macOS）
+不为状态文件创建跨进程锁；主节点身份与用户任务占用由 core.access 管理。
 """
 from __future__ import annotations
 
@@ -25,7 +21,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable
 
-from fasteners import InterProcessLock
 from loguru import logger
 
 from ..fs_util import atomic_write_text
@@ -35,11 +30,7 @@ from ..fs_util import atomic_write_text
 #: actives，统计同意记录归入 settings.network；没有该字段的文档首次写入时补上。
 SESSION_VERSION = 3
 
-# 只读实例仅隔离会改变“当前实例正在使用什么”的选择状态。未列出的节点和
-# 字段仍按普通 SessionStore 语义持锁、合并并原子落盘。
-#
-# 每个元组表示一棵完整的临时子树。名单必须保持窄小；新增 Session 字段默认
-# 可写，只有确认属于实例私有选择时才允许加入这里。session.json 现在只剩配置
+# 只读节点只能在内存中改允许的临时子树，其它节点拒绝落盘。session.json 只剩配置
 # 与事实，没有实例私有选择，所以这里是空的——那类状态（actives）已随新归属
 # 落到 InterfaceStore.TRANSIENT_PATHS。
 READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset()
@@ -88,22 +79,17 @@ class SessionStore:
     不带参构造时路径动态取自 constants.SESSION_PATH（monkeypatch 友好）；
     测试可显式传入 tmp_path 构造隔离实例。
 
-    多进程安全：
-    - 使用文件锁（fasteners）保护写入（跨平台：Windows/Unix/macOS）
-    - 锁仅在磁盘I/O时持有（6-14ms）
+    只有主节点落盘；进程内读改写使用 RLock，文件使用原子替换。
+    只读节点允许的临时选择仅更新本实例缓存。
     """
 
     FORMAT_VERSION = SESSION_VERSION
     TRANSIENT_PATHS = READONLY_TRANSIENT_PATHS
 
-    LOCK_TIMEOUT = 5  # 文件锁超时秒数
-
     def __init__(self, path: Path | str | None = None):
         self._path_override = Path(path) if path else None
         self._thread_lock = threading.RLock()  # 单进程内线程安全
         self._data: dict = self._read_disk()  # 构造时立即加载
-        # fasteners 跨平台文件锁（自动处理 Windows/Unix 差异）
-        self._file_lock = InterProcessLock(str(self.path) + ".lock")
 
     # ─── 路径与加载 ──────────────────────────────────────
 
@@ -129,57 +115,40 @@ class SessionStore:
             logger.error(f"{path.name} 解析失败，按空配置处理: {path}: {e}")
             return {}
 
-    def _acquire_write_lock(self, timeout: float = LOCK_TIMEOUT) -> None:
-        """【关键】获取写锁（跨平台），超时则抛异常
-
-        fasteners 自动处理 Windows/Unix 差异
-        """
-        acquired = self._file_lock.acquire(blocking=True, timeout=timeout)
-        if not acquired:
-            raise TimeoutError(f"无法在 {timeout}s 内获取 {self.path.name} 写锁")
-
     def _write_disk_atomic(self, data: dict) -> None:
-        """【关键】原子写入磁盘（必须在持有锁的情况下调用）
+        """主节点原子写入磁盘。
 
         tmp 文件 + os.replace，确保不会产生半截文件
         """
+        from ..access import require_primary_write
+        require_primary_write()
         text = json.dumps(data, ensure_ascii=False, indent=2)
         atomic_write_text(self.path, text, prefix=f".{self.path.stem}_")
 
     def _mutate_disk(
         self, mutator: Callable[[dict], Any], *, stamp_version: bool = True, strict: bool = False,
     ) -> Any:
-        """在文件锁内对最新磁盘快照执行变更并原子落盘。
-
-        - 线程锁串行化同一进程内对 fasteners 锁实例的访问
-        - 文件锁内重新读取磁盘，避免其他进程的同节点更新被陈旧缓存覆盖
-        - 使用 fasteners 确保 Windows/Unix 兼容
-        """
+        """主节点合并最新磁盘状态；只读节点只保留允许的临时选择。"""
         with self._thread_lock:
-            from ..access import is_readonly
+            from ..access import is_readonly, require_primary_write
             readonly = is_readonly()
-            self._acquire_write_lock(self.LOCK_TIMEOUT)
-            try:
-                disk_data = self._read_disk(strict=strict)
-                working = deepcopy(disk_data)
-                if stamp_version:
-                    working.setdefault("version", self.FORMAT_VERSION)
-                if readonly:
-                    _overlay_readonly_transients(working, self._data, self.TRANSIENT_PATHS)
-                result = mutator(working)
-
-                persisted = deepcopy(working)
-                if readonly:
-                    _overlay_readonly_transients(persisted, disk_data, self.TRANSIENT_PATHS)
-                if persisted != disk_data:
-                    self._write_disk_atomic(persisted)
-
-                self._data = deepcopy(persisted)
-                if readonly:
-                    _overlay_readonly_transients(self._data, working, self.TRANSIENT_PATHS)
-                return result
-            finally:
-                self._file_lock.release()
+            disk_data = self._read_disk(strict=strict)
+            working = deepcopy(disk_data)
+            if stamp_version and not readonly:
+                working.setdefault("version", self.FORMAT_VERSION)
+            if readonly:
+                _overlay_readonly_transients(working, self._data, self.TRANSIENT_PATHS)
+            result = mutator(working)
+            persisted = deepcopy(working)
+            if readonly:
+                _overlay_readonly_transients(persisted, disk_data, self.TRANSIENT_PATHS)
+            if persisted != disk_data:
+                require_primary_write()
+                self._write_disk_atomic(persisted)
+            self._data = deepcopy(persisted)
+            if readonly:
+                _overlay_readonly_transients(self._data, working, self.TRANSIENT_PATHS)
+            return result
 
     # ─── 节点读写 ────────────────────────────────────────
 
@@ -200,7 +169,7 @@ class SessionStore:
         """dict 节点一级浅合并并落盘（多组件分写同一节点用）
 
         节点缺失或不是 dict 时视为空 dict 重建。
-        使用文件锁确保多进程安全。
+        主节点在进程内互斥区读取最新磁盘值后原子写回。
         """
         def _update(data: dict) -> None:
             node = data.get(key)
@@ -214,7 +183,7 @@ class SessionStore:
         """锁内原子读-改-写：fn(旧值) 的返回值作为新节点并落盘
 
         返回写入的新值。供需要 get+set 原子性的调用方（如插件节点）。
-        使用文件锁确保多进程安全。
+        主节点在进程内互斥区读取最新磁盘值后原子写回。
         """
         def _mutate(data: dict) -> Any:
             new_value = fn(data.get(key))
@@ -226,7 +195,7 @@ class SessionStore:
     def delete_node(self, key: str):
         """删除顶层节点并落盘（不存在时静默）
 
-        使用文件锁确保多进程安全。
+        主节点在进程内互斥区读取最新磁盘值后原子写回。
         """
         def _delete(data: dict) -> None:
             data.pop(key, None)
@@ -238,7 +207,7 @@ class SessionStore:
 
         ``consumer`` 在最新磁盘快照的写锁内执行。只有 consumer 成功返回后
         才会删除节点并落盘；consumer 抛出异常时原节点保持不变。回调不得
-        再调用本 SessionStore，避免锁重入跨进程文件锁。
+        再修改本 SessionStore，避免回调结果被外层快照覆盖。
 
         返回 True 表示节点存在且已消费，False 表示节点原本不存在。
         """

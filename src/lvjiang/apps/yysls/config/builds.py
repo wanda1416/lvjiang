@@ -6,7 +6,6 @@ import re
 from dataclasses import asdict, dataclass, field
 from uuid import uuid4
 
-import fasteners
 import yaml
 from loguru import logger
 
@@ -136,9 +135,10 @@ class BuildRepository:
 
     def _mutate(self, build: BuildDefinition, value: dict | None, expected: dict | None) -> None:
         rel_path = f"{GEAR_SETS_DIR}/{build.id}.yaml"
-        lock_path = self.resolver.local_dir / f"{GEAR_SETS_DIR}/.locks/{build.id}.lock"
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with fasteners.InterProcessLock(str(lock_path)):
+        from ....core.access import require_primary_write
+        require_primary_write()
+        from ....core.config.content import configuration_lock
+        with configuration_lock(self.resolver.config_dir):
             current = next((item for item in self.all() if item.id == build.id), None)
             if (current is None and self.resolver.resolve_read(rel_path) is not None) or (
                     (current.to_dict() if current else None) != expected) or (

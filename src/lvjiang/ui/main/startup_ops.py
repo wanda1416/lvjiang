@@ -19,6 +19,9 @@ class StartupOpsMixin:
 
     def check_update_on_startup(self):
         """启动时先检查公告，处理完成后再检查版本更新。"""
+        from ...core.access import is_readonly
+        if is_readonly():
+            return  # 启动公告/同意/在线安装的持久化状态归主节点。
         from ...core.announcement import (
             AnnouncementFetchResult,
             applicable_notices,

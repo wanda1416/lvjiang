@@ -239,6 +239,9 @@ class MenuOpsMixin:
             self._theme_button, Qt.Corner.TopRightCorner
         )
         if is_readonly():
+            for action in (settings_mgmt, user_mgmt, reference_mgr, script_editor, batch_settings):
+                action.setEnabled(False)
+                action.setToolTip(tr("共享配置只能由主节点修改"))
             # 只读实例只响应显式 UI 操作，插件追加的 QAction 快捷键也一并清除。
             for action in self.findChildren(QAction):
                 action.setShortcut("")

@@ -28,6 +28,13 @@ install_closed_directory_scan()
 
 
 @pytest.fixture(autouse=True)
+def _isolate_node_role(monkeypatch):
+    """节点权限属于应用实例；测试的身份切换不能泄漏到下一个用例。"""
+    from lvjiang.core import access
+    monkeypatch.setattr(access, "_readonly", False)
+
+
+@pytest.fixture(autouse=True)
 def _no_native_dialogs(monkeypatch):
     def _banned(text: str, *args, **kwargs):
         raise AssertionError(

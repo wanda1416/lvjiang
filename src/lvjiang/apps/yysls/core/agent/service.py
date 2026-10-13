@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Callable
 
 import yaml
-from fasteners import InterProcessLock
 
 from ....._version import __version__
 from .....core.config.document_store import DocumentDirectoryStore
@@ -467,7 +466,7 @@ class AgentService:
         group, rules, run = self._generated(user, payload, result_id)
         digest = revision(payload)
         self.store.ensure_initialized()
-        with self._lock, InterProcessLock(str(self.store.root / "generation.lock")):
+        with self._lock:
             self._check(user)
             records = self.store.load("results")
             existing = records.get(result_id)

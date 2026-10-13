@@ -7,7 +7,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Mapping
 
-from fasteners import InterProcessLock
 from loguru import logger
 
 from lvjiang.core.fs_util import atomic_write_text
@@ -20,7 +19,6 @@ class DocumentDirectoryStore:
     子类可重写 :meth:`_prepare_initial_documents`，在首次初始化时迁入旧数据。
     """
 
-    LOCK_TIMEOUT = 5
     TRANSACTION_VERSION = 1
 
     def __init__(
@@ -36,7 +34,6 @@ class DocumentDirectoryStore:
         self.storage_version = storage_version
         self.label = label
         self._thread_lock = threading.RLock()
-        self._file_lock = InterProcessLock(str(root / ".lock"))
         self._initialized = False
 
     def _path(self, key: str) -> Path:
@@ -53,10 +50,10 @@ class DocumentDirectoryStore:
     def _transaction_path(self) -> Path:
         return self.root / "_transaction.json"
 
-    def _acquire(self) -> None:
+    def _require_write(self) -> None:
+        from ..access import require_primary_write
+        require_primary_write()
         self.root.mkdir(parents=True, exist_ok=True)
-        if not self._file_lock.acquire(blocking=True, timeout=self.LOCK_TIMEOUT):
-            raise TimeoutError(f"无法获取{self.label}目录锁: {self.root}")
 
     def _read(self, path: Path) -> dict:
         if not path.exists():
@@ -120,38 +117,36 @@ class DocumentDirectoryStore:
         with self._thread_lock:
             if self._initialized:
                 return
-            self._acquire()
-            try:
-                self._initialize_unlocked()
-                self._initialized = True
-            finally:
-                self._file_lock.release()
+            from ..access import is_readonly
+            if is_readonly():
+                return
+            self._require_write()
+            self._initialize_unlocked()
+            self._initialized = True
 
     def load(self, key: str) -> dict:
         self._path(key)
         self.ensure_initialized()
         with self._thread_lock:
-            self._acquire()
-            try:
+            from ..access import is_readonly
+            if not is_readonly():
                 self._recover_unlocked()
-                return deepcopy(self._read(self._path(key)))
-            finally:
-                self._file_lock.release()
+            path = self._path(key)
+            if is_readonly() and not path.exists():
+                return {}
+            return deepcopy(self._read(path))
 
     def mutate(self, key: str, fn: Callable[[dict], dict]) -> dict:
         self._path(key)
         self.ensure_initialized()
         with self._thread_lock:
-            self._acquire()
-            try:
-                self._recover_unlocked()
-                updated = fn(deepcopy(self._read(self._path(key))))
-                if not isinstance(updated, dict):
-                    raise TypeError(f"{self.label}文档 {key} 必须是对象")
-                self._write(self._path(key), updated)
-                return deepcopy(updated)
-            finally:
-                self._file_lock.release()
+            self._require_write()
+            self._recover_unlocked()
+            updated = fn(deepcopy(self._read(self._path(key))))
+            if not isinstance(updated, dict):
+                raise TypeError(f"{self.label}文档 {key} 必须是对象")
+            self._write(self._path(key), updated)
+            return deepcopy(updated)
 
     def mutate_many(
         self,
@@ -164,23 +159,18 @@ class DocumentDirectoryStore:
             self._path(key)
         self.ensure_initialized()
         with self._thread_lock:
-            self._acquire()
-            try:
-                self._recover_unlocked()
-                current = {key: self._read(self._path(key)) for key in keys}
-                updated = fn(deepcopy(current))
-                if set(updated) != set(keys) or any(
-                    not isinstance(value, dict) for value in updated.values()
-                ):
-                    raise ValueError("mutate_many 必须返回全部请求的对象文档")
-                result = {key: deepcopy(updated[key]) for key in keys}
-                self._write(
-                    self._transaction_path,
-                    {"version": self.TRANSACTION_VERSION, "documents": result},
-                )
-                for key, value in result.items():
-                    self._write(self._path(key), value)
-                self._transaction_path.unlink()
-                return deepcopy(result)
-            finally:
-                self._file_lock.release()
+            self._require_write()
+            self._recover_unlocked()
+            current = {key: self._read(self._path(key)) for key in keys}
+            updated = fn(deepcopy(current))
+            if set(updated) != set(keys) or any(
+                not isinstance(value, dict) for value in updated.values()
+            ):
+                raise ValueError("mutate_many 必须返回全部请求的对象文档")
+            result = {key: deepcopy(updated[key]) for key in keys}
+            self._write(self._transaction_path,
+                        {"version": self.TRANSACTION_VERSION, "documents": result})
+            for key, value in result.items():
+                self._write(self._path(key), value)
+            self._transaction_path.unlink()
+            return deepcopy(result)

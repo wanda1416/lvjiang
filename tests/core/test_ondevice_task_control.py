@@ -155,7 +155,7 @@ def test_selecting_next_user_preserves_run_owner_and_is_blocked_while_paused(sta
     active = {"user": "runner"}
     store = SimpleNamespace(get_active=lambda key, default="": active.get(key, default),
                             set_active=lambda key, value: active.__setitem__(key, value))
-    monkeypatch.setattr("lvjiang.core.config.session.get_session_store", lambda: store)
+    monkeypatch.setattr("lvjiang.core.config.interface.get_interface_store", lambda: store)
     monkeypatch.setattr("lvjiang.core.ondevice.offline.configuration_status", lambda: {"ready": True})
     monkeypatch.setattr(runner, "_local_user_names", lambda: ["runner", "viewer"])
     state.begin("task", "test", "runner")

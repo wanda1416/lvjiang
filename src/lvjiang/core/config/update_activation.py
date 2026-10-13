@@ -12,7 +12,7 @@ def activate_configuration(_system: Path, changed: tuple[str, ...]) -> None:
     """由主线程调用；只刷新内容相关缓存，不写 active 值和用户参数。"""
     resolver = get_resolver()
     resolver.clear_read_cache()
-    resolver.notify_changes(changed)
+    resolver.notify_changes(changed, refresh_content=False)
     if "ocr.yaml" in changed:
         from ..ocr_cleaner import OCRCleaner
         OCRCleaner.reset_instance()

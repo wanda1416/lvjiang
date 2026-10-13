@@ -6,15 +6,14 @@ UI 层在 Engine 创建后注入 session，并在正常结束时调用 save。
 
 import json
 import threading
-from contextlib import contextmanager
+from copy import deepcopy
 from pathlib import Path
 from typing import Callable
 
-from fasteners import InterProcessLock
 from loguru import logger
 
+from ..access import user_write_access
 from ..fs_util import atomic_write_text
-from ..user_file_locks import user_file_lock_path
 
 
 class SessionSnapshot(dict):
@@ -23,20 +22,33 @@ class SessionSnapshot(dict):
     def __init__(self, data, users_dir: Path | None = None):
         super().__init__(data)
         self.users_dir = users_dir
+        self.baseline = deepcopy(data)
 
 
 _SAVE_LOCK = threading.RLock()
 
 
-@contextmanager
-def _locked_file(path: Path):
-    lock = InterProcessLock(str(user_file_lock_path(path)))
-    if not lock.acquire(blocking=True, timeout=5):
-        raise TimeoutError(f"用户 Session 写入锁超时: {path.name}")
-    try:
-        yield
-    finally:
-        lock.release()
+class UserSessionConflict(ValueError):
+    """任务长期快照的同一字段已在磁盘改变，不能用旧快照覆盖。"""
+
+
+def _merge_changes(current: dict, baseline: dict, desired: dict) -> dict:
+    missing = object()
+    result = deepcopy(current)
+    for key in baseline.keys() | desired.keys():
+        before, after = baseline.get(key, missing), desired.get(key, missing)
+        if before == after:
+            continue
+        actual = current.get(key, missing)
+        if isinstance(before, dict) and isinstance(after, dict) and isinstance(actual, dict):
+            result[key] = _merge_changes(actual, before, after)
+        elif actual != before and actual != after:
+            raise UserSessionConflict(f"用户 Session 字段已在磁盘修改，本次未保存: {key}")
+        elif after is missing:
+            result.pop(key, None)
+        else:
+            result[key] = deepcopy(after)
+    return result
 
 
 class SessionManager:
@@ -93,14 +105,22 @@ class SessionManager:
     def save(self, username: str, session: dict):
         """保存 session 到 users/{username}.session.json
 
+        从 load 返回的快照只合并本次修改，同字段冲突拒绝覆盖。
+        普通 dict 表示调用方明确要求全量替换；短读改写优先使用 update。
+
         Args:
             username: 用户名
             session: session 数据
         """
         self._validate_username(username)
         path = self._users_dir / f"{username}.session.json"
-        with _SAVE_LOCK, _locked_file(path):
-            self._save(path, dict(session))
+        with user_write_access(username, self._users_dir), _SAVE_LOCK:
+            desired = dict(session)
+            if isinstance(session, SessionSnapshot):
+                desired = _merge_changes(self._load(username, path), session.baseline, desired)
+            self._save(path, desired)
+            if isinstance(session, SessionSnapshot):
+                session.baseline = deepcopy(dict(session))
         logger.debug(f"已保存 session: {username}")
 
     def update(self, username: str, mutator: Callable[[dict], None]) -> dict:
@@ -112,7 +132,7 @@ class SessionManager:
         """
         self._validate_username(username)
         path = self._users_dir / f"{username}.session.json"
-        with _SAVE_LOCK, _locked_file(path):
+        with user_write_access(username, self._users_dir), _SAVE_LOCK:
             session = self._load(username, path)
             mutator(session)
             self._save(path, session)

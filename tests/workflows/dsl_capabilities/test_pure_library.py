@@ -16,7 +16,7 @@ LIB_DIR = Path(__file__).resolve().parents[3] / "config/system/workflows/lib"
 def libraries():
     engines = {}
     for name in ("collections", "ordering", "numeric"):
-        engine = make_engine()
+        engine = make_engine(ocr=None)
         engine.load_subcalls(LIB_DIR / f"{name}.wf")
         engines[name] = engine
     return engines

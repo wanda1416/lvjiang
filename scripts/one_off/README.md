@@ -20,3 +20,10 @@
 验证事件、事务回滚、混合触发链及五个来源上限。上限参数只从实际脚本读取。
 运行 `python scripts/one_off/verify_profile_change_example.py`；示例中的循环与异常
 分支会有意产生错误日志，最终应输出 `PASS`。它不自动创建真实用户定义。
+
+## 废弃文件锁
+
+[停机清理](cleanup_obsolete_locks.py) 仅用于本轮锁收敛后移除已废弃侧车。
+退出所有律匠节点后运行 `python scripts/one_off/cleanup_obsolete_locks.py --config config`
+盘点，再追加 `--apply` 删除。主节点或用户仍占用时拒绝清理；不改用户数据，
+保留主节点及当前用户占用锁，不在客户端启动时自动执行。

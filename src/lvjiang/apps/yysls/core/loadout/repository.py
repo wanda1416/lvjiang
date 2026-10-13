@@ -10,9 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fasteners import InterProcessLock
-
-from lvjiang.core.user_file_locks import user_file_lock_path
+from lvjiang.core.access import user_write_access
 
 from ..equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
@@ -153,19 +151,13 @@ class LoadoutRepository:
 
     def update(self, mutator: Callable[[LoadoutState], None]) -> LoadoutState:
         # 只串行化短暂的读改写事务，任务执行期间仍可浏览、编辑用户数据。
-        with self._lock:
+        with user_write_access(self.username, self.users_dir), self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            lock = InterProcessLock(str(user_file_lock_path(self.path)))
-            if not lock.acquire(blocking=True, timeout=5):
-                raise TimeoutError(f"装备数据写入锁超时: {self.path.name}")
-            try:
-                state = self.load()
-                mutator(state)
-                state.revision += 1
-                self._save(state)
-                return copy.deepcopy(state)
-            finally:
-                lock.release()
+            state = self.load()
+            mutator(state)
+            state.revision += 1
+            self._save(state)
+            return copy.deepcopy(state)
 
     def _save(self, state: LoadoutState) -> None:
         payload = json.dumps(state.to_dict(), ensure_ascii=False, indent=2)

@@ -920,6 +920,11 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.btn_delete.setEnabled(can_delete)
         self.btn_delete.setToolTip(hint)
         self.btn_check.setEnabled(has_text)
+        from ...core.access import is_readonly
+        if is_readonly():
+            for button in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete):
+                button.setEnabled(False)
+                button.setToolTip(tr("只读节点不能修改共享配置，请在主节点操作"))
         title = tr("脚本编辑")
         if cur is not None:
             title += f" - {cur.rel_path}" + (" *" if self._dirty else "")

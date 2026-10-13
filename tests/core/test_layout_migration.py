@@ -7,7 +7,6 @@
 
 import pytest
 
-from lvjiang.core import layout_manager
 from lvjiang.core.layout_manager import LayoutConfigManager, migrate_layout_item
 from lvjiang.core.layout_models import Arrow, Layout, Panel, Point, Region
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
@@ -97,7 +96,6 @@ class TestMigrateAcrossLayouts:
         monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
         monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
-        monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
         # 重置 resolver 单例以使用新路径
         monkeypatch.setattr(cr, "_resolver", None)
@@ -153,7 +151,6 @@ class TestDeleteAcrossLayouts:
         monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
         monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
         monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
-        monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
         monkeypatch.setattr(cr, "_resolver", None)
         mgr = LayoutConfigManager()

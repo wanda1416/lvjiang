@@ -235,14 +235,12 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
     """目标场景只保存引用位置，尺寸和其他属性继续来自源场景。"""
     import lvjiang.constants as constants
     import lvjiang.core.config.resolver as cr
-    from lvjiang.core import layout_manager
     from lvjiang.core.layout_manager import LayoutConfigManager
     from lvjiang.core.layout_models import CanvasConfig, Layout
 
     monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
     monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
-    monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
     monkeypatch.setattr(cr, "_resolver", None)
 

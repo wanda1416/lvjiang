@@ -10,17 +10,10 @@
 """
 
 import json
-import re
-import shutil
-import uuid
 from functools import wraps
-from pathlib import Path
-from typing import Iterable
 
-import numpy as np
 from loguru import logger
 
-from ..constants import SESSION_CONFIG_DIR
 from ..i18n import tr
 from .config.interface import get_interface_store
 from .config.resolver import get_resolver
@@ -35,1027 +28,136 @@ from .layout_config import (
     validate_layout_key,
 )
 from .layout_models import CanvasConfig, Layout
+from .layout_references import (
+    _delete_layout_item_key as _delete_layout_item_key,
+)
+from .layout_references import (
+    _rename_layout_item_key as _rename_layout_item_key,
+)
+from .layout_references import (
+    delete_item_key_across_all_layouts as delete_item_key_across_all_layouts,
+)
+from .layout_references import (
+    delete_scene_across_all_layouts as delete_scene_across_all_layouts,
+)
+from .layout_references import (
+    migrate_layout_item as migrate_layout_item,
+)
+from .layout_references import (
+    rename_item_key_across_all_layouts as rename_item_key_across_all_layouts,
+)
+from .layout_references import (
+    rename_layout_scene_key as rename_layout_scene_key,
+)
+from .layout_references import (
+    rename_scene_across_all_layouts as rename_scene_across_all_layouts,
+)
+from .layout_screenshots import (
+    _existing_screenshot_path as _existing_screenshot_path,
+)
+from .layout_screenshots import (
+    _load_screenshot_meta as _load_screenshot_meta,
+)
+from .layout_screenshots import (
+    _safe_name as _safe_name,
+)
+from .layout_screenshots import (
+    _save_screenshot_meta as _save_screenshot_meta,
+)
+from .layout_screenshots import (
+    _screenshot_base_stem as _screenshot_base_stem,
+)
+from .layout_screenshots import (
+    _screenshot_meta_path as _screenshot_meta_path,
+)
+from .layout_screenshots import (
+    copy_screenshots as copy_screenshots,
+)
+from .layout_screenshots import (
+    delete_scene_screenshot as delete_scene_screenshot,
+)
+from .layout_screenshots import (
+    delete_screenshots as delete_screenshots,
+)
+from .layout_screenshots import (
+    get_active_screenshot_index as get_active_screenshot_index,
+)
+from .layout_screenshots import (
+    get_scene_screenshot_format as get_scene_screenshot_format,
+)
+from .layout_screenshots import (
+    layout_screenshots_dir as layout_screenshots_dir,
+)
+from .layout_screenshots import (
+    list_scene_screenshots as list_scene_screenshots,
+)
+from .layout_screenshots import (
+    load_scene_screenshot as load_scene_screenshot,
+)
+from .layout_screenshots import (
+    reindex_scene_screenshots as reindex_scene_screenshots,
+)
+from .layout_screenshots import (
+    rename_scene_screenshots as rename_scene_screenshots,
+)
+from .layout_screenshots import (
+    rename_view_screenshots as rename_view_screenshots,
+)
+from .layout_screenshots import (
+    save_scene_screenshot as save_scene_screenshot,
+)
+from .layout_screenshots import (
+    scene_screenshot_name as scene_screenshot_name,
+)
+from .layout_screenshots import (
+    set_active_screenshot_index as set_active_screenshot_index,
+)
+from .layout_screenshots import (
+    set_scene_screenshot_format as set_scene_screenshot_format,
+)
+from .layout_storage import _LAYOUTS_YAML_REL
+from .layout_storage import (
+    _drop_orphan_coords as _drop_orphan_coords,
+)
+from .layout_storage import (
+    _enumerate_scene_files as _enumerate_scene_files,
+)
+from .layout_storage import (
+    _expand_scene_references as _expand_scene_references,
+)
+from .layout_storage import (
+    _layout_dir_rel as _layout_dir_rel,
+)
+from .layout_storage import (
+    _resolve_layout_entry as _resolve_layout_entry,
+)
+from .layout_storage import (
+    _scene_rel as _scene_rel,
+)
+from .layout_storage import (
+    expand_one_reference as expand_one_reference,
+)
+from .layout_storage import (
+    load_layout_by_key as load_layout_by_key,
+)
+from .layout_storage import (
+    refresh_scene_references as refresh_scene_references,
+)
+from .layout_storage import (
+    scene_layout_rel as scene_layout_rel,
+)
+from .layout_storage import (
+    scene_layout_rels as scene_layout_rels,
+)
+from .layout_storage import (
+    shared_layout_bindings as shared_layout_bindings,
+)
 from .scene_registry import (
     get_panel_defs,
     get_point_defs,
     get_region_defs,
 )
 
-# ─── 路径常量 ────────────────────────────────────────────
-
-# 布局截图属于运行态产出，落 session 层
-SCREENSHOTS_DIR = SESSION_CONFIG_DIR / "screenshots"
-_SCREENSHOT_EXTENSIONS = ("webp", "png")
-_WEBP_QUALITY = 90
-
-
-def _safe_name(name: str) -> str:
-    """校验并返回可直接作为目录名的稳定布局 key。"""
-    return validate_layout_key(name)
-
-
-def layout_screenshots_dir(layout_name: str) -> Path:
-    """获取布局的截图目录"""
-    return SCREENSHOTS_DIR / _safe_name(layout_name)
-
-
-def scene_screenshot_name(
-    scene_key: str, view: str = "", index: int = 1, *, extension: str = "png",
-) -> str:
-    """截图文件名：基底视图沿用场景名，其余视图加 __视图 key 后缀
-
-    同一场景的多个视图（同一页面的不同滚动态）各自一张底图，
-    否则无法在正确的背景上标定坐标。
-
-    index >= 2 时追加 __N 后缀，index=1 无额外后缀（向后兼容）。
-    视图 key 必须以小写字母开头，纯数字后缀不会与视图名冲突。
-    """
-    from .scene_definition_models import BASE_VIEW_KEY
-    if not view or view == BASE_VIEW_KEY:
-        base = scene_key
-    else:
-        base = f"{scene_key}__{view}"
-    if extension not in _SCREENSHOT_EXTENSIONS:
-        raise ValueError(f"不支持的场景截图格式: {extension}")
-    if index <= 1:
-        return f"{base}.{extension}"
-    return f"{base}__{index}.{extension}"
-
-
-def _existing_screenshot_path(
-    layout_name: str, scene_key: str, view: str, index: int,
-) -> Path | None:
-    d = layout_screenshots_dir(layout_name)
-    for extension in _SCREENSHOT_EXTENSIONS:
-        path = d / scene_screenshot_name(
-            scene_key, view, index, extension=extension)
-        if path.is_file():
-            return path
-    return None
-
-
-# ─── 截图管理 ────────────────────────────────────────────
-
-def load_scene_screenshot(
-    layout_name: str, scene_key: str, view: str = "", index: int = 1,
-) -> np.ndarray | None:
-    """读取布局下某场景（可选视图、截图序号）的截图，不存在返回 None（支持中文路径）
-
-    别名布局使用自己的截图目录（按布局名），不重定向到父布局，
-    避免截图操作污染父布局。
-    """
-    path = _existing_screenshot_path(layout_name, scene_key, view, index)
-    if path is None:
-        return None
-    try:
-        import cv2
-        # cv2.imread 不支持中文路径，用 np.fromfile + imdecode
-        data = path.read_bytes()
-        buf = np.frombuffer(data, dtype=np.uint8)
-        img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
-        if img is None:
-            return None
-        # cv2.imdecode 返回 BGR，项目内部统一使用 BGR，无需翻转
-        return img
-    except Exception as e:
-        logger.error(f"读取截图失败 {path}: {e}")
-        return None
-
-
-def save_scene_screenshot(
-    layout_name: str, scene_key: str, image: np.ndarray,
-    view: str = "", index: int = 1,
-) -> np.ndarray:
-    """保存场景（可选视图、截图序号）截图（支持中文路径）
-
-    image: BGR numpy 数组（项目内部统一使用 BGR）
-    """
-    import cv2
-    d = layout_screenshots_dir(layout_name)
-    d.mkdir(parents=True, exist_ok=True)
-    extension = get_scene_screenshot_format(layout_name, scene_key, view)
-    path = d / scene_screenshot_name(scene_key, view, index, extension=extension)
-    if extension == "webp" and not cv2.haveImageWriter(".webp"):
-        raise OSError("当前 OpenCV 不支持 WebP，请在截图管理中改用 PNG")
-    params = ([cv2.IMWRITE_WEBP_QUALITY, _WEBP_QUALITY]
-              if extension == "webp" else [])
-    # image 已是 BGR，cv2.imencode 期望 BGR，无需翻转。
-    try:
-        success, buf = cv2.imencode(f".{extension}", image, params)
-    except cv2.error as exc:
-        raise OSError(f"截图编码失败: {path}") from exc
-    if not success:
-        raise OSError(f"截图编码失败: {path}")
-    stored_image = cv2.imdecode(buf, cv2.IMREAD_COLOR)
-    if stored_image is None:
-        raise OSError(f"截图编码后无法解码: {path}")
-    temporary = d / f".{path.stem}.{uuid.uuid4().hex}.{extension}"
-    try:
-        temporary.write_bytes(buf.tobytes())
-        temporary.replace(path)
-    finally:
-        temporary.unlink(missing_ok=True)
-    for other in _SCREENSHOT_EXTENSIONS:
-        if other != extension:
-            (d / scene_screenshot_name(
-                scene_key, view, index, extension=other)).unlink(missing_ok=True)
-    logger.info(f"截图已保存: {path}")
-    return stored_image
-
-
-def copy_screenshots(src_layout: str, dst_layout: str):
-    """复制整个截图目录（另存为时用）"""
-    src = layout_screenshots_dir(src_layout)
-    dst = layout_screenshots_dir(dst_layout)
-    if not src.exists():
-        return
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
-    logger.info(f"截图已复制: {src_layout} -> {dst_layout}")
-
-
-def delete_screenshots(layout_name: str):
-    """删除布局的截图目录"""
-    d = layout_screenshots_dir(layout_name)
-    if d.exists():
-        shutil.rmtree(d)
-        logger.info(f"截图目录已删除: {d}")
-
-
-def rename_scene_screenshots(old_key: str, new_key: str):
-    """重命名所有布局下的场景截图文件（含多视图后缀）
-
-    匹配规则：{old_key}.png/.webp 和 {old_key}__*.png/.webp
-    """
-    if old_key == new_key:
-        return
-    screenshots_base = SCREENSHOTS_DIR
-    if not screenshots_base.exists():
-        return
-    for layout_dir in screenshots_base.iterdir():
-        if not layout_dir.is_dir():
-            continue
-        # 只匹配 {old_key}.png 和 {old_key}__*.png，不能误伤同前缀场景。
-        for extension in _SCREENSHOT_EXTENSIONS:
-            candidates = [layout_dir / f"{old_key}.{extension}"]
-            candidates.extend(layout_dir.glob(f"{old_key}__*.{extension}"))
-            for image_path in candidates:
-                if not image_path.is_file():
-                    continue
-                suffix = image_path.stem[len(old_key):]
-                new_name = f"{new_key}{suffix}.{extension}"
-                image_path.rename(layout_dir / new_name)
-                logger.info(f"截图已重命名: {image_path.name} -> {new_name}")
-        meta = _load_screenshot_meta(layout_dir.name)
-        changed = False
-        for field in ("active", "format"):
-            values = meta.get(field, {})
-            if old_key in values:
-                values[new_key] = values.pop(old_key)
-                changed = True
-        if changed:
-            _save_screenshot_meta(layout_dir.name, meta)
-
-
-# ─── 多截图管理 ──────────────────────────────────────────
-
-_SCREENSHOT_META_FILENAME = "_screenshot_meta.json"
-
-
-def _screenshot_meta_path(layout_name: str) -> Path:
-    return layout_screenshots_dir(layout_name) / _SCREENSHOT_META_FILENAME
-
-
-def _load_screenshot_meta(layout_name: str) -> dict:
-    p = _screenshot_meta_path(layout_name)
-    if not p.exists():
-        return {}
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-
-def _save_screenshot_meta(layout_name: str, meta: dict) -> None:
-    p = _screenshot_meta_path(layout_name)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def get_scene_screenshot_format(
-    layout_name: str, scene_key: str, view: str = "",
-) -> str:
-    """当前视图新截图的保存格式；旧数据默认采用 WebP。"""
-    selected = (
-        _load_screenshot_meta(layout_name)
-        .get("format", {})
-        .get(scene_key, {})
-        .get(view or "", "webp")
-    )
-    return selected if selected in _SCREENSHOT_EXTENSIONS else "webp"
-
-
-def set_scene_screenshot_format(
-    layout_name: str, scene_key: str, view: str, extension: str,
-) -> None:
-    if extension not in _SCREENSHOT_EXTENSIONS:
-        raise ValueError(f"不支持的场景截图格式: {extension}")
-    meta = _load_screenshot_meta(layout_name)
-    meta.setdefault("format", {}).setdefault(scene_key, {})[view or ""] = extension
-    _save_screenshot_meta(layout_name, meta)
-
-
-def _screenshot_base_stem(scene_key: str, view: str) -> str:
-    """Return the filename stem shared by all screenshots of (scene, view)."""
-    from .scene_definition_models import BASE_VIEW_KEY
-    if not view or view == BASE_VIEW_KEY:
-        return scene_key
-    return f"{scene_key}__{view}"
-
-
-def list_scene_screenshots(
-    layout_name: str, scene_key: str, view: str = "",
-) -> list[int]:
-    """Return sorted screenshot indices for (scene, view) under *layout_name*.
-
-    Scans the screenshot directory with a regex that matches:
-      {base_stem}.png/.webp          -> index 1
-      {base_stem}__<N>.png/.webp     -> index N  (N >= 2)
-    """
-    d = layout_screenshots_dir(layout_name)
-    if not d.exists():
-        return []
-    stem = _screenshot_base_stem(scene_key, view)
-    pattern = re.compile(re.escape(stem) + r"(?:__(\d+))?\.(?:png|webp)$")
-    indices: set[int] = set()
-    for f in d.iterdir():
-        m = pattern.match(f.name)
-        if m:
-            indices.add(int(m.group(1)) if m.group(1) else 1)
-    return sorted(indices)
-
-
-def get_active_screenshot_index(
-    layout_name: str, scene_key: str, view: str = "",
-) -> int:
-    """Read the active screenshot index from meta, with fallback.
-
-    If the recorded index has no backing file, falls back to the first
-    available screenshot (or 1 when none exist).
-    """
-    meta = _load_screenshot_meta(layout_name)
-    active = (
-        meta.get("active", {})
-        .get(scene_key, {})
-        .get(view or "", 1)
-    )
-    indices = list_scene_screenshots(layout_name, scene_key, view)
-    if not indices:
-        return 1
-    if active in indices:
-        return active
-    return indices[0]
-
-
-def set_active_screenshot_index(
-    layout_name: str, scene_key: str, view: str, index: int,
-) -> None:
-    meta = _load_screenshot_meta(layout_name)
-    meta.setdefault("active", {}).setdefault(scene_key, {})[view or ""] = index
-    _save_screenshot_meta(layout_name, meta)
-
-
-def delete_scene_screenshot(
-    layout_name: str, scene_key: str, view: str, index: int,
-) -> None:
-    """Delete one screenshot and re-index the rest so no gap remains."""
-    d = layout_screenshots_dir(layout_name)
-    for extension in _SCREENSHOT_EXTENSIONS:
-        victim = d / scene_screenshot_name(
-            scene_key, view, index, extension=extension)
-        if victim.exists():
-            victim.unlink()
-            logger.info(f"截图已删除: {victim.name}")
-
-    # Re-index: shift every file with index > deleted down by 1
-    indices = list_scene_screenshots(layout_name, scene_key, view)
-    for old_idx in sorted(i for i in indices if i > index):
-        for extension in _SCREENSHOT_EXTENSIONS:
-            old_path = d / scene_screenshot_name(
-                scene_key, view, old_idx, extension=extension)
-            new_path = d / scene_screenshot_name(
-                scene_key, view, old_idx - 1, extension=extension)
-            if old_path.exists():
-                old_path.rename(new_path)
-
-    # Fix active pointer
-    meta = _load_screenshot_meta(layout_name)
-    cur = meta.get("active", {}).get(scene_key, {}).get(view or "", 1)
-    if cur >= index:
-        new_active = max(1, cur - 1)
-        set_active_screenshot_index(layout_name, scene_key, view, new_active)
-
-
-def reindex_scene_screenshots(
-    layout_name: str, scene_key: str, view: str,
-    old_index: int, new_index: int,
-) -> None:
-    """Swap two screenshot indices (used by move-up / move-down)."""
-    if old_index == new_index:
-        return
-    d = layout_screenshots_dir(layout_name)
-    path_a = _existing_screenshot_path(layout_name, scene_key, view, old_index)
-    path_b = _existing_screenshot_path(layout_name, scene_key, view, new_index)
-    if path_a is None or path_b is None:
-        return
-    # Three-way swap via temp file
-    tmp = d / f"_swap_tmp_{uuid.uuid4().hex}{path_a.suffix}"
-    new_a = d / scene_screenshot_name(
-        scene_key, view, new_index, extension=path_a.suffix[1:])
-    new_b = d / scene_screenshot_name(
-        scene_key, view, old_index, extension=path_b.suffix[1:])
-    path_a.rename(tmp)
-    path_b.rename(new_b)
-    tmp.rename(new_a)
-
-    # Swap active pointer if it referenced either index
-    meta = _load_screenshot_meta(layout_name)
-    cur = meta.get("active", {}).get(scene_key, {}).get(view or "", 1)
-    if cur == old_index:
-        set_active_screenshot_index(layout_name, scene_key, view, new_index)
-    elif cur == new_index:
-        set_active_screenshot_index(layout_name, scene_key, view, old_index)
-
-
-def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str):
-    """重命名单个布局下某场景的 JSON 文件（内容不变，仅改文件名）"""
-    if old_key == new_key:
-        return
-    resolver = get_resolver()
-    old_rel = _scene_rel(layout_name, old_key)
-    new_rel = _scene_rel(layout_name, new_key)
-    old_path = resolver.resolve_read(old_rel)
-    if old_path and old_path.exists():
-        content = old_path.read_text(encoding="utf-8")
-        resolver.write_entity(new_rel, content)
-        resolver.delete_entity(old_rel)
-        logger.info(f"布局场景文件已重命名: {old_key}.json -> {new_key}.json ({layout_name})")
-
-
-def rename_scene_across_all_layouts(old_key: str, new_key: str):
-    """遍历所有布局，重命名场景 JSON 文件 + 截图文件"""
-    if old_key == new_key:
-        return
-    manager = LayoutConfigManager()
-    for layout_name in manager.list_layout_keys():
-        rename_layout_scene_key(layout_name, old_key, new_key)
-    rename_scene_screenshots(old_key, new_key)
-
-
-def delete_scene_across_all_layouts(scene_key: str):
-    """彻底删除所有布局中的场景 JSON 及该场景的全部视图截图。"""
-    resolver = get_resolver()
-    manager = LayoutConfigManager()
-    for layout_name in manager.list_layout_keys():
-        resolver.delete_entity(_scene_rel(layout_name, scene_key))
-    if SCREENSHOTS_DIR.exists():
-        for layout_dir in SCREENSHOTS_DIR.iterdir():
-            if not layout_dir.is_dir():
-                continue
-            for extension in _SCREENSHOT_EXTENSIONS:
-                candidates = [layout_dir / f"{scene_key}.{extension}"]
-                candidates.extend(layout_dir.glob(f"{scene_key}__*.{extension}"))
-                for path in candidates:
-                    if path.is_file():
-                        path.unlink()
-                        logger.info(f"场景截图已删除: {path}")
-            meta = _load_screenshot_meta(layout_dir.name)
-            changed = False
-            for field in ("active", "format"):
-                values = meta.get(field, {})
-                if scene_key in values:
-                    del values[scene_key]
-                    changed = True
-            if changed:
-                _save_screenshot_meta(layout_dir.name, meta)
-
-
-def rename_item_key_across_all_layouts(scene_key: str, kind: str, old_key: str, new_key: str):
-    """遍历所有布局，重命名指定场景下某实例的 key
-
-    Args:
-        scene_key: 场景 key
-        kind: 实例类型 ("region" | "point" | "panel")
-        old_key: 旧 key
-        new_key: 新 key
-
-    对于 point 重命名，同步更新 Arrow 的 from_key/to_key 引用。
-    """
-    if old_key == new_key:
-        return
-    manager = LayoutConfigManager()
-    for layout_name in manager.list_layout_keys():
-        _rename_layout_item_key(layout_name, scene_key, kind, old_key, new_key)
-
-
-def _rename_layout_item_key(layout_name: str, scene_key: str, kind: str, old_key: str, new_key: str):
-    """重命名单个布局中某场景下指定类型实例的 key"""
-    resolver = get_resolver()
-    scene_rel = _scene_rel(layout_name, scene_key)
-    scene_path = resolver.resolve_read(scene_rel)
-    if scene_path is None or not scene_path.exists():
-        return  # 该布局下没有此场景的文件，跳过
-
-    # 加载场景 JSON
-    try:
-        data = json.loads(scene_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error(f"加载布局场景文件失败 {scene_path}: {e}")
-        return
-
-    changed = False
-
-    if kind == "region":
-        for region in data.get("regions", []):
-            if region.get("key") == old_key:
-                region["key"] = new_key
-                changed = True
-
-    elif kind == "point":
-        for point in data.get("points", []):
-            if point.get("key") == old_key:
-                point["key"] = new_key
-                changed = True
-        # 同步更新 Arrow 的 from_key/to_key 引用
-        for arrow in data.get("arrows", []):
-            if arrow.get("from_key") == old_key:
-                arrow["from_key"] = new_key
-                changed = True
-            if arrow.get("to_key") == old_key:
-                arrow["to_key"] = new_key
-                changed = True
-
-    elif kind == "panel":
-        for panel in data.get("panels", []):
-            if panel.get("key") == old_key:
-                panel["key"] = new_key
-                changed = True
-
-    else:
-        logger.warning(f"未知的实例类型: {kind}")
-        return
-
-    if changed:
-        resolver.write_entity(scene_rel, json.dumps(data, ensure_ascii=False, indent=2))
-        logger.info(f"布局 {layout_name} 场景 {scene_key} 中 {kind} key 重命名: {old_key} -> {new_key}")
-
-
-def delete_item_key_across_all_layouts(
-    scene_key: str, kind: str, key: str,
-) -> list[str]:
-    """遍历所有布局，删除指定场景下某实例的坐标记录，返回改动过的布局名。
-
-    删定义只改场景 YAML，布局 JSON 里的坐标不跟着走。加载期虽有
-    :func:`_drop_orphan_coords` 兜底，但那只清内存：没打开过的布局文件里
-    那条记录会一直躺着，直到有人恰好加载并保存了那套布局。更糟的是**同名
-    重建**——回头新建一个同 key 的实体，旧坐标会直接被当成它的坐标，位置
-    莫名其妙还完全静默。
-
-    删 point 连带删掉以它为端点的 arrow：端点没了的 arrow 既画不出来也跑
-    不了，留着就是下一条残留。
-    """
-    manager = LayoutConfigManager()
-    changed = []
-    for layout_name in manager.list_layout_keys():
-        if _delete_layout_item_key(layout_name, scene_key, kind, key):
-            changed.append(layout_name)
-    return changed
-
-
-def _delete_layout_item_key(layout_name: str, scene_key: str, kind: str,
-                            key: str) -> bool:
-    """删除单个布局中某场景下指定类型实例的坐标记录"""
-    table = {"region": "regions", "point": "points", "panel": "panels"}.get(kind)
-    if table is None:
-        logger.warning(f"未知的实例类型: {kind}")
-        return False
-    resolver = get_resolver()
-    scene_rel = _scene_rel(layout_name, scene_key)
-    scene_path = resolver.resolve_read(scene_rel)
-    if scene_path is None or not scene_path.exists():
-        return False  # 该布局下没有此场景的文件，跳过
-    try:
-        data = json.loads(scene_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error(f"加载布局场景文件失败 {scene_path}: {e}")
-        return False
-
-    items = data.get(table, [])
-    kept = [item for item in items if item.get("key") != key]
-    changed = len(kept) != len(items)
-    if changed:
-        data[table] = kept
-    if kind == "point":
-        arrows = data.get("arrows", [])
-        kept_arrows = [
-            a for a in arrows
-            if a.get("from_key") != key and a.get("to_key") != key
-        ]
-        if len(kept_arrows) != len(arrows):
-            data["arrows"] = kept_arrows
-            changed = True
-
-    if changed:
-        resolver.write_entity(
-            scene_rel, json.dumps(data, ensure_ascii=False, indent=2))
-        logger.info(
-            f"布局 {layout_name} 场景 {scene_key} 中已删除 {kind} 坐标: {key}")
-    return changed
-
-
-def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str):
-    """重命名所有布局下某视图的截图文件（含多截图 __N 后缀）
-
-    截图命名规则：
-    - 基底视图 (view="" 或 view="base"): {scene_key}.png/.webp
-    - 其他视图: {scene_key}__{view_key}.png/.webp（含多截图后缀）
-    """
-    if old_view_key == new_view_key:
-        return
-    screenshots_base = SCREENSHOTS_DIR
-    if not screenshots_base.exists():
-        return
-    old_stem = _screenshot_base_stem(scene_key, old_view_key)
-    new_stem = _screenshot_base_stem(scene_key, new_view_key)
-    pattern = re.compile(re.escape(old_stem) + r"(__\d+)?\.(png|webp)$")
-    for layout_dir in screenshots_base.iterdir():
-        if not layout_dir.is_dir():
-            continue
-        for image_path in list(layout_dir.iterdir()):
-            m = pattern.match(image_path.name)
-            if not m:
-                continue
-            suffix = m.group(1) or ""  # "" or "__N"
-            new_name = f"{new_stem}{suffix}.{m.group(2)}"
-            if new_name != image_path.name:
-                image_path.rename(layout_dir / new_name)
-                logger.info(f"视图截图已重命名: {image_path.name} -> {new_name}")
-        meta = _load_screenshot_meta(layout_dir.name)
-        changed = False
-        for field in ("active", "format"):
-            views = meta.get(field, {}).get(scene_key, {})
-            if old_view_key in views:
-                views[new_view_key] = views.pop(old_view_key)
-                changed = True
-        if changed:
-            _save_screenshot_meta(layout_dir.name, meta)
-
-
-# ─── 跨场景迁移 ──────────────────────────────────────────
-
-def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key: str) -> bool:
-    """将布局中指定 key 的 region/point/panel 从 source 场景迁移到 target 场景
-
-    kind="point" 时联动处理箭头：
-    - source 中 from_key == key 的箭头随点迁移到 target
-    - source 中 to_key == key 的箭头烘焙为绝对坐标，避免悬空引用
-
-    Returns:
-        是否发生了改动
-    """
-    if kind == "region":
-        source_regions = layout.get_scene_regions(source)
-        region = next((r for r in source_regions if r.key == key), None)
-        if region is None:
-            return False
-        layout.set_scene_regions(
-            source, [r for r in source_regions if r.key != key])
-        # target 已有同 key 的陈旧项先移除
-        target_regions = [
-            r for r in layout.get_scene_regions(target) if r.key != key]
-        target_regions.append(region)
-        layout.set_scene_regions(target, target_regions)
-        return True
-
-    if kind == "point":
-        source_points = layout.get_scene_points(source)
-        point = next((p for p in source_points if p.key == key), None)
-        if point is None:
-            return False
-        layout.set_scene_points(
-            source, [p for p in source_points if p.key != key])
-        target_points = [
-            p for p in layout.get_scene_points(target) if p.key != key]
-        target_points.append(point)
-        layout.set_scene_points(target, target_points)
-        # 箭头联动：from_key 随迁，to_key 烘焙为绝对坐标
-        src_arrows = layout.get_scene_arrows(source)
-        moved = [a for a in src_arrows if a.from_key == key]
-        remain = [a for a in src_arrows if a.from_key != key]
-        for a in remain:
-            if a.to_key == key:
-                a.to_key = None
-                a.to_cx_ratio = point.cx_ratio
-                a.to_cy_ratio = point.cy_ratio
-        layout.set_scene_arrows(source, remain)
-        if moved:
-            moved_keys = {a.key for a in moved}
-            dst_arrows = [a for a in layout.get_scene_arrows(target) if a.key not in moved_keys]
-            dst_arrows.extend(moved)
-            layout.set_scene_arrows(target, dst_arrows)
-        return True
-
-    if kind == "panel":
-        source_panels = layout.get_scene_panels(source)
-        panel = next((p for p in source_panels if p.key == key), None)
-        if panel is None:
-            return False
-        layout.set_scene_panels(
-            source, [p for p in source_panels if p.key != key])
-        target_panels = [
-            p for p in layout.get_scene_panels(target) if p.key != key]
-        target_panels.append(panel)
-        layout.set_scene_panels(target, target_panels)
-        return True
-
-    raise ValueError(f"未知迁移类型: {kind}")
-
-
-# ─── 布局目录辅助 ────────────────────────────────────────
-
-_LAYOUTS_YAML_REL = "layouts.yaml"
-
-
-def _layout_dir_rel(name: str) -> str:
-    """布局目录相对路径：layouts/{safe_name}"""
-    return f"layouts/{_safe_name(name)}"
-
-
-def _scene_rel(name: str, scene_key: str) -> str:
-    """场景文件相对路径：layouts/{safe_name}/{scene_key}.json"""
-    return f"layouts/{_safe_name(name)}/{scene_key}.json"
-
-
-def scene_layout_rel(name: str, scene_key: str) -> str:
-    """某布局下某场景坐标文件的相对路径（公开入口）。
-
-    UI 要按布局名解析该文件的来源层（system/remote/local），需要这个路径。
-    命名规则（safe_name 转义）与**别名布局的解析**都只有本模块知道，不该
-    让调用方自己拼：带 ``extends`` 的别名布局，scene 文件实际存放在**根布局**
-    目录下（见 :func:`_resolve_layout_entry`），照别名拼出来的路径根本不存在，
-    调用方会得到"这个文件没有"的空结果而不自知。
-    """
-    return scene_layout_rels(name, (scene_key,))[scene_key]
-
-
-def shared_layout_bindings(name: str) -> list[str]:
-    """返回与指定布局共用场景绑定的布局名（包括根布局和别名）。"""
-    doc = load_layout_doc().get("layouts", {})
-    current = _resolve_layout_entry(doc, name)
-    if current is None:
-        return []
-    names = []
-    for candidate in doc:
-        resolved = _resolve_layout_entry(doc, candidate)
-        if resolved is not None and resolved[1] == current[1]:
-            names.append(candidate)
-    return names
-
-
-def scene_layout_rels(name: str,
-                      scene_keys: Iterable[str]) -> dict[str, str]:
-    """批量返回布局场景路径，只解析一次 ``layouts.yaml``。
-
-    场景编辑器会同时展示一个布局下的许多场景。逐场景调用
-    :func:`scene_layout_rel` 会为每个场景重复解析同一份 YAML；这个批量入口
-    保留完全相同的别名布局语义，同时把解析成本固定为一次。
-    """
-    doc = load_layout_doc().get("layouts", {})
-    resolved = _resolve_layout_entry(doc, name)
-    scene_dir_name = resolved[1] if resolved else name
-    return {
-        scene_key: _scene_rel(scene_dir_name, scene_key)
-        for scene_key in scene_keys
-    }
-
-
-def _enumerate_scene_files(name: str) -> list[str]:
-    """枚举布局目录下所有场景 JSON 文件名（system ∪ local 并集）
-
-    Returns:
-        排序后的 scene_key 列表（不含 .json 后缀）
-    """
-    resolver = get_resolver()
-    rel_dir = _layout_dir_rel(name)
-    names: set[str] = set()
-    for root in (resolver.system_dir, resolver.local_dir):
-        base = root / rel_dir
-        if not base.is_dir():
-            continue
-        for p in base.glob("*.json"):
-            if p.is_file() and not p.name.startswith("_"):
-                names.add(p.stem)
-    return sorted(names)
-
-
-def _resolve_layout_entry(
-    layouts_doc: dict, name: str,
-) -> tuple[dict, str, str, str] | None:
-    """解析布局条目，返回 (canvas, scene 目录 key, 显示名, desc)。
-
-    支持别名布局：条目带 extends 时，scene 文件目录指向根布局。
-    严格约束：extends 只能指向根布局（目标自身不得再带 extends）。
-
-    Returns:
-        None 表示条目无效（extends 目标不存在或多级继承）
-    """
-    entry = layouts_doc.get(name)
-    if not isinstance(entry, dict):
-        return None
-    extends = entry.get("extends")
-    display_name = entry["name"]
-    desc = entry.get("desc", "")
-    if not extends:
-        return entry.get("canvas", {}), name, display_name, desc
-    if extends not in layouts_doc:
-        logger.error(f"布局 [{name}] 的 extends 目标不存在: {extends}")
-        return None
-    if (layouts_doc.get(extends) or {}).get("extends"):
-        logger.error(f"布局 [{name}] 的 extends 只能指向根布局，禁止多级继承: {extends}")
-        return None
-    return entry.get("canvas", {}), extends, display_name, desc
-
-
-def load_layout_by_key(name: str) -> Layout | None:
-    """模块级布局加载（无 session 依赖，供 workflow_runner 使用）
-
-    从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
-    别名布局（带 extends）的 scene 从根布局目录加载，canvas 取自身条目。
-    """
-    from .layout_models import (
-        Arrow,
-        Panel,
-        Point,
-        Region,
-        SubsceneRef,
-    )
-
-    resolver = get_resolver()
-    merged = load_layout_doc(resolver)
-    layouts_doc = merged.get("layouts", {})
-
-    resolved = _resolve_layout_entry(layouts_doc, name)
-    if resolved is None:
-        return None
-    canvas_dict, scene_dir_name, display_name, desc = resolved
-    scene_keys = _enumerate_scene_files(scene_dir_name)
-
-    # canvas（始终取自身条目）
-    from .layout_models import CanvasConfig
-    canvas = CanvasConfig.from_dict(canvas_dict) if canvas_dict else CanvasConfig()
-
-    # 逐场景加载（别名布局从根布局目录读）
-    regions: dict[str, list[Region]] = {}
-    points: dict[str, list[Point]] = {}
-    arrows: dict[str, list[Arrow]] = {}
-    panels: dict[str, list[Panel]] = {}
-    crop_canvases: dict[str, CanvasConfig] = {}
-    subscene_refs: dict[str, list[SubsceneRef]] = {}
-    reference_positions: dict[tuple[str, str, str], tuple[float, float]] = {}
-
-    for scene_key in scene_keys:
-        path = resolver.resolve_read(_scene_rel(scene_dir_name, scene_key))
-        if path is None:
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"场景文件解析失败 {path}: {e}")
-            continue
-        if "disabled" in data:
-            logger.error(
-                f"场景文件 {path} 的旧集中 disabled 段不再兼容，已跳过；"
-                "请将停用状态移到各实例的 disabled: true，保留原坐标")
-            continue
-        if "regions" in data:
-            regions[scene_key] = [Region.from_dict(r) for r in data["regions"]]
-        if "points" in data:
-            points[scene_key] = [Point.from_dict(p) for p in data["points"]]
-        if "arrows" in data:
-            arrows[scene_key] = [Arrow.from_dict(a) for a in data["arrows"]]
-        if "panels" in data:
-            panels[scene_key] = [Panel.from_dict(p) for p in data["panels"]]
-        if isinstance(data.get("crop_canvas"), dict):
-            crop_canvases[scene_key] = CanvasConfig.from_dict(data["crop_canvas"])
-        if "subscene_refs" in data:
-            subscene_refs[scene_key] = [SubsceneRef.from_dict(r) for r in data["subscene_refs"]]
-        for position in data.get("reference_positions", []):
-            if not isinstance(position, dict):
-                continue
-            source = position.get("scene")
-            entity = position.get("entity")
-            if source and entity:
-                reference_positions[(scene_key, str(source), str(entity))] = (
-                    float(position["x_ratio"]), float(position["y_ratio"]))
-
-    _drop_orphan_coords(regions, points)
-    _expand_scene_references(regions, points, reference_positions)
-
-    # aspect 与 canvas 同源：都描述「这个布局怎么看画面」，取自身条目而非根布局
-    own_entry = layouts_doc.get(name) or {}
-    aspect = str(own_entry.get("aspect", "") or "")
-    tolerance = own_entry.get("aspect_tolerance", DEFAULT_ASPECT_TOLERANCE)
-
-    return Layout(key=name, name=display_name, desc=desc, canvas=canvas,
-                  aspect=aspect, aspect_tolerance=float(tolerance),
-                  regions=regions,
-                  points=points, arrows=arrows, panels=panels,
-                  crop_canvases=crop_canvases, subscene_refs=subscene_refs)
-
-
-def _drop_orphan_coords(regions: dict, points: dict) -> None:
-    """丢弃布局里没有场景定义支撑的坐标记录（孤儿）。
-
-    删除区域/坐标定义只改场景 YAML（``remove_region_from_scene``），布局 JSON
-    里的坐标不跟着走；保存路径又只过滤带 ``source_scene`` 的引用项，于是这条
-    残留记录会永久留在文件里。它在编辑器列表中根本不显示（列表按场景定义遍
-    历），运行期却照常参与查表，还会把同名跨场景引用的展开顶掉——引用从此
-    指向一份再也不会同步的陈旧坐标，而且完全静默。
-
-    加载期统一清一次，存量自愈，不必手工改 JSON。**必须排在
-    ``_expand_scene_references`` 之前**，否则孤儿仍然挡着展开。
-    """
-    from .scene_registry import get_registry
-
-    try:
-        registry = get_registry()
-    except Exception as exc:  # noqa: BLE001 — 注册表不可用时绝不能清坐标
-        logger.warning(f"孤儿坐标清理跳过（场景注册表不可用）: {exc}")
-        return
-
-    for table, attr in ((regions, "regions"), (points, "points")):
-        for scene_key, items in list(table.items()):
-            scene = registry.get_scene(scene_key)
-            if scene is None:
-                # 场景 YAML 缺失时定义集为空，照清等于抹掉整份坐标。这种布局
-                # 文件整体已是死数据，属于文件级清理的活，这里不碰。
-                continue
-            defined = {d.key for d in getattr(scene, attr)}
-            dropped = [i.key for i in items if i.key not in defined]
-            if not dropped:
-                continue
-            table[scene_key] = [i for i in items if i.key in defined]
-            logger.warning(
-                f"布局中 {scene_key} 有 {len(dropped)} 条坐标已无场景定义，"
-                f"已丢弃: {', '.join(dropped)}")
-
-
-def _expand_scene_references(
-    regions: dict,
-    points: dict,
-    reference_positions: (
-        dict[tuple[str, str, str], tuple[float, float]] | None
-    ) = None,
-) -> None:
-    """把场景声明的跨场景 area 引用展开进本场景的坐标表。
-
-    只允许引用一级场景，其实体坐标本就是画布归一化，**原样搬过来即可，
-    零变换**——这正是"只引用一级场景"这条约束换来的简化。
-
-    展开在加载期做而不是查表期做，好处是运行期零改动：``get_scene_regions``
-    仍是纯字典查表，``click [equip_tune_detail].[confirm]`` 自然就通了，
-    click_region / click_any / _validate_refs_bound 一行都不用改。
-
-    展开项带 ``source_scene`` 标记。编辑器只允许移动，并把目标场景的位置
-    单独保存为 ``reference_positions``；完整实体仍由保存路径过滤。
-    """
-    from .scene_registry import get_registry
-
-    try:
-        scenes = get_registry().all_scenes()
-    except Exception as exc:  # noqa: BLE001 — 注册表异常不能让布局加载失败
-        logger.warning(f"跨场景引用展开跳过（场景注册表不可用）: {exc}")
-        return
-
-    for scene_key, scene in scenes.items():
-        for ref in getattr(scene, "references", ()):
-            expand_one_reference(
-                regions, points, scene_key, ref.scene, ref.entity,
-                position=(reference_positions or {}).get(
-                    (scene_key, ref.scene, ref.entity)))
-
-
-def refresh_scene_references(
-    layout: Layout,
-    source_scenes: set[str] | None = None,
-) -> set[str]:
-    """用源场景当前坐标重建跨场景引用，返回受影响的目标场景。
-
-    布局加载时引用只展开一次；编辑器随后修改源场景坐标时，目标场景持有的
-    仍是旧克隆。保存前调用本函数，先移除指定源场景的旧投影，再从 Layout
-    当前快照重新展开，使已打开的引用场景无需重进布局管理器即可同步。
-    """
-    from .scene_registry import get_registry
-
-    try:
-        scenes = get_registry().all_scenes()
-    except Exception as exc:  # noqa: BLE001 — 刷新失败不能破坏源布局数据
-        logger.warning(f"跨场景引用刷新跳过（场景注册表不可用）: {exc}")
-        return set()
-
-    affected: set[str] = set()
-    for scene_key, scene in scenes.items():
-        refs = [
-            ref for ref in getattr(scene, "references", ())
-            if source_scenes is None or ref.scene in source_scenes
-        ]
-        if not refs:
-            continue
-        affected.add(scene_key)
-        positions = {
-            (item.source_scene, item.key): (
-                (item.x_ratio, item.y_ratio)
-                if hasattr(item, "x_ratio")
-                else (item.cx_ratio, item.cy_ratio))
-            for item in (
-                *layout.regions.get(scene_key, []),
-                *layout.points.get(scene_key, []),
-            )
-            if item.source_scene and item.position_overridden
-        }
-        refreshed_sources = {ref.scene for ref in refs}
-        layout.regions[scene_key] = [
-            item for item in layout.regions.get(scene_key, [])
-            if item.source_scene not in refreshed_sources
-        ]
-        layout.points[scene_key] = [
-            item for item in layout.points.get(scene_key, [])
-            if item.source_scene not in refreshed_sources
-        ]
-        for ref in refs:
-            expand_one_reference(
-                layout.regions,
-                layout.points,
-                scene_key,
-                ref.scene,
-                ref.entity,
-                position=positions.get((ref.scene, ref.entity)),
-            )
-    return affected
-
-
-def expand_one_reference(regions: dict, points: dict, scene_key: str,
-                         source_scene: str, entity: str,
-                         position: tuple[float, float] | None = None) -> bool:
-    """把一条跨场景引用展开进坐标表，成功返回 True。
-
-    单独拆出来是为了编辑器：新加一条引用之后不必整份布局重载（那会丢掉
-    画布上还没保存的改动），把这一条的坐标补进去即可。
-    """
-    from dataclasses import replace as _replace
-
-    for table in (regions, points):
-        source = next(
-            (item for item in table.get(source_scene, [])
-             if item.key == entity), None)
-        if source is None:
-            continue
-        target = table.setdefault(scene_key, [])
-        if any(item.key == entity for item in target):
-            # 场景加载期的 key 去重本应拦下同名，走到这里说明配置被
-            # 绕过了。宁可不展开也不覆盖——覆盖等于让运行期点到另一
-            # 个位置，而且完全静默。
-            logger.error(
-                f"跨场景引用 {scene_key}.{entity} 与本场景已有定义"
-                f"同名，已跳过展开")
-            return False
-        expanded = _replace(
-            source,
-            source_scene=source_scene,
-            position_overridden=position is not None,
-            source_x_ratio=(
-                source.x_ratio if hasattr(source, "x_ratio")
-                else source.cx_ratio),
-            source_y_ratio=(
-                source.y_ratio if hasattr(source, "y_ratio")
-                else source.cy_ratio),
-        )
-        if position is not None:
-            if hasattr(expanded, "x_ratio"):
-                expanded.x_ratio, expanded.y_ratio = position
-            else:
-                expanded.cx_ratio, expanded.cy_ratio = position
-        target.append(expanded)
-        return True
-    # 源场景在当前布局里没给这个实体标坐标，跑到它就会失败。
-    logger.warning(
-        f"跨场景引用 {scene_key}.{entity} 在本布局中无坐标"
-        f"（源场景 {source_scene} 未绑定）")
-    return False
-
-
-# ─── 布局配置管理器 ──────────────────────────────────────
 
 def _checked_layout_save(function):
     @wraps(function)

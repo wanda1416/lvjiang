@@ -54,7 +54,6 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
     monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
-    monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
     monkeypatch.setattr(cr, "_resolver", None)
     return tmp_path

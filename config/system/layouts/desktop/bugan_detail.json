@@ -1,5 +1,5 @@
 {
-  "content_version": 2,
+  "content_version": 3,
   "regions": [
     {
       "key": "back",
@@ -114,6 +114,13 @@
       "y_ratio": 0.035219257967138914,
       "w_ratio": 0.06586544219437551,
       "h_ratio": 0.039844213662579064
+    },
+    {
+      "key": "huaruizhi_jindu",
+      "x_ratio": 0.7224069451572354,
+      "y_ratio": 0.34860769396955643,
+      "w_ratio": 0.11859403755294422,
+      "h_ratio": 0.07304886940035303
     }
   ],
   "panels": [

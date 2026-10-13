@@ -212,30 +212,6 @@ class AutoFarmWorkflow(BaseWorkflow):
 完整 `register_hooks` 在启动回调前装配策略；底层 resolver、修订索引和运行快照
 只消费登记结果，不自行发现或加载插件。
 
-## 公共服务与桌面适配
-
-- `core.update.fetch_latest_release` 提供更新结果与错误，Qt 检查线程位于 `ui/background/update.py`。
-- `core.config.remote.run_sync` 提供同步服务，Qt 包装位于 `ui/background/remote_config_sync.py`。
-- `core.telemetry.reporter.run_report` 返回上报结果，Qt 包装位于 `ui/background/telemetry.py`，
-  桌面仍在主线程构造 job 并应用记账结果。
-- `core.profile.engine.ProfileProcessor.tick` 保留周期处理、同步脚本与提醒持久化；
-  `ui/profile/engine.py` 管理桌面线程、信号和生命周期。key 重命名通过无 GUI 更新通知
-  发布已提交数据的变化，Qt 订阅在线程停止时解除。
-
-## 配置与布局内部职责
-
-燕云 `GameConfigManager` 保留唯一快照、加载入口、保存与查询门面；
-`game_config_parsers.py` 负责字段解析，`game_config_loader.py` 按领域阶段填充同一实例，
-`affix_queries`、`equipment_queries`、`arts_queries`、`progression_queries` 承担对应查询。
-不创建平行 manager 或缓存，来源优先级和运行快照仍由公共配置层维护。
-
-`core.layout_manager` 保留 CRUD、活动选择和保存冲突，`layout_storage` 负责文件加载、
-别名及引用展开，`layout_screenshots` 负责截图资源，`layout_references` 协调跨布局键维护。
-管理器继续提供既有公开入口，实际实现只存在于各职责模块中。
-
-最优组合页面保留候选装配、后台任务与设置编排；候选行、详情、结果卡片和选择控件
-集中在 `optimal_widgets.py`。搜索算法仍由燕云领域核心提供。
-
 ### 完整插件注册
 
 插件加载时，`register_hooks()` 会自动：
@@ -262,3 +238,10 @@ class AutoFarmWorkflow(BaseWorkflow):
 - **功能**：装备词条解析、评分规则、自动调律、材料识别
 - **工作流**：`auto_tuning`（自动调律）
 - **内置函数**：`to_equipment`、`check_scroll`、`scroll_advance` 等
+
+## 相关实现边界
+
+- [公共后台服务](../38-platform/11-background-services.md)
+- [游戏配置加载与查询](../31-models/01-equipment-models.md#游戏配置加载与查询)
+- [布局实现职责](../34-scene/02-scene-layout-editing.md#布局实现职责)
+- [最优组合页面](../36-graduation/08-scoring-layer.md#最优组合页面边界)

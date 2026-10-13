@@ -26,3 +26,6 @@
 | 了解游戏调律/转律/承音机制 | [装备系统](10-game/01-equipment-system.md) |
 | 写工作流脚本 | [脚本工作台与作者须知](60-userguide/10-script-authoring.md)、[DSL 语法](30-architecture/32-grammar/README.md) |
 | 反馈问题 | [问题反馈](60-userguide/08-feedback-and-issues.md) |
+
+- [官方在线配置与会员内容](60-userguide/13-online-config.md)：更新生效、本地覆盖、会员状态和人工恢复。
+- [功能激活与恢复](60-userguide/14-activation.md)：首次激活、离线使用与同机恢复。

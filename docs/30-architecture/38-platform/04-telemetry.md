@@ -3,7 +3,7 @@
 律匠的匿名统计分客户端（`src/lvjiang/core/telemetry/` +
 `src/lvjiang/apps/yysls/telemetry/`）与服务端（`ops/stats-worker/`，
 Cloudflare Workers + D1）两侧。本文档只讲**服务端数据落地之后长什么样、
-以后怎么查**；用户可见的收集范围与隐私边界见 [`PRIVACY.md`](../../../PRIVACY.md)，
+以后怎么查**；用户可见的收集范围与隐私边界见 [`PRIVACY.md`](../../../PRIVACY.md)（仅源码检出），
 客户端的字段白名单机制与采集点见 `core/telemetry/schema.py` 和
 `apps/yysls/telemetry/history_source.py`。调律事件现在从版本化本地历史中
 投影，用户开启统计时补传最近 7 天尚未上报的数据；完整本地模型、数据表与
@@ -51,7 +51,7 @@ cohort）。D1 免费额度 100k rows written/day、5M rows read/day、5GB
 
 ## 三、表结构
 
-完整定义与逐列注释见 [`ops/stats-worker/schema.sql`](../../../ops/stats-worker/schema.sql)。这里只给关系概览：
+完整定义与逐列注释见 [`ops/stats-worker/schema.sql`](../../../ops/stats-worker/schema.sql)（仅源码检出）。这里只给关系概览：
 
 | 表 | 一行代表什么 | 保留期 | 含 install_id |
 |---|---|---|---|
@@ -96,7 +96,7 @@ cohort）。D1 免费额度 100k rows written/day、5M rows read/day、5GB
 ## 五、怎么查
 
 `ops/stats-worker/queries/*.sql` 是现成的只读查询，用法见该目录
-[README](../../../ops/stats-worker/queries/README.md)：
+[README](../../../ops/stats-worker/queries/README.md)（仅源码检出）：
 
 ```bash
 wrangler d1 execute lvjiang-stats --remote --file=ops/stats-worker/queries/dau.sql
@@ -122,7 +122,7 @@ wrangler d1 execute lvjiang-stats --remote --file=ops/stats-worker/queries/dau.s
 词条、有没有保底、`cap_pct` 是什么分布——SQL 写起来很难读也很难复核，走
 `roll_export.sql` 导出到本地，用 `scripts/analyze_telemetry_rolls.py` 生成
 报告；方法论与这份数据已知的系统性偏差见
-[`docs/40-development/analysis/`](../../40-development/analysis/README.md)。
+[`docs/40-development/analysis/`](../../40-development/analysis/README.md)（仅源码检出）。
 
 ### 读数字时必须记住的两条
 

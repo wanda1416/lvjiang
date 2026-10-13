@@ -7,7 +7,7 @@
 也可在 VS Code 中安装仓库的 WF 扩展编辑 `.wf`。扩展提供高亮、片段及
 可用 Python 环境下的静态诊断、补全、跳转及过程引用/重命名；缺少环境时
 基础文本编辑仍可用，
-详细安装和边界见[编辑器说明](../20-requirements/60-editor/01-wf-editor-plugin.md)。
+详细安装和边界见[编辑器说明](../20-requirements/60-editor/01-wf-editor-plugin.md)（仅源码检出）。
 VS Code 扩展不负责运行或单步，需使用下述脚本工作台。编辑系统脚本前应
 确认配置层：日常使用时 local 同路径文件会覆盖 system 版本。
 

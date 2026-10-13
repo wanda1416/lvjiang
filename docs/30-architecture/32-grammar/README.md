@@ -14,7 +14,7 @@
 
 DSL 写法、AST 节点与运行行为保持原契约。非法语法抛出 Lark `UnexpectedInput` 子类，具体字符／token 异常类型可能随解析器改变；消费者使用行列定位，不绑定单一子类。
 
-验收边界见 [解析性能需求](../../20-requirements/60-editor/07-dsl-parser-performance.md)。历史对照工具及限制见 [等价验证](../../../scripts/one_off/lalr_parser/README.md)。
+验收边界见 [解析性能需求](../../20-requirements/60-editor/07-dsl-parser-performance.md)（仅源码检出）。历史对照工具及限制见 [等价验证](../../../scripts/one_off/lalr_parser/README.md)（仅源码检出）。
 
 ---
 

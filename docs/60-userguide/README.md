@@ -41,9 +41,9 @@
 
 | 文档 | 内容 |
 |------|------|
-| [README](../../README.md) | 项目简介、安装、技术架构 |
-| [隐私说明](../../PRIVACY.md) | 联网行为、匿名调律数据收集发出什么/不发出什么、如何关闭 |
-| [自动调律需求](../20-requirements/10-tuning/01-auto-tuning.md) | 自动调律需求与行为规则细节 |
+| [README](../../README.md)（仅源码检出） | 项目简介、安装、技术架构 |
+| [隐私说明](../../PRIVACY.md)（仅源码检出） | 联网行为、匿名调律数据收集发出什么/不发出什么、如何关闭 |
+| [自动调律需求](../20-requirements/10-tuning/01-auto-tuning.md)（仅源码检出） | 自动调律需求与行为规则细节 |
 | [装备与调律机制](../10-game/01-equipment-system.md) | 游戏客观机制：调律、转律、承音 |
 | [调律评价规则](../10-game/10-tuning-rules/README.md) | 律匠的装备分级与流派判定规格 |
 | [DSL 语法](../30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
@@ -60,3 +60,6 @@
 - [3.5 图像识别与模板匹配排查](03.05-visual-recognition-troubleshooting.md)：现场、模板、布局与实际任务结果的核对步骤。
 
 - [3.6 大世界地图管理](03.06-world-map-management.md)：大地图与地域目录、探查图片预览、拼接底图与覆盖范围。
+
+- [官方在线配置与会员内容](13-online-config.md)：更新生效、本地覆盖、会员状态和人工恢复。
+- [功能激活与恢复](14-activation.md)：首次激活、离线使用与同机恢复。

@@ -53,4 +53,4 @@
 - 引擎调用：`src/lvjiang/workflows/base/recognition.py`（`match_region_templates` / `find_image_in_region`）
 - 布局模型：`src/lvjiang/core/layout_models.py`（`TemplateBinding`、`RectCoordRef`、`CircleCoordRef`）
 
-用户排障见 [图像识别排查](../../60-userguide/03.05-visual-recognition-troubleshooting.md)，诊断与离线回归记录保存在 [开发档案](../../40-development/2026-10/2026-10-09-vision-tooling-regression.md)。
+用户排障见 [图像识别排查](../../60-userguide/03.05-visual-recognition-troubleshooting.md)，诊断与离线回归记录保存在 [开发档案](../../40-development/2026-10/2026-10-09-vision-tooling-regression.md)（仅源码检出）。

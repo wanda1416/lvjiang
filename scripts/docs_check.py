@@ -2,7 +2,9 @@
 
 用法：
 
-    python scripts/docs_check.py            # 全量检查，有问题时退出码 1
+    python scripts/docs_check.py            # 主工程检查，有问题时退出码 1
+    python scripts/docs_check.py --admin    # 独立管理仓库
+    python scripts/docs_check.py --bundle PATH  # 生成的发行文档
 
 检查范围是 `docs/` 下全部 `.md`；链接目标可以是仓库内任意文件（源码、配置、
 打包手册都允许被引用）。纯静态检查，不联网、不依赖 Qt，可以直接进 CI。
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import json
 import pathlib
 import re
 
@@ -176,7 +179,7 @@ def head_of(path: pathlib.Path) -> str:
     return "\n".join(read(path).splitlines()[:HEAD_LINES])
 
 
-def check_status(files: list[pathlib.Path]) -> list[str]:
+def check_status(files: list[pathlib.Path], *, descriptive: bool = False) -> list[str]:
     """活文档写状态行（含基线版本），归档文档写「状态止于」。
 
     状态行把「已实现 / 部分实现 / 规划」与基线版本钉在文档开头，避免再出现
@@ -186,7 +189,8 @@ def check_status(files: list[pathlib.Path]) -> list[str]:
     problems: list[str] = []
     for path in status_docs(files):
         rel = path.relative_to(DOCS).as_posix()
-        match = STATUS_LINE.search(head_of(path))
+        match = (re.search(r"^>\s*状态[：:]\s*\S+", head_of(path), re.M)
+                 if descriptive else STATUS_LINE.search(head_of(path)))
         if not match:
             problems.append(
                 "缺状态行（前 15 行需 `> 状态：已实现|部分实现|规划（YYYY-MM-DD，基线 vX.Y.Z）`）"
@@ -234,7 +238,10 @@ def check_index_status(files: list[pathlib.Path]) -> list[str]:
 
 def check_index_coverage() -> list[str]:
     problems: list[str] = []
-    for name in INDEX_DIRS:
+    names = set(INDEX_DIRS) if DOCS == REPO / "docs" else set()
+    names.update(path.parent.relative_to(DOCS).as_posix()
+                 for path in DOCS.rglob("README.md"))
+    for name in sorted(names):
         directory = DOCS / name
         index = directory / "README.md"
         if not index.is_file():
@@ -252,10 +259,58 @@ def check_index_coverage() -> list[str]:
     return problems
 
 
+def check_bundle_links(bundle: pathlib.Path) -> list[str]:
+    """验证发行文档的内部链接；源码参考必须显式标明且不能掩盖包内缺失。"""
+    bundle = bundle.resolve()
+    manifest = json.loads((bundle / "70-agent/manifest.json").read_text(encoding="utf-8"))
+    paths = [bundle / entry["path"] for entry in manifest["documents"]]
+    layers = {path.relative_to(bundle).parts[0] for path in paths}
+    problems = []
+    for path in paths:
+        if not path.is_file():
+            problems.append(f"清单文件缺失 {path.relative_to(bundle)}")
+            continue
+        if path.suffix != ".md":
+            continue
+        text = body_without_code(read(path))
+        for match in LINK.finditer(text):
+            raw = match.group(1)
+            if raw.startswith(("http://", "https://", "mailto:")):
+                continue
+            target, _, anchor = raw.partition("#")
+            resolved = (path.parent / target).resolve() if target else path
+            internal = any(resolved.is_relative_to(bundle / layer) for layer in layers)
+            if not internal:
+                if not text[match.end():].startswith("（仅源码检出）"):
+                    problems.append(f"发行引用未标明源码范围 {path.relative_to(bundle)} -> {raw}")
+                continue
+            if not resolved.exists():
+                problems.append(f"发行链接不可达 {path.relative_to(bundle)} -> {raw}")
+            elif anchor and resolved.suffix == ".md":
+                headings = {slug(m.group(2)) for m in HEADING.finditer(body_without_code(read(resolved)))}
+                if anchor not in headings:
+                    problems.append(f"发行锚点失效 {path.relative_to(bundle)} -> {raw}")
+    return problems
+
+
 def main() -> int:
+    global DOCS
     parser = argparse.ArgumentParser(description="docs 静态检查")
     parser.add_argument("--quiet", action="store_true", help="只打印失败项")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--admin", action="store_true", help="检查独立 admin 文档，需检出在主工程 admin 下")
+    mode.add_argument("--bundle", type=pathlib.Path, help="检查已生成的发行文档目录")
     args = parser.parse_args()
+    if args.bundle is not None:
+        problems = check_bundle_links(args.bundle)
+        for problem in problems:
+            print(problem)
+        print(f"发行文档链接问题 {len(problems)} 处")
+        return 1 if problems else 0
+    if args.admin:
+        DOCS = REPO / "admin/docs"
+    if not DOCS.is_dir():
+        parser.error(f"文档目录不存在：{DOCS}")
 
     files = sorted(DOCS.rglob("*.md"))
     link_problems, inbound = check_links(files)
@@ -265,7 +320,7 @@ def main() -> int:
         "一级标题": check_titles(files),
         "编号冲突": check_duplicate_numbers(files),
         "时效锚": check_freshness(files),
-        "状态行": check_status(files),
+        "状态行": check_status(files, descriptive=args.admin),
         "索引状态": check_index_status(files),
         "索引覆盖": check_index_coverage(),
     }

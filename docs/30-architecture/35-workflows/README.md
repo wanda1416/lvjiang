@@ -45,5 +45,5 @@
 ## 任务入口与参数编辑
 
 - [05-execution-feedback.md](05-execution-feedback.md)：任务入口的反馈归属、启动失败提示与参数保存边界。
-  需求见[任务入口状态与启动反馈](../../20-requirements/60-editor/11-execution-feedback.md)和
-  [日常参数保存边界](../../20-requirements/60-editor/12-parameter-save-boundaries.md)。
+  需求见[任务入口状态与启动反馈](../../20-requirements/60-editor/11-execution-feedback.md)（仅源码检出）和
+  [日常参数保存边界](../../20-requirements/60-editor/12-parameter-save-boundaries.md)（仅源码检出）。

@@ -47,7 +47,7 @@
 
 | 数据类型 | 现在存哪 | 读写方式 |
 |---------|---------|---------|
-| 调律材料库存、承音/定音石数量、装备评级历史等玩家数据 | `config/session/profile.db`（SQLite） | `profile_get()` / `profile_set()` 内置函数，见 [../../20-requirements/40-profile/README.md](../../20-requirements/40-profile/README.md) |
+| 调律材料库存、承音/定音石数量、装备评级历史等玩家数据 | `config/session/profile.db`（SQLite） | `profile_get()` / `profile_set()` 内置函数，见 [../../20-requirements/40-profile/README.md](../../20-requirements/40-profile/README.md)（仅源码检出） |
 | App/UI 层持久状态（当前用户、当前布局、日常脚本参数、窗口位置…） | `config/session/session.json`（`SessionStore` 节点） | 不经 DSL；Python 层经 `core.config.session.get_session_store()` 读写，见 [04-config-layering.md §四](../30-overview/04-config-layering.md#四用户偏好不进配置层) |
 
 `session` DSL 关键字与上面两套都**不是**同一个存储——它读写的是
@@ -237,4 +237,4 @@ class WorkflowEngine:
 | [01-equipment-models.md](01-equipment-models.md) | 装备领域模型完整定义 |
 | [02-scene-implementations.md](02-scene-implementations.md) | 场景实现与区域定义 |
 | [04-config-layering.md](../30-overview/04-config-layering.md) | `session.json`（SessionStore）的节点划分与合并规则 |
-| [../../20-requirements/40-profile/README.md](../../20-requirements/40-profile/README.md) | quota/regen/stock/note 四模型（玩家持久数据现在的落点） |
+| [../../20-requirements/40-profile/README.md](../../20-requirements/40-profile/README.md)（仅源码检出） | quota/regen/stock/note 四模型（玩家持久数据现在的落点） |

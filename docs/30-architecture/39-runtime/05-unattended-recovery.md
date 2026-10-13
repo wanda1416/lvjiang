@@ -1,7 +1,7 @@
 # 无人值守的改道与恢复
 
 > 产品边界（改道语义、恢复阶段、谁来勾选）见
-> [20-requirements/30-batch/03-unattended-batch.md](../../20-requirements/30-batch/03-unattended-batch.md)。
+> [20-requirements/30-batch/03-unattended-batch.md](../../20-requirements/30-batch/03-unattended-batch.md)（仅源码检出）。
 > 本文只描述实现契约：拦截点、注入信号、配置兜底与落点。
 
 ## 登录更新恢复

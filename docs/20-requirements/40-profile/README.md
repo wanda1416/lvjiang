@@ -484,3 +484,5 @@ CREATE TABLE profile_history (
 | [02-currency-tracking.md](02-currency-tracking.md) | 货币追踪子需求 |
 | [03-stamina-management.md](03-stamina-management.md) | 心力体力管理子需求 |
 | [README.md](../README.md) | 律匠主需求文档 |
+
+- [04-overview-multi-columns.md](04-overview-multi-columns.md)：总览多列配置与状态边界。

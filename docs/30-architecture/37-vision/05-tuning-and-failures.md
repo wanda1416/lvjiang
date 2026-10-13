@@ -14,4 +14,4 @@
 
 编辑器预览与运行时必须使用同一语义；比较时固定帧、布局、搜索范围、阈值和画布口径。不同帧或配置下的结果不能直接当作算法矛盾。
 
-操作排障见 [图像识别排查](../../60-userguide/03.05-visual-recognition-troubleshooting.md)；历史故障复现和修复笔记见 [开发归档](../../40-development/2026-10/2026-10-09-vision-failure-notes.md)。
+操作排障见 [图像识别排查](../../60-userguide/03.05-visual-recognition-troubleshooting.md)；历史故障复现和修复笔记见 [开发归档](../../40-development/2026-10/2026-10-09-vision-failure-notes.md)（仅源码检出）。

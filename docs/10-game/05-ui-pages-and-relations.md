@@ -487,16 +487,16 @@ verify: equip_tune_detail.tune_btn contains 词库预览
 
 ## 10. 代码与配置索引
 
-- Scene 注册：[scenes.yaml](../../config/system/scenes.yaml)
-- Layout 注册：[layouts.yaml](../../config/system/layouts.yaml)
-- Scene 定义目录：[scenes/](../../config/system/scenes/)
-- Layout 目录：[layouts/](../../config/system/layouts/)
-- 公共导航：[navigation.wf](../../config/system/workflows/subcall/navigation.wf)
-- 页面检测：[page_detection.wf](../../config/system/workflows/subcall/page_detection.wf)
-- 通用确认：[page_action.wf](../../config/system/workflows/subcall/page_action.wf)
-- 自动调律编排：[auto_tuning.py](../../src/lvjiang/apps/yysls/workflows/implementations/auto_tuning.py)
-- 平台路径策略：[route_strategy.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/route_strategy.py)
-- 单轮执行：[executor.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/executor.py)
-- 重置处理：[resetter.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/resetter.py)
-- 回收处理：[recycler.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/recycler.py)
-- 自动调律完整需求：[01-auto-tuning.md](../20-requirements/10-tuning/01-auto-tuning.md)
+- Scene 注册：[scenes.yaml](../../config/system/scenes.yaml)（仅源码检出）
+- Layout 注册：[layouts.yaml](../../config/system/layouts.yaml)（仅源码检出）
+- Scene 定义目录：[scenes/](../../config/system/scenes/)（仅源码检出）
+- Layout 目录：[layouts/](../../config/system/layouts/)（仅源码检出）
+- 公共导航：[navigation.wf](../../config/system/workflows/subcall/navigation.wf)（仅源码检出）
+- 页面检测：[page_detection.wf](../../config/system/workflows/subcall/page_detection.wf)（仅源码检出）
+- 通用确认：[page_action.wf](../../config/system/workflows/subcall/page_action.wf)（仅源码检出）
+- 自动调律编排：[auto_tuning.py](../../src/lvjiang/apps/yysls/workflows/implementations/auto_tuning.py)（仅源码检出）
+- 平台路径策略：[route_strategy.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/route_strategy.py)（仅源码检出）
+- 单轮执行：[executor.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/executor.py)（仅源码检出）
+- 重置处理：[resetter.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/resetter.py)（仅源码检出）
+- 回收处理：[recycler.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/recycler.py)（仅源码检出）
+- 自动调律完整需求：[01-auto-tuning.md](../20-requirements/10-tuning/01-auto-tuning.md)（仅源码检出）

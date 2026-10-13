@@ -1,6 +1,6 @@
 # Android 工作台架构
 
-状态：功能已实现，定向回归和构建已通过，隔离 UI 与真机游戏验收分别记录。目标需求见 [独立任务工作台](../../20-requirements/50-platform/15-android-workbench.md)。
+状态：功能已实现，定向回归和构建已通过，隔离 UI 与真机游戏验收分别记录。目标需求见 [独立任务工作台](../../20-requirements/50-platform/15-android-workbench.md)（仅源码检出）。
 
 ## 责任划分
 

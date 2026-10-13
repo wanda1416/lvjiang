@@ -135,7 +135,7 @@
 | `unit` | string \| null | 单位，百分比类为 `"%"`，否则为 `null` |
 | `is_transferred` | bool | 是否为转律产出 |
 | `cap_pct` | float \| null | 数值占该等级上限的百分比；无上限数据时为 `null` |
-| `target_transmute_name` | str（可选） | 模拟转律目标词条名；只是计划，不改变 `name`/`value`，不参与指纹。一件装备至多一条词条带此字段，须与 `target_transmute_value` 同时有效，见 [模拟转律需求](../../20-requirements/10-tuning/04-transmute-simulation.md) |
+| `target_transmute_name` | str（可选） | 模拟转律目标词条名；只是计划，不改变 `name`/`value`，不参与指纹。一件装备至多一条词条带此字段，须与 `target_transmute_value` 同时有效，见 [模拟转律需求](../../20-requirements/10-tuning/04-transmute-simulation.md)（仅源码检出） |
 | `target_transmute_value` | float（可选） | 目标词条按实际装备等级／承音状态的上限值（未承音普通上限、承音承音上限）；计算时按投影副本重新取值 |
 
 ---
@@ -492,3 +492,10 @@ make_fingerprint(equip_dict, is_mock=True)      # "mock_015850f8"
 | 模拟装备 | `mock_items` | 结构同上，索引 key 带 `mock_` 前缀 |
 
 两者结构相同（`{ group_key: { _fp: equip_data } }`），但在扫描工具 (wf) 扫描时必须分离，因此分开存储。UI 展示时将两者合并，模拟装备卡片带「模拟」标签。
+
+## 游戏配置加载与查询
+
+燕云 `GameConfigManager` 保留唯一快照、加载入口、保存与查询门面；
+`game_config_parsers.py` 负责字段解析，`game_config_loader.py` 按领域阶段填充同一实例，
+`affix_queries`、`equipment_queries`、`arts_queries`、`progression_queries` 承担对应查询。
+不创建平行 manager 或缓存，来源优先级和运行快照仍由公共配置层维护。

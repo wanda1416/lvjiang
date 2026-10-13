@@ -17,3 +17,7 @@
 - [08-i18n.md](08-i18n.md)：翻译模块、核心/插件合并、回退与内容一致性契约。
 
 - [09-android-workbench.md](09-android-workbench.md)：Android 四页工作台、确认交互、任务历史与只读用户数据。
+
+- [05-ai-connection.md](05-ai-connection.md)：AI 连接参数与可取消请求。
+- [10-android-batch.md](10-android-batch.md)：手机批量运行状态与执行边界。
+- [11-background-services.md](11-background-services.md)：无 GUI 服务与桌面线程适配。

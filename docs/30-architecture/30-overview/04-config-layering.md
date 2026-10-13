@@ -400,7 +400,7 @@ hooks = AppHooks(
 新文件和 `migration: {source: session, version: 1}` 标记，再删除旧文件四个节点，最后
 移除标记。新文件已存在但标记尚在时只重试清理；不存在标记时不回读旧数据。
 旧文件损坏不会被空数据覆盖。更完整的边界见
-[任务历史与界面状态需求](../../20-requirements/60-editor/02-task-history.md#5-界面与辅助状态独立存储)。
+[任务历史与界面状态需求](../../20-requirements/60-editor/02-task-history.md#5-界面与辅助状态独立存储)（仅源码检出）。
 
 手机同步包含新文件，配置应用后重置并加载两个存储。Profile key 重命名维护新文件，
 失败恢复日志也覆盖新路径。用户元数据内按用户保存的界面状态仍属于 `users/*.json`。

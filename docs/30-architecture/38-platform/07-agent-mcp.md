@@ -58,8 +58,8 @@ list_docs/search_docs 可按 category 筛选，清单带标题、分类、路径
 源码、需求/开发文档、私人配置不会因正文引用而扩大读取范围。安装升级只清理
 四个官方文档子目录与旧 agent 目录，不清用户 local/session。
 
-需求见 [MCP 需求](../../20-requirements/50-platform/12-agent-mcp.md)，
-文件边界见 [文档访问清单](../../20-requirements/50-platform/13-agent-docs-access.md)。
+需求见 [MCP 需求](../../20-requirements/50-platform/12-agent-mcp.md)（仅源码检出），
+文件边界见 [文档访问清单](../../20-requirements/50-platform/13-agent-docs-access.md)（仅源码检出）。
 
 ## 生成结果与执行闭环
 

@@ -3,7 +3,7 @@
 > 状态：已实现；本文同时保留实施约束与回归边界。
 >
 > 产品语义见
-> [多执行目标并发任务](../../20-requirements/50-platform/05-concurrent-target-execution.md)。本文只描述
+> [多执行目标并发任务](../../20-requirements/50-platform/05-concurrent-target-execution.md)（仅源码检出）。本文只描述
 > 运行时所有权、状态边界和依赖方向。
 
 ## 1. 已替换的旧结构与根因

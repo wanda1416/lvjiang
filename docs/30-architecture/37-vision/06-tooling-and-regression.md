@@ -14,4 +14,4 @@
 
 根脚本 import 作为一条无运行副作用的调试语句上报；单步 call 在调用行停一次，过程体钩子被抑制直到返回，源文件行号不能投影到错误编辑器。继续运行沿用正常引擎流程。
 
-用户步骤见 [脚本编写与调试](../../60-userguide/10-script-authoring.md) 和 [场景管理](../../60-userguide/03.02-scene-management.md)。诊断命令、fixture 操作和修复验证记录归 [开发档案](../../40-development/2026-10/2026-10-09-vision-tooling-regression.md)。
+用户步骤见 [脚本编写与调试](../../60-userguide/10-script-authoring.md) 和 [场景管理](../../60-userguide/03.02-scene-management.md)。诊断命令、fixture 操作和修复验证记录归 [开发档案](../../40-development/2026-10/2026-10-09-vision-tooling-regression.md)（仅源码检出）。

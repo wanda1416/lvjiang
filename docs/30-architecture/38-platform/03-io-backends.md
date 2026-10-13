@@ -15,7 +15,7 @@
 AndroidRecovery，策略也只由该设备持有；AgentClient 使用同一策略，不维护副本。
 ADB 与 Agent 保留单次探测、重建转发、握手及执行占用等各自原语，公共协调器负责
 重试间隔、停止检查、人工确认、输入降级判断及恢复成功通知。
-任务恢复需求见[Android 连接恢复与输入降级](../../20-requirements/50-platform/18-android-connection-recovery.md)。
+任务恢复需求见[Android 连接恢复与输入降级](../../20-requirements/50-platform/18-android-connection-recovery.md)（仅源码检出）。
 
 `shell` / `shell_bytes` 的 `retry_safe` 由消费者显式声明。screencap 与设备属性读取
 允许超时重试；未声明的命令按保守策略处理，超时后先确认可能已经执行的动作。

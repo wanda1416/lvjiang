@@ -16,4 +16,10 @@
 
 ## 用户操作
 
-操作正文统一位于 [场景管理指南](../../60-userguide/03.02-scene-management.md)。语义模型见 [场景与布局定义](01-scene-layout-definition.md)；旧的手工扩展步骤见 [开发归档](../../40-development/2026-10/2026-10-09-scene-extension-notes.md)。
+操作正文统一位于 [场景管理指南](../../60-userguide/03.02-scene-management.md)。语义模型见 [场景与布局定义](01-scene-layout-definition.md)；旧的手工扩展步骤见 [开发归档](../../40-development/2026-10/2026-10-09-scene-extension-notes.md)（仅源码检出）。
+
+## 布局实现职责
+
+`core.layout_manager` 保留 CRUD、活动选择和保存冲突，`layout_storage` 负责文件加载、
+别名及引用展开，`layout_screenshots` 负责截图资源，`layout_references` 协调跨布局键维护。
+管理器继续提供既有公开入口，实际实现只存在于各职责模块中。

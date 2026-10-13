@@ -39,6 +39,8 @@ jobs:
         run: |
           python scripts/docs_check.py
           python scripts/docs_index.py --check
+          python scripts/build_agent_bundle.py --output "${{ runner.temp }}/lvjiang-docs-check"
+          python scripts/docs_check.py --bundle "${{ runner.temp }}/lvjiang-docs-check"
 
       # 并发跑（windows-2022 为 4 核）。
       # 代价是 Qt 后台线程类用例必须确定性 join 线程，不能只靠 waitUntil 轮询

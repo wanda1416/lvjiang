@@ -1,7 +1,7 @@
 # 批量的状态分层
 
 > 产品语义（四层各回答什么问题、用户能感知到什么变化）见
-> [20-requirements/30-batch/04-batch-state-layers.md](../../20-requirements/30-batch/04-batch-state-layers.md)。
+> [20-requirements/30-batch/04-batch-state-layers.md](../../20-requirements/30-batch/04-batch-state-layers.md)（仅源码检出）。
 > 本文只描述数据归属、协调算法与迁移契约。
 
 ## 四层与存放位置

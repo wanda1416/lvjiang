@@ -48,3 +48,8 @@ LoadoutScorer.rate(projected)              # effective_equipped → 聚合 → b
 
 评分链路里不来自配置的规则常量（三率上限与精准基准、弓玦比例、五维系数、可转律槽位）
 登记在 [../../10-game/06-mechanics-conventions.md](../../10-game/06-mechanics-conventions.md)。
+
+## 最优组合页面边界
+
+最优组合页面保留候选装配、后台任务与设置编排；候选行、详情、结果卡片和选择控件
+集中在 `optimal_widgets.py`。搜索算法仍由燕云领域核心提供。

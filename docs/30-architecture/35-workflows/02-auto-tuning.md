@@ -1,6 +1,6 @@
 # 流程：自动调律（Auto Tuning）
 
-> 产品需求见 [自动调律需求](../../20-requirements/10-tuning/01-auto-tuning.md)。
+> 产品需求见 [自动调律需求](../../20-requirements/10-tuning/01-auto-tuning.md)（仅源码检出）。
 > 本文定义 Panel 与模块编排；[遍历契约](03-bag-traversal.md)和[决策契约](04-tuning-decisions.md)分别维护算法与执行语义。
 
 ## 1. Panel 数据结构
@@ -162,6 +162,6 @@ panels:
 
 | 文档 | 内容 |
 |------|------|
-| [20-requirements/10-tuning/01-auto-tuning.md](../../20-requirements/10-tuning/01-auto-tuning.md) | 自动调律的需求与行为规格 |
+| [20-requirements/10-tuning/01-auto-tuning.md](../../20-requirements/10-tuning/01-auto-tuning.md)（仅源码检出） | 自动调律的需求与行为规格 |
 | [01-current-equip-analysis.md](01-current-equip-analysis.md) | 用户当前装备分析流程 |
 | [34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md) | Scene / Area / Panel / Layout 的通用语义 |

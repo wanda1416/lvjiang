@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "back",
@@ -96,15 +96,15 @@
       "key": "supply_max",
       "x_ratio": 0.915,
       "y_ratio": 0.737,
-      "w_ratio": 0.029,
-      "h_ratio": 0.05
+      "w_ratio": 0.023036506017231284,
+      "h_ratio": 0.050000000000000044
     },
     {
       "key": "supply_price",
       "x_ratio": 0.868,
-      "y_ratio": 0.809,
-      "w_ratio": 0.081,
-      "h_ratio": 0.046
+      "y_ratio": 0.7972880648870365,
+      "w_ratio": 0.08099999999999996,
+      "h_ratio": 0.057711935112963575
     },
     {
       "key": "supply_buy",
@@ -117,7 +117,7 @@
       "key": "supply_back",
       "x_ratio": 0.912,
       "y_ratio": 0.023,
-      "w_ratio": 0.043,
+      "w_ratio": 0.03699999999999992,
       "h_ratio": 0.067
     }
   ],

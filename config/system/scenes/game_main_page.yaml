@@ -1,9 +1,9 @@
-content_version: 1
+content_version: 2
 key: game_main_page
 name: 主页
 views:
 - key: base
-  name: 基底
+  name: 首页
 - key: jiugongge
   name: 九宫格
 - key: more

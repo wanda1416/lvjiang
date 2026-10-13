@@ -1,9 +1,9 @@
-content_version: 1
+content_version: 2
 key: general_control
 name: 控制
 views:
 - key: base
-  name: 基底
+  name: 首页
 - key: confirm
   name: 确认
 - key: blank

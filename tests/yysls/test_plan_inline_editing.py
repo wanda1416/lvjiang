@@ -121,24 +121,26 @@ def test_simple_columns_write_their_own_field(schools, column, value, field):
 
 
 def test_empty_name_never_reaches_the_repository(tmp_path: Path):
-    """端到端：提交空名称后仓储里的名字不变。"""
+    """端到端：提交空名称后草稿与仓储里的名字都不变。"""
     from types import SimpleNamespace
 
     from lvjiang.apps.yysls.ui.loadout import plan_manager_dialog as module
+    from lvjiang.apps.yysls.ui.loadout.plan_draft import PlanDraft
 
     repo = LoadoutRepository("alice", tmp_path)
     plan = repo.create_plan("原名", "无名剑法", "无名枪法", activate=False)
+    draft = PlanDraft.load(repo)
     dialog = SimpleNamespace(
-        _repo=lambda: repo,
+        _draft=lambda: draft,
         _game_config=get_game_config(),
-        _mark_changed=lambda: None,
         _load_user=lambda **_kwargs: None,
     )
 
     module.PlanManagerDialog._commit_field(
-        dialog, repo.load().plans[plan.id], COL_NAME, "   ")
+        dialog, draft.state.plans[plan.id], COL_NAME, "   ")
 
     assert repo.load().plans[plan.id].name == "原名"
+    assert not draft.dirty
 
 
 # ─── 玩法候选与对话框同源 ──────────────────────────────────

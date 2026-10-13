@@ -35,6 +35,7 @@ from ...core.loadout import (
 from ..domain_labels import combat_type_label
 from ..game_settings.level_combo import LevelCombo
 from .plan_create_dialog import PlanCreateDialog
+from .plan_draft import PlanDraft
 from .plan_table_delegate import (
     COL_MAIN_ART,
     COL_NAME,
@@ -58,8 +59,11 @@ class PlanManagerDialog(QDialog):
         self.setMinimumSize(900, 520)
         self._users_dir = users_dir
         self._game_config = game_config or get_game_config()
+        #: 已经保存过的用户；主界面据此决定要不要刷新。
         self.changed_users: set[str] = set()
         self._loading = False
+        #: 每个用户一份未保存草稿：编辑只改这里，点「保存」才合并写回磁盘。
+        self._drafts: dict[str, PlanDraft] = {}
         #: 表格各行对应的方案，与表格在 _load_user 里一起重建。
         self._row_plans: list[LoadoutPlan] = []
 
@@ -181,9 +185,15 @@ class PlanManagerDialog(QDialog):
 
         bottom = QHBoxLayout()
         bottom.addStretch()
+        save_button = QPushButton(tr("保存"))
+        apply_button_style(save_button, variant="action")
+        save_button.clicked.connect(self._save)
+        save_button.setEnabled(False)
+        self._save_button = save_button
+        bottom.addWidget(save_button)
         close_button = QPushButton(tr("关闭"))
         apply_button_style(close_button, variant="neutral")
-        close_button.clicked.connect(self.accept)
+        close_button.clicked.connect(self.reject)
         bottom.addWidget(close_button)
         layout.addLayout(bottom)
 
@@ -197,6 +207,25 @@ class PlanManagerDialog(QDialog):
         return (LoadoutRepository(username.text(), self._users_dir)
                 if username is not None else None)
 
+    def _draft(self) -> PlanDraft | None:
+        """当前用户的草稿；第一次访问时从磁盘载入一份工作副本。
+
+        草稿按用户名常驻，所以来回切换用户不会丢掉各自的未保存修改。
+        """
+        repo = self._repo()
+        if repo is None:
+            return None
+        username = self._username()
+        draft = self._drafts.get(username)
+        if draft is None:
+            draft = PlanDraft.load(repo)
+            self._drafts[username] = draft
+        return draft
+
+    def _username(self) -> str:
+        item = self._users.currentItem()
+        return item.text() if item is not None else ""
+
     def _selected_plan_id(self) -> str:
         row = self._table.currentRow()
         item = self._table.item(row, 0) if row >= 0 else None
@@ -207,37 +236,31 @@ class PlanManagerDialog(QDialog):
 
         取 _load_user 本轮的快照，不重新读盘：委托每编辑一格要问三次（建
         编辑器、填初值、提交），每次 repo.load() 就是三遍读文件加解析。写回
-        后 _commit_field 会走 _load_user，表格和快照总是一起重建。
+        草稿后 _load_user 会整表重绘，表格和快照总是一起重建。
         """
         return self._row_plans[row] if 0 <= row < len(self._row_plans) else None
 
     def _commit_field(self, plan: LoadoutPlan, column: int,
                       value: str) -> None:
-        """写回一次列编辑，然后整行重读——联动结果只认仓储里的事实。"""
-        repo = self._repo()
-        if repo is None:
+        """把一次列编辑写进草稿，然后整行重绘——联动结果只认草稿里的事实。"""
+        draft = self._draft()
+        if draft is None:
             return
         updates = plan_field_updates(
             self._game_config.get_schools(), plan, column, value)
-        if not updates:
-            # 名称空串等无效输入：放弃写入，让单元格回滚成原值。
-            self._load_user(selected_id=plan.id)
-            return
-        try:
-            repo.configure_plan(plan.id, **updates)  # type: ignore[arg-type]
-        except Exception as exc:  # noqa: BLE001 - 单次编辑失败不该关掉对话框
-            logger.error(f"编辑备战方案失败: {exc}")
-            QMessageBox.warning(self, tr("保存失败"), str(exc))
-        self._mark_changed()
+        if updates:
+            draft.update_fields(plan.id, updates)
+        # 名称空串等无效输入不写入，重绘会让单元格回滚成原值。
         self._load_user(selected_id=plan.id)
 
     def _load_user(self, _name: str = "", *, selected_id: str = "") -> None:
-        repo = self._repo()
+        """用户切换或需要整表重绘时调用；数据一律取自草稿。"""
+        draft = self._draft()
         self._loading = True
         self._table.setRowCount(0)
         self._row_plans = []
-        if repo is not None:
-            state = repo.load()
+        if draft is not None:
+            state = draft.state
             self._world_level_combo.blockSignals(True)
             self._world_level_combo.set_level(state.world_level)
             self._world_level_combo.blockSignals(False)
@@ -295,88 +318,132 @@ class PlanManagerDialog(QDialog):
     def _on_world_level_changed(self, _index: int) -> None:
         if self._loading:
             return
-        repo = self._repo()
-        if repo is None:
+        draft = self._draft()
+        if draft is None:
             return
-        try:
-            repo.set_world_level(self._world_level_combo.get_level())
-        except Exception as exc:  # noqa: BLE001 - 局部设置失败不关闭管理器
-            logger.error(f"保存个人世界等级失败: {exc}")
-            QMessageBox.warning(self, tr("保存失败"), str(exc))
-            self._load_user()
-            return
-        self._mark_changed()
+        draft.set_world_level(self._world_level_combo.get_level())
+        self._update_actions()
 
     def _update_actions(self) -> None:
         if self._loading:
             return
-        repo = self._repo()
+        draft = self._draft()
         row = self._table.currentRow()
         count = self._table.rowCount()
-        self._add_button.setEnabled(repo is not None)
+        self._add_button.setEnabled(draft is not None)
         self._delete_button.setEnabled(row >= 0 and count > 1)
         self._up_button.setEnabled(row > 0)
         self._down_button.setEnabled(0 <= row < count - 1)
+        self._save_button.setEnabled(bool(self._dirty_users()))
 
-    def _mark_changed(self) -> None:
-        user = self._users.currentItem()
-        if user is not None:
-            self.changed_users.add(user.text())
+    def _dirty_users(self) -> list[str]:
+        """有未保存修改的用户名。"""
+        return [name for name, draft in self._drafts.items() if draft.dirty]
+
+    def _save(self, _checked: bool = False) -> bool:
+        """把所有草稿按字段合并写回；返回是否全部成功。"""
+        failures: list[str] = []
+        for username, draft in self._drafts.items():
+            if not draft.dirty:
+                continue
+            try:
+                draft.flush(LoadoutRepository(username, self._users_dir))
+            except Exception as exc:  # noqa: BLE001 - 单用户失败不影响其它用户
+                logger.error(f"保存备战方案失败（{username}）: {exc}")
+                failures.append(f"{username}: {exc}")
+                continue
+            draft.accept()
+            self.changed_users.add(username)
+        if failures:
+            QMessageBox.warning(self, tr("保存失败"), "\n".join(failures))
+        self._update_actions()
+        return not failures
+
+    def _ask_unsaved(self) -> str:
+        """询问未保存的修改怎么处置：save / discard / cancel。
+
+        单独成方法是为了测试能直接给出答案，不必去驱动模态框。
+        """
+        count = len(self._dirty_users())
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(tr("未保存的修改"))
+        box.setText(tr("{count} 个用户的备战方案还有未保存的修改，"
+                       "要保存后再关闭吗？").format(count=count))
+        save_button = box.addButton(
+            tr("保存并关闭"), QMessageBox.ButtonRole.AcceptRole)
+        discard_button = box.addButton(
+            tr("放弃修改"), QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton(tr("取消"), QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(save_button)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is save_button:
+            return "save"
+        if clicked is discard_button:
+            return "discard"
+        return "cancel"
+
+    def reject(self) -> None:
+        """关闭前拦一道：有草稿就交给用户决定保存、放弃还是留下。"""
+        if self._dirty_users():
+            answer = self._ask_unsaved()
+            if answer == "cancel":
+                return
+            if answer == "save" and not self._save():
+                return
+        super().reject()
 
     def _create_plan(self) -> None:
-        repo = self._repo()
-        if repo is None:
+        draft = self._draft()
+        if draft is None:
             return
         dialog = PlanCreateDialog(self._game_config, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         try:
-            plan = repo.create_plan(
-                dialog.plan_name, dialog.main_art, dialog.sub_art,
-                playstyle=dialog.playstyle,
-                combat_type=dialog.combat_type, activate=False)
+            plan = draft.add_plan(
+                name=dialog.plan_name, main_art=dialog.main_art,
+                sub_art=dialog.sub_art, playstyle=dialog.playstyle,
+                combat_type=dialog.combat_type)
         except Exception as exc:
             QMessageBox.warning(self, tr("新建失败"), str(exc))
             return
-        self._mark_changed()
         self._load_user(selected_id=plan.id)
 
     def _delete_plan(self) -> None:
-        repo = self._repo()
+        draft = self._draft()
         pid = self._selected_plan_id()
-        if repo is None or not pid:
+        if draft is None or not pid:
             return
-        state = repo.load()
-        if len(state.plans) <= 1 or pid not in state.plans:
+        plan = draft.state.plans.get(pid)
+        if plan is None or len(draft.state.plans) <= 1:
             return
-        plan = state.plans[pid]
         references = sum(bool(fp) for fp in plan.equipment.values())
         answer = QMessageBox.question(
             self, tr("删除备战方案"),
             tr("确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，"
-               "公共装备池中的装备不会删除。").format(
+               "公共装备池中的装备不会删除，保存后才会生效。").format(
                    name=plan.name, count=references),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            repo.delete_plan(pid)
+            draft.remove_plan(pid)
         except Exception as exc:
             QMessageBox.warning(self, tr("删除失败"), str(exc))
             return
-        self._mark_changed()
         self._load_user()
 
     def _move_plan(self, offset: int) -> None:
-        repo = self._repo()
+        draft = self._draft()
         pid = self._selected_plan_id()
-        if repo is None or not pid:
+        if draft is None or not pid:
             return
         try:
-            repo.move_plan(pid, offset)
+            draft.move_plan(pid, offset)
         except Exception as exc:
             QMessageBox.warning(self, tr("排序失败"), str(exc))
             return
-        self._mark_changed()
         self._load_user(selected_id=pid)

@@ -53,6 +53,12 @@ builder 约定：
 宿主 API（插件页面通过 host 使用，不摸私有属性）：
 
 - `host.active_user_name() -> str`：当前活跃用户名
+- `host.plugin_runtime: PluginRuntimePort`：查询目标、预检启动、切换目标、启动工作流、
+  查询运行记录与人工提示、暂停/恢复/停止任务，以及读取热键快照和插件页。
+  契约位于 `core/plugin_runtime.py`，桌面适配位于 `ui/main/plugin_runtime.py`。
+  插件不访问宿主的目标登记表、运行管理器、当前运行对象或界面恢复私有方法；
+  目标切换仍由宿主保存旧目标草稿并恢复新目标，不能改变默认用户。
+  桌面接口在 UI 线程调用；MCP 请求通过 AgentTaskBridge 的队列信号转入 UI 线程。
 - `host.is_running` / `host.request_stop()`：自动化运行状态与停止
 - `host.append_log(text)`：写运行日志
 - `host.run_workflow_implementation(impl_name, flow_name, configure, *, execution_username=None)`：
@@ -83,6 +89,9 @@ src/lvjiang/apps/<name>/
 - `workflows.ports`：工作流实现使用的场景自动化与子流程引擎 Protocol；插件端
   Protocol 组合这些能力并补充领域常量和状态。
 - `ui.layout_helpers`、`ui.presentation`：配置布局、主题判断和轻量展示组件。
+
+`core.app_events.AppEvent` 是无 GUI 依赖的公共事件信封；领域主题由插件自己的
+`core/events.py` 声明，Qt 路由与去抖仍留在插件 UI。
 
 用户资料的 `User.extra_fields` 保留公共模型未解释的顶层扩展字段。燕云的
 `config/analysis_settings.py` 负责按方案 ID 读写毕业率设置；原用户文件位置和

@@ -374,7 +374,7 @@ class _UIHelper(QObject):
             self._complete(req, None)
             return
         if action == "app_event":
-            from ..app_events import AppEvent
+            from ...core.app_events import AppEvent
             event = kwargs.get("event")
             if self._window is not None and isinstance(event, AppEvent):
                 self._window.app_event.emit(event)

@@ -104,7 +104,7 @@ class TuningTab(QWidget):
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
         self.btn_run_tuning = QPushButton(hotkey_label(
-            tr("开始调律"), self._host._user_config.hotkeys.start))
+            tr("开始调律"), self._host.plugin_runtime.hotkeys().start))
         self.btn_run_tuning.clicked.connect(self.f9_run)
         apply_execution_button_style(self.btn_run_tuning, "run")
         btn_layout.addWidget(self.btn_run_tuning, 1)
@@ -429,7 +429,7 @@ class TuningTab(QWidget):
     # ─── 按钮状态（订阅宿主 automation_state_changed）──────────
 
     def _on_automation_state(self, state: str):
-        hk = self._host._user_config.hotkeys
+        hk = self._host.plugin_runtime.hotkeys()
         other_label = other_task_running_label(self._host, "auto_tuning")
         self.btn_run_tuning.setEnabled(True)
         if other_label:

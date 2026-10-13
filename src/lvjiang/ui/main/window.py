@@ -49,6 +49,7 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 from ...core.config import load_available_envs, load_env, load_user_config
 from ...core.config.users import SessionManager
 from ...core.layout_manager import LayoutConfigManager
+from ...core.plugin_runtime import PluginRuntimePort
 from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager
 from ...i18n import tr
@@ -1054,6 +1055,14 @@ class MainWindow(
     def active_user_name(self) -> str:
         """当前激活用户名（无用户时返回空串）"""
         return self._user_manager.get_active_user_name() or ""
+
+    @property
+    def plugin_runtime(self) -> PluginRuntimePort:
+        """插件运行入口；目标草稿与任务状态仍由宿主唯一维护。"""
+        from .plugin_runtime import PluginRuntime
+        if not hasattr(self, "_plugin_runtime"):
+            self._plugin_runtime = PluginRuntime(self)
+        return self._plugin_runtime
 
     @property
     def is_running(self) -> bool:

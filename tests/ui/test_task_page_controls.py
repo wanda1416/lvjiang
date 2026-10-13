@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QPushButton
 from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
 from lvjiang.ui.batch.batch_tab import BatchTab
 from lvjiang.ui.hotkeys import hotkey_label
+from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.main.run_control import RunControlMixin
 
 
@@ -29,6 +30,7 @@ def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp):
     tuning = SimpleNamespace(
         _host=host, btn_run_tuning=QPushButton(),
         btn_pause_resume=QPushButton(), _find_progress_widget=lambda: None)
+    host.plugin_runtime = PluginRuntime(host)
     host._refresh_pause_button = lambda: RunControlMixin._refresh_pause_button(host)
     buttons = (
         (host.btn_run_workflow, host.btn_pause_resume),

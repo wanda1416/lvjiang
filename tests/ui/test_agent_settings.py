@@ -9,6 +9,7 @@ from lvjiang.core import agent_connection
 from lvjiang.core.agent_settings import load_agent_settings
 from lvjiang.core.config import resolver
 from lvjiang.ui.agent_settings import AgentSettingsPage
+from lvjiang.ui.main.plugin_runtime import PluginRuntime
 
 
 def test_global_agent_drafts_only_save_agents_node(qtbot, tmp_path, monkeypatch):
@@ -55,6 +56,7 @@ def test_instance_selection_override_and_download_leave_global_defaults_unchange
     opened = []
     monkeypatch.setattr(agent_page.QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True)
     host = QWidget()
+    host.plugin_runtime = PluginRuntime(host)
     qtbot.addWidget(host)
     page = agent_page.AgentTuningPage(host)
     qtbot.addWidget(page)

@@ -11,6 +11,11 @@ from lvjiang.apps.yysls.ui.tuning.agent_page import AgentTuningPage
 class Host(QWidget):
     user_changed = pyqtSignal(str)
 
+    @property
+    def plugin_runtime(self):
+        from lvjiang.ui.main.plugin_runtime import PluginRuntime
+        return PluginRuntime(self)
+
 
 def test_page_service_connection_survives_user_changes_without_packaging(qtbot, tmp_path, monkeypatch, free_tcp_port):
     import asyncio
@@ -221,7 +226,7 @@ def test_start_retry_returns_original_task_before_busy_or_offline_checks(qtbot, 
     worker = Worker()
     run = SimpleNamespace(task_run_id='task-one', state='running', worker=worker)
     launches = []
-    target = SimpleNamespace(id='target-one', ready=True)
+    target = SimpleNamespace(id='target-one', display_name='target-one', kind='adb', ready=True)
     host = Host()
     qtbot.addWidget(host)
     host.user_manager = SimpleNamespace(list_users=lambda: ['test_user'], get_active_user_name=lambda: 'test_user')

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from lvjiang.ui.app_events import AppEvent
+from lvjiang.core.app_events import AppEvent
 
 from ..core.events import (
     APP_ID,

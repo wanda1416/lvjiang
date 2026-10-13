@@ -13,6 +13,7 @@ from lvjiang.ui.execution_feedback import (
 )
 from lvjiang.ui.hotkeys import hotkey_label
 from lvjiang.ui.main.execution_access import guarded_launch
+from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.main.run_control import RunControlMixin
 
 
@@ -29,6 +30,7 @@ def controls():
         _emit_concurrency_changed=lambda: None, _sync_projected_context_locks=lambda: None,
         findChildren=lambda _kind: [],
     )
+    host.plugin_runtime = PluginRuntime(host)
     host._refresh_pause_button = lambda: RunControlMixin._refresh_pause_button(host)
     batch = SimpleNamespace(
         _host=host, _btn_run=QPushButton(), _btn_pause_resume=QPushButton(),

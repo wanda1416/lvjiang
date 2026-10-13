@@ -188,7 +188,7 @@ def _open_base_attr_form(_engine, prefill: dict) -> None:
         return
     try:
         from lvjiang.apps.yysls.core.events import APP_ID, OPEN_PLAY_STYLE_FORM
-        from lvjiang.ui.app_events import AppEvent
+        from lvjiang.core.app_events import AppEvent
         callback(
             "app_event",
             event=AppEvent(APP_ID, OPEN_PLAY_STYLE_FORM, prefill or {}),

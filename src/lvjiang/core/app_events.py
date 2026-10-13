@@ -1,4 +1,4 @@
-"""宿主与 app UI 之间的通用事件信封。"""
+"""宿主与插件之间的通用事件信封；不依赖 GUI。"""
 
 from __future__ import annotations
 

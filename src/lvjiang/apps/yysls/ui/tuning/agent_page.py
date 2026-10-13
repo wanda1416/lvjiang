@@ -5,6 +5,7 @@ import copy
 import json
 import threading
 from concurrent.futures import Future, TimeoutError
+from dataclasses import asdict
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QSignalBlocker, Qt, QThread, QTimer, QUrl, pyqtSignal
@@ -30,6 +31,7 @@ from .....core.agent_connection import AgentConnection, export_agent
 from .....core.agent_docs import AgentDocuments
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_access
 from .....core.agent_settings import AgentSettings, load_agent_settings
+from .....core.plugin_runtime import PluginRuntimePort
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
 from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
@@ -42,6 +44,7 @@ class AgentTaskBridge(QObject):
     def __init__(self, host):
         super().__init__(host)
         self.host = host
+        self.runtime: PluginRuntimePort = host.plugin_runtime
         self.tasks: dict = {}
         self.requests: dict = {}
         self.service: AgentService | None = None
@@ -112,30 +115,15 @@ class AgentTaskBridge(QObject):
             return {"current_user": host.user_manager.get_active_user_name(),
                     "users": host.user_manager.list_users()}
         if operation == "targets":
-            return {"current_target_id": host._execution_targets.active_target_id,
-                    "targets": [{"id": target.id, "name": target.display_name,
-                                 "kind": target.kind, "ready": target.ready,
-                                 "selected": target.id == host._execution_targets.active_target_id,
-                                 "busy": host._run_manager.run_for_target(target.id) is not None}
-                                for target in host._execution_targets.all()]}
+            return {"current_target_id": self.runtime.current_target_id,
+                    "targets": [asdict(target) for target in self.runtime.targets()]}
         if operation == "resolve_target":
-            target_id = args.get("target_id") or host._execution_targets.active_target_id
-            target = host._execution_targets.get(target_id)
-            if target is None or not target.ready:
-                raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看窗口和设备状态")
+            target = self.runtime.resolve_target(args.get("target_id") or "")
             return {"target_id": target.id}
         if operation == "validate":
             from ...core.agent.launch import prepare_tuning
             prepare_tuning(args["config"])
-            target = host._execution_targets.get(args["target_id"])
-            if target is None or not target.ready:
-                raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看状态")
-            decision = host._run_manager.can_start(target_id=target.id, username=args["user"])
-            if not decision.allowed:
-                raise ValueError(decision.reason)
-            self._select_target(target.id)
-            if not host._backend_ready() or not host._plan_allows_backend():
-                raise ValueError("当前连接方案或执行环境不可用")
+            self.runtime.prepare_start(args["target_id"], args["user"])
             from .tuning_tab import TuningTab
             if TuningTab._missing_tuning_output_fields():
                 raise ValueError("当前图库缺少调律必需字段，请先完成标定")
@@ -155,26 +143,15 @@ class AgentTaskBridge(QObject):
             action = args["action"]
             if self.service is not None:
                 self.service._check(args["user"])
-            active = host._run_manager.run(run.task_run_id)
+            active = self.runtime.run(run.task_run_id)
             if action != "status":
                 if active is None:
                     raise ValueError("任务已经结束")
-                self._select_target(run.target_id, require_ready=action != "stop")
-                if action == "stop":
-                    host._request_stop(stop_confirmed=True)
-                elif action == "pause":
-                    host._request_pause()
-                elif action == "resume":
-                    if getattr(run.ui_helper, "_active_dialog", None) is not None:
-                        raise ValueError("请先在律匠处理人工提示")
-                    if str(active.state) != "paused":
-                        raise ValueError("任务当前未暂停")
-                    host._on_pause_resume()
+                self.runtime.control_run(run.task_run_id, action)
             result = {"task_id": run.task_run_id, "state": str(run.state), "kind": task["kind"],
                       **self._feedback(run)}
-            if active is not None and getattr(run.ui_helper, "_active_dialog", None) is not None:
-                dialog = run.ui_helper._active_dialog
-                message = dialog.text() if hasattr(dialog, "text") else dialog.windowTitle()
+            message = self.runtime.pending_prompt(run.task_run_id)
+            if active is not None and message is not None:
                 result.update(state="waiting_user", reason=message,
                               recovery="请在律匠处理当前提示，停止入口仍可用")
             if active is None and task["kind"] == "scan":
@@ -213,14 +190,12 @@ class AgentTaskBridge(QObject):
                 args = {**args, **validated}
         if operation == "scan":
             args = {**args, **self.perform("resolve_target", {"target_id": args["target_id"]})}
-        target = host._execution_targets.get(args["target_id"])
-        if target is None or not target.ready:
-            raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看状态")
-        if host._run_manager.run_for_target(target.id) is not None:
+        target = self.runtime.resolve_target(args["target_id"])
+        if target.busy:
             raise ValueError("执行目标正在运行任务")
         if args["user"] not in host.user_manager.list_users():
             raise ValueError("执行用户已不存在")
-        self._select_target(target.id)
+        self.runtime.select_target(target.id)
         if operation == "scan":
             from .....core.config.resolver import get_resolver
             from .....workflows.metadata import build_flow_config
@@ -228,20 +203,19 @@ class AgentTaskBridge(QObject):
             if path is None:
                 raise ValueError("全部备战方案扫描未安装")
             config = build_flow_config(path)
-            host._on_run_workflow(flow_config=config, execution_username=args["user"],
-                                  parameter_overrides={"skip_existing": args["skip_existing"],
-                                                       "skip_existing_base_attrs": False})
+            self.runtime.start_workflow(config, args["user"],
+                                        {"skip_existing": args["skip_existing"],
+                                         "skip_existing_base_attrs": False})
         else:
             from .tuning_tab import TuningTab
-            page = next((host._left_tabs.widget(i) for i in range(host._left_tabs.count())
-                         if isinstance(host._left_tabs.widget(i), TuningTab)), None)
+            page = next((page for page in self.runtime.pages() if isinstance(page, TuningTab)), None)
             if page is None:
                 raise ValueError("调律页面不可用")
             from ...core.loadout.models import LoadoutState
             page._start_tuning(execution_username=args["user"], config=args["config"],
                                smart_state=LoadoutState.from_dict(args["smart_state"]))
-        run = host._current_run_context
-        if run is None or not host._run_manager.run(run.task_run_id):
+        run = self.runtime.current_run()
+        if run is None or not self.runtime.run(run.task_run_id):
             raise ValueError("任务启动被预检拒绝，请查看律匠提示")
         kind = "scan" if operation == "scan" else "tuning"
         self.tasks[run.task_run_id] = {"run": run, "user": args["user"], "kind": kind}
@@ -267,17 +241,6 @@ class AgentTaskBridge(QObject):
             if not run.worker.isRunning():
                 QTimer.singleShot(0, complete)
         return result
-
-
-    def _select_target(self, target_id: str, *, require_ready: bool = True) -> None:
-        host = self.host
-        target = host._execution_targets.get(target_id)
-        if target is None or (require_ready and not target.ready):
-            raise ValueError("执行目标未连接或不可用")
-        if host._execution_targets.active_target_id != target_id:
-            host._capture_launch_draft(host._execution_targets.active_target_id)
-            host._execution_targets.select(target_id)
-            host._restore_active_target_view()
 
 
 class AgentTuningPage(QWidget):

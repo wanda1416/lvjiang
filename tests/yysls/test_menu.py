@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QMainWindow
 
 from lvjiang.apps.yysls.ui import menus
+from lvjiang.ui.main.plugin_runtime import PluginRuntime
 
 
 def test_menu_entries_are_available_to_everyone(qtbot, tmp_path, monkeypatch):
@@ -10,6 +11,7 @@ def test_menu_entries_are_available_to_everyone(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(agent_connection, "settings_path", lambda _root: tmp_path / "connection.json")
     host = QMainWindow()
+    host.plugin_runtime = PluginRuntime(host)
     qtbot.addWidget(host)
 
     menus.build_menu(host, host.menuBar())

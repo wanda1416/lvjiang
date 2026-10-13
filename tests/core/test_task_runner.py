@@ -68,7 +68,7 @@ def _clean_state(monkeypatch, tmp_path):
     task_runner._PAUSE_GATE.set()
     monkeypatch.setattr("lvjiang.core.daily_history.default_log_root", lambda: tmp_path / "logs")
     from lvjiang import constants
-    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.config.interface import get_interface_store
     from lvjiang.core.user_config import User, save_user_metadata
 
     monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
@@ -76,7 +76,7 @@ def _clean_state(monkeypatch, tmp_path):
     (constants.SESSION_CONFIG_DIR / "offline.json").write_text(
         json.dumps({"username": "tester", "layout": "android"}), encoding="utf-8")
     save_user_metadata(User("tester"), constants.USERS_DIR)
-    get_session_store().set_active("user", "tester")
+    get_interface_store().set_active("user", "tester")
     # 默认放行无障碍检查，需要测「未就绪」的用例自己覆盖
     monkeypatch.setattr(
         "lvjiang.core.ondevice.a11y.is_ready", lambda: True, raising=False
@@ -161,6 +161,7 @@ def test_log_cursor_preserves_levels_and_resets_between_runs():
 
 def test_user_selection_only_changes_phone_active_user(monkeypatch):
     from lvjiang import constants
+    from lvjiang.core.config.interface import get_interface_store
     from lvjiang.core.config.session import get_session_store
     from lvjiang.core.user_config import User, save_user_metadata
 
@@ -170,7 +171,7 @@ def test_user_selection_only_changes_phone_active_user(monkeypatch):
     before = (constants.SESSION_CONFIG_DIR / "offline.json").read_bytes()
     listed = json.loads(task_runner.list_users())
     assert listed["users"] == ["tester", "second"]
-    assert store.get_active("user") == "tester" # 展示候选不能改变执行用户。
+    assert get_interface_store().get_active("user") == "tester" # 展示候选不能改变执行用户。
     assert json.loads(task_runner.select_user("second"))["ok"]
     status = json.loads(task_runner.get_status())
     assert status["sync"]["execution_username"] == "second"
@@ -178,17 +179,17 @@ def test_user_selection_only_changes_phone_active_user(monkeypatch):
     assert (constants.SESSION_CONFIG_DIR / "offline.json").read_bytes() == before
     assert not (constants.USERS_DIR / "missing.json").exists()
     assert not json.loads(task_runner.select_user("../outside"))["ok"]
-    assert store.get_active("user") == "second"
+    assert get_interface_store().get_active("user") == "second"
 
 
 def test_user_selection_is_rejected_while_task_is_active():
-    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.config.interface import get_interface_store
 
     task_runner._STATE.begin("task", "task")
     task_runner._STATE.request_pause()
     task_runner._STATE.acknowledge_pause()
     assert not json.loads(task_runner.select_user("tester"))["ok"]
-    assert get_session_store().get_active("user") == "tester"
+    assert get_interface_store().get_active("user") == "tester"
 
 def test_list_tasks_shape(monkeypatch):
     """清单每项只暴露 id / name / source 三个字段"""

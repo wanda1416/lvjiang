@@ -7,9 +7,17 @@ from typing import Any
 
 from .session import SessionStore
 
-INTERFACE_VERSION = 1
+INTERFACE_VERSION = 2
 _MOVED_NODES = ("ui_state", "profile", "alert_info", "server_config")
 _MIGRATION = {"source": "session", "version": INTERFACE_VERSION}
+
+#: 合法的激活项 kind —— 「当前在用哪个」的选择。它们频繁变动，丢了重选一次
+#: 即可，所以和界面状态一起放在 interface.json；plan 是机器级方案（图库 +
+#: 环境 + 布局 + 模式的组合），env 是当前工作环境，daily_workflow 是当前
+#: 选中的日常脚本。
+ACTIVE_KINDS = frozenset({
+    "user", "layout", "space", "env", "daily_workflow", "plan",
+})
 
 
 def interface_path() -> Path:
@@ -22,6 +30,9 @@ class InterfaceStore(SessionStore):
 
     FORMAT_VERSION = INTERFACE_VERSION
     TRANSIENT_PATHS = frozenset({
+        # 激活项整棵子树都是"本实例在用哪个"：只读实例可以临时切换，但不
+        # 落盘，也不该影响持有写权限的实例。
+        ("actives",),
         ("profile", "overview_active_group"),
         ("ui_state", "main_page"),
         ("ui_state", "scene_editor"), ("ui_state", "reference_manager"),
@@ -38,6 +49,31 @@ class InterfaceStore(SessionStore):
     @property
     def path(self) -> Path:
         return self._path_override if self._path_override is not None else interface_path()
+
+    # ─── 激活项（actives）─────────────────────────────────
+
+    def get_active(self, kind: str, default: Any = None) -> Any:
+        """读取 ``actives.<kind>``——本实例在用哪个用户/布局/空间/环境/方案。"""
+        if kind not in ACTIVE_KINDS:
+            raise KeyError(f"unknown active kind: {kind}")
+        with self._thread_lock:
+            actives = self._data.get("actives")
+            if isinstance(actives, dict) and kind in actives:
+                return deepcopy(actives[kind])
+            return default
+
+    def set_active(self, kind: str, value: Any) -> None:
+        """写入一个激活项。"""
+        if kind not in ACTIVE_KINDS:
+            raise KeyError(f"unknown active kind: {kind}")
+
+        def _set(data: dict) -> None:
+            current = data.get("actives")
+            actives = deepcopy(current) if isinstance(current, dict) else {}
+            actives[kind] = deepcopy(value)
+            data["actives"] = actives
+
+        self._mutate_disk(_set)
 
     def _migrate(self, legacy_path: Path) -> bool:
         # 固定锁序 interface -> session。中间标记让崩溃后的旧节点清理可重试。

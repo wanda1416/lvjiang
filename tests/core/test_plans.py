@@ -17,6 +17,7 @@ from lvjiang.core.config.plans import (
 )
 from lvjiang.core.config.session import (
     get_session_store,
+    load_env,
     load_settings,
     save_env,
     save_settings,
@@ -106,12 +107,11 @@ def test_rename_keeps_active_reference():
     assert active is not None and active.name == "PC 端"
 
 
-def test_save_env_keeps_sibling_settings():
-    """save_env 曾用 load+set_node 整节点覆盖，会吃掉并发写入的兄弟键。"""
-    save_settings({"font_sizes": {"base": 12}, "env": "desktop"})
+def test_save_env_keeps_settings_untouched():
+    """工作环境记在 interface.json 的 actives.env，写它不再碰 settings 节点。"""
+    save_settings({"font_sizes": {"base": 12}})
 
     save_env("android")
 
-    settings = load_settings()
-    assert settings["env"] == "android"
-    assert settings["font_sizes"] == {"base": 12}
+    assert load_env() == "android"
+    assert load_settings()["font_sizes"] == {"base": 12}

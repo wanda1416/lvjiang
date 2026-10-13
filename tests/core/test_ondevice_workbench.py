@@ -23,10 +23,10 @@ def test_qrcode_refresh_is_explicit_and_keeps_cache_on_failure(tmp_path, monkeyp
 
 
 def test_catalog_keeps_parameterless_and_invalid_tasks_without_selecting_user(monkeypatch):
-    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.config.interface import get_interface_store
     from lvjiang.core.ondevice import task_settings
 
-    get_session_store().set_active("user", "runner")
+    get_interface_store().set_active("user", "runner")
     monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
     monkeypatch.setattr("lvjiang.workflows.discovery.list_exposed_scripts", lambda *a, **kw: [
         {"id": "plain", "name": "无需参数", "parameters": []},
@@ -44,16 +44,16 @@ def test_catalog_keeps_parameterless_and_invalid_tasks_without_selecting_user(mo
     assert [t["id"] for t in result["tasks"]] == ["plain", "invalid"]
     assert not result["tasks"][0]["configurable"]
     assert result["tasks"][1]["reason"] == "请先配置任务"
-    assert get_session_store().get_active("user") == "runner"
+    assert get_interface_store().get_active("user") == "runner"
 
 
 def test_profile_distinguishes_zero_from_unknown_and_browsing_is_readonly(monkeypatch):
-    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.config.interface import get_interface_store
     from lvjiang.core.profile import schema, service
     from lvjiang.core.profile.models import KeyDef
     from lvjiang.core.profile.schema import ProfileSchema
 
-    get_session_store().set_active("user", "runner")
+    get_interface_store().set_active("user", "runner")
     monkeypatch.setattr(task_runner, "_local_user_names", lambda: ["viewer", "runner"])
     config = ProfileSchema(keys_by_model={"stock": [KeyDef(key="zero"), KeyDef(key="unknown")]})
     monkeypatch.setattr(schema, "get_profile_config", lambda: config)
@@ -63,7 +63,7 @@ def test_profile_distinguishes_zero_from_unknown_and_browsing_is_readonly(monkey
     assert [(i["key"], i["value"], i["collected"]) for i in result["items"]] == [
         ("zero", 0, True), ("unknown", None, False),
     ]
-    assert get_session_store().get_active("user") == "runner"
+    assert get_interface_store().get_active("user") == "runner"
 
 
 def test_profile_history_passes_user_and_page_without_writing(monkeypatch):

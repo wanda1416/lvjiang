@@ -23,14 +23,14 @@ def sync_status() -> dict:
 
 def configuration_status() -> dict:
     """运行配置就绪与同步历史分开；预置初始化不伪造 PC 同步记录。"""
-    from ..config.session import get_session_store
+    from ..config.interface import get_interface_store
     sync = sync_status()
     marker = constants.SESSION_CONFIG_DIR / "preset.json"
     from ..paths import get_config_system_dir
     system = get_config_system_dir()
     preset_ready = marker.is_file() and all((system / name).is_file() for name in ("app.yaml", "ocr.yaml", "layouts.yaml"))
     ready = bool(sync.get("synced") or preset_ready)
-    store = get_session_store()
+    store = get_interface_store()
     return {**sync, "ready": ready, "source": "pc" if sync.get("synced") else "preset",
             "execution_username": store.get_active("user", ""),
             "layout": store.get_active("layout", sync.get("layout", "")),

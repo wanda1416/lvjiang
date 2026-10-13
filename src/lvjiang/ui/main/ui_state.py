@@ -255,27 +255,25 @@ class UiStateMixin:
         各工作流的配置由其专属页面自行管理，日常页只负责自己的 workflow_id。
         擅自清理不归自己管理的配置会破坏其他工作流的数据完整性。
         """
-        from ...core.config import get_session_store
+        from ...core.config import get_interface_store
 
         flow_cfg = self._get_selected_flow_config()
         if not flow_cfg:
             return
 
-        # workflow_id 仍存 daily 节点（UI 状态，非工作流配置）
+        # 当前选中的日常脚本属于「本实例在用哪个」，和其他激活项一起记在
+        # interface.json 的 actives；同名的 daily.scripts 才是脚本配置。
         try:
-            get_session_store().update_node("daily", {"workflow_id": flow_cfg["id"]})
+            get_interface_store().set_active("daily_workflow", flow_cfg["id"])
         except Exception as e:
             logger.warning(f"保存日常配置失败: {e}")
 
     def _restore_daily_config(self):
         """启动时恢复日常页脚本选择与参数"""
-        from ...core.config import get_session_store
+        from ...core.config import get_interface_store
 
         # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
-        daily = get_session_store().get_node("daily", {})
-        if not isinstance(daily, dict):
-            daily = {}
-        workflow_id = daily.get("workflow_id")
+        workflow_id = get_interface_store().get_active("daily_workflow", "")
 
         # 选中上次使用的脚本
         if workflow_id:

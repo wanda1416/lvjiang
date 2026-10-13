@@ -270,9 +270,9 @@ def _reset_engine_state(engine) -> None:
 
     # 每次任务启动绑定手机已选择的用户，不要求该资料来自 PC。
     from ... import constants
-    from ..config.session import get_session_store
+    from ..config.interface import get_interface_store
 
-    username = _STATE.snapshot()["username"] or get_session_store().get_active("user", "")
+    username = _STATE.snapshot()["username"] or get_interface_store().get_active("user", "")
     engine.run_username = username if isinstance(username, str) else ""
     engine.users_dir = constants.USERS_DIR
     if not engine.run_username:
@@ -400,14 +400,14 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
         return json.dumps({"ok": False, "message": str(e)}, ensure_ascii=False)
 
     try:
-        from ..config.session import get_session_store
+        from ..config.interface import get_interface_store
         from .task_settings import validate_for_run
-        selected_user = username or get_session_store().get_active("user", "")
+        selected_user = username or get_interface_store().get_active("user", "")
         validate_for_run(task, selected_user, variables)
         if username:
             if username not in _local_user_names():
                 raise ValueError("执行用户资料不可用，请在用户管理中检查")
-            get_session_store().set_active("user", username)
+            get_interface_store().set_active("user", username)
     except Exception as exc:
         return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
     from ..daily_history import TaskHistoryRepository
@@ -464,11 +464,11 @@ def get_status() -> str:
     Returns:
         JSON 文本，字段见 ``_TaskState.snapshot``
     """
-    from ..config.session import get_session_store
+    from ..config.interface import get_interface_store
     from .offline import configuration_status
     sync = configuration_status()
     if sync.get("ready"):
-        sync["execution_username"] = get_session_store().get_active("user", sync.get("username", ""))
+        sync["execution_username"] = get_interface_store().get_active("user", sync.get("username", ""))
     return json.dumps({**_STATE.snapshot(), "sync": sync}, ensure_ascii=False, default=str)
 
 
@@ -493,9 +493,9 @@ def _local_user_names() -> list[str]:
 def list_users() -> str:
     """只展示同步名册中有有效资料的用户，不创建/修复缺失资料。"""
     try:
-        from ..config.session import get_session_store
+        from ..config.interface import get_interface_store
         return json.dumps({"ok": True, "users": _local_user_names(),
-                           "selected": get_session_store().get_active("user", "")}, ensure_ascii=False)
+                           "selected": get_interface_store().get_active("user", "")}, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({"ok": False, "users": [], "message": str(exc)}, ensure_ascii=False)
 
@@ -506,10 +506,10 @@ def select_user(username: str) -> str:
         if _STATE.is_running():
             return json.dumps({"ok": False, "message": "请先停止当前任务再选择用户"}, ensure_ascii=False)
         try:
-            from ..config.session import get_session_store
+            from ..config.interface import get_interface_store
             if username not in _local_user_names():
                 raise ValueError("该用户资料不可用，请在用户管理中检查")
-            get_session_store().set_active("user", username)
+            get_interface_store().set_active("user", username)
             return json.dumps({"ok": True, "message": "执行用户已切换，请确认游戏角色一致"}, ensure_ascii=False)
         except Exception as exc:
             return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)

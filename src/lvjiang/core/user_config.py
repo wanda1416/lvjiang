@@ -308,9 +308,11 @@ class UserConfigManager:
         self._load()
 
     def _load(self) -> None:
+        from .config.interface import get_interface_store
         from .config.session import get_session_store
 
         store = get_session_store()
+        active_store = get_interface_store()
         users_raw = store.get_node("users", [])
         if isinstance(users_raw, list):
             for value in users_raw:
@@ -322,7 +324,7 @@ class UserConfigManager:
                     save_user_metadata(user, self._users_dir)
                 self._users[value] = user
 
-        active = store.get_active("user", "")
+        active = active_store.get_active("user", "")
         self._active_user = active if isinstance(active, str) else ""
         if self._active_user and self._active_user not in self._users:
             self._active_user = ""
@@ -330,11 +332,13 @@ class UserConfigManager:
             self._create_default_user()
 
     def _save_order(self) -> None:
+        from .config.interface import get_interface_store
         from .config.session import get_session_store
 
         store = get_session_store()
+        active_store = get_interface_store()
         store.mutate_node("users", lambda _: list(self._users))
-        store.set_active("user", self._active_user)
+        active_store.set_active("user", self._active_user)
 
     def _save_user(self, user: User) -> None:
         save_user_metadata(user, self._users_dir)
@@ -451,7 +455,7 @@ class UserConfigManager:
         if name not in self._users:
             return False
         self._active_user = name
-        from .config.session import get_session_store
-        get_session_store().set_active("user", name)
+        from .config.interface import get_interface_store
+        get_interface_store().set_active("user", name)
         logger.info(f"已切换到用户: {name}")
         return True

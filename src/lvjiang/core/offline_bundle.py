@@ -116,11 +116,13 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                     if deleted:
                         doc["layouts"]["__deleted__"] = deleted
                     data = yaml.safe_dump(doc, allow_unicode=True, sort_keys=False).encode("utf-8")
-                if rel.as_posix() == "session/session.json":
-                    session = json.loads(data)
-                    session.setdefault("actives", {}).update(user=username, layout=layout)
-                    session.setdefault("settings", {})["env"] = "android"
-                    data = formatted_json_bytes(session)
+                if rel.as_posix() == "session/interface.json":
+                    # 手机端只认「当前在用哪个」这一层：直接给到同步清单里的
+                    # 执行用户与布局，环境固定为安卓。
+                    interface = json.loads(data)
+                    interface.setdefault("actives", {}).update(
+                        user=username, layout=layout, env="android")
+                    data = formatted_json_bytes(interface)
                 add("config/" + rel.as_posix(), data)
             for snapshot in snapshots:
                 add("config/session/" + snapshot.name, snapshot.read_bytes())
@@ -171,9 +173,13 @@ def install_offline_bundle(
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
         staged_config = staging / "config"
-        session = json.loads((staged_config / "session/session.json").read_text(encoding="utf-8"))
-        if (session.get("actives", {}).get("user") != manifest["username"]
-                or session.get("actives", {}).get("layout") != manifest["layout"]):
+        incoming_interface = staged_config / "session/interface.json"
+        interface_data = (json.loads(incoming_interface.read_text(encoding="utf-8"))
+                          if incoming_interface.is_file() else {})
+        actives = (interface_data.get("actives", {})
+                   if isinstance(interface_data, dict) else {})
+        if (actives.get("user") != manifest["username"]
+                or actives.get("layout") != manifest["layout"]):
             raise ValueError("同步包活动选择与清单不一致")
         for name in _DATABASE_FILES:
             database = staged_config / "session" / name
@@ -188,10 +194,15 @@ def install_offline_bundle(
             if mobile_batch.is_file():
                 shutil.copyfile(mobile_batch, staged_config / "session/batch.json")
         # 本次批量选择属于手机运行草稿，电脑仅同步配置组定义。
-        incoming_interface = staged_config / "session/interface.json"
-        interface_data = json.loads(incoming_interface.read_text(encoding="utf-8")) if incoming_interface.is_file() else {}
         old_interface = session_directory(target) / "interface.json"
         mobile_interface = json.loads(old_interface.read_text(encoding="utf-8")) if old_interface.is_file() else {}
+        # 上一步可能刚把手机端选定的执行用户写回暂存界面状态，这里必须重新
+        # 读盘后再补批量草稿，否则会用调用前读到的旧内容把它覆盖掉。
+        if incoming_interface.is_file():
+            interface_data = json.loads(incoming_interface.read_text(encoding="utf-8"))
+            if not isinstance(interface_data, dict):
+                interface_data = {}
+        interface_data.setdefault("actives", actives)
         interface_data["batch"] = mobile_interface.get("batch", {})
         incoming_interface.write_text(formatted_json(interface_data), encoding="utf-8")
         # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
@@ -286,7 +297,17 @@ def _preserve_task_parameters(old: Path, incoming: Path) -> None:
         if username not in names:
             names.append(username)
     new_session["users"] = names
-    active = old_session.get("actives", {}).get("user")
-    if active in names and (new_users / f"{active}.json").is_file():
-        new_session.setdefault("actives", {})["user"] = active
     new_path.write_text(formatted_json(new_session), encoding="utf-8")
+    # 手机端已经选定的执行用户属于本机选择，不随 PC 快照覆盖。
+    old_interface_path = session_directory(old) / "interface.json"
+    old_actives = (json.loads(old_interface_path.read_text(encoding="utf-8")).get("actives", {})
+                   if old_interface_path.is_file() else {})
+    active = old_actives.get("user") if isinstance(old_actives, dict) else None
+    if active in names and (new_users / f"{active}.json").is_file():
+        new_interface_path = incoming / "session/interface.json"
+        new_interface = (json.loads(new_interface_path.read_text(encoding="utf-8"))
+                         if new_interface_path.is_file() else {})
+        if not isinstance(new_interface, dict):
+            new_interface = {}
+        new_interface.setdefault("actives", {})["user"] = active
+        new_interface_path.write_text(formatted_json(new_interface), encoding="utf-8")

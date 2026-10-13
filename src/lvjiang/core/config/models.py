@@ -188,9 +188,18 @@ class NetworkConfig:
     update: bool = True
     telemetry: bool = False  # 默认关；首启同意弹窗同意后才置 True
     remote_config: bool = True
+    #: 首启弹窗里用户做过的选择与时间（""=从未问过 / granted / denied）。
+    #: 必须与布尔开关分开存：只有它能把"从未问过"和"拒绝过"区分开，否则
+    #: 每次启动都会再问一遍；它属于「网络与隐私」里的用户选择，因此和开关
+    #: 同节点，开关整份回写时也不会把它丢掉。
+    consent: str = ""
+    consent_at: str = ""
 
     def __post_init__(self):
         for f in fields(self):
+            if f.name in ("consent", "consent_at"):
+                setattr(self, f.name, str(getattr(self, f.name) or ""))
+                continue
             setattr(self, f.name, bool(getattr(self, f.name)))
 
 

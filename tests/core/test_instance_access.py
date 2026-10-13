@@ -89,10 +89,10 @@ os._exit(0)
 
 def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch):
     session = SessionStore(tmp_path / "session.json")
-    session.set_active("plan", "original")
-    session.set_node("settings", {"env": "desktop", "language": "zh_CN"})
-    session.set_node("daily", {"workflow_id": "old", "scripts": {"order": ["a"]}})
+    session.set_node("settings", {"language": "zh_CN"})
+    session.set_node("daily", {"scripts": {"order": ["a"]}})
     interface = InterfaceStore(tmp_path / "interface.json")
+    interface.set_active("plan", "original")
     interface.set_node("profile", {
         "overview_active_group": "old",
         "overview_groups": {"old": {"columns": ["name"]}},
@@ -105,11 +105,9 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     resolver.save_merged("app.yaml", {"plans": [{"name": "original"}]})
     monkeypatch.setattr(access, "_readonly", True)
 
-    session.set_active("plan", "temporary")
-    session.update_node("settings", {"env": "android", "language": "en_US"})
-    session.update_node("daily", {
-        "workflow_id": "new", "scripts": {"order": ["b"]},
-    })
+    # 白名单里的选择只在内存生效：激活项与界面状态都不落盘
+    interface.set_active("plan", "temporary")
+    interface.set_active("env", "android")
     interface.update_node("profile", {
         "overview_active_group": "new",
         "overview_groups": {"new": {"columns": ["progress"]}},
@@ -119,21 +117,23 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
         "main_page": {"left_tab_index": 1},
         "loadout_user:alice": {"equip_filter": {"type": "ring"}},
     })
+    # 白名单之外的节点照常持锁合并落盘
+    session.set_node("settings", {"language": "en_US"})
     session.set_node("new_plugin", {"enabled": True})
+    interface.update_node("server_config", {"skip_version": "9.9.9"})
     session.reload()
+    interface.reload()
 
-    assert session.get_active("plan") == "temporary"
-    assert session.get_node("settings") == {"env": "android", "language": "en_US"}
-    assert session.get_node("daily")["workflow_id"] == "new"
+    assert interface.get_active("plan") == "temporary"
+    assert interface.get_active("env") == "android"
     assert interface.get_node("profile")["overview_active_group"] == "new"
     assert interface.get_node("ui_state")["main_page"]["left_tab_index"] == 1
 
     disk = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
-    assert disk["actives"]["plan"] == "original"
-    assert disk["settings"] == {"env": "desktop", "language": "en_US"}
-    assert disk["daily"] == {"workflow_id": "old", "scripts": {"order": ["b"]}}
-    interface.reload()
+    assert disk["settings"] == {"language": "en_US"}
+    assert disk["new_plugin"] == {"enabled": True}
     interface_disk = json.loads((tmp_path / "interface.json").read_text(encoding="utf-8"))
+    assert interface_disk["actives"] == {"plan": "original"}
     assert interface_disk["profile"] == {
         "overview_active_group": "old",
         "overview_groups": {"new": {"columns": ["progress"]}},
@@ -142,7 +142,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
         "main_page": {"left_tab_index": 0},
         "loadout_user:alice": {"equip_filter": {"type": "ring"}},
     }
-    assert disk["new_plugin"] == {"enabled": True}
+    assert interface_disk["server_config"] == {"skip_version": "9.9.9"}
 
     resolver.save_merged("app.yaml", {"plans": [{"name": "temporary"}]})
     assert resolver.load_merged("app.yaml")["plans"][0]["name"] == "temporary"
@@ -187,18 +187,22 @@ def test_readonly_history_write_does_not_flush_temporary_settings(tmp_path, monk
     assert disk["alert_history"] == {"alice:key": "now"}
 
 def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path, monkeypatch):
-    path = tmp_path / "session.json"
-    store = SessionStore(path)
-    store.set_node("settings", {"env": "desktop", "language": "zh_CN"})
+    path = tmp_path / "interface.json"
+    store = InterfaceStore(path)
+    store.set_node("actives", {"env": "desktop"})
+    store.set_node("server_config", {"skip_version": "1.0.0"})
     monkeypatch.setattr(access, "_readonly", True)
-    store.update_node("settings", {"env": "android"})
+    store.set_active("env", "android")                              # 白名单：只留内存
+    store.update_node("server_config", {"skip_version": "2.0.0"})   # 白名单外：落盘
 
     disk = json.loads(path.read_text(encoding="utf-8"))
-    disk["settings"]["language"] = "en_US"
+    disk["server_config"]["skip_version"] = "3.0.0"   # 别的实例又写了一次
     path.write_text(json.dumps(disk), encoding="utf-8")
     store.reload()
 
-    assert store.get_node("settings") == {"env": "android", "language": "en_US"}
+    # 本实例的临时选择保留，磁盘上别人的改动照常刷新进来
+    assert store.get_active("env") == "android"
+    assert store.get_node("server_config")["skip_version"] == "3.0.0"
 
 
 def test_readonly_instance_keeps_batch_drafts_but_not_active_group(

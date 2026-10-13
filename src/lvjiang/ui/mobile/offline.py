@@ -177,8 +177,8 @@ class OfflineControlPage(QWidget):
         manager = getattr(self._host, "user_manager", None)
         if manager is not None:
             return str(manager.get_active_user_name() or "")
-        from ...core.config.session import get_session_store
-        return str(get_session_store().get_active("user", "") or "")
+        from ...core.config.interface import get_interface_store
+        return str(get_interface_store().get_active("user", "") or "")
 
     def _run(self, action: str) -> None:
         if action == "sync":

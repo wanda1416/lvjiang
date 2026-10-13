@@ -18,8 +18,6 @@ from enum import Enum
 
 from loguru import logger
 
-from ..config.interface import get_interface_store
-
 
 class ConsentState(str, Enum):
     UNKNOWN = ""
@@ -33,16 +31,15 @@ class NetFeature(str, Enum):
     TELEMETRY = "telemetry"
 
 
-def _telemetry_state_node() -> dict:
-    server = get_interface_store().get_node("server_config", {})
-    if not isinstance(server, dict):
-        return {}
-    node = server.get("telemetry")
+def _network_node() -> dict:
+    """读「网络与隐私」的开关节点（session.json settings.network）。"""
+    from ..config import load_settings
+    node = load_settings().get("network")
     return node if isinstance(node, dict) else {}
 
 
 def get_consent_state() -> ConsentState:
-    raw = _telemetry_state_node().get("consent", "")
+    raw = _network_node().get("consent", "")
     try:
         return ConsentState(raw)
     except ValueError:
@@ -66,22 +63,17 @@ def needs_prompt() -> bool:
 
 
 def record_consent_choice(granted: bool) -> None:
-    """记录首启弹窗的选择：写三态 bookkeeping，并同步落地为实际开关。
+    """记录首启弹窗的选择：写三态记录，并同步落地为实际开关。
 
-    必须在主线程调用（写 SessionStore）。
+    记录属于「网络与隐私」里的用户选择，和开关同节点（settings.network），
+    整份回写时由 ``NetworkConfig`` 的字段一起带上。必须在主线程调用（写
+    SessionStore）。
     """
-    from .settings import set_telemetry_enabled
+    from .settings import set_consent_record, set_telemetry_enabled
 
-    def _merge(existing):
-        existing = existing if isinstance(existing, dict) else {}
-        server = existing if isinstance(existing, dict) else {}
-        node = dict(server.get("telemetry") or {})
-        node["consent"] = ConsentState.GRANTED.value if granted else ConsentState.DENIED.value
-        node["consent_at"] = datetime.now(timezone.utc).isoformat()
-        server["telemetry"] = node
-        return server
-
-    get_interface_store().mutate_node("server_config", _merge)
+    set_consent_record(
+        ConsentState.GRANTED.value if granted else ConsentState.DENIED.value,
+        datetime.now(timezone.utc).isoformat())
     # set_telemetry_enabled 负责：写 settings.network.telemetry + 生成/清除本地标识与缓冲
     set_telemetry_enabled(granted)
     logger.info(

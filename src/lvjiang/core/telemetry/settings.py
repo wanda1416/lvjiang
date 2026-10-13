@@ -29,6 +29,18 @@ def set_network_feature(feature: str, value: bool) -> None:
     _save_network(network)
 
 
+def set_consent_record(state: str, recorded_at: str) -> None:
+    """记录用户在「网络与隐私」里做过的同意/拒绝选择及其时间。
+
+    与开关同节点：两者是一件事的两面（开关表当前是否上报，记录表"问过没有"），
+    整份回写 ``network`` 时由 ``NetworkConfig`` 的字段一起带上，不会互相覆盖。
+    """
+    network = _current_network_dict()
+    network["consent"] = state
+    network["consent_at"] = recorded_at
+    _save_network(network)
+
+
 def set_telemetry_enabled(value: bool) -> None:
     """开关统计功能：关闭时清除临时缓冲与标识，开启时补生成标识。
 

@@ -67,8 +67,8 @@ def save_user_auto_tuning_config(
 
 
 def active_username() -> str:
-    """返回 session 中当前用户的稳定用户名。"""
-    from ....core.config.session import get_session_store
+    """返回当前实例选中的用户（interface.json 的 actives.user）。"""
+    from ....core.config.interface import get_interface_store
 
-    value = get_session_store().get_active("user", "")
+    value = get_interface_store().get_active("user", "")
     return value if isinstance(value, str) else ""

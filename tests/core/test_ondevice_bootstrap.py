@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import pytest
 
 from lvjiang import constants
-from lvjiang.core.config.session import get_session_store, reset_session_store
+from lvjiang.core.config.interface import get_interface_store
+from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.ondevice import bootstrap, offline, task_runner, user_settings
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.profile import repository
@@ -71,12 +72,12 @@ def test_never_synced_phone_has_default_user_empty_database_and_can_start_task(p
 
 def test_phone_user_creation_and_attributes_do_not_switch_execution_user_or_overwrite_parameters(phone):
     assert json.loads(user_settings.create_user("second"))["ok"]
-    assert get_session_store().get_active("user") == "default"
+    assert get_interface_store().get_active("user") == "default"
     set_user_workflow_params("second", "task", {"keep": True})
     assert json.loads(user_settings.save_attributes("second", '{"角色":"示例"}', "{}"))["ok"]
     assert json.loads(user_settings.get_user("second"))["attributes"] == {"角色": "示例"}
     assert get_user_workflow_params("second", "task") == {"keep": True}
-    assert get_session_store().get_active("user") == "default"
+    assert get_interface_store().get_active("user") == "default"
     task_runner._STATE.begin("sample", "Sample")
     assert not json.loads(user_settings.create_user("third"))["ok"]
     assert not json.loads(user_settings.save_attributes("second", "{}", "{}"))["ok"]

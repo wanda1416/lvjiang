@@ -22,8 +22,8 @@ from loguru import logger
 
 from ..constants import SESSION_CONFIG_DIR
 from ..i18n import tr
+from .config.interface import get_interface_store
 from .config.resolver import get_resolver
-from .config.session import get_session_store
 from .key_validation import validate_layout_activation_keys
 from .layout_config import (
     DEFAULT_ASPECT_TOLERANCE,
@@ -1102,15 +1102,15 @@ class LayoutConfigManager:
         self.last_save_error = ""
 
     def _load_config(self) -> dict:
-        """从 session.json 读 actives.layout。
+        """从 interface.json 读 actives.layout。
 
-        layout_manager 只管理激活布局，不触碰 session.json 其他节点。
+        layout_manager 只管理激活布局，不触碰 interface.json 其他节点。
         """
-        return {"active_layout": get_session_store().get_active("layout", "")}
+        return {"active_layout": get_interface_store().get_active("layout", "")}
 
     def _save_config(self):
         """保存 actives.layout。"""
-        get_session_store().set_active(
+        get_interface_store().set_active(
             "layout", self._config.get("active_layout", ""))
 
     def _reload_config(self):

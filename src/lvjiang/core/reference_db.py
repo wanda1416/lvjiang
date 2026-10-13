@@ -193,7 +193,7 @@ class ReferenceDatabase:
         self._local_spaces_dir_override = (
             Path(local_spaces_dir) if local_spaces_dir else None)
         self._session_path_override = Path(session_path) if session_path else None
-        self._session_store_cache = None  # 仅 session_path override 时使用的独立 store
+        self._interface_store_cache = None  # 仅 session_path override 时使用的独立 store
         # 空间状态
         self._spaces: list[str] = []
         self._system_spaces: set[str] = set()  # system 层扫出的系统空间
@@ -257,12 +257,12 @@ class ReferenceDatabase:
         return get_resolver().local_dir / "references"
 
     @property
-    def session_path(self) -> Path:
-        """激活空间持久化位置（session.json）"""
+    def active_space_path(self) -> Path:
+        """激活空间（actives.space）的持久化位置：interface.json。"""
         if self._session_path_override is not None:
-            return self._session_path_override
-        from lvjiang import constants
-        return constants.SESSION_PATH
+            return self._session_path_override.with_name("interface.json")
+        from lvjiang.core.config.interface import interface_path
+        return interface_path()
 
 
     def _is_dev(self) -> bool:
@@ -337,24 +337,29 @@ class ReferenceDatabase:
         else:
             logger.info(f"空间名册已作废（空间改为扫描目录得出），可删除: {legacy}")
 
-    def _get_session_store(self):
-        """session.json 读写入口：缺省路径用全局单例，override 时用独立实例（测试隔离）"""
+    def _get_interface_store(self):
+        """激活空间（actives.space）的读写入口。
+
+        缺省路径用全局单例；``session_path`` 覆盖时按同目录的 interface.json
+        建独立实例，测试之间互不干扰。
+        """
         if self._session_path_override is not None:
-            if self._session_store_cache is None:
-                from lvjiang.core.config.session import SessionStore
-                self._session_store_cache = SessionStore(self._session_path_override)
-            return self._session_store_cache
-        from lvjiang.core.config.session import get_session_store
-        return get_session_store()
+            if self._interface_store_cache is None:
+                from lvjiang.core.config.interface import InterfaceStore
+                self._interface_store_cache = InterfaceStore(
+                    self._session_path_override.with_name("interface.json"))
+            return self._interface_store_cache
+        from lvjiang.core.config.interface import get_interface_store
+        return get_interface_store()
 
     def _read_session_active_space(self) -> str:
-        """读取 actives.space。"""
-        value = self._get_session_store().get_active("space")
+        """读取 actives.space（interface.json）。"""
+        value = self._get_interface_store().get_active("space")
         return str(value) if value else ""
 
     def _write_session_active_space(self, name: str) -> None:
-        """写 actives.space。"""
-        self._get_session_store().set_active("space", name)
+        """写 actives.space（interface.json）。"""
+        self._get_interface_store().set_active("space", name)
 
     def _resolve_space(self) -> None:
         """解析激活空间：session.json → DEFAULT_SPACE → 首个 → DEFAULT_SPACE"""

@@ -30,6 +30,7 @@ from uuid import uuid4
 
 from loguru import logger
 
+from .interface import get_interface_store
 from .session import get_session_store
 
 _PLANS_NODE = "plans"
@@ -212,12 +213,12 @@ def save_plans(plans: Sequence[Plan]) -> None:
 
 def get_active_plan_id() -> str:
     """当前选中的方案 id；空串表示「自定义」。"""
-    value = get_session_store().get_active("plan", "")
+    value = get_interface_store().get_active("plan", "")
     return value if isinstance(value, str) else ""
 
 
 def set_active_plan_id(plan_id: str) -> None:
-    get_session_store().set_active("plan", plan_id or "")
+    get_interface_store().set_active("plan", plan_id or "")
 
 
 def get_active_plan() -> Plan | None:

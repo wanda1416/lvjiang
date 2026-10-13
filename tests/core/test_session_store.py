@@ -71,27 +71,8 @@ class TestNodeOps:
         assert store.get_node("daily") == {"list": [1, 2]}
 
 
-class TestActives:
-    def test_round_trip(self, tmp_path):
-        path = tmp_path / "session.json"
-        store = SessionStore(path)
-
-        assert store.get_active("plan", "") == ""
-
-        store.set_active("plan", "7f3a")
-
-        data = json.loads(path.read_text(encoding="utf-8"))
-        assert data["actives"] == {"plan": "7f3a"}
-
-    def test_unknown_active_kind_still_rejected(self, tmp_path):
-        store = SessionStore(tmp_path / "session.json")
-
-        with pytest.raises(KeyError):
-            store.get_active("没这个东西")
-        with pytest.raises(KeyError):
-            store.set_active("没这个东西", "x")
-
-
+# actives（当前在用哪个）属于状态层，读写已归 InterfaceStore，见
+# tests/core/test_interface_store.py::TestActives。
 class TestDiskSemantics:
 
     def test_corrupt_file_treated_as_empty(self, tmp_path):

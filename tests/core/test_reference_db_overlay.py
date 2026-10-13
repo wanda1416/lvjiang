@@ -296,6 +296,7 @@ def space_env(tmp_path, monkeypatch):
         "local_ref": local_root / "references",
         "legacy_roster": local_root / "references.yaml",
         "session": session,
+        "interface": session.with_name("interface.json"),
     }
 
 
@@ -341,10 +342,10 @@ class TestReferenceSpaces:
         assert db.get_spaces()[0] == "AAA"
         assert db.get_active_space() == DEFAULT_SPACE
 
-    def test_active_space_from_session(self, space_env):
+    def test_active_space_from_interface(self, space_env):
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
-        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
-        space_env["session"].write_text(
+        space_env["interface"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["interface"].write_text(
             json.dumps({"actives": {"space": "空间A"}}), encoding="utf-8")
         db = ReferenceDatabase(dev_mode=False)
         assert db.get_active_space() == "空间A"
@@ -352,9 +353,9 @@ class TestReferenceSpaces:
     def test_active_space_missing_or_invalid_falls_back_default(self, space_env):
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         db = ReferenceDatabase(dev_mode=False)
-        assert db.get_active_space() == DEFAULT_SPACE  # 无 session
-        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
-        space_env["session"].write_text(
+        assert db.get_active_space() == DEFAULT_SPACE  # 无记录
+        space_env["interface"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["interface"].write_text(
             json.dumps({"actives": {"space": "不存在"}}), encoding="utf-8")
         db2 = ReferenceDatabase(dev_mode=False)
         assert db2.get_active_space() == DEFAULT_SPACE  # 非法回退 DEFAULT_SPACE
@@ -371,23 +372,23 @@ class TestReferenceSpaces:
         db.load()
         assert [e.label for e in db.entries] == ["乙"]
 
-    def test_set_active_space_persists_session(self, space_env):
-        """切换写 session.json（保留其他字段）；非法名拒绝"""
+    def test_set_active_space_persists_interface(self, space_env):
+        """切换写 interface.json（保留其他字段）；非法名拒绝"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
-        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
-        space_env["session"].write_text(
+        space_env["interface"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["interface"].write_text(
             json.dumps({"actives": {"user": "tester"}}), encoding="utf-8")
         db = ReferenceDatabase(dev_mode=False)
         assert db.set_active_space("幽灵") is False  # 未扫到的空间拒绝
         assert db.set_active_space("空间A") is True
-        data = json.loads(space_env["session"].read_text(encoding="utf-8"))
+        data = json.loads(space_env["interface"].read_text(encoding="utf-8"))
         assert data["actives"] == {"space": "空间A", "user": "tester"}
 
     def test_save_writes_active_space_yaml(self, space_env):
         """dev 模式 save 落盘到激活空间的 yaml"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
-        space_env["session"].parent.mkdir(parents=True, exist_ok=True)
-        space_env["session"].write_text(
+        space_env["interface"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["interface"].write_text(
             json.dumps({"actives": {"space": "空间A"}}), encoding="utf-8")
         db = ReferenceDatabase(dev_mode=True)
         img = np.zeros((2, 2, 3), dtype=np.uint8)
@@ -492,7 +493,7 @@ class TestDeleteSpace:
         assert db.delete_space("../系统") is False  # 路径穿越被空间名校验拦下
 
     def test_deleting_active_space_switches_and_reloads(self, space_env):
-        """删的是激活空间：自动改激活、写 session、重载条目"""
+        """删的是激活空间：自动改激活、写 interface、重载条目"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
         _write_yaml(space_env["system_ref"] / f"{DEFAULT_SPACE}.yaml",
                     {"version": 1, "references": [_entry("A.png", "甲")]})
@@ -505,7 +506,7 @@ class TestDeleteSpace:
         assert db.delete_space("空间A") is True
         assert db.get_active_space() == DEFAULT_SPACE
         assert [e.label for e in db.entries] == ["甲"]  # 已重载到新激活空间
-        data = json.loads(space_env["session"].read_text(encoding="utf-8"))
+        data = json.loads(space_env["interface"].read_text(encoding="utf-8"))
         assert data["actives"]["space"] == DEFAULT_SPACE
         assert "active_space" not in data
 

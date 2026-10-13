@@ -4,7 +4,7 @@ import json
 import pytest
 
 from lvjiang import constants
-from lvjiang.core.config.session import get_session_store
+from lvjiang.core.config.interface import get_interface_store
 from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
 from lvjiang.core.ondevice import task_runner, task_settings
 from lvjiang.core.user_config import (
@@ -24,7 +24,7 @@ def editor(tmp_path, monkeypatch):
     monkeypatch.setattr(task_settings, "_adapter", lambda _task: None)
     for name in ("runner", "editor"):
         save_user_metadata(User(name), constants.USERS_DIR)
-    get_session_store().set_active("user", "runner")
+    get_interface_store().set_active("user", "runner")
     definitions = [
         {"name": "claim", "label": "领奖", "type": "bool", "default": True},
         {"name": "limit", "type": "number", "default": 10, "min": 1, "max": 20, "require": "$claim"},
@@ -60,7 +60,7 @@ def test_edit_user_isolated_and_saved_values_are_used_on_reload(editor):
     assert "text" not in preview["visible"]
     values = {**view["values"], "limit": "15", "mode": "b", "items": {"x": False, "y": True}, "text": "示例文本"}
     assert _save(view, values)["ok"]
-    assert get_session_store().get_active("user") == "runner"
+    assert get_interface_store().get_active("user") == "runner"
     assert get_user_workflow_params("runner", "sample") is None
     assert get_wf_config("sample") == {"limit": 12, "desktop": 7}
     loaded = _get()
@@ -121,7 +121,7 @@ def test_restore_shared_only_changes_selected_user_and_task(editor):
     assert _save(_get(), {}, reset=True)["ok"]
     assert _get()["source"] == "global" and _get()["values"]["limit"] == 12
     assert get_user_workflow_params("editor", "other") == {"keep": True}
-    assert get_session_store().get_active("user") == "runner"
+    assert get_interface_store().get_active("user") == "runner"
 
 
 def test_tuning_adapter_keeps_execution_user_and_desktop_parameters(editor, monkeypatch):
@@ -140,7 +140,7 @@ def test_tuning_adapter_keeps_execution_user_and_desktop_parameters(editor, monk
     assert result["ok"], result
     assert get_user_workflow_params("editor", "auto_tuning")["skip_tuning"] is True
     assert get_user_workflow_params("runner", "auto_tuning") is None
-    assert get_session_store().get_active("user") == "runner"
+    assert get_interface_store().get_active("user") == "runner"
     view = json.loads(task_settings.get_settings("editor", "auto_tuning"))
     assert not json.loads(task_settings.save_settings("editor", "auto_tuning", view["token"], "{}", True))["ok"]
 

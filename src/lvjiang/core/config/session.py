@@ -30,23 +30,19 @@ from loguru import logger
 
 from ..fs_util import atomic_write_text
 
-#: session.json 文档格式版本。v2 即 0.12.0 起的结构（users 为用户名列表、
-#: 激活项集中在 actives）；没有该字段的文档在首次写入时补上。
-SESSION_VERSION = 2
-
-# 合法的激活项 kind。plan 是机器级方案（图库+环境+布局+模式的组合）。
-_ACTIVE_KINDS = frozenset({"user", "layout", "space", "plan"})
+#: session.json 文档格式版本。v3 起 session 只放配置与事实：当前选择（用户、
+#: 布局、图库空间、工作环境、日常脚本、连接方案）已移到 interface.json 的
+#: actives，统计同意记录归入 settings.network；没有该字段的文档首次写入时补上。
+SESSION_VERSION = 3
 
 # 只读实例仅隔离会改变“当前实例正在使用什么”的选择状态。未列出的节点和
 # 字段仍按普通 SessionStore 语义持锁、合并并原子落盘。
 #
 # 每个元组表示一棵完整的临时子树。名单必须保持窄小；新增 Session 字段默认
-# 可写，只有确认属于实例私有选择时才允许加入这里。
-READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset({
-    ("actives",),
-    ("settings", "env"),
-    ("daily", "workflow_id"),
-})
+# 可写，只有确认属于实例私有选择时才允许加入这里。session.json 现在只剩配置
+# 与事实，没有实例私有选择，所以这里是空的——那类状态（actives）已随新归属
+# 落到 InterfaceStore.TRANSIENT_PATHS。
+READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset()
 
 _MISSING = object()
 
@@ -259,31 +255,6 @@ class SessionStore:
         self._mutate_disk(_consume, stamp_version=False)
         return consumed
 
-    # ─── 激活项（actives）─────────────────────────────────
-
-    def get_active(self, kind: str, default: Any = None) -> Any:
-        """读取 ``actives.<kind>``。"""
-        if kind not in _ACTIVE_KINDS:
-            raise KeyError(f"unknown active kind: {kind}")
-        with self._thread_lock:
-            actives = self._data.get("actives")
-            if isinstance(actives, dict) and kind in actives:
-                return deepcopy(actives[kind])
-            return default
-
-    def set_active(self, kind: str, value: Any) -> None:
-        """写入一个激活项。"""
-        if kind not in _ACTIVE_KINDS:
-            raise KeyError(f"unknown active kind: {kind}")
-
-        def _set(data: dict) -> None:
-            current = data.get("actives")
-            actives = deepcopy(current) if isinstance(current, dict) else {}
-            actives[kind] = deepcopy(value)
-            data["actives"] = actives
-
-        self._mutate_disk(_set)
-
     def reload(self):
         """重新读盘；只读实例保留白名单中的本实例临时选择。"""
         with self._thread_lock:
@@ -340,11 +311,14 @@ def save_settings(settings: dict[str, Any]) -> None:
 
 
 def load_env() -> str:
-    """读取当前工作环境（session.json 的 settings.env 节点）
+    """读取当前工作环境（interface.json 的 actives.env）
 
-    无配置时取 app.yaml envs 列表第一项，保证与默认连接方案对应。
+    它是「当前在用哪个环境」的选择，丢了重选一次即可，所以和界面状态一起
+    存在 interface.json。无记录时取 app.yaml envs 列表第一项，保证与默认
+    连接方案对应。
     """
-    value = load_settings().get("env")
+    from .interface import get_interface_store
+    value = get_interface_store().get_active("env", "")
     if isinstance(value, str) and value:
         return value
     from .resolver import load_available_envs
@@ -353,9 +327,6 @@ def load_env() -> str:
 
 
 def save_env(env: str) -> None:
-    """保存工作环境到 session.json 的 settings.env 节点
-
-    ⚠️ 走 update_node 浅合并，禁止 load+set_node：后者会把读盘到写盘之间
-    别的组件写进 settings 的内容整体覆盖掉。
-    """
-    get_session_store().update_node("settings", {"env": env})
+    """把工作环境记进 interface.json 的 actives.env。"""
+    from .interface import get_interface_store
+    get_interface_store().set_active("env", env)

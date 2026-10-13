@@ -21,11 +21,15 @@ def bundle(tmp_path, monkeypatch):
     (session / "users").mkdir(parents=True)
     (session / "users/tester.json").write_text('{}')
     (session / "session.json").write_text(json.dumps({
-        "version": 2, "actives": {"user": "other", "layout": "desktop"},
-        "settings": {"env": "desktop", "ai": {
+        "version": 2,
+        "settings": {"ai": {
             "base_url": "https://example.invalid/v1", "model": "test-model", "timeout": 30,
         }},
-        "profile": {"alert_history": {"tester:demo": "now"}},
+    }))
+    (session / "interface.json").write_text(json.dumps({
+        "version": 1,
+        "actives": {"user": "other", "layout": "desktop", "env": "desktop"},
+        "alert_history": {"tester:demo": "now"},
     }))
     (source / "config/local/diagnostics").mkdir(parents=True)
     (source / "config/local/diagnostics/private.log").write_text("excluded")
@@ -55,15 +59,16 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     install_offline_bundle(archive, phone)
 
     pc_session = json.loads((source / "config/session/session.json").read_text())
-    assert pc_session["actives"] == {"user": "other", "layout": "desktop"}
-    assert pc_session["settings"]["env"] == "desktop"
+    pc_interface = json.loads((source / "config/session/interface.json").read_text())
+    assert pc_interface["actives"] == {
+        "user": "other", "layout": "desktop", "env": "desktop"}
     session = json.loads((phone / "config/session/session.json").read_text())
-    assert session["actives"] == {"user": "tester", "layout": "android"}
-    assert session["settings"]["env"] == "android"
-    assert session["settings"]["ai"] == pc_session["settings"]["ai"]
     interface = json.loads((phone / "config/session/interface.json").read_text())
+    assert interface["actives"] == {
+        "user": "tester", "layout": "android", "env": "android"}
+    assert session["settings"]["ai"] == pc_session["settings"]["ai"]
     assert interface["alert_history"] == {"tester:demo": "now"}
-    assert "profile" not in session
+    assert "actives" not in session
     for name in ("profile.db", "tuning_history.db"):
         with closing(sqlite3.connect(phone / "config/session" / name)) as db:
             assert db.execute("SELECT value FROM entries").fetchone() == (7,)
@@ -229,7 +234,7 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     source, _ = bundle
     pc = source / "config/session"
     (pc / "session.json").write_text(json.dumps({"users": ["tester"], "wf_configs": {
-        "existing": {"pc": True}, "new": {"new": True}}, "actives": {"user": "tester"}}))
+        "existing": {"pc": True}, "new": {"new": True}}}))
     (pc / "users/tester.json").write_text(json.dumps({"attributes": {"role": "pc"}, "workflow_params": {
         "existing": {"pc": True}, "new": {"new": True}}}))
     archive = tmp_path / "keep.zip"
@@ -237,9 +242,11 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     phone = tmp_path / "phone"
     users = phone / "config/session/users"
     users.mkdir(parents=True)
-    old_session = {"users": ["tester", "phone_only"], "wf_configs": {"existing": {"phone": True}},
-                   "actives": {"user": "phone_only", "layout": "other"}}
+    old_session = {"users": ["tester", "phone_only"],
+                   "wf_configs": {"existing": {"phone": True}}}
     (users.parent / "session.json").write_text(json.dumps(old_session))
+    (users.parent / "interface.json").write_text(json.dumps({
+        "actives": {"user": "phone_only", "layout": "other"}}))
     for name in old_session["users"]:
         (users / f"{name}.json").write_text(json.dumps({"username": name, "attributes": {"role": "phone"},
                                                        "workflow_params": {"existing": {"phone": True}}}))
@@ -248,7 +255,9 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     session = json.loads((users.parent / "session.json").read_text())
     assert session["users"] == ["tester", "phone_only"]
     assert session["wf_configs"] == {"existing": {"phone": True}, "new": {"new": True}}
-    assert session["actives"] == {"user": "phone_only", "layout": "android"}
+    interface = json.loads((users.parent / "interface.json").read_text())
+    assert interface["actives"] == {
+        "user": "phone_only", "layout": "android", "env": "android"}
     user = json.loads((users / "tester.json").read_text())
     assert user["attributes"] == {"role": "pc"}
     assert user["workflow_params"] == {"existing": {"phone": True}, "new": {"new": True}}

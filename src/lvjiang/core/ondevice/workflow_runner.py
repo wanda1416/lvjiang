@@ -20,8 +20,8 @@ from loguru import logger
 
 from ...core.capture_base import CaptureBackend
 from ...core.config import load_user_config
+from ...core.config.interface import get_interface_store
 from ...core.config.resolver import get_resolver
-from ...core.config.session import get_session_store
 from ...core.input_base import InputBackend
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
@@ -58,7 +58,7 @@ def _default_layout_name() -> str:
     """
     from ..layout_config import load_layout_entries
     keys = list(load_layout_entries())
-    name = get_session_store().get_active("layout", "")
+    name = get_interface_store().get_active("layout", "")
     if name:
         if name not in keys:
             raise RuntimeError(tr("当前 active_layout 不存在：{name}").format(name=name))

@@ -3,8 +3,40 @@ import json
 
 import pytest
 
-from lvjiang.core.config.interface import InterfaceStore
+from lvjiang.core.config.interface import INTERFACE_VERSION, InterfaceStore
 from lvjiang.core.config.session import SessionStore
+
+
+class TestActives:
+    """激活项（当前在用哪个用户/布局/空间/环境/方案）存在 interface.json。"""
+
+    def test_round_trip(self, tmp_path):
+        path = tmp_path / "interface.json"
+        store = InterfaceStore(path)
+
+        assert store.get_active("plan", "") == ""
+
+        store.set_active("plan", "7f3a")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["actives"] == {"plan": "7f3a"}
+
+    def test_env_and_daily_workflow_are_active_kinds(self, tmp_path):
+        store = InterfaceStore(tmp_path / "interface.json")
+
+        store.set_active("env", "android")
+        store.set_active("daily_workflow", "auto_tuning")
+
+        assert store.get_active("env") == "android"
+        assert store.get_active("daily_workflow") == "auto_tuning"
+
+    def test_unknown_active_kind_still_rejected(self, tmp_path):
+        store = InterfaceStore(tmp_path / "interface.json")
+
+        with pytest.raises(KeyError):
+            store.get_active("没这个东西")
+        with pytest.raises(KeyError):
+            store.set_active("没这个东西", "x")
 
 
 def test_migration_moves_only_owned_nodes_and_never_falls_back_again(tmp_path, monkeypatch):
@@ -69,7 +101,8 @@ def test_migration_write_failure_preserves_source_and_cleanup_can_resume(tmp_pat
         with pytest.raises(OSError, match="cleanup"):
             InterfaceStore(target)
     assert source.read_bytes() == old_bytes
-    assert json.loads(target.read_text())["migration"]["version"] == 1
+    assert (json.loads(target.read_text())["migration"]["version"]
+            == INTERFACE_VERSION)
     assert InterfaceStore(target).get_node("alert_history") == {"test": "now"}
     assert json.loads(source.read_text()) == {"settings": {"keep": True}}
     assert "migration" not in json.loads(target.read_text())

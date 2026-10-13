@@ -15,12 +15,23 @@ from tests.case_matrix import case_matrix
 
 
 class TestNetworkRoundTrip:
-    @case_matrix("name", [f.name for f in fields(NetworkConfig)])
+    @case_matrix("name", [
+        f.name for f in fields(NetworkConfig)
+        if f.name not in ("consent", "consent_at")
+    ])
     def test_every_field_survives_round_trip(self, name):
         """逐字段参数化：将来加新开关，漏同步会直接红在这里。"""
         flipped = not getattr(NetworkConfig(), name)
         config = UserConfig(network={name: flipped})
         assert getattr(config.network, name) is flipped
+
+    def test_consent_record_survives_round_trip(self):
+        """同意记录是「问过没有」的三态字符串，不能被布尔化掉。"""
+        config = UserConfig(network={
+            "consent": "granted", "consent_at": "2026-01-01T00:00:00+00:00"})
+
+        assert config.network.consent == "granted"
+        assert config.network.consent_at == "2026-01-01T00:00:00+00:00"
 
 
     def test_unknown_keys_ignored(self):

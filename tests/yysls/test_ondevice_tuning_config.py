@@ -27,6 +27,7 @@ from lvjiang.core.user_config import (
 def session_path(tmp_path, monkeypatch):
     """core SessionStore → tmp_path 隔离实例；ensure_loaded → 空操作"""
     import lvjiang.constants as constants_mod
+    import lvjiang.core.config.interface as interface_mod
     import lvjiang.core.config.session as store_mod
     path = tmp_path / "session.json"
     users_dir = tmp_path / "users"
@@ -36,7 +37,7 @@ def session_path(tmp_path, monkeypatch):
     save_user_metadata(User(name="测试用户"), users_dir)
     store = store_mod.get_session_store()
     store.set_node("users", ["测试用户"])
-    store.set_active("user", "测试用户")
+    interface_mod.get_interface_store().set_active("user", "测试用户")
     monkeypatch.setattr(plugins_module, "ensure_loaded", lambda *_args: None)
     return path
 

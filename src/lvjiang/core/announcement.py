@@ -276,6 +276,9 @@ def fetch_announcement_manifest(
     timeout: float = 5.0,
 ) -> AnnouncementFetchResult:
     """从固定 GitHub Pages 地址获取公告，支持 ETag/304。"""
+    from .telemetry.consent import is_offline_mode
+    if is_offline_mode():
+        raise AnnouncementNetworkError("当前为离线模式，请关闭离线模式后刷新公告")
     req = Request(ANNOUNCEMENT_URL)
     req.add_header("Accept", "application/json")
     req.add_header("User-Agent", "lvjiang-announcement-checker")

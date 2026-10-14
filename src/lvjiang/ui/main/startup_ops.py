@@ -22,6 +22,10 @@ class StartupOpsMixin:
         from ...core.access import is_readonly
         if is_readonly():
             return  # 启动公告/同意/在线安装的持久化状态归主节点。
+        from ...core.telemetry.consent import NetFeature, is_network_feature_enabled
+        if not is_network_feature_enabled(NetFeature.ANNOUNCEMENT):
+            self._start_update_check_on_startup()
+            return
         from ...core.announcement import (
             AnnouncementFetchResult,
             applicable_notices,
@@ -62,6 +66,10 @@ class StartupOpsMixin:
 
     def _start_update_check_on_startup(self):
         """公告检查完成后执行原有的静默版本检查，再串上统计的同意提示与上报。"""
+        from ...core.telemetry.consent import NetFeature, is_network_feature_enabled
+        if not is_network_feature_enabled(NetFeature.UPDATE):
+            self._continue_after_update_check()
+            return
         from ...core.update import should_prompt_update
         from ..background.update import UpdateChecker
 

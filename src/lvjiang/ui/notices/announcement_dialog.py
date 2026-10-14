@@ -52,6 +52,7 @@ class AnnouncementDialog(QDialog):
         self._checker: AnnouncementChecker | None = None
         self._setup_ui(allow_refresh)
         self.set_manifest(manifest, notices)
+        self._update_refresh_access()
 
     @property
     def manifest(self) -> AnnouncementManifest | None:
@@ -183,9 +184,19 @@ class AnnouncementDialog(QDialog):
         if url.scheme().lower() == "https" and url.host():
             QDesktopServices.openUrl(url)
 
+    def _update_refresh_access(self) -> bool:
+        from ...core.telemetry.consent import is_offline_mode
+        allowed = not is_offline_mode()
+        self._refresh_btn.setEnabled(allowed)
+        self._refresh_btn.setToolTip("" if allowed else tr("离线模式下可查看缓存，暂不联网刷新"))
+        return allowed
+
     def refresh(self) -> None:
         """异步刷新公告；失败时保留现有缓存内容。"""
         if self._checker is not None and self._checker.isRunning():
+            return
+        if not self._update_refresh_access():
+            self._status_label.setText(tr("当前为离线模式，仅显示本地公告缓存"))
             return
         self._refresh_btn.setEnabled(False)
         self._refresh_btn.setText(tr("获取中..."))
@@ -201,13 +212,13 @@ class AnnouncementDialog(QDialog):
     def _on_refresh_finished(self, result: AnnouncementFetchResult) -> None:
         self._checker = None
         cache_manifest(result.manifest, result.etag)
-        self._refresh_btn.setEnabled(True)
+        self._update_refresh_access()
         self._refresh_btn.setText(tr("重新获取"))
         self.set_manifest(result.manifest)
 
     def _on_refresh_error(self, message: str) -> None:
         self._checker = None
-        self._refresh_btn.setEnabled(True)
+        self._update_refresh_access()
         self._refresh_btn.setText(tr("重新获取"))
         if self._manifest is None:
             self._status_label.setText(message)

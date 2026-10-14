@@ -18,6 +18,10 @@ class AnnouncementChecker(QThread):
         self._etag = announcement.get_cached_etag()
 
     def run(self):
+        from ...core.telemetry.consent import is_offline_mode
+        if is_offline_mode():
+            self.error.emit(tr("当前为离线模式，请关闭离线模式后刷新公告"))
+            return
         try:
             self.finished.emit(announcement.fetch_announcement_manifest(
                 etag=self._etag,

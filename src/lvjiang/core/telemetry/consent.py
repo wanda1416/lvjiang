@@ -81,15 +81,20 @@ def record_consent_choice(granted: bool) -> None:
         "[telemetry] 用户" + ("同意" if granted else "拒绝") + "参与匿名数据收集")
 
 
-def is_network_feature_enabled(feature: NetFeature) -> bool:
-    """三条网络行为的统一闸门：离线模式总闸 → 分项开关。"""
+def is_offline_mode() -> bool:
+    """用户设置或环境变量启用离线模式时，自动与手动请求均停止。"""
     import os
-    if os.environ.get("LVJIANG_OFFLINE") == "1":
+
+    from ..config import load_user_config
+    return os.environ.get("LVJIANG_OFFLINE") == "1" or load_user_config().network.offline
+
+
+def is_network_feature_enabled(feature: NetFeature) -> bool:
+    """离线总闸与分项开关；公告、更新分项只控制启动自动检查。"""
+    if is_offline_mode():
         return False
     from ..config import load_user_config
     network = load_user_config().network
-    if network.offline:
-        return False
     if feature is NetFeature.ANNOUNCEMENT:
         return network.announcement
     if feature is NetFeature.UPDATE:

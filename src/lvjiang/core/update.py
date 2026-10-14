@@ -3,7 +3,7 @@
 提供：
 - 版本号获取（打包/开发环境）
 - GitHub Release 更新检查（后台线程）
-- 跳过版本持久化（用户选择"此版本不再询问"后存储到 session.json 的 server_config 节点）
+- 跳过版本持久化（用户选择"此版本不再询问"后存储到 interface.json 的 server_config 节点）
 """
 from __future__ import annotations
 
@@ -113,10 +113,10 @@ def is_newer_version(latest: str, current: str) -> bool:
         return False
 
 
-# ─── 跳过版本管理（存储于 session.json 的 server_config 节点）────────────
+# ─── 跳过版本管理（存储于 interface.json 的 server_config 节点）────────────
 #
 # ⚠️ 警告：禁止添加旧配置迁移逻辑
-# 本模块已从 config/local/update.json 迁移到 session.json。
+# 本模块只使用 interface.json。
 # 禁止添加读取旧文件的兼容代码。旧配置直接丢弃，不兼容。
 
 
@@ -160,6 +160,9 @@ class UpdateCheckError(RuntimeError):
 
 def fetch_latest_release() -> ReleaseInfo:
     """检查正式发行版本，不依赖线程或 GUI。"""
+    from .telemetry.consent import is_offline_mode
+    if is_offline_mode():
+        raise UpdateCheckError(tr("当前为离线模式，请关闭离线模式后检查更新"))
     try:
         req = Request(GITHUB_API_URL)
         req.add_header("Accept", "application/vnd.github+json")

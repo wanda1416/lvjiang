@@ -77,7 +77,8 @@ def _fetch_bytes(url: str, *, max_bytes: int, timeout: float,
 def is_enabled() -> bool:
     from . import load_user_config
     network = load_user_config().network
-    return bool(network.remote_config) and not network.offline
+    from ..telemetry.consent import is_offline_mode
+    return bool(network.remote_config) and not is_offline_mode()
 
 
 def _installed_store() -> UpdateStore | None:

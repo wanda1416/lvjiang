@@ -34,3 +34,8 @@ session.json、interface.json 不再生成无读取契约的顶层 version；公
 last_checked_at。旧 server_config.remote_config 无消费者，不恢复、不迁移；已有残留
 随其他未知字段原样保留。在线配置版本和安装时间以 UpdateStore 的 state.json 为准。
 数据库 schema 版本、多文档 _meta.json 与事务日志版本仍用于真实校验，不受此清理影响。
+
+## 网络开关
+
+公告和版本更新分项只控制启动自动检查，跳过后继续执行启动链。手动检查不受分项
+限制；用户离线设置或 LVJIANG_OFFLINE=1 同时阻止自动和手动网络请求，公告缓存仍可查看。

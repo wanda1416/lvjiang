@@ -212,6 +212,15 @@ class MenuOpsMixin:
         check_update.triggered.connect(self._check_update)
         help_menu.addAction(check_update)
 
+        def update_network_access():
+            from ...core.telemetry.consent import is_offline_mode
+            offline = is_offline_mode()
+            check_update.setEnabled(not offline)
+            check_update.setToolTip(tr("离线模式下不能检查更新") if offline else "")
+
+        help_menu.aboutToShow.connect(update_network_access)
+        update_network_access()
+
         docs = QAction(tr("文档"), self)
         docs.triggered.connect(self._open_docs)
         help_menu.addAction(docs)
@@ -375,10 +384,13 @@ class MenuOpsMixin:
         """直接检查更新（帮助菜单 → 检查更新）"""
         from PyQt6.QtWidgets import QMessageBox
 
+        from ...core.telemetry.consent import is_offline_mode
         from ...core.update import get_version, is_newer_version
         from ..background.update import UpdateChecker
         from ..notices.update_dialog import UpdateDialog
-
+        if is_offline_mode():
+            QMessageBox.information(self, tr("检查更新"), tr("当前为离线模式，请关闭离线模式后检查更新"))
+            return
         checker = UpdateChecker(self)
 
         def on_finished(release):

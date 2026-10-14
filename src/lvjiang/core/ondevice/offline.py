@@ -112,6 +112,9 @@ def _check_runtime(ocr: bool, screen_repetitions: int) -> str:
         if not 0 <= screen_repetitions <= 10:
             raise ValueError("屏幕 OCR 验收次数必须在 0～10 之间")
         for name in ("fasteners", "numpy", "cv2", "PIL", "yaml", "loguru", "lark",
+                     "cryptography.hazmat.primitives.ciphers.aead",
+                     "cryptography.hazmat.primitives.asymmetric.ed25519",
+                     "lvjiang.core.config.remote",
                      "lvjiang.core.profile.service", "lvjiang.core.ondevice.workflow_runner"):
             importlib.import_module(name)
         stages.append("运行依赖与 Profile 管线加载通过")

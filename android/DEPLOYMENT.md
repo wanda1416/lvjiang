@@ -16,6 +16,8 @@ App 能明确显示连接状态，设备端辅助已开启，并能真实执行�
 - Android SDK Platform 35、Build Tools 34.0.0、Platform Tools；
 - Android NDK 26.1.10909125、CMake 3.22.1（原生 OCR）；
 - Python 3.10 作为 Chaquopy `buildPython`；
+- APK 固定打包 Chaquopy 提供的 `cryptography==42.0.8` Android wheel，用于 Ed25519 验签和 AES-GCM 解密；
+  运行环境检查同时导入这两条密码学入口及在线配置模块，不能只验证 OCR 依赖。
 - 真机已开启开发者选项和 USB 调试，`adb devices -l` 显示 `device`；
 - 正式分发需要本机 `android/keystore.properties`，格式见 `README-signing.md`。
 

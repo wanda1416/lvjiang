@@ -188,6 +188,8 @@ chaquopy {
             install("lark==1.3.1")
             install("fasteners==0.20")
             install("packaging==26.2")
+            // 授权码 Ed25519 验签及会员配置 AES-GCM 解密；使用 Chaquopy 的 Android wheel。
+            install("cryptography==42.0.8")
         }
     }
 

@@ -40,11 +40,12 @@ class _OfflineWorker(QThread):
     progress = pyqtSignal(int, int)
 
     def __init__(self, serial: str, action: str, username: str, layout: str, task_id: str, parent=None,
-                 *, preserve_task_params: bool = True, history_selected: list[str] | None = None):
+                 *, preserve_task_params: bool = True, preserve_batch_config: bool = True, history_selected: list[str] | None = None):
         super().__init__(parent)
         self.serial, self.action = serial, action
         self.username, self.layout, self.task_id = username, layout, task_id
         self.preserve_task_params = preserve_task_params
+        self.preserve_batch_config = preserve_batch_config
         self.history_selected = history_selected or []
 
     def cancel(self) -> None:
@@ -57,17 +58,17 @@ class _OfflineWorker(QThread):
             if self.action == "sync":
                 require_offline_sync_access()
             agent = connect_agent_diagnostic(AdbDevice(self.serial))
-            if agent is None or agent.status.get("offline_protocol") not in (1, 2, 3):
+            if agent is None or agent.status.get("offline_protocol") not in (1, 2, 3, 4):
                 raise RuntimeError(tr("无法连接离线执行接口，请先打开手机 App 并更新 APK"))
             if self.action == "sync":
-                if agent.status.get("offline_protocol") != 3:
-                    raise RuntimeError(tr("请先更新 APK：旧版本不支持保留手机历史与结果"))
+                if agent.status.get("offline_protocol") != 4:
+                    raise RuntimeError(tr("请先更新 APK：旧版本不支持独立保留任务参数和批量配置"))
                 with tempfile.TemporaryDirectory(prefix="lvjiang-offline-sync-") as temp:
                     archive = Path(temp) / "snapshot.zip"
                     build_offline_bundle(PROJECT_ROOT, archive, username=self.username, layout=self.layout)
                     data["operation"] = sync_offline_bundle(
                         agent, archive, cancelled=self.isInterruptionRequested, progress=self.progress.emit,
-                        preserve_task_params=self.preserve_task_params)
+                        preserve_task_params=self.preserve_task_params, preserve_batch_config=self.preserve_batch_config)
             elif self.action == "history":
                 data["history"] = pull_history(
                     agent, PROJECT_ROOT, self.history_selected,
@@ -129,23 +130,33 @@ class OfflineControlPage(QWidget):
         scope = QLabel(tr("下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。"))
         scope.setWordWrap(True)
         sync_layout.addWidget(scope)
-        self.preserve_task_params = QCheckBox(tr("保留手机任务参数与批量配置"))
+        self.preserve_task_params = QCheckBox(tr("保留手机任务参数"))
         self.preserve_task_params.setChecked(True)
-        self.preserve_task_params.setToolTip(tr("保留各用户的任务设置（含自动调律）、手机批量配置和手机独有用户；脚本、布局和 Profile DB 仍更新。"))
-        sync_layout.addWidget(self.preserve_task_params)
+        self.preserve_task_params.setToolTip(tr("保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。"))
+        preservation_row = QHBoxLayout()
+        preservation_row.addWidget(self.preserve_task_params)
+        self.preserve_batch_config = QCheckBox(tr("保留手机批量配置"))
+        self.preserve_batch_config.setChecked(True)
+        self.preserve_batch_config.setToolTip(tr("保留手机整份批量配置组；取消后使用电脑配置组。本次运行草稿仍保留。"))
+        preservation_row.addWidget(self.preserve_batch_config)
+        preservation_row.addStretch()
+        sync_layout.addLayout(preservation_row)
         root.addWidget(sync_group)
         history_group = QGroupBox(tr("回传到电脑"))
         history_layout = QVBoxLayout(history_group)
         history_hint = QLabel(tr("仅合并已结束的手机记录；参数、Profile 和装备数据不回传。重复回传不会重复导入。"))
         history_hint.setWordWrap(True)
         history_layout.addWidget(history_hint)
+        history_row = QHBoxLayout()
         self.history_choices = {}
         for key, label in [(key, channel.label) for key, channel in history_channels().items()] + [("logs", "任务日志")]:
             check = QCheckBox(tr(label))
             check.setChecked(True)
             check.toggled.connect(self._save_history_choices)
             self.history_choices[key] = check
-            history_layout.addWidget(check)
+            history_row.addWidget(check)
+        history_row.addStretch()
+        history_layout.addLayout(history_row)
         self._load_history_choices()
         root.addWidget(history_group)
         execution_group = QGroupBox(tr("远程执行"))
@@ -206,6 +217,7 @@ class OfflineControlPage(QWidget):
         self.task.setEnabled(not busy and not active)
         self.layout_choice.setEnabled(not busy and not active)
         self.preserve_task_params.setEnabled(not busy and not active)
+        self.preserve_batch_config.setEnabled(not busy and not active)
 
     def _history_preferences(self):
         from ...core.config.session import SessionStore
@@ -249,9 +261,14 @@ class OfflineControlPage(QWidget):
             return
         if action == "sync" and QMessageBox.question(
             self, tr("同步到手机"),
-            tr("将更新脚本、布局和用户数据，保留手机任务参数与批量配置及手机独有用户；Profile 仍由 PC 快照覆盖。手机历史、日志和结果保留；回传需单独操作。确认下发？")
-            if self.preserve_task_params.isChecked() else
-            tr("将用 PC 配置和 Profile 替换手机参数、批量配置和用户名册；手机历史、日志和结果保留。回传需单独操作。确认下发？"),
+            "\n".join([
+                tr("将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。"),
+                tr("保留手机任务参数及手机独有用户。") if self.preserve_task_params.isChecked()
+                else tr("用 PC 配置覆盖手机任务参数和用户名册。"),
+                tr("保留手机批量配置。") if self.preserve_batch_config.isChecked()
+                else tr("用 PC 配置覆盖手机批量配置。"),
+                tr("手机历史、日志和结果保留；回传需单独操作。确认下发？"),
+            ]),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
@@ -260,6 +277,7 @@ class OfflineControlPage(QWidget):
             serial, action, self._sync_username() if action == "sync" else str(self.user.currentData() or ""),
             str(self.layout_choice.currentData() or ""), str(self.task.currentData() or ""), self,
             preserve_task_params=self.preserve_task_params.isChecked(),
+            preserve_batch_config=self.preserve_batch_config.isChecked(),
             history_selected=[key for key, check in self.history_choices.items() if check.isChecked()])
         self._worker = worker
         self._track_worker(worker)

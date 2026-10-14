@@ -117,6 +117,7 @@ def _isolate_session_store(tmp_path, monkeypatch):
     from lvjiang.core.config.session import reset_session_store
 
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "session")
+    monkeypatch.setattr(constants, "OUTPUT_DIR", tmp_path / "session" / "output")
     monkeypatch.setattr(
         constants, "SESSION_PATH", tmp_path / "session" / "session.json",
     )

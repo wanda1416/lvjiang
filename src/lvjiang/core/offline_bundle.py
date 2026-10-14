@@ -144,7 +144,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
 
 def install_offline_bundle(
     archive_path: Path, root: Path, *, on_applied: Callable[[], None] | None = None,
-    preserve_task_params: bool = True,
+    preserve_task_params: bool = True, preserve_batch_config: bool = True,
 ) -> dict:
     """校验后交换 config 目录；保留上一份备份，交换失败恢复原配置。"""
     from .access import require_primary_write
@@ -212,6 +212,7 @@ def install_offline_bundle(
                 shutil.copytree(existing, staged_config / "session" / name)
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
+        if preserve_batch_config and target.exists():
             mobile_batch = session_directory(target) / "batch.json"
             if mobile_batch.is_file():
                 shutil.copyfile(mobile_batch, staged_config / "session/batch.json")

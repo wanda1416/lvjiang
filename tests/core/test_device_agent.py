@@ -413,7 +413,7 @@ def test_execution_lease_is_optional_for_legacy_apk(fake):
 def test_execution_lease_releases_connection_after_end_failure(fake):
     def handler(req):
         if req["op"] == "ping":
-            return _status(offline_protocol=1), b""
+            return _status(offline_protocol=4), b""
         if req["op"] == "control_end":
             return {"ok": False, "error": "lease release failed"}, b""
         return {"ok": True}, b""

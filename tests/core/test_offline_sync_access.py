@@ -19,22 +19,24 @@ def test_lv1_sync_explicitly_sends_parameter_preservation_choice(monkeypatch, tm
     archive = tmp_path / "snapshot.zip"
     archive.write_bytes(b"configuration")
     agent = Mock()
-    agent.status = {"offline_protocol": 3}
+    agent.status = {"offline_protocol": 4}
     agent.call.return_value = ({"ok": True}, None)
-    assert offline.sync_offline_bundle(agent, archive) == {"ok": True}
+    assert offline.sync_offline_bundle(agent, archive, preserve_batch_config=False) == {"ok": True}
     assert [call.args[0] for call in agent.call.call_args_list] == [
         "offline_sync_begin", "offline_sync_chunk", "offline_sync_commit",
     ]
     assert agent.call.call_args_list[0].kwargs["preserve_task_params"] is True
+    assert agent.call.call_args_list[0].kwargs["preserve_batch_config"] is False
     agent.reset_mock()
     offline.sync_offline_bundle(agent, archive, preserve_task_params=False)
     assert agent.call.call_args_list[0].kwargs["preserve_task_params"] is False
+    assert agent.call.call_args_list[0].kwargs["preserve_batch_config"] is True
 
 
 def test_old_apk_cannot_silently_ignore_preservation_option(monkeypatch, tmp_path):
     monkeypatch.setattr(offline, "has_feature", lambda _level: True)
     agent = Mock()
-    agent.status = {"offline_protocol": 1}
+    agent.status = {"offline_protocol": 3}
     with pytest.raises(RuntimeError, match="更新 APK"):
         offline.sync_offline_bundle(agent, tmp_path / "not-created.zip")
     agent.call.assert_not_called()

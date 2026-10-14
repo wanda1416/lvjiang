@@ -79,6 +79,7 @@ object AgentServer {
     @Volatile private var pcOwner: Long? = null
     private var uploadFile: File? = null
     private var uploadPreserveTaskParams = true
+    private var uploadPreserveBatchConfig = true
     private var uploadSize = 0L
     private var uploadHash = ""
     private val controlOps = setOf("screenshot", "tap", "long_press", "swipe", "hold_move", "gesture", "key", "shell", "calib_set", "calib_clear", "calib_mark")
@@ -316,7 +317,7 @@ object AgentServer {
 
     private fun status(): JSONObject = JSONObject().apply {
         put("protocol", PROTOCOL_VERSION)
-        put("offline_protocol", 3)
+        put("offline_protocol", 4)
         put("history_protocol", 1)
         put("float_running", FloatService.isRunning)
         put("pc_controlling", pcControlsDevice())
@@ -342,6 +343,7 @@ object AgentServer {
 
     private fun beginSync(req: JSONObject): Pair<JSONObject, ByteArray?> {
         if (localTaskActive() || pcControlsDevice()) return fail("请先结束设备上的任务再同步")
+        if (req.opt("preserve_batch_config") !is Boolean) return fail("请更新 PC：同步必须明确选择是否保留手机批量配置")
         if (req.opt("preserve_task_params") !is Boolean) return fail("请更新 PC：同步必须明确选择是否保留手机任务参数")
         val size = req.getLong("size")
         if (size <= 0 || size > 256L * 1024 * 1024) return fail("同步包大小非法")
@@ -350,6 +352,7 @@ object AgentServer {
         uploadSize = size
         uploadHash = req.getString("sha256")
         uploadPreserveTaskParams = req.getBoolean("preserve_task_params")
+        uploadPreserveBatchConfig = req.getBoolean("preserve_batch_config")
         return ok()
     }
 
@@ -389,7 +392,7 @@ object AgentServer {
                 }
             }
             if (digest.digest().joinToString("") { "%02x".format(it) } != uploadHash) return fail("同步包校验失败")
-            return Pair(PyBridge.applySync(requireNotNull(appContext), file.absolutePath, uploadPreserveTaskParams), null)
+            return Pair(PyBridge.applySync(requireNotNull(appContext), file.absolutePath, uploadPreserveTaskParams, uploadPreserveBatchConfig), null)
         } finally {
             file.delete()
             uploadFile = null

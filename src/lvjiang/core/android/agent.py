@@ -520,7 +520,7 @@ class AgentInput(InputBackend):
     def begin_execution(self) -> None:
         if self._using_adb:
             return
-        if self._client.status.get("offline_protocol") in (1, 2):
+        if self._client.status.get("offline_protocol") in (1, 2, 3, 4):
             self._call("control_begin", "取得执行占用")
             self._client._owns_execution = not self._using_adb
 

@@ -21,18 +21,18 @@ def sync_offline_bundle(
     agent: AgentClient, path: Path, *,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda _done, _total: None,
-    preserve_task_params: bool = True,
+    preserve_task_params: bool = True, preserve_batch_config: bool = True,
 ) -> dict:
     require_offline_sync_access()
-    if agent.status.get("offline_protocol") != 3:
-        raise RuntimeError("手机 APK 不支持历史保留协议，请先更新 APK")
+    if agent.status.get("offline_protocol") != 4:
+        raise RuntimeError("手机 APK 不支持独立保留任务参数和批量配置，请先更新 APK")
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1 << 20), b""):
             digest.update(chunk)
     total = path.stat().st_size
     agent.call("offline_sync_begin", size=total, sha256=digest.hexdigest(),
-               preserve_task_params=preserve_task_params)
+               preserve_task_params=preserve_task_params, preserve_batch_config=preserve_batch_config)
     offset = 0
     with path.open("rb") as stream:
         while chunk := stream.read(192 << 10):

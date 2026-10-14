@@ -323,15 +323,28 @@ def test_batch_definition_preservation_uses_explicit_sync_choice(bundle, tmp_pat
     source, archive = bundle
     pc = {"document_type": "lvjiang.batch", "version": 2, "groups": {}}
     (source / "config/session/batch.json").write_text(json.dumps(pc), encoding="utf-8")
+    pc_session = source / "config/session/session.json"
+    session = json.loads(pc_session.read_text(encoding="utf-8"))
+    session["wf_configs"] = {"task": {"value": "pc"}}
+    pc_session.write_text(json.dumps(session), encoding="utf-8")
     build_offline_bundle(source, archive, username="tester", layout="android")
     phone = tmp_path / "phone"
     config = phone / "config/session/batch.json"
     config.parent.mkdir(parents=True)
     mobile = {"document_type": "lvjiang.batch", "version": 2, "groups": {"mobile": {"name": "手机配置"}}}
     config.write_text(json.dumps(mobile), encoding="utf-8")
-    install_offline_bundle(archive, phone, preserve_task_params=True)
+    phone_session = config.parent / "session.json"
+    phone_session.write_text(json.dumps({"users": ["tester"], "wf_configs": {"task": {"value": "phone"}}}),
+                             encoding="utf-8")
+    # 更新参数但保留批量配置，两项选择互不影响。
+    install_offline_bundle(archive, phone, preserve_task_params=False, preserve_batch_config=True)
+    assert json.loads(phone_session.read_text(encoding="utf-8"))["wf_configs"]["task"]["value"] == "pc"
     assert json.loads(config.read_text(encoding="utf-8")) == mobile
-    install_offline_bundle(archive, phone, preserve_task_params=False)
+    phone_session.write_text(json.dumps({"users": ["tester"], "wf_configs": {"task": {"value": "phone"}}}),
+                             encoding="utf-8")
+    # 更新批量配置但保留参数，防止新组仍被手机旧文件遮蔽。
+    install_offline_bundle(archive, phone, preserve_task_params=True, preserve_batch_config=False)
+    assert json.loads(phone_session.read_text(encoding="utf-8"))["wf_configs"]["task"]["value"] == "phone"
     assert json.loads(config.read_text(encoding="utf-8")) == pc
 
 

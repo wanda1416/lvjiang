@@ -108,16 +108,10 @@
     },
     {
       "key": "affection_max",
-      "x_ratio": 0.2749846352746656,
-      "y_ratio": 0.027115865149144915,
-      "w_ratio": 0.019452392423556564,
-      "h_ratio": 0.04553339662502553,
-      "template": {
-        "name": "android/chat_main/affection_max",
-        "min_score": 0.8,
-        "record_w": 2800,
-        "record_h": 1260
-      }
+      "x_ratio": 0.27786647118926655,
+      "y_ratio": 0.03967680214915196,
+      "w_ratio": 0.012968261615704376,
+      "h_ratio": 0.019626464062511003
     }
   ],
   "panels": [

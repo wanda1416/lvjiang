@@ -113,16 +113,10 @@
     },
     {
       "key": "affection_max",
-      "x_ratio": 0.21418139751648457,
-      "y_ratio": 0.24284960705478786,
-      "w_ratio": 0.021540429489195156,
-      "h_ratio": 0.0373910906679894,
-      "template": {
-        "name": "desktop/chat_main/affection_max",
-        "min_score": 0.8,
-        "record_w": 1920,
-        "record_h": 1080
-      }
+      "x_ratio": 0.21931007120438817,
+      "y_ratio": 0.254705318730004,
+      "w_ratio": 0.010257347375807217,
+      "h_ratio": 0.012767689496386625
     }
   ],
   "panels": [

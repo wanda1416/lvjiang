@@ -214,27 +214,20 @@ class TestResolveAffixCategory:
         assert not levels[105].allow_retransfer_after_chengyin
         assert levels[110].allow_retransfer_after_chengyin
 
-    def test_legacy_level_config_gets_capability_defaults(self, tmp_path):
+    def test_invalid_level_capabilities_do_not_enable_operations_or_hide_valid_levels(self, tmp_path):
+        import yaml
+
         path = tmp_path / "game_config.yaml"
-        path.write_text(
-            "level_configs:\n"
-            "- level: 90\n"
-            "- level: 91\n"
-            "- level: 105\n"
-            "- level: 110\n"
-            "  allow_retransfer: false\n",
-            encoding="utf-8",
-        )
-        levels = {
-            item.level: item
-            for item in GameConfigManager(path).get_level_configs()
-        }
-        assert not levels[90].allow_chengyin
-        assert levels[91].allow_chengyin
-        assert not levels[91].allow_retransfer
-        assert levels[105].allow_retransfer
-        assert not levels[110].allow_retransfer
-        assert not levels[110].allow_retransfer_after_chengyin
+        path.write_text(yaml.safe_dump({"level_configs": [
+            {"level": 105},
+            {"level": 110, "allow_chengyin": False, "allow_retransfer": False,
+             "allow_retransfer_after_chengyin": False, "reset_no_refund": False},
+        ]}), encoding="utf-8")
+        levels = GameConfigManager(path).get_level_configs()
+        assert [item.level for item in levels] == [110]
+        assert not levels[0].allow_chengyin
+        assert not levels[0].allow_retransfer
+        assert not levels[0].reset_no_refund
 
     @case_matrix("name,expected", [
         ("流星云珑", 110),
@@ -293,9 +286,8 @@ class TestAffixPool:
         assert caps["chengyin"] == 16.8
 
 
-    def test_chengyin_is_config_value_not_ratio(self, tmp_path):
-        """游戏的承音取舍可能比 94% 高/低 0.1，配置写多少就用多少；
-        缺失字段只在迁移期按 94% 派生。"""
+    def test_chengyin_explicit_value_overrides_game_ratio(self, tmp_path):
+        """显式配置优先；缺失时按游戏固定 94% 比例计算，定音不受限。"""
         import yaml
 
         from lvjiang.apps.yysls.config import derive_chengyin_cap

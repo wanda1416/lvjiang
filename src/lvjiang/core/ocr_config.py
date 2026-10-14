@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Any
 
 OCR_CONFIG_PATH = "ocr.yaml"
-_LEGACY_RULES_PATH = "ocr_rules.yaml"
 
 
 @dataclass(frozen=True)
@@ -47,39 +46,10 @@ def load_device_ocr_config() -> DeviceOCRConfig:
 
 
 def load_ocr_config() -> dict[str, Any]:
-    """读取 OCR 聚合配置，并兼容旧版 local 清洗规则。"""
+    """读取统一 OCR 配置；清洗规则使用 normalization.default/groups。"""
     from .config import get_resolver
 
-    resolver = get_resolver()
-    config = resolver.load_merged(OCR_CONFIG_PATH)
-
-    # 旧版 ocr_rules.yaml 和扁平 normalization 都是全局规则，因此迁移到
-    # default，而不是误当成需要显式选择的业务组。保留已有 groups。
-    local = resolver.load_local(OCR_CONFIG_PATH)
-    if "normalization" not in local:
-        legacy = resolver.load_local(_LEGACY_RULES_PATH)
-        if legacy:
-            normalization = dict(config.get("normalization") or {})
-            normalization["default"] = {
-                "replacements": dict(legacy.get("replacements") or {}),
-                "patterns": dict(legacy.get("patterns") or {}),
-            }
-            normalization.pop("replacements", None)
-            normalization.pop("patterns", None)
-            config["normalization"] = normalization
-    normalization = dict(config.get("normalization") or {})
-    if (
-        isinstance(normalization.get("replacements"), dict)
-        or isinstance(normalization.get("patterns"), dict)
-    ):
-        normalization["default"] = {
-            "replacements": dict(normalization.get("replacements") or {}),
-            "patterns": dict(normalization.get("patterns") or {}),
-        }
-        normalization.pop("replacements", None)
-        normalization.pop("patterns", None)
-        config["normalization"] = normalization
-    return config
+    return get_resolver().load_merged(OCR_CONFIG_PATH)
 
 
 def load_region_batch_config() -> RegionBatchConfig:

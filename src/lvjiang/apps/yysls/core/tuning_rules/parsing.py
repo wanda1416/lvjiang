@@ -60,38 +60,6 @@ _VALID_QUALITIES = ("gold", "purple", "blue")
 _VALID_RULE_QUALITIES = ("gold", "gold_only", "purple_only", "purple",
                          "blue")
 
-# 领域数据固定使用现有中文值。英文别名只用于兼容曾由英文界面写入的
-# 配置；解析结果始终归一化，不能让 UI 语言进入规则模型。
-_QUALITY_PART_ALIASES = {
-    "weapon": "武器",
-    "ring": "环",
-    "pendant": "佩",
-    "head guard": "冠胄",
-    "head": "冠胄",
-    "chest armor": "胸甲",
-    "chest": "胸甲",
-    "shin guard": "胫甲",
-    "leg": "胫甲",
-    "wrist guard": "腕甲",
-    "wrist": "腕甲",
-}
-_PATTERN_PART_ALIASES = {
-    "main weapon": "主武器",
-    "off weapon": "副武器",
-    "ring": "环",
-    "head guard": "冠胄",
-    "head": "冠胄",
-    "shin guard": "胫甲",
-    "leg": "胫甲",
-}
-_ALL_PART_ALIASES = {"全部", "all", "- all -"}
-
-
-def _normalize_part(value: object, aliases: dict[str, str]) -> str:
-    text = str(value).strip()
-    return aliases.get(text.casefold(), text)
-
-
 def _parse_quality_thresholds(raw, where: str,
                               require_all: bool = False,
                               ) -> dict[str, list[str]]:
@@ -104,7 +72,7 @@ def _parse_quality_thresholds(raw, where: str,
         raise RuleValidationError(f"{where} 必须是 dict")
     result: dict[str, list[str]] = {}
     for raw_part, qs in raw.items():
-        part = _normalize_part(raw_part, _QUALITY_PART_ALIASES)
+        part = str(raw_part).strip()
         if part not in QUALITY_PARTS:
             raise RuleValidationError(
                 f"{where}: 未知部位 {part!r}（须为 {list(QUALITY_PARTS)}）")
@@ -418,7 +386,7 @@ def parse_tuning_rule(data: dict,
 
     patterns: dict[str, PartPattern] = {}
     for raw_part, p_raw in (data.get("patterns") or {}).items():
-        part = _normalize_part(raw_part, _PATTERN_PART_ALIASES)
+        part = str(raw_part).strip()
         if part not in PART_KEYS:
             if part in PART_ALIAS:
                 target = PART_ALIAS[part]
@@ -573,17 +541,8 @@ def _parse_behavior_rule(raw, where: str,
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     raw_parts = raw.get("parts") or []
-    # "全部" 是持久化领域值；兼容旧英文界面可能写入的 All/- All -。
-    if (
-        len(raw_parts) == 1
-        and str(raw_parts[0]).strip().casefold() in _ALL_PART_ALIASES
-    ):
-        parts = list(QUALITY_PARTS)
-    else:
-        parts = [
-            _normalize_part(part, _QUALITY_PART_ALIASES)
-            for part in raw_parts
-        ]
+    parts = ([*QUALITY_PARTS] if raw_parts == ["全部"]
+             else [str(part).strip() for part in raw_parts])
     bad = [p for p in parts if p not in QUALITY_PARTS]
     if bad:
         raise RuleValidationError(
@@ -617,13 +576,14 @@ def _parse_behavior_rule(raw, where: str,
 def _parse_rule_pct(raw: dict, where: str) -> tuple[str, int]:
     """首词条条件解析：pct_op（le/ge）+ pct（[0, 100] 整数）
 
-    兼容历史字段 max_pct（固定 ≤ 语义）：换算为 pct_op=le。
     """
+    if "max_pct" in raw:
+        raise RuleValidationError(f"{where}.max_pct 已废弃，请改用 pct_op/pct")
     pct_op = raw.get("pct_op", "le")
     if pct_op not in PCT_OPS:
         raise RuleValidationError(
             f"{where}.pct_op 非法: {pct_op!r}（须为 {list(PCT_OPS)}）")
-    key = "pct" if "pct" in raw else "max_pct"
+    key = "pct"
     default = 100 if pct_op == "le" else 0
     pct = raw.get(key, default)
     if isinstance(pct, bool) or not isinstance(pct, int):
@@ -639,13 +599,14 @@ def _parse_rule_ratings(raw: dict, where: str, scope: str) -> list[str]:
 
     评级语义：ratings 档位集合（自由多选，空/全选 = 不限）；
     全选归一化为空（不限 = 不取评级，未知评级也命中）；去重
-    并按 RATING_KEYS 声明序归一。兼容历史字段 max_rating（≤
-    语义）：top → 不限，其余 → 该档及以下的档位集合。
+    并按 RATING_KEYS 声明序归一。
     自选词条语义（affix）：ratings 存词条名集合，按
     rule_affix_candidates 词表校验，去重按词表序归一；必须非空
     （空 = 永不命中的僵尸规则，直接报错）；不做全选归一
     （全选词条 = 全词条命中，语义不同于不限）。
     """
+    if "max_rating" in raw:
+        raise RuleValidationError(f"{where}.max_rating 已废弃，请改用 ratings")
     if scope == "affix":
         return _parse_rule_affix_ratings(raw, where)
     raw_ratings = raw.get("ratings")
@@ -658,16 +619,7 @@ def _parse_rule_ratings(raw: dict, where: str, scope: str) -> list[str]:
                 f"{where}.ratings 非法: {bad}（须为 {list(RATING_KEYS)}）")
         keys = [r for r in RATING_KEYS if r in raw_ratings]
         return [] if len(keys) == len(RATING_KEYS) else keys
-    # 历史字段 max_rating（≤ 语义）自动换算
-    max_rating = raw.get("max_rating", "top")
-    if max_rating not in RATING_KEYS:
-        raise RuleValidationError(
-            f"{where}.max_rating 非法: {max_rating!r}（须为 "
-            f"{list(RATING_KEYS)}）")
-    if max_rating == "top":
-        return []
-    cut = RATING_KEYS.index(max_rating)
-    return list(RATING_KEYS[:cut + 1])
+    return []
 
 
 def _parse_rule_affix_ratings(raw: dict, where: str) -> list[str]:

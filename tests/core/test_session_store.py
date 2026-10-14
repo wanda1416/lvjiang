@@ -38,17 +38,6 @@ class TestNodeOps:
         assert store.get_node("actives") == {"layout": "android"}
 
 
-    def test_first_write_stamps_document_version(self, store):
-        """新文档首次落盘就带 version，后续迁移才有判断锚点。"""
-        import json
-
-        from lvjiang.core.config.session import SESSION_VERSION
-
-        store.set_node("k", 1)
-        assert json.loads(store.path.read_text(encoding="utf-8"))["version"] == SESSION_VERSION
-        assert store.get_node("version") == SESSION_VERSION
-
-
     def test_update_node_rebuilds_non_dict(self, store):
         store.set_node("ui_state", "坏值")
         store.update_node("ui_state", {"k": 1})

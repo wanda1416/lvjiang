@@ -78,8 +78,8 @@ def _invertChecks(checks: list) -> None:
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config"
 
-# 承音上限是配置原值（游戏取舍可能与 94% 差 ±0.1）；这里只在新建等级 /
-# 承音列为空时用 derive_chengyin_cap 给一个默认值，填写者可改。
+# 显式承音上限优先；新建等级 /
+# 承音列为空时按游戏固定 94% 比例计算默认值。
 
 # 词条类型（_pool 字段；缺省为普通词条）
 _POOL_DINGYIN = "dingyin"
@@ -557,7 +557,7 @@ class AffixCapsPanel(QWidget):
         self._save_data()
 
     def _fill_default_chengyin(self, row: int):
-        """承音列为空时按上限×94% 填默认值，填写者觉得不合理自己改。"""
+        """承音列为空时按上限×94% 填默认值，显式填写值优先。"""
         cap_item = self._table.item(row, 1)
         chengyin_item = self._table.item(row, 2)
         if not cap_item or not chengyin_item or chengyin_item.text().strip():

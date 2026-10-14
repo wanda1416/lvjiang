@@ -34,7 +34,7 @@ FORMAT_VERSION = 3
 MAX_BUNDLE_BYTES = 256 << 20
 # 同步契约按消费者登记；新增目录默认不下发，不能递归复制整个配置层。
 _LAYER_PATTERNS = (
-    "app.yaml", "ocr.yaml", "ocr_rules.yaml", "scenes.yaml", "layouts.yaml",
+    "app.yaml", "ocr.yaml", "scenes.yaml", "layouts.yaml",
     "workflows/**/*.wf", "scenes/*.yaml",
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",

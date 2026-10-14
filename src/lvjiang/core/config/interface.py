@@ -7,10 +7,6 @@ from typing import Any
 
 from .session import SessionStore
 
-INTERFACE_VERSION = 2
-_MOVED_NODES = ("ui_state", "profile", "alert_info", "server_config")
-_MIGRATION = {"source": "session", "version": INTERFACE_VERSION}
-
 #: 合法的激活项 kind —— 「当前在用哪个」的选择。它们频繁变动，丢了重选一次
 #: 即可，所以和界面状态一起放在 interface.json；plan 是机器级方案（图库 +
 #: 环境 + 布局 + 模式的组合），env 是当前工作环境。
@@ -28,9 +24,8 @@ def interface_path() -> Path:
 
 
 class InterfaceStore(SessionStore):
-    """复用节点锁与原子写入；旧数据只在新文件不存在时导入。"""
+    """复用节点锁与原子写入，只读取独立界面状态文件。"""
 
-    FORMAT_VERSION = INTERFACE_VERSION
     TRANSIENT_PATHS = frozenset({
         # 激活项整棵子树都是"本实例在用哪个"：只读实例可以临时切换，但不
         # 落盘，也不该影响持有写权限的实例。
@@ -40,10 +35,6 @@ class InterfaceStore(SessionStore):
         ("batch",),
         ("profile", "overview_active_group"),
     })
-
-    def __init__(self, path: Path | str | None = None, *, legacy_path: Path | None = None):
-        super().__init__(path)
-        self._migrated = self._migrate(legacy_path or self.path.with_name("session.json"))
 
     @property
     def path(self) -> Path:
@@ -74,45 +65,6 @@ class InterfaceStore(SessionStore):
 
         self._mutate_disk(_set)
 
-    def _migrate(self, legacy_path: Path) -> bool:
-        from ..access import is_readonly
-        if is_readonly():
-            return False  # 不在只读节点创建文件或处理历史迁移。
-        # 主节点初始化；中间标记让崩溃后的旧节点清理可重试。
-        with self._thread_lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            fresh = not self.path.exists()
-            current = self._read_disk(strict=True)
-            pending = current.get("migration") == _MIGRATION
-            if not fresh and not pending:
-                self._data = current
-                return False
-            legacy = SessionStore(legacy_path)
-
-            def transfer(data: dict) -> None:
-                nonlocal current
-                if fresh:
-                    current = {
-                        "version": INTERFACE_VERSION,
-                        "migration": deepcopy(_MIGRATION),
-                        "ui_state": deepcopy(data.get("ui_state", {})),
-                        "profile": deepcopy(data.get("profile", {})),
-                        "alert_info": deepcopy(data.get("alert_info", [])),
-                        "server_config": deepcopy(data.get("server_config", {})),
-                    }
-                    profile = current["profile"]
-                    current["alert_history"] = (
-                        profile.pop("alert_history", {}) if isinstance(profile, dict) else {})
-                    self._write_disk_atomic(current)
-                for node in _MOVED_NODES:
-                    data.pop(node, None)
-
-            legacy._mutate_disk(transfer, stamp_version=False, strict=True)
-            current.pop("migration", None)
-            self._write_disk_atomic(current)
-            self._data = deepcopy(current)
-            return True
-
 
 _store: InterfaceStore | None = None
 
@@ -121,9 +73,6 @@ def get_interface_store() -> InterfaceStore:
     global _store
     if _store is None:
         _store = InterfaceStore()
-        if _store._migrated:
-            from .session import get_session_store
-            get_session_store().reload()
     return _store
 
 
@@ -133,7 +82,7 @@ def reset_interface_store() -> None:
 
 
 def initialize_state_stores() -> None:
-    """启动门禁：在创建任何页面前加载运行状态并完成界面状态迁移。"""
+    """启动门禁：在创建任何页面前加载运行状态。"""
     from .session import get_session_store
     get_session_store()
     get_interface_store()

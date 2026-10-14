@@ -33,7 +33,7 @@ def test_loads_recognition_and_normalization_from_aggregate_config(
             "max_content_height": 900,
             "gap": 12,
         }},
-        "normalization": {"replacements": {"错": "对"}},
+        "normalization": {"default": {"replacements": {"错": "对"}}},
     })
     monkeypatch.setattr(
         resolver_module,
@@ -46,39 +46,13 @@ def test_loads_recognition_and_normalization_from_aggregate_config(
     assert load_region_batch_config().gap == 12
 
 
-def test_legacy_local_rules_override_until_new_local_rules_are_saved(
-    monkeypatch, tmp_path,
-):
-    system = tmp_path / "system"
-    local = tmp_path / "local"
-    _write(system / "ocr.yaml", {
-        "content_version": 1,
-        "normalization": {"replacements": {"系统": "默认"}},
-    })
-    _write(local / "ocr_rules.yaml", {
-        "replacements": {"旧": "用户"},
-        "patterns": {"[。]": ""},
-    })
-    monkeypatch.setattr(
-        resolver_module,
-        "_resolver",
-        ConfigResolver(system, local, dev_mode=False),
-    )
-
-    config = load_ocr_config()
-    assert config["normalization"]["default"] == {
-        "replacements": {"旧": "用户"},
-        "patterns": {"[。]": ""},
-    }
-
-
 def test_saving_recognition_config_preserves_normalization(monkeypatch, tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     _write(system / "ocr.yaml", {
         "content_version": 1,
         "recognition": {"region_batch": {"gap": 16}},
-        "normalization": {"replacements": {"错": "对"}},
+        "normalization": {"default": {"replacements": {"错": "对"}}},
     })
     monkeypatch.setattr(
         resolver_module,

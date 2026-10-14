@@ -25,11 +25,6 @@ from loguru import logger
 
 from ..fs_util import atomic_write_text
 
-#: session.json 文档格式版本。v3 起 session 只放配置与事实：当前选择（用户、
-#: 布局、图库空间、工作环境、日常脚本、连接方案）已移到 interface.json 的
-#: actives，统计同意记录归入 settings.network；没有该字段的文档首次写入时补上。
-SESSION_VERSION = 3
-
 # 只读节点只能在内存中改允许的临时子树，其它节点拒绝落盘。session.json 只剩配置
 # 与事实，没有实例私有选择，所以这里是空的——那类状态（actives）已随新归属
 # 落到 InterfaceStore.TRANSIENT_PATHS。
@@ -83,7 +78,6 @@ class SessionStore:
     只读节点允许的临时选择仅更新本实例缓存。
     """
 
-    FORMAT_VERSION = SESSION_VERSION
     TRANSIENT_PATHS = READONLY_TRANSIENT_PATHS
 
     def __init__(self, path: Path | str | None = None):
@@ -126,7 +120,7 @@ class SessionStore:
         atomic_write_text(self.path, text, prefix=f".{self.path.stem}_")
 
     def _mutate_disk(
-        self, mutator: Callable[[dict], Any], *, stamp_version: bool = True, strict: bool = False,
+        self, mutator: Callable[[dict], Any], *, strict: bool = False,
     ) -> Any:
         """主节点合并最新磁盘状态；只读节点只保留允许的临时选择。"""
         with self._thread_lock:
@@ -134,8 +128,6 @@ class SessionStore:
             readonly = is_readonly()
             disk_data = self._read_disk(strict=strict)
             working = deepcopy(disk_data)
-            if stamp_version and not readonly:
-                working.setdefault("version", self.FORMAT_VERSION)
             if readonly:
                 _overlay_readonly_transients(working, self._data, self.TRANSIENT_PATHS)
             result = mutator(working)
@@ -201,28 +193,6 @@ class SessionStore:
             data.pop(key, None)
 
         self._mutate_disk(_delete)
-
-    def consume_node(self, key: str, consumer: Callable[[Any], None]) -> bool:
-        """持锁消费并删除一个顶层节点，供一次性外迁使用。
-
-        ``consumer`` 在最新磁盘快照的写锁内执行。只有 consumer 成功返回后
-        才会删除节点并落盘；consumer 抛出异常时原节点保持不变。回调不得
-        再修改本 SessionStore，避免回调结果被外层快照覆盖。
-
-        返回 True 表示节点存在且已消费，False 表示节点原本不存在。
-        """
-        consumed = False
-
-        def _consume(data: dict) -> None:
-            nonlocal consumed
-            if key not in data:
-                return
-            consumer(deepcopy(data[key]))
-            data.pop(key)
-            consumed = True
-
-        self._mutate_disk(_consume, stamp_version=False)
-        return consumed
 
     def reload(self):
         """重新读盘；只读实例保留白名单中的本实例临时选择。"""

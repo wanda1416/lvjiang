@@ -16,7 +16,6 @@ class DocumentDirectoryStore:
     """将登记过的对象文档存入独立 JSON 文件。
 
     单文档写入使用原子替换；跨文档写入先落事务日志，下次访问时完成恢复。
-    子类可重写 :meth:`_prepare_initial_documents`，在首次初始化时迁入旧数据。
     """
 
     TRANSACTION_VERSION = 1
@@ -71,9 +70,6 @@ class DocumentDirectoryStore:
             prefix=f".{path.stem}_",
         )
 
-    def _prepare_initial_documents(self) -> None:
-        """首次创建存储时迁入外部数据；默认无需处理。"""
-
     def _recover_unlocked(self) -> None:
         path = self._transaction_path
         if not path.exists():
@@ -103,7 +99,6 @@ class DocumentDirectoryStore:
             for key in self.documents:
                 self._read(self._path(key))
             return
-        self._prepare_initial_documents()
         for key in self.documents:
             path = self._path(key)
             if not path.exists():

@@ -175,10 +175,10 @@ def _parse_tuning_stones(raw, where: str) -> dict[str, TuningStoneRule]:
 
 
 def derive_chengyin_cap(cap) -> float:
-    """按 94% 从等级上限推一个承音上限**初值**（一位小数，与游戏显示位数一致）。
+    """按游戏固定 94% 比例计算普通词条承音上限，保留一位小数。
 
-    只用于两处：新建等级时先填一个默认值给填写者改，以及旧配置缺失
-    ``chengyin`` 字段时的迁移回退。计算链路一律读配置原值，不调用它。
+    用于编辑器默认值及未显式配置 ``chengyin`` 时的正常求值，非旧格式兼容。
+    显式配置优先；定音词条仍采用完整上限，不受此比例限制。
     """
     try:
         return round(float(cap) * _CHENGYIN_RATIO, 1)

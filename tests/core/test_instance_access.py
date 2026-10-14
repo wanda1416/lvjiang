@@ -148,7 +148,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
         "main_page": {"left_tab_index": 0},
         "loadout_user:alice": {"equip_filter": {"type": "all"}},
     }
-    assert interface_disk["server_config"] == {}
+    assert interface_disk.get("server_config", {}) == {}
 
     with pytest.raises(access.AccessDeniedError):
         resolver.save_merged("app.yaml", {"plans": [{"name": "temporary"}]})
@@ -190,7 +190,7 @@ def test_readonly_history_write_does_not_flush_temporary_settings(tmp_path, monk
         "overview_active_group": "original",
     }
 
-    assert disk["alert_history"] == {}
+    assert disk.get("alert_history", {}) == {}
 
 def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path, monkeypatch):
     path = tmp_path / "interface.json"

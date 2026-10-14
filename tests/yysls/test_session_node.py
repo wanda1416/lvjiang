@@ -1,4 +1,4 @@
-"""燕云会话数据拆分与一次性迁移。"""
+"""燕云独立会话文档的读写与事务恢复。"""
 from __future__ import annotations
 
 import json
@@ -73,94 +73,6 @@ class TestRoundTrip:
         assert "yysls" not in _session(session_env)
 
 
-def test_legacy_migrates_once_and_preserves_unrelated_nodes(session_env, monkeypatch):
-    from lvjiang.apps.yysls.config import session_node
-
-    legacy = {
-        "version": 2,
-        "settings": {"theme": "dark"},
-        "yysls": {
-            "play_styles": {"school": {"style": {"atk": 1}}},
-            "graduations": {"school": {"scheme": {"110": {"1": {"baseline_dps": 100}}}}},
-            "attr_loadout": {"school": {"level": 110}},
-            "attr_derivations": {"school": {"style": {"level": 110}}},
-        },
-    }
-    (session_env / "session.json").write_text(json.dumps(legacy), encoding="utf-8")
-    session_node.initialize_session_storage()
-    assert _session(session_env) == {"version": 2, "settings": {"theme": "dark"}}
-    for key, value in legacy["yysls"].items():
-        assert _document(session_env, key) == value
-    assert _document(session_env, "_meta") == {"version": 1}
-
-    session_node.reset_session_storage()
-    from lvjiang.core.config.session import SessionStore
-
-    monkeypatch.setattr(
-        SessionStore, "consume_node",
-        lambda self, key, consumer: pytest.fail("重复访问旧节点"),
-    )
-    session_node.initialize_session_storage()
-    assert session_node.load("play_styles") == legacy["yysls"]["play_styles"]
-
-
-def test_partial_migration_retries_without_losing_legacy(session_env, monkeypatch):
-    from lvjiang.apps.yysls.config import session_node
-
-    old = {"play_styles": {"school": {"A": {"atk": 1}}}}
-    (session_env / "session.json").write_text(
-        json.dumps({"version": 2, "yysls": old}), encoding="utf-8",
-    )
-    original_write = session_node.YyslsSessionStore._write
-    failed = False
-
-    def fail_second_document(path, data):
-        nonlocal failed
-        if path.name == "graduations.json" and not failed:
-            failed = True
-            raise OSError("模拟迁移中断")
-        original_write(path, data)
-
-    monkeypatch.setattr(session_node.YyslsSessionStore, "_write", staticmethod(fail_second_document))
-    with pytest.raises(OSError, match="模拟迁移中断"):
-        session_node.initialize_session_storage()
-    assert _session(session_env)["yysls"] == old
-    assert _document(session_env, "play_styles") == old["play_styles"]
-
-    monkeypatch.setattr(session_node.YyslsSessionStore, "_write", staticmethod(original_write))
-    session_node.reset_session_storage()
-    session_node.initialize_session_storage()
-    assert "yysls" not in _session(session_env)
-    assert _document(session_env, "play_styles") == old["play_styles"]
-
-
-def test_unknown_legacy_key_is_not_discarded(session_env):
-    from lvjiang.apps.yysls.config import session_node
-
-    original = {"version": 2, "yysls": {"future_key": {"value": 1}}}
-    (session_env / "session.json").write_text(json.dumps(original), encoding="utf-8")
-    with pytest.raises(ValueError, match="未登记子项"):
-        session_node.initialize_session_storage()
-    assert _session(session_env) == original
-    assert not (session_env / "yysls" / "_meta.json").exists()
-
-
-def test_conflicting_new_file_preserves_both_sides(session_env):
-    from lvjiang.apps.yysls.config import session_node
-
-    original = {"version": 2, "yysls": {"play_styles": {"school": {"old": {}}}}}
-    (session_env / "session.json").write_text(json.dumps(original), encoding="utf-8")
-    target = session_env / "yysls" / "play_styles.json"
-    target.parent.mkdir()
-    target.write_text(json.dumps({"school": {"new": {}}}), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="冲突"):
-        session_node.initialize_session_storage()
-    assert _session(session_env) == original
-    assert _document(session_env, "play_styles") == {"school": {"new": {}}}
-    assert not (session_env / "yysls" / "_meta.json").exists()
-
-
 def test_fresh_install_does_not_create_legacy_session_file(session_env):
     from lvjiang.apps.yysls.config import session_node
 
@@ -170,7 +82,7 @@ def test_fresh_install_does_not_create_legacy_session_file(session_env):
     assert _document(session_env, "_meta") == {"version": 1}
 
 
-def test_missing_file_after_migration_is_not_treated_as_empty(session_env):
+def test_missing_initialized_file_is_not_treated_as_empty(session_env):
     from lvjiang.apps.yysls.config import session_node
 
     session_node.initialize_session_storage()
@@ -205,7 +117,6 @@ def test_interrupted_two_document_write_recovers(session_env, monkeypatch):
     assert session_node.load("play_styles")["school"]["A"] == {"atk": 1}
     assert session_node.load("attr_derivations")["school"]["A"] == {"level": 110}
     assert not (session_env / "yysls" / "_transaction.json").exists()
-
 
 
 def test_manual_overwrite_clears_only_its_derivation(session_env):

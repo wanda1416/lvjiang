@@ -8,7 +8,6 @@ from loguru import logger
 
 from .affix_levels import LevelRange, parse_entry, parse_range
 from .constants import (
-    _CHENGYIN_RATIO,
     _KEY_TO_TYPE,
     AFFIX_CATEGORY_NAMES,
     BASE_ATTR_PARTS,
@@ -71,12 +70,7 @@ def parse_weapons(self: GameConfigManager, data: dict) -> None:
                 aliases = _string_list(entry.get("type_aliases"))
                 self._weapon_type_aliases[name] = aliases or [name]
         else:
-            # 兼容旧格式（纯字符串）
-            name = str(entry)
-            if name:
-                self._weapon_types.append(name)
-                self._weapon_name_suffixes[name] = []
-                self._weapon_type_aliases[name] = [name]
+            logger.error("weapon_types 条目必须是对象，已跳过；请在游戏设置重新保存")
 
 
 def parse_arts(self: GameConfigManager, data: dict) -> None:
@@ -334,16 +328,12 @@ def parse_affix_caps(self: GameConfigManager, data: dict) -> None:
                 cap = entry.get("cap", 0)
                 chengyin = entry.get("chengyin")
             else:
-                # 兼容旧格式（直接数值）
-                cap, chengyin = entry, None
+                logger.error(f"词组 {category} 等级 {level} 上限必须是对象，已跳过；请在游戏设置重新保存")
+                continue
             if not isinstance(chengyin, (int, float)) or isinstance(chengyin, bool):
-                # 承音上限是游戏配置原值；缺失只在迁移期出现，按 94% 派生
-                # 并提示补填——游戏的取舍可能高/低 0.1，派生值不是真值。
+                # 普通词条承音上限遵循游戏固定 94% 比例；显式配置优先。
+                # 定音词条的查询仍使用完整 cap，不受此比例限制。
                 chengyin = derive_chengyin_cap(cap)
-                if self._affix_pools[category] != POOL_DINGYIN:
-                    logger.warning(
-                        f"词组 {category} 等级 {level} 未配置承音上限，"
-                        f"暂按 cap×{_CHENGYIN_RATIO} 派生为 {chengyin}，请在游戏设置里核对")
             self._affix_caps[category][level] = {
                 "cap": cap,
                 "chengyin": chengyin,
@@ -361,21 +351,23 @@ def parse_progression(self: GameConfigManager, data: dict) -> None:
         level = item.get("level")
         if not isinstance(level, int) or level in seen_levels:
             continue
+        capability_keys = ("allow_chengyin", "allow_retransfer",
+                           "allow_retransfer_after_chengyin", "reset_no_refund")
+        invalid = [key for key in capability_keys if not isinstance(item.get(key), bool)]
+        if invalid:
+            logger.error(f"等级 {level} 能力字段缺失或不是布尔值：{', '.join(invalid)}；已跳过，请在游戏设置补全")
+            continue
         seen_levels.add(level)
         self._level_configs.append(LevelConfig(
             level=level,
             allow_reset=item.get("allow_reset"),
-            # 兼容尚未写入新能力字段的旧用户配置；显式 false 仍优先。
-            allow_chengyin=bool(item.get("allow_chengyin", level >= 91)),
-            allow_retransfer=bool(
-                item.get("allow_retransfer", level >= 105)),
-            allow_retransfer_after_chengyin=bool(
-                item.get("allow_retransfer_after_chengyin", False)),
+            allow_chengyin=item["allow_chengyin"],
+            allow_retransfer=item["allow_retransfer"],
+            allow_retransfer_after_chengyin=item["allow_retransfer_after_chengyin"],
             min_material_count=item.get("min_material_count"),
             judge_resistance=item.get("judge_resistance"),
             buff_resistance=item.get("buff_resistance"),
-            reset_no_refund=bool(
-                item.get("reset_no_refund", level <= 105)),
+            reset_no_refund=item["reset_no_refund"],
             tuning_stones=_parse_tuning_stones(
                 item.get("tuning_stones"),
                 f"level_configs[{level}].tuning_stones"),

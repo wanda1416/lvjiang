@@ -169,21 +169,14 @@ config/session/
 `session.json.yysls.<key>` 的值；新增状态必须先在代码里登记文件名，未知键不会
 自动生成文件。
 
-启动燕云插件时读 `_meta.json` 里的迁移版本：
+启动燕云插件时校验 `_meta.json` 的存储版本 `1`。新目录初始化缺失的文档并记录
+版本；已经初始化的目录缺少文件时明确报错。只读取这些独立文件，不再搬运旧
+`session.json.yysls` 节点。
 
-- 版本为 `1`：只用新目录，不再检查旧节点；
-- 没有版本记录：在 `SessionStore` 写锁内读 `session.json.yysls`，校验全部子项，
-  逐项写入对应文件，成功后删除旧节点并写版本记录；旧节点不存在时直接创建空文件
-  并记录版本。
-
-迁移中断时旧节点仍在，下次启动可重试；已经写入且内容与旧值相同的文件可复用；内容
-冲突、旧节点形状错误或出现未知子项时停止迁移并保留原数据。`play_styles` 与
-`attr_derivations` 的联合更新走可恢复事务，保存 / 删除 / 重命名基础属性后两份状态
-保持一致。
-
+`play_styles` 与 `attr_derivations` 的联合更新走可恢复事务，保存 / 删除 / 重命名
+基础属性后两份状态保持一致；中断后下次访问完成恢复。
 目录锁、原子读写、版本校验与事务恢复由
-`core.config.document_store.DocumentDirectoryStore` 提供；燕云适配器只登记上述文件
-并实现旧节点迁移，因此该抽取不改变磁盘格式与初始化顺序。
+`core.config.document_store.DocumentDirectoryStore` 提供；燕云适配器只登记上述文件。
 
 ---
 

@@ -1,13 +1,10 @@
-"""燕云插件会话文件，以及旧 ``session.json.yysls`` 的一次性迁移。"""
+"""燕云插件独立会话文件。"""
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
-
-from loguru import logger
+from typing import Callable
 
 from lvjiang.core.config.document_store import DocumentDirectoryStore
-from lvjiang.core.config.session import get_session_store
 
 STORAGE_VERSION = 1
 DOCUMENT_FILES = {
@@ -28,33 +25,6 @@ class YyslsSessionStore(DocumentDirectoryStore):
             storage_version=STORAGE_VERSION,
             label="燕云会话",
         )
-
-    def _migrate_legacy(self, legacy: Any) -> None:
-        if not isinstance(legacy, dict):
-            raise ValueError("session.json.yysls 必须是对象，旧数据已保留")
-        unknown = sorted(set(legacy) - set(DOCUMENT_FILES))
-        if unknown:
-            raise ValueError("旧 yysls 含未登记子项，旧数据已保留: " + ", ".join(unknown))
-        documents: dict[str, dict] = {}
-        for key in DOCUMENT_FILES:
-            value = legacy.get(key, {})
-            if not isinstance(value, dict):
-                raise ValueError(f"旧 yysls.{key} 必须是对象，旧数据已保留")
-            documents[key] = value
-        # 崩溃重试只接受与旧数据相同的已写文件；不同数据需要人工处理。
-        for key, value in documents.items():
-            path = self._path(key)
-            if path.exists() and self._read(path) != value:
-                raise ValueError(f"旧会话数据与新文件冲突，已保留两边: {path}")
-        for key, value in documents.items():
-            path = self._path(key)
-            if not path.exists():
-                self._write(path, value)
-
-    def _prepare_initial_documents(self) -> None:
-        migrated = get_session_store().consume_node("yysls", self._migrate_legacy)
-        if migrated:
-            logger.info("已将 session.json.yysls 迁移至 config/session/yysls")
 
 
 _store: YyslsSessionStore | None = None

@@ -79,40 +79,15 @@ def test_behavior_rule_summary_condenses_all_parts():
     assert "/".join(QUALITY_PARTS) not in summary
 
 
-@case_matrix("all_value", ["全部", "All", "- All -", "all"])
-def test_behavior_rule_all_parts_is_language_independent(all_value):
+def test_behavior_rule_all_parts_uses_domain_value():
     data = _valid_group()
     data["scan"] = {
-        "rules": [{"action": "recycle", "parts": [all_value]}],
+        "rules": [{"action": "recycle", "parts": ["全部"]}],
     }
 
     group = parse_tuning_group(data)
 
     assert group.scan.rules[0].parts == list(QUALITY_PARTS)
-
-
-def test_behavior_rule_normalizes_english_part_values():
-    data = _valid_group()
-    data["scan"] = {
-        "rules": [{
-            "action": "recycle",
-            "parts": ["Weapon", "Head Guard", "Wrist Guard"],
-        }],
-    }
-
-    group = parse_tuning_group(data)
-
-    assert group.scan.rules[0].parts == ["武器", "冠胄", "腕甲"]
-
-
-def test_tuning_rule_normalizes_english_part_keys():
-    data = minimal_rule(quality_thresholds={"Weapon": ["gold"]})
-    data["patterns"] = {"Ring": data["patterns"]["环"]}
-
-    rule = parse_tuning_rule(data)
-
-    assert list(rule.patterns) == ["环"]
-    assert rule.quality_thresholds == {"武器": ["gold"]}
 
 
 def test_builtin_groups_load_after_english_i18n_cold_start():
@@ -791,7 +766,7 @@ class TestBehaviorSettings:
             "entry_min_rating": "top",
             "rules": [
                 {"parts": ["武器"], "max_quality": "blue",
-                 "max_pct": 100, "max_rating": "junk",
+                 "pct": 100, "ratings": ["junk"],
                  "judge_scope": "custom",
                  "judge_rules": ["huiyi_general", "heal_pure"],
                  "first_affix_only": True,
@@ -800,10 +775,10 @@ class TestBehaviorSettings:
         }
         data["tune"] = {
             "rules": [
-                {"enabled": False, "max_rating": "junk", "judge_scope": "all",
+                {"enabled": False, "ratings": ["junk"], "judge_scope": "all",
                  "action": "recycle"},
-                {"max_pct": 30, "action": "reset"},
-                {"max_rating": "normal", "action": "skip"},
+                {"pct": 30, "action": "reset"},
+                {"ratings": ["junk", "normal"], "action": "skip"},
                 {"action": "continue"},
             ],
             "max_resets": 2,
@@ -867,15 +842,15 @@ class TestBehaviorSettings:
         {"rules": [{"action": "recycle",
                       "max_quality": "green"}]},         # 品阶非法
         {"rules": [{"action": "recycle",
-                      "max_pct": 101}]},                 # 超出上界
+                      "pct": 101}]},                 # 超出上界
         {"rules": [{"action": "recycle",
-                      "max_pct": True}]},                # bool 伪装 int
+                      "pct": True}]},                # bool 伪装 int
         {"rules": [{"action": "recycle",
                       "pct_op": "gt"}]},                 # 比较方向非法
         {"rules": [{"action": "recycle",
                       "pct": 101}]},                     # pct 超出上界
         {"rules": [{"action": "recycle",
-                      "max_rating": "good"}]},           # 评级非法（历史字段）
+                      "ratings": ["good"]}]},           # 评级非法
         {"rules": [{"action": "recycle",
                       "ratings": ["good"]}]},            # 评级档位非法
         {"rules": [{"action": "recycle",
@@ -923,7 +898,7 @@ class TestBehaviorSettings:
         junk = _rating("junk")
         data = _valid_group()
         data["scan"] = {"rules": [
-            {"max_pct": 30, "action": "recycle"},
+            {"pct": 30, "action": "recycle"},
             {"max_quality": "purple", "action": "skip"},
         ]}
         scan = parse_tuning_group(data).scan
@@ -953,9 +928,9 @@ class TestBehaviorSettings:
 
         data = _valid_group()
         data["scan"] = {"rules": [
-            {"max_rating": "junk", "judge_scope": "custom",
+            {"ratings": ["junk"], "judge_scope": "custom",
              "judge_rules": ["huiyi_general"], "action": "recycle"},
-            {"max_rating": "junk", "action": "recycle"},
+            {"ratings": ["junk"], "action": "recycle"},
             {"action": "skip"},
         ]}
         scan = parse_tuning_group(data).scan
@@ -1041,8 +1016,8 @@ class TestBehaviorSettings:
                              _rating("top"))
         data = _valid_group()
         data["tune"] = {"rules": [
-            {"max_rating": "junk", "action": "recycle"},
-            {"max_rating": "normal", "action": "continue"},
+            {"ratings": ["junk"], "action": "recycle"},
+            {"ratings": ["junk", "normal"], "action": "continue"},
         ]}
         tune = parse_tuning_group(data).tune
         # 首条命中 → 回收（满/未满一致）
@@ -1276,3 +1251,12 @@ class TestTuningGroupManagerCRUD:
         mgr.delete_group("default")
         assert "default" not in mgr.get_groups()
         assert "temp" in mgr.get_groups()
+
+
+def test_obsolete_behavior_conditions_are_rejected_instead_of_broadening_actions():
+    # 旧回收条件不能因忽略字段而退化为无条件回收。
+    for key, value in (("max_pct", 30), ("max_rating", "junk")):
+        data = _valid_group()
+        data["scan"] = {"rules": [{key: value, "action": "recycle"}]}
+        with pytest.raises(RuleValidationError, match=key):
+            parse_tuning_group(data)

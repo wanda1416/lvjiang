@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import ssl
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -249,7 +248,6 @@ def cache_manifest(manifest: AnnouncementManifest, etag: str = "") -> None:
     _update_announcement_state({
         "cached_manifest": manifest_to_dict(manifest),
         "etag": etag,
-        "last_checked_at": datetime.now(timezone.utc).isoformat(),
     })
 
 

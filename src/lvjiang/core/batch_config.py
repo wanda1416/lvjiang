@@ -159,7 +159,7 @@ class BatchConfigItem:
 
     @staticmethod
     def from_dict(name: str, data: object) -> "BatchConfigItem":
-        """只读当前字段；旧 selected_* 由文档 v1 转换路径处理。"""
+        """只读取当前配置组字段。"""
         source = data if isinstance(data, dict) else {}
         obsolete = {"selected_task_ids", "selected_usernames", "selected_units"} & source.keys()
         if obsolete:
@@ -277,7 +277,8 @@ class BatchConfig:
         ):
             return BatchConfig()
         version = data.get("version")
-        if version not in (1, BATCH_CONFIG_VERSION):
+        if version != BATCH_CONFIG_VERSION:
+            logger.error("批量配置仅支持 v2，请先在 0.13.15 保存配置或重新配置")
             return BatchConfig()
         configs: dict[str, BatchConfigItem] = {}
         groups = data.get("groups", {})
@@ -285,19 +286,7 @@ class BatchConfig:
             for key, raw in groups.items():
                 if not isinstance(key, str) or not key or not isinstance(raw, dict):
                     continue
-                # v1 的 key 是组名；v2 的 key 是稳定 ID，名称在组内部。
-                name = str(raw.get("name") or "") if version != 1 else key
-                if version == 1:
-                    raw = dict(raw)
-                    for old, current in (
-                        ("selected_task_ids", "default_task_ids"),
-                        ("selected_usernames", "default_usernames"),
-                        ("selected_units", "default_units"),
-                    ):
-                        if raw.get(current) is None:
-                            raw[current] = raw.get(old)
-                        raw.pop(old, None)
-                item = BatchConfigItem.from_dict(name or key, raw)
+                item = BatchConfigItem.from_dict(str(raw.get("name") or key), raw)
                 configs[item.id] = item
         return BatchConfig(configs=configs)
 
@@ -348,24 +337,7 @@ class BatchConfigStore:
     def load(self) -> BatchConfig:
         with self._thread_lock:
             document = self._read_document_unlocked()
-            if not (
-                isinstance(document, dict)
-                and document.get("document_type") == BATCH_DOCUMENT_TYPE
-                and document.get("version") == 1
-            ):
-                config = BatchConfig.from_dict(document)
-                config._file_baseline = self.path.read_bytes() if self.path.exists() else None
-                return config
-
-            # v1 没有稳定 ID。只在内存里补 uuid 会导致每次 load 都得到一组
-            # 新 ID，主页面下拉框、活动组与运行草稿立即失去关联。迁移必须在
-            # 主节点在进程内互斥区一次性写成 v2；只读节点不迁移落盘。
             config = BatchConfig.from_dict(document)
-            from .access import is_readonly
-            if not is_readonly():
-                text = json.dumps(config.to_dict(), ensure_ascii=False, indent=2)
-                atomic_write_text(self.path, text, prefix=".batch_")
-                logger.info("批量配置已从 v1 一次性迁移到 v2")
             config._file_baseline = self.path.read_bytes() if self.path.exists() else None
             return config
 

@@ -54,26 +54,6 @@ BASE_ATTR_PARTS = (
 # 与 tuning_rules.models.QUALITY_PARTS 对齐）
 EQUIP_PART_NAMES = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
 
-# 曾经由英文界面写入配置的部位值只在读取时兼容；所有保存路径仍写上面的
-# 中文领域值，保证现有中文配置和识别结果不发生迁移。
-_EQUIP_PART_ALIASES = {
-    "weapon": "武器",
-    "ring": "环",
-    "pendant": "佩",
-    "head guard": "冠胄",
-    "head": "冠胄",
-    "chest armor": "胸甲",
-    "chest": "胸甲",
-    "shin guard": "胫甲",
-    "leg": "胫甲",
-    "wrist guard": "腕甲",
-    "wrist": "腕甲",
-}
-
-
 def normalize_equip_part(value: object) -> str:
-    """把英文历史值归一化为与界面语言无关的中文领域值。"""
-    text = str(value).strip()
-    if text in EQUIP_PART_NAMES:
-        return text
-    return _EQUIP_PART_ALIASES.get(text.casefold(), text)
+    """读取持久化中文部位值；内部 BASE_ATTR_PARTS 的英文 key 不在此转换。"""
+    return str(value).strip()

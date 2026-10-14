@@ -85,62 +85,6 @@ def test_defaults_are_pruned_to_visible_items():
     assert item.default_usernames == ["用户A"]
 
 
-def test_v1_selection_is_read_as_default_selection(tmp_path):
-    """v1 的 selected_* 在旧版本里既是上次勾选又是下次初始值。
-
-    拆层后只保留后一半语义读进默认勾选；rounds / unattended 属于运行草稿，
-    直接丢掉。写出去只有新格式，所以这是一次性单向读取，不是常驻兼容层。
-    """
-    path = tmp_path / "batch.json"
-    path.write_text(json.dumps({
-        "document_type": BATCH_DOCUMENT_TYPE,
-        "version": 1,
-        "active_group": "日常",
-        "groups": {"日常": {
-            "task_ids": ["a", "b"],
-            "usernames": ["用户A"],
-            "selected_task_ids": ["b"],
-            "selected_usernames": ["用户A"],
-            "selected_units": {"account": ["acc1"]},
-            "rounds": 4,
-            "unattended": True,
-        }},
-    }), encoding="utf-8")
-
-    cfg = BatchConfigStore(path).load()
-    item = cfg.by_name("日常")
-    assert item is not None
-    assert item.id, "v1 没有 ID，读入时必须补一个稳定 ID"
-    assert item.default_task_ids == ["b"]
-    assert item.default_usernames == ["用户A"]
-    assert item.default_units == {"account": ["acc1"]}
-    assert cfg.configs == {item.id: item}, "读入后一律按 ID 索引"
-
-
-def test_v1_migration_is_persisted_and_ids_stay_stable(tmp_path):
-    """v1 没有 ID，首次读取必须一次性落盘，不能每次 load 都随机生成。"""
-    path = tmp_path / "batch.json"
-    path.write_text(json.dumps({
-        "document_type": BATCH_DOCUMENT_TYPE,
-        "version": 1,
-        "active_group": "第二组",
-        "groups": {
-            "第一组": {"task_ids": ["a"]},
-            "第二组": {"task_ids": ["b"]},
-        },
-    }), encoding="utf-8")
-    store = BatchConfigStore(path)
-
-    first = store.load()
-    second = store.load()
-
-    assert list(first.configs) == list(second.configs)
-    assert first.names() == ["第一组", "第二组"]
-    written = json.loads(path.read_text(encoding="utf-8"))
-    assert written["version"] == 2
-    assert list(written["groups"]) == list(first.configs)
-
-
 def test_single_user_lifecycle_skip_defaults_true_and_rejects_invalid_value():
     assert BatchConfigItem.from_dict(
         "默认", {}).skip_lifecycle_for_single_item is True
@@ -233,3 +177,11 @@ def test_v2_does_not_interpret_v1_selection_fields(monkeypatch):
     assert item.default_usernames == []
     assert item.default_units == {}
     assert any("v2 请使用 default_" in message for message in messages)
+
+
+def test_unsupported_batch_version_is_ignored_without_rewriting(tmp_path):
+    path = tmp_path / "batch.json"
+    data = json.dumps({"document_type": BATCH_DOCUMENT_TYPE, "version": 1, "groups": {}})
+    path.write_text(data, encoding="utf-8")
+    assert BatchConfigStore(path).load().configs == {}
+    assert path.read_text(encoding="utf-8") == data

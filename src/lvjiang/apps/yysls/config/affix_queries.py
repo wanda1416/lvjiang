@@ -147,9 +147,9 @@ def get_affix_caps(self: GameConfigManager, level: int, affix_name: str) -> dict
     Returns:
         {"cap": float, "unit": str, "chengyin": float} 或 None
 
-    ``cap`` 与 ``chengyin`` 都是词组配置里该等级的原值：承音上限由游戏
-    决定、由配置者按游戏显示填写，不按固定比例推算（配置缺失时加载期
-    已按 94% 派生并告警）。定音词条不受承音限制，承音值 = cap。
+    ``cap`` 读取该等级配置；普通词条的 ``chengyin`` 优先使用显式值，
+    缺省时在加载阶段按游戏固定 94% 比例计算。定音词条不受承音限制，
+    承音值 = cap。
     unit 从词组级别的 _unit 字段读取。
     """
     category = self.resolve_affix_category(affix_name)

@@ -170,3 +170,39 @@ def test_selecting_next_user_preserves_run_owner_and_is_blocked_while_paused(sta
     state.acknowledge_pause()
     assert not json.loads(runner.select_user("runner"))["ok"]
     assert active["user"] == "viewer" and state.snapshot()["username"] == "viewer"
+
+
+def test_device_result_uses_pc_output_tree_and_relative_history(tmp_path, monkeypatch, state):
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from lvjiang.core import daily_history
+
+    started = datetime(2026, 1, 31, 23, 59, 58)
+    repository = daily_history.TaskHistoryRepository(tmp_path / "history.db")
+    monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr("lvjiang.constants.OUTPUT_DIR", tmp_path / "config/session/output")
+    session_type = daily_history.TaskRunSession
+    monkeypatch.setattr(daily_history, "TaskRunSession", lambda **kwargs: session_type(
+        **kwargs, repository=repository, started_at=started, task_run_id="device-run"))
+    monkeypatch.setattr("lvjiang.core.ondevice.diagnostics.record", lambda *args: None)
+    monkeypatch.setattr("lvjiang.core.config.wf_configs.get_wf_config", lambda *args: {})
+    monkeypatch.setattr("lvjiang.core.task_params.resolve_task_params", lambda *args: ({}, {}))
+    engine = SimpleNamespace(run_username="用户甲", users_dir=tmp_path,
+                             execute=lambda *args, **kwargs: {"message": "完成"})
+    monkeypatch.setattr(runner, "_get_engine", lambda: engine)
+    monkeypatch.setattr(runner, "_reset_engine_state", lambda *args: None)
+    monkeypatch.setattr(runner, "_build_source", lambda *args: "fake")
+    monkeypatch.setattr(runner, "_ENGINE", None)
+    state.begin("daily", "日常", "用户甲")
+
+    runner._run_in_thread({"id": "daily", "name": "日常"}, None)
+
+    record = repository.list_task_runs()[0]
+    assert record.status == "completed"
+    assert record.result_path == (
+        "config/session/output/用户甲/2026-01/31/daily_20260131_235958_000000_device-run.json")
+    result = daily_history.resolve_history_path(record.result_path)
+    assert json.loads(result.read_text(encoding="utf-8")) == {"message": "完成"}
+    assert record.log_path.startswith("logs/daily/用户甲/2026-01/31/")
+    assert daily_history.resolve_history_path(record.log_path).is_file()

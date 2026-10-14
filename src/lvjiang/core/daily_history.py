@@ -51,11 +51,11 @@ def _safe_component(value: str, fallback: str) -> str:
     return value or fallback
 
 
-def _stored_path(path: Path | None) -> str:
+def stored_history_path(path: Path | None) -> str:
     if path is None:
         return ""
     try:
-        return str(path.resolve().relative_to(constants.PROJECT_ROOT.resolve()))
+        return path.resolve().relative_to(constants.PROJECT_ROOT.resolve()).as_posix()
     except ValueError:
         return str(path.resolve())
 
@@ -252,7 +252,7 @@ class TaskHistoryRepository:
                     result_path=?, error_message=? WHERE task_run_id=?
             """, (
                 status, finished_at, max(0, int(duration_ms)),
-                _stored_path(result_path), error_message, task_run_id,
+                stored_history_path(result_path), error_message, task_run_id,
             ))
 
     def update_task_params(self, task_run_id: str, params: dict[str, Any]) -> None:
@@ -335,7 +335,7 @@ class TaskHistoryRepository:
                     report_path=?, error_message=? WHERE batch_run_id=?
             """, (
                 status, finished_at, max(0, int(duration_ms)),
-                _stored_path(report_path), error_message, batch_run_id,
+                stored_history_path(report_path), error_message, batch_run_id,
             ))
 
     def list_batch_runs(
@@ -468,7 +468,7 @@ class TaskRunSession:
             username=username, task_id=task_id, task_name=task_name,
             task_scope=task_scope, source=source, status="running",
             started_at=self.started_at, finished_at="", duration_ms=0,
-            params=params, result_path="", log_path=_stored_path(self.log_path),
+            params=params, result_path="", log_path=stored_history_path(self.log_path),
             error_message="", target_id=target_id, target_kind=target_kind,
             target_label=target_label, environment=environment, layout=layout,
             input_kind=input_kind,

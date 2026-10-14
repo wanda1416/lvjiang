@@ -35,7 +35,7 @@ from .batch_report import BatchReport
 from .batch_run import BatchRunDraft
 from .config.resolver import get_resolver
 from .config.users import SessionManager
-from .fs_util import dated_output_dir
+from .fs_util import task_result_path
 
 # 进度状态常量
 ST_PENDING = tr("待执行")
@@ -1273,6 +1273,9 @@ class BatchScheduler:
         engine._ui_callback = (
             self._unattended_ui_callback if self._unattended_active()
             else ctx.ui_callback)
+        from types import SimpleNamespace
+        engine.execution_target_snapshot = SimpleNamespace(
+            id=ctx.target_id, kind=ctx.target_kind, display_name=ctx.target_label)
         engine.window_rebind_hook = ctx.window_rebind_hook
         return engine
 
@@ -1520,7 +1523,6 @@ class BatchScheduler:
         """结果落盘 output/{role}/YYYY-MM/DD/，日期取任务启动时间。"""
         if not isinstance(result, (dict, list)):
             return None
-        from ..constants import OUTPUT_DIR
 
         def _ser(obj):
             if isinstance(obj, list):
@@ -1532,10 +1534,8 @@ class BatchScheduler:
             return obj
 
         started_at = started_at or datetime.now()
-        user_dir = dated_output_dir(OUTPUT_DIR / role, started_at)
-        user_dir.mkdir(parents=True, exist_ok=True)
-        ts = started_at.strftime("%Y%m%d_%H%M%S_%f")
-        path = user_dir / f"{script.id}_{ts}.json"
+        path = task_result_path(role, script.id, started_at)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(_ser(result), ensure_ascii=False, indent=2),
             encoding="utf-8",

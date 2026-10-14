@@ -47,7 +47,7 @@ _STATUS_LABELS = {
     "interrupted": tr("已中断"), "failed": tr("失败"),
     "skipped": tr("跳过"),
 }
-_SOURCE_LABELS = {"single": tr("单独运行"), "batch": tr("批量运行")}
+_SOURCE_LABELS = {"ondevice": tr("手机独立执行"), "single": tr("单独运行"), "batch": tr("批量运行")}
 _SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
 _LINK_BUTTON_STYLE = (
     "QPushButton { background: transparent; border: none; "

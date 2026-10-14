@@ -304,6 +304,10 @@ object AgentServer {
         }
         "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(
             requireNotNull(appContext), true, req.optInt("screen_repetitions", 0))))
+        "history_begin", "history_chunk", "history_end" -> {
+            if (op == "history_begin" && (localTaskActive() || pcControlsDevice())) fail("请先结束设备任务再回传历史")
+            else Pair(PyBridge.historyTransfer(requireNotNull(appContext), op.removePrefix("history_"), req.toString()), null)
+        }
         "offline_sync_begin" -> beginSync(req)
         "offline_sync_chunk" -> syncChunk(req)
         "offline_sync_commit" -> commitSync()
@@ -312,7 +316,8 @@ object AgentServer {
 
     private fun status(): JSONObject = JSONObject().apply {
         put("protocol", PROTOCOL_VERSION)
-        put("offline_protocol", 2)
+        put("offline_protocol", 3)
+        put("history_protocol", 1)
         put("float_running", FloatService.isRunning)
         put("pc_controlling", pcControlsDevice())
         put("app", BuildConfig.VERSION_NAME)

@@ -13,6 +13,7 @@ from lvjiang.core.offline_bundle import build_offline_bundle, install_offline_bu
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
     monkeypatch.setattr(offline_bundle, "get_registered_app_ids", lambda: ("yysls",))
+    monkeypatch.setattr("lvjiang.apps.get_registered_app_ids", lambda: ("yysls",))
     source = tmp_path / "pc"
     (source / "config/system").mkdir(parents=True)
     (source / "config/system/layouts.yaml").write_text(
@@ -69,7 +70,8 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     assert session["settings"]["ai"] == pc_session["settings"]["ai"]
     assert interface["alert_history"] == {"tester:demo": "now"}
     assert "actives" not in session
-    for name in ("profile.db", "tuning_history.db"):
+    assert not (phone / "config/session/tuning_history.db").exists()
+    for name in ("profile.db",):
         with closing(sqlite3.connect(phone / "config/session" / name)) as db:
             assert db.execute("SELECT value FROM entries").fetchone() == (7,)
     assert (phone / "offline-backup/config/session/old.json").read_text() == "previous"
@@ -331,3 +333,28 @@ def test_batch_definition_preservation_uses_explicit_sync_choice(bundle, tmp_pat
     assert json.loads(config.read_text(encoding="utf-8")) == mobile
     install_offline_bundle(archive, phone, preserve_task_params=False)
     assert json.loads(config.read_text(encoding="utf-8")) == pc
+
+
+def test_downstream_preserves_phone_history_and_result_files(bundle, tmp_path):
+    _, archive = bundle
+    phone = tmp_path / "phone"
+    session = phone / "config/session"
+    session.mkdir(parents=True)
+    result = session / "output/user/2026-01/01/result.json"
+    result.parent.mkdir(parents=True)
+    result.write_text('{"结果": true}\n', encoding="utf-8")
+    with (closing(sqlite3.connect(session / "daily_history.db")) as tasks,
+          closing(sqlite3.connect(session / "tuning_history.db")) as tuning):
+        for conn in (tasks, tuning):
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("CREATE TABLE records (value TEXT)")
+            conn.execute("INSERT INTO records VALUES ('phone')")
+            conn.commit()
+    install_offline_bundle(archive, phone, preserve_task_params=False)
+    for name in ("daily_history.db", "tuning_history.db"):
+        with closing(sqlite3.connect(session / name)) as conn:
+            assert conn.execute("SELECT value FROM records").fetchall() == [("phone",)]
+    assert json.loads(result.read_text(encoding="utf-8")) == {"结果": True}
+    with zipfile.ZipFile(archive) as package:
+        assert "config/session/daily_history.db" not in package.namelist()
+        assert "config/session/tuning_history.db" not in package.namelist()

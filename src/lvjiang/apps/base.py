@@ -7,7 +7,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from ..core.history_transfer import HistoryChannel
 
 
 @dataclass(frozen=True)
@@ -93,3 +96,6 @@ class AppHooks:
     offline_session_files: Callable[[], tuple[str, ...]] | None = None
     # session 内的 SQLite 文件；公共同步器统一执行 backup 与完整性检查。
     offline_database_files: tuple[str, ...] = ()
+
+    # 手机历史独立回传声明；这些数据库不属于配置下发。
+    history_channels: Callable[[], tuple[HistoryChannel, ...]] | None = None

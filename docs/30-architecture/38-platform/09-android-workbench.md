@@ -51,6 +51,9 @@ get_status 增加 busy（包括线程收尾）、运行用户名和 interaction�
 复用 daily_history 的任务记录、日志归档和终态写入，不创建第二份历史 schema。
 ondevice 适配器负责筛选本机来源、结果摘要与有界日志预览，以及启动时恢复中断状态。
 历史记录引用任务启动时用户；结束后修改活动用户不影响旧记录。
+任务结果与 PC 共用 `config/session/output/<用户>/YYYY-MM/DD/` 路径生成规则，
+执行日志仍归档至 `logs/daily/<用户>/YYYY-MM/DD/`。历史中的包内路径使用相对路径和 `/` 分隔，
+日期取任务启动时间；已有记录继续按原路径读取，不搬迁旧文件。
 最终参数由引擎解析后更新到 running 记录；终态使用既有 completed/failed/stopped。
 线程收尾仍占用执行槽，避免结束画面已出现但日志尚未归档时启动下一轮。
 记录列表限定 source=ondevice、最近 100 条；日志预览最多 32KB，结果文件限制展示规模。

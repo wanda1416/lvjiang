@@ -19,6 +19,20 @@ def dated_output_dir(root: Path, started_at: datetime) -> Path:
     return root / started_at.strftime("%Y-%m") / started_at.strftime("%d")
 
 
+def task_result_path(
+    username: str, task_id: str, started_at: datetime, *,
+    task_run_id: str = "", interrupted: bool = False,
+) -> Path:
+    """PC 与设备端共用的任务结果路径，按启动用户及启动日期归档。"""
+    from ..constants import OUTPUT_DIR
+
+    directory = dated_output_dir(OUTPUT_DIR / username, started_at)
+    stamp = started_at.strftime("%Y%m%d_%H%M%S_%f")
+    run_suffix = f"_{task_run_id}" if task_run_id else ""
+    suffix = "_interrupted" if interrupted else ""
+    return directory / f"{task_id}_{stamp}{run_suffix}{suffix}.json"
+
+
 def atomic_write_bytes(
     path: Path,
     data: bytes,

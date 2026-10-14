@@ -660,7 +660,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.set_doc(None)
             return
         self.recorder.set_doc(doc)
-        self._history_markdown_path = str(doc.path)
+        from lvjiang.core.daily_history import stored_history_path
+        self._history_markdown_path = stored_history_path(doc.path)
         # 各规则配置的开关聚合（any 语义），再映射为显示名 → 状态
         merged: dict[str, bool] = {}
         for cfg in (self.ctx.judge_configs or {}).values():

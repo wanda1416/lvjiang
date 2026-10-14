@@ -86,3 +86,31 @@ def test_sync_scope_is_independent_of_remote_user_and_task_choices(qapp, monkeyp
     finally:
         page.close()
         page.deleteLater()
+
+
+def test_history_choices_are_device_specific_and_independent_of_downstream(qapp, monkeypatch, tmp_path):
+    from lvjiang.core.config.session import SessionStore
+    monkeypatch.setattr(offline, "has_feature", lambda _: False)
+    monkeypatch.setattr(offline, "load_layout_entries", dict)
+    monkeypatch.setattr(offline.OfflineControlPage, "_history_preferences",
+                        lambda self: SessionStore(tmp_path / "preferences.json"))
+    serial = ["device-a"]
+    page = offline.OfflineControlPage(None, lambda: serial[0], lambda _: None)
+    try:
+        assert page.buttons["history"].isEnabled()
+        assert not page.buttons["sync"].isEnabled()
+        page.history_choices["tasks"].setChecked(False)
+        assert page.history_choices["logs"].isChecked()
+        serial[0] = "device-b"
+        page.device_changed()
+        assert page.history_choices["tasks"].isChecked()
+        serial[0] = "device-a"
+        page.device_changed()
+        assert not page.history_choices["tasks"].isChecked()
+        page._state = "running"
+        page._update_buttons()
+        assert not page.buttons["history"].isEnabled()
+        assert page.buttons["stop"].isEnabled()
+    finally:
+        page.close()
+        page.deleteLater()

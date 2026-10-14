@@ -131,6 +131,9 @@ object PyBridge {
     fun resumeTask(context: Context): JSONObject = callJson(context, "resume_task")
     fun applySync(context: Context, path: String, preserveTaskParams: Boolean): JSONObject =
         callJson(context, "apply_sync", path, preserveTaskParams, moduleName = OFFLINE_MODULE)
+    fun historyTransfer(context: Context, operation: String, payload: String): JSONObject =
+        callJson(context, "request", operation, payload, moduleName = "lvjiang.core.ondevice.history_transfer")
+
     fun checkRuntime(context: Context, ocr: Boolean = true, screenRepetitions: Int = 0): JSONObject =
         callJson(context, "check_runtime", ocr, screenRepetitions, moduleName = OFFLINE_MODULE)
 

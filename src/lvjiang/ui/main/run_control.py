@@ -15,7 +15,7 @@ from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QMessageBox
 
 from ...core.config.resolver import get_resolver
-from ...core.fs_util import dated_output_dir
+from ...core.fs_util import task_result_path
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..button_styles import apply_execution_button_style
@@ -2197,14 +2197,11 @@ class RunControlMixin:
             started_at = datetime.now()
             if run_context is not None:
                 started_at = run_context.metadata["output_started_at"]
-            user_output_dir = dated_output_dir(OUTPUT_DIR / username, started_at)
-            user_output_dir.mkdir(parents=True, exist_ok=True)
-
-            timestamp = started_at.strftime("%Y%m%d_%H%M%S_%f")
-            suffix = "_interrupted" if interrupted else ""
-            run_suffix = f"_{task_run_id}" if task_run_id else ""
-            save_path = user_output_dir / (
-                f"{flow_id}_{timestamp}{run_suffix}{suffix}.json")
+            save_path = task_result_path(
+                username, flow_id, started_at,
+                task_run_id=task_run_id, interrupted=interrupted,
+            )
+            save_path.parent.mkdir(parents=True, exist_ok=True)
             save_path.write_text(
                 json.dumps(serializable, ensure_ascii=False, indent=2),
                 encoding="utf-8",

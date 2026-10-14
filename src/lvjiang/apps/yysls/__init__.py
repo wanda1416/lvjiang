@@ -11,6 +11,11 @@ from ...i18n import tr
 from ..base import AppHooks, TelemetryDisclosure
 
 
+def _history_channels():
+    from .core.tuning_history.transfer import history_channels
+    return history_channels()
+
+
 def _initialize_session_storage() -> None:
     from .config.session_node import initialize_session_storage
 
@@ -128,5 +133,5 @@ hooks = AppHooks(
         "yysls/attr_model/**/*.yaml", "yysls/graduation/**/*.json",
     ),
     offline_session_files=_offline_session_files,
-    offline_database_files=("tuning_history.db",),
+    history_channels=_history_channels,
 )

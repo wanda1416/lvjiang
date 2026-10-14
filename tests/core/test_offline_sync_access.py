@@ -19,7 +19,7 @@ def test_lv1_sync_explicitly_sends_parameter_preservation_choice(monkeypatch, tm
     archive = tmp_path / "snapshot.zip"
     archive.write_bytes(b"configuration")
     agent = Mock()
-    agent.status = {"offline_protocol": 2}
+    agent.status = {"offline_protocol": 3}
     agent.call.return_value = ({"ok": True}, None)
     assert offline.sync_offline_bundle(agent, archive) == {"ok": True}
     assert [call.args[0] for call in agent.call.call_args_list] == [

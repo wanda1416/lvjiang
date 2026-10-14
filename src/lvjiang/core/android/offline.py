@@ -24,8 +24,8 @@ def sync_offline_bundle(
     preserve_task_params: bool = True,
 ) -> dict:
     require_offline_sync_access()
-    if agent.status.get("offline_protocol") != 2:
-        raise RuntimeError("手机 APK 不支持新的任务参数保留协议，请先更新 APK")
+    if agent.status.get("offline_protocol") != 3:
+        raise RuntimeError("手机 APK 不支持历史保留协议，请先更新 APK")
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1 << 20), b""):

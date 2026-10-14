@@ -572,6 +572,10 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         record("task_begin", task["id"])
         engine = _get_engine()
         _reset_engine_state(engine)
+        from types import SimpleNamespace
+        engine.task_run_id = history.task_run_id
+        engine.execution_target_snapshot = SimpleNamespace(
+            id="ondevice", kind="android", display_name="本机独立执行")
         engine.workflow_config_snapshot = deepcopy(get_wf_config(task["id"]))
         if task.get("class"):
             from ...workflows.implementations import get_workflow_class
@@ -630,12 +634,18 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
             _ENGINE.clear_capture_snapshot()
         record("task_end", json.dumps({"task": task["id"], "state": _STATE.snapshot()["state"]}, ensure_ascii=False))
         if history is not None:
-            from ..fs_util import atomic_write_bytes
+            from datetime import datetime
+
+            from ..fs_util import atomic_write_bytes, task_result_path
             from ..json_files import formatted_json_bytes
             try:
                 snapshot = _STATE.snapshot()
                 logger.info(snapshot["message"])
-                result_path = history.log_path.with_suffix(".json")
+                result_path = task_result_path(
+                    snapshot["username"], task["id"], datetime.fromisoformat(history.started_at),
+                    task_run_id=history.task_run_id,
+                    interrupted=snapshot["state"] == STATE_STOPPED,
+                )
                 saved_result = snapshot["result"]
                 if len(json.dumps(saved_result, ensure_ascii=False, default=str)) > 32_000:
                     saved_result = {"message": "结果超过展示上限，请查看任务日志"}

@@ -148,9 +148,9 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 - PC 侧单测 `tests/core/test_device_agent.py` 用本地假服务端覆盖线协议与后端行为；
   Kotlin 侧可用 `kotlinc -cp android.jar` 做编译检查（见开发日志 2026-08-22）。
 
-## 离线执行扩展（offline_protocol = 2）
+## 离线执行扩展（offline_protocol = 3）
 
-基础输入协议保持 v3，新增能力通过握手字段 `offline_protocol:2` 探测；未提供离线能力
+基础输入协议保持 v3，新增能力通过握手字段 `offline_protocol:3` 探测；未提供离线能力
 的更早 APK 不携带此字段。`pc_controlling` 表示实际占用，区别于诊断连接数。
 
 | op | 请求字段 | 响应 |
@@ -223,3 +223,23 @@ Android 关闭 CPU arena，与 PC 默认一致；rec/cls 单条批次，输入 d
 `save_settings(username, values) -> None`（失败抛出可行动错误）。业务候选与校验仍归
 插件领域层所有；目前自动调律使用该协议，不在公共桥硬编码调律规则。
 普通脚本直接复用任务元数据与 `task_params`，不增加平行手机配置仓储。
+
+## 历史回传扩展（history_protocol = 1）
+
+基础输入协议保持 v3；历史回传与配置下发单独探测，PC 与 APK 的应用版本必须相同。
+配置包格式提升为 3，旧 APK 不能静默忽略历史保留要求。
+
+| op | 请求 | 响应 |
+| --- | --- | --- |
+| `history_begin` | `selected` 类别列表 | 空闲状态下冻结历史包，返回 `token`、`size`、`sha256` |
+| `history_chunk` | `token`、`offset` | 同位置可重读的 Base64 分块，最多 192 KiB |
+| `history_end` | `token` | 只删除冻结传输包，不删除手机历史或附件 |
+
+核心声明任务历史与独立日志选项，插件通过 `AppHooks.history_channels` 声明自己的历史表、
+稳定业务键和附件列。传输层不解释游戏数据，不导入 Profile 或参数。
+导出仅取终态手机记录；按库读取一致快照，整包摘要及逐附件摘要通过后才导入。
+历史表按类别事务合并，附件保持相对路径；相同身份不同内容报错，不静默覆盖。
+运行记录 UUID 及插件的运行 ID/明细序号用于去重，不照搬本地自增主键。
+中断可重新导出并回传，当前不保存分块续传游标；成功类别不因其他类别失败而回滚。
+传输暂存与按设备选项均位于 `config/session/history-transfer`。
+配置下发不携带历史库，安装时用 SQLite backup 保留手机库及 `session/output`，Profile 仍按原规则下发。

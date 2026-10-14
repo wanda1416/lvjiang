@@ -30,7 +30,7 @@ from .paths import (
 )
 from .user_config import is_valid_username
 
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 MAX_BUNDLE_BYTES = 256 << 20
 # 同步契约按消费者登记；新增目录默认不下发，不能递归复制整个配置层。
 _LAYER_PATTERNS = (
@@ -40,7 +40,7 @@ _LAYER_PATTERNS = (
     "maps/*/map.yaml", "maps/*/*.png",
 )
 _SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "batch.json")
-_DATABASE_FILES = ("profile.db", "daily_history.db")
+_DATABASE_FILES = ("profile.db",)
 
 
 def _database_files() -> tuple[str, ...]:
@@ -194,6 +194,22 @@ def install_offline_bundle(
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise ValueError(f"数据库快照校验失败：{database.name}")
+        # 历史不属于参数快照；包括旧包残留也不得覆盖手机记录。
+        from .history_transfer import history_channels
+        for channel in history_channels().values():
+            relative = Path("session") / channel.database
+            incoming = staged_config / relative
+            incoming.unlink(missing_ok=True)
+            existing = target / relative
+            if existing.is_file():
+                incoming.parent.mkdir(parents=True, exist_ok=True)
+                with (closing(sqlite3.connect(existing.resolve().as_uri() + "?mode=ro", uri=True)) as source,
+                      closing(sqlite3.connect(incoming)) as history_destination):
+                    source.backup(history_destination)
+        for name in ("output", "history-transfer"):
+            existing = target / "session" / name
+            if existing.is_dir():
+                shutil.copytree(existing, staged_config / "session" / name)
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
             mobile_batch = session_directory(target) / "batch.json"

@@ -50,6 +50,11 @@
 }
 
 # ─── Shizuku AIDL ────────────────────────────────────────────
+# Shizuku 在独立进程中反射创建 UserService；只引用 class 不会保留构造函数和实现。
+# 发行包必须保留具体服务，否则 R8 会将它裁剪为空抽象类，绑定一直无法就绪。
+-keep class com.lvjiang.app.ShellService {
+    public *;
+}
 # AIDL 生成的 Stub/Proxy 类被 ServiceConnection 反射引用
 -keep class com.lvjiang.app.IShellService$* { *; }
 

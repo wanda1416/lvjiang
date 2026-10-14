@@ -50,7 +50,6 @@ REGION_COLORS = [
 CLICK_RECT_COLOR = QColor(255, 140, 0)
 #: 由全局比例派生的默认落点框（灰虚线），仅作参照
 CLICK_RECT_DEFAULT_COLOR = QColor(190, 190, 190, 200)
-TEMPLATE_CROP_COLOR = QColor(190, 90, 255)
 
 
 # ─── 画布组件 ────────────────────────────────────────────
@@ -165,10 +164,7 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         # 未标定 click_rect 的区域，默认落点框占区域的比例（画布预览用）
         self._jitter_ratio = 0.25
 
-        # 模板裁剪是一次性覆盖交互，不改变当前 Region/点击框编辑模式。
-        self._template_crop_idx = -1
-        self._template_crop_start: QPointF | None = None
-        self._template_crop_current: QPointF | None = None
+        # 模板匹配结果仅用于短暂高亮，不改变当前 Region/点击框编辑模式。
         self._template_test_result: tuple[int, bool] | None = None
         self._template_test_token = 0
 
@@ -438,7 +434,6 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         )
         self._selected_idx = -1
         self._field_selected = False
-        self.cancel_template_crop()
         self._template_test_result = None
         self.update()
 
@@ -867,27 +862,6 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         self.update()
         return True
 
-    def begin_template_crop(self) -> bool:
-        """进入一次性模板框选；仅允许在当前本地 Region 内操作。"""
-        if self._original_image is None:
-            self._notify_status(tr("当前场景没有截图，无法截取模板"))
-            return False
-        if not (0 <= self._selected_idx < len(self._regions)):
-            self._notify_status(tr("请先选中一个已绑定坐标的区域"))
-            return False
-        region = self._regions[self._selected_idx]
-        if region.is_reference or region.w_ratio <= 0 or region.h_ratio <= 0:
-            self._notify_status(tr("引用区域只读，请回到源场景截取模板"))
-            return False
-        self._template_crop_idx = self._selected_idx
-        self._template_crop_start = None
-        self._template_crop_current = None
-        self.setCursor(Qt.CursorShape.CrossCursor)
-        self.setFocus()
-        self._notify_status(tr("请在选中区域内部拖拽选择截取部分；Esc 取消"))
-        self.update()
-        return True
-
     def capture_selected_region_template(self) -> bool:
         """直接截取完整 Region；click_rect 不参与模板裁剪。"""
         if self._original_image is None:
@@ -900,14 +874,7 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         if region.is_reference or region.w_ratio <= 0 or region.h_ratio <= 0:
             self._notify_status(tr("引用区域只读，请回到源场景截取模板"))
             return False
-        return self._emit_template_crop(region, 0.0, 0.0, 1.0, 1.0)
-
-    def cancel_template_crop(self):
-        self._template_crop_idx = -1
-        self._template_crop_start = None
-        self._template_crop_current = None
-        self.setCursor(Qt.CursorShape.ArrowCursor)
-        self.update()
+        return self._emit_template_crop(region)
 
     def show_template_test_result(self, passed: bool) -> None:
         """短暂高亮当前 Region 的模板测试结果。"""
@@ -925,31 +892,16 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         QTimer.singleShot(1800, clear)
         self.update()
 
-    def _finish_template_crop(self) -> None:
-        if (self._template_crop_idx < 0 or self._template_crop_start is None
-                or self._template_crop_current is None
-                or self._original_image is None):
-            return
-        region = self._regions[self._template_crop_idx]
-        x0, y0 = self._pos_in_region(
-            region, *self._canvas_pos(self._template_crop_start))
-        x1, y1 = self._pos_in_region(
-            region, *self._canvas_pos(self._template_crop_current))
-        rx, ry = min(x0, x1), min(y0, y1)
-        rw, rh = abs(x1 - x0), abs(y1 - y0)
-        if self._emit_template_crop(region, rx, ry, rw, rh):
-            self.cancel_template_crop()
-
     def _emit_template_crop(
-        self, region: Region, rx: float, ry: float, rw: float, rh: float,
+        self, region: Region,
     ) -> bool:
-        """按 Region 内相对矩形裁剪原图并交给编辑器；与 click_rect 无关。"""
+        """按完整 Region 裁剪原图并交给编辑器；与 click_rect 无关。"""
         if self._original_image is None:
             return False
-        left = region.x_ratio + rx * region.w_ratio
-        top = region.y_ratio + ry * region.h_ratio
-        right = left + rw * region.w_ratio
-        bottom = top + rh * region.h_ratio
+        left = region.x_ratio
+        top = region.y_ratio
+        right = left + region.w_ratio
+        bottom = top + region.h_ratio
         sx0, sy0 = self._canvas_to_screenshot_norm(left, top)
         sx1, sy1 = self._canvas_to_screenshot_norm(right, bottom)
         height, width = self._original_image.shape[:2]
@@ -960,9 +912,7 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         px1 = min(max(int(round(sx1 * width)), 0), width)
         py1 = min(max(int(round(sy1 * height)), 0), height)
         if px1 - px0 < 4 or py1 - py0 < 4:
-            self._template_crop_start = None
-            self._template_crop_current = None
-            self._notify_status(tr("模板至少需要 4×4 像素，请重新框选"))
+            self._notify_status(tr("模板至少需要 4×4 像素，请调整区域"))
             self.update()
             return False
         crop = self._original_image[py0:py1, px0:px1].copy()
@@ -1130,20 +1080,6 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
             preview = QRectF(self._subscene_drag_start, self._subscene_drag_current).normalized()
             painter.setPen(QPen(QColor(80, 220, 255), 2, Qt.PenStyle.DashLine))
             painter.setBrush(QColor(80, 220, 255, 35))
-            painter.drawRect(preview)
-
-        if (self._template_crop_idx >= 0
-                and self._template_crop_start is not None
-                and self._template_crop_current is not None):
-            preview = QRectF(
-                self._template_crop_start,
-                self._template_crop_current,
-            ).normalized()
-            target = self._region_rect_widget(
-                self._regions[self._template_crop_idx])
-            preview = preview.intersected(target)
-            painter.setPen(QPen(TEMPLATE_CROP_COLOR, 2, Qt.PenStyle.DashLine))
-            painter.setBrush(QColor(190, 90, 255, 35))
             painter.drawRect(preview)
 
         # 组选区高亮与橡皮筋：画在所有实体之上，否则会被网格/引用盖住

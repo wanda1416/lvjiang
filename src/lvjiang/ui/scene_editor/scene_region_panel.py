@@ -130,13 +130,29 @@ class RegionPanelMixin:
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-        template_options_row = QHBoxLayout()
-        self._template_allow_inverted = QCheckBox(tr("兼容反色图标"))
+        template_row = QHBoxLayout()
+        self._btn_capture_template = QPushButton(tr("截取模版"))
+        self._btn_capture_template.clicked.connect(
+            self._on_capture_region_template)
+        template_row.addWidget(self._btn_capture_template)
+        self._btn_test_template = QPushButton(tr("测试"))
+        self._btn_test_template.setToolTip(tr("测试当前区域的模板匹配"))
+        self._btn_test_template.clicked.connect(self._on_test_template)
+        template_row.addWidget(self._btn_test_template)
+        self._btn_unbind_template = QPushButton(tr("解除"))
+        self._btn_unbind_template.setToolTip(tr("解除当前区域的模板绑定"))
+        self._btn_unbind_template.clicked.connect(self._on_unbind_template)
+        template_row.addWidget(self._btn_unbind_template)
+        apply_button_style(self._btn_capture_template, variant="neutral")
+        apply_button_style(self._btn_test_template, variant="neutral")
+        apply_button_style(self._btn_unbind_template, variant="danger")
+
+        self._template_allow_inverted = QCheckBox(tr("兼容反色"))
         self._template_allow_inverted.setToolTip(
             tr("同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配"))
         self._template_allow_inverted.toggled.connect(
             self._on_template_inverted_changed)
-        template_options_row.addWidget(self._template_allow_inverted)
+        template_row.addWidget(self._template_allow_inverted)
         self._template_score = QDoubleSpinBox()
         self._template_score.setRange(0.0, 1.0)
         self._template_score.setDecimals(2)
@@ -145,31 +161,11 @@ class RegionPanelMixin:
         self._template_score.setPrefix(tr("阈值 "))
         self._template_score.editingFinished.connect(
             self._on_template_score_changed)
-        template_options_row.addWidget(self._template_score)
+        template_row.addWidget(self._template_score)
         self._template_status = QLabel(tr("未绑定"))
-        template_options_row.addWidget(self._template_status)
-        template_options_row.addStretch()
-        layout.addLayout(template_options_row)
-
-        template_button_row = QHBoxLayout()
-        self._btn_capture_template = QPushButton(tr("+ 截取模版"))
-        self._btn_capture_template.clicked.connect(
-            self._on_capture_region_template)
-        template_button_row.addWidget(self._btn_capture_template)
-        self._btn_crop_template = QPushButton(tr("部分截取"))
-        self._btn_crop_template.clicked.connect(self._on_crop_template)
-        template_button_row.addWidget(self._btn_crop_template)
-        self._btn_test_template = QPushButton(tr("测试匹配"))
-        self._btn_test_template.clicked.connect(self._on_test_template)
-        template_button_row.addWidget(self._btn_test_template)
-        self._btn_unbind_template = QPushButton(tr("解除绑定"))
-        self._btn_unbind_template.clicked.connect(self._on_unbind_template)
-        template_button_row.addWidget(self._btn_unbind_template)
-        template_button_row.addStretch()
-        for button in (self._btn_capture_template, self._btn_crop_template,
-                       self._btn_test_template, self._btn_unbind_template):
-            apply_button_style(button, variant="neutral")
-        layout.addLayout(template_button_row)
+        template_row.addWidget(self._template_status)
+        template_row.addStretch()
+        layout.addLayout(template_row)
         self._refresh_template_controls()
         return panel
 
@@ -380,7 +376,6 @@ class RegionPanelMixin:
         self._template_allow_inverted.blockSignals(False)
         self._template_allow_inverted.setEnabled(editable and binding is not None)
         self._btn_capture_template.setEnabled(editable)
-        self._btn_crop_template.setEnabled(editable)
         self._btn_test_template.setEnabled(binding is not None)
         self._btn_unbind_template.setEnabled(editable and binding is not None)
 
@@ -397,9 +392,6 @@ class RegionPanelMixin:
         else:
             self.set_region_mode()
             self.set_click_rect_button_checked(False)
-
-    def _on_crop_template(self):
-        self._canvas.begin_template_crop()
 
     def _on_test_template(self):
         callback = getattr(self, "test_selected_template", None)

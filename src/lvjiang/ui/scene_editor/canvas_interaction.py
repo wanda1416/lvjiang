@@ -143,9 +143,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _subscene_edit_orig: SubsceneRef | None
     on_region_changed: Callable | None
     on_canvas_changed: Callable | None
-    _template_crop_idx: int
-    _template_crop_start: QPointF | None
-    _template_crop_current: QPointF | None
     _group_selection: set[tuple[str, str]]
     _group_band_start: QPointF | None
     _group_band_current: QPointF | None
@@ -430,16 +427,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         pos = event.position()
         self._press_pos = pos
 
-        if self._template_crop_idx >= 0:
-            region = self._regions[self._template_crop_idx]
-            if not self._region_rect_widget(region).contains(pos):
-                self._notify_status("模板只能在当前 Region 内框选")
-                return
-            self._template_crop_start = pos
-            self._template_crop_current = pos
-            self.update()
-            return
-
         # ── Panel 放置模式优先介入 ──
         if self._pending_subscene_ref_def is not None:
             self._subscene_drag_start = pos
@@ -630,12 +617,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
         pos = event.position()
 
-        if self._template_crop_idx >= 0:
-            if self._template_crop_start is not None:
-                self._template_crop_current = pos
-                self.update()
-            return
-
         if self._subscene_drag_start is not None:
             self._subscene_drag_current = pos
             self.update()
@@ -807,12 +788,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         # 本次按下已结束，死区判定随之失效（下面各分支都不再用它）
         self._press_pos = None
 
-        if self._template_crop_idx >= 0:
-            if self._template_crop_start is not None:
-                self._template_crop_current = event.position()
-                self._finish_template_crop()
-            return
-
         if self._subscene_drag_start is not None and self._pending_subscene_ref_def is not None:
             sx0, sy0 = self._widget_to_norm(self._subscene_drag_start)
             sx1, sy1 = self._widget_to_norm(event.position())
@@ -980,10 +955,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if event.key() == Qt.Key.Key_Escape:
             if self.clear_group_selection():
                 self.update()
-                return
-            if self._template_crop_idx >= 0:
-                self.cancel_template_crop()
-                self._notify_status("已取消模板截取")
                 return
             # 取消 panel 放置模式
             if self._pending_panel_def is not None:

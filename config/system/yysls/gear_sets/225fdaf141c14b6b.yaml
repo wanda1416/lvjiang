@@ -1,0 +1,142 @@
+content_version: 1
+schema_version: 2
+id: 225fdaf141c14b6b
+name: 鸣金虹
+playstyle: 无名
+chengyin: true
+combat_type: pve
+gongjue: 会意
+equipment:
+  main_weapon:
+    type: 剑
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 会意率
+    affix_5:
+      name: 剑武学增伤
+  sub_weapon:
+    type: 枪
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 会意率
+  head:
+    type: 冠胄
+    equipment_set: yixiang
+    affix_1:
+      name: 会意率
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 会意率
+  chest:
+    type: 胸甲
+    equipment_set: yixiang
+    affix_1:
+      name: 会意率
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 会意率
+  ring:
+    type: 环
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 全武学增效
+  pendant:
+    type: 佩
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 全武学增效
+  leg:
+    type: 胫甲
+    equipment_set: yixiang
+    affix_1:
+      name: 劲
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 对首领单位增伤
+  wrist:
+    type: 腕甲
+    equipment_set: yixiang
+    affix_1:
+      name: 劲
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 势
+    affix_5:
+      name: 对首领单位增伤
+requirements:
+- affix: 最大外功攻击
+  priority: optimal
+  minimum: 12
+  maximum: 12
+- affix: 会意率
+  priority: optimal
+  minimum: 6
+  maximum: 6
+- affix: 势
+  priority: optimal
+  minimum: 7
+  maximum: 7
+- affix: 剑武学增伤
+  priority: required
+  minimum: 1
+  maximum: 1
+- affix: 对首领单位增伤
+  priority: required
+  minimum: 2
+  maximum: 2
+- affix: 全武学增效
+  priority: required
+  minimum: 2
+  maximum: 2
+- affix: 劲
+  priority: optimal
+  minimum: 10
+  maximum: 10

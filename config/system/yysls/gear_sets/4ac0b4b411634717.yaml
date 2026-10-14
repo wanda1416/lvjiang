@@ -1,13 +1,11 @@
 content_version: 1
 schema_version: 2
-id: e49c42f356064dc2943c153f044ccf98
+id: 4ac0b4b411634717
 name: 满值搭配
 playstyle: 无名
-level: 115
 chengyin: false
 combat_type: pve
 gongjue: 会意
-gongjue_level: 115
 equipment:
   main_weapon:
     type: 剑

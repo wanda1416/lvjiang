@@ -20,10 +20,9 @@ def setup_import(tmp_path):
     gc = get_game_config()
     repo = LoadoutRepository("test-user", tmp_path / "users")
     plan = repo.create_plan("导入目标", "无名剑法", "无名枪法", playstyle="无名")
-    build = BuildDefinition.create("测试搭配", "无名", 115)
+    build = BuildDefinition.create("测试搭配", "无名")
     build.equipment = allocate(counts() | {"劲": 9}).equipment
     build.gongjue = "会意"
-    build.gongjue_level = 115
     return gc, repo, plan, build
 
 
@@ -36,10 +35,10 @@ def test_import_preserves_pool_other_plans_positions_and_reuses_mocks(setup_impo
     repo.set_plan_equipment_set(plan.id, "ring", "old-set")
     before = repo.load()
     build_before = copy.deepcopy(build)
-    equipment = materialize_build(build, gc)
+    equipment = materialize_build(build, gc, 115)
     simulated = apply_hypothetical_caps(build_before.equipment, full_dingyin=True, playstyle=build.playstyle)
     assert equipment_attrs(equipment, gc) == equipment_attrs(simulated, gc)
-    state = import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc)
+    state = import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc, level=115)
     assert build == build_before
     assert state.equipment_items["old-real"] == before.equipment_items["old-real"]
     assert state.plans[other.id] == before.plans[other.id]
@@ -56,25 +55,25 @@ def test_import_preserves_pool_other_plans_positions_and_reuses_mocks(setup_impo
         for i in range(1, 6):
             assert equip.get(f"affix_{i}") == equipment[slot].get(f"affix_{i}")
     pool = copy.deepcopy(state.equipment_items)
-    again = import_build(repo, plan.id, build, expected_plan=target.to_dict(), game_config=gc)
+    again = import_build(repo, plan.id, build, expected_plan=target.to_dict(), game_config=gc, level=115)
     assert again.equipment_items == pool
 
 
 def test_conflict_and_stale_plan_never_write_partial_import(setup_import):
     gc, repo, plan, build = setup_import
-    equipment = materialize_build(build, gc)
+    equipment = materialize_build(build, gc, 115)
     conflict = copy.deepcopy(equipment["wrist"])
     conflict["dingyin"]["value"] = 1
     repo.upsert_item(conflict)
     before = repo.load()
     with pytest.raises(ValueError, match="同指纹"):
-        import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc)
+        import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc, level=115)
     assert repo.load() == before
     expected = before.plans[plan.id].to_dict()
     repo.assign_equipment(plan.id, "ring", {"_fp": "new-real", "type": "环", "level": 110})
     before = repo.load()
     with pytest.raises(ValueError, match="已修改"):
-        import_build(repo, plan.id, build, expected_plan=expected, game_config=gc)
+        import_build(repo, plan.id, build, expected_plan=expected, game_config=gc, level=115)
     assert repo.load() == before
 
 
@@ -82,19 +81,19 @@ def test_import_checks_level_and_unordered_arts(setup_import):
     gc, repo, plan, build = setup_import
     build.combat_type = "pvp"
     with pytest.raises(ValueError, match="只支持 PVE"):
-        materialize_build(build, gc)
+        materialize_build(build, gc, 115)
     build.combat_type = "pve"
     repo.set_world_level(110)
     before = repo.load()
     with pytest.raises(ValueError, match="高于"):
-        import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc)
+        import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc, level=115)
     assert repo.load() == before
     repo.set_world_level(115)
     def reverse(state):
         p = state.plans[plan.id]
         p.main_martial_art, p.sub_martial_art = p.sub_martial_art, p.main_martial_art
     state = repo.update(reverse)
-    state = import_build(repo, plan.id, build, expected_plan=state.plans[plan.id].to_dict(), game_config=gc)
+    state = import_build(repo, plan.id, build, expected_plan=state.plans[plan.id].to_dict(), game_config=gc, level=115)
     equipped = state.resolved_equipment(plan.id)
     assert equipped["main_weapon"]["type"] == "枪"
     assert equipped["sub_weapon"]["type"] == "剑"
@@ -102,12 +101,12 @@ def test_import_checks_level_and_unordered_arts(setup_import):
 
 def test_no_set_import_does_not_inherit_existing_mock_set(setup_import):
     gc, repo, plan, build = setup_import
-    existing = materialize_build(build, gc)["ring"]
+    existing = materialize_build(build, gc, 115)["ring"]
     existing["equipment_set"] = "existing-set"
     repo.upsert_item(existing)
     before = repo.load()
     with pytest.raises(ValueError, match="同指纹"):
-        import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc)
+        import_build(repo, plan.id, build, expected_plan=before.plans[plan.id].to_dict(), game_config=gc, level=115)
     assert repo.load() == before
 
 

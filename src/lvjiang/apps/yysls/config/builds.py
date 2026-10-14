@@ -21,32 +21,41 @@ BUILD_SCHEMA_VERSION = 2
 REQUIREMENT_PRIORITIES = ("required", "optimal", "recommended")
 
 
+def new_build_id() -> str:
+    """新搭配 id：无含义的稳定标识，也是文件名。
+
+    id 与展示名必须分离——改名字不动 id，文件名里也不出现名称。取 uuid4 的
+    前 16 位 hex：32 位在列表和路径里都太长，而 16 位仍有约 60 位随机量，
+    对几十上百套搭配不存在实际碰撞风险。所有生成点都走这里，不要各写一份。
+    """
+    return uuid4().hex[:16]
+
+
 @dataclass
 class BuildDefinition:
     id: str
     name: str
     playstyle: str
-    level: int
     chengyin: bool = True
     combat_type: str = "pve"
     gongjue: str = ""
-    gongjue_level: int = 0
     equipment: dict[str, dict] = field(default_factory=dict)
     requirements: list[dict] = field(default_factory=list)
     storage: str = "local"  # 读取来源／保存目标；不写进文件。
     content_version: int = 1
 
     @classmethod
-    def create(cls, name: str, playstyle: str, level: int) -> BuildDefinition:
-        return cls(uuid4().hex, name, playstyle, level)
+    def create(cls, name: str, playstyle: str) -> BuildDefinition:
+        return cls(new_build_id(), name, playstyle)
 
     @classmethod
     def from_dict(cls, key: str, data: dict) -> BuildDefinition:
+        # 兼容早期文件里遗留的 level：等级是模拟计算器的运行时参数，读取时忽略。
         return cls(
             id=key, name=str(data.get("name") or ""), playstyle=str(data.get("playstyle") or ""),
-            level=int(data.get("level") or 0), chengyin=bool(data.get("chengyin", True)),
+            chengyin=bool(data.get("chengyin", True)),
             combat_type=str(data.get("combat_type") or "pve"),
-            gongjue=str(data.get("gongjue") or ""), gongjue_level=int(data.get("gongjue_level") or 0),
+            gongjue=str(data.get("gongjue") or ""),
             equipment=copy.deepcopy(data.get("equipment") or {}),
             requirements=copy.deepcopy(data.get("requirements") or []),
             content_version=int(data.get("content_version") or 1),
@@ -68,8 +77,8 @@ class BuildDefinition:
     def validate(self) -> None:
         from ..core.loadout.affix_distribution import TOTAL_AFFIXES_MAX
 
-        if not self.name.strip() or not self.playstyle or self.level <= 0:
-            raise ValueError("请填写出装名称、玩法及装备等级")
+        if not self.name.strip() or not self.playstyle:
+            raise ValueError("请填写出装名称和玩法")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", self.id):
             raise ValueError("搭配 ID 格式无效")
         if self.storage not in ("system", "local"):

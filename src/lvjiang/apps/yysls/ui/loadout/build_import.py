@@ -36,6 +36,7 @@ class BuildImportDialog(QDialog):
         self.builds_repo = builds or BuildRepository()
         self.builds = copy.deepcopy(self.builds_repo.all(self.plan.playstyle)) if self.plan.playstyle else []
         self._equipment: dict[str, dict] = {}
+        self._level = 0
         layout = QVBoxLayout(self)
         target = QLabel(tr("目标用户：{user}　备战方案：{plan}　玩法：{style}").format(
             user=username, plan=self.plan.name, style=self.plan.playstyle or tr("未选择")))
@@ -44,7 +45,7 @@ class BuildImportDialog(QDialog):
         layout.addWidget(target)
         self.combo = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
         for build in self.builds:
-            self.combo.addItem(f"{build.name} · {build.level}级 · {'承音' if build.chengyin else '普通'}", build.id)
+            self.combo.addItem(f"{build.name} · {'承音' if build.chengyin else '普通'}", build.id)
         layout.addWidget(self.combo)
         self.details = QLabel()
         self.details.setWordWrap(True)
@@ -85,13 +86,14 @@ class BuildImportDialog(QDialog):
             self.status.setText(tr("当前玩法没有可导入的出装搭配"))
             return
         build = self.builds[index]
-        level = build.gongjue_level or self.gc.gongjue_level_for(build.level)
-        self.details.setText(tr("弓玦：{name}（{level}级）　战斗类型：{type}").format(
-            name=build.gongjue or tr("无"), level=level, type=build.combat_type.upper()))
+        # 搭配不绑定等级：按当前用户可用的最高等级生成，任何搭配都能适配。
+        self._level = self.state.effective_world_level(self.gc.current_equip_level())
+        gongjue_level = self.gc.gongjue_level_for(self._level)
+        self.details.setText(tr("弓玦：{name}（{level}级）　装备等级：{equip_level}　战斗类型：{type}").format(
+            name=build.gongjue or tr("无"), level=gongjue_level, equip_level=self._level,
+            type=build.combat_type.upper()))
         try:
-            if build.level > self.state.effective_world_level(self.gc.current_equip_level()):
-                raise ValueError(tr("搭配等级高于当前用户世界等级，请选择适用等级的搭配"))
-            self._equipment = equipment_for_plan(build, self.plan, self.gc)
+            self._equipment = equipment_for_plan(build, self.plan, self.gc, self._level)
         except (ValueError, KeyError, TypeError) as exc:
             self.status.setText(str(exc))
             return
@@ -127,7 +129,8 @@ class BuildImportDialog(QDialog):
                                     QMessageBox.StandardButton.Cancel) != QMessageBox.StandardButton.Yes:
                 return
         try:
-            import_build(self.repo, self.plan.id, build, expected_plan=self.expected_plan, game_config=self.gc)
+            import_build(self.repo, self.plan.id, build, expected_plan=self.expected_plan,
+                         game_config=self.gc, level=self._level)
         except (ValueError, KeyError, TypeError, OSError, TimeoutError) as exc:
             QMessageBox.warning(self, tr("导入失败"), str(exc))
             return

@@ -1,0 +1,150 @@
+content_version: 1
+schema_version: 2
+id: 5738a0a3be02436d
+name: 牵丝玉春断
+playstyle: 走地玉
+chengyin: true
+combat_type: pve
+gongjue: 会心
+equipment:
+  main_weapon:
+    type: 伞
+    equipment_set: yanliuchongchong
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 精准率
+    affix_5:
+      name: 伞武学增效
+  sub_weapon:
+    type: 扇
+    equipment_set: yanliuchongchong
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 会心率
+    affix_5:
+      name: 扇武学增效
+  head:
+    type: 冠胄
+    equipment_set: buzhihan
+    affix_1:
+      name: 会心率
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 敏
+    affix_5:
+      name: 会心率
+  chest:
+    type: 胸甲
+    equipment_set: buzhihan
+    affix_1:
+      name: 会心率
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 敏
+    affix_5:
+      name: 会心率
+  ring:
+    type: 环
+    equipment_set: yanliuchongchong
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 会心率
+    affix_5:
+      name: 全武学增效
+  pendant:
+    type: 佩
+    equipment_set: yanliuchongchong
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 会心率
+    affix_5:
+      name: 全武学增效
+  leg:
+    type: 胫甲
+    equipment_set: buzhihan
+    affix_1:
+      name: 劲
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 会心率
+    affix_5:
+      name: 对首领单位增伤
+  wrist:
+    type: 腕甲
+    equipment_set: buzhihan
+    affix_1:
+      name: 劲
+    affix_2:
+      name: 最大外功攻击
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 敏
+    affix_5:
+      name: 对首领单位增伤
+requirements:
+- affix: 最大外功攻击
+  priority: optimal
+  minimum: 12
+  maximum: 12
+- affix: 会心率
+  priority: optimal
+  minimum: 8
+  maximum: 8
+- affix: 精准率
+  priority: optimal
+  minimum: 1
+  maximum: 1
+- affix: 敏
+  priority: optimal
+  minimum: 3
+  maximum: 3
+- affix: 劲
+  priority: optimal
+  minimum: 10
+  maximum: 10
+- affix: 对首领单位增伤
+  priority: required
+  minimum: 2
+  maximum: 2
+- affix: 全武学增效
+  priority: required
+  minimum: 2
+  maximum: 2
+- affix: 伞武学增效
+  priority: required
+  minimum: 1
+  maximum: 1
+- affix: 扇武学增效
+  priority: required
+  minimum: 1
+  maximum: 1

@@ -215,3 +215,65 @@ def equipment_template(equipment: dict[str, dict]) -> dict[str, dict]:
         }
         for slot, equip in copy.deepcopy(equipment).items()
     }
+
+
+def affix_summary(equipment: dict[str, dict], attribute: str, game_config) -> str:
+    """把八件装备的词条压缩成简短描述，如「1剑增2首领增10大外」。
+
+    词条先按词组配置的简称归并（缺简称时保留原名），再把通用属攻并入具体
+    大属攻（1 大无相 + 2 大鸣金 → 3 大鸣金），最后按数量升序拼接；数量相同
+    按词组声明序，保证同一套装备的描述稳定可复现。
+    """
+    counts: Counter[str] = Counter()
+    for equip in equipment.values():
+        for i in range(1, 6):
+            name = str((equip.get(f"affix_{i}") or {}).get("name") or "")
+            if name:
+                counts[name] += 1
+    if not counts:
+        return ""
+    order = {name: index for index, name in enumerate(game_config.get_normal_affix_names())}
+    labels: dict[str, int] = {}
+    label_order: dict[str, int] = {}
+    for name, count in counts.items():
+        label = _short_label(name, game_config)
+        labels[label] = labels.get(label, 0) + count
+        label_order[label] = order.get(name, len(order))
+    _merge_generic_attribute_attack(labels, counts, attribute, game_config)
+    return "".join(
+        f"{count}{label}"
+        for label, count in sorted(labels.items(), key=lambda item: (item[1], label_order[item[0]]))
+    )
+
+
+def _short_label(name: str, game_config) -> str:
+    """词条的展示简称：词组配置里的别名，没配置就用原名。"""
+    aliases = game_config.get_affix_aliases(name)
+    return aliases[0] if aliases else name
+
+
+def _merge_generic_attribute_attack(labels: dict[str, int], counts: Counter[str],
+                                    attribute: str, game_config) -> None:
+    """把通用属攻（最大无相攻击）并入同池的具体大属攻。
+
+    无相在武器部位就是该流派的属攻，与具体属性攻击共用同一套上限；本属或
+    唯一的大属攻才合并，多属攻并存时保持原样，不做猜测。
+    """
+    generic = next((name for name, key in
+                    dynamic_affix_map(attribute, game_config=game_config, weapon=True).items()
+                    if key == DYNAMIC_AFFIXES[0]), None)
+    if not generic or generic not in counts:
+        return
+    dynamic = dynamic_affix_map(attribute, game_config=game_config)
+    candidates = [name for name in counts if name != generic
+                  and dynamic.get(name) in (DYNAMIC_AFFIXES[0], DYNAMIC_AFFIXES[2])]
+    target = next((name for name in candidates if dynamic.get(name) == DYNAMIC_AFFIXES[0]), None)
+    if target is None and len(candidates) == 1:
+        target = candidates[0]
+    if target is None:
+        return
+    generic_label = _short_label(generic, game_config)
+    if generic_label not in labels:
+        return
+    target_label = _short_label(target, game_config)
+    labels[target_label] = labels.get(target_label, 0) + labels.pop(generic_label)

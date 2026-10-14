@@ -21,6 +21,14 @@
 运行 `python scripts/one_off/verify_profile_change_example.py`；示例中的循环与异常
 分支会有意产生错误日志，最终应输出 `PASS`。它不自动创建真实用户定义。
 
+## 流派目标预置导入
+
+[导入脚本](import_school_target_presets.py) 把外部调律器的 20 条「流派 → 目标词条条数」
+展开成系统预置出装搭配。数据与映射内联在脚本里，生成结果写入
+`config/system/yysls/gear_sets/`。口径（承音数值、弓玦按流派、套装按推荐、等级不落盘）
+见脚本头注释。运行 `python scripts/one_off/import_school_target_presets.py`（需开发模式），
+可重复执行覆盖已生成的条目。
+
 ## 废弃文件锁
 
 [停机清理](cleanup_obsolete_locks.py) 仅用于本轮锁收敛后移除已废弃侧车。

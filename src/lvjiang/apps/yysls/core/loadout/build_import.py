@@ -14,15 +14,19 @@ from .models import LoadoutPlan
 from .repository import LoadoutRepository, stamp_equipment_write
 
 
-def materialize_build(build: BuildDefinition, game_config) -> dict[str, dict]:
-    """按保存的槽位生成满值金装；不重新分配，不修改搭配。"""
+def materialize_build(build: BuildDefinition, game_config, level: int) -> dict[str, dict]:
+    """按保存的槽位生成满值金装；不重新分配，不修改搭配。
+
+    ``level`` 是本次模拟/导入的运行时等级：搭配只记录词条与套装，可适配任意等级。
+    """
     build.validate()
     if set(build.equipment) != set(EQUIPMENT_SLOTS):
         raise ValueError("搭配必须包含八件装备")
     style = game_config.get_playstyle(build.playstyle)
     if not style:
         raise ValueError("搭配的玩法已不存在")
-    gongjue_level = build.gongjue_level or game_config.gongjue_level_for(build.level)
+    # 弓玦等级不再随搭配保存：按本次运行时等级取该赛季的默认弓玦等级。
+    gongjue_level = game_config.gongjue_level_for(level)
     if build.gongjue and game_config.get_gongjue_bonus(build.gongjue, gongjue_level) is None:
         raise ValueError("搭配的弓玦套装或等级没有有效配置")
     base_config = game_config.get_raw().get("base_attrs", {})
@@ -42,19 +46,19 @@ def materialize_build(build: BuildDefinition, game_config) -> dict[str, dict]:
             raise ValueError(f"{spec.label}装备类型与搭配玩法不匹配")
         group = game_config.get_type_to_group().get(kind)
         first = (template.get("affix_1") or {}).get("name")
-        if first not in game_config.get_first_affixes(group, build.level):
+        if first not in game_config.get_first_affixes(group, level):
             raise ValueError(f"{spec.label}缺少该等级合法首词条")
-        allowed = set(normal_affix_candidates({"type": kind, "level": build.level}, game_config))
+        allowed = set(normal_affix_candidates({"type": kind, "level": level}, game_config))
         equip: dict = {
-            "type": kind, "name": build.name, "level": build.level,
-            "original_level": build.level, "quality": "gold", "is_chengyin": build.chengyin,
+            "type": kind, "name": build.name, "level": level,
+            "original_level": level, "quality": "gold", "is_chengyin": build.chengyin,
             "equipment_set": str(template.get("equipment_set") or ""),
             "base_attr_2": None,
         }
         side = "left" if group in ("weapon", "ring", "pendant") else "right"
         if equip["equipment_set"] and equip["equipment_set"] not in game_config.get_equipment_sets(side):
             raise ValueError(f"{spec.label}套装已不存在或不适用于该部位")
-        low, high = game_config.get_base_attr_values(group, build.level, "gold")
+        low, high = game_config.get_base_attr_values(group, level, "gold")
         base = base_config.get(group, {})
         base = base_config.get(base.get("_follow"), {}) if base.get("_follow") else base
         if low is None or high is None or not base.get("_attr"):
@@ -66,16 +70,16 @@ def materialize_build(build: BuildDefinition, game_config) -> dict[str, dict]:
                 continue
             if i > 1 and name not in allowed:
                 raise ValueError(f"{spec.label}第 {i} 条词条不适用于该部位、武器或等级")
-            cap = affix_cap_value(build.level, name, chengyin=build.chengyin, game_config=game_config)
+            cap = affix_cap_value(level, name, chengyin=build.chengyin, game_config=game_config)
             if cap is None:
                 raise ValueError(f"{spec.label}词条「{name}」缺少数值上限")
-            caps = game_config.get_affix_caps(build.level, name) or {}
+            caps = game_config.get_affix_caps(level, name) or {}
             equip[f"affix_{i}"] = {"name": name, "value": cap, "unit": caps.get("unit") or None}
         reasons = validate_combination_dict(equip)
         if reasons:
             raise ValueError(f"{spec.label}：" + "；".join(r.message for r in reasons))
         dingyin = game_config.get_playstyle_dingyin(build.playstyle, kind)
-        if dingyin and not game_config.get_affix_caps(build.level, dingyin):
+        if dingyin and not game_config.get_affix_caps(level, dingyin):
             raise ValueError(f"{spec.label}缺少该等级定音数值上限")
         result[spec.key] = equip
     result = apply_hypothetical_caps(result, full_dingyin=True, playstyle=build.playstyle)
@@ -83,7 +87,7 @@ def materialize_build(build: BuildDefinition, game_config) -> dict[str, dict]:
         for key in [*(f"affix_{i}" for i in range(1, 6)), "dingyin"]:
             affix = equip.get(key)
             if affix:
-                pct = affix_cap_pct(build.level, affix["name"], affix["value"], game_config=game_config)
+                pct = affix_cap_pct(level, affix["name"], affix["value"], game_config=game_config)
                 if pct is not None:
                     affix["cap_pct"] = pct
         equip["_extra"] = {"is_mock": True, "affix_count": sum(bool(equip.get(f"affix_{i}")) for i in range(1, 6))}
@@ -91,13 +95,14 @@ def materialize_build(build: BuildDefinition, game_config) -> dict[str, dict]:
     return result
 
 
-def equipment_for_plan(build: BuildDefinition, plan: LoadoutPlan, game_config) -> dict[str, dict]:
+def equipment_for_plan(build: BuildDefinition, plan: LoadoutPlan, game_config,
+                       level: int) -> dict[str, dict]:
     if plan.playstyle != build.playstyle:
         raise ValueError("搭配玩法与目标备战方案不匹配")
     arts = (game_config.get_playstyle(build.playstyle) or {}).get("arts", [])
     if len(arts) != 2 or set(arts) != {plan.main_martial_art, plan.sub_martial_art}:
         raise ValueError("目标方案的主副武学与搭配玩法不匹配")
-    result = materialize_build(build, game_config)
+    result = materialize_build(build, game_config, level)
     if plan.main_martial_art != arts[0]:
         result["main_weapon"], result["sub_weapon"] = result["sub_weapon"], result["main_weapon"]
     return result
@@ -128,7 +133,7 @@ def _same_mock(existing: dict, incoming: dict) -> bool:
 
 
 def import_build(repo: LoadoutRepository, plan_id: str, build: BuildDefinition,
-                 *, expected_plan: dict, game_config):
+                 *, expected_plan: dict, game_config, level: int):
     """生成、校验并一次性落盘；不覆盖已有装备，不改变其他方案或活动选择。"""
     build = copy.deepcopy(build)
 
@@ -136,9 +141,9 @@ def import_build(repo: LoadoutRepository, plan_id: str, build: BuildDefinition,
         plan = state.plans.get(plan_id)
         if plan is None or plan.to_dict() != expected_plan:
             raise ValueError("目标备战方案已修改或删除，请重新打开导入窗口")
-        if build.level > state.effective_world_level(game_config.current_equip_level()):
+        if level > state.effective_world_level(game_config.current_equip_level()):
             raise ValueError("搭配等级高于当前用户世界等级，请选择适用等级的搭配")
-        equipment = equipment_for_plan(build, plan, game_config)
+        equipment = equipment_for_plan(build, plan, game_config, level)
         for slot, equip in equipment.items():
             fp = equip["_fp"]
             existing = state.equipment_items.get(fp)
@@ -151,7 +156,7 @@ def import_build(repo: LoadoutRepository, plan_id: str, build: BuildDefinition,
             if equip["equipment_set"]:
                 plan.equipment_sets[slot] = equip["equipment_set"]
         plan.gongjue = build.gongjue
-        plan.gongjue_level = build.gongjue_level or game_config.gongjue_level_for(build.level)
+        plan.gongjue_level = game_config.gongjue_level_for(level)
         plan.combat_type = build.combat_type
 
     return repo.update(mutate)

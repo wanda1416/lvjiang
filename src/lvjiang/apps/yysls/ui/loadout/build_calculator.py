@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import copy
-from uuid import uuid4
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QPainter, QPixmap, QStandardItemModel
+from PyQt6.QtGui import QAction, QColor, QDrag, QPainter, QPixmap, QStandardItemModel
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -20,6 +19,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLayout,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -41,7 +41,12 @@ from .....ui.button_styles import apply_button_style, apply_compact_button_style
 from .....ui.layout_helpers import fit_combo_to_contents
 from .....ui.widgets import strip_focus_rect
 from ...config import get_game_config
-from ...config.builds import BuildDefinition, BuildRepository, check_requirements
+from ...config.builds import (
+    BuildDefinition,
+    BuildRepository,
+    check_requirements,
+    new_build_id,
+)
 from ...config.equipment_slots import SLOT_SPECS
 from ...core.affix_cap import affix_cap_value
 from ...core.combat.affix_rules import normal_affix_candidates
@@ -52,6 +57,7 @@ from ...core.graduation.scoring import LoadoutScorer
 from ...core.loadout.affix_distribution import (
     TOTAL_AFFIXES_MAX,
     DistributionResult,
+    affix_summary,
     distribute_affixes,
     distribution_counts,
     native_name,
@@ -347,6 +353,24 @@ def _cell(table: QTableWidget, row: int, column: int, text: object) -> None:
     table.setItem(row, column, item)
 
 
+def playstyle_change_reason(build: BuildDefinition, playstyle: str, game_config) -> str:
+    """搭配能否直接改挂到该玩法；不能时返回可展示的原因。
+
+    玩法决定主副武器的类型，武器不符就无法生成合法装备，所以先在这里拦住，
+    而不是等用户导入时才报「装备类型与搭配玩法不匹配」。
+    """
+    config = game_config.get_playstyle(playstyle)
+    if not config:
+        return tr("玩法不存在")
+    for slot, label in (("main_weapon", tr("主武器")), ("sub_weapon", tr("副武器"))):
+        expected = str(config.get(slot) or "")
+        actual = str((build.equipment.get(slot) or {}).get("type") or "")
+        if expected and actual and expected != actual:
+            return tr("{label}是 {actual}，该玩法需要 {expected}").format(
+                label=label, actual=actual, expected=expected)
+    return ""
+
+
 def template_for_playstyle(playstyle: str, game_config) -> dict[str, dict]:
     cfg = game_config.get_playstyle(playstyle) or {}
     return {
@@ -358,12 +382,15 @@ def template_for_playstyle(playstyle: str, game_config) -> dict[str, dict]:
 
 class BuildEditor(QWidget):
     def __init__(self, playstyle: str, *, repository=None, context=None,
-                 equipped=None, initial=None, host=None, parent=None):
+                 equipped=None, initial=None, host=None, parent=None,
+                 header_label: str = "", header_tip: str = ""):
         super().__init__(parent)
         self.gc = get_game_config()
         self.repository = repository or BuildRepository()
         self.context: PlanScoringContext | None = context
         self._host = host
+        self._header_label = header_label
+        self._header_tip = header_tip
         self.playstyle = playstyle
         self.attribute = str((self.gc.get_playstyle(playstyle) or {}).get("attr") or "")
         self._loading = True
@@ -399,19 +426,39 @@ class BuildEditor(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(6)
+        # 第一行不可编辑：选择要编辑哪套搭配，并展示本次模拟的上下文。
+        header = QHBoxLayout()
+        header.addWidget(QLabel(tr("出装搭配")))
+        self.build_combo = AutoWidthComboBox()
+        self.build_combo.setMinimumContentsLength(18)
+        self.build_combo.currentIndexChanged.connect(self._switch_build)
+        header.addWidget(self.build_combo)
+        if self._header_label:
+            header.addSpacing(12)
+            info = QLabel(self._header_label)
+            info.setProperty("tone", "muted")
+            if self._header_tip:
+                info.setToolTip(self._header_tip)
+            header.addWidget(info)
+        header.addStretch()
+        root.addLayout(header)
+
         toolbar = QFrame()
         toolbar.setProperty("surface", "card")
         toolbar_layout = QVBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(10, 6, 10, 6)
         toolbar_layout.setSpacing(6)
         root.addWidget(toolbar)
-        selection = QHBoxLayout()
-        selection.addWidget(QLabel(tr("出装搭配")))
-        self.build_combo = AutoWidthComboBox()
-        self.build_combo.setMinimumContentsLength(18)
-        self.build_combo.currentIndexChanged.connect(self._switch_build)
-        selection.addWidget(self.build_combo, 1)
-        selection.addWidget(QLabel(tr("保存位置")))
+
+        # 第二行：会写回搭配的数据。
+        data_row = QHBoxLayout()
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText(tr("出装搭配名称"))
+        self.name_edit.setMinimumWidth(220)
+        self.name_edit.setMaximumWidth(320)
+        self.name_edit.textChanged.connect(self._changed)
+        data_row.addWidget(self.name_edit)
+        data_row.addWidget(QLabel(tr("保存位置")))
         self.save_location = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
         self.save_location.addItem(tr("本地"), "local")
         self.save_location.addItem(tr("系统预置"), "system")
@@ -422,54 +469,66 @@ class BuildEditor(QWidget):
             model.item(1).setToolTip(tr("普通用户不能写入系统预置"))
         self.save_location.setToolTip(tr("保存到其他位置会另存一份，原搭配保留"))
         self.save_location.currentIndexChanged.connect(self._changed)
-        selection.addWidget(self.save_location)
-        self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText(tr("出装搭配名称"))
-        self.name_edit.textChanged.connect(self._changed)
-        selection.addWidget(self.name_edit, 1)
-        for label, callback in [("保存出装搭配", lambda: self.save(False)),
-                                ("另存为新搭配", lambda: self.save(True))]:
-            button = QPushButton(tr(label))
-            apply_button_style(button, variant="action" if label == "保存出装搭配" else "neutral")
-            button.clicked.connect(callback)
-            selection.addWidget(button)
-            if label == "保存出装搭配":
-                self.save_button = button
-            else:
-                self.save_as_button = button
-        toolbar_layout.addLayout(selection)
-        settings = QHBoxLayout()
-        settings.addWidget(QLabel(tr("装备等级")))
-        self.level = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
-        for cfg in self.gc.get_level_configs():
-            self.level.addItem(str(cfg.level), cfg.level)
-        self.level.currentIndexChanged.connect(self._level_changed)
-        settings.addWidget(self.level)
-        self.chengyin = QCheckBox(tr("承音数值"))
-        self.chengyin.setToolTip(tr("取消后按普通词条满值计算；装备基础属性和定音仍按所选等级"))
-        self.chengyin.toggled.connect(self._changed)
-        settings.addWidget(QLabel(tr("弓玦套装")))
-        self.gongjue = AutoWidthComboBox()
+        data_row.addWidget(self.save_location)
+        data_row.addWidget(QLabel(tr("弓玦套装")))
+        self.gongjue = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
         self.gongjue.addItem(tr("无"), "")
         # 与现有战斗属性页共用候选，而非另写游戏事实。
         from .combat.attrs_tab import _GONGJUE_TYPES
         for name in _GONGJUE_TYPES[1:]:
             self.gongjue.addItem(tr(name), name)
-        fit_combo_to_contents(self.gongjue, minimum=96)
         self.gongjue.currentIndexChanged.connect(self._changed)
-        settings.addWidget(self.gongjue)
-        self.gongjue_level = QSpinBox()
-        self.gongjue_level.setRange(1, 999)
-        self.gongjue_level.valueChanged.connect(self._changed)
-        settings.addWidget(self.gongjue_level)
-        settings.addSpacing(12)
-        settings.addWidget(self.chengyin)
-        settings.addStretch()
+        data_row.addWidget(self.gongjue)
+        self.chengyin = QCheckBox(tr("承音数值"))
+        self.chengyin.setToolTip(tr("取消后按普通词条满值计算；装备基础属性和定音仍按所选等级"))
+        self.chengyin.toggled.connect(self._changed)
+        data_row.addWidget(self.chengyin)
+        data_row.addStretch()
+        for label, callback in [("保存出装搭配", lambda: self.save(False)),
+                                ("另存为新搭配", lambda: self.save(True))]:
+            button = QPushButton(tr(label))
+            apply_button_style(button, variant="action" if label == "保存出装搭配" else "neutral")
+            button.clicked.connect(callback)
+            data_row.addWidget(button)
+            if label == "保存出装搭配":
+                self.save_button = button
+            else:
+                self.save_as_button = button
+        toolbar_layout.addLayout(data_row)
+
+        # 第三行：只影响本次模拟的变量与计算结果。
+        runtime_row = QHBoxLayout()
+        runtime_row.addWidget(QLabel(tr("装备等级")))
+        self.level = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        for cfg in self.gc.get_level_configs():
+            self.level.addItem(str(cfg.level), cfg.level)
+        self.level.currentIndexChanged.connect(self._level_changed)
+        default_level = self.context.world_level if self.context else self.gc.current_equip_level()
+        self.level.setCurrentIndex(max(0, self.level.findData(default_level)))
+        runtime_row.addWidget(self.level)
+        runtime_row.addWidget(QLabel(tr("弓玦等级")))
+        # 与装备等级同款：只列配置里的等级档位，不提供 111-114 这类平均等级。
+        self.gongjue_level = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        for cfg in self.gc.get_level_configs():
+            self.gongjue_level.addItem(str(cfg.level), cfg.level)
+        default_gongjue = self._default_gongjue_level()
+        if self.gongjue_level.findData(default_gongjue) < 0:
+            # 方案若手填过平均等级，保留它作为当前值，但不主动列进候选。
+            self.gongjue_level.addItem(str(default_gongjue), default_gongjue)
+        self.gongjue_level.setCurrentIndex(self.gongjue_level.findData(default_gongjue))
+        self.gongjue_level.setToolTip(tr("弓玦实际生效等级，默认取当前赛季档位"))
+        self.gongjue_level.currentIndexChanged.connect(self._changed)
+        runtime_row.addWidget(self.gongjue_level)
+        runtime_hint = QLabel(tr("只影响本次计算，不会写进搭配"))
+        runtime_hint.setProperty("tone", "muted")
+        runtime_hint.setStyleSheet("font-size: 11px;")
+        runtime_row.addWidget(runtime_hint)
+        runtime_row.addStretch()
         self.metrics = QLabel()
         self.metrics.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.metrics.setStyleSheet("font-size: 14px; font-weight: 600;")
-        settings.addWidget(self.metrics)
-        toolbar_layout.addLayout(settings)
+        runtime_row.addWidget(self.metrics)
+        toolbar_layout.addLayout(runtime_row)
         self.status = QLabel()
         self.status.setWordWrap(True)
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -574,18 +633,30 @@ class BuildEditor(QWidget):
         self.build_combo.blockSignals(True)
         self.build_combo.clear()
         self.build_combo.addItem(tr("从当前方案开始"), "")
-        for build in self.repository.all(self.playstyle):
-            self.build_combo.addItem(build.name, build.id)
+        for build, is_current in self._build_choices():
+            label = build.name if is_current else tr("{name}（{style}）").format(
+                name=build.name, style=build.playstyle)
+            self.build_combo.addItem(label, build.id)
         self.build_combo.setCurrentIndex(max(0, self.build_combo.findData(selected)))
         self.build_combo.blockSignals(False)
 
+    def _build_choices(self) -> list[tuple[BuildDefinition, bool]]:
+        """当前玩法的搭配在前，同流派其他玩法的搭配靠后，便于参考与另存。"""
+        school = str((self.gc.get_playstyle(self.playstyle) or {}).get("school") or "")
+        current: list[tuple[BuildDefinition, bool]] = []
+        siblings: list[tuple[BuildDefinition, bool]] = []
+        for build in self.repository.all():
+            if build.playstyle == self.playstyle:
+                current.append((build, True))
+            elif school and str((self.gc.get_playstyle(build.playstyle) or {}).get("school") or "") == school:
+                siblings.append((build, False))
+        return current + siblings
+
     def _load_current(self):
-        level = self.context.world_level if self.context else self.gc.current_equip_level()
-        build = BuildDefinition.create(tr("新出装搭配"), self.playstyle, level)
+        build = BuildDefinition.create(tr("新出装搭配"), self.playstyle)
         build.equipment = copy.deepcopy(self._templates if self._build is None else self._original)
         if self.context:
             build.gongjue = self.context.gongjue
-            build.gongjue_level = self.context.gongjue_level
         self.load_build(build, persisted=False)
 
     def load_build(self, build: BuildDefinition, *, persisted=True):
@@ -595,14 +666,9 @@ class BuildEditor(QWidget):
         self._expected = build.to_dict() if persisted else None
         self.save_location.setCurrentIndex(max(0, self.save_location.findData(build.storage)))
         self.name_edit.setText(build.name)
-        index = self.level.findData(build.level)
-        if index < 0:
-            self.level.addItem(str(build.level), build.level)
-            index = self.level.count() - 1
-        self.level.setCurrentIndex(index)
+        # 等级是本次模拟的运行时参数，切换搭配不改变它。
         self.chengyin.setChecked(build.chengyin)
         self.gongjue.setCurrentIndex(max(0, self.gongjue.findData(build.gongjue)))
-        self.gongjue_level.setValue(build.gongjue_level or self.gc.gongjue_level_for(build.level))
         self._templates = template_for_playstyle(self.playstyle, self.gc)
         self._templates.update(copy.deepcopy(build.equipment))
         counts = distribution_counts(build.equipment, self.attribute, self.gc)
@@ -778,6 +844,19 @@ class BuildEditor(QWidget):
             self.save_as_button.setEnabled(False)
             self._timer.start()
 
+    def _current_level(self) -> int:
+        """本次模拟使用的装备等级；搭配本身不绑定等级。"""
+        return int(self.level.currentData() or 0)
+
+    def _default_gongjue_level(self) -> int:
+        """弓玦等级默认值：优先跟随上下文，否则取当前等级对应的赛季等级。
+
+        弓玦等级同样是运行参数，改它不会写进搭配。
+        """
+        if self.context is not None and self.context.gongjue_level:
+            return int(self.context.gongjue_level)
+        return self.gc.gongjue_level_for(self._current_level())
+
     def counts(self) -> dict[str, int]:
         return {name: spin.value() for name, spin in self._counts.items() if spin.value()}
 
@@ -812,7 +891,7 @@ class BuildEditor(QWidget):
             templates[slot]["equipment_set"] = combo.currentData() or ""
         self.result = distribute_affixes(
             counts, templates, attribute=self.attribute,
-            level=int(self.level.currentData() or 0), chengyin=self.chengyin.isChecked(), game_config=self.gc)
+            level=self._current_level(), chengyin=self.chengyin.isChecked(), game_config=self.gc)
         # 分配器保留部位偏好；普通槽位顺序由当前草稿拥有，保存/重算不能打乱。
         for slot, equip in self.result.equipment.items():
             remaining = [equip.pop(f"affix_{i}", None) for i in range(2, 6)]
@@ -869,21 +948,20 @@ class BuildEditor(QWidget):
         assert context is not None
         base = context.base_attrs_without_gongjue + gongjue_attrs(
             self.gongjue.currentData(), self.gc, world_level=context.world_level,
-            gongjue_level=self.gongjue_level.value())
+            gongjue_level=int(self.gongjue_level.currentData() or 0))
         equipped = apply_hypothetical_caps(self.result.equipment, full_dingyin=True, playstyle=self.playstyle)
         scorer = LoadoutScorer(context.calculator, base, context.school, self.gc, attr_context=context.attr_context)
         rate = scorer.rate(equipped)
         self.metrics.setText(f"{tr('毕业率')} {rate:.2%}  ·  {tr('当前方案')} {self._baseline_rate:.2%}  ·  "
                              f"{tr('变化')} {(rate - self._baseline_rate) * 100:+.2f}%")
-        self.metrics.setToolTip(f"{tr('毕业率方案')}：{context.scheme} · "
-                               f"{tr('模型等级')} {context.model_level} · {tr('模型版本')} {context.model_version}")
+        # 毕业率方案／模型等级／模型版本统一由顶部上下文行承载，这里不再重复一份。
         if self._attrs_preview is not None:
             self._attrs_preview.setEnabled(True)
             self._attrs_preview.show_preview(
                 equipped,
                 gongjue=str(self.gongjue.currentData() or ""),
                 world_level=context.world_level,
-                gongjue_level=self.gongjue_level.value(),
+                gongjue_level=int(self.gongjue_level.currentData() or 0),
                 base_attrs=context.base_attrs_without_gongjue,
                 school=context.school,
             )
@@ -901,18 +979,17 @@ class BuildEditor(QWidget):
             name, ok = QInputDialog.getText(self, tr("另存为新搭配"), tr("名称"), text=self.name_edit.text())
             if not ok or not name.strip():
                 return
-            build.id, build.name = uuid4().hex, name.strip()
+            build.id, build.name = new_build_id(), name.strip()
         else:
             build.name = self.name_edit.text().strip()
             if copy_to_location:
-                build.id = uuid4().hex
+                build.id = new_build_id()
         build.storage = target
         if as_new or copy_to_location:
             build.content_version = 1
-        build.level = int(self.level.currentData())
         build.chengyin = self.chengyin.isChecked()
         build.combat_type = "pve"
-        build.gongjue, build.gongjue_level = self.gongjue.currentData(), self.gongjue_level.value()
+        build.gongjue = self.gongjue.currentData()
         build.equipment = copy.deepcopy(self.result.equipment)
         build.requirements = self._requirement_rows()
         try:
@@ -937,7 +1014,7 @@ class BuildEditor(QWidget):
         if not self.confirm_discard():
             self._refresh_builds(self._build.id if self._expected and self._build else "")
             return
-        build = next((b for b in self.repository.all(self.playstyle) if b.id == selected), None)
+        build = next((b for b in self.repository.all() if b.id == selected), None)
         if build:
             self.load_build(build)
         else:
@@ -953,17 +1030,17 @@ class BuildCalculatorDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 12)
         layout.setSpacing(6)
+        # 模拟上下文并入编辑器第一行的不可编辑区，与搭配选择同一行展示。
+        header_label = ""
+        header_tip = ""
         if context:
-            label = QLabel(f"{user_label} · {context.plan_name}  |  {tr('角色基础属性')}：{base_label}")
-            label.setToolTip(f"{context.school} · {context.playstyle} · "
-                             f"{tr('毕业率方案')}：{context.scheme} · "
-                             f"{tr('模型等级')} {context.model_level} · {tr('模型版本')} {context.model_version}")
-            label.setWordWrap(True)
-            label.setProperty("tone", "muted")
-            layout.addWidget(label)
+            header_label = f"{user_label} · {context.plan_name}  |  {tr('角色基础属性')}：{base_label}"
+            header_tip = (f"{context.school} · {context.playstyle} · "
+                          f"{tr('毕业率方案')}：{context.scheme} · "
+                          f"{tr('模型等级')} {context.model_level} · {tr('模型版本')} {context.model_version}")
         self.editor = BuildEditor(playstyle, repository=repository, context=context,
                                   equipped=equipped, initial=initial, host=host,
-                                  parent=self)
+                                  parent=self, header_label=header_label, header_tip=header_tip)
         layout.addWidget(self.editor)
         close = QPushButton(tr("关闭"))
         apply_button_style(close, variant="neutral")
@@ -1009,11 +1086,16 @@ class BuildListPanel(QWidget):
         content_layout.setSpacing(6)
         layout.addWidget(self._content)
         self._toggle.toggled.connect(self._toggle_content)
-        self.table = _table(["名称", "等级", "词条数", "弓玦套装", "保存位置"])
+        self.table = _table(["名称", "词条数", "弓玦套装", "保存位置", "词条搭配"])
         header = self.table.horizontalHeader()
         assert header is not None
         header.setStretchLastSection(False)
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # 前面的列只占内容宽度，剩余空间全部留给最长的「词条搭配」。
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(header.count() - 1, QHeaderView.ResizeMode.Stretch)
+        self.table.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setMinimumHeight(170)
         self.table.cellDoubleClicked.connect(lambda *_: self.edit())
@@ -1043,11 +1125,18 @@ class BuildListPanel(QWidget):
 
     def refresh(self):
         self._items = self.repository.all(self.playstyle) if self.playstyle else []
+        game_config = get_game_config()
+        attribute = str((game_config.get_playstyle(self.playstyle) or {}).get("attr") or "")
         self.table.setRowCount(len(self._items))
         for row, build in enumerate(self._items):
             count = sum(1 for e in build.equipment.values() for i in range(1, 6) if e.get(f"affix_{i}"))
-            for col, text in enumerate([build.name, build.level, f"{count}/40", build.gongjue or tr("无"),
-                                        tr("系统预置") if build.storage == "system" else tr("本地")]):
+            for col, text in enumerate([
+                build.name,
+                f"{count}/40",
+                build.gongjue or tr("无"),
+                tr("系统预置") if build.storage == "system" else tr("本地"),
+                affix_summary(build.equipment, attribute, game_config) or tr("无"),
+            ]):
                 _cell(self.table, row, col, text)
         self._update_actions()
 
@@ -1068,7 +1157,7 @@ class BuildListPanel(QWidget):
     def create(self):
         name, ok = QInputDialog.getText(self, tr("新建出装搭配"), tr("名称"))
         if ok and name.strip():
-            build = BuildDefinition.create(name.strip(), self.playstyle, get_game_config().current_equip_level())
+            build = BuildDefinition.create(name.strip(), self.playstyle)
             try:
                 self.repository.save(build)
             except (ValueError, OSError) as exc:
@@ -1088,7 +1177,7 @@ class BuildListPanel(QWidget):
             name, ok = QInputDialog.getText(self, tr("复制出装搭配"), tr("名称"), text=build.name)
             if ok and name.strip():
                 build = copy.deepcopy(build)
-                build.id, build.name = uuid4().hex, name.strip()
+                build.id, build.name = new_build_id(), name.strip()
                 build.storage = "local"
                 build.content_version = 1
                 try:
@@ -1111,6 +1200,53 @@ class BuildListPanel(QWidget):
             self.refresh()
         except (ValueError, OSError) as exc:
             QMessageBox.warning(self, tr("删除失败"), str(exc))
+
+    def _show_context_menu(self, pos: QPoint) -> None:
+        """右键把搭配改挂到别的玩法：武器体系不符的玩法禁用并说明原因。"""
+        row = self.table.rowAt(pos.y())
+        if not 0 <= row < len(self._items):
+            return
+        self.table.selectRow(row)
+        build = self._items[row]
+        anchor = self.table.viewport().mapToGlobal(pos)
+        menu = QMenu(self)
+        change = QAction(tr("更改玩法类型"), menu)
+        menu.addAction(change)
+        if not self.repository.can_write(build):
+            change.setEnabled(False)
+            change.setToolTip(tr("系统预置只读，请复制或另存为本地搭配"))
+        if menu.exec(anchor) is not change:
+            return
+        target = self._choose_playstyle(build, anchor)
+        if target and target != build.playstyle:
+            self._change_playstyle(build, target)
+
+    def _choose_playstyle(self, build: BuildDefinition, anchor: QPoint) -> str:
+        game_config = get_game_config()
+        menu = QMenu(self)
+        for name in game_config.get_playstyles():
+            action = QAction(name, menu)
+            menu.addAction(action)
+            if name == build.playstyle:
+                action.setEnabled(False)
+                action.setToolTip(tr("当前玩法"))
+                continue
+            reason = playstyle_change_reason(build, name, game_config)
+            if reason:
+                action.setEnabled(False)
+                action.setToolTip(reason)
+        chosen = menu.exec(anchor)
+        return chosen.text() if chosen else ""
+
+    def _change_playstyle(self, build: BuildDefinition, target: str) -> None:
+        updated = copy.deepcopy(build)
+        updated.playstyle = target
+        try:
+            self.repository.save(updated, expected=build.to_dict())
+        except (ValueError, OSError) as exc:
+            QMessageBox.warning(self, tr("更改玩法类型失败"), str(exc))
+            return
+        self.refresh()
 
 
 def open_build_calculator(host, parent):

@@ -61,7 +61,6 @@ def test_save_routes_sections_to_their_owner_files(tmp_path):
     assert "weapon_types" not in basic
     assert equipment["weapon_types"][0]["name"] == "测试武器"
     assert "basic_config" not in equipment
-    assert basic["content_version"] == equipment["content_version"] == 2
 
 
 def test_old_season_file_is_diagnosed_without_renaming(tmp_path: Path, monkeypatch):

@@ -1,15 +1,23 @@
 """单搭配存储、写入权限与编辑上下文隔离。"""
 import copy
+import re
 
 import pytest
 from PyQt6.QtGui import QStandardItemModel
+from PyQt6.QtWidgets import QInputDialog
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.config.builds import (
     GEAR_SETS_DIR,
     BuildDefinition,
     BuildRepository,
 )
-from lvjiang.apps.yysls.ui.loadout.build_calculator import BuildEditor, BuildListPanel
+from lvjiang.apps.yysls.ui.loadout.build_calculator import (
+    BuildCalculatorDialog,
+    BuildEditor,
+    BuildListPanel,
+    playstyle_change_reason,
+)
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 from tests.yysls.test_build_calculator import allocate, counts
 
@@ -21,7 +29,7 @@ def repositories(tmp_path):
 
 
 def build(name, storage="local"):
-    value = BuildDefinition.create(name, "无名", 115)
+    value = BuildDefinition.create(name, "无名")
     value.storage = storage
     value.equipment = allocate(counts()).equipment
     return value
@@ -75,7 +83,30 @@ def test_constraints_follow_build_and_system_save_as_keeps_original(tmp_path, qt
     qtbot.addWidget(panel)
     panel.set_playstyle("无名")
     assert panel.table.columnCount() == 5
-    assert panel.table.item(0, 4).text() == "系统预置"
+    assert panel.table.item(0, 3).text() == "系统预置"
+    # 「词条搭配」列用简称压缩 40 条词条，不再是等级。
+    assert "劲" in panel.table.item(0, 4).text()
+
+
+def test_list_panel_create_saves_opaque_id(tmp_path, qtbot, monkeypatch):
+    """列表页「新建出装搭配」：id 无含义、文件名即 id。
+
+    这条路径曾漏改 `create` 的签名（多传一个等级），点按钮就 TypeError，
+    而当时没有用例真正驱动它。
+    """
+    developer, _user = repositories(tmp_path)
+    panel = BuildListPanel(repository=developer)
+    qtbot.addWidget(panel)
+    panel.set_playstyle("无名")
+    monkeypatch.setattr(QInputDialog, "getText",
+                        lambda *args, **kwargs: ("新建的搭配", True))
+    # 新建后立刻打开编辑器；这里只关注落盘结果，不打桩会被模态门禁拦下。
+    monkeypatch.setattr(BuildCalculatorDialog, "exec", lambda *args, **kwargs: 0)
+    panel.create()
+    builds = developer.all()
+    assert [item.name for item in builds] == ["新建的搭配"]
+    assert re.fullmatch(r"[0-9a-f]{16}", builds[0].id)
+    assert (developer.resolver.local_dir / GEAR_SETS_DIR / f"{builds[0].id}.yaml").is_file()
 
 
 def test_developer_can_explicitly_save_system_without_changing_source(tmp_path, qtbot):
@@ -90,3 +121,19 @@ def test_developer_can_explicitly_save_system_without_changing_source(tmp_path, 
     assert [item.storage for item in saved] == ["system", "local"]
     assert saved[1].id == local.id and saved[1].to_dict() == local.to_dict()
     assert saved[0].id != local.id
+
+
+def test_playstyle_change_requires_matching_weapons_and_saves(tmp_path, qtbot):
+    """改玩法类型：武器体系一致才允许，冲突时给出原因；允许时写盘并生效。"""
+    developer, _user = repositories(tmp_path)
+    game_config = get_game_config()
+    preset = build("可改玩法")
+    developer.save(preset)
+    assert playstyle_change_reason(preset, "九剑", game_config) == ""
+    assert "手甲" in playstyle_change_reason(preset, "鸢鸢", game_config)
+    panel = BuildListPanel(repository=developer)
+    qtbot.addWidget(panel)
+    panel.set_playstyle("无名")
+    assert len(panel._items) == 1
+    panel._change_playstyle(panel._items[0], "九剑")
+    assert [item.playstyle for item in developer.all()] == ["九剑"]

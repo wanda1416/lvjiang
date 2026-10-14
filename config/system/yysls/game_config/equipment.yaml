@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 base_attrs:
   weapon:
     _attr: 外功攻击
@@ -217,12 +217,6 @@ base_attrs:
       through_level: 110
     - 外功防御
     - 气血最大值
-# 弓玦实测加成（百分数）；中间等级按区间给出，不从普通词条上限推算。
-gongjue_bonuses:
-  会意:
-    110: 3.5
-    111-114: 3.75
-    115: 4.0
 equipment_sets:
   left:
     yudou:
@@ -317,6 +311,11 @@ equipment_sets:
       name: 御无缺
     yingzhan:
       name: 盈盏
+gongjue_bonuses:
+  会意:
+    110: 3.5
+    111-114: 3.75
+    115: 4.0
 equipment_name_series:
   output:
     110: 流星

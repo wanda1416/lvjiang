@@ -1,6 +1,7 @@
 """总量分配、独立保存与编辑状态的业务契约。全部写入临时配置。"""
 import copy
 import random
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -15,6 +16,7 @@ from lvjiang.apps.yysls.config.builds import (
 )
 from lvjiang.apps.yysls.core.equip_validator import validate_combination_dict
 from lvjiang.apps.yysls.core.loadout.affix_distribution import (
+    affix_summary,
     distribute_affixes,
     distribution_counts,
 )
@@ -141,13 +143,29 @@ def test_native_attack_resolves_by_equipment_position():
         assert expected in names
 
 
+def test_build_id_is_opaque_filename_and_survives_rename(repository):
+    """id 无含义且就是文件名：改展示名不动 id，也不产生新文件。"""
+    from lvjiang.apps.yysls.config.builds import GEAR_SETS_DIR
+
+    build = BuildDefinition.create("满值搭配", "无名")
+    assert re.fullmatch(r"[0-9a-f]{16}", build.id)
+    repository.save(build)
+    path = repository.resolver.local_dir / GEAR_SETS_DIR / f"{build.id}.yaml"
+    assert path.is_file()
+    expected = build.to_dict()
+    build.name = "改过的名字"
+    repository.save(build, expected=expected)
+    assert [item.id for item in repository.all()] == [build.id]
+    assert path.is_file()
+
+
 def test_system_override_can_clear_an_affix_without_deleting_preset(repository):
     import yaml
 
     from lvjiang.apps.yysls.config.builds import GEAR_SETS_DIR
     from lvjiang.core.config.resolver import SystemContentProtected
 
-    build = BuildDefinition.create("预设", "无名", 115)
+    build = BuildDefinition.create("预设", "无名")
     build.equipment = allocate(counts()).equipment
     path = repository.resolver.system_dir / GEAR_SETS_DIR / f"{build.id}.yaml"
     path.parent.mkdir(parents=True)
@@ -164,8 +182,8 @@ def test_system_override_can_clear_an_affix_without_deleting_preset(repository):
 
 
 def test_repository_merges_only_selected_build_and_rejects_stale_save(repository):
-    a = BuildDefinition.create("测试搭配甲", "无名", 115)
-    b = BuildDefinition.create("测试搭配乙", "无名", 115)
+    a = BuildDefinition.create("测试搭配甲", "无名")
+    b = BuildDefinition.create("测试搭配乙", "无名")
     repository.save(a)
     expected = a.to_dict()
     repository.save(b)
@@ -179,7 +197,7 @@ def test_repository_merges_only_selected_build_and_rejects_stale_save(repository
 
 
 def test_saved_build_contains_no_private_equipment_metadata(repository):
-    build = BuildDefinition.create("公开模板", "无名", 115)
+    build = BuildDefinition.create("公开模板", "无名")
     build.equipment = allocate(counts()).equipment
     build.equipment["main_weapon"].update(fingerprint="fake-private-fingerprint", owner="fake-user", scan_time="fake-time")
     repository.save(build)
@@ -199,7 +217,7 @@ def test_requirements_do_not_mutate_targets():
 
 def test_unmet_requirements_grow_from_bottom_and_share_count_scroll(qtbot, repository):
     """提示只占实际行高；词条和提示超高时一起滚动，不设提示条数上限。"""
-    build = BuildDefinition.create("约束提示", "无名", 115)
+    build = BuildDefinition.create("约束提示", "无名")
     build.equipment = allocate(counts()).equipment
     build.requirements = [
         {"affix": "会意率", "priority": "recommended", "minimum": 6, "maximum": 40},
@@ -267,7 +285,7 @@ def test_swapped_positions_survive_recalculate_and_save(qtbot, repository):
 
     from lvjiang.apps.yysls.ui.loadout.build_calculator import BUILD_DISPLAY_SLOTS
 
-    build = BuildDefinition.create("交换位置", "无名", 115)
+    build = BuildDefinition.create("交换位置", "无名")
     build.equipment = allocate(counts() | {"劲": 9}).equipment
     repository.save(build)
     editor = BuildEditor("无名", repository=repository, initial=build)
@@ -322,7 +340,7 @@ def test_drag_precomputes_targets_and_cancel_keeps_distribution(qtbot, repositor
 
     from lvjiang.apps.yysls.ui.loadout.build_calculator import BUILD_DISPLAY_SLOTS
 
-    build = BuildDefinition.create("拖拽候选", "无名", 115)
+    build = BuildDefinition.create("拖拽候选", "无名")
     build.equipment = allocate(counts()).equipment
     editor = BuildEditor("无名", repository=repository, initial=build)
     qtbot.addWidget(editor)
@@ -352,7 +370,7 @@ def test_drag_precomputes_targets_and_cancel_keeps_distribution(qtbot, repositor
 
 def test_first_show_has_same_row_heights_as_recalculation(qtbot, repository):
     """首次打开的窄列宽不能留下折行行高，用户无需拖动词条才能恢复。"""
-    build = BuildDefinition.create("首次行高", "无名", 115)
+    build = BuildDefinition.create("首次行高", "无名")
     build.equipment = allocate(counts()).equipment
     editor = BuildEditor("无名", repository=repository, initial=build)
     qtbot.addWidget(editor)
@@ -366,7 +384,7 @@ def test_first_show_has_same_row_heights_as_recalculation(qtbot, repository):
 
 
 def test_editor_load_adjust_save_and_invalid_clear(qtbot, repository):
-    build = BuildDefinition.create("测试实时分配", "无名", 115)
+    build = BuildDefinition.create("测试实时分配", "无名")
     build.equipment = allocate(counts()).equipment
     repository.save(build)
     before = repository.all()[0].to_dict()
@@ -392,8 +410,8 @@ def test_editor_load_adjust_save_and_invalid_clear(qtbot, repository):
 
 
 def test_cancel_switch_keeps_editor_draft(qtbot, monkeypatch, repository):
-    first = BuildDefinition.create("甲", "无名", 115)
-    second = BuildDefinition.create("乙", "无名", 115)
+    first = BuildDefinition.create("甲", "无名")
+    second = BuildDefinition.create("乙", "无名")
     repository.save(first)
     repository.save(second)
     editor = BuildEditor("无名", repository=repository, initial=first)
@@ -411,7 +429,7 @@ def test_counter_clicks_update_distribution_without_saving(qtbot, repository):
 
     from lvjiang.apps.yysls.ui.loadout.build_calculator import AffixCounter
 
-    build = BuildDefinition.create("步进操作", "无名", 115)
+    build = BuildDefinition.create("步进操作", "无名")
     build.equipment = allocate(counts()).equipment
     repository.save(build)
     before = repository.all()[0].to_dict()
@@ -437,7 +455,7 @@ def test_full_total_disables_every_increase(qtbot, repository):
 
     单列自己没到 40 也能越过上限，正是这里要拦的。
     """
-    build = BuildDefinition.create("总数上限", "无名", 115)
+    build = BuildDefinition.create("总数上限", "无名")
     build.equipment = allocate(counts()).equipment
     repository.save(build)
     editor = BuildEditor("无名", repository=repository, initial=build)
@@ -456,7 +474,7 @@ def test_full_total_disables_every_increase(qtbot, repository):
 
 
 def test_distribution_cells_match_saved_slots_and_set_owners(qtbot, repository):
-    build = BuildDefinition.create("逐格分配", "无名", 115)
+    build = BuildDefinition.create("逐格分配", "无名")
     build.equipment = allocate(counts()).equipment
     repository.save(build)
     editor = BuildEditor("无名", repository=repository, initial=build)
@@ -531,7 +549,8 @@ def test_live_calculation_uses_shared_scorer_and_never_changes_role(qtbot, repos
     editor.gongjue.setCurrentIndex(editor.gongjue.findData("会意"))
     editor.recalculate()
     actual = calculator.inputs[-1]
-    expected_base = base + gongjue_attrs("会意", editor.gc, world_level=115, gongjue_level=editor.gongjue_level.value())
+    expected_base = base + gongjue_attrs(
+        "会意", editor.gc, world_level=115, gongjue_level=editor.gongjue_level.currentData())
     expected = LoadoutScorer(calculator, expected_base, context.school, editor.gc, attr_context=context.attr_context).attrs(
         apply_hypothetical_caps(editor.result.equipment, full_dingyin=True, playstyle="无名"))
     assert actual == expected
@@ -546,3 +565,30 @@ def test_live_calculation_uses_shared_scorer_and_never_changes_role(qtbot, repos
     assert original == before
     assert context.base_attrs_without_gongjue == base
     assert context.gongjue == ""
+
+
+def test_editor_lists_same_school_builds_after_current_playstyle(qtbot, repository):
+    """同流派其它玩法的搭配排在当前玩法之后，跨流派的不列出。"""
+    for name, playstyle in (("本玩法", "走地玉"), ("同流派", "飞天玉"), ("异流派", "无名")):
+        repository.save(BuildDefinition.create(name, playstyle))
+    editor = BuildEditor("走地玉", repository=repository)
+    qtbot.addWidget(editor)
+    labels = [editor.build_combo.itemText(i) for i in range(editor.build_combo.count())]
+    assert labels == ["从当前方案开始", "本玩法", "同流派（飞天玉）"]
+
+
+def test_affix_summary_uses_short_names_merges_generic_attack_and_sorts_ascending():
+    """词条搭配摘要：词组简称归并、通用属攻并入具体大属攻、按数量升序拼接。"""
+    gc = get_game_config()
+    equipment = {
+        "main_weapon": {"affix_1": {"name": "最大无相攻击"}},
+        "sub_weapon": {"affix_1": {"name": "最大鸣金攻击"}, "affix_2": {"name": "最大鸣金攻击"}},
+        "head": {"affix_1": {"name": "最大外功攻击"}, "affix_2": {"name": "对首领单位增伤"},
+                 "affix_3": {"name": "对首领单位增伤"}, "affix_4": {"name": "剑武学增伤"}},
+    }
+    assert affix_summary(equipment, "鸣金", gc) == "1大外1剑增2首领增3大鸣金"
+    # 没有可合并的具体大属攻时不做猜测，保留「大无相」；空搭配返回空串。
+    generic_only = {"main_weapon": {"affix_1": {"name": "最大无相攻击"},
+                                    "affix_2": {"name": "会心率"}}}
+    assert affix_summary(generic_only, "牵丝", gc) == "1大无相1会心"
+    assert affix_summary({}, "牵丝", gc) == ""

@@ -268,7 +268,7 @@ def check_bundle_links(bundle: pathlib.Path) -> list[str]:
     problems = []
     for path in paths:
         if not path.is_file():
-            problems.append(f"清单文件缺失 {path.relative_to(bundle)}")
+            problems.append(f"清单文件缺失 {path.relative_to(bundle).as_posix()}")
             continue
         if path.suffix != ".md":
             continue
@@ -282,14 +282,14 @@ def check_bundle_links(bundle: pathlib.Path) -> list[str]:
             internal = any(resolved.is_relative_to(bundle / layer) for layer in layers)
             if not internal:
                 if not text[match.end():].startswith("（仅源码检出）"):
-                    problems.append(f"发行引用未标明源码范围 {path.relative_to(bundle)} -> {raw}")
+                    problems.append(f"发行引用未标明源码范围 {path.relative_to(bundle).as_posix()} -> {raw}")
                 continue
             if not resolved.exists():
-                problems.append(f"发行链接不可达 {path.relative_to(bundle)} -> {raw}")
+                problems.append(f"发行链接不可达 {path.relative_to(bundle).as_posix()} -> {raw}")
             elif anchor and resolved.suffix == ".md":
                 headings = {slug(m.group(2)) for m in HEADING.finditer(body_without_code(read(resolved)))}
                 if anchor not in headings:
-                    problems.append(f"发行锚点失效 {path.relative_to(bundle)} -> {raw}")
+                    problems.append(f"发行锚点失效 {path.relative_to(bundle).as_posix()} -> {raw}")
     return problems
 
 

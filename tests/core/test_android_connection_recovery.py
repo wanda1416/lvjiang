@@ -41,6 +41,64 @@ def test_agent_three_failures_then_adb_fallback_keeps_following_inputs_running(m
     assert device.recovery.allow_adb_fallback
 
 
+def test_recovery_notification_failure_does_not_fail_the_command(monkeypatch):
+    """恢复通知失败不能把成功的命令变成任务异常。
+
+    重连会替换执行目标并释放旧目标，在飞命令持有的旧设备回调可能指向已经被
+    销毁的 Qt 信号桥；`succeeded()` 里的一次通知异常原来会直接冒泡成 DSL
+    执行异常，整条任务被判失败、批量随即跳到下一个任务。
+    """
+    device, client, backend, shell = setup_input(monkeypatch)
+    monkeypatch.setattr(client, '_reconnect', lambda: False)
+    monkeypatch.setattr(device, '_reconnect_once', lambda: True)
+    device.on_connection_restored = Mock(
+        side_effect=RuntimeError('wrapped C/C++ object has been deleted'))
+
+    backend._call('tap', '点击', x=12, y=24)
+
+    assert shell.call_count == 1, '点击仍应发出'
+    assert not device.recovery_coordinator.recovering, '恢复状态仍要正确复位'
+
+
+def test_waiting_flag_and_kind_do_not_survive_the_wait(monkeypatch):
+    """等待结束后 waiting 与 kind 都不能残留。
+
+    宿主靠这两个值判断「重连能不能代替用户点继续」；残留会把上一次等过的
+    东西当成此刻正在等的东西。
+    """
+    device, _client, _backend, _shell = setup_input(monkeypatch)
+    coordinator = device.recovery_coordinator
+    seen = []
+
+    def confirm(message):
+        seen.append((coordinator.waiting, coordinator.waiting_kind))
+        device.resume_event.set()
+
+    device.on_connection_lost = confirm
+    device.can_wait_for_recovery = lambda: True
+
+    coordinator.wait_for_user(RuntimeError('响应丢失'), '点击', uncertain=True)
+
+    assert seen == [(True, 'uncertain_action')], '等待期间必须能看出有人在等'
+    assert not coordinator.waiting
+    assert coordinator.waiting_kind == 'connection'
+
+
+def test_stop_breaking_the_wait_also_clears_the_waiting_flag(monkeypatch):
+    """被停止打断的等待同样不能留下 waiting。"""
+    device, _client, _backend, _shell = setup_input(monkeypatch)
+    coordinator = device.recovery_coordinator
+    device.on_connection_lost = lambda message: None
+    device.can_wait_for_recovery = lambda: True
+    device.stop_check = lambda: True
+
+    with pytest.raises(AdbConnectionError, match='用户停止'):
+        coordinator.wait_for_user(RuntimeError('响应丢失'), '点击', uncertain=True)
+
+    assert not coordinator.waiting
+    assert coordinator.waiting_kind == 'connection'
+
+
 def test_exhausted_retries_wait_for_confirmation_and_repeat_connection_checks(monkeypatch):
     device, client, backend, shell = setup_input(monkeypatch)
     agent = Mock(side_effect=[False, False, False, True])

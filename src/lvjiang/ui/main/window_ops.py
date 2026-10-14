@@ -42,17 +42,32 @@ def _find_auto_connect_window_index(
     return None
 
 
+def _pending_uncertain(device) -> bool:
+    """该设备上此刻是否有人阻塞在「已发出、结果不确定」的确认上。
+
+    只有这种等待必须由用户亲自点「继续」；重连只是把通道修好，不能代替
+    这次确认，否则一次可能已经执行的点击会被再放一次。判定以设备自己记的
+    「正在等待」为准（`AndroidRecovery.waiting`），不看 `recovering`——后者
+    只说明传输在重建，透明重连也会置位。
+    """
+    coordinator = getattr(device, "recovery_coordinator", None)
+    if not getattr(coordinator, "waiting", False):
+        return False
+    return getattr(coordinator, "waiting_kind", "") == "uncertain_action"
+
+
 class _AdbConnSignalBridge(QObject):
     """工作流线程 → 主线程的 ADB 断连信号桥"""
-    adb_lost = pyqtSignal(str, str)
+    adb_lost = pyqtSignal(str, str, object)
     adb_restored = pyqtSignal(str)
 
     def __init__(self, target_id: str):
         super().__init__()
         self._target_id = target_id
 
-    def notify_lost(self, error_msg: str):
-        self.adb_lost.emit(self._target_id, error_msg)
+    def notify_lost(self, error_msg: str, device=None):
+        """`device` 是发起通知的那台设备；重连换过设备后两者不是同一个。"""
+        self.adb_lost.emit(self._target_id, error_msg, device)
 
     def notify_restored(self):
         self.adb_restored.emit(self._target_id)
@@ -1089,9 +1104,12 @@ class WindowOpsMixin:
             else threading.Event())
         # 先把旧 AdbDevice 的 transport 更新到新连接，再唤醒正在
         # _handle_connection_error 中等待的失败命令，这样重试不会继续打旧 IP。
-        if existing_target is not None and existing_target.device is not None:
-            existing_target.device.serial = device.serial
-            existing_target.device.adb_path = device.adb_path
+        # 断线时那条在飞命令一直持有这个旧 device（输入对象在一次调用里只解析
+        # 一次），所以它必须跟新连接一样可用。
+        old_device = existing_target.device if existing_target is not None else None
+        if old_device is not None:
+            old_device.serial = device.serial
+            old_device.adb_path = device.adb_path
         device.resume_event = resume_event
         try:
             from ...core.app_controller import record_connected_android
@@ -1106,12 +1124,29 @@ class WindowOpsMixin:
         bridge = _AdbConnSignalBridge(target_id)
         bridge.adb_lost.connect(self._on_adb_connection_lost)
         bridge.adb_restored.connect(self._on_adb_connection_restored)
-        device.on_connection_lost = bridge.notify_lost
-        device.on_connection_restored = bridge.notify_restored
-        device.can_wait_for_recovery = lambda tid=target_id: self._run_manager.run_for_target(tid) is not None
-        device.stop_check = lambda tid=target_id: bool(
-            (run := self._run_manager.run_for_target(tid))
-            and run.stop_event.is_set())
+
+        def wire(dev) -> None:
+            """同一个目标的所有 AdbDevice 共用一套恢复回调。
+
+            `on_connection_lost` 把发起通知的 device 一并带上：重连换过设备后
+            宿主必须知道断的是哪一条连接，不能拿新连接的协调器去判断旧连接
+            此刻在等什么（否则目标会被误标成离线，ready 门禁跟着失效）。
+            """
+            dev.on_connection_lost = (
+                lambda message, dev=dev: bridge.notify_lost(message, dev))
+            dev.on_connection_restored = bridge.notify_restored
+            dev.can_wait_for_recovery = lambda tid=target_id: self._run_manager.run_for_target(tid) is not None
+            dev.stop_check = lambda tid=target_id: bool(
+                (run := self._run_manager.run_for_target(tid))
+                and run.stop_event.is_set())
+
+        # 旧 device 的回调也必须改指新 bridge：它随旧目标一起被释放时，
+        # 新目标会 dispose 掉旧 bridge，而旧 device 还在被在飞命令持有，
+        # 命令重试成功时的恢复通知就会打到已销毁的 Qt 对象上，把一次正常
+        # 恢复变成任务级异常。
+        wire(device)
+        if old_device is not None:
+            wire(old_device)
 
         # 名字就是 serial：它唯一、用户能对上（哪根线、哪个 IP），同型号两台设备
         # 也由它分开。不用 target_id 的哈希前缀——那是主键的一截，对用户零信息量；
@@ -1137,24 +1172,33 @@ class WindowOpsMixin:
                 "device_identity_stable": identity.stable,
             },
         )
+        # 「已发出、结果不确定」的动作必须由用户点「继续」确认后才重放：重连
+        # 只修好通道，不能替这次确认，也不提前为它宣告已恢复（该等待的展示由
+        # _on_adb_connection_restored 在一次请求真正成功后才更新）。等通道本身
+        # 的等待不受影响，仍在重连后立即唤醒并复位运行状态。
+        # 确认权以存在运行实例为前提：没有运行实例就没有等待者，放行无副作用。
+        holds_confirmation = (
+            _pending_uncertain(old_device)
+            and self._run_manager.run_for_target(target_id) is not None)
         old = self._execution_targets.put(target)
         if old is not None:
             self._dispose_execution_target(old)
-        # 注册表和 TargetHandle 已切到新资源后才唤醒失败命令。
-        resume_event.set()
-        run_context = self._run_manager.run_for_target(target_id)
-        if run_context is not None and run_context.state.value == "waiting_target":
-            from .execution_runs import RunState
-            next_state = (
-                RunState.PAUSED
-                if run_context.pause_event is not None
-                and not run_context.pause_event.is_set()
-                else RunState.RUNNING)
-            self._run_manager.set_state(run_context.task_run_id, next_state)
-            self._emit_run_instance_state(run_context, next_state.value)
-            banner = getattr(self, "_adb_banner", None)
-            if banner is not None and target_id == self._execution_targets.active_target_id:
-                banner.setVisible(False)
+        if not holds_confirmation:
+            # 注册表和 TargetHandle 已切到新资源后才唤醒失败命令。
+            resume_event.set()
+            run_context = self._run_manager.run_for_target(target_id)
+            if run_context is not None and run_context.state.value == "waiting_target":
+                from .execution_runs import RunState
+                next_state = (
+                    RunState.PAUSED
+                    if run_context.pause_event is not None
+                    and not run_context.pause_event.is_set()
+                    else RunState.RUNNING)
+                self._run_manager.set_state(run_context.task_run_id, next_state)
+                self._emit_run_instance_state(run_context, next_state.value)
+                banner = getattr(self, "_adb_banner", None)
+                if banner is not None and target_id == self._execution_targets.active_target_id:
+                    banner.setVisible(False)
         self._activate_connected_target(target, old)
 
         method_label = tr("流式截图") if capture_method == "scrcpy" \

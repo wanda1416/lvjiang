@@ -1665,13 +1665,20 @@ class RunControlMixin:
 
     # ─── Android 执行通道恢复 ────────────────────────────
 
-    def _on_adb_connection_lost(self, target_id: str, error_msg: str):
-        """某台 ADB 设备断连；仅运行目标可以打断当前任务。"""
+    def _on_adb_connection_lost(self, target_id: str, error_msg: str, device=None):
+        """某台 ADB 设备断连；仅运行目标可以打断当前任务。
+
+        `device` 是发起通知的那条连接。重连替换目标后旧设备仍被在飞的执行链
+        持有，它再断线说明的是那条链还没好，而不是目标不可用；目标就绪态只由
+        当前连接自己改，否则 `ready` 会被误清掉，开始／批量启动都会被挡在
+        「请先连接设备」，而目标行本身还有运行状态（等待重连）可看。
+        """
         target = self._execution_targets.get(target_id)
         if target is None:
             return
-        coordinator = getattr(getattr(target, "device", None), "recovery_coordinator", None)
-        target.status = "connected" if getattr(coordinator, "waiting_kind", "") == "uncertain_action" else "offline"
+        if device is None or device is target.device:
+            coordinator = getattr(getattr(target, "device", None), "recovery_coordinator", None)
+            target.status = "connected" if getattr(coordinator, "waiting_kind", "") == "uncertain_action" else "offline"
         self._refresh_execution_targets_ui()
         run_context = self._run_manager.run_for_target(target_id)
         if run_context is None:

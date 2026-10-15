@@ -1,36 +1,140 @@
 """插件注册表与加载器。
 
-插件通过命令行参数 ``-reg <name>`` 注册。引擎在启动时按顺序调用
-``load_app(name)`` 加载插件模块，并从模块顶层 ``hooks`` 属性获取
-``AppHooks`` 实例，再通过 ``register_hooks`` 把识别器 / 工作流 /
-内置函数注入到各注册表中。
+插件通过命令行参数 ``-reg <spec>`` 注册，``<spec>`` 是 ``<name>`` 或
+``<name>@<path>``。引擎在启动时按顺序调用 ``load_app(spec)`` 加载插件模块，
+并从模块顶层 ``hooks`` 属性获取 ``AppHooks`` 实例，再通过 ``register_hooks``
+把识别器 / 工作流 / 内置函数注入到各注册表中。
+
+插件分三级，宿主主动发现前两级：
+
+1. 内置插件：``src/lvjiang/apps/<name>/``，随本包分发，public 打包自动携带；
+2. 外置默认目录：``<PROJECT_ROOT>/plugins/<name>/``，打包按目录是否存在决定
+   是否携带（public 仓库没有该目录，因此发布包不含外置插件）；
+3. 外置任意目录：``-reg <name>@<path>`` 显式声明，目录名不必等于插件名。
+
+插件以「子目录 + ``__init__.py``」识别，不读取任何清单文件；目录名必须是合法
+Python 标识符，否则记 warning 跳过，不影响其它插件与主程序启动。
 """
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import logging
+import sys
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
+from ..constants import PROJECT_ROOT
 from .base import AppHooks
 
 logger = logging.getLogger(__name__)
 
-# 内置插件可保留别名；其他插件按 lvjiang.apps.<name> 显式发现。
-_APP_REGISTRY: dict[str, str] = {
-    "yysls": "lvjiang.apps.yysls",
-}
+# 内置插件根：本包目录下的子目录。
+_BUILTIN_ROOT = Path(__file__).parent
+# 外置默认插件根：仓库根 / 安装目录旁的 plugins/。
+_DEFAULT_PLUGINS_ROOT = PROJECT_ROOT / "plugins"
+
+if _DEFAULT_PLUGINS_ROOT.is_dir() and str(_DEFAULT_PLUGINS_ROOT) not in __path__:
+    # 目录名等于插件名时，靠包搜索路径即可解析 lvjiang.apps.<name>；
+    # 名称与目录名不一致的任意目录走 load_app 里的显式挂载。
+    __path__ = [*__path__, str(_DEFAULT_PLUGINS_ROOT)]
 
 
+def _is_valid_app_name(name: str) -> bool:
+    """插件名必须是稳定、可作包名尾段的 ASCII 标识符。"""
+    return bool(name) and name.isascii() and name.isidentifier() and not name.startswith("_")
 
-def load_app(name: str) -> AppHooks:
+
+def _scan_root(root: Path) -> tuple[str, ...]:
+    """扫描一个插件根目录，返回按名排序的插件名。
+
+    只认「子目录 + ``__init__.py``」：``base.py`` 之类的模块文件和
+    ``__pycache__`` 都不会被当成插件。非法目录名只记 warning 跳过，
+    不让一个坏目录拖垮整次扫描或阻止程序启动。
+    """
+    try:
+        entries = sorted(root.iterdir(), key=lambda entry: entry.name.lower())
+    except OSError:
+        return ()
+    names: list[str] = []
+    for entry in entries:
+        if not entry.is_dir() or not (entry / "__init__.py").is_file():
+            continue
+        if not _is_valid_app_name(entry.name):
+            logger.warning("[plugin] 忽略非法插件目录名: %s", entry)
+            continue
+        names.append(entry.name)
+    return tuple(names)
+
+
+def builtin_app_ids() -> tuple[str, ...]:
+    """随本包分发的内置插件名册（只扫内置根，不扫外置目录）。
+
+    离线工具（``scripts/add_content_version.py``、配置层单测）靠它选择插件
+    声明，因此必须保持「与安装目录内容无关」的语义。
+    """
+    return _scan_root(_BUILTIN_ROOT)
+
+
+def discover_app_ids() -> tuple[str, ...]:
+    """内置根与外置默认目录的插件名册，内置优先且各按名排序、去重。"""
+    ordered: dict[str, None] = {}
+    for name in (*_scan_root(_BUILTIN_ROOT), *_scan_root(_DEFAULT_PLUGINS_ROOT)):
+        ordered.setdefault(name, None)
+    return tuple(ordered)
+
+
+def parse_app_spec(spec: str) -> tuple[str, Path | None]:
+    """解析 ``-reg`` 参数值：``<name>`` 或 ``<name>@<path>``。
+
+    返回 ``(插件名, 插件目录或 None)``。显式路径可相对当前工作目录或绝对，
+    目录名不必等于插件名。
+    """
+    name, sep, raw_path = spec.partition("@")
+    name = name.strip()
+    if not _is_valid_app_name(name):
+        raise KeyError(f"无效的插件名: {name!r}")
+    if not sep:
+        return name, None
+    path = raw_path.strip()
+    if not path:
+        raise KeyError(f"插件 {name!r} 的 @ 路径为空")
+    return name, Path(path)
+
+
+def app_name(spec: str) -> str:
+    """取 ``-reg`` 参数值里的插件名，供 i18n 等按名索引的消费者使用。"""
+    return parse_app_spec(spec)[0]
+
+
+def resolve_app_specs(
+    specs: Iterable[str], *, all_plugins: bool = False,
+) -> tuple[str, ...]:
+    """把 ``-reg`` 与 ``--all-plugins`` 展开成最终按序加载的参数名册。
+
+    显式 ``-reg`` 保持出现顺序，同名参数只保留首次出现；``--all-plugins``
+    再追加内置与外置默认目录扫描到、但尚未列出的插件（内置在前）。
+    """
+    ordered: dict[str, str] = {}
+    for spec in specs:
+        name, _ = parse_app_spec(spec)
+        ordered.setdefault(name, spec)
+    if all_plugins:
+        for name in discover_app_ids():
+            ordered.setdefault(name, name)
+    return tuple(ordered.values())
+
+
+def load_app(spec: str) -> AppHooks:
     """加载指定插件并返回其 ``AppHooks``。
 
     插件模块必须在顶层导出 ``hooks: AppHooks`` 属性。
     """
-    if not name.isascii() or not name.isidentifier() or name.startswith("_"):
-        raise KeyError(f"无效的插件名: {name!r}")
-    module_path = _APP_REGISTRY.get(name, f"lvjiang.apps.{name}")
+    name, path = parse_app_spec(spec)
+    module_path = f"lvjiang.apps.{name}"
+    if path is not None:
+        _mount_app(name, path)
     try:
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as exc:
@@ -48,6 +152,41 @@ def load_app(name: str) -> AppHooks:
             f"插件 {name!r} 模块 {module_path} 未导出有效的 hooks: AppHooks"
         )
     return hooks
+
+
+def _mount_app(name: str, directory: Path) -> None:
+    """把任意目录挂载成 ``lvjiang.apps.<name>`` 包。
+
+    ``-reg name@path`` 允许目录名与插件名不一致，因此不能靠追加父目录到
+    ``__path__``，只能显式构造包规格并注入 ``sys.modules``；加载失败时撤销
+    挂载，避免在 ``sys.modules`` 里留下半个包。
+    """
+    module_path = f"lvjiang.apps.{name}"
+    if module_path in sys.modules:
+        return
+    target = directory if directory.is_absolute() else Path.cwd() / directory
+    init_file = target / "__init__.py"
+    if not init_file.is_file():
+        raise KeyError(f"插件 {name!r} 的目录缺少 __init__.py: {target}")
+    module_spec = importlib.util.spec_from_file_location(
+        module_path,
+        init_file,
+        submodule_search_locations=[str(target)],
+    )
+    if module_spec is None or module_spec.loader is None:
+        raise RuntimeError(f"无法为插件 {name!r} 构造导入规格: {target}")
+    module = importlib.util.module_from_spec(module_spec)
+    sys.modules[module_path] = module
+    parent = sys.modules.get("lvjiang.apps")
+    if parent is not None and not hasattr(parent, name):
+        setattr(parent, name, module)
+    try:
+        module_spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(module_path, None)
+        if parent is not None and getattr(parent, name, None) is module:
+            delattr(parent, name)
+        raise
 
 
 def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> None:
@@ -166,11 +305,6 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         registry.setdefault("config_policy_modules", []).extend(hooks.config_policy_modules)
 
 
-def builtin_app_ids() -> tuple[str, ...]:
-    """离线工具显式选择内置插件，不扫描安装目录。"""
-    return tuple(_APP_REGISTRY)
-
-
 def register_config_policies(hooks: AppHooks) -> None:
     """装配已知插件的配置声明；不运行启动回调或 UI 构建器。"""
     for module in hooks.config_policy_modules:
@@ -180,7 +314,7 @@ def register_config_policies(hooks: AppHooks) -> None:
             logger.exception("[plugin] 配置策略模块加载失败: %s", module)
 
 
-def load_config_policies(app_ids: Iterable[str]) -> None:
+def load_config_policies(app_specs: Iterable[str]) -> None:
     """只加载各已登记插件的配置策略声明，不注入 Tab / 工作流 / 识别器。
 
     离线工具（`scripts/add_content_version.py`、配置层单测）需要完整的
@@ -188,11 +322,21 @@ def load_config_policies(app_ids: Iterable[str]) -> None:
     也不该——把插件的 UI 与工作流一并装配起来。走 ``register_hooks`` 会
     连带注册识别器与内置函数，对一个补字段的脚本是多余的副作用。
 
-    单个插件声明出错只记日志跳过，理由同 register_hooks 里的处理。
+    参数沿用 ``-reg`` 的写法（``<name>`` 或 ``<name>@<path>``），同名插件
+    只处理首次出现；单个插件声明出错只记日志跳过，理由同 register_hooks。
     """
-    for name in dict.fromkeys(app_ids):
+    seen: set[str] = set()
+    for spec in app_specs:
         try:
-            hooks = load_app(name)
+            name, _ = parse_app_spec(spec)
+        except KeyError:
+            logger.exception("[plugin] 解析插件参数失败: %s", spec)
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        try:
+            hooks = load_app(spec)
         except Exception:  # noqa: BLE001
             logger.exception("[plugin] 加载配置声明失败: %s", name)
             continue

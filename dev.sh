@@ -92,8 +92,9 @@ main() {
     local forwarded=()
     local use_admin=0
     local has_reg=0
-    # 默认不加载任何插件：-reg/--register APP 逐个显式指定；--all 表示本仓库
-    # 随包提供的全部插件（yysls 后 premium 的固定顺序），不按目录内容推断。
+    # 默认不加载任何插件：-reg/--register APP 逐个显式指定，APP 是 NAME
+    # （内置 apps/ 或 plugins/）或 NAME@PATH（任意目录）；--all 交给宿主扫描
+    # 内置根与默认 plugins/ 根下的全部插件，不在这里维护名册。
     # --admin 启动 admin/ 下的管理控制台，它在包命名空间里是 lvjiang.admin，
     # 与插件参数互斥——管理控制台不加载客户端插件。
     for arg in "$@"; do
@@ -102,8 +103,12 @@ main() {
                 use_admin=1
                 ;;
             --all)
-                extra_apps=(-reg yysls -reg premium)
+                extra_apps=(--all-plugins)
                 has_reg=1
+                ;;
+            --all-plugins)
+                has_reg=1
+                forwarded+=("$arg")
                 ;;
             -reg*|--register*)
                 has_reg=1
@@ -116,10 +121,6 @@ main() {
     done
     if (( use_admin )) && (( has_reg )); then
         error "--admin cannot be combined with -reg/--register/--all"
-        exit 1
-    fi
-    if (( ${#extra_apps[@]} )) && [[ ! -f src/lvjiang/apps/premium/__init__.py ]]; then
-        error "--all requires the premium repository at src/lvjiang/apps/premium"
         exit 1
     fi
     if (( use_admin )) && [[ ! -f admin/src/lvjiang/admin/__init__.py ]]; then

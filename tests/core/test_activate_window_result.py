@@ -3,7 +3,7 @@
 它原来无条件 `return True`：等待前台的循环超时后既不记日志也不改返回值。
 后果是前台输入静悄悄地发给**别的**窗口——日志里 key_down/key_up 一切正常，
 游戏毫无反应，排查时完全看不出输入落在哪（已经为此绕过一次）。而且
-`apps/premium/ui/gather.py` 早就写了 `if not activate_window(...): raise`，
+`plugins/yysls_premium/ui/gather.py` 早就写了 `if not activate_window(...): raise`，
 那个提示因为返回值永远为真而成了死代码。
 
 Win32 调用全部 monkeypatch：这些用例在 Linux 上也要能跑，断言的是契约而不是

@@ -8,7 +8,8 @@
    _configure_logging 会 logger.add(sys.stderr)，必须先兜底成 devnull；
 3. freeze_support —— loguru enqueue=True 与 scrcpy/OCR 均涉及
    multiprocessing，Windows frozen 环境下子进程会重入本入口，必须拦截；
-4. 默认注入 -reg yysls，最终用户双击即用，免命令行参数；
+4. 默认注入 --all-plugins，最终用户双击即用：加载内置插件与 plugins/ 默认
+   目录（公开包没有 plugins/，即只有内置插件）；
 5. 日志系统建立之前的早期异常落盘 logs/crashes/launcher_error.log
    （windowed 模式无处看 traceback，不落盘就是静默闪退）。
 """
@@ -25,8 +26,8 @@ if getattr(sys, "frozen", False):
         sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
-if not any(a in ("-reg", "--register") for a in sys.argv[1:]):
-    sys.argv += ["-reg", "yysls"]
+if not any(a in ("-reg", "--register", "--all-plugins") for a in sys.argv[1:]):
+    sys.argv += ["--all-plugins"]
 
 try:
     from lvjiang.__main__ import main  # noqa: E402 — 须在 chdir/argv 处理后导入

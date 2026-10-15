@@ -46,8 +46,36 @@ def _configure_dpi() -> None:
         pass
 
 
+class _InterceptHandler(logging.Handler):
+    """把标准库 logging 记录转发给 loguru。
+
+    插件加载器（``lvjiang.apps``）与 ``__main__`` 用的是标准库 logging：不转发
+    的话，「加载插件 / 注册插件 / 忽略非法插件目录名」这类关键状态只进控制台、
+    不落 ``logs/``，插件名册与加载顺序事后无法复盘。
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        from loguru import logger
+
+        try:
+            level: str | int = logger.level(record.levelname).name
+        except ValueError:  # 自定义 level 不在 loguru 级别表里
+            level = record.levelno
+
+        # 直接用 logging record 自带的调用点覆盖 loguru 的 {name}/{function}/{line}。
+        # 不用 opt(depth=...)：回溯层数随 Python 版本变化，写死后会把调用方显示成
+        # logging 内部（实测为 ``logging:callHandlers``）。
+        logger.patch(
+            lambda entry: entry.update(
+                name=record.name,
+                function=record.funcName,
+                line=record.lineno,
+            )
+        ).opt(exception=record.exc_info).log(level, record.getMessage())
+
+
 def _configure_logging() -> None:
-    """配置 loguru（控制台 + logs/ 落盘），标准库 logging 保底控制台。
+    """配置 loguru（控制台 + logs/ 落盘），标准库 logging 转发到 loguru。
 
     落盘文件按天命名 ``logs/lvjiang_YYYY-MM-DD.log``；午夜（00:00）换新文件。
     启动时把仍在 7 天保留期内的更早日志归入 ``logs/logs/YYYY-MM/``，再早的删除。
@@ -70,10 +98,12 @@ def _configure_logging() -> None:
         level="DEBUG",
         enqueue=True,  # 异步写入，防止进程崩溃时缓冲丢失
     )
-    # 少量模块仍用标准库 logging，保底输出到控制台
+    # 插件加载器与 __main__ 等模块仍用标准库 logging；统一转发给 loguru，
+    # 使「加载插件 / 注册插件」等关键状态同样落到 logs/ 文件里。
     logging.basicConfig(
+        handlers=[_InterceptHandler()],
         level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        force=True,
     )
 
 
@@ -107,7 +137,13 @@ def _parse_args() -> argparse.Namespace:
         action="append",
         dest="apps",
         metavar="APP",
-        help=tr("注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）"),
+        help=tr("注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用"),
+    )
+    parser.add_argument(
+        "--all-plugins",
+        action="store_true",
+        dest="all_plugins",
+        help=tr("额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg"),
     )
     return parser.parse_args()
 
@@ -138,11 +174,20 @@ def main() -> int:
     install_crash_handler()
 
     # 延迟导入 PyQt6 / 内部模块，确保 logging 先配置好
-    from lvjiang.apps import load_app, load_config_policies, register_hooks
+    from lvjiang.apps import (
+        app_name,
+        load_app,
+        load_config_policies,
+        register_hooks,
+        resolve_app_specs,
+    )
 
-    for name in args.apps or []:
-        load_app_i18n(name)
-    load_config_policies(args.apps or ())
+    # -reg 保持出现顺序；--all-plugins 追加内置与 plugins/ 目录扫描结果。
+    app_specs = resolve_app_specs(args.apps or (), all_plugins=args.all_plugins)
+
+    for spec in app_specs:
+        load_app_i18n(app_name(spec))
+    load_config_policies(app_specs)
 
     # 恢复未完成的安装事务、撤下明确失效的会员内容，再加载场景与布局缓存。
     # 这里不联网，也不提升旧协议暂存目录。
@@ -155,10 +200,10 @@ def main() -> int:
     from .app import run_app
 
     hooks_list = []
-    for name in args.apps or []:
-        logger.info("加载插件: %s", name)
-        load_app_i18n(name)
-        hooks = load_app(name)
+    for spec in app_specs:
+        logger.info("加载插件: %s", spec)
+        load_app_i18n(app_name(spec))
+        hooks = load_app(spec)
         register_hooks(hooks)
         hooks_list.append(hooks)
 

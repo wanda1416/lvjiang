@@ -35,6 +35,13 @@ rem PyInstaller creates dist/lvjiang/ with lvjiang.exe at the root
 rem Use the same canonical system tree and r0 identity as Android.
 uv run python scripts\build_system_baseline.py dist\lvjiang\config
 if errorlevel 1 exit /b 1
+rem External plugins ship as a data directory: copy plugins\ when present so
+rem the host discovers them next to the exe at runtime. A public build has no
+rem plugins\ checkout, so the released package carries built-in plugins only.
+if exist plugins (
+    xcopy /e /i /y plugins dist\lvjiang\plugins >nul
+    if errorlevel 1 exit /b 1
+)
 xcopy /e /i /y data\adb dist\lvjiang\data\adb >nul
 if errorlevel 1 exit /b 1
 

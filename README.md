@@ -195,9 +195,11 @@ python -m lvjiang
 python -m lvjiang -reg yysls
 
 # 方式三：Windows 快捷脚本（自动设置 PYTHONPATH，不默认加载任何插件）
-.\dev.bat                    # 纯通用模式
-.\dev.bat -reg yysls         # 通用 + 燕云插件
-.\dev.bat --all              # 加载全部插件（yysls + premium）
+.\dev.bat                         # 纯通用模式
+.\dev.bat -reg yysls              # 通用 + 内置燕云插件
+.\dev.bat -reg yysls_premium      # 通用 + plugins/ 下的外置插件
+.\dev.bat -reg foo@..\foo         # 通用 + 任意目录的外置插件（NAME@PATH）
+.\dev.bat --all                   # 加载内置插件与 plugins/ 下的全部插件
 ```
 
 > src-layout 下 `lvjiang` 包位于 `src/` 内：已 `pip install -e .` 则直接可用；否则需先将 `src` 加入 `PYTHONPATH`（`dev.bat` 已处理）。
@@ -222,7 +224,7 @@ python -m lvjiang -reg yysls
 | 层 | 路径 | 内容 | 是否提交到代码仓库 |
 |---|---|---|---|
 | 系统默认 | `config/system/` | 场景 / 工作流（`.wf`）/ 布局 / 输入参数 / 预置连接方案 / 调律规则 / 参考图 | ✅ |
-| 用户覆盖 | `config/local/` | 配置键级差异、用户脚本和其他本地实体；开发版还提供与 premium 配套的资源 | ❌ |
+| 用户覆盖 | `config/local/` | 配置键级差异、用户脚本和其他本地实体；开发版还提供与外置插件配套的资源 | ❌ |
 | 运行时会话 | `config/session/` | `session.json`（当前状态、自建连接方案）、用户数据、工作流输出日志 | ❌ |
 
 公开版不会自动上传 `config/local/` 或 `config/session/` 的内容。开发者可分别使用独立仓库同步开发版资源和运行数据；匿名安装标识始终不应进入仓库。律匠的联网行为见 [隐私说明](PRIVACY.md)。

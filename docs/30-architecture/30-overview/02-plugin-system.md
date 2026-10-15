@@ -5,14 +5,17 @@
 律匠采用「通用引擎 + 插件」的单包架构：
 
 - `src/`：通用视觉 RPA 引擎（截图、OCR、输入、场景、DSL 引擎、通用 GUI）
-- `src/lvjiang/apps/<name>/`：游戏/场景专属插件
+- `src/lvjiang/apps/<name>/`：内置插件，随包分发
+- `plugins/<name>/`：外置插件默认目录，独立检出（公开仓库不含）
 - `config/`、`data/`：全局共享，所有插件共用
 
 启动方式：
 ```bash
-python -m lvjiang                 # 纯通用（场景编辑 + 识别测试）
-python -m lvjiang -reg yysls      # 通用 + 燕云插件
-python -m lvjiang -reg foo -reg bar  # 多插件同时加载
+python -m lvjiang                      # 纯通用（场景编辑 + 识别测试）
+python -m lvjiang -reg yysls           # 通用 + 内置燕云插件
+python -m lvjiang -reg foo -reg bar    # 多插件同时加载
+python -m lvjiang -reg foo@../foo      # NAME@PATH：加载任意目录的外置插件
+python -m lvjiang --all-plugins        # 内置插件 + plugins/ 默认目录全部插件
 ```
 
 ## 核心接口：AppHooks
@@ -73,8 +76,11 @@ builder 约定：
 
 ## 插件目录结构
 
+内置与外置插件的包结构相同，区别只在检出位置：
+
 ```
-src/lvjiang/apps/<name>/
+src/lvjiang/apps/<name>/          # 内置插件（随包分发）
+plugins/<name>/                   # 外置插件（独立检出，公开仓库不含）
 ├── __init__.py        # 导出 hooks: AppHooks 实例
 ├── constants.py       # 插件专属常量
 ├── core/              # 插件专属能力（识别器、数据库等）
@@ -113,17 +119,27 @@ src/lvjiang/apps/<name>/
 ### 1. 创建插件目录
 
 ```bash
-mkdir -p src/lvjiang/apps/mygame
+mkdir -p src/lvjiang/apps/mygame     # 内置插件
+mkdir -p plugins/mygame              # 或：外置插件（默认目录）
 touch src/lvjiang/apps/mygame/__init__.py
 ```
 
 ### 2. 加载插件
 
-运行时使用 `-reg mygame` 显式加载 `lvjiang.apps.mygame`。
-插件目录可由独立仓库提供，无需修改主仓库的插件名册；不传 `-reg` 时不会加载。
+插件分三级，宿主主动发现前两级：
+
+| 级别 | 位置 | 加载方式 | 公开发布包 |
+|---|---|---|---|
+| 内置 | `src/lvjiang/apps/<name>/` | 目录扫描 | 随包携带 |
+| 外置默认 | `plugins/<name>/` | 目录扫描 | 打包时目录存在才携带 |
+| 外置任意 | 任意目录 | `-reg <name>@<path>` 显式声明 | 不携带 |
+
+插件以「子目录 + `__init__.py`」识别，不读取清单文件；目录名必须是合法 Python
+标识符（因此用 `yysls_premium` 而非 `yysls-premium`），非法目录名只记 warning
+跳过，不影响其它插件与主程序启动。
+
 本地 `dev.sh` / `dev.bat` 与主程序一致：不传 `-reg` 就是纯通用模式，`--all`
-按固定名册加载全部插件（`yysls`、`premium`），不按目录内容推断。公开发布在干净
-检出上构建，不包含独立私有仓库。
+交给宿主扫描内置根与 `plugins/` 默认目录，不在这里维护名册。
 
 ### 3. 实现 hooks
 
@@ -224,20 +240,27 @@ class AutoFarmWorkflow(BaseWorkflow):
 
 ## 设计决策
 
-1. **单包 + 插件**：避免双包发布的复杂度，`src/` 是唯一 Python 包
-2. **`-reg` 参数**：显式注册，避免自动发现带来的意外加载
-3. **全局 config/data**：所有插件共用一份配置，避免配置分散
+1. **单包 + 插件**：`src/lvjiang` 是唯一 Python 包；内置插件与引擎同仓库，
+   外置插件以独立仓库检出到 `plugins/`，不进公开发布
+2. **显式加载**：`-reg` 逐个显式注册，只有 `--all-plugins` 才按目录扫描加载全部，
+   避免自动发现带来的意外加载
+3. **全局 config/data**：所有插件共用一份配置，插件资源按 app 名命名空间
 4. **AppHooks 数据类**：插件通过数据声明扩展点，而非覆盖通用代码
 5. **注入式 UI**：插件只能注入 Tab/菜单，不能替换主窗口类，保证多插件共存
+6. **插件即数据目录**：外置插件不打进可执行文件，放在 exe 旁 `plugins/` 即被发现，
+   新增插件无需重新打包
 
 ## 现有插件
 
 ### 燕云十六声（yysls）
 
-- **路径**：`src/lvjiang/apps/yysls/`
+- **路径**：`src/lvjiang/apps/yysls/`（内置）
 - **功能**：装备词条解析、评分规则、自动调律、材料识别
 - **工作流**：`auto_tuning`（自动调律）
 - **内置函数**：`to_equipment`、`check_scroll`、`scroll_advance` 等
+
+外置插件（如会员功能）检出到 `plugins/<name>/`，形态与内置插件相同；公开发布
+的安装包只携带内置插件，外置插件由开发者放在 exe 旁的 `plugins/` 下。
 
 ## 相关实现边界
 

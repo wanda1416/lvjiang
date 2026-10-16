@@ -12,12 +12,19 @@ pytest——不报错、不超时，CI 和无人值守只表现为「卡住了�
 - ``_no_qt_modal_dialogs``：QMessageBox 等静态便捷函数与 QDialog.exec()。
 """
 
+import os
 from pathlib import Path
 
 import pytest
 
 from tests.config_write_guard import install_project_config_write_guard
 from tests.pytest_resources import install_closed_directory_scan
+
+# 子进程的 stdio 编码统一为 UTF-8：各用例普遍用 text=True, encoding="utf-8" 读取
+# 子进程输出，而 Windows 默认按代码页（GBK）写 stdio，两端不一致时读取方会抛
+# UnicodeDecodeError（CI 靠 PYTHONIOENCODING=utf-8 才对齐，本地没有就必然失败）。
+# 在这里显式固定，使本地、CI 与所有子进程的编码约定一致，不再依赖外部环境变量。
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 # 在收集测试模块前就封死真实 config；不能只依赖各用例自觉使用 tmp_path。
 install_project_config_write_guard(Path(__file__).parents[1] / "config")

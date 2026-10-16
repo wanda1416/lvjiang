@@ -16,6 +16,15 @@
 
 ## 快速开始
 
+从仓库根用开发脚本启动（首次会自动建独立 venv，不影响主项目）：
+
+```bash
+./dev.sh --stats        # macOS / Linux
+.\dev.bat --stats       # Windows
+```
+
+也可以直接进目录运行：
+
 ```bash
 cd ops/stats-client
 uv sync --extra dev   # 首次；建独立虚拟环境，不影响主项目

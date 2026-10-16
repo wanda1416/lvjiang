@@ -200,6 +200,7 @@ python -m lvjiang -reg yysls
 .\dev.bat -reg yysls_premium      # 通用 + plugins/ 下的外置插件
 .\dev.bat -reg foo@..\foo         # 通用 + 任意目录的外置插件（NAME@PATH）
 .\dev.bat --all                   # 加载内置插件与 plugins/ 下的全部插件
+.\dev.bat --stats                 # 启动 ops/stats-client 本地统计控制台
 ```
 
 > src-layout 下 `lvjiang` 包位于 `src/` 内：已 `pip install -e .` 则直接可用；否则需先将 `src` 加入 `PYTHONPATH`（`dev.bat` 已处理）。

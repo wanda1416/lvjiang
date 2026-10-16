@@ -91,16 +91,21 @@ main() {
     local extra_apps=()
     local forwarded=()
     local use_admin=0
+    local use_stats=0
     local has_reg=0
     # 默认不加载任何插件：-reg/--register APP 逐个显式指定，APP 是 NAME
     # （内置 apps/ 或 plugins/）或 NAME@PATH（任意目录）；--all 交给宿主扫描
     # 内置根与默认 plugins/ 根下的全部插件，不在这里维护名册。
-    # --admin 启动 admin/ 下的管理控制台，它在包命名空间里是 lvjiang.admin，
-    # 与插件参数互斥——管理控制台不加载客户端插件。
+    # --admin 启动 admin/ 下的管理控制台（lvjiang.admin），--stats 启动
+    # ops/stats-client 的本地统计控制台；两者都与插件参数互斥，也彼此互斥，
+    # 其后的参数原样转发。
     for arg in "$@"; do
         case "$arg" in
             --admin)
                 use_admin=1
+                ;;
+            --stats)
+                use_stats=1
                 ;;
             --all)
                 extra_apps=(--all-plugins)
@@ -119,6 +124,25 @@ main() {
                 ;;
         esac
     done
+    if (( use_stats )) && (( use_admin )); then
+        error "--stats cannot be combined with --admin"
+        exit 1
+    fi
+    if (( use_stats )) && (( has_reg )); then
+        error "--stats cannot be combined with -reg/--register/--all"
+        exit 1
+    fi
+    if (( use_stats )); then
+        if [[ ! -f ops/stats-client/pyproject.toml ]]; then
+            error "stats-client not found at ops/stats-client"
+            exit 1
+        fi
+        # stats-client 是 ops/ 下的独立 uv 项目，自带 venv 与依赖，不走主工程
+        # 的 Python 解释器发现与 PYTHONPATH 注入流程。
+        local stats_args=(uv run --directory ops/stats-client stats-client)
+        if (( ${#forwarded[@]} )); then stats_args+=("${forwarded[@]}"); fi
+        exec "${stats_args[@]}"
+    fi
     if (( use_admin )) && (( has_reg )); then
         error "--admin cannot be combined with -reg/--register/--all"
         exit 1

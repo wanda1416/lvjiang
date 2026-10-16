@@ -18,8 +18,12 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 from lvjiang.constants import PROJECT_ROOT
+
+if TYPE_CHECKING:
+    from loguru import Record
 
 from .i18n import tr
 
@@ -65,13 +69,14 @@ class _InterceptHandler(logging.Handler):
         # 直接用 logging record 自带的调用点覆盖 loguru 的 {name}/{function}/{line}。
         # 不用 opt(depth=...)：回溯层数随 Python 版本变化，写死后会把调用方显示成
         # logging 内部（实测为 ``logging:callHandlers``）。
-        logger.patch(
-            lambda entry: entry.update(
-                name=record.name,
-                function=record.funcName,
-                line=record.lineno,
-            )
-        ).opt(exception=record.exc_info).log(level, record.getMessage())
+        def override_callsite(entry: Record) -> None:
+            entry["name"] = record.name
+            entry["function"] = record.funcName
+            entry["line"] = record.lineno
+
+        logger.patch(override_callsite).opt(exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
 
 def _configure_logging() -> None:

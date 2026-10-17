@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 悬浮图标的「暂停」前景层：圆底由代码按运行状态着色，这里只画符号。
+     两根竖条合计 8dp 宽、18dp 高，与播放三角视觉重量对齐。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFE8D8A8"
+        android:pathData="M20,15 H23.5 V33 H20 Z" />
+    <path
+        android:fillColor="#FFE8D8A8"
+        android:pathData="M24.5,15 H28 V33 H24.5 Z" />
+</vector>

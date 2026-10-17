@@ -10,9 +10,11 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.os.Handler
 import android.os.Looper
 import android.os.IBinder
+import android.os.SystemClock
 import android.text.Editable
 import android.text.SpannableString
 import android.text.Spanned
@@ -21,6 +23,7 @@ import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -43,10 +46,12 @@ import kotlin.math.abs
  * FloatService — 悬浮小图标前台服务，同时是任务的唯一入口。
  *
  * 交互：
- * - 图标可拖动；单击展开任务面板，再单击收起；
+ * - 图标是「播放/暂停」双态按钮：未准备任务时保持 logo，点击只展开面板；有任务后
+ *   显示 ▶，点击直接启动（暂停后为继续）；运行中显示 ⏸，点击直接暂停；
+ * - 长按后原地松手才展开面板，一直按住不放不触发；拖动只移动位置，不受长按时长限制；
  * - 面板空闲时选择任务后启动；
  * - 运行中可暂停/结束，暂停后可继续/结束，并显示最近日志；
- * - 图标颜色反映状态：空闲无色 / 运行中绿 / 失败红 / 已停止橙。
+ * - 图标颜色反映状态：运行中绿 / 失败红 / 已停止橙 / 完成蓝。
  *
  * 主面板只显示当前选择与增量日志；任务全集在二级选择面板中展示。
  */
@@ -88,6 +93,9 @@ class FloatService : Service() {
     /** 上一次拿到的状态，用于判断是否需要重建面板按钮区（空闲↔运行切换时才重建） */
     private var interactionId = ""
     private var lastState = STATE_IDLE
+
+    /** 图标单击触发启动/暂停的时间戳，用于节流——轮询最长 1s 才确认，不节流会被连点两次 */
+    private var lastIconActionAt = 0L
 
     private val poller = object : Runnable {
         override fun run() {
@@ -163,35 +171,66 @@ class FloatService : Service() {
             y = dp(120)
         }
 
+        // 服务刚起来时先按上次选择恢复，图标第一帧就能判断「点下去会不会直接开跑」，
+        // 不必等首次同步完成的 loadTasks。
+        getSharedPreferences("float_tasks", MODE_PRIVATE).getString("selected", "").orEmpty().let {
+            if (it.isNotEmpty()) {
+                selectedTaskId = it
+                selectedTaskName = getSharedPreferences("float_tasks", MODE_PRIVATE)
+                    .getString("selected_name", "").orEmpty()
+            }
+        }
+
         val icon = ImageView(this).apply {
             setImageResource(R.drawable.ic_float)
             alpha = 0.85f
         }
 
-        // 拖动 + 单击判定（位移阈值区分）
+        // 手势只有三种去向，且都看「抬起时」的状态，不看计时器什么时候响：
+        // 移动过 = 拖动图标；没移动且按住够久 = 展开面板；没移动且短按 = 执行图标动作。
+        // 拖动不受长按时长限制，长按后继续拖动也仍然是拖动。
         icon.setOnTouchListener(object : View.OnTouchListener {
             private var downX = 0f
             private var downY = 0f
             private var startX = 0
             private var startY = 0
+
+            /** 已按拖动阈值移动过：本次手势是拖动，抬起时不再触发任何动作 */
             private var moved = false
+
+            /** 长按计时器已到点：抬起时展开面板，只要一直按住就什么都不会发生 */
+            private var armed = false
             private val touchSlop =
                 ViewConfiguration.get(this@FloatService).scaledTouchSlop.toFloat()
 
+            private val arm = Runnable {
+                if (moved) return@Runnable
+                armed = true
+                // 悬浮窗不可聚焦，没有别的反馈渠道，触感是唯一的「松手会打开面板」提示
+                runCatching {
+                    icon.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                }
+            }
+
             override fun onTouch(v: View, event: MotionEvent): Boolean {
-                when (event.action) {
+                when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         downX = event.rawX
                         downY = event.rawY
                         startX = params.x
                         startY = params.y
                         moved = false
+                        armed = false
+                        ui.postDelayed(arm, ViewConfiguration.getLongPressTimeout().toLong())
                     }
                     MotionEvent.ACTION_MOVE -> {
                         val dx = event.rawX - downX
                         val dy = event.rawY - downY
-                        if (moved || abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                        if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
+                            // 一旦移动过就锁成拖动，之后回到原位也不算点击或长按
                             moved = true
+                        }
+                        if (moved) {
                             val metrics = resources.displayMetrics
                             params.x = (startX + dx.toInt()).coerceIn(
                                 0, maxOf(0, metrics.widthPixels - params.width),
@@ -202,8 +241,19 @@ class FloatService : Service() {
                             windowManager.updateViewLayout(v, params)
                         }
                     }
-                    MotionEvent.ACTION_UP -> {
-                        if (!moved) togglePanel()
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        ui.removeCallbacks(arm)
+                        val released = event.actionMasked == MotionEvent.ACTION_UP
+                        val wasArmed = armed
+                        val dragged = moved
+                        moved = false
+                        armed = false
+                        when {
+                            !released -> Unit          // 手势被系统打断，不派发动作
+                            dragged -> Unit            // 拖动只改位置
+                            wasArmed -> togglePanel()  // 长按后原地松手才展开面板
+                            else -> onIconTap()        // 短按保持原有语义
+                        }
                     }
                 }
                 return true
@@ -221,25 +271,97 @@ class FloatService : Service() {
             if (iconHidden || pcConnected) View.INVISIBLE else View.VISIBLE
     }
 
-    private fun tintIcon(state: String) {
-        val color = when (state) {
-            STATE_RUNNING -> COLOR_RUNNING
-            STATE_PAUSING, STATE_PAUSED, STATE_STOPPING -> COLOR_STOPPED
-            STATE_FAILED -> COLOR_FAILED
-            STATE_STOPPED -> COLOR_STOPPED
-            STATE_DONE -> COLOR_DONE
-            else -> 0
+    /**
+     * 图标三态：没有可执行任务时保持原 logo（点击只展开面板），有任务时 ▶（点击启动/
+     * 继续），运行中 ⏸（点击暂停）。圆底色继续反映运行状态，符号只表达「点下去会发生
+     * 什么」——所以两个层必须分开上色，不能再用 setColorFilter 把符号一起染掉。
+     */
+    private fun applyIconState(state: String) {
+        val icon = floatView ?: return
+        val actionable = state in activeStates || (ready && selectedTaskId.isNotEmpty())
+        val glyph = when {
+            !actionable -> 0
+            state == STATE_RUNNING || state == STATE_PAUSING || state == STATE_STOPPING ->
+                R.drawable.ic_float_glyph_pause
+            else -> R.drawable.ic_float_glyph_play
         }
-        floatView?.let {
-            if (color == 0) it.clearColorFilter() else it.setColorFilter(color)
-            it.alpha = if (state == STATE_RUNNING) 1.0f else 0.85f
+        val color = when {
+            !actionable -> 0
+            state == STATE_RUNNING -> COLOR_RUNNING
+            state == STATE_FAILED -> COLOR_FAILED
+            state == STATE_DONE -> COLOR_DONE
+            state == STATE_PAUSING || state == STATE_PAUSED ||
+                state == STATE_STOPPING || state == STATE_STOPPED -> COLOR_STOPPED
+            else -> COLOR_IDLE
         }
+        if (glyph == 0) {
+            icon.background = null
+            icon.setImageResource(R.drawable.ic_float)
+        } else {
+            // 圆底用代码画，2dp 内缩让外径与原 logo 的 44/48 保持一致
+            icon.background = InsetDrawable(
+                GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(color)
+                },
+                dp(2),
+            )
+            icon.setImageResource(glyph)
+        }
+        icon.alpha = if (state == STATE_RUNNING) 1.0f else 0.85f
     }
 
     // ── 任务面板 ──────────────────────────────────────────
 
     private fun togglePanel() {
         if (panelView != null) closePanel() else openPanel()
+    }
+
+    /**
+     * 图标单击：面板开着时先收起（沿用原来的开关语义，避免在面板上用单击误启动任务），
+     * 否则按图标当前符号直接执行；没有可执行任务时退回展开面板，不静默失败。
+     */
+    private fun onIconTap() {
+        if (panelView != null) {
+            closePanel()
+            return
+        }
+        val state = lastState
+        // 过渡态不重复发请求，否则只会拿到一串「正在暂停/正在停止」的回包
+        if (state == STATE_PAUSING || state == STATE_STOPPING) return
+        // 等待人工确认时不能拿「暂停」代替回答，把决策交回面板
+        if (state in activeStates && interactionId.isNotEmpty()) {
+            openPanel()
+            return
+        }
+        if (!ready) {
+            openPanel()
+            toast("预置配置未就绪，请稍后重试")
+            return
+        }
+        if (selectedTaskId.isEmpty()) {
+            openPanel()
+            toast("请先选择任务")
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastIconActionAt < ICON_TAP_THROTTLE_MS) return
+        lastIconActionAt = now
+        when (state) {
+            STATE_RUNNING -> pauseResume(pause = true)
+            STATE_PAUSED -> pauseResume(pause = false)
+            else -> launchTask(selectedTaskId, selectedTaskName)
+        }
+    }
+
+    /** 暂停/继续：先乐观切换图标，避免 1s 轮询窗口内看起来没反应而被连点 */
+    private fun pauseResume(pause: Boolean) {
+        applyIconState(if (pause) STATE_PAUSED else STATE_RUNNING)
+        executor.execute {
+            val r = if (pause) PyBridge.pauseTask(this) else PyBridge.resumeTask(this)
+            toast(r.optString("message"))
+            ui.post { refreshStatus() }
+        }
     }
 
     private fun closePanel() {
@@ -467,7 +589,7 @@ class FloatService : Service() {
                 selectButton?.isEnabled = ready && state !in activeStates
                 selectUserButton?.isEnabled = ready && state !in activeStates
                 appendLogs(status)
-                tintIcon(state)
+                applyIconState(state)
                 updateNotification(
                     if (state in activeStates) "${if (state == STATE_PAUSED) "已暂停" else "运行中"}：$taskName" else header.replace('\n', ' ')
                 )
@@ -722,6 +844,8 @@ class FloatService : Service() {
                 if (ok) {
                     closePanel()
                     lastState = STATE_IDLE
+                    // 立刻切成暂停符号，别让用户在轮询确认前以为没点上
+                    applyIconState(STATE_RUNNING)
                 }
                 refreshStatus()
             }
@@ -970,5 +1094,11 @@ class FloatService : Service() {
         private const val COLOR_FAILED = 0xFFF44336.toInt()
         private const val COLOR_STOPPED = 0xFFFF9800.toInt()
         private const val COLOR_DONE = 0xFF2196F3.toInt()
+
+        /** 图标圆底默认色，与 ic_float.xml 的圆底保持一致 */
+        private const val COLOR_IDLE = 0xCC3B4A6B.toInt()
+
+        /** 单击直接启动/暂停后的节流窗口：状态轮询最长 1s 才确认，不节流会被连点两次 */
+        private const val ICON_TAP_THROTTLE_MS = 800L
     }
 }

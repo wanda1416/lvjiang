@@ -307,7 +307,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.home_permission_hint).text = when {
             !a11y -> "任务运行需要开启无障碍服务，可在权限设置中开启。"
             !overlay -> "启动悬浮图标需要悬浮窗权限，点击启动即可前往授权。"
-            FloatService.isRunning -> "悬浮图标已启动，切到游戏后点击图标选择任务。"
+            FloatService.isRunning -> "悬浮图标已启动，切到游戏后点击图标开始或暂停任务。"
             else -> "权限已就绪，启动悬浮图标即可在游戏中控制任务。"
         }
         findViewById<Button>(R.id.btn_home_permissions).visibility =

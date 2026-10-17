@@ -1560,7 +1560,6 @@ auto_strings:
   词条收益率: Affix Yield
   模拟转律: Simulate Transmute
   按装备上已保存的转律目标计算（目标由「培养建议 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: Compute with the transmute targets saved on equipment (set via Growth Suggestions → Transmute Advice); uses saved targets only, never triggers a search
-  原词条毕业率: Current-Affix Graduation
   已保存目标毕业率: Saved-Target Graduation
   推荐毕业率: Recommended Graduation
   实际数值: actual values
@@ -1616,7 +1615,7 @@ auto_strings:
   '方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值': 'Plan #{rank}　Gongjue set: {gongjue}　Graduation {rate:.2f}%　·　Attributes are computed under the search-time assumptions and this Gongjue set, not measured after equipping'
   组合详情: Combo Details
   战斗属性: Combat Attributes
-  以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。: These are affix yields (theoretical); they do not mean a single affix can be gained or lost in-game. Additions use the Lv{level} normal-affix cap; deductions use the equipment's actual current value.
+  以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按顶部计算假设投影后的装备数值计算。: These are affix yields (theoretical); they do not mean a single affix can be gained or lost in-game. Additions use the Lv{level} normal-affix cap; deductions are computed on equipment projected by the calculation assumptions above.
   新增一条词条的收益率: Yield of adding one affix
   扣除一条当前词条的损失率: Loss of removing one current affix
   已取消本次搜索。: This search was cancelled.

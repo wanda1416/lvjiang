@@ -159,19 +159,24 @@ class GraduationAnalysisLauncher:
                 return self._apply_transmute(
                     result, user_name=user_name, plan_id=plan_id)
 
-            affix_pages = AffixAnalysisPages(
-                school,
-                scoring.scheme,
-                equipped=equipped,
-                report_provider=lambda: analyze_affix_impacts(
-                    equipped,
+            def affix_yield_report():
+                """词条收益率跟随计算假设栏：先按假设投影，再逐条扣除/新增。"""
+                current = bar.value()
+                return analyze_affix_impacts(
+                    current.project(equipped, game_config),
                     calculator,
                     base_attrs,
                     school,
                     game_config=game_config,
                     graduation_context=scoring.attr_context,
-                    affix_level=world_level,
-                ),
+                    affix_level=current.full_level or world_level,
+                )
+
+            affix_pages = AffixAnalysisPages(
+                school,
+                scoring.scheme,
+                equipped=equipped,
+                report_provider=affix_yield_report,
                 joint_analyzer=lambda slots: analyze_combined_affix_replacements(
                     equipped,
                     (),

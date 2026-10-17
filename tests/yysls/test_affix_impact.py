@@ -535,7 +535,7 @@ def test_dialog_explains_blocked_equipment(qtbot):
 
 def test_removal_table_shows_smallest_loss_with_per_entry_tooltip(qtbot, monkeypatch):
     """扣除列表默认展示损失最小的一条，悬浮和点击都能看到逐条损失。"""
-    from PyQt6.QtWidgets import QTableWidget
+    from PyQt6.QtWidgets import QLabel, QTableWidget
 
     from lvjiang.apps.yysls.core.graduation.affix_impact import (
         AffixImpact,
@@ -574,6 +574,9 @@ def test_removal_table_shows_smallest_loss_with_per_entry_tooltip(qtbot, monkeyp
 
     table = pages.findChild(QTableWidget, "affixImpactRemovalTable")
     assert table is not None
+    current = pages.findChild(QLabel, "affixMetricValue_yieldRate")
+    assert current is not None
+    assert current.text() == "80.00%"
     assert table.item(0, 0).text() == "会心率（共2条，按损失最小一条）"
     assert table.item(0, 1).text() == "-0.80%"
     assert table.item(0, 2).text() == "14"
@@ -591,3 +594,36 @@ def test_removal_table_shows_smallest_loss_with_per_entry_tooltip(qtbot, monkeyp
     assert table.item(1, 0).toolTip() == ""
     table.itemClicked.emit(table.item(1, 0))
     assert _FakeToolTip.shown == [details_text]
+
+
+def test_assumption_change_recomputes_the_yield_page(qtbot):
+    """假设栏改动后词条收益率按新假设重算，当前毕业率跟着更新。"""
+    from PyQt6.QtWidgets import QLabel
+
+    from lvjiang.apps.yysls.ui.loadout.affix_analysis_pages import (
+        AffixAnalysisPages,
+    )
+
+    reports = (
+        AffixImpactReport(0.8, 110, (), ()),
+        AffixImpactReport(0.72, 110, (), ()),
+    )
+    calls: list[int] = []
+
+    def provider():
+        calls.append(len(calls))
+        return reports[min(len(calls) - 1, len(reports) - 1)]
+
+    def current_rate() -> str:
+        label = pages.findChild(QLabel, "affixMetricValue_yieldRate")
+        assert label is not None
+        return label.text()
+
+    pages = AffixAnalysisPages("鸣金·虹", "基础方案", report_provider=provider)
+    qtbot.addWidget(pages)
+    pages.ensure_built(pages.yield_page)
+    assert current_rate() == "80.00%"
+
+    pages.mark_stale()
+    qtbot.waitUntil(lambda: len(calls) == 2, timeout=3000)
+    assert current_rate() == "72.00%"

@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QToolTip,
@@ -200,6 +201,10 @@ class AffixAnalysisPages(QWidget):
         self._joint_timer.setSingleShot(True)
         self._joint_timer.setInterval(120)
         self._joint_timer.timeout.connect(self._calculate_joint)
+        self._report_timer = QTimer(self)
+        self._report_timer.setSingleShot(True)
+        self._report_timer.setInterval(250)
+        self._report_timer.timeout.connect(self._rebuild_sensitivity)
         self._transmute_jobs = JobController(self)
         self._transmute_jobs.finished.connect(self._on_transmute_finished)
         self._transmute_jobs.failed.connect(self._on_transmute_failed)
@@ -226,10 +231,27 @@ class AffixAnalysisPages(QWidget):
         )
 
     def mark_stale(self) -> None:
-        """假设栏改动后提示转律建议已过期，不自动重算、不清空。"""
+        """假设栏改动后提示转律建议已过期；词条收益率跟随假设重算。"""
         if self._transmute_result is not None and self._transmute_run.isEnabled():
             self._transmute_status.setText(
                 tr("计算假设已变化，当前结果按旧假设得出；请重新计算。"))
+        if self._tab_built["sensitivity"]:
+            # 连勾几个开关只重算一次；报告本身按计算时刻的假设投影装备。
+            self._report_timer.start()
+
+    def _rebuild_sensitivity(self) -> None:
+        """丢弃按旧假设算出的报告与页面，按当前假设重建词条收益率。"""
+        self._tab_built["sensitivity"] = False
+        self._report = None
+        layout = self.yield_page.layout()
+        assert layout is not None
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        self.ensure_built(self.yield_page)
 
     # ── 按需构建 ──────────────────────────────────────────
 
@@ -335,12 +357,12 @@ class AffixAnalysisPages(QWidget):
                        self._transmute_apply):
             button.setMinimumWidth(100)
             buttons.addWidget(button)
-        layout.addWidget(self._transmute_actions)
 
+        # 与另外两个页签一致：第一行三张指标卡，按钮退到第二行。
         metrics = QHBoxLayout()
         metrics.setSpacing(10)
         self._transmute_baseline = self._metric_card(
-            tr("原词条毕业率"), "—", "transmuteBaseline")
+            tr("当前毕业率"), "—", "transmuteBaseline")
         self._transmute_saved = self._metric_card(
             tr("已保存目标毕业率"), "—", "transmuteSaved")
         self._transmute_final = self._metric_card(
@@ -349,6 +371,7 @@ class AffixAnalysisPages(QWidget):
                      self._transmute_final):
             metrics.addWidget(card, 1)
         layout.addLayout(metrics)
+        layout.addWidget(self._transmute_actions)
 
         self._transmute_note = QLabel()
         self._transmute_note.setWordWrap(True)
@@ -791,6 +814,25 @@ class AffixAnalysisPages(QWidget):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
+        # 与另外两个页签一致：第一行是三栏指标行，这里只有当前毕业率。
+        # 留空也要用等宽空槽位：直接 addStretch 会把卡片自身的 sizeHint 当成
+        # 额外宽度，卡片就会比另外两页宽几个像素。
+        metrics = QHBoxLayout()
+        metrics.setSpacing(10)
+        for index in range(3):
+            slot = QWidget()
+            slot.setSizePolicy(
+                QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            if index == 0:
+                slot_layout = QVBoxLayout(slot)
+                slot_layout.setContentsMargins(0, 0, 0, 0)
+                slot_layout.addWidget(self._metric_card(
+                    tr("当前毕业率"),
+                    f"{report.baseline_rate * 100:.2f}%",
+                    "yieldRate",
+                ))
+            metrics.addWidget(slot, 1)
+        layout.addLayout(metrics)
         banner = QFrame()
         banner.setProperty("status", "warning")
         banner.setStyleSheet("QFrame { border-radius: 6px; }")
@@ -798,9 +840,8 @@ class AffixAnalysisPages(QWidget):
         banner_layout.setContentsMargins(12, 8, 12, 8)
         note = QLabel(
             tr("以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。"
-               "新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。").format(
-                level=report.affix_level,
-            )
+               "新增按 Lv{level} 普通词条满值，扣除按顶部计算假设投影后的装备数值计算。")
+            .format(level=report.affix_level)
         )
         note.setWordWrap(True)
         banner_layout.addWidget(note)

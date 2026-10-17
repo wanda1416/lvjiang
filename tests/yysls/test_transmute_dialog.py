@@ -76,7 +76,7 @@ def test_opening_pages_runs_nothing_until_asked(qtbot):
 
 
 def test_transmute_actions_stay_above_dynamic_content(qtbot):
-    """三个操作按钮属于顶部操作栏，不能被动态状态和卡片区推到底部。"""
+    """第一行是指标卡，操作按钮在第二行，不能被状态和卡片区推到底部。"""
     pages = AffixAnalysisPages(
         "鸣金·虹", "基础方案", equipped=_equipped(),
         transmute_runner=lambda _stop, _assumptions: _result(),
@@ -84,7 +84,8 @@ def test_transmute_actions_stay_above_dynamic_content(qtbot):
     qtbot.addWidget(pages)
     layout = pages.transmute_page.layout()
     assert layout is not None
-    assert layout.itemAt(0).widget() is pages._transmute_actions
+    assert layout.itemAt(0).layout() is not None
+    assert layout.itemAt(1).widget() is pages._transmute_actions
     scroll = pages.transmute_page.findChild(QScrollArea)
     assert scroll is not None
     assert layout.indexOf(pages._transmute_actions) < layout.indexOf(scroll)

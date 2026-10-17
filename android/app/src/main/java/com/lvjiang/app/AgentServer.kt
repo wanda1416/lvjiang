@@ -86,8 +86,23 @@ object AgentServer {
 
     fun pcControlsDevice(): Boolean = pcOwner != null
 
-    private fun localTaskActive(): Boolean = PyBridge.status(requireNotNull(appContext))
-        .optString("state") in setOf("running", "pausing", "paused", "stopping")
+    private fun localTaskState(): String =
+        PyBridge.status(requireNotNull(appContext)).optString("state")
+
+    /**
+     * 任务还活着（含已暂停）：同步、历史回传这类要独占配置的操作仍然要拦，
+     * 否则会被一个随时可能继续的任务读到半套配置。
+     */
+    private fun localTaskAlive(): Boolean =
+        localTaskState() in setOf("running", "pausing", "paused", "stopping")
+
+    /**
+     * 任务正在驱动设备：只有这几种状态才会和代理抢屏幕。
+     * 暂停后手机不再发输入，另一端可以接管；接管期间继续被拒绝，
+     * 见 PyBridge.resumeTask。
+     */
+    private fun localTaskDriving(): Boolean =
+        localTaskState() in setOf("running", "pausing", "stopping")
 
     fun isRunning(): Boolean = server != null
 
@@ -232,7 +247,7 @@ object AgentServer {
         val op = req.optString("op", "")
         val result = try {
             synchronized(executionLock) {
-                if (op in controlOps && localTaskActive()) {
+                if (op in controlOps && localTaskDriving()) {
                     fail("手机离线任务正在执行，请先结束任务")
                 } else if (op in controlOps && pcOwner != null && pcOwner != Thread.currentThread().id) {
                     fail("设备已被另一条 PC 执行连接占用")
@@ -269,7 +284,7 @@ object AgentServer {
         "calib_hide" -> calibHide()
         "float_icon" -> floatIcon(req)
         "control_begin" -> {
-            if (localTaskActive() || pcOwner != null && pcOwner != Thread.currentThread().id) fail("设备正在执行其他任务")
+            if (localTaskDriving() || pcOwner != null && pcOwner != Thread.currentThread().id) fail("设备正在执行其他任务")
             else {
                 pcOwner = Thread.currentThread().id
                 FloatService.setPcConnected(true)
@@ -306,7 +321,7 @@ object AgentServer {
         "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(
             requireNotNull(appContext), true, req.optInt("screen_repetitions", 0))))
         "history_begin", "history_chunk", "history_end" -> {
-            if (op == "history_begin" && (localTaskActive() || pcControlsDevice())) fail("请先结束设备任务再回传历史")
+            if (op == "history_begin" && (localTaskAlive() || pcControlsDevice())) fail("请先结束设备任务再回传历史")
             else Pair(PyBridge.historyTransfer(requireNotNull(appContext), op.removePrefix("history_"), req.toString()), null)
         }
         "offline_sync_begin" -> beginSync(req)
@@ -342,7 +357,7 @@ object AgentServer {
     }
 
     private fun beginSync(req: JSONObject): Pair<JSONObject, ByteArray?> {
-        if (localTaskActive() || pcControlsDevice()) return fail("请先结束设备上的任务再同步")
+        if (localTaskAlive() || pcControlsDevice()) return fail("请先结束设备上的任务再同步")
         if (req.opt("preserve_batch_config") !is Boolean) return fail("请更新 PC：同步必须明确选择是否保留手机批量配置")
         if (req.opt("preserve_task_params") !is Boolean) return fail("请更新 PC：同步必须明确选择是否保留手机任务参数")
         val size = req.getLong("size")
@@ -379,7 +394,7 @@ object AgentServer {
 
     private fun commitSync(): Pair<JSONObject, ByteArray?> {
         val file = uploadFile ?: return fail("没有待应用的同步包")
-        if (localTaskActive() || pcControlsDevice()) return fail("请先结束任务再应用同步")
+        if (localTaskAlive() || pcControlsDevice()) return fail("请先结束任务再应用同步")
         try {
             if (file.length() != uploadSize) return fail("同步包未传输完整")
             val digest = MessageDigest.getInstance("SHA-256")

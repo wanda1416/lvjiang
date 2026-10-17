@@ -128,7 +128,18 @@ object PyBridge {
     /** 请求停止：`{ok, message}` */
     fun stopTask(context: Context): JSONObject = callJson(context, "stop_task")
     fun pauseTask(context: Context): JSONObject = callJson(context, "pause_task")
-    fun resumeTask(context: Context): JSONObject = callJson(context, "resume_task")
+
+    /**
+     * 继续：暂停的手机任务不占用控制器，PC 可以在这期间接管设备；
+     * 接管期间必须拒绝继续，否则两端会同时往屏幕上发输入。
+     */
+    fun resumeTask(context: Context): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) {
+            JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
+        } else {
+            callJson(context, "resume_task")
+        }
+    }
     fun applySync(context: Context, path: String, preserveTaskParams: Boolean, preserveBatchConfig: Boolean): JSONObject =
         callJson(context, "apply_sync", path, preserveTaskParams, preserveBatchConfig, moduleName = OFFLINE_MODULE)
     fun historyTransfer(context: Context, operation: String, payload: String): JSONObject =

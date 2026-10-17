@@ -10,7 +10,7 @@ from dataclasses import replace
 
 from loguru import logger
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QCursor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -33,6 +34,7 @@ from .....ui.button_styles import apply_button_style
 from .....ui.presentation import is_dark_theme
 from ...config.equipment_slots import grid_layout
 from ...config.tune_slots import SLOT_LABELS
+from ...core.combat.combat_attrs import map_affix_to_attr
 from ...core.graduation.affix_impact import (
     AffixCombinationResult,
     AffixImpact,
@@ -78,6 +80,34 @@ def transmute_reason_text(code: str) -> str:
         REASON_NO_SLOTS: tr("没有可转词条"),
         REASON_NO_LEVEL_CONFIG: tr("缺少该等级配置"),
     }.get(code, code)
+
+
+def _removal_tooltip(impact: AffixImpact) -> str:
+    """同名词条逐条列出扣除损失率；只有一条时表格本身已经说清，不再提示。
+
+    每行按“部位  词条名 词条值  毕业率下降 X.XX%”给出，顺序即配装顺序。
+    悬浮由单元格自带提示直接展示；点击时由 ``_show_item_tooltip`` 补一次，
+    让不习惯悬浮的用户也能看到同一份明细。
+    """
+    if len(impact.details) <= 1:
+        return ""
+    lines = []
+    for detail in impact.details:
+        _field, is_percent = map_affix_to_attr(detail.name)
+        lines.append(tr("{slot}  {name} {value}  毕业率下降 {loss}").format(
+            slot=SLOT_LABELS.get(detail.slot_key, detail.slot_key),
+            name=detail.name,
+            value=f"{detail.affix_value:g}{'%' if is_percent else ''}",
+            loss=f"{abs(detail.graduation_delta) * 100:.2f}%",
+        ))
+    return "\n".join(lines)
+
+
+def _show_item_tooltip(item: QTableWidgetItem) -> None:
+    """点击单元格时把它已有的悬浮文案显示在鼠标位置。"""
+    text = item.toolTip()
+    if text:
+        QToolTip.showText(QCursor.pos(), text, item.tableWidget())
 
 
 class _ProportionalTableWidget(QTableWidget):
@@ -835,6 +865,9 @@ class AffixAnalysisPages(QWidget):
             tr("词条"), tr("毕业率变化"), tr("词条值"),
         ])
         self._prepare_table(table)
+        if not positive:
+            # 悬浮由单元格提示承担，点击再补一次，两条路径看到同一份明细。
+            table.itemClicked.connect(_show_item_tooltip)
         header = table.horizontalHeader()
         assert header is not None
         header.setStretchLastSection(False)
@@ -847,7 +880,7 @@ class AffixAnalysisPages(QWidget):
         for row, impact in enumerate(impacts):
             name = impact.name
             if not positive and impact.occurrence_count > 1:
-                name = tr("{name}（共{count}条，按损失最大一条）").format(
+                name = tr("{name}（共{count}条，按损失最小一条）").format(
                     name=name, count=impact.occurrence_count,
                 )
             name_item = QTableWidgetItem(name)
@@ -859,6 +892,11 @@ class AffixAnalysisPages(QWidget):
             value_item = QTableWidgetItem(f"{impact.affix_value:g}")
             value_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            tip = "" if positive else _removal_tooltip(impact)
+            if tip:
+                # 三列都挂上，悬浮在行内任意位置都能看到逐条损失。
+                for item in (name_item, delta_item, value_item):
+                    item.setToolTip(tip)
             table.setItem(row, 0, name_item)
             table.setItem(row, 1, delta_item)
             table.setItem(row, 2, value_item)

@@ -1,8 +1,9 @@
 """当前配装的词条敏感度与合法培养建议。
 
 新增词条按当前赛季装备等级的普通词条满值计算；扣除词条按
-当前装备的实际数值计算。此模块只分析 affix_1~5，定音词条不属于
-可追加的普通词条，不纳入本报告。
+当前装备的实际数值计算。同名词条在扣除列表里只占一行，取“扣除其中
+损失最小的一条”，逐条损失见 ``AffixImpact.details``。此模块只分析
+affix_1~5，定音词条不属于可追加的普通词条，不纳入本报告。
 """
 from __future__ import annotations
 
@@ -32,6 +33,20 @@ _JOINT_INVALID_BEAM = 512
 
 
 @dataclass(frozen=True)
+class AffixRemovalDetail:
+    """扣除某一条具体装备词条后的损失率。
+
+    同名词条在列表里只占一行，逐条代价由本结构提供。``slot_key`` 是稳定
+    key，显示名由界面按装备槽位定义转换。
+    """
+
+    slot_key: str
+    name: str
+    affix_value: float
+    graduation_delta: float
+
+
+@dataclass(frozen=True)
 class AffixImpact:
     """单个词条对毕业率的边际影响。"""
 
@@ -39,6 +54,7 @@ class AffixImpact:
     affix_value: float
     graduation_delta: float
     occurrence_count: int = 1
+    details: tuple[AffixRemovalDetail, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -497,7 +513,7 @@ def analyze_affix_impacts(
         rate = scorer.rate_attrs(new_attrs)
         additions.append(AffixImpact(name, value, rate - baseline_rate))
 
-    removal_candidates: dict[str, list[AffixImpact]] = {}
+    removal_candidates: dict[str, list[AffixRemovalDetail]] = {}
     occurrences: dict[str, int] = {}
     weapon_affixes = set(game_config.get_all_weapon_wuxue_affixes().values())
     for slot_key, _equip, field, name, value in _iter_affixes(effective):
@@ -512,18 +528,21 @@ def analyze_affix_impacts(
         # 评分内核里完成）。
         rate = scorer.rate(changed)
         removal_candidates.setdefault(name, []).append(
-            AffixImpact(name, value, rate - baseline_rate)
+            AffixRemovalDetail(slot_key, name, value, rate - baseline_rate)
         )
 
     removals: list[AffixImpact] = []
-    for name, impacts in removal_candidates.items():
-        # 同名词条只展示“扣除其中损失最大的一条”，避免重复刷屏。
-        impact = min(impacts, key=lambda item: item.graduation_delta)
+    for name, details in removal_candidates.items():
+        # 同名词条只占一行：默认取“扣除其中损失最小的一条”，即用户真正
+        # 要动那一条时最可能付出的代价；逐条损失由明细交给界面展示。
+        # 明细保持装备本身的顺序，悬浮提示与用户看到的配装顺序一致。
+        chosen = max(details, key=lambda item: item.graduation_delta)
         removals.append(AffixImpact(
-            impact.name,
-            impact.affix_value,
-            impact.graduation_delta,
+            chosen.name,
+            chosen.affix_value,
+            chosen.graduation_delta,
             occurrence_count=occurrences[name],
+            details=tuple(details),
         ))
 
     additions.sort(key=lambda item: (-item.graduation_delta, item.name))

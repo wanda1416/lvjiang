@@ -149,6 +149,32 @@ def test_duplicate_same_weapon_bonus_only_uses_the_best_one():
     assert "剑武学增伤" not in {item.name for item in report.additions}
 
 
+def test_removal_row_takes_the_smallest_loss_and_keeps_every_entry():
+    """同名词条只占一行，默认给"扣除损失最小的一条"，并保留逐条明细。
+
+    这一列回答的是"少一条会掉多少"，用户真正会动的那一条通常不是数值
+    最高的那条；按最大损失展示会把代价放大，所以默认取最小值。
+    """
+    equipped = _equipment()
+    equipped["main_weapon"]["affix_2"] = {"name": "最大外功攻击", "value": 60}
+
+    report = analyze_affix_impacts(
+        equipped,
+        _LinearCalculator(),
+        CombatAttributes(),
+        "鸣金·虹",
+        game_config=get_game_config(),
+        affix_level=110,
+    )
+
+    impact = next(item for item in report.removals if item.name == "最大外功攻击")
+    assert impact.occurrence_count == 2
+    assert impact.affix_value == 60
+    assert impact.graduation_delta == pytest.approx(-60 / 10000)
+    assert [detail.affix_value for detail in impact.details] == [100, 60]
+    assert all(detail.name == "最大外功攻击" for detail in impact.details)
+
+
 def test_cultivation_suggests_best_legal_equal_quality_replacement():
     report = analyze_affix_impacts(
         _equipment(),
@@ -505,3 +531,63 @@ def test_dialog_explains_blocked_equipment(qtbot):
     current_rate = dialog.findChild(QLabel, "affixMetricValue_rate")
     assert current_rate is not None
     assert current_rate.text() == "需先校正"
+
+
+def test_removal_table_shows_smallest_loss_with_per_entry_tooltip(qtbot, monkeypatch):
+    """扣除列表默认展示损失最小的一条，悬浮和点击都能看到逐条损失。"""
+    from PyQt6.QtWidgets import QTableWidget
+
+    from lvjiang.apps.yysls.core.graduation.affix_impact import (
+        AffixImpact,
+        AffixRemovalDetail,
+    )
+    from lvjiang.apps.yysls.ui.loadout import affix_analysis_pages
+    from lvjiang.apps.yysls.ui.loadout.affix_analysis_pages import (
+        AffixAnalysisPages,
+    )
+
+    class _FakeToolTip:
+        shown: list[str] = []
+
+        @staticmethod
+        def showText(_pos, text, _widget=None):
+            _FakeToolTip.shown.append(text)
+
+    monkeypatch.setattr(affix_analysis_pages, "QToolTip", _FakeToolTip)
+
+    duplicated = AffixImpact(
+        "会心率", 14, -0.008, occurrence_count=2,
+        details=(
+            AffixRemovalDetail("head", "会心率", 18, -0.024),
+            AffixRemovalDetail("chest", "会心率", 14, -0.008),
+        ),
+    )
+    single = AffixImpact(
+        "劲", 70, -0.005,
+        details=(AffixRemovalDetail("leg", "劲", 70, -0.005),),
+    )
+    report = AffixImpactReport(0.8, 110, (), (duplicated, single))
+    pages = AffixAnalysisPages(
+        "鸣金·虹", "基础方案", report_provider=lambda: report)
+    qtbot.addWidget(pages)
+    pages.ensure_built(pages.yield_page)
+
+    table = pages.findChild(QTableWidget, "affixImpactRemovalTable")
+    assert table is not None
+    assert table.item(0, 0).text() == "会心率（共2条，按损失最小一条）"
+    assert table.item(0, 1).text() == "-0.80%"
+    assert table.item(0, 2).text() == "14"
+    details_text = (
+        "冠胄  会心率 18%  毕业率下降 2.40%\n"
+        "胸甲  会心率 14%  毕业率下降 0.80%"
+    )
+    # 悬浮：单元格自带提示
+    assert table.item(0, 0).toolTip() == details_text
+    # 点击：同一条明细再弹一次
+    table.itemClicked.emit(table.item(0, 2))
+    assert _FakeToolTip.shown == [details_text]
+    # 只有一条时表格本身已经说清，悬浮和点击都不再重复提示。
+    assert table.item(1, 0).text() == "劲"
+    assert table.item(1, 0).toolTip() == ""
+    table.itemClicked.emit(table.item(1, 0))
+    assert _FakeToolTip.shown == [details_text]

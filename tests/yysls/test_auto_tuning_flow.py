@@ -19,11 +19,17 @@ import lvjiang.apps.yysls.workflows.builtins.equipment  # noqa: F401
 from lvjiang.apps.yysls.config import LevelConfig
 from lvjiang.apps.yysls.core.equip_parser import Affix, EquipmentData
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
+from lvjiang.apps.yysls.core.graduation.smart_tuning import (
+    SmartTuningResult,
+    SmartTuningStatus,
+)
 from lvjiang.apps.yysls.core.tuning_rules import (
     BehaviorRule,
     FoodRule,
     MaterialSettings,
     ScanBehavior,
+    SmartTuningConfig,
+    SmartTuningFailureAction,
     TuneBehavior,
     TuningGroup,
 )
@@ -1292,6 +1298,39 @@ def _mock_game_config(level_configs=None):
     return mock_mgr
 
 
+class ScriptedSmartEvaluator:
+    """按调用顺序返回既定结论的智能调律替身，并记录每次评估的词条数。
+
+    词条数是判断「评估发生在重置前还是重置后」的唯一可靠依据：重置前预检
+    拿到的是首词条画像（1 条），重置后的正式判定同样是 1 条，而按旧顺序
+    先重置时，外层二次判定也只会看到 1 条——所以断言还配合 resets 与点击。
+    """
+
+    def __init__(self, config, statuses):
+        self.active = True
+        self.plan_infos: list = []
+        self.config = config
+        self._statuses = list(statuses)
+        self.calls: list[int] = []
+
+    def evaluate(self, slot, equip):
+        self.calls.append(sum(
+            1 for key, value in equip.items()
+            if key.startswith("affix_") and isinstance(value, dict)))
+        status = (self._statuses.pop(0) if self._statuses
+                  else SmartTuningStatus.NO_IMPROVEMENT)
+        return SmartTuningResult(status=status, reason="脚本化智能结论", plans=())
+
+
+def _smart_tune_base(action: str, failure: str) -> TuningGroup:
+    """基础规则无条件重置 + 指定失败动作的基础规则组。"""
+    base = _behavior_base(tune=TuneBehavior(
+        rules=[BehaviorRule(action=action)], max_resets=3))
+    base.smart_tuning = SmartTuningConfig(
+        failure_action=SmartTuningFailureAction(action=failure, enabled=True))
+    return base
+
+
 _RECYCLE_ALL = [BehaviorRule(action="recycle")]   # 无条件 → 全部回收
 
 
@@ -1638,6 +1677,124 @@ def test_base_rule_tune_full_recycle_keeps_legacy_unconditional_recycle():
         is_initial=False)
 
     assert action == "recycle"
+
+
+def _patch_worthy_equipment(monkeypatch) -> None:
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_WORTHY))
+    monkeypatch.setattr(tuning_judge, "judge_equipment_potential",
+                        lambda *a, **k: dict(_WORTHY))
+    monkeypatch.setattr(
+        auto_tuning, "get_game_config",
+        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
+
+
+_RESET_OCR = {
+    "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
+    "tune_affix": "最大外功攻击 100", "tune_tip": "",
+    "reset_tune": "重置调律(3)",
+    "reset_check": "当前装备剩余可重置次数：3",
+    "reset_info": "持有 100",
+}
+_REPRO_EQUIPMENT = ("首词条合格剑", _equip(2, quality="gold", cap_pct=50),
+                    WEAPON_DETAIL)
+
+
+def test_smart_reset_precheck_prevents_wasted_reset(monkeypatch):
+    """重置前判定无法提升时，不能先花掉两颗传律石再发现没有收益。
+
+    基础规则命中重置后，智能调律原来只在重置之后判定；判定为不可提升时
+    这次重置已经提交。预检必须先用首词条画像给出结论，让重置根本不发生。
+    """
+    _patch_worthy_equipment(monkeypatch)
+    base = _smart_tune_base("reset", "tune_full_recycle")
+    wf = _wf_with(base)
+    wf.run_ctx.smart_tuning_enabled = True
+    evaluator = ScriptedSmartEvaluator(
+        base.smart_tuning, [SmartTuningStatus.NO_IMPROVEMENT])
+    wf._smart_evaluator = evaluator
+    wf._smart_config = base.smart_tuning
+    wf._ocr_map[TUNE_SCENE] = dict(_RESET_OCR)
+
+    wf._process_equipment(*_REPRO_EQUIPMENT)
+
+    report = wf.output["tuning_reports"][0]
+    assert evaluator.calls == [1], "预检应只评估首词条画像一次"
+    assert report["resets"] == 0, "判定不可提升时不应提交重置"
+    assert (TUNE_SCENE, "reset_tune") not in wf.clicks
+    assert (TUNE_SCENE, "reset_confirm") not in wf.clicks
+    assert report["smart_tuning_decisions"][0]["checkpoint"] == (
+        "首次调律处理/重置前")
+
+
+@pytest.mark.parametrize("status", [
+    SmartTuningStatus.IMPROVES,
+    SmartTuningStatus.UNKNOWN,
+])
+def test_smart_reset_precheck_allows_reset_when_not_proven_hopeless(
+        monkeypatch, status):
+    """IMPROVES 与 UNKNOWN 都不能证明重置没有收益，必须照原逻辑重置。"""
+    _patch_worthy_equipment(monkeypatch)
+    base = _smart_tune_base("reset", "tune_full_recycle")
+    wf = _wf_with(base)
+    wf.run_ctx.smart_tuning_enabled = True
+    evaluator = ScriptedSmartEvaluator(base.smart_tuning, [status, status])
+    wf._smart_evaluator = evaluator
+    wf._smart_config = base.smart_tuning
+    wf._ocr_map[TUNE_SCENE] = dict(_RESET_OCR)
+
+    wf._process_equipment(*_REPRO_EQUIPMENT)
+
+    report = wf.output["tuning_reports"][0]
+    assert report["resets"] == 1
+    assert (TUNE_SCENE, "reset_tune") in wf.clicks
+    assert (TUNE_SCENE, "reset_confirm") in wf.clicks
+
+
+def test_smart_reset_precheck_stays_silent_when_failure_action_is_continue(
+        monkeypatch):
+    """失败动作是「继续」时预检没有可执行动作，不该留下重复的决策记录。"""
+    _patch_worthy_equipment(monkeypatch)
+    base = _smart_tune_base("reset", "continue")
+    wf = _wf_with(base)
+    wf.run_ctx.smart_tuning_enabled = True
+    evaluator = ScriptedSmartEvaluator(base.smart_tuning, [
+        SmartTuningStatus.NO_IMPROVEMENT,
+        SmartTuningStatus.NO_IMPROVEMENT,
+    ])
+    wf._smart_evaluator = evaluator
+    wf._smart_config = base.smart_tuning
+    wf._ocr_map[TUNE_SCENE] = dict(_RESET_OCR)
+
+    wf._process_equipment(*_REPRO_EQUIPMENT)
+
+    report = wf.output["tuning_reports"][0]
+    assert report["resets"] == 1
+    assert [item["checkpoint"] for item in
+            report["smart_tuning_decisions"]] == ["首次调律处理"]
+
+
+def test_smart_failure_reset_is_prechecked_before_spending_stones(monkeypatch):
+    """失败动作本身就是重置时同样要先预检，不能先重置再发现无收益。"""
+    _patch_worthy_equipment(monkeypatch)
+    base = _smart_tune_base("continue", "reset")
+    wf = _wf_with(base)
+    wf.run_ctx.smart_tuning_enabled = True
+    evaluator = ScriptedSmartEvaluator(base.smart_tuning, [
+        SmartTuningStatus.NO_IMPROVEMENT,   # 首次调律处理：当前形态无提升
+        SmartTuningStatus.NO_IMPROVEMENT,   # 重置前预检：首词条也无提升
+    ])
+    wf._smart_evaluator = evaluator
+    wf._smart_config = base.smart_tuning
+    wf._ocr_map[TUNE_SCENE] = dict(_RESET_OCR)
+
+    wf._process_equipment(*_REPRO_EQUIPMENT)
+
+    report = wf.output["tuning_reports"][0]
+    assert evaluator.calls == [2, 1]
+    assert report["resets"] == 0
+    assert (TUNE_SCENE, "reset_tune") not in wf.clicks
+    assert "重置后仍无法提升" in report["stop_reason"]
 
 
 def test_tune_locked_equipment_closes_recycle_menu_without_recycling(

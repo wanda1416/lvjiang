@@ -27,6 +27,7 @@ _traverse_bag、_ensure_base_group、_ensure_judge_config、
 _resolve_selected_slots。
 """
 
+import copy
 import hashlib
 import json
 from dataclasses import asdict, replace
@@ -1668,6 +1669,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return action.value, why, resets_used, affix_count
 
         if action is BehaviorAction.RESET:
+            # 重置会花传律石，先确认重置后还有提升空间再提交。
+            blocked = self._smart_reset_precheck(
+                tune_cfg, equip_data, resets_used, base_affixes, prefix=prefix)
+            if blocked is not None:
+                blocked_action, blocked_why, resets_used, _ = blocked
+                return blocked_action, blocked_why, resets_used, affix_count
             # 调用重置公共逻辑
             reset_action, why, resets_used = self._execute_reset_action(
                 tune_cfg, equip_data, resets_used, why, prefix=prefix,
@@ -1867,9 +1874,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _execute_smart_processing(
         self, tune_cfg, equip_data: EquipmentData, affix_count: int,
         resets_used: int, base_affixes: list, *, checkpoint: str,
-        _allow_reset: bool = True,
+        _allow_reset: bool = True, _precomputed=None,
     ) -> tuple[str, str, int, int]:
-        """在当前调律处理已放行后执行智能判定及可选动作。"""
+        """在当前调律处理已放行后执行智能判定及可选动作。
+
+        ``_precomputed`` 供重置前预检复用同一次评估结果，避免对同一状态
+        重复搜索。
+        """
         evaluator = self._smart_evaluator
         if evaluator is None or not evaluator.active:
             return "continue", "智能调律未启用或本轮不可用", resets_used, affix_count
@@ -1887,7 +1898,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "checkpoint": checkpoint,
             "plans": list(evaluator.plan_infos),
         })
-        result = evaluator.evaluate(slot, equip_data.to_dict(include_fp=False))
+        result = _precomputed or evaluator.evaluate(
+            slot, equip_data.to_dict(include_fp=False))
         plan_summary = "；".join(
             f"{item.plan_name}: {item.reason}"
             for item in result.plans)
@@ -1946,6 +1958,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     resets_used,
                     affix_count,
                 )
+            # 判定为 reset 只说明当前形态没戏，重置本身也会花传律石；
+            # 先确认首词条状态还有提升空间，否则这次重置同样白花。
+            blocked = self._smart_reset_precheck(
+                tune_cfg, equip_data, resets_used, base_affixes,
+                prefix="智能调律")
+            if blocked is not None:
+                blocked_action, blocked_why, resets_used, _ = blocked
+                return blocked_action, blocked_why, resets_used, affix_count
             self._emit_smart_final(
                 decision_record["plans"], checkpoint, "reset")
             reset_action, reset_why, resets_used = self._execute_reset_action(
@@ -1983,6 +2003,49 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self._emit_smart_final(
             decision_record["plans"], checkpoint, action)
         return action, why, resets_used, affix_count
+
+    def _smart_reset_precheck(
+        self, tune_cfg, equip_data: EquipmentData, resets_used: int,
+        base_affixes: list, *, prefix: str,
+    ) -> tuple[str, str, int, int] | None:
+        """重置调律提交前，先用「重置后的画像」问一次智能调律。
+
+        重置会丢弃第 2 条起的词条并消耗传律石，而智能调律原来只在重置之后
+        才判定；判定为无法提升时，这次重置已经白花。这里用只保留首词条的
+        画像评估——它与重置后的实际状态一致，因此结论可以直接决定要不要
+        重置。``UNKNOWN`` 无法证明没有收益，按原逻辑放行。
+
+        返回 ``None`` 表示允许重置；否则是失败动作配置给出的处置，调用方
+        直接采用即可，不会再提交一次重置。
+        """
+        evaluator = self._smart_evaluator
+        if evaluator is None or not evaluator.active:
+            return None
+        from lvjiang.apps.yysls.core.graduation.smart_tuning import (
+            SmartTuningStatus,
+        )
+        slot = str(getattr(self, "_current_slot", "") or "")
+        probe = copy.deepcopy(equip_data)
+        # 重置后保留的就是首词条快照，与 _execute_reset_action 成功后的
+        # equip_data.affixes = base_affixes[:1] 用同一口径。
+        probe.affixes = list(base_affixes[:1])
+        probe.extra_data["affix_count"] = 1
+        result = evaluator.evaluate(slot, probe.to_dict(include_fp=False))
+        if result.status is not SmartTuningStatus.NO_IMPROVEMENT:
+            return None
+        # tune_full_recycle 也会返回 continue（表示原地继续调满），不能拿
+        # 返回动作判断是否放行重置，必须看配置本身是否真的要停止调律。
+        failure = evaluator.config.failure_action
+        if not failure.enabled or failure.action == "continue":
+            # 配置就是「仅记录/继续」，没有拦截动作可执行；此处不记决策、
+            # 不发进度，把结论留给重置后的正式判定，避免重复条目。
+            return None
+        logger.info(
+            f"  [{prefix}] 重置前智能判定：{result.reason}，跳过本次重置")
+        return self._execute_smart_processing(
+            tune_cfg, probe, 1, resets_used, base_affixes,
+            checkpoint=f"{prefix}/重置前", _allow_reset=False,
+            _precomputed=result)
 
     # ─── 重置调律公共逻辑（等级配置检查 + 重置执行）──────────
 

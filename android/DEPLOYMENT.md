@@ -12,7 +12,9 @@ App 能明确显示连接状态，设备端辅助已开启，并能真实执行�
 ## 2. 工具链
 
 - JDK 17 或 21；
-- 生成预置配置的宿主 Python 3.10 需安装 `packaging>=23,<27`，例如使用对应解释器执行 `python -m pip install "packaging>=23,<27"`。APK 内的 Chaquopy 依赖不会替宿主安装此模块。
+- 生成预置配置的宿主 Python 3.10 需安装 `packaging>=23,<27`。APK 内的 Chaquopy 依赖不会
+  替宿主安装此模块；缺了会在 `:app:generateSystemPreset` 阶段直接失败，报
+  `ModuleNotFoundError: No module named 'packaging'`（源自 `src/lvjiang/core/versioning.py`）。
 - Android SDK Platform 35、Build Tools 34.0.0、Platform Tools；
 - Android NDK 26.1.10909125、CMake 3.22.1（原生 OCR）；
 - Python 3.10 作为 Chaquopy `buildPython`；
@@ -26,6 +28,32 @@ App 能明确显示连接状态，设备端辅助已开启，并能真实执行�
 ```bash
 UV_PYTHON_INSTALL_DIR="$PWD/.tooling/python" uv python install 3.10
 ```
+
+该解释器由 uv 管理并带 PEP 668 标记，`uv pip install --python <它>` 与
+`python -m pip install` 都会被拒绝（`externally managed`）。把 `packaging` 装进**用户
+site** 即可绕开，不修改受管解释器本体的 `Lib/site-packages`：
+
+```powershell
+& '.\.tooling\python\cpython-3.10-windows-x86_64-none\python.exe' -m pip install --user --break-system-packages "packaging>=23,<27"
+```
+
+```bash
+.tooling/python/cpython-3.10-*/bin/python3 -m pip install --user --break-system-packages "packaging>=23,<27"
+```
+
+校验要换到仓库根之外执行：仓库自己的 `packaging/` 目录会被当成空的命名空间包，在根目录
+下 `import packaging` 会“成功”但 `packaging.version` 缺失，报出来的信息像另一类故障。
+
+```powershell
+cd android
+& '..\.tooling\python\cpython-3.10-windows-x86_64-none\python.exe' -c "import packaging.version; print(packaging.version.Version('1.2.3'))"
+```
+
+`.tooling/python` 下同时存在多个 `cpython-3.10*` 时，Gradle 按目录名排序取第一个
+（`cpython-3.10-windows-x86_64-none` 的 `-` 小于 `cpython-3.10.20-…` 的 `.`），装错目录
+等于没装。不确定就用 `-PbuildPython` 显式指向；不想用 `--break-system-packages` 时，
+可以 `uv venv --python 3.10 .tooling/build-py` 建独立环境装包，再把 `-PbuildPython`
+指到它。
 
 也可通过 `-PbuildPython=/绝对路径/python3.10` 或 `LVJIANG_BUILD_PYTHON` 指定。
 

@@ -1261,6 +1261,20 @@ class BatchTab(QWidget):
         if config is None:
             self._show_start_error(tr("暂无配置组，请先通过「工具 → 批量配置」添加"))
             return
+
+        # 设备执行占用原本只在每个条目准备时获取，手机端正在跑任务时整批会逐条失败
+        # 并重复同一句原因。这里先确认一次，占用就整批不启动。
+        busy = self._device_busy()
+        if busy:
+            from PyQt6.QtWidgets import QMessageBox
+            self._show_start_error(tr("手机端正在执行任务，请暂停或者结束任务"))
+            QMessageBox.warning(
+                self, tr("无法开始批量任务"),
+                tr("手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}").format(
+                    detail=busy),
+            )
+            return
+
         self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
 
@@ -1580,6 +1594,11 @@ class BatchTab(QWidget):
     def _on_pause_resume_clicked(self):
         """暂停/恢复按钮点击 → 转发给宿主"""
         self._host.request_pause_resume()
+
+    def _device_busy(self) -> str:
+        """宿主提供设备预检时才询问；测试宿主、窗口目标都按空闲处理。"""
+        check = getattr(self._host, "device_execution_busy", None)
+        return check() if callable(check) else ""
 
     def _show_start_error(self, message: str) -> None:
         self._start_feedback.show_failure(message)

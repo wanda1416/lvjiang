@@ -1827,6 +1827,36 @@ class RunControlMixin:
             return getattr(self, "_target_window", None) is not None
         return bool(target is not None and target.ready)
 
+    def device_execution_busy(self) -> str:
+        """设备当前能否立刻交出执行占用；空闲返回空串，被占用返回设备给出的原因。
+
+        设备端的执行占用原本只在每个条目准备时获取，手机端正在跑任务时整批会逐条
+        失败并重复同一句原因。这里先取一次再立刻释放，判断依据与真正执行时完全一致
+        ——同样是 `control_begin`，所以不会出现“预检放行、真跑被拒”的口径差异。
+        窗口模式、纯 ADB 输入等没有该能力的后端直接放行，交给原流程处理。
+        """
+        target = self._current_execution_target()
+        if target is None or getattr(target, "kind", "") != "adb":
+            return ""
+        input_ctrl = getattr(target, "input_ctrl", None)
+        begin = getattr(input_ctrl, "begin_execution", None)
+        end = getattr(input_ctrl, "end_execution", None)
+        if not callable(begin) or not callable(end):
+            return ""
+        from ...core.android.agent import AgentOpError
+        try:
+            begin()
+        except AgentOpError as exc:
+            return str(exc)
+        except Exception as exc:  # 传输类故障交给真正的执行路径报，预检不额外拦截
+            logger.warning(f"设备执行占用预检失败，按原流程继续: {exc}")
+            return ""
+        try:
+            end()
+        except Exception as exc:
+            logger.warning(f"设备执行占用预检释放失败: {exc}")
+        return ""
+
     def _plan_allows_backend(self) -> bool:
         """当前方案是否支持当前连接模式（自定义时永远放行）。"""
         plan = self._selected_plan()

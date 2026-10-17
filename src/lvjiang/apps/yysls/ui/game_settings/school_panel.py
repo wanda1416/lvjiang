@@ -1078,9 +1078,9 @@ class SchoolPanel(QWidget):
             (attr_fields["attr_pen"], f"属攻穿透（{attr_name}）", "", pen_tip),
             *weapon_cells,
             ("all_skill_bonus", "全武学增效", "%"),
-            None,
-            ("single_qs_bonus", "单体类奇术增伤", "%"),
-            ("group_qs_bonus", "群体类奇术增伤", "%"),
+            # 115 起单体/群体类奇术增伤合并成全奇术增伤，聚合时两路都已折进
+            # all_qs_bonus，再分别展示只会永远显示 0。
+            ("all_qs_bonus", "全奇术增伤", "%"),
             ("boss_bonus", "对首领单位增伤", "%"),
             ("player_bonus", "对玩家单位增效", "%"),
             skill_cell,

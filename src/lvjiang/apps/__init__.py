@@ -8,12 +8,14 @@
 插件分三级，宿主主动发现前两级：
 
 1. 内置插件：``src/lvjiang/apps/<name>/``，随本包分发，public 打包自动携带；
+   名册由 ``_BUILTIN_APP_IDS`` 显式登记（编译期已知，frozen 下无法靠磁盘扫描）。
 2. 外置默认目录：``<PROJECT_ROOT>/plugins/<name>/``，打包按目录是否存在决定
    是否携带（public 仓库没有该目录，因此发布包不含外置插件）；
 3. 外置任意目录：``-reg <name>@<path>`` 显式声明，目录名不必等于插件名。
 
-插件以「子目录 + ``__init__.py``」识别，不读取任何清单文件；目录名必须是合法
-Python 标识符，否则记 warning 跳过，不影响其它插件与主程序启动。
+外置插件（第 2、3 级）以「子目录 + ``__init__.py``」识别，不读取任何清单文件；
+目录名必须是合法 Python 标识符，否则记 warning 跳过，不影响其它插件与主程序启动。
+内置插件名册必须与实际源码目录保持一致，由回归测试约束。
 """
 from __future__ import annotations
 
@@ -34,6 +36,13 @@ logger = logging.getLogger(__name__)
 _BUILTIN_ROOT = Path(__file__).parent
 # 外置默认插件根：仓库根 / 安装目录旁的 plugins/。
 _DEFAULT_PLUGINS_ROOT = PROJECT_ROOT / "plugins"
+
+# 内置插件名册：随本包分发的插件，编译期已知。
+# ⚠️ 新增内置插件（src/lvjiang/apps/<name>/）必须同步在此登记。frozen 环境下
+# 内置插件代码在 PYZ 归档里、磁盘上不存在 apps/ 目录，不能用文件系统扫描发现，
+# 只能靠这份显式名册；tests/core/test_plugin_discovery.py 会校验名册与实际
+# 源码目录一致，漏登/多登都会让该用例失败。
+_BUILTIN_APP_IDS: tuple[str, ...] = ("yysls",)
 
 if _DEFAULT_PLUGINS_ROOT.is_dir() and str(_DEFAULT_PLUGINS_ROOT) not in __path__:
     # 目录名等于插件名时，靠包搜索路径即可解析 lvjiang.apps.<name>；
@@ -69,18 +78,20 @@ def _scan_root(root: Path) -> tuple[str, ...]:
 
 
 def builtin_app_ids() -> tuple[str, ...]:
-    """随本包分发的内置插件名册（只扫内置根，不扫外置目录）。
+    """随本包分发的内置插件名册（编译期登记的稳定 ID，不扫外置目录）。
 
     离线工具（``scripts/add_content_version.py``、配置层单测）靠它选择插件
-    声明，因此必须保持「与安装目录内容无关」的语义。
+    声明，因此必须保持「与安装目录内容无关」的语义。frozen 环境下内置插件
+    代码在 PYZ 归档里、磁盘上不存在 apps/ 目录，文件系统扫描必然落空，
+    所以返回 ``_BUILTIN_APP_IDS`` 显式名册而不是扫描 ``_BUILTIN_ROOT``。
     """
-    return _scan_root(_BUILTIN_ROOT)
+    return _BUILTIN_APP_IDS
 
 
 def discover_app_ids() -> tuple[str, ...]:
-    """内置根与外置默认目录的插件名册，内置优先且各按名排序、去重。"""
+    """内置名册 + 外置默认目录的插件名册，内置优先、去重。"""
     ordered: dict[str, None] = {}
-    for name in (*_scan_root(_BUILTIN_ROOT), *_scan_root(_DEFAULT_PLUGINS_ROOT)):
+    for name in (*_BUILTIN_APP_IDS, *_scan_root(_DEFAULT_PLUGINS_ROOT)):
         ordered.setdefault(name, None)
     return tuple(ordered)
 

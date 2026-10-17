@@ -40,6 +40,25 @@ def test_discover_app_ids_includes_builtin_yysls():
     assert "yysls" in discover_app_ids()
 
 
+def test_builtin_app_ids_in_sync_with_source_tree():
+    """内置插件名册常量必须与实际源码目录一致。
+
+    新增内置插件（src/lvjiang/apps/<name>/__init__.py）却忘记更新
+    ``_BUILTIN_APP_IDS`` 时此用例失败，提醒同步登记；反之名册里登记了
+    不存在（或已删除/拼错）的 ID 也会失败。frozen 环境下没有可扫的源码
+    目录，跳过比对。
+    """
+    builtin_root = apps._BUILTIN_ROOT
+    if not builtin_root.is_dir():
+        pytest.skip("frozen 环境无内置插件源码目录，名册无法与磁盘比对")
+    actual = apps._scan_root(builtin_root)
+    assert tuple(sorted(actual)) == tuple(sorted(apps._BUILTIN_APP_IDS)), (
+        "内置插件名册 _BUILTIN_APP_IDS 与源码目录不一致："
+        f"源码目录={sorted(actual)}，名册={sorted(apps._BUILTIN_APP_IDS)}。"
+        "新增内置插件请同步更新 src/lvjiang/apps/__init__.py 的 _BUILTIN_APP_IDS"
+    )
+
+
 def test_scan_skips_non_plugin_entries(tmp_path, monkeypatch):
     _write_plugin(tmp_path, "good_plugin", "good_plugin")
     (tmp_path / "not_a_plugin").mkdir()  # 缺 __init__.py

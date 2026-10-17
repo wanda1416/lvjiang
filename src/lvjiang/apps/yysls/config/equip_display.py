@@ -1,7 +1,7 @@
 """yysls 装备卡片展示参数（字号、卡片高度、网格列数）。
 
 这是本机的界面偏好，不是游戏规则：存在 session.json 的 ``settings.equip_display``
-节点，不进游戏配置 YAML（那套按 system/local/remote 分层分发的是游戏事实）。
+节点，不进游戏配置 YAML（那套按 system/local 分层分发的是游戏事实）。
 默认值只在代码里给一份，缺失项按默认补齐。
 """
 

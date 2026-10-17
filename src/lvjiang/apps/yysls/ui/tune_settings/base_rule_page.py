@@ -54,7 +54,7 @@ from .....i18n import tr
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 #: 开发者可选的保存位置（层 key → 显示名）
 _LAYER_CHOICES = (("system", "系统"), ("local", "本地"))
-_LAYER_LABELS = {"system": "系统", "local": "本地", "remote": "远程"}
+_LAYER_LABELS = {"system": "系统", "local": "本地"}
 #: 表格列：规则组名 / 等级门槛 / 调律门槛 / 规则说明 / 保存位置（仅开发模式）
 _COL_DESC = 3
 _COL_LAYER = 4
@@ -230,7 +230,7 @@ class BaseRuleGroupPage(QWidget):
     # ── 清单刷新 ──
 
     def _ordered_keys(self, groups: dict) -> list[str]:
-        """系统/远程在前、本地在后；各层保留管理器的 order 顺序。"""
+        """系统在前、本地在后；各层保留管理器的 order 顺序。"""
         return list(groups)
 
     def _refresh(self):
@@ -284,7 +284,7 @@ class BaseRuleGroupPage(QWidget):
         current = self._manager.layer_of(key)
         idx = combo.findData(current)
         if idx < 0:
-            # 远程等不可选的层：只展示，不允许改
+            # 未知或不可选的层：只展示，不允许改
             combo.addItem(tr(_LAYER_LABELS.get(current, current or "?")), current)
             idx = combo.count() - 1
             combo.setEnabled(False)

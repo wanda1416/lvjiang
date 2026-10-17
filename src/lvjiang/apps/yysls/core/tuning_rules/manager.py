@@ -34,7 +34,7 @@ from .parsing import (
 # 规则目录相对 config 层根的路径
 _RULES_REL_DIR = "yysls/tuning_rules"
 #: 「停用桩」：用户模式停用系统规则时，local 只写这几个键（disabled 加上
-#: 身份/版本元数据），规则内容仍来自 system/remote。用户看一眼文件就知道
+#: 身份/版本元数据），规则内容仍来自 system。用户看一眼文件就知道
 #: 删掉它等于重新启用，且不会丢自己的修改——因为本来就没有修改。
 _STUB_KEYS = frozenset({"key", "disabled", "content_version"})
 _GROUPS_REL_DIR = "yysls/base_groups"
@@ -66,7 +66,7 @@ class TuningRuleManager:
             self._resolver = ConfigResolver.for_single_directory(rules_dir)
             self._rel_dir = ""
         # 隔离编辑会话会把当前有效基底物化到临时 system，以便编辑后立即
-        # 预览；版本来源展示不能因此把真实 remote 误标成 system。
+        # 预览；版本来源展示不能因此把真实的本地覆盖误标成 system。
         self._origin_resolver = origin_resolver or self._resolver
         self._rules: dict[str, TuningRule] = {}
         self._raw: dict[str, dict] = {}
@@ -92,7 +92,7 @@ class TuningRuleManager:
     def reload(self) -> None:
         """重新加载全部规则文件（含 when 开关引用校验）
 
-        存在性由目录决定（system ∪ local ∪ remote），顺序与启停由规则文件
+        存在性由目录决定（system ∪ local），顺序与启停由规则文件
         自己的 ``order`` / ``disabled`` 声明：``order`` 升序、同序按 key；
         ``disabled: true`` 的规则不进注册表，但保留在 ``_all_names`` /
         ``_all_raw`` 供 UI 导航与重新启用。
@@ -159,7 +159,7 @@ class TuningRuleManager:
         """读一份规则；local 是停用桩时把 disabled 叠到 base 内容上。
 
         返回 ``(data, is_stub)``。桩的判定：local 文件的键全部落在
-        ``_STUB_KEYS`` 内，且 remote/system 有这条规则的正文。
+        ``_STUB_KEYS`` 内，且 system 有这条规则的正文。
         """
         rel = self._rel(name)
         data = self._resolver._load_yaml(path) or {}
@@ -174,7 +174,7 @@ class TuningRuleManager:
         return data, False
 
     def is_rule_local_stub(self, key: str) -> bool:
-        """local 里只有停用桩、正文仍来自系统/远程。"""
+        """local 里只有停用桩、正文仍来自系统。"""
         return key in self._stubs
 
     def _switch_keys(self) -> set[str] | None:
@@ -213,7 +213,7 @@ class TuningRuleManager:
     def describe_rule_version(self, key: str):
         """返回规则实体来源与版本，供配置页展示。
 
-        local 只是停用桩时，生效的正文仍是系统/远程那一份，展示它而不是桩。
+        local 只是停用桩时，生效的正文仍是系统那一份，展示它而不是桩。
         """
         rel = self.rule_rel_path(key)
         if key in self._stubs:
@@ -223,14 +223,13 @@ class TuningRuleManager:
         return self._origin_resolver.describe_entity(rel)
 
     def list_rule_versions(self, key: str):
-        """返回规则在本地、远程、系统各层现存的版本。"""
+        """返回规则在本地、系统各层现存的版本。"""
         return self._origin_resolver.list_entity_origins(self.rule_rel_path(key))
 
     def system_save_override(self, key: str):
         """开发模式写 system 后仍由其他层生效时，返回该来源。
 
-        local 恒高于 system；remote 在版本更新时也会顶替 system。两者都会
-        让“已保存并生效”成为假话，不能只检查 remote。
+        local 恒高于 system；本地影子会让“已保存并生效”成为假话。
         """
         from lvjiang.core.config.resolver import LAYER_SYSTEM
 
@@ -349,7 +348,7 @@ class TuningRuleManager:
     def set_rule_enabled(self, key: str, enabled: bool) -> None:
         """设置规则启用状态：写规则文件自己的 ``disabled`` 字段。
 
-        用户模式停用一条没改过的系统/远程规则时，local 只写一个停用桩
+        用户模式停用一条没改过的系统规则时，local 只写一个停用桩
         （``key`` + ``disabled: true``），正文继续跟随系统更新；重新启用就是
         删掉这个桩。local 已有完整影子（用户改过内容）时才在影子里改字段。
         """
@@ -377,7 +376,7 @@ class TuningRuleManager:
         self.reload()
 
     def _stub_applicable(self, rel: str) -> bool:
-        """用户模式、正文在系统/远程、local 要么没有要么只是桩 → 走桩逻辑。"""
+        """用户模式、正文在系统、local 要么没有要么只是桩 → 走桩逻辑。"""
         if self._resolver.is_dev_mode():
             return False
         if self._base_path(rel) is None:
@@ -416,7 +415,7 @@ def get_tuning_rule_manager() -> TuningRuleManager:
 class TuningGroupManager:
     """基础规则组管理器（目录型，一组一个 YAML）
 
-    存在性由目录决定（system ∪ local ∪ remote），展示顺序由文件自己的
+    存在性由目录决定（system ∪ local），展示顺序由文件自己的
     ``order`` 声明（升序、同序按 key）；校验失败的文件记录错误并跳过。
     提供原始数据访问（UI 编辑用）、新增/复制/删除、保存与跨层搬移 + reload。
     """
@@ -455,7 +454,7 @@ class TuningGroupManager:
         )
 
     def layer_of(self, key: str) -> str:
-        """规则组文件实际生效的层（system / local / remote）。"""
+        """规则组文件实际生效的层（system / local）。"""
         return self._resolver.describe_entity(self.group_rel_path(key)).layer
 
     def can_choose_layer(self) -> bool:
@@ -498,7 +497,7 @@ class TuningGroupManager:
     # ── 查询 ──
 
     def get_groups(self) -> dict[str, TuningGroup]:
-        """统一显示顺序：系统/远程在前、本地在后，再按 order、key 升序。"""
+        """统一显示顺序：系统在前、本地在后，再按 order、key 升序。"""
         return {
             key: self._groups[key]
             for key in sorted(self._groups, key=lambda key: (

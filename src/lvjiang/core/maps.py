@@ -241,7 +241,7 @@ class MapDef:
     regions: list[MapRegion] = field(default_factory=list)
     surveys: list[MapSurvey] = field(default_factory=list)
     heading: HeadingDetector = field(default_factory=HeadingDetector)
-    #: 实际生效的来源层：system / local / remote（读取时填充，不序列化）
+    #: 实际生效的来源层：system / local（读取时填充，不序列化）
     layer: str = ""
 
     @property
@@ -579,13 +579,13 @@ class MapManager:
         return result
 
     def copy_to_local(self, key: str) -> MapDef:
-        """把 system/remote 地图复制为 local 影子（含底图），供用户修改。"""
+        """把 system 地图复制为 local 影子（含底图），供用户修改。"""
         map_def = self.load(key)
         image = self.base_image_path(map_def)
         writer = self
         if self._resolver.is_dev_mode():
             # 开发模式普通 write_entity 固定写 system；“复制到本地”必须显式
-            # 使用用户模式 resolver，否则会把远程内容误写进随包 system 层。
+            # 使用用户模式 resolver，否则会把副本误写回随包 system 层。
             local_resolver = ConfigResolver(
                 system_dir=self._resolver.system_dir,
                 local_dir=self._resolver.local_dir,

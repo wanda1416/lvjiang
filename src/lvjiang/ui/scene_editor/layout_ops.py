@@ -272,7 +272,7 @@ class LayoutOpsMixin:
             written: set[str]) -> dict[str, EntityOrigin]:
         """返回开发模式写入 system 后仍在生效的更高优先级副本。
 
-        同时覆盖 local 与 remote 两种情况，并经批量路径入口只解析一次
+        同时覆盖 local 影子这一种情况，并经批量路径入口只解析一次
         ``layouts.yaml``。用户模式写入 local，本身就是最高优先级，无需提示。
         """
         resolver = get_resolver()

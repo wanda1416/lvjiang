@@ -333,7 +333,7 @@ def metadata_for_script_config(path: str | Path) -> tuple[dict, str]:
     """
     try:
         return parse_metadata_file(path), ""
-    except Exception as exc:  # noqa: BLE001 — 单个用户/remote WF 不得拖垮发现全集
+    except Exception as exc:  # noqa: BLE001 — 单个用户/系统 WF 不得拖垮发现全集
         logger.error(f"{METADATA_WARNING} {type(exc).__name__}: {exc}")
         return {}, METADATA_WARNING
 

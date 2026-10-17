@@ -1,4 +1,4 @@
-content_version: 2
+content_version: 3
 affix_caps:
   外功攻击:
     _aliases:
@@ -489,6 +489,8 @@ affix_aliases:
   - 大外
   最小外功攻击:
   - 小外
+  斩雪刀法轻重击派生技增伤:
+  - 派生定音
 affix_parts:
   最大无相攻击:
   - 武器

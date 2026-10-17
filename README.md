@@ -2,16 +2,16 @@
 
 > 通用视觉 RPA 引擎 + 插件架构
 
-律匠是一个基于计算机视觉的桌面自动化工具，采用「通用引擎 + 插件」架构。通过桌面窗口的截图识别、OCR 与模拟点击，自动完成各类繁琐的操作流程。工具运行在 PC 端，支持两种输入后端：**窗口模式**（捕捉任意 PC 窗口，包括游戏窗口化模式、手机投屏窗口、模拟器）和 **ADB 模式**（直连手机/模拟器）。**不读取内存、不注入游戏进程、不上传你的游戏数据**，规避反作弊风险。
+律匠是一个基于计算机视觉的桌面自动化工具，采用「通用引擎 + 插件」架构。通过桌面窗口的截图识别、OCR 与模拟点击，自动完成各类繁琐的操作流程。工具支持 **PC 端**（Windows 为主、macOS 支持 ADB 模式）与 **Android 手机端**（律匠 APK 独立执行）。**不读取内存、不注入游戏进程、不上传你的游戏数据**，规避反作弊风险。
 
 当前已内置《燕云十六声》装备调律插件，可通过插件机制扩展至更多游戏/场景。
 
-> **当前状态**：支持直接操作游戏 PC 端窗口，也支持通过 **手机投屏**、**Android 模拟器** 或 **ADB** 操作安卓端。直接操作端游窗口时，请以管理员身份启动律匠。
+> **当前状态**：支持直接操作游戏 PC 端窗口（含后台截图），也支持通过 **手机投屏**、**Android 模拟器** 或 **ADB** 操作安卓端，以及安装律匠 APK 在手机上独立执行。直接操作端游窗口时，请以管理员身份启动律匠。
 
 <p align="left">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-blue">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.11%E2%80%933.12-blue">
   <img alt="GUI" src="https://img.shields.io/badge/GUI-PyQt6-41CD52">
-  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6">
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Android-0078D6">
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
@@ -21,18 +21,31 @@
 
 ## ✨ 功能特性
 
-- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；可选择前台 SendInput 或后台 PostMessage 投递）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入）两种模式。
-- **视觉识别流水线**：`mss` / scrcpy 截图 → RapidOCR（ONNX）文字识别 → 装备词条结构化解析 → 品阶与数值评分。
+### 通用特性
+
+- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；可选择前台 SendInput、后台 PostMessage 或后台截图 Graphics Capture）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入 / 设备端代理通道）两种模式。
 - **开箱即用的连接方案**：内置「手游 / 端游 / 手游投屏」三个预置方案，把图库、环境、布局这三项必须配套的配置绑成一个整体，按运行方式选一次即可；连接方式与方案不匹配时直接拦下执行，避免坐标整体偏移却不报错。
-- **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放。
-- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算。支持 `full by` 全量匹配与短路匹配双模式、panel 范围索引、工作流暂停/恢复。
-- **装备评分规则**：可配置的词条上限（cap）、品阶推断、流派权重，支持鸣金 / 通用等评估器。
-- **背包滚动遍历**：自动化背包步进滚动 + fps 数据完整性校验，批量筛选装备（见 [自动调律流程文档](docs/20-requirements/10-tuning/01-auto-tuning.md)）。
-- **可视化桌面应用**：PyQt6 主窗口集成实时画面预览、识别结果叠加、坐标校准、OCR 测试、材料管理与运行日志面板。
-- **拟人化操作**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
-- **毕业率计算**：Excel 公式 → Python 转换引擎，支持最优组合搜索与毕业概率评估。
-- **i18n 国际化**：核心模块 tr() 全覆盖，支持中文 / 英文界面切换。
-- **安卓独立执行端（实验性）**：基于 Chaquopy 将核心引擎移植到设备端，无障碍服务完成截图与手势注入，无需 PC 即可运行（截图 → OCR → 点击三通道闭环已验证，见 [Android 平台计划](docs/00-meta/archive/android-platform-progress.md)）。
+- **视觉识别流水线**：`mss` / scrcpy 截图 → RapidOCR（ONNX）文字识别 → 结构化解析 → 品阶与数值评分。
+- **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放；提供图库管理（参考图 / 分组 / 模板匹配）与大地图管理（地域目录 / 探查底图拼接）。
+- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算；支持 `full by` 全量匹配与短路匹配双模式、panel 范围索引、工作流暂停/恢复。配套脚本工作台（可视化编排、取点取色、单步调试）与宏录制、图色原语。
+- **拟人化输入**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
+- **i18n 国际化**：核心模块 `tr()` 全覆盖，支持中文 / 英文界面切换。
+
+### 燕云十六声插件
+
+- **装备数据管理**：玩家档案（SQLite）与装备池，已穿戴 / 背包装备扫描、OCR 词条解析、指纹去重，支持真实 / 模拟装备的穿戴、卸下、复制校正与导出。
+- **自动调律**：背包滚动遍历 + fps 数据完整性校验，批量筛选与精调；调律历史与实时总览，支持承音 / 转律 / 双定音模型。
+- **毕业率分析**：角色基础属性反推与战斗属性聚合，真实 DPS 与毕业率；最优组合 Top 10 搜索（智能剪枝）、出装搭配模拟计算器、技能轴查看、词条收益率与培养 / 转律建议。
+- **智能调律（外部 Agent）**：通过 MCP 接入外部 Agent（如 WorkBuddy），分析培养与组合、生成全新调律方案并一键启动。
+- **备战方案管理**：草稿编辑与显式保存，按流派规则预筛无效候选。
+- **日常任务工作流**：江湖号令、不肝商店、每日签到等日常任务编排。
+
+### 移动应用（燕云插件专属）
+
+- **手机端独立执行**：律匠 APK 内置 Material 四区工作台（工作台 / 任务 / 用户 / 设置），无需 PC 即可在手机上执行单任务与批量任务。
+- **手机批量与无人值守**：按配置组勾选任务、用户与单元，支持拖动排序、轮数与无人值守；暂停、继续、结束控制整批。
+- **PC ↔ 手机同步**：下发配置（可保留手机任务参数与批量配置），手机任务历史、调律历史、日志与结果单向回传 PC。
+- **悬浮控制**：悬浮图标三态（logo / 播放 / 暂停），单击直接启动、暂停任务，无需切回律匠。
 
 ---
 
@@ -40,25 +53,27 @@
 
 ```
 PC 端游窗口 / 手机运行游戏
-    ↓ 直接捕捉 / 投屏（视频流 + 反向控制）/ ADB
-PC 端游戏或投屏窗口 / ADB 连接
+    ↓ 直接捕捉 / 投屏（视频流 + 反向控制）/ ADB / 设备端代理
+PC 端游戏或投屏窗口 / ADB 连接 / 手机律匠 APK
     ↓ 截图
 律匠：截屏 → OCR 识别 → 词条解析 → 规则评分 → 决策 → 模拟点击
-    ↓ 点击事件经窗口输入 / 投屏协议 / ADB 投递
+    ↓ 点击事件经窗口输入 / 投屏协议 / ADB / 无障碍手势投递
 PC 端或手机端执行操作
 ```
 
 | 层 | 模块 | 职责 |
 |----|------|------|
-| 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口与 ADB / scrcpy 后端 |
+| 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口（含后台截图）与 ADB / scrcpy / 设备端代理后端 |
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
 | 场景 / 布局 | `src/lvjiang/core/scene_definition.py`、`core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
 | 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征 / 参考图） |
 | 配置管理 | `src/lvjiang/core/config/` | 应用配置、会话管理、用户数据、工作流配置加载与合并 |
 | 工作流 | `src/lvjiang/workflows/` | `.wf` DSL 语法解析（grammar/）、执行引擎（engine/）、通用内置函数（builtins/） |
-| 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、运行控制 |
+| 智能调律 | `src/lvjiang/core/ai/` | 外部 Agent 接入（MCP）、文档发现与业务操作契约 |
+| 匿名统计 | `src/lvjiang/core/telemetry/` | 匿名调律数据收集、字段白名单校验与传输 |
+| 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、脚本工作台、运行控制 |
 | 插件 | `src/lvjiang/apps/<name>/` | 游戏/场景专属插件（识别器、工作流、UI Tab） |
-| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备解析、评分、调律、材料识别、毕业率、专属 UI（config/ + core/ + workflows/ + ui/） |
+| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备管理、评分、调律、材料识别、毕业率、出装搭配、智能调律、专属 UI（config/ + core/ + workflows/ + ui/） |
 | 设备端 | `src/lvjiang/core/ondevice/`、`android/` | 安卓独立执行端：无障碍截图/手势桥接、rapidocr 设备端适配、Kotlin 宿主工程 |
 
 更多细节见 [架构文档](docs/30-architecture/README.md) 与 [DSL 语法文档](docs/30-architecture/32-grammar/README.md)。
@@ -75,11 +90,16 @@ lvjiang/
 │   ├── _version.py            # 版本号
 │   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局 / 坐标类型
 │   │   ├── coord_types.py     # CoordRef 坐标类型体系（CoordRef/RectCoordRef/CircleCoordRef/Offset）
+│   │   ├── capture_base.py    # 截图抽象（桌面窗口 / ADB / scrcpy / 后台截图）
 │   │   ├── config/            # 配置加载与会话管理（app.yaml / session / 用户 / 工作流配置）
-│   │   ├── desktop/           # 桌面投屏窗口后端（截图 + SendInput 点击）
+│   │   ├── desktop/           # 桌面投屏窗口后端（截图 + SendInput / PostMessage 点击）
 │   │   ├── android/           # ADB / scrcpy 后端
 │   │   ├── ondevice/          # 设备端（Chaquopy）无障碍截图/输入与 OCR 适配
 │   │   ├── recognizers/       # 可插拔识别器插件包（OCR / 模板 / 颜色 / 参考图）
+│   │   ├── ai/                # 智能调律：外部 Agent 接入（MCP）与契约
+│   │   ├── telemetry/         # 匿名调律数据收集与传输
+│   │   ├── license/           # 功能激活与授权
+│   │   ├── profile/           # 玩家档案
 │   │   ├── scene_definition.py      # 声明式场景模型加载
 │   │   ├── layout_manager.py        # 布局索引与坐标换算
 │   │   ├── reference_db.py          # 参考图库管理
@@ -95,9 +115,14 @@ lvjiang/
 │   ├── ui/                    # PyQt6 通用图形界面
 │   │   ├── scene_editor/      # 场景编辑器（坐标标注 / 区域绘制）
 │   │   ├── reference/         # 参考图库管理 UI
+│   │   ├── reference_manager/ # 参考图库管理
 │   │   ├── batch/             # 批量运行面板
 │   │   ├── main/              # 主窗口本体与各功能混入（运行控制 / 窗口操作 / 菜单 / 托盘）
-│   │   ├── scripts/           # 脚本录制、编辑与清单配置
+│   │   ├── scripts/           # 脚本工作台（编排、取点取色、单步调试）
+│   │   ├── macros/            # 宏录制
+│   │   ├── map_manager/       # 大地图管理（地域目录 / 底图拼接）
+│   │   ├── mobile/            # 手机端同步
+│   │   ├── profile/           # 用户 / 档案 UI
 │   │   ├── ocr/               # 图像识别对话框与画布
 │   │   └── notices/           # 公告 / 更新 / 关于 / 反馈
 │   └── apps/                  # 插件注册表
@@ -105,30 +130,37 @@ lvjiang/
 │       └── yysls/             # 燕云十六声插件
 │           ├── config/        # 配置管理（manager / profile / 毕业率会话 / 玩法）
 │           ├── core/          # 核心业务逻辑
+│           │   ├── agent/         # 智能调律
+│           │   ├── attr_model/    # 战斗属性模型
 │           │   ├── combat/        # 战斗属性与装备模型
+│           │   ├── damage/        # 木桩测伤 / DPS
 │           │   ├── equip_parser/  # 装备词条解析（含定音词条）
 │           │   ├── evaluator/     # 评分规则引擎
 │           │   ├── graduation/    # 毕业率计算（Excel 公式 → Python）
-│           │   ├── loadout/       # 装备方案管理
+│           │   ├── loadout/       # 出装搭配
 │           │   ├── profile_engine/ # Profile 持久化与再生数学
 │           │   ├── recognizer/    # 材料识别
+│           │   ├── role_attr_parser/ # 角色面板属性解析
+│           │   ├── tuning_history/ # 调律历史
 │           │   └── tuning_rules/  # 调律规则解析与判定
 │           ├── workflows/     # 燕云专属工作流与内置函数
 │           │   ├── builtins/      # 背包 / 装备 / Profile 专属函数
 │           │   └── implementations/ # 自动调律 / 背包遍历实现
+│           ├── ondevice/      # 燕云设备端适配
+│           ├── telemetry/     # 燕云调律数据收集 schema
 │           └── ui/            # 燕云专属 UI Tab
 │               ├── game_settings/ # 游戏规则配置面板
 │               ├── loadout/       # 装备展示与方案面板
-│               ├── profile/       # Profile 数据面板
 │               ├── tune_settings/ # 调律规则编辑面板
 │               └── tuning/        # 调律管理、实时总览与历史详情
 ├── android/                   # 安卓独立执行端（Kotlin + Chaquopy 宿主工程）
 ├── config/
-│   ├── system/                # 随版本发布的配置
+│   ├── system/                # 随版本发布的配置（在线配置与会员内容也安装到此）
 │   │   ├── layouts/           # 布局定义（按名称分目录）
 │   │   ├── scenes/            # 场景定义 YAML
 │   │   ├── workflows/         # 工作流脚本（.wf）
 │   │   ├── references/        # 参考图库（{空间}.yaml + 同名图片目录）
+│   │   ├── templates/         # 预置模板
 │   │   ├── yysls/             # 燕云插件专属配置（调律规则 / 玩法等）
 │   │   ├── app.yaml           # 应用配置
 │   │   ├── layouts.yaml       # 布局索引
@@ -150,11 +182,11 @@ lvjiang/
 
 ## 🔧 环境要求
 
-- **操作系统**：Windows（桌面投屏模式依赖 Win32 API）或 macOS 11+（ADB 模式）
-- **Python**：3.11 及以上（3.11+ 才有 Windows 高精度 `time.sleep`，木桩测伤等精确计时依赖它）
-- **游戏侧**：手机端《燕云十六声》，并满足以下任一连接方式：
-  - **投屏模式**：PC 端存在可截屏、且支持鼠标点击转发到手机的投屏窗口（以 vivo 自带投屏为参考，不绑定特定品牌）
-  - **ADB 模式**：手机开启 USB / 无线调试，PC 端可通过 ADB 连接（可选启用 scrcpy 视频流）
+- **操作系统**：Windows（桌面窗口 / 后台截图模式依赖 Win32 API）、macOS 11+（ADB 模式；窗口模式尚未实现）或 Android 设备（安装律匠 APK）
+- **Python**：3.11–3.12（3.11+ 才有 Windows 高精度 `time.sleep`，木桩测伤等精确计时依赖它；RapidOCR 1.4.4 要求 Python <3.13）
+- **游戏侧**：《燕云十六声》，并满足以下任一运行方式：
+  - **手机端**（手游）：通过 **投屏模式**（PC 端存在可截屏、且支持鼠标点击转发到手机的投屏窗口，以 vivo 自带投屏为参考，不绑定特定品牌）或 **ADB 模式**（手机开启 USB / 无线调试，可选启用 scrcpy 视频流）
+  - **PC 端**（端游）：直接捕捉游戏窗口，支持前台 / 后台（PostMessage、后台截图）操作
 
 ---
 
@@ -173,7 +205,9 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-核心依赖：`PyQt6`、`mss`、`pynput`、`rapidocr-onnxruntime`、`onnxruntime`、`PyYAML`、`lark`（DSL 解析器）、`loguru`、`av`（scrcpy 模式的 H.264 解码）。
+项目亦支持 [uv](https://docs.astral.sh/uv/)：`uv sync` 即可按 `pyproject.toml` 与 `uv.lock` 安装。
+
+核心依赖：`PyQt6`、`mss`、`pynput`、`rapidocr-onnxruntime`、`onnxruntime`、`PyYAML`、`lark`（DSL 解析器）、`loguru`、`av`（scrcpy 模式的 H.264 解码）、`openpyxl`（毕业率 Excel 公式）、`mcp`（智能调律）、`keyring`（授权令牌）、`cryptography`（授权码验签）。
 
 ---
 
@@ -181,7 +215,7 @@ pip install -e ".[dev]"
 
 > 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/60-userguide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
 
-**Windows 用户** 可直接从 [Releases](https://github.com/wanda1416/lvjiang/releases) 下载最新发行包（免安装 zip 或安装程序 exe），解压/安装后运行 `lvjiang.exe` 即可，无需 Python 环境。
+**Windows 用户** 可直接从 [Releases](https://github.com/wanda1416/lvjiang/releases) 下载最新发行包（免安装 zip 或安装程序 exe），解压/安装后运行 `lvjiang.exe` 即可，无需 Python 环境。**Android 用户** 可下载随版发布的律匠 APK 在手机上独立执行。
 
 > 使用安装程序时建议选择「仅为当前用户安装」，不建议「为所有用户安装」，否则可能被安全软件拦截。
 
@@ -200,6 +234,8 @@ python -m lvjiang -reg yysls
 .\dev.bat -reg yysls_premium      # 通用 + plugins/ 下的外置插件
 .\dev.bat -reg foo@..\foo         # 通用 + 任意目录的外置插件（NAME@PATH）
 .\dev.bat --all                   # 加载内置插件与 plugins/ 下的全部插件
+.\dev.bat --all-plugins           # 同 --all
+.\dev.bat --admin                 # 启动私有 admin 控制台（需 admin/ 检出）
 .\dev.bat --stats                 # 启动 ops/stats-client 本地统计控制台
 ```
 
@@ -207,20 +243,20 @@ python -m lvjiang -reg yysls
 
 启动后进入 PyQt6 主窗口，基本流程：
 
-1. **选择连接**：刷新并选择投屏窗口，或连接 ADB 设备。
+1. **选择连接**：刷新并选择投屏窗口、PC 端游窗口，或连接 ADB 设备。
 2. **选择方案**：顶部「方案」下拉框按运行方式选「手游」「端游」或「手游投屏」，图库 / 环境 / 布局随之自动配好。
 3. **校准坐标**：在场景编辑器中标注 / 校验各界面区域（首次使用或游戏 UI 变动时）。
-4. **扫描装备**：自动截图识别当前穿戴装备，展示词条与评分结果。
-5. **选择部位与模式**：勾选需要处理的调律部位（攻具 / 防具），选择批量筛选或精调。
-6. **开始执行**：实时查看画面预览、识别叠加与运行日志。
+4. **管理装备**：扫描当前穿戴 / 背包装备，管理档案、评分、模拟装备与方案。
+5. **分析与执行**：计算毕业率组合、出装搭配，或运行批量自动调律 / 智能调律。
+6. **手机端（可选）**：下发配置到律匠 APK，在手机上独立执行或回传结果。
 
-> 详细业务流程见 [当前装备分析](docs/30-architecture/35-workflows/01-current-equip-analysis.md) 与 [自动调律流程](docs/20-requirements/10-tuning/01-auto-tuning.md)。
+> 详细业务流程见 [用户指南](docs/60-userguide/README.md) 与 [自动调律流程](docs/20-requirements/10-tuning/01-auto-tuning.md)。
 
 ---
 
 ## ⚙️ 配置
 
-配置采用三层分离：系统默认 → 用户覆盖 → 运行时会话，读取恒为合并视图。
+配置采用三层分离：系统默认 → 用户覆盖 → 运行时会话，读取恒为合并视图。开启「接收在线配置更新」后，官方修正与会员内容按修订索引累计安装到 `system`，`local` 仍然优先。
 
 | 层 | 路径 | 内容 | 是否提交到代码仓库 |
 |---|---|---|---|
@@ -275,7 +311,8 @@ pytest tests/workflows/test_parser.py
 | [`PRIVACY.md`](PRIVACY.md) | 隐私说明：联网行为、匿名调律数据收集发出什么/不发出什么 |
 | [`docs/`](docs/README.md) | 完整文档中心与按读者导航 |
 | [`docs/50-releases/`](docs/50-releases/README.md) | 发布记录与版本说明 |
-| [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接手机、配置与运行自动调律 |
+| [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
+| [`docs/70-agent/`](docs/70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
 | [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型、Profile、毕业率、国际化 |
@@ -285,13 +322,17 @@ pytest tests/workflows/test_parser.py
 | [`docs/30-architecture/33-engine/`](docs/30-architecture/33-engine/README.md) | 引擎细节：截图与裁剪 |
 | [`docs/30-architecture/34-scene/`](docs/30-architecture/34-scene/README.md) | 场景 / 布局定义与编辑 |
 | [`docs/30-architecture/35-workflows/`](docs/30-architecture/35-workflows/README.md) | 业务流程编排 |
+| [`docs/30-architecture/36-graduation/`](docs/30-architecture/36-graduation/README.md) | 毕业率计算引擎 |
+| [`docs/30-architecture/37-vision/`](docs/30-architecture/37-vision/README.md) | 视觉感知子系统：图色 / 模板匹配 / 坐标一致性 |
+| [`docs/30-architecture/38-platform/`](docs/30-architecture/38-platform/README.md) | 平台与接入：设备端代理协议、匿名统计 |
+| [`docs/30-architecture/39-runtime/`](docs/30-architecture/39-runtime/README.md) | 运行期能力：调律历史、地图管理、多目标并发、出装计算 |
 | [`docs/40-development/`](docs/40-development/README.md) | 开发日志：按月归档的重构 / 决策记录 |
 
 ---
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端（实验性）。完整路线见 [roadmap](docs/00-meta/01-roadmap.md)（3821 测试用例），平台计划见 [Android](docs/00-meta/archive/android-platform-progress.md) 与 [macOS](docs/00-meta/platforms/macos.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端。历史阶段快照见 [roadmap](docs/00-meta/01-roadmap.md)，当前待办见 [backlog](docs/00-meta/02-backlog.md)；平台计划见 [Android](docs/00-meta/archive/android-platform-progress.md) 与 [macOS](docs/00-meta/platforms/macos.md)。
 
 ---
 
@@ -327,10 +368,11 @@ pytest tests/workflows/test_parser.py
 
 ## 🔒 数据与隐私
 
-律匠只在四种情况下联网：查公告、查有没有新版本、同步在线配置（0.8.0 起）、以及（0.7.0 起）收集匿名调律数据。
+律匠只在少数情况下联网：查公告、查有没有新版本、同步在线配置（0.8.0 起）、功能激活与在线会员授权（0.15.0 起）、以及（0.7.0 起）收集匿名调律数据。
 
-- 前三项**只下载不上传**：查公告和查新版本从第一个版本起就是如此；在线配置用来远程修复
+- 查公告、查新版本、同步在线配置**只下载不上传**：查公告和查新版本从第一个版本起就是如此；在线配置用来远程修复
   坐标偏移、调律规则这类跑偏问题，默认开启但可在「配置管理 → 网络与隐私」逐项关闭。
+- 功能激活与在线会员授权用于验证授权码与获取会员内容，首次激活需联网；激活成功后可离线使用至到期。
 - 匿名调律数据收集需要你在首次启动时明确同意，不同意就一条都不会发；同意之后也能随时在设置里关掉，并一键删除本地未上传的记录。
 - 律匠**不会上传**你的截图、日志、装备数据、游戏账号或角色名，也不会上传 `config/` 目录里的任何内容。
 

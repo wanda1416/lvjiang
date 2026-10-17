@@ -3,14 +3,14 @@
   "schema_version": 3,
   "school": "破竹·风",
   "source": {
-    "file": "破竹风115阶竞速轴属性毕业率进阶计算器3.1.xlsx",
-    "version": "3.1",
-    "sha256": "0d7c8b883139af72657c23e8d270841446b17537445c7766f672c315093ed9ea"
+    "file": "破竹风115阶竞速轴属性毕业率进阶计算器3.2.xlsx",
+    "version": "3.2",
+    "sha256": "02148eefac3cc4b0b18f8acc50961e2b774323d21daa398d28164953a5ec1136"
   },
   "baseline_attrs": {
     "min_outer": 4460.0,
     "max_outer": 3339.6,
-    "outer_pen": 63.8,
+    "outer_pen": 63.78,
     "outer_bonus": 0.0,
     "min_mingjin": 0.0,
     "max_mingjin": 0.0,
@@ -45,7 +45,7 @@
       "双刀武学增伤": 0.0854,
       "绳镖武学增伤": 0.0854,
       "泥犁三垢强效轻击增伤": 0.0,
-      "粟子游尘鼠鼠增伤": 0.32
+      "粟子游尘鼠鼠增伤": 0.3206
     }
   },
   "environment": {
@@ -94,11 +94,11 @@
   },
   "reference": {
     "combat_time": 88.5,
-    "total_damage": 16149223.70992313,
-    "dps": 182477.104066928,
-    "graduation_rate": 1.0000000222873335
+    "total_damage": 16152450.302633975,
+    "dps": 182513.56274162684,
+    "graduation_rate": 1.0000000150214967
   },
-  "graduation_baseline_dps": 182477.1,
+  "graduation_baseline_dps": 182513.56,
   "program": {
     "inputs": [
       {
@@ -37723,5 +37723,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 1
+  "model_version": 2
 }

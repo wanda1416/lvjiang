@@ -324,6 +324,8 @@ class FormulaModel:
             return result
         if name == "OR":
             return any(self._truth(self._eval(arg, sheet)) for arg in args)
+        if name == "AND":
+            return all(self._truth(self._eval(arg, sheet)) for arg in args)
         if name in ("MIN", "MAX", "SUM"):
             values = []
             for arg in args:

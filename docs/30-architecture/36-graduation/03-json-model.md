@@ -105,8 +105,13 @@ Excel 源文件溯源信息：
 | 属攻（×6） | `min_mingjin` / `max_mingjin` / `mingjin_pen` / `mingjin_bonus` 等 | 同上 | 六大属性的攻击属性 |
 | 判定 | `precision` / `crit_rate` / `intent_rate` / `direct_crit` / `direct_intent` | 比例 | 精准率 / 会心率 / 会意率 / 直接会心 / 直接会意 |
 | 伤害 | `crit_dmg` / `intent_dmg` | 比例 | 会心伤害加成 / 会意伤害加成 |
-| 增效 | `all_skill_bonus` / `boss_bonus` / `single_qs_bonus` / `group_qs_bonus` | 比例 | 全武学增效 / 首领增伤 / 单体奇术 / 群体奇术 |
+| 增效 | `all_skill_bonus` / `boss_bonus` | 比例 | 全武学增效 / 首领增伤 |
+| 奇术增效 | `single_qs_bonus` / `group_qs_bonus` / `all_qs_bonus` | 比例 | 单体奇术 / 群体奇术 / 全奇术 |
 | 动态词条 | `extra_attrs` | 比例 | 由别名解析确定的非固定字段（武学增效、指定技能增效等） |
+
+奇术三路互斥：115 起合并成全奇术的表格只产生 `all_qs_bonus`，两行奇术的表格只
+产生 `single_qs_bonus` + `group_qs_bonus`。方案声明了哪一路，`adapt_attrs_to_model_inputs`
+就传哪一路；只声明单/群两路的旧方案会把装备的全奇术折算进 `single_qs_bonus`。
 
 ### extra_attrs 说明
 

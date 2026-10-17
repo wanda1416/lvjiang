@@ -90,6 +90,41 @@ def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> 
     }
 
 
+@pytest.mark.slow
+@case_matrix("school", SCHOOLS)
+def test_converter_accepts_both_qishu_input_layouts(school: str) -> None:
+    """110/115 的奇术输入布局不同，转换器必须两种都认。
+
+    115 起游戏把单体/群体类奇术增伤合并成全奇术增伤，一部分流派的表格因此少
+    一行，定音从 B21 上移到 B20，另一部分流派仍保留两行。行号写死时新布局的
+    定音行会被当成群体奇术，导入直接报「简称无法解析」，用户拿不到 115 方案。
+    """
+    slug = school.replace("·", "")
+    verified = 0
+    for level in (110, 115):
+        path = next(
+            (p for p in EXCEL_DIR.glob(f"{level}级/*{slug}*.xlsx")
+             if "副本" not in p.stem and not p.name.startswith("~$")),
+            None,
+        )
+        if path is None:
+            continue
+        try:
+            attrs = convert_workbook(path, school, model_level=level)["baseline_attrs"]
+        except PermissionError:
+            # 工作簿正被 Excel 打开时 Windows 不给读，属于环境状态而非模型缺陷
+            continue
+        verified += 1
+        merged = "all_qs_bonus" in attrs
+        split = {"single_qs_bonus", "group_qs_bonus"} & attrs.keys()
+        assert merged != bool(split), (
+            f"{school} {level} 级的奇术输入同时出现了合并词条与单/群两路："
+            f"{sorted(attrs)}"
+        )
+    if not verified:
+        pytest.skip(f"没有可读取的 Excel: {EXCEL_DIR}/*{slug}*.xlsx")
+
+
 @case_matrix("school", SCHOOLS)
 def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     model = _load(school)

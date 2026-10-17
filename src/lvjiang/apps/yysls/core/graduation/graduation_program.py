@@ -218,7 +218,7 @@ class ProgramCompiler:
             fallback = self._scalar(self._expr(args[1], sheet))
             return self._emit("iferror", [primary, fallback])
         compiled = [self._expr(arg, sheet) for arg in args]
-        if name in {"SUM", "MIN", "MAX", "OR"}:
+        if name in {"SUM", "MIN", "MAX", "OR", "AND"}:
             flat: list[int] = []
             for value in compiled:
                 if isinstance(value, _Range):
@@ -417,6 +417,8 @@ def evaluate_operation(op: str, values: list[Any]) -> Any:
         return max(nums) if nums else 0
     if op == "or":
         return any(bool(value) for value in values)
+    if op == "and":
+        return all(bool(value) for value in values)
     raise FormulaError(f"unsupported program opcode {op}")
 
 

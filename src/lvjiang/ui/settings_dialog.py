@@ -248,6 +248,7 @@ class SettingsDialog(QDialog):
         self._jitter_spin.valueChanged.connect(self._mark_dirty)
         self._clamp_oob_cb.toggled.connect(self._mark_dirty)
         self._adb_fallback_cb.toggled.connect(self._mark_dirty)
+        self._auto_start_shizuku_cb.toggled.connect(self._mark_dirty)
         for spin in self._recovery_spins.values():
             spin.valueChanged.connect(self._mark_dirty)
         for lo_spin, hi_spin in self._range_spins.values():
@@ -276,6 +277,12 @@ class SettingsDialog(QDialog):
         self._adb_fallback_cb = QCheckBox(tr("代理不可用时允许降级为 ADB 输入"))
         self._adb_fallback_cb.setChecked(policy.allow_adb_fallback)
         form.addRow(self._adb_fallback_cb)
+        self._auto_start_shizuku_cb = QCheckBox(tr("连接端侧执行时自动启动 Shizuku 服务"))
+        self._auto_start_shizuku_cb.setChecked(policy.auto_start_shizuku)
+        self._auto_start_shizuku_cb.setToolTip(tr(
+            "手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。"
+            "开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。"))
+        form.addRow(self._auto_start_shizuku_cb)
         self._recovery_spins: dict[str, QSpinBox | QDoubleSpinBox] = {}
         for name, label in (("agent_attempts", tr("代理重连次数")),
                             ("adb_attempts", tr("ADB 重连次数"))):
@@ -1747,6 +1754,7 @@ class SettingsDialog(QDialog):
         settings = {
             "android_recovery": {
                 "allow_adb_fallback": self._adb_fallback_cb.isChecked(),
+                "auto_start_shizuku": self._auto_start_shizuku_cb.isChecked(),
                 **{name: spin.value() for name, spin in self._recovery_spins.items()},
             },
             "android_capture_method": (

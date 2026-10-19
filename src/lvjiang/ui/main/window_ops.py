@@ -85,13 +85,14 @@ class _DeviceWorker(QObject):
 
     def __init__(self, task: str, serial: str = "", capture_method: str = "",
                  agent_mode: bool = False, subnets: list | None = None,
-                 allow_adb_fallback: bool = True):
+                 allow_adb_fallback: bool = True, auto_start_shizuku: bool = False):
         super().__init__()
         self._task = task
         self._serial = serial
         self._capture_method = capture_method
         self._agent_mode = agent_mode
         self._allow_adb_fallback = allow_adb_fallback
+        self._auto_start_shizuku = auto_start_shizuku
         self._subnets = subnets  # None = 扫描全部网卡
         self._cancelled = False
 
@@ -167,6 +168,13 @@ class _DeviceWorker(QObject):
         # 在后台线程读取稳定身份，避免把无线 ADB 的 IP:端口当成目标主键，
         # 也避免在主线程额外执行 adb shell。
         device.get_stable_identity()
+
+        # 端侧执行连接前，按高级设置自动拉起 Shizuku 服务（未运行才启动一次，
+        # 只读检测 + 幂等启动，不打断正在执行的任务；失败不阻断连接）。
+        if self._agent_mode and self._auto_start_shizuku:
+            from ...core.android.shizuku import ensure_shizuku_running
+            _ok, msg = ensure_shizuku_running(device)
+            self.notice.emit(f"[Shizuku] {msg}")
 
         # 设备端代理只负责输入手势；截图严格服从用户选择的 screencap / scrcpy。
         # 这样启用 Beta 输入通道不会暗中改变截图命令。
@@ -1035,6 +1043,7 @@ class WindowOpsMixin:
             capture_method=capture_method,
             agent_mode=device_execution,
             allow_adb_fallback=load_user_config().android_recovery.allow_adb_fallback,
+            auto_start_shizuku=load_user_config().android_recovery.auto_start_shizuku,
         )
         self._device_worker.moveToThread(self._device_thread)
         self._device_thread.started.connect(self._device_worker.run)

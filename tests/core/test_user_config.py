@@ -40,12 +40,20 @@ class TestLoadUserConfig:
     def test_advanced_recovery_settings_roundtrip_without_changing_running_snapshot(self, session_env, monkeypatch):
         monkeypatch.setattr("lvjiang.core.config.load_app_config", lambda: {})
         save_settings({"android_recovery": {"agent_attempts": 4, "adb_attempts": 2,
-                                           "retry_interval": 1.5, "allow_adb_fallback": False}})
+                                           "retry_interval": 1.5, "allow_adb_fallback": False,
+                                           "auto_start_shizuku": True}})
         running = load_user_config().android_recovery
         assert (running.agent_attempts, running.adb_attempts, running.retry_interval) == (4, 2, 1.5)
         assert not running.allow_adb_fallback
-        save_settings({"android_recovery": {"agent_attempts": 3, "adb_attempts": 3}})
-        assert load_user_config().android_recovery.agent_attempts == 3
+        assert running.auto_start_shizuku is True
+        # 同一节点整份重写（对话框每次保存都写全部字段）后仍可读回
+        save_settings({"android_recovery": {"agent_attempts": 3, "adb_attempts": 3,
+                                            "retry_interval": 2.0, "allow_adb_fallback": True,
+                                            "auto_start_shizuku": True}})
+        reloaded = load_user_config().android_recovery
+        assert reloaded.agent_attempts == 3
+        assert reloaded.auto_start_shizuku is True
+        # 启动时固定的快照不随后续落盘变化
         assert running.agent_attempts == 4
 
     def test_defaults_without_files(self, session_env, monkeypatch):

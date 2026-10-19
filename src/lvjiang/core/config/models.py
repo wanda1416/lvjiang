@@ -238,15 +238,22 @@ def _from_known(cls, raw: dict):
 
 @dataclass
 class AndroidRecoveryConfig:
-    """本机 Android 连接恢复策略，执行开始时固定。"""
+    """本机 Android 连接恢复策略，执行开始时固定。
+
+    ``auto_start_shizuku`` 与连接恢复同属「连接端侧执行时对设备做的准备」：
+    手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它，所以连接前
+    按该开关检测并启动一次（详见 ``core/android/shizuku.py``）。
+    """
 
     allow_adb_fallback: bool = True
+    auto_start_shizuku: bool = False
     agent_attempts: int = 3
     adb_attempts: int = 3
     retry_interval: float = 2.0
 
     def __post_init__(self):
         self.allow_adb_fallback = bool(self.allow_adb_fallback)
+        self.auto_start_shizuku = bool(self.auto_start_shizuku)
         self.agent_attempts = max(1, min(10, int(self.agent_attempts)))
         self.adb_attempts = max(1, min(10, int(self.adb_attempts)))
         self.retry_interval = max(0.0, min(30.0, float(self.retry_interval)))

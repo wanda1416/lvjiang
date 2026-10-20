@@ -90,8 +90,9 @@ object AgentServer {
         PyBridge.status(requireNotNull(appContext)).optString("state")
 
     /**
-     * 任务还活着（含已暂停）：同步、历史回传这类要独占配置的操作仍然要拦，
-     * 否则会被一个随时可能继续的任务读到半套配置。
+     * 任务还活着（含已暂停）：下发配置这类要独占配置的操作仍然要拦，
+     * 否则会被一个随时可能继续的任务读到半套配置。历史回传只读终态记录，
+     * 不受此限制。
      */
     private fun localTaskAlive(): Boolean =
         localTaskState() in setOf("running", "pausing", "paused", "stopping")
@@ -320,8 +321,10 @@ object AgentServer {
         }
         "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(
             requireNotNull(appContext), true, req.optInt("screen_repetitions", 0))))
+        // 历史导出只读终态记录，任务运行中也可以回传；运行中的任务与未结束批次
+        // 由导出查询自行跳过，结束后再回传即可补齐。
         "history_begin", "history_chunk", "history_end" -> {
-            if (op == "history_begin" && (localTaskAlive() || pcControlsDevice())) fail("请先结束设备任务再回传历史")
+            if (op == "history_begin" && pcControlsDevice()) fail("PC 正在控制设备，请先结束 PC 任务再回传历史")
             else Pair(PyBridge.historyTransfer(requireNotNull(appContext), op.removePrefix("history_"), req.toString()), null)
         }
         "offline_sync_begin" -> beginSync(req)

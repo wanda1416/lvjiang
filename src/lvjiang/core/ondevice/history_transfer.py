@@ -1,4 +1,10 @@
-"""手机历史导出 RPC：冻结包与分块读取，不删除运行原件。"""
+"""手机历史导出 RPC：冻结包与分块读取，不删除运行原件。
+
+导出只取终态记录（任务与批次均要求已结束），因此任务运行中也可以回传：
+运行中的任务与未结束批次由 ``export_history`` 的查询自行跳过，结束后再回传
+即可补齐。只读连接与 WAL 写库可以并发，这里不拿 ``CONTROL_LOCK``，避免导出
+期间阻塞启动、下发或批量保存。
+"""
 from __future__ import annotations
 
 import base64
@@ -15,7 +21,6 @@ _TOKEN = ""
 
 def request(operation: str, payload: str) -> str:
     global _TOKEN
-    from .task_runner import CONTROL_LOCK, is_running
 
     try:
         data = json.loads(payload)
@@ -23,16 +28,13 @@ def request(operation: str, payload: str) -> str:
             directory = constants.PROJECT_ROOT / "config/session/history-transfer"
             archive = directory / "outgoing.zip"
             if operation == "begin":
-                with CONTROL_LOCK:
-                    if is_running():
-                        raise ValueError("请先结束手机任务再回传历史")
-                    from .plugins import ensure_loaded
-                    ensure_loaded()
-                    directory.mkdir(parents=True, exist_ok=True)
-                    _TOKEN = ""  # 新导出失败也不能继续读取旧包。
-                    summary = export_history(constants.PROJECT_ROOT, archive, data["selected"])
-                    _TOKEN = uuid4().hex
-                    return json.dumps({"ok": True, "token": _TOKEN, **summary}, ensure_ascii=False)
+                from .plugins import ensure_loaded
+                ensure_loaded()
+                directory.mkdir(parents=True, exist_ok=True)
+                _TOKEN = ""  # 新导出失败也不能继续读取旧包。
+                summary = export_history(constants.PROJECT_ROOT, archive, data["selected"])
+                _TOKEN = uuid4().hex
+                return json.dumps({"ok": True, "token": _TOKEN, **summary}, ensure_ascii=False)
             if not _TOKEN or data.get("token") != _TOKEN:
                 raise ValueError("历史快照已失效，请重新回传")
             if operation == "chunk":

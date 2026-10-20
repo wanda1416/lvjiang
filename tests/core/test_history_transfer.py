@@ -157,11 +157,9 @@ def test_archive_rejects_unrequested_category_and_path_escape(histories, tmp_pat
 def test_rpc_retry_and_cancel_do_not_import_partial_history(histories, monkeypatch):
     from lvjiang.core.android.history_transfer import pull_history
     from lvjiang.core.ondevice import history_transfer as device
-    from lvjiang.core.ondevice import task_runner
 
     _, pc, _, _ = histories
     monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
-    monkeypatch.setattr(task_runner, "is_running", lambda: False)
 
     class Agent:
         status = {"history_protocol": 1}
@@ -185,6 +183,33 @@ def test_rpc_retry_and_cancel_do_not_import_partial_history(histories, monkeypat
     assert not (pc / "config/session/daily_history.db").exists()
     assert pull_history(agent, pc, ["tasks"])["imported"]["tasks"] == 2
     assert pull_history(agent, pc, ["tasks"])["imported"]["tasks"] == 0
-    monkeypatch.setattr(task_runner, "is_running", lambda: True)
-    with pytest.raises(RuntimeError, match="结束手机任务"):
-        pull_history(agent, pc, ["tasks"])
+
+
+def test_running_task_is_skipped_while_transfer_continues(histories, monkeypatch):
+    """任务运行中仍可回传：运行中的记录由导出查询跳过，不影响其他记录。"""
+    from lvjiang.core.android.history_transfer import pull_history
+    from lvjiang.core.ondevice import history_transfer as device
+
+    phone, pc, task, _ = histories
+    running = TaskRunSession(
+        username="手机用户", task_id="daily", task_name="运行中任务", task_scope="daily",
+        params={}, source="ondevice",
+        repository=TaskHistoryRepository(phone / "config/session/daily_history.db"),
+        started_at=datetime(2026, 1, 2), target_id="ondevice", target_kind="android",
+        log_root=phone / "logs/daily")
+    monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
+
+    class Agent:
+        status = {"history_protocol": 1}
+
+        def call(self, operation, timeout=None, **params):
+            response = json.loads(device.request(operation.removeprefix("history_"), json.dumps(params)))
+            if not response["ok"]:
+                raise RuntimeError(response["error"])
+            return response, b""
+
+    outcome = pull_history(Agent(), pc, ["tasks"])
+    assert outcome["imported"]["tasks"] == 2
+    records = TaskHistoryRepository(pc / "config/session/daily_history.db").list_task_runs()
+    assert [r.task_run_id for r in records] == [task.task_run_id]
+    assert running.task_run_id not in {r.task_run_id for r in records}

@@ -82,13 +82,18 @@ def atomic_write_text(
     suffix: str = ".tmp",
     encoding: str = "utf-8",
 ) -> None:
-    """同 atomic_write_bytes，但走文本模式写入（保留平台默认换行转换）。"""
+    """同 atomic_write_bytes，但走文本模式写入。
+
+    换行固定为 LF：配置与脚本在工作区的字节必须与仓库 ``.gitattributes``
+    的 ``eol=lf`` 一致，否则 Windows 上每次保存都会翻成 CRLF——它不会在 git
+    状态里显形（clean filter 会归一化），却会改变预置包摘要和跨平台产物。
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=prefix, suffix=suffix)
     tmp_path = Path(tmp_name)
     try:
         try:
-            with os.fdopen(fd, "w", encoding=encoding) as stream:
+            with os.fdopen(fd, "w", encoding=encoding, newline="\n") as stream:
                 stream.write(text)
         except BaseException:
             try:

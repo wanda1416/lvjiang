@@ -35,3 +35,27 @@ def test_save_editor_snapshot_updates_fixed_restore_source(wf_root):
     assert written == wf_root.parent.parent / "local/workflows/_editor_run.wf"
     assert written.read_text(encoding="utf-8") == "log info 42\n"
     assert get_resolver().resolve_read("workflows/_editor_run.wf") == written
+
+
+def test_editor_artifacts_stay_local_in_dev_mode(tmp_path, monkeypatch):
+    """开发模式普通保存写 system，但编辑器草稿不能污染预置输入。"""
+    from lvjiang.core.config import resolver as resolver_mod
+
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    (system / "workflows").mkdir(parents=True)
+    local.mkdir()
+    monkeypatch.setattr(
+        resolver_mod, "_resolver",
+        resolver_mod.ConfigResolver(system_dir=system, local_dir=local, dev_mode=True),
+    )
+
+    written = save_editor_snapshot("log info 7")
+    assert written == local / "workflows/_editor_run.wf"
+    assert written.read_text(encoding="utf-8") == "log info 7\n"
+    assert not (system / "workflows/_editor_run.wf").exists()
+
+    with runtime_source("log info 8") as source:
+        assert source.parent == local / "workflows"
+    assert not source.exists()
+    assert list((system / "workflows").iterdir()) == []

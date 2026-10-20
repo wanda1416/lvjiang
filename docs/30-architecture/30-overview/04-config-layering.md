@@ -27,6 +27,9 @@
 **读**：`local > system`，两种模式一致。
 **写**：按模式路由——开发模式（`.git` 存在或 `LVJIANG_DEV_MODE=1`）写 system 全量；
 用户模式写 local diff。在线安装器单独负责 system 的事务替换，不写 local。
+编辑器临时产物（`workflows/_editor_run.wf`、录制草稿、`workflows/_testwf/` 等
+`_` 前缀的私人脚本）不属于官方配置，两种模式都固定写 local。文本落盘统一 LF，
+与仓库 `.gitattributes` 的 `eol=lf` 一致，不随 Windows 文本模式变成 CRLF。
 
 实体修订缓存、任务快照与保存冲突检查见
 [配置修订缓存与运行快照](05-content-cache.md)。content_version 仅用于内部缓存失效，
@@ -207,6 +210,11 @@ scenes:
 只在自己机器上用的基础规则组（调律配置 → 基础规则页的"保存位置"列，普通
 用户看不到这一列）。local 恒高于 system，所以同 key 的 local 组会在这台机器
 上覆盖 system 版本；用户模式下 `layer` 只能是 local，不是给用户开的口子。
+
+编辑器生成物是固定例外：上次运行快照 `workflows/_editor_run.wf`、录制草稿和
+`workflows/_testwf/` 这类 `_` 前缀的私人脚本，即使开发模式也写 local。它们不是
+官方配置；落进 `config/system` 会被 Android / Windows 打包带进预置包，
+改变预置内容摘要并触发手机上的基底不匹配。
 
 ---
 

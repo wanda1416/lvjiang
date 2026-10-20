@@ -447,8 +447,10 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
                 f"#% batchable: true\n\n{text}")
 
     def _on_save(self):
-        """保存当前文本为 .wf 文件（默认目录为当前模式的可写 workflows 目录）"""
-        default_path = str(get_resolver().write_dir("workflows") / "recorded.wf")
+        """保存当前文本为 .wf 文件（默认落到 local：录制产物属于私人草稿）"""
+        default_dir = get_resolver().local_dir / "workflows"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        default_path = str(default_dir / "recorded.wf")
         path, _ = QFileDialog.getSaveFileName(
             self, tr("保存为工作流文件"), default_path,
             tr("工作流文件 (*.wf);;所有文件 (*)"))
@@ -471,7 +473,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
                     path,
                     template,
                     self._pending_trace,
-                    workflows_root=get_resolver().write_dir("workflows"),
+                    workflows_root=get_resolver().local_dir / "workflows",
                 )
                 trace_ref = Path(
                     os.path.relpath(trace_path, wf_path.parent)

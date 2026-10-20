@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from preset_sources import report_excluded, tracked_files  # noqa: E402
+
 from lvjiang._version import __version__  # noqa: E402
 from lvjiang.core.paths import get_config_system_dir  # noqa: E402
 from lvjiang.core.system_preset import write_baseline_identity  # noqa: E402
@@ -21,7 +23,14 @@ def main() -> None:
     system = get_config_system_dir(args.destination)
     if system.exists() and any(system.iterdir()):
         raise ValueError("请使用空的打包目标，不能覆盖用户 system")
-    for name, data in read_tree(get_config_system_dir()).items():
+    files = read_tree(get_config_system_dir())
+    include = tracked_files(ROOT, "config/system")
+    if include is None:
+        print("非 git 工作区：按磁盘内容建立预置基底，未启用跟踪文件过滤")
+    else:
+        report_excluded("config/system", list(files), include)
+        files = {name: data for name, data in files.items() if name in set(include)}
+    for name, data in files.items():
         path = system / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)

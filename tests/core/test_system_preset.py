@@ -32,6 +32,20 @@ def test_package_is_deterministic_and_only_contains_official_configuration(offic
         assert set(package.namelist()) == {"system/app.yaml", "system/ocr.yaml", "system/layouts.yaml", "system/workflows/task.wf", "manifest.json"}
 
 
+def test_include_excludes_untracked_drafts_and_rejects_missing_files(official, tmp_path):
+    """构建只打包 git 跟踪的官方文件；声明了却缺失的文件视为构建错误。"""
+    (official / "workflows/_draft.wf").write_text("wait 0.02", encoding="utf-8")
+    included = ["app.yaml", "ocr.yaml", "layouts.yaml", "workflows/task.wf"]
+    archive = tmp_path / "preset.zip"
+    manifest = build_system_preset(official, archive, include=included)
+    assert sorted(manifest["files"]) == sorted(included)
+    with zipfile.ZipFile(archive) as package:
+        assert "system/workflows/_draft.wf" not in package.namelist()
+    with pytest.raises(ValueError, match="官方预置缺少文件"):
+        build_system_preset(official, tmp_path / "bad.zip",
+                            include=["app.yaml", "workflows/missing.wf"])
+
+
 def test_packaging_only_writes_identity_and_startup_creates_r0(official, monkeypatch):
     from lvjiang.core.config import remote
     from lvjiang.core.config.update_store import UpdateStore

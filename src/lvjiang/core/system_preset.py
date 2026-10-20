@@ -6,7 +6,7 @@ import json
 import shutil
 import tempfile
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from pathlib import Path, PurePosixPath
 
 from .._version import __version__
@@ -24,9 +24,21 @@ PRESET_FORMAT = 2
 MAX_PRESET_BYTES = 256 << 20
 
 
-def build_system_preset(system_dir: Path, destination: Path) -> dict:
-    """输入仅为官方 system 根；文件顺序和 ZIP 时间固定，便于复核内容摘要。"""
+def build_system_preset(system_dir: Path, destination: Path, *,
+                        include: Collection[str] | None = None) -> dict:
+    """输入仅为官方 system 根；文件顺序和 ZIP 时间固定，便于复核内容摘要。
+
+    ``include`` 给定时只打包其中的相对路径。构建脚本用它排除工作区里
+    未纳入 git 的草稿（编辑器临时脚本等），使同一个提交在任何机器上
+    得到相同摘要；传入但磁盘上缺失的路径视为错误。
+    """
     contents = read_tree(system_dir)
+    if include is not None:
+        wanted = set(include)
+        missing = sorted(wanted - contents.keys())
+        if missing:
+            raise ValueError(f"官方预置缺少文件: {missing[0]}")
+        contents = {name: data for name, data in contents.items() if name in wanted}
     files = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
     if not {"app.yaml", "ocr.yaml", "layouts.yaml"} <= files.keys():
         raise ValueError("官方预置包缺少应用、OCR 或布局定义")

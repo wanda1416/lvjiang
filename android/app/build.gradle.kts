@@ -228,8 +228,8 @@ val generateSystemPreset by tasks.registering(Exec::class) {
     inputs.file(rootProject.file("../src/lvjiang/core/update_bundle.py"))
     inputs.file(rootProject.file("../src/lvjiang/core/license_files.py"))
     inputs.file(rootProject.file("../src/lvjiang/core/fs_util.py"))
+    inputs.file(rootProject.file("../src/lvjiang/core/preset_sources.py"))
     inputs.file(rootProject.file("../scripts/build_android_preset.py"))
-    inputs.file(rootProject.file("../scripts/preset_sources.py"))
     outputs.file(presetAssets.map { it.file("lvjiang-preset.zip") })
     commandLine(buildPythonExe.absolutePath, rootProject.file("../scripts/build_android_preset.py").absolutePath,
         presetAssets.get().file("lvjiang-preset.zip").asFile.absolutePath)

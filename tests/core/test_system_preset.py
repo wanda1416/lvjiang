@@ -46,6 +46,37 @@ def test_include_excludes_untracked_drafts_and_rejects_missing_files(official, t
                             include=["app.yaml", "workflows/missing.wf"])
 
 
+def _official_tree(root: Path, newline: str) -> Path:
+    system = root / "system"
+    (system / "workflows").mkdir(parents=True)
+    for name in ("app.yaml", "ocr.yaml", "layouts.yaml"):
+        (system / name).write_text("{}" + newline, encoding="utf-8", newline="")
+    (system / "workflows/task.wf").write_text("wait 0.01" + newline, encoding="utf-8", newline="")
+    return system
+
+
+def test_crlf_workspace_yields_same_preset_id(tmp_path):
+    """工作区被外部工具写成 CRLF 时摘要不变：行尾不属于提交内容。
+
+    ``.gitattributes`` 的归一化让 CRLF 在 git 状态里隐身，按磁盘字节打包却会让
+    摘要漂移，手机侧报「无法确认原始预置基底」。
+    """
+    lf = _official_tree(tmp_path / "lf", "\n")
+    crlf = _official_tree(tmp_path / "crlf", "\r\n")
+    lf_manifest = build_system_preset(lf, tmp_path / "lf.zip")
+    crlf_manifest = build_system_preset(crlf, tmp_path / "crlf.zip")
+    assert lf_manifest["preset_id"] == crlf_manifest["preset_id"]
+    assert (tmp_path / "lf.zip").read_bytes() == (tmp_path / "crlf.zip").read_bytes()
+
+
+def test_read_tree_only_skips_unlisted_entries_entirely(official):
+    """include 之外的条目连名字校验和体积统计都不做，草稿不参与构建。"""
+    from lvjiang.core.update_bundle import read_tree
+    (official / "workflows/_draft.wf").write_text("wait 0.02", encoding="utf-8")
+    files = read_tree(official, only={"app.yaml", "workflows/task.wf"})
+    assert sorted(files) == ["app.yaml", "workflows/task.wf"]
+
+
 def test_packaging_only_writes_identity_and_startup_creates_r0(official, monkeypatch):
     from lvjiang.core.config import remote
     from lvjiang.core.config.update_store import UpdateStore

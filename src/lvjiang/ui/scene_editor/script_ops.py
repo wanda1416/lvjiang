@@ -123,7 +123,10 @@ class ScriptOpsMixin:
         if not path:
             return
         from pathlib import Path
-        Path(path).write_text(content, encoding="utf-8")
+        # 默认目录在开发模式下就是 config/system：行尾必须固定 LF，否则 Windows
+        # 文本模式写出的 CRLF 因 .gitattributes 归一化在 git 状态里隐身，却会让
+        # 预置包摘要漂移（手机侧报「无法确认原始预置基底」）。
+        Path(path).write_text(content, encoding="utf-8", newline="\n")
         self._status_bar.showMessage(f"已保存: {path}")
         logger.info(f"已保存脚本: {path}")
 

@@ -482,7 +482,8 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
                 self.text_edit.setPlainText(final_text.rstrip("\n"))
                 logger.info(f"高精度录制已保存: {wf_path} + {trace_path}")
             else:
-                Path(path).write_text(text, encoding="utf-8")
+                # 录制草稿同样是配置类文本，行尾固定 LF（见 .gitattributes 的 eol=lf）。
+                Path(path).write_text(text, encoding="utf-8", newline="\n")
             self._preserved = True
             logger.info(f"录制 DSL 已保存: {path}")
             self.lbl_status.setText(f"已保存: {path}")

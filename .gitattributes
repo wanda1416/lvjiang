@@ -8,6 +8,10 @@
 *.yaml text eol=lf
 *.yml  text eol=lf
 *.wf   text eol=lf
+# 预置输入里的说明文档也算打包内容：漏了这条，autocrlf=true 的机器会把它
+# checkout 成 CRLF。只约束 config/system——全局 *.md 会让 docs 下历史 CRLF
+# 文件在下次编辑时整份重排，制造「改一行全改」的假 diff。
+config/system/**/*.md text eol=lf
 
 # 二进制显式声明，防止被 text 规则误转换
 *.png  binary

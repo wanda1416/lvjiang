@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from .._version import __version__
 from .fs_util import atomic_write_bytes
 from .json_files import formatted_json, formatted_json_bytes
+from .preset_sources import normalize_tree
 from .update_bundle import (
     json_bytes,
     read_tree,
@@ -28,17 +29,19 @@ def build_system_preset(system_dir: Path, destination: Path, *,
                         include: Collection[str] | None = None) -> dict:
     """输入仅为官方 system 根；文件顺序和 ZIP 时间固定，便于复核内容摘要。
 
-    ``include`` 给定时只打包其中的相对路径。构建脚本用它排除工作区里
+    ``include`` 给定时只读取其中的相对路径。构建脚本用它排除工作区里
     未纳入 git 的草稿（编辑器临时脚本等），使同一个提交在任何机器上
     得到相同摘要；传入但磁盘上缺失的路径视为错误。
+
+    文本文件的行尾统一归一为 LF：工作区被外部工具写成 CRLF 时，``.gitattributes``
+    让它在 git 状态里隐身，按磁盘字节打包却会让摘要漂移。
     """
-    contents = read_tree(system_dir)
+    contents = read_tree(system_dir, only=include)
     if include is not None:
-        wanted = set(include)
-        missing = sorted(wanted - contents.keys())
+        missing = sorted(set(include) - contents.keys())
         if missing:
             raise ValueError(f"官方预置缺少文件: {missing[0]}")
-        contents = {name: data for name, data in contents.items() if name in wanted}
+    contents = normalize_tree(contents)
     files = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
     if not {"app.yaml", "ocr.yaml", "layouts.yaml"} <= files.keys():
         raise ValueError("官方预置包缺少应用、OCR 或布局定义")
@@ -114,7 +117,10 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 # 只记录最后安装的官方代次，不代表当前 system 来自 PC 还是 APK。
                 pending = stage / "preset.json"
-                pending.write_text(formatted_json({"preset_id": digest, "app_version": __version__}), encoding="utf-8")
+                # 标记文件也在配置目录里，行尾固定 LF，与其它配置落盘保持一致。
+                pending.write_text(
+                    formatted_json({"preset_id": digest, "app_version": __version__}),
+                    encoding="utf-8", newline="\n")
                 pending.replace(marker)
             except Exception:
                 if old_identity is None:

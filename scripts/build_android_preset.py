@@ -8,11 +8,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from preset_sources import report_excluded, tracked_files  # noqa: E402
-
 from lvjiang.core.paths import get_config_system_dir  # noqa: E402
+from lvjiang.core.preset_sources import (  # noqa: E402
+    excluded_files,
+    format_excluded,
+    present_files,
+    tracked_files,
+)
 from lvjiang.core.system_preset import build_system_preset  # noqa: E402
-from lvjiang.core.update_bundle import read_tree  # noqa: E402
 
 
 def main() -> None:
@@ -24,7 +27,10 @@ def main() -> None:
     if include is None:
         print("非 git 工作区：按磁盘内容打包预置，未启用跟踪文件过滤")
     else:
-        report_excluded("config/system", list(read_tree(system)), include)
+        message = format_excluded(
+            "config/system", excluded_files(present_files(system), include))
+        if message:
+            print(message)
     manifest = build_system_preset(system, args.destination, include=include)
     print(f"官方预置包：{len(manifest['files'])} 个文件，内容摘要 {manifest['preset_id']}")
 

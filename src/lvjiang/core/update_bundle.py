@@ -7,7 +7,7 @@ import json
 import re
 import stat
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -69,13 +69,22 @@ def validate_names(names: Any) -> None:
         raise ValueError("配置文件数量超限")
 
 
-def read_tree(root: Path) -> dict[str, bytes]:
-    """读取明确的官方源或隔离候选目录，不跳过未知文件。"""
+def read_tree(root: Path, *, only: Collection[str] | None = None) -> dict[str, bytes]:
+    """读取明确的官方源或隔离候选目录，不跳过未知文件。
+
+    ``only`` 给定时只读取其中的相对路径，其余条目连名字校验和体积统计都不做：
+    打包官方预置时用它排除工作区里未纳入 git 的草稿，名字或体积不合规的草稿
+    就不会在「被排除之前」先把构建卡住。
+    """
     if not root.is_dir() or root.is_symlink():
         raise ValueError("配置源必须是普通目录")
+    wanted = set(only) if only is not None else None
     files: dict[str, bytes] = {}
     total = 0
     for path in sorted(root.rglob("*")):
+        name = path.relative_to(root).as_posix()
+        if wanted is not None and name not in wanted:
+            continue
         if path.is_symlink():
             raise ValueError("配置源不允许符号链接")
         if path.is_dir():
@@ -86,7 +95,7 @@ def read_tree(root: Path) -> dict[str, bytes]:
         total += size
         if size > MAX_FILE_BYTES or total > MAX_EXPANDED_BYTES:
             raise ValueError("配置源大小超限")
-        files[path.relative_to(root).as_posix()] = path.read_bytes()
+        files[name] = path.read_bytes()
     validate_names(files)
     return files
 

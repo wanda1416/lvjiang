@@ -29,6 +29,8 @@ coverage.xml
 
 # Logs
 logs/
+# 输入法（搜狗）在进程 cwd 落的内核日志；从仓库根启动时会被写到这里
+/debug.log
 
 # 外置插件默认目录（独立检出，可容纳多个私有插件）
 /plugins/

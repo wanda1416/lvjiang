@@ -109,7 +109,8 @@ def test_history_choices_are_device_specific_and_independent_of_downstream(qapp,
         assert not page.history_choices["tasks"].isChecked()
         page._state = "running"
         page._update_buttons()
-        assert not page.buttons["history"].isEnabled()
+        # 回传只导出终态历史（运行中的任务会被导出查询跳过），所以任务运行中也保持可用
+        assert page.buttons["history"].isEnabled()
         assert page.buttons["stop"].isEnabled()
     finally:
         page.close()

@@ -38,11 +38,9 @@ logs/
 # Private administration checkout and its nested public site repository.
 /admin/
 
-# local config (user overlay / session runtime / 在线下发层)
+# local config (user overlay / session runtime)
 /config/local*
 /config/session*
-/config/remote*
-/config/system/workflows/_*
 
 # local data
 /data/local
@@ -88,11 +86,3 @@ ops/stats-worker/.wrangler/
 # stats-client 本地缓存/凭据（含 install_id 与本地文件回退的 token，不进仓库）
 ops/stats-client/data/
 ops/stats-client/.env
-
-# Generated public Agent bundle; source stays in docs/10-game, docs/30-architecture, docs/60-userguide and docs/70-agent.
-/agent/
-
-# Local activation proof is private and never published.
-/config/local/license-activation.json
-
-/config/local/.license-*

@@ -1,9 +1,11 @@
 """运行任务的配置读取上下文；不改变 UI 的活动配置与编辑器状态。"""
 from __future__ import annotations
 
+import atexit
 import shutil
 import tempfile
 import threading
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -57,6 +59,53 @@ class _Generation:
 
 
 _generations: dict[tuple[Path, Path], _Generation] = {}
+
+_TASK_ROOT_NAME = ".task"
+_TASK_STALE_SECONDS = 24 * 60 * 60
+_task_root: Path | None = None
+_task_root_lock = threading.Lock()
+_task_owners: set[Path] = set()
+_task_owners_lock = threading.Lock()
+
+
+def task_directory() -> Path:
+    """任务快照根目录：工作目录下的 .task。
+
+    系统临时目录在受限环境里可能整体不可写，tempfile 会退到当前工作目录，把整份
+    配置副本倒进仓库根。这里固定到工作目录下的 .task，首次使用时顺带清掉被强杀
+    进程留下的过期代次。
+    """
+    global _task_root
+    with _task_root_lock:
+        if _task_root is None:
+            root = Path.cwd() / _TASK_ROOT_NAME
+            root.mkdir(parents=True, exist_ok=True)
+            _sweep_stale(root)
+            _task_root = root
+        return _task_root
+
+
+def _sweep_stale(root: Path) -> None:
+    deadline = time.time() - _TASK_STALE_SECONDS
+    for entry in root.iterdir():
+        if not entry.is_dir():
+            continue
+        try:
+            stale = entry.stat().st_mtime < deadline
+        except OSError:
+            continue
+        if stale:
+            shutil.rmtree(entry, ignore_errors=True)
+
+
+@atexit.register
+def _remove_task_directories() -> None:
+    """正常退出时回收本进程创建的全部代次目录，不依赖 __del__ 的时机。"""
+    with _task_owners_lock:
+        owners = tuple(_task_owners)
+        _task_owners.clear()
+    for owner in owners:
+        shutil.rmtree(owner, ignore_errors=True)
 
 
 def current_snapshot() -> RuntimeSnapshot | None:
@@ -138,7 +187,9 @@ def configuration_snapshot() -> Iterator[RuntimeSnapshot | None]:
         generation = _generations.get(cache_key)
         reused = generation is not None and generation.identity == identity
         if not reused:
-            owner = Path(tempfile.mkdtemp(prefix="lvjiang-task-config-"))
+            owner = Path(tempfile.mkdtemp(prefix="config-", dir=task_directory()))
+            with _task_owners_lock:
+                _task_owners.add(owner)
             root = owner
             generation = _Generation(identity, owner, root / "system", root / "local")
             if resolver.system_dir.is_dir():

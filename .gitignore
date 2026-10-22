@@ -51,6 +51,9 @@ logs/
 /data/temp*
 /data/apk
 
+# 任务运行快照（每次资源代次复制一份配置副本，进程退出后回收）
+/.task/
+
 # OS
 Thumbs.db
 Desktop.ini

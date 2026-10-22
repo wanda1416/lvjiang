@@ -1,10 +1,14 @@
-"""ADB 无线连接 - 局域网扫描 + 自动连接
+"""ADB 无线连接 - 局域网设备发现 + 自动连接
 
-核心流程：
-1. 获取本机局域网子网
-2. 并发扫描子网内所有 IP 的 ADB 端口（默认 5555）
-3. 对开放端口的 IP 执行 adb connect
-4. 返回已成功连接的设备列表
+核心流程（按可靠性排序，靠前者更便宜也更准）：
+1. mDNS：读 `adb mdns services`，直接拿到设备广播的 IP:端口。
+   Android 11+ 无线调试用随机端口，逐 IP 探测 5555 永远发现不了。
+2. ARP 邻居表：发 UDP 触发 ARP 解析后读系统邻居表，不依赖 ICMP 存活。
+   设备不回 ping、或不监听已知端口时，邻居表仍能证明它在同一广播域。
+3. TCP 确认：只对上面两步得到的少量候选探测端口，超时与重试都从宽。
+4. 兜底：两条协议通道都没有候选时，才逐 IP 扫描网段。
+   跨 VLAN / 跨路由的网段邻居表看不到设备，只能靠这一步。
+5. 对确认的端点执行 adb connect，并返回已成功连接的设备列表。
 
 也可用于将 USB 设备切换为无线连接（enable_tcpip）。
 """
@@ -286,14 +290,16 @@ def _ping_host(ip: str, timeout: float = 0.02) -> bool:
         return False
 
 
-def probe_port(ip: str, port: int, timeout: float = 0.3, *, ping_first: bool = True) -> bool:
+def probe_port(ip: str, port: int, timeout: float = 0.3, *, ping_first: bool = False) -> bool:
     """探测 IP:port 是否可达
 
     Args:
         ip: 目标 IP
         port: 目标端口
         timeout: TCP connect 超时时间（秒）
-        ping_first: 是否先 ping 探测（局域网内可快速过滤不存在的 IP）
+        ping_first: 是否先 ping 预筛（默认关闭）。默认值必须是 False：
+            息屏设备在 20ms 内常常不回 ICMP，开启后会把真实在线的手机
+            直接判死，连 TCP 都不发。
 
     Returns:
         True 如果端口开放，False 如果不可达
@@ -315,6 +321,8 @@ def scan_lan_for_adb(
     max_workers: int = 50,
     progress_cb: Callable[[str, int, int], None] | None = None,
     cancel_check: Callable[[], bool] | None = None,
+    *,
+    ping_first: bool = False,
 ) -> list[str]:
     """扫描局域网子网，返回端口开放的所有 IP
 
@@ -323,6 +331,9 @@ def scan_lan_for_adb(
         port: ADB 端口，默认 5555
         max_workers: 并发线程数
         progress_cb: 进度回调 (message, current, total)
+        ping_first: 是否先 ping 预筛（默认关闭）。开启后 ping 不通的 IP
+            会连 TCP 都不发，而息屏设备在 20ms 内常常不回 ICMP，
+            会稳定漏掉真实在线的手机，因此默认直接探测端口。
 
     Returns:
         开放该端口的 IP 列表，按末位数字排序
@@ -336,7 +347,10 @@ def scan_lan_for_adb(
     cancelled = False
     futures = {}
     try:
-        futures = {pool.submit(probe_port, ip, port): ip for ip in candidates}
+        futures = {
+            pool.submit(probe_port, ip, port, ping_first=ping_first): ip
+            for ip in candidates
+        }
         for future in as_completed(futures):
             if cancel_check is not None and cancel_check():
                 cancelled = True
@@ -357,6 +371,212 @@ def scan_lan_for_adb(
                 future.cancel()
         pool.shutdown(wait=not cancelled, cancel_futures=cancelled)
     return sorted(found, key=lambda ip: int(ip.split(".")[-1]))
+
+
+# ─── 设备发现：mDNS / ARP 邻居表 ─────────────────────────
+# 逐 IP 探测 ADB 端口有两个固有问题：
+# 1. 设备息屏时首个 ICMP/TCP 包可能被 WiFi 省电延迟，单次短超时会漏判；
+# 2. Android 11+ 无线调试用的是随机端口，只探 5555 永远发现不了。
+# 所以先用两条协议层通道拿到候选，再只对少量候选做 TCP 确认。
+
+# Android 无线调试会广播的服务类型。_adb-tls-pairing._tcp 只用于配对，
+# 直连没有意义，这里不取。
+MDNS_ADB_SERVICES: tuple[str, ...] = ("_adb._tcp", "_adb-tls-connect._tcp")
+
+# 触发 ARP 解析用的 UDP 端口。只是让内核为该 IP 发出 ARP 请求，
+# 收到端口不可达也没关系；避开 5555 以免给真实 adbd 送无意义数据。
+ARP_PROBE_PORT = 9
+
+# TCP 确认的超时与重试：息屏设备的首个 SYN 常因省电延迟，1s + 一次重试才稳。
+CONFIRM_TIMEOUT = 1.0
+CONFIRM_RETRIES = 1
+
+# 全段扫描一次给出超过这个数量的"开放端口"，基本只可能是透明代理或防火墙
+# 接管了出站 TCP（TUN 代理会让整段 IP 的 connect 全部成功）。
+SUSPICIOUS_TARGET_COUNT = 32
+
+_MAC_RE = r"(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}"
+# IP 与 MAC 之间用 .*? 而不是 \D+：Linux 的 "dev eth0 lladdr" 里含数字，
+# \D+ 会在此处断开，导致整段邻居表解析不出任何主机。
+_NEIGHBOR_RE = re.compile(r"(\d{1,3}(?:\.\d{1,3}){3}).*?(" + _MAC_RE + r")")
+_IPV4_PORT_RE = re.compile(r"(\d{1,3}(?:\.\d{1,3}){3}):(\d+)")
+
+
+def mdns_discover_adb(
+    adb: str,
+    subnets: list[str] | None = None,
+    timeout: float = 5,
+) -> list[tuple[str, int]]:
+    """通过 `adb mdns services` 发现正在广播的 ADB 端点。
+
+    返回 [(ip, port), ...]，按出现顺序去重。能覆盖 Android 11+ 无线调试的
+    随机端口（_adb-tls-connect._tcp），这是逐 IP 探测 5555 拿不到的信息。
+    设备未开启无线调试、或 adb 不支持 mdns 时返回空列表，不抛异常。
+
+    Args:
+        adb: adb 可执行路径
+        subnets: 只保留这些 /24 前缀内的结果；None 表示不过滤
+        timeout: adb 命令超时
+    """
+    try:
+        result = subprocess.run(
+            [adb, "mdns", "services"],
+            capture_output=True, timeout=timeout,
+            **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+        )
+        out = result.stdout or ""
+    except Exception as exc:  # noqa: BLE001 - 发现失败只降级，不影响整体扫描
+        logger.debug(f"[mDNS] 调用 adb mdns services 失败: {exc}")
+        return []
+
+    endpoints: list[tuple[str, int]] = []
+    for line in out.splitlines():
+        if not any(service in line for service in MDNS_ADB_SERVICES):
+            continue
+        match = _IPV4_PORT_RE.search(line)
+        if not match:
+            continue
+        ip, port = match.group(1), int(match.group(2))
+        if subnets is not None and _subnet_of(ip) not in subnets:
+            continue
+        if (ip, port) not in endpoints:
+            endpoints.append((ip, port))
+    return endpoints
+
+
+def _send_arp_probes(
+    subnet: str,
+    cancel_check: Callable[[], bool] | None = None,
+) -> None:
+    """向子网内每个地址发一个无关的 UDP 包，触发内核 ARP 解析。
+
+    UDP 不可达不会阻塞 sendto，/24 全量发送在毫秒级完成。这里不关心
+    是否有响应，只要求真实在线的主机在邻居表里出现。
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    except OSError as exc:
+        logger.debug(f"[ARP] 创建 UDP 套接字失败: {exc}")
+        return
+    try:
+        for i in range(1, 255):
+            if cancel_check is not None and cancel_check():
+                return
+            try:
+                sock.sendto(b"\x00", (f"{subnet}{i}", ARP_PROBE_PORT))
+            except OSError:
+                # ICMP 端口不可达可能让下一次 sendto 报 ECONNRESET，跳过即可
+                continue
+    finally:
+        sock.close()
+
+
+def _read_neighbor_table(timeout: float = 5) -> str:
+    """读取系统邻居表原始输出（Windows arp / Linux ip neigh / macOS arp）"""
+    if os.name == "nt":
+        attempts = [(["arp", "-a"], SUBPROCESS_TEXT_OEM)]
+    else:
+        attempts = [
+            (["ip", "neigh", "show"], SUBPROCESS_TEXT),
+            (["arp", "-an"], SUBPROCESS_TEXT),
+        ]
+    for cmd, text_kwargs in attempts:
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, timeout=timeout,
+                **text_kwargs, **SUBPROCESS_NO_WINDOW,
+            )
+        except Exception:
+            continue
+        if (result.stdout or "").strip():
+            return result.stdout
+    return ""
+
+
+def _parse_neighbor_table(
+    output: str,
+    subnets: list[str] | None = None,
+) -> list[str]:
+    """从 arp / ip neigh 输出中提取在线主机的 IPv4，按出现顺序去重。
+
+    同时兼容三种格式：
+    - Windows: `192.168.0.1  04-f9-f8-bb-47-ad  dynamic`
+    - Linux:   `192.168.1.1 dev eth0 lladdr aa:bb:cc:dd:ee:ff REACHABLE`
+    - macOS:   `? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]`
+    """
+    hosts: list[str] = []
+    for line in output.splitlines():
+        upper = line.upper()
+        # 未完成/失败的邻居条目没有可用 MAC，不能证明主机在线
+        if "INCOMPLETE" in upper or "FAILED" in upper:
+            continue
+        match = _NEIGHBOR_RE.search(line)
+        if not match:
+            continue
+        ip = match.group(1)
+        mac = match.group(2).lower().replace("-", ":")
+        if mac in {"ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"}:
+            continue
+        # 网络地址与广播地址不是主机
+        if ip.endswith(".0") or ip.endswith(".255"):
+            continue
+        if subnets is not None and _subnet_of(ip) not in subnets:
+            continue
+        if ip not in hosts:
+            hosts.append(ip)
+    return hosts
+
+
+def arp_scan_subnet(
+    subnet: str,
+    *,
+    wait: float = 0.35,
+    cancel_check: Callable[[], bool] | None = None,
+) -> list[str]:
+    """用 ARP 邻居表列出 /24 内在线的 IPv4 主机。
+
+    不依赖 ICMP：设备不回 ping 也会因为 ARP 解析出现在邻居表里。
+    只对同一广播域有效——跨 VLAN / 跨路由的网段邻居表里没有目标，
+    调用方需要在结果为空时走逐 IP 的 TCP 兜底。
+    """
+    _send_arp_probes(subnet, cancel_check)
+    if cancel_check is not None and cancel_check():
+        return []
+    # 留出 ARP 回复时间：局域网 ARP 往返在毫秒级，350ms 对休眠设备也够
+    time.sleep(wait)
+    return _parse_neighbor_table(_read_neighbor_table(), [subnet])
+
+
+def confirm_endpoints(
+    endpoints: list[tuple[str, int]],
+    *,
+    timeout: float = CONFIRM_TIMEOUT,
+    retries: int = CONFIRM_RETRIES,
+    progress_cb: Callable[[str, int, int], None] | None = None,
+    base: int = 0,
+    total: int | None = None,
+    cancel_check: Callable[[], bool] | None = None,
+) -> list[tuple[str, int]]:
+    """对候选端点做 TCP 连确认，返回真正可连的端点。
+
+    候选来自 mDNS/ARP，数量通常 <20，因此可以给足够宽松的超时与重试；
+    被透明代理劫持的连接在多数情况下也能在这里被识别（拿不到对端）。
+    """
+    total = total if total is not None else base + len(endpoints)
+    confirmed: list[tuple[str, int]] = []
+    for i, (ip, port) in enumerate(endpoints, 1):
+        if cancel_check is not None and cancel_check():
+            return []
+        if progress_cb:
+            progress_cb(f"正在确认 {ip}:{port}...", base + i, total)
+        ok = probe_port(ip, port, timeout=timeout, ping_first=False)
+        for _ in range(retries):
+            if ok:
+                break
+            ok = probe_port(ip, port, timeout=timeout, ping_first=False)
+        if ok:
+            confirmed.append((ip, port))
+    return confirmed
 
 
 def connect_wireless(adb: str, ip: str, port: int, timeout: float = 5) -> bool:
@@ -475,26 +695,49 @@ def _connect_targets(
     return devices
 
 
+def _dedupe_devices_by_ip(devices: list[dict]) -> list[dict]:
+    """同一台设备可能同时连上默认端口与 mDNS 随机端口，按 IP 只保留第一条。
+
+    调用方保证默认端口排在候选前面，因此优先留下的是 ip:5555，
+    不会让下拉框出现同一台机器的两条记录。
+    """
+    result: list[dict] = []
+    seen: set[str] = set()
+    for device in devices:
+        serial = str(device.get("serial", ""))
+        ip = serial.rpartition(":")[0] or serial
+        if ip in seen:
+            continue
+        seen.add(ip)
+        result.append(device)
+    return result
+
+
 def scan_and_connect_wireless(
     port: int = 5555,
     progress_cb: Callable[[str, int, int], None] | None = None,
     subnets: list[str] | None = None,
     cancel_check: Callable[[], bool] | None = None,
 ) -> list[dict]:
-    """扫描局域网并尝试连接所有发现的 ADB 设备
+    """发现局域网内的 ADB 设备并尝试连接
+
+    网段选择（全部网卡 / 指定网卡）只决定 ARP 和 TCP 兜底的作用范围：
+    mDNS 结果按同一网段过滤，ARP 逐段读邻居表，两条通道都没有候选时才
+    逐 IP 扫端口（跨 VLAN 场景的最后手段）。
 
     流程：
     1. 确定待扫描网段（未指定时取本机所有网卡的网段）
-    2. 并发扫描各网段内所有 IP 的指定端口
-    3. 对开放端口的 IP 执行 adb connect
-    4. 获取已连接设备信息
+    2. mDNS 读设备广播的 IP:端口（含 Android 11+ 的随机端口）
+    3. ARP 邻居表列出各网段在线主机，按默认端口加入候选
+    4. 对候选做 TCP 确认；候选为空才回退到逐 IP 扫描
+    5. 对确认的端点执行 adb connect 并取回设备信息
 
     Args:
-        port: ADB 端口，默认 5555
+        port: ADB 端口，默认 5555（mDNS 结果使用广播里的端口）
         progress_cb: 进度回调 (message, current, total)
         subnets: 指定网段前缀列表（如 ['192.168.1.']）；None 表示扫描全部网卡。
                  多网卡（VMware/WSL/VPN）场景下只扫单一网段会漏掉目标设备，
-                 因此默认逐个网段全扫。
+                 因此默认逐个网段处理。
 
     Returns:
         [{"serial": "ip:port", "model": str}, ...]
@@ -508,38 +751,106 @@ def scan_and_connect_wireless(
     logger.info(f"待扫描网段: {', '.join(s + '0/24' for s in targets_subnets)}")
     per_subnet = 254
     scan_total = per_subnet * len(targets_subnets)
-    open_targets: list[tuple[str, int]] = []
-    for idx, subnet in enumerate(targets_subnets):
-        if cancel_check is not None and cancel_check():
-            return []
-        offset = per_subnet * idx
+
+    def report(message: str, current: int, total: int = scan_total) -> None:
         if progress_cb:
-            progress_cb(f"正在扫描 {subnet}0/24 ...", offset, scan_total)
+            progress_cb(message, current, total)
 
-        def sub_progress(message: str, current: int, _total: int, _offset: int = offset):
-            if progress_cb:
-                progress_cb(message, _offset + current, scan_total)
+    # 阶段 1：mDNS（不扫网段，直接读设备广播；随机端口只能从这条路拿到）
+    report("正在通过 mDNS 查找无线调试设备...", 0)
+    mdns_endpoints = mdns_discover_adb(adb, targets_subnets)
+    logger.info(f"[mDNS] 发现 {len(mdns_endpoints)} 个 ADB 端点")
 
-        for ip in scan_lan_for_adb(
-            subnet,
-            port,
-            progress_cb=sub_progress if progress_cb else None,
-            cancel_check=cancel_check,
-        ):
-            open_targets.append((ip, port))
+    # 候选按 (ip, port) 去重。同一台设备常同时广播 legacy(5555) 与 TLS 随机端口，
+    # 两个都要试：设备可能只广播其中一个，而另一个仍然可连。默认端口排前面，
+    # 结果按 IP 去重时才会优先留下用户预期的 ip:5555。
+    candidates: list[tuple[str, int]] = []
+    seen_endpoints: set[tuple[str, int]] = set()
+
+    def add_endpoint(ip: str, endpoint_port: int) -> None:
+        key = (ip, endpoint_port)
+        if key in seen_endpoints:
+            return
+        seen_endpoints.add(key)
+        candidates.append(key)
+
+    for ip, mdns_port in mdns_endpoints:
+        add_endpoint(ip, port)
+        add_endpoint(ip, mdns_port)
+    if cancel_check is not None and cancel_check():
+        return []
+
+    # 阶段 2：ARP 邻居表（补齐没有广播 mDNS 的设备；不依赖 ICMP 存活）
+    for subnet in targets_subnets:
         if cancel_check is not None and cancel_check():
             return []
+        # ARP 阶段只换消息不推进进度：是否回退到逐 IP 扫描要到这一步之后才知道，
+        # 先推进再回退会让进度条倒退。
+        report(f"正在通过 ARP 扫描 {subnet}0/24 ...", 0)
+        hosts = arp_scan_subnet(subnet, cancel_check=cancel_check)
+        logger.info(f"[ARP] {subnet}0/24 在线主机 {len(hosts)} 台")
+        for ip in hosts:
+            add_endpoint(ip, port)
 
-    if not open_targets:
+    if cancel_check is not None and cancel_check():
+        return []
+
+    if candidates:
+        # 阶段 3：只对少量候选做 TCP 确认，宽松超时 + 重试
+        planned = len(candidates)
+        candidates = confirm_endpoints(
+            candidates,
+            progress_cb=progress_cb,
+            base=scan_total,
+            total=scan_total + planned,
+            cancel_check=cancel_check,
+        )
+        if cancel_check is not None and cancel_check():
+            return []
+        connect_base = scan_total + planned
+        connect_total = scan_total + 2 * planned
+    else:
+        # 阶段 4：兜底逐 IP 扫描。跨 VLAN / 跨路由时邻居表看不到设备，
+        # 只能靠这一步；此时 ping 预筛保持关闭，避免再次漏掉息屏设备。
+        logger.info("mDNS 与 ARP 均未发现候选，回退到逐 IP 扫描")
+        for idx, subnet in enumerate(targets_subnets):
+            if cancel_check is not None and cancel_check():
+                return []
+            offset = per_subnet * idx
+            report(f"正在扫描 {subnet}0/24 ...", offset)
+
+            def sub_progress(message: str, current: int, _total: int, _offset: int = offset):
+                report(message, _offset + current)
+
+            for ip in scan_lan_for_adb(
+                subnet,
+                port,
+                progress_cb=sub_progress if progress_cb else None,
+                cancel_check=cancel_check,
+            ):
+                if (ip, port) not in candidates:
+                    candidates.append((ip, port))
+            if cancel_check is not None and cancel_check():
+                return []
+
+        if len(candidates) > SUSPICIOUS_TARGET_COUNT:
+            logger.warning(
+                f"[扫描] 一次发现 {len(candidates)} 个开放端口，疑似出站 TCP 被代理/"
+                "防火墙接管；若正在使用 TUN/VPN，请把局域网网段设为直连")
+        connect_base = scan_total
+        connect_total = scan_total + len(candidates)
+
+    if not candidates:
         logger.info(f"局域网内未发现端口 {port} 开放的设备")
         return []
 
-    logger.info(f"发现 {len(open_targets)} 个 IP 开放端口 {port}，尝试 adb connect")
-    return _connect_targets(
-        adb, open_targets, progress_cb,
-        base=scan_total, total=scan_total + len(open_targets),
+    logger.info(f"发现 {len(candidates)} 个 ADB 端点，尝试 adb connect")
+    devices = _connect_targets(
+        adb, candidates, progress_cb,
+        base=connect_base, total=connect_total,
         cancel_check=cancel_check,
     )
+    return _dedupe_devices_by_ip(devices)
 
 
 def scan_and_connect_local(

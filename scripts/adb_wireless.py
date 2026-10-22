@@ -2,7 +2,8 @@
 
 流程：
 1. 列出当前 USB 连接的设备，获取 IP 并开启 TCP 模式，切换为无线连接
-2. 扫描局域网，尝试 adb connect 固定端口，发现已开启无线调试的设备
+2. 发现局域网设备：mDNS → ARP 邻居表 → 端口兜底，复用
+   `scan_and_connect_wireless` 的完整流程（含随机端口与 TUN 保护）
 3. 汇总所有已连接设备
 
 用法：
@@ -30,7 +31,7 @@ from lvjiang.core.android.wireless import (  # noqa: E402
     list_ipv4_interfaces,
     list_scan_subnets,
     resolve_adb,
-    scan_lan_for_adb,
+    scan_and_connect_wireless,
 )
 
 
@@ -90,37 +91,31 @@ def main():
         print("未发现 USB 连接的设备，将直接扫描局域网。")
         print()
 
-    # ── 阶段 2：局域网扫描（逐网卡，避免多网卡只扫到虚拟网段）──
+    # ── 阶段 2：局域网发现（mDNS → ARP 邻居表 → 端口兜底）──
+    # 复用应用内的完整发现流程，避免这里单独维护一套逐端口扫描：
+    # 那条老路径既漏掉息屏设备（ping 预筛），也发现不了 Android 11+ 的随机端口。
     for iface in list_ipv4_interfaces():
         print(f"本机网卡: {iface.label}")
     subnets = list_scan_subnets()
     if not subnets:
         print("[警告] 无法获取本机局域网地址，跳过局域网扫描。")
-    for subnet in subnets:
-        print(f"\n扫描地址段: {subnet}0/24")
-        open_ips = scan_lan_for_adb(subnet, port)
+    else:
+        print("\n正在发现局域网设备（mDNS → ARP → 端口兜底）...")
 
-        if open_ips:
-            print(f"\n发现 {len(open_ips)} 个 IP 开放端口 {port}，尝试 adb connect：")
-            for ip in open_ips:
-                if ip in connected_ips:
-                    print(f"  {ip} — 已在阶段1连接，跳过")
-                    continue
-                target = f"{ip}:{port}"
-                print(f"  连接 {target} ...", end="", flush=True)
-                if connect_wireless(adb, ip, port):
-                    time.sleep(0.5)
-                    info = get_adb_device_info(adb, ip, port)
-                    if info:
-                        print(f" 成功！ model={info['model']}")
-                        connected_ips.add(ip)
-                    else:
-                        print(" 已连接但未识别设备信息")
-                        connected_ips.add(ip)
-                else:
-                    print(" 失败（端口开放但非 ADB 服务）")
-        else:
-            print(f"  {subnet}0/24 内未发现端口 {port} 开放的设备。")
+        def _progress(message: str, current: int, total: int) -> None:
+            print(f"\r  [{current}/{total}] {message}", end="", flush=True)
+
+        devices = scan_and_connect_wireless(
+            port=port, subnets=subnets, progress_cb=_progress)
+        print()
+        for d in devices:
+            serial = d["serial"]
+            ip = serial.rpartition(":")[0]
+            if ip in connected_ips:
+                print(f"  {serial} — 已在阶段1连接，跳过")
+                continue
+            print(f"  已连接 {serial}  model={d.get('model') or '未知设备'}")
+            connected_ips.add(ip)
 
     if not connected_ips:
         print("\n提示：设备需先开启无线调试（USB 连接时运行此脚本，或在开发者选项中启用）。")

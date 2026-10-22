@@ -31,8 +31,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // versionCode 每次对外发布（含测试/预发布）递增；versionName 与应用版本同步。
-        versionCode = 73
-        versionName = "0.15.2"
+        versionCode = 74
+        versionName = "0.15.3"
         // 正式默认仍为 arm64；软件模拟器验收可显式 -PlvjiangAbi=x86_64。
         ndk { abiFilters += listOf(providers.gradleProperty("lvjiangAbi").orElse("arm64-v8a").get()) }
         externalNativeBuild {

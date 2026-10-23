@@ -6,6 +6,7 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QLabel,
@@ -54,6 +55,17 @@ class BasicConfigPanel(QWidget):
             "逾期时间会抵扣下一轮冷却，最多保留一次可重置次数"))
         self._cooldown_carryover.toggled.connect(self._apply)
         form.addRow(tr("逾期进度:"), self._cooldown_carryover)
+        self._stone_percent = QDoubleSpinBox()
+        self._stone_percent.setRange(0.1, 100.0)
+        self._stone_percent.setDecimals(1)
+        self._stone_percent.setSingleStep(0.1)
+        self._stone_percent.setSuffix(" %")
+        self._stone_percent.setMinimumWidth(140)
+        self._stone_percent.setToolTip(tr(
+            "一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。"
+            "装备「养成」里按它估算承音喂满还需要几个传律石。"))
+        self._stone_percent.valueChanged.connect(self._apply)
+        form.addRow(tr("传律石提升:"), self._stone_percent)
         layout.addWidget(box)
 
         self._status_label = QLabel()
@@ -69,8 +81,11 @@ class BasicConfigPanel(QWidget):
         self._cooldown_carryover.setChecked(bool(basic.get(
             "equipment_cooldown_carryover",
             manager.is_equipment_cooldown_carryover_enabled())))
+        self._stone_percent.setValue(float(basic.get(
+            "chuanlv_stone_percent",
+            manager.get_chuanlv_stone_percent())))
 
-    def _apply(self, _value: int | bool) -> None:
+    def _apply(self, _value: int | float | bool) -> None:
         if self._loading:
             return
         manager = get_game_config()
@@ -79,6 +94,8 @@ class BasicConfigPanel(QWidget):
         basic["equipment_cooldown_days"] = self._cooldown_days.value()
         basic["equipment_cooldown_carryover"] = (
             self._cooldown_carryover.isChecked())
+        basic["chuanlv_stone_percent"] = round(
+            self._stone_percent.value(), 2)
         data["basic_config"] = basic
         if self._on_changed is not None:
             self._on_changed()

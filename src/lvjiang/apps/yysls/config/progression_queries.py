@@ -29,6 +29,15 @@ def is_equipment_cooldown_carryover_enabled(self: GameConfigManager) -> bool:
     return self._equipment_cooldown_carryover
 
 
+def get_chuanlv_stone_percent(self: GameConfigManager) -> float:
+    """一次传律提升被喂词条普通满值的百分比，缺省 4.5。
+
+    只喂一条词条，增量 = 该词条在目标等级的普通满值 × 本比例；估算见
+    ``core/affix_cultivation.py``。
+    """
+    return self._chuanlv_stone_percent
+
+
 def level_config_for(self: GameConfigManager, level: int) -> LevelConfig | None:
     """按等级查找配置条目（精确匹配），未找到返回 None"""
     for cfg in self._level_configs:

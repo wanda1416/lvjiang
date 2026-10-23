@@ -5,6 +5,11 @@
 # 承音比例
 _CHENGYIN_RATIO = 0.94
 
+# 传律石提升比例的缺省值：一次传律只提升一条词条，增量是该词条在目标等级
+# 普通满值的这个百分比。可在「游戏配置 → 基础配置 → 装备养成」逐机校正；
+# 估算逻辑见 core/affix_cultivation.py。
+DEFAULT_CHUANLV_STONE_PERCENT = 4.5
+
 # 词库类型（_pool 字段取值；缺省为普通词条）
 POOL_NORMAL = "normal"
 POOL_DINGYIN = "dingyin"

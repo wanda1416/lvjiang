@@ -11,6 +11,7 @@ from .constants import (
     _KEY_TO_TYPE,
     AFFIX_CATEGORY_NAMES,
     BASE_ATTR_PARTS,
+    DEFAULT_CHUANLV_STONE_PERCENT,
     EQUIP_PART_NAMES,
     POOL_DINGYIN,
     POOL_NORMAL,
@@ -50,6 +51,17 @@ def parse_basic(self: GameConfigManager, data: dict) -> None:
         cooldown_carryover
         if isinstance(cooldown_carryover, bool)
         else True
+    )
+    # 传律石每次提升被喂词条多少百分比（按该等级普通满值算）。缺省 4.5%，
+    # 允许逐机校正；非正数或超过 100% 视为写坏，退回缺省值。
+    stone_percent = raw_basic.get(
+        "chuanlv_stone_percent", DEFAULT_CHUANLV_STONE_PERCENT)
+    self._chuanlv_stone_percent = (
+        float(stone_percent)
+        if isinstance(stone_percent, (int, float))
+        and not isinstance(stone_percent, bool)
+        and 0 < float(stone_percent) <= 100
+        else DEFAULT_CHUANLV_STONE_PERCENT
     )
 
 

@@ -152,6 +152,14 @@ yysls:
   冷却到期后累计一次: Carry Over One Expired Reset
   '逾期进度:': 'Expired Progress:'
   逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: Overdue time reduces the next cooldown, with at most one reset carried over
+  '传律石提升:': 'Chuanlv Stone Gain:'
+  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: One transmute raises a single affix by this percentage of that affix's normal cap at the current level. Equipment "Development" uses it to estimate how many Chuanlv Stones are still needed to max out Chengyin values.
+  当前装备承音喂满需要 {count} 个传律石: This equipment needs {count} Chuanlv Stones to max out Chengyin values
+  当前装备承音词条已满，无需传律石: Chengyin affixes are already maxed; no Chuanlv Stones needed
+  没有可估算的承音词条: No Chengyin affixes available to estimate
+  '{name}：已满（{value} / {target}）': '{name}: maxed ({value} / {target})'
+  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}: {stones} stones ({value} → {target}, +{step} each)'
+  无法估算（缺少该等级上限配置）：{names}: 'Cannot estimate (missing cap config for this level): {names}'
   冷却装备: Cooldown Equipment
   用户名: User
   冷却倒计时: Cooldown

@@ -292,6 +292,7 @@ class MockEquipDialog(QDialog):
             self._load_data()
         if self._is_real_development:
             self._configure_real_development()
+        self._refresh_stone_estimate()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -489,6 +490,16 @@ class MockEquipDialog(QDialog):
         self._dingyin_selected = ""  # 级联菜单选中的词条名
         affix_layout.addLayout(dingyin_layout)
 
+        # 承音喂满所需的传律石估算：一次传律只喂一条词条，所以这里给的是
+        # 五条普通词条各自向上取整后的合计，数值随词条输入实时刷新。
+        self._lbl_stone_estimate = QLabel("")
+        self._lbl_stone_estimate.setObjectName("stoneEstimateLabel")
+        self._lbl_stone_estimate.setWordWrap(True)
+        self._lbl_stone_estimate.setProperty("tone", "muted")
+        self._lbl_stone_estimate.setStyleSheet("font-size: 12px;")
+        self._lbl_stone_estimate.setVisible(False)
+        affix_layout.addWidget(self._lbl_stone_estimate)
+
         # 等级变化时刷新所有词条行的满值和比例
         self._combo_level.currentIndexChanged.connect(self._on_level_changed)
 
@@ -533,6 +544,13 @@ class MockEquipDialog(QDialog):
         # 初始化定音词条按钮（所有控件创建完毕后刷新）
         self._refresh_dingyin_button()
 
+        # 词条数值/名称变化后重算传律石估算。这里最后连接，保证排在
+        # _on_name_changed（刷新上限并预填数值）之后执行，读到的是新值。
+        for row in self._affix_rows:
+            row._spin_value.valueChanged.connect(self._refresh_stone_estimate)
+            row._combo_name.currentIndexChanged.connect(
+                self._refresh_stone_estimate)
+
     def _on_delete_all_mock(self) -> None:
         if self._delete_all_mock is None:
             return
@@ -560,6 +578,46 @@ class MockEquipDialog(QDialog):
     def _get_level(self) -> int:
         """获取当前选择的等级（供 _AffixRow 调用）"""
         return self._combo_level.currentData() or 110
+
+    # ─── 承音喂满所需的传律石估算 ──────────────────────────
+
+    def _stone_target_level(self) -> int:
+        """估算用的目标等级。
+
+        未承音的真实装备必须先承音才能培养词条数值，所以按**承音之后**的
+        等级取满值与承音上限——110 未承音装备因此和 115 原生承音装备口径
+        一致；已承音或模拟装备直接用它自己的等级。
+        """
+        if self._is_real_development and not self._equip_data.get("is_chengyin"):
+            level = int(getattr(self, "_real_chengyin_level", 0) or 0)
+            if level:
+                return level
+        return self._get_level()
+
+    def _refresh_stone_estimate(self, *_args) -> None:
+        """按当前词条行的数值重算传律石估算并刷新只读标签。"""
+        label = getattr(self, "_lbl_stone_estimate", None)
+        if label is None:
+            return
+        affixes = [
+            (row._index, str(row._combo_name.currentData() or ""),
+             row._spin_value.value())
+            for row in getattr(self, "_affix_rows", [])
+            if row._combo_name.currentData()
+        ]
+        if not affixes:
+            label.setText("")
+            label.setToolTip("")
+            label.setVisible(False)
+            return
+        from ....config import get_game_config
+        from ....core.affix_cultivation import estimate_stones
+
+        estimate = estimate_stones(
+            affixes, self._stone_target_level(), game_config=get_game_config())
+        label.setText(estimate.summary())
+        label.setToolTip(estimate.breakdown())
+        label.setVisible(True)
 
     def _on_part_changed(self, _index: int):
         """部位改变时更新武器类型行可见性，并刷新词条候选"""
@@ -668,6 +726,7 @@ class MockEquipDialog(QDialog):
         # 上面重建下拉时 blockSignals，选中项被静默清空/改变也不会触发
         # currentIndexChanged，这里手动补一次刷新。
         self._refresh_affix_warning()
+        self._refresh_stone_estimate()
 
     def _on_level_changed(self, _index: int):
         """等级变化时刷新词条候选、满值和百分比。
@@ -685,6 +744,7 @@ class MockEquipDialog(QDialog):
         for row in self._affix_rows:
             row._refresh_cap_info()
         self._update_dingyin_pct()
+        self._refresh_stone_estimate()
 
     def _get_normal_affix_names(self) -> list[str]:
         """获取普通词条列表"""
@@ -1063,6 +1123,8 @@ class MockEquipDialog(QDialog):
         self._clamp_rows_to_chengyin_caps(target, game_config)
         self._btn_chengyin.setEnabled(False)
         self._btn_chengyin.setToolTip(tr("该装备已经承音"))
+        # 承音后估算口径变了（目标等级冻结成当前等级、数值可能被截断）
+        self._refresh_stone_estimate()
 
     def _upgrade_rows_for_level(self, old_level: int, new_level: int,
                                 game_config) -> None:
@@ -1451,6 +1513,7 @@ class MockEquipDialog(QDialog):
                 level, dingyin_name, chengyin=False, game_config=gc)
             if cap:
                 self._spin_dingyin.setValue(cap)
+        self._refresh_stone_estimate()
 
     def _get_base_attr_name(self, group_key: str) -> str:
         """根据部位获取基础属性名"""

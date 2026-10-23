@@ -1404,6 +1404,9 @@ class MainWindow(
                 event.ignore()
                 return
         self._close_cleanup_started = True
+        # 关闭期间不再新起启动期网络线程：公告失败会立刻把链推进到版本检查，
+        # 收线之后又冒出运行中的 QThread，窗口销毁时 Qt 会 qFatal 打断进程。
+        self._shutting_down = True
         if self._tray_icon is not None:
             self._tray_icon.hide()
         # 每一步都单独兜底：只读实例保存脚本参数会抛 AccessDeniedError，
@@ -1427,6 +1430,10 @@ class MainWindow(
         self._run_close_step("释放设备连接", self._dispose_execution_targets)
         self._run_close_step("停止红框提示", self._red_box_flash_timer.stop)
         self._run_close_step("销毁遮罩", self._overlay.destroy)
+        # 收线放在最后：前面各步可能触发新的后台工作，这里是窗口销毁前
+        # 最后一次保证「没有还在运行的 QThread」。销毁仍运行的线程包装器会让
+        # Qt 直接 qFatal，退出变成进程崩溃。
+        self._run_close_step("停止后台线程", self._stop_running_qthreads)
         try:
             super().closeEvent(event)
         except Exception as exc:
@@ -1459,6 +1466,52 @@ class MainWindow(
         listener.join(3.0)
         if listener.is_alive():
             logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
+
+    def _stop_running_qthreads(self, *, timeout_ms: int = 3000) -> None:
+        """关闭前停掉仍在运行的 QThread。
+
+        Qt 在销毁仍运行的 QThread 包装器时会直接打印
+        「QThread: Destroyed while thread '' is still running」，随后进程可能
+        异常退出（无收尾、无崩溃栈）。窗口下挂着的启动期线程——公告、版本
+        检查、在线配置同步、统计上报——都卡在网络 I/O 上，没有协作取消接口，
+        因此先 requestInterruption + quit 让它们有机会收尾，超时后退化为
+        terminate（与 ProfileEngine 的停止策略一致），保证关闭流程结束时没有
+        存活的 QThread 被析构。
+        """
+        from PyQt6.QtCore import QThread
+
+        # 在线配置的安装轮询定时器每 2 秒会装一次配置，关闭时先停掉它，
+        # 免得收线之后还在改配置。
+        timer = getattr(self, "_config_install_timer", None)
+        stop_timer = getattr(timer, "stop", None)
+        if callable(stop_timer):
+            stop_timer()
+
+        # 设备扫描/连接循环靠取消标记退出，先置位再等线程结束。
+        worker = getattr(self, "_device_worker", None)
+        cancel = getattr(worker, "cancel", None)
+        if callable(cancel):
+            cancel()
+
+        threads = list(self.findChildren(QThread))
+        # 设备线程创建时没有 parent，findChildren 看不到，单独补上。
+        device_thread = getattr(self, "_device_thread", None)
+        if device_thread is not None and device_thread not in threads:
+            threads.append(device_thread)
+
+        for thread in threads:
+            if not thread.isRunning():
+                continue
+            thread.requestInterruption()
+            thread.quit()
+            if thread.wait(timeout_ms):
+                continue
+            logger.warning(
+                f"关闭时后台线程 {type(thread).__name__} 未在 {timeout_ms} ms "
+                "内结束，强制终止"
+            )
+            thread.terminate()
+            thread.wait(1000)
 
     def _run_cleanup_callbacks(self) -> None:
         """执行插件注册的关闭回调，单个失败不影响其余回调。"""

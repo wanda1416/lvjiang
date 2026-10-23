@@ -17,8 +17,19 @@
 class StartupOpsMixin:
     """启动期检查链混入类"""
 
+    def _startup_chain_closed(self) -> bool:
+        """关闭流程一旦开始，就不再新起网络线程。
+
+        公告检查失败会立刻把链推进到版本检查，若此时用户正在关闭窗口，就会在
+        收线之后又冒出一个运行中的 QThread；窗口销毁时 Qt 会直接
+        ``qFatal``（QThread: Destroyed while thread is still running）把进程打断。
+        """
+        return bool(getattr(self, "_shutting_down", False))
+
     def check_update_on_startup(self):
         """启动时先检查公告，处理完成后再检查版本更新。"""
+        if self._startup_chain_closed():
+            return
         from ...core.access import is_readonly
         if is_readonly():
             return  # 启动公告/同意/在线安装的持久化状态归主节点。
@@ -66,6 +77,8 @@ class StartupOpsMixin:
 
     def _start_update_check_on_startup(self):
         """公告检查完成后执行原有的静默版本检查，再串上统计的同意提示与上报。"""
+        if self._startup_chain_closed():
+            return
         from ...core.telemetry.consent import NetFeature, is_network_feature_enabled
         if not is_network_feature_enabled(NetFeature.UPDATE):
             self._continue_after_update_check()
@@ -101,6 +114,8 @@ class StartupOpsMixin:
         弹窗一样只能串行；上报放最后，因为它没有 UI，用户感知不到，
         也不该拖慢前面两个弹窗的展示时机。
         """
+        if self._startup_chain_closed():
+            return
         from ..notices.telemetry_consent_dialog import maybe_prompt_and_record
         maybe_prompt_and_record(self)
         self._start_telemetry_report_on_startup()
@@ -108,6 +123,8 @@ class StartupOpsMixin:
 
     def _start_remote_config_sync_on_startup(self):
         """后台获取候选，在主线程提交安装、刷新控件；任务读取独立快照。"""
+        if self._startup_chain_closed():
+            return
         from loguru import logger
         from PyQt6.QtCore import QTimer
 
@@ -203,6 +220,8 @@ class StartupOpsMixin:
         节流状态与已发批次的清理放回主线程的 finished 槽——工作线程
         绝对不能写 SessionStore，见 core/telemetry/reporter.py 模块 docstring。
         """
+        if self._startup_chain_closed():
+            return
         from ...core.telemetry.reporter import (
             apply_outcome,
             build_job,

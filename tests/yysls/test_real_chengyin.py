@@ -1,8 +1,8 @@
 """真实装备的承音操作。
 
-承音不是一个可以随手勾掉的布尔：它要同时决定目标等级、按升级表换掉被合并
-的词条、把数值截断到承音上限，三件事缺一件写入就会被养成规则拒掉。所以
-勾选框改成只读状态展示，承音由按钮执行。
+承音直接对「承音」复选框操作：勾选要同时决定目标等级、按升级表换掉被合并
+的词条、把数值截断到承音上限（缺一件写入就会被养成规则拒掉），取消则按
+「承音状态不能撤销」拦截。等级下拉在真实养成里也开放，只给原等级与承音目标。
 """
 
 from __future__ import annotations
@@ -50,14 +50,91 @@ _HELM_110 = [("会意率", 5.0), ("单体类奇术增伤", 15.4),
              ("最大外功攻击", 100.0), ("劲", 50.0), ("势", 50.0)]
 
 
-# ─── 勾选框只读、按钮接管 ──────────────────────────────────
+# ─── 复选框直接操作、等级可由用户切换 ──────────────────────
 
-def test_chengyin_checkbox_is_read_only_in_real_development(qtbot):
+def test_chengyin_checkbox_is_operable_in_real_development(qtbot):
+    """承音不再由单独按钮执行：未承音装备的复选框可直接勾选。"""
     dialog = _dialog(qtbot, _equip("冠胄", 110, _HELM_110))
 
+    assert dialog._check_chengyin.isEnabled() is True
+    assert dialog._check_chengyin.isChecked() is False
+    assert not hasattr(dialog, "_btn_chengyin")
+
+
+def test_level_dropdown_lists_every_configured_level(qtbot, gc):
+    """等级下拉给出全部已配置等阶，默认停在装备当前等级。"""
+    dialog = _dialog(qtbot, _equip("冠胄", 110, _HELM_110))
+
+    levels = [
+        dialog._combo_level.itemData(i)
+        for i in range(dialog._combo_level.count())
+    ]
+    configured = sorted(item.level for item in gc.get_level_configs())
+    assert levels == configured
+    assert dialog._get_level() == 110
+    assert dialog._combo_level.isEnabled() is True
+
+
+def test_chengyin_equipment_can_still_switch_level_for_the_estimate(qtbot, gc):
+    """已承音的 110 阶装备不能再升阶，但必须能切到 115 看还差多少颗。
+
+    它自己停在 110（承音状态不可撤销），换装决策却要看「如果按 115 阶承音
+    上限算」。下拉如果只给合法升阶目标，这类装备就永远看不到那个数。
+    """
+    dialog = _dialog(qtbot, _equip(
+        "冠胄", 110, [("最大外功攻击", 100.0)], chengyin=True))
+
+    assert dialog._combo_level.isEnabled() is True
+    levels = [
+        dialog._combo_level.itemData(i)
+        for i in range(dialog._combo_level.count())
+    ]
+    assert 115 in levels
+
+    dialog._combo_level.setCurrentIndex(dialog._combo_level.findData(115))
+
+    assert dialog._stone_target_level() == 115
+    assert dialog._lbl_stone_estimate.text() == (
+        "当前装备承音喂满需要 5 个传律石（115 阶承音上限）")
+    # 承音状态本身没被改动，仍勾着且只读
+    assert dialog._check_chengyin.isChecked() is True
     assert dialog._check_chengyin.isEnabled() is False
-    # 窗口未 show 时 isVisible 恒为假，这里问的是控件自己有没有被隐藏
-    assert not dialog._btn_chengyin.isHidden()
+
+
+def test_stone_estimate_follows_the_selected_level(qtbot, gc):
+    """切到 115 就按 115 的满值与承音上限算，切回 110 就按 110 的。"""
+    equip = _equip("冠胄", 110, [("最大外功攻击", 100.0)])
+    dialog = _dialog(qtbot, equip)
+
+    assert dialog._stone_target_level() == 110
+    at_110 = dialog._lbl_stone_estimate.text()
+    assert at_110 == "当前装备承音喂满需要 3 个传律石（110 阶承音上限）"
+
+    dialog._combo_level.setCurrentIndex(dialog._combo_level.findData(115))
+    assert dialog._stone_target_level() == 115
+    at_115 = dialog._lbl_stone_estimate.text()
+    # 115 的满值更大、承音上限更高，需要的颗数多于按 110 算
+    assert at_115 == "当前装备承音喂满需要 5 个传律石（115 阶承音上限）"
+    assert "115" in at_115
+
+
+def test_checking_chengyin_moves_level_to_the_target(qtbot, gc):
+    """勾选承音把等级带到承音目标：只看复选框就能完成一次承音。"""
+    dialog = _dialog(qtbot, _equip("冠胄", 110, _HELM_110))
+
+    dialog._check_chengyin.setChecked(True)
+
+    assert dialog._get_level() == 115
+
+
+def test_unchecking_chengyin_on_scanned_chengyin_equipment_is_reverted(qtbot, gc):
+    """扫描时已承音的装备不能撤销：取消勾选会被挡回并说明原因。"""
+    dialog = _dialog(qtbot, _equip(
+        "冠胄", gc.current_equip_level(), [("会意率", 5.0)], chengyin=True))
+
+    dialog._check_chengyin.setChecked(False)
+
+    assert dialog._check_chengyin.isChecked() is True
 
 
 # ─── 跨等阶承音 ────────────────────────────────────────────
@@ -72,7 +149,7 @@ def test_chengyin_upgrades_the_merged_affix_without_looking_like_a_transmute(
     equip = _equip("冠胄", 110, _HELM_110)
     dialog = _dialog(qtbot, equip)
 
-    dialog._btn_chengyin.click()
+    dialog._check_chengyin.setChecked(True)
     result = dialog._build_real_development_data()
 
     assert result["level"] == 115
@@ -88,7 +165,7 @@ def test_repository_does_not_start_transmute_cooldown_for_affix_upgrade(
     """承音自动改名必须在仓储写入边界也保持为承音，而不是转律。"""
     equip = _equip("冠胄", 110, _HELM_110)
     dialog = _dialog(qtbot, equip)
-    dialog._btn_chengyin.click()
+    dialog._check_chengyin.setChecked(True)
     result = dialog._build_real_development_data()
     repo = LoadoutRepository("test-user", tmp_path)
     old_fp = repo.upsert_item(equip)
@@ -106,7 +183,7 @@ def test_upgraded_affix_still_feeds_the_calculation(qtbot, gc):
     equip = _equip("冠胄", 110, _HELM_110)
     dialog = _dialog(qtbot, equip)
 
-    dialog._btn_chengyin.click()
+    dialog._check_chengyin.setChecked(True)
     result = dialog._build_real_development_data()
 
     before = aggregate_equipment_attrs(effective_equipped({"head": equip}, gc))
@@ -126,7 +203,7 @@ def test_affix_retired_from_the_new_first_pool_survives_chengyin(qtbot):
         ("势", 50.0), ("外功防御", 40.0)])
     dialog = _dialog(qtbot, equip)
 
-    dialog._btn_chengyin.click()
+    dialog._check_chengyin.setChecked(True)
     result = dialog._build_real_development_data()
 
     assert result["affix_1"]["name"] == "体"
@@ -144,7 +221,7 @@ def test_top_level_equipment_chengyins_in_place_and_clamps(qtbot, gc):
         for name in names])
     dialog = _dialog(qtbot, equip)
 
-    dialog._btn_chengyin.click()
+    dialog._check_chengyin.setChecked(True)
     result = dialog._build_real_development_data()
 
     assert result["level"] == level
@@ -166,7 +243,7 @@ def test_in_place_chengyin_state_change_is_a_real_edit(qtbot, gc):
     ])
     dialog = _dialog(qtbot, equip)
 
-    dialog._btn_chengyin.click()
+    dialog._check_chengyin.setChecked(True)
     result = dialog._build_real_development_data()
 
     assert result["is_chengyin"] is True
@@ -193,8 +270,8 @@ def test_clamping_down_is_allowed_only_at_the_moment_of_chengyin(gc):
 
 # ─── 不能承音的情况 ────────────────────────────────────────
 
-def test_button_is_blocked_below_the_season_floor(qtbot, gc):
-    """本赛季作废线以下的装备已经不能承音，按钮直接不可用并说明原因。"""
+def test_chengyin_checkbox_is_blocked_below_the_season_floor(qtbot, gc):
+    """本赛季作废线以下的装备已经不能承音，复选框禁用并说明原因。"""
     floor = gc.current_min_chengyin_level()
     assert floor, "当前赛季没有配置最低承音等级，本用例失去意义"
     below = max(
@@ -204,16 +281,17 @@ def test_button_is_blocked_below_the_season_floor(qtbot, gc):
 
     dialog = _dialog(qtbot, _equip("冠胄", below, [("会意率", 5.0)]))
 
-    assert dialog._btn_chengyin.isEnabled() is False
-    assert str(floor) in dialog._btn_chengyin.toolTip()
+    assert dialog._check_chengyin.isEnabled() is False
+    assert str(floor) in dialog._check_chengyin.toolTip()
 
 
-def test_already_chengyin_equipment_cannot_chengyin_again(qtbot, gc):
+def test_already_chengyin_equipment_checkbox_is_read_only(qtbot, gc):
     dialog = _dialog(qtbot, _equip(
         "冠胄", gc.current_equip_level(), [("会意率", 5.0)], chengyin=True))
 
-    assert dialog._btn_chengyin.isEnabled() is False
-    assert "已经承音" in dialog._btn_chengyin.toolTip()
+    assert dialog._check_chengyin.isChecked() is True
+    assert dialog._check_chengyin.isEnabled() is False
+    assert "已经承音" in dialog._check_chengyin.toolTip()
 
 
 def test_rules_reject_chengyin_below_the_season_floor(gc):

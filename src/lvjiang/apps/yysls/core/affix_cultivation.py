@@ -68,13 +68,20 @@ class StoneEstimate:
         return bool(self.items) and self.total == 0
 
     def summary(self) -> str:
-        """面向用户的一句话结论。"""
+        """面向用户的一句话结论。
+
+        带上参照等级：同一个「几颗」在不同等阶差别很大，不写清是哪一阶的
+        承音上限，用户没法判断这个数是怎么来的。
+        """
         if not self.items:
             return tr("没有可估算的承音词条")
         if self.total == 0:
-            return tr("当前装备承音词条已满，无需传律石")
-        return tr("当前装备承音喂满需要 {count} 个传律石").format(
-            count=self.total)
+            return tr(
+                "当前装备承音词条已满，无需传律石（{level} 阶承音上限）"
+            ).format(level=self.target_level)
+        return tr(
+            "当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）"
+        ).format(count=self.total, level=self.target_level)
 
     def breakdown(self) -> str:
         """逐条明细，供 tooltip 展示。"""

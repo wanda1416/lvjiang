@@ -10,7 +10,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Callable
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -26,6 +26,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QScrollArea,
+    QToolButton,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -279,6 +281,12 @@ class MockEquipDialog(QDialog):
         self._result_data: dict | None = None
         self._default_school = default_school  # 默认流派，用于防具定音词条排序
         self._delete_all_mock = delete_all_mock
+        # 承音勾选当前是否由程序写入（避免程序化改值触发侧效果）
+        self._loading_chengyin = False
+        # 词条行当前对齐的等级；真实养成换等级时按它推算升级表改名
+        self._row_level = int((equip_data or {}).get("level") or 0)
+        # 传律石估算的逐条明细，供行尾 ? 点击时展开
+        self._stone_breakdown = ""
 
         if self._is_real_development:
             self.setWindowTitle(tr("养成真实装备"))
@@ -363,21 +371,13 @@ class MockEquipDialog(QDialog):
             self._combo_quality.addItem(label, value)
         basic_layout.addRow(tr("品质:"), self._combo_quality)
 
-        # 承音（装备属性，默认不勾选）。真实养成时勾选框转为只读状态展示，
-        # 承音由旁边的按钮执行——它要同时决定目标等级、改名和数值截断，
-        # 不是一个用户能随手勾掉的布尔。
+        # 承音是装备属性，直接在复选框上操作。真实养成里勾选会顺带把等级带到
+        # 该装备的承音目标、并按升级表改名、把数值截断到承音上限——写入校验
+        # 要求这几件事一起变化，所以由勾选统一驱动，不再另设「承音」按钮。
         self._check_chengyin = QCheckBox(tr("承音"))
-        self._btn_chengyin = QPushButton(tr("承音"))
-        self._btn_chengyin.setVisible(False)
-        apply_button_style(self._btn_chengyin)
-        chengyin_row = QWidget()
-        chengyin_layout = QHBoxLayout(chengyin_row)
-        chengyin_layout.setContentsMargins(0, 0, 0, 0)
-        chengyin_layout.setSpacing(8)
-        chengyin_layout.addWidget(self._check_chengyin)
-        chengyin_layout.addWidget(self._btn_chengyin)
-        chengyin_layout.addStretch()
-        basic_layout.addRow(tr("承音:"), chengyin_row)
+        self._check_chengyin.setToolTip(tr(
+            "勾选表示该装备已承音；承音后词条数值上限变为承音上限"))
+        basic_layout.addRow(tr("承音:"), self._check_chengyin)
 
         body_layout.addWidget(self._basic_group)
 
@@ -490,21 +490,43 @@ class MockEquipDialog(QDialog):
         self._dingyin_selected = ""  # 级联菜单选中的词条名
         affix_layout.addLayout(dingyin_layout)
 
-        # 承音喂满所需的传律石估算：一次传律只喂一条词条，所以这里给的是
-        # 五条普通词条各自向上取整后的合计，数值随词条输入实时刷新。
-        self._lbl_stone_estimate = QLabel("")
-        self._lbl_stone_estimate.setObjectName("stoneEstimateLabel")
-        self._lbl_stone_estimate.setWordWrap(True)
-        self._lbl_stone_estimate.setProperty("tone", "muted")
-        self._lbl_stone_estimate.setStyleSheet("font-size: 12px;")
-        self._lbl_stone_estimate.setVisible(False)
-        affix_layout.addWidget(self._lbl_stone_estimate)
-
         # 等级变化时刷新所有词条行的满值和比例
         self._combo_level.currentIndexChanged.connect(self._on_level_changed)
 
         affix_layout.addWidget(self._lbl_affix_warning)
         body_layout.addWidget(affix_group)
+
+        # ── 传律石估算 ──
+        # 它是从词条数值推出来的独立结论，不属于「词条配置」那组编辑控件，
+        # 所以单独一张卡片、不设组标题；细节通过行尾的 ? 点击展开。
+        self._stone_group = QFrame()
+        self._stone_group.setProperty("surface", "card")
+        stone_layout = QHBoxLayout(self._stone_group)
+        stone_layout.setContentsMargins(14, 9, 14, 10)
+        stone_layout.setSpacing(6)
+        self._lbl_stone_estimate = QLabel("")
+        self._lbl_stone_estimate.setObjectName("stoneEstimateLabel")
+        self._lbl_stone_estimate.setWordWrap(True)
+        self._lbl_stone_estimate.setStyleSheet("font-size: 13px;")
+        stone_layout.addWidget(self._lbl_stone_estimate, 1)
+        self._btn_stone_help = QToolButton()
+        self._btn_stone_help.setObjectName("stoneEstimateHelp")
+        self._btn_stone_help.setText("?")
+        self._btn_stone_help.setCursor(Qt.CursorShape.WhatsThisCursor)
+        self._btn_stone_help.setFixedSize(18, 18)
+        self._btn_stone_help.setStyleSheet(
+            "QToolButton { border: 1px solid palette(mid); border-radius: 9px;"
+            " color: palette(mid); font-size: 11px; font-weight: 700;"
+            " background: transparent; }"
+            "QToolButton:hover { border-color: palette(highlight);"
+            " color: palette(highlight); }")
+        self._btn_stone_help.setToolTip(tr("点击查看逐条明细"))
+        self._btn_stone_help.clicked.connect(self._show_stone_breakdown)
+        stone_layout.addWidget(
+            self._btn_stone_help, 0, Qt.AlignmentFlag.AlignTop)
+        self._stone_group.setVisible(False)
+        body_layout.addWidget(self._stone_group)
+
         body_layout.addStretch()
         scroll.setWidget(body)
         layout.addWidget(scroll, 1)
@@ -582,22 +604,19 @@ class MockEquipDialog(QDialog):
     # ─── 承音喂满所需的传律石估算 ──────────────────────────
 
     def _stone_target_level(self) -> int:
-        """估算用的目标等级。
+        """估算用的目标等级 = 上方等级下拉当前选中的等级。
 
-        未承音的真实装备必须先承音才能培养词条数值，所以按**承音之后**的
-        等级取满值与承音上限——110 未承音装备因此和 115 原生承音装备口径
-        一致；已承音或模拟装备直接用它自己的等级。
+        等级下拉在真实养成里也开放：110 未承音装备可以切到 115 看「按 115 阶
+        承音上限」还差多少颗，切回去就看 110 的。估算只解释选中的那一阶，
+        不再偷偷按承音目标等级投影。
         """
-        if self._is_real_development and not self._equip_data.get("is_chengyin"):
-            level = int(getattr(self, "_real_chengyin_level", 0) or 0)
-            if level:
-                return level
         return self._get_level()
 
     def _refresh_stone_estimate(self, *_args) -> None:
-        """按当前词条行的数值重算传律石估算并刷新只读标签。"""
+        """按当前词条行的数值重算传律石估算，并刷新独立卡片。"""
         label = getattr(self, "_lbl_stone_estimate", None)
-        if label is None:
+        group = getattr(self, "_stone_group", None)
+        if label is None or group is None:
             return
         affixes = [
             (row._index, str(row._combo_name.currentData() or ""),
@@ -606,18 +625,40 @@ class MockEquipDialog(QDialog):
             if row._combo_name.currentData()
         ]
         if not affixes:
+            self._stone_breakdown = ""
             label.setText("")
             label.setToolTip("")
-            label.setVisible(False)
+            group.setVisible(False)
             return
         from ....config import get_game_config
         from ....core.affix_cultivation import estimate_stones
 
         estimate = estimate_stones(
             affixes, self._stone_target_level(), game_config=get_game_config())
+        # 明细要自报参照等级：同一个「几颗」在不同等阶差别很大，弹出来却
+        # 不说是哪一阶的上限，用户没法判断这个数怎么来的。
+        self._stone_breakdown = "\n".join((
+            tr("按 {level} 阶承音上限估算：").format(
+                level=estimate.target_level),
+            estimate.breakdown(),
+        ))
         label.setText(estimate.summary())
-        label.setToolTip(estimate.breakdown())
-        label.setVisible(True)
+        label.setToolTip("")
+        group.setVisible(True)
+
+    def _show_stone_breakdown(self) -> None:
+        """点击行尾 ? 立刻在按钮下方弹出逐条明细。
+
+        明细是派生结论，塞进标签正文会把这一行撑成两行；做成点击展开的
+        悬浮提示，既不占版面也不用用户先猜到哪里能悬停。
+        """
+        text = getattr(self, "_stone_breakdown", "")
+        if not text:
+            return
+        button = self._btn_stone_help
+        QToolTip.showText(
+            button.mapToGlobal(QPoint(button.width(), button.height())),
+            text, button)
 
     def _on_part_changed(self, _index: int):
         """部位改变时更新武器类型行可见性，并刷新词条候选"""
@@ -734,13 +775,26 @@ class MockEquipDialog(QDialog):
         模拟装备的候选必须一起重建：换到 115 还留着该等级已退役的词条，
         存出来就是一件游戏里造不出来的装备。
 
-        真实养成相反——那里等级只会由承音按钮带上去，词条是装备上的既有
-        事实，重建下拉会把该等级已退役的旧词条从候选里抹掉、连带把那一行
-        的选中值清空，承音就变成了「删词条」而被写入校验拒掉。被合并的
-        词条由 _upgrade_rows_for_level 按升级表改名，不靠重建下拉。
+        真实养成相反——那里词条是装备上的既有事实，重建下拉会把该等级已退役
+        的旧词条从候选里抹掉、连带把那一行的选中值清空，承音就变成了「删
+        词条」而被写入校验拒掉。被合并的词条改由 _sync_rows_for_level 按升级表
+        改名，不靠重建下拉。
         """
-        if not self._is_real_development:
-            self._update_affix_rows()
+        if self._is_real_development:
+            from ....config import get_game_config
+
+            game_config = get_game_config()
+            self._sync_rows_for_level(self._get_level(), game_config)
+            self._sync_chengyin_for_level(self._get_level())
+            if self._check_chengyin.isChecked() and self._may_clamp_values(
+                    self._get_level()):
+                # 换到更高的承音目标后，原等级的顶值可能超过新上限。
+                self._clamp_rows_to_chengyin_caps(
+                    self._get_level(), game_config)
+            self._update_dingyin_pct()
+            self._refresh_stone_estimate()
+            return
+        self._update_affix_rows()
         for row in self._affix_rows:
             row._refresh_cap_info()
         self._update_dingyin_pct()
@@ -950,8 +1004,8 @@ class MockEquipDialog(QDialog):
         if idx >= 0:
             self._combo_quality.setCurrentIndex(idx)
 
-        # 承音
-        self._check_chengyin.setChecked(bool(data.get("is_chengyin")))
+        # 承音（此时真实养成的勾选还没接上侧效果，只是回填状态）
+        self._set_chengyin_checked_silently(bool(data.get("is_chengyin")))
 
         # 词条
         for i, row in enumerate(self._affix_rows, 1):
@@ -976,7 +1030,6 @@ class MockEquipDialog(QDialog):
             self._combo_part,
             self._combo_weapon_type,
             self._edit_name,
-            self._combo_level,
             self._combo_quality,
         ):
             widget.setEnabled(False)
@@ -1012,20 +1065,26 @@ class MockEquipDialog(QDialog):
         )
         reason = self._chengyin_blocked_reason(
             current_level, current_config, game_config)
-        # 勾选框只展示状态：承音是一次带副作用的操作，不是可随手勾掉的布尔。
-        self._check_chengyin.setEnabled(False)
-        self._check_chengyin.setToolTip(tr("承音状态由「承音」按钮执行，不可直接勾选"))
-        self._btn_chengyin.setVisible(True)
-        self._btn_chengyin.setEnabled(reason is None)
-        if reason is not None:
+        self._row_level = current_level
+        # 等级下拉列出全部已配置等阶：已承音装备也要能切到更高阶查看上限与
+        # 传律石估算（它自己停在原阶、不能再承音，但换装决策要用这个数）。
+        self._rebuild_real_level_options(current_level)
+
+        # 承音改成直接对复选框操作。已承音的装备不能撤销，只能只读展示。
+        already_chengyin = bool(self._equip_data.get("is_chengyin"))
+        self._set_chengyin_checked_silently(already_chengyin)
+        self._check_chengyin.setEnabled(not already_chengyin and reason is None)
+        if already_chengyin:
+            hint = tr("该装备已经承音，承音状态不能撤销")
+        elif reason is not None:
             hint = reason
         elif self._real_chengyin_level == current_level:
             hint = tr("原地承音：等级不变，词条数值落到承音上限")
         else:
-            hint = tr("承音到 {level} 阶").format(
+            hint = tr("勾选后按 {level} 阶承音上限记录").format(
                 level=self._real_chengyin_level)
-        self._btn_chengyin.setToolTip(hint)
-        self._btn_chengyin.clicked.connect(self._apply_real_chengyin)
+        self._check_chengyin.setToolTip(hint)
+        self._check_chengyin.toggled.connect(self._on_chengyin_toggled)
 
         from ....core.loadout.transmute import (
             judge_transmute_eligibility,
@@ -1089,7 +1148,7 @@ class MockEquipDialog(QDialog):
 
     def _chengyin_blocked_reason(self, level: int, level_config,
                                  game_config) -> str | None:
-        """承音按钮不可用的原因；可用时返回 None。"""
+        """承音不可用的原因（复选框置灰的说明）；可用时返回 None。"""
         if self._equip_data.get("is_chengyin"):
             return tr("该装备已经承音")
         if not game_config.can_chengyin_this_season(level):
@@ -1101,51 +1160,123 @@ class MockEquipDialog(QDialog):
             return tr("没有更高的已配置等级")
         return None
 
-    def _apply_real_chengyin(self) -> None:
-        """执行一次承音：升到下一等阶，或已在赛季等阶时原地承音。
+    def _rebuild_real_level_options(self, current_level: int) -> None:
+        """真实养成的等级下拉：列出全部已配置等级，默认停在装备当前等级。
 
-        三件事一起做，缺一件写入就会被养成规则拒掉：跨等阶时按升级表换掉
-        被合并的旧词条、把等级和承音标记落上、把所有词条数值截断到该等级的
-        承音上限（承音上限低于普通上限，原地承音时顶满的词条必须落回来）。
+        这里不能只给「合法承音目标」：已承音的 110 阶装备永远停在 110，但它
+        仍需要能切到 115，看「按 115 阶承音上限还差多少颗」再决定要不要换装。
+        因此下拉同时承担两件事——切到该装备的承音目标时就是真实升阶（会同时
+        勾上承音），切到别的等阶只影响词条上限与传律石估算；真正能不能存由
+        写入校验按承音规则判定，各按钮不会因此造出静默的非法状态。
         """
         from ....config import get_game_config
 
-        game_config = get_game_config()
-        old_level = int(self._equip_data.get("level") or 0)
-        target = int(self._real_chengyin_level or 0)
-        if not target:
-            return
-        self._upgrade_rows_for_level(old_level, target, game_config)
-        index = self._combo_level.findData(target)
+        levels = sorted(
+            item.level for item in get_game_config().get_level_configs())
+        self._combo_level.blockSignals(True)
+        self._combo_level.clear()
+        for level in levels:
+            self._combo_level.addItem(str(level), level)
+        index = self._combo_level.findData(current_level)
         if index >= 0:
             self._combo_level.setCurrentIndex(index)
-        self._check_chengyin.setChecked(True)
-        self._clamp_rows_to_chengyin_caps(target, game_config)
-        self._btn_chengyin.setEnabled(False)
-        self._btn_chengyin.setToolTip(tr("该装备已经承音"))
-        # 承音后估算口径变了（目标等级冻结成当前等级、数值可能被截断）
-        self._refresh_stone_estimate()
+        self._combo_level.blockSignals(False)
+        self._combo_level.setEnabled(len(levels) > 1)
+        self._combo_level.setToolTip(tr(
+            "切换等级可查看该等级的词条上限与传律石估算；"
+            "选到本装备的承音目标等级时会同时勾选承音"))
 
-    def _upgrade_rows_for_level(self, old_level: int, new_level: int,
-                                game_config) -> None:
-        """按升级表换掉跨等阶时被合并的词条名。
+    def _sync_rows_for_level(self, level: int, game_config) -> None:
+        """按升级表换掉跨等阶被合并的词条名，并刷新各行上限。
 
-        这是同一条词条换了名字，不是转律，所以直接改下拉选项、不触发
-        update_minimum 那套转律联动。
+        跨等阶时旧词条会换成合并后的新词条（115 起单体/群体奇术增伤 →
+        全奇术增伤）。这是同一条词条改名、不是转律：不打 is_transferred，
+        也不走 update_minimum 那套转律联动。漏了这步，保存会把改名当成转律
+        产出，白白占掉这件装备唯一的转律名额并触发冷却。
+
+        只改「仍停在升级表期望名」的行：用户手动换过（转律）的行保持不动。
         """
-        for row in self._affix_rows:
-            name = str(row._combo_name.currentData() or "")
-            upgraded = (game_config.resolve_affix_upgrade(
-                name, old_level, new_level) if name else "")
-            if not upgraded:
-                continue
-            row._combo_name.blockSignals(True)
-            if row._combo_name.findData(upgraded) < 0:
-                row._combo_name.addItem(upgraded, upgraded)
-            row._combo_name.setCurrentIndex(row._combo_name.findData(upgraded))
-            row._combo_name.blockSignals(False)
-            row._spin_value.setMinimum(0.0)
+        original_level = int(self._equip_data.get("level") or 0)
+        previous_level = int(getattr(self, "_row_level", original_level) or original_level)
+        if previous_level == level:
+            self._row_level = level
+        for index, row in enumerate(self._affix_rows, 1):
+            base = str((self._equip_data.get(f"affix_{index}") or {}).get("name") or "")
+            if base and previous_level != level:
+                before = (game_config.resolve_affix_upgrade(
+                    base, original_level, previous_level) or base)
+                after = (game_config.resolve_affix_upgrade(
+                    base, original_level, level) or base)
+                current = str(row._combo_name.currentData() or "")
+                if after != before and current == before:
+                    row._combo_name.blockSignals(True)
+                    if row._combo_name.findData(after) < 0:
+                        row._combo_name.addItem(after, after)
+                    row._combo_name.setCurrentIndex(
+                        row._combo_name.findData(after))
+                    row._combo_name.blockSignals(False)
+                    row._spin_value.setMinimum(0.0)
             row._refresh_cap_info()
+        self._row_level = level
+
+    def _may_clamp_values(self, level: int) -> bool:
+        """该等级下是否允许把数值截断到承音上限。
+
+        往低于原等级的等阶切只是「按那一阶看看」，不能顺手把用户已填的数值
+        截掉——那样切回去数字就变了。
+        """
+        return level >= int(self._equip_data.get("level") or 0)
+
+    def _sync_chengyin_for_level(self, level: int) -> None:
+        """等级与承音勾选互为因果：选到承音目标就等于要承音，选回原等级就取消。
+
+        游戏里提升等级只能是承音的结果，所以「选了目标等级却没勾承音」必然
+        被写入校验拒掉；反过来「勾着承音却停在原等级」也不是等价操作。这里
+        直接替用户对齐，静默改值不触发 _on_chengyin_toggled。
+        """
+        if self._equip_data.get("is_chengyin"):
+            return
+        if not self._check_chengyin.isEnabled():
+            return
+        original_level = int(self._equip_data.get("level") or 0)
+        target = int(getattr(self, "_real_chengyin_level", 0) or 0)
+        should_check = bool(target) and level == target != original_level
+        if should_check != self._check_chengyin.isChecked():
+            self._set_chengyin_checked_silently(should_check)
+
+    def _set_chengyin_checked_silently(self, checked: bool) -> None:
+        """程序化改承音勾选，不触发侧效果（避免自己触发自己的截断逻辑）。"""
+        self._loading_chengyin = True
+        try:
+            self._check_chengyin.setChecked(checked)
+        finally:
+            self._loading_chengyin = False
+
+    def _on_chengyin_toggled(self, checked: bool) -> None:
+        """承音复选框：勾选即承音（带等级与数值截断），取消要按规则拦截。"""
+        if not self._is_real_development or getattr(self, "_loading_chengyin", False):
+            return
+        from ....config import get_game_config
+
+        game_config = get_game_config()
+        if not checked:
+            if self._equip_data.get("is_chengyin"):
+                # 承音状态不能撤销。已承音装备的勾选框本来就是禁用的，这里只是
+                # 程序化改值时把状态复原；用户看到的原因是控件提示，不必弹窗。
+                self._set_chengyin_checked_silently(True)
+                return
+            self._refresh_stone_estimate()
+            return
+        # 等级还停在原等级时，勾选承音就把它带到该装备的承音目标等级；
+        # 改等级会走 _on_level_changed 完成改名与上限刷新。
+        target = int(getattr(self, "_real_chengyin_level", 0) or 0)
+        if target and self._get_level() != target:
+            index = self._combo_level.findData(target)
+            if index >= 0:
+                self._combo_level.setCurrentIndex(index)
+        if self._may_clamp_values(self._get_level()):
+            self._clamp_rows_to_chengyin_caps(self._get_level(), game_config)
+        self._refresh_stone_estimate()
 
     def _clamp_rows_to_chengyin_caps(self, level: int, game_config) -> None:
         """承音装备的词条数值不得超过该等级的承音上限，超出的截断。

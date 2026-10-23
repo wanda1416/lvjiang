@@ -143,14 +143,14 @@ def test_equipment_snapshot_estimate(game_config):
     estimate = estimate_equipment_stones(equip, game_config=game_config)
     # 2 + 0 + 0 + 0 + 1 = 3
     assert estimate.total == 3
-    assert estimate.summary() == "当前装备承音喂满需要 3 个传律石"
+    assert estimate.summary() == "当前装备承音喂满需要 3 个传律石（115 阶承音上限）"
 
 
 def test_summary_reports_full_equipment(game_config):
     equip = {"level": 115, "affix_1": {"name": _ATK, "value": 131.2}}
     estimate = estimate_equipment_stones(equip, game_config=game_config)
     assert estimate.is_full
-    assert estimate.summary() == "当前装备承音词条已满，无需传律石"
+    assert estimate.summary() == "当前装备承音词条已满，无需传律石（115 阶承音上限）"
 
 
 def test_system_config_exposes_the_default_percent():

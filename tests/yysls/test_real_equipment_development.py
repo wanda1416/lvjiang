@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from PyQt6.QtWidgets import QLabel
+
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.equip_parser.models import make_fingerprint
 from lvjiang.apps.yysls.ui.loadout.equip.mock_dialog import MockEquipDialog
@@ -36,7 +38,14 @@ def test_real_development_locks_identity_and_non_chengyin_values(qtbot):
     assert not dialog._combo_part.isEnabled()
     assert not dialog._combo_weapon_type.isEnabled()
     assert not dialog._edit_name.isEnabled()
-    assert not dialog._combo_level.isEnabled()
+    # 等级可改（承音就是提升等级），候选是全部已配置等阶，默认停在原等级
+    assert dialog._combo_level.isEnabled()
+    levels = [
+        dialog._combo_level.itemData(i)
+        for i in range(dialog._combo_level.count())
+    ]
+    assert 105 in levels and 110 in levels
+    assert dialog._combo_level.currentData() == 105
     assert not dialog._combo_quality.isEnabled()
     assert dialog._btn_dingyin.isEnabled()
     assert dialog._spin_dingyin.isEnabled()
@@ -58,6 +67,62 @@ def test_real_equipment_copy_marker_keeps_dialog_in_mock_edit_mode(qtbot):
     assert dialog.windowTitle() == "编辑模拟装备"
     assert dialog._edit_name.isEnabled()
     assert dialog._combo_quality.isEnabled()
+
+
+def test_stone_estimate_has_its_own_untitled_card(qtbot):
+    """传律石估算是从词条推出来的独立结论，不放在「词条配置」那组编辑控件里。
+
+    它跟着词条数值实时变，但语义上不是编辑项；混在编辑组里会让人以为可以
+    直接改这一行。独立卡片且不带组标题，避免再起一个和「装备信息 / 词条配置」
+    同级的标题。
+    """
+    dialog = MockEquipDialog(_real_equip())
+    qtbot.addWidget(dialog)
+
+    group = dialog._stone_group
+    assert group.property("surface") == "card"
+
+    # 词条配置那组：从词条行往上找到最近一张卡片
+    affix_group = dialog._affix_rows[0]
+    while affix_group is not None and affix_group.property("surface") != "card":
+        affix_group = affix_group.parent()
+    assert affix_group is not None
+    assert group is not affix_group
+    assert not affix_group.isAncestorOf(dialog._lbl_stone_estimate)
+
+    # 卡片里只有「内容 + ? 按钮」，没有标题标签
+    texts = [label.text() for label in group.findChildren(QLabel)]
+    assert "装备信息" not in texts
+    assert "词条配置" not in texts
+
+
+def test_stone_help_button_shows_the_breakdown_on_click(qtbot, monkeypatch):
+    """行尾 ? 点击后立刻弹出逐条明细，不用先猜哪里能悬停。"""
+    from PyQt6.QtWidgets import QToolTip
+
+    dialog = MockEquipDialog(_real_equip())
+    qtbot.addWidget(dialog)
+    shown: list[tuple] = []
+    monkeypatch.setattr(
+        QToolTip, "showText", staticmethod(lambda *args: shown.append(args)))
+
+    dialog._btn_stone_help.click()
+
+    assert shown, "点击 ? 没有弹出提示"
+    assert "最大外功攻击" in shown[0][1]
+    assert "阶承音上限" in shown[0][1]
+
+
+def test_stone_card_hides_when_no_affix_can_be_estimated(qtbot):
+    """没有填任何词条时不显示这张卡片。"""
+    dialog = MockEquipDialog(None)
+    qtbot.addWidget(dialog)
+
+    assert dialog._stone_group.isHidden()
+
+    dialog._affix_rows[0]._combo_name.setCurrentIndex(1)
+
+    assert not dialog._stone_group.isHidden()
 
 
 def test_real_development_does_not_allow_filling_ocr_blank_affix(qtbot):

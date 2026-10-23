@@ -159,6 +159,7 @@ yysls:
   按 {level} 阶承音上限估算：: 'Estimated against the level {level} Chengyin cap:'
   勾选表示该装备已承音；承音后词条数值上限变为承音上限: 'Ticked means this equipment is Chengyin; affix values are then capped at the Chengyin cap'
   该装备已经承音，承音状态不能撤销: 'This equipment is already Chengyin; the state cannot be reverted'
+  已承音，可继续承音到 {level} 阶（用等级下拉）: 'Already Chengyin; can Chengyin further to level {level} (use the level dropdown)'
   勾选后按 {level} 阶承音上限记录: 'When ticked, values are recorded against the level {level} Chengyin cap'
   可切换到该装备的承音目标等级，查看对应等级的词条上限与传律石: 'Switch to this equipment''s Chengyin target level to see that level''s affix caps and Chuanlv Stones'
   该装备没有其它可承音到的等级: 'This equipment has no other level to Chengyin into'

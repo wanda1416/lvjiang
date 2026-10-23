@@ -76,11 +76,7 @@ def test_level_dropdown_lists_every_configured_level(qtbot, gc):
 
 
 def test_chengyin_equipment_can_still_switch_level_for_the_estimate(qtbot, gc):
-    """已承音的 110 阶装备不能再升阶，但必须能切到 115 看还差多少颗。
-
-    它自己停在 110（承音状态不可撤销），换装决策却要看「如果按 115 阶承音
-    上限算」。下拉如果只给合法升阶目标，这类装备就永远看不到那个数。
-    """
+    """已承音的 110 阶装备能切到 115：既看估算，也能真的继续承音上去。"""
     dialog = _dialog(qtbot, _equip(
         "冠胄", 110, [("最大外功攻击", 100.0)], chengyin=True))
 
@@ -96,9 +92,55 @@ def test_chengyin_equipment_can_still_switch_level_for_the_estimate(qtbot, gc):
     assert dialog._stone_target_level() == 115
     assert dialog._lbl_stone_estimate.text() == (
         "当前装备承音喂满需要 5 个传律石（115 阶承音上限）")
-    # 承音状态本身没被改动，仍勾着且只读
+    # 承音状态本身没被改动，仍勾着且只读（状态不可撤销）
     assert dialog._check_chengyin.isChecked() is True
     assert dialog._check_chengyin.isEnabled() is False
+
+
+def test_chengyin_can_be_repeated_to_the_next_level(qtbot, gc):
+    """承音不是一次性的：已承音的 110 装备还能继续承音到 115。
+
+    游戏里 105 → 110 → 115 是逐阶承音上去的，「已承音」只说明状态不可撤销，
+    不代表等级到顶。
+    """
+    equip = _equip("冠胄", 110, [
+        ("会意率", 5.0), ("单体类奇术增伤", 15.4), ("最大外功攻击", 100.0),
+        ("劲", 50.0), ("势", 50.0)], chengyin=True)
+    dialog = _dialog(qtbot, equip)
+
+    dialog._combo_level.setCurrentIndex(dialog._combo_level.findData(115))
+    result = dialog._build_real_development_data()
+
+    assert result["level"] == 115
+    assert result["is_chengyin"] is True
+    # 跨阶被合并的词条只是改名，不是转律
+    assert result["affix_2"]["name"] == "全奇术增伤"
+    assert not result["affix_2"].get("is_transferred")
+    assert check_real_development(equip, result) is None
+    assert dialog._validate_real_development(result) is None
+
+
+def test_repeat_chengyin_still_requires_the_next_level(gc):
+    """重复承音同样只能一阶一阶走：105 的装备不能一步跳到 115。"""
+    old = _equip("冠胄", 105, [("会意率", 5.0)], chengyin=True)
+    new = {**old, "level": 115, "is_chengyin": True}
+
+    assert check_real_development(old, new) == "承音只能提升到下一个已配置等级"
+
+
+def test_repeat_chengyin_below_the_season_floor_is_rejected(gc):
+    """作废线以下的已承音装备不能再往上承音。"""
+    floor = gc.current_min_chengyin_level()
+    below = max(
+        (c.level for c in gc.get_level_configs() if c.level < floor),
+        default=0)
+    if not below:
+        pytest.skip("没有低于作废线的已配置等级")
+    nxt = min(c.level for c in gc.get_level_configs() if c.level > below)
+    old = _equip("冠胄", below, [("会意率", 5.0)], chengyin=True)
+    new = {**old, "level": nxt, "is_chengyin": True}
+
+    assert check_real_development(old, new) == "本赛季该等级的装备已不能承音"
 
 
 def test_stone_estimate_follows_the_selected_level(qtbot, gc):

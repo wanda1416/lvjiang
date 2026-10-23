@@ -1066,16 +1066,21 @@ class MockEquipDialog(QDialog):
         reason = self._chengyin_blocked_reason(
             current_level, current_config, game_config)
         self._row_level = current_level
-        # 等级下拉列出全部已配置等阶：已承音装备也要能切到更高阶查看上限与
-        # 传律石估算（它自己停在原阶、不能再承音，但换装决策要用这个数）。
+        # 等级下拉列出全部已配置等阶：已承音装备也要能切到更高阶——它仍可
+        # 继续承音升阶，换装决策也要用更高阶的上限与传律石来比。
         self._rebuild_real_level_options(current_level)
 
-        # 承音改成直接对复选框操作。已承音的装备不能撤销，只能只读展示。
+        # 承音直接对复选框操作。已承音的装备状态不可撤销、只读展示，但等级
+        # 仍可通过上面的下拉继续往上承音。
         already_chengyin = bool(self._equip_data.get("is_chengyin"))
         self._set_chengyin_checked_silently(already_chengyin)
         self._check_chengyin.setEnabled(not already_chengyin and reason is None)
         if already_chengyin:
-            hint = tr("该装备已经承音，承音状态不能撤销")
+            can_continue = reason is None and self._real_chengyin_level != current_level
+            hint = (tr("已承音，可继续承音到 {level} 阶（用等级下拉）").format(
+                        level=self._real_chengyin_level)
+                    if can_continue
+                    else tr("该装备已经承音，承音状态不能撤销"))
         elif reason is not None:
             hint = reason
         elif self._real_chengyin_level == current_level:
@@ -1148,9 +1153,12 @@ class MockEquipDialog(QDialog):
 
     def _chengyin_blocked_reason(self, level: int, level_config,
                                  game_config) -> str | None:
-        """承音不可用的原因（复选框置灰的说明）；可用时返回 None。"""
-        if self._equip_data.get("is_chengyin"):
-            return tr("该装备已经承音")
+        """这件装备还能不能继续承音的原因；能时返回 None。
+
+        已承音的装备同样能继续承音到下一阶（105 → 110 → 115 逐阶上去），
+        所以这里不再因为「已经承音」而拦下——不可变的只是「已承音」这个
+        状态本身，等级仍然可以往上走。
+        """
         if not game_config.can_chengyin_this_season(level):
             return tr("本赛季 {floor} 阶以下的装备已不能承音").format(
                 floor=game_config.current_min_chengyin_level())

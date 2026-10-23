@@ -56,6 +56,12 @@ def _check_identity(old: dict, new: dict) -> str | None:
 
 
 def _check_chengyin(old: dict, new: dict) -> str | None:
+    """承音合法性：每次提升到下一个已配置等级，可以重复承音。
+
+    承音不是一次性动作——已经承音的装备到了新赛季仍能继续承音到下一阶
+    （105 → 110 → 115 逐阶上去）。可以变的只有等级；「已承音」这个状态本身
+    不可撤销，因为游戏里没有回到未承音的路径。
+    """
     from ...config import get_game_config
 
     old_level = int(old.get("level") or 0)
@@ -69,8 +75,6 @@ def _check_chengyin(old: dict, new: dict) -> str | None:
         return tr("承音状态不能撤销")
     if old_chengyin == new_chengyin and new_level == old_level:
         return None
-    if old_chengyin:
-        return tr("已承音的装备不能再次承音")
     if new_level > old_level and not new_chengyin:
         return tr("提升装备等级必须同时承音")
 

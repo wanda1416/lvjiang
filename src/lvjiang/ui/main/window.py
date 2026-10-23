@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from copy import deepcopy
 
 from loguru import logger
@@ -1405,35 +1406,73 @@ class MainWindow(
         self._close_cleanup_started = True
         if self._tray_icon is not None:
             self._tray_icon.hide()
+        # 每一步都单独兜底：只读实例保存脚本参数会抛 AccessDeniedError，
+        # 以前它会从 closeEvent 直接冒出去，把后面的后台停止、录屏转正和
+        # 连接释放全部跳过，退出变成一个没有收尾的半关闭。
         # 全局热键最先停：stop() 只投递停止信号不等线程结束，必须 join
         # 等钩子线程完成 UnhookWindowsHookEx；越早停，后续清理期间钩子
         # 回调踩空（退出时 TypeError 噪声乃至 access violation）的窗口越小
-        if self._hotkey_listener is not None:
-            try:
-                self._hotkey_listener.stop()
-                self._hotkey_listener.join(3.0)
-                if self._hotkey_listener.is_alive():
-                    logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
-            except Exception:
-                pass
-        self._save_displayed_params()
+        self._run_close_step("停止全局热键", self._stop_hotkey_listener)
+        self._run_close_step("保存脚本参数", self._save_displayed_params)
         # 退出时不能把分组筛选产生的默认展示项当成用户主动选择。
-        self._save_daily_config(save_workflow=False)
-        self._save_ui_state()
-        # 插件清理回调（如 ProfileEngine 停止）
-        for cb in self._cleanup_callbacks:
-            try:
-                cb()
-            except Exception as e:
-                logger.warning(f"插件清理回调失败: {e}")
+        self._run_close_step(
+            "保存日常配置",
+            lambda: self._save_daily_config(save_workflow=False))
+        self._run_close_step("保存界面状态", self._save_ui_state)
+        # 插件清理回调（如 ProfileEngine 停止、脚本运行器停止）
+        self._run_close_step("停止插件后台任务", self._run_cleanup_callbacks)
         # 录屏进行中/待保存时自动转正保存，不丢数据
-        self._abort_screen_record(tr("关闭程序"))
+        self._run_close_step(
+            "保存录屏", lambda: self._abort_screen_record(tr("关闭程序")))
+        self._run_close_step("释放设备连接", self._dispose_execution_targets)
+        self._run_close_step("停止红框提示", self._red_box_flash_timer.stop)
+        self._run_close_step("销毁遮罩", self._overlay.destroy)
+        try:
+            super().closeEvent(event)
+        except Exception as exc:
+            logger.opt(exception=exc).warning(
+                f"关闭清理步骤「提交关闭事件」失败: {exc}")
+        logger.info("关闭清理完成")
+
+    @staticmethod
+    def _run_close_step(label: str, action: Callable[[], None]) -> None:
+        """执行一步关闭清理，任何一步失败都不能阻断后面的清理。
+
+        以前参数保存在这里裸调用：只读实例或任务占用时抛 RuntimeError
+        子类，异常从 closeEvent 冒出去，后台线程停止、录屏转正和连接释放
+        全部被跳过。失败只记 warning 并继续下一步。
+        """
+        try:
+            action()
+        except Exception as exc:  # noqa: BLE001 - 关闭链必须继续
+            logger.opt(exception=exc).warning(
+                f"关闭清理步骤「{label}」失败: {exc}")
+            return
+        logger.debug(f"关闭清理：{label} 完成")
+
+    def _stop_hotkey_listener(self) -> None:
+        """停全局热键并等待钩子卸载，避免清理期间回调踩空。"""
+        listener = self._hotkey_listener
+        if listener is None:
+            return
+        listener.stop()
+        listener.join(3.0)
+        if listener.is_alive():
+            logger.warning("热键监听线程 3 秒内未退出，钩子可能未卸载")
+
+    def _run_cleanup_callbacks(self) -> None:
+        """执行插件注册的关闭回调，单个失败不影响其余回调。"""
+        for callback in self._cleanup_callbacks:
+            try:
+                callback()
+            except Exception as exc:  # noqa: BLE001 - 其它插件仍需清理
+                logger.warning(f"插件清理回调失败: {exc}")
+
+    def _dispose_execution_targets(self) -> None:
+        """释放全部执行目标独占的截图与代理资源。"""
         for target in list(self._execution_targets.all()):
             self._execution_targets.remove(target.id)
             self._dispose_execution_target(target)
-        self._red_box_flash_timer.stop()
-        self._overlay.destroy()
-        super().closeEvent(event)
 
     def _wait_for_run_workers(self, *, timeout_ms: int) -> tuple:
         """限时等待全部已登记 QThread；超时返回仍未结束的运行上下文。"""

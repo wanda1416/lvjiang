@@ -802,9 +802,28 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         return {}
 
     def _save_user_filter(self, filters: dict) -> None:
-        """保存当前用户的界面偏好，不修改任务使用的装备数据"""
-        if self._inv is not None:
+        """保存当前用户的界面偏好，不修改任务使用的装备数据。
+
+        偏好写入失败不能打断点击、筛选和网格刷新；以前直接抛异常会把一次
+        普通点击变成未捕获崩溃。
+        """
+        if self._inv is None:
+            return
+        try:
             self._inv._repo.set_ui_state("equip_filter", filters)
+        except Exception as exc:
+            logger.warning(f"保存装备筛选偏好失败: {exc}")
+            self._notify_pref_save_failed(exc)
+
+    def _notify_pref_save_failed(self, exc: Exception) -> None:
+        """界面偏好保存失败只提示一次，避免每次点击都弹窗。"""
+        if getattr(self, "_pref_save_warned", False):
+            return
+        self._pref_save_warned = True
+        QMessageBox.warning(
+            self, tr("筛选条件未保存"),
+            tr("筛选已生效，但保存到用户资料失败：{error}\n\n"
+               "本次浏览不受影响，下次操作会再尝试保存。").format(error=exc))
 
     def _on_filter_changed(self):
         """筛选下拉框变化时触发"""

@@ -1,6 +1,7 @@
 """只读节点不能落盘配置；长快照不能覆盖新数据；安装刷新不持临界区。"""
 import json
 import threading
+from contextlib import contextmanager
 
 import pytest
 
@@ -89,3 +90,52 @@ def test_installed_callback_can_read_configuration_from_another_thread(tmp_path)
     assert acquired == [True]
     assert json.loads(store.state_path.read_text(encoding="utf-8"))["files"]
     assert not (tmp_path / "session/config.lock").exists()
+
+
+@contextmanager
+def _occupied_user_lease(users_dir_path, username: str):
+    """模拟另一个进程持有该用户的执行租约。
+
+    直接占住锁文件而不经过 ``Lease``，这样本进程的 ``_held`` 缓存不会命中，
+    等价于跨进程占用。
+    """
+    from fasteners import InterProcessLock
+
+    lease = access.user_lease(username, users_dir_path)
+    with InterProcessLock(lease.key):
+        yield
+
+
+def test_ui_state_write_is_not_blocked_by_user_execution_lease(tmp_path):
+    """界面偏好与任务数据无关：别的进程在跑任务时也必须写得进去。
+
+    历史崩溃：点击装备槽位保存筛选走 user_write_access，被对方进程的租约
+    拒绝后直接冒到 Qt 事件循环。
+    """
+    from lvjiang.core import user_config
+
+    users_dir = tmp_path / "users"
+    users_dir.mkdir()
+    user_config.save_user_metadata(
+        user_config.User(name="测试用户", created_at=""), users_dir)
+
+    with _occupied_user_lease(users_dir, "测试用户"):
+        user_config.set_user_ui_state(
+            "测试用户", "equip_filter", {"sort": "level"}, users_dir)
+        assert user_config.get_user_ui_state(
+            "测试用户", "equip_filter", users_dir) == {"sort": "level"}
+
+
+def test_user_metadata_write_still_respects_the_execution_lease(tmp_path):
+    """任务执行期间仍然不允许别的进程改用户资料，界面偏好是唯一的例外。"""
+    from lvjiang.core import user_config
+
+    users_dir = tmp_path / "users"
+    users_dir.mkdir()
+    user_config.save_user_metadata(
+        user_config.User(name="测试用户", created_at=""), users_dir)
+
+    with _occupied_user_lease(users_dir, "测试用户"):
+        with pytest.raises(access.AccessDeniedError):
+            user_config.set_user_workflow_params(
+                "测试用户", "wf", {"n": 1}, users_dir)

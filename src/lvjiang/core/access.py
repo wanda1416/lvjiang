@@ -35,10 +35,22 @@ class Lease:
                 return False
             Path(self.key).parent.mkdir(parents=True, exist_ok=True)
             if not self.lock.acquire(blocking=False):
+                # fasteners 获取失败时不会关闭它刚打开的文件句柄；每次被占用
+                # 都会漏一个，长跑或严格告警环境下会累积并报 ResourceWarning。
+                self._close_lockfile()
                 return False
             _held.add(self.key)
             self.acquired = True
             return True
+
+    def _close_lockfile(self) -> None:
+        lockfile = getattr(self.lock, "lockfile", None)
+        if lockfile is None:
+            return
+        try:
+            lockfile.close()
+        finally:
+            self.lock.lockfile = None
 
     def release(self) -> None:
         with _mutex:
@@ -96,6 +108,9 @@ def user_write_access(username: str, users_dir: Path | None = None):
 
     同主节点内的 UI/任务共用已有占用；只读节点必须在任务授权上下文中。
     主节点修改未占用用户时短暂取得同一门禁，不能撞上其它节点的用户任务。
+
+    界面偏好（``set_user_ui_state``）不属于任务数据，不走这里：它只锁用户
+    资料文件本身，否则另一个进程跑任务时点一下筛选就会变成致命错误。
     """
     lease = user_lease(username, users_dir)
     # 检查与写回共用现有占用状态互斥；任务不能在写回中途释放/抢占用户。

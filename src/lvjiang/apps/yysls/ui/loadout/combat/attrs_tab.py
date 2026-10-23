@@ -674,7 +674,18 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         try:
             repo.set_combat_prefs(self._current_prefs())
         except Exception as e:
-            logger.debug(f"保存战斗属性选择失败: {e}")
+            logger.warning(f"保存战斗属性选择失败: {e}")
+            self._notify_pref_save_failed(e)
+
+    def _notify_pref_save_failed(self, exc: Exception) -> None:
+        """界面偏好保存失败只提示一次，不能因为保存失败打断勾选操作。"""
+        if getattr(self, "_pref_save_warned", False):
+            return
+        self._pref_save_warned = True
+        QMessageBox.warning(
+            self, tr("计算设置未保存"),
+            tr("选项已生效，但保存到用户资料失败：{error}\n\n"
+               "本次操作不受影响，下次操作会再尝试保存。").format(error=exc))
 
     def _current_prefs(self) -> dict:
         return {

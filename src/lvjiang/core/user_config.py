@@ -5,15 +5,19 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import threading
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fasteners import InterProcessLock
 from loguru import logger
 
 from .access import user_write_access
@@ -24,6 +28,32 @@ _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
 USER_SCHEMA_VERSION = 2
 _METADATA_SAVE_LOCK = threading.RLock()
+
+# 每份用户资料自己的跨进程读改写锁。执行租约表达「这个用户正被任务独占」，
+# 只管用户数据文件；界面偏好也写在同一份资料里，却与任务数据无关，不能因为
+# 别的进程在跑任务就写不进去。
+_METADATA_LOCKS: dict[str, tuple[threading.RLock, InterProcessLock]] = {}
+_METADATA_LOCKS_GUARD = threading.Lock()
+
+
+@contextmanager
+def _metadata_write_lock(path: Path):
+    """串行化 ``path`` 的跨进程读改写，与执行租约相互独立。"""
+    key = os.path.normcase(str(path.resolve()))
+    with _METADATA_LOCKS_GUARD:
+        entry = _METADATA_LOCKS.get(key)
+        if entry is None:
+            lock_dir = path.parent / ".lock"
+            lock_dir.mkdir(parents=True, exist_ok=True)
+            name = hashlib.sha256(key.encode()).hexdigest()
+            entry = (
+                threading.RLock(),
+                InterProcessLock(str(lock_dir / f"{name}.metadata.lock")),
+            )
+            _METADATA_LOCKS[key] = entry
+    thread_lock, process_lock = entry
+    with thread_lock, process_lock:
+        yield
 
 
 class UserMetadataConflictError(RuntimeError):
@@ -142,7 +172,8 @@ def load_user_metadata(username: str, users_dir: Path | None = None) -> User | N
 
 def save_user_metadata(user: User, users_dir: Path | None = None) -> None:
     path = user_metadata_path(user.name, users_dir)
-    with user_write_access(user.name, path.parent), _METADATA_SAVE_LOCK:
+    with user_write_access(user.name, path.parent), _metadata_write_lock(
+            path), _METADATA_SAVE_LOCK:
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_text(
             path,
@@ -158,7 +189,8 @@ def mutate_user_metadata(
 ) -> User:
     """锁内读取最新资料并只提交实际变化；相同内容不重写文件。"""
     path = user_metadata_path(username, users_dir)
-    with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
+    with user_write_access(username, path.parent), _metadata_write_lock(
+            path), _METADATA_SAVE_LOCK:
         user = load_user_metadata(username, users_dir)
         if user is None:
             raise FileNotFoundError(f"用户资料不存在: {username}")
@@ -238,14 +270,19 @@ def set_user_ui_state(
     value: dict[str, Any],
     users_dir: Path | None = None,
 ) -> None:
-    """原子替换 ``users/{username}.json`` 中一项用户界面状态。"""
+    """原子替换 ``users/{username}.json`` 中一项用户界面状态。
+
+    界面偏好与任务数据无关：另一个进程正在执行该用户的任务时也必须能写。
+    这里只用资料文件自己的锁，不申请执行租约——否则一次点击槽位保存筛选
+    就会变成「用户正在执行任务」的致命错误。
+    """
     saved = deepcopy(value)
     path = user_metadata_path(username, users_dir)
     from .access import is_readonly
     if is_readonly():
         _readonly_ui_states[path.resolve(), key] = saved
         return
-    with user_write_access(username, path.parent), _METADATA_SAVE_LOCK:
+    with _metadata_write_lock(path), _METADATA_SAVE_LOCK:
         user = load_user_metadata(username, users_dir)
         if user is None:
             raise FileNotFoundError(f"用户资料不存在: {username}")
@@ -254,7 +291,7 @@ def set_user_ui_state(
         user.ui_state[key] = saved
         atomic_write_text(
             path,
-            json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
+            formatted_json(user.to_dict()),
             prefix=f".{username}_metadata_",
         )
 

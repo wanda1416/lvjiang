@@ -134,7 +134,9 @@ def _parse_args() -> argparse.Namespace:
         description=tr("通用视觉 RPA 引擎（支持插件扩展）"),
     )
     parser.add_argument(
-        "--read-only", action="store_true", help=tr("共享配置只读，用户业务数据正常保存"),
+        "--read-only", action="store_true", help=tr(
+            "不争取主节点：更新包安装、离线包导入与历史回传不可用，"
+            "配置与运行状态仍可保存"),
     )
     parser.add_argument(
         "-reg",

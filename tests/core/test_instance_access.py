@@ -118,13 +118,11 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
         "main_page": {"left_tab_index": 1},
         "loadout_user:alice": {"equip_filter": {"type": "ring"}},
     })
-    # 白名单外属于主节点配置，不能从只读节点落盘。
-    with pytest.raises(access.AccessDeniedError):
-        session.set_node("settings", {"language": "en_US"})
-    with pytest.raises(access.AccessDeniedError):
-        session.set_node("new_plugin", {"enabled": True})
-    with pytest.raises(access.AccessDeniedError):
-        interface.update_node("server_config", {"skip_version": "9.9.9"})
+    # 状态文件不是版本化配置：告警、服务器状态这类写入两个实例都能做，
+    # 只靠跨进程锁串行化读改写，不再因为「另一个进程是主节点」被拒。
+    session.set_node("settings", {"language": "en_US"})
+    session.set_node("new_plugin", {"enabled": True})
+    interface.update_node("server_config", {"skip_version": "9.9.9"})
     session.reload()
     interface.reload()
 
@@ -135,8 +133,8 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     assert interface.get_node("ui_state")["main_page"]["left_tab_index"] == 1
 
     disk = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
-    assert disk["settings"] == {"language": "zh_CN"}
-    assert "new_plugin" not in disk
+    assert disk["settings"] == {"language": "en_US"}
+    assert disk["new_plugin"] == {"enabled": True}
     interface_disk = json.loads((tmp_path / "interface.json").read_text(encoding="utf-8"))
     assert interface_disk["actives"] == {"plan": "original"}
     assert interface_disk["daily"] == {"workflow_id": "a", "group": None}
@@ -148,13 +146,13 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
         "main_page": {"left_tab_index": 0},
         "loadout_user:alice": {"equip_filter": {"type": "all"}},
     }
-    assert interface_disk.get("server_config", {}) == {}
+    assert interface_disk["server_config"] == {"skip_version": "9.9.9"}
 
-    with pytest.raises(access.AccessDeniedError):
-        resolver.save_merged("app.yaml", {"plans": [{"name": "temporary"}]})
-    assert resolver.load_merged("app.yaml")["plans"][0]["name"] == "original"
-    with pytest.raises(access.AccessDeniedError):
-        resolver.write_entity("scenes/new.yaml", "{}")
+    # 配置写入也不再要求主节点：任务执行读的是启动时冻结的配置快照，
+    # 运行中改配置只影响下一次任务，不会污染正在跑的任务。
+    resolver.save_merged("app.yaml", {"plans": [{"name": "temporary"}]})
+    assert resolver.load_merged("app.yaml")["plans"][0]["name"] == "temporary"
+    resolver.write_entity("scenes/new.yaml", "{}")
     users = SessionManager(tmp_path / "users")
     data = users.load("alice")
     data["equipment"] = {"plan": "new"}
@@ -182,15 +180,58 @@ def test_readonly_history_write_does_not_flush_temporary_settings(tmp_path, monk
     store.set_node("profile", {"overview_active_group": "original"})
     monkeypatch.setattr(access, "_readonly", True)
     store.update_node("profile", {"overview_active_group": "temporary"})
-    with pytest.raises(access.AccessDeniedError):
-        store.mutate_node("alert_history", lambda _: {"alice:key": "now"})
+    # 告警属于运行时状态，只读节点也必须写得进去：ProfileEngine 每轮 tick
+    # 都要刷新告警与去重标记，写不进去就会每 60 秒重试一次同一个告警。
+    store.mutate_node("alert_history", lambda _: {"alice:key": "now"})
     assert store.get_node("profile")["overview_active_group"] == "temporary"
     disk = json.loads((tmp_path / "interface.json").read_text(encoding="utf-8"))
     assert disk["profile"] == {
         "overview_active_group": "original",
     }
 
-    assert disk.get("alert_history", {}) == {}
+    assert disk["alert_history"] == {"alice:key": "now"}
+
+def test_readonly_node_can_write_profile_alerts(tmp_path, monkeypatch):
+    """ProfileEngine 的告警写入属于运行时状态，只读节点不能失败。
+
+    历史问题：只读实例每 60 秒 tick 一次，告警入库与去重标记写 interface.json
+    被 require_primary_write 拒绝，日志刷「处理用户 X 失败」；标记写不进去，
+    下一轮又会重试同一条告警，永远无法收敛。
+    """
+    from lvjiang.core.config import interface as interface_module
+    from lvjiang.core.profile import store as profile_store
+
+    monkeypatch.setattr(
+        interface_module, "_store",
+        interface_module.InterfaceStore(tmp_path / "interface.json"))
+    monkeypatch.setattr(access, "_readonly", True)
+
+    assert interface_module.add_alert(
+        "profile:alice:tili:red", "体力偏低", "2026-10-23T13:43:47")
+    profile_store.mark_alert(
+        "alice:tili:red:current", "2026-10-23T13:43:47")
+
+    disk = json.loads(
+        (tmp_path / "interface.json").read_text(encoding="utf-8"))
+    assert [item["id"] for item in disk["alert_info"]] == [
+        "profile:alice:tili:red"]
+    assert disk["alert_history"] == {
+        "alice:tili:red:current": "2026-10-23T13:43:47"}
+
+
+def test_two_stores_merge_each_others_nodes(tmp_path):
+    """两个实例各写自己的节点：后写者必须基于最新磁盘合并，不能覆盖前者。"""
+    first = InterfaceStore(tmp_path / "interface.json")
+    second = InterfaceStore(tmp_path / "interface.json")
+
+    first.set_node("alert_history", {"a": "1"})
+    second.set_node("server_config", {"skip_version": "9.9.9"})
+
+    disk = json.loads(
+        (tmp_path / "interface.json").read_text(encoding="utf-8"))
+    assert disk["alert_history"] == {"a": "1"}
+    assert disk["server_config"] == {"skip_version": "9.9.9"}
+
 
 def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path, monkeypatch):
     path = tmp_path / "interface.json"
@@ -199,8 +240,8 @@ def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path,
     store.set_node("server_config", {"skip_version": "1.0.0"})
     monkeypatch.setattr(access, "_readonly", True)
     store.set_active("env", "android")                              # 白名单：只留内存
-    with pytest.raises(access.AccessDeniedError):
-        store.update_node("server_config", {"skip_version": "2.0.0"})
+    # 状态文件两个实例都能写；白名单只决定哪些路径不落盘。
+    store.update_node("server_config", {"skip_version": "2.0.0"})
 
     disk = json.loads(path.read_text(encoding="utf-8"))
     disk["server_config"]["skip_version"] = "3.0.0"   # 别的实例又写了一次

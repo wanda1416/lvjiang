@@ -922,9 +922,12 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.btn_check.setEnabled(has_text)
         from ...core.access import is_readonly
         if is_readonly():
+            # 脚本保存是无基线的整份覆盖（force=True），两个实例同时改会静默
+            # 互相覆盖；所以编辑入口仍只在主节点开放。后端 write_entity 本身
+            # 不限主节点，这里拦的是这份「谁最后写谁赢」的交互。
             for button in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete):
                 button.setEnabled(False)
-                button.setToolTip(tr("只读节点不能修改共享配置，请在主节点操作"))
+                button.setToolTip(tr("只读节点不能保存脚本，请在主节点操作"))
         title = tr("脚本编辑")
         if cur is not None:
             title += f" - {cur.rel_path}" + (" *" if self._dirty else "")

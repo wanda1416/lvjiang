@@ -97,9 +97,14 @@ def is_readonly() -> bool:
 
 
 def require_primary_write() -> None:
-    """共享配置只有主节点可以落盘；只读选择由界面存储留在内存。"""
+    """整目录替换与少数独占入口只有主节点可以做。
+
+    配置与运行状态本身不再要求主节点（见 ``config.content.config_write_lock``）：
+    这里只拦更新包安装、离线包导入、历史回传，以及出装搭配、批量配置这类仍
+    按主节点语义设计的保存入口。
+    """
     if is_readonly():
-        raise AccessDeniedError("只读节点不能修改共享配置，请在主节点操作")
+        raise AccessDeniedError("只读节点不能执行该操作，请在主节点操作")
 
 
 @contextmanager

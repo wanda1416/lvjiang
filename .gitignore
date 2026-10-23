@@ -22,6 +22,9 @@ build/
 .ruff_cache/
 .testmondata*
 .pytest-*/
+pytest-of-*/
+# 手工指定的 pytest basetemp（--basetemp=.tmp-run），测试报告与锁文件都落这里
+.tmp-run/
 # .coverage* 而非 .coverage：pytest-xdist 并行跑覆盖率会产生
 # .coverage.<host>.<pid>.<rand> 分片，中断的运行会把它们留在工作区。
 .coverage*
@@ -41,6 +44,8 @@ logs/
 # local config (user overlay / session runtime)
 /config/local*
 /config/session*
+# 跨进程读写锁（运行时产物，见 core/fs_util.interprocess_lock）
+/config/**/.locks/
 
 # local data
 /data/local

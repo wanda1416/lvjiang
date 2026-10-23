@@ -59,22 +59,32 @@ LAYER_SYSTEM = "system"
 _write_batches: ContextVar[dict[int, dict[str, None]] | None] = ContextVar("configuration_write_batches", default=None)
 
 
+def _config_write_lock(self):
+    """同一配置目录的跨进程写锁（见 ``content.config_write_lock``）。"""
+    from .content import config_write_lock
+    return config_write_lock(self.config_dir, self.local_dir)
+
+
 def _configuration_write(function):
     @wraps(function)
     def wrapped(self, *args, **kwargs):
-        from ..access import require_primary_write
-        require_primary_write()
         from .conflicts import checked_write, file_baseline
         from .content import configuration_lock
         rel_path = args[0] if args else kwargs.get("rel_path")
+
         def write():
             result = function(self, *args, **kwargs)
             if rel_path in self._read_baselines:
                 self._read_baselines[rel_path] = file_baseline(self, rel_path)
             return result
+
+        # 冲突确认可能弹窗问用户，不能持锁等待输入：checked_write 先把
+        # 弹窗做完，再进「进程内 configuration_lock → 跨进程文件锁」。
         if self.track_content and rel_path in self._read_baselines:
             return checked_write(self, {rel_path: self._read_baselines[rel_path]}, write)
-        with configuration_lock(self.config_dir):
+        # 锁顺序在全仓库统一为「线程锁 → 文件锁」。反过来会和 batch_changes、
+        # checked_write、出装搭配等既有调用方互相等待而永久死锁。
+        with configuration_lock(self.config_dir), _config_write_lock(self):
             return write()
     return wrapped
 

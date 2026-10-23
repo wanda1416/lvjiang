@@ -3,7 +3,7 @@
 纯运行态配置（config/session/session.json）统一经本模块读写：
 - 全量内存缓存：首次访问懒加载，此后所有读操作命中内存
 - 线程安全：RLock 保护单进程内的并发
-- 写入所有权：共享配置只有主节点可以落盘，只读选择留在内存
+- 写入所有权：任一节点都可落盘，用跨进程文件锁串行化「读盘 → 合并 → 替换」
 - 写即落盘：每次变更立即原子落盘（tmp + os.replace），杜绝半截文件
 
 节点语义：session.json 顶层 key 即节点（daily / settings 等），
@@ -11,7 +11,10 @@
 
 界面、Profile 总览、告警与服务器状态独立存于 interface.json，见 interface 模块。
 
-不为状态文件创建跨进程锁；主节点身份与用户任务占用由 core.access 管理。
+这里刻意不要求主节点：告警、界面状态、当前选择都是运行时状态，两个实例
+同时写最多丢一次更新（下一轮重试即可），不该因为另一个进程占着主节点就
+整类写入不可用。真正需要主节点的只剩整目录替换的操作（更新包安装、离线包
+导入、历史回传），见 core.access.require_primary_write 的调用点。
 """
 from __future__ import annotations
 
@@ -23,7 +26,7 @@ from typing import Any, Callable
 
 from loguru import logger
 
-from ..fs_util import atomic_write_text
+from ..fs_util import atomic_write_text, interprocess_lock
 
 # 只读节点只能在内存中改允许的临时子树，其它节点拒绝落盘。session.json 只剩配置
 # 与事实，没有实例私有选择，所以这里是空的——那类状态（actives）已随新归属
@@ -74,8 +77,8 @@ class SessionStore:
     不带参构造时路径动态取自 constants.SESSION_PATH（monkeypatch 友好）；
     测试可显式传入 tmp_path 构造隔离实例。
 
-    只有主节点落盘；进程内读改写使用 RLock，文件使用原子替换。
-    只读节点允许的临时选择仅更新本实例缓存。
+    任一节点都可落盘；进程内用 RLock、跨进程用文件锁串行化读改写，文件用
+    原子替换。只读节点允许的临时选择仍只更新本实例缓存。
     """
 
     TRANSIENT_PATHS = READONLY_TRANSIENT_PATHS
@@ -110,21 +113,19 @@ class SessionStore:
             return {}
 
     def _write_disk_atomic(self, data: dict) -> None:
-        """主节点原子写入磁盘。
+        """原子写入磁盘（调用方已持有跨进程读改写锁）。
 
         tmp 文件 + os.replace，确保不会产生半截文件
         """
-        from ..access import require_primary_write
-        require_primary_write()
         text = json.dumps(data, ensure_ascii=False, indent=2)
         atomic_write_text(self.path, text, prefix=f".{self.path.stem}_")
 
     def _mutate_disk(
         self, mutator: Callable[[dict], Any], *, strict: bool = False,
     ) -> Any:
-        """主节点合并最新磁盘状态；只读节点只保留允许的临时选择。"""
-        with self._thread_lock:
-            from ..access import is_readonly, require_primary_write
+        """合并最新磁盘状态；只读节点只保留允许的临时选择（不落盘）。"""
+        with self._thread_lock, interprocess_lock(self.path, suffix="session"):
+            from ..access import is_readonly
             readonly = is_readonly()
             disk_data = self._read_disk(strict=strict)
             working = deepcopy(disk_data)
@@ -135,7 +136,6 @@ class SessionStore:
             if readonly:
                 _overlay_readonly_transients(persisted, disk_data, self.TRANSIENT_PATHS)
             if persisted != disk_data:
-                require_primary_write()
                 self._write_disk_atomic(persisted)
             self._data = deepcopy(persisted)
             if readonly:

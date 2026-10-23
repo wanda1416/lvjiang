@@ -49,16 +49,22 @@ def test_batch_draft_checks_baseline_and_explicit_override_updates_it(tmp_path):
     assert store.load().configs["a"].name == "草稿"
 
 
-def test_readonly_does_not_initialize_or_write_shared_stores(tmp_path, monkeypatch):
+def test_readonly_can_write_runtime_stores_but_not_installs(tmp_path, monkeypatch):
+    """只读节点能改配置与场景文档，整目录替换仍限主节点。
+
+    任务执行读的是启动时冻结的配置快照，运行中改配置只影响下一次任务，所以
+    配置与场景文档不再要求主节点；更新包安装会整目录替换，仍必须独占。
+    """
     resolver = ConfigResolver(config_dir=tmp_path, dev_mode=False)
     directory = DocumentDirectoryStore(tmp_path / "session/plugin", {"sample": "sample.json"})
     monkeypatch.setattr(access, "_readonly", True)
+
     assert directory.load("sample") == {}
-    assert not directory.root.exists()
-    with pytest.raises(access.AccessDeniedError):
-        directory.mutate("sample", lambda _: {"value": 1})
-    with pytest.raises(access.AccessDeniedError):
-        resolver.write_entity("scenes/sample.yaml", "key: sample\n")
+    directory.mutate("sample", lambda _: {"value": 1})
+    assert directory.load("sample") == {"value": 1}
+    resolver.write_entity("scenes/sample.yaml", "key: sample\n")
+    assert resolver.load_merged("scenes/sample.yaml") is not None
+
     system = tmp_path / "system"
     system.mkdir()
     (system / "opaque").write_bytes(b"old")
@@ -66,7 +72,6 @@ def test_readonly_does_not_initialize_or_write_shared_stores(tmp_path, monkeypat
     with pytest.raises(access.AccessDeniedError):
         store.install(member_files={"opaque": b"new"}, activate=lambda *_: None)
     assert (system / "opaque").read_bytes() == b"old"
-    assert not list(tmp_path.rglob("*.lock"))
 
 
 def test_installed_callback_can_read_configuration_from_another_thread(tmp_path):

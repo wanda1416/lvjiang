@@ -282,16 +282,20 @@ def _carry_over_preserved(schema: ProfileSchema) -> ProfileSchema:
 
 
 def save_profile_config(schema: ProfileSchema) -> None:
-    """保存配置到 profile.yaml"""
-    from ..access import require_primary_write
-    require_primary_write()
+    """保存配置到 profile.yaml。
+
+    profile 定义是运行期可编辑内容，两个实例都能保存；跨进程锁只保证两次
+    保存不交错，不要求主节点。
+    """
+    from ..fs_util import interprocess_lock
     try:
         # 只校验进了索引的定义——留底的那些本来就是核心解释不了的，拿它们
         # 去校验只会把用户锁在"存不进去"的状态里。
         _reject_unknown_periods(schema.keys_by_model)
         data = _carry_over_preserved(schema).to_dict()
-        _PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        save_yaml(_PROFILE_PATH, data)
+        with interprocess_lock(_PROFILE_PATH, suffix="profile"):
+            _PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            save_yaml(_PROFILE_PATH, data)
         logger.info(f"已保存 profile.yaml: {_PROFILE_PATH}")
     except Exception as e:
         logger.error(f"保存 profile.yaml 失败: {e}")

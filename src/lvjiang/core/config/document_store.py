@@ -9,7 +9,7 @@ from typing import Callable, Mapping
 
 from loguru import logger
 
-from lvjiang.core.fs_util import atomic_write_text
+from lvjiang.core.fs_util import atomic_write_text, interprocess_lock
 
 
 class DocumentDirectoryStore:
@@ -50,8 +50,7 @@ class DocumentDirectoryStore:
         return self.root / "_transaction.json"
 
     def _require_write(self) -> None:
-        from ..access import require_primary_write
-        require_primary_write()
+        """只保证目录存在；并发写入由调用方的跨进程锁串行。"""
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _read(self, path: Path) -> dict:
@@ -112,29 +111,26 @@ class DocumentDirectoryStore:
         with self._thread_lock:
             if self._initialized:
                 return
-            from ..access import is_readonly
-            if is_readonly():
-                return
-            self._require_write()
-            self._initialize_unlocked()
+            with interprocess_lock(self._meta_path, suffix="documents"):
+                self._require_write()
+                self._initialize_unlocked()
             self._initialized = True
 
     def load(self, key: str) -> dict:
         self._path(key)
         self.ensure_initialized()
         with self._thread_lock:
-            from ..access import is_readonly
-            if not is_readonly():
-                self._recover_unlocked()
-            path = self._path(key)
-            if is_readonly() and not path.exists():
-                return {}
-            return deepcopy(self._read(path))
+            # 事务恢复会改文件，只在真的存在事务日志时才取写锁，正常读不阻塞。
+            if self._transaction_path.exists():
+                with interprocess_lock(self._meta_path, suffix="documents"):
+                    self._recover_unlocked()
+            return deepcopy(self._read(self._path(key)))
 
     def mutate(self, key: str, fn: Callable[[dict], dict]) -> dict:
         self._path(key)
         self.ensure_initialized()
-        with self._thread_lock:
+        with self._thread_lock, interprocess_lock(
+                self._meta_path, suffix="documents"):
             self._require_write()
             self._recover_unlocked()
             updated = fn(deepcopy(self._read(self._path(key))))
@@ -153,7 +149,8 @@ class DocumentDirectoryStore:
         for key in keys:
             self._path(key)
         self.ensure_initialized()
-        with self._thread_lock:
+        with self._thread_lock, interprocess_lock(
+                self._meta_path, suffix="documents"):
             self._require_write()
             self._recover_unlocked()
             current = {key: self._read(self._path(key)) for key in keys}

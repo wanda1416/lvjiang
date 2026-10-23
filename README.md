@@ -352,7 +352,7 @@ pytest tests/workflows/test_parser.py
 
 - **微信交流群**：主窗口「帮助 → 反馈」中点击「扫码加群」
 - **GitHub Issue**：[github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
-- **提交规范**：[问题反馈规范](docs/60-userguide/08-feedback-and-issues.md)
+- **提交规范**：[常见问题与反馈](docs/60-userguide/09-faq-and-feedback.md)
 
 **反馈范围说明：**
 

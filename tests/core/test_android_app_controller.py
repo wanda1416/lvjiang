@@ -151,7 +151,15 @@ def test_app_controller_rejects_unknown_target_platform():
         AppController({}, target_platform="")
 
 
-def test_connected_android_app_information_is_discovered():
+def test_connected_android_app_information_is_discovered(monkeypatch):
+    import lvjiang.core.app_controller as ac
+
+    # 模块级全局状态：其它用例（尤其 UI 测试先跑时）可能已记录过 window，
+    # 让 _active_connection_platform 停在 "window"，本用例的 android 记录就不会
+    # 被选为活动目标。清干净再跑，避免执行顺序决定成败。
+    monkeypatch.setattr(ac, "_connected_apps", {})
+    monkeypatch.setattr(ac, "_active_connection_platform", "")
+
     from lvjiang.core.app_controller import (
         get_active_connected_app_info,
         get_connected_app_info,

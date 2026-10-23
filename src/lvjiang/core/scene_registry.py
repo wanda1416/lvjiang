@@ -33,14 +33,12 @@ def _load_manifest():
 
 # ─── 场景注册表（从 YAML 加载） ─────────────────────────
 
-_manifest = _load_manifest()
-_registry = SceneRegistry(
-    resolver=get_root_resolver(),
-    scene_order=_manifest.order if _manifest else None,
-    group_config=_manifest.groups if _manifest else None,
-    group_names=_manifest.group_names if _manifest else None,
-    disabled_scenes=_manifest.disabled if _manifest else None,
-)
+# 模块导入不构造注册表：构造会立刻 _load_all 并打印每条场景日志，任何一条
+# 模块级 ``from .scene_registry import ...``（core.ocr、core.layout_manager
+# 等）都会因此抢在插件注册完成前触发场景加载。改为显式初始化：启动时由
+# run_app 调用 initialize_scene_registry()，首次 get_registry() /
+# reload_scene_registry() 也会兜底初始化。
+_registry: SceneRegistry | None = None
 
 # 场景 → (场景中文名, [(region_key, region_name), ...])
 SCENE_REGIONS: dict[str, tuple[str, list[tuple[str, str]]]] = {}
@@ -61,6 +59,7 @@ def _rebuild_scene_globals():
     """从 _registry 重建 SCENE_REGIONS / SCENE_POINTS / SCENE_PANELS / 分组缓存等全局字典"""
     global SCENE_REGIONS, SCENE_POINTS, SCENE_PANELS
     global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
+    assert _registry is not None  # 仅在 initialize_scene_registry / reload 内调用
     SCENE_REGIONS.clear()
     SCENE_REGIONS.update({
         key: (scene.name, [(r.key, r.name) for r in scene.regions])
@@ -86,12 +85,27 @@ def _rebuild_scene_globals():
         GROUP_ORDER.append(gk)
 
 
-# 初始化
-_rebuild_scene_globals()
+def initialize_scene_registry() -> None:
+    """显式初始化场景注册表（首次加载）；幂等。
 
-# 配置可暂时没有场景分组，不能在模块导入阶段阻断应用启动。
-if not _registry.get_groups():
-    logger.warning("未加载场景分组，场景相关功能暂不可用；请检查 scenes.yaml，不影响程序启动")
+    启动时在插件全部注册完成之后调用；后续场景变化走
+    :func:`reload_scene_registry` 原位更新，不再经过这里。
+    """
+    global _registry
+    if _registry is not None:
+        return
+    manifest = _load_manifest()
+    _registry = SceneRegistry(
+        resolver=get_root_resolver(),
+        scene_order=manifest.order if manifest else None,
+        group_config=manifest.groups if manifest else None,
+        group_names=manifest.group_names if manifest else None,
+        disabled_scenes=manifest.disabled if manifest else None,
+    )
+    _rebuild_scene_globals()
+    # 配置可暂时没有场景分组，不能在首次加载时阻断应用启动。
+    if not _registry.get_groups():
+        logger.warning("未加载场景分组，场景相关功能暂不可用；请检查 scenes.yaml，不影响程序启动")
 
 
 def get_registry() -> SceneRegistry:
@@ -104,11 +118,20 @@ def get_registry() -> SceneRegistry:
                                  group_config=manifest.groups, group_names=manifest.group_names,
                                  disabled_scenes=manifest.disabled)
         return scoped_value(SceneRegistry, create)
+    initialize_scene_registry()
+    assert _registry is not None  # initialize_scene_registry 保证已构造
     return _registry
 
 
 def reload_scene_registry():
-    """原位重新加载注册表，避免已打开编辑器持有失效对象。"""
+    """场景配置变化后原位重载，保留对象身份，避免已打开编辑器持有失效对象。
+
+    未初始化时先初始化（兜底）：正常启动由 run_app 显式调用
+    initialize_scene_registry，本函数只在场景文件变化后使用。
+    """
+    if _registry is None:
+        initialize_scene_registry()
+        return
     # 显式重载也服务于 Git 拉取和外部编辑，不依赖写入通知或文件时间戳。
     get_root_resolver().clear_read_cache()
     manifest = _load_manifest()

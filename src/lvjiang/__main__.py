@@ -204,8 +204,6 @@ def main() -> int:
     except Exception:  # noqa: BLE001
         logger.exception("应用在线配置失败，本次使用现有配置")
 
-    from .app import run_app
-
     hooks_list = []
     for spec in app_specs:
         logger.info("加载插件: %s", spec)
@@ -214,6 +212,12 @@ def main() -> int:
         register_hooks(hooks)
         hooks_list.append(hooks)
 
+    # run_app 的导入必须排在插件加载之后：`import lvjiang.app` 会连带导入
+    # MainWindow → PyQt6 / scene_registry / core.recognizers，其中场景注册表
+    # 在模块导入时就会构造一次（第一遍「已加载场景」）。把它放在插件循环前，
+    # 会让场景加载和识别器注册都先于插件发生，违背「插件优先」与「延迟导入
+    # PyQt6」的约定。
+    from .app import run_app
     return run_app(hooks_list)
 
 

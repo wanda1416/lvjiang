@@ -113,12 +113,16 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     from .core.config.interface import initialize_state_stores
     initialize_state_stores()
+    # 重建 content.json（实体修订索引）并清空 YAML 读取缓存；随后显式初始化
+    # 场景注册表。scene_registry 已改为懒加载（模块导入不构造），因此这是
+    # 启动时唯一一次场景加载，且发生在所有插件注册完成之后、创建 QApplication
+    # 之前——插件内置函数/布局模块导入 scene_registry 都不会再提前触发加载。
     from .core.config.content import rebuild_content
     from .core.config.resolver import get_resolver
-    from .core.scene_registry import reload_scene_registry
     rebuild_content(get_resolver())
     get_resolver().reset_edit_baselines()
-    reload_scene_registry()
+    from .core.scene_registry import initialize_scene_registry
+    initialize_scene_registry()
     _app = QApplication(sys.argv)
     from .core.config.conflicts import set_conflict_handler
     from .ui.config_conflicts import confirm_config_overwrite

@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from lvjiang.core.access import user_write_access
 
+from ..equip_parser.constants import ASSUME_CHENGYIN_KEY
 from ..equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_TYPE_KEY,
@@ -354,6 +355,25 @@ class LoadoutRepository:
             if equip is None:
                 raise ValueError(f"装备已不存在: {fp}")
             equip["lock_status"] = "locked" if locked else "unlock"
+            equip[EQUIPMENT_UPDATED_AT] = _now_iso()
+
+        return self.update(mutate)
+
+    def set_item_assume_chengyin(
+        self, fp: str, enabled: bool,
+    ) -> LoadoutState:
+        """只修改指定装备的「假设同级承音」计算设置，指纹不变。"""
+        if not isinstance(enabled, bool):
+            raise TypeError("假设承音必须是布尔值")
+
+        def mutate(state: LoadoutState) -> None:
+            equip = state.equipment_items.get(fp)
+            if equip is None:
+                raise ValueError(f"装备已不存在: {fp}")
+            if enabled:
+                equip[ASSUME_CHENGYIN_KEY] = True
+            else:
+                equip.pop(ASSUME_CHENGYIN_KEY, None)
             equip[EQUIPMENT_UPDATED_AT] = _now_iso()
 
         return self.update(mutate)

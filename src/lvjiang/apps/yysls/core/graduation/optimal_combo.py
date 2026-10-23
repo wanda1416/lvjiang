@@ -35,6 +35,7 @@ from ..combat.combat_attrs import (
     max_stack_affixes,
 )
 from ..combat.equipment_sets import LEFT_SET_SLOTS, equipment_set_bonus
+from ..equip_parser.constants import ASSUME_CHENGYIN_KEY
 from .assumptions import Assumptions
 from .graduation_program import ProgramRuntime
 from .model_inputs import adapt_attrs_to_model_inputs
@@ -179,9 +180,12 @@ def build_candidate_variants(
                 level = int(original.get("level") or 0)
             except (TypeError, ValueError):
                 level = 0
+            # 已经勾了「假设同级承音」的装备，满承音投影本来就按承音取值，
+            # 再派生一个平行分支只会产生数值完全相同的重复候选。
             if (season_chengyin and allow_season_chengyin
                     and level == season_level
-                    and not bool(original.get("is_chengyin"))):
+                    and not bool(original.get("is_chengyin"))
+                    and not bool(original.get(ASSUME_CHENGYIN_KEY))):
                 virtual = copy.deepcopy(original)
                 virtual["is_chengyin"] = True
                 for index in range(1, 6):

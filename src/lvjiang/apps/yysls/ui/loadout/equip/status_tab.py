@@ -1501,6 +1501,20 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 QMessageBox.critical(self, tr("修改失败"), str(exc))
                 return False
 
+        def update_assume_chengyin(enabled: bool) -> bool:
+            inv = self._require_inventory()
+            if inv is None or not fp:
+                return False
+            try:
+                inv.set_item_assume_chengyin(fp, enabled)
+                # 计算设置会直接改变毕业率，通知战斗属性页重算。
+                self._sync_inv(notify=True)
+                return True
+            except Exception as exc:
+                logger.error(f"修改假设同级承音失败: {exc}")
+                QMessageBox.critical(self, tr("修改失败"), str(exc))
+                return False
+
         def dingyin_swap_candidates(kind: str) -> list[dict]:
             inv = self._require_inventory()
             if inv is None:
@@ -1529,6 +1543,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             self.window(), equip_data, cooldown_changed=update_cooldown,
             dingyin_changed=switch_dingyin,
             equipment_set_changed=switch_equipment_set,
+            assume_chengyin_changed=update_assume_chengyin,
             dingyin_swap_candidates=dingyin_swap_candidates,
             dingyin_swapped=swap_dingyin,
             dingyin_kind=(self._plan_dingyin_kind(slot_key)

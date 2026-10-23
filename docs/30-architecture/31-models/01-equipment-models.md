@@ -82,10 +82,16 @@
 | `cooldown_state` | `cooling` \| `completed` \| `""` | 冷却中或冷却完成；无冷却标记为空 |
 | `cooldown_expires_at` | string | 冷却到期 UTC ISO 时间；无冷却或剩余时长无法识别时为空 |
 | `is_chengyin` | bool | 是否为承音装备 |
+| `assume_chengyin` | bool | 用户勾选的“假设同级承音”计算设置；装备事实仍按 `is_chengyin` 保存 |
 | `lock_status` | `"locked"` \| `"unlock"` \| 缺失 | 扫描时识别的锁定状态；旧数据或无法确定时缺失 |
 
 `level` 是当前显示等级，可能受承音影响；`original_level` 不得用当前等级或基础
 属性反推。系统配置中，攻具的“流星”和防具的“吴钩”均识别为原始 110 级。
+
+`assume_chengyin` 只对本赛季等级、且尚未承音的装备开放，在装备属性的
+“计算设置”一栏勾选。它不改变装备的承音状态，只让满承音投影把该件按承音
+上限取值——因此不需要再为同等级装备生成“承音/不承音”两个平行候选分支。
+最优组合应用带“同等级承音假设”的组合时，会把该假设写回对应装备。
 
 ### 2.4 装备品阶 `quality`
 
@@ -422,6 +428,7 @@ _fp = MD5(拼接字符串)[:8]   # 取前 8 位十六进制字符
 | `quality` | ✓ | 品阶（"gold""purple"） |
 | `is_chengyin` | ✓ | 是否承音（True/False） |
 | `lock_status` | ✗ | 可变的锁定状态，不得改变装备实体指纹 |
+| `assume_chengyin` | ✗ | 用户的显示/计算设置，不是装备身份 |
 | `affix_1` ~ `affix_5` | ✓ | 每条词条的 `name:value` |
 | `dingyin` | ✗ | **定音词条故意不包含** |
 | `dingyin_zhige` | ✗ | 同上，止戈定音槽一样是可变状态 |

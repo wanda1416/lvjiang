@@ -1355,6 +1355,31 @@ class OptimalComboPage(QWidget):
         rank = result.get("rank")
         return f"{title} (#{rank})" if rank else title
 
+    @staticmethod
+    def _apply_assume_chengyin(result: dict) -> dict[str, dict]:
+        """把搜索时的「同等级承音假设」落成装备上的计算开关。
+
+        该假设在搜索阶段只是平行候选分支，应用后装备本身仍然未承音；不把
+        它写回装备，下次打开假设视图就回到未承音数值。只给确实按承音分支
+        搜索过的部位打标，其余部位保持原样。
+        """
+        from ...core.equip_parser.constants import ASSUME_CHENGYIN_KEY
+        equipped = result.get("equipped", {})
+        if not isinstance(equipped, dict):
+            return {}
+        per_slot = result.get("assumptions", {})
+        applied: dict[str, dict] = {}
+        for slot, equip in equipped.items():
+            if not isinstance(equip, dict):
+                continue
+            labels = (per_slot.get(slot) or []) if isinstance(
+                per_slot, dict) else []
+            value = dict(equip)
+            if "同等级承音假设" in labels:
+                value[ASSUME_CHENGYIN_KEY] = True
+            applied[slot] = value
+        return applied
+
     def _on_apply_result(self, result: dict) -> None:
         """将搜索结果的装备组合写入 session（按槽位合并，不覆盖未参与槽位）。"""
         user_name = self._host.active_user_name()
@@ -1366,7 +1391,7 @@ class OptimalComboPage(QWidget):
             from ...core.combat.equipment import EquipmentInventory
             inv = EquipmentInventory(user_name)
             inv.apply_combos(
-                result.get("equipped", {}),
+                self._apply_assume_chengyin(result),
                 equipment_set=str(result.get("equipment_set") or ""),
             )
 

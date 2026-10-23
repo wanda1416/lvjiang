@@ -25,6 +25,7 @@ from typing import Any
 from loguru import logger
 
 from ...config.constants import STACK_MAX
+from ..equip_parser.constants import ASSUME_CHENGYIN_KEY
 
 # 战斗属性字段定义（顺序即展示顺序）
 # 每组: (字段名, 显示名, 单位, 是否区间)
@@ -560,19 +561,28 @@ def apply_hypothetical_caps(
 
         effective_level = equip.get("level")
         is_cy = can_cultivate_affix_values(equip)
+        # 用户给这件装备勾了「假设同级承音」：装备事实仍是未承音，但满承音
+        # 投影要按承音装备取值，不再为它生成承音/不承音两个平行候选。
+        assume_cy = bool(equip.get(ASSUME_CHENGYIN_KEY)) and not is_cy
 
         # 普通词条 affix_1~5
         for i in range(1, 6):
             affix = equip.get(f"affix_{i}")
             if not affix or not isinstance(affix, dict) or not affix.get("name"):
                 continue
-            if full_chengyin and is_cy and effective_level:
+            if full_chengyin and (is_cy or assume_cy) and effective_level:
                 chengyin_cap = affix_cap_value(
                     int(effective_level), affix["name"], chengyin=True,
                     game_config=gc)
                 if chengyin_cap is not None:
-                    # “满承音”只提升真实承音装备，不得把已经更高的识别值
-                    # 反向覆盖为较低上限。
+                    if assume_cy:
+                        # 假设承音要复现真实承音的结果：数值统一落到承音上限，
+                        # 原本高于上限的词条同样会被截断，不能保留高值。
+                        affix["value"] = chengyin_cap
+                        equip["is_chengyin"] = True
+                        continue
+                    # 已承音装备的“满承音”只补足没喂满的部分，不得把已经更高
+                    # 的识别值反向覆盖为较低上限。
                     try:
                         current = float(affix.get("value") or 0.0)
                     except (TypeError, ValueError):

@@ -247,6 +247,10 @@ class EquipmentInventory:
         """修改装备自身的原始套装。"""
         self._state = self._repo.set_item_equipment_set(fp, set_key)
 
+    def set_item_assume_chengyin(self, fp: str, enabled: bool) -> None:
+        """设置装备的「假设同级承音」计算开关。"""
+        self._state = self._repo.set_item_assume_chengyin(fp, enabled)
+
     def apply_transmute_targets(
         self,
         targets: dict[str, tuple[int, str, float] | None],

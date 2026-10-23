@@ -21,6 +21,7 @@ from __future__ import annotations
 import copy
 from enum import Enum
 
+from ..equip_parser.constants import ASSUME_CHENGYIN_KEY
 from ..equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_TYPE_KEY,
@@ -112,6 +113,10 @@ def merge_equipment_write(
     # 转律目标是用户算出来的计划，扫描数据永远不带它，只能从旧版本搬。
     if saved_transmute_target(value) is None:
         _carry_transmute_target(existing, value)
+    # 假设同级承音是用户给这件装备设的计算开关，扫描同样永远不带它。
+    if not value.get(ASSUME_CHENGYIN_KEY) and existing.get(
+            ASSUME_CHENGYIN_KEY):
+        value[ASSUME_CHENGYIN_KEY] = existing[ASSUME_CHENGYIN_KEY]
     return value
 
 

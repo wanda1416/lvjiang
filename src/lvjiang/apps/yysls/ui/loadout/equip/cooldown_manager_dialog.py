@@ -264,6 +264,25 @@ class CooldownEquipmentDialog(QDialog):
             self.changed = True
             return True
 
+        def update_assume_chengyin(enabled: bool) -> bool:
+            nonlocal changed
+            if not fp:
+                QMessageBox.warning(
+                    self, tr("修改失败"), tr("装备数据缺少 _fp 字段"))
+                return False
+            try:
+                LoadoutRepository(
+                    entry.username, self._users_dir,
+                ).set_item_assume_chengyin(fp, enabled)
+            except Exception as exc:
+                logger.exception(
+                    f"修改用户 {entry.username} 的假设同级承音失败")
+                QMessageBox.critical(self, tr("修改失败"), str(exc))
+                return False
+            changed = True
+            self.changed = True
+            return True
+
         repo = LoadoutRepository(entry.username, self._users_dir)
 
         def dingyin_swap_candidates(kind: str) -> list[dict]:
@@ -285,6 +304,7 @@ class CooldownEquipmentDialog(QDialog):
         _show_equipment_properties(
             self, entry.equip, cooldown_changed=update_cooldown,
             dingyin_changed=switch_dingyin,
+            assume_chengyin_changed=update_assume_chengyin,
             dingyin_swap_candidates=dingyin_swap_candidates,
             dingyin_swapped=swap_dingyin,
             referenced_plans=entry.referenced_plans)

@@ -38,6 +38,7 @@ from ......ui.button_styles import (
 )
 from ......ui.presentation import is_dark_theme, make_tag
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
+from ....core.equip_parser.constants import ASSUME_CHENGYIN_KEY
 from ....core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_SLOT_NOTICE,
@@ -362,6 +363,20 @@ def _add_dingyin_switch_action(
     return action
 
 
+def _season_assume_chengyin_available(equip: dict) -> bool:
+    """「假设同级承音」只对本赛季等级、且尚未承音的装备开放。"""
+    if bool(equip.get("is_chengyin")):
+        return False
+    from ....config import get_game_config
+    season_level = get_game_config().current_equip_level()
+    if not season_level:
+        return False
+    try:
+        return int(equip.get("level") or 0) == int(season_level)
+    except (TypeError, ValueError):
+        return False
+
+
 def _equipment_property_rows(
     equip: dict,
     referenced_plans: list[str] | tuple[str, ...] = (),
@@ -385,10 +400,14 @@ def _equipment_property_rows(
     from ....config import get_game_config
     set_name = get_game_config().equipment_set_name(
         str(equip.get("equipment_set") or ""))
-    return [
+    rows = [
         (tr("来源"), source),
         (tr("指纹"), str(equip.get("_fp") or "")),
         (tr("状态"), lock_status),
+    ]
+    if _season_assume_chengyin_available(equip):
+        rows.append((tr("计算设置"), tr("按照满承音装备计算")))
+    rows.extend([
         (tr("引用方案"), "、".join(referenced_plans) or tr("无")),
         (tr("装备套装"), set_name or tr("未记录")),
         (tr("普通定音"), _dingyin_slot_text(equip, "dingyin")),
@@ -402,7 +421,8 @@ def _equipment_property_rows(
         (tr("更新时间"), _format_equipment_time(equip.get("updated_at"))),
         (tr("扫描时间"), _format_equipment_time(
             equip.get(EQUIPMENT_LAST_SEEN_AT) or equip.get("updated_at"))),
-    ]
+    ])
+    return rows
 
 
 def _equipment_properties_text(
@@ -517,6 +537,7 @@ class _EquipmentPropertiesDialog(QDialog):
         cooldown_changed: Callable[[str], bool] | None = None,
         dingyin_changed: Callable[[str], bool] | None = None,
         equipment_set_changed: Callable[[str], bool] | None = None,
+        assume_chengyin_changed: Callable[[bool], bool] | None = None,
         dingyin_swap_candidates: Callable[[str], list[dict]] | None = None,
         dingyin_swapped: Callable[[str, str], dict | None] | None = None,
         dingyin_kind: str = "",
@@ -529,6 +550,7 @@ class _EquipmentPropertiesDialog(QDialog):
         # 展示状态。对话框只负责问「切到哪一种」，不知道也不该知道写到哪。
         self._dingyin_changed = dingyin_changed
         self._equipment_set_changed = equipment_set_changed
+        self._assume_chengyin_changed = assume_chengyin_changed
         self._dingyin_swap_candidates = dingyin_swap_candidates
         self._dingyin_swapped = dingyin_swapped
         self._dingyin_kind = (
@@ -554,6 +576,25 @@ class _EquipmentPropertiesDialog(QDialog):
                 Qt.TextInteractionFlag.TextSelectableByMouse)
             field_value.setWordWrap(True)
             self._value_labels[name] = field_value
+            if name == tr("计算设置"):
+                assume_row = QHBoxLayout()
+                assume_row.setContentsMargins(0, 0, 0, 0)
+                self._assume_chengyin_check = QCheckBox(value)
+                self._assume_chengyin_check.setChecked(
+                    bool(self._equip.get(ASSUME_CHENGYIN_KEY)))
+                self._assume_chengyin_check.setToolTip(tr(
+                    "勾选后，满承音假设会把本件当作承音装备计算；"
+                    "只影响计算，不改变装备的承音状态"))
+                if self._assume_chengyin_changed is None:
+                    # 新入口不接回调时禁用它，避免勾选后只在副本里生效。
+                    self._assume_chengyin_check.setEnabled(False)
+                    self._assume_chengyin_check.setToolTip(
+                        tr("当前入口不支持修改计算设置"))
+                self._assume_chengyin_check.toggled.connect(
+                    self._set_assume_chengyin)
+                assume_row.addWidget(self._assume_chengyin_check, 1)
+                form.addRow(field_name, assume_row)
+                continue
             if name == tr("装备套装"):
                 self._equipment_set_value_label = field_value
                 set_row = QHBoxLayout()
@@ -644,6 +685,21 @@ class _EquipmentPropertiesDialog(QDialog):
         self._switch_equipment_set_button.setEnabled(enabled)
         self._switch_equipment_set_button.setToolTip(
             tr("当前入口不支持修改套装") if not enabled else "")
+
+    def _set_assume_chengyin(self, checked: bool) -> None:
+        """写入「假设同级承音」；回调拒绝时把复选框还原。"""
+        enabled = bool(checked)
+        if (self._assume_chengyin_changed is not None
+                and not self._assume_chengyin_changed(enabled)):
+            self._assume_chengyin_check.blockSignals(True)
+            self._assume_chengyin_check.setChecked(
+                bool(self._equip.get(ASSUME_CHENGYIN_KEY)))
+            self._assume_chengyin_check.blockSignals(False)
+            return
+        if enabled:
+            self._equip[ASSUME_CHENGYIN_KEY] = True
+        else:
+            self._equip.pop(ASSUME_CHENGYIN_KEY, None)
 
     def _switch_equipment_set(self) -> None:
         if self._equipment_set_changed is None:
@@ -805,6 +861,7 @@ def _show_equipment_properties(
     cooldown_changed: Callable[[str], bool] | None = None,
     dingyin_changed: Callable[[str], bool] | None = None,
     equipment_set_changed: Callable[[str], bool] | None = None,
+    assume_chengyin_changed: Callable[[bool], bool] | None = None,
     dingyin_swap_candidates: Callable[[str], list[dict]] | None = None,
     dingyin_swapped: Callable[[str, str], dict | None] | None = None,
     dingyin_kind: str = "",
@@ -818,6 +875,7 @@ def _show_equipment_properties(
         equip, parent, cooldown_changed=cooldown_changed,
         dingyin_changed=dingyin_changed,
         equipment_set_changed=equipment_set_changed,
+        assume_chengyin_changed=assume_chengyin_changed,
         dingyin_swap_candidates=dingyin_swap_candidates,
         dingyin_swapped=dingyin_swapped,
         dingyin_kind=dingyin_kind,

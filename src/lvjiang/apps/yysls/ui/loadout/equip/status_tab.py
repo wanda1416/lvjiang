@@ -1850,6 +1850,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         candidates = load_user_chengyin_candidates(
             self._host.user_manager.list_users(),
             get_game_config().get_level_configs(),
+            min_chengyin_level=get_game_config().current_min_chengyin_level(),
         )
         dialog = ChengyinMergeDialog(
             candidates, self._display_params, self)
@@ -1895,6 +1896,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         dialog.set_candidates(load_user_chengyin_candidates(
             self._host.user_manager.list_users(),
             get_game_config().get_level_configs(),
+            min_chengyin_level=get_game_config().current_min_chengyin_level(),
         ))
         count = sum(len(replacements_by_user[name]) for name in completed_users)
         if error is not None:

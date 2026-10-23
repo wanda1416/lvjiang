@@ -22,6 +22,8 @@ def _levels() -> list[LevelConfig]:
             level=105, allow_chengyin=True, allow_retransfer=True),
         LevelConfig(
             level=110, allow_chengyin=True, allow_retransfer=True),
+        LevelConfig(
+            level=115, allow_chengyin=True, allow_retransfer=True),
     ]
 
 
@@ -33,13 +35,14 @@ def _equip(
     transferred: int | None = None,
     dingyin: bool = True,
     name: str = "套装甲",
+    chengyin: bool | None = None,
 ) -> dict:
     equip: dict = {
         "type": "剑",
         "name": name,
         "level": level,
         "quality": "gold",
-        "is_chengyin": level > 100,
+        "is_chengyin": level > 100 if chengyin is None else chengyin,
         "dingyin": {"name": "定音甲", "value": 1} if dingyin else None,
     }
     for index, (affix_name, value) in enumerate(
@@ -54,9 +57,10 @@ def _equip(
     return equip
 
 
-def _find(*equips: dict):
+def _find(*equips: dict, min_chengyin_level: int = 0):
     return find_chengyin_merge_candidates(
-        {equip["_fp"]: equip for equip in equips}, _levels())
+        {equip["_fp"]: equip for equip in equips}, _levels(),
+        min_chengyin_level)
 
 
 def test_first_transfer_does_not_require_old_level_to_allow_retransfer():
@@ -146,6 +150,72 @@ def test_both_levels_must_allow_chengyin():
     new = _equip(level=90, values=(11, 21, 31, 41, 51))
 
     assert _find(old, new) == []
+
+
+# ─── 升阶关系必须真的能发生 ────────────────────────────────
+
+def test_level_up_without_chengyin_is_not_the_same_item():
+    """等级只能由承音带来：未承音 → 未承音却涨了等级，游戏里造不出来。
+
+    合并会删记录、迁移方案引用且不可撤销，把这种组合当成同一件装备的前后
+    版本等同于误删。
+    """
+    old = _equip(level=105, chengyin=False)
+    new = _equip(level=110, values=(11, 21, 31, 41, 51), chengyin=False)
+
+    assert _find(old, new) == []
+    # 同一对只要新版本承音，就是一次合法的首次承音
+    assert len(_find(old, _equip(
+        level=110, values=(11, 21, 31, 41, 51), chengyin=True))) == 1
+
+
+def test_level_up_below_the_season_floor_is_not_the_same_item():
+    """本赛季作废线以下的装备已经不能继续承音，升阶链不可能再出现。"""
+    old = _equip(level=100)
+    new = _equip(level=105, values=(11, 21, 31, 41, 51))
+
+    assert _find(old, new, min_chengyin_level=105) == []
+    # 不设下限（离线分析）时仍按历史链识别
+    assert len(_find(old, new)) == 1
+
+
+def test_level_up_at_or_above_the_floor_still_merges():
+    """作废线之上的升阶照常识别：105 → 110、110 → 115 都是真的承音。"""
+    old = _equip(level=105)
+    new = _equip(level=110, values=(11, 21, 31, 41, 51))
+
+    assert len(_find(old, new, min_chengyin_level=105)) == 1
+
+
+def test_repeat_chengyin_chain_collapses_into_one_group():
+    """105 未承音 → 110 承音 → 115 承音：三条记录归成一组、保留最高阶。"""
+    first = _equip(level=105, chengyin=False)
+    middle = _equip(level=110, values=(11, 21, 31, 41, 51))
+    latest = _equip(level=115, values=(12, 22, 32, 42, 52))
+
+    candidates = _find(first, middle, latest, min_chengyin_level=105)
+
+    assert {c.new_fp for c in candidates} == {latest["_fp"]}
+    assert {c.old_fp for c in candidates} == {first["_fp"], middle["_fp"]}
+    assert all(not c.requires_review for c in candidates)
+
+
+def test_same_level_pairs_below_the_floor_still_merge():
+    """作废线只拦「继续承音」：同级只靠转律/培养产生的旧快照仍然合并。
+
+    低于作废线的装备不能再承音，但它同一等级上的转律快照仍是同一件实体，
+    排除它们只会让重复记录永远留在装备池里。
+    """
+    old = _equip(level=100)
+    new = _equip(level=100, values=(11, 21, 8, 41, 51),
+                 names=("词一", "词二", "新词三", "词四", "词五"),
+                 transferred=3, chengyin=False)
+
+    candidates = _find(old, new, min_chengyin_level=105)
+
+    assert len(candidates) == 1
+    assert candidates[0].old_fp == old["_fp"]
+    assert candidates[0].new_fp == new["_fp"]
 
 
 def test_multiple_transfer_markers_are_rejected():
@@ -480,6 +550,10 @@ def test_merge_keeps_dialog_open_and_reloads_remaining_candidates(qtbot, tmp_pat
     monkeypatch.setattr(chengyin_merge_dialog, "LoadoutRepository", lambda username, users_dir=None:
                         LoadoutRepository(username, tmp_path))
     monkeypatch.setattr(config.get_game_config(), "get_level_configs", _levels)
+    # 本用例讲的是对话框重载行为，装备用 100→105 这对历史快照；把赛季作废线
+    # 设到 100，避免真实配置的 105 把这对挡掉（作废线本身另有专门用例）。
+    monkeypatch.setattr(
+        config.get_game_config(), "current_min_chengyin_level", lambda: 100)
     hub = SimpleNamespace(publish=Mock())
     monkeypatch.setattr(status_tab, "get_event_hub", lambda _host: hub)
     owner = SimpleNamespace(

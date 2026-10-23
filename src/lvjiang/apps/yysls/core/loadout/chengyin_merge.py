@@ -115,6 +115,7 @@ def _can_follow(
     old: dict,
     new: dict,
     levels: dict[int, LevelConfig],
+    min_chengyin_level: int = 0,
 ) -> bool:
     """new 是否可能是 old 经承音、传律或转律后的版本。
 
@@ -122,6 +123,10 @@ def _can_follow(
     两份数值一致的快照——喂养中途重复录入，或一份手填满承音、一份实测，
     两者仅因小数位口径不同才生成了不同指纹。要求必须存在可见变化会把这
     类重复快照永远挡在候选之外，而它们正是最该合并的对象。
+
+    但「不矛盾」不等于允许游戏里造不出来的组合：升阶只能是承音的结果，
+    而本赛季低于作废线的装备已经不能继续承音，所以这两条必须在升阶时成立，
+    否则会把两件不同装备误判成同一件的前后版本（合并会删记录，不可逆）。
     """
     if not _eligible(old, levels) or not _eligible(new, levels):
         return False
@@ -136,6 +141,13 @@ def _can_follow(
         return False
     if new_level < old_level:
         return False
+    if new_level > old_level:
+        # 等级只能由承音带来：未承音 → 未承音却涨了等级，游戏里造不出来。
+        if not bool(new.get("is_chengyin")):
+            return False
+        # 本赛季作废线以下的装备已不能继续承音，跨阶链不可能再出现。
+        if old_level < min_chengyin_level:
+            return False
     # 承音标记一旦出现不能倒退；未承音装备之间仍可因首次/再次转律匹配。
     if bool(old.get("is_chengyin")) and not bool(new.get("is_chengyin")):
         return False
@@ -186,10 +198,15 @@ def _can_follow(
 def find_chengyin_merge_candidates(
     equipment_items: dict[str, dict],
     level_configs: list[LevelConfig],
+    min_chengyin_level: int = 0,
 ) -> list[ChengyinMergeCandidate]:
     """返回疑似同件装备对，移除明确历史链中的冗余中间关系。
 
     双向兼容（互为对方的合法后继）时由 :func:`_freshness` 决定保留哪份。
+
+    ``min_chengyin_level`` 是本赛季的承音作废线（``SeasonConfig.min_chengyin_level``）：
+    低于它的装备已经不能继续承音，因此不会再产生新的升阶快照，升级关系不成立。
+    0 表示不设下限（离线分析、单测直接构造）。
     """
     levels = {config.level: config for config in level_configs}
     eligible = [
@@ -201,8 +218,10 @@ def find_chengyin_merge_candidates(
     for left, right in combinations(eligible, 2):
         left_pos, left_fp, left_equip = left
         right_pos, right_fp, right_equip = right
-        left_to_right = _can_follow(left_equip, right_equip, levels)
-        right_to_left = _can_follow(right_equip, left_equip, levels)
+        left_to_right = _can_follow(
+            left_equip, right_equip, levels, min_chengyin_level)
+        right_to_left = _can_follow(
+            right_equip, left_equip, levels, min_chengyin_level)
         if not left_to_right and not right_to_left:
             continue
         if left_to_right and not right_to_left:
@@ -224,12 +243,13 @@ def find_chengyin_merge_candidates(
             old=old,
             new=new,
         ))
-    return _normalize_candidates(result, levels)
+    return _normalize_candidates(result, levels, min_chengyin_level)
 
 
 def _normalize_candidates(
     candidates: list[ChengyinMergeCandidate],
     levels: dict[int, LevelConfig],
+    min_chengyin_level: int = 0,
 ) -> list[ChengyinMergeCandidate]:
     successors: dict[str, set[str]] = {}
     for candidate in candidates:
@@ -276,8 +296,8 @@ def _normalize_candidates(
         ):
             review_targets.add(target)
         # 多个旧快照各自能达到同一新版本，并不证明它们彼此属于同一件装备。
-        if any(not (_can_follow(a.old, b.old, levels)
-                    or _can_follow(b.old, a.old, levels))
+        if any(not (_can_follow(a.old, b.old, levels, min_chengyin_level)
+                    or _can_follow(b.old, a.old, levels, min_chengyin_level))
                for a, b in combinations(group, 2)):
             review_targets.add(target)
     return [replace(c, requires_review=c.new_fp in review_targets)

@@ -44,8 +44,14 @@ def load_user_chengyin_candidates(
     usernames: list[str],
     level_configs: list[LevelConfig],
     users_dir: Path | None = None,
+    *,
+    min_chengyin_level: int = 0,
 ) -> list[UserChengyinMergeCandidate]:
-    """按用户顺序汇总全部承音装备合并候选。"""
+    """按用户顺序汇总全部承音装备合并候选。
+
+    ``min_chengyin_level`` 传本赛季作废线：低于它的装备已经不能继续承音，
+    不会再产生升阶快照，因此不参与升级关系判定。
+    """
     result: list[UserChengyinMergeCandidate] = []
     for username in usernames:
         try:
@@ -53,7 +59,8 @@ def load_user_chengyin_candidates(
             if not repo.path.exists():
                 continue
             candidates = find_chengyin_merge_candidates(
-                repo.load().equipment_items, level_configs)
+                repo.load().equipment_items, level_configs,
+                min_chengyin_level)
             result.extend(
                 UserChengyinMergeCandidate(username, candidate)
                 for candidate in candidates

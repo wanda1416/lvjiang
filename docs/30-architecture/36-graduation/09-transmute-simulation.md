@@ -22,7 +22,8 @@
 - 冷却中、已锁定的装备照常分析；卡片保留冷却／锁定提示，应用不改变这两种状态。
 - 该口径与 `rule_judge.py` 的再次转律判断一致（`allow_retransfer` +
   `allow_retransfer_after_chengyin`）。承音合并（`chengyin_merge.py`）故意宽松，
-  不以本需求为由收紧。
+  不以本需求为由收紧——这里说的是转律资格；升阶关系本身仍要求「新版本已承音」
+  且「旧等级不低于赛季作废线」，见 31-models/01-equipment-models.md §6.5。
 
 ### 3.2 每件装备是一组互斥选项
 

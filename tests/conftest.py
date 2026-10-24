@@ -39,6 +39,21 @@ load_config_policies(builtin_app_ids())
 install_closed_directory_scan()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _initialize_scene_registry_from_real_config():
+    """场景注册表是懒加载的：会话开头先按真实配置初始化一次。
+
+    它以前在模块导入时就构造，测试天然拿到仓库里的真实场景。改成显式初始化后，
+    「第一个碰它的用例」决定全局内容——xdist 并行时可能是某个用 tmp 配置的用例，
+    之后整条 worker 上的场景/布局校验都对着错误数据跑（``test_system_wf_refs_gate``
+    报「区域未绑定」「子场景引用未定义」正是这个症状）。这里在任何用例之前固定一次
+    真实配置，让每个 worker 的起点一致。
+    """
+    from lvjiang.core.scene_registry import initialize_scene_registry
+
+    initialize_scene_registry()
+
+
 @pytest.fixture(autouse=True)
 def _isolate_node_role(monkeypatch):
     """节点权限属于应用实例；测试的身份切换不能泄漏到下一个用例。"""

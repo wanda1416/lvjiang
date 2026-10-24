@@ -93,7 +93,8 @@ def test_installed_callback_can_read_configuration_from_another_thread(tmp_path)
 
     store.install(member_files={"opaque": b"new"}, activate=refresh)
     assert acquired == [True]
-    assert json.loads(store.state_path.read_text(encoding="utf-8"))["files"]
+    # 会员文件记录在 member 节点下；state 顶层只保留语义字段（files 已随修订号加载重构移除）。
+    assert json.loads(store.state_path.read_text(encoding="utf-8"))["member"]["files"]
     assert not (tmp_path / "session/config.lock").exists()
 
 

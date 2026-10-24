@@ -77,19 +77,24 @@ def test_read_tree_only_skips_unlisted_entries_entirely(official):
     assert sorted(files) == ["app.yaml", "workflows/task.wf"]
 
 
-def test_packaging_only_writes_identity_and_startup_creates_r0(official, monkeypatch):
+def test_packaging_only_writes_identity_and_first_install_creates_r0(official, monkeypatch):
     from lvjiang.core.config import remote
     from lvjiang.core.config.update_store import UpdateStore
     from lvjiang.core.system_preset import write_baseline_identity
-    from lvjiang.core.update_bundle import read_tree, unpack
+    from lvjiang.core.update_bundle import make_manifest, read_tree, unpack
     identity = write_baseline_identity(official, "0.15.0", config_dir=official.parent)
     store = UpdateStore(official.parent, "0.15.0", identity["sha256"])
     baseline = store.root / "r0.zip"
     assert not baseline.exists()
     monkeypatch.setattr(remote, "_installed_store", lambda: store)
+    # 没有待恢复事务时启动不碰配置，也不提前生成 r0。
     remote.recover_installation()
-    assert unpack(baseline.read_bytes()) == read_tree(official)
-    assert store._state()["revision"] == 0
+    assert not baseline.exists()
+    files = read_tree(official)
+    manifest, archive = make_manifest("0.15.0", 1, files, {})
+    store.install(manifest, archive, activate=lambda *args: None)
+    assert unpack(baseline.read_bytes()) == files
+    assert store._state()["revision"] == 1
 
 
 def test_upgrade_preserves_parameters_database_and_pc_sync_until_new_preset(official, tmp_path, monkeypatch):

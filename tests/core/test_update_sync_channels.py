@@ -1,6 +1,4 @@
 """断网不能变成撤回；公开与会员两个下载渠道互不拖累。"""
-import pytest
-
 from lvjiang.core.config import remote
 from lvjiang.core.config.member_download import MemberDownload
 
@@ -8,7 +6,7 @@ from lvjiang.core.config.member_download import MemberDownload
 def test_public_download_failure_preserves_member_candidate(tmp_path, monkeypatch):
     from types import SimpleNamespace
     monkeypatch.setattr(remote, "UpdateStore", lambda *args: SimpleNamespace(
-        install=lambda *a, **kw: (), prune_archives=lambda: None))
+        install=lambda *a, **kw: (), prune_archives=lambda: None, _state=lambda: {}))
     member = MemberDownload({}, {})
 
     def unavailable(*args, **kwargs):
@@ -35,11 +33,9 @@ def test_unknown_authorization_does_not_withdraw_member(tmp_path, monkeypatch):
     assert not result.errors
 
 
-def test_background_preparation_then_activation_and_other_instance_refresh(tmp_path, monkeypatch):
+def test_background_download_then_activation_on_main_thread(tmp_path, monkeypatch):
     from lvjiang.core.config import protected_remote, update_activation
     from lvjiang.core.config.update_download import PublicDownload
-    from lvjiang.core.config.update_observer import InstallationObserver
-    from lvjiang.core.config.update_store import UpdateStore
     from lvjiang.core.update_bundle import json_bytes, make_manifest, tree_digest
 
     system = tmp_path / "system"
@@ -56,10 +52,9 @@ def test_background_preparation_then_activation_and_other_instance_refresh(tmp_p
     monkeypatch.setattr(protected_remote, "snapshot", lambda: None)
     activated = []
     monkeypatch.setattr(update_activation, "activate_configuration", lambda path, changed: activated.append(changed))
-    observer = InstallationObserver(UpdateStore(tmp_path, "0.15.0", tree_digest(baseline)))
     job = remote.SyncJob(tmp_path, "0.15.0", tree_digest(baseline))
     result = remote.run_sync(job)
-    assert result.candidate is not None
+    # 下载不触碰生效目录。
     assert (system / "opaque.bin").read_bytes() == b"old"
     # 安装不审查或修改 local，本地编辑不能阻断官方包安装。
     (local / "app.yaml").write_text("value: 99", encoding="utf-8")
@@ -67,10 +62,6 @@ def test_background_preparation_then_activation_and_other_instance_refresh(tmp_p
     (local / "diagnostics/runtime.log").write_text("task is running", encoding="utf-8")
     assert remote.apply_outcome(result) == ("opaque.bin",)
     assert activated == [("opaque.bin",)]
-    seen = []
-    assert observer.poll(seen.append) == ("opaque.bin",)
-    assert observer.poll(seen.append) == ()
-    assert seen == [("opaque.bin",)]
     assert (local / "app.yaml").read_text(encoding="utf-8") == "value: 99"
     # 同修订再次同步不重新解析或切换目录。
     remote.apply_outcome(remote.run_sync(job))
@@ -102,13 +93,7 @@ def test_successful_empty_index_withdraws_public_but_failure_preserves_it(tmp_pa
     empty = json_bytes({"schema_version": 1, "series": {}})
     monkeypatch.setattr(remote, "_fetch_bytes", lambda *a, **kw: (empty, "", False))
     result = remote.run_sync(job)
-    # 另一个实例改变了索引选择，旧候选不能覆盖它；但真正的线上撤销仍可回退。
-    store.cache_index("public", json_bytes({"schema_version": 1, "series": {"0.15.0": {
-        "revision": 2, "manifest": "v0.15.0/r2/manifest.json", "sha256": store._state()["public_sha256"]}}}))
-    with pytest.raises(ValueError, match="其他同步"):
-        remote.apply_outcome(result)
-    assert store._state()["revision"] == 2
-    store.cache_index("public", empty)
+    # 成功的空索引是真正的线上撤销，可回退到 r0。
     remote.apply_outcome(result)
     assert store._state()["revision"] == 0
     assert (store.system / "opaque.bin").read_bytes() == b"base"

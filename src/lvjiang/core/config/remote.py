@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.error import HTTPError
@@ -44,7 +43,6 @@ class SyncResult:
     member: MemberDownload | None = None
     errors: tuple[str, ...] = ()
     performed: bool = True
-    candidate: tempfile.TemporaryDirectory[str] | None = field(default=None, repr=False, compare=False)
 
 
 def _fetch_bytes(url: str, *, max_bytes: int, timeout: float,
@@ -117,12 +115,7 @@ def get_config_version() -> int:
     store = _installed_store()
     if store is None:
         return 0
-    from ..update_bundle import file_hashes, read_tree
-    with store.locked():
-        state = store._state()
-        if state.get("files") != file_hashes(read_tree(store.system)):
-            return 0
-        return int(state.get("revision", 0))
+    return int(store._state().get("revision", 0))
 
 
 def get_last_synced_at() -> str:
@@ -133,19 +126,16 @@ def get_last_synced_at() -> str:
 
 
 def recover_installation() -> None:
-    """启动时只恢复未提交的安装事务；不提升旧 remote 暂存目录。"""
+    """启动时只回滚未提交事务；没有待恢复动作就不碰配置。"""
     store = _installed_store()
-    if store is not None:
-        store.recover()
-        from .protected_remote import authorized
-        member = store._state().get("member", {})
-        invalid = member.get("files") and not authorized(member)
-        if invalid:
-            # 在读取场景/工作流之前撤下失效会员内容，不依赖网络是否可用。
-            store.install(member_files={}, member_metadata={},
-                          activate=lambda *_args: None)
-        else:
-            store.install(activate=lambda *_args: None)
+    if store is None:
+        return
+    store.recover()
+    from .protected_remote import authorized
+    member = store._state().get("member", {})
+    if member.get("files") and not authorized(member):
+        # 在读取场景/工作流之前撤下失效会员内容，不依赖网络是否可用。
+        store.install(member_files={}, member_metadata={}, activate=lambda *_args: None)
 
 
 def prepare_task_installation() -> None:
@@ -192,6 +182,9 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
     member = None
     errors = []
     store = UpdateStore(config, job.app_version, job.baseline_sha256)
+    state = store._state()
+    local_public = int(state.get("revision", 0))
+    local_member = int(state.get("member_index_revision", 0))
     try:
         store.prune_archives()
     except (OSError, ValueError) as error:
@@ -199,7 +192,11 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
     if job.enabled:
         try:
             public = fetch_public_update(job.app_version, fetch=_fetch_bytes, timeout=timeout,
+                                         known_revision=local_public,
                                          cache_index=lambda raw: store.cache_index("public", raw))
+            if public is not None and public.unchanged:
+                logger.debug("[在线配置] 公开配置仍为 r{}，本轮不下载", local_public)
+                public = None
         except Exception as error:
             errors.append(f"公开更新未获取，保留已安装版本: {error}")
     if not job.enabled:
@@ -207,29 +204,19 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
     elif job.member_access_known:
         try:
             member = fetch_member_update(job.protected, job.app_version, fetch=_fetch_bytes, timeout=timeout,
+                                         known_revision=local_member,
                                          cache_index=lambda raw: store.cache_index("member", raw))
+            if member is not None and member.unchanged:
+                logger.debug("[在线配置] 会员配置仍为 r{}，本轮不下载", local_member)
+                member = None
         except Exception as error:
             errors.append(f"会员更新未获取，保留已安装版本: {error}")
-    if public is None and member is None:
-        return SyncResult(job, errors=tuple(errors))
-    store = UpdateStore(config, job.app_version, job.baseline_sha256)
-    candidate = None
-    def retain(owner):
-        nonlocal candidate
-        candidate = owner
-    store.install(public.manifest if public else None, public.archive if public else None,
-                  manifest_json=public.manifest_json if public and public.manifest_json else None,
-                  index_snapshots=_index_snapshots(public, member),
-                  reset_public=not job.enabled or bool(public is not None and public.manifest is None),
-                  member_files=member.files if member else None,
-                  member_metadata=member.metadata if member else None,
-                  preview=True, retain_candidate=retain, activate=lambda *_: None)
-    return SyncResult(job, public, member, tuple(errors), candidate=candidate)
+    return SyncResult(job, public, member, tuple(errors))
 
 
 def apply_outcome(result: SyncResult) -> tuple[str, ...]:
     """主线程原子安装并刷新；不修改用户 local、session 或活动选择。"""
-    from .protected_remote import authorized, snapshot
+    from .protected_remote import authorized
     from .update_activation import activate_configuration
     job = result.job
     for message in result.errors:
@@ -240,18 +227,11 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
     store = UpdateStore(config, job.app_version, job.baseline_sha256)
     member = result.member
     enabled = is_enabled()
-    try:
-        access = snapshot()
-        if (access.code_hash if access else None) != (job.protected.code_hash if job.protected else None):
-            member = None
-    except (ValueError, OSError):
-        member = None
-    # 下载期间用户可能切换授权；不能把旧授权的包安装给新上下文。
-    if member is not None and member.files and not authorized(member.metadata):
-        logger.info("[在线配置] 授权已变化，忽略本次会员候选")
-        member = None
     if not enabled:
         member = MemberDownload({}, {})
+    elif member is not None and member.files and not authorized(member.metadata):
+        logger.info("[在线配置] 会员授权已变化，忽略本次会员候选")
+        member = None
     elif member is None and job.member_access_known:
         state = store._state().get("member", {})
         if state.get("files") and not authorized(state):
@@ -259,20 +239,14 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
     if result.public is None and member is None and enabled:
         return ()
     if member is not None and member.encrypted:
-        from .protected_bundle import valid_key_id
-        key_id = member.metadata.get("key_id")
-        if not isinstance(key_id, str) or not valid_key_id(key_id):
-            raise ValueError("会员归档标识非法")
         store.cache_member(member.metadata, member.manifest_json, member.encrypted)
     public = result.public if enabled else None
     changed = store.install(
         public.manifest if public else None, public.archive if public else None,
         manifest_json=public.manifest_json if public and public.manifest_json else None,
-        index_snapshots=_index_snapshots(public, member),
         reset_public=not enabled or bool(public is not None and public.manifest is None),
         member_files=member.files if member is not None else None,
         member_metadata=member.metadata if member is not None else None,
-        prepared=result.candidate,
         activate=activate_configuration)
     if changed:
         logger.info("[在线配置] 已生效：{} 个文件；运行中的任务继续使用启动快照", len(changed))
@@ -283,8 +257,3 @@ def sync_now(*, timeout: float = 10.0) -> SyncResult:
     result = run_sync(build_sync_job(), timeout=timeout)
     apply_outcome(result)
     return result
-
-
-def _index_snapshots(public: PublicDownload | None, member: MemberDownload | None) -> dict[str, bytes]:
-    return {channel: download.index_json for channel, download in (("public", public), ("member", member))
-            if download is not None and download.index_json}

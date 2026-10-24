@@ -1480,13 +1480,6 @@ class MainWindow(
         """
         from PyQt6.QtCore import QThread
 
-        # 在线配置的安装轮询定时器每 2 秒会装一次配置，关闭时先停掉它，
-        # 免得收线之后还在改配置。
-        timer = getattr(self, "_config_install_timer", None)
-        stop_timer = getattr(timer, "stop", None)
-        if callable(stop_timer):
-            stop_timer()
-
         # 设备扫描/连接循环靠取消标记退出，先置位再等线程结束。
         worker = getattr(self, "_device_worker", None)
         cancel = getattr(worker, "cancel", None)

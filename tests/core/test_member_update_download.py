@@ -32,6 +32,8 @@ def test_member_integrity_and_authorization_failure_semantics(monkeypatch):
     assert result.files == contents
     assert result.encrypted == encrypted
     assert protected_remote.member_access_status(access.code_hash).state == "allowed"
+    # 会员索引修订与本地记录相同：只读索引，不请求授权与密文包。
+    assert member_download.fetch_member_update(access, "0.15.0b1", known_revision=3, fetch=fetch).unchanged
     def damaged(url, **kwargs):
         return (index if url == manifest_url() else encrypted[:-1]), "", False
     with pytest.raises(ValueError, match="摘要不匹配"):
@@ -64,11 +66,9 @@ def test_member_integrity_and_authorization_failure_semantics(monkeypatch):
     assert "云端停用" in "".join(logs) and access.code not in "".join(logs)
 
 
-def test_member_authenticated_archive_rejects_tamper_and_hierarchy_collision():
+def test_member_authenticated_archive_rejects_tamper():
     from lvjiang.core.config.protected_bundle import decrypt
     key = b"k" * 32
-    with pytest.raises(ValueError, match="冲突"):
-        encrypt({"a": b"x", "a/b": b"y"}, key, b"n" * 12)
     encrypted = encrypt({"x": b"x"}, key, b"n" * 12)
     with pytest.raises(ValueError, match="认证失败"):
         decrypt(encrypted[:-1] + bytes([encrypted[-1] ^ 1]), key)

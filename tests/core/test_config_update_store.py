@@ -38,7 +38,7 @@ def test_cumulative_unknown_files_and_local_survive(tmp_path):
     assert (tmp_path / "system/new/.future").read_bytes() == b"\xff\x00"
     assert (tmp_path / "local/app.yaml").read_bytes() == b"delay: 9"
     assert unpack((tmp_path / "updates/v0.15.0/r0.zip").read_bytes()) == base
-    assert (tmp_path / f"updates/v0.15.0/public/r5/{digest(json_bytes(manifest))[:8]}/update.zip").read_bytes() == archive
+    assert (tmp_path / f"updates/v0.15.0/public/r5/{digest(json_bytes(manifest))}/update.zip").read_bytes() == archive
     # 下一修订撤回全部覆盖，无需反向补丁链。
     manifest, archive = make_manifest("0.15.0", 6, base, {})
     store.install(manifest, archive, activate=lambda *args: None)
@@ -65,37 +65,44 @@ def test_activation_failure_does_not_revert_committed_installation(tmp_path):
     assert not (tmp_path / "updates/transaction.json").exists()
 
 
-def test_archive_names_are_short_indexes_not_content_identity(tmp_path):
-    """归档改名和短索引碰撞都不能破坏重启恢复或清理保留判断。"""
+def test_same_revision_is_untouched_and_archive_is_content_addressed(tmp_path):
+    """修订号相同就不动；归档目录以完整清单摘要命名。"""
     base = {"app.yaml": b"old"}
     write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
-    manifest, archive = make_manifest("0.15.0", 1, base, {"app.yaml": b"new"})
-    full_hash = digest(json_bytes(manifest))
-    revision = store.root / "public/r1"
-    occupied = revision / full_hash[:8]
-    write_files(occupied, {"manifest.json": b"other archive"})
-    store.install(manifest, archive, activate=lambda *args: None)
-    installed = next(item for item in revision.iterdir() if item != occupied)
-    assert len(installed.name) == 8
-    assert occupied.joinpath("manifest.json").read_bytes() == b"other archive"
-    assert store._state()["public_sha256"] == full_hash
-    renamed = revision / "index001"
-    installed.rename(renamed)
-    # 重启路径不按摘要拼出目录名，直接从清单内容找到已安装公开包。
-    store.install(activate=lambda *args: None)
+    first, first_archive = make_manifest("0.15.0", 1, base, {"app.yaml": b"new"})
+    store.install(first, first_archive, activate=lambda *args: None)
+    archive_path = store.root / "public/r1" / digest(json_bytes(first)) / "update.zip"
+    assert archive_path.read_bytes() == first_archive
+    # 同修订的不同内容不重装，也不写第二份归档。
+    second, second_archive = make_manifest("0.15.0", 1, base, {"app.yaml": b"other"})
+    assert store.install(second, second_archive, activate=lambda *args: None) == ()
+    assert (tmp_path / "system/app.yaml").read_bytes() == b"new"
+    assert not (store.root / "public/r1" / digest(json_bytes(second))).exists()
     store.prune_archives()
-    assert renamed.joinpath("update.zip").read_bytes() == archive
-    assert not occupied.exists()
+    assert archive_path.is_file()
     member_manifest = json_bytes({"key_id": "example"})
     encrypted = b"encrypted package"
-    metadata = {"package_version": 3, "manifest_sha256": digest(member_manifest),
-                "sha256": digest(encrypted)}
+    metadata = {"package_version": 3}
     store.cache_member(metadata, member_manifest, encrypted)
-    member_dir = next((store.root / "member/r3").iterdir())
-    assert len(member_dir.name) == 8
+    member_dir = store.root / "member/r3" / digest(member_manifest)
     assert member_dir.joinpath("manifest.json").read_bytes() == member_manifest
     assert member_dir.joinpath("package.bin").read_bytes() == encrypted
+
+
+def test_published_baseline_mismatch_does_not_block_install(tmp_path):
+    """发布方基于另一份预置打的包，仍可叠加到客户端当前 system。"""
+    client = {"app.yaml": b"client", "workflows/local.wf": b"wait 0.1\n"}
+    write_files(tmp_path / "system", client)
+    store = UpdateStore(tmp_path, "0.15.0", tree_digest(client))
+    published, archive = make_manifest("0.15.0", 3, {"app.yaml": b"published"},
+                                       {"workflows/added.wf": b"wait 0.2\n"})
+    assert published["baseline_sha256"] != tree_digest(client)
+    store.install(published, archive, activate=lambda *args: None)
+    assert (tmp_path / "system/workflows/added.wf").read_bytes() == b"wait 0.2\n"
+    # 补丁未提及的文件保持客户端版本，不要求两端预置一致。
+    assert (tmp_path / "system/app.yaml").read_bytes() == b"client"
+    assert (tmp_path / "system/workflows/local.wf").read_bytes() == b"wait 0.1\n"
 
 
 def test_untrusted_baseline_and_wrong_series_are_rejected(tmp_path):
@@ -217,17 +224,17 @@ def test_public_revision_preserves_member_registry_fragments(tmp_path):
     assert data["scenes"]["basic"]["items"] == ["base", "new", "member"]
 
 
-def test_member_dependency_and_authorization_survive_index_rollback(tmp_path, monkeypatch):
+def test_member_install_and_withdrawal_ignore_public_revision_dependency(tmp_path, monkeypatch):
+    """会员包按授权安装与撤回，不因发布方修订序号拒绝。"""
     monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
     base = {"base.bin": b"base"}
     write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
     member = {"member.bin": b"member"}
     metadata = {"config_version": 4, "public_revisions": {"0.15.0": 2}}
-    with pytest.raises(ValueError, match="至少 r2"):
-        store.install(member_files=member, member_metadata=metadata,
-                      activate=lambda *a: None)
-    assert not (tmp_path / "system/member.bin").exists()
+    store.install(member_files=member, member_metadata=metadata,
+                  activate=lambda *a: None)
+    assert (tmp_path / "system/member.bin").read_bytes() == b"member"
     manifest, archive = make_manifest("0.15.0", 2, base, {})
     store.install(manifest, archive, member_files=member, member_metadata=metadata,
                   activate=lambda *a: None)
@@ -274,32 +281,58 @@ def test_rollback_republish_and_manifest_deletion_rebuild_from_r0(tmp_path):
     assert store._state()["revision"] == 0
     store.prune_archives()
     assert (store.root / "r0.zip").exists()
-    assert (store.root / f"public/r2/{digest(json_bytes(new))[:8]}").is_dir()
-    assert not (store.root / f"public/r2/{digest(json_bytes(old))[:8]}").exists()
+    # 撤回后只保留可回滚的上一选择，更早的同修订归档被回收。
+    assert (store.root / f"public/r2/{digest(json_bytes(new))}").is_dir()
+    assert not (store.root / f"public/r2/{digest(json_bytes(old))}").exists()
 
 
-def test_manifest_rejects_unsafe_conflicting_deletion_and_member_wrong_digest(tmp_path):
+def test_manifest_rejects_unsafe_deletion_path():
     base = {"base.bin": b"base"}
-    for deleted in (("../local/file",), ("base.bin",)):
-        with pytest.raises(ValueError):
-            make_manifest("0.15.0", 1, base, base, delete_files=deleted)
+    with pytest.raises(ValueError):
+        make_manifest("0.15.0", 1, base, base, delete_files=("../local/file",))
+
+
+def test_member_withdrawal_resets_member_revision(tmp_path):
+    """撤回会员必须同时把会员修订归零，否则之后会被当成「远端未变」永不拉取。"""
+    base = {"base.bin": b"base"}
     write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
-    manifest, archive = make_manifest("0.15.0", 2, base, {})
-    with pytest.raises(ValueError, match="摘要"):
-        store.install(manifest, archive, member_files={"member.bin": b"member"},
-                      member_metadata={"public_manifests": {"0.15.0": "0" * 64}},
-                      activate=lambda *a: None)
-    assert (tmp_path / "system/base.bin").read_bytes() == b"base"
-    required = digest(json_bytes(manifest))
-    metadata = {"public_revisions": {"0.15.0": 2}, "public_manifests": {"0.15.0": required}}
-    member = {"member.bin": b"member"}
-    store.install(manifest, archive, member_files=member, member_metadata=metadata,
-                  activate=lambda *a: None)
-    newer, newer_archive = make_manifest("0.15.0", 3, base, {}, ancestors={"2": required})
-    store.install(newer, newer_archive, activate=lambda *a: None)
-    assert (store.system / "member.bin").read_bytes() == b"member"
-    replacement, replacement_archive = make_manifest("0.15.0", 2, base, {"base.bin": b"different"})
-    with pytest.raises(ValueError, match="摘要"):
-        store.install(replacement, replacement_archive, activate=lambda *a: None)
+    store.install(member_files={"member.bin": b"member"},
+                  member_metadata={"config_version": 3}, activate=lambda *a: None)
+    assert store._state()["member_index_revision"] == 3
+    store.install(member_files={}, member_metadata={}, activate=lambda *a: None)
+    assert store._state()["member_index_revision"] == 0
+    assert not (tmp_path / "system/member.bin").exists()
+
+
+def test_member_update_replays_recorded_public_revision(tmp_path):
+    """公开修订未变、只有会员变化时，重放上一版公开层再叠加会员。"""
+    base = {"base.bin": b"base"}
+    write_files(tmp_path / "system", base)
+    store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
+    manifest, archive = make_manifest("0.15.0", 3, base, {"base.bin": b"public3"})
+    store.install(manifest, archive, activate=lambda *a: None)
+    store.install(member_files={"member.bin": b"m1"},
+                  member_metadata={"config_version": 1}, activate=lambda *a: None)
+    store.install(member_files={"member.bin": b"m2"},
+                  member_metadata={"config_version": 2}, activate=lambda *a: None)
+    assert (tmp_path / "system/base.bin").read_bytes() == b"public3"
+    assert (tmp_path / "system/member.bin").read_bytes() == b"m2"
     assert store._state()["revision"] == 3
+    assert store._state()["member_index_revision"] == 2
+
+
+def test_missing_public_archive_degrades_to_r0(tmp_path):
+    """归档被清理后仍能只装会员，不因缺文件整轮失败。"""
+    base = {"base.bin": b"base"}
+    write_files(tmp_path / "system", base)
+    store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
+    manifest, archive = make_manifest("0.15.0", 3, base, {"base.bin": b"public3"})
+    store.install(manifest, archive, activate=lambda *a: None)
+    for item in (store.root / "public/r3").iterdir():
+        (item / "update.zip").unlink()
+    store.install(member_files={"member.bin": b"member"},
+                  member_metadata={"config_version": 2}, activate=lambda *a: None)
+    assert (tmp_path / "system/base.bin").read_bytes() == b"base"
+    assert (tmp_path / "system/member.bin").read_bytes() == b"member"
+    assert store._state()["revision"] == 0

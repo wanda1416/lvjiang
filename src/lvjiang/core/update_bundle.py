@@ -163,23 +163,15 @@ def parse_manifest(data: Any) -> dict[str, Any]:
     revision = data.get("revision")
     if type(revision) is not int or revision < 1:
         raise ValueError("公开修订必须是正整数")
-    if not _hash(data.get("baseline_sha256")) or not _hash(data.get("archive_sha256")):
-        raise ValueError("配置包或预置基底摘要无效")
-    files = data.get("files")
-    if not isinstance(files, dict) or not all(_hash(value) for value in files.values()):
-        raise ValueError("配置文件摘要表无效")
-    validate_names(files)
+    if not _hash(data.get("archive_sha256")):
+        raise ValueError("配置包摘要无效")
+    if data.get("baseline_sha256") is not None and not _hash(data["baseline_sha256"]):
+        raise ValueError("预置基底摘要无效")
     deleted = data.get("delete_files")
     if not isinstance(deleted, list) or not all(isinstance(name, str) for name in deleted) \
             or len(deleted) != len(set(deleted)):
         raise ValueError("配置删除文件清单无效")
     validate_names(deleted)
-    validate_names([*files, *deleted])
-    ancestry = data.get("ancestors", {})
-    if not isinstance(ancestry, dict) or any(
-            not isinstance(key, str) or not re.fullmatch(r"[1-9]\d*", key) or int(key) >= revision or not _hash(value)
-            for key, value in ancestry.items()):
-        raise ValueError("公开修订来源摘要无效")
     return data
 
 
@@ -199,10 +191,7 @@ def make_manifest(version: str, revision: int, baseline: Mapping[str, bytes],
 def verify_archive(manifest: Mapping[str, Any], archive: bytes) -> dict[str, bytes]:
     if digest(archive) != manifest["archive_sha256"]:
         raise ValueError("配置包摘要不匹配")
-    files = unpack(archive)
-    if file_hashes(files) != manifest["files"]:
-        raise ValueError("配置包文件清单与内容不一致")
-    return files
+    return unpack(archive)
 
 
 def parse_index(data: Any) -> dict[str, Any]:
@@ -213,8 +202,8 @@ def parse_index(data: Any) -> dict[str, Any]:
         if series(version) != version or not isinstance(entry, dict):
             raise ValueError("索引应用系列无效")
         revision = entry.get("revision")
-        if type(revision) is not int or revision < 1 \
-                or entry.get("manifest") != f"v{version}/r{revision}/manifest.json" \
-                or not _hash(entry.get("sha256")):
+        manifest = entry.get("manifest")
+        if type(revision) is not int or revision < 1 or not isinstance(manifest, str) \
+                or not safe_path(manifest) or not _hash(entry.get("sha256")):
             raise ValueError("索引修订或清单地址无效")
     return data

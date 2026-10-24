@@ -7,6 +7,7 @@ from lvjiang.core.update_bundle import (
     digest,
     json_bytes,
     make_manifest,
+    verify_archive,
 )
 
 
@@ -29,8 +30,13 @@ def test_exact_series_selection_and_consistent_artifacts():
     assert result is not None and result.archive == archive
     assert fetch_public_update("0.15.0b1", fetch=fetch).archive == archive
     calls.clear()
+    # 修订号与本地记录相同：只读索引，不下载清单与归档。
+    assert fetch_public_update("0.15.0", known_revision=2, fetch=fetch).unchanged
+    assert calls == [f"{root}/index.json"]
+    calls.clear()
     assert fetch_public_update("0.15.1", fetch=fetch).manifest is None
     assert calls == [f"{root}/index.json"]
     files[f"{root}/v0.15.0/r2/update.zip"] = b"partial upload"
+    result = fetch_public_update("0.15.0", fetch=fetch)
     with pytest.raises(ValueError, match="摘要"):
-        fetch_public_update("0.15.0", fetch=fetch)
+        verify_archive(result.manifest, result.archive)

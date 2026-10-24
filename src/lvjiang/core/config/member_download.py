@@ -34,17 +34,20 @@ class MemberDownload:
     encrypted: bytes = b""
     manifest_json: bytes = b""
     index_json: bytes = b""
+    unchanged: bool = False
 
 
 def fetch_member_update(access: ProtectedAccess | None, app_version: str, *,
                         fetch: Callable[..., tuple[bytes, str, bool]], timeout: float = 10,
+                        known_revision: int = 0,
                         cache_index: Callable[[bytes], None] | None = None) -> MemberDownload:
     if access is None:
         logger.debug("[在线配置] 跳过会员更新：未取得有效的本地会员激活码")
         return MemberDownload({}, {})
     report_access_status(access, "checking", "正在检查云端会员授权")
     try:
-        return _fetch_member_update(access, app_version, fetch=fetch, timeout=timeout, cache_index=cache_index)
+        return _fetch_member_update(access, app_version, fetch=fetch, timeout=timeout,
+                                    known_revision=known_revision, cache_index=cache_index)
     except Exception as error:
         if member_access_status(access.code_hash).state != "allowed":
             report_access_status(access, "unavailable", "在线检查未完成，请查看配置同步日志并重试")
@@ -54,11 +57,15 @@ def fetch_member_update(access: ProtectedAccess | None, app_version: str, *,
 
 def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
                          fetch: Callable[..., tuple[bytes, str, bool]], timeout: float,
+                         known_revision: int = 0,
                          cache_index: Callable[[bytes], None] | None) -> MemberDownload:
     raw, _, _ = fetch(manifest_url(), max_bytes=256 * 1024, timeout=timeout)
-    index = parse_manifest(json.loads(raw))
     if cache_index is not None:
         cache_index(raw)
+    document = json.loads(raw)
+    if known_revision and document.get("config_version") == known_revision:
+        return MemberDownload({}, {}, index_json=raw, unchanged=True)
+    index = parse_manifest(document)
     package = select_package(index, app_version)
     if package is None:
         report_access_status(access, "unchecked", "没有适用当前版本的会员包，尚未验证云端授权")
@@ -131,7 +138,7 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
                                   "package_version": package["config_version"],
                                   "min_app_version": package["min_app_version"],
                                   "max_app_version_exclusive": package["max_app_version_exclusive"],
-                                  "public_revisions": package["public_revisions"],
+                                  "public_revisions": package.get("public_revisions", {}),
                                   "public_manifests": package.get("public_manifests", {}),
                                   "manifest_sha256": digest(json_bytes(package)),
                                   "code_hash": access.code_hash, "expires": expires,

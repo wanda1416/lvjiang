@@ -72,7 +72,6 @@ def encrypt(files: dict[str, bytes], key: bytes, nonce: bytes) -> bytes:
         for name, data in sorted(files.items()):
             archive.writestr(name, data)
     plain = stream.getvalue()
-    unpack(plain)
     result = nonce + AESGCM(key).encrypt(nonce, plain, AAD)
     if len(result) > MAX_BUNDLE_BYTES:
         raise ValueError("加密包大小超限")

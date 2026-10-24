@@ -126,12 +126,8 @@ class StartupOpsMixin:
         if self._startup_chain_closed():
             return
         from loguru import logger
-        from PyQt6.QtCore import QTimer
 
         from ...core.config.remote import apply_outcome, build_sync_job
-        from ...core.config.update_activation import activate_configuration
-        from ...core.config.update_observer import InstallationObserver
-        from ...core.config.update_store import UpdateStore
         from ..background.remote_config_sync import RemoteConfigSyncer
 
         running = getattr(self, "_startup_remote_config_syncer", None)
@@ -140,27 +136,10 @@ class StartupOpsMixin:
             return
         try:
             job = build_sync_job()
-            if job.is_empty:
-                return
-            observer = getattr(self, "_config_install_observer", None)
-            if observer is None:
-                observer = InstallationObserver(UpdateStore(job.config, job.app_version, job.baseline_sha256))
-                self._config_install_observer = observer
-                timer = QTimer(self)
-                timer.setInterval(2000)
-                def poll():
-                    try:
-                        def activate(changed):
-                            activate_configuration(observer.store.system, changed)
-                            self._refresh_installed_configuration(changed)
-                        observer.poll(activate)
-                    except Exception as error:
-                        logger.warning("配置更新感知失败，下次重试: {}", error)
-                timer.timeout.connect(poll)
-                timer.start()
-                self._config_install_timer = timer
         except Exception as error:
             logger.warning("无法初始化配置更新，保留当前配置: {}", error)
+            return
+        if job.is_empty:
             return
         syncer = RemoteConfigSyncer(self, job=job)
         def on_finished_ok(result):
@@ -169,7 +148,6 @@ class StartupOpsMixin:
             except Exception as error:
                 logger.warning("配置更新未完成，保留可用配置: {}", error)
                 return
-            observer.accept()
             self._refresh_installed_configuration(changed)
         syncer.finished_ok.connect(on_finished_ok)
         def completed():

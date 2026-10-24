@@ -2,7 +2,7 @@
 
 > 状态止于 2026-08-01（本文是当时的进度记录，后续进展与当前能力见
 > [开发日志](../../40-development/README.md) 与
-> [移动设备用户文档](../../60-userguide/09-mobile-device.md)）。
+> [移动设备用户文档](../../60-userguide/07-mobile-device.md)）。
 >
 > 最后更新：2026-08-01（废弃三个旧 .wf：single_tuning/auto_tuning 调律逻辑已集成进
 > 类实现，device_smoke_test 内联进 smoke.py；发现层不再残留同名旧 DSL 退化路径。

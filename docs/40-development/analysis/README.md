@@ -15,7 +15,7 @@
 
 | 内容 | 去哪看 |
 |------|--------|
-| 收集了什么字段、隐私边界 | [`PRIVACY.md`](../../../PRIVACY.md)、[`08-feedback-and-issues.md`](../../60-userguide/08-feedback-and-issues.md) |
+| 收集了什么字段、隐私边界 | [`PRIVACY.md`](../../../PRIVACY.md)、[`08-feedback-and-issues.md`](../../60-userguide/09-faq-and-feedback.md) |
 | 服务端表结构、运营指标（DAU/留存/版本分布） | [`30-architecture/38-platform/04-telemetry.md`](../../30-architecture/38-platform/04-telemetry.md) |
 | 律匠**如何判定**装备好坏（评价规格） | [`10-tuning-rules/`](../../10-game/10-tuning-rules/README.md) |
 | 游戏调律/转律的客观机制描述 | [`01-equipment-system.md`](../../10-game/01-equipment-system.md) |

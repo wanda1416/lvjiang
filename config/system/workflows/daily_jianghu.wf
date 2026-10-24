@@ -693,9 +693,13 @@ def action_heying($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
 
+   # 新增选择拍照画质，直接跳过即可
+   call scan_and_cancel("画质选择")
+
    click [general_action].[camera_shot] after wait @page_refresh
    click [general_action].[back] after wait @step_interval
    click [general_action].[back] after wait @step_interval
+
    call scan_and_confirm("退出拍照", 0)
 
    # 拍照结束落在桌面，按任务位置和领奖配置决定是否返回号令页。

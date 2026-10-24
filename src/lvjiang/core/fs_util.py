@@ -15,8 +15,14 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from fasteners import InterProcessLock
+if TYPE_CHECKING:  # pragma: no cover - 仅类型标注
+    from fasteners import InterProcessLock
+
+# 这个模块被「裸 Python」构建脚本导入：`scripts/build_android_preset.py` 在
+# 没有安装项目依赖的构建机上 import `core.system_preset` → `core.fs_util`。
+# 因此第三方依赖一律在真正加锁处再导入，模块顶层只允许标准库。
 
 #: 等待其它实例释放写锁的上限（秒）。没有上限会让 UI 线程无声卡死，
 #: 所以宁愿超时抛错，让调用方给出「另一个实例正在写入」这类可操作提示。
@@ -40,6 +46,7 @@ def _lock_entry(
     with _LOCKS_GUARD:
         entry = _LOCKS.get(cache_key)
         if entry is None:
+            from fasteners import InterProcessLock
             lock_dir.mkdir(parents=True, exist_ok=True)
             name = hashlib.sha256(key.encode()).hexdigest()
             entry = (

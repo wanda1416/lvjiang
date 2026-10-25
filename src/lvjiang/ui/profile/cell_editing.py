@@ -40,6 +40,7 @@ from ...core.profile.schema import (
     save_profile_config,
 )
 from ...core.profile.store import get_groups
+from ...errors import log_failure
 from ...i18n import tr
 from .cell_formatting import (
     apply_cell_style,
@@ -217,7 +218,7 @@ class ProfileCellEditingMixin:
             from ...core.profile.service import profile_action
             def complete_note(error):
                 if error:
-                    logger.error(f"note 写入失败: {error}")
+                    log_failure(f"{user_name} {key_str} 备注写入失败", error)
                     QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
                 if group_name in self._tables:
                     self._refresh_group(group_name, self._tables[group_name])
@@ -448,11 +449,11 @@ class ProfileCellEditingMixin:
         )
         def complete(error):
             if isinstance(error, ProfileWriteConflict):
-                logger.warning(f"{user_name} {model_type}.{key} CAS 失败，本次增减未写入")
+                log_failure(f"{user_name} {model_type}.{key} CAS 冲突，本次增减未写入", error)
                 QMessageBox.warning(self, tr("写入冲突"),
                                     tr("该数值已被其他进程更新，本次增减未写入。请刷新后重试。"))
             elif error:
-                logger.error(f"回写失败: {error}")
+                log_failure(f"{user_name} {model_type}.{key} 回写失败", error)
                 QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
             elif kd is not None and source:
                 self._register_new_source(kd, source, kd.sources if delta > 0 else kd.uses)
@@ -652,7 +653,7 @@ class ProfileCellEditingMixin:
 
         def complete(error):
             if error:
-                logger.error(f"note 写入失败: {error}")
+                log_failure(f"{user_name} {key} 备注写入失败", error)
                 QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
             current_group = group_name or self._get_current_group_name()
             current_table = self._tables.get(current_group)

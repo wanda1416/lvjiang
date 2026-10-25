@@ -8,14 +8,21 @@ from typing import TYPE_CHECKING, Callable, Iterator
 
 from loguru import logger
 
+from ...errors import ExpectedError
+
 if TYPE_CHECKING:
     import sqlite3
 
     from .repository import ProfileDB
 
 
-class ProfileWriteRejected(ValueError):
-    """同步脚本拒绝候选变化；整个当前事务必须回滚。"""
+class ProfileWriteRejected(ValueError, ExpectedError):
+    """同步脚本拒绝候选变化；整个当前事务必须回滚。
+
+    继承 `ValueError` 保持 DSL `try/catch` 可捕获；继承 `ExpectedError` 决定
+    记账方式——拒绝原因已写在消息里，日志按 WARNING 记一行、不打印堆栈
+    （详见 `lvjiang/errors.py`）。
+    """
 
 
 @dataclass

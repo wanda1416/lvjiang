@@ -12,6 +12,7 @@ from typing import Callable, Iterator
 
 from loguru import logger
 
+from ...errors import log_failure
 from .transactions import after_commit, profile_transaction, reject_write
 
 
@@ -165,9 +166,10 @@ class ProfileScriptRunner(threading.Thread):
         logger.debug("Profile {}脚本开始: {}.{} -> {}", mode, event.model, event.key, event.script)
         try:
             self._run_event(event)
-        except Exception:  # noqa: BLE001 - 已落库的变更不回滚，无关事件继续执行
-            logger.exception("Profile {}变更脚本执行失败: {}.{} -> {}",
-                             mode, event.model, event.key, event.script)
+        except Exception as error:  # noqa: BLE001 - 已落库的变更不回滚，无关事件继续执行
+            log_failure(
+                f"Profile {mode}变更脚本执行失败: "
+                f"{event.model}.{event.key} -> {event.script}", error)
         else:
             logger.debug("Profile {}脚本结束: {}.{} -> {}", mode, event.model, event.key, event.script)
 

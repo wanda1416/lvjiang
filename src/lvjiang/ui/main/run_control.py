@@ -3,7 +3,6 @@
 import copy
 import json
 import threading
-import traceback
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +15,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ...core.config.resolver import get_resolver
 from ...core.fs_util import task_result_path
+from ...errors import log_failure
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..button_styles import apply_execution_button_style
@@ -156,8 +156,7 @@ class WorkflowWorker(QThread):
         try:
             self.result_or_exception = self._fn()
         except BaseException as e:
-            tb = traceback.format_exc()
-            logger.error(f"工作流 {self.flow_id} 异常退出:\n{tb}")
+            log_failure(f"工作流 {self.flow_id} 异常退出", e)
             self.result_or_exception = e
 
 

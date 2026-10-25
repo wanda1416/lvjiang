@@ -8,9 +8,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..errors import ExpectedError as ExpectedError
 
-class WorkflowUserError(Exception):
-    """DSL 脚本中用户操作引发的可预期错误（类型不匹配、字段不存在等）。"""
+
+class WorkflowUserError(ExpectedError):
+    """DSL 脚本中用户操作引发的可预期错误（类型不匹配、字段不存在等）。
+
+    归入 `ExpectedError`：消息已带行号和原因，堆栈只有引擎内部帧，按级别记
+    一行即可（详见 `lvjiang/errors.py`）。级别仍是 ERROR——脚本确实需要改。
+    """
+
+    log_level = "ERROR"
 
 
 class WorkflowExecutionError(RuntimeError):

@@ -34,7 +34,7 @@ def test_undo_rejects_key_with_sync_targets(monkeypatch):
         service, "db_undo_history", lambda history_id: undo_calls.append(history_id),
     )
 
-    with pytest.raises(ValueError, match="同步其他数据"):
+    with pytest.raises(service.ProfileOperationRefused, match="同步其他数据"):
         service.undo_profile_history(3)
     assert undo_calls == []
 
@@ -71,11 +71,11 @@ def test_directional_sync_allows_only_unsynchronized_source_changes(tmp_path, mo
     service.profile_action("tester", "source", delta=-2)
     decrease = db.get_history("tester", "stock", "source", limit=1)[0]
     assert db.get_entry("tester", "stock", "target")["value"] == 18
-    with pytest.raises(ValueError, match="同步其他数据"):
+    with pytest.raises(service.ProfileOperationRefused, match="同步其他数据"):
         service.undo_profile_history(decrease["id"])
     assert db.get_entry("tester", "stock", "source")["value"] == 8
 
     db.upsert("tester", "stock", "source", 11, change_type="action", sync_from="quota:grant")
     incoming = db.get_history("tester", "stock", "source", limit=1)[0]
-    with pytest.raises(ValueError, match="同步产生的记录"):
+    with pytest.raises(service.ProfileOperationRefused, match="同步产生的记录"):
         service.undo_profile_history(incoming["id"])

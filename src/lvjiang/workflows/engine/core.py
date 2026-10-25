@@ -84,6 +84,7 @@ from .evaluation import _EvalMixin
 from .key_state import KeyStateRegistry
 from .panel import _PanelMixin
 from .signals import (
+    ExpectedError,
     WorkflowAbort,
     WorkflowUserError,
     _BreakSignal,
@@ -1104,12 +1105,36 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                     e, (WorkflowUserError, KeyError, ValueError, TypeError)
                 ):
                     raise
-                line_info = f"(行 {node.line_no})" if hasattr(node, 'line_no') and node.line_no else ""
-                logger.error(f"DSL 执行异常 {line_info}: {e}")
-                logger.error(f"异常详情:\n{traceback.format_exc()}")
+                self._report_statement_failure(e, node)
                 raise  # 异常即终止，不跳过继续
 
             pc += 1
+
+    def _report_statement_failure(self, error: BaseException, node) -> None:
+        """按异常类别记一次语句失败，同一次失败只记在最内层。
+
+        `if` / 循环 / 子过程里失败会穿透每一层 `_exec_body`，逐层记账会把一次
+        失败打印成多份重复 ERROR + 堆栈，看起来像连环崩溃。所以在异常实例上
+        打标记，只让行号最准确的最内层记账。
+
+        预期结果（`ExpectedError`，例如 `profile_reject` 的业务拒绝）消息里已经
+        写清原因，按级别记一行；只有意外异常才附堆栈。
+        """
+        if getattr(error, "_dsl_reported", False):
+            return
+        try:
+            error._dsl_reported = True  # type: ignore[attr-defined]
+        except AttributeError:  # 少数内置异常不允许挂属性；宁可重复记也不炸
+            pass
+        line_info = (
+            f"(行 {node.line_no})"
+            if getattr(node, "line_no", None) else ""
+        )
+        if isinstance(error, ExpectedError):
+            error.log_reason(f"DSL 执行终止 {line_info}".rstrip())
+            return
+        logger.error(f"DSL 执行异常 {line_info}: {error}")
+        logger.error(f"异常详情:\n{traceback.format_exc()}")
 
     def _exec_stmt(self, node):
         """执行单条语句"""

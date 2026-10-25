@@ -43,6 +43,7 @@ from ...core.profile.service import (
     profile_history_undo_unavailable_reason,
     undo_profile_history,
 )
+from ...errors import log_failure
 from ...i18n import tr
 from ..button_styles import (
     apply_button_style,
@@ -390,6 +391,9 @@ class HistoryDialog(QDialog):
         try:
             undo_profile_history(int(record["id"]))
         except (ProfileWriteConflict, ValueError) as exc:
+            log_failure(
+                f"{record.get('username', '')} {self._model_type}.{self._key} 历史撤销失败",
+                exc)
             QMessageBox.warning(self, tr("撤销失败"), str(exc))
             self._load_page()
             return
@@ -412,6 +416,9 @@ class HistoryDialog(QDialog):
         try:
             delete_profile_history(int(record['id']), str(record['username']), self._model_type, self._key)
         except Exception as error:  # noqa: BLE001 - 失败保留界面并给出可行动提示
+            log_failure(
+                f"{record.get('username', '')} {self._model_type}.{self._key} 历史删除失败",
+                error)
             QMessageBox.warning(self, tr('删除失败'), str(error))
         self._load_page()
 

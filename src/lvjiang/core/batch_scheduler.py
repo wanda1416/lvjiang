@@ -15,7 +15,6 @@ from __future__ import annotations
 import copy
 import json
 import time
-import traceback
 from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -23,6 +22,7 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from ..errors import log_failure
 from ..i18n import tr
 from ..workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..workflows.errors import WorkflowAbort
@@ -351,7 +351,7 @@ class BatchScheduler:
             with configuration_snapshot():
                 self._run_locked()
         except Exception as exc:
-            logger.exception("批量执行失败")
+            log_failure("批量执行失败", exc)
             self.log.emit(f"[批量] 执行或保存失败: {exc}")
             if self._batch_run is not None:
                 try:
@@ -623,10 +623,9 @@ class BatchScheduler:
                                 script, session, username, params=params)
                             if username:
                                 self._session_manager.save(username, session)
-                        except Exception:
-                            tb = traceback.format_exc()
-                            logger.error(
-                                f"批量执行 {label}/{script.name} 异常:\n{tb}")
+                        except Exception as error:
+                            log_failure(
+                                f"批量执行 {label}/{script.name} 异常", error)
                             raise
                         if task_run is not None:
                             logger.info(

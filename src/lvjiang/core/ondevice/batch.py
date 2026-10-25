@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from loguru import logger
 
+from ...errors import log_failure
 from ..batch_config import declares_unit_prepare, load_batch_config
 from ..batch_run import (
     BatchRunDraft,
@@ -265,7 +266,7 @@ def _run(worker):
             result.get("error") or "批量执行已结束", result))
         worker.run()
     except Exception as exc:
-        logger.exception("手机批量执行失败")
+        log_failure("手机批量执行失败", exc)
         state.finish(task_runner.STATE_STOPPED if state.should_stop() else task_runner.STATE_FAILED, str(exc))
     finally:
         if sink is not None:

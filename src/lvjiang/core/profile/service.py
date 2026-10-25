@@ -17,6 +17,7 @@ from datetime import datetime
 
 from loguru import logger
 
+from ...errors import ExpectedError
 from ...i18n import tr
 from .maintenance import profile_operation, profile_write
 from .models import (
@@ -49,8 +50,24 @@ from .schema import get_profile_config
 # ─── 内部工具函数 ─────────────────────────────────────────────
 
 
-class ProfileWriteConflict(RuntimeError):
-    """CAS 写入冲突。"""
+class ProfileWriteConflict(RuntimeError, ExpectedError):
+    """写入冲突：目标已被其他进程改过，本次写入未生效。
+
+    属于预期结果而不是缺陷——重读后再试即可。归入 `ExpectedError` 后，统一记账
+    只记一行 WARNING，不打印堆栈（详见 `lvjiang/errors.py`）。
+    """
+
+    log_level = "WARNING"
+
+
+class ProfileOperationRefused(ValueError, ExpectedError):
+    """当前状态不允许这次 Profile 操作（例如撤销条件不满足）。
+
+    原因本身就是业务规则，会原样展示给用户；归入 `ExpectedError` 后日志只记
+    一行 WARNING，不打印堆栈。保留 `ValueError` 血统以兼容既有捕获点。
+    """
+
+    log_level = "WARNING"
 
 
 def profile_history_undo_unavailable_reason(
@@ -111,11 +128,15 @@ def profile_history_undo_unavailable_reason(
 
 
 def undo_profile_history(history_id: int) -> None:
-    """安全撤销一条历史变更，不触发同步目标或变更脚本。"""
+    """安全撤销一条历史变更，不触发同步目标或变更脚本。
+
+    当前状态不允许撤销时抛 `ProfileOperationRefused`：原因本身就是业务规则
+    （不是最新记录、关联了变更脚本、会带走同步数据等），直接展示给用户。
+    """
     record = db_get_history_record(history_id)
     reason = profile_history_undo_unavailable_reason(record)
     if reason is not None:
-        raise ValueError(reason)
+        raise ProfileOperationRefused(reason)
     if not db_undo_history(history_id):
         raise ProfileWriteConflict(tr("数据已发生变化，请刷新后重试"))
 

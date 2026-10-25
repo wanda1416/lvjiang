@@ -1,5 +1,6 @@
 """DSL 引擎的用户可见错误与控制流信号"""
 
+from ..errors import ExpectedError as ExpectedError
 from ..errors import WorkflowAbort as WorkflowAbort
 from ..errors import WorkflowUserError as WorkflowUserError
 

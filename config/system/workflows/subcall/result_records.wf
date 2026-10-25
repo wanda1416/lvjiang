@@ -1,9 +1,49 @@
 #% name: 任务结果摘要
-# 仅写运行结果与排查日志，不做识别、游戏操作或配置写入。
+
+# 把一次任务的结论整理成结构化摘要，供任务历史与统计上报消费。
+# 只写结果与排查日志——不做识别、不碰游戏、不写配置，所以任何流程都能安全调用，
+# 记录本身出问题也不会改变任务行为。
+#
+# 调用约定：调用方在流程开头 `global $record_result` 并
+# `call $record_result = new_record_result()`，随后按需调用下面的过程，结束时
+# `collect $record_result as "result"` 交给引擎。没有声明这个全局变量的流程里，
+# 所有过程都静默返回——同一段子流程被手工调试复用时不必额外加判断。
+#
+# 结果结构：
+#   status — 整体状态：running / processed / skipped / failed
+#   items  — 分组条目：{$key: {name, records: [{status, reason?, data?}]}}
+#   values — 观测到的单一取值（如当周声望），只保留最终采用值
+#   counts — 累计计数（如本次签到次数），多次调用累加
+#
+# 包含过程：
+#   new_record_result     — 建一个空的运行中记录
+#   record_item           — 追加上一条分组条目（可多次）
+#   record_observation    — 记录一个观测取值
+#   record_count          — 累加一个计数
+#   record_finish         — 收尾并写整体状态
+#   record_finish_if_open — 仅在仍是 running 时收尾
+#   record_set            — 用最终结论覆盖一个独立条目
+
+# ─── new_record_result ────────────────────────────────────
+# 建一个空的运行中记录。
+#
+# 返回：{status: "running", items: {}}；values / counts 按需在首次写入时创建。
 def new_record_result()
     return {"status": "running", "items": {}}
 end
 
+# ─── record_item ──────────────────────────────────────────
+# 追加一条分组条目：同一个 $key 可以有多条 records，用来记录分批、分轮或重试。
+#
+# 参数：
+#   $key    — 分组键（如 "activities"），同一键下的记录按追加顺序保存
+#   $name   — 展示名（活动名、奖励名等），只用于人看
+#   $status — 结论（processed / skipped / no_reward_detected 等）
+#   $reason — 原因；空串时不写该字段
+#   $data   — 附加业务数据；只挑下面白名单里的字段，其余（位置、OCR、过程返回值）
+#             只进日志不进结果
+# 前置：可选调用；$record_result 未声明时直接返回。
+# 后置：写入 $record_result.items.$key.records；首次写入时自动建该分组。
 def record_item($key, $name, $status, $reason, $data)
     if not $record_result
         return
@@ -30,6 +70,18 @@ def record_item($key, $name, $status, $reason, $data)
     eval append($group.records, $record)
 end
 
+# ─── record_observation ───────────────────────────────────
+# 记录一个观测取值：原文与历次观察都只进日志，结果里只留最终采用值。
+#
+# 参数：
+#   $key   — 取值键（如 "haoling_of_week"）
+#   $raw   — 原始读到的文本，仅用于日志
+#   $value — 最终采用的数值，写入 $record_result.values.$key
+# 前置：$record_result 已声明。
+# 后置：覆盖写入 values.$key。
+# 例外：regional_currency（区域货币是过程量，每次读数不可比）与任何以
+#       "_goods" 结尾的键（商品余量属于快照而非进度）都不进 values，避免下游
+#       把「一次读数」当成「进度变化」。
 def record_observation($key, $raw, $value)
     if not $record_result
         return
@@ -46,6 +98,14 @@ def record_observation($key, $raw, $value)
     end
 end
 
+# ─── record_count ─────────────────────────────────────────
+# 累加一个计数：同一键多次调用求和，供「本次做了多少次」这类结论使用。
+#
+# 参数：
+#   $key    — 计数键（如 "checkin"）
+#   $amount — 本次增量；为 0 时直接返回，不创建空计数
+# 前置：$record_result 已声明。
+# 后置：$record_result.counts.$key += $amount（首次写入时建 counts）。
 def record_count($key, $amount)
     if not $record_result
         return
@@ -63,6 +123,15 @@ def record_count($key, $amount)
     eval append($record_result.counts, $key, $count + $amount)
 end
 
+# ─── record_finish ────────────────────────────────────────
+# 收尾：写整体状态；只有非 processed 的收尾才带上原因。
+#
+# 参数：
+#   $status — 整体结论：processed / skipped / failed
+#   $reason — 原因；processed 时忽略（正常完成不需要解释）
+# 前置：$record_result 已声明。
+# 后置：覆盖 $record_result.status；必要时写 reason。
+# 注意：可以重复调用，最后一次生效——用于「先按失败收尾、重试成功后改判」。
 def record_finish($status, $reason)
     if $record_result
         eval $record_result.status = $status
@@ -74,13 +143,32 @@ def record_finish($status, $reason)
     end
 end
 
+# ─── record_finish_if_open ────────────────────────────────
+# 仅在记录仍是 running 时收尾，已经收过尾的流程保持原结论。
+#
+# 参数：同 record_finish。
+# 前置：$record_result 已声明。
+# 后置：只在 status == "running" 时改状态，用于异常兜底与「多个出口都想收尾」
+#       的流程，避免后到的出口覆盖真实结论。
 def record_finish_if_open($status, $reason)
     if $record_result and $record_result.status == "running"
         call record_finish($status, $reason)
     end
 end
 
+# ─── record_set ───────────────────────────────────────────
 # 独立奖励项只保留最终结论，不保存阶段事件。
+#
+# 参数：
+#   $key    — 条目键（如 "daily_checkin"）
+#   $name   — 展示名
+#   $status — 最终结论
+#   $reason — 原因；空串时不写
+#   $data   — 附加业务数据，原样写入（调用方自己保证只放业务字段）
+# 前置：$record_result 已声明。
+# 后置：覆盖写入 $record_result.items.$key（同名条目被替换，不追加 records）。
+# 与 record_item 的区别：这个用于「一项奖励一个结论」的场景，重复调用是改判，
+# 不是新增一条记录。
 def record_set($key, $name, $status, $reason, $data)
     if not $record_result
         return

@@ -187,6 +187,9 @@ def login_notice_kind($text)
     return ""
 end
 
+# 读登录页的提示文案并分流；读一帧、判一次，不轮询。
+# 返回：update（更新提示，优先）/ online（在线状态提示）/ ""（无提示）。
+# 前置：已在登录页 init 视图。后置：无副作用（只 OCR 一个区域，不点击）。
 def read_login_notice()
     scan [game_login_page].[online_label] as $notice
     call $kind = login_notice_kind($notice.online_label)

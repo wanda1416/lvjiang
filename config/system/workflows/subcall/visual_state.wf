@@ -24,6 +24,16 @@ def detect_baiye_reward_state($region)
     return "unknown"
 end
 
+# ─── detect_baiye_dividend_state ──────────────────────────
+# 百业分红（可领分红，不是按钮可点）的金光比例判定。
+#
+# 参数：
+#   $region — 分红区域，由调用方按当前布局给出
+# 前置：停在百业页；区域已绑定。
+# 后置：无副作用（只截图算比例），不点击领取。
+# 返回：claimable / unavailable / unknown。
+# 与 detect_baiye_reward_state 的差别只在金色阈值更严（分红条底色更亮），
+# 判定思路一致：中间带返回 unknown，交给调用方决定是否重试或放弃。
 def detect_baiye_dividend_state($region)
     eval $ratios = pixel_ratios($region, {"gold": {"r_min": 140, "g_min": 120, "r_g_min": -5, "g_b_min": 25}}, 2)
     if $ratios.gold >= 0.30

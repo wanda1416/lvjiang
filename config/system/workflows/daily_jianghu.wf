@@ -1136,6 +1136,9 @@ def new_jianghu_result()
    return {"summary": {"status": "running", "tasks": {}, "unidentified": [], "reputation": {}}, "schema_version": 1, "status": "running", "finished": false, "reason": "", "passes": 0, "counts": {}, "tasks": {}, "unidentified": [], "reputation": {"before": -1, "after": -1, "observations": []}, "cleanup": {"home": "unknown", "mode": "not_needed"}}
 end
 
+# 一张卡片的记录骨架：字段先占位，后续按实际分支逐项填写。
+# $pass=1 首轮、2 补扫；$idx 卡片序号（生成 card_N 身份）。
+# 领奖状态按本次配置预置 disabled，避免把「没开领奖」写成「领奖失败」。
 def make_jianghu_record($pass, $idx)
    eval $reward = "not_checked"
    if not $claim_reward
@@ -1144,6 +1147,9 @@ def make_jianghu_record($pass, $idx)
    return {"summary": {"status": "unknown"}, "pass": $pass, "card": "card_" + $idx, "task": "", "task_name": "", "initial_text": "", "task_text": "", "refresh_count": 0, "outcome": "unknown", "reason": "", "completion": "unknown", "refresh_icon_before": "unknown", "refresh_icon_after": "unknown", "action": {"status": "not_attempted", "reason": ""}, "events": [], "reward": {"status": $reward, "reason": "", "observed_state": "unknown"}}
 end
 
+# 开始记录一张卡片，并先把它放进「未识别」集合。
+# 补扫记录（$is_rescan=true）只用于合并到已知任务，不进 unidentified，否则同一
+# 张卡会在结果里出现两次。返回记录对象，供后续 record_jianghu_* 继续填写。
 def begin_jianghu_record($is_rescan, $idx)
    if $is_rescan
       call $record = make_jianghu_record(2, $idx)
@@ -1183,6 +1189,8 @@ def identify_jianghu_record($is_rescan, $idx, $text, $allowed)
    return 0
 end
 
+# 记下这张卡被识别成的任务身份；$key 是稳定任务类型，$name 只用于展示。
+# 只写记录，不改变刷新、动作、领奖或补扫的任何决策。
 def record_jianghu_task($key, $name)
    if $jianghu_item
       eval $jianghu_item.task = $key
@@ -1190,6 +1198,10 @@ def record_jianghu_task($key, $name)
    end
 end
 
+# 写这张卡的最终结论（completed / already_done / blocked / failed / disabled /
+# not_implemented / executed_unverified），并同步动作子状态。
+# 动作失败即使任务最终完成，也在 summary.problem 里留一条说明，避免「看起来成功
+# 但中间报过错」被吞掉。
 def record_jianghu_outcome($outcome, $reason)
    if $jianghu_item
       eval $jianghu_item.outcome = $outcome
@@ -1222,12 +1234,16 @@ def record_jianghu_outcome($outcome, $reason)
    end
 end
 
+# 动作执行完但没有确认完成时调用：把「执行中」改判为 executed_unverified，
+# 而不是留一个永远 running 的动作，否则收尾统计会漏掉这张卡。
 def record_jianghu_action_returned()
    if $jianghu_item and $jianghu_item.outcome == "executing"
       call record_jianghu_outcome("executed_unverified", "completion_not_checked")
    end
 end
 
+# 记录任务完成判定与刷新图标状态；两者分开存，避免「未完成」与「奖励未领」
+# 被压成同一个结论。
 def record_jianghu_completion($completion, $refresh_icon)
    if $jianghu_item
       eval $jianghu_item.completion = $completion
@@ -1235,6 +1251,8 @@ def record_jianghu_completion($completion, $refresh_icon)
    end
 end
 
+# 记录领奖结论。task_incomplete / disabled / not_checked 属于「没走到领奖」，
+# 不写进摘要的 reward，避免摘要读起来像领过奖。
 def record_jianghu_reward($status, $reason)
    if $jianghu_item
       eval $jianghu_item.reward.status = $status
@@ -1246,6 +1264,7 @@ def record_jianghu_reward($status, $reason)
    end
 end
 
+# 流程整体失败：状态与原因一起落定并标记结束，后续不再被收尾统计改判。
 def record_jianghu_failure($reason)
    eval $jianghu_result.summary.status = "failed"
    call $description = jianghu_reason_text($reason)
@@ -1255,6 +1274,11 @@ def record_jianghu_failure($reason)
    eval $jianghu_result.finished = true
 end
 
+# 收尾汇总：把首轮与补扫的全部记录合并成 counts 与整体状态。
+# 状态判定规则（低到高）：全是被跳过 → skipped / already_done；有实质执行且没有
+# 异常 → success；出现未完成、动作受阻或领奖不确定 → partial；恢复单人模式失败
+# → failed（优先级最高，先于其他结论）。
+# 只写结果，不触发任何游戏动作。
 def finish_jianghu_result()
    eval $counts = {}
    eval $status = "skipped"

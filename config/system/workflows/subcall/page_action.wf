@@ -70,14 +70,16 @@ def scan_and_cancel($action_name)
 end
 
 # ─── close_item_prompts ───────────────────────────────────
-# 关闭安卓端购买后连续保留的物品说明浮窗，直到一个都匹配不到。
+# 关闭安卓端购买或领奖后连续保留的物品说明浮窗，直到一个都匹配不到。
 #
 # 参数：无
-# 前置：购买动作已完成，浮窗可能叠了多层。
+# 前置：购买或领奖动作已完成，浮窗可能叠了多层。
 # 后置：所有命中到的浮窗都已关闭；桌面端不做任何点击。
-# 返回：累计关闭的浮窗数量（桌面端恒为 0）。
+# 返回：累计关闭的浮窗数量（桌面端恒为 0；达到上限时也返回已关闭数量）。
 #
 # 逐个匹配关闭按钮并点击，每次等待界面刷新后继续检查，直到所有浮窗都已关闭。
+# 上限：连续关闭 10 次仍然命中，说明存在点不掉的浮窗或模板误匹配——此时记 error
+# 并立即结束，绝不允许「一直点下去」把无人值守的任务卡死在这里。
 def close_item_prompts()
    if not env("android")
       return 0
@@ -90,6 +92,10 @@ def close_item_prompts()
       end
       click [general_control].[close_item] after wait @step_interval
       eval $closed_count = $closed_count + 1
+      if $closed_count >= 10
+         log error "物品提示连续关闭 " + $closed_count + " 次仍然存在，可能是点不掉的浮窗或关闭图标模板误匹配，停止关闭并继续后续流程"
+         break
+      end
    end
    return $closed_count
 end

@@ -47,3 +47,41 @@ def test_scan_and_cancel_with_dialog_cancels_once():
     assert engine.variables["done"] == 1
     assert calls["click"] == 1, "命中弹窗时只执行一次取消"
     assert calls["wait"] == 1
+
+
+def test_close_item_prompts_stops_after_ten_closes():
+    """关闭图标一直命中时必须停下来。
+
+    浮窗点不掉或模板误匹配时，无上限的循环会把无人值守的批量任务卡在无限点击上
+    直到用户按 F10。契约是「连续 10 次仍命中就记 error 并结束」，返回已关闭数量。
+    """
+    engine = make_engine(run_env="android")
+    engine._procs = dict(PAGE_ACTION)
+    calls = {"scan": 0, "click": 0}
+
+    def scan(node):
+        calls["scan"] += 1
+        engine.variables[node.target.name] = "close_item"  # 永远命中
+
+    engine._exec_scan = scan
+    engine._exec_click = lambda node: calls.__setitem__("click", calls["click"] + 1)
+    engine._exec_wait = lambda node: None
+
+    engine._exec_body(parse_text('call $closed = close_item_prompts()\n').body)
+
+    assert engine.variables["closed"] == 10
+    assert calls["click"] == 10, "达到上限后不得继续点击"
+    assert calls["scan"] == 10
+
+
+def test_close_item_prompts_is_noop_on_desktop():
+    engine = make_engine(run_env="desktop")
+    engine._procs = dict(PAGE_ACTION)
+    calls = {"scan": 0, "click": 0}
+    engine._exec_scan = lambda node: calls.__setitem__("scan", calls["scan"] + 1)
+    engine._exec_click = lambda node: calls.__setitem__("click", calls["click"] + 1)
+
+    engine._exec_body(parse_text('call $closed = close_item_prompts()\n').body)
+
+    assert engine.variables["closed"] == 0
+    assert calls == {"scan": 0, "click": 0}

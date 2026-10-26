@@ -111,9 +111,9 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 if on_applied:
                     on_applied()
                 write_baseline_identity(target, __version__, config_dir=config)
-                # 手机初始化在 PC 同步之前保存可信预置；构建安装包不重复携带归档。
-                from .config.update_store import UpdateStore
-                UpdateStore(config, __version__, digest).baseline()
+                # 不再调用 UpdateStore.baseline()：手机无在线配置，r0 校验没有
+                # 消费者，却会在「同版本内预置内容变化」时拿旧 r0 比对新摘要，
+                # 把正常升级误判成「无法确认原始预置基底」并打断启动。
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 # 只记录最后安装的官方代次，不代表当前 system 来自 PC 还是 APK。
                 pending = stage / "preset.json"

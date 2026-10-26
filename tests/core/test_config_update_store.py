@@ -105,13 +105,10 @@ def test_published_baseline_mismatch_does_not_block_install(tmp_path):
     assert (tmp_path / "system/workflows/local.wf").read_bytes() == b"wait 0.1\n"
 
 
-def test_untrusted_baseline_and_wrong_series_are_rejected(tmp_path):
+def test_wrong_series_is_rejected(tmp_path):
     base = {"app.yaml": b"official"}
-    write_files(tmp_path / "system", {"app.yaml": b"modified"})
+    write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
-    with pytest.raises(ValueError, match="原始预置"):
-        store.baseline()
-    assert not (tmp_path / "updates/v0.15.0/r0.zip").exists()
     manifest, archive = make_manifest("0.15.1", 1, base, {})
     with pytest.raises(ValueError, match="系列"):
         store.install(manifest, archive, activate=lambda *args: None)
@@ -147,10 +144,10 @@ def test_prerelease_baseline_and_recovery_do_not_touch_final_archives(tmp_path):
     final = {"app.yaml": b"final"}
     write_files(tmp_path / "system", beta)
     beta_store = UpdateStore(tmp_path, "0.15.0b1", tree_digest(beta))
-    beta_store.baseline()
+    beta_store._baseline()
     write_files(tmp_path / "system", final)
     final_store = UpdateStore(tmp_path, "0.15.0", tree_digest(final))
-    final_store.baseline()
+    final_store._baseline()
     assert unpack((beta_store.root / "r0.zip").read_bytes()) == beta
     assert unpack((final_store.root / "r0.zip").read_bytes()) == final
     token = "b" * 32

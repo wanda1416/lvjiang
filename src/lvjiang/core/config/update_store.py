@@ -89,18 +89,6 @@ class UpdateStore:
         with self.locked():
             self._recover()
 
-    def _baseline_files(self) -> tuple[dict[str, bytes], bool]:
-        path = self.root / "r0.zip"
-        if not path.is_file():
-            files = read_tree(self.system)
-        else:
-            try:
-                files = unpack(path.read_bytes())
-            except ValueError as error:
-                logger.warning("r0 归档不可读，改用当前 system：{}", error)
-                files = read_tree(self.system)
-        return files, tree_digest(files) == self.baseline_sha256
-
     def _baseline(self) -> dict[str, bytes]:
         """安装底座：直接用 r0；缺失或不可读时退回当前 system。"""
         path = self.root / "r0.zip"
@@ -113,17 +101,6 @@ class UpdateStore:
         if tree_digest(files) == self.baseline_sha256:
             self._write(path, pack(files))
         return files
-
-    def baseline(self) -> dict[str, bytes]:
-        with self.locked():
-            self._recover()
-            files, trusted = self._baseline_files()
-            if not trusted:
-                raise ValueError("无法确认原始预置基底，请恢复与应用版本匹配的 system")
-            path = self.root / "r0.zip"
-            if not path.exists():
-                self._write(path, pack(files))
-            return files
 
     def _archive(self, path: Path, data: bytes) -> None:
         if not path.is_file():

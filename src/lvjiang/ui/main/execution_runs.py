@@ -54,6 +54,8 @@ class ExecutionRunContext:
     lease: object | None = None
     pause_event: object | None = None
     stop_event: threading.Event = field(default_factory=threading.Event)
+    # 批量里「弹窗停止任务」只结束当前这一条，不置 stop_event；整批停止仍走 stop_event。
+    task_stop_event: threading.Event = field(default_factory=threading.Event)
     metadata: dict[str, object] = field(default_factory=dict)
 
 

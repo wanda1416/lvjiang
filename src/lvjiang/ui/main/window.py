@@ -1203,6 +1203,17 @@ class MainWindow(
         run_context = self._current_run_context
         assert run_context is not None
         stop_check = run_context.stop_event.is_set
+        # 批量：弹窗里的「停止任务」只结束当前这一条（task_stop_event），
+        # 整批停止仍走 stop_event（F10 / 主停止按钮）。标记先于 ui_callback 创建。
+        run_context.metadata["batch"] = True
+
+        def task_stop_check() -> bool:
+            return (
+                run_context.stop_event.is_set()
+                or run_context.task_stop_event.is_set()
+            )
+
+        task_stop_clear = run_context.task_stop_event.clear
 
         layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
@@ -1261,9 +1272,10 @@ class MainWindow(
             ctx=ctx,
             session_manager=self._session_manager,
             stop_check=stop_check,
+            task_stop_check=task_stop_check,
+            task_stop_clear=task_stop_clear,
         )
         run_context.worker = worker
-        run_context.metadata["batch"] = True
         self._batch_tab.bind_run(run_context.task_run_id)
         self._batch_tab.apply_run_task_plan(
             run_context.task_run_id, worker.task_plan_snapshot())

@@ -43,6 +43,7 @@ ST_RUNNING = tr("运行中")
 ST_SUCCESS = tr("成功")
 ST_FAILED = tr("失败")
 ST_SKIPPED = tr("跳过")
+ST_STOPPED = tr("已停止")
 
 RESULT_SUCCESS = "success"
 RESULT_SKIPPED = "skipped"
@@ -231,6 +232,9 @@ class BatchScheduler:
         ctx: BatchContext,
         session_manager: SessionManager,
         stop_check: Callable[[], bool],
+        *,
+        task_stop_check: Callable[[], bool] | None = None,
+        task_stop_clear: Callable[[], None] | None = None,
     ):
         if not hasattr(self, "progress"):
             self.progress = BatchEvent()
@@ -243,7 +247,11 @@ class BatchScheduler:
         self._scripts = copy.deepcopy(list(spec.scripts))
         self._ctx = ctx
         self._session_manager = session_manager
+        # 批次级停止（F10 / 主停止按钮）与单任务级停止分开：弹窗里的「停止任务」
+        # 只置 task_stop，引擎据此中止当前脚本，调度器继续跑同一条目的下一项。
         self._stop_check = stop_check
+        self._task_stop_check = task_stop_check or stop_check
+        self._task_stop_clear = task_stop_clear or (lambda: None)
         self._stopped = False
         self._task_plan: dict[tuple[int, str], PlannedTask] = {}
         self._member_task_plan: dict[tuple[str, str], PlannedTask] = {}
@@ -255,6 +263,10 @@ class BatchScheduler:
         #: 最近一次无人值守中止的弹窗文本；恢复后清空（见 _recover_unattended）。
         self._unattended_hit = ""
         self._build_execution_plan()
+
+    def _task_was_stopped(self) -> bool:
+        """当前脚本被单独结束（弹窗「停止任务」），而整批没有要求停止。"""
+        return self._task_stop_check() and not self._stop_check()
 
     def _history_target_kwargs(self) -> dict[str, str]:
         return {
@@ -630,10 +642,14 @@ class BatchScheduler:
                         if task_run is not None:
                             logger.info(
                                 f"任务线程结束: task_run_id={task_run.task_run_id}")
-                    entry_result["scripts"][script.id] = ST_SUCCESS
-                    self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
-                    self.log.emit(f"[批量] {label} → {script.name} 完成")
-                    report.end_script(ST_SUCCESS, result)
+                    task_stopped = self._task_was_stopped()
+                    script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
+                    entry_result["scripts"][script.id] = script_ui_status
+                    self.progress.emit(run_idx, label, script.id, script_ui_status)
+                    self.log.emit(
+                        f"[批量] {label} → {script.name} "
+                        + ("已停止，继续下一项" if task_stopped else "完成"))
+                    report.end_script(script_ui_status, result)
                     try:
                         result_path = self._save_result(
                             username or "unknown", script, result, task_started_at)
@@ -646,7 +662,8 @@ class BatchScheduler:
                     if task_run is not None:
                         try:
                             task_run.finish(
-                                status=("interrupted" if self._stop_check()
+                                status=("stopped" if task_stopped
+                                        else "interrupted" if self._stop_check()
                                         else "completed"),
                                 result_path=result_path,
                             )
@@ -992,10 +1009,14 @@ class BatchScheduler:
                                     script, session, username,
                                     params=copy.deepcopy(planned.params))
                                 self._session_manager.save(username, session)
-                            entry["scripts"][script.id] = ST_SUCCESS
-                            report.end_script(ST_SUCCESS, result)
-                            self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
-                            self.log.emit(f"[批量] {label} → {script.name} 完成")
+                            task_stopped = self._task_was_stopped()
+                            script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
+                            entry["scripts"][script.id] = script_ui_status
+                            report.end_script(script_ui_status, result)
+                            self.progress.emit(run_idx, label, script.id, script_ui_status)
+                            self.log.emit(
+                                f"[批量] {label} → {script.name} "
+                                + ("已停止，继续下一项" if task_stopped else "完成"))
                             try:
                                 result_path = self._save_result(
                                     username, script, result, task_started_at)
@@ -1009,7 +1030,8 @@ class BatchScheduler:
                             if task_run is not None:
                                 try:
                                     task_run.finish(
-                                        status=("interrupted" if self._stop_check()
+                                        status=("stopped" if task_stopped
+                                                else "interrupted" if self._stop_check()
                                                 else "completed"),
                                         result_path=result_path)
                                 except Exception as history_exc:  # noqa: BLE001
@@ -1212,7 +1234,7 @@ class BatchScheduler:
             RESULT_SUCCESS: ST_SUCCESS,
             RESULT_SKIPPED: ST_SKIPPED,
             RESULT_FAILED: ST_FAILED,
-            RESULT_STOPPED: ST_SKIPPED,
+            RESULT_STOPPED: ST_STOPPED,
         }.get(status, ST_FAILED)
 
     @staticmethod
@@ -1221,6 +1243,7 @@ class BatchScheduler:
             ST_SUCCESS: RESULT_SUCCESS,
             ST_FAILED: RESULT_FAILED,
             ST_SKIPPED: RESULT_SKIPPED,
+            ST_STOPPED: RESULT_STOPPED,
             ST_PENDING: "pending",
             ST_RUNNING: "running",
         }.get(status, RESULT_FAILED)
@@ -1264,7 +1287,7 @@ class BatchScheduler:
             android_device=ctx.android_device,
             window_left=ctx.window_left,
             window_top=ctx.window_top,
-            stop_check=self._stop_check,
+            stop_check=self._task_stop_check,
             pause_event=ctx.pause_event,
         ).build()
         # 生命周期与条目脚本必须复用宿主的主线程 UI broker；否则
@@ -1388,14 +1411,21 @@ class BatchScheduler:
             })
 
         try:
+            self._task_stop_clear()
             engine.execute(wf_path, initial_variables=variables)
             result = self._normalize_stage_result(engine.return_value, batch_state)
-            if not result.returned and self._stop_check():
-                # 停止请求让 _exec_body 提前 return，wf 没机会走到它的 return；
-                # 这是用户按了停止，不是 wf 违反返回协议，不能报成协议错误。
-                result = replace(
-                    result, status=RESULT_STOPPED,
-                    message=tr("执行被停止"))
+            if not result.returned:
+                if self._stop_check():
+                    # 停止请求让 _exec_body 提前 return，wf 没机会走到它的 return；
+                    # 这是用户按了停止，不是 wf 违反返回协议，不能报成协议错误。
+                    result = replace(
+                        result, status=RESULT_STOPPED,
+                        message=tr("执行被停止"))
+                elif self._task_stop_check():
+                    # 弹窗「停止任务」只结束当前阶段，批次继续下一项。
+                    result = replace(
+                        result, status=RESULT_SKIPPED,
+                        message=tr("用户结束当前任务，继续下一项"))
             return replace(result, source=str(wf_path))
         except WorkflowAbort as e:
             # 无人值守改道，不是阶段 wf 出错。按失败记账（这条目不重试，直接
@@ -1475,6 +1505,7 @@ class BatchScheduler:
         save_fn，全程不读全局 active user。
         """
         engine = self._create_engine()
+        self._task_stop_clear()
         engine.session = session
         engine.run_username = username or ""
         engine.users_dir = self._session_manager._users_dir
@@ -1501,7 +1532,7 @@ class BatchScheduler:
                 delay_params=ctx.delay_params,
                 window_left=ctx.window_left,
                 window_top=ctx.window_top,
-                stop_check=self._stop_check,
+                stop_check=self._task_stop_check,
                 pause_event=ctx.pause_event,
             )
             return engine.execute(wf_instance, initial_variables=params)

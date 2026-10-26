@@ -212,3 +212,33 @@ def test_stage_abort_is_recorded_as_a_redirect_not_a_stage_error(
     assert result.message.startswith("无人值守中止")
     assert errors == []
     assert any("无人值守中止" in line for line in infos)
+
+
+def test_task_stop_signal_is_distinct_from_batch_stop(tmp_path, qapp):
+    """弹窗「停止任务」只结束当前一条：批次级停止信号不受影响。
+
+    - 只置 task_stop：`_task_was_stopped()` 为真，调度器把当前脚本记「已停止」。
+    - 再置整批 stop：优先按整批停止，`_task_was_stopped()` 为假。
+    - `_task_stop_clear()` 是每个脚本开始前清上一轮信号用的复位口。
+    """
+    import threading
+
+    from lvjiang.core.batch_scheduler import RESULT_STOPPED, ST_STOPPED
+
+    task_event = threading.Event()
+    batch_event = threading.Event()
+    worker = BatchWorker(
+        _spec(), BatchContext(None, None, None, None),
+        SessionManager(tmp_path), batch_event.is_set,
+        task_stop_check=lambda: batch_event.is_set() or task_event.is_set(),
+        task_stop_clear=task_event.clear,
+    )
+
+    assert worker._task_was_stopped() is False
+    task_event.set()
+    assert worker._task_was_stopped() is True
+    batch_event.set()
+    assert worker._task_was_stopped() is False
+    worker._task_stop_clear()
+    assert not task_event.is_set()
+    assert worker._result_to_ui_status(RESULT_STOPPED) == ST_STOPPED

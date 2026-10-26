@@ -12,6 +12,7 @@ from ...core.batch_scheduler import (  # noqa: F401
     ST_PENDING,
     ST_RUNNING,
     ST_SKIPPED,
+    ST_STOPPED,
     ST_SUCCESS,
     BatchCheckResult,
     BatchContext,
@@ -30,10 +31,14 @@ class BatchWorker(BatchScheduler, QThread):
     log = pyqtSignal(str)
     finished_all = pyqtSignal(dict)
 
-    def __init__(self, spec, ctx, session_manager, stop_check, parent=None):
+    def __init__(self, spec, ctx, session_manager, stop_check, parent=None,
+                 *, task_stop_check=None, task_stop_clear=None):
         QThread.__init__(self, parent)
         # Use Qt signals rather than assigning instance event objects.
-        BatchScheduler.__init__(self, spec, ctx, session_manager, stop_check)
+        BatchScheduler.__init__(
+            self, spec, ctx, session_manager, stop_check,
+            task_stop_check=task_stop_check, task_stop_clear=task_stop_clear,
+        )
 
     def run(self):
         BatchScheduler.run(self)

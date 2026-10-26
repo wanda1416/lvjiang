@@ -208,10 +208,13 @@ class _UIHelper(QObject):
         self,
         window=None,
         stop_check: Callable[[], bool] | None = None,
+        task_stop_callback: Callable[[], None] | None = None,
     ):
         super().__init__()
         self._window = window
         self._stop_check = stop_check or (lambda: False)
+        # 批量运行：弹窗「停止任务」只结束当前任务；None 表示单任务，走整跑停止。
+        self._task_stop_callback = task_stop_callback
         self._active_dialog: Any = None
         self.request.connect(self._on_request)
         self.dismiss_active.connect(self._dismiss_active_dialog)
@@ -344,9 +347,13 @@ class _UIHelper(QObject):
                 box.setDefaultButton(continue_button)
             def resolve_pause(_code: int) -> None:
                 if stop_button is not None and box.clickedButton() is stop_button:
-                    request_stop = getattr(self._window, "request_stop", None)
-                    if callable(request_stop):
-                        request_stop()
+                    if self._task_stop_callback is not None:
+                        # 批量：只结束当前这一条任务，批次继续下一项。
+                        self._task_stop_callback()
+                    else:
+                        request_stop = getattr(self._window, "request_stop", None)
+                        if callable(request_stop):
+                            request_stop()
                 return None
 
             self._install_dialog(req, box, resolve_pause)
@@ -1423,7 +1430,13 @@ class RunControlMixin:
             context.stop_event.is_set if context is not None
             else self._is_stopped
         )
-        helper = _UIHelper(self, stop_check=stop_check)
+        task_stop_callback = None
+        if context is not None and context.metadata.get("batch"):
+            task_stop_callback = context.task_stop_event.set
+        helper = _UIHelper(
+            self, stop_check=stop_check,
+            task_stop_callback=task_stop_callback,
+        )
         if context is not None:
             context.ui_helper = helper
         # 迁移期兼容仍依赖当前运行实例的旧消费者；并发开放前会删除。

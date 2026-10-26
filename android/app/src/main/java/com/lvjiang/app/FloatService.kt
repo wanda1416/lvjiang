@@ -63,10 +63,14 @@ class FloatService : Service() {
     private var floatParams: WindowManager.LayoutParams? = null
     private var panelView: View? = null
     private var statusLine: TextView? = null
+    /** 选择用户按钮；当前选择展示在右侧的 userLine 文本上。 */
+    private var userButton: Button? = null
+    /** 选择任务按钮；当前选择展示在右侧的 taskLine 文本上。 */
+    private var taskButton: Button? = null
+    /** 当前用户值（选择用户按钮右侧的纯文本）。 */
     private var userLine: TextView? = null
+    /** 当前任务值（选择任务按钮右侧的纯文本）。 */
     private var taskLine: TextView? = null
-    private var selectButton: Button? = null
-    private var selectUserButton: Button? = null
     private var showingUsers = false
     private var logLine: TextView? = null
     private var logScroll: ScrollView? = null
@@ -368,10 +372,10 @@ class FloatService : Service() {
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelView = null
         statusLine = null
+        userButton = null
+        taskButton = null
         userLine = null
         taskLine = null
-        selectButton = null
-        selectUserButton = null
         showingUsers = false
         logLine = null
         logScroll = null
@@ -400,28 +404,36 @@ class FloatService : Service() {
         val actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         main.addView(actions)
         actionArea = actions
-        val user = TextView(this).apply {
+        val userRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val user = smallButton("选择用户") { openUserSelection() }
+        userRow.addView(user, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+        userButton = user
+        val userValue = TextView(this).apply {
             setTextColor(0xFF90CAF9.toInt())
-            text = "用户：读取中…"
+            text = "读取中…"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(0, dp(6), 0, dp(4))
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER_VERTICAL
         }
-        main.addView(user)
-        userLine = user
-        val task = TextView(this).apply {
+        userRow.addView(userValue, LinearLayout.LayoutParams(0, -2, 1f))
+        userLine = userValue
+        main.addView(userRow)
+        val taskRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val task = smallButton("选择任务") { openTaskSelection() }
+        taskRow.addView(task, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+        taskButton = task
+        val taskValue = TextView(this).apply {
             setTextColor(Color.WHITE)
+            text = "未选择"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER_VERTICAL
         }
-        main.addView(task)
-        taskLine = task
-        val selectors = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val selectUser = smallButton("选择用户") { openUserSelection() }
-        selectors.addView(selectUser, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
-        selectUserButton = selectUser
-        val select = smallButton("选择任务") { openTaskSelection() }
-        selectors.addView(select, LinearLayout.LayoutParams(0, -2, 1f))
-        main.addView(selectors)
-        selectButton = select
+        taskRow.addView(taskValue, LinearLayout.LayoutParams(0, -2, 1f))
+        taskLine = taskValue
+        main.addView(taskRow)
         val status = TextView(this).apply {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
@@ -575,19 +587,19 @@ class FloatService : Service() {
                 }
                 val sync = status.optJSONObject("sync")
                 ready = sync?.optBoolean("ready") == true
-                userLine?.text = if (ready) "用户：${SettingsUi.userLabel(sync?.optString("execution_username").orEmpty())}" else "预置配置未就绪"
+                userLine?.text = if (ready) SettingsUi.userLabel(sync?.optString("execution_username").orEmpty()) else "预置配置未就绪"
                 statusLine?.text = header
                 if (state in activeStates) {
                     selectedTaskId = status.optString("task_id")
                     selectedTaskName = taskName
                     closeTaskSelection()
                 }
-                taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
+                taskLine?.text = selectedTaskName.ifEmpty { "未选择" }
                 if (status.optJSONObject("batch")?.optString("group_id").orEmpty().isNotEmpty() && state in activeStates) {
                     userLine?.text = "单元：${status.optJSONObject("batch")?.optString("current_entry").orEmpty()}"
                 }
-                selectButton?.isEnabled = ready && state !in activeStates
-                selectUserButton?.isEnabled = ready && state !in activeStates
+                userButton?.isEnabled = ready && state !in activeStates
+                taskButton?.isEnabled = ready && state !in activeStates
                 appendLogs(status)
                 applyIconState(state)
                 updateNotification(
@@ -696,8 +708,24 @@ class FloatService : Service() {
             return
         }
 
-        area.addView(smallButton(if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务") { launchTask(selectedTaskId, selectedTaskName) }
-            .apply { isEnabled = ready && selectedTaskId.isNotEmpty() })
+        val idle = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        idle.addView(
+            smallButton(if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务") {
+                launchTask(selectedTaskId, selectedTaskName)
+            }.apply { isEnabled = ready && selectedTaskId.isNotEmpty() },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+        idle.addView(
+            smallButton("关闭悬浮窗") { closeOverlay() },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        area.addView(idle)
+    }
+
+    /** 关闭当前面板与悬浮图标，并结束前台服务。 */
+    private fun closeOverlay() {
+        closePanel()
+        floatView?.let { runCatching { windowManager.removeView(it) } }
+        floatView = null
+        stopSelf()
     }
 
     private fun loadTasks() {
@@ -711,7 +739,7 @@ class FloatService : Service() {
                     statusLine?.text = result.optString("error").ifEmpty { "没有可执行任务" }
                     selectedTaskId = ""
                     selectedTaskName = ""
-                    taskLine?.text = "任务：未选择"
+                    taskLine?.text = "未选择"
                     if (lastState !in activeStates) rebuildActions(lastState)
                     return@post
                 }
@@ -729,7 +757,7 @@ class FloatService : Service() {
                 selectedTaskName = selected?.second ?: ""
                 getSharedPreferences("float_tasks", MODE_PRIVATE).edit()
                     .putString("selected_name", selectedTaskName).apply()
-                taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
+                taskLine?.text = selectedTaskName.ifEmpty { "未选择" }
                 rebuildActions(lastState)
                 if (selectionArea?.visibility == View.VISIBLE && !showingUsers) renderTaskSelection()
             }
@@ -804,7 +832,7 @@ class FloatService : Service() {
                 selectedTaskName = name
                 preparedBatchGroup = ""; preparedBatchToken = ""
                 getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", id).putString("selected_name", name).apply()
-                taskLine?.text = "任务：$name"
+                taskLine?.text = name
                 closeTaskSelection()
                 rebuildActions(lastState)
             })
@@ -922,7 +950,7 @@ class FloatService : Service() {
                     service.preparedBatchToken = result.optString("token")
                     service.selectedTaskId = "batch:" + result.optString("group_id")
                     service.selectedTaskName = result.optString("name")
-                    service.taskLine?.text = "批量：${service.selectedTaskName}"
+                    service.taskLine?.text = service.selectedTaskName
                     service.lastState = ""
                     service.refreshStatus()
                 }
@@ -947,7 +975,7 @@ class FloatService : Service() {
                     service.selectedTaskId = taskId
                     service.selectedTaskName = taskName
                     service.getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", taskId).putString("selected_name", taskName).apply()
-                    service.taskLine?.text = "任务：$taskName"
+                    service.taskLine?.text = taskName
                     service.rebuildActions(service.lastState)
                 }
                 JSONObject().put("ok", true).put("message", "已准备，请回到对应游戏角色，点击悬浮图标启动任务")

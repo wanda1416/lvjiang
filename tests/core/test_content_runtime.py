@@ -1,15 +1,17 @@
 """两种模式的持续契约：修订复用、在线安装与下一任务加载。"""
 import json
+import sys
 
 import pytest
 import yaml
 
+from lvjiang import constants
 from lvjiang.core import scene_registry
 from lvjiang.core.config import remote
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.content import load_content, rebuild_content
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.core.config.runtime_snapshot import configuration_snapshot
+from lvjiang.core.config.runtime_snapshot import configuration_snapshot, task_directory
 from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.core.system_preset import write_baseline_identity
 from lvjiang.core.update_bundle import json_bytes, make_manifest
@@ -164,3 +166,27 @@ def test_release_public_member_install_refreshes_next_task_not_running_task(tmp_
         assert scene_registry.get_registry().get_scene("member") is not None
         assert [r.key for r in load_layout_by_key("phone").regions["sample"]] == ["button"]
     assert yaml.safe_load((resolver.system_dir / "scenes.yaml").read_text(encoding="utf-8"))["scenes"]["general"]["items"] == ["sample", "member"]
+
+
+def test_task_directory_uses_cwd_on_desktop(tmp_path, monkeypatch):
+    from lvjiang.core.config import runtime_snapshot
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(runtime_snapshot, "_task_root", None)
+    assert task_directory() == tmp_path / ".task"
+    assert (tmp_path / ".task").is_dir()
+
+
+def test_task_directory_uses_project_root_on_android(tmp_path, monkeypatch):
+    """安卓 cwd 是只读根 /，任务快照必须落到客户端自身根目录而不是 /.task。"""
+    from lvjiang.core.config import runtime_snapshot
+
+    cwd = tmp_path / "readonly-root"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    monkeypatch.setattr(sys, "getandroidapilevel", lambda: 35, raising=False)
+    monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path / "lvjiang")
+    monkeypatch.setattr(runtime_snapshot, "_task_root", None)
+    assert task_directory() == (tmp_path / "lvjiang") / ".task"
+    assert (tmp_path / "lvjiang" / ".task").is_dir()
+    assert not (cwd / ".task").exists()

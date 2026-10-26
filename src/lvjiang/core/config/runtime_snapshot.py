@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import atexit
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from loguru import logger
+
+from ... import constants
 
 T = TypeVar("T")
 
@@ -68,17 +71,32 @@ _task_owners: set[Path] = set()
 _task_owners_lock = threading.Lock()
 
 
-def task_directory() -> Path:
-    """任务快照根目录：工作目录下的 .task。
+def _task_root_base() -> Path:
+    """任务快照根目录的可写基目录。
 
-    系统临时目录在受限环境里可能整体不可写，tempfile 会退到当前工作目录，把整份
-    配置副本倒进仓库根。这里固定到工作目录下的 .task，首次使用时顺带清掉被强杀
-    进程留下的过期代次。
+    桌面端落在工作目录（仓库根）：系统临时目录在受限环境里可能整体不可写，
+    ``tempfile`` 会退回 ``cwd``，与其让配置副本散落进仓库根，不如固定到
+    ``cwd/.task``。
+
+    安卓端 ``cwd`` 是只读根 ``/``，往 ``/.task`` 写会直接得到
+    ``[Errno 30] Read-only file system``；改用客户端自身根目录
+    ``constants.PROJECT_ROOT``（``$HOME/lvjiang``），与桌面 ``<仓库根>/.task``
+    的布局保持一致。
+    """
+    if hasattr(sys, "getandroidapilevel"):
+        return constants.PROJECT_ROOT
+    return Path.cwd()
+
+
+def task_directory() -> Path:
+    """任务快照根目录：``<可写基目录>/.task``（见 ``_task_root_base``）。
+
+    首次使用时创建并顺带清掉被强杀进程留下的过期代次。
     """
     global _task_root
     with _task_root_lock:
         if _task_root is None:
-            root = Path.cwd() / _TASK_ROOT_NAME
+            root = _task_root_base() / _TASK_ROOT_NAME
             root.mkdir(parents=True, exist_ok=True)
             _sweep_stale(root)
             _task_root = root

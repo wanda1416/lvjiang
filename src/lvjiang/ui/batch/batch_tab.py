@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from typing import cast
 
 from loguru import logger
-from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QDropEvent
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QAction, QDropEvent, QMouseEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -31,6 +31,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QStyle,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -147,19 +149,71 @@ class _ReorderTreeWidget(QTreeWidget):
     restore_order_requested = pyqtSignal()
     shuffle_order_requested = pyqtSignal()
     profile_order_requested = pyqtSignal()
+    #: Shift+点击勾选框区间勾选：start_row, end_row, target_state（Qt.CheckState.value）
+    range_check_requested = pyqtSignal(int, int, int)
 
     def __init__(self, parent: QWidget | None = None, *, profile_order: bool = False) -> None:
         super().__init__(parent)
         self._profile_order = profile_order
         # 菜单弹出时现算：Profile 定义可能在别处被删，缓存值会过期。
         self.profile_order_status: Callable[[], ProfileOrderStatus] | None = None
+        #: 最近一次普通勾选的行 index；行序变化（重排/刷新）后失效。
+        self._check_anchor_row: int | None = None
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_order_menu)
+        viewport = self.viewport()
+        if viewport is not None:
+            viewport.installEventFilter(self)
+
+    def reset_check_anchor(self) -> None:
+        """清空区间勾选锚点：整表刷新、重排或全选/全不选后调用。"""
+        self._check_anchor_row = None
 
     def dropEvent(self, event: QDropEvent | None) -> None:
         super().dropEvent(event)
         if event is not None and event.isAccepted():
+            self._check_anchor_row = None
             self.order_changed.emit()
+
+    def _check_indicator_rect(self, item: QTreeWidgetItem) -> QRect:
+        option = QStyleOptionViewItem()
+        option.initFrom(self)
+        option.rect = self.visualItemRect(item)
+        option.viewItemPosition = QStyleOptionViewItem.ViewItemPosition.OnlyOne
+        option.features |= QStyleOptionViewItem.ViewItemFeature.HasCheckIndicator
+        option.checkState = item.checkState(0)
+        style = self.style()
+        if style is None:
+            return QRect()
+        return style.subElementRect(
+            QStyle.SubElement.SE_ItemViewItemCheckIndicator, option, self)
+
+    def eventFilter(self, watched: QObject | None, event: QEvent | None) -> bool:
+        if (watched is not None and event is not None
+                and watched is self.viewport()
+                and event.type() == QEvent.Type.MouseButtonPress):
+            mouse = cast(QMouseEvent, event)
+            if mouse.button() == Qt.MouseButton.LeftButton:
+                item = self.itemAt(mouse.position().toPoint())
+                if item is not None:
+                    row = self.indexOfTopLevelItem(item)
+                    if self._check_indicator_rect(item).contains(
+                            mouse.position().toPoint()):
+                        shift = bool(
+                            mouse.modifiers()
+                            & Qt.KeyboardModifier.ShiftModifier)
+                        if (shift and self._check_anchor_row is not None
+                                and self._check_anchor_row != row):
+                            target = (
+                                Qt.CheckState.Unchecked
+                                if item.checkState(0) == Qt.CheckState.Checked
+                                else Qt.CheckState.Checked)
+                            self.range_check_requested.emit(
+                                self._check_anchor_row, row, target.value)
+                            self._check_anchor_row = row
+                            return True
+                        self._check_anchor_row = row
+        return super().eventFilter(watched, event)
 
     def _show_order_menu(self, position: QPoint) -> None:
         menu = QMenu(self)
@@ -414,6 +468,8 @@ class BatchTab(QWidget):
             1, _four_cjk_column_width(self._script_list)
         )
         self._script_list.itemChanged.connect(self._on_script_item_changed)
+        self._script_list.range_check_requested.connect(
+            self._apply_script_range_check)
         self._script_list.order_changed.connect(self._on_script_rows_moved)
         self._script_list.restore_order_requested.connect(
             self._restore_script_order)
@@ -589,6 +645,8 @@ class BatchTab(QWidget):
         self._user_list.setColumnWidth(
             1, _four_cjk_column_width(self._user_list))
         self._user_list.itemChanged.connect(self._on_user_item_changed)
+        self._user_list.range_check_requested.connect(
+            self._apply_user_range_check)
         self._user_list.order_changed.connect(self._on_user_rows_moved)
         self._user_list.restore_order_requested.connect(
             self._restore_user_order)
@@ -788,6 +846,7 @@ class BatchTab(QWidget):
         config = self._item
         self._updating_user_list = True
         self._user_list.clear()
+        self._user_list.reset_check_anchor()
         if not config:
             self._user_order = []
             self._user_candidate_order = []
@@ -835,6 +894,7 @@ class BatchTab(QWidget):
 
     def _set_all_entries_checked(self, checked: bool):
         """全选/全不选行"""
+        self._user_list.reset_check_anchor()
         self._updating_user_list = True
         try:
             for index in range(self._user_list.topLevelItemCount()):
@@ -866,6 +926,19 @@ class BatchTab(QWidget):
         if not self._updating_user_list:
             self._sync_user_order_from_rows()
 
+    def _apply_user_range_check(self, start: int, end: int, target: int) -> None:
+        """Shift 区间勾选：把 [start, end] 闭区间统一设成目标状态，只写一次草稿。"""
+        state = Qt.CheckState(target)
+        self._updating_user_list = True
+        try:
+            for index in range(min(start, end), max(start, end) + 1):
+                item = self._user_list.topLevelItem(index)
+                if item is not None:
+                    item.setCheckState(0, state)
+        finally:
+            self._updating_user_list = False
+        self._sync_user_order_from_rows()
+
     def _restore_user_order(self) -> None:
         """恢复默认：顺序回到定义层初始顺序，勾选回到默认勾选。"""
         item = self._item
@@ -889,6 +962,7 @@ class BatchTab(QWidget):
             self._apply_tree_order(self._user_list, order, self._user_name)
         finally:
             self._updating_user_list = False
+        self._user_list.reset_check_anchor()
         self._sync_user_order_from_rows()
 
     def _profile_order_status(self) -> ProfileOrderStatus:
@@ -934,6 +1008,7 @@ class BatchTab(QWidget):
             self._apply_tree_order(self._user_list, sorted_order, self._user_name)
         finally:
             self._updating_user_list = False
+        self._user_list.reset_check_anchor()
         self._sync_user_order_from_rows()
         message = tr("已按 Profile 排序用户") + f": {key} ({len(order)} " + tr("人") + ")"
         if missing:
@@ -996,6 +1071,7 @@ class BatchTab(QWidget):
 
         self._updating_script_list = True
         self._script_list.clear()
+        self._script_list.reset_check_anchor()
         try:
             run_env_getter = getattr(self._host, "_selected_run_env", None)
             run_env = run_env_getter() if callable(run_env_getter) else None
@@ -1083,6 +1159,10 @@ class BatchTab(QWidget):
     def _on_script_rows_moved(self, *_args) -> None:
         if self._updating_script_list:
             return
+        self._sync_script_order_from_rows()
+
+    def _sync_script_order_from_rows(self) -> None:
+        """按列表当前行序与勾选重建候选顺序和实际执行顺序，并落盘草稿。"""
         self._script_candidate_order = []
         self._script_order = []
         for index in range(self._script_list.topLevelItemCount()):
@@ -1097,6 +1177,19 @@ class BatchTab(QWidget):
                 self._script_order.append(script_id)
         self._refresh_script_order_column()
         self._persist_script_order()
+
+    def _apply_script_range_check(self, start: int, end: int, target: int) -> None:
+        """Shift 区间勾选：把 [start, end] 闭区间统一设成目标状态，只写一次草稿。"""
+        state = Qt.CheckState(target)
+        self._updating_script_list = True
+        try:
+            for index in range(min(start, end), max(start, end) + 1):
+                item = self._script_list.topLevelItem(index)
+                if item is not None:
+                    item.setCheckState(0, state)
+        finally:
+            self._updating_script_list = False
+        self._sync_script_order_from_rows()
 
     def _restore_script_order(self) -> None:
         """恢复默认：顺序回到定义层初始顺序，勾选回到默认勾选。"""
@@ -1116,9 +1209,11 @@ class BatchTab(QWidget):
             self._apply_tree_order(self._script_list, order, self._script_id)
         finally:
             self._updating_script_list = False
+        self._script_list.reset_check_anchor()
         self._on_script_rows_moved()
 
     def _set_all_scripts_checked(self, checked: bool) -> None:
+        self._script_list.reset_check_anchor()
         self._updating_script_list = True
         try:
             for index in range(self._script_list.topLevelItemCount()):

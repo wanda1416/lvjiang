@@ -4,11 +4,11 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTreeWidget, QWidget
+from PyQt6.QtWidgets import QWidget
 
 from lvjiang.core.batch_config import BatchConfigItem
 from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
-from lvjiang.ui.batch.batch_tab import BatchTab
+from lvjiang.ui.batch.batch_tab import BatchTab, _ReorderTreeWidget
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.main.run_control import RunControlMixin
 from lvjiang.ui.main.ui_state import UiStateMixin
@@ -103,7 +103,7 @@ def test_filter_and_refresh_use_stable_ids_without_persisting_fallback(qtbot, mo
     monkeypatch.setattr("lvjiang.workflows.discovery.last_discovery_problems", lambda: [])
     host = Host()
     qtbot.addWidget(host)
-    tree = QTreeWidget(host)
+    tree = _ReorderTreeWidget(host)
     tree.setColumnCount(2)
     batch = SimpleNamespace(
         _host=host, _script_list=tree,

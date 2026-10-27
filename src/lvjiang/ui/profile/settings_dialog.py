@@ -43,7 +43,6 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.profile.models import (
-    ALL_MODELS,
     DEFAULT_KEY_GROUP,
     DIR_BOTH,
     DIRECTION_LABELS,
@@ -62,6 +61,7 @@ from ...core.profile.models import (
     format_sync_label,
     group_key_definitions,
     normalize_key_group,
+    parse_sync_key,
 )
 from ...core.profile.periods import get_profile_period, list_profile_periods
 from ...i18n import tr
@@ -256,29 +256,46 @@ class _SyncTargetsWidget(QWidget):
         row = self._table.rowCount()
         self._table.setRowCount(row + 1)
 
-        # 目标 key 下拉框（所有模型类型的 key）
+        # 目标 key 级联选择按钮（类型 → 分组 → 定义），与总览列/批量排序同款。
         from ...core.profile import get_profile_config
-        config = get_profile_config()
+        from .key_picker import create_profile_key_picker
 
-        combo = AutoWidthComboBox()
-        combo.addItem(tr("（请选择）"), "")
+        config = get_profile_config()
         exclude = (
             self._exclude_key_input.text().strip()
             if self._exclude_key_input else ""
         )
-        for mt in ALL_MODELS:
-            model_label = MODEL_LABELS.get(mt, mt)
-            for kd in config.get_keys_by_model(mt):
-                if kd.key == exclude:
-                    continue  # 排除自身，防止自环
-                sync_key = f"{mt}:{kd.key}"
-                combo.addItem(f"{model_label}：{kd.label}", sync_key)
+        available_keys = [
+            kd for kd in config.get_all_keys() if kd.key != exclude
+        ]
 
-        if target:
-            idx = combo.findData(target.key)
-            if idx >= 0:
-                combo.setCurrentIndex(idx)
-        self._table.setCellWidget(row, 0, combo)
+        # 每行一个可变容器保存当前选择的 model:key，get_sync_targets 统一读取。
+        holder: dict[str, str] = {"key": ""}
+        current_plain = ""
+        if target and target.key:
+            ns, name = parse_sync_key(target.key)
+            if (
+                name
+                and name != exclude
+                and config.get_key(name, model_type=ns or None) is not None
+            ):
+                holder["key"] = target.key
+                current_plain = name
+
+        def _remember(key: str) -> None:
+            if not key:
+                holder["key"] = ""
+                return
+            model_type = config.get_model_type(key) or ""
+            holder["key"] = f"{model_type}:{key}" if model_type else key
+
+        picker = create_profile_key_picker(
+            config, available_keys, current_plain, _remember,
+            clear_label=tr("（清空）"),
+            placeholder=tr("（请选择）"),
+        )
+        picker._sync_target_holder = holder  # type: ignore[attr-defined]
+        self._table.setCellWidget(row, 0, picker)
 
         # 倍率
         ratio_spin = QDoubleSpinBox()
@@ -331,10 +348,11 @@ class _SyncTargetsWidget(QWidget):
         """收集所有有效的同步目标"""
         targets: list[SyncTargetDef] = []
         for row in range(self._table.rowCount()):
-            combo = self._table.cellWidget(row, 0)
-            if not isinstance(combo, AutoWidthComboBox):
+            picker = self._table.cellWidget(row, 0)
+            holder = getattr(picker, "_sync_target_holder", None)
+            if not isinstance(holder, dict):
                 continue
-            key = combo.currentData()
+            key = holder.get("key", "")
             if not key:
                 continue
             ratio_spin = self._table.cellWidget(row, 1)

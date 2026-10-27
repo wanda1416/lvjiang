@@ -39,13 +39,16 @@ def create_profile_key_picker(
     on_choose: Callable[[str], None],
     *,
     empty_label: str = "",
+    clear_label: str = "",
     placeholder: str = "",
     minimum_width: int = 200,
 ) -> QPushButton:
     """按 类型 → 分组 → 定义 建出级联菜单的选择按钮。
 
-    ``empty_label`` 非空时，菜单顶部多一项"不限定"，选它回传空 key——批量的
-    「指定排序」需要能取消，用户总览的替换列不需要。
+    ``clear_label``（缺省回退 ``empty_label``）非空时，菜单顶部多一项"清空/不限定"，
+    选它回传空 key——批量的「指定排序」需要能取消，用户总览的替换列不需要。
+    ``empty_label`` 仅决定空 key 显示什么；需要「空值显示」和「清空项文案」分开时
+    同时传两个参数，例如同步目标编辑用「（请选择）」显示、"（清空）"清空。
 
     只有一个分组且就是默认分组时不再套那一层：它只会多一次点击，不提供信息。
     """
@@ -74,8 +77,9 @@ def create_profile_key_picker(
     def build_menu() -> QMenu:
         """与 exec 分开：exec 会阻塞，菜单结构只有这样才能被断言。"""
         menu = QMenu(button)
-        if empty_label:
-            clear_action = menu.addAction(empty_label)
+        clear_text = clear_label or empty_label
+        if clear_text:
+            clear_action = menu.addAction(clear_text)
             if clear_action is not None:
                 clear_action.triggered.connect(lambda _checked: _choose(""))
             menu.addSeparator()

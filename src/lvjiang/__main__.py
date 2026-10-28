@@ -79,12 +79,14 @@ class _InterceptHandler(logging.Handler):
         )
 
 
-def _configure_logging() -> None:
+def _configure_logging(console_level: str = "DEBUG") -> None:
     """配置 loguru（控制台 + logs/ 落盘），标准库 logging 转发到 loguru。
 
     落盘文件按天命名 ``logs/lvjiang_YYYY-MM-DD.log``；午夜（00:00）换新文件。
     启动时把仍在 7 天保留期内的更早日志归入 ``logs/logs/YYYY-MM/``，再早的删除。
     归档目录不在 FileSink 的文件名模式里，保留期由归档自己执行。
+
+    ``console_level`` 只影响 stderr；文件始终 DEBUG，命令行 ``--quiet`` 用它压控制台。
     """
     from loguru import logger
 
@@ -92,7 +94,7 @@ def _configure_logging() -> None:
     logger.add(
         sys.stderr,
         format="<green>{time:HH:mm:ss}</green> | <level>{level:<7}</level> | {message}",
-        level="DEBUG",
+        level=console_level,
     )
     logger.add(
         str(PROJECT_ROOT / "logs" / "lvjiang_{time:YYYY-MM-DD}.log"),
@@ -128,7 +130,7 @@ def _archive_old_logs() -> None:
         logger.info(f"[logs] 已归档 {len(archived)} 份历史日志到 {logs_dir / 'logs'}")
 
 
-def _parse_args() -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="lvjiang",
         description=tr("通用视觉 RPA 引擎（支持插件扩展）"),
@@ -147,23 +149,29 @@ def _parse_args() -> argparse.Namespace:
         help=tr("注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用"),
     )
     parser.add_argument(
+        "--all",
         "--all-plugins",
         action="store_true",
         dest="all_plugins",
         help=tr("额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg"),
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> int:
+def _bootstrap(
+    args: argparse.Namespace, *, console_level: str = "DEBUG", recover: bool = True,
+) -> list:
+    """GUI 与命令行共用的启动序列（不含 Qt）。
+
+    ``recover`` 为 False 时只读查询（``list`` / ``schema``）不碰配置目录。
+    """
     import atexit
 
     from .core.access import close_instance, initialize_instance
-    args = _parse_args()
-    initialize_instance(PROJECT_ROOT, readonly=args.read_only)
+    initialize_instance(PROJECT_ROOT, readonly=bool(getattr(args, "read_only", False)))
     atexit.register(close_instance)
     _configure_dpi()
-    _configure_logging()
+    _configure_logging(console_level)
     _archive_old_logs()
     from .core.config.interface import initialize_state_stores
     initialize_state_stores()
@@ -190,7 +198,9 @@ def main() -> int:
     )
 
     # -reg 保持出现顺序；--all-plugins 追加内置与 plugins/ 目录扫描结果。
-    app_specs = resolve_app_specs(args.apps or (), all_plugins=args.all_plugins)
+    app_specs = resolve_app_specs(
+        getattr(args, "apps", None) or (),
+        all_plugins=bool(getattr(args, "all_plugins", False)))
 
     for spec in app_specs:
         load_app_i18n(app_name(spec))
@@ -198,11 +208,12 @@ def main() -> int:
 
     # 恢复未完成的安装事务、撤下明确失效的会员内容，再加载场景与布局缓存。
     # 这里不联网，也不提升旧协议暂存目录。
-    try:
-        from lvjiang.core.config.remote import recover_installation
-        recover_installation()
-    except Exception:  # noqa: BLE001
-        logger.exception("应用在线配置失败，本次使用现有配置")
+    if recover:
+        try:
+            from lvjiang.core.config.remote import recover_installation
+            recover_installation()
+        except Exception:  # noqa: BLE001
+            logger.exception("应用在线配置失败，本次使用现有配置")
 
     hooks_list = []
     for spec in app_specs:
@@ -211,6 +222,17 @@ def main() -> int:
         hooks = load_app(spec)
         register_hooks(hooks)
         hooks_list.append(hooks)
+    return hooks_list
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in {"run", "list", "schema"}:
+        from .core.task_cli import cli_main
+        return cli_main(argv, bootstrap=_bootstrap)
+
+    args = _parse_args(argv)
+    hooks_list = _bootstrap(args)
 
     # run_app 的导入必须排在插件加载之后：`import lvjiang.app` 会连带导入
     # MainWindow → PyQt6 / scene_registry / core.recognizers，其中场景注册表

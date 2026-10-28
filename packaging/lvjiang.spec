@@ -61,8 +61,26 @@ exe = EXE(
     disable_windowed_traceback=False,
 )
 
+# 同一份 Analysis 再包一个控制台 exe：两者共用 launcher.py，由 argv 分流。
+# GUI 子系统进程从 cmd 启动会立即返回、stdout 也被重定向到 devnull，
+# 所以命令行入口必须是独立的 console=True 可执行文件。
+cli = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="lvjiang-cli",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=True,
+    disable_windowed_traceback=False,
+)
+
 coll = COLLECT(
     exe,
+    cli,
     a.binaries,
     a.datas,
     strip=False,

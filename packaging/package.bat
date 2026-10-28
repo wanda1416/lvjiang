@@ -61,6 +61,7 @@ if errorlevel 1 exit /b 1
 
 echo.
 echo [package] Output: dist\lvjiang\lvjiang.exe
+echo [package] Output: dist\lvjiang\lvjiang-cli.exe
 echo [package] Output: dist\lvjiang-v%APP_VERSION%-win64.zip
 
 rem --- Inno Setup installer ---

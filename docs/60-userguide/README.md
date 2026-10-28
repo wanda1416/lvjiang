@@ -43,6 +43,7 @@
 | [A. 配置升级调整](appendix-a-config-upgrade.md) | 旧入口清理后的手工调整、读取诊断与必要迁移边界 |
 | [B. 官方在线配置与会员内容](appendix-b-online-config.md) | 更新生效、本地覆盖、会员状态和人工恢复 |
 | [C. 功能激活与恢复](appendix-c-activation.md) | 首次激活、离线使用与同机恢复 |
+| [D. 命令行执行脚本](appendix-d-command-line.md) | 不开界面跑任务：list / schema / run、参数、退出码与 JSON 输出 |
 
 ## 相关文档
 

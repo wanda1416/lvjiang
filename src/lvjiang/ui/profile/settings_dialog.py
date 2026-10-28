@@ -207,6 +207,51 @@ def _format_sync_summary(kd: KeyDef) -> str | None:
         sync_parts.append(f"{label_text}{ratio_text}{dir_text}")
     return tr("同步:{sync}").format(sync=','.join(sync_parts))
 
+class _SyncTargetsTable(QTableWidget):
+    """列宽可拖动；窗口缩放时把剩余宽度按比例分给目标与来源两列。
+
+    最后一列是删除按钮，必须始终贴住表格右边缘。用默认的「需要时出现滚动条」
+    会让总列宽小于视口时右侧留一条空白，按钮飘在中间，和「变动规则」表格也
+    对不齐；所以这里和 `_ChangeRulesTable` 一样关掉横向滚动并按比例重算弹性列。
+    """
+
+    _RATIO_WIDTH = 110
+    _DIRECTION_WIDTH = 90
+    _LOCK_WIDTH = 90
+    _REMOVE_WIDTH = 40
+    _TARGET_MIN = 220
+    _SOURCE_MIN = 90
+    #: 弹性宽度里目标列占的比例（分子/分母），其余给来源列。
+    _TARGET_SHARE = (6, 10)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self.distribute_widths()
+
+    def distribute_widths(self) -> None:
+        """按视口宽度重算弹性列；固定列（倍率/方向/满值锁定/删除）不参与。
+
+        视口过窄时两列各自保底，宁可让合计略超视口也不把下拉框压到看不清。
+        """
+        if self.columnCount() < 6:
+            return
+        viewport = self.viewport()
+        if viewport is None:
+            return
+        fixed = (
+            self._RATIO_WIDTH + self._DIRECTION_WIDTH
+            + self._LOCK_WIDTH + self._REMOVE_WIDTH
+        )
+        available = max(
+            viewport.width() - fixed, self._TARGET_MIN + self._SOURCE_MIN)
+        numerator, denominator = self._TARGET_SHARE
+        target_width = max(
+            available * numerator // denominator, self._TARGET_MIN)
+        self.setColumnWidth(0, target_width)
+        self.setColumnWidth(
+            4, max(available - target_width, self._SOURCE_MIN))
+
+
 class _SyncTargetsWidget(QWidget):
     """同步目标动态列表编辑器
 
@@ -221,9 +266,10 @@ class _SyncTargetsWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        self._table = QTableWidget()
-        self._table.setColumnCount(5)
-        self._table.setHorizontalHeaderLabels([tr("目标"), tr("倍率"), tr("方向"), tr("来源"), ""])
+        self._table = _SyncTargetsTable()
+        self._table.setColumnCount(6)
+        self._table.setHorizontalHeaderLabels(
+            [tr("目标"), tr("倍率"), tr("方向"), tr("满值锁定"), tr("来源"), ""])
         v_header = self._table.verticalHeader()
         if v_header is not None:
             v_header.setVisible(False)
@@ -232,11 +278,15 @@ class _SyncTargetsWidget(QWidget):
         header = self._table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self._table.setColumnWidth(0, 300)
-        self._table.setColumnWidth(1, 120)
-        self._table.setColumnWidth(2, 90)
-        self._table.setColumnWidth(3, 120)
-        self._table.setColumnWidth(4, 44)
+        self._table.setColumnWidth(1, _SyncTargetsTable._RATIO_WIDTH)
+        self._table.setColumnWidth(2, _SyncTargetsTable._DIRECTION_WIDTH)
+        self._table.setColumnWidth(3, _SyncTargetsTable._LOCK_WIDTH)
+        self._table.setColumnWidth(4, 120)
+        self._table.setColumnWidth(5, _SyncTargetsTable._REMOVE_WIDTH)
         _fit_table_to_rows(self._table)
 
         layout.addWidget(self._table)
@@ -318,7 +368,20 @@ class _SyncTargetsWidget(QWidget):
 
         # 来源（可选）
         source_input = QLineEdit(target.source if target else "")
-        self._table.setCellWidget(row, 3, source_input)
+        self._table.setCellWidget(row, 4, source_input)
+
+        # 满值锁定：本目标达到硬上限时是否把源 key 锁成 —。属于这条边，不属于源定义。
+        lock_check = QCheckBox()
+        lock_check.setChecked(target.lock_on_cap if target else True)
+        lock_check.setToolTip(tr(
+            "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n"
+            "取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"))
+        lock_cell = QWidget()
+        lock_layout = QHBoxLayout(lock_cell)
+        lock_layout.setContentsMargins(0, 0, 0, 0)
+        lock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lock_layout.addWidget(lock_check)
+        self._table.setCellWidget(row, 3, lock_cell)
 
         # 删除按钮（点击时按 widget 反查行号，避免删行后行号错位）
         btn_remove = QPushButton("×")
@@ -329,13 +392,13 @@ class _SyncTargetsWidget(QWidget):
         btn_remove.clicked.connect(
             lambda _checked, b=btn_remove: self._remove_row(self._row_of_widget(b))
         )
-        self._table.setCellWidget(row, 4, btn_remove)
+        self._table.setCellWidget(row, 5, btn_remove)
         _fit_table_to_rows(self._table)
 
     def _row_of_widget(self, widget: QWidget) -> int:
         """反查指定 cell widget 所在行（QTableWidget.row 只接受 QTableWidgetItem）"""
         for r in range(self._table.rowCount()):
-            if self._table.cellWidget(r, 4) is widget:
+            if self._table.cellWidget(r, 5) is widget:
                 return r
         return -1
 
@@ -357,14 +420,23 @@ class _SyncTargetsWidget(QWidget):
                 continue
             ratio_spin = self._table.cellWidget(row, 1)
             direction_combo = self._table.cellWidget(row, 2)
-            source_input = self._table.cellWidget(row, 3)
+            lock_cell = self._table.cellWidget(row, 3)
+            source_input = self._table.cellWidget(row, 4)
             ratio = ratio_spin.value() if isinstance(ratio_spin, QDoubleSpinBox) else 1.0
             direction = (
                 direction_combo.currentData()
                 if isinstance(direction_combo, AutoWidthComboBox) else DIR_BOTH
             )
+            lock_check = (
+                lock_cell.findChild(QCheckBox)
+                if isinstance(lock_cell, QWidget) else None
+            )
+            lock_on_cap = lock_check.isChecked() if lock_check is not None else True
             source = source_input.text().strip() if isinstance(source_input, QLineEdit) else ""
-            targets.append(SyncTargetDef(key=key, ratio=ratio, direction=direction, source=source))
+            targets.append(SyncTargetDef(
+                key=key, ratio=ratio, direction=direction,
+                source=source, lock_on_cap=lock_on_cap,
+            ))
         return targets
 
 

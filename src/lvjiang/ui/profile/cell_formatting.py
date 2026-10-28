@@ -281,6 +281,21 @@ def is_sync_target_at_hard_cap(sync_key: str, data: dict) -> bool:
     return value >= cap
 
 
+def locked_sync_targets(kd, data: dict) -> list:
+    """导致源 key 被锁定的同步目标列表；空列表表示不锁定。
+
+    逐条边判断，而不是逐条边一票否决：只有勾了「满值锁定」且目标已达硬上限的
+    那条才参与锁定。同一个目标可能被多个源指向，一条边满了不代表别的源也该停用；
+    派生计数器、真实资源等场景取掉该边的勾选，目标满就只表示增量不再写入它。
+
+    总览单元格和右键菜单共用这一处判断，避免「显示为 — 但仍能增减」。
+    """
+    return [
+        target for target in kd.sync_targets
+        if target.lock_on_cap and is_sync_target_at_hard_cap(target.key, data)
+    ]
+
+
 def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
     """应用单元格样式: '' | 'red_bold' | 'orange_bold' | 'green_bold'"""
     if style == "red_bold":

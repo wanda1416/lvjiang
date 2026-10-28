@@ -60,12 +60,17 @@ class SyncTargetDef:
     direction 方向限定：both=全向（任意变动触发），pos=正向（仅增加触发），
     neg=负向（仅减少触发）。
     source 可选：覆盖默认来源描述（未填时沿用触发 action 的 source）。
+    lock_on_cap 满值锁定：本目标达到硬上限时是否把源 key 锁成 `—` 并禁止编辑，
+        默认 True。同一个目标可能被多个源指向，一条边满了不代表别的源也该停用，
+        所以这个开关属于边而不是源 key；派生计数器、真实资源等场景应取消勾选，
+        此时目标满只表示增量不再写入它。
     """
 
     key: str = ""
     ratio: float = 1.0
     direction: str = DIR_BOTH
     source: str = ""
+    lock_on_cap: bool = True
 
     def matches_delta(self, delta: int | float) -> bool:
         """源字段的实际变动是否满足此目标的倍率与方向条件。"""
@@ -90,6 +95,7 @@ class SyncTargetDef:
                 ratio=float(raw.get("ratio", 1.0)),
                 direction=direction,
                 source=str(raw.get("source", "")).strip(),
+                lock_on_cap=bool(raw.get("lock_on_cap", True)),
             )
         # 兼容裸字符串（隐式 1:1 倍率）
         return cls(key=str(raw).strip())
@@ -103,6 +109,8 @@ class SyncTargetDef:
             result["direction"] = self.direction
         if self.source:
             result["source"] = self.source
+        if not self.lock_on_cap:
+            result["lock_on_cap"] = False
         return result
 
 

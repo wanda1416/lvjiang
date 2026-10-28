@@ -372,3 +372,24 @@ class TestKeyDefSyncTargets:
         restored = RegenKeyDef.from_dict(kd.to_dict())
         assert restored.sync_targets == kd.sync_targets
         assert restored.uses == kd.uses
+
+    def test_lock_on_cap_defaults_true_and_survives_unchecking(self):
+        """满值锁定属于同步目标这条边：默认勾选，取消勾选必须落盘。
+
+        取消后的语义是「目标满了只停止写入」，不是「这条边不存在」，因此不能
+        靠删行或把 ratio 归零来实现，必须有自己的持久化字段。
+        """
+        default_target = SyncTargetDef.from_raw({"key": "stock:credits"})
+        assert default_target.lock_on_cap is True
+        # 默认值不写进 YAML，保持配置文件最小化。
+        assert "lock_on_cap" not in default_target.to_dict()
+
+        unchecked = SyncTargetDef.from_raw(
+            {"key": "stock:credits", "lock_on_cap": False})
+        assert unchecked.lock_on_cap is False
+        assert unchecked.to_dict()["lock_on_cap"] is False
+        assert SyncTargetDef.from_raw(unchecked.to_dict()).lock_on_cap is False
+
+        # 裸字符串与实例两种兼容入口同样保持默认值。
+        assert SyncTargetDef.from_raw("stock:credits").lock_on_cap is True
+        assert SyncTargetDef(key="stock:credits").lock_on_cap is True

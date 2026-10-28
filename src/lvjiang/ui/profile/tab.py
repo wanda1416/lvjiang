@@ -52,7 +52,7 @@ from .cell_formatting import (
     apply_cell_style,
     format_cell_tooltip,
     format_profile_cell,
-    is_sync_target_at_hard_cap,
+    locked_sync_targets,
     sum_profile_column,
 )
 from .column_management import (
@@ -464,11 +464,8 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             for col, kd in enumerate(key_defs):
                 model_type = config.get_model_type(kd.key) or ""
 
-                # 检查 sync_targets 目标是否已达硬上限（按命名空间查对应模型）
-                capped_targets = [
-                    t for t in kd.sync_targets
-                    if is_sync_target_at_hard_cap(t.key, data)
-                ]
+                # 同步目标达硬上限时按 key 的设置决定是否锁定本项
+                capped_targets = locked_sync_targets(kd, data)
                 sync_capped = len(capped_targets) > 0
 
                 if sync_capped:

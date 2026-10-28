@@ -29,6 +29,7 @@ from ...core.profile.models import (
     RegenKeyDef,
     StepDef,
     StockKeyDef,
+    format_sync_label,
 )
 from ...core.profile.regen import (
     compute_regen_entry,
@@ -45,6 +46,7 @@ from ...i18n import tr
 from .cell_formatting import (
     apply_cell_style,
     format_profile_cell,
+    locked_sync_targets,
 )
 from .dialogs import HistoryDialog, ask_value_dialog, format_number_text
 
@@ -317,6 +319,31 @@ class ProfileCellEditingMixin:
         # 构建菜单
         menu = QMenu(self)
         menu.setTitle(f"{kd.label} ({user_name})")
+
+        # 满值锁定：同步目标达上限且本项未取消该设置时，所有写入入口一并禁用。
+        # 单元格既然显示成 —，右键却还能增减就自相矛盾；只保留只读的历史入口。
+        capped_targets = locked_sync_targets(kd, profile_data)
+        if capped_targets:
+            targets_text = "、".join(
+                format_sync_label(target.key) for target in capped_targets)
+            for message in (
+                tr("同步目标 {targets} 已达上限").format(targets=targets_text),
+                tr("取消本项「满值锁定」后可继续记录，增量不再写入已满目标"),
+            ):
+                action_hint = menu.addAction(message)
+                if action_hint:
+                    action_hint.setEnabled(False)
+            menu.addSeparator()
+            action_history = menu.addAction(tr("查看历史记录"))
+            if action_history:
+                action_history.triggered.connect(
+                    lambda: self._show_history_dialog(
+                        user_name, model_type, key_str, kd.label)
+                )
+            viewport = table.viewport()
+            if viewport:
+                menu.exec(viewport.mapToGlobal(pos))
+            return
 
         # note 模型：提供文本编辑选项
         if model_type == MODEL_NOTE:

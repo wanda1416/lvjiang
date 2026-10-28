@@ -8,29 +8,29 @@
 
 ---
 
-## 1. 三条命令
+## 1. 两个动作
 
 ```powershell
 # 列出当前可运行的脚本
-lvjiang-cli list
+lvjiang-cli --list
 
 # 查看某个脚本的参数定义
-lvjiang-cli schema --id haoyun_lianji
+lvjiang-cli --list --id haoyun_lianji
 
 # 运行一次
-lvjiang-cli run --id haoyun_lianji --user 蔡元君 --target adb --yes
+lvjiang-cli --exec --id haoyun_lianji --user 蔡元君 --target adb --yes
 ```
 
 源码检出下等价写法：
 
 ```powershell
 $env:PYTHONPATH="src"
-python -m lvjiang list
+python -m lvjiang --list
 ```
 
 ---
 
-## 2. run 的常用参数
+## 2. 执行（--exec）的常用参数
 
 | 参数 | 说明 |
 |---|---|
@@ -52,7 +52,7 @@ python -m lvjiang list
 参数示例：
 
 ```powershell
-lvjiang-cli run --id haoyun_lianji --user 蔡元君 --param max_rolls=10 --json
+lvjiang-cli --exec --id haoyun_lianji --user 蔡元君 --param max_rolls=10 --json
 ```
 
 未在脚本里声明的参数会直接报错，而不是被静默忽略。

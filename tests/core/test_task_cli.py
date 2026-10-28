@@ -94,9 +94,9 @@ def test_headless_callback_never_blocks_on_dialogs():
         HeadlessCallbacks()("pause", message="需要人工处理")
 
 
-def test_parser_defaults_for_run():
-    args = build_parser().parse_args(["run", "--id", "haoyun_lianji"])
-    assert args.command == "run"
+def test_parser_exec_action_defaults():
+    args = build_parser().parse_args(["--exec", "--id", "haoyun_lianji"])
+    assert args.exec is True
     assert args.script_id == "haoyun_lianji"
     assert args.target == "auto"
     assert args.layout == ""
@@ -105,15 +105,24 @@ def test_parser_defaults_for_run():
     assert args.dry_run is False
 
 
-def test_parser_run_requires_exactly_one_selection():
+def test_parser_requires_exactly_one_action():
     with pytest.raises(SystemExit):
-        build_parser().parse_args(["run"])
+        build_parser().parse_args([])
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--exec", "--list"])
+
+
+def test_parser_list_action_lists_or_shows_schema():
+    assert build_parser().parse_args(["--list"]).list_scripts is True
+    detail = build_parser().parse_args(["--list", "--name", "好运连叽摇骰子"])
+    assert detail.list_scripts is True
+    assert detail.script_name == "好运连叽摇骰子"
 
 
 def test_parser_all_is_alias_for_all_plugins():
     # --all 与 --all-plugins 等价，都必须落到 all_plugins=True
-    assert build_parser().parse_args(["--all", "run", "--id", "haoyun_lianji"]).all_plugins is True
-    assert build_parser().parse_args(["--all-plugins", "run", "--id", "haoyun_lianji"]).all_plugins is True
+    assert build_parser().parse_args(["--all", "--exec", "--id", "haoyun_lianji"]).all_plugins is True
+    assert build_parser().parse_args(["--all-plugins", "--exec", "--id", "haoyun_lianji"]).all_plugins is True
 
 
 def test_console_level_quiet_only_silences_stdout_noise():
@@ -152,7 +161,7 @@ def test_cli_main_returns_usage_code_for_bad_params(monkeypatch):
         "lvjiang.core.task_cli.execute",
         lambda request: called.append(request) or {"code": EXIT_OK})
     code = cli_main(
-        ["run", "--id", "haoyun_lianji", "--params-json", "[]"],
+        ["--exec", "--id", "haoyun_lianji", "--params-json", "[]"],
         bootstrap=lambda *a, **kw: None)
     assert code == EXIT_USAGE
     assert called == []
@@ -166,7 +175,7 @@ def test_cli_main_runs_and_maps_interrupted(monkeypatch):
                          "user": "u", "target": "adb:1", "layout": "android",
                          "duration_ms": 1, "result_path": "", "error": "中断"})
     code = cli_main(
-        ["run", "--id", "haoyun_lianji", "--json"],
+        ["--exec", "--id", "haoyun_lianji", "--json"],
         bootstrap=lambda *a, **kw: None)
     assert code == EXIT_INTERRUPTED
 
@@ -177,7 +186,7 @@ def test_cli_main_emits_json_error_line(monkeypatch, capsys):
 
     monkeypatch.setattr("lvjiang.core.task_cli.execute", boom)
     code = cli_main(
-        ["run", "--id", "a", "--json", "--user", "u"],
+        ["--exec", "--id", "a", "--json", "--user", "u"],
         bootstrap=lambda *a, **kw: None)
     assert code == EXIT_USAGE
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])

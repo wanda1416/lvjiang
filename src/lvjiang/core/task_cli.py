@@ -2,14 +2,17 @@
 
 用法::
 
-    python -m lvjiang --script --id haoyun_lianji --user 宛元芷 --target adb
-    python -m lvjiang --script --name 好运连叽摇骰子 --yes
-    python -m lvjiang --script --file D:/tmp/临时脚本.wf --dry-run
-    lvjiang-cli --id haoyun_lianji --target adb:192.168.0.100:5555 --json
+    python -m lvjiang --exec --id haoyun_lianji --user 宛元芷 --target adb
+    python -m lvjiang --exec --name 好运连叽摇骰子 --yes
+    python -m lvjiang --exec --file D:/tmp/临时脚本.wf --dry-run
+    lvjiang-cli --exec --id haoyun_lianji --target adb:192.168.0.100:5555 --json
     lvjiang-cli --list
+    lvjiang-cli --list --id haoyun_lianji
 
-命令行走 ``--`` 选项：``--script`` 只是「进入脚本执行模式」的开关，
-``lvjiang-cli`` 下可以省略；脚本用 ``--id`` / ``--name`` / ``--file`` 三选一指定。
+命令行是扁平 ``--`` 选项：``--exec`` / ``--list`` 两个动作，带了任意一个就
+不启动 GUI、直接执行对应命令；脚本用 ``--id`` / ``--name`` / ``--file``
+三选一指定。``--list`` 不带脚本列出全部，带 ``--id`` / ``--name`` 时查看
+该脚本的参数定义。
 
 设计边界：
 - 只做「一次运行」：参数解析 → 目标装配 → 引擎执行 → 结果落盘；
@@ -25,6 +28,7 @@ import json
 import signal
 import sys
 import threading
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -474,8 +478,16 @@ def execute(request: RunRequest) -> dict[str, Any]:
             username=username, config=config, params=params,
             target=target, layout=layout_name, started=started)
         try:
-            with lease.authorized():
+            capture = (task_run.capture_logs() if task_run is not None
+                       else nullcontext())
+            with capture, lease.authorized():
+                if task_run is not None:
+                    logger.info("任务开始: task_run_id={}, task_id={}",
+                                task_run.task_run_id, script_id)
                 result = engine.execute(path, initial_variables=params)
+                if task_run is not None:
+                    logger.info("任务结束: task_run_id={}, task_id={}",
+                                task_run.task_run_id, script_id)
         except BaseException:
             _finish_history(task_run, "failed", result_path=None)
             raise
@@ -554,53 +566,50 @@ Bootstrap = Callable[..., Any]
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=CURRENT_CMD, description="律匠命令行执行入口")
+
+    # 动作二选一：--exec 执行、--list 列出/查参数。
+    actions = parser.add_mutually_exclusive_group(required=True)
+    actions.add_argument("--exec", action="store_true", dest="exec",
+                         help="执行脚本")
+    actions.add_argument("--list", action="store_true", dest="list_scripts",
+                         help="列出可运行脚本；配合 --id/--name 查看脚本参数定义")
+
+    # 脚本选择：--exec 用 --id/--name/--file；--list 用 --id/--name 查参数。
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--id", dest="script_id", default="", help="脚本 id")
+    selection.add_argument("--name", dest="script_name", default="", help="脚本显示名")
+    selection.add_argument("--file", dest="script_file", default="",
+                           help="直接执行任意位置的 .wf")
+
     parser.add_argument("--read-only", action="store_true",
                         help="不争取主节点：不可安装更新包或回传历史")
     parser.add_argument("-reg", "--register", action="append", dest="apps",
                         metavar="APP", help="加载插件，可多次使用")
     parser.add_argument("--all", "--all-plugins", action="store_true", dest="all_plugins",
                         help="加载内置与 plugins/ 目录中的全部插件")
-    sub = parser.add_subparsers(dest="command", required=True)
 
-    run = sub.add_parser("run", help="运行脚本")
-    run_sel = run.add_mutually_exclusive_group(required=True)
-    run_sel.add_argument("--id", dest="script_id", default="", help="脚本 id")
-    run_sel.add_argument("--name", dest="script_name", default="", help="脚本显示名")
-    run_sel.add_argument("--file", dest="script_file", default="",
-                         help="直接执行任意位置的 .wf")
-    run.add_argument("-p", "--param", action="append", default=[], metavar="K=V",
-                     help="覆盖脚本参数，可多次使用")
-    run.add_argument("--params-json", default="", metavar="JSON",
-                     help="以 JSON 对象提供参数，--param 优先")
-    run.add_argument("--user", default="", help="执行用户，默认当前用户")
-    run.add_argument("--layout", default="", help="布局 key，默认 android")
-    run.add_argument("--target", default="auto",
-                     help="执行目标：auto、adb 或 adb:<serial>")
-    run.add_argument("--timeout", type=float, default=0.0,
-                     help="超时秒数，0 表示不限")
-    run.add_argument("--yes", action="store_true",
-                     help="confirm() 一律返回 true")
-    run.add_argument("--dry-run", action="store_true",
-                     help="只做静态校验，不连接设备")
-    run.add_argument("--json", action="store_true", dest="as_json",
-                     help="stdout 输出单行 JSON 结果")
-    run.add_argument("--result", default="", metavar="PATH",
-                     help="额外把结果写到指定路径")
-    run.add_argument("--quiet", action="store_true", help="只输出错误")
-    run.add_argument("--log-level", default="",
-                     choices=["", "DEBUG", "INFO", "WARNING", "ERROR"],
-                     help="控制台日志级别")
-
-    listing = sub.add_parser("list", help="列出可运行脚本")
-    listing.add_argument("--json", action="store_true", dest="as_json")
-    listing.add_argument("--quiet", action="store_true")
-
-    schema = sub.add_parser("schema", help="输出脚本参数定义")
-    schema_sel = schema.add_mutually_exclusive_group(required=True)
-    schema_sel.add_argument("--id", dest="script_id", default="", help="脚本 id")
-    schema_sel.add_argument("--name", dest="script_name", default="", help="脚本显示名")
-    schema.add_argument("--json", action="store_true", dest="as_json")
-    schema.add_argument("--quiet", action="store_true")
+    parser.add_argument("-p", "--param", action="append", default=[], metavar="K=V",
+                        help="覆盖脚本参数，可多次使用")
+    parser.add_argument("--params-json", default="", metavar="JSON",
+                        help="以 JSON 对象提供参数，--param 优先")
+    parser.add_argument("--user", default="", help="执行用户，默认当前用户")
+    parser.add_argument("--layout", default="", help="布局 key，默认 android")
+    parser.add_argument("--target", default="auto",
+                        help="执行目标：auto、adb 或 adb:<serial>")
+    parser.add_argument("--timeout", type=float, default=0.0,
+                        help="超时秒数，0 表示不限")
+    parser.add_argument("--yes", action="store_true",
+                        help="confirm() 一律返回 true")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="只做静态校验，不连接设备")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="stdout 输出单行 JSON 结果")
+    parser.add_argument("--result", default="", metavar="PATH",
+                        help="额外把结果写到指定路径")
+    parser.add_argument("--quiet", action="store_true", help="只输出错误")
+    parser.add_argument("--log-level", default="",
+                        choices=["", "DEBUG", "INFO", "WARNING", "ERROR"],
+                        help="控制台日志级别")
     return parser
 
 
@@ -740,19 +749,15 @@ def cli_main(argv: Sequence[str], *, bootstrap: Bootstrap) -> int:
     except SystemExit as exit_error:
         return int(exit_error.code or EXIT_USAGE)
 
-    # 命令行与安装后的界面一致：默认加载内置插件与 plugins/ 目录，
-    # 否则脚本引用的插件场景/实现会缺失。
-    args.all_plugins = True
-
-    if args.command in {"list", "schema"}:
+    if args.list_scripts:
         args.read_only = True
         bootstrap(args, console_level=_console_level(args), recover=False)
         try:
-            if args.command == "list":
-                return _list_scripts(bool(getattr(args, "as_json", False)))
-            return _print_schema(
-                args.script_id, args.script_name,
-                bool(getattr(args, "as_json", False)))
+            if args.script_id or args.script_name:
+                return _print_schema(
+                    args.script_id, args.script_name,
+                    bool(getattr(args, "as_json", False)))
+            return _list_scripts(bool(getattr(args, "as_json", False)))
         except CliError as error:
             logger.error("{}", error)
             return error.code

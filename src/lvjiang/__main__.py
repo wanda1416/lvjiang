@@ -225,11 +225,26 @@ def _bootstrap(
     return hooks_list
 
 
+def _query_bootstrap(
+    args: argparse.Namespace, *, console_level: str = "DEBUG", recover: bool = True,
+) -> list:
+    """--list 纯查询入口：跳过插件、崩溃防护、日志与实例锁装配。
+
+    脚本发现（``discover_scripts``）只依赖配置解析器的懒初始化，不需要任何
+    插件注册；不加载插件时 class 脚本（自动调律/自动采集）不在查询范围，
+    命令行本就不能执行它们。因此直接返回空 hooks，让 ``--list`` 最高优先级
+    输出，不打印插件加载等 INFO 噪音。
+    """
+    return []
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] in {"run", "list", "schema"}:
+    if any(a in {"--exec", "--list"} for a in argv):
         from .core.task_cli import cli_main
-        return cli_main(argv, bootstrap=_bootstrap)
+        # --list 是纯查询：最高优先级截断，跳过插件/崩溃防护/日志装配。
+        bootstrap = _query_bootstrap if "--list" in argv else _bootstrap
+        return cli_main(argv, bootstrap=bootstrap)
 
     args = _parse_args(argv)
     hooks_list = _bootstrap(args)

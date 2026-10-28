@@ -26,9 +26,9 @@ if getattr(sys, "frozen", False):
         sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
-_CLI_COMMANDS = {"run", "list", "schema"}
-_IS_CLI = bool(sys.argv[1:]) and sys.argv[1] in _CLI_COMMANDS
-# 命令行子命令自己决定插件范围；在子命令后追加 --all-plugins 会被 argparse 拒绝。
+_CLI_ACTIONS = {"--exec", "--list"}
+_IS_CLI = any(a in _CLI_ACTIONS for a in sys.argv[1:])
+# 命令行动作自己决定插件范围；在动作后追加 --all-plugins 会被 argparse 拒绝。
 if not _IS_CLI and not any(
         a in ("-reg", "--register", "--all-plugins", "--all") for a in sys.argv[1:]):
     sys.argv += ["--all-plugins"]

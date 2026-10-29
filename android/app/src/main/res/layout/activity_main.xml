@@ -35,6 +35,11 @@
                     <Button android:id="@+id/btn_home_permissions" style="?attr/borderlessButtonStyle"
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:text="@string/menu_permissions" />
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_float_snap"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="48dp" android:layout_marginTop="12dp"
+                        android:text="@string/float_snap_label" android:textSize="15sp" />
                 </LinearLayout>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="16dp" android:orientation="vertical"

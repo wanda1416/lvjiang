@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 悬浮图标：圆形底 + 「律」字占位（音叉形几何线条） -->
+<!-- 悬浮图标符号：音叉形几何线条（寓意「律」）。只画符号，纯白占位，
+     圆底与颜色由代码按 Material 3 状态色绘制并 imageTintList 染色。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
     <path
-        android:fillColor="#CC3B4A6B"
-        android:pathData="M24,24m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0" />
-    <path
-        android:strokeColor="#FFE8D8A8"
-        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
         android:strokeLineCap="round"
+        android:strokeLineJoin="round"
         android:fillColor="#00000000"
-        android:pathData="M17,13 L17,26 A7,7 0 0 0 31,26 L31,13 M24,33 L24,39 M18,39 L30,39" />
+        android:pathData="M18,14 L18,25 A6,6 0 0 0 30,25 L30,14 M24,31 L24,37 M20,37 L28,37" />
 </vector>

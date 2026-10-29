@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用启动图标：主色圆底 + 白色音叉符号。与悬浮球符号同源，但作为桌面图标
+     必须自带完整底色（桌面不解析主题色，用主色硬编码）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#006B5D"
+        android:pathData="M24,24m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M18,14 L18,25 A6,6 0 0 0 30,25 L30,14 M24,31 L24,37 M20,37 L28,37" />
+</vector>

@@ -133,6 +133,12 @@ class MainActivity : AppCompatActivity() {
             toast("诊断报告已复制，请分享前核对本地路径等私人信息")
         }
         findViewById<Button>(R.id.btn_float_toggle).setOnClickListener { onFloatToggle() }
+        findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switch_float_snap).apply {
+            isChecked = getSharedPreferences("float_tasks", MODE_PRIVATE).getBoolean("snap_enabled", false)
+            setOnCheckedChangeListener { _, checked ->
+                getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putBoolean("snap_enabled", checked).apply()
+            }
+        }
         // 从高级功能进入标定，重新截图前需先切到游戏。
         findViewById<Button>(R.id.btn_calib).setOnClickListener {
             startActivity(Intent(this, CalibActivity::class.java))

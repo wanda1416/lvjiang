@@ -1,11 +1,14 @@
 package com.lvjiang.app
 
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Intent
 import android.content.Context
+import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -28,6 +31,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
+import android.view.ContextThemeWrapper
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
@@ -35,6 +39,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import com.google.android.material.color.MaterialColors
 import org.json.JSONObject
 import java.util.ArrayDeque
 import java.util.concurrent.Executors
@@ -61,8 +67,10 @@ class FloatService : Service() {
     private var floatView: ImageView? = null
     /** 悬浮图标的布局参数（拖动时就地更新 x/y），面板开展时据此贴近图标 */
     private var floatParams: WindowManager.LayoutParams? = null
+    /** 吸附态：贴边收起为边缘细把手（仅内存运行态，不持久化） */
+    private var collapsed = false
+    private var collapseEdge = ""
     private var panelView: View? = null
-    private var statusLine: TextView? = null
     /** 选择用户按钮；当前选择展示在右侧的 userLine 文本上。 */
     private var userButton: Button? = null
     /** 选择任务按钮；当前选择展示在右侧的 taskLine 文本上。 */
@@ -74,7 +82,7 @@ class FloatService : Service() {
     private var showingUsers = false
     private var logLine: TextView? = null
     private var logScroll: ScrollView? = null
-    private var latestButton: Button? = null
+    private var closeButton: Button? = null
     private var actionArea: LinearLayout? = null
     private var mainArea: LinearLayout? = null
     private var selectionArea: LinearLayout? = null
@@ -93,6 +101,11 @@ class FloatService : Service() {
 
     private val executor = Executors.newSingleThreadExecutor()
     private val ui by lazy { Handler(mainLooper) }
+
+    /** 悬浮 UI 的 Material 3 主题上下文：解析主题色（跟随系统深浅色）。 */
+    private val themedContext by lazy { ContextThemeWrapper(this, R.style.Theme_Lvjiang) }
+    private fun color(attr: Int): Int = MaterialColors.getColor(themedContext, attr, 0)
+    private fun resColor(id: Int): Int = ContextCompat.getColor(this, id)
 
     /** 上一次拿到的状态，用于判断是否需要重建面板按钮区（空闲↔运行切换时才重建） */
     private var interactionId = ""
@@ -187,7 +200,8 @@ class FloatService : Service() {
 
         val icon = ImageView(this).apply {
             setImageResource(R.drawable.ic_float)
-            alpha = 0.85f
+            alpha = 1.0f
+            elevation = dp(6).toFloat()
         }
 
         // 手势只有三种去向，且都看「抬起时」的状态，不看计时器什么时候响：
@@ -225,9 +239,32 @@ class FloatService : Service() {
                         startY = params.y
                         moved = false
                         armed = false
-                        ui.postDelayed(arm, ViewConfiguration.getLongPressTimeout().toLong())
+                        // 把手态不需要长按（展开面板依赖圆球位置），只留拖出/点击恢复
+                        if (!collapsed) {
+                            ui.postDelayed(arm, ViewConfiguration.getLongPressTimeout().toLong())
+                        }
                     }
                     MotionEvent.ACTION_MOVE -> {
+                        if (collapsed) {
+                            val ddx = event.rawX - downX
+                            val ddy = event.rawY - downY
+                            val inward = when (collapseEdge) {
+                                "left" -> ddx > touchSlop
+                                "right" -> ddx < -touchSlop
+                                "top" -> ddy > touchSlop
+                                "bottom" -> ddy < -touchSlop
+                                else -> false
+                            }
+                            if (inward) {
+                                restoreBall()
+                                downX = event.rawX
+                                downY = event.rawY
+                                startX = params.x
+                                startY = params.y
+                                moved = true
+                            }
+                            return true
+                        }
                         val dx = event.rawX - downX
                         val dy = event.rawY - downY
                         if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
@@ -253,10 +290,11 @@ class FloatService : Service() {
                         moved = false
                         armed = false
                         when {
-                            !released -> Unit          // 手势被系统打断，不派发动作
-                            dragged -> Unit            // 拖动只改位置
-                            wasArmed -> togglePanel()  // 长按后原地松手才展开面板
-                            else -> onIconTap()        // 短按保持原有语义
+                            !released -> Unit                    // 手势被系统打断，不派发动作
+                            collapsed -> restoreBall()           // 把手原地松手：仅恢复圆球
+                            dragged -> if (snapEnabled()) maybeSnap() else Unit
+                            wasArmed -> togglePanel()            // 长按后原地松手才展开面板
+                            else -> onIconTap()                  // 短按保持原有语义
                         }
                     }
                 }
@@ -268,6 +306,7 @@ class FloatService : Service() {
         floatView = icon
         floatParams = params
         applyIconVisibility()
+        applyIconState(STATE_IDLE)
     }
 
     private fun applyIconVisibility() {
@@ -281,38 +320,146 @@ class FloatService : Service() {
      * 什么」——所以两个层必须分开上色，不能再用 setColorFilter 把符号一起染掉。
      */
     private fun applyIconState(state: String) {
+        if (collapsed) return  // 把手态保持中性把手视觉，不映射运行状态
         val icon = floatView ?: return
         val actionable = state in activeStates || (ready && selectedTaskId.isNotEmpty())
         val glyph = when {
-            !actionable -> 0
+            !actionable -> R.drawable.ic_float
             state == STATE_RUNNING || state == STATE_PAUSING || state == STATE_STOPPING ->
                 R.drawable.ic_float_glyph_pause
             else -> R.drawable.ic_float_glyph_play
         }
-        val color = when {
-            !actionable -> 0
-            state == STATE_RUNNING -> COLOR_RUNNING
-            state == STATE_FAILED -> COLOR_FAILED
-            state == STATE_DONE -> COLOR_DONE
+        // 底色 + 符号色成对，跟随 Material 3 主题（深浅色自适应）：
+        // 空闲低调灰、可执行柔和主色容器、运行实心主色，暂停/完成/失败各自语义色。
+        val (bg, fg) = when {
+            state == STATE_FAILED -> color(com.google.android.material.R.attr.colorError) to
+                color(com.google.android.material.R.attr.colorOnError)
+            state == STATE_DONE -> resColor(R.color.float_success_container) to
+                resColor(R.color.float_on_success_container)
             state == STATE_PAUSING || state == STATE_PAUSED ||
-                state == STATE_STOPPING || state == STATE_STOPPED -> COLOR_STOPPED
-            else -> COLOR_IDLE
+                state == STATE_STOPPING || state == STATE_STOPPED ->
+                resColor(R.color.float_paused_container) to resColor(R.color.float_on_paused_container)
+            state == STATE_RUNNING -> color(com.google.android.material.R.attr.colorPrimary) to
+                color(com.google.android.material.R.attr.colorOnPrimary)
+            actionable -> color(com.google.android.material.R.attr.colorPrimaryContainer) to
+                color(com.google.android.material.R.attr.colorOnPrimaryContainer)
+            else -> color(com.google.android.material.R.attr.colorSurfaceContainerHighest) to
+                color(com.google.android.material.R.attr.colorOnSurfaceVariant)
         }
-        if (glyph == 0) {
-            icon.background = null
-            icon.setImageResource(R.drawable.ic_float)
-        } else {
-            // 圆底用代码画，2dp 内缩让外径与原 logo 的 44/48 保持一致
-            icon.background = InsetDrawable(
-                GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(color)
-                },
-                dp(2),
-            )
-            icon.setImageResource(glyph)
+        icon.background = InsetDrawable(
+            GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(bg) },
+            dp(2),
+        )
+        icon.setImageResource(glyph)
+        icon.imageTintList = ColorStateList.valueOf(fg)
+        icon.alpha = 1.0f
+    }
+
+    // ── 贴边吸附与恢复 ───────────────────────────────────
+
+    private fun snapEnabled(): Boolean =
+        getSharedPreferences("float_tasks", MODE_PRIVATE).getBoolean("snap_enabled", false)
+
+    /** 拖动松手后若贴近屏幕边缘，收起为边缘细把手。 */
+    private fun maybeSnap() {
+        val p = floatParams ?: return
+        val metrics = resources.displayMetrics
+        val threshold = dp(16)
+        val edge = when {
+            p.x <= threshold -> "left"
+            p.x + p.width >= metrics.widthPixels - threshold -> "right"
+            p.y <= threshold -> "top"
+            p.y + p.height >= metrics.heightPixels - threshold -> "bottom"
+            else -> ""
         }
-        icon.alpha = if (state == STATE_RUNNING) 1.0f else 0.85f
+        if (edge.isNotEmpty()) collapseToEdge(edge)
+    }
+
+    private fun collapseToEdge(edge: String) {
+        val p = floatParams ?: return
+        val metrics = resources.displayMetrics
+        val handleW = dp(6)
+        val handleH = dp(56)
+        val vertical = edge == "left" || edge == "right"
+        val targetW = if (vertical) handleW else handleH
+        val targetH = if (vertical) handleH else handleW
+        val targetX = when (edge) {
+            "left" -> 0
+            "right" -> metrics.widthPixels - targetW
+            else -> p.x.coerceIn(0, maxOf(0, metrics.widthPixels - targetW))
+        }
+        val targetY = when (edge) {
+            "top" -> 0
+            "bottom" -> metrics.heightPixels - targetH
+            else -> p.y.coerceIn(0, maxOf(0, metrics.heightPixels - targetH))
+        }
+        animateFloat(p.x, p.y, p.width, p.height, targetX, targetY, targetW, targetH) {
+            collapsed = true
+            collapseEdge = edge
+            setHandleVisual()
+        }
+    }
+
+    /** 从把手恢复为圆球：贴边方向往内让出一点，避免一恢复又立刻吸附。拖出时即时跟随手指。 */
+    private fun restoreBall() {
+        val icon = floatView ?: return
+        val p = floatParams ?: return
+        val metrics = resources.displayMetrics
+        val size = dp(42)
+        val inset = dp(8)
+        p.x = when (collapseEdge) {
+            "left" -> inset
+            "right" -> metrics.widthPixels - size - inset
+            else -> p.x.coerceIn(0, maxOf(0, metrics.widthPixels - size))
+        }
+        p.y = when (collapseEdge) {
+            "top" -> inset
+            "bottom" -> metrics.heightPixels - size - inset
+            else -> p.y.coerceIn(0, maxOf(0, metrics.heightPixels - size))
+        }
+        p.width = size
+        p.height = size
+        collapsed = false
+        collapseEdge = ""
+        windowManager.updateViewLayout(icon, p)
+        applyIconState(lastState)
+    }
+
+    /** 把手视觉：贴边细胶囊，中性描边色，不映射任务状态。 */
+    private fun setHandleVisual() {
+        val icon = floatView ?: return
+        icon.setImageResource(0)
+        icon.imageTintList = null
+        icon.background = GradientDrawable().apply {
+            cornerRadius = dp(3).toFloat()
+            setColor(color(com.google.android.material.R.attr.colorOutline))
+        }
+        icon.alpha = 0.85f
+    }
+
+    /** 位置与尺寸过渡动画（贴边收起用）。 */
+    private fun animateFloat(
+        fromX: Int, fromY: Int, fromW: Int, fromH: Int,
+        toX: Int, toY: Int, toW: Int, toH: Int, onEnd: () -> Unit,
+    ) {
+        val icon = floatView ?: run { onEnd(); return }
+        val p = floatParams ?: run { onEnd(); return }
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 180L
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { va ->
+                val t = va.animatedValue as Float
+                p.x = (fromX + (toX - fromX) * t).toInt()
+                p.y = (fromY + (toY - fromY) * t).toInt()
+                p.width = (fromW + (toW - fromW) * t).toInt()
+                p.height = (fromH + (toH - fromH) * t).toInt()
+                runCatching { windowManager.updateViewLayout(icon, p) }
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) { onEnd() }
+            })
+            start()
+        }
     }
 
     // ── 任务面板 ──────────────────────────────────────────
@@ -371,7 +518,6 @@ class FloatService : Service() {
     private fun closePanel() {
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelView = null
-        statusLine = null
         userButton = null
         taskButton = null
         userLine = null
@@ -379,7 +525,7 @@ class FloatService : Service() {
         showingUsers = false
         logLine = null
         logScroll = null
-        latestButton = null
+        closeButton = null
         actionArea = null
         mainArea = null
         selectionArea = null
@@ -391,11 +537,13 @@ class FloatService : Service() {
     private fun openPanel() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setPadding(dp(16), dp(14), dp(16), dp(14))
             background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(0xF01E1E1E.toInt())
+                cornerRadius = dp(16).toFloat()
+                setColor(color(com.google.android.material.R.attr.colorSurfaceContainerHigh))
+                setStroke(dp(1), color(com.google.android.material.R.attr.colorOutlineVariant))
             }
+            elevation = dp(8).toFloat()
         }
 
         val main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -409,7 +557,7 @@ class FloatService : Service() {
         userRow.addView(user, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
         userButton = user
         val userValue = TextView(this).apply {
-            setTextColor(0xFF90CAF9.toInt())
+            setTextColor(color(com.google.android.material.R.attr.colorPrimary))
             text = "读取中…"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             maxLines = 1
@@ -424,7 +572,7 @@ class FloatService : Service() {
         taskRow.addView(task, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
         taskButton = task
         val taskValue = TextView(this).apply {
-            setTextColor(Color.WHITE)
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
             text = "未选择"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             maxLines = 1
@@ -434,16 +582,9 @@ class FloatService : Service() {
         taskRow.addView(taskValue, LinearLayout.LayoutParams(0, -2, 1f))
         taskLine = taskValue
         main.addView(taskRow)
-        val status = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            text = "读取状态…"
-        }
-        main.addView(status)
-        statusLine = status
 
         val log = TextView(this).apply {
-            setTextColor(0xFFAAAAAA.toInt())
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurfaceVariant))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
             setText("", TextView.BufferType.EDITABLE)
             setPadding(0, dp(3), 0, dp(4))
@@ -456,7 +597,7 @@ class FloatService : Service() {
                 if (event.actionMasked == MotionEvent.ACTION_MOVE &&
                     abs(event.y - downY) > ViewConfiguration.get(this@FloatService).scaledTouchSlop) {
                     followLogs = false
-                    latestButton?.visibility = View.VISIBLE
+                    closeButton?.text = "回到最新"
                 }
                 false
             }
@@ -465,13 +606,6 @@ class FloatService : Service() {
         logScroll = scroll
         logLine = log
         followLogs = true
-        val latest = smallButton("回到最新") {
-            followLogs = true
-            latestButton?.visibility = View.GONE
-            logScroll?.post { logScroll?.fullScroll(View.FOCUS_DOWN) }
-        }.apply { visibility = View.GONE }
-        main.addView(latest)
-        latestButton = latest
         val selection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -479,9 +613,16 @@ class FloatService : Service() {
         root.addView(selection, LinearLayout.LayoutParams(-1, 0, 1f))
         selectionArea = selection
 
-        root.addView(smallButton("收起") { closePanel() })
+        root.addView(smallButton("收起") {
+            if (followLogs) closePanel()
+            else {
+                followLogs = true
+                closeButton?.text = "收起"
+                logScroll?.post { logScroll?.fullScroll(View.FOCUS_DOWN) }
+            }
+        }.also { closeButton = it })
 
-        val panelW = minOf(dp(220), resources.displayMetrics.widthPixels - dp(58))
+        val panelW = minOf(dp(256), resources.displayMetrics.widthPixels - dp(58))
         val panelH = minOf(dp(260), usableHeight() - dp(24))
         val params = WindowManager.LayoutParams(
             panelW, panelH,
@@ -536,25 +677,35 @@ class FloatService : Service() {
         return bounds.height().takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
     }
 
-    /** 面板里所有按钮长一个样，抽出来省掉 5 处重复 */
-    private fun smallButton(label: String, onClick: () -> Unit): Button =
+    /** 面板按钮分级：FILLED=主动作（primary），TONAL=次动作（secondaryContainer），TEXT=危险（error）。 */
+    private enum class FloatButtonKind { FILLED, TONAL, TEXT }
+
+    private fun smallButton(label: String, kind: FloatButtonKind = FloatButtonKind.TONAL, onClick: () -> Unit): Button =
         Button(this).apply {
             text = label
             isAllCaps = false
-            setTextColor(Color.WHITE)
+            isSingleLine = true
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            // Button 默认内边距很占高度，显式压到最小才能真正把行高砍下来；
-            // minimumHeight 也一并调小，让行高由文字本身决定。
-            minimumHeight = dp(15)
-            minHeight = dp(15)
-            setPadding(dp(12), dp(2), dp(12), dp(2))
+            minimumHeight = dp(34)
+            minHeight = dp(34)
+            setPadding(dp(12), 0, dp(12), 0)
+            elevation = 0f
             background = GradientDrawable().apply {
-                cornerRadius = dp(6).toFloat()
-                setColor(0xFF3A3A3A.toInt())
+                cornerRadius = dp(12).toFloat()
+                setColor(when (kind) {
+                    FloatButtonKind.FILLED -> color(com.google.android.material.R.attr.colorPrimary)
+                    FloatButtonKind.TONAL -> color(com.google.android.material.R.attr.colorSecondaryContainer)
+                    FloatButtonKind.TEXT -> Color.TRANSPARENT
+                })
             }
+            setTextColor(when (kind) {
+                FloatButtonKind.FILLED -> color(com.google.android.material.R.attr.colorOnPrimary)
+                FloatButtonKind.TONAL -> color(com.google.android.material.R.attr.colorOnSecondaryContainer)
+                FloatButtonKind.TEXT -> color(com.google.android.material.R.attr.colorError)
+            })
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(3) }
+            ).apply { topMargin = dp(4) }
             setOnClickListener { onClick() }
         }
 
@@ -588,7 +739,6 @@ class FloatService : Service() {
                 val sync = status.optJSONObject("sync")
                 ready = sync?.optBoolean("ready") == true
                 userLine?.text = if (ready) SettingsUi.userLabel(sync?.optString("execution_username").orEmpty()) else "预置配置未就绪"
-                statusLine?.text = header
                 if (state in activeStates) {
                     selectedTaskId = status.optString("task_id")
                     selectedTaskName = taskName
@@ -629,7 +779,7 @@ class FloatService : Service() {
             lastLogSeq = 0
             logGeneration = generation
             followLogs = true
-            latestButton?.visibility = View.GONE
+            closeButton?.text = "收起"
         }
         val records = status.optJSONArray("log_records") ?: return
         var changed = false
@@ -674,7 +824,7 @@ class FloatService : Service() {
         if (state in activeStates) {
             val subject = if (selectedTaskId.startsWith("batch:")) "批量" else "任务"
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            row.addView(smallButton("结束$subject") {
+            row.addView(smallButton("结束$subject", FloatButtonKind.FILLED) {
                 executor.execute {
                     val r = PyBridge.stopTask(this)
                     toast(r.optString("message", "已请求停止"))
@@ -685,7 +835,7 @@ class FloatService : Service() {
             if (interactionId.isNotEmpty() && state != STATE_STOPPING) {
                 val requestId = interactionId
                 for ((label, accepted) in listOf("确认" to true, "拒绝" to false)) {
-                    row.addView(smallButton(label) {
+                    row.addView(smallButton(label, if (accepted) FloatButtonKind.FILLED else FloatButtonKind.TEXT) {
                         executor.execute {
                             val result = PyBridge.respondInteraction(this, requestId, accepted)
                             toast(result.optString("message"))
@@ -696,7 +846,7 @@ class FloatService : Service() {
                 area.addView(row)
                 return
             }
-            row.addView(smallButton(if (state == STATE_PAUSED) "继续$subject" else "暂停$subject") {
+            row.addView(smallButton(if (state == STATE_PAUSED) "继续$subject" else "暂停$subject", FloatButtonKind.FILLED) {
                     executor.execute {
                         val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
                         toast(r.optString("message"))
@@ -710,12 +860,12 @@ class FloatService : Service() {
 
         val idle = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         idle.addView(
-            smallButton(if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务") {
+            smallButton(if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务", FloatButtonKind.FILLED) {
                 launchTask(selectedTaskId, selectedTaskName)
             }.apply { isEnabled = ready && selectedTaskId.isNotEmpty() },
             LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
         idle.addView(
-            smallButton("关闭悬浮窗") { closeOverlay() },
+            smallButton("关闭悬浮窗", FloatButtonKind.TEXT) { closeOverlay() },
             LinearLayout.LayoutParams(0, -2, 1f))
         area.addView(idle)
     }
@@ -736,7 +886,6 @@ class FloatService : Service() {
                 if (!isRunning) return@post
                 if (!result.optBoolean("ok", false) || tasks == null || tasks.length() == 0) {
                     this@FloatService.tasks = emptyList()
-                    statusLine?.text = result.optString("error").ifEmpty { "没有可执行任务" }
                     selectedTaskId = ""
                     selectedTaskName = ""
                     taskLine?.text = "未选择"
@@ -779,7 +928,7 @@ class FloatService : Service() {
         mainArea?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
         selectionArea?.removeAllViews()
-        selectionArea?.addView(TextView(this).apply { text = "读取用户…"; setTextColor(Color.WHITE) })
+        selectionArea?.addView(TextView(this).apply { text = "读取用户…"; setTextColor(color(com.google.android.material.R.attr.colorOnSurface)) })
         selectionArea?.addView(smallButton("返回") { closeTaskSelection() })
         executor.execute {
             val result = PyBridge.listUsers(this)
@@ -793,7 +942,7 @@ class FloatService : Service() {
                 area.addView(TextView(this).apply {
                     text = if (result.optBoolean("ok") && users != null && users.length() > 0)
                         "选择执行用户（不切换游戏角色）" else result.optString("message", "没有可用用户")
-                    setTextColor(Color.WHITE)
+                    setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
                 })
                 val choices = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 if (users != null) for (index in 0 until users.length()) {
@@ -823,7 +972,7 @@ class FloatService : Service() {
     private fun renderTaskSelection() {
         val area = selectionArea ?: return
         area.removeAllViews()
-        area.addView(TextView(this).apply { text = "选择任务"; setTextColor(Color.WHITE) })
+        area.addView(TextView(this).apply { text = "选择任务"; setTextColor(color(com.google.android.material.R.attr.colorOnSurface)) })
         val choices = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         for ((id, name) in tasks) {
             choices.addView(smallButton(if (id == selectedTaskId) "✓ $name" else name) {
@@ -1117,14 +1266,6 @@ class FloatService : Service() {
         private const val STATE_DONE = "done"
         private const val STATE_FAILED = "failed"
         private const val STATE_STOPPED = "stopped"
-
-        private const val COLOR_RUNNING = 0xFF4CAF50.toInt()
-        private const val COLOR_FAILED = 0xFFF44336.toInt()
-        private const val COLOR_STOPPED = 0xFFFF9800.toInt()
-        private const val COLOR_DONE = 0xFF2196F3.toInt()
-
-        /** 图标圆底默认色，与 ic_float.xml 的圆底保持一致 */
-        private const val COLOR_IDLE = 0xCC3B4A6B.toInt()
 
         /** 单击直接启动/暂停后的节流窗口：状态轮询最长 1s 才确认，不节流会被连点两次 */
         private const val ICON_TAP_THROTTLE_MS = 800L

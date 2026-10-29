@@ -16,7 +16,7 @@
     <application
         android:name=".App"
         android:allowBackup="false"
-        android:icon="@drawable/ic_float"
+        android:icon="@drawable/ic_launcher"
         android:label="${lvjiangLabel}"
         android:supportsRtl="true"
         android:theme="@style/Theme.Lvjiang">

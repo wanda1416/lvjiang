@@ -10,4 +10,9 @@
     <color name="app_surface_container_highest">#303A34</color>
     <color name="app_surface_variant">#414A44</color>
     <color name="app_outline">#89938B</color>
+    <!-- 悬浮球状态色（Material 3 容器语义，深浅色成对） -->
+    <color name="float_paused_container">#5C3A00</color>
+    <color name="float_on_paused_container">#FFD9A0</color>
+    <color name="float_success_container">#0A3A15</color>
+    <color name="float_on_success_container">#B9F6C5</color>
 </resources>

@@ -50,6 +50,7 @@
     <string name="btn_notification">授予通知权限</string>
     <string name="btn_start_float">启动悬浮图标</string>
     <string name="btn_stop_float">停止悬浮图标</string>
+    <string name="float_snap_label">悬浮球贴边吸附（拖到屏幕边缘收起为细把手）</string>
     <string name="btn_test_shell">自检：shell 通道（id）</string>
     <string name="btn_test_python">自检：Python 运行时</string>
     <string name="btn_test_click">自检：点击回显</string>

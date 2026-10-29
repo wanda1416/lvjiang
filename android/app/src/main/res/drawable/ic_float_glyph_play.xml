@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 悬浮图标的「播放」前景层：圆底由代码按运行状态着色，这里只画符号。
-     与 ic_float.xml 同 viewport，切换时符号大小与原 logo 一致。 -->
+<!-- 悬浮图标「播放」符号：纯白占位，颜色由代码 imageTintList 染色。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
     <path
-        android:fillColor="#FFE8D8A8"
+        android:fillColor="#FFFFFF"
         android:pathData="M20,15 L33,24 L20,33 Z" />
 </vector>

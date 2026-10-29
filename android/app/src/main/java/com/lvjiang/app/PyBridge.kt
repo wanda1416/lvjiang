@@ -211,6 +211,8 @@ object PyBridge {
         callJson(context, "task_catalog", username, moduleName = WORKBENCH_MODULE)
     fun profileView(context: Context, username: String): JSONObject =
         callJson(context, "profile_view", username, moduleName = WORKBENCH_MODULE)
+    fun profileAllUsers(context: Context, model: String, key: String): JSONObject =
+        callJson(context, "profile_all_users", model, key, moduleName = WORKBENCH_MODULE)
     fun profileHistory(context: Context, username: String, model: String, key: String, offset: Int): JSONObject =
         callJson(context, "profile_history", username, model, key, offset, moduleName = WORKBENCH_MODULE)
     fun taskHistory(context: Context, runId: String = ""): JSONObject =

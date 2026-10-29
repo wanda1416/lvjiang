@@ -80,6 +80,96 @@ def profile_history(username: str, model: str, key: str, offset: int = 0) -> str
         return _json({"ok": False, "message": str(exc)})
 
 
+def profile_all_users(model: str = "", key: str = "") -> str:
+    """全部用户实时数据总览：按「模型 · 分组」组织，每个数据项附所有用户值。
+
+    传入 ``model``/``key`` 时只返回该数据项（用户数据页单个 key 的「全部」入口）。
+    可累加模型（quota/regen/stock）附带合计；note 是自由文本，不参与合计。
+    与 profile_view 同源（profile_read_all 实时计算 regen），保证数值一致。
+    """
+    from ..profile.models import (
+        MODEL_LABELS,
+        MODEL_NOTE,
+        MODEL_QUOTA,
+        MODEL_REGEN,
+        MODEL_STOCK,
+    )
+    from ..profile.schema import get_profile_config
+    from ..profile.service import profile_read_all
+
+    try:
+        users = task_runner._local_user_names()
+        if not users:
+            return _json({"ok": True, "users": [], "groups": []})
+        config = get_profile_config()
+        per_user = {name: profile_read_all(name) for name in users}
+
+        def display_value(model: str, entry: dict):
+            """单个值：note 用文本，其余数值取整；返回字符串或 None。"""
+            if model == MODEL_NOTE:
+                text = entry.get("value_text", "")
+                return text if text else None
+            value = entry.get("value")
+            if value is None:
+                return None
+            try:
+                num = float(value)
+                return str(int(num)) if num == int(num) else str(num)
+            except (TypeError, ValueError):
+                return str(value)
+
+        summable_models = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK)
+        want_model, want_key = model, key
+        groups: list[dict] = []
+        group_index: dict[str, int] = {}
+        for kd in config.get_all_keys():
+            model = config.get_model_type(kd.key) or ""
+            if want_key and (kd.key != want_key or (want_model and model != want_model)):
+                continue
+            model_label = MODEL_LABELS.get(model, "数据")
+            group = "默认" if kd.group == "default" else kd.group
+            title = f"{model_label} · {group}"
+            if title not in group_index:
+                group_index[title] = len(groups)
+                groups.append({"title": title, "items": []})
+
+            summable = model in summable_models
+            values: list[dict] = []
+            total = 0.0
+            has_total = False
+            for name in users:
+                entry = per_user[name].get(model, {}).get(kd.key)
+                value = display_value(model, entry) if entry else None
+                values.append({
+                    "user": name,
+                    "value": value,
+                    "collected": bool(entry),
+                })
+                if summable and entry and entry.get("value") is not None:
+                    try:
+                        total += float(entry["value"])
+                        has_total = True
+                    except (TypeError, ValueError):
+                        pass
+
+            item = {
+                "key": kd.key,
+                "label": kd.label or kd.key,
+                "model": model,
+                "summable": summable,
+                "values": values,
+            }
+            if kd.show_cap and kd.cap is not None:
+                item["cap"] = kd.cap
+            if summable and has_total:
+                item["total"] = str(int(total)) if total == int(total) else str(total)
+            groups[group_index[title]]["items"].append(item)
+
+        return _json({"ok": True, "users": users, "groups": groups})
+    except Exception as exc:
+        return _json({"ok": False, "message": str(exc)})
+
+
 def recover_interrupted(repository: TaskHistoryRepository) -> None:
     """本进程尚未开始任务时，恢复上次独立执行遗留的 running 记录。"""
     with task_runner.CONTROL_LOCK:

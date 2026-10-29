@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private var statusPending = false
     private var refreshWorkbenchOnResume = false
     private var page = Page.HOME
+    private var workbenchSubpage = ""
     private lateinit var backToHome: OnBackPressedCallback
     private var runtimeReport = "尚未检查运行环境"
     private val executor = Executors.newSingleThreadExecutor()
@@ -84,7 +85,8 @@ class MainActivity : AppCompatActivity() {
         workbench = WorkbenchUi(this, findViewById(R.id.workbench_host),
             openTools = { target -> showPage(Page.valueOf(target)) }, toggleFloat = { onFloatToggle() },
             browseUserChanged = { if (page == Page.USERS) updateUserTitle(it) },
-            selectedTaskChanged = { if (page == Page.TASKS) updateTaskTitle(it) })
+            selectedTaskChanged = { if (page == Page.TASKS) updateTaskTitle(it) },
+            subpageChanged = { p -> workbenchSubpage = p; applyWorkbenchSubpage() })
         workbench.restore(savedInstanceState)
         val navigation = findViewById<BottomNavigationView>(R.id.main_navigation)
         navigation.setOnItemSelectedListener { item ->
@@ -102,6 +104,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(findViewById<Toolbar>(R.id.main_toolbar))
         backToHome = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
+                if (workbenchSubpage == "ALL_USERS") { workbench.show("USERS"); return }
                 showPage(if (page in setOf(Page.PERMISSIONS, Page.ADVANCED, Page.DIAGNOSTICS)) Page.SETTINGS else Page.HOME)
             }
         }
@@ -233,6 +236,20 @@ class MainActivity : AppCompatActivity() {
         supportActionBar?.title = title
     }
 
+    /** 工作台内部子页（如「全部用户」）切换时，同步固定 Toolbar 的标题与返回导航。 */
+    private fun applyWorkbenchSubpage() {
+        when (workbenchSubpage) {
+            "ALL_USERS" -> {
+                supportActionBar?.title = "全部用户 · ${workbench.allUsersLabel()}"
+                supportActionBar?.setDisplayHomeAsUpEnabled(true)
+            }
+            "USERS" -> {
+                supportActionBar?.setDisplayHomeAsUpEnabled(false)
+                updateUserTitle(workbench.browsingUsername())
+            }
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             MENU_BATCH_SETTINGS -> if (page == Page.TASKS) startActivity(Intent(this, BatchConfigActivity::class.java).putExtra("group_id", workbench.batchGroupId()))
@@ -240,7 +257,7 @@ class MainActivity : AppCompatActivity() {
                 .putExtra("username", workbench.parameterUsername()))
             MENU_USER_SETTINGS -> if (page == Page.USERS) startActivity(Intent(this, UserSettingsActivity::class.java))
             MENU_SWITCH_USER -> if (page == Page.USERS) workbench.switchBrowsingUser()
-            android.R.id.home -> showPage(Page.SETTINGS)
+            android.R.id.home -> if (workbenchSubpage == "ALL_USERS") workbench.show("USERS") else showPage(Page.SETTINGS)
             else -> return super.onOptionsItemSelected(item)
         }
         return true

@@ -33,12 +33,17 @@ class WorkbenchUi(
     private val toggleFloat: () -> Unit,
     private val browseUserChanged: (String) -> Unit,
     private val selectedTaskChanged: (String) -> Unit,
+    private val subpageChanged: (String) -> Unit,
 ) {
     private val executor = Executors.newFixedThreadPool(2)
     private val controlExecutor = Executors.newSingleThreadExecutor()
     private var historyRequest = 0
     private var recentHistory: LinearLayout? = null
     private var lastHistoryState = ""
+    private var allUsersFocus: JSONObject? = null
+    private var dataItems: List<JSONObject> = emptyList()
+    private var dataGroupFilter = ""
+    private var dataContent: LinearLayout? = null
     private var generation = 0
     private var closed = false
     private var page = ""
@@ -155,18 +160,23 @@ class WorkbenchUi(
         generation++
         page = next
         host.removeAllViews()
+        dataContent = null
         runtimeText = null; runtimeLog = null; controls = null; controlKey = ""; recentHistory = null
         runtimeMeta = null; runtimeMessage = null; runtimeStatus = null; logsButton = null
         executionUserText = null; executionUserCard = null; selectedTaskText = null
         floatingButton = null; floatingHint = null
-        host.visibility = if (next in setOf("HOME", "TASKS", "USERS", "SETTINGS")) View.VISIBLE else View.GONE
+        host.visibility = if (next in setOf("HOME", "TASKS", "USERS", "SETTINGS", "ALL_USERS")) View.VISIBLE else View.GONE
         when (next) {
             "HOME" -> home()
             "TASKS" -> tasks()
             "USERS" -> users()
+            "ALL_USERS" -> allUsers()
             "SETTINGS" -> settings()
         }
+        subpageChanged(next)
     }
+
+    fun allUsersLabel(): String = allUsersFocus?.optString("label").orEmpty()
 
     fun updateStatus(value: JSONObject) {
         status = value
@@ -722,43 +732,146 @@ class WorkbenchUi(
         val username = browseUser
         request({ PyBridge.profileView(activity, username) }) { result ->
             if (!result.optBoolean("ok")) { text(host, result.optString("message")); return@request }
-            val items = objects(result.optJSONArray("items"))
-            if (items.isEmpty()) text(host, "暂无可展示的数据项")
-            items.groupBy { "${it.optString("model_label")} · ${it.optString("group")}" }.forEach { (groupName, entries) ->
+            dataItems = objects(result.optJSONArray("items"))
+            renderDataView(username)
+        }
+    }
+
+    /** 渲染「用户数据」的分组筛选栏与分组内容；点 chip 时局部刷新，不重新请求。 */
+    private fun renderDataView(username: String) {
+        dataContent?.let { host.removeView(it) }
+        val content = column()
+        dataContent = content
+        host.addView(content, LinearLayout.LayoutParams(-1, -2))
+
+        if (dataItems.isEmpty()) { text(content, "暂无可展示的数据项"); return }
+
+        // 稳定 key = model:group（model 英文、group 唯一），展示名沿用 model_label · group
+        val groups = dataItems.groupBy { "${it.optString("model")}:${it.optString("group")}" }
+        if (dataGroupFilter.isNotEmpty() && dataGroupFilter !in groups) dataGroupFilter = ""
+        if (groups.size > 1) renderGroupFilter(content, groups)
+        val visible = if (dataGroupFilter.isEmpty()) groups else groups.filterKeys { it == dataGroupFilter }
+        visible.forEach { (_, entries) -> renderGroupCard(content, entries, username) }
+    }
+
+    private fun renderGroupFilter(parent: LinearLayout, groups: Map<String, List<JSONObject>>) {
+        val options: List<Pair<String, String>> = listOf("" to "全部") + groups.map { (key, entries) ->
+            val first = entries.first()
+            key to "${first.optString("model_label")} · ${first.optString("group")}"
+        }
+        val labels = options.map { it.second }
+        val current = options.firstOrNull { it.first == dataGroupFilter }?.second ?: "全部"
+
+        val groupButton = button(parent, "分组：$current") {}
+        groupButton.setOnClickListener {
+            MaterialAlertDialogBuilder(activity).setTitle("选择分组")
+                .setItems(labels.toTypedArray()) { _, index ->
+                    val (key, _) = options[index]
+                    if (dataGroupFilter != key) {
+                        dataGroupFilter = key
+                        renderDataView(browseUser)
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+    }
+
+    private fun renderGroupCard(parent: LinearLayout, entries: List<JSONObject>, username: String) {
+        val section = card(parent)
+        val first = entries.first()
+        text(section, "${first.optString("model_label")} · ${first.optString("group")}", 18f)
+        entries.forEach { entry ->
+            val value = if (!entry.optBoolean("collected")) "未采集" else entry.optString("value") +
+                if (entry.isNull("cap")) "" else "/${entry.optString("cap") }"
+            val row = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
+                val pad = (10 * resources.displayMetrics.density).toInt()
+                setPadding(0, pad, 0, pad)
+                isClickable = true; isFocusable = true
+                val ripple = android.util.TypedValue()
+                activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                setBackgroundResource(ripple.resourceId)
+                setOnClickListener { profileHistory(username, entry, 0) }
+            }
+            section.addView(row)
+            val body = column()
+            row.addView(body, LinearLayout.LayoutParams(0, -2, 1f))
+            val heading = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+            body.addView(heading)
+            text(heading, entry.optString("label"), 14f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            text(heading, value, 16f).apply { gravity = android.view.Gravity.END }
+                .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            val stamp = entry.optString("updated_at")
+            val timestamp = runCatching {
+                val date = runCatching { java.time.OffsetDateTime.parse(stamp).toLocalDateTime() }
+                    .getOrElse { java.time.LocalDateTime.parse(stamp) }
+                date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            }.getOrDefault(stamp)
+            if (timestamp.isNotEmpty()) text(body, timestamp, 12f).apply {
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
+            }
+            text(row, "全部", 13f).apply {
+                val pad = (12 * resources.displayMetrics.density).toInt()
+                setPadding(pad, 0, pad, 0)
+                gravity = android.view.Gravity.CENTER
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorPrimary))
+                setOnClickListener {
+                    allUsersFocus = entry
+                    show("ALL_USERS")
+                }
+            }
+            text(row, "›", 24f).apply { gravity = android.view.Gravity.CENTER }
+                .layoutParams = LinearLayout.LayoutParams((24 * activity.resources.displayMetrics.density).toInt(), -2)
+        }
+    }
+
+    private fun allUsers() {
+        val focus = allUsersFocus ?: run { show("USERS"); return }
+        val loading = text(host, "正在读取全部用户数据…")
+        request({ PyBridge.profileAllUsers(activity, focus.optString("model"), focus.optString("key")) }) { result ->
+            host.removeView(loading)
+            if (!result.optBoolean("ok")) { text(host, result.optString("message")); return@request }
+            val groups = objects(result.optJSONArray("groups"))
+            if (groups.isEmpty()) text(host, "暂无可展示的数据项")
+            groups.forEach { group ->
                 val section = card()
-                text(section, groupName, 18f)
-                entries.forEach { entry ->
-                    val value = if (!entry.optBoolean("collected")) "未采集" else entry.optString("value") +
-                        if (entry.isNull("cap")) "" else "/${entry.optString("cap") }"
-                    val row = LinearLayout(activity).apply {
-                        orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
-                        val pad = (10 * resources.displayMetrics.density).toInt()
-                        setPadding(0, pad, 0, pad)
-                        isClickable = true; isFocusable = true
-                        val ripple = android.util.TypedValue()
-                        activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
-                        setBackgroundResource(ripple.resourceId)
-                        setOnClickListener { profileHistory(username, entry, 0) }
-                    }
-                    section.addView(row)
+                text(section, group.optString("title"), 18f)
+                objects(group.optJSONArray("items")).forEach { item ->
                     val body = column()
-                    row.addView(body, LinearLayout.LayoutParams(0, -2, 1f))
-                    val heading = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
-                    body.addView(heading)
-                    text(heading, entry.optString("label"), 14f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-                    text(heading, value, 16f).apply { gravity = android.view.Gravity.END }
-                        .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-                    val stamp = entry.optString("updated_at")
-                    val timestamp = runCatching {
-                        val date = runCatching { java.time.OffsetDateTime.parse(stamp).toLocalDateTime() }
-                            .getOrElse { java.time.LocalDateTime.parse(stamp) }
-                        date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                    }.getOrDefault(stamp)
-                    if (timestamp.isNotEmpty()) text(body, timestamp, 12f).apply {
-                        setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    section.addView(body, LinearLayout.LayoutParams(-1, -2))
+                    val heading = LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
                     }
-                    text(row, "›", 24f).apply { gravity = android.view.Gravity.CENTER }
-                        .layoutParams = LinearLayout.LayoutParams((24 * activity.resources.displayMetrics.density).toInt(), -2)
+                    body.addView(heading)
+                    text(heading, item.optString("label"), 15f).apply { setTypeface(null, android.graphics.Typeface.BOLD) }
+                        .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    if (!item.isNull("total")) {
+                        text(heading, "合计 ${item.optString("total")}", 13f).apply {
+                            setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
+                        }
+                    }
+                    objects(item.optJSONArray("values")).forEach { entry ->
+                        val row = LinearLayout(activity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = android.view.Gravity.CENTER_VERTICAL
+                            val pad = (4 * resources.displayMetrics.density).toInt()
+                            setPadding((16 * resources.displayMetrics.density).toInt(), pad, 0, pad)
+                        }
+                        section.addView(row)
+                        text(row, SettingsUi.userLabel(entry.optString("user")), 14f)
+                            .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                        val raw = entry.optString("value", "")
+                        val valueText = when {
+                            !entry.optBoolean("collected") -> "未采集"
+                            raw.isEmpty() -> "—"
+                            item.isNull("cap") -> raw
+                            else -> "$raw/${item.optString("cap")}"
+                        }
+                        text(row, valueText, 15f).apply { gravity = android.view.Gravity.END }
+                            .layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                    }
                 }
             }
         }

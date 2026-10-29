@@ -82,6 +82,76 @@ def test_profile_history_passes_user_and_page_without_writing(monkeypatch):
     assert not json.loads(workbench.profile_history("missing", "stock", "count"))["ok"]
 
 
+def test_profile_all_users_groups_values_and_totals(monkeypatch):
+    from lvjiang.core.profile import schema, service
+    from lvjiang.core.profile.models import NoteKeyDef, StockKeyDef
+    from lvjiang.core.profile.schema import ProfileSchema
+
+    monkeypatch.setattr(task_runner, "_local_user_names", lambda: ["甲", "乙"])
+    config = ProfileSchema(keys_by_model={
+        "stock": [StockKeyDef(key="huarui", label="花蕊织")],
+        "note": [NoteKeyDef(key="build", label="配装定位")],
+    })
+    monkeypatch.setattr(schema, "get_profile_config", lambda: config)
+
+    def read_all(username):
+        if username == "甲":
+            return {
+                "stock": {"huarui": {"value": 12}},
+                "note": {"build": {"value_text": "主玩会心双刀"}},
+            }
+        return {"stock": {"huarui": {"value": 8}}}
+
+    monkeypatch.setattr(service, "profile_read_all", read_all)
+    result = json.loads(workbench.profile_all_users())
+    assert result["ok"]
+    assert result["users"] == ["甲", "乙"]
+
+    stock = next(g for g in result["groups"] if g["title"] == "库存 · 默认")
+    item = stock["items"][0]
+    assert (item["key"], item["label"], item["total"]) == ("huarui", "花蕊织", "20")
+    assert [(v["user"], v["value"], v["collected"]) for v in item["values"]] == [
+        ("甲", "12", True), ("乙", "8", True),
+    ]
+
+    note = next(g for g in result["groups"] if g["title"] == "备注 · 默认")
+    note_item = note["items"][0]
+    assert "total" not in note_item
+    assert [(v["user"], v["value"], v["collected"]) for v in note_item["values"]] == [
+        ("甲", "主玩会心双刀", True), ("乙", None, False),
+    ]
+
+
+def test_profile_all_users_filters_single_key(monkeypatch):
+    from lvjiang.core.profile import schema, service
+    from lvjiang.core.profile.models import NoteKeyDef, StockKeyDef
+    from lvjiang.core.profile.schema import ProfileSchema
+
+    monkeypatch.setattr(task_runner, "_local_user_names", lambda: ["甲", "乙"])
+    config = ProfileSchema(keys_by_model={
+        "stock": [StockKeyDef(key="huarui", label="花蕊织")],
+        "note": [NoteKeyDef(key="build", label="配装定位")],
+    })
+    monkeypatch.setattr(schema, "get_profile_config", lambda: config)
+
+    def read_all(username):
+        if username == "甲":
+            return {
+                "stock": {"huarui": {"value": 12}},
+                "note": {"build": {"value_text": "主玩会心双刀"}},
+            }
+        return {"stock": {"huarui": {"value": 8}}}
+
+    monkeypatch.setattr(service, "profile_read_all", read_all)
+    result = json.loads(workbench.profile_all_users("stock", "huarui"))
+    assert result["ok"]
+    # 只返回该 key 所在分组，note 项不出现
+    assert [g["title"] for g in result["groups"]] == ["库存 · 默认"]
+    item = result["groups"][0]["items"][0]
+    assert item["key"] == "huarui"
+    assert item["total"] == "20"
+
+
 def test_recovery_only_marks_interrupted_ondevice_runs(tmp_path, monkeypatch):
     from lvjiang.core.daily_history import TaskHistoryRepository, TaskRunSession
 

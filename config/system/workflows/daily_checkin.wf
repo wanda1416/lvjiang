@@ -112,8 +112,16 @@ click [game_menu_page].[huodong] after wait @page_refresh
 # ─── 切回「活动」页签 ────────────────────────────────────────────────
 # 活动名称左侧有「活动 / 新内容 / 推荐」三个页签，进入活动页时可能停留在
 # 非「活动」页签，此时左侧列表不是领奖活动列表。页签文字本身不可点击，
-# 可点击的是文字上方的 logo，所以直接点「活动」页签的 logo 区域。
-click [activity_main].[tab_activity] after wait @page_refresh
+# 可点的是文字上方的 logo（布局用 click_rect 标定）。点击前先确认区域内
+# 识别得到「活动」二字，识别不到视为布局错位或 OCR 异常：参照进菜单
+# 失败的处理截图提醒并跳过点击，不在未确认的位置上盲点。
+find [activity_main].[tab_activity] as $tab_check by contains "活动"
+if $tab_check
+    click [activity_main].[tab_activity] after wait @page_refresh
+else
+    screenshot from last
+    log warn "活动页签区域未识别到「活动」二字，跳过切页签，按当前页签继续扫描活动列表。"
+end
 
 # ─── 逐屏查找并领取各活动奖励 ─────────────────────────────────────────
 # 初始视口加最多 5 次滚动；每个视口检查全部尚未处理的活动。

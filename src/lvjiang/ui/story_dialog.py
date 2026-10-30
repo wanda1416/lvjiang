@@ -15,6 +15,7 @@ import uuid
 
 from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -137,7 +138,11 @@ class StoryChoicesDialog(QDialog):
             self._layer.addItem(tr("系统（随发布）"), "system")
         else:
             self._layer.addItem(tr("系统（仅开发者）"), "system")
-            self._layer.model().item(1).setEnabled(False)
+            model = self._layer.model()
+            if isinstance(model, QStandardItemModel):
+                item = model.item(1)
+                if item is not None:
+                    item.setEnabled(False)
         self._layer.setToolTip(tr("普通用户只能保存到本地；系统为随发布内容"))
         row.addWidget(QLabel(tr("保存到：")))
         row.addWidget(self._layer)
@@ -218,8 +223,12 @@ class StoryChoicesDialog(QDialog):
             QDialogButtonBox.StandardButton.Save
             | QDialogButtonBox.StandardButton.Close
         )
-        self._buttons.button(QDialogButtonBox.StandardButton.Save).setText(tr("保存"))
-        self._buttons.button(QDialogButtonBox.StandardButton.Close).setText(tr("关闭"))
+        save_button = self._buttons.button(QDialogButtonBox.StandardButton.Save)
+        assert save_button is not None
+        save_button.setText(tr("保存"))
+        close_button = self._buttons.button(QDialogButtonBox.StandardButton.Close)
+        assert close_button is not None
+        close_button.setText(tr("关闭"))
         self._buttons.accepted.connect(self._on_save)
         self._buttons.rejected.connect(self.reject)
         apply_dialog_button_box_style(self._buttons)
@@ -318,7 +327,8 @@ class StoryChoicesDialog(QDialog):
         keyword = text.strip().lower()
         for index in range(self._list.count()):
             item = self._list.item(index)
-            item.setHidden(bool(keyword) and keyword not in item.text().lower())
+            if item is not None:
+                item.setHidden(bool(keyword) and keyword not in item.text().lower())
 
     def _sync_answers(self) -> None:
         current = self._answer.currentText()

@@ -49,6 +49,7 @@ register_versioned_dir("scenes", "*.yaml", depth=1)
 register_versioned_dir("layouts", "*.json", depth=2)
 register_versioned_dir("maps", "map.yaml", depth=2)
 register_versioned_dir("workflows", "*.wf", depth=0, has_content_version=False)
+register_versioned_dir("tools/auto_plot", "*.json", depth=1)
 register_versioned_file("ocr.yaml")
 
 

@@ -1,0 +1,44 @@
+#% id: story_auto_skip
+#% name: 自动剧情跳过
+#% runnable: true
+#% batchable: false
+#% env: [android]
+#% note: |-
+#%   自动推进对话；检测到选项时查「剧情文案库」选正确答案。
+#%   未收录的选项会暂停，等你手动选择后点继续，再到
+#%   「工具 → 自动剧情」补充文案即可。
+#%   需要移动的剧情暂不支持：判定对话结束后提示你手动处理。
+#% parameters:
+#%   - name: max_rounds
+#%     label: 最多推进轮数
+#%     type: number
+#%     default: 500
+
+default $max_rounds = 500
+
+# 剧情跳过只做弱调度：识别、查表、选哪一项都在 Python 内置函数里，
+# 这里只负责「推进 / 选择 / 结束提示」的循环。
+eval $round = 0
+loop while $round < $max_rounds
+    eval $round = $round + 1
+
+    eval $opts = story_options("general_chat", "dialogue_options")
+    if $opts
+        eval $pick = story_pick("general_chat", "dialogue_options")
+        if $pick
+            click $pick after wait @step_interval
+        else
+            log warn "遇到未收录的剧情选项，已暂停等待手动处理"
+            eval pause("遇到未收录的选项，请手动选择后点击继续；可在「工具 → 自动剧情」补充文案")
+        end
+    else
+        scan [general_chat].[chat_area] as $chat
+        if not $chat.chat_area
+            log info "对话区域已无文本，判定剧情结束"
+            break
+        end
+        click [general_chat].[dialogue_continue] after wait @step_interval
+    end
+end
+
+eval notify("剧情已结束或需要移动，请检查")

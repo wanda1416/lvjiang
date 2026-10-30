@@ -621,6 +621,81 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         logger.debug(f"frame_seq={self.last_capture_seq} find 未命中: target={target_value!r} mode={mode}")
         return ""
 
+    def ocr_region_blocks(
+        self,
+        scene_key: str,
+        region_key: str,
+        min_confidence: float | None = None,
+        cleaning_group: str | None = None,
+    ) -> list[dict]:
+        """对指定区域做一次 OCR，返回该区域**所有**文字块（画布归一化坐标）。
+
+        与 :meth:`find_text_in_region` 共用裁剪与坐标换算，但不做筛选——
+        把区域内所有文字块原样返回，供上层按自定义规则匹配（例如剧情选项
+        查表后定位应点击的那个选项，需要每个选项各自的 bbox）。
+
+        Returns:
+            ``[{"text", "confidence", "x_ratio", "y_ratio", "w_ratio", "h_ratio"}]``
+        """
+        img = self.capture_frame(source="ocr_region_blocks")
+        if img is None:
+            self._log_capture_failed("ocr_region_blocks", scene_key, [region_key])
+            return []
+
+        canvas = self._layout.get_canvas()
+        regions = self._layout.get_scene_regions(scene_key)
+        region = next((item for item in regions if item.key == region_key), None)
+        if region is None:
+            raise ValueError(f"区域 [{scene_key}].[{region_key}] 在当前布局不存在")
+
+        height, width = img.shape[:2]
+        canvas_px_x = canvas.x_ratio * width
+        canvas_px_y = canvas.y_ratio * height
+        canvas_px_w = canvas.w_ratio * width
+        canvas_px_h = canvas.h_ratio * height
+        crop_x1 = int(canvas_px_x + region.x_ratio * canvas_px_w)
+        crop_y1 = int(canvas_px_y + region.y_ratio * canvas_px_h)
+        crop_x2 = int(canvas_px_x + (region.x_ratio + region.w_ratio) * canvas_px_w)
+        crop_y2 = int(canvas_px_y + (region.y_ratio + region.h_ratio) * canvas_px_h)
+        crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
+        if crop.size == 0:
+            logger.warning(f"ocr_region_blocks: 区域 [{scene_key}].[{region_key}] 裁剪为空")
+            return []
+
+        results = (
+            self._ocr.recognize(crop, cleaning_group=cleaning_group)
+            if cleaning_group
+            else self._ocr.recognize(crop)
+        )
+        if min_confidence is not None:
+            results = [item for item in results if item.confidence >= min_confidence]
+
+        blocks: list[dict] = []
+        for result in results:
+            xs = [point[0] for point in result.bbox]
+            ys = [point[1] for point in result.bbox]
+            if not xs or not ys:
+                continue
+            full_x1 = crop_x1 + min(xs)
+            full_y1 = crop_y1 + min(ys)
+            full_x2 = crop_x1 + max(xs)
+            full_y2 = crop_y1 + max(ys)
+            blocks.append(
+                {
+                    "text": result.text,
+                    "confidence": result.confidence,
+                    "x_ratio": (full_x1 - canvas_px_x) / canvas_px_w,
+                    "y_ratio": (full_y1 - canvas_px_y) / canvas_px_h,
+                    "w_ratio": (full_x2 - full_x1) / canvas_px_w,
+                    "h_ratio": (full_y2 - full_y1) / canvas_px_h,
+                }
+            )
+        logger.debug(
+            f"frame_seq={self.last_capture_seq} ocr_region_blocks "
+            f"[{scene_key}].[{region_key}] 识别 {len(blocks)} 块"
+        )
+        return blocks
+
 
     def find_image_in_region(
         self,

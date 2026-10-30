@@ -1,6 +1,20 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
+    {
+      "key": "tab_activity",
+      "x_ratio": 0.03605571837925075,
+      "y_ratio": 0.1451468112332017,
+      "w_ratio": 0.05298783609300991,
+      "h_ratio": 0.08338222985335506
+    },
+    {
+      "key": "tab_new",
+      "x_ratio": 0.03605571837925075,
+      "y_ratio": 0.259870904558127,
+      "w_ratio": 0.05298783609300991,
+      "h_ratio": 0.08710153485398131
+    },
     {
       "key": "reward_list",
       "x_ratio": 0.11306843838476453,

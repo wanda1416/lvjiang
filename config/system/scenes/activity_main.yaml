@@ -7,6 +7,22 @@ views:
 - key: checkin
   name: 签到领奖
 regions:
+- key: tab_activity
+  name: 活动页签
+  type: func
+  is_text: false
+  is_clickable: true
+  views:
+  - base
+  - checkin
+- key: tab_new
+  name: 新内容页签
+  type: func
+  is_text: false
+  is_clickable: true
+  views:
+  - base
+  - checkin
 - key: reward_list
   name: 领奖活动滚动区
   type: func

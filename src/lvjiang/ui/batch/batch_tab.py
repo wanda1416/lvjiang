@@ -842,7 +842,11 @@ class BatchTab(QWidget):
         ]
 
     def _refresh_entry_list(self):
-        """刷新用户页的勾选列表。"""
+        """刷新用户页的勾选列表。
+
+        与脚本页同理：重建本次执行顺序后自己重算开始状态，调用方先落盘再刷新
+        才不会残留上一次的「至少勾选一个执行单元」提示。
+        """
         config = self._item
         self._updating_user_list = True
         self._user_list.clear()
@@ -851,6 +855,7 @@ class BatchTab(QWidget):
             self._user_order = []
             self._user_candidate_order = []
             self._updating_user_list = False
+            self._refresh_start_feedback()
             return
 
         key = config.execution_unit_key
@@ -891,6 +896,7 @@ class BatchTab(QWidget):
             self._user_list.addTopLevelItem(item)
         self._updating_user_list = False
         self._refresh_user_order_column()
+        self._refresh_start_feedback()
 
     def _set_all_entries_checked(self, checked: bool):
         """全选/全不选行"""
@@ -1063,7 +1069,12 @@ class BatchTab(QWidget):
     # ─── 脚本列表 ─────────────────────────────────────────
 
     def _refresh_script_list(self, checked_ids: list[str] | None = None):
-        """刷新脚本勾选列表（数据源与日常下拉一致）"""
+        """刷新脚本勾选列表（数据源与日常下拉一致）
+
+        重建本次执行顺序后必须自己重算开始状态：调用方可能先落盘再刷新
+        （「恢复默认顺序」就是），而 _save_draft 里的刷新读到的是重建前的
+        顺序，于是「至少勾选一个脚本」的提示和灰掉的开按钮会留在界面上。
+        """
         from ...workflows.discovery import list_exposed_scripts, script_display_name
 
         if checked_ids is None:
@@ -1130,6 +1141,7 @@ class BatchTab(QWidget):
             self._script_list.addTopLevelItem(item)
         self._updating_script_list = False
         self._refresh_script_order_column()
+        self._refresh_start_feedback()
 
     def _script_id(self, item: QTreeWidgetItem | None) -> str:
         """返回脚本行绑定的 ID。"""

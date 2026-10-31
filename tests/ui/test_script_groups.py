@@ -114,6 +114,7 @@ def test_filter_and_refresh_use_stable_ids_without_persisting_fallback(qtbot, mo
     batch._warn_missing_scripts = BatchTab._warn_missing_scripts.__get__(batch)
     batch._refresh_script_order_column = BatchTab._refresh_script_order_column.__get__(batch)
     batch._refresh_script_list = BatchTab._refresh_script_list.__get__(batch)
+    batch._refresh_start_feedback = lambda: None
     batch.refresh_scripts = BatchTab.refresh_scripts.__get__(batch)
     host._batch_tab = batch
     host._load_workflow_configs()

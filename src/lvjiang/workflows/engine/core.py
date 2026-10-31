@@ -1,8 +1,11 @@
 """WorkflowEngine 主类：生命周期、执行入口与语句分发"""
 
+import hashlib
 import posixpath
+import sys
 import threading
 import traceback
+import types
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
@@ -189,6 +192,12 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._init_capture_snapshot()
         # 执行状态
         self.variables: dict = {}
+        # 本次加载 import 的外置脚本：相对 workflows 根的路径 → 文件绝对路径。
+        # 静态校验阶段只登记不执行，全部校验通过后才真正加载模块。
+        self._script_modules: dict[str, str] = {}
+        # 外置脚本通过 @builtin_func 注册的函数。放进引擎私有命名空间而不是
+        # 全局注册表：并发执行的多个引擎各持有各的，脚本热更新也不会互相覆盖。
+        self._script_funcs: dict[str, Callable] = {}
         # try/catch 内的预期业务异常由 DSL 自行处理，不先记成整项任务失败。
         self._try_depth = 0
         # global 声明按变量名跨 call 共享；普通变量仍由 _run_proc 隔离。
@@ -344,6 +353,24 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 raise _BreakSignal()
             self._pause_event.wait(timeout=1.0)
 
+    # ─── 外置脚本函数入口 ──────────────────────────────────
+
+    def should_stop(self) -> bool:
+        """当前是否已请求停止。
+
+        语句边界的停止检查管不到外置脚本函数内部的长循环，脚本在自己的
+        耗时循环里调用它，F10 才来得及生效。
+        """
+        return self._stop_check()
+
+    def get_script_function(self, name: str) -> Callable | None:
+        """本次 import 的外置脚本注册的函数，不存在返回 None"""
+        return self._script_funcs.get(name)
+
+    def script_function_names(self) -> list[str]:
+        """本次 import 的外置脚本注册的全部函数名"""
+        return list(self._script_funcs)
+
     @user_execution
     def execute(self, source, *, initial_variables: dict | None = None,
                 _reset_context: bool = True) -> dict:
@@ -394,6 +421,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 self.variables.pop(name, None)
             self._global_variable_names.clear()
             self._global_variables.clear()
+            # 外置脚本函数只活在当前任务：任务开始清空、结束清空。批处理里
+            # 相邻两个任务即使 import 同一个文件也各注册各的，互不可见。
+            self._script_funcs.clear()
+            self._script_modules.clear()
 
         if initial_variables:
             self.variables.update(initial_variables)
@@ -416,6 +447,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             # 所有退出路径统一释放按键（正常/异常/取消/超时）
             if self._key_registry:
                 self._key_registry.release_all()
+            # 只有顶层任务边界才销毁脚本函数；_reset_context=False 是同一
+            # 任务内的嵌套调用，清掉会连带抹掉外层还在用的函数。
+            if _reset_context:
+                self._script_funcs.clear()
+                self._script_modules.clear()
 
     def validate_only(self, wf_path: Path | str) -> None:
         """只解析与静态校验 .wf，不执行任何动作
@@ -506,6 +542,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # 同名过程若来自不同文件则报错，不让 import 顺序暗中决定行为。
         loaded_procs: dict[str, ProcDef] = {}
         loaded_sources: dict[str, str] = {}
+        # 每次加载都重扫外置脚本：上一次执行的 import 不计入本次
+        self._script_modules = {}
         # 必须规范化：下面的 imp_resolved 走的是 .resolve()，根文件若用未
         # 规范化的路径，自引用或 A→B→A 的环就检测不到，会一路递归到爆栈。
         root_key = str(Path(resolved).resolve())
@@ -692,6 +730,9 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # 但下一次 load_subcalls 仍会检查当前文件内容，保留热更新语义。
         loaded_procs: dict[str, ProcDef] = {}
         loaded_sources: dict[str, str] = {}
+        # 外置脚本按合并处理：主任务已登记的保留，本次 import 新增的并入；
+        # 校验失败时回滚到加载前的快照
+        previous_scripts = dict(self._script_modules)
         old_base, old_rel = self._base_dir, self._wf_rel_dir
         self._base_dir = resolved.parent
         self._wf_rel_dir = self._workflows_rel_dir(resolved)
@@ -728,7 +769,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         except Exception:
             self._procs = previous_procs
             self._proc_sources = previous_sources
+            self._script_modules = previous_scripts
             raise
+        # 校验通过后才真正加载脚本（与 _execute_dsl 同一时机语义）
+        self._load_script_modules()
         logger.debug(f"load_subcalls: {key} → 注册 {len(loaded_procs)} 个过程")
 
     def call_subcall(self, name: str, args: list | None = None):
@@ -751,6 +795,9 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._ensure_workflow()
         resolved = Path(wf_path).resolve()
         program = self._load_and_validate(resolved)
+        # 静态校验全部通过后才执行外置脚本的模块顶层代码：脚本写错不会
+        # 在校验失败的路径上留下"跑了一半"的副作用
+        self._load_script_modules()
 
         logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令, {len(self._procs)} 个过程) ===")
 
@@ -817,6 +864,88 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         loaded_procs[name] = proc_def
         loaded_sources[name] = source
 
+    def _resolve_script_import(self, rel: str, imported_files: set[str]) -> None:
+        """登记 import 的外置 Python 脚本，只接受本地配置层。
+
+        路径已由 ``_normalize_import_path`` 限制在 workflows 根内。这里再加
+        一条层级限制：只认 ``config/local``。系统配置可被在线下发，允许它带
+        .py 等于把下发通道变成任意代码执行入口，所以命中 system 直接报错——
+        不做「忽略这条 import」的降级，静默忽略会让人以为脚本已经加载。
+        """
+        resolver = get_resolver()
+        resolved = resolver.resolve_read(f"workflows/{rel}")
+        if resolved is None:
+            raise WorkflowUserError(
+                f"import 找不到脚本: {rel}"
+                f"（config/local/workflows/ 下没有它）")
+        path = Path(resolved).resolve()
+        local_path = (resolver.local_dir / "workflows" / rel).resolve()
+        if path != local_path:
+            raise WorkflowUserError(
+                f"外部脚本只允许来自本地配置层: {rel}\n"
+                f"命中的是系统配置 config/system/workflows/{rel}。\n"
+                f"系统配置可被在线下发，执行其中的 Python 等于允许远程下发"
+                f"任意代码；请把脚本放到 config/local/workflows/ 下再 import。")
+        key = str(path)
+        if key in imported_files:
+            return
+        imported_files.add(key)
+        self._script_modules[rel] = key
+
+    def _load_script_modules(self) -> None:
+        """加载本次 import 的外置脚本，把 @builtin_func 收进引擎命名空间。
+
+        每次执行都从源码重新编译，脚本改完再跑即生效。不走 importlib 的
+        文件加载器：那条路带 __pycache__，同一秒内改两次文件会命中旧字节码，
+        而"随时改随时生效"正是外置脚本的用法。模块名按路径取哈希挂进
+        sys.modules，供脚本内绝对导入使用。
+        """
+        from ..builtins import capture_registrations, get_function
+
+        self._script_funcs.clear()
+        if not self._script_modules:
+            return
+        loaded_modules: list[str] = []
+        try:
+            for rel, path in self._script_modules.items():
+                module_name = (
+                    f"lvjiang_script_"
+                    f"{hashlib.sha1(path.encode('utf-8')).hexdigest()[:12]}"
+                )
+                try:
+                    code = compile(
+                        Path(path).read_text(encoding="utf-8"), path, "exec")
+                except (OSError, SyntaxError) as exc:
+                    raise WorkflowUserError(
+                        f"外部脚本执行失败: {rel}"
+                        f"（{type(exc).__name__}: {exc}）") from exc
+                module = types.ModuleType(module_name)
+                module.__file__ = path
+                sys.modules[module_name] = module
+                loaded_modules.append(module_name)
+                try:
+                    with capture_registrations() as registered:
+                        exec(code, module.__dict__)
+                except Exception as exc:
+                    raise WorkflowUserError(
+                        f"外部脚本执行失败: {rel}"
+                        f"（{type(exc).__name__}: {exc}）") from exc
+                for name, fn in registered.items():
+                    if name in self._script_funcs:
+                        raise WorkflowUserError(
+                            f"外部脚本函数重名: {name}，"
+                            f"多个 import 的脚本都注册了它")
+                    if get_function(name) is not None:
+                        raise WorkflowUserError(
+                            f"外部脚本函数与内置函数重名: {name}，请换个名字")
+                    self._script_funcs[name] = fn
+                logger.debug(f"外部脚本 {rel} → 注册 {len(registered)} 个函数")
+        except Exception:
+            for module_name in loaded_modules:
+                sys.modules.pop(module_name, None)
+            self._script_funcs.clear()
+            raise
+
     def _resolve_imports(
         self,
         program,
@@ -839,6 +968,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """
         for imp in program.imports:
             rel = _normalize_import_path(imp.path)
+            # 外置 Python 脚本：此处只做层级与路径校验并登记，
+            # 模块真正加载推迟到执行前（_load_script_modules）
+            if rel.endswith(".py"):
+                self._resolve_script_import(rel, imported_files)
+                continue
             resolved = get_resolver().resolve_read(f"workflows/{rel}")
             if resolved is None:
                 raise WorkflowUserError(

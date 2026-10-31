@@ -482,9 +482,9 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（99 个）
+## 十、内置函数（101 个）
 
-> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 69 + yysls 插件 27，可
+> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 74 + yysls 插件 27，可
 > 用 `list_functions()` 复核。
 
 | 类别 | 函数 |

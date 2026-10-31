@@ -331,7 +331,8 @@ class _PanelMixin:
                 if node.with_func is not None:
                     from .. import builtins
                     func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
-                    transform = builtins.get_function(func_name)
+                    transform = (self._script_funcs.get(func_name)
+                                 or builtins.get_function(func_name))
                     if transform is None:
                         raise ValueError(f"未知内置函数: {func_name}")
                     base = transform(base)
@@ -415,7 +416,8 @@ class _PanelMixin:
         if rich and with_func is not None:
             from .. import builtins
             func_name = with_func.value if hasattr(with_func, 'value') else str(with_func)
-            transform = builtins.get_function(func_name)
+            transform = (self._script_funcs.get(func_name)
+                         or builtins.get_function(func_name))
             if transform is None:
                 raise ValueError(f"未知内置函数: {func_name}")
         result: dict[str, dict[str, str | dict]] = {}
@@ -539,7 +541,8 @@ class _PanelMixin:
         if node.rich and node.with_func is not None:
             from .. import builtins
             func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
-            transform = builtins.get_function(func_name)
+            transform = (self._script_funcs.get(func_name)
+                         or builtins.get_function(func_name))
             if transform is None:
                 raise ValueError(f"未知内置函数: {func_name}")
 

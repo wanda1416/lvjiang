@@ -133,14 +133,22 @@ class BaseWorkflow(
         self.variables[name] = value
 
     def call_function(self, func_name: str, args: list, engine=None) -> Any:
-        """调用内置函数
+        """调用内置函数或本次 import 的外置脚本函数
 
         若函数第一参数名为 _engine，自动注入当前 Engine 实例。
         若函数第一参数名为 _wf，自动注入 workflow 实例（兼容旧代码）。
+
+        外置脚本函数先在引擎私有命名空间里找：同一份内置函数表被所有引擎
+        共享，脚本函数则各引擎各的，重名在加载阶段就已拒绝。
         """
-        fn = builtins.get_function(func_name)
+        fn = engine.get_script_function(func_name) if engine is not None else None
         if fn is None:
-            available = ", ".join(builtins.list_functions())
+            fn = builtins.get_function(func_name)
+        if fn is None:
+            names = set(builtins.list_functions())
+            if engine is not None:
+                names.update(engine.script_function_names())
+            available = ", ".join(sorted(names))
             raise ValueError(f"未知内置函数: {func_name}，可用函数: {available}")
         # 注入类型已在注册时缓存到 fn._inject，无需每次反射
         inject = getattr(fn, '_inject', None)

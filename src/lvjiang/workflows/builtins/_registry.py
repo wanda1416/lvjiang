@@ -3,10 +3,30 @@
 提供装饰器和查询接口，各子模块通过 builtin_func 装饰器注册函数。
 """
 
+from contextlib import contextmanager
 from typing import Callable
 
 # 全局函数注册表
 _FUNCTION_REGISTRY: dict[str, Callable] = {}
+
+# 外置脚本加载期间的捕获栈：非空时 @builtin_func 写进栈顶，不进全局表。
+_CAPTURE_STACK: list[dict[str, Callable]] = []
+
+
+@contextmanager
+def capture_registrations():
+    """捕获块内 ``@builtin_func`` 的注册结果，不写入全局注册表。
+
+    外置脚本（``config/local/workflows`` 下的 .py）用它把函数装进引擎私有
+    命名空间：并发的多个引擎各捕获各自的，互不覆盖；脚本改完重新执行即生效，
+    引擎结束后进程里也不留残余。
+    """
+    bucket: dict[str, Callable] = {}
+    _CAPTURE_STACK.append(bucket)
+    try:
+        yield bucket
+    finally:
+        _CAPTURE_STACK.pop()
 
 
 def builtin_func(name: str):
@@ -29,7 +49,10 @@ def builtin_func(name: str):
             fn._inject = 'wf'
         else:
             fn._inject = None
-        _FUNCTION_REGISTRY[name] = fn
+        if _CAPTURE_STACK:
+            _CAPTURE_STACK[-1][name] = fn
+        else:
+            _FUNCTION_REGISTRY[name] = fn
         return fn
     return decorator
 

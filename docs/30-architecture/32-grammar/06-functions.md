@@ -2,6 +2,10 @@
 
 DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗、装备解析、条件判定、背包遍历、玩家档案访问等能力。eval 语法详见 [01-basics.md](01-basics.md#三变量)。
 
+本地脚本还可以用 `import "lib/xxx.py"` 引入自己写的 Python 函数，调用方式与内置函数
+一致，但只允许来自 `config/local/workflows/`，且函数生命周期限于当前任务。写法与安全
+边界见 [07-subworkflows.md](07-subworkflows.md#六import-外置-python-脚本)。
+
 ## 子文档
 
 | 文件 | 内容 |
@@ -15,14 +19,15 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **99 个**内置函数（core 72 个 + yysls 插件 27 个），按功能分为 14 类。
+共 **101 个**内置函数（core 74 个 + yysls 插件 27 个），按功能分为 14 类。
 
 > 本节列表与注册表一致，核对方式：
 >
 > ```python
 > from lvjiang.workflows import builtins as b
-> import lvjiang.apps.yysls.workflows.builtins  # 触发插件注册
-> print(sorted(b.list_functions()))           # → 96 个
+> from lvjiang.apps import load_app, register_hooks
+> register_hooks(load_app("yysls"))    # 插件函数靠 hooks 注册，直接 import 空包不生效
+> print(sorted(b.list_functions()))    # → 101 个
 > ```
 
 ### 基础运算（8）

@@ -404,6 +404,17 @@ def _load_import_graph(program, source_path: Path) -> tuple[dict, dict, list[Dia
             diagnostic_line = root_line or imp.line_no
             try:
                 rel = _normalize_import_path(imp.path)
+                if rel.endswith(".py"):
+                    # 外置 Python 脚本没有 DSL 过程可收集，不能当 .wf 解析；
+                    # 但层级规则要与引擎一致，否则编辑器放过、运行时才报错
+                    script = resolver.resolve_read(f"workflows/{rel}")
+                    if script is None:
+                        raise ValueError(f"导入脚本不存在: {imp.path}")
+                    local = (resolver.local_dir / "workflows" / rel).resolve()
+                    if script.resolve() != local:
+                        raise ValueError(
+                            f"外部脚本只允许放在 config/local/workflows/ 下: {imp.path}")
+                    continue
                 resolved = resolver.resolve_read(f"workflows/{rel}")
                 if resolved is None:
                     raise ValueError(f"导入文件不存在: {imp.path}")

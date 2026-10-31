@@ -25,4 +25,9 @@ from . import (
     system,  # noqa: F401
     vision,  # noqa: F401
 )
-from ._registry import builtin_func, get_function, list_functions  # noqa: F401
+from ._registry import (  # noqa: F401
+    builtin_func,
+    capture_registrations,
+    get_function,
+    list_functions,
+)

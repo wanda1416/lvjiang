@@ -37,7 +37,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ..core.config import (
     load_available_envs,
@@ -67,14 +67,24 @@ _HOTKEY_FIELDS = [
     ("pause", tr("暂停 / 恢复")),
     ("stop", tr("停止 / 结束")),
     ("record", tr("脚本录制")),
+    ("toggle_window", tr("最小化 / 恢复窗口")),
 ]
 _HOTKEY_CHOICES = [f"F{i}" for i in range(7, 13)]
+# 前四项保持纯 F7~F12 的候选；窗口切换是"窗口藏起来以后"的恢复入口，
+# 必须允许带修饰键，否则会和游戏/输入法的功能键抢占，而且它不影响任何
+# 游戏内按键（全局热键只在软件进程存活时响应）。
+_TOGGLE_WINDOW_CHOICES = (
+    [f"Alt+F{i}" for i in range(7, 13)]
+    + [f"Ctrl+F{i}" for i in range(7, 13)]
+    + [f"Shift+F{i}" for i in range(7, 13)]
+    + _HOTKEY_CHOICES
+)
 
 # 数值输入框统一定宽，避免被布局拉满整行
 _SPIN_WIDTH = 90
-# 热键候选最长为 F10/F11/F12；显式定宽，避免“脚本录制”行与提示按钮
+# 热键候选最长为 Ctrl+F12；显式定宽，避免“脚本录制”行与提示按钮
 # 共用子布局时 QComboBox 被压缩到只剩下部分文字。
-_HOTKEY_COMBO_WIDTH = 90
+_HOTKEY_COMBO_WIDTH = 110
 
 
 class _ActivationWorker(QThread):
@@ -1074,20 +1084,34 @@ class SettingsDialog(QDialog):
         hk = self._config.hotkeys
         self._hotkey_combos: dict[str, QComboBox] = {}
         for name, label in _HOTKEY_FIELDS:
-            combo = AutoWidthComboBox()
-            combo.addItems(_HOTKEY_CHOICES)
+            # POPUP：闭合框一律取固定宽度，候选长短只影响展开列表。默认的
+            # STRETCH 会按最长候选（Ctrl+F12）把最小宽度撑开，这一行就比
+            # 其它四行宽出一截。
+            combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+            combo.addItems(_TOGGLE_WINDOW_CHOICES if name == "toggle_window"
+                           else _HOTKEY_CHOICES)
             combo.setFixedWidth(_HOTKEY_COMBO_WIDTH)
             idx = combo.findText(getattr(hk, name))
             combo.setCurrentIndex(idx if idx >= 0 else 0)
             self._hotkey_combos[name] = combo
+            tip = ""
             if name == "record":
-                row = QHBoxLayout()
-                row.addWidget(combo)
-                row.addWidget(self._tip_button(tr(
-                    "该热键只在「脚本编辑」工作台打开期间临时全局注册，"
-                    "对话框关闭后立即注销；其余三个热键在软件运行期间始终生效。")))
-                row.addStretch()
-                form.addRow(f"{label}:", row)
+                tip = tr("该热键只在「脚本编辑」工作台打开期间临时全局注册，"
+                         "对话框关闭后立即注销；其余热键在软件运行期间始终生效。")
+            elif name == "toggle_window":
+                tip = tr("按一次最小化到系统状态栏，再按一次唤回主界面。"
+                         "系统托盘图标可能因通知区域设置而不显示，这个热键是窗口"
+                         "隐藏后唯一可靠的恢复方式，建议保留带 Alt 的组合键。")
+            if tip:
+                # 提示按钮放在标题一侧：塞进字段列会让这一行比其它行宽一个按钮，
+                # 五个下拉框的右边缘就对不齐了。
+                label_box = QWidget()
+                label_row = QHBoxLayout(label_box)
+                label_row.setContentsMargins(0, 0, 0, 0)
+                label_row.addWidget(QLabel(f"{label}:"))
+                label_row.addWidget(self._tip_button(tip))
+                label_row.addStretch()
+                form.addRow(label_box, combo)
             else:
                 form.addRow(f"{label}:", combo)
         vbox.addLayout(form)

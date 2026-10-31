@@ -143,26 +143,61 @@ class ReferenceGridConfig:
 
 
 _VALID_HOTKEYS = {f"F{i}" for i in range(7, 13)}
+_HOTKEY_MODIFIERS = {"alt": "Alt", "ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift"}
+
+
+def normalize_hotkey(value: str, default: str) -> str:
+    """把热键文本规范成 ``F9`` / ``Alt+F8`` 形式，非法值回退默认键位。
+
+    修饰键顺序统一为 Alt → Ctrl → Shift，主键必须落在 F7~F12：这些键位既不
+    与游戏常用快捷键大面积重叠，也便于 pynput 在 Windows 上稳定捕获。
+    """
+    text = str(value or "").replace(" ", "").strip()
+    if not text:
+        return default
+    parts = [p for p in text.split("+") if p]
+    if len(parts) < 2:
+        key = parts[0].upper() if parts else ""
+        return key if key in _VALID_HOTKEYS else default
+    *raw_mods, key = parts
+    key = key.upper()
+    if key not in _VALID_HOTKEYS:
+        return default
+    mods: list[str] = []
+    for raw in raw_mods:
+        name = _HOTKEY_MODIFIERS.get(raw.lower())
+        # 未知修饰键或重复修饰键都视为配置错误，整条回退默认值
+        if name is None or name in mods:
+            return default
+        mods.append(name)
+    order = {"Alt": 0, "Ctrl": 1, "Shift": 2}
+    mods.sort(key=lambda m: order[m])
+    return "+".join([*mods, key])
 
 
 @dataclass
 class HotkeyConfig:
     """全局热键的按键位配置（配置管理「热键设置」页维护）。
 
-    字段名是固定的"动作"语义，值是当前绑定的按键（限 F7~F12）；
-    改动写入 session.json 的 settings.hotkeys 节点，保存后由
-    主窗口重建 pynput 全局监听并立即生效。
+    字段名是固定的"动作"语义，值是当前绑定的按键（主键限 F7~F12，可带
+    Alt/Ctrl/Shift 修饰）；改动写入 session.json 的 settings.hotkeys 节点，
+    保存后由主窗口重建 pynput 全局监听并立即生效。
     """
     start: str = "F9"    # 开始执行工作流
     pause: str = "F11"   # 暂停 / 恢复
     stop: str = "F10"    # 停止 / 结束
     record: str = "F12"  # 脚本录制；仅在脚本编辑工作台打开期间临时全局注册
+    # 最小化到状态栏 / 唤回主界面：托盘图标属于系统通知区域，可能根本不显示，
+    # 这个热键是窗口隐藏之后唯一不依赖系统界面的恢复通道，默认避开 F9~F12。
+    toggle_window: str = "Alt+F8"
 
     def __post_init__(self):
-        defaults = {"start": "F9", "pause": "F11", "stop": "F10", "record": "F12"}
+        defaults = {
+            "start": "F9", "pause": "F11", "stop": "F10", "record": "F12",
+            "toggle_window": "Alt+F8",
+        }
         for name, default in defaults.items():
-            value = str(getattr(self, name) or "").strip().upper()
-            setattr(self, name, value if value in _VALID_HOTKEYS else default)
+            setattr(self, name, normalize_hotkey(getattr(self, name), default))
         # session.json 可能被手工编辑；重复键会在构造监听
         # 字典时覆盖其中一个动作，因此整组回退到唯一的默认组合。
         values = [getattr(self, name) for name in defaults]

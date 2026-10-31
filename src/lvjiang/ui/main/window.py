@@ -281,6 +281,9 @@ class MainWindow(
     f9_pressed = pyqtSignal()
     f10_pressed = pyqtSignal()
     pause_pressed = pyqtSignal()
+    # 最小化/唤回请求：热键回调跑在 pynput 监听线程，只能发信号，
+    # 由主线程的槽去切换窗口可见性。
+    toggle_window_requested = pyqtSignal()
     _pause_acknowledged = pyqtSignal(str)
     _scrcpy_frame_ready = pyqtSignal(str, object)
     # 宿主信号：自动化状态（含暂停中/结束中过渡态）与用户切换
@@ -379,6 +382,7 @@ class MainWindow(
         self.f9_pressed.connect(self._on_f9_start)
         self.f10_pressed.connect(self._request_stop)
         self.pause_pressed.connect(self._on_pause_resume)
+        self.toggle_window_requested.connect(self._toggle_window_visibility)
         self._pause_acknowledged.connect(self._on_pause_acknowledged)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
@@ -387,18 +391,78 @@ class MainWindow(
 
         logger.info("主窗口已初始化")
 
-    def _main_global_hotkey_bindings(self):
+    def _main_global_hotkey_bindings(self, *, include_toggle: bool = False):
         """主窗口常驻全局热键；F12 由录制对话框临时管理。
 
         按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F11）。
+        ``include_toggle`` 只在系统热键注册不上时为真，用来把窗口切换键
+        退回 pynput 监听。
         """
         from ...core.platforms import hotkey_pynput_token
         hk = self._user_config.hotkeys
-        return {
+        bindings = {
             hotkey_pynput_token(hk.start): self._on_global_f9,
             hotkey_pynput_token(hk.stop): self._on_global_f10,
             hotkey_pynput_token(hk.pause): self._on_global_pause,
         }
+        # 「最小化到状态栏」把窗口藏起来之后，托盘图标属于系统通知区域，可能因为
+        # 通知区域策略、资源管理器重启而根本不出现——此时窗口既不可见也没有任何
+        # 恢复入口，只能杀进程（运行中的任务一起丢）。这个热键是隐藏后唯一的
+        # 兜底通道，因此优先交给系统 RegisterHotKey 注册（见 hotkey_native）；
+        # include_toggle 只在系统热键不可用时为真，退回 pynput 监听。
+        self._toggle_window_hotkey = hk.toggle_window
+        if include_toggle:
+            bindings[hotkey_pynput_token(hk.toggle_window)] = \
+                self._on_global_toggle_window
+        return bindings
+
+    def _on_global_toggle_window(self):
+        """pynput 降级回调：监听线程里只发信号，由主线程切换窗口。"""
+        self.toggle_window_requested.emit()
+
+    def _on_native_toggle_window(self):
+        """系统热键回调：WM_HOTKEY 在 GUI 线程分发，可直接切换窗口。"""
+        self._toggle_window_visibility()
+
+    def _register_native_toggle_hotkey(self) -> bool:
+        """用系统热键承载窗口切换键，失败时返回 False 交给 pynput 兜底。
+
+        pynput 的 GlobalHotKeys 用「按下集合恰好等于目标集合」判定，Windows 上
+        Alt 的 release 会被系统菜单模式吞掉，残留一次之后该组合就永久不再
+        触发（实测一次成功、之后无任何回调）。这条键一旦失效，最小化的窗口
+        就再也回不来，所以它必须走 OS 投递的 WM_HOTKEY。
+        """
+        from ...core.desktop.hotkey_native import NativeHotkeyManager
+
+        manager = getattr(self, "_native_hotkeys", None)
+        if manager is None:
+            manager = NativeHotkeyManager()
+            self._native_hotkeys = manager
+        hotkey = self._user_config.hotkeys.toggle_window
+        self._toggle_window_hotkey = hotkey
+        try:
+            from PyQt6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is None or not manager.install(app, int(self.winId())):
+                return False
+            manager.unregister_all()
+            return manager.register(
+                NativeHotkeyManager.next_id(), hotkey,
+                self._on_native_toggle_window)
+        except Exception as exc:  # noqa: BLE001 - 失败要能降级，不能中断启动
+            logger.warning(f"系统热键启用失败，回退到 pynput 绑定: {exc}")
+            return False
+
+    def _toggle_window_visibility(self):
+        """最小化到状态栏 / 唤回主界面，同一热键双向切换。
+
+        窗口被外界最小化到任务栏时 isVisible() 仍为真，必须再看 isMinimized()，
+        否则按热键会去“最小化”一个本来就最小化的窗口。
+        """
+        if self.isVisible() and not self.isMinimized():
+            self._minimize_to_tray()
+        else:
+            self._restore_from_tray()
 
     def _start_main_global_hotkeys(self):
         """主实例注册系统热键；只读实例完全不创建全局监听器。"""
@@ -407,7 +471,9 @@ class MainWindow(
             logger.info("只读实例不注册全局热键")
             return None
         from ...core.platforms import start_global_hotkeys
-        return start_global_hotkeys(self._main_global_hotkey_bindings())
+        native_ok = self._register_native_toggle_hotkey()
+        return start_global_hotkeys(
+            self._main_global_hotkey_bindings(include_toggle=not native_ok))
 
     # ─── 热键回调 ────────────────────────────────────────────
 
@@ -1471,6 +1537,9 @@ class MainWindow(
 
     def _stop_hotkey_listener(self) -> None:
         """停全局热键并等待钩子卸载，避免清理期间回调踩空。"""
+        native = getattr(self, "_native_hotkeys", None)
+        if native is not None:
+            native.unregister_all()
         listener = self._hotkey_listener
         if listener is None:
             return

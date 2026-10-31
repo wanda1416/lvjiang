@@ -533,8 +533,11 @@ class MenuOpsMixin:
         # 当前进程留在无全局热键的半切换状态。
         self._user_config.hotkeys = hotkeys
         try:
+            # 系统热键与 pynput 监听要一起重建：窗口切换键优先走
+            # RegisterHotKey，注册不上才退回 pynput 绑定。
+            native_ok = self._register_native_toggle_hotkey()
             new_listener = start_global_hotkeys(
-                self._main_global_hotkey_bindings())
+                self._main_global_hotkey_bindings(include_toggle=not native_ok))
         except Exception as exc:
             self._user_config.hotkeys = old_hotkeys
             logger.error(f"热键立即生效失败: {exc}")

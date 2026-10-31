@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "confirm",
@@ -59,15 +59,26 @@
     },
     {
       "key": "safe_label",
-      "disabled": true
+      "x_ratio": 0.3723582971312294,
+      "y_ratio": 0.39688380432752907,
+      "w_ratio": 0.12584611072089852,
+      "h_ratio": 0.06612050762664995
     },
     {
       "key": "safe_cancel",
-      "disabled": true
+      "x_ratio": 0.3785921602009953,
+      "y_ratio": 0.5603495470458342,
+      "w_ratio": 0.07441674039533008,
+      "h_ratio": 0.05264151036691178,
+      "activation_key": "ESC"
     },
     {
       "key": "safe_ok",
-      "disabled": true
+      "x_ratio": 0.5359972027125836,
+      "y_ratio": 0.5603495470458342,
+      "w_ratio": 0.07948175413951486,
+      "h_ratio": 0.05264151036691178,
+      "activation_key": "SPACE"
     }
   ],
   "points": [

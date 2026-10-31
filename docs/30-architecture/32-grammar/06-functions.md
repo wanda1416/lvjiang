@@ -19,7 +19,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **101 个**内置函数（core 74 个 + yysls 插件 27 个），按功能分为 14 类。
+共 **102 个**内置函数（core 75 个 + yysls 插件 27 个），按功能分为 15 类。
 
 > 分组、简介、参数含义与返回值声明在 `@builtin_func(...)` 装饰器里，运行期由
 > `describe_function()` / `signature_params()` 读取；应用内「脚本编辑 → 内置函数」
@@ -32,7 +32,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > from lvjiang.workflows import builtins as b
 > from lvjiang.apps import load_app, register_hooks
 > register_hooks(load_app("yysls"))    # 插件函数靠 hooks 注册，直接 import 空包不生效
-> print(sorted(b.list_functions()))    # → 101 个
+> print(sorted(b.list_functions()))    # → 102 个
 > ```
 
 ### 基础运算（8）
@@ -169,9 +169,9 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > Android/PC 绑定，不依据工作流环境。指令形式 `app stop "game" timeout 15` 等价于
 > `eval app_stop("game", 15)`。
 
-### 运行环境与后端（5）
+### 运行环境与后端（6）
 
-这五个函数回答的是**不同层面**的问题，不能互相替代：
+这六个函数回答的是**不同层面**的问题，不能互相替代：
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -180,11 +180,14 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `is_send` | `() -> bool` | 窗口模式且用 SendInput 注入（移动真实光标，需前台） |
 | `is_post` | `() -> bool` | 窗口模式且用 PostMessage 注入（不移动光标，不抢焦点） |
 | `is_device` | `() -> bool` | **指令实际打给设备端**（ADB / Agent / 无障碍 / Shell） |
+| `is_unattended` | `() -> bool` | 无人值守执行（批量勾选无人值守 / CLI headless），界面上有人时为假 |
 
 - `is_send` / `is_post` / `is_device` **互斥**，且设备端后端一律归 `is_device`；后端未知时三者都为假。
 - `env()` 与 `is_device()` 正交：桌面环境下也可能挂着 ADB 后端（PC 连手机跑），此时 `env("desktop")` 与 `is_device()` 同时为真。
 - 需要「只有窗口模式才成立」的前提时用 `is_device()` 取反——按键、光标位置、前台焦点这些概念在设备端不存在。
 - `env()` 是**查询**，`check_env()` 是**断言**：前者用于分支，后者用于在脚本开头一次性拒绝不该跑的环境。
+- `is_unattended()` 与 `pause()` 配套：需要人工介入的弹窗（如二级密码）在无人值守时应自行返回并结束，具体写法见
+  [06.2-system-interaction.md](06.2-system-interaction.md)。
 
 ```
 if is_device()
@@ -222,3 +225,11 @@ end
 | `profile_declare` | `(model_type, key, definition) -> dict` | 声明工作流依赖的 profile key，不存在时按 definition 创建（幂等）；返回 `{ok, created, key}` |
 | `profile_history_aggregate` | `(key, operation?, source?, change_types?, direction?, since?, until?) -> float` | 当前用户历史 delta 聚合；支持 sum/count/min/max/avg、来源/类型/方向过滤和时间区间 |
 | `profile_reject` | `(message)` | 同步变更脚本拒绝当前事务，原始写入及同步子链一起回滚 |
+
+### 自动剧情（3）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `story_options` | `(scene, area) -> list[str]` | 返回当前对话的全部选项文本（按画面从上到下） |
+| `story_pick` | `(scene, area) -> FoundRegion \| str` | 查全部配置组，返回当前画面中正确答案选项的坐标（`FoundRegion`） |
+| `story_learn` | `(options, answer, question, scene, group, layer) -> bool` | 把一次「选项集合 + 正确答案」写回指定配置组 |

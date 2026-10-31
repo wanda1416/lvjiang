@@ -1,0 +1,124 @@
+{
+  "content_version": 1,
+  "regions": [
+    {
+      "key": "price",
+      "x_ratio": 0.0714,
+      "y_ratio": 0.2381,
+      "w_ratio": 0.0893,
+      "h_ratio": 0.0794
+    },
+    {
+      "key": "stock",
+      "x_ratio": 0.2429,
+      "y_ratio": 0.2381,
+      "w_ratio": 0.0571,
+      "h_ratio": 0.0794
+    },
+    {
+      "key": "total",
+      "x_ratio": 0.8393,
+      "y_ratio": 0.8016,
+      "w_ratio": 0.1214,
+      "h_ratio": 0.0873
+    },
+    {
+      "key": "balance",
+      "x_ratio": 0.825,
+      "y_ratio": 0.0159,
+      "w_ratio": 0.06,
+      "h_ratio": 0.0714
+    },
+    {
+      "key": "toast",
+      "x_ratio": 0.4107,
+      "y_ratio": 0.1746,
+      "w_ratio": 0.1857,
+      "h_ratio": 0.0873
+    },
+    {
+      "key": "refresh",
+      "x_ratio": 0.0607,
+      "y_ratio": 0.873,
+      "w_ratio": 0.1071,
+      "h_ratio": 0.0873
+    },
+    {
+      "key": "buy",
+      "x_ratio": 0.8464,
+      "y_ratio": 0.873,
+      "w_ratio": 0.1286,
+      "h_ratio": 0.0873
+    },
+    {
+      "key": "tab_onsale",
+      "x_ratio": 0.075,
+      "y_ratio": 0.119,
+      "w_ratio": 0.0536,
+      "h_ratio": 0.0675
+    },
+    {
+      "key": "tab_public",
+      "x_ratio": 0.1393,
+      "y_ratio": 0.119,
+      "w_ratio": 0.0536,
+      "h_ratio": 0.0675
+    },
+    {
+      "key": "public_price_1",
+      "x_ratio": 0.0821,
+      "y_ratio": 0.2579,
+      "w_ratio": 0.0571,
+      "h_ratio": 0.0437
+    },
+    {
+      "key": "public_cd_1",
+      "x_ratio": 0.2536,
+      "y_ratio": 0.3016,
+      "w_ratio": 0.0393,
+      "h_ratio": 0.0381
+    },
+    {
+      "key": "public_price_2",
+      "x_ratio": 0.0821,
+      "y_ratio": 0.3714,
+      "w_ratio": 0.0571,
+      "h_ratio": 0.0452
+    },
+    {
+      "key": "public_cd_2",
+      "x_ratio": 0.2536,
+      "y_ratio": 0.4143,
+      "w_ratio": 0.0393,
+      "h_ratio": 0.0444
+    },
+    {
+      "key": "public_price_3",
+      "x_ratio": 0.0821,
+      "y_ratio": 0.4889,
+      "w_ratio": 0.0571,
+      "h_ratio": 0.0429
+    },
+    {
+      "key": "public_cd_3",
+      "x_ratio": 0.2536,
+      "y_ratio": 0.5325,
+      "w_ratio": 0.0393,
+      "h_ratio": 0.0405
+    },
+    {
+      "key": "public_price_4",
+      "x_ratio": 0.0821,
+      "y_ratio": 0.6048,
+      "w_ratio": 0.0571,
+      "h_ratio": 0.0421
+    },
+    {
+      "key": "public_cd_4",
+      "x_ratio": 0.2536,
+      "y_ratio": 0.6468,
+      "w_ratio": 0.0393,
+      "h_ratio": 0.0452
+    }
+  ]
+}

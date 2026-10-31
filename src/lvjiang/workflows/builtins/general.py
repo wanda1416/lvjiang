@@ -4,9 +4,20 @@ from loguru import logger
 
 from ._registry import builtin_func
 
+#: 本模块函数的缺省分组；concat 归字符串、clock/datetime 归时间，逐个覆盖
+GROUP = "字典/列表操作"
+
+
 # ─── 字符串 ─────────────────────────────────────────────
 
-@builtin_func("concat")
+@builtin_func(
+    "concat",
+    group="字符串处理",
+    params={
+        "*args": "依次拼接的值，null 视为空串",
+    },
+    returns="str",
+)
 def _concat(*args) -> str:
     """拼接多个参数为字符串
 
@@ -21,7 +32,13 @@ def _concat(*args) -> str:
 
 # ─── 范围 ───────────────────────────────────────────────
 
-@builtin_func("range")
+@builtin_func(
+    "range",
+    params={
+        "*args": "参数形式 (end) 或 (start, end)，闭区间",
+    },
+    returns="list[int]",
+)
 def _range(*args) -> list:
     """生成整数范围列表（闭区间）
 
@@ -48,7 +65,14 @@ def _range(*args) -> list:
 
 # ─── 字典 ───────────────────────────────────────────────
 
-@builtin_func("count_nonempty")
+@builtin_func(
+    "count_nonempty",
+    params={
+        "scan_result": "识别结果字典",
+        "*args": "其余参数忽略",
+    },
+    returns="int",
+)
 def _count_nonempty(scan_result, *args) -> int:
     """统计非空项数量
 
@@ -67,7 +91,14 @@ def _count_nonempty(scan_result, *args) -> int:
     return sum(1 for v in scan_result.values() if v and str(v).strip())
 
 
-@builtin_func("contains")
+@builtin_func(
+    "contains",
+    params={
+        "scan_result": "识别结果字典",
+        "*args": "要查找的文本",
+    },
+    returns="bool",
+)
 def _contains(scan_result: dict, *args) -> bool:
     """检查 scan 结果中是否有任意字段包含指定文本
 
@@ -79,7 +110,14 @@ def _contains(scan_result: dict, *args) -> bool:
     return any(text in v for v in scan_result.values() if isinstance(v, str))
 
 
-@builtin_func("find_key")
+@builtin_func(
+    "find_key",
+    params={
+        "scan_result": "识别结果字典",
+        "*args": "目标文本",
+    },
+    returns="str",
+)
 def _find_key(scan_result: dict, *args) -> str:
     """在字典 values 中查找包含目标文本的项，返回其 key 名
 
@@ -105,7 +143,14 @@ def _find_key(scan_result: dict, *args) -> str:
 
 # ─── 列表/字典追加 ──────────────────────────────────────
 
-@builtin_func("append")
+@builtin_func(
+    "append",
+    params={
+        "list_or_dict": "目标列表或字典",
+        "*args": "列表追加元素；字典需依次传键和值",
+    },
+    returns="str",
+)
 def _append(list_or_dict, *args) -> str:
     """向列表追加元素，或向字典添加键值对
 
@@ -131,7 +176,13 @@ def _append(list_or_dict, *args) -> str:
 
 # ─── 字典/列表扩展 ─────────────────────────────────────
 
-@builtin_func("len")
+@builtin_func(
+    "len",
+    params={
+        "obj": "字典、列表或字符串",
+    },
+    returns="int",
+)
 def _len(obj) -> int:
     """返回长度
 
@@ -152,7 +203,14 @@ def _len(obj) -> int:
     return 0
 
 
-@builtin_func("keys")
+@builtin_func(
+    "keys",
+    params={
+        "obj": "目标字典",
+        "*args": "其余参数忽略",
+    },
+    returns="list[str]",
+)
 def _keys(obj, *args) -> list:
     """返回字典所有 key 的列表
 
@@ -166,7 +224,14 @@ def _keys(obj, *args) -> list:
     return []
 
 
-@builtin_func("values")
+@builtin_func(
+    "values",
+    params={
+        "obj": "目标字典",
+        "*args": "其余参数忽略",
+    },
+    returns="list",
+)
 def _values(obj, *args) -> list:
     """返回字典所有 value 的列表
 
@@ -177,7 +242,14 @@ def _values(obj, *args) -> list:
     return []
 
 
-@builtin_func("has_key")
+@builtin_func(
+    "has_key",
+    params={
+        "obj": "目标字典",
+        "*args": "要检查的 key",
+    },
+    returns="bool",
+)
 def _has_key(obj, *args) -> bool:
     """检查字典是否包含指定 key
 
@@ -191,7 +263,14 @@ def _has_key(obj, *args) -> bool:
     return str(args[0]) in obj
 
 
-@builtin_func("del_key")
+@builtin_func(
+    "del_key",
+    params={
+        "obj": "目标字典",
+        "*args": "要删除的 key",
+    },
+    returns="str",
+)
 def _del_key(obj, *args) -> str:
     """删除字典指定 key（不存在不报错）
 
@@ -202,7 +281,14 @@ def _del_key(obj, *args) -> str:
     return ""
 
 
-@builtin_func("remove")
+@builtin_func(
+    "remove",
+    params={
+        "obj": "目标列表",
+        "*args": "要移除的值",
+    },
+    returns="str",
+)
 def _remove(obj, *args) -> str:
     """删除列表中首个匹配元素
 
@@ -216,7 +302,14 @@ def _remove(obj, *args) -> str:
     return ""
 
 
-@builtin_func("slice")
+@builtin_func(
+    "slice",
+    params={
+        "obj": "目标列表",
+        "*args": "起始下标与可选结束下标（闭区间）",
+    },
+    returns="list",
+)
 def _slice(obj, *args) -> list:
     """列表切片（闭区间）
 
@@ -237,7 +330,11 @@ def _slice(obj, *args) -> list:
 
 # ─── 时间 ──────────────────────────────────────────────────
 
-@builtin_func("clock")
+@builtin_func(
+    "clock",
+    group="时间",
+    returns="float",
+)
 def _clock() -> float:
     """获取当前 Unix 时间戳（秒精度 float）
 
@@ -249,7 +346,14 @@ def _clock() -> float:
     return time.time()
 
 
-@builtin_func("datetime")
+@builtin_func(
+    "datetime",
+    group="时间",
+    params={
+        "*args": "可选时间戳与格式串，省略时用当前时间",
+    },
+    returns="str",
+)
 def _datetime(*args) -> str:
     """时间格式化：支持当前时间或指定时间戳
 

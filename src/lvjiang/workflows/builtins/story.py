@@ -30,6 +30,9 @@ from lvjiang.core.story import (
 )
 from lvjiang.workflows.builtins._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "自动剧情"
+
 
 def _blocks(_wf, scene: str, area: str) -> list[dict]:
     """取区域内所有文字块；OCR 能力缺失时返回空列表而非抛错。"""
@@ -40,7 +43,13 @@ def _blocks(_wf, scene: str, area: str) -> list[dict]:
         return []
 
 
-@builtin_func("story_options")
+@builtin_func(
+    "story_options",
+    params={
+        "scene": "场景名",
+        "area": "区域名",
+    },
+)
 def story_options(
     _wf,
     scene: str = "general_chat",
@@ -57,7 +66,13 @@ def story_options(
     return [block["text"] for block in _blocks(_wf, scene, area) if block.get("text")]
 
 
-@builtin_func("story_pick")
+@builtin_func(
+    "story_pick",
+    params={
+        "scene": "场景名",
+        "area": "区域名",
+    },
+)
 def story_pick(
     _wf,
     scene: str = "general_chat",
@@ -107,7 +122,17 @@ def story_pick(
     )
 
 
-@builtin_func("story_learn")
+@builtin_func(
+    "story_learn",
+    params={
+        "options": "选项文本列表",
+        "answer": "正确答案",
+        "question": "问题文本",
+        "scene": "场景名",
+        "group": "配置组名",
+        "layer": "写入层 local/system",
+    },
+)
 def story_learn(
     options: list,
     answer: str,

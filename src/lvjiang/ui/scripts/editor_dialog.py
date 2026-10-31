@@ -472,11 +472,19 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.main_splitter = splitter
         edit_layout.addWidget(splitter, 1)
         self.workspace_tabs.addTab(edit_page, tr("脚本编辑"))
+        # 记下编辑页引用：Tab 变多之后不能再靠"不是配置页就是编辑页"判断
+        self._edit_tab_page = edit_page
 
         from .config_dialog import ScriptConfigDialog
         self.config_panel = ScriptConfigDialog(self._main, embedded=True)
         self.config_panel.preferences_saved.connect(self._preferences_saved)
         self.workspace_tabs.addTab(self.config_panel, tr("脚本配置"))
+
+        from .builtin_panel import BuiltinFunctionPanel
+        self.builtin_panel = BuiltinFunctionPanel()
+        self.builtin_panel.locate_requested.connect(self._open_local_script)
+        self.workspace_tabs.addTab(self.builtin_panel, tr("内置函数"))
+
         self.workspace_tabs.currentChanged.connect(self._on_workspace_tab_changed)
         root.addWidget(self.workspace_tabs, 1)
 
@@ -872,9 +880,30 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
                 reload_configs()
 
     def _on_workspace_tab_changed(self, index: int) -> None:
-        editing = self.workspace_tabs.widget(index) is not self.config_panel
-        if not editing and not self.config_panel.dirty:
+        widget = self.workspace_tabs.widget(index)
+        if widget is getattr(self, "builtin_panel", None):
+            # 切到函数页时重扫：本地脚本可能刚被别的编辑器改过
+            self.builtin_panel.reload()
+            return
+        if widget is self.config_panel and not self.config_panel.dirty:
             self.config_panel._load()
+
+    def _open_local_script(self, rel_path: str, line: int) -> None:
+        """内置函数面板的「定位到脚本」：用系统默认编辑器打开本地 .py。
+
+        .py 不是工作流：脚本编辑器的列表、保存与校验整套都建立在 .wf 上，
+        把它塞进编辑器会让"存到哪、按什么规则校验"都变含糊。交给外部编辑器
+        打开更诚实，状态栏给出准确行号供定位。
+        """
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+
+        path = get_resolver().local_dir / "workflows" / rel_path
+        if not path.is_file():
+            self._set_status(tr("脚本文件不存在：") + rel_path, error=True)
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        self._set_status(f"{tr('已用外部编辑器打开')}：{rel_path}:{line}")
 
     def _refresh_metadata_warning(self) -> None:
         text = self.editor.toPlainText()
@@ -1274,7 +1303,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self.code_tabs.setTabEnabled(self.code_tabs.indexOf(page), False)
         self.tree.setEnabled(False)
         self.editor.setReadOnly(True)
-        self.workspace_tabs.setTabEnabled(1, False)
+        self.workspace_tabs.setTabEnabled(
+            self.workspace_tabs.indexOf(self.config_panel), False)
         for button in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete):
             button.setEnabled(False)
 
@@ -1283,7 +1313,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         for page in (self.editor, self.metadata_panel):
             self.code_tabs.setTabEnabled(self.code_tabs.indexOf(page), True)
         self.tree.setEnabled(True)
-        self.workspace_tabs.setTabEnabled(1, True)
+        self.workspace_tabs.setTabEnabled(
+            self.workspace_tabs.indexOf(self.config_panel), True)
         self._apply_read_only(self._current)
         self._refresh_buttons()
 

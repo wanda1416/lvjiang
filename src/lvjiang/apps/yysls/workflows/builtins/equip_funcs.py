@@ -8,11 +8,21 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "背包扫描游标"
+
+
 _MAX_IDLE_ROUNDS = 2
 _MAX_SCROLL_ROUNDS = 200
 
 
-@builtin_func("bag_cursor_init")
+@builtin_func(
+    "bag_cursor_init",
+    params={
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _bag_cursor_init(_engine, *args) -> str:
     """初始化一个部位的背包扫描游标。"""
     _engine.context["_bag_cursor"] = {
@@ -26,7 +36,14 @@ def _bag_cursor_init(_engine, *args) -> str:
     return ""
 
 
-@builtin_func("bag_cursor_visit")
+@builtin_func(
+    "bag_cursor_visit",
+    params={
+        "fingerprint": "行首锚点指纹",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _bag_cursor_visit(_engine, fingerprint: str | None, *args) -> str:
     """登记当前物理行的首列锚点，返回 ``new`` / ``skip`` / ``end``。
 
@@ -56,7 +73,16 @@ def _bag_cursor_visit(_engine, fingerprint: str | None, *args) -> str:
     return "new"
 
 
-@builtin_func("bag_cursor_finish_window")
+@builtin_func(
+    "bag_cursor_finish_window",
+    params={
+        "visible_rows": "窗口内可见行数",
+        "expected_rows": "期望行数",
+        "hit_confirmed_empty": "是否已确认到底",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _bag_cursor_finish_window(
     _engine, visible_rows: int, expected_rows: int,
     hit_confirmed_empty: bool = False, *args,

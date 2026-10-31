@@ -10,6 +10,9 @@ from lvjiang.workflows.builtins._registry import builtin_func
 
 from ...i18n import tr
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "玩家档案"
+
 
 def _get_username(_engine) -> str:
     """从引擎获取当前用户名；未绑定用户时拒绝隐式读写。"""
@@ -53,7 +56,14 @@ def _profile_history_aggregate(
     )
 
 
-@builtin_func("user_get")
+@builtin_func(
+    "user_get",
+    params={
+        "username": "内部用户名",
+        "key": "档案键名",
+        "*args": "其余参数忽略",
+    },
+)
 def _user_get(_engine, username: str, key: str, *args):
     """按内部用户名读取用户资料属性；不存在时返回 null。"""
     if not username or not key:
@@ -69,7 +79,14 @@ def _user_get(_engine, username: str, key: str, *args):
     )
 
 
-@builtin_func("profile_get")
+@builtin_func(
+    "profile_get",
+    params={
+        "key": "档案键名",
+        "username": "目标用户，省略为当前用户",
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_get(_engine, key: str, username: str | None = None, *args) -> float | str | None:
     """读取 profile 属性值（自动识别模型类型）
 
@@ -96,7 +113,15 @@ def _profile_get(_engine, key: str, username: str | None = None, *args) -> float
     return profile_read(target, key)
 
 
-@builtin_func("profile_set")
+@builtin_func(
+    "profile_set",
+    params={
+        "key": "档案键名",
+        "value": "写入值",
+        "source": "来源标记",
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_set(
     _engine, key: str, value, source: str | None = None, *args,
 ) -> float | str:
@@ -144,7 +169,15 @@ def _profile_set(
     return profile_action(username, key, set_value=value_num, source=write_source)
 
 
-@builtin_func("profile_observe")
+@builtin_func(
+    "profile_observe",
+    params={
+        "key": "档案键名",
+        "value": "观测值",
+        "source": "来源标记",
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_observe(
     _engine, key: str, value, source: str | None = None, *args,
 ) -> dict:
@@ -163,7 +196,15 @@ def _profile_observe(
     return profile_observe(username, key, value, source=write_source)
 
 
-@builtin_func("profile_inc")
+@builtin_func(
+    "profile_inc",
+    params={
+        "key": "档案键名",
+        "delta": "增量",
+        "source": "来源标记",
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_inc(
     _engine, key: str, delta=1, source: str | None = None, *args,
 ) -> float:
@@ -205,7 +246,13 @@ def _profile_inc(
     return float(result) if not isinstance(result, str) else 0.0
 
 
-@builtin_func("profile_model")
+@builtin_func(
+    "profile_model",
+    params={
+        "key": "档案键名",
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_model(_engine, key: str, *args) -> str:
     """查询 profile key 所属的模型类型
 
@@ -225,7 +272,15 @@ def _profile_model(_engine, key: str, *args) -> str:
     return config.get_model_type(key) or ""
 
 
-@builtin_func("profile_declare")
+@builtin_func(
+    "profile_declare",
+    params={
+        "model_type": "模型类型",
+        "key": "档案键名",
+        "definition": "未定义时使用的初始值",
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_declare(
     _engine, model_type: str, key: str, definition, *args,
 ) -> dict:
@@ -305,7 +360,12 @@ def _profile_declare(
     return {"ok": True, "created": True, "key": key, "reason": ""}
 
 
-@builtin_func("profile_all")
+@builtin_func(
+    "profile_all",
+    params={
+        "*args": "其余参数忽略",
+    },
+)
 def _profile_all(_engine, *args) -> dict:
     """获取当前用户的全部 profile 数据
 

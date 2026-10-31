@@ -4,6 +4,9 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "装备入库与角色属性"
+
 
 def _run_username(_engine) -> str:
     return getattr(_engine, "run_username", "") or "default"
@@ -15,7 +18,10 @@ def _repository(_engine):
         _run_username(_engine), getattr(_engine, "users_dir", None))
 
 
-@builtin_func("scanned_loadout_names")
+@builtin_func(
+    "scanned_loadout_names",
+    returns="list[str]",
+)
 def _scanned_loadout_names(_engine) -> dict[str, bool]:
     """Snapshot existing local plan names before a batch scans game plans."""
     return {plan.name: True for plan in _repository(_engine).load().plans.values()}
@@ -59,7 +65,15 @@ def _match_playstyle(name: str, candidates: list[str],
     return candidates[0]
 
 
-@builtin_func("ensure_scanned_loadout")
+@builtin_func(
+    "ensure_scanned_loadout",
+    params={
+        "name": "方案名",
+        "main_art": "主武学",
+        "sub_art": "副武学",
+    },
+    returns="dict",
+)
 def _ensure_scanned_loadout(
     _engine, name: str, main_art: str, sub_art: str,
 ) -> dict[str, str | bool]:
@@ -107,7 +121,15 @@ def _ensure_scanned_loadout(
             "playstyle": playstyle, "created": True}
 
 
-@builtin_func("bind_scanned_loadout")
+@builtin_func(
+    "bind_scanned_loadout",
+    params={
+        "name": "方案名",
+        "main_art": "主武学",
+        "sub_art": "副武学",
+    },
+    returns="dict",
+)
 def _bind_scanned_loadout(_engine, name: str, main_art: str, sub_art: str) -> str:
     """Bind writes to the one local plan matching the verified game name and arts."""
     _engine.context.pop("_bound_loadout_plan_id", None)
@@ -122,7 +144,15 @@ def _bind_scanned_loadout(_engine, name: str, main_art: str, sub_art: str) -> st
     return plan.id
 
 
-@builtin_func("loadout_scan_target")
+@builtin_func(
+    "loadout_scan_target",
+    params={
+        "name": "方案名",
+        "main_art": "主武学",
+        "sub_art": "副武学",
+    },
+    returns="dict",
+)
 def _loadout_scan_target(
     _engine, name: str = "", main_art: str = "", sub_art: str = "",
 ) -> dict[str, str]:
@@ -169,7 +199,15 @@ def _notify_equipment_changed(_engine) -> None:
         logger.debug(f"equipment_changed 通知失败（写入已生效）: {e}")
 
 
-@builtin_func("write_bag_item")
+@builtin_func(
+    "write_bag_item",
+    summary="写入背包物品到仓储并广播装备变更事件",
+    params={
+        "group_key": "分组键",
+        "equip_dict": "装备字典",
+    },
+    returns="bool",
+)
 def _write_bag_item(_engine, group_key: str, equip_dict: dict) -> str:
     if not isinstance(equip_dict, dict):
         raise ValueError("装备数据必须是字典")
@@ -182,7 +220,13 @@ def _write_bag_item(_engine, group_key: str, equip_dict: dict) -> str:
     return fp
 
 
-@builtin_func("mark_equipment_seen")
+@builtin_func(
+    "mark_equipment_seen",
+    params={
+        "equip_dict": "装备观测字典",
+    },
+    returns="bool",
+)
 def _mark_equipment_seen(_engine, equip_dict: dict) -> bool:
     """记录一次真实装备观察；被扫描条件过滤的旧装备也需要刷新。"""
     if not isinstance(equip_dict, dict):
@@ -197,7 +241,15 @@ def _mark_equipment_seen(_engine, equip_dict: dict) -> bool:
     return marked
 
 
-@builtin_func("write_equipped")
+@builtin_func(
+    "write_equipped",
+    summary="写入已装备项到绑定方案并广播装备变更事件",
+    params={
+        "slot_key": "槽位键",
+        "equip_dict": "装备字典",
+    },
+    returns="bool",
+)
 def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
     repo = _repository(_engine)
     plan_id = _engine.context.get("_bound_loadout_plan_id")
@@ -208,7 +260,14 @@ def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
     return fp
 
 
-@builtin_func("set_scanned_loadout_gongjue")
+@builtin_func(
+    "set_scanned_loadout_gongjue",
+    params={
+        "gongjue": "共鸣数据",
+        "detail": "写入明细",
+    },
+    returns="bool",
+)
 def _set_scanned_loadout_gongjue(_engine, gongjue: str, detail: str) -> str:
     """原子写入扫描到的弓玦类型及实际生效等级。"""
     import re

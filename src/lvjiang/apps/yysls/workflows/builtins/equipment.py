@@ -7,9 +7,19 @@ from lvjiang.workflows.builtins._registry import builtin_func
 
 from .....i18n import tr
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "装备处理"
+
+
 # ─── 材料富解析 ───────────────────────────────────────────
 
-@builtin_func("yysls_rich_parse")
+@builtin_func(
+    "yysls_rich_parse",
+    params={
+        "base": "rich 模式的基础识别结果",
+    },
+    returns="dict",
+)
 def _yysls_rich_parse(base: dict) -> dict:
     """yysls rich 模式：从 level_text/count_text 解析 real_level / count / devoted
 
@@ -21,7 +31,13 @@ def _yysls_rich_parse(base: dict) -> dict:
 
 # ─── 装备解析 ───────────────────────────────────────────
 
-@builtin_func("to_equipment")
+@builtin_func(
+    "to_equipment",
+    params={
+        "raw_data": "OCR 原始识别数据",
+    },
+    returns="dict",
+)
 def _to_equipment(raw_data: dict) -> dict:
     """解析装备 OCR 原始数据为标准装备字典
 
@@ -50,7 +66,13 @@ def _to_equipment(raw_data: dict) -> dict:
         return {}
 
 
-@builtin_func("equipment_lock_status")
+@builtin_func(
+    "equipment_lock_status",
+    params={
+        "ref": "装备区域引用",
+    },
+    returns="bool",
+)
 def _equipment_lock_status(_engine=None, ref=None) -> str:
     """从引擎最近一张截图识别装备锁定状态。
 
@@ -75,7 +97,14 @@ def _equipment_lock_status(_engine=None, ref=None) -> str:
 
 # ─── 指纹 ───────────────────────────────────────────────
 
-@builtin_func("make_fingerprint")
+@builtin_func(
+    "make_fingerprint",
+    params={
+        "equip_data": "装备数据字典",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _make_fingerprint(equip_data: dict, *args) -> str:
     """基于装备数据生成去重指纹（MD5 前 8 位 hex）
 
@@ -94,7 +123,15 @@ def _make_fingerprint(equip_data: dict, *args) -> str:
 
 # ─── 词条上限查询 ───────────────────────────────────────
 
-@builtin_func("affix_cap")
+@builtin_func(
+    "affix_cap",
+    params={
+        "affix_name": "词条名",
+        "level": "装备等级",
+        "*args": "其余参数忽略",
+    },
+    returns="dict",
+)
 def _affix_cap(affix_name: str, level, *args) -> float:
     """查询词条数值上限（不含单位）
 
@@ -123,7 +160,15 @@ def _affix_cap(affix_name: str, level, *args) -> float:
     return result["cap"]
 
 
-@builtin_func("chengyin_cap")
+@builtin_func(
+    "chengyin_cap",
+    params={
+        "affix_name": "承音词条名",
+        "level": "装备等级",
+        "*args": "其余参数忽略",
+    },
+    returns="dict",
+)
 def _chengyin_cap(affix_name: str, level, *args) -> float:
     """查询承音装备词条数值上限（不含单位）
 
@@ -157,7 +202,14 @@ _HIGH_VALUE_KEYWORDS = [
 ]
 
 
-@builtin_func("is_good_equip")
+@builtin_func(
+    "is_good_equip",
+    params={
+        "scan_result": "装备识别结果",
+        "*args": "其余参数忽略",
+    },
+    returns="bool",
+)
 def _is_good_equip(scan_result: dict, *args) -> bool:
     """判定装备是否值得保留
 
@@ -192,7 +244,14 @@ def _is_good_equip(scan_result: dict, *args) -> bool:
 _cached_judge = None
 
 
-@builtin_func("evaluate")
+@builtin_func(
+    "evaluate",
+    params={
+        "equip_data": "装备数据字典",
+        "*args": "其余参数忽略",
+    },
+    returns="dict",
+)
 def _evaluate(equip_data: dict, *args) -> dict:
     """判定装备，返回评级结果 dict
 

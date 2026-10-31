@@ -10,6 +10,9 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "游戏属性"
+
 
 def _season_name() -> str:
     """当前生效赛季的名称；无生效赛季返回空字符串。"""
@@ -27,7 +30,14 @@ _ATTR_GETTERS = {
 }
 
 
-@builtin_func("game_attr")
+@builtin_func(
+    "game_attr",
+    params={
+        "attr_name": "游戏属性名",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _game_attr(attr_name: str, *args) -> str:
     """查询燕云游戏属性
 

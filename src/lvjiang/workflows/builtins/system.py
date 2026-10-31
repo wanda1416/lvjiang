@@ -7,6 +7,9 @@ from ...core.platforms import native_confirm, native_notify, native_pause
 from ...i18n import tr
 from ._registry import builtin_func
 
+#: 本模块函数的缺省分组；应用生命周期、运行环境与后端逐个覆盖
+GROUP = "用户交互与系统"
+
 
 def _build_text(message, args) -> str:
     """拼接消息文本，null 参数视为空字符串"""
@@ -18,7 +21,14 @@ def _build_text(message, args) -> str:
 
 # ─── 用户交互 ───────────────────────────────────────────
 
-@builtin_func("confirm")
+@builtin_func(
+    "confirm",
+    params={
+        "message": "提示文本",
+        "*args": "其余参数忽略",
+    },
+    returns="bool",
+)
 def _confirm(_engine=None, message: str = "", *args) -> bool:
     """弹出确认对话框（是/否），返回 bool
 
@@ -48,7 +58,13 @@ def pause_user(_engine=None, message: str = "", *args) -> str:
     return ""
 
 
-@builtin_func("pause")
+@builtin_func(
+    "pause",
+    params={
+        "message": "暂停原因",
+        "*args": "其余参数忽略",
+    },
+)
 def _pause(_engine=None, message: str = "", *args) -> str:
     """声明异常阻断，暂停 DSL 执行，直到用户点击确定。
 
@@ -63,7 +79,13 @@ def _pause(_engine=None, message: str = "", *args) -> str:
     return pause_user(_engine, message, *args)
 
 
-@builtin_func("notify")
+@builtin_func(
+    "notify",
+    params={
+        "message": "通知文本",
+        "*args": "其余参数忽略",
+    },
+)
 def _notify(_engine=None, message: str = "", *args) -> str:
     """非阻塞通知（5 秒后自动关闭）+ 写入告警面板
 
@@ -86,7 +108,14 @@ def _notify(_engine=None, message: str = "", *args) -> str:
     return ""
 
 
-@builtin_func("input")
+@builtin_func(
+    "input",
+    params={
+        "prompt": "输入框提示",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _input(_engine=None, prompt: str = "", *args):
     """弹出输入对话框，返回用户输入的字符串
 
@@ -109,7 +138,12 @@ def _input(_engine=None, prompt: str = "", *args):
 
 # ─── Session 持久化 ─────────────────────────────────────
 
-@builtin_func("save")
+@builtin_func(
+    "save",
+    params={
+        "*args": "其余参数忽略",
+    },
+)
 def _save(_engine=None, *args) -> str:
     """强制保存 session 到磁盘
 
@@ -128,7 +162,14 @@ def _save(_engine=None, *args) -> str:
 
 # ─── Panel 查询 ─────────────────────────────────────────
 
-@builtin_func("panel_rows")
+@builtin_func(
+    "panel_rows",
+    params={
+        "scene_key": "场景 key",
+        "panel_key": "面板 key",
+    },
+    returns="int",
+)
 def _panel_rows(_engine, scene_key: str = "", panel_key: str = "") -> int:
     """返回 panel 实际检测到的行数
 
@@ -139,7 +180,14 @@ def _panel_rows(_engine, scene_key: str = "", panel_key: str = "") -> int:
     return cal.n_rows if cal else 0
 
 
-@builtin_func("panel_cols")
+@builtin_func(
+    "panel_cols",
+    params={
+        "scene_key": "场景 key",
+        "panel_key": "面板 key",
+    },
+    returns="int",
+)
 def _panel_cols(_engine, scene_key: str = "", panel_key: str = "") -> int:
     """返回 panel 实际检测到的列数
 
@@ -152,7 +200,14 @@ def _panel_cols(_engine, scene_key: str = "", panel_key: str = "") -> int:
 
 # ─── 工作环境查询 ─────────────────────────────────────────
 
-@builtin_func("env")
+@builtin_func(
+    "env",
+    group="运行环境与后端",
+    params={
+        "name": "可选环境名；省略返回当前环境名，传入返回是否匹配",
+    },
+    returns="str | bool",
+)
 def _env(_engine=None, name: str | None = None) -> str | bool:
     """查询当前工作环境
 
@@ -181,7 +236,41 @@ def _env(_engine=None, name: str | None = None) -> str | bool:
     return current == str(name)
 
 
-@builtin_func("check_env")
+@builtin_func(
+    "unattended",
+    group="运行环境与后端",
+    returns="bool",
+)
+def _unattended(_engine=None) -> bool:
+    """判断当前是否无人值守执行（批量勾选无人值守 / CLI headless）。
+
+    无人值守时身边没有人：wf 碰到二级密码这类需要人工介入的弹窗，应当
+    自行返回并结束任务，而不是 pause 卡住等一个不会来的人；有人值守时
+    才用 pause 等用户处理。
+
+        if unattended()
+            log warn "无人值守，跳过需要密码的操作"
+            return -1
+        else
+            eval pause("请输入二级密码后点击确定")
+        end
+
+    标记由引擎持有：BatchScheduler 按无人值守开关注入，CLI headless 恒为真，
+    界面正常运行时为假。
+    """
+    if _engine is None:
+        return False
+    return bool(getattr(_engine, "unattended", False))
+
+
+@builtin_func(
+    "check_env",
+    group="运行环境与后端",
+    params={
+        "envs": "允许的运行环境列表",
+    },
+    returns="bool",
+)
 def _check_env(_engine=None, envs=None) -> bool:
     """检查当前工作环境是否在允许列表中内，否则报错中断
 
@@ -227,7 +316,11 @@ def _backend_kind(engine) -> InputBackendKind:
         return InputBackendKind.UNKNOWN
 
 
-@builtin_func("is_send")
+@builtin_func(
+    "is_send",
+    group="运行环境与后端",
+    returns="bool",
+)
 def _is_send(_engine=None) -> bool:
     """判断当前是否为 SendInput 模式
 
@@ -241,7 +334,11 @@ def _is_send(_engine=None) -> bool:
     return _backend_kind(_engine) is InputBackendKind.SEND
 
 
-@builtin_func("is_post")
+@builtin_func(
+    "is_post",
+    group="运行环境与后端",
+    returns="bool",
+)
 def _is_post(_engine=None) -> bool:
     """判断当前是否为 PostMessage 模式
 
@@ -255,7 +352,11 @@ def _is_post(_engine=None) -> bool:
     return _backend_kind(_engine) is InputBackendKind.POST
 
 
-@builtin_func("is_device")
+@builtin_func(
+    "is_device",
+    group="运行环境与后端",
+    returns="bool",
+)
 def _is_device(_engine=None) -> bool:
     """判断当前是否由设备端后端执行（ADB / Agent / 无障碍 / Shell）
 
@@ -322,13 +423,26 @@ def _app_call(_engine, operation):
         raise WorkflowUserError(str(exc)) from exc
 
 
-@builtin_func("app_is_running")
+@builtin_func(
+    "app_is_running",
+    group="应用生命周期",
+    params={
+        "name": "应用名，空串表示默认应用",
+    },
+    returns="bool",
+)
 def _app_is_running(_engine, name: str = "") -> bool:
     """按目标应用注册的平台检查运行状态，与工作流 env 无关。"""
     return _app_call(_engine, lambda controller: controller.is_running(name))
 
 
-@builtin_func("app_stop")
+@builtin_func(
+    "app_stop",
+    group="应用生命周期",
+    summary="停止目标应用并清理截图缓存",
+    params={"name": "应用名，空串表示默认应用", "timeout": "等待停止的超时秒数"},
+    returns="bool：是否成功停止",
+)
 def _app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
     _engine.clear_capture_snapshot()
     invalidate = getattr(_engine._capture, "invalidate_geometry", None)
@@ -338,7 +452,13 @@ def _app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
         _engine, lambda controller: controller.stop(name, float(timeout)))
 
 
-@builtin_func("app_start")
+@builtin_func(
+    "app_start",
+    group="应用生命周期",
+    summary="启动目标应用并清理截图缓存",
+    params={"name": "应用名，空串表示默认应用", "timeout": "等待启动的超时秒数"},
+    returns="bool：是否成功启动",
+)
 def _app_start(_engine, name: str = "", timeout: float = 30) -> bool:
     _engine.clear_capture_snapshot()
     return _app_call(
@@ -373,17 +493,38 @@ def _android_call(_engine, operation):
         raise WorkflowUserError(str(exc)) from exc
 
 
-@builtin_func("android_app_stop")
+@builtin_func(
+    "android_app_stop",
+    group="应用生命周期",
+    summary="按 Android 应用配置停止应用（app_stop 的 Android 入口）",
+    params={"name": "应用名，空串表示默认应用", "timeout": "等待停止的超时秒数"},
+    returns="bool：是否成功停止",
+)
 def _android_app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
     return _app_stop(_engine, name, timeout)
 
 
-@builtin_func("android_app_start")
+@builtin_func(
+    "android_app_start",
+    group="应用生命周期",
+    summary="按 Android 应用配置启动应用（app_start 的 Android 入口）",
+    params={"name": "应用名，空串表示默认应用", "timeout": "等待启动的超时秒数"},
+    returns="bool：是否成功启动",
+)
 def _android_app_start(_engine, name: str = "", timeout: float = 30) -> bool:
     return _app_start(_engine, name, timeout)
 
 
-@builtin_func("android_wait_stable_frame")
+@builtin_func(
+    "android_wait_stable_frame",
+    group="应用生命周期",
+    params={
+        "name": "应用名",
+        "timeout": "超时秒数",
+        "stable_duration": "需要的稳定持续秒数",
+    },
+    returns="bool",
+)
 def _android_wait_stable_frame(
     _engine, name: str = "", timeout: float = 60, stable_duration: float = 1,
 ) -> bool:

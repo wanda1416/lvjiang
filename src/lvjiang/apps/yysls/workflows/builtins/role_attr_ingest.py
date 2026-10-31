@@ -4,6 +4,9 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "装备入库与角色属性"
+
 
 def _plan_base_attr_target(username: str, plan) -> tuple[str, str]:
     """静默写入会用到的 (流派, 基础属性名称)。
@@ -19,7 +22,15 @@ def _plan_base_attr_target(username: str, plan) -> tuple[str, str]:
     return school or "", f"{username}_{plan.name}"
 
 
-@builtin_func("has_scanned_base_attrs")
+@builtin_func(
+    "has_scanned_base_attrs",
+    params={
+        "name": "方案名",
+        "main_art": "主武学",
+        "sub_art": "副武学",
+    },
+    returns="bool",
+)
 def _has_scanned_base_attrs(
     _engine, name: str = "", main_art: str = "", sub_art: str = "",
 ) -> bool:
@@ -57,7 +68,13 @@ def _has_scanned_base_attrs(
     return attr_name in get_play_styles(school)
 
 
-@builtin_func("save_scanned_base_attrs")
+@builtin_func(
+    "save_scanned_base_attrs",
+    params={
+        "prefill": "预填的基础属性数据",
+    },
+    returns="bool",
+)
 def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     """Silently store the real base values for the bound plan's school/playstyle."""
     from ...config import get_game_config, save_play_style
@@ -146,7 +163,13 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     return name
 
 
-@builtin_func("to_role_base_attrs")
+@builtin_func(
+    "to_role_base_attrs",
+    params={
+        "raw": "OCR 原始识别数据",
+    },
+    returns="dict",
+)
 def _to_role_base_attrs(raw: dict) -> dict:
     """解析角色详情页滚动识别的 OCR 原始数据为基础属性字典
 
@@ -173,7 +196,13 @@ def _to_role_base_attrs(raw: dict) -> dict:
         return {}
 
 
-@builtin_func("open_base_attr_form")
+@builtin_func(
+    "open_base_attr_form",
+    params={
+        "prefill": "预填的基础属性数据",
+    },
+    returns="bool",
+)
 def _open_base_attr_form(_engine, prefill: dict) -> None:
     """触发 UI 弹出"创建基础属性"面板并预填数值，不等待用户确认
 

@@ -4,8 +4,18 @@ from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "背包遍历"
 
-@builtin_func("check_scroll")
+
+@builtin_func(
+    "check_scroll",
+    params={
+        "fingerprint": "窗口首行锚点指纹",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _check_scroll(_engine, fingerprint: str, *args) -> str:
     """滚动校验：比对 grid[1][1] 指纹与滚动管理器预期
 
@@ -42,7 +52,16 @@ def _check_scroll(_engine, fingerprint: str, *args) -> str:
     return "0"
 
 
-@builtin_func("notify_scroll")
+@builtin_func(
+    "notify_scroll",
+    params={
+        "col": "列号",
+        "row": "行号",
+        "fingerprint": "装备指纹",
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _notify_scroll(_engine, col, row, fingerprint: str, *args) -> str:
     """记录已处理装备的指纹到滚动管理器
 
@@ -64,7 +83,13 @@ def _notify_scroll(_engine, col, row, fingerprint: str, *args) -> str:
     return ""
 
 
-@builtin_func("scroll_advance")
+@builtin_func(
+    "scroll_advance",
+    params={
+        "*args": "其余参数忽略",
+    },
+    returns="str",
+)
 def _scroll_advance(_engine, *args) -> str:
     """滚动校验通过后，推进状态：移除已滚出的行指纹
 

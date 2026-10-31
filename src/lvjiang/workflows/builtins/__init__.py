@@ -26,8 +26,15 @@ from . import (
     vision,  # noqa: F401
 )
 from ._registry import (  # noqa: F401
+    FALLBACK_GROUP,
+    FunctionMeta,
+    ParamSpec,
     builtin_func,
     capture_registrations,
+    describe_function,
     get_function,
+    iter_function_metas,
     list_functions,
+    signature_params,
+    validate_function_meta,
 )

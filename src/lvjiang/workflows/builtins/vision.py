@@ -28,6 +28,10 @@ from ...i18n import tr
 from ._coerce import to_number
 from ._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "图色"
+
+
 # ─── 画布与坐标换算 ─────────────────────────────────────
 
 def _crop_canvas(engine, img: np.ndarray) -> np.ndarray:
@@ -156,7 +160,13 @@ def _found(frame: np.ndarray, cx_px: float, cy_px: float, w_px: float, h_px: flo
 
 # ─── 取点 ───────────────────────────────────────────────
 
-@builtin_func("pixel")
+@builtin_func(
+    "pixel",
+    params={
+        "ref": "坐标或区域引用",
+    },
+    returns="list[int]",
+)
 def _pixel(_engine=None, ref=None) -> list[int]:
     """取坐标中心点的颜色 → [r, g, b]
 
@@ -172,7 +182,13 @@ def _pixel(_engine=None, ref=None) -> list[int]:
     return [r, g, b]
 
 
-@builtin_func("bright")
+@builtin_func(
+    "bright",
+    params={
+        "ref": "坐标或区域引用",
+    },
+    returns="int",
+)
 def _bright(_engine=None, ref=None) -> int:
     """取坐标中心点亮度 = r + g + b（0–765）
 
@@ -188,7 +204,16 @@ def _bright(_engine=None, ref=None) -> int:
 
 # ─── 色占比 ─────────────────────────────────────────────
 
-@builtin_func("color_ratio")
+@builtin_func(
+    "color_ratio",
+    params={
+        "ref": "区域引用",
+        "lo": "目标色分量下限",
+        "hi_or_tol": "分量上限或容差",
+        "step": "采样步长",
+    },
+    returns="float",
+)
 def _color_ratio(_engine=None, ref=None, lo=None, hi_or_tol=None, step=1) -> float:
     """区域内目标色像素占比（0.0–1.0）
 
@@ -217,7 +242,14 @@ def _color_ratio(_engine=None, ref=None, lo=None, hi_or_tol=None, step=1) -> flo
     return color_ops.color_ratio_tol(frame, x1, y1, x2, y2, color_ops.parse_hex(lo), tol, st)
 
 
-@builtin_func("pixel_ratios")
+@builtin_func(
+    "pixel_ratios",
+    params={
+        "ref": "区域引用",
+        "rules": "通道规则列表",
+        "step": "采样步长",
+    },
+)
 def _pixel_ratios(_engine=None, ref=None, rules=None, step=1) -> dict[str, float]:
     """一次截图统计多组通道关系的像素占比。
 
@@ -245,7 +277,15 @@ def _pixel_ratios(_engine=None, ref=None, rules=None, step=1) -> dict[str, float
 
 # ─── 亮段计数 ───────────────────────────────────────────
 
-@builtin_func("bright_segs")
+@builtin_func(
+    "bright_segs",
+    params={
+        "ref": "区域引用",
+        "on_min": "判为亮的亮度下限",
+        "off_max": "判为暗的亮度上限",
+    },
+    returns="int",
+)
 def _bright_segs(_engine=None, ref=None, on_min=None, off_max=None) -> int:
     """沿区域中线水平扫描，数「亮→暗」跳变次数（底部页签栏有几段字）
 
@@ -269,7 +309,21 @@ def _bright_segs(_engine=None, ref=None, on_min=None, off_max=None) -> int:
 
 # ─── 色心方位角 ─────────────────────────────────────────
 
-@builtin_func("color_vec")
+@builtin_func(
+    "color_vec",
+    params={
+        "ref": "区域引用",
+        "center": "中心颜色",
+        "c_lo": "分量下限",
+        "c_hi": "分量上限",
+        "margin": "容差",
+        "channel": "通道",
+        "min_r": "半径下限",
+        "max_r": "半径上限",
+        "step": "采样步长",
+    },
+    returns="float",
+)
 def _color_vec(
     _engine=None, ref=None, center=None,
     c_lo=None, c_hi=None, margin=None,
@@ -309,7 +363,21 @@ def _color_vec(
 
 # ─── 同色图标连通分量 ───────────────────────────────────
 
-@builtin_func("find_icons")
+@builtin_func(
+    "find_icons",
+    params={
+        "ref": "区域引用",
+        "channel": "主导通道",
+        "c_min": "分量下限",
+        "margin1": "容差一",
+        "margin2": "容差二",
+        "o_max": "其它通道上限",
+        "min_area": "最小面积",
+        "min_bbox": "最小外接框边长",
+        "c_max": "分量上限",
+    },
+    returns="list[FoundRegion]",
+)
 def _find_icons(
     _engine=None, ref=None,
     channel=1, c_min=None, margin1=None, margin2=None,
@@ -353,7 +421,16 @@ def _find_icons(
 
 # ─── 多点找色 ───────────────────────────────────────────
 
-@builtin_func("find_multi_color")
+@builtin_func(
+    "find_multi_color",
+    params={
+        "ref": "区域引用",
+        "anchor": "锚点颜色",
+        "points": "偏移点列表",
+        "tol": "颜色容差",
+    },
+    returns="FoundRegion | None",
+)
 def _find_multi_color(_engine=None, ref=None, anchor=None, points=None, tol=12):
     """多点找色：锚点色 + 偏移点全部命中 → FoundRegion（锚点位置，零尺寸）；未命中返回 ""
 

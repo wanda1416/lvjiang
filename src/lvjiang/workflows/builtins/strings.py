@@ -7,9 +7,20 @@ from loguru import logger
 from ._coerce import to_number
 from ._registry import builtin_func
 
+#: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
+GROUP = "字符串处理"
+
+
 # ─── 字符串 ─────────────────────────────────────────────
 
-@builtin_func("substr")
+@builtin_func(
+    "substr",
+    params={
+        "s": "源文本",
+        "*args": "起始下标与可选结束下标（闭区间，支持负数）",
+    },
+    returns="str",
+)
 def _substr(s, *args) -> str:
     """子串截取
 
@@ -35,13 +46,26 @@ def _substr(s, *args) -> str:
     return s[start:]
 
 
-@builtin_func("split_lines")
+@builtin_func(
+    "split_lines",
+    params={
+        "s": "源文本",
+    },
+    returns="list[str]",
+)
 def _split_lines(s) -> list[str]:
     """按实际换行拆分文本，兼容 LF、CRLF 和 CR；空行由调用方决定如何处理。"""
     return str(s).splitlines() if s is not None else []
 
 
-@builtin_func("split")
+@builtin_func(
+    "split",
+    params={
+        "s": "源文本",
+        "*args": "分隔符；空串表示按字符拆，省略返回单元素列表",
+    },
+    returns="list[str]",
+)
 def _split(s, *args) -> list:
     """按分隔符拆分为列表
 
@@ -58,7 +82,14 @@ def _split(s, *args) -> list:
     return s.split(str(sep))
 
 
-@builtin_func("replace")
+@builtin_func(
+    "replace",
+    params={
+        "s": "源文本",
+        "*args": "被替换文本与新文本",
+    },
+    returns="str",
+)
 def _replace(s, *args) -> str:
     """替换所有匹配
 
@@ -75,7 +106,14 @@ def _replace(s, *args) -> str:
     return s.replace(old, new)
 
 
-@builtin_func("match")
+@builtin_func(
+    "match",
+    params={
+        "s": "源文本",
+        "*args": "正则表达式与可选分组序号",
+    },
+    returns="str",
+)
 def _match(s, *args) -> bool:
     """正则匹配（Python re.search）
 
@@ -94,7 +132,13 @@ def _match(s, *args) -> bool:
         return False
 
 
-@builtin_func("trim")
+@builtin_func(
+    "trim",
+    params={
+        "s": "源文本",
+    },
+    returns="str",
+)
 def _trim(s) -> str:
     """去除两端空白
 
@@ -103,19 +147,37 @@ def _trim(s) -> str:
     return str(s).strip() if s is not None else ""
 
 
-@builtin_func("upper")
+@builtin_func(
+    "upper",
+    params={
+        "s": "源文本",
+    },
+    returns="str",
+)
 def _upper(s) -> str:
     """转大写"""
     return str(s).upper() if s is not None else ""
 
 
-@builtin_func("lower")
+@builtin_func(
+    "lower",
+    params={
+        "s": "源文本",
+    },
+    returns="str",
+)
 def _lower(s) -> str:
     """转小写"""
     return str(s).lower() if s is not None else ""
 
 
-@builtin_func("to_num")
+@builtin_func(
+    "to_num",
+    params={
+        "s": "源文本",
+    },
+    returns="int | float",
+)
 def _to_num(s):
     """字符串转数字，失败返回 0
 
@@ -129,7 +191,14 @@ _NUMBER_BOUNDARY_LEFT = r"(?<![\d.,，+\-])"
 _NUMBER_BOUNDARY_RIGHT = r"(?![\d.,，])"
 
 
-@builtin_func("extract_int")
+@builtin_func(
+    "extract_int",
+    params={
+        "s": "源文本",
+        "*args": "其余参数忽略",
+    },
+    returns="int",
+)
 def _extract_int(s, *args) -> int:
     """从文本中提取第一项非负整数（容忍数字之外的 OCR 乱码）。
 
@@ -143,7 +212,13 @@ def _extract_int(s, *args) -> int:
     return int(match.group(0)) if match else -1
 
 
-@builtin_func("extract_progress")
+@builtin_func(
+    "extract_progress",
+    params={
+        "s": "源文本",
+        "*args": "其余参数忽略",
+    },
+)
 def _extract_progress(s, *args) -> dict:
     """从 OCR 文本中提取唯一的 ``当前值/总量`` 进度对。
 
@@ -173,7 +248,14 @@ def _extract_progress(s, *args) -> dict:
     return {"valid": True, "current": current, "total": total}
 
 
-@builtin_func("extract_num")
+@builtin_func(
+    "extract_num",
+    params={
+        "s": "源文本",
+        "*args": "其余参数忽略",
+    },
+    returns="int | float",
+)
 def _extract_num(s, *args) -> int | float:
     """从文本中提取第一项非负数（整数或小数）。
 

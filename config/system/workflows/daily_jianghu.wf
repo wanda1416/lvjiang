@@ -27,6 +27,10 @@
 #%     label: 合影
 #%     type: bool
 #%     default: true
+#%   - name: keep_multiplayer
+#%     label: 多人模式保持
+#%     type: bool
+#%     default: false
 #%   - name: do_huanzhuang
 #%     label: 换装
 #%     type: bool
@@ -60,7 +64,10 @@
 #   2. 处理六张任务卡：逐卡校验页面 → 判断是否已完成 → 命中目标则执行动作 →
 #      按配置领奖；未命中则刷新到命中或达到 $max_refresh
 #   3. 首轮遇到「处理前就已完成」的任务时补扫一轮，覆盖任务换位
-#   4. 收尾：退回游戏首页；本次为合影切过多人模式则回到主页后切回单人模式
+#   4. 收尾：退回游戏首页；再按「多人模式保持」决定收尾模式——
+#      脚本切过单人→多人一定切回单人；未勾选该项（默认）时，起始是多人
+#      （或模式未识别）就统一切回单人，起始本来就是单人则不必再开菜单确认；
+#      勾选了且脚本没切过则保持当前模式不动
 #
 # 参数：
 #   max_refresh          — 单个任务最大刷新次数，默认 50
@@ -69,10 +76,14 @@
 #                          当周已领取声望小于该值时才领奖
 #   do_heying / do_huanzhuang / do_qingjing — 是否执行合影、换装、情境
 #   do_kanbao / do_yinjiu / do_juezhanglin — 是否执行看报、饮酒、觉障林
+#   keep_multiplayer     — 多人模式保持，默认 false：起始是多人模式（或模式未
+#                          识别）时收尾切回单人；起始就是单人则不做多余操作。
+#                          勾选后，脚本没切过模式就保持当前模式不动
 #   min_yinjiu_confidence — 黄泉酿识别置信度阈值，默认 0.65；反复匹配
 #                          不上时可降到 0.5 以上，但不要太低以免误认
 # 前置：在游戏首页或江湖号令活动页（两种入口都按页面判定自行收敛）。
-# 后置：成功时已退回游戏首页；为合影切过多人模式时已切回单人模式。
+# 后置：成功时已退回游戏首页；模式已按「多人模式保持」处理
+#      （默认不会停在多人模式）。
 # 返回：0=六项都没勾选，未做任何操作或正常收尾；-1=Profile 声明失败、
 #       页面校验失败或导航失败。
 #
@@ -82,6 +93,7 @@ default $claim_reward = false
 default $max_refresh = 50
 default $max_claim_reputation = 1500
 default $do_heying = true
+default $keep_multiplayer = false
 default $do_huanzhuang = true
 default $do_qingjing = true
 default $do_kanbao = true
@@ -93,8 +105,9 @@ default $min_yinjiu_confidence = "0.65"
 # 仍显式传递，避免子过程依赖隐藏的当前任务上下文。
 # $min_yinjiu_confidence 必须在 global 中声明：过程作用域的变量表是全局表副本，
 # 漏声明时 action_yinjiu 内读不到阈值，where 会静默失效（等于不过滤、任意分数都命中）。
-global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked, $mode_switched
+global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked, $mode_switched, $mode_at_start
 global $do_heying, $do_huanzhuang, $do_qingjing, $do_kanbao, $do_yinjiu, $do_juezhanglin
+global $keep_multiplayer
 global $min_yinjiu_confidence
 global $jianghu_result, $jianghu_item
 
@@ -120,6 +133,7 @@ end
 eval $haoling_of_week = -1
 eval $mode_checked = false
 eval $mode_switched = false
+eval $mode_at_start = ""
 
 # 六项都未勾选时没有执行诉求，直接退出；只要勾选任一项，候选匹配仍按
 # 完整六类目标进行，用户开关只影响命中后的动作与领奖。
@@ -187,10 +201,18 @@ if $at_haoling
    eval $jianghu_result.cleanup.home = "return_attempted"
 end
 
-# 本次为合影切到过多人模式：从主页进菜单切回单人模式，再确认回到主页。
-# 未切换过的不动作，保持用户原有模式。
+# 收尾模式：起始定位时已经读过菜单页的模式标签（零成本），按它决定要不要动——
+# 脚本切过单人→多人一定切回；勾选了「多人模式保持」则保持现状；
+# 起始就是单人且没切过，收尾无需再开菜单确认；起始是多人或未识别，
+# 未勾选时统一切回单人。
 if $mode_switched
-   call restore_single_mode()
+   call restore_single_mode("本次为合影切换过多人模式，收尾切回单人模式")
+else if $keep_multiplayer
+   log "已勾选「多人模式保持」，本次未切换过模式，保持当前游戏模式不动"
+else if $mode_at_start == "sp"
+   log "本次起始为单人模式且未切换过，收尾无需处理"
+else
+   call restore_single_mode("未勾选「多人模式保持」，收尾统一切回单人模式")
 end
 
 call finish_jianghu_result()
@@ -960,6 +982,28 @@ def action_juezhanglin($label)
    call record_jianghu_reward("task_incomplete", "action_not_implemented")
 end
 
+# ─── detect_game_mode ─────────────────────────────────────
+# 读菜单页「模式」标签当前显示的模式。
+#
+# 参数：无
+# 前置：在菜单页。
+# 后置：不做任何点击。
+# 返回："sp"=单人模式；"mp"=多人模式；""=未识别（OCR 失败或不在菜单页）。
+#
+# 菜单页的模式标签本身就是「单人模式 / 多人模式」文字，读它不需要额外操作；
+# 起始定位时菜单已经打开，所以这次读取是零成本的。
+def detect_game_mode()
+   scan [game_menu_page].[mode] as $current_mode by contains "单人"
+   if $current_mode
+      return "sp"
+   end
+   scan [game_menu_page].[mode] as $current_mode by contains "多人"
+   if $current_mode
+      return "mp"
+   end
+   return ""
+end
+
 # ─── switch_game_mode ─────────────────────────────────────
 # 切换游戏模式（单人 / 多人）。
 #
@@ -1013,16 +1057,17 @@ end
 # ─── restore_single_mode ──────────────────────────────────
 # 收尾把游戏切回单人模式。
 #
-# 参数：无
-# 前置：本次为合影切换过多人模式。
+# 参数：
+#   $reason — 记入日志的原因（切换过 / 默认统一回单人），只用于排障
+# 前置：已退回游戏首页。
 # 后置：0=已确认在游戏主页；-1=菜单打不开或切完仍未回到主页（已 pause 提示）。
 # 返回：0=成功；-1=失败。
 #
 # 路径：主页 → 菜单 → 切换单人模式 → 确认回到游戏主页。
-# 已是单人模式（用户中途手动切回）则只关闭菜单。
-def restore_single_mode()
+# 已是单人模式（用户中途手动切回、或本来就在单人）则只关闭菜单。
+def restore_single_mode($reason)
    eval $jianghu_result.cleanup.mode = "restoring"
-   log "本次为合影切换过多人模式，收尾切回单人模式"
+   log $reason
    call $nav_result = nav_main_to_menu()
    if $nav_result < 0
       log "打不开菜单页，无法切回单人模式"
@@ -1070,18 +1115,21 @@ def back_to_haoling()
       end
    end
 
-   # 首次打开菜单时检查游戏模式，识别到单人则切到多人模式；
-   # 切换后会回到游戏主页，需重新打开菜单；未切换则仍在菜单页，
-   # 无需再次导航。mode_checked 是本次执行内的全局标记，下次运行会重置。
-   if $do_heying and not $mode_checked
+   # 首次打开菜单时先读当前模式（菜单已开，读标签不额外点击），记下来供收尾判断；
+   # 再按「合影」开关决定是否切到多人模式。切换后会回到游戏主页，需重新打开菜单；
+   # 未切换则仍在菜单页，无需再次导航。mode_checked 是本次执行内的全局标记。
+   if not $mode_checked
       eval $mode_checked = true
-      call $switched = switch_game_mode("mp")
-      if $switched
-         # 记下本次切换过，收尾时切回；切换后落在游戏主页，重新打开菜单继续导航
-         eval $mode_switched = true
-         call $nav_result = nav_main_to_menu()
-         if $nav_result < 0
-            return -1
+      call $mode_at_start = detect_game_mode()
+      if $do_heying
+         call $switched = switch_game_mode("mp")
+         if $switched
+            # 记下本次切换过，收尾时切回；切换后落在游戏主页，重新打开菜单继续导航
+            eval $mode_switched = true
+            call $nav_result = nav_main_to_menu()
+            if $nav_result < 0
+               return -1
+            end
          end
       end
    end

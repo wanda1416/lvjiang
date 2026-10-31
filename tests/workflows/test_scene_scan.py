@@ -239,16 +239,62 @@ def test_daily_jianghu_restores_single_mode_only_after_switching():
     mark = nav.index("eval $mode_switched = true", guard)
     assert switched < guard < mark
 
-    # 收尾：退回主页之后、任何 def 之前，切换过才切回
+    # 收尾：退回主页之后、任何 def 之前，按起始模式与「多人模式保持」分支
     tail = text[text.index('log "六个任务刷新处理完成"'):text.index("def is_task_completed(")]
     back = tail.index("click [game_menu_page].[back]")
     restore = tail.index("if $mode_switched", back)
-    assert "call restore_single_mode()" in tail[restore:]
+    segment = tail[restore:]
+    assert "call restore_single_mode(" in segment
+    # 勾选了就保持；起始本来就是单人则不必再开菜单；其余（起始多人/未识别）回单人
+    assert "else if $keep_multiplayer" in segment
+    assert "保持当前游戏模式不动" in segment
+    assert 'else if $mode_at_start == "sp"' in segment
+    assert "收尾无需处理" in segment
 
     body = text[text.index("def restore_single_mode("):text.index("def back_to_haoling(")]
+    assert "def restore_single_mode($reason)" in body
     assert 'call $switched = switch_game_mode("sp")' in body
     assert body.index("call $nav_result = nav_main_to_menu()") < body.index('switch_game_mode("sp")')
     assert body.index('switch_game_mode("sp")') < body.index("call $in_main = is_in_main_page()")
+
+
+def test_daily_jianghu_reads_mode_label_before_switching():
+    """起始定位时先读菜单页「模式」标签，记住起始模式，供收尾零成本判断。
+
+    菜单已经打开，读标签不额外点击；据此在收尾免掉一次「开菜单再关」。
+    """
+    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+
+    detect = text[text.index("def detect_game_mode()"):text.index("def switch_game_mode(")]
+    assert "scan [game_menu_page].[mode]" in detect
+    assert 'by contains "单人"' in detect and 'by contains "多人"' in detect
+    assert "click" not in detect  # 只读不点
+
+    nav = text[text.index("def back_to_haoling("):]
+    read_at = nav.index("call $mode_at_start = detect_game_mode()")
+    switch_at = nav.index('call $switched = switch_game_mode("mp")')
+    assert read_at < switch_at
+    # 起始模式在「合影」开关之外也要记，否则关了合影就无从判断收尾要不要动
+    block = nav[nav.index("if not $mode_checked"):switch_at]
+    assert "detect_game_mode()" in block
+
+
+def test_daily_jianghu_keep_multiplayer_defaults_to_returning_single():
+    """「多人模式保持」默认不勾选：结束后统一回单人，勾选才尊重原有模式。"""
+    from lvjiang.workflows.metadata import parse_metadata_file
+
+    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    params = {p["name"]: p for p in parse_metadata_file(wf).get("parameters") or []}
+    assert params["keep_multiplayer"]["type"] == "bool"
+    assert params["keep_multiplayer"]["default"] is False
+    assert params["keep_multiplayer"]["label"] == "多人模式保持"
+
+    text = wf.read_text(encoding="utf-8")
+    assert "default $keep_multiplayer = false" in text
+    # 过程作用域只拿到 global 声明的变量，漏了这里收尾分支读不到开关
+    globals_block = text[text.index("global $do_heying"):text.index("import \"subcall/navigation.wf\"")]
+    assert "$keep_multiplayer" in globals_block
 
 
 def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():

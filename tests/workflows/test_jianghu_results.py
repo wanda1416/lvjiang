@@ -15,7 +15,12 @@ def mixed_run(monkeypatch, source=None):
     program = parse_text(source if source is not None else WORKFLOW.read_text(encoding="utf-8"))
     engine = make_engine(run_env="android")
     engine.variables.update({"claim_reward": True, "max_refresh": 2, "do_kanbao": False})
-    engine._procs = {**program.procs, **parse_text("def declare_profiles($keys)\nreturn 1\nend\ndef detect_jianghu_card_reward_state($label)\nreturn \"unclaimed\"\nend\n").procs}
+    # 收尾的模式恢复走真实导航与菜单扫描，与本用例关注的结果汇总无关；
+    # 「默认也会恢复单人」这条契约由 test_scene_scan 的结构用例守着。
+    engine._procs = {**program.procs, **parse_text(
+        "def declare_profiles($keys)\nreturn 1\nend\n"
+        "def detect_jianghu_card_reward_state($label)\nreturn \"unclaimed\"\nend\n"
+        "def restore_single_mode($reason)\nreturn 0\nend\n").procs}
     phase = 1
     probes = Counter()
     scans = Counter()

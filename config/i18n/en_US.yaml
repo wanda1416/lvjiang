@@ -227,6 +227,35 @@ script_record:
   status_cleared: Cleared
   unsaved_title: Unsaved
   unsaved_message: Recording has not been saved or copied. Close anyway?
+builtin_panel:
+  tab_title: Built-in Functions
+  search_hint: Search functions by name or description
+  root_builtin: Built-in Functions
+  root_script: Local Scripts
+  source_builtin: Built-in
+  source_plugin: Plugin
+  no_summary: (no description)
+  label_group: Group
+  label_returns: Returns
+  undeclared: (not declared)
+  label_source: Source
+  caption_params: Parameters
+  caption_preview: Try it
+  col_param: Parameter
+  col_type: Type
+  col_default: Default
+  col_meaning: Meaning
+  btn_locate: Reveal script
+  btn_run: Run
+  param_placeholder: Leave empty to use default
+  preview_placeholder: Result appears here
+  injected_tip: Needs engine injection (_engine/_wf); only callable while a script runs
+  function_missing: Function not found
+  args_invalid: Cannot parse arguments
+  conflict_builtin: Duplicated with a built-in name; the script would be rejected at run time
+  unparsable: Cannot parse
+  script_missing: "Script file not found: "
+  opened_external: "Opened in external editor: "
 script_config:
   tab_daily: Daily
   tab_dedicated: Dedicated

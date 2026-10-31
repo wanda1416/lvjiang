@@ -227,6 +227,35 @@ script_record:
   status_cleared: 已清除
   unsaved_title: 未保存
   unsaved_message: 录制内容尚未保存或复制到剪贴板，确定要关闭吗？
+builtin_panel:
+  tab_title: 内置函数
+  search_hint: 搜索函数名或说明
+  root_builtin: 内置函数
+  root_script: 本地脚本
+  source_builtin: 内置
+  source_plugin: 插件
+  no_summary: （无说明）
+  label_group: 分组
+  label_returns: 返回
+  undeclared: （未声明）
+  label_source: 来源
+  caption_params: 参数
+  caption_preview: 试算
+  col_param: 参数
+  col_type: 类型
+  col_default: 默认值
+  col_meaning: 含义
+  btn_locate: 定位到脚本
+  btn_run: 执行
+  param_placeholder: 留空使用默认值
+  preview_placeholder: 执行结果显示在这里
+  injected_tip: 该函数需要引擎注入（_engine/_wf），只能在脚本执行时调用
+  function_missing: 找不到该函数
+  args_invalid: 参数解析失败
+  conflict_builtin: 与内置函数重名，脚本运行时会被拒绝
+  unparsable: 无法解析
+  script_missing: "脚本文件不存在："
+  opened_external: "已用外部编辑器打开："
 script_config:
   tab_daily: 日常
   tab_dedicated: 专用

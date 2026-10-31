@@ -47,6 +47,58 @@ ZHIGE_DINGYIN_NAME = "止戈定音"
 # 没带的那一槽是整块搬过去的，提示跟着槽走才不会丢、也不会串到另一种定音
 # 头上。放 _extra 就得靠「记得把提示和槽配对搬」，迟早漏。
 DINGYIN_SLOT_NOTICE = "notice"
+
+# ─── OCR 丢字容错 ───────────────────────────────────────────
+#
+# 复杂字（醺、鹜、鹫）在游戏艺术字下常被 OCR 整个丢掉：「悬身断水·浓醺技能
+# 增伤」读成「悬身断水浓技能增伤」，间隔号也一并丢失。前缀/子串匹配都要求
+# 词条名完整出现，这类文本必然落空，最终被当成止戈定音，该装备的定音收益
+# 从毕业率里彻底消失。
+#
+# 定音词条是封闭词库，所以允许长词条有一个字以内的偏差；短词条（4~5 字）
+# 彼此太像（外功穿透 / 外功抗性 / 外功穿诱），放宽会把真正的止戈定音和乱码
+# 吞进普通词条，因此只对 6 字以上的名字启用。
+_FUZZY_MIN_NAME_LEN = 6
+_FUZZY_MAX_DISTANCE = 1
+_FUZZY_MIN_PREFIX = 3
+_HANZI_ONLY = re.compile(r"[^\u4e00-\u9fa5]")
+
+
+def _hanzi_only(text: str) -> str:
+    """只留汉字：间隔号、空格、百分号与数值都不参与词条名比对。"""
+    return _HANZI_ONLY.sub("", text or "")
+
+
+def _common_prefix(a: str, b: str) -> int:
+    count = 0
+    for left, right in zip(a, b, strict=False):
+        if left != right:
+            break
+        count += 1
+    return count
+
+
+def _edit_distance(a: str, b: str) -> int:
+    """莱文斯坦距离；词条名不超过十几个字，直接 O(n*m) 即可。"""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    previous = list(range(len(b) + 1))
+    for i, char_a in enumerate(a, 1):
+        current = [i]
+        for j, char_b in enumerate(b, 1):
+            current.append(min(
+                previous[j] + 1,
+                current[j - 1] + 1,
+                previous[j - 1] + (char_a != char_b),
+            ))
+        previous = current
+    return previous[-1]
+
+
 def has_normal_dingyin(equip_dict: dict) -> bool:
     """普通定音槽是否有数据。"""
     dingyin = equip_dict.get("dingyin")
@@ -131,7 +183,15 @@ class DingyinParser:
 
         matched = self._match_name(text, self._candidates())
         if matched is None:
-            logger.debug(f"定音不属于普通词库: {raw!r}")
+            # 认不出时要立刻分清两种情形：像 OCR 误读的（与某个词条名共享长
+            # 前缀）是配置或识别问题，用户得去核对；真正没进词库的止戈定音
+            # 是正常数据，不该刷 warning 把日志淹掉。
+            suspected = self.suspected_misread(text)
+            if suspected is not None:
+                logger.warning(
+                    f"定音词条疑似误读: {raw!r}，可能是「{suspected}」，请核对")
+            else:
+                logger.debug(f"定音不属于普通词库: {raw!r}")
             return None
 
         value = self._extract_value(text, matched)
@@ -184,21 +244,58 @@ class DingyinParser:
             names.extend(self._attr_config.get_aliases_for_category(cat))
         return sorted(names, key=len, reverse=True)
 
-    @staticmethod
-    def _match_name(text: str, candidates: list[str]) -> str | None:
-        """匹配候选词条名：前缀优先，其次子串（容忍 OCR 前缀噪声）"""
+    @classmethod
+    def _match_name(cls, text: str, candidates: list[str]) -> str | None:
+        """匹配候选词条名：前缀优先，其次子串，再忽略标点，最后长词条模糊匹配"""
         for name in candidates:
             if text.startswith(name):
                 return name
         for name in candidates:
             if name in text:
                 return name
-        return None
+        # 词条配置里不带间隔号，但游戏内文本常带（「悬身断水·浓醺技能增伤」）。
+        # 去标点后再比一次，两边写法差异不该让整条定音识别失败。
+        probe = _hanzi_only(text)
+        if probe:
+            for name in candidates:
+                target = _hanzi_only(name)
+                if target and target in probe:
+                    return name
+        return cls._fuzzy_name(text, candidates)
+
+    @staticmethod
+    def _fuzzy_name(text: str, candidates: list[str]) -> str | None:
+        """前缀/子串都落空时，按编辑距离找最接近的长词条名。
+
+        只处理复杂字被 OCR 整个吃掉的情况（「浓醺」读成「浓」），要求与词条名
+        共享至少 3 个字的公共前缀、且只差一个字，避免把止戈定音或乱码吞进
+        普通定音槽。
+        """
+        probe = _hanzi_only(text)
+        if len(probe) < _FUZZY_MIN_NAME_LEN - 1:
+            return None
+        best: str | None = None
+        best_dist = _FUZZY_MAX_DISTANCE + 1
+        for name in candidates:
+            target = _hanzi_only(name)
+            if len(target) < _FUZZY_MIN_NAME_LEN:
+                continue
+            if _common_prefix(probe, target) < _FUZZY_MIN_PREFIX:
+                continue
+            # 词条名后面跟着数值，取等长再多一个字的那一段比较
+            dist = _edit_distance(probe[:len(target) + 1], target)
+            if dist < best_dist:
+                best, best_dist = name, dist
+        return best if best_dist <= _FUZZY_MAX_DISTANCE else None
 
     @staticmethod
     def _extract_value(text: str, matched: str) -> float | None:
-        """从词条名之后的剩余文本提取数值"""
-        remainder = text.split(matched, 1)[1]
+        """从词条名之后的剩余文本提取数值。
+
+        模糊匹配命中的词条名并不出现在原文里（原文缺了那个字），此时从整段
+        文本取第一个数字——词条名里不含数字，取到的仍是定音数值。
+        """
+        remainder = text.split(matched, 1)[1] if matched in text else text
         m = re.search(r"(\d+\.?\d*)", remainder)
         return float(m.group(1)) if m else None
 

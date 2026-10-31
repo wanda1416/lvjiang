@@ -357,6 +357,17 @@ class EquipmentParser:
         if result:
             equip.dingyin = result
             equip.dingyin_type = DINGYIN_NORMAL
+            if result["name"] not in dingyin_text:
+                # 词条名是按编辑距离纠回来的：OCR 把「醺」这类复杂字整个丢了，
+                # 原文里根本没有这个词条名。结果可用，但要留痕让用户能核对，
+                # 否则一次错误推断会静默影响毕业率计算。
+                notice = (
+                    f"定音词条按最接近的词条纠正为「{result['name']}」"
+                    f"（识别原文 {dingyin_text!r}），请核对")
+                result[DINGYIN_SLOT_NOTICE] = notice
+                equip.warnings.append(notice)
+                logger.warning(
+                    f"定音词条模糊纠正: {dingyin_text!r} → {result['name']}")
             # 计算定音词条 cap_pct（与普通词条相同逻辑）
             if equip.level and result.get("name"):
                 caps = self._attr_config.get_affix_caps(

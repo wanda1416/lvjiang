@@ -160,8 +160,8 @@ class TestPlaystyleRegistry:
     def test_school_affix_group_does_not_depend_on_art_prefixes(self):
         names = get_game_config().get_affix_names_in_group(
             "指定技能增效", "破竹·樽")
-        assert "悬身断水·浓醺技能增伤" in names
-        assert "断水双诀·轻击增伤" in names
+        assert "悬身断水浓醺技能增伤" in names
+        assert "断水双诀轻击增伤" in names
 
     def test_damage_and_defense_targets_follow_graduation_baselines(self):
         """内置输出玩法以毕业率表的满值属性为真源。

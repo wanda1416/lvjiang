@@ -195,6 +195,59 @@ class TestParserDelegation:
         assert len(equip.affixes) == 2
 
 
+class TestOcrMissingChar:
+    """复杂字被 OCR 整个吃掉时，长词条仍要能认出来。
+
+    「悬身断水·浓醺技能增伤」在游戏艺术字下常被读成「悬身断水浓技能增伤」：
+    前缀与子串匹配都要求词条名完整出现，必然落空，最终被当成止戈定音，
+    这件装备的定音收益从毕业率里彻底消失，而用户只看到一个正常的
+    <止戈定音>。定音词条是封闭词库，长词条允许一个字以内的偏差。
+    """
+
+    def test_missing_complex_char_still_matches(self, dp):
+        assert dp.parse("悬身断水浓技能增伤  9.8%") == {
+            "name": "悬身断水浓醺技能增伤", "value": 9.8}
+
+    def test_game_text_with_dot_matches_config_name(self, dp):
+        """游戏内文本带间隔号、配置词条名不带：去标点后仍要命中。"""
+        assert dp.parse("悬身断水·浓醺技能增伤 +9.8%") == {
+            "name": "悬身断水浓醺技能增伤", "value": 9.8}
+
+    def test_value_read_from_whole_text_when_name_absent(self, dp):
+        """模糊命中时词条名不在原文里，数值仍要取得到（不能 IndexError）。"""
+        assert dp.parse("悬身断水浓技能增伤9.8%")["value"] == 9.8
+
+    def test_short_names_are_not_fuzzy_matched(self, dp):
+        """短词条彼此太像（外功穿透/外功抗性），放宽会吞掉止戈定音与乱码。"""
+        assert dp.parse("外功穿诱 +14.2%") is None
+
+    def test_garbage_never_fuzzy_matched(self, dp):
+        assert dp.parse("纯噪声文本") is None
+        assert dp.parse("止戈特殊效果 +12") is None
+
+
+class TestFuzzyCorrectionNotice:
+    """模糊纠正必须留痕：一次错误推断会静默影响毕业率。"""
+
+    def test_correction_warns_and_lands_in_normal_slot(self, parser):
+        equip = parser.parse({
+            "equip_type": "踏雪含光 | 武器·剑",
+            "equip_level": "承音 | 110阶",
+            "base_attr": "外功攻击 100~232",
+            "affix_gong": "最大外功攻击 +121.4",
+            "affix_shang": "劲 +50.0",
+            "affix_jue": "敏 +40.0",
+            "affix_zhi": "气血最大值 +500",
+            "affix_yu": "外功防御 +30.0",
+            "dingyin": "悬身断水浓技能增伤 9.8%",
+        })
+        assert equip.dingyin["name"] == "悬身断水浓醺技能增伤"
+        assert equip.dingyin["value"] == 9.8
+        assert equip.dingyin_type == DINGYIN_NORMAL
+        assert any("纠正" in w for w in equip.warnings)
+        assert "纠正" in equip.dingyin[DINGYIN_SLOT_NOTICE]
+
+
 class TestStoredDingyinType:
     def test_missing_type_is_always_normal(self):
         assert stored_dingyin_type({}) == DINGYIN_NORMAL
@@ -218,6 +271,39 @@ class TestMisreadVsZhige:
 
     def test_genuine_zhige_not_flagged(self, dp):
         assert dp.suspected_misread("止戈特殊效果 +12") is None
+
+
+class TestMisreadLogLevel:
+    """疑似误读必须在解析器层面就 warning。
+
+    debug 级别在默认配置下不出现在运行日志里，等于没有提示：用户只看到定音被
+    记成 <止戈定音>，不知道是 OCR 读错了、需要核对。真正的止戈定音仍保持
+    debug——两者都升级会把日志淹掉。
+    """
+
+    @staticmethod
+    def _warnings(dp, text: str) -> list[str]:
+        from loguru import logger as loguru_logger
+
+        records: list[str] = []
+        sink = loguru_logger.add(
+            lambda message: records.append(message.record["message"]),
+            level="WARNING",
+            filter=lambda record: record["name"].endswith("dingyin_parser"),
+        )
+        try:
+            dp.parse(text)
+        finally:
+            loguru_logger.remove(sink)
+        return records
+
+    def test_misread_logs_warning_immediately(self, dp):
+        messages = self._warnings(dp, "外功穿诱 +14.2%")
+        assert any("疑似误读" in m and "外功穿透" in m for m in messages)
+
+    def test_genuine_zhige_does_not_warn(self, dp):
+        assert self._warnings(dp, "止戈特殊效果 +12") == []
+        assert self._warnings(dp, "乱码噪声 x") == []
 
 
 class TestMisreadReachesWarnings:

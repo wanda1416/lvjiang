@@ -777,7 +777,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             self._proc_sources = previous_sources
             self._script_modules = previous_scripts
             raise
-        # 校验通过后才真正加载脚本（与 _execute_dsl 同一时机语义）
+        # 校验通过后才真正加载脚本（与 _execute_dsl 同一时机语义）。
+        # 注意语义：_load_script_modules 会清空函数表后重跑**全部**已登记脚本
+        # 的模块顶层代码（不只是本次新增的），因此任务中途 import 子 .wf 时，
+        # 主任务先前加载过的脚本会再执行一次顶层代码、模块级状态被重置。
+        # 脚本顶层应保持无副作用；确需保留状态请放在引擎变量里。
         self._load_script_modules()
         logger.debug(f"load_subcalls: {key} → 注册 {len(loaded_procs)} 个过程")
 

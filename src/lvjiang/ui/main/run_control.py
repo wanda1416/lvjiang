@@ -6,12 +6,12 @@ import threading
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QMessageBox, QWidget
 
 from ...core.config.resolver import get_resolver
 from ...core.fs_util import task_result_path
@@ -1150,6 +1150,15 @@ class RunControlMixin:
         if target is None:
             self._show_workflow_start_error(tr("当前没有可执行目标"), scope=execution_scope)
             return False
+        # 设备执行占用是启动成败的硬前提：手机端还在跑别的任务时，工作流线程
+        # 要到 engine.execute → control_begin 才失败。这里在占用本地目标之前
+        # 先试取一次（拿到即释放，判据与真正执行同为 control_begin），被占用
+        # 就弹窗说明，不留下"一闪就结束 + 一行 ERROR"的体验。
+        device_busy = self.device_execution_busy()
+        if device_busy:
+            self._notify_device_busy(device_busy)
+            report_start_failure(self, device_busy, execution_scope)
+            return False
         target_snapshot = target.snapshot()
         from ...core.config import load_user_config
         recovery = load_user_config().android_recovery if target.kind == "adb" else None
@@ -1868,6 +1877,19 @@ class RunControlMixin:
         except Exception as exc:
             logger.warning(f"设备执行占用预检释放失败: {exc}")
         return ""
+
+    def _notify_device_busy(self, reason: str) -> None:
+        """设备执行占用被别的任务持有时，启动前弹窗说明原因。
+
+        以前这条冲突要等工作流线程跑到 ``engine.execute → control_begin`` 才暴
+        露，用户看到的是"点下去一闪就结束 + 一行 ERROR 日志"，既不知道原因，
+        也不知道该去哪儿结束占用。占用检查提前到启动前，用弹窗讲清楚。
+        """
+        message = tr("设备正在执行其他任务，本次未启动。\n\n{reason}").format(
+            reason=reason)
+        self.log_text.append(f"[{tr('提示')}] {reason}")
+        self.statusBar().showMessage(tr("设备正在执行其他任务"))
+        QMessageBox.warning(cast(QWidget, self), tr("无法开始执行"), message)
 
     def _plan_allows_backend(self) -> bool:
         """当前方案是否支持当前连接模式（自定义时永远放行）。"""

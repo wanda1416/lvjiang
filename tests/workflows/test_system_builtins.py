@@ -24,11 +24,27 @@ def _fn(name):
 class MockEngine:
     """模拟引擎"""
     def __init__(self, ui_callback=None, save_callback=None, panel_alignments=None,
-                 run_env="desktop"):
+                 run_env="desktop", unattended=False):
         self._ui_callback = ui_callback
         self._save_callback = save_callback
         self._panel_alignments = panel_alignments or {}
         self.run_env = run_env
+        self.unattended = unattended
+
+
+class TestUnattended:
+    """无人值守标记：批量勾选无人值守 / CLI headless 时为真。"""
+
+    def test_is_unattended_true(self):
+        assert _fn("is_unattended")(MockEngine(unattended=True)) is True
+
+    def test_is_unattended_false_by_default(self):
+        assert _fn("is_unattended")(MockEngine()) is False
+
+    def test_is_unattended_no_engine(self):
+        # 引擎缺失（解析期静态求值）时保守为假：宁可有人值守走 pause，
+        # 也不要在没人时误判成无人值守直接放弃任务。
+        assert _fn("is_unattended")(None) is False
 
 
 class TestBuildText:

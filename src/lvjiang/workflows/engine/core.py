@@ -160,6 +160,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         window_top: int = 0,
         stop_check: Callable[[], bool] | None = None,
         pause_event: threading.Event | None = None,
+        unattended: bool = False,
     ):
         # 硬件后端（直接持有）
         self._capture = capture
@@ -169,6 +170,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._input_sim = input_sim or InputSimConfig()
         self._delay_params = delay_params or {}
         self._android_apps = parse_android_apps(android_apps)
+        # 无人值守：批量勾选无人值守、或 CLI headless 时为真。业务 wf 用
+        # is_unattended() 分支——碰到需要人工介入的弹窗（如二级密码）时，
+        # 有人值守交给 pause 等用户处理，无人值守则自行返回并结束，
+        # 避免把整批卡在密码框前。
+        self.unattended = bool(unattended)
         # 现有 ADB 截图/输入后端都持有同一个 AdbDevice；允许宿主显式注入，
         # 也兼容测试工具和脚本工作台从后端自动发现。
         self._android_device = android_device or getattr(capture, "_device", None) \

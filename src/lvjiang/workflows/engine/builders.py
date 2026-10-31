@@ -47,6 +47,7 @@ class DeviceWorkflowEngineBuilder:
         window_top: int = 0,
         stop_check: Callable[[], bool] | None = None,
         pause_event: threading.Event | None = None,
+        unattended: bool = False,
     ) -> None:
         self._kwargs = {
             "capture": capture,
@@ -62,6 +63,7 @@ class DeviceWorkflowEngineBuilder:
             "window_top": window_top,
             "stop_check": stop_check,
             "pause_event": pause_event,
+            "unattended": unattended,
         }
 
     def build(self) -> WorkflowEngine:

@@ -468,6 +468,9 @@ def execute(request: RunRequest) -> dict[str, Any]:
             android_device=target.device,
             run_env="android",
             stop_check=lambda: request.stop_event.is_set(),
+            # CLI 是无人值守执行：wf 碰到二级密码这类需要人工介入的弹窗时，
+            # 自行返回并结束，而不是 pause 卡住等一个不会来的人。
+            unattended=True,
         ).build()
         _bind_user(engine, username)
         engine.workflow_config_snapshot = _workflow_config(script_id)

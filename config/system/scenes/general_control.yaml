@@ -1,4 +1,4 @@
-content_version: 2
+content_version: 5
 key: general_control
 name: 控制
 views:
@@ -9,7 +9,10 @@ views:
 - key: blank
   name: 弹窗
 - key: currency
-  name: 货币兑换确认
+  name: 货币兑换
+- key: safe_confirm
+  name: 密码验证
+hide_all_views: true
 regions:
 - key: confirm
   name: 确认
@@ -74,6 +77,25 @@ regions:
   is_text: false
   is_clickable: false
   view: currency
+- key: safe_label
+  name: 密码提示标题
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: safe_confirm
+- key: safe_cancel
+  name: 密码框取消
+  type: func
+  is_text: true
+  is_clickable: true
+  view: safe_confirm
+  to: '@caller'
+- key: safe_ok
+  name: 密码框确认
+  type: func
+  is_text: true
+  is_clickable: true
+  view: safe_confirm
 points:
 - key: material_slot_1
   name: 材料格1

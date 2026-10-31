@@ -56,6 +56,18 @@
         "record_w": 1920,
         "record_h": 1080
       }
+    },
+    {
+      "key": "safe_label",
+      "disabled": true
+    },
+    {
+      "key": "safe_cancel",
+      "disabled": true
+    },
+    {
+      "key": "safe_ok",
+      "disabled": true
     }
   ],
   "points": [

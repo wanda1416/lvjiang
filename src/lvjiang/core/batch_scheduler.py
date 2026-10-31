@@ -1289,6 +1289,7 @@ class BatchScheduler:
             window_top=ctx.window_top,
             stop_check=self._task_stop_check,
             pause_event=ctx.pause_event,
+            unattended=self._unattended_active(),
         ).build()
         # 生命周期与条目脚本必须复用宿主的主线程 UI broker；否则
         # pause/confirm 会退化为无法被 F10 关闭的系统原生阻塞框。

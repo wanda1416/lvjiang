@@ -245,6 +245,29 @@ loop while 1 == 1
     call record_count("recycle_attempts", 1)
     click [training_xinfa].[confirm] after wait @page_refresh
 
+    # 用户设置了二级密码时，回收确认后会弹出「输入密码以继续」密码框
+    # （[general_control] 的 safe_confirm 视图）。
+    # 检测判据用标题亮字「输入密码」（safe_label 区域）；输入框内的
+    # 「请输入二级密码」是暗色占位文字，亮度低不宜作判据。
+    # 有人值守 → 暂停等用户输完密码、点游戏内「确认」关闭弹窗后继续；
+    # 无人值守（批量勾选无人值守 / CLI）→ 点「取消」放弃回收，逐级返回
+    # 并结束任务——回收被取消后书票必然不足，继续跑购买只会空转。
+    # android 坐标已实测；desktop 布局中 safe_* 暂为禁用占位，坐标取证
+    # 补齐后本检测在 desktop 自动生效（补齐前执行到此会报未绑定布局坐标）。
+    scan [general_control].[safe_label] as $pwd_dlg by contains "输入密码"
+    if $pwd_dlg
+        if is_unattended()
+            log warn "检测到二级密码弹窗，无人值守模式自动取消并结束任务"
+            call record_item("xinfa", "心法心得", "password_dialog", "检测到二级密码弹窗，无人值守自动返回", {})
+            click [general_control].[safe_cancel] after wait @step_interval
+            call go_back()
+            call record_finish("processed", "检测到二级密码弹窗，无人值守自动返回；回收与购买未完成")
+            return -1
+        else
+            eval pause("检测到二级密码弹窗：请输入二级密码并点击游戏内「确认」关闭弹窗，然后点击本提示的「确定」继续")
+        end
+    end
+
     click [training_xinfa].$zixuan after wait @step_interval
     click [training_xinfa].[add_all] after wait @step_interval
     click [training_xinfa].[purchase] after wait @page_refresh

@@ -237,18 +237,18 @@ def _env(_engine=None, name: str | None = None) -> str | bool:
 
 
 @builtin_func(
-    "unattended",
+    "is_unattended",
     group="运行环境与后端",
     returns="bool",
 )
-def _unattended(_engine=None) -> bool:
+def _is_unattended(_engine=None) -> bool:
     """判断当前是否无人值守执行（批量勾选无人值守 / CLI headless）。
 
     无人值守时身边没有人：wf 碰到二级密码这类需要人工介入的弹窗，应当
     自行返回并结束任务，而不是 pause 卡住等一个不会来的人；有人值守时
     才用 pause 等用户处理。
 
-        if unattended()
+        if is_unattended()
             log warn "无人值守，跳过需要密码的操作"
             return -1
         else

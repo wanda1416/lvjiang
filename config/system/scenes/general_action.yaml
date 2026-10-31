@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 key: general_action
 name: 动作
 views:
@@ -10,6 +10,7 @@ views:
   name: 表情动作
 - key: kanbao
   name: 报纸阅读
+hide_all_views: true
 regions:
 - key: camera_shot
   name: 拍照

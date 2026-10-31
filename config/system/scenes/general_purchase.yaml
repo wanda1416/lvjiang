@@ -1,6 +1,13 @@
-content_version: 1
+content_version: 2
 key: general_purchase
 name: 购买
+views:
+- key: base
+  name: 通用购买
+- key: supply
+  name: 物资商店
+  same_layer: false
+hide_all_views: true
 regions:
 - key: back
   name: 返回
@@ -104,12 +111,6 @@ regions:
   is_text: false
   is_clickable: true
   view: supply
-views:
-- key: base
-  name: 通用购买
-- key: supply
-  name: 物资商店
-  same_layer: false
 points:
 - key: supply_scroll_high
   name: 列表上端

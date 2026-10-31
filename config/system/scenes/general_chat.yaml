@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 key: general_chat
 name: 对话
 views:
@@ -6,6 +6,7 @@ views:
   name: 人物交互
 - key: dialogue
   name: 人物对话
+hide_all_views: true
 regions:
 - key: chat_area
   name: 对话区域

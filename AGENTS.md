@@ -304,6 +304,10 @@ git push --force-with-lease=refs/heads/dev:<recorded-old-tip> origin dev
    python scripts/add_content_version.py --check
    ```
 
+   所有带 `content_version` 的 YAML/JSON 配置文件（场景、布局、调律规则等），
+   修改内容后必须在同一次改动里把该文件的 `content_version` 递增 1。新增文件
+   不必手写，由 `add_content_version.py` 补初始值 1。
+
 3. 测试必须保护可观察业务契约或高风险架构边界。新增测试前必须能回答“它防止哪个
    真实回归”：说明会再次触发的具体场景、受保护的可观察契约和失败时的用户影响。
    答不出这三点就不要写；不要为静态样式、无意义实现细节或无法稳定控制的时间扩大
@@ -337,8 +341,8 @@ git push --force-with-lease=refs/heads/dev:<recorded-old-tip> origin dev
    “现象 / 原因 / 如何调整”。开发周期内引入又修复的问题不写成用户修复项。
 4. 同步 `pyproject.toml`、`src/lvjiang/_version.py`、Android `versionName`；按发布手册
    判断并递增 `versionCode`，依赖变化时纳入 `uv.lock`。
-5. AI 不得自行提升任何 `content_version`。只有开发者明确安排远端配置下发并已主动
-   提升指定文件时，AI 才能核对和提交这些值。
+5. `content_version` 已按第五节随每次修改自动递增，发布准备中不得再额外批量提升；
+   工作区里已递增的值如实随提交带上，远端下发的范围与时机仍由开发者决定。
 
 “编写预发布文档”只授权生成和更新文档，不授权修改版本号、合并 `master`、打标签或
 创建 GitHub Release。预发布文档必须明确当前正式版本、目标版本仍处于预发布，以及尚未

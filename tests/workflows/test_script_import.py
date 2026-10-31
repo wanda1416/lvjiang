@@ -3,11 +3,17 @@
 只允许 config/local：系统层可被在线下发，允许它带 .py 等于开放远程代码执行。
 """
 
+import threading
 from pathlib import Path
 
 import pytest
 
-from lvjiang.workflows.builtins import list_functions
+from lvjiang.workflows.builtins import (
+    builtin_func,
+    capture_registrations,
+    get_function,
+    list_functions,
+)
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from tests.workflows.conftest import make_engine
 
@@ -241,3 +247,49 @@ def test_script_never_touches_global_registry(wf_root):
     assert first.variables["v"] == 6
     assert second.variables["v"] == 6
     assert global_get("double_it") is None
+
+
+def test_script_capture_is_thread_local():
+    """两个线程同时加载脚本时各捕获各自的函数，不串台。
+
+    界面上「试算」在界面线程执行脚本，后台任务在 WorkflowWorker 线程执行，
+    两边会同时进捕获块。捕获栈若共用一个全局栈，后进者的桶会收下前者的函数，
+    一方的脚本函数凭空消失、另一方多出别人的函数。
+
+    交错是**强制**的：先让 A 进块，等 B 也进块并停在块内，再让 A 注册 ——
+    此时共享栈的栈顶是 B 的桶，A 的函数会落进 B。不用 sleep 或多次重试。
+    """
+    a_inside = threading.Event()
+    b_inside = threading.Event()
+    a_registered = threading.Event()
+    buckets: dict[str, list] = {}
+
+    def load_a() -> None:
+        with capture_registrations() as bucket:
+            a_inside.set()
+            assert b_inside.wait(timeout=5), "B 没能进入捕获块"
+
+            @builtin_func("only_a")
+            def fn() -> str:
+                return "a"
+
+            buckets["a"] = list(bucket)
+            a_registered.set()
+
+    def load_b() -> None:
+        assert a_inside.wait(timeout=5), "A 没能进入捕获块"
+        with capture_registrations() as bucket:
+            b_inside.set()
+            assert a_registered.wait(timeout=5), "A 没能完成注册"
+            buckets["b"] = list(bucket)
+
+    first = threading.Thread(target=load_a)
+    second = threading.Thread(target=load_b)
+    first.start()
+    second.start()
+    first.join(timeout=10)
+    second.join(timeout=10)
+
+    assert not first.is_alive() and not second.is_alive()
+    assert buckets == {"a": ["only_a"], "b": []}
+    assert get_function("only_a") is None

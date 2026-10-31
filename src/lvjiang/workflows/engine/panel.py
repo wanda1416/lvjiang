@@ -5,7 +5,8 @@ panel 没在布局里定义、行列索引不是数值都是脚本 / 布局配�
 网格的终止条件。
 """
 
-from typing import TYPE_CHECKING
+from functools import partial
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 from loguru import logger
@@ -28,6 +29,22 @@ if TYPE_CHECKING:
 
 class _PanelMixin:
     """Panel 对齐与路由：align / panel cell 裁剪与识别 / 坐标换算"""
+
+    def _resolve_with_func(self, func_name: str) -> Callable[[Any], Any] | None:
+        """解析 panel ``with`` 转换函数，补齐与 DSL 一致的首参注入。
+
+        外置脚本函数可以声明 ``_engine`` / ``_wf`` 首参；这里把它当作「吃一个
+        值」的转换器调用，注入规则必须与 ``call_function`` 相同，否则行值会被
+        当作 ``_engine`` 传进去，参数静默错位。
+        """
+        from .. import builtins
+
+        fn = self._script_funcs.get(func_name) or builtins.get_function(func_name)
+        if fn is None:
+            return None
+        if getattr(fn, "_inject", None):
+            return partial(fn, self)
+        return fn
 
     def _exec_align(self, node: "Align"):
         self.align_panel(node.scene, node.panel)
@@ -329,10 +346,8 @@ class _PanelMixin:
             else:
                 base = recognizer.build_rich_base(info)
                 if node.with_func is not None:
-                    from .. import builtins
                     func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
-                    transform = (self._script_funcs.get(func_name)
-                                 or builtins.get_function(func_name))
+                    transform = self._resolve_with_func(func_name)
                     if transform is None:
                         raise ValueError(f"未知内置函数: {func_name}")
                     base = transform(base)
@@ -414,10 +429,8 @@ class _PanelMixin:
         # 解析 with 转换函数
         transform = None
         if rich and with_func is not None:
-            from .. import builtins
             func_name = with_func.value if hasattr(with_func, 'value') else str(with_func)
-            transform = (self._script_funcs.get(func_name)
-                         or builtins.get_function(func_name))
+            transform = self._resolve_with_func(func_name)
             if transform is None:
                 raise ValueError(f"未知内置函数: {func_name}")
         result: dict[str, dict[str, str | dict]] = {}
@@ -539,10 +552,8 @@ class _PanelMixin:
         # 无 by 子句：返回完整 dict
         transform = None
         if node.rich and node.with_func is not None:
-            from .. import builtins
             func_name = node.with_func.value if hasattr(node.with_func, 'value') else str(node.with_func)
-            transform = (self._script_funcs.get(func_name)
-                         or builtins.get_function(func_name))
+            transform = self._resolve_with_func(func_name)
             if transform is None:
                 raise ValueError(f"未知内置函数: {func_name}")
 

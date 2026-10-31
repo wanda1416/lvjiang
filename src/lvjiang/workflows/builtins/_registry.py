@@ -4,7 +4,7 @@
 
 元数据为什么写在装饰器参数里：管理界面（脚本编辑 → 内置函数）与文档都靠它。
 写在函数定义旁边，新增函数时漏不掉；写成外部表格则会漂移——本仓库的实际
-证据是文档里 99 个、注册表里 101 个。
+证据是文档里 101 个、注册表里 102 个。
 
 参数名、顺序、默认值与类型注解**不在这里重复声明**：它们由签名现取，
 ``params`` 只补"这个名字是什么意思"。这样签名改了不会留下对不上的旧文案。
@@ -12,6 +12,7 @@
 
 import inspect
 import sys
+import threading
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -20,7 +21,18 @@ from dataclasses import dataclass, field
 _FUNCTION_REGISTRY: dict[str, Callable] = {}
 
 # 外置脚本加载期间的捕获栈：非空时 @builtin_func 写进栈顶，不进全局表。
-_CAPTURE_STACK: list[dict[str, Callable]] = []
+# 必须按线程隔离：工作流跑在 WorkflowWorker 线程，管理界面的「试算」跑在
+# 界面线程，两边同时加载脚本时共用一个栈会让函数落进别人的桶。
+_CAPTURE_LOCAL = threading.local()
+
+
+def _capture_stack() -> list[dict[str, Callable]]:
+    """当前线程的捕获栈，首次访问时创建"""
+    stack = getattr(_CAPTURE_LOCAL, "stack", None)
+    if stack is None:
+        stack = []
+        _CAPTURE_LOCAL.stack = stack
+    return stack
 
 #: 模块未声明 ``GROUP`` 且装饰器未指定 group 时的兜底分类
 FALLBACK_GROUP = "其他"
@@ -91,8 +103,9 @@ def builtin_func(
             module=getattr(fn, "__module__", "") or "",
             line=_first_line(fn),
         )
-        if _CAPTURE_STACK:
-            _CAPTURE_STACK[-1][name] = fn
+        stack = _capture_stack()
+        if stack:
+            stack[-1][name] = fn
         else:
             _FUNCTION_REGISTRY[name] = fn
         return fn
@@ -104,15 +117,16 @@ def capture_registrations():
     """捕获块内 ``@builtin_func`` 的注册结果，不写入全局注册表。
 
     外置脚本（``config/local/workflows`` 下的 .py）用它把函数装进引擎私有
-    命名空间：并发的多个引擎各捕获各自的，互不覆盖；脚本改完重新执行即生效，
-    引擎结束后进程里也不留残余。
+    命名空间：捕获栈按线程隔离，并发执行的引擎各捕获各自的，互不覆盖；
+    脚本改完重新执行即生效，捕获结果随块退出即丢弃。
     """
     bucket: dict[str, Callable] = {}
-    _CAPTURE_STACK.append(bucket)
+    stack = _capture_stack()
+    stack.append(bucket)
     try:
         yield bucket
     finally:
-        _CAPTURE_STACK.pop()
+        stack.pop()
 
 
 def get_function(name: str) -> Callable | None:

@@ -1,11 +1,13 @@
-content_version: 1
+content_version: 3
 key: shop_bayinqiao
 name: 八音窍
 views:
 - key: purchase
   name: 在售购买页
+  kind: page
 - key: public
   name: 公示页
+  kind: page
 regions:
 - key: price
   name: 当前最低单价
@@ -57,6 +59,7 @@ regions:
   views:
   - purchase
   - public
+  to: /purchase
 - key: tab_public
   name: 公示页签
   type: func
@@ -65,6 +68,7 @@ regions:
   views:
   - purchase
   - public
+  to: /public
 - key: public_price_1
   name: 公示第1行单价
   type: attr

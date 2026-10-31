@@ -1072,7 +1072,10 @@ class WindowOpsMixin:
         input_ctrl = create_input_backend(
             device=device, input_sim=self._user_config.input_sim, agent=agent)
         identity = device.get_stable_identity()
-        target_id = android_target_id(identity.value)
+        # 本机模拟器多开的实例共享稳定身份，需把 transport 地址并入 ID 才能并存；
+        # 真机仍只按身份归并（USB 与无线是一个目标）。
+        target_id = android_target_id(
+            identity.value, str(getattr(device, "serial", "") or ""))
         conflict = self._unconfirmed_identity_conflict(target_id, identity.stable)
         if conflict is not None:
             # 读不到任何稳定标识时，无法判断这条 transport 是不是已连目标的

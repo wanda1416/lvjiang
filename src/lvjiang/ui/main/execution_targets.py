@@ -16,9 +16,36 @@ TargetKind = Literal["windows", "adb"]
 WINDOW_TARGET_ID = "window"
 
 
-def android_target_id(device_identity: str) -> str:
-    """从逻辑设备身份生成不暴露原始设备标识的稳定目标 ID。"""
-    digest = hashlib.sha256(str(device_identity).encode("utf-8")).hexdigest()
+# 本机模拟器（MuMu/雷电/夜神等）的 transport 形如 `127.0.0.1:7555` 或
+# `emulator-5554`。多开实例由同一份镜像克隆而来，`android_id`、`ro.serialno`、
+# `boot_id` 可能完全相同（实测 MuMu 四个实例 android_id 一致，其中三个连
+# boot_id 也一致），只按稳定身份算 ID 会让后连的实例覆盖先连的实例。
+# 这类 transport 的端口恰好是实例的稳定标识，因此允许它参与 ID 计算。
+_LOCAL_EMULATOR_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def is_local_emulator_transport(serial: str) -> bool:
+    """transport 是否指向本机模拟器实例（端口即实例身份）。"""
+    text = str(serial or "").strip()
+    if not text:
+        return False
+    if text.startswith("emulator-"):
+        return True
+    return text.rpartition(":")[0] in _LOCAL_EMULATOR_HOSTS
+
+
+def android_target_id(device_identity: str, serial: str = "") -> str:
+    """从逻辑设备身份生成不暴露原始设备标识的稳定目标 ID。
+
+    默认只按逻辑身份归并：同一台手机的 USB 与无线两条 transport 必须落在
+    同一个目标上，否则两个任务会各自以为独占它。唯一的例外是本机模拟器——
+    多开实例共享同一份镜像，稳定身份可能完全相同，此时把 transport 地址
+    并入身份，否则两个实例会算出同一个 ID 互相顶掉。
+    """
+    identity = str(device_identity)
+    if is_local_emulator_transport(serial):
+        identity = f"{identity}#{serial}"
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
     return f"android:{digest[:24]}"
 
 

@@ -48,6 +48,32 @@ def test_two_unconfirmed_devices_cannot_both_become_executable() -> None:
     assert conflict is first
 
 
+def test_local_emulator_instances_get_distinct_target_ids() -> None:
+    """本机模拟器多开的实例按端口区分，可以同时并存。
+
+    MuMu 多开由同一份镜像克隆而来，`android_id` 完全相同（实测四个实例取值
+    一致），只按稳定身份算 ID 会让后连的实例覆盖先连的实例。
+    """
+    from lvjiang.ui.main.execution_targets import android_target_id
+
+    identity = "a5924625343b460"
+    assert android_target_id(identity, "127.0.0.1:7555") != \
+        android_target_id(identity, "127.0.0.1:5555")
+    assert android_target_id(identity, "emulator-5554") != \
+        android_target_id(identity, "emulator-5556")
+
+
+def test_physical_device_transports_still_merge() -> None:
+    """真机的 USB 与无线通道仍归并为一个目标，地址不参与身份。"""
+    from lvjiang.ui.main.execution_targets import android_target_id
+
+    identity = "physical-android-id"
+    assert android_target_id(identity, "192.168.1.20:5555") == \
+        android_target_id(identity, "R58M123ABC")
+    assert android_target_id(identity, "192.168.1.20:5555") == \
+        android_target_id(identity)
+
+
 def test_stable_identities_never_block_each_other() -> None:
     """有稳定标识的设备照常多连；拦的只是无法区分的那一类。"""
     from lvjiang.ui.main.execution_targets import ExecutionTargetRegistry

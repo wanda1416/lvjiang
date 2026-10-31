@@ -36,6 +36,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -584,8 +585,10 @@ class FloatService : Service() {
         main.addView(taskRow)
 
         val log = TextView(this).apply {
-            setTextColor(color(com.google.android.material.R.attr.colorOnSurfaceVariant))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            // 悬浮窗日志此前用次要灰 + 10sp，叠在游戏画面上几乎不可读；
+            // 改为主文字色并与面板其他正文统一 12sp。
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setText("", TextView.BufferType.EDITABLE)
             setPadding(0, dp(3), 0, dp(4))
         }
@@ -918,6 +921,8 @@ class FloatService : Service() {
         showingUsers = false
         mainArea?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
+        // 选择视图只保留「返回」：收起先退回主面板再操作，避免同屏三个底部按钮。
+        closeButton?.visibility = View.GONE
         renderTaskSelection()
         loadTasks()
     }
@@ -927,6 +932,7 @@ class FloatService : Service() {
         showingUsers = true
         mainArea?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
+        closeButton?.visibility = View.GONE
         selectionArea?.removeAllViews()
         selectionArea?.addView(TextView(this).apply { text = "读取用户…"; setTextColor(color(com.google.android.material.R.attr.colorOnSurface)) })
         selectionArea?.addView(smallButton("返回") { closeTaskSelection() })
@@ -975,7 +981,8 @@ class FloatService : Service() {
         area.addView(TextView(this).apply { text = "选择任务"; setTextColor(color(com.google.android.material.R.attr.colorOnSurface)) })
         val choices = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         for ((id, name) in tasks) {
-            choices.addView(smallButton(if (id == selectedTaskId) "✓ $name" else name) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(smallButton(if (id == selectedTaskId) "✓ $name" else name) {
                 if (lastState in activeStates) return@smallButton
                 selectedTaskId = id
                 selectedTaskName = name
@@ -984,23 +991,46 @@ class FloatService : Service() {
                 taskLine?.text = name
                 closeTaskSelection()
                 rebuildActions(lastState)
-            })
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(4) })
+            row.addView(taskMoreButton(id))
+            choices.addView(row)
         }
         area.addView(ScrollView(this).apply { addView(choices) }, LinearLayout.LayoutParams(-1, 0, 1f))
-        area.addView(smallButton("设置任务参数") {
-            startActivity(Intent(this, TaskSettingsActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                putExtra("task_id", selectedTaskId)
-            })
-            closePanel()
-        })
         area.addView(smallButton("返回") { closeTaskSelection() })
     }
+
+    /**
+     * 任务行尾的「更多」入口：点 ⋮ 弹菜单，操作针对该行任务，不要求先选中。
+     * 比齿轮图标轻，也为后续挂更多行内操作留口。
+     */
+    private fun taskMoreButton(taskId: String): Button =
+        smallButton("⋮") {}.apply {
+            minWidth = dp(36)
+            minimumWidth = dp(36)
+            setPadding(dp(10), 0, dp(10), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(4); marginStart = dp(4) }
+            setOnClickListener { anchor ->
+                val menu = PopupMenu(this@FloatService, anchor)
+                menu.menu.add("设置任务参数")
+                menu.setOnMenuItemClickListener {
+                    startActivity(Intent(this@FloatService, TaskSettingsActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        putExtra("task_id", taskId)
+                    })
+                    closePanel()
+                    true
+                }
+                menu.show()
+            }
+        }
 
     private fun closeTaskSelection() {
         showingUsers = false
         selectionArea?.visibility = View.GONE
         mainArea?.visibility = View.VISIBLE
+        closeButton?.visibility = View.VISIBLE
     }
 
     private fun launchTask(taskId: String, taskName: String) {

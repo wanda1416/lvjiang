@@ -123,7 +123,15 @@ def _parse_cached_file(text: str) -> Program:
 
 
 def parse_text(text: str, source: str = "<text>") -> Program:
-    """从字符串解析 DSL 文本，返回 Program AST 节点（主要用于测试）"""
+    """从字符串解析 DSL 文本，返回 Program AST 节点（主要用于测试）
+
+    入口先把 CRLF/CR 归一为 LF：引擎读文件时 ``read_text()`` 已做通用换行，
+    但编辑器 LSP 直接把文档原文送进来，Windows 上带 CR 的文本会让括号内
+    「换行视为空格」这一步只吃掉 \\n、把 \\r 漏给词法层，出现「本地能跑、
+    插件报语法错」的假故障。
+    """
+    if "\r" in text:
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
     parser = _get_parser()
     # 预处理：换行续行。origin[i] 是预处理文本第 i 个字符在原文中的下标。
     original = text

@@ -651,3 +651,18 @@ def test_replay_input_trace():
     node = program.body[0]
     assert isinstance(node, ReplayInputTrace)
     assert node.path == "lvtrace/abc.lvtrace"
+
+
+def test_crlf_document_parses_like_lf():
+    """CRLF 文档必须与 LF 等价：编辑器 LSP 送的是文档原文，不经通用换行。
+
+    括号内的换行会被预处理成空格，但那段只处理 \n；漏掉的 \r 会落到词法层，
+    表现为「引擎读文件能跑、插件报语法错」。
+    """
+    lf = 'call f([\n    "a",\n    "b"\n])\n'
+    crlf = lf.replace("\n", "\r\n")
+
+    from_lf = parse_text(lf)
+    from_crlf = parse_text(crlf)
+    assert len(from_crlf.body) == len(from_lf.body)
+    assert type(from_crlf.body[0]) is type(from_lf.body[0])

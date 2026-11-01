@@ -114,6 +114,36 @@ def _profile_get(_engine, key: str, username: str | None = None, *args) -> float
 
 
 @builtin_func(
+    "profile_locked",
+    group="玩家档案",
+    params={
+        "key": "档案键名",
+        "username": "目标用户，省略为当前用户",
+        "*args": "其余参数忽略",
+    },
+    returns="bool",
+    summary="该用户是否把这个 key 标记为失效（锁定后引擎忽略其值）",
+)
+def _profile_locked(_engine, key: str, username: str | None = None, *args) -> bool:
+    """查询 profile key 是否被该用户锁定
+
+    锁定表示这个 key 对该用户物理失效：profile_get 返回 null、所有写入被
+    拒绝、周期重置不再发生，值会永久停在锁定时的样子。工作流应先用它判断，
+    再决定要不要为这个 key 购买/记账，而不是拿 profile_get 的 null 去比较。
+
+    .wf 用法:
+        if not profile_locked("baiye_raoliang_shengwang_of_month")
+            call buy_baiye_goods(...)
+        end
+    """
+    if not key:
+        return False
+    from ...core.profile.service import profile_is_locked
+    target = str(username) if username else _get_username(_engine)
+    return profile_is_locked(target, key)
+
+
+@builtin_func(
     "profile_set",
     params={
         "key": "档案键名",

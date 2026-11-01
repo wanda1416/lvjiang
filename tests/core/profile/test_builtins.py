@@ -343,3 +343,21 @@ def test_profile_declare_rolls_back_memory_on_save_failure(
     assert _profile_model(engine, "rollback_key") == ""
     # 其余既有定义不受影响
     assert _profile_model(engine, "weekly_progress") == "quota"
+
+def test_profile_locked_reports_lock_state_and_metadata(profile_func_env):
+    """profile_locked 供 wf 判断锁定；锁定后 profile_get 返回 null。"""
+    from lvjiang.core.profile.repository import db_set_locked, db_upsert
+    from lvjiang.workflows.builtins import describe_function
+    from lvjiang.workflows.builtins.profile import _profile_get, _profile_locked
+
+    db_upsert(profile_func_env.username, "quota", "weekly_progress", 1)
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    assert _profile_locked(engine, "weekly_progress") is False
+    db_set_locked(profile_func_env.username, "quota", "weekly_progress")
+    assert _profile_locked(engine, "weekly_progress") is True
+    assert _profile_get(engine, "weekly_progress") is None
+
+    meta = describe_function("profile_locked")
+    assert meta is not None and meta.group
+    assert "key" in meta.params and "username" in meta.params

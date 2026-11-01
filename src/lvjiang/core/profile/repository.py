@@ -139,6 +139,23 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    """entries 新增 locked 列：该用户把这个 key 标记为失效（幂等）。
+
+    锁定后引擎完全忽略该值：读取返回空、写入被拒绝、周期重置不再发生，
+    所以值会永久停在锁定时的样子。锁是"用户 × key"的状态，不是定义层
+    属性，因此放在 entries 行上而不是 profile.yaml。
+    """
+    cols = [
+        row[1]
+        for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
+    ]
+    if "locked" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_entries ADD COLUMN locked INTEGER NOT NULL DEFAULT 0"
+        )
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
@@ -148,6 +165,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (5, "history add old/new_value_text columns", _migrate_v5),
     (6, "history add type/key index", _migrate_v6),
     (7, "structured history and key rename audit", migrate_structured_history),
+    (8, "entries add locked column", _migrate_v8),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -225,8 +243,10 @@ class ProfileDB:
             ).fetchone()
             if has_version:
                 version = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
-                backup_path = self._db_path.with_suffix(".before-v7.db")
-                if version and version < 7 and not backup_path.exists():
+                # 只在确实有未应用的迁移时备份，文件名跟当前版本走，
+                # 避免这次加列之后又忘了改版本号导致升级不备份。
+                backup_path = self._db_path.with_suffix(f".before-v{CURRENT_VERSION}.db")
+                if version and version < CURRENT_VERSION and not backup_path.exists():
                     with sqlite3.connect(backup_path) as backup:
                         conn.backup(backup)
             # 在读取版本前取得写锁。并发初始化者会在 busy_timeout 范围内
@@ -260,12 +280,16 @@ class ProfileDB:
     # ─── 读取 ───
 
     def get_entry(self, username: str, type_: str, key: str) -> dict:
-        """读取单条 entry，不存在返回空 dict"""
+        """读取单条 entry，不存在返回空 dict
+
+        锁定条目返回的 dict 带 ``locked: True``；未锁定条目不出现该键，
+        调用方据此区分"有没有锁"，不必再查一次。
+        """
         conn = self._borrow_connection()
         try:
             row = conn.execute(
-                "SELECT value, value_text, updated_at, updated_time FROM profile_entries "
-                "WHERE username=? AND type=? AND key=?",
+                "SELECT value, value_text, updated_at, updated_time, locked "
+                "FROM profile_entries WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
         finally:
@@ -273,34 +297,111 @@ class ProfileDB:
 
         if row is None:
             return {}
-        return {"value": row[0], "value_text": row[1], "updated_at": row[2], "updated_time": row[3]}
+        entry = {"value": row[0], "value_text": row[1],
+                 "updated_at": row[2], "updated_time": row[3]}
+        if row[4]:
+            entry["locked"] = True
+        return entry
 
     def get_all(self, username: str) -> dict[str, dict[str, dict]]:
         """读取用户全部 profile
 
-        Returns: {type: {key: {value, value_text, updated_at}}}
-        格式与早期 user.json 的 profile 节点兼容。
+        Returns: {type: {key: {value, value_text, updated_at[, locked]}}}
+        格式与早期 user.json 的 profile 节点兼容；只有锁定条目带 ``locked``。
         """
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT type, key, value, value_text, updated_at, updated_time FROM profile_entries "
-                "WHERE username=?",
+                "SELECT type, key, value, value_text, updated_at, updated_time, locked "
+                "FROM profile_entries WHERE username=?",
                 (username,),
             ).fetchall()
         finally:
             self._release_connection(conn)
 
         result: dict[str, dict[str, dict]] = {}
-        for type_, key, value, value_text, updated_at, updated_time in rows:
+        for type_, key, value, value_text, updated_at, updated_time, locked in rows:
             model_data = result.setdefault(type_, {})
-            model_data[key] = {
+            entry = {
                 "value": value,
                 "value_text": value_text,
                 "updated_at": updated_at,
                 "updated_time": updated_time,
             }
+            if locked:
+                entry["locked"] = True
+            model_data[key] = entry
         return result
+
+    # ─── 锁定 ───
+
+    def is_locked(self, username: str, type_: str, key: str) -> bool:
+        """该用户的这个 key 是否已锁定"""
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                "SELECT locked FROM profile_entries "
+                "WHERE username=? AND type=? AND key=?",
+                (username, type_, key),
+            ).fetchone()
+        finally:
+            self._release_connection(conn)
+        return bool(row and row[0])
+
+    def set_locked(self, username: str, type_: str, key: str) -> bool:
+        """锁定该用户的这个 key；返回是否发生了变化。
+
+        从未写过的 key 也要能锁：插入一条占位行（value/value_text/updated_at
+        全为默认空值），锁定期间这些值不会被任何路径读取或展示。
+        """
+        conn = self._borrow_connection()
+        try:
+            self._begin(conn)
+            cursor = conn.execute(
+                "UPDATE profile_entries SET locked=1 "
+                "WHERE username=? AND type=? AND key=? AND locked=0",
+                (username, type_, key),
+            )
+            changed = cursor.rowcount == 1
+            if not changed:
+                exists = conn.execute(
+                    "SELECT locked FROM profile_entries "
+                    "WHERE username=? AND type=? AND key=?",
+                    (username, type_, key),
+                ).fetchone()
+                if exists is None:
+                    conn.execute(
+                        "INSERT INTO profile_entries "
+                        "(username, type, key, value, value_text, updated_at, updated_time, locked) "
+                        "VALUES (?, ?, ?, 0, '', '', '', 1)",
+                        (username, type_, key),
+                    )
+                    changed = True
+            self._commit(conn)
+            return changed
+        except Exception:
+            self._rollback(conn)
+            raise
+        finally:
+            self._release_connection(conn)
+
+    def unlock(self, username: str, type_: str, key: str) -> bool:
+        """解除锁定；返回是否发生了变化。值保持锁定时的样子。"""
+        conn = self._borrow_connection()
+        try:
+            self._begin(conn)
+            cursor = conn.execute(
+                "UPDATE profile_entries SET locked=0 "
+                "WHERE username=? AND type=? AND key=? AND locked=1",
+                (username, type_, key),
+            )
+            self._commit(conn)
+            return cursor.rowcount == 1
+        except Exception:
+            self._rollback(conn)
+            raise
+        finally:
+            self._release_connection(conn)
 
     # ─── 写入 ───
 
@@ -317,11 +418,12 @@ class ProfileDB:
         value_text: str = "",
         sync_from: str | None = None,
     ) -> None:
-        """INSERT OR REPLACE 单条 entry
+        """写入单条 entry（ON CONFLICT 更新，不用 INSERT OR REPLACE）
 
         change_type 非 None 时记录 history（内部对比 old/new 值，无变化跳过）。
         source: 变更来源描述，随 history 一并记录。
         value_text: note 模型存储文本，其他模型传默认空串。
+        锁定条目直接拒绝写入（不写值、不写 history），并记 error 暴露调用方。
         锁冲突抛 sqlite3.OperationalError。
         """
         write_ts = datetime.now().isoformat(timespec="seconds")
@@ -330,19 +432,29 @@ class ProfileDB:
         try:
             self._begin(conn)
 
-            # 读取旧值（用于 history 对比）
+            # 读取旧值（用于 history 对比与锁定判断）
             old_row = conn.execute(
-                "SELECT value, value_text FROM profile_entries WHERE username=? AND type=? AND key=?",
+                "SELECT value, value_text, locked FROM profile_entries "
+                "WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
             old_value = old_row[0] if old_row else None
             old_value_text = old_row[1] if old_row and len(old_row) > 1 else ""
+            if old_row and len(old_row) > 2 and old_row[2]:
+                self._rollback(conn)
+                logger.error(
+                    f"profile 写入被拒绝：{username}.{type_}.{key} 已锁定"
+                    f"（来源 {source or '未标注'}）")
+                return
 
-            # upsert entry
+            # upsert entry：显式列更新，锁定列不在 SET 里，不会被清掉
             conn.execute(
-                "INSERT OR REPLACE INTO profile_entries "
+                "INSERT INTO profile_entries "
                 "(username, type, key, value, value_text, updated_at, updated_time) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(username, type, key) DO UPDATE SET "
+                "value=excluded.value, value_text=excluded.value_text, "
+                "updated_at=excluded.updated_at, updated_time=excluded.updated_time",
                 (username, type_, key, float(value), value_text, ts, write_ts),
             )
 
@@ -395,17 +507,26 @@ class ProfileDB:
                 ts = updated_at or write_ts
 
                 old_row = conn.execute(
-                    "SELECT value, value_text FROM profile_entries "
+                    "SELECT value, value_text, locked FROM profile_entries "
                     "WHERE username=? AND type=? AND key=?",
                     (username, type_, key),
                 ).fetchone()
                 old_value = old_row[0] if old_row else None
                 old_value_text = old_row[1] if old_row and len(old_row) > 1 else ""
+                if old_row and len(old_row) > 2 and old_row[2]:
+                    # 锁定条目：整批里逐条跳过，不写值也不写 history
+                    logger.error(
+                        f"profile 写入被拒绝：{username}.{type_}.{key} 已锁定"
+                        f"（来源 {source or '未标注'}）")
+                    continue
 
                 conn.execute(
-                    "INSERT OR REPLACE INTO profile_entries "
+                    "INSERT INTO profile_entries "
                     "(username, type, key, value, value_text, updated_at, updated_time) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(username, type, key) DO UPDATE SET "
+                    "value=excluded.value, value_text=excluded.value_text, "
+                    "updated_at=excluded.updated_at, updated_time=excluded.updated_time",
                     (username, type_, key, float(value), value_text, ts, write_ts),
                 )
 
@@ -469,7 +590,7 @@ class ProfileDB:
                     "UPDATE profile_entries "
                     "SET value=?, updated_at=?, updated_time=? "
                     "WHERE username=? AND type=? AND key=? "
-                    "AND value=? AND updated_at=?",
+                    "AND value=? AND updated_at=? AND locked=0",
                     (
                         value, ts, write_ts, username, type_, key,
                         old_value, expected_updated_at,
@@ -730,11 +851,17 @@ class ProfileDB:
                 return False
 
             current = conn.execute(
-                "SELECT value, value_text FROM profile_entries "
+                "SELECT value, value_text, locked FROM profile_entries "
                 "WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
             current_text = current[1] or "" if current is not None else ""
+            if current is not None and len(current) > 2 and current[2]:
+                # 锁定 key 不允许回滚历史：否则等于绕过锁把值写回去
+                self._rollback(conn)
+                logger.error(
+                    f"profile 撤销被拒绝：{username}.{type_}.{key} 已锁定")
+                return False
             if (
                 current is None
                 or float(current[0]) != float(new_value)
@@ -868,6 +995,18 @@ def db_read_entry(username: str, type_: str, key: str) -> dict:
 
 def db_read_all(username: str) -> dict[str, dict[str, dict]]:
     return get_profile_db().get_all(username)
+
+
+def db_is_locked(username: str, type_: str, key: str) -> bool:
+    return get_profile_db().is_locked(username, type_, key)
+
+
+def db_set_locked(username: str, type_: str, key: str) -> bool:
+    return get_profile_db().set_locked(username, type_, key)
+
+
+def db_unlock(username: str, type_: str, key: str) -> bool:
+    return get_profile_db().unlock(username, type_, key)
 
 
 def db_upsert(

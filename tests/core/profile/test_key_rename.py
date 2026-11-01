@@ -41,7 +41,8 @@ def test_v7_preserves_history_and_separates_reset_sync_and_unknown(tmp_path):
     with db._connect() as conn:
         assert conn.execute("SELECT detail FROM profile_history_legacy WHERE history_id=5").fetchone()[0] == "unrecognized"
         assert "detail" not in {row[1] for row in conn.execute("PRAGMA table_info(profile_history)")}
-    assert path.with_suffix(".before-v7.db").exists()
+    # 备份名跟当前 schema 版本走：升级到最新版之前留一份可回退副本
+    assert path.with_suffix(f".before-v{repository.CURRENT_VERSION}.db").exists()
     assert ProfileDB(path).get_history("tester") == db.get_history("tester")
 
 

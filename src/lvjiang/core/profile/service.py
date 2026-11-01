@@ -39,6 +39,7 @@ from .regen import (
 from .repository import (
     db_get_history,
     db_get_history_record,
+    db_is_locked,
     db_read_all,
     db_read_entry,
     db_undo_history,
@@ -242,6 +243,8 @@ def profile_read(username: str, key: str) -> float | str | None:
     """读取 profile 单个 key 的当前值（regen 自动实时计算，note 返回文本）
 
     key 未在 profile.yaml 中定义或无数据时返回 None。
+    锁定 key 视为物理失效也返回 None：引擎完全忽略该值，调用方要区分
+    "有没有锁"请用 ``profile_is_locked``。
     与 UI 读取路径共用 _read_current_value，保证行为一致。
     """
     config = get_profile_config()
@@ -251,8 +254,19 @@ def profile_read(username: str, key: str) -> float | str | None:
     entry = db_read_entry(username, model_type, key)
     if not entry:
         return None
+    if entry.get("locked"):
+        return None
     kd = config.get_key(key)
     return _read_current_value(username, model_type, key, kd)
+
+
+def profile_is_locked(username: str, key: str) -> bool:
+    """该用户的这个 key 是否已锁定（DSL 的 ``profile_locked`` 走这里）"""
+    config = get_profile_config()
+    model_type = config.get_model_type(key)
+    if model_type is None:
+        return False
+    return db_is_locked(username, model_type, key)
 
 
 def profile_read_all(username: str) -> dict:
@@ -420,6 +434,18 @@ def profile_action(
         logger.warning(f"profile_action: key '{key}' 未在 profile.yaml 中定义")
         return 0
     kd = config.get_key(key, model_type=model_type)
+
+    # ── 锁定短路：锁定 key 物理失效，任何写入一律拒绝 ──
+    # 记 error 而不是 warning：走到这里说明调用方没先查 profile_locked，
+    # 属于漏判，需要在日志里暴露出来（正常流程应当先判锁再决定是否写）。
+    current_entry = db_read_entry(username, model_type, key)
+    if current_entry.get("locked"):
+        logger.error(
+            f"profile 写入被拒绝：{username}.{model_type}.{key} 已锁定"
+            f"（来源 {source}）")
+        if model_type == MODEL_NOTE:
+            return current_entry.get("value_text", "") or ""
+        return current_entry.get("value", 0) or 0
 
     # ── note 短路：文本直接写入，不走数值管线 ──
     if model_type == MODEL_NOTE:

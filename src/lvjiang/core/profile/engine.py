@@ -310,6 +310,9 @@ class ProfileProcessor:
         quota_keys = config.get_keys_by_model("quota")
         for kd in quota_keys:
             entry = profile_data.get("quota", {}).get(kd.key, {})
+            if entry.get("locked"):
+                # 锁定 key 物理失效：既不首次建值，也不做周期重置
+                continue
             if not entry:
                 # 首次初始化：entry 不存在，直接 upsert 创建
                 db_upsert(user_name, "quota", kd.key, 0,
@@ -344,6 +347,9 @@ class ProfileProcessor:
             if not isinstance(kd, RegenKeyDef):
                 continue
             entry = profile_data.get("regen", {}).get(kd.key, {})
+            if entry.get("locked"):
+                # 锁定 key 既不自动恢复，也不产生阈值告警
+                continue
             if not entry:
                 # 首次：以 0 值、空时间戳构造虚拟 entry，走正常计算路径
                 entry = {"value": 0, "updated_at": ""}

@@ -233,7 +233,7 @@ class TestSchemaMigration:
             )
         ]
 
-        assert CURRENT_VERSION == 7
+        assert CURRENT_VERSION == 8
         assert primary_key == ["username", "type", "key"]
         assert "app_id" not in entry_columns
         assert "app_id" not in history_columns

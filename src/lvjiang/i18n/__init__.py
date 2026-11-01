@@ -7,18 +7,16 @@ tr(text) 以中文原文为 key 查找翻译，找不到则返回原文。
 """
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
+from loguru import logger
 
 if TYPE_CHECKING:
     from PyQt6.QtCore import QTranslator
 
 from ..core.paths import get_config_i18n_dir
-
-logger = logging.getLogger(__name__)
 
 # ── 全局状态 ──
 _translations: dict[str, str] = {}   # 扁平化翻译表：中文原文 → 译文
@@ -47,7 +45,7 @@ def init_i18n(language: str | None = None) -> str:
     _install_qt_translation(language)
 
     if language != "zh_CN":
-        logger.info("[i18n] 已加载语言: %s，共 %d 条翻译", language, len(_translations))
+        logger.info("[i18n] 已加载语言: {}，共 {} 条翻译", language, len(_translations))
     return language
 
 
@@ -91,7 +89,7 @@ def load_app_i18n(app_name: str) -> None:
         with open(yaml_file, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
     except Exception:
-        logger.exception("[i18n] 解析插件翻译文件失败: %s", yaml_file)
+        logger.exception("[i18n] 解析插件翻译文件失败: {}", yaml_file)
         return
 
     zh_data: dict = {}
@@ -100,14 +98,14 @@ def load_app_i18n(app_name: str) -> None:
             with open(zh_file, "r", encoding="utf-8") as f:
                 zh_data = yaml.safe_load(f) or {}
         except Exception:
-            logger.warning("[i18n] 解析插件中文基准文件失败: %s", zh_file)
+            logger.warning("[i18n] 解析插件中文基准文件失败: {}", zh_file)
 
     before = len(_translations)
     _build_translation_map(zh_data, data, _translations)
     added = len(_translations) - before
     _loaded_app_i18n.add(app_name)
     if added:
-        logger.info("[i18n] 已加载插件 %s 翻译: %d 条", app_name, added)
+        logger.info("[i18n] 已加载插件 {} 翻译: {} 条", app_name, added)
 
 
 def set_language(language: str) -> None:
@@ -142,7 +140,7 @@ def available_languages() -> list[dict[str, str]]:
             display_name = data.get("meta", {}).get("display_name", code)
             languages.append({"code": code, "name": display_name})
         except Exception:
-            logger.warning("[i18n] 加载语言文件失败: %s", yaml_file)
+            logger.warning("[i18n] 加载语言文件失败: {}", yaml_file)
 
     return languages or [{"code": "zh_CN", "name": "简体中文"}]
 
@@ -187,7 +185,7 @@ def _install_qt_translation(language: str) -> bool:
             app.installTranslator(translator)
             _qt_translator = translator
             return True
-    logger.warning("[i18n] Qt 标准控件翻译不存在: %s", language)
+    logger.warning("[i18n] Qt 标准控件翻译不存在: {}", language)
     return False
 
 def _load_translation_file(language: str) -> dict[str, str]:
@@ -201,14 +199,14 @@ def _load_translation_file(language: str) -> dict[str, str]:
         return {}
     yaml_file = get_config_i18n_dir() / f"{language}.yaml"
     if not yaml_file.exists():
-        logger.warning("[i18n] 翻译文件不存在: %s", yaml_file)
+        logger.warning("[i18n] 翻译文件不存在: {}", yaml_file)
         return {}
 
     try:
         with open(yaml_file, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
     except Exception:
-        logger.exception("[i18n] 解析翻译文件失败: %s", yaml_file)
+        logger.exception("[i18n] 解析翻译文件失败: {}", yaml_file)
         return {}
 
     # 加载中文基准文件，用于建立 原文 → 译文 映射

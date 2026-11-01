@@ -10,12 +10,10 @@
 """
 from __future__ import annotations
 
-import logging
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 @runtime_checkable
@@ -46,9 +44,9 @@ def register_recognizer(cls: type) -> type:
     if not name:
         raise ValueError(f"识别器类 {cls} 缺少 name 属性")
     if name in _RECOGNIZERS:
-        logger.warning("识别器 %s 重复注册，旧实现将被覆盖", name)
+        logger.warning("识别器 {} 重复注册，旧实现将被覆盖", name)
     _RECOGNIZERS[name] = cls
-    logger.info("[recognizer] 注册: %s -> %s", name, cls.__name__)
+    logger.info("[recognizer] 注册: {} -> {}", name, cls.__name__)
     return cls
 
 

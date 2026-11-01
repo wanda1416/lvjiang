@@ -87,7 +87,7 @@ def ensure_shizuku_running(
         )
     # Shizuku 13.x 服务端即原生 libshizuku.so，直接后台执行（自行 daemonize）
     _launch_background(device, lib)
-    logger.info("[Shizuku] 已启动服务: %s", lib)
+    logger.info("[Shizuku] 已启动服务: {}", lib)
 
     deadline = time.monotonic() + max(0.1, float(timeout))
     while time.monotonic() < deadline:

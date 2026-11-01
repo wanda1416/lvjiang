@@ -14,11 +14,10 @@ None；而回调原型 ``_HOOKPROC`` 要求返回 LPARAM（整数），ctypes �
 """
 from __future__ import annotations
 
-import logging
 import sys
 import threading
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 _installed = False
 # 持有 ctypes 回调对象的强引用，防止被 GC 后钩子踩空（access violation）
@@ -33,7 +32,7 @@ def install() -> None:
     try:
         from pynput._util.win32 import SystemHook
     except Exception:  # pynput 未安装或导入失败，不影响主程序
-        logger.debug("[pynput_patch] pynput 不可用，跳过补丁", exc_info=True)
+        logger.opt(exception=True).debug("[pynput_patch] pynput 不可用，跳过补丁")
         return
 
     @SystemHook._HOOKPROC

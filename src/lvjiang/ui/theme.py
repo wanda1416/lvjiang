@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from loguru import logger
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication
@@ -326,7 +327,6 @@ QToolButton#themeToggleButton:hover {{ background-color: {t.surface_hover}; }}
 
 def _extension_stylesheet(tokens: ThemeTokens) -> str:
     """渲染已注册 app 的 QSS；单个扩展失败不影响基础主题。"""
-    import logging
 
     from ..apps import get_registry
 
@@ -337,7 +337,7 @@ def _extension_stylesheet(tokens: ThemeTokens) -> str:
             if chunk:
                 chunks.append(str(chunk))
         except Exception:  # noqa: BLE001
-            logging.getLogger(__name__).exception("app 主题扩展渲染失败")
+            logger.exception("app 主题扩展渲染失败")
     return "\n".join(chunks)
 
 

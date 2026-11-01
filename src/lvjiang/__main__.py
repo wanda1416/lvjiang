@@ -20,6 +20,8 @@ import logging
 import sys
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
 from lvjiang.constants import PROJECT_ROOT
 
 if TYPE_CHECKING:
@@ -51,11 +53,10 @@ def _configure_dpi() -> None:
 
 
 class _InterceptHandler(logging.Handler):
-    """把标准库 logging 记录转发给 loguru。
+    """把残余的标准库 logging 记录转发给 loguru。
 
-    插件加载器（``lvjiang.apps``）与 ``__main__`` 用的是标准库 logging：不转发
-    的话，「加载插件 / 注册插件 / 忽略非法插件目录名」这类关键状态只进控制台、
-    不落 ``logs/``，插件名册与加载顺序事后无法复盘。
+    源码内的模块已统一直连 loguru；这条转发为仍在标准 logging 上发日志的
+    第三方库兜底，保证它们同样落到 ``logs/``，事后可复盘。
     """
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -105,8 +106,7 @@ def _configure_logging(console_level: str = "DEBUG") -> None:
         level="DEBUG",
         enqueue=True,  # 异步写入，防止进程崩溃时缓冲丢失
     )
-    # 插件加载器与 __main__ 等模块仍用标准库 logging；统一转发给 loguru，
-    # 使「加载插件 / 注册插件」等关键状态同样落到 logs/ 文件里。
+    # 第三方库仍可能走标准 logging；转发给 loguru 使其同样落 logs/ 文件。
     logging.basicConfig(
         handlers=[_InterceptHandler()],
         level=logging.INFO,
@@ -182,8 +182,6 @@ def _bootstrap(
     from .i18n import init_i18n, load_app_i18n
     init_i18n()
 
-    logger = logging.getLogger("lvjiang.__main__")
-
     # 崩溃防护：必须在所有 C 扩展（mss 等）加载之前安装
     from lvjiang.core.crash_handler import install as install_crash_handler
     install_crash_handler()
@@ -217,7 +215,7 @@ def _bootstrap(
 
     hooks_list = []
     for spec in app_specs:
-        logger.info("加载插件: %s", spec)
+        logger.info("加载插件: {}", spec)
         load_app_i18n(app_name(spec))
         hooks = load_app(spec)
         register_hooks(hooks)

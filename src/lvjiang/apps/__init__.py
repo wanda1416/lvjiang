@@ -21,16 +21,15 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import logging
 import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from ..constants import PROJECT_ROOT
 from .base import AppHooks
-
-logger = logging.getLogger(__name__)
 
 # 内置插件根：本包目录下的子目录。
 _BUILTIN_ROOT = Path(__file__).parent
@@ -71,7 +70,7 @@ def _scan_root(root: Path) -> tuple[str, ...]:
         if not entry.is_dir() or not (entry / "__init__.py").is_file():
             continue
         if not _is_valid_app_name(entry.name):
-            logger.warning("[plugin] 忽略非法插件目录名: %s", entry)
+            logger.warning("[plugin] 忽略非法插件目录名: {}", entry)
             continue
         names.append(entry.name)
     return tuple(names)
@@ -151,10 +150,10 @@ def load_app(spec: str) -> AppHooks:
     except ModuleNotFoundError as exc:
         if exc.name == module_path:
             raise KeyError(f"插件 {name!r} 未安装") from exc
-        logger.exception("加载插件 %s 失败", module_path)
+        logger.exception("加载插件 {} 失败", module_path)
         raise RuntimeError(f"加载插件 {name!r} 失败: {exc}") from exc
     except Exception as exc:  # noqa: BLE001
-        logger.exception("加载插件 %s 失败", module_path)
+        logger.exception("加载插件 {} 失败", module_path)
         raise RuntimeError(f"加载插件 {name!r} 失败: {exc}") from exc
 
     hooks = getattr(module, "hooks", None)
@@ -217,13 +216,13 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     register_config_policies(hooks)
 
-    logger.info("[plugin] 注册插件: %s", hooks.name or "<unnamed>")
+    logger.info("[plugin] 注册插件: {}", hooks.name or "<unnamed>")
 
     for callback in hooks.startup_callbacks:
         try:
             callback()
         except Exception:  # noqa: BLE001
-            logger.exception("[plugin] 启动初始化失败: %s", hooks.id or hooks.name)
+            logger.exception("[plugin] 启动初始化失败: {}", hooks.id or hooks.name)
 
     if hooks.id:
         app_ids = registry.setdefault("app_ids", [])
@@ -232,19 +231,19 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     if hooks.window_title:
         registry["window_title"] = hooks.window_title
-        logger.info("[plugin]   window_title = %s", hooks.window_title)
+        logger.info("[plugin]   window_title = {}", hooks.window_title)
 
     if hooks.left_tab_builders:
         registry.setdefault("left_tab_builders", []).extend(hooks.left_tab_builders)
-        logger.info("[plugin]   left tabs: %s", [label for label, _ in hooks.left_tab_builders])
+        logger.info("[plugin]   left tabs: {}", [label for label, _ in hooks.left_tab_builders])
 
     if hooks.right_tab_builders:
         registry.setdefault("right_tab_builders", []).extend(hooks.right_tab_builders)
-        logger.info("[plugin]   right tabs: %s", [label for label, _ in hooks.right_tab_builders])
+        logger.info("[plugin]   right tabs: {}", [label for label, _ in hooks.right_tab_builders])
 
     if hooks.menu_builders:
         registry.setdefault("menu_builders", []).extend(hooks.menu_builders)
-        logger.info("[plugin]   menu builders: %d", len(hooks.menu_builders))
+        logger.info("[plugin]   menu builders: {}", len(hooks.menu_builders))
 
     if hooks.theme_stylesheet_builders:
         registry.setdefault("theme_stylesheet_builders", []).extend(
@@ -260,7 +259,7 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
                 register_recognizer(cls)
         except Exception:  # noqa: BLE001
             logger.exception("[plugin] 识别器注册失败")
-        logger.info("[plugin]   recognizers: %d", len(hooks.recognizer_classes))
+        logger.info("[plugin]   recognizers: {}", len(hooks.recognizer_classes))
 
     if hooks.workflow_implementations:
         registry.setdefault("workflow_implementations", {}).update(hooks.workflow_implementations)
@@ -271,7 +270,7 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
                 register_workflow(name, cls_path)
         except Exception:  # noqa: BLE001
             logger.exception("[plugin] 工作流注册失败")
-        logger.info("[plugin]   workflows: %s", list(hooks.workflow_implementations.keys()))
+        logger.info("[plugin]   workflows: {}", list(hooks.workflow_implementations.keys()))
 
     if hooks.builtin_modules:
         registry.setdefault("builtin_modules", []).extend(hooks.builtin_modules)
@@ -279,10 +278,10 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         try:
             for mod_path in hooks.builtin_modules:
                 importlib.import_module(mod_path)
-                logger.info("[plugin]   builtin module 已加载: %s", mod_path)
+                logger.info("[plugin]   builtin module 已加载: {}", mod_path)
         except Exception:  # noqa: BLE001
             logger.exception("[plugin] 内置函数模块加载失败")
-        logger.info("[plugin]   builtin modules: %d", len(hooks.builtin_modules))
+        logger.info("[plugin]   builtin modules: {}", len(hooks.builtin_modules))
 
     if hooks.profile_period_modules:
         registry.setdefault("profile_period_modules", []).extend(
@@ -291,9 +290,9 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         for mod_path in hooks.profile_period_modules:
             try:
                 importlib.import_module(mod_path)
-                logger.info("[plugin]   profile period module 已加载: %s", mod_path)
+                logger.info("[plugin]   profile period module 已加载: {}", mod_path)
             except Exception:  # noqa: BLE001
-                logger.exception("[plugin] Profile 周期模块加载失败: %s", mod_path)
+                logger.exception("[plugin] Profile 周期模块加载失败: {}", mod_path)
                 raise
 
     if hooks.telemetry_modules:
@@ -303,9 +302,9 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         for mod_path in hooks.telemetry_modules:
             try:
                 importlib.import_module(mod_path)
-                logger.info("[plugin]   telemetry module 已加载: %s", mod_path)
+                logger.info("[plugin]   telemetry module 已加载: {}", mod_path)
             except Exception:  # noqa: BLE001
-                logger.exception("[plugin] 统计事件 schema 模块加载失败: %s", mod_path)
+                logger.exception("[plugin] 统计事件 schema 模块加载失败: {}", mod_path)
 
     if hooks.telemetry_disclosures:
         registry.setdefault("telemetry_disclosures", []).extend(
@@ -322,7 +321,7 @@ def register_config_policies(hooks: AppHooks) -> None:
         try:
             importlib.import_module(module)
         except Exception:  # noqa: BLE001
-            logger.exception("[plugin] 配置策略模块加载失败: %s", module)
+            logger.exception("[plugin] 配置策略模块加载失败: {}", module)
 
 
 def load_config_policies(app_specs: Iterable[str]) -> None:
@@ -341,7 +340,7 @@ def load_config_policies(app_specs: Iterable[str]) -> None:
         try:
             name, _ = parse_app_spec(spec)
         except KeyError:
-            logger.exception("[plugin] 解析插件参数失败: %s", spec)
+            logger.exception("[plugin] 解析插件参数失败: {}", spec)
             continue
         if name in seen:
             continue
@@ -349,7 +348,7 @@ def load_config_policies(app_specs: Iterable[str]) -> None:
         try:
             hooks = load_app(spec)
         except Exception:  # noqa: BLE001
-            logger.exception("[plugin] 加载配置声明失败: %s", name)
+            logger.exception("[plugin] 加载配置声明失败: {}", name)
             continue
         register_config_policies(hooks)
 

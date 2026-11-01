@@ -9,9 +9,8 @@
 from __future__ import annotations
 
 import importlib
-import logging
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 # 通用注册表（初始为空，由插件注入）
 _REGISTRY: dict[str, str] = {}
@@ -25,9 +24,9 @@ def register_workflow(name: str, class_path: str) -> None:
         class_path: 完整类路径，例如 "lvjiang.apps.yysls.workflows.implementations.auto_tuning.AutoTuningWorkflow"
     """
     if name in _REGISTRY:
-        logger.warning("工作流 %s 重复注册，旧实现将被覆盖", name)
+        logger.warning("工作流 {} 重复注册，旧实现将被覆盖", name)
     _REGISTRY[name] = class_path
-    logger.info("[workflow] 注册: %s -> %s", name, class_path)
+    logger.info("[workflow] 注册: {} -> {}", name, class_path)
 
 
 def get_workflow_class(name: str):

@@ -5,12 +5,12 @@
 """
 from __future__ import annotations
 
-import logging
 import sys
 import threading
 import time
 from typing import Any
 
+from loguru import logger
 from PyQt6 import sip
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
@@ -18,8 +18,6 @@ from PyQt6.QtWidgets import QApplication
 from .ui.main import MainWindow
 from .ui.theme import get_theme_manager, reset_theme_manager
 from .ui.widgets import install_wheel_guard
-
-logger = logging.getLogger(__name__)
 
 # ── 模块级 Qt 对象引用 ──────────────────────────────────────────────
 # 必须保持在模块级（而非函数局部），确保 QApplication 比窗口及其他
@@ -108,7 +106,7 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     for hooks in hooks_list:
         register_config_policies(hooks)
 
-    logger.info("[app] 启动主窗口，已加载插件: %s",
+    logger.info("[app] 启动主窗口，已加载插件: {}",
                 [getattr(h, "name", "?") for h in hooks_list] or "无")
 
     from .core.config.interface import initialize_state_stores

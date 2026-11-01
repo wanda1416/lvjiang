@@ -485,6 +485,13 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
                     item.setToolTip(
                         f"{kd.label} 的同步目标 {', '.join(capped_labels)} 已达上限"
                     )
+                elif style == "locked":
+                    # 锁定 key 对该用户物理失效：空白、深灰、不可编辑
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    apply_cell_style(item, style)
+                    tooltip = format_cell_tooltip(kd, model_type, data)
+                    if tooltip:
+                        item.setToolTip(tooltip)
                 else:
                     apply_cell_style(item, style)
                     # 设置悬停提示，显示元信息

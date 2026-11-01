@@ -315,10 +315,39 @@ class ProfileCellEditingMixin:
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
         expected_entry = dict(entry)
+        is_locked = bool(entry.get("locked"))
 
         # 构建菜单
         menu = QMenu(self)
         menu.setTitle(f"{kd.label} ({user_name})")
+
+        def lock_action() -> None:
+            """在「查看历史记录」上方插入锁定/解锁入口"""
+            action = menu.addAction(tr("解锁") if is_locked else tr("锁定"))
+            if action:
+                action.triggered.connect(
+                    lambda: self._toggle_profile_lock(
+                        user_name, model_type, key_str, kd.label, is_locked)
+                )
+
+        # 锁定条目：只剩"为什么是空白"的说明、解绑与该 key 的历史，不再提供
+        # 任何编辑入口——引擎这边也拒绝写入，菜单里留着只会自相矛盾。
+        if is_locked:
+            hint = menu.addAction(tr("该 key 已锁定：引擎忽略其值，自动任务不读写"))
+            if hint:
+                hint.setEnabled(False)
+            menu.addSeparator()
+            lock_action()
+            action_history = menu.addAction(tr("查看历史记录"))
+            if action_history:
+                action_history.triggered.connect(
+                    lambda: self._show_history_dialog(
+                        user_name, model_type, key_str, kd.label)
+                )
+            viewport = table.viewport()
+            if viewport:
+                menu.exec(viewport.mapToGlobal(pos))
+            return
 
         # 满值锁定：同步目标达上限且本项未取消该设置时，所有写入入口一并禁用。
         # 单元格既然显示成 —，右键却还能增减就自相矛盾；只保留只读的历史入口。
@@ -334,6 +363,7 @@ class ProfileCellEditingMixin:
                 if action_hint:
                     action_hint.setEnabled(False)
             menu.addSeparator()
+            lock_action()
             action_history = menu.addAction(tr("查看历史记录"))
             if action_history:
                 action_history.triggered.connect(
@@ -357,6 +387,8 @@ class ProfileCellEditingMixin:
                     )
                 )
             # note 历史记录
+            menu.addSeparator()
+            lock_action()
             action_history = menu.addAction(tr("查看历史记录"))
             if action_history:
                 action_history.triggered.connect(
@@ -436,6 +468,7 @@ class ProfileCellEditingMixin:
 
         # 历史记录
         menu.addSeparator()
+        lock_action()
         action_history = menu.addAction(tr("查看历史记录"))
         if action_history:
             action_history.triggered.connect(
@@ -445,6 +478,51 @@ class ProfileCellEditingMixin:
         viewport = table.viewport()
         if viewport:
             menu.exec(viewport.mapToGlobal(pos))
+
+    def _toggle_profile_lock(  # type: ignore[misc]
+        self: ProfileTab,
+        user_name: str,
+        model_type: str,
+        key: str,
+        label: str,
+        is_locked: bool,
+    ) -> None:
+        """锁定 / 解锁该用户的这个 key（二次确认）。
+
+        锁定后引擎完全忽略该值：读取返回空、写入被拒绝、周期重置不再发生，
+        所以值永久停留在锁定时的样子；解锁后一切照旧，值保持原状。
+        """
+        from ...core.profile.events import notify_updated
+        from ...core.profile.repository import db_set_locked, db_unlock
+
+        if is_locked:
+            title = tr("解锁")
+            prompt = tr(
+                "解除 {user} 的「{label}」锁定？\n"
+                "解锁后自动任务会重新读取并更新该 key。"
+            ).format(user=user_name, label=label)
+        else:
+            title = tr("锁定")
+            prompt = tr(
+                "锁定 {user} 的「{label}」？\n"
+                "锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，"
+                "值永久停在当前状态。\n随时可以右键解锁。"
+            ).format(user=user_name, label=label)
+        if QMessageBox.question(
+            self, title, prompt,
+        ) != QMessageBox.StandardButton.Yes:
+            return
+
+        changed = (
+            db_unlock(user_name, model_type, key) if is_locked
+            else db_set_locked(user_name, model_type, key)
+        )
+        if changed:
+            logger.info(
+                f"profile {user_name}.{model_type}.{key} "
+                f"{'已解锁' if is_locked else '已锁定'}")
+            notify_updated(user_name)
+        self.refresh()
 
     # ─── 数据写入与增减 ──────────────────────────────────────
 

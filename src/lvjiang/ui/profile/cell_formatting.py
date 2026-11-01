@@ -139,11 +139,17 @@ def quota_reset_remaining(
 def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, str]:
     """根据模型类型格式化 profile 值用于总览显示
 
-    返回 (display_text, style)，style 为 "" | "red_bold" | "orange_bold" | "green_bold"
+    返回 (display_text, style)，style 为
+    "" | "red_bold" | "orange_bold" | "green_bold" | "locked"
+
+    锁定条目一律显示为空白（style="locked"）：锁定表示该用户这个 key 物理
+    失效，引擎完全忽略其值，展示值只会误导。
     """
     entry = data.get(model_type, {}).get(kd.key, {})
     if not entry:
         return "", ""
+    if entry.get("locked"):
+        return "", "locked"
 
     value = entry.get("value")
     if value is None:
@@ -240,6 +246,9 @@ def sum_profile_column(kd: KeyDef, model_type: str, users_data: dict[str, dict])
         entry = data.get(model_type, {}).get(kd.key, {})
         if not entry:
             continue
+        if entry.get("locked"):
+            # 锁定 key 对这个用户物理失效，值不存在于任何计算里
+            continue
         value = entry.get("value")
         if value is None:
             continue
@@ -297,7 +306,7 @@ def locked_sync_targets(kd, data: dict) -> list:
 
 
 def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
-    """应用单元格样式: '' | 'red_bold' | 'orange_bold' | 'green_bold'"""
+    """应用单元格样式: '' | 'red_bold' | 'orange_bold' | 'green_bold' | 'locked'"""
     if style == "red_bold":
         font = QFont(item.font())
         font.setBold(True)
@@ -313,6 +322,12 @@ def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
         font.setBold(True)
         item.setFont(font)
         item.setForeground(QColor(34, 139, 34))  # 森林绿
+    elif style == "locked":
+        # 深灰：该用户在总览里"没有这个值"，不是 0 也不是上限
+        font = QFont(item.font())
+        font.setBold(True)
+        item.setFont(font)
+        item.setForeground(QColor(105, 105, 105))  # 暗灰
 
 
 def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
@@ -321,6 +336,12 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
     if not entry:
         return ""
 
+    if entry.get("locked"):
+        return "\n".join([
+            f"【{kd.label}】",
+            tr("该用户已锁定此 key：引擎忽略其值，自动任务不会读取或写入"),
+            tr("值永久停留在锁定时的状态；右键可解锁"),
+        ])
     lines = [f"【{kd.label}】"]
 
     updated_at = entry.get("updated_at")

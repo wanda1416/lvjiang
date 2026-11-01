@@ -250,6 +250,12 @@ regen 模型区分两种刷新机制，DSL 函数自动处理：
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
 | `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值；返回 `{accepted, value, reason}` |
 | `user_get` | `(username, key) -> any \| null` | 按「内部用户名」读取用户资料属性（内存快照优先），取不到返回 `null` |
+| `profile_locked` | `(key, username?) -> bool` | 该用户是否把这个 key 标记为失效；锁定时 `profile_get` 返回 null、写入被拒绝、周期重置停止，值永久停在锁定时的样子 |
+
+用户可以在 Profile 总览里右键锁定/解锁某个 key（如声望货币已耗尽、以后不再补充）。
+锁定是"用户 × key"的状态，存在 profile.db 的 `profile_entries.locked`，不属于
+`profile.yaml` 定义层。工作流要判断"这个用户还需要买吗"，应当先查 `profile_locked`，
+再决定是否购买或记账。
 
 系统业务 key 的定义由 `subcall/profile_registry.wf` 统一登记。业务工作流导入该文件后，在
 正文开头调用一次 `declare_profiles(["key1", "key2"])`；函数会先验证整个列表，再幂等

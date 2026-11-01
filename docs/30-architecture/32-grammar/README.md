@@ -482,9 +482,9 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（102 个）
+## 十、内置函数（103 个）
 
-> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 75 + yysls 插件 27，可
+> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 76 + yysls 插件 27，可
 > 用 `list_functions()` 复核。
 
 | 类别 | 函数 |
@@ -502,7 +502,7 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **应用生命周期（6）** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
 | **运行环境与后端（6）** | `env` `check_env` `is_send` `is_post` `is_device` `is_unattended` |
 | **图色（8）** | `pixel` `bright` `color_ratio` `pixel_ratios` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
-| **玩家档案（10）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `user_get` `profile_history_aggregate` `profile_reject` |
+| **玩家档案（11）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `profile_locked` `user_get` `profile_history_aggregate` `profile_reject` |
 | **自动剧情（3）** | `story_options` `story_pick` `story_learn` |
 
 ## 十一、模块化

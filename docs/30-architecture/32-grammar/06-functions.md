@@ -19,7 +19,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **102 个**内置函数（core 75 个 + yysls 插件 27 个），按功能分为 15 类。
+共 **103 个**内置函数（core 76 个 + yysls 插件 27 个），按功能分为 15 类。
 
 > 分组、简介、参数含义与返回值声明在 `@builtin_func(...)` 装饰器里，运行期由
 > `describe_function()` / `signature_params()` 读取；应用内「脚本编辑 → 内置函数」
@@ -32,7 +32,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > from lvjiang.workflows import builtins as b
 > from lvjiang.apps import load_app, register_hooks
 > register_hooks(load_app("yysls"))    # 插件函数靠 hooks 注册，直接 import 空包不生效
-> print(sorted(b.list_functions()))    # → 102 个
+> print(sorted(b.list_functions()))    # → 103 个
 > ```
 
 ### 基础运算（8）
@@ -211,20 +211,21 @@ end
 > 坐标入参是 `$ref = [scene].[region]` 的求值结果、4 元矩形字面量或 find 产出；
 > 距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
 
-### 玩家档案（10）
+### 玩家档案（11）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
+| `user_get` | `(username, key) -> any \| null` | 按内部用户名读取用户资料属性，取不到返回 null |
 | `profile_get` | `(key) -> float \| str \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值 |
 | `profile_set` | `(key, value) -> float \| str` | 写入 profile 值；realtime regen 自动规范化时间锚点 |
 | `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值；note 模型不支持 |
 | `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` / `"note"`；未定义返回 `""` |
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
 | `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值 |
-| `user_get` | `(username, key) -> any \| null` | 按内部用户名读取用户资料属性，取不到返回 null |
 | `profile_declare` | `(model_type, key, definition) -> dict` | 声明工作流依赖的 profile key，不存在时按 definition 创建（幂等）；返回 `{ok, created, key}` |
 | `profile_history_aggregate` | `(key, operation?, source?, change_types?, direction?, since?, until?) -> float` | 当前用户历史 delta 聚合；支持 sum/count/min/max/avg、来源/类型/方向过滤和时间区间 |
 | `profile_reject` | `(message)` | 同步变更脚本拒绝当前事务，原始写入及同步子链一起回滚 |
+| `profile_locked` | `(key, username?) -> bool` | 该用户是否把这个 key 标记为失效（锁定后引擎忽略其值：读空、写拒绝、不再重置） |
 
 ### 自动剧情（3）
 

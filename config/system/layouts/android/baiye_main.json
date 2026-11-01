@@ -1,5 +1,5 @@
 {
-  "content_version": 3,
+  "content_version": 4,
   "regions": [
     {
       "key": "back",
@@ -221,14 +221,14 @@
     {
       "key": "scroll_top",
       "cx_ratio": 0.26875,
-      "cy_ratio": 0.1527777777777778,
-      "r_ratio": 0.001
+      "cy_ratio": 0.19297202673378455,
+      "r_ratio": 0.015926267073679667
     },
     {
       "key": "scroll_bottom",
       "cx_ratio": 0.26875,
-      "cy_ratio": 0.7222222222222222,
-      "r_ratio": 0.001
+      "cy_ratio": 0.7726399577166063,
+      "r_ratio": 0.01802008833332908
     },
     {
       "key": "search_end",

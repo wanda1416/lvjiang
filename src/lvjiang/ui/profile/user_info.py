@@ -346,9 +346,15 @@ class _DetailPage(QWidget):
 
 
 def _format_detail_value(kd: KeyDef, model_type: str, data: dict) -> str:
-    """格式化详情页的值显示（纯数值，取整）"""
+    """格式化详情页的值显示（纯数值，取整）
+
+    锁定条目显示为空白，与总览保持一致：锁定表示该用户这个 key 物理失效，
+    引擎忽略其值，详情页再显示冻结值只会让人以为它还生效。
+    """
     entry = data.get(model_type, {}).get(kd.key, {})
     if not entry:
+        return ""
+    if entry.get("locked"):
         return ""
 
     if model_type == MODEL_NOTE:

@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,9 +30,10 @@ def profile_env(tmp_path, monkeypatch):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
 
-    profile_config._config = None
-    profile_config._PROFILE_PATH = session_dir / "profile.yaml"
-    profile_config._PROFILE_PATH.write_text(
+    monkeypatch.setattr(profile_config, "_config", None, raising=False)
+    profile_path = session_dir / "profile.yaml"
+    monkeypatch.setattr(profile_config, "_PROFILE_PATH", profile_path, raising=False)
+    profile_path.write_text(
         yaml.dump(
             {
                 "quota": [
@@ -45,19 +47,54 @@ def profile_env(tmp_path, monkeypatch):
                      "alert_red": 90},
                 ],
                 "note": [{"key": "user_note", "label": "状态备注"}],
+                "stock": [{"key": "target_stock", "label": "同步目标"}],
             },
             allow_unicode=True,
         ),
         encoding="utf-8",
     )
 
-    profile_db._db = None
-    profile_db._DB_PATH = session_dir / "profile.db"
+    monkeypatch.setattr(profile_db, "_db", None, raising=False)
+    monkeypatch.setattr(
+        profile_db, "_DB_PATH", session_dir / "profile.db", raising=False)
 
     yield SimpleNamespace(username="u1", session_dir=session_dir)
 
-    profile_config._config = None
-    profile_db._db = None
+
+def _make_v7_db(path: Path) -> None:
+    """构造 v7 形态的库：entries 没有 locked 列，schema_version 记为 7。"""
+    with sqlite3.connect(path) as conn:
+        conn.execute("""
+            CREATE TABLE profile_entries (
+                username TEXT NOT NULL, type TEXT NOT NULL, key TEXT NOT NULL,
+                value REAL NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT '',
+                updated_time TEXT NOT NULL DEFAULT '',
+                value_text TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (username, type, key)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE profile_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL,
+                username TEXT NOT NULL, type TEXT NOT NULL, key TEXT NOT NULL,
+                old_value REAL, new_value REAL NOT NULL,
+                change_type TEXT NOT NULL, detail TEXT DEFAULT '',
+                source TEXT DEFAULT '', delta_value REAL,
+                old_value_text TEXT DEFAULT '', new_value_text TEXT DEFAULT '',
+                sync_from TEXT DEFAULT ''
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX idx_history_user_key "
+            "ON profile_history(username, type, key, id DESC)")
+        conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO schema_version VALUES (7)")
+        conn.execute(
+            "INSERT INTO profile_entries "
+            "(username, type, key, value, updated_at, updated_time, value_text) "
+            "VALUES ('u1', 'quota', 'k', 5, '2026-01-01T00:00:00', "
+            "'2026-01-01T00:00:00', '')")
 
 
 # ─── 迁移 ────────────────────────────────────────────────────
@@ -77,15 +114,36 @@ class TestMigration:
         }
         assert "locked" in cols
 
-    def test_old_database_upgrades_in_place(self, tmp_path: Path):
-        """v7 老库打开后自动补 locked 列，已有数据不变。"""
-        db_path = tmp_path / "old.db"
-        db = ProfileDB(db_path)  # 先建到当前版本
-        db.upsert("u1", "quota", "k", 7)
+    def test_v7_database_upgrades_in_place(self, tmp_path: Path):
+        """v7 老库（无 locked 列）打开后自动补列，已有数据与版本号都正确。"""
+        db_path = tmp_path / "v7.db"
+        _make_v7_db(db_path)
 
-        # 模拟 v7：删表里的 locked 列不可行，改成校验重复打开幂等
+        with sqlite3.connect(db_path) as conn:
+            cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(profile_entries)").fetchall()}
+        assert "locked" not in cols
+
+        upgraded = ProfileDB(db_path)
+
+        assert upgraded.get_entry("u1", "quota", "k")["value"] == 5
+        assert upgraded.get_entry("u1", "quota", "k")["updated_at"] == "2026-01-01T00:00:00"
+        with sqlite3.connect(db_path) as conn:
+            cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(profile_entries)").fetchall()}
+            version = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
+        assert "locked" in cols
+        assert version == CURRENT_VERSION
+
+        # 升级后的库可以正常上锁
+        assert upgraded.set_locked("u1", "quota", "k") is True
+
+    def test_reopen_after_upgrade_is_idempotent(self, tmp_path: Path):
+        db_path = tmp_path / "v7b.db"
+        _make_v7_db(db_path)
+        ProfileDB(db_path)
         again = ProfileDB(db_path)
-        assert again.get_entry("u1", "quota", "k")["value"] == 7
+        assert again.get_entry("u1", "quota", "k")["value"] == 5
         assert "locked" not in again.get_entry("u1", "quota", "k")
 
 
@@ -244,6 +302,54 @@ class TestServiceSemantics:
             profile_env.username, "user_note", set_value="新文本", source="测试")
         assert db_read_entry(
             profile_env.username, "note", "user_note")["value_text"] == ""
+
+
+    def test_profile_observe_reports_locked_instead_of_accepted(self, profile_env):
+        """观测写入被锁拒绝时必须报 locked，不能把"什么都没写"报成 accepted。"""
+        from lvjiang.core.profile.repository import db_set_locked, db_upsert
+        from lvjiang.core.profile.service import profile_observe
+
+        db_upsert(profile_env.username, "quota", "weekly_quota", 1)
+        db_set_locked(profile_env.username, "quota", "weekly_quota")
+
+        result = profile_observe(profile_env.username, "weekly_quota", 2)
+        assert result["accepted"] is False
+        assert result["reason"] == "locked"
+
+    def test_profile_read_all_hides_locked_value(self, profile_env):
+        """profile_all 的口径要和 profile_get 一致：锁定项没有值。"""
+        from lvjiang.core.profile.repository import db_set_locked, db_upsert
+        from lvjiang.core.profile.service import profile_read_all
+
+        db_upsert(profile_env.username, "quota", "weekly_quota", 1)
+        db_set_locked(profile_env.username, "quota", "weekly_quota")
+
+        entry = profile_read_all(
+            profile_env.username)["quota"]["weekly_quota"]
+        assert entry["locked"] is True
+        assert entry["value"] is None
+
+    def test_profile_read_all_skips_regen_computation_for_locked(self, profile_env):
+        """锁定 regen 不能每读一次就算出一个"活"的当前值。"""
+        from lvjiang.core.profile.repository import db_set_locked, db_upsert
+        from lvjiang.core.profile.service import profile_read_all
+
+        db_upsert(profile_env.username, "regen", "energy", 50,
+                  updated_at="2020-01-01T00:00:00")
+        db_set_locked(profile_env.username, "regen", "energy")
+
+        entry = profile_read_all(profile_env.username)["regen"]["energy"]
+        assert entry["locked"] is True
+        assert entry["value"] is None
+
+    def test_sync_adapter_returns_none_for_locked_target(self, profile_env):
+        """同步目标锁定时按"写入失败"返回 None，让引擎中止下游递归。"""
+        from lvjiang.core.profile.repository import db_set_locked
+        from lvjiang.core.profile.service import sync_write_adapter
+
+        db_set_locked(profile_env.username, "stock", "target_stock")
+        assert sync_write_adapter(
+            profile_env.username, "stock", "target_stock", delta=3) is None
 
 
 # ─── 引擎：锁定不重置、不告警 ───────────────────────────────

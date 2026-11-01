@@ -167,7 +167,13 @@ def _normalize_float_noise(value: float) -> float:
 
 
 def _read_current_value(username: str, model_type: str, key: str, kd) -> float | str | None:
-    """读取当前值（regen 模型按实时计算，note 返回文本或 None）"""
+    """读取当前值（regen 模型按实时计算，note 返回文本或 None）
+
+    锁定 key 视为物理失效：返回 None，且不参与 regen 实时计算——锁定期间
+    值必须停在锁定时的样子，不能每次读取都算出一个"活"的数字。
+    """
+    if db_is_locked(username, model_type, key):
+        return None
     if model_type == MODEL_NOTE:
         entry = db_read_entry(username, model_type, key)
         return entry.get("value_text", "") or None
@@ -274,14 +280,23 @@ def profile_read_all(username: str) -> dict:
 
     返回 {model_type: {key: {value, updated_at, ...}}} 结构。
     regen 条目的 value 已按当前时间计算。
+
+    锁定条目保留 key 的存在性（带 ``locked: True``），但 value/value_text 一律
+    为 None/"" —— 与 ``profile_read`` 返回 None 的口径一致：锁定的 key 对这个
+    用户物理失效，`profile_all` 的消费方不该再读到冻结值。
     """
     data = db_read_all(username)
     config = get_profile_config()
+    for entries in data.values():
+        for locked_entry in entries.values():
+            if locked_entry.get("locked"):
+                locked_entry["value"] = None
+                locked_entry["value_text"] = ""
     for kd in config.get_keys_by_model(MODEL_REGEN):
         if not isinstance(kd, RegenKeyDef):
             continue
         entry = data.get(MODEL_REGEN, {}).get(kd.key)
-        if entry:
+        if entry and not entry.get("locked"):
             entry["value"] = compute_regen_entry(entry, kd).value
     return data
 
@@ -303,6 +318,11 @@ def profile_observe(
     config = get_profile_config()
     model_type = config.get_model_type(key)
     kd = config.get_key(key, model_type=model_type) if model_type else None
+    if model_type is not None and db_is_locked(username, model_type, key):
+        # 锁定 key 物理失效：写入被拒，不能把"什么都没写"报成 accepted
+        logger.error(
+            f"profile_observe: {username}.{model_type}.{key} 已锁定，拒绝观测写入")
+        return {"accepted": False, "value": -1, "reason": "locked"}
     if model_type != MODEL_QUOTA or not isinstance(kd, QuotaKeyDef):
         current = profile_read(username, key)
         return {
@@ -621,6 +641,12 @@ def sync_write_adapter(
     """
     config = get_profile_config()
     kd = config.get_key(key, model_type=model_type)
+    if db_is_locked(user_name, model_type, key):
+        # 目标被用户锁定：不是"写成功"，必须返回 None 让引擎中止下游递归，
+        # 否则源 key 已扣、目标没动，还会继续往更下游传。
+        logger.error(
+            f"sync 目标已锁定，跳过同步写入：{user_name}.{model_type}.{key}")
+        return None
 
     current_value = _read_current_value(user_name, model_type, key, kd)
     # sync 适配器仅用于数值模型

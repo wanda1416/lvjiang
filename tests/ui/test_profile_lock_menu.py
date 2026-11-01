@@ -73,3 +73,13 @@ def test_unlock_uses_unlock_api(monkeypatch):
     tab._toggle_profile_lock("u1", "quota", "k", "配额", True)
 
     assert calls[0] == ("unlock", ("u1", "quota", "k"))
+
+
+def test_detail_page_hides_locked_value():
+    """用户详情页与总览同口径：锁定 key 显示空白，不显示冻结值。"""
+    from lvjiang.core.profile.models import KeyDef
+    from lvjiang.ui.profile.user_info import _format_detail_value
+
+    kd = KeyDef(key="k", label="配额")
+    data = {"quota": {"k": {"value": 2, "locked": True, "updated_at": ""}}}
+    assert _format_detail_value(kd, "quota", data) == ""

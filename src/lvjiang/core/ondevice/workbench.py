@@ -61,6 +61,7 @@ def profile_view(username: str) -> str:
                           "group": "默认" if kd.group == "default" else kd.group,
                           "value": (entry.get("value_text", "") if model == MODEL_NOTE else entry.get("value")) if entry else None,
                           "collected": bool(entry), "cap": kd.cap if kd.show_cap else None,
+                          "locked": bool(entry and entry.get("locked")),
                           "updated_at": entry.get("updated_at", "") if entry else ""})
         return _json({"ok": True, "items": items, "username": username})
     except Exception as exc:

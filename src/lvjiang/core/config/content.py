@@ -38,19 +38,17 @@ def configuration_lock(config: Path, *, blocking: bool = True) -> Iterator[bool]
 
 
 @contextmanager
-def config_write_lock(config_dir: Path, local_dir: Path) -> Iterator[None]:
+def config_write_lock(local_dir: Path) -> Iterator[None]:
     """配置写的跨进程锁，与 :func:`configuration_lock` 组成统一加锁顺序。
 
     全仓库统一「进程内线程锁 ``configuration_lock`` → 跨进程文件锁」：
     ``_configuration_write``、``checked_write``、``batch_changes``、出装搭配
     保存都是这个顺序，反过来会互相等待而永久死锁。
 
-    锁目录显式放在 session 下：同一实例的 system/local 写入共用一把，同时
-    不会把运行时锁文件写进受版本控制的 config 目录。
+    锁统一放在 ``config/session/.locks``：同一实例的 system/local 写入共用一把，
+    也不会把运行时锁文件写进受版本控制的 config 目录。
     """
-    with interprocess_lock(
-            local_dir, suffix="config",
-            lock_dir=session_directory(config_dir) / ".locks"):
+    with interprocess_lock(local_dir, suffix="install"):
         yield
 
 

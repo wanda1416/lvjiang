@@ -38,7 +38,7 @@ class InterprocessLockTimeout(RuntimeError):
 
 
 def _lock_entry(
-    key: str, lock_dir: Path, suffix: str,
+    key: str, suffix: str,
 ) -> tuple[threading.RLock, InterProcessLock]:
     # 缓存键必须带 suffix：同一路径换用途是两把不同的锁，只按路径缓存会让
     # 后一个调用方静默复用前一个的锁文件，进程内外的互斥范围就不一致了。
@@ -47,24 +47,36 @@ def _lock_entry(
         entry = _LOCKS.get(cache_key)
         if entry is None:
             from fasteners import InterProcessLock
-            lock_dir.mkdir(parents=True, exist_ok=True)
-            name = hashlib.sha256(key.encode()).hexdigest()
-            entry = (
-                threading.RLock(),
-                InterProcessLock(str(lock_dir / f"{name}.{suffix}.lock")),
-            )
+            path = lock_file(suffix, key)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            entry = (threading.RLock(), InterProcessLock(str(path)))
             _LOCKS[cache_key] = entry
         return entry
 
 
-def _default_lock_dir(target: Path) -> Path:
-    """锁目录只由目标路径决定，不看目标此刻是否存在。
+def lock_root() -> Path:
+    """所有运行时锁的唯一存放处：``config/session/.locks``。
 
-    以前按 ``target.is_dir()`` 分支：目录还没创建时锁落在父目录，等写入把
-    目录建出来之后又落到目录内部，同一目标会分裂成两个锁文件、互斥直接
-    失效（全新安装的 ``config/local`` 正好走这条路）。
+    锁集中在这一处，不再往各数据目录旁散落 ``.locks``：退出所有节点后整目录
+    删掉即可重置，下次按需重建；也不会污染用户数据目录与受版本控制的
+    ``config/local``。
     """
-    return target.parent / ".locks"
+    from ..constants import SESSION_CONFIG_DIR
+    return SESSION_CONFIG_DIR / ".locks"
+
+
+def lock_file(kind: str, key: str, *, root: Path | None = None) -> Path:
+    """``<锁根>/<类型>_<摘要前8位>.lock``。
+
+    ``kind`` 是锁的用途（instance / state / install / profile / document /
+    execution / agent …），``key`` 是稳定身份（目标绝对路径或用户名），
+    摘要只取前 8 位仅为可读——碰撞的后果是两个不同类型/目标共用一把锁而
+    互相等待，不会让该互斥的地方失去互斥。``root`` 显式指定锁根，供针对
+    其它安装目录的停机工具使用。
+    """
+    base = root if root is not None else lock_root()
+    digest = hashlib.sha256(key.encode()).hexdigest()[:8]
+    return base / f"{kind}_{digest}.lock"
 
 
 def _acquire_process_lock(
@@ -101,17 +113,13 @@ def interprocess_lock(
     target: Path,
     *,
     suffix: str = "state",
-    lock_dir: Path | None = None,
     timeout: float | None = DEFAULT_LOCK_TIMEOUT,
 ):
     """串行化同一目标的跨进程读改写。
 
-    锁文件放在目标旁的 ``.locks`` 目录，按目标绝对路径摘要命名，同一目标的
-    多实例共享一把。同一线程嵌套获取直接放行：fasteners 的锁不可重入，而
-    写入链路上会出现「批处理已持锁 → 单文件写入再取锁」的情况。
-
-    ``lock_dir`` 可显式指定锁目录（受版本控制的目录用它会更好，避免把运行时
-    锁文件写进仓库）；省略时按目标路径推导。``timeout`` 为 None 表示无限等待。
+    锁文件统一放在 ``config/session/.locks/``，按「用途 + 目标绝对路径摘要」
+    命名，同一目标的多实例共享一把。同一线程嵌套获取直接放行：fasteners 的
+    锁不可重入，而写入链路上会出现「批处理已持锁 → 单文件写入再取锁」的情况。
 
     跨进程锁永远在 ``configuration_lock`` 之后获取：全仓库统一「进程内线程锁
     → 跨进程文件锁」的顺序，反过来会和 ``batch_changes`` / ``checked_write`` /
@@ -131,8 +139,7 @@ def interprocess_lock(
         finally:
             depths[key] -= 1
         return
-    base = lock_dir if lock_dir is not None else _default_lock_dir(target)
-    thread_lock, process_lock = _lock_entry(key, base, suffix)
+    thread_lock, process_lock = _lock_entry(key, suffix)
     with thread_lock:
         _acquire_process_lock(process_lock, target, timeout)
         depths[key] = 1

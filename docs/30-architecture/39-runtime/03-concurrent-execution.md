@@ -481,10 +481,11 @@ run_workflow_implementation(..., target_id) -> task_run_id
 
 加锁顺序统一为「进程内 `configuration_lock` → 跨进程 `interprocess_lock`」。反过来
 （先文件锁再线程锁）会与 `batch_changes`、`checked_write`、出装搭配保存互相等待而永久
-死锁，两条路径都不得调换。跨进程锁的锁目录只由目标路径决定，不看目标当前是否存在——
-按 `is_dir()` 分支会让全新安装的 `config/local` 先落在父目录、再落在目录内部，同一目标
-分裂成两把锁、互斥静默失效。等待跨进程锁有上限（`DEFAULT_LOCK_TIMEOUT`），超时抛
-`InterprocessLockTimeout` 而不是把 UI 线程无声拖死。
+死锁，两条路径都不得调换。所有跨进程锁集中落在 `config/session/.locks/`，文件名统一为
+`<类型>_<摘要8位>.lock`（`instance` / `state` / `install` / `profile` / `document` /
+`execution` / `agent`）：锁根不随目标位置变化，不会往 `config/local` 等数据目录写运行时
+文件，退出所有节点后整目录删掉即可重置、下次按需重建。等待跨进程锁有上限
+（`DEFAULT_LOCK_TIMEOUT`），超时抛 `InterprocessLockTimeout` 而不是把 UI 线程无声拖死。
 Session 快照冲突检查、原子替换和 SQLite 短事务仍然保留。
 
 `daily_history.db`、调律历史库和 profile 数据库均要核对 WAL、busy timeout 与事务长度；

@@ -1,7 +1,6 @@
 """Process lifetime configuration ownership and user execution leases."""
 from __future__ import annotations
 
-import hashlib
 import os
 import threading
 from contextlib import contextmanager
@@ -11,6 +10,7 @@ from pathlib import Path
 
 from fasteners import InterProcessLock
 
+from .fs_util import lock_file
 from .paths import config_directory, session_directory
 
 
@@ -78,7 +78,8 @@ def initialize_instance(root: Path, *, readonly: bool = False) -> None:
     global _instance, _readonly
     if _instance is not None:
         raise RuntimeError("实例权限已经初始化")
-    lease = Lease(session_directory(config_directory(root)) / ".locks" / "configuration.lock")
+    lease = Lease(lock_file(
+        "instance", os.path.normcase(str(session_directory(config_directory(root)).resolve()))))
     _readonly = True  # Fail closed if lock acquisition raises.
     if not readonly:
         _readonly = not lease.acquire()
@@ -141,8 +142,7 @@ def user_lease(username: str, users_dir: Path | None = None) -> Lease:
         users_dir = USERS_DIR
     # User names are immutable storage keys in the current user model.
     identity = os.path.normcase(str((users_dir / f"{username}.json").resolve()))
-    key = hashlib.sha256(identity.encode()).hexdigest()
-    return Lease(users_dir / ".lock" / f"{key}.execution.lock")
+    return Lease(lock_file("execution", identity))
 
 
 def acquire_user(username: str, users_dir: Path | None = None) -> Lease:

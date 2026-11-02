@@ -31,8 +31,14 @@ def child(code, root):
     return result.stdout.strip()
 
 
-def test_instance_election_and_user_execution_are_independent(tmp_path):
-    lease = access.Lease(tmp_path / "config/session/.locks/configuration.lock")
+def test_instance_election_and_user_execution_are_independent(tmp_path, monkeypatch):
+    # 锁统一落在 ``config/session/.locks``：父进程要和子进程（LVJIANG_ROOT=tmp_path）
+    # 用同一个 session 目录，才能撞在同一把锁上。
+    from lvjiang import constants
+    from lvjiang.core.fs_util import lock_file
+    monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "config/session")
+    session = (tmp_path / "config/session").resolve()
+    lease = access.Lease(lock_file("instance", os.path.normcase(str(session))))
     assert lease.acquire()
     code = """
 from lvjiang.constants import PROJECT_ROOT
@@ -48,10 +54,12 @@ close_instance()
     assert child(code, tmp_path) == "False"
 
 
-def test_same_user_rejected_other_user_allowed_and_lock_file_can_remain(tmp_path):
+def test_same_user_rejected_other_user_allowed_and_lock_file_can_remain(tmp_path, monkeypatch):
+    from lvjiang import constants
+    monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "config/session")
     users = tmp_path / "config/session/users"
     lease = access.acquire_user("alice", users)
-    assert Path(lease.key).parent == (users / ".lock").resolve()
+    assert Path(lease.key).parent == (tmp_path / "config/session/.locks").resolve()
     code = """
 from lvjiang.core.access import acquire_user, AccessDeniedError
 try:
@@ -340,8 +348,13 @@ def _exercise_equipment_writes(repo, profile, users_dir):
         access.acquire_user("alice", users_dir)
 
 
-def test_equipment_write_from_another_process_is_rejected_while_user_is_occupied(tmp_path):
+def test_equipment_write_from_another_process_is_rejected_while_user_is_occupied(
+        tmp_path, monkeypatch):
+    from lvjiang import constants
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
+
+    # 父进程与子进程（LVJIANG_ROOT=tmp_path）必须共用同一个锁根，占用才可见。
+    monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "config/session")
 
     config_source = Path(__file__).resolve().parents[2] / "config/system/yysls/game_config"
     config_target = tmp_path / "config/system/yysls/game_config"

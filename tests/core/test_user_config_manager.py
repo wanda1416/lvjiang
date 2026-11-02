@@ -145,11 +145,15 @@ class TestUserConfigManagerCRUD:
         assert [note.text for note in repo.list_notes()] == ["私人备忘"]
 
     def test_user_metadata_reuses_user_occupancy_without_document_lock(self, session_env):
+        from lvjiang.core.fs_util import lock_root
+
         UserConfigManager()
 
-        assert not (session_env.parent / "users/.lock/default.json.lock").exists()
-        assert list((session_env.parent / "users/.lock").glob("*.execution.lock"))
-        assert not (session_env.parent / "users/default.json.lock").exists()
+        # 用户数据目录里不再出现任何锁文件；执行租约统一落在 session/.locks。
+        assert not (session_env.parent / "users/.lock").exists()
+        assert not list((session_env.parent / "users").glob("*.lock"))
+        assert list(lock_root().glob("execution_*.lock"))
+        assert not list(lock_root().glob("metadata_*.lock"))
 
 
     def test_delete_last_user_rejected(self, session_env):

@@ -124,7 +124,7 @@ class SessionStore:
         self, mutator: Callable[[dict], Any], *, strict: bool = False,
     ) -> Any:
         """合并最新磁盘状态；只读节点只保留允许的临时选择（不落盘）。"""
-        with self._thread_lock, interprocess_lock(self.path, suffix="session"):
+        with self._thread_lock, interprocess_lock(self.path, suffix="state"):
             from ..access import is_readonly
             readonly = is_readonly()
             disk_data = self._read_disk(strict=strict)

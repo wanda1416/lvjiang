@@ -38,8 +38,7 @@ def checked_write(resolver, baselines: dict[str, Baseline], write):
     from .content import config_write_lock, configuration_lock
     # 弹窗已在锁外完成；这里按全仓库统一的「线程锁 → 文件锁」顺序写入，
     # 顺序反过来会和 _configuration_write 互相等待而永久死锁。
-    with configuration_lock(resolver.config_dir), config_write_lock(
-            resolver.config_dir, resolver.local_dir):
+    with configuration_lock(resolver.config_dir), config_write_lock(resolver.local_dir):
         if any(file_baseline(resolver, name) != expected for name, expected in confirmed.items()):
             raise ConfigWriteConflict("确认期间磁盘配置再次更新，请重新保存")
         if hasattr(resolver, "_read_baselines"):

@@ -2,9 +2,8 @@
 
 锁住四条会静默失效的性质：
 
-- 锁目录只看目标路径，不看目标此刻是否存在——按 ``is_dir()`` 分支会让
-  全新安装的 ``config/local`` 先落在父目录、后落在目录内部，分裂成两把锁、
-  互斥直接消失；
+- 所有锁集中在 ``config/session/.locks``，不随目标位置散落——否则退出节点后
+  无法整目录重置，还会往受版本控制的 ``config/local`` 里写运行时文件；
 - 同一线程嵌套获取可重入（写入链路里必然嵌套）；
 - 另一个进程持锁时超时抛错，而不是把 UI 线程无声拖死；
 - 真正跨进程的读改写不能丢更新（同一个进程内的两个实例测不出这一点）。
@@ -17,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -28,55 +28,48 @@ import pytest
 from lvjiang.core import fs_util
 from lvjiang.core.fs_util import InterprocessLockTimeout, interprocess_lock
 
+#: 子进程要用同一把锁根：父进程的 constants 已被 conftest 指到临时目录。
 _PRELUDE = """
-import json, sys, time
+import json, os, sys, time
 from pathlib import Path
+import lvjiang.constants as _constants
+if os.environ.get("LVJIANG_TEST_SESSION"):
+    _constants.SESSION_CONFIG_DIR = Path(os.environ["LVJIANG_TEST_SESSION"])
 from lvjiang.core.fs_util import interprocess_lock
 """
 
 
-def _run(script: str, *, cwd: Path, timeout: float = 30.0) -> subprocess.CompletedProcess:
-    """在子进程里跑脚本，保证 PYTHONPATH 指向本仓库的 src。"""
+def _child_env() -> dict[str, str]:
     env = {**os.environ}
     src = str(Path(__file__).resolve().parents[2] / "src")
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (src, env.get("PYTHONPATH"))))
     env["PYTHONIOENCODING"] = "utf-8"
+    env["LVJIANG_TEST_SESSION"] = str(fs_util.lock_root().parent)
+    return env
+
+
+def _run(script: str, *, cwd: Path, timeout: float = 30.0) -> subprocess.CompletedProcess:
+    """在子进程里跑脚本，保证 PYTHONPATH 与锁根与父进程一致。"""
     return subprocess.run(
         [sys.executable, "-c", _PRELUDE + script],
-        cwd=str(cwd), env=env, capture_output=True, text=True,
+        cwd=str(cwd), env=_child_env(), capture_output=True, text=True,
         encoding="utf-8", timeout=timeout,
     )
 
 
-# ─── 锁目录稳定性 ─────────────────────────────────────────
+# ─── 锁根唯一 ─────────────────────────────────────────────
 
-def test_lock_dir_does_not_depend_on_whether_target_exists(tmp_path):
-    """目录目标在创建前后必须用同一个锁文件，否则互斥静默失效。"""
-    directory = tmp_path / "local"
-    assert not directory.exists()
-
-    with interprocess_lock(directory, suffix="config"):
-        pass
-    before = sorted(p.name for p in (tmp_path / ".locks").glob("*.lock"))
-
-    directory.mkdir()
-
-    fs_util._LOCKS.clear()  # 等价于新进程：缓存为空
-    with interprocess_lock(directory, suffix="config"):
-        pass
-    after = sorted(p.name for p in (tmp_path / ".locks").glob("*.lock"))
-
-    assert before == after
-    assert not (directory / ".locks").exists()
-
-
-def test_lock_dir_can_be_placed_explicitly(tmp_path):
-    """显式锁目录必须被采用，且不与默认位置混用。"""
-    pad = tmp_path / "padded"
-    with interprocess_lock(tmp_path / "a.json", suffix="x", lock_dir=pad):
-        pass
-    assert list(pad.glob("*.lock"))
-    assert not (tmp_path / ".locks").exists()
+def test_all_locks_live_in_one_root(tmp_path):
+    """不同目标、不同目录的锁都落在同一个锁根，目标旁不留锁文件。"""
+    inside = tmp_path / "config" / "local"
+    nested = tmp_path / "config" / "local" / "yysls" / "gear_sets"
+    nested.mkdir(parents=True)
+    with interprocess_lock(inside, suffix="install"):
+        with interprocess_lock(nested / "sample.json", suffix="state"):
+            names = sorted(p.name for p in fs_util.lock_root().glob("*.lock"))
+    assert len(names) == 2
+    assert not (tmp_path / "config" / "local" / ".locks").exists()
+    assert not (nested / ".locks").exists()
 
 
 def test_different_suffixes_use_different_lock_files(tmp_path):
@@ -88,10 +81,11 @@ def test_different_suffixes_use_different_lock_files(tmp_path):
     with interprocess_lock(target, suffix="beta"):
         pass
 
-    names = sorted(p.name for p in (tmp_path / ".locks").glob("*.lock"))
+    names = sorted(p.name for p in fs_util.lock_root().glob("*.lock"))
     assert len(names) == 2
-    assert any(name.endswith(".alpha.lock") for name in names)
-    assert any(name.endswith(".beta.lock") for name in names)
+    assert any(name.startswith("alpha_") for name in names)
+    assert any(name.startswith("beta_") for name in names)
+    assert all(re.fullmatch(r"[a-z]+_[0-9a-f]{8}\.lock", name) for name in names)
 
 
 def test_nested_acquire_in_one_thread_is_reentrant(tmp_path):
@@ -121,7 +115,7 @@ def test_other_process_holding_the_lock_makes_us_time_out(tmp_path):
         deadline = time.monotonic() + 10
         lock_files = []
         while time.monotonic() < deadline:
-            lock_files = list((tmp_path / ".locks").glob("*.lock"))
+            lock_files = list(fs_util.lock_root().glob("*.lock"))
             if lock_files:
                 break
             time.sleep(0.05)
@@ -156,10 +150,7 @@ def test_cross_process_read_modify_write_does_not_lose_updates(tmp_path):
         f"print('done', flush=True)\n"
     )
 
-    env = {**os.environ}
-    src = str(Path(__file__).resolve().parents[2] / "src")
-    env["PYTHONPATH"] = os.pathsep.join(filter(None, (src, env.get("PYTHONPATH"))))
-    env["PYTHONIOENCODING"] = "utf-8"
+    env = _child_env()
     processes = [
         subprocess.Popen(
             [sys.executable, "-c", _PRELUDE + worker],

@@ -62,7 +62,7 @@ _write_batches: ContextVar[dict[int, dict[str, None]] | None] = ContextVar("conf
 def _config_write_lock(self):
     """同一配置目录的跨进程写锁（见 ``content.config_write_lock``）。"""
     from .content import config_write_lock
-    return config_write_lock(self.config_dir, self.local_dir)
+    return config_write_lock(self.local_dir)
 
 
 def _configuration_write(function):

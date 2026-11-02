@@ -10,7 +10,7 @@ from pathlib import Path
 from fasteners import InterProcessLock
 
 from .agent_mcp import DEFAULT_MCP_PORT
-from .fs_util import atomic_write_text
+from .fs_util import atomic_write_text, lock_file
 from .paths import config_directory, session_directory
 
 
@@ -57,7 +57,9 @@ class AgentConnection:
 def export_agent(config: dict, path: Path, *, server_name: str, transport: str = "streamable-http") -> Path:
     """共同的 JSON 配置合并；各客户端由自己的适配器选择目标文件。"""
     path.parent.mkdir(parents=True, exist_ok=True)
-    lock = InterProcessLock(str(path) + ".lvjiang.lock")
+    lock_path = lock_file("agent", os.path.normcase(str(path.resolve())))
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = InterProcessLock(str(lock_path))
     with lock:
         data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         if not isinstance(data, dict) or not isinstance(data.get("mcpServers", {}), dict):

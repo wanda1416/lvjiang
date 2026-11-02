@@ -111,7 +111,7 @@ class DocumentDirectoryStore:
         with self._thread_lock:
             if self._initialized:
                 return
-            with interprocess_lock(self._meta_path, suffix="documents"):
+            with interprocess_lock(self._meta_path, suffix="document"):
                 self._require_write()
                 self._initialize_unlocked()
             self._initialized = True
@@ -122,7 +122,7 @@ class DocumentDirectoryStore:
         with self._thread_lock:
             # 事务恢复会改文件，只在真的存在事务日志时才取写锁，正常读不阻塞。
             if self._transaction_path.exists():
-                with interprocess_lock(self._meta_path, suffix="documents"):
+                with interprocess_lock(self._meta_path, suffix="document"):
                     self._recover_unlocked()
             return deepcopy(self._read(self._path(key)))
 
@@ -130,7 +130,7 @@ class DocumentDirectoryStore:
         self._path(key)
         self.ensure_initialized()
         with self._thread_lock, interprocess_lock(
-                self._meta_path, suffix="documents"):
+                self._meta_path, suffix="document"):
             self._require_write()
             self._recover_unlocked()
             updated = fn(deepcopy(self._read(self._path(key))))
@@ -150,7 +150,7 @@ class DocumentDirectoryStore:
             self._path(key)
         self.ensure_initialized()
         with self._thread_lock, interprocess_lock(
-                self._meta_path, suffix="documents"):
+                self._meta_path, suffix="document"):
             self._require_write()
             self._recover_unlocked()
             current = {key: self._read(self._path(key)) for key in keys}

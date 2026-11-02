@@ -112,7 +112,10 @@ def _clear_stored_session() -> None:
 
 def _request(method: str, route: str, data: dict | None = None,
              token: str = "") -> dict:
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    headers = {"Content-Type": "application/json", "Accept": "application/json",
+               # 自定义 UA：urllib 默认的 Python-urllib 会被 Cloudflare Bot 防护
+               # 在边缘直接 403（请求到不了 Worker），网页与内容服务客户端同理。
+               "User-Agent": "lvjiang-account-client"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     request = urlrequest.Request(

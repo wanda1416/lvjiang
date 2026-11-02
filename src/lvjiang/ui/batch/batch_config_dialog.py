@@ -63,6 +63,10 @@ class BatchConfigDialog(QDialog):
         self._current_id = ""
         self._updating_choices = False
         self._setup_ui()
+        # 默认高度在 sizeHint 基础上加 20%：参数区可见时树不至于被压到最小值，
+        # 多余高度由 splitter 全部分给任务/用户列表。
+        hint = self.sizeHint()
+        self.resize(hint.width(), int(hint.height() * 1.2))
         self._refresh_config_list()
 
     def _setup_ui(self) -> None:
@@ -171,6 +175,10 @@ class BatchConfigDialog(QDialog):
         self._scope_form = scope_form
 
         wf_form = scope_form
+        # 调度单元／生命周期工作流这些行高度固定：Maximum 让 splitter 把表单
+        # pane 限制在内容 sizeHint 内，富余高度全部给上方任务用户列表，
+        # 条目准备等行紧贴调度单元块，pane 底部不留空白带。
+        wf_form.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._selectors = {}
         for key, label in (
             ("batch_setup", tr("批次准备工作流：")),
@@ -198,7 +206,6 @@ class BatchConfigDialog(QDialog):
         recover_widget.setLayout(recover_row)
         wf_form.add_field(tr("异常恢复工作流："), recover_widget, new_row=True)
         wf_form.add_field(None, self._skip_single_lifecycle)
-        layout.addWidget(wf_form)
         # 生命周期参数紧跟它所属的 wf：wf 在这里选，参数却要去另一个窗口填，
         # 是上一版把同一件事拆到两处的典型。
         self._workflow_params_panel = QWidget()
@@ -211,8 +218,32 @@ class BatchConfigDialog(QDialog):
         self._workflow_params_scroll.setWidgetResizable(True)
         self._workflow_params_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._workflow_params_scroll.setWidget(self._workflow_params_panel)
-        self._workflow_params_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-        layout.addWidget(self._workflow_params_scroll)
+        self._workflow_params_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        # 三块都放进一个纵向 splitter：选择树不再靠 stretch 独占全部富余高度，
+        # 参数区也不再需要"按对话框高度//3"手算上限——那条路径依赖 resizeEvent
+        # 重算，首帧 height()/sizeHint() 还没就绪时会把参数区压没，只有用户
+        # 缩放对话框才"刷出来"。
+        main_splitter = QSplitter(Qt.Orientation.Vertical)
+        main_splitter.addWidget(choices)
+        main_splitter.addWidget(wf_form)
+        main_splitter.addWidget(self._workflow_params_scroll)
+        main_splitter.setStretchFactor(0, 1)
+        main_splitter.setStretchFactor(1, 0)
+        main_splitter.setStretchFactor(2, 0)
+        main_splitter.setCollapsible(1, False)
+        main_splitter.setSizes([
+            max(180, choices.minimumSizeHint().height()),
+            max(140, wf_form.sizeHint().height()),
+            200,
+        ])
+        layout.addWidget(main_splitter, 1)
+        # QSplitter 不把表单的 Maximum 策略当成 pane 上限：表单内容变化
+        # （require 显隐、单双列切换）后 pane 仍会留出多余高度。用事件过滤器
+        # 监听重排请求，把中间 pane 高度钳回 sizeHint，富余还给上方列表。
+        self._main_splitter = main_splitter
+        self._clamping_form_pane = False
+        wf_form.installEventFilter(self)
+        self._clamp_form_pane()
         for combo in self._selectors.values():
             combo.currentTextChanged.connect(self._on_workflow_changed)
 
@@ -539,7 +570,6 @@ class BatchConfigDialog(QDialog):
             self._workflow_params_layout.addWidget(group)
         self._refresh_workflow_param_visibility()
         self._workflow_params_scroll.setVisible(bool(self._workflow_param_groups))
-        self._update_workflow_params_height()
 
     def _refresh_workflow_param_visibility(self) -> None:
         """按 require 依赖隐藏当前取值下不适用的生命周期参数行。
@@ -564,17 +594,6 @@ class BatchConfigDialog(QDialog):
             for (row_phase, name), widget in self._workflow_param_widgets.items():
                 if row_phase == phase:
                     form.set_field_visible(widget, name in visible)
-        self._update_workflow_params_height()
-
-    def _update_workflow_params_height(self) -> None:
-        scroll = getattr(self, "_workflow_params_scroll", None)
-        if scroll is not None:
-            content_height = self._workflow_params_layout.sizeHint().height()
-            scroll.setMaximumHeight(min(content_height, max(140, self.height() // 3)))
-
-    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API
-        super().resizeEvent(event)
-        self._update_workflow_params_height()
 
     def _collect_workflow_params(self) -> dict[str, dict]:
         """从控件读出各阶段参数值；写回配置与算 require 可见性共用这一份。"""

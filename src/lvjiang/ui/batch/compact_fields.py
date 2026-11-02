@@ -84,6 +84,12 @@ class CompactFields(QWidget):
             if column == columns:
                 row += 1
                 column = 0
+        # 富余高度必须沉到表单底部：行 stretch 残留不清零、也不补一行兜底
+        # stretch 的话，网格会把 pane 多出来的高度平摊进行间距，字段行之间
+        # 就会隔出大段空白（放进 splitter 后 pane 高度不再贴着内容走）。
+        for r in range(self._grid.rowCount()):
+            self._grid.setRowStretch(r, 0)
+        self._grid.setRowStretch(row + 1, 1)
         self.updateGeometry()
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt API

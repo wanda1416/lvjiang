@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
@@ -89,6 +90,9 @@ class AccountHolder(QObject):
         self.summary: dict | None = None
         self.done = False
         self.worker: _AccountWorker | None = None
+        self.sync_attempted = False
+        self.last_sync_report = None
+        self.sync_worker: _AccountWorker | None = None
 
     @property
     def busy(self) -> bool:
@@ -109,6 +113,29 @@ class AccountHolder(QObject):
     def _restore_finished(self, ok: bool, result) -> None:
         self.worker = None
         self.apply(result if ok else None)
+        if result is not None:
+            self.sync_in_background()
+
+    def sync_in_background(self) -> None:
+        """启动/登录后的静默自动同步：日志记账，结果供对话框展示。"""
+        from ..core.sync.engine import sync_documents
+        token = self.session.access_token
+        if not token or self.sync_worker is not None:
+            return
+        self.sync_attempted = True
+        self.sync_worker = _AccountWorker(lambda: sync_documents(token), self)
+        self.sync_worker.completed.connect(self._sync_done)
+        self.sync_worker.start()
+
+    def _sync_done(self, ok: bool, result) -> None:
+        worker, self.sync_worker = self.sync_worker, None
+        if worker is not None:
+            worker.deleteLater()
+        if ok:
+            self.last_sync_report = result
+            logger.info("[account] {}", result.describe())
+        else:
+            logger.warning("[account] 自动同步未完成：{}", result)
 
     def apply(self, summary: dict | None) -> None:
         """写入最新状态（登录/登出/刷新后的 summary）并广播。"""
@@ -194,9 +221,17 @@ class AccountManagerDialog(QDialog):
         self.info_host.setVisible(False)
         layout.addWidget(self.info_host)
 
-        note = QLabel(tr("数据同步将在后续版本开放；当前为账号认证与信息查看。"))
-        note.setWordWrap(True)
-        layout.addWidget(note)
+        # ── 数据同步（文档通道）──
+        sync_row = QHBoxLayout()
+        self.sync_button = QPushButton(tr("立即同步"))
+        apply_button_style(self.sync_button, variant="neutral")
+        self.sync_button.clicked.connect(self._sync_now)
+        sync_row.addWidget(self.sync_button)
+        sync_row.addStretch()
+        layout.addLayout(sync_row)
+        self.sync_status = QLabel(tr("尚未同步。登录后自动同步一次；换页面前手动同步可立即互通。"))
+        self.sync_status.setWordWrap(True)
+        layout.addWidget(self.sync_status)
 
         # 启动恢复若已完成，立即按缓存渲染；否则跟随恢复结果刷新。
         self.holder.changed.connect(self._on_holder_changed)
@@ -276,6 +311,9 @@ class AccountManagerDialog(QDialog):
                 self._render(None)
             return
         self.holder.apply(result)
+        if result is not None and not self.holder.sync_attempted:
+            # 登录/启动恢复成功后自动同步一次（后台，不阻塞渲染）。
+            self._sync_now(quiet=True)
 
     # ─── 动作 ───────────────────────────────────────────
 
@@ -324,3 +362,35 @@ class AccountManagerDialog(QDialog):
             return self.holder.session.summary()
 
         self._run(action, tr("正在修改密码…"))
+
+    # ─── 数据同步 ───────────────────────────────────────
+
+    def _sync_now(self, quiet: bool = False) -> None:
+        from ..core.sync.engine import sync_documents
+        token = self.holder.session.access_token
+        # 启动自动同步还在跑时直接跳过：它结束会刷新同一份状态，重复跑白费流量。
+        if not token or self.worker is not None or self.holder.sync_worker is not None:
+            return
+        self.holder.sync_attempted = True
+        if not quiet:
+            self._set_busy(True, tr("正在同步…"))
+        self.sync_button.setEnabled(False)
+        if not quiet:
+            self.sync_status.setText(tr("正在同步文档…"))
+        self.worker = _AccountWorker(lambda: sync_documents(token), self)
+        self.worker.completed.connect(self._sync_finished)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.worker.start()
+
+    def _sync_finished(self, ok: bool, result) -> None:
+        self.worker = None
+        self._set_busy(False)
+        self.sync_button.setEnabled(True)
+        if not ok:
+            self.sync_status.setText(str(result))
+            return
+        self.holder.last_sync_report = result
+        parts = [tr("上次同步") + "：", result.describe()]
+        if result.errors:
+            parts.append("；".join(result.errors[:3]))
+        self.sync_status.setText("".join(parts))

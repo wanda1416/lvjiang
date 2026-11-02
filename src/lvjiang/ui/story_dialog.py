@@ -1,11 +1,11 @@
 """自动剧情文案库编辑对话框（通用工具，挂在「工具」菜单）。
 
-支持多配置文件组：每组一个 ``tools/auto_plot/<组名>.json``，激活时全部组
+支持多个配置文件：一个文件 ``tools/auto_plot/<文件名>.json``，激活时全部文件
 一起生效。普通用户只能保存到 ``local``；``system`` 是随发布内容，仅在开发者
 模式可选。
 
 顶部两行：
-1. 配置文件组下拉 + 新建/删除；
+1. 配置文件下拉 + 新建/删除；
 2. 匹配阈值 / 保存到 / 文案库来源。
 """
 
@@ -44,9 +44,8 @@ from lvjiang.core.story import (
     delete_group,
     list_groups,
     load_group,
-    load_settings,
     save_group,
-    save_settings,
+    set_group_threshold,
     upsert_entry,
 )
 from lvjiang.i18n import tr
@@ -61,9 +60,13 @@ from lvjiang.ui.layout_helpers import (
     navigation_width_for_chars,
 )
 
+#: 各「标签 + 控件」行的统一间距（像素）。每行都是独立的 QHBoxLayout，
+#: 间距不一致时即使标签等宽，后面的输入框也会错开。
+_FIELD_ROW_SPACING = 12
+
 
 class StoryChoicesDialog(QDialog):
-    """剧情文案库编辑器（多配置组）。"""
+    """剧情文案库编辑器（多配置文件）。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -82,6 +85,7 @@ class StoryChoicesDialog(QDialog):
 
         layout.addLayout(self._build_group_row())
         layout.addLayout(self._build_settings_row())
+        self._align_field_labels()
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._build_list())
@@ -95,12 +99,31 @@ class StoryChoicesDialog(QDialog):
 
         layout.addLayout(self._build_bottom())
 
+    def _align_field_labels(self) -> None:
+        """统一字段标签宽度，让各行的输入控件左边界对齐。
+
+        「配置文件 / 匹配阈值 / 保存到」都是四个字，但每行是独立的
+        QHBoxLayout：字号、间距、附加控件的任何差异都会让输入框错开一格。
+        取最宽标签的 sizeHint 统一 setFixedWidth，再配合同一行间距即可对齐。
+        """
+        labels = [getattr(self, name, None) for name in
+                  ("_group_label", "_threshold_label", "_save_label")]
+        existing = [label for label in labels if label is not None]
+        if not existing:
+            return
+        width = max(label.sizeHint().width() for label in existing)
+        for label in existing:
+            label.setFixedWidth(width)
+
     def _build_group_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.addWidget(QLabel(tr("配置文件组：")))
+        # 与设置行同一间距：间距不同时，两个标签等宽也会让后面的控件错开。
+        row.setSpacing(_FIELD_ROW_SPACING)
+        self._group_label = QLabel(tr("配置文件："))
+        row.addWidget(self._group_label)
         self._group = AutoWidthComboBox()
         self._group.setToolTip(
-            tr("激活时全部配置组一起生效；这里只切换要编辑的那一组")
+            tr("激活时全部配置文件一起生效；这里只切换要编辑的那一个")
         )
         self._group.currentIndexChanged.connect(self._on_group_changed)
         row.addWidget(self._group)
@@ -108,7 +131,7 @@ class StoryChoicesDialog(QDialog):
         new_btn = QPushButton(tr("＋ 新建"))
         new_btn.setAutoDefault(False)
         new_btn.clicked.connect(self._on_new_group)
-        del_btn = QPushButton(tr("删除组"))
+        del_btn = QPushButton(tr("删除文件"))
         del_btn.setAutoDefault(False)
         del_btn.clicked.connect(self._on_delete_group)
         apply_button_style(new_btn)
@@ -120,7 +143,7 @@ class StoryChoicesDialog(QDialog):
 
     def _build_settings_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setSpacing(12)
+        row.setSpacing(_FIELD_ROW_SPACING)
 
         self._threshold = QDoubleSpinBox()
         self._threshold.setRange(0.0, 1.0)
@@ -129,7 +152,9 @@ class StoryChoicesDialog(QDialog):
         self._threshold.setToolTip(
             tr("选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择")
         )
-        row.addWidget(QLabel(tr("匹配阈值：")))
+        self._threshold.editingFinished.connect(self._on_threshold_edited)
+        self._threshold_label = QLabel(tr("匹配阈值："))
+        row.addWidget(self._threshold_label)
         row.addWidget(self._threshold)
 
         self._layer = AutoWidthComboBox()
@@ -144,7 +169,8 @@ class StoryChoicesDialog(QDialog):
                 if item is not None:
                     item.setEnabled(False)
         self._layer.setToolTip(tr("普通用户只能保存到本地；系统为随发布内容"))
-        row.addWidget(QLabel(tr("保存到：")))
+        self._save_label = QLabel(tr("保存到："))
+        row.addWidget(self._save_label)
         row.addWidget(self._layer)
 
         row.addStretch(1)
@@ -235,7 +261,7 @@ class StoryChoicesDialog(QDialog):
         row.addWidget(self._buttons)
         return row
 
-    # ─── 组管理 ──────────────────────────────────────────
+    # ─── 文件管理 ────────────────────────────────────────
 
     def _reload_groups(self, select: str = "") -> None:
         groups = list_groups()
@@ -255,31 +281,31 @@ class StoryChoicesDialog(QDialog):
 
     def _on_new_group(self) -> None:
         name, ok = QInputDialog.getText(
-            self, tr("新建配置组"), tr("组名（如 主线-第三章 / 活动-夏日）：")
+            self, tr("新建配置文件"), tr("文件名（如 主线-第三章 / 活动-夏日）：")
         )
         name = name.strip()
         if not ok or not name:
             return
         if name in list_groups():
-            self._set_status(tr("该配置组已存在"), error=True)
+            self._set_status(tr("该配置文件已存在"), error=True)
             return
         try:
             save_group(name, StoryDoc(), layer=self._layer.currentData())
         except Exception as exc:  # noqa: BLE001
-            logger.warning(f"story: 新建配置组失败: {exc}")
+            logger.warning(f"story: 新建配置文件失败: {exc}")
             self._set_status(tr("新建失败：") + str(exc), error=True)
             return
         self._reload_groups(select=name)
-        self._set_status(tr("已新建配置组：") + name)
+        self._set_status(tr("已新建配置文件：") + name)
 
     def _on_delete_group(self) -> None:
         group = self._current_group()
         if not group:
-            self._set_status(tr("没有可删除的配置组"), error=True)
+            self._set_status(tr("没有可删除的配置文件"), error=True)
             return
         box = QMessageBox(self)
         box.setWindowTitle(tr("确认删除"))
-        box.setText(tr("删除配置组「{name}」及其全部文案？").format(name=group))
+        box.setText(tr("删除配置文件「{name}」及其全部文案？").format(name=group))
         box.setStandardButtons(
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -289,11 +315,11 @@ class StoryChoicesDialog(QDialog):
         try:
             delete_group(group, layer=self._layer.currentData())
         except Exception as exc:  # noqa: BLE001
-            logger.warning(f"story: 删除配置组失败: {exc}")
+            logger.warning(f"story: 删除配置文件失败: {exc}")
             self._set_status(tr("删除失败：") + str(exc), error=True)
             return
         self._reload_groups()
-        self._set_status(tr("已删除配置组：") + group)
+        self._set_status(tr("已删除配置文件：") + group)
 
     # ─── 条目 ────────────────────────────────────────────
 
@@ -311,9 +337,25 @@ class StoryChoicesDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, entry.id)
             self._list.addItem(item)
         self._list.blockSignals(False)
-        self._threshold.setValue(load_settings().match_threshold)
+        # 阈值属于当前文件：切文件就跟着换，没存过的文件用默认值
+        self._threshold.setValue(doc.match_threshold)
         self._refresh_origin()
         self._current_id = ""
+
+    def _on_threshold_edited(self) -> None:
+        """阈值改完就写回当前文件，避免"改了阈值却要另存一条文案才生效"。"""
+        group = self._current_group()
+        if not group:
+            self._set_status(tr("请先新建一个配置文件"), error=True)
+            return
+        try:
+            set_group_threshold(
+                group, self._threshold.value(), layer=self._layer.currentData())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"story: 保存匹配阈值失败: {exc}")
+            self._set_status(tr("阈值保存失败：") + str(exc), error=True)
+            return
+        self._set_status(tr("匹配阈值已保存到") + group)
 
     def _find_entry(self, entry_id: str) -> StoryEntry | None:
         group = self._current_group()
@@ -347,7 +389,7 @@ class StoryChoicesDialog(QDialog):
     def _refresh_origin(self) -> None:
         group = self._current_group()
         if not group:
-            self._origin.setText(tr("无配置组"))
+            self._origin.setText(tr("无配置文件"))
             self._origin.setStyleSheet("color: palette(mid);")
             self._origin.setToolTip("")
             return
@@ -366,7 +408,7 @@ class StoryChoicesDialog(QDialog):
         else:
             self._origin.setText(tr("未创建"))
             self._origin.setStyleSheet("color: palette(mid);")
-            tip = tr("该组还没有落盘，保存后创建")
+            tip = tr("该文件还没有落盘，保存后创建")
         self._origin.setToolTip(tip)
 
     def _set_status(self, text: str, *, error: bool = False) -> None:
@@ -396,7 +438,7 @@ class StoryChoicesDialog(QDialog):
 
     def _on_add(self) -> None:
         if not self._current_group():
-            self._set_status(tr("请先新建一个配置组"), error=True)
+            self._set_status(tr("请先新建一个配置文件"), error=True)
             return
         self._current_id = ""
         self._scene.clear()
@@ -438,7 +480,7 @@ class StoryChoicesDialog(QDialog):
     def _on_save(self) -> None:
         group = self._current_group()
         if not group:
-            self._set_status(tr("请先新建一个配置组"), error=True)
+            self._set_status(tr("请先新建一个配置文件"), error=True)
             return
         options = [
             line.strip()
@@ -462,8 +504,8 @@ class StoryChoicesDialog(QDialog):
         )
         layer = self._layer.currentData()
         try:
-            upsert_entry(entry, group=group, layer=layer)
-            save_settings(self._threshold.value(), layer=layer)
+            upsert_entry(entry, group=group, layer=layer,
+                         match_threshold=self._threshold.value())
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"story: 保存文案失败: {exc}")
             self._set_status(tr("保存失败：") + str(exc), error=True)
@@ -471,7 +513,7 @@ class StoryChoicesDialog(QDialog):
         self._current_id = entry.id
         self._reload_entries()
         self._set_status(
-            tr("已保存到") + str(self._layer.currentText()) + tr("，配置组「") + group + tr("」")
+            tr("已保存到") + str(self._layer.currentText()) + tr("，配置文件「") + group + tr("」")
         )
 
 

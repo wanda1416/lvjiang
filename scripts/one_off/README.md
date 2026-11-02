@@ -50,3 +50,17 @@
 运行 `python scripts/one_off/compare_role_attr_validity.py`，全部一致时退出码为 0；
 加 `--mutate-max-key` 会把新版的 `max_` 前缀改坏，脚本必须报差异——用于确认这套
 比对有分辨率，不是恒真。
+
+## 自动剧情匹配阈值迁移
+
+[migrate_story_threshold.py](migrate_story_threshold.py) 把 0.15.7 及更早版本的
+全局阈值（`tools/auto_plot/_settings.json`）搬进每个缺 `match_threshold` 的
+配置文件；已经自带阈值的文件不动。0.15.8 起阈值随文件走，`_settings.json` 不再是
+产品的一部分。
+
+先干跑看清单，再写入：
+
+```bash
+python scripts/one_off/migrate_story_threshold.py
+python scripts/one_off/migrate_story_threshold.py --apply --delete-legacy
+```

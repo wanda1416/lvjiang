@@ -232,5 +232,5 @@ end
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `story_options` | `(scene, area) -> list[str]` | 返回当前对话的全部选项文本（按画面从上到下） |
-| `story_pick` | `(scene, area) -> FoundRegion \| str` | 查全部配置组，返回当前画面中正确答案选项的坐标（`FoundRegion`） |
-| `story_learn` | `(options, answer, question, scene, group, layer) -> bool` | 把一次「选项集合 + 正确答案」写回指定配置组 |
+| `story_pick` | `(scene, area) -> FoundRegion \| str` | 查全部文案库文件，返回当前画面中正确答案选项的坐标（`FoundRegion`） |
+| `story_learn` | `(options, answer, question, scene, group, layer) -> bool` | 把一次「选项集合 + 正确答案」写回指定文案库文件 |

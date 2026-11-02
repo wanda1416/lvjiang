@@ -78,7 +78,7 @@ def story_pick(
     scene: str = "general_chat",
     area: str = "dialogue_options",
 ) -> FoundRegion | str:
-    """查全部配置组，返回当前画面中正确答案选项的坐标（``FoundRegion``）。
+    """查全部文案库文件，返回当前画面中正确答案选项的坐标（``FoundRegion``）。
 
     未收录或匹配分数低于阈值时返回 ``""``——调用方应 ``pause`` 让人工选择，
     避免误点不可逆的剧情选项。
@@ -129,7 +129,7 @@ def story_pick(
         "answer": "正确答案",
         "question": "问题文本",
         "scene": "场景名",
-        "group": "配置组名",
+        "group": "写入的文件名（即 tools/auto_plot/<文件名>.json）",
         "layer": "写入层 local/system",
     },
 )
@@ -141,7 +141,7 @@ def story_learn(
     group: str = "未分类",
     layer: str = "local",
 ) -> bool:
-    """把一次「选项集合 + 正确答案」写回指定配置组。
+    """把一次「选项集合 + 正确答案」写回指定文案库文件。
 
     普通用户只能写 ``local``；``layer="system"`` 仅在开发者模式生效，
     否则自动降级为 local。

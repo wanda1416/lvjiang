@@ -84,8 +84,6 @@ def match(doc: StoryDoc, current_options: Sequence[str]) -> MatchResult | None:
     options = [item for item in current_options if item.strip()]
     if not options or not doc.entries:
         return None
-    threshold = doc.settings.match_threshold
-
     best_entry: StoryEntry | None = None
     best_score = 0.0
     for entry in doc.entries:
@@ -93,7 +91,12 @@ def match(doc: StoryDoc, current_options: Sequence[str]) -> MatchResult | None:
         if score > best_score:
             best_score = score
             best_entry = entry
-    if best_entry is None or best_score < threshold:
+    if best_entry is None:
+        return None
+
+    # 阈值随文件走：用命中条目**来源文件**的阈值，多个文件之间互不影响。
+    threshold = doc.threshold_for(best_entry)
+    if best_score < threshold:
         return None
 
     answer = pick_answer(best_entry, options, threshold)

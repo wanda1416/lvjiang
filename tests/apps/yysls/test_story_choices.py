@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from lvjiang.core.story import (
+    DEFAULT_THRESHOLD,
     StoryDoc,
     StoryEntry,
     list_groups,
@@ -12,6 +15,7 @@ from lvjiang.core.story import (
     load_group,
     match,
     normalize,
+    set_group_threshold,
     similarity,
     upsert_entry,
 )
@@ -126,12 +130,59 @@ def test_list_groups_and_merge_across_layers(tmp_path, monkeypatch):
     assert {entry.id for entry in all_doc.entries} == {"a1", "a2", "a3", "b1"}
 
 
-def test_list_groups_skips_internal_settings(tmp_path, monkeypatch):
+def test_list_groups_skips_underscore_prefixed_files(tmp_path, monkeypatch):
+    """``_`` 前缀是内部文件（临时/草稿），不算配置文件。"""
     system, _local = _fake_resolver(tmp_path, monkeypatch)
     _write_group(system, "主线", [{"id": "a", "options": ["x"], "answer": "x"}])
-    settings_path = system / "tools" / "auto_plot" / "_settings.json"
-    settings_path.write_text('{"match_threshold": 0.6}', encoding="utf-8")
+    sidecar = system / "tools" / "auto_plot" / "_draft.json"
+    sidecar.write_text('{"entries": []}', encoding="utf-8")
     assert list_groups() == ["主线"]
+
+
+def test_threshold_lives_in_the_file_and_roundtrips(tmp_path, monkeypatch):
+    """阈值跟着文件走：写进去再读回来，且不影响别的文件。"""
+    _system, local = _fake_resolver(tmp_path, monkeypatch)
+    _write_group(local, "主线", [{"id": "a", "options": ["x"], "answer": "x"}])
+    _write_group(local, "活动", [{"id": "b", "options": ["y"], "answer": "y"}])
+
+    assert load_group("主线").match_threshold == DEFAULT_THRESHOLD
+    set_group_threshold("主线", 0.55, layer="local")
+
+    assert load_group("主线").match_threshold == pytest.approx(0.55)
+    assert load_group("活动").match_threshold == DEFAULT_THRESHOLD
+    raw = json.loads(
+        (local / "tools" / "auto_plot" / "主线.json").read_text(encoding="utf-8"))
+    assert raw["match_threshold"] == pytest.approx(0.55)
+    # 条目没被阈值写入碰掉
+    assert [item["id"] for item in raw["entries"]] == ["a"]
+
+
+def test_upsert_entry_keeps_existing_threshold(tmp_path, monkeypatch):
+    """加一条文案不能把该文件已调好的阈值冲回默认值。"""
+    _system, local = _fake_resolver(tmp_path, monkeypatch)
+    _write_group(local, "主线", [{"id": "a", "options": ["x"], "answer": "x"}])
+    set_group_threshold("主线", 0.4, layer="local")
+
+    upsert_entry(
+        StoryEntry(id="b", options=("y",), answer="y"),
+        group="主线", layer="local")
+
+    assert load_group("主线").match_threshold == pytest.approx(0.4)
+
+
+def test_match_uses_the_threshold_of_the_entry_source_file():
+    """合并视图里按命中条目**来源文件**的阈值判分，文件之间互不污染。
+
+    严格文件(0.99)的条目分数更高但没到自己的阈值 → 不命中；
+    把阈值对调后同样的分数就命中，证明判分看的是来源而不是某个全局值。
+    """
+    entry = StoryEntry(id="a", options=("为守护他人", "为求长生"), answer="为守护他人")
+
+    strict = StoryDoc(entries=[entry], thresholds={"a": 0.99})
+    assert match(strict, ["为守沪他人", "为求长生"]) is None
+
+    lenient = StoryDoc(entries=[entry], thresholds={"a": 0.3})
+    assert match(lenient, ["为守沪他人", "为求长生"]) is not None
 
 
 def test_upsert_entry_only_writes_target_layer(tmp_path, monkeypatch):

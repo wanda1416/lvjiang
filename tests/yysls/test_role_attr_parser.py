@@ -211,10 +211,14 @@ class TestParseDetail2OuterAttack:
 
 def test_scan_reads_outer_attack_before_attribute_attack(monkeypatch):
     """执行生产 DSL：先保存基础外功，再读取各流派属性攻击，详情正确进入结果。"""
-    proc = parse_file(
+    program = parse_file(
         get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
-    ).procs["capture_role_base_attrs"]
+    )
+    proc = program.procs["capture_role_base_attrs"]
     engine = make_engine()
+    # 判定语句调用同文件的 attr_range_complete / attr_attack_has_school；
+    # 不注册本文件的过程，call 会落空、_right_*_valid 变成 None。
+    engine._procs = dict(program.procs)
     details = {
         "外功攻击": RIGHT_OUTER_ATTACK,
         "属性攻击": RIGHT_ATTR_ATTACK,
@@ -277,14 +281,16 @@ def test_scan_failure_tells_user_to_create_base_attrs_manually():
 )
 def test_scan_requires_parsed_school_attack_detail(attr_attack, expected):
     """运行生产 DSL 校验：无相或只有攻击标签，不能冒充流派属性攻击。"""
-    proc = parse_file(
+    program = parse_file(
         get_config_system_dir() / "workflows/subcall/loadout/role_attrs.wf"
-    ).procs["capture_role_base_attrs"]
+    )
+    proc = program.procs["capture_role_base_attrs"]
     parse_index = next(
         index for index, node in enumerate(proc.body)
         if isinstance(node, Eval) and node.target == "parsed"
     )
     engine = make_engine()
+    engine._procs = dict(program.procs)
     engine.variables = {"data": {
         "right_outer_attack": RIGHT_OUTER_ATTACK,
         "right_attr_attack": attr_attack,

@@ -35,3 +35,18 @@
 退出所有律匠节点后运行 `python scripts/one_off/cleanup_obsolete_locks.py --config config`
 盘点，再追加 `--apply` 删除。主节点或用户仍占用时拒绝清理；不改用户数据，
 保留主节点及当前用户占用锁，不在客户端启动时自动执行。
+
+## 角色属性有效性判定
+
+[等价验证](compare_role_attr_validity.py) 对照 Git `HEAD` 的 `role_attrs.wf`，把
+"外功区间完整 / 至少一门流派的属性攻击区间完整"两条判定，在 4 门派 ×
+{缺 min / 缺 max / 都在 / 都缺} × 外功 4 态共 1024 组键存在组合下逐组比对
+**取值与类型**。用于证明拆分出的 `attr_range_complete` / `attr_attack_has_school`
+与原来的两条 `and/or` 表达式行为一致（语句数变了，AST 逐棵比对不适用）。
+
+基线固定为重构前提交 `71a702ae`（最后一次仍带旧表达式的版本），不要用 `git HEAD`
+——重构提交之后 HEAD 就是新版，再跑等于新版跟自己比。需要换基线时用 `--base <rev>`。
+
+运行 `python scripts/one_off/compare_role_attr_validity.py`，全部一致时退出码为 0；
+加 `--mutate-max-key` 会把新版的 `max_` 前缀改坏，脚本必须报差异——用于确认这套
+比对有分辨率，不是恒真。

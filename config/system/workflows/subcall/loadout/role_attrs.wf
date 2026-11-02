@@ -71,6 +71,25 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
     return $saved_name
 end
 
+# ─── 右区有效性判定 ───────────────────────────────────────
+# 某门派的区间是否完整：min/max 两个键都在。外功与四门流派共用同一判据。
+def attr_range_complete($detail, $school)
+    return has_key($detail, "min_" + $school) and has_key($detail, "max_" + $school)
+end
+
+# 属性攻击至少要有一门流派的完整区间。门派列表是数据：新增流派只改这里，
+# 不再往判定式里加一组 and/or。
+def attr_attack_has_school($detail)
+    for school in ["mingjin", "lieshi", "qiansi", "pozhu"]
+        call $complete = attr_range_complete($detail, $school)
+        if $complete
+            return true
+        end
+    end
+    return false
+end
+
+
 # ─── capture_role_base_attrs ──────────────────────────────
 # 滚动采集角色属性面板的原始文本，并解析成结构化属性（不做 UI 与存储写入）。
 #
@@ -137,8 +156,10 @@ def capture_role_base_attrs($scroll_count)
     eval $attr_attack_detail = to_role_base_attrs({"right_attr_attack": $data.right_attr_attack})
     eval $outer_pen_detail = to_role_base_attrs({"right_outer_pen": $data.right_outer_pen})
     eval $attr_pen_detail = to_role_base_attrs({"right_attr_pen": $data.right_attr_pen})
-    eval $parsed._right_outer_valid = has_key($outer_detail, "min_outer") and has_key($outer_detail, "max_outer")
-    eval $parsed._right_attr_attack_valid = (has_key($attr_attack_detail, "min_mingjin") and has_key($attr_attack_detail, "max_mingjin")) or (has_key($attr_attack_detail, "min_lieshi") and has_key($attr_attack_detail, "max_lieshi")) or (has_key($attr_attack_detail, "min_qiansi") and has_key($attr_attack_detail, "max_qiansi")) or (has_key($attr_attack_detail, "min_pozhu") and has_key($attr_attack_detail, "max_pozhu"))
+    call $outer_valid = attr_range_complete($outer_detail, "outer")
+    eval $parsed._right_outer_valid = $outer_valid
+    call $attr_attack_valid = attr_attack_has_school($attr_attack_detail)
+    eval $parsed._right_attr_attack_valid = $attr_attack_valid
     eval $parsed._right_outer_pen_valid = has_key($outer_pen_detail, "outer_pen")
     eval $parsed._right_attr_pen_valid = len(keys($attr_pen_detail)) > 0
     return $parsed

@@ -64,3 +64,38 @@
 python scripts/one_off/migrate_story_threshold.py
 python scripts/one_off/migrate_story_threshold.py --apply --delete-legacy
 ```
+
+## 工作流产出目录迁移
+
+[migrate_output_to_logs.py](migrate_output_to_logs.py) 把工作流结果从
+`config/session/output/` 搬到 `logs/output/`，同时把历史库里指向旧目录的
+`*_path` 记录改成新路径。程序本身不需要它——历史库存的是相对客户端根目录的
+路径，新旧目录都能打开——它是给用户**自行选择**使用的收拢工具，客户端不会自动
+执行。
+
+安全边界：默认干跑；先移文件后改数据库（中断可重跑收敛）；目标位置已有不同内容
+的同名文件时不覆盖，源文件与对应记录一起留在原地；改写前把数据库备份到
+`logs/one_off/migrate-output-<时间戳>/`。需要客户端未运行。
+
+```bash
+python scripts/one_off/migrate_output_to_logs.py                     # 干跑
+python scripts/one_off/migrate_output_to_logs.py --apply             # 执行
+python scripts/one_off/migrate_output_to_logs.py --root D:\lvjiang   # 指定客户端目录
+```
+
+## 历史路径分隔符规范化
+
+[normalize_history_paths.py](normalize_history_paths.py) 把历史库里反斜杠写法的路径
+统一成正斜杠：`logs\daily\…` → `logs/daily/…`。2026-10-14 之前生成端用
+`str(path.relative_to(PROJECT_ROOT))`，Windows 下就是反斜杠；此后改成
+`.as_posix()`，于是存量记录两种写法混杂。Windows 上都能打开，但回传包是跨端协议
+（`core.history_transfer` 明确拒绝含 `\` 的名字），手机端也只认 posix。
+
+只改 `config/session/*.db` 里以 `_path` 结尾的文本列，**不动任何文件**；只替换分隔符，
+不改变路径指向；UNC 路径跳过；默认干跑；改写前把数据库备份到
+`logs/one_off/normalize-paths-<时间戳>/`；可重复执行。需要客户端未运行。
+
+```bash
+python scripts/one_off/normalize_history_paths.py            # 干跑
+python scripts/one_off/normalize_history_paths.py --apply    # 执行
+```

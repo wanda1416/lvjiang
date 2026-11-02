@@ -146,6 +146,10 @@ class MenuOpsMixin:
         settings_mgmt.triggered.connect(self._open_settings_manager)
         settings_menu.addAction(settings_mgmt)
 
+        account_mgmt = QAction(tr("账户管理"), self)
+        account_mgmt.triggered.connect(self._open_account_manager)
+        settings_menu.addAction(account_mgmt)
+
         user_mgmt = QAction(tr("用户管理"), self)
         user_mgmt.setShortcut("F2")
         user_mgmt.triggered.connect(self._open_user_manager)
@@ -154,8 +158,6 @@ class MenuOpsMixin:
         scene_editor = QAction(tr("场景管理"), self)
         scene_editor.setShortcut("F3")
         scene_editor.triggered.connect(self._open_scene_editor)
-        from ...core.access import is_readonly
-        scene_editor.setEnabled(not is_readonly())
         settings_menu.addAction(scene_editor)
 
         reference_mgr = QAction(tr("图库管理"), self)
@@ -165,7 +167,6 @@ class MenuOpsMixin:
 
         map_mgr = QAction(tr("地图管理"), self)
         map_mgr.triggered.connect(self._open_map_manager)
-        map_mgr.setEnabled(not is_readonly())
         settings_menu.addAction(map_mgr)
 
         # ── 工具 ──
@@ -251,13 +252,6 @@ class MenuOpsMixin:
         menubar.setCornerWidget(
             self._theme_button, Qt.Corner.TopRightCorner
         )
-        if is_readonly():
-            for action in (settings_mgmt, user_mgmt, reference_mgr, script_editor, batch_settings):
-                action.setEnabled(False)
-                action.setToolTip(tr("共享配置只能由主节点修改"))
-            # 只读实例只响应显式 UI 操作，插件追加的 QAction 快捷键也一并清除。
-            for action in self.findChildren(QAction):
-                action.setShortcut("")
 
     def _update_theme_button(self, theme: str) -> None:
         """更新图标和辅助文本，描述按钮点击后的目标主题。"""
@@ -446,6 +440,11 @@ class MenuOpsMixin:
         from ..notices.feedback_dialog import FeedbackDialog
         dialog = FeedbackDialog(self)
         dialog.exec()
+
+    def _open_account_manager(self):
+        """账户管理：登录、注销、改密码与账号信息；与游戏用户管理无关。"""
+        from ..account_dialog import AccountManagerDialog
+        AccountManagerDialog(self).exec()
 
     def _open_user_manager(self):
         from ..user_manager_dialog import UserManagerDialog

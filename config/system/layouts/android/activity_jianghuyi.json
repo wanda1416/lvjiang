@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 12,
   "regions": [
     {
       "key": "tab_jianghuyi",
@@ -24,24 +24,24 @@
     },
     {
       "key": "mode_single_ai",
-      "x_ratio": 0.85714,
+      "x_ratio": 0.8694159220559456,
       "y_ratio": 0.69048,
-      "w_ratio": 0.1,
-      "h_ratio": 0.06349
+      "w_ratio": 0.07252466660212509,
+      "h_ratio": 0.06349000000000005
     },
     {
       "key": "start_match",
-      "x_ratio": 0.83929,
+      "x_ratio": 0.8355600161051713,
       "y_ratio": 0.89286,
-      "w_ratio": 0.14643,
+      "w_ratio": 0.16071000000000002,
       "h_ratio": 0.07143
     },
     {
       "key": "wulujuan_level",
-      "x_ratio": 0.11786,
-      "y_ratio": 0.39683,
-      "w_ratio": 0.08214,
-      "h_ratio": 0.12698
+      "x_ratio": 0.1255275419923547,
+      "y_ratio": 0.3714445813518409,
+      "w_ratio": 0.07963115974327759,
+      "h_ratio": 0.14163010820305777
     },
     {
       "key": "wulujuan_action",

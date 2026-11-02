@@ -1,4 +1,4 @@
-content_version: 3
+content_version: 5
 key: tongyou_main
 name: 同游
 views:
@@ -22,6 +22,7 @@ views:
   name: 闲趣
   kind: page
   owner: /base
+hide_all_views: true
 regions:
 - key: shijian
   name: 试剑
@@ -109,7 +110,7 @@ regions:
 - key: back
   name: 返回
   type: attr
-  is_text: true
+  is_text: false
   is_clickable: true
   views:
   - base

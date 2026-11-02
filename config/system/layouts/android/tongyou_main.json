@@ -1,5 +1,5 @@
 {
-  "content_version": 2,
+  "content_version": 4,
   "regions": [
     {
       "key": "shijian",
@@ -108,17 +108,17 @@
     },
     {
       "key": "xianqu_jianghuyi",
-      "x_ratio": 0.05357,
+      "x_ratio": 0.057599148144562504,
       "y_ratio": 0.55556,
-      "w_ratio": 0.06071,
-      "h_ratio": 0.05159
+      "w_ratio": 0.16247144073455977,
+      "h_ratio": 0.13897951656944385
     },
     {
       "key": "xianqu_enter",
-      "x_ratio": 0.83214,
+      "x_ratio": 0.8351084946990868,
       "y_ratio": 0.88889,
-      "w_ratio": 0.15714,
-      "h_ratio": 0.0754
+      "w_ratio": 0.16489150530091323,
+      "h_ratio": 0.07829482632559448
     }
   ],
   "panels": [

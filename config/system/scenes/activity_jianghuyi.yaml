@@ -1,4 +1,4 @@
-content_version: 2
+content_version: 3
 key: activity_jianghuyi
 name: 江湖弈
 views:
@@ -14,6 +14,7 @@ views:
   owner: /base
 - key: game_end
   name: 棋局结束
+hide_all_views: true
 regions:
 - key: tab_jianghuyi
   name: 江湖弈页签

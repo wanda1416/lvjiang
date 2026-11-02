@@ -24,11 +24,12 @@ def overview(request: Request,
 
     ov = metrics_user.overview(conn)
     series = metrics_user.dau_series(conn, days=90)
-    retention = metrics_user.retention_cohort(conn)
+    retention = metrics_user.retention_matrix(conn)
     return templates.TemplateResponse(request, "overview.html", {
         "cfg": cfg, "ov": ov,
         "series_json": json.dumps(series, ensure_ascii=False),
         "version_dist": metrics_user.version_dist(conn),
         "platform_dist": metrics_user.platform_dist(conn),
         "retention": retention,
+        "milestones": metrics_user.RETENTION_MILESTONES,
     })

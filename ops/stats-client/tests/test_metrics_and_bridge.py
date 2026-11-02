@@ -82,16 +82,85 @@ class TestMetricsUser:
         dist = metrics_user.version_dist(conn)
         assert dist[0] == {"app_version": "0.7.0", "n": 2}
 
-    def test_retention_cohort_drops_small_cohorts(self, tmp_path):
+    def test_retention_matrix_drops_small_cohorts_sorts_newest(self, tmp_path):
+        """规模 < min_cohort_n 的周整行不出现；行按安装周倒序（新的在上）。"""
         conn = database.connect(tmp_path / "cache.sqlite3")
-        today = _today_utc8()
-        # cohort 只有 2 人，应该被 min_cohort_n=20 挡掉
-        _seed_daily(conn, today, "i1", first_day=today)
-        _seed_daily(conn, today, "i2", first_day=today)
-        rows = metrics_user.retention_cohort(conn, min_cohort_n=20)
-        assert rows == []
-        rows = metrics_user.retention_cohort(conn, min_cohort_n=1)
+        older, newer = "2026-08-31", "2026-09-07"   # 两个周一，属相邻两周
+        for index in range(20):
+            _seed_daily(conn, older, f"old{index}", first_day=older)
+            _seed_daily(conn, newer, f"new{index}", first_day=newer)
+
+        assert metrics_user.retention_matrix(conn, min_cohort_n=21) == []
+
+        rows = metrics_user.retention_matrix(conn, min_cohort_n=20)
+        assert [r["week_start"] for r in rows] == [newer, older]
+        assert [r["size"] for r in rows] == [20, 20]
+        assert rows[0]["range"] == "09/07 -> 09/13"
+        assert rows[1]["range"] == "08/31 -> 09/06"
+        # 标签里的周号必须与分组键一致
+        assert rows[0]["label"].startswith(rows[0]["cohort_week"] + " 周")
+
+    def test_retention_matrix_milestones_and_cumulative(self, tmp_path):
+        """D n 是恰好第 n 天；7 日累计只算第 1..7 天，不含安装当天与更远的天。"""
+        conn = database.connect(tmp_path / "cache.sqlite3")
+        first_day = "2026-09-07"                     # 周一
+        def day_at(offset: int) -> str:
+            return (datetime.fromisoformat(first_day)
+                    + timedelta(days=offset)).strftime("%Y-%m-%d")
+
+        for index in range(20):                      # 规模 = 20（装当天活跃）
+            _seed_daily(conn, first_day, f"u{index}", first_day=first_day)
+        for index in range(4):                       # 第 1 天回来 4 人
+            _seed_daily(conn, day_at(1), f"u{index}", first_day=first_day)
+        for index in range(2):                       # 第 3 天回来 2 人
+            _seed_daily(conn, day_at(3), f"u{index}", first_day=first_day)
+        _seed_daily(conn, day_at(7), "u0", first_day=first_day)   # 第 7 天回来 1 人
+        # 第 8 天与第 26 天：不进 7 日累计，也不该自己变成一行
+        _seed_daily(conn, day_at(8), "u19", first_day=first_day)
+        _seed_daily(conn, day_at(26), "u18", first_day=first_day)
+
+        rows = metrics_user.retention_matrix(conn, min_cohort_n=20)
         assert len(rows) == 1
+        row = rows[0]
+        assert row["size"] == 20
+        cells = {c["day"]: c for c in row["cells"]}
+        assert cells[1]["users"] == 4 and cells[1]["pct"] == 20.0
+        assert cells[3]["users"] == 2 and cells[3]["pct"] == 10.0
+        assert cells[7]["users"] == 1
+        assert cells[14]["users"] == 0
+        # 热度按 50% 封顶折成 0..1，供页面铺色（20% → 0.4，10% → 0.2）
+        assert cells[1]["heat"] == 0.4
+        assert cells[3]["heat"] == 0.2
+        # 累计 = u0..u3（第 1 天）∪ 第 3 天 ∪ 第 7 天 = 4 人，不含第 8/26 天
+        cumulative = row["cumulative"]
+        assert (cumulative["day"], cumulative["users"],
+                cumulative["pct"]) == (7, 4, 20.0)
+        assert cumulative["mature"] is True
+        assert cumulative["heat"] == 0.4
+        # 远端第 26 天不会自己变成一行
+        assert all(c["day"] <= 30 for c in row["cells"])
+
+
+    def test_retention_matrix_marks_not_yet_mature_milestones(self, tmp_path):
+        """本周的 cohort：周一才装的人第 3 天还没到，不能画成"0 人回访"。"""
+        conn = database.connect(tmp_path / "cache.sqlite3")
+        today = datetime.strptime(_today_utc8(), "%Y-%m-%d").date()
+        monday = today - timedelta(days=today.weekday())     # 本周一
+        for index in range(20):
+            _seed_daily(conn, monday.isoformat(), f"u{index}",
+                        first_day=monday.isoformat())
+
+        rows = metrics_user.retention_matrix(conn, min_cohort_n=20)
+        assert len(rows) == 1
+        cells = {c["day"]: c for c in rows[0]["cells"]}
+        elapsed = (today - monday).days                        # 本周已经过去几天
+        for day_n, cell in cells.items():
+            if day_n <= elapsed:
+                assert cell["mature"] is True
+            else:
+                assert cell["mature"] is False, f"D{day_n} 不该算到期"
+        # D30 在本周必然还没到期
+        assert cells[30]["mature"] is False
 
 
 class TestAnalysisBridge:

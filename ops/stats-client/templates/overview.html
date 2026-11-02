@@ -47,42 +47,96 @@
 <h2>最近 90 天 DAU / 新增趋势</h2>
 <div class="panel"><div id="dau-chart"></div></div>
 
-<h2>版本分布（{{ ov.today }}）</h2>
+<h2>当日用户版本分布（{{ ov.today }}）</h2>
+<p class="hint">统计口径：当天有心跳的安装所用的客户端版本，按安装数降序。</p>
 <div class="table-wrap">
-<table>
-  <tr><th>app_version</th><th>安装数</th></tr>
+<table class="compact">
+  <thead><tr><th>客户端版本</th><th class="num">安装数</th></tr></thead>
+  <tbody>
   {% for row in version_dist %}
-  <tr><td>{{ row.app_version }}</td><td>{{ row.n }}</td></tr>
+  <tr><td>{{ row.app_version }}</td><td class="num">{{ row.n }}</td></tr>
   {% else %}
   <tr><td colspan="2" class="hint">暂无数据，先去「数据与同步」页拉一次</td></tr>
   {% endfor %}
+  </tbody>
 </table>
 </div>
 
-<h2>端类型 / 系统分布（{{ ov.today }}）</h2>
+<h2>当日执行端 / 系统分布（{{ ov.today }}）</h2>
+<p class="hint">「端」是任务跑在哪一侧：桌面端 = PC 客户端，安卓 = 手机独立执行。</p>
 <div class="table-wrap">
-<table>
-  <tr><th>run_env</th><th>os_name</th><th>安装数</th></tr>
+<table class="compact">
+  <thead><tr><th>执行端</th><th class="num">系统</th><th class="num">安装数</th></tr></thead>
+  <tbody>
   {% for row in platform_dist %}
-  <tr><td>{{ row.run_env }}</td><td>{{ row.os_name }}</td><td>{{ row.n }}</td></tr>
+  <tr>
+    <td>{{ {"desktop": "桌面端", "android": "安卓"}.get(row.run_env, row.run_env) }}</td>
+    <td class="num">{{ row.os_name }}</td>
+    <td class="num">{{ row.n }}</td>
+  </tr>
   {% else %}
   <tr><td colspan="3" class="hint">暂无数据</td></tr>
   {% endfor %}
+  </tbody>
 </table>
 </div>
 
-<h2>周 Cohort 留存</h2>
-<p class="hint">按周分组，&lt; 20 人的 cohort 不显示——样本量小时按天/格分组全是噪声。</p>
+<h2>周留存（Cohort）</h2>
+<p class="hint">
+  按<strong>安装周</strong>分组（周一为界，新的一周在上）。<strong>规模</strong>是该周
+  新装且装当天就活跃的人数，也就是所有百分比的分母。<strong>D n</strong> 是"恰好第 n 天
+  回来过"的人占规模的比例，<strong>7 日内累计</strong> 是"第 1–7 天里任一天回来过"——
+  周里周一到周日装的人第 7 天落在不同日历日，累计口径比逐日稳。
+  颜色越深回访率越高；鼠标停在格子上有具体人数。
+</p>
 <div class="table-wrap">
-<table>
-  <tr><th>Cohort 周</th><th>第 N 天</th><th>回访用户数</th></tr>
+<table class="cohort">
+  <thead>
+    <tr>
+      <th>安装周</th>
+      <th class="num">规模<small>人</small></th>
+      {% for day in milestones %}<th class="num">D{{ day }}</th>{% endfor %}
+      <th class="num cumulative">7 日内累计</th>
+    </tr>
+  </thead>
+  <tbody>
   {% for row in retention %}
-  <tr><td>{{ row.cohort_week }}</td><td>{{ row.day_n }}</td><td>{{ row.users }}</td></tr>
+    <tr>
+      <td class="cohort-label">
+        <span class="week">{{ row.label }}</span>
+        <span class="range">{{ row.range }}</span>
+      </td>
+      <td class="num size">{{ row.size }}</td>
+      {% for cell in row.cells %}
+      <td class="num heat{% if not cell.mature %} pending{% endif %}"
+          style="--heat: {{ cell.heat }}"
+          title="第 {{ cell.day }} 天：{{ cell.users }} / {{ row.size }} 人回访（{{ cell.pct }}%）{% if not cell.mature %}——这一周还没到第 {{ cell.day }} 天{% endif %}">
+        {% if not cell.mature %}<span class="dim">·</span>
+        {% elif cell.users == 0 %}<span class="dim">0</span>
+        {% else %}<span class="val">{{ cell.pct }}%</span>{% endif %}
+      </td>
+      {% endfor %}
+      <td class="num heat cumulative{% if not row.cumulative.mature %} pending{% endif %}"
+          style="--heat: {{ row.cumulative.heat }}"
+          title="第 1–{{ row.cumulative.day }} 天内：{{ row.cumulative.users }} / {{ row.size }} 人回访（{{ row.cumulative.pct }}%）{% if not row.cumulative.mature %}——这一周还没满 {{ row.cumulative.day }} 天{% endif %}">
+        {% if not row.cumulative.mature %}<span class="dim">·</span>
+        {% elif row.cumulative.users == 0 %}<span class="dim">0</span>
+        {% else %}<span class="val">{{ row.cumulative.pct }}%</span>{% endif %}
+      </td>
+    </tr>
   {% else %}
-  <tr><td colspan="3" class="hint">暂无满足样本量的 cohort</td></tr>
+    <tr><td colspan="{{ milestones|length + 2 }}" class="hint">暂无规模 ≥ 20 人的周 cohort</td></tr>
   {% endfor %}
+  </tbody>
 </table>
 </div>
+<p class="legend">
+  <span class="legend-item"><span class="swatch" style="--heat: 0.15"></span>低</span>
+  <span class="legend-item"><span class="swatch" style="--heat: 0.55"></span>中</span>
+  <span class="legend-item"><span class="swatch" style="--heat: 1"></span>高（≥ 50%）</span>
+  <span class="legend-item"><span class="dim">0</span> 到期但无人回访</span>
+  <span class="legend-item"><span class="dim">·</span> 这一周还没到那一天</span>
+</p>
 
 <script src="/static/vendor/echarts.min.js"></script>
 <script>

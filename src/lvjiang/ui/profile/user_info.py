@@ -307,8 +307,9 @@ class _DetailPage(QWidget):
                 label.setText("")
                 continue
 
-            text = _format_detail_value(kd, model_type, data)
+            text, locked = _format_detail_label(kd, model_type, data)
             label.setText(text)
+            label.setStyleSheet("color: #5a5a5a;" if locked else "")
 
     def _schedule_avatar_load(self, filename: str) -> None:
         """Defer avatar disk I/O until the rest of the detail panel can render."""
@@ -345,11 +346,24 @@ class _DetailPage(QWidget):
             self._avatar.set_avatar(username, filename)
 
 
+def _format_detail_label(kd: KeyDef, model_type: str, data: dict) -> tuple[str, bool]:
+    """详情页显示文本 + 是否锁定。
+
+    锁定项直接写「已锁定」：只留空白会被当成"这项没数据"，而锁定是用户的
+    主动决定，必须能一眼看出来。
+    """
+    entry = data.get(model_type, {}).get(kd.key, {})
+    if entry.get("locked"):
+        return tr("已锁定"), True
+    return _format_detail_value(kd, model_type, data), False
+
+
 def _format_detail_value(kd: KeyDef, model_type: str, data: dict) -> str:
     """格式化详情页的值显示（纯数值，取整）
 
-    锁定条目显示为空白，与总览保持一致：锁定表示该用户这个 key 物理失效，
-    引擎忽略其值，详情页再显示冻结值只会让人以为它还生效。
+    锁定条目返回空串：锁定表示该用户这个 key 物理失效，引擎忽略其值，
+    详情页再显示冻结值只会让人以为它还生效。界面层用
+    :func:`_format_detail_label` 把它换成一个明确的「已锁定」提示。
     """
     entry = data.get(model_type, {}).get(kd.key, {})
     if not entry:

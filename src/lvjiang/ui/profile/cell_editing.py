@@ -333,7 +333,7 @@ class ProfileCellEditingMixin:
         # 锁定条目：只剩"为什么是空白"的说明、解绑与该 key 的历史，不再提供
         # 任何编辑入口——引擎这边也拒绝写入，菜单里留着只会自相矛盾。
         if is_locked:
-            hint = menu.addAction(tr("该 key 已锁定：引擎忽略其值，自动任务不读写"))
+            hint = menu.addAction(tr("当前用户已锁定"))
             if hint:
                 hint.setEnabled(False)
             menu.addSeparator()

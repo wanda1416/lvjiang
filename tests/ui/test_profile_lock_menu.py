@@ -75,11 +75,48 @@ def test_unlock_uses_unlock_api(monkeypatch):
     assert calls[0] == ("unlock", ("u1", "quota", "k"))
 
 
-def test_detail_page_hides_locked_value():
-    """用户详情页与总览同口径：锁定 key 显示空白，不显示冻结值。"""
+def test_detail_page_marks_locked_value():
+    """用户详情页不显示冻结值，而要给一个明确的「已锁定」提示。"""
     from lvjiang.core.profile.models import KeyDef
-    from lvjiang.ui.profile.user_info import _format_detail_value
+    from lvjiang.ui.profile.user_info import (
+        _format_detail_label,
+        _format_detail_value,
+    )
 
     kd = KeyDef(key="k", label="配额")
     data = {"quota": {"k": {"value": 2, "locked": True, "updated_at": ""}}}
+    # 纯格式化层仍是空串（值不可信），界面层负责换成提示
     assert _format_detail_value(kd, "quota", data) == ""
+    text, locked = _format_detail_label(kd, "quota", data)
+    assert (text, locked) == ("已锁定", True)
+
+
+def test_detail_page_formats_unlocked_value():
+    """未锁定项照常显示数值，且不带锁定标记。"""
+    from lvjiang.core.profile.models import KeyDef
+    from lvjiang.ui.profile.user_info import _format_detail_label
+
+    kd = KeyDef(key="k", label="配额")
+    data = {"quota": {"k": {"value": 2, "updated_at": "2026-11-01T00:00:00"}}}
+    text, locked = _format_detail_label(kd, "quota", data)
+    assert locked is False
+    assert text == "2"
+
+
+def test_locked_cell_uses_pause_button_grey_background():
+    """锁定单元格必须填**底色**，且用的是「暂停按钮默认那档灰」。
+
+    只有前景色的话，空文本等于什么都没显示；色值单独抄一个还会和按钮不一致。
+    """
+    from PyQt6.QtGui import QColor
+    from PyQt6.QtWidgets import QApplication, QTableWidgetItem
+
+    from lvjiang.ui.button_styles import DISABLED_BUTTON_BG
+    from lvjiang.ui.profile.cell_formatting import apply_cell_style
+
+    app = QApplication.instance() or QApplication([])  # noqa: F841 - 供控件使用
+    item = QTableWidgetItem("")
+    apply_cell_style(item, "locked")
+    assert item.background().color() == QColor(DISABLED_BUTTON_BG)
+    assert DISABLED_BUTTON_BG.upper() == "#9E9E9E"   # 暂停按钮默认态
+    assert item.text() == ""

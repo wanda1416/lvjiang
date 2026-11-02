@@ -440,6 +440,13 @@ class BuiltinFunctionPanel(QWidget):
         preview_caption.setFont(font)
         layout.addWidget(preview_caption)
 
+        preview_hint = QLabel(tr(
+            "试算会真的执行脚本再调这个函数：别拿它跑耗时或来源不明的脚本，"
+            "界面会一直卡到它返回。"))
+        preview_hint.setWordWrap(True)
+        preview_hint.setStyleSheet("color: #8a6d3b;")
+        layout.addWidget(preview_hint)
+
         self.params_form = QFormLayout()
         self.params_form.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(self.params_form)

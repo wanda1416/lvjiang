@@ -39,6 +39,7 @@ from ...core.profile.regen import (
     next_realtime_point_seconds,
 )
 from ...i18n import tr
+from ..button_styles import DISABLED_BUTTON_BG
 
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
 
@@ -323,11 +324,9 @@ def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
         item.setFont(font)
         item.setForeground(QColor(34, 139, 34))  # 森林绿
     elif style == "locked":
-        # 深灰：该用户在总览里"没有这个值"，不是 0 也不是上限
-        font = QFont(item.font())
-        font.setBold(True)
-        item.setFont(font)
-        item.setForeground(QColor(105, 105, 105))  # 暗灰
+        # 底色用「暂停按钮默认那档灰」：该用户在总览里"没有这个值"，不是 0
+        # 也不是上限。单元格没有文本，只改前景色等于什么都没显示，必须填底色。
+        item.setBackground(QColor(DISABLED_BUTTON_BG))
 
 
 def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
@@ -337,11 +336,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         return ""
 
     if entry.get("locked"):
-        return "\n".join([
-            f"【{kd.label}】",
-            tr("该用户已锁定此 key：引擎忽略其值，自动任务不会读取或写入"),
-            tr("值永久停留在锁定时的状态；右键可解锁"),
-        ])
+        return tr("当前用户已锁定")
     lines = [f"【{kd.label}】"]
 
     updated_at = entry.get("updated_at")

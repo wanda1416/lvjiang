@@ -99,6 +99,11 @@ _EXECUTION_BUTTON_COLORS = {
 }
 
 
+#: 执行按钮「未就绪 / 不可用」那一档灰底——暂停按钮默认就是这个颜色。
+#: 别处需要"和暂停按钮一样的灰"时引用它，不要再抄一遍色值。
+DISABLED_BUTTON_BG = _EXECUTION_BUTTON_COLORS["disabled"][0]
+
+
 def apply_execution_button_style(button: QPushButton, variant: str) -> None:
     """主页面各执行 Tab 的启停和暂停按钮共用同一尺寸与状态颜色。"""
     background, foreground = _EXECUTION_BUTTON_COLORS[variant]

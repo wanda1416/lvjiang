@@ -84,6 +84,15 @@ def declare_profiles($keys)
                 ]
             }
         },
+        "wulujuan_level": {
+            "model": "quota",
+            "definition": {
+                "label": "乌鹭卷等级",
+                "period": "season",
+                "increment_only": true,
+                "sources": ["江湖弈"]
+            }
+        },
         "huaruizhi": {"model": "stock", "definition": {"label": "花蕊织"}},
         "niaoniao": {"model": "stock", "definition": {"label": "袅袅之音", "sources": ["逐战商店"]}},
         "nn_of_halfseason": {

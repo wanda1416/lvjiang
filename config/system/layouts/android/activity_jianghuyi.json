@@ -1,0 +1,61 @@
+{
+  "content_version": 1,
+  "regions": [
+    {
+      "key": "tab_jianghuyi",
+      "x_ratio": 0.05714,
+      "y_ratio": 0.03175,
+      "w_ratio": 0.06071,
+      "h_ratio": 0.05159
+    },
+    {
+      "key": "tab_wulujuan",
+      "x_ratio": 0.13571,
+      "y_ratio": 0.03175,
+      "w_ratio": 0.06071,
+      "h_ratio": 0.05159
+    },
+    {
+      "key": "tab_zhenlongju",
+      "x_ratio": 0.21429,
+      "y_ratio": 0.03175,
+      "w_ratio": 0.06429,
+      "h_ratio": 0.05159
+    },
+    {
+      "key": "mode_single_ai",
+      "x_ratio": 0.85714,
+      "y_ratio": 0.69048,
+      "w_ratio": 0.1,
+      "h_ratio": 0.06349
+    },
+    {
+      "key": "start_match",
+      "x_ratio": 0.83929,
+      "y_ratio": 0.89286,
+      "w_ratio": 0.14643,
+      "h_ratio": 0.07143
+    },
+    {
+      "key": "wulujuan_level",
+      "x_ratio": 0.11786,
+      "y_ratio": 0.39683,
+      "w_ratio": 0.08214,
+      "h_ratio": 0.12698
+    },
+    {
+      "key": "wulujuan_action",
+      "x_ratio": 0.82143,
+      "y_ratio": 0.88889,
+      "w_ratio": 0.16786,
+      "h_ratio": 0.0754
+    },
+    {
+      "key": "blank",
+      "x_ratio": 0.2,
+      "y_ratio": 0.1,
+      "w_ratio": 0.6,
+      "h_ratio": 0.08
+    }
+  ]
+}

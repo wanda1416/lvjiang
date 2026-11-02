@@ -1,8 +1,77 @@
-content_version: 1
+content_version: 2
 key: activity_jianghuyi
 name: 江湖弈
 views:
 - key: base
-  name: 基底
+  name: 江湖弈
+- key: wulujuan
+  name: 乌鹭卷
+  kind: page
+  owner: /base
+- key: zhenlongju
+  name: 珍珑局
+  kind: page
+  owner: /base
 - key: game_end
   name: 棋局结束
+regions:
+- key: tab_jianghuyi
+  name: 江湖弈页签
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - base
+  - wulujuan
+  - zhenlongju
+  to: /base
+- key: tab_wulujuan
+  name: 乌鹭卷页签
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - base
+  - wulujuan
+  - zhenlongju
+  to: /wulujuan
+- key: tab_zhenlongju
+  name: 珍珑局页签
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - base
+  - wulujuan
+  - zhenlongju
+  to: /zhenlongju
+- key: mode_single_ai
+  name: 单人AI模式
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+- key: start_match
+  name: 开始匹配
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+- key: wulujuan_level
+  name: 乌鹭卷等级
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: wulujuan
+- key: wulujuan_action
+  name: 乌鹭卷右下按钮
+  type: attr
+  is_text: true
+  is_clickable: true
+  view: wulujuan
+- key: blank
+  name: 空白区域
+  type: func
+  is_text: false
+  is_clickable: true
+  view: wulujuan

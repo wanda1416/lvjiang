@@ -1,0 +1,37 @@
+{
+  "content_version": 1,
+  "regions": [
+    {
+      "key": "tab_jianghuyi",
+      "disabled": true
+    },
+    {
+      "key": "tab_wulujuan",
+      "disabled": true
+    },
+    {
+      "key": "tab_zhenlongju",
+      "disabled": true
+    },
+    {
+      "key": "mode_single_ai",
+      "disabled": true
+    },
+    {
+      "key": "start_match",
+      "disabled": true
+    },
+    {
+      "key": "wulujuan_level",
+      "disabled": true
+    },
+    {
+      "key": "wulujuan_action",
+      "disabled": true
+    },
+    {
+      "key": "blank",
+      "disabled": true
+    }
+  ]
+}

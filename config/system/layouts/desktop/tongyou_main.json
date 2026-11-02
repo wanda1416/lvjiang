@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "shijian",
@@ -106,6 +106,14 @@
       "y_ratio": 0.03746449623183746,
       "w_ratio": 0.029630866753912015,
       "h_ratio": 0.038287316481183185
+    },
+    {
+      "key": "xianqu_jianghuyi",
+      "disabled": true
+    },
+    {
+      "key": "xianqu_enter",
+      "disabled": true
     }
   ],
   "panels": [

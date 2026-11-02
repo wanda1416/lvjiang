@@ -1,12 +1,12 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "menu",
       "x_ratio": 0.9039764655876331,
-      "y_ratio": 0.0,
+      "y_ratio": 0.0714,
       "w_ratio": 0.04835604018775852,
-      "h_ratio": 0.11079403759627796
+      "h_ratio": 0.0437
     },
     {
       "key": "huodong",

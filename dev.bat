@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
 rem With src-layout the package lives under src/lvjiang, so the repo root
-rem is not importable. Add the source root to PYTHONPATH explicitly — this
+rem is not importable. Add the source root to PYTHONPATH explicitly ?? this
 rem allows running bare python without pip install -e .
 set "PYTHONPATH=%~dp0src;%PYTHONPATH%"
 rem Force dev mode: config writes go to config/system (no .git probing)
@@ -10,13 +10,13 @@ set "LVJIANG_DEV_MODE=1"
 rem Prefer the project's virtual environment interpreter so pinned dependency
 rem versions (e.g. rapidocr-onnxruntime==1.4.4) are always used. Running the
 rem venv's python.exe resolves its own site-packages via pyvenv.cfg, so it does
-rem NOT depend on PATH or activation — this keeps the correct versions even when
+rem NOT depend on PATH or activation ?? this keeps the correct versions even when
 rem launched from a fresh/elevated shell where the venv is not activated.
 set "PY=%~dp0.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=python"
 
 rem No plugin is loaded unless asked for: -reg/--register APP (repeatable)
-rem passes one through, --all means the whole roster this repo ships —
+rem passes one through, --all means the whole roster this repo ships ??
 rem and the host scans the built-in apps/ root plus the default plugins/ root;
 rem a plugin anywhere else must be named as -reg NAME@PATH. --admin starts the
 rem private admin console checked out at admin/, --stats starts the local
@@ -83,8 +83,14 @@ if not exist "%~dp0admin\src\lvjiang\admin\__init__.py" (
     echo [ERROR]   expected entry point admin\src\lvjiang\admin\__init__.py 1>&2
     exit /b 1
 )
-set "PYTHONPATH=%~dp0admin\src;%PYTHONPATH%"
-"%PY%" -m lvjiang.admin %FORWARD_ARGS%
+rem Account ledger writes ~\.lvjiang and iCloud backup: some security filters block
+rem site-packages instead (same pinned deps, see pyvenv.cfg home).
+for /f "tokens=1,3 delims= " %%a in (%~dp0.venv\pyvenv.cfg) do (
+    if /I "%%a"=="home" set "PY_ADMIN=%%b\python.exe"
+)
+if not exist "%PY_ADMIN%" set "PY_ADMIN=%PY%"
+set "PYTHONPATH=%~dp0.venv\Lib\site-packages;%~dp0admin\src;%PYTHONPATH%"
+"%PY_ADMIN%" -m lvjiang.admin %FORWARD_ARGS%
 exit /b %ERRORLEVEL%
 :launch_stats
 if not exist "%~dp0ops\stats-client\pyproject.toml" (

@@ -179,6 +179,13 @@ class UserManagerDialog(QDialog):
         self._btn_delete.clicked.connect(self._on_delete_user)
         toolbar.addWidget(self._btn_delete)
 
+        self._btn_claim = QPushButton(tr("认领到账号…"))
+        self._btn_claim.setToolTip(
+            tr("把选中的游戏用户挂到一个账号名下（多端同步与网页查看按账号归属）"))
+        self._btn_claim.setEnabled(False)
+        self._btn_claim.clicked.connect(self._on_claim_to_account)
+        toolbar.addWidget(self._btn_claim)
+
         toolbar.addStretch()
         layout.addLayout(toolbar)
 
@@ -371,6 +378,7 @@ class UserManagerDialog(QDialog):
         # 激活用户不可删除
         is_active = (name == self._user_manager.get_active_user_name())
         self._btn_delete.setEnabled(not is_active)
+        self._btn_claim.setEnabled(True)
 
         # 显示详情
         self._lbl_name.setText(user.name)
@@ -384,6 +392,7 @@ class UserManagerDialog(QDialog):
 
     def _clear_detail(self):
         """清空详情显示"""
+        self._btn_claim.setEnabled(False)
         self._lbl_name.setText("-")
         self._lbl_created.setText("-")
         self._avatar.set_avatar("", "")
@@ -540,3 +549,23 @@ class UserManagerDialog(QDialog):
             logger.info(f"用户已删除: {name}")
         else:
             QMessageBox.warning(self, tr("失败"), tr("无法删除该用户"))
+
+    def _on_claim_to_account(self):
+        """把选中的游戏用户挂到一个账号名下。
+
+        账号台账在 admin 秘密目录，客户端不去读它——这里只做「生成一条绑定码，
+        用户把码输进网页/弹窗完成归属」。当前账号服务尚未上线，先走占位提示。
+        """
+        name = self._current_user_name()
+        if not name:
+            return
+        QMessageBox.information(
+            self,
+            tr("认领到账号"),
+            tr(
+                "游戏用户「{name}」的账号认领需要在账号服务上线后进行：\n\n"
+                "1. 在管理控制台「账号」页为你的账号生成一条绑定码；\n"
+                "2. 在网页端登录后，把绑定码输入「认领游戏用户」；\n"
+                "3. 认领成功后，多端同步与网页查看都会按账号归属。"
+            ).format(name=name),
+        )

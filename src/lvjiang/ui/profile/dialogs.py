@@ -80,7 +80,7 @@ class HistoryDialog(QDialog):
 
     _TYPE_LABEL = {
         "tick": tr("恢复"), "reset": tr("重置"),
-        "set": tr("覆盖"), "delta": tr("增减"),
+        "set": tr("覆盖"), "delta": tr("增量"),
     }  # runtime tr()
     _SOURCE_COLUMN = 5
     _ACTION_COLUMN = 8

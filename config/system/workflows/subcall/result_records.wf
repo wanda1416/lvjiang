@@ -55,7 +55,21 @@ def record_item($key, $name, $status, $reason, $data)
     end
     # 位置、OCR、过程返回值是日志信息；只保留必要业务数据。
     eval $details = {}
-    for field in ["activity_name", "reward_keyword", "code", "planned_quantity", "confirmed_quantity", "old_value", "observed_value", "tolerance", "friend", "item", "quantity", "purchased", "total"]
+    for field in [
+        "activity_name",
+        "reward_keyword",
+        "code",
+        "planned_quantity",
+        "confirmed_quantity",
+        "old_value",
+        "observed_value",
+        "tolerance",
+        "friend",
+        "item",
+        "quantity",
+        "purchased",
+        "total"
+    ]
         if has_key($data, $field)
             eval append($details, $field, $data.$field)
         end

@@ -99,7 +99,17 @@ import "subcall/profile_registry.wf"
 # ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
 global $record_category
 eval $record_category = "combat"
-call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili", "huaruizhi_of_week", "huaruizhi", "niaoniao", "nn_of_halfseason", "zhuzhanbox_of_halfseason"])
+call $profile_ok = declare_profiles(
+    ["bugan_of_week",
+    "nn_bugan_of_week",
+    "changmingyu",
+    "tili",
+    "huaruizhi_of_week",
+    "huaruizhi",
+    "niaoniao",
+    "nn_of_halfseason",
+    "zhuzhanbox_of_halfseason"
+])
 if $profile_ok < 0
     call record_finish_if_open("failed", "Profile 声明失败")
     return -1

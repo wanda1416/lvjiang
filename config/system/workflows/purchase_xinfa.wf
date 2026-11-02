@@ -200,7 +200,10 @@ def open_all_bag_xinfa($max_xinfa_boxes)
             eval $opened_count = $opened_count + 1
             call record_count("box_open_attempts", 1)
             if $opened_count >= $max_xinfa_boxes
-                call record_item("bag_xinfa", "背包心法心得", "limit_reached", "达到开箱尝试上限", {"attempts": $opened_count, "limit": $max_xinfa_boxes})
+                call record_item("bag_xinfa", "背包心法心得", "limit_reached", "达到开箱尝试上限", {
+                    "attempts": $opened_count,
+                    "limit": $max_xinfa_boxes
+                })
                 log warn "已打开 " + $opened_count \
                     + " 件心法心得，达到上限 " + $max_xinfa_boxes \
                     + "，停止扫描并继续购买心法流程"

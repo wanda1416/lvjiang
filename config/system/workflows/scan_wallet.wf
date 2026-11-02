@@ -167,7 +167,9 @@ end
 
 for record_key in ["bugan", "baoqian", "changmingyu"]
     if $vals.$record_key <= 0
-        call record_item($record_key, "钱袋货币", "not_written", "未读取到正数；无法区分未识别与余额为零", {"observed_value": $vals.$record_key})
+        call record_item($record_key, "钱袋货币", "not_written", "未读取到正数；无法区分未识别与余额为零", {
+            "observed_value": $vals.$record_key
+        })
     end
 end
 call record_observation("regional_currency", $money1, $tongbao_wan)
@@ -275,11 +277,19 @@ def safe_set($key, $new_val, $tolerance, $label, $source)
         eval $diff = abs($delta)
         if $diff > $tolerance
             log $label + " 差值 " + $diff + " 超过容差 " + $tolerance + "，跳过写入"
-            call record_item($key, $label, "tolerance_rejected", "识别值超过允许差值，保留旧值", {"old_value": $old, "observed_value": $new_val, "tolerance": $tolerance})
+            call record_item($key, $label, "tolerance_rejected", "识别值超过允许差值，保留旧值", {
+                "old_value": $old,
+                "observed_value": $new_val,
+                "tolerance": $tolerance
+            })
             return
         end
     end
     eval profile_set($key, $new_val, $source)
-    call record_item($key, $label, "write_attempted", "已调用原有 Profile 写入", {"old_value": $old, "observed_value": $new_val, "tolerance": $tolerance})
+    call record_item($key, $label, "write_attempted", "已调用原有 Profile 写入", {
+        "old_value": $old,
+        "observed_value": $new_val,
+        "tolerance": $tolerance
+    })
     log $label + ": " + $new_val
 end

@@ -9,12 +9,26 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lvjiang.workflows.grammar import parse_file
+from lvjiang.workflows.grammar import parse_file, parse_text
+from lvjiang.workflows.grammar.ast_nodes import CallProc
 from tests.workflows.conftest import make_engine
 
 _ROOT = Path(__file__).parents[2]
 _WORKFLOWS = _ROOT / "config" / "system" / "workflows"
 _REGISTRY = _WORKFLOWS / "subcall" / "profile_registry.wf"
+
+
+def _declared_keys(source: str) -> list[str]:
+    """取 ``declare_profiles([...])`` 的 key 列表。
+
+    断言保护的是"通过注册表声明了哪些 key、顺序如何"，与书写是否折行无关，
+    所以走 AST 而不是在源码里找单行字符串。
+    """
+    for stmt in parse_text(source).body:
+        if isinstance(stmt, CallProc) and stmt.name == "declare_profiles":
+            return [lit.value for lit in stmt.args[0]]
+    return []
+
 
 
 @pytest.fixture
@@ -140,10 +154,8 @@ def test_profile_consumers_use_the_central_registry() -> None:
 
     for filename, keys in dependencies.items():
         source = (_WORKFLOWS / filename).read_text(encoding="utf-8")
-        rendered = ", ".join(f'"{key}"' for key in keys)
-        declaration = f"declare_profiles([{rendered}])"
         assert 'import "subcall/profile_registry.wf"' in source
-        assert declaration in source
+        assert _declared_keys(source) == keys
         assert "profile_declare(" not in source
         profile_operations = [
             source.find(f"profile_{operation}(")
@@ -151,7 +163,8 @@ def test_profile_consumers_use_the_central_registry() -> None:
         ]
         operation_indexes = [index for index in profile_operations if index >= 0]
         if operation_indexes:
-            assert source.index(declaration) < min(operation_indexes)
+            # 声明必须排在所有 profile_* 调用之前；只看关键字位置，不管折行排版。
+            assert source.index("declare_profiles(") < min(operation_indexes)
 
     business_sources = "\n".join(
         path.read_text(encoding="utf-8")

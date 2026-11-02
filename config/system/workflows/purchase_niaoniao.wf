@@ -79,7 +79,11 @@ end
 eval $remaining = 2 - $bought_week
 eval $cmyu = profile_get("changmingyu")
 call $want = niaoniao_purchase_count($bought_week, $cmyu)
-call record_observation("purchase_plan", null, {"bought_week": $bought_week, "balance": $cmyu, "planned_quantity": $want})
+call record_observation("purchase_plan", null, {
+    "bought_week": $bought_week,
+    "balance": $cmyu,
+    "planned_quantity": $want
+})
 if $want <= 0
     call record_finish("blocked", "长鸣玉不足")
     log "长鸣玉不足：购买 1 个需 200，现有 " + $cmyu + "，跳过购买"
@@ -128,7 +132,11 @@ loop while $tries < $max_scroll
             eval profile_inc("niaoniao_of_week", $want, "百珍商店")
             log "已购买 " + $want + " 个 袅袅之音·绑，niaoniao_of_week 增加 " + $want
             eval $bought = 1
-            call record_item("niaoniao", "袅袅之音·绑", "purchase_attempted", "已点击购买；未读取成交凭据", {"item_name": $pn.item_name, "planned_quantity": $want, "confirmed_quantity": null})
+            call record_item("niaoniao", "袅袅之音·绑", "purchase_attempted", "已点击购买；未读取成交凭据", {
+                "item_name": $pn.item_name,
+                "planned_quantity": $want,
+                "confirmed_quantity": null
+            })
             break
         else
             # 命中的「绑」不是袅袅之音，或名称异常：绝不购买，回退中止
@@ -147,7 +155,10 @@ end
 
 if not $bought
     if not has_key($record_result.items, "niaoniao")
-        call record_item("niaoniao", "袅袅之音·绑", "not_found", "滚动查找范围内未命中绑定商品", {"scrolls": $tries, "max_scroll": $max_scroll})
+        call record_item("niaoniao", "袅袅之音·绑", "not_found", "滚动查找范围内未命中绑定商品", {
+            "scrolls": $tries,
+            "max_scroll": $max_scroll
+        })
     end
     call record_finish("not_purchased", "未提交购买；原因见记录或原流程日志")
     log "未购买 袅袅之音·绑（可能周库存已购满、货币不足，或滚动到尽头仍未命中）"

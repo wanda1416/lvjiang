@@ -1181,7 +1181,19 @@ end
 
 # ─── 结果记录（只更新输出对象，不参与原有动作决策）──────────────────
 def new_jianghu_result()
-   return {"summary": {"status": "running", "tasks": {}, "unidentified": [], "reputation": {}}, "schema_version": 1, "status": "running", "finished": false, "reason": "", "passes": 0, "counts": {}, "tasks": {}, "unidentified": [], "reputation": {"before": -1, "after": -1, "observations": []}, "cleanup": {"home": "unknown", "mode": "not_needed"}}
+   return {
+      "summary": {"status": "running", "tasks": {}, "unidentified": [], "reputation": {}},
+      "schema_version": 1,
+      "status": "running",
+      "finished": false,
+      "reason": "",
+      "passes": 0,
+      "counts": {},
+      "tasks": {},
+      "unidentified": [],
+      "reputation": {"before": -1, "after": -1, "observations": []},
+      "cleanup": {"home": "unknown", "mode": "not_needed"}
+   }
 end
 
 # 一张卡片的记录骨架：字段先占位，后续按实际分支逐项填写。
@@ -1192,7 +1204,24 @@ def make_jianghu_record($pass, $idx)
    if not $claim_reward
       eval $reward = "disabled"
    end
-   return {"summary": {"status": "unknown"}, "pass": $pass, "card": "card_" + $idx, "task": "", "task_name": "", "initial_text": "", "task_text": "", "refresh_count": 0, "outcome": "unknown", "reason": "", "completion": "unknown", "refresh_icon_before": "unknown", "refresh_icon_after": "unknown", "action": {"status": "not_attempted", "reason": ""}, "events": [], "reward": {"status": $reward, "reason": "", "observed_state": "unknown"}}
+   return {
+      "summary": {"status": "unknown"},
+      "pass": $pass,
+      "card": "card_" + $idx,
+      "task": "",
+      "task_name": "",
+      "initial_text": "",
+      "task_text": "",
+      "refresh_count": 0,
+      "outcome": "unknown",
+      "reason": "",
+      "completion": "unknown",
+      "refresh_icon_before": "unknown",
+      "refresh_icon_after": "unknown",
+      "action": {"status": "not_attempted", "reason": ""},
+      "events": [],
+      "reward": {"status": $reward, "reason": "", "observed_state": "unknown"}
+   }
 end
 
 # 开始记录一张卡片，并先把它放进「未识别」集合。
@@ -1383,7 +1412,27 @@ end
 
 # 展示解释只属于结果，不参与任务判断。
 def jianghu_reason_text($reason)
-   eval $descriptions = {"action_not_implemented": "暂未实现", "user_disabled": "未启用", "completed_before_processing": "执行前已完成", "completed_during_refresh": "刷新时已完成", "completion_not_checked": "执行后未确认完成", "completion_observed": "已确认完成", "refresh_icon_present": "仍未完成", "refresh_limit": "达到刷新上限", "reading_not_entered": "未进入阅读", "item_not_found": "未找到黄泉酿", "use_button_not_found": "未找到食用按钮", "item_navigation_failed": "背包导航失败", "profile_declaration_failed": "档案声明失败", "mode_restore_failed": "恢复单人模式失败", "initial_page_failed": "初始页面检查失败", "first_pass_page_failed": "首轮页面检查失败", "rescan_page_failed": "补扫页面检查失败", "rescan_processing_failed": "补扫处理失败", "page_check_failed": "号令页面检查失败"}
+   eval $descriptions = {
+      "action_not_implemented": "暂未实现",
+      "user_disabled": "未启用",
+      "completed_before_processing": "执行前已完成",
+      "completed_during_refresh": "刷新时已完成",
+      "completion_not_checked": "执行后未确认完成",
+      "completion_observed": "已确认完成",
+      "refresh_icon_present": "仍未完成",
+      "refresh_limit": "达到刷新上限",
+      "reading_not_entered": "未进入阅读",
+      "item_not_found": "未找到黄泉酿",
+      "use_button_not_found": "未找到食用按钮",
+      "item_navigation_failed": "背包导航失败",
+      "profile_declaration_failed": "档案声明失败",
+      "mode_restore_failed": "恢复单人模式失败",
+      "initial_page_failed": "初始页面检查失败",
+      "first_pass_page_failed": "首轮页面检查失败",
+      "rescan_page_failed": "补扫页面检查失败",
+      "rescan_processing_failed": "补扫处理失败",
+      "page_check_failed": "号令页面检查失败"
+   }
    if has_key($descriptions, $reason)
       return $descriptions.$reason
    end

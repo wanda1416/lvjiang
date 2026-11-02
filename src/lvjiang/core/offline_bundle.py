@@ -206,6 +206,8 @@ def install_offline_bundle(
                 with (closing(sqlite3.connect(existing.resolve().as_uri() + "?mode=ro", uri=True)) as source,
                       closing(sqlite3.connect(incoming)) as history_destination):
                     source.backup(history_destination)
+        # 产出与回传包不属于参数快照。产出现在写 logs/output（在 config 之外，交换
+        # 配置不会碰到），这里只为旧版留在 config/session/output 的产出保留兼容。
         for name in ("output", "history-transfer"):
             existing = target / "session" / name
             if existing.is_dir():

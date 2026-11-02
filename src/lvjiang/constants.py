@@ -37,13 +37,18 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 
 # system/local/updates/i18n 的目录关系统一由 core.paths 声明。
 
-# 纯运行态（会话/用户/产出/截图，.gitignore）
+# 纯运行态（会话/用户/头像/截图，.gitignore）
 SESSION_CONFIG_DIR = CONFIG_DIR / "session"
 SESSION_PATH = SESSION_CONFIG_DIR / "session.json"
 BATCH_CONFIG_PATH = SESSION_CONFIG_DIR / "batch.json"
 USERS_DIR = SESSION_CONFIG_DIR / "users"
 AVATARS_DIR = SESSION_CONFIG_DIR / "avatars"
-OUTPUT_DIR = SESSION_CONFIG_DIR / "output"
+
+# 工作流产出（结果 JSON）：与任务日志（logs/daily）、批量报告（logs/batch）、
+# 调律说明（logs/tuning）同根，同一次运行的产出与日志落在同一目录树。
+# 旧版在 config/session/output；历史库按 PROJECT_ROOT 相对路径保存记录，
+# 旧记录直接指向旧目录，因此不搬迁、不清理旧文件。
+OUTPUT_DIR = PROJECT_ROOT / "logs" / "output"
 
 # 用户采集产出（录屏/截屏，与场景布局截图、工作流产出分开）
 DATA_DIR = PROJECT_ROOT / "data"

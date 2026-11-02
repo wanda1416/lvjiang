@@ -61,6 +61,15 @@ def history_channels() -> dict[str, HistoryChannel]:
     return channels
 
 
+#: 历史附件允许的落点。`logs/output/` 是当前产出根；`config/session/output/` 是旧版
+#: 产出根——旧记录、以及「新 APK 回传旧记录 / 旧 APK 回传新记录」这类混用都会出现，
+#: 两个前缀都要接受。
+_ATTACHMENT_PREFIXES = (
+    "logs/daily/", "logs/batch/", "logs/tuning/", "logs/output/",
+    "config/session/output/",
+)
+
+
 def _attachment(root: Path, name: str, *, legacy: bool = False) -> tuple[str, Path]:
     # 旧调律记录曾存绝对路径，仅允许将本实例内的路径规范化。
     path = Path(name)
@@ -69,8 +78,7 @@ def _attachment(root: Path, name: str, *, legacy: bool = False) -> tuple[str, Pa
     relative = PurePosixPath(name)
     if (not name or relative.is_absolute() or ".." in relative.parts or "\\" in name
             or relative.as_posix() != name
-            or not (name.startswith("logs/daily/") or name.startswith("logs/batch/")
-                    or name.startswith("logs/tuning/") or name.startswith("config/session/output/"))):
+            or not name.startswith(_ATTACHMENT_PREFIXES)):
         raise ValueError(f"历史附件路径不在允许范围：{name}")
     path = root.joinpath(*relative.parts)
     if not path.resolve().is_relative_to(root.resolve()):

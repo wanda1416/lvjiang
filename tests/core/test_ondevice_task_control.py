@@ -181,7 +181,7 @@ def test_device_result_uses_pc_output_tree_and_relative_history(tmp_path, monkey
     started = datetime(2026, 1, 31, 23, 59, 58)
     repository = daily_history.TaskHistoryRepository(tmp_path / "history.db")
     monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", tmp_path)
-    monkeypatch.setattr("lvjiang.constants.OUTPUT_DIR", tmp_path / "config/session/output")
+    monkeypatch.setattr("lvjiang.constants.OUTPUT_DIR", tmp_path / "logs/output")
     session_type = daily_history.TaskRunSession
     monkeypatch.setattr(daily_history, "TaskRunSession", lambda **kwargs: session_type(
         **kwargs, repository=repository, started_at=started, task_run_id="device-run"))
@@ -201,7 +201,7 @@ def test_device_result_uses_pc_output_tree_and_relative_history(tmp_path, monkey
     record = repository.list_task_runs()[0]
     assert record.status == "completed"
     assert record.result_path == (
-        "config/session/output/用户甲/2026-01/31/daily_20260131_235958_000000_device-run.json")
+        "logs/output/用户甲/2026-01/31/daily_20260131_235958_000000_device-run.json")
     result = daily_history.resolve_history_path(record.result_path)
     assert json.loads(result.read_text(encoding="utf-8")) == {"message": "完成"}
     assert record.log_path.startswith("logs/daily/用户甲/2026-01/31/")

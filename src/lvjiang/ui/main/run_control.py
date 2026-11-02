@@ -2249,7 +2249,7 @@ class RunControlMixin:
         self, flow_id: str, result, interrupted: bool = False,
         task_run_id: str = "", run_context=None,
     ):
-        """保存工作流结果到 session/output/{username}/YYYY-MM/DD/。
+        """保存工作流结果到 logs/output/{username}/YYYY-MM/DD/。
 
         中断（F10）的部分结果同样落盘，文件名带 _interrupted 后缀；
         即使结果为空也保留 JSON，确保历史记录始终能定位本次返回值。
@@ -2282,7 +2282,7 @@ class RunControlMixin:
             self.log_text.append(f"[警告] {flow_id} 结果 JSON 保存失败: {exc}")
             return None
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {flow_id} → output/{save_path.relative_to(OUTPUT_DIR)}")
+        self.log_text.append(f"[保存] {flow_id} → logs/output/{save_path.relative_to(OUTPUT_DIR)}")
         return save_path
 
     # ─── 运行按钮 ──────────────────────────────────────────

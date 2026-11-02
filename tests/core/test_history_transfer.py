@@ -38,7 +38,7 @@ def histories(tmp_path, monkeypatch):
                           started_at=datetime(2026, 1, 1), target_id="ondevice", target_kind="android",
                           log_root=phone / "logs/daily")
     task.log_path.write_text("手机日志\n", encoding="utf-8")
-    result = phone / "config/session/output/手机用户/2026-01/01/result.json"
+    result = phone / "logs/output/手机用户/2026-01/01/result.json"
     result.parent.mkdir(parents=True)
     result.write_text('{"结果": 1}\n', encoding="utf-8")
     task.finish(status="completed", result_path=result)
@@ -88,6 +88,35 @@ def test_roundtrip_keeps_details_and_paths_without_repeating_telemetry(histories
         assert conn.execute("SELECT markdown_path FROM tuning_runs").fetchone()[0] == "logs/tuning/report.md"
     assert not (pc / "config/session/users").exists()
     assert not (pc / "config/session/profile.db").exists()
+
+
+def test_legacy_session_output_attachment_is_still_accepted(tmp_path, monkeypatch):
+    """旧版产出在 config/session/output；两端混用时回传仍须接受该前缀。"""
+    from lvjiang import apps
+    from lvjiang.apps import yysls
+    monkeypatch.setattr(apps, "get_registered_app_ids", lambda: ("yysls",))
+    monkeypatch.setattr(apps, "load_app", lambda _: yysls.hooks)
+    phone = tmp_path / "phone"
+    monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", phone)
+    repository = TaskHistoryRepository(phone / "config/session/daily_history.db")
+    task = TaskRunSession(username="手机用户", task_id="daily", task_name="旧任务",
+                          task_scope="daily", params={}, source="ondevice",
+                          repository=repository, started_at=datetime(2026, 1, 1),
+                          target_id="ondevice", target_kind="android",
+                          log_root=phone / "logs/daily")
+    task.log_path.write_text("手机日志\n", encoding="utf-8")
+    legacy = phone / "config/session/output/手机用户/2026-01/01/result.json"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text('{"旧": 1}\n', encoding="utf-8")
+    task.finish(status="completed", result_path=legacy)
+
+    archive = tmp_path / "legacy.zip"
+    export_history(phone, archive, ["tasks", "logs"])
+    with zipfile.ZipFile(archive) as package:
+        assert "config/session/output/手机用户/2026-01/01/result.json" in package.namelist()
+    outcome = import_history(tmp_path / "pc", archive, ["tasks", "logs"])
+    assert not outcome["errors"] and not outcome["missing"]
+    assert outcome["files"] == 2
 
 
 def test_logs_are_independent_and_missing_files_are_reported(histories, tmp_path):

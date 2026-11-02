@@ -372,7 +372,7 @@ class TestNoteHistory:
         assert len(history) == 1
         assert history[0]["new_value_text"] == "已完成"
         assert history[0]["old_value_text"] == ""
-        assert history[0]["change_type"] == "action"
+        assert history[0]["change_type"] == "set"
 
 
     def test_note_same_value_no_history(self, note_env):
@@ -383,9 +383,9 @@ class TestNoteHistory:
         )
 
         # 先写入初始值
-        db_upsert(note_env.username, "note", "user_note", 0, change_type="action", value_text="已完成")
+        db_upsert(note_env.username, "note", "user_note", 0, change_type="set", value_text="已完成")
         # 再次写入相同值
-        db_upsert(note_env.username, "note", "user_note", 0, change_type="action", value_text="已完成")
+        db_upsert(note_env.username, "note", "user_note", 0, change_type="set", value_text="已完成")
 
         history = db_get_history(note_env.username, type_="note", key="user_note")
         # action 类型始终记录，所以会有 2 条

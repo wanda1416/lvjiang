@@ -57,10 +57,10 @@ def test_manual_same_value_skips_write_even_with_force(monkeypatch):
         raise AssertionError("手动同值更新不应进入写入与脚本链路")
 
     monkeypatch.setattr("lvjiang.core.profile.service.profile_action", unexpected_write)
-    for is_action in (True, False):
+    for trigger_sync in (True, False):
         ProfileCellEditingMixin._adjust_value(
             None, "tester", "regen", "energy", None, 10.5, 0,
-            is_action=is_action, force_write=True, regen_progress_source="target",
+            trigger_sync=trigger_sync, force_write=True, regen_progress_source="target",
         )
 
 
@@ -298,7 +298,7 @@ def test_runner_submit_is_non_blocking_and_events_run_in_fifo_order(
         new_value=1,
         delta=1,
         source="test",
-        change_type="action",
+        change_type="set",
         script="profile/test.wf",
         origin_key=key,
         origin_model="stock",
@@ -315,3 +315,41 @@ def test_runner_submit_is_non_blocking_and_events_run_in_fifo_order(
     assert executed == ["first", "second"]
     runner.request_stop()
     runner.join(timeout=3)
+
+def _configure_sync_targets(tmp_path: Path, monkeypatch) -> None:
+    """source --同步依赖方--> target：验证 set 也会触发联动。"""
+    from lvjiang.core.profile import repository, schema
+
+    profile_path = tmp_path / "profile_sync.yaml"
+    profile_path.write_text(
+        yaml.safe_dump(
+            {
+                "stock": [
+                    {"key": "source", "label": "源",
+                     "sync_targets": [{"key": "stock:target"}]},
+                    {"key": "target", "label": "目标"},
+                    {"key": "lonely", "label": "无联动",
+                     "sync_targets": [{"key": "stock:target"}]},
+                ]
+            },
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(schema, "_PROFILE_PATH", profile_path)
+    monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile_sync.db")
+    schema._config = None
+    repository.reset_profile_db()
+
+
+def test_set_value_also_fires_sync_targets(tmp_path, monkeypatch):
+    """profile_set 走绝对值写入，同样必须触发「同步变更依赖方」。"""
+    from lvjiang.core.profile.service import profile_action, profile_read
+
+    _configure_sync_targets(tmp_path, monkeypatch)
+    assert profile_action("tester", "source", set_value=5) == 5
+    assert profile_read("tester", "target") == 5
+
+    # 关掉联动时只写本项，目标值不动。
+    assert profile_action("tester", "lonely", set_value=9, trigger_sync=False) == 9
+    assert profile_read("tester", "target") == 5

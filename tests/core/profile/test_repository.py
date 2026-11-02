@@ -171,7 +171,7 @@ class TestCRUD:
             expected_entry_exists=False,
             new_value=10,
             new_updated_at="2026-08-11T10:08:00",
-            change_type="action",
+            change_type="set",
             delta_value=10.0,
         )
 
@@ -233,7 +233,7 @@ class TestSchemaMigration:
             )
         ]
 
-        assert CURRENT_VERSION == 8
+        assert CURRENT_VERSION == 9
         assert primary_key == ["username", "type", "key"]
         assert "app_id" not in entry_columns
         assert "app_id" not in history_columns
@@ -333,7 +333,7 @@ class TestSchemaMigration:
             conn.close()
         # 再次执行 v2 已验证 source 列存在时不会报错；重开不伪造历史版本。
         db2 = ProfileDB(db_path)
-        db2.upsert("u", "quota", "k", 10, change_type="action", delta_value=10.0, source="导入")
+        db2.upsert("u", "quota", "k", 10, change_type="delta", delta_value=10.0, source="导入")
         assert db2.get_history("u")[0]["source"] == "导入"
 
     def test_migrate_v3_adds_updated_time_to_legacy_entries(self, tmp_path: Path):
@@ -484,18 +484,18 @@ class TestSchemaMigration:
 class TestHistory:
     def test_action_always_records(self, db: ProfileDB):
         """action 类型：即使值不变也记录"""
-        db.upsert("u", "quota", "k", 10, change_type="action", delta_value=10.0)
-        db.upsert("u", "quota", "k", 10, change_type="action", delta_value=0.0)
+        db.upsert("u", "quota", "k", 10, change_type="delta", delta_value=10.0)
+        db.upsert("u", "quota", "k", 10, change_type="delta", delta_value=0.0)
 
         history = db.get_history("u")
         assert len(history) == 2
-        assert history[0]["change_type"] == "action"
+        assert history[0]["change_type"] == "delta"
         assert history[0]["delta_value"] == 0
 
     def test_source_recorded_in_history(self, db: ProfileDB):
         """upsert 传入的 source 应随 history 落盘并可读回"""
-        db.upsert("u", "quota", "k", 10, change_type="action", delta_value=10.0, source="导入")
-        db.upsert("u", "quota", "k", 20, change_type="action", delta_value=10.0, source="同步")
+        db.upsert("u", "quota", "k", 10, change_type="delta", delta_value=10.0, source="导入")
+        db.upsert("u", "quota", "k", 20, change_type="delta", delta_value=10.0, source="同步")
 
         history = db.get_history("u")
         assert len(history) == 2
@@ -505,7 +505,7 @@ class TestHistory:
     def test_history_source_edit_uses_original_value_as_guard(self, db: ProfileDB):
         db.upsert(
             "u", "quota", "k", 10,
-            change_type="action", delta_value=10, source="误填来源",
+            change_type="delta", delta_value=10, source="误填来源",
         )
         record = db.get_history("u")[0]
 
@@ -517,49 +517,10 @@ class TestHistory:
         )
         assert db.get_history("u")[0]["source"] == "正确来源"
 
-    def test_undo_latest_history_restores_value_and_records_audit(self, db: ProfileDB):
-        db.upsert("u", "quota", "k", 3)
-        db.upsert(
-            "u", "quota", "k", 5,
-            change_type="action", delta_value=2, source="误操作",
-        )
-        record = db.get_history("u")[0]
-
-        assert db.undo_history(record["id"])
-        assert db.get_entry("u", "quota", "k")["value"] == 3
-        history = db.get_history("u")
-        assert history[0]["change_type"] == "undo"
-        assert history[0]["old_value"] == 5
-        assert history[0]["new_value"] == 3
-        assert history[0]["delta_value"] == -2
-        assert history[0]["source"] == "撤销：误操作"
-        assert not db.undo_history(record["id"])
-
-    def test_undo_rejects_stale_record_without_touching_other_user(self, db: ProfileDB):
-        db.upsert("u1", "quota", "k", 1, change_type="action")
-        stale = db.get_history("u1")[0]
-        db.upsert("u1", "quota", "k", 2, change_type="action")
-        db.upsert("u2", "quota", "k", 9, change_type="action")
-
-        assert not db.undo_history(stale["id"])
-        assert db.get_entry("u1", "quota", "k")["value"] == 2
-        assert db.get_entry("u2", "quota", "k")["value"] == 9
-
-    def test_undo_rejects_sync_derived_record(self, db: ProfileDB):
-        db.upsert(
-            "u", "quota", "k", 2, change_type="action",
-            delta_value=2, sync_from="stock:source",
-        )
-        record = db.get_history("u")[0]
-
-        assert not db.undo_history(record["id"])
-        assert db.get_entry("u", "quota", "k")["value"] == 2
-
-
     def test_override_always_records(self, db: ProfileDB):
         """override 类型：即使值不变也记录"""
-        db.upsert("u", "quota", "k", 10, change_type="override", delta_value=10.0)
-        db.upsert("u", "quota", "k", 10, change_type="override", delta_value=10.0)
+        db.upsert("u", "quota", "k", 10, change_type="set", delta_value=10.0)
+        db.upsert("u", "quota", "k", 10, change_type="set", delta_value=10.0)
 
         history = db.get_history("u")
         assert len(history) == 2
@@ -585,8 +546,8 @@ class TestHistory:
 
     def test_history_old_value(self, db: ProfileDB):
         """history 中 old_value 正确记录"""
-        db.upsert("u", "quota", "k", 10, change_type="action", delta_value=10.0)
-        db.upsert("u", "quota", "k", 20, change_type="action", delta_value=10.0)
+        db.upsert("u", "quota", "k", 10, change_type="delta", delta_value=10.0)
+        db.upsert("u", "quota", "k", 20, change_type="delta", delta_value=10.0)
 
         history = db.get_history("u")
         # 按 id 倒序：最新在前
@@ -596,7 +557,7 @@ class TestHistory:
         assert history[1]["new_value"] == 10
 
     def test_history_filter_by_type(self, db: ProfileDB):
-        db.upsert("u", "quota", "k1", 10, change_type="action", delta_value=None)
+        db.upsert("u", "quota", "k1", 10, change_type="set", delta_value=None)
         db.upsert("u", "regen", "energy", 2500, change_type="tick", delta_value=None)
 
         daily_history = db.get_history("u", type_="quota")
@@ -604,8 +565,8 @@ class TestHistory:
         assert daily_history[0]["type"] == "quota"
 
     def test_history_filter_by_key(self, db: ProfileDB):
-        db.upsert("u", "quota", "k1", 10, change_type="action", delta_value=None)
-        db.upsert("u", "quota", "k2", 20, change_type="action", delta_value=None)
+        db.upsert("u", "quota", "k1", 10, change_type="set", delta_value=None)
+        db.upsert("u", "quota", "k2", 20, change_type="set", delta_value=None)
 
         k1_history = db.get_history("u", key="k1")
         assert len(k1_history) == 1
@@ -621,11 +582,11 @@ class TestHistory:
         assert limited[0]["new_value"] == 19
 
     def test_cross_user_history_filters_and_pages_by_key(self, db: ProfileDB):
-        db.upsert("u1", "quota", "target", 1, change_type="action")
-        db.upsert("u2", "quota", "target", 2, change_type="action")
-        db.upsert("u1", "quota", "other", 3, change_type="action")
-        db.upsert("u2", "stock", "target", 4, change_type="action")
-        db.upsert("u1", "quota", "target", 5, change_type="action")
+        db.upsert("u1", "quota", "target", 1, change_type="set")
+        db.upsert("u2", "quota", "target", 2, change_type="set")
+        db.upsert("u1", "quota", "other", 3, change_type="set")
+        db.upsert("u2", "stock", "target", 4, change_type="set")
+        db.upsert("u1", "quota", "target", 5, change_type="set")
 
         assert db.count_history(None, "quota", "target") == 3
         assert db.count_history("u1", "quota", "target") == 2

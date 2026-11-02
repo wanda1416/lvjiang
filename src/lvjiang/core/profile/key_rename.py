@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import base64
 import json
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
-from ..fs_util import atomic_write_bytes, atomic_write_text
+from ..fs_util import atomic_write_text
 from ..json_files import formatted_json
 from .maintenance import profile_lock
 from .models import parse_sync_key
@@ -39,31 +37,43 @@ def _journal_path(db: ProfileDB) -> Path:
     return db._db_path.with_suffix(".rename-journal.json")
 
 
-def _restore_files(journal: dict) -> None:
-    for filename, content in journal["files"].items():
-        path = Path(filename)
-        if content is None:
-            path.unlink(missing_ok=True)
-        else:
-            atomic_write_bytes(path, base64.b64decode(content), prefix=".profile_restore_")
+def _write_references(schema, renames: list[tuple[str, str, str]]) -> None:
+    """把改名应用到定义文件与引用文件；重复执行结果相同（幂等）。"""
+    from ... import constants
+    from ..config.interface import interface_path
+    from . import schema as schema_module
+
+    schema_module.save_profile_config(rename_schema_references(schema, renames))
+    if interface_path().exists():
+        data = json.loads(interface_path().read_text(encoding="utf-8"))
+        _rename_interface(data, renames)
+        atomic_write_text(interface_path(), json.dumps(data, ensure_ascii=False, indent=2),
+                          prefix=".profile_rename_")
+    if constants.BATCH_CONFIG_PATH.exists():
+        data = json.loads(constants.BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
+        _rename_batch_parameters(data, renames)
+        atomic_write_text(constants.BATCH_CONFIG_PATH,
+                          json.dumps(data, ensure_ascii=False, indent=2),
+                          prefix=".profile_rename_")
 
 
 def recover_rename(db: ProfileDB) -> None:
-    """SQL 未提交则恢复文件；已提交则保留新文件。异常退出后可再次执行。"""
+    """重放未完成的改名。
+
+    journal 只记 renames 列表，不存文件快照：DB 的 ``UPDATE ... WHERE key=old``
+    与文件里的 ``replace_key`` 都可重复执行，因此无论崩溃发生在事务提交前还是
+    提交后，重放都收敛到同一状态，不需要再判断「SQL 是否已提交」。
+    """
     path = _journal_path(db)
     if not path.exists():
         return
     journal = json.loads(path.read_text(encoding="utf-8"))
-    conn = db._connect()
-    try:
-        committed = conn.execute(
-            "SELECT 1 FROM profile_key_renames WHERE operation_id=? LIMIT 1",
-            (journal["operation_id"],),
-        ).fetchone()
-    finally:
-        conn.close()
-    if not committed:
-        _restore_files(journal)
+    renames = [tuple(item) for item in journal.get("renames", [])]
+    if renames:
+        from .schema import get_profile_config
+        db.rename_keys(
+            renames,
+            save_references=lambda: _write_references(get_profile_config(), renames))
     path.unlink()
     from ..config import get_interface_store
     from .schema import reload_profile_config
@@ -104,10 +114,8 @@ def save_renamed_definitions(
     db: ProfileDB | None = None,
 ) -> None:
     """仅用于定义编辑器确认保存；调用前必须确认设备任务已停止。"""
-    from ... import constants
     from ..access import is_readonly
     from ..config import get_interface_store
-    from ..config.interface import interface_path
     from . import schema as schema_module
     from .repository import get_profile_db
     from .triggers import _runner
@@ -131,32 +139,17 @@ def save_renamed_definitions(
             if current.get_key(new) is not None or declared:
                 raise ValueError(f"目标 key {new} 已存在，不能合并")
         get_interface_store()  # 在引用维护前完成存储迁移。
-        new_schema = rename_schema_references(schema, renames)
-        paths = [schema_module._PROFILE_PATH, interface_path(), constants.BATCH_CONFIG_PATH]
-        operation_id = uuid4().hex
-        journal = {
-            "operation_id": operation_id,
-            "files": {str(path.resolve()): base64.b64encode(path.read_bytes()).decode()
-                      if path.exists() else None for path in paths},
-        }
         journal_path = _journal_path(db)
-        atomic_write_text(journal_path, formatted_json(journal), prefix=".profile_rename_")
+        atomic_write_text(journal_path, formatted_json({"renames": renames}),
+                          prefix=".profile_rename_")
 
         def save_references() -> None:
-            schema_module.save_profile_config(new_schema)
-            if interface_path().exists():
-                data = json.loads(interface_path().read_text(encoding="utf-8"))
-                _rename_interface(data, renames)
-                atomic_write_text(interface_path(), json.dumps(data, ensure_ascii=False, indent=2), prefix=".profile_rename_")
-            if constants.BATCH_CONFIG_PATH.exists():
-                data = json.loads(constants.BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
-                _rename_batch_parameters(data, renames)
-                atomic_write_text(constants.BATCH_CONFIG_PATH, json.dumps(data, ensure_ascii=False, indent=2), prefix=".profile_rename_")
+            _write_references(schema, renames)
 
         try:
-            db.rename_keys(renames, operation_id=operation_id, save_references=save_references)
+            db.rename_keys(renames, save_references=save_references)
         finally:
-            # 数据库审计判断提交结果，避免 commit 成功后的清理失败误回滚文件。
+            # 幂等重放：中断在任何位置都能收敛到同一状态。
             recover_rename(db)
             get_interface_store().reload()
             schema_module.reload_profile_config()

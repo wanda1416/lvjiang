@@ -1,81 +1,109 @@
-"""Profile 历史撤销的业务安全边界。"""
+"""撤销 = 反向写一次：走普通写入管线、按写入方意图记账、来源标注原来源。"""
+
+from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
-
-from lvjiang.core.profile import service
-from lvjiang.core.profile.models import StockKeyDef, SyncTargetDef
-from lvjiang.core.profile.schema import ProfileSchema
+import yaml
 
 
-def test_undo_rejects_key_with_sync_targets(monkeypatch):
-    record = {
-        "id": 3,
-        "username": "user",
-        "type": "stock",
-        "key": "source",
-        "old_value": 1.0,
-        "new_value": 2.0,
-        "old_value_text": "",
-        "new_value_text": "",
-        "change_type": "action",
-        "sync_from": None,
-    }
-    config = ProfileSchema(keys_by_model={
-        "stock": [StockKeyDef(
-            key="source",
-            sync_targets=[SyncTargetDef(key="stock:target")],
-        )],
-    })
-    monkeypatch.setattr(service, "get_profile_config", lambda: config)
-    monkeypatch.setattr(service, "db_get_history_record", lambda history_id: record)
-    monkeypatch.setattr(service, "db_get_history", lambda *args, **kwargs: [record])
-    undo_calls = []
-    monkeypatch.setattr(
-        service, "db_undo_history", lambda history_id: undo_calls.append(history_id),
+@pytest.fixture
+def undo_env(tmp_path: Path, monkeypatch) -> None:
+    from lvjiang.core.profile import repository, schema
+
+    profile_path = tmp_path / "profile.yaml"
+    profile_path.write_text(
+        yaml.safe_dump(
+            {
+                "stock": [{"key": "credits", "label": "积分"}],
+                "quota": [{"key": "weekly", "label": "周配额", "cap": 10}],
+                "note": [{"key": "memo", "label": "备注"}],
+            },
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(schema, "_PROFILE_PATH", profile_path)
+    monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
+    schema._config = None
+    repository.reset_profile_db()
+
+
+def _history(username: str, model: str, key: str) -> list[dict]:
+    from lvjiang.core.profile.repository import db_get_history
+
+    return db_get_history(username, type_=model, key=key)
+
+
+def test_undo_delta_record_writes_reverse_delta(undo_env):
+    from lvjiang.core.profile.service import (
+        profile_action,
+        profile_read,
+        undo_profile_history,
     )
 
-    with pytest.raises(service.ProfileOperationRefused, match="同步其他数据"):
-        service.undo_profile_history(3)
-    assert undo_calls == []
+    profile_action("u", "credits", delta=5, source="手动登记")
+    record = _history("u", "stock", "credits")[0]
+    assert profile_read("u", "credits") == 5
+
+    undo_profile_history(record["id"])
+
+    assert profile_read("u", "credits") == 0
+    latest = _history("u", "stock", "credits")[0]
+    assert latest["change_type"] == "delta"
+    assert latest["delta_value"] == -5
+    assert latest["source"] == "撤销：手动登记"
 
 
-def test_directional_sync_allows_only_unsynchronized_source_changes(tmp_path, monkeypatch):
-    """增加未触发负向目标时可撤销，消耗及同步来源不能拆开撤销。"""
-    from lvjiang.core.profile import repository, schema
-    from lvjiang.core.profile.models import DIR_NEG
+def test_undo_set_record_restores_previous_value(undo_env):
+    from lvjiang.core.profile.service import (
+        profile_action,
+        profile_read,
+        undo_profile_history,
+    )
 
-    config = ProfileSchema(keys_by_model={
-        "stock": [
-            StockKeyDef(key="source", sync_targets=[
-                SyncTargetDef(key="stock:target", direction=DIR_NEG),
-            ]),
-            StockKeyDef(key="target"),
-        ],
-    })
-    db = repository.ProfileDB(tmp_path / "profile.db")
-    monkeypatch.setattr(repository, "_db", db)
-    monkeypatch.setattr(schema, "_config", config)
-    db.upsert("tester", "stock", "source", 10)
-    db.upsert("tester", "stock", "target", 20)
-    target_history = db.get_history("tester", "stock", "target")
+    profile_action("u", "credits", delta=5, source="先攒分")
+    profile_action("u", "credits", set_value=2, source="扫描到的真实值")
+    record = _history("u", "stock", "credits")[0]
+    assert record["change_type"] == "set"
 
-    service.profile_action("tester", "source", delta=3)
-    increase = db.get_history("tester", "stock", "source", limit=1)[0]
-    assert service.profile_history_undo_unavailable_reason(increase) is None
-    service.undo_profile_history(increase["id"])
-    assert db.get_entry("tester", "stock", "source")["value"] == 10
-    assert db.get_entry("tester", "stock", "target")["value"] == 20
-    assert db.get_history("tester", "stock", "target") == target_history
-    assert db.get_history("tester", "stock", "source", limit=1)[0]["change_type"] == "undo"
+    undo_profile_history(record["id"])
 
-    service.profile_action("tester", "source", delta=-2)
-    decrease = db.get_history("tester", "stock", "source", limit=1)[0]
-    assert db.get_entry("tester", "stock", "target")["value"] == 18
-    with pytest.raises(service.ProfileOperationRefused, match="同步其他数据"):
-        service.undo_profile_history(decrease["id"])
-    assert db.get_entry("tester", "stock", "source")["value"] == 8
+    assert profile_read("u", "credits") == 5
+    latest = _history("u", "stock", "credits")[0]
+    assert latest["source"] == "撤销：扫描到的真实值"
 
-    db.upsert("tester", "stock", "source", 11, change_type="action", sync_from="quota:grant")
-    incoming = db.get_history("tester", "stock", "source", limit=1)[0]
-    with pytest.raises(service.ProfileOperationRefused, match="同步产生的记录"):
-        service.undo_profile_history(incoming["id"])
+
+def test_undo_note_writes_back_old_text(undo_env):
+    from lvjiang.core.profile.service import (
+        profile_action,
+        profile_read,
+        undo_profile_history,
+    )
+
+    profile_action("u", "memo", set_value="旧内容", source="第一次")
+    profile_action("u", "memo", set_value="新内容", source="第二次")
+    record = _history("u", "note", "memo")[0]
+
+    undo_profile_history(record["id"])
+
+    assert profile_read("u", "memo") == "旧内容"
+    latest = _history("u", "note", "memo")[0]
+    assert latest["change_type"] == "set"
+    assert latest["source"] == "撤销：第二次"
+
+
+def test_undo_refuses_stale_record(undo_env):
+    from lvjiang.core.profile.service import (
+        ProfileOperationRefused,
+        profile_action,
+        undo_profile_history,
+    )
+
+    profile_action("u", "credits", delta=5, source="第一笔")
+    record = _history("u", "stock", "credits")[0]
+    profile_action("u", "credits", delta=-1, source="第二笔")
+
+    with pytest.raises(ProfileOperationRefused):
+        undo_profile_history(record["id"])

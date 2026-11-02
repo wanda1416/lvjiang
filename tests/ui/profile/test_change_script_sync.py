@@ -105,7 +105,7 @@ def test_queued_adjustments_keep_increment_and_absolute_override_semantics(qtbot
     qtbot.waitUntil(lambda: host.finished == 2)
     assert profile_read('tester', 'source') == 2  # 第二次不能用排队前的 0 覆盖第一次。
     host._adjust_value('tester', 'stock', 'source', definition, 0, 5,
-                       is_action=True, set_value=5)
+                       trigger_sync=True, set_value=5)
     qtbot.waitUntil(lambda: host.finished == 3)
     assert profile_read('tester', 'source') == 5  # 勾选依赖同步的覆写仍是绝对目标，不是加 5。
     runner.request_stop()

@@ -266,7 +266,7 @@ class ProfileCellEditingMixin:
 
         self._adjust_value(
             user_name, model_type, key_str, kd, current_value, delta,
-            is_action=True, source=cell_source, expected_entry=dict(entry),
+            trigger_sync=True, source=cell_source, expected_entry=dict(entry),
             regen_progress_source="target",
             force_write=force_target_write,
             set_value=parsed_value,
@@ -430,7 +430,7 @@ class ProfileCellEditingMixin:
                     action.triggered.connect(
                         lambda checked, s=step: self._adjust_value(
                             user_name, model_type, key_str, kd, current_value, s.value,
-                            is_action=True, source=s.source, expected_entry=expected_entry,
+                            trigger_sync=True, source=s.source, expected_entry=expected_entry,
                         )
                     )
             has_quick_actions = True
@@ -534,7 +534,7 @@ class ProfileCellEditingMixin:
         kd,
         current_value,
         delta: int | float,
-        is_action: bool = True,
+        trigger_sync: bool = True,
         source: str = "",
         expected_entry: dict | None = None,
         use_cas: bool = True,
@@ -574,9 +574,9 @@ class ProfileCellEditingMixin:
             set_value=set_value,
             source=source,
             # 操作可能排队；增减按执行时当前值计算，覆写保留用户指定的目标值语义。
-            current_value=None if is_action else current_value,
+            current_value=None if trigger_sync else current_value,
             expected_entry=expected_entry,
-            is_action=is_action,
+            trigger_sync=trigger_sync,
             use_cas=use_cas,
             regen_progress_source=regen_progress_source,
             force_write=force_write,
@@ -671,7 +671,7 @@ class ProfileCellEditingMixin:
         # 自定义增减属于 action，触发 sync_targets 同步
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
-            is_action=True, source=source, expected_entry=expected_entry,
+            trigger_sync=True, source=source, expected_entry=expected_entry,
         )
 
     def _override_value_custom(  # type: ignore[misc]
@@ -728,7 +728,7 @@ class ProfileCellEditingMixin:
         # sync_checked=False: 纯覆写语义（change_type="override"，不触发同步）
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
-            is_action=sync_checked, source=source, use_cas=False,
+            trigger_sync=sync_checked, source=source, use_cas=False,
             regen_progress_source="target",
             force_write=force_target_write,
             set_value=new_value,

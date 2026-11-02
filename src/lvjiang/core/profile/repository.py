@@ -156,6 +156,28 @@ def _migrate_v8(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    """把历史表改造成可同步账本，并删掉两张纯审计表。
+
+    - 语义归一：老库分不出「增量」与「绝对值覆盖」（`profile_set` 也记成
+      `action`），统一按 `set` 落库；`tick`/`reset` 是时间派生，保留原类型。
+    - 新增 `device_id`：账本要能说明「哪台设备写的」，也是同步幂等键的一半。
+    - 删除 `profile_history_legacy`（v7 时无法解析的原文，无业务读取）与
+      `profile_key_renames`（改名审计；崩溃恢复改为幂等重放，不再需要提交标记）。
+
+    就地 ALTER，不重建表：枚举取值由写入方保证，不靠数据库约束做校验。
+    """
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(profile_history)").fetchall()]
+    if "device_id" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_history ADD COLUMN device_id TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        "UPDATE profile_history SET change_type='set' "
+        "WHERE change_type IN ('action', 'override', 'undo')")
+    conn.execute("DROP TABLE IF EXISTS profile_history_legacy")
+    conn.execute("DROP TABLE IF EXISTS profile_key_renames")
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
@@ -166,6 +188,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (6, "history add type/key index", _migrate_v6),
     (7, "structured history and key rename audit", migrate_structured_history),
     (8, "entries add locked column", _migrate_v8),
+    (9, "history becomes sync ledger; drop audit tables", _migrate_v9),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -461,7 +484,7 @@ class ProfileDB:
             # history 记录
             if change_type is not None:
                 should_record = False
-                if change_type in ("action", "override", "reset"):
+                if change_type in ("set", "delta", "reset"):
                     # 用户主动操作始终记录
                     should_record = True
                 elif type_ == "note":
@@ -532,7 +555,7 @@ class ProfileDB:
 
                 if change_type is not None:
                     should_record = False
-                    if change_type in ("action", "override", "reset"):
+                    if change_type in ("set", "delta", "reset"):
                         should_record = True
                     elif type_ == "note":
                         if old_value_text != value_text:
@@ -612,7 +635,7 @@ class ProfileDB:
 
             if change_type is not None:
                 should_record = False
-                if change_type in ("action", "override", "reset"):
+                if change_type in ("set", "delta", "reset"):
                     should_record = True
                 elif history_old_value != value:
                     should_record = True
@@ -633,27 +656,34 @@ class ProfileDB:
             self._release_connection(conn)
 
     def rename_keys(
-        self, renames: list[tuple[str, str, str]], *,
-        operation_id: str, save_references: Callable[[], None],
+        self, renames: list[tuple[str, str, str]], *, save_references: Callable[[], None],
     ) -> None:
-        """全用户身份重命名；SQL 变化与审计共用事务，不触发数值事件。"""
+        """全用户身份重命名；SQL 变化与引用文件共用事务，不触发数值事件。
+
+        幂等：旧 key 已不存在说明这一步做过了（崩溃后重放），跳过继续；目标 key
+        已有别处的数据才算冲突。
+        """
         conn = self._borrow_connection()
         try:
             self._begin(conn)
             for model, old, new in renames:
                 if old == new or not new or not new.replace("_", "").isalnum():
                     raise ValueError("无效的 key 重命名")
+                if not conn.execute(
+                    "SELECT 1 FROM profile_entries WHERE type=? AND key=? "
+                    "UNION SELECT 1 FROM profile_history WHERE type=? AND key=? LIMIT 1",
+                    (model, old, model, old),
+                ).fetchone():
+                    continue
                 if conn.execute(
                     "SELECT 1 FROM profile_entries WHERE key=? "
                     "UNION SELECT 1 FROM profile_history WHERE key=? LIMIT 1", (new, new),
                 ).fetchone():
                     raise ValueError(f"目标 key {new} 已有数据或历史，不能合并")
-                entries = conn.execute(
-                    "UPDATE profile_entries SET key=? WHERE type=? AND key=?", (new, model, old),
-                ).rowcount
-                history = conn.execute(
-                    "UPDATE profile_history SET key=? WHERE type=? AND key=?", (new, model, old),
-                ).rowcount
+                conn.execute(
+                    "UPDATE profile_entries SET key=? WHERE type=? AND key=?", (new, model, old))
+                conn.execute(
+                    "UPDATE profile_history SET key=? WHERE type=? AND key=?", (new, model, old))
                 # 未限定模型的旧来源，仅在身份没有歧义时更新。
                 ambiguous = conn.execute(
                     "SELECT 1 FROM profile_entries WHERE key=? AND type!=? "
@@ -663,19 +693,10 @@ class ProfileDB:
                 refs = [f"{model}:{old}"]
                 if not ambiguous:
                     refs.append(old)
-                sync = 0
                 for reference in refs:
-                    sync += conn.execute(
+                    conn.execute(
                         "UPDATE profile_history SET sync_from=? WHERE sync_from=?",
-                        (f"{model}:{new}", reference),
-                    ).rowcount
-                conn.execute(
-                    "INSERT INTO profile_key_renames "
-                    "(ts, operation_id, type, old_key, new_key, entries_count, history_count, sync_count) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (datetime.now().isoformat(timespec="seconds"), operation_id,
-                     model, old, new, entries, history, sync),
-                )
+                        (f"{model}:{new}", reference))
             save_references()
             self._commit(conn)
         except BaseException:
@@ -683,25 +704,6 @@ class ProfileDB:
             raise
         finally:
             self._release_connection(conn)
-
-    def get_key_renames(self, type_: str, key: str) -> list[dict]:
-        """按重命名链追溯曾用名，包括连续多次重命名。"""
-        conn = self._borrow_connection()
-        try:
-            rows = conn.execute(
-                "SELECT ts, old_key, new_key, entries_count, history_count, sync_count "
-                "FROM profile_key_renames WHERE type=? ORDER BY id DESC", (type_,),
-            ).fetchall()
-        finally:
-            self._release_connection(conn)
-        result = []
-        names = {key}
-        for ts, old, new, entries, history, sync in rows:
-            if new in names:
-                names.add(old)
-                result.append(dict(ts=ts, old_key=old, new_key=new,
-                                   entries_count=entries, history_count=history, sync_count=sync))
-        return result
 
     # ─── History 查询 ───
 
@@ -811,96 +813,6 @@ class ProfileDB:
             )
             self._commit(conn)
             return cursor.rowcount == 1
-        finally:
-            self._release_connection(conn)
-
-    def undo_history(self, history_id: int) -> bool:
-        """原子撤销一条历史记录并追加 ``undo`` 审计记录。
-
-        只接受 action/override 的当前最新记录，且当前 entry 仍须等于该记录
-        的新值。更高层负责排除带同步、变更脚本或连续再生语义的 key。
-        """
-        write_ts = datetime.now().isoformat(timespec="seconds")
-        conn = self._borrow_connection()
-        try:
-            self._begin(conn)
-            row = conn.execute(
-                "SELECT username, type, key, old_value, new_value, "
-                "old_value_text, new_value_text, change_type, source, sync_from "
-                "FROM profile_history WHERE id=?",
-                (history_id,),
-            ).fetchone()
-            if row is None:
-                self._rollback(conn)
-                return False
-            (
-                username, type_, key, old_value, new_value,
-                old_value_text, new_value_text, change_type, source, sync_from,
-            ) = row
-            if change_type not in ("action", "override") or sync_from:
-                self._rollback(conn)
-                return False
-
-            latest = conn.execute(
-                "SELECT id FROM profile_history "
-                "WHERE username=? AND type=? AND key=? ORDER BY id DESC LIMIT 1",
-                (username, type_, key),
-            ).fetchone()
-            if latest is None or latest[0] != history_id:
-                self._rollback(conn)
-                return False
-
-            current = conn.execute(
-                "SELECT value, value_text, locked FROM profile_entries "
-                "WHERE username=? AND type=? AND key=?",
-                (username, type_, key),
-            ).fetchone()
-            current_text = current[1] or "" if current is not None else ""
-            if current is not None and len(current) > 2 and current[2]:
-                # 锁定 key 不允许回滚历史：否则等于绕过锁把值写回去
-                self._rollback(conn)
-                logger.error(
-                    f"profile 撤销被拒绝：{username}.{type_}.{key} 已锁定")
-                return False
-            if (
-                current is None
-                or float(current[0]) != float(new_value)
-                or (type_ == "note" and current_text != (new_value_text or ""))
-            ):
-                self._rollback(conn)
-                return False
-
-            restored_value = float(old_value) if old_value is not None else 0.0
-            restored_text = old_value_text or ""
-            undo_delta = (
-                None if type_ == "note" else restored_value - float(new_value)
-            )
-            conn.execute(
-                "UPDATE profile_entries SET value=?, value_text=?, "
-                "updated_at=?, updated_time=? "
-                "WHERE username=? AND type=? AND key=?",
-                (
-                    restored_value, restored_text, write_ts, write_ts,
-                    username, type_, key,
-                ),
-            )
-            conn.execute(
-                "INSERT INTO profile_history "
-                "(ts, username, type, key, old_value, new_value, "
-                "old_value_text, new_value_text, change_type, delta_value, source, sync_from) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'undo', ?, ?, NULL)",
-                (
-                    write_ts, username, type_, key, float(new_value), restored_value,
-                    new_value_text or "", restored_text,
-                    undo_delta,
-                    f"撤销：{source}" if source else "撤销",
-                ),
-            )
-            self._commit(conn)
-            return True
-        except BaseException:
-            self._rollback(conn)
-            raise
         finally:
             self._release_connection(conn)
 
@@ -1079,10 +991,6 @@ def db_update_history_source(
     return get_profile_db().update_history_source(
         history_id, expected_source=expected_source, new_source=new_source,
     )
-
-
-def db_undo_history(history_id: int) -> bool:
-    return get_profile_db().undo_history(history_id)
 
 
 def db_count_history(

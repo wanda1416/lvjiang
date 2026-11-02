@@ -54,7 +54,7 @@ from ..button_styles import (
 # ProfileDefinitionDialog 位于 settings_dialog.py，此处 re-export 便于统一导入。
 from .settings_dialog import ProfileDefinitionDialog  # noqa: F401
 
-__all__ = ["HistoryDialog", "KeyRenameHistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
+__all__ = ["HistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
 
 # ─── 历史记录对话框 ────────────────────────────────────────────
 
@@ -75,46 +75,12 @@ def _cjk_column_width(widget: QWidget, characters: int) -> int:
     return metrics.horizontalAdvance("汉" * characters) + _COLUMN_CHROME_WIDTH
 
 
-class KeyRenameHistoryDialog(QDialog):
-    """独立展示模型定义的重命名审计，不混入数值变更历史。"""
-
-    def __init__(self, model_type: str, key: str, parent=None):
-        super().__init__(parent)
-        from ...core.profile.repository import get_profile_db
-        self.setWindowTitle(tr("key 重命名记录"))
-        self.resize(780, 360)
-        layout = QVBoxLayout(self)
-        records = get_profile_db().get_key_renames(model_type, key)
-        table = QTableWidget(len(records), 6, self)
-        table.setHorizontalHeaderLabels([
-            tr("时间"), tr("原 key"), tr("新 key"),
-            tr("当前记录数"), tr("历史记录数"), tr("同步引用数"),
-        ])
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        header = table.horizontalHeader()
-        assert header is not None
-        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setStretchLastSection(True)
-        for row, record in enumerate(records):
-            for column, field in enumerate(("ts", "old_key", "new_key", "entries_count", "history_count", "sync_count")):
-                table.setItem(row, column, QTableWidgetItem(str(record[field])))
-        layout.addWidget(table)
-        if not records:
-            layout.addWidget(QLabel(tr("尚无 key 重命名记录")))
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        apply_dialog_button_box_style(buttons)
-        layout.addWidget(buttons)
-
-
 class HistoryDialog(QDialog):
     """按 key 查看变更记录；可限定单个用户，也可跨用户分页。"""
 
     _TYPE_LABEL = {
-        "tick": tr("恢复"), "reset": tr("重置"), "action": tr("操作"),
-        "override": tr("覆写"), "undo": tr("撤销"),
+        "tick": tr("恢复"), "reset": tr("重置"),
+        "set": tr("覆盖"), "delta": tr("增减"),
     }  # runtime tr()
     _SOURCE_COLUMN = 5
     _ACTION_COLUMN = 8
@@ -236,14 +202,6 @@ class HistoryDialog(QDialog):
 
         self._loading_history = True
         table.setRowCount(len(history))
-        latest_ids: dict[str, int | None] = {}
-        for rec in history:
-            username = str(rec.get("username", ""))
-            if username not in latest_ids:
-                latest = db_get_history(
-                    username, self._model_type, self._key, limit=1,
-                )
-                latest_ids[username] = int(latest[0]["id"]) if latest else None
         for row, rec in enumerate(history):
             # 格式化时间
             raw_ts = rec.get("ts", "")
@@ -299,10 +257,7 @@ class HistoryDialog(QDialog):
             sync_item.setFlags(sync_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             table.setItem(row, 7, sync_item)
 
-            username = str(rec.get("username", ""))
-            reason = profile_history_undo_unavailable_reason(
-                rec, is_latest=latest_ids.get(username) == rec.get("id"),
-            )
+            reason = profile_history_undo_unavailable_reason(rec)
             undo_button = QPushButton(tr("撤销"), table)
             apply_button_style(undo_button, variant="neutral")
             fit_button_width(undo_button)
@@ -310,9 +265,7 @@ class HistoryDialog(QDialog):
             if reason is not None:
                 undo_button.setToolTip(reason)
             undo_button.clicked.connect(
-                lambda _checked=False, record=rec, old=old_str, new=new_str:
-                self._confirm_undo(record, old, new)
-            )
+                lambda _checked=False, record=rec: self._confirm_undo(record))
             delete_button = QPushButton(tr('删除'), table)
             apply_button_style(delete_button, variant='neutral')
             fit_button_width(undo_button, delete_button)
@@ -365,24 +318,18 @@ class HistoryDialog(QDialog):
         item.setData(self._ORIGINAL_SOURCE_ROLE, new_source)
         self._loading_history = False
 
-    def _confirm_undo(self, record: dict, old_value: str, new_value: str) -> None:
+    def _confirm_undo(self, record: dict) -> None:
         message = tr(
-            "确定撤销这条变更吗？\n\n"
-            "用户：{username}\n"
-            "数据项：{label}\n"
-            "当前值：{new_value}\n"
-            "撤销后：{old_value}\n\n"
-            "撤销会新增一条变更记录。"
+            '确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n'
+            '时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。'
         ).format(
             username=record.get("username", ""),
             label=self._key_label,
-            new_value=new_value,
-            old_value=old_value,
+            time=record.get("ts", ""),
+            source=record.get("source", "") or tr("无"),
         )
         answer = QMessageBox.question(
-            self,
-            tr("确认撤销"),
-            message,
+            self, tr("确认撤销"), message,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -392,8 +339,7 @@ class HistoryDialog(QDialog):
             undo_profile_history(int(record["id"]))
         except (ProfileWriteConflict, ValueError) as exc:
             log_failure(
-                f"{record.get('username', '')} {self._model_type}.{self._key} 历史撤销失败",
-                exc)
+                f"{record.get('username', '')} {self._model_type}.{self._key} 历史撤销失败", exc)
             QMessageBox.warning(self, tr("撤销失败"), str(exc))
             self._load_page()
             return

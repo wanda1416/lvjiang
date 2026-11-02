@@ -235,19 +235,11 @@ class TestWriteGuards:
         assert updated is False
         assert db.get_entry("u1", "quota", "k")["value"] == 1
 
-    def test_undo_history_refused_for_locked(self, db: ProfileDB):
-        db.upsert("u1", "quota", "k", 1, change_type="action")
-        db.upsert("u1", "quota", "k", 2, change_type="action")
-        history_id = db.get_history("u1")[0]["id"]
-        db.set_locked("u1", "quota", "k")
-        assert db.undo_history(history_id) is False
-        assert db.get_entry("u1", "quota", "k")["value"] == 2
-
     def test_rename_keys_keeps_lock(self, db: ProfileDB):
         db.upsert("u1", "quota", "old", 1)
         db.set_locked("u1", "quota", "old")
         db.rename_keys(
-            [("quota", "old", "new")], operation_id="op1",
+            [("quota", "old", "new")],
             save_references=lambda: None)
         entry = db.get_entry("u1", "quota", "new")
         assert entry["value"] == 1

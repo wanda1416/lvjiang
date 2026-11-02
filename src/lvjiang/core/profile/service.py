@@ -42,7 +42,6 @@ from .repository import (
     db_is_locked,
     db_read_all,
     db_read_entry,
-    db_undo_history,
     db_update_if_current,
     db_upsert,
 )
@@ -62,7 +61,7 @@ class ProfileWriteConflict(RuntimeError, ExpectedError):
 
 
 class ProfileOperationRefused(ValueError, ExpectedError):
-    """当前状态不允许这次 Profile 操作（例如撤销条件不满足）。
+    """当前状态不允许这次 Profile 操作（例如目标已被锁定）。
 
     原因本身就是业务规则，会原样展示给用户；归入 `ExpectedError` 后日志只记
     一行 WARNING，不打印堆栈。保留 `ValueError` 血统以兼容既有捕获点。
@@ -71,75 +70,51 @@ class ProfileOperationRefused(ValueError, ExpectedError):
     log_level = "WARNING"
 
 
-def profile_history_undo_unavailable_reason(
-    record: dict, *, is_latest: bool | None = None,
-) -> str | None:
-    """返回历史记录不能安全撤销的原因；可撤销时返回 ``None``。"""
+def profile_history_undo_unavailable_reason(record: dict) -> str | None:
+    """撤销前的准入判断；可撤销时返回 ``None``。"""
     if not record:
         return tr("历史记录不存在")
-    if record.get("change_type") not in ("action", "override"):
-        return tr("仅可撤销操作或覆写记录")
-    if record.get("sync_from"):
-        return tr("同步产生的记录不能单独撤销")
-
+    if record.get("change_type") not in ("set", "delta"):
+        return tr("仅可撤销写入记录")
     username = str(record.get("username", ""))
     model_type = str(record.get("type", ""))
     key = str(record.get("key", ""))
-    if is_latest is None:
-        latest = db_get_history(username, model_type, key, limit=1)
-        is_latest = bool(latest and latest[0].get("id") == record.get("id"))
-    if not is_latest:
+    latest = db_get_history(username, model_type, key, limit=1)
+    if not latest or latest[0].get("id") != record.get("id"):
         return tr("只能撤销该用户此数据项的最新记录")
-
-    kd = get_profile_config().get_key(key, model_type=model_type)
-    if kd is None:
-        return tr("当前数据模型中已不存在此数据项")
-    if kd.change_script:
-        return tr("该数据项关联了变更脚本，不能在此单独撤销")
-    if model_type == MODEL_REGEN and _is_continuous_regen(kd):
-        return tr("连续恢复的数据不能按历史值直接撤销")
-
-    old_value = record.get("old_value")
-    new_value = record.get("new_value")
-    if new_value is None:
-        return tr("历史记录缺少新值")
-    # 判断原记录的方向，而非撤销方向；撤销直接恢复数据库，不经过同步管线。
-    if kd.sync_targets and (
-        model_type == MODEL_NOTE
-        or any(target.matches_delta(float(new_value) - float(old_value or 0))
-               for target in kd.sync_targets)
-    ):
-        return tr("该数据项会同步其他数据，不能在此单独撤销")
-    old_text = record.get("old_value_text", "") or ""
-    new_text = record.get("new_value_text", "") or ""
-    if model_type == MODEL_NOTE:
-        if old_text == new_text:
-            return tr("该记录没有改变值")
-    elif old_value == new_value:
-        return tr("该记录没有改变值")
-
     current = db_read_entry(username, model_type, key)
     if not current:
-        return tr("当前数据已不存在")
-    if float(current.get("value", 0)) != float(new_value):
-        return tr("当前值已发生变化，不能覆盖后续操作")
-    if model_type == MODEL_NOTE and (current.get("value_text", "") or "") != new_text:
-        return tr("当前值已发生变化，不能覆盖后续操作")
+        return tr("当前数据项已不存在")
+    if model_type == MODEL_NOTE:
+        if (current.get("value_text") or "") != (record.get("new_value_text") or ""):
+            return tr("数据已发生变化，请刷新后重试")
+    else:
+        expected = record.get("new_value")
+        if expected is None or float(current.get("value", 0) or 0) != float(expected):
+            return tr("数据已发生变化，请刷新后重试")
     return None
 
 
+@profile_write
 def undo_profile_history(history_id: int) -> None:
-    """安全撤销一条历史变更，不触发同步目标或变更脚本。
+    """按历史记录反向写一次：数值给反向增量，文本写回旧值。
 
-    当前状态不允许撤销时抛 `ProfileOperationRefused`：原因本身就是业务规则
-    （不是最新记录、关联了变更脚本、会带走同步数据等），直接展示给用户。
+    撤销就是一次普通写入——记账按写入方意图（数值是增量、文本是绝对值），来源记成
+    「撤销：<原来源>」，所以它进同一份账本，也可以再被撤销。
     """
     record = db_get_history_record(history_id)
     reason = profile_history_undo_unavailable_reason(record)
     if reason is not None:
         raise ProfileOperationRefused(reason)
-    if not db_undo_history(history_id):
-        raise ProfileWriteConflict(tr("数据已发生变化，请刷新后重试"))
+    username = str(record["username"])
+    key = str(record["key"])
+    source = f"撤销：{record.get('source') or '手动'}"
+    if str(record["type"]) == MODEL_NOTE:
+        profile_action(username, key, set_value=record.get("old_value_text") or "",
+                       source=source, trigger_sync=False)
+        return
+    reverse = float(record.get("old_value") or 0) - float(record.get("new_value") or 0)
+    profile_action(username, key, delta=reverse, source=source, trigger_sync=False)
 
 
 @profile_write
@@ -387,7 +362,7 @@ def profile_observe(
                 source=source,
                 current_value=current,
                 expected_entry=entry,
-                is_action=True,
+                trigger_sync=True,
                 use_cas=True,
             )
         except ProfileWriteConflict:
@@ -416,7 +391,7 @@ def profile_action(
     source: str = tr("DSL 写入"),
     current_value: float | None = None,
     expected_entry: dict | None = None,
-    is_action: bool = True,
+    trigger_sync: bool = True,
     use_cas: bool = False,
     regen_progress_source: str = "target",
     force_write: bool = False,
@@ -491,7 +466,7 @@ def profile_action(
             new_value=text,
             delta=None,
             source=source,
-            change_type="action" if is_action else "override",
+            change_type="set",
             script=kd.change_script,
             synchronous=kd.change_script_sync,
         )
@@ -501,7 +476,7 @@ def profile_action(
             submit_profile_trigger(event)
         db_upsert(
             username, model_type, key, 0,
-            change_type="action" if is_action else "override",
+            change_type="set",
             value_text=text,
             source=source,
         )
@@ -555,7 +530,8 @@ def profile_action(
             write_value = new_value
 
     # ── 7. 写入 DB ──
-    change_type = "action" if is_action else "override"
+    # 账本只有两种写入：给了绝对值就是 set，给了增量就是 delta。
+    change_type = "set" if set_value is not None else "delta"
     from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
     event = None
     if actual_delta != 0:
@@ -575,7 +551,7 @@ def profile_action(
             return current_value
         if event.synchronous:
             submit_profile_trigger(event)
-    if is_action and use_cas and expected_entry is not None:
+    if trigger_sync and use_cas and expected_entry is not None:
         updated = db_update_if_current(
             username, model_type, key,
             expected_value=expected_entry.get("value", 0) or 0,
@@ -607,7 +583,7 @@ def profile_action(
         with trigger_context(event):
             if not event.synchronous:
                 submit_profile_trigger(event)
-            if is_action and kd and kd.sync_targets:
+            if trigger_sync and kd and kd.sync_targets:
                 from .sync import fire_sync_targets
                 fire_sync_targets(
                     write_fn=sync_write_adapter,
@@ -630,7 +606,7 @@ def sync_write_adapter(
     key: str,
     *,
     delta: int | float,
-    change_type: str = "action",
+    change_type: str = "delta",
     sync_from: str | None = None,
     source: str = "",
 ) -> tuple[int | float, int | float] | None:

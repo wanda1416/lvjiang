@@ -1641,18 +1641,6 @@ class ProfileDefinitionDialog(QDialog):
             existing.key if existing and get_profile_config().get_key(existing.key, model_type=model_type)
             else None
         )
-        btn_rename_history = QPushButton(tr("查看 key 重命名记录"))
-        btn_rename_history.setEnabled(persisted_key is not None)
-        if persisted_key is None:
-            btn_rename_history.setToolTip(tr("尚未保存的 key 没有重命名记录"))
-
-        def show_rename_history() -> None:
-            from .dialogs import KeyRenameHistoryDialog
-            if persisted_key is not None:
-                KeyRenameHistoryDialog(model_type, persisted_key, dialog).exec()
-
-        btn_rename_history.clicked.connect(show_rename_history)
-        btn_row.addWidget(btn_rename_history)
         btn_row.addWidget(error_label, stretch=1)
         btn_row.addStretch()
         btn_ok = QPushButton(tr("保存"))
@@ -1662,7 +1650,6 @@ class ProfileDefinitionDialog(QDialog):
         btn_row.addWidget(btn_cancel)
         apply_button_style(btn_ok)
         apply_button_style(btn_cancel, variant="neutral")
-        apply_button_style(btn_rename_history, variant="neutral")
         button_area = QWidget()
         button_layout = QVBoxLayout(button_area)
         button_layout.setContentsMargins(0, dialog.fontMetrics().lineSpacing(), 0, 0)

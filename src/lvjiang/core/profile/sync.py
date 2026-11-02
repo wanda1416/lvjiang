@@ -84,7 +84,7 @@ def fire_sync_targets(
         effective_source = target.source or source
         result = write_fn(
             user_name, target_model, target_kd.key,
-            delta=scaled_delta, change_type="action",
+            delta=scaled_delta, change_type="delta",
             sync_from=f"{config.get_model_type(source_kd.key)}:{source_kd.key}",
             source=effective_source,
         )

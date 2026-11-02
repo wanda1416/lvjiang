@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -23,6 +24,35 @@ from PyQt6.QtWidgets import (
 from ..core.account import AccountError, AccountSession
 from ..i18n import tr
 from .button_styles import apply_button_style
+
+
+class PasswordField:
+    """密码输入框 + 「显示」切换按钮；widget() 返回可直接进表单的容器。"""
+
+    def __init__(self, parent=None):
+        self.editor = QLineEdit()
+        self.editor.setEchoMode(QLineEdit.EchoMode.Password)
+        self.toggle = QToolButton(self.editor)
+        self.toggle.setText(tr("显示"))
+        self.toggle.setCheckable(True)
+        self.toggle.setAutoRaise(True)
+        self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.toggle.setFixedWidth(40)
+        self.toggle.toggled.connect(self._toggle_echo)
+        self.host = QWidget(parent)
+        row = QHBoxLayout(self.host)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(4)
+        row.addWidget(self.editor, stretch=1)
+        row.addWidget(self.toggle)
+
+    def _toggle_echo(self, visible: bool) -> None:
+        self.editor.setEchoMode(
+            QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password)
+        self.toggle.setText(tr("隐藏") if visible else tr("显示"))
+
+    def widget(self) -> QWidget:
+        return self.host
 
 
 class _AccountWorker(QThread):
@@ -61,12 +91,11 @@ class AccountManagerDialog(QDialog):
         form = QFormLayout(self.form_host)
         self.login_input = QLineEdit()
         self.login_input.setPlaceholderText(tr("账户名（由管理员创建）"))
-        self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText(tr("密码"))
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_input.returnPressed.connect(self._login)
+        self.password_field = PasswordField()
+        self.password_field.editor.setPlaceholderText(tr("密码"))
+        self.password_field.editor.returnPressed.connect(self._login)
         form.addRow(tr("账户名"), self.login_input)
-        form.addRow(tr("密码"), self.password_input)
+        form.addRow(tr("密码"), self.password_field.widget())
         self.login_button = QPushButton(tr("登录"))
         apply_button_style(self.login_button)
         self.login_button.clicked.connect(self._login)
@@ -155,7 +184,7 @@ class AccountManagerDialog(QDialog):
         if self.worker is not None:
             return
         login_name = self.login_input.text().strip()
-        password = self.password_input.text()
+        password = self.password_field.editor.text()
         if not login_name:
             self.status.setText(tr("请输入账户名"))
             return
@@ -163,7 +192,7 @@ class AccountManagerDialog(QDialog):
             self.status.setText(tr("请输入密码"))
             return
         self._run(lambda: self.session.login(login_name, password), tr("正在登录…"))
-        self.password_input.clear()
+        self.password_field.editor.clear()
 
     def _restore(self) -> None:
         self._run(self.session.restore, tr("正在检查登录状态…"))
@@ -175,15 +204,13 @@ class AccountManagerDialog(QDialog):
         self._run(self.session.logout_all, tr("正在退出所有设备…"))
 
     def _change_password(self) -> None:
-        old_input = QLineEdit()
-        old_input.setEchoMode(QLineEdit.EchoMode.Password)
-        new_input = QLineEdit()
-        new_input.setEchoMode(QLineEdit.EchoMode.Password)
+        old_field = PasswordField(self)
+        new_field = PasswordField(self)
         dialog = QDialog(self)
         dialog.setWindowTitle(tr("修改密码"))
         form = QFormLayout(dialog)
-        form.addRow(tr("当前密码"), old_input)
-        form.addRow(tr("新密码（至少 8 位）"), new_input)
+        form.addRow(tr("当前密码"), old_field.widget())
+        form.addRow(tr("新密码（至少 8 位）"), new_field.widget())
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept)
@@ -191,7 +218,7 @@ class AccountManagerDialog(QDialog):
         form.addRow(buttons)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        old_password, new_password = old_input.text(), new_input.text()
+        old_password, new_password = old_field.editor.text(), new_field.editor.text()
         if len(new_password) < 8:
             self.status.setText(tr("新密码至少 8 位"))
             return

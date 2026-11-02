@@ -126,7 +126,7 @@ UI 展示。key 和 name 都必须全局唯一，另存为不允许覆盖已有 
 `core/telemetry/paths.py`）不是 local 对 system 的覆盖，是纯本地运行态
 ——system 层没有对应内容。选它而不是 `config/session/`，是因为用户会
 把 `config/session/` 打包发给作者排查问题（见
-docs/60-userguide/08-feedback-and-issues.md），标识落在那里会让匿名性
+docs/60-userguide/09-faq-and-feedback.md），标识落在那里会让匿名性
 失效；而这个目录又不适合套用 local 的影子/diff 语义（没有系统内容可
 覆盖）。resolver 的 `enumerate_entities`/`load_merged` 只按已知
 `rel_dir` 枚举，不会遍历到这个目录，代码层面无冲突，纯粹是文档提醒：

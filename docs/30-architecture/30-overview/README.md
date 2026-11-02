@@ -1,6 +1,6 @@
 # 架构总览
 
-> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-11-02（基线 v0.15.8）。本层描述如与代码或配置不符，以代码与配置为准。
 
 主窗口状态流、插件系统边界、毕业率公式模型与配置分层——从这里开始读架构文档。
 
@@ -13,3 +13,4 @@
 | [03-graduation-formula-model.md](03-graduation-formula-model.md) | 毕业率公式模型（导航至 36-graduation） |
 | [04-config-layering.md](04-config-layering.md) | 配置分层：system/local 读取、session 运行数据、合并与写权限 |
 | [05-content-cache.md](05-content-cache.md) | 配置修订缓存、运行快照、保存冲突与基底状态路径 |
+| [06-session-data-map.md](06-session-data-map.md) | `config/session` 全量数据划分、读写咽喉模块、锁与存续判断 |

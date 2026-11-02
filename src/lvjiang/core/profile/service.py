@@ -491,6 +491,36 @@ def profile_action(
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
 
+    # ── 1.5 regen 固化：先把「上次写入至今的恢复」落成一条 tick ──
+    # 不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
+    # 两处基线不一致：回放（delta 相加）、撤销（old−new 反向）、按来源聚合都会算错。
+    # 固化是时间派生，不触发「同步变更依赖方」。
+    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+        stored_value = float((current_entry or {}).get("value", 0) or 0)
+        restored = compute_regen_entry(current_entry or {}, kd)
+        restored_value = float(restored.value)
+        if _is_continuous_regen(kd):
+            restored_value, restored_at = _normalize_continuous_regen_write(
+                kd, restored_value)
+        else:
+            restored_at = restored.updated_at
+        if int(restored_value) != int(stored_value):
+            db_upsert(
+                username, model_type, key, restored_value,
+                updated_at=restored_at,
+                change_type="tick",
+                delta_value=_normalize_float_noise(restored_value - stored_value),
+                source=tr("自动恢复"),
+            )
+            current_entry = db_read_entry(username, model_type, key)
+            # 计算基线保持带小数的实时值：入库取整只在 tick 那一行做，若这里降级成
+            # 整数，后面的 normalize 会认为小数进度为 0 并把锚点设成 now，白丢一点。
+            current_value = float(restored.value)
+            if expected_entry is not None:
+                # 固化是本事务自己写的：CAS 的期望值必须跟着换，否则会被误判成
+                # 「其他进程更新过」，单进程一次消耗也会报冲突。
+                expected_entry = current_entry
+
     # ── 2. 计算目标新值 ──
     if set_value is not None:
         target = float(set_value)
@@ -532,6 +562,12 @@ def profile_action(
     # ── 7. 写入 DB ──
     # 账本只有两种写入：给了绝对值就是 set，给了增量就是 delta。
     change_type = "set" if set_value is not None else "delta"
+    # 账本记的变动量取「入库值之差」：regen 会取整并回拨时间，语义 delta 与入库差可能
+    # 差不到 1 点；不变式 new = old + delta 必须按入库值成立，触发器仍用语义 delta。
+    ledger_delta = actual_delta
+    if model_type == MODEL_REGEN and current_entry:
+        ledger_delta = _normalize_float_noise(
+            float(write_value) - float(current_entry.get("value", 0) or 0))
     from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
     event = None
     if actual_delta != 0:
@@ -560,7 +596,7 @@ def profile_action(
             new_value=write_value,
             new_updated_at=custom_updated_at,
             change_type=change_type,
-            delta_value=actual_delta,
+            delta_value=ledger_delta,
             source=source,
         )
         if not updated:
@@ -570,7 +606,7 @@ def profile_action(
             username, model_type, key, write_value,
             updated_at=custom_updated_at,
             change_type=change_type,
-            delta_value=actual_delta,
+            delta_value=ledger_delta,
             source=source,
         )
     logger.debug(

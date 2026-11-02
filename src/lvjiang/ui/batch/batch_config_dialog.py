@@ -595,6 +595,32 @@ class BatchConfigDialog(QDialog):
                 if row_phase == phase:
                     form.set_field_visible(widget, name in visible)
 
+    def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API
+        from PyQt6.QtCore import QEvent, QTimer
+
+        if watched is self._scope_form and event.type() == QEvent.Type.LayoutRequest:
+            # 延迟一拍：此刻 sizeHint 还没随重排更新
+            QTimer.singleShot(0, self._clamp_form_pane)
+        return super().eventFilter(watched, event)
+
+    def _clamp_form_pane(self) -> None:
+        """表单 pane 高度锁到内容 sizeHint：行块之间不隔空白带。"""
+        splitter = getattr(self, "_main_splitter", None)
+        form = getattr(self, "_scope_form", None)
+        if splitter is None or form is None or self._clamping_form_pane:
+            return
+        sizes = splitter.sizes()
+        if len(sizes) != 3:
+            return
+        hint = form.sizeHint().height()
+        if sizes[1] == hint:
+            return
+        self._clamping_form_pane = True
+        try:
+            splitter.setSizes([sizes[0] + sizes[1] - hint, hint, sizes[2]])
+        finally:
+            self._clamping_form_pane = False
+
     def _collect_workflow_params(self) -> dict[str, dict]:
         """从控件读出各阶段参数值；写回配置与算 require 可见性共用这一份。"""
         values: dict[str, dict] = {}

@@ -53,7 +53,7 @@ with patch.object(m, 'load_batch_config', lambda: deepcopy(config)), \
     sizes = main.sizes()
     print('no selection:', sizes)
     assert dlg._workflow_params_scroll.isHidden() and sizes[2] == 0, sizes
-    assert sizes[0] >= 180 and sizes[1] >= 140, sizes
+    assert sizes[0] >= 180 and sizes[1] <= dlg._scope_form.sizeHint().height() + 2, sizes
 
     # 选中带参数的配置组：参数区首帧即出现
     dlg._load_config('first')
@@ -64,6 +64,8 @@ with patch.object(m, 'load_batch_config', lambda: deepcopy(config)), \
     assert not dlg._workflow_params_scroll.isHidden(), sizes
     assert params_h >= 120, params_h
     # 表单 pane 必须贴内容：高度 == sizeHint，底部无空白带
+    app.processEvents()
+    sizes = main.sizes()
     print('form pane h:', sizes[1], 'form hint:', dlg._scope_form.sizeHint().height())
     assert sizes[1] <= dlg._scope_form.sizeHint().height() + 2, sizes
     # 表单行距必须紧凑：富余高度沉底，不摊进行间距

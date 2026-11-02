@@ -1,4 +1,4 @@
-content_version: 5
+content_version: 8
 key: tongyou_main
 name: 同游
 views:
@@ -133,6 +133,12 @@ regions:
 - key: xianqu_enter
   name: 闲趣·前往玩法
   type: func
+  is_text: true
+  is_clickable: true
+  view: xianqu
+- key: xianqu_items
+  name: 闲趣·项目
+  type: attr
   is_text: true
   is_clickable: true
   view: xianqu

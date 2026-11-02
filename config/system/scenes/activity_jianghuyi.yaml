@@ -1,4 +1,4 @@
-content_version: 3
+content_version: 5
 key: activity_jianghuyi
 name: 江湖弈
 views:
@@ -76,3 +76,25 @@ regions:
   is_text: false
   is_clickable: true
   view: wulujuan
+- key: game_end_exit
+  name: 棋局结束·退出
+  type: func
+  is_text: true
+  is_clickable: true
+  view: game_end
+- key: settle_continue
+  name: 棋局结束·继续
+  type: func
+  is_text: true
+  is_clickable: true
+  view: game_end
+- key: back
+  name: 返回
+  type: attr
+  is_text: false
+  is_clickable: true
+  views:
+  - base
+  - wulujuan
+  - zhenlongju
+  - game_end

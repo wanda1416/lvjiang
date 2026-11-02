@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "tab_jianghuyi",
@@ -31,6 +31,18 @@
     },
     {
       "key": "blank",
+      "disabled": true
+    },
+    {
+      "key": "game_end_exit",
+      "disabled": true
+    },
+    {
+      "key": "settle_continue",
+      "disabled": true
+    },
+    {
+      "key": "back",
       "disabled": true
     }
   ]

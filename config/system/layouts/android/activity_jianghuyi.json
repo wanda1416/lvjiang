@@ -1,5 +1,5 @@
 {
-  "content_version": 12,
+  "content_version": 13,
   "regions": [
     {
       "key": "tab_jianghuyi",
@@ -56,6 +56,27 @@
       "y_ratio": 0.1,
       "w_ratio": 0.6,
       "h_ratio": 0.08
+    },
+    {
+      "key": "game_end_exit",
+      "x_ratio": 0.8,
+      "y_ratio": 0.78,
+      "w_ratio": 0.18,
+      "h_ratio": 0.2
+    },
+    {
+      "key": "settle_continue",
+      "x_ratio": 0.8,
+      "y_ratio": 0.78,
+      "w_ratio": 0.18,
+      "h_ratio": 0.2
+    },
+    {
+      "key": "back",
+      "x_ratio": 0.915,
+      "y_ratio": 0.031,
+      "w_ratio": 0.03,
+      "h_ratio": 0.048
     }
   ]
 }

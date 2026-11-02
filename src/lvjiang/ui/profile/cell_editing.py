@@ -1,6 +1,6 @@
 """档案总览单元格编辑与数据写入 Mix-in
 
-ProfileCellEditingMixin: 双击编辑、右键菜单增减、自定义增减、覆写、
+ProfileCellEditingMixin: 双击编辑、右键菜单增量、自定义增量、覆写、
 note 编辑、历史记录、值解析。
 """
 
@@ -273,13 +273,13 @@ class ProfileCellEditingMixin:
         )
 
     def _on_cell_context_menu(self: ProfileTab, pos, group_name: str, table: QTableWidget):  # type: ignore[misc]
-        """右键菜单：快速增减数值"""
+        """右键菜单：快速增量数值"""
         from PyQt6.QtWidgets import QMenu
 
         item = table.itemAt(pos)
         if not item:
             return
-        # 合计行没有对应的用户，菜单里的增减会写到一个叫「总和」的用户上。
+        # 合计行没有对应的用户，菜单里的增量操作会写到一个叫「总和」的用户上。
         if table.is_totals_row(item.row()):
             return
 
@@ -350,7 +350,7 @@ class ProfileCellEditingMixin:
             return
 
         # 满值锁定：同步目标达上限且本项未取消该设置时，所有写入入口一并禁用。
-        # 单元格既然显示成 —，右键却还能增减就自相矛盾；只保留只读的历史入口。
+        # 单元格既然显示成 —，右键却还能做增量就自相矛盾；只保留只读的历史入口。
         capped_targets = locked_sync_targets(kd, profile_data)
         if capped_targets:
             targets_text = "、".join(
@@ -524,7 +524,7 @@ class ProfileCellEditingMixin:
             notify_updated(user_name)
         self.refresh()
 
-    # ─── 数据写入与增减 ──────────────────────────────────────
+    # ─── 数据写入与增量 ──────────────────────────────────────
 
     def _adjust_value(  # type: ignore[misc]
         self: ProfileTab,
@@ -542,7 +542,7 @@ class ProfileCellEditingMixin:
         force_write: bool = False,
         set_value: float | None = None,
     ):
-        """增减数值并写回。
+        """按增量数值写回。
 
         UI 只负责收集上下文、处理提示和刷新；写入语义统一委托 profile.service.profile_action。
         """
@@ -554,9 +554,9 @@ class ProfileCellEditingMixin:
         )
         def complete(error):
             if isinstance(error, ProfileWriteConflict):
-                log_failure(f"{user_name} {model_type}.{key} CAS 冲突，本次增减未写入", error)
+                log_failure(f"{user_name} {model_type}.{key} CAS 冲突，本次增量操作未写入", error)
                 QMessageBox.warning(self, tr("写入冲突"),
-                                    tr("该数值已被其他进程更新，本次增减未写入。请刷新后重试。"))
+                                    tr("该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。"))
             elif error:
                 log_failure(f"{user_name} {model_type}.{key} 回写失败", error)
                 QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
@@ -573,7 +573,7 @@ class ProfileCellEditingMixin:
             delta=delta if set_value is None else None,
             set_value=set_value,
             source=source,
-            # 操作可能排队；增减按执行时当前值计算，覆写保留用户指定的目标值语义。
+            # 操作可能排队；增量按执行时当前值计算，覆写保留用户指定的目标值语义。
             current_value=None if trigger_sync else current_value,
             expected_entry=expected_entry,
             trigger_sync=trigger_sync,
@@ -609,7 +609,7 @@ class ProfileCellEditingMixin:
         direction: int = 0,
         expected_entry: dict | None = None,
     ):
-        """自定义增减数值（带来源/用途选择）
+        """自定义增量数值（带来源/用途选择）
 
         direction: 1=增加（展示来源词表），-1=减少（展示用途词表），
             0=双向（两类叠加，来源在上）。
@@ -627,7 +627,7 @@ class ProfileCellEditingMixin:
             vocab_label = tr("用途")
         else:
             min_val = -999999
-            prompt = tr("增减量（正增负减）:")
+            prompt = tr("增量（正增负减）:")
             vocab = kd.sources + [u for u in kd.uses if u not in kd.sources]
             vocab_label = tr("来源")
 
@@ -640,7 +640,7 @@ class ProfileCellEditingMixin:
 
         value, source, _sync, ok = ask_value_dialog(
             self,
-            title=tr("自定义增减 - {label}").format(label=kd.label),
+            title=tr("自定义增量 - {label}").format(label=kd.label),
             hint=tr("当前值: {val}").format(val=current_text),
             prompt=prompt,
             is_float=is_float,
@@ -668,7 +668,7 @@ class ProfileCellEditingMixin:
             )
             return
 
-        # 自定义增减属于 action，触发 sync_targets 同步
+        # 自定义增量属于 action，触发 sync_targets 同步
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
             trigger_sync=True, source=source, expected_entry=expected_entry,

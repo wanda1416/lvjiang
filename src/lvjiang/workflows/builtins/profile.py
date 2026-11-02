@@ -157,7 +157,7 @@ def _profile_set(
 ) -> float | str:
     """写入 profile 属性值（自动识别模型类型）
 
-    走共享写入管线 profile_action()，与 UI 增减完全一致：
+    走共享写入管线 profile_action()，与 UI 增量写入完全一致：
     数值模型: clamp → delta_value → db_upsert → sync_targets。
     note 模型: 文本直接写入 value_text 列，不走数值管线。
     source 可由工作流显式传入；省略时兼容使用 "DSL 写入"。
@@ -238,9 +238,9 @@ def _profile_observe(
 def _profile_inc(
     _engine, key: str, delta=1, source: str | None = None, *args,
 ) -> float:
-    """增减 profile 属性值（自动识别模型类型）
+    """按增量修改 profile 属性值（自动识别模型类型）
 
-    走共享写入管线 profile_action()，与 UI 增减完全一致：
+    走共享写入管线 profile_action()，与 UI 增量写入完全一致：
     clamp → delta_value → db_upsert → sync_targets。
     source 可由工作流显式传入；省略时兼容使用 "DSL 写入"。
 
@@ -260,7 +260,7 @@ def _profile_inc(
     config = get_profile_config()
     model_type = config.get_model_type(key) or ""
     if model_type == "note":
-        logger.warning(f"profile_inc: note 模型 key '{key}' 不支持增减操作")
+        logger.warning(f"profile_inc: note 模型 key '{key}' 不支持增量操作")
         return 0
 
     try:

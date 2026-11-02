@@ -2,7 +2,7 @@
 
 提供 profile_action() 作为所有写入来源的统一入口，
 以及 profile_read() / profile_read_all() 作为读取的统一入口：
-- UI 增减/覆写（overview._adjust_value）
+- UI 增量/覆写（overview._adjust_value）
 - DSL profile_set / profile_inc / profile_get / profile_all
 - sync_engine 递归写入（_sync_write_adapter）
 
@@ -411,7 +411,7 @@ def profile_action(
     key:
         profile key（自动识别模型类型）。
     delta:
-        增减量（与 set_value 二选一）。
+        增量（与 set_value 二选一）。
     set_value:
         绝对设定值（与 delta 二选一）。数值模型内部转化为 delta；note 模型直接存储文本。
         内部转化为 delta = set_value - current，后续管线完全一致。

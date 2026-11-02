@@ -68,5 +68,11 @@ class D1Client:
         return result[0].get("results") or []
 
     def verify(self) -> None:
-        """轻量连通性/权限检查：配置页保存时调用，失败抛 D1Error/D1ConnectionError。"""
+        """轻量连通性/权限检查：配置页保存时调用，失败抛 D1Error/D1ConnectionError。
+
+        **必须走 D1 查询接口（``SELECT 1``），不要改用
+        ``GET /client/v4/user/tokens/verify``**：账号级（account-owned）API Token
+        在那个端点会返回 ``401 code 1000 Invalid API Token``，看起来像"token 失效"，
+        实际用一个 D1 查询就能通。判断凭据是否可用，以客户端真正要用的接口为准。
+        """
         self.query("SELECT 1 AS ok")

@@ -90,6 +90,8 @@ editors/vscode/lvjiang-wf/*.vsix
 # Cloudflare Workers CLI 本地缓存（含账号信息，不进仓库）
 ops/stats-worker/.wrangler/
 
-# stats-client 本地缓存/凭据（含 install_id 与本地文件回退的 token，不进仓库）
+# stats-client 本机配置与缓存：settings.toml（secrets_dir）、client.json、缓存库
+ops/stats-client/.local/
+# 旧目录（已迁到 .local/，留着忽略以防残留文件被误提交）
 ops/stats-client/data/
 ops/stats-client/.env

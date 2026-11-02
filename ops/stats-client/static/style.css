@@ -210,3 +210,16 @@ table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--text) 3
 table.cohort tbody tr:nth-child(even) td.heat {
   background: color-mix(in srgb, var(--accent) calc(var(--heat, 0) * 55%), transparent);
 }
+
+/* ─── 提示条与面板标题 ──────────────────────────────────────── */
+.banner.ok {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent);
+  color: var(--ok);
+}
+.panel-title { font-size: 0.95rem; margin: 0 0 0.6rem; }
+.panel .hint code {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+}

@@ -4,6 +4,9 @@
 活跃度这类运营指标，也展示调律分析的汇总结论。数据增量拉到本地 SQLite
 缓存，页面基于本地缓存跑，Cloudflare 不可用时历史数据仍然能看。
 
+Token 与配置都放在被 Git 忽略的 `.local/` 里，凭据本身**只读**自秘密目录
+（做法与 `admin/` 一致）：
+
 替代的是"每次都手敲 `wrangler d1 execute` + 手动导出 `rolls.json` 再跑
 `scripts/analyze_telemetry_rolls.py`"这套流程——本工具不取代那个脚本，
 是把它包起来、加上取数和用户指标两块它没有的能力，见下面「与
@@ -31,25 +34,34 @@ uv sync --extra dev   # 首次；建独立虚拟环境，不影响主项目
 uv run stats-client   # 默认监听 127.0.0.1:8765，自动打开浏览器
 ```
 
-浏览器会先跳到 `/setup`：填一个**只有 `Account.D1:Read` 权限**的 API
-Token（Cloudflare 控制台 → My Profile → API Tokens → Create Token，
-Permissions 选 `Account` / `D1` / `Read`）、Account ID；Database ID 已按
-`ops/stats-worker/wrangler.toml` 预填，不用改。保存时会用一条
-`SELECT 1` 校验凭据可用。
+先准备本机设置（一次），再启动页面：
+
+```toml
+# ops/stats-client/.local/settings.toml（不入库，可从 settings.example.toml 复制）
+secrets_dir = 'C:\Users\你\iCloudDrive\工作资料\律匠\current'
+```
+
+把**只有 `Account.D1:Read` 权限**的 API Token（Cloudflare 控制台 → My Profile
+→ API Tokens → Create Token，Permissions 选 `Account` / `D1` / `Read`）写成
+`<secrets_dir>/cloudflare_api_token.txt`。程序**只读这个文件、永不写它**：
+想换 token 就改文件，刷新页面即可，不需要重启（每个请求都重新读一次）。
+
+浏览器会先跳到 `/setup`：那里只填 Account ID；Database ID 已按
+`ops/stats-worker/wrangler.toml` 预填。Token 一栏是只读状态显示——能看到
+读的是哪个文件、读到没有，还有一个「校验凭据」按钮跑一条 `SELECT 1` 把
+失败原因原样显示出来。
 
 - `--port` 换端口，`--no-browser` 启动后不自动开浏览器。
-- `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` 环境变量优先于页面填写的值。
-- `STATS_CLIENT_DATA_DIR` 环境变量覆盖 `config.json` 自身的落脚位置（默认
-  `ops/stats-client/data/`）；配置页里的"本地数据目录"字段控制的是**缓存库**
-  放哪，不影响 `config.json` 自己放哪——这是解"先有鸡还是先有蛋"必须要有
-  的一个固定锚点。
+- `STATS_CLIENT_ROOT` 环境变量只给测试用（决定 `.local/` 落在哪个临时目录）；
+  正常运行不读任何凭据相关的环境变量。
+- 配置页里的"本地数据目录"字段控制**缓存库**放哪，默认就是 `.local/`。
 
 ## 目录结构
 
 ```
 src/stats_client/
   app.py            FastAPI 入口 + `stats-client` console-script
-  config.py         首次配置向导 / 凭据存取（token 走系统密钥环，见下）
+  config.py         本机设置（settings.toml）、客户端配置、只读 token（见下）
   cloudflare.py     Cloudflare D1 REST Query API 的只读客户端（stdlib urllib）
   database.py       本地 SQLite 建表（remote_* 前缀 = 远端镜像）
   sync.py           增量同步编排：daily/roll_batch/install_day_rolls 三种节奏
@@ -63,7 +75,8 @@ src/stats_client/
 templates/          Jinja2
 static/             CSS + 本地打包的 ECharts（不接 CDN，离线也能看缓存报告）
 vocab/              主项目导出的规范枚举快照（进 git，见下）
-data/               本地缓存库 + 配置/token（gitignore，见下）
+.local/             本机设置 + client.json + 缓存库（gitignore，见下）
+settings.example.toml  .local/settings.toml 的模板（进 git）
 tests/              纯逻辑测试全部伪造 D1Client，不碰真实网络
 ```
 
@@ -144,11 +157,13 @@ python scripts/export_yysls_vocab.py   # 用主项目 venv 跑
 
 - 只需要 `D1:Read` 权限的 Token；Token 不下发浏览器、不写日志、不进报告。
 - 默认只监听 `127.0.0.1`，不做鉴权——单机单用户工具。
-- Token 默认写系统密钥环（`keyring`），不支持密钥环的平台退化为
-  `data/token.secret`（chmod 0600）；两种情况下都不出现在 `config.json`。
-- 本地缓存（`data/stats-cache.sqlite3`）含 `install_id`，与
+- Token **只读**自 `<secrets_dir>/cloudflare_api_token.txt`，代码里没有任何
+  写它的入口（`set_api_token` 已删除），也不再读环境变量或系统密钥环：凭据
+  只有一处落点、只有人能改。`secrets_dir` 由 `.local/settings.toml` 唯一决定，
+  缺失或填相对路径直接报错，没有隐含默认值。
+- 本地缓存（`.local/stats-cache.sqlite3`）含 `install_id`，与
   `ops/stats-worker/queries/roll_export.sql` 的隐私提示同等对待：只留
-  本机、不进仓库、不外发（`data/` 已在 `.gitignore` 里）。
+  本机、不进仓库、不外发（`.local/` 已在 `.gitignore` 里）。
 - "数据与同步"页提供一键清空本地缓存；远端不受影响，下次同步按首次同步
   逻辑从 90 天保留窗口重新拉。
 

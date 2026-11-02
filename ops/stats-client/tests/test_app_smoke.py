@@ -1,9 +1,10 @@
 """端到端冒烟测试：真的把 FastAPI app 跑起来（TestClient，不碰真实网络），
 用依赖覆盖把 D1Client 换成内存里的假实现。
 
-隔离手段：``STATS_CLIENT_DATA_DIR`` 环境变量决定 config.json/缓存库落在哪，
-每个测试指向自己的 tmp_path，互不干扰、也不碰真实的
-``ops/stats-client/data/``。"""
+隔离手段：``STATS_CLIENT_ROOT`` 环境变量决定检出根（``.local/`` 的父目录）落在哪，
+每个测试指向自己的 tmp_path，互不干扰，也不碰真实的 ``ops/stats-client/.local/``。
+Token 走"秘密目录里的只读文件"这条真实路径：测试写一份临时
+``.local/settings.toml`` 指向临时秘密目录，再放一个 token 文件进去。"""
 from __future__ import annotations
 
 import sys
@@ -20,13 +21,31 @@ from stats_client.sync import Syncer  # noqa: E402
 from tests.test_sync import FakeD1Client, _mkbatch, _mkdaily, _today_utc8  # noqa: E402
 
 
+def _write_local_settings(root: Path,
+                         token: str | None = "fake-token-for-tests") -> None:
+    """按真实布局准备 ``.local/settings.toml`` 与秘密目录里的 token 文件。"""
+    secrets = root / "secrets"
+    secrets.mkdir(parents=True, exist_ok=True)
+    if token is not None:
+        (secrets / "cloudflare_api_token.txt").write_text(token, encoding="utf-8")
+    local = root / ".local"
+    local.mkdir(parents=True, exist_ok=True)
+    (local / "settings.toml").write_text(
+        f"secrets_dir = '{secrets.as_posix()}'\n", encoding="utf-8")
+
+
+def _use_tmp_root(tmp_path, monkeypatch,
+                  token: str | None = "fake-token-for-tests") -> None:
+    monkeypatch.setenv("STATS_CLIENT_ROOT", str(tmp_path))
+    _write_local_settings(tmp_path, token)
+
+
 def _make_client(tmp_path, monkeypatch, seed: bool = True) -> TestClient:
-    monkeypatch.setenv("STATS_CLIENT_DATA_DIR", str(tmp_path / "data"))
+    _use_tmp_root(tmp_path, monkeypatch)
     cfg = config_mod.Config(account_id="acct-test", database_id="db-test",
                             database_name="lvjiang-stats",
                             auto_sync=False)  # 关掉自动同步，避免冒烟测试悄悄发真实请求
     config_mod.save_config(cfg)
-    config_mod.set_api_token(cfg, "fake-token-for-tests")
 
     if seed:
         fake = FakeD1Client()
@@ -50,11 +69,12 @@ class TestSetupFlow:
         assert r.status_code == 200
         assert "Account ID" in r.text
 
-    def test_save_keeps_env_account_id_despite_disabled(self, tmp_path, monkeypatch):
-        """account_id 来自环境变量时表单里的 <input disabled> 不会被浏览器提交
-        （模拟为提交空字符串）——保存不该因此把 account_id 当成"没填"报错。"""
-        monkeypatch.setenv("STATS_CLIENT_DATA_DIR", str(tmp_path / "data"))
-        monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct-from-env")
+    def test_save_keeps_saved_account_id_when_field_empty(self, tmp_path, monkeypatch):
+        """表单里留空的字段必须沿用已保存的值，不能被当成"没填"而报错。"""
+        _use_tmp_root(tmp_path, monkeypatch)
+        config_mod.save_config(config_mod.Config(
+            account_id="acct-saved", database_id="db-saved",
+            database_name="lvjiang-stats", auto_sync=False))
         import stats_client.routes.setup as setup_mod
 
         class _FakeVerifyClient:
@@ -68,17 +88,17 @@ class TestSetupFlow:
         app = create_app()
         client = TestClient(app, follow_redirects=False)
         r = client.post("/setup", data={
-            "account_id": "",  # disabled 输入框不会被提交
-            "api_token": "tok",
+            "account_id": "",   # 留空 = 沿用已保存值
             "database_id": "db-x",
             "database_name": "n",
         })
         assert r.status_code == 303, r.text
         cfg = config_mod.load_config()
-        assert cfg.account_id == "acct-from-env"
+        assert cfg.account_id == "acct-saved"
+        assert cfg.database_id == "db-x"
 
     def test_root_redirects_to_setup_when_not_configured(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("STATS_CLIENT_DATA_DIR", str(tmp_path / "empty"))
+        _use_tmp_root(tmp_path, monkeypatch)
         app = create_app()
         client = TestClient(app, follow_redirects=False)
         r = client.get("/")
@@ -145,11 +165,10 @@ class TestRollsSlotQuery:
     """
 
     def _seed_slot_data(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("STATS_CLIENT_DATA_DIR", str(tmp_path / "data"))
+        _use_tmp_root(tmp_path, monkeypatch)
         cfg = config_mod.Config(account_id="a", database_id="d", database_name="n",
                                 auto_sync=False)
         config_mod.save_config(cfg)
-        config_mod.set_api_token(cfg, "tok")
         import json as json_mod
 
         from stats_client.database import connect

@@ -1,0 +1,3 @@
+# 复制到 .local/settings.toml 后填写。which 目录由自己决定，通常放云盘同步目录。
+# secrets_dir 必须是绝对路径；不填或填相对路径会直接报错（没有默认值）。
+secrets_dir = 'C:\\path\\to\\secrets'

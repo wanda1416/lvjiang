@@ -59,7 +59,7 @@ def _parse_slot_params(request: Request) -> dict:
 def rolls_page(request: Request,
                cfg: config_mod.Config = Depends(get_cfg),
                conn: sqlite3.Connection = Depends(get_conn)):
-    if not cfg.is_ready() or not config_mod.get_api_token(cfg):
+    if not cfg.is_ready() or not config_mod.get_api_token():
         return RedirectResponse("/setup", status_code=303)
 
     params = _parse_params(request)

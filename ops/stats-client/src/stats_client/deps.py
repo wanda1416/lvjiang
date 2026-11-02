@@ -27,7 +27,7 @@ def get_conn(cfg: config_mod.Config = Depends(get_cfg)) -> Iterator[sqlite3.Conn
 
 
 def get_client(cfg: config_mod.Config = Depends(get_cfg)) -> D1Client | None:
-    token = config_mod.get_api_token(cfg)
+    token = config_mod.get_api_token()
     if not (cfg.is_ready() and token):
         return None
     return D1Client(account_id=cfg.account_id, api_token=token,

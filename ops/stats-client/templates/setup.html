@@ -1,27 +1,49 @@
 {% extends "base.html" %}
 {% block title %}配置 · 律匠统计控制台{% endblock %}
 {% block content %}
-<h1>首次配置</h1>
+<h1>本机配置</h1>
 <p class="hint">
-  在 Cloudflare 控制台建一个<strong>只有 D1:Read 权限</strong>的 API Token（不要用 Global API Key）。
-  Database ID 已按 <code>ops/stats-worker/wrangler.toml</code> 预填——它不是密钥，可以公开。
+  只编辑这台机器自己的配置；<strong>Cloudflare Token 不在这个页面上改</strong>——
+  它固定放在秘密目录里的文件里，程序只读不写。
 </p>
 
 {% if error %}
 <div class="banner error">{{ error }}</div>
 {% endif %}
+{% if notice %}
+<div class="banner ok">{{ notice }}</div>
+{% endif %}
+
+<div class="panel">
+  <h2 class="panel-title">Cloudflare API Token（只读）</h2>
+  <p class="hint">
+    读取位置：<code>{{ token.path or "（未配置 secrets_dir）" }}</code>
+  </p>
+  <p>
+    {% if token.ready %}
+      <span class="badge ok">已读取</span>
+      <span class="hint">换 token 就直接改这个文件，然后刷新页面。</span>
+    {% else %}
+      <span class="badge bad">不可用</span>
+      <span class="hint">{{ token.error }}</span>
+    {% endif %}
+  </p>
+  <form method="post" action="/setup/verify" style="margin-top:0.4rem;">
+    <button class="btn secondary" type="submit" {% if not token.ready %}disabled{% endif %}>
+      校验凭据（跑一条 SELECT 1）
+    </button>
+  </form>
+  <p class="hint" style="margin-top:0.6rem;">
+    Token 需要 <strong>D1:Read</strong> 权限（不要用 Global API Key）。文件位置由
+    <code>.local/settings.toml</code> 的 <code>secrets_dir</code> 决定，
+    文件名固定为 <code>cloudflare_api_token.txt</code>。
+  </p>
+</div>
 
 <form class="panel" method="post" action="/setup" style="display:flex;flex-direction:column;gap:0.9rem;max-width:480px;">
+  <h2 class="panel-title">账号与数据库</h2>
   <label class="hint">Account ID
-    <input name="account_id" value="{{ cfg.account_id }}" required
-           {% if cfg.account_id_from_env %}disabled{% endif %}>
-    {% if cfg.account_id_from_env %}
-    <span class="hint">当前来自环境变量 CLOUDFLARE_ACCOUNT_ID</span>
-    {% endif %}
-  </label>
-  <label class="hint">API Token（D1:Read）
-    <input name="api_token" type="password"
-           placeholder="{% if has_token %}已保存，留空则不修改{% else %}粘贴 token{% endif %}">
+    <input name="account_id" value="{{ cfg.account_id }}" required>
   </label>
   <label class="hint">Database ID
     <input name="database_id" value="{{ cfg.database_id }}">
@@ -39,8 +61,9 @@
 </form>
 
 <p class="hint">
-  保存时会用一条 <code>SELECT 1</code> 校验凭据可用。Token 优先写入系统密钥环，
-  不支持密钥环的平台会退化为本地 <code>data/token.secret</code>（权限 0600），
-  两种情况下都不会出现在 <code>config.json</code> 或任何页面/日志里。
+  保存时用一条 <code>SELECT 1</code> 校验凭据可用。配置写在
+  <code>.local/client.json</code>，缓存写在 <code>.local/stats-cache.sqlite3</code>，
+  两个文件都被 Git 忽略；Database ID 已按 <code>ops/stats-worker/wrangler.toml</code>
+  预填——它不是密钥，可以公开。
 </p>
 {% endblock %}

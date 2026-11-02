@@ -1,4 +1,4 @@
-"""只读实例仅限制场景管理入口和系统级全局热键。"""
+"""只读实例仅限制全局热键注册；窗口内按键与所有功能入口保持可用。"""
 
 from types import SimpleNamespace
 
@@ -8,7 +8,6 @@ from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QComboBox, QMainWindow
 
 from lvjiang.core import access
-from lvjiang.core.config import resolver as resolver_module
 
 
 @pytest.fixture
@@ -16,9 +15,8 @@ def readonly(monkeypatch):
     monkeypatch.setattr(access, "_readonly", True)
 
 
-@pytest.mark.parametrize("is_readonly", [False, True])
-def test_scene_manager_action_keeps_f3_and_follows_instance_access(
-        qtbot, monkeypatch, is_readonly):
+def test_scene_manager_action_keeps_f3_on_readonly_instance(
+        qtbot, monkeypatch):
     from lvjiang.ui.main.menu_ops import MenuOpsMixin
 
     class Host(MenuOpsMixin, QMainWindow):
@@ -28,21 +26,14 @@ def test_scene_manager_action_keeps_f3_and_follows_instance_access(
         def _check_update(self):
             pass
 
-    monkeypatch.setattr(access, "_readonly", is_readonly)
+    monkeypatch.setattr(access, "_readonly", True)
     host = Host()
     qtbot.addWidget(host)
     host._setup_menu()
     action = next(action for action in host.menuBar().actions()[0].menu().actions()
                   if action.text() == "场景管理")
-    assert action.shortcut().toString() == ("" if is_readonly else "F3")
-    assert action.isEnabled() is not is_readonly
-
-    shortcuts = [
-        action.shortcut().toString()
-        for action in host.menuBar().findChildren(type(action))
-    ]
-    if is_readonly:
-        assert not any(shortcuts)
+    assert action.isEnabled()
+    assert action.shortcut().toString() == "F3"
 
 
 def test_readonly_hotkey_labels_hide_key_names(readonly):
@@ -53,7 +44,7 @@ def test_readonly_hotkey_labels_hide_key_names(readonly):
         "运行中", ("F10", "结束"), ("F11", "暂停")) == "运行中"
 
 
-def test_readonly_main_window_ignores_application_hotkeys(qtbot, readonly):
+def test_readonly_main_window_keeps_application_hotkeys(qtbot, readonly):
     from lvjiang.core.config import HotkeyConfig
     from lvjiang.ui.main.window import MainWindow
 
@@ -73,7 +64,7 @@ def test_readonly_main_window_ignores_application_hotkeys(qtbot, readonly):
         QEvent.Type.KeyPress, Qt.Key.Key_F10,
         Qt.KeyboardModifier.NoModifier)
     host.keyPressEvent(event)
-    assert host.calls == []
+    assert host.calls == ["stop"]
 
 
 def test_readonly_record_dialog_ignores_application_hotkey(qtbot, readonly):
@@ -101,20 +92,21 @@ def test_readonly_record_dialog_ignores_application_hotkey(qtbot, readonly):
     assert dialog.calls == []
 
 
-def test_script_editor_write_controls_are_disabled_for_readonly_node(
+def test_script_editor_write_controls_follow_normal_rules_on_readonly_instance(
         qtbot, tmp_path, monkeypatch):
+    """只读实例不再额外禁用脚本编辑的写入按钮，状态与主实例完全一致。"""
     from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
 
-    resolver = resolver_module.ConfigResolver(tmp_path / "system", tmp_path / "local", dev_mode=True)
-    monkeypatch.setattr(resolver_module, "_resolver", resolver)
-    resolver.write_entity("workflows/demo.wf", 'log info "demo"\n')
+    def button_states():
+        widget = ScriptEditorDialog()
+        qtbot.addWidget(widget)
+        return {name: getattr(widget, name).isEnabled()
+                for name in ("btn_new", "btn_save", "btn_save_as", "btn_delete")}
+
+    monkeypatch.setattr(access, "_readonly", False)
+    primary = button_states()
     monkeypatch.setattr(access, "_readonly", True)
-    widget = ScriptEditorDialog()
-    qtbot.addWidget(widget)
-    assert widget.tree.isEnabled()
-    assert widget.btn_check.isEnabled()
-    for button in (widget.btn_new, widget.btn_save, widget.btn_save_as, widget.btn_delete):
-        assert not button.isEnabled()
+    assert button_states() == primary
 
 
 def test_readonly_instance_does_not_start_main_global_hotkeys(

@@ -49,12 +49,8 @@ def test_batch_draft_checks_baseline_and_explicit_override_updates_it(tmp_path):
     assert store.load().configs["a"].name == "草稿"
 
 
-def test_readonly_can_write_runtime_stores_but_not_installs(tmp_path, monkeypatch):
-    """只读节点能改配置与场景文档，整目录替换仍限主节点。
-
-    任务执行读的是启动时冻结的配置快照，运行中改配置只影响下一次任务，所以
-    配置与场景文档不再要求主节点；更新包安装会整目录替换，仍必须独占。
-    """
+def test_readonly_instance_can_write_documents_scenes_and_installs(tmp_path, monkeypatch):
+    """只读实例没有任何写入限制：文档、场景与整目录安装都能执行。"""
     resolver = ConfigResolver(config_dir=tmp_path, dev_mode=False)
     directory = DocumentDirectoryStore(tmp_path / "session/plugin", {"sample": "sample.json"})
     monkeypatch.setattr(access, "_readonly", True)
@@ -69,9 +65,8 @@ def test_readonly_can_write_runtime_stores_but_not_installs(tmp_path, monkeypatc
     system.mkdir()
     (system / "opaque").write_bytes(b"old")
     store = UpdateStore(tmp_path, "0.15.0", tree_digest({"opaque": b"old"}))
-    with pytest.raises(access.AccessDeniedError):
-        store.install(member_files={"opaque": b"new"}, activate=lambda *_: None)
-    assert (system / "opaque").read_bytes() == b"old"
+    store.install(member_files={"opaque": b"new"}, activate=lambda *_: None)
+    assert (system / "opaque").read_bytes() == b"new"
 
 
 def test_installed_callback_can_read_configuration_from_another_thread(tmp_path):

@@ -114,14 +114,11 @@ def save_renamed_definitions(
     db: ProfileDB | None = None,
 ) -> None:
     """仅用于定义编辑器确认保存；调用前必须确认设备任务已停止。"""
-    from ..access import is_readonly
     from ..config import get_interface_store
     from . import schema as schema_module
     from .repository import get_profile_db
     from .triggers import _runner
 
-    if is_readonly():
-        raise ValueError("只读实例不能重命名 Profile key")
     with profile_lock:
         if _runner is not None and _runner.is_busy:
             raise ValueError("Profile 变更脚本仍在执行，请等待队列完成后重命名")

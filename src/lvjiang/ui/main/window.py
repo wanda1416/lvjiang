@@ -1408,10 +1408,6 @@ class MainWindow(
 
     def keyPressEvent(self, event: QKeyEvent):  # type: ignore[override]
         # macOS 无全局热键时的窗口内兜底；按键位跟随「热键设置」配置。
-        from ...core.access import is_readonly
-        if is_readonly():
-            super().keyPressEvent(event)
-            return
         hk = self._user_config.hotkeys
         key = event.key()
         if key == getattr(Qt.Key, f"Key_{hk.start}", None):

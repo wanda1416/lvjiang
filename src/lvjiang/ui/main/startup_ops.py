@@ -30,9 +30,6 @@ class StartupOpsMixin:
         """启动时先检查公告，处理完成后再检查版本更新。"""
         if self._startup_chain_closed():
             return
-        from ...core.access import is_readonly
-        if is_readonly():
-            return  # 启动公告/同意/在线安装的持久化状态归主节点。
         from ...core.telemetry.consent import NetFeature, is_network_feature_enabled
         if not is_network_feature_enabled(NetFeature.ANNOUNCEMENT):
             self._start_update_check_on_startup()

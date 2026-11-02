@@ -339,17 +339,14 @@ class AgentTuningPage(QWidget):
         licensed = has_agent_access()
         running = bool(self.server and self.server.running)
         readonly = is_readonly()
-        self.entitlement.setText(tr("只读实例无法启用 MCP 服务，请使用主实例") if readonly
-                                 else "" if licensed else tr(LV1_REQUIRED_MESSAGE))
+        self.entitlement.setText("" if licensed else tr(LV1_REQUIRED_MESSAGE))
         self.start_service.setEnabled(licensed and not running and not readonly)
         self.start_service.setToolTip("" if licensed else tr(LV1_REQUIRED_MESSAGE))
         self.export.setEnabled(running and self.service.enabled)
-        self.generated_results.setEnabled(licensed and running and self.service.enabled and not readonly)
-        self.agent.setEnabled(not readonly)
-        self.export_path.setEnabled(not readonly)
-        self.choose_path.setEnabled(not readonly)
-        self.download_agent.setEnabled(bool(self.agent_settings.download_url))
-        self.stop_service.setEnabled((running or self.connection.enabled) and not readonly)
+        self.generated_results.setEnabled(licensed and running and self.service.enabled)
+        self.stop_service.setEnabled(running or self.connection.enabled)
+        # 端口属于主实例持有的 MCP 配置：只读实例改了会写进共享配置，
+        # 下次主实例启动时用错端口
         self.port.setEnabled(not running and not readonly)
 
     def _save_port(self, port):
@@ -390,8 +387,6 @@ class AgentTuningPage(QWidget):
         self.export_path.setText(self.connection.export_paths.get(target.key, target.export_path) if target else "")
 
     def _select_agent(self):
-        if is_readonly():
-            return
         self.connection.agent_key = self.agent.currentData() or ""
         self._show_export_path()
         try:
@@ -403,7 +398,7 @@ class AgentTuningPage(QWidget):
 
     def _save_export_path(self):
         target = self._selected_agent()
-        if target is None or is_readonly():
+        if target is None:
             return
         try:
             path = self.export_path.text().strip()
@@ -467,6 +462,8 @@ class AgentTuningPage(QWidget):
 
     def _stop_service(self):
         if is_readonly():
+            # 停用会写共享的 MCP 配置，只读实例不该悄悄改掉主实例的开关
+            self.status.setText(tr("只读实例不能停用 MCP 服务，请在主实例操作"))
             return
         self.connection.enabled = False
         try:
@@ -495,8 +492,6 @@ class AgentTuningPage(QWidget):
             self.status.setText(str(exc))
 
     def _choose_export_file(self):
-        if is_readonly():
-            return
         name, _ = QFileDialog.getSaveFileName(self, tr("选择 Agent 接入配置文件"),
                                             self.export_path.text(), "JSON (*.json)")
         if name:

@@ -196,14 +196,12 @@ class OfflineControlPage(QWidget):
         active = self._state in {"running", "pausing", "paused", "stopping"}
         for button in self.buttons.values():
             button.setEnabled(not busy)
-        from ...core.access import is_readonly
         # 回传只导出终态历史，运行中的任务会被导出查询跳过，因此任务运行中也可用。
         self.buttons["history"].setEnabled(
-            not busy and not is_readonly()
+            not busy
             and any(check.isChecked() for check in self.history_choices.values()))
-        self.buttons["history"].setToolTip(tr("请在主节点回传历史") if is_readonly() else "")
         for check in self.history_choices.values():
-            check.setEnabled(not busy and not is_readonly())
+            check.setEnabled(not busy)
         sync_allowed = has_feature("lv1")
         self.buttons["sync"].setEnabled(sync_allowed and not busy and not active
                                         and bool(self.layout_choice.currentData()) and bool(self._sync_username()))

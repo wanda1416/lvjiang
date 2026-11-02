@@ -165,12 +165,8 @@ class BatchRunDraft:
 
 # ─── interface.json 根节点的 batch ─────────────────────────
 #
-# 不放 ui_state 下：ui_state 整片是"实例私有的界面状态"，多开时抢不到实例锁的
-# 只读实例改它会整片不落盘。而运行草稿是用户一行行调出来的数据，需求要求"应用
-# 重启后恢复上次页面状态"，放进 ui_state 会连它一起被排除掉。
-#
-# 活动组确实属于"本实例在看什么"，所以单独留在 TRANSIENT_PATHS 里（见
-# InterfaceStore.TRANSIENT_PATHS 的 ("batch", "active_group_id")）。
+# 活动组回答"本实例在看哪个组"，草稿是用户一行行调出来的数据；两者都要
+# 持久化，重启后恢复上次页面状态。
 #
 # 写入必须在 SessionStore 锁内改最新节点；先 get 再整体 update 会让两个实例用
 # 各自的旧快照互相覆盖。
@@ -199,9 +195,8 @@ def _mutate_batch_node(mutator: Callable[[dict], None]) -> None:
 def active_group_id() -> str:
     """主页面当前选中的配置组 ID。
 
-    与运行草稿同在 batch 节点，但语义不同：它回答"本实例在看哪个组"，只读
-    实例下不落盘（见 InterfaceStore.TRANSIENT_PATHS）；草稿是必须保存的
-    用户数据。不进 batch.json。
+    与运行草稿同在 batch 节点，但语义不同：它回答"本实例在看哪个组"，
+    草稿是用户必须保存的数据。不进 batch.json。
     """
     value = _batch_node().get("active_group_id")
     return value if isinstance(value, str) else ""

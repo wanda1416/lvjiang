@@ -202,8 +202,6 @@ def _merge_channel(root: Path, channel: HistoryChannel, tables: dict) -> int:
 
 
 def import_history(root: Path, archive_path: Path, selected: list[str]) -> dict:
-    from .access import require_primary_write
-    require_primary_write()
     channels = history_channels()
     if not selected or set(selected) - {*channels, "logs"}:
         raise ValueError("回传类别不合法")

@@ -150,13 +150,11 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     _window = MainWindow()
     if is_readonly():
         from PyQt6.QtWidgets import QLabel
-        notice = "只读节点：共享配置不可修改；当前选择仅在本实例生效"
-        _window.setWindowTitle(_window.windowTitle() + " [只读节点]")
+        notice = "只读实例：全局热键由另一实例持有"
+        _window.setWindowTitle(_window.windowTitle() + " [只读实例]")
         status = _window.statusBar()
         if status is not None:
             status.addPermanentWidget(QLabel(notice, _window))
-    else:
-        _window.setWindowTitle(_window.windowTitle() + " [主实例]")
     _window.setUpdatesEnabled(True)   # 构造期重绘已关闭，show 前恢复
     _window.show()
 

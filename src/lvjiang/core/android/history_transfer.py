@@ -7,7 +7,6 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from ..access import require_primary_write
 from ..history_transfer import MAX_BYTES, import_history
 from .agent import AgentClient
 
@@ -17,7 +16,6 @@ def pull_history(
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda _done, _total: None,
 ) -> dict:
-    require_primary_write()
     if agent.status.get("history_protocol") != 1:
         raise RuntimeError("请先更新 APK：手机不支持历史回传")
     summary, _ = agent.call("history_begin", selected=selected, timeout=120)

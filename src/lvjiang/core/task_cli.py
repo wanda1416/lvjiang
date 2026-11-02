@@ -585,7 +585,7 @@ def build_parser() -> argparse.ArgumentParser:
                            help="直接执行任意位置的 .wf")
 
     parser.add_argument("--read-only", action="store_true",
-                        help="不争取主节点：不可安装更新包或回传历史")
+                        help="不注册全局热键（留给另一实例）；不启动 MCP 服务")
     parser.add_argument("-reg", "--register", action="append", dest="apps",
                         metavar="APP", help="加载插件，可多次使用")
     parser.add_argument("--all", "--all-plugins", action="store_true", dest="all_plugins",
@@ -753,7 +753,6 @@ def cli_main(argv: Sequence[str], *, bootstrap: Bootstrap) -> int:
         return int(exit_error.code or EXIT_USAGE)
 
     if args.list_scripts:
-        args.read_only = True
         bootstrap(args, console_level=_console_level(args), recover=False)
         try:
             if args.script_id or args.script_name:

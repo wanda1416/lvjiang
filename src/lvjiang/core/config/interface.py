@@ -26,16 +26,6 @@ def interface_path() -> Path:
 class InterfaceStore(SessionStore):
     """复用节点锁与原子写入，只读取独立界面状态文件。"""
 
-    TRANSIENT_PATHS = frozenset({
-        # 激活项整棵子树都是"本实例在用哪个"：只读实例可以临时切换，但不
-        # 落盘，也不该影响持有写权限的实例。
-        ("actives",),
-        ("daily",),
-        ("ui_state",),
-        ("batch",),
-        ("profile", "overview_active_group"),
-    })
-
     @property
     def path(self) -> Path:
         return self._path_override if self._path_override is not None else interface_path()

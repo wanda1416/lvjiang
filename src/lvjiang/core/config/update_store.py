@@ -55,8 +55,6 @@ class UpdateStore:
             yield acquired
 
     def _write(self, path: Path, data: bytes, *, fsync: bool = False) -> None:
-        from ..access import require_primary_write
-        require_primary_write()
         atomic_write_bytes(path, data, prefix=".update-", fsync=fsync)
 
     def _state(self) -> dict[str, Any]:
@@ -68,8 +66,6 @@ class UpdateStore:
         journal = self.updates / "transaction.json"
         if not journal.is_file():
             return
-        from ..access import require_primary_write
-        require_primary_write()
         data = json.loads(journal.read_text(encoding="utf-8"))
         token = data.get("token", "")
         if not isinstance(token, str) or len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
@@ -127,8 +123,6 @@ class UpdateStore:
 
     def prune_archives(self) -> None:
         """只回收本系列未引用的完整归档，不动 r0、索引和事务资料。"""
-        from ..access import require_primary_write
-        require_primary_write()
         with self.locked():
             if (self.updates / "transaction.json").exists():
                 return
@@ -165,8 +159,6 @@ class UpdateStore:
         activate: Callable[[Path, tuple[str, ...]], None],
     ) -> tuple[str, ...]:
         """主节点提交安装；消费者刷新在安装临界区外执行。"""
-        from ..access import require_primary_write
-        require_primary_write()
         pending = None
 
         def defer(system, changed):

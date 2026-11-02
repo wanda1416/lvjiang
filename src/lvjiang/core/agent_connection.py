@@ -43,9 +43,6 @@ class AgentConnection:
         return result
 
     def save(self, root: Path) -> None:
-        from .access import is_readonly
-        if is_readonly():
-            raise PermissionError("只读实例不能修改 MCP 接入配置")
         if not self.token:
             self.token = secrets.token_urlsafe(32)
         path = settings_path(root)

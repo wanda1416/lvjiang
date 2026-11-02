@@ -137,7 +137,6 @@
 | 文档内 `revision` 乐观并发 | `users/*.loadouts.json` |
 | SQLite 事务（WAL + busy_timeout） | 三个 `.db` |
 | 事务日志 + 下次访问恢复（`_transaction.json`） | `yysls/`、`agent/` 多文档更新 |
-| `READONLY_TRANSIENT_PATHS` 白名单 | 只读实例的 `actives`/`daily`/`ui_state`/`batch` 等选择项 |
 
 ## 八、生命周期与存续判断
 

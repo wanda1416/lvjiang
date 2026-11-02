@@ -342,8 +342,6 @@ class BatchConfigStore:
             return config
 
     def save(self, config: BatchConfig, *, force: bool = False) -> None:
-        from .access import require_primary_write
-        require_primary_write()
         with self._thread_lock:
             current = self.path.read_bytes() if self.path.exists() else None
             if not force and current != config._file_baseline:
@@ -353,8 +351,6 @@ class BatchConfigStore:
             config._file_baseline = self.path.read_bytes()
 
     def mutate(self, mutator: Callable[[BatchConfig], None]) -> BatchConfig:
-        from .access import require_primary_write
-        require_primary_write()
         with self._thread_lock:
             config = self.load()
             mutator(config)

@@ -69,7 +69,7 @@
 | [16-android-batch.md](50-platform/16-android-batch.md) | 手机批量配置、运行草稿、悬浮启动与方向过渡 | 已实现，真机验收范围按验证章节确认 |
 | [17-prerelease.md](50-platform/17-prerelease.md) | PEP 440 测试/候选版本与正式升级比较 | 已实现，具体发布结果以实际流水线为准 |
 | [18-android-connection-recovery.md](50-platform/18-android-connection-recovery.md) | 代理与 ADB 重连、输入降级及人工恢复边界 | 已实现，实机断线场景需单独验收 |
-| [19-write-ownership.md](50-platform/19-write-ownership.md) | 主节点写权限、用户占用和文件锁收敛 | 已实现 |
+| [19-write-ownership.md](50-platform/19-write-ownership.md) | 用户执行占用、热键与 MCP 的主实例专属门禁 | 已实现 |
 | [20-world-map-catalog.md](50-platform/20-world-map-catalog.md) | 大世界地图与地域目录、探查底图保存与预览、重叠截图拼接 | 部分实现（地域选择和界碑传送运行时函数待实现） |
 | [21-plugin-data.md](50-platform/21-plugin-data.md) | 插件领域数据与同步数据库声明 | 已实现 |
 | [22-plugin-runtime.md](50-platform/22-plugin-runtime.md) | 插件宿主运行接口与公共事件契约 | 已实现 |

@@ -137,8 +137,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--read-only", action="store_true", help=tr(
-            "不争取主节点：更新包安装、离线包导入与历史回传不可用，"
-            "配置与运行状态仍可保存"),
+            "不注册全局热键（留给另一实例）；不启动 MCP 服务"),
     )
     parser.add_argument(
         "-reg",
@@ -168,7 +167,9 @@ def _bootstrap(
     import atexit
 
     from .core.access import close_instance, initialize_instance
-    initialize_instance(PROJECT_ROOT, readonly=bool(getattr(args, "read_only", False)))
+    # --read-only 直接声明只读：不参与抢占，把实例锁留给真正要干活的实例
+    initialize_instance(
+        PROJECT_ROOT, readonly=bool(getattr(args, "read_only", False)))
     atexit.register(close_instance)
     _configure_dpi()
     _configure_logging(console_level)

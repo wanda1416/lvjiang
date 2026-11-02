@@ -92,9 +92,7 @@ def rebuild_content(resolver) -> dict:
             for key in keys[:-1]:
                 node = node.setdefault(key, {})
             node[keys[-1]] = versioning.read_version(source) or 1
-        from ..access import is_readonly
-        if not is_readonly():
-            atomic_write_bytes(path, formatted_json_bytes(data), prefix=".content-")
+        atomic_write_bytes(path, formatted_json_bytes(data), prefix=".content-")
         resolver.clear_read_cache()
         return data
 
@@ -131,10 +129,6 @@ def load_content(resolver) -> dict:
 
 
 def content_changed(resolver) -> None:
-    from ..access import is_readonly
-    if is_readonly():
-        resolver.clear_read_cache()
-        return
     try:
         rebuild_content(resolver)
     except OSError as exc:

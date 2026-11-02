@@ -1,4 +1,7 @@
-"""Process lifetime configuration ownership and user execution leases."""
+"""User execution leases: 同一用户不被多实例互相覆盖。
+
+实例级主节点/只读语义已移除：共享配置由 content_version 基线与覆盖确认保护，
+任务数据由这里的用户占用锁保护。"""
 from __future__ import annotations
 
 import os
@@ -75,12 +78,21 @@ _readonly = False
 
 
 def initialize_instance(root: Path, *, readonly: bool = False) -> None:
+    """初始化实例身份：抢占式——谁先拿到实例锁谁是主节点。
+
+    抢不到的实例成为只读节点，它只放弃全局热键与 MCP 服务，**不锁任何功能
+    入口**（更新安装、离线导入、脚本编辑、出装等照常可用）。
+
+    ``readonly=True``（来自 ``--read-only``）直接声明只读：不参与抢占，
+    把锁留给真正要干活的实例。
+    """
     global _instance, _readonly
     if _instance is not None:
         raise RuntimeError("实例权限已经初始化")
     lease = Lease(lock_file(
         "instance", os.path.normcase(str(session_directory(config_directory(root)).resolve()))))
-    _readonly = True  # Fail closed if lock acquisition raises.
+    # 抢锁失败或异常时按只读处理（fail closed）
+    _readonly = True
     if not readonly:
         _readonly = not lease.acquire()
     _instance = lease
@@ -94,26 +106,16 @@ def close_instance() -> None:
 
 
 def is_readonly() -> bool:
+    """是否只读节点：决定让不让出全局热键与 MCP，不限制任何功能入口。"""
     return _readonly
-
-
-def require_primary_write() -> None:
-    """整目录替换与少数独占入口只有主节点可以做。
-
-    配置与运行状态本身不再要求主节点（见 ``config.content.config_write_lock``）：
-    这里只拦更新包安装、离线包导入、历史回传，以及出装搭配、批量配置这类仍
-    按主节点语义设计的保存入口。
-    """
-    if is_readonly():
-        raise AccessDeniedError("只读节点不能执行该操作，请在主节点操作")
 
 
 @contextmanager
 def user_write_access(username: str, users_dir: Path | None = None):
     """复用用户占用门禁，不创建数据文件锁。
 
-    同主节点内的 UI/任务共用已有占用；只读节点必须在任务授权上下文中。
-    主节点修改未占用用户时短暂取得同一门禁，不能撞上其它节点的用户任务。
+    同主实例内的 UI/任务共用已有占用；主实例修改未占用用户时短暂取得同一
+    门禁，不能撞上其它实例的用户任务。
 
     界面偏好（``set_user_ui_state``）不属于任务数据，不走这里：它只锁用户
     资料文件本身，否则另一个进程跑任务时点一下筛选就会变成致命错误。
@@ -121,11 +123,9 @@ def user_write_access(username: str, users_dir: Path | None = None):
     lease = user_lease(username, users_dir)
     # 检查与写回共用现有占用状态互斥；任务不能在写回中途释放/抢占用户。
     with _mutex:
-        if lease.key in _held and (not is_readonly() or lease.key in _authorized.get()):
+        if lease.key in _held:
             yield
             return
-        if is_readonly():
-            raise AccessDeniedError("只读节点只能写入本节点正在执行任务的用户数据")
         lease = acquire_user(username, users_dir)
         try:
             with lease.authorized():

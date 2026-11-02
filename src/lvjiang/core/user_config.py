@@ -232,17 +232,10 @@ def delete_user_workflow_params(
     )
 
 
-_readonly_ui_states: dict[tuple[Path, str], dict[str, Any]] = {}
-
-
 def get_user_ui_state(
     username: str, key: str, users_dir: Path | None = None,
 ) -> dict[str, Any]:
     """读取 ``users/{username}.json`` 中一项用户界面状态。"""
-    from .access import is_readonly
-    path = user_metadata_path(username, users_dir).resolve()
-    if is_readonly() and (path, key) in _readonly_ui_states:
-        return deepcopy(_readonly_ui_states[path, key])
     user = load_user_metadata(username, users_dir)
     if user is None:
         return {}
@@ -265,10 +258,6 @@ def set_user_ui_state(
     """
     saved = deepcopy(value)
     path = user_metadata_path(username, users_dir)
-    from .access import is_readonly
-    if is_readonly():
-        _readonly_ui_states[path.resolve(), key] = saved
-        return
     with _metadata_write_lock(path):
         user = load_user_metadata(username, users_dir)
         if user is None:
@@ -339,9 +328,6 @@ class UserConfigManager:
                     continue
                 user = load_user_metadata(value, self._users_dir)
                 if user is None:
-                    from .access import is_readonly
-                    if is_readonly():
-                        continue
                     user = User(name=value, created_at=datetime.now().isoformat())
                     save_user_metadata(user, self._users_dir)
                 self._users[value] = user
@@ -374,9 +360,6 @@ class UserConfigManager:
         user = User(name="default", created_at=datetime.now().isoformat())
         self._users[user.name] = user
         self._active_user = user.name
-        from .access import is_readonly
-        if is_readonly():
-            return  # 空目录只读展示，不创建用户资料或名册。
         self._save_user(user)
         self._save_order()
         logger.info("已创建默认用户")

@@ -370,9 +370,6 @@ class AgentService:
 
     def _generated(self, user: str, payload: dict, result_id: str) -> tuple[dict, list[dict], dict]:
         self._check(user)
-        from .....core.access import is_readonly
-        if is_readonly():
-            raise PermissionError("当前实例不是主节点，不能生成调律规则")
         if set(payload) - {"name", "goal", "plan_ids", "plan_targets", "suggestions", "base_group", "rules", "run_config"}:
             raise ValueError("生成配置包含未知字段")
         if not isinstance(payload.get("goal", ""), str):

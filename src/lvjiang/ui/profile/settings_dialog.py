@@ -954,10 +954,7 @@ class _ModelTab(QWidget):
 
 
 def _rename_unavailable_reason(parent: QWidget) -> str:
-    from ...core.access import is_readonly
     from ...core.profile.triggers import _runner
-    if is_readonly():
-        return tr("只读实例不可以重命名 key")
     if _runner is not None and _runner.is_busy:
         return tr("Profile 变更脚本仍在执行，请等待队列完成后重命名")
     ancestor: QWidget | None = parent
@@ -1375,10 +1372,6 @@ class ProfileDefinitionDialog(QDialog):
             edit_key = QPushButton(tr("编辑"))
             apply_button_style(edit_key, variant="neutral")
             def begin_key_edit() -> None:
-                from ...core.access import is_readonly
-                if is_readonly():
-                    QMessageBox.information(dialog, tr("提示"), tr("只读实例不可以重命名 key"))
-                    return
                 key_input.setReadOnly(False)
                 key_input.setFocus()
                 key_input.selectAll()

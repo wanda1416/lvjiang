@@ -11,10 +11,8 @@
 
 界面、Profile 总览、告警与服务器状态独立存于 interface.json，见 interface 模块。
 
-这里刻意不要求主节点：告警、界面状态、当前选择都是运行时状态，两个实例
-同时写最多丢一次更新（下一轮重试即可），不该因为另一个进程占着主节点就
-整类写入不可用。真正需要主节点的只剩整目录替换的操作（更新包安装、离线包
-导入、历史回传），见 core.access.require_primary_write 的调用点。
+这里没有任何主节点限制：告警、界面状态、当前选择都是运行时状态，两个实例
+同时写由跨进程文件锁串行化，最多丢一次更新（下一轮重试即可）。
 """
 from __future__ import annotations
 
@@ -28,11 +26,6 @@ from loguru import logger
 
 from ..fs_util import atomic_write_text, interprocess_lock
 
-# 只读节点只能在内存中改允许的临时子树，其它节点拒绝落盘。session.json 只剩配置
-# 与事实，没有实例私有选择，所以这里是空的——那类状态（actives）已随新归属
-# 落到 InterfaceStore.TRANSIENT_PATHS。
-READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset()
-
 _MISSING = object()
 
 
@@ -45,43 +38,15 @@ def _value_at_path(data: dict, path: tuple[str, ...]) -> Any:
     return value
 
 
-def _overlay_path(target: dict, source: dict, path: tuple[str, ...]) -> None:
-    """Copy one transient subtree from source to target, including deletion."""
-    source_value = _value_at_path(source, path)
-    parent: dict = target
-    for key in path[:-1]:
-        child = parent.get(key)
-        if not isinstance(child, dict):
-            if source_value is _MISSING:
-                return
-            child = {}
-            parent[key] = child
-        parent = child
-    leaf = path[-1]
-    if source_value is _MISSING:
-        parent.pop(leaf, None)
-    else:
-        parent[leaf] = deepcopy(source_value)
-
-
-def _overlay_readonly_transients(
-    target: dict, source: dict, paths=READONLY_TRANSIENT_PATHS,
-) -> None:
-    for path in paths:
-        _overlay_path(target, source, path)
-
-
 class SessionStore:
     """session.json 唯一读写入口
 
     不带参构造时路径动态取自 constants.SESSION_PATH（monkeypatch 友好）；
     测试可显式传入 tmp_path 构造隔离实例。
 
-    任一节点都可落盘；进程内用 RLock、跨进程用文件锁串行化读改写，文件用
-    原子替换。只读节点允许的临时选择仍只更新本实例缓存。
+    任一实例都可落盘；进程内用 RLock、跨进程用文件锁串行化读改写，文件用
+    原子替换。
     """
-
-    TRANSIENT_PATHS = READONLY_TRANSIENT_PATHS
 
     def __init__(self, path: Path | str | None = None):
         self._path_override = Path(path) if path else None
@@ -123,23 +88,15 @@ class SessionStore:
     def _mutate_disk(
         self, mutator: Callable[[dict], Any], *, strict: bool = False,
     ) -> Any:
-        """合并最新磁盘状态；只读节点只保留允许的临时选择（不落盘）。"""
+        """合并最新磁盘状态后原子写回。"""
         with self._thread_lock, interprocess_lock(self.path, suffix="state"):
-            from ..access import is_readonly
-            readonly = is_readonly()
             disk_data = self._read_disk(strict=strict)
             working = deepcopy(disk_data)
-            if readonly:
-                _overlay_readonly_transients(working, self._data, self.TRANSIENT_PATHS)
             result = mutator(working)
             persisted = deepcopy(working)
-            if readonly:
-                _overlay_readonly_transients(persisted, disk_data, self.TRANSIENT_PATHS)
             if persisted != disk_data:
                 self._write_disk_atomic(persisted)
             self._data = deepcopy(persisted)
-            if readonly:
-                _overlay_readonly_transients(self._data, working, self.TRANSIENT_PATHS)
             return result
 
     # ─── 节点读写 ────────────────────────────────────────
@@ -195,13 +152,9 @@ class SessionStore:
         self._mutate_disk(_delete)
 
     def reload(self):
-        """重新读盘；只读实例保留白名单中的本实例临时选择。"""
+        """重新读盘。"""
         with self._thread_lock:
-            from ..access import is_readonly
-            disk_data = self._read_disk()
-            if is_readonly():
-                _overlay_readonly_transients(disk_data, self._data, self.TRANSIENT_PATHS)
-            self._data = disk_data
+            self._data = self._read_disk()
 
 
 # ─── 模块级单例 ──────────────────────────────────────────

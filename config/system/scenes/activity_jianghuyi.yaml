@@ -1,4 +1,4 @@
-content_version: 5
+content_version: 6
 key: activity_jianghuyi
 name: 江湖弈
 views:
@@ -97,4 +97,3 @@ regions:
   - base
   - wulujuan
   - zhenlongju
-  - game_end

@@ -1,5 +1,5 @@
 {
-  "content_version": 13,
+  "content_version": 16,
   "regions": [
     {
       "key": "tab_jianghuyi",
@@ -45,10 +45,10 @@
     },
     {
       "key": "wulujuan_action",
-      "x_ratio": 0.82143,
+      "x_ratio": 0.8282217029026329,
       "y_ratio": 0.88889,
-      "w_ratio": 0.16786,
-      "h_ratio": 0.0754
+      "w_ratio": 0.13161514600324253,
+      "h_ratio": 0.08066841874431796
     },
     {
       "key": "blank",
@@ -59,17 +59,17 @@
     },
     {
       "key": "game_end_exit",
-      "x_ratio": 0.8,
-      "y_ratio": 0.78,
-      "w_ratio": 0.18,
-      "h_ratio": 0.2
+      "x_ratio": 0.8328739319761438,
+      "y_ratio": 0.88,
+      "w_ratio": 0.12788516210841383,
+      "h_ratio": 0.09999999999999998
     },
     {
       "key": "settle_continue",
-      "x_ratio": 0.8,
-      "y_ratio": 0.78,
-      "w_ratio": 0.18,
-      "h_ratio": 0.2
+      "x_ratio": 0.8328739319761438,
+      "y_ratio": 0.88,
+      "w_ratio": 0.12788516210841383,
+      "h_ratio": 0.09999999999999998
     },
     {
       "key": "back",

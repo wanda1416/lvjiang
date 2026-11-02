@@ -1,11 +1,12 @@
 """账户管理对话框 —— 登录、注销、改密码与账号信息查看。
 
-数据同步及其状态属下一阶段，此处不出现同步入口；对话框只承载认证与
-账号信息。网络操作走一次性 QThread，不阻塞界面。
+登录态是应用级的：主窗口启动时就后台恢复会话（凭据库里的 refresh 令牌），
+打开本对话框直接呈现已登录视图，不闪登录框。网络操作走一次性 QThread。
+数据同步及其状态属下一阶段，此处不出现同步入口。
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -73,16 +74,74 @@ class _AccountWorker(QThread):
             self.completed.emit(False, AccountError(f"{tr('操作未完成')}：{error}"))
 
 
+class AccountHolder(QObject):
+    """应用级登录态：共享一个 AccountSession，缓存最近一次 summary。
+
+    主窗口启动时 restore_async() 后台恢复；此后任何打开的对话框都直接
+    渲染缓存状态，不再让用户面对「正在检查登录状态」的空等。
+    """
+
+    changed = pyqtSignal(object)   # summary dict 或 None
+
+    def __init__(self):
+        super().__init__()
+        self.session = AccountSession()
+        self.summary: dict | None = None
+        self.done = False
+        self.worker: _AccountWorker | None = None
+
+    @property
+    def busy(self) -> bool:
+        return self.worker is not None
+
+    def restore_async(self) -> None:
+        """启动时后台恢复登录态；只在第一次调用时真正执行。"""
+        if self.done or self.busy:
+            return
+        if not self.session.has_stored_session():
+            # 凭据库里没有登录态：不联网，直接落「未登录」
+            self.apply(None)
+            return
+        self.worker = _AccountWorker(self.session.restore, self)
+        self.worker.completed.connect(self._restore_finished)
+        self.worker.start()
+
+    def _restore_finished(self, ok: bool, result) -> None:
+        self.worker = None
+        self.apply(result if ok else None)
+
+    def apply(self, summary: dict | None) -> None:
+        """写入最新状态（登录/登出/刷新后的 summary）并广播。"""
+        self.done = True
+        self.summary = summary
+        self.changed.emit(summary)
+
+
+_holder: AccountHolder | None = None
+
+
+def account_holder() -> AccountHolder:
+    global _holder
+    if _holder is None:
+        _holder = AccountHolder()
+    return _holder
+
+
+def ensure_account_restored() -> None:
+    """主窗口启动时调用：后台恢复登录态并预取账号数据。"""
+    account_holder().restore_async()
+
+
 class AccountManagerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.session = AccountSession()
+        self.holder = account_holder()
         self.worker = None
         self.setWindowTitle(tr("账户管理"))
         self.setMinimumWidth(460)
         layout = QVBoxLayout(self)
 
-        self.status = QLabel(tr("正在检查登录状态…"))
+        self.status = QLabel()
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
@@ -139,18 +198,57 @@ class AccountManagerDialog(QDialog):
         note.setWordWrap(True)
         layout.addWidget(note)
 
-        self._restore()
+        # 启动恢复若已完成，立即按缓存渲染；否则跟随恢复结果刷新。
+        self.holder.changed.connect(self._on_holder_changed)
+        if self.holder.done:
+            self._render(self.holder.summary)
+        elif self.holder.busy:
+            self.status.setText(tr("正在检查登录状态…"))
 
     def done(self, result: int) -> None:
         # 关闭时若网络操作还在跑，等它退出，避免 QThread 随对话框销毁。
         if self.worker is not None:
             self.worker.wait(5000)
+        self.holder.changed.disconnect(self._on_holder_changed)
         super().done(result)
+
+    # ─── 状态渲染 ───────────────────────────────────────
+
+    def _on_holder_changed(self, summary) -> None:
+        self._render(summary)
+
+    def _render(self, summary: dict | None) -> None:
+        self._set_busy(False)
+        if summary is None:
+            self.status.setText(tr("当前未登录"))
+            self.info_host.setVisible(False)
+            self.form_host.setVisible(True)
+        else:
+            self._show_logged_in(summary)
+
+    def _show_logged_in(self, summary: dict) -> None:
+        account = summary["account"]
+        display = account.get("display_name") or "—"
+        self.account_label.setText(
+            f"{tr('账户名')}：{account['login']}　{tr('显示名')}：{display}")
+        devices = summary.get("devices") or []
+        self.devices.setRowCount(len(devices))
+        for row, device in enumerate(devices):
+            values = (device.get("name") or device["id"][:8],
+                      device.get("platform") or "—", device.get("last_seen") or "—")
+            for column, text in enumerate(values):
+                item = QTableWidgetItem(str(text))
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.devices.setItem(row, column, item)
+        active = summary.get("active_sessions")
+        self.status.setText(f"{tr('已登录')}。{tr('活跃会话')}：{active}")
+        self.form_host.setVisible(False)
+        self.info_host.setVisible(True)
 
     # ─── 后台执行 ───────────────────────────────────────
 
     def _run(self, action, status_text: str) -> None:
-        if self.worker is not None:
+        if self.worker is not None or self.holder.busy:
             return
         self._set_busy(True, status_text)
         self.worker = _AccountWorker(action, self)
@@ -169,19 +267,20 @@ class AccountManagerDialog(QDialog):
         self.worker = None
         self._set_busy(False)
         if not ok:
-            self.status.setText(str(result))
-            self._show_login_form()
-        elif result is None:
-            # restore 无本地登录态：安静地呈现登录表单
-            self.status.setText(tr("当前未登录"))
-            self._show_login_form()
-        else:
-            self._show_logged_in(result)
+            # 失败不打断已有登录态：已登录就留在信息页，只提示错误。
+            if self.holder.summary is not None:
+                self.status.setText(str(result))
+                self._show_logged_in(self.holder.summary)
+            else:
+                self.status.setText(str(result))
+                self._render(None)
+            return
+        self.holder.apply(result)
 
     # ─── 动作 ───────────────────────────────────────────
 
     def _login(self) -> None:
-        if self.worker is not None:
+        if self.worker is not None or self.holder.busy:
             return
         login_name = self.login_input.text().strip()
         password = self.password_field.editor.text()
@@ -191,17 +290,14 @@ class AccountManagerDialog(QDialog):
         if not password:
             self.status.setText(tr("请输入密码"))
             return
-        self._run(lambda: self.session.login(login_name, password), tr("正在登录…"))
+        self._run(lambda: self.holder.session.login(login_name, password), tr("正在登录…"))
         self.password_field.editor.clear()
 
-    def _restore(self) -> None:
-        self._run(self.session.restore, tr("正在检查登录状态…"))
-
     def _logout(self) -> None:
-        self._run(self.session.logout, tr("正在退出…"))
+        self._run(self.holder.session.logout, tr("正在退出…"))
 
     def _logout_all(self) -> None:
-        self._run(self.session.logout_all, tr("正在退出所有设备…"))
+        self._run(self.holder.session.logout_all, tr("正在退出所有设备…"))
 
     def _change_password(self) -> None:
         old_field = PasswordField(self)
@@ -224,32 +320,7 @@ class AccountManagerDialog(QDialog):
             return
 
         def action():
-            self.session.change_password(old_password, new_password)
-            return self.session.summary()
+            self.holder.session.change_password(old_password, new_password)
+            return self.holder.session.summary()
 
         self._run(action, tr("正在修改密码…"))
-
-    # ─── 展示 ───────────────────────────────────────────
-
-    def _show_login_form(self) -> None:
-        self.info_host.setVisible(False)
-        self.form_host.setVisible(True)
-
-    def _show_logged_in(self, summary: dict) -> None:
-        account = summary["account"]
-        display = account.get("display_name") or "—"
-        self.account_label.setText(
-            f"{tr('账户名')}：{account['login']}　{tr('显示名')}：{display}")
-        devices = summary.get("devices") or []
-        self.devices.setRowCount(len(devices))
-        for row, device in enumerate(devices):
-            values = (device.get("name") or device["id"][:8],
-                      device.get("platform") or "—", device.get("last_seen") or "—")
-            for column, text in enumerate(values):
-                item = QTableWidgetItem(str(text))
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.devices.setItem(row, column, item)
-        active = summary.get("active_sessions")
-        self.status.setText(f"{tr('已登录')}。{tr('活跃会话')}：{active}")
-        self.form_host.setVisible(False)
-        self.info_host.setVisible(True)

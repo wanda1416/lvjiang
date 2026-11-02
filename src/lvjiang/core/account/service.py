@@ -188,6 +188,10 @@ class AccountSession:
         self.access_expires_at = result["access_expires_at"]
         return self.summary()
 
+    def has_stored_session(self) -> bool:
+        """凭据库里是否存在登录态（只查本地，不联网）。"""
+        return bool(_stored_refresh_token())
+
     def restore(self) -> dict | None:
         """用凭据库里的 refresh 令牌恢复登录态；没有或已失效返回 None。"""
         token = _stored_refresh_token()

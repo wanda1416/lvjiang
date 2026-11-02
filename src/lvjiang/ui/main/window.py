@@ -370,6 +370,9 @@ class MainWindow(
         self._setup_menu()
         self._setup_ui()
         self._build_tray_icon()
+        # 启动即后台恢复账号登录态并预取数据；账户管理对话框因此开箱即已登录。
+        from ..account_dialog import ensure_account_restored
+        ensure_account_restored()
         self._refresh_run_button()
         self._refresh_user_combo()
         self._refresh_layout_combo()

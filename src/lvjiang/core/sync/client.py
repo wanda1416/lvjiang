@@ -60,6 +60,11 @@ def manifest(token: str) -> list[dict]:
     return list(_request("POST", "/api/sync/manifest", {}, token).get("documents") or [])
 
 
+def post(route: str, data: dict, token: str) -> dict:
+    """向账号服务发一次带 Bearer 的 POST；供 profile 账本通道复用。"""
+    return _request("POST", route, data, token)
+
+
 def pull(token: str, label: str, kind: str) -> dict:
     return _request("POST", "/api/sync/pull", {"label": label, "kind": kind}, token)
 

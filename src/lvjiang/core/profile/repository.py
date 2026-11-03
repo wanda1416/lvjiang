@@ -777,6 +777,42 @@ class ProfileDB:
             for r in rows
         ]
 
+    def get_max_history_id(self) -> int:
+        """本地 history 当前最大 id（无历史时为 0）。"""
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM profile_history").fetchone()
+        finally:
+            self._release_connection(conn)
+        return int(row[0]) if row else 0
+
+    def get_history_since(self, since_id: int, limit: int) -> list[dict]:
+        """取 id 大于水位的账本行（只要 ``set`` / ``delta``），按 id 升序。
+
+        供同步上行使用：``tick`` / ``reset`` 是时间派生，不上云。水位用的是
+        本地自增 id，与远端 ``remote_id`` 是两套编号。
+        """
+        conn = self._borrow_connection()
+        try:
+            rows = conn.execute(
+                "SELECT id, username, type, key, new_value, new_value_text, "
+                "change_type, delta_value, ts "
+                "FROM profile_history "
+                "WHERE id>? AND change_type IN ('set', 'delta') "
+                "ORDER BY id ASC LIMIT ?",
+                (since_id, limit),
+            ).fetchall()
+        finally:
+            self._release_connection(conn)
+        return [
+            {
+                "id": r[0], "username": r[1], "type": r[2], "key": r[3],
+                "new_value": r[4], "new_value_text": r[5] or "",
+                "change_type": r[6], "delta_value": r[7], "ts": r[8],
+            }
+            for r in rows
+        ]
+
     def get_history_record(self, history_id: int) -> dict:
         """按稳定 id 读取单条变更历史；不存在返回空 dict。"""
         conn = self._borrow_connection()
@@ -983,6 +1019,16 @@ def db_get_history(
 
 def db_get_history_record(history_id: int) -> dict:
     return get_profile_db().get_history_record(history_id)
+
+
+def db_get_history_since(since_id: int, limit: int = 200) -> list[dict]:
+    """本地水位之后待上行的账本行（``set`` / ``delta``，按 id 升序）。"""
+    return get_profile_db().get_history_since(since_id, limit)
+
+
+def db_max_history_id() -> int:
+    """本地 history 最大 id。"""
+    return get_profile_db().get_max_history_id()
 
 
 def db_update_history_source(

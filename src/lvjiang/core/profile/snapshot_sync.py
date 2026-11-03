@@ -67,14 +67,15 @@ RESET_HINT = "本地记录的同步进度比云端新（云端可能被重建或
 NO_SNAPSHOT_HINT = "云端还没有快照。请先在其中一台设备上点「刷新快照」建立基线，再让其他设备登录。"
 
 
-def remote_head(token: str) -> int:
-    """云端账本当前最大 remote_id；没有快照/账本时为 0。"""
+def remote_head(token: str) -> int | None:
+    """云端账本当前最大 remote_id。**鉴权失败返回 None**（不能当 0——否则
+    会误导出「进度比云端新」的错误结论）；网络失败也返回 None 让调用方跳过。"""
     try:
         response = post("/api/sync/profile/snapshot", {}, token)
     except SyncError:
-        return 0
+        return None
     head = response.get("head_remote_id")
-    return head if isinstance(head, int) and head >= 0 else 0
+    return head if isinstance(head, int) and head >= 0 else None
 
 
 def state_problem(token: str) -> str:
@@ -83,9 +84,12 @@ def state_problem(token: str) -> str:
     只做「发现并告知」，不修正任何本地状态。只比较 ``remote_history_id``：
     它与 head 同在远端编号空间；``local_history_id`` 是本地编号，与 head
     不可比（新库 head 归零不代表本地编号要归零）。
+    鉴权失败（head 未知）时跳过校验——那是令牌问题，不是进度问题。
     """
     state = _state()
     head = remote_head(token)
+    if head is None:
+        return ""                       # 令牌/网络问题：让后续真正的同步调用报准确的错
     remote = int(state.get("remote_history_id") or 0)
     if remote > head:
         return RESET_HINT

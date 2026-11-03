@@ -1,9 +1,8 @@
 """账号服务客户端 —— 账密登录、会话刷新、账号信息与自助改密。
 
 登录态拆两半存放：refresh 令牌只进系统凭据库（明文文件不放），账号名与设备
-标识进 ``config/local/account.json``（机器级归属，不是凭据）。access 令牌只在
-内存，30 天过期由 refresh 轮换，用户不感知。数据同步属下一阶段，本模块只做
-认证、账号信息与改密。
+标识进 ``config/session/account.json``（运行数据，机器级归属，不是凭据）。
+access 令牌只在内存，30 天过期由 refresh 轮换，用户不感知。
 """
 from __future__ import annotations
 
@@ -19,8 +18,8 @@ from urllib import request as urlrequest
 import keyring
 from loguru import logger
 
+from ...constants import SESSION_CONFIG_DIR
 from ..json_files import formatted_json
-from ..paths import get_config_local_dir
 
 ACCOUNT_SERVICE = "https://lvjiang.wyxj.net"
 _KEYRING_SERVICE = "lvjiang.account"
@@ -47,7 +46,8 @@ class AccountError(Exception):
 
 
 def account_config_path() -> Path:
-    return get_config_local_dir() / "account.json"
+    """账号运行态落 config/session（运行数据语义）。"""
+    return SESSION_CONFIG_DIR / "account.json"
 
 
 def _load_profile() -> dict:

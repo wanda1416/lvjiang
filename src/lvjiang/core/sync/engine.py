@@ -65,6 +65,9 @@ def iter_local_documents(users_dir: Path = USERS_DIR,
     avatars: set[str] = set()
     for path in sorted(users_dir.glob("*.json")):
         name = path.name
+        # 会话运行态（users/{名}.session.json）不属于同步范围，永不入云。
+        if name.endswith(".session.json"):
+            continue
         if name.endswith(".loadouts.json"):
             documents.append(LocalDocument(name[:-len(".loadouts.json")], "loadouts", path))
         elif name.endswith(".notes.json"):

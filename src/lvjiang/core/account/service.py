@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import socket
 import sys
-import uuid
 from http.client import HTTPException
 from pathlib import Path
 from urllib import error as urlerror
@@ -20,10 +19,10 @@ from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR
 from ..json_files import formatted_json
+from . import identity
 
 ACCOUNT_SERVICE = "https://lvjiang.wyxj.net"
 _KEYRING_SERVICE = "lvjiang.account"
-_KEYRING_USER = "session"
 
 _ERROR_MESSAGES = {
     "invalid_credentials": "账户名或密码不正确",
@@ -68,6 +67,30 @@ def _save_profile(profile: dict) -> None:
         logger.warning("账号信息保存失败：{}（登录态仍保留在凭据库）", error)
 
 
+def current_instance_id() -> str:
+    """本实例标识；未登录过（无实例 uuid）时为空串。"""
+    instance_uuid = _instance_uuid()
+    return identity.instance_id(instance_uuid) if instance_uuid else ""
+
+
+def profile_sync_state() -> dict:
+    """profile 账本同步状态（落 account.json）：
+
+    - ``remote_history_id``：已应用的**远端**水位（远端自增 id，与本地
+      ``profile_history.id`` 是两套编号，绝不互认）
+    - ``push_local_id``：已上传的**本地** history.id 水位
+    - ``profile_snapshot_id``：``{username: 远端快照 id}``，本设备落地/刷新时绑定
+    """
+    data = _load_profile().get("profile_sync")
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def save_profile_sync_state(state: dict) -> None:
+    profile = _load_profile()
+    profile["profile_sync"] = state
+    _save_profile(profile)
+
+
 def _credentials():
     """系统凭据库后端；不接受明文文件后端，令牌落明文等于没做。"""
     backend = keyring.get_keyring()
@@ -84,9 +107,22 @@ def _credentials():
     return backend
 
 
+def _instance_uuid() -> str:
+    """本实例标识；未登录过时为空（此时也不可能有登录态）。"""
+    return str(_load_profile().get("instance_uuid") or "")
+
+
+def _keyring_user() -> str:
+    """凭据库键带实例维度：同机多实例各存各的令牌，互不顶替。"""
+    return identity.keyring_user(_instance_uuid())
+
+
 def _stored_refresh_token() -> str:
+    user = _keyring_user()
+    if not user:
+        return ""
     try:
-        return _credentials().get_password(_KEYRING_SERVICE, _KEYRING_USER) or ""
+        return _credentials().get_password(_KEYRING_SERVICE, user) or ""
     except AccountError:
         raise
     except Exception as error:
@@ -94,12 +130,17 @@ def _stored_refresh_token() -> str:
 
 
 def _store_refresh_token(token: str) -> None:
+    user = _keyring_user()
+    if not user:
+        if token:
+            raise AccountError("缺少实例标识，无法保存登录态")
+        return
     try:
         backend = _credentials()
         if token:
-            backend.set_password(_KEYRING_SERVICE, _KEYRING_USER, token)
-        elif backend.get_password(_KEYRING_SERVICE, _KEYRING_USER):
-            backend.delete_password(_KEYRING_SERVICE, _KEYRING_USER)
+            backend.set_password(_KEYRING_SERVICE, user, token)
+        elif backend.get_password(_KEYRING_SERVICE, user):
+            backend.delete_password(_KEYRING_SERVICE, user)
     except AccountError:
         raise
     except Exception as error:
@@ -147,14 +188,21 @@ def _request(method: str, route: str, data: dict | None = None,
     return result
 
 
-def _device_identity() -> tuple[str, str]:
-    """本机稳定设备标识与展示名；设备标识生成一次后随 account.json 固定。"""
+def _device_identity() -> tuple[str, str, str]:
+    """本实例的登录身份 ``(instance_id, device_name, instance_uuid)``。
+
+    账号侧一律用**实例级**标识（见 ``identity``）：同机多实例各算各的，源码版与
+    安装版不会合成一条设备记录。机器级 ``machine_device_id`` 只服务激活码绑定，
+    这里不碰。实例 uuid 缺失时立即生成并落盘，保证随后的凭据库写入有实例维度。
+    """
     profile = _load_profile()
-    device_id = str(profile.get("device_id") or "")
-    if not device_id:
-        device_id = uuid.uuid4().hex
+    instance_uuid = str(profile.get("instance_uuid") or "")
+    if not instance_uuid:
+        instance_uuid = identity.new_instance_uuid()
+        profile["instance_uuid"] = instance_uuid
+        _save_profile(profile)
     device_name = socket.gethostname() or "此电脑"
-    return device_id, device_name
+    return identity.instance_id(instance_uuid), device_name, instance_uuid
 
 
 class AccountSession:
@@ -172,17 +220,17 @@ class AccountSession:
             raise AccountError("请输入账户名")
         if not password:
             raise AccountError("请输入密码")
-        device_id, device_name = _device_identity()
+        instance, device_name, instance_uuid = _device_identity()
         result = _request("POST", "/api/login", {
             "login": login_name.strip(), "password": password,
-            "device_id": device_id, "device_name": device_name,
+            "instance_id": instance, "device_name": device_name,
             "platform": sys.platform,
         })
         _store_refresh_token(result["refresh_token"])
         _save_profile({
             "login": result["login"], "account_id": result["account_id"],
-            "display_name": result["display_name"], "device_id": result["device_id"],
-            "device_name": device_name,
+            "display_name": result["display_name"], "instance_id": result["instance_id"],
+            "device_name": device_name, "instance_uuid": instance_uuid,
         })
         self.access_token = result["access_token"]
         self.access_expires_at = result["access_expires_at"]

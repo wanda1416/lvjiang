@@ -16,7 +16,7 @@ import gzip
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from loguru import logger
@@ -162,7 +162,7 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
 
 
 def _local_mtime(document: LocalDocument) -> datetime:
-    return datetime.fromtimestamp(document.path.stat().st_mtime, tz=UTC)
+    return datetime.fromtimestamp(document.path.stat().st_mtime, tz=timezone.utc)
 
 
 def sync_documents(token: str,

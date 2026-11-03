@@ -47,6 +47,8 @@ class SyncReport:
     errors: list[str] = field(default_factory=list)
 
     def describe(self) -> str:
+        if not (self.pushed or self.pulled or self.conflicts or self.errors):
+            return "已是最新，无改动"
         parts = [f"上行 {len(self.pushed)}、下行 {len(self.pulled)}"]
         if self.conflicts:
             parts.append(f"冲突另存 {len(self.conflicts)}")

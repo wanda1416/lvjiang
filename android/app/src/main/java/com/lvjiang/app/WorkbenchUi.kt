@@ -1192,23 +1192,30 @@ class WorkbenchUi(
                 .setNegativeButton("关闭", null)
                 .setPositiveButton(if (isPc) "清除并切回远端同步" else "切换为 PC 同步") { _, _ ->
                     if (isPc) {
-                        MaterialAlertDialogBuilder(activity).setTitle("清除本地总览数据")
-                            .setMessage("将删除手机上的全部总览数据并切回远端同步；下次同步会从云端快照重新获取。")
-                            .setNegativeButton("取消", null)
-                            .setPositiveButton("清除并切换") { _, _ ->
-                                request({ PyBridge.accountClearProfile(activity) }) { r ->
-                                    if (r.optBoolean("ok")) updateProfileSourceSummary("remote")
-                                    toast(if (r.optBoolean("ok")) r.optString("message") else "失败：${r.optString("message")}")
-                                }
-                            }.show()
+                        confirmClearProfile()
                     } else {
                         request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
                             if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
                             toast(if (r.optBoolean("ok")) "已切换为 PC 同步" else "失败：${r.optString("message")}")
                         }
                     }
+                }
+                .apply {
+                    if (!isPc) setNeutralButton("清除并重新获取") { _, _ -> confirmClearProfile() }
                 }.show()
         }
+    }
+
+    private fun confirmClearProfile() {
+        MaterialAlertDialogBuilder(activity).setTitle("清除本地总览数据")
+            .setMessage("将删除手机上的全部总览数据并清空同步进度；下次同步会从云端快照完整重新获取。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("清除") { _, _ ->
+                request({ PyBridge.accountClearProfile(activity) }) { r ->
+                    if (r.optBoolean("ok")) updateProfileSourceSummary("remote")
+                    toast(if (r.optBoolean("ok")) r.optString("message") else "失败：${r.optString("message")}")
+                }
+            }.show()
     }
 
     private fun showAccountActions() {

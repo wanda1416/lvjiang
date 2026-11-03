@@ -72,11 +72,26 @@ def reset_configuration() -> None:
 
 def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_config: bool = True) -> str:
     from ..offline_bundle import install_offline_bundle
+    from . import profile_source
     from .task_runner import CONTROL_LOCK, is_running
 
     with CONTROL_LOCK:
         if is_running():
             return json.dumps({"ok": False, "message": "请先结束手机任务再同步"}, ensure_ascii=False)
+        # 总览数据来源模式是手机的主权设置：remote 模式下 profile 只认云端，
+        # PC 包携带 profile.db 时必须拒收（PC 侧会展示这条拒绝原因）。
+        try:
+            import zipfile
+
+            with zipfile.ZipFile(path) as bundle:
+                carries_profile = any("profile.db" in name for name in bundle.namelist())
+        except OSError:
+            carries_profile = True          # 读不了包内容时按携带处理，宁可拒绝
+        if carries_profile and profile_source.mode() == profile_source.REMOTE:
+            return json.dumps({"ok": False,
+                "message": "Android 拒绝接收：总览数据处于远端同步模式。"
+                           "请在手机「设置 → 总览数据」切换为 PC 同步后重试"},
+                ensure_ascii=False)
         try:
             summary = install_offline_bundle(Path(path), constants.PROJECT_ROOT,
                                              preserve_task_params=preserve_task_params,

@@ -659,13 +659,6 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         if sink is not None:
             from loguru import logger
             logger.remove(sink)
-        # 任务可能改了 profile（set/delta op）：登录了就把新 op 推给云端。
-        # 后台线程 + 全吞异常——同步失败绝不影响任务收尾。
-        try:
-            from .account_api import sync_after_task
-            sync_after_task()
-        except Exception:                          # noqa: BLE001 — 未登录/模块缺失都静默
-            pass
 
 
 def _build_source(task: dict, engine):

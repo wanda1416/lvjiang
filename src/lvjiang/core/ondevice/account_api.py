@@ -10,9 +10,6 @@
 from __future__ import annotations
 
 import json
-import threading
-
-from loguru import logger
 
 from ..account.service import AccountError, AccountSession
 
@@ -22,20 +19,74 @@ def _session() -> AccountSession:
 
 
 def _sync(token: str) -> dict:
-    """拉（快照回放 + 增量）+ 推（本机新 op）。不建快照。"""
-    from ..profile.snapshot_sync import pull_and_replay, push_local
+    """只拉不推，且服从「总览数据来源」模式：pc 模式下整体跳过 profile。
+
+    手机 db 在 pc 模式下由离线包整库重建（PC 的镜像），在线通道碰它就会
+    两条线打架（推出去的是 PC 旧账；自己写的行又被下一次包冲掉）。因此
+    在线通道对手机是只读的，且 pc 模式下连读都不读。上行只走离线回传。
+    """
+    from . import profile_source
+
+    if profile_source.mode() == profile_source.PC:
+        return {"synced": True, "skipped": "profile",
+                "message": "总览数据处于 PC 同步模式，已跳过在线同步"}
+    from ..profile.snapshot_sync import NO_SNAPSHOT_HINT, pull_and_replay
 
     pulled = pull_and_replay(token)
-    # 远端没快照且本机未初始化：明确「无需同步」，不算错误
-    from ..profile.snapshot_sync import NO_SNAPSHOT_HINT
     if any(error == NO_SNAPSHOT_HINT for error in pulled.errors):
         return {"synced": False, "reason": "no_snapshot",
                 "message": "云端还没有快照；先在 PC 上刷新快照"}
-    pushed = push_local(token)
-    errors = [*pulled.errors, *pushed.errors]
-    return {"synced": not errors,
-            "pulled": pulled.pulled, "pushed": pushed.pushed,
-            "message": "；".join(errors[:3]) if errors else ""}
+    return {"synced": not pulled.errors,
+            "pulled": pulled.pulled, "pushed": 0,
+            "message": "；".join(pulled.errors[:3]) if pulled.errors else ""}
+
+
+def _reset_sync_state() -> None:
+    """清除 profile 同步水位（profile_source.clear_local_profile 调用）。"""
+    from ..account.service import save_profile_sync_state
+
+    save_profile_sync_state({})
+
+
+def account_profile_mode() -> str:
+    """总览数据来源模式：`{ok, mode}`（remote / pc）。"""
+    from . import profile_source
+
+    return json.dumps({"ok": True, "mode": profile_source.mode()},
+                      ensure_ascii=False)
+
+
+def account_set_profile_mode(mode_value: str) -> str:
+    """切换模式。pc 随时可切；切回 remote 必须先清除本地总览数据。"""
+    from . import profile_source
+
+    if mode_value == profile_source.PC:
+        profile_source.set_mode(profile_source.PC)
+        return json.dumps({"ok": True, "mode": profile_source.PC,
+                           "message": "总览数据改为 PC 同步；离线包将携带总览数据"},
+                          ensure_ascii=False)
+    if mode_value == profile_source.REMOTE:
+        if profile_source.mode() == profile_source.PC:
+            return json.dumps(
+                {"ok": False, "need_clear": True,
+                 "message": "请先点「清除本地总览数据」，再切换为远端同步"},
+                ensure_ascii=False)
+        profile_source.set_mode(profile_source.REMOTE)
+        return json.dumps({"ok": True, "mode": profile_source.REMOTE},
+                          ensure_ascii=False)
+    return json.dumps({"ok": False, "message": "未知模式"}, ensure_ascii=False)
+
+
+def account_clear_profile() -> str:
+    """清除本地总览数据并切回远端同步模式。"""
+    from . import profile_source
+
+    try:
+        message = profile_source.clear_local_profile()
+    except Exception as error:                 # noqa: BLE001 — 入口不外抛
+        return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
+    return json.dumps({"ok": True, "mode": profile_source.REMOTE,
+                       "message": message}, ensure_ascii=False)
 
 
 def account_status() -> str:
@@ -96,20 +147,3 @@ def account_sync() -> str:
     except AccountError as error:
         return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
     return json.dumps({"ok": True, **result}, ensure_ascii=False)
-
-
-def sync_after_task() -> None:
-    """任务收尾钩子：后台推送本机新 op，失败只记日志（任务结果不受影响）。
-
-    由 task_runner 在任务终态调用；网络慢/失败不阻塞、不报错到任务状态。
-    """
-    def run() -> None:
-        try:
-            result = json.loads(account_sync())
-            if result.get("ok") and result.get("synced"):
-                logger.info("[account] 任务后同步：上行 {} 条",
-                            result.get("pushed", 0))
-        except Exception as error:               # noqa: BLE001 — 钩子绝不外抛
-            logger.warning("[account] 任务后同步未完成：{}", error)
-
-    threading.Thread(target=run, daemon=True, name="account-sync").start()

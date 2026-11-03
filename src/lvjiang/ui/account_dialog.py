@@ -272,6 +272,42 @@ def ensure_account_restored() -> None:
     account_holder().restore_async()
 
 
+def _tune_table(table: QTableWidget, *, fixed: dict[int, int], row_height: int,
+                stretch_column: int | None = None) -> None:
+    """统一表格外观：去竖表头、定宽列、紧凑行高。
+
+    默认的 ResizeToContents 会随内容长度反复跳动（按钮列尤其难看）。
+    给定宽后列宽稳定；``stretch_column`` 为 None 时表格宽度收成各列之和，
+    不会把短内容列拉成一大片空白。
+    """
+    side = table.verticalHeader()
+    assert side is not None                   # Qt 的桩把访问器标成可能为 None
+    side.setVisible(False)
+    side.setDefaultSectionSize(row_height)
+    table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+    table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+    table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    table.setShowGrid(False)
+    table.setAlternatingRowColors(False)
+    table.setWordWrap(False)
+    table.setTextElideMode(Qt.TextElideMode.ElideRight)
+    table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+    header = table.horizontalHeader()
+    assert header is not None                 # Qt 的桩把访问器标成可能为 None
+    header.setStretchLastSection(False)
+    header.setHighlightSections(False)
+    header.setMinimumSectionSize(48)
+    for column, width in fixed.items():
+        header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(column, width)
+    if stretch_column is not None:
+        header.setSectionResizeMode(stretch_column, QHeaderView.ResizeMode.Stretch)
+    else:
+        table.setFixedWidth(sum(fixed.values()) + 2 * len(fixed) + 2)
+
+
 class AccountManagerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -282,11 +318,11 @@ class AccountManagerDialog(QDialog):
         self._connections: list[tuple[object, object]] = []
         layout = QVBoxLayout(self)
 
-        # ════ 第一行：状态 + 右侧「修改密码 / 退出登录」 ════
+        # ════ 第一行：左侧账户身份 + 右侧「修改密码 / 退出登录」 ════
         head_row = QHBoxLayout()
-        self.status = QLabel()
-        self.status.setWordWrap(True)
-        head_row.addWidget(self.status, stretch=1)
+        self.account_label = QLabel()
+        self.account_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+        head_row.addWidget(self.account_label, stretch=1)
         self.change_password_button = QPushButton(tr("修改密码…"))
         apply_button_style(self.change_password_button, variant="neutral")
         self.change_password_button.clicked.connect(self._change_password)
@@ -296,6 +332,13 @@ class AccountManagerDialog(QDialog):
         head_row.addWidget(self.change_password_button)
         head_row.addWidget(self.logout_button)
         layout.addLayout(head_row)
+
+        # 一行临时反馈（正在登录…／登录失败）：空时不占位，不常驻任何状态数字。
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        self.status.setStyleSheet("color: #c62828; font-size: 12px;")
+        self.status.setVisible(False)
+        layout.addWidget(self.status)
 
         # ════ 未登录：登录表单 ════
         self.form_host = QWidget()
@@ -322,13 +365,9 @@ class AccountManagerDialog(QDialog):
         layout.addWidget(self.tabs, stretch=1)
 
         # ── Tab 1：数据同步（更常用，放第一） ──
+        # 只放「同步」这件事：账户身份在对话框第一行，设备信息在设备管理页。
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
-
-        # 身份只留一行：登录名（显示名），不重复对话框标题和字段名。
-        self.account_label = QLabel()
-        self.account_label.setStyleSheet("font-size: 15px; font-weight: 600;")
-        sync_layout.addWidget(self.account_label)
 
         sync_row = QHBoxLayout()
         self.sync_button = QPushButton(tr("立即同步"))
@@ -360,14 +399,8 @@ class AccountManagerDialog(QDialog):
         self.sync_table = QTableWidget(0, 4)
         self.sync_table.setHorizontalHeaderLabels(
             [tr("通道"), tr("上行"), tr("下行"), tr("失败")])
-        header = self.sync_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in (1, 2, 3):
-            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-        self.sync_table.verticalHeader().setVisible(False)
-        self.sync_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.sync_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
-        self.sync_table.setMaximumHeight(140)
+        _tune_table(self.sync_table, fixed={0: 150, 1: 64, 2: 64, 3: 64},
+                    row_height=28)
         self.sync_table.setVisible(False)
         sync_layout.addWidget(self.sync_table)
 
@@ -386,13 +419,8 @@ class AccountManagerDialog(QDialog):
         self.devices = QTableWidget(0, 4)
         self.devices.setHorizontalHeaderLabels(
             [tr("设备"), tr("平台"), tr("最近活跃"), tr("操作")])
-        header = self.devices.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for column in (1, 2, 3):
-            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-        self.devices.verticalHeader().setVisible(False)
-        self.devices.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.devices.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        _tune_table(self.devices, fixed={1: 84, 2: 168, 3: 96},
+                    row_height=40, stretch_column=0)
         device_layout.addWidget(self.devices, stretch=1)
 
         device_actions = QHBoxLayout()
@@ -441,39 +469,33 @@ class AccountManagerDialog(QDialog):
             return
         self._render(summary)
 
+    def _set_status(self, text: str) -> None:
+        """一行临时反馈（正在登录…／失败原因）：空文本时整行不占位。"""
+        self.status.setText(text)
+        self.status.setVisible(bool(text))
+
     def _on_operation_failed(self, ok: bool, result) -> None:
         if ok or not self._alive():
             return
-        if self.holder.summary is not None:
-            self._render(self.holder.summary)
-            self.status.setText(str(result))
-        else:
-            self._render(None)
-            self.status.setText(str(result))
+        self._render(self.holder.summary)
+        self._set_status(str(result))
 
     def _render(self, summary: dict | None) -> None:
         self._set_busy(self.holder.busy)
-        logged_in = summary is not None
-        # 第一行右侧的「修改密码 / 退出登录」只在已登录时可用
-        self.change_password_button.setVisible(logged_in)
-        self.logout_button.setVisible(logged_in)
         if summary is None:
-            self.status.setText(tr("当前未登录"))
-            self.tabs.setVisible(False)
-            self.form_host.setVisible(True)
+            self.account_label.setText(tr("未登录"))
         else:
             self._show_logged_in(summary)
+        self.change_password_button.setVisible(summary is not None)
+        self.logout_button.setVisible(summary is not None)
+        self.tabs.setVisible(summary is not None)
+        self.form_host.setVisible(summary is None)
 
     def _show_logged_in(self, summary: dict) -> None:
         account = summary["account"]
         display = account.get("display_name") or ""
-        who = account["login"] + (f"（{display}）" if display else "")
-        self.account_label.setText(who)
+        self.account_label.setText(account["login"] + (f"（{display}）" if display else ""))
         self._render_devices(summary)
-        active = summary.get("active_sessions")
-        self.status.setText(tr("活跃会话 {} 个").format(active))
-        self.form_host.setVisible(False)
-        self.tabs.setVisible(True)
 
     def _render_devices(self, summary: dict) -> None:
         """设备列表；每行末尾一个「登出」按钮，允许单独下线某台设备。"""
@@ -488,18 +510,21 @@ class AccountManagerDialog(QDialog):
             for column, text in enumerate(values):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                # 除设备名外都居中，数字/短文本列看起来才齐。
+                if column:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.devices.setItem(row, column, item)
 
             host = QWidget()
             cell = QHBoxLayout(host)
-            cell.setContentsMargins(4, 2, 4, 2)
+            cell.setContentsMargins(6, 0, 6, 0)
             kick = QPushButton(tr("登出"))
             apply_button_style(kick, variant="neutral")
+            kick.setFixedWidth(64)          # 固定宽度：不让按钮把列撑变形
             device_id = device.get("id")
             kick.clicked.connect(
                 lambda _=False, did=device_id: self._revoke_device(did))
             cell.addWidget(kick)
-            cell.addStretch()
             self.devices.setCellWidget(row, 3, host)
 
     def _set_sync_note(self, text: str, *, error: bool = False) -> None:
@@ -543,6 +568,10 @@ class AccountManagerDialog(QDialog):
                 if column:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(index, column, item)
+        # 高度跟着行数走：三行结果不该占一大片空白，也不留内部滚动条。
+        header_height = self.sync_table.horizontalHeader().height()
+        body = sum(self.sync_table.rowHeight(row) for row in range(len(rows)))
+        self.sync_table.setFixedHeight(header_height + body + 2)
         self.sync_table.setVisible(True)
 
         errors = report.distinct_errors()
@@ -567,17 +596,17 @@ class AccountManagerDialog(QDialog):
         login_name = self.login_input.text().strip()
         password = self.password_field.editor.text()
         if not login_name:
-            self.status.setText(tr("请输入账户名"))
+            self._set_status(tr("请输入账户名"))
             return
         if not password:
-            self.status.setText(tr("请输入密码"))
+            self._set_status(tr("请输入密码"))
             return
-        self.status.setText(tr("正在登录…"))
+        self._set_status(tr("正在登录…"))
         self.password_field.editor.clear()
         self.holder.login_async(login_name, password)
 
     def _logout(self) -> None:
-        self.status.setText(tr("正在退出…"))
+        self._set_status(tr("正在退出…"))
         self.holder.logout_async()
 
     def _revoke_device(self, device_id: str) -> None:
@@ -595,7 +624,7 @@ class AccountManagerDialog(QDialog):
         self.holder.revoke_device_async(device_id)
 
     def _logout_all(self) -> None:
-        self.status.setText(tr("正在退出所有设备…"))
+        self._set_status(tr("正在退出所有设备…"))
         self.holder.logout_all_async()
 
     def _change_password(self) -> None:
@@ -615,9 +644,9 @@ class AccountManagerDialog(QDialog):
             return
         old_password, new_password = old_field.editor.text(), new_field.editor.text()
         if len(new_password) < 8:
-            self.status.setText(tr("新密码至少 8 位"))
+            self._set_status(tr("新密码至少 8 位"))
             return
-        self.status.setText(tr("正在修改密码…"))
+        self._set_status(tr("正在修改密码…"))
         self.holder.change_password_async(old_password, new_password)
 
     def _sync_now(self) -> None:

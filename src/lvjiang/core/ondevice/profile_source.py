@@ -2,8 +2,8 @@
 
 | 模式 | profile 数据来源 | 另一端的义务 |
 | --- | --- | --- |
-| ``remote``（默认） | 账号云端：快照 + 历史回放（只收不发） | PC 离线包带总览数据时**必须拒收** |
-| ``pc`` | PC 离线包整库重建 | 账号在线同步**必须跳过** profile |
+| ``remote``（默认） | 账号云端：快照 + 历史回放（只收不发） | PC端离线包带总览数据时**必须拒收** |
+| ``pc`` | PC端离线包整库重建 | 账号在线同步**必须跳过** profile |
 
 切换语义：``pc → remote`` 必须先「清除本地总览数据」（否则 PC 建立的库
 会被云端水位判定为领先，回放语义错乱）；``remote → pc`` 随时允许。
@@ -27,7 +27,7 @@ def _marker_path() -> Path:
 
 
 def mode() -> str:
-    """当前模式；无标记时默认远端同步。"""
+    """当前模式；无标记时默认云端。"""
     try:
         data = json.loads(_marker_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -44,16 +44,21 @@ def set_mode(value: str) -> None:
                     encoding="utf-8")
 
 
-def clear_local_profile() -> str:
+def clear_local_profile(*, switch_to_remote: bool = False) -> str:
     """清除本地总览数据并复位同步水位；返回结果说明（可直接展示）。
 
-    只在切换回远端同步前调用：清空 profile 库 + 账号同步水位，此后首次
-    同步会从云端快照重新落地。
+    ``switch_to_remote`` 为真时顺带切到云端模式（PC端→云端的前置清除）；
+    为假时保持当前模式——云端模式下次同步从快照重拉，PC端模式等下一次
+    离线包填充。
     """
     from ..profile import repository
     from . import account_api
 
     repository.wipe_profile_data()
     account_api._reset_sync_state()
-    set_mode(REMOTE)
-    return "已清除本地总览数据；下次同步将从云端快照重新获取。"
+    if switch_to_remote:
+        set_mode(REMOTE)
+        return "已清除本地总览数据；已切换为云端，下次同步从云端快照重新获取。"
+    if mode() == REMOTE:
+        return "已清除本地总览数据；下次同步将从云端快照重新获取。"
+    return "已清除本地总览数据；总览数据将在下一次离线包同步时填充。"

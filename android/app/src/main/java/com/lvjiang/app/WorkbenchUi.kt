@@ -1171,48 +1171,51 @@ class WorkbenchUi(
 
     private fun updateProfileSourceSummary(mode: String) {
         profileSourceSummary?.text =
-            if (mode == "pc") "数据来源：PC 离线包" else "数据来源：云端"
+            if (mode == "pc") "数据来源：PC端" else "数据来源：云端"
     }
 
-    /** 总览数据来源模式：远端同步（默认）/ PC 同步；切回远端需先清除本地数据。
+    /** 总览数据来源模式：云端（默认）/ PC端。两模式按钮布局完全同构：
+     *  主按钮永远是「切到另一边」，neutral 永远是「清除数据」（模式不变）。
      *  注意 setMessage 与 setItems 在 Material 对话框里互斥（列表会被挤掉），
      *  用自定义视图放说明文字，动作走按钮。 */
     private fun showProfileSource() {
         request({ PyBridge.accountProfileMode(activity) }) { result ->
             if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
             val isPc = result.optString("mode") == "pc"
-            val current = if (isPc) "当前：PC 同步（总览数据随离线包更新；在线同步跳过总览）"
-                          else "当前：远端同步（总览数据来自云端快照，只收不发）"
+            val current = if (isPc) "当前：PC端（总览数据随离线包更新，在线同步跳过总览）"
+                          else "当前：云端（总览数据来自云端快照，只收不发）"
             val content = SettingsUi.dialogContent(activity)
             text(content, current)
-            text(content, if (isPc) "切回远端同步需要先清除本地总览数据。"
-                          else "切换后 PC 离线包将携带总览数据。", 12f)
+            text(content, if (isPc) "切换到云端需要先清除本地总览数据。"
+                          else "切换后 PC 端离线包将携带总览数据。", 12f)
             MaterialAlertDialogBuilder(activity).setTitle("总览数据")
                 .setView(SettingsUi.dialogScroll(activity, content))
                 .setNegativeButton("关闭", null)
-                .setPositiveButton(if (isPc) "清除并切回远端同步" else "切换为 PC 同步") { _, _ ->
+                .setNeutralButton("清除数据") { _, _ -> confirmClearProfile(keepMode = true) }
+                .setPositiveButton(if (isPc) "切换为云端" else "切换为 PC端") { _, _ ->
                     if (isPc) {
-                        confirmClearProfile()
+                        confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
                     } else {
                         request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
                             if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
-                            toast(if (r.optBoolean("ok")) "已切换为 PC 同步" else "失败：${r.optString("message")}")
+                            toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
                         }
                     }
-                }
-                .apply {
-                    if (!isPc) setNeutralButton("清除并重新获取") { _, _ -> confirmClearProfile() }
                 }.show()
         }
     }
 
-    private fun confirmClearProfile() {
+    /** 清除本地总览数据。keepMode=true 保持当前模式（云端=从云端重拉，
+     *  PC端=等下一次离线包）；false 为切换到云门前置清除。 */
+    private fun confirmClearProfile(keepMode: Boolean) {
+        val afterClear = if (keepMode) "下次同步将按当前来源重新获取。"
+                         else "清除后将切换为云端，下次同步从云端快照重新获取。"
         MaterialAlertDialogBuilder(activity).setTitle("清除本地总览数据")
-            .setMessage("将删除手机上的全部总览数据并清空同步进度；下次同步会从云端快照完整重新获取。")
+            .setMessage("将删除手机上的全部总览数据并清空同步进度；$afterClear")
             .setNegativeButton("取消", null)
             .setPositiveButton("清除") { _, _ ->
-                request({ PyBridge.accountClearProfile(activity) }) { r ->
-                    if (r.optBoolean("ok")) updateProfileSourceSummary("remote")
+                request({ PyBridge.accountClearProfile(activity, keepMode) }) { r ->
+                    if (r.optBoolean("ok") && !keepMode) updateProfileSourceSummary("remote")
                     toast(if (r.optBoolean("ok")) r.optString("message") else "失败：${r.optString("message")}")
                 }
             }.show()

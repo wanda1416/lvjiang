@@ -91,8 +91,8 @@ def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_conf
             carries_profile = True
         if carries_profile and profile_source.mode() == profile_source.REMOTE:
             return json.dumps({"ok": False,
-                "message": "Android 拒绝接收：总览数据处于远端同步模式。"
-                           "请在手机「设置 → 总览数据」切换为 PC 同步后重试"},
+                "message": "Android 拒绝接收：总览数据处于云端模式。"
+                           "请在手机「设置 → 总览数据」切换为 PC端后重试"},
                 ensure_ascii=False)
         try:
             summary = install_offline_bundle(Path(path), constants.PROJECT_ROOT,

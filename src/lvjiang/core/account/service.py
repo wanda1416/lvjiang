@@ -340,9 +340,12 @@ class AccountSession:
         try:
             return _request(method, route, data, token=self.access_token)
         except AccountError as error:
-            if error.code != "token_expired":
+            # ``unauthorized`` 和 ``token_expired`` 都是「这个 access 令牌不再
+            # 被会话认」，必须一样滑动重试：refresh 会轮换 access，同一会话在
+            # 别的进程/实例里刷新过之后，本进程手上的旧令牌就查不到行。
+            if error.code not in ("token_expired", "unauthorized"):
                 raise
-        # access 令牌到期：滑动一次再试；refresh 也失效则要求重新登录。
+        # 滑动一次再试；refresh 也失效则要求重新登录。
         if self.restore() is None:
             raise AccountError("登录已过期，请重新登录", code="token_expired")
         return _request(method, route, data, token=self.access_token)

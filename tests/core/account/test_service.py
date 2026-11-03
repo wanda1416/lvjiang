@@ -134,6 +134,25 @@ def test_no_keyring_falls_back_to_android_store(monkeypatch, tmp_path) -> None:
     assert backend.get_password("lvjiang.account", "session:x") is None
 
 
+def test_stale_access_token_self_heals_via_refresh(fake_env, monkeypatch) -> None:
+    """access 被别的实例/进程轮换掉时收到 unauthorized，也应滑动重试而不是直接报错。"""
+    session = AccountSession()
+    session.login("wang", "pw")
+    session.access_token = "rotated-elsewhere"      # 服务端已不认这个令牌
+
+    def fake_request(method, route, data=None, token=""):
+        if route == "/api/refresh":
+            return {"access_token": "access-3", "access_expires_at": "later",
+                    "refresh_token": "refresh-3"}
+        if token == "access-3":
+            return {"account": {"login": "wang", "display_name": ""},
+                    "devices": [], "active_sessions": 1}
+        raise AccountError("未登录或会话已失效", code="unauthorized")
+
+    monkeypatch.setattr(account_service, "_request", fake_request)
+    assert session.summary()["account"]["login"] == "wang"
+
+
 def test_distinct_instances_get_distinct_device_ids_and_tokens(tmp_path, monkeypatch) -> None:
     """同机多实例（源码版 / 安装版）必须各算各的设备身份，登录态互不顶替。"""
     keyring = FakeKeyring()

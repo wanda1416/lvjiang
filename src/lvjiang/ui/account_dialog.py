@@ -123,13 +123,6 @@ class _CombinedReport:
                 seen.append(text)
         return seen
 
-    def describe(self) -> str:
-        pushed = sum(row[1] for row in self.rows())
-        pulled = sum(row[2] for row in self.rows())
-        failures = sum(row[3] for row in self.rows())
-        text = f"上行 {pushed} 条，下行 {pulled} 条"
-        return text + (f"，失败 {failures} 项" if failures else "")
-
 
 class AccountHolder(QObject):
     """应用级登录态与后台任务持有者：共享一个 AccountSession，缓存状态。
@@ -365,52 +358,59 @@ class AccountManagerDialog(QDialog):
         layout.addWidget(self.tabs, stretch=1)
 
         # ── Tab 1：数据同步（更常用，放第一） ──
-        # 只放「同步」这件事：账户身份在对话框第一行，设备信息在设备管理页。
+        # 结构与设备管理一致：表格常驻并撑满，操作按钮放底部一行。
+        # 三个通道行固定存在（同步前显示 —），不做「点同步表格消失」这种跳动。
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
 
-        sync_row = QHBoxLayout()
+        self.sync_table = QTableWidget(3, 4)
+        self.sync_table.setHorizontalHeaderLabels(
+            [tr("通道"), tr("上行"), tr("下行"), tr("失败")])
+        _tune_table(self.sync_table, fixed={1: 96, 2: 96, 3: 96},
+                    row_height=36, stretch_column=0)
+        for row, name in enumerate((tr("名册"), tr("文档"), tr("profile"))):
+            item = QTableWidgetItem(name)
+            self.sync_table.setItem(row, 0, item)
+            for column in (1, 2, 3):
+                cell = QTableWidgetItem("—")
+                cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.sync_table.setItem(row, column, cell)
+        sync_layout.addWidget(self.sync_table, stretch=1)
+
+        # 错误行：只在真失败时出现，其余时候不占位。
+        self.sync_error = QLabel()
+        self.sync_error.setWordWrap(True)
+        self.sync_error.setStyleSheet("color: #c62828; font-size: 12px;")
+        self.sync_error.setVisible(False)
+        sync_layout.addWidget(self.sync_error)
+
+        # 临时状态（正在同步…）：空文本不占位。
+        self.sync_caption = QLabel()
+        self.sync_caption.setStyleSheet("color: palette(mid); font-size: 12px;")
+        self.sync_caption.setVisible(False)
+        sync_layout.addWidget(self.sync_caption)
+
+        sync_actions = QHBoxLayout()
         self.sync_button = QPushButton(tr("立即同步"))
         apply_button_style(self.sync_button)
         self.sync_button.clicked.connect(self._sync_now)
-        sync_row.addWidget(self.sync_button)
+        sync_actions.addWidget(self.sync_button)
         self.snapshot_button = QPushButton(tr("刷新快照"))
         apply_button_style(self.snapshot_button, variant="neutral")
         self.snapshot_button.setToolTip(tr(
             "把本机当前全部角色数据上传为云端基线。\n"
             "新设备接入、或云端被重建后需要先做一次；日常同步不用点。"))
         self.snapshot_button.clicked.connect(self._refresh_snapshot)
-        sync_row.addWidget(self.snapshot_button)
+        sync_actions.addWidget(self.snapshot_button)
         self.clear_sync_button = QPushButton(tr("清除同步"))
         apply_button_style(self.clear_sync_button, variant="neutral")
         self.clear_sync_button.setToolTip(
             tr("清除本地同步进度（远端水位/本机水位/快照编号），不动本地数据；"
                "换账号或云端重建后使用"))
         self.clear_sync_button.clicked.connect(self._clear_sync)
-        sync_row.addWidget(self.clear_sync_button)
-        sync_row.addStretch()
-        sync_layout.addLayout(sync_row)
-
-        self.sync_caption = QLabel()
-        self.sync_caption.setStyleSheet("color: palette(mid); font-size: 12px;")
-        sync_layout.addWidget(self.sync_caption)
-
-        # 结果用四列计数表：谁失败一眼能看出来，不再拼长句。
-        self.sync_table = QTableWidget(0, 4)
-        self.sync_table.setHorizontalHeaderLabels(
-            [tr("通道"), tr("上行"), tr("下行"), tr("失败")])
-        _tune_table(self.sync_table, fixed={0: 150, 1: 64, 2: 64, 3: 64},
-                    row_height=28)
-        self.sync_table.setVisible(False)
-        sync_layout.addWidget(self.sync_table)
-
-        # 错误单独一处，只在真失败时出现。
-        self.sync_error = QLabel()
-        self.sync_error.setWordWrap(True)
-        self.sync_error.setStyleSheet("color: #c62828; font-size: 12px;")
-        self.sync_error.setVisible(False)
-        sync_layout.addWidget(self.sync_error)
-        sync_layout.addStretch()
+        sync_actions.addWidget(self.clear_sync_button)
+        sync_actions.addStretch()
+        sync_layout.addLayout(sync_actions)
         self.tabs.addTab(sync_tab, tr("数据同步"))
 
         # ── Tab 2：设备管理（列表 + 逐行登出 + 底部退出所有设备） ──
@@ -528,52 +528,54 @@ class AccountManagerDialog(QDialog):
             self.devices.setCellWidget(row, 3, host)
 
     def _set_sync_note(self, text: str, *, error: bool = False) -> None:
-        """同步页的一句话反馈：普通提示写摘要行，失败写红色错误行。"""
+        """同步页的临时反馈（正在同步…／失败原因）：空文本时两行都不占位。"""
         if error:
             self.sync_error.setText(text)
             self.sync_error.setVisible(True)
-            self.sync_caption.setText(tr("同步失败"))
-        else:
-            self.sync_caption.setText(text)
+        self.sync_caption.setText(text if not error else "")
+        self.sync_caption.setVisible(bool(text) and not error)
 
     def _render_sync(self) -> None:
         report = self.holder.last_sync_report
         if self.holder.syncing:
-            self.sync_caption.setText(tr("正在同步…"))
-            self.sync_table.setVisible(False)
+            self._set_sync_note(tr("正在同步…"))
             self.sync_error.setVisible(False)
         elif report is not None:
+            self._set_sync_note("")               # 结果都在表格里，不留统计行
             self._render_report(report)
         else:
-            self.sync_caption.setText(tr("尚未同步"))
-            self.sync_table.setVisible(False)
+            self._set_sync_note("")
+            self._fill_sync_table(None)
             self.sync_error.setVisible(False)
         running = self.holder.syncing or self.holder.busy
         self.sync_button.setEnabled(not running)
         self.clear_sync_button.setEnabled(not running)
         self.snapshot_button.setEnabled(not running and self.holder.summary is not None)
 
-    def _render_report(self, report) -> None:
-        rows = report.rows()
-        self.sync_caption.setText(
-            tr("上次同步：") + report.describe()
-            + (tr("（名册顺序已按云端更新）") if getattr(report, "users", None)
-               and report.users.reordered else ""))
-        self.sync_table.setRowCount(len(rows))
+    def _fill_sync_table(self, rows: list[tuple[str, int | None, int | None, int | None]] | None) -> None:
+        """三个通道行固定存在；没有结果时数值列显示 —，表格不消失。"""
+        if not rows:
+            rows = [(name, None, None, None)
+                    for name in (tr("名册"), tr("文档"), tr("profile"))]
         for index, (name, pushed, pulled, failed) in enumerate(rows):
-            for column, value in enumerate((name, str(pushed), str(pulled),
-                                            str(failed) if failed else "—")):
+            def cell_text(value, failed_count=False):
+                if value is None:
+                    return "—"
+                if failed_count and not value:
+                    return "—"
+                return str(value)
+
+            for column, value in enumerate((
+                    name, cell_text(pushed), cell_text(pulled),
+                    cell_text(failed, failed_count=True))):
                 item = QTableWidgetItem(value)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 if column:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(index, column, item)
-        # 高度跟着行数走：三行结果不该占一大片空白，也不留内部滚动条。
-        header_height = self.sync_table.horizontalHeader().height()
-        body = sum(self.sync_table.rowHeight(row) for row in range(len(rows)))
-        self.sync_table.setFixedHeight(header_height + body + 2)
-        self.sync_table.setVisible(True)
 
+    def _render_report(self, report) -> None:
+        self._fill_sync_table(report.rows())
         errors = report.distinct_errors()
         if errors:
             shown = errors[:2]

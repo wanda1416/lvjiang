@@ -1,9 +1,10 @@
 """文档通道同步引擎：本地文件 ↔ 云端 documents，整文档后写覆盖 + 冲突另存。
 
-映射：users/{名}.json → user_doc（push 时剥离 ui_state，pull 时保留本地
-ui_state——界面偏好永远以本机为准）；{名}.loadouts.json → loadouts；
+映射：{名}.loadouts.json → loadouts（插件 kind，经 registry 登记）；
 {名}.notes.json（便利贴）→ notes；profile.yaml → profile_yaml（账户级
 label __global__）；用户头像引用的 avatars/ 文件 → avatar。
+用户资料（users/{名}.json）**不走文档通道**——入服务端 account_users 表
+（见 users_sync.py），这里只读它引用的头像文件名。
 
 胜负判定：同键 sha 不同时，云端 updated_at 与本地文件 mtime 比新；输的
 一版另存 ``<文件>.conflict-<时间戳>``。服务端只存当前版。
@@ -21,7 +22,6 @@ from pathlib import Path
 from loguru import logger
 
 from ...constants import AVATARS_DIR, SESSION_CONFIG_DIR, USERS_DIR
-from ..json_files import formatted_json
 from ..user_config import is_valid_username
 from . import client, registry
 from .client import SyncConflict, SyncError
@@ -36,8 +36,6 @@ class LocalDocument:
     label: str
     kind: str
     path: Path
-    #: JSON 文档 push 剥离 ui_state / pull 保留本地 ui_state
-    strip_ui_state: bool = False
 
 
 @dataclass
@@ -89,14 +87,11 @@ def iter_local_documents(users_dir: Path = USERS_DIR,
             kind, suffix = matched
             documents.append(LocalDocument(name[:-len(suffix)], kind, path))
             continue
-        # 兜底：整文件即 user_doc。但用户名不允许含「.」，所以带点的文件名一定是
-        # 某个 kind 的文档——只是该 kind 的插件此刻没登记（例如同步在插件注册前
-        # 触发）。这类文件不能当 user_doc 上云（会造成「某用户.loadouts」这种假
-        # 用户），跳过并留日志，等插件登记后再同步。
+        # 用户资料（{名}.json）已入服务端 account_users 表，不再作为文档上云；
+        # 这里只读它引用的头像文件名（头像二进制仍是文档）。
         if not is_valid_username(path.stem):
             logger.warning("[sync] 跳过未登记 kind 的文档：{}", path.name)
             continue
-        documents.append(LocalDocument(path.stem, "user_doc", path, strip_ui_state=True))
         try:
             avatar = json.loads(path.read_text(encoding="utf-8")).get("avatar")
         except (OSError, ValueError):
@@ -114,29 +109,12 @@ def iter_local_documents(users_dir: Path = USERS_DIR,
 
 
 def _read_bytes(document: LocalDocument) -> bytes:
-    if document.strip_ui_state:
-        data = json.loads(document.path.read_text(encoding="utf-8"))
-        data.pop("ui_state", None)
-        return formatted_json(data).encode("utf-8")
     return document.path.read_bytes()
 
 
 def _write_bytes(document: LocalDocument, payload: bytes) -> None:
     document.path.parent.mkdir(parents=True, exist_ok=True)
-    if document.strip_ui_state:
-        data = json.loads(payload.decode("utf-8"))
-        # 本机 ui_state 永远以本地为准：远端版本不带它，带上本机现值再落盘。
-        if document.path.is_file():
-            try:
-                local_ui = json.loads(
-                    document.path.read_text(encoding="utf-8")).get("ui_state")
-            except (OSError, ValueError):
-                local_ui = None
-            if isinstance(local_ui, dict):
-                data["ui_state"] = local_ui
-        document.path.write_text(formatted_json(data), encoding="utf-8")
-    else:
-        document.path.write_bytes(payload)
+    document.path.write_bytes(payload)
 
 
 def _save_conflict(document: LocalDocument, local_raw: bytes) -> Path | None:

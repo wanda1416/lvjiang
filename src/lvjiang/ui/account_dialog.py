@@ -1,8 +1,10 @@
-"""账户管理对话框 —— 登录、注销、改密码与账号信息查看。
+"""账户管理对话框 —— 登录、注销、改密码、账号信息与数据同步。
 
-登录态是应用级的：主窗口启动时就后台恢复会话（凭据库里的 refresh 令牌），
-打开本对话框直接呈现已登录视图，不闪登录框。网络操作走一次性 QThread。
-数据同步及其状态属下一阶段，此处不出现同步入口。
+**线程归属**：所有网络操作（登录/恢复/改密/同步）的 QThread 都由应用级
+``AccountHolder`` 持有，对话框只订阅它的信号。对话框是临时对象，绝不能作为
+线程的父对象——否则关闭对话框会把仍在运行的线程一起销毁，Qt 直接 abort；
+也不能在关闭路径里 ``wait()`` 阻塞 UI 线程。关掉对话框时同步继续在后台跑完，
+结果留在 ``holder`` 里，重新打开即可看到。
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -58,12 +61,17 @@ class PasswordField:
 
 
 class _AccountWorker(QThread):
-    """一次性网络操作：动作在 run() 中执行，结果经信号回 UI 线程。"""
+    """一次性后台动作：**不设父对象**，由持有者保引用，结束后自删。
+
+    刻意不接受 parent：QObject 父对象被销毁时会连带销毁子 QThread，若线程
+    仍在运行，Qt 会以 "QThread: Destroyed while thread is still running"
+    直接 abort 进程。生命周期一律由 ``AccountHolder`` 管理。
+    """
 
     completed = pyqtSignal(bool, object)   # (成功与否, 结果或 AccountError)
 
-    def __init__(self, action, parent):
-        super().__init__(parent)
+    def __init__(self, action):
+        super().__init__()
         self._action = action
 
     def run(self):
@@ -75,73 +83,136 @@ class _AccountWorker(QThread):
             self.completed.emit(False, AccountError(f"{tr('操作未完成')}：{error}"))
 
 
-class AccountHolder(QObject):
-    """应用级登录态：共享一个 AccountSession，缓存最近一次 summary。
+class _CombinedReport:
+    """文档通道 + profile 账本的合并结果，界面只关心总量与错误。"""
 
-    主窗口启动时 restore_async() 后台恢复；此后任何打开的对话框都直接
-    渲染缓存状态，不再让用户面对「正在检查登录状态」的空等。
+    def __init__(self, documents, profile):
+        self.documents = documents
+        self.profile = profile
+        self.errors = [*documents.errors, *profile.errors]
+
+    def describe(self) -> str:
+        parts = [f"文档 {self.documents.describe()}", f"profile {self.profile.describe()}"]
+        if self.errors:
+            parts.append(f"失败 {len(self.errors)}")
+        return "；".join(parts)
+
+
+class AccountHolder(QObject):
+    """应用级登录态与后台任务持有者：共享一个 AccountSession，缓存状态。
+
+    主窗口启动时 restore_async() 后台恢复并预取；对话框直接渲染缓存状态。
+    所有线程归它所有，因此对话框开合不影响在跑的任务。
     """
 
-    changed = pyqtSignal(object)   # summary dict 或 None
+    changed = pyqtSignal(object)              # summary dict 或 None
+    operation_finished = pyqtSignal(bool, object)   # 登录/登出/改密
+    sync_finished = pyqtSignal(bool, object)        # 数据同步
 
     def __init__(self):
         super().__init__()
         self.session = AccountSession()
         self.summary: dict | None = None
         self.done = False
-        self.worker: _AccountWorker | None = None
         self.sync_attempted = False
         self.last_sync_report = None
-        self.sync_worker: _AccountWorker | None = None
+        self._worker: _AccountWorker | None = None
+        self._sync_worker: _AccountWorker | None = None
+
+    # ─── 状态 ───────────────────────────────────────────
 
     @property
     def busy(self) -> bool:
-        return self.worker is not None
+        return self._worker is not None
+
+    @property
+    def syncing(self) -> bool:
+        return self._sync_worker is not None
+
+    def apply(self, summary: dict | None) -> None:
+        self.done = True
+        self.summary = summary
+        self.changed.emit(summary)
+
+    # ─── 后台任务 ───────────────────────────────────────
+
+    def _start(self, action, kind: str) -> bool:
+        """启动一个后台动作；同类任务已在跑时拒绝并返回 False。"""
+        attr = "_worker" if kind == "operation" else "_sync_worker"
+        if getattr(self, attr) is not None:
+            return False
+        worker = _AccountWorker(action)
+        worker.completed.connect(
+            lambda ok, result, w=worker: self._finished(kind, w, ok, result))
+        worker.finished.connect(worker.deleteLater)
+        setattr(self, attr, worker)
+        worker.start()
+        return True
+
+    def _finished(self, kind: str, worker, ok: bool, result) -> None:
+        attr = "_worker" if kind == "operation" else "_sync_worker"
+        if getattr(self, attr) is worker:
+            setattr(self, attr, None)
+        if kind == "sync":
+            if ok:
+                self.last_sync_report = result
+                describe = getattr(result, "describe", None)
+                logger.info("[account] 同步完成：{}", describe() if describe else result)
+            else:
+                logger.warning("[account] 同步未完成：{}", result)
+            self.sync_finished.emit(ok, result)
+            return
+        if ok:
+            if result is None:
+                self.apply(None)
+            else:
+                self.apply(result)
+                if not self.sync_attempted:
+                    self.sync_async()          # 登录成功后自动同步一次
+        else:
+            self.operation_finished.emit(False, result)
+
+    # ─── 对外入口 ───────────────────────────────────────
 
     def restore_async(self) -> None:
         """启动时后台恢复登录态；只在第一次调用时真正执行。"""
         if self.done or self.busy:
             return
         if not self.session.has_stored_session():
-            # 凭据库里没有登录态：不联网，直接落「未登录」
-            self.apply(None)
+            self.apply(None)                   # 凭据库无登录态：不联网
             return
-        self.worker = _AccountWorker(self.session.restore, self)
-        self.worker.completed.connect(self._restore_finished)
-        self.worker.start()
+        self._start(self.session.restore, "operation")
 
-    def _restore_finished(self, ok: bool, result) -> None:
-        self.worker = None
-        self.apply(result if ok else None)
-        if result is not None:
-            self.sync_in_background()
+    def login_async(self, login_name: str, password: str) -> bool:
+        return self._start(lambda: self.session.login(login_name, password), "operation")
 
-    def sync_in_background(self) -> None:
-        """启动/登录后的静默自动同步：日志记账，结果供对话框展示。"""
+    def logout_async(self) -> bool:
+        return self._start(self.session.logout, "operation")
+
+    def logout_all_async(self) -> bool:
+        return self._start(self.session.logout_all, "operation")
+
+    def change_password_async(self, old_password: str, new_password: str) -> bool:
+        def action():
+            self.session.change_password(old_password, new_password)
+            return self.session.summary()
+        return self._start(action, "operation")
+
+    def sync_async(self, allow_overwrite: bool = False) -> bool:
+        """一轮完整同步（文档通道 + profile 账本）；同一时刻只跑一份。"""
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
-        if not token or self.sync_worker is not None:
-            return
+        if not token:
+            return False
         self.sync_attempted = True
-        self.sync_worker = _AccountWorker(lambda: sync_documents(token), self)
-        self.sync_worker.completed.connect(self._sync_done)
-        self.sync_worker.start()
 
-    def _sync_done(self, ok: bool, result) -> None:
-        worker, self.sync_worker = self.sync_worker, None
-        if worker is not None:
-            worker.deleteLater()
-        if ok:
-            self.last_sync_report = result
-            logger.info("[account] {}", result.describe())
-        else:
-            logger.warning("[account] 自动同步未完成：{}", result)
+        def action():
+            from ..core.profile.snapshot_sync import sync_all
+            document_report = sync_documents(token)
+            profile_report = sync_all(token, allow_overwrite=allow_overwrite)
+            return _CombinedReport(document_report, profile_report)
 
-    def apply(self, summary: dict | None) -> None:
-        """写入最新状态（登录/登出/刷新后的 summary）并广播。"""
-        self.done = True
-        self.summary = summary
-        self.changed.emit(summary)
+        return self._start(action, "sync")
 
 
 _holder: AccountHolder | None = None
@@ -155,7 +226,7 @@ def account_holder() -> AccountHolder:
 
 
 def ensure_account_restored() -> None:
-    """主窗口启动时调用：后台恢复登录态并预取账号数据。"""
+    """主窗口启动时调用：后台恢复登录态并预取数据。"""
     account_holder().restore_async()
 
 
@@ -163,9 +234,9 @@ class AccountManagerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.holder = account_holder()
-        self.worker = None
         self.setWindowTitle(tr("账户管理"))
         self.setMinimumWidth(460)
+        self._connections: list[tuple[object, object]] = []
         layout = QVBoxLayout(self)
 
         self.status = QLabel()
@@ -221,39 +292,71 @@ class AccountManagerDialog(QDialog):
         self.info_host.setVisible(False)
         layout.addWidget(self.info_host)
 
-        # ── 数据同步（文档通道）──
+        # ── 数据同步 ──
         sync_row = QHBoxLayout()
         self.sync_button = QPushButton(tr("立即同步"))
         apply_button_style(self.sync_button, variant="neutral")
         self.sync_button.clicked.connect(self._sync_now)
+        self.snapshot_button = QPushButton(tr("刷新快照"))
+        apply_button_style(self.snapshot_button, variant="neutral")
+        self.snapshot_button.clicked.connect(self._refresh_snapshot)
         sync_row.addWidget(self.sync_button)
+        sync_row.addWidget(self.snapshot_button)
         sync_row.addStretch()
         layout.addLayout(sync_row)
-        self.sync_status = QLabel(tr("尚未同步。登录后自动同步一次；换页面前手动同步可立即互通。"))
+        self.sync_status = QLabel()
         self.sync_status.setWordWrap(True)
         layout.addWidget(self.sync_status)
 
-        # 启动恢复若已完成，立即按缓存渲染；否则跟随恢复结果刷新。
-        self.holder.changed.connect(self._on_holder_changed)
-        if self.holder.done:
-            self._render(self.holder.summary)
-        elif self.holder.busy:
-            self.status.setText(tr("正在检查登录状态…"))
+        self._connect(self.holder.changed, self._on_holder_changed)
+        self._connect(self.holder.operation_finished, self._on_operation_failed)
+        self._connect(self.holder.sync_finished, self._on_sync_finished)
+
+        self._render(self.holder.summary)
+        self._render_sync()
+
+    # ─── 信号连接（关闭时统一断开） ─────────────────────
+
+    def _connect(self, signal, slot) -> None:
+        signal.connect(slot)
+        self._connections.append((signal, slot))
 
     def done(self, result: int) -> None:
-        # 关闭时若网络操作还在跑，等它退出，避免 QThread 随对话框销毁。
-        if self.worker is not None:
-            self.worker.wait(5000)
-        self.holder.changed.disconnect(self._on_holder_changed)
+        # 只断开订阅，**不等待线程**：后台任务由 holder 拥有，对话框先走即可。
+        for signal, slot in self._connections:
+            try:
+                signal.disconnect(slot)
+            except (TypeError, RuntimeError):
+                pass
+        self._connections.clear()
         super().done(result)
 
-    # ─── 状态渲染 ───────────────────────────────────────
+    # ─── 渲染 ───────────────────────────────────────────
+
+    def _alive(self) -> bool:
+        """槽函数可能在对话框销毁后才收到已排队的信号。"""
+        try:
+            return self.isVisible() or self.parent() is not None
+        except RuntimeError:
+            return False
 
     def _on_holder_changed(self, summary) -> None:
+        if not self._alive():
+            return
         self._render(summary)
 
+    def _on_operation_failed(self, ok: bool, result) -> None:
+        if ok or not self._alive():
+            return
+        if self.holder.summary is not None:
+            self._render(self.holder.summary)
+            self.status.setText(str(result))
+        else:
+            self._render(None)
+            self.status.setText(str(result))
+
     def _render(self, summary: dict | None) -> None:
-        self._set_busy(False)
+        self._set_busy(self.holder.busy)
         if summary is None:
             self.status.setText(tr("当前未登录"))
             self.info_host.setVisible(False)
@@ -280,46 +383,30 @@ class AccountManagerDialog(QDialog):
         self.form_host.setVisible(False)
         self.info_host.setVisible(True)
 
-    # ─── 后台执行 ───────────────────────────────────────
+    def _render_sync(self) -> None:
+        report = self.holder.last_sync_report
+        if self.holder.syncing:
+            self.sync_status.setText(tr("正在同步文档…"))
+        elif report is not None:
+            parts = [tr("上次同步") + "：" + report.describe()]
+            if report.errors:
+                parts.append("；".join(report.errors[:3]))
+            self.sync_status.setText("".join(parts))
+        else:
+            self.sync_status.setText(
+                tr("尚未同步。登录后自动同步一次；换设备前建议先「刷新快照」。"))
+        running = self.holder.syncing or self.holder.busy
+        self.sync_button.setEnabled(not running)
+        self.snapshot_button.setEnabled(not running and self.holder.summary is not None)
 
-    def _run(self, action, status_text: str) -> None:
-        if self.worker is not None or self.holder.busy:
-            return
-        self._set_busy(True, status_text)
-        self.worker = _AccountWorker(action, self)
-        self.worker.completed.connect(self._finished)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.worker.start()
-
-    def _set_busy(self, busy: bool, status_text: str = "") -> None:
+    def _set_busy(self, busy: bool) -> None:
         for widget in (self.login_button, self.change_password_button,
                        self.logout_button, self.logout_all_button):
             widget.setEnabled(not busy)
-        if status_text:
-            self.status.setText(status_text)
-
-    def _finished(self, ok: bool, result) -> None:
-        self.worker = None
-        self._set_busy(False)
-        if not ok:
-            # 失败不打断已有登录态：已登录就留在信息页，只提示错误。
-            if self.holder.summary is not None:
-                self.status.setText(str(result))
-                self._show_logged_in(self.holder.summary)
-            else:
-                self.status.setText(str(result))
-                self._render(None)
-            return
-        self.holder.apply(result)
-        if result is not None and not self.holder.sync_attempted:
-            # 登录/启动恢复成功后自动同步一次（后台，不阻塞渲染）。
-            self._sync_now()
 
     # ─── 动作 ───────────────────────────────────────────
 
     def _login(self) -> None:
-        if self.worker is not None or self.holder.busy:
-            return
         login_name = self.login_input.text().strip()
         password = self.password_field.editor.text()
         if not login_name:
@@ -328,14 +415,17 @@ class AccountManagerDialog(QDialog):
         if not password:
             self.status.setText(tr("请输入密码"))
             return
-        self._run(lambda: self.holder.session.login(login_name, password), tr("正在登录…"))
+        self.status.setText(tr("正在登录…"))
         self.password_field.editor.clear()
+        self.holder.login_async(login_name, password)
 
     def _logout(self) -> None:
-        self._run(self.holder.session.logout, tr("正在退出…"))
+        self.status.setText(tr("正在退出…"))
+        self.holder.logout_async()
 
     def _logout_all(self) -> None:
-        self._run(self.holder.session.logout_all, tr("正在退出所有设备…"))
+        self.status.setText(tr("正在退出所有设备…"))
+        self.holder.logout_all_async()
 
     def _change_password(self) -> None:
         old_field = PasswordField(self)
@@ -356,40 +446,54 @@ class AccountManagerDialog(QDialog):
         if len(new_password) < 8:
             self.status.setText(tr("新密码至少 8 位"))
             return
-
-        def action():
-            self.holder.session.change_password(old_password, new_password)
-            return self.holder.session.summary()
-
-        self._run(action, tr("正在修改密码…"))
-
-    # ─── 数据同步 ───────────────────────────────────────
+        self.status.setText(tr("正在修改密码…"))
+        self.holder.change_password_async(old_password, new_password)
 
     def _sync_now(self) -> None:
-        from ..core.sync.engine import sync_documents
-        token = self.holder.session.access_token
-        # 启动自动同步还在跑时直接跳过：它结束会刷新同一份状态，重复跑白费流量。
-        if not token or self.worker is not None or self.holder.sync_worker is not None:
-            return
-        self.holder.sync_attempted = True
-        # 进度只落在下方 sync_status，不再改写顶部的账号状态行。
-        self._set_busy(True)
-        self.sync_button.setEnabled(False)
-        self.sync_status.setText(tr("正在同步文档…"))
-        self.worker = _AccountWorker(lambda: sync_documents(token), self)
-        self.worker.completed.connect(self._sync_finished)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.worker.start()
+        if self.holder.sync_async():
+            self._render_sync()
 
-    def _sync_finished(self, ok: bool, result) -> None:
-        self.worker = None
-        self._set_busy(False)
-        self.sync_button.setEnabled(True)
+    def _refresh_snapshot(self) -> None:
+        """把本机当前 profile 值作为新快照上传，绑到最新远端 history id。
+
+        新设备此后从这里取基线回放；已有设备各自按自己的水位继续，不受影响。
+        """
+        from ..core.profile.snapshot_sync import refresh_snapshot
+        if self.holder.syncing or self.holder.busy:
+            return
+        self.sync_status.setText(tr("正在刷新快照…"))
+        self.holder._start(lambda: refresh_snapshot(self.holder.session.access_token), "sync")
+
+    def _on_sync_finished(self, ok: bool, result) -> None:
+        if not self._alive():
+            return
+        self._render_sync()
         if not ok:
             self.sync_status.setText(str(result))
             return
-        self.holder.last_sync_report = result
-        parts = [tr("上次同步") + "：", result.describe()]
-        if result.errors:
-            parts.append("；".join(result.errors[:3]))
-        self.sync_status.setText("".join(parts))
+        pending = getattr(getattr(result, "profile", result), "pending", None) or []
+        if pending:
+            self._confirm_overwrite(pending)
+
+    def _confirm_overwrite(self, pending: list[dict]) -> None:
+        """非初始设备：必须显式确认才会覆盖本地数据（覆盖前自动整份备份）。"""
+        lines = [
+            f"{row['username']}　本地 profile {row['entries']} 条 / 历史 {row['history']} 条"
+            f"　（云端来自 {row['origin_name']}）"
+            for row in pending
+        ]
+        detail = "\n".join(lines)
+        answer = QMessageBox.question(
+            self, tr("当前设备不是初始同步设备"),
+            tr("下列用户的数据将以云端快照为准，本机数据会被覆盖：") + "\n\n"
+            + detail + "\n\n"
+            + tr("确认后会先把本机 profile 数据备份到 config/session/_sync-backup-<时间戳>/，"
+                 "再应用云端快照；可在该目录恢复。"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            self.sync_status.setText(
+                tr("已取消覆盖：本机数据未改动，profile 同步未启用。"))
+            return
+        self.sync_status.setText(tr("正在备份并应用云端快照…"))
+        self.holder.sync_async(allow_overwrite=True)

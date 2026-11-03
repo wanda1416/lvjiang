@@ -25,8 +25,10 @@ class FakeServer:
             if isinstance(data.get("id"), int):
                 match = next((row for row in self.snapshots if row["id"] == data["id"]), None)
                 return {"snapshot": match}
+            head = max((r["remote_id"] for r in self.rows), default=0)
             return {"snapshots": [{k: v for k, v in row.items() if k != "entries"}
-                                  for row in self.snapshots]}
+                                  for row in self.snapshots],
+                    "head_remote_id": head}
         if route == "/api/sync/profile/pull":
             since = data.get("since_remote_id", 0)
             rows = [r for r in self.rows if r["remote_id"] > since]
@@ -85,6 +87,8 @@ def env(monkeypatch, tmp_path):
                         lambda username: len([r for r in history if r["username"] == username]))
     monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since",
                         lambda since, limit: [r for r in history if r["id"] > since][:limit])
+    monkeypatch.setattr(snapshot_sync.repository, "db_history_row_exists",
+                        lambda history_id: any(r["id"] == history_id for r in history))
     monkeypatch.setattr(snapshot_sync, "current_instance_id", lambda: "mine")
     monkeypatch.setattr(snapshot_sync, "backup_local", lambda: str(tmp_path / "backup"))
     return {"server": server, "entries": entries, "history": history,
@@ -114,6 +118,7 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
 
 def test_incremental_pull_applies_set_and_delta(env) -> None:
     env["state"]["remote_history_id"] = 1
+    env["state"]["profile_snapshot_id"] = 1   # 已落地过，不得重新 bootstrap
     env["entries"].setdefault("蔡元君", {})["stock"] = {"energy": {"value": 10}}
     env["server"].rows = [
         {"remote_id": 1},
@@ -130,7 +135,7 @@ def test_incremental_pull_applies_set_and_delta(env) -> None:
 
 
 def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
-    env["state"]["push_local_id"] = 100
+    env["state"]["local_history_id"] = 100
     env["history"].extend([
         {"id": 100, "username": "蔡元君", "type": "stock", "key": "old",
          "new_value": 1, "new_value_text": "", "change_type": "set",
@@ -147,7 +152,7 @@ def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
     assert [op["local_id"] for op in env["server"].pushed] == [101, 102]
     assert env["server"].pushed[1]["op"] == "delta"
     assert env["server"].pushed[1]["delta"] == -2
-    assert env["state"]["push_local_id"] == 102
+    assert env["state"]["local_history_id"] == 102
 
 
 def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
@@ -189,6 +194,57 @@ def test_pull_stops_with_pending_when_overwrite_not_confirmed(env) -> None:
     # sync_all 同样停在 pending，且不做上行
     combined = snapshot_sync.sync_all("t")
     assert combined.pending and combined.pushed == 0
+
+
+def test_own_echo_ops_with_local_rows_are_skipped(env) -> None:
+    """回声护栏：自己实例的 op 且本地已有该 history 行 → 不得重放（delta 双算）。"""
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1          # 已落地，不触发 bootstrap
+    # 本地已有 id=51 的行（效果已在 entries 里：energy=100）
+    env["history"].append({"id": 51, "username": "蔡元君", "type": "stock",
+                           "key": "energy", "new_value": 100, "new_value_text": "",
+                           "change_type": "delta", "delta_value": 40,
+                           "ts": "2026-11-03T10:00:00"})
+    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 100}}}
+    # 云端回放流：自己的 echo（local_id=51，本地已有）+ 别的设备的新 delta
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "mine", "local_id": 51,
+         "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "delta", "delta": 40, "value": None, "value_text": "",
+         "happened_at": "2026-11-03T10:00:00"},
+        {"remote_id": 2, "instance_id": "other", "local_id": 9,
+         "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "delta", "delta": 5, "value": None, "value_text": "",
+         "happened_at": "2026-11-03T11:00:00"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    # echo 被跳过（不双算 +40），他机 delta 正常应用（100+5）
+    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 105
+    assert report.pulled == 1
+    assert env["writes"] == [(  # 只有他机那一条写入了 entries
+        "蔡元君", "stock", "energy", 105.0, "", None)]
+
+
+def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
+    """事故回归：新库快照水位为 0 时，已落地的设备不得每次同步都被快照回滚。
+
+    2026-11-03 数据损坏根源：以 remote_history_id==0 判定「需要 bootstrap」，
+    而新库首份快照水位恰为 0 → 每次同步把 entries 回滚到旧快照，tick 累计
+    与未推送的改动被反复抹除。
+    """
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1   # 已落地过（哪怕水位是 0）
+    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 42}}}   # 本地新值
+    env["server"].snapshots = [{
+        "id": 1, "snapshot_remote_id": 0, "origin_instance_id": "mine",
+        "origin_name": "本机", "created_at": "T0", "entry_count": 1,
+        "entries": json.dumps([{"username": "蔡元君", "type": "stock",
+                                "key": "energy", "value": 7}])}]       # 旧快照值
+    report = snapshot_sync.pull_and_replay("t")
+    # 不重新落地：本地 42 保留，快照里的 7 不得覆盖
+    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 42
+    assert report.snapshots == 0
+    assert env["writes"] == []
 
 
 def test_network_failure_reports_error_without_crashing(env) -> None:

@@ -49,16 +49,53 @@ class ProfileSyncReport:
 def _state() -> dict:
     state = profile_sync_state()
     state.setdefault("remote_history_id", 0)
-    state.setdefault("push_local_id", 0)
+    state.setdefault("local_history_id", 0)
     # 本设备落地时用的是哪一份快照（账户级多份里的 id）
     if not isinstance(state.get("profile_snapshot_id"), int):
         state["profile_snapshot_id"] = 0
     return state
 
 
-def _push_local_id(state: dict) -> int:
-    value = state.get("push_local_id")
+def _local_history_id(state: dict) -> int:
+    value = state.get("local_history_id")
     return value if isinstance(value, int) and value >= 0 else 0
+
+
+#: 同步进度与云端不一致时的提示。**只提示，绝不动本地数据**——自动重置水位
+#: 一旦判断出错就会静默丢数据，必须由用户自己决定「清除同步」。
+RESET_HINT = "本地记录的同步进度比云端新（云端可能被重建或已换库）。请在账户管理中点「清除同步」后重新登录同步。"
+NO_SNAPSHOT_HINT = "云端还没有快照。请先在其中一台设备上点「刷新快照」建立基线，再让其他设备登录。"
+
+
+def remote_head(token: str) -> int:
+    """云端账本当前最大 remote_id；没有快照/账本时为 0。"""
+    try:
+        response = post("/api/sync/profile/snapshot", {}, token)
+    except SyncError:
+        return 0
+    head = response.get("head_remote_id")
+    return head if isinstance(head, int) and head >= 0 else 0
+
+
+def state_problem(token: str) -> str:
+    """同步前的进度校验：返回提示文案，没问题返回空串。
+
+    只做「发现并告知」，不修正任何本地状态。只比较 ``remote_history_id``：
+    它与 head 同在远端编号空间；``local_history_id`` 是本地编号，与 head
+    不可比（新库 head 归零不代表本地编号要归零）。
+    """
+    state = _state()
+    head = remote_head(token)
+    remote = int(state.get("remote_history_id") or 0)
+    if remote > head:
+        return RESET_HINT
+    return ""
+
+
+def clear_sync_state() -> None:
+    """清除本地同步进度（用户显式操作）。快照与账本数据不动。"""
+    save_profile_sync_state({})
+    logger.info("[profile sync] 已按用户操作清除本地同步进度")
 
 
 def _apply_op(op: dict) -> None:
@@ -182,7 +219,7 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
     state = _state()
     snapshot = latest_snapshot(token)
     if snapshot is None:
-        report.errors.append("云端还没有快照")
+        report.errors.append(NO_SNAPSHOT_HINT)
         return
     try:
         entries = json.loads(snapshot.get("entries") or "[]")
@@ -219,31 +256,50 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
                 snapshot_row_id, watermark, applied)
 
 
-def pull_and_replay(token: str, *, allow_overwrite: bool = False) -> ProfileSyncReport:
+def pull_and_replay(token: str, *, allow_overwrite: bool = False,
+                    tolerate_no_snapshot: bool = False) -> ProfileSyncReport:
     """把远端增量折进 entries。首次（无水位）先取快照作基线。
 
     非初始设备（远端快照来自别的实例、本地又有数据）**不覆盖**：只回填
     ``report.pending`` 让界面确认。确认后带 ``allow_overwrite=True`` 再来一次，
     此时先整份备份本地 profile 数据再落地。
+    ``tolerate_no_snapshot``：远端还没有任何快照时不视为错误（首建快照的
+    refresh 路径用它——那里 bootstrap 本来就没有可取的基线）。
     """
     report = ProfileSyncReport()
     state = _state()
-    if not state.get("remote_history_id"):
-        pending = overwrite_warnings(token)
-        if pending and not allow_overwrite:
-            report.pending = pending
-            return report
-        if pending:
-            report.backup = backup_local()
-            if not report.backup:
-                report.errors.append("本地备份失败，已中止覆盖")
+    problem = state_problem(token)
+    if problem:
+        report.errors.append(problem)     # 只提示，本地数据不动
+        return report
+    # bootstrap 只做一次：以「从未落地过快照」为准（profile_snapshot_id==0）。
+    # **不能**用 remote_history_id==0 判断——新库的快照水位就是 0，那样会
+    # 每次同步都把 entries 回滚到旧快照，抹掉 tick 累计与未推送的改动
+    # （这正是 2026-11-03 数据损坏事故的根源）。
+    if not state.get("profile_snapshot_id"):
+        snapshots = [row for row in remote_snapshots(token)]
+        if not snapshots:
+            if tolerate_no_snapshot:
+                pass                      # 远端还没有基线，直接从 0 回放
+            else:
+                report.errors.append(NO_SNAPSHOT_HINT)
                 return report
-        try:
-            _bootstrap(token, report)
-        except SyncError as error:
-            report.errors.append(str(error))
-            return report
-        state = _state()
+        else:
+            pending = overwrite_warnings(token)
+            if pending and not allow_overwrite:
+                report.pending = pending
+                return report
+            if pending:
+                report.backup = backup_local()
+                if not report.backup:
+                    report.errors.append("本地备份失败，已中止覆盖")
+                    return report
+            try:
+                _bootstrap(token, report)
+            except SyncError as error:
+                report.errors.append(str(error))
+                return report
+            state = _state()
     since = int(state.get("remote_history_id") or 0)
     while True:
         try:
@@ -253,12 +309,24 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False) -> ProfileSync
             report.errors.append(str(error))
             break
         ops = response.get("ops") or []
+        mine = current_instance_id()
+        applied = 0
         for op in ops:
+            # 回声护栏：自己实例推的 op 且本地 history 已有该行 → 其效果已含在
+            # 本地状态里（entries 重建自完整 history），重放会造成 delta 双算。
+            # 库重建后的窗口期（水位归零）尤其会撞上这批自己的历史 op。
+            op_instance = op.get("instance_id")
+            op_local_id = op.get("local_id")
+            if (isinstance(op_instance, str) and op_instance == mine
+                    and isinstance(op_local_id, int)
+                    and repository.db_history_row_exists(op_local_id)):
+                continue
             try:
                 _apply_op(op)
+                applied += 1
             except Exception as error:      # 单条失败不拖垮整轮
                 report.errors.append(f"{op.get('username')}/{op.get('key')}: {error}")
-        report.pulled += len(ops)
+        report.pulled += applied
         cursor = int(response.get("last_remote_id") or since)
         if cursor <= since or not ops:
             break
@@ -274,7 +342,7 @@ def push_local(token: str) -> ProfileSyncReport:
     """把本地 ``history.id`` 水位之后的 set/delta 上行。"""
     report = ProfileSyncReport()
     state = _state()
-    since = _push_local_id(state)
+    since = _local_history_id(state)
     while True:
         rows = repository.db_get_history_since(since, 200)
         if not rows:
@@ -293,9 +361,32 @@ def push_local(token: str) -> ProfileSyncReport:
             break
         report.pushed += int(response.get("accepted") or 0)
         since = rows[-1]["id"]
-        state["push_local_id"] = since
+        state["local_history_id"] = since
         save_profile_sync_state(state)
     return report
+
+
+def _key_definitions() -> list[dict]:
+    """profile.yaml 的定义摘要（type/key/label/group/cap/period）。
+
+    浏览器无法零依赖解析 YAML，网页端把裸 key 渲染成带中文标签的二维表
+    全靠这份摘要随快照上传。
+    """
+    from .schema import get_profile_config
+
+    keys: list[dict] = []
+    for model_type, key_defs in get_profile_config().keys_by_model.items():
+        for kd in key_defs:
+            item: dict[str, str | int] = {"type": model_type, "key": kd.key,
+                                          "label": kd.label or kd.key, "group": kd.group or ""}
+            cap = getattr(kd, "cap", None)
+            if cap is not None:
+                item["cap"] = cap
+            period = getattr(kd, "period", None)
+            if period:
+                item["period"] = period
+            keys.append(item)
+    return keys
 
 
 def refresh_snapshot(token: str) -> ProfileSyncReport:
@@ -310,7 +401,7 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
     from ..user_config import list_user_names
 
     report = ProfileSyncReport()
-    pulled = pull_and_replay(token)
+    pulled = pull_and_replay(token, tolerate_no_snapshot=True)
     report.pulled = pulled.pulled
     report.errors.extend(pulled.errors)
     state = _state()
@@ -328,15 +419,20 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
         return report
     try:
         response = post("/api/sync/profile/snapshot/put",
-                        {"entries": payload, "origin_name": socket.gethostname()}, token)
+                        {"entries": payload, "keys": _key_definitions(),
+                         "origin_name": socket.gethostname()}, token)
     except SyncError as error:
         report.errors.append(str(error))
         return report
     state["profile_snapshot_id"] = int(response.get("id") or 0) or None
+    # 快照水位必须一并记下：快照语义是「该 remote_id 及之前的变更都已体现在
+    # entries 里」。漏记会让本机后续拉取从 0 开始重复回放。
+    watermark = int(response.get("snapshot_remote_id") or 0)
+    state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
     report.snapshots += 1
     # 快照已经代表了此刻全部用户的完整状态：本地既有历史无需再逐行上行，否则
     # 首次同步要把几万条陈年账本全推一遍（而新设备根本不需要它们）。
-    state["push_local_id"] = repository.db_max_history_id()
+    state["local_history_id"] = repository.db_max_history_id()
     save_profile_sync_state(state)
     logger.info("[profile sync] 快照刷新完成：{}", report.describe())
     return report

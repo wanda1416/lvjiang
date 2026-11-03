@@ -777,6 +777,14 @@ class ProfileDB:
             for r in rows
         ]
 
+    def history_row_exists(self, history_id: int) -> bool:
+        conn = self._borrow_connection()
+        try:
+            return conn.execute(
+                "SELECT 1 FROM profile_history WHERE id=?", (history_id,)).fetchone() is not None
+        finally:
+            self._release_connection(conn)
+
     def get_max_history_id(self) -> int:
         """本地 history 当前最大 id（无历史时为 0）。"""
         conn = self._borrow_connection()
@@ -1024,6 +1032,11 @@ def db_get_history_record(history_id: int) -> dict:
 def db_get_history_since(since_id: int, limit: int = 200) -> list[dict]:
     """本地水位之后待上行的账本行（``set`` / ``delta``，按 id 升序）。"""
     return get_profile_db().get_history_since(since_id, limit)
+
+
+def db_history_row_exists(history_id: int) -> bool:
+    """本地 history 是否已有该 id 的行（同步回声护栏用）。"""
+    return get_profile_db().history_row_exists(history_id)
 
 
 def db_max_history_id() -> int:

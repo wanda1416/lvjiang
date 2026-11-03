@@ -314,6 +314,17 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
     if hooks.config_policy_modules:
         registry.setdefault("config_policy_modules", []).extend(hooks.config_policy_modules)
 
+    if hooks.sync_document_modules:
+        registry.setdefault("sync_document_modules", []).extend(hooks.sync_document_modules)
+        # 实际导入模块触发 register_user_document_kind() 注册；单个插件的
+        # 声明出错不该拖垮整个插件加载，仅记日志跳过。
+        for mod_path in hooks.sync_document_modules:
+            try:
+                importlib.import_module(mod_path)
+                logger.info("[plugin]   sync document module 已加载: {}", mod_path)
+            except Exception:  # noqa: BLE001
+                logger.exception("[plugin] 同步文档声明模块加载失败: {}", mod_path)
+
 
 def register_config_policies(hooks: AppHooks) -> None:
     """装配已知插件的配置声明；不运行启动回调或 UI 构建器。"""

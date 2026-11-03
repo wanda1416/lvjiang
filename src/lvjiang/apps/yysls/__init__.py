@@ -125,6 +125,11 @@ hooks = AppHooks(
     config_policy_modules=[
         "lvjiang.apps.yysls.config.merge_policy",
     ],
+
+    # 账号服务文档通道 kind 声明（导入即触发 register_user_document_kind 注册）
+    sync_document_modules=[
+        "lvjiang.apps.yysls.sync.documents",
+    ],
     configuration_reload_callbacks=[_reload_configuration],
     offline_configuration_patterns=(
         "yysls/tune_config.yaml", "yysls/game_config/*.yaml",

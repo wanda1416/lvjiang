@@ -56,6 +56,9 @@ class FakeClient:
 
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
+    # yysls 生产环境经 AppHooks.sync_document_modules 登记；测试直接登记同一映射。
+    from lvjiang.core.sync import registry
+    registry.register_user_document_kind("loadouts", ".loadouts.json")
     fake = FakeClient()
     monkeypatch.setattr(engine.client, "manifest", fake.manifest)
     monkeypatch.setattr(engine.client, "pull", fake.pull)

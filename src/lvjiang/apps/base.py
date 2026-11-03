@@ -88,6 +88,13 @@ class AppHooks:
     # register_protected_list_paths 声明。
     config_policy_modules: list[str] = field(default_factory=list)
 
+    # 账号服务文档通道 kind 声明模块路径列表（同上「import 即注册」语义）：
+    # ["lvjiang.apps.yysls.sync.documents", ...]。core.sync 不认识任何插件
+    # 领域词汇，插件用户级文档（如出装 .loadouts.json）的 kind 与文件后缀
+    # 由插件自己在这些模块里调用 core.sync.registry 的
+    # register_user_document_kind 声明。
+    sync_document_modules: list[str] = field(default_factory=list)
+
     # 外部完整配置快照应用后清理插件自己的只读缓存，不重注册 UI 或执行任务。
     configuration_reload_callbacks: list[Callable[[], None]] = field(default_factory=list)
 

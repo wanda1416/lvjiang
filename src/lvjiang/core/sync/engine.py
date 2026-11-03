@@ -22,7 +22,7 @@ from loguru import logger
 
 from ...constants import AVATARS_DIR, SESSION_CONFIG_DIR, USERS_DIR
 from ..json_files import formatted_json
-from . import client
+from . import client, registry
 from .client import SyncConflict, SyncError
 
 GLOBAL_LABEL = "__global__"
@@ -60,26 +60,34 @@ class SyncReport:
 def iter_local_documents(users_dir: Path = USERS_DIR,
                          avatars_dir: Path = AVATARS_DIR,
                          session_dir: Path = SESSION_CONFIG_DIR) -> list[LocalDocument]:
-    """枚举本机全部可同步文档；头像只取用户文档实际引用的文件。"""
+    """枚举本机全部可同步文档；头像只取用户文档实际引用的文件。
+
+    kind 判定：core 固有后缀（.notes.json / .session.json 排除）优先，
+    插件经 registry 登记的后缀次之（最长匹配），其余整文件即 user_doc——
+    core 不认识任何插件领域词汇。
+    """
     documents: list[LocalDocument] = []
     avatars: set[str] = set()
+    suffix_map: list[tuple[str, str]] = sorted(
+        registry.user_document_kinds().items(), key=lambda item: -len(item[1]))
     for path in sorted(users_dir.glob("*.json")):
         name = path.name
         # 会话运行态（users/{名}.session.json）不属于同步范围，永不入云。
         if name.endswith(".session.json"):
             continue
-        if name.endswith(".loadouts.json"):
-            documents.append(LocalDocument(name[:-len(".loadouts.json")], "loadouts", path))
-        elif name.endswith(".notes.json"):
-            documents.append(LocalDocument(name[:-len(".notes.json")], "notes", path))
-        else:
-            documents.append(LocalDocument(path.stem, "user_doc", path, strip_ui_state=True))
-            try:
-                avatar = json.loads(path.read_text(encoding="utf-8")).get("avatar")
-            except (OSError, ValueError):
-                continue
-            if isinstance(avatar, str) and avatar:
-                avatars.add(avatar)
+        matched = next(((kind, suffix) for kind, suffix in suffix_map if name.endswith(suffix)),
+                       None)
+        if matched is not None:
+            kind, suffix = matched
+            documents.append(LocalDocument(name[:-len(suffix)], kind, path))
+            continue
+        documents.append(LocalDocument(path.stem, "user_doc", path, strip_ui_state=True))
+        try:
+            avatar = json.loads(path.read_text(encoding="utf-8")).get("avatar")
+        except (OSError, ValueError):
+            continue
+        if isinstance(avatar, str) and avatar:
+            avatars.add(avatar)
     for filename in sorted(avatars):
         path = avatars_dir / filename
         if path.is_file():
@@ -221,8 +229,11 @@ def _document_for_remote(label: str, kind: str,
         return LocalDocument(label, kind, session_dir / "profile.yaml")
     if kind == "avatar":
         return LocalDocument(label, kind, avatars_dir / label)
-    if kind in ("user_doc", "loadouts", "notes"):
-        suffix = {"user_doc": ".json", "loadouts": ".loadouts.json", "notes": ".notes.json"}[kind]
-        return LocalDocument(label, kind, users_dir / f"{label}{suffix}",
-                             strip_ui_state=kind == "user_doc")
+    if kind == "notes":
+        return LocalDocument(label, kind, users_dir / f"{label}.notes.json")
+    # 插件登记的 kind：按登记的后缀落盘；未登记（本机没加载该插件）→ 不落，
+    # 云端该文档保持原样，等装了插件的设备再拉取。
+    suffix = registry.user_document_kinds().get(kind)
+    if suffix is not None:
+        return LocalDocument(label, kind, users_dir / f"{label}{suffix}")
     return None

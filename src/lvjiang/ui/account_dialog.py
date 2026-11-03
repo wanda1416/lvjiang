@@ -313,7 +313,7 @@ class AccountManagerDialog(QDialog):
         self.holder.apply(result)
         if result is not None and not self.holder.sync_attempted:
             # 登录/启动恢复成功后自动同步一次（后台，不阻塞渲染）。
-            self._sync_now(quiet=True)
+            self._sync_now()
 
     # ─── 动作 ───────────────────────────────────────────
 
@@ -365,18 +365,17 @@ class AccountManagerDialog(QDialog):
 
     # ─── 数据同步 ───────────────────────────────────────
 
-    def _sync_now(self, quiet: bool = False) -> None:
+    def _sync_now(self) -> None:
         from ..core.sync.engine import sync_documents
         token = self.holder.session.access_token
         # 启动自动同步还在跑时直接跳过：它结束会刷新同一份状态，重复跑白费流量。
         if not token or self.worker is not None or self.holder.sync_worker is not None:
             return
         self.holder.sync_attempted = True
-        if not quiet:
-            self._set_busy(True, tr("正在同步…"))
+        # 进度只落在下方 sync_status，不再改写顶部的账号状态行。
+        self._set_busy(True)
         self.sync_button.setEnabled(False)
-        if not quiet:
-            self.sync_status.setText(tr("正在同步文档…"))
+        self.sync_status.setText(tr("正在同步文档…"))
         self.worker = _AccountWorker(lambda: sync_documents(token), self)
         self.worker.completed.connect(self._sync_finished)
         self.worker.finished.connect(self.worker.deleteLater)

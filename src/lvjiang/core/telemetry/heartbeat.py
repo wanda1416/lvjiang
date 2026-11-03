@@ -1,12 +1,11 @@
 """通道 A：心跳事件的 schema、payload 组装、节流。
 
 字段全部来自公开的运行环境信息，不含任何游戏内数据——这是 core 层本就
-该管的部分，与调律事件（apps/yysls/telemetry）分层对称。
+该管的部分，与插件事件（apps/*/telemetry）分层对称。
 
-唯一的例外是 ``plugin`` 的取值白名单里出现了具体插件名。取值本身来自
-``AppHooks.id``（框架登记的稳定 ID，core 不猜也不认识它的含义），白名单
-是隐私护栏而非领域耦合：放行自由文本会让自定义插件名成为指纹维度。
-详见该字段处的说明。
+``plugin`` 取值经 ``choices_fn`` 在校验时动态枚举框架登记的 ``AppHooks.id``
+（core 不认识任何具体插件名），白名单是隐私护栏而非领域耦合：放行自由
+文本会让自定义插件名成为指纹维度。详见该字段处的说明。
 """
 from __future__ import annotations
 
@@ -24,6 +23,14 @@ _UUID_HEX_PATTERN = r"^[0-9a-f]{32}$"
 _OS_RELEASE_PATTERN = r"^[0-9A-Za-z._-]{1,16}$"
 _ARCH_PATTERN = r"^[A-Za-z0-9_]{1,20}$"
 
+
+def _plugin_choices() -> tuple[str, ...]:
+    """已装配插件的稳定 ID + ``none``；core 不硬编码任何具体插件名。"""
+    from ...apps import get_registered_app_ids
+
+    return tuple(get_registered_app_ids()) or ("none",)
+
+
 HEARTBEAT_SCHEMA = EventSchema(
     name="heartbeat", version=1,
     fields=(
@@ -37,7 +44,8 @@ HEARTBEAT_SCHEMA = EventSchema(
                   example="11"),
         FieldSpec("arch", str, pattern=_ARCH_PATTERN, example="amd64"),
         FieldSpec("ui_language", str, pattern=r"^[a-z]{2}_[A-Z]{2}$", example="zh_CN"),
-        # 取值来自 AppHooks.id（框架登记的稳定 ID），不是模块路径或用户文本。
+        # 取值来自 AppHooks.id（框架登记的稳定 ID），choices_fn 校验时动态
+        # 枚举已装配插件——core 不硬编码任何具体插件名。
         #
         # **保持这个字段名与单值形状**：服务端 ops/stats-worker 的 PLUGIN 枚举
         # 校验这个键，改名或改成列表会让整条心跳被 validateHeartbeat() 判空
@@ -46,9 +54,10 @@ HEARTBEAT_SCHEMA = EventSchema(
         # 组件契约，要动必须连 worker 校验、D1 schema、stats-client 镜像一起
         # 动，见 tests/core/test_heartbeat_worker_contract.py。
         #
-        # 白名单是隐私护栏：放行自由文本会让自定义插件名成为指纹维度。
-        # 新增插件时**必须同步扩充这里与 worker 的 PLUGIN 两处**，否则拒收。
-        FieldSpec("plugin", str, choices=("yysls", "none")),
+        # 白名单是隐私护栏：choices_fn 只放行框架登记的稳定 ID，不收自由
+        # 文本（自定义插件名成为指纹维度）。新增插件时**仍必须同步扩充
+        # worker 的 PLUGIN 枚举**，否则该插件心跳会被服务端拒收。
+        FieldSpec("plugin", str, choices_fn=_plugin_choices),
     ),
 )
 register_schema(HEARTBEAT_SCHEMA)

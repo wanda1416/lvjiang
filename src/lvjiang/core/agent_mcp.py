@@ -11,7 +11,7 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-LV1_REQUIRED_MESSAGE = "智能调律需要激活 Lv1，请在设置的「功能激活」中激活"
+LV1_REQUIRED_MESSAGE = "MCP 功能需要激活 Lv1，请在设置的「功能激活」中激活"
 DEFAULT_MCP_PORT = 18765
 
 

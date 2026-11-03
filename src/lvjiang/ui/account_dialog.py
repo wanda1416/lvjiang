@@ -502,6 +502,15 @@ class AccountManagerDialog(QDialog):
             cell.addStretch()
             self.devices.setCellWidget(row, 3, host)
 
+    def _set_sync_note(self, text: str, *, error: bool = False) -> None:
+        """同步页的一句话反馈：普通提示写摘要行，失败写红色错误行。"""
+        if error:
+            self.sync_error.setText(text)
+            self.sync_error.setVisible(True)
+            self.sync_caption.setText(tr("同步失败"))
+        else:
+            self.sync_caption.setText(text)
+
     def _render_sync(self) -> None:
         report = self.holder.last_sync_report
         if self.holder.syncing:
@@ -627,7 +636,7 @@ class AccountManagerDialog(QDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
         clear_sync_state()
-        self.sync_status.setText(tr("已清除本地同步进度。点「立即同步」重新建立。"))
+        self._set_sync_note(tr("已清除本地同步进度。点「立即同步」重新建立。"))
 
     def _refresh_snapshot(self) -> None:
         """把本机当前 profile 值作为新快照上传，绑到最新远端 history id。
@@ -637,7 +646,7 @@ class AccountManagerDialog(QDialog):
         from ..core.profile.snapshot_sync import refresh_snapshot
         if self.holder.syncing or self.holder.busy:
             return
-        self.sync_status.setText(tr("正在刷新快照…"))
+        self._set_sync_note(tr("正在刷新快照…"))
         self.holder._start(lambda: refresh_snapshot(self.holder.session.access_token), "sync")
 
     def _on_sync_finished(self, ok: bool, result) -> None:
@@ -645,7 +654,7 @@ class AccountManagerDialog(QDialog):
             return
         self._render_sync()
         if not ok:
-            self.sync_status.setText(str(result))
+            self._set_sync_note(str(result), error=True)
             return
         pending = getattr(getattr(result, "profile", result), "pending", None) or []
         if pending:
@@ -668,8 +677,8 @@ class AccountManagerDialog(QDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if answer != QMessageBox.StandardButton.Yes:
-            self.sync_status.setText(
+            self._set_sync_note(
                 tr("已取消覆盖：本机数据未改动，profile 同步未启用。"))
             return
-        self.sync_status.setText(tr("正在备份并应用云端快照…"))
+        self._set_sync_note(tr("正在备份并应用云端快照…"))
         self.holder.sync_async(allow_overwrite=True)

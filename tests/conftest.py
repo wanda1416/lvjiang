@@ -39,6 +39,24 @@ load_config_policies(builtin_app_ids())
 install_closed_directory_scan()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_instance_id(tmp_path_factory):
+    """把实例出生标识隔离到测试临时目录。
+
+    ``stable_instance_id`` 默认落真实 ``config/instance.id``（Android 为
+    filesDir），会被全局写防线拦截；所有测试统一指到 tmp，并复位模块缓存。
+    """
+    from lvjiang.core.account import identity
+
+    marker = tmp_path_factory.mktemp("instance-id") / "instance.id"
+    original_path, original_cache = identity._instance_id_path, identity._stable_instance_id_cache
+    identity._instance_id_path = lambda: marker
+    identity._stable_instance_id_cache = None
+    yield
+    identity._instance_id_path = original_path
+    identity._stable_instance_id_cache = original_cache
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _initialize_scene_registry_from_real_config():
     """场景注册表是懒加载的：会话开头先按真实配置初始化一次。

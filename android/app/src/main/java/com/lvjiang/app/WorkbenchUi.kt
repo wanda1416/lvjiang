@@ -1174,10 +1174,16 @@ class WorkbenchUi(
             if (mode == "pc") "数据来源：PC端" else "数据来源：云端"
     }
 
-    /** 总览数据来源模式：云端（默认）/ PC端。两模式按钮布局完全同构：
-     *  主按钮永远是「切到另一边」，neutral 永远是「清除数据」（模式不变）。
-     *  注意 setMessage 与 setItems 在 Material 对话框里互斥（列表会被挤掉），
-     *  用自定义视图放说明文字，动作走按钮。 */
+    /**
+     * 总览数据来源模式：云端（默认）/ PC端。两种模式布局完全同构，动作行固定为
+     * **左「清除数据」、右「切到另一边」**，「关闭」仍是对话框自己的按钮、落在下一行。
+     *
+     * 之所以不用三个 framework 按钮：Material 会把三个按钮竖着叠在右下角，
+     * 敏感的「清除数据」正好贴在「切换」和「关闭」下面那一格，拇指够「关闭」时
+     * 偏一点就命中它。现在清除数据独占最左，与右侧的切换/关闭拉开距离。
+     * 注意 setMessage 与 setItems 在 Material 对话框里互斥（列表会被挤掉），
+     * 用自定义视图放说明文字，动作走自定义按钮行。
+     */
     private fun showProfileSource() {
         request({ PyBridge.accountProfileMode(activity) }) { result ->
             if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
@@ -1188,22 +1194,51 @@ class WorkbenchUi(
             text(content, current)
             text(content, if (isPc) "切换到云端需要先清除本地总览数据。"
                           else "切换后 PC 端离线包将携带总览数据。", 12f)
+
+            val actions = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            actions.addView(profileActionButton("清除数据", destructive = true) {
+                confirmClearProfile(keepMode = true)
+            }, LinearLayout.LayoutParams(-2, -2))
+            actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+            actions.addView(profileActionButton(if (isPc) "切换为云端" else "切换为 PC端") {
+                if (isPc) {
+                    confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
+                } else {
+                    request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
+                        if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
+                        toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
+                    }
+                }
+            }, LinearLayout.LayoutParams(-2, -2))
+            content.addView(actions, LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = (8 * activity.resources.displayMetrics.density).toInt()
+            })
+
             MaterialAlertDialogBuilder(activity).setTitle("总览数据")
                 .setView(SettingsUi.dialogScroll(activity, content))
                 .setNegativeButton("关闭", null)
-                .setNeutralButton("清除数据") { _, _ -> confirmClearProfile(keepMode = true) }
-                .setPositiveButton(if (isPc) "切换为云端" else "切换为 PC端") { _, _ ->
-                    if (isPc) {
-                        confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
-                    } else {
-                        request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
-                            if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
-                            toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
-                        }
-                    }
-                }.show()
+                .show()
         }
     }
+
+    /** 对话框内的文字按钮：默认主色；destructive 用 error 色标出不可逆操作。 */
+    private fun profileActionButton(
+        label: String,
+        destructive: Boolean = false,
+        action: () -> Unit,
+    ): MaterialButton =
+        MaterialButton(ContextThemeWrapper(activity, R.style.ThemeOverlay_Lvjiang_TextButton)).apply {
+            text = label
+            isAllCaps = false
+            textSize = 14f
+            if (destructive) {
+                setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorError))
+            }
+            setOnClickListener { action() }
+        }
 
     /** 清除本地总览数据。keepMode=true 保持当前模式（云端=从云端重拉，
      *  PC端=等下一次离线包）；false 为切换到云门前置清除。 */

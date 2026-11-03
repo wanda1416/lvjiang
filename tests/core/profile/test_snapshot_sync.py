@@ -85,8 +85,14 @@ def env(monkeypatch, tmp_path):
                         lambda u, t, k: entries.get(u, {}).get(t, {}).get(k, {}))
     monkeypatch.setattr(snapshot_sync.repository, "db_count_history",
                         lambda username: len([r for r in history if r["username"] == username]))
-    monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since",
-                        lambda since, limit: [r for r in history if r["id"] > since][:limit])
+    def _rows_of(since, limit, author=""):
+        from lvjiang.core.profile.repository import _author_stamp
+
+        mine = author or _author_stamp()
+        return [r for r in history
+                if r["id"] > since and r.get("device_id", mine) == mine][:limit]
+
+    monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since", _rows_of)
     monkeypatch.setattr(snapshot_sync.repository, "db_history_row_exists",
                         lambda history_id: any(r["id"] == history_id for r in history))
     monkeypatch.setattr(snapshot_sync, "current_instance_id", lambda: "mine")
@@ -118,6 +124,39 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
         (row["id"] for row in env["history"]), default=0)
     # 回放不写本地 history（因此无从回声上行）
     assert all(write[5] is None for write in env["writes"])
+
+
+def test_push_refuses_backlog_over_limit(env) -> None:
+    """积压超过 200 条拒绝上传，提示刷新快照——防止水位异常时全量倾倒。"""
+    env["state"]["local_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["state"]["remote_history_id"] = 5
+    env["history"].extend([
+        {"id": i, "username": "蔡元君", "type": "stock", "key": f"k{i}",
+         "new_value": 1, "new_value_text": "", "change_type": "set",
+         "delta_value": None, "ts": "2026-11-04T07:00:00"}
+        for i in range(1, snapshot_sync.MAX_PUSH_BACKLOG + 2)])
+    report = snapshot_sync.push_local("t")
+    assert report.pushed == 0
+    assert any("刷新快照" in e for e in report.errors)
+
+
+def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
+    """回放按操作时间合并：远端旧 set 不覆盖本地新值（delta 恒应用）。"""
+    env["state"]["remote_history_id"] = 1
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"].setdefault("蔡元君", {})["stock"] = {
+        "energy": {"value": 120, "updated_at": "2026-11-04T07:00:00"}}
+    env["server"].rows = [
+        {"remote_id": 1},
+        {"remote_id": 2, "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "set", "value": 100, "happened_at": "2026-11-03T10:00:00"},   # 旧值
+        {"remote_id": 3, "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "delta", "delta": 5, "happened_at": "2026-11-03T10:00:01"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.pulled == 1                          # 只有 delta 生效
+    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 125
 
 
 def test_incremental_pull_applies_set_and_delta(env) -> None:

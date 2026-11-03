@@ -102,22 +102,38 @@ def clear_sync_state() -> None:
     logger.info("[profile sync] 已按用户操作清除本地同步进度")
 
 
-def _apply_op(op: dict) -> None:
-    """把一条远端 op 折进 entries；**不写本地 history**，因此不会回声上行。"""
+def _apply_op(op: dict) -> bool:
+    """把一条远端 op 折进 entries；返回是否实际生效。
+
+    **不写本地 history**，因此不会回声上行。
+
+    回放按 remote_id（到达序）驱动，但**合并按操作时间**：远端来的旧 set
+    （``happened_at`` 早于本地现值的 ``updated_at``）不覆盖新值——离线设备
+    补传的陈旧 set 正是这种形态。delta 恒应用（加法可交换，顺序无关）。
+    """
     username, type_, key = op["username"], op["type"], op["key"]
+    happened = op.get("happened_at") or ""
     if op["op"] == "delta":
         current = repository.db_read_entry(username, type_, key)
         base = current.get("value") if isinstance(current, dict) else None
         base = float(base) if isinstance(base, (int, float)) else 0.0
         value = base + float(op.get("delta") or 0)
         repository.db_upsert(username, type_, key, value, change_type=None)
-        return
+        return True
     text = op.get("value_text") or ""
     raw = op.get("value")
+    if type_ != "note" and raw is not None:
+        current = repository.db_read_entry(username, type_, key)
+        local_at = (current or {}).get("updated_at") or ""
+        if local_at and happened and happened < local_at:
+            logger.info("[profile sync] 跳过旧 set：{}/{} {}@{} < 本地@{}",
+                        username, type_, key, happened, local_at)
+            return False
     if type_ == "note" or (text and raw is None):
         repository.db_upsert(username, type_, key, 0.0, value_text=text, change_type=None)
-        return
+        return True
     repository.db_upsert(username, type_, key, float(raw or 0), change_type=None)
+    return True
 
 
 def remote_snapshots(token: str) -> list[dict]:
@@ -331,8 +347,8 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
                     and repository.db_history_row_exists(op_local_id)):
                 continue
             try:
-                _apply_op(op)
-                applied += 1
+                if _apply_op(op):
+                    applied += 1
             except Exception as error:      # 单条失败不拖垮整轮
                 report.errors.append(f"{op.get('username')}/{op.get('key')}: {error}")
         report.pulled += applied
@@ -347,13 +363,32 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     return report
 
 
+#: 单次同步允许的最大上行积压。超过说明水位异常或长期离线——这些旧行
+#: 绝大多数已被快照收编，逐条上传既浪费配额又可能用旧值污染回放；正确
+#: 动作是刷新快照重建基线（水位重置到本机 max，积压归零）。
+MAX_PUSH_BACKLOG = 200
+
+
 def push_local(token: str) -> ProfileSyncReport:
-    """把本地 ``history.id`` 水位之后的 set/delta 上行。"""
+    """把本地 ``history.id`` 水位之后的 set/delta 上行——**只推本机写的行**。
+
+    - 请求携带 ``base_remote_id``（自己的拉取水位）：云端发现落后于 head
+      即拒绝，强制「先拉最新再上传」，防止基于过期基线的 op 混入。
+    - 积压超过 :data:`MAX_PUSH_BACKLOG` 直接拒绝并提示刷新快照。
+    """
+    from .repository import _author_stamp
+
     report = ProfileSyncReport()
     state = _state()
     since = _local_history_id(state)
+    author = _author_stamp()
+    first = repository.db_get_history_since(since, MAX_PUSH_BACKLOG + 1, author=author)
+    if len(first) > MAX_PUSH_BACKLOG:
+        report.errors.append(
+            f"待上行积压超过 {MAX_PUSH_BACKLOG} 条；请先「刷新快照」重建基线后再同步")
+        return report
     while True:
-        rows = repository.db_get_history_since(since, 200)
+        rows = repository.db_get_history_since(since, 200, author=author)
         if not rows:
             break
         ops = [{
@@ -364,7 +399,9 @@ def push_local(token: str) -> ProfileSyncReport:
             "value_text": row["new_value_text"], "happened_at": row["ts"],
         } for row in rows]
         try:
-            response = post("/api/sync/profile/push", {"ops": ops}, token)
+            response = post("/api/sync/profile/push", {
+                "ops": ops,
+                "base_remote_id": int(state.get("remote_history_id") or 0)}, token)
         except SyncError as error:
             report.errors.append(str(error))
             break

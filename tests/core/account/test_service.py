@@ -161,7 +161,11 @@ def test_distinct_instances_get_distinct_device_ids_and_tokens(tmp_path, monkeyp
 
     def login_with(config_name: str) -> tuple[str, str]:
         path = tmp_path / config_name / "account.json"
+        marker = tmp_path / config_name / "instance.id"
         monkeypatch.setattr(account_service, "account_config_path", lambda p=path: p)
+        # 实例身份 = 出生文件；两个实例各有各的出生文件
+        monkeypatch.setattr(account_identity, "_instance_id_path", lambda m=marker: m)
+        account_identity._stable_instance_id_cache = None
         monkeypatch.setattr(account_service, "_request", lambda method, route, data=None, token="": {
             "account_id": "a" * 32, "login": data["login"], "display_name": "",
             "instance_id": data["instance_id"], "access_token": "access",
@@ -170,7 +174,7 @@ def test_distinct_instances_get_distinct_device_ids_and_tokens(tmp_path, monkeyp
                                        "devices": [], "active_sessions": 1})
         AccountSession().login("wang", "pw")
         profile = json.loads(path.read_text(encoding="utf-8"))
-        return profile["instance_id"], profile["instance_uuid"]
+        return profile["instance_id"], marker.read_text(encoding="utf-8").strip()
 
     source_id, source_uuid = login_with("source")
     install_id, install_uuid = login_with("install")

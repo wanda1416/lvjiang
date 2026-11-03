@@ -513,11 +513,11 @@ class ProfileDB:
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
-                        "old_value_text, new_value_text, change_type, delta_value, source, sync_from) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "old_value_text, new_value_text, change_type, delta_value, source, sync_from, device_id) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (write_ts, username, type_, key, old_value, float(value),
                          old_value_text or "", value_text,
-                         change_type, delta_value, source, sync_from),
+                         change_type, delta_value, source, sync_from, _author_stamp()),
                     )
 
             self._commit(conn)
@@ -581,11 +581,11 @@ class ProfileDB:
                         conn.execute(
                             "INSERT INTO profile_history "
                             "(ts, username, type, key, old_value, new_value, "
-                            "old_value_text, new_value_text, change_type, delta_value, source, sync_from) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            "old_value_text, new_value_text, change_type, delta_value, source, sync_from, device_id) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (write_ts, username, type_, key, old_value, float(value),
                              old_value_text or "", value_text,
-                             change_type, delta_value, source, sync_from),
+                             change_type, delta_value, source, sync_from, _author_stamp()),
                         )
 
             self._commit(conn)
@@ -658,10 +658,10 @@ class ProfileDB:
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
-                        "change_type, delta_value, source, sync_from) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "change_type, delta_value, source, sync_from, device_id) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (write_ts, username, type_, key, history_old_value, value,
-                         change_type, delta_value, source, sync_from),
+                         change_type, delta_value, source, sync_from, _author_stamp()),
                     )
 
             self._commit(conn)
@@ -808,11 +808,14 @@ class ProfileDB:
             self._release_connection(conn)
         return int(row[0]) if row else 0
 
-    def get_history_since(self, since_id: int, limit: int) -> list[dict]:
+    def get_history_since(self, since_id: int, limit: int,
+                         author: str = "") -> list[dict]:
         """取 id 大于水位的账本行（只要 ``set`` / ``delta``），按 id 升序。
 
         供同步上行使用：``tick`` / ``reset`` 是时间派生，不上云。水位用的是
-        本地自增 id，与远端 ``remote_id`` 是两套编号。
+        本地自增 id，与远端 ``remote_id`` 是两套编号。``author`` 非空时只取
+        该作者写的行——**每端只上传自己产生的 hid**，离线包复制来的行（带
+        来源机器标记）与旧存量行（空标记）永不代传。
         """
         conn = self._borrow_connection()
         try:
@@ -820,9 +823,10 @@ class ProfileDB:
                 "SELECT id, username, type, key, new_value, new_value_text, "
                 "change_type, delta_value, ts "
                 "FROM profile_history "
-                "WHERE id>? AND change_type IN ('set', 'delta') "
-                "ORDER BY id ASC LIMIT ?",
-                (since_id, limit),
+                "WHERE id>? AND change_type IN ('set', 'delta')"
+                + (" AND device_id=?" if author else "") +
+                " ORDER BY id ASC LIMIT ?",
+                ((since_id, author, limit) if author else (since_id, limit)),
             ).fetchall()
         finally:
             self._release_connection(conn)
@@ -959,6 +963,19 @@ def reset_profile_db() -> None:
         _db = None
 
 
+_author_id_cache: str | None = None
+
+
+def _author_stamp() -> str:
+    """本机作者标记（模块级缓存：Android 路径涉及文件读写）。"""
+    global _author_id_cache
+    if _author_id_cache is None:
+        from ..account.identity import device_author_id
+
+        _author_id_cache = device_author_id()
+    return _author_id_cache
+
+
 def wipe_profile_data() -> None:
     """清空全部 entries 与 history（「清除本地总览数据」用，云端快照重建）。"""
     get_profile_db().wipe()
@@ -1048,9 +1065,10 @@ def db_get_history_record(history_id: int) -> dict:
     return get_profile_db().get_history_record(history_id)
 
 
-def db_get_history_since(since_id: int, limit: int = 200) -> list[dict]:
+def db_get_history_since(since_id: int, limit: int = 200,
+                         author: str = "") -> list[dict]:
     """本地水位之后待上行的账本行（``set`` / ``delta``，按 id 升序）。"""
-    return get_profile_db().get_history_since(since_id, limit)
+    return get_profile_db().get_history_since(since_id, limit, author=author)
 
 
 def db_history_row_exists(history_id: int) -> bool:

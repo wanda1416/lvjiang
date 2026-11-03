@@ -108,9 +108,8 @@ def _save_profile(profile: dict) -> None:
 
 
 def current_instance_id() -> str:
-    """本实例标识；未登录过（无实例 uuid）时为空串。"""
-    instance_uuid = _instance_uuid()
-    return identity.instance_id(instance_uuid) if instance_uuid else ""
+    """本实例标识（出生标识）；回声护栏比对 op 的写入方时使用。"""
+    return identity.stable_instance_id()
 
 
 def profile_sync_state() -> dict:
@@ -151,8 +150,12 @@ def _credentials():
 
 
 def _instance_uuid() -> str:
-    """本实例标识；未登录过时为空（此时也不可能有登录态）。"""
-    return str(_load_profile().get("instance_uuid") or "")
+    """本实例标识：**出生标识**（独立文件、永不变化），与登录态无关。
+
+    历史实现从 account.json 读 instance_uuid——删 account.json 就换身份，
+    自己写的行自己不认；出生文件修复了这一点。
+    """
+    return identity.stable_instance_id()
 
 
 def _keyring_user() -> str:
@@ -236,16 +239,12 @@ def _device_identity() -> tuple[str, str, str]:
 
     账号侧一律用**实例级**标识（见 ``identity``）：同机多实例各算各的，源码版与
     安装版不会合成一条设备记录。机器级 ``machine_device_id`` 只服务激活码绑定，
-    这里不碰。实例 uuid 缺失时立即生成并落盘，保证随后的凭据库写入有实例维度。
+    这里不碰。实例标识 = **出生标识**（首次生成随机 uuid 落独立文件，此后
+    永不变化，删 account.json/重建登录态都不换身份）。
     """
-    profile = _load_profile()
-    instance_uuid = str(profile.get("instance_uuid") or "")
-    if not instance_uuid:
-        instance_uuid = identity.new_instance_uuid()
-        profile["instance_uuid"] = instance_uuid
-        _save_profile(profile)
     device_name = socket.gethostname() or "此电脑"
-    return identity.instance_id(instance_uuid), device_name, instance_uuid
+    stable = identity.stable_instance_id()
+    return stable, device_name, stable
 
 
 class AccountSession:

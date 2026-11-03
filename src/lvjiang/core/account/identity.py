@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from pathlib import Path
 
 from loguru import logger
 
@@ -68,3 +69,62 @@ def keyring_user(instance_uuid: str) -> str:
     if not instance_uuid:
         return ""
     return f"session:{instance_uuid}"
+
+
+def device_author_id() -> str:
+    """账本行作者标记：**实例出生标识**（见 :func:`stable_instance_id`）。
+
+    「每端只上传自己写的行」的依据：离线包复制来的行带着来源实例的标记，
+    接收方永不代传。旧存量行（空标记）视为出处不明，不上传。
+    """
+    return stable_instance_id()
+
+
+_stable_instance_id_cache: str | None = None
+
+
+def _instance_id_path() -> Path:
+    """实例出生文件位置：必须在「会被重建/删除的路径」之外。
+
+    - Android：``filesDir/instance.id``（离线包只重建 ``filesDir/lvjiang``，
+      重建范围之外才保得住）；
+    - PC：``config/instance.id``（没有离线包重建，但账号态 account.json
+      可能被删除重建，兄弟文件不受影响）。
+    """
+    import sys
+
+    from ...constants import PROJECT_ROOT
+
+    if hasattr(sys, "getandroidapilevel"):
+        return PROJECT_ROOT.parent / "instance.id"
+    return PROJECT_ROOT / "config" / "instance.id"
+
+
+def stable_instance_id() -> str:
+    """实例出生标识：首次调用生成随机 uuid 并落盘，此后**永不变化**。
+
+    这是实例的唯一身份，用于账号设备登记与账本行作者标记。刻意不做任何
+    派生（不掺机器指纹、不 hash 目录/包名）：一台机器可能装多个实例、
+    实例目录可能被移动，任何派生都会导致「身份漂移」——重装/搬迁/删
+    account.json 之后自己写的行自己不认。文件损坏或丢失时生成新 id
+    （等于一个新实例；旧 id 的行成为出处不明，不上传，安全降级）。
+    """
+    global _stable_instance_id_cache
+    if _stable_instance_id_cache is not None:
+        return _stable_instance_id_cache
+    path = _instance_id_path()
+    try:
+        if path.is_file():
+            value = path.read_text(encoding="utf-8").strip()
+            if value:
+                _stable_instance_id_cache = value
+                return value
+        path.parent.mkdir(parents=True, exist_ok=True)
+        value = uuid.uuid4().hex
+        path.write_text(value + "\n", encoding="utf-8")
+        _stable_instance_id_cache = value
+        return value
+    except OSError as err:
+        logger.warning("实例出生标识读写失败，本次进程内使用临时标识：{}", err)
+        _stable_instance_id_cache = uuid.uuid4().hex
+        return _stable_instance_id_cache

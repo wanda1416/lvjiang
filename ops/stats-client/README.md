@@ -38,7 +38,7 @@ uv run stats-client   # 默认监听 127.0.0.1:8765，自动打开浏览器
 
 ```toml
 # ops/stats-client/.local/settings.toml（不入库，可从 settings.example.toml 复制）
-secrets_dir = 'C:\Users\你\iCloudDrive\工作资料\律匠\current'
+secrets_dir = '~\.lvjiang'
 ```
 
 把**只有 `Account.D1:Read` 权限**的 API Token（Cloudflare 控制台 → My Profile

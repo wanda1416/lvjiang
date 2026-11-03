@@ -379,8 +379,8 @@ def _key_definitions() -> list[dict]:
       用它做过滤会误删这些键；原始 YAML 不受插件影响。
     - **不含 period**：云端只做展示，没有重置/编辑能力，周期是客户端运行时
       概念（周期边界归零），对展示毫无意义。
-    - 浏览器无法零依赖解析 YAML，所以这份摘要随快照上传，供网页把裸 key
-      渲染成带中文标签的表。
+    - **只用于过滤，不上传**：定义的唯一来源是 profile.yaml（文档通道同步），
+      不随快照存副本——副本必然漂移。网页直接解析 profile.yaml 取标签。
     """
     import yaml
 
@@ -432,12 +432,12 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
     report.pulled = pulled.pulled
     report.errors.extend(pulled.errors)
     state = _state()
-    keys = _key_definitions()
+    definitions = _key_definitions()
     # 快照只带「有定义」的条目：entries 里可能存在定义已删除/改名的残留键
     # （例如 _of_week 改成 _of_month 后旧行还在，或某次写入用错了模型类型）。
     # 它们没有标签、没有分组，进快照只会在网页上冒出裸键列。**只过滤快照，
     # 不删本地数据**——本地是否清理由用户决定。
-    defined = {(item["type"], item["key"]) for item in keys}
+    defined = {(item["type"], item["key"]) for item in definitions}
     payload: list[dict] = []
     orphan = 0
     for username in list_user_names():
@@ -459,7 +459,7 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
         return report
     try:
         response = post("/api/sync/profile/snapshot/put",
-                        {"entries": payload, "keys": keys,
+                        {"entries": payload,
                          "origin_name": socket.gethostname()}, token)
     except SyncError as error:
         report.errors.append(str(error))

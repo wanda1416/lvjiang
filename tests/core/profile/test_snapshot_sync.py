@@ -112,6 +112,10 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
     assert env["entries"]["楚湘菱"]["stock"]["energy"]["value"] == 8
     assert env["state"]["remote_history_id"] == 2
     assert env["state"]["profile_snapshot_id"] == 1
+    # 落地前的本地历史不上行：快照已代表当前状态，自己的陈年账本推上去
+    # 只会把旧值回放给别的设备（Android 首次同步曾倾倒两万余条）。
+    assert env["state"]["local_history_id"] == max(
+        (row["id"] for row in env["history"]), default=0)
     # 回放不写本地 history（因此无从回声上行）
     assert all(write[5] is None for write in env["writes"])
 

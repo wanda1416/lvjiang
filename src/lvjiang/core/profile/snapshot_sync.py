@@ -254,6 +254,11 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
     watermark = int(snapshot.get("snapshot_remote_id") or 0)
     state["profile_snapshot_id"] = snapshot_row_id
     state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
+    # 落地前的本地历史不上行：快照已代表全部用户的当前状态，自己的陈年
+    # 账本推上去只会把旧值回放给别的设备（Android 首次同步曾因此倾倒
+    # 22853 条历史，覆盖了别的设备刚写入的新值）。与 refresh_snapshot
+    # 的语义一致。
+    state["local_history_id"] = repository.db_max_history_id()
     save_profile_sync_state(state)
     report.snapshots += 1
     logger.info("[profile sync] 已应用快照 #{}（水位 {}，{} 项）",

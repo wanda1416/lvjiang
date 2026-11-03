@@ -371,10 +371,11 @@ def push_local(token: str) -> ProfileSyncReport:
 
 
 def _key_definitions() -> list[dict]:
-    """profile.yaml 的定义摘要（type/key/label/group/cap/period）。
+    """profile.yaml 的定义摘要（type/key/label/group/cap）。
 
-    浏览器无法零依赖解析 YAML，网页端把裸 key 渲染成带中文标签的二维表
-    全靠这份摘要随快照上传。
+    云端只做展示，没有重置/编辑能力，因此**不含 period**——周期是客户端
+    运行时概念（周期边界归零），对展示毫无意义。浏览器无法零依赖解析 YAML，
+    这份摘要随快照上传，供网页把裸 key 渲染成带中文标签的表。
     """
     from .schema import get_profile_config
 
@@ -386,9 +387,6 @@ def _key_definitions() -> list[dict]:
             cap = getattr(kd, "cap", None)
             if cap is not None:
                 item["cap"] = cap
-            period = getattr(kd, "period", None)
-            if period:
-                item["period"] = period
             keys.append(item)
     return keys
 

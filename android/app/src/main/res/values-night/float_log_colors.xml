@@ -1,0 +1,5 @@
+<resources>
+    <!-- 悬浮窗日志的层级色（深色面板 #27302B 下的浅色文字），与 values/ 成对。 -->
+    <color name="float_log_warn">#FFCC80</color>
+    <color name="float_log_error">#FF8A80</color>
+</resources>

@@ -37,6 +37,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -56,11 +57,18 @@ import kotlin.math.abs
  * - 图标是「播放/暂停」双态按钮：未准备任务时保持 logo，点击只展开面板；有任务后
  *   显示 ▶，点击直接启动（暂停后为继续）；运行中显示 ⏸，点击直接暂停；
  * - 长按后原地松手才展开面板，一直按住不放不触发；拖动只移动位置，不受长按时长限制；
- * - 面板空闲时选择任务后启动；
- * - 运行中可暂停/结束，暂停后可继续/结束，并显示最近日志；
  * - 图标颜色反映状态：运行中绿 / 失败红 / 已停止橙 / 完成蓝。
  *
- * 主面板只显示当前选择与增量日志；任务全集在二级选择面板中展示。
+ * 面板按状态分两套骨架（见 [PanelMode]），切换时只重建内容、不重建窗口：
+ * - **未启动**（`idle`，以及 `done`/`failed`/`stopped` 的结果态）：任务名 + 执行用户
+ *   + 「选择用户 / 选择任务」+ 启动；结束后追加一条结果横幅，日志按需展开。
+ *   完全运行过后这里不再有空白日志区，面板高度按内容量。
+ * - **运行**（`running`/`pausing`/`paused`/`stopping`，含等待人工确认）：状态条
+ *   （状态 + 任务名 + 计时）+ 进度（批量才有 `processed/total` 与进度条）+ 操作行
+ *   + 占满剩余高度的日志区。运行态不再显示「用户 / 任务」两行——任务已绑定，那两行
+ *   既重复又白占 76dp 日志空间。
+ *
+ * 任务全集仍在二级选择面板中展示。
  */
 class FloatService : Service() {
 
@@ -72,21 +80,38 @@ class FloatService : Service() {
     private var collapsed = false
     private var collapseEdge = ""
     private var panelView: View? = null
-    /** 选择用户按钮；当前选择展示在右侧的 userLine 文本上。 */
-    private var userButton: Button? = null
-    /** 选择任务按钮；当前选择展示在右侧的 taskLine 文本上。 */
-    private var taskButton: Button? = null
-    /** 当前用户值（选择用户按钮右侧的纯文本）。 */
-    private var userLine: TextView? = null
-    /** 当前任务值（选择任务按钮右侧的纯文本）。 */
-    private var taskLine: TextView? = null
+    private var panelParams: WindowManager.LayoutParams? = null
+    /** 当前骨架：未启动（含结束后的结果态）/ 运行（含暂停与待决策）。 */
+    private var panelMode: PanelMode? = null
+    /** 骨架内容容器：切换骨架时只重建它的子视图，窗口本身不重建。 */
+    private var contentHost: LinearLayout? = null
+    private var selectionArea: LinearLayout? = null
     private var showingUsers = false
+    /** 日志只有一套实例，跨骨架复用（重建会清空 Editable、重放整批日志）。 */
     private var logLine: TextView? = null
     private var logScroll: ScrollView? = null
-    private var closeButton: Button? = null
-    private var actionArea: LinearLayout? = null
-    private var mainArea: LinearLayout? = null
-    private var selectionArea: LinearLayout? = null
+    /** 运行骨架里的「最新」：只在用户向上翻过日志时出现。 */
+    private var followButton: Button? = null
+    // 未启动骨架
+    private var idleTitle: TextView? = null
+    private var idleUser: TextView? = null
+    private var idleStartButton: Button? = null
+    private var idleResultBanner: TextView? = null
+    private var idleLogToggle: Button? = null
+    private var idleLogBox: LinearLayout? = null
+    // 运行骨架
+    private var runChip: TextView? = null
+    private var runTitle: TextView? = null
+    private var runTimer: TextView? = null
+    private var runProgressLabel: TextView? = null
+    private var runProgressBar: ProgressBar? = null
+    private var runDetail: TextView? = null
+    private var runInteraction: TextView? = null
+    private var runActionHost: LinearLayout? = null
+    /** 操作行的重建签名（状态 + 交互 id），避免每次轮询都重建按钮。 */
+    private var lastActionSignature = ""
+    /** 未启动骨架的内容签名：内容高度一变就要重量一次窗口高度，否则会被裁掉。 */
+    private var idleLayoutSignature = ""
     private var selectedTaskId = ""
     private var selectedTaskName = ""
     private var preparedBatchGroup = ""
@@ -107,6 +132,15 @@ class FloatService : Service() {
     private val themedContext by lazy { ContextThemeWrapper(this, R.style.Theme_Lvjiang) }
     private fun color(attr: Int): Int = MaterialColors.getColor(themedContext, attr, 0)
     private fun resColor(id: Int): Int = ContextCompat.getColor(this, id)
+
+    // 日志层级色：一律取主题语义色 / 深浅成对资源。早先写死的 #CCCCCC 是"深底浅字"
+    // 配色，在浅色面板（#E4ECE7）上只有 1.33:1，等于看不见。
+    private val logInfoColor by lazy { color(com.google.android.material.R.attr.colorOnSurface) }
+    private val logStampColor by lazy {
+        color(com.google.android.material.R.attr.colorOnSurfaceVariant)
+    }
+    private val logWarnColor by lazy { resColor(R.color.float_log_warn) }
+    private val logErrorColor by lazy { resColor(R.color.float_log_error) }
 
     /** 上一次拿到的状态，用于判断是否需要重建面板按钮区（空闲↔运行切换时才重建） */
     private var interactionId = ""
@@ -519,20 +553,39 @@ class FloatService : Service() {
     private fun closePanel() {
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelView = null
-        userButton = null
-        taskButton = null
-        userLine = null
-        taskLine = null
-        showingUsers = false
+        panelParams = null
+        panelMode = null
+        contentHost = null
+        selectionArea = null
+        (logScroll?.parent as? ViewGroup)?.removeView(logScroll)
         logLine = null
         logScroll = null
-        closeButton = null
-        actionArea = null
-        mainArea = null
-        selectionArea = null
+        clearSkeletonRefs()
+        showingUsers = false
+        lastActionSignature = ""
         lastLogSeq = 0
         logGeneration = -1
         logLengths.clear()
+    }
+
+    /** 清空两套骨架的视图引用；骨架重建与面板关闭都要走一遍。 */
+    private fun clearSkeletonRefs() {
+        idleTitle = null
+        idleUser = null
+        idleStartButton = null
+        idleResultBanner = null
+        idleLogToggle = null
+        idleLogBox = null
+        runChip = null
+        runTitle = null
+        runTimer = null
+        runProgressLabel = null
+        runProgressBar = null
+        runDetail = null
+        runInteraction = null
+        runActionHost = null
+        followButton = null
+        idleLayoutSignature = ""
     }
 
     private fun openPanel() {
@@ -547,68 +600,11 @@ class FloatService : Service() {
             elevation = dp(8).toFloat()
         }
 
-        val main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        root.addView(main, LinearLayout.LayoutParams(-1, 0, 1f))
-        mainArea = main
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        main.addView(actions)
-        actionArea = actions
-        val userRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val user = smallButton("选择用户") { openUserSelection() }
-        userRow.addView(user, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
-        userButton = user
-        val userValue = TextView(this).apply {
-            setTextColor(color(com.google.android.material.R.attr.colorPrimary))
-            text = "读取中…"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        userRow.addView(userValue, LinearLayout.LayoutParams(0, -2, 1f))
-        userLine = userValue
-        main.addView(userRow)
-        val taskRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val task = smallButton("选择任务") { openTaskSelection() }
-        taskRow.addView(task, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
-        taskButton = task
-        val taskValue = TextView(this).apply {
-            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
-            text = "未选择"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        taskRow.addView(taskValue, LinearLayout.LayoutParams(0, -2, 1f))
-        taskLine = taskValue
-        main.addView(taskRow)
+        val host = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(host, LinearLayout.LayoutParams(-1, 0, 1f))
+        contentHost = host
 
-        val log = TextView(this).apply {
-            // 悬浮窗日志此前用次要灰 + 10sp，叠在游戏画面上几乎不可读；
-            // 改为主文字色并与面板其他正文统一 12sp。
-            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setText("", TextView.BufferType.EDITABLE)
-            setPadding(0, dp(3), 0, dp(4))
-        }
-        val scroll = ScrollView(this).apply {
-            addView(log)
-            var downY = 0f
-            setOnTouchListener { _, event ->
-                if (event.actionMasked == MotionEvent.ACTION_DOWN) downY = event.y
-                if (event.actionMasked == MotionEvent.ACTION_MOVE &&
-                    abs(event.y - downY) > ViewConfiguration.get(this@FloatService).scaledTouchSlop) {
-                    followLogs = false
-                    closeButton?.text = "回到最新"
-                }
-                false
-            }
-        }
-        main.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        logScroll = scroll
-        logLine = log
-        followLogs = true
+        // 二级选择（用户/任务）继续复用同一块区域，切换时只交换可见性。
         val selection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -616,19 +612,12 @@ class FloatService : Service() {
         root.addView(selection, LinearLayout.LayoutParams(-1, 0, 1f))
         selectionArea = selection
 
-        root.addView(smallButton("收起") {
-            if (followLogs) closePanel()
-            else {
-                followLogs = true
-                closeButton?.text = "收起"
-                logScroll?.post { logScroll?.fullScroll(View.FOCUS_DOWN) }
-            }
-        }.also { closeButton = it })
+        logLine = buildLogView()
+        logScroll = buildLogScroll(logLine!!)
 
         val panelW = minOf(dp(256), resources.displayMetrics.widthPixels - dp(58))
-        val panelH = minOf(dp(260), usableHeight() - dp(24))
         val params = WindowManager.LayoutParams(
-            panelW, panelH,
+            panelW, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             // 不要 FLAG_NOT_TOUCHABLE：面板里的按钮要能点。
             // 也不加 FLAG_NOT_FOCUSABLE 之外的输入相关 flag，避免抢走游戏的触摸。
@@ -641,17 +630,277 @@ class FloatService : Service() {
 
         windowManager.addView(root, params)
         panelView = root
+        panelParams = params
 
-        // 面板刚建好时按钮区是空的，先按当前状态填一次，随后进入轮询
-        lastState = ""
+        // 先按上一次已知状态建骨架，避免轮询请求在途时面板空白一秒
+        panelMode = null
+        lastActionSignature = ""
+        followLogs = true
+        buildSkeleton(if (lastState in activeStates) PanelMode.RUN else PanelMode.IDLE)
         refreshStatus()
+    }
+
+    private fun buildLogView(): TextView = TextView(this).apply {
+        setTextColor(logInfoColor)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, LOG_TEXT_SP)
+        setLineSpacing(0f, LOG_LINE_SPACING)
+        setText("", TextView.BufferType.EDITABLE)
+    }
+
+    private fun buildLogScroll(log: TextView): ScrollView = ScrollView(this).apply {
+        addView(log)
+        // 独立底色块：文字不再直接压在面板底色上，浅色模式下也有稳定的对比基准
+        setPadding(dp(8), dp(6), dp(8), dp(6))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(10).toFloat()
+            setColor(color(com.google.android.material.R.attr.colorSurfaceContainerLow))
+            setStroke(dp(1), color(com.google.android.material.R.attr.colorOutlineVariant))
+        }
+        var downY = 0f
+        setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) downY = event.y
+            if (event.actionMasked == MotionEvent.ACTION_MOVE &&
+                abs(event.y - downY) > ViewConfiguration.get(this@FloatService).scaledTouchSlop) {
+                followLogs = false
+                followButton?.visibility = View.VISIBLE
+            }
+            false
+        }
+    }
+
+    /**
+     * 切换骨架：只重建 contentHost 的子视图并把日志视图重新挂进去，窗口本身
+     * 保持不动，因此不会闪、也不会丢滚动位置与已累积的日志。
+     */
+    private fun buildSkeleton(mode: PanelMode) {
+        val host = contentHost ?: return
+        (logScroll?.parent as? ViewGroup)?.removeView(logScroll)
+        host.removeAllViews()
+        clearSkeletonRefs()
+        // 运行骨架的窗口高度固定，内容用 weight 吃满；未启动骨架改成 WRAP_CONTENT，
+        // 由 relayoutPanel() 量出真实高度再设给窗口（这样 idle 面板不再有空白区）。
+        val lp = host.layoutParams as? LinearLayout.LayoutParams
+        if (lp != null) {
+            if (mode == PanelMode.RUN) {
+                lp.height = 0
+                lp.weight = 1f
+            } else {
+                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                lp.weight = 0f
+            }
+            host.layoutParams = lp
+        }
+        when (mode) {
+            PanelMode.IDLE -> buildIdleSkeleton(host)
+            PanelMode.RUN -> buildRunSkeleton(host)
+        }
+        panelMode = mode
+        relayoutPanel()
+    }
+
+    /** 未启动骨架：选人/选任务 + 启动，任务名与执行用户各占一行标题，不放空白日志区。 */
+    private fun buildIdleSkeleton(host: LinearLayout) {
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        idleTitle = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            text = "未选择任务"
+        }
+        heading.addView(idleTitle, LinearLayout.LayoutParams(0, -2, 1f))
+        idleUser = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorPrimary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(dp(8), dp(2), dp(8), dp(2))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(color(com.google.android.material.R.attr.colorSurfaceContainerLow))
+            }
+            setOnClickListener { openUserSelection() }
+        }
+        heading.addView(idleUser, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(6) })
+        host.addView(heading)
+
+        idleResultBanner = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            visibility = View.GONE
+        }
+        host.addView(idleResultBanner, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
+        val pickRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        pickRow.addView(smallButton("选择用户") { openUserSelection() },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+        pickRow.addView(smallButton("选择任务") { openTaskSelection() },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        host.addView(pickRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
+        idleLogToggle = smallButton("查看本次日志") { toggleIdleLog() }.apply {
+            visibility = View.GONE
+        }
+        host.addView(idleLogToggle, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+
+        idleLogBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        idleLogBox?.addView(logScroll, LinearLayout.LayoutParams(-1, dp(150)))
+        host.addView(idleLogBox, LinearLayout.LayoutParams(-1, -2))
+
+        idleStartButton = smallButton("启动任务", FloatButtonKind.FILLED) {
+            launchTask(selectedTaskId, selectedTaskName)
+        }.apply {
+            minimumHeight = dp(40)
+            minHeight = dp(40)
+        }
+        host.addView(idleStartButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        // 「关闭悬浮窗」只在未启动时提供：它会 stopSelf()，运行中关掉会连带结束任务
+        host.addView(smallButton("关闭悬浮窗", FloatButtonKind.TEXT) { closeOverlay() },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+    }
+
+    /** 运行骨架：状态条 + 进度 + 操作 + 占满剩余高度的日志；不再有用户/任务两行。 */
+    private fun buildRunSkeleton(host: LinearLayout) {
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        runChip = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setPadding(dp(8), dp(3), dp(8), dp(3))
+            text = "运行中"
+        }
+        statusRow.addView(runChip, LinearLayout.LayoutParams(-2, -2))
+        runTitle = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(dp(6), 0, 0, 0)
+        }
+        statusRow.addView(runTitle, LinearLayout.LayoutParams(0, -2, 1f))
+        runTimer = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }
+        statusRow.addView(runTimer, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(6) })
+        host.addView(statusRow)
+
+        runProgressLabel = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            visibility = View.GONE
+        }
+        host.addView(runProgressLabel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
+        runProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 0
+            progressTintList =
+                ColorStateList.valueOf(color(com.google.android.material.R.attr.colorPrimary))
+            progressBackgroundTintList =
+                ColorStateList.valueOf(color(com.google.android.material.R.attr.colorSurfaceVariant))
+            visibility = View.GONE
+        }
+        host.addView(runProgressBar, LinearLayout.LayoutParams(-1, dp(4)).apply { topMargin = dp(4) })
+
+        runDetail = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        host.addView(runDetail, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+
+        runInteraction = TextView(this).apply {
+            setTextColor(color(com.google.android.material.R.attr.colorOnSecondaryContainer))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(color(com.google.android.material.R.attr.colorSecondaryContainer))
+            }
+            visibility = View.GONE
+        }
+        host.addView(runInteraction, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
+        runActionHost = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        host.addView(runActionHost, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
+        val logHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        logHeader.addView(TextView(this).apply {
+            text = "日志"
+            setTextColor(color(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        followButton = smallButton("最新") { jumpToLatest() }.apply {
+            visibility = View.GONE
+            minWidth = dp(44)
+            minimumWidth = dp(44)
+        }
+        logHeader.addView(followButton, LinearLayout.LayoutParams(-2, -2))
+        host.addView(logHeader, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+
+        // 运行骨架的窗口高度固定，日志用 weight=1 吃掉剩余空间
+        host.addView(logScroll, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(4) })
+
+        host.addView(smallButton("收起") { closePanel() },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+    }
+
+    private fun toggleIdleLog() {
+        val box = idleLogBox ?: return
+        val showing = box.visibility == View.VISIBLE
+        box.visibility = if (showing) View.GONE else View.VISIBLE
+        idleLogToggle?.text = if (showing) "查看本次日志" else "收起日志"
+        if (!showing) logScroll?.post { logScroll?.fullScroll(View.FOCUS_DOWN) }
+        relayoutPanel()
+    }
+
+    private fun jumpToLatest() {
+        followLogs = true
+        followButton?.visibility = View.GONE
+        logScroll?.post { logScroll?.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /**
+     * 重排窗口：运行骨架用固定上限高度，未启动骨架用实测高度（WRAP_CONTENT），
+     * 两种情况下都按实际尺寸重新贴到图标旁边，避免此前"固定 260dp 估算"贴错位。
+     */
+    private fun relayoutPanel() {
+        val root = panelView ?: return
+        val params = panelParams ?: return
+        val maxHeight = usableHeight() - dp(24)
+        // 二级选择视图内部是 weight 撑开的列表，必须有确定高度；运行骨架同理。
+        // 只有"未启动骨架且没在选东西"时才按内容量高度。
+        val selectionVisible = selectionArea?.visibility == View.VISIBLE
+        if (panelMode == PanelMode.RUN || selectionVisible) {
+            params.height = minOf(dp(360), maxHeight)
+        } else {
+            root.measure(
+                View.MeasureSpec.makeMeasureSpec(params.width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            params.height = minOf(root.measuredHeight, maxHeight)
+        }
+        anchorPanelToIcon(params, params.width)
+        runCatching { windowManager.updateViewLayout(root, params) }
     }
 
     /**
      * 把面板放到悬浮图标旁边（gravity 均为 TOP|START，故 x/y 直接用图标坐标系）。
      *
      * 横向：图标在左半屏→面板贴在图标右侧；在右半屏→贴左侧，避免越界。
-     * 纵向：与图标顶端对齐向下展开；靠底时上提（面板高度 WRAP_CONTENT，用估计上限做 clamp）。
+     * 纵向：与图标顶端对齐向下展开；靠底时上提（WRAP_CONTENT 阶段还没有实测高度，
+     * 按 0 处理，随后 relayoutPanel() 会带真实高度再贴一次）。
      * 拿不到图标参数时退回原来的固定位置。
      */
     private fun anchorPanelToIcon(params: WindowManager.LayoutParams, panelW: Int) {
@@ -665,7 +914,7 @@ class FloatService : Service() {
         val screenW = metrics.widthPixels
         val screenH = usableHeight()
         val gap = dp(4)
-        val panelHApprox = params.height
+        val panelHApprox = params.height.coerceAtLeast(0)
 
         val iconW = floatView?.width?.takeIf { it > 0 } ?: dp(42)
         val toRight = icon.x + iconW / 2 < screenW / 2
@@ -682,6 +931,15 @@ class FloatService : Service() {
 
     /** 面板按钮分级：FILLED=主动作（primary），TONAL=次动作（secondaryContainer），TEXT=危险（error）。 */
     private enum class FloatButtonKind { FILLED, TONAL, TEXT }
+
+    /**
+     * 面板只有两套骨架：未启动（含 done/failed/stopped 的结果态）与
+     * 运行（running/pausing/paused/stopping，以及等待人工确认）。
+     */
+    private enum class PanelMode { IDLE, RUN }
+
+    /** 结果横幅内容 + 需要套用的主题容器色。 */
+    private class ResultBanner(val text: String, val backgroundAttr: Int, val foregroundAttr: Int)
 
     private fun smallButton(label: String, kind: FloatButtonKind = FloatButtonKind.TONAL, onClick: () -> Unit): Button =
         Button(this).apply {
@@ -724,46 +982,29 @@ class FloatService : Service() {
             val elapsed = status.optDouble("elapsed", 0.0)
             ui.post {
                 statusPending = false
-                val stateTitle = when (state) {
-                    STATE_PAUSED -> "已暂停"
-                    STATE_PAUSING -> "正在暂停"
-                    STATE_STOPPING -> "正在停止"
-                    else -> "运行中"
-                }
-                val detail = message.trim().takeUnless {
-                    it.isEmpty() || it == stateTitle || state == STATE_RUNNING && it in setOf("执行中", "运行中")
-                }
-                val header = when (state) {
-                    STATE_RUNNING, STATE_PAUSING, STATE_PAUSED, STATE_STOPPING ->
-                        "$stateTitle（${"%.0f".format(elapsed)}s）" + (detail?.let { "\n$it" } ?: "")
-                    STATE_IDLE -> "空闲"
-                    else -> message.ifEmpty { "空闲：选择一个任务开始" }
-                }
                 val sync = status.optJSONObject("sync")
                 ready = sync?.optBoolean("ready") == true
-                userLine?.text = if (ready) SettingsUi.userLabel(sync?.optString("execution_username").orEmpty()) else "预置配置未就绪"
                 if (state in activeStates) {
                     selectedTaskId = status.optString("task_id")
                     selectedTaskName = taskName
                     closeTaskSelection()
                 }
-                taskLine?.text = selectedTaskName.ifEmpty { "未选择" }
-                if (status.optJSONObject("batch")?.optString("group_id").orEmpty().isNotEmpty() && state in activeStates) {
-                    userLine?.text = "单元：${status.optJSONObject("batch")?.optString("current_entry").orEmpty()}"
-                }
-                userButton?.isEnabled = ready && state !in activeStates
-                taskButton?.isEnabled = ready && state !in activeStates
-                appendLogs(status)
-                applyIconState(state)
-                updateNotification(
-                    if (state in activeStates) "${if (state == STATE_PAUSED) "已暂停" else "运行中"}：$taskName" else header.replace('\n', ' ')
-                )
                 val nextInteraction = status.optJSONObject("interaction")?.optString("id").orEmpty()
                 if (state != lastState || nextInteraction != interactionId) {
-                    interactionId = nextInteraction
-                    lastState = state
-                    rebuildActions(state)
+                    lastActionSignature = ""
                 }
+                interactionId = nextInteraction
+                lastState = state
+
+                // 只有状态跨过"运行/未运行"边界时才换骨架，暂停↔运行只改内容
+                val wanted = if (state in activeStates) PanelMode.RUN else PanelMode.IDLE
+                if (panelView != null && panelMode != wanted) buildSkeleton(wanted)
+
+                bindStatus(state, message, taskName, elapsed, status)
+                appendLogs(status)
+                applyIconState(state)
+                updateNotification(notificationText(state, taskName, message, elapsed))
+
                 val stamp = sync?.optString("synced_at", "preset") ?: ""
                 if (ready && stamp != syncStamp && state !in activeStates) {
                     syncStamp = stamp
@@ -771,6 +1012,262 @@ class FloatService : Service() {
                 }
             }
         }
+    }
+
+    private fun bindStatus(state: String, message: String, taskName: String,
+                           elapsed: Double, status: JSONObject) {
+        when (panelMode) {
+            PanelMode.RUN -> bindRunPanel(state, message, taskName, elapsed, status)
+            PanelMode.IDLE -> bindIdlePanel(state, status)
+            null -> {}
+        }
+    }
+
+    /** 未启动骨架：任务名 + 执行用户 + 结果横幅 + 启动按钮。 */
+    private fun bindIdlePanel(state: String, status: JSONObject) {
+        val user = SettingsUi.userLabel(
+            status.optJSONObject("sync")?.optString("execution_username").orEmpty())
+        idleUser?.text = when {
+            !ready -> "预置配置未就绪"
+            user.isNotEmpty() -> user
+            else -> "未指定用户"
+        }
+        idleUser?.isEnabled = ready
+        applySelectionToUi()
+        val banner = resultBanner(state, status)
+        idleResultBanner?.apply {
+            if (banner == null) {
+                visibility = View.GONE
+            } else {
+                visibility = View.VISIBLE
+                text = banner.text
+                setTextColor(color(banner.foregroundAttr))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(10).toFloat()
+                    setColor(color(banner.backgroundAttr))
+                }
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+            }
+        }
+        idleLogToggle?.visibility = if (hasLog()) View.VISIBLE else View.GONE
+        // 未启动骨架的窗口高度是按内容量出来的：横幅 / 日志入口 / 文案一变就重量一次，
+        // 否则新冒出来的内容会被上一轮算好的高度裁掉。
+        val layoutSignature = listOf(
+            banner?.text.orEmpty(),
+            idleTitle?.text?.toString().orEmpty(),
+            idleUser?.text?.toString().orEmpty(),
+            (idleResultBanner?.visibility ?: View.GONE).toString(),
+            (idleLogToggle?.visibility ?: View.GONE).toString(),
+            (idleLogBox?.visibility ?: View.GONE).toString(),
+        ).joinToString("|")
+        if (layoutSignature != idleLayoutSignature) {
+            idleLayoutSignature = layoutSignature
+            relayoutPanel()
+        }
+    }
+
+    /** 运行骨架：状态条 + 进度 + 操作行（日志由 appendLogs 增量追加）。 */
+    private fun bindRunPanel(state: String, message: String, taskName: String,
+                             elapsed: Double, status: JSONObject) {
+        val chipText = when (state) {
+            STATE_PAUSED -> "已暂停"
+            STATE_PAUSING -> "正在暂停"
+            STATE_STOPPING -> "正在停止"
+            else -> "运行中"
+        }
+        val (chipBg, chipFg) = when (state) {
+            STATE_PAUSED, STATE_PAUSING ->
+                resColor(R.color.float_paused_container) to resColor(R.color.float_on_paused_container)
+            STATE_STOPPING ->
+                color(com.google.android.material.R.attr.colorSurfaceVariant) to
+                    color(com.google.android.material.R.attr.colorOnSurfaceVariant)
+            else ->
+                color(com.google.android.material.R.attr.colorSecondaryContainer) to
+                    color(com.google.android.material.R.attr.colorOnSecondaryContainer)
+        }
+        // 轮询每秒一次，状态没变就不重建背景 drawable（省掉每秒一份垃圾）
+        if (runChip?.tag != chipText) {
+            runChip?.apply {
+                tag = chipText
+                text = chipText
+                setTextColor(chipFg)
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(chipBg)
+                }
+            }
+        }
+        runTitle?.text = taskName.ifEmpty { selectedTaskName }.ifEmpty { "任务" }
+        runTimer?.text = formatElapsed(elapsed)
+
+        // 批量才有确定的 total；单任务没有"第几项"这回事，只显示当前步骤
+        val batch = status.optJSONObject("batch")
+        val total = batch?.optInt("total", 0) ?: 0
+        val processed = batch?.optInt("processed", 0) ?: 0
+        val rounds = batch?.optInt("rounds", 1) ?: 1
+        val round = batch?.optInt("round", 0) ?: 0
+        if (total > 0) {
+            runProgressLabel?.apply {
+                visibility = View.VISIBLE
+                text = buildString {
+                    append("已处理 ").append(processed).append(" / ").append(total).append(" 项")
+                    if (rounds > 1 && round in 1..rounds) {
+                        append(" · 第 ").append(round).append(" / ").append(rounds).append(" 轮")
+                    }
+                }
+            }
+            runProgressBar?.apply {
+                visibility = View.VISIBLE
+                max = total
+                progress = processed.coerceIn(0, total)
+            }
+            val entry = batch?.optString("current_entry").orEmpty()
+            val currentTask = batch?.optString("current_task").orEmpty()
+            runDetail?.text = listOf(entry, currentTask)
+                .filter { it.isNotEmpty() }
+                .joinToString(" · ")
+                .ifEmpty { detailMessage(message) }
+        } else {
+            runProgressLabel?.visibility = View.GONE
+            runProgressBar?.visibility = View.GONE
+            runDetail?.text = detailMessage(message)
+        }
+
+        val interactionMessage =
+            status.optJSONObject("interaction")?.optString("message").orEmpty()
+        runInteraction?.apply {
+            if (interactionMessage.isEmpty()) {
+                visibility = View.GONE
+            } else {
+                visibility = View.VISIBLE
+                text = interactionMessage
+            }
+        }
+
+        val signature = "$state|$interactionId"
+        if (signature != lastActionSignature) {
+            lastActionSignature = signature
+            rebuildRunActions(state, interactionId.isNotEmpty())
+        }
+    }
+
+    /** 顶部仅放启动或安全控制；任务全集仅在二级选择中展示。 */
+    private fun rebuildRunActions(state: String, awaitingAnswer: Boolean) {
+        val area = runActionHost ?: return
+        area.removeAllViews()
+        val subject = if (selectedTaskId.startsWith("batch:")) "批量" else "任务"
+        if (awaitingAnswer && state != STATE_STOPPING) {
+            val answerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            answerRow.addView(smallButton("确认", FloatButtonKind.FILLED) { answerInteraction(true) },
+                LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+            answerRow.addView(smallButton("拒绝", FloatButtonKind.TONAL) { answerInteraction(false) },
+                LinearLayout.LayoutParams(0, -2, 1f))
+            area.addView(answerRow)
+            // 等待回答时「结束」也要留着：停止本来就是"不回答"的另一种合法出口
+            area.addView(smallButton("结束$subject", FloatButtonKind.TEXT) { requestStop() },
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+            return
+        }
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(
+            smallButton(if (state == STATE_PAUSED) "继续$subject" else "暂停$subject",
+                FloatButtonKind.FILLED) { pauseResume(pause = state != STATE_PAUSED) }
+                .apply { isEnabled = state == STATE_RUNNING || state == STATE_PAUSED },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+        row.addView(smallButton("结束$subject", FloatButtonKind.TEXT) { requestStop() }
+            .apply { isEnabled = state != STATE_STOPPING },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        area.addView(row)
+    }
+
+    private fun answerInteraction(accepted: Boolean) {
+        val requestId = interactionId
+        if (requestId.isEmpty()) return
+        executor.execute {
+            val result = PyBridge.respondInteraction(this, requestId, accepted)
+            toast(result.optString("message"))
+            ui.post { refreshStatus() }
+        }
+    }
+
+    private fun requestStop() {
+        executor.execute {
+            val r = PyBridge.stopTask(this)
+            toast(r.optString("message", "已请求停止"))
+            ui.post { refreshStatus() }
+        }
+    }
+
+    /** 把当前选择同步到未启动骨架（任务名、启动按钮文案与可用性）。 */
+    private fun applySelectionToUi() {
+        idleTitle?.text = selectedTaskName.ifEmpty { "未选择任务" }
+        idleStartButton?.apply {
+            text = if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务"
+            isEnabled = ready && selectedTaskId.isNotEmpty()
+        }
+    }
+
+    private fun hasLog(): Boolean = (logLine?.length() ?: 0) > 0
+
+    /** ``done``/``failed``/``stopped`` 的结果横幅：任务名之后一行说清结果与用时。 */
+    private fun resultBanner(state: String, status: JSONObject): ResultBanner? {
+        val label = when (state) {
+            STATE_DONE -> "已完成"
+            STATE_FAILED -> "失败"
+            STATE_STOPPED -> "已停止"
+            else -> return null
+        }
+        val elapsed = status.optDouble("elapsed", 0.0)
+        val summary = status.optJSONObject("result")?.let { summaryOf(it) }
+            ?.ifEmpty { null } ?: status.optString("message")
+        val text = buildString {
+            append(label)
+            if (elapsed > 0) append(" · 用时 ").append(formatElapsed(elapsed))
+            firstLine(summary).takeIf { it.isNotEmpty() }?.let { append(" · ").append(it) }
+        }
+        val failed = state == STATE_FAILED
+        return ResultBanner(
+            text,
+            if (failed) com.google.android.material.R.attr.colorErrorContainer
+            else com.google.android.material.R.attr.colorSecondaryContainer,
+            if (failed) com.google.android.material.R.attr.colorOnErrorContainer
+            else com.google.android.material.R.attr.colorOnSecondaryContainer,
+        )
+    }
+
+    private fun summaryOf(result: JSONObject): String =
+        listOf("summary", "message", "error")
+            .mapNotNull { key -> result.optString(key).takeIf { it.isNotBlank() } }
+            .joinToString(" ")
+
+    private fun firstLine(text: String): String =
+        text.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(80) ?: ""
+
+    /** 状态里那些"执行中"之类的空话不值得占一行。 */
+    private fun detailMessage(message: String): String {
+        val trimmed = message.trim()
+        val noisy = setOf("执行中", "运行中", "正在启动", "已暂停", "正在暂停", "正在停止")
+        if (trimmed.isEmpty() || trimmed in noisy) return ""
+        return trimmed.lineSequence().first().take(120)
+    }
+
+    private fun formatElapsed(seconds: Double): String {
+        val total = seconds.toLong().coerceAtLeast(0)
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val s = total % 60
+        return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+    }
+
+    private fun notificationText(state: String, taskName: String, message: String,
+                                 elapsed: Double): String = when (state) {
+        STATE_RUNNING -> "运行中（${formatElapsed(elapsed)}）：$taskName"
+        STATE_PAUSING -> "正在暂停：$taskName"
+        STATE_PAUSED -> "已暂停：$taskName"
+        STATE_STOPPING -> "正在停止：$taskName"
+        STATE_IDLE -> if (ready) "待命：${selectedTaskName.ifEmpty { "未选择任务" }}"
+        else "预置配置未就绪"
+        else -> message.ifEmpty { "空闲" }.replace('\n', ' ')
     }
 
     private fun appendLogs(status: JSONObject) {
@@ -782,7 +1279,7 @@ class FloatService : Service() {
             lastLogSeq = 0
             logGeneration = generation
             followLogs = true
-            closeButton?.text = "收起"
+            followButton?.visibility = View.GONE
         }
         val records = status.optJSONArray("log_records") ?: return
         var changed = false
@@ -793,14 +1290,21 @@ class FloatService : Service() {
             lastLogSeq = seq
             val level = record.optString("level", "INFO")
             if (level == "DEBUG" || level == "TRACE") continue
-            val color = when (level) {
-                "WARNING" -> 0xFFFFCC80.toInt()
-                "ERROR", "CRITICAL" -> 0xFFFF8A80.toInt()
-                else -> 0xFFCCCCCC.toInt()
+            val lineColor = when (level) {
+                "WARNING" -> logWarnColor
+                "ERROR", "CRITICAL" -> logErrorColor
+                else -> logInfoColor
             }
             for (content in record.optString("text").lines().takeLast(LOG_VISIBLE_LINES)) {
                 val line = SpannableString(content.take(2000) + "\n")
-                line.setSpan(ForegroundColorSpan(color), 0, line.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                // 时间戳弱化、正文用层级色：整行同色时"哪一行是什么时候的"要重新读一遍
+                val stampEnd = TIMESTAMP_RE.find(content)?.range?.last?.plus(1) ?: 0
+                if (stampEnd > 0) {
+                    line.setSpan(ForegroundColorSpan(logStampColor), 0, stampEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+                line.setSpan(ForegroundColorSpan(lineColor), stampEnd, line.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 text.append(line)
                 logLengths.addLast(line.length)
             }
@@ -817,60 +1321,7 @@ class FloatService : Service() {
             }
         }
         if (changed && followLogs) logScroll?.post { logScroll?.fullScroll(View.FOCUS_DOWN) }
-    }
-
-    /** 顶部仅放启动或安全控制；任务全集仅在二级选择中展示。 */
-    private fun rebuildActions(state: String) {
-        val area = actionArea ?: return
-        area.removeAllViews()
-
-        if (state in activeStates) {
-            val subject = if (selectedTaskId.startsWith("batch:")) "批量" else "任务"
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            row.addView(smallButton("结束$subject", FloatButtonKind.FILLED) {
-                executor.execute {
-                    val r = PyBridge.stopTask(this)
-                    toast(r.optString("message", "已请求停止"))
-                    ui.post { refreshStatus() }
-                }
-            }.apply { isEnabled = state != STATE_STOPPING },
-                LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
-            if (interactionId.isNotEmpty() && state != STATE_STOPPING) {
-                val requestId = interactionId
-                for ((label, accepted) in listOf("确认" to true, "拒绝" to false)) {
-                    row.addView(smallButton(label, if (accepted) FloatButtonKind.FILLED else FloatButtonKind.TEXT) {
-                        executor.execute {
-                            val result = PyBridge.respondInteraction(this, requestId, accepted)
-                            toast(result.optString("message"))
-                            ui.post { refreshStatus() }
-                        }
-                    }, LinearLayout.LayoutParams(0, -2, 1f))
-                }
-                area.addView(row)
-                return
-            }
-            row.addView(smallButton(if (state == STATE_PAUSED) "继续$subject" else "暂停$subject", FloatButtonKind.FILLED) {
-                    executor.execute {
-                        val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
-                        toast(r.optString("message"))
-                        ui.post { refreshStatus() }
-                    }
-                }.apply { isEnabled = state == STATE_RUNNING || state == STATE_PAUSED },
-                LinearLayout.LayoutParams(0, -2, 1f))
-            area.addView(row)
-            return
-        }
-
-        val idle = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        idle.addView(
-            smallButton(if (selectedTaskId.startsWith("batch:")) "启动批量" else "启动任务", FloatButtonKind.FILLED) {
-                launchTask(selectedTaskId, selectedTaskName)
-            }.apply { isEnabled = ready && selectedTaskId.isNotEmpty() },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
-        idle.addView(
-            smallButton("关闭悬浮窗", FloatButtonKind.TEXT) { closeOverlay() },
-            LinearLayout.LayoutParams(0, -2, 1f))
-        area.addView(idle)
+        followButton?.visibility = if (followLogs) View.GONE else View.VISIBLE
     }
 
     /** 关闭当前面板与悬浮图标，并结束前台服务。 */
@@ -891,8 +1342,7 @@ class FloatService : Service() {
                     this@FloatService.tasks = emptyList()
                     selectedTaskId = ""
                     selectedTaskName = ""
-                    taskLine?.text = "未选择"
-                    if (lastState !in activeStates) rebuildActions(lastState)
+                    applySelectionToUi()
                     return@post
                 }
                 this@FloatService.tasks = (0 until tasks.length()).mapNotNull { i ->
@@ -909,8 +1359,7 @@ class FloatService : Service() {
                 selectedTaskName = selected?.second ?: ""
                 getSharedPreferences("float_tasks", MODE_PRIVATE).edit()
                     .putString("selected_name", selectedTaskName).apply()
-                taskLine?.text = selectedTaskName.ifEmpty { "未选择" }
-                rebuildActions(lastState)
+                applySelectionToUi()
                 if (selectionArea?.visibility == View.VISIBLE && !showingUsers) renderTaskSelection()
             }
         }
@@ -919,10 +1368,9 @@ class FloatService : Service() {
     private fun openTaskSelection() {
         if (!ready || lastState in activeStates) return
         showingUsers = false
-        mainArea?.visibility = View.GONE
+        contentHost?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
-        // 选择视图只保留「返回」：收起先退回主面板再操作，避免同屏三个底部按钮。
-        closeButton?.visibility = View.GONE
+        relayoutPanel()
         renderTaskSelection()
         loadTasks()
     }
@@ -930,9 +1378,9 @@ class FloatService : Service() {
     private fun openUserSelection() {
         if (!ready || lastState in activeStates) return
         showingUsers = true
-        mainArea?.visibility = View.GONE
+        contentHost?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
-        closeButton?.visibility = View.GONE
+        relayoutPanel()
         selectionArea?.removeAllViews()
         selectionArea?.addView(TextView(this).apply { text = "读取用户…"; setTextColor(color(com.google.android.material.R.attr.colorOnSurface)) })
         selectionArea?.addView(smallButton("返回") { closeTaskSelection() })
@@ -988,9 +1436,8 @@ class FloatService : Service() {
                 selectedTaskName = name
                 preparedBatchGroup = ""; preparedBatchToken = ""
                 getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", id).putString("selected_name", name).apply()
-                taskLine?.text = name
+                applySelectionToUi()
                 closeTaskSelection()
-                rebuildActions(lastState)
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { topMargin = dp(4) })
             row.addView(taskMoreButton(id))
             choices.addView(row)
@@ -1029,8 +1476,8 @@ class FloatService : Service() {
     private fun closeTaskSelection() {
         showingUsers = false
         selectionArea?.visibility = View.GONE
-        mainArea?.visibility = View.VISIBLE
-        closeButton?.visibility = View.VISIBLE
+        contentHost?.visibility = View.VISIBLE
+        relayoutPanel()
     }
 
     private fun launchTask(taskId: String, taskName: String) {
@@ -1129,7 +1576,7 @@ class FloatService : Service() {
                     service.preparedBatchToken = result.optString("token")
                     service.selectedTaskId = "batch:" + result.optString("group_id")
                     service.selectedTaskName = result.optString("name")
-                    service.taskLine?.text = service.selectedTaskName
+                    service.applySelectionToUi()
                     service.lastState = ""
                     service.refreshStatus()
                 }
@@ -1154,8 +1601,7 @@ class FloatService : Service() {
                     service.selectedTaskId = taskId
                     service.selectedTaskName = taskName
                     service.getSharedPreferences("float_tasks", MODE_PRIVATE).edit().putString("selected", taskId).putString("selected_name", taskName).apply()
-                    service.taskLine?.text = taskName
-                    service.rebuildActions(service.lastState)
+                    service.applySelectionToUi()
                 }
                 JSONObject().put("ok", true).put("message", "已准备，请回到对应游戏角色，点击悬浮图标启动任务")
             }
@@ -1285,6 +1731,11 @@ class FloatService : Service() {
         /** 轮询间隔：任务是秒级节奏的，1s 足够跟上，也不至于把 Binder 打满 */
         private const val POLL_INTERVAL_MS = 1000L
         private const val LOG_VISIBLE_LINES = 100
+        /** 日志字号与行距：12sp 无行距在游戏画面上扫读成本太高 */
+        private const val LOG_TEXT_SP = 13f
+        private const val LOG_LINE_SPACING = 1.15f
+        /** Python 侧 log() 的前缀是 "HH:MM:SS "，用它把时间戳单独弱化 */
+        private val TIMESTAMP_RE = Regex("^\\d{2}:\\d{2}:\\d{2} ")
 
         // 与 Python 侧 task_runner 的状态常量一一对应
         private const val STATE_IDLE = "idle"

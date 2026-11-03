@@ -1,0 +1,8 @@
+<resources>
+    <!-- 悬浮窗日志的层级色。面板底色是 colorSurfaceContainerHigh（本文件同目录
+         的 app_surface_container_high = #E4ECE7），所以浅色模式下必须用深色文字：
+         原先写死的 #CCCCCC / #FFCC80 / #FF8A80 是"深底浅字"配色，在浅色面板上
+         对比度只有 1.23~1.90:1，等于看不见。深色模式的取值见 values-night。 -->
+    <color name="float_log_warn">#8A5000</color>
+    <color name="float_log_error">#B3261E</color>
+</resources>

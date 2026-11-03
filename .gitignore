@@ -40,6 +40,7 @@ logs/
 
 # Private administration checkout and its nested public site repository.
 /admin/
+/server/
 
 # local config (user overlay / session runtime)
 /config/local*

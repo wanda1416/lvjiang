@@ -302,6 +302,13 @@ class AccountManagerDialog(QDialog):
         self.snapshot_button.clicked.connect(self._refresh_snapshot)
         sync_row.addWidget(self.sync_button)
         sync_row.addWidget(self.snapshot_button)
+        self.clear_sync_button = QPushButton(tr("清除同步"))
+        apply_button_style(self.clear_sync_button, variant="neutral")
+        self.clear_sync_button.setToolTip(
+            tr("清除本地同步进度（远端水位/本机水位/快照编号），不动本地数据；"
+               "换账号或云端重建后使用"))
+        self.clear_sync_button.clicked.connect(self._clear_sync)
+        sync_row.addWidget(self.clear_sync_button)
         sync_row.addStretch()
         layout.addLayout(sync_row)
         self.sync_status = QLabel()
@@ -452,6 +459,20 @@ class AccountManagerDialog(QDialog):
     def _sync_now(self) -> None:
         if self.holder.sync_async():
             self._render_sync()
+
+    def _clear_sync(self) -> None:
+        """用户显式清除本地同步进度。同步发现进度异常时也引导到这里，不自动改。"""
+        from ..core.profile.snapshot_sync import clear_sync_state
+
+        answer = QMessageBox.question(
+            self, tr("清除同步"),
+            tr("清除本地同步进度后，下次同步会重新从云端快照开始。本地数据不会被删除。"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        clear_sync_state()
+        self.sync_status.setText(tr("已清除本地同步进度。点「立即同步」重新建立。"))
 
     def _refresh_snapshot(self) -> None:
         """把本机当前 profile 值作为新快照上传，绑到最新远端 history id。

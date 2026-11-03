@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -205,6 +206,13 @@ class AccountHolder(QObject):
             return self.session.summary()
         return self._start(action, "operation")
 
+    def revoke_device_async(self, device_id: str) -> bool:
+        """下线单台设备；成功后刷新 summary（设备列表随之更新）。"""
+        def action():
+            self.session.revoke_device(device_id)
+            return self.session.summary()
+        return self._start(action, "operation")
+
     def sync_async(self, allow_overwrite: bool = False) -> bool:
         """一轮完整同步（用户表 + 文档通道 + profile 账本）；同一时刻只跑一份。"""
         from ..core.sync.engine import sync_documents
@@ -244,22 +252,26 @@ class AccountManagerDialog(QDialog):
         super().__init__(parent)
         self.holder = account_holder()
         self.setWindowTitle(tr("账户管理"))
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(560)
         self._connections: list[tuple[object, object]] = []
         layout = QVBoxLayout(self)
 
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
-
-        # ════ Tab 1：账户（登录 / 信息 / 设备管理） ════
-        account_tab = QWidget()
-        account_layout = QVBoxLayout(account_tab)
-
+        # ════ 第一行：状态 + 右侧「修改密码 / 退出登录」 ════
+        head_row = QHBoxLayout()
         self.status = QLabel()
         self.status.setWordWrap(True)
-        account_layout.addWidget(self.status)
+        head_row.addWidget(self.status, stretch=1)
+        self.change_password_button = QPushButton(tr("修改密码…"))
+        apply_button_style(self.change_password_button, variant="neutral")
+        self.change_password_button.clicked.connect(self._change_password)
+        self.logout_button = QPushButton(tr("退出登录"))
+        apply_button_style(self.logout_button, variant="neutral")
+        self.logout_button.clicked.connect(self._logout)
+        head_row.addWidget(self.change_password_button)
+        head_row.addWidget(self.logout_button)
+        layout.addLayout(head_row)
 
-        # ── 登录表单 ──
+        # ════ 未登录：登录表单 ════
         self.form_host = QWidget()
         form = QFormLayout(self.form_host)
         self.login_input = QLineEdit()
@@ -276,43 +288,20 @@ class AccountManagerDialog(QDialog):
         button_row.addWidget(self.login_button)
         button_row.addStretch()
         form.addRow(button_row)
-        account_layout.addWidget(self.form_host)
+        layout.addWidget(self.form_host)
 
-        # ── 已登录信息（账户 + 设备） ──
-        self.info_host = QWidget()
-        info = QVBoxLayout(self.info_host)
-        self.account_label = QLabel()
-        self.account_label.setWordWrap(True)
-        info.addWidget(self.account_label)
-        self.devices = QTableWidget(0, 3)
-        self.devices.setHorizontalHeaderLabels([tr("设备"), tr("平台"), tr("最近活跃")])
-        self.devices.horizontalHeader().setStretchLastSection(True)
-        self.devices.verticalHeader().setVisible(False)
-        self.devices.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.devices.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
-        info.addWidget(self.devices)
-        actions = QHBoxLayout()
-        self.change_password_button = QPushButton(tr("修改密码…"))
-        apply_button_style(self.change_password_button, variant="neutral")
-        self.change_password_button.clicked.connect(self._change_password)
-        self.logout_button = QPushButton(tr("退出登录"))
-        apply_button_style(self.logout_button, variant="neutral")
-        self.logout_button.clicked.connect(self._logout)
-        self.logout_all_button = QPushButton(tr("退出所有设备"))
-        apply_button_style(self.logout_all_button, variant="neutral")
-        self.logout_all_button.clicked.connect(self._logout_all)
-        for button in (self.change_password_button, self.logout_button, self.logout_all_button):
-            actions.addWidget(button)
-        actions.addStretch()
-        info.addLayout(actions)
-        self.info_host.setVisible(False)
-        account_layout.addWidget(self.info_host)
-        account_layout.addStretch()
-        self.tabs.addTab(account_tab, tr("账户"))
+        # ════ 已登录：两个页签（数据同步 / 设备管理） ════
+        self.tabs = QTabWidget()
+        self.tabs.setVisible(False)
+        layout.addWidget(self.tabs, stretch=1)
 
-        # ════ Tab 2：数据同步 ════
+        # ── Tab 1：数据同步（更常用，放第一） ──
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
+
+        self.account_label = QLabel()
+        self.account_label.setWordWrap(True)
+        sync_layout.addWidget(self.account_label)
 
         sync_row = QHBoxLayout()
         self.sync_button = QPushButton(tr("立即同步"))
@@ -345,6 +334,30 @@ class AccountManagerDialog(QDialog):
         sync_layout.addWidget(hint)
         sync_layout.addStretch()
         self.tabs.addTab(sync_tab, tr("数据同步"))
+
+        # ── Tab 2：设备管理（列表 + 逐行登出 + 底部退出所有设备） ──
+        device_tab = QWidget()
+        device_layout = QVBoxLayout(device_tab)
+        self.devices = QTableWidget(0, 4)
+        self.devices.setHorizontalHeaderLabels(
+            [tr("设备"), tr("平台"), tr("最近活跃"), tr("操作")])
+        header = self.devices.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for column in (1, 2, 3):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        self.devices.verticalHeader().setVisible(False)
+        self.devices.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.devices.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        device_layout.addWidget(self.devices, stretch=1)
+
+        device_actions = QHBoxLayout()
+        self.logout_all_button = QPushButton(tr("退出所有设备"))
+        apply_button_style(self.logout_all_button, variant="neutral")
+        self.logout_all_button.clicked.connect(self._logout_all)
+        device_actions.addWidget(self.logout_all_button)
+        device_actions.addStretch()
+        device_layout.addLayout(device_actions)
+        self.tabs.addTab(device_tab, tr("设备管理"))
 
         self._connect(self.holder.changed, self._on_holder_changed)
         self._connect(self.holder.operation_finished, self._on_operation_failed)
@@ -395,9 +408,13 @@ class AccountManagerDialog(QDialog):
 
     def _render(self, summary: dict | None) -> None:
         self._set_busy(self.holder.busy)
+        logged_in = summary is not None
+        # 第一行右侧的「修改密码 / 退出登录」只在已登录时可用
+        self.change_password_button.setVisible(logged_in)
+        self.logout_button.setVisible(logged_in)
         if summary is None:
             self.status.setText(tr("当前未登录"))
-            self.info_host.setVisible(False)
+            self.tabs.setVisible(False)
             self.form_host.setVisible(True)
         else:
             self._show_logged_in(summary)
@@ -407,19 +424,38 @@ class AccountManagerDialog(QDialog):
         display = account.get("display_name") or "—"
         self.account_label.setText(
             f"{tr('账户名')}：{account['login']}　{tr('显示名')}：{display}")
+        self._render_devices(summary)
+        active = summary.get("active_sessions")
+        self.status.setText(f"{tr('已登录')}。{tr('活跃会话')}：{active}")
+        self.form_host.setVisible(False)
+        self.tabs.setVisible(True)
+
+    def _render_devices(self, summary: dict) -> None:
+        """设备列表；每行末尾一个「登出」按钮，允许单独下线某台设备。"""
         devices = summary.get("devices") or []
+        mine = summary.get("instance_id") or ""
         self.devices.setRowCount(len(devices))
         for row, device in enumerate(devices):
-            values = (device.get("name") or device["id"][:8],
-                      device.get("platform") or "—", device.get("last_seen") or "—")
+            name = device.get("name") or device["id"][:8]
+            if device.get("id") == mine:
+                name = f"{name}（本机）"
+            values = (name, device.get("platform") or "—", device.get("last_seen") or "—")
             for column, text in enumerate(values):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.devices.setItem(row, column, item)
-        active = summary.get("active_sessions")
-        self.status.setText(f"{tr('已登录')}。{tr('活跃会话')}：{active}")
-        self.form_host.setVisible(False)
-        self.info_host.setVisible(True)
+
+            host = QWidget()
+            cell = QHBoxLayout(host)
+            cell.setContentsMargins(4, 2, 4, 2)
+            kick = QPushButton(tr("登出"))
+            apply_button_style(kick, variant="neutral")
+            device_id = device.get("id")
+            kick.clicked.connect(
+                lambda _=False, did=device_id: self._revoke_device(did))
+            cell.addWidget(kick)
+            cell.addStretch()
+            self.devices.setCellWidget(row, 3, host)
 
     def _render_sync(self) -> None:
         report = self.holder.last_sync_report
@@ -461,6 +497,20 @@ class AccountManagerDialog(QDialog):
     def _logout(self) -> None:
         self.status.setText(tr("正在退出…"))
         self.holder.logout_async()
+
+    def _revoke_device(self, device_id: str) -> None:
+        """单独下线某台设备（会话鉴权，服务端只允许踢自己账号下的设备）。"""
+        if not device_id:
+            return
+        mine = (self.holder.summary or {}).get("instance_id") or ""
+        note = (tr("这是本机：下线后需要重新登录。") if device_id == mine else "")
+        if QMessageBox.question(
+                self, tr("设备登出"),
+                tr("确定让该设备下线？该设备上的全部会话会立即失效。") + note,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        self.holder.revoke_device_async(device_id)
 
     def _logout_all(self) -> None:
         self.status.setText(tr("正在退出所有设备…"))

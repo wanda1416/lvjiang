@@ -327,6 +327,13 @@ class AccountSession:
         self._authorized("POST", "/api/change_password",
                          {"old_password": old_password, "new_password": new_password})
 
+    def revoke_device(self, device_id: str) -> dict:
+        """让某台设备下线（会话鉴权；服务端只允许操作自己账号下的设备）。"""
+        if not device_id:
+            raise AccountError("缺少设备标识")
+        return self._authorized("POST", "/api/devices/revoke",
+                                {"instance_id": device_id})
+
     def _authorized(self, method: str, route: str, data: dict | None = None) -> dict:
         if not self.access_token:
             raise AccountError("尚未登录")

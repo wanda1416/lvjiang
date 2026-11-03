@@ -53,7 +53,7 @@ def clear_local_profile() -> str:
     from ..profile import repository
     from . import account_api
 
-    repository.reset_profile_db()
+    repository.wipe_profile_data()
     account_api._reset_sync_state()
     set_mode(REMOTE)
     return "已清除本地总览数据；下次同步将从云端快照重新获取。"

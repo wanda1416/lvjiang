@@ -945,6 +945,21 @@ def reset_profile_db() -> None:
         _db = None
 
 
+def wipe_profile_data() -> None:
+    """清空全部 entries 与 history（不清 schema、不清 locked 以外的表结构）。
+
+    「清除本地总览数据」用：与 reset_profile_db（只重置单例，不删数据）
+    不同，这里真的删行。删除后由云端快照 bootstrap 重建。
+    """
+    conn = get_profile_db()._borrow_connection()
+    try:
+        conn.execute("DELETE FROM profile_entries")
+        conn.execute("DELETE FROM profile_history")
+        conn.commit()
+    finally:
+        get_profile_db()._release_connection(conn)
+
+
 def db_read_entry(username: str, type_: str, key: str) -> dict:
     return get_profile_db().get_entry(username, type_, key)
 

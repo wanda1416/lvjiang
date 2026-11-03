@@ -45,9 +45,9 @@ def _request(method: str, route: str, data: dict | None, token: str) -> dict:
             raise SyncConflict(details) from None
         code = details.get("error") if isinstance(details, dict) and isinstance(details.get("error"), str) else ""
         # 与账户层共用一套中文文案：界面只展示 message，不把 error code 抛给用户。
-        from ..account.service import _ERROR_MESSAGES
+        from ..account.service import ERROR_MESSAGES
 
-        message = _ERROR_MESSAGES.get(str(code)) or f"同步请求失败（HTTP {exc.code}）"
+        message = ERROR_MESSAGES.get(str(code)) or f"同步请求失败（HTTP {exc.code}）"
         raise SyncError(message, code=str(code)) from None
     except (urlerror.URLError, TimeoutError, OSError):
         raise SyncError("账号服务暂时不可用，同步未完成") from None

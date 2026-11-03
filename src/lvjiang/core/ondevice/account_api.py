@@ -1,11 +1,13 @@
 """Android 账户桥接 —— 登录/登出/状态/同步四个 JSON 入口，供 PyBridge 调用。
 
 与 PC 端的差异（按定案）：
-- **不建快照**：Android 没有 profile 编辑能力，只是被动接受远端快照与历史
-  回放；快照永远由 PC 刷新。
-- **任务结束后自动推送**：task_runner 在任务收尾时调 ``sync_after_task``，
-  把本机新产生的 set/delta op 上行（后台线程，不阻塞任务收尾）。
-- 远端没有快照时不做同步（无基线可回放，也无需上行——没有别的设备在等）。
+- **只收不发**：手机 profile 只从云端快照 + 历史回放获取，永不上行——
+  手机的 db 可能被离线包整库重建，推上去的是 PC 旧账，自己写的行又被
+  下一次包冲掉；上行数据走既有的离线回传通道（手机 → PC → 云）。
+- **不建快照**：Android 没有 profile 编辑能力，快照永远由 PC 刷新。
+- **服从总览数据来源模式**：``profile_source`` 为 pc 模式时整体跳过
+  profile 同步（离线包独占这份 db）。
+- 远端没有快照时不做同步（无基线可回放）。
 """
 from __future__ import annotations
 
@@ -36,6 +38,12 @@ def _sync(token: str) -> dict:
     if any(error == NO_SNAPSHOT_HINT for error in pulled.errors):
         return {"synced": False, "reason": "no_snapshot",
                 "message": "云端还没有快照；先在 PC 上刷新快照"}
+    if getattr(pulled, "pending", None):
+        # 本地有数据但从未落地过快照（典型：离线包重建后重新登录）。绝不
+        # 静默跳过——必须让用户知道 profile 没同步、该怎么处理。
+        return {"synced": False, "reason": "pending_overwrite",
+                "message": "检测到本地已有总览数据；请先在「设置 → 总览数据」"
+                           "点「清除并重新获取」，再执行同步"}
     return {"synced": not pulled.errors,
             "pulled": pulled.pulled, "pushed": 0,
             "message": "；".join(pulled.errors[:3]) if pulled.errors else ""}

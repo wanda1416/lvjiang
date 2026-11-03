@@ -85,8 +85,10 @@ def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_conf
 
             with zipfile.ZipFile(path) as bundle:
                 carries_profile = any("profile.db" in name for name in bundle.namelist())
-        except OSError:
-            carries_profile = True          # 读不了包内容时按携带处理，宁可拒绝
+        except (OSError, zipfile.BadZipFile):
+            # BadZipFile 直继承 Exception，需显式列出；读不了/坏了的包按携带
+            # profile 处理，宁可拒绝也不能绕过模式闸门。
+            carries_profile = True
         if carries_profile and profile_source.mode() == profile_source.REMOTE:
             return json.dumps({"ok": False,
                 "message": "Android 拒绝接收：总览数据处于远端同步模式。"

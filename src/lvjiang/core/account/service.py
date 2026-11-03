@@ -64,7 +64,7 @@ class _AndroidTokenStore:
 ACCOUNT_SERVICE = "https://lvjiang.wyxj.net"
 _KEYRING_SERVICE = "lvjiang.account"
 
-_ERROR_MESSAGES = {
+ERROR_MESSAGES = {
     "invalid_credentials": "账户名或密码不正确",
     "account_disabled": "账号已被禁用，请联系管理员",
     "device_revoked": "设备已被移出，请联系管理员",
@@ -217,11 +217,11 @@ def _request(method: str, route: str, data: dict | None = None,
                 code = details["error"]
         except (ValueError, UnicodeDecodeError, OSError):
             pass
-        message = _ERROR_MESSAGES.get(code, f"账号服务请求失败（HTTP {exc.code}）")
+        message = ERROR_MESSAGES.get(code, f"账号服务请求失败（HTTP {exc.code}）")
         raise AccountError(message, code=code) from None
     except (urlerror.URLError, TimeoutError, OSError, HTTPException) as error:
         logger.warning("账号服务连接失败：{}", error)
-        raise AccountError(_ERROR_MESSAGES["service_unavailable"]) from None
+        raise AccountError(ERROR_MESSAGES["service_unavailable"]) from None
     try:
         result = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):

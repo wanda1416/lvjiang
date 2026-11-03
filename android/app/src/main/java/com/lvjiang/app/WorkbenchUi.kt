@@ -1077,7 +1077,13 @@ class WorkbenchUi(
         entry(tools, "高级功能", "悬浮控制、电脑连接与屏幕标定") { openTools("ADVANCED") }
         entry(tools, "自检与诊断", "检查环境、复制与分享报告") { openTools("DIAGNOSTICS") }
         accountCard()
-        entry(tools, "总览数据", "数据来源：远端同步 / PC 同步") { showProfileSource() }
+        val sourceRow = SettingsUi.row(activity, "总览数据", "正在读取数据来源…")
+        sourceRow.setOnClickListener { showProfileSource() }
+        tools.addView(sourceRow)
+        profileSourceSummary = (sourceRow.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        request({ PyBridge.accountProfileMode(activity) }) { result ->
+            updateProfileSourceSummary(result.optString("mode"))
+        }
         val about = card()
         text(about, "关于与反馈", 18f)
         val versionRow = SettingsUi.row(activity, "版本与发布说明", "正在读取版本…")
@@ -1160,27 +1166,44 @@ class WorkbenchUi(
             }.show()
     }
 
-    /** 总览数据来源模式：远端同步（默认）/ PC 同步；切回远端需先清除本地数据。 */
+    /** 总览数据行的摘要：只显示当前模式，不罗列所有选项。 */
+    private var profileSourceSummary: TextView? = null
+
+    private fun updateProfileSourceSummary(mode: String) {
+        profileSourceSummary?.text =
+            if (mode == "pc") "数据来源：PC 离线包" else "数据来源：云端"
+    }
+
+    /** 总览数据来源模式：远端同步（默认）/ PC 同步；切回远端需先清除本地数据。
+     *  注意 setMessage 与 setItems 在 Material 对话框里互斥（列表会被挤掉），
+     *  用自定义视图放说明文字，动作走按钮。 */
     private fun showProfileSource() {
         request({ PyBridge.accountProfileMode(activity) }) { result ->
             if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
             val isPc = result.optString("mode") == "pc"
-            val current = if (isPc) "当前：PC 同步（总览数据随离线包更新）" else "当前：远端同步（总览数据来自云端快照）"
-            val options = if (isPc) arrayOf("清除本地总览数据并切回远端同步") else arrayOf("切换为 PC 同步")
-            MaterialAlertDialogBuilder(activity).setTitle("总览数据").setMessage(current)
+            val current = if (isPc) "当前：PC 同步（总览数据随离线包更新；在线同步跳过总览）"
+                          else "当前：远端同步（总览数据来自云端快照，只收不发）"
+            val content = SettingsUi.dialogContent(activity)
+            text(content, current)
+            text(content, if (isPc) "切回远端同步需要先清除本地总览数据。"
+                          else "切换后 PC 离线包将携带总览数据。", 12f)
+            MaterialAlertDialogBuilder(activity).setTitle("总览数据")
+                .setView(SettingsUi.dialogScroll(activity, content))
                 .setNegativeButton("关闭", null)
-                .setItems(options) { _, which ->
+                .setPositiveButton(if (isPc) "清除并切回远端同步" else "切换为 PC 同步") { _, _ ->
                     if (isPc) {
                         MaterialAlertDialogBuilder(activity).setTitle("清除本地总览数据")
-                            .setMessage("将删除手机上的全部总览数据并切回远端同步；下次登录同步会从云端快照重新获取。")
+                            .setMessage("将删除手机上的全部总览数据并切回远端同步；下次同步会从云端快照重新获取。")
                             .setNegativeButton("取消", null)
                             .setPositiveButton("清除并切换") { _, _ ->
                                 request({ PyBridge.accountClearProfile(activity) }) { r ->
+                                    if (r.optBoolean("ok")) updateProfileSourceSummary("remote")
                                     toast(if (r.optBoolean("ok")) r.optString("message") else "失败：${r.optString("message")}")
                                 }
                             }.show()
                     } else {
                         request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
+                            if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
                             toast(if (r.optBoolean("ok")) "已切换为 PC 同步" else "失败：${r.optString("message")}")
                         }
                     }

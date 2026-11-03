@@ -1076,6 +1076,7 @@ class WorkbenchUi(
         entry(tools, "权限", "无障碍、悬浮窗与通知") { openTools("PERMISSIONS") }
         entry(tools, "高级功能", "悬浮控制、电脑连接与屏幕标定") { openTools("ADVANCED") }
         entry(tools, "自检与诊断", "检查环境、复制与分享报告") { openTools("DIAGNOSTICS") }
+        accountCard()
         val about = card()
         text(about, "关于与反馈", 18f)
         val versionRow = SettingsUi.row(activity, "版本与发布说明", "正在读取版本…")
@@ -1095,6 +1096,98 @@ class WorkbenchUi(
         entry(about, "公告", "查看适用于当前版本的公告") { publicContent("notices") }
         entry(about, "反馈联系", "查看联系二维码，可手动刷新") { publicContent("qrcode") }
         entry(about, "关于", "律匠 · ${BuildConfig.VERSION_NAME}") { showAbout() }
+    }
+
+    /** 账户卡片：未登录显示登录入口；已登录显示账户名 + 同步/登出。 */
+    private fun accountCard() {
+        val accountCardLayout = card()
+        text(accountCardLayout, "账户与数据同步", 18f)
+        val loginRow = SettingsUi.row(activity, "账户", "正在检查登录状态…")
+        accountCardLayout.addView(loginRow)
+        loginRow.isEnabled = false
+        fun summaryText(row: LinearLayout): TextView =
+            (row.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        loginRow.setOnClickListener { showAccountActions() }
+        request({ PyBridge.accountStatus(activity) }) { result ->
+            if (!result.optBoolean("ok")) {
+                summaryText(loginRow).text = result.optString("message")
+                return@request
+            }
+            if (result.optBoolean("logged_in")) {
+                val who = result.optString("display_name").ifEmpty { result.optString("login") }
+                summaryText(loginRow).text = "已登录 $who · 点击同步或登出"
+                loginRow.isEnabled = true
+            } else {
+                summaryText(loginRow).text = "未登录 · 点击登录并同步数据"
+                loginRow.isEnabled = true
+                loginRow.setOnClickListener { showLoginDialog() }
+            }
+        }
+    }
+
+    private fun showLoginDialog() {
+        val content = SettingsUi.dialogContent(activity)
+        text(content, "登录账号后，本机数据与云端保持同步。", 14f)
+        val loginEdit = android.widget.EditText(activity).apply {
+            hint = "账户名"; inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val passwordEdit = android.widget.EditText(activity).apply {
+            hint = "密码"; inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        content.addView(loginEdit)
+        content.addView(passwordEdit)
+        MaterialAlertDialogBuilder(activity).setTitle("账户登录")
+            .setView(SettingsUi.dialogScroll(activity, content))
+            .setNegativeButton("取消", null)
+            .setPositiveButton("登录") { _, _ ->
+                val login = loginEdit.text.toString().trim()
+                val password = passwordEdit.text.toString()
+                if (login.isEmpty() || password.isEmpty()) { toast("请填写账户名与密码"); return@setPositiveButton }
+                toast("正在登录并同步…")
+                request({ PyBridge.accountLogin(activity, login, password) }) { result ->
+                    if (!result.optBoolean("ok")) { toast("登录失败：${result.optString("message")}"); return@request }
+                    val sync = result.optJSONObject("sync")
+                    val syncNote = when {
+                        sync == null -> ""
+                        sync.optBoolean("synced") -> "，已同步 ${sync.optInt("pulled", 0)}/${sync.optInt("pushed", 0)} 条"
+                        sync.optString("reason") == "no_snapshot" -> "；云端还没有快照，请先在电脑上刷新快照"
+                        else -> "；同步未完成：${sync.optString("message")}"
+                    }
+                    toast("已登录 ${result.optString("login")}$syncNote")
+                    show("SETTINGS")           // 重建设置页刷新账户卡片
+                }
+            }.show()
+    }
+
+    private fun showAccountActions() {
+        val options = arrayOf("立即同步", "退出登录")
+        MaterialAlertDialogBuilder(activity).setTitle("账户")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        toast("正在同步…")
+                        request({ PyBridge.accountSync(activity) }) { result ->
+                            if (!result.optBoolean("ok")) { toast("同步失败：${result.optString("message")}"); return@request }
+                            if (result.optString("reason") == "no_snapshot") {
+                                toast("云端还没有快照；请先在电脑上刷新快照")
+                            } else if (result.optBoolean("synced")) {
+                                toast("同步完成：下行 ${result.optInt("pulled", 0)} 条，上行 ${result.optInt("pushed", 0)} 条")
+                            } else {
+                                toast("同步未完成：${result.optString("message")}")
+                            }
+                        }
+                    }
+                    1 -> MaterialAlertDialogBuilder(activity).setTitle("退出登录")
+                        .setMessage("退出后本机数据保留，但不再与云端同步。")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("退出") { _, _ ->
+                            request({ PyBridge.accountLogout(activity) }) { result ->
+                                toast(if (result.optBoolean("ok")) "已退出登录" else "退出失败：${result.optString("message")}")
+                                show("SETTINGS")
+                            }
+                        }.show()
+                }
+            }.show()
     }
 
     private fun showAbout() {

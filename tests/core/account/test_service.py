@@ -118,6 +118,22 @@ def test_change_password_rejects_short_new_password(fake_env) -> None:
         session.change_password("pw", "short")
 
 
+def test_no_keyring_falls_back_to_android_store(monkeypatch, tmp_path) -> None:
+    """APK 环境没有 keyring 包：凭据落到应用私有沙箱文件（等价安全边界）。"""
+    monkeypatch.setattr(account_service, "keyring", None)
+    monkeypatch.setattr(account_service, "_on_android", lambda: True)
+    token_file = tmp_path / "account_token"
+    monkeypatch.setattr(account_service, "_android_token_path", lambda: token_file)
+
+    backend = account_service._credentials()
+    assert type(backend).__name__ == "_AndroidTokenStore"
+    backend.set_password("lvjiang.account", "session:x", "tok-1")
+    assert backend.get_password("lvjiang.account", "session:x") == "tok-1"
+    assert backend.get_password("lvjiang.account", "session:other") is None
+    backend.delete_password("lvjiang.account", "session:x")
+    assert backend.get_password("lvjiang.account", "session:x") is None
+
+
 def test_distinct_instances_get_distinct_device_ids_and_tokens(tmp_path, monkeypatch) -> None:
     """同机多实例（源码版 / 安装版）必须各算各的设备身份，登录态互不顶替。"""
     keyring = FakeKeyring()

@@ -14,12 +14,52 @@ from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
-import keyring
 from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR
 from ..json_files import formatted_json
 from . import identity
+
+try:
+    import keyring  # 桌面端系统凭据库；APK 未打包（Android 走沙箱文件存储）
+except ImportError:                    # pragma: no cover - 仅 Android 环境出现
+    keyring = None                     # type: ignore[assignment]
+
+
+def _on_android() -> bool:
+    return hasattr(sys, "getandroidapilevel")
+
+
+def _android_token_path() -> Path:
+    """Android 的 refresh 令牌落点：应用私有 session 目录（沙箱隔离，
+    其他应用不可读——这是 Android 的安全边界，等价于桌面系统凭据库）。"""
+    return SESSION_CONFIG_DIR / "account_token"
+
+
+class _AndroidTokenStore:
+    """极简 get/set/delete 接口，与 keyring 后端同形。"""
+
+    def get_password(self, service: str, username: str) -> str | None:
+        try:
+            data = json.loads(_android_token_path().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if isinstance(data, dict) and data.get("user") == username:
+            value = data.get("token")
+            return value if isinstance(value, str) else None
+        return None
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        _android_token_path().parent.mkdir(parents=True, exist_ok=True)
+        _android_token_path().write_text(
+            json.dumps({"user": username, "token": password}, ensure_ascii=False),
+            encoding="utf-8")
+
+    def delete_password(self, service: str, username: str) -> None:
+        try:
+            _android_token_path().unlink()
+        except OSError:
+            pass
 
 ACCOUNT_SERVICE = "https://lvjiang.wyxj.net"
 _KEYRING_SERVICE = "lvjiang.account"
@@ -92,7 +132,10 @@ def save_profile_sync_state(state: dict) -> None:
 
 
 def _credentials():
-    """系统凭据库后端；不接受明文文件后端，令牌落明文等于没做。"""
+    """凭据后端。桌面端用系统凭据库（不接受明文文件后端）；Android 用
+    应用私有沙箱文件——进程隔离由 OS 保证，等价于桌面的凭据库边界。"""
+    if _on_android() or keyring is None:
+        return _AndroidTokenStore()
     backend = keyring.get_keyring()
     allowed = {
         "keyring.backends.Windows", "keyring.backends.macOS",

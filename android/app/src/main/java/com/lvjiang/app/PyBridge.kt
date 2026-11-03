@@ -28,6 +28,7 @@ object PyBridge {
     private const val USER_SETTINGS_MODULE = "lvjiang.core.ondevice.user_settings"
     private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
     private const val OFFLINE_MODULE = "lvjiang.core.ondevice.offline"
+    private const val ACCOUNT_MODULE = "lvjiang.core.ondevice.account_api"
 
     @Volatile
     private var startFailure: String? = null
@@ -144,6 +145,16 @@ object PyBridge {
         callJson(context, "apply_sync", path, preserveTaskParams, preserveBatchConfig, moduleName = OFFLINE_MODULE)
     fun historyTransfer(context: Context, operation: String, payload: String): JSONObject =
         callJson(context, "request", operation, payload, moduleName = "lvjiang.core.ondevice.history_transfer")
+
+    // ── 账户（登录/登出/状态/同步）────────────────────────────
+    fun accountStatus(context: Context): JSONObject =
+        callJson(context, "account_status", moduleName = ACCOUNT_MODULE)
+    fun accountLogin(context: Context, login: String, password: String): JSONObject =
+        callJson(context, "account_login", login, password, moduleName = ACCOUNT_MODULE)
+    fun accountLogout(context: Context): JSONObject =
+        callJson(context, "account_logout", moduleName = ACCOUNT_MODULE)
+    fun accountSync(context: Context): JSONObject =
+        callJson(context, "account_sync", moduleName = ACCOUNT_MODULE)
 
     fun checkRuntime(context: Context, ocr: Boolean = true, screenRepetitions: Int = 0): JSONObject =
         callJson(context, "check_runtime", ocr, screenRepetitions, moduleName = OFFLINE_MODULE)

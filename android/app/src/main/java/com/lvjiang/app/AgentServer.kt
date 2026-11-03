@@ -330,7 +330,43 @@ object AgentServer {
         "offline_sync_begin" -> beginSync(req)
         "offline_sync_chunk" -> syncChunk(req)
         "offline_sync_commit" -> commitSync()
+        // 会话库只读导出：PC 把 config/session 下的文件拉到本机临时目录做分析
+        // （对照 / 备份），绝不回写手机。只读字节，不改手机上的任何数据。
+        "session_list" -> sessionList()
+        "session_file" -> sessionFile(req)
         else -> fail("未知 op: $op")
+    }
+
+    /** 列出 config/session 下的文件（名字 + 大小），供 PC 端发现要拉哪些。 */
+    private fun sessionList(): Pair<JSONObject, ByteArray?> {
+        val root = sessionRoot()
+        val files = JSONArray()
+        root?.listFiles()?.filter { it.isFile }?.sortedBy { it.name }?.forEach {
+            files.put(JSONObject().put("name", it.name).put("size", it.length()))
+        }
+        return ok(JSONObject().put("files", files))
+    }
+
+    /** 按字节回传 session 下的单个文件。只接受纯文件名（拒绝任何路径段）。 */
+    private fun sessionFile(req: JSONObject): Pair<JSONObject, ByteArray?> {
+        val name = req.optString("name")
+        if (name.isEmpty() || name.contains('/') || name.contains('\\') || name.contains(".."))
+            return fail("非法文件名")
+        val root = sessionRoot() ?: return fail("session 目录不存在")
+        val target = File(root, name)
+        if (!target.isFile) return fail("文件不存在: $name")
+        if (target.canonicalFile.parentFile != root.canonicalFile) return fail("越界路径")
+        return try {
+            okBin(JSONObject().put("name", name).put("size", target.length()),
+                target.readBytes())
+        } catch (e: IOException) {
+            fail("读取失败: ${e.message}")
+        }
+    }
+
+    private fun sessionRoot(): File? {
+        val root = File(requireNotNull(appContext).filesDir, "lvjiang/config/session")
+        return if (root.isDirectory) root else null
     }
 
     private fun status(): JSONObject = JSONObject().apply {

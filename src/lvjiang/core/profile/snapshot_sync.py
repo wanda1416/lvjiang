@@ -371,23 +371,48 @@ def push_local(token: str) -> ProfileSyncReport:
 
 
 def _key_definitions() -> list[dict]:
-    """profile.yaml 的定义摘要（type/key/label/group/cap）。
+    """profile.yaml 的定义摘要（type/key/label/group/cap），**直接解析原始 YAML**。
 
-    云端只做展示，没有重置/编辑能力，因此**不含 period**——周期是客户端
-    运行时概念（周期边界归零），对展示毫无意义。浏览器无法零依赖解析 YAML，
-    这份摘要随快照上传，供网页把裸 key 渲染成带中文标签的表。
+    三处刻意的取舍：
+    - **不走 ProfileSchema**：schema 会把「周期未注册」的条目挪进
+      ``ignored_by_model``（插件没加载时 yysls 的 season 键会被整条移出），
+      用它做过滤会误删这些键；原始 YAML 不受插件影响。
+    - **不含 period**：云端只做展示，没有重置/编辑能力，周期是客户端运行时
+      概念（周期边界归零），对展示毫无意义。
+    - 浏览器无法零依赖解析 YAML，所以这份摘要随快照上传，供网页把裸 key
+      渲染成带中文标签的表。
     """
-    from .schema import get_profile_config
+    import yaml
 
+    from ...constants import SESSION_CONFIG_DIR
+
+    path = SESSION_CONFIG_DIR / "profile.yaml"
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        logger.warning("[profile sync] profile.yaml 读取失败，定义摘要为空：{}", error)
+        return []
+    if not isinstance(data, dict):
+        return []
     keys: list[dict] = []
-    for model_type, key_defs in get_profile_config().keys_by_model.items():
-        for kd in key_defs:
-            item: dict[str, str | int] = {"type": model_type, "key": kd.key,
-                                          "label": kd.label or kd.key, "group": kd.group or ""}
-            cap = getattr(kd, "cap", None)
-            if cap is not None:
-                item["cap"] = cap
-            keys.append(item)
+    for model_type, items in data.items():
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            key = item.get("key")
+            if not isinstance(key, str) or not key:
+                continue
+            entry: dict[str, str | int | float] = {
+                "type": model_type, "key": key,
+                "label": str(item.get("label") or key),
+                "group": str(item.get("group") or ""),
+            }
+            cap = item.get("cap")
+            if isinstance(cap, (int, float)):
+                entry["cap"] = cap
+            keys.append(entry)
     return keys
 
 
@@ -407,21 +432,34 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
     report.pulled = pulled.pulled
     report.errors.extend(pulled.errors)
     state = _state()
+    keys = _key_definitions()
+    # 快照只带「有定义」的条目：entries 里可能存在定义已删除/改名的残留键
+    # （例如 _of_week 改成 _of_month 后旧行还在，或某次写入用错了模型类型）。
+    # 它们没有标签、没有分组，进快照只会在网页上冒出裸键列。**只过滤快照，
+    # 不删本地数据**——本地是否清理由用户决定。
+    defined = {(item["type"], item["key"]) for item in keys}
     payload: list[dict] = []
+    orphan = 0
     for username in list_user_names():
         entries = repository.db_read_all(username)
-        payload.extend(
-            {"username": username, "type": type_, "key": key,
-             "value": entry.get("value"), "value_text": entry.get("value_text") or "",
-             "updated_at": entry.get("updated_at") or ""}
-            for type_, group in entries.items() for key, entry in group.items()
-        )
+        for type_, group in entries.items():
+            for key, entry in group.items():
+                if (type_, key) not in defined:
+                    orphan += 1
+                    continue
+                payload.append(
+                    {"username": username, "type": type_, "key": key,
+                     "value": entry.get("value"),
+                     "value_text": entry.get("value_text") or "",
+                     "updated_at": entry.get("updated_at") or ""})
+    if orphan:
+        logger.info("[profile sync] 快照跳过 {} 条无定义的历史残留条目", orphan)
     if not payload:
         report.errors.append("本机没有可上传的 profile 数据")
         return report
     try:
         response = post("/api/sync/profile/snapshot/put",
-                        {"entries": payload, "keys": _key_definitions(),
+                        {"entries": payload, "keys": keys,
                          "origin_name": socket.gethostname()}, token)
     except SyncError as error:
         report.errors.append(str(error))

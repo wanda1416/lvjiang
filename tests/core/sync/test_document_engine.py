@@ -91,7 +91,7 @@ def test_unregistered_plugin_document_not_uploaded_as_user_doc(monkeypatch) -> N
         (users / "蔡元君.json").write_text('{"username": "蔡元君"}', encoding="utf-8")
         (users / "蔡元君.loadouts.json").write_text("{}", encoding="utf-8")
         documents = engine.iter_local_documents(users, avatars, session)
-    assert [(d.label, d.kind) for d in documents] == [("蔡元君", "user_doc")]
+    assert [(d.label, d.kind) for d in documents] == []   # 纯资料文件不入文档通道
 
 
 def test_core_notes_suffix_wins_over_plugin_registry(env) -> None:
@@ -119,44 +119,33 @@ def test_stale_local_pull_makes_no_conflict_copy(env) -> None:
     assert not any(".conflict-" in p.name for p in users.iterdir())
 
 
-def test_new_local_documents_push_gzipped_without_ui_state(env) -> None:
+def test_user_profile_not_pushed_as_document_but_avatar_is(env) -> None:
+    """用户资料入 account_users 表（users_sync），文档通道只带它引用的头像。"""
     users = env["dirs"]["users"]
     (users / "蔡元君.json").write_text(json.dumps({
         "username": "蔡元君", "avatar": "avatar_a.png",
         "attributes": {"level": 60}, "ui_state": {"equip_filter": ["x"]}}, ensure_ascii=False),
         encoding="utf-8")
     (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
+    (env["dirs"]["avatars"] / "avatar_a.png").write_bytes(b"\x89PNG")
     (env["dirs"]["session"] / "profile.yaml").write_text("quota: []\n", encoding="utf-8")
     _sync(env)
-    assert len(env["fake"].pushes) == 3
-    pushes = {(p["label"], p["kind"]): p for p in env["fake"].pushes}
-    # user_doc 剥离 ui_state 后 gzip
-    doc = pushes[("蔡元君", "user_doc")]
-    decoded = json.loads(gzip.decompress(base64.b64decode(doc["payload_base64"])).decode("utf-8"))
-    assert "ui_state" not in decoded
-    assert decoded["attributes"]["level"] == 60
-    # profile.yaml 账户级标签
-    assert ("__global__", "profile_yaml") in pushes
+    kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
+    assert ("蔡元君", "user_doc") not in kinds          # 资料不走文档
+    assert ("蔡元君", "loadouts") in kinds
+    assert ("avatar_a.png", "avatar") in kinds           # 引用的头像照常
+    assert ("__global__", "profile_yaml") in kinds
 
 
-def test_remote_newer_pulls_and_preserves_local_ui_state(env) -> None:
+def test_remote_only_user_doc_left_alone(env) -> None:
+    """远端遗留的 user_doc 文档（资料已入表）不再下行，也不落本地。"""
     users = env["dirs"]["users"]
-    path = users / "蔡元君.json"
-    path.write_text(json.dumps({"username": "蔡元君", "attributes": {"level": 1},
-                                "ui_state": {"equip_filter": ["本地筛选"]}},
-                               ensure_ascii=False), encoding="utf-8")
-    remote = {"username": "蔡元君", "attributes": {"level": 99}}
-    env["fake"].set_remote_future("蔡元君", "user_doc",
-                                  json.dumps(remote, ensure_ascii=False).encode("utf-8"),
-                                  "2099-01-01T00:00:00Z")
+    env["fake"].docs[("蔡元君", "user_doc")] = {
+        "sha256": "x", "size": 3, "zipped": True, "payload": "e30=",
+        "updated_at": "2099-01-01T00:00:00Z"}
     report = _sync(env)
-    assert report.pulled == ["蔡元君/user_doc"]
-    merged = json.loads(path.read_text(encoding="utf-8"))
-    assert merged["attributes"]["level"] == 99
-    assert merged["ui_state"]["equip_filter"] == ["本地筛选"]  # 界面偏好永远以本机为准
-    # 本地只是旧版：直接覆盖，不留副本
-    assert not any(".conflict-" in p.name for p in users.iterdir())
-    assert report.conflicts == []
+    assert report.pulled == []
+    assert not (users / "蔡元君.json").exists()
 
 
 def test_local_newer_pushes_with_remote_sha_as_lock(env) -> None:
@@ -194,12 +183,8 @@ def test_avatar_pushed_raw_binary_and_remote_only_pulled(env) -> None:
     report = _sync(env)
     push = next(p for p in env["fake"].pushes if p["kind"] == "avatar")
     assert base64.b64decode(push["payload_base64"]) == avatar  # 不 gzip
-    assert any(p["kind"] == "user_doc" for p in env["fake"].pushes)
+    assert not any(p["kind"] == "user_doc" for p in env["fake"].pushes)
     # 远端独有头像（另一台设备上传）→ 下行到本地
-    env["fake"].set_remote_future("蔡元君", "user_doc",
-                                  json.dumps({"username": "蔡元君", "avatar": "avatar_b.png"},
-                                             ensure_ascii=False).encode("utf-8"),
-                                  "2099-01-01T00:00:00Z")
     remote_avatar = bytes([1, 2, 3])
     env["fake"].docs[("avatar_b.png", "avatar")] = {
         "sha256": "abc", "size": 3, "zipped": False,

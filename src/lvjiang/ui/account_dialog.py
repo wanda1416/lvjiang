@@ -86,7 +86,11 @@ class _AccountWorker(QThread):
 
 
 class _CombinedReport:
-    """用户表 + 文档通道 + profile 账本的合并结果，界面只关心总量与错误。"""
+    """用户表 + 文档通道 + profile 账本的合并结果。
+
+    界面按「通道 / 上行 / 下行 / 失败」四列展示，不再拼一段长文案：
+    多通道拼句既读不出哪一项失败，也把提示、结果、错误混成一坨。
+    """
 
     def __init__(self, documents, profile, users=None):
         self.documents = documents
@@ -95,15 +99,36 @@ class _CombinedReport:
         self.errors = [*documents.errors, *profile.errors,
                        *(users.errors if users else [])]
 
+    @staticmethod
+    def _count(value) -> int:
+        return len(value) if isinstance(value, (list, tuple)) else int(value or 0)
+
+    def rows(self) -> list[tuple[str, int, int, int]]:
+        """各通道 ``(名称, 上行, 下行, 失败)``。"""
+        rows = []
+        if self.users is not None:
+            rows.append((tr("名册"), self._count(self.users.pushed),
+                         self._count(self.users.pulled), len(self.users.errors)))
+        rows.append((tr("文档"), self._count(self.documents.pushed),
+                     self._count(self.documents.pulled), len(self.documents.errors)))
+        rows.append((tr("profile"), self._count(self.profile.pushed),
+                     self._count(self.profile.pulled), len(self.profile.errors)))
+        return rows
+
+    def distinct_errors(self) -> list[str]:
+        seen: list[str] = []
+        for error in self.errors:
+            text = str(error).strip()
+            if text and text not in seen:
+                seen.append(text)
+        return seen
+
     def describe(self) -> str:
-        parts = []
-        if self.users:
-            parts.append(f"名册 {self.users.describe()}")
-        parts.append(f"文档 {self.documents.describe()}")
-        parts.append(f"profile {self.profile.describe()}")
-        if self.errors:
-            parts.append(f"失败 {len(self.errors)}")
-        return "；".join(parts)
+        pushed = sum(row[1] for row in self.rows())
+        pulled = sum(row[2] for row in self.rows())
+        failures = sum(row[3] for row in self.rows())
+        text = f"上行 {pushed} 条，下行 {pulled} 条"
+        return text + (f"，失败 {failures} 项" if failures else "")
 
 
 class AccountHolder(QObject):
@@ -252,7 +277,8 @@ class AccountManagerDialog(QDialog):
         super().__init__(parent)
         self.holder = account_holder()
         self.setWindowTitle(tr("账户管理"))
-        self.setMinimumWidth(560)
+        self.setMinimumSize(760, 560)
+        self.resize(760, 560)
         self._connections: list[tuple[object, object]] = []
         layout = QVBoxLayout(self)
 
@@ -299,8 +325,9 @@ class AccountManagerDialog(QDialog):
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
 
+        # 身份只留一行：登录名（显示名），不重复对话框标题和字段名。
         self.account_label = QLabel()
-        self.account_label.setWordWrap(True)
+        self.account_label.setStyleSheet("font-size: 15px; font-weight: 600;")
         sync_layout.addWidget(self.account_label)
 
         sync_row = QHBoxLayout()
@@ -310,6 +337,9 @@ class AccountManagerDialog(QDialog):
         sync_row.addWidget(self.sync_button)
         self.snapshot_button = QPushButton(tr("刷新快照"))
         apply_button_style(self.snapshot_button, variant="neutral")
+        self.snapshot_button.setToolTip(tr(
+            "把本机当前全部角色数据上传为云端基线。\n"
+            "新设备接入、或云端被重建后需要先做一次；日常同步不用点。"))
         self.snapshot_button.clicked.connect(self._refresh_snapshot)
         sync_row.addWidget(self.snapshot_button)
         self.clear_sync_button = QPushButton(tr("清除同步"))
@@ -322,16 +352,31 @@ class AccountManagerDialog(QDialog):
         sync_row.addStretch()
         sync_layout.addLayout(sync_row)
 
-        self.sync_status = QLabel()
-        self.sync_status.setWordWrap(True)
-        sync_layout.addWidget(self.sync_status)
+        self.sync_caption = QLabel()
+        self.sync_caption.setStyleSheet("color: palette(mid); font-size: 12px;")
+        sync_layout.addWidget(self.sync_caption)
 
-        hint = QLabel(tr(
-            "同步内容：角色名册与资料、出装/便利贴/头像文档、profile 数值账本。\n"
-            "新设备接入前，请先在其中一台设备上点「刷新快照」建立云端基线。"))
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: palette(mid); font-size: 12px;")
-        sync_layout.addWidget(hint)
+        # 结果用四列计数表：谁失败一眼能看出来，不再拼长句。
+        self.sync_table = QTableWidget(0, 4)
+        self.sync_table.setHorizontalHeaderLabels(
+            [tr("通道"), tr("上行"), tr("下行"), tr("失败")])
+        header = self.sync_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for column in (1, 2, 3):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        self.sync_table.verticalHeader().setVisible(False)
+        self.sync_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.sync_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.sync_table.setMaximumHeight(140)
+        self.sync_table.setVisible(False)
+        sync_layout.addWidget(self.sync_table)
+
+        # 错误单独一处，只在真失败时出现。
+        self.sync_error = QLabel()
+        self.sync_error.setWordWrap(True)
+        self.sync_error.setStyleSheet("color: #c62828; font-size: 12px;")
+        self.sync_error.setVisible(False)
+        sync_layout.addWidget(self.sync_error)
         sync_layout.addStretch()
         self.tabs.addTab(sync_tab, tr("数据同步"))
 
@@ -421,12 +466,12 @@ class AccountManagerDialog(QDialog):
 
     def _show_logged_in(self, summary: dict) -> None:
         account = summary["account"]
-        display = account.get("display_name") or "—"
-        self.account_label.setText(
-            f"{tr('账户名')}：{account['login']}　{tr('显示名')}：{display}")
+        display = account.get("display_name") or ""
+        who = account["login"] + (f"（{display}）" if display else "")
+        self.account_label.setText(who)
         self._render_devices(summary)
         active = summary.get("active_sessions")
-        self.status.setText(f"{tr('已登录')}。{tr('活跃会话')}：{active}")
+        self.status.setText(tr("活跃会话 {} 个").format(active))
         self.form_host.setVisible(False)
         self.tabs.setVisible(True)
 
@@ -460,19 +505,47 @@ class AccountManagerDialog(QDialog):
     def _render_sync(self) -> None:
         report = self.holder.last_sync_report
         if self.holder.syncing:
-            self.sync_status.setText(tr("正在同步文档…"))
+            self.sync_caption.setText(tr("正在同步…"))
+            self.sync_table.setVisible(False)
+            self.sync_error.setVisible(False)
         elif report is not None:
-            parts = [tr("上次同步") + "：" + report.describe()]
-            if report.errors:
-                parts.append("；".join(report.errors[:3]))
-            self.sync_status.setText("".join(parts))
+            self._render_report(report)
         else:
-            self.sync_status.setText(
-                tr("尚未同步。登录后自动同步一次；换设备前建议先「刷新快照」。"))
+            self.sync_caption.setText(tr("尚未同步"))
+            self.sync_table.setVisible(False)
+            self.sync_error.setVisible(False)
         running = self.holder.syncing or self.holder.busy
         self.sync_button.setEnabled(not running)
         self.clear_sync_button.setEnabled(not running)
         self.snapshot_button.setEnabled(not running and self.holder.summary is not None)
+
+    def _render_report(self, report) -> None:
+        rows = report.rows()
+        self.sync_caption.setText(
+            tr("上次同步：") + report.describe()
+            + (tr("（名册顺序已按云端更新）") if getattr(report, "users", None)
+               and report.users.reordered else ""))
+        self.sync_table.setRowCount(len(rows))
+        for index, (name, pushed, pulled, failed) in enumerate(rows):
+            for column, value in enumerate((name, str(pushed), str(pulled),
+                                            str(failed) if failed else "—")):
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                if column:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.sync_table.setItem(index, column, item)
+        self.sync_table.setVisible(True)
+
+        errors = report.distinct_errors()
+        if errors:
+            shown = errors[:2]
+            text = "；".join(shown)
+            if len(errors) > len(shown):
+                text += tr("；等 {} 项").format(len(errors))
+            self.sync_error.setText(text)
+            self.sync_error.setVisible(True)
+        else:
+            self.sync_error.setVisible(False)
 
     def _set_busy(self, busy: bool) -> None:
         for widget in (self.login_button, self.change_password_button,

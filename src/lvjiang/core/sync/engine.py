@@ -22,6 +22,7 @@ from loguru import logger
 
 from ...constants import AVATARS_DIR, SESSION_CONFIG_DIR, USERS_DIR
 from ..json_files import formatted_json
+from ..user_config import is_valid_username
 from . import client, registry
 from .client import SyncConflict, SyncError
 
@@ -57,29 +58,43 @@ class SyncReport:
         return "，".join(parts)
 
 
+#: core 自己拥有的用户级文档后缀（优先于插件登记，插件不得抢占）。
+_CORE_SUFFIXES: tuple[tuple[str, str], ...] = (("notes", ".notes.json"),)
+#: 永不参与同步的会话运行态后缀。
+_EXCLUDED_SUFFIXES: tuple[str, ...] = (".session.json",)
+
+
 def iter_local_documents(users_dir: Path = USERS_DIR,
                          avatars_dir: Path = AVATARS_DIR,
                          session_dir: Path = SESSION_CONFIG_DIR) -> list[LocalDocument]:
     """枚举本机全部可同步文档；头像只取用户文档实际引用的文件。
 
-    kind 判定：core 固有后缀（.notes.json / .session.json 排除）优先，
-    插件经 registry 登记的后缀次之（最长匹配），其余整文件即 user_doc——
-    core 不认识任何插件领域词汇。
+    kind 判定顺序：core 固有后缀（``.notes.json``）→ 排除项（``.session.json``）
+    → 插件经 registry 登记的后缀（最长匹配）→ 其余整文件即 ``user_doc``。
+    core 只认自己拥有的语义，不认识任何插件领域词汇。
     """
     documents: list[LocalDocument] = []
     avatars: set[str] = set()
-    suffix_map: list[tuple[str, str]] = sorted(
+    plugin_suffixes: list[tuple[str, str]] = sorted(
         registry.user_document_kinds().items(), key=lambda item: -len(item[1]))
     for path in sorted(users_dir.glob("*.json")):
         name = path.name
-        # 会话运行态（users/{名}.session.json）不属于同步范围，永不入云。
-        if name.endswith(".session.json"):
+        if any(name.endswith(suffix) for suffix in _EXCLUDED_SUFFIXES):
             continue
-        matched = next(((kind, suffix) for kind, suffix in suffix_map if name.endswith(suffix)),
-                       None)
+        core = next(((kind, suffix) for kind, suffix in _CORE_SUFFIXES
+                     if name.endswith(suffix)), None)
+        matched = core or next(
+            ((kind, suffix) for kind, suffix in plugin_suffixes if name.endswith(suffix)), None)
         if matched is not None:
             kind, suffix = matched
             documents.append(LocalDocument(name[:-len(suffix)], kind, path))
+            continue
+        # 兜底：整文件即 user_doc。但用户名不允许含「.」，所以带点的文件名一定是
+        # 某个 kind 的文档——只是该 kind 的插件此刻没登记（例如同步在插件注册前
+        # 触发）。这类文件不能当 user_doc 上云（会造成「某用户.loadouts」这种假
+        # 用户），跳过并留日志，等插件登记后再同步。
+        if not is_valid_username(path.stem):
+            logger.warning("[sync] 跳过未登记 kind 的文档：{}", path.name)
             continue
         documents.append(LocalDocument(path.stem, "user_doc", path, strip_ui_state=True))
         try:
@@ -147,13 +162,20 @@ def _push(document: LocalDocument, token: str, raw: bytes, sha256: str,
     report.pushed.append(key)
 
 
-def _pull(document: LocalDocument, token: str, report: SyncReport) -> None:
+def _pull(document: LocalDocument, token: str, report: SyncReport,
+          *, keep_local: bool = False) -> None:
+    """把云端版本落到本地。``keep_local`` 为真时先把本地版另存为冲突副本。
+
+    只有**本地确实有更新的独立改动、却被云端覆盖**时才算冲突。本地只是旧版
+    时直接覆盖即可——给每个旧版都留一份副本只会堆垃圾（实测会导致所有
+    notes.json 每次同步都多出一个 .conflict 文件）。
+    """
     key = f"{document.label}/{document.kind}"
     remote = client.pull(token, document.label, document.kind)
     payload = base64.b64decode(remote["payload_base64"])
     if remote.get("zipped"):
         payload = gzip.decompress(payload)
-    if document.path.is_file():
+    if keep_local and document.path.is_file():
         saved = _save_conflict(document, document.path.read_bytes())
         if saved is not None:
             report.conflicts.append(f"{key} → {saved.name}")
@@ -194,8 +216,9 @@ def sync_documents(token: str,
                 try:
                     _push(entry, token, raw, sha256, remote["sha256"], report)
                 except SyncConflict:
-                    # 本机 mtime 较新但云端又先写入了（竞态）：按冲突规则让云端赢。
-                    _pull(entry, token, report)
+                    # 本机 mtime 较新但云端又先写入了（竞态）：云端赢，但本地这版
+                    # 是真实的独立改动，必须另存，否则改动静默丢失。
+                    _pull(entry, token, report, keep_local=True)
             else:
                 _pull(entry, token, report)
         except (OSError, ValueError) as error:

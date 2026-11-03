@@ -6,6 +6,6 @@ core.sync 不认识插件领域词汇；出装（备战方案 + 装备池）是 
 """
 from __future__ import annotations
 
-from ...core.sync.registry import register_user_document_kind
+from ....core.sync.registry import register_user_document_kind
 
 register_user_document_kind("loadouts", ".loadouts.json")

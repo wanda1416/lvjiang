@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import gzip
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -76,6 +78,47 @@ def _sync(env):
                                  session_dir=env["dirs"]["session"])
 
 
+def test_unregistered_plugin_document_not_uploaded_as_user_doc(monkeypatch) -> None:
+    """插件未登记时（如同步早于插件注册），带点文件名不得当成 user_doc 上云。"""
+    from lvjiang.core.sync import registry
+
+    monkeypatch.setattr(registry, "_USER_DOCUMENT_KINDS", {})
+    with tempfile.TemporaryDirectory() as raw:
+        root = Path(raw)
+        users, avatars, session = root / "users", root / "avatars", root / "session"
+        for directory in (users, avatars, session):
+            directory.mkdir()
+        (users / "蔡元君.json").write_text('{"username": "蔡元君"}', encoding="utf-8")
+        (users / "蔡元君.loadouts.json").write_text("{}", encoding="utf-8")
+        documents = engine.iter_local_documents(users, avatars, session)
+    assert [(d.label, d.kind) for d in documents] == [("蔡元君", "user_doc")]
+
+
+def test_core_notes_suffix_wins_over_plugin_registry(env) -> None:
+    """便利贴必须归类为 notes；曾被误当 user_doc（label「某用户.notes」）。"""
+    users = env["dirs"]["users"]
+    (users / "蔡元君.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
+    (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
+    _sync(env)
+    kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
+    assert ("蔡元君", "notes") in kinds
+    assert ("蔡元君", "loadouts") in kinds
+    assert not any(label.endswith(".notes") for label, _ in kinds)
+
+
+def test_stale_local_pull_makes_no_conflict_copy(env) -> None:
+    """本地只是旧版时直接覆盖，不留副本——否则每次同步都在堆 .conflict 文件。"""
+    users = env["dirs"]["users"]
+    path = users / "蔡元君.notes.json"
+    path.write_text('{"notes": [], "old": true}\n', encoding="utf-8")
+    remote = json.dumps({"notes": []}, ensure_ascii=False).encode("utf-8")
+    env["fake"].set_remote_future("蔡元君", "notes", remote, "2099-01-01T00:00:00Z")
+    report = _sync(env)
+    assert report.pulled == ["蔡元君/notes"]
+    assert report.conflicts == []
+    assert not any(".conflict-" in p.name for p in users.iterdir())
+
+
 def test_new_local_documents_push_gzipped_without_ui_state(env) -> None:
     users = env["dirs"]["users"]
     (users / "蔡元君.json").write_text(json.dumps({
@@ -111,10 +154,9 @@ def test_remote_newer_pulls_and_preserves_local_ui_state(env) -> None:
     merged = json.loads(path.read_text(encoding="utf-8"))
     assert merged["attributes"]["level"] == 99
     assert merged["ui_state"]["equip_filter"] == ["本地筛选"]  # 界面偏好永远以本机为准
-    # 冲突另存：本地输的一版留档
-    assert any("conflict" in name for name in [p.name for p in users.iterdir()])
-    # 便利贴：本地输入 ui_state 的覆盖逻辑不适用，但同样走 pull
-    assert report.conflicts and "conflict" in report.conflicts[0]
+    # 本地只是旧版：直接覆盖，不留副本
+    assert not any(".conflict-" in p.name for p in users.iterdir())
+    assert report.conflicts == []
 
 
 def test_local_newer_pushes_with_remote_sha_as_lock(env) -> None:

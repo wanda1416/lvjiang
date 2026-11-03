@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -84,15 +85,21 @@ class _AccountWorker(QThread):
 
 
 class _CombinedReport:
-    """文档通道 + profile 账本的合并结果，界面只关心总量与错误。"""
+    """用户表 + 文档通道 + profile 账本的合并结果，界面只关心总量与错误。"""
 
-    def __init__(self, documents, profile):
+    def __init__(self, documents, profile, users=None):
         self.documents = documents
         self.profile = profile
-        self.errors = [*documents.errors, *profile.errors]
+        self.users = users
+        self.errors = [*documents.errors, *profile.errors,
+                       *(users.errors if users else [])]
 
     def describe(self) -> str:
-        parts = [f"文档 {self.documents.describe()}", f"profile {self.profile.describe()}"]
+        parts = []
+        if self.users:
+            parts.append(f"名册 {self.users.describe()}")
+        parts.append(f"文档 {self.documents.describe()}")
+        parts.append(f"profile {self.profile.describe()}")
         if self.errors:
             parts.append(f"失败 {len(self.errors)}")
         return "；".join(parts)
@@ -199,7 +206,7 @@ class AccountHolder(QObject):
         return self._start(action, "operation")
 
     def sync_async(self, allow_overwrite: bool = False) -> bool:
-        """一轮完整同步（文档通道 + profile 账本）；同一时刻只跑一份。"""
+        """一轮完整同步（用户表 + 文档通道 + profile 账本）；同一时刻只跑一份。"""
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
         if not token:
@@ -208,9 +215,11 @@ class AccountHolder(QObject):
 
         def action():
             from ..core.profile.snapshot_sync import sync_all
+            from ..core.sync.users_sync import sync_users
+            users_report = sync_users(token)
             document_report = sync_documents(token)
             profile_report = sync_all(token, allow_overwrite=allow_overwrite)
-            return _CombinedReport(document_report, profile_report)
+            return _CombinedReport(document_report, profile_report, users_report)
 
         return self._start(action, "sync")
 
@@ -235,13 +244,20 @@ class AccountManagerDialog(QDialog):
         super().__init__(parent)
         self.holder = account_holder()
         self.setWindowTitle(tr("账户管理"))
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(520)
         self._connections: list[tuple[object, object]] = []
         layout = QVBoxLayout(self)
 
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+
+        # ════ Tab 1：账户（登录 / 信息 / 设备管理） ════
+        account_tab = QWidget()
+        account_layout = QVBoxLayout(account_tab)
+
         self.status = QLabel()
         self.status.setWordWrap(True)
-        layout.addWidget(self.status)
+        account_layout.addWidget(self.status)
 
         # ── 登录表单 ──
         self.form_host = QWidget()
@@ -260,9 +276,9 @@ class AccountManagerDialog(QDialog):
         button_row.addWidget(self.login_button)
         button_row.addStretch()
         form.addRow(button_row)
-        layout.addWidget(self.form_host)
+        account_layout.addWidget(self.form_host)
 
-        # ── 已登录信息 ──
+        # ── 已登录信息（账户 + 设备） ──
         self.info_host = QWidget()
         info = QVBoxLayout(self.info_host)
         self.account_label = QLabel()
@@ -290,17 +306,22 @@ class AccountManagerDialog(QDialog):
         actions.addStretch()
         info.addLayout(actions)
         self.info_host.setVisible(False)
-        layout.addWidget(self.info_host)
+        account_layout.addWidget(self.info_host)
+        account_layout.addStretch()
+        self.tabs.addTab(account_tab, tr("账户"))
 
-        # ── 数据同步 ──
+        # ════ Tab 2：数据同步 ════
+        sync_tab = QWidget()
+        sync_layout = QVBoxLayout(sync_tab)
+
         sync_row = QHBoxLayout()
         self.sync_button = QPushButton(tr("立即同步"))
-        apply_button_style(self.sync_button, variant="neutral")
+        apply_button_style(self.sync_button)
         self.sync_button.clicked.connect(self._sync_now)
+        sync_row.addWidget(self.sync_button)
         self.snapshot_button = QPushButton(tr("刷新快照"))
         apply_button_style(self.snapshot_button, variant="neutral")
         self.snapshot_button.clicked.connect(self._refresh_snapshot)
-        sync_row.addWidget(self.sync_button)
         sync_row.addWidget(self.snapshot_button)
         self.clear_sync_button = QPushButton(tr("清除同步"))
         apply_button_style(self.clear_sync_button, variant="neutral")
@@ -310,10 +331,20 @@ class AccountManagerDialog(QDialog):
         self.clear_sync_button.clicked.connect(self._clear_sync)
         sync_row.addWidget(self.clear_sync_button)
         sync_row.addStretch()
-        layout.addLayout(sync_row)
+        sync_layout.addLayout(sync_row)
+
         self.sync_status = QLabel()
         self.sync_status.setWordWrap(True)
-        layout.addWidget(self.sync_status)
+        sync_layout.addWidget(self.sync_status)
+
+        hint = QLabel(tr(
+            "同步内容：角色名册与资料、出装/便利贴/头像文档、profile 数值账本。\n"
+            "新设备接入前，请先在其中一台设备上点「刷新快照」建立云端基线。"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: palette(mid); font-size: 12px;")
+        sync_layout.addWidget(hint)
+        sync_layout.addStretch()
+        self.tabs.addTab(sync_tab, tr("数据同步"))
 
         self._connect(self.holder.changed, self._on_holder_changed)
         self._connect(self.holder.operation_finished, self._on_operation_failed)
@@ -404,6 +435,7 @@ class AccountManagerDialog(QDialog):
                 tr("尚未同步。登录后自动同步一次；换设备前建议先「刷新快照」。"))
         running = self.holder.syncing or self.holder.busy
         self.sync_button.setEnabled(not running)
+        self.clear_sync_button.setEnabled(not running)
         self.snapshot_button.setEnabled(not running and self.holder.summary is not None)
 
     def _set_busy(self, busy: bool) -> None:

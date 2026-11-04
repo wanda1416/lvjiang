@@ -566,11 +566,10 @@ class AccountManagerDialog(QDialog):
         self.sync_table.setCellWidget(3, 5, snapshot_host)
         sync_layout.addWidget(self.sync_table, stretch=1)
 
-        # 错误行：只在真失败时出现，其余时候不占位。
+        # 错误行：固定高度常驻，只换文字，不随失败出现/消失顶跳布局。
         self.sync_error = QLabel()
-        self.sync_error.setWordWrap(True)
+        self.sync_error.setFixedHeight(20)
         self.sync_error.setStyleSheet("color: #c62828; font-size: 12px;")
-        self.sync_error.setVisible(False)
         sync_layout.addWidget(self.sync_error)
 
         self._step_rows = {tr("定义"): 0, tr("用户"): 1, tr("文档"): 2, tr("总览"): 3}
@@ -732,12 +731,12 @@ class AccountManagerDialog(QDialog):
             self.devices.setCellWidget(row, 3, host)
 
     def _set_sync_note(self, text: str, *, error: bool = False) -> None:
-        """同步页反馈：失败原因进底部红字行；其余进按钮行的状态标签。"""
+        """同步页反馈：失败原因进固定红字行；其余进按钮行的状态标签。"""
         if error:
             self.sync_error.setText(text)
-            self.sync_error.setVisible(True)
+            self.sync_error.setToolTip(text)
             return
-        self.sync_error.setVisible(False)
+        self.sync_error.setText("")
         self.sync_status.setText(text)
 
     def _on_sync_progress(self, data: dict) -> None:
@@ -764,7 +763,6 @@ class AccountManagerDialog(QDialog):
         report = self.holder.last_sync_report
         if self.holder.syncing:
             self._set_sync_note(tr("正在同步…"))
-            self.sync_error.setVisible(False)
         elif report is not None:
             # 结果在表格里；状态标签固定显示最近同步时间，确认点过就跑过
             self._set_sync_note(
@@ -776,7 +774,6 @@ class AccountManagerDialog(QDialog):
                 tr("最近同步时间：{}").format(self.holder.last_sync_at)
                 if self.holder.last_sync_at else "")
             self._fill_sync_table(None)
-            self.sync_error.setVisible(False)
         running = self.holder.syncing or self.holder.busy
         self.sync_button.setEnabled(established and not running)
         self.sync_button.setToolTip(
@@ -839,9 +836,9 @@ class AccountManagerDialog(QDialog):
             if len(errors) > len(shown):
                 text += tr("；等 {} 项").format(len(errors))
             self.sync_error.setText(text)
-            self.sync_error.setVisible(True)
+            self.sync_error.setToolTip(text)
         else:
-            self.sync_error.setVisible(False)
+            self.sync_error.setText("")
 
     def _set_busy(self, busy: bool) -> None:
         for widget in (self.login_button, self.change_password_button,

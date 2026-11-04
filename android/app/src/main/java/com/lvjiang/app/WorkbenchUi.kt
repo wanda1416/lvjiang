@@ -1153,7 +1153,7 @@ class WorkbenchUi(
      */
     private fun accountCard() {
         val accountCardLayout = card()
-        text(accountCardLayout, "账户与数据同步", 18f)
+        text(accountCardLayout, "账户", 18f)
         val loginRow = SettingsUi.row(activity, "账户", "正在检查登录状态…")
         accountCardLayout.addView(loginRow)
         loginRow.isEnabled = false
@@ -1259,8 +1259,12 @@ class WorkbenchUi(
     }
 
     /**
-     * 数据同步对话框（原「总览数据」，改名与角色定位一致）。
-     * 云端模式：关闭键左侧多一个「立即同步」；PC端模式没有同步概念，只收离线包。
+     * 数据同步对话框。布局定案：
+     * - 标题行右上角：「清除数据」（destructive，与标题同一行）；
+     * - 状态行（模式 / 云端位置 / 未同步数）；
+     * - 底部按钮行：云端模式 = 「立即同步」在左、「关闭」在最右（同一行）；
+     *   PC端模式没有同步概念，底部只有「关闭」；
+     * - 「切换为 云端/PC端」独立成行、靠最左，不与上述按钮混排。
      */
     private fun showProfileSource() {
         request({ PyBridge.accountProfileMode(activity) }) { result ->
@@ -1269,8 +1273,6 @@ class WorkbenchUi(
             val snapshot = result.optInt("snapshot_id", 0)
             val watermark = result.optInt("snapshot_remote_id", 0)
             val pending = result.optInt("pending_push", 0)
-            // 三行说完：当前模式 / 云端位置 / 未同步数。解释性文字全删——
-            // 用户要的是状态，不是说明书。
             val lines = mutableListOf(if (isPc) "当前来源：PC端" else "当前来源：云端")
             if (snapshot > 0) lines.add("云端快照 #$snapshot · 历史水位 $watermark")
             if (!isPc) lines.add(
@@ -1278,36 +1280,54 @@ class WorkbenchUi(
             val content = SettingsUi.dialogContent(activity)
             lines.forEach { text(content, it) }
 
-            val actions = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-            }
             // 成功的切换/清除都会关掉本对话框：内容基于打开时的旧状态构建，
             // 留着只会展示陈旧信息（点过「切换为 PC端」后界面还停在云端态）
             val dialog = MaterialAlertDialogBuilder(activity).setTitle("数据同步")
                 .setView(SettingsUi.dialogScroll(activity, content))
                 .setNegativeButton("关闭", null)
                 .create()
-            if (!isPc) {
-                // 云端模式专属：立即同步（与「关闭」并排，放其左侧）
-                actions.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
-                    LinearLayout.LayoutParams(-2, -2))
-                actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+
+            // 标题行右上角：清除数据（继承对话框关闭行为）
+            val titleBar = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
             }
-            actions.addView(profileActionButton("清除数据", destructive = true) {
+            titleBar.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+            titleBar.addView(profileActionButton("清除数据", destructive = true) {
                 dialog.dismiss()
                 confirmClearProfile(keepMode = true)
             }, LinearLayout.LayoutParams(-2, -2))
-            actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            actions.addView(profileActionButton(if (isPc) "切换为云端" else "切换为 PC端") {
+            content.addView(titleBar, LinearLayout.LayoutParams(-1, -2))
+
+            // 底部按钮行：立即同步（仅云端）在左、关闭在最右
+            val bottom = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            if (!isPc) {
+                bottom.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
+                    LinearLayout.LayoutParams(-2, -2))
+                bottom.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+            }
+            bottom.addView(profileActionButton("关闭") { dialog.dismiss() },
+                LinearLayout.LayoutParams(-2, -2))
+            content.addView(bottom, LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = (8 * activity.resources.displayMetrics.density).toInt()
+            })
+
+            // 切换模式：独立一行，靠最左
+            val switchRow = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.START
+            }
+            switchRow.addView(profileActionButton(if (isPc) "切换为云端" else "切换为 PC端") {
+                dialog.dismiss()
                 if (isPc) {
-                    dialog.dismiss()
                     confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
                 } else {
                     // 云端→PC端：破坏性操作，一律二次确认（带未同步数据评估）
                     request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
                         if (r.optBoolean("need_confirm")) {
-                            dialog.dismiss()
                             MaterialAlertDialogBuilder(activity)
                                 .setTitle("切换为 PC端")
                                 .setMessage(r.optString("message"))
@@ -1321,13 +1341,12 @@ class WorkbenchUi(
                                 }.show()
                             return@request
                         }
-                        dialog.dismiss()
                         if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
                         toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
                     }
                 }
             }, LinearLayout.LayoutParams(-2, -2))
-            content.addView(actions, LinearLayout.LayoutParams(-1, -2).apply {
+            content.addView(switchRow, LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = (8 * activity.resources.displayMetrics.density).toInt()
             })
 
@@ -1381,8 +1400,7 @@ class WorkbenchUi(
             }.onFailure { toast("未找到可打开链接的浏览器") }
         }, LinearLayout.LayoutParams(-2, -2))
         actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-        val logout = profileActionButton("退出登录", destructive = true)
-        logout.setOnClickListener {
+        actions.addView(profileActionButton("退出登录", destructive = true) {
             MaterialAlertDialogBuilder(activity).setTitle("退出登录")
                 .setMessage("退出后本机数据保留，但不再与云端同步。")
                 .setNegativeButton("取消", null)
@@ -1392,8 +1410,7 @@ class WorkbenchUi(
                         show("SETTINGS")
                     }
                 }.show()
-        }
-        actions.addView(logout, LinearLayout.LayoutParams(-2, -2))
+        }, LinearLayout.LayoutParams(-2, -2))
         content.addView(actions, LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = (8 * activity.resources.displayMetrics.density).toInt()
         })

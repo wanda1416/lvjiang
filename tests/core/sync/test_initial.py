@@ -37,3 +37,24 @@ def test_backup_noop_when_nothing_to_move(monkeypatch, tmp_path):
 
     assert initial.backup_local_profile_data() is None
     assert not session.exists() or not any(session.iterdir())
+
+
+def test_backup_moves_registered_session_documents(monkeypatch, tmp_path):
+    from lvjiang.core.sync import initial, registry
+
+    session = tmp_path / "session"
+    monkeypatch.setattr(initial, "SESSION_CONFIG_DIR", session)
+    monkeypatch.setattr(initial, "USERS_DIR", session / "users")
+
+    monkeypatch.setattr(registry, "_SESSION_DOCUMENTS", dict(registry._SESSION_DOCUMENTS))
+    registry.register_session_document("acceptance", "acceptance/play_styles.json")
+
+    doc = session / "acceptance" / "play_styles.json"
+    doc.parent.mkdir(parents=True)
+    doc.write_text("{}", encoding="utf-8")
+
+    backup = initial.backup_local_profile_data()
+
+    assert backup is not None
+    assert (backup / "acceptance" / "play_styles.json").exists()
+    assert not doc.exists()

@@ -84,15 +84,27 @@ def _backup_target() -> Path:
     return target
 
 
-def backup_local_profile_data() -> Path | None:
-    """把本地 ``users/``、``profile.db``、``profile.yaml`` 移入备份目录。
+def _session_document_sources() -> list[Path]:
+    """注册的账户级同步文档（如 yysl/play_styles.json）的本地路径。"""
+    from . import registry
 
-    移完重建空的 ``users/``；profile.db / profile.yaml 由后续拉取重建。
-    三个目标都不存在时返回 None（不做空备份）。
+    sources: list[Path] = []
+    for spec in registry.session_documents().values():
+        path = SESSION_CONFIG_DIR / spec.rel_path
+        if path.is_file():
+            sources.append(path)
+    return sources
+
+
+def backup_local_profile_data() -> Path | None:
+    """把本地 ``users/``、``profile.db``、``profile.yaml`` 与注册的会话级
+    同步文档移入备份目录；移完重建空的 ``users/``，profile.db / profile.yaml
+    与文档由后续拉取重建。目标与文档都不存在时返回 None（不做空备份）。
     """
     sources = [Path(USERS_DIR), SESSION_CONFIG_DIR / "profile.db",
                SESSION_CONFIG_DIR / "profile.yaml"]
-    if not any(source.exists() for source in sources):
+    session_docs = _session_document_sources()
+    if not any(source.exists() for source in sources) and not session_docs:
         return None
     target = _backup_target()
     target.mkdir(parents=True, exist_ok=True)
@@ -100,6 +112,12 @@ def backup_local_profile_data() -> Path | None:
         if source.exists():
             shutil.move(str(source), str(target / source.name))
             logger.info("[initial sync] 已备份 {} → {}", source.name, target)
+    for source in session_docs:
+        relative = source.relative_to(SESSION_CONFIG_DIR)
+        destination = target / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(destination))
+        logger.info("[initial sync] 已备份会话文档 {} → {}", relative, destination)
     Path(USERS_DIR).mkdir(parents=True, exist_ok=True)
     return target
 

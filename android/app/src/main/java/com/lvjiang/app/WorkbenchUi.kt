@@ -146,9 +146,30 @@ class WorkbenchUi(
             }
         }
     }
+
+    /**
+     * 长耗时操作（登录/登出这类要等网络十秒以上的）专用：不走 generation 守卫，
+     * 只在页面或 Activity 真的销毁时放弃。否则用户在这段时间里切个页签，结果
+     * 就被静默丢弃——表现就是「点了登录什么都没发生」。
+     */    private fun requestSticky(load: () -> JSONObject, done: (JSONObject) -> Unit) {
+        executor.execute {
+            val result = try { load() } catch (e: Exception) {
+                JSONObject().put("ok", false).put("message", e.message ?: "操作失败")
+            }
+            activity.runOnUiThread { if (!closed && !activity.isDestroyed) done(result) }
+        }
+    }
     private fun action(load: () -> JSONObject) = request(load, control = true) { toast(it.optString("message")) }
     private fun objects(array: JSONArray?): List<JSONObject> =
         if (array == null) emptyList() else (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+
+    /** 无障碍没开时「启动悬浮窗」变成「授权无障碍」，点了直接进系统无障碍页。 */
+    private fun openAccessibilitySettings() {
+        runCatching {
+            activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }.onFailure { Toast.makeText(activity, "打不开无障碍设置：${it.message}", Toast.LENGTH_LONG).show() }
+    }
+
     private fun detail(title: String, body: String) {
         val content = SettingsUi.dialogContent(activity)
         content.addView(SettingsUi.label(activity, body).apply { setTextIsSelectable(true) })
@@ -165,6 +186,7 @@ class WorkbenchUi(
         runtimeMeta = null; runtimeMessage = null; runtimeStatus = null; logsButton = null
         executionUserText = null; executionUserCard = null; selectedTaskText = null
         floatingButton = null; floatingHint = null
+        accountSummary = null
         host.visibility = if (next in setOf("HOME", "TASKS", "USERS", "SETTINGS", "ALL_USERS")) View.VISIBLE else View.GONE
         when (next) {
             "HOME" -> home()
@@ -223,7 +245,13 @@ class WorkbenchUi(
             .ifEmpty { "尚未选择" } + if (canSelectUser) "" else "\n执行中不可切换"
         floatingButton?.apply {
             val started = FloatService.isRunning
-            text = if (started) "关闭悬浮窗" else "启动悬浮窗"
+            // 没开无障碍时起不了悬浮窗，按钮直接变成「授权无障碍」，点了去系统页
+            val needsA11y = !started && !A11yBridge.isReady()
+            text = when {
+                started -> "关闭悬浮窗"
+                needsA11y -> "授权无障碍"
+                else -> "启动悬浮窗"
+            }
             isEnabled = canSelectUser
             val background = if (!canSelectUser) com.google.android.material.R.attr.colorSurfaceContainerHighest
                 else if (started) com.google.android.material.R.attr.colorSecondaryContainer else com.google.android.material.R.attr.colorPrimary
@@ -235,6 +263,7 @@ class WorkbenchUi(
         floatingHint?.text = when {
             AgentServer.pcControlsDevice() -> "设备正由电脑控制，请在电脑端暂停或结束任务。"
             !canSelectUser -> "执行中请使用上方的暂停或结束操作。"
+            !FloatService.isRunning && !A11yBridge.isReady() -> "需要无障碍权限，点击后按系统提示授权。"
             !Settings.canDrawOverlays(activity) -> "需要悬浮窗权限，点击后按系统提示授权。"
             FloatService.isRunning -> "悬浮窗已开启，回到游戏后点击图标启动任务。"
             else -> "开启后回到游戏，从悬浮图标启动任务。"
@@ -339,7 +368,11 @@ class WorkbenchUi(
         }
         selectedTaskText = taskChoice.second
         button(host, "批量执行") { taskSection = "BATCH"; openTools("TASKS") }
-        floatingButton = button(host, "启动悬浮窗", primary = true) { toggleFloat() }
+        floatingButton = button(host, "启动悬浮窗", primary = true) {
+            // 无障碍没开时这个按钮就是「授权无障碍」：直接把用户送到系统无障碍页
+            if (!FloatService.isRunning && !A11yBridge.isReady()) openAccessibilitySettings()
+            else toggleFloat()
+        }
         floatingHint = text(host, "开启后回到游戏，从悬浮图标启动任务。", 12f).apply {
             setTextColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant))
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = (12 * activity.resources.displayMetrics.density).toInt() }
@@ -1105,7 +1138,19 @@ class WorkbenchUi(
         entry(about, "关于", "律匠 · ${BuildConfig.VERSION_NAME}") { showAbout() }
     }
 
-    /** 账户卡片：未登录显示登录入口；已登录显示账户名 + 同步/登出。 */
+    /**
+     * 登录失败的原因要留在账户行上：登录要等十几秒甚至更久，只弹一个 Toast
+     * 用户很容易错过，页面刷新后更是彻底看不到发生过什么。
+     */
+    private var lastLoginError = ""
+    private var accountSummary: TextView? = null
+
+    /**
+     * 账户卡片。三种情况严格分开，不能混：
+     * - 已登录（`logged_in`）：网络不通时只是多一句「网络不可用」，**绝不显示未登录**；
+     * - 未登录（`logged_in=false` 且不是 `orphaned`）：给登录入口 + 上次失败原因；
+     * - 登录记录与实例不匹配（`orphaned`）：说明该重新登录，而不是静默当没登录。
+     */
     private fun accountCard() {
         val accountCardLayout = card()
         text(accountCardLayout, "账户与数据同步", 18f)
@@ -1114,6 +1159,7 @@ class WorkbenchUi(
         loginRow.isEnabled = false
         fun summaryText(row: LinearLayout): TextView =
             (row.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        accountSummary = summaryText(loginRow)
         loginRow.setOnClickListener { showAccountActions() }
         request({ PyBridge.accountStatus(activity) }) { result ->
             if (!result.optBoolean("ok")) {
@@ -1122,10 +1168,20 @@ class WorkbenchUi(
             }
             if (result.optBoolean("logged_in")) {
                 val who = result.optString("display_name").ifEmpty { result.optString("login") }
-                summaryText(loginRow).text = "已登录 $who · 点击同步或登出"
+                summaryText(loginRow).text = if (result.has("online") && !result.optBoolean("online")) {
+                    "已登录 $who · 网络不可用，点此重试同步"
+                } else {
+                    "已登录 $who · 点击同步或登出"
+                }
+                lastLoginError = ""
                 loginRow.isEnabled = true
             } else {
-                summaryText(loginRow).text = "未登录 · 点击登录并同步数据"
+                val orphaned = result.optBoolean("orphaned")
+                summaryText(loginRow).text = when {
+                    orphaned -> result.optString("message").ifEmpty { "请重新登录" } + " · 点击登录"
+                    lastLoginError.isNotEmpty() -> "登录失败：$lastLoginError · 点击重试"
+                    else -> "未登录 · 点击登录并同步数据"
+                }
                 loginRow.isEnabled = true
                 loginRow.setOnClickListener { showLoginDialog() }
             }
@@ -1150,18 +1206,33 @@ class WorkbenchUi(
                 val login = loginEdit.text.toString().trim()
                 val password = passwordEdit.text.toString()
                 if (login.isEmpty() || password.isEmpty()) { toast("请填写账户名与密码"); return@setPositiveButton }
-                toast("正在登录并同步…")
-                request({ PyBridge.accountLogin(activity, login, password) }) { result ->
-                    if (!result.optBoolean("ok")) { toast("登录失败：${result.optString("message")}"); return@request }
-                    val sync = result.optJSONObject("sync")
-                    val syncNote = when {
-                        sync == null -> ""
-                        sync.optBoolean("synced") -> "，已同步 ${sync.optInt("pulled", 0)}/${sync.optInt("pushed", 0)} 条"
-                        sync.optString("reason") == "no_snapshot" -> "；云端还没有快照，请先在电脑上刷新快照"
-                        else -> "；同步未完成：${sync.optString("message")}"
+                // 登录要等十几秒（含重试最多 40s），先把「正在登录」写进行摘要，
+                // 用完 requestSticky：这段时间里页面重建也不能把结果丢掉。
+                lastLoginError = ""
+                accountSummary?.text = "正在登录并同步…"
+                requestSticky({ PyBridge.accountLogin(activity, login, password) }) { result ->
+                    if (!result.optBoolean("ok")) {
+                        val message = result.optString("message").ifEmpty { "登录失败" }
+                        lastLoginError = message
+                        accountSummary?.text = "登录失败：$message · 点击重试"
+                        toast("登录失败：$message")
+                        return@requestSticky
                     }
-                    toast("已登录 ${result.optString("login")}$syncNote")
-                    show("SETTINGS")           // 重建设置页刷新账户卡片
+                    // 登录本身一到就反馈；profile 同步放后台，别再让用户等第二次握手
+                    val who = result.optString("login")
+                    lastLoginError = ""
+                    accountSummary?.text = "已登录 $who · 正在同步…"
+                    toast("已登录 $who")
+                    if (page == "SETTINGS") show("SETTINGS")
+                    requestSticky({ PyBridge.accountSync(activity) }) { sync ->
+                        if (!sync.optBoolean("ok")) {
+                            toast(if (sync.optBoolean("offline")) {
+                                "已登录，但网络不可用，稍后再同步"
+                            } else {
+                                "已登录；同步未完成：${sync.optString("message")}"
+                            })
+                        }
+                    }
                 }
             }.show()
     }

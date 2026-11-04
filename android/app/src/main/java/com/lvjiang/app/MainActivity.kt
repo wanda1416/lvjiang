@@ -88,6 +88,12 @@ class MainActivity : AppCompatActivity() {
             selectedTaskChanged = { if (page == Page.TASKS) updateTaskTitle(it) },
             subpageChanged = { p -> workbenchSubpage = p; applyWorkbenchSubpage() })
         workbench.restore(savedInstanceState)
+        // 账户登录态预热：解释器起来后先把状态读进内存（Python 侧缓存），
+        // 之后进设置页只是读内存，不再每次现查凭据库/网络。
+        executor.execute {
+            PyBridge.ensureStarted(this)
+            PyBridge.accountStatus(this)
+        }
         val navigation = findViewById<BottomNavigationView>(R.id.main_navigation)
         navigation.setOnItemSelectedListener { item ->
             val target = when (item.itemId) {

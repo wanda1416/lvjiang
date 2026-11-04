@@ -16,12 +16,6 @@ def _history_channels():
     return history_channels()
 
 
-def _initialize_session_storage() -> None:
-    from .config.session_node import initialize_session_storage
-
-    initialize_session_storage()
-
-
 def _reload_configuration() -> None:
     from .config.manager import reset_game_config
     from .config.session_node import reset_session_storage
@@ -70,7 +64,9 @@ def _quality_stylesheet(tokens):
 hooks = AppHooks(
     id="yysls",
     name=tr("燕云十六声"),
-    startup_callbacks=[_initialize_session_storage],
+    # 不在这里建会话文件：启动就把 play_styles 等登记文档写成空 {}，会让文档
+    # 通道把空文件当成「本地更新」推上去盖掉云端真实数据。改为首次真正访问
+    # 该文档时由 DocumentDirectoryStore 懒初始化。
     window_title=tr("律匠 - 燕云十六声装备调律工具") + f" v{__version__}",
 
     # 注入通用 MainWindow 的 Tab / 菜单

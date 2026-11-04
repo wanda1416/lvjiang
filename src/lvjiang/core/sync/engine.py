@@ -220,7 +220,8 @@ def sync_documents(token: str,
             _pull(document, token, report)
         except SyncError as error:
             report.errors.append(f"{label}/{kind}: {error}")
-    logger.info("[sync] {}", report.describe())
+    # 不在这里打完成日志：唯一调用方（PC 账户对话框）会用 _CombinedReport
+    # 打一行覆盖四通道的汇总，内层再打一份纯重复；失败已逐条进 errors。
     return report
 
 

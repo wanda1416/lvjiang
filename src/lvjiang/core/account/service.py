@@ -385,6 +385,8 @@ class AccountSession:
     def __init__(self) -> None:
         self.access_token = ""
         self.access_expires_at = ""
+        # E2E 密钥：登录派生 / 恢复时从 account.json 加载（见 login/restore）
+        self.e2e_key: bytes | None = None
 
     # ─── 登录态生命周期 ─────────────────────────────────
 
@@ -408,6 +410,11 @@ class AccountSession:
             "platform": _platform_tag(),
         }, timeout=_AUTH_TIMEOUT_S)
         _store_refresh_token(result["refresh_token"])
+        # E2E 密钥在「握有明文口令的瞬间」派生并常驻内存；hex 缓存进
+        # account.json 供 restore 免重派生（本地盘本就是明文，不降安全性）
+        from . import e2e
+        self.e2e_key = e2e.derive_key(password, result["account_id"])
+        e2e.set_key(self.e2e_key)
         # 同账号重新登录（掉线/登出后再登）必须**保留**同步水位等运行态——
         # 整写 account.json 会抹掉 profile_sync/users_sync，下一轮同步退回
         # bootstrap，把云端旧快照静默盖到本地新数据上（2026-11-04 事故根源）。
@@ -419,6 +426,7 @@ class AccountSession:
             "display_name": result["display_name"], "instance_id": result["instance_id"],
             "device_name": device_name, "instance_uuid": instance_uuid,
         })
+        e2e.persist_key_into(self.e2e_key, profile)
         _save_profile(profile)
         self.access_token = result["access_token"]
         self.access_expires_at = result["access_expires_at"]
@@ -455,6 +463,11 @@ class AccountSession:
         _store_refresh_token(result["refresh_token"])
         self.access_token = result["access_token"]
         self.access_expires_at = result["access_expires_at"]
+        # restore 不经口令：E2E 密钥从 account.json 缓存加载
+        from . import e2e
+        if self.e2e_key is None:
+            self.e2e_key = e2e.load_stored_key()
+            e2e.set_key(self.e2e_key)
         # 不取详情时也要返回一个真值，调用方靠"返回 None"判断失败
         return self.summary() if fetch_summary else {"ok": True}
 
@@ -483,6 +496,13 @@ class AccountSession:
             raise AccountError("新密码至少 8 位")
         self._authorized("POST", "/api/change_password",
                          {"old_password": old_password, "new_password": new_password})
+        # E2E 密钥由口令派生：换口令即换钥。旧密文由下一次同步自动重推——
+        # 名册内容签名基于密文（必变）触发上传；notes 文档 sha 同理。
+        from . import e2e
+        account_id = load_profile().get("account_id") or ""
+        self.e2e_key = e2e.derive_key(new_password, str(account_id))
+        e2e.set_key(self.e2e_key)
+        e2e.persist_key(self.e2e_key)
 
     def revoke_device(self, device_id: str) -> dict:
         """让某台设备下线（会话鉴权；服务端只允许操作自己账号下的设备）。"""

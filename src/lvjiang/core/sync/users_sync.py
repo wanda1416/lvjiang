@@ -139,6 +139,8 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     order_changed = roster != signature
 
     if roster:
+        from ..account.e2e import current_key, encrypt_json
+        e2e_key = current_key()
         payload = []
         for position, name in enumerate(roster):
             path = users_dir / f"{name}.json"
@@ -149,11 +151,15 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
                     data.pop("ui_state", None)      # 界面偏好永不上云
                 except (OSError, ValueError):
                     data = {}
+            # 基础属性端到端加密：本地明文 → 上云密文（封装对象按原样透传）。
+            # 无密钥（未登录窗口/异常）则退回明文，读取端按 legacy 处理。
+            cloud_data = encrypt_json(e2e_key, data) if e2e_key and data else data
             payload.append({"username": name, "position": position,
                             "updated_at": _mtime_iso(path) if path.is_file()
                               else datetime.now().isoformat(timespec="seconds"),
-                            "data": data})
+                            "data": cloud_data})
         # 内容签名：名册顺序 + 各用户资料都没变 → 本次推送整个跳过。
+        # 签名基于**上云形态**（密文），改密换钥后密文必变 → 自动触发全量重推。
         # 否则每次同步都全量发 19 行、D1 白写几十行配额，界面还恒显「上行 19」。
         content_sig = hashlib.sha256(json.dumps(
             payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -180,13 +186,22 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
         return report
     remote_users = response.get("users") or []
 
-    # 资料落地：合并回本地 json（保留本机 ui_state）
+    # 资料落地：密文解密后合并回本地 json（保留本机 ui_state）
+    from ..account.e2e import current_key, is_encrypted
+    from ..account.e2e import decrypt_json as _decrypt
+    e2e_key = current_key()
     local_roster = _roster()
     for row in remote_users:
         name = row.get("username")
         data = row.get("data")
         if not isinstance(name, str) or not isinstance(data, dict) or not data:
             continue
+        if is_encrypted(data):
+            data = _decrypt(e2e_key, data) if e2e_key else None
+            if not data:
+                # 密文但本机无钥（改密后旧数据/异常）：跳过，绝不能把密文写进
+                # 本地明文文件覆盖真实数据
+                continue
         path = users_dir / f"{name}.json"
         if not path.is_file():
             continue                          # 本地没有该用户：资料等名册引入后再落

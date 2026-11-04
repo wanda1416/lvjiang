@@ -139,6 +139,35 @@ def _push(document: LocalDocument, token: str, raw: bytes, sha256: str,
     report.pushed.append(key)
 
 
+def _outbound_bytes(document: LocalDocument, raw: bytes) -> bytes:
+    """上云前的边界变换：便利贴端到端加密（本地明文 → 云端密文）。
+
+    无密钥时原样上云（读取端按 legacy 明文处理），不让加密层阻断同步。
+    """
+    if document.kind != "notes":
+        return raw
+    from ..account.e2e import current_key, encrypt_text
+    key = current_key()
+    if key is None:
+        return raw
+    return encrypt_text(key, raw.decode("utf-8")).encode("utf-8")
+
+
+def _inbound_bytes(document: LocalDocument, payload: bytes) -> bytes | None:
+    """下拉后的边界变换：便利贴解密。返回 None 表示保持本地文件不变。"""
+    if document.kind != "notes":
+        return payload
+    from ..account.e2e import current_key, decrypt_text, is_encrypted_text
+    text = payload.decode("utf-8", "replace")
+    if not is_encrypted_text(text):
+        return payload                  # legacy 明文：原样落地
+    key = current_key()
+    plain = decrypt_text(key, text) if key else None
+    if plain is None:
+        return None                     # 密文解不开：绝不用密文覆盖本地明文
+    return plain.encode("utf-8")
+
+
 def _pull(document: LocalDocument, token: str, report: SyncReport,
           *, keep_local: bool = False) -> None:
     """把云端版本落到本地。``keep_local`` 为真时先把本地版另存为冲突副本。
@@ -152,6 +181,11 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
     payload = base64.b64decode(remote["payload_base64"])
     if remote.get("zipped"):
         payload = gzip.decompress(payload)
+    payload = _inbound_bytes(document, payload)
+    if payload is None:
+        # 密文但本机解不开（改密后旧数据等）：保留本地明文，不制造冲突副本
+        report.pulled.append(key)
+        return
     if keep_local and document.path.is_file():
         saved = _save_conflict(document, document.path.read_bytes())
         if saved is not None:
@@ -190,7 +224,7 @@ def sync_documents(token: str,
         seen.add(key)
         remote = remote_by_key.get(key)
         try:
-            raw = _read_bytes(entry)
+            raw = _outbound_bytes(entry, _read_bytes(entry))
             sha256 = hashlib.sha256(raw).hexdigest()
             if remote is None:
                 _push(entry, token, raw, sha256, None, report)

@@ -163,6 +163,8 @@ object PyBridge {
         callJson(context, "account_profile_mode", moduleName = ACCOUNT_MODULE)
     fun accountSetProfileMode(context: Context, mode: String): JSONObject =
         callJson(context, "account_set_profile_mode", mode, moduleName = ACCOUNT_MODULE)
+    fun accountSetProfileModeForce(context: Context, mode: String): JSONObject =
+        callJson(context, "account_set_profile_mode", mode, true, moduleName = ACCOUNT_MODULE)
     fun accountClearProfile(context: Context, keepMode: Boolean = false): JSONObject =
         callJson(context, "account_clear_profile", keepMode, moduleName = ACCOUNT_MODULE)
 

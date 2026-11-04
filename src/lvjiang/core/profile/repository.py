@@ -903,6 +903,19 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
+    def count_pending_push(self, since_id: int, author: str) -> int:
+        """水位之上、本机产生的待上行 history 行数（切模式风险评估用）。"""
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM profile_history "
+                "WHERE id>? AND device_id=? AND change_type IN ('set','delta','reset')",
+                (since_id, author),
+            ).fetchone()
+            return int(row[0]) if row else 0
+        finally:
+            self._release_connection(conn)
+
     def users_with_history_since(self, since_ts: str) -> set[str]:
         """ts 晚于 ``since_ts`` 的 history 行涉及的用户集合（快照覆盖告警用）。"""
         conn = self._borrow_connection()
@@ -1148,6 +1161,10 @@ def db_count_history(
 
 def db_users_with_history_since(since_ts: str) -> set[str]:
     return get_profile_db().users_with_history_since(since_ts)
+
+
+def db_count_pending_push(since_id: int, author: str) -> int:
+    return get_profile_db().count_pending_push(since_id, author)
 
 
 def db_history_fingerprint_exists(

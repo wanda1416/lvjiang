@@ -148,27 +148,52 @@ def _reset_sync_state() -> None:
 
 
 def account_profile_mode() -> str:
-    """总览数据来源模式：`{ok, mode, snapshot_id, snapshot_remote_id, pulled_at}`。
+    """总览数据来源模式：`{ok, mode, snapshot_id, snapshot_remote_id, pending_push}`。
 
     snapshot_id/remote_id 是手机当前跟随的云端位置（哪份快照、回放到账本
-    哪个水位），给「总览数据」页展示同步进度用；未落地过快照时为 0。
+    哪个水位）；pending_push 是水位之上本机产生、尚未上云的变更行数——
+    切到 PC端前必须让用户知道这些数据会留在本地不再上云。未落地快照为 0。
     """
     from ..account.service import profile_sync_state
+    from ..profile.repository import db_count_pending_push
     from . import profile_source
 
     state = profile_sync_state()
+    watermark = int(state.get("remote_history_id") or 0)
     return json.dumps({
         "ok": True, "mode": profile_source.mode(),
         "snapshot_id": int(state.get("profile_snapshot_id") or 0),
-        "snapshot_remote_id": int(state.get("remote_history_id") or 0),
+        "snapshot_remote_id": watermark,
+        "pending_push": db_count_pending_push(
+            int(state.get("local_history_id") or 0), _author_stamp()),
     }, ensure_ascii=False)
 
 
-def account_set_profile_mode(mode_value: str) -> str:
-    """切换模式。切 PC端随时可切；切回云端必须先清除本地总览数据。"""
+def _author_stamp() -> str:
+    from ..profile.repository import _author_stamp
+
+    return _author_stamp()
+
+
+def account_set_profile_mode(mode_value: str, force: bool = False) -> str:
+    """切换模式。切 PC端带未同步风险评估（pending_push > 0 且未 force 时
+    返回 need_confirm 要求二次确认）；切回云端必须先清除本地总览数据。"""
+    from ..account.service import profile_sync_state
+    from ..profile.repository import db_count_pending_push
     from . import profile_source
 
     if mode_value == profile_source.PC:
+        if profile_source.mode() != profile_source.PC and not force:
+            state = profile_sync_state()
+            pending = db_count_pending_push(
+                int(state.get("local_history_id") or 0), _author_stamp())
+            if pending > 0:
+                return json.dumps(
+                    {"ok": False, "need_confirm": True, "pending_push": pending,
+                     "message": f"还有 {pending} 条本机变更未同步到云端。"
+                                "切到 PC端后这些变更会留在本机、不再上云，"
+                                "可能与云端数据分叉。确认切换？"},
+                    ensure_ascii=False)
         profile_source.set_mode(profile_source.PC)
         return json.dumps({"ok": True, "mode": profile_source.PC,
                            "message": "总览数据改为 PC端；离线包将携带总览数据"},

@@ -1266,14 +1266,20 @@ class WorkbenchUi(
             val isPc = result.optString("mode") == "pc"
             val snapshot = result.optInt("snapshot_id", 0)
             val watermark = result.optInt("snapshot_remote_id", 0)
+            val pending = result.optInt("pending_push", 0)
             val current = if (isPc) "当前：PC端（总览数据随离线包更新，在线同步跳过总览）"
-                          else "当前：云端（总览数据来自云端快照，只收不发）"
+                          else "当前：云端（总览数据来自云端快照与账本双向同步）"
             val progress = if (snapshot > 0)
                 "已跟随云端快照 #$snapshot，历史回放至水位 $watermark。"
             else "尚未落地任何云端快照；同步后这里会显示快照编号与回放水位。"
+            val pendingLine = if (!isPc && pending > 0)
+                "⚠️ 有 $pending 条本机变更尚未同步到云端。"
+            else if (!isPc) "本机变更已全部同步到云端。"
+            else ""
             val content = SettingsUi.dialogContent(activity)
             text(content, current)
             text(content, progress, 12f)
+            if (pendingLine.isNotEmpty()) text(content, pendingLine, 12f)
             text(content, if (isPc) "切换到云端需要先清除本地总览数据。"
                           else "切换后 PC 端离线包将携带总览数据。", 12f)
 
@@ -1289,7 +1295,25 @@ class WorkbenchUi(
                 if (isPc) {
                     confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
                 } else {
+                    // 云端→PC端：服务端判定有未同步变更时先弹强确认
+                    //（这些变更会留在本机不再上云，可能与云端分叉）
                     request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
+                        if (r.optBoolean("need_confirm")) {
+                            MaterialAlertDialogBuilder(activity)
+                                .setTitle("存在未同步的变更")
+                                .setMessage(r.optString("message") +
+                                    "\n\n建议先等手机同步完成（或手动点「立即同步」）再切换。" +
+                                    "仍要切换吗？")
+                                .setNegativeButton("取消", null)
+                                .setPositiveButton("仍要切换") { _, _ ->
+                                    request({ PyBridge.accountSetProfileModeForce(activity, "pc") }) { rr ->
+                                        if (rr.optBoolean("ok")) updateProfileSourceSummary("pc")
+                                        toast(if (rr.optBoolean("ok")) "已切换为 PC端"
+                                              else "失败：${rr.optString("message")}")
+                                    }
+                                }.show()
+                            return@request
+                        }
                         if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
                         toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
                     }

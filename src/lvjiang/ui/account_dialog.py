@@ -693,6 +693,7 @@ class AccountManagerDialog(QDialog):
         self.logout_button.setVisible(summary is not None)
         self.tabs.setVisible(summary is not None)
         self.form_host.setVisible(summary is None)
+        self._render_sync()
 
     def _show_logged_in(self, summary: dict) -> None:
         account = summary["account"]

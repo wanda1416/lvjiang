@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -145,12 +146,23 @@ def sync_users(token: str) -> UsersSyncReport:
                             "updated_at": _mtime_iso(path) if path.is_file()
                               else datetime.now().isoformat(timespec="seconds"),
                             "data": data})
-        try:
-            post("/api/sync/users/push",
-                 {"users": payload, "order_changed": order_changed}, token)
-            report.pushed = len(payload)
-        except SyncError as error:
-            report.errors.append(f"上行失败: {error}")
+        # 内容签名：名册顺序 + 各用户资料都没变 → 本次推送整个跳过。
+        # 否则每次同步都全量发 19 行、D1 白写几十行配额，界面还恒显「上行 19」。
+        content_sig = hashlib.sha256(json.dumps(
+            payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        if not order_changed and content_sig == state.get("content_sig"):
+            pass                                   # 无变化：跳过推送
+        else:
+            try:
+                response = post("/api/sync/users/push",
+                                {"users": payload, "order_changed": order_changed}, token)
+                # 服务端回报真实变更行数（新增/资料更新/顺序变更），
+                # 没变就是 0，不再把「发了多少行」当「上行了多少」。
+                report.pushed = int(response.get("changed", len(payload)))
+                state["content_sig"] = content_sig
+                _save_sync_state(state)
+            except SyncError as error:
+                report.errors.append(f"上行失败: {error}")
 
     try:
         response = post("/api/sync/users/pull", {}, token)

@@ -92,14 +92,19 @@ def test_first_push_sets_order_and_signature(env) -> None:
 
 
 def test_unchanged_roster_pushes_without_reordering_cloud(env) -> None:
-    """常规同步（本地顺序没变）不得改写云端顺序——否则旧顺序设备会冲掉新排序。"""
+    """常规同步（本地顺序没变）不得改写云端顺序——否则旧顺序设备会冲掉新排序。
+
+    内容签名一致时推送整个跳过（连请求都不发），比「发了但 order_changed=false」
+    更进一步：无变化时不产生任何云端写入。"""
     tmp, server = env["tmp"], env["server"]
     _write_roster(tmp, ["甲", "乙"])
     users_sync.sync_users("t")                              # 建立签名 甲,乙
     # 云端被另一台设备排成 乙,甲
     server.rows["乙"]["position"], server.rows["甲"]["position"] = 0, 1
+    push_count = len(server.pushes)
     report = users_sync.sync_users("t")                     # 本地仍 甲,乙（签名一致）
-    assert env["server"].pushes[-1]["order_changed"] is False
+    assert len(server.pushes) == push_count                 # 无变化：推送跳过
+    assert report.pushed == 0
     # 下行：本地按云端重排为 乙,甲
     assert _roster(tmp) == ["乙", "甲"]
     assert report.reordered

@@ -110,6 +110,11 @@ def _apply_op(op: dict) -> bool:
     回放按 remote_id（到达序）驱动，但**合并按操作时间**：远端来的旧 set
     （``happened_at`` 早于本地现值的 ``updated_at``）不覆盖新值——离线设备
     补传的陈旧 set 正是这种形态。delta 恒应用（加法可交换，顺序无关）。
+
+    回放写入时把条目 ``updated_at`` 定为 op 的 ``happened_at`` 而不是本地
+    墙钟：两台设备的时钟互不可信，本地墙钟会让回放后的所有条目都"新于"
+    此后到达的远端 set，护栏从此永久误跳（2026-11-04 手机端 3179 事故的
+    根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
     """
     username, type_, key = op["username"], op["type"], op["key"]
     happened = op.get("happened_at") or ""
@@ -118,7 +123,8 @@ def _apply_op(op: dict) -> bool:
         base = current.get("value") if isinstance(current, dict) else None
         base = float(base) if isinstance(base, (int, float)) else 0.0
         value = base + float(op.get("delta") or 0)
-        repository.db_upsert(username, type_, key, value, change_type=None)
+        repository.db_upsert(username, type_, key, value,
+                             updated_at=hadwent(happened), change_type=None)
         return True
     text = op.get("value_text") or ""
     raw = op.get("value")
@@ -130,10 +136,21 @@ def _apply_op(op: dict) -> bool:
                         username, type_, key, happened, local_at)
             return False
     if type_ == "note" or (text and raw is None):
-        repository.db_upsert(username, type_, key, 0.0, value_text=text, change_type=None)
+        repository.db_upsert(username, type_, key, 0.0, updated_at=hadwent(happened),
+                             value_text=text, change_type=None)
         return True
-    repository.db_upsert(username, type_, key, float(raw or 0), change_type=None)
+    repository.db_upsert(username, type_, key, float(raw or 0),
+                         updated_at=hadwent(happened), change_type=None)
     return True
+
+
+def hadwent(happened: str) -> str | None:
+    """回放写入用的条目时间戳：源 op 时间；缺失时 None（upsert 落本地墙钟）。
+
+    独立小函数只为命名意图清晰：条目的 ``updated_at`` 必须"曾经发生"在
+    源写入时刻，而不是本机回放时刻。
+    """
+    return happened or None
 
 
 def remote_snapshots(token: str) -> list[dict]:

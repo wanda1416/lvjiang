@@ -175,6 +175,52 @@ def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
     assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 125
 
 
+def test_replay_stamps_entry_with_source_time_not_local_clock(env) -> None:
+    """回放后条目的 updated_at 必须是源 op 的 happened_at，不是本机墙钟。
+
+    2026-11-04 手机端 3179 事故根因：回放把 updated_at 盖成本地墙钟，此后
+    所有远端 set 都被「跳过旧 set」护栏判成过去时，设备永久锁死在旧值。
+    条目时间戳必须是源写入时间，护栏比较的才是同一种时间。
+    """
+    env["state"]["remote_history_id"] = 1
+    env["state"]["profile_snapshot_id"] = 1
+    env["server"].rows = [
+        {"remote_id": 1},
+        {"remote_id": 2, "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "set", "value": 7, "happened_at": "2026-11-01T09:00:00"},
+        {"remote_id": 3, "username": "蔡元君", "type": "stock", "key": "moon",
+         "op": "set", "value": 8, "happened_at": "2026-11-02T09:00:00"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.pulled == 2
+    entries = env["entries"]["蔡元君"]["stock"]
+    assert entries["energy"]["updated_at"] == "2026-11-01T09:00:00"
+    assert entries["moon"]["updated_at"] == "2026-11-02T09:00:00"
+
+
+def test_replayed_set_wins_over_later_stale_replay_of_same_key(env) -> None:
+    """先回放新 set 再回放旧 set：旧的被护栏拦下，且不污染时间戳。
+
+    与上一条互补：护栏判断的"本地现值时间"现在也是源时间，两端比较的是
+    同一种时钟——时间上更晚的 set 恒胜，无论到达顺序。
+    """
+    env["state"]["remote_history_id"] = 1
+    env["state"]["profile_snapshot_id"] = 1
+    env["server"].rows = [
+        {"remote_id": 1},
+        # 到达序：先旧后新（离线设备补传 + 在线设备新写的典型混排）
+        {"remote_id": 2, "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "set", "value": 100, "happened_at": "2026-11-01T09:00:00"},
+        {"remote_id": 3, "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "set", "value": 200, "happened_at": "2026-11-03T09:00:00"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.pulled == 2
+    entry = env["entries"]["蔡元君"]["stock"]["energy"]
+    assert entry["value"] == 200
+    assert entry["updated_at"] == "2026-11-03T09:00:00"
+
+
 def test_incremental_pull_applies_set_and_delta(env) -> None:
     env["state"]["remote_history_id"] = 1
     env["state"]["profile_snapshot_id"] = 1   # 已落地过，不得重新 bootstrap

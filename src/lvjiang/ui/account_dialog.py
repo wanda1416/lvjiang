@@ -524,6 +524,12 @@ class AccountManagerDialog(QDialog):
         sync_layout.addWidget(self.sync_error)
 
         self._step_rows = {tr("定义"): 0, tr("名册"): 1, tr("文档"): 2, tr("总览"): 3}
+        # 同步层发的 step 是英文键（definition/roster/documents/overview），
+        # 表格行键是中文通道名——不映射的话进度列永远对不上行
+        self._step_key_rows = {"definition": self._step_rows[tr("定义")],
+                               "roster": self._step_rows[tr("名册")],
+                               "documents": self._step_rows[tr("文档")],
+                               "overview": self._step_rows[tr("总览")]}
         self.stop_sync_button = QPushButton(tr("停止"))
         apply_button_style(self.stop_sync_button, variant="neutral")
         self.stop_sync_button.setFixedWidth(72)
@@ -697,7 +703,7 @@ class AccountManagerDialog(QDialog):
         """分步进度：进度列实时显示细节，上行/下行随批累加。"""
         if not self._alive():
             return
-        row = self._step_rows.get(data.get("step"))
+        row = self._step_key_rows.get(data.get("step"))
         if row is None:
             return
         cell = self.sync_table.item(row, 1)
@@ -733,11 +739,18 @@ class AccountManagerDialog(QDialog):
         self.stop_sync_button.setVisible(self.holder.syncing)
 
     def _fill_sync_table(self, rows: list[tuple[str, int | None, int | None, int | None]] | None) -> None:
-        """四个通道行固定存在；没有结果时数值列显示 —，表格不消失。"""
+        """四个通道行固定存在；没有结果时数值列显示 —，表格不消失。
+
+        行按**通道名**对号入座，不按列表下标——刷新快照的报告只有单行
+        「总览」，按下标写会把第 0 行「定义」的通道名覆盖成「总览」闪一下。
+        """
         if not rows:
             rows = [(name, None, None, None)
                     for name in (tr("定义"), tr("名册"), tr("文档"), tr("总览"))]
-        for index, (name, pushed, pulled, failed) in enumerate(rows):
+        for name, pushed, pulled, failed in rows:
+            row = self._step_rows.get(name)
+            if row is None:
+                continue
             def cell_text(value, failed_count=False):
                 if value is None:
                     return "—"
@@ -752,7 +765,7 @@ class AccountManagerDialog(QDialog):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 if column != 1:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.sync_table.setItem(index, column, item)
+                self.sync_table.setItem(row, column, item)
 
     def _render_report(self, report) -> None:
         """统一渲染两种报告：完整同步是 _CombinedReport，刷新快照走 sync

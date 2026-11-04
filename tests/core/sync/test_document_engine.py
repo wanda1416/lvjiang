@@ -78,19 +78,33 @@ def _sync(env):
 
 
 def test_unregistered_plugin_document_not_uploaded_as_user_doc(monkeypatch) -> None:
-    """插件未登记时（如同步早于插件注册），带点文件名不得当成 user_doc 上云。"""
+    """插件未登记时（如同步早于插件注册），带点文件名不得当成 user_doc 上云。
+
+    纯资料文件（{名}.json）静默跳过——每个用户一行告警全是噪音；只有带
+    kind 后缀却查不到登记的（.loadouts.json）才值得告警。
+    """
+    from loguru import logger as loguru_logger
+
     from lvjiang.core.sync import registry
 
     monkeypatch.setattr(registry, "_USER_DOCUMENT_KINDS", {})
-    with tempfile.TemporaryDirectory() as raw:
-        root = Path(raw)
-        users, avatars, session = root / "users", root / "avatars", root / "session"
-        for directory in (users, avatars, session):
-            directory.mkdir()
-        (users / "蔡元君.json").write_text('{"username": "蔡元君"}', encoding="utf-8")
-        (users / "蔡元君.loadouts.json").write_text("{}", encoding="utf-8")
-        documents = engine.iter_local_documents(users)
+    messages: list[str] = []
+    handler = loguru_logger.add(messages.append, level="WARNING")
+    try:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            users, avatars, session = root / "users", root / "avatars", root / "session"
+            for directory in (users, avatars, session):
+                directory.mkdir()
+            (users / "蔡元君.json").write_text('{"username": "蔡元君"}', encoding="utf-8")
+            (users / "蔡元君.loadouts.json").write_text("{}", encoding="utf-8")
+            documents = engine.iter_local_documents(users)
+    finally:
+        loguru_logger.remove(handler)
     assert [(d.label, d.kind) for d in documents] == []   # 纯资料文件不入文档通道
+    warnings = "".join(messages)
+    assert "蔡元君.json" not in warnings                  # 资料文件不告警
+    assert "蔡元君.loadouts.json" in warnings             # 残留 kind 文件仍告警
 
 
 def test_core_notes_suffix_wins_over_plugin_registry(env) -> None:

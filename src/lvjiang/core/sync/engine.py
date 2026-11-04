@@ -86,8 +86,12 @@ def iter_local_documents(users_dir: Path = USERS_DIR,
             kind, suffix = matched
             documents.append(LocalDocument(name[:-len(suffix)], kind, path))
             continue
-        # 用户资料（{名}.json）与头像已入服务端 account_users / 其头像表；
-        # profile.yaml 是定义，走 definition 专用通道。文档通道只剩用户内容。
+        # 用户资料（{名}.json，无 kind 后缀）与头像已入服务端 account_users /
+        # 其头像表；profile.yaml 是定义，走 definition 专用通道。这些是预期内
+        # 的非文档文件，静默跳过；只有带点后缀却查不到 kind 的（如插件卸载后
+        # 残留的 .loadouts.json）才是异常，告警提示。
+        if "." not in name[: -len(".json")]:
+            continue
         logger.warning("[sync] 跳过未登记 kind 的文档：{}", path.name)
     documents.extend(_session_documents(session_dir))
     return documents

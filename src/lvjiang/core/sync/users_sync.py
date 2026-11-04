@@ -296,22 +296,24 @@ def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
         if remote_sha:
             missing.append((name, filename))
     if missing:
-        try:
-            response = post("/api/sync/users/avatars/pull",
-                            {"usernames": [name for name, _ in missing]}, token)
-            avatars = {item.get("username"): item
-                       for item in response.get("avatars") or []
-                       if isinstance(item, dict) and isinstance(item.get("username"), str)}
-            for name, filename in missing:
-                item = avatars.get(name)
-                if not item or not isinstance(item.get("payload_base64"), str):
-                    continue
-                avatar_path = AVATARS_DIR / filename
-                avatar_path.parent.mkdir(parents=True, exist_ok=True)
-                avatar_path.write_bytes(base64.b64decode(item["payload_base64"]))
-                report.avatars += 1
-        except (SyncError, OSError, ValueError) as error:
-            report.errors.append(f"头像批量下载失败: {error}")
+        for start in range(0, len(missing), 10):
+            chunk = missing[start:start + 10]
+            try:
+                response = post("/api/sync/users/avatars/pull",
+                                {"usernames": [name for name, _ in chunk]}, token)
+                avatars = {item.get("username"): item
+                           for item in response.get("avatars") or []
+                           if isinstance(item, dict) and isinstance(item.get("username"), str)}
+                for name, filename in chunk:
+                    item = avatars.get(name)
+                    if not item or not isinstance(item.get("payload_base64"), str):
+                        continue
+                    avatar_path = AVATARS_DIR / filename
+                    avatar_path.parent.mkdir(parents=True, exist_ok=True)
+                    avatar_path.write_bytes(base64.b64decode(item["payload_base64"]))
+                    report.avatars += 1
+            except (SyncError, OSError, ValueError) as error:
+                report.errors.append(f"头像批量下载失败: {error}")
 
     done = 0
     for name in pending:
@@ -340,10 +342,14 @@ def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
         local_sha = hashlib.sha256(avatar_path.read_bytes()).hexdigest()
         if local_sha == remote_sha:
             continue                          # 一致：跳过
+        avatar_bytes = avatar_path.read_bytes()
+        if len(avatar_bytes) > 1_000_000:
+            report.errors.append(f"头像超过 1MB 未上传({name})")
+            continue
         try:
             post("/api/sync/users/avatar/put", {
                 "username": name, "sha256": local_sha,
-                "payload_base64": base64.b64encode(avatar_path.read_bytes()).decode()},
+                "payload_base64": base64.b64encode(avatar_bytes).decode()},
                 token)
             report.avatars += 1
         except SyncError as error:

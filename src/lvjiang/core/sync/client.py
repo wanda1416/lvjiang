@@ -74,8 +74,18 @@ def pull(token: str, label: str, kind: str) -> dict:
 
 
 def pull_all(token: str) -> list[dict]:
-    """一次拉取账号下全部文档 payload（批量接口，避免逐份请求）。"""
-    return list(_request("POST", "/api/sync/documents/pull", {}, token).get("documents") or [])
+    """分页拉取账号下全部文档 payload；每批最多 20 份，避免响应过大。"""
+    documents: list[dict] = []
+    offset = 0
+    while True:
+        page = _request("POST", "/api/sync/documents/pull",
+                        {"limit": 20, "offset": offset}, token)
+        batch = list(page.get("documents") or [])
+        documents.extend(batch)
+        if not page.get("has_more") or not batch:
+            break
+        offset += len(batch)
+    return documents
 
 
 def push(token: str, label: str, kind: str, sha256: str,

@@ -286,3 +286,51 @@ def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
     report = engine.sync_documents("t", users_dir=users, session_dir=session)
     assert report.errors == []
     assert report.pushed == ["蔡元君/notes"]
+
+
+def _remote_note_payload(raw: bytes) -> str:
+    return base64.b64encode(gzip.compress(raw)).decode("ascii")
+
+
+def _pull_note(monkeypatch, tmp_path, payload: str, pushes: list):
+    monkeypatch.setattr(engine.client, "pull", lambda t, label, kind: {
+        "label": label, "kind": kind, "sha256": "x", "size": 1, "zipped": True,
+        "updated_at": "2020-01-01T00:00:00Z", "payload_base64": payload})
+    monkeypatch.setattr(engine.client, "push",
+                        lambda *args, **kwargs: pushes.append(args))
+    doc = engine.LocalDocument("甲", "notes", tmp_path / "甲.notes.json")
+    report = engine.SyncReport()
+    engine._pull(doc, "t", report)
+    return report
+
+
+def test_pull_encrypted_note_does_not_reupload(monkeypatch, tmp_path) -> None:
+    """远端已是密文的便利贴只落地，不每轮重新上推（0.15.10 修复）。"""
+    from lvjiang.core.account import e2e
+
+    key = b"k" * 32
+    monkeypatch.setattr(e2e, "_KEY", key)
+    ciphertext = e2e.encrypt_text(key, "明文便利贴").encode("utf-8")
+    pushes: list = []
+    report = _pull_note(monkeypatch, tmp_path,
+                        _remote_note_payload(ciphertext), pushes)
+    assert report.pulled == ["甲/notes"]
+    assert pushes == []
+
+
+def test_pull_legacy_plaintext_note_reuploads_ciphertext(monkeypatch, tmp_path) -> None:
+    """远端是 legacy 明文的便利贴，拉下后立即重推密文（E2E 迁移钩子）。"""
+    from lvjiang.core.account import e2e
+
+    monkeypatch.setattr(e2e, "_KEY", b"k" * 32)
+    pushes: list = []
+    report = _pull_note(monkeypatch, tmp_path,
+                        _remote_note_payload("明文便利贴".encode("utf-8")), pushes)
+    assert report.pulled == ["甲/notes"]
+    assert len(pushes) == 1
+    # 上推的是密文（gzip 后 base64），而不是原始明文
+    _, _, kind, _, pushed_payload = pushes[0]
+    assert kind == "notes"
+    pushed_raw = gzip.decompress(base64.b64decode(pushed_payload))
+    from lvjiang.core.account.e2e import is_encrypted_text
+    assert is_encrypted_text(pushed_raw.decode("utf-8"))

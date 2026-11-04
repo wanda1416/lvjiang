@@ -271,9 +271,10 @@ class AccountHolder(QObject):
                 text = describe() if describe else str(result)
                 # 分钟节拍下零变更是常态（全 0 无失败）：INFO 一天刷几百行
                 # 噪音，降 debug；有实际动作才值得进 INFO。
+                rows_method = getattr(result, "rows", None)
+                rows = rows_method() if callable(rows_method) else (rows_method or [])
                 changed = bool(getattr(result, "errors", None)) or any(
-                    up or down for _name, up, down, _fail in (
-                        result.rows() if hasattr(result, "rows") else []))
+                    up or down for _name, up, down, _fail in rows)
                 (logger.info if changed else logger.debug)(
                     "[account] 同步完成：{}", text)
             else:
@@ -985,12 +986,15 @@ class AccountManagerDialog(QDialog):
                 self._confirm_overwrite(pending)
 
     def _reload_users(self) -> None:
-        """同步拉回用户后让主窗口的用户管理器重读名册（不刷新则列表仍是旧快照）。"""
+        """同步拉回用户后让主窗口的用户管理器重读名册并刷新用户选择器。"""
         parent = self.parent()
         manager = getattr(parent, "user_manager", None)
         if manager is not None and hasattr(manager, "reload"):
             try:
                 manager.reload()
+                refresh = getattr(parent, "_refresh_user_combo", None)
+                if callable(refresh):
+                    refresh()
             except Exception:  # noqa: BLE001 - 刷新失败不能把同步结果判死
                 logger.warning("同步后刷新用户管理器失败", exc_info=True)
 

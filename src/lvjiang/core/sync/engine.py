@@ -191,7 +191,7 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
     # 远端本来就是密文时，解密后的 payload 恒为明文，不能再按 payload 判定，
     # 否则每次同步都把 19 份便利贴重新上推一遍。
     remote_was_plaintext = (document.kind == "notes"
-                            and not _is_plain_legacy_note(raw))
+                            and _is_plain_legacy_note(raw))
     payload = _inbound_bytes(document, raw)
     if payload is None:
         # 密文但本机解不开（改密后旧数据等）：保留本地明文，不制造冲突副本

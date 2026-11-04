@@ -192,6 +192,16 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
             report.conflicts.append(f"{key} → {saved.name}")
     _write_bytes(document, payload)
     report.pulled.append(key)
+    # E2E 迁移钩子：拉到的是**明文**而本机有密钥 → 云端还没换密文。立即把
+    # 密文推上去，否则会卡死在「明文 sha 相同 → 跳过推送」的循环里，明文
+    # 永远留在云端（首次切换 E2E 时每个 notes 文档都会撞上）。
+    if document.kind == "notes":
+        from ..account.e2e import current_key, encrypt_text, is_encrypted_text
+        e2e_key = current_key()
+        if e2e_key is not None and not is_encrypted_text(payload.decode("utf-8", "replace")):
+            encrypted = encrypt_text(e2e_key, payload.decode("utf-8")).encode("utf-8")
+            _push(document, token, encrypted,
+                  hashlib.sha256(encrypted).hexdigest(), None, report)
 
 
 def _local_mtime(document: LocalDocument) -> datetime:

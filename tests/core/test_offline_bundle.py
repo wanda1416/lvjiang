@@ -74,7 +74,9 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     for name in ("profile.db",):
         with closing(sqlite3.connect(phone / "config/session" / name)) as db:
             assert db.execute("SELECT value FROM entries").fetchone() == (7,)
-    assert (phone / "offline-backup/config/session/old.json").read_text() == "previous"
+    # 不再整目录交换：session 里不在清单的文件原地保留，也不产出旧配置备份
+    assert (phone / "config/session/old.json").read_text() == "previous"
+    assert not (phone / "offline-backup").exists()
     with zipfile.ZipFile(archive) as package:
         assert all(".git" not in name and "diagnostics" not in name for name in package.namelist())
         assert "config/local/license.txt" not in package.namelist()
@@ -215,7 +217,8 @@ def test_snapshot_creation_failure_releases_source_handle(bundle, connections, m
             connection.execute("SELECT 1")
 
 
-def test_reload_failure_rolls_back_applied_configuration(bundle, tmp_path):
+def test_reload_failure_keeps_applied_config_and_reports(bundle, tmp_path):
+    """重载失败不再回滚：同步本身可重复执行，报错让用户重跑一次即可。"""
     _, archive = bundle
     phone = tmp_path / "phone"
     (phone / "config").mkdir(parents=True)
@@ -228,8 +231,71 @@ def test_reload_failure_rolls_back_applied_configuration(bundle, tmp_path):
     with pytest.raises(RuntimeError, match="reload failed"):
         install_offline_bundle(archive, phone, on_applied=reload_failed)
 
-    assert (phone / "config/keep").read_text() == "original"
-    assert not (phone / "config/session").exists()
+    assert (phone / "config/keep").read_text() == "original"   # 会话层之外没被碰
+    assert (phone / "config/session/profile.db").exists()       # 已应用的配置保留
+
+
+def test_install_mirrors_system_and_local_removing_stale_files(bundle, tmp_path):
+    """包里没有的脚本/场景必须从手机上消失，否则会留下幽灵副本。"""
+    _, archive = bundle
+    phone = tmp_path / "phone"
+    config = phone / "config"
+    stale = [
+        "config/system/workflows/ghost.wf",
+        "config/system/scenes/ghost.yaml",
+        "config/local/workflows/user_script.py",
+    ]
+    for relative in stale:
+        path = phone / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("stale", encoding="utf-8")
+    keep = phone / "config/session/keep.json"
+    keep.parent.mkdir(parents=True, exist_ok=True)
+    keep.write_text('{"kept": true}', encoding="utf-8")
+
+    install_offline_bundle(archive, phone)
+
+    for relative in stale:
+        assert not (phone / relative).exists(), relative
+    assert (config / "system/layouts.yaml").is_file()            # 包里的文件已落地
+    assert keep.read_text(encoding="utf-8") == '{"kept": true}'  # session 不在清单 → 保留
+
+
+def test_install_never_touches_local_only_files(bundle, tmp_path):
+    """实例标识与登录令牌属于本机，同步包不得覆盖、也不得删除。"""
+    _, archive = bundle
+    phone = tmp_path / "phone"
+    session = phone / "config/session"
+    session.mkdir(parents=True)
+    local_only = {
+        "instance.id": "instance-uuid",
+        "account_token": '{"user": "session:instance-uuid", "token": "refresh"}',
+        "account.json": '{"login": "wang", "display_name": "王"}',
+    }
+    for name, content in local_only.items():
+        (session / name).write_text(content, encoding="utf-8")
+
+    install_offline_bundle(archive, phone)
+
+    for name, content in local_only.items():
+        assert (session / name).read_text(encoding="utf-8") == content, name
+
+
+def test_bundle_never_carries_local_only_files(bundle, tmp_path):
+    """打包侧同样不得把它们收进清单（防止将来往白名单里加错东西）。"""
+    source, archive = bundle
+    session = source / "config/session"
+    for name in offline_bundle.LOCAL_ONLY_CONFIG_FILES:
+        path = source / "config" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("secret", encoding="utf-8")
+    fresh = tmp_path / "no-credentials.zip"
+    build_offline_bundle(source, fresh, username="tester", layout="android")
+    with zipfile.ZipFile(fresh) as package:
+        names = set(package.namelist())
+    for name in offline_bundle.LOCAL_ONLY_CONFIG_FILES:
+        assert f"config/{name}" not in names
+    assert (session / "instance.id").is_file()      # PC 自己的文件不受影响
 
 
 def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(bundle, tmp_path):

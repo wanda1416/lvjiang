@@ -50,6 +50,13 @@ object AgentServer {
     private const val UID_ROOT = 0
     private const val UID_SHELL = 2000
 
+    /**
+     * session 目录里**不允许导出到 PC** 的文件。
+     * `account_token` 是本机登录令牌（凭据），PC 端做分析/备份用不到；
+     * `instance.id`、`account.json` 属于本机身份，一并挡住，避免 PC 侧误存。
+     */
+    private val SESSION_EXPORT_DENY = setOf("account_token", "instance.id", "account.json")
+
     /** PNG 文件头，用于判定 Shizuku screencap 回的是图还是错误文本 */
     private val PNG_MAGIC = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
 
@@ -341,9 +348,10 @@ object AgentServer {
     private fun sessionList(): Pair<JSONObject, ByteArray?> {
         val root = sessionRoot()
         val files = JSONArray()
-        root?.listFiles()?.filter { it.isFile }?.sortedBy { it.name }?.forEach {
-            files.put(JSONObject().put("name", it.name).put("size", it.length()))
-        }
+        root?.listFiles()?.filter { it.isFile && it.name !in SESSION_EXPORT_DENY }
+            ?.sortedBy { it.name }?.forEach {
+                files.put(JSONObject().put("name", it.name).put("size", it.length()))
+            }
         return ok(JSONObject().put("files", files))
     }
 
@@ -352,6 +360,7 @@ object AgentServer {
         val name = req.optString("name")
         if (name.isEmpty() || name.contains('/') || name.contains('\\') || name.contains(".."))
             return fail("非法文件名")
+        if (name in SESSION_EXPORT_DENY) return fail("该文件不允许导出: $name")
         val root = sessionRoot() ?: return fail("session 目录不存在")
         val target = File(root, name)
         if (!target.isFile) return fail("文件不存在: $name")

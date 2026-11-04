@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -25,7 +26,6 @@ from .paths import (
     config_directory,
     get_config_local_dir,
     get_config_system_dir,
-    get_config_updates_dir,
     session_directory,
 )
 from .user_config import is_valid_username
@@ -41,6 +41,18 @@ _LAYER_PATTERNS = (
 )
 _SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "batch.json")
 _DATABASE_FILES = ("profile.db",)
+
+#: 配置目录里**由本机独占**的文件（相对 ``config/``）：实例出生标识、登录令牌、
+#: 账号名等本机登录态。它们不属于同步契约，打包侧不得收进清单，安装侧一个字节
+#: 都不碰——否则一次 PC→手机同步就会把登录态连根拔掉。
+LOCAL_ONLY_CONFIG_FILES: tuple[str, ...] = (
+    "session/instance.id",
+    "session/account_token",
+    "session/account.json",
+)
+#: 同步域里按**镜像**处理的层：包中没有的文件与空目录要先删掉，否则上游删除或
+#: 移动过的脚本 / 场景 / 布局会永远留在手机上（.wf 换个目录就变成两份同 id 脚本）。
+MIRRORED_LAYERS: tuple[str, ...] = ("system", "local")
 
 
 def _database_files() -> tuple[str, ...]:
@@ -139,20 +151,193 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
             archive.writestr("manifest.json", formatted_json_bytes(manifest))
     if destination.stat().st_size > MAX_BUNDLE_BYTES:
         raise ValueError("同步包超过 256 MiB，请移除无关的大文件")
+    leaked = sorted(name for name in manifest["files"]
+                    if name.startswith("config/")
+                    and name[len("config/"):] in LOCAL_ONLY_CONFIG_FILES)
+    if leaked:
+        raise ValueError(f"同步清单不得包含本机独占文件：{', '.join(leaked)}")
     return summary
+
+
+def _read_json(path: Path) -> dict:
+    """读 JSON 对象；缺失或损坏时按空字典处理（合并逻辑能继续跑）。"""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_bytes(destination: Path, data: bytes) -> None:
+    """单文件原子替换：先写同名临时文件再 rename。
+
+    不做整体事务——同步本身可重复执行，失败重来一次即可；这里只保证单个文件
+    不会出现"写了一半"的中间态。
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".incoming")
+    temporary.write_bytes(data)
+    os.replace(temporary, destination)
+
+
+def _write_json(destination: Path, data: dict) -> None:
+    _write_bytes(destination, formatted_json(data).encode("utf-8"))
+
+
+def _apply_database(destination: Path, source: Path) -> None:
+    """SQLite 不能用文件覆盖（目标库可能正被打开）：用 backup 还原过去。"""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with (closing(sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)) as origin,
+          closing(sqlite3.connect(destination)) as target):
+        origin.backup(target)
+
+
+def _mirror_layers(target: Path, files: dict[str, str]) -> None:
+    """``system`` / ``local`` 按镜像处理：删掉包中没有的文件与空目录。
+
+    这是整目录交换唯一真正需要的能力——上游删除或移动过的 ``.wf``、场景、布局
+    必须在这里消失，否则手机上会留着幽灵副本（同 id 脚本两份、删掉的场景仍加载）。
+    """
+    managed = set(files)
+    for layer in MIRRORED_LAYERS:
+        layer_root = target / layer
+        if not layer_root.is_dir():
+            continue
+        for path in sorted(layer_root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+            relative = path.relative_to(target).as_posix()
+            if path.is_dir():
+                if not any(path.iterdir()):
+                    path.rmdir()
+            elif f"config/{relative}" not in managed:
+                path.unlink()
+
+
+def _write_mirrored_layers(target: Path, staged: Path, files: dict[str, str]) -> None:
+    """把包里的 ``system`` / ``local`` 文件逐个写到本机（镜像删除由调用方先做）。"""
+    for name in files:
+        relative = PurePosixPath(name)
+        if len(relative.parts) < 3 or relative.parts[1] not in MIRRORED_LAYERS:
+            continue
+        source = staged.joinpath(*relative.parts[1:])
+        destination = target.joinpath(*relative.parts[1:])
+        _write_bytes(destination, source.read_bytes())
+
+
+def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
+                   username: str, layout: str,
+                   preserve_task_params: bool, preserve_batch_config: bool) -> None:
+    """``session`` 只按清单覆盖：同目录里不在清单的文件一律不动。
+
+    清单内的四类合并语义与以前一致：
+    - ``users/*.json``：包内覆盖；保留任务参数时把手机参数并进同名用户，
+      不保留时删掉包里没有的手机用户文件（否则名册里没有的幽灵用户会留着）；
+    - ``session.json``：名册与任务通用参数按保留开关合并；
+    - ``interface.json``：actives 跟清单，``batch`` 草稿永远属于手机；
+    - ``batch.json``：明确保留手机本次选择时整份不写。
+    """
+    from .history_transfer import history_channels
+
+    session_target = session_directory(target)
+    session_staged = staged / "session"
+    history_names = {channel.database for channel in history_channels().values()}
+    phone_session = _read_json(session_target / "session.json")
+    phone_interface = _read_json(session_target / "interface.json")
+
+    # 1) 其余清单文件（profile.yaml、offline.json、*.db…）直接覆盖
+    for name in files:
+        relative = PurePosixPath(name)
+        if len(relative.parts) < 3 or relative.parts[1] != "session":
+            continue
+        if relative.parts[2] in {"session.json", "interface.json", "batch.json", "users"}:
+            continue
+        if relative.name in history_names:
+            continue                      # 历史不属于参数快照
+        source = staged.joinpath(*relative.parts[1:])
+        destination = target.joinpath(*relative.parts[1:])
+        if destination.suffix == ".db":
+            _apply_database(destination, source)
+        else:
+            _write_bytes(destination, source.read_bytes())
+
+    # 2) 用户资料
+    staged_users = session_staged / "users"
+    incoming_users: set[str] = set()
+    if staged_users.is_dir():
+        for path in sorted(staged_users.glob("*.json")):
+            incoming_users.add(path.name)
+            data = _read_json(path)
+            if preserve_task_params:
+                phone_params = _read_json(session_target / "users" / path.name).get("workflow_params")
+                if isinstance(phone_params, dict):
+                    merged = dict(data.get("workflow_params") or {})
+                    merged.update(phone_params)
+                    data["workflow_params"] = merged
+            _write_json(session_target / "users" / path.name, data)
+    if not preserve_task_params and (session_target / "users").is_dir():
+        for path in sorted((session_target / "users").glob("*.json")):
+            if path.name not in incoming_users:
+                path.unlink()
+
+    # 3) session.json：名册与任务通用参数
+    incoming_session = _read_json(session_staged / "session.json")
+    if incoming_session:
+        names = list(incoming_session.get("users") or [])
+        if preserve_task_params:
+            for name in phone_session.get("users") or []:
+                if name not in names and (session_target / "users" / f"{name}.json").is_file():
+                    names.append(name)
+            shared = dict(incoming_session.get("wf_configs") or {})
+            phone_shared = phone_session.get("wf_configs")
+            if isinstance(phone_shared, dict):
+                shared.update(phone_shared)
+            incoming_session["wf_configs"] = shared
+        incoming_session["users"] = names
+        _write_json(session_target / "session.json", incoming_session)
+
+    # 4) interface.json：actives 跟清单，批量草稿属于手机
+    incoming_interface = _read_json(session_staged / "interface.json")
+    if incoming_interface:
+        actives = incoming_interface.get("actives")
+        if not isinstance(actives, dict):
+            actives = {}
+        actives.update(user=username, layout=layout, env="android")
+        phone_actives = phone_interface.get("actives")
+        if preserve_task_params and isinstance(phone_actives, dict):
+            active_user = phone_actives.get("user")
+            if (isinstance(active_user, str)
+                    and (session_target / "users" / f"{active_user}.json").is_file()):
+                actives["user"] = active_user
+        incoming_interface["actives"] = actives
+        batch = phone_interface.get("batch")
+        incoming_interface["batch"] = batch if isinstance(batch, dict) else {}
+        _write_json(session_target / "interface.json", incoming_interface)
+
+    # 5) batch.json：明确保留手机的本次选择时，手机已有那份就不动；
+    #    手机还没有时仍然落地包里的配置组定义（否则第一次同步拿不到批量配置）。
+    staged_batch = session_staged / "batch.json"
+    phone_batch = session_target / "batch.json"
+    if staged_batch.is_file() and (not preserve_batch_config or not phone_batch.is_file()):
+        _write_bytes(phone_batch, staged_batch.read_bytes())
 
 
 def install_offline_bundle(
     archive_path: Path, root: Path, *, on_applied: Callable[[], None] | None = None,
     preserve_task_params: bool = True, preserve_batch_config: bool = True,
 ) -> dict:
-    """校验后交换 config 目录；保留上一份备份，交换失败恢复原配置。"""
+    """把同步包按文件覆盖到本机配置（不再整目录交换）。
+
+    写入策略分域：
+    - ``system`` / ``local``：**镜像**（先删包中没有的文件与空目录，再逐文件写）；
+    - ``session``：**只覆盖清单内的文件**，同目录其他文件保留；
+    - ``LOCAL_ONLY_CONFIG_FILES``（实例标识 / 登录令牌 / 账号名）：一个字节都不碰。
+
+    不做整份备份与回滚：同步是可重复操作，失败重跑一次即可。SQLite 仍走
+    ``backup`` 到目标库，那是因为目标库可能正被打开，不是为了回滚。
+    """
     root = root.resolve()
     root.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".offline-stage-", dir=root))
     target = config_directory(root)
-    previous = root / "offline-backup/config"
-    swapped = False
+    staging = Path(tempfile.mkdtemp(prefix=".offline-stage-", dir=root))
     try:
         with zipfile.ZipFile(archive_path) as archive:
             manifest = json.loads(archive.read("manifest.json"))
@@ -166,171 +351,45 @@ def install_offline_bundle(
                 raise ValueError("同步包文件清单不一致")
             if sum(info.file_size for info in archive.infolist()) > MAX_BUNDLE_BYTES:
                 raise ValueError("同步包展开后超过 256 MiB")
+            guarded = {f"config/{name}" for name in LOCAL_ONLY_CONFIG_FILES}
+            if guarded & set(files):
+                raise ValueError("同步包包含本机独占文件，已拒绝安装")
             for name, digest in files.items():
-                rel = PurePosixPath(name)
-                if (rel.is_absolute() or ".." in rel.parts or "\\" in name
-                        or len(rel.parts) < 3 or rel.parts[0] != "config"
-                        or rel.parts[1] not in {"system", "local", "session"}
-                        or rel.as_posix() != name):
+                relative = PurePosixPath(name)
+                if (relative.is_absolute() or ".." in relative.parts or "\\" in name
+                        or len(relative.parts) < 3 or relative.parts[0] != "config"
+                        or relative.parts[1] not in {"system", "local", "session"}
+                        or relative.as_posix() != name):
                     raise ValueError("同步包包含非法路径")
                 data = archive.read(name)
                 if hashlib.sha256(data).hexdigest() != digest:
                     raise ValueError("同步包文件校验失败")
-                path = staging.joinpath(*rel.parts)
+                path = staging.joinpath(*relative.parts)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
-        staged_config = staging / "config"
-        incoming_interface = staged_config / "session/interface.json"
-        interface_data = (json.loads(incoming_interface.read_text(encoding="utf-8"))
-                          if incoming_interface.is_file() else {})
-        actives = (interface_data.get("actives", {})
-                   if isinstance(interface_data, dict) else {})
+        staged = staging / "config"
+        incoming_interface = staged / "session/interface.json"
+        interface_data = _read_json(incoming_interface)
+        actives = interface_data.get("actives") if isinstance(interface_data, dict) else {}
+        actives = actives if isinstance(actives, dict) else {}
         if (actives.get("user") != manifest["username"]
                 or actives.get("layout") != manifest["layout"]):
             raise ValueError("同步包活动选择与清单不一致")
-        for database in (staged_config / "session").rglob("*.db"):
+        for database in (staged / "session").rglob("*.db"):
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise ValueError(f"数据库快照校验失败：{database.name}")
-        # 历史不属于参数快照；包括旧包残留也不得覆盖手机记录。
-        from .history_transfer import history_channels
-        for channel in history_channels().values():
-            relative = Path("session") / channel.database
-            incoming = staged_config / relative
-            incoming.unlink(missing_ok=True)
-            existing = target / relative
-            if existing.is_file():
-                incoming.parent.mkdir(parents=True, exist_ok=True)
-                with (closing(sqlite3.connect(existing.resolve().as_uri() + "?mode=ro", uri=True)) as source,
-                      closing(sqlite3.connect(incoming)) as history_destination):
-                    source.backup(history_destination)
-        # 产出与回传包不属于参数快照。产出现在写 logs/output（在 config 之外，交换
-        # 配置不会碰到），这里只为旧版留在 config/session/output 的产出保留兼容。
-        for name in ("output", "history-transfer"):
-            existing = target / "session" / name
-            if existing.is_dir():
-                shutil.copytree(existing, staged_config / "session" / name)
-        if preserve_task_params and target.exists():
-            _preserve_task_parameters(target, staged_config)
-        if preserve_batch_config and target.exists():
-            mobile_batch = session_directory(target) / "batch.json"
-            if mobile_batch.is_file():
-                shutil.copyfile(mobile_batch, staged_config / "session/batch.json")
-        # 本次批量选择属于手机运行草稿，电脑仅同步配置组定义。
-        old_interface = session_directory(target) / "interface.json"
-        mobile_interface = json.loads(old_interface.read_text(encoding="utf-8")) if old_interface.is_file() else {}
-        # 上一步可能刚把手机端选定的执行用户写回暂存界面状态，这里必须重新
-        # 读盘后再补批量草稿，否则会用调用前读到的旧内容把它覆盖掉。
-        if incoming_interface.is_file():
-            interface_data = json.loads(incoming_interface.read_text(encoding="utf-8"))
-            if not isinstance(interface_data, dict):
-                interface_data = {}
-        interface_data.setdefault("actives", actives)
-        interface_data["batch"] = mobile_interface.get("batch", {})
-        incoming_interface.write_text(formatted_json(interface_data), encoding="utf-8")
-        # 手机目前不主动在线更新。PC 快照替换 system，但不能删除 APK 的原始
-        # 预置归档；它不成为新 r0，也不携带 PC 的更新身份、会员凭据或归档。
-        for name in ("updates",):
-            existing = get_config_updates_dir(target)
-            if existing.is_dir():
-                shutil.copytree(existing, staged_config / name)
-            elif existing.is_file():
-                (staged_config / name).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(existing, staged_config / name)
-        baseline = session_directory(target) / "baseline.json"
-        if baseline.is_file():
-            destination = session_directory(staged_config) / "baseline.json"
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(baseline, destination)
-        # 此标记只记录 APK 官方代次，与是否覆盖用户参数无关。
-        marker = session_directory(target) / "preset.json"
-        if marker.is_file():
-            shutil.copyfile(marker, staged_config / "session/preset.json")
-        old = staging / "old-config"
-        if target.exists():
-            target.rename(old)
-        try:
-            staged_config.rename(target)
-            swapped = True
-        except OSError:
-            if old.exists():
-                old.rename(target)
-            raise
+        # ▲ 校验全部通过，从这里开始才动本机配置 ▲
+        _mirror_layers(target, files)
+        _write_mirrored_layers(target, staged, files)
+        _apply_session(target, staged, files, username=manifest["username"],
+                       layout=manifest["layout"],
+                       preserve_task_params=preserve_task_params,
+                       preserve_batch_config=preserve_batch_config)
         from .config.content import rebuild_content
-        from .config.resolver import ConfigResolver
         rebuild_content(ConfigResolver(config_dir=target, dev_mode=False))
         if on_applied is not None:
             on_applied()
-        if old.exists():
-            previous.parent.mkdir(exist_ok=True)
-            if previous.exists():
-                shutil.rmtree(previous)  # 仅轮换本功能拥有的上一份配置备份。
-            old.rename(previous)
         return {key: value for key, value in manifest.items() if key != "files"}
-    except Exception:
-        old = staging / "old-config"
-        if swapped and old.exists():
-            target.rename(staging / "failed-config")
-            old.rename(target)
-            swapped = False
-        raise
     finally:
-        # 交换完成后这里只包含暂存内容；失败时原目录已恢复。
-        if not swapped and (staging / "old-config").exists() and not target.exists():
-            (staging / "old-config").rename(target)
-        shutil.rmtree(staging)
-
-
-def _preserve_task_parameters(old: Path, incoming: Path) -> None:
-    """在校验后的暂存区按任务整体保留；不拷贝 DB 或用户运行 session。"""
-    old_path = session_directory(old) / "session.json"
-    if not old_path.is_file():
-        return
-    old_session = json.loads(old_path.read_text(encoding="utf-8"))
-    new_path = incoming / "session/session.json"
-    new_session = json.loads(new_path.read_text(encoding="utf-8"))
-    old_shared = old_session.get("wf_configs", {})
-    new_shared = new_session.get("wf_configs", {})
-    if not isinstance(old_shared, dict) or not isinstance(new_shared, dict):
-        raise ValueError("任务通用配置格式不正确，无法保留手机参数")
-    new_session["wf_configs"] = {**new_shared, **old_shared}
-    names = list(new_session.get("users", []))
-    new_users = incoming / "session/users"
-    new_users.mkdir(exist_ok=True)
-    for username in old_session.get("users", []):
-        if not isinstance(username, str) or not is_valid_username(username):
-            continue
-        source = session_directory(old) / "users" / f"{username}.json"
-        if not source.is_file():
-            continue
-        destination = new_users / f"{username}.json"
-        phone = json.loads(source.read_text(encoding="utf-8"))
-        phone_params = phone.get("workflow_params", {})
-        if not isinstance(phone_params, dict):
-            raise ValueError("手机用户任务参数格式不正确，无法保留")
-        if destination.exists():
-            pc = json.loads(destination.read_text(encoding="utf-8"))
-            pc_params = pc.get("workflow_params", {})
-            if not isinstance(pc_params, dict):
-                raise ValueError("同步用户任务参数格式不正确")
-            pc["workflow_params"] = {**pc_params, **phone_params}
-            destination.write_text(formatted_json(pc), encoding="utf-8")
-        else:
-            shutil.copyfile(source, destination)
-        if username not in names:
-            names.append(username)
-    new_session["users"] = names
-    new_path.write_text(formatted_json(new_session), encoding="utf-8")
-    # 手机端已经选定的执行用户属于本机选择，不随 PC 快照覆盖。
-    old_interface_path = session_directory(old) / "interface.json"
-    old_actives = (json.loads(old_interface_path.read_text(encoding="utf-8")).get("actives", {})
-                   if old_interface_path.is_file() else {})
-    active = old_actives.get("user") if isinstance(old_actives, dict) else None
-    if active in names and (new_users / f"{active}.json").is_file():
-        new_interface_path = incoming / "session/interface.json"
-        new_interface = (json.loads(new_interface_path.read_text(encoding="utf-8"))
-                         if new_interface_path.is_file() else {})
-        if not isinstance(new_interface, dict):
-            new_interface = {}
-        new_interface.setdefault("actives", {})["user"] = active
-        new_interface_path.write_text(formatted_json(new_interface), encoding="utf-8")
+        shutil.rmtree(staging, ignore_errors=True)

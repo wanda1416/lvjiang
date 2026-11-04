@@ -13,11 +13,85 @@ from __future__ import annotations
 
 import json
 
-from ..account.service import AccountError, AccountSession
+from loguru import logger
+
+from ..account.service import (
+    AccountError,
+    AccountSession,
+    current_keyring_user,
+    load_profile,
+    stored_token_owner,
+)
+
+# 进程内唯一会话：access 令牌只存在内存里，每次调用都新建一个 AccountSession
+# 就等于每次都要重新 refresh（进一次设置页白打两个网络请求）。
+_SESSION: AccountSession | None = None
+# 登录态快照。首次询问后常驻内存，之后读它即可；登录/登出/令牌失效时刷新。
+_STATUS_CACHE: dict | None = None
+# 只是"现在连不上服务"，与登录态无关，别混进 logged_in。
+_OFFLINE_CODES = frozenset({"network", "service_unavailable", "rejected"})
 
 
 def _session() -> AccountSession:
-    return AccountSession()
+    global _SESSION
+    if _SESSION is None:
+        _SESSION = AccountSession()
+    return _SESSION
+
+
+def _remember_status(value: dict) -> None:
+    global _STATUS_CACHE
+    _STATUS_CACHE = dict(value)
+
+
+def _set_online(value: bool) -> None:
+    """记录"服务此刻是否可达"。它只影响提示，不参与登录态判断。"""
+    if _STATUS_CACHE is not None:
+        _STATUS_CACHE["online"] = value
+
+
+def _note_network_error(error: AccountError) -> None:
+    if error.code in _OFFLINE_CODES:
+        _set_online(False)
+
+
+def _probe_status() -> dict:
+    """登录态：**以本地凭据为准，绝不因为网络失败改口**。
+
+    三层事实严格分开：
+
+    - 有没有会话 = 本地凭据（refresh 令牌）在不在，只由用户登录/登出或服务端
+      **明确**拒绝（``AUTH_REJECTED_CODES``）改变；
+    - 能不能连上服务 = ``online``，只用于提示"暂时同步不了"；
+    - 登录态被实例变更孤立（令牌在、但当前实例键匹配不上）= 单独一条 message，
+      让用户知道该重新登录，而不是被当成"从没登录"。
+    """
+    session = _session()
+    profile = load_profile()
+    if session.access_token or session.has_stored_session():
+        status = {"ok": True, "logged_in": True,
+                  "login": str(profile.get("login") or ""),
+                  "display_name": str(profile.get("display_name") or "")}
+        if not status["login"]:
+            try:
+                summary = session.restore()
+            except AccountError as error:
+                # 拿不到账号名只是少个显示名，登录态照旧
+                _note_network_error(error)
+                return status
+            if summary is None:
+                return {"ok": True, "logged_in": False,
+                        "message": "登录已过期，请重新登录"}
+            status["login"] = summary["account"]["login"]
+            status["display_name"] = summary["account"].get("display_name") or ""
+        return status
+    owner = stored_token_owner()
+    if owner:
+        logger.warning("登录态与当前实例不匹配：令牌属于 {}，当前实例 {}",
+                       owner, current_keyring_user())
+        return {"ok": True, "logged_in": False, "orphaned": True,
+                "message": "本机登录记录与当前实例不匹配（实例标识变了），请重新登录"}
+    return {"ok": True, "logged_in": False}
 
 
 def _sync(token: str) -> dict:
@@ -100,38 +174,36 @@ def account_clear_profile(keep_mode: bool = False) -> str:
 
 
 def account_status() -> str:
-    """是否已登录（凭据库有令牌且能用它恢复会话）。"""
-    session = _session()
-    if not session.has_stored_session():
-        return json.dumps({"ok": True, "logged_in": False}, ensure_ascii=False)
-    try:
-        summary = session.restore()
-    except AccountError as error:
-        return json.dumps({"ok": True, "logged_in": False,
-                           "message": str(error)}, ensure_ascii=False)
-    if summary is None:
-        return json.dumps({"ok": True, "logged_in": False,
-                           "message": "登录已过期，请重新登录"}, ensure_ascii=False)
-    return json.dumps({"ok": True, "logged_in": True,
-                       "login": summary["account"]["login"],
-                       "display_name": summary["account"].get("display_name") or "",
-                       "active_sessions": summary.get("active_sessions")},
-                      ensure_ascii=False)
+    """登录态。**内存快照优先**：进程内第一次才真的问一次（凭据库 + 必要时
+    一次网络校验），之后进设置页只是读缓存；登录/登出/令牌失效时才刷新。
+    之前每次调用都新建会话并 refresh+summary，等于进一次设置页打两个网络请求。"""
+    global _STATUS_CACHE
+    if _STATUS_CACHE is None:
+        _STATUS_CACHE = _probe_status()
+    return json.dumps(_STATUS_CACHE, ensure_ascii=False)
 
 
 def account_login(login: str, password: str) -> str:
+    """账密登录。**只做登录本身**，不在这里串行拉快照：
+
+    一次登录要走的网络请求越少越好——手机弱网下每一次都是一轮 TLS 握手。
+    这里只发 ``POST /api/login``（响应已带账号名），成功立刻返回；profile
+    同步由界面在后台另起一次 ``account_sync``，成功与否都不影响"已登录"。
+    """
     session = _session()
     try:
-        summary = session.login(login, password)
+        summary = session.login(login, password, fetch_summary=False)
     except AccountError as error:
-        return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
+        # 登录失败只在"网络/服务不可用"时标记在线状态，登录态本身不动
+        _note_network_error(error)
+        return json.dumps({"ok": False, "message": str(error),
+                           "code": error.code or "", "offline": error.code in _OFFLINE_CODES},
+                          ensure_ascii=False)
     result = {"ok": True, "login": summary["account"]["login"],
-              "display_name": summary["account"].get("display_name") or ""}
-    # 登录成功即拉一轮：新设备落地快照 + 回放（云端没快照就等 PC 端建）
-    try:
-        result["sync"] = _sync(session.access_token)
-    except AccountError as error:
-        result["sync"] = {"synced": False, "message": str(error)}
+              "display_name": summary["account"].get("display_name") or "",
+              "pending_sync": True}
+    _remember_status({"ok": True, "logged_in": True, "online": True,
+                      "login": result["login"], "display_name": result["display_name"]})
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -141,19 +213,29 @@ def account_logout() -> str:
         session.logout()
     except AccountError as error:
         return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
+    _remember_status({"ok": True, "logged_in": False})
     return json.dumps({"ok": True}, ensure_ascii=False)
 
 
 def account_sync() -> str:
+    """同步。网络失败只影响 `online`，**绝不改登录态**；只有服务端明确拒绝
+    凭据（``AUTH_REJECTED_CODES``）才清本地登录。"""
     session = _session()
     if not session.access_token:
         try:
-            if session.restore() is None:
+            if session.restore(fetch_summary=False) is None:
+                _remember_status({"ok": True, "logged_in": False})
                 return json.dumps({"ok": False, "message": "尚未登录"}, ensure_ascii=False)
         except AccountError as error:
-            return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
+            _note_network_error(error)
+            return json.dumps({"ok": False, "message": str(error),
+                               "offline": error.code in _OFFLINE_CODES},
+                              ensure_ascii=False)
     try:
         result = _sync(session.access_token)
     except AccountError as error:
-        return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
+        _note_network_error(error)
+        return json.dumps({"ok": False, "message": str(error),
+                           "offline": error.code in _OFFLINE_CODES}, ensure_ascii=False)
+    _set_online(True)
     return json.dumps({"ok": True, **result}, ensure_ascii=False)

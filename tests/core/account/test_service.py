@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from urllib.error import URLError
 
 import pytest
 
@@ -41,7 +42,7 @@ def fake_env(tmp_path, monkeypatch):
     monkeypatch.setattr(account_identity, "_machine_component", lambda: "test:fixed")
     requests: list[tuple[str, str, dict | None]] = []
 
-    def fake_request(method, route, data=None, token=""):
+    def fake_request(method, route, data=None, token="", timeout=None):
         requests.append((method, route, data))
         if route == "/api/login":
             return {"account_id": "a" * 32, "login": data["login"], "display_name": "王某",
@@ -140,7 +141,7 @@ def test_stale_access_token_self_heals_via_refresh(fake_env, monkeypatch) -> Non
     session.login("wang", "pw")
     session.access_token = "rotated-elsewhere"      # 服务端已不认这个令牌
 
-    def fake_request(method, route, data=None, token=""):
+    def fake_request(method, route, data=None, token="", timeout=None):
         if route == "/api/refresh":
             return {"access_token": "access-3", "access_expires_at": "later",
                     "refresh_token": "refresh-3"}
@@ -166,7 +167,8 @@ def test_distinct_instances_get_distinct_device_ids_and_tokens(tmp_path, monkeyp
         # 实例身份 = 出生文件；两个实例各有各的出生文件
         monkeypatch.setattr(account_identity, "_instance_id_path", lambda m=marker: m)
         account_identity._stable_instance_id_cache = None
-        monkeypatch.setattr(account_service, "_request", lambda method, route, data=None, token="": {
+        monkeypatch.setattr(account_service, "_request",
+                            lambda method, route, data=None, token="", timeout=None: {
             "account_id": "a" * 32, "login": data["login"], "display_name": "",
             "instance_id": data["instance_id"], "access_token": "access",
             "access_expires_at": "later", "refresh_token": f"refresh-{config_name}"}
@@ -181,3 +183,165 @@ def test_distinct_instances_get_distinct_device_ids_and_tokens(tmp_path, monkeyp
     assert source_id != install_id
     assert source_uuid != install_uuid
     assert len(keyring.store) == 2          # 两条登录态并存，互不覆盖
+
+def test_android_reports_model_name_and_android_platform(monkeypatch) -> None:
+    """Android 上 sys.platform 是 linux、gethostname 是 localhost：
+    上报必须换成机型 + android，否则设备列表里全是认不出的条目。"""
+    monkeypatch.setattr(account_service, "_on_android", lambda: True)
+    monkeypatch.setattr(account_service, "_android_device_name", lambda: "vivo V2415A")
+    monkeypatch.setattr(account_identity, "stable_instance_id", lambda: "inst-1")
+
+    instance, device_name, instance_uuid = account_service._device_identity()
+
+    assert (instance, device_name, instance_uuid) == ("inst-1", "vivo V2415A", "inst-1")
+    assert account_service._platform_tag() == "android"
+
+
+def test_desktop_keeps_hostname_and_sys_platform(monkeypatch) -> None:
+    monkeypatch.setattr(account_service, "_on_android", lambda: False)
+    monkeypatch.setattr(account_service.socket, "gethostname", lambda: "PC-01")
+    monkeypatch.setattr(account_service.sys, "platform", "win32")
+
+    assert account_service._device_identity()[1] == "PC-01"
+    assert account_service._platform_tag() == "win32"
+
+
+def test_request_retries_once_after_network_error(monkeypatch) -> None:
+    """弱网下一次握手超时不该直接判失败：重试一次成功就正常返回。"""
+    calls: list[int] = []
+
+    def flaky(_request, timeout=None):
+        calls.append(1)
+        if len(calls) == 1:
+            raise URLError(OSError(101, "Network is unreachable"))
+        return json.dumps({"ok": True}).encode("utf-8")
+
+    monkeypatch.setattr(account_service, "_open_once", flaky)
+    monkeypatch.setattr(account_service.time, "sleep", lambda _seconds: None)
+
+    assert account_service._request("POST", "/api/login", {}) == {"ok": True}
+    assert len(calls) == 2
+
+
+def test_request_network_failure_is_actionable(monkeypatch) -> None:
+    """两次都失败时给可行动的中文原因，而不是笼统的"服务暂时不可用"。"""
+
+    def always_fail(_request, timeout=None):
+        raise URLError(TimeoutError("The handshake operation timed out"))
+
+    monkeypatch.setattr(account_service, "_open_once", always_fail)
+    monkeypatch.setattr(account_service.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(AccountError) as info:
+        account_service._request("POST", "/api/login", {})
+    assert info.value.code == "network"
+    assert "握手超时" in str(info.value)
+
+def test_network_error_never_clears_stored_token(monkeypatch) -> None:
+    """网络失败只说明"现在问不到"，绝不能把本地登录态清掉。"""
+    cleared: list[int] = []
+    monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "refresh-token")
+    monkeypatch.setattr(account_service, "_clear_stored_session",
+                        lambda: cleared.append(1))
+
+    def offline(method, route, data=None, token="", timeout=None):
+        raise AccountError("和账号服务握手超时，请检查网络后重试", code="network")
+
+    monkeypatch.setattr(account_service, "_request", offline)
+    session = AccountSession()
+
+    with pytest.raises(AccountError):
+        session.restore()
+    assert cleared == []
+
+
+def test_auth_rejection_clears_stored_token(monkeypatch) -> None:
+    """服务端明确说令牌不行时，才清本地登录态。"""
+    cleared: list[int] = []
+    monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "refresh-token")
+    monkeypatch.setattr(account_service, "_clear_stored_session",
+                        lambda: cleared.append(1))
+
+    def rejected(method, route, data=None, token="", timeout=None):
+        raise AccountError("登录已过期，请重新登录", code="token_expired")
+
+    monkeypatch.setattr(account_service, "_request", rejected)
+
+    assert AccountSession().restore() is None
+    assert cleared == [1]
+
+
+def _http_error(status: int, body: bytes) -> AccountError:
+    """把 (状态码, 响应体) 走一遍 ``_request`` 的错误映射，返回映射后的异常。"""
+    import io
+    from urllib import error as urlerror
+
+    try:
+        raise urlerror.HTTPError("https://x/api", status, "err", {}, io.BytesIO(body))
+    except urlerror.HTTPError as exc:
+        return account_service._http_error(exc)
+
+
+def test_http_5xx_is_service_unavailable_not_auth() -> None:
+    """网关 502 / 非 JSON 响应：服务不可用，不能当成认证失败。"""
+    error = _http_error(502, b"<html>bad gateway</html>")
+    assert error.code == "service_unavailable"
+    assert error.code not in account_service.AUTH_REJECTED_CODES
+
+
+def test_http_403_html_is_rejected_but_not_auth() -> None:
+    """Cloudflare Bot 防护那种 403 HTML 不能把用户踢下线。"""
+    error = _http_error(403, b"<html>blocked</html>")
+    assert error.code == "rejected"
+    assert error.code not in account_service.AUTH_REJECTED_CODES
+
+
+def test_http_401_with_explicit_code_is_auth() -> None:
+    error = _http_error(401, b'{"error": "token_expired"}')
+    assert error.code == "token_expired"
+    assert error.code in account_service.AUTH_REJECTED_CODES
+
+def test_login_fast_path_costs_one_request(monkeypatch) -> None:
+    """手机端登录只发一次 POST /api/login：每少一跳就少一次 TLS 握手。"""
+    calls: list[str] = []
+
+    def fake_request(method, route, data=None, token="", timeout=None):
+        calls.append(route)
+        if route == "/api/login":
+            return {"login": "wang", "display_name": "王", "account_id": "a" * 32,
+                    "instance_id": "inst", "access_token": "at",
+                    "access_expires_at": "later", "refresh_token": "rt"}
+        return {"account": {"login": "wang", "display_name": "王"}}    # /api/summary
+
+    monkeypatch.setattr(account_service, "_request", fake_request)
+    monkeypatch.setattr(account_service, "_store_refresh_token", lambda token: None)
+    monkeypatch.setattr(account_service, "_save_profile", lambda profile: None)
+    monkeypatch.setattr(account_identity, "stable_instance_id", lambda: "inst")
+
+    summary = AccountSession().login("wang", "pw", fetch_summary=False)
+
+    assert calls == ["/api/login"]
+    assert summary["account"]["login"] == "wang"
+
+    calls.clear()
+    AccountSession().login("wang", "pw")          # 桌面端仍要设备列表 → 多取一次
+    assert calls == ["/api/login", "/api/summary"]
+
+
+def test_restore_fast_path_returns_truthy_without_summary(monkeypatch) -> None:
+    """同步路径只要令牌：restore(fetch_summary=False) 不能再打 summary，
+    同时必须返回真值，调用方才不会当成"未登录"。"""
+    calls: list[str] = []
+    monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "rt")
+
+    def fake_request(method, route, data=None, token="", timeout=None):
+        calls.append(route)
+        return {"refresh_token": "rt2", "access_token": "at", "access_expires_at": "later"}
+
+    monkeypatch.setattr(account_service, "_request", fake_request)
+    monkeypatch.setattr(account_service, "_store_refresh_token", lambda token: None)
+
+    session = AccountSession()
+    assert session.restore(fetch_summary=False)
+    assert calls == ["/api/refresh"]
+    assert session.access_token == "at"

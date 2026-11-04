@@ -235,6 +235,8 @@ def sync_documents(token: str,
     seen: set[tuple[str, str]] = set()
     local_docs = iter_local_documents(users_dir, session_dir)
     total_docs = len(local_docs)
+    logger.info("[sync] 文档对账开始：本地 {} 份，远端 {} 份",
+                total_docs, len(remote_by_key))
     for index, entry in enumerate(local_docs):
         if stop and stop():
             report.errors.append("已停止")

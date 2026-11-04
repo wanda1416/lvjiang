@@ -745,6 +745,8 @@ class AccountManagerDialog(QDialog):
         """分步进度：进度列实时显示细节，上行/下行随批累加。"""
         if not self._alive():
             return
+        if data.get("reload_users"):
+            self._reload_users()
         row = self._step_key_rows.get(data.get("step"))
         if row is None:
             return

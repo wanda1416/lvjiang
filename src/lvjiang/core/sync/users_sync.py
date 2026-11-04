@@ -251,6 +251,9 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     if final_order and final_order != local_roster:
         if _set_roster(final_order):
             report.reordered = True
+            if on_progress:
+                # 名册一旦落盘就通知界面刷新用户选择器——不必等整轮四通道结束
+                on_progress({"step": "roster", "detail": "完成", "reload_users": True})
             logger.info("[users sync] 名册已按云端顺序重排")
     if final_order and final_order != signature:
         state["roster"] = final_order

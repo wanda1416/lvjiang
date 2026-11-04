@@ -14,6 +14,7 @@ def test_sync_is_disabled_but_existing_task_controls_remain_available(qapp, monk
     page = offline.OfflineControlPage(SimpleNamespace(user_manager=manager), lambda: "", lambda _: None)
     try:
         assert not page.buttons["sync"].isEnabled()
+        assert "需激活功能" in page.buttons["sync"].text()
         assert "Lv1" in page.buttons["sync"].toolTip()
         assert page.buttons["status"].isEnabled()
         assert page.buttons["diagnostics"].isEnabled()
@@ -28,6 +29,7 @@ def test_sync_is_disabled_but_existing_task_controls_remain_available(qapp, monk
         page._state = "idle"
         page._update_buttons()
         assert page.buttons["sync"].isEnabled()
+        assert page.buttons["sync"].text() == "下发配置"
         assert page.preserve_task_params.isChecked()
     finally:
         page.close()

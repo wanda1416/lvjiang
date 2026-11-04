@@ -205,6 +205,9 @@ class OfflineControlPage(QWidget):
         sync_allowed = has_feature("lv1")
         self.buttons["sync"].setEnabled(sync_allowed and not busy and not active
                                         and bool(self.layout_choice.currentData()) and bool(self._sync_username()))
+        # 禁用按钮的 tooltip 在部分平台不显示，激活门禁必须写进按钮文案本身。
+        self.buttons["sync"].setText(
+            tr("下发配置") if sync_allowed else tr("下发配置（需激活功能）"))
         self.buttons["sync"].setToolTip(
             "" if sync_allowed else tr("向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活"))
         self.buttons["start"].setEnabled(not busy and not active and bool(self.task.currentData())

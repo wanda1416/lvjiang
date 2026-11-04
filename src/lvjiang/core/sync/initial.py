@@ -175,5 +175,4 @@ def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
     if not report.errors:
         set_sync_established(True)
         report.established = True
-        logger.info("[initial sync] 同步状态已建立：{}", report.describe())
     return report

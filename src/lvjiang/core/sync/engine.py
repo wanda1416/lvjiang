@@ -238,6 +238,8 @@ def sync_documents(token: str,
     seen: set[tuple[str, str]] = set()
     local_docs = iter_local_documents(users_dir, session_dir)
     total_docs = len(local_docs)
+    logger.info("[sync] 文档对账开始：本地 {} 份，远端 {} 份",
+                total_docs, len(remote_by_key))
     # 批量拉取全部远端 payload（替代逐份 pull）：初始同步 38 份从 ~60s 降到 1 次请求。
     remote_raw: dict[tuple[str, str], bytes] = {}
     try:
@@ -253,8 +255,6 @@ def sync_documents(token: str,
     except SyncError as error:
         # 批量接口失败时退回逐份 pull（remote_raw 为空，_pull 会按 raw=None 单拉）
         report.errors.append(str(error))
-    logger.info("[sync] 文档对账开始：本地 {} 份，远端 {} 份",
-                total_docs, len(remote_by_key))
     for index, entry in enumerate(local_docs):
         if stop and stop():
             report.errors.append("已停止")

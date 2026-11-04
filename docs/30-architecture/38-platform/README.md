@@ -20,4 +20,4 @@
 
 - [05-ai-connection.md](05-ai-connection.md)：AI 连接参数与可取消请求。
 - [10-android-batch.md](10-android-batch.md)：手机批量运行状态与执行边界。
-- [11-background-services.md](11-background-services.md)：无 GUI 服务与桌面线程适配。
+- [11-background-services.md](11-background-services.md)：无 GUI 服务与桌面线程适配；运行时线程全景（常驻线程、QTimer 节拍、临时线程、同步执行模型、Android 差异）。

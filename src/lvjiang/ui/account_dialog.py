@@ -263,7 +263,14 @@ class AccountHolder(QObject):
                 self.last_sync_report = result
                 self.last_sync_at = datetime.now().strftime("%H:%M:%S")
                 describe = getattr(result, "describe", None)
-                logger.info("[account] 同步完成：{}", describe() if describe else result)
+                text = describe() if describe else str(result)
+                # 分钟节拍下零变更是常态（全 0 无失败）：INFO 一天刷几百行
+                # 噪音，降 debug；有实际动作才值得进 INFO。
+                changed = bool(getattr(result, "errors", None)) or any(
+                    up or down for _name, up, down, _fail in (
+                        result.rows() if hasattr(result, "rows") else []))
+                (logger.info if changed else logger.debug)(
+                    "[account] 同步完成：{}", text)
             else:
                 logger.warning("[account] 同步未完成：{}", result)
             self.sync_finished.emit(ok, result)

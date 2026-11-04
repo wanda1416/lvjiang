@@ -418,10 +418,15 @@ class AccountManagerDialog(QDialog):
         sync_layout.addWidget(self.sync_caption)
 
         sync_actions = QHBoxLayout()
-        self.sync_button = QPushButton(tr("立即同步"))
-        apply_button_style(self.sync_button)
-        self.sync_button.clicked.connect(self._sync_now)
-        sync_actions.addWidget(self.sync_button)
+        # 左：危险操作（清除同步）；右：常规操作（刷新快照、立即同步）
+        self.clear_sync_button = QPushButton(tr("清除同步"))
+        apply_button_style(self.clear_sync_button, variant="danger")
+        self.clear_sync_button.setToolTip(
+            tr("清除本地同步进度（远端水位/本机水位/快照编号），不动本地数据；"
+               "换账号或云端重建后使用"))
+        self.clear_sync_button.clicked.connect(self._clear_sync)
+        sync_actions.addWidget(self.clear_sync_button)
+        sync_actions.addStretch()
         self.snapshot_button = QPushButton(tr("刷新快照"))
         apply_button_style(self.snapshot_button, variant="neutral")
         self.snapshot_button.setToolTip(tr(
@@ -429,14 +434,10 @@ class AccountManagerDialog(QDialog):
             "新设备接入、或云端被重建后需要先做一次；日常同步不用点。"))
         self.snapshot_button.clicked.connect(self._refresh_snapshot)
         sync_actions.addWidget(self.snapshot_button)
-        self.clear_sync_button = QPushButton(tr("清除同步"))
-        apply_button_style(self.clear_sync_button, variant="neutral")
-        self.clear_sync_button.setToolTip(
-            tr("清除本地同步进度（远端水位/本机水位/快照编号），不动本地数据；"
-               "换账号或云端重建后使用"))
-        self.clear_sync_button.clicked.connect(self._clear_sync)
-        sync_actions.addWidget(self.clear_sync_button)
-        sync_actions.addStretch()
+        self.sync_button = QPushButton(tr("立即同步"))
+        apply_button_style(self.sync_button)
+        self.sync_button.clicked.connect(self._sync_now)
+        sync_actions.addWidget(self.sync_button)
         sync_layout.addLayout(sync_actions)
         self.tabs.addTab(sync_tab, tr("数据同步"))
 

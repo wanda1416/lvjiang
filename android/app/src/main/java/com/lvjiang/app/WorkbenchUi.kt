@@ -1267,21 +1267,14 @@ class WorkbenchUi(
             val snapshot = result.optInt("snapshot_id", 0)
             val watermark = result.optInt("snapshot_remote_id", 0)
             val pending = result.optInt("pending_push", 0)
-            val current = if (isPc) "当前：PC端（总览数据随离线包更新，在线同步跳过总览）"
-                          else "当前：云端（总览数据来自云端快照与账本双向同步）"
-            val progress = if (snapshot > 0)
-                "已跟随云端快照 #$snapshot，历史回放至水位 $watermark。"
-            else "尚未落地任何云端快照；同步后这里会显示快照编号与回放水位。"
-            val pendingLine = if (!isPc && pending > 0)
-                "⚠️ 有 $pending 条本机变更尚未同步到云端。"
-            else if (!isPc) "本机变更已全部同步到云端。"
-            else ""
+            // 三行说完：当前模式 / 云端位置 / 未同步数。解释性文字全删——
+            // 用户要的是状态，不是说明书。
+            val lines = mutableListOf(if (isPc) "当前来源：PC端" else "当前来源：云端")
+            if (snapshot > 0) lines.add("云端快照 #$snapshot · 历史水位 $watermark")
+            if (!isPc) lines.add(
+                if (pending > 0) "未同步变更 $pending 条" else "变更已全部同步")
             val content = SettingsUi.dialogContent(activity)
-            text(content, current)
-            text(content, progress, 12f)
-            if (pendingLine.isNotEmpty()) text(content, pendingLine, 12f)
-            text(content, if (isPc) "切换到云端需要先清除本地总览数据。"
-                          else "切换后 PC 端离线包将携带总览数据。", 12f)
+            lines.forEach { text(content, it) }
 
             val actions = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL

@@ -599,6 +599,10 @@ class AccountManagerDialog(QDialog):
         self.stop_sync_button = QPushButton(tr("停止"))
         apply_button_style(self.stop_sync_button, variant="neutral")
         self.stop_sync_button.setFixedWidth(72)
+        # 隐藏时保留占位，避免同步开始/结束时「立即同步」左右跳。
+        stop_policy = self.stop_sync_button.sizePolicy()
+        stop_policy.setRetainSizeWhenHidden(True)
+        self.stop_sync_button.setSizePolicy(stop_policy)
         self.stop_sync_button.clicked.connect(self.holder.cancel_sync)
         self.stop_sync_button.setVisible(False)
         self.sync_button = QPushButton(tr("立即同步"))

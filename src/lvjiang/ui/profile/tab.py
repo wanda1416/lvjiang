@@ -265,6 +265,25 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         )
         self._profile_script_status.setVisible(False)
         toolbar.addWidget(self._profile_script_status)
+
+        # 行尾固定组合：历史记录 · 数据模型（两者间留半个按钮宽，不紧贴）
+        btn_history = QPushButton(tr("历史记录"))
+        btn_history.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_history.setMinimumHeight(32)
+        btn_history.setToolTip(tr("查看全部用户、全部 key 的变更记录"))
+        btn_history.clicked.connect(self._open_history_dialog)
+        toolbar.addWidget(btn_history)
+
+        btn_settings = QPushButton(tr("数据模型"))
+        # 与同页工具栏的新建/重命名/删除分组同一套样式，别再是系统默认灰按钮
+        btn_settings.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_settings.setMinimumHeight(32)
+        btn_settings.setToolTip(tr("定义数据模型 key"))
+        btn_settings.clicked.connect(self._open_metadata_dialog)
+        toolbar.addWidget(btn_settings)
+        # 半个按钮宽的分隔：两个按钮是一个固定组合，但不挤在一起
+        toolbar.insertSpacing(toolbar.count() - 1, btn_settings.sizeHint().width() // 2)
+
         layout.addLayout(toolbar)
 
         # ── 内容区：QTabWidget ──
@@ -273,20 +292,6 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         self._tab_widget.tabBar().tabMoved.connect(self._on_groups_reordered)
         self._tab_widget.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self._tab_widget, stretch=1)
-
-        # ── 底部按钮行 ──
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-
-        btn_settings = QPushButton(tr("数据模型"))
-        # 与同页工具栏的新建/重命名/删除分组同一套样式，别再是系统默认灰按钮
-        btn_settings.setStyleSheet(USER_ACTION_BTN_STYLE)
-        btn_settings.setMinimumHeight(32)
-        btn_settings.setToolTip(tr("定义数据模型 key"))
-        btn_settings.clicked.connect(self._open_metadata_dialog)
-        btn_row.addWidget(btn_settings)
-
-        layout.addLayout(btn_row)
 
         self._build_groups()
 
@@ -571,6 +576,11 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         if dialog.exec() or dialog.has_saved_changes:
             reload_profile_config()
             self._build_groups()
+
+    def _open_history_dialog(self) -> None:
+        """全量变更记录：不限定用户/类型/key，整个账本翻页浏览。"""
+        from .dialogs import HistoryDialog
+        HistoryDialog(None, "", "", "", self).exec()
 
     # ─── 分组管理 ──────────────────────────────────────────────
 

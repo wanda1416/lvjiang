@@ -1041,7 +1041,7 @@ class SettingsDialog(QDialog):
 
         caption = QLabel(tr(
             "只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，"
-            "包括列表表头；顶部工具栏和底部「数据模型」按钮保持不变。"
+            "包括列表表头；顶部工具栏按钮保持不变。"
         ))
         caption.setWordWrap(True)
         vbox.addWidget(caption)

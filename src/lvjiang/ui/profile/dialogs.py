@@ -76,7 +76,11 @@ def _cjk_column_width(widget: QWidget, characters: int) -> int:
 
 
 class HistoryDialog(QDialog):
-    """按 key 查看变更记录；可限定单个用户，也可跨用户分页。"""
+    """按 key 查看变更记录；可限定单个用户，也可跨用户分页。
+
+    ``key`` 传空串时进入**全量模式**：不限定用户、类型与 key，查看整个账本
+    （用户总览工具栏的「历史记录」入口）。全量模式额外显示「键」列。
+    """
 
     _TYPE_LABEL = {
         "tick": tr("恢复"), "reset": tr("重置"),
@@ -96,24 +100,34 @@ class HistoryDialog(QDialog):
         self._model_type = model_type
         self._key = key
         self._key_label = key_label
+        self._global_mode = not key
+        # 全量模式多一列「键」：来源/撤销等列号整体右移一格
+        self._offset = 1 if self._global_mode else 0
+        self._SOURCE_COLUMN += self._offset
+        self._ACTION_COLUMN += self._offset
         self._page = 1
         self._page_size = 100
         self._loading_history = False
         self.values_changed = False
-        title = f"{key_label} — {user_name}" if user_name is not None else key_label
-        self.setWindowTitle(f"{title} " + tr("变更记录"))
-        self.resize(900 if user_name is not None else 1040, 480)
+        if self._global_mode:
+            title = tr("全部变更记录")
+        else:
+            title = f"{key_label} — {user_name}" if user_name is not None else key_label
+            title += " " + tr("变更记录")
+        self.setWindowTitle(title)
+        self.resize(1040, 480)
         self._setup_ui()
         self._load_page()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         table = QTableWidget(self)
-        table.setColumnCount(9)
-        table.setHorizontalHeaderLabels([
-            tr("时间"), tr("用户名"), tr("类型"), tr("旧值"),
-            tr("新值"), tr("来源"), tr("变动量"), tr("同步来源"), "",
-        ])
+        headers = [tr("时间"), tr("用户名"), tr("类型"), tr("旧值"),
+                   tr("新值"), tr("来源"), tr("变动量"), tr("同步来源"), ""]
+        if self._global_mode:
+            headers.insert(2, tr("键"))
+        table.setColumnCount(len(headers))
+        table.setHorizontalHeaderLabels(headers)
         table.setColumnHidden(1, self._user_name is not None)
         table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -129,16 +143,21 @@ class HistoryDialog(QDialog):
             table.setColumnWidth(0, 140)
             header.setSectionResizeMode(
                 1, QHeaderView.ResizeMode.ResizeToContents)
+            if self._global_mode:
+                header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
             for col, w in (
-                (2, 60), (3, 70), (4, 70),
-                (5, _cjk_column_width(table, _SOURCE_CHARACTER_CAPACITY)),
+                (2 + self._offset, 60), (3 + self._offset, 70), (4 + self._offset, 70),
+                (5 + self._offset, _cjk_column_width(table, _SOURCE_CHARACTER_CAPACITY)),
             ):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
                 table.setColumnWidth(col, w)
-            header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
-            header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
-            header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
-            table.setColumnWidth(8, _cjk_column_width(table, 3))
+            header.setSectionResizeMode(
+                6 + self._offset, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(
+                7 + self._offset, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(
+                8 + self._offset, QHeaderView.ResizeMode.Fixed)
+            table.setColumnWidth(8 + self._offset, _cjk_column_width(table, 3))
 
         self._table = table
         layout.addWidget(table)
@@ -190,18 +209,21 @@ class HistoryDialog(QDialog):
             self._load_page()
 
     def _load_page(self) -> None:
-        total = db_count_history(
-            self._user_name, type_=self._model_type, key=self._key)
+        # 全量模式（key/type 为空串）要传 None：过滤条件把空串当真实值
+        model_type = self._model_type or None
+        key = self._key or None
+        total = db_count_history(self._user_name, type_=model_type, key=key)
         self._page_count = max(1, (total + self._page_size - 1) // self._page_size)
         self._page = min(self._page, self._page_count)
         history = db_get_history(
-            self._user_name, type_=self._model_type, key=self._key,
+            self._user_name, type_=model_type, key=key,
             limit=self._page_size, offset=(self._page - 1) * self._page_size,
         )
         table = self._table
 
         self._loading_history = True
         table.setRowCount(len(history))
+        offset = self._offset
         for row, rec in enumerate(history):
             # 格式化时间
             raw_ts = rec.get("ts", "")
@@ -231,13 +253,16 @@ class HistoryDialog(QDialog):
                     else str(new_val) if new_val is not None else "—"
                 )
 
-            for column, text in enumerate((
+            cells = [
                 formatted_ts,
                 rec.get("username", ""),
                 tr(self._TYPE_LABEL.get(ct, ct)),
                 old_str,
                 new_str,
-            )):
+            ]
+            if self._global_mode:
+                cells.insert(2, f"{rec.get('type', '')}:{rec.get('key', '')}")
+            for column, text in enumerate(cells):
                 item = QTableWidgetItem(str(text))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 table.setItem(row, column, item)
@@ -251,11 +276,11 @@ class HistoryDialog(QDialog):
             delta = rec.get("delta_value")
             delta_item = QTableWidgetItem(f"{delta:+g}" if delta is not None else "—")
             delta_item.setFlags(delta_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            table.setItem(row, 6, delta_item)
+            table.setItem(row, 6 + offset, delta_item)
             sync_from = rec.get("sync_from") or ""
             sync_item = QTableWidgetItem(format_sync_label(sync_from) if sync_from else "")
             sync_item.setFlags(sync_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            table.setItem(row, 7, sync_item)
+            table.setItem(row, 7 + offset, sync_item)
 
             reason = profile_history_undo_unavailable_reason(rec)
             undo_button = QPushButton(tr("撤销"), table)

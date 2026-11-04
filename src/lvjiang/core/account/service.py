@@ -83,7 +83,9 @@ _AUTH_TIMEOUT_S = 8
 ERROR_MESSAGES = {
     "invalid_credentials": "账户名或密码不正确",
     "account_disabled": "账号已被禁用，请联系管理员",
-    "device_revoked": "设备已被移出，请联系管理员",
+    # 服务端已不再返回此码（revoked 设备凭密码登录会就地复活），留一行
+    # 旧服务端兜底文案；不在 AUTH_REJECTED_CODES 里。
+    "device_revoked": "设备登录已失效，请重新登录",
     "token_expired": "登录已过期，请重新登录",
     "invalid_request": "请求无效",
     "unauthorized": "未登录或会话已失效",
@@ -94,7 +96,7 @@ ERROR_MESSAGES = {
 # 服务端**明确**判定"这个凭据/会话不行"时才允许清理本地登录态。网络失败、
 # 5xx、网关拦截都不在此列——它们只说明"现在问不到"，不能据此把用户踢下线。
 AUTH_REJECTED_CODES = frozenset({
-    "invalid_credentials", "token_expired", "account_disabled", "device_revoked",
+    "invalid_credentials", "token_expired", "account_disabled",
 })
 
 

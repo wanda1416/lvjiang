@@ -430,6 +430,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 心跳跟随前台：在线状态 + 跳成功后自动同步（后台不跳，省电）
+        executor.execute { PyBridge.accountHeartbeatStart(this) }
         if (refreshWorkbenchOnResume && page in setOf(Page.TASKS, Page.USERS)) workbench.show(page.name)
         refreshWorkbenchOnResume = false
         // 自检期间不刷状态：刷一下就会把「点击已生效」或报告正文覆掉，
@@ -443,6 +445,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        executor.execute { PyBridge.accountHeartbeatStop(this) }
         refreshWorkbenchOnResume = true
         ui.removeCallbacks(statusPoller)
         super.onPause()

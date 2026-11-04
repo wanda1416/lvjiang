@@ -506,3 +506,11 @@ class AccountSession:
         if self.restore() is None:
             raise AccountError("登录已过期，请重新登录", code="token_expired")
         return _request(method, route, data, token=self.access_token)
+
+    def heartbeat(self) -> dict:
+        """在线心跳：刷新设备与会话活跃时间（设备列表「在线」的数据源）。
+
+        设备被踢或登录态彻底失效时抛 AccountError——调用方据此感知会话
+        健康状况，无需等下一次业务请求才发现。
+        """
+        return self._authorized("POST", "/api/heartbeat", {})

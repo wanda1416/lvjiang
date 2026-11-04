@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 from loguru import logger
 
@@ -239,3 +240,50 @@ def account_sync() -> str:
                            "offline": error.code in _OFFLINE_CODES}, ensure_ascii=False)
     _set_online(True)
     return json.dumps({"ok": True, **result}, ensure_ascii=False)
+
+
+# ─── 在线节拍：前台期间每分钟自动同步、每 10 分钟心跳一次 ────────────────
+# 前后台由 Kotlin Activity 的 onResume/onPause 驱动（account_heartbeat_start/stop），
+# 后台全停：省电，且"在线=App 在前台"与用户直觉一致。在线判定窗口 20 分钟
+# （服务端设备列表口径），心跳 10 分钟一跳即容错两跳。
+
+SYNC_INTERVAL_S = 60
+HEARTBEAT_EVERY_N_SYNC = 10            # 60s × 10 = 10 分钟一跳
+_heartbeat_stop = threading.Event()
+_heartbeat_thread: threading.Thread | None = None
+
+
+def _heartbeat_loop() -> None:
+    ticks = 0
+    while not _heartbeat_stop.wait(SYNC_INTERVAL_S):
+        session = _session()
+        if not session.access_token and not session.has_stored_session():
+            continue                          # 未登录不跳不同步
+        ticks += 1
+        if ticks % HEARTBEAT_EVERY_N_SYNC == 0:
+            try:
+                session.heartbeat()
+            except AccountError:
+                pass                          # 弱网抖动静默，下轮再试
+        try:
+            _sync(session.access_token)       # 每分钟刷新同步状态
+        except AccountError:
+            pass
+
+
+def account_heartbeat_start() -> str:
+    """启动心跳循环（幂等）。"""
+    global _heartbeat_thread
+    if _heartbeat_thread is not None and _heartbeat_thread.is_alive():
+        return json.dumps({"ok": True, "running": True})
+    _heartbeat_stop.clear()
+    _heartbeat_thread = threading.Thread(
+        target=_heartbeat_loop, name="account-heartbeat", daemon=True)
+    _heartbeat_thread.start()
+    return json.dumps({"ok": True, "running": True})
+
+
+def account_heartbeat_stop() -> str:
+    """停止心跳循环（幂等）。"""
+    _heartbeat_stop.set()
+    return json.dumps({"ok": True, "running": False})

@@ -73,6 +73,11 @@ def pull(token: str, label: str, kind: str) -> dict:
     return _request("POST", "/api/sync/pull", {"label": label, "kind": kind}, token)
 
 
+def pull_all(token: str) -> list[dict]:
+    """一次拉取账号下全部文档 payload（批量接口，避免逐份请求）。"""
+    return list(_request("POST", "/api/sync/documents/pull", {}, token).get("documents") or [])
+
+
 def push(token: str, label: str, kind: str, sha256: str,
          payload_base64: str, expected_sha256: str | None = None) -> dict:
     data = {"label": label, "kind": kind, "sha256": sha256, "payload_base64": payload_base64}

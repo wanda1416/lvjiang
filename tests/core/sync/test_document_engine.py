@@ -34,6 +34,11 @@ class FakeClient:
                 "zipped": entry.get("zipped", True), "updated_at": entry["updated_at"],
                 "payload_base64": entry["payload"]}
 
+    def pull_all(self, token):
+        return [{"label": k[0], "kind": k[1], "sha256": d["sha256"], "size": d["size"],
+                 "zipped": d.get("zipped", True), "updated_at": d["updated_at"],
+                 "payload_base64": d["payload"]} for k, d in self.docs.items()]
+
     def push(self, token, label, kind, sha256, payload_base64, expected_sha256=None):
         key = (label, kind)
         if self.fail_expected and expected_sha256 is not None:
@@ -64,6 +69,7 @@ def env(tmp_path, monkeypatch):
     fake = FakeClient()
     monkeypatch.setattr(engine.client, "manifest", fake.manifest)
     monkeypatch.setattr(engine.client, "pull", fake.pull)
+    monkeypatch.setattr(engine.client, "pull_all", fake.pull_all)
     monkeypatch.setattr(engine.client, "push", fake.push)
     dirs = {"users": tmp_path / "users", "avatars": tmp_path / "avatars",
             "session": tmp_path / "session"}
@@ -278,6 +284,7 @@ def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
     fake = FakeClient()
     monkeypatch.setattr(engine.client, "manifest", fake.manifest)
     monkeypatch.setattr(engine.client, "pull", fake.pull)
+    monkeypatch.setattr(engine.client, "pull_all", fake.pull_all)
     monkeypatch.setattr(engine.client, "push", fake.push)
     users, session = tmp_path / "users", tmp_path / "session"
     users.mkdir()

@@ -264,10 +264,10 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
 
 def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
                   report: UsersSyncReport, on_progress=None, stop=None) -> None:
-    """头像按用户归属增量同步：sha 一致不动，变化上传、缺失下载。
+    """头像按用户归属增量同步：sha 一致不动，变化上传、缺失批量下载。
 
     本地头像文件名在用户资料的 ``avatar`` 字段里；名册行带云端
-    ``avatar_sha256``。只处理差异项——19 个头像不重复收发。
+    ``avatar_sha256``。缺失的头像一次批量拉取，不再逐份请求。
     """
     import base64
 
@@ -276,6 +276,43 @@ def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
     remote_by_name = {row.get("username"): row for row in remote_users
                       if isinstance(row.get("username"), str)}
     pending = [n for n in _roster()]
+    # 1) 先收集「本地缺失且云端有」的头像，一次性批量下载。
+    missing: list[tuple[str, str]] = []          # (username, 本地文件名)
+    for name in pending:
+        if stop and stop():
+            report.errors.append("已停止")
+            return
+        path = users_dir / f"{name}.json"
+        try:
+            local = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        filename = local.get("avatar")
+        if not isinstance(filename, str) or not filename:
+            continue
+        if (AVATARS_DIR / filename).is_file():
+            continue
+        remote_sha = (remote_by_name.get(name) or {}).get("avatar_sha256")
+        if remote_sha:
+            missing.append((name, filename))
+    if missing:
+        try:
+            response = post("/api/sync/users/avatars/pull",
+                            {"usernames": [name for name, _ in missing]}, token)
+            avatars = {item.get("username"): item
+                       for item in response.get("avatars") or []
+                       if isinstance(item, dict) and isinstance(item.get("username"), str)}
+            for name, filename in missing:
+                item = avatars.get(name)
+                if not item or not isinstance(item.get("payload_base64"), str):
+                    continue
+                avatar_path = AVATARS_DIR / filename
+                avatar_path.parent.mkdir(parents=True, exist_ok=True)
+                avatar_path.write_bytes(base64.b64decode(item["payload_base64"]))
+                report.avatars += 1
+        except (SyncError, OSError, ValueError) as error:
+            report.errors.append(f"头像批量下载失败: {error}")
+
     done = 0
     for name in pending:
         if stop and stop():
@@ -298,7 +335,7 @@ def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
         if not avatar_path.is_file():
             if not remote_sha:
                 continue                      # 双方都没有：无事
-            _download_avatar(token, name, avatar_path, report)   # 本地缺：下载
+            _download_avatar(token, name, avatar_path, report)   # 批量没覆盖到的兜底
             continue
         local_sha = hashlib.sha256(avatar_path.read_bytes()).hexdigest()
         if local_sha == remote_sha:

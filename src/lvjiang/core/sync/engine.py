@@ -175,18 +175,21 @@ def _is_plain_legacy_note(raw: bytes) -> bool:
 
 
 def _pull(document: LocalDocument, token: str, report: SyncReport,
-          *, keep_local: bool = False) -> None:
+          *, keep_local: bool = False, raw: bytes | None = None) -> None:
     """把云端版本落到本地。``keep_local`` 为真时先把本地版另存为冲突副本。
 
     只有**本地确实有更新的独立改动、却被云端覆盖**时才算冲突。本地只是旧版
     时直接覆盖即可——给每个旧版都留一份副本只会堆垃圾（实测会导致所有
     notes.json 每次同步都多出一个 .conflict 文件）。
+
+    ``raw`` 传入时不再逐份请求（批量拉取路径）；为 None 时按单份接口拉。
     """
     key = f"{document.label}/{document.kind}"
-    remote = client.pull(token, document.label, document.kind)
-    raw = base64.b64decode(remote["payload_base64"])
-    if remote.get("zipped"):
-        raw = gzip.decompress(raw)
+    if raw is None:
+        remote = client.pull(token, document.label, document.kind)
+        raw = base64.b64decode(remote["payload_base64"])
+        if remote.get("zipped"):
+            raw = gzip.decompress(raw)
     # E2E 迁移判定必须看**远端原始字节**：远端是 legacy 明文才需要重推密文；
     # 远端本来就是密文时，解密后的 payload 恒为明文，不能再按 payload 判定，
     # 否则每次同步都把 19 份便利贴重新上推一遍。
@@ -235,6 +238,21 @@ def sync_documents(token: str,
     seen: set[tuple[str, str]] = set()
     local_docs = iter_local_documents(users_dir, session_dir)
     total_docs = len(local_docs)
+    # 批量拉取全部远端 payload（替代逐份 pull）：初始同步 38 份从 ~60s 降到 1 次请求。
+    remote_raw: dict[tuple[str, str], bytes] = {}
+    try:
+        for remote_entry in client.pull_all(token):
+            key = (remote_entry["label"], remote_entry["kind"])
+            try:
+                raw = base64.b64decode(remote_entry["payload_base64"])
+                if remote_entry.get("zipped"):
+                    raw = gzip.decompress(raw)
+                remote_raw[key] = raw
+            except (ValueError, OSError):
+                continue      # 坏条目不入批量表，走单份接口兜底
+    except SyncError as error:
+        # 批量接口失败时退回逐份 pull（remote_raw 为空，_pull 会按 raw=None 单拉）
+        report.errors.append(str(error))
     logger.info("[sync] 文档对账开始：本地 {} 份，远端 {} 份",
                 total_docs, len(remote_by_key))
     for index, entry in enumerate(local_docs):
@@ -246,6 +264,7 @@ def sync_documents(token: str,
         key = (entry.label, entry.kind)
         seen.add(key)
         remote = remote_by_key.get(key)
+        batch_raw = remote_raw.get(key)
         try:
             raw = _outbound_bytes(entry, _read_bytes(entry))
             sha256 = hashlib.sha256(raw).hexdigest()
@@ -259,9 +278,9 @@ def sync_documents(token: str,
                 except SyncConflict:
                     # 本机 mtime 较新但云端又先写入了（竞态）：云端赢，但本地这版
                     # 是真实的独立改动，必须另存，否则改动静默丢失。
-                    _pull(entry, token, report, keep_local=True)
+                    _pull(entry, token, report, keep_local=True, raw=batch_raw)
             else:
-                _pull(entry, token, report)
+                _pull(entry, token, report, raw=batch_raw)
         except (OSError, ValueError) as error:
             report.errors.append(f"{key}: 本地读取失败 {error}")
         except SyncError as error:
@@ -274,7 +293,8 @@ def sync_documents(token: str,
         if document is None:
             continue
         try:
-            _pull(document, token, report)
+            _pull(document, token, report,
+                  raw=remote_raw.get((label, kind)))
         except SyncError as error:
             report.errors.append(f"{label}/{kind}: {error}")
     # 不在这里打完成日志：唯一调用方（PC 账户对话框）会用 _CombinedReport

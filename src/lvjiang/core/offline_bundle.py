@@ -80,8 +80,14 @@ def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple
             yield from ((Path("session") / name, session / name) for name in app.offline_session_files())
 
 
-def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str) -> dict:
-    """构造配置副本和 SQLite backup 快照；不修改 PC 的活动选择或数据库。"""
+def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str,
+                         include_profile: bool = True) -> dict:
+    """构造配置副本和 SQLite backup 快照；不修改 PC 的活动选择或数据库。
+
+    ``include_profile=False``（云端模式配置包）：不携带 profile.db 与
+    profile.yaml——手机总览数据由账号云端同步更新，配置部分照常下发。
+    manifest 用 ``profile`` 布尔字段声明，安装端据此校验与放行。
+    """
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
     config = config_directory(root)
@@ -102,10 +108,13 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
         "username": username, "layout": layout,
         "synced_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "files": {},
+        "profile": include_profile,
     }
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:
         snapshots = []
         for name in _database_files():
+            if not include_profile and name == "profile.db":
+                continue
             database = session_directory(config) / name
             snapshot = Path(temp) / name
             snapshot.parent.mkdir(parents=True, exist_ok=True)
@@ -125,6 +134,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
             for rel, path in _configuration_files(config, layout_scope):
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
+                    continue
+                if not include_profile and rel.as_posix() == "session/profile.yaml":
                     continue
                 data = path.read_bytes()
                 if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml"}:
@@ -354,6 +365,15 @@ def install_offline_bundle(
             guarded = {f"config/{name}" for name in LOCAL_ONLY_CONFIG_FILES}
             if guarded & set(files):
                 raise ValueError("同步包包含本机独占文件，已拒绝安装")
+            # manifest["profile"] 声明包是否携带总览数据（PC 新版本始终写入；
+            # 旧版本包缺省按携带处理，保持原有拒收语义）。声明与内容不一致
+            # 视为包损坏，宁可拒绝也不能绕过模式闸门。
+            declared_profile = manifest.get("profile", True)
+            carries_profile = any(name == "config/session/profile.db" or name.endswith("/profile.db")
+                                  or name == "config/session/profile.yaml"
+                                  for name in files)
+            if declared_profile != carries_profile:
+                raise ValueError("同步包总览数据声明与内容不一致，已拒绝安装")
             for name, digest in files.items():
                 relative = PurePosixPath(name)
                 if (relative.is_absolute() or ".." in relative.parts or "\\" in name

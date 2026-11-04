@@ -79,15 +79,18 @@ def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_conf
         if is_running():
             return json.dumps({"ok": False, "message": "请先结束手机任务再同步"}, ensure_ascii=False)
         # 总览数据来源模式是手机的主权设置：remote 模式下 profile 只认云端，
-        # PC 包携带 profile.db 时必须拒收（PC 侧会展示这条拒绝原因）。
+        # PC 包携带 profile 数据时必须拒收。manifest["profile"]=false 的
+        # 配置包（云端模式配置下发）不携带总览数据，按声明放行；旧版本 PC
+        # 的包没有该字段，缺省按携带处理维持拒收。读不了/坏包按携带处理，
+        # 宁可拒绝也不能绕过模式闸门。
         try:
+            import json as _json
             import zipfile
 
             with zipfile.ZipFile(path) as bundle:
-                carries_profile = any("profile.db" in name for name in bundle.namelist())
-        except (OSError, zipfile.BadZipFile):
-            # BadZipFile 直继承 Exception，需显式列出；读不了/坏了的包按携带
-            # profile 处理，宁可拒绝也不能绕过模式闸门。
+                manifest = _json.loads(bundle.read("manifest.json"))
+                carries_profile = bool(manifest.get("profile", True))
+        except (OSError, ValueError, KeyError, zipfile.BadZipFile):
             carries_profile = True
         if carries_profile and profile_source.mode() == profile_source.REMOTE:
             return json.dumps({"ok": False,
@@ -98,7 +101,10 @@ def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_conf
             summary = install_offline_bundle(Path(path), constants.PROJECT_ROOT,
                                              preserve_task_params=preserve_task_params,
                                              preserve_batch_config=preserve_batch_config, on_applied=reset_configuration)
-            return json.dumps({"ok": True, "message": "脚本、配置与 DB 已同步到手机", "sync": summary}, ensure_ascii=False)
+            message = ("脚本与配置已同步到手机；总览数据由账号云端同步更新"
+                       if not summary.get("profile", True)
+                       else "脚本、配置与 DB 已同步到手机")
+            return json.dumps({"ok": True, "message": message, "sync": summary}, ensure_ascii=False)
         except Exception as exc:
             # 安装器已恢复旧配置；同时丢弃重载失败前创建的部分缓存。
             try:

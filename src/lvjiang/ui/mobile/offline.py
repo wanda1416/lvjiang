@@ -40,12 +40,14 @@ class _OfflineWorker(QThread):
     progress = pyqtSignal(int, int)
 
     def __init__(self, serial: str, action: str, username: str, layout: str, task_id: str, parent=None,
-                 *, preserve_task_params: bool = True, preserve_batch_config: bool = True, history_selected: list[str] | None = None):
+                 *, preserve_task_params: bool = True, preserve_batch_config: bool = True,
+                 include_profile: bool = True, history_selected: list[str] | None = None):
         super().__init__(parent)
         self.serial, self.action = serial, action
         self.username, self.layout, self.task_id = username, layout, task_id
         self.preserve_task_params = preserve_task_params
         self.preserve_batch_config = preserve_batch_config
+        self.include_profile = include_profile
         self.history_selected = history_selected or []
 
     def cancel(self) -> None:
@@ -65,7 +67,8 @@ class _OfflineWorker(QThread):
                     raise RuntimeError(tr("请先更新 APK：旧版本不支持独立保留任务参数和批量配置"))
                 with tempfile.TemporaryDirectory(prefix="lvjiang-offline-sync-") as temp:
                     archive = Path(temp) / "snapshot.zip"
-                    build_offline_bundle(PROJECT_ROOT, archive, username=self.username, layout=self.layout)
+                    build_offline_bundle(PROJECT_ROOT, archive, username=self.username, layout=self.layout,
+                                         include_profile=self.include_profile)
                     data["operation"] = sync_offline_bundle(
                         agent, archive, cancelled=self.isInterruptionRequested, progress=self.progress.emit,
                         preserve_task_params=self.preserve_task_params, preserve_batch_config=self.preserve_batch_config)
@@ -141,6 +144,11 @@ class OfflineControlPage(QWidget):
         preservation_row.addWidget(self.preserve_batch_config)
         preservation_row.addStretch()
         sync_layout.addLayout(preservation_row)
+        self.exclude_profile = QCheckBox(tr("不含总览数据（Profile 由账号云端同步）"))
+        self.exclude_profile.setToolTip(tr(
+            "勾选后不下发 Profile 数据库和定义，手机总览数据继续由账号云端同步更新。"
+            "手机处于云端模式（默认）时必须勾选，否则手机会拒绝接收。"))
+        sync_layout.addWidget(self.exclude_profile)
         root.addWidget(sync_group)
         history_group = QGroupBox(tr("回传到电脑"))
         history_layout = QVBoxLayout(history_group)
@@ -220,6 +228,7 @@ class OfflineControlPage(QWidget):
         self.layout_choice.setEnabled(not busy and not active)
         self.preserve_task_params.setEnabled(not busy and not active)
         self.preserve_batch_config.setEnabled(not busy and not active)
+        self.exclude_profile.setEnabled(not busy and not active)
 
     def _history_preferences(self):
         from ...core.config.session import SessionStore
@@ -261,25 +270,31 @@ class OfflineControlPage(QWidget):
             return
         if self._worker is not None and self._worker.isRunning():
             return
-        if action == "sync" and QMessageBox.question(
-            self, tr("同步到手机"),
-            "\n".join([
-                tr("将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。"),
-                tr("保留手机任务参数及手机独有用户。") if self.preserve_task_params.isChecked()
-                else tr("用 PC 配置覆盖手机任务参数和用户名册。"),
-                tr("保留手机批量配置。") if self.preserve_batch_config.isChecked()
-                else tr("用 PC 配置覆盖手机批量配置。"),
-                tr("手机历史、日志和结果保留；回传需单独操作。确认下发？"),
-            ]),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        ) != QMessageBox.StandardButton.Yes:
-            return
+        if action == "sync":
+            exclude_profile = self.exclude_profile.isChecked()
+            lines = [
+                tr("将更新脚本、布局和用户数据。") if exclude_profile
+                else tr("将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。"),
+            ]
+            if exclude_profile:
+                lines.append(tr("不下发总览数据；手机 Profile 继续按账号云端同步更新。"))
+            lines.append(tr("保留手机任务参数及手机独有用户。") if self.preserve_task_params.isChecked()
+                         else tr("用 PC 配置覆盖手机任务参数和用户名册。"))
+            lines.append(tr("保留手机批量配置。") if self.preserve_batch_config.isChecked()
+                         else tr("用 PC 配置覆盖手机批量配置。"))
+            lines.append(tr("手机历史、日志和结果保留；回传需单独操作。确认下发？"))
+            if QMessageBox.question(
+                self, tr("同步到手机"), "\n".join(lines),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            ) != QMessageBox.StandardButton.Yes:
+                return
         worker = _OfflineWorker(
             serial, action, self._sync_username() if action == "sync" else str(self.user.currentData() or ""),
             str(self.layout_choice.currentData() or ""), str(self.task.currentData() or ""), self,
             preserve_task_params=self.preserve_task_params.isChecked(),
             preserve_batch_config=self.preserve_batch_config.isChecked(),
+            include_profile=not self.exclude_profile.isChecked(),
             history_selected=[key for key, check in self.history_choices.items() if check.isChecked()])
         self._worker = worker
         self._track_worker(worker)

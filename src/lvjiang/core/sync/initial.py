@@ -124,7 +124,7 @@ def backup_local_profile_data() -> Path | None:
 
 def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
     """执行一次初始同步；成功返回 ``established=True``。"""
-    from ..profile.snapshot_sync import refresh_snapshot, sync_all
+    from ..profile.snapshot_sync import pull_and_replay, refresh_snapshot
     from .definition_sync import sync_definition
     from .engine import sync_documents
     from .users_sync import sync_users
@@ -161,7 +161,14 @@ def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
         definition = sync_definition(token, on_progress=progress)
         users = sync_users(token, on_progress=progress, stop=stop)
         documents = sync_documents(token, on_progress=progress, stop=stop)
-        profile = sync_all(token, on_progress=progress, stop=stop)
+        # 只拉不推：初始同步以云端为准。回放会触发 profile 引擎物化周期锚点并
+        # 写本地历史，那些是云数据的派生，不是本机真实编辑，禁止回推云端。
+        profile = pull_and_replay(token, on_progress=progress, stop=stop)
+        from ..account.service import profile_sync_state, save_profile_sync_state
+        from ..profile import repository
+        state = profile_sync_state()
+        state["local_history_id"] = repository.db_max_history_id()
+        save_profile_sync_state(state)
         report.rows = [
             ("定义", definition.pushed, definition.pulled, len(definition.errors)),
             ("用户", users.pushed, users.pulled, len(users.errors)),

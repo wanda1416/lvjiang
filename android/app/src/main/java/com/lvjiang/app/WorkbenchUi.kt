@@ -1277,43 +1277,32 @@ class WorkbenchUi(
             if (snapshot > 0) lines.add("云端快照 #$snapshot · 历史水位 $watermark")
             if (!isPc) lines.add(
                 if (pending > 0) "未同步变更 $pending 条" else "变更已全部同步")
-            val content = SettingsUi.dialogContent(activity)
-            lines.forEach { text(content, it) }
 
-            // 成功的切换/清除都会关掉本对话框：内容基于打开时的旧状态构建，
-            // 留着只会展示陈旧信息（点过「切换为 PC端」后界面还停在云端态）
-            val dialog = MaterialAlertDialogBuilder(activity).setTitle("数据同步")
+            val content = SettingsUi.dialogContent(activity)
+
+            // 对话框先创建：下方各按钮行闭包引用 dialog.dismiss()，声明必须在前
+            val dialog = MaterialAlertDialogBuilder(activity)
                 .setView(SettingsUi.dialogScroll(activity, content))
-                .setNegativeButton("关闭", null)
                 .create()
 
-            // 标题行右上角：清除数据（继承对话框关闭行为）
+            // 标题行：「数据同步」+ 右上角「清除数据」同一行
             val titleBar = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
-            titleBar.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+            titleBar.addView(TextView(activity).apply {
+                text = "数据同步"
+                textSize = 22f
+            }, LinearLayout.LayoutParams(0, -2, 1f))
             titleBar.addView(profileActionButton("清除数据", destructive = true) {
                 dialog.dismiss()
                 confirmClearProfile(keepMode = true)
             }, LinearLayout.LayoutParams(-2, -2))
-            content.addView(titleBar, LinearLayout.LayoutParams(-1, -2))
-
-            // 底部按钮行：立即同步（仅云端）在左、关闭在最右
-            val bottom = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-            }
-            if (!isPc) {
-                bottom.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
-                    LinearLayout.LayoutParams(-2, -2))
-                bottom.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            }
-            bottom.addView(profileActionButton("关闭") { dialog.dismiss() },
-                LinearLayout.LayoutParams(-2, -2))
-            content.addView(bottom, LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = (8 * activity.resources.displayMetrics.density).toInt()
+            content.addView(titleBar, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = (6 * activity.resources.displayMetrics.density).toInt()
             })
+
+            lines.forEach { text(content, it) }
 
             // 切换模式：独立一行，靠最左
             val switchRow = LinearLayout(activity).apply {
@@ -1347,6 +1336,22 @@ class WorkbenchUi(
                 }
             }, LinearLayout.LayoutParams(-2, -2))
             content.addView(switchRow, LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = (8 * activity.resources.displayMetrics.density).toInt()
+            })
+
+            // 底部按钮行：立即同步（仅云端）在左、关闭在最右
+            val bottom = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            if (!isPc) {
+                bottom.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
+                    LinearLayout.LayoutParams(-2, -2))
+                bottom.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+            }
+            bottom.addView(profileActionButton("关闭") { dialog.dismiss() },
+                LinearLayout.LayoutParams(-2, -2))
+            content.addView(bottom, LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = (8 * activity.resources.displayMetrics.density).toInt()
             })
 

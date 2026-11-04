@@ -34,3 +34,22 @@ def test_encrypt_text_roundtrip():
     assert e2e.decrypt_text(key, wrapped) == text
     assert e2e.decrypt_text(key, "普通明文") is None       # legacy 原文不误伤
     assert not e2e.is_encrypted_text("普通明文")
+
+
+def test_wrong_key_fails_closed_not_garbage(tmp_path):
+    """改密场景的安全核心：错钥解密**必然失败**而不是产出错误明文。
+
+    GCM 认证标签保证旧钥密文对新钥只有 InvalidTag 一种结果——不存在
+    「错误解密出来的数据」覆盖本地正确数据的可能；失败后封装结构原样
+    保留，拉取边界据此跳过、保留本地文件。
+    """
+    old_key = e2e.derive_key("pw-old", "a" * 32)
+    new_key = e2e.derive_key("pw-new", "a" * 32)
+    wrapper = e2e.encrypt_json(old_key, {"attributes": {"实名": "张三"}})
+    # 错钥：返回 None（调用方跳过），绝不返回看起来合理的字典
+    assert e2e.decrypt_json(new_key, wrapper) is None
+    # 封装结构原样保留（拉取边界据此识别「这是密文，跳过写入」）
+    assert e2e.is_encrypted(wrapper)
+    wrapped_text = e2e.encrypt_text(old_key, "重要便利贴内容")
+    assert e2e.decrypt_text(new_key, wrapped_text) is None
+    assert e2e.is_encrypted_text(wrapped_text)

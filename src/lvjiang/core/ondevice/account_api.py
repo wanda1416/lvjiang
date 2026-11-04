@@ -141,11 +141,20 @@ def _reset_sync_state() -> None:
 
 
 def account_profile_mode() -> str:
-    """总览数据来源模式：`{ok, mode}`（remote / pc）。"""
+    """总览数据来源模式：`{ok, mode, snapshot_id, snapshot_remote_id, pulled_at}`。
+
+    snapshot_id/remote_id 是手机当前跟随的云端位置（哪份快照、回放到账本
+    哪个水位），给「总览数据」页展示同步进度用；未落地过快照时为 0。
+    """
+    from ..account.service import profile_sync_state
     from . import profile_source
 
-    return json.dumps({"ok": True, "mode": profile_source.mode()},
-                      ensure_ascii=False)
+    state = profile_sync_state()
+    return json.dumps({
+        "ok": True, "mode": profile_source.mode(),
+        "snapshot_id": int(state.get("profile_snapshot_id") or 0),
+        "snapshot_remote_id": int(state.get("remote_history_id") or 0),
+    }, ensure_ascii=False)
 
 
 def account_set_profile_mode(mode_value: str) -> str:

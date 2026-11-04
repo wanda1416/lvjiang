@@ -1237,12 +1237,17 @@ class WorkbenchUi(
             }.show()
     }
 
-    /** 总览数据行的摘要：只显示当前模式，不罗列所有选项。 */
+    /** 总览数据行的摘要：模式 + 云端同步位置。 */
     private var profileSourceSummary: TextView? = null
 
     private fun updateProfileSourceSummary(mode: String) {
-        profileSourceSummary?.text =
-            if (mode == "pc") "数据来源：PC端" else "数据来源：云端"
+        request({ PyBridge.accountProfileMode(activity) }) { result ->
+            val snapshot = result.optInt("snapshot_id", 0)
+            val watermark = result.optInt("snapshot_remote_id", 0)
+            val source = if (mode == "pc") "数据来源：PC端" else "数据来源：云端"
+            profileSourceSummary?.text = if (snapshot > 0)
+                "$source · 快照#$snapshot · 历史水位 $watermark" else source
+        }
     }
 
     /**
@@ -1259,10 +1264,16 @@ class WorkbenchUi(
         request({ PyBridge.accountProfileMode(activity) }) { result ->
             if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
             val isPc = result.optString("mode") == "pc"
+            val snapshot = result.optInt("snapshot_id", 0)
+            val watermark = result.optInt("snapshot_remote_id", 0)
             val current = if (isPc) "当前：PC端（总览数据随离线包更新，在线同步跳过总览）"
                           else "当前：云端（总览数据来自云端快照，只收不发）"
+            val progress = if (snapshot > 0)
+                "已跟随云端快照 #$snapshot，历史回放至水位 $watermark。"
+            else "尚未落地任何云端快照；同步后这里会显示快照编号与回放水位。"
             val content = SettingsUi.dialogContent(activity)
             text(content, current)
+            text(content, progress, 12f)
             text(content, if (isPc) "切换到云端需要先清除本地总览数据。"
                           else "切换后 PC 端离线包将携带总览数据。", 12f)
 

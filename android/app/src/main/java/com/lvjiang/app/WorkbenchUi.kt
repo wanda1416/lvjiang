@@ -1110,7 +1110,7 @@ class WorkbenchUi(
         entry(tools, "高级功能", "悬浮控制、电脑连接与屏幕标定") { openTools("ADVANCED") }
         entry(tools, "自检与诊断", "检查环境、复制与分享报告") { openTools("DIAGNOSTICS") }
         accountCard()
-        val sourceRow = SettingsUi.row(activity, "总览数据", "正在读取数据来源…")
+        val sourceRow = SettingsUi.row(activity, "数据同步", "正在读取数据来源…")
         sourceRow.setOnClickListener { showProfileSource() }
         tools.addView(sourceRow)
         profileSourceSummary = (sourceRow.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
@@ -1199,7 +1199,7 @@ class WorkbenchUi(
         }
         content.addView(loginEdit)
         content.addView(passwordEdit)
-        MaterialAlertDialogBuilder(activity).setTitle("账户登录")
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle("账户登录")
             .setView(SettingsUi.dialogScroll(activity, content))
             .setNegativeButton("取消", null)
             .setPositiveButton("登录") { _, _ ->
@@ -1234,7 +1234,15 @@ class WorkbenchUi(
                         }
                     }
                 }
-            }.show()
+            }
+            .setNeutralButton("注册") { _, _ ->
+                runCatching {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://lvjiang.wyxj.net/#/register")))
+                }.onFailure { toast("未找到可打开链接的浏览器") }
+            }
+            .create()
+        dialog.show()
     }
 
     /** 总览数据行的摘要：模式 + 云端同步位置。 */
@@ -1251,14 +1259,8 @@ class WorkbenchUi(
     }
 
     /**
-     * 总览数据来源模式：云端（默认）/ PC端。两种模式布局完全同构，动作行固定为
-     * **左「清除数据」、右「切到另一边」**，「关闭」仍是对话框自己的按钮、落在下一行。
-     *
-     * 之所以不用三个 framework 按钮：Material 会把三个按钮竖着叠在右下角，
-     * 敏感的「清除数据」正好贴在「切换」和「关闭」下面那一格，拇指够「关闭」时
-     * 偏一点就命中它。现在清除数据独占最左，与右侧的切换/关闭拉开距离。
-     * 注意 setMessage 与 setItems 在 Material 对话框里互斥（列表会被挤掉），
-     * 用自定义视图放说明文字，动作走自定义按钮行。
+     * 数据同步对话框（原「总览数据」，改名与角色定位一致）。
+     * 云端模式：关闭键左侧多一个「立即同步」；PC端模式没有同步概念，只收离线包。
      */
     private fun showProfileSource() {
         request({ PyBridge.accountProfileMode(activity) }) { result ->
@@ -1282,10 +1284,16 @@ class WorkbenchUi(
             }
             // 成功的切换/清除都会关掉本对话框：内容基于打开时的旧状态构建，
             // 留着只会展示陈旧信息（点过「切换为 PC端」后界面还停在云端态）
-            val dialog = MaterialAlertDialogBuilder(activity).setTitle("总览数据")
+            val dialog = MaterialAlertDialogBuilder(activity).setTitle("数据同步")
                 .setView(SettingsUi.dialogScroll(activity, content))
                 .setNegativeButton("关闭", null)
                 .create()
+            if (!isPc) {
+                // 云端模式专属：立即同步（与「关闭」并排，放其左侧）
+                actions.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
+                    LinearLayout.LayoutParams(-2, -2))
+                actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+            }
             actions.addView(profileActionButton("清除数据", destructive = true) {
                 dialog.dismiss()
                 confirmClearProfile(keepMode = true)
@@ -1359,35 +1367,55 @@ class WorkbenchUi(
             }.show()
     }
 
+    /** 账户对话框：只保留修改密码（浏览器）与退出登录（红色警示）。 */
     private fun showAccountActions() {
-        val options = arrayOf("立即同步", "退出登录")
-        MaterialAlertDialogBuilder(activity).setTitle("账户")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> {
-                        toast("正在同步…")
-                        request({ PyBridge.accountSync(activity) }) { result ->
-                            if (!result.optBoolean("ok")) { toast("同步失败：${result.optString("message")}"); return@request }
-                            if (result.optString("reason") == "no_snapshot") {
-                                toast("云端还没有快照；请先在电脑上刷新快照")
-                            } else if (result.optBoolean("synced")) {
-                                toast("同步完成：下行 ${result.optInt("pulled", 0)} 条，上行 ${result.optInt("pushed", 0)} 条")
-                            } else {
-                                toast("同步未完成：${result.optString("message")}")
-                            }
-                        }
+        val content = SettingsUi.dialogContent(activity)
+        val actions = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        actions.addView(profileActionButton("修改密码") {
+            runCatching {
+                activity.startActivity(Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://lvjiang.wyxj.net")))
+            }.onFailure { toast("未找到可打开链接的浏览器") }
+        }, LinearLayout.LayoutParams(-2, -2))
+        actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+        val logout = profileActionButton("退出登录", destructive = true)
+        logout.setOnClickListener {
+            MaterialAlertDialogBuilder(activity).setTitle("退出登录")
+                .setMessage("退出后本机数据保留，但不再与云端同步。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("退出") { _, _ ->
+                    request({ PyBridge.accountLogout(activity) }) { result ->
+                        toast(if (result.optBoolean("ok")) "已退出登录" else "退出失败：${result.optString("message")}")
+                        show("SETTINGS")
                     }
-                    1 -> MaterialAlertDialogBuilder(activity).setTitle("退出登录")
-                        .setMessage("退出后本机数据保留，但不再与云端同步。")
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("退出") { _, _ ->
-                            request({ PyBridge.accountLogout(activity) }) { result ->
-                                toast(if (result.optBoolean("ok")) "已退出登录" else "退出失败：${result.optString("message")}")
-                                show("SETTINGS")
-                            }
-                        }.show()
-                }
-            }.show()
+                }.show()
+        }
+        actions.addView(logout, LinearLayout.LayoutParams(-2, -2))
+        content.addView(actions, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = (8 * activity.resources.displayMetrics.density).toInt()
+        })
+        MaterialAlertDialogBuilder(activity).setTitle("账户")
+            .setView(SettingsUi.dialogScroll(activity, content))
+            .setNegativeButton("关闭", null)
+            .show()
+    }
+
+    /** 同步动作（数据同步对话框与摘要行的共用入口）。 */
+    private fun syncNow() {
+        toast("正在同步…")
+        request({ PyBridge.accountSync(activity) }) { result ->
+            if (!result.optBoolean("ok")) { toast("同步失败：${result.optString("message")}"); return@request }
+            if (result.optString("reason") == "no_snapshot") {
+                toast("云端还没有快照；请先在电脑上刷新快照")
+            } else if (result.optBoolean("synced")) {
+                toast("同步完成：下行 ${result.optInt("pulled", 0)} 条，上行 ${result.optInt("pushed", 0)} 条")
+            } else {
+                toast("同步未完成：${result.optString("message")}")
+            }
+        }
     }
 
     private fun showAbout() {

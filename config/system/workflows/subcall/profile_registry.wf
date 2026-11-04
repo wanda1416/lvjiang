@@ -149,7 +149,7 @@ def declare_profiles($keys)
                 "sources": ["银百叶"]
             }
         },
-        "baiye_raoliang_shengwang_of_month": {
+        "baiye_rl_sw_of_month": {
             "model": "quota",
             "definition": {
                 "label": "百业绕梁之音·声望",

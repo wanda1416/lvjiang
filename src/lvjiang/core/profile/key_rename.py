@@ -26,10 +26,34 @@ def replace_key(reference: str, renames: list[tuple[str, str, str]]) -> str:
 
 
 def rename_schema_references(schema: ProfileSchema, renames: list[tuple[str, str, str]]) -> ProfileSchema:
+    """把改名应用到定义自身的 key 和同步目标引用。重复执行结果相同。
+
+    调用方传入的 schema 可能已经把 key 改成新名（编辑器内层保存）；磁盘上的
+    schema 则可能还是旧名（崩溃重放）。两种输入都收敛到新 key，已是新名的
+    定义不再改。目标 key 已有另一条定义时拒绝，避免写出两个同名 key。
+    """
     result = deepcopy(schema)
-    for definition in result.get_all_keys():
-        for target in definition.sync_targets:
-            target.key = replace_key(target.key, renames)
+    index = {(kind, old): new for kind, old, new in renames}
+    occupied = {
+        definition.key
+        for definitions in result.keys_by_model.values()
+        for definition in definitions
+    }
+    for model, definitions in result.keys_by_model.items():
+        for definition in definitions:
+            new = index.get((model, definition.key))
+            if not new or new == definition.key:
+                continue
+            if new in occupied:
+                raise ValueError(f"目标 key {new} 已存在，不能合并")
+            occupied.remove(definition.key)
+            occupied.add(new)
+            definition.key = new
+    for definitions in result.keys_by_model.values():
+        for definition in definitions:
+            for target in definition.sync_targets:
+                target.key = replace_key(target.key, renames)
+    result._rebuild_index()
     return result
 
 
@@ -70,10 +94,12 @@ def recover_rename(db: ProfileDB) -> None:
     journal = json.loads(path.read_text(encoding="utf-8"))
     renames = [tuple(item) for item in journal.get("renames", [])]
     if renames:
-        from .schema import get_profile_config
+        from .schema import reload_profile_config
+        # 重放只认磁盘。保存函数不更新内存单例，用改名前的单例会把旧 key 写回去。
+        reload_profile_config()
         db.rename_keys(
             renames,
-            save_references=lambda: _write_references(get_profile_config(), renames))
+            save_references=lambda: _write_references(reload_profile_config(), renames))
     path.unlink()
     from ..config import get_interface_store
     from .schema import reload_profile_config
@@ -176,8 +202,16 @@ def _emit_rename_baselines(db: ProfileDB,
     手机 _sync 先拉定义再回放。
     """
     from ...i18n import tr as _tr
+    from .schema import get_profile_config
 
+    defined = get_profile_config()
     for model, old, new in renames:
+        if defined.get_key(new, model_type=model) is None:
+            from loguru import logger as _logger
+            _logger.error(
+                "[profile rename] 定义中没有 {}，跳过基线 set（{}→{}）",
+                new, old, new)
+            continue
         # _connect() 返回的连接必须显式关：sqlite3.connect 的上下文管理器
         # 只提交事务不关连接（与 repository._ensure_schema 的备份连接同坑）
         conn = db._connect()

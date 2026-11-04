@@ -1,10 +1,12 @@
 """既有 key 不能随普通字段编辑误改；需点击独立编辑按钮。"""
 
+from copy import deepcopy
 
 from PyQt6.QtWidgets import (
     QDialog,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QWidget,
 )
@@ -37,3 +39,24 @@ def test_note_editor_hides_inert_sync_and_keeps_script_and_legacy_config(qapp, m
     assert saved.change_script == definition.change_script
     assert saved.sync_targets == definition.sync_targets
     parent.close()
+
+
+def test_outer_save_refuses_when_saved_key_is_missing_from_disk(qapp, monkeypatch):
+    """基线里已有的 key 不在磁盘上时，外层保存不得把改名前的定义再写回去。"""
+    schema.save_profile_config(schema.ProfileSchema(keys_by_model={
+        "stock": [StockKeyDef(key="credits", label="资源")],
+    }))
+    schema.reload_profile_config()
+    dialog = ProfileDefinitionDialog()
+    renamed = StockKeyDef(key="coins", label="资源")
+    dialog._baseline["stock"] = [renamed]
+    dialog._drafts["stock"] = [deepcopy(renamed)]
+    raw = schema._PROFILE_PATH.read_bytes()
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: None)
+
+    dialog._on_save()
+
+    assert schema._PROFILE_PATH.read_bytes() == raw
+    assert schema.get_profile_config().get_key("credits").label == "资源"
+    assert schema.get_profile_config().get_key("coins") is None
+    dialog.close()

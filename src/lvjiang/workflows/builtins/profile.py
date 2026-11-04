@@ -132,7 +132,7 @@ def _profile_locked(_engine, key: str, username: str | None = None, *args) -> bo
     再决定要不要为这个 key 购买/记账，而不是拿 profile_get 的 null 去比较。
 
     .wf 用法:
-        if not profile_locked("baiye_raoliang_shengwang_of_month")
+        if not profile_locked("baiye_rl_sw_of_month")
             call buy_baiye_goods(...)
         end
     """

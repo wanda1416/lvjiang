@@ -1842,7 +1842,9 @@ class ProfileDefinitionDialog(QDialog):
                         if key not in latest_names:
                             if key not in baseline:
                                 merged.append(deepcopy(kd))
-                            elif kd != baseline[key]:
+                            else:
+                                # 内层已保存的 key 不在磁盘上时不能继续写：静默跳过会把
+                                # 改名前的旧 key 留在文件里，并丢掉新 key。
                                 raise ValueError(tr("原 key 已不存在，请重新打开编辑对话框"))
                     if list(desired) != list(baseline):
                         by_key = {kd.key: kd for kd in merged}

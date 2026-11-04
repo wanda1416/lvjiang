@@ -1,7 +1,12 @@
 """文档通道同步引擎：本地文件 ↔ 云端 documents，整文档后写覆盖 + 冲突另存。
 
-映射：{名}.loadouts.json → loadouts（插件 kind，经 registry 登记）；
-{名}.notes.json（便利贴）→ notes。
+映射由 registry 静态声明，引擎只按登记枚举，不认识任何领域词汇：
+
+- 用户级（``users/<用户名><后缀>``，云端 label = 用户名）：notes 与插件登记的
+  ``.loadouts.json`` 一类；
+- 账户级（会话目录内固定相对路径，云端 label = ``__global__``）：插件登记的
+  跨角色共享文档。
+
 用户资料与头像入服务端用户级数据（users_sync.py），profile.yaml 是定义走
 definition 专用通道（definition_sync.py）——文档通道只承载用户内容。
 
@@ -57,12 +62,14 @@ _CORE_SUFFIXES: tuple[tuple[str, str], ...] = (("notes", ".notes.json"),)
 _EXCLUDED_SUFFIXES: tuple[str, ...] = (".session.json",)
 
 
-def iter_local_documents(users_dir: Path = USERS_DIR) -> list[LocalDocument]:
-    """枚举本机全部可同步文档（用户内容：notes 与插件 kind）。
+def iter_local_documents(users_dir: Path = USERS_DIR,
+                         session_dir: Path = SESSION_CONFIG_DIR) -> list[LocalDocument]:
+    """枚举本机全部可同步文档：用户内容（notes 与插件 kind）+ 登记的账户级文档。
 
-    kind 判定顺序：core 固有后缀（``.notes.json``）→ 排除项（``.session.json``）
-    → 插件经 registry 登记的后缀（最长匹配）→ 其余整文件即 ``user_doc``。
-    core 只认自己拥有的语义，不认识任何插件领域词汇。
+    用户级 kind 判定顺序：core 固有后缀（``.notes.json``）→ 排除项
+    （``.session.json``）→ 插件经 registry 登记的后缀（最长匹配）→ 其余整文件
+    都不入文档通道（资料已入表，定义走 definition）。core 只认自己拥有的语义，
+    不认识任何插件领域词汇。
     """
     documents: list[LocalDocument] = []
     plugin_suffixes: list[tuple[str, str]] = sorted(
@@ -82,7 +89,18 @@ def iter_local_documents(users_dir: Path = USERS_DIR) -> list[LocalDocument]:
         # 用户资料（{名}.json）与头像已入服务端 account_users / 其头像表；
         # profile.yaml 是定义，走 definition 专用通道。文档通道只剩用户内容。
         logger.warning("[sync] 跳过未登记 kind 的文档：{}", path.name)
+    documents.extend(_session_documents(session_dir))
     return documents
+
+
+def _session_documents(session_dir: Path) -> list[LocalDocument]:
+    """登记的账户级文档中本地确实存在的那几份（label 固定 ``__global__``）。"""
+    result: list[LocalDocument] = []
+    for document in registry.session_documents().values():
+        path = session_dir / document.rel_path
+        if path.is_file():
+            result.append(LocalDocument(registry.GLOBAL_LABEL, document.kind, path))
+    return result
 
 
 def _read_bytes(document: LocalDocument) -> bytes:
@@ -156,7 +174,7 @@ def sync_documents(token: str,
         report.errors.append(str(error))
         return report
     seen: set[tuple[str, str]] = set()
-    local_docs = iter_local_documents(users_dir)
+    local_docs = iter_local_documents(users_dir, session_dir)
     total_docs = len(local_docs)
     for index, entry in enumerate(local_docs):
         if stop and stop():
@@ -212,8 +230,14 @@ def _document_for_remote(label: str, kind: str,
     """远端独有文档的本地落点；反推不出物理路径（如空 label）时跳过。"""
     if kind == "notes":
         return LocalDocument(label, kind, users_dir / f"{label}.notes.json")
-    # 插件登记的 kind：按登记的后缀落盘；未登记（本机没加载该插件）→ 不落，
-    # 云端该文档保持原样，等装了插件的设备再拉取。
+    # 账户级文档：落点由登记决定，与云端 label 无关（必须是 __global__）。
+    session_document = registry.session_document_for(kind)
+    if session_document is not None:
+        if label != registry.GLOBAL_LABEL:
+            return None
+        return LocalDocument(label, kind, session_dir / session_document.rel_path)
+    # 插件登记的用户级 kind：按登记的后缀落盘；未登记（本机没加载该插件）→
+    # 不落，云端该文档保持原样，等装了插件的设备再拉取。
     suffix = registry.user_document_kinds().get(kind)
     if suffix is not None:
         return LocalDocument(label, kind, users_dir / f"{label}{suffix}")

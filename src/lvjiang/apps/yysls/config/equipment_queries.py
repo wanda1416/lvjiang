@@ -32,6 +32,18 @@ def get_gongjue_bonus(self: GameConfigManager, gongjue_type: str, level: int) ->
     return (float(low_caps["cap"]) + float(high_caps["cap"])) / 4
 
 
+def get_gongjue_bonuses(self: GameConfigManager) -> dict[str, list[list[float]]]:
+    """全部弓玦实测加成区间：类型 → [[低等级, 高等级, 百分数], ...]。
+
+    网页端按同一份区间表算弓玦属性，不必把 ``get_gongjue_bonus`` 的
+    逐等级回退逻辑再实现一遍。
+    """
+    return {
+        kind: [[low, high, value] for (low, high), value in sorted(ranges.items())]
+        for kind, ranges in self._gongjue_bonuses.items()
+    }
+
+
 def get_equipment_sets(self: GameConfigManager, side: str | None = None) -> dict:
     """返回套装注册表副本；左右套装身份始终分开。"""
     if side in ("left", "right"):

@@ -180,3 +180,95 @@ def test_document_channel_has_no_avatar_kind(env) -> None:
     report = _sync(env)
     assert report.pulled == []
     assert not (env["dirs"]["avatars"] / "avatar_b.png").exists()
+
+
+# ─── 账户级（会话）文档 ────────────────────────────────────────
+
+@pytest.fixture()
+def session_env(env, monkeypatch):
+    """在 env 基础上登记一份账户级文档 yysls/play_styles.json。"""
+    from lvjiang.core.sync import registry
+
+    monkeypatch.setattr(registry, "_SESSION_DOCUMENTS", {})
+    registry.register_session_document("play_styles", "yysls/play_styles.json")
+    (env["dirs"]["session"] / "yysls").mkdir(parents=True, exist_ok=True)
+    return env
+
+
+def test_session_document_pushes_under_global_label(session_env) -> None:
+    """账户级文档与角色无关：label 必须是 __global__，不能带用户名。"""
+    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path.write_text('{"牵丝·霖": {"火拳": {"min_outer": 1}}}\n', encoding="utf-8")
+    _sync(session_env)
+    assert [(p["label"], p["kind"]) for p in session_env["fake"].pushes] == [
+        ("__global__", "play_styles")]
+
+
+def test_session_document_pulls_to_registered_path(session_env) -> None:
+    """云端独有时落到登记的相对路径（目录不存在自动创建）。"""
+    raw = '{"裂石·钧": {"双切": {"max_outer": 2}}}\n'.encode()
+    session_env["fake"].set_remote_future(
+        "__global__", "play_styles", raw, "2099-01-01T00:00:00Z")
+    report = _sync(session_env)
+    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    assert report.pulled == ["__global__/play_styles"]
+    assert path.read_text(encoding="utf-8") == raw.decode()
+
+
+def test_session_document_race_conflict_keeps_local_copy(session_env) -> None:
+    """两边都改过（推送时被云端抢先）时云端赢，但本地这版必须另存不被静默丢弃。"""
+    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path.write_text('{"local": 1}\n', encoding="utf-8")
+    session_env["fake"].docs[("__global__", "play_styles")] = {
+        "sha256": "cloud-new", "size": 3, "zipped": True,
+        "payload": base64.b64encode(gzip.compress(b'{"cloud": 2}\n')).decode(),
+        "updated_at": "2020-01-01T00:00:00Z"}
+    session_env["fake"].fail_expected = True
+    report = _sync(session_env)
+    assert report.pulled == ["__global__/play_styles"]
+    assert report.conflicts and "play_styles" in report.conflicts[0]
+    assert json.loads(path.read_text(encoding="utf-8")) == {"cloud": 2}
+
+
+def test_session_document_stale_local_is_overwritten_without_copy(session_env) -> None:
+    """本地只是旧版时直接覆盖，不留副本——否则每次同步都在堆 .conflict 文件。"""
+    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path.write_text('{"local": 1}\n', encoding="utf-8")
+    session_env["fake"].set_remote_future(
+        "__global__", "play_styles", b'{"cloud": 2}\n', "2099-01-01T00:00:00Z")
+    report = _sync(session_env)
+    assert report.pulled == ["__global__/play_styles"]
+    assert report.conflicts == []
+    assert not any(".conflict-" in p.name for p in path.parent.iterdir())
+
+
+def test_session_document_with_user_label_is_not_laid_down(session_env) -> None:
+    """label 不是 __global__ 的同 kind 远端文档不认——账户级文档只有一份。"""
+    session_env["fake"].set_remote_future(
+        "蔡元君", "play_styles", b"{}\n", "2099-01-01T00:00:00Z")
+    report = _sync(session_env)
+    assert report.pulled == []
+    assert not (session_env["dirs"]["session"] / "yysls" / "play_styles.json").exists()
+
+
+def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
+    """没有任何插件注册时文档通道照常工作——依赖方向只能是插件指向 core。
+
+    这条守的是「单独启动主引擎」：core 必须能在只认得自己那几类文档的情况下
+    跑完一轮同步，不得因为缺插件而抛异常或漏掉 core 自己的文档。
+    """
+    from lvjiang.core.sync import registry
+
+    monkeypatch.setattr(registry, "_USER_DOCUMENT_KINDS", {})
+    monkeypatch.setattr(registry, "_SESSION_DOCUMENTS", {})
+    fake = FakeClient()
+    monkeypatch.setattr(engine.client, "manifest", fake.manifest)
+    monkeypatch.setattr(engine.client, "pull", fake.pull)
+    monkeypatch.setattr(engine.client, "push", fake.push)
+    users, session = tmp_path / "users", tmp_path / "session"
+    users.mkdir()
+    session.mkdir()
+    (users / "蔡元君.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
+    report = engine.sync_documents("t", users_dir=users, session_dir=session)
+    assert report.errors == []
+    assert report.pushed == ["蔡元君/notes"]

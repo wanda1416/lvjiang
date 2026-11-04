@@ -245,6 +245,8 @@ class GameConfigManager:
 
     get_gongjue_bonus = equipment_queries.get_gongjue_bonus
 
+    get_gongjue_bonuses = equipment_queries.get_gongjue_bonuses
+
     get_equipment_sets = equipment_queries.get_equipment_sets
 
     resolve_equipment_set = equipment_queries.resolve_equipment_set

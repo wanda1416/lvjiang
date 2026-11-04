@@ -29,6 +29,21 @@
 见脚本头注释。运行 `python scripts/one_off/import_school_target_presets.py`（需开发模式），
 可重复执行覆盖已生成的条目。
 
+## 网页端毕业率对拍
+
+[graduation_web_parity.py](graduation_web_parity.py) 给网页端（`server/web`）的毕业率
+实现算一份期望值：读取 `server/web/scripts/graduation-fixture.json` 里的合成装备与
+基础属性（构造数据，不含用户信息），用 PC 端链路算出属性表、DPS 与毕业率，写进
+`server/web/scripts/graduation-expected.json`。网页端
+`server/web/scripts/check-graduation.ts` 用同一份用例跑 TS 实现并与之比对。
+
+用途是证明「网页算出来的数和 PC 是同一条链路」，属于一次性等价性验证；日常由网页端
+脚本自己跑（`node scripts/check-graduation.ts`）。模型或用例变更后重新生成：
+
+```bash
+python scripts/one_off/graduation_web_parity.py
+```
+
 ## 废弃文件锁
 
 [停机清理](cleanup_obsolete_locks.py) 仅用于本轮锁收敛后移除已废弃侧车。

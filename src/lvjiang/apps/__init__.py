@@ -316,7 +316,7 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     if hooks.sync_document_modules:
         registry.setdefault("sync_document_modules", []).extend(hooks.sync_document_modules)
-        # 实际导入模块触发 register_user_document_kind() 注册；单个插件的
+        # 实际导入模块触发文档 kind 注册（用户级/账户级）；单个插件的
         # 声明出错不该拖垮整个插件加载，仅记日志跳过。
         for mod_path in hooks.sync_document_modules:
             try:

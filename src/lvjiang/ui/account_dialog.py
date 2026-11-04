@@ -86,7 +86,7 @@ class _AccountWorker(QThread):
 
 
 class _CombinedReport:
-    """用户表 + 文档通道 + profile 账本的合并结果。
+    """用户表 + 文档通道 + 总览账本的合并结果。
 
     界面按「通道 / 上行 / 下行 / 失败」四列展示，不再拼一段长文案：
     多通道拼句既读不出哪一项失败，也把提示、结果、错误混成一坨。
@@ -111,7 +111,7 @@ class _CombinedReport:
                          self._count(self.users.pulled), len(self.users.errors)))
         rows.append((tr("文档"), self._count(self.documents.pushed),
                      self._count(self.documents.pulled), len(self.documents.errors)))
-        rows.append((tr("profile"), self._count(self.profile.pushed),
+        rows.append((tr("总览"), self._count(self.profile.pushed),
                      self._count(self.profile.pulled), len(self.profile.errors)))
         return rows
 
@@ -232,7 +232,7 @@ class AccountHolder(QObject):
         return self._start(action, "operation")
 
     def sync_async(self, allow_overwrite: bool = False) -> bool:
-        """一轮完整同步（用户表 + 文档通道 + profile 账本）；同一时刻只跑一份。"""
+        """一轮完整同步（用户表 + 文档通道 + 总览账本）；同一时刻只跑一份。"""
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
         if not token:

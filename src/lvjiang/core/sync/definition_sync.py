@@ -32,7 +32,7 @@ def _local_sha256(path: Path) -> str:
 
 def sync_definition(token: str, yaml_path: Path | None = None,
                     on_progress=None) -> DefinitionSyncReport:
-    """一轮定义同步：内容签名一致时零请求。"""
+    """一轮定义同步：每次核对云端 sha，本地与云端不同就上推，冲突时拉云端。"""
     if yaml_path is None:
         from ...constants import SESSION_CONFIG_DIR
 
@@ -48,8 +48,6 @@ def sync_definition(token: str, yaml_path: Path | None = None,
         return report
 
     local_sha = _local_sha256(yaml_path)
-    if local_sha == state.get("definition_sha"):
-        return report          # 与上次成功同步一致：跳过
 
     try:
         remote = post("/api/sync/profile/definition", {}, token).get("definition")

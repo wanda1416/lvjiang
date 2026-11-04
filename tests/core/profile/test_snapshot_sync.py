@@ -79,6 +79,13 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync, "save_profile_sync_state",
                         lambda value: state.update(value))
     monkeypatch.setattr(snapshot_sync.repository, "db_upsert", db_upsert)
+    def db_upsert_many(username, batch):
+        for entry in batch:
+            type_, key, value, updated_at = entry[0], entry[1], entry[2], entry[3]
+            value_text = entry[7] if len(entry) > 7 else ""
+            db_upsert(username, type_, key, value, updated_at=updated_at,
+                      value_text=value_text)
+    monkeypatch.setattr(snapshot_sync.repository, "db_upsert_many", db_upsert_many)
     monkeypatch.setattr(snapshot_sync.repository, "db_read_all",
                         lambda username: entries.get(username, {}))
     monkeypatch.setattr(snapshot_sync.repository, "db_read_entry",

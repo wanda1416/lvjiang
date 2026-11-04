@@ -274,6 +274,8 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
         report.errors.append("快照格式无效")
         return
     applied = 0
+    from collections import defaultdict
+    grouped: dict[str, list[tuple]] = defaultdict(list)
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -290,12 +292,16 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
         if repository.db_is_locked(username, type_, key):
             continue
         value = entry.get("value")
-        repository.db_upsert(
-            username, type_, key,
+        grouped[username].append((
+            type_, key,
             float(value) if isinstance(value, (int, float)) else 0.0,
-            updated_at=entry.get("updated_at") or None,
-            value_text=entry.get("value_text") or "", change_type=None)
-        applied += 1
+            entry.get("updated_at") or None,
+            None, None, "", entry.get("value_text") or "", None))
+    # 按用户批量事务落地：1244 条逐条 upsert 是 1244 个独立事务，慢到分钟级；
+    # 19 个用户 = 19 个事务，量级回到秒级。
+    for username, batch in grouped.items():
+        repository.db_upsert_many(username, batch)
+        applied += len(batch)
     # 两个编号别混：profile_snapshot_id 是「哪一份快照」（表主键），
     # snapshot_remote_id 是「该快照覆盖到账本的哪个水位」。
     snapshot_row_id = int(snapshot.get("id") or 0)

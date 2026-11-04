@@ -997,6 +997,10 @@ class AccountManagerDialog(QDialog):
                 refresh = getattr(parent, "_refresh_user_combo", None)
                 if callable(refresh):
                     refresh()
+                profile_tab = getattr(parent, "_profile_tab", None)
+                tab_refresh = getattr(profile_tab, "refresh", None)
+                if callable(tab_refresh):
+                    tab_refresh()
             except Exception:  # noqa: BLE001 - 刷新失败不能把同步结果判死
                 logger.warning("同步后刷新用户管理器失败", exc_info=True)
 

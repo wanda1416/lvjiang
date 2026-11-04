@@ -226,15 +226,20 @@ class AccountHolder(QObject):
         if self.summary is None or self._beat_worker is not None:
             return
 
-        def beat_done(ok: bool, result, worker: _AccountWorker) -> None:
-            if self._beat_worker is worker:
+        def beat_done(ok: bool, result, *, _worker: _AccountWorker | None = None) -> None:
+            # completed 信号只带 (ok, result)；worker 经闭包比对（信号重载
+            # 无法直接传第三个参数，此前按三参声明直接 TypeError 崩溃）
+            if _worker is not None and self._beat_worker is _worker:
                 self._beat_worker = None
             if not ok and isinstance(result, AccountError) \
                     and result.code == "token_expired":
                 self.apply(None)              # 登录态已死，停止节拍并回登录页
 
         worker = _AccountWorker(self.session.heartbeat)
-        worker.completed.connect(beat_done)
+        def on_completed(ok: bool, result) -> None:
+            beat_done(ok, result, _worker=worker)
+            self._beat_worker = None          # 跳完即清，允许下一跳
+        worker.completed.connect(on_completed)
         worker.finished.connect(worker.deleteLater)
         self._beat_worker = worker
         worker.start()

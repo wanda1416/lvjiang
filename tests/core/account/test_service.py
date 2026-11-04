@@ -83,6 +83,34 @@ def test_login_stores_refresh_in_keyring_profile_without_tokens(fake_env) -> Non
     assert "refresh" not in json.dumps(profile) and "token" not in json.dumps(profile)
 
 
+def test_relogin_same_account_preserves_sync_state(fake_env) -> None:
+    """事故回归：掉线/登出后重新登录不得抹掉同步水位。
+
+    2026-11-04 事故根源：login() 整写 account.json，profile_sync 被清 →
+    下一轮同步退回 bootstrap，云端旧快照静默盖掉本地未推送的更新。
+    同账号重登必须保留；换账号才换干净的运行态。
+    """
+    session = AccountSession()
+    session.login("wang", "pw")
+    path = account_service.account_config_path()
+    account_service.save_profile_sync_state({
+        "remote_history_id": 199, "local_history_id": 31120,
+        "profile_snapshot_id": 2})
+    # 掉线后重新登录同一账号
+    session.login("wang", "pw")
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    assert profile["profile_sync"]["remote_history_id"] == 199
+    assert profile["profile_sync"]["local_history_id"] == 31120
+    assert profile["profile_sync"]["profile_snapshot_id"] == 2
+    # 换账号 → 运行态重置（水位属于旧账号，不能带到新账号）：
+    # 把 account.json 的 account_id 改成别的账号再登录即可模拟
+    profile["account_id"] = "b" * 32
+    path.write_text(json.dumps(profile, ensure_ascii=False), encoding="utf-8")
+    session.login("wang", "pw")
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    assert "profile_sync" not in profile
+
+
 def test_restore_slides_tokens_and_expired_access_refreshes_once(fake_env) -> None:
     session = AccountSession()
     session.login("wang", "pw")

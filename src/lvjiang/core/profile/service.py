@@ -508,7 +508,11 @@ def profile_action(
             db_upsert(
                 username, model_type, key, restored_value,
                 updated_at=restored_at,
-                change_type="tick",
+                # 物化用 set 而非 tick：set 会随上行通道推送，消耗前的
+                # 「锚点 set + delta」成对到达回放端，delta 加在新锚点上，
+                # 回放端无需做任何 regen 计算即天然正确（tick 不上行，
+                # 锚点全靠快照收编，是跨端 regen 错乱的根源）。
+                change_type="set",
                 delta_value=_normalize_float_noise(restored_value - stored_value),
                 source=tr("自动恢复"),
             )

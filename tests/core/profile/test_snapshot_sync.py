@@ -85,6 +85,21 @@ def env(monkeypatch, tmp_path):
                         lambda u, t, k: entries.get(u, {}).get(t, {}).get(k, {}))
     monkeypatch.setattr(snapshot_sync.repository, "db_count_history",
                         lambda username: len([r for r in history if r["username"] == username]))
+    monkeypatch.setattr(snapshot_sync.repository, "db_users_with_history_since",
+                        lambda since: {r["username"] for r in history if r["ts"] > since})
+    def _fingerprint(u, t, k, ts, *, delta, new_value):
+        for r in history:
+            if (r["username"], r["type"], r["key"], r["ts"]) != (u, t, k, ts):
+                continue
+            if delta is not None and r.get("change_type") == "delta" and r["delta_value"] == delta:
+                return True
+            if delta is None and r.get("change_type") != "delta" and r["new_value"] == new_value:
+                return True
+        return False
+    monkeypatch.setattr(snapshot_sync.repository, "db_history_fingerprint_exists", _fingerprint)
+    locked: set[tuple[str, str, str]] = set()
+    monkeypatch.setattr(snapshot_sync.repository, "db_is_locked",
+                        lambda u, t, k: (u, t, k) in locked)
     def _rows_of(since, limit, author=""):
         from lvjiang.core.profile.repository import _author_stamp
 
@@ -98,7 +113,7 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync, "current_instance_id", lambda: "mine")
     monkeypatch.setattr(snapshot_sync, "backup_local", lambda: str(tmp_path / "backup"))
     return {"server": server, "entries": entries, "history": history,
-            "state": state, "writes": writes}
+            "state": state, "writes": writes, "locked": locked}
 
 
 def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
@@ -127,7 +142,8 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
 
 
 def test_push_refuses_backlog_over_limit(env) -> None:
-    """积压超过 200 条拒绝上传，提示刷新快照——防止水位异常时全量倾倒。"""
+    """积压超过上限（1000）拒绝上传，提示刷新快照——防止水位异常时全量倾倒。
+    周一周期重置风暴（~500 条 reset）属常规量，必须放行。"""
     env["state"]["local_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
     env["state"]["remote_history_id"] = 5
@@ -218,9 +234,18 @@ def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
     assert warnings[0]["entries"] == 2
     assert warnings[0]["origin_name"] == "手机"
 
-    # 最新快照来自本机 → 无需任何确认
+    # 最新快照来自本机且本地没有更新的行 → 无需确认（快照已含全部本地状态）
     env["server"].snapshots[0]["origin_instance_id"] = "mine"
     assert snapshot_sync.overwrite_warnings("t") == []
+
+    # 本机快照但本地有快照创建之后、未推送的新行 → 必须确认
+    # （2026-11-04 事故：本机旧快照静默盖掉未推送的 323 行更新）
+    env["history"].append({"id": 900, "username": "蔡元君", "type": "stock",
+                           "key": "energy", "new_value": 8, "new_value_text": "",
+                           "change_type": "set", "delta_value": None,
+                           "ts": "T9"})
+    warnings = snapshot_sync.overwrite_warnings("t")
+    assert [row["username"] for row in warnings] == ["蔡元君"]
 
 
 def test_pull_stops_with_pending_when_overwrite_not_confirmed(env) -> None:
@@ -268,6 +293,30 @@ def test_own_echo_ops_with_local_rows_are_skipped(env) -> None:
         "蔡元君", "stock", "energy", 105.0, "", None)]
 
 
+def test_own_echo_ops_matched_by_fingerprint_after_rebuild(env) -> None:
+    """回声指纹兜底：库重建后本地 id 重新编号，云端旧 local_id 对不上时，
+    仍要靠内容指纹识别 echo，防止旧 delta 重复应用（2026-11-04 二次污染）。"""
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    # 本地重建后的行：id 变成 77（云端记得的是 local_id=51）
+    env["history"].append({"id": 77, "username": "蔡元君", "type": "stock",
+                           "key": "energy", "new_value": 100, "new_value_text": "",
+                           "change_type": "delta", "delta_value": 40,
+                           "ts": "2026-11-03T10:00:00"})
+    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 100}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "mine", "local_id": 51,   # 对不上 77
+         "username": "蔡元君", "type": "stock", "key": "energy",
+         "op": "delta", "delta": 40, "value": None, "value_text": "",
+         "happened_at": "2026-11-03T10:00:00"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    # 指纹命中 → 跳过，不再把 +40 算第二遍
+    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 100
+    assert report.pulled == 0
+    assert env["writes"] == []
+
+
 def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
     """事故回归：新库快照水位为 0 时，已落地的设备不得每次同步都被快照回滚。
 
@@ -295,3 +344,61 @@ def test_network_failure_reports_error_without_crashing(env) -> None:
     report = snapshot_sync.pull_and_replay("t")
     assert report.errors
     assert env["entries"] == {}
+
+
+def test_push_maps_reset_to_zero_set(env) -> None:
+    """reset 行上行映射为 set(0)：跨边界设备先按时间戳归零再回放 delta，
+    不会把 delta 加在周期前的旧基线上（2026-11-04 复盘补的窟窿）。"""
+    env["state"]["local_history_id"] = 0
+    env["history"].extend([
+        {"id": 10, "username": "蔡元君", "type": "quota", "key": "weekly",
+         "new_value": 0, "new_value_text": "", "change_type": "reset",
+         "delta_value": -5, "ts": "2026-11-04T05:00:00"},
+        {"id": 11, "username": "蔡元君", "type": "quota", "key": "weekly",
+         "new_value": 3, "new_value_text": "", "change_type": "delta",
+         "delta_value": 3, "ts": "2026-11-04T09:00:00"},
+    ])
+    snapshot_sync.push_local("t")
+    assert [op["op"] for op in env["server"].pushed] == ["set", "delta"]
+    assert env["server"].pushed[0]["value"] == 0     # reset → set(0)
+    assert env["server"].pushed[0]["delta"] is None
+
+
+def test_cross_boundary_replay_converges_on_stale_base(env) -> None:
+    """离线跨周期的设备：reset-set 先归零，delta 才不会加在旧基线上。"""
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
+                                                     "updated_at": "2026-11-03T09:00:00"}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "set", "value": 0, "delta": None, "value_text": "",
+         "happened_at": "2026-11-04T05:00:00"},      # 对端周期归零（reset 映射）
+        {"remote_id": 2, "instance_id": "other", "local_id": 2,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "delta", "delta": 3, "value": None, "value_text": "",
+         "happened_at": "2026-11-04T09:00:00"},
+    ]
+    snapshot_sync.pull_and_replay("t")
+    # 5(旧) --set0--> 0 --delta+3--> 3；没有 reset-set 时会错算成 8
+    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 3.0
+
+
+def test_bootstrap_skips_locked_entries_silently(env) -> None:
+    """锁定条目拒绝快照覆盖是锁的语义，静默跳过——不得刷误导性 ERROR。"""
+    env["server"].rows = [{"remote_id": 1}]
+    env["server"].snapshots = [{
+        "id": 1, "snapshot_remote_id": 1, "origin_instance_id": "other",
+        "origin_name": "手机", "created_at": "2026-11-04T13:20:00", "entry_count": 2,
+        "entries": json.dumps([
+            {"username": "宛元芷", "type": "quota", "key": "locked_key", "value": 9,
+             "updated_at": "2026-11-04T13:00:00"},
+            {"username": "蔡元君", "type": "quota", "key": "free_key", "value": 7,
+             "updated_at": "2026-11-04T13:00:00"}])}]
+    env["locked"].add(("宛元芷", "quota", "locked_key"))
+    report = snapshot_sync.pull_and_replay("t", allow_overwrite=True)
+    assert report.snapshots == 1
+    assert "宛元芷" not in env["entries"]        # 锁定的没被覆盖
+    assert env["entries"]["蔡元君"]["quota"]["free_key"]["value"] == 7
+    assert not report.errors

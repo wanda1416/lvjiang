@@ -59,13 +59,14 @@ def test_realtime_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "xinli", delta=-5, source="镇守")
 
     records = _history("regen", "xinli")
-    latest, tick = records[0], records[1]
-    assert tick["change_type"] == "tick"
-    assert (tick["old_value"], tick["new_value"]) == (19.0, 26.0)
-    assert tick["delta_value"] == 7.0
+    latest, anchor = records[0], records[1]
+    # 物化记为 set（随上行通道成为其他端的 regen 锚点），不再是不上行的 tick
+    assert anchor["change_type"] == "set"
+    assert (anchor["old_value"], anchor["new_value"]) == (19.0, 26.0)
+    assert anchor["delta_value"] == 7.0
     assert latest["change_type"] == "delta"
     assert (latest["old_value"], latest["new_value"], latest["delta_value"]) == (26.0, 21.0, -5.0)
-    for record in (tick, latest):
+    for record in (anchor, latest):
         assert record["new_value"] - record["old_value"] == record["delta_value"]
     # 小数进度必须保留：写入前是 26.5 点，消耗 20 后应是 6.5 而不是 6.0，
     # 否则每次消耗都会把「距下一点的进度」重置成 0（最多白丢 1 点）。
@@ -82,12 +83,12 @@ def test_boundary_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "tili", delta=-30, source="副本")
 
     records = _history("regen", "tili")
-    latest, tick = records[0], records[1]
-    assert tick["change_type"] == "tick"
-    assert tick["delta_value"] == 450.0
+    latest, anchor = records[0], records[1]
+    assert anchor["change_type"] == "set"
+    assert anchor["delta_value"] == 450.0
     assert latest["change_type"] == "delta"
     assert (latest["old_value"], latest["new_value"], latest["delta_value"]) == (550.0, 520.0, -30.0)
-    for record in (tick, latest):
+    for record in (anchor, latest):
         assert record["new_value"] - record["old_value"] == record["delta_value"]
 
 
@@ -104,7 +105,7 @@ def test_realtime_regen_cas_write_survives_materialization(regen_env):
                    use_cas=True, expected_entry=stale)
 
     assert int(profile_read("u", "xinli")) == 6       # 19 + 7 恢复 − 20
-    assert [r["change_type"] for r in _history("regen", "xinli")[:2]] == ["delta", "tick"]
+    assert [r["change_type"] for r in _history("regen", "xinli")[:2]] == ["delta", "set"]
 
 
 def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):

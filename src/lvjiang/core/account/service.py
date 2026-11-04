@@ -408,11 +408,18 @@ class AccountSession:
             "platform": _platform_tag(),
         }, timeout=_AUTH_TIMEOUT_S)
         _store_refresh_token(result["refresh_token"])
-        _save_profile({
+        # 同账号重新登录（掉线/登出后再登）必须**保留**同步水位等运行态——
+        # 整写 account.json 会抹掉 profile_sync/users_sync，下一轮同步退回
+        # bootstrap，把云端旧快照静默盖到本地新数据上（2026-11-04 事故根源）。
+        # 只有切换到不同账号时才换一份干净的运行态。
+        profile = (load_profile()
+                   if load_profile().get("account_id") == result["account_id"] else {})
+        profile.update({
             "login": result["login"], "account_id": result["account_id"],
             "display_name": result["display_name"], "instance_id": result["instance_id"],
             "device_name": device_name, "instance_uuid": instance_uuid,
         })
+        _save_profile(profile)
         self.access_token = result["access_token"]
         self.access_expires_at = result["access_expires_at"]
         if not fetch_summary:

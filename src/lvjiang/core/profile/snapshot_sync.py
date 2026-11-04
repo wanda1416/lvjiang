@@ -172,15 +172,23 @@ def current_instance_id() -> str:
 def overwrite_warnings(token: str) -> list[dict]:
     """本机将被云端快照覆盖的用户清单。
 
-    快照是账户级的一份；判定：快照来自别实例 **且** 本地那几个用户已有数据。
+    判定：快照来自别实例 **且** 本地那几个用户已有数据；或**无论快照来自谁**，
+    本地存在晚于快照创建时间的 history 行——快照是"过去某刻"的状态，本地
+    完全可能有快照之后、未推送的新数据，"快照来自本机"绝不构成静默覆盖的
+    通行证（2026-11-04 事故：本机旧快照静默盖掉 323 行未推送更新）。
     本地为空（新设备）不需要警告——那里没有东西可丢。
     """
     mine = current_instance_id()
     if not mine:
         return []
     snapshot = latest_snapshot(token)
-    if snapshot is None or snapshot.get("origin_instance_id") == mine:
+    if snapshot is None:
         return []
+    created_at = snapshot.get("created_at") or ""
+    from_mine = snapshot.get("origin_instance_id") == mine
+    newer_users: set[str] = set()
+    if from_mine and created_at:
+        newer_users = repository.db_users_with_history_since(created_at)
     warnings: list[dict] = []
     try:
         entries = json.loads(snapshot.get("entries") or "[]")
@@ -196,6 +204,8 @@ def overwrite_warnings(token: str) -> list[dict]:
         total = sum(len(group) for group in local.values() if isinstance(group, dict))
         if not total:
             continue
+        if from_mine and username not in newer_users:
+            continue   # 快照已包含该用户的全部本地状态，覆盖无损
         warnings.append({
             "username": username,
             "entries": total,
@@ -256,6 +266,11 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
         if not isinstance(username, str) or not isinstance(type_, str) or not isinstance(key, str):
             continue
         if not username or not type_ or not key:
+            continue
+        # 锁定条目拒绝快照覆盖是**预期内**的（锁的语义就是物理失效），静默
+        # 跳过即可——upsert 的锁拒绝分支会记 ERROR，整份落地会刷一屏误导
+        # 性"写入被拒绝"，让人误以为数据事故（2026-11-04 13:20 的日志）。
+        if repository.db_is_locked(username, type_, key):
             continue
         value = entry.get("value")
         repository.db_upsert(
@@ -348,13 +363,20 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
         for op in ops:
             # 回声护栏：自己实例推的 op 且本地 history 已有该行 → 其效果已含在
             # 本地状态里（entries 重建自完整 history），重放会造成 delta 双算。
-            # 库重建后的窗口期（水位归零）尤其会撞上这批自己的历史 op。
+            # id 匹配是快路径；库重建后本地 id 重新编号、云端旧 local_id 对不上，
+            # 用内容指纹（用户+key+时间+数值）兜底，防止旧 delta 重复应用。
             op_instance = op.get("instance_id")
             op_local_id = op.get("local_id")
-            if (isinstance(op_instance, str) and op_instance == mine
-                    and isinstance(op_local_id, int)
-                    and repository.db_history_row_exists(op_local_id)):
-                continue
+            if isinstance(op_instance, str) and op_instance == mine:
+                if (isinstance(op_local_id, int)
+                        and repository.db_history_row_exists(op_local_id)):
+                    continue
+                if repository.db_history_fingerprint_exists(
+                        op["username"], op["type"], op["key"],
+                        op.get("happened_at") or "",
+                        delta=op.get("delta") if op.get("op") == "delta" else None,
+                        new_value=op.get("value") if op.get("op") == "set" else None):
+                    continue
             try:
                 if _apply_op(op):
                     applied += 1
@@ -372,10 +394,12 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     return report
 
 
-#: 单次同步允许的最大上行积压。超过说明水位异常或长期离线——这些旧行
-#: 绝大多数已被快照收编，逐条上传既浪费配额又可能用旧值污染回放；正确
-#: 动作是刷新快照重建基线（水位重置到本机 max，积压归零）。
-MAX_PUSH_BACKLOG = 200
+#: 单次同步允许的最大上行积压。常规量按「周一 05:00 的周期重置风暴」定：
+#: 19 用户 × ~25 个周期 key ≈ 500 条 reset，属**正常业务量**而非水位异常，
+#: 上限必须容得下；分批（每批 200）上传。D1 免费额度 10 万行写/天，按每天
+#: 2000 行可支撑 50 个用户，1000 的上限绰绰有余。真正超过的（长期离线数月、
+#: 水位错乱）仍拒绝并提示刷新快照重建基线。
+MAX_PUSH_BACKLOG = 1000
 
 
 def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
@@ -410,9 +434,13 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
                          "pushed": report.pushed})
         ops = [{
             "local_id": row["id"], "username": row["username"],
-            "type": row["type"], "key": row["key"], "op": row["change_type"],
-            "value": row["new_value"] if row["change_type"] == "set" else None,
-            "delta": row["delta_value"] if row["change_type"] == "delta" else None,
+            "type": row["type"], "key": row["key"],
+            # reset 上行映射为 set(0)：回放端按时间戳归零，跨边界离线设备
+            # 不会把 delta 加在周期前的旧基线上（本地 change_type 保留
+            # 'reset' 供 UI 显示「周期重置」）。
+            "op": "delta" if row["change_type"] == "delta" else "set",
+            "value": (row["new_value"] if row["change_type"] != "delta" else None),
+            "delta": (row["delta_value"] if row["change_type"] == "delta" else None),
             "value_text": row["new_value_text"], "happened_at": row["ts"],
         } for row in rows]
         try:

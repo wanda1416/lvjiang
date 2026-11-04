@@ -359,13 +359,14 @@ class ProfileProcessor:
             regen_result = compute_regen_entry(entry, kd)
             computed = regen_result.value
 
-            # realtime 由 UI 基于 value + updated_at 实时计算展示，tick 不落库；
-            # boundary 经过准点边界后持久化，避免日/周等回复遗漏。
+            # realtime 由 UI 基于 value + updated_at 实时计算展示，不落库；
+            # boundary 经过准点边界后持久化，避免日/周等回复遗漏。物化记为
+            # set（上行后成为其他端的 regen 锚点），不再用不上行的 tick。
             if regen_result.persisted and int(computed) != int(stored_value):
                 delta = computed - (stored_value or 0)
                 try:
                     updated = _write_background_change(
-                        user_name, 'regen', kd, entry, computed, delta, 'tick', updated_at=regen_result.updated_at)
+                        user_name, 'regen', kd, entry, computed, delta, 'set', updated_at=regen_result.updated_at)
                 except Exception as error:  # noqa: BLE001
                     logger.warning('Profile 自动恢复未提交 {}: {}', kd.key, error)
                     continue

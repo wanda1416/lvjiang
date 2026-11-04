@@ -810,12 +810,14 @@ class ProfileDB:
 
     def get_history_since(self, since_id: int, limit: int,
                          author: str = "") -> list[dict]:
-        """取 id 大于水位的账本行（只要 ``set`` / ``delta``），按 id 升序。
+        """取 id 大于水位的账本行（``set`` / ``delta`` / ``reset``），按 id 升序。
 
-        供同步上行使用：``tick`` / ``reset`` 是时间派生，不上云。水位用的是
-        本地自增 id，与远端 ``remote_id`` 是两套编号。``author`` 非空时只取
-        该作者写的行——**每端只上传自己产生的 hid**，离线包复制来的行（带
-        来源机器标记）与旧存量行（空标记）永不代传。
+        供同步上行使用：``reset`` 一并上行（push 端映射为 ``set(0)``）——
+        周期归零若不上云，跨边界离线的设备会在旧基线上回放 delta 算错；
+        ``tick`` 是时间派生的中间物，已被物化 set 取代，不上云。水位用的
+        是本地自增 id，与远端 ``remote_id`` 是两套编号。``author`` 非空时
+        只取该作者写的行——**每端只上传自己产生的行**，离线包复制来的行
+        （带来源机器标记）与旧存量行（空标记）永不代传。
         """
         conn = self._borrow_connection()
         try:
@@ -823,7 +825,7 @@ class ProfileDB:
                 "SELECT id, username, type, key, new_value, new_value_text, "
                 "change_type, delta_value, ts "
                 "FROM profile_history "
-                "WHERE id>? AND change_type IN ('set', 'delta')"
+                "WHERE id>? AND change_type IN ('set', 'delta', 'reset')"
                 + (" AND device_id=?" if author else "") +
                 " ORDER BY id ASC LIMIT ?",
                 ((since_id, author, limit) if author else (since_id, limit)),
@@ -892,6 +894,47 @@ class ProfileDB:
                 f"SELECT COUNT(*) FROM profile_history WHERE {where}", params,
             ).fetchone()
             return int(row[0]) if row else 0
+        finally:
+            self._release_connection(conn)
+
+    def users_with_history_since(self, since_ts: str) -> set[str]:
+        """ts 晚于 ``since_ts`` 的 history 行涉及的用户集合（快照覆盖告警用）。"""
+        conn = self._borrow_connection()
+        try:
+            rows = conn.execute(
+                "SELECT DISTINCT username FROM profile_history WHERE ts > ?",
+                (since_ts,),
+            ).fetchall()
+            return {row[0] for row in rows if row[0]}
+        finally:
+            self._release_connection(conn)
+
+    def history_fingerprint_exists(
+        self, username: str, type_: str, key: str, ts: str, *,
+        delta: float | None, new_value: float | None,
+    ) -> bool:
+        """按内容指纹查本地是否已有该行（回声护栏的兜底匹配）。
+
+        库重建后本地 ``id`` 会重新编号，云端 op 携带的 ``local_id`` 对不上，
+        仅靠 id 判重会把已应用过的旧 delta 再算一遍（2026-11-04 二次污染）。
+        指纹 = 用户 + key + 时间 + 数值，对 delta 匹配 delta_value、
+        对 set 匹配 new_value。
+        """
+        conn = self._borrow_connection()
+        try:
+            if delta is not None:
+                row = conn.execute(
+                    "SELECT 1 FROM profile_history WHERE username=? AND type=? AND key=? "
+                    "AND ts=? AND delta_value=? LIMIT 1",
+                    (username, type_, key, ts, float(delta)),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT 1 FROM profile_history WHERE username=? AND type=? AND key=? "
+                    "AND ts=? AND new_value=? LIMIT 1",
+                    (username, type_, key, ts, float(new_value or 0)),
+                ).fetchone()
+            return row is not None
         finally:
             self._release_connection(conn)
 
@@ -1095,6 +1138,18 @@ def db_count_history(
     key: str | None = None,
 ) -> int:
     return get_profile_db().count_history(username, type_, key)
+
+
+def db_users_with_history_since(since_ts: str) -> set[str]:
+    return get_profile_db().users_with_history_since(since_ts)
+
+
+def db_history_fingerprint_exists(
+    username: str, type_: str, key: str, ts: str, *,
+    delta: float | None, new_value: float | None,
+) -> bool:
+    return get_profile_db().history_fingerprint_exists(
+        username, type_, key, ts, delta=delta, new_value=new_value)
 
 
 def db_cleanup_history(days: int = 90) -> int:

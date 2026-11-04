@@ -82,3 +82,37 @@ def test_rename_failure_keeps_journal_and_restart_converges(tmp_path, monkeypatc
     assert schema.get_profile_config().get_key("reward").sync_targets[0].key == "stock:coins"
     assert json.loads(interface_path().read_text())["profile"]["overview_groups"]["group"]["columns"] == ["stock:coins"]
     assert json.loads(constants.BATCH_CONFIG_PATH.read_text())["groups"]["group"]["profile_sort_key"] == "coins"
+
+
+def test_rename_emits_baselines_for_all_users(tmp_path):
+    """改名后自动重发全量基线 set：跨端无感传播的核心契约。
+
+    其他设备（含手机）对新 key 没有基线，第一条 delta 会在 0 上算错；
+    每用户一行 set(当前值) 随分钟级自动同步上行，回放端按时间戳合并直接
+    落正确值。锁定条目与空占位不发。
+    """
+    db = ProfileDB(tmp_path / "profile.db")
+    for user in ("tester_a", "tester_b"):
+        db.upsert(user, "quota", "weekly_old", 5, change_type="delta", delta_value=5)
+    db.upsert("tester_c", "quota", "weekly_old", 0)          # 空占位用户
+    db.set_locked("tester_b", "quota", "weekly_old")          # 锁定用户
+
+    # 真实流程：先原子改名（emit 读取的是新 key），再重发基线
+    db.rename_keys([("quota", "weekly_old", "weekly_new")],
+                   save_references=lambda: None)
+    key_rename._emit_rename_baselines(db, [("quota", "weekly_old", "weekly_new")])
+
+    # 只有 tester_a 的非零值获得基线行；锁定与空占位不发
+    rows = db.get_history("tester_a", "quota", "weekly_new")
+    baseline = [r for r in rows if r["change_type"] == "set"]
+    assert len(baseline) == 1
+    assert baseline[0]["new_value"] == 5.0
+    assert baseline[0]["source"] == "key 改名重设"
+    # 锁定用户：旧历史行随改名重写（审计保留），但**不发新基线 set**
+    locked_rows = db.get_history("tester_b", "quota", "weekly_new")
+    assert locked_rows and all(r["change_type"] != "set" for r in locked_rows)
+    # 空占位用户同样不发
+    assert not db.get_history("tester_c", "quota", "weekly_new")
+    # 基线行的 id 在改名前的行之上：随水位推进自然上行
+    older = [r for r in rows if r["change_type"] == "delta"]
+    assert all(baseline[0]["id"] > r["id"] for r in older)

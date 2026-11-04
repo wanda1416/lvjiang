@@ -96,11 +96,17 @@ def _probe_status() -> dict:
 
 
 def _sync(token: str) -> dict:
-    """只拉不推，且服从「总览数据来源」模式：pc 模式下整体跳过 profile。
+    """定义先行、账本随后；只拉不推，且服从「总览数据来源」模式。
 
-    手机 db 在 pc 模式下由离线包整库重建（PC 的镜像），在线通道碰它就会
-    两条线打架（推出去的是 PC 旧账；自己写的行又被下一次包冲掉）。因此
-    在线通道对手机是只读的，且 pc 模式下连读都不读。上行只走离线回传。
+    顺序是硬约束：**profile.yaml 先提交（拉取并重载 schema），再回放账本**。
+    改名场景里新 key 的基线 set 会先于定义到达就会被当成未知项，值在却
+    不显示、引擎不计算——手机此前根本不同步定义（只靠离线包），这是改名
+    能否无感传播的前提缺口。
+
+    pc 模式下整体跳过 profile：手机 db 由离线包整库重建（PC 的镜像），
+    在线通道碰它就会两条线打架（推出去的是 PC 旧账；自己写的行又被下一
+    次包冲掉）。因此在线通道对手机是只读的，且 pc 模式下连读都不读。
+    上行只走离线回传。
     """
     from . import profile_source
 
@@ -108,8 +114,11 @@ def _sync(token: str) -> dict:
         return {"synced": True, "skipped": "profile",
                 "message": "总览数据处于 PC端模式，已跳过在线同步"}
     from ..profile.snapshot_sync import NO_SNAPSHOT_HINT, pull_and_replay
+    from ..sync.definition_sync import sync_definition
 
+    definition = sync_definition(token)
     pulled = pull_and_replay(token)
+    errors = [*definition.errors, *pulled.errors]
     if any(error == NO_SNAPSHOT_HINT for error in pulled.errors):
         return {"synced": False, "reason": "no_snapshot",
                 "message": "云端还没有快照；先在 PC 端刷新快照"}
@@ -119,9 +128,9 @@ def _sync(token: str) -> dict:
         return {"synced": False, "reason": "pending_overwrite",
                 "message": "检测到本地已有总览数据；请先在「设置 → 总览数据」"
                            "点「清除数据」，再执行同步"}
-    return {"synced": not pulled.errors,
+    return {"synced": not errors,
             "pulled": pulled.pulled, "pushed": 0,
-            "message": "；".join(pulled.errors[:3]) if pulled.errors else ""}
+            "message": "；".join(errors[:3]) if errors else ""}
 
 
 def _reset_sync_state() -> None:

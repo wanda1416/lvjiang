@@ -150,8 +150,44 @@ def save_renamed_definitions(
             recover_rename(db)
             get_interface_store().reload()
             schema_module.reload_profile_config()
+        _emit_rename_baselines(db, renames)
         from .events import notify_updated
         with db._connect() as conn:
             users = conn.execute("SELECT DISTINCT username FROM profile_entries").fetchall()
         for (username,) in users:
             notify_updated(username)
+
+
+def _emit_rename_baselines(db: ProfileDB,
+                           renames: list[tuple[str, str, str]]) -> None:
+    """为每个改名的 key 重发全量基线 set——跨端无感传播的核心。
+
+    已推送的云端 op 仍挂旧 key 且水位不回退，其他设备（含手机）对新 key
+    **没有基线**：改名后第一条 delta 会在 0 基线上算错。这里为每个拥有该
+    key 的用户写一行 ``set(当前值)``（id 在水位之上，随分钟级自动同步上
+    行），回放端按时间戳合并必然应用，新 key 直接落正确值——手机无需清
+    数据、无需重新 bootstrap、无需手动刷新快照。
+    定义先行的顺序由同步周期保证：定义推送先于账本（PC sync 通道顺序），
+    手机 _sync 先拉定义再回放。
+    """
+    from ...i18n import tr as _tr
+
+    for model, old, new in renames:
+        with db._connect() as conn:
+            rows = conn.execute(
+                "SELECT username, value, value_text, locked FROM profile_entries "
+                "WHERE type=? AND key=?", (model, new)).fetchall()
+        emitted = 0
+        for username, value, value_text, locked in rows:
+            if locked:
+                continue      # 锁定条目物理失效，不参与展示与同步
+            if value in (None, 0) and not value_text:
+                continue      # 空占位不值得基线行
+            db.upsert(username, model, new, float(value or 0),
+                      value_text=value_text or "",
+                      change_type="set", source=_tr("key 改名重设"))
+            emitted += 1
+        if emitted:
+            from loguru import logger as _logger
+            _logger.info("[profile rename] {}→{} 已重发 {} 位用户基线 set",
+                         old, new, emitted)

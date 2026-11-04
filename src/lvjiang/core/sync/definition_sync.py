@@ -91,7 +91,12 @@ def _pull_to_local(token: str, yaml_path: Path, report: DefinitionSyncReport) ->
         state = profile_sync_state()
         state["definition_sha"] = remote.get("sha256") or _local_sha256(yaml_path)
         save_profile_sync_state(state)
+        # 定义必须**先提交到内存**再进入账本回放：同一同步周期里，回放端
+        # 若拿着旧 schema 处理新 key（改名场景），引擎会把新 key 当未知项
+        # 忽略、UI 不显示——文件新内存旧正是状态不一致的来源。
+        from ..profile.schema import reload_profile_config
+        reload_profile_config()
         report.pulled = 1
-        logger.info("[definition] 已拉取云端定义（本地让位）")
+        logger.info("[definition] 已拉取云端定义（本地让位，schema 已重载）")
     except (SyncError, OSError, ValueError) as error:
         report.errors.append(str(error))

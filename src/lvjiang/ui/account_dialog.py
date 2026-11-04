@@ -508,6 +508,8 @@ class AccountManagerDialog(QDialog):
         if summary is None:
             self.account_label.setText(tr("未登录"))
         else:
+            # 登录成功即清掉「正在登录…」——临时反馈不留在已就绪的界面上
+            self._set_status("")
             self._show_logged_in(summary)
         self.change_password_button.setVisible(summary is not None)
         self.logout_button.setVisible(summary is not None)
@@ -598,8 +600,15 @@ class AccountManagerDialog(QDialog):
                 self.sync_table.setItem(index, column, item)
 
     def _render_report(self, report) -> None:
-        self._fill_sync_table(report.rows())
-        errors = report.distinct_errors()
+        """统一渲染两种报告：完整同步是 _CombinedReport，刷新快照走 sync
+        通道的是裸 ProfileSyncReport——后者适配成单行 profile 通道数据。"""
+        if hasattr(report, "rows"):
+            rows = report.rows()
+            errors = report.distinct_errors()
+        else:
+            rows = [(tr("profile"), report.pushed, report.pulled, len(report.errors))]
+            errors = [str(e) for e in report.errors if str(e).strip()]
+        self._fill_sync_table(rows)
         if errors:
             shown = errors[:2]
             text = "；".join(shown)

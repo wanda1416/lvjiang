@@ -345,6 +345,9 @@ class UserConfigManager:
 
     def reload(self) -> None:
         """从磁盘重读名册（初始同步拉回用户后调用）；仍有效的当前用户保留。"""
+        from .config.session import get_session_store
+
+        get_session_store().reload()      # users_sync 直写文件，先让缓存重读盘
         self._users.clear()
         self._load()
 

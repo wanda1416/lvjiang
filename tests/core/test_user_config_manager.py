@@ -145,6 +145,27 @@ class TestUserConfigManagerCRUD:
         assert mgr.get_user("待删除").attributes == {"account": "保留账号"}
         assert [note.text for note in repo.list_notes()] == ["私人备忘"]
 
+    def test_reload_sees_users_written_directly_to_disk(self, session_env):
+        """users_sync 直写 session.json，reload 必须让缓存重读盘才能看到新用户。"""
+        import json
+
+        from lvjiang import constants
+
+        constants.USERS_DIR.mkdir(parents=True, exist_ok=True)
+        session_env.write_text(json.dumps({"users": []}), encoding="utf-8")
+        reset_session_store()
+        mgr = UserConfigManager()
+        assert mgr.list_users() == []
+
+        # 模拟 users_sync 直写文件（绕过 SessionStore 缓存）
+        session_env.write_text(json.dumps({"users": ["云端用户"]}), encoding="utf-8")
+        (constants.USERS_DIR / "云端用户.json").write_text(
+            json.dumps({"attributes": {}}), encoding="utf-8")
+
+        mgr.reload()
+        assert mgr.list_users() == ["云端用户"]
+        assert mgr.get_active_user_name() == "云端用户"
+
     def test_user_metadata_reuses_user_occupancy_without_document_lock(self, session_env):
         from lvjiang.core.fs_util import lock_root
 

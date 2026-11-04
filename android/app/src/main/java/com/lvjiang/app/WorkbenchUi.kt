@@ -1295,17 +1295,14 @@ class WorkbenchUi(
                 if (isPc) {
                     confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
                 } else {
-                    // 云端→PC端：服务端判定有未同步变更时先弹强确认
-                    //（这些变更会留在本机不再上云，可能与云端分叉）
+                    // 云端→PC端：破坏性操作，一律二次确认（带未同步数据评估）
                     request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
                         if (r.optBoolean("need_confirm")) {
                             MaterialAlertDialogBuilder(activity)
-                                .setTitle("存在未同步的变更")
-                                .setMessage(r.optString("message") +
-                                    "\n\n建议先等手机同步完成（或手动点「立即同步」）再切换。" +
-                                    "仍要切换吗？")
+                                .setTitle("切换为 PC端")
+                                .setMessage(r.optString("message"))
                                 .setNegativeButton("取消", null)
-                                .setPositiveButton("仍要切换") { _, _ ->
+                                .setPositiveButton("确认切换") { _, _ ->
                                     request({ PyBridge.accountSetProfileModeForce(activity, "pc") }) { rr ->
                                         if (rr.optBoolean("ok")) updateProfileSourceSummary("pc")
                                         toast(if (rr.optBoolean("ok")) "已切换为 PC端"

@@ -176,8 +176,10 @@ def _author_stamp() -> str:
 
 
 def account_set_profile_mode(mode_value: str, force: bool = False) -> str:
-    """切换模式。切 PC端带未同步风险评估（pending_push > 0 且未 force 时
-    返回 need_confirm 要求二次确认）；切回云端必须先清除本地总览数据。"""
+    """切换模式。**云端→PC端一律返回 need_confirm 二次确认**（切走后本机
+    变更不再上云，且云端模式的 DB 将被离线包覆盖——不管当前有没有未同步
+    数据，这是破坏性操作的标准防护）；force=true 为确认后的执行。
+    切回云端必须先清除本地总览数据。"""
     from ..account.service import profile_sync_state
     from ..profile.repository import db_count_pending_push
     from . import profile_source
@@ -187,13 +189,16 @@ def account_set_profile_mode(mode_value: str, force: bool = False) -> str:
             state = profile_sync_state()
             pending = db_count_pending_push(
                 int(state.get("local_history_id") or 0), _author_stamp())
-            if pending > 0:
-                return json.dumps(
-                    {"ok": False, "need_confirm": True, "pending_push": pending,
-                     "message": f"还有 {pending} 条本机变更未同步到云端。"
-                                "切到 PC端后这些变更会留在本机、不再上云，"
-                                "可能与云端数据分叉。确认切换？"},
-                    ensure_ascii=False)
+            pending_text = (f"还有 {pending} 条本机变更尚未同步到云端。"
+                            if pending > 0 else "当前本机变更已全部同步到云端。")
+            return json.dumps(
+                {"ok": False, "need_confirm": True, "pending_push": pending,
+                 "message": "切换为 PC端后：\n\n"
+                            f"· {pending_text}\n"
+                            "· 本机总览数据将改为随离线包更新，在线同步跳过总览\n"
+                            "· 下一次 PC 离线包会覆盖本机总览数据\n\n"
+                            "建议先确认手机同步已完成。仍要切换？"},
+                ensure_ascii=False)
         profile_source.set_mode(profile_source.PC)
         return json.dumps({"ok": True, "mode": profile_source.PC,
                            "message": "总览数据改为 PC端；离线包将携带总览数据"},

@@ -12,7 +12,8 @@ from lvjiang.ui.main.run_control import RunControlMixin
 
 def test_recovery_question_waits_for_yes_or_no_without_affecting_other_target(qtbot):
     class Host(RunControlMixin, QWidget):
-        pass
+        def append_log(self, text: str) -> None:
+            self.log_text.append(text)
     host = Host()
     qtbot.addWidget(host)
     context = SimpleNamespace(task_run_id='test-run', stop_event=threading.Event(), pause_event=None)
@@ -43,7 +44,8 @@ def test_recovery_question_waits_for_yes_or_no_without_affecting_other_target(qt
 
 def test_recheck_does_not_resume_task_and_verified_recovery_preserves_user_pause(qtbot):
     class Host(RunControlMixin, QWidget):
-        pass
+        def append_log(self, text: str) -> None:
+            self.log_text.append(text)
     host = Host()
     qtbot.addWidget(host)
     resume = threading.Event()

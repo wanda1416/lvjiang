@@ -25,6 +25,9 @@ def host(qtbot, monkeypatch):
             self._execution_targets.get(target_id).launch_draft = LaunchDraft(
                 plan_id=self.plan_combo.currentData())
 
+        def append_log(self, text):
+            self.log_text.append(text)
+
     host = Host()
     host.running = False
     host._execution_targets = ExecutionTargetRegistry()

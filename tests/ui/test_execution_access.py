@@ -18,6 +18,9 @@ class Harness:
         self.log_text = SimpleNamespace(append=self.messages.append)
         self.history = []
 
+    def append_log(self, text):
+        self.messages.append(text)
+
     def _end_automation(self, name):
         self._running = False
 

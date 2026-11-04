@@ -104,6 +104,7 @@ def test_scan_failure_and_user_stop_have_distinct_terminal_states(stopped, expec
     saved = []
     host = SimpleNamespace(
         _run_manager=SimpleNamespace(run=lambda _id: run), log_text=[],
+        append_log=lambda *_args: None,
         _save_workflow_result=lambda *_args, **_kwargs: None,
         _finish_task_run=lambda *_args, **kwargs: saved.append(kwargs),
         _auto_save_session=lambda *_args: pytest.fail("Neither path may save a partial session"),

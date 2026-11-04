@@ -61,6 +61,9 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(users_sync, "_users_dir", lambda: tmp_path / "users")
     monkeypatch.setattr(users_sync, "_sync_state", load_state)
     monkeypatch.setattr(users_sync, "_save_sync_state", save_state)
+    # 进程内 E2E 密钥可能被其它用例留下：本组用例走明文推送路径，必须复位。
+    from lvjiang.core.account import e2e
+    monkeypatch.setattr(e2e, "_KEY", None)
     users = tmp_path / "users"
     users.mkdir()
     return {"server": server, "tmp": tmp_path, "users": users, "account": account_json}

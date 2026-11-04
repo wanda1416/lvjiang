@@ -134,6 +134,7 @@ def test_keyword_plugin_launch_rejection_reports_to_owner(qtbot, monkeypatch, tm
         _user_manager=SimpleNamespace(get_active_user_name=lambda: "example"),
         _session_manager=SimpleNamespace(_users_dir=tmp_path),
         log_text=SimpleNamespace(append=messages.append),
+        append_log=messages.append,
     )
 
     def deny(*_args):

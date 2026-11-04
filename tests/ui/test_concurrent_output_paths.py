@@ -48,9 +48,11 @@ def test_workflow_result_filename_contains_task_run_id(tmp_path, monkeypatch):
         engine=SimpleNamespace(run_username="用户甲"),
         metadata={"output_started_at": started_at},
     )
+    log = _LogText()
     host = SimpleNamespace(
         _current_engine=SimpleNamespace(run_username="用户甲"),
-        log_text=_LogText(),
+        log_text=log,
+        append_log=log.append,
     )
 
     path = RunControlMixin._save_workflow_result(

@@ -41,6 +41,11 @@ class Host(QWidget, RunControlMixin):
     def _save_displayed_params(self):
         self.saved_scripts.append(self._displayed_script_id)
 
+    def append_log(self, text):
+        log_text = getattr(self, "log_text", None)
+        if log_text is not None:
+            log_text.append(text)
+
     def _rebuild_param_panel(self):
         self.rebuilt_scripts.append(self._displayed_script_id)
 

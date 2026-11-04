@@ -39,6 +39,7 @@ def _host(registry, manager, *, current=None):
     host._run_manager = manager
     host._execution_targets = registry
     host._current_run_context = current
+    host.append_log = lambda text: host.log_text.append(text)
     return host
 
 

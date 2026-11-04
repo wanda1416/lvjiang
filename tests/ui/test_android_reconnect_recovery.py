@@ -86,6 +86,9 @@ class _Host(RunControlMixin, WindowOpsMixin):
     def statusBar(self):  # noqa: N802 - 模仿 QMainWindow 接口
         return SimpleNamespace(showMessage=Mock())
 
+    def append_log(self, text: str) -> None:
+        self.log_text.append(text)
+
     def _hotkey_status(self, message: str, *bindings) -> str:
         return message
 

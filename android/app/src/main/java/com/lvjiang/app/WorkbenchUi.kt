@@ -1287,17 +1287,26 @@ class WorkbenchUi(
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
+            // 成功的切换/清除都会关掉本对话框：内容基于打开时的旧状态构建，
+            // 留着只会展示陈旧信息（点过「切换为 PC端」后界面还停在云端态）
+            val dialog = MaterialAlertDialogBuilder(activity).setTitle("总览数据")
+                .setView(SettingsUi.dialogScroll(activity, content))
+                .setNegativeButton("关闭", null)
+                .create()
             actions.addView(profileActionButton("清除数据", destructive = true) {
+                dialog.dismiss()
                 confirmClearProfile(keepMode = true)
             }, LinearLayout.LayoutParams(-2, -2))
             actions.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
             actions.addView(profileActionButton(if (isPc) "切换为云端" else "切换为 PC端") {
                 if (isPc) {
+                    dialog.dismiss()
                     confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
                 } else {
                     // 云端→PC端：破坏性操作，一律二次确认（带未同步数据评估）
                     request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
                         if (r.optBoolean("need_confirm")) {
+                            dialog.dismiss()
                             MaterialAlertDialogBuilder(activity)
                                 .setTitle("切换为 PC端")
                                 .setMessage(r.optString("message"))
@@ -1311,6 +1320,7 @@ class WorkbenchUi(
                                 }.show()
                             return@request
                         }
+                        dialog.dismiss()
                         if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
                         toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
                     }
@@ -1320,10 +1330,7 @@ class WorkbenchUi(
                 topMargin = (8 * activity.resources.displayMetrics.density).toInt()
             })
 
-            MaterialAlertDialogBuilder(activity).setTitle("总览数据")
-                .setView(SettingsUi.dialogScroll(activity, content))
-                .setNegativeButton("关闭", null)
-                .show()
+            dialog.show()
         }
     }
 

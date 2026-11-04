@@ -120,7 +120,7 @@ class UsersSyncReport:
         return "，".join(parts)
 
 
-def sync_users(token: str) -> UsersSyncReport:
+def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     """一轮名册同步：先推本地（资料 LWW + 顺序仅在本地变过时），再拉远端。
 
     顺序语义：本地名册与「上次同步签名」一致 → 常规推送（``order_changed=false``，
@@ -128,6 +128,10 @@ def sync_users(token: str) -> UsersSyncReport:
     下行按云端顺序重排本地名册（本地独有名字 append）。
     """
     report = UsersSyncReport()
+    def _prog(detail, **kw):
+        if on_progress:
+            on_progress({"step": "roster", "detail": detail, **kw})
+    _prog("推送")
     roster = _roster()
     users_dir = _users_dir()
     state = _sync_state()
@@ -164,10 +168,12 @@ def sync_users(token: str) -> UsersSyncReport:
                 report.pushed = int(response.get("changed", len(payload)))
                 state["content_sig"] = content_sig
                 _save_sync_state(state)
+                _prog("已推送", pushed=report.pushed)
             except SyncError as error:
                 report.errors.append(f"上行失败: {error}")
 
     try:
+        _prog("拉取")
         response = post("/api/sync/users/pull", {}, token)
     except SyncError as error:
         report.errors.append(f"下行失败: {error}")
@@ -216,12 +222,12 @@ def sync_users(token: str) -> UsersSyncReport:
     if final_order and final_order != signature:
         state["roster"] = final_order
         _save_sync_state(state)
-    _sync_avatars(token, remote_users, users_dir, report)
+    _sync_avatars(token, remote_users, users_dir, report, on_progress, stop)
     return report
 
 
 def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
-                  report: UsersSyncReport) -> None:
+                  report: UsersSyncReport, on_progress=None, stop=None) -> None:
     """头像按用户归属增量同步：sha 一致不动，变化上传、缺失下载。
 
     本地头像文件名在用户资料的 ``avatar`` 字段里；名册行带云端
@@ -233,7 +239,15 @@ def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
 
     remote_by_name = {row.get("username"): row for row in remote_users
                       if isinstance(row.get("username"), str)}
-    for name in _roster():
+    pending = [n for n in _roster()]
+    done = 0
+    for name in pending:
+        if stop and stop():
+            report.errors.append("已停止")
+            return
+        done += 1
+        if on_progress:
+            on_progress({"step": "roster", "detail": f"头像 {done}/{len(pending)}"})
         path = users_dir / f"{name}.json"
         try:
             local = json.loads(path.read_text(encoding="utf-8"))
@@ -261,6 +275,8 @@ def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
             report.avatars += 1
         except SyncError as error:
             report.errors.append(f"头像上传失败({name}): {error}")
+    if on_progress:
+        on_progress({"step": "roster", "detail": "完成"})
 
 
 def _download_avatar(token: str, name: str, avatar_path: Path,

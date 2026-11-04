@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+import threading
+
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -105,7 +107,7 @@ class _CombinedReport:
 
     def rows(self) -> list[tuple[str, int, int, int]]:
         """各通道 ``(名称, 上行, 下行, 失败)``。"""
-        rows = []
+        rows = [(tr("定义"), 0, 0, 0)]
         if self.users is not None:
             rows.append((tr("名册"), self._count(self.users.pushed),
                          self._count(self.users.pulled), len(self.users.errors)))
@@ -134,6 +136,7 @@ class AccountHolder(QObject):
     changed = pyqtSignal(object)              # summary dict 或 None
     operation_finished = pyqtSignal(bool, object)   # 登录/登出/改密
     sync_finished = pyqtSignal(bool, object)        # 数据同步
+    sync_progress = pyqtSignal(dict)                # 分步进度
 
     def __init__(self):
         super().__init__()
@@ -144,6 +147,7 @@ class AccountHolder(QObject):
         self.last_sync_report = None
         self._worker: _AccountWorker | None = None
         self._sync_worker: _AccountWorker | None = None
+        self._sync_cancel = threading.Event()
 
     # ─── 状态 ───────────────────────────────────────────
 
@@ -239,19 +243,30 @@ class AccountHolder(QObject):
             return False
         self.sync_attempted = True
 
+        self._sync_cancel.clear()
+
         def action():
             from ..core.profile.snapshot_sync import sync_all
             from ..core.sync.definition_sync import sync_definition
             from ..core.sync.users_sync import sync_users
-            definition_report = sync_definition(token)
-            users_report = sync_users(token)
-            document_report = sync_documents(token)
-            profile_report = sync_all(token, allow_overwrite=allow_overwrite)
+            def progress(data):
+                self.sync_progress.emit(dict(data))
+
+            stop = self._sync_cancel.is_set
+            definition_report = sync_definition(token, on_progress=progress)
+            users_report = sync_users(token, on_progress=progress, stop=stop)
+            document_report = sync_documents(token, on_progress=progress, stop=stop)
+            profile_report = sync_all(token, allow_overwrite=allow_overwrite,
+                                      on_progress=progress, stop=stop)
             report = _CombinedReport(document_report, profile_report, users_report)
             report.errors.extend(definition_report.errors)
             return report
 
         return self._start(action, "sync")
+
+    def cancel_sync(self) -> None:
+        """请求停止当前同步：步骤间与批次间协作式检查。"""
+        self._sync_cancel.set()
 
 
 _holder: AccountHolder | None = None
@@ -390,16 +405,18 @@ class AccountManagerDialog(QDialog):
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
 
-        self.sync_table = QTableWidget(3, 4)
+        self.sync_table = QTableWidget(4, 5)
         self.sync_table.setHorizontalHeaderLabels(
-            [tr("通道"), tr("上行"), tr("下行"), tr("失败")])
-        _tune_table(self.sync_table, fixed={1: 96, 2: 96, 3: 96},
-                    row_height=36, stretch_column=0)
-        for row, name in enumerate((tr("名册"), tr("文档"), tr("profile"))):
+            [tr("通道"), tr("进度"), tr("上行"), tr("下行"), tr("失败")])
+        _tune_table(self.sync_table, fixed={2: 72, 3: 72, 4: 72},
+                    row_height=36, stretch_column=1)
+        for row, name in enumerate((tr("定义"), tr("名册"), tr("文档"), tr("总览"))):
             item = QTableWidgetItem(name)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.sync_table.setItem(row, 0, item)
-            for column in (1, 2, 3):
+            for column in (1, 2, 3, 4):
                 cell = QTableWidgetItem("—")
+                cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(row, column, cell)
         sync_layout.addWidget(self.sync_table, stretch=1)
@@ -417,6 +434,12 @@ class AccountManagerDialog(QDialog):
         self.sync_caption.setVisible(False)
         sync_layout.addWidget(self.sync_caption)
 
+        self._step_rows = {tr("定义"): 0, tr("名册"): 1, tr("文档"): 2, tr("总览"): 3}
+        self.stop_sync_button = QPushButton(tr("停止"))
+        self.stop_sync_button.setFixedWidth(72)
+        self.stop_sync_button.clicked.connect(self.holder.cancel_sync)
+        self.stop_sync_button.setVisible(False)
+
         sync_actions = QHBoxLayout()
         # 左：危险操作（清除同步）；右：常规操作（刷新快照、立即同步）
         self.clear_sync_button = QPushButton(tr("清除同步"))
@@ -433,10 +456,11 @@ class AccountManagerDialog(QDialog):
             "把本机当前全部角色数据上传为云端基线。\n"
             "新设备接入、或云端被重建后需要先做一次；日常同步不用点。"))
         self.snapshot_button.clicked.connect(self._refresh_snapshot)
-        sync_actions.addWidget(self.snapshot_button)
         self.sync_button = QPushButton(tr("立即同步"))
         apply_button_style(self.sync_button)
         self.sync_button.clicked.connect(self._sync_now)
+        sync_actions.addWidget(self.snapshot_button)
+        sync_actions.addWidget(self.stop_sync_button)
         sync_actions.addWidget(self.sync_button)
         sync_layout.addLayout(sync_actions)
         self.tabs.addTab(sync_tab, tr("数据同步"))
@@ -463,6 +487,7 @@ class AccountManagerDialog(QDialog):
         self._connect(self.holder.changed, self._on_holder_changed)
         self._connect(self.holder.operation_finished, self._on_operation_failed)
         self._connect(self.holder.sync_finished, self._on_sync_finished)
+        self._connect(self.holder.sync_progress, self._on_sync_progress)
 
         self._render(self.holder.summary)
         self._render_sync()
@@ -565,6 +590,22 @@ class AccountManagerDialog(QDialog):
         self.sync_caption.setText(text if not error else "")
         self.sync_caption.setVisible(bool(text) and not error)
 
+    def _on_sync_progress(self, data: dict) -> None:
+        """分步进度：进度列实时显示细节，上行/下行随批累加。"""
+        if not self._alive():
+            return
+        row = self._step_rows.get(data.get("step"))
+        if row is None:
+            return
+        cell = self.sync_table.item(row, 1)
+        if cell is not None:
+            cell.setText(str(data.get("detail") or ""))
+        for column, key in ((2, "pushed"), (3, "pulled")):
+            if key in data:
+                item = self.sync_table.item(row, column)
+                if item is not None:
+                    item.setText(str(data[key] or 0))
+
     def _render_sync(self) -> None:
         report = self.holder.last_sync_report
         if self.holder.syncing:
@@ -581,12 +622,13 @@ class AccountManagerDialog(QDialog):
         self.sync_button.setEnabled(not running)
         self.clear_sync_button.setEnabled(not running)
         self.snapshot_button.setEnabled(not running and self.holder.summary is not None)
+        self.stop_sync_button.setVisible(self.holder.syncing)
 
     def _fill_sync_table(self, rows: list[tuple[str, int | None, int | None, int | None]] | None) -> None:
-        """三个通道行固定存在；没有结果时数值列显示 —，表格不消失。"""
+        """四个通道行固定存在；没有结果时数值列显示 —，表格不消失。"""
         if not rows:
             rows = [(name, None, None, None)
-                    for name in (tr("名册"), tr("文档"), tr("profile"))]
+                    for name in (tr("定义"), tr("名册"), tr("文档"), tr("总览"))]
         for index, (name, pushed, pulled, failed) in enumerate(rows):
             def cell_text(value, failed_count=False):
                 if value is None:
@@ -596,11 +638,11 @@ class AccountManagerDialog(QDialog):
                 return str(value)
 
             for column, value in enumerate((
-                    name, cell_text(pushed), cell_text(pulled),
+                    name, "—", cell_text(pushed), cell_text(pulled),
                     cell_text(failed, failed_count=True))):
                 item = QTableWidgetItem(value)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if column:
+                if column != 1:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(index, column, item)
 

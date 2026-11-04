@@ -30,13 +30,16 @@ def _local_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def sync_definition(token: str, yaml_path: Path | None = None) -> DefinitionSyncReport:
+def sync_definition(token: str, yaml_path: Path | None = None,
+                    on_progress=None) -> DefinitionSyncReport:
     """一轮定义同步：内容签名一致时零请求。"""
     if yaml_path is None:
         from ...constants import SESSION_CONFIG_DIR
 
         yaml_path = SESSION_CONFIG_DIR / "profile.yaml"
     report = DefinitionSyncReport()
+    if on_progress:
+        on_progress({"step": "definition", "detail": "检查"})
     state = profile_sync_state()
 
     if not yaml_path.is_file():
@@ -65,6 +68,9 @@ def sync_definition(token: str, yaml_path: Path | None = None) -> DefinitionSync
         state["definition_sha"] = local_sha
         save_profile_sync_state(state)
         report.pushed = 1
+        if on_progress:
+            on_progress({"step": "definition", "detail": "已上传",
+                         "pushed": 1})
     except SyncError as error:
         # 乐观锁冲突（他机刚推）或网络失败：拉云端版本落盘，以云端为准
         report.errors.append(str(error))

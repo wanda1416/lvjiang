@@ -282,7 +282,8 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
 
 
 def pull_and_replay(token: str, *, allow_overwrite: bool = False,
-                    tolerate_no_snapshot: bool = False) -> ProfileSyncReport:
+                    tolerate_no_snapshot: bool = False,
+                    on_progress=None, stop=None) -> ProfileSyncReport:
     """把远端增量折进 entries。首次（无水位）先取快照作基线。
 
     非初始设备（远端快照来自别的实例、本地又有数据）**不覆盖**：只回填
@@ -326,7 +327,15 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
                 return report
             state = _state()
     since = int(state.get("remote_history_id") or 0)
+    page = 0
     while True:
+        if stop and stop():
+            report.errors.append("已停止")
+            break
+        page += 1
+        if on_progress:
+            on_progress({"step": "overview", "detail": f"回放 第{page}页",
+                         "pulled": report.pulled})
         try:
             response = post("/api/sync/profile/pull",
                                 {"since_remote_id": since, "limit": 500}, token)
@@ -369,7 +378,7 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
 MAX_PUSH_BACKLOG = 200
 
 
-def push_local(token: str) -> ProfileSyncReport:
+def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
     """把本地 ``history.id`` 水位之后的 set/delta 上行——**只推本机写的行**。
 
     - 请求携带 ``base_remote_id``（自己的拉取水位）：云端发现落后于 head
@@ -387,10 +396,18 @@ def push_local(token: str) -> ProfileSyncReport:
         report.errors.append(
             f"待上行积压超过 {MAX_PUSH_BACKLOG} 条；请先「刷新快照」重建基线后再同步")
         return report
+    batch = 0
     while True:
+        if stop and stop():
+            report.errors.append("已停止")
+            break
         rows = repository.db_get_history_since(since, 200, author=author)
         if not rows:
             break
+        batch += 1
+        if on_progress:
+            on_progress({"step": "overview", "detail": f"上行 第{batch}批",
+                         "pushed": report.pushed})
         ops = [{
             "local_id": row["id"], "username": row["username"],
             "type": row["type"], "key": row["key"], "op": row["change_type"],
@@ -520,16 +537,18 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
     return report
 
 
-def sync_all(token: str, *, allow_overwrite: bool = False) -> ProfileSyncReport:
+def sync_all(token: str, *, allow_overwrite: bool = False,
+             on_progress=None, stop=None) -> ProfileSyncReport:
     """一轮完整同步：先拉后推（先拿到远端状态，再把自己的新变更补上）。
 
     ``allow_overwrite=False`` 时若本机是「非初始设备」，只回报 pending 并
     停下——绝不静默覆盖本地数据。
     """
-    pull = pull_and_replay(token, allow_overwrite=allow_overwrite)
+    pull = pull_and_replay(token, allow_overwrite=allow_overwrite,
+                         on_progress=on_progress, stop=stop)
     if pull.pending or pull.errors and not pull.snapshots and not pull.pulled:
         return pull
-    push = push_local(token)
+    push = push_local(token, on_progress=on_progress, stop=stop)
     return ProfileSyncReport(pushed=push.pushed, pulled=pull.pulled,
                              snapshots=pull.snapshots, pending=pull.pending,
                              backup=pull.backup,

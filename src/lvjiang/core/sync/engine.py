@@ -144,7 +144,8 @@ def _local_mtime(document: LocalDocument) -> datetime:
 
 def sync_documents(token: str,
                    users_dir: Path = USERS_DIR,
-                   session_dir: Path = SESSION_CONFIG_DIR) -> SyncReport:
+                   session_dir: Path = SESSION_CONFIG_DIR,
+                   on_progress=None, stop=None) -> SyncReport:
     """全量对账一次：本地枚举 + 远端 manifest，按键做后写覆盖；失败逐条记账不中断。"""
     report = SyncReport()
     remote_by_key: dict[tuple[str, str], dict] = {}
@@ -155,7 +156,14 @@ def sync_documents(token: str,
         report.errors.append(str(error))
         return report
     seen: set[tuple[str, str]] = set()
-    for entry in iter_local_documents(users_dir):
+    local_docs = iter_local_documents(users_dir)
+    total_docs = len(local_docs)
+    for index, entry in enumerate(local_docs):
+        if stop and stop():
+            report.errors.append("已停止")
+            return report
+        if on_progress:
+            on_progress({"step": "documents", "detail": f"{index + 1}/{total_docs}"})
         key = (entry.label, entry.kind)
         seen.add(key)
         remote = remote_by_key.get(key)

@@ -178,10 +178,10 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
     """
     key = f"{document.label}/{document.kind}"
     remote = client.pull(token, document.label, document.kind)
-    payload = base64.b64decode(remote["payload_base64"])
+    raw = base64.b64decode(remote["payload_base64"])
     if remote.get("zipped"):
-        payload = gzip.decompress(payload)
-    payload = _inbound_bytes(document, payload)
+        raw = gzip.decompress(raw)
+    payload = _inbound_bytes(document, raw)
     if payload is None:
         # 密文但本机解不开（改密后旧数据等）：保留本地明文，不制造冲突副本
         report.pulled.append(key)

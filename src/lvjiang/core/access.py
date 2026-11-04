@@ -55,12 +55,19 @@ class Lease:
         finally:
             self.lock.lockfile = None
 
+    def __del__(self):  # pragma: no cover - 仅兜底漏调 release 的场景
+        try:
+            self._close_lockfile()
+        except Exception:  # noqa: BLE001 - 析构期任何异常都不能外抛
+            pass
+
     def release(self) -> None:
         with _mutex:
             if self.acquired:
                 self.lock.release()
                 self.acquired = False
                 _held.discard(self.key)
+            self._close_lockfile()
 
     @contextmanager
     def authorized(self):

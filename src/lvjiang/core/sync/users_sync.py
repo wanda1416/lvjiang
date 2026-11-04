@@ -197,11 +197,12 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
         if not isinstance(name, str) or not isinstance(data, dict) or not data:
             continue
         if is_encrypted(data):
-            data = _decrypt(e2e_key, data) if e2e_key else None
-            if not data:
+            decrypted = _decrypt(e2e_key, data) if e2e_key else None
+            if not decrypted:
                 # 密文但本机无钥（改密后旧数据/异常）：跳过，绝不能把密文写进
                 # 本地明文文件覆盖真实数据
                 continue
+            data = decrypted
         path = users_dir / f"{name}.json"
         if not path.is_file():
             continue                          # 本地没有该用户：资料等名册引入后再落

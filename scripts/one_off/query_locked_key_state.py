@@ -1,7 +1,5 @@
 """一次性诊断：核对云端快照与本地 profile 库中指定 key 的状态。只读。"""
 import json
-import sqlite3
-import sys
 
 from lvjiang.core.account.service import AccountSession
 from lvjiang.core.profile import repository

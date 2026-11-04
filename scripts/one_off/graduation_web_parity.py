@@ -24,6 +24,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from lvjiang.apps.yysls.config import get_game_config  # noqa: E402
+from lvjiang.apps.yysls.core.affix_cap import (  # noqa: E402
+    affix_dict_cap_pct,
+    equip_affix_cap_pcts,
+)
 from lvjiang.apps.yysls.core.combat.combat_attrs import (  # noqa: E402
     CombatAttributes,
     GraduationAttrContext,
@@ -98,6 +102,79 @@ def _case(fixture: dict, assumptions: dict) -> dict:
     }
 
 
+def _cards(fixture: dict) -> dict:
+    """装备卡片与属性卡片的展示口径（对齐 PC cards.py / attrs_tab.py）。
+
+    卡片走的是**未投影**的装备（与 PC 装备页一致：假设只影响属性与毕业率，
+    不改卡片上的数值），属性走**投影后**的结果。
+    """
+    from lvjiang.apps.yysls.core.combat.combat_attrs import (
+        fold_wuxiang_pen,
+        format_value,
+    )
+    from lvjiang.apps.yysls.core.graduation.scoring import equipment_attrs
+
+    gc = get_game_config()
+    plan = fixture["plan"]
+    level = int(fixture["world_level"])
+    school = resolve_school(
+        plan["main_martial_art"], plan["sub_martial_art"], gc.get_schools())
+    equipped = _equipped(fixture)
+
+    cards: dict[str, dict] = {}
+    for slot, item in equipped.items():
+        cap_pcts = equip_affix_cap_pcts(item, game_config=gc)
+        item_level = item.get("level")
+        affixes = []
+        for index in range(1, 6):
+            affix = item.get(f"affix_{index}")
+            if not isinstance(affix, dict) or not affix.get("name"):
+                continue
+            affixes.append({
+                "name": affix["name"],
+                "value": affix.get("value"),
+                "unit": affix.get("unit") or "",
+                "cap_pct": affix_dict_cap_pct(affix, item_level, game_config=gc),
+                "is_transferred": bool(affix.get("is_transferred")),
+            })
+        dingyin = item.get("dingyin") or {}
+        cards[slot] = {
+            "name": item.get("name"),
+            "level": item_level,
+            "is_chengyin": bool(item.get("is_chengyin")),
+            "level_pct": (sum(cap_pcts) / len(cap_pcts)) if cap_pcts else None,
+            "affixes": affixes,
+            "dingyin": (
+                {
+                    "name": dingyin.get("name"),
+                    "value": dingyin.get("value"),
+                    "unit": dingyin.get("unit") or "%",
+                    "cap_pct": affix_dict_cap_pct(
+                        {**dingyin, "unit": dingyin.get("unit") or "%"},
+                        item_level, game_config=gc),
+                }
+                if dingyin.get("name") else None
+            ),
+        }
+
+    base_data = fixture["play_styles"][school][plan["base_attribute"]]
+    base = CombatAttributes.from_dict(base_data) + gongjue_attrs(
+        plan["gongjue"], gc, world_level=level,
+        gongjue_level=plan.get("gongjue_level") or None)
+    context = GraduationAttrContext.from_school(school, world_level=level)
+    raw_attrs = base + fold_wuxiang_pen(
+        equipment_attrs(equipped, gc), context.target_pen_field)
+    effective = graduation_input(base, equipped, school, gc, attr_context=context)
+    effective_items = {label: value for label, value, _ in effective.display_items()}
+    combat = [
+        {"label": label, "raw": format_value(value, unit),
+         "effective": format_value(effective_items.get(label, value), unit)}
+        for label, value, unit in raw_attrs.display_items()
+    ]
+    return {"school_attr": gc.get_school_attr(school) or "", "slots": cards,
+            "combat": combat}
+
+
 def main() -> int:
     fixture = _load_fixture()
     cases = {
@@ -108,6 +185,7 @@ def main() -> int:
         "_generated_by": "scripts/one_off/graduation_web_parity.py",
         "_fixture": "server/web/scripts/graduation-fixture.json",
         "cases": cases,
+        "display": _cards(fixture),
     }
     _EXPECTED.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

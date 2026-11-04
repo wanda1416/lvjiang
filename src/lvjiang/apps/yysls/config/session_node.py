@@ -55,10 +55,17 @@ def load(key: str) -> dict:
 
 
 def mutate(key: str, fn: Callable[[dict], dict]) -> dict:
-    return get_store().mutate(key, fn)
+    result = get_store().mutate(key, fn)
+    from lvjiang.core.sync.dirty import mark_dirty
+    mark_dirty("__global__", key)
+    return result
 
 
 def mutate_many(
     keys: tuple[str, ...], fn: Callable[[dict[str, dict]], dict[str, dict]],
 ) -> dict[str, dict]:
-    return get_store().mutate_many(keys, fn)
+    result = get_store().mutate_many(keys, fn)
+    from lvjiang.core.sync.dirty import mark_dirty
+    for key in keys:
+        mark_dirty("__global__", key)
+    return result

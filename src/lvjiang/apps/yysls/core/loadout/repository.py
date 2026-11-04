@@ -169,6 +169,8 @@ class LoadoutRepository:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 stream.write(payload)
             os.replace(tmp_path, self.path)
+            from lvjiang.core.sync.dirty import mark_dirty
+            mark_dirty(self.username, "loadouts")
         finally:
             if tmp_path.exists():
                 tmp_path.unlink()

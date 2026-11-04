@@ -258,7 +258,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     if final_order and final_order != signature:
         state["roster"] = final_order
         _save_sync_state(state)
-    _sync_avatars(token, remote_users, users_dir, report, on_progress, stop)
+    # 头像同步暂时整体停用（读写都不再碰头像，数据保留）：后续单独设计。
     return report
 
 

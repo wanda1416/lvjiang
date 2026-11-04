@@ -134,6 +134,8 @@ class UserNotesRepository:
     def _save_state(self, state: dict) -> None:
         payload = json.dumps(state, ensure_ascii=False, indent=2)
         atomic_write_text(self.path, payload, prefix=f".{self.path.stem}_")
+        from .sync.dirty import mark_dirty
+        mark_dirty(self.username, "notes")
 
     def _mutate(self, fn: Callable[[dict], _T]) -> _T:
         self.path.parent.mkdir(parents=True, exist_ok=True)

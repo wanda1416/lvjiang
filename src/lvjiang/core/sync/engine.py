@@ -26,7 +26,7 @@ from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR, USERS_DIR
 from . import client, registry
-from .client import SyncConflict, SyncError
+from .client import SyncConflict, SyncError, post
 
 
 @dataclass
@@ -226,21 +226,90 @@ def sync_documents(token: str,
                    users_dir: Path = USERS_DIR,
                    session_dir: Path = SESSION_CONFIG_DIR,
                    on_progress=None, stop=None) -> SyncReport:
-    """全量对账一次：本地枚举 + 远端 manifest，按键做后写覆盖；失败逐条记账不中断。"""
+    """增量对账：远端 revision 水位 + 本地脏集合；只有双变才全量对比。"""
     report = SyncReport()
+    from . import dirty
+
+    remote_id = dirty.remote_document_id()
+    local_dirty = dirty.dirty_keys()
+    try:
+        page = post("/api/sync/documents/pull", {"since_revision": remote_id}, token)
+    except SyncError as error:
+        report.errors.append(str(error))
+        return report
+    changed = list(page.get("documents") or [])
+    next_id = int(page.get("next_id") or 0)
+    remote_changed = bool(changed)
+    local_changed = bool(local_dirty)
+
+    if not remote_changed and not local_changed:
+        return report
+
+    if remote_changed and not local_changed:
+        # 只拉变化文档
+        for entry in changed:
+            if stop and stop():
+                report.errors.append("已停止")
+                break
+            document = _document_for_remote(entry["label"], entry["kind"],
+                                            users_dir, session_dir)
+            if document is None:
+                continue
+            try:
+                raw = base64.b64decode(entry["payload_base64"])
+                if entry.get("zipped"):
+                    raw = gzip.decompress(raw)
+                _pull(document, token, report, raw=raw)
+            except (ValueError, OSError) as error:
+                report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
+            except SyncError as error:
+                report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
+        dirty.save_sync_state(next_id - 1, set())
+        return report
+
+    if local_changed and not remote_changed:
+        # 只推脏集合
+        for key in sorted(local_dirty):
+            if stop and stop():
+                report.errors.append("已停止")
+                break
+            label, _, kind = key.partition("/")
+            document = _document_for_remote(label, kind, users_dir, session_dir)
+            if document is None or not document.path.is_file():
+                continue
+            try:
+                raw = _outbound_bytes(document, _read_bytes(document))
+                sha256 = hashlib.sha256(raw).hexdigest()
+                _push(document, token, raw, sha256, None, report)
+            except (OSError, ValueError) as error:
+                report.errors.append(f"{key}: {error}")
+            except SyncError as error:
+                report.errors.append(f"{key}: {error}")
+        dirty.save_sync_state(next_id - 1, set())
+        return report
+
+    # 双变：全量 manifest + 本地 mtime 对比裁决，之后清脏、抬水位。
+    _sync_documents_full(token, users_dir, session_dir, on_progress, stop, report)
+    dirty.save_sync_state(next_id - 1, set())
+    return report
+
+
+def _sync_documents_full(token: str, users_dir: Path, session_dir: Path,
+                         on_progress, stop, report: SyncReport) -> None:
+    """全量对账（双变冲突时的裁决路径）：本地枚举 + 远端 manifest，mtime 最新者胜。"""
     remote_by_key: dict[tuple[str, str], dict] = {}
     try:
         for remote_entry in client.manifest(token):
             remote_by_key[(remote_entry["label"], remote_entry["kind"])] = remote_entry
     except SyncError as error:
         report.errors.append(str(error))
-        return report
+        return
     seen: set[tuple[str, str]] = set()
     local_docs = iter_local_documents(users_dir, session_dir)
     total_docs = len(local_docs)
-    logger.info("[sync] 文档对账开始：本地 {} 份，远端 {} 份",
+    logger.info("[sync] 文档全量对账（双变冲突）：本地 {} 份，远端 {} 份",
                 total_docs, len(remote_by_key))
-    # 批量拉取全部远端 payload（替代逐份 pull）：初始同步 38 份从 ~60s 降到 1 次请求。
+    # 批量拉取全部远端 payload（替代逐份 pull）。
     remote_raw: dict[tuple[str, str], bytes] = {}
     try:
         for remote_entry in client.pull_all(token):
@@ -253,12 +322,11 @@ def sync_documents(token: str,
             except (ValueError, OSError):
                 continue      # 坏条目不入批量表，走单份接口兜底
     except SyncError as error:
-        # 批量接口失败时退回逐份 pull（remote_raw 为空，_pull 会按 raw=None 单拉）
         report.errors.append(str(error))
     for index, entry in enumerate(local_docs):
         if stop and stop():
             report.errors.append("已停止")
-            return report
+            return
         if on_progress:
             on_progress({"step": "documents", "detail": f"{index + 1}/{total_docs}"})
         key = (entry.label, entry.kind)
@@ -276,8 +344,6 @@ def sync_documents(token: str,
                 try:
                     _push(entry, token, raw, sha256, remote["sha256"], report)
                 except SyncConflict:
-                    # 本机 mtime 较新但云端又先写入了（竞态）：云端赢，但本地这版
-                    # 是真实的独立改动，必须另存，否则改动静默丢失。
                     _pull(entry, token, report, keep_local=True, raw=batch_raw)
             else:
                 _pull(entry, token, report, raw=batch_raw)
@@ -285,7 +351,7 @@ def sync_documents(token: str,
             report.errors.append(f"{key}: 本地读取失败 {error}")
         except SyncError as error:
             report.errors.append(f"{key}: {error}")
-    # 远端有、本地没有的文档（另一台设备新建的用户/头像/全局定义）→ 下行
+    # 远端有、本地没有的文档 → 下行
     for (label, kind) in remote_by_key:
         if (label, kind) in seen:
             continue
@@ -297,9 +363,6 @@ def sync_documents(token: str,
                   raw=remote_raw.get((label, kind)))
         except SyncError as error:
             report.errors.append(f"{label}/{kind}: {error}")
-    # 不在这里打完成日志：唯一调用方（PC 账户对话框）会用 _CombinedReport
-    # 打一行覆盖四通道的汇总，内层再打一份纯重复；失败已逐条进 errors。
-    return report
 
 
 def _parse_utc(value: str) -> datetime:

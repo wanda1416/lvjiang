@@ -1,10 +1,9 @@
 """文档通道同步引擎：本地文件 ↔ 云端 documents，整文档后写覆盖 + 冲突另存。
 
 映射：{名}.loadouts.json → loadouts（插件 kind，经 registry 登记）；
-{名}.notes.json（便利贴）→ notes；profile.yaml → profile_yaml（账户级
-label __global__）；用户头像引用的 avatars/ 文件 → avatar。
-用户资料（users/{名}.json）**不走文档通道**——入服务端 account_users 表
-（见 users_sync.py），这里只读它引用的头像文件名。
+{名}.notes.json（便利贴）→ notes。
+用户资料与头像入服务端用户级数据（users_sync.py），profile.yaml 是定义走
+definition 专用通道（definition_sync.py）——文档通道只承载用户内容。
 
 胜负判定：同键 sha 不同时，云端 updated_at 与本地文件 mtime 比新；输的
 一版另存 ``<文件>.conflict-<时间戳>``。服务端只存当前版。
@@ -14,19 +13,15 @@ from __future__ import annotations
 import base64
 import gzip
 import hashlib
-import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from loguru import logger
 
-from ...constants import AVATARS_DIR, SESSION_CONFIG_DIR, USERS_DIR
-from ..user_config import is_valid_username
+from ...constants import SESSION_CONFIG_DIR, USERS_DIR
 from . import client, registry
 from .client import SyncConflict, SyncError
-
-GLOBAL_LABEL = "__global__"
 
 
 @dataclass
@@ -62,17 +57,14 @@ _CORE_SUFFIXES: tuple[tuple[str, str], ...] = (("notes", ".notes.json"),)
 _EXCLUDED_SUFFIXES: tuple[str, ...] = (".session.json",)
 
 
-def iter_local_documents(users_dir: Path = USERS_DIR,
-                         avatars_dir: Path = AVATARS_DIR,
-                         session_dir: Path = SESSION_CONFIG_DIR) -> list[LocalDocument]:
-    """枚举本机全部可同步文档；头像只取用户文档实际引用的文件。
+def iter_local_documents(users_dir: Path = USERS_DIR) -> list[LocalDocument]:
+    """枚举本机全部可同步文档（用户内容：notes 与插件 kind）。
 
     kind 判定顺序：core 固有后缀（``.notes.json``）→ 排除项（``.session.json``）
     → 插件经 registry 登记的后缀（最长匹配）→ 其余整文件即 ``user_doc``。
     core 只认自己拥有的语义，不认识任何插件领域词汇。
     """
     documents: list[LocalDocument] = []
-    avatars: set[str] = set()
     plugin_suffixes: list[tuple[str, str]] = sorted(
         registry.user_document_kinds().items(), key=lambda item: -len(item[1]))
     for path in sorted(users_dir.glob("*.json")):
@@ -87,24 +79,9 @@ def iter_local_documents(users_dir: Path = USERS_DIR,
             kind, suffix = matched
             documents.append(LocalDocument(name[:-len(suffix)], kind, path))
             continue
-        # 用户资料（{名}.json）已入服务端 account_users 表，不再作为文档上云；
-        # 这里只读它引用的头像文件名（头像二进制仍是文档）。
-        if not is_valid_username(path.stem):
-            logger.warning("[sync] 跳过未登记 kind 的文档：{}", path.name)
-            continue
-        try:
-            avatar = json.loads(path.read_text(encoding="utf-8")).get("avatar")
-        except (OSError, ValueError):
-            continue
-        if isinstance(avatar, str) and avatar:
-            avatars.add(avatar)
-    for filename in sorted(avatars):
-        path = avatars_dir / filename
-        if path.is_file():
-            documents.append(LocalDocument(filename, "avatar", path))
-    profile_yaml = session_dir / "profile.yaml"
-    if profile_yaml.is_file():
-        documents.append(LocalDocument(GLOBAL_LABEL, "profile_yaml", profile_yaml))
+        # 用户资料（{名}.json）与头像已入服务端 account_users / 其头像表；
+        # profile.yaml 是定义，走 definition 专用通道。文档通道只剩用户内容。
+        logger.warning("[sync] 跳过未登记 kind 的文档：{}", path.name)
     return documents
 
 
@@ -167,7 +144,6 @@ def _local_mtime(document: LocalDocument) -> datetime:
 
 def sync_documents(token: str,
                    users_dir: Path = USERS_DIR,
-                   avatars_dir: Path = AVATARS_DIR,
                    session_dir: Path = SESSION_CONFIG_DIR) -> SyncReport:
     """全量对账一次：本地枚举 + 远端 manifest，按键做后写覆盖；失败逐条记账不中断。"""
     report = SyncReport()
@@ -179,7 +155,7 @@ def sync_documents(token: str,
         report.errors.append(str(error))
         return report
     seen: set[tuple[str, str]] = set()
-    for entry in iter_local_documents(users_dir, avatars_dir, session_dir):
+    for entry in iter_local_documents(users_dir):
         key = (entry.label, entry.kind)
         seen.add(key)
         remote = remote_by_key.get(key)
@@ -207,7 +183,7 @@ def sync_documents(token: str,
     for (label, kind) in remote_by_key:
         if (label, kind) in seen:
             continue
-        document: LocalDocument | None = _document_for_remote(label, kind, users_dir, avatars_dir, session_dir)
+        document: LocalDocument | None = _document_for_remote(label, kind, users_dir, session_dir)
         if document is None:
             continue
         try:
@@ -223,13 +199,9 @@ def _parse_utc(value: str) -> datetime:
 
 
 def _document_for_remote(label: str, kind: str,
-                         users_dir: Path, avatars_dir: Path,
+                         users_dir: Path,
                          session_dir: Path) -> LocalDocument | None:
     """远端独有文档的本地落点；反推不出物理路径（如空 label）时跳过。"""
-    if kind == "profile_yaml":
-        return LocalDocument(label, kind, session_dir / "profile.yaml")
-    if kind == "avatar":
-        return LocalDocument(label, kind, avatars_dir / label)
     if kind == "notes":
         return LocalDocument(label, kind, users_dir / f"{label}.notes.json")
     # 插件登记的 kind：按登记的后缀落盘；未登记（本机没加载该插件）→ 不落，

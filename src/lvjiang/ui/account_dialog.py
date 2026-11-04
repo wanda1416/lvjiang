@@ -241,11 +241,15 @@ class AccountHolder(QObject):
 
         def action():
             from ..core.profile.snapshot_sync import sync_all
+            from ..core.sync.definition_sync import sync_definition
             from ..core.sync.users_sync import sync_users
+            definition_report = sync_definition(token)
             users_report = sync_users(token)
             document_report = sync_documents(token)
             profile_report = sync_all(token, allow_overwrite=allow_overwrite)
-            return _CombinedReport(document_report, profile_report, users_report)
+            report = _CombinedReport(document_report, profile_report, users_report)
+            report.errors.extend(definition_report.errors)
+            return report
 
         return self._start(action, "sync")
 

@@ -74,7 +74,6 @@ def env(tmp_path, monkeypatch):
 
 def _sync(env):
     return engine.sync_documents("t", users_dir=env["dirs"]["users"],
-                                 avatars_dir=env["dirs"]["avatars"],
                                  session_dir=env["dirs"]["session"])
 
 
@@ -90,7 +89,7 @@ def test_unregistered_plugin_document_not_uploaded_as_user_doc(monkeypatch) -> N
             directory.mkdir()
         (users / "蔡元君.json").write_text('{"username": "蔡元君"}', encoding="utf-8")
         (users / "蔡元君.loadouts.json").write_text("{}", encoding="utf-8")
-        documents = engine.iter_local_documents(users, avatars, session)
+        documents = engine.iter_local_documents(users)
     assert [(d.label, d.kind) for d in documents] == []   # 纯资料文件不入文档通道
 
 
@@ -119,22 +118,20 @@ def test_stale_local_pull_makes_no_conflict_copy(env) -> None:
     assert not any(".conflict-" in p.name for p in users.iterdir())
 
 
-def test_user_profile_not_pushed_as_document_but_avatar_is(env) -> None:
-    """用户资料入 account_users 表（users_sync），文档通道只带它引用的头像。"""
+def test_user_profile_and_avatar_not_in_document_channel(env) -> None:
+    """资料入 account_users、头像入用户级头像表、定义走 definition——文档通道全都不带。"""
     users = env["dirs"]["users"]
     (users / "蔡元君.json").write_text(json.dumps({
         "username": "蔡元君", "avatar": "avatar_a.png",
-        "attributes": {"level": 60}, "ui_state": {"equip_filter": ["x"]}}, ensure_ascii=False),
-        encoding="utf-8")
+        "attributes": {"level": 60}}, ensure_ascii=False), encoding="utf-8")
     (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
     (env["dirs"]["avatars"] / "avatar_a.png").write_bytes(b"\x89PNG")
     (env["dirs"]["session"] / "profile.yaml").write_text("quota: []\n", encoding="utf-8")
     _sync(env)
     kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
-    assert ("蔡元君", "user_doc") not in kinds          # 资料不走文档
-    assert ("蔡元君", "loadouts") in kinds
-    assert ("avatar_a.png", "avatar") in kinds           # 引用的头像照常
-    assert ("__global__", "profile_yaml") in kinds
+    assert ("蔡元君", "loadouts") in kinds               # 用户内容照常
+    assert ("avatar_a.png", "avatar") not in kinds       # 头像已退出文档通道
+    assert ("__global__", "profile_yaml") not in kinds   # 定义已退出文档通道
 
 
 def test_remote_only_user_doc_left_alone(env) -> None:
@@ -174,22 +171,12 @@ def test_push_conflict_falls_back_to_remote_win(env, monkeypatch) -> None:
     assert report.pulled == ["蔡元君/notes"]
 
 
-def test_avatar_pushed_raw_binary_and_remote_only_pulled(env) -> None:
-    avatar = bytes([0, 255, 137, 80, 78, 71])
-    (env["dirs"]["avatars"] / "avatar_a.png").write_bytes(avatar)
-    (env["dirs"]["users"] / "蔡元君.json").write_text(json.dumps({
-        "username": "蔡元君", "avatar": "avatar_a.png"}, ensure_ascii=False),
-        encoding="utf-8")
-    report = _sync(env)
-    push = next(p for p in env["fake"].pushes if p["kind"] == "avatar")
-    assert base64.b64decode(push["payload_base64"]) == avatar  # 不 gzip
-    assert not any(p["kind"] == "user_doc" for p in env["fake"].pushes)
-    # 远端独有头像（另一台设备上传）→ 下行到本地
-    remote_avatar = bytes([1, 2, 3])
+def test_document_channel_has_no_avatar_kind(env) -> None:
+    """头像不再作为文档 kind 存在：远端遗留的 avatar 文档不下行也不落本地。"""
     env["fake"].docs[("avatar_b.png", "avatar")] = {
         "sha256": "abc", "size": 3, "zipped": False,
-        "payload": base64.b64encode(remote_avatar).decode(),
+        "payload": base64.b64encode(bytes([1, 2, 3])).decode(),
         "updated_at": "2099-01-01T00:00:00Z"}
     report = _sync(env)
-    assert (env["dirs"]["avatars"] / "avatar_b.png").read_bytes() == remote_avatar
-    assert "avatar_b.png/avatar" in report.pulled
+    assert report.pulled == []
+    assert not (env["dirs"]["avatars"] / "avatar_b.png").exists()

@@ -168,6 +168,12 @@ def _inbound_bytes(document: LocalDocument, payload: bytes) -> bytes | None:
     return plain.encode("utf-8")
 
 
+def _is_plain_legacy_note(raw: bytes) -> bool:
+    """远端便利贴字节是否仍是 legacy 明文（未套 E2E 封装）。"""
+    from ..account.e2e import is_encrypted_text
+    return not is_encrypted_text(raw.decode("utf-8", "replace"))
+
+
 def _pull(document: LocalDocument, token: str, report: SyncReport,
           *, keep_local: bool = False) -> None:
     """把云端版本落到本地。``keep_local`` 为真时先把本地版另存为冲突副本。
@@ -181,6 +187,11 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
     raw = base64.b64decode(remote["payload_base64"])
     if remote.get("zipped"):
         raw = gzip.decompress(raw)
+    # E2E 迁移判定必须看**远端原始字节**：远端是 legacy 明文才需要重推密文；
+    # 远端本来就是密文时，解密后的 payload 恒为明文，不能再按 payload 判定，
+    # 否则每次同步都把 19 份便利贴重新上推一遍。
+    remote_was_plaintext = (document.kind == "notes"
+                            and not _is_plain_legacy_note(raw))
     payload = _inbound_bytes(document, raw)
     if payload is None:
         # 密文但本机解不开（改密后旧数据等）：保留本地明文，不制造冲突副本
@@ -196,9 +207,9 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
     # 密文推上去，否则会卡死在「明文 sha 相同 → 跳过推送」的循环里，明文
     # 永远留在云端（首次切换 E2E 时每个 notes 文档都会撞上）。
     if document.kind == "notes":
-        from ..account.e2e import current_key, encrypt_text, is_encrypted_text
+        from ..account.e2e import current_key, encrypt_text
         e2e_key = current_key()
-        if e2e_key is not None and not is_encrypted_text(payload.decode("utf-8", "replace")):
+        if e2e_key is not None and remote_was_plaintext:
             encrypted = encrypt_text(e2e_key, payload.decode("utf-8")).encode("utf-8")
             _push(document, token, encrypted,
                   hashlib.sha256(encrypted).hexdigest(), None, report)

@@ -74,6 +74,12 @@ def _write_roster(tmp, names: list[str]) -> None:
         json.dumps({"users": names, "other": 1}, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _write_user(users, name: str, attributes: dict) -> None:
+    (users / f"{name}.json").write_text(
+        json.dumps({"attributes": attributes}, ensure_ascii=False) + "\n",
+        encoding="utf-8")
+
+
 def _roster(tmp) -> list[str]:
     return json.loads((tmp / "session.json").read_text(encoding="utf-8"))["users"]
 
@@ -81,6 +87,7 @@ def _roster(tmp) -> list[str]:
 def test_first_push_sets_order_and_signature(env) -> None:
     tmp, users = env["tmp"], env["users"]
     _write_roster(tmp, ["楚湘菱", "蔡元君"])
+    _write_user(users, "楚湘菱", {"level": 50})
     (users / "蔡元君.json").write_text(json.dumps({
         "attributes": {"level": 60}, "ui_state": {"filter": ["x"]}}, ensure_ascii=False),
         encoding="utf-8")
@@ -99,8 +106,10 @@ def test_unchanged_roster_pushes_without_reordering_cloud(env) -> None:
 
     内容签名一致时推送整个跳过（连请求都不发），比「发了但 order_changed=false」
     更进一步：无变化时不产生任何云端写入。"""
-    tmp, server = env["tmp"], env["server"]
+    tmp, users, server = env["tmp"], env["users"], env["server"]
     _write_roster(tmp, ["甲", "乙"])
+    _write_user(users, "甲", {"level": 1})
+    _write_user(users, "乙", {"level": 2})
     users_sync.sync_users("t")                              # 建立签名 甲,乙
     # 云端被另一台设备排成 乙,甲
     server.rows["乙"]["position"], server.rows["甲"]["position"] = 0, 1
@@ -115,8 +124,11 @@ def test_unchanged_roster_pushes_without_reordering_cloud(env) -> None:
 
 def test_local_reorder_propagates(env) -> None:
     """本地主动排序 → order_changed=true → 云端采用本地顺序。"""
-    tmp, server = env["tmp"], env["server"]
+    tmp, users, server = env["tmp"], env["users"], env["server"]
     _write_roster(tmp, ["甲", "乙", "丙"])
+    _write_user(users, "甲", {"level": 1})
+    _write_user(users, "乙", {"level": 2})
+    _write_user(users, "丙", {"level": 3})
     users_sync.sync_users("t")
     _write_roster(tmp, ["丙", "甲", "乙"])                   # 用户手动重排
     users_sync.sync_users("t")
@@ -142,11 +154,42 @@ def test_pull_merges_profile_preserving_local_ui_state(env) -> None:
     assert report.pulled == 1
 
 
-def test_unknown_remote_user_profile_not_written(env) -> None:
-    tmp, server = env["tmp"], env["server"]
+def test_remote_only_user_is_created_locally(env) -> None:
+    """云端有、本地没有的用户，下行时直接创建本地资料文件并纳入名册。"""
+    tmp, users, server = env["tmp"], env["users"], env["server"]
     _write_roster(tmp, ["甲"])
-    server.rows["陌生人"] = {"position": 0, "data": {"attributes": {}},
-                            "updated_at": "T"}
+    _write_user(users, "甲", {"level": 1})
+    server.rows["陌生人"] = {"position": 1,
+                            "data": {"attributes": {"level": 9}}, "updated_at": "T"}
     report = users_sync.sync_users("t")
-    assert not (env["users"] / "陌生人.json").exists()
-    assert report.pulled == 0
+    assert (users / "陌生人.json").exists()
+    assert report.pulled == 1
+    assert _roster(tmp) == ["甲", "陌生人"]
+
+
+def test_fresh_device_adopts_cloud_roster_and_creates_files(env) -> None:
+    """全新实例（空名册）同步后必须把云端用户完整拉回本地（0.15.10 修复）。"""
+    tmp, users, server = env["tmp"], env["users"], env["server"]
+    _write_roster(tmp, [])
+    server.rows["甲"] = {"position": 0,
+                        "data": {"attributes": {"level": 60}}, "updated_at": "T"}
+    server.rows["乙"] = {"position": 1,
+                        "data": {"attributes": {"level": 70}}, "updated_at": "T"}
+    report = users_sync.sync_users("t")
+    assert report.pulled == 2
+    assert _roster(tmp) == ["甲", "乙"]
+    assert json.loads((users / "甲.json").read_text(encoding="utf-8")) \
+        ["attributes"]["level"] == 60
+
+
+def test_missing_user_file_not_pushed_as_empty(env) -> None:
+    """名册有名字但本地没有资料文件：不上行空资料，只从云端补回（防 LWW 清空）。"""
+    tmp, users, server = env["tmp"], env["users"], env["server"]
+    _write_roster(tmp, ["甲"])
+    server.rows["甲"] = {"position": 0,
+                        "data": {"attributes": {"level": 99}}, "updated_at": "T"}
+    report = users_sync.sync_users("t")
+    assert server.pushes == []
+    assert report.pulled == 1
+    local = json.loads((users / "甲.json").read_text(encoding="utf-8"))
+    assert local["attributes"]["level"] == 99

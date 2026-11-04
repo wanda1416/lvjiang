@@ -511,6 +511,16 @@ class AccountSession:
         return self._authorized("POST", "/api/devices/revoke",
                                 {"instance_id": device_id})
 
+    def sync_state(self) -> dict:
+        """云端同步数据概况（各通道计数与是否为空），初始同步前判定用。"""
+        return self._authorized("POST", "/api/sync/state", {})
+
+    def clear_sync(self, password: str) -> dict:
+        """清空云端同步数据（验密码）；本地水位由调用方重置。"""
+        if not password:
+            raise AccountError("请输入密码")
+        return self._authorized("POST", "/api/sync/clear", {"password": password})
+
     def _authorized(self, method: str, route: str, data: dict | None = None) -> dict:
         if not self.access_token:
             raise AccountError("尚未登录")

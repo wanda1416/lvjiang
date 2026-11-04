@@ -136,7 +136,7 @@ class _CombinedReport:
         """各通道 ``(名称, 上行, 下行, 失败)``。"""
         rows = [(tr("定义"), 0, 0, 0)]
         if self.users is not None:
-            rows.append((tr("名册"), self._count(self.users.pushed),
+            rows.append((tr("用户"), self._count(self.users.pushed),
                          self._count(self.users.pulled), len(self.users.errors)))
         rows.append((tr("文档"), self._count(self.documents.pushed),
                      self._count(self.documents.pulled), len(self.documents.errors)))
@@ -285,8 +285,7 @@ class AccountHolder(QObject):
                 self.apply(None)
             else:
                 self.apply(result)
-                if not self.sync_attempted:
-                    self.sync_async()          # 登录成功后自动同步一次
+                # 登录成功不再自动同步：同步必须先经「初始同步」建立状态
         else:
             self.operation_finished.emit(False, result)
 
@@ -328,7 +327,11 @@ class AccountHolder(QObject):
 
         ``auto=True`` 表示由分钟节拍自动触发：覆盖确认弹窗与红字报错被抑制
         （半夜的例行同步不该弹窗吵人），结果仍进表格与日志。
+        未建立同步状态（没做过初始同步）时不执行——这是硬门禁。
         """
+        from ..core.sync.initial import sync_established
+        if not sync_established():
+            return False
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
         if not token:
@@ -356,6 +359,39 @@ class AccountHolder(QObject):
             return report
 
         return self._start(action, "sync")
+
+    def initial_sync_async(self) -> bool:
+        """初始同步：一次性建立本实例的同步状态（云端空则上传+建快照，
+        云端有数据则备份本地三件套后拉远端）。"""
+        from ..core.sync.initial import initial_sync
+        token = self.session.access_token
+        if not token:
+            return False
+        self.sync_attempted = True
+        self.last_sync_auto = False
+        self._sync_cancel.clear()
+
+        def action():
+            def progress(data):
+                self.sync_progress.emit(dict(data))
+            return initial_sync(token, on_progress=progress,
+                                stop=self._sync_cancel.is_set)
+
+        return self._start(action, "sync")
+
+    def clear_sync_async(self, password: str) -> bool:
+        """清除同步：清空云端同步数据 + 本机水位与状态，回到未建立。"""
+        from ..core.sync.initial import clear_local_sync_state, set_sync_established
+
+        def action():
+            self.session.clear_sync(password)
+            clear_local_sync_state()
+            set_sync_established(False)
+            self.last_sync_report = None
+            self.last_sync_at = ""
+            return self.session.summary()
+
+        return self._start(action, "operation")
 
     def cancel_sync(self) -> None:
         """请求停止当前同步：步骤间与批次间协作式检查。"""
@@ -500,20 +536,33 @@ class AccountManagerDialog(QDialog):
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
 
-        self.sync_table = QTableWidget(4, 5)
+        self.sync_table = QTableWidget(4, 6)
         self.sync_table.setHorizontalHeaderLabels(
-            [tr("通道"), tr("进度"), tr("上行"), tr("下行"), tr("失败")])
-        _tune_table(self.sync_table, fixed={2: 72, 3: 72, 4: 72},
+            [tr("通道"), tr("进度"), tr("上行"), tr("下行"), tr("失败"), tr("功能")])
+        _tune_table(self.sync_table, fixed={2: 72, 3: 72, 4: 72, 5: 104},
                     row_height=36, stretch_column=1)
-        for row, name in enumerate((tr("定义"), tr("名册"), tr("文档"), tr("总览"))):
+        for row, name in enumerate((tr("定义"), tr("用户"), tr("文档"), tr("总览"))):
             item = QTableWidgetItem(name)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.sync_table.setItem(row, 0, item)
-            for column in (1, 2, 3, 4):
+            for column in (1, 2, 3, 4, 5):
                 cell = QTableWidgetItem("—")
                 cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(row, column, cell)
+        # 只有总览行有「创建快照」，其余三行功能列留白。
+        snapshot_host = QWidget()
+        snap_layout = QHBoxLayout(snapshot_host)
+        snap_layout.setContentsMargins(4, 0, 4, 0)
+        snap_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.snapshot_button = QPushButton(tr("创建快照"))
+        apply_button_style(self.snapshot_button, variant="neutral")
+        self.snapshot_button.setToolTip(tr(
+            "把本机当前全部角色数据上传为云端总览基线。\n"
+            "初始同步会自动创建一次；之后需要时手动点。"))
+        self.snapshot_button.clicked.connect(self._refresh_snapshot)
+        snap_layout.addWidget(self.snapshot_button)
+        self.sync_table.setCellWidget(3, 5, snapshot_host)
         sync_layout.addWidget(self.sync_table, stretch=1)
 
         # 错误行：只在真失败时出现，其余时候不占位。
@@ -523,47 +572,38 @@ class AccountManagerDialog(QDialog):
         self.sync_error.setVisible(False)
         sync_layout.addWidget(self.sync_error)
 
-        self._step_rows = {tr("定义"): 0, tr("名册"): 1, tr("文档"): 2, tr("总览"): 3}
+        self._step_rows = {tr("定义"): 0, tr("用户"): 1, tr("文档"): 2, tr("总览"): 3}
         # 同步层发的 step 是英文键（definition/roster/documents/overview），
         # 表格行键是中文通道名——不映射的话进度列永远对不上行
         self._step_key_rows = {"definition": self._step_rows[tr("定义")],
-                               "roster": self._step_rows[tr("名册")],
+                               "roster": self._step_rows[tr("用户")],
                                "documents": self._step_rows[tr("文档")],
                                "overview": self._step_rows[tr("总览")]}
+
+        # 行内状态（正在同步…／最近同步时间）
+        self.sync_status = QLabel()
+        self.sync_status.setStyleSheet("color: palette(mid); font-size: 12px;")
+
+        sync_actions = QHBoxLayout()
+        # 同一个按钮位：未建立 → 初始同步；已建立 → 清除同步（危险红）
+        self.initial_clear_button = QPushButton(tr("初始同步"))
+        apply_button_style(self.initial_clear_button)
+        self.initial_clear_button.setToolTip(tr(
+            "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n"
+            "用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"))
+        self.initial_clear_button.clicked.connect(self._initial_or_clear)
+        sync_actions.addWidget(self.initial_clear_button)
+        sync_actions.addSpacing(12)
+        sync_actions.addWidget(self.sync_status)
+        sync_actions.addStretch()
         self.stop_sync_button = QPushButton(tr("停止"))
         apply_button_style(self.stop_sync_button, variant="neutral")
         self.stop_sync_button.setFixedWidth(72)
         self.stop_sync_button.clicked.connect(self.holder.cancel_sync)
         self.stop_sync_button.setVisible(False)
-
-        # 行内状态（正在同步…／最近同步时间）：跟着「清除同步」放一行，
-        # 不再单独占一行把底部撑高——同步结束固定显示最近时间，用户才能
-        # 确认点过的「立即同步」到底跑没跑。
-        self.sync_status = QLabel()
-        self.sync_status.setStyleSheet("color: palette(mid); font-size: 12px;")
-
-        sync_actions = QHBoxLayout()
-        # 左：危险操作（清除同步）；右：常规操作（刷新快照、立即同步）
-        self.clear_sync_button = QPushButton(tr("清除同步"))
-        apply_button_style(self.clear_sync_button, variant="danger")
-        self.clear_sync_button.setToolTip(
-            tr("清除本地同步进度（远端水位/本机水位/快照编号），不动本地数据；"
-               "换账号或云端重建后使用"))
-        self.clear_sync_button.clicked.connect(self._clear_sync)
-        sync_actions.addWidget(self.clear_sync_button)
-        sync_actions.addSpacing(12)
-        sync_actions.addWidget(self.sync_status)
-        sync_actions.addStretch()
-        self.snapshot_button = QPushButton(tr("刷新快照"))
-        apply_button_style(self.snapshot_button, variant="neutral")
-        self.snapshot_button.setToolTip(tr(
-            "把本机当前全部角色数据上传为云端基线。\n"
-            "新设备接入、或云端被重建后需要先做一次；日常同步不用点。"))
-        self.snapshot_button.clicked.connect(self._refresh_snapshot)
         self.sync_button = QPushButton(tr("立即同步"))
         apply_button_style(self.sync_button)
         self.sync_button.clicked.connect(self._sync_now)
-        sync_actions.addWidget(self.snapshot_button)
         sync_actions.addWidget(self.stop_sync_button)
         sync_actions.addWidget(self.sync_button)
         sync_layout.addLayout(sync_actions)
@@ -716,6 +756,8 @@ class AccountManagerDialog(QDialog):
                     item.setText(str(data[key] or 0))
 
     def _render_sync(self) -> None:
+        from ..core.sync.initial import sync_established
+        established = sync_established()
         report = self.holder.last_sync_report
         if self.holder.syncing:
             self._set_sync_note(tr("正在同步…"))
@@ -733,9 +775,17 @@ class AccountManagerDialog(QDialog):
             self._fill_sync_table(None)
             self.sync_error.setVisible(False)
         running = self.holder.syncing or self.holder.busy
-        self.sync_button.setEnabled(not running)
-        self.clear_sync_button.setEnabled(not running)
-        self.snapshot_button.setEnabled(not running and self.holder.summary is not None)
+        self.sync_button.setEnabled(established and not running)
+        self.sync_button.setToolTip(
+            "" if established else tr("请先点「初始同步」建立同步状态"))
+        self.initial_clear_button.setEnabled(not running
+                                             and self.holder.summary is not None)
+        apply_button_style(self.initial_clear_button,
+                           variant="danger" if established else "action")
+        self.initial_clear_button.setText(
+            tr("清除同步") if established else tr("初始同步"))
+        self.snapshot_button.setEnabled(established and not running
+                                        and self.holder.summary is not None)
         self.stop_sync_button.setVisible(self.holder.syncing)
 
     def _fill_sync_table(self, rows: list[tuple[str, int | None, int | None, int | None]] | None) -> None:
@@ -746,7 +796,7 @@ class AccountManagerDialog(QDialog):
         """
         if not rows:
             rows = [(name, None, None, None)
-                    for name in (tr("定义"), tr("名册"), tr("文档"), tr("总览"))]
+                    for name in (tr("定义"), tr("用户"), tr("文档"), tr("总览"))]
         for name, pushed, pulled, failed in rows:
             row = self._step_rows.get(name)
             if row is None:
@@ -768,14 +818,17 @@ class AccountManagerDialog(QDialog):
                 self.sync_table.setItem(row, column, item)
 
     def _render_report(self, report) -> None:
-        """统一渲染两种报告：完整同步是 _CombinedReport，刷新快照走 sync
-        通道的是裸 ProfileSyncReport——后者适配成单行总览通道数据。"""
-        if hasattr(report, "rows"):
-            rows = report.rows()
+        """统一渲染报告：完整同步是 _CombinedReport（rows() 方法），初始同步
+        是 InitialSyncReport（rows 属性），刷新快照是裸 ProfileSyncReport。"""
+        rows_method = getattr(report, "rows", None)
+        if callable(rows_method):
+            rows = rows_method()
             errors = report.distinct_errors()
         else:
-            rows = [(tr("总览"), report.pushed, report.pulled, len(report.errors))]
-            errors = [str(e) for e in report.errors if str(e).strip()]
+            rows = getattr(report, "rows", None) or [
+                (tr("总览"), report.pushed, report.pulled, len(report.errors))]
+            errors = [str(e) for e in getattr(report, "errors", [])
+                      if str(e).strip()]
         self._fill_sync_table(rows)
         if errors:
             shown = errors[:2]
@@ -859,22 +912,45 @@ class AccountManagerDialog(QDialog):
         self.holder.change_password_async(old_password, new_password)
 
     def _sync_now(self) -> None:
+        from ..core.sync.initial import sync_established
+        if not sync_established():
+            self._set_sync_note(tr("请先点「初始同步」建立同步状态"))
+            return
         if self.holder.sync_async():
             self._render_sync()
 
-    def _clear_sync(self) -> None:
-        """用户显式清除本地同步进度。同步发现进度异常时也引导到这里，不自动改。"""
-        from ..core.profile.snapshot_sync import clear_sync_state
+    def _initial_or_clear(self) -> None:
+        from ..core.sync.initial import sync_established
+        if sync_established():
+            self._clear_sync()
+        elif self.holder.initial_sync_async():
+            self._render_sync()
 
-        answer = QMessageBox.question(
-            self, tr("清除同步"),
-            tr("清除本地同步进度后，下次同步会重新从云端快照开始。本地数据不会被删除。"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No)
-        if answer != QMessageBox.StandardButton.Yes:
+    def _clear_sync(self) -> None:
+        """清空云端同步数据 + 本机同步状态；红色警告 + 密码确认。"""
+        field = PasswordField(self)
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("清除同步"))
+        form = QFormLayout(dialog)
+        warning = QLabel(tr(
+            "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n"
+            "此操作不可恢复；本地数据不会被删除。"))
+        warning.setStyleSheet("color: #c62828;")
+        form.addRow(warning)
+        form.addRow(tr("密码"), field.widget())
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        clear_sync_state()
-        self._set_sync_note(tr("已清除本地同步进度。点「立即同步」重新建立。"))
+        password = field.editor.text()
+        if not password:
+            self._set_sync_note(tr("请输入密码"))
+            return
+        self._set_sync_note(tr("正在清除同步…"))
+        self.holder.clear_sync_async(password)
 
     def _refresh_snapshot(self) -> None:
         """把本机当前 profile 值作为新快照上传，绑到最新远端 history id。
@@ -897,6 +973,7 @@ class AccountManagerDialog(QDialog):
             if not auto:
                 self._set_sync_note(str(result), error=True)
             return
+        self._reload_users()
         pending = getattr(getattr(result, "profile", result), "pending", None) or []
         if pending:
             if auto:
@@ -905,6 +982,16 @@ class AccountManagerDialog(QDialog):
                     tr("检测到云端覆盖待确认；点「立即同步」处理。"))
             else:
                 self._confirm_overwrite(pending)
+
+    def _reload_users(self) -> None:
+        """同步拉回用户后让主窗口的用户管理器重读名册（不刷新则列表仍是旧快照）。"""
+        parent = self.parent()
+        manager = getattr(parent, "user_manager", None)
+        if manager is not None and hasattr(manager, "reload"):
+            try:
+                manager.reload()
+            except Exception:  # noqa: BLE001 - 刷新失败不能把同步结果判死
+                logger.warning("同步后刷新用户管理器失败", exc_info=True)
 
     def _confirm_overwrite(self, pending: list[dict]) -> None:
         """非初始设备：必须显式确认才会覆盖本地数据（覆盖前自动整份备份）。"""

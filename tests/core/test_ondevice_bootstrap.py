@@ -45,13 +45,15 @@ def phone(tmp_path, monkeypatch):
     return session
 
 
-def test_never_synced_phone_has_default_user_empty_database_and_can_start_task(phone, monkeypatch):
+def test_never_synced_phone_has_no_user_until_created_then_can_start_task(phone, monkeypatch):
     status = offline.configuration_status()
     assert status["ready"] and not status["synced"]
-    assert status["execution_username"] == "default" and status["layout"] == "android"
-    assert json.loads(task_runner.list_users())["users"] == ["default"]
+    assert status["execution_username"] == "" and status["layout"] == "android"
+    assert json.loads(task_runner.list_users())["users"] == []
     with closing(sqlite3.connect(phone / "profile.db")) as db:
         assert db.execute("SELECT COUNT(*) FROM profile_entries").fetchone() == (0,)
+    assert json.loads(user_settings.create_user("first"))["ok"]
+    assert get_interface_store().get_active("user") == "first"
     task = {"id": "sample", "name": "Sample", "parameters": [], "class": ""}
     monkeypatch.setattr(task_runner, "_resolve_task", lambda _id: task)
     monkeypatch.setattr(task_runner, "_build_source", lambda *_: "collect $result = 1")
@@ -67,17 +69,17 @@ def test_never_synced_phone_has_default_user_empty_database_and_can_start_task(p
     assert json.loads(task_runner.start_task("sample"))["ok"]
     task_runner._STATE._thread.join(2)
     assert task_runner._STATE.snapshot()["state"] == "done"
-    assert engine.run_username == "default"
+    assert engine.run_username == "first"
 
 
 def test_phone_user_creation_and_attributes_do_not_switch_execution_user_or_overwrite_parameters(phone):
     assert json.loads(user_settings.create_user("second"))["ok"]
-    assert get_interface_store().get_active("user") == "default"
+    assert get_interface_store().get_active("user") == "second"
     set_user_workflow_params("second", "task", {"keep": True})
     assert json.loads(user_settings.save_attributes("second", '{"角色":"示例"}', "{}"))["ok"]
     assert json.loads(user_settings.get_user("second"))["attributes"] == {"角色": "示例"}
     assert get_user_workflow_params("second", "task") == {"keep": True}
-    assert get_interface_store().get_active("user") == "default"
+    assert get_interface_store().get_active("user") == "second"
     task_runner._STATE.begin("sample", "Sample")
     assert not json.loads(user_settings.create_user("third"))["ok"]
     assert not json.loads(user_settings.save_attributes("second", "{}", "{}"))["ok"]

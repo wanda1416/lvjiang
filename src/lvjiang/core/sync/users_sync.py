@@ -82,11 +82,12 @@ def _set_roster(names: list[str]) -> bool:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return False
+        data = {}
     if not isinstance(data, dict):
-        return False
+        data = {}
     data["users"] = names
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
                         encoding="utf-8")
     except OSError as error:
@@ -142,41 +143,45 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
         from ..account.e2e import current_key, encrypt_json
         e2e_key = current_key()
         payload = []
-        for position, name in enumerate(roster):
+        position = 0
+        for name in roster:
             path = users_dir / f"{name}.json"
-            data: dict = {}
-            if path.is_file():
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                    data.pop("ui_state", None)      # 界面偏好永不上云
-                except (OSError, ValueError):
-                    data = {}
+            if not path.is_file():
+                # 名册里有名字但没有资料文件：不推空资料。空 data + 新时间戳会
+                # 被服务端 LWW 当成更新，把云端真实属性冲成空对象。
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                data.pop("ui_state", None)      # 界面偏好永不上云
+            except (OSError, ValueError):
+                data = {}
             # 基础属性端到端加密：本地明文 → 上云密文（封装对象按原样透传）。
             # 无密钥（未登录窗口/异常）则退回明文，读取端按 legacy 处理。
             cloud_data = encrypt_json(e2e_key, data) if e2e_key and data else data
             payload.append({"username": name, "position": position,
-                            "updated_at": _mtime_iso(path) if path.is_file()
-                              else datetime.now().isoformat(timespec="seconds"),
+                            "updated_at": _mtime_iso(path),
                             "data": cloud_data})
+            position += 1
         # 内容签名：名册顺序 + 各用户资料都没变 → 本次推送整个跳过。
         # 签名基于**上云形态**（密文），改密换钥后密文必变 → 自动触发全量重推。
         # 否则每次同步都全量发 19 行、D1 白写几十行配额，界面还恒显「上行 19」。
-        content_sig = hashlib.sha256(json.dumps(
-            payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-        if not order_changed and content_sig == state.get("content_sig"):
-            pass                                   # 无变化：跳过推送
-        else:
-            try:
-                response = post("/api/sync/users/push",
-                                {"users": payload, "order_changed": order_changed}, token)
-                # 服务端回报真实变更行数（新增/资料更新/顺序变更），
-                # 没变就是 0，不再把「发了多少行」当「上行了多少」。
-                report.pushed = int(response.get("changed", len(payload)))
-                state["content_sig"] = content_sig
-                _save_sync_state(state)
-                _prog("已推送", pushed=report.pushed)
-            except SyncError as error:
-                report.errors.append(f"上行失败: {error}")
+        if payload:
+            content_sig = hashlib.sha256(json.dumps(
+                payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+            if not order_changed and content_sig == state.get("content_sig"):
+                pass                                   # 无变化：跳过推送
+            else:
+                try:
+                    response = post("/api/sync/users/push",
+                                    {"users": payload, "order_changed": order_changed}, token)
+                    # 服务端回报真实变更行数（新增/资料更新/顺序变更），
+                    # 没变就是 0，不再把「发了多少行」当「上行了多少」。
+                    report.pushed = int(response.get("changed", len(payload)))
+                    state["content_sig"] = content_sig
+                    _save_sync_state(state)
+                    _prog("已推送", pushed=report.pushed)
+                except SyncError as error:
+                    report.errors.append(f"上行失败: {error}")
 
     try:
         _prog("拉取")
@@ -205,7 +210,14 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
             data = decrypted
         path = users_dir / f"{name}.json"
         if not path.is_file():
-            continue                          # 本地没有该用户：资料等名册引入后再落
+            # 本地没有该用户：直接用云端资料落盘创建（无 ui_state 可保留）。
+            # 全新实例 / 初始同步备份后都要靠这条把远端用户补回本地。
+            merged = {**data}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8")
+            report.pulled += 1
+            continue
         try:
             local = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -221,16 +233,21 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
                             encoding="utf-8")
             report.pulled += 1
 
-    # 顺序落地：远端顺序重排本地名册，本地独有名字 append。
-    # 本地刚排过序（order_changed）时以本地为准：云端已被本次推送改写。
-    remote_order = [row.get("username") for row in remote_users
-                    if isinstance(row.get("username"), str)]
-    if order_changed:
+    # 顺序落地：远端顺序为准，本地独有名字 append。本地刚排过序（签名存在且
+    # 与当前名册不同）时以本地为准——云端已被本次推送改写。首次同步（无签名）
+    # 与常规同步都要采用远端顺序，并把远端新增用户纳入本地。
+    from ..user_config import is_valid_username
+    remote_order: list[str] = []
+    for row in remote_users:
+        name = row.get("username")
+        if isinstance(name, str) and is_valid_username(name) and name not in remote_order:
+            remote_order.append(name)
+    if signature is not None and order_changed:
         final_order = roster
     else:
-        final_order = ([name for name in remote_order if name in local_roster]
-                       + [name for name in local_roster if name not in remote_order]
-                       ) if remote_order and local_roster else local_roster
+        final_order = (remote_order + [name for name in local_roster
+                                       if name not in remote_order]
+                       ) if remote_order else local_roster
     if final_order and final_order != local_roster:
         if _set_roster(final_order):
             report.reordered = True

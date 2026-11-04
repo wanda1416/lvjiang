@@ -336,13 +336,17 @@ class UserConfigManager:
         self._active_user = active if isinstance(active, str) else ""
         if self._active_user and self._active_user not in self._users:
             self._active_user = ""
-        if not self._users:
-            self._create_default_user()
+        # 名册为空就保持空：新实例必须创建用户或登录同步，不允许自动造 default。
         # actives 没记录（或记的名字已不在名册）时，界面第一行就是当前用户。
         # 不兜底就会分裂：顶部照常展示第一个用户，而只认 get_active_user_name()
         # 的备战方案、装备页拿到空用户名，读 users/*.loadouts.json 自然为空。
         if not self._active_user and self._users:
             self._active_user = next(iter(self._users))
+
+    def reload(self) -> None:
+        """从磁盘重读名册（初始同步拉回用户后调用）；仍有效的当前用户保留。"""
+        self._users.clear()
+        self._load()
 
     def _save_order(self) -> None:
         from .config.interface import get_interface_store
@@ -355,14 +359,6 @@ class UserConfigManager:
 
     def _save_user(self, user: User) -> None:
         save_user_metadata(user, self._users_dir)
-
-    def _create_default_user(self) -> None:
-        user = User(name="default", created_at=datetime.now().isoformat())
-        self._users[user.name] = user
-        self._active_user = user.name
-        self._save_user(user)
-        self._save_order()
-        logger.info("已创建默认用户")
 
     def list_users(self) -> list[str]:
         return list(self._users)
@@ -379,6 +375,8 @@ class UserConfigManager:
             user = User(name=name, created_at=datetime.now().isoformat())
             self._save_user(user)
         self._users[name] = user
+        if not self._active_user:
+            self._active_user = name           # 首个用户自动成为当前用户
         self._save_order()
         logger.info(f"用户已{'恢复' if restored else '创建'}: {name}")
         return True
@@ -396,7 +394,7 @@ class UserConfigManager:
         return True
 
     def reorder_users(self, names: list[str]) -> bool:
-        if len(names) != len(self._users) or set(names) != set(self._users):
+        if not names or len(names) != len(self._users) or set(names) != set(self._users):
             return False
         self._users = {name: self._users[name] for name in names}
         self._save_order()

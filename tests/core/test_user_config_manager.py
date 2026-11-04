@@ -125,6 +125,7 @@ class TestUserConfigManagerCRUD:
 
         monkeypatch.setattr(constants, "USERS_DIR", tmp_path)
         mgr = UserConfigManager()
+        mgr.create_user("用户甲")
         mgr.create_user("待删除")
         mgr.update_user_attributes("待删除", {"account": "保留账号"})
         repo = UserNotesRepository("待删除")
@@ -147,7 +148,8 @@ class TestUserConfigManagerCRUD:
     def test_user_metadata_reuses_user_occupancy_without_document_lock(self, session_env):
         from lvjiang.core.fs_util import lock_root
 
-        UserConfigManager()
+        manager = UserConfigManager()
+        manager.create_user("用户A")
 
         # 用户数据目录里不再出现任何锁文件；执行租约统一落在 session/.locks。
         assert not (session_env.parent / "users/.lock").exists()
@@ -158,18 +160,32 @@ class TestUserConfigManagerCRUD:
 
     def test_delete_last_user_rejected(self, session_env):
         mgr = UserConfigManager()
-        # 默认只有一个用户
-        assert mgr.delete_user("default") is False
-        assert "default" in mgr.list_users()
+        mgr.create_user("唯一用户")
+        assert mgr.delete_user("唯一用户") is False
+        assert "唯一用户" in mgr.list_users()
+
+    def test_empty_roster_creates_no_default_user(self, session_env):
+        """新实例空名册不得自动创建 default（0.15.10 起）。"""
+        import json
+
+        from lvjiang import constants
+        constants.USERS_DIR.mkdir(parents=True, exist_ok=True)
+        session_env.write_text(json.dumps({"users": []}), encoding="utf-8")
+        reset_session_store()
+        mgr = UserConfigManager()
+        assert mgr.list_users() == []
+        assert mgr.get_active_user_name() == ""
+        assert not (constants.USERS_DIR / "default.json").exists()
 
     def test_delete_active_user_switches(self, session_env):
         mgr = UserConfigManager()
+        mgr.create_user("用户A")
         mgr.create_user("用户B")
         mgr.set_active_user("用户B")
         mgr.delete_user("用户B")
         # 激活用户应切换到剩余用户
         active = mgr.get_active_user_name()
-        assert active != "用户B"
+        assert active == "用户A"
         assert active in mgr.list_users()
 
     def test_reorder_users_success(self, session_env):
@@ -201,7 +217,8 @@ class TestUserConfigManagerCRUD:
 
     def test_avatar_filename_persists_and_rejects_unsafe_paths(self, session_env):
         mgr = UserConfigManager()
-        name = mgr.get_active_user_name()
+        mgr.create_user("头像用户")
+        name = "头像用户"
         assert mgr.set_user_avatar(name, "avatar_0123456789abcdef.png") is True
         assert mgr.get_user(name).avatar == "avatar_0123456789abcdef.png"
         assert mgr.set_user_avatar(name, "../escape.png") is False
@@ -230,7 +247,8 @@ class TestUserConfigManagerCRUD:
         import lvjiang.core.user_config as user_config
 
         mgr = UserConfigManager()
-        name = mgr.get_active_user_name()
+        mgr.create_user("头像用户")
+        name = "头像用户"
         monkeypatch.setattr(
             user_config, "mutate_user_metadata",
             lambda *_args: (_ for _ in ()).throw(OSError("disk full")))
@@ -261,7 +279,8 @@ class TestUserConfigManagerCRUD:
 
     def test_disjoint_updates_from_two_managers_merge(self, session_env):
         first = UserConfigManager()
-        name = first.get_active_user_name()
+        first.create_user("合并用户")
+        name = "合并用户"
         first.update_user_attributes(name, {"role": "原角色"})
         second = UserConfigManager()
 
@@ -275,7 +294,8 @@ class TestUserConfigManagerCRUD:
 
     def test_generic_attribute_editor_can_add_change_and_delete_keys(self, session_env):
         mgr = UserConfigManager()
-        name = mgr.get_active_user_name()
+        mgr.create_user("属性用户")
+        name = "属性用户"
         mgr.update_user_attributes(name, {"custom_a": "1", "custom_b": "2"})
         baseline = dict(mgr.get_user(name).attributes)
 
@@ -295,17 +315,18 @@ class TestUserConfigManagerCRUD:
         )
 
         mgr = UserConfigManager()
+        mgr.create_user("用户甲")
         mgr.create_user("待删除")
         group = BatchConfigItem(
-            name="日常", usernames=["default", "待删除"],
-            default_usernames=["default", "待删除"])
+            name="日常", usernames=["用户甲", "待删除"],
+            default_usernames=["用户甲", "待删除"])
         save_batch_config(BatchConfig(configs={group.id: group}))
 
         assert mgr.delete_user("待删除")
         restored = load_batch_config().by_name("日常")
         assert restored is not None
-        assert restored.usernames == ["default"]
-        assert restored.default_usernames == ["default"], (
+        assert restored.usernames == ["用户甲"]
+        assert restored.default_usernames == ["用户甲"], (
             "默认勾选里也不能留下已删除的用户")
 
 

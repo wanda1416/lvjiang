@@ -43,7 +43,9 @@ def sync_definition(token: str, yaml_path: Path | None = None,
     state = profile_sync_state()
 
     if not yaml_path.is_file():
-        return report          # 本地无定义（罕见）：不做任何事，等配置生成
+        # 本地无定义（初始同步备份后 / 全新实例）：从远端拉回并重载 schema。
+        _pull_to_local(token, yaml_path, report)
+        return report
 
     local_sha = _local_sha256(yaml_path)
     if local_sha == state.get("definition_sha"):

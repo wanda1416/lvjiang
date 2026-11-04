@@ -84,20 +84,15 @@ _stable_instance_id_cache: str | None = None
 
 
 def _instance_id_path() -> Path:
-    """实例出生文件位置：必须在「会被重建/删除的路径」之外。
+    """实例出生文件位置：``config/session/instance.id``。
 
-    - Android：``filesDir/instance.id``（离线包只重建 ``filesDir/lvjiang``，
-      重建范围之外才保得住）；
-    - PC：``config/instance.id``（没有离线包重建，但账号态 account.json
-      可能被删除重建，兄弟文件不受影响）。
+    config/session 是运行态目录——随客户端整体压缩/解压/移动，身份跟着
+    走；删 account.json 等账号态文件不影响它。不做任何旧位置迁移：文件
+    由部署时直接摆放，代码只认这一个路径。
     """
-    import sys
+    from ...constants import SESSION_CONFIG_DIR
 
-    from ...constants import PROJECT_ROOT
-
-    if hasattr(sys, "getandroidapilevel"):
-        return PROJECT_ROOT.parent / "instance.id"
-    return PROJECT_ROOT / "config" / "instance.id"
+    return SESSION_CONFIG_DIR / "instance.id"
 
 
 def stable_instance_id() -> str:

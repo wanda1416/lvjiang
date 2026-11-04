@@ -9,9 +9,11 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime
 
 from loguru import logger
-from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -30,23 +32,47 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.account import AccountError, AccountSession
+from ..core.account import ACCOUNT_SERVICE, AccountError, AccountSession
 from ..i18n import tr
 from .button_styles import apply_button_style
 
 
+def _eye_icon(visible: bool) -> QIcon:
+    """密码框的小眼睛图标：睁眼（可见）/ 闭眼（隐藏）。
+
+    QStyle 没有内置眼睛图标，字体图标又依赖系统字体，直接画两枚位图最稳。
+    """
+    pixmap = QPixmap(20, 20)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    pen = QPen(painter.pen())
+    pen.setWidthF(1.4)
+    painter.setPen(pen)
+    if visible:
+        # 睁眼：眼眶椭圆 + 瞳孔
+        painter.drawEllipse(2, 5, 16, 10)
+        painter.setBrush(painter.pen().brush())
+        painter.drawEllipse(8, 8, 4, 4)
+    else:
+        # 闭眼：一条下弯弧线
+        painter.drawArc(2, 6, 16, 10, 30 * 16, 120 * 16)
+    painter.end()
+    return QIcon(pixmap)
+
+
 class PasswordField:
-    """密码输入框 + 「显示」切换按钮；widget() 返回可直接进表单的容器。"""
+    """密码输入框 + 眼睛图标切换按钮；widget() 返回可直接进表单的容器。"""
 
     def __init__(self, parent=None):
         self.editor = QLineEdit()
         self.editor.setEchoMode(QLineEdit.EchoMode.Password)
         self.toggle = QToolButton(self.editor)
-        self.toggle.setText(tr("显示"))
+        self.toggle.setIcon(_eye_icon(False))
         self.toggle.setCheckable(True)
         self.toggle.setAutoRaise(True)
-        self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.toggle.setFixedWidth(40)
+        self.toggle.setFixedWidth(28)
+        self.toggle.setToolTip(tr("显示密码"))
         self.toggle.toggled.connect(self._toggle_echo)
         self.host = QWidget(parent)
         row = QHBoxLayout(self.host)
@@ -58,7 +84,8 @@ class PasswordField:
     def _toggle_echo(self, visible: bool) -> None:
         self.editor.setEchoMode(
             QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password)
-        self.toggle.setText(tr("隐藏") if visible else tr("显示"))
+        self.toggle.setIcon(_eye_icon(visible))
+        self.toggle.setToolTip(tr("隐藏密码") if visible else tr("显示密码"))
 
     def widget(self) -> QWidget:
         return self.host
@@ -125,6 +152,16 @@ class _CombinedReport:
                 seen.append(text)
         return seen
 
+    def describe(self) -> str:
+        """日志用一行摘要：各通道 上行/下行/失败。"""
+        parts = [f"{name} 上行{up} 下行{down}" + (f" 失败{fail}" if fail else "")
+                 for name, up, down, fail in self.rows()]
+        text = "，".join(parts)
+        distinct = self.distinct_errors()
+        if distinct:
+            text += f"；失败 {len(distinct)} 项（{distinct[0]}…）"
+        return text
+
 
 class AccountHolder(QObject):
     """应用级登录态与后台任务持有者：共享一个 AccountSession，缓存状态。
@@ -145,9 +182,22 @@ class AccountHolder(QObject):
         self.done = False
         self.sync_attempted = False
         self.last_sync_report = None
+        #: 最近一次同步**成功**的时刻——对话框跨开关期间保留，落「最近同步时间」
+        self.last_sync_at: str = ""
+        #: 最近一轮同步是否由分钟节拍自动触发——抑制覆盖确认弹窗与红字报错
+        self.last_sync_auto = False
         self._worker: _AccountWorker | None = None
         self._sync_worker: _AccountWorker | None = None
+        self._beat_worker: _AccountWorker | None = None
         self._sync_cancel = threading.Event()
+        # 登录期间两条独立节拍：每分钟自动同步一轮上推新数据；每 10 分钟
+        # 心跳一次刷新设备在线（在线窗口 20 分钟，容错两跳，避免无谓消耗）。
+        self._sync_timer = QTimer(self)
+        self._sync_timer.setInterval(60_000)
+        self._sync_timer.timeout.connect(lambda: self.sync_async(auto=True))
+        self._heartbeat_timer = QTimer(self)
+        self._heartbeat_timer.setInterval(600_000)
+        self._heartbeat_timer.timeout.connect(self._on_heartbeat)
 
     # ─── 状态 ───────────────────────────────────────────
 
@@ -162,7 +212,32 @@ class AccountHolder(QObject):
     def apply(self, summary: dict | None) -> None:
         self.done = True
         self.summary = summary
+        for timer in (self._sync_timer, self._heartbeat_timer):
+            if summary:
+                timer.start()
+            else:
+                timer.stop()
         self.changed.emit(summary)
+
+    # ─── 心跳 ─────────────────────────────────────────
+
+    def _on_heartbeat(self) -> None:
+        """每 10 分钟一跳：仅刷新设备活跃与探测会话健康（同步由独立分钟节拍负责）。"""
+        if self.summary is None or self._beat_worker is not None:
+            return
+
+        def beat_done(ok: bool, result, worker: _AccountWorker) -> None:
+            if self._beat_worker is worker:
+                self._beat_worker = None
+            if not ok and isinstance(result, AccountError) \
+                    and result.code == "token_expired":
+                self.apply(None)              # 登录态已死，停止节拍并回登录页
+
+        worker = _AccountWorker(self.session.heartbeat)
+        worker.completed.connect(beat_done)
+        worker.finished.connect(worker.deleteLater)
+        self._beat_worker = worker
+        worker.start()
 
     # ─── 后台任务 ───────────────────────────────────────
 
@@ -186,6 +261,7 @@ class AccountHolder(QObject):
         if kind == "sync":
             if ok:
                 self.last_sync_report = result
+                self.last_sync_at = datetime.now().strftime("%H:%M:%S")
                 describe = getattr(result, "describe", None)
                 logger.info("[account] 同步完成：{}", describe() if describe else result)
             else:
@@ -235,13 +311,18 @@ class AccountHolder(QObject):
             return self.session.summary()
         return self._start(action, "operation")
 
-    def sync_async(self, allow_overwrite: bool = False) -> bool:
-        """一轮完整同步（用户表 + 文档通道 + 总览账本）；同一时刻只跑一份。"""
+    def sync_async(self, allow_overwrite: bool = False, *, auto: bool = False) -> bool:
+        """一轮完整同步（用户表 + 文档通道 + 总览账本）；同一时刻只跑一份。
+
+        ``auto=True`` 表示由分钟节拍自动触发：覆盖确认弹窗与红字报错被抑制
+        （半夜的例行同步不该弹窗吵人），结果仍进表格与日志。
+        """
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
         if not token:
             return False
         self.sync_attempted = True
+        self.last_sync_auto = auto
 
         self._sync_cancel.clear()
 
@@ -345,23 +426,19 @@ class AccountManagerDialog(QDialog):
         head_row.addWidget(self.logout_button)
         layout.addLayout(head_row)
 
-        # 一行临时反馈（正在登录…／登录失败）：空时不占位，不常驻任何状态数字。
+        # 一行临时反馈（正在登录…／登录失败）：固定在对话框左下角，空时不占位。
         self.status = QLabel()
         self.status.setWordWrap(True)
         self.status.setStyleSheet("color: #c62828; font-size: 12px;")
         self.status.setVisible(False)
-        layout.addWidget(self.status)
 
         # ════ 未登录：居中的紧凑登录卡（不摊满整个对话框） ════
+        # 对话框标题已是「账户管理」，卡内不再重复「账户登录」标题。
         self.form_host = QWidget()
         outer = QVBoxLayout(self.form_host)
         outer.addStretch(2)
         card = QVBoxLayout()
         card.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        title = QLabel(tr("账户登录"))
-        title.setStyleSheet("font-size: 17px; font-weight: 600;")
-        title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        card.addWidget(title)
         subtitle = QLabel(tr("登录后可同步角色名册、文档与总览数据"))
         subtitle.setStyleSheet("color: palette(mid); font-size: 12px;")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -374,19 +451,25 @@ class AccountManagerDialog(QDialog):
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.login_input = QLineEdit()
-        self.login_input.setPlaceholderText(tr("账户名（由管理员创建）"))
+        self.login_input.setPlaceholderText(tr("账户"))
         self.password_field = PasswordField()
         self.password_field.editor.setPlaceholderText(tr("密码"))
         self.password_field.editor.returnPressed.connect(self._login)
-        form.addRow(tr("账户名"), self.login_input)
+        form.addRow(tr("账户"), self.login_input)
         form.addRow(tr("密码"), self.password_field.widget())
         self.login_button = QPushButton(tr("登录"))
         apply_button_style(self.login_button)
         self.login_button.setMinimumWidth(120)
         self.login_button.clicked.connect(self._login)
+        register_button = QPushButton(tr("注册"))
+        apply_button_style(register_button)
+        register_button.setMinimumWidth(120)
+        register_button.setToolTip(tr("在浏览器中打开注册页面"))
+        register_button.clicked.connect(self._open_register_page)
         button_row = QHBoxLayout()
         button_row.addStretch()
         button_row.addWidget(self.login_button)
+        button_row.addWidget(register_button)
         button_row.addStretch()
         form.addRow(button_row)
         card.addWidget(form_body)
@@ -428,17 +511,18 @@ class AccountManagerDialog(QDialog):
         self.sync_error.setVisible(False)
         sync_layout.addWidget(self.sync_error)
 
-        # 临时状态（正在同步…）：空文本不占位。
-        self.sync_caption = QLabel()
-        self.sync_caption.setStyleSheet("color: palette(mid); font-size: 12px;")
-        self.sync_caption.setVisible(False)
-        sync_layout.addWidget(self.sync_caption)
-
         self._step_rows = {tr("定义"): 0, tr("名册"): 1, tr("文档"): 2, tr("总览"): 3}
         self.stop_sync_button = QPushButton(tr("停止"))
+        apply_button_style(self.stop_sync_button, variant="neutral")
         self.stop_sync_button.setFixedWidth(72)
         self.stop_sync_button.clicked.connect(self.holder.cancel_sync)
         self.stop_sync_button.setVisible(False)
+
+        # 行内状态（正在同步…／最近同步时间）：跟着「清除同步」放一行，
+        # 不再单独占一行把底部撑高——同步结束固定显示最近时间，用户才能
+        # 确认点过的「立即同步」到底跑没跑。
+        self.sync_status = QLabel()
+        self.sync_status.setStyleSheet("color: palette(mid); font-size: 12px;")
 
         sync_actions = QHBoxLayout()
         # 左：危险操作（清除同步）；右：常规操作（刷新快照、立即同步）
@@ -449,6 +533,8 @@ class AccountManagerDialog(QDialog):
                "换账号或云端重建后使用"))
         self.clear_sync_button.clicked.connect(self._clear_sync)
         sync_actions.addWidget(self.clear_sync_button)
+        sync_actions.addSpacing(12)
+        sync_actions.addWidget(self.sync_status)
         sync_actions.addStretch()
         self.snapshot_button = QPushButton(tr("刷新快照"))
         apply_button_style(self.snapshot_button, variant="neutral")
@@ -483,6 +569,9 @@ class AccountManagerDialog(QDialog):
         device_actions.addStretch()
         device_layout.addLayout(device_actions)
         self.tabs.addTab(device_tab, tr("设备管理"))
+
+        # 临时反馈固定在对话框最底部一行（左下角），不插在内容中间漂移
+        layout.addWidget(self.status)
 
         self._connect(self.holder.changed, self._on_holder_changed)
         self._connect(self.holder.operation_finished, self._on_operation_failed)
@@ -536,7 +625,8 @@ class AccountManagerDialog(QDialog):
     def _render(self, summary: dict | None) -> None:
         self._set_busy(self.holder.busy)
         if summary is None:
-            self.account_label.setText(tr("未登录"))
+            # 未登录时头部不占位：登录卡本身就是状态，不写「未登录」占位文字
+            self.account_label.setText("")
         else:
             # 登录成功即清掉「正在登录…」——临时反馈不留在已就绪的界面上
             self._set_status("")
@@ -583,12 +673,13 @@ class AccountManagerDialog(QDialog):
             self.devices.setCellWidget(row, 3, host)
 
     def _set_sync_note(self, text: str, *, error: bool = False) -> None:
-        """同步页的临时反馈（正在同步…／失败原因）：空文本时两行都不占位。"""
+        """同步页反馈：失败原因进底部红字行；其余进按钮行的状态标签。"""
         if error:
             self.sync_error.setText(text)
             self.sync_error.setVisible(True)
-        self.sync_caption.setText(text if not error else "")
-        self.sync_caption.setVisible(bool(text) and not error)
+            return
+        self.sync_error.setVisible(False)
+        self.sync_status.setText(text)
 
     def _on_sync_progress(self, data: dict) -> None:
         """分步进度：进度列实时显示细节，上行/下行随批累加。"""
@@ -612,10 +703,15 @@ class AccountManagerDialog(QDialog):
             self._set_sync_note(tr("正在同步…"))
             self.sync_error.setVisible(False)
         elif report is not None:
-            self._set_sync_note("")               # 结果都在表格里，不留统计行
+            # 结果在表格里；状态标签固定显示最近同步时间，确认点过就跑过
+            self._set_sync_note(
+                tr("最近同步时间：{}").format(self.holder.last_sync_at)
+                if self.holder.last_sync_at else "")
             self._render_report(report)
         else:
-            self._set_sync_note("")
+            self._set_sync_note(
+                tr("最近同步时间：{}").format(self.holder.last_sync_at)
+                if self.holder.last_sync_at else "")
             self._fill_sync_table(None)
             self.sync_error.setVisible(False)
         running = self.holder.syncing or self.holder.busy
@@ -648,12 +744,12 @@ class AccountManagerDialog(QDialog):
 
     def _render_report(self, report) -> None:
         """统一渲染两种报告：完整同步是 _CombinedReport，刷新快照走 sync
-        通道的是裸 ProfileSyncReport——后者适配成单行 profile 通道数据。"""
+        通道的是裸 ProfileSyncReport——后者适配成单行总览通道数据。"""
         if hasattr(report, "rows"):
             rows = report.rows()
             errors = report.distinct_errors()
         else:
-            rows = [(tr("profile"), report.pushed, report.pulled, len(report.errors))]
+            rows = [(tr("总览"), report.pushed, report.pulled, len(report.errors))]
             errors = [str(e) for e in report.errors if str(e).strip()]
         self._fill_sync_table(rows)
         if errors:
@@ -677,7 +773,7 @@ class AccountManagerDialog(QDialog):
         login_name = self.login_input.text().strip()
         password = self.password_field.editor.text()
         if not login_name:
-            self._set_status(tr("请输入账户名"))
+            self._set_status(tr("请输入账户"))
             return
         if not password:
             self._set_status(tr("请输入密码"))
@@ -686,8 +782,16 @@ class AccountManagerDialog(QDialog):
         self.password_field.editor.clear()
         self.holder.login_async(login_name, password)
 
+    def _open_register_page(self) -> None:
+        """注册在网页端完成（自助注册），PC 只负责打开浏览器。"""
+        url = f"{ACCOUNT_SERVICE}/#/register"
+        if not QDesktopServices.openUrl(QUrl(url)):
+            # 兜底：Qt 的 ShellExecute 失败时（如权限上下文不一致），用标准库再试
+            import webbrowser
+            logger.warning(f"QDesktopServices.openUrl 失败，改用 webbrowser 打开注册页：{url}")
+            webbrowser.open(url)
+
     def _logout(self) -> None:
-        self._set_status(tr("正在退出…"))
         self.holder.logout_async()
 
     def _revoke_device(self, device_id: str) -> None:
@@ -705,7 +809,6 @@ class AccountManagerDialog(QDialog):
         self.holder.revoke_device_async(device_id)
 
     def _logout_all(self) -> None:
-        self._set_status(tr("正在退出所有设备…"))
         self.holder.logout_all_async()
 
     def _change_password(self) -> None:
@@ -763,12 +866,20 @@ class AccountManagerDialog(QDialog):
         if not self._alive():
             return
         self._render_sync()
+        auto = self.holder.last_sync_auto
         if not ok:
-            self._set_sync_note(str(result), error=True)
+            # 自动同步的失败只进日志，不刷红字（夜间断网不该满屏报错）
+            if not auto:
+                self._set_sync_note(str(result), error=True)
             return
         pending = getattr(getattr(result, "profile", result), "pending", None) or []
         if pending:
-            self._confirm_overwrite(pending)
+            if auto:
+                # 心跳自动同步不弹确认窗：提示用户手动处理即可
+                self._set_sync_note(
+                    tr("检测到云端覆盖待确认；点「立即同步」处理。"))
+            else:
+                self._confirm_overwrite(pending)
 
     def _confirm_overwrite(self, pending: list[dict]) -> None:
         """非初始设备：必须显式确认才会覆盖本地数据（覆盖前自动整份备份）。"""

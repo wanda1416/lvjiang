@@ -748,7 +748,7 @@ class RunControlMixin:
         self._fill_workflow_combo(cfg["id"])
         self._rebuild_param_panel()
         self._save_daily_config()
-        self.log_text.append(f"[加载] 已加载工作流: {cfg['name']}")
+        self.append_log(f"[加载] 已加载工作流: {cfg['name']}")
 
     def _get_selected_flow_config(self) -> dict | None:
         """获取当前选中的工作流配置"""
@@ -969,7 +969,7 @@ class RunControlMixin:
         if stored and idx < 0:
             # 上次选中的方案已被删除：说清楚，并把失效引用清掉。
             logger.warning(f"上次选中的方案 {stored} 已不存在，回到自定义")
-            self.log_text.append(tr("[提示] 上次选中的方案已不存在，已回到自定义"))
+            self.append_log(tr("[提示] 上次选中的方案已不存在，已回到自定义"))
             set_active_plan_id("")
         self._apply_selected_plan(persist=False)
 
@@ -1008,11 +1008,11 @@ class RunControlMixin:
             self.plan_combo.blockSignals(blocked)
             self._apply_selected_plan(persist=False)
             self._capture_launch_draft(target.id)
-            self.log_text.append(
+            self.append_log(
                 tr("[执行目标] 当前方案不适用，已自动切换到「{name}」").format(
                     name=candidate.name))
             return
-        self.log_text.append(tr("[提示] 没有适用于当前执行目标的方案，请配置连接方案"))
+        self.append_log(tr("[提示] 没有适用于当前执行目标的方案，请配置连接方案"))
 
     def _on_plan_changed(self, index: int):
         """方案下拉切换：选方案则填充并锁定三个选择器，选自定义则放开。"""
@@ -1026,7 +1026,7 @@ class RunControlMixin:
         if plan_id and plan is None:
             # 方案被删除但 actives.plan 还指着它：降级回自定义，别静默。
             logger.warning(f"方案 {plan_id} 已不存在，回到自定义")
-            self.log_text.append(tr("[提示] 选中的方案已不存在，已回到自定义"))
+            self.append_log(tr("[提示] 选中的方案已不存在，已回到自定义"))
             self.plan_combo.blockSignals(True)
             self.plan_combo.setCurrentIndex(0)
             self.plan_combo.blockSignals(False)
@@ -1041,7 +1041,7 @@ class RunControlMixin:
         missing = self._apply_plan_context(plan)
         if missing:
             logger.warning(f"方案「{plan.name}」引用了不存在的内容: {missing}")
-            self.log_text.append(
+            self.append_log(
                 tr("[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用").format(
                     name=plan.name, missing="、".join(missing)))
         self._set_context_controls_locked(LOCK_REASON_PLAN, True)
@@ -1107,7 +1107,7 @@ class RunControlMixin:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         hk = self._user_config.hotkeys
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
-            self.log_text.append(self._hotkey_status(
+            self.append_log(self._hotkey_status(
                 tr("[拒绝] 已有自动化在运行中，请等待结束"),
                 (hk.stop, tr("停止"))))
             self.statusBar().showMessage(self._hotkey_status(
@@ -1129,7 +1129,7 @@ class RunControlMixin:
                 self._refresh_run_button()
                 message = tr("窗口已消失或句柄失效，请重新定位")
                 self.statusBar().showMessage(message)
-                self.log_text.append(
+                self.append_log(
                     tr("[启动失败] {name}：{message}").format(
                         name=target.display_name, message=message))
                 report_start_failure(self, message, execution_scope)
@@ -1169,7 +1169,7 @@ class RunControlMixin:
         decision, run_context = self._run_manager.try_begin(
             target=target_snapshot, username=run_username, name=name)
         if run_context is None:
-            self.log_text.append(f"[拒绝] {decision.reason}")
+            self.append_log(f"[拒绝] {decision.reason}")
             self.statusBar().showMessage(decision.reason)
             report_start_failure(self, decision.reason, execution_scope)
             return False
@@ -1395,7 +1395,7 @@ class RunControlMixin:
         """报告启动前错误，但不因提示窗口禁用主界面。"""
         from PyQt6.QtWidgets import QMessageBox, QWidget
 
-        self.log_text.append(f"[错误] {message}")
+        self.append_log(f"[错误] {message}")
         report_start_failure(self, message, scope)
         logger.error(message)
         box = QMessageBox(
@@ -1487,7 +1487,7 @@ class RunControlMixin:
             self._confirm_stop_while_paused()
             return
         if not self._running:
-            self.log_text.append(tr("[提示] 当前没有正在运行的自动化"))
+            self.append_log(tr("[提示] 当前没有正在运行的自动化"))
             return
         if self._run_state == STATE_STOPPING:
             return
@@ -1509,7 +1509,7 @@ class RunControlMixin:
             pause_event = getattr(self, '_pause_event', None)
             if pause_event is not None:
                 pause_event.set()
-        self.log_text.append(tr("[操作] 收到停止请求"))
+        self.append_log(tr("[操作] 收到停止请求"))
         logger.info("收到停止请求")
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
         helper = (
@@ -1533,7 +1533,7 @@ class RunControlMixin:
             self._refresh_run_button()
             self._refresh_pause_button()
             self._overlay.set_color("red")
-            self.log_text.append(tr("[操作] 已停止"))
+            self.append_log(tr("[操作] 已停止"))
 
     def _confirm_stop_while_paused(self) -> None:
         """异步确认停止：不启动嵌套事件循环，主界面始终可操作。"""
@@ -1600,7 +1600,7 @@ class RunControlMixin:
         hk = self._user_config.hotkeys
         paused_status = self._hotkey_status(
             tr("暂停中..."), (hk.pause, tr("恢复")), (hk.stop, tr("停止")))
-        self.log_text.append(f"{tr('[操作] ')}{paused_status}")
+        self.append_log(f"{tr('[操作] ')}{paused_status}")
         self.statusBar().showMessage(paused_status)
         logger.info("工作流暂停中")
 
@@ -1631,7 +1631,7 @@ class RunControlMixin:
         hk = self._user_config.hotkeys
         paused_status = self._hotkey_status(
             tr("已暂停"), (hk.pause, tr("恢复")), (hk.stop, tr("停止")))
-        self.log_text.append(f"{tr('[操作] ')}{paused_status}")
+        self.append_log(f"{tr('[操作] ')}{paused_status}")
         self.statusBar().showMessage(paused_status)
         logger.info("工作流已暂停")
 
@@ -1651,7 +1651,7 @@ class RunControlMixin:
         self._refresh_pause_button()
         self._refresh_run_button()  # 广播 "running" 状态给插件 Tab
         hk = self._user_config.hotkeys
-        self.log_text.append(tr("[操作] 已恢复，继续执行..."))
+        self.append_log(tr("[操作] 已恢复，继续执行..."))
         self.statusBar().showMessage(self._hotkey_status(
             tr("已恢复"), (hk.pause, tr("暂停")), (hk.stop, tr("停止"))))
         logger.info("工作流已恢复")
@@ -1706,7 +1706,7 @@ class RunControlMixin:
             if target_id == self._execution_targets.active_target_id:
                 self._sync_active_target_compat()
                 self._refresh_run_button()
-            self.log_text.append(
+            self.append_log(
                 f"[警告] 非运行目标 {target.display_name} 已离线: {error_msg}")
             return
         from .execution_runs import RunState
@@ -1718,7 +1718,7 @@ class RunControlMixin:
             "[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；"
             "若无法恢复，请按 F10 停止任务后重新连接: {error}").format(
                 name=target.display_name, error=error_msg)
-        self.log_text.append(message)
+        self.append_log(message)
         self._show_connection_recovery_question(target, run_context, error_msg)
         if target_id != self._execution_targets.active_target_id:
             return
@@ -1774,7 +1774,7 @@ class RunControlMixin:
                 if answer == QMessageBox.StandardButton.Yes:
                     if target.resume_event is not None:
                         target.resume_event.set()
-                    self.log_text.append(tr("[操作] 重新检查设备连接"))
+                    self.append_log(tr("[操作] 重新检查设备连接"))
                 else:
                     run_context.stop_event.set()
                     if run_context.pause_event is not None:
@@ -1783,7 +1783,7 @@ class RunControlMixin:
                         target.resume_event.set()
                     self._run_manager.set_state(run_context.task_run_id, RunState.STOPPING)
                     self._emit_run_instance_state(run_context, RunState.STOPPING.value)
-                    self.log_text.append(tr("[操作] 停止等待恢复的设备任务"))
+                    self.append_log(tr("[操作] 停止等待恢复的设备任务"))
             box.deleteLater()
 
         def poll():
@@ -1830,7 +1830,7 @@ class RunControlMixin:
         if resume_event is not None:
             resume_event.set()
             self.statusBar().showMessage(tr("正在重新检查设备执行通道..."))
-            self.log_text.append(tr("[操作] 重新检查设备执行通道"))
+            self.append_log(tr("[操作] 重新检查设备执行通道"))
 
     # ─── 后端就绪判定 ──────────────────────────────────
 
@@ -1887,7 +1887,7 @@ class RunControlMixin:
         """
         message = tr("设备正在执行其他任务，本次未启动。\n\n{reason}").format(
             reason=reason)
-        self.log_text.append(f"[{tr('提示')}] {reason}")
+        self.append_log(f"[{tr('提示')}] {reason}")
         self.statusBar().showMessage(tr("设备正在执行其他任务"))
         QMessageBox.warning(cast(QWidget, self), tr("无法开始执行"), message)
 
@@ -1907,7 +1907,7 @@ class RunControlMixin:
         plan = self._selected_plan()
         message = tr("当前方案「{name}」不支持{mode}").format(
             name=plan.name if plan else "", mode=self._backend_label())
-        self.log_text.append(f"[{tr('错误')}] {message}")
+        self.append_log(f"[{tr('错误')}] {message}")
         self.statusBar().showMessage(message)
 
     # ─── 通用工作流执行 ────────────────────────────────────
@@ -1929,13 +1929,13 @@ class RunControlMixin:
         if not self._backend_ready():
             target = self._current_execution_target()
             if target is None:
-                self.log_text.append(tr("[错误] 请先连接并选择执行目标"))
+                self.append_log(tr("[错误] 请先连接并选择执行目标"))
                 self.statusBar().showMessage(tr("未连接 | 请先定位窗口或连接设备"))
             elif self._backend == "adb":
-                self.log_text.append(tr("[错误] 请先连接设备"))
+                self.append_log(tr("[错误] 请先连接设备"))
                 self.statusBar().showMessage(tr("未连接设备 | 请先扫描并连接设备"))
             else:
-                self.log_text.append(tr("[错误] 请先定位窗口"))
+                self.append_log(tr("[错误] 请先定位窗口"))
                 self.statusBar().showMessage(tr("未定位窗口 | 请先扫描窗口并点击定位"))
             return
 
@@ -1946,7 +1946,7 @@ class RunControlMixin:
 
         flow_cfg = flow_config if flow_config is not None else self._get_selected_flow_config()
         if flow_cfg is None:
-            self.log_text.append(tr("[错误] 请选择一个工作流"))
+            self.append_log(tr("[错误] 请选择一个工作流"))
             if feedback is not None:
                 feedback.show_failure(tr("请选择一个脚本"))
             return
@@ -1958,7 +1958,7 @@ class RunControlMixin:
             if current_env not in env_list:
                 message = tr("当前工作环境 {env} 不在该脚本支持的环境 {envs} 中").format(
                     env=current_env, envs=", ".join(env_list))
-                self.log_text.append(f"[错误] {message}")
+                self.append_log(f"[错误] {message}")
                 if feedback is not None:
                     feedback.show_failure(message)
                 return
@@ -1977,7 +1977,7 @@ class RunControlMixin:
 
         username = execution_username or self._execution_username_snapshot
         if not username:
-            self.log_text.append(tr("[错误] 请选择有效的执行用户"))
+            self.append_log(tr("[错误] 请选择有效的执行用户"))
             if feedback is not None:
                 feedback.show_failure(tr("请选择有效的执行用户"))
             return
@@ -1993,7 +1993,7 @@ class RunControlMixin:
         layout = self._layout_manager.load_layout(layout_name)
 
         if not layout:
-            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            self.append_log(f"[错误] 无法加载布局: {layout_name}")
             self._end_automation(flow_name)
             report_start_failure(self, tr("无法加载布局：{name}").format(name=layout_name))
             return
@@ -2063,10 +2063,10 @@ class RunControlMixin:
         if flow_config is None and hasattr(self, '_save_daily_config'):
             self._save_daily_config()
 
-        self.log_text.append(f"[开始] {flow_name} 流程...")
-        self.log_text.append(f"[执行用户] {username}")
+        self.append_log(f"[开始] {flow_name} 流程...")
+        self.append_log(f"[执行用户] {username}")
         if flow_params:
-            self.log_text.append(f"[参数] {flow_params}")
+            self.append_log(f"[参数] {flow_params}")
 
         # Python 代码工作流 vs DSL 工作流
         if wf_class_name:
@@ -2169,7 +2169,7 @@ class RunControlMixin:
 
         if isinstance(result_or_exception, BaseException):
             run_context.metadata["terminal_state"] = "failed"
-            self.log_text.append(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
+            self.append_log(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
             logger.error(f"{flow_name}流程异常退出: {result_or_exception}")
             result_path = self._save_workflow_result(flow_id, {
                 "error": str(result_or_exception),
@@ -2191,7 +2191,7 @@ class RunControlMixin:
                 worker.result_or_exception = result
             if isinstance(result, dict) and result.get("error"):
                 run_context.metadata["terminal_state"] = "failed"
-                self.log_text.append(f"[错误] {flow_name}: {result['error']}")
+                self.append_log(f"[错误] {flow_name}: {result['error']}")
                 logger.error(f"工作流 {flow_id} 启动被拒绝: {result['error']}")
                 result_path = self._save_workflow_result(
                     flow_id, result,
@@ -2206,7 +2206,7 @@ class RunControlMixin:
             if interrupted:
                 # 中途停止（F10）是常态（如自动调律），已收集的结果
                 # 照常落盘输出；仅不保存 session（中断点状态不完整）
-                self.log_text.append(f"[已停止] {flow_name}流程被用户中断")
+                self.append_log(f"[已停止] {flow_name}流程被用户中断")
             else:
                 # 正常结束 → 自动保存 session
                 self._auto_save_session(run_context)
@@ -2219,7 +2219,7 @@ class RunControlMixin:
                 result_path=result_path,
             )
             if not interrupted:
-                self.log_text.append(f"[完成] {flow_name} 结果已保存")
+                self.append_log(f"[完成] {flow_name} 结果已保存")
 
     @staticmethod
     def _finish_task_run(worker, **kwargs) -> None:
@@ -2279,10 +2279,10 @@ class RunControlMixin:
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"工作流结果保存失败，继续任务收尾: {exc}")
-            self.log_text.append(f"[警告] {flow_id} 结果 JSON 保存失败: {exc}")
+            self.append_log(f"[警告] {flow_id} 结果 JSON 保存失败: {exc}")
             return None
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {flow_id} → logs/output/{save_path.relative_to(OUTPUT_DIR)}")
+        self.append_log(f"[保存] {flow_id} → logs/output/{save_path.relative_to(OUTPUT_DIR)}")
         return save_path
 
     # ─── 运行按钮 ──────────────────────────────────────────
@@ -2358,7 +2358,7 @@ class RunControlMixin:
         decision = self._start_denial()
         if decision is None:
             return
-        self.log_text.append(f"[{tr('拒绝')}] {decision.reason}")
+        self.append_log(f"[{tr('拒绝')}] {decision.reason}")
         self.statusBar().showMessage(decision.reason)
 
     def _daily_start_reason(self) -> str:
@@ -2512,17 +2512,17 @@ class RunControlMixin:
             else self._user_manager.get_active_user_name()
         )
         if not username or username not in self._user_manager.list_users():
-            self.log_text.append(tr("[错误] 请选择有效的执行用户"))
+            self.append_log(tr("[错误] 请选择有效的执行用户"))
             report_start_failure(self, tr("请选择有效的执行用户"), impl_name)
             return
 
         if not self._backend_ready():
             if self._current_execution_target() is None:
-                self.log_text.append(tr("[错误] 请先连接并选择执行目标"))
+                self.append_log(tr("[错误] 请先连接并选择执行目标"))
             elif self._backend == "adb":
-                self.log_text.append(tr("[错误] 请先连接设备"))
+                self.append_log(tr("[错误] 请先连接设备"))
             else:
-                self.log_text.append(tr("[错误] 请先定位窗口"))
+                self.append_log(tr("[错误] 请先定位窗口"))
             return
 
         if not self._begin_automation(
@@ -2536,7 +2536,7 @@ class RunControlMixin:
         layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
-            self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
+            self.append_log(f"[错误] 无法加载布局: {layout_name}")
             self._end_automation(flow_name)
             report_start_failure(self, tr("无法加载布局：{name}").format(name=layout_name), impl_name)
             return

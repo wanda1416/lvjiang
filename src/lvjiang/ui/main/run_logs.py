@@ -3,6 +3,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
+
+#: UI 直写消息补的时间戳前缀，与 loguru sink 的
+#: ``{time:HH:mm:ss} | {level:<7} | `` 保持同一格式，两种来源在面板里混排
+#: 才不会一眼看出是谁写的。
+_UI_STAMP = "{time} | {level:<7} | "
+
+_LEVEL_TEXT = {
+    logging.DEBUG: "DEBUG",
+    logging.INFO: "INFO",
+    logging.WARNING: "WARNING",
+    logging.ERROR: "ERROR",
+}
 
 
 @dataclass(frozen=True)
@@ -28,6 +41,27 @@ class RunLogEvent:
         else:
             level = logging.INFO
         return cls(level, text, task_run_id, target_id, target_label)
+
+    @classmethod
+    def ui_message(
+        cls, text: str, *, task_run_id: str = "", target_id: str = "",
+        target_label: str = "",
+    ) -> "RunLogEvent":
+        """UI 代码直写的消息（log_text.append / notice.emit）。
+
+        这些消息不经过 loguru，面板里会缺时间戳与级别，与 logger 输出混排
+        时格式断裂；这里统一补上与 sink 相同的前缀。已有的 loguru 风格前缀
+        原样保留（重复补缀没有意义）。
+        """
+        if "| INFO" in text[:40] or "| WARNING" in text[:40] \
+                or "| ERROR" in text[:40] or "| DEBUG" in text[:40]:
+            return cls.from_text(text, task_run_id=task_run_id,
+                                 target_id=target_id, target_label=target_label)
+        stamp = _UI_STAMP.format(
+            time=datetime.now().strftime("%H:%M:%S"),
+            level=_LEVEL_TEXT.get(logging.INFO, "INFO"))
+        return cls.from_text(f"{stamp}{text}", task_run_id=task_run_id,
+                             target_id=target_id, target_label=target_label)
 
     def display_text(self) -> str:
         """返回实时合流视图使用的带目标标识文本。

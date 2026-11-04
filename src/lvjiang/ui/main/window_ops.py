@@ -585,7 +585,7 @@ class WindowOpsMixin:
         # 可空的，加守卫等于承认这里可能是 None，而实际上不可能。
         target = self._execution_targets.select(str(target_id))
         self._restore_active_target_view()
-        self.log_text.append(
+        self.append_log(
             tr("[执行目标] 已切换到 {name}").format(name=target.display_name))
 
     def _activate_connected_target(self, target, old) -> None:
@@ -717,7 +717,7 @@ class WindowOpsMixin:
         from ...core.platforms import DESKTOP_BACKEND_AVAILABLE
         if not DESKTOP_BACKEND_AVAILABLE:
             # 按钮在非 Windows 已隐藏，此处为防御：投屏模式依赖 Win32 API
-            self.log_text.append(tr("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」"))
+            self.append_log(tr("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」"))
             return
         self._apply_backend_ui("windows")
 
@@ -729,7 +729,7 @@ class WindowOpsMixin:
         self.window_combo.clear()
 
         if not self._scanned_windows:
-            self.log_text.append(tr("[错误] 未找到可见窗口"))
+            self.append_log(tr("[错误] 未找到可见窗口"))
             self.statusBar().showMessage(tr("未定位窗口 | 未找到可见窗口"))
             return
 
@@ -748,12 +748,12 @@ class WindowOpsMixin:
                 window = self._scanned_windows[match_index]
                 self.window_combo.setCurrentIndex(match_index)
                 self._on_locate_window()
-                self.log_text.append(
+                self.append_log(
                     f"[扫描] 已自动匹配窗口: {window['title']}（关键字: {keyword}）")
                 return
-            self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，未匹配到关键字「{keyword}」")
+            self.append_log(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，未匹配到关键字「{keyword}」")
         else:
-            self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
+            self.append_log(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
         self._set_locate_enabled(True)
         self.statusBar().showMessage(tr("已扫描窗口 | 请下拉选择目标窗口并点击定位"))
 
@@ -796,7 +796,7 @@ class WindowOpsMixin:
         self.window_combo.clear()
 
         if not devices:
-            self.log_text.append(tr("[提示] 未发现 USB 连接的 ADB 设备"))
+            self.append_log(tr("[提示] 未发现 USB 连接的 ADB 设备"))
             self.statusBar().showMessage(tr("未发现设备 | 可尝试局域网扫描"))
             # 弹出对话框询问是否扫描局域网
             self._ask_wireless_scan()
@@ -806,7 +806,7 @@ class WindowOpsMixin:
             label = d["serial"] + (f"  ({d['model']})" if d["model"] else "")
             self.window_combo.addItem(label, d)
         self._set_locate_enabled(True)
-        self.log_text.append(f"[扫描] 找到 {len(devices)} 台设备，请选择并点击连接")
+        self.append_log(f"[扫描] 找到 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(tr("已扫描设备 | 请选择设备并点击连接"))
 
     def _ask_wireless_scan(self):
@@ -888,12 +888,12 @@ class WindowOpsMixin:
         if mode == "local":
             self.btn_scan_device.setText(tr("扫描本机..."))
             self.statusBar().showMessage(tr("正在扫描本机模拟器..."))
-            self.log_text.append(tr("[扫描] 正在探测本机模拟器 ADB 端口..."))
+            self.append_log(tr("[扫描] 正在探测本机模拟器 ADB 端口..."))
         else:
             self.btn_scan_device.setText(tr("扫描局域网..."))
             self.statusBar().showMessage(tr("正在扫描局域网..."))
             scope = "全部网卡" if not subnets else "、".join(f"{s}0/24" for s in subnets)
-            self.log_text.append(f"[扫描] 正在扫描局域网 ADB 设备（{scope}）...")
+            self.append_log(f"[扫描] 正在扫描局域网 ADB 设备（{scope}）...")
 
         self._wait_device_thread()
         self._device_thread = QThread()
@@ -942,7 +942,7 @@ class WindowOpsMixin:
         if not devices:
             local_mode = getattr(self._device_worker, "_task", "") == "local_scan"
             if local_mode:
-                self.log_text.append(tr("[扫描] 本机未发现开放的模拟器 ADB 端口"))
+                self.append_log(tr("[扫描] 本机未发现开放的模拟器 ADB 端口"))
                 self.statusBar().showMessage(tr("未发现设备 | 请确认模拟器已启动"))
                 QMessageBox.warning(
                     self,  # type: ignore[arg-type]  # mixin: self is QWidget
@@ -953,7 +953,7 @@ class WindowOpsMixin:
                        "2. 模拟器已开启 ADB 调试"),
                 )
             else:
-                self.log_text.append(tr("[扫描] 局域网内未发现可连接的 ADB 设备"))
+                self.append_log(tr("[扫描] 局域网内未发现可连接的 ADB 设备"))
                 self.statusBar().showMessage(tr("未发现设备 | 请确认设备已开启无线调试"))
                 QMessageBox.warning(
                     self,  # type: ignore[arg-type]  # mixin: self is QWidget
@@ -971,7 +971,7 @@ class WindowOpsMixin:
             label = d["serial"] + (f"  ({d['model']})" if d.get("model") else "")
             self.window_combo.addItem(label, d)
         self._set_locate_enabled(True)
-        self.log_text.append(f"[扫描] 发现 {len(devices)} 台设备，请选择并点击连接")
+        self.append_log(f"[扫描] 发现 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(f"已发现 {len(devices)} 台设备 | 请选择并点击连接")
 
     def _on_wireless_scan_error(self, error_msg: str):
@@ -986,7 +986,7 @@ class WindowOpsMixin:
             except RuntimeError:
                 pass  # 对话框已被销毁
         logger.error(f"局域网扫描失败: {error_msg}")
-        self.log_text.append(f"[错误] 局域网扫描失败: {error_msg}")
+        self.append_log(f"[错误] 局域网扫描失败: {error_msg}")
         self.statusBar().showMessage(tr("扫描失败 | 详见日志"))
 
     def _on_scan_devices_error(self, error_msg: str):
@@ -995,7 +995,7 @@ class WindowOpsMixin:
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
         logger.error(f"扫描设备失败: {error_msg}")
-        self.log_text.append(f"[错误] 扫描设备失败: {error_msg}")
+        self.append_log(f"[错误] 扫描设备失败: {error_msg}")
         self.statusBar().showMessage(tr("扫描失败 | 详见日志"))
 
     def _on_connect_device(self):
@@ -1083,7 +1083,7 @@ class WindowOpsMixin:
             # 各自以为独占它；自动归并又可能把两台设备错当成一台。两者都不能
             # 猜，所以拦在前台应用探测、历史登记这些副作用之前。
             self._release_rejected_connection(capture, agent)
-            self.log_text.append(tr(
+            self.append_log(tr(
                 "[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的"
                 "「{name}」是同一台设备。请先断开该目标再连接。"
             ).format(serial=combo_data["serial"], name=conflict.display_name))
@@ -1128,7 +1128,7 @@ class WindowOpsMixin:
             app_info = record_connected_android(
                 device, width=w, height=h, target_id=target_id)
             if app_info.get("package"):
-                self.log_text.append(
+                self.append_log(
                     f"[应用识别] {app_info['package']}/{app_info['activity']}")
         except Exception as exc:  # noqa: BLE001 - 连接不应因前台应用探测失败而失败
             logger.warning(f"ADB 当前应用信息获取失败: {exc}")
@@ -1218,12 +1218,12 @@ class WindowOpsMixin:
         method_label = (
             (tr("端侧执行") if agent is not None else tr("指令执行"))
             + "  |  " + method_label)
-        self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
+        self.append_log(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
         if not identity.stable:
             logger.warning(
                 f"[连接] {combo_data['serial']} 读不到稳定设备标识，"
                 f"目标身份退化为连接地址")
-            self.log_text.append(tr(
+            self.append_log(tr(
                 "[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标"))
         hk = self._user_config.hotkeys
         self.statusBar().showMessage(self._hotkey_status(
@@ -1245,7 +1245,7 @@ class WindowOpsMixin:
             self, error_msg: str, *, update_candidate_ui: bool = True):
         """连接失败回调（主线程）"""
         logger.error(f"连接设备失败: {error_msg}")
-        self.log_text.append(f"[错误] 连接设备失败: {error_msg}")
+        self.append_log(f"[错误] 连接设备失败: {error_msg}")
         self.statusBar().showMessage(tr("连接失败 | 详见日志"))
         if update_candidate_ui:
             self.btn_locate.setText(tr("连接"))
@@ -1286,7 +1286,7 @@ class WindowOpsMixin:
         if target is None:
             return
         if self._target_has_active_run(target.id):
-            self.log_text.append(tr("[提示] 该目标正在执行任务，不能断开"))
+            self.append_log(tr("[提示] 该目标正在执行任务，不能断开"))
             return
         was_active = target.id == self._execution_targets.active_target_id
         self._abort_recording_for_target(target.id, tr("断开执行目标"))
@@ -1309,7 +1309,7 @@ class WindowOpsMixin:
             self._refresh_run_button()
         self.statusBar().showMessage(
             tr("已断开目标：{name}").format(name=target.display_name))
-        self.log_text.append(f"[断连] {target.display_name}")
+        self.append_log(f"[断连] {target.display_name}")
 
     def _refresh_or_reconnect_execution_target(self, target_id: str) -> None:
         """刷新窗口坐标，或重新建立指定 Android 目标。"""
@@ -1337,7 +1337,7 @@ class WindowOpsMixin:
                 self._refresh_run_button()
             message = tr("窗口已消失或句柄失效，请重新定位")
             self.statusBar().showMessage(message)
-            self.log_text.append(
+            self.append_log(
                 tr("[定位失效] {name}：{message}").format(
                     name=target.display_name, message=message))
             return
@@ -1378,7 +1378,7 @@ class WindowOpsMixin:
         self.statusBar().showMessage(
             tr("已刷新窗口位置") if marker_ok
             else tr("窗口位置已刷新，但红框移动失败"))
-        self.log_text.append(
+        self.append_log(
             tr("[定位刷新] {name} · {old} → {new} · {details}").format(
                 name=target.display_name, old=old_rect, new=new_rect,
                 details=self._target_details(target)))
@@ -1390,7 +1390,7 @@ class WindowOpsMixin:
         if target is None or target.kind != "windows" or target.window is None:
             return
         if self._target_has_active_run(target.id):
-            self.log_text.append(tr("[提示] 该目标正在执行任务，不能切换输入方式"))
+            self.append_log(tr("[提示] 该目标正在执行任务，不能切换输入方式"))
             return
         if not enabled:
             from ...core.desktop import WgcCapture
@@ -1414,7 +1414,7 @@ class WindowOpsMixin:
         if self._execution_targets.active_target_id == target_id:
             self._sync_active_target_compat()
         self._refresh_execution_targets_ui()
-        self.log_text.append(
+        self.append_log(
             tr("[模式] {name} 已切换到{mode}").format(
                 name=target.display_name,
                 mode=tr("后台输入") if enabled else tr("前台输入")))
@@ -1445,7 +1445,7 @@ class WindowOpsMixin:
         if target is None or target.kind != "windows" or target.window is None:
             return
         if self._target_has_active_run(target.id):
-            self.log_text.append(tr("[提示] 该目标正在执行任务，不能切换截图方式"))
+            self.append_log(tr("[提示] 该目标正在执行任务，不能切换截图方式"))
             return
         if enabled and not bool(
                 getattr(target.input_ctrl, "background_mode", False)):
@@ -1454,7 +1454,7 @@ class WindowOpsMixin:
         if enabled:
             available, reason = wgc_available()
             if not available:
-                self.log_text.append(tr("[截图] 后台截图不可用：") + reason)
+                self.append_log(tr("[截图] 后台截图不可用：") + reason)
                 return
         capture = WgcCapture() if enabled else DesktopCapture()
         window = target.window
@@ -1463,7 +1463,7 @@ class WindowOpsMixin:
         if isinstance(capture, WgcCapture) \
                 and not capture.attach_hwnd(window["hwnd"]):
             capture.stop()
-            self.log_text.append(tr("[截图] 后台截图启动失败，保留原截图方式"))
+            self.append_log(tr("[截图] 后台截图启动失败，保留原截图方式"))
             return
         old_capture = target.capture
         target.capture = capture
@@ -1488,13 +1488,13 @@ class WindowOpsMixin:
         if target is None or target.kind != "adb" or target.device is None:
             return
         if self._target_has_active_run(target.id):
-            self.log_text.append(tr("[提示] 该目标正在执行任务，不能切换截图方式"))
+            self.append_log(tr("[提示] 该目标正在执行任务，不能切换截图方式"))
             return
         method = "scrcpy" if enabled else "screencap"
         from ...core.android import AndroidStreamCapture, create_capture_backend
         capture = create_capture_backend(device=target.device, method=method)
         if not capture.start():
-            self.log_text.append(
+            self.append_log(
                 tr("[错误] {method} 截图后端不可用，保留原截图方式").format(
                     method=method))
             return
@@ -1554,7 +1554,7 @@ class WindowOpsMixin:
             return
         from .execution_targets import WINDOW_TARGET_ID
         if self._target_has_active_run(WINDOW_TARGET_ID):
-            self.log_text.append(
+            self.append_log(
                 tr("[提示] 窗口目标正在执行任务，不能重新定位"))
             return
         w = self.window_combo.currentData()
@@ -1563,7 +1563,7 @@ class WindowOpsMixin:
         if not self._refresh_window_rect(w):
             message = tr("所选窗口已消失，请重新扫描窗口")
             self.statusBar().showMessage(message)
-            self.log_text.append(tr("[定位失败] {message}").format(
+            self.append_log(tr("[定位失败] {message}").format(
                 message=message))
             return
         from ...core.app_controller import record_connected_window
@@ -1576,7 +1576,7 @@ class WindowOpsMixin:
             f" DPI={ratio}"
         )
 
-        self.log_text.append(
+        self.append_log(
             f"[定位成功] {w['title']}  "
             f"({w['width']}x{w['height']} @ {w['left']},{w['top']})"
             + (f" DPI={ratio:.1f}x" if ratio != 1.0 else "")
@@ -1690,7 +1690,7 @@ class WindowOpsMixin:
             from ...core.desktop import wgc_available
             ok, reason = wgc_available()
             if not ok:
-                self.log_text.append(tr("[截图] 后台截图不可用：") + reason)
+                self.append_log(tr("[截图] 后台截图不可用：") + reason)
                 self.chk_bg_capture.blockSignals(True)
                 self.chk_bg_capture.setChecked(False)
                 self.chk_bg_capture.blockSignals(False)
@@ -1722,7 +1722,7 @@ class WindowOpsMixin:
         assert capture is not None
         capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
         if isinstance(capture, WgcCapture) and not capture.attach_hwnd(w["hwnd"]):
-            self.log_text.append(
+            self.append_log(
                 tr("[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）"))
             try:
                 capture.stop()
@@ -1744,7 +1744,7 @@ class WindowOpsMixin:
         self._android_connection_draft.device_execution = bool(state)
         label = tr("端侧执行（需安装律匠 App）") if state \
             else tr("指令执行（adb shell input）")
-        self.log_text.append(f"[模式] 安卓输入方式: {label}（下次连接生效）")
+        self.append_log(f"[模式] 安卓输入方式: {label}（下次连接生效）")
 
     # ─── 截屏 ─────────────────────────────────────────────
 

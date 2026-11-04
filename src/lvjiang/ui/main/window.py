@@ -1032,7 +1032,7 @@ class MainWindow(
         log_layout.addWidget(self.log_text, 1)
         for event in self._log_buffer:
             if event.level >= self._log_min_level:
-                self.log_text.append(event.text)
+                self.log_text.append(event.display_text())
 
         # 底部级别过滤栏
         filter_bar = QHBoxLayout()
@@ -1165,10 +1165,10 @@ class MainWindow(
         from .run_logs import RunLogEvent
         if isinstance(value, RunLogEvent):
             event = value
-            text = event.text
         else:
-            text = str(value)
-            event = RunLogEvent.from_text(text)
+            # UI 直写的消息补时间戳/级别前缀，与 loguru sink 输出同格式，
+            # 两种来源在面板里混排不再断裂
+            event = RunLogEvent.ui_message(str(value))
         self._log_buffer.append(event)
         if (event.level >= self._log_min_level
                 and MainWindow._log_event_visible(self, event)

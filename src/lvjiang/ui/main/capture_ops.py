@@ -245,11 +245,11 @@ class CaptureOpsMixin:
 
     def _start_screen_record(self):
         if not self._scrcpy_streaming or self._capture is None:
-            self.log_text.append(tr("[录屏] 仅流式截图模式支持录屏"))
+            self.append_log(tr("[录屏] 仅流式截图模式支持录屏"))
             return
         w, h = self._capture.get_capture_size()
         if w <= 0 or h <= 0:
-            self.log_text.append(tr("[录屏] 无法获取画面尺寸"))
+            self.append_log(tr("[录屏] 无法获取画面尺寸"))
             return
         from ...core.screen_recorder import ScreenRecorder
         # 流式模式已确认，_capture 必为 AndroidStreamCapture
@@ -258,14 +258,14 @@ class CaptureOpsMixin:
         path = VIDEO_DIR / f"recording_{ts}.mp4"
         recorder = ScreenRecorder(path, w, h, fps=fps)
         if not recorder.start():
-            self.log_text.append(tr("[录屏] 启动失败（详见日志）"))
+            self.append_log(tr("[录屏] 启动失败（详见日志）"))
             return
         self._screen_recorder = recorder
         self._record_target_id = getattr(
             getattr(self, "_execution_targets", None), "active_target_id", None)
         self._rec_state = "recording"
         self._rec_timer.start()
-        self.log_text.append(f"[录屏] 开始录制 → {path.name}")
+        self.append_log(f"[录屏] 开始录制 → {path.name}")
         self._apply_rec_state()
 
     def _stop_screen_record(self):
@@ -278,7 +278,7 @@ class CaptureOpsMixin:
         msg = f"[录屏] 已停止 时长 {result.duration:.1f}s 帧数 {result.frames}"
         if result.dropped:
             msg += f" 丢帧 {result.dropped}"
-        self.log_text.append(msg + tr("，请选择 保存 或 放弃"))
+        self.append_log(msg + tr("，请选择 保存 或 放弃"))
         self._apply_rec_state()
 
     def _on_pause_record(self):
@@ -302,10 +302,10 @@ class CaptureOpsMixin:
             return
         final = rec.finalize()
         if final is not None:
-            self.log_text.append(f"[录屏] 已保存: {final}")
+            self.append_log(f"[录屏] 已保存: {final}")
             self.statusBar().showMessage(f"录屏已保存: {final.name}", 3000)
         else:
-            self.log_text.append(tr("[录屏] 保存失败（详见日志）"))
+            self.append_log(tr("[录屏] 保存失败（详见日志）"))
         self._screen_recorder = None
         self._record_target_id = None
         self._rec_state = "idle"
@@ -317,7 +317,7 @@ class CaptureOpsMixin:
         if rec is None:
             return
         rec.discard()
-        self.log_text.append(tr("[录屏] 已放弃本次录制，文件已删除"))
+        self.append_log(tr("[录屏] 已放弃本次录制，文件已删除"))
         self._screen_recorder = None
         self._record_target_id = None
         self._rec_state = "idle"
@@ -336,9 +336,9 @@ class CaptureOpsMixin:
         if self._rec_timer is not None:
             self._rec_timer.stop()
         if final is not None:
-            self.log_text.append(f"[录屏] 录制已随{reason}自动保存: {final}")
+            self.append_log(f"[录屏] 录制已随{reason}自动保存: {final}")
         else:
-            self.log_text.append(f"[录屏] {reason}时自动保存失败（详见日志）")
+            self.append_log(f"[录屏] {reason}时自动保存失败（详见日志）")
         self._apply_rec_state()
 
     # ─── 截屏 ─────────────────────────────────────────────
@@ -347,7 +347,7 @@ class CaptureOpsMixin:
         """刷新：重新取一帧更新预览，不落盘"""
         img = self._grab_capture_image()
         if img is None:
-            self.log_text.append(tr("[预览] 刷新失败：无可用画面"))
+            self.append_log(tr("[预览] 刷新失败：无可用画面"))
             return
         self._show_preview_image(img)
         self.statusBar().showMessage(tr("预览已刷新"), 2000)
@@ -371,7 +371,7 @@ class CaptureOpsMixin:
         """截屏：更新预览并把这一帧保存到 data/capture/picture"""
         img = self._grab_capture_image()
         if img is None:
-            self.log_text.append(tr("[截屏] 截屏失败：无可用画面"))
+            self.append_log(tr("[截屏] 截屏失败：无可用画面"))
             return
         # 先更新预览：存下来的必须就是屏幕上看到的那一帧，不能事后再抓一次
         self._show_preview_image(img)
@@ -386,12 +386,12 @@ class CaptureOpsMixin:
                 i += 1
             ok, buf = cv2.imencode(".png", img)
             if not ok:
-                self.log_text.append(tr("[截屏] PNG 编码失败"))
+                self.append_log(tr("[截屏] PNG 编码失败"))
                 return
             # imencode + tofile 规避 Windows 非 ASCII 路径问题
             buf.tofile(str(path))
-            self.log_text.append(f"[截屏] 已保存: {path}")
+            self.append_log(f"[截屏] 已保存: {path}")
             self.statusBar().showMessage(f"截屏已保存: {path.name}", 3000)
         except Exception as e:
             logger.error(f"[截屏] 保存失败: {e}")
-            self.log_text.append(f"[截屏] 保存失败: {e}")
+            self.append_log(f"[截屏] 保存失败: {e}")

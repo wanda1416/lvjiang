@@ -35,10 +35,10 @@ def _request(method: str, route: str, data: dict | None, token: str) -> dict:
         headers=headers, method=method)
     try:
         with urlrequest.build_opener().open(request, timeout=30) as response:
-            raw = response.read(4_000_001)
+            raw = response.read(32_000_000)
     except urlerror.HTTPError as exc:
         try:
-            details = json.loads(exc.read(4_000_001).decode("utf-8"))
+            details = json.loads(exc.read(32_000_000).decode("utf-8"))
         except (ValueError, UnicodeDecodeError, OSError):
             details = {}
         if exc.code == 409 and isinstance(details, dict) and details.get("error") == "conflict":

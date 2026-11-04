@@ -475,11 +475,11 @@ class AccountManagerDialog(QDialog):
         head_row.addWidget(self.logout_button)
         layout.addLayout(head_row)
 
-        # 一行临时反馈（正在登录…／登录失败）：固定在对话框左下角，空时不占位。
+        # 一行临时反馈（正在登录…／登录失败）：固定高度常驻，空文本不占额外空间，
+        # 避免登录时从无到有把整个对话框顶跳一下。
         self.status = QLabel()
-        self.status.setWordWrap(True)
+        self.status.setFixedHeight(20)
         self.status.setStyleSheet("color: #c62828; font-size: 12px;")
-        self.status.setVisible(False)
 
         # ════ 未登录：居中的紧凑登录卡（不摊满整个对话框） ════
         # 对话框标题已是「账户管理」，卡内不再重复「账户登录」标题。
@@ -671,9 +671,8 @@ class AccountManagerDialog(QDialog):
         self._render(summary)
 
     def _set_status(self, text: str) -> None:
-        """一行临时反馈（正在登录…／失败原因）：空文本时整行不占位。"""
+        """一行临时反馈（正在登录…／失败原因）：固定高度常驻，只换文字。"""
         self.status.setText(text)
-        self.status.setVisible(bool(text))
 
     def _on_operation_failed(self, ok: bool, result) -> None:
         if ok or not self._alive():
@@ -927,7 +926,23 @@ class AccountManagerDialog(QDialog):
         from ..core.sync.initial import sync_established
         if sync_established():
             self._clear_sync()
-        elif self.holder.initial_sync_async():
+            return
+        # 云端有数据时必须先确认：会备份本地并拉取云端。
+        try:
+            state = self.holder.session.sync_state()
+        except AccountError as error:
+            self._set_sync_note(str(error), error=True)
+            return
+        if not state.get("empty"):
+            answer = QMessageBox.question(
+                self, tr("初始同步"),
+                tr("云端已有数据。继续将先把本地用户、总览定义与总览数据备份到 "
+                   "config/session/_backup-*，再拉取云端数据。是否继续？"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        if self.holder.initial_sync_async():
             self._render_sync()
 
     def _clear_sync(self) -> None:

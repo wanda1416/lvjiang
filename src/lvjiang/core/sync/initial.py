@@ -70,6 +70,7 @@ def clear_local_sync_state() -> None:
     profile = load_profile()
     profile.pop("users_sync", None)
     profile.pop("profile_sync", None)
+    profile.pop("document_sync", None)
     _save_profile(profile)
     logger.info("[initial sync] 本地同步水位已清除")
 
@@ -144,7 +145,8 @@ def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
     if state.get("empty"):
         definition = sync_definition(token, on_progress=progress)
         users = sync_users(token, on_progress=progress, stop=stop)
-        documents = sync_documents(token, on_progress=progress, stop=stop)
+        documents = sync_documents(token, on_progress=progress, stop=stop,
+                                   force_full=True)
         snapshot = refresh_snapshot(token)
         report.rows = [
             ("定义", definition.pushed, definition.pulled, len(definition.errors)),

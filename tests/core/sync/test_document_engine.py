@@ -71,11 +71,29 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(engine.client, "pull", fake.pull)
     monkeypatch.setattr(engine.client, "pull_all", fake.pull_all)
     monkeypatch.setattr(engine.client, "push", fake.push)
+    # 增量判定所需的 document_sync 状态与增量 pull 接口
+    doc_state: dict = {"remote_document_id": 0, "dirty": {}}
+    monkeypatch.setattr(engine.dirty, "remote_document_id",
+                        lambda: doc_state.get("remote_document_id") or 0)
+    monkeypatch.setattr(engine.dirty, "dirty_keys",
+                        lambda: set(doc_state.get("dirty") or {}))
+    monkeypatch.setattr(engine.dirty, "save_sync_state",
+                        lambda rid, d: doc_state.update(
+                            {"remote_document_id": rid, "dirty": {k: True for k in d}}))
+
+    def fake_delta(route, data, token):
+        docs = [{"label": k[0], "kind": k[1], "sha256": d["sha256"], "size": d["size"],
+                 "zipped": d.get("zipped", True), "updated_at": d["updated_at"],
+                 "payload_base64": d["payload"], "revision": i + 1}
+                for i, (k, d) in enumerate(sorted(fake.docs.items()))]
+        return {"documents": docs, "next_id": len(docs) + 1}
+
+    monkeypatch.setattr(engine, "post", fake_delta)
     dirs = {"users": tmp_path / "users", "avatars": tmp_path / "avatars",
             "session": tmp_path / "session"}
     for directory in dirs.values():
         directory.mkdir(parents=True)
-    return {"fake": fake, "dirs": dirs}
+    return {"fake": fake, "dirs": dirs, "doc_state": doc_state}
 
 
 def _sync(env):
@@ -118,6 +136,7 @@ def test_core_notes_suffix_wins_over_plugin_registry(env) -> None:
     users = env["dirs"]["users"]
     (users / "蔡元君.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
     (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
+    env["doc_state"]["dirty"] = {"蔡元君/notes": True, "蔡元君/loadouts": True}
     _sync(env)
     kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
     assert ("蔡元君", "notes") in kinds
@@ -147,6 +166,7 @@ def test_user_profile_and_avatar_not_in_document_channel(env) -> None:
     (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
     (env["dirs"]["avatars"] / "avatar_a.png").write_bytes(b"\x89PNG")
     (env["dirs"]["session"] / "profile.yaml").write_text("quota: []\n", encoding="utf-8")
+    env["doc_state"]["dirty"] = {"蔡元君/loadouts": True}
     _sync(env)
     kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
     assert ("蔡元君", "loadouts") in kinds               # 用户内容照常
@@ -171,6 +191,7 @@ def test_local_newer_pushes_with_remote_sha_as_lock(env) -> None:
     env["fake"].docs[("蔡元君", "loadouts")] = {
         "sha256": "old", "size": 3, "zipped": True, "payload": "",
         "updated_at": "2020-01-01T00:00:00Z"}
+    env["doc_state"]["dirty"] = {"蔡元君/loadouts": True}
     report = _sync(env)
     assert report.pushed == ["蔡元君/loadouts"]
     push = env["fake"].pushes[0]
@@ -185,6 +206,7 @@ def test_push_conflict_falls_back_to_remote_win(env, monkeypatch) -> None:
         "sha256": "cloud-new", "size": 3, "zipped": True,
         "payload": base64.b64encode(gzip.compress(b"{\"notes\": []}\n")).decode(),
         "updated_at": "2020-01-01T00:00:00Z"}
+    env["doc_state"]["dirty"] = {"蔡元君/notes": True}
     report = _sync(env)
     # 推送失败回退为拉取：远端胜，本地另存冲突
     assert report.conflicts and "蔡元君/notes" in report.conflicts[0]
@@ -219,6 +241,7 @@ def test_session_document_pushes_under_global_label(session_env) -> None:
     """账户级文档与角色无关：label 必须是 __global__，不能带用户名。"""
     path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
     path.write_text('{"牵丝·霖": {"火拳": {"min_outer": 1}}}\n', encoding="utf-8")
+    session_env["doc_state"]["dirty"] = {"__global__/play_styles": True}
     _sync(session_env)
     assert [(p["label"], p["kind"]) for p in session_env["fake"].pushes] == [
         ("__global__", "play_styles")]
@@ -244,6 +267,7 @@ def test_session_document_race_conflict_keeps_local_copy(session_env) -> None:
         "payload": base64.b64encode(gzip.compress(b'{"cloud": 2}\n')).decode(),
         "updated_at": "2020-01-01T00:00:00Z"}
     session_env["fake"].fail_expected = True
+    session_env["doc_state"]["dirty"] = {"__global__/play_styles": True}
     report = _sync(session_env)
     assert report.pulled == ["__global__/play_styles"]
     assert report.conflicts and "play_styles" in report.conflicts[0]
@@ -286,6 +310,12 @@ def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(engine.client, "pull", fake.pull)
     monkeypatch.setattr(engine.client, "pull_all", fake.pull_all)
     monkeypatch.setattr(engine.client, "push", fake.push)
+    monkeypatch.setattr(engine, "post", lambda route, data, token: {
+        "documents": [], "next_id": 1})
+    monkeypatch.setattr(engine.dirty, "remote_document_id", lambda: 0)
+    monkeypatch.setattr(engine.dirty, "dirty_keys",
+                        lambda: {"蔡元君/notes"})
+    monkeypatch.setattr(engine.dirty, "save_sync_state", lambda rid, d: None)
     users, session = tmp_path / "users", tmp_path / "session"
     users.mkdir()
     session.mkdir()

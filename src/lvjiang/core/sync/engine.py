@@ -25,7 +25,7 @@ from pathlib import Path
 from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR, USERS_DIR
-from . import client, registry
+from . import client, dirty, registry
 from .client import SyncConflict, SyncError, post
 
 
@@ -222,23 +222,36 @@ def _local_mtime(document: LocalDocument) -> datetime:
     return datetime.fromtimestamp(document.path.stat().st_mtime, tz=timezone.utc)
 
 
-def sync_documents(token: str,
-                   users_dir: Path = USERS_DIR,
+def _delta_page(token: str, since: int) -> tuple[list[dict], int]:
+    page = post("/api/sync/documents/pull", {"since_revision": since}, token)
+    return list(page.get("documents") or []), int(page.get("next_id") or 0)
+
+
+def sync_documents(token: str, users_dir: Path = USERS_DIR,
                    session_dir: Path = SESSION_CONFIG_DIR,
-                   on_progress=None, stop=None) -> SyncReport:
-    """增量对账：远端 revision 水位 + 本地脏集合；只有双变才全量对比。"""
+                   on_progress=None, stop=None,
+                   force_full: bool = False) -> SyncReport:
+    """增量对账：远端 revision 水位 + 本地脏集合；只有双变（或强制）才全量对比。"""
     report = SyncReport()
-    from . import dirty
+    local_dirty = dirty.dirty_keys()
+
+    if force_full:
+        # 初始同步等场景：本地已有全量数据要上云，脏集合未必完整，直接全量。
+        _sync_documents_full(token, users_dir, session_dir, on_progress, stop, report)
+        try:
+            _changed, next_id = _delta_page(token, dirty.remote_document_id())
+        except SyncError as error:
+            report.errors.append(str(error))
+            return report
+        dirty.save_sync_state(max(next_id - 1, 0), set())
+        return report
 
     remote_id = dirty.remote_document_id()
-    local_dirty = dirty.dirty_keys()
     try:
-        page = post("/api/sync/documents/pull", {"since_revision": remote_id}, token)
+        changed, next_id = _delta_page(token, remote_id)
     except SyncError as error:
         report.errors.append(str(error))
         return report
-    changed = list(page.get("documents") or [])
-    next_id = int(page.get("next_id") or 0)
     remote_changed = bool(changed)
     local_changed = bool(local_dirty)
 

@@ -284,8 +284,14 @@ class ProfileDB:
                 # 避免这次加列之后又忘了改版本号导致升级不备份。
                 backup_path = self._db_path.with_suffix(f".before-v{CURRENT_VERSION}.db")
                 if version and version < CURRENT_VERSION and not backup_path.exists():
-                    with sqlite3.connect(backup_path) as backup:
+                    # sqlite3.connect 的上下文管理器只提交事务、**不关连接**，
+                    # 必须显式 close——这里每次构造 ProfileDB 都会执行（仅首次
+                    # 升级时真正建文件），不关就一条条泄漏下去。
+                    backup = sqlite3.connect(backup_path)
+                    try:
                         conn.backup(backup)
+                    finally:
+                        backup.close()
             # 在读取版本前取得写锁。并发初始化者会在 busy_timeout 范围内
             # 等待，取得锁后重新读取已经提交的新版本，不会重复执行迁移。
             self._begin(conn)

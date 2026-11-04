@@ -110,6 +110,11 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since", _rows_of)
     monkeypatch.setattr(snapshot_sync.repository, "db_history_row_exists",
                         lambda history_id: any(r["id"] == history_id for r in history))
+    # 不 mock 的话 push/bootstrap 会走真库（config/session/profile.db）——
+    # 既违反测试隔离门禁，泄漏的连接还会在后续用例里以
+    # PytestUnraisableExceptionWarning 的形式炸出来。
+    monkeypatch.setattr(snapshot_sync.repository, "db_max_history_id",
+                        lambda: max((r["id"] for r in history), default=0))
     monkeypatch.setattr(snapshot_sync, "current_instance_id", lambda: "mine")
     monkeypatch.setattr(snapshot_sync, "backup_local", lambda: str(tmp_path / "backup"))
     return {"server": server, "entries": entries, "history": history,

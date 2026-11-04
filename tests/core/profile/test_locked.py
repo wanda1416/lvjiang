@@ -63,7 +63,8 @@ def profile_env(tmp_path, monkeypatch):
 
 def _make_v7_db(path: Path) -> None:
     """构造 v7 形态的库：entries 没有 locked 列，schema_version 记为 7。"""
-    with sqlite3.connect(path) as conn:
+    conn = sqlite3.connect(path)
+    try:
         conn.execute("""
             CREATE TABLE profile_entries (
                 username TEXT NOT NULL, type TEXT NOT NULL, key TEXT NOT NULL,
@@ -95,6 +96,9 @@ def _make_v7_db(path: Path) -> None:
             "(username, type, key, value, updated_at, updated_time, value_text) "
             "VALUES ('u1', 'quota', 'k', 5, '2026-01-01T00:00:00', "
             "'2026-01-01T00:00:00', '')")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ─── 迁移 ────────────────────────────────────────────────────
@@ -107,11 +111,15 @@ class TestMigration:
 
     def test_locked_column_exists_and_defaults_to_zero(self, db: ProfileDB):
         db.upsert("u1", "quota", "k", 1)
-        cols = {
-            row[1]: row
-            for row in db._borrow_connection().execute(
-                "PRAGMA table_info(profile_entries)").fetchall()
-        }
+        conn = db._borrow_connection()
+        try:
+            cols = {
+                row[1]: row
+                for row in conn.execute(
+                    "PRAGMA table_info(profile_entries)").fetchall()
+            }
+        finally:
+            db._release_connection(conn)
         assert "locked" in cols
 
     def test_v7_database_upgrades_in_place(self, tmp_path: Path):
@@ -119,19 +127,27 @@ class TestMigration:
         db_path = tmp_path / "v7.db"
         _make_v7_db(db_path)
 
-        with sqlite3.connect(db_path) as conn:
-            cols = {row[1] for row in conn.execute(
-                "PRAGMA table_info(profile_entries)").fetchall()}
-        assert "locked" not in cols
+        def table_cols():
+            conn = sqlite3.connect(db_path)
+            try:
+                return {row[1] for row in conn.execute(
+                    "PRAGMA table_info(profile_entries)").fetchall()}
+            finally:
+                conn.close()
+
+        assert "locked" not in table_cols()
 
         upgraded = ProfileDB(db_path)
 
         assert upgraded.get_entry("u1", "quota", "k")["value"] == 5
         assert upgraded.get_entry("u1", "quota", "k")["updated_at"] == "2026-01-01T00:00:00"
-        with sqlite3.connect(db_path) as conn:
+        conn = sqlite3.connect(db_path)
+        try:
             cols = {row[1] for row in conn.execute(
                 "PRAGMA table_info(profile_entries)").fetchall()}
             version = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
+        finally:
+            conn.close()
         assert "locked" in cols
         assert version == CURRENT_VERSION
 

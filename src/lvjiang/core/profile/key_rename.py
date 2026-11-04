@@ -152,8 +152,13 @@ def save_renamed_definitions(
             schema_module.reload_profile_config()
         _emit_rename_baselines(db, renames)
         from .events import notify_updated
-        with db._connect() as conn:
-            users = conn.execute("SELECT DISTINCT username FROM profile_entries").fetchall()
+        # _connect() 的连接必须显式关（同 _emit_rename_baselines）
+        conn = db._connect()
+        try:
+            users = conn.execute(
+                "SELECT DISTINCT username FROM profile_entries").fetchall()
+        finally:
+            conn.close()
         for (username,) in users:
             notify_updated(username)
 
@@ -173,10 +178,15 @@ def _emit_rename_baselines(db: ProfileDB,
     from ...i18n import tr as _tr
 
     for model, old, new in renames:
-        with db._connect() as conn:
+        # _connect() 返回的连接必须显式关：sqlite3.connect 的上下文管理器
+        # 只提交事务不关连接（与 repository._ensure_schema 的备份连接同坑）
+        conn = db._connect()
+        try:
             rows = conn.execute(
                 "SELECT username, value, value_text, locked FROM profile_entries "
                 "WHERE type=? AND key=?", (model, new)).fetchall()
+        finally:
+            conn.close()
         emitted = 0
         for username, value, value_text, locked in rows:
             if locked:

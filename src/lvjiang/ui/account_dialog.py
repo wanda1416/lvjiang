@@ -547,7 +547,7 @@ class AccountManagerDialog(QDialog):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.sync_table.setItem(row, 0, item)
             for column in (1, 2, 3, 4, 5):
-                cell = QTableWidgetItem("—")
+                cell = QTableWidgetItem("")
                 cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(row, column, cell)
@@ -793,7 +793,7 @@ class AccountManagerDialog(QDialog):
         self.stop_sync_button.setVisible(self.holder.syncing)
 
     def _fill_sync_table(self, rows: list[tuple[str, int | None, int | None, int | None]] | None) -> None:
-        """四个通道行固定存在；没有结果时数值列显示 —，表格不消失。
+        """四个通道行固定存在；没有结果时数值列留空。
 
         行按**通道名**对号入座，不按列表下标——刷新快照的报告只有单行
         「总览」，按下标写会把第 0 行「定义」的通道名覆盖成「总览」闪一下。
@@ -807,13 +807,13 @@ class AccountManagerDialog(QDialog):
                 continue
             def cell_text(value, failed_count=False):
                 if value is None:
-                    return "—"
+                    return ""
                 if failed_count and not value:
-                    return "—"
+                    return ""
                 return str(value)
 
             for column, value in enumerate((
-                    name, "—", cell_text(pushed), cell_text(pulled),
+                    name, "", cell_text(pushed), cell_text(pulled),
                     cell_text(failed, failed_count=True))):
                 item = QTableWidgetItem(value)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)

@@ -262,113 +262,219 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     return report
 
 
-def _sync_avatars(token: str, remote_users: list[dict], users_dir: Path,
-                  report: UsersSyncReport, on_progress=None, stop=None) -> None:
-    """头像按用户归属增量同步：sha 一致不动，变化上传、缺失批量下载。
+@dataclass
+class AvatarSyncReport:
+    """一次性头像同步结果（手动按钮触发，不参与常规同步）。"""
 
-    本地头像文件名在用户资料的 ``avatar`` 字段里；名册行带云端
-    ``avatar_sha256``。缺失的头像一次批量拉取，不再逐份请求。
+    uploaded: int = 0
+    downloaded: int = 0
+    skipped: int = 0
+    errors: list[str] = field(default_factory=list)
+
+    def describe(self) -> str:
+        if not (self.uploaded or self.downloaded or self.skipped or self.errors):
+            return "名册里没有带头像的用户"
+        parts = [f"上传 {self.uploaded}", f"下载 {self.downloaded}",
+                 f"跳过 {self.skipped}"]
+        if self.errors:
+            parts.append(f"失败 {len(self.errors)}")
+        return "，".join(parts)
+
+    def distinct_errors(self) -> list[str]:
+        seen: list[str] = []
+        for error in self.errors:
+            text = str(error).strip()
+            if text and text not in seen:
+                seen.append(text)
+        return seen
+
+
+#: 单个头像的大小上限（客户端与云端同口径）。
+MAX_AVATAR_BYTES = 1_000_000
+#: 批量下载时一次请求带多少个用户名。
+AVATAR_BATCH = 10
+
+
+def sync_all_avatars(token: str, users_dir: Path | None = None,
+                     on_progress=None, stop=None) -> AvatarSyncReport:
+    """手动触发的双向头像同步（**不加入常规同步**）。
+
+    四种情况：
+    - 本地有、云端无 → 上传
+    - 本地无、云端有 → 下载
+    - 两边都有且 sha 相同 → 跳过
+    - 两边都有但不同 → 按时间裁决：本地文件 mtime 与云端 updated_at 比新
+
+    只处理名册里的用户（与名册一致）；单个头像超过 1MB 跳过并计入失败。
+    不做删除同步：本地清空 ``avatar`` 字段不会删云端那份。
     """
     import base64
 
     from ...constants import AVATARS_DIR
 
-    remote_by_name = {row.get("username"): row for row in remote_users
-                      if isinstance(row.get("username"), str)}
-    pending = [n for n in _roster()]
-    # 1) 先收集「本地缺失且云端有」的头像，一次性批量下载。
-    missing: list[tuple[str, str]] = []          # (username, 本地文件名)
-    for name in pending:
-        if stop and stop():
-            report.errors.append("已停止")
-            return
-        path = users_dir / f"{name}.json"
-        try:
-            local = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        filename = local.get("avatar")
-        if not isinstance(filename, str) or not filename:
-            continue
-        if (AVATARS_DIR / filename).is_file():
-            continue
-        remote_sha = (remote_by_name.get(name) or {}).get("avatar_sha256")
-        if remote_sha:
-            missing.append((name, filename))
-    if missing:
-        for start in range(0, len(missing), 10):
-            chunk = missing[start:start + 10]
-            try:
-                response = post("/api/sync/users/avatars/pull",
-                                {"usernames": [name for name, _ in chunk]}, token)
-                avatars = {item.get("username"): item
-                           for item in response.get("avatars") or []
-                           if isinstance(item, dict) and isinstance(item.get("username"), str)}
-                for name, filename in chunk:
-                    item = avatars.get(name)
-                    if not item or not isinstance(item.get("payload_base64"), str):
-                        continue
-                    avatar_path = AVATARS_DIR / filename
-                    avatar_path.parent.mkdir(parents=True, exist_ok=True)
-                    avatar_path.write_bytes(base64.b64decode(item["payload_base64"]))
-                    report.avatars += 1
-            except (SyncError, OSError, ValueError) as error:
-                report.errors.append(f"头像批量下载失败: {error}")
+    users_dir = users_dir or _users_dir()
+    report = AvatarSyncReport()
 
-    done = 0
-    for name in pending:
+    def _prog(detail: str) -> None:
+        if on_progress:
+            on_progress({"detail": detail})
+
+    names = _roster()
+    if not names:
+        return report
+
+    # 云端现状：名册行带 avatar_sha256，但没有 updated_at，需要时按批补拉。
+    try:
+        remote_rows = post("/api/sync/users/pull", {}, token).get("users") or []
+    except SyncError as error:
+        report.errors.append(f"读取云端名册失败: {error}")
+        return report
+    cloud = {row.get("username"): row for row in remote_rows
+             if isinstance(row, dict) and isinstance(row.get("username"), str)}
+
+    # 1) 先收集本地缺失、云端有的头像，按批下载。
+    missing: list[tuple[str, str]] = []
+    for name in names:
+        info = _local_avatar(users_dir, name)
+        if info is None:
+            continue                       # 该用户没有头像字段
+        path, _sha = info
+        if path.is_file():
+            continue
+        if (cloud.get(name) or {}).get("avatar_sha256"):
+            missing.append((name, path.name))
+    for start in range(0, len(missing), AVATAR_BATCH):
         if stop and stop():
             report.errors.append("已停止")
-            return
-        done += 1
-        if on_progress:
-            on_progress({"step": "roster", "detail": f"头像 {done}/{len(pending)}"})
-        path = users_dir / f"{name}.json"
+            return report
+        chunk = missing[start:start + AVATAR_BATCH]
+        _prog(f"下载头像 {start + 1}-{start + len(chunk)}/{len(missing)}")
         try:
-            local = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        filename = local.get("avatar")
-        if not isinstance(filename, str) or not filename:
-            continue                          # 该用户未设置头像
-        avatar_path = AVATARS_DIR / filename
-        remote_row = remote_by_name.get(name) or {}
-        remote_sha = remote_row.get("avatar_sha256")
-        if not avatar_path.is_file():
-            if not remote_sha:
-                continue                      # 双方都没有：无事
-            _download_avatar(token, name, avatar_path, report)   # 批量没覆盖到的兜底
-            continue
-        local_sha = hashlib.sha256(avatar_path.read_bytes()).hexdigest()
-        if local_sha == remote_sha:
-            continue                          # 一致：跳过
-        avatar_bytes = avatar_path.read_bytes()
-        if len(avatar_bytes) > 1_000_000:
-            report.errors.append(f"头像超过 1MB 未上传({name})")
-            continue
-        try:
-            post("/api/sync/users/avatar/put", {
-                "username": name, "sha256": local_sha,
-                "payload_base64": base64.b64encode(avatar_bytes).decode()},
-                token)
-            report.avatars += 1
+            response = post("/api/sync/users/avatars/pull",
+                            {"usernames": [name for name, _ in chunk]}, token)
         except SyncError as error:
-            report.errors.append(f"头像上传失败({name}): {error}")
-    if on_progress:
-        on_progress({"step": "roster", "detail": "完成"})
+            report.errors.append(f"头像批量下载失败: {error}")
+            continue
+        items = {item.get("username"): item for item in response.get("avatars") or []
+                 if isinstance(item, dict) and isinstance(item.get("username"), str)}
+        for name, filename in chunk:
+            item = items.get(name)
+            payload = item.get("payload_base64") if item else None
+            if not isinstance(payload, str):
+                continue
+            try:
+                raw = base64.b64decode(payload)
+            except ValueError as error:
+                report.errors.append(f"头像解码失败({name}): {error}")
+                continue
+            target = AVATARS_DIR / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+            report.downloaded += 1
+
+    # 2) 再逐用户处理「上传 / 冲突裁决」。
+    done = 0
+    for name in names:
+        if stop and stop():
+            report.errors.append("已停止")
+            return report
+        done += 1
+        info = _local_avatar(users_dir, name)
+        if info is None:
+            continue
+        path, _ = info
+        remote_sha = (cloud.get(name) or {}).get("avatar_sha256")
+        if not path.is_file():
+            if not remote_sha:
+                report.skipped += 1       # 双方都没有
+            continue                      # 云端有但刚才下载失败：不重复上报
+        local_bytes = path.read_bytes()
+        local_sha = hashlib.sha256(local_bytes).hexdigest()
+        if not remote_sha:
+            _prog(f"上传头像 {done}/{len(names)}")
+            if _upload_avatar(token, name, local_sha, local_bytes, report):
+                report.uploaded += 1
+            continue
+        if local_sha == remote_sha:
+            report.skipped += 1
+            continue
+        if _local_is_newer(path, token, name):
+            _prog(f"上传头像 {done}/{len(names)}")
+            if _upload_avatar(token, name, local_sha, local_bytes, report):
+                report.uploaded += 1
+        else:
+            _prog(f"下载头像 {done}/{len(names)}")
+            if _download_avatar(token, name, path, report):
+                report.downloaded += 1
+    return report
+
+
+def _local_avatar(users_dir: Path, username: str) -> tuple[Path, str] | None:
+    """用户资料里的头像路径；没有头像字段返回 None。"""
+    from ...constants import AVATARS_DIR
+
+    try:
+        data = json.loads((users_dir / f"{username}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    filename = data.get("avatar") if isinstance(data, dict) else None
+    if not isinstance(filename, str) or not filename:
+        return None
+    return AVATARS_DIR / filename, filename
+
+
+def _local_is_newer(path: Path, token: str, username: str) -> bool:
+    """本地文件 mtime 是否新于云端 updated_at；取不到云端时间时按本地赢。"""
+    try:
+        response = post("/api/sync/users/avatars/pull",
+                        {"usernames": [username]}, token)
+    except SyncError:
+        return True
+    items = [item for item in response.get("avatars") or []
+             if isinstance(item, dict) and item.get("username") == username]
+    if not items:
+        return True                       # 云端查不到：按本地赢（与上传语义一致）
+    stamp = items[0].get("updated_at")
+    if not isinstance(stamp, str) or not stamp:
+        return True
+    try:
+        if stamp.endswith("Z"):
+            stamp = stamp[:-1] + "+00:00"
+        cloud_at = datetime.fromisoformat(stamp).timestamp()
+    except ValueError:
+        return True
+    return path.stat().st_mtime >= cloud_at
+
+
+def _upload_avatar(token: str, name: str, sha: str, raw: bytes,
+                   report: AvatarSyncReport) -> bool:
+    import base64
+
+    if len(raw) > MAX_AVATAR_BYTES:
+        report.errors.append(f"头像超过 1MB 未上传({name})")
+        return False
+    try:
+        post("/api/sync/users/avatar/put", {
+            "username": name, "sha256": sha,
+            "payload_base64": base64.b64encode(raw).decode()}, token)
+        return True
+    except SyncError as error:
+        report.errors.append(f"头像上传失败({name}): {error}")
+        return False
 
 
 def _download_avatar(token: str, name: str, avatar_path: Path,
-                     report: UsersSyncReport) -> None:
+                     report: AvatarSyncReport) -> bool:
     import base64
 
     try:
         avatar = post("/api/sync/users/avatar/get", {"username": name}, token).get("avatar")
-        if not isinstance(avatar, dict):
-            return
+        if not isinstance(avatar, dict) or not isinstance(avatar.get("payload_base64"), str):
+            return False
         raw = base64.b64decode(avatar["payload_base64"])
         avatar_path.parent.mkdir(parents=True, exist_ok=True)
         avatar_path.write_bytes(raw)
-        report.avatars += 1
+        return True
     except (SyncError, OSError, ValueError) as error:
         report.errors.append(f"头像下载失败({name}): {error}")
+        return False

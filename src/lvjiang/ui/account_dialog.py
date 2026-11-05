@@ -121,6 +121,10 @@ def readonly_instance() -> bool:
     return is_readonly()
 
 
+#: 后台任务种类 → 持有的 worker 属性名
+_KIND_ATTR = {"operation": "_worker", "sync": "_sync_worker", "avatars": "_avatar_worker"}
+
+
 def _open_in_browser(url: str) -> None:
     """用系统浏览器打开网页端页面；Qt 失败时退回标准库 webbrowser。"""
     if QDesktopServices.openUrl(QUrl(url)):
@@ -195,6 +199,7 @@ class AccountHolder(QObject):
     operation_finished = pyqtSignal(bool, object)   # 登录/登出/改密
     sync_finished = pyqtSignal(bool, object)        # 数据同步
     sync_progress = pyqtSignal(dict)                # 分步进度
+    avatars_finished = pyqtSignal(bool, object)     # 手动「同步全部头像」
 
     def __init__(self):
         super().__init__()
@@ -209,6 +214,7 @@ class AccountHolder(QObject):
         self.last_sync_auto = False
         self._worker: _AccountWorker | None = None
         self._sync_worker: _AccountWorker | None = None
+        self._avatar_worker: _AccountWorker | None = None
         self._beat_worker: _AccountWorker | None = None
         self._sync_cancel = threading.Event()
         # 登录期间两条独立节拍：每分钟自动同步一轮上推新数据；每 10 分钟
@@ -225,6 +231,10 @@ class AccountHolder(QObject):
     @property
     def busy(self) -> bool:
         return self._worker is not None
+
+    @property
+    def syncing_avatars(self) -> bool:
+        return self._avatar_worker is not None
 
     @property
     def syncing(self) -> bool:
@@ -271,7 +281,7 @@ class AccountHolder(QObject):
 
     def _start(self, action, kind: str) -> bool:
         """启动一个后台动作；同类任务已在跑时拒绝并返回 False。"""
-        attr = "_worker" if kind == "operation" else "_sync_worker"
+        attr = _KIND_ATTR[kind]
         if getattr(self, attr) is not None:
             return False
         worker = _AccountWorker(action)
@@ -283,9 +293,14 @@ class AccountHolder(QObject):
         return True
 
     def _finished(self, kind: str, worker, ok: bool, result) -> None:
-        attr = "_worker" if kind == "operation" else "_sync_worker"
+        attr = _KIND_ATTR[kind]
         if getattr(self, attr) is worker:
             setattr(self, attr, None)
+        if kind == "avatars":
+            text = result.describe() if ok else str(result)
+            (logger.info if ok else logger.warning)("[account] 头像同步：{}", text)
+            self.avatars_finished.emit(ok, result)
+            return
         if kind == "sync":
             if ok:
                 self.last_sync_report = result
@@ -422,6 +437,21 @@ class AccountHolder(QObject):
                                 stop=self._sync_cancel.is_set)
 
         return self._start(action, "sync")
+
+    def sync_avatars_async(self) -> bool:
+        """手动「同步全部头像」：双向合并一次，不参与常规同步。
+
+        头像体积大、变化少，放进每分钟节拍只会白耗流量，所以单独做成按钮。
+        """
+        from ..core.sync.users_sync import sync_all_avatars
+        token = self.session.access_token
+        if readonly_instance() or not token or self.summary is None:
+            return False
+
+        def action():
+            return sync_all_avatars(token)
+
+        return self._start(action, "avatars")
 
     def clear_sync_async(self, password: str) -> bool:
         """清除同步：清空云端同步数据 + 本机水位与状态，回到未建立。"""

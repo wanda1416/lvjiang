@@ -147,14 +147,74 @@ class UserManagerDialog(QDialog):
         body.addWidget(self._build_left_panel())
         body.addWidget(self._build_right_panel(), stretch=1)
 
-        # ─── 底部按钮行 ───
+        # ─── 底部按钮行：左「同步全部头像」（仅登录可见）… 右「关闭」 ───
         bottom_row = QHBoxLayout()
+        self._btn_sync_avatars = QPushButton(tr("同步全部头像"))
+        self._btn_sync_avatars.setStyleSheet(_STYLE_BTN_GHOST)
+        self._btn_sync_avatars.setToolTip(
+            tr("把本机与云端的头像做一次双向合并；不参与日常自动同步"))
+        self._btn_sync_avatars.clicked.connect(self._sync_avatars)
+        bottom_row.addWidget(self._btn_sync_avatars)
         bottom_row.addStretch()
         btn_close = QPushButton(tr("关闭"))
         btn_close.setStyleSheet(_STYLE_BTN_GHOST)
         btn_close.clicked.connect(self.accept)
         bottom_row.addWidget(btn_close)
         root.addLayout(bottom_row)
+
+        self._refresh_avatar_button()
+        holder = self._account_holder()
+        if holder is not None:
+            # 连到 self 的槽：对话框销毁时 Qt 自动断开，不会留下悬空回调。
+            holder.changed.connect(self._on_holder_changed_for_avatar)
+            holder.avatars_finished.connect(self._on_avatars_finished)
+
+    # ─── 头像同步（手动，仅登录可用） ─────────────────────
+
+    @staticmethod
+    def _account_holder():
+        """账户持有者；只读实例不参与账号操作，直接返回 None。"""
+        from ..core.access import is_readonly
+
+        if is_readonly():
+            return None
+        from .account_dialog import account_holder
+
+        return account_holder()
+
+    def _on_holder_changed_for_avatar(self, _summary) -> None:
+        """登录/登出后即时刷新按钮显隐。"""
+        self._refresh_avatar_button()
+
+    def _refresh_avatar_button(self) -> None:
+        """只有登录后才显示；同步中置灰。"""
+        holder = self._account_holder()
+        logged_in = holder is not None and holder.summary is not None
+        self._btn_sync_avatars.setVisible(logged_in)
+        running = holder is not None and holder.syncing_avatars
+        self._btn_sync_avatars.setEnabled(logged_in and not running)
+        self._btn_sync_avatars.setText(
+            tr("正在同步头像…") if running else tr("同步全部头像"))
+
+    def _sync_avatars(self) -> None:
+        holder = self._account_holder()
+        if holder is None or holder.summary is None:
+            return
+        if holder.sync_avatars_async():
+            self._refresh_avatar_button()
+
+    def _on_avatars_finished(self, ok: bool, result) -> None:
+        self._refresh_avatar_button()
+        from PyQt6.QtWidgets import QMessageBox
+
+        if not ok:
+            QMessageBox.warning(self, tr("同步全部头像"), str(result))
+            return
+        text = result.describe() if hasattr(result, "describe") else str(result)
+        errors = list(getattr(result, "distinct_errors", lambda: [])())
+        if errors:
+            text += "\n\n" + "\n".join(errors[:3])
+        QMessageBox.information(self, tr("同步全部头像"), text)
 
     def _build_left_panel(self) -> QWidget:
         """左侧：工具栏 + 用户列表"""

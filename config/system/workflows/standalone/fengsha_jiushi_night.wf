@@ -1,0 +1,608 @@
+#% id: fengsha_jiushi_night
+#% name: 风沙酒肆·夜宿谜影
+#% group: 活动
+#% runnable: true
+#% batchable: false
+#% env: [desktop, android]
+#% note: |-
+#%   从客栈房间内部开始跑（不需要站在从拾香旁）：
+#%   看到「躺下」就触发一次（重复触发会起身）。
+#%   PC 端用键盘位移（W/A/S/D）扫房间找床边；
+#%   安卓端推摇杆、每轮右转 45° 扫一圈。
+#%   多人模式躺下后要等队友都躺下才开始守夜，
+#%   然后连续接待 5 位访客：默认只放第 2、第 5 位。
+#%   只实机验证过「只开 2、5」策略；
+#%   床位默认 1 号，2、3 号床会先转向再走到床边。
+#% parameters:
+#%   - name: rounds
+#%     label: 连刷轮数
+#%     type: number
+#%     default: 3
+#%     min: 1
+#%     max: 50
+#%   - name: strategy
+#%     label: 判断策略
+#%     type: select
+#%     default: only25
+#%     options:
+#%       - { value: only25, label: 只开第 2、5 位 }
+#%       - { value: auto, label: 识别优先，认不出按序号 }
+#%       - { value: count, label: 只看序号 }
+#%       - { value: ocr, label: 只信识别，认不出就拒绝 }
+#%   - name: safe_slots
+#%     label: 保守放行序号
+#%     type: text
+#%     default: "2,5"
+#%   - name: rehearsal
+#%     label: 演练模式
+#%     type: bool
+#%     default: false
+#%   - name: bed
+#%     label: 床位
+#%     type: select
+#%     default: bed1
+#%     options:
+#%       - { value: bed1, label: 1 号床（推荐） }
+#%       - { value: bed2, label: 2 号床 }
+#%       - { value: bed3, label: 3 号床 }
+#%   - name: open_words
+#%     label: 开门选项关键字
+#%     env: [android]
+#%     type: text
+#%     default: "开门,放进来,请他进来,让他进来,请他入内"
+#%   - name: refuse_words
+#%     label: 拒绝选项关键字
+#%     env: [android]
+#%     type: text
+#%     default: "不开门,不开,拒绝,不理会,关门,赶走,撵走"
+
+import "subcall/fengsha/desktop.wf"
+import "subcall/fengsha/android.wf"
+
+# 风沙酒肆 · 夜宿谜影（统一入口）
+#
+# 玩法：在酒肆向「从拾香」住店，夜里五个人轮流敲门。走到门边可「观察／对话／
+# 听风辨位」，「听风辨位」直接列出对方随身物品；身份与物品对得上就是好人，
+# 带违禁品的是坏人。放好人进来有奖励，放坏人进来当夜判负。
+#
+# 文件划分（import 只合并 def，被子文件的顶层语句不会执行，所以参数、词表、
+# 共享变量全部在本文件初始化，子文件只放过程）：
+#   本文件                                  参数 / 词表 / 主流程 / 两平台相同的过程
+#   subcall/fengsha/desktop.wf             键盘与后台输入专用的平台过程（*_desktop）
+#   subcall/fengsha/android.wf             点按与摇杆专用的平台过程（*_android）
+#
+# 平台差异只出现在四个能力上，本文件用同名分发过程按 env 选择实现：
+#   go_to_bed            找床边躺下
+#   act_on_decision      按判定开门／拒绝
+#   dismiss_clue_dialog  关「未查看线索」拦截弹窗
+#   finish_night         结算后开下一局
+# 其余过程（等人敲门、判定访客、结算门禁等）两端完全一致，只保留一份。
+#
+# 识别策略（参数 strategy）：
+#   only25  完全不做识别，五位里只放第 2、第 5 位（默认，最稳，当前唯一实机验证过）
+#   auto    先识别；认不出时只放 safe_slots 里的序号
+#   count   不做识别，只按 safe_slots 的序号放行
+#   ocr     只信识别，认不出就拒绝
+#
+# 前置：人在客栈房间内部（下榻的房间里），不需要站在从拾香旁。
+# 后置：跑满 rounds 轮，或始终无法躺下时停下并提示。
+# 返回：正常结束返回 0。
+
+default $rounds = 3
+default $strategy = "only25"
+default $safe_slots = "2,5"
+default $rehearsal = false
+default $bed = "bed1"
+default $open_words = "开门,放进来,请他进来,让他进来,请他入内"
+default $refuse_words = "不开门,不开,拒绝,不理会,关门,赶走,撵走"
+
+eval $rounds = to_num($rounds)
+if $rounds < 1
+    eval $rounds = 1
+end
+
+# ─── 词表 ─────────────────────────────────────────────────────────────
+# 违禁物品：只要看到任意一项就判坏人。注意别写单字「刀」「镖」——
+# 镖师本来就带刀，身份里也带「镖」字，容易误伤。
+eval $words_bad = ["带血", "沾血", "血迹", "血污", "匕首", "银针", "飞镖", "暗器", "金钗", "菜刀", "钉子", "镐子", "工具箱", "破了一角", "破损的包裹", "未知物品", "蒙汗药"]
+
+# 看物品就能判断的身份。
+eval $words_identity = ["镖师", "镖客", "僧人", "和尚", "工匠", "行商", "商人", "侍女", "丫鬟", "贵家小姐", "小姐", "店小二", "小二"]
+
+# 只能靠对话盘问的身份：物品看不出真假，一律交给兜底规则，不凭物品放人。
+eval $words_talk = ["天泉", "九流", "青溪", "三更天", "梨园", "账房", "鉴宝", "孤云"]
+
+# 各身份该带的东西，至少认出一件才算「身份与物品都对得上」。
+eval $words_good = ["草药", "三蔬杂菇", "杂菇", "化缘碗", "破碗", "绳子", "绳索", "锤子", "书画", "花枝", "首饰", "钱袋", "货物", "芙蓉蛤蜊", "蛤蜊", "铜钱", "盘缠"]
+
+# 门边交互项。
+eval $words_listen = ["听风辨位", "听风辩位", "辨位", "辩位", "听风"]
+# 决策提示：访客到位后出现「是否开门」，看到它就代表该做决定了。
+eval $words_ask = ["是否开门"]
+
+# 安卓端点按用的按钮与确认词（PC 端是 Y/N/Space 键，用不到这些词表）。
+# 「开门（1人选择）」带人数后缀，不能用裸「开门」——「是否开门?」提示也含这两个字。
+eval $open_suffix = ["开门（", "开门(", "开门1", "开门 1", "开门１", "开门 １"]
+eval $words_confirm = ["确定", "确认", "知道了", "继续"]
+
+# 结算画面关键字（大标题「失败/胜利」是书法体 OCR 不稳，小字「客栈夜话」和
+# 右下角「再来一局 / Space 继续」才是可靠特征）。
+eval $words_settle = ["再来一局", "客栈夜话", "Space 继续", "奖励"]
+# 结算场景第二特征：触发前除了「再来一局」还必须看到其中之一，
+# 防止公屏聊天里刷出「再来一局」四个字就误操作。
+eval $words_settle2 = ["Space 继续", "Space继续", "Space", "客栈夜话"]
+# 标准开局场景（每一轮开始、开完下一局之后应看到的画面）：
+# 左上角任务栏「来到客栈 / 下榻休息: 0/1」，床上金色发光点。
+eval $words_standard = ["下榻休息", "来到客栈"]
+
+# 「未查看线索」拦截弹窗的提示文案（安卓端点按需要认这些字；PC 端用更窄的字面量）。
+eval $words_clue_head = ["未查看的线索", "未查看线索", "尚未查看", "请先查看"]
+
+# 多人模式躺下后「等待其他玩家躺下」的提示文案。
+# 躺下后只要看到这类文字，就说明守夜还没开始，只能等，绝不能重复触发（会起身）。
+eval $words_waiting = ["等待其他玩家", "等待其他侠士", "等待队友", "等待其他", "等待中", "正在等待", "请稍候"]
+
+# 从参数里拆出的开门／拒绝关键字。
+eval $open_list = []
+for part in split($open_words, ",")
+    eval $word = trim($part)
+    if not $word is_empty
+        eval append($open_list, $word)
+    end
+end
+eval $refuse_list = []
+for part in split($refuse_words, ",")
+    eval $word = trim($part)
+    if not $word is_empty
+        eval append($refuse_list, $word)
+    end
+end
+
+# 保守放行的序号表：字典 key 是字符串，查的时候把序号转成字符串。
+eval $safe_map = {}
+for part in split($safe_slots, ",")
+    eval $slot = trim($part)
+    if not $slot is_empty
+        eval $safe_map.$slot = true
+    end
+end
+
+# only25 策略写死的放行位：第 2、第 5 位。不受 safe_slots 参数影响，
+# 避免改动参数时把这个「最稳打法」一起改掉。
+eval $only25_map = {"2": true, "5": true}
+
+# ─── 共享变量 ─────────────────────────────────────────────────────────
+# 子过程的变量是隔离的：过程里要用到的词表、参数、累计结果都得先声明成 global，
+# 否则过程里读到的是空值。子文件里的过程同样读这里初始化的值。
+global $words_bad
+global $words_identity
+global $words_talk
+global $words_good
+global $words_listen
+global $words_ask
+global $open_suffix
+global $words_confirm
+global $words_settle
+global $words_settle2
+global $words_standard
+global $words_clue_head
+global $words_waiting
+global $open_list
+global $refuse_list
+global $safe_map
+global $only25_map
+global $strategy
+global $rehearsal
+global $bed
+global $records
+global $opened_total
+
+# ─── 主流程 ───────────────────────────────────────────────────────────
+eval $round = 0
+eval $guests_total = 0
+eval $opened_total = 0
+eval $records = []
+
+loop while $round < $rounds
+    eval $round = $round + 1
+    log info "第 " + $round + " / " + $rounds + " 轮：开始。"
+
+    # 开完下一局后人物仍站在房间里，不是躺在床上的——
+    # 所以每一轮都要重新找「躺下」提示 / 走向床上的金色发光点。
+    call $in_bed = go_to_bed()
+    if $in_bed < 0
+        log warn "没找到「躺下」提示，可能已经躺在床上，直接守夜。"
+    end
+
+    call $paid = play_night($round)
+    eval $guests_total = $guests_total + $paid
+
+    call finish_night()
+
+    if $round < $rounds
+        wait (1, 2)
+    end
+end
+
+log info "夜宿谜影跑完 " + $round + " 轮，累计判断 " + $guests_total + " 位访客。"
+eval notify("夜宿谜影完成：" + $round + " 轮 / " + $guests_total + " 位访客")
+collect $records as "guests"
+collect $round as "rounds_done"
+return 0
+
+
+# ─── 环境分发 ─────────────────────────────────────────────────────────
+# 四个平台能力按 env 选实现：desktop 走键盘/后台输入，其余走设备端点按与摇杆。
+
+# go_to_bed：在客栈房间内躺到床上开始守夜。
+# 返回：0=已躺下；-1=扫完房间都没能躺下（已截图）。
+def go_to_bed()
+    if env("desktop")
+        call $state = go_to_bed_desktop()
+    else
+        call $state = go_to_bed_android()
+    end
+    return $state
+end
+
+# dismiss_clue_dialog：「尚有未查看的线索」拦截弹窗，勾「今日不再提醒」后关掉。
+# 返回：1=处理过弹窗；0=画面上没有这个弹窗。
+def dismiss_clue_dialog()
+    if env("desktop")
+        call $done = dismiss_clue_dialog_desktop()
+    else
+        call $done = dismiss_clue_dialog_android()
+    end
+    return $done
+end
+
+# act_on_decision：按判定结果开门／拒绝。
+# 参数：$index — 第几位；$should_open — 1=放行，0=拒绝；$reason — 记进日志的理由。
+# 返回：实际生效的放行标记（1=真的开了门；0=拒绝）。
+def act_on_decision($index, $should_open, $reason)
+    if env("desktop")
+        call $opened = act_on_decision_desktop($index, $should_open, $reason)
+    else
+        call $opened = act_on_decision_android($index, $should_open, $reason)
+    end
+    return $opened
+end
+
+# finish_night：匹配结算场景 → 开下一局 → 验证标准开局场景。
+def finish_night()
+    if env("desktop")
+        call finish_night_desktop()
+    else
+        call finish_night_android()
+    end
+    return 0
+end
+
+
+# ─── try_lie_down ─────────────────────────────────────────────────────
+# 看到「躺下」就触发一次，然后验证提示是否消失：
+#   消失 = 已躺下；两次确认仍在 = 多半在等队友，绝不补触发（会起身），
+#   直接进入「等守夜开始」流程，由画面自己判断。
+#
+# 返回：1=已躺下且守夜已开始；2=触发过但没等到守夜开始（通常在等队友）；
+#       0=画面上没有「躺下」提示。
+def try_lie_down()
+    global $words_waiting
+    if env("desktop")
+        call $seen = lie_down_desktop()
+    else
+        call $seen = lie_down_android()
+    end
+    if $seen < 1
+        return 0
+    end
+    find as $still by contains "躺下"
+    if $still
+        wait (1.0, 1.0)
+        find as $still2 by contains "躺下"
+        if $still2
+            # 「等待其他玩家躺下」这类文案本身就含「躺下」两个字，别当成按钮还在。
+            find as $waiting2 by contains_any $words_waiting
+            if $waiting2
+                log info "已躺下，画面是等待提示（" + $waiting2.text + "），不重复触发，继续等守夜开始。"
+            else
+                log warn "触发后 2 秒「躺下」提示仍在（" + $still2.text + "），不重复触发（会起身），继续等守夜开始。"
+            end
+        else
+            log info "「躺下」提示已消失，已躺下。"
+        end
+    else
+        log info "「躺下」提示已消失，已躺下。"
+    end
+    call $started = wait_night_start(200)
+    if $started > 0
+        return 1
+    end
+    return 2
+end
+
+
+# ─── wait_night_start ─────────────────────────────────────────────────
+# 躺下后等守夜真正开始（多人模式必须等所有队友都躺下才会开始）。
+# 等待期间只「看」，绝不再触发躺下——重复输入会让人物起身。
+#   ① 看到「门外来客」→ 守夜开始，返回 1；
+#   ② 看到「等待其他玩家…」→ 记一条日志（只记一次），继续等；
+#   ③ 等满 $limit 秒仍未开始 → 截图 + 警告，返回 -1。
+# 参数：$limit — 最多等多少秒。
+def wait_night_start($limit)
+    global $words_waiting
+    eval $waited = 0
+    eval $logged = 0
+    eval $tick = 0
+    loop while $waited < $limit
+        find as $door by contains "门外来客"
+        if $door
+            if $waited > 0
+                log info "【守夜】已开始（躺下后等了 " + $waited + " 秒）。"
+            else
+                log info "【守夜】已开始。"
+            end
+            return 1
+        end
+        find as $waiting by contains_any $words_waiting
+        if $waiting
+            if $logged == 0
+                log info "【守夜】已躺下，等待其他玩家躺下（画面：" + $waiting.text + "）；期间不再重复触发。"
+                eval $logged = 1
+            end
+        end
+        # 等待期间若弹出「未查看线索」拦截框，先关掉：
+        # 它会盖住画面，导致「门外来客」判断一直看不到，白等到超时。
+        # 每 10 次轮询试一次（没弹窗时内部直接返回，不会误操作）。
+        if $tick == 0
+            call $dismissed = dismiss_clue_dialog()
+        end
+        eval $tick = $tick + 1
+        if $tick >= 10
+            log info "【守夜】已等 " + $waited + " 秒，还没开始（多人模式要等队友都躺下）。"
+            eval $tick = 0
+        end
+        wait (0.5, 0.6)
+        eval $waited = $waited + 1
+    end
+    screenshot from last
+    log warn "【守夜】躺下后等了 " + $limit + " 秒仍未开始（没看到「门外来客」），已截图。多人模式请确认队友是否都躺下了。"
+    return -1
+end
+
+
+# ─── play_night ───────────────────────────────────────────────────────
+# 守夜：等人敲门，来了就判断一位，直到 5 位访客都处理完或画面进入结算。
+#
+# 返回：本夜实际处理的访客数。
+def play_night($round)
+    eval $index = 0
+    loop while $index < 6
+        call $state = wait_knock(60)
+        if $state < 0
+            log "本轮没有新的敲门了，按 " + $index + " 位访客结算。"
+            break
+        end
+        eval $index = $index + 1
+        call handle_guest($index, $round)
+        # 等这扇门收起来，避免同一帧里把同一个人认两遍。
+        call $closed = wait_door_closed(8)
+        if $closed < 0
+            log warn "门边交互一直没消失，按已处理一位继续。"
+        end
+    end
+    return $index
+end
+
+
+# ─── wait_knock ───────────────────────────────────────────────────────
+# 等下一次敲门：访客到位后出现「是否开门?」提示就代表该做决定了。
+#
+# 参数：$timeout — 最多等多少秒。
+# 返回：0=决策提示已出现；-1=超时（可能已结算或不在夜宿画面）。
+def wait_knock($timeout)
+    eval $waited = 0
+    loop while $waited < $timeout
+        find as $ask by contains_any $words_ask
+        if $ask
+            return 0
+        end
+        # 画面已经进结算、没有下一扇门了。
+        find as $settle by contains_any $words_settle
+        if $settle
+            return -1
+        end
+        # 等待期间如果弹出「未查看线索」拦截框，顺手处理掉。
+        call dismiss_clue_dialog()
+        wait (0.8, 1.1)
+        eval $waited = $waited + 1
+    end
+    return -1
+end
+
+
+# ─── wait_door_closed ─────────────────────────────────────────────────
+# 等「是否开门」提示从画面上消失（表示这位访客已处理完）。
+#
+# 返回：0=已消失；-1=等到超时仍在。
+def wait_door_closed($timeout)
+    eval $waited = 0
+    loop while $waited < $timeout
+        wait (0.6, 0.9)
+        find as $ask by contains_any $words_ask
+        if not $ask
+            return 0
+        end
+        eval $waited = $waited + 1
+    end
+    return -1
+end
+
+
+# ─── handle_guest ─────────────────────────────────────────────────────
+# 判断并处理一位访客：先读屏幕确认是第几位 → 听风辨位看物品 → 定性 → 开门或拒绝。
+#
+# 参数：$index — 内部计数（兜底用）；$round — 第几轮（只用于日志）。
+# 序号以屏幕上的「门外来客(X/5)」为准，读不到才退回内部计数。
+# 前置：门边已出现交互项。
+# 后置：已对该访客做出开门／不开门的操作，结论写进日志与 $records。
+def handle_guest($index, $round)
+    eval $verdict = "unknown"
+    eval $reason = "没识别到身份或物品"
+
+    # 第一步：先确认现在是第几位。
+    eval $slot = $index
+    find as $cnt by contains "门外来客"
+    if $cnt
+        eval $prog = extract_progress($cnt.text)
+        if $prog.valid
+            eval $slot = $prog.current
+        else
+            log warn "读到「" + $cnt.text + "」但解析不出 X/5，按内部计数第 " + $index + " 位处理。"
+        end
+    else
+        log warn "没读到「门外来客 X/5」，按内部计数第 " + $index + " 位处理。"
+    end
+    if $slot == $index
+        log info "确认当前是第 " + $slot + " 位访客。"
+    else
+        log warn "计数校正：内部第 " + $index + " 位，屏幕显示第 " + $slot + " 位，以屏幕为准。"
+    end
+
+    if $strategy == "only25"
+        # 只开第 2、5 位：连「听风辨位」都不点，省一步、也省掉认错的概率。
+        if $cnt
+            eval $reason = "只开第 2、5 位，不做识别（" + $cnt.text + "）"
+        else
+            eval $reason = "只开第 2、5 位，不做识别"
+        end
+        call $should_open = decide($slot, $verdict)
+        if $rehearsal
+            eval $should_open = 0
+        end
+        call $final_open = act_on_decision($slot, $should_open, $reason)
+        eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
+        eval append($records, $record)
+        return 0
+    end
+
+    if $strategy == "count"
+        # 只看序号：不做任何识别，直接交给 decide 按人数规则开门。
+        eval $reason = "序号模式，不做识别"
+        call $should_open = decide($slot, $verdict)
+        if $rehearsal
+            eval $should_open = 0
+        end
+        call $final_open = act_on_decision($slot, $should_open, $reason)
+        eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
+        eval append($records, $record)
+        return 0
+    end
+
+    find as $listen by contains_any $words_listen
+    if $listen
+        click $listen after wait (0.6, 0.9)
+
+        # ① 违禁物品：看到就一定是坏人，不用再往下看。
+        find as $bad by contains_any $words_bad
+        if $bad
+            eval $verdict = "bad"
+            eval $reason = "发现违禁物品「" + $bad.text + "」"
+        else
+            # ② 只能靠对话盘问的身份，物品判断不了，交给兜底规则。
+            find as $talk by contains_any $words_talk
+            find as $who by contains_any $words_identity
+            find as $good by contains_any $words_good
+            if $talk
+                eval $reason = "身份「" + $talk.text + "」需对话盘问，物品不作依据"
+            else if $who and $good
+                eval $verdict = "good"
+                eval $reason = "身份「" + $who.text + "」+「" + $good.text + "」，与身份相符"
+            else if $who
+                eval $reason = "只认出身份「" + $who.text + "」，没看到常规物品"
+            end
+        end
+    else
+        eval $reason = "门边没有「听风辨位」选项"
+    end
+
+    call $should_open = decide($slot, $verdict)
+    if $rehearsal
+        eval $should_open = 0
+    end
+    call $final_open = act_on_decision($slot, $should_open, $reason)
+
+    eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
+    eval append($records, $record)
+    return 0
+end
+
+
+# ─── decide ───────────────────────────────────────────────────────────
+# 定性结果 → 是否放行。
+#
+#   识别为坏人        → 拒
+#   识别为好人        → 放
+#   认不出来：
+#     strategy=ocr    → 拒（宁可少拿，不冒险）
+#     strategy=count  → 只放 safe_slots 里的序号
+#     strategy=auto   → 同上（识别优先，认不出退回序号）
+#   另外，strategy=only25 时无论识别结果如何，都只看 $only25_map（第 2、5 位）。
+# 返回：1=放行；0=拒绝。
+def decide($index, $verdict)
+    eval $key = "" + $index
+    if $strategy == "only25"
+        if has_key($only25_map, $key)
+            return 1
+        end
+        return 0
+    end
+    if $verdict == "bad"
+        return 0
+    end
+    if $verdict == "good"
+        return 1
+    end
+    if $strategy == "ocr"
+        return 0
+    end
+    if has_key($safe_map, $key)
+        return 1
+    end
+    return 0
+end
+
+
+# ─── wait_standard_scene ──────────────────────────────────────────────
+# 开完下一局之后，验证标准开局场景是否出现：
+# 左上角任务栏「来到客栈 / 下榻休息: 0/1」+ 床上金色发光点。
+# 多人模式：会先弹「确认进入」匹配框（带倒计时和「拒绝」按钮），
+# 必须点「确认进入」才会进下一局；单人模式没有这一步，扫过即跳过。
+#
+# 返回：1=标准场景已确认；0=等了约 20 秒仍没看到（已截图）。
+def wait_standard_scene()
+    eval $scan = 0
+    eval $ce_clicked = 0
+    loop while $scan < 24
+        # 多人模式：先处理「确认进入」匹配框（最多点 2 次，避免误触旁边的「拒绝」）。
+        find as $ok_btn by contains "确认进入"
+        if $ok_btn
+            if $ce_clicked < 2
+                log info "【结算】多人匹配确认框出现，点「确认进入」（第 " + ($ce_clicked + 1) + " 次）。"
+                click $ok_btn after wait (0.6, 0.9)
+                eval $ce_clicked = $ce_clicked + 1
+            end
+        else
+            find as $std by contains_any $words_standard
+            if $std
+                log info "【结算】标准开局场景确认（命中「" + $std.text + "」），新一轮开始。"
+                return 1
+            end
+        end
+        wait (0.5, 0.7)
+        eval $scan = $scan + 1
+    end
+    screenshot from last
+    log warn "【结算】没等到标准开局场景（找：来到客栈/下榻休息；多人模式还找：确认进入），已截图。"
+    return 0
+end

@@ -1,0 +1,247 @@
+#% name: 风沙酒肆·夜宿谜影（桌面端过程）
+#% env: [desktop]
+
+# 桌面端平台过程：全部走键盘，Y/N 开门，Space 关弹窗。
+#
+# 后台输入（PostMessage）发不了相对鼠标位移，游戏视角转不动，
+# 所以找床完全不依赖视角：先试原地「躺下」，再用 W/A/S/D 扫一圈房间。
+#
+# 词表、序号表与 $records 由入口 standalone/fengsha_jiushi_night.wf 初始化：
+# import 只合并 def，本文件顶层的语句不会执行，所以这里只放过程。
+
+# ─── lie_down_desktop ─────────────────────────────────────────────────
+# 找一次「躺下」提示并按 F。只按一次——重复按会让人物起身，
+# 按完是否真的躺下由入口的 try_lie_down 校验。
+#
+# 返回：1=已按过 F；0=画面上没有「躺下」提示。
+def lie_down_desktop()
+    find as $lie by contains "躺下"
+    if not $lie
+        return 0
+    end
+    log info "看到「躺下」提示，按 F 躺下（只按一次，重复按会起身）。"
+    press "f" after wait (1.0, 1.0)
+    return 1
+end
+
+
+# ─── go_to_bed_desktop ────────────────────────────────────────────────
+# 在客栈房间内躺到床上开始守夜（键盘 / 后台输入）：
+#   ① 原地先试躺下：可能进房间时提示已经在画面上；
+#   ①b 位置选 2、3 号床时：先按住 D 键转身对向床（每次转完试一次躺下，最多 3 次），
+#      转好再按住 W 向前走到床边；
+#   ② 再用键盘扫房间：前 3 步（W）→ 右 3 步（D）→ 左 6 步（A）→ 后 3 步（S），
+#      每走一步都找一次「躺下」，看到就按 F；
+#   ③ 走完一圈还没有就截图 + 警告，不会乱按后续按键。
+# 前置：人在客栈房间内即可（视角无需对准床）。
+# 返回：0=已躺下；-1=走完一圈都没能躺下（已截图）。
+def go_to_bed_desktop()
+    global $bed
+    eval $bed_name = "1 号床"
+    if $bed == "bed2"
+        eval $bed_name = "2 号床"
+    end
+    if $bed == "bed3"
+        eval $bed_name = "3 号床"
+    end
+    # ① 原地先试：视角刚好正对床时，「躺下」提示一开始就在。
+    call $ok = try_lie_down()
+    if $ok > 0
+        return 0
+    end
+
+    # ①b 2、3 号床：后台输入模式（PostMessage）不支持相对鼠标位移，转不了视角，
+    #     改用键盘按 D 键转身对向床（每按一次试一下躺下，最多 3 次），再按住 W 走过去。
+    if $bed != "bed1"
+        log info "位置 " + $bed_name + "：后台模式不能转视角，改为按 D 键转身对向床。"
+        eval $turn = 0
+        loop while $turn < 3
+            eval $tn = $turn + 1
+            log info "第 " + $tn + " 次按 D 键转身，看看床边有没有「躺下」。"
+            press "D" hold (0.6, 0.9)
+            wait (0.6, 0.9)
+            call $ok = try_lie_down()
+            if $ok > 0
+                return 0
+            end
+            eval $turn = $turn + 1
+        end
+        log info "方向转好，按住 W 走到床边。"
+        press "W" hold (0.5, 0.8)
+        wait (0.4, 0.7)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        log warn "按 D 转身并前进后仍没看到「躺下」，继续用键盘扫房间。"
+    end
+
+    # ② 键盘扫房间（完全不依赖视角）：前 → 右 → 左 → 后，各走几步，
+    #    每走一步都试一次躺下。房间很小，走这一圈总能贴到床边。
+    eval $step = 0
+    loop while $step < 3
+        eval $sn = $step + 1
+        log info "向前走第 " + $sn + " 步（W），看看床边有没有「躺下」。"
+        press "W" hold (0.5, 0.8)
+        wait (0.4, 0.7)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        eval $step = $step + 1
+    end
+
+    eval $step = 0
+    loop while $step < 3
+        eval $sn = $step + 1
+        log info "向右平移第 " + $sn + " 步（D），看看床边有没有「躺下」。"
+        press "D" hold (0.5, 0.8)
+        wait (0.4, 0.7)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        eval $step = $step + 1
+    end
+
+    eval $step = 0
+    loop while $step < 6
+        eval $sn = $step + 1
+        log info "向左平移第 " + $sn + " 步（A），看看床边有没有「躺下」。"
+        press "A" hold (0.5, 0.8)
+        wait (0.4, 0.7)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        eval $step = $step + 1
+    end
+
+    eval $step = 0
+    loop while $step < 3
+        eval $sn = $step + 1
+        log info "向后退第 " + $sn + " 步（S），看看床边有没有「躺下」。"
+        press "S" hold (0.5, 0.8)
+        wait (0.4, 0.7)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        eval $step = $step + 1
+    end
+
+    screenshot from last
+    log warn "键盘扫了一圈（前 3、右 3、左 6、后 3 步）仍没躺下，已截图。请手动走到床边再启动脚本。"
+    return -1
+end
+
+
+# ─── dismiss_clue_dialog_desktop ──────────────────────────────────────
+# 「尚有未查看的线索」拦截弹窗：勾选「今日不再提醒」，再按 Space 确认。
+#
+# 返回：1=处理过弹窗；0=画面上没有这个弹窗。
+def dismiss_clue_dialog_desktop()
+    find as $dlg by contains "未查看的线索"
+    if not $dlg
+        find as $dlg2 by contains "未查看线索"
+        if not $dlg2
+            return 0
+        end
+    end
+    log info "检测到「未查看线索」弹窗：勾选今日不再提醒，按 Space 确认。"
+    find as $tip by contains "不再提醒"
+    if $tip
+        click $tip after wait (0.5, 0.8)
+    end
+    press "space" after wait (0.4, 0.6)
+    wait (0.6, 0.9)
+    return 1
+end
+
+
+# ─── act_on_decision_desktop ──────────────────────────────────────────
+# 按判定结果用键盘做选择：Y=开门，N=不开（游戏是 Y/N 快捷键，不是可点按钮）。
+#
+# 参数：$index — 第几位；$should_open — 1=放行，0=拒绝；$reason — 记进日志的理由。
+# 返回：实际生效的放行标记（1=真的开了门；0=拒绝）。
+def act_on_decision_desktop($index, $should_open, $reason)
+    global $words_ask
+    global $opened_total
+    if $should_open > 0
+        press "y" after wait (1.0, 1.6)
+        # 游戏可能弹「尚有未查看的线索」拦住开门：勾不再提醒 + Space 确认，
+        # 关掉后提示还在的话再按一次 Y。
+        call $dismissed = dismiss_clue_dialog()
+        if $dismissed > 0
+            find as $ask by contains_any $words_ask
+            if $ask
+                log info "弹窗已关，重新按 Y 开门。"
+                press "y" after wait (0.6, 0.9)
+                call dismiss_clue_dialog()
+            end
+        end
+        eval $opened_total = $opened_total + 1
+        log info "第 " + $index + " 位：放行（" + $reason + "）"
+        return 1
+    end
+
+    press "n" after wait (1.0, 1.6)
+    log info "第 " + $index + " 位：拒绝（" + $reason + "）"
+    return 0
+end
+
+
+# ─── finish_night_desktop ─────────────────────────────────────────────
+# 收尾：先匹配结算场景 → 写日志 → 按 F 再来一局 → 验证标准开局场景。
+#
+# 场景门禁（场景不对，不进行输入）：
+#   按 F 前必须同时看到「再来一局」和第二结算特征（Space 继续 / 客栈夜话），
+#   只有孤零零一个「再来一局」（比如公屏聊天里刷出来的）不算数，不按 F。
+#   连续多轮只看到「再来一局」、始终看不到第二特征时，为避免卡死，
+#   记警告后仍按 F（此时「再来一局」已持续在屏 8 秒以上，基本可确认是结算画面）。
+# 按 F 后多人模式若有「确认进入」匹配框，由 wait_standard_scene 点掉再验证开局场景。
+def finish_night_desktop()
+    global $words_settle
+    global $words_settle2
+    eval $waited = 0
+    eval $gate_tries = 0
+    loop while $waited < 40
+        find as $again by contains "再来一局"
+        if $again
+            # 场景门禁：结算特征必须齐全才允许按 F。
+            find as $mark by contains_any $words_settle2
+            if $mark
+                log info "【结算】场景匹配成功（「再来一局」+「" + $mark.text + "」），按 F 再来一局。"
+                press "f" after wait (0.6, 0.9)
+                log info "【结算】已按 F，等待标准开局场景。"
+                call $ok = wait_standard_scene()
+                if $ok > 0
+                    return 0
+                end
+                log warn "【结算】按 F 后没等到标准开局场景，补按一次 F 再验一次。"
+                press "f" after wait (0.5, 0.8)
+                call wait_standard_scene()
+                return 0
+            end
+            eval $gate_tries = $gate_tries + 1
+            if $gate_tries >= 4
+                log warn "【结算】连续 4 次只看到「再来一局」、始终看不到第二结算特征（Space 继续/客栈夜话），判定场景大致正确，仍按 F。"
+                press "f" after wait (0.6, 0.9)
+                call wait_standard_scene()
+                return 0
+            end
+            log info "【结算】看到「再来一局」但结算场景特征不全（缺 Space 继续/客栈夜话），暂不按 F，继续确认场景。"
+        end
+        find as $settle by contains_any $words_settle
+        if $settle
+            # 只看到第二特征、没看到「再来一局」：先记着，继续等下一帧补齐。
+            eval $gate_tries = $gate_tries + 1
+            log info "【结算】看到结算特征「" + $settle.text + "」，等待「再来一局」一并提供场景确认。"
+        end
+        wait (0.8, 1.1)
+        eval $waited = $waited + 1
+    end
+    screenshot from last
+    log warn "【结算】等了 40 秒场景始终不匹配（需要：再来一局 + Space 继续/客栈夜话），已截图，不按 F。下一轮将尝试正常住店流程。"
+    return 0
+end

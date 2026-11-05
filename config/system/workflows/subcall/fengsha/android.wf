@@ -1,0 +1,323 @@
+#% name: 风沙酒肆·夜宿谜影（安卓端过程）
+#% env: [android]
+
+# 安卓端平台过程：全部交互改为点按与摇杆拖拽，无键盘依赖
+# （设备端输入后端只表达 ESC/HOME，press 其他键会直接报错）。
+#
+# 词表、序号表与 $records 由入口 standalone/fengsha_jiushi_night.wf 初始化：
+# import 只合并 def，本文件顶层的语句不会执行，所以这里只放过程。
+
+# ─── click_first_word_android ─────────────────────────────────────────
+# 按优先级逐个词找屏幕文字，找到就点。全屏 find 只返回读到的第一处文字，
+# 标题、说明里也可能带关键字，所以按钮类目标要按词逐个找。
+#
+# 返回：1=已点击；0=一个词都没找到。
+def click_first_word_android($words)
+    for word in $words
+        find as $hit by contains $word
+        if $hit
+            click $hit after wait (1.4, 2.0)
+            return 1
+        end
+    end
+    return 0
+end
+
+
+# ─── lie_down_android ─────────────────────────────────────────────────
+# 找一次「躺下」按钮并点击。只点一次——重复点会让人物起身，
+# 点完是否真的躺下由入口的 try_lie_down 校验。
+#
+# 返回：1=已点过；0=画面上没有「躺下」按钮。
+def lie_down_android()
+    find as $lie by contains "躺下"
+    if not $lie
+        return 0
+    end
+    log info "看到「躺下」提示，点击（只点一次，重复点会起身。OCR 读到：" + $lie.text + "）。"
+    click $lie after wait (1.0, 1.0)
+    return 1
+end
+
+
+# ─── go_to_bed_android ────────────────────────────────────────────────
+# 在客栈房间内躺到床上开始守夜（点按 + 摇杆）：
+#   ① 先向上推摇杆向前走一小步，走完立刻找「躺下」；
+#   ② 没有就向右横滑转视角约 45°，再看一次；如此「走 → 看 → 右转 45° → 看」
+#      循环最多 8 轮（8 × 45° 正好转一圈），直到找到「躺下」；
+#   ①b 位置选 2、3 号床时：开局位置偏开，先把摇杆向右偏后方推（人物向右后斜移），
+#      再向上推摇杆走到床边试躺；1 号床不做这一步。
+#
+# ⚠️ 手势坐标写死在下面 drag 行里，按手机实际画面改：
+#    右后斜移（2/3 号床）：(0.12,0.80) → (0.36,0.92)，摇杆推向右下（右偏后）；
+#             移得不够就把止点 X 加大（例如 0.40），后移不足就把 Y 加大（例如 0.96）；
+#             要改成右前斜移就把 Y 改小（例如 0.68）。
+#    摇杆：   (0.12,0.80) 是左下角典型位置，向上推到 0.52。
+# 前置：人在客栈房间内即可，不需要先转好视角。
+# 返回：0=已躺下；-1=走了 8 轮都没能躺下（已截图）。
+def go_to_bed_android()
+    global $bed
+    eval $bed_name = "1 号床"
+    if $bed == "bed2"
+        eval $bed_name = "2 号床"
+    end
+    if $bed == "bed3"
+        eval $bed_name = "3 号床"
+    end
+    # ①b 2、3 号床：开局朝向偏开，先原地右滑转一次约 45°，再向前走。
+    #     （1 号床与单人模式完全一致，直接进入下面的扫描循环。）
+    if $bed != "bed1"
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        log info "位置 " + $bed_name + "：摇杆向右偏后方移动（右下），再向前走到床边。"
+        drag (0.12, 0.80) to (0.36, 0.92) duration [0.8, 1.2]
+        wait (0.5, 0.8)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        log info "已向右后方移动过，再向上推摇杆走到床边。"
+        drag (0.12, 0.80) to (0.12, 0.52) duration [0.6, 0.9]
+        wait (0.5, 0.8)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        log info "该位置专用路线没躺下，退回常规扫描流程。"
+    end
+
+    # ② 常规扫描：先向前走一小步 → 看有没有「躺下」→ 没有就右转约 45° → 再看，
+    #    最多 8 轮（8 × 45° 正好转一圈），一路扫过整个房间。
+    eval $cycle = 0
+    loop while $cycle < 8
+        eval $cn = $cycle + 1
+        log info "第 " + $cn + " / 8 轮：先向上推摇杆向前走，再看有没有「躺下」。"
+        drag (0.12, 0.80) to (0.12, 0.52) duration [0.6, 0.9]
+        wait (0.5, 0.8)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+
+        log info "第 " + $cn + " 轮：没看到「躺下」，向右转约 45°。"
+        drag (0.62, 0.50) to (0.73, 0.50) duration [0.6, 0.9]
+        wait (0.4, 0.6)
+        call $ok = try_lie_down()
+        if $ok > 0
+            return 0
+        end
+        eval $cycle = $cycle + 1
+    end
+
+    screenshot from last
+    log warn "走了 8 轮仍没躺下，已截图。检查摇杆坐标、右后移动方向是否正确。"
+    return -1
+end
+
+
+# ─── dismiss_clue_dialog_android ──────────────────────────────────────
+# 「尚有未查看的线索，请先查看全部线索」拦截弹窗：
+# 勾选「今日不再提醒」→ 点确认按钮 → 验证弹窗是否关掉，没关就点空白处再确认一次。
+# 移动端没有键盘，全程点按（对应 PC 版的「按 Space 确认」）。
+#
+# 返回：1=处理过弹窗；0=画面上没有这个弹窗。
+def dismiss_clue_dialog_android()
+    global $words_clue_head
+    global $words_confirm
+    # 真的弹窗一定会带「未查看的线索 / 请先查看」这类提示文案；
+    # 「今日不再提醒」单独出现（比如公屏聊天）不算弹窗。
+    find as $head by contains_any $words_clue_head
+    if not $head
+        return 0
+    end
+    log info "检测到弹窗「" + $head.text + "」：勾选今日不再提醒，点确认按钮。"
+    find as $tip by contains "不再提醒"
+    if $tip
+        log info "勾选「" + $tip.text + "」。"
+        click $tip after wait (0.5, 0.8)
+    end
+    eval $ok = 0
+    eval $try = 0
+    loop while $try < 2
+        call $ok = click_first_word_android($words_confirm)
+        if $ok > 0
+            log info "已点确认按钮。"
+            break
+        end
+        eval $try = $try + 1
+        wait (0.4, 0.6)
+    end
+    wait (0.6, 0.9)
+    # 验证：弹窗还在就点空白处再确认一次。
+    find as $still by contains_any $words_clue_head
+    if $still
+        log warn "确认后弹窗仍在，点空白处并再点一次确认。"
+        click (0.5, 0.88)
+        wait (0.5, 0.8)
+        call click_first_word_android($words_confirm)
+        wait (0.6, 0.9)
+    else
+        log info "弹窗已关闭。"
+    end
+    return 1
+end
+
+
+# ─── click_open_button_android / click_refuse_button_android ──────────
+# 点「开门」/「不开」按钮。真实 UI 文案带人数后缀：「开门（1人选择）」「不开（0人选择）」。
+# ⚠️ 全屏 find 按从上到下顺序返回第一条命中，而按钮上方的「是否开门?」提示也含「开门」，
+#    所以开门绝不能用裸 contains "开门"（会点到提示文字）——只认带人数后缀的形态。
+#
+# 开门匹配顺序：
+#   ① equals 精确匹配（兼容无后缀的旧版文案）；
+#   ② equals_any 关键字表；
+#   ③ contains_any 后缀形态（全角/半角括号、空格、直接跟数字）。
+# 不开没有歧义（提示与任务栏都不含「不开」），最后可直接 contains 兜底。
+#
+# 返回：1=已点击；0=没找到按钮。
+def click_open_button_android()
+    global $open_list
+    global $open_suffix
+    find as $a by equals "开门"
+    if $a
+        click $a after wait (1.4, 2.0)
+        return 1
+    end
+    find as $b by equals_any $open_list
+    if $b
+        click $b after wait (1.4, 2.0)
+        return 1
+    end
+    find as $c by contains_any $open_suffix
+    if $c
+        log info "命中「开门」按钮（OCR 读到：" + $c.text + "）。"
+        click $c after wait (1.4, 2.0)
+        return 1
+    end
+    return 0
+end
+
+def click_refuse_button_android()
+    global $refuse_list
+    find as $a by equals "不开门"
+    if $a
+        click $a after wait (1.4, 2.0)
+        return 1
+    end
+    find as $b by equals_any $refuse_list
+    if $b
+        click $b after wait (1.4, 2.0)
+        return 1
+    end
+    find as $c by contains_any $refuse_list
+    if $c
+        log info "命中「不开」按钮（OCR 读到：" + $c.text + "）。"
+        click $c after wait (1.4, 2.0)
+        return 1
+    end
+    return 0
+end
+
+
+# ─── act_on_decision_android ──────────────────────────────────────────
+# 按判定结果点「开门」或「不开门」按钮（移动端是触屏按钮，不是键盘快捷键）。
+#
+# 参数：$index — 第几位；$should_open — 1=放行，0=拒绝；$reason — 记进日志的理由。
+# 返回：实际生效的放行标记（1=真的开了门；0=拒绝）。
+def act_on_decision_android($index, $should_open, $reason)
+    global $words_ask
+    global $opened_total
+    if $should_open > 0
+        call $clicked = click_open_button_android()
+        if $clicked > 0
+            # 游戏可能弹「尚有未查看的线索」拦住开门：勾不再提醒 + 点确认，
+            # 关掉后提示还在的话再点一次开门。
+            call $dismissed = dismiss_clue_dialog()
+            if $dismissed > 0
+                find as $ask by contains_any $words_ask
+                if $ask
+                    log info "弹窗已关，重新点「开门」。"
+                    call click_open_button_android()
+                    call dismiss_clue_dialog()
+                end
+            end
+            eval $opened_total = $opened_total + 1
+            log info "第 " + $index + " 位：放行（" + $reason + "）"
+            return 1
+        end
+        log warn "第 " + $index + " 位判定放行，但没找到「开门」按钮，跳过。"
+        eval pause("要放行第 " + $index + " 位，却没找到「开门」按钮。请手动处理后点确定。")
+        return 0
+    end
+
+    call $clicked = click_refuse_button_android()
+    if $clicked > 0
+        log info "第 " + $index + " 位：拒绝（" + $reason + "）"
+    else
+        log warn "第 " + $index + " 位要拒绝，但没找到「不开门」按钮，跳过。"
+    end
+    return 0
+end
+
+
+# ─── finish_night_android ─────────────────────────────────────────────
+# 收尾：先匹配结算场景 → 写日志 → 点「再来一局」→ 验证标准开局场景。
+#
+# 场景门禁（场景不对，不进行输入）：
+#   点击前必须同时看到「再来一局」和第二结算特征（Space 继续 / 客栈夜话），
+#   只有孤零零一个「再来一局」（比如公屏聊天里刷出来的）不算数，不点。
+#   连续 4 次不全时为避免卡死，记警告后仍点一次。
+# 点完验证标准开局场景（左上角「来到客栈 / 下榻休息: 0/1」），没等到补点一次。
+def finish_night_android()
+    global $words_settle
+    global $words_settle2
+    eval $waited = 0
+    eval $gate_tries = 0
+    loop while $waited < 40
+        # 结算画面上偶尔压着「未查看线索」弹窗，先清掉再判断场景。
+        call dismiss_clue_dialog()
+
+        find as $again by contains "再来一局"
+        if $again
+            # 场景门禁：结算特征必须齐全才允许点。
+            find as $mark by contains_any $words_settle2
+            if $mark
+                log info "【结算】场景匹配成功（「再来一局」+「" + $mark.text + "」），点「再来一局」。"
+                click $again after wait (0.6, 0.9)
+                log info "【结算】已点「再来一局」，等待标准开局场景。"
+                call $ok = wait_standard_scene()
+                if $ok > 0
+                    return 0
+                end
+                log warn "【结算】没等到标准开局场景，补点一次「再来一局」再验一次。"
+                find as $again2 by contains "再来一局"
+                if $again2
+                    click $again2 after wait (0.5, 0.8)
+                end
+                call wait_standard_scene()
+                return 0
+            end
+            eval $gate_tries = $gate_tries + 1
+            if $gate_tries >= 4
+                log warn "【结算】连续 4 次只看到「再来一局」、始终看不到第二结算特征（Space/客栈夜话），判定场景大致正确，仍点一次。"
+                click $again after wait (0.6, 0.9)
+                call wait_standard_scene()
+                return 0
+            end
+            log info "【结算】看到「再来一局」但结算场景特征不全（缺 Space/客栈夜话），暂不点击，继续确认场景。"
+        end
+        find as $settle by contains_any $words_settle
+        if $settle
+            # 只看到第二特征、没看到「再来一局」：先记着，继续等下一帧补齐。
+            eval $gate_tries = $gate_tries + 1
+            log info "【结算】看到结算特征「" + $settle.text + "」，等待「再来一局」一并提供场景确认。"
+        end
+        wait (0.8, 1.1)
+        eval $waited = $waited + 1
+    end
+    screenshot from last
+    log warn "【结算】等了 40 秒场景始终不匹配（需要：再来一局 + Space/客栈夜话），已截图，不点任何按钮。下一轮将重新找床。"
+    return 0
+end

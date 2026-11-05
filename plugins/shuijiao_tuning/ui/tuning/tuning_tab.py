@@ -1,0 +1,892 @@
+"""燕云「调律」Tab —— 通过 AppHooks 注入通用 MainWindow 的插件页面。
+
+职责：
+- 调律配置两页 Tab（规则 | 参数）按执行用户独立持久化：
+  规则 = 调律规则与玩法；参数 = 部位、全局开关、调律设置与调试参数
+- 「开始调律」按钮三态（运行中 / 未就绪 / 就绪），订阅宿主 automation_state_changed
+- ``f9_run()``：F9 快捷键与按钮共用的启停入口，
+  收集配置并通过宿主 ``run_workflow_implementation`` 启动 auto_tuning
+"""
+from __future__ import annotations
+
+from loguru import logger
+from lvjiang.apps.shuijiao_tuning.config.auto_tuning_config import (
+    load_user_auto_tuning_config,
+    save_user_auto_tuning_config,
+)
+from lvjiang.apps.shuijiao_tuning.ui.tuning.gold_food_widget import GoldFoodWidget
+from lvjiang.apps.shuijiao_tuning.ui.tuning.junk_policy_widget import JunkPolicyWidget
+from lvjiang.apps.shuijiao_tuning.ui.tuning.profile_widget import (
+    ProfileRequirementsWidget,
+)
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QTabWidget,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
+
+from lvjiang.apps.yysls.config.tune_slots import LOCKED_SLOTS, SLOT_GROUPS
+from lvjiang.apps.yysls.ui.tuning.config_widget import TuningGlobalsWidget
+from lvjiang.core.config.resolver import get_resolver
+from lvjiang.i18n import tr
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_execution_button_style,
+    fit_button_width,
+)
+from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.execution_feedback import (
+    ExecutionFeedback,
+    apply_idle_start,
+    idle_start_state,
+    show_running_feedback,
+)
+from lvjiang.ui.execution_user_selector import ExecutionUserSelector
+from lvjiang.ui.hotkeys import hotkey_label
+from lvjiang.ui.main.run_control import (
+    STATE_PAUSING,
+    STATE_STOPPING,
+    other_task_running_label,
+)
+
+
+def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
+    """开启的开关 key → 注册表显示名（注册表不可用时退回 key）"""
+    try:
+        from lvjiang.apps.yysls.core.tuning_rules import get_tune_config
+        names = get_tune_config().switches
+    except Exception:
+        names = {}
+    return [names.get(k, k) for k, v in switches.items() if v]
+
+
+class _OptionalPositiveSpinBox(QSpinBox):
+    """以 0 表示未设置，但界面保持空白而不是显示占位文字。"""
+
+    def textFromValue(self, value: int) -> str:  # noqa: N802 - Qt override
+        return "" if value == 0 else super().textFromValue(value)
+
+    def valueFromText(self, text: str | None) -> int:  # noqa: N802 - Qt override
+        return 0 if not text or not text.strip() else super().valueFromText(text)
+
+
+class TuningTab(QWidget):
+    """调律 Tab（host 为通用 MainWindow，提供宿主 API 与信号）"""
+
+    def __init__(self, host, parent=None):
+        super().__init__(parent)
+        self._host = host
+        self._loading_tuning_config = False
+        self._build_ui()
+        self._execution_user_selector.resolved_user_changed.connect(
+            self._on_execution_user_changed)
+        host.user_changed.connect(self._on_active_user_changed)
+        self._load_tuning_config()
+        host.automation_state_changed.connect(self._on_automation_state)
+        # 基础配置变更时刷新「参数」页开关（新增/删除开关即时生效）
+        get_resolver().add_change_listener(self._on_base_config_changed)
+        QTimer.singleShot(0, self._apply_compact_shell)
+
+    # ─── UI 构建 ─────────────────────────────────────────────
+
+    def _build_ui(self):
+        # 顶部固定按钮 + 下方配置两页 Tab + 底部状态栏
+        tab_layout = QVBoxLayout(self)
+        tab_layout.setContentsMargins(8, 8, 8, 8)
+        tab_layout.setSpacing(8)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(8)
+        self.btn_run_tuning = QPushButton(hotkey_label(
+            tr("开始调律"), self._host.plugin_runtime.hotkeys().start))
+        self.btn_run_tuning.clicked.connect(self.f9_run)
+        apply_execution_button_style(self.btn_run_tuning, "run")
+        btn_layout.addWidget(self.btn_run_tuning, 1)
+
+        self.btn_pause_resume = QPushButton(tr("暂停"))
+        self.btn_pause_resume.setEnabled(False)
+        apply_execution_button_style(self.btn_pause_resume, "disabled")
+        self.btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
+        btn_layout.addWidget(self.btn_pause_resume, 1)
+        self.btn_strategy_preset = QPushButton(tr("通用调律预设"))
+        self.btn_strategy_preset.setToolTip(tr("保留所选流派，填写 105–115 阶回收保护与金狗粮策略。"))
+        self.btn_strategy_preset.clicked.connect(self._apply_tuning_preset)
+        btn_layout.addWidget(self.btn_strategy_preset)
+        tab_layout.addLayout(btn_layout)
+
+        self._status_label = ExecutionFeedback()
+        self.execution_scope = "shuijiao_tuning"
+        self.execution_feedback = self._status_label
+        tab_layout.addWidget(self._status_label)
+
+        self._execution_user_selector = ExecutionUserSelector(
+            self._host.user_manager)
+        tab_layout.addWidget(self._execution_user_selector)
+
+        self._config_tabs = QTabWidget()
+        self._init_tuning_controls()
+        self._config_tabs.addTab(self._build_slots_page(), tr("部位"))
+        self._config_tabs.addTab(self._build_parameters_page(), tr("参数"))
+        self._profile_editor = ProfileRequirementsWidget()
+        self._profile_editor.config_changed.connect(self._save_tuning_config)
+        self._profile_editor.save_strict_callback = self._save_tuning_config
+        self._profile_editor.layout_changed.connect(lambda: QTimer.singleShot(0, self._fit_window))
+        self._config_tabs.insertTab(0, self._wrap_scroll(self._profile_editor), tr("流派与词条"))
+        self._changelog = QTextBrowser()
+        self._changelog.setOpenExternalLinks(False)
+        from pathlib import Path
+        PROJECT_ROOT = Path(__file__).parents[2]
+        try:
+            self._changelog.setMarkdown((PROJECT_ROOT / "README.md").read_text(encoding="utf-8"))
+        except OSError:
+            self._changelog.setPlainText("未找到更新日志，请检查是否完整解压软件。")
+        self._config_tabs.addTab(self._changelog, "使用说明")
+        self._config_tabs.setCurrentIndex(0)
+        tab_layout.addWidget(self._config_tabs)
+
+
+    def _fit_window(self, *_):
+        """A subplugin never resizes or hides the host shell."""
+        return
+
+    def _apply_compact_shell(self, *_):
+        """A subplugin never resizes or hides the host shell."""
+        return
+
+    def _wrap_scroll(self, panel: QWidget) -> QScrollArea:
+        """页面统一包可滚动容器（禁水平滚动，最小宽避免内容被裁切）"""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(panel)
+        vscrollbar = scroll.verticalScrollBar()
+        assert vscrollbar is not None
+        scrollbar_w = vscrollbar.sizeHint().width()
+        scroll.setMinimumWidth(
+            panel.minimumSizeHint().width() + scrollbar_w + 8)
+        return scroll
+
+    def _apply_tuning_preset(self):
+        """显式填写当前执行用户的预设；不启动、不消费材料。"""
+        from lvjiang.apps.shuijiao_tuning.config.auto_tuning_config import (
+            default_auto_tuning_config,
+        )
+
+        factory = default_auto_tuning_config()
+
+        if not self._execution_user_selector.resolve_username():
+            self._show_status_error(tr("请先选择执行用户"))
+            return
+        if idle_start_state(self._host) in ("running", STATE_PAUSING, "paused", STATE_STOPPING):
+            self._show_status_error(tr("请先停止当前任务，再应用预设"))
+            return
+        self._loading_tuning_config = True
+        try:
+            for cb in self._tuning_checkboxes:
+                cb.setChecked(cb.isEnabled())
+            self._min_level_combo.setCurrentIndex(
+                max(0, self._min_level_combo.findData(factory.get("min_level", 105))))
+            self._junk_policy.set_config(factory.get("junk_recycle"))
+            self._gold_food.set_config(factory.get("gold_food"))
+            self._fast_tuning_cb.setChecked(True)
+            self._front_inventory_cb.setChecked(True)
+            self._skip_locked_equipment_cb.setChecked(True)
+            self._skip_tuning_cb.setChecked(False)
+            self._cb_skip.setChecked(False)
+            self._cb_target.setChecked(False)
+            self._smart_tuning_enabled_by_group = {self._base_group_key: False}
+        finally:
+            self._loading_tuning_config = False
+        self._save_tuning_config()
+        self._status_label.set_reason(tr("通用预设已填写；请选择要调律的流派，检查材料后开始。"))
+
+    def _init_tuning_controls(self):
+        """初始化等级控件与底层材料配置引用，不构造旧规则页。"""
+        # ── 最低等级（运行时覆盖基础规则的等级门槛）────────
+        min_level_row = QHBoxLayout()
+        min_level_row.setContentsMargins(0, 0, 0, 0)
+        min_level_row.setSpacing(6)
+        min_level_row.addWidget(QLabel("<b>" + tr("最低等级：") + "</b>"))
+        self._min_level_combo = AutoWidthComboBox()
+        self._refresh_min_level_combo()
+        self._min_level_combo.currentIndexChanged.connect(
+            lambda _i: self._save_tuning_config())
+        self._min_level_combo.setToolTip(tr(
+            "低于所选等级的装备直接回收；保留既有锁定、冷却保护及回收确认。"))
+        min_level_row.addWidget(self._min_level_combo)
+        min_level_row.addStretch()
+        self._min_level_row = min_level_row
+
+        self._base_group_key = "default"
+        self._smart_tuning_enabled_by_group = {}
+
+    def _refresh_min_level_combo(self):
+        """刷新最低等级下拉列表（等级配置变更后调用）"""
+        current = self._min_level_combo.currentData()
+        self._min_level_combo.blockSignals(True)
+        self._min_level_combo.clear()
+        levels = (105, 110, 115)
+        for lv in levels:
+            self._min_level_combo.addItem(str(lv), lv)
+        # 恢复之前的选中值
+        if current is not None:
+            idx = self._min_level_combo.findData(current)
+            if idx >= 0:
+                self._min_level_combo.setCurrentIndex(idx)
+        self._min_level_combo.blockSignals(False)
+
+    def _select_base_group_radio(self, key: str):
+        # 仅保留基础材料配置的稳定引用，不提供旧规则/智能调律界面。
+        from lvjiang.apps.yysls.core.tuning_rules import get_tuning_group
+        self._base_group_key = key if get_tuning_group(key) is not None else "default"
+
+    def _sync_smart_tuning_checkbox(self):
+        self._smart_tuning_enabled_by_group = {self._base_group_key: False}
+
+    def _build_slots_page(self) -> QWidget:
+        """「部位」页：调律部位选择及全选操作。"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        slots_header = QHBoxLayout()
+        slots_header.addWidget(QLabel("<b>" + tr("调律部位：") + "</b>"))
+        slots_header.addStretch()
+        btn_select_all = QPushButton(tr("全选"))
+        btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
+        slots_header.addWidget(btn_select_all)
+        btn_deselect_all = QPushButton(tr("取消全选"))
+        btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
+        slots_header.addWidget(btn_deselect_all)
+        apply_button_style(btn_select_all, btn_deselect_all, variant="neutral")
+        fit_button_width(btn_select_all, btn_deselect_all, minimum=70)
+        layout.addLayout(slots_header)
+        self._tuning_checkboxes: list[QCheckBox] = []
+
+        slots_row = QHBoxLayout()
+        for group_name, slots in SLOT_GROUPS:
+            grp = QGroupBox(group_name)
+            grp_layout = QVBoxLayout(grp)
+            for slot_key, slot_label in slots:
+                cb = QCheckBox(slot_label)
+                cb.setObjectName(slot_key)
+                cb.setChecked(True)
+                if slot_key in LOCKED_SLOTS:
+                    # 主武器槽已展示全部武器，副武器无需遍历，强制禁用
+                    cb.setChecked(False)
+                    cb.setEnabled(False)
+                # 初始状态设置完成后再连接，避免构造期半成品状态误落盘
+                cb.stateChanged.connect(self._save_tuning_config)
+                grp_layout.addWidget(cb)
+                self._tuning_checkboxes.append(cb)
+            slots_row.addWidget(grp)
+        layout.addLayout(slots_row)
+        layout.addStretch()
+        return self._wrap_scroll(panel)
+
+    def _build_parameters_page(self) -> QWidget:
+        """「参数」页：全局开关、调律设置与调试参数。"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        layout.addWidget(QLabel("<b>" + tr("全局开关：") + "</b>"))
+        self._tuning_globals = TuningGlobalsWidget(show_skip_tuning=False)
+        self._tuning_globals.config_changed.connect(self._save_tuning_config)
+        layout.addWidget(self._tuning_globals)
+
+        self._junk_policy = JunkPolicyWidget()
+        self._junk_policy.config_changed.connect(self._save_tuning_config)
+        layout.addWidget(self._junk_policy)
+        layout.addLayout(self._min_level_row)
+        self._right_click_results = QCheckBox("空格调律 / 右键跳过结果动画（从左侧读取实际词条）")
+        self._right_click_results.setChecked(True)
+        self._right_click_results.toggled.connect(self._save_tuning_config)
+        layout.addWidget(self._right_click_results)
+        self._gold_food = GoldFoodWidget()
+        self._gold_food.config_changed.connect(self._save_tuning_config)
+        layout.addWidget(self._gold_food)
+        self._fast_tuning_cb = QCheckBox(tr("快速调律（PC，目标约 2 秒/轮）"))
+        self._fast_tuning_cb.setToolTip(tr("操作间隔缩短，并轮询结果及返还提示；首轮材料识别、返还动画和异常重试可能更久。"))
+        self._fast_tuning_cb.toggled.connect(self._save_tuning_config)
+        layout.addWidget(self._fast_tuning_cb)
+        self._scan_mode_combo = AutoWidthComboBox()
+        self._scan_mode_combo.addItem("新装备：从第一格开始，遇到原有满5条装备停止", "prefix")
+        self._scan_mode_combo.addItem("全背包：跳过已满5条装备，扫描到底", "all")
+        self._scan_mode_combo.currentIndexChanged.connect(self._save_tuning_config)
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("背包扫描模式："))
+        mode_row.addWidget(self._scan_mode_combo, 1)
+        self._scan_mode_combo.setToolTip("运行前请将背包回到第一格；两种模式都在页末逐行检查，不在启动时滚轮翻页。")
+        layout.insertLayout(0, mode_row)
+        self._front_inventory_cb = QCheckBox(tr("按当前首屏顺序调律，遇到已满五条即停止"))
+        self._front_inventory_cb.setChecked(True)
+        self._front_inventory_cb.setToolTip(tr("只处理当前可见首屏，不发送滚轮、不向后翻页；逐格处理，回收后读补位装备。请手动保持新装备在前。"))
+        self._front_inventory_cb.toggled.connect(self._save_tuning_config)
+        self._front_inventory_cb.hide()
+
+        layout.addWidget(QLabel("<b>" + tr("调律设置：") + "</b>"))
+        self._pc_background_scroll_cb = QCheckBox(
+            tr("PC 端兼容后台模式"))
+        self._pc_background_scroll_cb.setToolTip(tr(
+            "仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。"))
+        self._pc_background_scroll_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._pc_background_scroll_cb)
+        self._skip_locked_equipment_cb = QCheckBox(
+            tr("跳过锁定装备调律"))
+        self._skip_locked_equipment_cb.setToolTip(tr(
+            "启用后，扫描到已锁定装备时直接保留，不进入调律、重置或回收流程。"))
+        self._skip_locked_equipment_cb.setChecked(True)
+        self._skip_locked_equipment_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._skip_locked_equipment_cb)
+        self._use_stone_cache_cb = QCheckBox(tr("使用律准石缓存"))
+        self._use_stone_cache_cb.setToolTip(tr(
+            "首次识别后按调律、重置和回收结果记账；"
+            "关闭后每个检查点重新识别。"))
+        self._use_stone_cache_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._use_stone_cache_cb)
+        initial_stone_row = QHBoxLayout()
+        self._initial_stone_check_cb = QCheckBox(
+            tr("检查大律准石>="))
+        self._initial_stone_check_cb.setToolTip(tr(
+            "启用后，首次识别数量低于设定值时要求人工确认。"))
+        initial_stone_row.addWidget(self._initial_stone_check_cb)
+        self._initial_stone_min = _OptionalPositiveSpinBox()
+        self._initial_stone_min.setRange(0, 99999)
+        self._initial_stone_min.setEnabled(False)
+        self._initial_stone_min.setToolTip(tr(
+            "首次识别时使用的额外大律准石数量门槛。"))
+        self._initial_stone_check_cb.toggled.connect(
+            self._on_initial_stone_check_toggled)
+        self._initial_stone_min.valueChanged.connect(
+            lambda _value: self._save_tuning_config())
+        initial_stone_row.addWidget(self._initial_stone_min)
+        initial_stone_row.addStretch()
+        layout.addLayout(initial_stone_row)
+        self._positional_traversal_cb = QCheckBox(
+            tr("启用位置校验遍历策略"))
+        self._positional_traversal_cb.setToolTip(tr(
+            "默认使用去重遍历（dedup）；启用后改用位置校验遍历（positional）。"))
+        self._positional_traversal_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._positional_traversal_cb)
+
+        layout.addWidget(QLabel("<b>" + tr("调试参数：") + "</b>"))
+        self._skip_tuning_cb = QCheckBox(tr("跳过实际调律"))
+        self._skip_tuning_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._skip_tuning_cb)
+        self._validate_stone_cache_cb = QCheckBox(tr("运行时校验缓存"))
+        self._validate_stone_cache_cb.setToolTip(tr(
+            "启用后，每实际开始调律 5 件装备时重新读取律准石；"
+            "有效读数与缓存相差超过 1 个大律准石时记录错误日志。"))
+        self._validate_stone_cache_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._validate_stone_cache_cb)
+
+        # ── 初始跳过 / 指定调律（互斥）────────────────────
+        skip_group = QHBoxLayout()
+        self._cb_skip = QCheckBox(tr("初始跳过"))
+        self._sp_skip_row = QSpinBox()
+        self._sp_skip_row.setRange(1, 99)
+        self._sp_skip_row.setPrefix(tr("行 "))
+        self._sp_skip_col = QSpinBox()
+        self._sp_skip_col.setRange(1, 6)
+        self._sp_skip_col.setPrefix(tr("列 "))
+        skip_group.addWidget(self._cb_skip)
+        skip_group.addWidget(self._sp_skip_row)
+        skip_group.addWidget(self._sp_skip_col)
+        skip_group.addStretch()
+        layout.addLayout(skip_group)
+
+        target_group = QHBoxLayout()
+        self._cb_target = QCheckBox(tr("指定调律"))
+        self._sp_target_row = QSpinBox()
+        self._sp_target_row.setRange(1, 99)
+        self._sp_target_row.setPrefix(tr("行 "))
+        self._sp_target_col = QSpinBox()
+        self._sp_target_col.setRange(1, 6)
+        self._sp_target_col.setPrefix(tr("列 "))
+        target_group.addWidget(self._cb_target)
+        target_group.addWidget(self._sp_target_row)
+        target_group.addWidget(self._sp_target_col)
+        target_group.addStretch()
+        layout.addLayout(target_group)
+
+        # 互斥联动
+        self._cb_skip.toggled.connect(self._on_skip_target_toggled)
+        self._cb_target.toggled.connect(self._on_skip_target_toggled)
+        # 变更即持久化
+        self._cb_skip.toggled.connect(lambda: self._save_tuning_config())
+        self._cb_target.toggled.connect(lambda: self._save_tuning_config())
+        for sp in (self._sp_skip_row, self._sp_skip_col,
+                   self._sp_target_row, self._sp_target_col):
+            sp.valueChanged.connect(lambda: self._save_tuning_config())
+        # 初始状态：SpinBox 随 checkbox 勾选才可用
+        self._sp_skip_row.setEnabled(False)
+        self._sp_skip_col.setEnabled(False)
+        self._sp_target_row.setEnabled(False)
+        self._sp_target_col.setEnabled(False)
+
+        layout.addStretch()
+        return self._wrap_scroll(panel)
+
+    # ─── 按钮状态（订阅宿主 automation_state_changed）──────────
+
+    def _on_automation_state(self, state: str):
+        hk = self._host.plugin_runtime.hotkeys()
+        other_label = other_task_running_label(self._host, "shuijiao_tuning")
+        self.btn_run_tuning.setEnabled(True)
+        if other_label:
+            self.btn_run_tuning.setText(other_label)
+            self.btn_run_tuning.setEnabled(False)
+            apply_execution_button_style(self.btn_run_tuning, "disabled")
+        elif state == STATE_STOPPING:
+            self.btn_run_tuning.setText(tr("停止中"))
+            self.btn_run_tuning.setEnabled(False)
+            apply_execution_button_style(self.btn_run_tuning, "stopping")
+        elif state in ("running", STATE_PAUSING, "paused"):
+            self.btn_run_tuning.setText(hotkey_label(tr("停止"), hk.stop))
+            apply_execution_button_style(self.btn_run_tuning, "stop")
+        else:
+            selector = getattr(self, "_execution_user_selector", None)
+            reason = tr("请选择有效的执行用户") if selector is not None and not selector.resolve_username() else ""
+            apply_idle_start(self.btn_run_tuning, getattr(self, "_status_label", None),
+                             self._host, state, hotkey_label(tr("开始调律"), hk.start), reason)
+        if other_label or state in ("running", STATE_PAUSING, "paused", STATE_STOPPING):
+            self.btn_run_tuning.setToolTip("")
+            show_running_feedback(getattr(self, "_status_label", None), other_label)
+        # 刷新暂停/恢复按钮
+        if other_label:
+            self.btn_pause_resume.setText(tr("暂停"))
+            self.btn_pause_resume.setEnabled(False)
+            apply_execution_button_style(self.btn_pause_resume, "disabled")
+        elif state == STATE_PAUSING:
+            self.btn_pause_resume.setText(tr("暂停中"))
+            self.btn_pause_resume.setEnabled(False)
+            apply_execution_button_style(self.btn_pause_resume, "pausing")
+        elif state == "running":
+            self.btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
+            self.btn_pause_resume.setEnabled(True)
+            apply_execution_button_style(self.btn_pause_resume, "pause")
+        elif state == "paused":
+            self.btn_pause_resume.setText(hotkey_label(tr("恢复"), hk.pause))
+            self.btn_pause_resume.setEnabled(True)
+            apply_execution_button_style(self.btn_pause_resume, "run")
+        else:
+            self.btn_pause_resume.setText(tr("暂停"))
+            self.btn_pause_resume.setEnabled(False)
+            apply_execution_button_style(self.btn_pause_resume, "disabled")
+        # 进度面板的暂停提示：独立于按钮，避免只看右侧面板时误以为卡死
+        widget = self._find_progress_widget()
+        if widget is not None:
+            context = getattr(self._host, "_current_run_context", None)
+            if (context is not None
+                    and hasattr(widget, "set_run_paused")):
+                widget.set_run_paused(
+                    context.task_run_id, state == "paused")
+            else:
+                widget.set_paused(state == "paused")
+
+    def _on_pause_resume_clicked(self):
+        """暂停/恢复按钮点击 → 转发给宿主"""
+        self._host.request_pause_resume()
+
+    # ─── 配置变更监听 ────────────────────────────────────────
+
+    def _on_base_config_changed(self, rel_path: str):
+        """配置变更监听回调：tune_config/规则组变化时刷新对应控件"""
+        if rel_path == "yysls/tune_config.yaml":
+            self._tuning_globals.refresh_switches()
+        elif rel_path.startswith("yysls/base_groups/"):
+            self._select_base_group_radio(self._base_group_key)
+            self._sync_smart_tuning_checkbox()
+
+    def _on_execution_user_changed(self, username: str) -> None:
+        """固定执行用户改变时，切换到该用户的调律配置。"""
+        self._load_tuning_config(username)
+        self._status_label.clear_failure()
+        self._on_automation_state(idle_start_state(self._host))
+
+    def _on_active_user_changed(self, username: str) -> None:
+        """跟随当前用户时，主用户切换同步刷新调律配置。"""
+        if self._execution_user_selector.combo.currentData() is None:
+            self._load_tuning_config(username)
+            self._status_label.clear_failure()
+            if not self._host.is_running:
+                self._on_automation_state(idle_start_state(self._host))
+
+    def _users_dir(self):
+        return getattr(self._host.user_manager, "users_dir", None)
+
+    # ─── 启停入口（F9 快捷键 / 按钮点击共用）───────────────────
+
+    @staticmethod
+    def _missing_tuning_output_fields() -> list[str]:
+        """当前图库空间缺失的必需输出字段 key（调律启动预检）"""
+        from lvjiang.apps.yysls.core.recognizer.reference_adapter import (
+            get_missing_output_fields,
+        )
+        from lvjiang.core.reference_db import ReferenceDatabase
+        db = ReferenceDatabase()
+        db.load()
+        return get_missing_output_fields(db)
+
+    def f9_run(self):
+        """运行中 → 停止；否则收集配置启动自动调律"""
+        if self._host.is_running:
+            self._host.request_stop()
+            return
+        self._start_tuning()
+
+    def _show_status_error(self, message: str):
+        """在执行按钮下方显示启动错误。"""
+        self._status_label.show_failure(message)
+
+    def _clear_status(self):
+        """清除底部状态栏"""
+        self._status_label.clear_failure()
+
+    def _start_tuning(self, *, execution_username=None, config=None, smart_state=None):
+        """从统一存储读取调律配置，校验后启动 auto_tuning 工作流"""
+        host = self._host
+        if getattr(host, "_pc_only", False) and not host.is_running:
+            from lvjiang.pc_mode import enforce_pc_controls
+            enforce_pc_controls(host)
+        self._clear_status()
+
+        state = idle_start_state(host)
+        if state != "idle":
+            self._on_automation_state(state)
+            message = self._status_label.text()
+            host.append_log(f"[拒绝] {message}")
+            return
+
+        execution_username = execution_username or self._execution_user_selector.resolve_username()
+        if not execution_username:
+            msg = tr("请选择有效的执行用户")
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
+            return
+
+        # 图库空间预检（UI 即时反馈，与工作流 run() 预检同契约）
+        if self._missing_tuning_output_fields():
+            msg = tr("当前图库空间缺少 levels/counts 输出字段，无法启动自动调律")
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
+            return
+
+        # 启动快照与上方执行用户绑定，运行中不再重新读取配置。
+        tc = config if config is not None else load_user_auto_tuning_config(
+            execution_username, self._users_dir())
+        if config is None and getattr(self, "_profile_editor", None) is not None:
+            tc = {**tc, **self._profile_editor.get_config()}
+
+        if config is None:
+            tc = {**tc, "front_inventory": True, "inventory_mode": self._scan_mode_combo.currentData()}
+
+        from lvjiang.apps.shuijiao_tuning.core.agent.launch import prepare_tuning
+        try:
+            run_context = prepare_tuning(tc)
+            run_context.smart_state = smart_state
+            run_context.smart_tuning_enabled = False
+        except ValueError as exc:
+            self._show_status_error(str(exc))
+            host.append_log(f"[错误] {exc}")
+            return
+        # Only the human UI supplies unsaved positional controls.
+        if config is None:
+            if self._cb_skip.isChecked() and self._cb_skip.isEnabled():
+                run_context.skip_start = (self._sp_skip_row.value(), self._sp_skip_col.value())
+            if self._cb_target.isChecked() and self._cb_target.isEnabled():
+                run_context.target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
+            run_context.min_level = self._min_level_combo.currentData()
+        flow_name = tr("自动调律")
+        rule_judges = run_context.rule_judges
+        switches = tc.get("switches", {})
+        skip_tuning = run_context.skip_tuning
+        selected_slots = run_context.selected_slots
+        min_level_override = run_context.min_level
+        base_group = run_context.base_group
+        assert base_group is not None
+
+        def configure(wf_instance, engine):
+            import copy
+            engine.workflow_config_snapshot = copy.deepcopy(tc)
+            wf_instance.run_ctx = copy.deepcopy(run_context)
+            # 创建调律进度信号桥（右侧进度 Tab 由 _find_progress_widget 查找并连接）
+            if engine is not None:
+                from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
+                engine._progress_hub = TuningProgressHub()
+                # 连接右侧调律管理中的进度页
+                widget = self._find_progress_widget()
+                if widget is not None:
+                    task_run_id = str(getattr(engine, "task_run_id", "") or "")
+                    target = getattr(engine, "execution_target_snapshot", None)
+                    target_label = str(
+                        getattr(target, "display_name", "") or tr("未知目标"))
+                    title = f"{target_label} · {execution_username}"
+                    if task_run_id and hasattr(widget, "register_run"):
+                        engine._tuning_management = widget
+                        widget.register_run(
+                            task_run_id, engine._progress_hub, title=title)
+                    else:
+                        widget.reconnect(engine._progress_hub)
+                        widget.reset_state()
+                else:
+                    logger.warning("未找到调律进度控件，进度信号不会显示")
+
+            rule_names_text = "、".join(j.rule_name for j in rule_judges)
+            on_names = _tuning_switch_names(switches)
+            if on_names:
+                rule_names_text += f"（开关：{'、'.join(on_names)}）"
+            if skip_tuning:
+                host.append_log(tr("[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律"))
+            effective_min_level = (
+                min_level_override if min_level_override is not None
+                else base_group.scan.min_level)
+            host.append_log(
+                f"[开始] {flow_name} 流程，基础规则: {base_group.name}，"
+                f"规则: {rule_names_text}，范围: {'背包第一格起，遇满五条停止' if run_context.front_inventory else selected_slots}，"
+                f"最低等级: {effective_min_level}，"
+                f"执行用户: {execution_username}"
+                + ("" if min_level_override is None else "（UI 覆盖）"))
+
+        host.run_workflow_implementation(
+            "shuijiao_tuning", flow_name, configure,
+            execution_username=execution_username)
+
+    # ─── 进度控件查找 ────────────────────────────────
+
+    def _find_progress_widget(self):
+        """查找可连接进度桥的调律管理容器（兼容旧进度控件）。"""
+        from lvjiang.apps.shuijiao_tuning.ui.tuning.management_widget import (
+            TuningManagementWidget,
+        )
+
+        from lvjiang.apps.yysls.ui.tuning.progress_widget import TuningProgressWidget
+        tabs = getattr(self._host, 'tabs', None)
+        if tabs is None:
+            return None
+        for i in range(tabs.count()):
+            w = tabs.widget(i)
+            if isinstance(w, TuningManagementWidget):
+                return w
+            if isinstance(w, TuningProgressWidget):
+                return w
+        return None
+
+    # ─── 调律配置持久化（users/{username}.json）──────────────
+
+    def _load_tuning_config(self, username: str | None = None):
+        username = username or self._execution_user_selector.resolve_username()
+        tc = (
+            load_user_auto_tuning_config(username, self._users_dir())
+            if username else {}
+        )
+        self._loading_tuning_config = True
+        selected = tc.get("selected_slots") or []
+        try:
+            for cb in self._tuning_checkboxes:
+                cb.blockSignals(True)
+                # 禁用项（副武器）不随用户配置回选
+                cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
+                cb.blockSignals(False)
+            if getattr(self, "_profile_editor", None) is not None:
+                self._profile_editor.set_config(tc)
+            self._base_group_key = tc.get("base_group", "default")
+            self._select_base_group_radio(self._base_group_key)
+            self._tuning_globals.set_switches(tc.get("switches", {}))
+            self._junk_policy.set_config(tc.get("junk_recycle"))
+            self._right_click_results.setChecked(tc.get("right_click_results", True))
+            self._gold_food.set_config(tc.get("gold_food"))
+            self._fast_tuning_cb.blockSignals(True)
+            self._fast_tuning_cb.setChecked(bool(tc.get("fast_tuning", False)))
+            self._fast_tuning_cb.blockSignals(False)
+            self._front_inventory_cb.blockSignals(True)
+            self._front_inventory_cb.setChecked(True)
+            self._scan_mode_combo.blockSignals(True)
+            self._scan_mode_combo.setCurrentIndex(max(0, self._scan_mode_combo.findData(tc.get("inventory_mode", "prefix"))))
+            self._scan_mode_combo.blockSignals(False)
+            self._front_inventory_cb.blockSignals(False)
+            self._skip_tuning_cb.blockSignals(True)
+            self._skip_tuning_cb.setChecked(bool(tc.get("skip_tuning", False)))
+            self._skip_tuning_cb.blockSignals(False)
+            self._pc_background_scroll_cb.blockSignals(True)
+            self._pc_background_scroll_cb.setChecked(
+                bool(tc.get("pc_background_scroll", False)))
+            self._pc_background_scroll_cb.blockSignals(False)
+            self._skip_locked_equipment_cb.blockSignals(True)
+            self._skip_locked_equipment_cb.setChecked(
+                bool(tc.get("skip_locked_equipment", True)))
+            self._skip_locked_equipment_cb.blockSignals(False)
+            self._use_stone_cache_cb.blockSignals(True)
+            self._use_stone_cache_cb.setChecked(
+                bool(tc.get("use_stone_cache", True)))
+            self._use_stone_cache_cb.blockSignals(False)
+            initial_stone_min = tc.get("initial_stone_min_count")
+            initial_stone_enabled = bool(tc.get(
+                "initial_stone_check_enabled", initial_stone_min is not None))
+            self._initial_stone_check_cb.blockSignals(True)
+            self._initial_stone_check_cb.setChecked(initial_stone_enabled)
+            self._initial_stone_check_cb.blockSignals(False)
+            self._initial_stone_min.blockSignals(True)
+            self._initial_stone_min.setValue(
+                int(initial_stone_min) if initial_stone_min is not None
+                else (80 if initial_stone_enabled else 0))
+            self._initial_stone_min.blockSignals(False)
+            self._initial_stone_min.setEnabled(initial_stone_enabled)
+            self._validate_stone_cache_cb.blockSignals(True)
+            self._validate_stone_cache_cb.setChecked(
+                bool(tc.get("validate_stone_cache", False)))
+            self._validate_stone_cache_cb.blockSignals(False)
+            self._positional_traversal_cb.blockSignals(True)
+            self._positional_traversal_cb.setChecked(
+                tc.get("scroll_strategy") == "positional")
+            self._positional_traversal_cb.blockSignals(False)
+            saved_smart = tc.get("smart_tuning_enabled")
+            self._smart_tuning_enabled_by_group = (
+                dict(saved_smart) if isinstance(saved_smart, dict) else {})
+            self._sync_smart_tuning_checkbox()
+            # 最低等级（运行时覆盖基础规则的等级门槛）
+            saved_min_level = tc.get("min_level")
+            self._min_level_combo.blockSignals(True)
+            if saved_min_level is not None:
+                idx = self._min_level_combo.findData(int(saved_min_level))
+                if idx >= 0:
+                    self._min_level_combo.setCurrentIndex(idx)
+                else:
+                    self._min_level_combo.setCurrentIndex(0)  # 回退到「默认」
+            else:
+                self._min_level_combo.setCurrentIndex(0)  # 「默认」
+            self._min_level_combo.blockSignals(False)
+            # 初始跳过 / 指定调律
+            for key, cb, sp_row, sp_col in (
+                ("skip_start", self._cb_skip,
+                 self._sp_skip_row, self._sp_skip_col),
+                ("target_cell", self._cb_target,
+                 self._sp_target_row, self._sp_target_col),
+            ):
+                val = tc.get(key)
+                cb.blockSignals(True)
+                sp_row.blockSignals(True)
+                sp_col.blockSignals(True)
+                if isinstance(val, (list, tuple)) and len(val) == 2:
+                    cb.setChecked(True)
+                    sp_row.setValue(int(val[0]))
+                    sp_col.setValue(int(val[1]))
+                else:
+                    cb.setChecked(False)
+                cb.blockSignals(False)
+                sp_row.blockSignals(False)
+                sp_col.blockSignals(False)
+            self._on_skip_target_toggled()
+        finally:
+            self._loading_tuning_config = False
+
+    def _save_tuning_config(self):
+        if self._loading_tuning_config:
+            return False
+        username = self._execution_user_selector.resolve_username()
+        if not username:
+            return False
+        self._smart_tuning_enabled_by_group = {
+            **getattr(self, "_smart_tuning_enabled_by_group", {}),
+            self._base_group_key: False,
+        }
+        skip_start = None
+        if self._cb_skip.isChecked():
+            skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]
+        target_cell = None
+        if self._cb_target.isChecked():
+            target_cell = [self._sp_target_row.value(), self._sp_target_col.value()]
+        updated = load_user_auto_tuning_config(username, self._users_dir())
+        updated.update({
+            "selected_slots": self._get_tuning_selected_slots(),
+            "rules": self._get_tuning_rule_config(),
+            "switches": self._get_tuning_switches(),
+            "base_group": self._base_group_key,
+            "skip_tuning": self._get_tuning_skip_tuning(),
+            "pc_background_scroll": self._pc_background_scroll_cb.isChecked(),
+            "skip_locked_equipment": (
+                self._skip_locked_equipment_cb.isChecked()),
+            "use_stone_cache": self._use_stone_cache_cb.isChecked(),
+            "initial_stone_check_enabled": (
+                self._initial_stone_check_cb.isChecked()),
+            "initial_stone_min_count": (
+                self._initial_stone_min.value()
+                if (self._initial_stone_check_cb.isChecked()
+                    and self._initial_stone_min.value() > 0) else None),
+            "validate_stone_cache": self._validate_stone_cache_cb.isChecked(),
+            "scroll_strategy": (
+                "positional" if self._positional_traversal_cb.isChecked() else ""),
+            "skip_start": skip_start,
+            "target_cell": target_cell,
+            "min_level": self._min_level_combo.currentData(),
+            "smart_tuning_enabled": self._smart_tuning_enabled_by_group,
+            "junk_recycle": self._junk_policy.get_config(),
+            "right_click_results": self._right_click_results.isChecked(),
+            "gold_food": self._gold_food.get_config(),
+            "fast_tuning": self._fast_tuning_cb.isChecked(),
+            "front_inventory": True,
+            "inventory_mode": self._scan_mode_combo.currentData(),
+        })
+        if getattr(self, "_profile_editor", None) is not None:
+            updated.update(self._profile_editor.get_config())
+        save_user_auto_tuning_config(username, updated, self._users_dir())
+        return True
+
+    def _on_initial_stone_check_toggled(self, checked: bool) -> None:
+        self._initial_stone_min.setEnabled(checked)
+        if checked and self._initial_stone_min.value() == 0:
+            self._initial_stone_min.blockSignals(True)
+            self._initial_stone_min.setValue(80)
+            self._initial_stone_min.blockSignals(False)
+        self._save_tuning_config()
+
+    def _set_all_tuning_checks(self, checked: bool):
+        for cb in self._tuning_checkboxes:
+            if cb.isEnabled():
+                cb.setChecked(checked)
+        self._save_tuning_config()
+
+    def _on_skip_target_toggled(self):
+        """初始跳过 / 指定调律互斥联动：勾一个另一个置灰"""
+        skip_on = self._cb_skip.isChecked()
+        target_on = self._cb_target.isChecked()
+        self._cb_target.setEnabled(not skip_on)
+        self._sp_target_row.setEnabled(not skip_on and target_on)
+        self._sp_target_col.setEnabled(not skip_on and target_on)
+        self._cb_skip.setEnabled(not target_on)
+        self._sp_skip_row.setEnabled(skip_on and not target_on)
+        self._sp_skip_col.setEnabled(skip_on and not target_on)
+
+    def _get_tuning_selected_slots(self) -> list[str]:
+        return [cb.objectName() for cb in self._tuning_checkboxes if cb.isChecked()]
+
+    def _get_tuning_rule_config(self) -> dict[str, dict]:
+        """流派规则配置委托公共控件收集"""
+        if getattr(self, "_profile_editor", None) is not None:
+            return self._profile_editor.get_rules()
+        return {}
+
+    def _get_tuning_switches(self) -> dict[str, bool]:
+        """全局开关状态（「参数」页动态复选框）"""
+        return self._tuning_globals.get_switches()
+
+    def _get_tuning_skip_tuning(self) -> bool:
+        """「跳过实际调律」调试开关。"""
+        return self._skip_tuning_cb.isChecked()

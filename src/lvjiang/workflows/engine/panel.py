@@ -49,7 +49,7 @@ class _PanelMixin:
     def _exec_align(self, node: "Align"):
         self.align_panel(node.scene, node.panel)
 
-    def align_panel(self, scene_key: str, panel_key: str):
+    def align_panel(self, scene_key: str, panel_key: str, *, calibration_override: str | None = None):
         """align [scene].[panel] — 截图 panel 区域 + 运行图像自对齐，缓存 slot 中心
 
         校准模式由 panel.calibration 控制：
@@ -63,7 +63,9 @@ class _PanelMixin:
                 f"align: 布局中未定义 panel {scene_key}.{panel_key}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
-        calibration = getattr(panel_obj, "calibration", "auto")
+        calibration = calibration_override or getattr(panel_obj, "calibration", "auto")
+        if calibration_override is not None and calibration_override not in ("auto", "even", "image"):
+            raise ValueError(f"未知网格校准方式: {calibration}")
 
         # even 模式：跳过图像检测，直接等分
         alignment: GridAlignment | None

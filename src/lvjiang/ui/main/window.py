@@ -1562,7 +1562,7 @@ class MainWindow(
         Qt 在销毁仍运行的 QThread 包装器时会直接打印
         「QThread: Destroyed while thread '' is still running」，随后进程可能
         异常退出（无收尾、无崩溃栈）。窗口下挂着的启动期线程——公告、版本
-        检查、在线配置同步、统计上报——都卡在网络 I/O 上，没有协作取消接口，
+        检查、统计上报——都卡在网络 I/O 上，没有协作取消接口，
         因此先 requestInterruption + quit 让它们有机会收尾，超时后退化为
         terminate（与 ProfileEngine 的停止策略一致），保证关闭流程结束时没有
         存活的 QThread 被析构。

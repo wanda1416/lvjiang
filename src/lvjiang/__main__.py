@@ -205,12 +205,12 @@ def _bootstrap(
         load_app_i18n(app_name(spec))
     load_config_policies(app_specs)
 
-    # 恢复未完成的安装事务、撤下明确失效的会员内容，再加载场景与布局缓存。
-    # 这里不联网，也不提升旧协议暂存目录。
+    # 回滚未完成事务，并按已保存开关安装公开包和会员包。
+    # 必须发生在加载插件和场景注册表之前。网络失败保留当前磁盘配置。
     if recover:
         try:
-            from lvjiang.core.config.remote import recover_installation
-            recover_installation()
+            from lvjiang.core.config.remote import prepare_startup_configuration
+            prepare_startup_configuration()
         except Exception:  # noqa: BLE001
             logger.exception("应用在线配置失败，本次使用现有配置")
 

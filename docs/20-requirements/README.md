@@ -89,7 +89,7 @@
 | [06-runtime-drag-hold.md](60-editor/06-runtime-drag-hold.md) | 拖拽保持时长变量、区间与 timeline 校验 | 已实现 |
 | [07-dsl-parser-performance.md](60-editor/07-dsl-parser-performance.md) | DSL 解析性能与 AST、错误定位一致性 | 已实现 |
 | [08-config-schema-boundaries.md](60-editor/08-config-schema-boundaries.md) | 配置旧入口清理、当前增量与必要迁移边界 | 已实现 |
-| [09-content-revisions.md](60-editor/09-content-revisions.md) | 文件修订索引、统一任务快照与保存冲突提示 | 已实现（本地验证，发行包待验证） |
+| [09-content-revisions.md](60-editor/09-content-revisions.md) | 文件修订索引与保存冲突提示 | 已实现（本地验证，发行包待验证） |
 | [10-script-groups.md](60-editor/10-script-groups.md) | 脚本展示分组、刷新加载及名称覆盖标记 | 已实现 |
 | [11-execution-feedback.md](60-editor/11-execution-feedback.md) | 四类任务入口的就地状态与启动失败提示 | 已实现 |
 | [12-parameter-save-boundaries.md](60-editor/12-parameter-save-boundaries.md) | 日常参数字段合并、连续输入保存及运行快照边界 | 已实现 |

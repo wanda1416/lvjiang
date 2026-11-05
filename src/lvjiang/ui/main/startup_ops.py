@@ -1,13 +1,12 @@
-"""启动检查链混入类 - 公告 → 版本更新 → 匿名统计同意 → 统计上报 + 在线配置
+"""启动检查链混入类 - 公告 → 版本更新 → 匿名统计同意 → 统计上报
 
 前四步串行，顺序是有意的：前三步都是模态对话框，只能一个接一个弹；
 上报排在最后是因为它没有 UI，不该拖慢前面弹窗的展示时机。每一步无论
 成功还是失败都必须推进下一步，任何一环的网络故障都不能卡住启动流程。
 
-在线配置同步和统计上报一样没有 UI，也放在链尾；两者互不依赖，各自起线程
-即可，不必再串一层。后台核验包完整性并组合文件，主线程安装并刷新，当前任务持有独立快照。
+在线配置在读取场景之前安装，不在这条界面链里。
 
-各 checker/reporter/syncer 都要挂在 self 上防止被 GC（Qt 对象的 Python 端
+各 checker/reporter 都要挂在 self 上防止被 GC（Qt 对象的 Python 端
 引用一旦释放，底层线程还没跑完就会被回收）。
 
 依赖主类提供：QMainWindow 自身（作为各对话框的 parent）。
@@ -116,76 +115,6 @@ class StartupOpsMixin:
         from ..notices.telemetry_consent_dialog import maybe_prompt_and_record
         maybe_prompt_and_record(self)
         self._start_telemetry_report_on_startup()
-        self._start_remote_config_sync_on_startup()
-
-    def _start_remote_config_sync_on_startup(self):
-        """后台获取候选，在主线程提交安装、刷新控件。"""
-        if self._startup_chain_closed():
-            return
-        from loguru import logger
-
-        from ...core.config.remote import apply_outcome, build_sync_job
-        from ..background.remote_config_sync import RemoteConfigSyncer
-
-        running = getattr(self, "_startup_remote_config_syncer", None)
-        if running is not None and running.isRunning():
-            self._config_sync_again = True
-            return
-        try:
-            job = build_sync_job()
-        except Exception as error:
-            logger.warning("无法初始化配置更新，保留当前配置: {}", error)
-            return
-        if job.is_empty:
-            return
-        syncer = RemoteConfigSyncer(self, job=job)
-        def on_finished_ok(result):
-            try:
-                changed = apply_outcome(result)
-            except Exception as error:
-                logger.warning("配置更新未完成，保留可用配置: {}", error)
-                return
-            self._refresh_installed_configuration(changed)
-        syncer.finished_ok.connect(on_finished_ok)
-        def completed():
-            if getattr(self, "_config_sync_again", False):
-                self._config_sync_again = False
-                self._start_remote_config_sync_on_startup()
-        syncer.finished.connect(completed)
-        syncer.start()
-        self._startup_remote_config_syncer = syncer
-
-    def _refresh_installed_configuration(self, changed: tuple[str, ...]):
-        from loguru import logger
-
-        if not changed:
-            return
-        failed = []
-        def refresh(label, callback):
-            try:
-                callback()
-            except Exception as error:
-                failed.append(label)
-                logger.warning("配置已安装，{}界面刷新失败，不影响其它配置：{}", label, error)
-        if any(name.startswith("workflows/") for name in changed):
-            # 不重建当前参数编辑区，保留用户尚未保存的草稿及本次批量顺序。
-            refresh("任务列表", self._load_workflow_configs)
-        if any(name.startswith("references/") for name in changed):
-            refresh("参考图库", self._refresh_reference_space_combo)
-        if any(name == "layouts.yaml" or name.startswith("layouts/") for name in changed):
-            refresh("布局", lambda: self._refresh_layout_combo(self.layout_combo.currentData() or ""))
-        if "app.yaml" in changed:
-            from ...core.config import load_user_config
-            # 替换主页面默认快照，不原地修改运行中的引擎/批量上下文。
-            def refresh_app():
-                active_hotkeys = self._user_config.hotkeys
-                self._user_config = load_user_config()
-                self._user_config.hotkeys = active_hotkeys
-                self._refresh_plan_combo()
-            refresh("运行方案", refresh_app)
-        message = ("官方配置已更新；部分界面刷新失败，请查看日志。" if failed else
-                   "官方配置已更新；已打开的编辑器保留草稿，保存前请核对新配置。")
-        self.statusBar().showMessage(message, 15000)
 
     def _start_telemetry_report_on_startup(self):
         """启动期的统计上报：心跳（若今天还没发过）+ 积压的调律批次。

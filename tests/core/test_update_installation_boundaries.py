@@ -1,8 +1,9 @@
-"""业务配置不完整及单个刷新失败，不能阻止其它文件安装和刷新。"""
+"""业务配置不完整不能阻止其它文件安装。安装不刷新当前进程的监听器。"""
 
 import os
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import yaml
@@ -52,7 +53,7 @@ def test_member_installs_without_business_selfcheck_or_global_refresh_failure(tm
     result = remote.run_sync(job)
     assert not (system / "workflows/new.wf").exists()
     remote.apply_outcome(result)
-    assert refreshed == ["listener", "plugin"]
+    assert refreshed == []
     for name, data in member.files.items():
         assert (system / name).read_bytes() == data
     assert parse_text((system / "workflows/new.wf").read_text(encoding="utf-8")) is not None
@@ -90,7 +91,8 @@ def test_empty_scene_registry_does_not_abort_next_startup(tmp_path):
     system = tmp_path / "config/system"
     system.mkdir(parents=True)
     (system / "scenes.yaml").write_text("schema_version: 2\nscenes: {}\n", encoding="utf-8")
-    env = {**os.environ, "LVJIANG_ROOT": str(tmp_path)}
+    env = {**os.environ, "LVJIANG_ROOT": str(tmp_path),
+           "PYTHONPATH": str(Path(__file__).parents[2] / "src")}
     result = subprocess.run(
         [sys.executable, "-c", "from lvjiang.core.scene_registry import get_registry; assert not get_registry().get_groups()"],
         env=env, capture_output=True, text=True, encoding="utf-8", timeout=15,

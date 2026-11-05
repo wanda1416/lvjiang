@@ -303,7 +303,8 @@ class UpdateStore:
                     activate(self.system, changed)
                 except Exception as error:
                     logger.warning("配置已安装，消费者刷新失败，不回滚配置文件：{}", error)
-                # 任务持有独立快照，不引用被替换的目录。只回收本事务创建的旧目录。
+                # 安装只发生在读取配置之前，此时没有任务持有 system 下的路径。
+                # 只回收本事务创建的旧目录。
                 try:
                     shutil.rmtree(retired)
                 except OSError:

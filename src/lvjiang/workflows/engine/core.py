@@ -415,8 +415,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # context 是临时状态，仅顶层执行时重置
         # 过程中通过 context/global 共享数据；两者都不得泄漏到下一次执行。
         if _reset_context:
-            # 配置只在磁盘上：任务起点放掉上一任务解析的读盘缓存，
-            # 让 Git 拉取、外部编辑器改过的配置在下一个任务生效。
+            # 只放掉 YAML 读缓存。进程内保存仍走变更通知；
+            # Git 拉取和外部改文件要刷新或重启后才进入场景注册表等单例。
             get_resolver().clear_read_cache()
             self.context = {}
             self.clear_capture_snapshot()

@@ -1,7 +1,7 @@
 # 公共服务与桌面适配
 
 - `core.update.fetch_latest_release` 提供更新结果与错误，Qt 检查线程位于 `ui/background/update.py`。
-- `core.config.remote.run_sync` 提供同步服务，Qt 包装位于 `ui/background/remote_config_sync.py`。
+- `core.config.remote.run_sync` 在进程读取配置之前下载公开包和会员包，由启动引导安装，没有 Qt 线程。
 - `core.telemetry.reporter.run_report` 返回上报结果，Qt 包装位于 `ui/background/telemetry.py`，
   桌面仍在主线程构造 job 并应用记账结果。
 - `core.profile.engine.ProfileProcessor.tick` 保留周期处理、同步脚本与提醒持久化；
@@ -34,7 +34,7 @@
 
 ### 启动期一次性线程（跑完自灭）
 
-公告检查、更新检查、在线配置同步、统计上报：启动时各起一个 QThread
+公告检查、更新检查、统计上报：启动时各起一个 QThread
 （`ui/main/startup_ops.py`），完成后自删；公告/更新可手动再触发。
 
 ### 按需临时线程（用完即毁）

@@ -92,6 +92,6 @@ def content_changed(resolver) -> None:
     try:
         rebuild_content(resolver)
     except OSError as exc:
-        # 不能保留一份可能让下次任务误用旧缓存的记录。
+        # 不能保留一份可能和刚写完的文件不一致的索引。
         (session_directory(resolver.config_dir) / "content.json").unlink(missing_ok=True)
-        logger.warning("配置已写入，修订索引将在下次任务重建：{}", exc)
+        logger.warning("配置已写入，修订索引将在下次进程启动或下一次成功写入时重建：{}", exc)

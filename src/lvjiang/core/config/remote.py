@@ -1,4 +1,4 @@
-"""在线增量包协调：下载不触碰生效层，安装成功后立即切换缓存。"""
+"""在线增量包协调：下载不触碰生效层，安装只在进程读取配置之前进行。"""
 from __future__ import annotations
 
 import json
@@ -123,7 +123,7 @@ def get_last_synced_at() -> str:
 
 
 def recover_installation() -> None:
-    """启动时只回滚未提交事务；没有待恢复动作就不碰配置。"""
+    """回滚未提交事务，并撤下未授权的会员层。不下载。"""
     store = _installed_store()
     if store is None:
         return
@@ -133,6 +133,16 @@ def recover_installation() -> None:
     if member.get("files") and not authorized(member):
         # 在读取场景/工作流之前撤下失效会员内容，不依赖网络是否可用。
         store.install(member_files={}, member_metadata={}, activate=lambda *_args: None)
+
+
+def prepare_startup_configuration() -> None:
+    """读取场景与布局之前：先回滚，再按已保存开关下载并安装。
+
+    开发模式、没有基底或网络失败时保留当前磁盘配置。此处还没有场景注册表，
+    安装不刷新 OCR、模板或插件缓存。
+    """
+    recover_installation()
+    sync_now()
 
 
 def build_sync_job() -> SyncJob:
@@ -195,9 +205,8 @@ def run_sync(job: SyncJob, *, timeout: float = 10.0) -> SyncResult:
 
 
 def apply_outcome(result: SyncResult) -> tuple[str, ...]:
-    """主线程原子安装并刷新；不修改用户 local、session 或活动选择。"""
+    """把已下载的候选安装到 system。调用时还不能有场景或任务读者。"""
     from .protected_remote import authorized
-    from .update_activation import activate_configuration
     job = result.job
     for message in result.errors:
         logger.info("[在线配置] {}", message)
@@ -227,9 +236,9 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
         reset_public=not enabled or bool(public is not None and public.manifest is None),
         member_files=member.files if member is not None else None,
         member_metadata=member.metadata if member is not None else None,
-        activate=activate_configuration)
+        activate=lambda *_args: None)
     if changed:
-        logger.info("[在线配置] 已生效：{} 个文件", len(changed))
+        logger.info("[在线配置] 已安装：{} 个文件，本次启动读取新配置", len(changed))
     return changed
 
 

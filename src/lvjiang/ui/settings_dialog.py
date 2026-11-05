@@ -1413,9 +1413,6 @@ class SettingsDialog(QDialog):
         if result.active:
             self._license_edit.clear()
             self._refresh_license_status()
-            starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
-            if callable(starter):
-                starter()
             self._activation_message = tr("激活成功。部分功能需要重新定位窗口后生效。")
         else:
             self._activation_message = tr("激活失败") + "：" + result.reason
@@ -1431,9 +1428,6 @@ class SettingsDialog(QDialog):
         clear_code()
         refresh_entitlement()
         self._refresh_license_status()
-        starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
-        if callable(starter):
-            starter()
 
     def _build_privacy_tab(self) -> QWidget:
         tab = QWidget()
@@ -1473,9 +1467,9 @@ class SettingsDialog(QDialog):
         sub_box.addWidget(self._remote_config_check)
 
         remote_caption = QLabel(
-            tr("接收与当前应用版本匹配的官方配置和任务更新，校验通过后立即生效。"
-               "你的本地配置始终优先；运行中的任务继续使用启动时的配置。"
-               "关闭此选项或进入离线模式会恢复预置并撤下会员内容，不影响本地数据。"))
+            tr("接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。"
+               "你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。"
+               "关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。"))
         remote_caption.setWordWrap(True)
         remote_caption.setStyleSheet("color: palette(mid);")
         sub_box.addWidget(remote_caption)
@@ -1574,17 +1568,10 @@ class SettingsDialog(QDialog):
         from ..core.telemetry.settings import set_network_feature
         set_network_feature("offline", checked)
         self._refresh_privacy_tab_state()
-        starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
-        if callable(starter):
-            starter()
 
     def _on_net_feature_toggled(self, feature: str, checked: bool):
         from ..core.telemetry.settings import set_network_feature
         set_network_feature(feature, checked)
-        if feature == "remote_config":
-            starter = getattr(self.parent(), "_start_remote_config_sync_on_startup", None)
-            if callable(starter):
-                starter()
 
     def _on_telemetry_toggled(self, checked: bool):
         from ..core.telemetry.settings import set_telemetry_enabled

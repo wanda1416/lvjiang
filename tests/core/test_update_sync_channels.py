@@ -33,8 +33,8 @@ def test_unknown_authorization_does_not_withdraw_member(tmp_path, monkeypatch):
     assert not result.errors
 
 
-def test_background_download_then_activation_on_main_thread(tmp_path, monkeypatch):
-    from lvjiang.core.config import protected_remote, update_activation
+def test_download_does_not_touch_system_until_apply(tmp_path, monkeypatch):
+    from lvjiang.core.config import protected_remote
     from lvjiang.core.config.update_download import PublicDownload
     from lvjiang.core.update_bundle import json_bytes, make_manifest, tree_digest
 
@@ -50,8 +50,6 @@ def test_background_download_then_activation_on_main_thread(tmp_path, monkeypatc
     monkeypatch.setattr(remote, "fetch_member_update", lambda *a, **kw: MemberDownload({}, {}))
     monkeypatch.setattr(remote, "is_enabled", lambda: True)
     monkeypatch.setattr(protected_remote, "snapshot", lambda: None)
-    activated = []
-    monkeypatch.setattr(update_activation, "activate_configuration", lambda path, changed: activated.append(changed))
     job = remote.SyncJob(tmp_path, "0.15.0", tree_digest(baseline))
     result = remote.run_sync(job)
     # 下载不触碰生效目录。
@@ -61,15 +59,15 @@ def test_background_download_then_activation_on_main_thread(tmp_path, monkeypatc
     (local / "diagnostics").mkdir()
     (local / "diagnostics/runtime.log").write_text("task is running", encoding="utf-8")
     assert remote.apply_outcome(result) == ("opaque.bin",)
-    assert activated == [("opaque.bin",)]
+    assert (system / "opaque.bin").read_bytes() == b"new"
     assert (local / "app.yaml").read_text(encoding="utf-8") == "value: 99"
     # 同修订再次同步不重新解析或切换目录。
     remote.apply_outcome(remote.run_sync(job))
-    assert activated == [("opaque.bin",)]
+    assert (system / "opaque.bin").read_bytes() == b"new"
 
 
 def test_successful_empty_index_withdraws_public_but_failure_preserves_it(tmp_path, monkeypatch):
-    from lvjiang.core.config import protected_remote, update_activation
+    from lvjiang.core.config import protected_remote
     from lvjiang.core.config.update_store import UpdateStore
     from lvjiang.core.update_bundle import json_bytes, make_manifest, tree_digest
 
@@ -82,7 +80,6 @@ def test_successful_empty_index_withdraws_public_but_failure_preserves_it(tmp_pa
     store.install(manifest, archive, activate=lambda *a: None)
     monkeypatch.setattr(remote, "is_enabled", lambda: True)
     monkeypatch.setattr(protected_remote, "snapshot", lambda: None)
-    monkeypatch.setattr(update_activation, "activate_configuration", lambda *a: None)
     def unavailable(*a, **kw):
         raise OSError("offline")
     monkeypatch.setattr(remote, "_fetch_bytes", unavailable)

@@ -227,23 +227,64 @@ def _delta_page(token: str, since: int) -> tuple[list[dict], int]:
     return list(page.get("documents") or []), int(page.get("next_id") or 0)
 
 
+def _local_stamps(local_docs: list[LocalDocument]) -> dict[str, list[int]]:
+    """每份本地文档的 ``[size, mtime_ns]``（只 stat，不读内容）。"""
+    result: dict[str, list[int]] = {}
+    for document in local_docs:
+        try:
+            stat = document.path.stat()
+        except OSError:
+            continue
+        result[f"{document.label}/{document.kind}"] = [stat.st_size, stat.st_mtime_ns]
+    return result
+
+
+def _detect_local_changes(local_docs: list[LocalDocument]) -> set[str]:
+    """磁盘戳与上次同步不一致的文档键。
+
+    这是「谁改的都能发现」的那一半：只读实例、外部编辑器、备份还原改过的
+    文件不会调用 ``mark_dirty``，只能靠 stat 比对认出来。
+    """
+    cached = dirty.stamps()
+    changed: set[str] = set()
+    for document in local_docs:
+        key = f"{document.label}/{document.kind}"
+        try:
+            stat = document.path.stat()
+        except OSError:
+            continue
+        known = cached.get(key)
+        if known is None or known[0] != stat.st_size or known[1] != stat.st_mtime_ns:
+            changed.add(key)
+    return changed
+
+
 def sync_documents(token: str, users_dir: Path = USERS_DIR,
                    session_dir: Path = SESSION_CONFIG_DIR,
                    on_progress=None, stop=None,
                    force_full: bool = False) -> SyncReport:
-    """增量对账：远端 revision 水位 + 本地脏集合；只有双变（或强制）才全量对比。"""
-    report = SyncReport()
-    local_dirty = dirty.dirty_keys()
+    """增量对账：远端 revision 水位 + 本地改动（标脏 ∪ 磁盘戳）。
 
-    if force_full:
-        # 初始同步等场景：本地已有全量数据要上云，脏集合未必完整，直接全量。
+    四种情况：都没变 → 空转；只远端变 → 拉增量；只本地变 → 推脏；都变 →
+    全量 manifest + mtime 对比裁决。
+    """
+    report = SyncReport()
+    local_docs = iter_local_documents(users_dir, session_dir)
+    # 首次运行（没有任何戳）时无法判断「谁改的」，交给 mtime 全量对比定胜负，
+    # 之后戳就建起来了。否则会把本地全部文档当成「刚改过」直接推上云。
+    first_run = not dirty.stamps()
+    local_dirty = dirty.dirty_keys() | _detect_local_changes(local_docs)
+
+    if force_full or first_run:
+        # 初始同步 / 首次运行：本地已有全量数据要上云或需要裁决，直接全量。
         _sync_documents_full(token, users_dir, session_dir, on_progress, stop, report)
         try:
             _changed, next_id = _delta_page(token, dirty.remote_document_id())
         except SyncError as error:
             report.errors.append(str(error))
             return report
-        dirty.save_sync_state(max(next_id - 1, 0), set())
+        dirty.save_sync_state(max(next_id - 1, 0), set(),
+                              _local_stamps(iter_local_documents(users_dir, session_dir)))
         return report
 
     remote_id = dirty.remote_document_id()
@@ -277,7 +318,7 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
                 report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
             except SyncError as error:
                 report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
-        dirty.save_sync_state(next_id - 1, set())
+        dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
         return report
 
     if local_changed and not remote_changed:
@@ -298,12 +339,13 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
                 report.errors.append(f"{key}: {error}")
             except SyncError as error:
                 report.errors.append(f"{key}: {error}")
-        dirty.save_sync_state(next_id - 1, set())
+        dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
         return report
 
     # 双变：全量 manifest + 本地 mtime 对比裁决，之后清脏、抬水位。
     _sync_documents_full(token, users_dir, session_dir, on_progress, stop, report)
-    dirty.save_sync_state(next_id - 1, set())
+    dirty.save_sync_state(next_id - 1, set(),
+                          _local_stamps(iter_local_documents(users_dir, session_dir)))
     return report
 
 

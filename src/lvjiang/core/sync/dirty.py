@@ -1,4 +1,15 @@
-"""本地文档脏标记：写路径 bump，同步层消费，落 account.json 的 document_sync。"""
+"""本地文档变更感知：写路径立即标脏 + 磁盘戳兜底，同步层消费。
+
+两条来源合并成同一个「本地有改动」信号：
+
+1. **写路径标脏**（`mark_dirty`）：本进程改完文档立刻记名，最快。
+2. **磁盘戳比对**（`stamps`）：记录每份文档上次同步时的 ``(size, mtime_ns)``，
+   下一轮 stat 一遍就能发现「谁改的」——包括**只读实例**或外部工具改的文件。
+   只做 stat，不读内容、不哈希。
+
+状态落 ``account.json`` 的 ``document_sync``；**只读实例不写**（登录态与同步
+状态只归主实例），它的改动完全靠主实例的磁盘戳比对自动感知。
+"""
 from __future__ import annotations
 
 import json
@@ -6,6 +17,13 @@ import os
 from pathlib import Path
 
 from loguru import logger
+
+
+def writable() -> bool:
+    """本实例是否有权写同步状态（只读实例没有）。"""
+    from ..access import is_readonly
+
+    return not is_readonly()
 
 
 def _account_path() -> Path:
@@ -34,6 +52,8 @@ def _save(state: dict) -> None:
     标记是尽力而为：写失败（未登录、只读实例、测试门禁）只降级为「下次多做
     一次全量对比」，绝不能让用户的一次便利贴保存因为标记写不进去而失败。
     """
+    if not writable():
+        return
     path = _account_path()
     data = _read()
     if not data:
@@ -49,7 +69,7 @@ def _save(state: dict) -> None:
 
 
 def mark_dirty(label: str, kind: str) -> None:
-    """文档被本地修改后调用；同步成功后由同步层清掉。"""
+    """文档被本进程修改后调用；同步成功后由同步层清掉。"""
     state = _state()
     dirty = state.get("dirty")
     if not isinstance(dirty, dict):
@@ -69,8 +89,24 @@ def remote_document_id() -> int:
     return value if isinstance(value, int) and value >= 0 else 0
 
 
-def save_sync_state(remote_id: int, dirty: set[str]) -> None:
+def stamps() -> dict[str, list[int]]:
+    """每份文档上次同步时的 ``[size, mtime_ns]``。"""
+    raw = _state().get("stamps")
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, list[int]] = {}
+    for key, value in raw.items():
+        if (isinstance(key, str) and isinstance(value, list) and len(value) == 2
+                and all(isinstance(item, int) for item in value)):
+            result[key] = value
+    return result
+
+
+def save_sync_state(remote_id: int, dirty: set[str],
+                    stamps: dict[str, list[int]] | None = None) -> None:
     state = _state()
     state["remote_document_id"] = remote_id
     state["dirty"] = {key: True for key in dirty}
+    if stamps is not None:
+        state["stamps"] = stamps
     _save(state)

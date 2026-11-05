@@ -72,14 +72,24 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(engine.client, "pull_all", fake.pull_all)
     monkeypatch.setattr(engine.client, "push", fake.push)
     # 增量判定所需的 document_sync 状态与增量 pull 接口
-    doc_state: dict = {"remote_document_id": 0, "dirty": {}}
+    doc_state: dict = {"remote_document_id": 0, "dirty": {},
+                       "stamps": {"__baseline__/none": [0, 0]}}
     monkeypatch.setattr(engine.dirty, "remote_document_id",
                         lambda: doc_state.get("remote_document_id") or 0)
     monkeypatch.setattr(engine.dirty, "dirty_keys",
                         lambda: set(doc_state.get("dirty") or {}))
-    monkeypatch.setattr(engine.dirty, "save_sync_state",
-                        lambda rid, d: doc_state.update(
-                            {"remote_document_id": rid, "dirty": {k: True for k in d}}))
+    monkeypatch.setattr(engine.dirty, "stamps",
+                        lambda: dict(doc_state.get("stamps") or {}))
+
+    def fake_save_state(rid, d, stamps=None):
+        doc_state["remote_document_id"] = rid
+        doc_state["dirty"] = {k: True for k in d}
+        if stamps is not None:
+            doc_state["stamps"] = stamps
+
+    monkeypatch.setattr(engine.dirty, "save_sync_state", fake_save_state)
+    # 本文件只验证「标脏 → 状态机」；磁盘戳感知由 test_document_detect.py 覆盖。
+    monkeypatch.setattr(engine, "_detect_local_changes", lambda _docs: set())
 
     def fake_delta(route, data, token):
         docs = [{"label": k[0], "kind": k[1], "sha256": d["sha256"], "size": d["size"],
@@ -315,7 +325,10 @@ def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(engine.dirty, "remote_document_id", lambda: 0)
     monkeypatch.setattr(engine.dirty, "dirty_keys",
                         lambda: {"蔡元君/notes"})
-    monkeypatch.setattr(engine.dirty, "save_sync_state", lambda rid, d: None)
+    monkeypatch.setattr(engine.dirty, "stamps", lambda: {"__baseline__/none": [0, 0]})
+    monkeypatch.setattr(engine.dirty, "save_sync_state",
+                        lambda rid, d, stamps=None: None)
+    monkeypatch.setattr(engine, "_detect_local_changes", lambda _docs: set())
     users, session = tmp_path / "users", tmp_path / "session"
     users.mkdir()
     session.mkdir()

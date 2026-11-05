@@ -50,6 +50,25 @@ def _rewind(key: str, *, minutes: int) -> None:
     db_upsert("u", "regen", key, entry["value"], updated_at=stamp)
 
 
+def _rewind_before_last_boundary(key: str, *, hour: int = 5) -> None:
+    """把 updated_at 拨到「最近一次准点边界之前 1 分钟」。
+
+    这样 ``(updated_at, now]`` 之间**恰好**跨过一个边界，与当前钟点无关。
+    固定回拨 30 小时并不等价：当本机时刻早于约 11:00 时，那 30 小时会跨过
+    **两个** 05:00 边界（恢复 900 而非 450），测试因此在特定时段失败
+    （CI 在 UTC 09:56 跑就撞上了）。
+    """
+    from lvjiang.core.profile.repository import db_read_entry, db_upsert
+
+    now = datetime.now()
+    boundary = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if boundary > now:
+        boundary -= timedelta(days=1)
+    entry = db_read_entry("u", "regen", key)
+    stamp = (boundary - timedelta(minutes=1)).isoformat(timespec="seconds")
+    db_upsert("u", "regen", key, entry["value"], updated_at=stamp)
+
+
 def test_realtime_regen_write_materializes_tick_before_delta(regen_env):
     from lvjiang.core.profile.service import profile_action, profile_read
 
@@ -78,7 +97,7 @@ def test_boundary_regen_write_materializes_tick_before_delta(regen_env):
     from lvjiang.core.profile.service import profile_action
 
     profile_action("u", "tili", set_value=100, source="初始化")
-    _rewind("tili", minutes=60 * 30)      # 跨过 05:00 边界 → +450
+    _rewind_before_last_boundary("tili")   # 恰好跨过一个 05:00 边界 → +450
 
     profile_action("u", "tili", delta=-30, source="副本")
 

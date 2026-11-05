@@ -398,9 +398,6 @@ _instance: GameConfigManager | None = None
 
 def get_game_config() -> GameConfigManager:
     """获取全局 GameConfigManager 单例"""
-    from ....core.config.runtime_snapshot import current_snapshot, scoped_value
-    if current_snapshot() is not None:
-        return scoped_value(GameConfigManager, GameConfigManager)
     global _instance
     if _instance is None:
         _instance = GameConfigManager()

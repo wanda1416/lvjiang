@@ -24,7 +24,6 @@ from ...core.config import (
     parse_android_apps,
 )
 from ...core.config.resolver import get_resolver
-from ...core.config.runtime_snapshot import task_configuration
 from ...core.input_base import InputBackend, InputBackendKind
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
 from ...core.key_validation import validate_key_name
@@ -397,7 +396,6 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             if end is not None:
                 end()
 
-    @task_configuration
     def _execute_unlocked(self, source, *, initial_variables: dict | None = None,
                           _reset_context: bool = True) -> dict:
         """统一执行入口
@@ -417,6 +415,9 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # context 是临时状态，仅顶层执行时重置
         # 过程中通过 context/global 共享数据；两者都不得泄漏到下一次执行。
         if _reset_context:
+            # 配置只在磁盘上：任务起点放掉上一任务解析的读盘缓存，
+            # 让 Git 拉取、外部编辑器改过的配置在下一个任务生效。
+            get_resolver().clear_read_cache()
             self.context = {}
             self.clear_capture_snapshot()
             # Panel 对齐依赖当前画面，只属于单次顶层运行。

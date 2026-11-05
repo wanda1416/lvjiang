@@ -27,13 +27,6 @@ class OCRCleaner:
     _instance: OCRCleaner | None = None
 
     def __new__(cls):
-        from .config.runtime_snapshot import current_snapshot, scoped_value
-        if current_snapshot() is not None:
-            def create():
-                instance = object.__new__(cls)
-                instance._initialized = False
-                return instance
-            return scoped_value(cls, create)
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False

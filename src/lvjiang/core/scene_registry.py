@@ -9,7 +9,7 @@ from dataclasses import replace
 
 from loguru import logger
 
-from .config.resolver import get_resolver, get_root_resolver
+from .config.resolver import get_root_resolver
 from .scene_config import load_scene_manifest
 from .scene_definition import SceneRegistry
 from .scene_definition_models import (
@@ -110,14 +110,6 @@ def initialize_scene_registry() -> None:
 
 def get_registry() -> SceneRegistry:
     """获取场景注册表实例（供 UI 层调用 CRUD 方法）"""
-    from .config.runtime_snapshot import current_snapshot, scoped_value
-    if current_snapshot() is not None:
-        def create():
-            manifest = load_scene_manifest(get_resolver())
-            return SceneRegistry(resolver=get_resolver(), scene_order=manifest.order,
-                                 group_config=manifest.groups, group_names=manifest.group_names,
-                                 disabled_scenes=manifest.disabled)
-        return scoped_value(SceneRegistry, create)
     initialize_scene_registry()
     assert _registry is not None  # initialize_scene_registry 保证已构造
     return _registry

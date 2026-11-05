@@ -160,51 +160,6 @@ def test_prerelease_baseline_and_recovery_do_not_touch_final_archives(tmp_path):
     assert not final_store.state_path.exists()
 
 
-def test_task_snapshot_keeps_lazy_files_while_next_task_sees_update(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
-    from lvjiang.core import layout_manager
-    from lvjiang.core.config import resolver
-    from lvjiang.core.config.runtime_snapshot import (
-        configuration_snapshot,
-        task_configuration,
-    )
-
-    base = {"workflows/subcall/task.wf": b"old", "templates/example.png": b"old image"}
-    write_files(tmp_path / "system", base)
-    (tmp_path / "local").mkdir()
-    (tmp_path / "session").mkdir(exist_ok=True)
-    (tmp_path / "session/baseline.json").write_text(json.dumps({
-        "app_series": "0.15.0", "sha256": tree_digest(base)}), encoding="utf-8")
-    monkeypatch.setattr(resolver, "_resolver", resolver.ConfigResolver(
-        system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False, config_dir=tmp_path))
-    store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
-    manifest, archive = make_manifest("0.15.0", 1, base, {"templates/example.png": b"new image"})
-    monkeypatch.setattr(layout_manager, "load_layout_by_key", lambda key: SimpleNamespace(
-        key=key, content=resolver.get_resolver().resolve_read("templates/example.png").read_bytes()))
-    class Engine:
-        _layout = SimpleNamespace(key="test", content=b"original")
-        _reference_recognizer = _workflow = _ocr = None
-
-        @task_configuration
-        def run(self, source):
-            return self._layout.content, source.read_bytes()
-    engine = Engine()
-    with configuration_snapshot():
-        frozen = resolver.get_resolver()
-        store.install(manifest, archive, activate=lambda *args: None)
-        assert frozen.resolve_read("templates/example.png").read_bytes() == b"old image"
-        assert frozen.resolve_read("workflows/subcall/task.wf").read_bytes() == b"old"
-        # 批量外层已有快照，内层引擎仍须用其重新构造布局与重定位源脚本。
-        assert engine.run(tmp_path / "system/workflows/subcall/task.wf") == (b"old image", b"old")
-        assert engine._layout.content == b"original"
-    # 本进程保留当前代次，后续相同修订任务复用；旧运行仍持有自己的代次。
-    assert frozen.system_dir.exists()
-    with configuration_snapshot():
-        assert resolver.get_resolver().resolve_read("templates/example.png").read_bytes() == b"new image"
-        assert engine.run(tmp_path / "system/workflows/subcall/task.wf") == (b"new image", b"old")
-
-
 def test_public_revision_preserves_member_registry_fragments(tmp_path):
     base = {"scenes.yaml": b"schema_version: 2\nscenes:\n  basic:\n    items: [base]\n"}
     write_files(tmp_path / "system", base)
@@ -241,17 +196,6 @@ def test_member_install_and_withdrawal_ignore_public_revision_dependency(tmp_pat
     store.install(member_files=member, member_metadata={**metadata, "config_version": 3},
                   activate=lambda *a: None)
     assert (tmp_path / "system/member.bin").read_bytes() == b"member"
-    from lvjiang.core.config import protected_remote, resolver
-    from lvjiang.core.config.runtime_snapshot import configuration_snapshot
-    (tmp_path / "session").mkdir(exist_ok=True)
-    (tmp_path / "session/baseline.json").write_text(json.dumps({
-        "app_series": "0.15.0", "sha256": tree_digest(base)}), encoding="utf-8")
-    monkeypatch.setattr(resolver, "_resolver", resolver.ConfigResolver(
-        system_dir=tmp_path / "system", local_dir=tmp_path / "local", dev_mode=False, config_dir=tmp_path))
-    monkeypatch.setattr(protected_remote, "authorized", lambda doc: False)
-    with configuration_snapshot():
-        assert resolver.get_resolver().resolve_read("member.bin") is None
-        assert resolver.get_resolver().resolve_read("base.bin").read_bytes() == b"base"
     assert store._state()["revision"] == 2
 
 

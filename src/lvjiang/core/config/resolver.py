@@ -915,15 +915,12 @@ _resolver: ConfigResolver | None = None
 
 
 def get_resolver() -> ConfigResolver:
-    from .runtime_snapshot import current_snapshot
-    snapshot = current_snapshot()
-    if snapshot is not None:
-        return snapshot.resolver
+    """配置读取入口：始终是进程级单例，任务运行期不再切换副本。"""
     return get_root_resolver()
 
 
 def get_root_resolver() -> ConfigResolver:
-    """仅用于进程级单例初始化与监听注册；任务读取必须使用 get_resolver。"""
+    """进程级配置解析器单例；任务与界面读盘共用同一实例。"""
     global _resolver
     if _resolver is None:
         _resolver = ConfigResolver()

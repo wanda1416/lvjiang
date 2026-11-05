@@ -359,9 +359,7 @@ class BatchScheduler:
         self._user_scope = ExitStack()
         self._batch_run = None
         try:
-            from .config.runtime_snapshot import configuration_snapshot
-            with configuration_snapshot():
-                self._run_locked()
+            self._run_locked()
         except Exception as exc:
             log_failure("批量执行失败", exc)
             self.log.emit(f"[批量] 执行或保存失败: {exc}")

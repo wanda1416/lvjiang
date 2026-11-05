@@ -64,15 +64,6 @@ def indexed_paths(resolver) -> dict[tuple[str, ...], Path]:
     return paths
 
 
-def _lookup(data: dict, keys: tuple[str, ...]) -> Any:
-    value: Any = data
-    for key in keys:
-        if not isinstance(value, dict):
-            return None
-        value = value.get(key)
-    return value
-
-
 def rebuild_content(resolver) -> dict:
     """刷新和启动的强制路径；重建只读修订号，不修改配置文件。"""
     with configuration_lock(resolver.config_dir):
@@ -95,37 +86,6 @@ def rebuild_content(resolver) -> dict:
         atomic_write_bytes(path, formatted_json_bytes(data), prefix=".content-")
         resolver.clear_read_cache()
         return data
-
-
-def load_content(resolver) -> dict:
-    """不存在、损坏或 key 缺失一律重建，不阻断任务。"""
-    path = session_directory(resolver.config_dir) / "content.json"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict) or not isinstance(data.get("update_at"), str):
-            raise ValueError("缺少 update_at")
-        if datetime.fromisoformat(data["update_at"]).tzinfo is None:
-            raise ValueError("update_at 缺少时区")
-        expected = indexed_paths(resolver)
-        for keys in expected:
-            value = _lookup(data, keys)
-            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                raise ValueError("实体修订记录缺失")
-        # 文件删除同样会使缓存失效。
-        def leaves(node, prefix=()):
-            for key, value in node.items():
-                if not prefix and key == "update_at":
-                    continue
-                if isinstance(value, dict):
-                    yield from leaves(value, (*prefix, key))
-                else:
-                    yield (*prefix, key)
-        if set(leaves(data)) != set(expected):
-            raise ValueError("实体列表变化")
-        return data
-    except (OSError, ValueError, TypeError):
-        logger.debug("配置修订索引缺失或不完整，从磁盘重建")
-        return rebuild_content(resolver)
 
 
 def content_changed(resolver) -> None:

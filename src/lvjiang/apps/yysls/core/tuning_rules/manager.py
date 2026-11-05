@@ -401,9 +401,6 @@ _instance: TuningRuleManager | None = None
 
 def get_tuning_rule_manager() -> TuningRuleManager:
     """获取全局 TuningRuleManager 单例"""
-    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
-    if current_snapshot() is not None:
-        return scoped_value(TuningRuleManager, TuningRuleManager)
     global _instance
     if _instance is None:
         _instance = TuningRuleManager()
@@ -654,9 +651,6 @@ _group_manager: TuningGroupManager | None = None
 
 def get_tuning_group_manager() -> TuningGroupManager:
     """获取全局 TuningGroupManager 单例"""
-    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
-    if current_snapshot() is not None:
-        return scoped_value(TuningGroupManager, TuningGroupManager)
     global _group_manager
     if _group_manager is None:
         _group_manager = TuningGroupManager()
@@ -772,9 +766,6 @@ _tune_config_manager: TuneConfigManager | None = None
 
 def get_tune_config_manager() -> TuneConfigManager:
     """获取全局 TuneConfigManager 单例"""
-    from .....core.config.runtime_snapshot import current_snapshot, scoped_value
-    if current_snapshot() is not None:
-        return scoped_value(TuneConfigManager, TuneConfigManager)
     global _tune_config_manager
     if _tune_config_manager is None:
         _tune_config_manager = TuneConfigManager()

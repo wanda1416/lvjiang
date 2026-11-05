@@ -5,21 +5,24 @@ import pytest
 import yaml
 
 from lvjiang.core.config import conflicts
-from lvjiang.core.config.content import load_content
 from lvjiang.core.config.edit_session import ConfigEditSession
 from lvjiang.core.config.resolver import ConfigResolver
+
+
+def content_index(config_dir):
+    return json.loads((config_dir / "session/content.json").read_text(encoding="utf-8"))
 
 
 def test_actual_edit_increments_revision_but_noop_does_not(tmp_path):
     resolver = ConfigResolver(tmp_path / "system", tmp_path / "local", dev_mode=True)
     first = resolver.write_entity("scenes/sample.yaml", "key: sample\nname: 示例\n")
     assert yaml.safe_load(first.read_text(encoding="utf-8"))["content_version"] == 1
-    old = load_content(resolver)
+    old = content_index(tmp_path)
     resolver.write_entity("scenes/sample.yaml", "key: sample\nname: 示例\n")
-    assert load_content(resolver) == old
+    assert content_index(tmp_path) == old
     resolver.write_entity("scenes/sample.yaml", "key: sample\nname: 修改\n")
-    assert load_content(resolver)["scenes"]["sample"] == 2
-    data = json.loads((tmp_path / "session/content.json").read_text(encoding="utf-8"))
+    assert content_index(tmp_path)["scenes"]["sample"] == 2
+    data = content_index(tmp_path)
     assert data["update_at"] != old["update_at"]
     assert first.read_text(encoding="utf-8").startswith("content_version: 2")
 
@@ -105,4 +108,4 @@ def test_failed_nested_write_batch_flushes_saved_changes_once(tmp_path, monkeypa
                 resolver.write_entity("scenes/second.yaml", "key: second\nname: 示例\n")
             raise RuntimeError("partial failure")
     assert rebuild.call_count == 1
-    assert load_content(resolver)["scenes"] == {"first": 1, "second": 1}
+    assert content_index(tmp_path)["scenes"] == {"first": 1, "second": 1}

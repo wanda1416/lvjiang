@@ -27,7 +27,7 @@ AgentCapture 的传输失败进入相同的等待入口，不转成识别未命�
 主窗口的**执行目标**决定实际 capture/input 实例，方案决定环境、布局并声明允许的
 连接模式。一个窗口和多台 Android 设备可以同时保持连接，但第一阶段每次任务只冻结
 其中一个目标。后续多目标并发会让每个任务绑定独立目标句柄，并允许断线后重绑定
-capture/input；业务配置仍保持启动快照。见
+capture/input；业务配置在任务起点按磁盘内容解析，不另建副本。见
 [03-concurrent-execution.md](../39-runtime/03-concurrent-execution.md)。连接模式只有两种，后端在模式
 内部再按设备状态细分。
 

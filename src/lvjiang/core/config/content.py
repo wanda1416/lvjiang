@@ -21,7 +21,7 @@ _mutexes: dict[Path, threading.RLock] = {}
 
 @contextmanager
 def configuration_lock(config: Path, *, blocking: bool = True) -> Iterator[bool]:
-    """进程内协调保存、安装与任务快照；跨进程串行由 :func:`config_write_lock`。
+    """进程内协调配置保存与安装；跨进程串行由 :func:`config_write_lock`。
 
     阻塞调用等待完成；``blocking=False`` 时返回是否拿到（不等待）。
     """

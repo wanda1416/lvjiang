@@ -119,7 +119,7 @@ class StartupOpsMixin:
         self._start_remote_config_sync_on_startup()
 
     def _start_remote_config_sync_on_startup(self):
-        """后台获取候选，在主线程提交安装、刷新控件；任务读取独立快照。"""
+        """后台获取候选，在主线程提交安装、刷新控件。"""
         if self._startup_chain_closed():
             return
         from loguru import logger

@@ -73,7 +73,7 @@
 | `session.json` | `users`（用户名册与顺序）、`settings`、`daily.scripts`（脚本顺序/启停/显示名）、`wf_configs`（按 `wf_id` 的工作流参数）、`plans`（不分发的机器级方案） | `SessionStore`（`core/config/session.py`） | 节点语义见 04-config-layering；写入口是 `get_node`/`set_node`/`update_node`/`mutate_node`，禁止外部直接读写文件 |
 | `interface.json` | `actives`（当前用户/布局/空间/环境/方案）、`daily`（当前脚本与分组）、`ui_state`（窗口、分栏、页签、列宽）、`batch`（活动组 ID 与草稿）、`profile`（总览分组与顺序）、`alert_info`、`alert_history`、`server_config`（公告、遥测、在线配置状态） | `InterfaceStore`（`core/config/interface.py`） | 页面级状态唯一写入口是 `update_ui_page_state`，不得整节点替换 |
 | `batch.json` | 批量活动组的**定义**（`groups`） | `core/batch_run.py` | 与 `interface.json.batch` 分工：定义在 batch.json，当前选中与草稿在 interface.json |
-| `content.json` | 内容修订索引：按实体记 revision，供缓存失效 | `core/config/content.py` | 可重建；缺失只影响缓存命中，不影响配置正确性 |
+| `content.json` | 内容修订索引：按实体记 revision | `core/config/content.py` | 可重建；任务读取不依赖它，缺失或损坏只影响这份记录本身 |
 
 `session.json` 与 `users/{名}.session.json` 只是名字像，归属完全不同：前者是 App/UI 状态，
 后者是 DSL `session` 关键字的落点。按用途区分，不要按文件名猜。

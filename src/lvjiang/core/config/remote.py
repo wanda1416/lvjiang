@@ -135,23 +135,6 @@ def recover_installation() -> None:
         store.install(member_files={}, member_metadata={}, activate=lambda *_args: None)
 
 
-def prepare_task_installation() -> None:
-    """任务前处理安装恢复及会员到期；不决定任务快照是否启用。"""
-    try:
-        store = _installed_store()
-        if store is None:
-            return
-        with store.locked():
-            store._recover()
-            member = store._state().get("member", {})
-        if member.get("files"):
-            from .protected_remote import authorized
-            if not authorized(member):
-                store.install(member_files={}, member_metadata={}, activate=lambda *_args: None)
-    except (OSError, ValueError) as error:
-        logger.debug("任务前安装状态暂不可恢复，仍加载当前磁盘配置：{}", error)
-
-
 def build_sync_job() -> SyncJob:
     from ..update import get_version
     from .protected_remote import snapshot
@@ -246,7 +229,7 @@ def apply_outcome(result: SyncResult) -> tuple[str, ...]:
         member_metadata=member.metadata if member is not None else None,
         activate=activate_configuration)
     if changed:
-        logger.info("[在线配置] 已生效：{} 个文件；运行中的任务继续使用启动快照", len(changed))
+        logger.info("[在线配置] 已生效：{} 个文件", len(changed))
     return changed
 
 

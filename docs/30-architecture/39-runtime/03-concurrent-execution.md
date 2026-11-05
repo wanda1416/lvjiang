@@ -84,7 +84,6 @@ ExecutionRunManager                 运行调度层
 
 ExecutionRunContext                 单次任务所有者
   ├─ task_run_id / target_id
-  ├─ 业务配置快照
   ├─ engine / worker
   ├─ stop / pause / target-ready gates
   ├─ history / log context

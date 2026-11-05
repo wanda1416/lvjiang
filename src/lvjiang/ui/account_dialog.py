@@ -121,6 +121,17 @@ def readonly_instance() -> bool:
     return is_readonly()
 
 
+def _open_in_browser(url: str) -> None:
+    """用系统浏览器打开网页端页面；Qt 失败时退回标准库 webbrowser。"""
+    if QDesktopServices.openUrl(QUrl(url)):
+        return
+    # 兜底：Qt 的 ShellExecute 失败时（如权限上下文不一致），用标准库再试
+    import webbrowser
+
+    logger.warning("QDesktopServices.openUrl 失败，改用 webbrowser 打开：{}", url)
+    webbrowser.open(url)
+
+
 READONLY_ACCOUNT_HINT = "只读实例不能管理账户与同步数据，请在主实例中操作"
 
 
@@ -494,11 +505,17 @@ class AccountManagerDialog(QDialog):
         self._connections: list[tuple[object, object]] = []
         layout = QVBoxLayout(self)
 
-        # ════ 第一行：左侧账户身份 + 右侧「修改密码 / 退出登录」 ════
+        # ════ 第一行：左侧账户身份 + 右侧「自助服务 / 修改密码 / 退出登录」 ════
         head_row = QHBoxLayout()
         self.account_label = QLabel()
         self.account_label.setStyleSheet("font-size: 15px; font-weight: 600;")
         head_row.addWidget(self.account_label, stretch=1)
+        self.self_service_button = QPushButton(tr("自助服务…"))
+        apply_button_style(self.self_service_button, variant="neutral")
+        self.self_service_button.setToolTip(tr(
+            "在浏览器打开自助操作页：导出数据、清除云端数据、注销账号"))
+        self.self_service_button.clicked.connect(self._open_self_service)
+        head_row.addWidget(self.self_service_button)
         self.change_password_button = QPushButton(tr("修改密码…"))
         apply_button_style(self.change_password_button, variant="neutral")
         self.change_password_button.clicked.connect(self._change_password)
@@ -726,6 +743,7 @@ class AccountManagerDialog(QDialog):
             # 登录成功即清掉「正在登录…」——临时反馈不留在已就绪的界面上
             self._set_status("")
             self._show_logged_in(summary)
+        self.self_service_button.setVisible(summary is not None)
         self.change_password_button.setVisible(summary is not None)
         self.logout_button.setVisible(summary is not None)
         self.tabs.setVisible(summary is not None)
@@ -900,12 +918,11 @@ class AccountManagerDialog(QDialog):
 
     def _open_register_page(self) -> None:
         """注册在网页端完成（自助注册），PC 只负责打开浏览器。"""
-        url = f"{ACCOUNT_SERVICE}/#/register"
-        if not QDesktopServices.openUrl(QUrl(url)):
-            # 兜底：Qt 的 ShellExecute 失败时（如权限上下文不一致），用标准库再试
-            import webbrowser
-            logger.warning(f"QDesktopServices.openUrl 失败，改用 webbrowser 打开注册页：{url}")
-            webbrowser.open(url)
+        _open_in_browser(f"{ACCOUNT_SERVICE}/#/register")
+
+    def _open_self_service(self) -> None:
+        """自助操作页（导出数据 / 清除数据 / 注销账号）在网页端完成。"""
+        _open_in_browser(f"{ACCOUNT_SERVICE}/#/selfservice")
 
     def _logout(self) -> None:
         self.holder.logout_async()

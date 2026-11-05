@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 from dataclasses import dataclass, field
 
 from loguru import logger
@@ -64,7 +65,7 @@ def _local_history_id(state: dict) -> int:
 #: 同步进度与云端不一致时的提示。**只提示，绝不动本地数据**——自动重置水位
 #: 一旦判断出错就会静默丢数据，必须由用户自己决定「清除同步」。
 RESET_HINT = "本地记录的同步进度比云端新（云端可能被重建或已换库）。请在账户管理中点「清除同步」后重新登录同步。"
-NO_SNAPSHOT_HINT = "云端还没有快照。请先在其中一台设备上点「刷新快照」建立基线，再让其他设备登录。"
+NO_SNAPSHOT_HINT = "云端还没有总览快照；请先在 PC 端完成初始同步后继续。"
 
 
 def remote_head(token: str) -> int | None:
@@ -530,6 +531,9 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
     """把本机**全部用户**的当前 entries 作为一份账户级快照上传，
     绑到「此刻的远端最大 remote_id」。
 
+    **只有 PC 能建快照**：Android 是没有总览编辑能力的镜像端，建快照等于把
+    手机那份 db 当成全网基线；这里做硬门禁，任何调用路径都挡住。
+
     **上传前先拉一遍**：快照绑定的 ``snapshot_remote_id`` 语义是「该 id 及之前
     的变更都已体现在这份 entries 里」。若不先同步，别的设备刚推上来的行会被
     这个水位"吞掉"——新设备拿到的是旧基线，且那些行再也不会被回放。
@@ -538,6 +542,9 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
     from ..user_config import list_user_names
 
     report = ProfileSyncReport()
+    if hasattr(sys, "getandroidapilevel"):
+        report.errors.append("手机端不能创建总览快照；请在 PC 端完成初始同步")
+        return report
     pulled = pull_and_replay(token, tolerate_no_snapshot=True)
     report.pulled = pulled.pulled
     report.errors.extend(pulled.errors)

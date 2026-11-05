@@ -2,8 +2,9 @@
 
 - 上行：本地文件 sha ≠ 云端 sha 即推送（携带 ``expected_sha`` 乐观锁，
   冲突时拉云端新版本就地落盘——定义以最后写入者为准）。
-- 内容未变整个跳过（不产生任何云端写入）。
-- 下行：本地文件缺失时从云端拉回（正常情况本地永远存在）。
+- 下行：本地文件缺失时从云端拉回。
+- **方向控制**：``allow_push=False``（镜像端，如 Android）时永不上行——手机上
+  的 profile.yaml 是 PC 离线包的副本，上行会把云端定义回退成旧版。
 """
 from __future__ import annotations
 
@@ -31,8 +32,12 @@ def _local_sha256(path: Path) -> str:
 
 
 def sync_definition(token: str, yaml_path: Path | None = None,
-                    on_progress=None) -> DefinitionSyncReport:
-    """一轮定义同步：每次核对云端 sha，本地与云端不同就上推，冲突时拉云端。"""
+                    on_progress=None, *, allow_push: bool = True) -> DefinitionSyncReport:
+    """一轮定义同步：每次核对云端 sha，本地与云端不同就上推，冲突时拉云端。
+
+    ``allow_push=False`` 时是纯镜像端语义：只拉不推。云端还没有定义时保持
+    本地文件不动（镜像端不能创建云端定义）。
+    """
     if yaml_path is None:
         from ...constants import SESSION_CONFIG_DIR
 
@@ -59,6 +64,14 @@ def sync_definition(token: str, yaml_path: Path | None = None,
     if remote_sha == local_sha:
         state["definition_sha"] = local_sha      # 云端已是同内容（他机推过）
         save_profile_sync_state(state)
+        return report
+
+    if not allow_push:
+        # 镜像端：本地是离线包副本，绝不能反推云端（会把 PC 的新定义回退）。
+        if remote_sha is None:
+            logger.debug("[definition] 云端暂无定义；镜像端不上行，保持本地")
+            return report
+        _pull_to_local(token, yaml_path, report)
         return report
 
     try:

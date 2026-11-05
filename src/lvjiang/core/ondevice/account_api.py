@@ -96,21 +96,19 @@ def _probe_status() -> dict:
 
 
 def _sync(token: str) -> dict:
-    """定义先行、账本双向（云端模式）；PC端模式只收不发。
+    """镜像端同步：定义只拉不推、总览只拉快照+历史、绝不建快照。
 
     顺序是硬约束：**profile.yaml 先提交（拉取并重载 schema），再回放账本**。
     改名场景里新 key 的基线 set 会先于定义到达就会被当成未知项，值在却
-    不显示、引擎不计算——手机此前根本不同步定义（只靠离线包），这是改名
-    能否无感传播的前提缺口。
+    不显示、引擎不计算。
 
-    **云端模式下手机是对等写入端**：手机上跑任务直接改 profile.db，这些
-    变更必须上行云端（push_local 只推本机产生的行，author 过滤天然排除
-    离线包带来的 PC 行——离线包重建后误推 PC 旧账的旧顾虑已被该机制堵死）。
-    PC端模式维持只收不发：db 是 PC 的镜像，推了必污染。
+    **云端模式**：手机跑任务会改 profile.db，这些行按 author 过滤上行
+    （push_local 只推本机产生的行，离线包带来的 PC 行被天然排除）。
+    **PC端模式**：整体跳过——手机 db 是 PC 的镜像，推了必污染。
 
-    pc 模式下整体跳过 profile：手机 db 由离线包整库重建（PC 的镜像），
-    在线通道碰它就会两条线打架（推出去的是 PC 旧账；自己写的行又被下一
-    次包冲掉）。上行只走离线回传。
+    定义与快照都是 **PC 独占的写权限**：手机上的 profile.yaml 是离线包副本，
+    上行会把云端定义回退成旧版；建快照等于把手机 db 当成全网基线。两条都
+    在底层做了硬门禁（``allow_push=False`` / ``refresh_snapshot`` 拒绝）。
     """
     from . import profile_source
 
@@ -120,12 +118,12 @@ def _sync(token: str) -> dict:
     from ..profile.snapshot_sync import NO_SNAPSHOT_HINT, pull_and_replay, push_local
     from ..sync.definition_sync import sync_definition
 
-    definition = sync_definition(token)
+    definition = sync_definition(token, allow_push=False)
     pulled = pull_and_replay(token)
     errors = [*definition.errors, *pulled.errors]
     if any(error == NO_SNAPSHOT_HINT for error in pulled.errors):
         return {"synced": False, "reason": "no_snapshot",
-                "message": "云端还没有快照；先在 PC 端刷新快照"}
+                "message": "云端还没有总览快照；请先在 PC 端完成初始同步后继续"}
     if getattr(pulled, "pending", None):
         # 本地有数据但从未落地过快照（典型：离线包重建后重新登录）。绝不
         # 静默跳过——必须让用户知道 profile 没同步、该怎么处理。

@@ -306,22 +306,44 @@ _heartbeat_stop = threading.Event()
 _heartbeat_thread: threading.Thread | None = None
 
 
+def _ensure_access_token() -> str:
+    """心跳使用的 access 令牌。进程重启后内存是空的，先用 refresh 换一张。"""
+    session = _session()
+    if session.access_token:
+        return session.access_token
+    if not session.has_stored_session():
+        return ""
+    try:
+        if session.restore(fetch_summary=False) is None:
+            return ""
+    except AccountError:
+        return ""
+    return session.access_token or ""
+
+
+def _heartbeat_tick(ticks: int) -> int:
+    """跑一轮前台同步。没有令牌时计数不变，调用方据此跳过这一分钟。"""
+    session = _session()
+    token = _ensure_access_token()
+    if not token:
+        return ticks
+    ticks += 1
+    if ticks % HEARTBEAT_EVERY_N_SYNC == 0:
+        try:
+            session.heartbeat()
+        except AccountError:
+            pass                          # 弱网抖动静默，下轮再试
+    try:
+        _sync(token)
+    except AccountError:
+        pass
+    return ticks
+
+
 def _heartbeat_loop() -> None:
     ticks = 0
     while not _heartbeat_stop.wait(SYNC_INTERVAL_S):
-        session = _session()
-        if not session.access_token and not session.has_stored_session():
-            continue                          # 未登录不跳不同步
-        ticks += 1
-        if ticks % HEARTBEAT_EVERY_N_SYNC == 0:
-            try:
-                session.heartbeat()
-            except AccountError:
-                pass                          # 弱网抖动静默，下轮再试
-        try:
-            _sync(session.access_token)       # 每分钟刷新同步状态
-        except AccountError:
-            pass
+        ticks = _heartbeat_tick(ticks)
 
 
 def account_heartbeat_start() -> str:

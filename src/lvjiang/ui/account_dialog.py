@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import html
 import threading
 from datetime import datetime
 
@@ -1009,23 +1010,56 @@ class AccountManagerDialog(QDialog):
         if sync_established():
             self._clear_sync()
             return
-        # 云端有数据时必须先确认：会备份本地并拉取云端。
+        # 只有「已有快照、改跟云端」和「空基线改由本机补上」需要确认。
+        # 播种和只补快照不剪切本地文件。
         try:
             state = self.holder.session.sync_state()
         except AccountError as error:
             self._set_sync_note(str(error), error=True)
             return
-        if not state.get("empty"):
-            answer = QMessageBox.question(
-                self, tr("初始同步"),
-                tr("云端已有数据。继续将先把本地用户、总览定义与总览数据备份到 "
-                   "config/session/_backup-*，再拉取云端数据。是否继续？"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No)
-            if answer != QMessageBox.StandardButton.Yes:
-                return
+        from ..core.sync.initial import (
+            classify_initial_action,
+            local_profile_has_entries,
+        )
+        try:
+            has_entries = local_profile_has_entries()
+        except Exception as error:  # noqa: BLE001 - 读总览失败不能当成「没有数据」去跟随
+            self._set_sync_note(tr("读取本机总览失败：{error}").format(error=error), error=True)
+            return
+        action = classify_initial_action(state, local_has_entries=has_entries)
+        if action in ("follow", "replace_empty") and not self._confirm_initial(state, action):
+            return
         if self.holder.initial_sync_async():
             self._render_sync()
+
+    def _confirm_initial(self, state: dict, action: str) -> bool:
+        snapshot = state.get("snapshot") if isinstance(state.get("snapshot"), dict) else {}
+        origin = html.escape(str(snapshot.get("origin_name") or tr("未知设备")))
+        created = html.escape(str(snapshot.get("created_at") or tr("未知")))
+        entry_count = snapshot.get("entry_count")
+        count_text = str(entry_count) if isinstance(entry_count, int) else tr("未知")
+        empty_baseline = entry_count == 0
+        if action == "replace_empty":
+            text = tr(
+                "云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0"
+                "<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。"
+            ).format(origin=origin, created=created)
+        else:
+            warning = (
+                "<br><span style=\"color:#c62828\">云端基线是空的。</span>"
+                if empty_baseline else "")
+            text = tr(
+                "云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}"
+                "{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 "
+                "config/session/_backup-*，再拉取云端数据。"
+            ).format(origin=origin, created=created, count=count_text, warning=warning)
+        box = QMessageBox(self)
+        box.setWindowTitle(tr("初始同步"))
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(text)
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        box.setDefaultButton(QMessageBox.StandardButton.No)
+        return box.exec() == QMessageBox.StandardButton.Yes
 
     def _clear_sync(self) -> None:
         """清空云端同步数据 + 本机同步状态；红色警告 + 密码确认。"""

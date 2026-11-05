@@ -16,6 +16,7 @@ import json
 import socket
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from loguru import logger
 
@@ -470,9 +471,12 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         try:
             response = post("/api/sync/profile/push", {
                 "ops": ops,
-                "base_remote_id": int(state.get("remote_history_id") or 0)}, token)
+                "base_remote_id": int(state.get("remote_history_id") or 0),
+                "tz_offset_minutes": local_tz_offset_minutes()}, token)
         except SyncError as error:
             report.errors.append(str(error))
+            if error.code == "pre_snapshot":
+                logger.warning("[profile sync] {}", error)
             break
         report.pushed += int(response.get("accepted") or 0)
         since = rows[-1]["id"]
@@ -527,34 +531,19 @@ def _key_definitions() -> list[dict]:
     return keys
 
 
-def refresh_snapshot(token: str) -> ProfileSyncReport:
-    """把本机**全部用户**的当前 entries 作为一份账户级快照上传，
-    绑到「此刻的远端最大 remote_id」。
+def local_tz_offset_minutes() -> int:
+    """本机相对 UTC 的偏移（分钟）。东八区为 480。"""
+    offset = datetime.now().astimezone().utcoffset()
+    if offset is None:
+        return 0
+    return int(offset.total_seconds() // 60)
 
-    **只有 PC 能建快照**：Android 是没有总览编辑能力的镜像端，建快照等于把
-    手机那份 db 当成全网基线；这里做硬门禁，任何调用路径都挡住。
 
-    **上传前先拉一遍**：快照绑定的 ``snapshot_remote_id`` 语义是「该 id 及之前
-    的变更都已体现在这份 entries 里」。若不先同步，别的设备刚推上来的行会被
-    这个水位"吞掉"——新设备拿到的是旧基线，且那些行再也不会被回放。
-    已有设备各自按自己的水位继续，不受影响。
-    """
+def _snapshot_entries() -> tuple[list[dict], int]:
+    """本机有定义的总览条目，以及被跳过的无定义残留条数。"""
     from ..user_config import list_user_names
 
-    report = ProfileSyncReport()
-    if hasattr(sys, "getandroidapilevel"):
-        report.errors.append("手机端不能创建总览快照；请在 PC 端完成初始同步")
-        return report
-    pulled = pull_and_replay(token, tolerate_no_snapshot=True)
-    report.pulled = pulled.pulled
-    report.errors.extend(pulled.errors)
-    state = _state()
-    definitions = _key_definitions()
-    # 快照只带「有定义」的条目：entries 里可能存在定义已删除/改名的残留键
-    # （例如 _of_week 改成 _of_month 后旧行还在，或某次写入用错了模型类型）。
-    # 它们没有标签、没有分组，进快照只会在网页上冒出裸键列。**只过滤快照，
-    # 不删本地数据**——本地是否清理由用户决定。
-    defined = {(item["type"], item["key"]) for item in definitions}
+    defined = {(item["type"], item["key"]) for item in _key_definitions()}
     payload: list[dict] = []
     orphan = 0
     for username in list_user_names():
@@ -569,9 +558,49 @@ def refresh_snapshot(token: str) -> ProfileSyncReport:
                      "value": entry.get("value"),
                      "value_text": entry.get("value_text") or "",
                      "updated_at": entry.get("updated_at") or ""})
+    return payload, orphan
+
+
+def local_profile_has_entries() -> bool:
+    """本机是否已有能写入快照的总览值。"""
+    payload, _orphan = _snapshot_entries()
+    return bool(payload)
+
+
+def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncReport:
+    """把本机**全部用户**的当前 entries 作为一份账户级快照上传，
+    绑到「此刻的远端最大 remote_id」。
+
+    **只有 PC 能建快照**：Android 是没有总览编辑能力的镜像端，建快照等于把
+    手机那份 db 当成全网基线；这里做硬门禁，任何调用路径都挡住。
+
+    **上传前先拉一遍**：快照绑定的 ``snapshot_remote_id`` 语义是「该 id 及之前
+    的变更都已体现在这份 entries 里」。若不先同步，别的设备刚推上来的行会被
+    这个水位"吞掉"——新设备拿到的是旧基线，且那些行再也不会被回放。
+    已有设备各自按自己的水位继续，不受影响。
+
+    ``allow_empty=False``（手动「创建快照」）在没有任何可上传条目时直接失败。
+    初始播种传 True，允许用空列表建立第一份基线。
+    """
+    report = ProfileSyncReport()
+    if hasattr(sys, "getandroidapilevel"):
+        report.errors.append("手机端不能创建总览快照；请在 PC 端完成初始同步")
+        return report
+    pulled = pull_and_replay(token, tolerate_no_snapshot=True)
+    report.pulled = pulled.pulled
+    report.errors.extend(pulled.errors)
+    # 拉取失败就不要建快照：水位会把没拉到的远端行吞掉。
+    if pulled.errors:
+        return report
+    state = _state()
+    # 快照只带「有定义」的条目：entries 里可能存在定义已删除/改名的残留键
+    # （例如 _of_week 改成 _of_month 后旧行还在，或某次写入用错了模型类型）。
+    # 它们没有标签、没有分组，进快照只会在网页上冒出裸键列。**只过滤快照，
+    # 不删本地数据**——本地是否清理由用户决定。
+    payload, orphan = _snapshot_entries()
     if orphan:
         logger.info("[profile sync] 快照跳过 {} 条无定义的历史残留条目", orphan)
-    if not payload:
+    if not payload and not allow_empty:
         report.errors.append("本机没有可上传的 profile 数据")
         return report
     try:

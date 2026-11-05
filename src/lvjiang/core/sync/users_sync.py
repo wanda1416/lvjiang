@@ -93,6 +93,9 @@ def _set_roster(names: list[str]) -> bool:
     except OSError as error:
         logger.warning("[users sync] 名册顺序写回失败：{}", error)
         return False
+    # 直写文件不经过 SessionStore。不刷新的话 list_user_names 仍是旧内存。
+    from ..config.session import get_session_store
+    get_session_store().reload()
     return True
 
 

@@ -16,6 +16,7 @@ class FakeServer:
         self.snapshots: list[dict] = []
         self.rows: list[dict] = []
         self.pushed: list[dict] = []
+        self.push_bodies: list[dict] = []
         self.fail = False
 
     def post(self, route: str, data: dict, token: str) -> dict:
@@ -34,6 +35,7 @@ class FakeServer:
             rows = [r for r in self.rows if r["remote_id"] > since]
             return {"ops": rows, "last_remote_id": rows[-1]["remote_id"] if rows else since}
         if route == "/api/sync/profile/push":
+            self.push_bodies.append(data)
             before = len(self.rows)
             for op in data["ops"]:
                 self.rows.append({"remote_id": len(self.rows) + 1,
@@ -267,6 +269,7 @@ def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
     report = snapshot_sync.push_local("t")
     assert report.pushed == 2
     assert [op["local_id"] for op in env["server"].pushed] == [101, 102]
+    assert isinstance(env["server"].push_bodies[-1]["tz_offset_minutes"], int)
     assert env["server"].pushed[1]["op"] == "delta"
     assert env["server"].pushed[1]["delta"] == -2
     assert env["state"]["local_history_id"] == 102

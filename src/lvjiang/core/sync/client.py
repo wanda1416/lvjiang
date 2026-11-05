@@ -48,6 +48,9 @@ def _request(method: str, route: str, data: dict | None, token: str) -> dict:
         from ..account.service import ERROR_MESSAGES
 
         message = ERROR_MESSAGES.get(str(code)) or f"同步请求失败（HTTP {exc.code}）"
+        detail = details.get("detail") if isinstance(details.get("detail"), str) else ""
+        if detail:
+            message = f"{message}（{detail}）"
         raise SyncError(message, code=str(code)) from None
     except (urlerror.URLError, TimeoutError, OSError):
         raise SyncError("账号服务暂时不可用，同步未完成") from None

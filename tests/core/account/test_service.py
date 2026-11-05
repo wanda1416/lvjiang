@@ -163,6 +163,19 @@ def test_no_keyring_falls_back_to_android_store(monkeypatch, tmp_path) -> None:
     assert backend.get_password("lvjiang.account", "session:x") is None
 
 
+def test_desktop_without_keyring_refuses_plaintext_fallback(monkeypatch) -> None:
+    """桌面端缺 keyring 必须报错，绝不把 refresh 令牌明文写进 config/session。"""
+    monkeypatch.setattr(account_service, "keyring", None)
+    monkeypatch.setattr(account_service, "_on_android", lambda: False)
+
+    with pytest.raises(AccountError):
+        account_service._credentials()
+
+    session = account_service.AccountSession()
+    # 启动期不能因为凭据库不可用就抛异常：按未登录处理
+    assert session.has_stored_session() is False
+
+
 def test_stale_access_token_self_heals_via_refresh(fake_env, monkeypatch) -> None:
     """access 被别的实例/进程轮换掉时收到 unauthorized，也应滑动重试而不是直接报错。"""
     session = AccountSession()

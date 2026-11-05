@@ -155,10 +155,16 @@ def save_profile_sync_state(state: dict) -> None:
 
 
 def _credentials():
-    """凭据后端。桌面端用系统凭据库（不接受明文文件后端）；Android 用
-    应用私有沙箱文件——进程隔离由 OS 保证，等价于桌面的凭据库边界。"""
-    if _on_android() or keyring is None:
+    """凭据后端。桌面端用系统凭据库；Android 用应用私有沙箱文件——进程隔离
+    由 OS 保证，等价于桌面的凭据库边界。
+
+    **桌面端缺 keyring 时不退回明文文件**：否则 refresh 令牌会明文落到
+    ``config/session/account_token``，是静默的安全降级。宁可明确报错。
+    """
+    if _on_android():
         return _AndroidTokenStore()
+    if keyring is None:
+        raise AccountError("系统凭据库不可用，无法保存登录态")
     backend = keyring.get_keyring()
     allowed = {
         "keyring.backends.Windows", "keyring.backends.macOS",
@@ -438,8 +444,16 @@ class AccountSession:
         return self.summary()
 
     def has_stored_session(self) -> bool:
-        """凭据库里是否存在登录态（只查本地，不联网）。"""
-        return bool(_stored_refresh_token())
+        """凭据库里是否存在登录态（只查本地，不联网）。
+
+        凭据库不可用时按「没有登录态」处理，避免启动期在 UI 线程抛出；
+        真正的错误会在用户点登录时由 ``_store_refresh_token`` 明确报出。
+        """
+        try:
+            return bool(_stored_refresh_token())
+        except AccountError as error:
+            logger.warning("凭据库不可用，按未登录处理：{}", error)
+            return False
 
     def restore(self, *, fetch_summary: bool = True) -> dict | None:
         """用凭据库里的 refresh 令牌恢复登录态；没有或**服务端明确拒绝**返回 None。

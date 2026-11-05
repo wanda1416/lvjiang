@@ -275,6 +275,34 @@ def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
     assert env["state"]["local_history_id"] == 102
 
 
+def test_push_stores_newer_row_and_skips_older_ones(env, monkeypatch) -> None:
+    """同批里早于快照的行不能挡住后面的新修改，水位要划过整批。"""
+    env["state"]["local_history_id"] = 0
+    env["history"].extend([
+        {"id": 1, "username": "蔡元君", "type": "stock", "key": "energy",
+         "new_value": 1, "new_value_text": "", "change_type": "set",
+         "delta_value": None, "ts": "2000-01-01T00:00:00"},
+        {"id": 2, "username": "蔡元君", "type": "stock", "key": "energy",
+         "new_value": 9, "new_value_text": "", "change_type": "set",
+         "delta_value": None, "ts": "2099-01-01T00:00:00"},
+    ])
+
+    def post(route, data, token):
+        if route == "/api/sync/profile/push":
+            return {"accepted": 1, "skipped": 0, "remote_id": 1,
+                    "skipped_pre_snapshot": [
+                        {"local_id": 1, "happened_at": "2000-01-01T00:00:00"}]}
+        return env["server"].post(route, data, token)
+
+    monkeypatch.setattr(snapshot_sync, "post", post)
+    report = snapshot_sync.push_local("t")
+    assert report.errors == []
+    assert report.pushed == 1
+    assert report.skipped_pre_snapshot == [1]
+    assert env["state"]["local_history_id"] == 2
+    assert "早于快照跳过 1 条" in report.describe()
+
+
 def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
     # 快照是账户级多份：只看最新一份（列表首位），旧的忽略
     env["server"].snapshots = [

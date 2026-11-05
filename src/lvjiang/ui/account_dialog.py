@@ -420,9 +420,8 @@ class AccountHolder(QObject):
 
         return self._start(action, "sync")
 
-    def initial_sync_async(self) -> bool:
-        """初始同步：一次性建立本实例的同步状态（云端空则上传+建快照，
-        云端有数据则备份本地三件套后拉远端）。"""
+    def initial_sync_async(self, confirmed: str = "seed") -> bool:
+        """初始同步。``confirmed`` 是用户刚刚确认的动作，跟随必须带 follow。"""
         from ..core.sync.initial import initial_sync
         token = self.session.access_token
         if readonly_instance() or not token:
@@ -435,7 +434,8 @@ class AccountHolder(QObject):
             def progress(data):
                 self.sync_progress.emit(dict(data))
             return initial_sync(token, on_progress=progress,
-                                stop=self._sync_cancel.is_set)
+                                stop=self._sync_cancel.is_set,
+                                confirmed=confirmed)
 
         return self._start(action, "sync")
 
@@ -1029,7 +1029,7 @@ class AccountManagerDialog(QDialog):
         action = classify_initial_action(state, local_has_entries=has_entries)
         if action in ("follow", "replace_empty") and not self._confirm_initial(state, action):
             return
-        if self.holder.initial_sync_async():
+        if self.holder.initial_sync_async(action):
             self._render_sync()
 
     def _confirm_initial(self, state: dict, action: str) -> bool:

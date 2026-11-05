@@ -107,16 +107,38 @@ def backup_local_profile_data() -> Path | None:
         return None
     target = _backup_target()
     target.mkdir(parents=True, exist_ok=True)
+    pairs: list[tuple[Path, Path]] = []
     for source in sources:
         if source.exists():
-            shutil.move(str(source), str(target / source.name))
-            logger.info("[initial sync] 已备份 {} → {}", source.name, target)
+            pairs.append((source, target / source.name))
     for source in session_docs:
         relative = source.relative_to(SESSION_CONFIG_DIR)
-        destination = target / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(source), str(destination))
-        logger.info("[initial sync] 已备份会话文档 {} → {}", relative, destination)
+        pairs.append((source, target / relative))
+    try:
+        for source, destination in pairs:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if source.is_dir():
+                shutil.copytree(source, destination)
+            else:
+                shutil.copy2(source, destination)
+    except Exception:
+        shutil.rmtree(target, ignore_errors=True)
+        raise
+    removed: list[tuple[Path, Path]] = []
+    try:
+        for source, destination in pairs:
+            if source.is_dir():
+                shutil.rmtree(source)
+            else:
+                source.unlink()
+            removed.append((source, destination))
+            logger.info("[initial sync] 已备份 {} → {}", source.name, destination)
+    except Exception:
+        for source, destination in removed:
+            if destination.exists() and not source.exists():
+                shutil.move(str(destination), str(source))
+        shutil.rmtree(target, ignore_errors=True)
+        raise
     Path(USERS_DIR).mkdir(parents=True, exist_ok=True)
     return target
 
@@ -312,8 +334,13 @@ def _rows(definition, users, documents, overview) -> list[tuple[str, int, int, i
     ]
 
 
-def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
-    """执行一次初始同步；成功返回 ``established=True``。"""
+def initial_sync(token: str, on_progress=None, stop=None,
+                 confirmed: str | None = None) -> InitialSyncReport:
+    """执行一次初始同步；成功返回 ``established=True``。
+
+    ``confirmed`` 是用户刚刚确认过的动作。跟随会剪切本地文件，只有
+    ``confirmed="follow"`` 才执行。确认之后云端状态变了，就停下来再问一次。
+    """
     report = InitialSyncReport()
     try:
         state = post("/api/sync/state", {}, token)
@@ -322,6 +349,12 @@ def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
         return report
     action = classify_initial_action(
         state, local_has_entries=local_profile_has_entries())
+    if action == "follow" and confirmed != "follow":
+        report.errors.append("云端已有快照。请再点一次「初始同步」，确认后再继续。")
+        return report
+    if action == "replace_empty" and confirmed not in ("replace_empty", "follow"):
+        report.errors.append("云端基线是空的。请再点一次「初始同步」，确认后再用本机总览补上。")
+        return report
     if action == "replace_empty":
         return _publish_local_baseline(token, report)
     if action == "follow":
@@ -330,9 +363,21 @@ def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
 
 
 def _publish_local_baseline(token: str, report: InitialSyncReport) -> InitialSyncReport:
-    """空基线不跟随。用本机总览再写一份快照，本地用户目录保持不动。"""
+    """空基线不跟随。先占锁，再用本机总览写一份快照。本地用户目录保持不动。"""
     from ..profile.snapshot_sync import refresh_snapshot
 
+    try:
+        claim = post("/api/sync/claim_init", {}, token)
+    except SyncError as error:
+        report.errors.append(str(error))
+        return report
+    status = claim.get("status")
+    if status == "busy":
+        report.errors.append("另一台电脑正在建立初始同步，请稍后再试")
+        return report
+    if status != "owner":
+        report.errors.append("云端基线已更新，请再点一次「初始同步」")
+        return report
     snapshot = refresh_snapshot(token, allow_empty=False)
     report.rows = [("总览", snapshot.snapshots, snapshot.pulled, len(snapshot.errors))]
     report.errors = list(snapshot.errors)
@@ -367,7 +412,11 @@ def _seed_or_repair(token: str, state: dict, report: InitialSyncReport,
 
     repair_only = cloud_has_seed_data(state) and not claim.get("seed_owner")
     if repair_only:
-        snapshot = refresh_snapshot(token, allow_empty=True)
+        if not local_profile_has_entries():
+            report.errors.append(
+                "本机没有总览数据，不能补快照。请回到最初那台电脑完成，或先在总览里写入数据。")
+            return report
+        snapshot = refresh_snapshot(token, allow_empty=False)
         report.rows = [("总览", snapshot.snapshots, snapshot.pulled, len(snapshot.errors))]
         report.errors = list(snapshot.errors)
         if not report.errors and snapshot.snapshots < 1:

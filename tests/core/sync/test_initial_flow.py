@@ -110,7 +110,7 @@ def test_seed_does_not_snapshot_when_roster_upload_fails(monkeypatch, tmp_path):
     assert not list(session.glob("_backup-initialsync-*"))
 
 
-def test_takeover_only_refreshes_snapshot(monkeypatch, tmp_path):
+def test_takeover_without_entries_does_not_write_empty_snapshot(monkeypatch, tmp_path):
     _isolate(monkeypatch, tmp_path)
     calls: list[str] = []
 
@@ -123,22 +123,46 @@ def test_takeover_only_refreshes_snapshot(monkeypatch, tmp_path):
             return {"status": "owner", "seed_owner": False}
         raise AssertionError(route)
 
-    def users(*_args, **_kwargs):
-        calls.append("users")
-        return _Step()
+    def snapshot(token, *, allow_empty=False):
+        calls.append(f"snapshot:{allow_empty}")
+        return _Step(snapshots=1)
+
+    monkeypatch.setattr(initial, "post", post)
+    _install_channels(monkeypatch, snapshot=snapshot)
+
+    report = initial.initial_sync("t")
+
+    assert report.established is False
+    assert calls == []
+    assert any("没有总览数据" in error for error in report.errors)
+
+
+def test_takeover_with_entries_refreshes_snapshot(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    calls: list[str] = []
+
+    def post(route, data, token):
+        if route == "/api/sync/state":
+            return {"snapshot_count": 0, "not_inited": False, "users": 2,
+                    "documents": 0, "definition": True, "history": 0, "empty": False,
+                    "snapshot": None}
+        if route == "/api/sync/claim_init":
+            return {"status": "owner", "seed_owner": False}
+        raise AssertionError(route)
 
     def snapshot(token, *, allow_empty=False):
         calls.append(f"snapshot:{allow_empty}")
         return _Step(snapshots=1)
 
     monkeypatch.setattr(initial, "post", post)
-    _install_channels(monkeypatch, users=users, snapshot=snapshot)
+    _install_channels(monkeypatch, snapshot=snapshot)
+    monkeypatch.setattr(initial, "local_profile_has_entries", lambda: True)
     monkeypatch.setattr(initial, "set_sync_established", lambda _value: None)
 
     report = initial.initial_sync("t")
 
     assert report.established is True
-    assert calls == ["snapshot:True"]
+    assert calls == ["snapshot:False"]
 
 
 def test_busy_claim_does_not_upload(monkeypatch, tmp_path):
@@ -205,7 +229,7 @@ def test_follow_failure_restores_users_and_database(monkeypatch, tmp_path):
     monkeypatch.setattr(initial, "post", post)
     _install_channels(monkeypatch, definition=definition, users=users_step, pull=pull)
 
-    report = initial.initial_sync("t")
+    report = initial.initial_sync("t", confirmed="follow")
 
     assert report.established is False
     assert (users / "甲.json").read_text(encoding="utf-8").startswith("{")
@@ -221,7 +245,7 @@ def test_follow_failure_restores_users_and_database(monkeypatch, tmp_path):
     assert not any(path.name.startswith("_backup-initialsync-") for path in session.iterdir())
 
     # 再失败一次：云端用户不能残留在已经还原的名册里。
-    again = initial.initial_sync("t")
+    again = initial.initial_sync("t", confirmed="follow")
     assert again.established is False
     assert not (users / "云.json").exists()
     checked = sqlite3.connect(database)
@@ -245,8 +269,32 @@ def test_follow_rejects_empty_roster_when_cloud_has_users(monkeypatch, tmp_path)
     monkeypatch.setattr(initial, "post", post)
     _install_channels(monkeypatch)
 
-    report = initial.initial_sync("t")
+    report = initial.initial_sync("t", confirmed="follow")
 
     assert report.established is False
     assert any("名册仍为空" in error for error in report.errors)
     assert '"甲"' in (session / "session.json").read_text(encoding="utf-8")
+
+
+def test_unconfirmed_follow_does_not_move_local_files(monkeypatch, tmp_path):
+    session = _isolate(monkeypatch, tmp_path)
+    users = session / "users"
+    users.mkdir()
+    (users / "甲.json").write_text("{}\n", encoding="utf-8")
+
+    def post(route, data, token):
+        if route == "/api/sync/claim_init":
+            raise AssertionError("未确认不能占锁或跟随")
+        return {"snapshot_count": 1, "users": 1, "history": 1, "snapshot": {
+            "entry_count": 2, "snapshot_remote_id": 3, "origin_name": "PC",
+            "created_at": "T"}}
+
+    monkeypatch.setattr(initial, "post", post)
+    _install_channels(monkeypatch)
+
+    report = initial.initial_sync("t", confirmed="seed")
+
+    assert report.established is False
+    assert (users / "甲.json").is_file()
+    assert not any(path.name.startswith("_backup-initialsync-") for path in session.iterdir())
+    assert any("确认后再继续" in error for error in report.errors)

@@ -34,15 +34,20 @@ class ProfileSyncReport:
     #: 需用户确认才能覆盖的用户（远端快照来自别的设备，且本地已有数据）
     pending: list[dict] = field(default_factory=list)
     backup: str = ""
+    #: 早于云端快照、本批不再重传的本地 history.id
+    skipped_pre_snapshot: list[int] = field(default_factory=list)
 
     def describe(self) -> str:
-        if not (self.pushed or self.pulled or self.snapshots or self.errors or self.pending):
+        if not (self.pushed or self.pulled or self.snapshots or self.errors
+                or self.pending or self.skipped_pre_snapshot):
             return "已是最新，无改动"
         parts = [f"上行 {self.pushed} 条", f"下行 {self.pulled} 条"]
         if self.snapshots:
             parts.append(f"快照 {self.snapshots} 个")
         if self.backup:
             parts.append(f"已备份到 {self.backup}")
+        if self.skipped_pre_snapshot:
+            parts.append(f"早于快照跳过 {len(self.skipped_pre_snapshot)} 条")
         if self.errors:
             parts.append(f"失败 {len(self.errors)}")
         return "，".join(parts)
@@ -475,10 +480,14 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
                 "tz_offset_minutes": local_tz_offset_minutes()}, token)
         except SyncError as error:
             report.errors.append(str(error))
-            if error.code == "pre_snapshot":
-                logger.warning("[profile sync] {}", error)
             break
+        skipped = _skipped_pre_snapshot(response.get("skipped_pre_snapshot"))
+        if skipped:
+            report.skipped_pre_snapshot.extend(skipped)
+            logger.warning("[profile sync] 早于快照的本地修改已跳过，不再重传：{}", skipped)
         report.pushed += int(response.get("accepted") or 0)
+        # 水位划过整批，包括被跳过的旧行。否则旧行会一直占着队头，
+        # 后面的新修改永远送不出去。
         since = rows[-1]["id"]
         state["local_history_id"] = since
         save_profile_sync_state(state)
@@ -529,6 +538,18 @@ def _key_definitions() -> list[dict]:
                 entry["cap"] = cap
             keys.append(entry)
     return keys
+
+
+def _skipped_pre_snapshot(raw) -> list[int]:
+    if not isinstance(raw, list):
+        return []
+    ids: list[int] = []
+    for item in raw:
+        if isinstance(item, dict) and isinstance(item.get("local_id"), int):
+            ids.append(item["local_id"])
+        elif isinstance(item, int):
+            ids.append(item)
+    return ids
 
 
 def local_tz_offset_minutes() -> int:

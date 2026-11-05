@@ -1,0 +1,148 @@
+"""自动调律应用层所需的外部能力接口。
+
+Protocol 只描述组件实际使用的最小能力，避免把 AutoTuningWorkflow 当作
+无边界的服务定位器。现有 Workflow 本身满足这些结构化接口，无需适配继承。
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Protocol
+
+from lvjiang.workflows.ports import SceneAutomationPort, SubcallEnginePort
+
+if TYPE_CHECKING:
+    from lvjiang.apps.shuijiao_tuning.workflows.implementations.tuning.state import (
+        TuningRunState,
+    )
+
+    from lvjiang.core.layout_models import Region
+    from lvjiang.core.recognizers import ReferenceInfo
+
+
+class RouteHostPort(SceneAutomationPort, Protocol):
+    """平台路径适配器可使用的 Workflow 原语。"""
+
+    TUNE_SCENE: str
+    EQUIP_DETAIL: str
+    CONTROL_SCENE: str
+
+    @property
+    def engine(self) -> SubcallEnginePort | None: ...
+
+class RecycleHostPort(Protocol):
+    """装备回收用例所需的最小 Workflow 能力。"""
+
+    EQUIP_DETAIL: str
+    output: dict
+
+    @property
+    def ctx(self) -> Any: ...
+
+    @property
+    def is_stopped(self) -> bool: ...
+
+    @property
+    def stone_stock(self) -> Any: ...
+
+    @property
+    def engine(self) -> SubcallEnginePort | None: ...
+
+    def wait_stable(self, timeout: float | str) -> Any: ...
+
+
+class ResetHostPort(Protocol):
+    """调律重置用例所需的最小 Workflow 能力。"""
+
+    TUNE_SCENE: str
+    CONTROL_SCENE: str
+    output: dict
+
+    @property
+    def run_state(self) -> TuningRunState: ...
+
+    def call_function(self, func_name: str, args: list, engine=None) -> Any: ...
+
+    @property
+    def engine(self) -> SubcallEnginePort | None: ...
+
+    def ocr_scene(
+        self,
+        scene_key: str,
+        field_keys: list[str] | None = None,
+        min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
+        cleaning_group: str | None = None,
+    ) -> dict[str, str]: ...
+
+    def click_region(self, scene_key: str, field_key: str, **kwargs) -> Any: ...
+
+    def wait_stable(self, timeout: float | str) -> Any: ...
+
+    def wait_delay(self, delay_name: str) -> Any: ...
+
+    def _emit_operation(self, phase: str, message: str, **details) -> None: ...
+
+
+class TuningRoundHostPort(Protocol):
+    """材料读取与单轮调律执行所需的宿主能力。"""
+
+    TUNE_SCENE: str
+    RESULT_SCENE: str
+    MATERIAL_PANEL: str
+    MATERIAL_GROUP: str
+    @property
+    def is_stopped(self) -> bool: ...
+    @property
+    def base_group(self) -> Any: ...
+
+    @property
+    def ctx(self) -> Any: ...
+
+    @property
+    def run_state(self) -> TuningRunState: ...
+
+    @property
+    def stone_stock(self) -> Any: ...
+
+    @property
+    def equipment_session(self) -> Any: ...
+
+    @property
+    def judge(self) -> Any: ...
+
+    @property
+    def engine(self) -> Any: ...
+
+    output: dict
+
+    def recognize_references_info_panel(
+        self,
+        scene_key: str,
+        panel_key: str,
+        group: str | list[str] | None = None,
+    ) -> dict[tuple[int, int], ReferenceInfo]: ...
+
+    def ocr_scene(
+        self,
+        scene_key: str,
+        field_keys: list[str] | None = None,
+        min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
+        cleaning_group: str | None = None,
+    ) -> dict[str, str]: ...
+
+    def click_region(self, scene_key: str, field_key: str, **kwargs) -> Any: ...
+
+    def click_panel(
+        self, scene_key: str, panel_key: str, row: int, col: int
+    ) -> bool: ...
+
+    def wait_stable(self, timeout: float | str) -> Any: ...
+
+    def wait_delay(self, delay_name: str) -> Any: ...
+
+    def wait_seconds(self, seconds: float) -> Any: ...
+
+    def press(self, key: str, wait: str | None = None) -> Any: ...
+
+    def _emit_operation(self, phase: str, message: str, **details) -> None: ...

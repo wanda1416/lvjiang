@@ -1,0 +1,1595 @@
+{
+  "defaults": {
+    "selected_slots": [
+      "main_weapon",
+      "ring",
+      "pendant",
+      "head",
+      "chest",
+      "leg",
+      "wrist"
+    ],
+    "rules": {},
+    "switches": {
+      "keep_danti": false,
+      "keep_wanjia": false
+    },
+    "base_group": "default",
+    "skip_tuning": false,
+    "pc_background_scroll": false,
+    "skip_locked_equipment": true,
+    "use_stone_cache": true,
+    "initial_stone_check_enabled": true,
+    "initial_stone_min_count": 80,
+    "validate_stone_cache": false,
+    "scroll_strategy": "",
+    "skip_start": null,
+    "target_cell": null,
+    "min_level": 105,
+    "smart_tuning_enabled": {},
+    "junk_recycle": {
+      "enabled": false,
+      "minimum": 2,
+      "affixes": [
+        "气血最大值",
+        "外功防御",
+        "体",
+        "御"
+      ],
+      "protect_other_builds": true,
+      "confirm_recycle": false,
+      "by_build": true,
+      "small_affixes": [
+        "最大外功攻击",
+        "劲",
+        "势"
+      ],
+      "large_affixes": [
+        "最小外功攻击",
+        "敏"
+      ]
+    },
+    "gold_food": {
+      "enabled": true,
+      "min_initial_pct": 85.0,
+      "low_stock": 0,
+      "reserve_enabled": true,
+      "reserve_pct": 97.0,
+      "reserve_parts": [
+        "main_weapon",
+        "sub_weapon",
+        "ring",
+        "pendant",
+        "head",
+        "chest",
+        "leg",
+        "wrist"
+      ],
+      "color_enabled": true,
+      "color_pct": 98.0,
+      "color_low_stock": 9,
+      "keep_enabled": true,
+      "keep_pct": 95.0,
+      "refund_wait": 2.0
+    },
+    "right_click_results": true,
+    "fast_tuning": true,
+    "front_inventory": true,
+    "strict_parts": [],
+    "strict_flexible": true,
+    "build_profiles": [],
+    "profile_overrides": {
+      "hong": {
+        "main_weapon": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "剑武学增伤",
+          "会意率/劲/势/最大无相攻击",
+          ""
+        ],
+        "sub_weapon": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "会意率/劲/势/最大无相攻击",
+          "",
+          ""
+        ],
+        "ring": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "全武学增效",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ],
+        "pendant": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "全武学增效",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ],
+        "head": [
+          "会意率",
+          "最大外功攻击",
+          "会意率/劲/势/最大鸣金攻击",
+          "",
+          ""
+        ],
+        "chest": [
+          "会意率",
+          "最大外功攻击",
+          "会意率/劲/势/最大鸣金攻击",
+          "",
+          ""
+        ],
+        "leg": [
+          "劲",
+          "最大外功攻击",
+          "对首领单位增伤",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ],
+        "wrist": [
+          "劲",
+          "最大外功攻击",
+          "对首领单位增伤",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ]
+      },
+      "lin_heal": {
+        "main_weapon": [
+          "最大外功攻击",
+          "会心率/劲/扇武学增效/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "sub_weapon": [
+          "最大外功攻击",
+          "会心率/伞武学增效/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "ring": [
+          "最大外功攻击/最小外功攻击",
+          "全武学增效",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "pendant": [
+          "最大外功攻击/最小外功攻击",
+          "全武学增效",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "head": [
+          "会心率/精准率",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "会心率/劲/敏/最大外功攻击/精准率/最小外功攻击",
+          "",
+          "",
+          ""
+        ],
+        "leg": [
+          "劲",
+          "对玩家单位增效",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "wrist": [
+          "劲",
+          "对玩家单位增效",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ]
+      },
+      "lin_fire": {
+        "main_weapon": [
+          "最大外功攻击/最小外功攻击",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "sub_weapon": [
+          "最大外功攻击/最小外功攻击",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "ring": [
+          "最大外功攻击/最小外功攻击",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "pendant": [
+          "最大外功攻击/最小外功攻击",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "head": [
+          "会心率/精准率",
+          "全奇术增伤",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "全奇术增伤",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "leg": [
+          "劲",
+          "对首领单位增伤",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "wrist": [
+          "劲",
+          "对首领单位增伤",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ]
+      },
+      "ying": {
+        "main_weapon": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "剑武学增伤",
+          "会意率/劲/势/最大无相攻击",
+          ""
+        ],
+        "sub_weapon": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "会意率/劲/势/最大无相攻击",
+          "",
+          ""
+        ],
+        "ring": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "全武学增效",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ],
+        "pendant": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "全武学增效",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ],
+        "head": [
+          "会意率",
+          "最大外功攻击",
+          "会意率/劲/势/最大鸣金攻击",
+          "全奇术增伤",
+          ""
+        ],
+        "chest": [
+          "会意率",
+          "最大外功攻击",
+          "会意率/劲/势/最大鸣金攻击",
+          "全奇术增伤",
+          ""
+        ],
+        "leg": [
+          "劲",
+          "最大外功攻击",
+          "对首领单位增伤",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ],
+        "wrist": [
+          "劲",
+          "最大外功攻击",
+          "对首领单位增伤",
+          "会意率/劲/势/最大鸣金攻击",
+          ""
+        ]
+      },
+      "feng": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "双刀武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "绳镖武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ]
+      },
+      "zun": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "手甲武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "双刀武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ]
+      },
+      "yuan": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "手甲武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "会心率/最大无相攻击/最小无相攻击/精准率",
+          ""
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ]
+      },
+      "chen": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "伞武学增效",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "会心率/最大无相攻击/最小无相攻击/精准率",
+          ""
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大破竹攻击/最小破竹攻击/精准率"
+        ]
+      },
+      "jun_double": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "会心率/最大无相攻击/最小无相攻击/精准率",
+          ""
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "陌刀武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ]
+      },
+      "jun_tang": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "横刀武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "会心率/最大无相攻击/最小无相攻击/精准率",
+          ""
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大裂石攻击/最小裂石攻击/精准率"
+        ]
+      },
+      "yi": {
+        "main_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "舞绫鼓武学增伤",
+          "会心率/最大无相攻击/最小无相攻击/精准率"
+        ],
+        "sub_weapon": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "会心率/最大无相攻击/最小无相攻击/精准率",
+          ""
+        ],
+        "ring": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大牵丝攻击/最小牵丝攻击/精准率"
+        ],
+        "pendant": [
+          "最小外功攻击",
+          "最小外功攻击",
+          "敏",
+          "全武学增效",
+          "会心率/其他流派小属攻/最大牵丝攻击/最小牵丝攻击/精准率"
+        ],
+        "head": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大牵丝攻击/最小牵丝攻击/精准率",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "会心率/其他流派小属攻/最大牵丝攻击/最小牵丝攻击/精准率",
+          ""
+        ],
+        "leg": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大牵丝攻击/最小牵丝攻击/精准率"
+        ],
+        "wrist": [
+          "会心率/精准率",
+          "敏",
+          "最小外功攻击",
+          "对首领单位增伤",
+          "会心率/其他流派小属攻/最大牵丝攻击/最小牵丝攻击/精准率"
+        ]
+      },
+      "yu": {
+        "main_weapon": [
+          "最大外功攻击",
+          "伞武学增效",
+          "会心率/劲/敏/最大外功攻击/最大无相攻击/最小外功攻击/最小无相攻击/精准率",
+          "",
+          ""
+        ],
+        "sub_weapon": [
+          "最大外功攻击",
+          "最大外功攻击",
+          "",
+          "",
+          ""
+        ],
+        "ring": [
+          "最大外功攻击/最小外功攻击",
+          "全武学增效",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "pendant": [
+          "最大外功攻击/最小外功攻击",
+          "全武学增效",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "head": [
+          "会心率/精准率",
+          "会心率/劲/敏/最大牵丝攻击/最小外功攻击/精准率",
+          "全奇术增伤",
+          "",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "全奇术增伤",
+          "",
+          ""
+        ],
+        "leg": [
+          "劲",
+          "对首领单位增伤",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "wrist": [
+          "劲",
+          "对首领单位增伤",
+          "会心率/劲/敏/最大外功攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ]
+      },
+      "wei": {
+        "main_weapon": [
+          "最小外功攻击",
+          "陌刀武学增伤",
+          "会心率/会意率/劲/势/最大外功攻击/最大无相攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "sub_weapon": [
+          "最大外功攻击",
+          "会心率/会意率/劲/势/最大外功攻击/最大无相攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "ring": [
+          "最大外功攻击/最小外功攻击",
+          "全武学增效",
+          "会心率/会意率/劲/势/最大外功攻击/最大裂石攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "pendant": [
+          "最大外功攻击/最小外功攻击",
+          "全武学增效",
+          "会心率/会意率/劲/势/最大外功攻击/最大裂石攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "head": [
+          "会心率/精准率",
+          "会心率/会意率/劲/势/最大外功攻击/最大裂石攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "chest": [
+          "会心率/精准率",
+          "会心率/会意率/劲/势/最大外功攻击/最大裂石攻击/最小外功攻击/精准率",
+          "",
+          "",
+          ""
+        ],
+        "leg": [
+          "劲",
+          "对首领单位增伤",
+          "会心率/会意率/劲/势/最大外功攻击/最大裂石攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ],
+        "wrist": [
+          "劲",
+          "对首领单位增伤",
+          "会心率/会意率/劲/势/最大外功攻击/最大裂石攻击/最小外功攻击/精准率",
+          "",
+          ""
+        ]
+      }
+    },
+    "profile_field_modes": {
+      "hong": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ]
+      },
+      "lin_heal": {
+        "main_weapon": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "pendant": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "head": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "wrist": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ]
+      },
+      "lin_fire": {
+        "main_weapon": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "pendant": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "head": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "wrist": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ]
+      },
+      "ying": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "flexible",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "flexible",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "divine",
+          "flexible",
+          "none"
+        ]
+      },
+      "feng": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "zun": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "yuan": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "chen": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "jun_double": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "jun_tang": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "yi": {
+        "main_weapon": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "pendant": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "head": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "required",
+          "required",
+          "flexible",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ],
+        "wrist": [
+          "initial",
+          "required",
+          "required",
+          "divine",
+          "flexible"
+        ]
+      },
+      "yu": {
+        "main_weapon": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "required",
+          "none",
+          "none",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "pendant": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "head": [
+          "initial",
+          "flexible",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "flexible",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "wrist": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ]
+      },
+      "wei": {
+        "main_weapon": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "sub_weapon": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "ring": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "pendant": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "head": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "chest": [
+          "initial",
+          "flexible",
+          "none",
+          "none",
+          "none"
+        ],
+        "leg": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ],
+        "wrist": [
+          "initial",
+          "divine",
+          "flexible",
+          "none",
+          "none"
+        ]
+      }
+    },
+    "inventory_mode": "prefix"
+  }
+}

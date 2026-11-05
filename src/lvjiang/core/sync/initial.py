@@ -123,6 +123,51 @@ def backup_local_profile_data() -> Path | None:
     return target
 
 
+def cloud_not_inited(token: str) -> bool | None:
+    """云端是否**明确**处于「未初始化 / 已被清空」状态。
+
+    三态语义，绝不含糊：
+    - ``True``：服务端明确回 ``not_inited: true``（所有内容表计数为 0）；
+    - ``False``：云端有数据；
+    - ``None``：问不到（网络/鉴权/响应格式异常）。
+
+    ``None`` 必须按「未知」处理，**不能当成空**——否则一次网络抖动就会把本地
+    同步状态清掉，用户被迫重做初始同步。
+    """
+    try:
+        state = post("/api/sync/state", {}, token)
+    except SyncError:
+        return None
+    flag = state.get("not_inited")
+    if not isinstance(flag, bool):
+        return None                     # 老服务端/异常响应：不认，按未知处理
+    return flag
+
+
+@dataclass
+class CloudClearedNotice:
+    """云端被清空后本机自动复位的提示（同步流程的一个结果）。"""
+
+    message: str = "云端数据已被清空，请点「初始同步」重新建立同步状态"
+    cloud_cleared: bool = True
+    rows: list = field(default_factory=list)
+    errors: list = field(default_factory=list)
+
+    def describe(self) -> str:
+        return self.message
+
+    def distinct_errors(self) -> list[str]:
+        return []
+
+
+def reset_local_after_cloud_clear() -> str:
+    """云端被清空后，把本机退回「未建立同步状态」。"""
+    clear_local_sync_state()
+    set_sync_established(False)
+    logger.info("[sync] 检测到云端已清空，本机同步状态已复位为未建立")
+    return str(CloudClearedNotice().message)
+
+
 def initial_sync(token: str, on_progress=None, stop=None) -> InitialSyncReport:
     """执行一次初始同步；成功返回 ``established=True``。"""
     from ..profile.snapshot_sync import pull_and_replay, refresh_snapshot

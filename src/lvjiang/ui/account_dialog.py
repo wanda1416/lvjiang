@@ -366,9 +366,20 @@ class AccountHolder(QObject):
         def action():
             from ..core.profile.snapshot_sync import sync_all
             from ..core.sync.definition_sync import sync_definition
+            from ..core.sync.initial import (
+                CloudClearedNotice,
+                cloud_not_inited,
+                reset_local_after_cloud_clear,
+            )
             from ..core.sync.users_sync import sync_users
             def progress(data):
                 self.sync_progress.emit(dict(data))
+
+            # 云端被清空（网页或另一台设备）时本机自动退回「未建立」。
+            # 只认服务端明确的 not_inited；问不到（None）绝不当成空。
+            if cloud_not_inited(token) is True:
+                reset_local_after_cloud_clear()
+                return CloudClearedNotice()
 
             stop = self._sync_cancel.is_set
             definition_report = sync_definition(token, on_progress=progress)
@@ -1017,6 +1028,12 @@ class AccountManagerDialog(QDialog):
                 self._set_sync_note(str(result), error=True)
             return
         self._reload_users()
+        if getattr(result, "cloud_cleared", False):
+            # 云端已被清空：本机已复位为未建立，同步表清空，只留一句提示。
+            self.holder.last_sync_report = None
+            self._fill_sync_table(None)
+            self._set_sync_note(str(result))
+            return
         pending = getattr(getattr(result, "profile", result), "pending", None) or []
         if pending:
             if auto:

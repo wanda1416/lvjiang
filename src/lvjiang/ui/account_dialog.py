@@ -114,6 +114,16 @@ class _AccountWorker(QThread):
             self.completed.emit(False, AccountError(f"{tr('操作未完成')}：{error}"))
 
 
+def readonly_instance() -> bool:
+    """只读实例不做任何账号操作（登录态与同步数据只归主实例）。"""
+    from ..core.access import is_readonly
+
+    return is_readonly()
+
+
+READONLY_ACCOUNT_HINT = "只读实例不能管理账户与同步数据，请在主实例中操作"
+
+
 class _CombinedReport:
     """用户表 + 文档通道 + 总览账本的合并结果。
 
@@ -212,6 +222,8 @@ class AccountHolder(QObject):
     def apply(self, summary: dict | None) -> None:
         self.done = True
         self.summary = summary
+        if readonly_instance():
+            summary = None              # 只读实例永不启动节拍
         for timer in (self._sync_timer, self._heartbeat_timer):
             if summary:
                 timer.start()
@@ -223,7 +235,7 @@ class AccountHolder(QObject):
 
     def _on_heartbeat(self) -> None:
         """每 10 分钟一跳：仅刷新设备活跃与探测会话健康（同步由独立分钟节拍负责）。"""
-        if self.summary is None or self._beat_worker is not None:
+        if readonly_instance() or self.summary is None or self._beat_worker is not None:
             return
 
         def beat_done(ok: bool, result, *, _worker: _AccountWorker | None = None) -> None:
@@ -293,7 +305,14 @@ class AccountHolder(QObject):
     # ─── 对外入口 ───────────────────────────────────────
 
     def restore_async(self) -> None:
-        """启动时后台恢复登录态；只在第一次调用时真正执行。"""
+        """启动时后台恢复登录态；只在第一次调用时真正执行。
+
+        只读实例**不自动登录**：登录态与同步数据只归主实例，否则两个进程会
+        交叉覆盖 account.json 的水位与脏标记。
+        """
+        if readonly_instance():
+            self.apply(None)
+            return
         if self.done or self.busy:
             return
         if not self.session.has_stored_session():
@@ -302,6 +321,8 @@ class AccountHolder(QObject):
         self._start(self.session.restore, "operation")
 
     def login_async(self, login_name: str, password: str) -> bool:
+        if readonly_instance():
+            return False
         return self._start(lambda: self.session.login(login_name, password), "operation")
 
     def logout_async(self) -> bool:
@@ -331,7 +352,7 @@ class AccountHolder(QObject):
         未建立同步状态（没做过初始同步）时不执行——这是硬门禁。
         """
         from ..core.sync.initial import sync_established
-        if not sync_established():
+        if readonly_instance() or not sync_established():
             return False
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
@@ -366,7 +387,7 @@ class AccountHolder(QObject):
         云端有数据则备份本地三件套后拉远端）。"""
         from ..core.sync.initial import initial_sync
         token = self.session.access_token
-        if not token:
+        if readonly_instance() or not token:
             return False
         self.sync_attempted = True
         self.last_sync_auto = False
@@ -383,6 +404,8 @@ class AccountHolder(QObject):
     def clear_sync_async(self, password: str) -> bool:
         """清除同步：清空云端同步数据 + 本机水位与状态，回到未建立。"""
         from ..core.sync.initial import clear_local_sync_state, set_sync_established
+        if readonly_instance():
+            return False
 
         def action():
             self.session.clear_sync(password)

@@ -371,12 +371,16 @@ class MainWindow(
         self._setup_ui()
         self._build_tray_icon()
         # 启动即后台恢复账号登录态并预取数据；账户管理对话框因此开箱即已登录。
+        # 只读实例由 restore_async 内部直接跳过（不碰凭据库、不联网）。
         from ..account_dialog import ensure_account_restored
         ensure_account_restored()
         if not self._user_manager.list_users():
             bar = self.statusBar()
             if bar is not None:
+                from ...core.access import is_readonly
                 bar.showMessage(tr(
+                    "尚未创建用户：请在「用户管理」中创建用户"
+                    if is_readonly() else
                     "尚未创建用户：请在「账户管理」登录同步，或在「用户管理」中创建用户"))
         self._refresh_run_button()
         self._refresh_user_combo()

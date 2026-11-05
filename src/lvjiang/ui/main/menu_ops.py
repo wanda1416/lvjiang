@@ -148,6 +148,13 @@ class MenuOpsMixin:
 
         account_mgmt = QAction(tr("账户管理"), self)
         account_mgmt.triggered.connect(self._open_account_manager)
+        from ...core.access import is_readonly
+        if is_readonly():
+            # 登录态与同步数据只归主实例：两个进程同时读写 account.json 的
+            # 水位与脏标记会互相覆盖，所以只读实例从入口就禁用。
+            from ..account_dialog import READONLY_ACCOUNT_HINT
+            account_mgmt.setEnabled(False)
+            account_mgmt.setToolTip(tr(READONLY_ACCOUNT_HINT))
         settings_menu.addAction(account_mgmt)
 
         user_mgmt = QAction(tr("用户管理"), self)
@@ -443,6 +450,11 @@ class MenuOpsMixin:
 
     def _open_account_manager(self):
         """账户管理：登录、注销、改密码与账号信息；与游戏用户管理无关。"""
+        from ...core.access import is_readonly
+        if is_readonly():
+            from ..account_dialog import READONLY_ACCOUNT_HINT
+            QMessageBox.information(self, tr("账户管理"), tr(READONLY_ACCOUNT_HINT))
+            return
         from ..account_dialog import AccountManagerDialog
         AccountManagerDialog(self).exec()
 

@@ -32,8 +32,11 @@ class _PanelMixin:
         return self._panel_engine().panel_ratio_to_screen(panel_obj, cx, cy)
 
     def align_panel(
-        self, scene_key: str, panel_key: str,
+        self, scene_key: str, panel_key: str, *, calibration_override: str | None = None,
     ) -> "GridAlignment | None":
+        if calibration_override is not None:
+            return self._panel_engine().align_panel(
+                scene_key, panel_key, calibration_override=calibration_override)
         return self._panel_engine().align_panel(scene_key, panel_key)
 
     def _ensure_aligned(
@@ -45,10 +48,10 @@ class _PanelMixin:
         self._panel_engine().invalidate_panel_alignment(scene_key, panel_key)
 
     def click_panel(
-        self, scene_key: str, panel_key: str, row: int, col: int,
+        self, scene_key: str, panel_key: str, row: int, col: int, **kw,
     ) -> bool:
         return self._panel_engine().click_panel(
-            scene_key, panel_key, row, col)
+            scene_key, panel_key, row, col, **kw)
 
     def drag_grid(
         self,

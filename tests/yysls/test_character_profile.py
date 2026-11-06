@@ -212,8 +212,9 @@ def test_current_max_base_is_independent_from_the_level_23_profile(profile):
     for name in ("dim_jin", "dim_shi", "dim_min", "dim_ti", "dim_yu"):
         assert result.panel.values[name] == 304
         assert profile_result.resolved.panel.values[name] == 283
-    assert result.panel.values["min_outer"] == pytest.approx(845.88)
+    # 未央城 P1 收集按 DIY 计算器 0.10.3 计入（小外 12），基线随之 +12。
+    assert result.panel.values["min_outer"] == pytest.approx(857.88)
     assert result.panel.values["max_outer"] == pytest.approx(1513.84)
     assert result.panel.values["intent_rate"] == pytest.approx(.25552)
     assert result.panel.values["crit_rate"] == pytest.approx(.51104)
-    assert result.combat_attrs.min_outer == pytest.approx(845.88)
+    assert result.combat_attrs.min_outer == pytest.approx(857.88)

@@ -1,5 +1,6 @@
 # 来源类别: oddity
-# DIY 计算器 0.10.1 的满收集攻击累计；同地图多段数据在这里按地图合并。
+# DIY 计算器 0.10.1 的满收集攻击累计，未央城 P1 按 0.10.3 补录；
+# 同地图多段数据在这里按地图合并。
 kind: oddity
 entries:
   蹊跷·清河:
@@ -24,3 +25,5 @@ entries:
     stats: {min_outer: 12, max_outer: 12}
   蹊跷·杭州全收集:
     stats: {min_outer: 13.2, max_outer: 26.4}
+  蹊跷·未央城:
+    stats: {min_outer: 12, max_outer: 0}

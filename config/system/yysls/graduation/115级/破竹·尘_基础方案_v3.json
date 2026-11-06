@@ -3,12 +3,12 @@
   "schema_version": 3,
   "school": "破竹·尘",
   "source": {
-    "file": "破竹尘115阶竞速轴属性毕业率进阶计算器3.3.xlsx",
-    "version": "3.3",
-    "sha256": "90617530fe8e084091eda4402af1728e5120a94d6e33b2298412ad92d9a00f6e"
+    "file": "破竹尘115阶竞速轴属性毕业率进阶计算器3.4.xlsx",
+    "version": "3.4",
+    "sha256": "2094b505eedfc5cfc31599948d42452785ad4f36149384f3dc26b267984edaa0"
   },
   "baseline_attrs": {
-    "min_outer": 4460.0,
+    "min_outer": 4472.0,
     "max_outer": 3339.6,
     "outer_pen": 63.78,
     "outer_bonus": 0.027999999999999997,
@@ -93,11 +93,11 @@
   },
   "reference": {
     "combat_time": 96.1,
-    "total_damage": 16671421.40476782,
-    "dps": 173479.9313711532,
-    "graduation_rate": 1.0000000079038145
+    "total_damage": 16703339.558913553,
+    "dps": 173812.06616975603,
+    "graduation_rate": 0.9999999779633026
   },
-  "graduation_baseline_dps": 173479.93,
+  "graduation_baseline_dps": 173812.07,
   "program": {
     "inputs": [
       {
@@ -20263,5 +20263,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 2
+  "model_version": 3
 }

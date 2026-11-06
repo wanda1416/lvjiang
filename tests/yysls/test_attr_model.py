@@ -357,7 +357,8 @@ def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> No
         loadout, school_attr="破竹", martial_arts=("天志垂象", "千机索天"))
 
     attrs = result.panel_attrs
-    assert attrs.min_outer == pytest.approx(2111.64341463415)
+    # 未央城 P1 收集按 DIY 计算器 0.10.3 计入（小外 12），基线随之 +12。
+    assert attrs.min_outer == pytest.approx(2123.64341463415)
     assert attrs.max_outer == pytest.approx(3339.64)
     assert attrs.precision == pytest.approx(1.254)
     assert attrs.crit_rate == pytest.approx(0.738722926829268)
@@ -406,8 +407,9 @@ def test_representative_calculator_templates_match_the_115_baseline(
 
     ratio = result.panel.values[required_dim] / 492
     talent_attack = 129.9 * ratio
+    # 未央城 P1 收集按 DIY 计算器 0.10.3 计入（小外 12）。
     assert attrs.min_outer == pytest.approx(
-        1225.88 + (talent_attack if template in ("tank", "crit") else 0))
+        1237.88 + (talent_attack if template in ("tank", "crit") else 0))
     assert attrs.max_outer == pytest.approx(
         2270.84 + (talent_attack if template in ("tank", "intent") else 0))
     assert attrs.crit_rate == pytest.approx(

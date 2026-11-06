@@ -3,12 +3,12 @@
   "schema_version": 3,
   "school": "裂石·威",
   "source": {
-    "file": "裂石威115阶竞速轴属性毕业率进阶计算器3.3.xlsx",
-    "version": "3.3",
-    "sha256": "52721245f43fe4887f54670acc5d269b97e4b20b808a4a4984c16e7b3ecfc1eb"
+    "file": "裂石威115阶竞速轴属性毕业率进阶计算器3.4.xlsx",
+    "version": "3.4",
+    "sha256": "c6c3c71d296e56812cfd08bca5c1bc51edf382231f22d6fb135cc5f23e0c41af"
   },
   "baseline_attrs": {
-    "min_outer": 2165.2,
+    "min_outer": 2177.2,
     "max_outer": 6744.8,
     "outer_pen": 58.68,
     "outer_bonus": 0.0,
@@ -96,11 +96,11 @@
   },
   "reference": {
     "combat_time": 88.4,
-    "total_damage": 14148020.82569086,
-    "dps": 160045.48445351652,
-    "graduation_rate": 1.0000000278265684
+    "total_damage": 14159297.07469385,
+    "dps": 160173.04383137837,
+    "graduation_rate": 1.000000023920245
   },
-  "graduation_baseline_dps": 160045.48,
+  "graduation_baseline_dps": 160173.04000000004,
   "program": {
     "inputs": [
       {
@@ -14528,5 +14528,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 3
+  "model_version": 4
 }

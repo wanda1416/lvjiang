@@ -3,12 +3,12 @@
   "schema_version": 3,
   "school": "破竹·樽",
   "source": {
-    "file": "破竹樽115阶竞速轴属性毕业率进阶计算器3.7.xlsx",
-    "version": "3.7",
-    "sha256": "0a21c1a34336949ef95f20899797a9abba16791b63fe29adcd8fef5a1b4a748a"
+    "file": "破竹樽115阶竞速轴属性毕业率进阶计算器3.8.xlsx",
+    "version": "3.8",
+    "sha256": "5f00b3d7d12361d5b62b3c99ee08ec51d13b62b3c927d3a4bc74990a521031e1"
   },
   "baseline_attrs": {
-    "min_outer": 4473.0,
+    "min_outer": 4485.0,
     "max_outer": 3417.6,
     "outer_pen": 58.68,
     "outer_bonus": 0.0,
@@ -97,11 +97,11 @@
   },
   "reference": {
     "combat_time": 88.6,
-    "total_damage": 16232235.79652895,
-    "dps": 183208.0789675954,
-    "graduation_rate": 0.9999999943648522
+    "total_damage": 16262716.74847187,
+    "dps": 183552.10777056287,
+    "graduation_rate": 0.9999999878539282
   },
-  "graduation_baseline_dps": 183208.08,
+  "graduation_baseline_dps": 183552.11,
   "program": {
     "inputs": [
       {
@@ -27352,5 +27352,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 4
+  "model_version": 5
 }

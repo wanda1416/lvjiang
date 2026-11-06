@@ -3,12 +3,12 @@
   "schema_version": 3,
   "school": "牵丝·霖",
   "source": {
-    "file": "牵丝霖115阶竞速轴属性毕业率进阶计算器3.1.xlsx",
-    "version": "3.1",
-    "sha256": "98f460cd805c029fd7072c62872cb05580c9e02c15517893a982d80cdec1326e"
+    "file": "牵丝霖115阶竞速轴属性毕业率进阶计算器3.2.xlsx",
+    "version": "3.2",
+    "sha256": "b9a8fe7103ed253d1f84d4421b02651bfed4881bd60a961d11f9af317a43f5bb"
   },
   "baseline_attrs": {
-    "min_outer": 4320.0,
+    "min_outer": 4332.0,
     "max_outer": 3339.6,
     "outer_pen": 63.78,
     "outer_bonus": 0.0,
@@ -99,11 +99,11 @@
   },
   "reference": {
     "combat_time": 15.0,
-    "total_damage": 1706351.5928623094,
-    "dps": 113756.77285748729,
-    "graduation_rate": 1.0000000251192724
+    "total_damage": 1709761.6714655198,
+    "dps": 113984.11143103466,
+    "graduation_rate": 1.0000000125546855
   },
-  "graduation_baseline_dps": 113756.76999999999,
+  "graduation_baseline_dps": 113984.11,
   "program": {
     "inputs": [
       {
@@ -7184,5 +7184,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 2
+  "model_version": 3
 }

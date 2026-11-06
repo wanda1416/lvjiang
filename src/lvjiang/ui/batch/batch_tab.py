@@ -480,6 +480,9 @@ class BatchTab(QWidget):
         self._script_order: list[str] = []
         self._script_candidate_order: list[str] = []
         self._missing_script_ids: list[tuple[int, str]] = []
+        # 当前环境不支持、但脚本本身健在的已勾选条目：原位保留勾选，
+        # 不按“脚本不可用”报警。
+        self._env_filtered_script_ids: list[tuple[int, str]] = []
         self._script_configs_by_id: dict[str, dict] = {}
         self._updating_script_list = False
         return widget
@@ -1075,7 +1078,11 @@ class BatchTab(QWidget):
         （「恢复默认顺序」就是），而 _save_draft 里的刷新读到的是重建前的
         顺序，于是「至少勾选一个脚本」的提示和灰掉的开按钮会留在界面上。
         """
-        from ...workflows.discovery import list_exposed_scripts, script_display_name
+        from ...workflows.discovery import (
+            list_exposed_scripts,
+            script_display_name,
+            script_supports_env,
+        )
 
         if checked_ids is None:
             checked_ids = list(self._draft.tasks.checked)
@@ -1086,12 +1093,17 @@ class BatchTab(QWidget):
         try:
             run_env_getter = getattr(self._host, "_selected_run_env", None)
             run_env = run_env_getter() if callable(run_env_getter) else None
-            discovered = [
-                cfg for cfg in list_exposed_scripts(run_env)
+            # 环境过滤在本地做，仍然只扫一次发现层。这样能区分两种“看不见”：
+            # 脚本被删/取消暴露（真缺失，必须报警），和脚本不支持当前环境
+            # （切换视角时正常隐藏，勾选必须原地保留）。
+            exposed = [
+                cfg for cfg in list_exposed_scripts(None)
                 if cfg.get("batchable", False)
             ]
+            discovered = [cfg for cfg in exposed
+                          if script_supports_env(cfg, run_env)]
         except Exception:
-            discovered = []
+            exposed, discovered = [], []
         discovered_by_id = {cfg["id"]: cfg for cfg in discovered}
         group = self._item
         visible = set(group.task_ids) if group is not None else set()
@@ -1112,13 +1124,22 @@ class BatchTab(QWidget):
             task_id for task_id in checked_ids
             if task_id in self._script_configs_by_id
         ]
-        # 勾选过、但此刻发现不到的脚本（被删、取消暴露、改成 dedicated、
-        # 挪进 standalone/…）。它们不参与本次执行，但必须原位留在
-        # selected_task_ids 里：顺手抹掉的话，脚本一恢复暴露，用户的
-        # 勾选就再也回不来了，而且全程没有任何提示。
+        # 勾选过、但此刻发现不到的脚本分两种。两类都必须原位留在
+        # selected_task_ids 里：顺手抹掉的话，脚本一恢复可执行，用户的勾选就
+        # 再也回不来了。
+        #   a) 真缺失——被删、取消暴露、改成 dedicated、挪进 standalone/…：
+        #      本轮不执行，必须明确告诉用户。
+        #   b) 只是不支持当前环境——切换执行视角（手机 ↔ 端游）时正常隐藏，
+        #      不打扰用户；切回该环境勾选照旧生效。
         self._missing_script_ids = []
+        self._env_filtered_script_ids = []
+        exposed_ids = {cfg["id"] for cfg in exposed}
         for index, script_id in enumerate(checked_ids):
-            if script_id in visible and script_id not in self._script_configs_by_id:
+            if script_id not in visible or script_id in self._script_configs_by_id:
+                continue
+            if script_id in exposed_ids:
+                self._env_filtered_script_ids.append((index, script_id))
+            else:
                 self._missing_script_ids.append((index, script_id))
         self._warn_missing_scripts()
 
@@ -1266,17 +1287,24 @@ class BatchTab(QWidget):
         if callable(append_log):
             append_log(message)
 
+    def _unavailable_script_ids(self) -> list[tuple[int, str]]:
+        """本轮不参与执行的已勾选脚本：真缺失 + 当前环境不支持，按原位序。"""
+        return sorted([
+            *getattr(self, "_missing_script_ids", []),
+            *getattr(self, "_env_filtered_script_ids", []),
+        ])
+
     def _merged_script_ids(self) -> list[str]:
-        """当前执行顺序 + 暂时不可用的 id（按原位插回）。"""
+        """当前执行顺序 + 暂时不参与的 id（按原位插回）。"""
         merged = list(self._script_order)
-        for index, script_id in self._missing_script_ids:
+        for index, script_id in self._unavailable_script_ids():
             merged.insert(min(index, len(merged)), script_id)
         return merged
 
     def _persist_script_order(self):
         """把列表当前顺序与勾选写回本次草稿。**不碰配置组定义。**"""
         self._draft.tasks.order = list(self._script_candidate_order) + [
-            task_id for _index, task_id in self._missing_script_ids
+            script_id for _index, script_id in self._unavailable_script_ids()
         ]
         self._draft.tasks.checked = self._merged_script_ids()
         self._save_draft()

@@ -524,6 +524,10 @@ class RunControlMixin:
                 control.blockSignals(False)
             if selector is not None:
                 selector.combo.blockSignals(False)
+        # 草稿可能带着另一个环境（手机 ↔ 端游）。候选集必须先按它重建，
+        # 再让参数面板按新脚本绘制，日常下拉、分组、批量页和参数面板才是
+        # 同一份事实。上面屏蔽了环境信号，这里不补就只剩参数面板会跟着变。
+        self._sync_task_views_to_env(draft.workflow_id or None)
         flow_cfg = self._get_selected_flow_config()
         self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
         for name in ("reference_space_combo", "_env_combo", "layout_combo"):
@@ -599,12 +603,15 @@ class RunControlMixin:
         value = combo.currentData()
         return str(value) if value is not None else ""
 
-    def _load_workflow_configs(self):
+    def _load_workflow_configs(self, preferred_workflow_id: str | None = None):
         """发现全部脚本，按作者声明与用户偏好过滤排序后填充下拉。
 
         脚本本体（.wf + 内置类）由发现层自动扫描；暴露层只决定日常页
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
+
+        ``preferred_workflow_id`` 由「按某个执行目标的草稿重建」传入：
+        那一刻下拉里还是上一个目标环境的条目，不能拿它当新选中项。
         """
         from ...workflows.discovery import (
             last_discovery_problems,
@@ -613,7 +620,8 @@ class RunControlMixin:
 
         # 环境切换只会改变“不支持”提示，不应把用户选中的日常任务重置
         # 为第一项。清空 combo 前先按稳定 id 留住当前选择。
-        selected_workflow_id = self.workflow_combo.currentData()
+        selected_workflow_id = (
+            preferred_workflow_id or self.workflow_combo.currentData())
         if selected_workflow_id is None:
             selected_workflow_id = getattr(self, "_displayed_script_id", None)
         self._workflow_configs: list[dict] = getattr(self, "_workflow_configs", [])
@@ -635,6 +643,9 @@ class RunControlMixin:
         if temporary is not None:
             configs.append(temporary)
         self._workflow_configs = configs
+        # 这份候选集是按哪个环境算出来的。切换执行目标只投影草稿、屏蔽了
+        # 环境信号，靠它判断“视图相对环境是否已经过期”。
+        self._workflow_env = current_env
         self._refresh_workflow_groups()
         self._fill_workflow_combo(selected_workflow_id)
 
@@ -642,6 +653,24 @@ class RunControlMixin:
         if self._batch_tab is not None:
             self._batch_tab.refresh_scripts()
         logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
+
+    def _sync_task_views_to_env(
+            self, preferred_workflow_id: str | None = None) -> bool:
+        """候选视图跟随当前环境重建，返回是否真的发生了重建。
+
+        日常下拉、分组、参数面板和批量页的候选都由 ``_selected_run_env()``
+        决定。切换执行目标走的是草稿投影：写入环境选择器时屏蔽了信号，不会
+        触发 ``_on_env_changed``。缺了这次重建，页面会继续展示上一个目标
+        环境（例如端游）的任务，而启动门禁又按当前环境判定——用户会看到
+        当前连接根本跑不了的任务，还会在切走时把它记进该目标的草稿。
+
+        环境没变时直接返回，避免同环境目标互切产生无谓的全量扫描，也避免
+        覆盖各目标自己的任务选择。
+        """
+        if self._selected_run_env() == getattr(self, "_workflow_env", None):
+            return False
+        self._load_workflow_configs(preferred_workflow_id)
+        return True
 
     def _refresh_workflow_groups(self):
         combo = self.workflow_group_combo

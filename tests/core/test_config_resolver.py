@@ -3,9 +3,12 @@
 全部在 tmp_path 上构造隔离实例，不触碰真实 config 目录。
 """
 
+from pathlib import Path
+
 import pytest
 import yaml
 
+from lvjiang.core.config.conflicts import ConfigWriteConflict
 from lvjiang.core.config.resolver import (
     ConfigResolver,
     SystemContentProtected,
@@ -642,6 +645,73 @@ class TestWriteIsMinimal:
         (system / "scenes" / "a.yaml").write_bytes(b"key: a\r\n")
         _user(dirs).write_entity("scenes/a.yaml", "key: a\n")
         assert not (local / "scenes" / "a.yaml").exists()
+
+
+# ─── 编辑基线：打开编辑器时对齐，之后仍能检测 ────────────────
+
+class TestEditBaselines:
+    """打开编辑器时读到的内容必须成为基线。
+
+    基线只在进程首次读取时记录，``reload`` 不会刷新它。若打开对话框时不
+    同步，保存就会拿启动那一刻的旧字节比对，把打开前（在线下发、另一个
+    实例、外部编辑器）的改动报成「编辑期间磁盘被改」。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_conflict_handler(self):
+        from lvjiang.core.config.conflicts import set_conflict_handler
+
+        set_conflict_handler(None)
+        yield
+        set_conflict_handler(None)
+
+    @staticmethod
+    def _scene(dirs, name: str, version: int, layer: str) -> Path:
+        system, _local = dirs
+        (system / "scenes").mkdir(exist_ok=True)
+        path = system / "scenes" / name
+        path.write_text(
+            f"content_version: {version}\nlayer: {layer}\n", encoding="utf-8")
+        return path
+
+    def test_open_adopts_changes_made_before_it(self, dirs):
+        """打开前磁盘已变：reload 读到的内容成为基线，保存不该报冲突。"""
+        r = _dev(dirs)
+        path = self._scene(dirs, "a.yaml", 1, "system")
+        r.resolve_read("scenes/a.yaml")             # 启动时首次读取
+        self._scene(dirs, "a.yaml", 2, "updated")   # 打开前的外部改动
+        r.resolve_read("scenes/a.yaml")             # 对话框 reload
+        r.renew_edit_baselines(["scenes/a.yaml"])
+
+        r.write_entity("scenes/a.yaml", "content_version: 2\nlayer: edited\n")
+
+        assert path.read_text(encoding="utf-8").endswith("layer: edited\n")
+
+    def test_write_after_open_still_conflicts(self, dirs):
+        """打开之后的并发写入仍必须被发现。"""
+        r = _dev(dirs)
+        self._scene(dirs, "a.yaml", 1, "system")
+        r.resolve_read("scenes/a.yaml")
+        r.renew_edit_baselines(["scenes/a.yaml"])
+        self._scene(dirs, "a.yaml", 2, "concurrent")
+
+        with pytest.raises(ConfigWriteConflict):
+            r.write_entity(
+                "scenes/a.yaml", "content_version: 2\nlayer: edited\n")
+
+    def test_renew_does_not_touch_other_files(self, dirs):
+        """只刷新点名的文件，同时打开的别的编辑器照旧做并发检查。"""
+        r = _dev(dirs)
+        self._scene(dirs, "a.yaml", 1, "a")
+        self._scene(dirs, "b.yaml", 1, "b")
+        r.resolve_read("scenes/a.yaml")
+        r.resolve_read("scenes/b.yaml")
+        self._scene(dirs, "b.yaml", 2, "b-updated")
+
+        r.renew_edit_baselines(["scenes/a.yaml"])
+
+        with pytest.raises(ConfigWriteConflict):
+            r.write_entity("scenes/b.yaml", "content_version: 2\nlayer: b\n")
 
     def test_crlf_shadow_not_rewritten(self, dirs):
         """已有 CRLF 影子时，写入等价的 LF 内容不该刷新文件。"""

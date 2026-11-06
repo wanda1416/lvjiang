@@ -43,6 +43,10 @@ class GameConfigDialog(QDialog):
         # 两次对话框之间的外部改动。YAML 未变时只做 stat + 缓存拷贝。
         manager = get_game_config()
         manager.reload()
+        # 打开时读到的就是用户眼里的「当前内容」，编辑基线必须同步到同一份。
+        # 否则保存时仍比对启动那一刻的旧字节，把打开前（在线下发、另一实例、
+        # 外部编辑器）发生过的改动报成「编辑期间磁盘被改」。
+        self._renew_baselines()
         self._data = manager.get_raw()
         self._dirty = False
         self._tab = GameConfigTab(
@@ -98,6 +102,14 @@ class GameConfigDialog(QDialog):
         self._version_title.setToolTip(tip)
         self._version_value.setToolTip(tip)
 
+    def _renew_baselines(self) -> None:
+        """把游戏配置这 7 份文件的编辑基线对齐到当前磁盘。
+
+        只刷新本对话框负责的文件；同时打开的场景/布局编辑器仍用各自的
+        旧基线做并发检查，不会被这里清空。
+        """
+        get_resolver().renew_edit_baselines(tuple(GAME_CONFIG_FILES))
+
     def _mark_dirty(self) -> None:
         self._dirty = True
         self._save_button.setEnabled(True)
@@ -133,6 +145,8 @@ class GameConfigDialog(QDialog):
             return
         manager = get_game_config()
         manager.reload()
+        # 撤销后界面内容换成了磁盘上的最新内容，基线同样要跟上。
+        self._renew_baselines()
         self._data = manager.get_raw()
         old_tab = self._tab
         self._tab = GameConfigTab(

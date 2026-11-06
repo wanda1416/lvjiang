@@ -32,6 +32,7 @@ register_registry_list_paths / register_protected_list_paths 注册，
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
@@ -445,6 +446,34 @@ class ConfigResolver:
     def reset_edit_baselines(self) -> None:
         """显式刷新编辑上下文时放弃旧读盘基线，不用于后台安装通知。"""
         self._read_baselines.clear()
+
+    def renew_edit_baselines(self, rel_paths: Iterable[str]) -> list[str]:
+        """把给定文件的编辑基线重设为当前磁盘内容，返回实际刷新了哪些。
+
+        「基线」的语义是「编辑开始时用户看到的内容」。只在进程首次读取时
+        记录会让基线停留在启动那一刻：之后磁盘被在线下发、另一个实例或
+        外部编辑器改过，重新打开编辑器虽然读到了新内容（对话框会 reload），
+        保存时却仍拿启动时的旧字节比对，把**打开前**就发生的改动误判成
+        「编辑期间磁盘被改」。
+
+        与 :meth:`reset_edit_baselines` 的区别：只覆盖调用方点名的文件，
+        不清空其它文件——同时打开的场景/布局编辑器仍在用它们做并发检查。
+        真正在打开之后发生的写入仍会被 ``checked_write`` 发现。
+        """
+        from .conflicts import file_baseline
+        from .content import configuration_lock
+
+        refreshed: list[str] = []
+        if not self.track_content:
+            return refreshed
+        with configuration_lock(self.config_dir), _config_write_lock(self):
+            for rel_path in rel_paths:
+                spec = versioning.spec_for(rel_path)
+                if spec is None or not spec.has_content_version:
+                    continue
+                self._read_baselines[rel_path] = file_baseline(self, rel_path)
+                refreshed.append(rel_path)
+        return refreshed
 
     def add_change_listener(self, cb: Callable[[str], None]):
         if cb not in self._listeners:

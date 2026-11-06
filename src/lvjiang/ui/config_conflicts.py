@@ -11,7 +11,10 @@ def confirm_config_overwrite(files: str) -> bool:
         return False
     return QMessageBox.question(
         QApplication.activeWindow(), tr("磁盘配置已更新"),
-        tr("编辑期间磁盘中的配置发生了变更。是否仍保存本次修改？") + "\n\n" + files,
+        tr("编辑器打开之后，磁盘上的这些配置被其他窗口或程序改过：")
+        + "\n\n" + files + "\n\n"
+        + tr("选择「是」会用当前编辑内容覆盖它们，磁盘上的改动将丢失；"
+             "选择「否」放弃本次保存，请关闭编辑器重新打开、确认最新内容后再改。"),
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         QMessageBox.StandardButton.No,
     ) == QMessageBox.StandardButton.Yes

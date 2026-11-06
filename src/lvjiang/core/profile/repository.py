@@ -816,14 +816,13 @@ class ProfileDB:
 
     def get_history_since(self, since_id: int, limit: int,
                          author: str = "") -> list[dict]:
-        """取 id 大于水位的账本行（``set`` / ``delta`` / ``reset``），按 id 升序。
+        """取 id 大于水位的账本行（``set`` / ``delta``），按 id 升序。
 
-        供同步上行使用：``reset`` 一并上行（push 端映射为 ``set(0)``）——
-        周期归零若不上云，跨边界离线的设备会在旧基线上回放 delta 算错；
-        ``tick`` 是时间派生的中间物，已被物化 set 取代，不上云。水位用的
-        是本地自增 id，与远端 ``remote_id`` 是两套编号。``author`` 非空时
-        只取该作者写的行——**每端只上传自己产生的行**，离线包复制来的行
-        （带来源机器标记）与旧存量行（空标记）永不代传。
+        供同步上行使用。``reset`` 是本机周期语义，不上传；回放端按操作时间
+        自行归零。``tick`` 是时间派生的中间物，已被物化 set 取代，也不上云。
+        水位用的是本地自增 id，与远端 ``remote_id`` 是两套编号。``author``
+        非空时只取该作者写的行——**每端只上传自己产生的行**，离线包复制来的
+        行（带来源机器标记）与旧存量行（空标记）永不代传。
         """
         conn = self._borrow_connection()
         try:
@@ -831,7 +830,7 @@ class ProfileDB:
                 "SELECT id, username, type, key, new_value, new_value_text, "
                 "change_type, delta_value, ts "
                 "FROM profile_history "
-                "WHERE id>? AND change_type IN ('set', 'delta', 'reset')"
+                "WHERE id>? AND change_type IN ('set', 'delta')"
                 + (" AND device_id=?" if author else "") +
                 " ORDER BY id ASC LIMIT ?",
                 ((since_id, author, limit) if author else (since_id, limit)),
@@ -909,7 +908,7 @@ class ProfileDB:
         try:
             row = conn.execute(
                 "SELECT COUNT(*) FROM profile_history "
-                "WHERE id>? AND device_id=? AND change_type IN ('set','delta','reset')",
+                "WHERE id>? AND device_id=? AND change_type IN ('set','delta')",
                 (since_id, author),
             ).fetchone()
             return int(row[0]) if row else 0

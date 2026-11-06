@@ -114,7 +114,8 @@ def env(monkeypatch, tmp_path):
 
         mine = author or _author_stamp()
         return [r for r in history
-                if r["id"] > since and r.get("device_id", mine) == mine][:limit]
+                if r["id"] > since and r.get("change_type") != "reset"
+                and r.get("device_id", mine) == mine][:limit]
 
     monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since", _rows_of)
     monkeypatch.setattr(snapshot_sync.repository, "db_history_row_exists",
@@ -157,7 +158,7 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
 
 def test_push_refuses_backlog_over_limit(env) -> None:
     """积压超过上限（1000）拒绝上传，提示刷新快照——防止水位异常时全量倾倒。
-    周一周期重置风暴（~500 条 reset）属常规量，必须放行。"""
+    周期 reset 不计入这条积压。"""
     env["state"]["local_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
     env["state"]["remote_history_id"] = 5
@@ -435,9 +436,14 @@ def test_network_failure_reports_error_without_crashing(env) -> None:
     assert env["entries"] == {}
 
 
-def test_push_maps_reset_to_zero_set(env) -> None:
-    """reset 行上行映射为 set(0)：跨边界设备先按时间戳归零再回放 delta，
-    不会把 delta 加在周期前的旧基线上（2026-11-04 复盘补的窟窿）。"""
+class _DayQuota:
+    period = "day"
+    reset_time = "05:00"
+    reset_day = 0
+
+
+def test_push_skips_reset_and_sends_following_delta(env) -> None:
+    """周期重置留在本地，不上传。后面的增量照常上行。"""
     env["state"]["local_history_id"] = 0
     env["history"].extend([
         {"id": 10, "username": "蔡元君", "type": "quota", "key": "weekly",
@@ -448,13 +454,14 @@ def test_push_maps_reset_to_zero_set(env) -> None:
          "delta_value": 3, "ts": "2026-11-04T09:00:00"},
     ])
     snapshot_sync.push_local("t")
-    assert [op["op"] for op in env["server"].pushed] == ["set", "delta"]
-    assert env["server"].pushed[0]["value"] == 0     # reset → set(0)
-    assert env["server"].pushed[0]["delta"] is None
+    assert [op["local_id"] for op in env["server"].pushed] == [11]
+    assert env["server"].pushed[0]["op"] == "delta"
+    assert env["state"]["local_history_id"] == 11
 
 
-def test_cross_boundary_replay_converges_on_stale_base(env) -> None:
-    """离线跨周期的设备：reset-set 先归零，delta 才不会加在旧基线上。"""
+def test_cross_period_replay_zeros_before_delta(env, monkeypatch) -> None:
+    """回放不依赖对端上传的 reset。本地还停在上个周期时，增量从 0 加。"""
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
     env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
@@ -462,16 +469,112 @@ def test_cross_boundary_replay_converges_on_stale_base(env) -> None:
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
          "username": "蔡元君", "type": "quota", "key": "weekly",
-         "op": "set", "value": 0, "delta": None, "value_text": "",
-         "happened_at": "2026-11-04T05:00:00"},      # 对端周期归零（reset 映射）
-        {"remote_id": 2, "instance_id": "other", "local_id": 2,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 3, "value": None, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    # 5(旧) --set0--> 0 --delta+3--> 3；没有 reset-set 时会错算成 8
     assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 3.0
+    assert all(write[5] is None for write in env["writes"])
+
+
+def test_cross_period_replay_set_replaces_stale_value(env, monkeypatch) -> None:
+    """跟上的设备已是 15。落后的设备上个周期还是 5，回放 set(15) 得到 15。"""
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
+                                                     "updated_at": "2026-11-03T09:00:00"}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "set", "value": 15, "delta": None, "value_text": "",
+         "happened_at": "2026-11-04T09:00:00"},
+    ]
+    snapshot_sync.pull_and_replay("t")
+    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 15.0
+
+
+def test_same_period_delta_adds_to_current_value(env, monkeypatch) -> None:
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 10,
+                                                     "updated_at": "2026-11-04T08:00:00"}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "delta", "delta": 5, "value": None, "value_text": "",
+         "happened_at": "2026-11-04T09:00:00"},
+    ]
+    snapshot_sync.pull_and_replay("t")
+    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 15.0
+
+
+def test_previous_period_delta_is_discarded(env, monkeypatch) -> None:
+    """本地已在新周期时，上一周期的增量不能加进来。"""
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 4,
+                                                     "updated_at": "2026-11-04T06:00:00"}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "delta", "delta": 3, "value": None, "value_text": "",
+         "happened_at": "2026-11-03T20:00:00"},
+    ]
+    snapshot_sync.pull_and_replay("t")
+    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 4
+    assert env["writes"] == []
+
+
+def test_offset_timestamp_keeps_clock_face(env, monkeypatch) -> None:
+    """带偏移的发生时间按钟面参加周期判断，不因时区比较抛错而丢掉。"""
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
+                                                     "updated_at": "2026-11-03T09:00:00"}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "delta", "delta": 3, "value": None, "value_text": "",
+         "happened_at": "2026-11-04T09:00:00+08:00"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.errors == []
+    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 3.0
+
+
+def test_unparseable_local_time_does_not_zero_base(env, monkeypatch) -> None:
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 10,
+                                                     "updated_at": "not-a-time"}}}
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "delta", "delta": 1, "value": None, "value_text": "",
+         "happened_at": "2026-11-04T09:00:00"},
+    ]
+    snapshot_sync.pull_and_replay("t")
+    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 11.0
+
+
+def test_old_period_delta_does_not_seed_empty_entry(env, monkeypatch) -> None:
+    """没有本地条目时，已经过去的周期增量也不写入当前值。"""
+    monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
+    env["state"]["remote_history_id"] = 0
+    env["state"]["profile_snapshot_id"] = 1
+    env["server"].rows = [
+        {"remote_id": 1, "instance_id": "other", "local_id": 1,
+         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "op": "delta", "delta": 3, "value": None, "value_text": "",
+         "happened_at": "2000-01-01T20:00:00"},
+    ]
+    snapshot_sync.pull_and_replay("t")
+    assert "蔡元君" not in env["entries"]
 
 
 def test_bootstrap_skips_locked_entries_silently(env) -> None:

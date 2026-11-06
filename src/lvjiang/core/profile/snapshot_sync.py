@@ -109,14 +109,82 @@ def clear_sync_state() -> None:
     logger.info("[profile sync] 已按用户操作清除本地同步进度")
 
 
+def _quota_key(key: str):
+    """配额定义。未注册周期或不是配额时返回 None，回放就不做周期归零。"""
+    from .models import QuotaKeyDef
+    from .schema import get_profile_config
+
+    found = get_profile_config().get_key(key, model_type="quota")
+    return found if isinstance(found, QuotaKeyDef) else None
+
+
+def _wall_clock(value: str) -> datetime | None:
+    """解析时间并留下钟面。带偏移的时间去掉时区，不换算到本机时区。
+
+    周期边界是本地钟面（例如每天 05:00），库存的 ``updated_at`` 也是无时区钟面。
+    把 ``09:00+08:00`` 按运行机器的时区换算，会在非东八区把周期判错。
+    """
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.replace(tzinfo=None)
+    return parsed
+
+
+def _period_relation(op: dict, current: dict) -> str | None:
+    """配额操作相对本地条目的周期：``new`` / ``same`` / ``old``。无法判断时返回 None。"""
+    if op.get("type") != "quota":
+        return None
+    happened_at = _wall_clock(op.get("happened_at") or "")
+    if happened_at is None:
+        return None
+    key_def = _quota_key(str(op.get("key") or ""))
+    if key_def is None:
+        return None
+    from .periods import get_period_boundary
+
+    reset_day = getattr(key_def, "reset_day", 0)
+    try:
+        boundary = get_period_boundary(
+            key_def.period, key_def.reset_time, happened_at, reset_day)
+        now_boundary = get_period_boundary(
+            key_def.period, key_def.reset_time, datetime.now(), reset_day)
+    except (TypeError, ValueError):
+        return None
+    local_at = current.get("updated_at") or ""
+    if not local_at:
+        # 没有本地时间：操作自己已经落在过去的周期里，就不要写进当前值。
+        if boundary < now_boundary:
+            return "old"
+        return "new"
+    local_dt = _wall_clock(local_at)
+    if local_dt is None:
+        return None
+    if local_dt < boundary:
+        return "new"
+    try:
+        local_boundary = get_period_boundary(
+            key_def.period, key_def.reset_time, local_dt, reset_day)
+    except (TypeError, ValueError):
+        return None
+    if boundary < local_boundary:
+        return "old"
+    return "same"
+
+
 def _apply_op(op: dict) -> bool:
     """把一条远端 op 折进 entries；返回是否实际生效。
 
     **不写本地 history**，因此不会回声上行。
 
-    回放按 remote_id（到达序）驱动，但**合并按操作时间**：远端来的旧 set
-    （``happened_at`` 早于本地现值的 ``updated_at``）不覆盖新值——离线设备
-    补传的陈旧 set 正是这种形态。delta 恒应用（加法可交换，顺序无关）。
+    回放按 remote_id（到达序）驱动，但**合并按操作时间**：同一周期里，
+    远端来的旧 set（``happened_at`` 早于本地现值的 ``updated_at``）不覆盖
+    新值。配额跨进新周期时先把本机底数当成 0 再套用；属于上一周期的操作
+    直接丢弃。两种情况都不另写 reset 历史。delta 在同一周期内加在当前值上。
 
     回放写入时把条目 ``updated_at`` 定为 op 的 ``happened_at`` 而不是本地
     墙钟：两台设备的时钟互不可信，本地墙钟会让回放后的所有条目都"新于"
@@ -125,20 +193,31 @@ def _apply_op(op: dict) -> bool:
     """
     username, type_, key = op["username"], op["type"], op["key"]
     happened = op.get("happened_at") or ""
+    current = repository.db_read_entry(username, type_, key)
+    if not isinstance(current, dict):
+        current = {}
+    relation = _period_relation(op, current)
+    if relation == "old":
+        logger.debug("[profile sync] 跳过旧周期 op：{}/{} {}@{}",
+                     username, type_, key, happened)
+        return False
+    fresh_period = relation == "new"
     if op["op"] == "delta":
-        current = repository.db_read_entry(username, type_, key)
-        base = current.get("value") if isinstance(current, dict) else None
-        base = float(base) if isinstance(base, (int, float)) else 0.0
+        if fresh_period:
+            base = 0.0
+        else:
+            raw_base = current.get("value")
+            base = float(raw_base) if isinstance(raw_base, (int, float)) else 0.0
         value = base + float(op.get("delta") or 0)
         repository.db_upsert(username, type_, key, value,
                              updated_at=hadwent(happened), change_type=None)
         return True
     text = op.get("value_text") or ""
     raw = op.get("value")
-    if type_ != "note" and raw is not None:
-        current = repository.db_read_entry(username, type_, key)
-        local_at = (current or {}).get("updated_at") or ""
-        if local_at and happened and happened < local_at:
+    if not fresh_period and type_ != "note" and raw is not None:
+        local_at = _wall_clock(current.get("updated_at") or "")
+        happened_at = _wall_clock(happened)
+        if local_at and happened_at and happened_at < local_at:
             logger.info("[profile sync] 跳过旧 set：{}/{} {}@{} < 本地@{}",
                         username, type_, key, happened, local_at)
             return False
@@ -424,11 +503,10 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     return report
 
 
-#: 单次同步允许的最大上行积压。常规量按「周一 05:00 的周期重置风暴」定：
-#: 19 用户 × ~25 个周期 key ≈ 500 条 reset，属**正常业务量**而非水位异常，
-#: 上限必须容得下；分批（每批 200）上传。D1 免费额度 10 万行写/天，按每天
-#: 2000 行可支撑 50 个用户，1000 的上限绰绰有余。真正超过的（长期离线数月、
-#: 水位错乱）仍拒绝并提示刷新快照重建基线。
+#: 单次同步允许的最大上行积压。只数 set 与 delta；周期 reset 不上传。
+#: 分批（每批 200）上传。D1 免费额度 10 万行写/天，按每天 2000 行可支撑
+#: 50 个用户，1000 的上限绰绰有余。真正超过的（长期离线数月、水位错乱）
+#: 仍拒绝并提示刷新快照重建基线。
 MAX_PUSH_BACKLOG = 1000
 
 
@@ -465,9 +543,6 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         ops = [{
             "local_id": row["id"], "username": row["username"],
             "type": row["type"], "key": row["key"],
-            # reset 上行映射为 set(0)：回放端按时间戳归零，跨边界离线设备
-            # 不会把 delta 加在周期前的旧基线上（本地 change_type 保留
-            # 'reset' 供 UI 显示「周期重置」）。
             "op": "delta" if row["change_type"] == "delta" else "set",
             "value": (row["new_value"] if row["change_type"] != "delta" else None),
             "delta": (row["delta_value"] if row["change_type"] == "delta" else None),

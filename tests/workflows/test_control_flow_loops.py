@@ -51,7 +51,7 @@ end
         assert v["count"] == 0
 
     def test_for_range_start_greater_than_end(self):
-        """for_range 起始值大于结束值时跳过"""
+        """起点大于终点时与 range() 一样空转，不进入循环体。"""
         code = '''for i in [10...5]
     eval $count = $count + 1
 end

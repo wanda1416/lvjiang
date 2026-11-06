@@ -36,8 +36,9 @@ def _parameter_defaults_preamble(source: str) -> str:
     import 前声明 Profile 或执行其他入口动作，而这个测试只负责参数语义。
     """
     start = source.index("default $buy_keywords = ")
-    guard = source.index('if not $buy_keyword_keys contains "振玉"', start)
-    end = source.index("\nend", guard) + len("\nend")
+    # 用补齐动作本身定位，不绑定具体的条件写法（判断形式会随 DSL 演进变化）。
+    marker = source.index("$buy_keywords.振玉 = true", start)
+    end = source.index("\nend", marker) + len("\nend")
     return source[start:end] + "\n"
 
 

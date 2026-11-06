@@ -88,7 +88,7 @@ end
 recognize [bag_wallet_detail].[money_1] as rich $money1 on group "货币资产" with yysls_rich_parse
 
 eval $tongbao_total = 0
-for c in range(1, 4)
+for c in [1...4]
     eval $cell = $money1."1".$c
     eval $label = $cell.label
     eval $count = $cell.count
@@ -206,7 +206,7 @@ return 0
 # 行；旧第 1 行滚出屏幕丢弃；新的最后一行（$rows）用 $fresh 的补扫结果填。
 def shift_rows_after_scroll($data, $fresh, $rows)
     eval $shifted = {}
-    for r in range(2, $rows)
+    for r in [2...$rows]
         eval $src_key = "" + $r
         eval $new_r = $r - 1
         eval $dst_key = "" + $new_r
@@ -245,8 +245,8 @@ end
 # 返回：{value, row, col, confidence}；未命中时 value/row/col 为 0。
 def select_currency_cell($data, $rows, $target)
     eval $best = {"value": 0, "row": 0, "col": 0, "confidence": -1}
-    for r in range(1, $rows)
-        for c in range(1, 6)
+    for r in [1...$rows]
+        for c in [1...6]
             eval $cell = $data.$r.$c
             if $cell.label == $target
                 if $cell.confidence > $best.confidence

@@ -52,7 +52,10 @@ class _ControlFlowMixin:
             logger.error(f"for_range: 起止值非数值: start={start_val}, end={end_val}")
             return
         if start_int > end_int:
-            logger.error(f"for_range: 起始值大于结束值: {start_int} > {end_int}")
+            # range() 在起点超过终点时返回空列表。面板行数为 0 或 1 时
+            # [2...$rows] 同样是「没有要搬的行」，不是脚本写错。
+            logger.debug(
+                f"for_range: 起点大于终点，按空区间跳过: {start_int} > {end_int}")
             return
         items = list(range(start_int, end_int + 1))  # 闭区间
         logger.debug(f"for {node.var} in [{start_int}...{end_int}] → {items}")

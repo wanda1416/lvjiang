@@ -22,7 +22,6 @@ stats-client 私有的构建产物，不经 `ConfigResolver` 的 system/local �
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -31,6 +30,7 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from lvjiang.apps.yysls.config import get_game_config  # noqa: E402
 from lvjiang.apps.yysls.telemetry import vocab  # noqa: E402
+from lvjiang.core.json_files import formatted_json_bytes  # noqa: E402
 
 _OUT_PATH = _REPO_ROOT / "ops/stats-client/vocab/telemetry_vocab.json"
 
@@ -93,8 +93,9 @@ def build_vocab() -> dict:
 
 def main() -> int:
     data = build_vocab()
-    _OUT_PATH.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # write_bytes 才能保证 LF：write_text 在 Windows 上会把 \n 写成 \r\n，
+    # 而 .gitattributes 对 *.json 要求 eol=lf，每次导出都会留下假 diff。
+    _OUT_PATH.write_bytes(formatted_json_bytes(data))
     print(f"写入 {_OUT_PATH}："
          f"{len(data['parts'])} 个部位、{len(data['normal_affixes'])} 个普通词条、"
          f"{len(data['dingyin_affixes'])} 个定音词条、{len(data['weapon_types'])} 种武器",

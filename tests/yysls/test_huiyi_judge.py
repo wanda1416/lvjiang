@@ -4,6 +4,12 @@
 鸣金属性分部位（武器写 最大无相攻击 / 非武器写 最大鸣金攻击）、
 开关 keep_danti / keep_wanjia（条件组 when 语义）、品阶/首词条筛选、规则注册与
 调律潜力判定。
+
+判定只遍历「用户勾选的玩法」（``rule_judge._enabled_playstyles``），未配置勾选时
+才回退规则声明的全部玩法。本文件的 fixture 因此一律显式勾选：否则规则里新增一个
+玩法（例如双枪）就会静默改写这些用例的输入集合与期望值。武器的归属也随勾选改变
+——枪在「无名/九剑」下是副武器、在「双枪」下是主武器，两套断言分开写。
+
 会心/治疗规则测试见 test_huixin_judge.py / test_heal_judge.py。
 """
 
@@ -32,13 +38,23 @@ def make_equip(equip_type: str, affix_names: list[str],
 
 @pytest.fixture
 def judge():
-    return get_tuning_judge("huiyi_general")
+    """非双枪：枪是无名/九剑的副武器。"""
+    return get_tuning_judge("huiyi_general",
+                            {"playstyles": ["无名", "九剑"]})
 
 
 @pytest.fixture
 def judge_pvp():
-    return get_tuning_judge("huiyi_general",
-                            {"switches": {"keep_danti": True, "keep_wanjia": True}})
+    return get_tuning_judge(
+        "huiyi_general",
+        {"playstyles": ["无名", "九剑"],
+         "switches": {"keep_danti": True, "keep_wanjia": True}})
+
+
+@pytest.fixture
+def judge_shuangqiang():
+    """只勾双枪：两把枪都是主副武器，剑不在判定范围。"""
+    return get_tuning_judge("huiyi_general", {"playstyles": ["双枪"]})
 
 
 # ─── 各部位四档判定（参数化） ────────────────────────────────
@@ -55,7 +71,7 @@ class TestEquipRatings:
         ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会心率"], "gold", Rating.NORMAL),
         ("剑", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.JUNK),
         ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "会心率", "精准率"], "gold", Rating.JUNK),
-        # ── 枪（副武器，不需增伤）──
+        # ── 枪（无名/九剑下是副武器，不需增伤；双枪场景见下一个用例）──
         ("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "最大无相攻击"], "gold", Rating.TOP),
         ("枪", ["最大外功攻击", "最大外功攻击", "劲", "劲", "会意率"], "gold", Rating.EXCELLENT),
         ("枪", ["最大外功攻击", "最大外功攻击", "会意率", "最大无相攻击", "最大无相攻击"], "gold", Rating.EXCELLENT),
@@ -79,6 +95,32 @@ class TestEquipRatings:
     def test_rating(self, judge, equip_type, affixes, quality, expected):
         e = make_equip(equip_type, affixes, quality=quality)
         assert judge.judge(e).rating == expected
+
+    @case_matrix("equip_type,affixes,quality,expected", [
+        # 只勾双枪时枪升为主武器，带「枪武学增伤」才可能顶级；
+        # 与上一组同一件装备在无名/九剑下判垃圾，正是玩法归属的差异。
+        ("枪", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.TOP),
+        ("枪", ["最大外功攻击", "枪武学增伤", "最大外功攻击", "势", "会意率"], "gold", Rating.EXCELLENT),
+        ("枪", ["最大外功攻击", "枪武学增伤", "劲", "势", "会意率"], "gold", Rating.NORMAL),
+        # 双枪的主副都是枪，同一把枪还按副武器装备判定，缺增伤不影响取最优
+        ("枪", ["最大外功攻击", "最大外功攻击", "劲", "势", "最大无相攻击"], "gold", Rating.TOP),
+        # 剑不在双枪的判定范围
+        ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.JUNK),
+        # 非武器部位与玩法无关，只看属攻与词条组合
+        ("冠胄", ["会意率", "最大外功攻击", "劲", "势", "会意率"], "purple", Rating.TOP),
+    ])
+    def test_rating_shuangqiang(
+            self, judge_shuangqiang, equip_type, affixes, quality, expected):
+        e = make_equip(equip_type, affixes, quality=quality)
+        assert judge_shuangqiang.judge(e).rating == expected
+
+    def test_shuangqiang_marks_sword_not_applicable(self, judge_shuangqiang):
+        """只勾双枪时剑不是「垃圾」，而是根本不在判定范围。"""
+        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"])
+        result = judge_shuangqiang.judge(e)
+        assert result.rating == Rating.JUNK
+        assert result.not_applicable
+        assert any("不在" in s and "判定范围" in s for s in result.reasons)
 
     def test_junk_missing_damage_reason(self, judge):
         """缺增伤时 reason 包含 '增伤'"""

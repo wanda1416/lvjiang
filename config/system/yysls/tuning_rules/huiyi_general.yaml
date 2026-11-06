@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 key: huiyi_general
 name: 通用会意
 order: 10
@@ -10,6 +10,7 @@ quality_thresholds:
 playstyles:
 - 无名
 - 九剑
+- 双枪
 playstyle_switches:
   九剑: keep_danti
 transmute_priority:

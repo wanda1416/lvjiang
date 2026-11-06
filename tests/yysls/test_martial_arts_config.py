@@ -44,7 +44,8 @@ class TestPlaystyleRegistry:
 
     def test_registry_is_loaded(self):
         styles = get_game_config().get_playstyles()
-        assert len(styles) == 14
+        # 只防「清单为空导致下面的字段断言零用例通过」；玩法会持续新增
+        assert styles
         assert styles["纯唐"]["main_weapon"] == "横刀"
         assert styles["纯唐"]["main_damage"] == "横刀武学增伤"
         assert styles["纯唐"]["school"] == "裂石·钧"
@@ -172,6 +173,7 @@ class TestPlaystyleRegistry:
         """
         g = get_game_config()
         exceptions = {"纯奶", "纯唐", "飞天玉"}
+        checked: list[str] = []
 
         for name, style in g.get_playstyles().items():
             if name in exceptions or not style.get("school"):
@@ -181,8 +183,14 @@ class TestPlaystyleRegistry:
                 _GRADUATION_DIR / "110级"
                 / f'{style["school"]}_基础方案_v1.json'
             )
+            if not scheme_path.is_file():
+                # 新流派可能还没有毕业率表（伤害模型未出）。没有真源就无从
+                # 推导增伤/定音目标，跳过而不是要求数据存在；已有方案表的
+                # 流派仍逐条校验。
+                continue
             scheme = json.loads(scheme_path.read_text(encoding="utf-8"))
             extra = scheme["baseline_attrs"]["extra_attrs"]
+            checked.append(name)
 
             for side in ("main", "sub"):
                 affix = g.get_weapon_wuxue_affix(style[f"{side}_weapon"])
@@ -197,6 +205,8 @@ class TestPlaystyleRegistry:
             assert len(defense) <= 1, name
             assert style.get("defense_dingyin", "") == (
                 defense[0] if defense else ""), name
+
+        assert checked, "没有任何玩法带毕业率方案，这条校验等于空转"
 
     def test_non_maximum_damage_playstyles_keep_manual_targets(self):
         """低输出/治疗玩法不得被流派最大化伤害表反向覆盖。"""

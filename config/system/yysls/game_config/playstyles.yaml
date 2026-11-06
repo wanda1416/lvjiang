@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 3
 playstyles:
 - name: 火拳
   school: 牵丝·霖
@@ -214,3 +214,19 @@ playstyles:
   all_skill_requirement: 需要
   qishu_requirement: 单体
   unit_requirement: 首领
+- name: 双枪
+  school: 鸣金·霆
+  attr: 鸣金
+  arts:
+  - 决狱悬锋枪
+  - 拨山取月枪
+  all_skill_requirement: 不需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+  main_weapon: 枪
+  sub_weapon: 枪
+  main_damage: 枪武学增伤
+  sub_damage: ''
+  output_dingyin: 外功穿透
+  defense_dingyin: 悬锋取月轻重击派生增伤
+  match_keywords: []

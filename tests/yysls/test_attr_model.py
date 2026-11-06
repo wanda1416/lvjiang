@@ -461,7 +461,8 @@ def test_every_school_uses_the_same_equipment_and_independent_gongjue_levels() -
 
     manager = get_attr_model_manager()
     schools = get_game_config().get_schools()
-    assert len(schools) == 11
+    # 只防「清单为空导致下面的遍历零用例通过」；流派会持续新增，不钉数量
+    assert schools
 
     for school, config in schools.items():
         result = manager.resolve_loadout(

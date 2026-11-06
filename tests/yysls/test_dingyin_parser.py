@@ -7,6 +7,7 @@
 
 import pytest
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_SLOT_NOTICE,
@@ -45,24 +46,35 @@ def clean(text: str) -> str:
 
 class TestCandidates:
     def test_full_pool(self, dp):
-        # 全量池 = 增益类 3 条 + 指定技能增效 57 条（11 流派）
+        """候选池 = 三类定音词条的全部别名，期望集从配置派生。
+
+        不钉条数：新增流派会带来新的「指定技能增效」词条。
+        """
+        gc = get_game_config()
+        expected = {
+            name
+            for category in ("外功增益", "属攻增益", "指定技能增效")
+            for name in gc.get_aliases_for_category(category)
+        }
+        assert expected, "定音词条配置为空，下面的断言会恒真"
         names = set(dp._candidates())
+        assert names == expected
         assert {"外功穿透", "外功抗性", "无相穿透"} <= names
         assert "无名剑法武学技增伤" in names
         assert "千机索天重击增伤" in names
-        assert len(names) == 60
 
     def test_full_pool_survives_translation(self, dp, monkeypatch):
         """_DINGYIN_CATEGORIES 查的是 attributes.yaml 里的分类 key（裸中文
         游戏配置数据），不能过 tr()——一旦被翻译，候选池会在英文界面下
         整个查不到任何别名，定音解析全灭。"""
+        before = set(dp._candidates())
         import lvjiang.i18n as i18n
         monkeypatch.setattr(i18n, "_current_language", "en_US")
         monkeypatch.setattr(i18n, "_translations", {
             "外功增益": "EXT_BONUS", "属攻增益": "ELEM_BONUS",
             "指定技能增效": "SKILL_BONUS",
         })
-        assert len(set(dp._candidates())) == 60
+        assert set(dp._candidates()) == before
 
 
 # ─── 解析 ─────────────────────────────────────────────────

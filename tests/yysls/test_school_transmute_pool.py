@@ -126,9 +126,9 @@ def test_game_config_transmute_pool_api():
     from lvjiang.apps.yysls.config import get_game_config
 
     gc = get_game_config()
-    # 鸣金：会意流派模板，含会意率/劲/势
+    # 鸣金：会意流派模板，动态本属攻击展开为无相 + 本属两个真实词条
     pool = gc.get_transmute_pool("鸣金·虹")
-    assert pool[:3] == ["最大外功攻击", "最大无相攻击", "最大鸣金攻击"]
+    assert {"最大外功攻击", "最大无相攻击", "最大鸣金攻击"} <= set(pool)
     assert "会意率" in pool and "劲" in pool and "势" in pool
     # 会心流派：无相 + 本属攻击并存
     pool_ls = gc.get_transmute_pool("裂石·威")

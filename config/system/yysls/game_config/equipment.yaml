@@ -1,4 +1,4 @@
-content_version: 2
+content_version: 3
 base_attrs:
   weapon:
     _attr: 外功攻击
@@ -284,6 +284,11 @@ equipment_sets:
       recommended_right: yingzhan
       recommended_school: 破竹·樽
       two_piece_affix: 最小外功攻击
+    hanmang:
+      name: 寒芒
+      recommended_right: yinluan
+      recommended_school: 鸣金·霆
+      two_piece_affix: 最大外功攻击
   right:
     yixiang:
       name: 易相
@@ -311,6 +316,8 @@ equipment_sets:
       name: 御无缺
     yingzhan:
       name: 盈盏
+    yinluan:
+      name: 隐峦
 gongjue_bonuses:
   会意:
     110: 3.5

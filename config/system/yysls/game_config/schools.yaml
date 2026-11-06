@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 5
 schools:
   鸣金·虹:
     attr: 鸣金
@@ -10,11 +10,11 @@ schools:
       martial_art: 无名枪法
     transmute_pool:
     - 最大外功攻击
-    - 最大本属攻击
-    - 会意率
-    - 会心率
-    - 劲
     - 势
+    - 劲
+    - 会意率
+    - 最大本属攻击
+    - 会心率
   鸣金·影:
     attr: 鸣金
     main:
@@ -25,11 +25,11 @@ schools:
       martial_art: 九曲惊神枪
     transmute_pool:
     - 最大外功攻击
-    - 最大本属攻击
-    - 会意率
-    - 会心率
-    - 劲
     - 势
+    - 劲
+    - 会意率
+    - 最大本属攻击
+    - 会心率
   裂石·威:
     attr: 裂石
     main:
@@ -165,3 +165,18 @@ schools:
     - 会心率
     - 敏
     - 劲
+  鸣金·霆:
+    attr: 鸣金
+    main:
+      martial_art: 决狱悬锋枪
+      weapon: 枪
+    sub:
+      martial_art: 拨山取月枪
+      weapon: 枪
+    transmute_pool:
+    - 最大外功攻击
+    - 势
+    - 劲
+    - 会意率
+    - 最大本属攻击
+    - 会心率

@@ -71,6 +71,7 @@ def test_real_transmute_values_saved_targets_and_graduation(level, chengyin):
     )
 
     gc = get_game_config()
+    graduation_checked: set[str] = set()
     for school in gc.get_schools():
         attr = gc.get_school_attr(school)
         aliases = dynamic_affix_map(attr)
@@ -106,9 +107,15 @@ def test_real_transmute_values_saved_targets_and_graduation(level, chengyin):
             if kind == "剑":
                 assert actual_attrs.max_wuxiang == cap
             calculator = get_graduation_calculator(school, world_level=level)
-            assert calculator is not None
+            if calculator is None:
+                # 新流派可能还没有毕业率方案（伤害模型未出）。此时没有可比
+                # 的基线，跳过毕业率这一步；上面的词条/转律校验已经执行。
+                continue
             base = get_graduation_scheme_combat_attrs(school, "基础方案", level)
             assert calculator.calculate(base + actual_attrs) == calculator.calculate(base + expected_attrs)
+            graduation_checked.add(school)
+
+    assert graduation_checked, "没有任何流派的毕业率被校验，这条校验等于空转"
 
 
 def test_dynamic_first_affix_and_weapon_potential():

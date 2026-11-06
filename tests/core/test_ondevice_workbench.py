@@ -6,8 +6,9 @@ from lvjiang.core.ondevice import task_runner, workbench
 
 
 def test_qrcode_refresh_is_explicit_and_keeps_cache_on_failure(tmp_path, monkeypatch):
-    from lvjiang.core import group_qrcode
-    monkeypatch.setattr("lvjiang.constants.SESSION_CONFIG_DIR", tmp_path)
+    from lvjiang.core import group_qrcode, qr_cache
+    monkeypatch.setattr(qr_cache, "temp_cache_directory", lambda: tmp_path / "temp")
+    monkeypatch.setattr("lvjiang.constants.SESSION_CONFIG_DIR", tmp_path / "session")
     group_qrcode.save_qrcode(b"old")
     monkeypatch.setattr(group_qrcode, "fetch_qrcode_bytes", lambda: b"latest")
     cached = json.loads(workbench.public_content("qrcode"))

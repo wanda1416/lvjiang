@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 recognition:
   region_batch:
     min_canvas_side: 736
@@ -23,5 +23,7 @@ normalization:
         背仓: 背包
         缚祷: 缚袴
         率丝: 牵丝
+        # 形近字按词组替换：单字「拔: 拨」会误伤任何含「拔」的文本。
+        拔山取月: 拨山取月
       patterns:
         '[荐存·]': ''

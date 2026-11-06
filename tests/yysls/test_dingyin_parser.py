@@ -44,6 +44,40 @@ def clean(text: str) -> str:
 
 # ─── 候选词条池 ────────────────────────────────────────────
 
+class TestCleaningGroup:
+    """equip 清洗组与定音词条的契约。
+
+    游戏展示的定音名带间隔号（「悬身断水·浓醺技能增伤」），配置里的词条名不带。
+    清洗组按规则删掉间隔号后可直接前缀匹配；即便某次 OCR 把分隔符读成别的
+    符号（``.`` / ``•``）或干脆没读出来，``_hanzi_only`` 也还有一层兜底。
+    """
+
+    def test_separator_is_removed_before_matching(self):
+        assert clean("悬身断水·浓醺技能增伤 +8.0%") == "悬身断水浓醺技能增伤 +8.0%"
+
+    def test_dingyin_still_matches_with_separator(self, dp):
+        text = clean("悬身断水·浓醺技能增伤 +8.0%")
+        assert DingyinParser._match_name(text, dp._candidates()) == (
+            "悬身断水浓醺技能增伤")
+
+    def test_matches_when_ocr_reads_separator_as_dot(self, dp):
+        """间隔号被 OCR 读成 ``.`` 时清洗组不动它，靠匹配层去标点兜住。"""
+        text = clean("悬身断水.浓醺技能增伤 +8.0%")
+        assert "·" not in text
+        assert DingyinParser._match_name(text, dp._candidates()) == (
+            "悬身断水浓醺技能增伤")
+
+    def test_every_dingyin_name_matches_with_separator_anywhere(self, dp):
+        """每个词条名在每个字符间隙插入间隔号后都必须命中。"""
+        candidates = dp._candidates()
+        names = get_game_config().get_dingyin_affix_names()
+        assert names
+        for name in names:
+            for index in range(1, len(name)):
+                text = clean(f"{name[:index]}·{name[index:]} +8.0%")
+                assert DingyinParser._match_name(text, candidates) == name, text
+
+
 class TestCandidates:
     def test_full_pool(self, dp):
         """候选池 = 三类定音词条的全部别名，期望集从配置派生。

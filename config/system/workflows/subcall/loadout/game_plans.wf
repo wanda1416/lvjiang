@@ -74,7 +74,7 @@ end
 #
 # 第一版只扫描当前网格可见行；空槽无文字，不滚动、不去重。
 def collect_game_plan_names()
-    scan [training_plan].[plan_list] as $grid
+    scan [training_plan].[plan_list] as $grid with "equip"
     eval $names = []
     for row in keys($grid)
         eval $name = trim($grid.$row.[1])

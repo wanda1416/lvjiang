@@ -241,6 +241,10 @@ class MenuOpsMixin:
         feedback.triggered.connect(self._open_feedback)
         help_menu.addAction(feedback)
 
+        sponsor = QAction(tr("赞助"), self)
+        sponsor.triggered.connect(self._open_sponsor)
+        help_menu.addAction(sponsor)
+
         help_menu.addSeparator()
 
         about = QAction(tr("关于"), self)
@@ -446,6 +450,12 @@ class MenuOpsMixin:
         """打开反馈规范与反馈渠道对话框。"""
         from ..notices.feedback_dialog import FeedbackDialog
         dialog = FeedbackDialog(self)
+        dialog.exec()
+
+    def _open_sponsor(self):
+        """打开赞助对话框：微信 / 支付宝收款码与站点赞助页入口。"""
+        from ..notices.sponsor_dialog import SponsorDialog
+        dialog = SponsorDialog(self)
         dialog.exec()
 
     def _open_account_manager(self):

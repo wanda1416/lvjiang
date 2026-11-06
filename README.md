@@ -366,6 +366,24 @@ pytest tests/workflows/test_parser.py
 
 ---
 
+## ☕ 赞助作者
+
+律匠免费使用、源码公开，功能与授权不因赞助而改变。如果它帮你省下了时间，可以自愿请作者喝杯咖啡：
+
+<details>
+<summary>微信 / 支付宝收款码（点击展开）</summary>
+
+<p align="left">
+  <img alt="微信收款码" src="docs/assets/support/wechat.png" width="220">
+  <img alt="支付宝收款码" src="docs/assets/support/alipay.png" width="220">
+</p>
+
+</details>
+
+赞助完全自愿：不换取功能、授权或优先支持，也不影响任何既有功能。也可以直接打开[赞助页面](https://lvjiang.wyxj.net/#/support)，或从主窗口「帮助 → 赞助」查看。
+
+---
+
 ## 🔒 数据与隐私
 
 律匠只在少数情况下联网：查公告、查有没有新版本、同步在线配置（0.8.0 起）、功能激活与在线会员授权（0.15.0 起）、以及（0.7.0 起）收集匿名调律数据。

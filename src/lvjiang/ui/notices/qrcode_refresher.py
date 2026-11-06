@@ -1,4 +1,6 @@
 """桌面二维码刷新线程。"""
+from collections.abc import Callable
+
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -27,3 +29,29 @@ class QrCodeRefresher(QThread):
             self.error.emit(f"刷新二维码失败: {exc}")
         else:
             self.succeeded.emit(data)
+
+
+class ImageRefreshThread(QThread):
+    """后台执行一次取图动作，成功与失败都带上 key。
+
+    赞助对话框一次要管微信、支付宝两张图，结果必须能对上是哪一张；把 key
+    随信号发出，对话框就不用为每个渠道各写一个 QThread 子类。
+    """
+
+    # 同 QrCodeRefresher：成功信号不能叫 finished，见上面的注释。
+    succeeded = pyqtSignal(str, bytes)  # key, 图片二进制
+    error = pyqtSignal(str, str)        # key, 可读错误信息
+
+    def __init__(self, key: str, loader: Callable[[], bytes], parent=None):
+        super().__init__(parent)
+        self.key = key
+        self._loader = loader
+
+    def run(self):
+        try:
+            data = self._loader()
+        except Exception as exc:  # noqa: BLE001 - 线程边界统一转成信号
+            logger.warning(f"[二维码] {self.key} 获取失败: {exc}")
+            self.error.emit(self.key, str(exc))
+        else:
+            self.succeeded.emit(self.key, data)

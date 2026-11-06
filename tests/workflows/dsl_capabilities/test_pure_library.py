@@ -7,6 +7,7 @@ from shutil import copyfile
 import pytest
 
 from lvjiang.workflows.discovery import discover_scripts
+from lvjiang.workflows.engine.signals import WorkflowUserError
 from tests.workflows.conftest import make_engine, run
 
 LIB_DIR = Path(__file__).resolve().parents[3] / "config/system/workflows/lib"
@@ -163,10 +164,13 @@ def test_pure_libraries_are_not_discovered_as_runnable_scripts(wf_root):
     })
 
 
-def test_list_index_assignment_is_currently_unsupported():
-    """读下标可用；字段赋值仅写字典，不能悄悄改动列表。"""
-    values = run('eval $items[0] = 99\neval $first = $items[0]\n', {
-        "items": [1, 2],
-    })
-    assert values["items"] == [1, 2]
+def test_list_index_read_is_supported():
+    """读下标可用（写路径另有约束）。"""
+    values = run("eval $first = $items[0]\n", {"items": [1, 2]})
     assert values["first"] == 1
+
+
+def test_list_index_assignment_is_rejected():
+    """写只能写字典：列表下标赋值必须报错，不能静默保留旧值。"""
+    with pytest.raises(WorkflowUserError, match="只能写字典"):
+        run("eval $items[0] = 99\n", {"items": [1, 2]})

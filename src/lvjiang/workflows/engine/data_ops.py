@@ -494,32 +494,36 @@ class _DataOpsMixin:
         """eval $dict.key = value 或 eval session.key = value — 字段赋值
 
         支持 VarRef 根（$dict.key）和 KeywordRef 根（session.key / context.key）。
+
+        写路径只接受字典：列表的下标可读（``_eval_field_raw`` 支持 ``$list[0]``），
+        但不可写。过去越界写入只打一条 error 日志、旧值原地不动，脚本看起来像
+        赋值成功；现在一律抛 ``WorkflowUserError``，让失败当场可见。
         """
-        # 解析字段访问链，获取所有字段名
         field_chain = self._extract_field_chain(node.target)
-        if not field_chain:
-            logger.error("eval_field_assign: 无法解析字段链")
-            return
+        path = ".".join(str(f) for f in field_chain)
 
         # 第一个字段是变量名或关键字名
         root_name = field_chain[0]
-        # 判断根是关键字还是普通变量
         if root_name == "session":
-            dict_var = self.session
+            container = self.session
         elif root_name == "context":
-            dict_var = self.context
+            container = self.context
         else:
-            dict_var = self.variables.get(root_name)
-        if not isinstance(dict_var, dict):
-            logger.error(f"eval_field_assign: {root_name} 不是字典类型")
-            return
+            container = self.variables.get(root_name)
+        if not isinstance(container, dict):
+            raise WorkflowUserError(
+                f"不能对 ${path} 做字段赋值：${root_name} 的值是 "
+                f"{type(container).__name__}，不是字典。"
+                "字段赋值只能写字典；列表请用 append() 追加")
 
         # 遍历到倒数第二个字段，获取父字典
-        current = dict_var
+        current = container
         for field_name in field_chain[1:-1]:
             if not isinstance(current, dict):
-                logger.error(f"eval_field_assign: 中间字段 {field_name} 不是字典类型")
-                return
+                raise WorkflowUserError(
+                    f"不能对 ${path} 做字段赋值：路径上的 {field_name!r} 处在 "
+                    f"{type(current).__name__} 里，不是字典，无法继续下钻。"
+                    "字段赋值只能写字典；列表请用 append() 追加")
             next_val = current.get(field_name)
             if next_val is None:
                 # 自动创建空字典
@@ -527,8 +531,19 @@ class _DataOpsMixin:
                 current[field_name] = next_val
             current = next_val
 
-        # 最后一个字段是赋值目标
+        if not isinstance(current, dict):
+            raise WorkflowUserError(
+                f"不能对 ${path} 做字段赋值：写入目标是 "
+                f"{type(current).__name__}，不是字典。"
+                "字段赋值只能写字典；列表请用 append() 追加")
+
         final_field = field_chain[-1]
+        if not isinstance(final_field, str):
+            raise WorkflowUserError(
+                f"不能对 ${path} 做字段赋值：字典的 key 必须是字符串，"
+                f"这里解析出 {type(final_field).__name__}。"
+                f'请改写为 $var."{final_field}" 或先把 key 转成字符串')
+
         # 解析右侧值：FuncCall 调用函数，空 dict 初始化，其余统一走 _resolve
         # （_resolve 覆盖 VarRef / Literal / FieldAccess，后者用于 $a.b = $c.d.e）
         if isinstance(node.value, FuncCall):
@@ -538,9 +553,9 @@ class _DataOpsMixin:
         else:
             value = self._resolve(node.value)
         current[final_field] = value
-        logger.debug(f"eval: {'.'.join(str(f) for f in field_chain)} = {value!r}")
+        logger.debug(f"eval: {path} = {value!r}")
 
-    def _extract_field_chain(self, node: FieldAccess) -> list | None:
+    def _extract_field_chain(self, node: FieldAccess) -> list:
         """从 FieldAccess 节点提取字段名链
 
         支持 VarRef / KeywordRef 作为根。返回的链第一个元素是变量名或关键字名。
@@ -551,8 +566,8 @@ class _DataOpsMixin:
         取值设计的兼容行为，写路径没有理由静默模仿）。$key 想用数值构造，
         脚本自己显式转（如 `eval $key = "" + $rows`），类型一目了然，也
         不会在 dict 里意外留下一个字符串以外的 key。
-        解析失败（动态字段名不是 str）时返回 None，调用方按现有的
-        "field_chain 为空" 分支处理，不吞异常也不悄悄继续。
+
+        动态字段名不是 str 时直接抛错：写路径不能静默丢掉这次写入。
         """
         chain = []
         current = node
@@ -563,13 +578,11 @@ class _DataOpsMixin:
             elif isinstance(fn, VarRef):
                 dynamic_key = self.variables.get(fn.name, "")
                 if not isinstance(dynamic_key, str):
-                    logger.error(
-                        f"eval_field_assign: 动态字段名 ${fn.name} 的值不是字符串"
-                        f"（{dynamic_key!r}），dict key 必须是 str；"
-                        f"请先显式转换（如 eval ${fn.name}_key = \"\" + ${fn.name}）"
-                        f"再用作 key"
-                    )
-                    return None
+                    raise WorkflowUserError(
+                        f"不能对 $var 做字段赋值：动态字段名 ${fn.name} 的值是 "
+                        f"{type(dynamic_key).__name__}（{dynamic_key!r}）。"
+                        f"字典 key 必须是字符串，请先显式转换"
+                        f'（如 eval ${fn.name}_key = "" + ${fn.name}）')
                 chain.append(dynamic_key)
             elif isinstance(fn, Literal):
                 chain.append(fn.value)

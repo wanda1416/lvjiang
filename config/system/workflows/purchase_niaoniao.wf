@@ -52,7 +52,7 @@ import "subcall/page_action.wf"
 import "subcall/profile_registry.wf"
 
 # 参数缺省回落（批量注入缺失时用默认值）
-default $max_scroll = 2
+default $max_scroll = 4
 
 # ─── profile 依赖与本周额度检查（买满或不足 200 长鸣玉则整段跳过） ────────────────
 # niaoniao_of_week：本周已购「绑」数量（quota，周周期自动清零，cap 2）。

@@ -63,6 +63,61 @@ def test_save_routes_sections_to_their_owner_files(tmp_path):
     assert "basic_config" not in equipment
 
 
+def test_save_only_writes_files_whose_content_changed(tmp_path):
+    """只改一个领域时其余六份不写。
+
+    无条件写七份会让「只改了词条别名」也因另一个文件在编辑器打开后被别的
+    窗口保存，而整次保存要求覆盖确认。
+    """
+    resolver = _resolver(tmp_path)
+    data = load_game_config(resolver)
+    data["basic_config"]["equipment_cooldown_days"] = 9
+
+    written = save_game_config(data, resolver)
+
+    assert written == ["yysls/game_config/basic.yaml"]
+
+
+def test_save_reports_every_changed_file(tmp_path):
+    resolver = _resolver(tmp_path)
+    data = load_game_config(resolver)
+    data["basic_config"]["equipment_cooldown_days"] = 9
+    data["schools"]["鸣金·虹"]["transmute_pool"] = ["最大外功攻击"]
+
+    written = save_game_config(data, resolver)
+
+    assert written == [
+        "yysls/game_config/basic.yaml",
+        "yysls/game_config/schools.yaml",
+    ]
+
+
+def test_save_is_noop_when_nothing_changed(tmp_path):
+    resolver = _resolver(tmp_path)
+    data = load_game_config(resolver)
+    before = {
+        rel_path: (resolver.system_dir / rel_path).stat().st_mtime_ns
+        for rel_path in GAME_CONFIG_FILES
+    }
+
+    assert save_game_config(data, resolver) == []
+
+    assert {
+        rel_path: (resolver.system_dir / rel_path).stat().st_mtime_ns
+        for rel_path in GAME_CONFIG_FILES
+    } == before
+
+
+def test_every_top_level_section_is_owned_by_one_file(tmp_path):
+    """顶层键必须全部登记归属；未登记的键保存时会被静默丢弃。"""
+    resolver = _resolver(tmp_path)
+    for rel_path, sections in GAME_CONFIG_FILES.items():
+        document = yaml.safe_load(
+            (resolver.system_dir / rel_path).read_text(encoding="utf-8")) or {}
+        unknown = set(document) - {"content_version"} - set(sections)
+        assert not unknown, f"{rel_path} 有未登记的顶层键: {sorted(unknown)}"
+
+
 def test_old_season_file_is_diagnosed_without_renaming(tmp_path: Path, monkeypatch):
     resolver = _resolver(tmp_path)
     messages = []

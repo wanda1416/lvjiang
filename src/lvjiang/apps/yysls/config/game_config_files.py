@@ -77,16 +77,21 @@ def load_game_config(resolver: ConfigResolver | None = None) -> dict:
 def save_game_config(
     data: Mapping[str, object],
     resolver: ConfigResolver | None = None,
-) -> None:
-    """把完整业务文档按固定归属写回七份配置。
+) -> list[str]:
+    """把完整业务文档按固定归属写回七份配置，只写内容真正变过的文件。
 
     每份文件保留自己的 ``content_version``；版本是远程发布代次，不因普通保存
     自动增长。
+
+    只写变化的文件不只是省 IO：``save_merged`` 会做并发检查（磁盘在本窗口
+    打开后被改过就要求确认），无条件写七份会让「只改了词条别名」也因另一个
+    文件被别的窗口保存而整次失败。返回实际写入的相对路径，便于调用方记录。
     """
     resolver = resolver or get_resolver()
     unknown = set(data) - set(GAME_CONFIG_SECTION_FILES)
     if unknown:
         raise ValueError(f"游戏配置包含未知顶层字段: {', '.join(sorted(unknown))}")
+    written: list[str] = []
     for rel_path, sections in GAME_CONFIG_FILES.items():
         current = resolver.load_merged(rel_path)
         document = {
@@ -97,7 +102,23 @@ def save_game_config(
                 if section in data
             },
         }
+        if _same_content(current, document):
+            continue
         resolver.save_merged(rel_path, document)
+        written.append(rel_path)
+    return written
+
+
+def _same_content(current: Mapping[str, object], document: Mapping[str, object]) -> bool:
+    """忽略 ``content_version`` 比对业务内容。
+
+    版本号由写盘自动递增，且生效层（system/local）的版本与即将写入的版本
+    本来就可能不同；拿它参与比对会让每份文件都被判成「有变化」。
+    """
+    def payload(doc: Mapping[str, object]) -> dict[str, object]:
+        return {key: value for key, value in doc.items() if key != "content_version"}
+
+    return payload(current) == payload(document)
 
 
 def system_game_config_section(

@@ -72,6 +72,59 @@ def test_converter_ignores_blank_skill_affix_label() -> None:
     assert not skill_group.intersection(model["baseline_attrs"].get("extra_attrs", {}))
 
 
+def _expectation_workbook(labels: tuple[str, ...]):
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "期望"
+    for row, label in enumerate(labels, start=15):
+        sheet.cell(row, 1, label)
+    sheet.cell(15 + len(labels), 1, "固伤加成")
+    return book
+
+
+def _two_spear_config():
+    """真实词组别名 + 一个主副都是枪的流派，隔离于随包流派配置。"""
+    from copy import deepcopy
+
+    from lvjiang.apps.yysls.core.graduation import graduation_converter as converter
+
+    config = deepcopy(converter._game_config())
+    config["schools"]["测试·双枪"] = {
+        "attr": "鸣金",
+        "main": {"martial_art": "测试枪法", "weapon": "枪"},
+        "sub": {"martial_art": "测试枪法二", "weapon": "枪"},
+    }
+    config["affix_caps"]["指定技能增效"]["_aliases"]["测试·双枪"] = ["测试定音"]
+    return config
+
+
+def test_workbook_inputs_ignores_weapon_rows_the_school_cannot_use() -> None:
+    """双枪流派的表格带着模板遗留的「剑增」行时，导入不能被这行卡住。
+
+    表格由同一套模板派生，本流派用不到的武器增伤行不参与任何计算；
+    把它当错误会让整份表无法导入，而改表又会被作者的下一版覆盖。
+    """
+    from lvjiang.apps.yysls.core.graduation import graduation_converter as converter
+
+    book = _expectation_workbook(("全武增", "首领增", "剑增", "枪增", "奇术增"))
+    inputs = converter._workbook_inputs(book, "测试·双枪", _two_spear_config())
+
+    assert inputs["weapon_bonus_primary"] == "期望!B18"
+    assert "期望!B17" not in inputs.values()
+    assert inputs["all_skill_bonus"] == "期望!B15"
+
+
+def test_workbook_inputs_still_rejects_labels_outside_the_alias_config() -> None:
+    """忽略无关武器行不等于放宽校验：真正不认识的简称仍要报错。"""
+    from lvjiang.apps.yysls.core.graduation import graduation_converter as converter
+
+    book = _expectation_workbook(("不存在的简称",))
+    with pytest.raises(RuntimeError, match="不在词组别名配置中"):
+        converter._workbook_inputs(book, "测试·双枪", _two_spear_config())
+
+
 @pytest.mark.slow
 def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> None:
     """破竹·风比通用表多一行老鼠定音，后续环境行也随之下移。"""
@@ -162,6 +215,15 @@ def test_runtime_uses_non_mingjin_element_inputs() -> None:
     high = CombatAttributes(min_outer=3000, max_outer=3000,
                             min_pozhu=1000, max_pozhu=1000)
     assert calculator.calculate(high).dps > calculator.calculate(low).dps
+
+
+def test_new_school_needs_only_a_model_not_a_code_list() -> None:
+    """新流派只要导入模型就能算毕业率，不需要同时改代码里的流派清单。"""
+    invalidate_graduation_cache()
+    assert get_graduation_calculator("鸣金·霆", "基础方案", 115) is not None
+    # 没有对应等级的模型属于正常情况：返回 None，不抛异常也不刷错误日志。
+    assert get_graduation_calculator("鸣金·霆", "基础方案", 110) is None
+    assert get_graduation_calculator("不存在的流派", "基础方案", 115) is None
 
 
 def test_runtime_reports_workbook_baseline() -> None:

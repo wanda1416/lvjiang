@@ -25,11 +25,6 @@ from .model_registry import (
     select_graduation_model,
 )
 
-_ALL_SCHOOLS = {
-    "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
-    "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",
-}
-
 
 @dataclass
 class GraduationResult:
@@ -190,11 +185,24 @@ def get_graduation_calculator(
     school_name: str, scheme_name: str = "基础方案",
     world_level: int | None = None,
 ) -> GraduationCalculator | None:
-    if school_name not in _ALL_SCHOOLS or not scheme_name:
+    """能否算毕业率由模型文件自身决定，不另维护一份流派白名单。
+
+    新增流派只要导入模型即可生效；该世界等级没有模型（例如新流派只有
+    115 表）属于正常情况，返回 ``None`` 让界面不显示毕业率，不当异常记录。
+    """
+    if not scheme_name:
         return None
     try:
-        return GenericCalculator(
-            _selected_model(school_name, scheme_name, world_level))
+        model = _selected_model(school_name, scheme_name, world_level)
+    except FileNotFoundError:
+        return None
+    except Exception as exc:
+        logger.error(
+            f"查找毕业率模型失败 ({school_name}/{scheme_name}/"
+            f"世界等级 {_effective_world_level(world_level)}): {exc}")
+        return None
+    try:
+        return GenericCalculator(model)
     except Exception as exc:
         logger.error(
             f"创建毕业率计算器失败 ({school_name}/{scheme_name}/"

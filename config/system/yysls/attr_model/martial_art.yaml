@@ -33,6 +33,14 @@ entries:
     group: 九曲惊神枪
     label: 已合并到鸣金·影武学天赋汇总
     no_effect: true
+  决狱悬锋枪·天赋:
+    group: 决狱悬锋枪
+    modeled: false
+    label: 鸣金·霆不在 DIY 计算器武学天赋表中
+  拨山取月枪·天赋:
+    group: 拨山取月枪
+    modeled: false
+    label: 鸣金·霆不在 DIY 计算器武学天赋表中
   嗟夫刀法·天赋:
     group: 嗟夫刀法
     label: 裂石·威武学天赋汇总

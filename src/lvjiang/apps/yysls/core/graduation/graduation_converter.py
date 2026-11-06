@@ -154,6 +154,15 @@ def _school_weapon_affixes(config: dict[str, Any], school: str) -> set[str]:
     return resolved
 
 
+def _all_weapon_affixes(config: dict[str, Any]) -> set[str]:
+    """全部武器登记的武学增伤词条（不区分流派）。"""
+    return {
+        str(entry.get("wuxue_affix"))
+        for entry in (config.get("weapon_types") or [])
+        if isinstance(entry, dict) and entry.get("wuxue_affix")
+    }
+
+
 def _affix_input_key(
     name: str, weapon_affixes: set[str], skill_names: set[str],
 ) -> str | None:
@@ -169,8 +178,14 @@ def _affix_input_key(
 def _input_key(
     label: str, row: int, alias_index: dict[str, list[str]],
     weapon_affixes: set[str], skill_names: set[str],
-) -> str:
-    """把一行 Excel 简称解析成输入类别。"""
+    unused_weapon_affixes: set[str],
+) -> str | None:
+    """把一行 Excel 简称解析成输入类别；``None`` 表示该行与本流派无关。
+
+    计算器的表格由同一套模板派生，双枪这类流派会保留一行本流派用不到的
+    武器增伤（如鸣金·霆的「剑增」）。这类行只映射到别的武器的武学增伤，
+    留着也不参与本流派计算，按无关行忽略；表格结构不能成为导入的硬依赖。
+    """
     candidates = alias_index.get(label) or []
     keys = {
         key for name in candidates
@@ -178,6 +193,8 @@ def _input_key(
     }
     if len(keys) == 1:
         return keys.pop()
+    if candidates and all(name in unused_weapon_affixes for name in candidates):
+        return None
     if not candidates:
         raise RuntimeError(
             f"Excel 期望页第 {row} 行的输入简称 {label!r} 不在词组别名配置中。"
@@ -209,19 +226,25 @@ def _workbook_inputs(
     词条，行数随表格版本变化——115 起单体/群体类奇术增伤合并成全奇术增伤，
     一部分流派因此少一行，定音从 B21 上移到 B20，而另一部分流派仍沿用两行
     奇术。这整段都必须按 A 列简称反查词条类别定位，不能按行号猜。
+
+    模板留下、本流派用不到的武器增伤行（双枪流派的「剑增」等）不计入输入。
     """
     sheet = workbook["期望"]
     fixed_row = _label_row(sheet, "固伤加成")
     alias_index = _alias_index(config)
     weapon_affixes = _school_weapon_affixes(config, school)
     skill_names = set(_school_skill_names(config, school))
+    unused_weapon_affixes = _all_weapon_affixes(config) - weapon_affixes
     inputs = dict(INPUTS)
     for row in range(INPUT_ZONE_START, fixed_row):
         label = str(sheet.cell(row, 1).value or "").strip()
         if not label:
             continue
         key = _input_key(
-            label, row, alias_index, weapon_affixes, skill_names)
+            label, row, alias_index, weapon_affixes, skill_names,
+            unused_weapon_affixes)
+        if key is None:
+            continue
         if key == "weapon_bonus":
             key = ("weapon_bonus_primary" if "weapon_bonus_primary" not in inputs
                    else "weapon_bonus_secondary")

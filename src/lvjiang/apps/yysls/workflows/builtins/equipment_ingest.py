@@ -1,5 +1,7 @@
 """The only workflow write surface for user equipment/loadout data."""
 
+from difflib import SequenceMatcher
+
 from loguru import logger
 
 from lvjiang.workflows.builtins._registry import builtin_func
@@ -65,6 +67,34 @@ def _match_playstyle(name: str, candidates: list[str],
     return candidates[0]
 
 
+def _canonical_art_name(scanned: str, names: dict[str, dict]) -> str | None:
+    """把 OCR 读到的武学名对到配置里的标准名；无法唯一确定时返回 ``None``。
+
+    扫描页的武学名是自由 OCR 文本，形近字（「拨」读成「拔」）会让逐字比较
+    失败、整条方案被跳过。这里只做**唯一**匹配：精确命中优先，其次包含关系，
+    最后按编辑相似度取最优且必须明显高于第二候选。宁可返回 ``None`` 让调用方
+    报错，也不猜一个错的武学写进用户数据。
+    """
+    text = str(scanned or "").strip()
+    if not text:
+        return None
+    if text in names:
+        return text
+    contained = [name for name in names if text in name or name in text]
+    if len(contained) == 1:
+        return contained[0]
+    scored = sorted(
+        ((SequenceMatcher(None, text, name).ratio(), name) for name in names),
+        reverse=True)
+    if not scored:
+        return None
+    best_score, best = scored[0]
+    runner_up = scored[1][0] if len(scored) > 1 else 0.0
+    if best_score >= 0.75 and best_score - runner_up >= 0.1:
+        return best
+    return None
+
+
 @builtin_func(
     "ensure_scanned_loadout",
     params={
@@ -86,6 +116,27 @@ def _ensure_scanned_loadout(
                                for value in (name, main_art, sub_art))
     if not name or not main_art or not sub_art or main_art == sub_art:
         raise ValueError("游戏方案名称或两门武学识别不完整，不能创建备战方案")
+    game_config = get_game_config()
+    # 扫描页是自由 OCR 文本：形近字不该让整条方案被跳过，但纠正只取唯一
+    # 匹配；认不出就把原始文本报出来，避免把错的武学写进用户数据。
+    raw_arts = (main_art, sub_art)
+    canonical = {
+        raw: _canonical_art_name(raw, game_config.get_martial_arts())
+        for raw in raw_arts
+    }
+    resolved_main = canonical[main_art]
+    resolved_sub = canonical[sub_art]
+    if resolved_main is None or resolved_sub is None:
+        return {"ok": False, "reason": (
+            f"游戏武学名未在武学配置中登记：{main_art}/{sub_art}"
+            "（请先在游戏配置→武学配置添加对应武学）")}
+    main_art, sub_art = resolved_main, resolved_sub
+    if main_art == sub_art:
+        return {"ok": False, "reason": f"游戏两门武学被识别成同一门：{main_art}"}
+    for raw, resolved in canonical.items():
+        if resolved != raw:
+            logger.info(f"武学名按配置纠正: {raw!r} → {resolved!r}")
+
     repo = _repository(_engine)
     matches = [plan for plan in repo.load().plans.values() if plan.name == name]
     if len(matches) > 1:
@@ -93,12 +144,13 @@ def _ensure_scanned_loadout(
     if matches:
         plan = matches[0]
         if {plan.main_martial_art, plan.sub_martial_art} != {main_art, sub_art}:
-            return {"ok": False, "reason": "本地同名方案的武学与游戏不一致"}
+            return {"ok": False, "reason": (
+                f"本地同名方案的武学（{plan.main_martial_art}/"
+                f"{plan.sub_martial_art}）与游戏（{main_art}/{sub_art}）不一致")}
         return {"ok": True, "name": name,
                 "main_art": main_art, "sub_art": sub_art,
                 "playstyle": plan.playstyle, "created": False}
 
-    game_config = get_game_config()
     school = resolve_school(main_art, sub_art, game_config.get_schools())
     arts = {main_art, sub_art}
     # get_playstyles() 保留配置声明顺序；UI 候选接口按名称排序，不能用于默认项。

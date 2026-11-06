@@ -196,8 +196,40 @@ def test_game_plan_same_name_with_other_arts_does_not_mutate_local_plan(tmp_path
     plan = repo.create_plan("方案甲", "无名剑法", "无名枪法",
                             playstyle="玩法甲", activate=False)
     result = _ensure_scanned_loadout(engine, "方案甲", "明川药典", "千香引魂蛊")
-    assert result == {"ok": False, "reason": "本地同名方案的武学与游戏不一致"}
+    assert result["ok"] is False
+    assert "无名剑法/无名枪法" in result["reason"]
+    assert "明川药典/千香引魂蛊" in result["reason"]
     assert repo.load().plans[plan.id].playstyle == "玩法甲"
+
+
+def test_ocr_variant_art_name_is_corrected_to_registered_name(tmp_path):
+    """形近字误识别（拨→拔）不该让整条方案被跳过。
+
+    扫描页是自由 OCR 文本，武学名差一个字就判「与游戏不一致」会让方案被
+    整条跳过且无从排查；这里按唯一近似匹配对回配置里的标准名。
+    """
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    repo.create_plan("双枪PVE", "决狱悬锋枪", "拨山取月枪", activate=False)
+
+    result = _ensure_scanned_loadout(
+        engine, "双枪PVE", "决狱悬锋枪", "拔山取月枪")
+
+    assert result["ok"] is True
+    assert result["created"] is False
+    assert result["main_art"] == "决狱悬锋枪"
+    assert result["sub_art"] == "拨山取月枪"
+
+
+def test_unregistered_scanned_art_reports_raw_text(tmp_path):
+    """纠正不出来时要说清是哪个名字没有登记，而不是笼统判不一致。"""
+    engine = _engine(tmp_path)
+    result = _ensure_scanned_loadout(
+        engine, "方案乙", "完全认不出的武学", "决狱悬锋枪")
+
+    assert result["ok"] is False
+    assert "完全认不出的武学" in result["reason"]
+    assert "武学配置" in result["reason"]
 
 
 def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(

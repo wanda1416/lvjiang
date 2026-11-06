@@ -3,6 +3,9 @@
 数据仍使用 ``equipment_sets.left/right`` 的稳定 key；界面分别称为
 “攻具套装”和“防具套装”。防具页的“关联套装”
 是 ``left.recommended_right`` 的反向编辑视图，不另存一份平行关系。
+
+新增套装由界面生成稳定 key（``custom_N``），用户只填名称：名称是展示
+label，key 才是配装方案、装备记录和跨语言协议引用的身份。
 """
 
 from __future__ import annotations
@@ -12,14 +15,23 @@ from collections.abc import Callable
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
+    QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
+    QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
 )
 
+from lvjiang.ui.button_styles import apply_button_style
+
 from .....i18n import tr
+
+#: 界面新增套装的稳定 key 前缀，后接第一个未被占用的序号。
+_NEW_SET_KEY_PREFIX = "custom_"
 
 
 class EquipmentSetEditor(QFrame):
@@ -40,9 +52,16 @@ class EquipmentSetEditor(QFrame):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
+        header = QHBoxLayout()
         self._title = QLabel()
         self._title.setStyleSheet("font-weight: 600;")
-        layout.addWidget(self._title)
+        header.addWidget(self._title)
+        header.addStretch()
+        self._btn_add = QPushButton(tr("添加套装"))
+        self._btn_add.clicked.connect(self._on_add)
+        apply_button_style(self._btn_add)
+        header.addWidget(self._btn_add)
+        layout.addLayout(header)
 
         self._table = QTableWidget()
         vertical_header = self._table.verticalHeader()
@@ -108,6 +127,58 @@ class EquipmentSetEditor(QFrame):
                 str(linked.get("recommended_school") or ""),
                 linked_name,
             ))
+
+    def _reload(self) -> None:
+        """按当前页重建行；期间阻断 itemChanged，避免刷新触发保存。"""
+        self._loading = True
+        try:
+            self._table.setRowCount(0)
+            self._reload_rows()
+        finally:
+            self._loading = False
+
+    def _on_add(self) -> None:
+        """新增一条套装定义：用户只填名称，稳定 key 由界面生成。"""
+        if self._series not in {"output", "armor"}:
+            return
+        side = "left" if self._series == "output" else "right"
+        side_label = tr("攻具") if side == "left" else tr("防具")
+        name, ok = QInputDialog.getText(
+            self, tr("添加{side}套装").format(side=side_label),
+            tr("套装名称："))
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        raw = self._data.setdefault("equipment_sets", {})
+        entries = raw.setdefault(side, {})
+        if any(str(entry.get("name") or "").strip() == name
+               for entry in entries.values() if isinstance(entry, dict)):
+            QMessageBox.warning(
+                self, tr("无法添加"),
+                tr("「{name}」套装已存在。").format(name=name))
+            return
+        entries[self._new_key(raw)] = {"name": name}
+        self._reload()
+        for row in range(self._table.rowCount()):
+            item = self._table.item(row, 0)
+            if item is not None and item.text() == name:
+                self._table.setCurrentCell(row, 0)
+                break
+        if self._on_changed is not None:
+            self._on_changed()
+
+    @staticmethod
+    def _new_key(raw: dict) -> str:
+        """取左右两侧都未占用的 ``custom_N`` key。"""
+        used = {
+            str(key)
+            for side in ("left", "right")
+            for key in (raw.get(side) or {})
+        }
+        index = 1
+        while f"{_NEW_SET_KEY_PREFIX}{index}" in used:
+            index += 1
+        return f"{_NEW_SET_KEY_PREFIX}{index}"
 
     def _set_row(self, row: int, key: str, values: tuple[str, str, str]) -> None:
         for column, value in enumerate(values):

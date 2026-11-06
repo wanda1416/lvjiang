@@ -1,4 +1,4 @@
-content_version: 7
+content_version: 8
 affix_caps:
   外功攻击:
     _aliases:
@@ -495,10 +495,12 @@ affix_aliases:
   - 小外
   斩雪刀法轻重击派生技增伤:
   - 派生定音
+  - 派生技定音
   悬身断水浓醺技能增伤:
   - 酩酊技定音
   悬锋取月轻重击派生增伤:
   - 派生定音
+  - 派生技定音
 affix_parts:
   最大无相攻击:
   - 武器

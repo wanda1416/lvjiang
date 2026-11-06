@@ -170,9 +170,13 @@ def test_the_shipped_model_matches_its_graduation_scheme() -> None:
         assert manager.mismatched(school) == "", school
 
 
-def test_every_school_with_a_graduation_scheme_has_a_damage_model() -> None:
-    """方案有而系数表没有的流派，伤害建模页会是空的却不报错——加流派时
-    容易漏，让测试盯着。"""
+def test_schools_without_a_damage_model_are_explicitly_unmodelled() -> None:
+    """有毕业方案却没有系数表的流派，必须在 attr_model 里登记为未建模。
+
+    伤害建模页对缺失系数只会空白，不会报错；「模型还没出」本身是合法状态，
+    但必须是登记过的状态（两门武学都 ``modeled: false``），不能静默漏掉一个
+    流派——那样加流派时既没人报错、页面也是空的。
+    """
     from lvjiang.apps.yysls.core.damage import get_damage_model_manager
 
     root = Path(__file__).resolve().parents[2]
@@ -181,8 +185,32 @@ def test_every_school_with_a_graduation_scheme_has_a_damage_model() -> None:
         # 方案按等级分子目录，所以要递归找
         for path in (root / "config/system/yysls/graduation").glob("*/*.json")
     }
+    assert schemes
 
-    assert schemes and schemes <= set(get_damage_model_manager().schools())
+    entries = yaml.safe_load(
+        (root / "config/system/yysls/attr_model/martial_art.yaml")
+        .read_text(encoding="utf-8"),
+    )["entries"]
+    unmodelled_arts = {
+        str(config.get("group") or key.split("·")[0])
+        for key, config in entries.items()
+        if config.get("modeled") is False
+    }
+    schools = yaml.safe_load(
+        (root / "config/system/yysls/game_config/schools.yaml")
+        .read_text(encoding="utf-8"),
+    )["schools"]
+
+    silent = {
+        school for school in schemes - set(get_damage_model_manager().schools())
+        if not {
+            schools[school]["main"]["martial_art"],
+            schools[school]["sub"]["martial_art"],
+        } <= unmodelled_arts
+    }
+    assert not silent, (
+        f"这些流派有毕业方案、没有伤害模型，也未在 martial_art.yaml 标记 "
+        f"modeled: false: {sorted(silent)}")
 
 
 def test_the_three_sword_qi_coefficients_come_straight_from_the_workbook() -> None:

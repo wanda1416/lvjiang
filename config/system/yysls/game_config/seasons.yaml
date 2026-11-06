@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 level_configs:
 - level: 91
   allow_reset: false
@@ -295,7 +295,7 @@ season_configs:
   name: 南吕相和
   start_date: '2026-09-24'
   end_date: '2026-12-25'
-  first_half_end_date: '2026-11-06'
+  first_half_end_date: '2026-11-05'
   equip_level: 115
   gongjue_level: 115
   min_chengyin_level: 105

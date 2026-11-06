@@ -7,8 +7,8 @@
 #% parameters:
 #%   - name: max_scroll
 #%     label: 最大滚动查找次数
-#%     type: int
-#%     default: 12
+#%     type: number
+#%     default: 4
 
 # 在「商店 - 精选 - 道具」网格中查找并购买「袅袅之音·绑」（周库存有限）。
 #

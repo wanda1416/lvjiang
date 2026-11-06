@@ -149,7 +149,14 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
     if not isinstance(param_type, str):
         raise _error(f"{path}.type", "必须是字符串")
     if param_type not in _PARAMETER_TYPES:
-        return None
+        # 过去这里静默 return None：参数被整个丢弃，UI 不显示、批量不注入，
+        # 而脚本里的 default 继续生效，用户完全看不到「参数消失了」。
+        raise _error(
+            f"{path}.type",
+            f"未知类型 {param_type!r}，必须是 "
+            + " / ".join(sorted(_PARAMETER_TYPES))
+            + " 之一",
+        )
 
     allowed = _COMMON_PARAMETER_FIELDS | _TYPE_PARAMETER_FIELDS[param_type]
     normalized = {key: value for key, value in parameter.items() if key in allowed}

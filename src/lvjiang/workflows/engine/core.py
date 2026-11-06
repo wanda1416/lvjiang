@@ -77,6 +77,11 @@ from ..grammar.ast_nodes import (
     WhileLoop,
 )
 from ..grammar.parser import parse_file
+from ..program_check import (
+    check_metadata_defaults,
+    check_proc_scope_reads,
+    collect_global_names,
+)
 from ..static_check import check_refs, format_problems
 from ..workflow_references import collect_refs
 from .actions import _ActionsMixin
@@ -471,11 +476,12 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         判据与 _execute_dsl 共用 _load_and_validate，不会出现「预检放过、
         上机仍炸」的偏差。
 
-        唯一的差别是**预检更严**：这里连没被调用的过程也一起校验
-        （``reachable_only=False``），执行时只查真正可达的。方向是安全的
-        ——预检更严只会「报了但其实不会炸」，反过来才是事故。这样库函数
-        （如 page_detection.wf 里那些 is_in_*_page）的 key 拼错、布局漏绑
-        仍能被 CI 门禁发现，而用户执行某个脚本时不会被无关页面挡住。
+        布局引用预检更严：这里连没被调用的过程也校验
+        （``reachable_only=False``），库函数里的 key 拼错、布局漏绑仍能被
+        CI 发现，而执行时不会被无关页面挡住。过程作用域不沿用这个开关，
+        只查从顶层 call 可达的过程。记录库允许调用方不声明 ``global`` 时
+        让辅助过程空操作；把没调用到的过程也算进去，会要求每个 import
+        都写上用不到的 global。
 
         ``#% env`` 在这里只校验声明本身，不与 ``run_env`` 比对：
         编辑器和 CI 并没有「本次真实执行环境」。真正执行时仍在
@@ -576,6 +582,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # 静态校验：press 的字面量按键必须存在于公共合法键名库。
         # 变量按键无法预知，仍由执行时 normalize_key 校验。
         self._validate_literal_press_keys(program)
+        # 静态校验：过程内读取未声明名字（过程作用域只有形参/本过程赋值/global，
+        # 其余名字运行时恒为 null，变量名写错不会报错）。
+        self._validate_proc_scope_reads(program)
+        # 静态校验：metadata 参数默认值与代码 default 语句不能各写一套。
+        self._validate_metadata_defaults(program, metadata)
         # 静态校验：脚本引用的场景 / 区域 / 方向 / 面板必须已在当前布局绑定坐标
         self._validate_refs_bound(program, reachable_only=reachable_only)
         # 高精度轨迹在执行任何动作前完成路径与内容校验（含 import 引入的过程）。
@@ -1071,6 +1082,48 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         if problems:
             raise WorkflowUserError(
                 "press 使用了非法按键：\n" + "\n".join(problems))
+
+    def _validate_proc_scope_reads(self, program) -> None:
+        """静态校验：可达过程不能读取本作用域不存在的名字。
+
+        过程启动时用的是「全局表副本 + 形参」（见 ``data_ops._run_proc``），
+        没声明过的名字一律读到 null。变量名拼错、漏写 ``global`` 都不会抛错，
+        只会让条件恒假、循环体一次都不进。只查从顶层 call 可达的过程：
+        没被调用的库过程，其可选 global 属于调用方，不在这次加载里判定。
+        """
+        if not program.body:
+            # 纯过程库没有顶层 call，可达集为空。作用域留到 import 它的脚本、
+            # 按实际调用到的过程再查。
+            return
+        problems = check_proc_scope_reads(
+            program,
+            self._procs,
+            proc_sources=self._proc_sources,
+            global_names=collect_global_names(
+                program.body, *(p.body for p in self._procs.values())),
+            reachable_only=True,
+            run_env=self.run_env,
+        )
+        if problems:
+            detail = "\n".join(
+                f"  {p.source}:{p.line_no} {p.describe()}" for p in problems)
+            raise WorkflowUserError(
+                f"过程作用域检查未通过，共 {len(problems)} 处：\n{detail}\n"
+                "过程内只能读取形参、本过程赋值过的变量，以及 global 声明过的变量")
+
+    def _validate_metadata_defaults(self, program, metadata: dict) -> None:
+        """静态校验：metadata 参数默认值不能与代码 ``default`` 语句漂移。
+
+        批量入口按 ``#% parameters[].default`` 注入，单跑与调试按 ``default $x =
+        ...`` 回落，两边各写一套。漂移后同一脚本在两种入口下行为不同。
+        """
+        problems = check_metadata_defaults(metadata, program)
+        if problems:
+            detail = "\n".join(f"  {p.describe()}" for p in problems)
+            raise WorkflowUserError(
+                f"参数默认值不一致，共 {len(problems)} 处：\n{detail}\n"
+                "批量入口按 #% parameters 的 default 注入，单跑按 default 语句，"
+                "两处必须一致")
 
     def _collect_invalid_press_keys(
         self, stmts: list, source: str, problems: list[str],

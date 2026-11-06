@@ -1033,7 +1033,9 @@ class AccountManagerDialog(QDialog):
             self._render_sync()
 
     def _confirm_initial(self, state: dict, action: str) -> bool:
-        snapshot = state.get("snapshot") if isinstance(state.get("snapshot"), dict) else {}
+        # 先取值再窄化：同一表达式调两次 .get() 时 mypy 无法收窄成 dict。
+        raw_snapshot = state.get("snapshot")
+        snapshot: dict = raw_snapshot if isinstance(raw_snapshot, dict) else {}
         origin = html.escape(str(snapshot.get("origin_name") or tr("未知设备")))
         created = html.escape(str(snapshot.get("created_at") or tr("未知")))
         entry_count = snapshot.get("entry_count")

@@ -22,7 +22,7 @@ class TestRegistry:
     def test_all_general_functions_registered(self):
         registered = set(list_functions())
         expected = {
-            "add", "sub", "mul", "div", "mod", "min", "max", "abs",
+            "mod", "min", "max", "abs",
             "concat", "range", "count_nonempty", "contains", "find_key", "append",
             "clock", "datetime",
         }
@@ -41,13 +41,8 @@ class TestRegistry:
 
 class TestArithmetic:
     @case_matrix("name,a,b,expected", [
-        ("add", 2, 3, 5),
-        ("add", 3, 0.5, 3.5),
-        ("sub", 10, 4, 6),
-        ("mul", 3, 4, 12),
-        ("mul", 3, 0.5, 1.5),
-        ("div", 7, 2, 3.5),   # 浮点除
         ("mod", 7, 3, 1),
+        ("mod", 7.5, 2, 1.5),
         ("min", 5, 9, 5),
         ("max", 5, 9, 9),
     ])
@@ -60,19 +55,15 @@ class TestArithmetic:
 
     def test_string_numbers_coerced(self):
         # DSL 变量常以字符串形态传入
-        assert _fn("add")("2", "3") == 5
-        assert _fn("add")("2.5", "0.5") == 3.0
+        assert _fn("mod")("7", "3") == 1
+        assert _fn("min")("2.5", "0.5") == 0.5
 
-    @case_matrix("name", ["div", "mod"])
-    def test_divide_by_zero_returns_zero(self, name):
-        assert _fn(name)(7, 0) == 0
+    def test_divide_by_zero_returns_zero(self):
+        assert _fn("mod")(7, 0) == 0
 
-    @case_matrix("name", [
-        "add", "sub", "mul", "div", "mod",
-    ])
-    def test_invalid_input_returns_zero(self, name):
-        assert _fn(name)("abc", 1) == 0
-        assert _fn(name)(None, 1) == 0
+    def test_invalid_input_returns_zero(self):
+        assert _fn("mod")("abc", 1) == 0
+        assert _fn("mod")(None, 1) == 0
 
     def test_min_max_skip_invalid(self):
         """min/max 跳过无效值，仅全无效时返回 0"""

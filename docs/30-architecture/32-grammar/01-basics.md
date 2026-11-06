@@ -287,7 +287,7 @@ end
 | 形式 | 示例 |
 |---|---|
 | 字符串常量 | `substr($text, 0, 4)` |
-| 数字常量 | `add($count, 1)` |
+| 数字常量 | `mod($count, 3)` |
 | 变量引用 | `has_key($data, $key)` |
 | 字段访问 | `concat($result.status, "!")` |
 

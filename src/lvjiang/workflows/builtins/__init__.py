@@ -2,7 +2,7 @@
 
 按功能分类组织（仅通用部分）：
 
-- ``arithmetic``: 基础运算 (add/sub/mul/div/mod/min/max/abs)
+- ``arithmetic``: 基础运算 (mod/min/max/abs)
 - ``general``:    通用工具 (concat/range/count_nonempty/contains/find_key/append)
 - ``profile``:    用户档案 (profile_get/profile_set/profile_inc/profile_all)
 - ``strings``:    字符串处理 (substr/split/replace/match/trim/upper/lower/to_num)

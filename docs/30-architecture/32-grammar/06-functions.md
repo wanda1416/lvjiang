@@ -19,7 +19,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **103 个**内置函数（core 76 个 + yysls 插件 27 个），按功能分为 15 类。
+共 **99 个**内置函数（core 72 个 + yysls 插件 27 个），按功能分为 15 类。
 
 > 分组、简介、参数含义与返回值声明在 `@builtin_func(...)` 装饰器里，运行期由
 > `describe_function()` / `signature_params()` 读取；应用内「脚本编辑 → 内置函数」
@@ -32,17 +32,13 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > from lvjiang.workflows import builtins as b
 > from lvjiang.apps import load_app, register_hooks
 > register_hooks(load_app("yysls"))    # 插件函数靠 hooks 注册，直接 import 空包不生效
-> print(sorted(b.list_functions()))    # → 103 个
+> print(sorted(b.list_functions()))    # → 99 个
 > ```
 
-### 基础运算（8）
+### 基础运算（4）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `add` | `(a, b) -> int \| float` | 两数相加，保持类型（int+int→int，int+float→float） |
-| `sub` | `(a, b) -> int \| float` | 两数相减，保持类型 |
-| `mul` | `(a, b) -> int \| float` | 两数相乘，保持类型 |
-| `div` | `(a, b) -> float` | 浮点除，除数为 0 返回 0.0 |
 | `mod` | `(a, b) -> int \| float` | 取模，除数为 0 返回 0 |
 | `min` | `(a, b, ...) -> int \| float` | 取最小值（支持两个以上参数），跳过无效值 |
 | `max` | `(a, b, ...) -> int \| float` | 取最大值（支持两个以上参数），跳过无效值 |

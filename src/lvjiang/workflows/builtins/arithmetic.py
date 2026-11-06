@@ -1,7 +1,11 @@
 """内置函数 - 基础运算
 
-int/float 双类型语义：参数保持原始类型，int+int→int，int+float→float。
-除法始终为浮点除，除 0 返回 0.0。
+只保留运算符无法表达的三类能力：取模、最值、绝对值。四则运算由文法里的
+``+ - * /`` 直接表达，这里不再提供 add/sub/mul/div——同名函数与运算符完全
+重复，且变参形式容易让调用点误以为能一次连加多值。
+
+int/float 双类型语义：参数保持原始类型，int+int→int，int+float→float；
+无法转成数字时返回 0。
 """
 
 from ._coerce import to_number
@@ -9,92 +13,6 @@ from ._registry import builtin_func
 
 #: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
 GROUP = "基础运算"
-
-
-@builtin_func(
-    "add",
-    params={
-        "a": "加数",
-        "b": "被加数",
-        "*args": "其余加数，依次累加",
-    },
-    returns="int | float",
-)
-def _add(a, b, *args):
-    """两数相加
-
-    .wf 用法:
-        eval $new_val = add($old_val, 1)
-    """
-    a_num, b_num = to_number(a), to_number(b)
-    if a_num is None or b_num is None:
-        return 0
-    return a_num + b_num
-
-
-@builtin_func(
-    "sub",
-    params={
-        "a": "被减数",
-        "b": "减数",
-        "*args": "其余减数，依次相减",
-    },
-    returns="int | float",
-)
-def _sub(a, b, *args):
-    """两数相减
-
-    .wf 用法:
-        eval $remain = sub($total, 1)
-    """
-    a_num, b_num = to_number(a), to_number(b)
-    if a_num is None or b_num is None:
-        return 0
-    return a_num - b_num
-
-
-@builtin_func(
-    "mul",
-    params={
-        "a": "乘数",
-        "b": "被乘数",
-        "*args": "其余乘数，依次相乘",
-    },
-    returns="int | float",
-)
-def _mul(a, b, *args):
-    """两数相乘
-
-    .wf 用法:
-        eval $double = mul($val, 2)
-    """
-    a_num, b_num = to_number(a), to_number(b)
-    if a_num is None or b_num is None:
-        return 0
-    return a_num * b_num
-
-
-@builtin_func(
-    "div",
-    params={
-        "a": "被除数",
-        "b": "除数，为 0 时返回 0.0",
-        "*args": "其余参数忽略",
-    },
-    returns="float",
-)
-def _div(a, b, *args) -> float:
-    """两数相除（浮点除），除数为 0 返回 0.0
-
-    .wf 用法:
-        eval $half = div($total, 2)
-    """
-    a_num, b_num = to_number(a), to_number(b)
-    if a_num is None or b_num is None:
-        return 0.0
-    if b_num == 0:
-        return 0.0
-    return a_num / b_num
 
 
 @builtin_func(

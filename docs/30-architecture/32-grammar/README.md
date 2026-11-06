@@ -482,14 +482,14 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（103 个）
+## 十、内置函数（99 个）
 
-> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 76 + yysls 插件 27，可
+> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 72 + yysls 插件 27，可
 > 用 `list_functions()` 复核。
 
 | 类别 | 函数 |
 |------|------|
-| **基础运算（8）** | `add` `sub` `mul` `div` `mod` `min` `max` `abs` |
+| **基础运算（4）** | `mod` `min` `max` `abs` |
 | **字典/列表（12）** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
 | **字符串（13）** | `concat` `substr` `split` `split_lines` `replace` `match` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
 | **装备（8）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` `equipment_lock_status` |

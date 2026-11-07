@@ -1091,6 +1091,17 @@ class OptimalComboPage(QWidget):
         gongjues = self._selected_gongjues() or [""]
         total *= len(gongjues)
 
+        # 该流派/等级还没有毕业率模型时停在空状态，不放用户进入搜索再抛异常。
+        from ...config import get_game_config
+        from ...core.graduation import get_graduation_calculator
+        gc = get_game_config()
+        season_level = self._world_level or gc.current_equip_level()
+        if get_graduation_calculator(self._school, self._scheme, season_level) is None:
+            QMessageBox.information(
+                self, tr("暂无毕业率方案"),
+                self._missing_model_hint(season_level))
+            return
+
         # UI state
         self._btn_clear_results.setVisible(False)
         self._btn_search.setVisible(False)
@@ -1117,9 +1128,6 @@ class OptimalComboPage(QWidget):
         self._clear_rendered_results()
 
         # Launch worker
-        from ...config import get_game_config
-        gc = get_game_config()
-        season_level = self._world_level or gc.current_equip_level()
         scenarios = [
             (name, self._base_attrs_raw + gongjue_attrs(
                 name, gc, world_level=season_level,
@@ -1143,6 +1151,21 @@ class OptimalComboPage(QWidget):
             season_chengyin,
             equipment_set,
         ))
+
+    def _missing_model_hint(self, season_level: int) -> str:
+        """没有可用模型时说明缺什么、现有哪几级，而不是抛异常。"""
+        from ...core.graduation.model_registry import available_models
+
+        refs = available_models(self._school, self._scheme) or available_models(self._school)
+        target = (f"{self._school}·{self._scheme}" if self._scheme else str(self._school))
+        if not refs:
+            return tr("「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。").format(
+                target=target)
+        levels = "、".join(sorted({tr("{level} 级").format(level=ref.level) for ref in refs}))
+        return tr(
+            "「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。\n\n"
+            "现有可用等级：{levels}。").format(
+            target=target, level=season_level, levels=levels)
 
     def _on_cancel(self) -> None:
         self._jobs.cancel()

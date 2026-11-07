@@ -15,6 +15,7 @@ from contextlib import contextmanager
 import numpy as np
 from loguru import logger
 
+from ..core.capture_base import capture_for_run
 from .errors import WorkflowUserError
 
 
@@ -58,7 +59,7 @@ class CaptureSnapshotMixin:
             return self._reused_capture_frame
 
         try:
-            frame = self._capture.capture()
+            frame = capture_for_run(self._capture)
         except Exception:
             self.clear_capture_snapshot()
             raise

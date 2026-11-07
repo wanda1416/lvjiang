@@ -10,6 +10,7 @@ import time
 
 from loguru import logger
 
+from ...core.capture_base import capture_for_run
 from ...core.key_names import normalize_pressable
 from ...core.timing import precise_wait
 from ..runtime_layout import require_enabled
@@ -409,7 +410,7 @@ class _ActionMixin:
                 return
 
             # 稳定检测是临时采样，不覆盖识别依据，也不分配诊断帧序号。
-            img = self._capture.capture()
+            img = capture_for_run(self._capture)
             if img is None:
                 _sleep(interval)
                 continue

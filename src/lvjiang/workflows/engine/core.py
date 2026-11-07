@@ -363,6 +363,20 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 raise _BreakSignal()
             self._pause_event.wait(timeout=1.0)
 
+    def _ensure_capture_channel(self) -> None:
+        """语句前确认画面通道可用。
+
+        纯输入脚本（只 click/drag、从不截图）不会经过取帧路径，光在 capture()
+        上设闸门拦不住它们；通道故障时这里会阻塞等待恢复，用户放弃则抛
+        ``ChannelFaultError``，由运行层按「通道故障」中止整批。健康时只是一次
+        布尔判断。
+        """
+        capture = getattr(self, "_capture", None)
+        if capture is None:
+            return
+        from ...core.capture_base import ensure_capture_channel
+        ensure_capture_channel(capture)
+
     # ─── 外置脚本函数入口 ──────────────────────────────────
 
     def should_stop(self) -> bool:
@@ -1342,6 +1356,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         if self._stop_check():
             raise _BreakSignal()
         self._wait_if_paused()  # 暂停检查
+        self._ensure_capture_channel()
         self._debug_before_stmt(node)
         match node:
             case AndroidAppAction():

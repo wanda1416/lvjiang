@@ -56,6 +56,23 @@ class TestLoadUserConfig:
         # 启动时固定的快照不随后续落盘变化
         assert running.agent_attempts == 4
 
+    def test_recovery_attempt_defaults_and_stream_attempts_roundtrip(self, session_env, monkeypatch):
+        """建立流式传输次数与代理/ADB 重连次数都默认 5 次，且可保存并钳制。
+
+        回归点：默认值被改小会让断连恢复窗口变短（自动恢复还没试完就进人工），
+        新字段漏进 clamp 则会让越界值变成"永不放弃"的重试预算。
+        """
+        monkeypatch.setattr("lvjiang.core.config.load_app_config", lambda: {})
+        policy = load_user_config().android_recovery
+        assert (policy.stream_attempts, policy.agent_attempts,
+                policy.adb_attempts) == (5, 5, 5)
+
+        save_settings({"android_recovery": {"stream_attempts": 9}})
+        assert load_user_config().android_recovery.stream_attempts == 9
+
+        save_settings({"android_recovery": {"stream_attempts": 99}})
+        assert load_user_config().android_recovery.stream_attempts == 10
+
     def test_defaults_without_files(self, session_env, monkeypatch):
         """无任何配置文件时使用代码默认值"""
         monkeypatch.setattr(

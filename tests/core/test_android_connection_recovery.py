@@ -18,7 +18,10 @@ from lvjiang.core.config.models import AndroidRecoveryConfig
 
 def setup_input(monkeypatch):
     device = AdbDevice(serial='test-device', adb_path='test-adb')
-    device.recovery = AndroidRecoveryConfig(retry_interval=0)
+    # 这些用例验证的是"次数耗尽后的升降级机制"，次数用显式值，不跟随默认值；
+    # 默认次数（5）由 test_user_config 保护，改默认不会把机制用例一起改坏。
+    device.recovery = AndroidRecoveryConfig(
+        retry_interval=0, agent_attempts=3, adb_attempts=3)
     client = AgentClient(device)
     client.recovery = device.recovery
     backend = AgentInput(client)

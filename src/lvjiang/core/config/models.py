@@ -282,8 +282,10 @@ class AndroidRecoveryConfig:
 
     allow_adb_fallback: bool = True
     auto_start_shizuku: bool = False
-    agent_attempts: int = 3
-    adb_attempts: int = 3
+    agent_attempts: int = 5
+    adb_attempts: int = 5
+    #: 建立流式传输的尝试次数；首次连接与断连后的自动恢复共用同一个数。
+    stream_attempts: int = 5
     retry_interval: float = 2.0
 
     def __post_init__(self):
@@ -291,6 +293,7 @@ class AndroidRecoveryConfig:
         self.auto_start_shizuku = bool(self.auto_start_shizuku)
         self.agent_attempts = max(1, min(10, int(self.agent_attempts)))
         self.adb_attempts = max(1, min(10, int(self.adb_attempts)))
+        self.stream_attempts = max(1, min(10, int(self.stream_attempts)))
         self.retry_interval = max(0.0, min(30.0, float(self.retry_interval)))
 
 

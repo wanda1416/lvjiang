@@ -171,7 +171,7 @@ class SettingsDialog(QDialog):
             (tr("热键设置"), self._build_hotkey_tab()),
         ]), tr("基础设置"))
         self._tabs.addTab(self._build_grouped_tab([
-            (tr("Android 连接恢复"), self._build_recovery_tab()),
+            (tr("Android 连接设置"), self._build_recovery_tab()),
         ]), tr("高级设置"))
         self._tabs.addTab(self._build_android_tab(), tr("应用注册"))
         self._tabs.addTab(self._build_grouped_tab([
@@ -294,12 +294,17 @@ class SettingsDialog(QDialog):
             "开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。"))
         form.addRow(self._auto_start_shizuku_cb)
         self._recovery_spins: dict[str, QSpinBox | QDoubleSpinBox] = {}
-        for name, label in (("agent_attempts", tr("代理重连次数")),
+        for name, label in (("stream_attempts", tr("建立流式传输尝试次数")),
+                            ("agent_attempts", tr("代理重连次数")),
                             ("adb_attempts", tr("ADB 重连次数"))):
             spin = QSpinBox()
             spin.setRange(1, 10)
             spin.setValue(getattr(policy, name))
             spin.setFixedWidth(_SPIN_WIDTH)
+            if name == "stream_attempts":
+                spin.setToolTip(tr(
+                    "首次建立视频流和断连后自动恢复视频流共用这个次数；"
+                    "耗尽后等待人工处理，不会自动放弃任务。"))
             self._recovery_spins[name] = spin
             form.addRow(label, spin)
         interval = QDoubleSpinBox()
@@ -310,8 +315,9 @@ class SettingsDialog(QDialog):
         self._recovery_spins["retry_interval"] = interval
         form.addRow(tr("重试间隔（秒）"), interval)
         note = QLabel(tr(
-            "默认代理重连 3 次，失败后尝试 ADB 重连 3 次。仍不可用时等待人工恢复，"
-            "选择是重新检查、选择否停止对应任务；无人值守也会等待确认。\n"
+            "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。"
+            "仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；"
+            "关掉提示不会停止任务，顶部横幅会一直保留。\n"
             "多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。"
             "设置对后续启动的任务生效。"))
         note.setWordWrap(True)

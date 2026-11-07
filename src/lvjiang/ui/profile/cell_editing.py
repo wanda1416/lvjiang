@@ -48,7 +48,7 @@ from .cell_formatting import (
     format_profile_cell,
     locked_sync_targets,
 )
-from .dialogs import HistoryDialog, ask_value_dialog, format_number_text
+from .dialogs import HistoryDialog, HistoryScope, ask_value_dialog, format_number_text
 
 if TYPE_CHECKING:
     from .tab import ProfileTab
@@ -775,8 +775,12 @@ class ProfileCellEditingMixin:
         self: ProfileTab,
         user_name: str | None, model_type: str, key: str, key_label: str,
     ) -> None:
-        """打开共用历史查看器；无用户名时展示该 key 的所有用户记录。"""
-        dialog = HistoryDialog(user_name, model_type, key, key_label, self)
+        """打开共用的变更记录对话框；入口只决定初始范围，条件可以再放宽。"""
+        scope = HistoryScope(
+            model_type=model_type, key=key, key_label=key_label,
+            username=user_name,
+        )
+        dialog = HistoryDialog(scope, self)
         dialog.exec()
         if dialog.values_changed:
             self.refresh()

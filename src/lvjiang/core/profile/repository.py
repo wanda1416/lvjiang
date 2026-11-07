@@ -23,6 +23,7 @@ from loguru import logger
 from lvjiang.constants import SESSION_CONFIG_DIR
 
 from .history_migration import migrate_structured_history
+from .history_query import HistoryQuery
 from .transactions import current_transaction
 
 # 数据库路径
@@ -192,6 +193,149 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
+
+
+# ─── 变更记录查询：条件构造与维度表达式 ─────────────────────────
+#
+# 历史对话框的筛选、聚合候选、跳页都走这三张表。SQL 只在这里拼一次，
+# 别处不得再写一套 WHERE，否则同一个界面会出现两种筛选语义。
+
+#: SELECT 的列顺序；``_history_row`` 与它一一对应，改这里要同时改那边。
+_HISTORY_COLUMNS = (
+    "id, ts, username, type, key, old_value, new_value, "
+    "old_value_text, new_value_text, change_type, delta_value, source, sync_from"
+)
+
+#: 聚合候选的维度表达式。``key`` 是「模型:key」，与 UI 的「键」列同一口径。
+_FACET_COLUMNS = {
+    "username": "username",
+    "key": "type || ':' || key",
+    "change_type": "change_type",
+    "source": "COALESCE(source, '')",
+    "sync_from": "COALESCE(sync_from, '')",
+}
+
+#: 变动量：优先用记账时写下的 ``delta_value``；没有就按新旧值补算；两者都
+#: 缺（旧值本身未知，例如某键的第一条记录）时为 NULL，表示"无法确认"。
+#: 不写成 ``COALESCE(delta_value, new - COALESCE(old, 0))``——那会把"不清楚
+#: 起点"伪造成"从 0 增加了这么多"，与「变动量」列显示的「—」自相矛盾。
+_DELTA_AMOUNT_SQL = (
+    "CASE WHEN delta_value IS NOT NULL THEN delta_value "
+    "WHEN old_value IS NOT NULL THEN new_value - old_value END"
+)
+
+_DELTA_COMPARATORS = {"pos": " > 0", "neg": " < 0", "zero": " = 0"}
+
+#: 允许的排序：白名单，绝不拼接调用方传入的字符串。
+_HISTORY_ORDERS = {
+    "id_desc": "id DESC",
+    "id_asc": "id ASC",
+    "ts_desc": "ts DESC, id DESC",
+    "ts_asc": "ts ASC, id ASC",
+}
+
+_ESCAPE = "ESCAPE '\\'"
+
+
+def _marks(count: int) -> str:
+    return ", ".join("?" for _ in range(count))
+
+
+def _like_pattern(text: str) -> str:
+    """把用户输入变成"包含"匹配的模式串。
+
+    ``%`` / ``_`` 在 LIKE 里是通配符，用户输入的字面量必须转义，否则
+    搜一个下划线会把整张表搜出来。
+    """
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _value_text_clause(column: str) -> str:
+    """文本值与数值都按"包含"匹配：数值列 CAST 成文本再比。"""
+    return (
+        f"(COALESCE({column}_value_text, '') LIKE ? {_ESCAPE} "
+        f"OR CAST({column}_value AS TEXT) LIKE ? {_ESCAPE})"
+    )
+
+
+def _history_where(query: HistoryQuery) -> tuple[str, list[object]]:
+    """把条件对象翻成 WHERE 子句与参数。"""
+    clauses: list[str] = []
+    params: list[object] = []
+
+    if query.usernames:
+        clauses.append(f"username IN ({_marks(len(query.usernames))})")
+        params.extend(query.usernames)
+    if query.keys:
+        clauses.append(
+            "(" + " OR ".join(["(type = ? AND key = ?)"] * len(query.keys)) + ")")
+        for model_type, key in query.keys:
+            params.extend((model_type, key))
+    if query.model_types:
+        clauses.append(f"type IN ({_marks(len(query.model_types))})")
+        params.extend(query.model_types)
+    if query.key_names:
+        clauses.append(f"key IN ({_marks(len(query.key_names))})")
+        params.extend(query.key_names)
+    if query.change_types:
+        clauses.append(f"change_type IN ({_marks(len(query.change_types))})")
+        params.extend(query.change_types)
+    if query.sources:
+        clauses.append(f"COALESCE(source, '') IN ({_marks(len(query.sources))})")
+        params.extend(query.sources)
+    if query.sync_froms:
+        clauses.append(
+            f"COALESCE(sync_from, '') IN ({_marks(len(query.sync_froms))})")
+        params.extend(query.sync_froms)
+    if query.ts_from:
+        clauses.append("ts >= ?")
+        params.append(query.ts_from)
+    if query.ts_until:
+        clauses.append("ts < ?")
+        params.append(query.ts_until)
+    if query.delta_scope != "all":
+        clauses.append(_DELTA_AMOUNT_SQL + _DELTA_COMPARATORS[query.delta_scope])
+    if query.old_text:
+        clauses.append(_value_text_clause("old"))
+        params.extend((_like_pattern(query.old_text),) * 2)
+    if query.new_text:
+        clauses.append(_value_text_clause("new"))
+        params.extend((_like_pattern(query.new_text),) * 2)
+    if query.keyword or query.key_matches:
+        parts: list[str] = []
+        if query.keyword:
+            pattern = _like_pattern(query.keyword)
+            parts.extend([
+                f"COALESCE(source, '') LIKE ? {_ESCAPE}",
+                f"username LIKE ? {_ESCAPE}",
+                f"type LIKE ? {_ESCAPE}",
+                f"key LIKE ? {_ESCAPE}",
+                f"COALESCE(old_value_text, '') LIKE ? {_ESCAPE}",
+                f"COALESCE(new_value_text, '') LIKE ? {_ESCAPE}",
+            ])
+            params.extend([pattern] * len(parts))
+        for model_type, key in query.key_matches:
+            parts.append("(type = ? AND key = ?)")
+            params.extend((model_type, key))
+        clauses.append("(" + " OR ".join(parts) + ")")
+
+    return (" AND ".join(clauses) if clauses else "1 = 1"), params
+
+
+def _single_history_query(
+    username: str | None, type_: str | None, key: str | None,
+) -> HistoryQuery:
+    """把旧的「单用户 / 单键」参数翻成条件对象（便捷入口专用）。
+
+    ``type_`` 与 ``key`` 可以只给一个，语义是"该模型下的全部键"或
+    "所有模型下的同名键"，与旧的等值筛选完全一致。
+    """
+    return HistoryQuery(
+        usernames=(username,) if username is not None else (),
+        model_types=(type_,) if type_ is not None else (),
+        key_names=(key,) if key is not None else (),
+    )
 
 
 # ─── ProfileDB 核心类 ────────────────────────────────────────
@@ -763,6 +907,18 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
+    @staticmethod
+    def _history_row(row: tuple) -> dict:
+        """历史行 → dict；列顺序由 ``_HISTORY_COLUMNS`` 决定。"""
+        return {
+            "id": row[0], "ts": row[1], "username": row[2],
+            "type": row[3], "key": row[4],
+            "old_value": row[5], "new_value": row[6],
+            "old_value_text": row[7] or "", "new_value_text": row[8] or "",
+            "change_type": row[9], "delta_value": row[10], "source": row[11],
+            "sync_from": row[12],
+        }
+
     def get_history(
         self,
         username: str | None,
@@ -771,31 +927,113 @@ class ProfileDB:
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict]:
-        """查询变更历史；username=None 时跨用户，按写入顺序倒序分页。"""
-        where, params = self._history_filter(username, type_, key)
+        """单用户 / 单键的便捷查询，内部走 ``history_page``；复杂条件用后者。"""
+        query = _single_history_query(username, type_, key)
+        return self.history_page(query, limit=limit, offset=offset)
+
+    def history_page(
+        self,
+        query: HistoryQuery,
+        limit: int = 100,
+        offset: int = 0,
+        order: str = "id_desc",
+    ) -> list[dict]:
+        """按条件分页取变更历史。"""
+        where, params = _history_where(query)
+        ordering = _HISTORY_ORDERS.get(order, _HISTORY_ORDERS["id_desc"])
 
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                f"SELECT id, ts, username, type, key, old_value, new_value, "
-                f"old_value_text, new_value_text, change_type, delta_value, source, sync_from "
-                f"FROM profile_history "
-                f"WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+                f"SELECT {_HISTORY_COLUMNS} FROM profile_history "
+                f"WHERE {where} ORDER BY {ordering} LIMIT ? OFFSET ?",
                 (*params, limit, offset),
             ).fetchall()
         finally:
             self._release_connection(conn)
 
-        return [
-            {
-                "id": r[0], "ts": r[1], "username": r[2],
-                "type": r[3], "key": r[4],
-                "old_value": r[5], "new_value": r[6],
-                "old_value_text": r[7] or "", "new_value_text": r[8] or "",
-                "change_type": r[9], "delta_value": r[10], "source": r[11], "sync_from": r[12],
-            }
-            for r in rows
-        ]
+        return [self._history_row(r) for r in rows]
+
+    def history_count(self, query: HistoryQuery) -> int:
+        """相同条件的历史记录总数（分页用）。"""
+        where, params = _history_where(query)
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                f"SELECT COUNT(*) FROM profile_history WHERE {where}", params,
+            ).fetchone()
+        finally:
+            self._release_connection(conn)
+        return int(row[0]) if row else 0
+
+    def history_facets(
+        self,
+        query: HistoryQuery,
+        dimension: str,
+        limit: int = 10,
+        search: str = "",
+    ) -> list[tuple[str, int]]:
+        """某个维度的聚合候选（按出现次数倒序，最多 ``limit`` 项）。
+
+        计数用的是"去掉本维度条件"的其它条件（见 ``HistoryQuery.relaxed``），
+        这样勾选一个值之后候选列表不会塌缩成只剩它自己。``search`` 是候选
+        列表内的模糊查找，不是查询条件。
+        """
+        expr = _FACET_COLUMNS[dimension]
+        where, params = _history_where(query.relaxed(dimension))
+        if search:
+            where = f"({where}) AND {expr} LIKE ? {_ESCAPE}"
+            params.append(_like_pattern(search))
+        params.append(int(limit))
+
+        conn = self._borrow_connection()
+        try:
+            rows = conn.execute(
+                f"SELECT {expr} AS facet_value, COUNT(*) AS total "
+                f"FROM profile_history WHERE {where} "
+                f"GROUP BY facet_value ORDER BY total DESC, facet_value ASC LIMIT ?",
+                params,
+            ).fetchall()
+        finally:
+            self._release_connection(conn)
+        return [(r[0] or "", int(r[1])) for r in rows]
+
+    def history_facet_total(
+        self, query: HistoryQuery, dimension: str, search: str = "",
+    ) -> int:
+        """该维度在相同条件下的取值个数，用于提示"另有 N 项需输入搜索"。"""
+        expr = _FACET_COLUMNS[dimension]
+        where, params = _history_where(query.relaxed(dimension))
+        if search:
+            where = f"({where}) AND {expr} LIKE ? {_ESCAPE}"
+            params.append(_like_pattern(search))
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                f"SELECT COUNT(DISTINCT {expr}) FROM profile_history WHERE {where}",
+                params,
+            ).fetchone()
+        finally:
+            self._release_connection(conn)
+        return int(row[0]) if row else 0
+
+    def history_delta_totals(self, query: HistoryQuery) -> tuple[float, float]:
+        """按当前条件统计的正向 / 负向变动量合计（对话框摘要行）。"""
+        where, params = _history_where(query)
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                "SELECT "
+                "COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0), "
+                "COALESCE(SUM(CASE WHEN amount < 0 THEN amount END), 0) "
+                f"FROM (SELECT {_DELTA_AMOUNT_SQL} AS amount "
+                f"FROM profile_history WHERE {where})",
+                params,
+            ).fetchone()
+        finally:
+            self._release_connection(conn)
+        return (float(row[0]) if row else 0.0, float(row[1]) if row else 0.0)
+
 
     def history_row_exists(self, history_id: int) -> bool:
         conn = self._borrow_connection()
@@ -851,23 +1089,12 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             row = conn.execute(
-                "SELECT id, ts, username, type, key, old_value, new_value, "
-                "old_value_text, new_value_text, change_type, delta_value, source, sync_from "
-                "FROM profile_history WHERE id=?",
+                f"SELECT {_HISTORY_COLUMNS} FROM profile_history WHERE id=?",
                 (history_id,),
             ).fetchone()
         finally:
             self._release_connection(conn)
-        if row is None:
-            return {}
-        return {
-            "id": row[0], "ts": row[1], "username": row[2],
-            "type": row[3], "key": row[4],
-            "old_value": row[5], "new_value": row[6],
-            "old_value_text": row[7] or "", "new_value_text": row[8] or "",
-            "change_type": row[9], "delta_value": row[10],
-            "source": row[11] or "", "sync_from": row[12],
-        }
+        return self._history_row(row) if row is not None else {}
 
     def update_history_source(
         self, history_id: int, *, expected_source: str, new_source: str,
@@ -891,16 +1118,8 @@ class ProfileDB:
         type_: str | None = None,
         key: str | None = None,
     ) -> int:
-        """返回相同筛选条件下的历史记录总数。"""
-        where, params = self._history_filter(username, type_, key)
-        conn = self._borrow_connection()
-        try:
-            row = conn.execute(
-                f"SELECT COUNT(*) FROM profile_history WHERE {where}", params,
-            ).fetchone()
-            return int(row[0]) if row else 0
-        finally:
-            self._release_connection(conn)
+        """单用户 / 单键的便捷计数，内部走 ``history_count``。"""
+        return self.history_count(_single_history_query(username, type_, key))
 
     def count_pending_push(self, since_id: int, author: str) -> int:
         """水位之上、本机产生的待上行 history 行数（切模式风险评估用）。"""
@@ -955,18 +1174,6 @@ class ProfileDB:
             return row is not None
         finally:
             self._release_connection(conn)
-
-    @staticmethod
-    def _history_filter(
-        username: str | None, type_: str | None, key: str | None,
-    ) -> tuple[str, list[str]]:
-        conditions: list[str] = []
-        params: list[str] = []
-        for column, value in (("username", username), ("type", type_), ("key", key)):
-            if value is not None:
-                conditions.append(f"{column} = ?")
-                params.append(value)
-        return " AND ".join(conditions) or "1 = 1", params
 
     def delete_history(self, history_id: int, username: str, type_: str, key: str) -> bool:
         """只删除明确归属的这一条历史；不回写余额，不追加删除审计。"""
@@ -1119,7 +1326,42 @@ def db_get_history(
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
+    """单用户 / 单键的便捷查询；多条件查询用 ``db_history_page``。"""
     return get_profile_db().get_history(username, type_, key, limit, offset)
+
+
+def db_history_page(
+    query: HistoryQuery,
+    limit: int = 100,
+    offset: int = 0,
+    order: str = "id_desc",
+) -> list[dict]:
+    return get_profile_db().history_page(query, limit, offset, order)
+
+
+def db_history_count(query: HistoryQuery) -> int:
+    return get_profile_db().history_count(query)
+
+
+def db_history_facets(
+    query: HistoryQuery,
+    dimension: str,
+    limit: int = 10,
+    search: str = "",
+) -> list[tuple[str, int]]:
+    """某维度的聚合候选 ``[(取值, 条数)]``，按条数倒序。"""
+    return get_profile_db().history_facets(query, dimension, limit, search)
+
+
+def db_history_facet_total(
+    query: HistoryQuery, dimension: str, search: str = "",
+) -> int:
+    return get_profile_db().history_facet_total(query, dimension, search)
+
+
+def db_history_delta_totals(query: HistoryQuery) -> tuple[float, float]:
+    """当前条件下的正向 / 负向变动量合计。"""
+    return get_profile_db().history_delta_totals(query)
 
 
 def db_get_history_record(history_id: int) -> dict:
@@ -1155,6 +1397,7 @@ def db_count_history(
     type_: str | None = None,
     key: str | None = None,
 ) -> int:
+    """单用户 / 单键的便捷计数；多条件计数用 ``db_history_count``。"""
     return get_profile_db().count_history(username, type_, key)
 
 

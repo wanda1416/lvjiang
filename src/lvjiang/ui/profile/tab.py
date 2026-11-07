@@ -578,9 +578,9 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             self._build_groups()
 
     def _open_history_dialog(self) -> None:
-        """全量变更记录：不限定用户/类型/key，整个账本翻页浏览。"""
-        from .dialogs import HistoryDialog
-        HistoryDialog(None, "", "", "", self).exec()
+        """全量变更记录：入口不带范围，用户/键/类型等条件都在对话框里筛。"""
+        from .dialogs import HistoryDialog, HistoryScope
+        HistoryDialog(HistoryScope(), self).exec()
 
     # ─── 分组管理 ──────────────────────────────────────────────
 

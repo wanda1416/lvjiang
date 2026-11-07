@@ -313,9 +313,10 @@ CREATE TABLE profile_history (
 **交互功能**：
 - 双击 cell 编辑（计算 delta，走 action 路径）
 - 单元格右键可覆写、查看该用户对当前 key 的历史；列头右键可查看所有用户对
-  当前 key 的历史。两种入口共用一个对话框，单用户模式隐藏用户名列
-- 历史按写入顺序倒序查询，默认每页 100 条；底部显示页码、总数和当前范围，
-  可调整每页条数并翻到首页、上一页、下一页或末页
+  当前 key 的历史；工具栏「历史记录」查看整个账本。三个入口共用同一个对话框，
+  入口只决定预先填好的筛选条件（见 [05-history-dialog.md](05-history-dialog.md)）
+- 历史对话框提供关键词与时间范围、每列一个聚合筛选行（默认前 10 项，其余输入
+  模糊查找）、任意页跳转；筛选不锁定，入口范围可一键恢复
 - 列头拖拽调整顺序和宽度
 - 分组切换
 
@@ -483,6 +484,7 @@ CREATE TABLE profile_history (
 | [01-graduation-rate.md](01-graduation-rate.md) | 毕业率分析子需求 |
 | [02-currency-tracking.md](02-currency-tracking.md) | 货币追踪子需求 |
 | [03-stamina-management.md](03-stamina-management.md) | 心力体力管理子需求 |
+| [05-history-dialog.md](05-history-dialog.md) | 变更记录对话框：三入口统一、筛选与聚合 |
 | [README.md](../README.md) | 律匠主需求文档 |
 
 - [04-overview-multi-columns.md](04-overview-multi-columns.md)：总览多列配置与状态边界。

@@ -174,6 +174,29 @@ local 的 `profile/chengyinshi_limit.wf` 校验承音石获取：天赋领奖 4�
 共用 `locked_sync_targets()` 判定，不得只在其中一处拦截，否则会出现「显示为 — 但仍能
 增减」的自相矛盾状态。
 
+### 历史查询与筛选
+
+变更记录对话框（`ui/profile/history_dialog.py` + `history_filters.py`）与三处入口
+之间只有一份契约：`core/profile/history_query.py` 的 `HistoryQuery`。条件分两类
+——精确集合（用户 / 键 / 变动类型 / 来源 / 同步来源）与模糊词（关键词、旧值、
+新值），另有时间区间和变动量方向；空集合表示"不限"，空字符串是真实取值
+（表达"未记录来源"），两者不可混用。
+
+仓储层的 `_history_where` 是唯一的 WHERE 构造点，`history_page` / `history_count` /
+`history_facets` / `history_facet_total` / `history_delta_totals` 全部从它生成 SQL，
+排序走白名单。`HistoryQuery.relaxed(dimension)` 返回"去掉该维度条件"的副本，
+聚合候选据此实现"按其余条件统计"，避免勾选后候选塌缩成只剩自己。旧的
+`get_history` / `count_history`（单用户 / 单键）是便捷包装，不再各自拼条件。
+
+变动量方向使用 `CASE WHEN delta_value IS NOT NULL ... WHEN old_value IS NOT NULL
+THEN new_value - old_value END`：起点未知时结果为 NULL，既不算增加也不算减少，
+与「变动量」列显示的「—」保持同一口径。历史累计额度另有一套
+`COALESCE(delta_value, new_value - COALESCE(old_value, 0))` 口径，两者不共用。
+
+界面层把"布局稳定"当契约：列集合与列宽固定（条件变化不隐藏列、不重排列宽），
+合计与页码使用 `history_filters.ElidedLabel`（`sizeHint` 按全文、`minimumSizeHint`
+为 0），条件标签单条限宽省略。否则随数据变长的文字会拖着对话框最小宽度上下跳。
+
 ### 历史删除
 
 历史对话框每行提供撤销和删除。删除需二次确认，仅按 id 和用户/模型/key

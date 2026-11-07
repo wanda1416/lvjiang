@@ -810,6 +810,10 @@ class _ModelTab(QWidget):
         self._group_context_menu = QMenu(self._table)
         self._change_group_action = self._group_context_menu.addAction(tr("更改分组"))
         self._change_group_action.triggered.connect(self._change_selected_groups)
+        # 复制定义排在更改分组之后；只对单行生效，多选时置灰
+        self._duplicate_action = self._group_context_menu.addAction(tr("复制定义"))
+        self._duplicate_action.triggered.connect(self._duplicate_selected_key)
+        self._duplicate_row = -1
 
         # 表头加粗
         header_font = self._table.horizontalHeader().font()
@@ -912,7 +916,19 @@ class _ModelTab(QWidget):
         if index.row() not in selected_rows:
             self._table.clearSelection()
             self._table.selectRow(index.row())
+        # 复制定义只对单行有意义：多选时逐个弹编辑器没有可用的交互
+        self._duplicate_row = index.row()
+        single = len(self._table.selectionModel().selectedRows()) == 1
+        self._duplicate_action.setEnabled(single)
+        self._duplicate_action.setToolTip(
+            "" if single else tr("一次只能复制一条定义"))
         self._group_context_menu.exec(self._table.viewport().mapToGlobal(position))
+
+    def _duplicate_selected_key(self) -> None:
+        dialog = self._get_parent()
+        row = getattr(self, "_duplicate_row", -1)
+        if dialog is not None and row >= 0:
+            dialog._duplicate_key(self._model_type, row)
 
     def _change_selected_groups(self) -> None:
         dialog = self._get_parent()
@@ -1175,6 +1191,31 @@ class ProfileDefinitionDialog(QDialog):
         self.has_saved_changes = True
         self._refresh_model_tab(model_type, kd.group, kd.key)
 
+    def _duplicate_key(self, model_type: str, row: int) -> None:
+        """复制定义：除 Key / 标签外全部字段照抄，落成同分组末尾的新 key。
+
+        复制的是**定义**，不是各用户的当前值——新 key 没有任何 entry，取值从
+        0 起步（quota 首次初始化、note 空文本），与手工新增一个 key 一致。
+        """
+        tab = self._tabs[model_type]
+        key_item = tab.table.item(row, 0)
+        if key_item is None:
+            return
+        old_kd = key_item.data(_ROLE_KEYDEF)
+        if old_kd is None:
+            raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法复制定义")
+
+        kd = self.open_key_editor(
+            self, model_type, None, self._defined_key_names(),
+            initial_group=old_kd.group, template=deepcopy(old_kd))
+        if kd is None:
+            return
+
+        self._drafts[model_type].append(kd)
+        self._baseline[model_type].append(deepcopy(kd))
+        self.has_saved_changes = True
+        self._refresh_model_tab(model_type, kd.group, kd.key)
+
     def _edit_key(self, model_type: str, row: int):
         """编辑 key"""
         tab = self._tabs[model_type]
@@ -1351,10 +1392,21 @@ class ProfileDefinitionDialog(QDialog):
         known_keys: set[str],
         *,
         initial_group: str = DEFAULT_KEY_GROUP,
+        template: KeyDef | None = None,
     ) -> KeyDef | None:
-        """打开 key 编辑对话框，返回新的 KeyDef 或 None"""
+        """打开 key 编辑对话框，返回新的 KeyDef 或 None
+
+        ``template`` 供「复制定义」用：按它预填**除 Key / 标签以外**的全部字段，
+        但对话框仍按新增处理——标题是「新增」、Key 可编辑且留空、标签留空，
+        重复校验也不把模板的 key 排除在外（它还在被占用）。
+
+        两个参数都只决定预填与标题：最终 KeyDef 由控件值重新构造，传入对象
+        不会被改写。
+        """
         dialog = QDialog(parent)
         title = tr("编辑") if existing else tr("新增")
+        # 预填来源：编辑取自身，复制取模板，全新时为空
+        source = template or existing
         dialog.setWindowTitle(tr("{title} Key ({model})").format(title=title, model=MODEL_LABELS[model_type]))
         dialog.setMinimumWidth(806)
 
@@ -1366,6 +1418,7 @@ class ProfileDefinitionDialog(QDialog):
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
         key_input.setReadOnly(existing is not None)
+        key_input.setObjectName("key_input")
         key_row = QHBoxLayout()
         key_row.addWidget(key_input)
         if existing is not None:
@@ -1382,11 +1435,12 @@ class ProfileDefinitionDialog(QDialog):
         layout.addRow("Key:", key_row)
 
         label_input = QLineEdit(existing.label if existing else "")
+        label_input.setObjectName("label_input")
         layout.addRow(tr("标签:"), label_input)
 
         change_script_input = _ChangeScriptFileField(
-            existing.change_script if existing else "",
-            synchronous=existing.change_script_sync if existing else False,
+            source.change_script if source else "",
+            synchronous=source.change_script_sync if source else False,
         )
         layout.addRow(tr("变更脚本:"), change_script_input)
 
@@ -1394,10 +1448,10 @@ class ProfileDefinitionDialog(QDialog):
         widgets: dict[str, QWidget] = {}
 
         # 上限/软上限/展示上限（四种模型通用）
-        existing_cap = existing.cap if existing else None
-        existing_soft = existing.soft if existing else False
-        existing_show_cap = existing.show_cap if existing else False
-        existing_decimal = existing.decimal if existing else False
+        existing_cap = source.cap if source else None
+        existing_soft = source.soft if source else False
+        existing_show_cap = source.show_cap if source else False
+        existing_decimal = source.decimal if source else False
 
         cap_spin = QSpinBox()
         cap_spin.setRange(0, 999999)
@@ -1428,18 +1482,18 @@ class ProfileDefinitionDialog(QDialog):
         widgets["decimal"] = decimal_check
 
         existing_steps = (
-            existing.steps
-            if isinstance(existing, (QuotaKeyDef, RegenKeyDef, StockKeyDef))
+            source.steps
+            if isinstance(source, (QuotaKeyDef, RegenKeyDef, StockKeyDef))
             else []
         )
         source_tags = TagInputWidget(
             _standalone_terms(
-                existing.sources if existing else [], existing_steps, positive=True
+                source.sources if source else [], existing_steps, positive=True
             )
         )
         use_tags = TagInputWidget(
             _standalone_terms(
-                existing.uses if existing else [], existing_steps, positive=False
+                source.uses if source else [], existing_steps, positive=False
             )
         )
         layout.addRow(tr("来源:"), source_tags)
@@ -1448,7 +1502,7 @@ class ProfileDefinitionDialog(QDialog):
         widgets["use_tags"] = use_tags
 
         if model_type == MODEL_QUOTA:
-            kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
+            kd = source if isinstance(source, QuotaKeyDef) else QuotaKeyDef()
             period_combo = AutoWidthComboBox()
             for period in list_profile_periods():
                 period_combo.addItem(tr(period.label), period.name)
@@ -1495,7 +1549,7 @@ class ProfileDefinitionDialog(QDialog):
             widgets["increment_only"] = increment_check
 
         elif model_type == MODEL_REGEN:
-            rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
+            rt_kd = source if isinstance(source, RegenKeyDef) else RegenKeyDef()
 
             regen_type_combo = AutoWidthComboBox()
             regen_type_combo.addItem(tr("实时恢复"), "realtime")
@@ -1601,8 +1655,8 @@ class ProfileDefinitionDialog(QDialog):
 
         # 同步目标动态列表（三种模型通用，下拉排除自身）
         sync_targets_widget = _SyncTargetsWidget(exclude_key_input=key_input)
-        if existing and existing.sync_targets:
-            for t in existing.sync_targets:
+        if source and source.sync_targets:
+            for t in source.sync_targets:
                 sync_targets_widget.add_row(t)
         widgets["sync_targets"] = sync_targets_widget
 

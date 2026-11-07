@@ -16,6 +16,14 @@ class AdbConnectionError(RuntimeError):
     """恢复被停止，或没有人工恢复入口。"""
 
 
+class ChannelFaultError(AdbConnectionError):
+    """执行通道故障（视频流/ADB/代理）且已放弃自动恢复。
+
+    与任务内业务异常必须分开：批量遇到它要中止整批，而不是记一条失败继续
+    下一项——通道坏了，后续每一项都只是拿旧帧空转。
+    """
+
+
 class RecoveryAction(Enum):
     RETRY = "retry"
     FALLBACK = "fallback"
@@ -59,9 +67,10 @@ class AndroidRecovery:
                 self.wait_interval()
         return False
 
-    def wait_for_user(self, error: Exception, description: str, *, uncertain: bool = False) -> None:
+    def wait_for_user(self, error: Exception, description: str, *, uncertain: bool = False,
+                      kind: str | None = None) -> None:
         self.recovering = True
-        self.waiting_kind = "uncertain_action" if uncertain else "connection"
+        self.waiting_kind = kind or ("uncertain_action" if uncertain else "connection")
         message = f"{description} 失败: {error}"
         logger.warning("执行通道等待人工确认：{}", message)
         if self.device.on_connection_lost is None:
@@ -112,6 +121,48 @@ class AndroidRecovery:
             self.wait_for_user(error, description + "；请恢复 ADB 连接")
             confirmed = True
             failed_attempts = 0
+
+    def recover_stream(self, stream: object) -> None:
+        """建立/恢复推送式视频流：自动重试耗尽后无限等待人工。
+
+        每轮 = ``stream_attempts`` 次重建会话；一轮失败就交给人工（点「重新检查」
+        开始新一轮，计数随之重置，不会因为"已经试过 N 次"拒绝再试）。用户选择
+        停止时抛 :class:`ChannelFaultError`，上层据此按「通道故障」中止整批，
+        而不是记一条业务失败继续下一项。
+
+        这里不做超时：通道停下后任务本身已经无法推进，自动放弃只会把一次可恢复
+        的故障变成一次失败。
+        """
+        attempts = max(1, int(getattr(self.device.recovery, "stream_attempts", 5)))
+        self.recovering = True
+        try:
+            while True:
+                for attempt in range(1, attempts + 1):
+                    self.check_stop()
+                    logger.info("[流式] 重建视频流 {}/{}", attempt, attempts)
+                    restart = getattr(stream, "restart", None)
+                    if callable(restart) and restart():
+                        clear = getattr(stream, "clear_fault", None)
+                        if callable(clear):
+                            clear()
+                        logger.info("[流式] 视频流已恢复")
+                        self.succeeded()
+                        return
+                    logger.warning(
+                        "[流式] 重建失败 {}/{}：{}", attempt, attempts,
+                        getattr(stream, "last_fault_detail", "") or "未知原因")
+                    if attempt < attempts:
+                        self.wait_interval()
+                error = ChannelFaultError(
+                    "视频流恢复失败："
+                    + (getattr(stream, "last_fault_detail", "") or "未知原因"))
+                try:
+                    self.wait_for_user(error, "视频流", kind="stream")
+                except AdbConnectionError as stopped:
+                    # 用户选择停止，或没有可用的恢复入口（CLI）：按通道故障上报
+                    raise ChannelFaultError(str(stopped)) from stopped
+        finally:
+            self.recovering = False
 
     def after_agent_failure(self, error: Exception, description: str, *,
                             uncertain: bool, fallback_supported: bool) -> RecoveryAction:

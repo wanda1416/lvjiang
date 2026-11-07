@@ -37,6 +37,7 @@ from ..capture_base import CaptureBackend
 from ..paths import data_directory
 from ..platforms import SUBPROCESS_NO_WINDOW, SUBPROCESS_TEXT
 from .device import AdbDevice
+from .recovery import ChannelFaultError
 
 if TYPE_CHECKING:
     import av
@@ -51,6 +52,21 @@ _DUMMY_BYTE_SIZE = 1
 _DEVICE_META_SIZE = 64
 # server 版本（必须与 jar 匹配）
 _SERVER_VERSION = "4.1"
+
+# ── 画面流故障归因 ──────────────────────────────────────
+# 日志与界面文案共用同一套固定取值，避免事后只有自由文本无法统计。
+FAULT_SOCKET_EOF = "socket_eof"    # 通道断开：socket EOF / 读异常
+FAULT_RX_IDLE = "rx_idle"          # 连接无响应：亮屏却长时间收不到任何字节
+FAULT_SERVER_GONE = "server_gone"  # 设备端采集进程已退出
+FAULT_STALL = "stall"              # 编码器停摆：字节在流、画面不再更新
+FAULT_DECODE = "decode"            # 收到的数据无法解码
+_FAULT_LABELS = {
+    FAULT_SOCKET_EOF: "连接断开",
+    FAULT_RX_IDLE: "连接无响应",
+    FAULT_SERVER_GONE: "采集进程退出",
+    FAULT_STALL: "画面采集停摆",
+    FAULT_DECODE: "画面无法解码",
+}
 
 
 class ScrcpyProtocolError(RuntimeError):
@@ -117,6 +133,36 @@ class AndroidStreamCapture(CaptureBackend):
         self._codec_config = b""
         self._last_error = ""
 
+        # ── 健康观测 ────────────────────────────────────────
+        # 判定规则（真机实测依据：亮屏静止仍有 ≥2 帧/秒、最长帧间隔 2.03s；
+        # 息屏与编码器停摆都是 0 帧 0 字节，只能靠设备显示状态区分）：
+        #   通道断开 = EOF / 读异常             → 立刻，0 误判
+        #   连接无响应 = 亮屏且 3s 内零字节      → 半开连接（EOF 不会来）
+        #   采集停摆 = 亮屏且 5s 内无新帧        → 编码器/虚拟显示卡死
+        # 息屏（mWakefulness=Asleep）期间不判故障，那是挂机常态。
+        self._rx_bytes = 0
+        self._last_rx_at = 0.0
+        self._last_frame_at = 0.0
+        self._decode_errors = 0
+        self._consecutive_decode_errors = 0
+        self._fault = ""
+        self._fault_detail = ""
+        self._fault_notified = False
+        self._user_stop = False
+        self._on_stream_lost = None
+        self._stream_recovery = None
+        self._recover_lock = threading.Lock()
+        self._lifecycle_lock = threading.RLock()
+        self._watchdog_stop = threading.Event()
+        self._watchdog_thread: threading.Thread | None = None
+        #: 按策略暂停（如空闲停流）期间不该有帧，看门狗必须豁免
+        self.paused_by_policy = threading.Event()
+        self._stall_seconds = 5.0
+        self._rx_idle_seconds = 3.0
+        self._transition_timeout_seconds = 10.0
+        self._awake_cache_ttl = 10.0
+        self._awake_cache: tuple[float, bool] = (0.0, True)
+
     @property
     def last_error(self) -> str:
         """最近一次 start() 失败的具体原因，供上层直接展示给用户。"""
@@ -142,6 +188,131 @@ class AndroidStreamCapture(CaptureBackend):
         """scrcpy 已通知尺寸变化、但新画面尚未成功解码。"""
         return self._transitioning
 
+    @property
+    def is_healthy(self) -> bool:
+        """画面通道当前是否可用（解码线程在跑且没有未处理的故障）。"""
+        if self._fault:
+            return False
+        thread = self._decode_thread
+        return thread is not None and thread.is_alive()
+
+    @property
+    def last_fault(self) -> str:
+        """故障归因 key（``FAULT_*``）；空串表示健康。"""
+        return self._fault
+
+    @property
+    def last_fault_detail(self) -> str:
+        """可直接展示的故障说明。"""
+        return self._fault_detail
+
+    @property
+    def fault_label(self) -> str:
+        return tr(_FAULT_LABELS.get(self._fault, "画面异常"))
+
+    def set_on_stream_lost(self, callback) -> None:
+        """订阅「画面流故障」回调：``callback(kind, detail)``。
+
+        在解码线程或看门狗线程里触发，宿主必须自己转到 UI 线程。
+        """
+        self._on_stream_lost = callback
+
+    def set_stream_recovery(self, hook) -> None:
+        """安装恢复钩子：``hook(stream)`` 阻塞到恢复成功，放弃时抛异常。
+
+        由宿主接到 ``AndroidRecovery.recover_stream``（重试阶梯 + 无限等待人工），
+        后端本身不关心重试次数和人工确认长什么样。
+        """
+        self._stream_recovery = hook
+
+    def clear_fault(self) -> None:
+        """恢复成功后清掉故障标记（由恢复钩子在 restart 成功时调用）。"""
+        self._fault = ""
+        self._fault_detail = ""
+        self._fault_notified = False
+        self._consecutive_decode_errors = 0
+        self._last_frame_at = time.monotonic()
+        self._last_rx_at = time.monotonic()
+
+    def _declare_fault(self, kind: str, detail: str) -> None:
+        """登记一次故障并通知宿主（只通知一次，避免重复弹窗）。"""
+        if self._fault or self._user_stop:
+            return
+        self._fault = kind
+        self._fault_detail = detail
+        logger.error(f"[AndroidStream] 画面流故障（{kind}）：{detail}")
+        if self._fault_notified:
+            return
+        self._fault_notified = True
+        callback = self._on_stream_lost
+        if callback is None:
+            return
+        try:
+            callback(kind, detail)
+        except Exception as exc:  # noqa: BLE001 - 通知失败不能影响解码线程
+            logger.debug(f"[AndroidStream] 故障通知异常: {exc}")
+
+    def ensure_channel_healthy(self) -> None:
+        """动作前的通道闸门：不健康就阻塞等待恢复；恢复无望时抛 ChannelFaultError。"""
+        if self.is_healthy:
+            return
+        self._recover_channel()
+        if not self.is_healthy:
+            raise ChannelFaultError(
+                self._fault_detail or tr("画面流不可用"))
+
+    def capture_blocking(self, timeout: float = 5.0) -> np.ndarray | None:
+        """运行期取帧：通道故障时先阻塞等待恢复，再返回最新帧。
+
+        与 :meth:`capture`（永远返回最后一帧，UI 预览/截屏用）不同，这条路径
+        在拿不到画面时宁可阻塞或抛错，也绝不把陈旧帧当成当前画面交给识别——
+        那正是「流断了却静默跑完」的成因。
+        """
+        self.ensure_channel_healthy()
+        frame = self.capture(timeout=timeout)
+        if frame is not None:
+            return frame
+        # 刚恢复时会话可能还没出首帧，按剩余预算短等一次
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        while time.monotonic() < deadline:
+            time.sleep(0.02)
+            frame = self.capture(timeout=timeout)
+            if frame is not None:
+                return frame
+        self._declare_fault(FAULT_STALL, tr("等待新画面超时"))
+        raise ChannelFaultError(self._fault_detail or tr("等待新画面超时"))
+
+    def _recover_channel(self) -> None:
+        """单飞调用恢复钩子：同目标多个线程同时等恢复时只跑一条恢复链。"""
+        with self._recover_lock:
+            if self.is_healthy:
+                return
+            hook = self._stream_recovery
+            if hook is None:
+                raise ChannelFaultError(self._fault_detail or tr("画面流不可用"))
+            hook(self)
+
+    def restart(self) -> bool:
+        """重建整个会话（停 → 起）。生命周期锁与手动断开/切换截图方式互斥。"""
+        with self._lifecycle_lock:
+            logger.info("[AndroidStream] 重建视频流会话")
+            self.stop()
+            self._user_stop = False
+            time.sleep(0.2)
+            if not self.start():
+                return False
+            self.clear_fault()
+            return True
+
+    def _fail(self, reason: str) -> None:
+        """记录可展示的具体失败原因。
+
+        上层只会说「截图后端不可用」；不提亮真实原因（协议不符、息屏无帧、
+        server 启动失败）时，用户只能自己去翻日志，而日志里往往也只有一行。
+        """
+        self._last_error = reason
+        logger.error(f"[AndroidStream] {reason}")
+
     # ─── 生命周期 ─────────────────────────────────────────
 
     def start(self) -> bool:
@@ -149,14 +320,17 @@ class AndroidStreamCapture(CaptureBackend):
         try:
             import av  # noqa: F401
         except ImportError:
-            logger.error(
-                "[AndroidStream] 未安装 PyAV，无法解码 H.264 流。请执行 `pip install av`"
-            )
+            self._fail(tr("未安装 PyAV，无法解码视频流（请安装 av 依赖）"))
             return False
 
         try:
             self._running = True
+            self._user_stop = False
             self._last_error = ""
+            self._fault = ""
+            self._fault_detail = ""
+            self._fault_notified = False
+            self._consecutive_decode_errors = 0
             self._ready_event.clear()
             self._transitioning = True
             self._pending_session = True
@@ -181,7 +355,7 @@ class AndroidStreamCapture(CaptureBackend):
             self._video_port = self._device.forward_dynamic(
                 f"localabstract:{self._socket_name}")
             if self._video_port is None:
-                logger.error("[AndroidStream] adb 动态 forward 失败")
+                self._fail(tr("无法建立 scrcpy 视频端口转发"))
                 self._running = False
                 return False
             logger.debug(
@@ -228,7 +402,7 @@ class AndroidStreamCapture(CaptureBackend):
                         self.stop()
                         return False
             else:
-                logger.error("[AndroidStream] 3 次尝试均无法读取协议头")
+                self._fail(tr("3 次尝试均无法读取视频流协议头（scrcpy server 未就绪或版本不符）"))
                 self.stop()
                 return False
 
@@ -239,6 +413,9 @@ class AndroidStreamCapture(CaptureBackend):
                 target=self._decode_loop, daemon=True, name="android-stream-decode"
             )
             self._decode_thread.start()
+            self._last_rx_at = time.monotonic()
+            self._last_frame_at = time.monotonic()
+            self._start_watchdog()
 
             # 7. 等待首帧
             deadline = time.monotonic() + 5.0
@@ -248,12 +425,15 @@ class AndroidStreamCapture(CaptureBackend):
                 time.sleep(0.05)
 
             if self._latest_frame is None:
-                logger.error("[AndroidStream] 5 秒内未收到首帧")
+                self._fail(tr(
+                    "5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；"
+                    "请点亮屏幕后重试"))
                 self.stop()
                 return False
 
             h, w = self._latest_frame.shape[:2]
             self._size = (w, h)
+            self._last_frame_at = time.monotonic()
             logger.info(
                 f"[AndroidStream] 启动成功 scrcpy={_SERVER_VERSION} "
                 f"分辨率={w}x{h} max_fps={self._max_fps} max_size={self._max_size}"
@@ -261,12 +441,15 @@ class AndroidStreamCapture(CaptureBackend):
             return True
 
         except Exception as e:  # noqa: BLE001
-            logger.error(f"[AndroidStream] 启动失败: {e}")
+            self._fail(tr("启动视频流失败：{error}").format(error=e))
             self.stop()
             return False
 
     def stop(self):
         """停止解码线程 → 关闭 socket → 终止 server → 清理 forward"""
+        # 主动停止不算故障：置位后解码线程与看门狗都不会再报错
+        self._user_stop = True
+        self._stop_watchdog()
         self._running = False
         self._ready_event.clear()
         self._transitioning = True
@@ -300,11 +483,16 @@ class AndroidStreamCapture(CaptureBackend):
         self._decode_thread = None
 
         self._cleanup_forward()
-        # 清理设备端 server 进程
-        subprocess.run(
-            [*self._device._base(), "shell", "pkill", "-f", "scrcpy-server"],
-            capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
-        )
+        # 只杀本会话的服务端。scid 是随机 31 位，按它精确匹配即可命中
+        # 本实例的 sh 包装进程与 app_process；绝不能用 pkill -f scrcpy-server，
+        # 那会连带杀掉同设备上其他目标、其他客户端（包括用户正在跑的批量任务）
+        # 的会话——它们的 socket 只会收到一次静默 EOF。
+        if self._scid:
+            subprocess.run(
+                [*self._device._base(), "shell",
+                 "pkill", "-f", f"scid={self._scid:08x}"],
+                capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
+            )
 
         if not decode_thread_stuck:
             with self._decoder_lock:
@@ -405,7 +593,7 @@ class AndroidStreamCapture(CaptureBackend):
     def _push_jar(self) -> bool:
         """推送 scrcpy-server.jar 到设备"""
         if not self._jar_local.exists():
-            logger.error(f"[AndroidStream] scrcpy-server.jar 不存在: {self._jar_local}")
+            self._fail(tr("找不到 scrcpy-server.jar：{path}").format(path=self._jar_local))
             return False
         r = subprocess.run(
             [*self._device._base(), "push", str(self._jar_local), _REMOTE_JAR_PATH],
@@ -413,7 +601,8 @@ class AndroidStreamCapture(CaptureBackend):
             **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
-            logger.error(f"[AndroidStream] 推送 jar 失败: {r.stderr.strip()}")
+            self._fail(tr("推送 scrcpy-server.jar 失败：{detail}").format(
+                detail=(r.stderr or "").strip()[:200]))
             return False
         logger.debug(f"[AndroidStream] jar 已推送到 {_REMOTE_JAR_PATH}")
         return True
@@ -438,7 +627,7 @@ class AndroidStreamCapture(CaptureBackend):
             )
             logger.debug(f"[AndroidStream] server 进程已启动 pid={self._server_proc.pid}")
         except Exception as e:
-            logger.error(f"[AndroidStream] 启动 server 失败: {e}")
+            self._fail(tr("启动 scrcpy server 失败：{error}").format(error=e))
             self._server_proc = None
             return False
 
@@ -446,8 +635,9 @@ class AndroidStreamCapture(CaptureBackend):
         time.sleep(1.5)
         if self._server_proc.poll() is not None:
             _, stderr = self._server_proc.communicate()
-            logger.error(f"[AndroidStream] server 启动失败 (rc={self._server_proc.returncode}): "
-                         f"{stderr.decode(errors='replace')[:300]}")
+            self._fail(tr("scrcpy server 启动失败（返回码 {rc}）：{detail}").format(
+                rc=self._server_proc.returncode,
+                detail=stderr.decode(errors="replace")[:300]))
             self._server_proc = None
             return False
 
@@ -471,7 +661,7 @@ class AndroidStreamCapture(CaptureBackend):
                 return True
             except (ConnectionRefusedError, OSError):
                 time.sleep(0.2)
-        logger.error(f"[AndroidStream] 连接 video socket 超时 (port {port})")
+        self._fail(tr("连接 scrcpy 视频端口超时（端口 {port}）").format(port=port))
         return False
 
     # ─── 内部：协议头解析 ─────────────────────────────────
@@ -605,18 +795,29 @@ class AndroidStreamCapture(CaptureBackend):
                 data = self._sock.recv(65536)
             except socket.timeout:
                 continue
-            except OSError:
-                # socket 已关闭（stop() 调用），正常退出
+            except OSError as exc:
+                # socket 被 stop() 关闭是正常退出；其余情况就是通道断了
+                if not self._user_stop:
+                    self._declare_fault(
+                        FAULT_SOCKET_EOF,
+                        tr("视频流连接被中断：{error}").format(error=exc))
                 break
-            except Exception as e:
-                if self._running:
-                    logger.debug(f"[AndroidStream] socket 读取异常: {e}")
+            except Exception as e:  # noqa: BLE001
+                if not self._user_stop:
+                    self._declare_fault(
+                        FAULT_SOCKET_EOF,
+                        tr("读取视频流异常：{error}").format(error=e))
                 break
 
             if not data:
-                logger.debug("[AndroidStream] socket EOF")
+                if not self._user_stop:
+                    self._declare_fault(
+                        FAULT_SOCKET_EOF,
+                        tr("视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）"))
                 break
 
+            self._rx_bytes += len(data)
+            self._last_rx_at = time.monotonic()
             buf += data
 
             # scrcpy 在方向/显示属性变化时会在同一流中再次插入无 payload
@@ -651,6 +852,7 @@ class AndroidStreamCapture(CaptureBackend):
                             break
                         packets = self._decoder.parse(h264_data)
                 except Exception:
+                    self._note_decode_error()
                     continue
 
                 for pkt in packets:
@@ -660,6 +862,7 @@ class AndroidStreamCapture(CaptureBackend):
                                 break
                             frames = self._decoder.decode(pkt)
                     except Exception:
+                        self._note_decode_error()
                         continue
                     for frame in frames:
                         now = time.monotonic()
@@ -678,6 +881,8 @@ class AndroidStreamCapture(CaptureBackend):
                         with self._frame_lock:
                             self._latest_frame = bgr
                             self._frame_sequence += 1
+                        self._last_frame_at = time.monotonic()
+                        self._consecutive_decode_errors = 0
                         self._size = (w, h)
                         if self._pending_session:
                             self._pending_session = False
@@ -710,6 +915,96 @@ class AndroidStreamCapture(CaptureBackend):
                             self._latest_frame = bgr
                 except Exception:
                     pass
+
+    # ─── 内部：健康看门狗 ─────────────────────────────────
+
+    def _note_decode_error(self) -> None:
+        """统计解码失败：数据在流、但画面出不来同样是故障。"""
+        self._decode_errors += 1
+        self._consecutive_decode_errors += 1
+        if self._consecutive_decode_errors >= 30:
+            self._declare_fault(
+                FAULT_DECODE,
+                tr("连续 {n} 个视频包无法解码").format(n=self._consecutive_decode_errors))
+
+    def _start_watchdog(self) -> None:
+        self._stop_watchdog()
+        self._watchdog_stop = threading.Event()
+        thread = threading.Thread(
+            target=self._watchdog_loop, daemon=True, name="android-stream-watchdog")
+        self._watchdog_thread = thread
+        thread.start()
+
+    def _stop_watchdog(self) -> None:
+        event = getattr(self, "_watchdog_stop", None)
+        if event is not None:
+            event.set()
+        self._watchdog_thread = None
+
+    def _watchdog_loop(self) -> None:
+        """每 0.5s 复核一次通道健康；规则见 __init__ 里的判定说明。"""
+        while not self._watchdog_stop.wait(0.5):
+            self._check_health_once()
+
+    def _check_health_once(self) -> None:
+        """单次健康复核（独立出来便于单测覆盖三条判定分支）。"""
+        if not self._running or self._user_stop or self.paused_by_policy.is_set():
+            return
+        if self._fault:
+            return
+        now = time.monotonic()
+        try:
+            if self._transitioning:
+                # 尺寸/方向切换期间本来就没有帧，只防它永远切不完
+                if now - self._last_rx_at > self._transition_timeout_seconds:
+                    self._declare_fault(
+                        FAULT_STALL,
+                        tr("画面尺寸切换后超过 {n:.0f} 秒仍未恢复").format(
+                            n=self._transition_timeout_seconds))
+                return
+            if now - self._last_rx_at > self._rx_idle_seconds:
+                if self._device_awake():
+                    # 半开连接与"编码器停摆"都表现为零字节（编码器不产出，
+                    # socket 上自然没有数据）；恢复动作相同，文案两者都提。
+                    self._declare_fault(
+                        FAULT_RX_IDLE,
+                        tr("亮屏但 {n:.0f} 秒没有收到任何画面数据"
+                           "（连接无响应或画面采集已停摆）").format(
+                            n=now - self._last_rx_at))
+                return
+            if (now - self._last_frame_at > self._stall_seconds
+                    and self._device_awake()):
+                self._declare_fault(
+                    FAULT_STALL,
+                    tr("亮屏但 {n:.0f} 秒没有新画面").format(
+                        n=now - self._last_frame_at))
+        except Exception as exc:  # noqa: BLE001 - 看门狗自身不能把主流程带崩
+            logger.debug(f"[AndroidStream] 看门狗检查异常: {exc}")
+
+    def _device_awake(self) -> bool:
+        """设备屏幕是否亮着（带 10s 缓存）。
+
+        实测（V2415A/MTK）：息屏时编码器 0 帧 0 字节，与"编码器停摆"在客户端
+        完全同构，只能靠设备显示状态区分；亮屏静止时仍有 2–4 帧/秒。查询失败
+        按"亮着"处理：宁可多重启一次会话，也不要把真故障咽下去。
+        """
+        now = time.monotonic()
+        cached_at, cached = self._awake_cache
+        if now - cached_at < self._awake_cache_ttl:
+            return cached
+        awake = True
+        try:
+            result = subprocess.run(
+                [*self._device._base(), "shell",
+                 "dumpsys power | grep -m1 mWakefulness="],
+                capture_output=True, timeout=5,
+                **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            )
+            awake = "Awake" in str(result.stdout or "")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"[AndroidStream] 读取屏幕状态失败: {exc}")
+        self._awake_cache = (now, awake)
+        return awake
 
     @staticmethod
     def _frame_to_bgr(frame) -> np.ndarray:

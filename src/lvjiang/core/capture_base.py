@@ -140,3 +140,31 @@ class CaptureBackend(ABC):
         退出程序时会统一调用此方法。
         """
         pass
+
+
+def capture_for_run(capture: object, *, timeout: float = 5.0) -> np.ndarray | None:
+    """工作流运行期取帧入口。
+
+    推送式视频流后端（Android scrcpy）在通道故障时会阻塞等待恢复，恢复无望或
+    用户放弃则抛 ``ChannelFaultError``，由运行层按「通道故障」处置；其余后端
+    （PC 窗口、screencap、设备端代理）没有常驻通道，语义保持原样——兜底分支
+    的调用形态与原代码完全一致，不向既有后端和测试替身追加参数。
+    能力探测而非改基类签名：避免要求每个后端与测试替身都接受新参数。
+    探测按**类型**查而不是实例 `getattr`——替身/桩对象常带 ``__getattr__``，
+    实例探测会凭空返回一个 Mock 并把整条取帧路径带偏。
+    """
+    blocking = getattr(type(capture), "capture_blocking", None)
+    if callable(blocking):
+        return capture.capture_blocking(timeout=timeout)  # type: ignore[attr-defined]
+    return capture.capture()  # type: ignore[attr-defined]
+
+
+def ensure_capture_channel(capture: object) -> None:
+    """动作前确认画面通道可用。
+
+    纯输入脚本（只 click/drag、从不截图）不会经过任何取帧路径，光在 capture()
+    上设闸门拦不住它们；这条闸门在每一条语句前执行，健康时只是一次布尔判断。
+    """
+    check = getattr(type(capture), "ensure_channel_healthy", None)
+    if callable(check):
+        capture.ensure_channel_healthy()  # type: ignore[attr-defined]

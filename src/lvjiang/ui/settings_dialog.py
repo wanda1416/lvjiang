@@ -45,7 +45,7 @@ from ..core.config import (
     save_app_config,
     save_settings,
 )
-from ..i18n import tr
+from ..i18n import tr, tr_label
 from .button_styles import apply_button_style, apply_compact_tool_button_style
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
@@ -359,7 +359,7 @@ class SettingsDialog(QDialog):
         self._input_bg_radio.setChecked(self._config.desktop_background_input)
         self._input_fg_radio.setChecked(
             not self._config.desktop_background_input)
-        form.addRow(tr("窗口输入:"), _radio_row(
+        form.addRow(tr_label('窗口输入'), _radio_row(
             self._input_fg_radio, self._input_bg_radio))
 
         self._desktop_capture_group = QButtonGroup(self)
@@ -382,11 +382,11 @@ class SettingsDialog(QDialog):
         desktop_capture_row = _radio_row(
             self._desktop_capture_fg_radio, self._desktop_capture_bg_radio)
         desktop_capture_row.setToolTip(self._desktop_capture_tip)
-        form.addRow(tr("窗口截图:"), desktop_capture_row)
+        form.addRow(tr_label('窗口截图'), desktop_capture_row)
 
         self._title_edit = QLineEdit(self._config.desktop_window_title)
         self._title_edit.setPlaceholderText(tr("空串不自动定位窗口"))
-        form.addRow(tr("窗口标题:"), self._title_edit)
+        form.addRow(tr_label('窗口标题'), self._title_edit)
 
         form.addRow(_form_divider())
 
@@ -408,7 +408,7 @@ class SettingsDialog(QDialog):
         android_input_row = _radio_row(
             self._android_input_adb_radio, self._android_input_agent_radio)
         android_input_row.setToolTip(agent_tip)
-        form.addRow(tr("安卓输入:"), android_input_row)
+        form.addRow(tr_label('安卓输入'), android_input_row)
 
         self._capture_group = QButtonGroup(self)
         self._capture_stream_radio = QRadioButton(tr("Scrcpy 流式截图"))
@@ -419,7 +419,7 @@ class SettingsDialog(QDialog):
             self._config.android_capture_method == "scrcpy")
         self._capture_static_radio.setChecked(
             self._config.android_capture_method == "screencap")
-        form.addRow(tr("安卓截图:"), _radio_row(
+        form.addRow(tr_label('安卓截图'), _radio_row(
             self._capture_stream_radio, self._capture_static_radio))
 
         # 四行的第二个单选纵向对齐（后台输入 / 后台截图 / 端侧执行 / 单帧截图）
@@ -489,7 +489,7 @@ class SettingsDialog(QDialog):
         card_layout = QVBoxLayout(card)
 
         header = QHBoxLayout()
-        header.addWidget(QLabel(tr("应用名：")))
+        header.addWidget(QLabel(tr_label('应用名')))
         name_edit = QLineEdit(name)
         name_edit.setPlaceholderText(tr("如 game"))
         header.addWidget(name_edit, 1)
@@ -503,27 +503,27 @@ class SettingsDialog(QDialog):
         android_form = QFormLayout(android_group)
         package_edit = QLineEdit(package)
         package_edit.setPlaceholderText(tr("如 com.example.game"))
-        android_form.addRow(tr("包名："), package_edit)
+        android_form.addRow(tr_label('包名'), package_edit)
         activity_edit = QLineEdit(activity)
         activity_edit.setPlaceholderText(tr("留空自动解析 Launcher"))
-        android_form.addRow(tr("Activity："), activity_edit)
+        android_form.addRow(tr_label('Activity'), activity_edit)
         orientation_combo = AutoWidthComboBox()
         orientation_combo.addItem(tr("不限"), "any")
         orientation_combo.addItem(tr("横屏"), "landscape")
         orientation_combo.addItem(tr("竖屏"), "portrait")
         index = orientation_combo.findData(orientation)
         orientation_combo.setCurrentIndex(index if index >= 0 else 0)
-        android_form.addRow(tr("期望方向："), orientation_combo)
+        android_form.addRow(tr_label('期望方向'), orientation_combo)
         card_layout.addWidget(android_group)
 
         windows_group = QGroupBox("Windows")
         windows_form = QFormLayout(windows_group)
         executable_edit = QLineEdit(executable)
         executable_edit.setPlaceholderText(tr("首次窗口定位后可自动获取"))
-        windows_form.addRow(tr("可执行文件："), executable_edit)
+        windows_form.addRow(tr_label('可执行文件'), executable_edit)
         window_title_edit = QLineEdit(window_title)
         window_title_edit.setPlaceholderText(tr("用于重启后重新发现窗口"))
-        windows_form.addRow(tr("窗口标题："), window_title_edit)
+        windows_form.addRow(tr_label('窗口标题'), window_title_edit)
         card_layout.addWidget(windows_group)
 
         entry = {
@@ -601,7 +601,7 @@ class SettingsDialog(QDialog):
         self._offset_spin.setRange(0, 50)
         self._offset_spin.setValue(sim.click_random_offset)
         self._offset_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow(tr("坐标随机偏移(px):"), self._spin_with_tip(
+        form.addRow(tr_label('坐标随机偏移(px)'), self._spin_with_tip(
             self._offset_spin, tr("点击坐标附加 ±N 像素的随机偏移")))
 
         self._jitter_spin = QDoubleSpinBox()
@@ -610,7 +610,7 @@ class SettingsDialog(QDialog):
         self._jitter_spin.setDecimals(2)
         self._jitter_spin.setValue(sim.region_jitter_ratio)
         self._jitter_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow(tr("默认点击范围半径:"), self._spin_with_tip(
+        form.addRow(tr_label('默认点击范围半径'), self._spin_with_tip(
             self._jitter_spin,
             tr("未单独标定点击区域时，落点框从区域中心向四边延伸的比例。"
                "0.25 = 落点覆盖区域中间的一半；必须小于 0.5")))
@@ -636,7 +636,7 @@ class SettingsDialog(QDialog):
         clamp_layout.addWidget(self._clamp_oob_cb)
         clamp_layout.addStretch()
         clamp_row.setToolTip(clamp_tip)
-        form.addRow(tr("坐标越界处理:"), clamp_row)
+        form.addRow(tr_label('坐标越界处理'), clamp_row)
 
         return tab
 
@@ -1670,7 +1670,7 @@ class SettingsDialog(QDialog):
 
     def _show_telemetry_identity(self, install_id: str) -> None:
         """完整展示匿名标识，便于用户核对和复制。"""
-        self._telemetry_id_label.setText(tr("当前标识：") + install_id)
+        self._telemetry_id_label.setText(tr_label('当前标识') + install_id)
 
     # ─── 保存 ──────────────────────────────────────────────
 

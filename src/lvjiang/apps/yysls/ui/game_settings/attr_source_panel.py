@@ -56,7 +56,7 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.theme import get_theme_manager
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config import get_game_config
 from ...core.attr_model import (
     DIMENSION_LABELS,
@@ -237,9 +237,9 @@ class AttrSourcePanel(QWidget):
         left_layout.addWidget(self._list)
 
         btns = QHBoxLayout()
-        self._btn_add = QPushButton(tr("+ 条目"))
+        self._btn_add = QPushButton("+" + tr('条目'))
         self._btn_add.clicked.connect(self._on_add)
-        self._btn_del = QPushButton(tr("- 条目"))
+        self._btn_del = QPushButton("-" + tr('条目'))
         self._btn_del.clicked.connect(self._on_delete)
         apply_button_style(self._btn_add)
         apply_button_style(self._btn_del, variant="danger")
@@ -248,8 +248,8 @@ class AttrSourcePanel(QWidget):
         left_layout.addLayout(btns)
         if self._kinds == ("inner_way",):
             # 心法按「门」增删，六重一起走，按钮上就说清楚
-            self._btn_add.setText(tr("+ 心法"))
-            self._btn_del.setText(tr("- 心法"))
+            self._btn_add.setText("+" + tr('心法'))
+            self._btn_del.setText("-" + tr('心法'))
         if self._kinds == ("martial_art",):
             # 武学名册以武学配置为准，这里只填数值。开了增删就会有两份
             # 名册，改一处漏一处。
@@ -612,7 +612,7 @@ class AttrSourcePanel(QWidget):
         会显示这门已经填完，缺口只能等反解那头露出来。
         """
         name, ok = QInputDialog.getText(
-            self, tr("新增心法"), tr("心法名（六重自动建好）："))
+            self, tr("新增心法"), tr_label('心法名（六重自动建好）'))
         name = name.strip() if ok else ""
         if not name:
             return

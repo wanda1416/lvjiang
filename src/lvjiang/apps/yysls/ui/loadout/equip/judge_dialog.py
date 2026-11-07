@@ -45,7 +45,7 @@ from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
 from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ......i18n import tr
+from ......i18n import tr, tr_label
 from ...domain_labels import domain_label
 from ...game_settings.level_combo import LevelCombo
 from ...tuning.config_widget import TuningConfigWidget
@@ -99,10 +99,10 @@ class EquipAffixEditor(QWidget):
         for part in PART_ITEMS:
             self.part_combo.addItem(domain_label(part), part)
         self.part_combo.currentIndexChanged.connect(self._on_part_changed)
-        form.addRow(tr("部位："), self.part_combo)
+        form.addRow(tr_label('部位'), self.part_combo)
 
         # 二级选择：部位为「武器」时显示，选具体武器
-        self._weapon_label = QLabel(tr("武器："))
+        self._weapon_label = QLabel(tr_label('武器'))
         self.weapon_combo = AutoWidthComboBox()
         for weapon in WEAPON_TYPES:
             self.weapon_combo.addItem(domain_label(weapon), weapon)
@@ -113,11 +113,11 @@ class EquipAffixEditor(QWidget):
         self.quality_combo = AutoWidthComboBox()
         self.quality_combo.addItem(tr("金色"), "gold")
         self.quality_combo.addItem(tr("紫色"), "purple")
-        form.addRow(tr("品阶："), self.quality_combo)
+        form.addRow(tr_label('品阶'), self.quality_combo)
 
         # 等级选择（从等级配置中选择）
         self._level_combo = LevelCombo(allow_empty=False)
-        form.addRow(tr("等级："), self._level_combo)
+        form.addRow(tr_label('等级'), self._level_combo)
 
         # 词条 1-5 行：下拉 + 数值 + 待调出复选框（仅词条 2-5）
         self._affix_combos: list[QComboBox] = []
@@ -333,7 +333,7 @@ class EquipJudgeTestDialog(QDialog):
 
         # ── 右：装备编辑 + 判定 ──
         right = QVBoxLayout()
-        right.addWidget(QLabel("<b>" + tr("构造装备：") + "</b>"))
+        right.addWidget(QLabel("<b>" + tr_label('构造装备') + "</b>"))
         self.editor = EquipAffixEditor()
         right.addWidget(self.editor)
         btn_row = QHBoxLayout()

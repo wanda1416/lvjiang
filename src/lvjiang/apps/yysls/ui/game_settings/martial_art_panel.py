@@ -24,7 +24,7 @@ from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import config_field_card, configure_navigation_list
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config import get_game_config
 
 _ATTRS_REL = "yysls/game_config"
@@ -60,10 +60,10 @@ class MartialArtPanel(QWidget):
         left_layout.addWidget(self._list)
 
         btns = QHBoxLayout()
-        self._btn_add = QPushButton(tr("+ 武学"))
+        self._btn_add = QPushButton("+" + tr('武学'))
         self._btn_add.clicked.connect(self._on_add)
         btns.addWidget(self._btn_add)
-        self._btn_del = QPushButton(tr("- 武学"))
+        self._btn_del = QPushButton("-" + tr('武学'))
         self._btn_del.clicked.connect(self._on_delete)
         btns.addWidget(self._btn_del)
         apply_button_style(self._btn_add)
@@ -171,7 +171,7 @@ class MartialArtPanel(QWidget):
         self._save_data()
 
     def _on_add(self) -> None:
-        name, ok = QInputDialog.getText(self, tr("新增武学"), tr("武学名称:"))
+        name, ok = QInputDialog.getText(self, tr("新增武学"), tr_label('武学名称'))
         name = (name or "").strip()
         if not ok or not name:
             return

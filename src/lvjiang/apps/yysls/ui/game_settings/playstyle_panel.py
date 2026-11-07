@@ -35,7 +35,7 @@ from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config import get_game_config
 
 _ATTRS_REL = "yysls/game_config"
@@ -152,10 +152,10 @@ class PlaystylePanel(QWidget):
         left_layout.addWidget(self._list)
 
         row = QHBoxLayout()
-        self._btn_add = QPushButton(tr("+ 玩法"))
+        self._btn_add = QPushButton("+" + tr('玩法'))
         self._btn_add.clicked.connect(self._on_add)
         row.addWidget(self._btn_add)
-        self._btn_del = QPushButton(tr("- 玩法"))
+        self._btn_del = QPushButton("-" + tr('玩法'))
         self._btn_del.clicked.connect(self._on_delete)
         row.addWidget(self._btn_del)
         apply_button_style(self._btn_add)
@@ -533,7 +533,7 @@ class PlaystylePanel(QWidget):
         self._save_data()
 
     def _on_add(self) -> None:
-        name, ok = QInputDialog.getText(self, tr("新增玩法"), tr("玩法名称:"))
+        name, ok = QInputDialog.getText(self, tr("新增玩法"), tr_label('玩法名称'))
         name = (name or "").strip()
         if not ok or not name:
             return

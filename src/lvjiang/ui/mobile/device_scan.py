@@ -23,7 +23,7 @@ from ...core.android import (
     scan_and_connect_local,
     scan_and_connect_wireless,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, fit_button_width
 
 
@@ -89,7 +89,7 @@ class DeviceScanPanel(QWidget):
         layout.addWidget(hint)
 
         controls = QHBoxLayout()
-        controls.addWidget(QLabel(tr("扫描网段：")))
+        controls.addWidget(QLabel(tr_label('扫描网段')))
         self.subnet_combo = AutoWidthComboBox()
         self.subnet_combo.addItem(tr("全部网卡（默认）"), None)
         try:

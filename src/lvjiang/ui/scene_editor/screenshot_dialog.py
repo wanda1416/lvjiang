@@ -26,7 +26,7 @@ from ...core.layout_manager import (
     set_scene_screenshot_format,
 )
 from ...core.scene_registry import get_scene_name
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, fit_button_width
 
 _PREVIEW_HEIGHT = 200
@@ -116,7 +116,7 @@ class ScreenshotManagerDialog(QDialog):
         layout.addLayout(btn_row)
 
         format_row = QHBoxLayout()
-        format_row.addWidget(QLabel(tr("当前视图新截图格式：")))
+        format_row.addWidget(QLabel(tr_label('当前视图新截图格式')))
         self._format_combo = AutoWidthComboBox()
         self._format_combo.addItem(tr("WebP（质量 90，默认）"), "webp")
         self._format_combo.addItem(tr("PNG（无损，适合识别困难时）"), "png")

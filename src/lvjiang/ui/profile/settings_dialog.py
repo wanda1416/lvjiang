@@ -64,7 +64,7 @@ from ...core.profile.models import (
     parse_sync_key,
 )
 from ...core.profile.periods import get_profile_period, list_profile_periods
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, fit_button_width
 from ..tag_input import TagInputWidget
 
@@ -1278,7 +1278,7 @@ class ProfileDefinitionDialog(QDialog):
         value, accepted = QInputDialog.getItem(
             self,
             tr("更改分组"),
-            tr("分组名称:"),
+            tr_label('分组名称'),
             group_labels,
             current_index,
             True,
@@ -1436,13 +1436,13 @@ class ProfileDefinitionDialog(QDialog):
 
         label_input = QLineEdit(existing.label if existing else "")
         label_input.setObjectName("label_input")
-        layout.addRow(tr("标签:"), label_input)
+        layout.addRow(tr_label('标签'), label_input)
 
         change_script_input = _ChangeScriptFileField(
             source.change_script if source else "",
             synchronous=source.change_script_sync if source else False,
         )
-        layout.addRow(tr("变更脚本:"), change_script_input)
+        layout.addRow(tr_label('变更脚本'), change_script_input)
 
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
@@ -1475,7 +1475,7 @@ class ProfileDefinitionDialog(QDialog):
         cap_row.addWidget(show_cap_check)
         cap_row.addWidget(decimal_check)
         cap_row.addStretch()
-        layout.addRow(tr("上限:"), cap_row)
+        layout.addRow(tr_label('上限'), cap_row)
         widgets["cap"] = cap_spin
         widgets["soft"] = soft_check
         widgets["show_cap"] = show_cap_check
@@ -1496,8 +1496,8 @@ class ProfileDefinitionDialog(QDialog):
                 source.uses if source else [], existing_steps, positive=False
             )
         )
-        layout.addRow(tr("来源:"), source_tags)
-        layout.addRow(tr("用途:"), use_tags)
+        layout.addRow(tr_label('来源'), source_tags)
+        layout.addRow(tr_label('用途'), use_tags)
         widgets["source_tags"] = source_tags
         widgets["use_tags"] = use_tags
 
@@ -1509,12 +1509,12 @@ class ProfileDefinitionDialog(QDialog):
             idx = period_combo.findData(kd.period)
             if idx >= 0:
                 period_combo.setCurrentIndex(idx)
-            layout.addRow(tr("周期:"), period_combo)
+            layout.addRow(tr_label('周期'), period_combo)
             widgets["period"] = period_combo
 
             reset_input = QLineEdit(kd.reset_time)
             reset_input.setFixedWidth(80)
-            layout.addRow(tr("重置时刻:"), reset_input)
+            layout.addRow(tr_label('重置时刻'), reset_input)
             widgets["reset_time"] = reset_input
 
             reset_day_spin = QSpinBox()
@@ -1535,10 +1535,10 @@ class ProfileDefinitionDialog(QDialog):
                 reset_day_label.setVisible(visible)
                 if is_week:
                     reset_day_spin.setRange(0, 7)
-                    reset_day_label.setText(tr("重置日(周几):"))
+                    reset_day_label.setText(tr_label('重置日(周几)'))
                 elif is_month:
                     reset_day_spin.setRange(0, 31)
-                    reset_day_label.setText(tr("重置日(几号):"))
+                    reset_day_label.setText(tr_label('重置日(几号)'))
             period_combo.currentIndexChanged.connect(_update_reset_day_visibility)
             _update_reset_day_visibility()
 
@@ -1557,7 +1557,7 @@ class ProfileDefinitionDialog(QDialog):
             idx = regen_type_combo.findData(rt_kd.regen_type)
             if idx >= 0:
                 regen_type_combo.setCurrentIndex(idx)
-            layout.addRow(tr("恢复类型:"), regen_type_combo)
+            layout.addRow(tr_label('恢复类型'), regen_type_combo)
             widgets["regen_type"] = regen_type_combo
 
             regen_period_combo = AutoWidthComboBox()
@@ -1568,7 +1568,7 @@ class ProfileDefinitionDialog(QDialog):
             idx = regen_period_combo.findData(rt_kd.regen_period)
             if idx >= 0:
                 regen_period_combo.setCurrentIndex(idx)
-            layout.addRow(tr("准点周期:"), regen_period_combo)
+            layout.addRow(tr_label('准点周期'), regen_period_combo)
             widgets["regen_period"] = regen_period_combo
 
             regen_rate_unit_combo = AutoWidthComboBox()
@@ -1579,7 +1579,7 @@ class ProfileDefinitionDialog(QDialog):
             idx = regen_rate_unit_combo.findData(rt_kd.regen_rate_unit)
             if idx >= 0:
                 regen_rate_unit_combo.setCurrentIndex(idx)
-            layout.addRow(tr("速率单位:"), regen_rate_unit_combo)
+            layout.addRow(tr_label('速率单位'), regen_rate_unit_combo)
             widgets["regen_rate_unit"] = regen_rate_unit_combo
 
             regen_rate_spin = QDoubleSpinBox()
@@ -1587,7 +1587,7 @@ class ProfileDefinitionDialog(QDialog):
             regen_rate_spin.setDecimals(4)
             regen_rate_spin.setSingleStep(0.1)
             regen_rate_spin.setValue(rt_kd.regen_rate_value)
-            layout.addRow(tr("速率数值:"), regen_rate_spin)
+            layout.addRow(tr_label('速率数值'), regen_rate_spin)
             widgets["regen_rate_value"] = regen_rate_spin
 
             regen_amount_spin = QDoubleSpinBox()
@@ -1595,12 +1595,12 @@ class ProfileDefinitionDialog(QDialog):
             regen_amount_spin.setDecimals(4)
             regen_amount_spin.setSingleStep(1)
             regen_amount_spin.setValue(rt_kd.regen_amount)
-            layout.addRow(tr("每次恢复:"), regen_amount_spin)
+            layout.addRow(tr_label('每次恢复'), regen_amount_spin)
             widgets["regen_amount"] = regen_amount_spin
 
             reset_input = QLineEdit(rt_kd.reset_time)
             reset_input.setFixedWidth(80)
-            layout.addRow(tr("重置时刻:"), reset_input)
+            layout.addRow(tr_label('重置时刻'), reset_input)
             widgets["reset_time"] = reset_input
 
             reset_day_spin = QSpinBox()
@@ -1616,14 +1616,14 @@ class ProfileDefinitionDialog(QDialog):
             orange_spin.setRange(0, 999999)
             orange_spin.setSpecialValueText(tr("不提醒"))
             orange_spin.setValue(rt_kd.alert_orange or 0)
-            layout.addRow(tr("橙色阈值:"), orange_spin)
+            layout.addRow(tr_label('橙色阈值'), orange_spin)
             widgets["alert_orange"] = orange_spin
 
             red_spin = QSpinBox()
             red_spin.setRange(0, 999999)
             red_spin.setSpecialValueText(tr("不提醒"))
             red_spin.setValue(rt_kd.alert_red or 0)
-            layout.addRow(tr("红色阈值:"), red_spin)
+            layout.addRow(tr_label('红色阈值'), red_spin)
             widgets["alert_red"] = red_spin
 
             def _update_reset_time_visibility():
@@ -1648,7 +1648,7 @@ class ProfileDefinitionDialog(QDialog):
                 if label_widget:
                     label_widget.setVisible((not is_realtime) and is_day_or_week)
                 if is_week:
-                    reset_day_label.setText(tr("重置日(周几):"))
+                    reset_day_label.setText(tr_label('重置日(周几)'))
             regen_period_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             regen_type_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             _update_reset_time_visibility()
@@ -1664,8 +1664,8 @@ class ProfileDefinitionDialog(QDialog):
             change_rules_widget = _ChangeRulesWidget(existing_steps)
             widgets["change_rules"] = change_rules_widget
 
-            layout.addRow(tr("变动规则:"), change_rules_widget)
-            layout.addRow(tr("同步目标:"), sync_targets_widget)
+            layout.addRow(tr_label('变动规则'), change_rules_widget)
+            layout.addRow(tr_label('同步目标'), sync_targets_widget)
         else:
             # 备注不执行数值同步；保留旧配置，但不展示无效的编辑入口。
             sync_targets_widget.setParent(dialog)

@@ -25,8 +25,8 @@ def test_note_editor_hides_inert_sync_and_keeps_script_and_legacy_config(qapp, m
     schema.reload_profile_config()
 
     def edit(dialog):
-        assert not any(label.text() == "同步目标:" for label in dialog.findChildren(QLabel))
-        assert any(label.text() == "变更脚本:" for label in dialog.findChildren(QLabel))
+        assert not any(label.text() == "同步目标：" for label in dialog.findChildren(QLabel))
+        assert any(label.text() == "变更脚本：" for label in dialog.findChildren(QLabel))
         next(field for field in dialog.findChildren(QLineEdit) if field.text() == "备注").setText("新备注")
         next(button for button in dialog.findChildren(QPushButton) if button.text() == "保存").click()
         return dialog.result()

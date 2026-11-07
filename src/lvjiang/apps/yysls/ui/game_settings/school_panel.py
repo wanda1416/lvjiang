@@ -56,7 +56,7 @@ from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ..domain_labels import domain_label
 from ..tune_settings.affix_picker import AffixSelectSortDialog
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
@@ -461,7 +461,7 @@ class SchoolPanel(QWidget):
         self._refresh_list(select=new_name)
 
     def _on_add_school(self):
-        name, ok = QInputDialog.getText(self, tr("添加流派"), tr("流派名称："))
+        name, ok = QInputDialog.getText(self, tr("添加流派"), tr_label('流派名称'))
         if not ok:
             return
         name = name.strip()
@@ -635,8 +635,8 @@ class SchoolPanel(QWidget):
             level_combo.set_level(current_level)
         level_combo.setToolTip(tr(
             "默认使用当前赛季等级，也可以手动选择旧等级。"))
-        meta_layout.addRow(tr("方案名称："), name_edit)
-        meta_layout.addRow(tr("方案等级："), level_combo)
+        meta_layout.addRow(tr_label('方案名称'), name_edit)
+        meta_layout.addRow(tr_label('方案等级'), level_combo)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)

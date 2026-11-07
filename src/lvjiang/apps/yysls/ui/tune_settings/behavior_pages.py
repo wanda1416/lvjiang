@@ -78,14 +78,14 @@ from lvjiang.ui.layout_helpers import (
     fit_combo_to_contents,
 )
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ..domain_labels import domain_label
 from .rule_coverage import RuleCoverageCheck
 
 # 品阶候选（从高到低，最高档 = 不限；扫描/调律处理共用）
 _QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
 _QUALITY_LABELS = {
-    "gold": tr("- 不限 -"),
+    "gold": "-" + tr('不限') + " -",
     "gold_only": tr("金装"),
     "purple_only": tr("紫色"),
     "purple": tr("紫装及以下"),
@@ -176,7 +176,7 @@ class _MultiSelect(QPushButton):
     def _refresh_text(self):
         labels = [a.text() for a in self._actions.values() if a.isChecked()]
         if len(labels) == len(self._actions):
-            self.setText(tr("- 全部 -"))
+            self.setText("-" + tr('全部') + " -")
         else:
             self.setText("/".join(labels))
 
@@ -237,7 +237,7 @@ class _JudgeRulesDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("自选判定规则"))
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(tr("预期评级识别使用勾选的流派规则：")))
+        layout.addWidget(QLabel(tr_label('预期评级识别使用勾选的流派规则')))
         self._boxes: dict[str, QCheckBox] = {}
         for key, name in get_rule_names().items():
             cb = QCheckBox(name)
@@ -270,7 +270,7 @@ class _AffixEntriesDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("自选词条"))
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(tr("勾选装备词条名（至少一项）：")))
+        layout.addWidget(QLabel(tr_label('勾选装备词条名（至少一项）')))
         # 词条数量较多（41 项），使用滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -347,7 +347,7 @@ class _AffixEntriesButton(QPushButton):
     def _refresh_text(self):
         labels = [label for key, label in self._items if key in self._checked]
         if len(labels) == len(self._items) and self._items:
-            self.setText(tr("- 全部 -"))
+            self.setText("-" + tr('全部') + " -")
         elif labels:
             self.setText("/".join(labels))
         else:

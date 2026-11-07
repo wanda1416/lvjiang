@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_models import Panel
-from ...i18n import tr
+from ...i18n import tr, tr_label
 
 
 @dataclass(frozen=True)
@@ -51,30 +51,30 @@ class PanelBindingForm(QWidget):
         for spin, count in ((self.rows, config.rows), (self.cols, config.cols)):
             spin.setRange(1, max(20, count))
             spin.setValue(count)
-        form.addRow(tr("行数:"), self.rows)
-        form.addRow(tr("列数:"), self.cols)
+        form.addRow(tr_label('行数'), self.rows)
+        form.addRow(tr_label('列数'), self.cols)
         self.visible = QDoubleSpinBox()
         self.visible.setRange(0.51, 1.0)
         self.visible.setDecimals(2)
         self.visible.setSingleStep(0.01)
         self.visible.setValue(config.min_visible)
-        form.addRow(tr("最小可见比例:"), self.visible)
+        form.addRow(tr_label('最小可见比例'), self.visible)
         self.calibration = AutoWidthComboBox()
         for value, label in (("auto", "自动模式"), ("even", "等分网格"), ("image", "图像检测")):
             self.calibration.addItem(tr(label), value)
         self.calibration.setCurrentIndex(self.calibration.findData(config.calibration))
-        form.addRow(tr("校准模式:"), self.calibration)
+        form.addRow(tr_label('校准模式'), self.calibration)
         self.direction = AutoWidthComboBox()
         for value, label in (("vertical", "纵向滚动"), ("horizontal", "横向滚动"),
                              ("both", "双向滚动"), ("none", "固定网格")):
             self.direction.addItem(tr(label), value)
         self.direction.setCurrentIndex(self.direction.findData(config.scroll_direction))
-        form.addRow(tr("滚动方向:"), self.direction)
+        form.addRow(tr_label('滚动方向'), self.direction)
         self.disabled = QCheckBox(tr("在此布局中禁用"))
         self.disabled.setChecked(config.disabled)
         form.addRow(self.disabled)
         if panel is not None and panel.w_ratio > 0 and panel.h_ratio > 0:
-            form.addRow(tr("位置 / 尺寸:"), QLabel(
+            form.addRow(tr_label('位置 / 尺寸'), QLabel(
                 f"{panel.x_ratio:.4f}, {panel.y_ratio:.4f} / "
                 f"{panel.w_ratio:.4f}, {panel.h_ratio:.4f}"))
             form.addRow(QLabel(tr("位置和尺寸可在画布中拖动调整。")))

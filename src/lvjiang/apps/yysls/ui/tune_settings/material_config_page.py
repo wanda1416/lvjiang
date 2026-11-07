@@ -64,7 +64,7 @@ from .behavior_pages import (
 from .rule_coverage import RuleCoverageCheck
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）
-_NO_FOOD = tr("- 不添加 -")
+_NO_FOOD = "-" + tr('不添加') + " -"
 # 规则表列定义（第一列为序号）；条件列与扫描/调律处理同语义。
 _SEQ_COL = 0
 _COL_KEYS = ("seq", "parts", "quality", "judge", "ratings", "pct",

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config.tune_slots import SLOT_LABELS
 from ...core.tuning_rules import RATING_LABELS
 from .result_store import (
@@ -189,7 +189,7 @@ class TuningResultCard(QFrame):
             state_parts.append(f"{kind}{state}")
         if state_parts:
             equipment_state = QLabel(
-                tr("装备状态：") + "、".join(state_parts))
+                tr_label('装备状态') + "、".join(state_parts))
             equipment_state.setWordWrap(True)
             equipment_state.setStyleSheet(
                 "font-size: 11px; font-weight: bold; color: #8A5A00; border: none;")

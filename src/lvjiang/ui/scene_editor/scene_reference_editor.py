@@ -22,7 +22,7 @@ from ...core.scene_registry import (
     get_subscene_scenes,
     is_view_visible,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from .entity_order_table import EntityOrderTable
 
@@ -57,7 +57,7 @@ class SceneReferenceEditorMixin:
 
         # 顺序与其他 Tab 一致：创建 → 删除 → 绑定
         buttons = QHBoxLayout()
-        self._btn_new_reference = QPushButton(tr("+ 创建引用"))
+        self._btn_new_reference = QPushButton("+" + tr('创建引用'))
         self._btn_new_reference.clicked.connect(self._on_new_reference)
         self._btn_delete_reference = QPushButton(tr("删除引用"))
         self._btn_delete_reference.clicked.connect(self._on_delete_reference)
@@ -132,8 +132,8 @@ class SceneReferenceEditorMixin:
             index = scene_combo.findData(old.scene)
             scene_combo.setCurrentIndex(max(0, index))
         form.addRow("Key:", key_edit)
-        form.addRow(tr("名称:"), name_edit)
-        form.addRow(tr("子场景:"), scene_combo)
+        form.addRow(tr_label('名称'), name_edit)
+        form.addRow(tr_label('子场景'), scene_combo)
         box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel)

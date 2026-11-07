@@ -30,7 +30,7 @@ from ...core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
 from .entity_order_table import EntityOrderTable
@@ -104,7 +104,7 @@ class PanelEditorMixin:
         # 「+」只给新增定义的动作。布局作用域由面板里的说明文字承担
         # （见 _panel_layout_scope），不再写进按钮文本。
         btn_row = QHBoxLayout()
-        self._btn_new_panel = QPushButton(tr("+ 创建网格"))
+        self._btn_new_panel = QPushButton("+" + tr('创建网格'))
         self._btn_new_panel.setToolTip(tr("在场景 YAML 中新增 Panel 定义（声明式网格）"))
         self._btn_new_panel.clicked.connect(self._on_new_panel_def)
         btn_row.addWidget(self._btn_new_panel)
@@ -399,7 +399,7 @@ class PanelEditorMixin:
         key_edit = QLineEdit(panel_def.key if panel_def else "")
         name_edit = QLineEdit(panel_def.name if panel_def else "")
         form.addRow("Key:", key_edit)
-        form.addRow(tr("名称:"), name_edit)
+        form.addRow(tr_label('名称'), name_edit)
         scene_combo = add_scene_combo_row(form, self._scene_key) if panel_def else None
         views = add_views_checklist_row(
             form, self._scene_key,

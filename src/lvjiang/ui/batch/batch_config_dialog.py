@@ -42,7 +42,7 @@ from ...core.batch_config import (
     save_batch_config,
 )
 from ...core.user_config import UserConfigManager
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ...workflows.builtins._coerce import to_bool
 from ..button_styles import apply_button_style
 from ..layout_helpers import fit_combo_popup_to_contents
@@ -72,7 +72,7 @@ class BatchConfigDialog(QDialog):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         config_row = QHBoxLayout()
-        config_row.addWidget(QLabel(tr("配置：")))
+        config_row.addWidget(QLabel(tr_label('配置')))
         self._config_combo = AutoWidthComboBox()
         self._config_combo.currentIndexChanged.connect(self._on_config_selected)
         config_row.addWidget(self._config_combo, 1)
@@ -95,7 +95,7 @@ class BatchConfigDialog(QDialog):
         task_layout = QVBoxLayout(task_box)
         task_layout.setContentsMargins(0, 0, 0, 0)
         task_header = QHBoxLayout()
-        task_header.addWidget(QLabel(tr("可见任务：")))
+        task_header.addWidget(QLabel(tr_label('可见任务')))
         task_header.addStretch()
         task_all = QPushButton(tr("全选"))
         task_none = QPushButton(tr("全不选"))
@@ -117,7 +117,7 @@ class BatchConfigDialog(QDialog):
         user_layout = QVBoxLayout(user_box)
         user_layout.setContentsMargins(0, 0, 0, 0)
         user_header = QHBoxLayout()
-        user_header.addWidget(QLabel(tr("可见用户：")))
+        user_header.addWidget(QLabel(tr_label('可见用户')))
         user_header.addStretch()
         user_all = QPushButton(tr("全选"))
         user_none = QPushButton(tr("全不选"))
@@ -148,7 +148,7 @@ class BatchConfigDialog(QDialog):
         self._unit_combo.setToolTip(tr(
             "按用户名调度，还是按用户资料的某个属性调度。它决定主页面候选列表的"
             "内容、生命周期契约和条目准备工作流的合法性，所以属于配置组定义"))
-        scope_form.add_field(tr("调度单元："), self._unit_combo)
+        scope_form.add_field(tr_label('调度单元'), self._unit_combo)
         sort_row = QHBoxLayout()
         # 去掉内边距：外层包了一个 QWidget 才能放两个控件，默认边距会让这一行
         # 比上下行的输入框整体右缩一截，左边缘就对不齐了。
@@ -165,7 +165,7 @@ class BatchConfigDialog(QDialog):
         fit_combo_popup_to_contents(self._profile_sort_direction)
         sort_row.addLayout(self._sort_key_slot, 1)
         sort_row.addWidget(self._profile_sort_direction)
-        self._profile_sort_label = QLabel(tr("指定排序："))
+        self._profile_sort_label = QLabel(tr_label('指定排序'))
         self._profile_sort_widget = QWidget()
         self._profile_sort_widget.setLayout(sort_row)
         self._profile_sort_widget.setToolTip(tr(
@@ -181,10 +181,10 @@ class BatchConfigDialog(QDialog):
         wf_form.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._selectors = {}
         for key, label in (
-            ("batch_setup", tr("批次准备工作流：")),
-            ("batch_teardown", tr("批次收尾工作流：")),
-            ("prepare_item", tr("条目准备工作流：")),
-            ("finish_item", tr("条目收尾工作流：")),
+            ("batch_setup", tr_label('批次准备工作流')),
+            ("batch_teardown", tr_label('批次收尾工作流')),
+            ("prepare_item", tr_label('条目准备工作流')),
+            ("finish_item", tr_label('条目收尾工作流')),
         ):
             row, combo = self._create_wf_selector()
             self._selectors[key] = combo
@@ -204,7 +204,7 @@ class BatchConfigDialog(QDialog):
             "主页面的「无人值守」要等这里配好才能勾选"))
         recover_widget = QWidget()
         recover_widget.setLayout(recover_row)
-        wf_form.add_field(tr("异常恢复工作流："), recover_widget, new_row=True)
+        wf_form.add_field(tr_label('异常恢复工作流'), recover_widget, new_row=True)
         wf_form.add_field(None, self._skip_single_lifecycle)
         # 生命周期参数紧跟它所属的 wf：wf 在这里选，参数却要去另一个窗口填，
         # 是上一版把同一件事拆到两处的典型。
@@ -848,7 +848,7 @@ class BatchConfigDialog(QDialog):
         self._load_config(group_id)
 
     def _on_new_config(self) -> None:
-        name, ok = QInputDialog.getText(self, tr("新建配置"), tr("配置名称："))
+        name, ok = QInputDialog.getText(self, tr("新建配置"), tr_label('配置名称'))
         name = name.strip()
         if not ok or not name:
             return
@@ -866,7 +866,7 @@ class BatchConfigDialog(QDialog):
         if item is None:
             return
         new_name, ok = QInputDialog.getText(
-            self, tr("重命名配置"), tr("配置名称："), text=item.name)
+            self, tr("重命名配置"), tr_label('配置名称'), text=item.name)
         new_name = new_name.strip()
         if not ok or not new_name or new_name == item.name:
             return

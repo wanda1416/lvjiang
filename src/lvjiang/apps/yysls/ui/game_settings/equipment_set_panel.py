@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.button_styles import apply_button_style
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 
 #: 界面新增套装的稳定 key 前缀，后接第一个未被占用的序号。
 _NEW_SET_KEY_PREFIX = "custom_"
@@ -149,7 +149,7 @@ class EquipmentSetEditor(QFrame):
         side_label = tr("攻具") if side == "left" else tr("防具")
         name, ok = QInputDialog.getText(
             self, tr("添加{side}套装").format(side=side_label),
-            tr("套装名称："))
+            tr_label('套装名称'))
         name = (name or "").strip()
         if not ok or not name:
             return

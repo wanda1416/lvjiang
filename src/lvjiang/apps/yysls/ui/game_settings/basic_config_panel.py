@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config import get_game_config
 
 
@@ -49,12 +49,12 @@ class BasicConfigPanel(QWidget):
         self._cooldown_days.setToolTip(tr(
             "扫描装备发生转律后的冷却天数"))
         self._cooldown_days.valueChanged.connect(self._apply)
-        form.addRow(tr("冷却时间:"), self._cooldown_days)
+        form.addRow(tr_label('冷却时间'), self._cooldown_days)
         self._cooldown_carryover = QCheckBox(tr("冷却到期后累计一次"))
         self._cooldown_carryover.setToolTip(tr(
             "逾期时间会抵扣下一轮冷却，最多保留一次可重置次数"))
         self._cooldown_carryover.toggled.connect(self._apply)
-        form.addRow(tr("逾期进度:"), self._cooldown_carryover)
+        form.addRow(tr_label('逾期进度'), self._cooldown_carryover)
         self._stone_percent = QDoubleSpinBox()
         self._stone_percent.setRange(0.1, 100.0)
         self._stone_percent.setDecimals(1)
@@ -65,7 +65,7 @@ class BasicConfigPanel(QWidget):
             "一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。"
             "装备「养成」里按它估算承音喂满还需要几个传律石。"))
         self._stone_percent.valueChanged.connect(self._apply)
-        form.addRow(tr("传律石提升:"), self._stone_percent)
+        form.addRow(tr_label('传律石提升'), self._stone_percent)
         layout.addWidget(box)
 
         self._status_label = QLabel()

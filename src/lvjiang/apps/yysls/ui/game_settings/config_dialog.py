@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....core.config.resolver import get_resolver
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_dialog_button_box_style
 from .....ui.config_origin import layer_style, origin_tooltip
 from ...config import get_game_config
@@ -69,7 +69,7 @@ class GameConfigDialog(QDialog):
         apply_dialog_button_box_style(self._buttons)
 
         bottom = QHBoxLayout()
-        self._version_title = QLabel(tr("游戏配置版本："))
+        self._version_title = QLabel(tr_label('游戏配置版本'))
         self._version_value = QLabel()
         self._version_value.setObjectName("game_config_version")
         bottom.addWidget(self._version_title)

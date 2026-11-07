@@ -40,7 +40,7 @@ from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config.affix_levels import OPEN as OPEN_LEVEL_RANGE
 from ...config.affix_levels import LevelRange, dump_entry, parse_entry
 from .equipment_set_panel import EquipmentSetEditor
@@ -751,7 +751,7 @@ class BaseAttrPanel(QWidget):
 
     def _on_add_weapon(self):
         """添加新武器类型"""
-        name, ok = QInputDialog.getText(self, tr("添加武器类型"), tr("武器名称："))
+        name, ok = QInputDialog.getText(self, tr("添加武器类型"), tr_label('武器名称'))
         if not ok:
             return
         name = name.strip()

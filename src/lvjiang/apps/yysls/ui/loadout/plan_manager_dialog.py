@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_button_style
 from ...config import GameConfigManager, get_game_config
 from ...core.loadout import (
@@ -100,7 +100,7 @@ class PlanManagerDialog(QDialog):
         right_layout.setContentsMargins(12, 0, 0, 0)
         right_layout.setSpacing(10)
         world_level_row = QHBoxLayout()
-        world_level_row.addWidget(QLabel(tr("个人世界等级：")))
+        world_level_row.addWidget(QLabel(tr_label('个人世界等级')))
         season_level = self._game_config.current_equip_level()
         follow_label = (
             tr("随赛季更新（{level}）").format(level=season_level)

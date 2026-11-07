@@ -31,7 +31,7 @@ from lvjiang.ui.button_styles import (
 )
 from lvjiang.ui.widgets import FlowLayout
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.presentation import (
     highlight_pill,
     make_pill,
@@ -530,7 +530,7 @@ class _SlotDetailPanel(QWidget):
         for text in self.assumptions:
             self.assumption_slot.addWidget(assumption_pill(text, self.strip))
         self.strip.setToolTip(
-            tr("计算假设：") + "、".join(self.assumptions)
+            tr_label('计算假设') + "、".join(self.assumptions)
             if self.assumptions else "")
 
         self.card.set_attention(self.change in (_CHANGE_SWAP, _CHANGE_NEW))

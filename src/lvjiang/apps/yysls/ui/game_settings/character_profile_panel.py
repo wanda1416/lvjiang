@@ -28,7 +28,7 @@ from lvjiang.ui.button_styles import apply_button_style, apply_dialog_button_box
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...core.attr_model.character import CharacterProfileManager, evaluate_profile
 from ...core.attr_model.models import (
     DIMENSION_LABELS,
@@ -237,7 +237,7 @@ class CharacterProfilePanel(QWidget):
                          if self._equipment.item(row, 1).text().strip()}
             result = evaluate_profile(self._profile, growth=self._growth(), equipment=equipment)
         except (AttrModelError, ValueError) as exc:
-            self._notice.setText(tr("推导失败：") + str(exc))
+            self._notice.setText(tr_label('推导失败') + str(exc))
             self._attrs.setRowCount(0)
             return
         self._notice.setText(tr("{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值\n{notes}").format(
@@ -321,7 +321,7 @@ class CharacterProfilePanel(QWidget):
             return
         source = self._profile.sources[row]
         dialog = QDialog(self)
-        dialog.setWindowTitle(tr("编辑来源：") + source.label)
+        dialog.setWindowTitle(tr_label('编辑来源') + source.label)
         dialog.resize(720, 600)
         layout = QVBoxLayout(dialog)
         editor = QPlainTextEdit(yaml.safe_dump(self._profile.raw["sources"][source.source_id],

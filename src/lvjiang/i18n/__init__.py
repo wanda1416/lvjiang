@@ -122,6 +122,17 @@ def current_language() -> str:
     return _current_language
 
 
+def tr_label(text: str) -> str:
+    """表单标签：翻译后追加冒号。
+
+    中文用全角「：」，其他语言用半角「: 」。冒号是排版符号而非翻译内容，
+    不进词表；调用方写 ``QLabel(tr_label("玩法名称"))``，词表只存
+    「玩法名称」一条，"+ "/「- 」等装饰前缀同理由调用方自行拼接。
+    """
+    suffix = "：" if _current_language == "zh_CN" else ": "
+    return tr(text) + suffix
+
+
 def available_languages() -> list[dict[str, str]]:
     """扫描 config/i18n/ 目录，返回可用语言列表。
 

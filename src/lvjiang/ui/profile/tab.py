@@ -45,7 +45,7 @@ from ...core.profile.store import (
     reorder_overview_groups,
     set_active_group,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_refresh_button
 from .cell_editing import ProfileCellEditingMixin
 from .cell_formatting import (
@@ -602,7 +602,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         """新建分组"""
         stored_groups = get_groups()
         groups = stored_groups or {tr("默认"): {"columns": []}}
-        name, ok = QInputDialog.getText(self, tr("新建分组"), tr("分组名称:"))
+        name, ok = QInputDialog.getText(self, tr("新建分组"), tr_label('分组名称'))
         if not ok:
             return
         name = name.strip()
@@ -630,7 +630,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             return
 
         new_name, ok = QInputDialog.getText(
-            self, tr("重命名分组"), tr("新名称:"), text=old_name
+            self, tr("重命名分组"), tr_label('新名称'), text=old_name
         )
         if not ok:
             return

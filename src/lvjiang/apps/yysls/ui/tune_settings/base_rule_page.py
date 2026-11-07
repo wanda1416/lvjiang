@@ -48,7 +48,7 @@ from lvjiang.ui.button_styles import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 
 # 规则组 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -71,17 +71,17 @@ class _NewGroupDialog(QDialog):
         form = QFormLayout()
         self._key_edit = QLineEdit()
         self._key_edit.setPlaceholderText(tr("如 aggressive（小写字母/数字/下划线）"))
-        form.addRow(tr("标识 key："), self._key_edit)
+        form.addRow(tr_label('标识 key'), self._key_edit)
         self._name_edit = QLineEdit()
         self._name_edit.setPlaceholderText(tr("如 激进回收"))
-        form.addRow(tr("规则组名称："), self._name_edit)
+        form.addRow(tr_label('规则组名称'), self._name_edit)
         # 保存位置只对开发者开放：私有规则组放 local，不写进随包的 system
         self._layer_combo: QComboBox | None = None
         if choose_layer:
             self._layer_combo = AutoWidthComboBox()
             for layer, label in _LAYER_CHOICES:
                 self._layer_combo.addItem(tr(label), layer)
-            form.addRow(tr("保存位置："), self._layer_combo)
+            form.addRow(tr_label('保存位置'), self._layer_combo)
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(

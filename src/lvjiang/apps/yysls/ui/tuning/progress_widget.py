@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_button_style
 from .progress_hub import TuningProgressHub
 from .result_store import TuningResultStore
@@ -415,7 +415,7 @@ class TuningProgressWidget(QWidget):
         lines = list(self._current_events)
         final_affixes = finish.get("final_affixes", [])
         if final_affixes:
-            lines.append(tr("最终词条："))
+            lines.append(tr_label('最终词条'))
             for affix in final_affixes:
                 cap = affix.get("cap_pct")
                 cap_text = f" ({cap}%)" if cap is not None else ""
@@ -631,7 +631,7 @@ class TuningProgressWidget(QWidget):
                     parts.append(f"○{t}")
             remaining = len(target) - 12
             suffix = f" 等+{remaining}" if remaining > 0 else ""
-            self._target_label.setText(tr("目标：") + "、".join(parts) + suffix)
+            self._target_label.setText(tr_label('目标') + "、".join(parts) + suffix)
         else:
             self._target_label.setText(tr("目标：-"))
         expect = info.get("expect_rating", "")
@@ -694,7 +694,7 @@ class TuningProgressWidget(QWidget):
         stock = info.get("material_stock") or {}
         if stock:
             self._material_label.setText(
-                tr("材料：") + "、".join(f"{k}×{v}" for k, v in stock.items()))
+                tr_label('材料') + "、".join(f"{k}×{v}" for k, v in stock.items()))
             self._material_label.setVisible(True)
         self._record_event(
             f"第 {round_no} 轮准备：{food}" + (f"｜{reason}" if reason else ""))
@@ -729,7 +729,7 @@ class TuningProgressWidget(QWidget):
         stock = info.get("material_stock", {})
         if stock:
             parts = [f"{k}×{v}" for k, v in stock.items()]
-            self._material_label.setText(tr("材料：") + "、".join(parts))
+            self._material_label.setText(tr_label('材料') + "、".join(parts))
             self._material_label.setVisible(True)
         expect = info.get("expect_rating")
         if expect:

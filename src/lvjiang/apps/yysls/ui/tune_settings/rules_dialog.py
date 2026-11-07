@@ -62,7 +62,7 @@ from lvjiang.ui.layout_helpers import (
     navigation_width_for_chars,
 )
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
@@ -95,10 +95,10 @@ class _NewRuleDialog(QDialog):
         form = QFormLayout()
         self._key_edit = QLineEdit()
         self._key_edit.setPlaceholderText(tr("如 my_rule（小写字母/数字/下划线）"))
-        form.addRow(tr("标识 key："), self._key_edit)
+        form.addRow(tr_label('标识 key'), self._key_edit)
         self._name_edit = QLineEdit()
         self._name_edit.setPlaceholderText(tr("如 治疗-纯奶"))
-        form.addRow(tr("规则名称："), self._name_edit)
+        form.addRow(tr_label('规则名称'), self._name_edit)
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(
@@ -156,7 +156,7 @@ class TuningRulesDialog(QDialog):
 
         version_row = QHBoxLayout()
         version_row.addStretch(1)
-        self._config_version_title = QLabel(tr("调律配置来源："))
+        self._config_version_title = QLabel(tr_label('调律配置来源'))
         self._config_version_value = QLabel()
         self._config_version_value.setObjectName("tune_config_version")
         version_row.addWidget(self._config_version_title)
@@ -402,7 +402,7 @@ class TuningRulesDialog(QDialog):
             return
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(QLabel(tr("当前规则：")))
+        row.addWidget(QLabel(tr_label('当前规则')))
         combo = AutoWidthComboBox()
         combo.currentIndexChanged.connect(
             lambda idx: self._on_group_dropdown_changed(idx, combo))
@@ -454,7 +454,7 @@ class TuningRulesDialog(QDialog):
         panel = self._materialize_rule_page(index)
         old_name = panel.rule_name
         new_name, ok = QInputDialog.getText(
-            self, tr("重命名规则"), tr("规则名称："), text=old_name)
+            self, tr("重命名规则"), tr_label('规则名称'), text=old_name)
         if not ok:
             return
         new_name = new_name.strip()

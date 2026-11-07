@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.config.resolver import get_resolver
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 
 
@@ -366,7 +366,7 @@ class ScriptOpsMixin:
         else:
             lines.append(tr("返回值：(无)"))
         if result:
-            lines.append(tr("结果集："))
+            lines.append(tr_label('结果集'))
             lines.append(json.dumps(
                 _to_serializable(result), ensure_ascii=False, indent=2))
         else:

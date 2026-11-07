@@ -19,7 +19,7 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.scene_definition import BASE_VIEW_KEY
 from ...core.scene_registry import get_registry, get_scene_views, is_view_visible
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 
 
@@ -34,7 +34,7 @@ def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:
         combo.addItem(f"{scene.name} ({key})", userData=key)
         if key == current_scene_key:
             combo.setCurrentIndex(combo.count() - 1)
-    form.addRow(tr("场景:"), combo)
+    form.addRow(tr_label('场景'), combo)
     return combo
 
 
@@ -48,7 +48,7 @@ def add_view_combo_row(
     """
     combo = AutoWidthComboBox()
     _populate_view_combo(combo, scene_key, selected_view)
-    form.addRow(tr("视图:"), combo)
+    form.addRow(tr_label('视图'), combo)
     return combo
 
 
@@ -146,7 +146,7 @@ def add_views_checklist_row(
 ) -> ViewChecklist:
     """向表单添加「视图」多选行。"""
     widget = ViewChecklist(scene_key, selected)
-    form.addRow(tr("视图:"), widget)
+    form.addRow(tr_label('视图'), widget)
     return widget
 
 
@@ -365,7 +365,7 @@ def prompt_scene_area_references(
     dialog.setWindowTitle(title)
     dialog.resize(560, 520)
     form = QFormLayout(dialog)
-    form.addRow(tr("来源:"), picker)
+    form.addRow(tr_label('来源'), picker)
     view_list = add_views_checklist_row(form, scene_key, [current_view])
     buttons = QDialogButtonBox(
         QDialogButtonBox.StandardButton.Ok
@@ -606,8 +606,8 @@ def add_transition_row(form: QFormLayout, current_scene: str,
                        available_from: list[str] | None = None) -> TransitionPicker:
     picker = TransitionPicker(current_scene, value)
     picker._navigation.setCurrentIndex(max(0, picker._navigation.findData(navigation)))
-    form.addRow(tr("跳转:"), picker)
+    form.addRow(tr_label('跳转'), picker)
     picker._available_from.setText(", ".join(available_from or []))
     picker._available_from.setPlaceholderText(tr("留空为本地入口；* 为全局，或逗号分隔场景 key"))
-    form.addRow(tr("入口作用范围:"), picker._available_from)
+    form.addRow(tr_label('入口作用范围'), picker._available_from)
     return picker

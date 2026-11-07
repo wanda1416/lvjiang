@@ -52,7 +52,7 @@ from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_butt
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ..domain_labels import domain_label
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
@@ -62,7 +62,7 @@ _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _QUALITIES = ("gold", "purple", "blue")
 
 # 增伤列留空项的展示文案（仅显示层，收集时仍写入空 = null）
-_NO_DAMAGE_LABEL = tr("- 无需增伤 -")
+_NO_DAMAGE_LABEL = "-" + tr('无需增伤') + " -"
 
 # 玩法设定表说明（「?」按钮点击展示，不用悬停 tooltip）
 _PLAYSTYLE_TIPS = (
@@ -142,7 +142,7 @@ class RuleSettingsPage(QWidget):
         sep.setFrameShadow(QFrame.Shadow.Sunken)
         key_row.addWidget(sep)
         key_row.addSpacing(12)
-        self._version_title = QLabel(tr("规则来源："))
+        self._version_title = QLabel(tr_label('规则来源'))
         key_row.addWidget(self._version_title)
         self._version_label = QLabel()
         key_row.addWidget(self._version_label)
@@ -159,7 +159,7 @@ class RuleSettingsPage(QWidget):
             self._btn_delete.setEnabled(False)
             self._btn_delete.setToolTip(hint)
         self._key_row = key_row     # 排布有讲究（见上），留给测试盯住
-        form.addRow(tr("标识 key："), key_row)
+        form.addRow(tr_label('标识 key'), key_row)
         self._set_version_display(
             self._version_origin.version, self._version_origin.layer)
 
@@ -171,7 +171,7 @@ class RuleSettingsPage(QWidget):
         hint.setStyleSheet("color: palette(mid);")
         name_row.addWidget(hint)
         name_row.addStretch()
-        form.addRow(tr("规则名称："), name_row)
+        form.addRow(tr_label('规则名称'), name_row)
 
         # 默认判定：四档条件全不命中时的兜底档位
         self._default_rating_combo = AutoWidthComboBox()
@@ -180,7 +180,7 @@ class RuleSettingsPage(QWidget):
                 RATING_LABELS[rating_key], rating_key)
         self._default_rating_combo.currentIndexChanged.connect(
             self._apply_default_rating)
-        form.addRow(tr("默认判定："), self._default_rating_combo)
+        form.addRow(tr_label('默认判定'), self._default_rating_combo)
         layout.addLayout(form)
 
         # ── playstyles 玩法设定（说明收入「?」按钮，点击展示）──
@@ -494,7 +494,7 @@ class RuleSettingsPage(QWidget):
                 tr("所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」"))
             return
         name, ok = QInputDialog.getItem(
-            self, tr("新增玩法"), tr("选择要引用的玩法:"), available, 0, False)
+            self, tr("新增玩法"), tr_label('选择要引用的玩法'), available, 0, False)
         if not ok or not name:
             return
         self._data["playstyles"] = list(

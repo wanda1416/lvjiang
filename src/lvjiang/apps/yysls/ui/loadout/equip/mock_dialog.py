@@ -35,7 +35,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
-from ......i18n import tr
+from ......i18n import tr, tr_label
 from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
 from ....core.affix_cap import (
     affix_cap_pct,
@@ -342,10 +342,10 @@ class MockEquipDialog(QDialog):
         self._combo_part = AutoWidthComboBox()
         for part_name in _PART_TO_GROUP.keys():
             self._combo_part.addItem(part_name, part_name)
-        basic_layout.addRow(tr("部位:"), self._combo_part)
+        basic_layout.addRow(tr_label('部位'), self._combo_part)
 
         # 武器类型（直接加入表单布局，与部位输入框对齐）
-        self._lbl_weapon_type = QLabel(tr("类型:"))
+        self._lbl_weapon_type = QLabel(tr_label('类型'))
         self._combo_weapon_type = AutoWidthComboBox()
         self._refresh_weapon_types()
         basic_layout.insertRow(1, self._lbl_weapon_type, self._combo_weapon_type)
@@ -356,20 +356,20 @@ class MockEquipDialog(QDialog):
         # 装备名称
         self._edit_name = QLineEdit()
         self._edit_name.setPlaceholderText(tr("如：踏雪云珑"))
-        basic_layout.addRow(tr("名称:"), self._edit_name)
+        basic_layout.addRow(tr_label('名称'), self._edit_name)
 
         # 等级
         self._combo_level = AutoWidthComboBox()
         from ....config import get_game_config
         for lvl in sorted([c.level for c in get_game_config().get_level_configs()], reverse=True):
             self._combo_level.addItem(str(lvl), lvl)
-        basic_layout.addRow(tr("等级:"), self._combo_level)
+        basic_layout.addRow(tr_label('等级'), self._combo_level)
 
         # 品质
         self._combo_quality = AutoWidthComboBox()
         for label, value in _QUALITY_OPTIONS:
             self._combo_quality.addItem(label, value)
-        basic_layout.addRow(tr("品质:"), self._combo_quality)
+        basic_layout.addRow(tr_label('品质'), self._combo_quality)
 
         # 承音是装备属性，直接在复选框上操作。真实养成里勾选会顺带把等级带到
         # 该装备的承音目标、并按升级表改名、把数值截断到承音上限——写入校验
@@ -377,7 +377,7 @@ class MockEquipDialog(QDialog):
         self._check_chengyin = QCheckBox(tr("承音"))
         self._check_chengyin.setToolTip(tr(
             "勾选表示该装备已承音；承音后词条数值上限变为承音上限"))
-        basic_layout.addRow(tr("承音:"), self._check_chengyin)
+        basic_layout.addRow(tr_label('承音'), self._check_chengyin)
 
         body_layout.addWidget(self._basic_group)
 

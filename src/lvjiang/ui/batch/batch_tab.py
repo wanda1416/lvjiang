@@ -65,7 +65,7 @@ from ...core.batch_run import (
     set_active_group_id,
 )
 from ...core.profile.schema import get_profile_config
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import (
     apply_button_style,
     apply_execution_button_style,
@@ -345,22 +345,22 @@ class BatchTab(QWidget):
         self._rounds_spin.setRange(1, 999)
         self._rounds_spin.setValue(1)
         self._rounds_spin.valueChanged.connect(self._on_rounds_changed)
-        summary_form.addRow(tr("执行轮数："), self._rounds_spin)
+        summary_form.addRow(tr_label('执行轮数'), self._rounds_spin)
         # 调度单元与指定排序属于配置组定义（它们决定候选列表的内容和生命周期
         # 契约），在「批量配置」里改；这里只如实显示本次用的是什么。
         self._unit_value = QLabel()
         self._unit_value.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
-        summary_form.addRow(tr("调度单元："), self._unit_value)
+        summary_form.addRow(tr_label('调度单元'), self._unit_value)
         self._profile_sort_value = QLabel()
         self._profile_sort_value.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
-        self._profile_sort_label = QLabel(tr("指定排序："))
+        self._profile_sort_label = QLabel(tr_label('指定排序'))
         self._summary_form = summary_form
         summary_form.addRow(self._profile_sort_label, self._profile_sort_value)
         self._unattended_check = QCheckBox()
         self._unattended_check.toggled.connect(self._on_unattended_toggled)
-        summary_form.addRow(tr("无人值守："), self._unattended_check)
+        summary_form.addRow(tr_label('无人值守'), self._unattended_check)
         self._workflow_labels: dict[str, QLabel] = {}
         for key, label in (
             ("batch_setup", tr("批次准备") + "："),

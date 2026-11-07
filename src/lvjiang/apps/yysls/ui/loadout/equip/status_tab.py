@@ -39,7 +39,7 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
-from ......i18n import tr
+from ......i18n import tr, tr_label
 from ....config.equipment_slots import SLOT_SPECS
 from ....core.affix_cap import equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
@@ -1718,7 +1718,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 from PyQt6.QtWidgets import QInputDialog
                 slot_names = [tr("主武器") if s == "main_weapon" else tr("副武器") for s in target_slots]
                 choice, ok = QInputDialog.getItem(
-                    self, tr("选择槽位"), tr("请选择要穿戴到的槽位:"),
+                    self, tr("选择槽位"), tr_label('请选择要穿戴到的槽位'),
                     slot_names, 0, False
                 )
                 if not ok:

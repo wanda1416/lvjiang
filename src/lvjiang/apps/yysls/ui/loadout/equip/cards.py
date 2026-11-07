@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ......i18n import tr
+from ......i18n import tr, tr_label
 from ......ui.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
@@ -1523,7 +1523,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
     def set_hypotheses(self, assumptions) -> None:
         """显示计算假设；装备数据本身始终保持原始值。"""
         labels = [str(value) for value in (assumptions or ()) if str(value)]
-        self.set_note(tr("计算假设：") + "、".join(labels) if labels else "")
+        self.set_note(tr_label('计算假设') + "、".join(labels) if labels else "")
 
     def set_note(self, text: str) -> None:
         """在卡片顶部显示一行说明文字（空则隐藏）。"""

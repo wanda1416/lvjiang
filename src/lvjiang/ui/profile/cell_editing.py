@@ -42,7 +42,7 @@ from ...core.profile.schema import (
 )
 from ...core.profile.store import get_groups
 from ...errors import log_failure
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from .cell_formatting import (
     apply_cell_style,
     format_profile_cell,
@@ -617,17 +617,17 @@ class ProfileCellEditingMixin:
         # 根据 direction 选择词表与标签
         if direction > 0:
             min_val = 0
-            prompt = tr("增加量:")
+            prompt = tr_label('增加量')
             vocab = kd.sources
             vocab_label = tr("来源")
         elif direction < 0:
             min_val = 0
-            prompt = tr("减少量:")
+            prompt = tr_label('减少量')
             vocab = kd.uses
             vocab_label = tr("用途")
         else:
             min_val = -999999
-            prompt = tr("增量（正增负减）:")
+            prompt = tr_label('增量（正增负减）')
             vocab = kd.sources + [u for u in kd.uses if u not in kd.sources]
             vocab_label = tr("来源")
 
@@ -698,7 +698,7 @@ class ProfileCellEditingMixin:
             self,
             title=tr("覆写 - {label}").format(label=kd.label),
             hint=tr("当前值: {val}").format(val=current_text),
-            prompt=tr("新值:"),
+            prompt=tr_label('新值'),
             is_float=is_float,
             min_val=0,
             sources=kd.sources + [u for u in kd.uses if u not in kd.sources],
@@ -750,7 +750,7 @@ class ProfileCellEditingMixin:
         text, ok = QInputDialog.getMultiLineText(
             self,
             tr("编辑备注 - {label}").format(label=kd.label),
-            tr("备注内容:"),
+            tr_label('备注内容'),
             current_text,
         )
         if not ok:

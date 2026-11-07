@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.key_names import normalize_pressable
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..pressable_combo import PressableSelector
 
 
@@ -28,7 +28,7 @@ def add_attribute_row(
     layout.addWidget(is_text_check)
     layout.addWidget(is_clickable_check)
     layout.addStretch()
-    form.addRow(tr("属性:"), row)
+    form.addRow(tr_label('属性'), row)
 
 
 def add_activation_key_row(
@@ -47,7 +47,7 @@ def add_activation_key_row(
         edit.setToolTip(tr("仅作用于当前布局；click 将改为按下该按键"))
     else:
         edit.setToolTip(tr("请先在当前布局中放置该实体，或将其标记为禁用后设置按键"))
-    form.addRow(tr("按键:"), edit)
+    form.addRow(tr_label('按键'), edit)
     return edit
 
 

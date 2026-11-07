@@ -39,7 +39,7 @@ from ...core.ocr_config import (
     load_region_batch_config,
     save_region_batch_config,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 from .canvas import OCRBox, OCRCanvas
 
@@ -154,9 +154,9 @@ class OCRDialog(QDialog):
 
         # 分组选择下拉框
         group_row = QHBoxLayout()
-        group_row.addWidget(QLabel(tr("匹配分组:")))
+        group_row.addWidget(QLabel(tr_label('匹配分组')))
         self._group_combo = AutoWidthComboBox()
-        self._group_combo.addItem(tr("- 全部 -"), None)
+        self._group_combo.addItem("-" + tr('全部') + " -", None)
         self._group_combo.setMinimumWidth(120)
         self._load_groups()
         group_row.addWidget(self._group_combo)
@@ -164,7 +164,7 @@ class OCRDialog(QDialog):
         right_layout.addLayout(group_row)
 
         # 识别结果
-        right_layout.addWidget(QLabel(tr("识别结果（已应用清洗规则）：")))
+        right_layout.addWidget(QLabel(tr_label('识别结果（已应用清洗规则）')))
         self._result_text = QTextEdit()
         self._result_text.setReadOnly(True)
         self._result_text.setStyleSheet(
@@ -205,7 +205,7 @@ class OCRDialog(QDialog):
         self._min_canvas_side.setToolTip(tr(
             "拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。"
         ))
-        form.addRow(tr("画布最小边长："), self._min_canvas_side)
+        form.addRow(tr_label('画布最小边长'), self._min_canvas_side)
 
         self._max_content_height = QSpinBox()
         self._max_content_height.setObjectName("ocr_max_content_height")
@@ -214,14 +214,14 @@ class OCRDialog(QDialog):
         self._max_content_height.setToolTip(tr(
             "一批区域内容允许的最大总高度，超过后拆分为下一批识别。"
         ))
-        form.addRow(tr("单批内容最大高度："), self._max_content_height)
+        form.addRow(tr_label('单批内容最大高度'), self._max_content_height)
 
         self._region_gap = QSpinBox()
         self._region_gap.setObjectName("ocr_region_gap")
         self._region_gap.setRange(0, 512)
         self._region_gap.setSuffix(" px")
         self._region_gap.setToolTip(tr("相邻文字区域在拼图中的间隔。"))
-        form.addRow(tr("区域间隔："), self._region_gap)
+        form.addRow(tr_label('区域间隔'), self._region_gap)
 
         layout.addWidget(group)
         layout.addStretch()
@@ -310,7 +310,7 @@ class OCRDialog(QDialog):
         ))
 
         group_row = QHBoxLayout()
-        group_row.addWidget(QLabel(tr("清洗组：")))
+        group_row.addWidget(QLabel(tr_label('清洗组')))
         self._cleaning_group_combo = AutoWidthComboBox()
         self._cleaning_group_combo.setMinimumWidth(240)
         cleaner = OCRCleaner()
@@ -352,11 +352,11 @@ class OCRDialog(QDialog):
         repl_layout.addWidget(self._repl_table)
 
         repl_btn_row = QHBoxLayout()
-        self._btn_add_repl = QPushButton(tr("+ 添加替换规则"))
+        self._btn_add_repl = QPushButton("+" + tr('添加替换规则'))
         self._btn_add_repl.clicked.connect(self._on_add_replacement)
         repl_btn_row.addWidget(self._btn_add_repl)
 
-        self._btn_del_repl = QPushButton(tr("- 删除选中"))
+        self._btn_del_repl = QPushButton("-" + tr('删除选中'))
         self._btn_del_repl.clicked.connect(self._on_delete_replacement)
         repl_btn_row.addWidget(self._btn_del_repl)
 
@@ -381,11 +381,11 @@ class OCRDialog(QDialog):
         pattern_layout.addWidget(self._pattern_table)
 
         pattern_btn_row = QHBoxLayout()
-        self._btn_add_pattern = QPushButton(tr("+ 添加正则规则"))
+        self._btn_add_pattern = QPushButton("+" + tr('添加正则规则'))
         self._btn_add_pattern.clicked.connect(self._on_add_pattern)
         pattern_btn_row.addWidget(self._btn_add_pattern)
 
-        self._btn_del_pattern = QPushButton(tr("- 删除选中"))
+        self._btn_del_pattern = QPushButton("-" + tr('删除选中'))
         self._btn_del_pattern.clicked.connect(self._on_delete_pattern)
         pattern_btn_row.addWidget(self._btn_del_pattern)
 
@@ -549,7 +549,7 @@ class OCRDialog(QDialog):
             return
         current = self._cleaning_group_combo.currentText()
         label, ok = QInputDialog.getText(
-            self, tr("重命名规则组"), tr("规则组名称："), text=current)
+            self, tr("重命名规则组"), tr_label('规则组名称'), text=current)
         if not ok or not label.strip():
             return
         try:

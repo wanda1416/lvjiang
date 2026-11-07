@@ -38,7 +38,7 @@ from ...core.profile.regen import (
     next_boundary_after,
     next_realtime_point_seconds,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import DISABLED_BUTTON_BG
 
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
@@ -418,7 +418,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
 
     # 同步目标（所有模型通用）
     if kd.sync_targets:
-        lines.append(tr("同步到:"))
+        lines.append(tr_label('同步到'))
         for t in kd.sync_targets:
             label = format_sync_label(t.key)
             suffix = f" [{DIRECTION_LABELS[t.direction]}]" if t.direction != DIR_BOTH else ""

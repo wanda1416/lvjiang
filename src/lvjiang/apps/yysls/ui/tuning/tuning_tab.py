@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.config.resolver import get_resolver
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import (
     apply_button_style,
     apply_execution_button_style,
@@ -154,7 +154,7 @@ class TuningTab(QWidget):
         min_level_row = QHBoxLayout()
         min_level_row.setContentsMargins(0, 0, 0, 0)
         min_level_row.setSpacing(6)
-        min_level_row.addWidget(QLabel("<b>" + tr("最低等级：") + "</b>"))
+        min_level_row.addWidget(QLabel("<b>" + tr_label('最低等级') + "</b>"))
         self._min_level_combo = AutoWidthComboBox()
         self._min_level_combo.addItem(tr("默认（跟随基础规则）"), None)
         self._refresh_min_level_combo()
@@ -168,7 +168,7 @@ class TuningTab(QWidget):
         min_level_row.addStretch()
         layout.addLayout(min_level_row)
 
-        layout.addWidget(QLabel("<b>" + tr("基础规则（单选）：") + "</b>"))
+        layout.addWidget(QLabel("<b>" + tr_label('基础规则（单选）') + "</b>"))
         self._base_group_key = ""
         self._button_group: QButtonGroup | None = None
         self._group_container = QWidget()
@@ -184,7 +184,7 @@ class TuningTab(QWidget):
         self._smart_tuning_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._smart_tuning_cb)
-        layout.addWidget(QLabel("<b>" + tr("流派规则（可多选）：") + "</b>"))
+        layout.addWidget(QLabel("<b>" + tr_label('流派规则（可多选）') + "</b>"))
         self._tuning_config = TuningConfigWidget(show_globals=False)
         self._tuning_config.config_changed.connect(self._save_tuning_config)
         layout.addWidget(self._tuning_config)
@@ -272,7 +272,7 @@ class TuningTab(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         slots_header = QHBoxLayout()
-        slots_header.addWidget(QLabel("<b>" + tr("调律部位：") + "</b>"))
+        slots_header.addWidget(QLabel("<b>" + tr_label('调律部位') + "</b>"))
         slots_header.addStretch()
         btn_select_all = QPushButton(tr("全选"))
         btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
@@ -312,12 +312,12 @@ class TuningTab(QWidget):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        layout.addWidget(QLabel("<b>" + tr("全局开关：") + "</b>"))
+        layout.addWidget(QLabel("<b>" + tr_label('全局开关') + "</b>"))
         self._tuning_globals = TuningGlobalsWidget(show_skip_tuning=False)
         self._tuning_globals.config_changed.connect(self._save_tuning_config)
         layout.addWidget(self._tuning_globals)
 
-        layout.addWidget(QLabel("<b>" + tr("调律设置：") + "</b>"))
+        layout.addWidget(QLabel("<b>" + tr_label('调律设置') + "</b>"))
         self._pc_background_scroll_cb = QCheckBox(
             tr("PC 端兼容后台模式"))
         self._pc_background_scroll_cb.setToolTip(tr(
@@ -366,7 +366,7 @@ class TuningTab(QWidget):
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._positional_traversal_cb)
 
-        layout.addWidget(QLabel("<b>" + tr("调试参数：") + "</b>"))
+        layout.addWidget(QLabel("<b>" + tr_label('调试参数') + "</b>"))
         self._skip_tuning_cb = QCheckBox(tr("跳过实际调律"))
         self._skip_tuning_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())

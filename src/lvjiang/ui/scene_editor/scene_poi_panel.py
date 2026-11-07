@@ -37,7 +37,7 @@ from ...core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
 from .entity_edit_form import (
@@ -117,11 +117,11 @@ class PoiPanelMixin:
         layout.addWidget(self._point_list)
 
         btn_row = QHBoxLayout()
-        self._btn_new_point_def = QPushButton(tr("+ 创建坐标"))
+        self._btn_new_point_def = QPushButton("+" + tr('创建坐标'))
         self._btn_new_point_def.setToolTip(tr("在场景 YAML 中新增坐标点定义（meta 数据）"))
         self._btn_new_point_def.clicked.connect(self._on_new_point_def)
         btn_row.addWidget(self._btn_new_point_def)
-        self._btn_add_point_ref = QPushButton(tr("+ 引用坐标"))
+        self._btn_add_point_ref = QPushButton("+" + tr('引用坐标'))
         self._btn_add_point_ref.setToolTip(
             tr("引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读"))
         self._btn_add_point_ref.clicked.connect(self._on_add_point_reference)
@@ -170,7 +170,7 @@ class PoiPanelMixin:
         layout.addWidget(self._arrow_list)
 
         btn_row = QHBoxLayout()
-        self._btn_new_arrow = QPushButton(tr("+ 创建方向"))
+        self._btn_new_arrow = QPushButton("+" + tr('创建方向'))
         self._btn_new_arrow.setToolTip(tr("先选中一个已放置的坐标点，再从它拉出一条方向箭头"))
         self._btn_new_arrow.clicked.connect(self._on_new_arrow)
         btn_row.addWidget(self._btn_new_arrow)
@@ -382,7 +382,7 @@ class PoiPanelMixin:
         items = [f"{n} ({k})" for k, n in available]
         dlg = QInputDialog(self)
         dlg.setWindowTitle(tr("创建坐标"))
-        dlg.setLabelText(tr("选择要放置的坐标点："))
+        dlg.setLabelText(tr_label('选择要放置的坐标点'))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(_LIGHT_DIALOG_QSS)
         if not dlg.exec() or not dlg.textValue():
@@ -592,7 +592,7 @@ class PoiPanelMixin:
         existing = {a.key for a in self._canvas.get_arrows()} - {old}
         while True:
             new, ok = QInputDialog.getText(
-                self, tr("重命名方向"), tr("输入新的方向 key（小写字母开头）："), text=old,
+                self, tr("重命名方向"), tr_label('输入新的方向 key（小写字母开头）'), text=old,
             )
             if not ok:
                 return
@@ -648,13 +648,13 @@ class PoiPanelMixin:
         name_edit.setPlaceholderText(tr("中文名称"))
         if point_def:
             name_edit.setText(point_def.name)
-        form.addRow(tr("名称:"), name_edit)
+        form.addRow(tr_label('名称'), name_edit)
 
         type_combo = AutoWidthComboBox()
         type_combo.addItems(sorted(VALID_REGION_TYPES))
         if point_def:
             type_combo.setCurrentText(point_def.type)
-        form.addRow(tr("类型:"), type_combo)
+        form.addRow(tr_label('类型'), type_combo)
 
         is_text_check = QCheckBox(tr("含文本"))
         if point_def:

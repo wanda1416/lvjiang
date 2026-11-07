@@ -47,7 +47,7 @@ from ...core.scene_registry import (
     is_subscene,
     sync_scene_cache,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from .canvas import EditMode, RegionCanvas
 from .entity_order_table import EntityOrderTable
@@ -225,7 +225,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         bar.addWidget(self._btn_manage_screenshots)
         bar.addSpacing(12)
 
-        self._scene_version_title = QLabel(tr("场景来源："))
+        self._scene_version_title = QLabel(tr_label('场景来源'))
         self._scene_version_value = QLabel()
         for label in (
                 self._scene_version_title,
@@ -238,7 +238,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         bar.addWidget(self._scene_version_value)
         bar.addSpacing(18)
 
-        self._layout_version_title = QLabel(tr("布局来源："))
+        self._layout_version_title = QLabel(tr_label('布局来源'))
         self._layout_version_value = QLabel()
         for label in (
                 self._layout_version_title,

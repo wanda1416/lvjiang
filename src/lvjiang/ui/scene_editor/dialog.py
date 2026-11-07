@@ -40,7 +40,7 @@ from ...core.scene_registry import (
     get_subscene_ref_defs,
     is_subscene,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 from ..dialog_guards import EscapeCloseConfirmationMixin
 from ..reference.combo_sizing import set_combo_minimum_character_capacity
@@ -432,7 +432,7 @@ class SceneEditorDialog(
         self._btn_run_script.clicked.connect(self._on_script_test)
         script_btn_row.addWidget(self._btn_run_script)
         # 当前用户下拉列表（仅影响脚本测试执行，不切换主页面用户）
-        script_btn_row.addWidget(QLabel(tr("当前用户:")))
+        script_btn_row.addWidget(QLabel(tr_label('当前用户')))
         self._script_user_combo = AutoWidthComboBox()
         self._script_user_combo.setToolTip(tr("脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。"))
         script_btn_row.addWidget(self._script_user_combo)

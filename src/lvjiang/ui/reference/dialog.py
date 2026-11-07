@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import ReferenceDatabase
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 from ..dialog_guards import EscapeCloseConfirmationMixin
 from .browser_panel import BrowserPanel
@@ -103,7 +103,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
 
         # ── 图库空间切换栏（图库内部概念，外部消费方无感）──
         space_bar = QHBoxLayout()
-        space_bar.addWidget(QLabel(tr("图库空间:")))
+        space_bar.addWidget(QLabel(tr_label('图库空间')))
         self._space_combo = AutoWidthComboBox()
         self._fill_space_combo()
         self._space_combo.setCurrentText(self._db.get_active_space())
@@ -195,7 +195,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _on_new_space(self):
         """新建空间：创建空空间 + 激活 + 刷新下拉与面板"""
-        name, ok = QInputDialog.getText(self, tr("新建图库空间"), tr("空间名:"))
+        name, ok = QInputDialog.getText(self, tr("新建图库空间"), tr_label('空间名'))
         if not ok or not str(name).strip():
             return
         name = str(name).strip()

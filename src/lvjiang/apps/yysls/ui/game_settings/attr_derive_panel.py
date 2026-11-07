@@ -49,7 +49,7 @@ from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config import (
     get_derivation,
     get_game_config,
@@ -606,7 +606,7 @@ class AttrDerivePanel(QWidget):
             return
 
         name, ok = QInputDialog.getText(
-            self, tr("存为基础属性"), tr("名称："),
+            self, tr("存为基础属性"), tr_label('名称'),
             text=tr("{school} 推导").format(school=self._school()))
         if not ok or not name.strip():
             return

@@ -39,7 +39,7 @@ from lvjiang.ui.button_styles import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.presentation import (
     style_document_tabs,
 )
@@ -1080,7 +1080,7 @@ class OptimalComboPage(QWidget):
         if missing:
             QMessageBox.warning(
                 self, tr("无法搜索"),
-                tr("以下部位没有候选装备：") + "、".join(missing))
+                tr_label('以下部位没有候选装备') + "、".join(missing))
             return
 
         equipment_set = str(self._combo_equipment_set.currentData() or "")

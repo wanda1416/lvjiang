@@ -69,7 +69,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.config.resolver import LAYER_LOCAL, LAYER_SYSTEM, get_resolver
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ...workflows.file_tree import (
     WORKFLOWS_DIR,
     WorkflowFile,
@@ -900,7 +900,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
         path = get_resolver().local_dir / "workflows" / rel_path
         if not path.is_file():
-            self._set_status(tr("脚本文件不存在：") + rel_path, error=True)
+            self._set_status(tr_label('脚本文件不存在') + rel_path, error=True)
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
         self._set_status(f"{tr('已用外部编辑器打开')}：{rel_path}:{line}")

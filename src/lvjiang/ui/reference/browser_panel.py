@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 
 THUMB_SIZE = 96  # 图库缩略图尺寸
@@ -157,13 +157,13 @@ class BrowserPanel(QWidget):
 
         # ── 过滤栏 ──
         filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel(tr("分组:")))
+        filter_layout.addWidget(QLabel(tr_label('分组')))
         self._group_filter = AutoWidthComboBox()
         self._group_filter.addItem(tr("全部"), "")
         self._group_filter.setMinimumWidth(120)
         filter_layout.addWidget(self._group_filter)
 
-        filter_layout.addWidget(QLabel(tr("名称:")))
+        filter_layout.addWidget(QLabel(tr_label('名称')))
         self._label_filter = AutoWidthComboBox()
         self._label_filter.addItem(tr("全部"), "")
         self._label_filter.setMinimumWidth(120)
@@ -247,13 +247,13 @@ class BrowserPanel(QWidget):
         edit_layout.addWidget(self._file_label)
 
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel(tr("名称:")))
+        row1.addWidget(QLabel(tr_label('名称')))
         self._label_edit = QLineEdit()
         row1.addWidget(self._label_edit)
         edit_layout.addLayout(row1)
 
         row_group = QHBoxLayout()
-        row_group.addWidget(QLabel(tr("分组:")))
+        row_group.addWidget(QLabel(tr_label('分组')))
         self._group_edit = AutoWidthComboBox()
         self._group_edit.setEditable(True)
         row_group.addWidget(self._group_edit, 1)  # stretch=1 让它填充剩余空间
@@ -265,7 +265,7 @@ class BrowserPanel(QWidget):
         edit_layout.addLayout(self._meta_edit_layout)
 
         row_notes = QHBoxLayout()
-        row_notes.addWidget(QLabel(tr("备注:")))
+        row_notes.addWidget(QLabel(tr_label('备注')))
         self._notes_edit = QLineEdit()
         row_notes.addWidget(self._notes_edit)
         edit_layout.addLayout(row_notes)
@@ -293,14 +293,14 @@ class BrowserPanel(QWidget):
         batch_edit_layout.addWidget(batch_hint)
 
         brow1 = QHBoxLayout()
-        brow1.addWidget(QLabel(tr("名称:")))
+        brow1.addWidget(QLabel(tr_label('名称')))
         self._batch_label_edit = QLineEdit()
         self._batch_label_edit.setPlaceholderText(tr("留空则不修改"))
         brow1.addWidget(self._batch_label_edit)
         batch_edit_layout.addLayout(brow1)
 
         brow_group = QHBoxLayout()
-        brow_group.addWidget(QLabel(tr("分组:")))
+        brow_group.addWidget(QLabel(tr_label('分组')))
         self._batch_group_edit = AutoWidthComboBox()
         self._batch_group_edit.setEditable(True)
         brow_group.addWidget(self._batch_group_edit, 1)
@@ -563,7 +563,7 @@ class BrowserPanel(QWidget):
         self._group_filter.blockSignals(True)
         self._group_filter.clear()
         self._group_filter.addItem(tr("全部"), "")
-        self._group_filter.addItem(tr("- 未分组 -"), "ungrouped")
+        self._group_filter.addItem("-" + tr('未分组') + " -", "ungrouped")
         for g in self._db.get_groups():
             self._group_filter.addItem(g, g)
         idx = self._group_filter.findData(cur_group)
@@ -574,7 +574,7 @@ class BrowserPanel(QWidget):
         self._label_filter.blockSignals(True)
         self._label_filter.clear()
         self._label_filter.addItem(tr("全部"), "")
-        self._label_filter.addItem(tr("- 未命名 -"), "unnamed")
+        self._label_filter.addItem("-" + tr('未命名') + " -", "unnamed")
         for t in self._db.get_labels():
             self._label_filter.addItem(t, t)
         idx = self._label_filter.findData(cur_label)

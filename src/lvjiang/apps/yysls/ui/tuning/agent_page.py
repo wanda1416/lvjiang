@@ -32,7 +32,7 @@ from .....core.agent_docs import AgentDocuments
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_access
 from .....core.agent_settings import AgentSettings, load_agent_settings
 from .....core.plugin_runtime import PluginRuntimePort, RuntimeTarget
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_button_style
 from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
 from ...core.agent.service import AgentService, revision
@@ -242,7 +242,7 @@ class AgentTaskBridge(QObject):
                 try:
                     self.service.store.mutate("tasks", lambda records: {**records, run.task_run_id: data})
                 except (OSError, ValueError) as exc:
-                    host.append_log(tr("Agent 任务状态保存失败：") + str(exc))
+                    host.append_log(tr_label('Agent 任务状态保存失败') + str(exc))
             run.worker.finished.connect(complete)
             if not run.worker.isRunning():
                 QTimer.singleShot(0, complete)
@@ -328,7 +328,7 @@ class AgentTuningPage(QWidget):
         self.timer.start()
         self._refresh_state()
         if settings_error:
-            self.status.setText(tr("无法读取 MCP 接入配置：") + settings_error)
+            self.status.setText(tr_label('无法读取 MCP 接入配置') + settings_error)
         elif self.connection.enabled and not is_readonly():
             QTimer.singleShot(0, self._start_service)
         app = QApplication.instance()
@@ -376,7 +376,7 @@ class AgentTuningPage(QWidget):
             self.agent_settings = settings
             self._show_export_path()
         except (ValueError, OSError) as exc:
-            self.status.setText(tr("Agent 设置无法读取：") + str(exc))
+            self.status.setText(tr_label('Agent 设置无法读取') + str(exc))
 
     def _selected_agent(self):
         return next((item for item in self.agent_settings.items
@@ -469,7 +469,7 @@ class AgentTuningPage(QWidget):
         try:
             self.connection.save(self.root)
         except OSError as exc:
-            self.status.setText(tr("停用状态未保存：") + str(exc))
+            self.status.setText(tr_label('停用状态未保存') + str(exc))
             return
         self.service.set_enabled(False)
         if self.server:

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 
 from ...core.layout_models import Arrow, Point
 from ...core.scene_registry import get_point_name
-from ...i18n import tr
+from ...i18n import tr, tr_label
 
 # ─── 常量 ────────────────────────────────────────────────
 
@@ -387,7 +387,7 @@ class CanvasPoiMixin:
         items = [f"{n} ({k})" for k, n in available]
         dlg = QInputDialog(self.window())
         dlg.setWindowTitle(tr("复制坐标"))
-        dlg.setLabelText(tr("新坐标绑定哪个坐标点？（沿用源半径）："))
+        dlg.setLabelText(tr_label('新坐标绑定哪个坐标点？（沿用源半径）'))
         dlg.setComboBoxItems(items)
         dlg.setStyleSheet(
             "QInputDialog { background-color: palette(window); }"

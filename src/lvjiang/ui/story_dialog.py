@@ -48,7 +48,7 @@ from lvjiang.core.story import (
     set_group_threshold,
     upsert_entry,
 )
-from lvjiang.i18n import tr
+from lvjiang.i18n import tr, tr_label
 from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
@@ -119,7 +119,7 @@ class StoryChoicesDialog(QDialog):
         row = QHBoxLayout()
         # 与设置行同一间距：间距不同时，两个标签等宽也会让后面的控件错开。
         row.setSpacing(_FIELD_ROW_SPACING)
-        self._group_label = QLabel(tr("配置文件："))
+        self._group_label = QLabel(tr_label('配置文件'))
         row.addWidget(self._group_label)
         self._group = AutoWidthComboBox()
         self._group.setToolTip(
@@ -153,7 +153,7 @@ class StoryChoicesDialog(QDialog):
             tr("选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择")
         )
         self._threshold.editingFinished.connect(self._on_threshold_edited)
-        self._threshold_label = QLabel(tr("匹配阈值："))
+        self._threshold_label = QLabel(tr_label('匹配阈值'))
         row.addWidget(self._threshold_label)
         row.addWidget(self._threshold)
 
@@ -169,12 +169,12 @@ class StoryChoicesDialog(QDialog):
                 if item is not None:
                     item.setEnabled(False)
         self._layer.setToolTip(tr("普通用户只能保存到本地；系统为随发布内容"))
-        self._save_label = QLabel(tr("保存到："))
+        self._save_label = QLabel(tr_label('保存到'))
         row.addWidget(self._save_label)
         row.addWidget(self._layer)
 
         row.addStretch(1)
-        row.addWidget(QLabel(tr("文案库来源：")))
+        row.addWidget(QLabel(tr_label('文案库来源')))
         self._origin = QLabel()
         row.addWidget(self._origin)
         return row
@@ -224,19 +224,19 @@ class StoryChoicesDialog(QDialog):
 
         self._scene = QLineEdit()
         self._scene.setPlaceholderText(tr("如 主线-第三章-问剑"))
-        form.addRow(tr("场景/任务："), self._scene)
+        form.addRow(tr_label('场景/任务'), self._scene)
         self._question = QLineEdit()
         self._question.setPlaceholderText(tr("问题或旁白关键文本（可选）"))
-        form.addRow(tr("问题/旁白："), self._question)
+        form.addRow(tr_label('问题/旁白'), self._question)
         self._options = QPlainTextEdit()
         self._options.setPlaceholderText(tr("每行一个选项"))
         self._options.textChanged.connect(self._sync_answers)
-        form.addRow(tr("选项："), self._options)
+        form.addRow(tr_label('选项'), self._options)
         self._answer = AutoWidthComboBox()
-        form.addRow(tr("正确答案："), self._answer)
+        form.addRow(tr_label('正确答案'), self._answer)
         self._note = QLineEdit()
         self._note.setPlaceholderText(tr("为什么选这个（可选）"))
-        form.addRow(tr("备注："), self._note)
+        form.addRow(tr_label('备注'), self._note)
         return box
 
     def _build_bottom(self) -> QHBoxLayout:
@@ -293,10 +293,10 @@ class StoryChoicesDialog(QDialog):
             save_group(name, StoryDoc(), layer=self._layer.currentData())
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"story: 新建配置文件失败: {exc}")
-            self._set_status(tr("新建失败：") + str(exc), error=True)
+            self._set_status(tr_label('新建失败') + str(exc), error=True)
             return
         self._reload_groups(select=name)
-        self._set_status(tr("已新建配置文件：") + name)
+        self._set_status(tr_label('已新建配置文件') + name)
 
     def _on_delete_group(self) -> None:
         group = self._current_group()
@@ -316,10 +316,10 @@ class StoryChoicesDialog(QDialog):
             delete_group(group, layer=self._layer.currentData())
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"story: 删除配置文件失败: {exc}")
-            self._set_status(tr("删除失败：") + str(exc), error=True)
+            self._set_status(tr_label('删除失败') + str(exc), error=True)
             return
         self._reload_groups()
-        self._set_status(tr("已删除配置文件：") + group)
+        self._set_status(tr_label('已删除配置文件') + group)
 
     # ─── 条目 ────────────────────────────────────────────
 
@@ -353,7 +353,7 @@ class StoryChoicesDialog(QDialog):
                 group, self._threshold.value(), layer=self._layer.currentData())
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"story: 保存匹配阈值失败: {exc}")
-            self._set_status(tr("阈值保存失败：") + str(exc), error=True)
+            self._set_status(tr_label('阈值保存失败') + str(exc), error=True)
             return
         self._set_status(tr("匹配阈值已保存到") + group)
 
@@ -434,7 +434,7 @@ class StoryChoicesDialog(QDialog):
         self._answer.addItems(list(entry.options))
         self._answer.setCurrentText(entry.answer)
         self._note.setText(entry.note)
-        self._set_status(tr("正在编辑：") + (entry.scene or entry.id))
+        self._set_status(tr_label('正在编辑') + (entry.scene or entry.id))
 
     def _on_add(self) -> None:
         if not self._current_group():
@@ -471,7 +471,7 @@ class StoryChoicesDialog(QDialog):
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"story: 删除文案失败: {exc}")
-            self._set_status(tr("删除失败：") + str(exc), error=True)
+            self._set_status(tr_label('删除失败') + str(exc), error=True)
             return
         self._current_id = ""
         self._reload_entries()
@@ -508,7 +508,7 @@ class StoryChoicesDialog(QDialog):
                          match_threshold=self._threshold.value())
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"story: 保存文案失败: {exc}")
-            self._set_status(tr("保存失败：") + str(exc), error=True)
+            self._set_status(tr_label('保存失败') + str(exc), error=True)
             return
         self._current_id = entry.id
         self._reload_entries()

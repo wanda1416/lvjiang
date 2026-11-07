@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.config.resolver import get_resolver
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..dialog_guards import EscapeCloseConfirmationMixin
 
 _STYLE_IDLE = (
@@ -186,7 +186,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.btn_clear.clicked.connect(self._on_clear)
 
         precision_row = QHBoxLayout()
-        lbl_precision = QLabel(tr("录制精度："))
+        lbl_precision = QLabel(tr_label('录制精度'))
         precision_row.addWidget(lbl_precision)
         self.radio_precision_low = QRadioButton(tr("低精度"))
         low_tip = tr(

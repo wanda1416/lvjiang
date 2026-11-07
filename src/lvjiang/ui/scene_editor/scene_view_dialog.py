@@ -26,7 +26,7 @@ from ...core.layout_manager import rename_view_screenshots
 from ...core.scene_definition import BASE_VIEW_KEY
 from ...core.scene_registry import get_registry, sync_scene_cache
 from ...core.scene_transitions import entries_of_view, exits_of_view
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
@@ -94,12 +94,12 @@ class ViewManagerDialog(QDialog):
         self._btn_save_relation = QPushButton(tr("保存关系"))
         self._btn_save_relation.clicked.connect(self._save_relation)
         apply_button_style(self._btn_save_relation)
-        relation_row.addWidget(QLabel(tr("关系：")))
+        relation_row.addWidget(QLabel(tr_label('关系')))
         relation_row.addWidget(self._relation)
         relation_row.addStretch()
         layout.addLayout(relation_row)
         owner_row = QHBoxLayout()
-        owner_row.addWidget(QLabel(tr("关联视图：")))
+        owner_row.addWidget(QLabel(tr_label('关联视图')))
         owner_row.addWidget(self._owner_group, 2)
         owner_row.addWidget(self._owner_scene, 3)
         owner_row.addWidget(self._owner_view, 2)
@@ -414,14 +414,14 @@ class ViewManagerDialog(QDialog):
         form = QFormLayout(dialog)
         key_edit = QLineEdit()
         key_edit.setPlaceholderText(tr("小写字母开头，仅含小写字母/数字/下划线"))
-        form.addRow(tr("视图 Key:"), key_edit)
+        form.addRow(tr_label('视图 Key'), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()
         name_edit.setPlaceholderText(tr("留空则与 key 相同"))
-        form.addRow(tr("视图名称:"), name_edit)
+        form.addRow(tr_label('视图名称'), name_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
@@ -495,14 +495,14 @@ class ViewManagerDialog(QDialog):
         if old_key == BASE_VIEW_KEY:
             key_edit.setEnabled(False)
             key_edit.setToolTip(tr("基底视图的 key 是保留值，不可重命名"))
-        form.addRow(tr("视图 Key:"), key_edit)
+        form.addRow(tr_label('视图 Key'), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit(old_view.name)
         name_edit.setPlaceholderText(tr("留空则与 key 相同"))
-        form.addRow(tr("视图名称:"), name_edit)
+        form.addRow(tr_label('视图名称'), name_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel

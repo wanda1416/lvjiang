@@ -34,7 +34,7 @@ LOCK_REASON_PLAN = "plan"
 LOCK_REASON_RUNNING = "running"
 
 # 方案下拉的「不使用方案」项，userData 为空串。
-PLAN_CUSTOM_LABEL = tr("- 自定义 -")
+PLAN_CUSTOM_LABEL = "-" + tr('自定义') + " -"
 
 # automation_state_changed 的非常规状态。订阅方必须显式处理——
 # 它们的 else 分支都会把未知状态当成「就绪」。

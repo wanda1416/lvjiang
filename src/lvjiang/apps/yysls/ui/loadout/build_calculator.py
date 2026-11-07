@@ -36,7 +36,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_button_style, apply_compact_button_style
 from .....ui.layout_helpers import fit_combo_to_contents
 from .....ui.widgets import strip_focus_rect
@@ -932,7 +932,7 @@ class BuildEditor(QWidget):
             try:
                 self._show_calculation()
             except (ValueError, KeyError, ArithmeticError) as exc:
-                self.metrics.setText(tr("计算失败：") + str(exc))
+                self.metrics.setText(tr_label('计算失败') + str(exc))
         valid_requirements = all(
             row.get("minimum", 0) <= row.get("maximum", TOTAL_AFFIXES_MAX)
             for row in requirements)

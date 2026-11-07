@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_button_style
 from .affix_picker import AffixSelectSortDialog
 
@@ -231,7 +231,7 @@ class _ConditionGroupBox(QGroupBox):
         layout.setContentsMargins(8, 4, 8, 4)
         # 开关前提：绑定开关 key + 期望值，不绑定 = 恒生效
         when_row = QHBoxLayout()
-        when_row.addWidget(QLabel(tr("开关前提：")))
+        when_row.addWidget(QLabel(tr_label('开关前提')))
         self.when_combo = AutoWidthComboBox()
         self.when_combo.addItem(tr("（无，恒生效）"), "")
         for key in switch_keys:

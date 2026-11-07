@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.user_config import UserConfigManager
 
-from ..i18n import tr
+from ..i18n import tr, tr_label
 from .avatar_editor_dialog import AvatarEditorDialog
 from .avatar_widget import AvatarWidget
 
@@ -555,7 +555,7 @@ class UserManagerDialog(QDialog):
     def _on_create_user(self):
         """新建用户"""
         name, ok = QInputDialog.getText(
-            self, tr("新建用户"), tr("请输入用户名："),
+            self, tr("新建用户"), tr_label('请输入用户名'),
         )
         if not ok or not name:
             return

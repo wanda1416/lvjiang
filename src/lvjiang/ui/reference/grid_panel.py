@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.reference_db import MetaFieldDef
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 
 
@@ -50,19 +50,19 @@ class CellEditor(QWidget):
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(4)
 
-        info_layout.addWidget(QLabel(tr("名称:")), 0, 0)
+        info_layout.addWidget(QLabel(tr_label('名称')), 0, 0)
         self.label_edit = AutoWidthComboBox()
         self.label_edit.setEditable(True)
         self.label_edit.setMinimumWidth(100)
         info_layout.addWidget(self.label_edit, 0, 1)
 
-        self._group_label = QLabel(tr("分组:"))
+        self._group_label = QLabel(tr_label('分组'))
         info_layout.addWidget(self._group_label, 1, 0)
         self.group_edit = AutoWidthComboBox()
         self.group_edit.setEditable(True)
         info_layout.addWidget(self.group_edit, 1, 1)
 
-        info_layout.addWidget(QLabel(tr("备注:")), 2, 0)
+        info_layout.addWidget(QLabel(tr_label('备注')), 2, 0)
         self.notes_edit = QLineEdit()
         info_layout.addWidget(self.notes_edit, 2, 1)
 
@@ -192,17 +192,17 @@ class GridPanel(QWidget):
         grid_layout = QVBoxLayout(grid_group)
 
         row_layout = QHBoxLayout()
-        row_layout.addWidget(QLabel(tr("行:")))
+        row_layout.addWidget(QLabel(tr_label('行')))
         self._rows_spin = QSpinBox()
         self._rows_spin.setRange(1, 20)
         self._rows_spin.setValue(self._default_rows)
         row_layout.addWidget(self._rows_spin)
-        row_layout.addWidget(QLabel(tr("列:")))
+        row_layout.addWidget(QLabel(tr_label('列')))
         self._cols_spin = QSpinBox()
         self._cols_spin.setRange(1, 20)
         self._cols_spin.setValue(self._default_cols)
         row_layout.addWidget(self._cols_spin)
-        row_layout.addWidget(QLabel(tr("间隔:")))
+        row_layout.addWidget(QLabel(tr_label('间隔')))
         self._gap_spin = QSpinBox()
         self._gap_spin.setRange(0, 50)
         self._gap_spin.setValue(self._default_gap)
@@ -217,13 +217,13 @@ class GridPanel(QWidget):
         cell_layout = QVBoxLayout(cell_group)
 
         size_layout = QHBoxLayout()
-        size_layout.addWidget(QLabel(tr("高:")))
+        size_layout.addWidget(QLabel(tr_label('高')))
         self._height_spin = QSpinBox()
         self._height_spin.setRange(10, 500)
         self._height_spin.setValue(self._default_height)
         self._height_spin.setSuffix(" px")
         size_layout.addWidget(self._height_spin)
-        size_layout.addWidget(QLabel(tr("宽:")))
+        size_layout.addWidget(QLabel(tr_label('宽')))
         self._width_spin = QSpinBox()
         self._width_spin.setRange(10, 500)
         self._width_spin.setValue(self._default_width)
@@ -269,7 +269,7 @@ class GridPanel(QWidget):
 
         # 批量设置 + 提交
         batch_layout = QHBoxLayout()
-        batch_layout.addWidget(QLabel(tr("批量分组:")))
+        batch_layout.addWidget(QLabel(tr_label('批量分组')))
         self._batch_group = AutoWidthComboBox()
         self._batch_group.setEditable(True)
         self._batch_group.setMinimumWidth(100)

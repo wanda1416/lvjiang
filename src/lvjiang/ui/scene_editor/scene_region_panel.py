@@ -34,7 +34,7 @@ from ...core.scene_registry import (
     is_view_visible,
     sync_scene_cache,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
 from .entity_edit_form import (
@@ -105,7 +105,7 @@ class RegionPanelMixin:
         layout.addWidget(self._region_table)
 
         btn_row = QHBoxLayout()
-        self._btn_new_region = QPushButton(tr("+ 创建区域"))
+        self._btn_new_region = QPushButton("+" + tr('创建区域'))
         self._btn_new_region.clicked.connect(self._on_new_region)
         btn_row.addWidget(self._btn_new_region)
         self._btn_del_region = QPushButton(tr("删除区域"))
@@ -113,7 +113,7 @@ class RegionPanelMixin:
         self._btn_del_region.setEnabled(False)
         btn_row.addWidget(self._btn_del_region)
         # 跨场景引用：只能新增/移除，坐标属于源场景，本场景改不了
-        self._btn_add_ref = QPushButton(tr("+ 引用区域"))
+        self._btn_add_ref = QPushButton("+" + tr('引用区域'))
         self._btn_add_ref.clicked.connect(self._on_add_scene_reference)
         btn_row.addWidget(self._btn_add_ref)
         self._btn_click_rect_mode = QPushButton(tr("标定点击区域"))
@@ -621,13 +621,13 @@ class RegionPanelMixin:
         name_edit.setPlaceholderText(tr("中文名称"))
         if region_def:
             name_edit.setText(region_def.name)
-        form.addRow(tr("名称:"), name_edit)
+        form.addRow(tr_label('名称'), name_edit)
 
         type_combo = AutoWidthComboBox()
         type_combo.addItems(sorted(VALID_REGION_TYPES))
         if region_def:
             type_combo.setCurrentText(region_def.type)
-        form.addRow(tr("类型:"), type_combo)
+        form.addRow(tr_label('类型'), type_combo)
 
         is_text_check = QCheckBox(tr("含文本"))
         if region_def:

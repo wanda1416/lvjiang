@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.user_notes import MAX_TEXT_LENGTH, UserNote, UserNotesRepository
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..user_toolbar import USER_TOOLBAR_BTN_STYLE
 from .user_info_styles import USER_INFO_GROUP_STYLE
 
@@ -157,7 +157,7 @@ class UserNotesPanel(QGroupBox):
 
     def _prompt_text(self, title: str, current: str = "") -> str | None:
         text, accepted = QInputDialog.getMultiLineText(
-            self, title, tr("便利贴内容:"), current
+            self, title, tr_label('便利贴内容'), current
         )
         if not accepted:
             return None

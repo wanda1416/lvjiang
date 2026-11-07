@@ -38,7 +38,7 @@ from ..core.daily_history import (
     TaskRunRecord,
     resolve_history_path,
 )
-from ..i18n import tr
+from ..i18n import tr, tr_label
 from .button_styles import apply_button_style
 from .history_viewer import HistoryViewer
 
@@ -527,7 +527,7 @@ class DailyHistoryDialog(QDialog):
             return
         self._batch_filter = record.batch_run_id
         self._batch_filter_label.setText(
-            tr("当前批次：") + record.config_name + " · " + _format_time(record.started_at))
+            tr_label('当前批次') + record.config_name + " · " + _format_time(record.started_at))
         self._batch_filter_label.setVisible(True)
         self._clear_batch_filter_button.setVisible(True)
         self._users.clear_checks()

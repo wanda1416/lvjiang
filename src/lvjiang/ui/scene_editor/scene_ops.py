@@ -27,7 +27,7 @@ from ...core.scene_registry import (
     get_scene_name,
     reload_scene_registry,
 )
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_dialog_button_box_style
 from .scene_tab import SceneTab
 
@@ -242,14 +242,14 @@ class SceneOpsMixin:
         form.addRow(hint)
         key_edit = QLineEdit()
         key_edit.setPlaceholderText(tr("英文，如 my_scene"))
-        form.addRow(tr("场景 Key:"), key_edit)
+        form.addRow(tr_label('场景 Key'), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()
         name_edit.setPlaceholderText(tr("中文名称"))
-        form.addRow(tr("场景名称:"), name_edit)
+        form.addRow(tr_label('场景名称'), name_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -316,14 +316,14 @@ class SceneOpsMixin:
         form = QFormLayout(dialog)
         key_edit = QLineEdit()
         key_edit.setPlaceholderText(tr("英文，如 my_group"))
-        form.addRow(tr("分组 Key:"), key_edit)
+        form.addRow(tr_label('分组 Key'), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()
         name_edit.setPlaceholderText(tr("中文名称"))
-        form.addRow(tr("分组名称:"), name_edit)
+        form.addRow(tr_label('分组名称'), name_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -384,9 +384,9 @@ class SceneOpsMixin:
         dialog = QDialog(self)  # type: ignore[arg-type]
         form = QFormLayout(dialog)
         key_edit = QLineEdit(group_key)
-        form.addRow(tr("分组 Key:"), key_edit)
+        form.addRow(tr_label('分组 Key'), key_edit)
         name_edit = QLineEdit(old_name)
-        form.addRow(tr("分组名称:"), name_edit)
+        form.addRow(tr_label('分组名称'), name_edit)
         error_label = QLabel("")
         error_label.setStyleSheet("color: red;")
         error_label.hide()
@@ -610,9 +610,9 @@ class SceneOpsMixin:
         if protected:
             key_edit.setEnabled(False)
             key_edit.setToolTip(tr("系统场景不能修改 key"))
-        form.addRow(tr("场景 Key:"), key_edit)
+        form.addRow(tr_label('场景 Key'), key_edit)
         name_edit = QLineEdit(old_name)
-        form.addRow(tr("场景名称:"), name_edit)
+        form.addRow(tr_label('场景名称'), name_edit)
         error_label = QLabel("")
         error_label.setStyleSheet("color: red;")
         error_label.hide()

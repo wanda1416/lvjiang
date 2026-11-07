@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, has_agent_access
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from .....ui.button_styles import apply_button_style
 from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
@@ -89,13 +89,13 @@ class AgentResultsDialog(QDialog):
         prepared = self.service.prepare_generated_tuning(record["user"], record["id"])
         plans = prepared["smart_state"]["plans"]
         smart = prepared["smart_tuning"]
-        lines = [tr("执行用户：") + record["user"], tr("目标：") + record["goal"]]
+        lines = [tr_label('执行用户') + record["user"], tr_label('目标') + record["goal"]]
         if not smart["required"]:
             lines.append(tr("普通规则调律：此基础组未启用毕业率判定。"))
         else:
             infos = smart["plans"]
             participating = list(dict.fromkeys(info["plan_id"] for info in infos if info["status"] == "ready"))
-            lines.append(tr("实际参与智能判定的方案："))
+            lines.append(tr_label('实际参与智能判定的方案'))
             for plan_id in participating:
                 plan = plans[plan_id]
                 lines.append(" · ".join(str(plan.get(key) or "—") for key in
@@ -108,8 +108,8 @@ class AgentResultsDialog(QDialog):
             excluded.extend(f"{plan['name']}：" + tr("未匹配本次规则玩法")
                             for plan_id, plan in plans.items() if plan_id not in mentioned)
             if excluded:
-                lines.extend([tr("未参与的方案或规则及原因："), *excluded])
-        lines.extend([tr("培养建议："), *record["suggestions"],
+                lines.extend([tr_label('未参与的方案或规则及原因'), *excluded])
+        lines.extend([tr_label('培养建议'), *record["suggestions"],
                       tr("启动时会再次核对判定范围，并执行当前选中的设备；不会改变默认选择。")])
         self.details.setPlainText("\n".join(lines))
         self.start.setEnabled(prepared["ready"])

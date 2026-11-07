@@ -55,7 +55,7 @@ from ...core.android.gesture_probe import (
     screen_size,
 )
 from ...core.update import get_version
-from ...i18n import tr
+from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 from .device_scan import DeviceDiscoveryWorker, DeviceScanPanel
 from .diagnostics import build_checks, build_report, capability_notes
@@ -300,7 +300,7 @@ class MobileDeviceDialog(QDialog):
             tr("当前版本 <b>{v}</b> · 对应安装包 {name}").format(
                 v=self._version, name=apk_asset_name(self._version))))
         header.addStretch()
-        header.addWidget(QLabel(tr("设备：")))
+        header.addWidget(QLabel(tr_label('设备')))
         self._device_combo = AutoWidthComboBox()
         self._device_combo.setMinimumWidth(220)
         header.addWidget(self._device_combo)
@@ -396,7 +396,7 @@ class MobileDeviceDialog(QDialog):
             "换地址只改链接，不会中断共享"))
         self._lan_combo.currentIndexChanged.connect(
             lambda _i: self._refresh_qr())
-        self._lan_form.addRow(tr("本机地址："), self._lan_combo)
+        self._lan_form.addRow(tr_label('本机地址'), self._lan_combo)
         state_layout.addLayout(self._lan_form)
         self._progress = QProgressBar()
         self._progress.setVisible(False)
@@ -439,7 +439,7 @@ class MobileDeviceDialog(QDialog):
             "也就是「推着摇杆同时连点」。\n"
             "请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。")))
         row = QHBoxLayout()
-        row.addWidget(QLabel(tr("按住时长（秒）：")))
+        row.addWidget(QLabel(tr_label('按住时长（秒）')))
         self._hold_spin = QDoubleSpinBox()
         self._hold_spin.setRange(0.5, 10.0)
         self._hold_spin.setSingleStep(0.5)

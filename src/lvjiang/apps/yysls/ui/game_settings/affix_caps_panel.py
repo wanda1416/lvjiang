@@ -55,7 +55,7 @@ from lvjiang.ui.button_styles import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
-from .....i18n import tr
+from .....i18n import tr, tr_label
 from ...config.affix_levels import FROM_KEY as FROM_LEVEL_KEY
 from ...config.affix_levels import THROUGH_KEY as THROUGH_LEVEL_KEY
 from ...config.affix_levels import LevelRange, parse_range
@@ -195,11 +195,11 @@ class AffixCapsPanel(QWidget):
 
         # 添加/删除词组按钮
         affix_btn_layout = QHBoxLayout()
-        self._btn_add_affix = QPushButton(tr("+ 词组"))
+        self._btn_add_affix = QPushButton("+" + tr('词组'))
         self._btn_add_affix.clicked.connect(self._add_affix)
         affix_btn_layout.addWidget(self._btn_add_affix)
 
-        self._btn_del_affix = QPushButton(tr("- 词组"))
+        self._btn_del_affix = QPushButton("-" + tr('词组'))
         self._btn_del_affix.clicked.connect(self._del_affix)
         affix_btn_layout.addWidget(self._btn_del_affix)
         apply_button_style(self._btn_add_affix)
@@ -351,17 +351,17 @@ class AffixCapsPanel(QWidget):
         alias_title_row = QHBoxLayout()
         alias_title_row.addWidget(QLabel(tr("词条名称（原始词条名 → 当前类别）")))
         alias_title_row.addStretch()
-        self._btn_add_group = QPushButton(tr("+ 分组"))
+        self._btn_add_group = QPushButton("+" + tr('分组'))
         self._btn_add_group.setMinimumWidth(60)
         self._btn_add_group.clicked.connect(self._add_group)
         self._btn_add_group.setVisible(False)
         alias_title_row.addWidget(self._btn_add_group)
-        self._btn_del_group = QPushButton(tr("- 分组"))
+        self._btn_del_group = QPushButton("-" + tr('分组'))
         self._btn_del_group.setMinimumWidth(60)
         self._btn_del_group.clicked.connect(self._del_group)
         self._btn_del_group.setVisible(False)
         alias_title_row.addWidget(self._btn_del_group)
-        self._btn_add_alias = QPushButton(tr("+ 词条名"))
+        self._btn_add_alias = QPushButton("+" + tr('词条名'))
         self._btn_add_alias.setMinimumWidth(70)
         self._btn_add_alias.clicked.connect(self._add_alias)
         alias_title_row.addWidget(self._btn_add_alias)
@@ -429,12 +429,12 @@ class AffixCapsPanel(QWidget):
             "原词条自动变成目标词条；只影响升级投影，不改真实扫描结果"))
         upgrade_hint.setStyleSheet("color: palette(mid);")
         upgrade_header.addWidget(upgrade_hint, 1)
-        self._btn_add_upgrade = QPushButton(tr("+ 规则"))
+        self._btn_add_upgrade = QPushButton("+" + tr('规则'))
         self._btn_add_upgrade.setMinimumWidth(70)
         self._btn_add_upgrade.clicked.connect(self._add_upgrade_rule)
         apply_button_style(self._btn_add_upgrade)
         upgrade_header.addWidget(self._btn_add_upgrade)
-        self._btn_del_upgrade = QPushButton(tr("- 规则"))
+        self._btn_del_upgrade = QPushButton("-" + tr('规则'))
         self._btn_del_upgrade.setMinimumWidth(70)
         self._btn_del_upgrade.clicked.connect(self._del_upgrade_rule)
         apply_button_style(self._btn_del_upgrade, variant="danger")
@@ -626,7 +626,7 @@ class AffixCapsPanel(QWidget):
 
     def _add_affix(self):
         """添加新词组"""
-        name, ok = QInputDialog.getText(self, tr("添加词组"), tr("词组名称:"))
+        name, ok = QInputDialog.getText(self, tr("添加词组"), tr_label('词组名称'))
         if not ok or not name:
             return
 
@@ -647,7 +647,7 @@ class AffixCapsPanel(QWidget):
     def _rename_affix(self, item):
         """双击词组类别重命名（保留在 YAML 中的键顺序）"""
         old = item.text()
-        name, ok = QInputDialog.getText(self, tr("重命名词组"), tr("词组名称:"), text=old)
+        name, ok = QInputDialog.getText(self, tr("重命名词组"), tr_label('词组名称'), text=old)
         if not ok or not name:
             return
         name = name.strip()
@@ -972,7 +972,7 @@ class AffixCapsPanel(QWidget):
         """添加词条分组"""
         if not self._current_affix or not self._is_grouped():
             return
-        name, ok = QInputDialog.getText(self, tr("添加分组"), tr("分组名称:"))
+        name, ok = QInputDialog.getText(self, tr("添加分组"), tr_label('分组名称'))
         if not ok or not name:
             return
         name = name.strip()
@@ -996,7 +996,7 @@ class AffixCapsPanel(QWidget):
         if index < 0 or not self._current_affix:
             return
         old = self._alias_group_tabs.tabText(index)
-        name, ok = QInputDialog.getText(self, tr("重命名分组"), tr("分组名称:"), text=old)
+        name, ok = QInputDialog.getText(self, tr("重命名分组"), tr_label('分组名称'), text=old)
         if not ok or not name:
             return
         name = name.strip()
@@ -1257,7 +1257,7 @@ class AffixCapsPanel(QWidget):
         """编辑具体词条的外部简称，一行一个。"""
         current = "\n".join(self._get_external_aliases(affix_name))
         text, ok = QInputDialog.getMultiLineText(
-            self, tr("编辑别名"), tr("别名（每行一个）:"), current,
+            self, tr("编辑别名"), tr_label('别名（每行一个）'), current,
         )
         if not ok:
             return
@@ -1494,7 +1494,7 @@ class AffixCapsPanel(QWidget):
 
     def _rename_alias(self, alias: str):
         """双击词条名标签重命名（原位替换，兼容分组/不分组形态）"""
-        name, ok = QInputDialog.getText(self, tr("重命名词条名"), tr("原始词条名称:"), text=alias)
+        name, ok = QInputDialog.getText(self, tr("重命名词条名"), tr_label('原始词条名称'), text=alias)
         if not ok or not name:
             return
         name = name.strip()
@@ -1541,7 +1541,7 @@ class AffixCapsPanel(QWidget):
             QMessageBox.information(self, tr("提示"), tr("请先选择词条类别"))
             return
 
-        name, ok = QInputDialog.getText(self, tr("添加词条名"), tr("原始词条名称:"))
+        name, ok = QInputDialog.getText(self, tr("添加词条名"), tr_label('原始词条名称'))
         if not ok or not name:
             return
 

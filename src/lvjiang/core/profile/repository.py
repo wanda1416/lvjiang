@@ -2,8 +2,8 @@
 
 替代早期 user.json 中的 profile 节点（该文件已不存在），提供：
 - profile_entries: 当前值（upsert 覆盖）
-- profile_history: 变更历史（action/override/tick/reset；身份重命名更新引用）
-- profile_key_renames: 全用户 key 重命名审计
+- profile_history: 变更账本——本机操作与跨端回放写同一张表，按 ``device_id``
+  归属；行身份是「哪台设备上的第几号操作」``(device_id, origin_local_id)``
 - schema_version: 轻量版本管理，支持未来增量迁移
 
 数据库路径: config/session/profile.db（单文件集中存储）
@@ -179,6 +179,32 @@ def _migrate_v9(conn: sqlite3.Connection) -> None:
     conn.execute("DROP TABLE IF EXISTS profile_key_renames")
 
 
+def _migrate_v10(conn: sqlite3.Connection) -> None:
+    """history 升级为「跨端可还原的账本」：补行身份与来源作者。
+
+    行身份是 ``(device_id, origin_local_id)``——「哪台设备上的第几号操作」，
+    而不是本地自增 ``id``。本地自增 id 会在库重建后重新编号，拿它判重必然
+    在重建窗口期失效；``origin_local_id`` 由写入方给出，重建后仍然一致。
+
+    - 本机写入：插入后回填成自己的 id（见 :meth:`ProfileDB.upsert`）。
+    - 跨端回放：写来源实例 id 与该实例的 ``local_id``。
+
+    唯一索引让回放幂等（页级重试、水位没落盘就崩溃都不会写第二行）。
+    旧行全部是本机写的，直接回填成自身 id；``device_id`` 为空的存量行出处
+    不明（不上传），保持 NULL 不参与唯一约束。
+    """
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(profile_history)").fetchall()]
+    if "origin_local_id" not in cols:
+        conn.execute(
+            "ALTER TABLE profile_history ADD COLUMN origin_local_id INTEGER")
+    conn.execute(
+        "UPDATE profile_history SET origin_local_id = id "
+        "WHERE origin_local_id IS NULL AND device_id <> ''")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_history_origin "
+        "ON profile_history(device_id, origin_local_id)")
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
@@ -190,6 +216,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (7, "structured history and key rename audit", migrate_structured_history),
     (8, "entries add locked column", _migrate_v8),
     (9, "history becomes sync ledger; drop audit tables", _migrate_v9),
+    (10, "history gains origin row identity", _migrate_v10),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -203,7 +230,8 @@ CURRENT_VERSION = MIGRATIONS[-1][0]
 #: SELECT 的列顺序；``_history_row`` 与它一一对应，改这里要同时改那边。
 _HISTORY_COLUMNS = (
     "id, ts, username, type, key, old_value, new_value, "
-    "old_value_text, new_value_text, change_type, delta_value, source, sync_from"
+    "old_value_text, new_value_text, change_type, delta_value, source, sync_from, "
+    "device_id"
 )
 
 #: 聚合候选的维度表达式。``key`` 是「模型:key」，与 UI 的「键」列同一口径。
@@ -213,6 +241,7 @@ _FACET_COLUMNS = {
     "change_type": "change_type",
     "source": "COALESCE(source, '')",
     "sync_from": "COALESCE(sync_from, '')",
+    "device": "COALESCE(device_id, '')",
 }
 
 #: 变动量：优先用记账时写下的 ``delta_value``；没有就按新旧值补算；两者都
@@ -288,6 +317,10 @@ def _history_where(query: HistoryQuery) -> tuple[str, list[object]]:
         clauses.append(
             f"COALESCE(sync_from, '') IN ({_marks(len(query.sync_froms))})")
         params.extend(query.sync_froms)
+    if query.devices:
+        clauses.append(
+            f"COALESCE(device_id, '') IN ({_marks(len(query.devices))})")
+        params.extend(query.devices)
     if query.ts_from:
         clauses.append("ts >= ?")
         params.append(query.ts_from)
@@ -339,6 +372,54 @@ def _single_history_query(
 
 
 # ─── ProfileDB 核心类 ────────────────────────────────────────
+
+
+def _record_history(
+    conn: sqlite3.Connection,
+    *,
+    ts: str,
+    username: str,
+    type_: str,
+    key: str,
+    old_value: float | None,
+    new_value: float,
+    old_value_text: str = "",
+    new_value_text: str = "",
+    change_type: str,
+    delta_value: float | None = None,
+    source: str = "",
+    sync_from: str | None = None,
+    device_id: str,
+    origin_local_id: int | None = None,
+) -> bool:
+    """写一行账本记录；``(device_id, origin_local_id)`` 已存在时跳过。
+
+    行身份是「哪台设备上的第几号操作」：本机写入插入后回填成自己的 id，
+    跨端回放写入来源实例 id 与该实例的 ``local_id``。唯一索引让回放幂等
+    ——页级重试、水位没落盘就崩溃都不会写出第二行。
+
+    返回是否真的新增了一行。
+    """
+    cursor = conn.execute(
+        "INSERT INTO profile_history "
+        "(ts, username, type, key, old_value, new_value, "
+        "old_value_text, new_value_text, change_type, delta_value, source, "
+        "sync_from, device_id, origin_local_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(device_id, origin_local_id) DO NOTHING",
+        (ts, username, type_, key, old_value, float(new_value),
+         old_value_text or "", new_value_text or "",
+         change_type, delta_value, source, sync_from, device_id, origin_local_id),
+    )
+    if not cursor.rowcount:
+        return False
+    if origin_local_id is None:
+        # 本机写入：行身份就是自己的 id，插入后才知道
+        conn.execute(
+            "UPDATE profile_history SET origin_local_id=? WHERE id=?",
+            (cursor.lastrowid, cursor.lastrowid),
+        )
+    return True
 
 
 class ProfileDB:
@@ -604,12 +685,21 @@ class ProfileDB:
         source: str = "",
         value_text: str = "",
         sync_from: str | None = None,
+        *,
+        device_id: str | None = None,
+        origin_local_id: int | None = None,
+        history_ts: str | None = None,
     ) -> None:
         """写入单条 entry（ON CONFLICT 更新，不用 INSERT OR REPLACE）
 
         change_type 非 None 时记录 history（内部对比 old/new 值，无变化跳过）。
         source: 变更来源描述，随 history 一并记录。
         value_text: note 模型存储文本，其他模型传默认空串。
+
+        跨端回放必须显式传 ``device_id``（来源实例）、``origin_local_id``
+        （来源实例的 local_id）与 ``history_ts``（源写入时刻）：缺省值会把
+        回放行记成本机操作，下一轮上行就代传出去。
+
         锁定条目直接拒绝写入（不写值、不写 history），并记 error 暴露调用方。
         锁冲突抛 sqlite3.OperationalError。
         """
@@ -660,14 +750,16 @@ class ProfileDB:
                     should_record = True
 
                 if should_record:
-                    conn.execute(
-                        "INSERT INTO profile_history "
-                        "(ts, username, type, key, old_value, new_value, "
-                        "old_value_text, new_value_text, change_type, delta_value, source, sync_from, device_id) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (write_ts, username, type_, key, old_value, float(value),
-                         old_value_text or "", value_text,
-                         change_type, delta_value, source, sync_from, _author_stamp()),
+                    _record_history(
+                        conn,
+                        ts=history_ts or write_ts,
+                        username=username, type_=type_, key=key,
+                        old_value=old_value, new_value=float(value),
+                        old_value_text=old_value_text or "", new_value_text=value_text,
+                        change_type=change_type, delta_value=delta_value,
+                        source=source, sync_from=sync_from,
+                        device_id=device_id or _author_stamp(),
+                        origin_local_id=origin_local_id,
                     )
 
             self._commit(conn)
@@ -728,14 +820,16 @@ class ProfileDB:
                         should_record = True
 
                     if should_record:
-                        conn.execute(
-                            "INSERT INTO profile_history "
-                            "(ts, username, type, key, old_value, new_value, "
-                            "old_value_text, new_value_text, change_type, delta_value, source, sync_from, device_id) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (write_ts, username, type_, key, old_value, float(value),
-                             old_value_text or "", value_text,
-                             change_type, delta_value, source, sync_from, _author_stamp()),
+                        _record_history(
+                            conn,
+                            ts=write_ts,
+                            username=username, type_=type_, key=key,
+                            old_value=old_value, new_value=float(value),
+                            old_value_text=old_value_text or "",
+                            new_value_text=value_text,
+                            change_type=change_type, delta_value=delta_value,
+                            source=source, sync_from=sync_from,
+                            device_id=_author_stamp(),
                         )
 
             self._commit(conn)
@@ -805,13 +899,14 @@ class ProfileDB:
                     should_record = True
 
                 if should_record:
-                    conn.execute(
-                        "INSERT INTO profile_history "
-                        "(ts, username, type, key, old_value, new_value, "
-                        "change_type, delta_value, source, sync_from, device_id) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (write_ts, username, type_, key, history_old_value, value,
-                         change_type, delta_value, source, sync_from, _author_stamp()),
+                    _record_history(
+                        conn,
+                        ts=write_ts,
+                        username=username, type_=type_, key=key,
+                        old_value=history_old_value, new_value=value,
+                        change_type=change_type, delta_value=delta_value,
+                        source=source, sync_from=sync_from,
+                        device_id=_author_stamp(),
                     )
 
             self._commit(conn)
@@ -916,7 +1011,7 @@ class ProfileDB:
             "old_value": row[5], "new_value": row[6],
             "old_value_text": row[7] or "", "new_value_text": row[8] or "",
             "change_type": row[9], "delta_value": row[10], "source": row[11],
-            "sync_from": row[12],
+            "sync_from": row[12], "device_id": row[13] or "",
         }
 
     def get_history(
@@ -1035,14 +1130,6 @@ class ProfileDB:
         return (float(row[0]) if row else 0.0, float(row[1]) if row else 0.0)
 
 
-    def history_row_exists(self, history_id: int) -> bool:
-        conn = self._borrow_connection()
-        try:
-            return conn.execute(
-                "SELECT 1 FROM profile_history WHERE id=?", (history_id,)).fetchone() is not None
-        finally:
-            self._release_connection(conn)
-
     def get_max_history_id(self) -> int:
         """本地 history 当前最大 id（无历史时为 0）。"""
         conn = self._borrow_connection()
@@ -1060,13 +1147,15 @@ class ProfileDB:
         自行归零。``tick`` 是时间派生的中间物，已被物化 set 取代，也不上云。
         水位用的是本地自增 id，与远端 ``remote_id`` 是两套编号。``author``
         非空时只取该作者写的行——**每端只上传自己产生的行**，离线包复制来的
-        行（带来源机器标记）与旧存量行（空标记）永不代传。
+        行（带来源机器标记）、跨端回放行（带来源实例标记）与旧存量行（空标记）
+        永不代传。``source`` 一并带出：上行 op 有了来源，别的设备回放后才能说清
+        "这次变化因为什么"。
         """
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
                 "SELECT id, username, type, key, new_value, new_value_text, "
-                "change_type, delta_value, ts "
+                "change_type, delta_value, ts, source "
                 "FROM profile_history "
                 "WHERE id>? AND change_type IN ('set', 'delta')"
                 + (" AND device_id=?" if author else "") +
@@ -1080,6 +1169,7 @@ class ProfileDB:
                 "id": r[0], "username": r[1], "type": r[2], "key": r[3],
                 "new_value": r[4], "new_value_text": r[5] or "",
                 "change_type": r[6], "delta_value": r[7], "ts": r[8],
+                "source": r[9] or "",
             }
             for r in rows
         ]
@@ -1134,43 +1224,40 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
-    def users_with_history_since(self, since_ts: str) -> set[str]:
-        """ts 晚于 ``since_ts`` 的 history 行涉及的用户集合（快照覆盖告警用）。"""
+    def users_with_history_since(self, since_ts: str, author: str = "") -> set[str]:
+        """ts 晚于 ``since_ts`` 的 history 行涉及的用户集合（快照覆盖告警用）。
+
+        ``author`` 非空时只算该作者写的行：跨端回放行同样落在这张表里，把它们
+        算进来会让用户"看起来有未推送的新数据"，白白弹一次覆盖确认。
+        """
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT DISTINCT username FROM profile_history WHERE ts > ?",
-                (since_ts,),
+                "SELECT DISTINCT username FROM profile_history WHERE ts > ?"
+                + (" AND device_id=?" if author else ""),
+                (since_ts, author) if author else (since_ts,),
             ).fetchall()
             return {row[0] for row in rows if row[0]}
         finally:
             self._release_connection(conn)
 
-    def history_fingerprint_exists(
-        self, username: str, type_: str, key: str, ts: str, *,
-        delta: float | None, new_value: float | None,
-    ) -> bool:
-        """按内容指纹查本地是否已有该行（回声护栏的兜底匹配）。
+    def ledger_op_seen(self, device_id: str, origin_local_id: int) -> bool:
+        """这条账本操作是否已经落过本地（回放幂等判据）。
 
-        库重建后本地 ``id`` 会重新编号，云端 op 携带的 ``local_id`` 对不上，
-        仅靠 id 判重会把已应用过的旧 delta 再算一遍（2026-11-04 二次污染）。
-        指纹 = 用户 + key + 时间 + 数值，对 delta 匹配 delta_value、
-        对 set 匹配 new_value。
+        判据是行身份 ``(device_id, origin_local_id)``，不是本地自增 id：库重建
+        后本地 id 会重新编号，而 ``origin_local_id`` 由来源设备给出、重建前后
+        一致。因此同一台设备自己推上去的 op 回声回来时也天然命中，不再需要
+        "id 匹配 + 内容指纹" 那套启发式。
         """
+        if not device_id or not origin_local_id:
+            return False
         conn = self._borrow_connection()
         try:
-            if delta is not None:
-                row = conn.execute(
-                    "SELECT 1 FROM profile_history WHERE username=? AND type=? AND key=? "
-                    "AND ts=? AND delta_value=? LIMIT 1",
-                    (username, type_, key, ts, float(delta)),
-                ).fetchone()
-            else:
-                row = conn.execute(
-                    "SELECT 1 FROM profile_history WHERE username=? AND type=? AND key=? "
-                    "AND ts=? AND new_value=? LIMIT 1",
-                    (username, type_, key, ts, float(new_value or 0)),
-                ).fetchone()
+            row = conn.execute(
+                "SELECT 1 FROM profile_history "
+                "WHERE device_id=? AND origin_local_id=? LIMIT 1",
+                (device_id, origin_local_id),
+            ).fetchone()
             return row is not None
         finally:
             self._release_connection(conn)
@@ -1280,8 +1367,16 @@ def db_upsert(
     source: str = "",
     value_text: str = "",
     sync_from: str | None = None,
+    *,
+    device_id: str | None = None,
+    origin_local_id: int | None = None,
+    history_ts: str | None = None,
 ) -> None:
-    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, delta_value, source, value_text, sync_from)
+    get_profile_db().upsert(
+        username, type_, key, value, updated_at, change_type, delta_value,
+        source, value_text, sync_from,
+        device_id=device_id, origin_local_id=origin_local_id,
+        history_ts=history_ts)
 
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:
@@ -1374,11 +1469,6 @@ def db_get_history_since(since_id: int, limit: int = 200,
     return get_profile_db().get_history_since(since_id, limit, author=author)
 
 
-def db_history_row_exists(history_id: int) -> bool:
-    """本地 history 是否已有该 id 的行（同步回声护栏用）。"""
-    return get_profile_db().history_row_exists(history_id)
-
-
 def db_max_history_id() -> int:
     """本地 history 最大 id。"""
     return get_profile_db().get_max_history_id()
@@ -1401,20 +1491,17 @@ def db_count_history(
     return get_profile_db().count_history(username, type_, key)
 
 
-def db_users_with_history_since(since_ts: str) -> set[str]:
-    return get_profile_db().users_with_history_since(since_ts)
+def db_users_with_history_since(since_ts: str, author: str = "") -> set[str]:
+    return get_profile_db().users_with_history_since(since_ts, author)
 
 
 def db_count_pending_push(since_id: int, author: str) -> int:
     return get_profile_db().count_pending_push(since_id, author)
 
 
-def db_history_fingerprint_exists(
-    username: str, type_: str, key: str, ts: str, *,
-    delta: float | None, new_value: float | None,
-) -> bool:
-    return get_profile_db().history_fingerprint_exists(
-        username, type_, key, ts, delta=delta, new_value=new_value)
+def db_ledger_op_seen(device_id: str, origin_local_id: int) -> bool:
+    """该设备的这条操作是否已落过本地（回放幂等判据）。"""
+    return get_profile_db().ledger_op_seen(device_id, origin_local_id)
 
 
 def db_cleanup_history(days: int = 90) -> int:

@@ -177,9 +177,19 @@ def _period_relation(op: dict, current: dict) -> str | None:
 
 
 def _apply_op(op: dict) -> bool:
-    """把一条远端 op 折进 entries；返回是否实际生效。
+    """把一条远端 op 折进本地 entries 与账本；返回是否实际生效。
 
-    **不写本地 history**，因此不会回声上行。
+    **回放照常写账本**（``change_type`` 取 op 语义，``device_id`` 取来源实例，
+    ``origin_local_id`` 取来源设备的 local_id）。账本行的身份是
+    ``(device_id, origin_local_id)``，与本地自增 id 无关，所以：
+
+    - 重复回放（页级重试、水位没落盘就崩溃）天然幂等，见
+      :func:`repository.db_ledger_op_seen`；
+    - 上行按 ``device_id = 本机`` 过滤，回放行永不被代传，构不成回声。
+
+    以前这里刻意不写 history 来"防回声"，代价是跨端写入完全不可见：值被改
+    回去却查不到是谁、什么时候、从哪台设备改的（2026-11-06 太平武墓被另一
+    实例的陈旧 set 覆盖就是这么丢的）。
 
     回放按 remote_id（到达序）驱动，但**合并按操作时间**：同一周期里，
     远端来的旧 set（``happened_at`` 早于本地现值的 ``updated_at``）不覆盖
@@ -191,6 +201,16 @@ def _apply_op(op: dict) -> bool:
     此后到达的远端 set，护栏从此永久误跳（2026-11-04 手机端 3179 事故的
     根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
     """
+    origin = str(op.get("instance_id") or "")
+    origin_local_id = op.get("local_id")
+    if not origin or not isinstance(origin_local_id, int):
+        logger.warning("[profile sync] 忽略缺来源身份的 op：remote_id={}",
+                       op.get("remote_id"))
+        return False
+    if repository.db_ledger_op_seen(origin, origin_local_id):
+        logger.debug("[profile sync] 已回放过，跳过：{}/{}", origin, origin_local_id)
+        return False
+
     username, type_, key = op["username"], op["type"], op["key"]
     happened = op.get("happened_at") or ""
     current = repository.db_read_entry(username, type_, key)
@@ -202,6 +222,8 @@ def _apply_op(op: dict) -> bool:
                      username, type_, key, happened)
         return False
     fresh_period = relation == "new"
+    raw = op.get("value")
+    text = op.get("value_text") or ""
     if op["op"] == "delta":
         if fresh_period:
             base = 0.0
@@ -209,24 +231,38 @@ def _apply_op(op: dict) -> bool:
             raw_base = current.get("value")
             base = float(raw_base) if isinstance(raw_base, (int, float)) else 0.0
         value = base + float(op.get("delta") or 0)
-        repository.db_upsert(username, type_, key, value,
-                             updated_at=hadwent(happened), change_type=None)
-        return True
-    text = op.get("value_text") or ""
-    raw = op.get("value")
-    if not fresh_period and type_ != "note" and raw is not None:
-        local_at = _wall_clock(current.get("updated_at") or "")
-        happened_at = _wall_clock(happened)
-        if local_at and happened_at and happened_at < local_at:
-            logger.info("[profile sync] 跳过旧 set：{}/{} {}@{} < 本地@{}",
-                        username, type_, key, happened, local_at)
+        value_text = ""
+    elif type_ == "note" or (text and raw is None):
+        value = float(current.get("value") or 0)
+        value_text = text
+    else:
+        if not fresh_period and type_ != "note" and raw is not None:
+            local_at = _wall_clock(current.get("updated_at") or "")
+            happened_at = _wall_clock(happened)
+            if local_at and happened_at and happened_at < local_at:
+                logger.info("[profile sync] 跳过旧 set：{}/{} {}@{} < 本地@{}",
+                            username, type_, key, happened, local_at)
+                return False
+        value = float(raw or 0)
+        value_text = ""
+    # 值没变就不写：不抬条目 updated_at（远端噪声会把本地时间戳推高，让
+    # 之后更早的真实 op 被时间护栏误挡），也不在账本里刷一行空记录。
+    if current:
+        same_value = (isinstance(current.get("value"), (int, float))
+                      and float(current["value"]) == value)
+        if same_value and (current.get("value_text") or "") == value_text:
             return False
-    if type_ == "note" or (text and raw is None):
-        repository.db_upsert(username, type_, key, 0.0, updated_at=hadwent(happened),
-                             value_text=text, change_type=None)
-        return True
-    repository.db_upsert(username, type_, key, float(raw or 0),
-                         updated_at=hadwent(happened), change_type=None)
+    repository.db_upsert(
+        username, type_, key, value,
+        updated_at=hadwent(happened),
+        change_type=op["op"],
+        delta_value=op.get("delta") if op["op"] == "delta" else None,
+        source=str(op.get("source") or ""),
+        value_text=value_text,
+        device_id=origin,
+        origin_local_id=origin_local_id,
+        history_ts=happened or None,
+    )
     return True
 
 
@@ -291,7 +327,10 @@ def overwrite_warnings(token: str) -> list[dict]:
     from_mine = snapshot.get("origin_instance_id") == mine
     newer_users: set[str] = set()
     if from_mine and created_at:
-        newer_users = repository.db_users_with_history_since(created_at)
+        # 只算**本机写的**行：跨端回放行同样落在这张表里，把它们算进来会让
+        # "快照已包含本地全部状态"这个判断失效，白白弹一次覆盖确认。
+        newer_users = repository.db_users_with_history_since(
+            created_at, author=repository._author_stamp())
     warnings: list[dict] = []
     try:
         entries = json.loads(snapshot.get("entries") or "[]")
@@ -467,25 +506,10 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
             report.errors.append(str(error))
             break
         ops = response.get("ops") or []
-        mine = current_instance_id()
         applied = 0
         for op in ops:
-            # 回声护栏：自己实例推的 op 且本地 history 已有该行 → 其效果已含在
-            # 本地状态里（entries 重建自完整 history），重放会造成 delta 双算。
-            # id 匹配是快路径；库重建后本地 id 重新编号、云端旧 local_id 对不上，
-            # 用内容指纹（用户+key+时间+数值）兜底，防止旧 delta 重复应用。
-            op_instance = op.get("instance_id")
-            op_local_id = op.get("local_id")
-            if isinstance(op_instance, str) and op_instance == mine:
-                if (isinstance(op_local_id, int)
-                        and repository.db_history_row_exists(op_local_id)):
-                    continue
-                if repository.db_history_fingerprint_exists(
-                        op["username"], op["type"], op["key"],
-                        op.get("happened_at") or "",
-                        delta=op.get("delta") if op.get("op") == "delta" else None,
-                        new_value=op.get("value") if op.get("op") == "set" else None):
-                    continue
+            # 判重与回声护栏都在 _apply_op 里，依据是账本行身份
+            # (来源实例, 该实例的 local_id)，不再靠"id 匹配 + 内容指纹"猜。
             try:
                 if _apply_op(op):
                     applied += 1
@@ -546,7 +570,9 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
             "op": "delta" if row["change_type"] == "delta" else "set",
             "value": (row["new_value"] if row["change_type"] != "delta" else None),
             "delta": (row["delta_value"] if row["change_type"] == "delta" else None),
-            "value_text": row["new_value_text"], "happened_at": row["ts"],
+            "value_text": row["new_value_text"],
+            "source": row.get("source") or "",
+            "happened_at": row["ts"],
         } for row in rows]
         try:
             response = post("/api/sync/profile/push", {

@@ -127,6 +127,27 @@ class HistoryScope:
         return title + (" · " + " · ".join(parts) if parts else "")
 
 
+def _local_author() -> str:
+    """本机账本作者标记（实例出生标识，与上行/回放写入的 device_id 同源）。"""
+    from ...core.account.identity import device_author_id
+
+    return device_author_id()
+
+
+def _device_label(raw: str) -> str:
+    """把账本的 ``device_id`` 变成人能读的设备名。
+
+    账本里存的是实例标识，不是设备显示名：显示名会随用户改名而变，标识不会。
+    本机直接标「本机」，其余显示前 8 位——足够在两三台设备之间分辨，完整
+    标识留在 tooltip 与筛选里。
+    """
+    if not raw:
+        return tr("未记录")
+    if raw == _local_author():
+        return tr("本机")
+    return tr("其他设备") + " · " + raw[:8]
+
+
 @dataclass(frozen=True)
 class _Column:
     """一列的渲染 + 筛选规格；列号不再靠手写偏移量计算。"""
@@ -297,6 +318,11 @@ class HistoryDialog(QDialog):
             _cjk_column_width(self, 6),
             metrics.horizontalAdvance(tr("全部") + " ▾") + _COLUMN_CHROME_WIDTH + 8,
         )
+        # 设备列：本机显示「本机」，他机显示「其他设备 · 前 8 位」——宽度按后者量。
+        device_width = max(
+            metrics.horizontalAdvance(tr("其他设备") + " · 00000000"),
+            metrics.horizontalAdvance(tr("本机")),
+        ) + _COLUMN_CHROME_WIDTH
         return [
             _Column("ts", tr("时间"), fixed, time_width),
             # 「键 → 用户 → 类型」：先看是哪个数据项，再看是谁、怎么变。
@@ -312,6 +338,8 @@ class HistoryDialog(QDialog):
             _Column("source", tr("来源"), fixed,
                     _cjk_column_width(self, _SOURCE_CHARACTER_CAPACITY),
                     facet="source", filter_kind="facet"),
+            _Column("device", tr("设备"), fixed, device_width,
+                    facet="device", filter_kind="facet"),
             _Column("sync_from", tr("同步来源"), fixed,
                     _cjk_column_width(self, _SOURCE_CHARACTER_CAPACITY),
                     facet="sync_from", filter_kind="facet"),
@@ -428,6 +456,7 @@ class HistoryDialog(QDialog):
             change_types=values.get("change_type", ()),
             sources=values.get("source", ()),
             sync_froms=values.get("sync_from", ()),
+            devices=values.get("device", ()),
             keyword=keyword,
             old_text=self._text_filters["old"].text().strip()
             if "old" in self._text_filters else "",
@@ -588,6 +617,9 @@ class HistoryDialog(QDialog):
             raw = record.get("sync_from") or ""
             if raw:
                 item.setToolTip(raw)
+        elif key == "device":
+            raw = record.get("device_id") or ""
+            item.setToolTip(raw or tr("未记录设备"))
         elif key == "source":
             item.setToolTip(item.text() or tr("未记录"))
 
@@ -609,6 +641,8 @@ class HistoryDialog(QDialog):
             return _format_amount(amount) if amount is not None else "—"
         if key == "source":
             return str(record.get("source") or "")
+        if key == "device":
+            return _device_label(str(record.get("device_id") or ""))
         if key == "sync_from":
             raw = record.get("sync_from") or ""
             return format_sync_label(str(raw)) if raw else ""
@@ -788,6 +822,9 @@ class HistoryDialog(QDialog):
                 value=summary(
                     query.sources,
                     lambda raw: raw or tr("未记录"), tr("来源"))), ""))
+        if query.devices:
+            chips.append(("device", tr("设备：{value}").format(
+                value=summary(query.devices, _device_label, tr("设备"))), ""))
         if query.sync_froms:
             chips.append(("sync_from", tr("同步来源：{value}").format(
                 value=summary(query.sync_froms, format_sync_label, tr("同步来源"))), ""))
@@ -875,6 +912,8 @@ class HistoryDialog(QDialog):
             return lambda raw: format_sync_label(raw) if raw else tr("未记录")
         if dimension == "change_type":
             return lambda raw: self._TYPE_LABEL.get(raw, raw) if raw else tr("未记录")
+        if dimension == "device":
+            return _device_label
         return lambda raw: raw or tr("未记录")
 
     # ─── 来源列内联编辑与撤销 / 删除 ──────────────────────────
@@ -1028,6 +1067,8 @@ def _values_for_dimension(query: HistoryQuery, dimension: str) -> tuple[str, ...
         return query.change_types
     if dimension == "source":
         return query.sources
+    if dimension == "device":
+        return query.devices
     return query.sync_froms
 
 

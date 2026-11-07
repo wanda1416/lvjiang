@@ -233,10 +233,12 @@ class TestSchemaMigration:
             )
         ]
 
-        assert CURRENT_VERSION == 9
+        assert CURRENT_VERSION == 10
         assert primary_key == ["username", "type", "key"]
         assert "app_id" not in entry_columns
         assert "app_id" not in history_columns
+        # 账本行身份：跨端回放要靠它判重，缺了就只能退回本地自增 id
+        assert "origin_local_id" in history_columns
 
     def test_cross_user_history_index_is_migrated(self, db: ProfileDB):
         conn = db._connect()
@@ -501,6 +503,50 @@ class TestHistory:
         assert len(history) == 2
         assert history[0]["source"] == "同步"   # 最新在前
         assert history[1]["source"] == "导入"
+
+    def test_local_row_identity_is_its_own_id(self, db: ProfileDB):
+        """本机写入的账本行身份 = (本机作者, 自己的 history id)。"""
+        from lvjiang.core.profile.repository import _author_stamp
+
+        db.upsert("u", "quota", "k", 10, change_type="set")
+        record = db.get_history("u")[0]
+        assert record["device_id"] == _author_stamp()
+        assert db.ledger_op_seen(_author_stamp(), record["id"])
+
+    def test_replayed_row_keeps_origin_identity(self, db: ProfileDB):
+        """跨端回放按来源设备 + 来源 local_id 落库，且重复回放不再新增。
+
+        判据必须与本地自增 id 无关：库重建后 id 会重新编号，只有来源标识在
+        重建前后一致（2026-11-04 旧 delta 被二次应用的根因）。
+        """
+        db.upsert("u", "quota", "k", 20, updated_at="2026-11-06T07:45:19",
+                  change_type="set", source="太平武墓",
+                  device_id="other-device", origin_local_id=45,
+                  history_ts="2026-11-06T07:45:19")
+
+        history = db.get_history("u")
+        assert len(history) == 1
+        assert history[0]["device_id"] == "other-device"
+        assert history[0]["ts"] == "2026-11-06T07:45:19"
+        assert history[0]["source"] == "太平武墓"
+        assert db.ledger_op_seen("other-device", 45)
+
+        # 同一条 op 再回放一次：唯一索引挡掉，不会写出第二行
+        db.upsert("u", "quota", "k", 20, change_type="set",
+                  device_id="other-device", origin_local_id=45)
+        assert len(db.get_history("u")) == 1
+
+    def test_pending_push_only_covers_own_rows(self, db: ProfileDB):
+        """回放行不被代传：上行只看本机作者的行（写入回放账本的安全前提）。"""
+        from lvjiang.core.profile.repository import _author_stamp
+
+        db.upsert("u", "quota", "mine", 1, change_type="set")
+        db.upsert("u", "quota", "theirs", 2, change_type="set",
+                  device_id="other-device", origin_local_id=9)
+
+        mine = db.get_history_since(0, 100, author=_author_stamp())
+        assert [row["key"] for row in mine] == ["mine"]
+        assert {row["key"] for row in db.get_history_since(0, 100)} == {"mine", "theirs"}
 
     def test_history_source_edit_uses_original_value_as_guard(self, db: ProfileDB):
         db.upsert(

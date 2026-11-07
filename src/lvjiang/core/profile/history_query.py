@@ -7,7 +7,7 @@
 条件是两种形态的组合，没有第三种：
 
 - **精确集合**：``usernames`` / ``keys`` / ``change_types`` / ``sources`` /
-  ``sync_froms``。空元组表示"不限"；空字符串是真实取值，用来表达
+  ``sync_froms`` / ``devices``。空元组表示"不限"；空字符串是真实取值，用来表达
   "未记录来源"（``sources=("",)`` 只匹配 source 为空的行）。两者绝不能混用。
   ``model_types`` / ``key_names`` 是"只有一半"的单侧条件（按模型类型或按键名
   过滤，不限定配对的另一半），只有便捷查询入口用得到，界面不会产生它们。
@@ -27,7 +27,7 @@ from typing import TypeVar
 _T = TypeVar("_T")
 
 #: 可聚合成候选的维度；与仓储层的列表达式一一对应。
-FACET_DIMENSIONS = ("username", "key", "change_type", "source", "sync_from")
+FACET_DIMENSIONS = ("username", "key", "change_type", "source", "sync_from", "device")
 
 #: 变动量方向：全部 / 增加 / 减少 / 为零。
 DELTA_SCOPES = ("all", "pos", "neg", "zero")
@@ -56,6 +56,8 @@ class HistoryQuery:
     change_types: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
     sync_froms: tuple[str, ...] = ()
+    #: 写入设备（跨端回放的来源实例）；空串表示"未记录设备"的存量行。
+    devices: tuple[str, ...] = ()
     keyword: str = ""
     old_text: str = ""
     new_text: str = ""
@@ -74,6 +76,7 @@ class HistoryQuery:
         object.__setattr__(self, "change_types", _clean_unique(tuple(self.change_types)))
         object.__setattr__(self, "sources", _clean_unique(tuple(self.sources)))
         object.__setattr__(self, "sync_froms", _clean_unique(tuple(self.sync_froms)))
+        object.__setattr__(self, "devices", _clean_unique(tuple(self.devices)))
         object.__setattr__(self, "key_matches", _clean_unique(tuple(self.key_matches)))
         object.__setattr__(self, "keyword", _clean_text(self.keyword))
         object.__setattr__(self, "old_text", _clean_text(self.old_text))
@@ -102,6 +105,8 @@ class HistoryQuery:
             return replace(self, change_types=())
         if dimension == "source":
             return replace(self, sources=())
+        if dimension == "device":
+            return replace(self, devices=())
         return replace(self, sync_froms=())
 
     @property
@@ -109,7 +114,7 @@ class HistoryQuery:
         """没有任何限制条件时的全账本查询。"""
         return not (
             self.usernames or self.keys or self.model_types or self.key_names
-            or self.change_types or self.sources or self.sync_froms
+            or self.change_types or self.sources or self.sync_froms or self.devices
             or self.keyword or self.old_text or self.new_text or self.key_matches
             or self.ts_from or self.ts_until or self.delta_scope != "all"
         )

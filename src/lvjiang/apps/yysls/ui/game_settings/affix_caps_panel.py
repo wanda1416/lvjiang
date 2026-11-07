@@ -1,8 +1,10 @@
 """词组配置面板
 
 管理各词组在不同等级的最大值。
-左侧词组列表，右侧等级-上限表格。
-右侧顶部为词组分类（普通词组 / 定音词组）+ 词组单位（空 / %）+ 词条分组（不分组 / 分组）+ 词条部位（分类级，整组生效）+ 词条名称区域。
+左侧词组列表，右侧拆两个子 Tab：
+- 基础属性：词组分类（普通/定音）+ 词组单位（空/%）+ 同名叠加 + 词条分组
+  （不分组/分组）+ 词条部位 + 词条名称映射。整页顺序平铺，装不下时整页滚动。
+- 等级属性：等级-上限-承音表格 + 升级规则。
 定音词组不受承音限制，表格隐藏承音列。
 定音词组的词条部位为分类级配置（affix_caps 内 _parts 字段），整组统一设置。
 普通词组的每个词条可配置归属与词条部位（可出现的装备部位，
@@ -26,10 +28,12 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QLabel,
+    QLayout,
     QListWidget,
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -205,10 +209,35 @@ class AffixCapsPanel(QWidget):
 
         splitter.addWidget(left_widget)
 
-        # 右侧：词组分类 + 词组单位 + 词条分组 + 词条名称 + 表格 + 按钮
+        # 右侧：基础属性（词组分类 → 词条名称映射）与等级属性（等级/数值 + 升级规则）
+        # 拆成两个子 Tab。基础属性页内全局顺序平铺，放不下时**整页**滚动——
+        # 不再给词条列表单独套滚动条，避免局部滚动与页内空白并存的割裂感。
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._sub_tabs = QTabWidget()
+
+        # 基础属性页：整页滚动区，内容按序平铺（SetMinimumSize 让滚动范围
+        # 等于内容高度，装不下才出滚动条；与 school_panel 的详情页同款做法）。
+        self._base_scroll = QScrollArea()
+        self._base_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._base_scroll.setWidgetResizable(True)
+        self._base_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._base_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        base_page = QWidget()
+        self._base_page = base_page
+        base_layout = QVBoxLayout(base_page)
+        base_layout.setContentsMargins(0, 0, 0, 0)
+        base_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self._base_scroll.setWidget(base_page)
+
+        level_page = QWidget()
+        self._level_page = level_page
+        level_layout = QVBoxLayout(level_page)
+        level_layout.setContentsMargins(0, 0, 0, 0)
 
         # ── 词组分类（单选：普通词组 / 定音词组）──
         pool_frame = QFrame()
@@ -229,7 +258,7 @@ class AffixCapsPanel(QWidget):
         pool_layout.addWidget(self._radio_pool_normal)
         pool_layout.addWidget(self._radio_pool_dingyin)
         pool_layout.addStretch()
-        right_layout.addWidget(pool_frame)
+        base_layout.addWidget(pool_frame)
 
         # ── 词组单位（下拉：空 / %）──
         unit_frame = QFrame()
@@ -245,7 +274,7 @@ class AffixCapsPanel(QWidget):
         self._unit_combo.currentTextChanged.connect(self._on_unit_combo_changed)
         unit_layout.addWidget(self._unit_combo)
         unit_layout.addStretch()
-        right_layout.addWidget(unit_frame)
+        base_layout.addWidget(unit_frame)
 
         # ── 同名叠加（单选：累加 / 取最大值）──
         stack_frame = QFrame()
@@ -269,7 +298,7 @@ class AffixCapsPanel(QWidget):
         stack_layout.addWidget(self._radio_stack_sum)
         stack_layout.addWidget(self._radio_stack_max)
         stack_layout.addStretch()
-        right_layout.addWidget(stack_frame)
+        base_layout.addWidget(stack_frame)
 
         # ── 词条分组（单选：不分组 / 分组）──
         group_frame = QFrame()
@@ -290,7 +319,7 @@ class AffixCapsPanel(QWidget):
         group_mode_layout.addWidget(self._radio_group_off)
         group_mode_layout.addWidget(self._radio_group_on)
         group_mode_layout.addStretch()
-        right_layout.addWidget(group_frame)
+        base_layout.addWidget(group_frame)
 
         # ── 词条部位（分类级，整组生效）──
         self._cat_parts_frame = QFrame()
@@ -308,7 +337,7 @@ class AffixCapsPanel(QWidget):
         cat_parts_layout.addWidget(self._cat_parts_btn)
         cat_parts_layout.addStretch()
         self._cat_parts_frame.setVisible(False)
-        right_layout.addWidget(self._cat_parts_frame)
+        base_layout.addWidget(self._cat_parts_frame)
 
         # ── 词条名称区域 ──
         self._alias_frame = QFrame()
@@ -353,14 +382,19 @@ class AffixCapsPanel(QWidget):
         self._alias_group_tabs.tabBarDoubleClicked.connect(self._rename_group)
         alias_layout.addWidget(self._alias_group_tabs)
 
-        right_layout.addWidget(self._alias_frame)
+        base_layout.addWidget(self._alias_frame)
+        # 尾 stretch：内容严格按序贴顶排列，多出来的高度全部留到底部——
+        # 没有它，QVBoxLayout 会把剩余空间均摊进各行间距，把「词组分类 /
+        # 词组单位 / 同名叠加」这些卡片拉成相隔很远的一串。
+        base_layout.addStretch()
 
         self._table = QTableWidget()
         self._table.setColumnCount(3)
         self._table.setHorizontalHeaderLabels([tr("等级"), tr("上限"), tr("承音")])
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._table.setMinimumHeight(140)
         self._table.cellChanged.connect(self._on_cell_changed)
-        right_layout.addWidget(self._table)
+        level_layout.addWidget(self._table, 1)
 
         # 底部按钮
         btn_layout = QHBoxLayout()
@@ -376,7 +410,7 @@ class AffixCapsPanel(QWidget):
         apply_button_style(self._btn_add_level)
         apply_button_style(self._btn_del_level, variant="danger")
 
-        right_layout.addLayout(btn_layout)
+        level_layout.addLayout(btn_layout)
 
         # ── 升级规则（本词组内的跨等级合并，放在最底下）──
         self._upgrade_frame = QFrame()
@@ -412,20 +446,26 @@ class AffixCapsPanel(QWidget):
             [tr("起始等级"), tr("目标等级"), tr("原词条"), tr("目标词条")])
         self._upgrade_table.verticalHeader().setVisible(False)
         upgrade_header_view = self._upgrade_table.horizontalHeader()
+        # 两个等级列贴内容；原词条与目标词条平分剩余宽度——只让原词条吃
+        # 全部剩余会让目标词条被压到内容宽，升级关系看起来一头宽一头窄。
         for column in (0, 1):
             upgrade_header_view.setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents)
-        upgrade_header_view.setSectionResizeMode(
-            2, QHeaderView.ResizeMode.Stretch)
-        upgrade_header_view.setSectionResizeMode(
-            3, QHeaderView.ResizeMode.ResizeToContents)
+        for column in (2, 3):
+            upgrade_header_view.setSectionResizeMode(
+                column, QHeaderView.ResizeMode.Stretch)
         self._upgrade_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers)
         self._upgrade_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self._upgrade_table.setMaximumHeight(160)
         upgrade_layout.addWidget(self._upgrade_table)
-        right_layout.addWidget(self._upgrade_frame)
+        level_layout.addWidget(self._upgrade_frame)
+
+        # 组装两个子 Tab：基础属性页是整页滚动区，等级属性页吃剩余高度的是等级表
+        self._sub_tabs.addTab(self._base_scroll, tr("基础属性"))
+        self._sub_tabs.addTab(level_page, tr("等级属性"))
+        right_layout.addWidget(self._sub_tabs)
 
         splitter.addWidget(right_widget)
 
@@ -1055,17 +1095,16 @@ class AffixCapsPanel(QWidget):
 
         if grouped:
             self._rebuild_group_tabs()
-            return
+        else:
+            aliases = self._get_aliases()
+            for alias in aliases:
+                self._alias_tags_layout.addWidget(self._create_alias_row(alias))
 
-        aliases = self._get_aliases()
-        for alias in aliases:
-            self._alias_tags_layout.addWidget(self._create_alias_row(alias))
-
-        # 无词条名时显示提示
-        if not aliases:
-            hint = QLabel(tr("（无词条名，点击 '+ 词条名' 添加）"))
-            hint.setStyleSheet("color: palette(mid); font-size: 12px;")
-            self._alias_tags_layout.addWidget(hint)
+            # 无词条名时显示提示
+            if not aliases:
+                hint = QLabel(tr("（无词条名，点击 '+ 词条名' 添加）"))
+                hint.setStyleSheet("color: palette(mid); font-size: 12px;")
+                self._alias_tags_layout.addWidget(hint)
 
     def _rebuild_group_tabs(self):
         """重建分组 Tab 页（保留当前选中组）"""

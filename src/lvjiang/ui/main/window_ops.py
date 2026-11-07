@@ -57,9 +57,11 @@ def _pending_uncertain(device) -> bool:
 
 
 class _AdbConnSignalBridge(QObject):
-    """工作流线程 → 主线程的 ADB 断连信号桥"""
+    """工作流线程 → 主线程的 ADB 断连 / 画面流故障信号桥"""
     adb_lost = pyqtSignal(str, str, object)
     adb_restored = pyqtSignal(str)
+    stream_lost = pyqtSignal(str, str, str)   # target_id, 归因, 说明
+    stream_restored = pyqtSignal(str)
 
     def __init__(self, target_id: str):
         super().__init__()
@@ -71,6 +73,13 @@ class _AdbConnSignalBridge(QObject):
 
     def notify_restored(self):
         self.adb_restored.emit(self._target_id)
+
+    def notify_stream_lost(self, kind: str, detail: str):
+        """画面流故障：来自解码线程或看门狗线程，必须经信号转回主线程。"""
+        self.stream_lost.emit(self._target_id, kind, detail)
+
+    def notify_stream_restored(self):
+        self.stream_restored.emit(self._target_id)
 
 
 class _DeviceWorker(QObject):
@@ -1136,6 +1145,8 @@ class WindowOpsMixin:
         bridge = _AdbConnSignalBridge(target_id)
         bridge.adb_lost.connect(self._on_adb_connection_lost)
         bridge.adb_restored.connect(self._on_adb_connection_restored)
+        bridge.stream_lost.connect(self._on_stream_lost)
+        bridge.stream_restored.connect(self._on_stream_restored)
 
         def wire(dev) -> None:
             """同一个目标的所有 AdbDevice 共用一套恢复回调。
@@ -1159,6 +1170,10 @@ class WindowOpsMixin:
         wire(device)
         if old_device is not None:
             wire(old_device)
+
+        # 画面流健康：故障经信号桥回主线程，恢复走统一的 recover_stream 阶梯
+        self._install_stream_hooks(
+            capture, target_id, generation, bridge, device)
 
         # 名字就是 serial：它唯一、用户能对上（哪根线、哪个 IP），同型号两台设备
         # 也由它分开。不用 target_id 的哈希前缀——那是主键的一截，对用户零信息量；
@@ -1515,6 +1530,9 @@ class WindowOpsMixin:
         target.capture_method = method
         target.streaming = streaming
         target.last_capture = None
+        if streaming:
+            self._install_stream_hooks(
+                capture, target_id, generation, target.connection_bridge, target.device)
         self._rebind_target_resources(target)
         if old_capture is not None:
             try:
@@ -1910,6 +1928,42 @@ class WindowOpsMixin:
         except Exception as e:
             logger.debug(f"获取窗口 DPI 失败: {e}")
         return 1.0
+
+    # ─── 画面流健康接线 ───────────────────────────────────
+
+    def _install_stream_hooks(
+            self, capture, target_id: str, generation: int, bridge, device) -> None:
+        """把「画面流故障」与「恢复钩子」接到宿主。
+
+        故障回调来自解码线程/看门狗线程，必须经 Qt 信号转到主线程再碰控件；
+        恢复钩子走 ``AndroidRecovery.recover_stream``（阶梯重试 + 无限等待人工），
+        界面与运行层都不需要知道重试次数与退避细节。
+        """
+        from ...core.android import AndroidStreamCapture
+        if not isinstance(capture, AndroidStreamCapture):
+            return
+        capture.set_on_stream_lost(
+            lambda kind, detail, tid=target_id, gen=generation:
+            self._on_stream_lost_event(tid, kind, detail, gen))
+        capture.set_stream_recovery(
+            lambda stream, dev=device: dev.recovery_coordinator.recover_stream(stream))
+
+    def _on_stream_lost_event(
+            self, target_id: str, kind: str, detail: str, generation: int | None) -> None:
+        """解码/看门狗线程 → Qt 信号；代次不符的旧流不得污染已恢复的新目标。"""
+        target = self._execution_targets.get(target_id)
+        if target is None or target.handle is None:
+            return
+        if generation is not None and target.handle.binding().generation != generation:
+            return
+        bridge = target.connection_bridge
+        if bridge is None:
+            return
+        try:
+            bridge.notify_stream_lost(kind, detail)
+        except RuntimeError:
+            # 目标已被重建释放，旧流晚到的通知直接丢弃
+            pass
 
     # ─── scrcpy 帧回调 ────────────────────────────────────
 

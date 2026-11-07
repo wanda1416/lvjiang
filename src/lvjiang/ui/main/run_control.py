@@ -1728,7 +1728,10 @@ class RunControlMixin:
             return
         if device is None or device is target.device:
             coordinator = getattr(getattr(target, "device", None), "recovery_coordinator", None)
-            target.status = "connected" if getattr(coordinator, "waiting_kind", "") == "uncertain_action" else "offline"
+            # 「等待画面流恢复」时设备本身是好的，不能标成离线——
+            # 否则开始/批量启动会被"请先连接设备"挡住。
+            target.status = "connected" if getattr(coordinator, "waiting_kind", "") in {
+                "uncertain_action", "stream"} else "offline"
         self._refresh_execution_targets_ui()
         run_context = self._run_manager.run_for_target(target_id)
         if run_context is None:
@@ -1769,23 +1772,97 @@ class RunControlMixin:
                 btn.clicked.connect(self._resume_adb)
             banner.setVisible(True)
 
-    def _show_connection_recovery_question(self, target, run_context, error_msg):
+    def _on_stream_lost(self, target_id: str, kind: str, detail: str, device=None):
+        """画面流故障（ADB 通道还在）：运行中的任务停下等恢复，空闲时只提示。
+
+        这条路径和 ADB 断连分开：断连要重连 transport，流故障只需要重建 scrcpy
+        会话。设备本身是好的，所以目标状态不能标成离线。
+        """
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        self._abort_recording_for_target(target_id, tr("画面流中断"))
+        self.append_log(tr("[警告] {name} 画面流中断：{reason}").format(
+            name=target.display_name, reason=detail))
+        if target_id == self._execution_targets.active_target_id:
+            label = getattr(self, "preview_label", None)
+            if label is not None and label.isVisible():
+                label.setText(tr("画面已中断，正在恢复…"))
+        run_context = self._run_manager.run_for_target(target_id)
+        if run_context is None:
+            # 空闲时段不弹窗：挂机时不该被反复打扰，横幅与日志足够提示
+            self._show_channel_banner(
+                target_id,
+                tr("⚠ 画面流已中断：点「重新检查」重试，或断开重连设备"))
+            return
+        from .execution_runs import RunState
+        self._run_manager.set_state(
+            run_context.task_run_id, RunState.WAITING_TARGET)
+        self._emit_run_instance_state(
+            run_context, RunState.WAITING_TARGET.value)
+        self._show_connection_recovery_question(
+            target, run_context, detail, kind="stream")
+        if target_id != self._execution_targets.active_target_id:
+            return
+        self.statusBar().showMessage(tr("画面流中断，任务正在等待恢复"))
+        self._show_channel_banner(
+            target_id,
+            tr("⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务"))
+
+    def _on_stream_restored(self, target_id: str):
+        """画面流恢复：与 ADB 恢复走同一套状态复位（横幅收起、WAITING→RUNNING）。"""
+        self._on_adb_connection_restored(target_id)
+
+    def _show_channel_banner(self, target_id: str, text: str) -> None:
+        """只在当前查看目标上显示通道横幅，按钮统一指向「重新检查」。"""
+        if target_id != self._execution_targets.active_target_id:
+            return
+        banner = getattr(self, "_adb_banner", None)
+        if banner is None:
+            return
+        label = getattr(self, "_adb_banner_label", None)
+        if label is not None:
+            label.setText(text)
+        btn = getattr(self, "_adb_banner_btn", None)
+        if btn is not None:
+            try:
+                btn.clicked.disconnect()
+            except TypeError:
+                pass
+            btn.clicked.connect(self._resume_adb)
+        banner.setVisible(True)
+
+    def _show_connection_recovery_question(self, target, run_context, error_msg,
+                                           *, kind: str = "connection"):
         """设备恢复属于安全交互，不走无人值守工作流弹窗自动处理。"""
         from PyQt6.QtCore import Qt, QTimer
         from PyQt6.QtWidgets import QMessageBox
 
-        dialogs = getattr(self, '_connection_recovery_dialogs', None)
-        if dialogs is None:
-            dialogs = self._connection_recovery_dialogs = {}
-        text = tr(
-            "{name} 的连接恢复未完成。\n{error}\n\n"
-            "请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。"
-        ).format(name=target.display_name, error=error_msg)
+        existing: dict[str, Any] | None = getattr(
+            self, '_connection_recovery_dialogs', None)
+        dialogs: dict[str, Any] = existing if existing is not None else {}
+        if existing is None:
+            self._connection_recovery_dialogs = dialogs
+        if kind == "stream":
+            text = tr(
+                "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n"
+                "请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后"
+                "选择是重新检查；选择否停止该目标任务。"
+                "关掉本提示不会停止任务，顶部横幅会一直保留。"
+            ).format(name=target.display_name, error=error_msg)
+            title = tr("等待画面恢复")
+        else:
+            text = tr(
+                "{name} 的连接恢复未完成。\n{error}\n\n"
+                "请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。"
+            ).format(name=target.display_name, error=error_msg)
+            title = tr("等待设备恢复")
         if target.id in dialogs:
             dialogs[target.id].setText(text)
             return
-        box = QMessageBox(QMessageBox.Icon.Warning, tr("等待设备恢复"), text,
-                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, self)
+        box = QMessageBox(QMessageBox.Icon.Warning, title, text,
+                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                          cast(QWidget, self))
         box.setDefaultButton(QMessageBox.StandardButton.No)
         box.setWindowModality(Qt.WindowModality.NonModal)
         dialogs[target.id] = box
@@ -1803,8 +1880,8 @@ class RunControlMixin:
                 if answer == QMessageBox.StandardButton.Yes:
                     if target.resume_event is not None:
                         target.resume_event.set()
-                    self.append_log(tr("[操作] 重新检查设备连接"))
-                else:
+                    self.append_log(tr("[操作] 重新检查执行通道"))
+                elif answer == QMessageBox.StandardButton.No:
                     run_context.stop_event.set()
                     if run_context.pause_event is not None:
                         run_context.pause_event.set()
@@ -1812,7 +1889,13 @@ class RunControlMixin:
                         target.resume_event.set()
                     self._run_manager.set_state(run_context.task_run_id, RunState.STOPPING)
                     self._emit_run_instance_state(run_context, RunState.STOPPING.value)
-                    self.append_log(tr("[操作] 停止等待恢复的设备任务"))
+                    self.append_log(tr("[操作] 停止等待恢复的任务"))
+                else:
+                    # 关窗（X / Esc）只是收起提示：恢复等待没有超时，
+                    # 关掉弹窗不能被当成"用户选择停止"。
+                    self.append_log(tr(
+                        "[提示] 已收起恢复提示，任务仍在等待通道恢复；"
+                        "可点顶部横幅「重新检查」或按 F10 停止"))
             box.deleteLater()
 
         def poll():

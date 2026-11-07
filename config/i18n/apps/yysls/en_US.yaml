@@ -601,7 +601,6 @@ yysls:
     Unchecked: overwrite only this key without triggering synchronization.
   至少保留一个分组: Keep at least one group
   覆写_{label}: Override - {label}
-  覆写: Override...
   该数值已被其他进程更新_本次增减未写入_请刷新后重试: Value was updated by another process, change not written. Please refresh and retry.
   选择字段: Select Field
   错误: Error
@@ -724,19 +723,16 @@ config:
   wf_gather_zhayu: Taiji Fish Bombing
 auto_strings:
   '   - 词条未记录': '   - Affix Not Recorded'
-  '  扫描处理未启用 → 跳过': '  Scan Processing not enabled -> skip'
   ' 等+': ' ...+'
   '#': '#'
   '## 运行结束': '## Run Finished'
   '### 成品清单（一般及以上）': '### Finished Items (Common and above)'
-  '&lt;止戈定音&gt;': '&lt;Zhige Dingyin&gt;'
   + 分组: + Group
   + 词条名: + Add Affix Name
   '- 不添加 -': '- Don''t Add -'
   '- 不限 -': '- No Limit -'
   '- 分组': '- Group'
   '- 无需增伤 -': '- No Damage Bonus Needed -'
-  0 = 不限首词条: 0 = No restriction on first affix
   100%毕业率基准 DPS: 100% Graduation Rate Baseline DPS
   <止戈定音>: <Zhige Dingyin>
   DPS: DPS
@@ -744,14 +740,12 @@ auto_strings:
   Excel 工作簿 (*.xlsx): Excel Workbook (*.xlsx)
   Excel 文件 (*.xlsx): Excel File (*.xlsx)
   '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律': '[Notice] "Skip Actual Tuning" is on: only simulates entering/exiting the tuning page, no tuning is performed'
-  base_rules 必须是 list: base_rules must be a list
   common_conditions 必须是 dict: common_conditions must be a dict
   'playstyles: 名字不能为空': 'playstyles: name cannot be empty'
   profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: profile.yaml is in the old format (contains fields/groups); please update it to the new format manually
   pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when: The pvp section is deprecated; use the switches registry + rule condition group `when` instead
   switches 必须是 dict: switches must be a dict
   tune_config 顶层必须是 dict: The top level of tune_config must be a dict
-  tuning_rules 必须是 dict: tuning_rules must be a dict
   '{count} 个可提升词条': '{count} improvable affixes'
   '{count} 件': '{count} pieces'
   '{count} 条': '{count} entries'
@@ -759,7 +753,6 @@ auto_strings:
   '{label}（基础值）': '{label} (Base Value)'
   '{name} 里没有「{sheet}」工作表，可能不是毕业率计算器': '{name} has no "{sheet}" worksheet; it may not be a graduation-rate calculator'
   '{name}（共{count}条，按损失最小一条）': '{name} ({count} total, showing the smallest loss)'
-  '{school}  ·  {scheme}  ·  基于当前备战方案': '{school}  ·  {scheme}  ·  based on the current loadout plan'
   '{slot}  {name} {value}  毕业率下降 {loss}': '{slot}  {name} {value}  graduation rate drop {loss}'
   '{slot} · {name}': '{slot} · {name}'
   '{slot} · {name}：{reasons}': '{slot} · {name}: {reasons}'
@@ -781,7 +774,6 @@ auto_strings:
   上一件装备 · 重置前: Previous Equipment · Before Reset
   上半赛季结束日期: First half season end date
   '下一点恢复: 已达上限': 'Next point recovers: cap reached'
-  不应用规则: Don't Apply Rule
   不添加狗粮: Don't Add Fodder
   全奇术增伤: All Arts Damage
   群体类奇术增伤: AoE Arts Damage
@@ -792,14 +784,12 @@ auto_strings:
   不限品阶: No Quality Limit
   不限评级: No Rating Limit
   不限部位: No Slot Limit
-  '主武学:': 'Main Martial:'
   仅用于辅助筛选候选装备，不参与装备合法性判断: Only used to help filter candidate equipment; not part of equipment validity checks
   仅紫色: Purple Only
   仅金色: Gold Only
   仅金装: Gold Equipment Only
   仅首词条: First Affix Only
   仅展示黄字三率和增效: Show Effective Rates and Bonuses Only
-  以下是理论敏感度，不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。: The following is theoretical sensitivity; it doesn't mean you can gain or lose a single affix in-game. Additions are computed at the Lv{level} normal-affix cap; deductions use the equipment's actual current value.
   以下装备存在词条组合异常，已排除培养计算；请先校正：: 'The following equipment has an invalid affix combination and has been excluded from the graduation calculation; please correct it first:'
   以下部位没有候选装备：: 'No candidate equipment for the following slots:'
   任务被停止: Task Stopped
@@ -820,7 +810,6 @@ auto_strings:
   : 'Failed to save profile.yaml:
 
     {e}'
-  保存为方案：: 'Save as Plan:'
   保存修改: Save Changes
   保存成功: Saved Successfully
   保留版本: Keep Version
@@ -848,13 +837,10 @@ auto_strings:
   准备执行: Preparing to Run
   分析失败: Analysis Failed
   分析当前配装的合法培养建议和词条敏感度: Analyze valid growth suggestions and affix sensitivity for the current build
-  切换后扫描处理/材料处理/结束处理页同步对准该组，调律任务启动时以此为准: After switching, the Scan/Material/End Processing pages sync to this group; tuning tasks use this group when started
   '列 ': 'Column '
   创建基础属性: Create Base Attributes
   创建模拟装备: Create Mock Equipment
   创建装备: Create Equipment
-  初始判定: Initial Judgment
-  删除左侧旧版本，并把备战方案引用迁移到右侧版本: Delete the old version on the left, and migrate loadout-plan references to the version on the right
   删除当前列: Delete Current Column
   删除方案: Delete Plan
   删除此装备: Delete This Equipment
@@ -870,18 +856,10 @@ auto_strings:
   刷新装备: Refresh Equipment
   剑: Sword
   剑武学增伤: Sword Martial Damage
-  '副武学:': 'Off Martial:'
   动作: Action
   动态类: Dynamic
   劲: Vigor
   势: Momentum
-  勾选后，判定属性和增益效果直接展示抗性后数值，节省空间: When checked, Judgment Attribute and Bonus Effects show post-resistance values directly, saving space
-  ? '勾选后，对每件装备进行第一次调律前会先执行一次结束处理判定。
-
-    用于支持本身已经是废品的装备先重置，再开始正常调律。'
-  : 'When checked, an End Processing judgment runs once before the first tuning round on each piece of equipment.
-
-    Useful for resetting equipment that''s already junk before starting normal tuning.'
   勾选装备后计算；最多选择 3 件。: Check equipment to include in the calculation; select up to 3 pieces.
   区间值（最小~最大）: Range value (min~max)
   升序: Ascending
@@ -902,9 +880,7 @@ auto_strings:
   可用词条库为全局价值序（越靠前越优先保留与填充）；武学增伤不在此填写——玩法指定武器的武学增伤自动视为最高优先级，未指定时按垃圾词条处理。: The available-affix pool is a global priority order (earlier = kept/filled first); Martial Damage bonuses aren't entered here -- the Martial Damage bonus of the weapon specified by the playstyle is automatically treated as top priority, and treated as a junk affix otherwise.
   右侧新增列: Add Column on Right
   右键菜单: Right-Click Menu
-  合并: Merge
   合并失败: Merge Failed
-  合并完成: Merge Complete
   合并选中项: Merge Selected
   '同步到:': 'Sync To:'
   名称为空: Name Is Empty
@@ -924,7 +900,6 @@ auto_strings:
   命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）: 'Hit condition: compares the first affix''s initial value against this value by direction; <= 100 / >= 0 = no limit (recognition failure counts as not meeting it)'
   '品质:': 'Quality:'
   品阶: Quality
-  品阶 ≥: Quality >=
   品阶未知: Quality Unknown
   品阶未识别，跳过品阶筛选: Quality not recognized; skipping quality filter
   品阶识别异常: Quality Recognition Error
@@ -938,11 +913,10 @@ auto_strings:
   回收装备: Recycle Equipment
   回收装备：分解为材料: 'Recycle Equipment: Break Down into Materials'
   固定标准部位；勾选有调律价值的品阶；规则设置页可按部位覆盖本全局默认: Fixed standard slots; check the quality tiers worth tuning; the Rule Settings page can override this global default per slot
-  在游戏配置中编辑当前属性: Edit the current attribute in Game Config
   培养建议: Growth Suggestions
-  培养建议  {count}: Growth Suggestions  {count}
   基准DPS: Baseline DPS
   基础属性: Base Attributes
+  等级属性: Level Attributes
   基础属性「{name}」已保存到流派「{school}」: Base attributes "{name}" saved to playstyle "{school}"
   基础属性「{name}」已存在，是否覆盖？: Base attributes "{name}" already exist. Overwrite?
   基础属性名称: Base Attribute Name
@@ -957,7 +931,6 @@ auto_strings:
   增益抗性百分比（可选，>= 0）: Bonus resistance percentage (optional, >= 0)
   增益效果: Bonus Effects
   处理中: Processing
-  处置未启用，保留: Disposal not enabled; keep
   备战: Loadout
   备战中: Preparing Loadout
   备战方案: Loadout Plan
@@ -972,8 +945,6 @@ auto_strings:
   如：黄钟长鸣: e.g. Huangzhong Changming
   字体设置: Font Settings
   完成：{rounds} 轮，{status}: 'Done: {rounds} rounds, {status}'
-  定义数据模型的 key。双击行可编辑。: Defines the data model's key. Double-click a row to edit.
-  定时: Scheduled
   定音: Dingyin
   最终评级：: 'Final Rating:'
   最终评级：-: 'Final Rating: -'
@@ -981,7 +952,6 @@ auto_strings:
   宫: Gong
   宫为首词条 · 商角徵羽不可重复: Gong must be the first affix · Shang/Jue/Zhi/Yu cannot repeat
   对玩家单位增效: Enhancement vs. Player Units
-  对装备进行第一次调律前执行一次结束处理，用于支持装备直接重置: Run an End Processing pass once before the first tuning round, to support resetting equipment directly
   对首领单位增伤: Damage Bonus vs. Boss Units
   对齐失败：alignment 为 None: 'Alignment failed: alignment is None'
   导入 Excel: Import Excel
@@ -996,10 +966,8 @@ auto_strings:
   导出装备数据: Export Equipment Data
   将低于最高等级的装备视为最高等级参与计算: Treat equipment below the max level as max level for the calculation
   将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定: Treat equipment below the max level as max level (raises base attributes); affix/Dingyin values are determined by full Chengyin/full Dingyin
-  将定音词条数值视为上限（100%）参与计算: Treat Dingyin affix values as the cap (100%) in the calculation
   将已装备的定音词条数值视为上限（100%）参与计算: Treat the equipped Dingyin affix values as the cap (100%) in the calculation
   将已装备的承音装备词条数值视为承音上限参与计算: Treat the equipped Chengyin equipment's affix values as the Chengyin cap in the calculation
-  将承音装备的词条数值视为承音上限参与计算: Treat Chengyin equipment's affix values as the Chengyin cap in the calculation
   尚未导入。选择毕业率计算器 Excel 查看其竞速轴。: Not imported yet. Select a graduation-rate calculator Excel file to view its race axis.
   属性攻击: Elemental Attack
   属性跟随: Attribute Follow
@@ -1010,7 +978,6 @@ auto_strings:
   属攻穿透（{name}）: Elemental Penetration ({name})
   属攻类: Elemental
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Elemental ATK affixes (including Formless) allowed at most 2; affixes 2-5 currently have {n}
-  已合并 {count} 组装备。此操作保留右侧版本，并迁移所有备战方案引用。: Merged {count} equipment group(s). This keeps the version on the right and migrates all loadout-plan references.
   已定音: Dingyin Applied
   ? '已导出到
 
@@ -1027,7 +994,6 @@ auto_strings:
   已校验 {count} 种合法组合: Validated {count} legal combinations
   已符合规则但未找到调律入口，跳过本件: Matches the rule, but no tuning entry point was found; skipping this piece
   已请求停止: Stop requested
-  已请求停止，等当前步骤结束: Stop requested; waiting for the current step to finish
   已跳过: Skipped
   已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。勾选参与搜索的装备后，系统会重新计算整套毕业率。: Loaded {count} candidate equipment pieces, covering {slots}/8 slots. Once you check the equipment to search with, the system recalculates the full graduation rate.
   已选择 {count} 件装备，正在计算联合提升…: '{count} equipment selected, calculating combined uplift…'
@@ -1044,8 +1010,6 @@ auto_strings:
   开始调律: Start Tuning
   弓玦: Gongjue
   弓玦套装: Gongjue Set
-  强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）: 'Force Tuning: ignores the entry threshold and forces entry into the tuning page (combine with End Processing "Enable Initial Judgment" to reset and reuse scrapped equipment)'
-  当前备战方案尚未装备任何装备。: The current loadout plan has no equipment equipped yet.
   当前毕业率: Current Graduation Rate
   当前没有运行中的任务: No task is currently running
   当前装备完成后将在这里归档: Once the current equipment is finished, it'll be archived here
@@ -1059,7 +1023,6 @@ auto_strings:
   当前阶段：材料准备 — 第 {n} 轮{action}，{food}: 'Current Stage: Material Prep -- round {n} {action}, {food}'
   当前阶段：等待下一件装备: 'Current Stage: Waiting for Next Equipment'
   当前阶段：等待开始: 'Current Stage: Waiting to Start'
-  当前阶段：结束处理 — 第 {n} 轮完成，正在匹配处理规则: 'Current Stage: End Processing -- round {n} complete, matching processing rules'
   当前阶段：重置调律 — 重置完成，按新装备继续调律: 'Current Stage: Reset Tuning -- reset complete, continuing tuning as a new equipment'
   律匠 - 燕云十六声装备调律工具: LvJiang - YYSLS Equipment Tuning Tool
   御: Defense
@@ -1083,22 +1046,18 @@ auto_strings:
   执行中: Running
   执行调律: Execute Tuning
   扫描判定: Scan Judgment
-  扫描处置未启用 → 跳过该装备: Scan disposal not enabled -> skip this equipment
   '承音:': 'Chengyin:'
   承音装备: Chengyin Equipment
-  全部用户中识别出 {count} 组疑似同一件装备，请核对用户名和左右装备后选择是否合并。: Found {count} possible duplicate equipment pairs across all users. Verify the user and both equipment versions before merging.
   全部用户中没有找到符合条件的疑似重复装备: No possible duplicate equipment was found across all users
   面向全部用户: All users
   技能: Skill
   技能轴: Skill Axis
   指定武学增效: Specified Martial Enhancement
-  排除模拟: Exclude Mock
   搜索失败: Search Failed
   搜索失败，请检查候选装备后重试。: Search failed; check the candidate equipment and try again.
   搜索完成，共得到 {count} 个可用结果。: Search complete, {count} usable results found.
   搜索时排除模拟装备，仅使用真实背包和已穿戴装备: Exclude mock equipment during search; only use real inventory and equipped items
   搜索最优毕业率装备组合: Search for the Optimal Graduation-Rate Equipment Combination
-  搜索设置: Search Settings
   操作: Action
   支持承音: Chengyin
   支持重置: Supports Reset
@@ -1115,7 +1074,6 @@ auto_strings:
   新建方案: New Plan
   方案: Plan
   方案 ADPS: Plan ADPS
-  方案「{name}」已存在，是否覆盖？: Plan "{name}" already exists. Overwrite?
   ? '方案「{name}」已生成。
 
     DPS：{dps:.2f}
@@ -1127,16 +1085,12 @@ auto_strings:
 
     File: {path}'
   方案名称: Plan Name
-  '方案名称:': 'Plan Name:'
-  方案已存在: Plan Already Exists
   方案数值读取失败：{error}: 'Failed to read plan values: {error}'
   方案管理: Plan Management
-  方案：{name}（满值属性，不含食物加成）: 'Plan: {name} (max-value attributes, excluding food bonuses)'
   无: None
   无可用判定规则: No usable judgment rule
   无处置规则命中 → 跳过该装备: No disposal rule matched -> skip this equipment
   无已实现规则可判定该装备，结束调律: No implemented rule can judge this equipment; ending tuning
-  无截图 请连接投屏后点击「刷新截图」: No screenshot. Connect screen mirroring, then click "Refresh Screenshot"
   无方案: No Plan
   无有效结论: No Valid Conclusion
   无法保存: Cannot Save
@@ -1159,7 +1113,6 @@ auto_strings:
   旧版本: Old Version
   展示白字和黄字三率和增效: Show Base and Effective Rates and Bonuses
   右键切换白字和黄字三率及增效的显示方式: Right-click to switch rate and bonus display
-  智能筛选: Smart Filter
   暂无已完成装备: No Completed Equipment Yet
   暂无数据: No Data
   暂无符合条件的词条: No matching affixes
@@ -1184,7 +1137,6 @@ auto_strings:
   最小本属攻击: Min Innate Elemental ATK
   最终词条：: 'Final Affixes:'
   最高单项提升: Highest Single-Item Uplift
-  期望 ≥: Expected >=
   未归类: Uncategorized
   未找到「添加」入口: '"Add" entry point not found'
   未找到对应流派的毕业率方案: No graduation-rate plan found for the matching playstyle
@@ -1245,12 +1197,9 @@ auto_strings:
   攻具套装：{name}: 'Attack Gear Set: {name}'
   请选择攻具套装: Please select an attack gear set
   武学属性: Martial Attributes
-  每日: Daily
   每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when: 'Each tier is defined by several condition groups: OR between groups, AND within a group; a group can bind a `when` switch precondition'
   每轮添加: Add Every Round
   每轮调律开始前的行为点）：律准石数量检查、狗粮检查与添加: 'Behavior point before each tuning round): tuning-stone count check, fodder check and add'
-  每轮调律结束后的行为点）：按预期评级决策（首条命中）。无命中默认：未满 = 继续调律、词条满 = 结束保留；材料不足/用户中断属阻断，不触发: 'Behavior point after each tuning round): decide by expected rating (first match wins). Default when nothing matches: not full = continue tuning, affixes full = end and keep; material shortage/user interrupt are blocking conditions and don''t trigger this'
-  每轮调律自上而下匹配，首条命中即生效；全部不命中则不添加: Each tuning round matches top-down; the first hit takes effect; if nothing matches, nothing is added
   毕业率: Graduation Rate
   毕业率变化: Graduation Rate Change
   气血最大值: Max HP
@@ -1274,29 +1223,17 @@ auto_strings:
   漂移补滚后对齐失败: Alignment failed after drift compensation reroll
   燕云十六声: Yan Yun Shi Liu Sheng
   牵丝: Qianzi
-  玩法评级只辅助勾选候选，不作为装备合法性规则: Playstyle rating only assists in checking candidates; it isn't an equipment validity rule
   环: Ring
   环 · 佩: Ring · Pendant
-  理论扣除一条当前词条的损失: Theoretical loss from removing one current affix
-  理论敏感度: Theoretical Sensitivity
-  理论新增一条词条的收益: Theoretical gain from adding one affix
   生存类: Survival
   用于备战方案比较  ·  不会修改真实背包装备: For comparing loadout plans  ·  does not modify your real inventory equipment
   用于改进律匠内置的调律规则: Used to improve LvJiang's built-in tuning rules
   用户中断: User Interrupted
-  用户中断（F10）: User Interrupted (F10)
   用户总览: User Overview
   用途: Purpose
   目标：: 'Target:'
   破竹: Pozhu
   确定删除基础属性「{name}」？: Delete base attributes "{name}"?
-  确定删除当前方案吗？: Delete the current plan?
-  ? '确定删除方案「{name}」？
-
-    对应的 JSON 文件也会被删除。'
-  : 'Delete plan "{name}"?
-
-    The corresponding JSON file will also be deleted.'
   ? '确定要从背包中删除【{name}】吗？
 
     此操作不可撤销。'
@@ -1309,7 +1246,6 @@ auto_strings:
   : 'Delete mock equipment [{name}]?
 
     This cannot be undone.'
-  确认清空: Confirm Clear
   确认跟随: Confirm Follow
   神力词条「{name}」不能是转律产出：转律不会产出神力词条: 'Godly affix "{name}" cannot come from a Transform: Transform never produces Godly affixes'
   神力词条最多 1 条，当前词条 2-5 里有 {n} 条: At most 1 Godly affix allowed; affixes 2-5 currently have {n}
@@ -1326,9 +1262,7 @@ auto_strings:
   等级倒序: Level Descending
   等级字号: Level Font Size
   等级正序: Level Ascending
-  等级门槛 + 调律门槛 + 扫描/材料/结束处理，一组一套可切换；流派规则全局不受影响: Level threshold + tuning threshold + scan/material/end processing, one set per switchable group; playstyle rules are unaffected globally
   筛选: Filter
-  筛选中: Filtering
   精准率: Accuracy Rate
   系统规则不可删除或修改 key；不使用时请取消启用: System rules cannot be deleted or have their key changed; disable them instead of deleting
   系统规则组不可删除: System rule groups cannot be deleted
@@ -1339,11 +1273,8 @@ auto_strings:
   紫装及以下: Purple Equipment and Below
   红色: Red
   结束全部调律: End All Tuning
-  结束处理未启用: End Processing not enabled
   结束日期: End Date
   继续调律: Continue Tuning
-  继续调律或跳过: Continue Tuning or Skip
-  继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则: 'Continue Tuning or Skip: continues while affixes aren''t full, ends tuning and keeps the equipment once full, without running later rules'
   绳镖: Rope Dart
   绳镖武学增伤: Rope Dart Martial Damage
   编辑别名: Edit Alias
@@ -1371,7 +1302,6 @@ auto_strings:
   自选规则: Custom Rules
   舞绫鼓: Dancing Silk Drum
   舞绫鼓武学增伤: Dancing Silk Drum Martial Damage
-  '英文，如 ': 'English, e.g. '
   蓝装: Blue Equipment
   蓝装及以下: Blue Equipment and Below
   '行 ': 'Row '
@@ -1381,9 +1311,7 @@ auto_strings:
   装备信息: Equipment Info
   装备名字号: Equipment Name Font Size
   装备失败: Equip Failed
-  装备展示参数已保存: Equipment display parameters saved
   装备展示设置: Equipment Display Settings
-  装备数据: Equipment Data
   装备数据缺少 _fp 字段: Equipment data missing the _fp field
   装备未加载，请刷新: Equipment not loaded; please refresh
   装备状态异常: Equipment State Error
@@ -1393,9 +1321,7 @@ auto_strings:
   装备部位、等级品阶、启用规则、初始词条、逐轮材料与产出、停止原因和最终评级: Equipment slot, level/quality, enabled rules, initial affixes, per-round materials and output, stop reason, and final rating
   装备重置冷却期，跳过该装备: Equipment is in the reset cooldown; skipping this equipment
   装备面板全屏: Equipment Panel Fullscreen
-  覆写: Override
   规则 key 须为小写字母开头的英文/数字/下划线: The rule key must start with a lowercase letter, using letters/digits/underscore
-  规则「{name}」需至少勾选一个玩法: Rule "{name}" requires at least one checked playstyle
   规则可引用词表为空（attributes.yaml 异常）: The rule's referenceable word list is empty (attributes.yaml error)
   规则命中重置但次数已用尽（按钮文本读不到数字）时的转处置动作: The fallback disposal action when a rule matches Reset but the count is already used up (the button text has no readable number)
   规则文件顶层必须是 dict: The top level of a rule file must be a dict
@@ -1404,8 +1330,6 @@ auto_strings:
   规则设置: Rule Settings
   规则评级: Rule Rating
   角: Jue
-  角色名列（不可删除）: Character name column (cannot be deleted)
-  角色详情: Character Detail
   解析 {name} 时出错：{err}: 'Error parsing {name}: {err}'
   计数大于等于: Count Greater Than or Equal To
   计数小于等于: Count Less Than or Equal To
@@ -1420,11 +1344,8 @@ auto_strings:
   词条 {slot}「{name}」不能出现在{part}: Affix {slot} "{name}" cannot appear on {part}
   词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}: Affix {slot} "{name}" doesn't match equipment type "{type_name}"{detail}
   词条值: Affix Value
-  词条分析: Affix Analysis
   词条名称（原始词条名 → 当前类别）: Affix name (original affix → current category)
-  词条培养分析: Affix Growth Analysis
   词条字号: Affix Font Size
-  词条已满，无行为规则命中 → 跳过该装备: Affixes full, no behavior rule matched -> skip this equipment
   词条库设置: Affix Pool Settings
   词条部位: Affix Slot
   词条配置: Affix Config
@@ -1435,14 +1356,10 @@ auto_strings:
   该等级要求的最低材料数量（可选）: Minimum material count required for this level (optional)
   该行不产出伤害，通常是心法切换或起手动作: This row produces no damage; usually a stance switch or opener action
   该装备存在以下异常，游戏中不会出现这样的装备，通常是识别误读，请手工校正：: 'This equipment has the following anomalies; equipment like this doesn''t occur in-game, usually a recognition misread -- please correct it manually:'
-  请先在角色详情页选择流派和毕业率方案: Select a playstyle and graduation-rate plan on the Character Detail page first
   请先点击 '+ 分组' 创建分组: Please click '+ Group' to create a group first
   请先选中要删除的赛季行: Select the season row to delete first
   请先选中要删除的配置行: Select the config row to delete first
-  两门武学组合无法匹配任何流派，请重新选择: The two martial arts do not match any school; please pick again
-  请先选择一个流派: Please select a playstyle first
   请先选择一个流派后再确认基础属性识别结果: Select a playstyle first before confirming the base-attribute recognition result
-  请先选择属性: Please select an attribute first
   请先选择词条类别: Please select an affix category first
   请输入装备名称: Please enter an equipment name
   请选择方案或基础属性: Please select a plan or base attributes
@@ -1450,7 +1367,6 @@ auto_strings:
   调律: Tuning
   调律中断: Tuning Interrupted
   调律中断，已保存部分报告: Tuning interrupted; a partial report was saved
-  调律前识别材料区数量，低于基准判材料不足，按不足处理执行: Before tuning, recognize the material area's count; below the baseline counts as insufficient and triggers the shortage handling
   调律材料: Tuning Materials
   调律结束: Tuning Ended
   调律部位配置无效，请在调律页重新选择部位: Invalid tuning slot config; reselect the slots on the Tuning page
@@ -1503,7 +1419,6 @@ auto_strings:
 
 
     New key (starts with a lowercase letter, letters/digits/underscore):'
-  重命名方案: Rename Plan
   重命名词条名: Rename Affix Name
   重新计算: Recalculate
   重置二次确认识别失败，跳过该装备: Failed to recognize the reset secondary confirmation; skipping this equipment
@@ -1525,7 +1440,6 @@ auto_strings:
   '非 ': 'Not '
   页面导航: Page Navigation
   首词条 %: First Affix %
-  首词条 ≥ %: First Affix >= %
   首词条「{name}」不能出现在{part}: First affix "{name}" cannot appear on {part}
   首词条不限: First Affix Unrestricted
   鸣金: Mingjin
@@ -1547,8 +1461,6 @@ auto_strings:
   装备属性: Equipment Properties
   选择要复制的模拟装备: Select mock equipment to copy
   点击选择要复制的装备: Click to select equipment to copy
-  收起部位至状态筛选: Collapse slot-to-status filters
-  展开部位至状态筛选: Expand slot-to-status filters
   只删除当前筛选出的背包装备，此处不支持删除模拟装备: Delete only filtered inventory equipment; mock equipment is not supported here
   确定删除当前筛选出的背包装备吗？: Delete the filtered inventory equipment?
   保留备战中的装备: Keep equipment used by loadouts
@@ -1556,7 +1468,6 @@ auto_strings:
   保留已锁定的装备: Keep locked equipment
   保留已标记为锁定的装备: Keep equipment marked as locked
   筛选命中 {matched} 件；备战保护 {referenced} 件；锁定保护 {locked} 件；实际将删除 {deleted} 件: 'Matched: {matched}; protected by loadouts: {referenced}; locked: {locked}; to delete: {deleted}'
-  筛选命中 {matched} 件；备战保护 {protected} 件；实际将删除 {deleted} 件: 'Matched: {matched}; protected by loadouts: {protected}; to delete: {deleted}'
   警告：{count} 件装备将从相关备战方案中移除。: 'Warning: {count} equipment item(s) will be removed from related loadouts.'
   批量复制装备: Batch Copy Equipment
   批量复制模拟装备到其他用户: Copy mock equipment to other users in batches
@@ -1567,14 +1478,12 @@ auto_strings:
   确定将 {items} 件模拟装备复制给 {users} 个用户吗？: Copy {items} mock equipment items to {users} users?
   '{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}': '{user}: {copied} added, {existing} existing, {conflicts} conflicts'
   '{user}：复制失败：{error}': '{user}: copy failed: {error}'
-  此处不支持删除模拟装备: Mock equipment deletion is not supported here
   确认复制: Confirm Copy
   复制完成: Copy Complete
   # 模拟转律：转律建议页、备战方案第四假设、卡片目标展示
   转律建议: Transmute Advice
   词条收益率: Affix Yield
   模拟转律: Simulate Transmute
-  按装备上已保存的转律目标计算（目标由「培养建议 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: Compute with the transmute targets saved on equipment (set via Growth Suggestions → Transmute Advice); uses saved targets only, never triggers a search
   已保存目标毕业率: Saved-Target Graduation
   推荐毕业率: Recommended Graduation
   实际数值: actual values
@@ -1618,7 +1527,6 @@ auto_strings:
   # 毕业率分析对话框：共享假设栏与结果缓存
   毕业率分析: Graduation Analysis
   计算假设: Assumptions
-  '{school}  ·  {scheme}  ·  {plan}': '{school}  ·  {scheme}  ·  {plan}'
   对话框内的改动不会写回备战方案: Changes here are not written back to the loadout
   按装备上已保存的转律目标计算；转律建议页本身不受此项影响: Compute with the transmute targets saved on equipment; the Transmute Advice page itself ignores this option
   显示上次搜索的 {count} 个结果；重新搜索会覆盖。: Showing the {count} result(s) of the last search; a new search overwrites them.

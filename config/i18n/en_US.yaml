@@ -570,22 +570,14 @@ auto_strings:
   '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用': '[Notice] The {missing} of plan "{name}" no longer exists; it was not fully applied'
   '[提示] 选中的方案已不存在，已回到自定义': '[Notice] The selected plan no longer exists; back to Custom'
   当前正在使用方案，如需手动调整请先切换为「自定义」: 'A plan is in use; switch to "Custom" first to adjust these manually'
-  全武学增伤要求: All-art damage bonus
-  奇术增伤要求: Qishu damage bonus
-  对单位增伤要求: Target damage bonus
   以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: The three above describe the build only; they do not affect rating, auto-tuning or graduation rate
   + 引用坐标: + Reference Point
   引用坐标: Reference Point
   引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读: Reference a point from another top-level scene; it stays read-only here
-  没有可引用的坐标：一级场景中同名的 key 已被本场景占用。: 'No point available to reference: matching keys are already taken by this scene.'
   删除玩法: Remove Playstyle
   '选择要引用的玩法:': 'Pick a playstyle to reference:'
   所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」: All playstyles are referenced; create new ones in Game Config → Playstyles
   玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用: Playstyles are defined in Game Config → Playstyles; referenced here only
-  '主武学:': 'Main art:'
-  '副武学:': 'Sub art:'
-  主武学增伤要求: Main art damage bonus
-  副武学增伤要求: Sub art damage bonus
   武学类型: Martial Art Type
   玩法类型: Playstyle Type
   + 武学: + Art
@@ -605,7 +597,6 @@ auto_strings:
   防具定音: Armor Dingyin
   属性与主副武学由绑定流派提供，已锁定: Attribute and martial arts come from the bound school and are locked
   自定义玩法可自由选择属性与武学，并显示全部防具定音: Custom playstyles can freely select attributes and martial arts and show all armor dingyin options
-  这两个武学尚未登记到任何玩法: These two arts are not registered to any playstyle yet
   以下流派仍在使用该武学：{schools}: 'Still used by these schools: {schools}'
   以下调律规则仍在引用该玩法：{rules}: 'Still referenced by these tuning rules: {rules}'
   流派与玩法只引用武学，武器由此派生，不在别处录入: Schools and playstyles reference arts only; the weapon is derived here
@@ -614,11 +605,7 @@ auto_strings:
   跟随当前用户: Follow current user
   请选择有效的执行用户: Select a valid user to run as
   '[错误] 请选择有效的执行用户': '[Error] Select a valid user to run as'
-  同层视图与基底处于同一图层，无入口: 'Same-layer view: shares a layer with the base view and has no entry'
-  '无入口（死视图：补 to: 声明，或改标为同层视图）': 'No entry (dead view: add a to: declaration, or mark it as same-layer)'
   '  · 同层': '  · same layer'
-  同层视图（与基底同一图层，如滚动后的另一屏）: Same-layer view (shares the base layer, e.g. another scroll position)
-  同层视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口: Same-layer views have exits but no entry; uncheck it for a standalone page that needs one
   入口: Entry
   基底  （单视图）: Base  (Single View)
   '跳转:': 'Goes to:'
@@ -626,194 +613,18 @@ auto_strings:
   未声明: Not declared
   + 引用区域: + Reference Area
   引用区域: Reference Area
-  没有可引用的区域：一级场景中同名的 key 已被本场景占用。: 'No area available to reference: matching keys in top-level scenes are already taken by this scene.'
-  确定移除对 {scene}.{entity} 的引用吗？源场景的定义不受影响。: Remove the reference to {scene}.{entity}? The source scene definition is unaffected.
-  移除引用: Remove Reference
   '来源:': 'Source:'
   来源: Source
   跳转: Goes To
   不跳转: No transition
-  profile_core_001: DSL Write
-  profile_core_002: Key '{key}' already shown in group
-  profile_core_003: Key '{key}' already exists
-  profile_core_004: Key can only contain letters, digits and underscores
-  profile_core_005: profile.yaml is in the old format (contains fields/groups); please update it to the new format manually
-  profile_core_006: '{field} cannot exceed 999999'
-  profile_core_007: '{field} cannot be less than {min}'
-  profile_core_008: '{field} must be a valid number'
-  profile_core_009: '{label} must be an integer'
-  profile_core_010: '{title} Key ({model})'
-  profile_core_011: Previous User
-  profile_core_012: Cap
-  profile_core_013: 'Cap:'
-  profile_core_014: Next User
-  profile_core_015: 'Next point recovers: cap reached'
-  profile_core_016: No Alert
-  profile_core_017: Chinese, e.g. Weekly Task
-  profile_core_018: 'Failed to save profile.yaml:
 
     {e}'
-  profile_core_019: Ratio
-  profile_core_020: All Directions
-  profile_core_021: Regeneration
-  profile_core_022: Write conflict
-  profile_core_023: Boundary/{unit}
-  profile_core_024: Boundary:{val}/{period}
-  profile_core_025: 'Boundary Period:'
-  profile_core_026: Boundary Recovery
-  profile_core_027: Decrease...
-  profile_core_028: 'Value after decrease cannot be less than 0 (current: {cur}, input: {inp})'
-  profile_core_029: 'Decrease Amount:'
-  profile_core_030: Group '{name}' already exists
-  profile_core_031: Group name cannot be empty
-  profile_core_032: 'Group Name:'
-  profile_core_033: Minute
-  profile_core_034: Delete Group
-  profile_core_035: Delete Current Column
-  profile_core_036: Refresh
-  profile_core_037: 'Checked: apply action semantics and trigger configured sync_targets.
-
-    Unchecked: overwrite only this key without triggering synchronization.'
-  profile_core_038: Increase Only
-  profile_core_039: Change Log
-  profile_core_040: Optional
-  profile_core_041: Add Column on Right
-  profile_core_042: Sync:{sync}
-  profile_core_043: 'Sync To:'
-  profile_core_044: Sync change dependents
-  profile_core_045: 'Sync Targets:'
-  profile_core_046: Sync target cannot point to itself
-  profile_core_047: 'No'
-  profile_core_048: Week
-  profile_core_049: Monday
-  profile_core_050: Wednesday
-  profile_core_051: Tuesday
-  profile_core_052: Friday
-  profile_core_053: Saturday
-  profile_core_054: Thursday
-  profile_core_055: Period
-  profile_core_056: 'Period:'
-  profile_core_057: 'Failed to write back user data:
-
-    {e}'
-  profile_core_060: 'Change amount (+/-):'
-  profile_core_061: Increase...
-  profile_core_062: 'Increase Amount:'
-  profile_core_063: Note
-  profile_core_064: 'Note Content:'
-  profile_core_065: Day
-  profile_core_069: Define data model keys
-  profile_core_070: Defines the data model's key. Double-click a row to edit.
-  profile_core_071: Scheduled
-  profile_core_072: Realtime/{unit}
-  profile_core_073: Realtime:{val}/{unit}
-  profile_core_074: Realtime Recovery
-  profile_core_075: Hour
-  profile_core_076: Show Cap
-  profile_core_077: Completed
-  profile_core_079: Stock
-  profile_core_080: When enabled, allows decimal input; UI uses DoubleValidator
-  profile_core_081: 'Current Value: {val}'
-  profile_core_082: 'Recovery Type:'
-  profile_core_083: 'Recovery type: fixed-point recovery'
-  profile_core_084: 'Recovery type: real-time recovery'
-  profile_core_085: Notice
-  profile_core_086: Action
-  profile_core_087: Decimal Support
-  profile_core_088: Invalid value
-  profile_core_089: Data Model
-  profile_core_090: New Value
-  profile_core_091: 'New Value:'
-  profile_core_092: 'New Name:'
-  profile_core_093: New
-  profile_core_094: No Cap
-  profile_core_095: Old Value
-  profile_core_096: Time
-  profile_core_097: Incomplete
-  profile_core_098: Source/Usage
-  profile_core_099: 'Source:'
-  profile_core_100: View History
-  profile_core_101: Label
-  profile_core_102: 'Label:'
-  profile_core_103: Orange
-  profile_core_104: 'Orange Threshold:'
-  profile_core_105: Orange:>={val}
-  profile_core_106: Positive
-  profile_core_108: Weekly
-  profile_core_109: Daily
-  profile_core_110: Daily
-  profile_core_111: Monthly
-  profile_core_112: 'Per Recovery:'
-  profile_core_114: No data model keys available, please add in model definition first
-  profile_core_115: Add Sync Target
-  profile_core_116: User Data Model Definition
-  profile_core_117: Purpose
-  profile_core_119: Target
-  profile_core_120: OK
-  profile_core_121: Delete key '{key}'?
-  profile_core_122: Delete group '{name}'?
-  profile_core_123: Type
-  profile_core_124: Red
-  profile_core_125: 'Red Threshold:'
-  profile_core_126: Red:>={val}
-  profile_core_127: Edit
-  profile_core_128: Edit Note - {label}
-  profile_core_129: Edit Text...
-  profile_core_130: Custom change - {label}
-  profile_core_131: Keep at least one group
-  profile_core_132: 'English, e.g. '
-  profile_core_133: Override
-  profile_core_134: Override - {label}
-  profile_core_135: Override...
-  profile_core_136: Value was updated by another process, change not written. Please refresh and retry.
-  profile_core_137: Details
-  profile_core_138: Summary
-  profile_core_139: Please select a user first
-  profile_core_140: Please enter Key
-  profile_core_141: Please enter {field}
-  profile_core_142: Please enter a value
-  profile_core_143: Please enter label
-  profile_core_144: Negative
-  profile_core_145: Soft Cap
-  profile_core_146: Input Error
-  profile_core_147: Select Field
-  profile_core_148: Select or enter new {label}
-  profile_core_151: 'Rate Unit:'
-  profile_core_152: 'Rate Value:'
-  profile_core_153: Quota
-  profile_core_154: Duplicate
-  profile_core_155: Reload user data
-  profile_core_156: Reset:{time}
-  profile_core_157: 'Reset Day (date):'
-  profile_core_158: 'Reset Day (weekday):'
-  profile_core_159: Reset day:{day}
-  profile_core_160: Reset day:{day}
-  profile_core_161: 'Reset Time:'
-  profile_core_162: Error
-  profile_core_163: (Please select)
-  profile_rules_003: 'Change rules:'
-  profile_rules_004: 'Duplicate source or usage in change rules; merge amounts into one row: {name}'
-  profile_rules_005: 'Change rule row {row} has a shortcut amount; enter a source or usage'
-  profile_rules_006: 'e.g. Harmony Draw'
-  profile_rules_007: 'e.g. Mail Gift'
-  profile_rules_008: Shortcut Amount
-  profile_rules_009: Source (Increase)
-  profile_rules_010: Add Source
-  profile_rules_011: Add Usage
-  profile_rules_012: Usage (Decrease)
-  profile_rules_013: Quick rules:{count}
-  profile_rules_014: 'Usage:'
-  profile_rules_017: Change rule row {row} needs at least one shortcut amount
-  profile_core_164: Edit Current Column
   '  未导入图片': '  No image imported'
   '## 汇总': '## Summary'
-  (可选): (Optional)
   (无): (None)
   (无匹配): (No Match)
   (未命名): (Unnamed)
   (未识别到): (Not Recognized)
-  (空): (Empty)
-  (空行): (Blank Line)
   + 创建区域: + Create Region
   + 创建坐标: + Create Point
   + 创建引用: + Create Reference
@@ -822,16 +633,9 @@ auto_strings:
   '- 未分组 -': '- Ungrouped -'
   '- 未命名 -': '- Unnamed -'
   0=红 1=绿 2=蓝: 0=Red 1=Green 2=Blue
-  <b>勾选要执行的脚本：</b>: <b>Select scripts to execute:</b>
-  <b>选择要执行的行：</b>: <b>Select lines to execute:</b>
-  <span style="color:#888;">截图：—  画布：—</span>: '<span style="color:#888;">Screenshot: —  Canvas: —</span>'
-  <span style="color:#888;">截图：—　　画布：—</span>: '<span style="color:#888;">Screenshot: —　　Canvas: —</span>'
   ADB screencap 单帧截图: ADB screencap (single frame)
   ADB shell input 指令执行: ADB shell input (command channel)
-  ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止: ADB error. Restore the device connection and click Resume; if it cannot be restored, press F10 to stop
-  '[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；若无法恢复，请按 F10 停止任务后重新连接: {error}': '[Warning] ADB connection error. Restore the connection to {name} and click Resume; if it cannot be restored, press F10 to stop the task and reconnect: {error}'
   DesktopCapture 已停止: DesktopCapture stopped
-  ESC / HOME / 字母键；设备端 ESC=返回: ESC / HOME / letter keys; on-device ESC = Back
   OCR 扫描区域: OCR Scan Region
   YAML 顶层必须是字典: YAML top level must be a dict
   '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off, or disabled by the system); please re-enable it'
@@ -845,30 +649,15 @@ auto_strings:
   '[截屏] PNG 编码失败': '[Screenshot] PNG encoding failed'
   '[截屏] 截屏失败：无可用画面': '[Screenshot] Failed: no frame available'
   '[扫描] 局域网内未发现可连接的 ADB 设备': '[Scan] No connectable ADB device found on the LAN'
-  '[扫描] 正在扫描局域网 ADB 设备...': '[Scan] Scanning LAN ADB devices...'
   '[批量] 以下已勾选脚本当前不可用，本次不会执行：': '[Batch] These checked scripts are unavailable and will not run:'
-  '[批量] 暂无启用的行，请到「配置」页勾选': '[Batch] No rows enabled; check them on the "Config" page'
-  '[批量] 请至少勾选一个脚本': '[Batch] Please check at least one script'
-  '[拒绝] 已有自动化在运行中，请等待结束或按': '[Rejected] Automation already running; wait for it to finish or press'
-  '[拒绝] 已有自动化在运行中，请等待结束或按 F10 停止': '[Rejected] Automation already running; wait for it to finish or press F10 to stop'
   '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': '[Notice] The current platform doesn''t support window-mirroring mode; use "Scan Devices" instead'
   '[提示] 当前没有正在运行的自动化': '[Notice] No automation is currently running'
   '[提示] 未发现 USB 连接的 ADB 设备': '[Notice] No USB-connected ADB device found'
-  '[提示] 请先停止当前任务，再重新扫描窗口': '[Notice] Stop the current task before rescanning windows'
-  '[提示] 请先停止当前任务，再重新扫描设备': '[Notice] Stop the current task before rescanning devices'
-  '[操作] ADB 已恢复，工作流继续': '[Action] ADB restored, workflow continues'
   '[操作] 已停止': '[Action] Stopped'
   '[操作] 已恢复，继续执行...': '[Action] Resumed, continuing...'
   '[操作] 收到停止请求': '[Action] Stop request received'
-  '[操作] 暂停中...': '[Action] Pausing...'
-  '[断连] 窗口定位已清除': '[Disconnected] Window positioning cleared'
-  '[模式] 已切换到前台模式（SendInput，移动光标）': '[Mode] Switched to Foreground Mode (SendInput, moves the cursor)'
-  '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[Mode] Switched to Background Mode (PostMessage, cursor stays put)'
-  '[状态] 重新扫描窗口，旧定位已失效': '[Status] Rescanning windows; the old location is no longer valid'
   '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input': '[On-device Execution] App is unreachable or no on-device execution channel is ready; falling back to adb shell input'
-  '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中': '[Error] Current environment {env} is not among the environments {envs} this script supports'
   '[错误] 无主窗口，无法获取运行环境': '[Error] No main window; cannot get the runtime environment'
-  '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[Error] No config yet; add one via Tools -> Batch Config first'
   '[错误] 未找到可见窗口': '[Error] No visible window found'
   '[错误] 没有已加载的布局': '[Error] No layout loaded'
   '[错误] 脚本内容为空': '[Error] Script content is empty'
@@ -879,32 +668,24 @@ auto_strings:
   '[错误] 请选择一个工作流': '[Error] Please select a workflow'
   'color_ratio: 缺少颜色参数': 'color_ratio: missing color parameter'
   'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules must be a non-empty mapping'
-  cols=1 时滚动方向不能为横向: Scroll direction cannot be horizontal when cols=1
   config 中缺少 model_path: config is missing model_path
   find 结果、矩形或坐标变量: find result, rectangle, or coordinate variable
   'find: 模板 {name} 不存在（config/system/templates/）': 'find: template {name} does not exist (config/system/templates/)'
   'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: offset point should be [dx, dy, "#rrggbb"], got: {v!r}'
   'find_multi_color: 缺少锚点颜色': 'find_multi_color: missing anchor color'
-  id 不合法: Invalid id
   initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
   key 必须以小写字母开头，仅含小写字母/数字/下划线: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores
   key 必须以小写字母开头，仅含小写字母/数字/下划线。: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores.
   key 重复: Duplicate key
   payload 必须是 JSON 对象: payload must be a JSON object
   pynput 未安装，无法录制: pynput not installed; cannot record
-  rows=1 时滚动方向不能为纵向: Scroll direction cannot be vertical when rows=1
-  scenes.yaml 必须至少包含一个场景分组，请检查配置: scenes.yaml must contain at least one scene group; please check the config
-  scrcpy 流式: scrcpy Streaming
   Scrcpy 流式截图: Scrcpy Streaming Capture
   '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
   '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], a find result, or an (x, y[, w, h]) literal), got: {t}'
   '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'
-  ↑ 上移: ↑ Move Up
-  ↓ 下移: ↓ Move Down
   ■ 停止录制: ■ Stop Recording
   ● 录制脚本: ● Record Script
   ● 有改动: ● Modified
-  ⚠ ADB 连接异常：恢复设备连接后点击「恢复」；无法恢复时请按 F10 停止任务: ⚠ ADB connection error. Restore the device connection and click "Resume"; if it cannot be restored, press F10 to stop the task
   '「{label}」应为 #rrggbb': '"{label}" should be #rrggbb'
   「{label}」应为 {n} 个数: '"{label}" should be {n} numbers'
   「{label}」未填写: '"{label}" is not filled in'
@@ -915,13 +696,11 @@ auto_strings:
   不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: No data will be uploaded. You can opt in anytime later via "Config Manager → Network & Privacy".
   不会被录制: Not recorded
   不公开发布原始数据。: Raw data is never published.
-  不可覆盖: Cannot Overwrite
   不同意: Decline
   不带 by 得到文字；带 by 得到命中与否: Without `by`, returns the text; with `by`, returns whether it matched
   不收集: Not Collected
   不收集什么: What Isn't Collected
   中文名称: Chinese Name
-  中文名称，如 背包网格: Chinese name, e.g. Bag Grid
   为该区域绑定哪个字段？: Which field to bind for this region?
   主导通道: Dominant Channel
   主窗口有工作流在运行，先停止它: The main window has a workflow running; stop it first
@@ -934,16 +713,12 @@ auto_strings:
   从场景 YAML 中删除 Panel 定义: Delete Panel definition from scene YAML
   从场景 YAML 中删除坐标点定义（meta 数据）: Delete coordinate point definition from scene YAML (meta data)
   以下为系统级全局热键，保存后立即生效。: The following are system-wide global hotkeys; changes take effect immediately after saving.
-  任务暂停中，是否直接结束？: Task is paused. End it now?
   任务暂停中，是否直接停止？: Task is paused. Stop it now?
   确认停止: Confirm Stop
   停止任务: Stop Task
-  '{name}运行中': '{name} running'
-  低精度录制中…连续移动将合并，: Low-precision recording…consecutive moves are merged,
   使用实时图像: Use Live Image
   保存文件: Save File
   保存脚本文件: Save Script File
-  保留鼠标键按下或松开的原始事件，不自动合并为点击: Keep raw mouse-button press/release events instead of auto-merging them into clicks
   值: Value
   值/表达式: Value/Expression
   停在第 {n} 行（单步 = 执行这一行）: Stopped at line {n} (Step = execute this line)
@@ -953,22 +728,10 @@ auto_strings:
   停止中: Stopping
   隐藏标题: Hide Header
   显示标题: Show Header
-  重命名记录: Rename History
-  key 重命名记录: Key Rename History
-  查看 key 重命名记录: View Key Rename History
-  尚未保存的 key 没有重命名记录: Unsaved keys have no rename history
-  尚无 key 重命名记录: No key rename history
-  原 key: Previous Key
-  新 key: New Key
-  当前记录数: Current Records
-  历史记录数: History Records
-  同步引用数: Sync References
   原 key 已不存在，请重新打开编辑对话框: The original key no longer exists. Reopen the editor
   确认重命名: Confirm Rename
   变动量: Delta
   同步来源: Synced From
-  只读实例不能重命名 Profile key: A read-only instance cannot rename Profile keys
-  只读实例不可以重命名 key: A read-only instance cannot rename keys
   请停止所有任务后再重命名 Profile key: Stop all tasks before renaming a Profile key
   Profile 变更脚本仍在执行，请等待队列完成后重命名: Profile change scripts are still running. Wait for the queue to finish before renaming
   "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
@@ -980,7 +743,6 @@ auto_strings:
   全部删除: Delete All
   全量: Full
   关闭场景编辑器: Close Scene Editor
-  关闭时过滤鼠标视角移动，点击、拖拽和滚轮仍会录制: When on, filters out mouse-look movement while still recording clicks, drags, and scroll
   关闭程序: Close the Program
   内容: Content
   内置字段不可删除: Built-in fields cannot be deleted
@@ -995,15 +757,9 @@ auto_strings:
   切割: Split
   切割结果: Split Result
   切换截图方式: Switch Screenshot Method
-  切换日志显示级别：DEBUG 会显示更详细的调试信息: 'Switch log level: DEBUG shows more detailed debug info'
   切换日志显示级别：低于选中级别的日志将被隐藏: 'Switch log level: logs below the selected level will be hidden'
   切换画布编辑模式，调整画布范围以排除窗口边框: Toggle canvas edit mode, adjust canvas range to exclude window borders
   '列:': 'Col:'
-  列名 '{name}' 已存在: Column name '{name}' already exists
-  列名不能为空: Column name cannot be empty
-  列名（逗号分隔）：: 'Column names (comma-separated):'
-  列名：: 'Column Name:'
-  列数: Columns
   '列数:': 'Columns:'
   列表: List
   创建分组: Create Group
@@ -1021,18 +777,14 @@ auto_strings:
   删除空间: Delete Space
   删除脚本: Delete Script
   删除脚本 {rel}？此操作不可恢复。: Delete script {rel}? This cannot be undone.
-  删除行: Delete Row
   删除视图: Delete View
   删除选中的图库空间（含其全部参考图）: Delete the selected gallery space (including all its reference images)
-  删除面板: Delete Panel
   别名布局创建失败，请检查日志。: Alias layout creation failed, please check logs.
   别名布局禁止另存为，请使用原布局另存或者新建布局。: Alias layouts cannot be saved-as. Please use the original layout or create a new one.
   到达后按住(秒): Hold After Arriving (sec)
   刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
   加载工作流文件: Load Workflow File
   加载文件: Load File
-  ? 勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数：日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。专用脚本默认不暴露，需要时可显式勾选。用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。
-  : 'Checking "Expose" decides whether it shows in the Daily page dropdown; "Script Nature" decides whether the Daily tab manages its parameters: Daily = the Daily page draws a parameter panel and reads/writes the config; Dedicated = the Daily page leaves it alone and a dedicated page manages it. Dedicated scripts are not exposed by default; check explicitly if needed. Use Move Up/Down to reorder exposure; double-click the display name to edit it (leave blank to restore the default).'
   勾选后直接从设备实时截屏进行识别，不保存到场景文件: When checked, capture directly from device for recognition without saving to scene file
   匹配: Match
   匹配参考图: Match Reference Image
@@ -1042,8 +794,6 @@ auto_strings:
   区域/坐标点/面板: Region/Point/Panel
   区域/点: Region/Point
   区域/面板: Region/Panel
-  '区域中心偏移比例:': 'Region Center Offset Ratio:'
-  区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）: Random offset ratio of the click point from the region center (must be under 0.5 to avoid landing outside the region)
   区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Fraction (0-1) of pixels in the region close to the target color; used to tell whether a button is lit / which screen is showing
   匿名使用数据收集: Anonymous Usage Data Collection
   单cell尺寸: Cell Size
@@ -1065,14 +815,12 @@ auto_strings:
   变量名（不用写 $）: Variable name (no need to write $)
   另存为: Save As
   另存为失败: Save As Failed
-  只下发识别所需的配置（场景与布局坐标、插件规则），用于在不发新版的情况下修复识别问题；你自己改过的配置始终优先，不会被覆盖。拉取到的配置下次启动生效。: Only pushes config needed for recognition (scene/layout coordinates, plugin rules), used to fix recognition issues without shipping a new release; your own edits always take priority and are never overwritten. Pulled config takes effect on next launch.
   只判断是否含: Only Check Contains
   只看某区域: Only Look at a Region
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Below you can control announcements, version updates, remote config, and anonymous data reporting independently.
   可点击: Clickable
   可筛选: Filterable
   可采用自定义设置 2000:900（等效 20:9）。: You can use a custom 2000:900 setting (equivalent to 20:9).
-  右键表头增删列，双击表头重命名: Right-click the header to add/remove columns; double-click to rename
   同意: Agree
   同意后随时可在「配置管理 → 网络与隐私」关闭。: After agreeing, you can turn it off anytime via "Config Manager → Network & Privacy".
   ? '名字 = 调律 Tab 勾选项；
@@ -1095,7 +843,6 @@ auto_strings:
     Weapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon.'
   名称: Name
   '名称:': 'Name:'
-  名称不合法: Invalid Name
   否则导航流程会因输入方式不匹配而失败。: otherwise the navigation flow will fail due to a mismatched input method.
   含文本: Contains Text
   启动失败: Startup Failed
@@ -1136,7 +883,6 @@ auto_strings:
   基底视图不可删除，如需取消分层请取消多视图: The base view cannot be deleted; to remove layering, disable multi-view
   '备注:': 'Note:'
   复制 DSL 引用: Copy DSL Reference
-  复制为新行: Copy as New Row
   复制到本地: Copy to Local
   复制到本地以修改: Copy to Local for Editing
   复制坐标: Copy Coordinates
@@ -1153,14 +899,11 @@ auto_strings:
   如果…否则…: If… Else…
   字段标识 (key): Field Identifier (key)
   存入变量: Store in Variable
-  '安卓截图方式:': 'Android Screenshot Method:'
-  '安卓输入方式:': 'Android Input Method:'
   安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入: 'Android (android): phone or emulator, uses ADB screenshot + touch input'
   完全离线模式（暂停全部联网功能）: Fully Offline Mode (pause all network features)
   '完成，返回值: {rv}': 'Done, return value: {rv}'
   定义区域变量: Define Region Variable
   定义子过程: Define Subprocedure
-  定位窗口后是否显示红色边框标记；不保存配置，仅本次运行期间生效: Whether to show a red border marker after locating the window; not saved, applies only to this run
   实时截屏失败: Live screenshot failed
   实际会发送的数据长这样: The data actually sent looks like this
   实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Experimental: the phone must have the LvJiang App installed with Accessibility Service enabled; this only changes the channel used for taps and swipes, not the screenshot method. Falls back to ADB shell input if the connection fails.'
@@ -1170,13 +913,11 @@ auto_strings:
   将在下一条语句前暂停: Will pause before the next statement
   小写字母开头，仅含小写字母/数字/下划线: Starts with lowercase letter, containing only lowercase letters/digits/underscores
   尚未切割: Not yet split
-  尚未获取过在线配置: Remote config has not been fetched yet
   工作流已暂停，点击确定继续: Workflow paused; click OK to continue
   工作流文件 (*.wf): Workflow Files (*.wf)
   '工作流文件不存在: {path}': 'Workflow file does not exist: {path}'
   工作流通知: Workflow Notification
   左侧选择脚本，或点「新建」: Select a script on the left, or click "New"
-  已下载在线配置 v{version}，重启后生效: Downloaded remote config v{version}; takes effect after restart
   已保存: Saved
   ? '已保存 {path}，但校验未通过：
 
@@ -1192,46 +933,30 @@ auto_strings:
   已复制到本地，现在可以编辑: Copied to local; you can edit it now
   已存在: Already Exists
   已恢复: Resumed
-  已恢复，继续执行...: Resumed, continuing...
   已截图 {w}×{h}（画布裁剪后）: Captured {w}x{h} (after canvas crop)
-  已放弃未保存的清洗规则修改: Discarded unsaved cleaning-rule changes
   已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
   已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Minimized to the tray; double-click the icon or right-click -> "Open Main Window" to restore.
   已退出画布编辑模式: Exited canvas edit mode
   布局: Layout
   布局写入失败，请检查日志。: Layout write failed, please check logs.
-  布局名称不能以空格或点开头: Layout name cannot start with space or dot
   应用到全部: Apply to All
   应用设置: Apply Settings
   延迟: Delay
   开启多视图、新增/重命名/删除视图: Enable multi-view, add/rename/delete views
   开始: Start
-  开始批量执行 (F9): Start Batch Execution (F9)
   异常退出: Exit on Exception
   归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
   当…时重复: Repeat While…
-  当前在线配置版本 v{version}（{date} 同步）: Current remote config version v{version} (synced {date})
   当前场景无截图: The current scene has no screenshot
   当前场景无截图，请先刷新截图: The current scene has no screenshot; refresh it first
   当前场景没有 slot 类型的区域: The current scene has no slot-type regions
   当前标识：: 'Current ID:'
   当前标识：未生成（未开启）: 'Current ID: not generated (disabled)'
   当前激活布局不可删除: The currently active layout cannot be deleted
-  '当前版本: ': 'Current version: '
   '当前用户:': 'Current User:'
-  当前脚本有未保存的修改，放弃？: The current script has unsaved changes. Discard them?
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: No region field is bindable in this view (all assigned, or not part of this view)
-  当前配置：: 'Current Config:'
-  ? '录制结果将显示在这里（画布归一化坐标，可保存为 .wf）
-
-    低精度生成可编辑指令；高精度保存原始输入轨迹，'
-  : 'Recorded output appears here (canvas-normalized coordinates, savable as .wf)
 
     Low precision produces editable commands; high precision saves a raw input trace,'
-  ? '录制结果将显示在这里（画布归一化坐标）
-
-    停止录制后将自动插入当前脚本'
-  : 'Recorded output appears here (canvas-normalized coordinates)
 
     The result is inserted into the current script when recording stops'
   录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: Recorded output appears here (canvas-normalized coordinates, savable as .wf)
@@ -1239,7 +964,6 @@ auto_strings:
   录制精度：: 'Recording precision:'
   低精度: Low precision
   高精度: High precision
-  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms 粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: Generates readable, directly editable WF DSL. On stop, safely mergeable key-down, hold, key-up, and following-wait events are combined; continuous mouse movement and short waits are grouped at roughly 100 ms granularity. Best for ordinary UI automation and later manual editing, not for game-camera input requiring event-level replay fidelity.
   记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: Records the raw timeline of keyboard input, mouse buttons, wheel events, and optional pointer movement. Saving also creates a companion trace under workflows/lvtrace for timing closer to the original recording. This is suitable for timing-sensitive game-camera actions; the WF text cannot be moved without its companion trace file.
   开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: When enabled, pointer movement is recorded. When disabled, only standalone movement is ignored; clicks, holds, drags, and wheel events are still captured. It is usually unnecessary for ordinary UI actions, but should be enabled for game-camera rotation or other continuous movement.
   形如 [scene].[region]: 'Format: [scene].[region]'
@@ -1338,17 +1062,16 @@ auto_strings:
   无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: Failed to get screenshot size; cannot convert to screen coordinates (check the screenshot backend)
   无法获取版本信息: Failed to get version info
   无法获取设备分辨率: Failed to get device resolution
-  时长(秒): Duration (sec)
   是: 'Yes'
-  '显示名:': 'Display Name:'
   显示名称: Display Name
   显示连接控制台: Show Connection Console
   暂停: Pause
   暂停 / 恢复: Pause / Resume
   暂停中...: Pausing...
   暂停等人工: Pause for Manual Action
-  暂无数据，请通过 工具 → 批量配置 添加: No data yet, please add via Tools → Batch Config
   更改分组: Change Group
+  复制定义: Duplicate Definition
+  一次只能复制一条定义: Only one definition can be duplicated at a time
   更新失败: Update Failed
   最低分(0-1): Min Score (0-1)
   最小化到状态栏: Minimize to Tray
@@ -1365,8 +1088,6 @@ auto_strings:
   未连接设备 | 请先扫描并连接设备: Device not connected | Scan and connect a device first
   未选择: Not Selected
   本地: Local
-  本项目仅供学习交流使用: This project is for learning and communication purposes only
-  本项目完全开源免费: This project is fully open-source and free
   条目: Entry
   查看待上报数据: View Data to Be Reported
   校准模式: Calibration Mode
@@ -1389,37 +1110,27 @@ auto_strings:
   没有已加载的布局: No layout loaded
   没有已定义的区域: No regions defined
   没有已定义的面板: No panels defined
-  注册并加载指定插件（可多次使用，例如 -reg yysls -reg other）: Register and load the given plugin (repeatable, e.g. -reg yysls -reg other)
   浏览...: Browse...
   添加参数: Add Parameter
   添加环境: Add Environment
-  ? '清洗规则有未保存的修改，关闭将丢失这些修改。
-
-    是否先保存？'
-  : 'The cleaning rules have unsaved changes; closing will discard them.
 
     Save first?'
   清除网格: Clear Grid
-  滚动方向: Scroll Direction
   '滚动方向:': 'Scroll Direction:'
   激活布局不可删除: The active layout cannot be deleted
   激活空间: Active Space
   点: Point
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Click "Recognize All Fields" to see OCR results, or "Recognize All Reference Images" to see match results
-  点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果: Click 'Recognize All Fields' to view OCR results, click 'Recognize All Materials' to view material recognition results
   点击前延迟(秒): Delay Before Click (sec)
   激活区域: Activate Region
   点击变量: Click Variable
   点击后延迟(秒): Delay After Click (sec)
-  点击在脚本编辑器光标处插入当前场景 key: Click to insert current scene key at script editor cursor
   点击坐标: Click Coordinate
   点击坐标附加 ±N 像素的随机偏移: Add a +/-N pixel random offset to the click coordinate
   激活布局实体；默认点击中心，布局可改为按键: Activate a layout entity; click its center by default or use a layout-bound key
   '属性:': 'Properties:'
   '按键:': 'Activation Key:'
-  留空则点击坐标，如 SPACE / ESC / R: Leave empty to click coordinates, e.g. SPACE / ESC / R
   仅作用于当前布局；click 将改为按下该按键: Applies only to this layout; click will press this key
-  请先在当前布局中放置该实体，再设置激活按键: Place this entity in the current layout before setting an activation key
   点击画布归一化坐标: Click Canvas-Normalized Coordinate
   热键不能重复绑定同一个按键，请检查后重试: Hotkeys cannot be bound to the same key twice; please check and retry
   热键已更新并立即生效: Hotkeys updated and took effect immediately
@@ -1427,12 +1138,10 @@ auto_strings:
   状态: Status
   环境: Environment
   环境 key: Environment key
-  环境不支持: Environment Not Supported
   生命周期 wf 必须返回 dict 或 null: Lifecycle wf must return a dict or null
   生命周期 wf 的 state 必须是 dict: The lifecycle wf's state must be a dict
   生成网格: Generate Grid
   用户: User
-  用户名列：: 'Username column:'
   用来做什么: What It's Used For
   画布上点一下取值: Click on the Canvas to Pick a Value
   画布尺寸非法: Invalid canvas size
@@ -1446,8 +1155,6 @@ auto_strings:
   目标环境说明: Target Environment Explained
   目标色: Target Color
   确定清除已录制的 DSL 内容吗？: Clear the recorded DSL content?
-  确认结束: Confirm End
-  确认覆盖: Confirm Overwrite
   秒: sec
   移动场景: Move Scene
   移动失败: Move Failed
@@ -1477,7 +1184,6 @@ auto_strings:
   终点: End Point
   绑定坐标: Bind Point
   绑定网格: Bind Grid
-  结束: End
   结束任务: End Task
   结果集：: 'Result Set:'
   结果集：(空): 'Result Set: (Empty)'
@@ -1486,7 +1192,6 @@ auto_strings:
   编辑区域: Edit Region
   编辑坐标: Edit Point
   编辑画布: Edit Canvas
-  编辑面板: Edit Panel
   缺参照图或实时截图: Missing reference image or live screenshot
   网格参数: Grid Parameters
   网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
@@ -1495,7 +1200,6 @@ auto_strings:
   脚本 id 不能为空: Script id cannot be empty
   脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: Script id cannot start with _ (the discovery layer treats it as a temp file and skips it)
   脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: Script id may only use Unicode letters, digits, and underscores, and must start with a letter
-  '脚本 id（文件名，Unicode 字母/数字/下划线）:': 'Script id (filename, Unicode letters/digits/underscore):'
   脚本 {rel} 已存在，覆盖？: Script {rel} already exists. Overwrite?
   脚本为空: Script Is Empty
   脚本候选: Script Candidates
@@ -1506,11 +1210,9 @@ auto_strings:
   脚本测试运行中...: Script test running...
   脚本编辑: Script Editing
   自动化运行中: Automation Running
-  自动化运行中 | F10 停止: Automation Running | F10 to Stop
   自动模式: Auto Mode
   至少保留一个图库空间: At least one gallery space must be kept
   至少需要保留一个场景分组: At least one scene group must be retained
-  英文，如 bag_grid: English, e.g. bag_grid
   英文，如 my_group: English, e.g. my_group
   英文，如 my_point: English, e.g. my_point
   英文，如 my_region: English, e.g. my_region
@@ -1518,24 +1220,18 @@ auto_strings:
   '行 {n}: 无效的正则表达式': 'Row {n}: invalid regular expression'
   行/列数: Rows/Columns
   '行:': 'Row:'
-  行数: Rows
   '行数:': 'Rows:'
-  '行最小可见比例:': 'Row Min Visible Ratio:'
   裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
   视图: View
   '视图 Key:': 'View Key:'
   '视图:': 'View:'
   '视图名称:': 'View Name:'
-  设备端执行: On-Device Execution
   端侧执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
-  识别全部参考图: Recognize All Reference Images
   识别全部字段: Recognize All Fields
-  识别全部材料: Recognize All Materials
   识别文字: Recognize Text
   该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
   该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
   该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
-  该热键只在「脚本录制」对话框打开期间临时全局注册，对话框关闭后立即注销；其余三个热键在软件运行期间始终生效。: This hotkey is only registered globally while the "Script Recording" dialog is open, and unregistered as soon as it closes; the other three hotkeys stay active for the whole session.
   语法检查通过（保存后会再做布局引用校验）: Syntax check passed (a layout-reference check runs again on save)
   说明: Description
   请先在主窗口定位游戏窗口: Please locate the game window in the main window first
@@ -1548,8 +1244,6 @@ auto_strings:
   请先选中坐标: Please select a point first
   请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: Check the key spelling in the script (the DSL only recognizes keys, not Chinese names), or bind it in the Scene Editor
   请至少选择一个参考图: Please select at least one reference image
-  请输入布局名称: Please enter a layout name
-  请输入布局名称：: 'Enter a layout name:'
   '读取失败: {e}': 'Failed to read: {e}'
   调用子过程: Call Subprocedure
   调试: Debug
@@ -1560,7 +1254,6 @@ auto_strings:
   轮: round(s)
   输入 DSL 脚本内容...: Enter DSL script content...
   输入元数据（用于筛选管理）: Enter metadata (for filter management)
-  输入当前场景: Enter current scene
   输入新的方向 key（小写字母开头）：: 'Enter a new direction key (must start with a lowercase letter):'
   输入方向 key（小写字母开头，可含数字/下划线）：: 'Enter direction key (starts with lowercase letter, may contain digits/underscores):'
   输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
@@ -1593,7 +1286,6 @@ auto_strings:
   配置名称：: 'Config Name:'
   配置：: 'Config:'
   重命名分组: Rename Group
-  重命名列: Rename Column
   重命名场景: Rename Scene
   重命名失败: Rename Failed
   重命名方向: Rename Direction
@@ -1608,23 +1300,15 @@ auto_strings:
   '间隔:': 'Interval:'
   限定区域: Restrict to Region
   限定参考图识别的分组范围: Restrict the group scope of reference-image recognition
-  限定材料识别的分组范围: Limit group scope for material recognition
-  需安装律匠 App 并开启无障碍服务；仅改变输入通道，不改变截图方式；不可达时回退 ADB shell input: Requires the LvJiang App with Accessibility Service enabled; only changes the input channel, not the screenshot method; falls back to ADB shell input if unreachable
   面板: Panel
   面板/区域: Panel/Region
   颜色占比: Color Ratio
-  颜色特征识别器尚未实现: Color-feature recognizer not yet implemented
   '高:': 'H:'
   高出其他通道: Exceeds Other Channels By
-  高精度录制中…原始输入写入统一时间线，: High-precision recording…raw input is written to a unified timeline,
   默认: Default
-  默认用户: Default User
   鼠标/触控移动到目标位置的耗时: Time for the mouse/touch to move to the target position
   鼠标移动时长(秒): Mouse Move Duration (sec)
-  鼠标键: Mouse Button
-  鼠标键原始事件: Raw Mouse Button Event
   （无）: (None)
-  （未开启多视图，点「新增视图」自动开启）: (Multi-view not enabled, click "New View" to enable)
   （未截图）: (No Screenshot)
   （正常完成）: (Completed Normally)
   （用户中断）: (User Interrupted)
@@ -1633,23 +1317,13 @@ auto_strings:
   对应的任务脚本已不存在；取消勾选并保存即可从列表移除: The task script no longer exists; uncheck it and save to remove it from the list
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'
-  丢弃 {name} 的本地修改，恢复系统版本？此操作不可恢复。: Discard local changes to {name} and restore the system version? This cannot be undone.
-  仅开发模式可以提升系统配置版本: Only developer mode can bump system configuration versions
-  场景版本：: 'Scene version:'
-  已还原为系统版本: Restored to the system version
-  布局版本：: 'Layout version:'
   ? '把系统脚本 {name} 复制到本地后才能修改。
 
     复制之后这个文件不再跟随系统更新，确定？'
   : 'System script {name} must be copied to local before it can be modified.
 
     After copying, this file no longer follows system updates. Continue?'
-  提升: Bump
-  提升至 v{version}: Bump to v{version}
-  撤销提升: Cancel bump
   本地覆盖系统: Local override of system
-  规则版本：: 'Rule version:'
-  版本提升失败: Version bump failed
   系统场景不可删除: System scenes cannot be deleted
   系统场景不能修改 key: The key of a system scene cannot be changed
   系统场景只能修改显示名称，不能修改 key: System scenes can only have their display name changed, not the key
@@ -1660,26 +1334,17 @@ auto_strings:
   系统脚本只读——右键「复制到本地以修改」后才能保存: System scripts are read-only — right-click and choose "Copy to Local for Editing" before saving
   系统脚本只读——右键「复制到本地以修改」后才能编辑: System scripts are read-only — right-click and choose "Copy to Local for Editing" to edit
   系统（只读）: System (read-only)
-  规则版本已提升至 v{version} 并生效: Rule version bumped to v{version} and applied
-  还原为系统: Restore System Version
-  这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改: This is a local copy of a system script and cannot be deleted; right-click and choose "Restore System Version" to discard local changes
-  远程: Remote
-  ，提升 {count} 项版本: ', bumped {count} versions'
   无: None
   当前生效：{current}: 'Currently effective: {current}'
   现有版本：{count} 份，来自 {sources} 个来源: '{count} versions from {sources} sources'
-  待保存：系统将提升至 v{version}: 'Pending save: system will be bumped to v{version}'
   已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）: Saved to the system layer, but the local copy is still effective; restore the local override to apply the system change ({now})
-  已保存到系统层，但远程 v{version} 仍在生效；系统修改尚未生效，请点「提升」（{now}）: Saved to the system layer, but remote v{version} is still effective; click Bump to apply the system change ({now})
   '{scenes} 仍由本地副本生效，请先还原本地覆盖': '{scenes} still use local copies; restore the local overrides first'
-  '{scenes} 仍由远程版本生效，请提升版本后再保存': '{scenes} still use remote versions; bump their versions and save again'
   已保存布局「{name}」到系统层，但尚未生效：{reasons}: 'Layout "{name}" was saved to the system layer but is not yet effective: {reasons}'
   可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.
   可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.
   无法访问 {url} 获取更新：HTTP {code}: 'Unable to access {url} for updates: HTTP {code}'
   '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} has an invalid kind: {kind}; allowed: {allowed}'
   '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: dimension affixes must name the dimension in stats; full_affix is not supported'
-  '{label}: 公式引用了未知源字段 {source}': '{label}: formula references unknown source field {source}'
   '{label}: 未知属性字段 {field}': '{label}: unknown stat field {field}'
   '{label}: 等级 {level} 没有词条 {category} 的上限配置': '{label}: no cap configured for affix {category} at level {level}'
   '{label}: 词条 {category} 未登记字段映射': '{label}: affix {category} has no field mapping'
@@ -1762,7 +1427,6 @@ auto_strings:
   '槽 {n}': 'Slot {n}'
   '武学：{arts}（由流派决定，不需选择）': 'Martial arts: {arts} (set by the path, not selectable)'
   '（不选）': '(none)'
-  '{label} 的 {field} 引用了 {producer} 用公式算出的 {source}；公式不能引用公式的结果': '{label}.{field} reads {source}, which {producer} computes with a formula; formulas cannot read formula results'
   '{n} 个属性靠补足': '{n} stat(s) rely on the gap'
   '保存时包含未建模补足': 'Include the unmodelled gap when saving'
   '未建模补足': 'Unmodelled gap'

@@ -61,6 +61,10 @@ class EquipmentSetEditor(QFrame):
         self._btn_add.clicked.connect(self._on_add)
         apply_button_style(self._btn_add)
         header.addWidget(self._btn_add)
+        self._btn_delete = QPushButton(tr("删除套装"))
+        self._btn_delete.clicked.connect(self._on_delete)
+        apply_button_style(self._btn_delete)
+        header.addWidget(self._btn_delete)
         layout.addLayout(header)
 
         self._table = QTableWidget()
@@ -169,16 +173,75 @@ class EquipmentSetEditor(QFrame):
 
     @staticmethod
     def _new_key(raw: dict) -> str:
-        """取左右两侧都未占用的 ``custom_N`` key。"""
+        """取左右两侧都没用过的 ``custom_N`` key。
+
+        取最大序号加一，不补中间的空号：删掉的套装 key 可能还留在任务历史、
+        装备记录和备战方案里，复用编号会让旧记录指向另一套装备。
+        """
         used = {
             str(key)
             for side in ("left", "right")
             for key in (raw.get(side) or {})
         }
-        index = 1
-        while f"{_NEW_SET_KEY_PREFIX}{index}" in used:
-            index += 1
-        return f"{_NEW_SET_KEY_PREFIX}{index}"
+        indexes = [
+            int(key[len(_NEW_SET_KEY_PREFIX):])
+            for key in used
+            if key.startswith(_NEW_SET_KEY_PREFIX) and key[len(_NEW_SET_KEY_PREFIX):].isdigit()
+        ]
+        return f"{_NEW_SET_KEY_PREFIX}{max(indexes, default=0) + 1}"
+
+    def _on_delete(self) -> None:
+        """删除选中的套装定义，被引用时先列出引用者并二次确认。"""
+        if self._series not in {"output", "armor"}:
+            return
+        row = self._table.currentRow()
+        name_item = self._table.item(row, 0) if row >= 0 else None
+        key = str((name_item.data(Qt.ItemDataRole.UserRole) if name_item else "") or "")
+        if name_item is None or not key:
+            QMessageBox.information(
+                self, tr("无法删除"), tr("先在表格里选中要删除的套装。"))
+            return
+        name = name_item.text().strip() or key
+        side = "left" if self._series == "output" else "right"
+        raw = self._data.get("equipment_sets") or {}
+        references = self._references(raw, side, key)
+        detail = ""
+        if references:
+            detail = tr("\n\n同一份配置里有引用，删除后会显示为未知套装：\n{items}").format(
+                items="\n".join(f"· {item}" for item in references))
+        answer = QMessageBox.question(
+            self, tr("删除套装"),
+            tr("删除套装「{name}」？\n\n"
+               "备战方案和装备记录里引用它的部位，删除后会按未知套装处理，"
+               "不会自动清空。{detail}").format(name=name, detail=detail),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        entries = dict(raw.get(side) or {})
+        entries.pop(key, None)
+        raw[side] = entries
+        if side == "right":
+            # 关联关系存在攻具一侧，删掉防具套装时要顺手解开，避免悬空引用。
+            for entry in (raw.get("left") or {}).values():
+                if isinstance(entry, dict) and entry.get("recommended_right") == key:
+                    entry["recommended_right"] = ""
+        self._data["equipment_sets"] = raw
+        self._reload()
+        if self._on_changed is not None:
+            self._on_changed()
+
+    @staticmethod
+    def _references(raw: dict, side: str, key: str) -> list[str]:
+        """列出同一份配置里引用该套装的条目（跨文件的方案与记录在确认文案里统一提示）。"""
+        if side != "right":
+            return []
+        return [
+            tr("攻具套装「{name}」把它登记为关联防具").format(
+                name=str(entry.get("name") or left_key))
+            for left_key, entry in (raw.get("left") or {}).items()
+            if isinstance(entry, dict) and entry.get("recommended_right") == key
+        ]
 
     def _set_row(self, row: int, key: str, values: tuple[str, str, str]) -> None:
         for column, value in enumerate(values):

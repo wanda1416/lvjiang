@@ -137,3 +137,85 @@ def test_add_set_rejects_duplicate_name(qtbot, monkeypatch):
 
     assert list(data["equipment_sets"]["left"]) == ["output_a"]
     assert warnings == ["「输出甲」套装已存在。"]
+
+
+def _stub_delete_dialog(monkeypatch, *, answer: bool) -> list[str]:
+    """把删除确认换成可控实现，返回收到的确认文案。"""
+    from PyQt6.QtWidgets import QMessageBox as RealMessageBox
+
+    questions: list[str] = []
+
+    class _Message:
+        StandardButton = RealMessageBox.StandardButton
+
+        @staticmethod
+        def question(_parent, _title, message, *_args, **_kwargs):
+            questions.append(message)
+            return (RealMessageBox.StandardButton.Yes if answer
+                    else RealMessageBox.StandardButton.No)
+
+        @staticmethod
+        def information(_parent, _title, message):
+            questions.append(message)
+
+    monkeypatch.setattr(equipment_set_panel, "QMessageBox", _Message)
+    return questions
+
+
+def test_delete_armor_set_clears_dangling_relationship(qtbot, monkeypatch):
+    data = {"equipment_sets": {
+        "left": {"output_a": {"name": "输出甲", "recommended_right": "custom_2"}},
+        "right": {"custom_2": {"name": "防具乙"}},
+    }}
+    changes: list[bool] = []
+    editor = EquipmentSetEditor(
+        data=data, on_changed=lambda: changes.append(True))
+    qtbot.addWidget(editor)
+    editor.set_series("armor")
+    editor._table.setCurrentCell(0, 0)
+
+    questions = _stub_delete_dialog(monkeypatch, answer=True)
+    editor._btn_delete.click()
+
+    assert data["equipment_sets"]["right"] == {}
+    # 关联关系存在攻具一侧；删掉防具套装必须解开，不能留悬空引用。
+    assert data["equipment_sets"]["left"]["output_a"]["recommended_right"] == ""
+    assert changes == [True]
+    assert "输出甲" in questions[0]
+
+
+def test_delete_set_cancelled_keeps_definition(qtbot, monkeypatch):
+    data = {"equipment_sets": {"left": {}, "right": {"custom_1": {"name": "防具甲"}}}}
+    changes: list[bool] = []
+    editor = EquipmentSetEditor(
+        data=data, on_changed=lambda: changes.append(True))
+    qtbot.addWidget(editor)
+    editor.set_series("armor")
+    editor._table.setCurrentCell(0, 0)
+
+    _stub_delete_dialog(monkeypatch, answer=False)
+    editor._btn_delete.click()
+
+    assert data["equipment_sets"]["right"] == {"custom_1": {"name": "防具甲"}}
+    assert changes == []
+
+
+def test_new_set_after_delete_does_not_backfill_number(qtbot, monkeypatch):
+    """编号不补空号：删掉的 key 可能仍留在任务历史与装备记录里。"""
+    data = {"equipment_sets": {
+        "left": {},
+        "right": {"custom_1": {"name": "防具甲"}, "custom_3": {"name": "防具丙"}},
+    }}
+    editor = EquipmentSetEditor(data=data)
+    qtbot.addWidget(editor)
+    editor.set_series("armor")
+    editor._table.setCurrentCell(0, 0)
+    _stub_delete_dialog(monkeypatch, answer=True)
+    editor._btn_delete.click()
+    assert list(data["equipment_sets"]["right"]) == ["custom_3"]
+
+    _stub_add_dialog(monkeypatch, "防具丁")
+    editor._btn_add.click()
+
+    # 空出来的 custom_1 不会被新套装占用，新编号接在最大值后面。
+    assert sorted(data["equipment_sets"]["right"]) == ["custom_3", "custom_4"]

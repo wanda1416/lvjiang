@@ -26,6 +26,7 @@ from ..errors import log_failure
 from ..i18n import tr
 from ..workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..workflows.errors import WorkflowAbort
+from .android.recovery import ChannelFaultError
 from .batch_config import (
     BatchConfigItem,
     BatchWorkflows,
@@ -44,6 +45,7 @@ ST_SUCCESS = tr("成功")
 ST_FAILED = tr("失败")
 ST_SKIPPED = tr("跳过")
 ST_STOPPED = tr("已停止")
+ST_CHANNEL_FAULT = tr("通道中断")
 
 RESULT_SUCCESS = "success"
 RESULT_SKIPPED = "skipped"
@@ -253,6 +255,11 @@ class BatchScheduler:
         self._task_stop_check = task_stop_check or stop_check
         self._task_stop_clear = task_stop_clear or (lambda: None)
         self._stopped = False
+        #: 通道级故障（画面流/ADB/代理不可恢复）导致的中止：与用户停止、
+        #: 条目内异常都不同，报告与历史必须分开记。
+        self._aborted = False
+        self._channel_fault = ""
+        self._run_started_at = 0.0
         self._task_plan: dict[tuple[int, str], PlannedTask] = {}
         self._member_task_plan: dict[tuple[str, str], PlannedTask] = {}
         self._unit_members: dict[str, list[str]] = {}
@@ -263,6 +270,41 @@ class BatchScheduler:
         #: 最近一次无人值守中止的弹窗文本；恢复后清空（见 _recover_unattended）。
         self._unattended_hit = ""
         self._build_execution_plan()
+
+    def _abort_channel_fault(self, fault, *, report, label: str, script, run_idx: int,
+                             attempt: int, task_run, username: str,
+                             started_at=None) -> None:
+        """通道级故障：详细记日志、按「通道中断」记账，并中止整批。
+
+        与另外两类失败的区别：任务内异常只废掉当前条目，无人值守中断还会跑
+        恢复 wf 继续下一项；通道坏了以后每一项都只会拿旧帧空转，所以这里直接
+        整批终止，且不触发无人值守恢复流程。
+        """
+        detail = str(fault) or "执行通道恢复失败"
+        self._aborted = True
+        self._channel_fault = detail
+        elapsed = max(0.0, time.monotonic() - self._run_started_at)
+        message = (
+            f"[通道故障] 批量中止：{label} → {script.name}"
+            f"（第 {attempt} 次尝试，用户={username or '-'}，启动后 {elapsed:.0f}s）：{detail}")
+        logger.error(message)
+        self.log.emit(message)
+        self.progress.emit(run_idx, label, script.id, ST_CHANNEL_FAULT)
+        report.record_channel_fault(detail)
+        report.end_script(ST_CHANNEL_FAULT)
+        if task_run is not None:
+            try:
+                task_run.finish(status="channel_fault",
+                                error_message=detail)
+            except Exception as history_exc:  # noqa: BLE001
+                logger.warning(f"任务历史收尾失败，继续退出批量任务: {history_exc}")
+        if started_at is not None:
+            try:
+                self._save_result(username or "unknown", script, {
+                    "error": detail, "exception_type": "ChannelFaultError",
+                }, started_at)
+            except Exception as output_exc:  # noqa: BLE001
+                logger.warning(f"通道故障结果保存失败: {output_exc}")
 
     def _task_was_stopped(self) -> bool:
         """当前脚本被单独结束（弹窗「停止任务」），而整批没有要求停止。"""
@@ -346,6 +388,9 @@ class BatchScheduler:
     # ─── 主循环 ─────────────────────────────────────────
 
     def run(self):
+        self._run_started_at = time.monotonic()
+        self._aborted = False
+        self._channel_fault = ""
         with logger.contextualize(
             task_run_id=self._ctx.task_run_id,
             target_id=self._ctx.target_id,
@@ -362,7 +407,7 @@ class BatchScheduler:
             self._run_locked()
         except Exception as exc:
             log_failure("批量执行失败", exc)
-            self.log.emit(f"[批量] 执行或保存失败: {exc}")
+            self._log(f"[批量] 执行或保存失败: {exc}", "error")
             if self._batch_run is not None:
                 try:
                     self._batch_run.finish(status="failed", error_message=str(exc))
@@ -414,19 +459,19 @@ class BatchScheduler:
             len(self._usernames) == 1
             and self._spec.skip_lifecycle_for_single_item
         )
-        self.log.emit(f"[批量] 开始：{len(self._usernames)} 用户 × "
+        self._log(f"[批量] 开始：{len(self._usernames)} 用户 × "
                       f"{len(self._scripts)} 脚本 × {rounds} 轮")
-        self.log.emit("[批量] 执行用户：" + "、".join(self._usernames))
-        self.log.emit("[批量] 执行任务：" + "、".join(
+        self._log("[批量] 执行用户：" + "、".join(self._usernames))
+        self._log("[批量] 执行任务：" + "、".join(
             script.name for script in self._scripts))
         if not use_lifecycle:
-            self.log.emit("[批量] 单用户直通：跳过批量生命周期工作流")
+            self._log("[批量] 单用户直通：跳过批量生命周期工作流")
         for run_idx, username in enumerate(self._usernames):
             for script in self._scripts:
                 planned = self._task_plan[(run_idx, script.id)]
                 params = json.dumps(planned.params, ensure_ascii=False, sort_keys=True)
                 source = "用户独立" if planned.parameter_source == "user" else "全局任务"
-                self.log.emit(
+                self._log(
                     f"[批量计划] 用户={username} 任务={script.name} "
                     f"参数来源={source} 输入参数={params}"
                 )
@@ -454,7 +499,7 @@ class BatchScheduler:
             can_run = setup.status == RESULT_SUCCESS
             if not can_run:
                 self._stopped = setup.status == RESULT_STOPPED
-                self.log.emit(self._stage_message(tr("批次准备"), setup))
+                self._log(self._stage_message(tr("批次准备"), setup))
                 for round_number, run_idx, username in visits:
                     label = (username if rounds == 1 else
                              f"第 {round_number} 轮 · {username}")
@@ -477,7 +522,7 @@ class BatchScheduler:
                 break
 
             if run_idx == 0:
-                self.log.emit(f"[批量] 开始第 {round_number}/{rounds} 轮")
+                self._log(f"[批量] 开始第 {round_number}/{rounds} 轮")
                 if round_number > 1:
                     for pending_idx, pending_user in enumerate(self._usernames):
                         for pending_script in self._scripts:
@@ -515,10 +560,10 @@ class BatchScheduler:
                     for script in self._scripts:
                         self.progress.emit(
                             run_idx, label, script.id, ST_SKIPPED)
-                    self.log.emit(f"[批量] {label} 跳过: {reason}")
+                    self._log(f"[批量] {label} 跳过: {reason}")
                     continue
                 self._user_scope.enter_context(self._execution_lease.authorized())
-            self.log.emit(f"[批量] ── [{visit_index + 1}/{total}] {label} ──")
+            self._log(f"[批量] ── [{visit_index + 1}/{total}] {label} ──")
             entry_result: dict = {
                 "prepare": ST_SKIPPED,
                 "finish": ST_SKIPPED,
@@ -555,13 +600,13 @@ class BatchScheduler:
                     report.start_script(script.id, script.name)
                     report.end_script(ui_status)
                     reason = checked.message or checked.status
-                    self.log.emit(
+                    self._log(
                         f"[批量] {label} → {script.name} "
                         f"{'跳过' if checked.status == RESULT_SKIPPED else '检查失败'}: "
                         f"{reason}")
                 report.record_prepare(ST_SKIPPED)
                 report.end_entry()
-                self.log.emit(f"[批量] {label} 没有可执行任务，忽略该用户")
+                self._log(f"[批量] {label} 没有可执行任务，忽略该用户")
                 continue
 
             prepared = BatchStageResult(state=batch_state)
@@ -581,7 +626,7 @@ class BatchScheduler:
                     for s in self._scripts:
                         entry_result["scripts"][s.id] = ST_SKIPPED
                         self.progress.emit(run_idx, label, s.id, ST_SKIPPED)
-                    self.log.emit(self._stage_message(label, prepared))
+                    self._log(self._stage_message(label, prepared))
                     if prepared.status == RESULT_STOPPED:
                         self._stopped = True
                         break
@@ -605,7 +650,7 @@ class BatchScheduler:
                     break
 
                 self.progress.emit(run_idx, label, script.id, ST_RUNNING)
-                self.log.emit(f"[批量] {label} → {script.name} ...")
+                self._log(f"[批量] {label} → {script.name} ...")
                 report.start_script(script.id, script.name)
                 planned = self._task_plan[(run_idx, script.id)]
                 params = copy.deepcopy(planned.params)
@@ -644,7 +689,7 @@ class BatchScheduler:
                     script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
                     entry_result["scripts"][script.id] = script_ui_status
                     self.progress.emit(run_idx, label, script.id, script_ui_status)
-                    self.log.emit(
+                    self._log(
                         f"[批量] {label} → {script.name} "
                         + ("已停止，继续下一项" if task_stopped else "完成"))
                     report.end_script(script_ui_status, result)
@@ -654,7 +699,7 @@ class BatchScheduler:
                     except Exception as output_exc:  # noqa: BLE001
                         result_path = None
                         logger.warning(f"批量结果保存失败，继续任务收尾: {output_exc}")
-                        self.log.emit(
+                        self._log(
                             f"[批量] {label} → {script.name} 结果 JSON 保存失败: "
                             f"{output_exc}")
                     if task_run is not None:
@@ -688,14 +733,24 @@ class BatchScheduler:
                                 f"任务历史收尾失败，继续批量任务: {history_exc}")
                     entry_result["scripts"][script.id] = ST_FAILED
                     self.progress.emit(run_idx, label, script.id, ST_FAILED)
-                    self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
+                    self._log(f"[批量] {label} → {script.name} 失败: {e}", "error")
                     report.end_script(ST_FAILED)
                     self._recover_unattended(
                         run_idx, username, batch_state,
                         pending=script_idx + 1 < len(self._scripts))
+                except ChannelFaultError as fault:
+                    # 通道级故障：后续每一项都只会拿旧帧空转，必须中止整批。
+                    # 它跟「任务内异常」和「无人值守中断」都不是一类事，不能
+                    # 记一条失败继续下一项，也不该跑无人值守恢复 wf（那时设备
+                    # 本身不可用，恢复流程只会连环失败）。
+                    self._abort_channel_fault(
+                        fault, report=report, label=label, script=script,
+                        run_idx=run_idx, attempt=script_idx + 1,
+                        task_run=task_run, username=username,
+                        started_at=task_started_at)
 
-            # 用户中断时，关闭尚未结束的脚本记录
-            if self._stopped:
+            # 用户中断或通道故障时，关闭尚未结束的脚本记录
+            if self._stopped or self._aborted:
                 report.finish_pending()
 
             if use_lifecycle:
@@ -718,19 +773,22 @@ class BatchScheduler:
                 entry_result["finish"] = finish_ui_status
                 report.record_finish(finish_ui_status)
                 if finished.status != RESULT_SUCCESS:
-                    self.log.emit(self._stage_message(
+                    self._log(self._stage_message(
                         f"{label} 条目收尾", finished))
                 if finished.status == RESULT_STOPPED:
                     self._stopped = True
 
             report.end_entry()
 
-            if self._stopped:
+            if self._stopped or self._aborted:
                 break
 
         summary["stopped"] = self._stopped
-        tag = tr("（用户中断）") if self._stopped else ""
-        self.log.emit(f"[批量] 全部结束{tag}")
+        summary["aborted"] = self._aborted
+        summary["channel_fault"] = self._channel_fault
+        tag = (tr("（执行通道中断，整批中止）") if self._aborted
+               else tr("（用户中断）") if self._stopped else "")
+        self._log(f"[批量] 全部结束{tag}", "error" if self._aborted else "info")
 
         # setup 成功才说明批次现场已经建立，此时才允许执行 teardown。
         # setup 非 success 时直接终止，不启动任何后续生命周期阶段。
@@ -743,7 +801,7 @@ class BatchScheduler:
             )
             summary["lifecycle"]["batch_teardown"] = teardown.status
             if teardown.status != RESULT_SUCCESS:
-                self.log.emit(self._stage_message(tr("批次收尾"), teardown))
+                self._log(self._stage_message(tr("批次收尾"), teardown))
 
         # 6. 生成报告
         report.end_batch(stopped=self._stopped)
@@ -751,10 +809,10 @@ class BatchScheduler:
         try:
             report_path = report.write()
             if report_path:
-                self.log.emit(f"[批量] 报告已保存: {report_path}")
+                self._log(f"[批量] 报告已保存: {report_path}")
         except Exception as e:
             logger.error(f"批量报告写入失败: {e}")
-            self.log.emit(f"[批量] 报告写入失败（不影响执行结果）: {e}")
+            self._log(f"[批量] 报告写入失败（不影响执行结果）: {e}", "warning")
 
         if batch_run is not None:
             task_failed = any(
@@ -769,10 +827,12 @@ class BatchScheduler:
             )
             try:
                 batch_run.finish(
-                    status=("interrupted" if self._stopped else
-                            "failed" if task_failed or lifecycle_failed else
-                            "completed"),
+                    status=("channel_fault" if self._aborted
+                            else "interrupted" if self._stopped
+                            else "failed" if task_failed or lifecycle_failed
+                            else "completed"),
                     report_path=report_path,
+                    error_message=self._channel_fault if self._aborted else "",
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"批量历史收尾失败，继续退出批量任务: {exc}")
@@ -830,7 +890,7 @@ class BatchScheduler:
         if setup.status != RESULT_SUCCESS:
             self._stopped = setup.status == RESULT_STOPPED
             done.update(self._usernames)
-            self.log.emit(self._stage_message(tr("批次准备"), setup))
+            self._log(self._stage_message(tr("批次准备"), setup))
             for round_number in range(1, self._spec.rounds + 1):
                 for run_idx, unit in enumerate(self._usernames):
                     label = f"{unit} · 第 {round_number} 次"
@@ -849,7 +909,8 @@ class BatchScheduler:
                     report.end_entry()
 
         while (len(done) < len(self._usernames)
-               and not self._stopped and not self._stop_check()):
+               and not self._stopped and not self._aborted
+               and not self._stop_check()):
             ready = [value for value in self._usernames
                      if value not in done and next_ready[value] <= time.monotonic()]
             if not ready:
@@ -863,13 +924,13 @@ class BatchScheduler:
             cursor = (run_idx + 1) % len(self._usernames)
             members = self._unit_members.get(unit, [])
             if not members:
-                self.log.emit(f"[批量] 单元 {unit} 无用户资料，跳过")
+                self._log(f"[批量] 单元 {unit} 无用户资料，跳过")
                 done.add(unit)
                 continue
             attempt += 1
             round_number = counts[unit] + 1
             label = f"{unit} · 第 {round_number} 次 · 尝试 {attempt}"
-            self.log.emit(f"[批量] {unit_key}={unit}，第 {round_number}/{self._spec.rounds} 次")
+            self._log(f"[批量] {unit_key}={unit}，第 {round_number}/{self._spec.rounds} 次")
             report.start_entry(label, "")
             entry: dict = {"prepare": ST_SKIPPED, "finish": ST_SKIPPED,
                            "username": "", "scripts": {}}
@@ -896,7 +957,7 @@ class BatchScheduler:
                                for check in checks.values()):
                             eligible.append(name)
                     if not eligible:
-                        self.log.emit(f"[批量] {unit} 内所有角色均无可执行任务")
+                        self._log(f"[批量] {unit} 内所有角色均无可执行任务")
                         done.add(unit)
                         for script in self._scripts:
                             statuses = [checks[script.id].status
@@ -919,7 +980,7 @@ class BatchScheduler:
                     entry["prepare"] = self._result_to_ui_status(prepared.status)
                     report.record_prepare(entry["prepare"])
                     if prepared.status != RESULT_SUCCESS:
-                        self.log.emit(self._stage_message(label, prepared))
+                        self._log(self._stage_message(label, prepared))
                         for script in self._scripts:
                             entry["scripts"][script.id] = ST_SKIPPED
                             self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
@@ -964,7 +1025,7 @@ class BatchScheduler:
                             report.start_script(script.id, script.name)
                             report.end_script(status)
                             reason = checked.message or checked.status
-                            self.log.emit(
+                            self._log(
                                 f"[批量] {label} → {script.name} "
                                 f"{'跳过' if status == ST_SKIPPED else '检查失败'}: "
                                 f"{reason}")
@@ -1012,7 +1073,7 @@ class BatchScheduler:
                             entry["scripts"][script.id] = script_ui_status
                             report.end_script(script_ui_status, result)
                             self.progress.emit(run_idx, label, script.id, script_ui_status)
-                            self.log.emit(
+                            self._log(
                                 f"[批量] {label} → {script.name} "
                                 + ("已停止，继续下一项" if task_stopped else "完成"))
                             try:
@@ -1022,7 +1083,7 @@ class BatchScheduler:
                                 result_path = None
                                 logger.warning(
                                     f"批量结果保存失败，继续任务收尾: {output_exc}")
-                                self.log.emit(
+                                self._log(
                                     f"[批量] {label} → {script.name} "
                                     f"结果 JSON 保存失败: {output_exc}")
                             if task_run is not None:
@@ -1035,6 +1096,12 @@ class BatchScheduler:
                                 except Exception as history_exc:  # noqa: BLE001
                                     logger.warning(
                                         f"任务历史收尾失败，继续批量任务: {history_exc}")
+                        except ChannelFaultError as fault:
+                            self._abort_channel_fault(
+                                fault, report=report, label=label, script=script,
+                                run_idx=run_idx, attempt=script_idx + 1,
+                                task_run=task_run, username=username,
+                                started_at=task_started_at)
                         except Exception as exc:  # noqa: BLE001
                             if isinstance(exc, WorkflowAbort):
                                 logger.info(
@@ -1055,7 +1122,7 @@ class BatchScheduler:
                             entry["scripts"][script.id] = ST_FAILED
                             report.end_script(ST_FAILED)
                             self.progress.emit(run_idx, label, script.id, ST_FAILED)
-                            self.log.emit(f"[批量] {label} → {script.name} 失败: {exc}")
+                            self._log(f"[批量] {label} → {script.name} 失败: {exc}", "error")
                             if task_run is not None:
                                 try:
                                     task_run.finish(
@@ -1067,7 +1134,7 @@ class BatchScheduler:
                             self._recover_unattended(
                                 run_idx, username, batch_state,
                                 pending=script_idx + 1 < len(self._scripts))
-                    if self._stopped:
+                    if self._stopped or self._aborted:
                         report.finish_pending()
                     finished = self._run_stage(
                         "finish_item", self._spec.workflows.finish_item,
@@ -1083,13 +1150,13 @@ class BatchScheduler:
                     if finished.status == RESULT_STOPPED:
                         self._stopped = True
                     elif finished.status != RESULT_SUCCESS:
-                        self.log.emit(self._stage_message(f"{label} 条目收尾", finished))
+                        self._log(self._stage_message(f"{label} 条目收尾", finished))
                     counts[unit] += 1
                     if counts[unit] >= self._spec.rounds:
                         done.add(unit)
             except AccessDeniedError as exc:
                 reason = self._describe_user_conflict(entry.get("username", ""), exc)
-                self.log.emit(f"[批量] {unit} 暂不可执行: {reason}")
+                self._log(f"[批量] {unit} 暂不可执行: {reason}")
                 entry["prepare"] = ST_SKIPPED
                 entry["skip_reason"] = reason
                 report.record_prepare(ST_SKIPPED)
@@ -1097,7 +1164,7 @@ class BatchScheduler:
                 deferrals[unit] += 1
                 next_ready[unit] = time.monotonic() + 60
                 if deferrals[unit] >= 30:
-                    self.log.emit(f"[批量] {unit} 连续 30 次无法取得用户锁，本次停止调度该单元")
+                    self._log(f"[批量] {unit} 连续 30 次无法取得用户锁，本次停止调度该单元", "warning")
                     for script in self._scripts:
                         entry["scripts"][script.id] = ST_SKIPPED
                         self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
@@ -1106,7 +1173,7 @@ class BatchScheduler:
                     done.add(unit)
             except Exception as exc:  # noqa: BLE001
                 logger.exception(f"属性单元执行失败: {unit}")
-                self.log.emit(f"[批量] {unit} 执行失败: {exc}")
+                self._log(f"[批量] {unit} 执行失败: {exc}")
                 entry["error"] = str(exc)
                 report.record_error(str(exc))
                 done.add(unit)
@@ -1128,7 +1195,7 @@ class BatchScheduler:
             report_path = report.write()
         except Exception as exc:  # noqa: BLE001
             logger.error(f"批量报告写入失败: {exc}")
-            self.log.emit(f"[批量] 报告写入失败（不影响执行结果）: {exc}")
+            self._log(f"[批量] 报告写入失败（不影响执行结果）: {exc}", "warning")
         if batch_run is not None:
             failed = (
                 any(value == RESULT_FAILED
@@ -1141,8 +1208,12 @@ class BatchScheduler:
             )
             try:
                 batch_run.finish(
-                    status="interrupted" if self._stopped else "failed" if failed
-                    else "completed", report_path=report_path)
+                    status=("channel_fault" if self._aborted
+                            else "interrupted" if self._stopped
+                            else "failed" if failed
+                            else "completed"),
+                    report_path=report_path,
+                    error_message=self._channel_fault if self._aborted else "")
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"批量历史收尾失败，继续退出批量任务: {exc}")
         self.finished_all.emit(summary)
@@ -1270,6 +1341,19 @@ class BatchScheduler:
 
     # ─── 内部方法 ───────────────────────────────────────
 
+    def _log(self, message: str, level: str = "info") -> None:
+        """批量逐项消息：进批量页滚动区，同时写主日志。
+
+        这些消息过去只 emit 到界面控件，任务结束后主日志里只剩「自动化结束」
+        一行，事后无法追溯是哪个条目、第几次尝试、为什么被跳过或失败。
+        级别由调用方显式给出，不让日志层按关键字猜。
+        """
+        try:
+            getattr(logger, level, logger.info)(str(message))
+        except Exception:  # noqa: BLE001 - 记日志失败不能影响批量执行
+            pass
+        self.log.emit(message)
+
     def _create_engine(self) -> WorkflowEngine:
         """创建新引擎（共享后端引用，每个脚本独立实例）"""
         ctx = self._ctx
@@ -1337,10 +1421,10 @@ class BatchScheduler:
         text, self._unattended_hit = self._unattended_hit, ""
         wf_name = self._spec.workflows.recover_unattended
         if not wf_name:
-            self.log.emit(
+            self._log(
                 f"[批量] 无人值守中止（{text}）；未配置恢复 wf，直接继续下一个任务")
             return
-        self.log.emit(f"[批量] 无人值守中止（{text}）；执行恢复 wf 收回登录主页")
+        self._log(f"[批量] 无人值守中止（{text}）；执行恢复 wf 收回登录主页")
         result = self._run_stage(
             "recover_unattended", wf_name, run_idx, username, batch_state,
             extra_variables={
@@ -1352,7 +1436,7 @@ class BatchScheduler:
             })
         self._unattended_hit = ""
         if result.status != RESULT_SUCCESS:
-            self.log.emit(f"[批量] 无人值守恢复未成功：{result.message}")
+            self._log(f"[批量] 无人值守恢复未成功：{result.message}", "warning")
 
     def _run_stage(
         self,

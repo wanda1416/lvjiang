@@ -103,6 +103,9 @@ class BatchReport:
         self._start_time: datetime | None = None
         self._end_time: datetime | None = None
         self._stopped = False
+        #: 通道级故障（画面流/ADB/代理不可恢复）导致的中止
+        self._aborted = False
+        self._channel_fault = ""
         self._entries: list[_EntryRecord] = []
         self._current_entry: _EntryRecord | None = None
         self._current_script: _ScriptRecord | None = None
@@ -143,6 +146,15 @@ class BatchReport:
     def record_error(self, message: str) -> None:
         if self._current_entry:
             self._current_entry.error = message
+
+    def record_channel_fault(self, detail: str) -> None:
+        """记录执行通道故障（整批中止）。
+
+        报告必须能一眼区分「用户中断」「条目内异常」和「通道坏了导致中止」：
+        只有这个原因会让剩下的条目根本没被执行过。
+        """
+        self._aborted = True
+        self._channel_fault = str(detail or "")
 
     def start_script(self, script_id: str, script_name: str) -> None:
         rec = _ScriptRecord(script_id=script_id, script_name=script_name)
@@ -200,8 +212,17 @@ class BatchReport:
         lines.append(f"- 配置名称：{self._config_name}")
         lines.append(f"- 启动时间：{st:%H:%M:%S}")
         if self._end_time:
-            lines.append(f"- 结束时间：{self._end_time:%H:%M:%S}"
-                         f"{tr('（用户中断）') if self._stopped else tr('（正常完成）')}")
+            script_total = sum(len(e.scripts) for e in self._entries)
+            if self._aborted:
+                tag = tr("（执行通道中断，整批中止）")
+            elif self._stopped:
+                tag = tr("（用户中断）")
+            elif script_total == 0:
+                # 一个脚本都没跑起来却写「正常完成」，正是过去最误导人的地方
+                tag = tr("（未执行任何脚本）")
+            else:
+                tag = tr("（正常完成）")
+            lines.append(f"- 结束时间：{self._end_time:%H:%M:%S}{tag}")
             total_sec = (self._end_time - st).total_seconds()
             lines.append(f"- 总耗时：{_fmt_duration(total_sec)}")
         lines.append(f"- 计划执行：{self._total_rows} 单元轮次")
@@ -220,6 +241,10 @@ class BatchReport:
                 wf_parts.append(f"{key}={val}")
         if wf_parts:
             lines.append(f"- 工作流：{', '.join(wf_parts)}")
+        if self._aborted:
+            lines.append(f"- 通道状态：{tr('执行通道中断，整批已中止')}")
+            if self._channel_fault:
+                lines.append(f"- 中断原因：{self._channel_fault}")
         lines.append("")
 
         # ── 逐行记录 ──
@@ -279,6 +304,8 @@ class BatchReport:
             total_entries - entry_success - entry_lifecycle_fail
             - entry_error - entry_skipped)
         lines.append(f"- 行执行总计：{total_entries} 行")
+        if self._aborted:
+            lines.append(f"  - {tr('通道中断（整批中止）')}")
         lines.append(f"  - 全部成功：{entry_success}")
         if entry_partial:
             lines.append(f"  - 部分失败：{entry_partial}")

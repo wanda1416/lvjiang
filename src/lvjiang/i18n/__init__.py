@@ -7,6 +7,7 @@ tr(text) 以中文原文为 key 查找翻译，找不到则返回原文。
 """
 from __future__ import annotations
 
+import pathlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -205,35 +206,53 @@ def _install_qt_translation(language: str) -> bool:
     return False
 
 def _load_translation_file(language: str) -> dict[str, str]:
-    """加载指定语言的翻译文件，扁平化为 {原文: 译文} 字典。
+    """加载指定语言的翻译，扁平化为 {原文: 译文} 字典。
 
-    同时加载 zh_CN.yaml 基准文件，与目标语言文件并行递归遍历，
-    建立 中文原文 → 译文 的映射。结构不对齐的条目自动跳过。
+    主文件 ``{language}.yaml`` 之外，还合并 ``{language}/`` 目录下的模块文件
+    （按文件名排序，目录内容覆盖主文件同名段）。同时加载 zh_CN 基准
+    （主文件 + ``zh_CN/`` 目录），并行递归遍历建立 中文原文 → 译文 映射；
+    结构不对齐的条目自动跳过。
     """
     if language == "zh_CN":
         # 中文是原文本身，tr() 直接返回；解析基准文件只会得到空表。
         return {}
-    yaml_file = get_config_i18n_dir() / f"{language}.yaml"
+    base_dir = get_config_i18n_dir()
+    yaml_file = base_dir / f"{language}.yaml"
     if not yaml_file.exists():
         logger.warning("[i18n] 翻译文件不存在: {}", yaml_file)
         return {}
 
-    try:
-        with open(yaml_file, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-    except Exception:
-        logger.exception("[i18n] 解析翻译文件失败: {}", yaml_file)
-        return {}
+    def _read(path: pathlib.Path) -> dict:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            logger.exception("[i18n] 解析翻译文件失败: {}", path)
+            return {}
+
+    data = _read(yaml_file)
+    lang_dir = base_dir / language
+    if lang_dir.is_dir():
+        for module_file in sorted(lang_dir.glob("*.yaml")):
+            module_data = _read(module_file)
+            for key, value in module_data.items():
+                if isinstance(value, dict) and isinstance(data.get(key), dict):
+                    data[key].update(value)
+                else:
+                    data[key] = value
 
     # 加载中文基准文件，用于建立 原文 → 译文 映射
-    zh_file = get_config_i18n_dir() / "zh_CN.yaml"
-    zh_data: dict = {}
-    if zh_file.exists() and language != "zh_CN":
-        try:
-            with open(zh_file, "r", encoding="utf-8") as f:
-                zh_data = yaml.safe_load(f) or {}
-        except Exception:
-            pass
+    zh_file = base_dir / "zh_CN.yaml"
+    zh_data: dict = _read(zh_file)
+    zh_dir = base_dir / "zh_CN"
+    if zh_dir.is_dir():
+        for module_file in sorted(zh_dir.glob("*.yaml")):
+            module_data = _read(module_file)
+            for key, value in module_data.items():
+                if isinstance(value, dict) and isinstance(zh_data.get(key), dict):
+                    zh_data[key].update(value)
+                else:
+                    zh_data[key] = value
 
     result: dict[str, str] = {}
     _build_translation_map(zh_data, data, result)

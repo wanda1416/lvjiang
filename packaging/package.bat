@@ -35,6 +35,11 @@ rem PyInstaller creates dist/lvjiang/ with lvjiang.exe at the root
 rem Use the same canonical system tree and r0 identity as Android.
 uv run python scripts\build_system_baseline.py dist\lvjiang\config
 if errorlevel 1 exit /b 1
+rem UI translations ship next to config/system: available_languages() scans
+rem config\i18n\*.yaml for meta.display_name, so a missing directory silently
+rem degrades the language picker to Chinese only (0.15.11 shipped without it).
+xcopy /e /i /y config\i18n dist\lvjiang\config\i18n >nul
+if errorlevel 1 exit /b 1
 rem External plugins ship as a data directory: copy plugins\ when present so
 rem the host discovers them next to the exe at runtime. A public build has no
 rem plugins\ checkout, so the released package carries built-in plugins only.

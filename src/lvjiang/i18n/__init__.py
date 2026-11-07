@@ -130,6 +130,11 @@ def available_languages() -> list[dict[str, str]]:
     """
     languages = []
     if not get_config_i18n_dir().exists():
+        # 发行包漏带 config/i18n 时这里只会返回简体中文，界面上没有任何异常，
+        # 用户只会觉得"没有英文选项"。必须留下可行动的一行日志。
+        logger.warning(
+            "[i18n] 未找到 {}，界面语言只提供简体中文"
+            "（发行包应随包携带 config/i18n）", get_config_i18n_dir())
         return [{"code": "zh_CN", "name": "简体中文"}]
 
     for yaml_file in sorted(get_config_i18n_dir().glob("*.yaml")):

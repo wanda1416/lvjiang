@@ -228,6 +228,10 @@ APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 2. 调用 PyInstaller 构建
 3. 复制配置、ADB、scrcpy 等运行时依赖，并构建明确收录的 Agent 文档与 schema；
    同一份结果放入 `dist/lvjiang/docs` 并输出独立 Agent ZIP，保留 `10-game`、`30-architecture`、`60-userguide`、`70-agent` 的原目录；安装升级清理这些官方文档目录与旧 `agent` 目录
+   - **`config/system` 之外还要带 `config/i18n`**：界面语言下拉框扫描
+     `config/i18n/*.yaml` 的 `meta.display_name`，漏带时只会显示简体中文且不报错
+     （0.15.11 就是这样丢掉英文选项的）。打包后用
+     `dir dist\lvjiang\config\i18n` 确认 `zh_CN.yaml`、`en_US.yaml` 都在。
 4. 压缩为 zip
 5. 调用 Inno Setup 生成安装包（需安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）
 

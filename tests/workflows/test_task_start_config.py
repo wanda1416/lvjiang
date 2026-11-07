@@ -7,7 +7,8 @@ from tests.workflows.conftest import make_engine
 
 def test_task_start_does_not_install_or_lock(tmp_path, monkeypatch):
     hit = []
-    monkeypatch.setattr(remote, "sync_now", lambda **_kwargs: hit.append("sync"))
+    monkeypatch.setattr(remote, "start_background_sync", lambda **_kwargs: hit.append("sync"))
+    monkeypatch.setattr(remote, "install_pending", lambda **_kwargs: hit.append("install"))
     monkeypatch.setattr(remote, "prepare_startup_configuration", lambda: hit.append("prepare"))
     monkeypatch.setattr(remote, "recover_installation", lambda: hit.append("recover"))
     monkeypatch.setattr(remote, "apply_outcome", lambda *_args, **_kwargs: hit.append("apply"))

@@ -121,6 +121,99 @@ class UpdateStore:
             self._archive(root / "manifest.json", manifest)
             self._archive(root / "package.bin", encrypted)
 
+    # ── 下载暂存：后台只落候选，安装留给下次启动 ────────────────────
+    #
+    # 归档本身就是暂存区（按修订与清单摘要寻址），另在 state.json 里登记
+    # `pending`，才能让 prune_archives() 认出「还没安装但不该回收」的候选。
+
+    def cache_public(self, manifest_json: bytes, archive: bytes) -> None:
+        """暂存公开候选：按修订与清单摘要寻址，不触碰 system。"""
+        if not manifest_json or not archive:
+            raise ValueError("公开候选缺少清单或归档")
+        manifest = parse_manifest(json.loads(manifest_json))
+        revision = int(manifest["revision"])
+        with self.locked():
+            root = self._archive_directory("public", revision, digest(manifest_json))
+            self._archive(root / "manifest.json", manifest_json)
+            self._archive(root / "update.zip", archive)
+
+    def pending(self) -> dict[str, Any]:
+        """已下载、等下次启动安装的候选；空映射表示没有。"""
+        pending = self._state().get("pending")
+        return pending if isinstance(pending, dict) else {}
+
+    def mark_pending(self, *, public: tuple[int, str] | None = None,
+                     member: tuple[int, str] | None = None) -> None:
+        """登记待安装候选；只动 state，不安装。"""
+        with self.locked():
+            state = self._state()
+            pending = dict(state.get("pending") or {})
+            if public is not None:
+                pending["revision"] = int(public[0])
+                pending["public_sha256"] = public[1]
+            if member is not None:
+                pending["member"] = {"package_version": int(member[0]),
+                                     "manifest_sha256": member[1]}
+            state["pending"] = pending
+            self._write(self.state_path, formatted_json_bytes(state), fsync=True)
+
+    def clear_pending(self, *, public: bool = False, member: bool = False) -> None:
+        with self.locked():
+            state = self._state()
+            pending = dict(state.get("pending") or {})
+            if public:
+                pending.pop("revision", None)
+                pending.pop("public_sha256", None)
+            if member:
+                pending.pop("member", None)
+            if pending:
+                state["pending"] = pending
+            else:
+                state.pop("pending", None)
+            self._write(self.state_path, formatted_json_bytes(state), fsync=True)
+
+    def pending_public(self) -> tuple[dict[str, Any], bytes, bytes] | None:
+        """返回 ``(manifest, archive, manifest_json)``；文件缺失或摘要不符时返回 None。"""
+        pending = self.pending()
+        revision = int(pending.get("revision") or 0)
+        sha256 = str(pending.get("public_sha256") or "")
+        if not revision or not sha256:
+            return None
+        root = self._archive_directory("public", revision, sha256)
+        manifest_path = root / "manifest.json"
+        archive_path = root / "update.zip"
+        if not manifest_path.is_file() or not archive_path.is_file():
+            logger.warning("暂存的公开候选缺少文件，跳过离线安装：r{}", revision)
+            return None
+        manifest_json = manifest_path.read_bytes()
+        if digest(manifest_json) != sha256:
+            logger.warning("暂存的公开候选清单摘要不符，跳过离线安装：r{}", revision)
+            return None
+        return parse_manifest(json.loads(manifest_json)), archive_path.read_bytes(), manifest_json
+
+    def pending_member(self) -> tuple[bytes, bytes, bytes] | None:
+        """返回 ``(index_json, manifest_json, encrypted)``；文件缺失时返回 None。
+
+        暂存只保留密文包：解密仍需授权接口返回的一次性密钥，因此安装阶段要重新
+        取一次授权，而不是把明文会员内容留在磁盘上等下次启动。
+        """
+        pending = self.pending()
+        member = pending.get("member")
+        if not isinstance(member, dict):
+            return None
+        version = int(member.get("package_version") or 0)
+        sha256 = str(member.get("manifest_sha256") or "")
+        if not version or not sha256:
+            return None
+        root = self._archive_directory("member", version, sha256)
+        index_path = self.root / "member" / "index.json"
+        manifest_path = root / "manifest.json"
+        package_path = root / "package.bin"
+        if not all(path.is_file() for path in (index_path, manifest_path, package_path)):
+            logger.warning("暂存的会员候选缺少文件，跳过离线安装：v{}", version)
+            return None
+        return index_path.read_bytes(), manifest_path.read_bytes(), package_path.read_bytes()
+
     def prune_archives(self) -> None:
         """只回收本系列未引用的完整归档，不动 r0、索引和事务资料。"""
         with self.locked():
@@ -134,6 +227,15 @@ class UpdateStore:
                 member = selection.get("member") or {}
                 if member.get("package_version") and member.get("manifest_sha256"):
                     keep["member"].add((member["package_version"], member["manifest_sha256"]))
+            # 已下载但还没安装的候选必须保活：否则下次启动一 prune 就把它删掉，
+            # 后台线程等于白下载。
+            pending = state.get("pending") or {}
+            if pending.get("revision") and pending.get("public_sha256"):
+                keep["public"].add((int(pending["revision"]), pending["public_sha256"]))
+            pending_member = pending.get("member") or {}
+            if pending_member.get("package_version") and pending_member.get("manifest_sha256"):
+                keep["member"].add((int(pending_member["package_version"]),
+                                    pending_member["manifest_sha256"]))
             for channel, root in ((name, self.root / name) for name in keep):
                 if not root.exists():
                     continue

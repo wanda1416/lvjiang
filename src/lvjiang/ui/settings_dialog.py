@@ -1550,19 +1550,35 @@ class SettingsDialog(QDialog):
                 + ((" " + " ".join(history_notices)) if history_notices else ""))
 
     def _refresh_remote_config_status(self):
-        """展示已经安装的公开修订，而非下载中的候选。"""
+        """展示已经安装的公开修订与待安装候选。
+
+        下载在后台进行，装好的内容下次启动才生效；这里必须把两件事分开写，
+        否则用户下完就以为已经生效。
+        """
         from ..core.config.remote import (
             get_config_version,
             get_last_synced_at,
+            pending_versions,
         )
+        pending_public, pending_member = pending_versions()
+        pending_text = ""
+        if pending_public or pending_member:
+            parts = []
+            if pending_public:
+                parts.append(f"r{pending_public}")
+            if pending_member:
+                parts.append(tr("会员包 v{version}").format(version=pending_member))
+            pending_text = "　" + tr("已下载待安装：{parts}（下次启动生效）").format(
+                parts="、".join(parts))
         version = get_config_version()
         if not version:
-            self._remote_config_status.setText(tr("公开配置：预置 r0"))
+            self._remote_config_status.setText(
+                tr("公开配置：预置 r0") + pending_text)
             return
         synced = (get_last_synced_at() or "")[:10]
         self._remote_config_status.setText(
             tr("公开配置修订 r{version}（{date} 同步）").format(
-                version=version, date=synced or tr("未知日期")))
+                version=version, date=synced or tr("未知日期")) + pending_text)
 
     def _on_offline_toggled(self, checked: bool):
         from ..core.telemetry.settings import set_network_feature

@@ -9,10 +9,10 @@ from lvjiang.ui import settings_dialog
 def test_settings_actions_do_not_install_configuration(qtbot, monkeypatch):
     installed = []
     monkeypatch.setattr(
-        "lvjiang.core.config.remote.apply_outcome",
-        lambda *_args, **_kwargs: installed.append("apply"))
+        "lvjiang.core.config.remote.install_pending",
+        lambda **_kwargs: installed.append("install"))
     monkeypatch.setattr(
-        "lvjiang.core.config.remote.sync_now",
+        "lvjiang.core.config.remote.start_background_sync",
         lambda **_kwargs: installed.append("sync"))
     monkeypatch.setattr(
         "lvjiang.core.config.remote.prepare_startup_configuration",

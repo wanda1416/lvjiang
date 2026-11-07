@@ -76,6 +76,7 @@
 | [23-service-boundaries.md](50-platform/23-service-boundaries.md) | 公共服务与桌面适配边界 | 已实现 |
 | [24-config-policy-bootstrap.md](50-platform/24-config-policy-bootstrap.md) | 插件配置策略显式装配 | 已实现 |
 | [25-configuration-modules.md](50-platform/25-configuration-modules.md) | 配置、布局与组合展示职责拆分 | 已实现 |
+| [26-online-config-background-download.md](50-platform/26-online-config-background-download.md) | 在线配置后台下载、暂存与下次启动安装 | 部分实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

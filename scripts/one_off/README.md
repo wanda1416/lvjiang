@@ -9,6 +9,33 @@
 - 新的一次性迁移/重构对照不得放进 `tests/` 后再依赖 `skip` 或 marker 排除；
   应从一开始放在本目录，并在完成迁移后保留必要说明与冻结数据。
 
+## 在线配置会员链路
+
+0.15.12 把在线配置改成「后台下载会员密文包、下次启动再取一次授权解密」。这条链路
+有一段只有真实服务器才能回答：同一激活码被请求两次 `/v1/key` 会不会被限制。
+
+- [check_member_key_reuse.py](check_member_key_reuse.py) 连续请求授权接口，逐次打印
+  HTTP 状态/错误码/耗时，最后给出「是否被服务端限制」的判定。
+- [check_member_staged_flow.py](check_member_staged_flow.py) 在临时客户端根目录里跑
+  真实下载与安装：验证下载阶段不改 `system`、安装阶段不重新下载整包、暂存区只有密文。
+
+两者默认用本机当前生效的码；加 `--ledger` 会改用签发台账（默认
+`~/.lvjiang/license_ledger.db`，可用路径或 `LVJIANG_LICENSE_LEDGER` 覆盖）里
+**绑定本机序列号**的码，覆盖 `bind=claim` 的 `nonce + 服务端签名回执`分支
+（`bind=serial` 的码不支持带序列号请求，脚本会明说，不当作限流）。
+授权记录写临时目录，本机 `config/local` 不被读取或改写；全程不打印激活码、密钥、
+回执、序列号或摘要。
+
+两者都只读本机既有激活码与授权状态，不打印激活码、密钥、回执或摘要，也不写本机
+`config`。需要本机已配置有效会员授权。
+
+```bash
+python scripts/one_off/check_member_key_reuse.py --attempts 3
+python scripts/one_off/check_member_key_reuse.py --ledger --attempts 3
+python scripts/one_off/check_member_staged_flow.py
+python scripts/one_off/check_member_staged_flow.py --ledger
+```
+
 ## DSL 解析器
 
 [LALR 等价验证](lalr_parser/README.md) 对照指定 Git 基线的 Earley 语法与当前解析器。

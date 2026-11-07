@@ -161,6 +161,15 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 启动后延迟检查更新（不阻塞主窗口显示）
     QTimer.singleShot(1000, _window.check_update_on_startup)
 
+    # 在线配置同样放到后台：下载完只登记为待安装，下次启动读配置之前才安装。
+    # 只读实例不下载；任务运行中也不会替换 system。
+    from .core.config import remote as remote_config
+    if not is_readonly():
+        remote_config.start_background_sync()
+    # 先让后台下载看到停止信号，再由 _wait_for_threads 兜底等待；
+    # aboutToQuit 的槽按连接顺序执行，所以这条必须排在它前面。
+    _app.aboutToQuit.connect(remote_config.stop_background_sync)
+
     # 退出前等待后台线程，避免 PyQt6/SIP 清理时的 native crash
     _app.aboutToQuit.connect(_wait_for_threads)
 

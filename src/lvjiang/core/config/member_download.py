@@ -71,6 +71,39 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
         report_access_status(access, "unchecked", "没有适用当前版本的会员包，尚未验证云端授权")
         logger.debug("[在线配置] 跳过会员更新：没有适用客户端 {} 的会员包", app_version)
         return MemberDownload({}, {"config_version": index["config_version"]}, index_json=raw)
+    return _authorize(access, app_version, index, package, fetch=fetch, timeout=timeout,
+                      encrypted=None, index_json=raw)
+
+
+def install_staged_member(access: ProtectedAccess | None, app_version: str, *,
+                          index_json: bytes, manifest_json: bytes, encrypted: bytes,
+                          timeout: float = 10,
+                          fetch: Callable[..., tuple[bytes, str, bool]] | None = None,
+                          ) -> MemberDownload:
+    """用暂存的索引与密文包完成授权校验与解密，不再下载整包。
+
+    暂存区只放密文：解密需要授权接口下发的一次性密钥，所以安装阶段仍要请求一次
+    授权（一个小请求），而不是把会员明文留在磁盘上等下次启动。
+    """
+    if access is None:
+        logger.debug("[在线配置] 跳过暂存会员候选：未取得有效的本地会员激活码")
+        return MemberDownload({}, {})
+    index = parse_manifest(json.loads(index_json))
+    package = select_package(index, app_version)
+    if package is None:
+        logger.debug("[在线配置] 放弃暂存会员候选：没有适用客户端 {} 的会员包", app_version)
+        return MemberDownload({}, {"config_version": index["config_version"]}, index_json=index_json)
+    if digest(json_bytes(package)) != digest(manifest_json):
+        raise ValueError("暂存会员候选与索引中的包不一致")
+    return _authorize(access, app_version, index, package, fetch=fetch, timeout=timeout,
+                      encrypted=encrypted, index_json=index_json)
+
+
+def _authorize(access: ProtectedAccess, app_version: str,
+               index: dict[str, Any], package: dict[str, Any], *,
+               fetch: Callable[..., tuple[bytes, str, bool]] | None, timeout: float,
+               encrypted: bytes | None, index_json: bytes = b"") -> MemberDownload:
+    """授权校验、密文完整性校验与解密；``encrypted=None`` 表示需要现场下载。"""
     nonce = secrets.token_hex(16) if access.serial else ""
     from ..license.code import normalize_code
     request = {"code": normalize_code(access.code), "key_id": package["key_id"]}
@@ -91,7 +124,7 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
             }.get(error.reason, "云端拒绝授权，可能未登记、已停用、已过期或等级不足")
             report_access_status(access, "denied", reason)
             logger.debug("[在线配置] 跳过会员更新：{}（HTTP 403）；本地激活有效不代表云端授权有效", reason)
-            return MemberDownload({}, {}, index_json=raw)
+            return MemberDownload({}, {}, index_json=index_json)
         raise
     expires_at = access.expires_at
     if access.serial:
@@ -99,7 +132,7 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
         data = accept_status(access.code, access.serial, grant.get("receipt"), nonce)
         if data["status"] != "active":
             report_access_status(access, "denied", STATUS_REASON[data["status"]])
-            return MemberDownload({}, {}, index_json=raw)
+            return MemberDownload({}, {}, index_json=index_json)
         expires_at = min(filter(lambda value: value is not None,
                                 (expires_at, data["expires_at"])))
         if data.get("package_key_id") != package["key_id"]:
@@ -107,7 +140,7 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
         # Package-specific denial must itself be signed.
         if data.get("package_status") in {"package_unavailable", "insufficient_level"}:
             report_access_status(access, "denied", "云端会员包不可用或等级不足")
-            return MemberDownload({}, {}, index_json=raw)
+            return MemberDownload({}, {}, index_json=index_json)
         proof = json.dumps([package["key_id"], grant.get("key"), grant.get("sha256"),
                             grant.get("min_app_version"), grant.get("config_version"), grant.get("expires")],
                            separators=(",", ":")).encode("utf-8")
@@ -121,15 +154,18 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
             or (expires_at is not None and time.time() >= expires_at):
         report_access_status(access, "denied", "会员授权已过期")
         logger.debug("[在线配置] 跳过会员更新：会员授权已过期")
-        return MemberDownload({}, {}, index_json=raw)
+        return MemberDownload({}, {}, index_json=index_json)
     from ..versioning import config_version
     if config_version(app_version) < Version(grant["min_app_version"]):
         report_access_status(access, "unchecked", "应用版本未满足会员包要求")
         logger.debug("[在线配置] 跳过会员更新：应用版本未满足会员包要求")
-        return MemberDownload({}, {}, index_json=raw)
+        return MemberDownload({}, {}, index_json=index_json)
     report_access_status(access, "allowed", "最近检查通过")
     logger.debug("[在线配置] 云端会员授权检查通过，开始获取会员包 r{}", package["config_version"])
-    encrypted, _, _ = fetch(package["url"], max_bytes=MAX_BUNDLE_BYTES, timeout=timeout)
+    if encrypted is None:
+        if fetch is None:
+            raise ValueError("缺少会员密文包下载通道")
+        encrypted, _, _ = fetch(package["url"], max_bytes=MAX_BUNDLE_BYTES, timeout=timeout)
     if digest(encrypted) != package["sha256"]:
         raise ValueError("会员密文包摘要不匹配")
     files = decrypt(encrypted, base64.b64decode(grant["key"], validate=True))
@@ -143,4 +179,4 @@ def _fetch_member_update(access: ProtectedAccess, app_version: str, *,
                                   "manifest_sha256": digest(json_bytes(package)),
                                   "code_hash": access.code_hash, "expires": expires,
                                   "expires_at": expires_at}, encrypted,
-                          json_bytes(package), raw)
+                          json_bytes(package), index_json)

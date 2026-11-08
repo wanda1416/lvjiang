@@ -1,98 +1,99 @@
+# map_manager.yaml — 按模块段落组织
 map_manager:
-  HUD 场景: HUD Scene
-  HUD 场景绑定（坐标在场景编辑器里标定）: HUD scene bindings (calibrate coordinates in the Scene Manager)
-  '{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。': '{scene}.{point} is outside the minimap; heading detection uses the region center for now.'
-  ⚠ 缺失：{key}: '⚠ Missing: {key}'
-  不能删除: Cannot Delete
-  从当前画面截取: Capture from the current frame
-  会同时生成 HUD 场景 map_<key>，之后在场景编辑器里标定小地图与大地图区域。: This also generates the HUD scene map_<key>; calibrate the minimap and world-map regions in the Scene Manager afterwards.
-  保存当前画面为探查图片: Save the current frame as a survey image
-  先登记地域: Register a region first
-  删除地图: Delete Map
-  删除地图「{name}」及其底图？自动生成的 HUD 场景 map_{key} 也会一并删除。: Delete map "{name}" and its base map? The auto-generated HUD scene map_{key} is deleted too.
-  删除选中 POI: Delete Selected POI
-  删除选中地域: Delete Selected Regions
-  只有实际补齐整张地图后才勾选；拼接成功不代表已采集整图。: Check only after the full map is actually stitched; a successful stitch doesn't mean the whole map was surveyed.
-  只读，请先“复制到本地”再修改: Read-only; "Copy to local" before editing
-  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp): Image files (*.png *.jpg *.jpeg *.bmp *.webp)
-  在底图上点击新增 POI；点击已有标记选中它。坐标为底图归一化坐标。: Click the base map to add a POI; click an existing marker to select it. Coordinates are base-map normalized.
-  地图 key: Map key
-  地域与探查: Regions & Surveys
-  地域仍被使用: Region still in use
-  地域名称: Region name
-  坐标必须在 0–1 之间: Coordinates must be between 0 and 1
-  基本信息: Basics
-  基本信息与绑定: Basics & Bindings
-  复制到本地: Copy to Local
-  大地图底图: World Map Base Image
-  大地图正北朝上: World map is north-up
-  导入底图文件…: Import base map…
-  导航模式: Navigation mode
-  小写字母开头，字母/数字/下划线: Starts with a lowercase letter; letters, digits, underscores
-  小地图朝向: Minimap heading
-  尖端（退化）: Tip (degenerate)
-  尚未导入底图：先「标定 HUD…」标出大地图区域，再在“底图与 POI”页导入: 'No base map yet: "Calibrate HUD…" the world-map region first, then import on the "Base Map & POI" page'
-  展示: Display
-  底图与 POI: Base Map & POI
-  底图区域未标定: Base map region not calibrated
-  底图可标注 POI；空白部分尚未探查。: POIs are placed on the base map; blank areas haven't been surveyed yet.
-  底图已完成整图探查: Base map fully surveyed
-  底图编码失败: Base map encoding failed
-  底图：局部探查，待补齐: 'Base map: partially surveyed; more to explore'
-  底图：整图探查已完成: 'Base map: fully surveyed'
-  当前地图有未保存的修改，放弃吗？: This map has unsaved changes; discard them?
-  当前布局不存在，未能定位地图区域。: The current layout doesn't exist; cannot locate the map region.
-  当前布局尚未标定 {scene}.{point}，朝向识别暂用小地图区域中心。: The current layout hasn't calibrated {scene}.{point}; heading detection uses the minimap center for now.
-  当前布局尚未标定 {scene}.{region}，无法裁剪地图区域。: The current layout hasn't calibrated {scene}.{region}; cannot crop the map region.
-  当前无法读取布局，未能定位地图区域。: Cannot read the layout; cannot locate the map region.
-  当前未选择地图，无法解析地图区域。: No map selected; cannot resolve the map region.
-  截取当前画面: Capture the current frame
-  截图所属地域: Region of this screenshot
-  按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。: Register regions with the game's area selector. Survey images and the base map are stored separately; switch views on the base-map page.
-  探查: Surveys
-  探查图片仅供查看: Survey images are view-only
-  探查图片缺失或无法解码: Survey image missing or undecodable
-  探查截图用于查看；POI 只在底图上编辑。: Survey screenshots are for viewing; POIs are edited on the base map only.
-  搜索窗口（相对短边）: Search window (relative to short edge)
-  新地域: New Region
-  新建地图: New Map
-  无效的 POI: Invalid POI
-  无法获取截图: Cannot Capture Screenshot
-  '无法解码图片: {path}': 'Cannot decode image: {path}'
-  无法读取图片: Cannot read the image
-  是否仍然使用整帧作为底图？: Use the full frame as the base map anyway?
-  最小面积（像素）: Min area (pixels)
-  朝向 {deg:.1f}°　置信度 {conf:.2f}　方法：{method}　面积 {area}px: 'Heading {deg:.1f}°　confidence {conf:.2f}　method: {method}　area {area}px'
-  未保存: Unsaved
-  未取得当前画面: No current frame captured
-  未找到箭头：检查颜色阈值或小地图区域标定: 'Arrow not found: check the color threshold or the minimap calibration'
-  来源：{layer}: 'Source: {layer}'
-  标定 HUD…（打开场景编辑器）: Calibrate HUD… (opens the Scene Manager)
-  标识: Identity
-  没有地图。点击“新建”创建一张。: No maps. Click "New" to create one.
-  添加地域: Add Region
-  添加失败: Add failed
-  添加探查图片: Add Survey Image
-  添加探查图片…: Add survey image…
-  燕尾缺口: Swallowtail notch
-  留空 = key: Empty = key
-  种类: Kind
-  箭头颜色与搜索参数（保存到地图）: Arrow color and search parameters (saved to the map)
-  识别结果: Detection Result
-  该地域已有探查图片，不能直接删除。: This region has survey images and cannot be deleted directly.
-  请选择截图所属地域。: Pick the region this screenshot belongs to.
-  读取失败: Read failed
-  读取当前布局失败，未能定位地图区域。: Failed to read the current layout; cannot locate the map region.
-  载入截图文件…: Load screenshot file…
-  载入整张局内截图后，按当前布局标定的小地图区域裁剪，解析居中的黄色内凹箭头。0° = 正北（屏幕上方），顺时针为正。: Load an in-game screenshot, crop by the current layout's calibrated minimap region, and parse the centered concave yellow arrow. 0° = north (top of screen); clockwise positive.
-  适应窗口: Fit Window
-  选择局内截图: Select In-game Screenshot
-  选择底图: Select Base Map
-  重新识别: Re-detect
-  （尚未载入截图）: (no screenshot loaded)
-  'POI key 重复: {key}': 'Duplicate POI key: {key}'
+  HUD 场景: HUD 場景
+  HUD 场景绑定（坐标在场景编辑器里标定）: HUD 場景繫結（座標在場景編輯器裡標定）
+  '{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。': '{scene}.{point} 不在小地圖區域內，朝向識別暫用區域中心。'
+  ⚠ 缺失：{key}: ⚠ 缺失：{key}
+  不能删除: 不能刪除
+  从当前画面截取: 從當前畫面擷取
+  会同时生成 HUD 场景 map_<key>，之后在场景编辑器里标定小地图与大地图区域。: 會同時生成 HUD 場景 map_<key>，之後在場景編輯器裡標定小地圖與大地圖區域。
+  保存当前画面为探查图片: 儲存當前畫面為探查圖片
+  先登记地域: 先登記地域
+  删除地图: 刪除地圖
+  删除地图「{name}」及其底图？自动生成的 HUD 场景 map_{key} 也会一并删除。: 刪除地圖「{name}」及其底圖？自動生成的 HUD 場景 map_{key} 也會一併刪除。
+  删除选中 POI: 刪除選中 POI
+  删除选中地域: 刪除選中地域
+  只有实际补齐整张地图后才勾选；拼接成功不代表已采集整图。: 只有實際補齊整張地圖後才勾選；拼接成功不代表已採集整圖。
+  只读，请先“复制到本地”再修改: 只讀，請先“複製到本地”再修改
+  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp): 圖片檔案 (*.png *.jpg *.jpeg *.bmp *.webp)
+  在底图上点击新增 POI；点击已有标记选中它。坐标为底图归一化坐标。: 在底圖上點選新增 POI；點選已有標記選中它。座標為底圖歸一化座標。
+  地图 key: 地圖 key
+  地域与探查: 地域與探查
+  地域仍被使用: 地域仍被使用
+  地域名称: 地域名稱
+  坐标必须在 0–1 之间: 座標必須在 0–1 之間
+  基本信息: 基本資訊
+  基本信息与绑定: 基本資訊與繫結
+  复制到本地: 複製到本地
+  大地图底图: 大地圖底圖
+  大地图正北朝上: 大地圖正北朝上
+  导入底图文件…: 匯入底圖檔案…
+  导航模式: 導航模式
+  小写字母开头，字母/数字/下划线: 小寫字母開頭，字母/數字/下劃線
+  小地图朝向: 小地圖朝向
+  尖端（退化）: 尖端（退化）
+  尚未导入底图：先「标定 HUD…」标出大地图区域，再在“底图与 POI”页导入: 尚未匯入底圖：先「標定 HUD…」標出大地圖區域，再在“底圖與 POI”頁匯入
+  展示: 展示
+  底图与 POI: 底圖與 POI
+  底图区域未标定: 底圖區域未標定
+  底图可标注 POI；空白部分尚未探查。: 底圖可標註 POI；空白部分尚未探查。
+  底图已完成整图探查: 底圖已完成整圖探查
+  底图编码失败: 底圖編碼失敗
+  底图：局部探查，待补齐: 底圖：區域性探查，待補齊
+  底图：整图探查已完成: 底圖：整圖探查已完成
+  当前地图有未保存的修改，放弃吗？: 當前地圖有未儲存的修改，放棄嗎？
+  当前布局不存在，未能定位地图区域。: 當前佈局不存在，未能定位地圖區域。
+  当前布局尚未标定 {scene}.{point}，朝向识别暂用小地图区域中心。: 當前佈局尚未標定 {scene}.{point}，朝向識別暫用小地圖區域中心。
+  当前布局尚未标定 {scene}.{region}，无法裁剪地图区域。: 當前佈局尚未標定 {scene}.{region}，無法裁剪地圖區域。
+  当前无法读取布局，未能定位地图区域。: 當前無法讀取佈局，未能定位地圖區域。
+  当前未选择地图，无法解析地图区域。: 當前未選擇地圖，無法解析地圖區域。
+  截取当前画面: 擷取當前畫面
+  截图所属地域: 截圖所屬地域
+  按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。: 按遊戲區域選擇器登記地域。探查圖片與底圖分別儲存，可在底圖頁切換檢視。
+  探查: 探查
+  探查图片仅供查看: 探查圖片僅供檢視
+  探查图片缺失或无法解码: 探查圖片缺失或無法解碼
+  探查截图用于查看；POI 只在底图上编辑。: 探查截圖用於檢視；POI 只在底圖上編輯。
+  搜索窗口（相对短边）: 搜尋視窗（相對短邊）
+  新地域: 新地域
+  新建地图: 新建地圖
+  无效的 POI: 無效的 POI
+  无法获取截图: 無法獲取截圖
+  '无法解码图片: {path}': '無法解碼圖片: {path}'
+  无法读取图片: 無法讀取圖片
+  是否仍然使用整帧作为底图？: 是否仍然使用整幀作為底圖？
+  最小面积（像素）: 最小面積（畫素）
+  朝向 {deg:.1f}°　置信度 {conf:.2f}　方法：{method}　面积 {area}px: 朝向 {deg:.1f}°　置信度 {conf:.2f}　方法：{method}　面積 {area}px
+  未保存: 未儲存
+  未取得当前画面: 未取得當前畫面
+  未找到箭头：检查颜色阈值或小地图区域标定: 未找到箭頭：檢查顏色閾值或小地圖區域標定
+  来源：{layer}: 來源：{layer}
+  标定 HUD…（打开场景编辑器）: 標定 HUD…（開啟場景編輯器）
+  标识: 標識
+  没有地图。点击“新建”创建一张。: 沒有地圖。點選“新建”建立一張。
+  添加地域: 新增地域
+  添加失败: 新增失敗
+  添加探查图片: 新增探查圖片
+  添加探查图片…: 新增探查圖片…
+  燕尾缺口: 燕尾缺口
+  留空 = key: 留空 = key
+  种类: 種類
+  箭头颜色与搜索参数（保存到地图）: 箭頭顏色與搜尋引數（儲存到地圖）
+  识别结果: 識別結果
+  该地域已有探查图片，不能直接删除。: 該地域已有探查圖片，不能直接刪除。
+  请选择截图所属地域。: 請選擇截圖所屬地域。
+  读取失败: 讀取失敗
+  读取当前布局失败，未能定位地图区域。: 讀取當前佈局失敗，未能定位地圖區域。
+  载入截图文件…: 載入截圖檔案…
+  载入整张局内截图后，按当前布局标定的小地图区域裁剪，解析居中的黄色内凹箭头。0° = 正北（屏幕上方），顺时针为正。: 載入整張局內截圖後，按當前佈局標定的小地圖區域裁剪，解析居中的黃色內凹箭頭。0° = 正北（螢幕上方），順時針為正。
+  适应窗口: 適應視窗
+  选择局内截图: 選擇局內截圖
+  选择底图: 選擇底圖
+  重新识别: 重新識別
+  （尚未载入截图）: （尚未載入截圖）
+  'POI key 重复: {key}': 'POI key 重複: {key}'
 maps:
-  'POI key 重复: {key}': 'Duplicate POI key: {key}'
-  '地图 key 已存在: {key}': 'Map key already exists: {key}'
+  'POI key 重复: {key}': 'POI key 重複: {key}'
+  '地图 key 已存在: {key}': '地圖 key 已存在: {key}'
 user_avatar:
-  截图功能不可用，请先在主窗口定位窗口或连接设备: Screenshot unavailable, please position window or connect device in main window first
+  截图功能不可用，请先在主窗口定位窗口或连接设备: 截圖功能不可用，請先在主視窗定位視窗或連線裝置

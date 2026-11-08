@@ -1,120 +1,79 @@
+# user.yaml — 按模块段落组织
 common:
-  add_title: Add Sticky Note
-  btn_add: + Add Note
-  btn_close: Close
-  btn_delete: Delete
-  btn_new_user: + New User
-  cancel: Cancel
-  cannot_delete: Cannot delete this user
-  clipboard_empty: No image in clipboard
-  confirm_delete_message: "Delete user \"{name}\"?\nAssociated user data will be cleared; saved avatars remain in the avatar library. This cannot be undone."
-  confirm_delete_title: Confirm Delete
-  content_label: 'Note:'
-  current: Current
-  delete_confirm: Delete this sticky note?
-  delete_error: 'Failed to delete sticky note: {error}'
-  delete_failed: 'Could not delete saved avatar: {error}'
-  delete_history: Delete Saved Avatar
-  delete_invalid: The avatar file does not exist or has an invalid filename
-  double_click: Double-click to edit avatar
-  edit_action: Edit Avatar
-  edit_title: Edit Sticky Note
-  empty: No sticky notes yet
-  empty_crop: There is no cropped image to save
-  empty_error: Sticky note content cannot be empty
-  failure: Failed
-  hover_hint: Hover to edit, or double-click the avatar
-  image_filter: Images (*.png *.jpg *.jpeg *.webp *.bmp)
-  import: Import Image
-  import_failed: Import Failed
-  import_placeholder: Import an image or paste from the clipboard
-  import_title: Import Avatar Image
-  in_use_message: "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove the avatar for these users first."
-  in_use_title: Avatar In Use
-  input_username_prompt: 'Enter username:'
-  label_created_at: Created
-  label_current_user: Current User
-  label_username: Username
-  length_error: Sticky note content cannot exceed {limit} characters
-  library: Avatar Library
-  library_hint: Choose a saved avatar or import a new image
-  load_error: 'Failed to load sticky notes: {error}'
-  new_user_title: New User
-  no_image: No valid image was found
-  paste: Paste from Clipboard
-  paste_failed: Cannot Paste
-  paste_hint: Drag to position, use the wheel or slider to zoom · Ctrl+V to paste
-  read_failed: 'Could not read image: {error}'
-  reference_failed: Could not update the user avatar reference
-  remove: Remove Current Avatar
-  remove_failed: 'Could not remove avatar: {error}'
-  reset: Reset
-  save_error: 'Failed to save sticky note: {error}'
-  save_failed: 'Could not save avatar: {error}'
-  save_use: Save and Use
-  screenshot_hint: Get the latest screenshot from the current device or window
-  section_basic: Basic Info
-  title: Sticky Notes
-  too_large: The image is too large; choose an image under 40 megapixels
-  use_selected: Use This Avatar
-  user_created: 'User created: {name}'
-  user_deleted: 'User deleted: {name}'
-  username_exists: Username already exists
-  username_invalid: Usernames may contain Chinese characters, letters, digits, underscores and hyphens only, up to 32 characters.
-  zoom: Zoom
-  请输入用户名: Enter a username
+  cancel: cancel
+  current: current
+  empty: empty
+  paste: paste
+  remove: remove
+  reset: reset
+  title: title
+  请输入用户名: 請輸入使用者名稱
 user_avatar:
-  从剪贴板粘贴: Paste from clipboard
-  从当前设备或窗口获取最新截图: Grab the latest screenshot from the current device or window
-  使用此头像: Use This Avatar
-  保存头像失败：{error}: 'Failed to save avatar: {error}'
-  保存并使用: Save and Use
-  删除历史头像: Delete History Avatar
-  删除历史头像失败：{error}: 'Failed to delete history avatar: {error}'
-  剪贴板中没有图片: No image in the clipboard
-  双击编辑头像: Double-click to edit avatar
-  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Drag the image to position; zoom with wheel or slider · Ctrl+V to paste
-  图片尺寸过大，请选择不超过 4000 万像素的图片: Image too large; pick one no larger than 40 megapixels
-  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Image files (*.png *.jpg *.jpeg *.webp *.bmp)
-  头像库: Avatar Library
-  头像文件不存在或文件名无效: Avatar file missing or invalid file name
-  头像正在使用: Avatar in use
-  导入图片或从剪贴板粘贴: Import an image or paste from the clipboard
-  导入头像图片: Import Avatar Image
-  当前使用: Current
-  截图失败: Screenshot Failed
-  无法更新用户头像引用: Cannot update the user's avatar reference
-  无法粘贴: Cannot paste
-  无法读取图片：{error}: 'Cannot read the image: {error}'
-  没有可保存的裁剪图片: No cropped image to save
-  没有读取到有效图片: No valid image was read
-  确定永久删除这张历史头像吗？此操作无法撤销。: Permanently delete this history avatar? This cannot be undone.
-  移除头像失败：{error}: 'Failed to remove avatar: {error}'
-  移除当前头像: Remove Current Avatar
-  编辑“{name}”的头像: Edit avatar for "{name}"
-  编辑头像: Edit Avatar
-  缩放: Zoom
-  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
-  选择之前保存的头像，或导入一张新图片: Pick a previously saved avatar or import a new image
+  从剪贴板粘贴: 從剪貼簿貼上
+  从当前设备或窗口获取最新截图: 從當前裝置或視窗獲取最新截圖
+  使用此头像: 使用此頭像
+  保存头像失败：{error}: 儲存頭像失敗：{error}
+  保存并使用: 儲存並使用
+  删除历史头像: 刪除歷史頭像
+  删除历史头像失败：{error}: 刪除歷史頭像失敗：{error}
+  剪贴板中没有图片: 剪貼簿中沒有圖片
+  双击编辑头像: 雙擊編輯頭像
+  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: 可拖動圖片定位，滾輪或滑塊縮放 · Ctrl+V 貼上
+  图片尺寸过大，请选择不超过 4000 万像素的图片: 圖片尺寸過大，請選擇不超過 4000 萬畫素的圖片
+  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): 圖片檔案 (*.png *.jpg *.jpeg *.webp *.bmp)
+  头像库: 頭像庫
+  头像文件不存在或文件名无效: 頭像檔案不存在或檔名無效
+  头像正在使用: 頭像正在使用
+  导入图片或从剪贴板粘贴: 匯入圖片或從剪貼簿貼上
+  导入头像图片: 匯入頭像圖片
+  当前使用: 當前使用
+  截图失败: 截圖失敗
+  无法更新用户头像引用: 無法更新使用者頭像引用
+  无法粘贴: 無法貼上
+  无法读取图片：{error}: 無法讀取圖片：{error}
+  没有可保存的裁剪图片: 沒有可儲存的裁剪圖片
+  没有读取到有效图片: 沒有讀取到有效圖片
+  确定永久删除这张历史头像吗？此操作无法撤销。: 確定永久刪除這張歷史頭像嗎？此操作無法撤銷。
+  移除头像失败：{error}: 移除頭像失敗：{error}
+  移除当前头像: 移除當前頭像
+  编辑“{name}”的头像: 編輯“{name}”的頭像
+  编辑头像: 編輯頭像
+  缩放: 縮放
+  ? '该头像正被以下用户使用，不能删除：
+
+    {users}
+
+
+    请先为这些用户更换或移除头像。'
+  : '該頭像正被以下使用者使用，不能刪除：
+
+    {users}
+
+
+    請先為這些使用者更換或移除頭像。'
+  选择之前保存的头像，或导入一张新图片: 選擇之前儲存的頭像，或匯入一張新圖片
 user_manager:
-  保存属性: Save Attributes
-  删除属性: Delete Attributes
-  同步全部头像: Sync All Avatars
-  属性 Key 不能为空: Attribute key cannot be empty
-  属性 Key 不能重复：{key}: 'Duplicate attribute key: {key}'
-  悬浮点击编辑，或双击头像: Hover and click to edit, or double-click the avatar
-  把本机与云端的头像做一次双向合并；不参与日常自动同步: One-time two-way merge of local and cloud avatars; not part of daily auto sync
-  新增属性: Add Attribute
-  新建用户: New User
-  无法删除该用户: This user cannot be deleted
-  正在同步头像…: Syncing avatars…
-  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters.
-  用户名已存在: Username already exists
-  用户属性: User Attributes
-  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
-  ＋ 新建用户: ＋ New User
+  保存属性: 儲存屬性
+  删除属性: 刪除屬性
+  同步全部头像: 同步全部頭像
+  属性 Key 不能为空: 屬性 Key 不能為空
+  属性 Key 不能重复：{key}: 屬性 Key 不能重複：{key}
+  悬浮点击编辑，或双击头像: 懸浮點選編輯，或雙擊頭像
+  把本机与云端的头像做一次双向合并；不参与日常自动同步: 把本機與雲端的頭像做一次雙向合併；不參與日常自動同步
+  新增属性: 新增屬性
+  新建用户: 新建使用者
+  无法删除该用户: 無法刪除該使用者
+  正在同步头像…: 正在同步頭像…
+  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: 使用者名稱只能用中文、字母、數字、下劃線和連字元，最多 32 個字元。
+  用户名已存在: 使用者名稱已存在
+  用户属性: 使用者屬性
+  ? '确定要删除用户「{name}」吗？
+
+    用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。'
+  : '確定要刪除使用者「{name}」嗎？
+
+    使用者將從當前列表和批次配置中移除，關聯資料檔案會保留；以後新增同名使用者即可恢復。'
+  ＋ 新建用户: ＋ 新建使用者
 user_toolbar:
-  上一个用户: Previous User
-  下一个用户: Next User
+  上一个用户: 上一個使用者
+  下一个用户: 下一個使用者

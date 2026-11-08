@@ -1,65 +1,66 @@
+# reference.yaml — 按模块段落组织
 common:
-  分组: Group
-  数字: Number
-  文本: Text
+  分组: 分組
+  数字: 數字
+  文本: 文字
 menu_ops:
-  图库管理: Reference Manager
+  图库管理: 相簿管理
 reference:
-  '  未导入图片': '  No image imported'
-  元数据字段定义已保存: Metadata field definitions saved
-  元数据定义: Metadata Definitions
-  全部删除: Delete All
-  内置字段不可删除: Built-in fields cannot be deleted
-  内置字段，不可编辑或删除: Built-in field; cannot be edited or deleted
-  切割: Crop
-  切割结果: Crop Result
-  删除空间: Delete Space
-  删除选中的图库空间（含其全部参考图）: Delete the selected gallery space (including all its reference images)
-  匹配度阈值: Match Threshold
-  单cell尺寸: Cell Size
-  参数超出图片大小: Parameter exceeds image size
-  参考图信息: Reference Image Info
-  可筛选: Filterable
-  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
-  图片文件 (*.png *.jpg *.bmp *.webp): Image Files (*.png *.jpg *.bmp *.webp)
-  字段标识 (key): Field Identifier (key)
-  尚未切割: Not yet split
-  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
-  应用到全部: Apply to All
-  应用设置: Apply Settings
-  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
-  执行切割: Execute Split
-  批量管理: Batch Management
-  提交到图库: Submit to Gallery
-  新增参考图: Add Reference Image
-  新增字段: Add Field
-  新建图库空间: New Gallery Space
-  新建空间: New Space
-  未填写: Not Filled
-  未框选区域: No Area Selected
-  清除网格: Clear Grid
-  激活空间: Active Space
-  生成网格: Generate Grid
-  留空则不修改: Leave empty to keep unchanged
-  粘贴 (Ctrl+V): Paste (Ctrl+V)
-  系统空间：可编辑其中内容，但不能删除该空间: 'System Space: its contents can be edited, but the space itself cannot be deleted'
-  网格参数: Grid Parameters
-  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
-  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
-  请先导入图片: Please import an image first
-  请先框选区域: Please select an area first
-  请至少选择一个参考图: Please select at least one reference image
-  输入元数据（用于筛选管理）: Enter metadata (for filter management)
-  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
-  退出批量: Exit Batch
-  选择参考图片: Select Reference Image
-  "图库空间": "Gallery Space"
-  "空间名": "Space Name"
-  "宽": "Width"
-  "高": "Height"
-  "间隔": "Spacing"
-  "批量分组": "Batch Group"
-  "行": "Rows"
-  "列": "Columns"
+  '  未导入图片': '  未匯入圖片'
+  元数据字段定义已保存: 後設資料欄位定義已儲存
+  元数据定义: 後設資料定義
+  全部删除: 全部刪除
+  内置字段不可删除: 內建欄位不可刪除
+  内置字段，不可编辑或删除: 內建欄位，不可編輯或刪除
+  切割: 切割
+  切割结果: 切割結果
+  删除空间: 刪除空間
+  删除选中的图库空间（含其全部参考图）: 刪除選中的相簿空間（含其全部參考圖）
+  匹配度阈值: 匹配度閾值
+  单cell尺寸: 單cell尺寸
+  参数超出图片大小: 引數超出圖片大小
+  参考图信息: 參考圖資訊
+  可筛选: 可篩選
+  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: 影象識別的最低置信度（0~1），低於此值視為未匹配；越高越嚴格
+  图片文件 (*.png *.jpg *.bmp *.webp): 圖片檔案 (*.png *.jpg *.bmp *.webp)
+  字段标识 (key): 欄位標識 (key)
+  尚未切割: 尚未切割
+  已填写的字段将应用到所有选中项: 已填寫的欄位將應用到所有選中項
+  应用到全部: 應用到全部
+  应用设置: 應用設定
+  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: 歸一化座標 x, y, w, h（0~1），如 0, 0, 1, 0.5
+  执行切割: 執行切割
+  批量管理: 批次管理
+  提交到图库: 提交到相簿
+  新增参考图: 新增參考圖
+  新增字段: 新增欄位
+  新建图库空间: 新建相簿空間
+  新建空间: 新建空間
+  未填写: 未填寫
+  未框选区域: 未框選區域
+  清除网格: 清除網格
+  激活空间: 啟用空間
+  生成网格: 生成網格
+  留空则不修改: 留空則不修改
+  粘贴 (Ctrl+V): 貼上 (Ctrl+V)
+  系统空间：可编辑其中内容，但不能删除该空间: 系統空間：可編輯其中內容，但不能刪除該空間
+  网格参数: 網格引數
+  网格线间隔像素，用于过滤黑边: 網格線間隔畫素，用於過濾黑邊
+  裁剪区域 (x, y, w, h): 裁剪區域 (x, y, w, h)
+  请先导入图片: 請先匯入圖片
+  请先框选区域: 請先框選區域
+  请至少选择一个参考图: 請至少選擇一個參考圖
+  输入元数据（用于筛选管理）: 輸入後設資料（用於篩選管理）
+  输出元数据（识别时按区域 OCR）: 輸出後設資料（識別時按區域 OCR）
+  退出批量: 退出批次
+  选择参考图片: 選擇參考圖片
+  图库空间: 相簿空間
+  空间名: 空間名
+  宽: 寬
+  高: 高
+  间隔: 間隔
+  批量分组: 批次分組
+  行: 行
+  列: 列
 user_avatar:
-  导入图片: Import Image
+  导入图片: 匯入圖片

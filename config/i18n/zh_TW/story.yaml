@@ -1,48 +1,49 @@
+# story.yaml — 按模块段落组织
 common:
-  保存到: Saved to
-  匹配阈值: Match threshold
-  场景/任务: Scene/quest
-  已删除配置文件: Deleted config file
-  已新建配置文件: Created config file
-  文案库来源: Story library source
-  正在编辑: Editing
-  正确答案: Correct answer
-  配置文件: Config file
-  问题/旁白: Question/narration
-  阈值保存失败: Failed to save the threshold
+  保存到: 儲存到
+  匹配阈值: 匹配閾值
+  场景/任务: 場景/任務
+  已删除配置文件: 已刪除配置檔案
+  已新建配置文件: 已新建配置檔案
+  文案库来源: 文案庫來源
+  正在编辑: 正在編輯
+  正确答案: 正確答案
+  配置文件: 配置檔案
+  问题/旁白: 問題/旁白
+  阈值保存失败: 閾值儲存失敗
 story_dialog:
-  为什么选这个（可选）: Why this choice (optional)
-  删除文件: Delete File
-  删除文案: Delete Entry
-  删除这条文案？: Delete this entry?
-  删除配置文件「{name}」及其全部文案？: Delete config file "{name}" and all its entries?
-  匹配阈值已保存到: Match threshold saved to
-  如 主线-第三章-问剑: e.g. Main-Chapter 3-Sword
-  已保存到: Saved to
-  已删除: Deleted
-  搜索场景 / 选项 / 答案: Search scenes / choices / answers
-  文件名（如 主线-第三章 / 活动-夏日）：: 'File name (e.g. Main-Chapter 3 / Event-Summer):'
-  新建文案：填写选项与正确答案后保存: 'New entry: fill in the choices and the correct answer, then save'
-  新建配置文件: New Config File
-  无配置文件: No config files
-  普通用户只能保存到本地；系统为随发布内容: Regular users save locally only; system ships with releases
-  未创建: Not created
-  本地覆盖生效: Local override active
-  来自随发布的系统配置: From the bundled system config
-  正确答案必须是选项之一: The correct answer must be one of the choices
-  每行一个选项: One choice per line
-  没有可删除的配置文件: No config files to delete
-  激活时全部配置文件一起生效；这里只切换要编辑的那一个: All config files apply together when active; this only switches which one you edit
-  系统（仅开发者）: System (developers only)
-  系统（随发布）: System (bundled)
-  该文件还没有落盘，保存后创建: This file isn't on disk yet; it's created on save
-  该配置文件已存在: That config file already exists
-  请先在左侧选择要删除的文案: Select an entry on the left to delete first
-  请先新建一个配置文件: Create a config file first
-  选项和正确答案不能为空: Choices and the correct answer cannot be empty
-  选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择: If the choice-set similarity falls below this, it counts as unknown and the workflow pauses for manual selection
-  问题或旁白关键文本（可选）: Key text of the question or narration (optional)
-  ＋ 新增文案: ＋ New Entry
-  ＋ 新建: ＋ New
-  ，配置文件「: ', config file "'
-  ；系统也有副本: ; the system also has a copy
+  为什么选这个（可选）: 為什麼選這個（可選）
+  删除文件: 刪除檔案
+  删除文案: 刪除文案
+  删除这条文案？: 刪除這條文案？
+  删除配置文件「{name}」及其全部文案？: 刪除配置檔案「{name}」及其全部文案？
+  匹配阈值已保存到: 匹配閾值已儲存到
+  如 主线-第三章-问剑: 如 主線-第三章-問劍
+  已保存到: 已儲存到
+  已删除: 已刪除
+  搜索场景 / 选项 / 答案: 搜尋場景 / 選項 / 答案
+  文件名（如 主线-第三章 / 活动-夏日）：: 檔名（如 主線-第三章 / 活動-夏日）：
+  新建文案：填写选项与正确答案后保存: 新建文案：填寫選項與正確答案後儲存
+  新建配置文件: 新建配置檔案
+  无配置文件: 無配置檔案
+  普通用户只能保存到本地；系统为随发布内容: 普通使用者只能儲存到本地；系統為隨釋出內容
+  未创建: 未建立
+  本地覆盖生效: 本地覆蓋生效
+  来自随发布的系统配置: 來自隨釋出的系統配置
+  正确答案必须是选项之一: 正確答案必須是選項之一
+  每行一个选项: 每行一個選項
+  没有可删除的配置文件: 沒有可刪除的配置檔案
+  激活时全部配置文件一起生效；这里只切换要编辑的那一个: 啟用時全部配置檔案一起生效；這裡只切換要編輯的那一個
+  系统（仅开发者）: 系統（僅開發者）
+  系统（随发布）: 系統（隨釋出）
+  该文件还没有落盘，保存后创建: 該檔案還沒有落盤，儲存後建立
+  该配置文件已存在: 該配置檔案已存在
+  请先在左侧选择要删除的文案: 請先在左側選擇要刪除的文案
+  请先新建一个配置文件: 請先新建一個配置檔案
+  选项和正确答案不能为空: 選項和正確答案不能為空
+  选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择: 選項集合相似度低於該值時視為未收錄，工作流會暫停等你手動選擇
+  问题或旁白关键文本（可选）: 問題或旁白關鍵文字（可選）
+  ＋ 新增文案: ＋ 新增文案
+  ＋ 新建: ＋ 新建
+  ，配置文件「: ，配置檔案「
+  ；系统也有副本: ；系統也有副本

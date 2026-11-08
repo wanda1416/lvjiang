@@ -1,68 +1,81 @@
+# account.yaml — 按模块段落组织
 account_dialog:
-  上行: Upload
-  下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Data for the following users will follow the cloud snapshot; local data will be overwritten:'
-  下行: Download
-  云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: "The cloud baseline is empty.<br>Source: {origin}<br>Time: {created}<br>Entries: 0<br><br>Continuing will fill the baseline from this machine's current overview; local users are not backed up or replaced."
+  上行: 上行
+  下列用户的数据将以云端快照为准，本机数据会被覆盖：: 下列使用者的資料將以雲端快照為準，本機資料會被覆蓋：
+  下行: 下行
+  云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: 雲端基線是空的。<br>來源：{origin}<br>時間：{created}<br>條目：0<br><br>繼續將用本機當前總覽補上基線，不會備份或替換本地使用者。
   ? 云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。
-  : 'A cloud snapshot already exists.<br>Source: {origin}<br>Time: {created}<br>Entries: {count}{warning}<br><br>Continuing will first back up local users, overview definitions and overview data to config/session/_backup-*, then pull cloud data.'
-  修改密码: Change Password
-  修改密码…: Changing password…
-  创建快照: Create Snapshot
-  初始同步: Initial Sync
-  功能: Feature
-  在浏览器中打开注册页面: Open the registration page in a browser
-  在浏览器打开自助操作页：导出数据、清除云端数据、注销账号: 'Open the self-service page in a browser: export data, clear cloud data, delete account'
-  定义: Definitions
-  密码: Password
-  ? "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。"
-  : "This clears cloud definitions, users, documents and overview data (account and login state are kept).\nThis cannot be undone; local data is not deleted."
-  已取消覆盖：本机数据未改动，profile 同步未启用。: 'Overwrite cancelled: local data unchanged, profile sync not enabled.'
-  平台: Platform
-  当前密码: Current password
-  当前设备不是初始同步设备: This device is not the initial-sync device
-  总览: Overview
-  ? "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。"
-  : "Upload all local character data as the cloud overview baseline.\nInitial sync creates one automatically; click manually later when needed."
-  操作未完成: Operation not completed
-  数据同步: Data Sync
-  文档: Documentation
-  新密码至少 8 位: The new password must be at least 8 characters
-  新密码（至少 8 位）: New password (at least 8 characters)
-  显示密码: Show password
-  最近同步时间：{}: 'Last sync: {}'
-  最近活跃: Last active
-  未知设备: Unknown device
-  检测到云端覆盖待确认；点「立即同步」处理。: A pending cloud overwrite awaits confirmation; click "Sync now" to handle it.
-  正在修改密码…: Changing password…
-  正在刷新快照…: Refreshing snapshot…
-  正在同步…: Syncing…
-  正在备份并应用云端快照…: Backing up and applying the cloud snapshot…
-  正在清除同步…: Clearing sync…
-  正在登录…: Signing in…
-  注册: Register
-  清除同步: Clear Sync
-  登出: Sign out
+  : 雲端已有快照。<br>來源：{origin}<br>時間：{created}<br>條目：{count}{warning}<br><br>繼續將先把本地使用者、總覽定義與總覽資料備份到 config/session/_backup-*，再拉取雲端資料。
+  修改密码: 修改密碼
+  修改密码…: 修改密碼…
+  创建快照: 建立快照
+  初始同步: 初始同步
+  功能: 功能
+  在浏览器中打开注册页面: 在瀏覽器中開啟註冊頁面
+  在浏览器打开自助操作页：导出数据、清除云端数据、注销账号: 在瀏覽器開啟自助操作頁：匯出資料、清除雲端資料、登出帳號
+  定义: 定義
+  密码: 密碼
+  ? '将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。
+
+    此操作不可恢复；本地数据不会被删除。'
+  : '將清空雲端的定義、使用者、文件與總覽資料（帳號與登入態保留）。
+
+    此操作不可恢復；本地資料不會被刪除。'
+  已取消覆盖：本机数据未改动，profile 同步未启用。: 已取消覆蓋：本機資料未改動，profile 同步未啟用。
+  平台: 平台
+  当前密码: 當前密碼
+  当前设备不是初始同步设备: 當前裝置不是初始同步裝置
+  总览: 總覽
+  ? '把本机当前全部角色数据上传为云端总览基线。
+
+    初始同步会自动创建一次；之后需要时手动点。'
+  : '把本機當前全部角色資料上傳為雲端總覽基線。
+
+    初始同步會自動建立一次；之後需要時手動點。'
+  操作未完成: 操作未完成
+  数据同步: 資料同步
+  文档: 文件
+  新密码至少 8 位: 新密碼至少 8 位
+  新密码（至少 8 位）: 新密碼（至少 8 位）
+  显示密码: 顯示密碼
+  最近同步时间：{}: 最近同步時間：{}
+  最近活跃: 最近活躍
+  未知设备: 未知裝置
+  检测到云端覆盖待确认；点「立即同步」处理。: 檢測到雲端覆蓋待確認；點「立即同步」處理。
+  正在修改密码…: 正在修改密碼…
+  正在刷新快照…: 正在重新整理快照…
+  正在同步…: 正在同步…
+  正在备份并应用云端快照…: 正在備份並應用雲端快照…
+  正在清除同步…: 正在清除同步…
+  正在登录…: 正在登入…
+  注册: 註冊
+  清除同步: 清除同步
+  登出: 登出
   登录: 登入
-  登录后可同步角色名册、文档与总览数据: Sign in to sync rosters, documents and overview data
-  确定让该设备下线？该设备上的全部会话会立即失效。: Take this device offline? All sessions on it will be invalidated immediately.
-  确认后会先把本机 profile 数据备份到 config/session/_sync-backup-<时间戳>/，再应用云端快照；可在该目录恢复。: After confirmation, local profile data is backed up to config/session/_sync-backup-<timestamp>/ before applying the cloud snapshot; you can restore from that directory.
-  立即同步: Sync Now
-  自助服务…: Self-service…
-  设备登出: Sign out device
-  设备管理: Device Management
-  请先点「初始同步」建立同步状态: Click "Initial Sync" first to establish sync state
-  请输入密码: Enter your password
-  请输入账户: Enter your account
-  读取本机总览失败：{error}: 'Failed to read the local overview: {error}'
-  账户: Account
-  这是本机：下线后需要重新登录。: "This is the local machine: you'll need to sign in again after signing it out."
-  进度: Progress
-  退出所有设备: Sign out all devices
-  退出登录: Sign out
-  通道: Channel
-  隐藏密码: Hide password
-  ? "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"
-  : "First time: establish sync state between this machine and the cloud. If the cloud already has data, local\nusers, overview definitions and overview data are backed up to config/session/_backup-* before pulling."
-  ；等 {} 项: ; {} more items
+  登录后可同步角色名册、文档与总览数据: 登入後可同步角色名冊、文件與總覽資料
+  确定让该设备下线？该设备上的全部会话会立即失效。: 確定讓該裝置下線？該裝置上的全部會話會立即失效。
+  确认后会先把本机 profile 数据备份到 config/session/_sync-backup-<时间戳>/，再应用云端快照；可在该目录恢复。: 確認後會先把本機 profile 資料備份到 config/session/_sync-backup-<時間戳>/，再應用雲端快照；可在該目錄恢復。
+  立即同步: 立即同步
+  自助服务…: 自助服務…
+  设备登出: 裝置登出
+  设备管理: 裝置管理
+  请先点「初始同步」建立同步状态: 請先點「初始同步」建立同步狀態
+  请输入密码: 請輸入密碼
+  请输入账户: 請輸入帳戶
+  读取本机总览失败：{error}: 讀取本機總覽失敗：{error}
+  账户: 帳戶
+  这是本机：下线后需要重新登录。: 這是本機：下線後需要重新登入。
+  进度: 進度
+  退出所有设备: 退出所有裝置
+  退出登录: 退出登入
+  通道: 通道
+  隐藏密码: 隱藏密碼
+  ? '首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地
+
+    用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。'
+  : '首次使用：建立本機與雲端的同步狀態。雲端已有資料時，會先把本地
+
+    使用者、總覽定義與總覽資料備份到 config/session/_backup-* 再拉取雲端。'
+  ；等 {} 项: ；等 {} 項
 common:
-  用户: 用戶
+  用户: 使用者

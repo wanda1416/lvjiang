@@ -72,6 +72,32 @@ def test_decode_failure_does_not_declare_fault():
     assert cap.last_fault == ""
 
 
+def test_frame_to_bgr_converts_real_frame():
+    """真实事故回归：_frame_to_bgr 丢 self 导致解码线程启动即崩，
+    首帧永远不出、连接必然失败。用真实 av 帧走一遍转换路径。"""
+    import av
+
+    cap = _stream()
+    frame = av.VideoFrame(4, 4, format="yuv420p")
+    bgr = cap._frame_to_bgr(frame)
+    assert bgr.shape == (4, 4, 3)
+    assert bgr.dtype == np.uint8
+
+
+def test_decode_loop_crash_is_recorded_not_silent():
+    """解码线程崩溃必须记录 _decode_thread_error，
+    让 start() 首帧等待报真实原因而不是误导性的息屏提示。"""
+    cap = _stream()
+
+    def _boom(*_a):
+        raise TypeError("_frame_to_bgr() takes 1 positional argument but 2 were given")
+
+    cap._decode_loop_inner = _boom
+    cap._decode_loop()
+    assert cap._decode_thread_error is not None
+    assert "TypeError" in cap._decode_thread_error
+
+
 def test_capture_blocking_never_returns_stale_frame_on_fault():
     cap = _stream(alive=False)
     cap._latest_frame = np.zeros((2, 2, 3), dtype=np.uint8)

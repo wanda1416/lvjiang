@@ -145,6 +145,7 @@ class AndroidStreamCapture(CaptureBackend):
         self._last_frame_at = 0.0
         self._decode_errors = 0
         self._consecutive_decode_errors = 0
+        self._decode_thread_error: str | None = None
         self._fault = ""
         self._fault_detail = ""
         self._fault_notified = False
@@ -324,6 +325,7 @@ class AndroidStreamCapture(CaptureBackend):
             self._fault_detail = ""
             self._fault_notified = False
             self._consecutive_decode_errors = 0
+            self._decode_thread_error = None
             self._ready_event.clear()
             self._transitioning = True
             self._pending_session = True
@@ -366,8 +368,14 @@ class AndroidStreamCapture(CaptureBackend):
                 return False
 
             # 5. 读协议头（device meta + codec id + session packet）
-            # server 可能还没完全就绪，给 3 次重试机会
-            for attempt in range(3):
+            # scrcpy server 启动/初始化可能需要数秒（jar 推送、app_process
+            # 拉起、编码器初始化），此前"3 次共 1.3 秒"的重试常常在 server
+            # 就绪前就放弃。这里改为截止时间内的持续重连等待；dummy byte
+            # 读不到只说明 server 还没准备好，不算通道异常。
+            header_deadline = time.monotonic() + 10.0
+            attempt = 0
+            while True:
+                attempt += 1
                 try:
                     header_ok = self._read_protocol_header()
                 except ScrcpyProtocolError as exc:
@@ -381,23 +389,26 @@ class AndroidStreamCapture(CaptureBackend):
                     return False
                 if header_ok:
                     break
-                if attempt < 2:
-                    logger.debug(f"[AndroidStream] 协议头读取失败，重试 ({attempt + 1}/3)")
-                    # 关闭当前 socket，等待后重连
-                    if self._sock:
-                        try:
-                            self._sock.close()
-                        except Exception:
-                            pass
-                        self._sock = None
-                    time.sleep(0.5)
-                    if not self._connect_socket():
-                        self.stop()
-                        return False
-            else:
-                self._fail(tr("3 次尝试均无法读取视频流协议头（scrcpy server 未就绪或版本不符）"))
-                self.stop()
-                return False
+                if time.monotonic() >= header_deadline:
+                    self._fail(tr(
+                        "等待 {seconds} 秒仍无法读取视频流协议头"
+                        "（scrcpy server 启动失败或版本不符）").format(seconds=10))
+                    self.stop()
+                    return False
+                logger.debug(
+                    f"[AndroidStream] 协议头读取失败，server 未就绪，"
+                    f"继续等待（第 {attempt} 次）")
+                # 关闭当前 socket，等待后重连
+                if self._sock:
+                    try:
+                        self._sock.close()
+                    except Exception:
+                        pass
+                    self._sock = None
+                time.sleep(0.5)
+                if not self._connect_socket():
+                    self.stop()
+                    return False
 
             # 6. 启动解码线程
             with self._decoder_lock:
@@ -409,17 +420,23 @@ class AndroidStreamCapture(CaptureBackend):
             self._last_rx_at = time.monotonic()
             self._last_frame_at = time.monotonic()
 
-            # 7. 等待首帧
+            # 7. 等待首帧（解码线程若已崩溃则立即失败，报真实原因）
             deadline = time.monotonic() + 5.0
             while not self._ready_event.is_set() and time.monotonic() < deadline:
                 if not self._running:
                     break
+                if self._decode_thread is not None and not self._decode_thread.is_alive():
+                    break
                 time.sleep(0.05)
 
             if self._latest_frame is None:
-                self._fail(tr(
-                    "5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；"
-                    "请点亮屏幕后重试"))
+                if self._decode_thread_error:
+                    self._fail(tr(
+                        "解码线程异常退出：{error}").format(error=self._decode_thread_error))
+                else:
+                    self._fail(tr(
+                        "5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；"
+                        "请点亮屏幕后重试"))
                 self.stop()
                 return False
 
@@ -779,6 +796,18 @@ class AndroidStreamCapture(CaptureBackend):
         last_frame_time = 0.0
         buf = b""
 
+        try:
+            self._decode_loop_inner(frame_interval, last_frame_time, buf)
+        except Exception as e:  # noqa: BLE001
+            # 线程级致命错误（如转换函数签名/依赖问题）：记录真实原因，
+            # 让 start() 的首帧等待立即失败并报出它，而不是落到"息屏"误导提示
+            if not self._user_stop:
+                logger.error(
+                    f"[AndroidStream] 解码线程崩溃: {type(e).__name__}: {e}",
+                    exc_info=True)
+                self._decode_thread_error = f"{type(e).__name__}: {e}"
+
+    def _decode_loop_inner(self, frame_interval: float, last_frame_time: float, buf: bytes) -> None:
         while self._running:
             if self._sock is None:
                 break
@@ -914,7 +943,7 @@ class AndroidStreamCapture(CaptureBackend):
         self._decode_errors += 1
         self._consecutive_decode_errors += 1
 
-    def _frame_to_bgr(frame) -> np.ndarray:
+    def _frame_to_bgr(self, frame) -> np.ndarray:
         """将 PyAV VideoFrame 转换为 BGR numpy 数组
 
         注意：reformat / to_ndarray 期间必须保持 frame 引用，

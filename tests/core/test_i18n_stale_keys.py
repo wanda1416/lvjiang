@@ -1,4 +1,4 @@
-"""en_US 词表卫生：不允许存在源码里已经不存在的 CJK 死键。
+"""词表卫生：不允许存在源码里已经不存在的 CJK 死键，也不允许它们再增长。
 
 判定规则：只标记**含 CJK 字符**的键——这些才是 tr() 实际查找的中文原文。
 纯 ASCII/标识符键（如 btn_add、profile_core_001）是旧 section 结构的
@@ -6,6 +6,11 @@
 
 真实事故：Profile 模块迁移后主表残留 168 条 profile_core_XXX 枚举键，
 "en 比 zh 还多 26 条"——看起来翻译过、实际全是死键。
+
+范围：核心层按全段落硬性归零（2026-11-08 清掉 486 条标识符自映射与 5 条
+重构后残留的 Android 采集文案）；插件层还有 252/231 条 CJK 存量——其中大半
+是自动抽取遗留的伪键（用下划线拼接整句），其余可能是远端游戏配置才驱动的
+术语，删除前要确认来源，所以先用棘轮锁住只许下降。
 """
 from __future__ import annotations
 
@@ -19,9 +24,16 @@ from lvjiang.i18n import available_languages
 
 ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = ROOT / "config" / "i18n"
+APPS_DIR = I18N_DIR / "apps" / "yysls"
 
-#: 已人工确认要保留的例外（当前为空；加入时必须写明原因）
-ALLOWED_STALE: set[str] = set()
+#: 已人工确认要保留的例外（加入时必须写明原因）
+ALLOWED_STALE: set[str] = {
+    # 配置分组名：由 config 下发，源码里没有字面量，运行时 tr(分组名)
+    "general",
+}
+
+#: 插件层仍未被源码字面量引用的 CJK 存量（2026-11-08 排查值），只许下降。
+MAX_APP_STALE_CJK = {"zh_CN": 252, "en_US": 231}
 
 _HAS_CJK = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
 
@@ -39,31 +51,54 @@ def _literal_pool() -> set[str]:
     return pool
 
 
-def _iter_auto_strings_tables() -> list[Path]:
-    files = [I18N_DIR / "en_US.yaml", I18N_DIR / "zh_CN.yaml"]
-    for lang_dir in (I18N_DIR / "en_US", I18N_DIR / "zh_CN"):
-        if lang_dir.is_dir():
-            files.extend(sorted(lang_dir.glob("*.yaml")))
-    return files
+def _stale_cjk_keys(path: Path, pool: set[str]) -> set[str]:
+    """该词表文件全部段落里，源码已无对应文案的 CJK 键。"""
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return {key for key in _leaf_keys(data)
+            if _HAS_CJK.search(key) and key not in pool and key not in ALLOWED_STALE}
 
 
-def test_en_us_has_no_stale_cjk_keys() -> None:
+def _leaf_keys(node: object) -> set[str]:
+    if not isinstance(node, dict):
+        return set()
+    keys: set[str] = set()
+    for key, value in node.items():
+        if isinstance(value, dict):
+            keys |= _leaf_keys(value)
+        else:
+            keys.add(str(key))
+    return keys
+
+
+def test_core_tables_have_no_stale_cjk_keys() -> None:
+    """核心层每个段落（不只 auto_strings）都不允许残留 CJK 死键。
+
+    只查 auto_strings 等于给命名段落开后门：词表拆成 settings_dialog/
+    scene_editor 等段落后，旧用例对核心层已完全空转（2026-11-08 发现并修正）。
+    """
     pool = _literal_pool()
     stale: dict[str, list[str]] = {}
-    for path in _iter_auto_strings_tables():
-        table = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get(
-            "auto_strings") or {}
-        for key in table:
-            k = str(key)
-            if not _HAS_CJK.search(k):
-                continue
-            if k in pool or k in ALLOWED_STALE:
-                continue
-            stale.setdefault(k, []).append(str(path.relative_to(ROOT)))
+    for code in ("zh_CN", "en_US"):
+        for path in sorted((I18N_DIR / code).glob("*.yaml")):
+            for key in _stale_cjk_keys(path, pool):
+                stale.setdefault(key, []).append(str(path.relative_to(ROOT)))
     assert not stale, (
-        f"词表存在 {len(stale)} 条 CJK 死键（源码已无此中文文案）。"
+        f"核心词表存在 {len(stale)} 条 CJK 死键（源码已无此中文文案）。"
         f"删除它们而不是继续翻译：{sorted(stale)[:20]}"
     )
+
+
+def test_app_tables_stale_cjk_do_not_grow() -> None:
+    """插件层 CJK 死键只许减少：棘轮锁住 2026-11-08 的存量。"""
+    pool = _literal_pool()
+    grown = {}
+    for code, limit in MAX_APP_STALE_CJK.items():
+        count = len(_stale_cjk_keys(APPS_DIR / f"{code}.yaml", pool))
+        if count > limit:
+            grown[code] = f"{count} > {limit}"
+    assert not grown, (
+        f"插件层 CJK 死键上涨 {grown}——新增文案请先写进源码再翻译，"
+        f"不要让词表自己长出键。修复存量后同步下调 MAX_APP_STALE_CJK。")
 
 
 def _leaf_paths(data: object, trail: tuple[str, ...] = ()) -> set[tuple[str, ...]]:

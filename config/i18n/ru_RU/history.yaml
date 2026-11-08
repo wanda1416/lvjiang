@@ -7,40 +7,16 @@ batch:
   重命名配置: Rename Configuration
   随机打乱顺序: Shuffle Order
 common:
-  'True': 'True'
-  batch_history: Batch History
-  batch_report: Batch Report
-  batch_run: Batch Run
   batch_run_id: Batch Run ID
-  clear_batch: Back to All Tasks
-  clear_selection: Clear
-  clear_tasks_tooltip: Clear selection and use all tasks
-  clear_users_tooltip: Clear selection and use all users
-  current_batch: 'Showing batch run: '
   duration: Duration
-  file_missing: File Not Found
-  filters: User and task filters (multi-select; no selection means all)
   finished_at: End Time
-  invalid_date_order: Start date cannot be later than end date
-  invalid_date_range: Invalid Date Range
-  missing_path: The corresponding file is missing or has been moved
-  no_batches: No matching batch history
-  no_tasks: No matching task history
-  open_batch_report: Open Batch Report
-  open_log: Open Execution Log
-  open_result: Open Execution Result
-  query: Search
   scope: Scope
-  select_batch: Select a batch run to view its input snapshot
-  select_task: Select a task run to view its input parameters and file paths
-  single_run: Single Run
   source: Source
   task: Task
   task_count: Tasks
   task_run_id: Task Run ID
   title: Task History
   unavailable: Task history is temporarily unavailable
-  view_tasks: View All Tasks
   参数: Parameters
   当前批次: Current batch
   执行目标: Execution Target

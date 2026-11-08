@@ -1,67 +1,11 @@
 common:
-  add_title: Add Sticky Note
-  btn_add: + Add Note
-  btn_close: Close
-  btn_delete: Delete
-  btn_new_user: + New User
   cancel: Cancel
-  cannot_delete: Cannot delete this user
-  clipboard_empty: No image in clipboard
-  confirm_delete_message: "Delete user \"{name}\"?\nAssociated user data will be cleared; saved avatars remain in the avatar library. This cannot be undone."
-  confirm_delete_title: Confirm Delete
-  content_label: 'Note:'
   current: Current
-  delete_confirm: Delete this sticky note?
-  delete_error: 'Failed to delete sticky note: {error}'
-  delete_failed: 'Could not delete saved avatar: {error}'
-  delete_history: Delete Saved Avatar
-  delete_invalid: The avatar file does not exist or has an invalid filename
-  double_click: Double-click to edit avatar
-  edit_action: Edit Avatar
-  edit_title: Edit Sticky Note
   empty: No sticky notes yet
-  empty_crop: There is no cropped image to save
-  empty_error: Sticky note content cannot be empty
-  failure: Failed
-  hover_hint: Hover to edit, or double-click the avatar
-  image_filter: Images (*.png *.jpg *.jpeg *.webp *.bmp)
-  import: Import Image
-  import_failed: Import Failed
-  import_placeholder: Import an image or paste from the clipboard
-  import_title: Import Avatar Image
-  in_use_message: "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove the avatar for these users first."
-  in_use_title: Avatar In Use
-  input_username_prompt: 'Enter username:'
-  label_created_at: Created
-  label_current_user: Current User
-  label_username: Username
-  length_error: Sticky note content cannot exceed {limit} characters
-  library: Avatar Library
-  library_hint: Choose a saved avatar or import a new image
-  load_error: 'Failed to load sticky notes: {error}'
-  new_user_title: New User
-  no_image: No valid image was found
   paste: Paste from Clipboard
-  paste_failed: Cannot Paste
-  paste_hint: Drag to position, use the wheel or slider to zoom · Ctrl+V to paste
-  read_failed: 'Could not read image: {error}'
-  reference_failed: Could not update the user avatar reference
   remove: Remove Current Avatar
-  remove_failed: 'Could not remove avatar: {error}'
   reset: Reset
-  save_error: 'Failed to save sticky note: {error}'
-  save_failed: 'Could not save avatar: {error}'
-  save_use: Save and Use
-  screenshot_hint: Get the latest screenshot from the current device or window
-  section_basic: Basic Info
   title: Sticky Notes
-  too_large: The image is too large; choose an image under 40 megapixels
-  use_selected: Use This Avatar
-  user_created: 'User created: {name}'
-  user_deleted: 'User deleted: {name}'
-  username_exists: Username already exists
-  username_invalid: Usernames may contain Chinese characters, letters, digits, underscores and hyphens only, up to 32 characters.
-  zoom: Zoom
   请输入用户名: Enter a username
 user_avatar:
   从剪贴板粘贴: Paste from clipboard

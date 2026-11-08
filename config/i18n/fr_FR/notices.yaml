@@ -1,59 +1,15 @@
 action_catalog:
   通知: Notify
 common:
-  app_desc: Universal Visual RPA Engine
-  app_name: LvJiang
-  btn_check_update: Check for Updates
-  btn_close: Close
-  btn_continue: Dismiss
-  btn_details: Reporting Guide
-  btn_download: Download this version
-  btn_group: Join Group
-  btn_issue: Report on GitHub
-  btn_refresh_qr: Refresh QR Code
-  btn_release_notes: View release notes
-  cached_error: 'Refresh failed; showing cached announcements: {error}'
-  check_failed: Update check failed
   checking: Checking...
-  chk_skip: Don't remind me about this version
   close: Close
-  current_version: Current version
-  details: View Details
   empty: No announcements
-  fetch_failed: 'Failed to fetch announcements: {error}'
-  fetching: Fetching...
-  fetching_notice: Fetching announcements...
-  group_hint: Please use the community group for general usage discussion and questions
-  heading: Prepare complete diagnostic information before reporting an issue
-  latest_version: Latest version
-  level_critical: Critical
-  level_info: Notice
-  level_warning: Warning
-  no_cache: No announcements have been fetched. Click Refresh to sync.
-  no_release_notes: No detailed release notes are available for this release.
   notice_version: Announcement version {version}
-  privacy: Redact account details, character names, ADB serial numbers, tokens, and other private information before submitting logs or screenshots.
   published_at: Published on {date}
-  qr_failed: Failed to load the community group QR code
-  qr_refresh_done: QR code updated
-  qr_refresh_failed: 'Refresh failed, kept the current QR code: {error}'
-  qr_refresh_pending: Fetching the latest QR code...
   refresh: Refresh
-  refreshing_qr: Refreshing...
-  required_backend: Capture method, input method, workflow name, and all parameters
-  required_environment: Runtime environment, layout, device resolution, and orientation
-  required_evidence: Continuous logs around the failure; screenshots or video for recognition and input issues
-  required_reproduction: Reproduction steps, expected and actual results, and frequency
-  required_title: Bug reports must include at least
-  required_version: LvJiang version; source builds must also include the commit hash
-  scope_accepted: 'Accepted: reproducible bugs, feature requests, and outdated or unusable documentation.'
-  scope_rejected: 'Not accepted: one-to-one tutorials, remote setup, incomplete reports, explicitly unsupported features, third-party modifications, or commercial use.'
-  scope_title: Support scope
   summary: Only reports with enough information to reproduce or diagnose the problem enter developer triage; acceptance does not promise a fix date.
   title: Announcements
   updated_at: Updated {date}
-  version_prefix: Version
-  workflow_desc: Window capture → Region annotation → OCR → Workflow execution
 menu_ops:
   检查更新: Check for Updates
   检查更新失败: Update check failed

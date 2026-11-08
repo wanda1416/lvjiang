@@ -104,26 +104,21 @@ scene_editor:
   "布局名称不能为空": "Layout name cannot be empty"
   "通过": "Passed"
 scrcpy_capture:
-  "3 次尝试均无法读取视频流协议头（scrcpy server 未就绪或版本不符）": "Failed to read the video stream header after 3 attempts (scrcpy server not ready or version mismatch)"
   "5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试": "No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry"
   "scrcpy server 启动失败（返回码 {rc}）：{detail}": "scrcpy server failed to start (exit code {rc}): {detail}"
   "scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}": "scrcpy protocol version changed unexpectedly: client implements {version}; {detail}"
-  "亮屏但 {n:.0f} 秒没有收到任何画面数据（连接无响应或画面采集已停摆）": "Screen is on but no stream data for {n:.0f} s (connection not responding or capture has stalled)"
-  "亮屏但 {n:.0f} 秒没有新画面": "Screen is on but no new frames for {n:.0f} s"
   "启动 scrcpy server 失败：{error}": "Failed to start the scrcpy server: {error}"
   "启动视频流失败：{error}": "Failed to start the video stream: {error}"
   "找不到 scrcpy-server.jar：{path}": "scrcpy-server.jar not found: {path}"
   "推送 scrcpy-server.jar 失败：{detail}": "Failed to push scrcpy-server.jar: {detail}"
   "无法建立 scrcpy 视频端口转发": "Could not set up the scrcpy video port forward"
   "未安装 PyAV，无法解码视频流（请安装 av 依赖）": "PyAV is not installed; the video stream cannot be decoded (install the av dependency)"
-  "画面尺寸切换后超过 {n:.0f} 秒仍未恢复": "Not recovered within {n:.0f} s after a screen size switch"
   "画面流不可用": "The screen stream is unavailable"
   "等待新画面超时": "Timed out waiting for a new frame"
   "视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）": "The video stream connection was closed by the peer (scrcpy session ended or cleaned up by another program)"
   "视频流连接被中断：{error}": "The video stream connection was interrupted: {error}"
   "读取视频流异常：{error}": "Error while reading the video stream: {error}"
   "连接 scrcpy 视频端口超时（端口 {port}）": "Timed out connecting to the scrcpy video port ({port})"
-  "连续 {n} 个视频包无法解码": "{n} consecutive video packets could not be decoded"
   "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "Still no video stream header after {seconds} s (scrcpy server failed to start or version mismatch)"
   "解码线程异常退出：{error}": "Decode thread exited unexpectedly: {error}"
 scripts:
@@ -140,14 +135,11 @@ wgc_capture:
 workflows_common:
   "pixel_ratios: rules 必须是非空字典": "pixel_ratios: rules must be a non-empty mapping"
 android:
-  3 次尝试均无法读取视频流协议头（scrcpy server 未就绪或版本不符）: "Failed to read the video stream header after 3 attempts (scrcpy server not ready or version mismatch)"
   5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: "No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry"
   scrcpy server 启动失败（返回码 {rc}）：{detail}: "scrcpy server failed to start (exit code {rc}): {detail}"
   scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: "scrcpy protocol version changed unexpectedly: client implements {version}; {detail}"
   下载 {url} 失败：{err}: "Failed to download {url}: {err}"
   下载已取消: "Download cancelled"
-  亮屏但 {n:.0f} 秒没有收到任何画面数据（连接无响应或画面采集已停摆）: "Screen is on but no stream data for {n:.0f} s (connection not responding or capture has stalled)"
-  亮屏但 {n:.0f} 秒没有新画面: "Screen is on but no new frames for {n:.0f} s"
 desktop:
   DesktopCapture 已停止: "DesktopCapture stopped"
 ondevice:

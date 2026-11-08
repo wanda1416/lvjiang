@@ -627,7 +627,6 @@ yysls:
   请先选择用户: 请先选择用户
   Key_{key}_已存在: Key '{key}' 已存在
   Key_只能包含字母_数字和下划线: Key 只能包含字母、数字和下划线
-  '{title}_Key_{model}': '{title} Key ({model})'
   上限: 上限
   上限_1: '上限:'
   不提醒: 不提醒
@@ -713,14 +712,6 @@ yysls:
   未选择用户: 未选择用户
   所选用户没有冷却装备: 所选用户没有冷却装备
   '{shown} / {total} 件': '{shown} / {total} 件'
-config:
-  wf_scan_equipped: Equipment Analysis
-  wf_scan_unequipped: Full Equipment Scan
-  wf_purchase_xinfa: Auto Purchase Xinfa
-  wf_purchase_bugan: Auto Purchase Bugan
-  wf_daily_jianghu: Daily Jianghu Order
-  wf_daily_checkin: Daily Check-in
-  wf_gather_zhayu: Taiji Fish Bombing
 auto_strings:
   '   - 词条未记录': '   - 词条未记录'
   ' 等+': ' 等+'
@@ -1860,7 +1851,6 @@ auto_strings:
   '{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条': '{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条'
   '{school}  ·  {scheme}  ·  {level}级  ·  v{version}  ·  {plan}': '{school}  ·  {scheme}  ·  {level}级  ·  v{version}  ·  {plan}'
   '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值': '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值'
-  '{notes}': '{notes}'
   '{shown} / {total} 件': '{shown} / {total} 件'
   '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}'
   '{source} 的 kind 必须是字符串': '{source} 的 kind 必须是字符串'

@@ -30,64 +30,11 @@ ai_settings:
   配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。: Configure an OpenAI-compatible API for upcoming AI features. The connection test sends a short request to the selected model and may cost a little.
 common:
   Activity: Activity
-  adb_capture_label: 'ADB Capture Mode:'
-  adb_capture_scrcpy: Streaming (scrcpy)
-  adb_capture_screencap: Static (screencap)
-  adb_input_agent: On-device execution (Lvjiang app accessibility)
-  adb_input_label: 'ADB Input Mode:'
-  adb_input_shell: adb shell input
-  adb_input_tip: With the Lvjiang app installed and accessibility enabled, taps/drags/screenshots are performed by the app; falls back to adb when unreachable
   ai: AI Settings
-  btn_close: Close
   btn_save: Save
   execution: Execution Parameters
-  font_scope_tip: Only changes content below the refresh toolbar in User Overview and User Info, including table headers. The top toolbar and bottom Data Model button remain unchanged.
   general: General Settings
-  input_mode_label: 'Window Input Mode:'
-  input_postmessage: Background (PostMessage)
-  input_sendinput: Foreground (SendInput)
-  language_label: Interface Language
-  status_saved: Settings saved
-  tab_basic: Basic
-  tab_fonts: Font Settings
-  tab_input: Input Simulation
-  tab_wait: Wait Parameters
-  text_0: Fetch Models
-  text_1: Cancel Request
-  text_10: Save failed. Check configuration directory permissions.
-  text_11: AI configuration saved
-  text_12: Testing connection…
-  text_13: 'Connection available: the model returned text ({seconds} seconds)'
-  text_14: Connection test cancelled
-  text_15: Connection test failed. Check connection settings.
-  text_16: Invalid API address
-  text_17: Enter a complete HTTP/HTTPS base URL without credentials, query parameters, or fragments.
-  text_18: Enter a model name
-  text_19: Request timeout must be between 1 and 300 seconds
-  text_2: AI request cancelled
-  text_20: Request timed out. Check the network or increase the timeout.
-  text_21: Connection failed. Check the API address, network, and certificate.
-  text_22: Authentication failed. Check the API key and model access permissions.
-  text_23: API endpoint or model not found. Check the base URL and model name.
-  text_24: Rate limit or insufficient quota. Check your provider account.
-  text_25: The model refused the request
-  text_26: The model response was truncated
-  text_27: No valid text response. Check that the service supports Chat Completions.
-  text_28: System credential store unavailable. You can enter a key temporarily for testing; enable the credential store to save it.
-  text_29: Cannot read system credentials. Check that the credential store is unlocked.
-  text_3: AI request failed. Check connection settings.
-  text_30: Cannot update system credentials. Connection settings were not saved.
-  text_4: Fetching model list…
-  text_5: Fetched {count} models. Select a model and test the connection.
-  text_6: The model list is empty. Enter a model name manually and test the connection.
-  text_7: No valid model list was returned. Enter a model name manually and test the connection.
-  text_8: Test Connection
-  text_9: Cancel Test
   title: Settings
-  user_info_font_size: User Info Font Size
-  user_overview_font_size: User Overview Font Size
-  window_title_label: 'Default Window Title:'
-  window_title_placeholder: Empty = no auto-locate
   包名: Package name
   可执行文件: Executable
   安卓截图: Android capture

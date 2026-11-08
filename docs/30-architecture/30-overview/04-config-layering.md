@@ -177,6 +177,7 @@ system 层扫出的空间即**系统空间**（`is_system_space()`）：用户�
 | 文件 | 路径 | 声明方 |
 |------|------|--------|
 | `scenes.yaml` | `scenes.*.items` / `scenes.*.disabled` | core（`resolver.py` 常量表） |
+| `app.yaml` | `envs` / `plans`（按身份对齐，见下） | core（`resolver.py` 常量表） |
 | `yysls/tune_config.yaml` | `base_rules`（仅为兼容旧 local diff 保留，现已无此键） | 插件（`apps/yysls/config/merge_policy.py`） |
 
 local 形如：
@@ -192,6 +193,31 @@ scenes:
 
 读取时 `system 基底 − __removed__ + __added__`，再按 `__order__` 排序；
 `__order__` 未提到的条目（系统新增的）排末尾并保持 system 相对顺序。
+
+#### 带身份的注册表 → 按条目身份对齐（`REGISTRY_LIST_IDENTITY`）
+
+上面按**整条值**比较。`envs` / `plans` 的条目是 `{key, name}`、`{id, name, …}`
+这样的映射，改一个显示名就变成「删一条 + 加一条」，被改的条目合并时挪到末尾，
+于是只能退化成写整张 `__order__`，local 还是冻住了整张表。
+
+在 `REGISTRY_LIST_IDENTITY` 里声明身份字段（`envs` → `key`，`plans` → `id`）
+后改按身份对齐：
+
+- 同身份条目在 `__added__` 里**原位替换**，新条目追加；
+- **永不产生 `__removed__`**——随包分发的预置环境/方案在用户层不可删除，保存时
+  缺失的系统条目按原位补回（与受保护列表同一产品约定：系统内容只可改值与新增）；
+- 于是 local 只记用户真正动过的条目，系统后续新增的环境/方案照常进合并视图。
+
+```yaml
+# 用户只改了 android 的显示名
+envs:
+  __added__:
+  - key: android
+    name: {zh_CN: 安卓手机, en_US: Android}
+```
+
+存量 local 若还是整张普通列表，读取时仍整键替换；用户下次保存由
+`compute_diff` 自动转成增量形式，不需要迁移脚本。
 
 调律规则与基础规则组**不再有登记表**：存在性由 `yysls/tuning_rules/`、
 `yysls/base_groups/` 目录决定，顺序由各文件的 `order`（升序、同序按 key，

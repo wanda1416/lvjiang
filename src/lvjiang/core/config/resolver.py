@@ -138,6 +138,24 @@ REGISTRY_LIST_PATHS: dict[str, tuple[str, ...]] = {
     # v1 路径保留给通用 resolver 的存量兼容；v2 的专用跨 schema 合并见
     # core.scene_config（必须先分别转换 system/local，不能直接混合结构）。
     "scenes.yaml": ("scenes.*.items", "scenes.*.disabled"),
+    # 环境与方案都是带稳定 key 的登记表：local 存整张表会把系统后续新增的
+    # 环境/方案挡在合并视图之外。按身份对齐见 REGISTRY_LIST_IDENTITY。
+    "app.yaml": ("envs", "plans"),
+}
+
+
+#: 注册表列表的「条目身份」：``{文件: {点分路径: 身份字段}}``。
+#:
+#: 未声明的注册表列表按**整条值**比较：改一个字段就变成「删一条 + 加一条」，
+#: 合并时被改的条目会被挪到末尾，``diff_registry_list`` 便只能退化成写整张
+#: ``__order__``，local 又冻住了整张表。
+#:
+#: 声明身份后按身份对齐：同身份条目在 ``__added__`` 里**原位替换**，新条目追加。
+#: 并且这类列表**永不产生 __removed__**——随包分发的预置条目在用户层不允许
+#: 删除，保存时缺失的系统条目也会按原位补回（与 PROTECTED_LIST_PATHS 同一
+#: 产品约定：系统内容只可改值与新增，不可删除）。
+REGISTRY_LIST_IDENTITY: dict[str, dict[str, str]] = {
+    "app.yaml": {"envs": "key", "plans": "id"},
 }
 
 
@@ -228,36 +246,90 @@ def _path_matches(path: str, patterns: tuple[str, ...]) -> bool:
     return False
 
 
-def merge_registry_list(base_list: list, overlay: dict) -> list:
+def merge_registry_list(base_list: list, overlay: dict,
+                        identity_field: str | None = None) -> list:
     """注册表列表：system 基底 − __removed__ + __added__，再按 __order__ 排序
 
     __order__ 里没提到的条目（通常是系统后来新增的）排在末尾，保持 system 里的
     相对顺序——新条目宁可靠后也不能消失。
+
+    ``identity_field`` 声明后按条目身份对齐：``__added__`` 里同身份的条目原位
+    替换、新身份追加，``__removed__`` 被忽略（预置条目不可删除，见
+    REGISTRY_LIST_IDENTITY）。
     """
-    removed = set(overlay.get(REMOVED_KEY) or [])
-    result = [x for x in (base_list or []) if x not in removed]
-    for item in overlay.get(ADDED_KEY) or []:
-        if item not in result:
-            result.append(item)
+    overlay = overlay or {}
+    if identity_field is None:
+        removed = set(overlay.get(REMOVED_KEY) or [])
+        result = [x for x in (base_list or []) if x not in removed]
+        for item in overlay.get(ADDED_KEY) or []:
+            if item not in result:
+                result.append(item)
+    else:
+        result = list(base_list or [])
+        position: dict = {}
+        for index, item in enumerate(result):
+            ident = _identity(item, identity_field)
+            if ident is not None:
+                position[ident] = index
+        for item in overlay.get(ADDED_KEY) or []:
+            ident = _identity(item, identity_field)
+            if ident is not None and ident in position:
+                result[position[ident]] = item
+            elif item not in result:
+                position[ident] = len(result)
+                result.append(item)
     order = overlay.get(ORDER_KEY)
     if order:
-        rank = {name: i for i, name in enumerate(order)}
-        # sort 稳定：未在 order 中的条目保持原相对顺序落在末尾
-        result.sort(key=lambda x: (0, rank[x]) if x in rank else (1, 0))
+        rank = (
+            {name: i for i, name in enumerate(order)}
+            if identity_field is None
+            else {
+                _identity(name, identity_field): i
+                for i, name in enumerate(order)
+            }
+        )
+
+        def _rank(item):
+            """sort 稳定：未在 order 中的条目（系统新增）保持原相对顺序落末尾。"""
+            ident = item if identity_field is None else _identity(item, identity_field)
+            return (0, rank[ident]) if ident in rank else (1, 0)
+
+        result.sort(key=_rank)
     return result
 
 
-def diff_registry_list(base_list: list, desired: list) -> dict:
+def diff_registry_list(base_list: list, desired: list,
+                       identity_field: str | None = None) -> dict:
     """求注册表列表的增量；无差异返回空 dict
 
     仅在「增删还原不出目标顺序」时才写 __order__，保证
     merge_registry_list(base, diff) == desired 恒成立。
+
+    ``identity_field`` 声明后只产出 ``__added__``（含被改动的同身份条目），
+    不产出 ``__removed__``：预置条目在用户层不可删除。
     """
     base_list = list(base_list or [])
     desired = list(desired or [])
+    diff: dict = {}
+    if identity_field is not None:
+        current = {
+            _identity(item, identity_field): item
+            for item in base_list
+            if _identity(item, identity_field) is not None
+        }
+        added = [
+            item for item in desired
+            if current.get(_identity(item, identity_field)) != item
+        ]
+        if added:
+            diff[ADDED_KEY] = added
+        if merge_registry_list(base_list, diff, identity_field) == desired:
+            return diff
+        diff[ORDER_KEY] = desired
+        return diff
+
     added = [x for x in desired if x not in base_list]
     removed = [x for x in base_list if x not in desired]
-    diff: dict = {}
     if added:
         diff[ADDED_KEY] = added
     if removed:
@@ -273,7 +345,8 @@ def diff_registry_list(base_list: list, desired: list) -> dict:
 # ─── 纯函数：聚合 diff 的合并与求解 ─────────────────────────
 
 def merge_doc(base: dict, overlay: dict,
-              registry: tuple[str, ...] = (), _prefix: str = "") -> dict:
+              registry: tuple[str, ...] = (), _prefix: str = "",
+              identity: dict[str, str] | None = None) -> dict:
     """system 文档 ← local diff 深合并（不修改入参）
 
     dict 递归合并；列表与标量整键替换；overlay 每层的 __deleted__
@@ -283,6 +356,9 @@ def merge_doc(base: dict, overlay: dict,
     该路径下 overlay 若是 __added__/__removed__/__order__ 形式的 dict 则按增量
     合并；**若仍是普通列表则照旧整键替换**，保持存量 local 文件的行为不变，
     等用户下次保存时由 compute_diff 自动转成增量形式。
+
+    ``identity`` 给出注册表路径的条目身份字段（见 REGISTRY_LIST_IDENTITY），
+    声明后按身份原位替换而不是整条增删。
     """
     result = deepcopy(base) if isinstance(base, dict) else {}
     if not isinstance(overlay, dict):
@@ -296,9 +372,10 @@ def merge_doc(base: dict, overlay: dict,
         if (registry and _path_matches(path, registry)
                 and isinstance(value, dict)
                 and any(k in value for k in _REGISTRY_KEYS)):
-            result[key] = merge_registry_list(result.get(key) or [], value)
+            result[key] = merge_registry_list(
+                result.get(key) or [], value, (identity or {}).get(path))
         elif isinstance(value, dict) and isinstance(result.get(key), dict):
-            result[key] = merge_doc(result[key], value, registry, path)
+            result[key] = merge_doc(result[key], value, registry, path, identity)
         else:
             result[key] = deepcopy(value)
     return result
@@ -307,7 +384,8 @@ def merge_doc(base: dict, overlay: dict,
 def compute_diff(base: dict, desired: dict,
                  registry: tuple[str, ...] = (), _prefix: str = "",
                  deletable: tuple[str, ...] | None = None,
-                 protected: dict[str, str | None] | None = None) -> dict:
+                 protected: dict[str, str | None] | None = None,
+                 identity: dict[str, str] | None = None) -> dict:
     """逆向求最小 diff，满足 merge_doc(base, diff) == desired
 
     新增/改动键入 diff；base 有而 desired 无的键入 __deleted__；
@@ -315,6 +393,8 @@ def compute_diff(base: dict, desired: dict,
 
     registry 声明的路径上，两侧都是列表时改求增量（__added__/__removed__，
     必要时补 __order__），local 因此只记用户自己的改动，不再冻住整张表。
+    ``identity`` 给出这些路径的条目身份字段：声明后按身份对齐、且不产生
+    __removed__，缺失的系统条目会先按原位补回（预置条目不可删除）。
 
     deletable 为 None 时保持「缺键即删除」的原始语义（纯函数用法、单测）；
     传入元组则启用白名单：只有父路径被声明的键才允许进 __deleted__，
@@ -343,6 +423,7 @@ def compute_diff(base: dict, desired: dict,
     for key, value in desired.items():
         base_value = base.get(key)
         path = f"{_prefix}.{key}" if _prefix else key
+        identity_field = (identity or {}).get(path)
         if (protected is not None and path in protected
                 and isinstance(value, list) and isinstance(base_value, list)):
             value, restored = restore_protected_list(
@@ -355,12 +436,19 @@ def compute_diff(base: dict, desired: dict,
                 diff[key] = deepcopy(value)
         elif (registry and _path_matches(path, registry)
                 and isinstance(value, list) and isinstance(base_value, list)):
-            sub = diff_registry_list(base_value, value)
+            if identity_field is not None:
+                value, restored = restore_protected_list(
+                    base_value, value, identity_field)
+                if restored:
+                    logger.warning(
+                        f"配置删除被拦下：{path} 下的系统条目 {restored} 不允许移除，"
+                        f"已补回；如需停用请走激活机制或直接改值")
+            sub = diff_registry_list(base_value, value, identity_field)
             if sub:
                 diff[key] = sub
         elif isinstance(value, dict) and isinstance(base_value, dict):
             sub = compute_diff(
-                base_value, value, registry, path, deletable, protected)
+                base_value, value, registry, path, deletable, protected, identity)
             if sub:
                 diff[key] = sub
         elif key not in base or base_value != value:
@@ -886,7 +974,9 @@ class ConfigResolver:
         if not overlay_path.exists():
             return base
         registry = REGISTRY_LIST_PATHS.get(rel_path, ())
-        return merge_doc(base, self._load_yaml(overlay_path), registry)
+        identity = REGISTRY_LIST_IDENTITY.get(rel_path, {})
+        return merge_doc(base, self._load_yaml(overlay_path), registry,
+                         identity=identity)
 
     @_configuration_write
     def save_merged(self, rel_path: str, full_doc: dict, *,
@@ -920,7 +1010,8 @@ class ConfigResolver:
                 base, full_doc, (registry if registry is not None
                                  else REGISTRY_LIST_PATHS.get(rel_path, ())),
                 deletable=DELETABLE_PATHS.get(rel_path, ()),
-                protected=PROTECTED_LIST_PATHS.get(rel_path, {}))
+                protected=PROTECTED_LIST_PATHS.get(rel_path, {}),
+                identity=REGISTRY_LIST_IDENTITY.get(rel_path, {}))
             overlay_path = self.local_dir / rel_path
             if diff:
                 text = _dump(diff)

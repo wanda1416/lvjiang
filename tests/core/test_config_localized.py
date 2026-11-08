@@ -23,6 +23,7 @@ from lvjiang.core.config.resolver import (
     load_app_config,
     load_available_envs,
     save_app_config,
+    save_app_config_node,
 )
 
 BILINGUAL = {"zh_CN": "安卓", "en_US": "Android"}
@@ -266,16 +267,74 @@ class TestUserModeOverlay:
         save_app_config(input_sim, delay, envs)
         assert not (user_config / "app.yaml").exists()
 
-    def test_edited_name_writes_local_keeping_other_language(self, user_config):
+    def test_edited_name_stores_only_that_entry(self, user_config):
+        """改一个名字只落那一条增量，local 不能把整张 envs 冻住。"""
         input_sim, delay, envs = self._unchanged_args()
         envs[0]["name"] = "安卓手机"
         save_app_config(input_sim, delay, envs)
 
         overlay = yaml.safe_load(
             (user_config / "app.yaml").read_text(encoding="utf-8"))
-        stored = {item["key"]: item["name"] for item in overlay["envs"]}
-        assert stored["android"] == {"zh_CN": "安卓手机", "en_US": "Android"}
-        assert stored["desktop"] == {"zh_CN": "桌面", "en_US": "Desktop"}
-        # 合并视图也要跟着变
-        assert load_available_envs()[0] == ("android", "安卓手机")
+        assert set(overlay["envs"]) == {"__added__"}
+        assert overlay["envs"]["__added__"] == [
+            {"key": "android", "name": {"zh_CN": "安卓手机", "en_US": "Android"}}]
+        # 另一种语言保留，另一条环境仍由 system 层提供
+        assert load_available_envs() == [
+            ("android", "安卓手机"), ("desktop", "桌面")]
+
+    @staticmethod
+    def _system_add_env(local_dir, key: str, name: str) -> None:
+        """模拟版本更新：系统随包配置新增一个环境。"""
+        system_file = local_dir.parent / "system" / "app.yaml"
+        doc = yaml.safe_load(system_file.read_text(encoding="utf-8"))
+        doc["envs"].append({"key": key, "name": {"zh_CN": name, "en_US": name}})
+        system_file.write_text(
+            yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
+
+    def test_system_added_env_reaches_user_with_local_override(self, user_config):
+        """系统后续新增的环境必须能被已经改过名的用户看到。
+
+        此前 envs 走整键替换，用户改过一次名字就把整张表冻进 local，之后随包
+        新增的环境在他这里永远不出现。
+        """
+        input_sim, delay, envs = self._unchanged_args()
+        envs[0]["name"] = "安卓手机"
+        save_app_config(input_sim, delay, envs)
+
+        self._system_add_env(user_config, "emulator", "模拟器")
+
+        assert load_available_envs() == [
+            ("android", "安卓手机"), ("desktop", "桌面"), ("emulator", "模拟器")]
+
+    def test_plan_rename_stores_only_that_plan(self, user_config):
+        """方案同理：改一个名字只落那一条；随包新增的方案仍然出现。"""
+        items = [
+            Plan.from_dict(item, distributed=True).to_dict()
+            for item in load_app_config()["plans"]
+        ]
+        renamed = items[0]["id"]
+        items[0] = {**items[0], "name": {"zh_CN": "手游版", "en_US": "Mobile"}}
+        save_app_config_node("plans", items)
+
+        overlay = yaml.safe_load(
+            (user_config / "app.yaml").read_text(encoding="utf-8"))
+        assert set(overlay["plans"]) == {"__added__"}
+        assert [item["id"] for item in overlay["plans"]["__added__"]] == [renamed]
+
+        system_file = user_config.parent / "system" / "app.yaml"
+        doc = yaml.safe_load(system_file.read_text(encoding="utf-8"))
+        doc["plans"].append({
+            "id": "brandnew",
+            "name": {"zh_CN": "新方案", "en_US": "New Plan"},
+            "env": "android",
+            "modes": ["adb"],
+        })
+        system_file.write_text(
+            yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
+
+        plans = [Plan.from_dict(item) for item in load_app_config()["plans"]]
+        names = [plan.name for plan in plans]
+        assert "手游版" in names
+        assert "新方案" in names
+        assert "端游" in names, "未改动的预置方案不能因为别人改名而消失"
 

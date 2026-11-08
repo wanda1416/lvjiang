@@ -377,6 +377,84 @@ class TestRegistryList:
         assert merge_doc(base, {"exposed": ["a"]}, self.REG)["exposed"] == ["a"]
 
 
+class TestRegistryIdentityList:
+    """按身份对齐的注册表：改一条只落那一条，预置条目不可删除。
+
+    ``app.yaml`` 的 ``envs`` / ``plans`` 是带稳定 key 的登记表。不按身份对齐
+    时，改一个显示名就变成「删一条 + 加一条」，被改的条目合并时挪到末尾，
+    ``diff_registry_list`` 只能退化成写整张 ``__order__``，local 又冻住了整张表，
+    系统后续新增的环境/方案再也进不到合并视图。
+    """
+
+    REG = ("envs",)
+    IDENT = {"envs": "key"}
+    BASE = {
+        "envs": [
+            {"key": "android", "name": "安卓"},
+            {"key": "desktop", "name": "桌面"},
+        ]
+    }
+
+    def _diff(self, desired: dict) -> dict:
+        return compute_diff(self.BASE, desired, self.REG, identity=self.IDENT)
+
+    def test_edit_records_only_the_edited_entry(self):
+        desired = {"envs": [
+            {"key": "android", "name": "安卓手机"},
+            {"key": "desktop", "name": "桌面"},
+        ]}
+        assert self._diff(desired) == {
+            "envs": {"__added__": [{"key": "android", "name": "安卓手机"}]}}
+
+    def test_edited_entry_keeps_position_and_later_system_entries_appear(self):
+        """改过的条目原位替换，系统后来新增的环境仍然自动出现。"""
+        diff = self._diff({"envs": [
+            {"key": "android", "name": "安卓手机"},
+            {"key": "desktop", "name": "桌面"},
+        ]})
+        later = {"envs": [
+            {"key": "android", "name": "安卓"},
+            {"key": "desktop", "name": "桌面"},
+            {"key": "emulator", "name": "模拟器"},
+        ]}
+        merged = merge_doc(later, diff, self.REG, identity=self.IDENT)["envs"]
+        assert [item["key"] for item in merged] == ["android", "desktop", "emulator"]
+        assert merged[0]["name"] == "安卓手机"
+        assert merged[1]["name"] == "桌面"
+
+    def test_user_added_entry_appended(self):
+        desired = {"envs": [*self.BASE["envs"], {"key": "mine", "name": "我的"}]}
+        diff = self._diff(desired)
+        assert diff == {"envs": {"__added__": [{"key": "mine", "name": "我的"}]}}
+        merged = merge_doc(self.BASE, diff, self.REG, identity=self.IDENT)
+        assert [item["key"] for item in merged["envs"]] == [
+            "android", "desktop", "mine"]
+
+    def test_missing_system_entry_is_restored_not_removed(self):
+        """预置条目不可删除：少了就补回原位，且不写 __removed__。"""
+        diff = self._diff({"envs": [self.BASE["envs"][0]]})
+        assert diff == {}
+        assert merge_doc(self.BASE, diff, self.REG, identity=self.IDENT) == self.BASE
+
+    @case_matrix("desired", [
+        BASE["envs"],                                            # 不变
+        [{"key": "android", "name": "改名"}, BASE["envs"][1]],    # 改值
+        [*BASE["envs"], {"key": "mine", "name": "我的"}],         # 新增
+        list(reversed(BASE["envs"])),                            # 重排
+        [],                                                      # 全丢（应补回）
+    ])
+    def test_roundtrip_keeps_restored_entries(self, desired):
+        """合并结果 = 用户目标 + 被补回的预置条目，两边的条目都不能少。"""
+        merged = merge_doc(
+            self.BASE, self._diff({"envs": desired}), self.REG,
+            identity=self.IDENT)["envs"]
+        merged_keys = {item["key"] for item in merged}
+        for preset in self.BASE["envs"]:
+            assert preset["key"] in merged_keys
+        for item in desired:
+            assert item in merged
+
+
 class TestRegistryThroughResolver:
     """经 load_merged / save_merged 走完整路径，验证按文件名选用注册表声明。
 

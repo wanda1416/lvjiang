@@ -23,6 +23,7 @@ input_simulation:
   - 0.7
   click_random_offset: 5
   region_jitter_ratio: 0.25
+  clamp_out_of_bounds: false
 delay_params:
   step_interval:
     label: 操作间隔
@@ -69,6 +70,7 @@ plans:
   space: 手游
   env: android
   layout: android
+  requires_admin: false
   modes:
   - adb
 - id: 5deb7222def5486bb5431fd3b541a950
@@ -84,6 +86,7 @@ plans:
   space: 手游
   env: android
   layout: android_cast
+  requires_admin: false
   modes:
   - windows
 - id: 7ce5dc50d0c547f8963ff5f834e1b6de

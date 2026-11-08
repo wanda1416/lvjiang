@@ -53,7 +53,7 @@
 
 | 文档 | 内容 | 状态 |
 |------|------|------|
-| [01-i18n.md](50-platform/01-i18n.md) | 国际化支持框架：tr() 函数、翻译文件、UI 改造 | 已实现 |
+| [01-i18n.md](50-platform/01-i18n.md) | 国际化支持框架：tr() 函数、翻译文件、UI 改造 | 部分实现（zh/en 完整，繁中与日文术语同源生成，其余英文回退） |
 | [02-in-match-navigation.md](50-platform/02-in-match-navigation.md) | 局内地图目标闭环导航与撤离：渡尘墟、觉障林等玩法通用 | 部分实现（基础设施已落地，导航运行时未开始） |
 | [03-input-timeline.md](50-platform/03-input-timeline.md) | 输入时间线：描述严格并发的操作序列，多路手势与跨端落地 | 已实现（待真机验收并发手势） |
 | [04-execution-targets.md](50-platform/04-execution-targets.md) | 单窗口、多设备连接与显式执行目标 | 已实现 |

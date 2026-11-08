@@ -1,5 +1,7 @@
 # 游戏术语中英对照（20-translation）
 
+> 容器格式与词表现状最后核对：2026-11-09（国际服客户端 locale 目录）
+
 本目录整理《燕云十六声》国际服（Where Winds Meet）官方翻译中与律匠相关的
 游戏独有术语，供识别映射、文档写作和与海外用户交流时统一口径。
 
@@ -133,9 +135,18 @@ def iter_blocks(path):
 The shopkeeper left, saying goodbye to life (send event).You are in auto-bidding mode.You…
 ```
 
-第一个数据块解压后是纯 u32 数组（编号/偏移类索引），不含可读文本。也就是说
-完整切分词条要结合该索引还原，目前仅验证到「块内容为连续文本」这一步，
-尚未实现切分器——引用具体词条时不要假定块边界等于词条边界。
+第一个数据块解压后是纯 u32 数组（编号/偏移类索引），不含可读文本。
+
+### 切分进度（截至 2026-11-09，**尚未完成**）
+
+已核实到「数据块 = 24 字节头 + 槽表 + 文本池」，槽表容量为
+`A + ceil(A/16) + 1` 个 16 字节槽（`A` 取自块头第一个 u64），文本池紧接槽表之后；
+部分槽确为 `[u64][u32 offset][u32 length]`。但**大部分槽解出的是同一段文本的
+重叠子串**，说明文本池是共享区而非逐条拼接，还缺一个「如何组合出完整串」的字段。
+
+结论：**引用具体词条时不要假定块边界等于词条边界**，也还不能按条取词。
+详细的已证实结构、已排除假设与实测数据见
+[08-i18n-language-status.md](08-i18n-language-status.md) 第 5 节。
 
 ## 键结构
 
@@ -187,3 +198,4 @@ The shopkeeper left, saying goodbye to life (send event).You are in auto-bidding
 | [05-buffs-debuffs.md](05-buffs-debuffs.md) | 增益/减益 |
 | [06-equipment.md](06-equipment.md) | 装备部位/品阶/套装/弓玦、定音词条 |
 | [07-consumables-misc.md](07-consumables-misc.md) | 神工、帖、食物、突破 |
+| [08-i18n-language-status.md](08-i18n-language-status.md) | 多语言词表完成度、繁中/日文生成方式、客户端容器切分进度 |

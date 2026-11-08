@@ -236,7 +236,7 @@ yysls:
   F6_调律配置可新增_编辑规则组: 'F6: Tuning Config to add/edit rule groups'
   停止_F10: Stop (F10)
   全局开关与测试选项: 'Global Switches & Test Options:'
-  列: Col
+  列: Columns
   初始跳过: Initial Skip
   取消全选: Deselect All
   基础规则组_{key}_不存在_拒绝启动: Base rule group '{key}' does not exist, refusing to start
@@ -259,7 +259,7 @@ yysls:
   流派规则_可多选: 'Playstyle Rules (multi-select):'
   自动打开调律进度: Auto Open Tuning Progress
   自动调律: Auto Tuning
-  行: Line
+  行: Rows
   规则: Rule
   请至少选择一个调律规则: Please select at least one tuning rule
   请至少选择一个调律部位: Please select at least one tuning slot
@@ -850,7 +850,7 @@ auto_strings:
   合并失败: Merge Failed
   合并选中项: Merge Selected
   名称为空: Name Is Empty
-  否: No
+  否: "No"
   命中: Hit
   ? "命中条件：装备任一条题名属于勾选词条\n（勾选仅首词条时只判定装备首词条）；\n自选词条语义不跑潜力判定"
   : "Hit condition: any of the equipment's affixes belongs to the checked affixes\n(when \"first affix only\" is checked, only the first affix is judged);\n\"Custom Affix\" semantics skip potential judgment"
@@ -1479,7 +1479,7 @@ auto_strings:
   新增玩法: New Gameplay
   新建: New
   无法添加: Cannot Add
-  是: It's, it's...
+  是: "Yes"
   普通定音: Normal Attuning
   暂停: Pause
   暂停中: Paused
@@ -2561,3 +2561,42 @@ auto_strings:
   : "Gold Zone\nTuning Cost"
   ? "金装区\n重置累计返还"
   : "Gold Zone\nReset Cumulative Return"
+  "别名（每行一个）": "Aliases (one per line)"
+  "原始词条名称": "Original Affix Name"
+  "词组名称": "Phrase Name"
+  "心法名（六重自动建好）": "Inner Way Name (tiers 1-6 are created automatically)"
+  "武器名称": "Weapon Name"
+  "传律石提升": "Chuanlv Stone Gain"
+  "逾期进度": "Expired Progress"
+  "编辑来源": "Edit Source"
+  "游戏配置版本": "Game Config Version"
+  "流派名称": "School Name"
+  "计算失败": "Calculation Failed"
+  "构造装备": "Build Equipment"
+  "品质": "Quality"
+  "请选择要穿戴到的槽位": "Select the slot to equip to"
+  "以下部位没有候选装备": "No candidate equipment for these slots"
+  "个人世界等级": "Personal World Level"
+  "标识 key": "Identifier Key"
+  "勾选装备词条名（至少一项）": "Check affix names (at least one)"
+  "预期评级识别使用勾选的流派规则": "Expected-rating detection uses the checked playstyle rules"
+  "开关前提": "Switch Prerequisite"
+  "规则名称": "Rule Name"
+  "规则来源": "Rule Source"
+  "选择要引用的玩法": "Select a playstyle to reference"
+  "调律配置来源": "Tuning Config Source"
+  "Agent 任务状态保存失败": "Failed to save Agent task state"
+  "Agent 设置无法读取": "Could not read Agent settings"
+  "停用状态未保存": "Disabled state not saved"
+  "无法读取 MCP 接入配置": "Could not read the MCP connection config"
+  "实际参与智能判定的方案": "Plans actually used for smart judging"
+  "未参与的方案或规则及原因": "Plans or rules not used, and why"
+  "材料": "Materials"
+  "装备状态": "Equipment State"
+  "全局开关": "Global Switches"
+  "基础规则（单选）": "Base Rule (single select)"
+  "流派规则（可多选）": "Playstyle Rules (multi-select)"
+  "最低等级": "Minimum Level"
+  "调律设置": "Tuning Settings"
+  "调律部位": "Tuning Slots"
+  "调试参数": "Debug Parameters"

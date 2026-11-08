@@ -123,6 +123,8 @@ scrcpy_capture:
   读取视频流异常：{error}: 'Error while reading the video stream: {error}'
   连接 scrcpy 视频端口超时（端口 {port}）: Timed out connecting to the scrcpy video port ({port})
   连续 {n} 个视频包无法解码: '{n} consecutive video packets could not be decoded'
+  "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "Still no video stream header after {seconds} s (scrcpy server failed to start or version mismatch)"
+  "解码线程异常退出：{error}": "Decode thread exited unexpectedly: {error}"
 scripts:
   '区域 ': 'Region '
   检查: Check

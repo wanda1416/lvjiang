@@ -347,6 +347,8 @@ profile:
   负向: Negative
   配额: Quota
   降序: Descending
+  "同步到": "Synced To"
+  "备注内容": "Note Content"
 run_control:
   错误: ข้อผิดพลาด
 profile_service:

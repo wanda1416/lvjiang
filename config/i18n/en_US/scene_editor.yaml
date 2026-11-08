@@ -358,6 +358,18 @@ scene_editor:
   删除分组: "Delete Group"
   模板测试：{state}，分数 {score:.3f}，阈值 {threshold:.2f}，缩放 {scale:.2f}: "Template test: {state}, score {score:.3f}, threshold {threshold:.2f}, scale {scale:.2f}"
   管理当前截图列表: "Manage the screenshot list"
+  "场景 Key": "Scene Key"
+  "分组 Key": "Group Key"
+  "场景名称": "Scene Name"
+  "视图 Key": "View Key"
+  "视图名称": "View Name"
+  "行数": "Rows"
+  "列数": "Columns"
+  "滚动方向": "Scroll Direction"
+  "结果集": "Result Set"
+  "选择要放置的坐标点": "Select the Point to Place"
+  "输入新的方向 key（小写字母开头）": "New direction key (starts with a lowercase letter)"
+  "新坐标绑定哪个坐标点？（沿用源半径）": "Which point should the new coordinate bind to? (keeps the source radius)"
 story_dialog:
   "」": "”"
 user_manager:

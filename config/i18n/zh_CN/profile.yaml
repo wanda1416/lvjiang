@@ -348,6 +348,8 @@ profile:
   负向: 负向
   配额: 配额
   降序: 降序
+  "同步到": "同步到"
+  "备注内容": "备注内容"
 run_control:
   "错误": "错误"
 profile_service:

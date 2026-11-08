@@ -53,5 +53,13 @@ reference:
   输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
   退出批量: Exit Batch
   选择参考图片: Select Reference Image
+  "图库空间": "Gallery Space"
+  "空间名": "Space Name"
+  "宽": "Width"
+  "高": "Height"
+  "间隔": "Spacing"
+  "批量分组": "Batch Group"
+  "行": "Rows"
+  "列": "Columns"
 user_avatar:
   导入图片: Import Image

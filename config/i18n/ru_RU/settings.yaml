@@ -242,3 +242,6 @@ settings_dialog:
   : "By default the video stream is set up 5 times, then the agent is reconnected 5 times and ADB 5 times, 2 s apart. If it still fails, the task waits for manual handling with no timeout: Yes re-checks, No stops the task; closing the prompt does not stop it and the banner stays.\nMulti-touch and concurrent gestures are not downgraded. Inputs that may already have been sent are never replayed automatically. Applies to tasks started afterwards."
   鼠标/触控移动到目标位置的耗时: Time for the mouse/touch to move to the target position
   鼠标移动时长(秒): Mouse Move Duration (sec)
+  "坐标越界处理": "Out-of-Bounds Handling"
+  "坐标随机偏移(px)": "Random Coordinate Offset (px)"
+  "当前标识": "Current ID"

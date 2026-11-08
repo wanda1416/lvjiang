@@ -581,6 +581,7 @@ common:
   "（空）": "(Empty)"
   操作: "Action"
   未命名: "(Unnamed)"
+  "否": "No"
 config_conflicts:
   "磁盘配置已更新": "Config Updated on Disk"
   "编辑器打开之后，磁盘上的这些配置被其他窗口或程序改过：": "While this editor was open, these configs were changed on disk by another window or program:"

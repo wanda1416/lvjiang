@@ -511,7 +511,7 @@ common:
   无: None
   无法删除: Cannot Delete
   无静态属性: No static stats
-  是: Yes
+  是: "Yes"
   暂停: 暫停
   暂停中...: Pausing...
   最多同时装备 {n} 门心法，给了 {got} 门: At most {n} inner ways can be equipped, got {got}
@@ -580,6 +580,7 @@ common:
   （空）: (Empty)
   操作: Action
   未命名: (Unnamed)
+  "否": "No"
 config_conflicts:
   磁盘配置已更新: Config Updated on Disk
   编辑器打开之后，磁盘上的这些配置被其他窗口或程序改过：: 'While this editor was open, these configs were changed on disk by another window or program:'

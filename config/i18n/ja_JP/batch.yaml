@@ -77,6 +77,7 @@ batch:
   随机打乱顺序: Shuffle Order
   需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守撞上异常暂停后要靠它把游戏收回登录主页: "First configure this group's \"recovery workflow\" in \"Tools → Batch Configuration\": unattended mode relies on it to return the game to the login page after an abnormal pause"
   默认执行: Run by default
+  "配置名称": "Configuration Name"
 batch_report:
   （执行通道中断，整批中止）: ' (execution channel lost, batch aborted)'
   （用户中断）: (User Interrupted)

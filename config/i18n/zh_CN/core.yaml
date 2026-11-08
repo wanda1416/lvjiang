@@ -124,6 +124,8 @@ scrcpy_capture:
   "读取视频流异常：{error}": "读取视频流异常：{error}"
   "连接 scrcpy 视频端口超时（端口 {port}）": "连接 scrcpy 视频端口超时（端口 {port}）"
   "连续 {n} 个视频包无法解码": "连续 {n} 个视频包无法解码"
+  "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）"
+  "解码线程异常退出：{error}": "解码线程异常退出：{error}"
 scripts:
   "区域 ": "区域 "
   "检查": "检查"

@@ -246,10 +246,10 @@ auto_strings:
   打开进度: Open Progress
   指定调律: Designated Tuning
   参数: Parameters
-  调律部位: 'Tuning Slots:'
-  全局开关: 'Global Switches:'
-  调律设置: 'Tuning Settings:'
-  调试参数: 'Debug Parameters:'
+  "调律部位": "Tuning Slots"
+  "全局开关": "Global Switches"
+  "调律设置": "Tuning Settings"
+  "调试参数": "Debug Parameters"
   PC_端兼容后台模式: PC background compatibility mode
   启用位置校验遍历策略: Enable positional traversal strategy
   默认使用去重遍历_dedup_启用后改用位置校验遍历_positional: Uses dedup traversal by default; when enabled, switches to positional validation traversal.
@@ -292,7 +292,7 @@ auto_strings:
   扫描处理_{name}: 'Scan Result: {name} → '
   批次进度: Batch Progress
   最终词条: Final Affixes
-  材料: 'Materials:'
+  "材料": "Materials"
   正在处理_{name}: 'Processing: {name}'
   目标词条: Target Affix
   目标: Target
@@ -319,7 +319,7 @@ auto_strings:
   品阶: Quality
   基础规则组_{key}_不存在: Base rule group {key} does not exist
   待调出: To Transfer Out
-  构造装备: 'Build Equipment:'
+  "构造装备": "Build Equipment"
   模拟调律: Mock Tuning
   武器: Weapon
   流派配置_仅本次测试_不保存: 'Playstyle Config (this test only, not saved):'
@@ -368,14 +368,14 @@ auto_strings:
   最大值: Max
   最小值: Min
   武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: Weapon candidates come from weapon types in Equipment Config. Martial Enhancement moved to weapon types in Equipment Config.
-  武器名称: 'Weapon Name:'
+  "武器名称": "Weapon Name"
   武器类型: Weapon Type
   武器类型_{name}_已存在: Weapon type '{name}' already exists.
   武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Weapon type '{name}' is referenced by playstyle {users}, please unbind in playstyle config first.
   武学增效: Martial Arts Boost
   流派_{name}_已存在: Playstyle '{name}' already exists.
   流派名不能为空或与已有流派重名: Playstyle name cannot be empty or duplicate.
-  流派名称: 'Playstyle Name:'
+  "流派名称": "School Name"
   流派类型: School Type
   流派配置: School Config
   添加: Add
@@ -399,7 +399,7 @@ auto_strings:
   词组_{name}_已存在: Phrase '{name}' already exists
   词组分类: Group Category
   词组单位: Group Unit
-  词组名称: 'Phrase Name:'
+  "词组名称": "Phrase Name"
   词组类型: Group Type
   词组配置: Group Config
   请先选择要删除的等级: Select a level to delete first
@@ -480,7 +480,7 @@ auto_strings:
   已选词条_可拖拽调整顺序: Selected affixes (drag to reorder)
   开关_key: Switch key
   开关_key_显示名_规则条件组_when_引用的: Switch key → display name; referenced by rule condition group when
-  开关前提: 'Switch precondition:'
+  "开关前提": "Switch Prerequisite"
   开关设定: Toggle Settings
   开启时生效: Active when on
   当前规则: Current Rule
@@ -524,7 +524,7 @@ auto_strings:
   装备评级: Equipment Grade
   规则变更即校验_校验通过自动保存并生效: Rule changes validated; auto-saved on pass
   规则名称不能为空: Rule name cannot be empty
-  规则名称: 'Rule Name:'
+  "规则名称": "Rule Name"
   规则命中重置但次数已用尽_按钮文本读不到数字: Rule hit reset but count exhausted (button text cannot read number)
   规则已禁用_右键启用: Rule disabled; right-click to enable
   规则组名: Rule Group Name
@@ -552,7 +552,7 @@ auto_strings:
   重命名规则: Rename Rule
   重命名规则_key: Rename rule key
   预期评级_该档即进入调律_固定用传入规则判定: Enter tuning when expected rating >= this tier (uses passed rules)
-  预期评级识别使用勾选的流派规则: 'Expected rating uses checked playstyle rules:'
+  "预期评级识别使用勾选的流派规则": "Expected-rating detection uses the checked playstyle rules"
   首词条: First Affix
   首词条初始数值比较方向: First affix initial value comparison direction
   默认判定: Default Judgment
@@ -848,7 +848,7 @@ auto_strings:
   合并失败: Merge Failed
   合并选中项: Merge Selected
   名称为空: Name Is Empty
-  否: 'False'
+  否: "No"
   命中: Hit
   ? "命中条件：装备任一条题名属于勾选词条\n（勾选仅首词条时只判定装备首词条）；\n自选词条语义不跑潜力判定"
   : "Hit condition: any of the equipment's affixes belongs to the checked affixes\n(when \"first affix only\" is checked, only the first affix is judged);\n\"Custom Affix\" semantics skip potential judgment"
@@ -1427,7 +1427,7 @@ auto_strings:
   效果: Visuals
   新增玩法: New Gameplay
   新建: New
-  是: It's, it's...
+  是: "Yes"
   普通定音: Normal Attuning
   暂停: Pause
   暂停中: Paused
@@ -2164,3 +2164,30 @@ auto_strings:
   : "Gold Zone\nTuning Cost"
   ? "金装区\n重置累计返还"
   : "Gold Zone\nReset Cumulative Return"
+  "别名（每行一个）": "Aliases (one per line)"
+  "原始词条名称": "Original Affix Name"
+  "心法名（六重自动建好）": "Inner Way Name (tiers 1-6 are created automatically)"
+  "传律石提升": "Chuanlv Stone Gain"
+  "逾期进度": "Expired Progress"
+  "编辑来源": "Edit Source"
+  "游戏配置版本": "Game Config Version"
+  "计算失败": "Calculation Failed"
+  "品质": "Quality"
+  "请选择要穿戴到的槽位": "Select the slot to equip to"
+  "以下部位没有候选装备": "No candidate equipment for these slots"
+  "个人世界等级": "Personal World Level"
+  "标识 key": "Identifier Key"
+  "勾选装备词条名（至少一项）": "Check affix names (at least one)"
+  "规则来源": "Rule Source"
+  "选择要引用的玩法": "Select a playstyle to reference"
+  "调律配置来源": "Tuning Config Source"
+  "Agent 任务状态保存失败": "Failed to save Agent task state"
+  "Agent 设置无法读取": "Could not read Agent settings"
+  "停用状态未保存": "Disabled state not saved"
+  "无法读取 MCP 接入配置": "Could not read the MCP connection config"
+  "实际参与智能判定的方案": "Plans actually used for smart judging"
+  "未参与的方案或规则及原因": "Plans or rules not used, and why"
+  "装备状态": "Equipment State"
+  "基础规则（单选）": "Base Rule (single select)"
+  "流派规则（可多选）": "Playstyle Rules (multi-select)"
+  "最低等级": "Minimum Level"

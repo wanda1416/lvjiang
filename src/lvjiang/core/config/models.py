@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from typing import Any
 
+from .localized import resolve_localized
+
 
 def _pair(value: Any) -> tuple[float, float]:
     """list/tuple → (float, float)（JSON 反序列化出 list，统一成 tuple）"""
@@ -60,13 +62,22 @@ class InputSimConfig:
 
 
 def parse_delay_params(raw: dict | None) -> dict[str, DelayParam]:
-    """dict → {key: DelayParam}（YAML/JSON 载入与测试直接传 dict 统一处理）"""
+    """dict → {key: DelayParam}（YAML/JSON 载入与测试直接传 dict 统一处理）
+
+    ``label`` 允许是纯字符串（用户自建参数）或按语言取值的映射（随包分发的
+    系统参数）；这里统一解析成当前界面语言的一个字符串，模型里只留 str。
+    """
     if not raw:
         return {}
-    return {
-        k: v if isinstance(v, DelayParam) else DelayParam(**v)
-        for k, v in raw.items()
-    }
+    result: dict[str, DelayParam] = {}
+    for key, value in raw.items():
+        if isinstance(value, DelayParam):
+            result[key] = value
+            continue
+        if isinstance(value, dict) and "label" in value:
+            value = {**value, "label": resolve_localized(value["label"])}
+        result[key] = DelayParam(**value)
+    return result
 
 
 @dataclass

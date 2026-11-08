@@ -31,6 +31,7 @@ from uuid import uuid4
 from loguru import logger
 
 from .interface import get_interface_store
+from .localized import preserve_edited, resolve_localized
 from .session import get_session_store
 
 _PLANS_NODE = "plans"
@@ -65,6 +66,9 @@ class Plan:
     #: 是否随安装包分发（存 app.yaml 而非 session.json）。不序列化：
     #: 由加载来源推导，见模块 docstring。
     distributed: bool = False
+    #: ``name`` 在磁盘上的原始形态（可能是按语言取值的映射）。不参与比较
+    #: 与展示，只在写回时用于判断「用户到底改了没改」，见 to_dict。
+    name_raw: object = field(default=None, repr=False, compare=False)
 
     @classmethod
     def create(cls, name: str, *, space: str = "", env: str = "",
@@ -87,14 +91,17 @@ class Plan:
         """脏数据返回 None（调用方跳过该条），不抛异常。
 
         ``distributed`` 由调用方按加载来源指定，不从 data 里读。
+        ``name`` 允许是按语言取值的映射（随包分发的系统方案），解析成当前
+        界面语言的字符串后放在 ``name``，原始形态留在 ``name_raw``。
         """
         if not isinstance(data, dict):
             return None
         plan_id = data.get("id")
-        name = data.get("name")
+        raw_name = data.get("name")
+        name = resolve_localized(raw_name)
         if not isinstance(plan_id, str) or not plan_id:
             return None
-        if not isinstance(name, str) or not name:
+        if not name:
             return None
         return cls(
             id=plan_id,
@@ -105,13 +112,18 @@ class Plan:
             requires_admin=data.get("requires_admin") is True,
             modes=_clean_modes(data.get("modes")),
             distributed=distributed,
+            name_raw=raw_name,
         )
 
     def to_dict(self) -> dict:
-        """落盘形态。刻意不含 ``distributed``——存在哪就是哪。"""
+        """落盘形态。刻意不含 ``distributed``——存在哪就是哪。
+
+        ``name`` 与原始形态对齐后再写：内容没变就原样带回（系统方案的中英
+        双语一个键都不丢），改过则只覆盖当前语言那一项。
+        """
         return {
             "id": self.id,
-            "name": self.name,
+            "name": preserve_edited(self.name_raw, self.name),
             "space": self.space,
             "env": self.env,
             "layout": self.layout,

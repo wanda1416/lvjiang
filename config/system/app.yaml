@@ -26,35 +26,49 @@ input_simulation:
   clamp_out_of_bounds: false
 delay_params:
   step_interval:
-    label: 操作间隔
+    label:
+      zh_CN: 操作间隔
+      en_US: Step Interval
     range:
     - 1.0
     - 1.2
   click_interval:
-    label: 点击间隔
+    label:
+      zh_CN: 点击间隔
+      en_US: Click Interval
     range:
     - 1.0
     - 1.2
   page_refresh:
-    label: 页面刷新等待
+    label:
+      zh_CN: 页面刷新等待
+      en_US: Page Refresh Wait
     range:
     - 2.0
     - 3.0
   scroll_settle:
-    label: 滚动惯性等待
+    label:
+      zh_CN: 滚动惯性等待
+      en_US: Scroll Settle Wait
     range:
     - 3.0
     - 4.0
   secondary_confirm:
-    label: 二次确认等待（包括装备冷却）
+    label:
+      zh_CN: 二次确认等待（包括装备冷却）
+      en_US: Secondary Confirm Wait (incl. gear cooldown)
     range:
     - 6.0
     - 7.0
 envs:
 - key: android
-  name: 安卓
+  name:
+    zh_CN: 安卓
+    en_US: Android
 - key: desktop
-  name: 桌面
+  name:
+    zh_CN: 桌面
+    en_US: Desktop
 apps:
   yyslscn:
     android:
@@ -66,7 +80,9 @@ apps:
       window_title: ''
 plans:
 - id: 13626639a4d5427588e1b620e855c3fc
-  name: 手游
+  name:
+    zh_CN: 手游
+    en_US: Mobile
   space: 手游
   env: android
   layout: android
@@ -74,7 +90,9 @@ plans:
   modes:
   - adb
 - id: 5deb7222def5486bb5431fd3b541a950
-  name: 端游
+  name:
+    zh_CN: 端游
+    en_US: PC
   space: 端游
   env: desktop
   layout: desktop
@@ -82,7 +100,9 @@ plans:
   modes:
   - windows
 - id: f29e8e838d2a40d8b22aa48627a1c14f
-  name: 手游投屏
+  name:
+    zh_CN: 手游投屏
+    en_US: Mobile Mirroring
   space: 手游
   env: android
   layout: android_cast
@@ -90,7 +110,9 @@ plans:
   modes:
   - windows
 - id: 7ce5dc50d0c547f8963ff5f834e1b6de
-  name: 端游全屏
+  name:
+    zh_CN: 端游全屏
+    en_US: PC Fullscreen
   space: 端游
   env: desktop
   layout: desktop_fullscreen

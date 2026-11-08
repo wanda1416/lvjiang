@@ -48,6 +48,7 @@ from ... import constants
 from ..fs_util import atomic_write_bytes, atomic_write_text
 from ..paths import get_config_local_dir, get_config_system_dir
 from . import versioning
+from .localized import preserve_mapping_field, preserve_sequence, resolve_localized
 
 # 聚合 diff 中的删除键标记
 DELETED_KEY = "__deleted__"
@@ -981,12 +982,18 @@ def save_app_config(
     读-改-写全量：先取合并视图再改这几个键。save_merged 的入参语义是**完整
     文档**，只传自己关心的键会让 compute_diff 把其余键判成「用户删除」写进
     __deleted__，系统新增的顶层键一保存就永久消失。
+
+    显示文本（``envs[].name`` / ``delay_params.*.label``）按 ``localized`` 的
+    约定与磁盘上的原值对齐后再写：界面只把当前语言解析成字符串交给这里，
+    若直接整体落盘，随包分发的中英双语就会被抹成单语言。
     """
     data = load_app_config()
     data["input_simulation"] = input_sim
-    data["delay_params"] = delay_params
+    data["delay_params"] = preserve_mapping_field(
+        data.get("delay_params"), delay_params, text_field="label")
     if envs is not None:
-        data["envs"] = envs
+        data["envs"] = preserve_sequence(
+            data.get("envs"), envs, key_field="key", text_field="name")
     if android_apps is not None:
         data["apps"] = android_apps
         # 保存一次即完成旧键迁移。
@@ -1006,7 +1013,11 @@ def save_app_config_node(key: str, value: object) -> None:
 
 
 def load_available_envs() -> list[tuple[str, str]]:
-    """从 app.yaml 读取可用环境列表，返回 [(key, display_name), ...]"""
+    """从 app.yaml 读取可用环境列表，返回 [(key, display_name), ...]
+
+    ``name`` 允许是纯字符串（用户自建）或按语言取值的映射（随包分发的系统
+    内容）；这里统一解析成当前界面语言的一个字符串，调用方只处理 str。
+    """
     app = load_app_config()
     envs = app.get("envs", [])
     if not isinstance(envs, list):
@@ -1015,6 +1026,6 @@ def load_available_envs() -> list[tuple[str, str]]:
     for item in envs:
         if isinstance(item, dict) and "key" in item:
             key = str(item["key"])
-            name = str(item.get("name", key))
+            name = resolve_localized(item.get("name"), fallback=key)
             result.append((key, name))
     return result or [("desktop", "桌面")]

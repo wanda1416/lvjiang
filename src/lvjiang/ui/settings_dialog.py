@@ -199,7 +199,9 @@ class SettingsDialog(QDialog):
         # 文字用**目标语言**查表（tr_in），否则用户看到的是自己刚换掉的那种语言。
         self._restart_hint = QLabel()
         self._restart_hint.setProperty("status", "warning")
-        self._restart_hint.setWordWrap(True)
+        # 关闭自动换行：换行标签的最小宽度极小，横向布局里的 stretch 会把它压成
+        # 两行——这行字本来就短，单行才不打断「保存 / 关闭」这一排的对齐。
+        self._restart_hint.setWordWrap(False)
         self._restart_hint.setVisible(False)
         btn_row.addWidget(self._restart_hint)
         btn_row.addStretch()

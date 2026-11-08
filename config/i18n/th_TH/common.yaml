@@ -2231,6 +2231,7 @@ settings_dialog:
   用户信息字号: User Info font size
   用户总览字号: User Overview font size
   界面语言: Interface Language
+  重启应用后生效: Takes effect after restarting the app
   留空自动解析 Launcher: Leave empty to resolve the Launcher automatically
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: Target Environment determines what env() returns in the DSL, used to distinguish navigation strategy between PC and mobile games. This is the environment the game runs in, not this machine's OS.
   确定删除方案「{name}」吗？: Delete plan "{name}"?

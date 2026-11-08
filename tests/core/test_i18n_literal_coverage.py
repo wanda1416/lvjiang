@@ -64,10 +64,12 @@ def _translations_for(language: str) -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def _tr_literals() -> dict[str, str]:
-    """源码里全部 ``tr("字面量")`` / ``tr_label("字面量")``：原文 → 首个出处。
+    """源码里全部 ``tr("字面量")`` / ``tr_label("字面量")`` / ``tr_in("字面量", lang)``
+    的原文 → 首个出处。
 
     只认字面量：``tr(变量)`` 无法静态核对，由调用点自己保证（例如游戏配置
-    显示名走词表里的具体条目）。
+    显示名走词表里的具体条目）。``tr_in`` 的第一参数同样是原文，故一并纳入——
+    它按目标语言查表，缺条目时同样静默回退中文，缺口性质完全一样。
     """
     found: dict[str, str] = {}
     for path in sorted((ROOT / "src").rglob("*.py")):
@@ -80,7 +82,7 @@ def _tr_literals() -> dict[str, str]:
                 continue
             func = node.func
             name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
-            if name not in ("tr", "tr_label") or not node.args:
+            if name not in ("tr", "tr_label", "tr_in") or not node.args:
                 continue
             first = node.args[0]
             if isinstance(first, ast.Constant) and isinstance(first.value, str):

@@ -45,7 +45,7 @@ from ..core.config import (
     save_app_config,
     save_settings,
 )
-from ..i18n import tr, tr_label
+from ..i18n import tr, tr_in, tr_label
 from .button_styles import apply_button_style, apply_compact_tool_button_style
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
@@ -195,6 +195,13 @@ class SettingsDialog(QDialog):
         self._save_btn.setEnabled(self._dirty)
         self._save_btn.clicked.connect(self._on_save)
         btn_row.addWidget(self._save_btn)
+        # 语言词表在启动时加载，改语言要重启才全局生效。提示紧贴保存按钮右侧，
+        # 文字用**目标语言**查表（tr_in），否则用户看到的是自己刚换掉的那种语言。
+        self._restart_hint = QLabel()
+        self._restart_hint.setProperty("status", "warning")
+        self._restart_hint.setWordWrap(True)
+        self._restart_hint.setVisible(False)
+        btn_row.addWidget(self._restart_hint)
         btn_row.addStretch()
         self._close_btn = QPushButton(tr("关闭"))
         self._close_btn.clicked.connect(self.accept)
@@ -239,6 +246,24 @@ class SettingsDialog(QDialog):
     def _refresh_save_button_visibility(self, index: int) -> None:
         """独立保存的 AI 页和即时保存的隐私页隐藏全局保存按钮。"""
         self._save_btn.setVisible(index not in {self._privacy_tab_index, self._ai_tab_index})
+        self._update_restart_hint()
+
+    def _update_restart_hint(self) -> None:
+        """保存的语言与进程当前语言不一致时，用该语言提示重启生效。
+
+        语言词表在启动时加载，保存后整个过程仍在旧语言下运行，所以这里必须按
+        目标语言查表；一旦用户改回当前语言，提示立刻收起。提示跟着保存按钮
+        显示——按钮被隐藏的页签上不该留下孤立的一行字。
+        """
+        from ..i18n import current_language
+
+        target = self._lang_combo.currentData()
+        if not target or target == current_language():
+            self._restart_hint.clear()
+            self._restart_hint.setVisible(False)
+            return
+        self._restart_hint.setText(tr_in("重启应用后生效", target))
+        self._restart_hint.setVisible(not self._save_btn.isHidden())
 
     def _connect_dirty_signals(self):
         """UI 构建完成后统一连接变更信号（避免初始赋值触发）"""
@@ -341,7 +366,11 @@ class SettingsDialog(QDialog):
         for lang in available_languages():
             self._lang_combo.addItem(
                 f"{lang['name']} ({lang['code']})", lang["code"])
-        idx = self._lang_combo.findData(current_language())
+        # 回填**已保存**的语言，而不是进程当前语言：改过语言但还没重启时两者不同，
+        # 按 current_language() 回填会让待生效的选择在下次打开设置时被悄悄改回去。
+        idx = self._lang_combo.findData(self._config.language)
+        if idx < 0:
+            idx = self._lang_combo.findData(current_language())
         if idx >= 0:
             self._lang_combo.setCurrentIndex(idx)
         form.addRow(tr("界面语言") + ":", self._lang_combo)
@@ -1835,3 +1864,4 @@ class SettingsDialog(QDialog):
             entry["saved"] = bool(entry["name"].text().strip())
         self._dirty = False
         self._save_btn.setEnabled(False)
+        self._update_restart_hint()

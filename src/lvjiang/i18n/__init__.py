@@ -24,6 +24,8 @@ _translations: dict[str, str] = {}   # 扁平化翻译表：中文原文 → 译
 _current_language: str = "zh_CN"
 _loaded_app_i18n: set[str] = set()   # 已加载插件翻译的集合（幂等保护）
 _qt_translator: QTranslator | None = None
+#: 指定语言查询用的缓存（语言代码 → 扁平表），见 tr_in()。
+_language_tables: dict[str, dict[str, str]] = {}
 
 
 def init_i18n(language: str | None = None) -> str:
@@ -60,6 +62,26 @@ def tr(text: str) -> str:
     if _current_language == "zh_CN":
         return text
     return _translations.get(text, text)
+
+
+def tr_in(text: str, language: str) -> str:
+    """按指定语言查词表，**不改变**当前进程语言。
+
+    用于「已经保存但尚未重启」的提示：改语言后必须立刻用新语言告诉用户重启
+    才生效，而此刻进程仍在旧语言下，``tr()`` 查的是旧表，提示语会变成用户已经
+    看不懂的那一种。
+
+    只加载核心层词表（``config/i18n/{language}.yaml`` 与 ``{language}/`` 目录），
+    插件层不参与——这类提示属于软件自身文案，不属于任何插件。词表按语言缓存，
+    配置内容变更仍需重启，与 ``init_i18n`` 的既有约定一致。
+    """
+    if language == "zh_CN":
+        return text
+    table = _language_tables.get(language)
+    if table is None:
+        table = _load_translation_file(language)
+        _language_tables[language] = table
+    return table.get(text, text)
 
 
 def load_app_i18n(app_name: str) -> None:

@@ -1,671 +1,2518 @@
-auto_strings:
-  "True": "True"
-  "adb_capture_label": "ADB Capture Mode:"
-  "adb_capture_scrcpy": "Streaming (scrcpy)"
-  "adb_capture_screencap": "Static (screencap)"
-  "adb_input_agent": "On-device execution (Lvjiang app accessibility)"
-  "adb_input_label": "ADB Input Mode:"
-  "adb_input_shell": "adb shell input"
-  "adb_input_tip": "With the Lvjiang app installed and accessibility enabled, taps/drags/screenshots are performed by the app; falls back to adb when unreachable"
-  "add_title": "Add Sticky Note"
-  "app_desc": "Universal Visual RPA Engine"
-  "app_name": "LvJiang"
-  "args_invalid": "Cannot parse arguments"
-  "batch_history": "Batch History"
-  "batch_report": "Batch Report"
-  "batch_run": "Batch Run"
-  "btn_add": "+ Add Note"
-  "btn_add_regex": "+ Add Regex Rule"
-  "btn_add_replacement": "+ Add Replacement"
-  "btn_cancel": "Cancel"
-  "btn_check_update": "Check for Updates"
-  "btn_clear": "Clear"
-  "btn_clear_canvas": "Clear Canvas"
-  "btn_clear_selection": "Clear Selection"
-  "btn_close": "Close"
-  "btn_connect": "Connect"
-  "btn_continue": "Dismiss"
-  "btn_continue_tuning": "Continue Tuning"
-  "btn_copy": "Copy"
-  "btn_delete": "Delete"
-  "btn_delete_selected": "- Delete Selected"
-  "btn_details": "Reporting Guide"
-  "btn_discard": "Discard"
-  "btn_disconnect": "Disconnect"
-  "btn_download": "Download this version"
-  "btn_end_tuning": "End This Tuning Session"
-  "btn_group": "Join Group"
-  "btn_hide_preview": "Hide Preview"
-  "btn_issue": "Report on GitHub"
-  "btn_load": "Load"
-  "btn_locate": "Reveal script"
-  "btn_move_down": "Move Down"
-  "btn_move_up": "Move Up"
-  "btn_new_user": "+ New User"
-  "btn_ocr_material": "Material Recognition (F6)"
-  "btn_ocr_text": "Text Recognition (F5)"
-  "btn_pause": "⏸ Pause"
-  "btn_record": "● Record Script (F12)"
-  "btn_refresh": "Refresh Capture"
-  "btn_refresh_qr": "Refresh QR Code"
-  "btn_release_notes": "View release notes"
-  "btn_resume": "▶ Resume"
-  "btn_run": "Run"
-  "btn_scan": "Scan"
-  "btn_scan_device": "Scan Devices"
-  "btn_scan_lan": "Scan LAN..."
-  "btn_scan_lan_action": "Scan LAN"
-  "btn_scan_local": "Local Scan (Emulator)"
-  "btn_scan_local_running": "Scanning local..."
-  "btn_scan_window": "Scan Windows"
-  "btn_scanning": "Scanning..."
-  "btn_screenshot": "Screenshot"
-  "btn_show_preview": "Show Preview"
-  "btn_skip_current": "Skip Current Equipment"
-  "btn_start": "Start"
-  "btn_stop": "Stop"
-  "btn_stop_f10": "Stop (F10)"
-  "btn_stop_record": "■ Stop Recording (F12)"
-  "btn_test": "Test"
-  "btn_upload": "Upload Image"
-  "cached_error": "Refresh failed; showing cached announcements: {error}"
-  "cancel": "Cancel"
-  "cannot_delete": "Cannot delete this user"
-  "cannot_read_clipboard": "Cannot read clipboard image"
-  "caption_params": "Parameters"
-  "caption_preview": "Try it"
-  "capture_failed": "Failed to capture image"
-  "change_type_tip": "Change type: {label}"
-  "check_failed": "Update check failed"
-  "chip_delta": "Change: {value}"
-  "chip_key": "Key: {value}"
-  "chip_keyword": "Search: {value}"
-  "chip_new_text": "New value contains: {value}"
-  "chip_old_text": "Old value contains: {value}"
-  "chip_source": "Source: {value}"
-  "chip_sync_from": "Sync source: {value}"
-  "chip_time": "Time: {value}"
-  "chip_type": "Type: {value}"
-  "chip_user": "User: {value}"
-  "chk_agent": "On-device Execution"
-  "chk_bg_mode": "Background Mode"
-  "chk_scrcpy": "Streaming Capture"
-  "chk_skip": "Don't remind me about this version"
-  "claim_disabled": "License code has been disabled in the cloud"
-  "claim_expired": "License code has expired"
-  "claim_other": "License code is bound to another device"
-  "claim_pending": "License code has not been bound online"
-  "claim_unregistered": "License code is not registered; contact the issuer"
-  "cleaning_rules_hint": "Global cleaning rules: every string OCR reads passes through them.\nChanges take effect after you click \"Save\" -- no restart needed; use \"Cancel\" to discard unsaved edits."
-  "clear_batch": "Back to All Tasks"
-  "clear_filters": "Clear all filters"
-  "clear_selection": "Clear"
-  "clear_tasks_tooltip": "Clear selection and use all tasks"
-  "clear_users_tooltip": "Clear selection and use all users"
-  "clipboard_empty": "No image in clipboard"
-  "col_default": "Default"
-  "col_display_name": "Display Name"
-  "col_exposed": "Exposed"
-  "col_meaning": "Meaning"
-  "col_nature": "Type"
-  "col_original": "Original Text"
-  "col_param": "Parameter"
-  "col_params": "Params"
-  "col_regex": "Regex Pattern"
-  "col_replacement": "Replace With"
-  "col_source": "Source"
-  "col_type": "Type"
-  "confirm_close": "Confirm Close"
-  "confirm_close_message": "Are you sure you want to close this window?"
-  "confirm_delete_message": "Delete user \"{name}\"?\nAssociated user data will be cleared; saved avatars remain in the avatar library. This cannot be undone."
-  "confirm_delete_title": "Confirm Delete"
-  "confirm_exit_message": "A workflow is currently running. Closing will terminate it.\nAre you sure you want to exit?"
-  "confirm_exit_title": "Confirm Exit"
-  "conflict_builtin": "Duplicated with a built-in name; the script would be rejected at run time"
-  "content_label": "Note:"
-  "current_batch": "Showing batch run: "
-  "current_version": "Current version"
-  "delay_click_interval": "Click Interval"
-  "delay_page_refresh": "Page Refresh Wait"
-  "delay_scroll_settle": "Scroll Settle Wait"
-  "delay_step_wait": "Step Interval"
-  "delete_confirm": "Delete this sticky note?"
-  "delete_confirm_message": "Delete this history row permanently?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nChange: {delta}\n\nOnly the history row is removed; current values stay. This cannot be undone; deleting a gain row may release a quota accumulated from history."
-  "delete_error": "Failed to delete sticky note: {error}"
-  "delete_failed": "Could not delete saved avatar: {error}"
-  "delete_history": "Delete Saved Avatar"
-  "delete_history_only_tip": "Deletes the history row only; current values stay; history-based quotas change"
-  "delete_invalid": "The avatar file does not exist or has an invalid filename"
-  "delta_column": "Change"
-  "delta_decrease": "Decrease"
-  "delta_increase": "Increase"
-  "delta_zero": "Zero"
-  "details": "View Details"
-  "devices_found": "Found {count} device(s)"
-  "disconnected": "Disconnected"
-  "dismiss": "Dismiss"
-  "done": "Done"
-  "double_click": "Double-click to edit avatar"
-  "duration": "Duration"
-  "edit_action": "Edit Avatar"
-  "edit_title": "Edit Sticky Note"
-  "empty": "No sticky notes yet"
-  "empty_crop": "There is no cropped image to save"
-  "empty_error": "Sticky note content cannot be empty"
-  "empty_result": "No records match the filters"
-  "err_adb_not_supported": "ADB mode does not support recording yet"
-  "err_content_not_cleared_message": "There is unsaved recorded content. Please click \"Clear\" before recording again to avoid overwriting it."
-  "err_content_not_cleared_title": "Cannot Start Recording"
-  "err_layout_not_found": "Failed to load layout: {layout_name}"
-  "err_no_capture_source": "No capture source, please locate window first"
-  "err_no_window": "Please locate a window in the main window first"
-  "err_no_workflow": "Please select a workflow"
-  "err_panel_not_defined": "Panel {scene}.{panel} not defined in layout, please bind it in Scene Editor"
-  "err_record_failed": "Recording start failed: {e}"
-  "err_start_failed": "Start failed: {e}"
-  "err_streaming_only": "Recording requires streaming capture mode"
-  "err_workflow_running": "Cannot record while workflow is running"
-  "facet_all_tip": "Filter by {title}"
-  "facet_more_hint": "{count} more not listed; type to search"
-  "facet_multi_label": "{first} +{rest}"
-  "facet_search_placeholder": "Search {title} (type values not listed)"
-  "failure": "Failed"
-  "fetch_failed": "Failed to fetch announcements: {error}"
-  "fetching": "Fetching..."
-  "fetching_notice": "Fetching announcements..."
-  "file_missing": "File Not Found"
-  "filters": "User and task filters (multi-select; no selection means all)"
-  "first_page": "First"
-  "font_scope_tip": "Only changes content below the refresh toolbar in User Overview and User Info, including table headers. The top toolbar and bottom Data Model button remain unchanged."
-  "function_missing": "Function not found"
-  "general": "General Settings"
-  "group_hint": "Please use the community group for general usage discussion and questions"
-  "group_params": "Parameters"
-  "group_regex_replace": "Regex Replacement"
-  "group_region_batch": "Batch Region Recognition"
-  "group_script": "Script"
-  "group_test": "Test Cleaning"
-  "group_text_replace": "Text Replacement (exact match)"
-  "heading": "Prepare complete diagnostic information before reporting an issue"
-  "high_copy_disabled": "High-precision workflows require their companion trace and cannot be copied alone"
-  "hover_hint": "Hover to edit, or double-click the avatar"
-  "image_file_filter": "Image Files (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)"
-  "image_filter": "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
-  "import": "Import Image"
-  "import_failed": "Import Failed"
-  "import_placeholder": "Import an image or paste from the clipboard"
-  "import_title": "Import Avatar Image"
-  "in_use_message": "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove the avatar for these users first."
-  "in_use_title": "Avatar In Use"
-  "injected_tip": "Needs engine injection (_engine/_wf); only callable while a script runs"
-  "input_mode_label": "Window Input Mode:"
-  "input_postmessage": "Background (PostMessage)"
-  "input_sendinput": "Foreground (SendInput)"
-  "input_username_prompt": "Enter username:"
-  "invalid": "Invalid member authorization request"
-  "invalid_date_order": "Start date cannot be later than end date"
-  "invalid_date_range": "Invalid Date Range"
-  "jump_page": "Go to"
-  "key_column": "Key"
-  "keyword_placeholder": "Search values / sources / users / keys"
-  "label": "Online member authorization"
-  "label_all_groups": "- All -"
-  "label_created_at": "Created"
-  "label_current_layout": "Current Layout"
-  "label_current_user": "Current User"
-  "label_group": "Group"
-  "label_log_level": "Log Level"
-  "label_match_group": "Match Group:"
-  "label_max_content_height": "Maximum content height per batch:"
-  "label_min_canvas_side": "Minimum canvas side:"
-  "label_no_window": "No window selected"
-  "label_not_connected": "No device connected"
-  "label_not_located": "No window located"
-  "label_ocr_result": "Recognition Results (with cleaning rules applied):"
-  "label_preview_placeholder": "Locate window to capture"
-  "label_region_gap": "Region gap:"
-  "label_returns": "Returns"
-  "label_scan_subnet": "Scan subnet:"
-  "label_select_device": "Please select a device and click connect..."
-  "label_select_window": "Please select a target window..."
-  "label_source": "Source"
-  "label_username": "Username"
-  "language_label": "Interface Language"
-  "last_page": "Last"
-  "latest_version": "Latest version"
-  "layout_default": "Default Layout"
-  "layout_phone": "Phone Layout"
-  "length_error": "Sticky note content cannot exceed {limit} characters"
-  "level": "License level is insufficient for this member package"
-  "level_critical": "Critical"
-  "level_info": "Notice"
-  "level_warning": "Warning"
-  "library": "Avatar Library"
-  "library_hint": "Choose a saved avatar or import a new image"
-  "load_error": "Failed to load sticky notes: {error}"
-  "local_no_device_msg": "No open emulator ADB port found on this machine.\n\nPlease ensure:\n1. The emulator is running\n2. ADB debugging is enabled in the emulator"
-  "log_local_no_device": "[Scan] No open emulator ADB port found on this machine"
-  "log_scanning_local": "[Scan] Probing local emulator ADB ports..."
-  "member_expired": "Member authorization has expired"
-  "menu_about": "About"
-  "menu_announcements": "Announcements"
-  "menu_batch_config": "Batch Config"
-  "menu_check_update": "Check for Updates"
-  "menu_docs": "Documentation"
-  "menu_feedback": "Feedback"
-  "menu_general": "General"
-  "menu_help": "Help"
-  "menu_ocr": "Image Recognition"
-  "menu_reference_mgr": "Reference Manager"
-  "menu_scene_editor": "Scene Editor"
-  "menu_script_config": "Script Config"
-  "menu_script_record": "Script Recording"
-  "menu_settings": "Settings"
-  "menu_tools": "Tools"
-  "menu_user_mgmt": "User Management"
-  "missing_path": "The corresponding file is missing or has been moved"
-  "multi_value_summary": "{noun} · {count} selected"
-  "new_user_title": "New User"
-  "next_page": "Next"
-  "no_adb_device_msg": "No USB-connected ADB device found.\n\nPick a subnet to scan the LAN (device needs wireless debugging on),\nor scan local ports to find an emulator."
-  "no_adb_device_title": "No ADB Device Found"
-  "no_batches": "No matching batch history"
-  "no_cache": "No announcements have been fetched. Click Refresh to sync."
-  "no_clipboard_image": "No image in clipboard"
-  "no_device_found": "No Device Found"
-  "no_image": "No valid image was found"
-  "no_material_found": "No material recognized (empty slot or no match)"
-  "no_package": "No member package matches this version; cloud authorization has not been checked"
-  "no_release_notes": "No detailed release notes are available for this release."
-  "no_summary": "(no description)"
-  "no_tasks": "No matching task history"
-  "no_text_found": "No text recognized"
-  "no_window_found": "No window found"
-  "not_recorded": "Not recorded"
-  "ocr_canvas_placeholder": "Ctrl+V to paste screenshot, or click \"Upload Image\""
-  "ocr_failed": "Recognition failed"
-  "open_batch_report": "Open Batch Report"
-  "open_log": "Open Execution Log"
-  "open_result": "Open Execution Result"
-  "opened_external": "Opened in external editor: "
-  "package_denied": "Cloud member package unavailable or license level insufficient"
-  "page_status": "Page {page} / {pages} · {start}–{end}"
-  "page_unit": "rows"
-  "param_placeholder": "Leave empty to use default"
-  "paste_failed": "Cannot Paste"
-  "paste_hint": "Drag to position, use the wheel or slider to zoom · Ctrl+V to paste"
-  "payload 必须是 JSON 对象": "payload must be a JSON object"
-  "per_page": "Per page"
-  "placeholder_test_input": "Enter test text..."
-  "placeholder_test_output": "Cleaning result..."
-  "precision_high": "High precision (raw game input)"
-  "precision_label": "Recording precision"
-  "precision_low": "Low precision (editable workflow)"
-  "precision_tip_high": "Saves a workflows/lvtrace companion file, faithfully replaying raw input"
-  "precision_tip_low": "Merges movement and short waits at 100ms granularity into editable DSL commands"
-  "preview_placeholder": "Result appears here"
-  "preview_stopped": "Preview stopped"
-  "previous_page": "Previous"
-  "privacy": "Redact account details, character names, ADB serial numbers, tokens, and other private information before submitting logs or screenshots."
-  "qr_failed": "Failed to load the community group QR code"
-  "qr_refresh_done": "QR code updated"
-  "qr_refresh_failed": "Refresh failed, kept the current QR code: {error}"
-  "qr_refresh_pending": "Fetching the latest QR code..."
-  "query": "Search"
-  "read_failed": "Could not read image: {error}"
-  "recognition_config_hint": "Batch region recognition combines multiple text regions into one canvas and runs OCR once.\nThese settings control the composite image size and apply from the next recognition run after saving."
-  "reference_failed": "Could not update the user avatar reference"
-  "refreshing_qr": "Refreshing..."
-  "remove_condition": "Remove this condition"
-  "remove_failed": "Could not remove avatar: {error}"
-  "required_backend": "Capture method, input method, workflow name, and all parameters"
-  "required_environment": "Runtime environment, layout, device resolution, and orientation"
-  "required_evidence": "Continuous logs around the failure; screenshots or video for recognition and input issues"
-  "required_reproduction": "Reproduction steps, expected and actual results, and frequency"
-  "required_title": "Bug reports must include at least"
-  "required_version": "LvJiang version; source builds must also include the commit hash"
-  "reset": "Reset"
-  "restore_scope": "Restore entry scope"
-  "restore_scope_tip": "Go back to the range this dialog opened with"
-  "root_builtin": "Built-in Functions"
-  "root_script": "Local Scripts"
-  "save_error": "Failed to save sticky note: {error}"
-  "save_failed": "Could not save avatar: {error}"
-  "save_use": "Save and Use"
-  "save_workflow_filter": "Workflow Files (*.wf);;All Files (*)"
-  "save_workflow_title": "Save as Workflow File"
-  "scope_accepted": "Accepted: reproducible bugs, feature requests, and outdated or unusable documentation."
-  "scope_key": "Key: {label}"
-  "scope_rejected": "Not accepted: one-to-one tutorials, remote setup, incomplete reports, explicitly unsupported features, third-party modifications, or commercial use."
-  "scope_title": "Support scope"
-  "scope_user": "User {name}"
-  "screenshot_failed": "Screenshot failed"
-  "screenshot_hint": "Get the latest screenshot from the current device or window"
-  "script_missing": "Script file not found: "
-  "search_hint": "Search functions by name or description"
-  "section_basic": "Basic Info"
-  "select_batch": "Select a batch run to view its input snapshot"
-  "select_image_title": "Select Image"
-  "select_task": "Select a task run to view its input parameters and file paths"
-  "selection_cleared": "Selection cleared"
-  "selection_empty": "Selection area is empty"
-  "showing_all": "Showing all records"
-  "single_run": "Single Run"
-  "source_builtin": "Built-in"
-  "source_edit_tip": "Double-click to edit the source"
-  "source_plugin": "Plugin"
-  "source_update_conflict": "This record has changed; refresh and try again"
-  "source_update_failed": "Update Failed"
-  "status_cleared": "Cleared"
-  "status_connect_failed": "Connection failed | See logs"
-  "status_connecting": "Connecting to device..."
-  "status_copied": "Copied to clipboard"
-  "status_device_connected": "Device connected"
-  "status_device_scanned": "Devices scanned | Select device and click Connect"
-  "status_disconnected": "Device disconnected"
-  "status_done": "Recording done. Edit and save as .wf"
-  "status_done_empty": "Recording ended, no valid actions captured"
-  "status_error": "Execution error"
-  "status_idle": "Idle | Click \"Record Script\" or press F12"
-  "status_no_device_hint": "No device found | Try LAN scan"
-  "status_no_local_hint": "No device found | Make sure the emulator is running"
-  "status_no_wireless_hint": "No device found | Check wireless debugging"
-  "status_ocr_material": "Recognizing materials..."
-  "status_ocr_text": "Recognizing text..."
-  "status_paused": "Paused"
-  "status_pending_save": "Pending save"
-  "status_ready": "Ready"
-  "status_recognition_config_discarded": "Discarded unsaved recognition setting changes"
-  "status_recognition_config_saved": "Recognition settings saved"
-  "status_recording": "Recording... Raw Input move/click/drag/scroll/press; F12 or click to stop"
-  "status_recording_high": "Recording in high precision... writing raw input to one timeline; F12 or click to stop"
-  "status_recording_low": "Recording in low precision... continuous movement will be merged; F12 or click to stop"
-  "status_refresh_failed": "Refresh capture failed"
-  "status_refreshing": "Refreshing capture..."
-  "status_rules_saved": "Cleaning rules saved"
-  "status_saved": "Settings saved"
-  "status_scan_cancelled": "Scan cancelled"
-  "status_scan_failed": "Scan failed | See logs"
-  "status_scanning_device": "Scanning devices..."
-  "status_scanning_lan": "Scanning LAN..."
-  "status_scanning_local": "Scanning local emulators..."
-  "status_scanning_window": "Scanning windows..."
-  "status_stopped": "Execution stopped"
-  "status_window_located": "Window located"
-  "status_window_scanned": "Windows scanned | Select target and click Locate"
-  "status_window_unlocated": "Window location cleared"
-  "status_workflow_done": "Workflow completed"
-  "status_workflow_error": "Execution error"
-  "status_workflow_stopped": "Workflow stopped"
-  "subnet_all": "All adapters (default)"
-  "summary": "Only reports with enough information to reproduce or diagnose the problem enter developer triage; acceptance does not promise a fix date."
-  "summary_gained": "Increase {value}"
-  "summary_spent": "Decrease {value}"
-  "sync_from_column": "Sync Source"
-  "tab_basic": "Basic"
-  "tab_batch": "Batch"
-  "tab_cleaning_rules": "Cleaning Rules"
-  "tab_daily": "Daily"
-  "tab_dedicated": "Dedicated"
-  "tab_fonts": "Font Settings"
-  "tab_input": "Input Simulation"
-  "tab_log": "Run Log"
-  "tab_ocr": "Image Recognition"
-  "tab_profile": "User Overview"
-  "tab_recognition_config": "Recognition Settings"
-  "tab_title": "Built-in Functions"
-  "tab_user_info": "User Info"
-  "tab_wait": "Wait Parameters"
-  "text_0": "Fetch Models"
-  "text_1": "Cancel Request"
-  "text_10": "Save failed. Check configuration directory permissions."
-  "text_11": "AI configuration saved"
-  "text_12": "Testing connection…"
-  "text_13": "Connection available: the model returned text ({seconds} seconds)"
-  "text_14": "Connection test cancelled"
-  "text_15": "Connection test failed. Check connection settings."
-  "text_16": "Invalid API address"
-  "text_17": "Enter a complete HTTP/HTTPS base URL without credentials, query parameters, or fragments."
-  "text_18": "Enter a model name"
-  "text_19": "Request timeout must be between 1 and 300 seconds"
-  "text_2": "AI request cancelled"
-  "text_20": "Request timed out. Check the network or increase the timeout."
-  "text_21": "Connection failed. Check the API address, network, and certificate."
-  "text_22": "Authentication failed. Check the API key and model access permissions."
-  "text_23": "API endpoint or model not found. Check the base URL and model name."
-  "text_24": "Rate limit or insufficient quota. Check your provider account."
-  "text_25": "The model refused the request"
-  "text_26": "The model response was truncated"
-  "text_27": "No valid text response. Check that the service supports Chat Completions."
-  "text_28": "System credential store unavailable. You can enter a key temporarily for testing; enable the credential store to save it."
-  "text_29": "Cannot read system credentials. Check that the credential store is unlocked."
-  "text_3": "AI request failed. Check connection settings."
-  "text_30": "Cannot update system credentials. Connection settings were not saved."
-  "text_4": "Fetching model list…"
-  "text_5": "Fetched {count} models. Select a model and test the connection."
-  "text_6": "The model list is empty. Enter a model name manually and test the connection."
-  "text_7": "No valid model list was returned. Enter a model name manually and test the connection."
-  "text_8": "Test Connection"
-  "text_9": "Cancel Test"
-  "theme_to_dark": "Switch to dark theme"
-  "theme_to_light": "Switch to light theme"
-  "time_custom": "Custom"
-  "time_month": "Last 30 days"
-  "time_quarter": "Last 90 days"
-  "time_today": "Today"
-  "time_week": "Last 7 days"
-  "too_large": "The image is too large; choose an image under 40 megapixels"
-  "tooltip_clear_selection": "Clear red selection box"
-  "tooltip_max_content_height": "The maximum total content height in one batch. Additional regions are moved to the next batch."
-  "tooltip_min_canvas_side": "The minimum width and height of the composite canvas. A smaller value can cause the OCR detector to enlarge narrow regions excessively."
-  "tooltip_refresh": "Get latest capture from device"
-  "tooltip_region_gap": "Spacing between adjacent text regions in the composite image."
-  "total_records": "{total} records"
-  "type_increment": "Increment"
-  "type_overwrite": "Overwrite"
-  "unavailable": "Online check incomplete; review configuration sync logs and retry"
-  "undeclared": "(not declared)"
-  "undo": "Undo"
-  "undo_confirm_message": "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndo writes a new record in the opposite direction."
-  "undo_confirm_title": "Confirm Undo"
-  "undo_failed": "Undo Failed"
-  "unparsable": "Cannot parse"
-  "unsaved_message": "Recording has not been saved or copied. Close anyway?"
-  "unsaved_ocr_config": "The OCR settings have unsaved changes; closing will discard them.\nSave first?"
-  "unsaved_title": "Unsaved"
-  "update_available": "New version v{latest} available.\nCurrent: v{current}\n\nDownload now?"
-  "update_latest_message": "Version v{current} is the latest"
-  "update_latest_title": "Up to Date"
-  "use_selected": "Use This Avatar"
-  "user_created": "User created: {name}"
-  "user_deleted": "User deleted: {name}"
-  "user_info_font_size": "User Info Font Size"
-  "user_overview_font_size": "User Overview Font Size"
-  "username_exists": "Username already exists"
-  "username_invalid": "Usernames may contain Chinese characters, letters, digits, underscores and hyphens only, up to 32 characters."
-  "version_prefix": "Version"
-  "view_tasks": "View All Tasks"
-  "window_closed": "Window closed"
-  "window_located": "Window located"
-  "window_title_label": "Default Window Title:"
-  "window_title_placeholder": "Empty = no auto-locate"
-  "wireless_no_device_msg": "No connectable ADB device found on LAN.\n\nPlease ensure:\n1. Device and PC are on the same LAN\n2. Wireless debugging is enabled (Developer Options)\n3. With multiple adapters, pick the target subnet or use Local Scan"
-  "wireless_no_device_title": "No Device Found"
-  "workflow_confirm": "Workflow Confirmation"
-  "workflow_desc": "Window capture → Region annotation → OCR → Workflow execution"
-  "workflow_input": "Workflow Input"
-  "workflow_pause": "Workflow Paused"
-  "workflow_running": "Workflow Running"
-  "zoom": "Zoom"
-  "{filename} 的 kind 无效: {kind}；可选 {allowed}": "{filename} has an invalid kind: {kind}; allowed: {allowed}"
-  "{filename} 顶层含未知字段: {keys}": "{filename} has unknown top-level fields: {keys}"
-  "{kind} 不是单选来源，不能用 selections 指定": "{kind} is not a single-choice source and cannot be set via selections"
-  "{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix": "{label}: dimension affixes must name the dimension in stats; full_affix is not supported"
-  "{label}: 未知属性字段 {field}": "{label}: unknown stat field {field}"
-  "{label}: 等级 {level} 没有词条 {category} 的上限配置": "{label}: no cap configured for affix {category} at level {level}"
-  "{label}: 词条 {category} 未登记字段映射": "{label}: affix {category} has no field mapping"
-  "{n} 个属性靠补足": "{n} stat(s) rely on the gap"
-  "{school} 推导": "{school} derived"
-  "{source} 含未知字段: {keys}": "{source} has unknown fields: {keys}"
-  "{source} 声明了 split 却没有 full_affix": "{source} declares split without full_affix"
-  "{source} 既声明无静态属性又填了数值，取哪个无从判断": "{source} declares no static stats yet also carries values; which one applies is undecidable"
-  "{source} 的 full_affix 不受支持: {name}；可用 {allowed}": "{source}: full_affix {name} is not supported; available: {allowed}"
-  "{source} 的 full_affix 必须是词条类别名": "{source}: full_affix must be an affix category name"
-  "{source} 的 group 必须是字符串": "{source}: group must be a string"
-  "{source} 的 label 必须是字符串": "{source}: label must be a string"
-  "{source} 的 modeled 必须是布尔值": "{source}: modeled must be a boolean"
-  "{source} 的 no_effect 必须是布尔值": "{source}: no_effect must be a boolean"
-  "{source} 的 scope 只能是 {allowed}": "{source}: scope must be one of {allowed}"
-  "{source} 的 tier 必须是非负整数": "{source}: tier must be a non-negative integer"
-  "{what} 不是已知属性字段": "{what} is not a known stat field"
-  "{what} 含未知公式字段: {keys}": "{what} has unknown formula fields: {keys}"
-  "{what} 必须是数值，实际是 {kind}": "{what} must be a number, got {kind}"
-  "{what} 必须是映射，实际是 {kind}": "{what} must be a mapping, got {kind}"
-  "{what} 是映射时必须含 formula": "{what} must contain formula when it is a mapping"
-  "{what} 的 formula 之外还有多余的键: {keys}": "{what} has keys besides formula: {keys}"
-  "{what} 的 round 必须是整数": "{what}: round must be an integer"
-  "{what} 的 source 不是已知属性字段: {source}": "{what}: source is not a known stat field: {source}"
-  "{what} 的 split 必须是两个整数，如 [1, 2]": "{what}: split must be two integers, e.g. [1, 2]"
-  "{what} 缺少 source": "{what} is missing source"
-  "—": "—"
-  "「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑": "Values for \"one full affix\" come from the affix cap of the current level, so a new season only needs the affix config updated; use Advanced for entries with several stats or a formula"
-  "不绑定（使用坐标点击）": "Unbound (use coordinate tap)"
-  "不能启动": "Cannot start"
-  "与对照完全一致": "Matches the reference exactly"
-  "与对照有 {n} 项不一致，看「按来源拆分」定位": "{n} field(s) differ from the reference; use the per-source breakdown to locate them"
-  "仅战斗内": "Combat only"
-  "以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算": "The three above describe the build only; they do not affect rating, auto-tuning or graduation rate"
-  "以下文件解析失败，已跳过：{files}": "These files failed to parse and were skipped: {files}"
-  "以下流派仍在使用该武学：{schools}": "Still used by these schools: {schools}"
-  "以下调律规则仍在引用该玩法：{rules}": "Still referenced by these tuning rules: {rules}"
-  "作用域": "Scope"
-  "保存时包含未建模补足": "Include the unmodelled gap when saving"
-  "修改失败": "Modify failed"
-  "停止中": "Stopping"
-  "全部": "All"
-  "关闭此告警": "Dismiss this alert"
-  "其中 {n} 项尚未填数值": "{n} of them have no values yet"
-  "其他来源": "Other sources"
-  "分组 '{name}' 已存在": "Group '{name}' already exists"
-  "分组名称": "Group name"
-  "删除「{name}」的 {n} 个条目？": "Delete the {n} entries of \"{name}\"?"
-  "删除失败": "Delete Failed"
-  "删除条目": "Delete Entries"
-  "删除玩法": "Remove Playstyle"
-  "删除选中": "Delete Selected"
-  "加载失败": "Load failed"
-  "参与推导 {n} 项": "{n} contributions included"
-  "反解目标含未知字段: {field}": "Back-solve target has an unknown field: {field}"
-  "反选": "Invert Selection"
-  "取值": "Value"
-  "取值方式": "Value kind"
-  "另有 {n} 项仅战斗内生效，不进本表": "{n} more apply in combat only and are not listed here"
-  "同一门心法不能装在多个槽位": "The same inner way cannot occupy two slots"
-  "名字 = 调律 Tab 勾选项；\n增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。": "Name = Tuning Tab checkbox item;\nLeave damage affix empty / select '- No Damage -' = no damage boost needed on that side;\nAttribute = gameplay element school (non-weapon slots use element→no-equal equivalence);\nBind switch = this gameplay judgment equals activating that switch (overrides global state);\nWeapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon."
-  "名称": "Name"
-  "基础属性推导": "Derive Base Attributes"
-  "存为基础属性": "Save as base attributes"
-  "对照值": "Reference"
-  "对照基础属性": "Reference set"
-  "尚未配装，先在左侧选心法与其他来源": "Nothing equipped yet — pick inner ways and other sources on the left"
-  "属性与主副武学由绑定流派提供，已锁定": "Attribute and martial arts come from the bound school and are locked"
-  "属性来源": "Attribute Sources"
-  "属性来源条目名不能为空": "Entry name cannot be empty"
-  "属性来源条目已存在: {ids}": "Entry already exists: {ids}"
-  "属性配置": "Attribute Config"
-  "已中断": "Interrupted"
-  "已保存": "Saved"
-  "已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）": "Saved to the system layer, but the local copy is still effective; restore the local override to apply the system change ({now})"
-  "已填": "Filled"
-  "已存为基础属性「{name}」，毕业率可直接选用": "Saved as base attributes \"{name}\"; graduation rate can use it directly"
-  "已锁定": "Locked"
-  "当前方案不支持所选后端，请切换方案或连接方式": "The current plan doesn't support the selected backend; switch plan or connection method"
-  "当前生效：{current}": "Currently effective: {current}"
-  "当前目标正在执行其他任务，请到对应任务页操作停止或暂停": "The current target is running another task; stop or pause it from its task page"
-  "待填": "To fill"
-  "待填 {n} 条": "{n} still to fill"
-  "心法重数只能是 1-{max}：{name} 填了 {tier}": "Inner way tier must be 1-{max}: {name} got {tier}"
-  "心法（{n} 个槽）": "Inner Ways ({n} slots)"
-  "所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」": "All playstyles are referenced; create new ones in Game Config → Playstyles"
-  "手填补足": "Manual remainder"
-  "执行用户": "Executing User"
-  "按来源拆分": "By source"
-  "排序": "Sort"
-  "推导值": "Derived"
-  "推导失败": "Derivation failed"
-  "推导失败：{msg}": "Derivation failed: {msg}"
-  "攻具定音": "Attack Gear Dingyin"
-  "新增失败": "Add Failed"
-  "新增条目": "New Entry"
-  "新增武学": "New Martial Art"
-  "新增玩法": "New Playstyle"
-  "新建": "New"
-  "方案不支持": "Unsupported by plan"
-  "无": "None"
-  "无法删除": "Cannot Delete"
-  "无静态属性": "No static stats"
-  "是": "Yes"
-  "暂停中...": "Pausing..."
-  "最多同时装备 {n} 门心法，给了 {got} 门": "At most {n} inner ways can be equipped, got {got}"
-  "未保存的修改": "Unsaved Changes"
-  "未保存的更改": "Unsaved Changes"
-  "未定位": "Not located"
-  "未建模补足": "Unmodelled gap"
-  "未知作用域: {scope}": "Unknown scope: {scope}"
-  "未知来源类别: {kind}": "Unknown source kind: {kind}"
-  "未知流派属性: {attr}": "Unknown school attribute: {attr}"
-  "未知的属性来源条目: {ids}": "Unknown stat source entries: {ids}"
-  "未连接": "Not connected"
-  "未选对照，只显示推导值": "No reference selected; showing derived values only"
-  "未选择": "Not Selected"
-  "未配置": "not configured"
-  "本地": "Local"
-  "本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}": "This page {done}/{total} confirmed　All sources {all_done}/{all_total}"
-  "条目": "Entry"
-  "条目内容必须是映射": "Entry content must be a mapping"
-  "条目名（分组用「·」分隔，如 易水歌·二重）：": "Entry name (group and item separated by \"·\", e.g. 易水歌·二重):"
-  "来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值": "While sources are incomplete the gap is solved from the reference panel; uncheck to save the model value alone"
-  "槽 {n}": "Slot {n}"
-  "次数": "Count"
-  "武学类型": "Martial Art Type"
-  "武学配置": "Martial Arts"
-  "武学：{arts}（由流派决定，不需选择）": "Martial arts: {arts} (set by the path, not selectable)"
-  "流派与玩法只引用武学，武器由此派生，不在别处录入": "Schools and playstyles reference arts only; the weapon is derived here"
-  "状态": "Status"
-  "玩法": "Playstyle"
-  "玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用": "Playstyles are defined in Game Config → Playstyles; referenced here only"
-  "玩法类型": "Playstyle Type"
-  "玩法配置": "Playstyles"
-  "现有版本：{count} 份，来自 {sources} 个来源": "{count} versions from {sources} sources"
-  "用户名": "Username"
-  "目标": "Target"
-  "直接编辑该条目的 YAML。可用键：stats、extra、full_affix、split、scope、no_effect、label": "Edit this entry's YAML directly. Keys: stats, extra, full_affix, split, scope, no_effect, label"
-  "确定要关闭此窗口吗？": "Close this window?"
-  "确认关闭": "Confirm Close"
-  "磁盘配置已更新": "Config Updated on Disk"
-  "空": "Empty"
-  "等级": "Level"
-  "简体中文": "简体中文"
-  "结束任务": "End Task"
-  "编辑…": "Edit..."
-  "编辑器打开之后，磁盘上的这些配置被其他窗口或程序改过：": "While this editor was open, these configs were changed on disk by another window or program:"
-  "自定义玩法可自由选择属性与武学，并显示全部防具定音": "Custom playstyles can freely select attributes and martial arts and show all armor dingyin options"
-  "词条拆分比无效: {split}": "Invalid affix split ratio: {split}"
-  "该武学已存在": "That martial art already exists"
-  "该玩法已存在": "That playstyle already exists"
-  "请先定位窗口或连接设备，并选择执行目标": "Locate a window or connect a device first, and select an execution target"
-  "请先扫描并连接设备": "Scan and connect a device first"
-  "请先扫描窗口并点击定位": "Scan windows and click Locate first"
-  "跟随当前用户": "Follow current user"
-  "轮": "round(s)"
-  "进面板": "On panel"
-  "选择「是」会用当前编辑内容覆盖它们，磁盘上的改动将丢失；选择「否」放弃本次保存，请关闭编辑器重新打开、确认最新内容后再改。": "Yes overwrites them with the current editor content and disk changes are lost. No discards this save — close and reopen the editor, review the latest content, then edit."
-  "重复": "Duplicate"
-  "重置": "Reset"
-  "防具定音": "Armor Dingyin"
-  "随武学": "From art"
-  "高级编辑 - {name}": "Advanced edit - {name}"
-  "（不对照）": "(no reference)"
-  "（不选）": "(none)"
-  "（无）": "(None)"
-  "（空）": "(Empty)"
+about:
+  仅限非商业使用: Non-commercial use only
+  律匠: LvJiang
+  本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。: This project is for learning and technical research only. Using automation tools to operate games may violate the relevant game's user agreement; users bear the consequences themselves.
+  本项目源码公开、免费使用: Open source and free to use
+  窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行: Window capture → region annotation → OCR → workflow execution
+  软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。: The software is provided as is, without warranty of any kind; the author is not liable for any loss caused by using it.
+  通用视觉 RPA 引擎: General-purpose Visual RPA Engine
+account_dialog:
+  上行: Upload
+  下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Data for the following users will follow the cloud snapshot; local data will be overwritten:'
+  下行: Download
+  云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: "The cloud baseline is empty.<br>Source: {origin}<br>Time: {created}<br>Entries: 0<br><br>Continuing will fill the baseline from this machine's current overview; local users are not backed up or replaced."
+  ? 云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。
+  : 'A cloud snapshot already exists.<br>Source: {origin}<br>Time: {created}<br>Entries: {count}{warning}<br><br>Continuing will first back up local users, overview definitions and overview data to config/session/_backup-*, then pull cloud data.'
+  修改密码: Change Password
+  修改密码…: Changing password…
+  创建快照: Create Snapshot
+  初始同步: Initial Sync
+  功能: Feature
+  在浏览器中打开注册页面: Open the registration page in a browser
+  在浏览器打开自助操作页：导出数据、清除云端数据、注销账号: 'Open the self-service page in a browser: export data, clear cloud data, delete account'
+  定义: Definitions
+  密码: Password
+  ? "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。"
+  : "This clears cloud definitions, users, documents and overview data (account and login state are kept).\nThis cannot be undone; local data is not deleted."
+  已取消覆盖：本机数据未改动，profile 同步未启用。: 'Overwrite cancelled: local data unchanged, profile sync not enabled.'
+  平台: Platform
+  当前密码: Current password
+  当前设备不是初始同步设备: This device is not the initial-sync device
+  总览: Overview
+  ? "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。"
+  : "Upload all local character data as the cloud overview baseline.\nInitial sync creates one automatically; click manually later when needed."
+  操作未完成: Operation not completed
+  数据同步: Data Sync
+  文档: Documentation
+  新密码至少 8 位: The new password must be at least 8 characters
+  新密码（至少 8 位）: New password (at least 8 characters)
+  显示密码: Show password
+  最近同步时间：{}: 'Last sync: {}'
+  最近活跃: Last active
+  未知设备: Unknown device
+  检测到云端覆盖待确认；点「立即同步」处理。: A pending cloud overwrite awaits confirmation; click "Sync now" to handle it.
+  正在修改密码…: Changing password…
+  正在刷新快照…: Refreshing snapshot…
+  正在同步…: Syncing…
+  正在备份并应用云端快照…: Backing up and applying the cloud snapshot…
+  正在清除同步…: Clearing sync…
+  正在登录…: Signing in…
+  注册: Register
+  清除同步: Clear Sync
+  登出: Sign out
+  登录: Sign in
+  登录后可同步角色名册、文档与总览数据: Sign in to sync rosters, documents and overview data
+  确定让该设备下线？该设备上的全部会话会立即失效。: Take this device offline? All sessions on it will be invalidated immediately.
+  确认后会先把本机 profile 数据备份到 config/session/_sync-backup-<时间戳>/，再应用云端快照；可在该目录恢复。: After confirmation, local profile data is backed up to config/session/_sync-backup-<timestamp>/ before applying the cloud snapshot; you can restore from that directory.
+  立即同步: Sync Now
+  自助服务…: Self-service…
+  设备: Appareil
+  设备登出: Sign out device
+  设备管理: Device Management
+  请先点「初始同步」建立同步状态: Click "Initial Sync" first to establish sync state
+  请输入密码: Enter your password
+  请输入账户: Enter your account
+  读取本机总览失败：{error}: 'Failed to read the local overview: {error}'
+  账户: Account
+  账户管理: Account Management
+  这是本机：下线后需要重新登录。: "This is the local machine: you'll need to sign in again after signing it out."
+  进度: Progress
+  退出所有设备: Sign out all devices
+  退出登录: Sign out
+  通道: Channel
+  隐藏密码: Hide password
+  ? "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"
+  : "First time: establish sync state between this machine and the cloud. If the cloud already has data, local\nusers, overview definitions and overview data are backed up to config/session/_backup-* before pulling."
+  ；等 {} 项: ; {} more items
+action_catalog:
+  0=红 1=绿 2=蓝: 0=Red 1=Green 2=Blue
+  ESC / 字母键 / MOUSE_LEFT；设备端 ESC=返回: ESC / letter keys / MOUSE_LEFT; on-device ESC = Back
+  OCR 扫描区域: OCR Scan Region
+  PC 端通过剪贴板和 Ctrl+V 输入文本，支持后台模式: On PC, types text via clipboard and Ctrl+V; supports background mode
+  find 结果、矩形或坐标变量: find result, rectangle, or coordinate variable
+  '「{label}」应为 #rrggbb': '"{label}" should be #rrggbb'
+  「{label}」应为 {n} 个数: '"{label}" should be {n} numbers'
+  「{label}」未填写: '"{label}" is not filled in'
+  不带 by 得到文字；带 by 得到命中与否: Without `by`, returns the text; with `by`, returns whether it matched
+  不抖动: No jitter
+  主导通道: Dominant Channel
+  交互: Interaction
+  亮段计数: Bright-Segment Count
+  值/表达式: Value/Expression
+  停止应用: Stop App
+  内容: Content
+  出错也继续: Continue on Error
+  列表: List
+  到达后按住(秒): Hold After Arriving (sec)
+  匹配: Match
+  区域/点: Region/Point
+  区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Fraction (0-1) of pixels in the region close to the target color; used to tell whether a button is lit / which screen is showing
+  取点亮度: Sample Point Brightness
+  取点颜色: Sample Point Color
+  只判断是否含: Only Check Contains
+  只看某区域: Only Look at a Region
+  向量倍数: Vector multiplier
+  启动应用: Start App
+  命名延迟，留空则不等待: Named delay; leave empty to skip waiting
+  图库识别（分类）: Gallery Recognition (Classification)
+  图色: Pixel Color
+  声明全局变量: Declare Global Variable
+  声明后可在主流程与所有子过程中共享读写: Shared for reading and writing by the main flow and all subprocedures after declaration
+  失败退出: Exit on Failure
+  如 $x > 0.5 / $v contains "ok" / not $hit: e.g. $x > 0.5 / $v contains "ok" / not $hit
+  如果…: If…
+  如果…否则…: If… Else…
+  字符串写双引号，或使用 $变量: Strings in double quotes, or use $variables
+  存入变量: Store in Variable
+  定义区域变量: Define Region Variable
+  定义子过程: Define Subprocedure
+  容差: Tolerance
+  应用名: App name
+  延迟: Delay
+  当…时重复: Repeat While…
+  形如 [scene].[region]: 'Format: [scene].[region]'
+  形如 [scene].[region]，留空全画布: 'Format: [scene].[region]; leave empty for the full canvas'
+  形如 [scene].[region]；留空则搜索整个画布: Like [scene].[region]; empty searches the whole canvas
+  循环变量: Loop Variable
+  感知: Perception
+  截图存档: Screenshot Archive
+  打日志: Write Log
+  找同色图标: Find Same-Color Icon
+  找图（模板定位）: Find Image (Template Match)
+  找文字（可点击）: Find Text (Clickable)
+  拖拽区域翻页: Drag Region to Page
+  拖拽（两点）: Drag (Two Points)
+  按住(秒/区间): Hold (seconds/range)
+  按区域绑定找图: Find image by region binding
+  按压按键/鼠标键: Press a key or mouse button
+  按布局中 Region 绑定的模板匹配，返回首个命中的区域 key: Match templates bound to Region in the layout; returns the first hit's region key
+  按应用注册类型停止 Android 或 PC 应用，并确认进程消失: Stop an Android or PC app per its registration type and confirm the process is gone
+  按应用注册类型启动 Android 或 PC 应用，并确认进程出现: Start an Android or PC app per its registration type and confirm the process appears
+  控制流: Control Flow
+  搜索范围: Search Range
+  操作后等待: Wait After Action
+  收集到输出: Collect into Output
+  数据与输出: Data & Output
+  文字: Text
+  文本/变量: Text/variable
+  暂停等人工: Pause for Manual Action
+  最低分(0-1): Min Score (0-1)
+  最长等待(秒): Max Wait (sec)
+  模板匹配区域: Template Match Region
+  模板区域: Template Region
+  模板场景: Template Scene
+  滑动时长(秒/区间): Swipe duration (seconds/range)
+  激活区域: Activate Region
+  激活布局实体；默认点击中心，布局可改为按键: Activate a layout entity; click its center by default or use a layout-bound key
+  点击变量: Click Variable
+  点击坐标: Click Coordinate
+  点击画布归一化坐标: Click Canvas-Normalized Coordinate
+  画布上点一下取值: Click on the Canvas to Pick a Value
+  画布框选取值: Box-Select on Canvas to Pick a Value
+  画布框选的区域存成变量，之后 click / 图色函数都能用: The region boxed on the canvas is stored as a variable, usable later by click / pixel-color functions
+  目标色: Target Color
+  秒: sec
+  等待画面稳定: Wait for Screen to Settle
+  等待（命名延迟）: Wait (Named Delay)
+  等待（秒）: Wait (sec)
+  粘贴文本: Paste Text
+  级别: Level
+  终点: End Point
+  行/列数: Rows/Columns
+  读取当前布局的 Region 模板绑定，并在指定范围或全画布定位: Reads the current layout's Region template bindings and locates within the range or the whole canvas
+  调用子过程: Call Subprocedure
+  赋值: Assign
+  起点: Start Point
+  起点→终点向量放大/缩小，如 2 或 0.5: Scale of the start→end vector, e.g. 2 or 0.5
+  超时(秒): Timeout (seconds)
+  输出键名: Output Key Name
+  过程名: Procedure Name
+  返回列表，按面积降序；$first = $icons[0] 后可 click: Returns a list, sorted by area descending; $first = $icons[0] can then be clicked
+  进入亮段阈值: Enter-Bright-Segment Threshold
+  退出阈值: Exit Threshold
+  通知: Notify
+  通道下限: Channel Lower Bound
+  遍历列表: Iterate List
+  重复 N 次: Repeat N Times
+  重复直到…: Repeat Until…
+  错误变量: Error Variable
+  键名: Key Name
+  限定区域: Restrict to Region
+  面板/区域: Panel/Region
+  颜色占比: Color Ratio
+  高出其他通道: Exceeds Other Channels By
+agent_settings:
+  Agent 名称: Agent name
+  Agent 设置已保存: Agent settings saved
+  MCP 连接名称: MCP connection name
+  下载 Agent 链接: Agent download link
+  保存 Agent 设置: Save Agent Settings
+  删除所选: Delete Selected
+  添加 Agent: Add Agent
+  配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。: Configure external Agent names and default export files, all via Streamable HTTP. Smart tuning chooses which Agent to use; access tokens are not stored here.
+  默认导出文件: Default export file
+ai_settings:
+  ' 秒': ' s'
+  AI 配置已保存: AI settings saved
+  保存 AI 配置: Save AI Settings
+  保存失败，请检查配置目录权限: Save failed; check the config directory permissions
+  取消请求: Cancel Request
+  外部 Agent: External Agent
+  已获取 {count} 个模型；请选择模型后测试连接: Fetched {count} models; pick one and test the connection
+  接口根地址: API base URL
+  接口根地址通常以 /v1 结尾，不包含 /chat/completions。API Key 保存到系统凭据库，不进入配置文件或手机同步数据。: The API base URL usually ends with /v1 and excludes /chat/completions. The API key is stored in the system credential store, not in config files or phone sync data.
+  无需鉴权的本地服务可留空: Leave empty for local services that need no auth
+  服务返回的模型列表为空，可手动填写模型名称后测试连接: The service returned an empty model list; fill in a model name manually and test the connection
+  模型名称: Model name
+  模型接口: Model API
+  正在测试连接…: Testing connection…
+  正在获取模型列表…: Fetching model list…
+  测试连接: Test Connection
+  获取模型: Fetch Models
+  请求超时: Request timed out
+  连接可用，模型已返回文本回复（耗时 {seconds} 秒）: Connection works; the model replied with text (took {seconds} s)
+  配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。: Configure an OpenAI-compatible API for upcoming AI features. The connection test sends a short request to the selected model and may cost a little.
+alert_panel:
+  关闭此告警: Dismiss this alert
+all_user_params:
+  上一个: Previous
+  下一个: Next
+  任务: Task
+  全部用户参数: All User Parameters
+  参数来源：全局参数: 'Parameter source: global parameters'
+  参数来源：独立参数: 'Parameter source: per-user parameters'
+  该任务没有可配置参数: This task has no configurable parameters
+  该用户使用全局参数: This user uses global parameters
+  该用户使用独立参数: This user uses per-user parameters
+  该用户已保存独立参数，任务运行时优先使用下列值。: This user has saved per-user parameters; the values below take priority at runtime.
+  该用户未设置独立参数，任务运行时使用全局参数。: This user has no per-user parameters; global parameters apply at runtime.
+apk_release:
+  下载 {url} 失败：{err}: 'Failed to download {url}: {err}'
+  下载已取消: Download cancelled
+  ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
+  : "Checksum mismatch; the file may be corrupted or tampered with\nExpected {want}\nActual {got}"
+batch:
+  ? "* 表示当前用户使用独立参数\n"
+  : "* means the current user uses per-user parameters\n"
+  <b>选择执行单元</b>: <b>Select execution units</b>
+  <b>选择执行脚本</b>: <b>Select scripts</b>
+  Profile 定义不可用: Profile definitions unavailable
+  Profile 定义已不存在: Profile definitions no longer exist
+  '[批量] 以下已勾选脚本当前不可用，本次不会执行：': '[Batch] These checked scripts are unavailable and will not run:'
+  '{name}（已失效）': '{name} (obsolete)'
+  不指定: Unspecified
+  人: users
+  人无数值，置于末尾: users without a value go last
+  全局任务参数: Global Task Parameters
+  单个执行单元时跳过上述生命周期工作流: Skip the lifecycle workflows above when there is a single execution unit
+  单元: Units
+  单元候选: Unit Candidates
+  单元候选（{key}）: Unit candidates ({key})
+  单元候选（用户名）: Unit candidates (username)
+  可见任务: Visible Tasks
+  可见用户: Visible Users
+  定义主页面右键「按 Profile 排序」用哪个键、什么方向。排完的顺序只属于本次运行，不写回这里: Choose which Profile key and direction the main window's right-click "Sort by Profile" uses. The sorted order belongs to that run only and is not written back here
+  实际只选择一个用户单元时，直接执行任务，不调用生命周期工作流: When only one user unit is actually selected, run tasks directly without lifecycle workflows
+  实际只选择一个用户单元时，直接执行任务；属性单元始终运行准备工作流: When only one user unit is actually selected, run tasks directly; attribute units always run the prepare workflow
+  对应的任务脚本已不存在；取消勾选并保存即可从列表移除: The task script no longer exists; uncheck it and save to remove it from the list
+  工作流文件 (*.wf): Workflow Files (*.wf)
+  已按 Profile 排序用户: Users sorted by Profile
+  开始执行: Démarrer l'exécution
+  异常恢复: Unattended Recovery
+  ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
+  : "Scheduling by \"{key}\", but the prepare workflow \"{wf}\" does not pick and return the unit's username. Use batch/prepare_item_by_attr.wf, or declare #% batch_unit_prepare: true in your own workflow and return username."
+  当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: Scheduling by attribute; configure the item prepare workflow in "Tools → Batch Configuration" first.
+  恢复默认顺序: Restore Default Order
+  手机端正在执行任务，请暂停或者结束任务: The phone is running a task; pause or stop it first
+  ? "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}"
+  : "The phone is running a task; pause or stop it first.\n\nDevice replied: {detail}"
+  ? "执行用户：{username}\n参数来源：{source}"
+  : "Executing user: {username}\nParameter source: {source}"
+  ? "执行用户：{username}\n点击查看本轮任务参数"
+  : "Executing user: {username}\nClick to view this round's task parameters"
+  执行顺序: Execution Order
+  批量设置: Batch settings
+  批量配置: Batch Configuration
+  拖动可临时调整实际执行顺序: Drag to temporarily adjust the actual execution order
+  拖动可调整实际执行顺序；右键可恢复默认、随机打乱或按 Profile 排序；批量配置中的顺序仅作为初始顺序: Drag to adjust the actual execution order; right-click to restore defaults, shuffle, or sort by Profile; the order in Batch Configuration is only the initial order
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to adjust the actual execution order; right-click to restore defaults or shuffle; the order in Batch Configuration is only the initial order
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱；批量配置中的顺序仅作为初始顺序: Drag to adjust the actual execution order; right-click to restore defaults or shuffle; the order in Batch Configuration is only the initial order
+  指定顺序排序: Sort by Specified Order
+  按属性调度时不适用：一个属性值可能对应多名用户，必须由条目准备工作流选定并回传用户名，所以生命周期始终执行。切回「用户名」会恢复你原来的选择: 'Not applicable when scheduling by attribute: one attribute value may map to multiple users, so the prepare workflow must pick and return the username and lifecycle always runs. Switching back to "Username" restores your original choice'
+  按用户名调度，还是按用户资料的某个属性调度。它决定主页面候选列表的内容、生命周期契约和条目准备工作流的合法性，所以属于配置组定义: Schedule by username or by a profile attribute. It determines the main window candidate list, the lifecycle contract and which prepare workflow is valid — a configuration-group definition
+  排序键属于配置组定义；在用户列表右键「按 Profile 排序」执行一次，排完的顺序只属于本次运行: The sort key is a configuration-group definition; right-click the user list and "Sort by Profile" to sort once — the order belongs to that run only
+  新建配置: New Config
+  无人值守撞上异常暂停后，用它把游戏收回登录主页。主页面的「无人值守」要等这里配好才能勾选: Used to return the game to the login page after an unattended abnormal pause. The main window's "Unattended" checkbox needs this configured first
+  无法开始批量任务: Cannot start the batch
+  暂无启用的单元，请到「单元」页勾选: No enabled units; check some on the "Units" page
+  暂无配置组，请先通过「工具 → 批量配置」添加: No configuration groups; add one via "Tools → Batch Configuration" first
+  本次长时间无人看守时勾选：任务遇到异常暂停时不再等人，该任务按失败记录并跳过，随后由配置组的「异常恢复 wf」把游戏收回登录主页，再继续下一个任务。确认、输入和选择仍等待用户交互: "Check when leaving the machine unattended for a long time: on an abnormal pause the task no longer waits — it's recorded as failed and skipped, then the group's recovery workflow returns the game to the login page and the next task runs. Confirmations, inputs and choices still wait for interaction"
+  条目准备: Item preparation
+  条目准备工作流不支持当前属性调度，请到批量配置中修改: The item prepare workflow doesn't support the current attribute scheduling; change it in Batch Configuration
+  条目收尾: Item cleanup
+  浏览...: Browse...
+  点击查看本轮任务参数: Click to view this round's task parameters
+  用户独立参数: Per-user Parameters
+  确定删除当前批量配置吗？: Delete the current batch configuration?
+  第一列决定是否出现在主页面，第二列决定主页面首次加载或点「恢复默认」时是否勾选；拖动可调整初始顺序: The first column controls visibility in the main window; the second controls whether it's checked on first load or "Restore defaults". Drag to adjust the initial order
+  脚本: Script
+  脚本候选: Script Candidates
+  请到「单元」页至少勾选一个执行单元: Check at least one execution unit on the "Units" page
+  请到「脚本」页至少勾选一个脚本: Check at least one script on the "Scripts" page
+  请在「工具 → 批量配置」中配置条目准备工作流: Configure the item prepare workflow in "Tools → Batch Configuration"
+  请至少勾选一个脚本: Check at least one script
+  请选择 workflows 目录下的 .wf 文件: Pick a .wf file under the workflows directory
+  调度单元属于配置组定义，在「工具 → 批量配置」中修改: The scheduling unit is a configuration-group definition; change it in "Tools → Batch Configuration"
+  选择工作流文件: Select Workflow File
+  配置名称已存在: Configuration name already exists
+  重命名配置: Rename Configuration
+  随机打乱顺序: Shuffle Order
+  需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守撞上异常暂停后要靠它把游戏收回登录主页: "First configure this group's \"recovery workflow\" in \"Tools → Batch Configuration\": unattended mode relies on it to return the game to the login page after an abnormal pause"
+  默认执行: Run by default
+batch_report:
+  '## 汇总': '## Summary'
+  成功: Succeeded
+  执行通道中断，整批已中止: Execution channel lost; the batch was aborted
+  通道中断（整批中止）: Channel interrupted (batch aborted)
+  （执行通道中断，整批中止）: ' (execution channel lost, batch aborted)'
+  （未执行任何脚本）: ' (no script was executed)'
+  （正常完成）: (Completed Normally)
+  （用户中断）: (User Interrupted)
+batch_scheduler:
+  已停止: Stopped
+  待执行: Pending
+  执行被停止: Execution was stopped
+  批次准备: Batch Init
+  批次收尾: Batch Wrap-up
+  批量可执行性子过程必须返回 dict: The batch executability subroutine must return a dict
+  批量可执行性检查只支持 DSL 工作流: Batch executability checks support DSL workflows only
+  生命周期 wf 必须返回 dict 或 null: Lifecycle wf must return a dict or null
+  生命周期 wf 的 state 必须是 dict: The lifecycle wf's state must be a dict
+  生命周期 wf 返回了无效角色: The lifecycle workflow returned an invalid role
+  用户结束当前任务，继续下一项: User ended the current task; continue with the next one
+  运行中: Running
+  通道中断: Channel interrupted
+builtin_profile:
+  DSL OCR 观测: DSL OCR Observation
+capture_ops:
+  '[录屏] 仅流式截图模式支持录屏': '[Recording] Screen recording is only supported in streaming screenshot mode'
+  '[录屏] 保存失败（详见日志）': '[Recording] Save failed (see log for details)'
+  '[录屏] 启动失败（详见日志）': '[Recording] Failed to start (see log for details)'
+  '[录屏] 已放弃本次录制，文件已删除': '[Recording] Recording discarded, file deleted'
+  '[录屏] 无法获取画面尺寸': '[Recording] Failed to get frame size'
+  '[截屏] PNG 编码失败': '[Screenshot] PNG encoding failed'
+  '[截屏] 截屏失败：无可用画面': '[Screenshot] Failed: no frame available'
+  '[预览] 刷新失败：无可用画面': '[Preview] Refresh failed: no frame available'
+  ⏸ 暂停: ⏸ Pause
+  ■ 停止: ■ Stop
+  ▶ 继续: ▶ Resume
+  ● 录屏: ● Record
+  仅流式截图模式支持录屏: Screen recording is only supported in streaming capture mode
+  取一帧、更新预览并保存到 data/capture/picture: Capture a frame, update the preview, and save it to data/capture/picture
+  图像已复制到剪贴板，可用 Ctrl+V 粘贴: Image copied to clipboard; paste with Ctrl+V
+  复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件: Copy the preview's original image to the clipboard (paste with Ctrl+V); nothing is saved to disk
+  已暂停: Paused
+  录制中: Recording
+  待保存: Pending Save
+  待机: Standby
+  截屏: Screenshot
+  放弃: Discard
+  暂无可复制的画面，请先刷新或截屏: Nothing to copy yet; refresh or take a screenshot first
+  暂无可复制的画面，请先连接目标并刷新或截屏: Nothing to copy yet; connect a target, then refresh or screenshot
+  重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
+  预览已刷新: Preview refreshed
+  ，请选择 保存 或 放弃: ', please choose Save or Discard'
+cli:
+  不注册全局热键（留给另一实例）；不启动 MCP 服务: Do not register global hotkeys (leave them to another instance); do not start the MCP service
+  注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用: 'Register and load a plugin: NAME (built-in or plugins/) or NAME@PATH (any directory); repeatable'
+  通用视觉 RPA 引擎（支持插件扩展）: General-purpose vision RPA engine (plugin-extensible)
+  额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg: Load all built-in plugins and everything in the default plugins/ directory without individual -reg flags
+common:
+  '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
+  confirm_close: Confirm Close
+  confirm_close_message: Are you sure you want to close this window?
+  delay_click_interval: Click Interval
+  delay_page_refresh: Page Refresh Wait
+  delay_scroll_settle: Scroll Settle Wait
+  delay_step_wait: Step Interval
+  err_layout_not_found: 'Failed to load layout: {name}'
+  err_no_capture_source: No capture source, please locate window first
+  err_panel_not_defined: Panel {scene}.{panel} not defined in layout, please bind it in Scene Editor
+  layout_default: Default Layout
+  layout_phone: Phone Layout
+  payload 必须是 JSON 对象: payload must be a JSON object
+  update_available: "New version v{latest} available.\nCurrent: v{current}\n\nDownload now?"
+  update_latest_message: Version v{current} is the latest
+  update_latest_title: Up to Date
+  '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} has an invalid kind: {kind}; allowed: {allowed}'
+  '{filename} 顶层含未知字段: {keys}': '{filename} has unknown top-level fields: {keys}'
+  '{kind} 不是单选来源，不能用 selections 指定': '{kind} is not a single-choice source and cannot be set via selections'
+  '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: dimension affixes must name the dimension in stats; full_affix is not supported'
+  '{label}: 未知属性字段 {field}': '{label}: unknown stat field {field}'
+  '{label}: 等级 {level} 没有词条 {category} 的上限配置': '{label}: no cap configured for affix {category} at level {level}'
+  '{label}: 词条 {category} 未登记字段映射': '{label}: affix {category} has no field mapping'
+  '{n} 个属性靠补足': '{n} stat(s) rely on the gap'
+  '{school} 推导': '{school} derived'
+  '{source} 含未知字段: {keys}': '{source} has unknown fields: {keys}'
+  '{source} 声明了 split 却没有 full_affix': '{source} declares split without full_affix'
+  '{source} 既声明无静态属性又填了数值，取哪个无从判断': '{source} declares no static stats yet also carries values; which one applies is undecidable'
+  '{source} 的 full_affix 不受支持: {name}；可用 {allowed}': '{source}: full_affix {name} is not supported; available: {allowed}'
+  '{source} 的 full_affix 必须是词条类别名': '{source}: full_affix must be an affix category name'
+  '{source} 的 group 必须是字符串': '{source}: group must be a string'
+  '{source} 的 label 必须是字符串': '{source}: label must be a string'
+  '{source} 的 modeled 必须是布尔值': '{source}: modeled must be a boolean'
+  '{source} 的 no_effect 必须是布尔值': '{source}: no_effect must be a boolean'
+  '{source} 的 scope 只能是 {allowed}': '{source}: scope must be one of {allowed}'
+  '{source} 的 tier 必须是非负整数': '{source}: tier must be a non-negative integer'
+  '{what} 不是已知属性字段': '{what} is not a known stat field'
+  '{what} 含未知公式字段: {keys}': '{what} has unknown formula fields: {keys}'
+  '{what} 必须是数值，实际是 {kind}': '{what} must be a number, got {kind}'
+  '{what} 必须是映射，实际是 {kind}': '{what} must be a mapping, got {kind}'
+  '{what} 是映射时必须含 formula': '{what} must contain formula when it is a mapping'
+  '{what} 的 formula 之外还有多余的键: {keys}': '{what} has keys besides formula: {keys}'
+  '{what} 的 round 必须是整数': '{what}: round must be an integer'
+  '{what} 的 source 不是已知属性字段: {source}': '{what}: source is not a known stat field: {source}'
+  '{what} 的 split 必须是两个整数，如 [1, 2]': '{what}: split must be two integers, e.g. [1, 2]'
+  '{what} 缺少 source': '{what} is missing source'
+  「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑: Values for "one full affix" come from the affix cap of the current level, so a new season only needs the affix config updated; use Advanced for entries with several stats or a formula
+  上移: Monter
+  上限: Cap
+  下移: Descendre
+  与对照完全一致: Matches the reference exactly
+  与对照有 {n} 项不一致，看「按来源拆分」定位: '{n} field(s) differ from the reference; use the per-source breakdown to locate them'
+  仅战斗内: Combat only
+  以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: The three above describe the build only; they do not affect rating, auto-tuning or graduation rate
+  以下文件解析失败，已跳过：{files}: 'These files failed to parse and were skipped: {files}'
+  以下流派仍在使用该武学：{schools}: 'Still used by these schools: {schools}'
+  以下调律规则仍在引用该玩法：{rules}: 'Still referenced by these tuning rules: {rules}'
+  作用域: Scope
+  保存时包含未建模补足: Include the unmodelled gap when saving
+  修改失败: Modify failed
+  修改暂存于当前对话框，点击保存后生效: Edits are staged in this dialog; they take effect on Save
+  停止中: Stopping
+  全不选: Deselect All
+  全部: All
+  其中 {n} 项尚未填数值: '{n} of them have no values yet'
+  其他来源: Other sources
+  '内置类: ': 'Built-in class: '
+  分组: Group
+  分组 '{name}' 已存在: Group '{name}' already exists
+  分组名称: Group name
+  创建失败: Creation Failed
+  删除「{name}」的 {n} 个条目？: Delete the {n} entries of "{name}"?
+  删除失败: Delete Failed
+  删除条目: Delete Entries
+  删除玩法: Remove Playstyle
+  删除选中: Delete Selected
+  加载失败: Load failed
+  参与推导 {n} 项: '{n} contributions included'
+  参数: Parameters
+  '反解目标含未知字段: {field}': 'Back-solve target has an unknown field: {field}'
+  反选: Invert Selection
+  取值: Value
+  取值方式: Value kind
+  另有 {n} 项仅战斗内生效，不进本表: '{n} more apply in combat only and are not listed here'
+  同一门心法不能装在多个槽位: The same inner way cannot occupy two slots
+  ? "名字 = 调律 Tab 勾选项；\n增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。"
+  : "Name = Tuning Tab checkbox item;\nLeave damage affix empty / select '- No Damage -' = no damage boost needed on that side;\nAttribute = gameplay element school (non-weapon slots use element→no-equal equivalence);\nBind switch = this gameplay judgment equals activating that switch (overrides global state);\nWeapon/affix candidates from game config, damage boost candidates narrowed by same-side weapon."
+  名称: Name
+  基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
+  基础属性推导: Derive Base Attributes
+  存为基础属性: Save as base attributes
+  对照值: Reference
+  对照基础属性: Reference set
+  尚未配装，先在左侧选心法与其他来源: Nothing equipped yet — pick inner ways and other sources on the left
+  属性与主副武学由绑定流派提供，已锁定: Attribute and martial arts come from the bound school and are locked
+  属性来源: Attribute Sources
+  属性来源条目名不能为空: Entry name cannot be empty
+  '属性来源条目已存在: {ids}': 'Entry already exists: {ids}'
+  属性配置: Attribute Config
+  已中断: Interrupted
+  已保存: Saved
+  已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）: Saved to the system layer, but the local copy is still effective; restore the local override to apply the system change ({now})
+  已填: Filled
+  已存为基础属性「{name}」，毕业率可直接选用: Saved as base attributes "{name}"; graduation rate can use it directly
+  已锁定: Locked
+  当前生效：{current}: 'Currently effective: {current}'
+  录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: Recorded output appears here (canvas-normalized coordinates, savable as .wf)
+  待填: To fill
+  待填 {n} 条: '{n} still to fill'
+  心法重数只能是 1-{max}：{name} 填了 {tier}: 'Inner way tier must be 1-{max}: {name} got {tier}'
+  心法（{n} 个槽）: Inner Ways ({n} slots)
+  恢复: Resume
+  所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」: All playstyles are referenced; create new ones in Game Config → Playstyles
+  手填补足: Manual remainder
+  执行目标: Execution Target
+  按来源拆分: By source
+  排序: Sort
+  推导值: Derived
+  推导失败: Derivation failed
+  推导失败：{msg}: 'Derivation failed: {msg}'
+  搜索: Rechercher
+  攻具定音: Attack Gear Dingyin
+  数字: Number
+  文本: Text
+  新增失败: Add Failed
+  新增条目: New Entry
+  新增武学: New Martial Art
+  新增玩法: New Playstyle
+  新建: New
+  新建失败: Create Failed
+  无: None
+  无法删除: Cannot Delete
+  无静态属性: No static stats
+  是: Yes
+  暂停: Pause
+  暂停中...: Pausing...
+  最多同时装备 {n} 门心法，给了 {got} 门: At most {n} inner ways can be equipped, got {got}
+  未保存的修改: Unsaved Changes
+  未保存的更改: Unsaved Changes
+  未建模补足: Unmodelled gap
+  '未知作用域: {scope}': 'Unknown scope: {scope}'
+  '未知来源类别: {kind}': 'Unknown source kind: {kind}'
+  '未知流派属性: {attr}': 'Unknown school attribute: {attr}'
+  '未知的属性来源条目: {ids}': 'Unknown stat source entries: {ids}'
+  未记录: Not recorded
+  未选对照，只显示推导值: No reference selected; showing derived values only
+  未选择: Not Selected
+  未配置: not configured
+  本地: Local
+  本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}: This page {done}/{total} confirmed　All sources {all_done}/{all_total}
+  条目: Entry
+  条目内容必须是映射: Entry content must be a mapping
+  条目名（分组用「·」分隔，如 易水歌·二重）：: 'Entry name (group and item separated by "·", e.g. 易水歌·二重):'
+  来源: Source
+  来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值: While sources are incomplete the gap is solved from the reference panel; uncheck to save the model value alone
+  槽 {n}: Slot {n}
+  次数: Count
+  武学类型: Martial Art Type
+  武学配置: Martial Arts
+  武学：{arts}（由流派决定，不需选择）: 'Martial arts: {arts} (set by the path, not selectable)'
+  流派与玩法只引用武学，武器由此派生，不在别处录入: Schools and playstyles reference arts only; the weapon is derived here
+  状态: Status
+  玩法: Playstyle
+  玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用: Playstyles are defined in Game Config → Playstyles; referenced here only
+  玩法类型: Playstyle Type
+  玩法配置: Playstyles
+  现有版本：{count} 份，来自 {sources} 个来源: '{count} versions from {sources} sources'
+  用户: User
+  用户名: Username
+  画面异常: Screen error
+  画面无法解码: Cannot decode the screen
+  画面采集停摆: Capture stalled
+  直接编辑该条目的 YAML。可用键：stats、extra、full_affix、split、scope、no_effect、label: "Edit this entry's YAML directly. Keys: stats, extra, full_affix, split, scope, no_effect, label"
+  空: Empty
+  等级: Level
+  简体中文: 简体中文
+  系统: System
+  结束任务: End Task
+  编辑…: Edit...
+  自定义玩法可自由选择属性与武学，并显示全部防具定音: Custom playstyles can freely select attributes and martial arts and show all armor dingyin options
+  '词条拆分比无效: {split}': 'Invalid affix split ratio: {split}'
+  该武学已存在: That martial art already exists
+  该玩法已存在: That playstyle already exists
+  请选择有效的执行用户: Select a valid user to run as
+  跳过: Skip
+  轮: round(s)
+  进面板: On panel
+  连接断开: Disconnected
+  连接无响应: No response
+  采集进程退出: Capture process exited
+  重命名分组: Rename Group
+  重复: Duplicate
+  防具定音: Armor Dingyin
+  随武学: From art
+  高级编辑 - {name}: Advanced edit - {name}
+  默认: Default
+  （不对照）: (no reference)
+  （不选）: (none)
+  （无）: (None)
+  （空）: (Empty)
+  操作: Action
+  未命名: (Unnamed)
+config_conflicts:
+  磁盘配置已更新: Config Updated on Disk
+  编辑器打开之后，磁盘上的这些配置被其他窗口或程序改过：: 'While this editor was open, these configs were changed on disk by another window or program:'
+  选择「是」会用当前编辑内容覆盖它们，磁盘上的改动将丢失；选择「否」放弃本次保存，请关闭编辑器重新打开、确认最新内容后再改。: Yes overwrites them with the current editor content and disk changes are lost. No discards this save — close and reopen the editor, review the latest content, then edit.
+core_common:
+  DesktopCapture 已停止: DesktopCapture stopped
+  YAML 顶层必须是字典: YAML top level must be a dict
+  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off, or disabled by the system); please re-enable it'
+  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap returned empty data (Shizuku not authorized?)'
+  config 中缺少 model_path: config is missing model_path
+  initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
+  pynput 未安装，无法录制: pynput not installed; cannot record
+  全量: Full
+  分组名称不能为空: Group name cannot be empty
+  可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.
+  可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.
+  场景: Scene
+  场景必须包含 key 和 name: Scene must contain key and name
+  基底: Base
+  基底视图不可删除，如需取消分层请取消多视图: The base view cannot be deleted; to remove layering, disable multi-view
+  截图失败：无障碍服务未连接或截图被节流: 'Screenshot failed: Accessibility Service not connected, or screenshots are being throttled'
+  截图编码失败: Screenshot encoding failed
+  '未知图色操作: {op}，可用: {ops}': 'Unknown pixel-color operation: {op}, available: {ops}'
+  画布尺寸非法: Invalid canvas size
+  空间不存在: Space does not exist
+  系统空间不可删除，可新建自己的空间: The system space cannot be deleted; create your own space instead
+  缺参照图或实时截图: Missing reference image or live screenshot
+  至少保留一个图库空间: At least one gallery space must be kept
+  至少需要保留一个场景分组: At least one scene group must be retained
+  还没有实时截图: No live screenshot yet
+daily_history:
+  专用: Dedicated
+  任务历史: Task History
+  任务历史暂不可用: Task history is temporarily unavailable
+  任务数: Tasks
+  单独运行: Single Run
+  已选: selected
+  开始日期不能晚于结束日期: Start date cannot be after the end date
+  手机独立执行: On-device Execution
+  批量历史: Batch History
+  批量运行: Batch Run
+  日常: Daily
+  日期范围无效: Invalid date range
+  未记录用户: Unrecorded user
+  查看全部单任务: View all single tasks
+  查询: Query
+  清除: Clear
+  清除勾选，改为全部: Clear the check to include all
+  窗口: Window
+  结束时间: End Time
+  耗时: Duration
+  返回全部任务: Back to all tasks
+  配置: Config
+  项: items
+dialog_guards:
+  确定要关闭此窗口吗？: Close this window?
+  确认关闭: Confirm Close
+execution_feedback:
+  不能启动: Cannot start
+  当前方案不支持所选后端，请切换方案或连接方式: The current plan doesn't support the selected backend; switch plan or connection method
+  当前目标正在执行其他任务，请到对应任务页操作停止或暂停: The current target is running another task; stop or pause it from its task page
+  方案不支持: Unsupported by plan
+  未定位: Not located
+  未连接: Not connected
+  请先定位窗口或连接设备，并选择执行目标: Locate a window or connect a device first, and select an execution target
+  请先扫描并连接设备: Scan and connect a device first
+  请先扫描窗口并点击定位: Scan windows and click Locate first
+execution_targets:
+  游戏窗口: Game Window
+execution_user_selector:
+  执行用户: Executing User
+  跟随当前用户: Follow current user
+history_viewer:
+  刷新日志: Refresh Log
+  当前级别没有日志: No logs at this level
+  执行日志: Execution Log
+  执行结果: Execution Result
+  批量报告: Batch Report
+  文件较大，仅预览开头 2 MiB: File is large; only the first 2 MiB is previewed
+  文件较大，仅预览末尾 2 MiB: File is large; only the last 2 MiB is previewed
+  无法读取文件: Cannot read the file
+  日志文件为空: The log file is empty
+  日志级别: Log Level
+  显示所选级别及更高级别的日志: Show logs at the selected level and above
+  没有对应文件: No matching file
+  结果不是有效 JSON，显示原文: The result isn't valid JSON; showing raw text
+  记录详情: Record Details
+  选择一条记录查看内容: Select a record to view its content
+  选择一条记录查看日志: Select a record to view its log
+main_window:
+  '[错误] 当前环境不支持以下脚本：': "[Error] The current environment doesn't support these scripts:"
+  【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，: '[Emulator Aspect Ratio] If the target emulator has no built-in 20:9 preset,'
+  【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，: '[Important] When using a PC emulator (e.g. MuMu, LDPlayer) you must select "Android",'
+  ? "以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。"
+  : "These tasks haven't finished safely, so the program won't close yet:\n{tasks}\n\nTry closing again later; if a task is stuck, force-quit LvJiang from the system."
+  任务仍在收尾: Tasks are still finishing
+  使用独立参数: Use per-user parameters
+  全部任务: All Tasks
+  关闭程序: Close the Program
+  切换日志显示级别：低于选中级别的日志将被隐藏: 'Switch log level: logs below the selected level will be hidden'
+  加载: Load
+  参数保存失败，本次批量未启动：{error}: "Failed to save parameters; the batch didn't start: {error}"
+  参数设置: Parameter Settings
+  可采用自定义设置 2000:900（等效 20:9）。: You can use a custom 2000:900 setting (equivalent to 20:9).
+  后台截图: Background Capture
+  后台输入: Background Input
+  否则导航流程会因输入方式不匹配而失败。: otherwise the navigation flow will fail due to a mismatched input method.
+  安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入: 'Android (android): phone or emulator, uses ADB screenshot + touch input'
+  定位: Locate
+  定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效: After locating, the red border shows for 1 second; check this to keep it visible until disconnect (this run only)
+  定位窗口后自动截屏: Auto-screenshot after locating the window
+  就绪: Ready
+  展示分组，仅筛选脚本列表: Display group; only filters the script list
+  工作流运行中: Workflow running
+  ? "当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n确定要退出吗？"
+  : "{count} workflows are running; closing will stop them and wait for cleanup.\nAre you sure you want to quit?"
+  当前正在使用方案，如需手动调整请先切换为「自定义」: A plan is in use; switch to "Custom" first to adjust these manually
+  当前目标: Current Target
+  律匠 - 通用视觉 RPA 引擎: LvJiang - General-purpose Visual RPA Engine
+  扫描窗口: Scan Windows
+  扫描设备: Scan Devices
+  批量: Batch
+  批量任务运行过程中不可修改环境和布局: Environment and layout cannot be changed while a batch task is running
+  批量执行: Batch Run
+  持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）: Keeps pulling frames from the mirroring stream; unchecked grabs one frame per request (single-frame capture)
+  显示标题: Show Header
+  显示连接控制台: Show Connection Console
+  最小化到状态栏: Minimize to Tray
+  桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击: 'Desktop (desktop): PC game window, uses window mirroring + mouse click'
+  流式截图: Streaming Capture
+  清理日志: Clear Logs
+  清空当前窗口的全部日志，包括被级别筛选隐藏的日志: Clear all logs in the current window, including those hidden by the level filter
+  用户信息: User Info
+  目标: Target
+  目标大小: Target Size
+  目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：: "Target Environment determines navigation strategy and input method (the environment the game runs in, not this machine's OS):"
+  目标环境说明: Target Environment Explained
+  端侧执行: On-Device Execution
+  红框标定: Red-Box Marking
+  运行日志: Run Log
+  连接信息: Connection Info
+  重新检查: Re-check
+  隐藏标题: Hide Header
+  隐藏连接控制台: Hide Connection Console
+  需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input: Requires the LvJiang App with accessibility enabled; changes only the execution channel, not the capture method; falls back to ADB shell input when unreachable
+map_manager:
+  HUD 场景: HUD Scene
+  HUD 场景绑定（坐标在场景编辑器里标定）: HUD scene bindings (calibrate coordinates in the Scene Manager)
+  key: key
+  '{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。': '{scene}.{point} is outside the minimap; heading detection uses the region center for now.'
+  —: —
+  ⚠ 缺失：{key}: '⚠ Missing: {key}'
+  不能删除: Cannot delete
+  从当前画面截取: Capture from the current frame
+  会同时生成 HUD 场景 map_<key>，之后在场景编辑器里标定小地图与大地图区域。: This also generates the HUD scene map_<key>; calibrate the minimap and world-map regions in the Scene Manager afterwards.
+  保存当前画面为探查图片: Save the current frame as a survey image
+  先登记地域: Register a region first
+  删除地图: Delete Map
+  删除地图「{name}」及其底图？自动生成的 HUD 场景 map_{key} 也会一并删除。: Delete map "{name}" and its base map? The auto-generated HUD scene map_{key} is deleted too.
+  删除选中 POI: Delete Selected POI
+  删除选中地域: Delete Selected Regions
+  只有实际补齐整张地图后才勾选；拼接成功不代表已采集整图。: Check only after the full map is actually stitched; a successful stitch doesn't mean the whole map was surveyed.
+  只读，请先“复制到本地”再修改: Read-only; "Copy to local" before editing
+  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp): Image files (*.png *.jpg *.jpeg *.bmp *.webp)
+  在底图上点击新增 POI；点击已有标记选中它。坐标为底图归一化坐标。: Click the base map to add a POI; click an existing marker to select it. Coordinates are base-map normalized.
+  地图 key: Map key
+  地域与探查: Regions & Surveys
+  地域仍被使用: Region still in use
+  地域名称: Region name
+  坐标必须在 0–1 之间: Coordinates must be between 0 and 1
+  基本信息: Basics
+  基本信息与绑定: Basics & Bindings
+  复制到本地: Copy to Local
+  大地图底图: World Map Base Image
+  大地图正北朝上: World map is north-up
+  导入底图文件…: Import base map…
+  导航模式: Navigation mode
+  小写字母开头，字母/数字/下划线: Starts with a lowercase letter; letters, digits, underscores
+  小地图朝向: Minimap heading
+  尖端（退化）: Tip (degenerate)
+  尚未导入底图：先「标定 HUD…」标出大地图区域，再在“底图与 POI”页导入: 'No base map yet: "Calibrate HUD…" the world-map region first, then import on the "Base Map & POI" page'
+  展示: Display
+  底图与 POI: Base Map & POI
+  底图区域未标定: Base map region not calibrated
+  底图可标注 POI；空白部分尚未探查。: POIs are placed on the base map; blank areas haven't been surveyed yet.
+  底图已完成整图探查: Base map fully surveyed
+  底图编码失败: Base map encoding failed
+  底图：局部探查，待补齐: 'Base map: partially surveyed; more to explore'
+  底图：整图探查已完成: 'Base map: fully surveyed'
+  当前地图有未保存的修改，放弃吗？: This map has unsaved changes; discard them?
+  当前布局不存在，未能定位地图区域。: The current layout doesn't exist; cannot locate the map region.
+  当前布局尚未标定 {scene}.{point}，朝向识别暂用小地图区域中心。: The current layout hasn't calibrated {scene}.{point}; heading detection uses the minimap center for now.
+  当前布局尚未标定 {scene}.{region}，无法裁剪地图区域。: The current layout hasn't calibrated {scene}.{region}; cannot crop the map region.
+  当前无法读取布局，未能定位地图区域。: Cannot read the layout; cannot locate the map region.
+  当前未选择地图，无法解析地图区域。: No map selected; cannot resolve the map region.
+  截取当前画面: Capture the current frame
+  截图所属地域: Region of this screenshot
+  按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。: Register regions with the game's area selector. Survey images and the base map are stored separately; switch views on the base-map page.
+  探查: Surveys
+  探查图片仅供查看: Survey images are view-only
+  探查图片缺失或无法解码: Survey image missing or undecodable
+  探查截图用于查看；POI 只在底图上编辑。: Survey screenshots are for viewing; POIs are edited on the base map only.
+  搜索窗口（相对短边）: Search window (relative to short edge)
+  新地域: New Region
+  新建地图: New Map
+  无效的 POI: Invalid POI
+  无法获取截图: Cannot Capture Screenshot
+  '无法解码图片: {path}': 'Cannot decode image: {path}'
+  无法读取图片: Cannot read the image
+  是否仍然使用整帧作为底图？: Use the full frame as the base map anyway?
+  最小面积（像素）: Min area (pixels)
+  朝向 {deg:.1f}°　置信度 {conf:.2f}　方法：{method}　面积 {area}px: 'Heading {deg:.1f}°　confidence {conf:.2f}　method: {method}　area {area}px'
+  未保存: Unsaved
+  未取得当前画面: No current frame captured
+  未找到箭头：检查颜色阈值或小地图区域标定: 'Arrow not found: check the color threshold or the minimap calibration'
+  来源：{layer}: 'Source: {layer}'
+  标定 HUD…（打开场景编辑器）: Calibrate HUD… (opens the Scene Manager)
+  标识: Identity
+  没有地图。点击“新建”创建一张。: No maps. Click "New" to create one.
+  添加地域: Add Region
+  添加失败: Add failed
+  添加探查图片: Add Survey Image
+  添加探查图片…: Add survey image…
+  燕尾缺口: Swallowtail notch
+  留空 = key: Empty = key
+  种类: Kind
+  箭头颜色与搜索参数（保存到地图）: Arrow color and search parameters (saved to the map)
+  识别结果: Detection Result
+  该地域已有探查图片，不能直接删除。: This region has survey images and cannot be deleted directly.
+  请选择截图所属地域。: Pick the region this screenshot belongs to.
+  读取失败: Read failed
+  读取当前布局失败，未能定位地图区域。: Failed to read the current layout; cannot locate the map region.
+  载入截图文件…: Load screenshot file…
+  载入整张局内截图后，按当前布局标定的小地图区域裁剪，解析居中的黄色内凹箭头。0° = 正北（屏幕上方），顺时针为正。: Load an in-game screenshot, crop by the current layout's calibrated minimap region, and parse the centered concave yellow arrow. 0° = north (top of screen); clockwise positive.
+  适应窗口: Fit Window
+  选择局内截图: Select In-game Screenshot
+  选择底图: Select Base Map
+  重新识别: Re-detect
+  （尚未载入截图）: (no screenshot loaded)
+maps:
+  'HUD 场景不存在: {scene}': 'HUD scene does not exist: {scene}'
+  HUD 绑定 minimap_center 必须属于基础视图: HUD binding minimap_center must belong to the base view
+  'HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}': 'HUD binding minimap_center must reference a point; not found: {key}'
+  HUD 绑定 {attr} 必须属于 full 视图: HUD binding {attr} must belong to the full view
+  HUD 绑定 {attr} 必须属于基础视图: HUD binding {attr} must belong to the base view
+  'HUD 绑定 {attr} 必须引用区域，未找到: {key}': 'HUD binding {attr} must reference a region; not found: {key}'
+  POI key 必须以小写字母开头，仅含小写字母/数字/下划线: POI key must start with a lowercase letter and contain only lowercase letters, digits and underscores
+  'POI key 重复: {key}': 'Duplicate POI key: {key}'
+  POI {key} 坐标超出底图范围: POI {key} coordinates are outside the base map
+  POI 必须是键值映射: POI must be a mapping
+  base_image_sha256 必须是 64 位十六进制摘要: base_image_sha256 must be a 64-character hex digest
+  min_area 必须大于 0: min_area must be greater than 0
+  pois 必须是列表: pois must be a list
+  ui 必须是键值映射: ui must be a mapping
+  window_ratio 必须在 0.05–1 之间: window_ratio must be between 0.05 and 1
+  '{name} 必须是三元整数列表': '{name} must be a list of three integers'
+  '{name} 必须满足 H=0–180、S/V=0–255': '{name} must satisfy H=0–180, S/V=0–255'
+  '{name}地图': '{name} map'
+  '地图 key 已存在: {key}': 'Map key already exists: {key}'
+  地图 key 必须以小写字母开头，仅含小写字母/数字/下划线: Map key must start with a lowercase letter and contain only lowercase letters, digits and underscores
+  '地图不存在: {key}': 'Map does not exist: {key}'
+  地图名称不能为空: Map name cannot be empty
+  '地图名称已存在: {name}': 'Map name already exists: {name}'
+  地图图片与定义摘要不一致: Map image does not match the definition digest
+  地图定义必须是键值映射: Map definition must be a mapping
+  地图文件 {rel} 内的 key 为 {inner}，与文件名不一致: Map file {rel} declares key {inner}, which differs from the file name
+  地域名称不能为空，且 key 不得重复: Region name cannot be empty and keys must be unique
+  大地图: World Map
+  底图数据为空: Base map data is empty
+  底图文件名固定为 base.png: The base map file must be named base.png
+  探查图片名称不能为空，且 key 不得重复: Survey image names cannot be empty and keys must be unique
+  '探查图片引用了不存在的地域: {region}': 'Survey image references a nonexistent region: {region}'
+  探查图片必须有有效的 SHA256 摘要: Survey images must have a valid SHA256 digest
+  '探查图片缺失或摘要不匹配: {name}': 'Survey image missing or digest mismatch: {name}'
+  '未知导航模式: {mode}': 'Unknown navigation mode: {mode}'
+  '未知朝向识别方法: {method}': 'Unknown heading detection method: {method}'
+menu_ops:
+  公告: Announcements
+  关于: About
+  切换到浅色主题: Switch to light theme
+  切换到深色主题: Switch to dark theme
+  反馈: Feedback
+  图像识别: OCR
+  图库已刷新: Gallery Refreshed
+  图库管理: Reference Manager
+  地图管理: Map Manager
+  场景管理: Scene Manager
+  工具: Tools
+  已是最新版本: Already up to date
+  帮助: Help
+  当前版本 v{current} 已是最新版本: Current version v{current} is up to date
+  新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。: New hotkeys were saved, but the current process failed to rebuild the global listener; this run keeps using the old hotkeys, and the new settings will be retried after restart.
+  显示预览: Show Preview
+  检查更新: Check for Updates
+  检查更新失败: Update check failed
+  热键已更新并立即生效: Hotkeys updated and took effect immediately
+  热键设置: Hotkey Settings
+  用户管理: User Management
+  离线模式下不能检查更新: Cannot check for updates in offline mode
+  移动设备: Mobile Device
+  脚本编辑: Script Editing
+  自动剧情: Auto Story
+  赞助: Sponsor
+  配置已保存: Settings saved
+  配置管理: Settings
+  隐藏预览: Hide Preview
+mobile:
+  ADB 直传到设备: Push to device via ADB
+  Android 安装包 (*.apk): Android package (*.apk)
+  Shizuku: Shizuku
+  '{label}回传失败：{message}': '{label} upload failed: {message}'
+  '{label}有 {count} 条旧记录缺少可确认的手机来源，未导入；原记录保留在手机。': '{label}: {count} old records lack a confirmable phone origin and were not imported; the originals remain on the phone.'
+  '{label}：新增 {count} 条记录': '{label}: {count} new records'
+  '{n} 路': '{n} connections'
+  ℹ️ shell 通道不可用（Shizuku 未授权）。普通点击与截图不受影响: ℹ️ shell channel unavailable (Shizuku not authorized). Regular taps and screenshots are unaffected
+  ✅ Shizuku 已授权：shell 通道可用: '✅ Shizuku authorized: shell channel available'
+  '✅ 支持输入时间线（并发手势）：声明 #% requires: [device_gesture] 的脚本可以运行': '✅ Input timeline supported (concurrent gestures): scripts declaring #% requires: [device_gesture] can run'
+  '❌ 不支持输入时间线：声明 #% requires: [device_gesture] 的脚本会在加载时被拒绝，需要先开启无障碍服务': '❌ Input timeline unsupported: scripts declaring #% requires: [device_gesture] are rejected at load; enable the accessibility service first'
+  上一设备操作已完成；当前设备已切换，请刷新状态: The previous device operation finished; the current device has switched — refresh the status
+  下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。: Push all users, task configs and Profile, carrying only the selected layout and its inherited dependencies; phone history, logs and results are kept.
+  下发配置: Push Config
+  下发配置（需激活功能）: Push Config (activation required)
+  下载 APK 到本机: Download APK to PC
+  下载失败: Download failed
+  不下发总览数据；手机 Profile 继续按账号云端同步更新。: Overview data is not pushed; the phone's Profile keeps updating via account cloud sync.
+  不含总览数据（Profile 由账号云端同步）: Excludes overview data (Profile syncs from the cloud by account)
+  二维码来源: QR code source
+  二维码生成失败，请手动打开上面的链接: QR code generation failed; open the link above manually
+  仅合并已结束的手机记录；参数、Profile 和装备数据不回传。重复回传不会重复导入。: Only finished phone records are merged; parameters, Profile and equipment data are not uploaded. Re-uploading doesn't duplicate imports.
+  任务状态：{state}: 'Task status: {state}'
+  体检失败：{err}: 'Health check failed: {err}'
+  使用应用预置配置；执行用户：{user}: "Uses the app's bundled config; executing user: {user}"
+  保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。: Keeps each user's task settings (including auto-tuning) and phone-only users; scripts, layouts and the Profile DB still update.
+  保留手机任务参数: Keep phone task parameters
+  保留手机任务参数及手机独有用户。: Keeps phone task parameters and phone-only users.
+  保留手机批量配置: Keep phone batch configs
+  保留手机批量配置。: Keeps the phone's batch configs.
+  保留手机整份批量配置组；取消后使用电脑配置组。本次运行草稿仍保留。: Keeps the phone's entire batch configuration groups; unchecking uses the PC's groups. This run's draft is still kept.
+  先「下载 APK 到本机」或选择一个本地安装包: First "Download APK to PC" or pick a local package
+  先准备一个本地安装包: Prepare a local package first
+  全部网卡（默认）: All NICs (default)
+  其他连接: Other connections
+  勾选后不下发 Profile 数据库和定义，手机总览数据继续由账号云端同步更新。手机处于云端模式（默认）时必须勾选，否则手机会拒绝接收。: When checked, the Profile database and definitions are not pushed; the phone's overview keeps updating via account cloud sync. Must be checked when the phone is in cloud mode (default), or the phone rejects the transfer.
+  协议: Protocol
+  协议不匹配会直接连不上。{newer}端较新，请升级另一边: A protocol mismatch prevents connection entirely. The {newer} side is newer; upgrade the other one
+  协议版本: Protocol version
+  协议版本不匹配，无法执行手势测试: Protocol version mismatch; cannot run the gesture test
+  取消下载: Cancel Download
+  只影响 shell 通道；手势与无障碍截图不需要它: Only affects the shell channel; gestures and accessibility screenshots don't need it
+  可选能力，不装也能用无障碍通道: Optional capability; the accessibility channel works without it
+  同步到手机: Sync to Phone
+  同步布局（请选择安卓布局）: Sync layout (pick an Android layout)
+  同步配置: Sync Config
+  向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活: Pushing configs to the phone requires Lv1 activation; activate under Settings → "Activation"
+  回传到电脑: Upload to PC
+  回传完成；重复记录已跳过，手机原件保留。: Upload finished; duplicate records skipped, phone originals kept.
+  回传已处理，但刷新手机状态失败：{message}: 'Upload processed, but refreshing the phone state failed: {message}'
+  在线下载（GitHub）: Online download (GitHub)
+  在运行但未授权: Running but not authorized
+  复制诊断报告: Copy Diagnostics Report
+  安装失败：{err}: 'Install failed: {err}'
+  安装完成：{out}: 'Install finished: {out}'
+  将更新脚本、布局和用户数据。: Will update scripts, layouts and user data.
+  将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。: Will update scripts, layouts and user data; Profile is overwritten by the PC snapshot.
+  尚未扫描: Not scanned yet
+  ? "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。"
+  : "LAN scan discovers devices with wireless ADB; local port scan discovers emulators listening only on 127.0.0.1.\nScanning only establishes ADB connections; it doesn't switch the main window's execution target."
+  屏幕: Screen
+  屏幕标定: Screen Calibration
+  已下载 {mb:.1f} MB: Downloaded {mb:.1f} MB
+  已发现并连接 {count} 台设备: Found and connected {count} devices
+  已开启: Enabled
+  已授权: Authorized
+  已标定: Calibrated
+  已结束: Finished
+  并发手势上限: Concurrent gesture limit
+  应用安装: App Install
+  开始体检: Start Health Check
+  开始测试: Start Test
+  当前版本 <b>{v}</b> · 对应安装包 {name}: Current version <b>{v}</b> · matching package {name}
+  往返延迟：中位 {mid:.0f} ms（{n} 次，最快 {lo:.0f} / 最慢 {hi:.0f}）: 'Round-trip latency: median {mid:.0f} ms ({n} tries, fastest {lo:.0f} / slowest {hi:.0f})'
+  律匠 移动设备诊断报告: LvJiang Mobile Device Diagnostics Report
+  恒等（未标定）: Identity (uncalibrated)
+  截图坐标与输入坐标一致。非 20:9 机型若点位整体偏移，在手机端悬浮球里做一次屏幕标定: Screenshot and input coordinates match. On non-20:9 devices with an overall offset, run one screen calibration from the floating ball on the phone
+  手势、点击与截图都依赖它。在 app 内按引导开启；部分系统会在「受限设置」里额外拦一道，需要先允许: Gestures, taps and screenshots all depend on it. Enable it in the app as guided; some systems additionally gate it behind "Restricted settings" — allow it there first
+  手势测试: Gesture Test
+  手势测试失败：{err}: 'Gesture test failed: {err}'
+  手势测试已取消: Gesture test cancelled
+  手机: Phone
+  手机内置任务，可独立配置和执行，无需先连接 PC。可向手机下发脚本、配置和 Profile，也可独立回传手机历史与日志。: Tasks built into the phone, configurable and runnable without a PC. You can push scripts, configs and Profile to the phone, and upload phone history and logs independently.
+  手机历史、日志和结果保留；回传需单独操作。确认下发？: Phone history, logs and results are kept; uploading is a separate action. Confirm the push?
+  手机执行用户：{user}；最近同步：{time}: 'Phone executing user: {user}; last sync: {time}'
+  手机缺失 {count} 个附件，相关历史不完整；请检查手机原文件。: The phone is missing {count} attachments; related history is incomplete. Check the original files on the phone.
+  手机要访问的本机地址。多网卡时选与手机同网段的那个；换地址只改链接，不会中断共享: The local address the phone will access. With multiple NICs pick the one on the phone's subnet; changing it only updates the link and doesn't interrupt sharing
+  执行任务: Run Task
+  执行用户（手机资料）: Executing user (phone profile)
+  扫描失败: Scan failed
+  扫描失败：{error}: 'Scan failed: {error}'
+  扫描局域网: Scan LAN
+  扫描已取消: Scan cancelled
+  扫描本机端口: Scan Local Ports
+  扫码安装: Scan to Install
+  拿不到屏幕尺寸，无法下发手势: Cannot get the screen size; cannot send gestures
+  新增附件：{count} 个: 'New attachments: {count}'
+  旋转: Rotation
+  无可用局域网地址: No available LAN address
+  无法启动本机共享: Cannot start local sharing
+  无法连接离线执行接口，请先打开手机 App 并更新 APK: Cannot reach the offline execution API; open the phone app and update the APK first
+  无法连接设备端代理: Cannot connect to the on-device agent
+  无障碍服务: Accessibility Service
+  无障碍服务未开启，无法执行手势测试: Accessibility service is off; cannot run the gesture test
+  旧版 app 不上报版本，建议升级到与 PC 相同的版本: The old app doesn't report its version; upgrading to match the PC is recommended
+  旧版 app 不上报该值，升级后可见: The old app doesn't report this value; visible after upgrading
+  最近一次操作: Last operation
+  未上报: Not reported
+  未发现可连接的设备: No connectable devices found
+  未开启: 'False'
+  未比对（取不到 SHA256SUMS）: Not verified (SHA256SUMS unavailable)
+  未运行: Not running
+  未连接设备，无法判断可用能力: No device connected; cannot determine available capabilities
+  本地 APK 校验失败：{err}: 'Local APK verification failed: {err}'
+  本地安装包: Local package
+  本机不支持多路并发，输入时间线无法落地: This machine doesn't support multi-channel concurrency; the input timeline can't be realized
+  本机共享（局域网）: Local Sharing (LAN)
+  本机尚无安装包: No local package yet
+  校验不一致: Checksum mismatch
+  校验通过: Validation passed
+  正在传输：{done}/{total} KiB: 'Transferring: {done}/{total} KiB'
+  正在刷新设备列表，请稍后重试: Refreshing the device list; try again shortly
+  正在取消扫描…: Cancelling scan…
+  正在扫描…: Scanning…
+  正在扫描局域网设备…: Scanning LAN devices…
+  正在扫描本机模拟器端口…: Scanning local emulator ports…
+  正在操作…: Working…
+  正在暂停: Pausing
+  正在校验…: Verifying…
+  正在校验本地 APK…: Verifying the local APK…
+  正在结束: Stopping
+  正在连接设备端代理…: Connecting to the on-device agent…
+  正在通过 ADB 安装…: Installing via ADB…
+  比例: Ratio
+  没有可用的局域网地址: No available LAN address
+  没有可用的局域网地址：确认本机已连接网络: 'No available LAN address: make sure this PC is connected to a network'
+  没有已连接的 ADB 设备: No ADB device connected
+  ? "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。"
+  : "The test holds the bottom-left of the screen for a while while tapping the bottom-right twice — \"holding the joystick while tapping\".\nPut the phone on a game screen where movement and jumping are visible, then click Start."
+  版本: Version
+  版本不一致时协议和随包配置都可能对不上。建议把低的那一边升到高的: With mismatched versions, protocol and bundled configs may disagree. Upgrade the lower side to match
+  用 PC 配置覆盖手机任务参数和用户名册。: Overwrite the phone's task parameters and user roster with PC configs.
+  用 PC 配置覆盖手机批量配置。: Overwrite the phone's batch configs with PC configs.
+  用手机扫码，从本机下载安装。手机需要和电脑在同一局域网，但不需要能上网。: Scan with the phone to download and install from this PC. The phone must be on the same LAN but needs no internet.
+  ? "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。"
+  : "Scan with the phone to download and install directly from GitHub.\nIf the phone has no internet, use \"Local Sharing\" on the right instead."
+  由本机提供下载，手机不需要能上网: Downloads are served by this PC; the phone needs no internet
+  电脑: PC
+  确认手机已安装律匠 app、与本机同一局域网或已用 USB 连接，并在 app 内开启无障碍服务: Make sure the LvJiang app is installed on the phone, on the same LAN or connected via USB, and the accessibility service is enabled in the app
+  离线任务: Offline Tasks
+  移动设备（正在停止后台操作…）: Mobile device (stopping background operation…)
+  落点：按住 {push}，期间点击 {tap}: 'Landing: hold {push} while tapping {tap}'
+  设备体检: Device Health Check
+  设备已切换，请刷新离线任务状态: The device has switched; refresh the offline task status
+  设备序列号: Device serial
+  设备扫描: Device Scan
+  设备端代理: On-device Agent
+  设备端收到了指令但执行失败，展开日志看原因: The device received the command but execution failed; expand the log for the reason
+  设备端版本: Device-side version
+  请先更新 APK：旧版本不支持独立保留任务参数和批量配置: "Update the APK first: the old version doesn't support keeping task parameters and batch configs separately"
+  请先选择在线设备: Select an online device first
+  远程执行: Remote Execution
+  选择 APK: Select APK
+  选择本地 APK…: Select local APK…
+  重新扫描: Rescan
+  除本窗口外还有 {n} 路连接连着这台手机，可能来自另一个窗口或另一台电脑，操作会互相打断: Besides this window, {n} other connections are attached to this phone — possibly another window or computer; operations will interrupt each other
+notices:
+  '{name}二维码获取失败：{error}；可点「打开赞助页面」': 'Failed to fetch the {name} QR code: {error}; you can click "Open sponsor page"'
+  下载该版本: Download This Version
+  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: No data will be uploaded. You can opt in anytime later via "Config Manager → Network & Privacy".
+  不受理：一对一教学、远程配置、信息不足、明确不支持的功能、第三方修改导致的问题及商业用途。: 'Not accepted: one-on-one teaching, remote configuration, insufficient information, explicitly unsupported features, issues caused by third-party modifications, and commercial use.'
+  不同意: Decline
+  不收集: Not Collected
+  不收集什么: What Isn't Collected
+  二维码已更新: QR code updated
+  仅用于所列功能改进，不公开发布原始数据: Used only to improve the listed features; raw data is never published
+  使用交流和一般咨询请优先在群内讨论: For usage questions and general discussion, please ask in the group first
+  免责声明: Disclaimer
+  公告版本 {version}: Announcement version {version}
+  关于律匠: About LvJiang
+  刷新{name}二维码失败，已保留当前二维码：{error}: 'Failed to refresh the {name} QR code; keeping the current one: {error}'
+  刷新中...: Refreshing...
+  刷新二维码: Refresh QR Code
+  刷新失败，已保留当前二维码：{error}: 'Refresh failed; keeping the current QR code: {error}'
+  前往发布声明: Open Release Notes
+  匿名使用数据收集: Anonymous Usage Data Collection
+  反馈与建议: Feedback & Suggestions
+  发布于 {date}: Released {date}
+  发现新版本: New Version Available
+  受理范围: Scope
+  受理：可复现的 Bug、功能建议、过时或无法执行的文档。: 'Accepted: reproducible bugs, feature suggestions, outdated or non-working documentation.'
+  只有信息足以复现或定位的问题才会进入开发者排查；受理不代表承诺修复时间。: Only issues with enough information to reproduce or locate go to the developer; acceptance doesn't promise a fix timeline.
+  同意: Agree
+  同意后随时可在「配置管理 → 网络与隐私」关闭。: After agreeing, you can turn it off anytime via "Config Manager → Network & Privacy".
+  图片无法显示，请刷新或打开赞助页面: The image cannot be displayed; refresh or open the sponsor page
+  复现步骤、预期结果、实际结果和出现频率: Reproduction steps, expected result, actual result and frequency
+  好的: OK
+  实际会发送的数据长这样: The data actually sent looks like this
+  尚未获取到公告，点击“重新获取”进行同步。: No announcements fetched yet; click "Refresh" to sync.
+  开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: Enabling telemetry uploads related, unreported history from the last {days} days; records created while disabled remain stored locally.
+  异常前后的连续日志；识别或点击问题附截图或录屏: Continuous logs around the issue; screenshots or recordings for recognition/tap problems
+  当前为离线模式，仅显示本地公告缓存: Offline mode; showing the local announcement cache only
+  当前为离线模式，请关闭离线模式后刷新公告: Offline mode is on; turn it off to refresh announcements
+  当前版本: Current Version
+  律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: LvJiang is free and open source. If it saves you time, you're welcome to buy the author a coffee.
+  律匠版本；源码版同时提供 commit hash: LvJiang version; source builds also include the commit hash
+  忽略该提示: Ignore This Version
+  愿意贡献匿名使用数据，帮助改进律匠吗？: Would you like to contribute anonymous usage data to help improve LvJiang?
+  截图、日志、配置文件或其他未在上方列明的本地内容: Screenshots, logs, configuration files, or other local content not listed above
+  截图方式、输入方式、工作流名称与全部参数: Capture method, input method, workflow name and all parameters
+  打开赞助页面: Open Sponsor Page
+  扫码加群: Scan to Join the Group
+  提交 Bug 时至少提供: Minimum information for a bug report
+  提交 GitHub Issue: Submit a GitHub Issue
+  提交日志和截图前，请遮盖账号、角色名、ADB 序列号、Token 等隐私信息。: Before submitting logs and screenshots, mask private info such as accounts, character names, ADB serials and tokens.
+  提交问题前请准备完整的定位信息: Prepare complete diagnostic information before reporting
+  支持律匠: Support LvJiang
+  收集什么: What's Collected
+  暂无二维码，请获取最新二维码: No QR code yet; fetch the latest one
+  暂无公告: No announcements
+  更新于 {date}: Updated {date}
+  最新版本: Latest Version
+  本次发布暂无详细说明。: No detailed notes for this release.
+  查看详细规范: View detailed guidelines
+  检查中...: Checking...
+  正在获取…: Fetching…
+  正在获取公告...: Fetching announcements...
+  正在获取最新二维码...: Fetching the latest QR code...
+  正在获取最新二维码…: Fetching the latest QR code…
+  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: 'Once-daily launch record: LvJiang version, OS type, runtime environment, and a random identifier'
+  用来做什么: What It's Used For
+  离线模式下可查看缓存，暂不联网刷新: Cache viewable in offline mode; no online refresh for now
+  获取中...: Fetching...
+  '获取公告失败: {error}': 'Failed to fetch announcements: {error}'
+  获取失败，当前显示上次缓存：{error}: 'Fetch failed; showing the last cache: {error}'
+  许可证: License
+  该版本不再提醒: Don't remind me about this version
+  账号、姓名或其他能认出你是谁的信息: Your account, name, or any other information that could identify you
+  赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: Sponsoring is entirely voluntary — it buys no features, licenses or priority support, and affects nothing existing.
+  赞助律匠: Sponsor LvJiang
+  运行环境、布局、设备分辨率与横竖屏方向: Runtime environment, layout, device resolution and orientation
+  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: This ID is a random string generated on this machine; it doesn't contain your account or hardware info, but it does let us tell that records came from the same machine. You can reset it anytime in Settings.
+  重新获取: Refresh
+ocr_dialog:
+  (无): (None)
+  (无匹配): (No Match)
+  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Ctrl+V to paste a screenshot, or click "Upload Image" to load a file
+  key 不能为空: key cannot be empty
+  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: The maximum total height allowed per batch of regions; anything beyond splits into the next batch.
+  上传图片: Upload Image
+  从设备获取最新截图: Grab the latest screenshot from the device
+  创建规则组: Create Rule Group
+  删除规则组: Delete Rule Group
+  刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
+  刷新截图失败: Failed to refresh the screenshot
+  匹配参考图: Match Reference Image
+  区域批量识别: Batch Region Recognition
+  ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
+  : "Batch region recognition stitches multiple text regions into one canvas and calls OCR once.\nThese parameters control the stitched size; they take effect from the next recognition after saving."
+  原始文本: Raw Text
+  名称不能为空: Name cannot be empty
+  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: OCR settings have unsaved changes; quit and discard them?
+  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Image files (*.png *.jpg *.jpeg *.bmp *.webp);;All files (*)
+  已撤销未保存的清洗规则修改: Reverted unsaved cleaning-rule changes
+  已撤销未保存的识别配置修改: Reverted unsaved recognition-config changes
+  已清除选框: Selection cleared
+  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: Minimum width and height of the stitched canvas. Too small and narrow regions get hugely upscaled by the OCR detector.
+  撤销清洗规则: Undo Cleaning Rules
+  撤销识别配置: Undo Recognition Config
+  文本替换（精确匹配）: Text replacement (exact match)
+  无图片: No image
+  无法读取剪贴板图片: Cannot read the clipboard image
+  替换为: Replace with
+  未匹配到参考图: No reference image matched
+  未识别到文字: No text recognized
+  正则替换: Regex replacement
+  正则表达式: Regular expression
+  正在刷新截图...: Refreshing screenshot...
+  正在匹配参考图...: Matching reference images...
+  正在识别文字...: Recognizing text...
+  测试: Test
+  测试清洗效果: Test Cleaning
+  清洗结果...: Cleaning result...
+  清洗规则: Cleaning Rules
+  清洗规则已保存: Cleaning rules saved
+  清空画布: Clear Canvas
+  清除红色选框: Clear red selection
+  清除选择: Clear Selection
+  相邻文字区域在拼图中的间隔。: Gap between adjacent text regions in the stitched canvas.
+  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: Delete rule group "{name}"? Workflows referencing it will fail to run.
+  确定撤销本次所有未保存的清洗规则更改吗？: Undo all unsaved cleaning-rule changes made this session?
+  确定撤销本次所有未保存的识别配置更改吗？: Undo all unsaved recognition-config changes made this session?
+  获取图像失败: Failed to grab the image
+  '行 {n}: 无效的正则表达式': 'Row {n}: invalid regular expression'
+  规则组 key（用于 with 声明）: Rule group key (used in with clauses)
+  规则组名称: Rule group name
+  规则组已创建: Rule group created
+  规则组已删除: Rule group deleted
+  规则组已重命名: Rule group renamed
+  识别失败: Recognition failed
+  识别文字: Recognize Text
+  识别配置: Recognition Config
+  识别配置已保存: Recognition config saved
+  请先保存或取消当前清洗组的修改: Save or discard the current cleaning group's changes first
+  输入测试文本...: Enter test text...
+  选择图片: Select Image
+  选框区域为空: The selection region is empty
+  重命名规则组: Rename Rule Group
+  ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
+  : "Default rules apply globally to all OCR; scan/find with clauses stack the selected business group on top of the defaults.\nClick \"Save\" to apply — no restart needed; use \"Undo\" to revert unsaved changes."
+  默认规则（全局）: Default Rules (Global)
+ondevice_runner:
+  当前 active_layout 不存在：{name}: 'The current active_layout does not exist: {name}'
+  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 'No layout available: session has no active_layout set, and the layouts.yaml roster is empty'
+platforms:
+  工作流暂停: Workflow Paused
+  工作流确认: Workflow Confirmation
+  工作流通知: Workflow Notification
+pressable_combo:
+  不绑定（使用坐标点击）: Unbound (use coordinate tap)
+profile:
+  Key '{key}' 已在该分组中显示: Key '{key}' is already shown in this group
+  Key '{key}' 已存在: Key '{key}' already exists
+  Key 只能包含字母、数字和下划线: Keys may contain only letters, digits and underscores
+  Profile 关联脚本处理中（待处理 {count}）: Profile-related scripts processing ({count} pending)
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: Profile change scripts are still running. Wait for the queue to finish before renaming
+  '{field}不能大于 999999': '{field} cannot exceed 999999'
+  '{field}不能小于 {min}': '{field} cannot be less than {min}'
+  '{field}必须是有效数字': '{field} must be a valid number'
+  '{first} +{rest}': '{first} +{rest}'
+  '{label} 必须是整数': '{label} must be an integer'
+  '{noun} · {count} 项': '{noun} · {count} items'
+  '{title} Key ({model})': '{title} Key ({model})'
+  一次只能复制一条定义: Only one definition can be duplicated at a time
+  上一页: Previous Page
+  下一页: Next Page
+  不提醒: Don't remind
+  为零: Zero
+  仅删除历史，不修改当前值；会影响按历史统计的额度: Deletes history only, leaving current values unchanged; affects quotas that accumulate from history
+  今天: Today
+  便利贴: Sticky Note
+  便利贴内容不能为空: Sticky note content cannot be empty
+  便利贴内容不能超过 {limit} 个字符: Sticky note content cannot exceed {limit} characters
+  保存便利贴失败：{error}: 'Failed to save the sticky note: {error}'
+  倍率: Multiplier
+  全选当前结果: Select All Results
+  共 {total} 条: '{total} records total'
+  其他设备: Other Devices
+  写入冲突: Write Conflict
+  准点/{unit}: At reset/{unit}
+  准点:{val}/{period}: 'At reset: {val}/{period}'
+  准点恢复: Restore at reset
+  减少: Decrease
+  减少 {value}: Decrease {value}
+  减少...: Decrease...
+  '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）': 'The value after decreasing cannot go below 0 (current: {cur}, entered: {inp})'
+  分组名不能为空: Group name cannot be empty
+  分钟: minutes
+  删除便利贴失败：{error}: 'Failed to delete the sticky note: {error}'
+  删除分组: Delete Group
+  勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: When checked the script runs before the write lands; a rejection or failure rolls back the whole sync write chain. Unchecked, it queues after commit. Sync scripts should be short — not for long waits.
+  ? "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
+  : "Checked: handled as an action, triggering sync of the config's sync_targets.\nUnchecked: handled as a pure overwrite, writing only this key without triggering any sync."
+  ? "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"
+  : "Checked: once the target caps out this item locks (the overview shows — and becomes read-only).\nUnchecked: the item displays and edits normally even when the target is full; increments just stop writing to the capped target."
+  包含: Contains
+  单向增加: Increase-only
+  原 key 已不存在，请重新打开编辑对话框: The original key no longer exists. Reopen the editor
+  原分组已被移除，请重新选择: The original group was removed; pick again
+  原列已被移除，请重新选择插入位置: The original column was removed; pick an insert position again
+  双击修改来源: Double-click to edit the source
+  取消本项「满值锁定」后可继续记录，增量不再写入已满目标: Uncheck this item's "full-value lock" to keep recording; increments stop writing to the capped target
+  取消这个条件: Remove this condition
+  变动规则第 {row} 行至少添加一个快捷数量: Change rule row {row} needs at least one quick amount
+  变动规则第 {row} 行设置了快捷数量，请填写来源或用途: Change rule row {row} has quick amounts; fill in the source or use
+  变动量: Delta
+  变动量：{value}: 'Delta: {value}'
+  变更类型：{label}: 'Change type: {label}'
+  '变更脚本不存在: workflows/{path}': "Change script doesn't exist: workflows/{path}"
+  变更记录: Change History
+  另有 {count} 项未列出，输入可搜索: '{count} more items not listed; type to search'
+  同步:{sync}: 'Sync: {sync}'
+  同步修改: Sync changes
+  同步变更依赖方: Sync dependent parties of the change
+  同步来源: Synced From
+  同步来源：{value}: 'Sync source: {value}'
+  同步目标 {targets} 已达上限: Sync target {targets} has reached its cap
+  同步目标不能指向自身: Sync targets cannot point at themselves
+  周: weeks
+  周一: Mon
+  周三: Wed
+  周二: Tue
+  周五: Fri
+  周六: Sat
+  周四: Thu
+  周期: Cycle
+  回到打开这个对话框时的默认范围: Back to the default range from when this dialog opened
+  增加: Increase
+  增加 {value}: Increase {value}
+  增加...: Increase...
+  增量: Delta
+  复制定义: Duplicate Definition
+  定义数据模型 key: Define Data-Model Keys
+  定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Defines the data model's keys. Double-click non-group columns to edit; right-click to change groups in bulk.
+  实时/{unit}: Realtime/{unit}
+  实时:{val}/{unit}: 'Realtime: {val}/{unit}'
+  实时恢复: Realtime restore
+  小时: hours
+  展示上限: Display cap
+  展示总和行: Show total row
+  工作流语法正确: Workflow syntax OK
+  '当前值: {val}': 'Current value: {val}'
+  当前分组没有可添加的字段: The current group has no fields to add
+  当前显示全部记录: Showing all records
+  当前用户已锁定: Locked for the current user
+  快捷数量: Quick amounts
+  快捷规则:{count}项: 'Quick rules: {count}'
+  总和: Total
+  恢复入口范围: Restore Entry Scope
+  按{title}筛选: Filter by {title}
+  搜索 值 / 来源 / 用户 / 键: Search value / source / user / key
+  搜索{title}（可输入未列出的值）: Search {title} (values not listed can be typed)
+  搜索字段名称或 key: Search field names or keys
+  搜索：{value}: 'Search: {value}'
+  撤销失败: Undo failed
+  支持小数: Decimals supported
+  数值无效: Invalid number
+  数据变化后执行；路径相对于 workflows 目录: Runs after data changes; path relative to the workflows directory
+  数据模型: Data Model
+  新值: New Value
+  新值包含：{value}: 'New value contains: {value}'
+  新增: Add
+  新增便利贴: New Sticky Note
+  新增列: Add Column
+  新建分组: New Group
+  方向: Direction
+  无上限: No cap
+  旧值: Old Value
+  旧值包含：{value}: 'Old value contains: {value}'
+  时间: Time
+  时间：{value}: 'Time: {value}'
+  暂无便利贴: No sticky notes
+  更改分组: Change Group
+  未完成: Incomplete
+  未记录设备: Unrecorded device
+  末页: Last Page
+  本机: This PC
+  条: records
+  来源/用途: Source/Use
+  来源（增加）: Source (increase)
+  来源：{value}: 'Source: {value}'
+  查看全部用户、全部 key 的变更记录: View change history for all users and all keys
+  查看历史记录: View History
+  标签: Label
+  校验: Validate
+  校验失败: Validation Failed
+  橙警:>={val}: 'Orange alert: >={val}'
+  每周: Weekly
+  每天: Daily
+  每页: Per page
+  没有可用的数据模型 key，请先在数据模型定义中添加: No data-model keys available; add some in the data-model definition first
+  没有符合筛选条件的记录: No records match the filters
+  添加同步目标: Add Sync Target
+  添加来源: Add Source
+  添加用途: Add Use
+  添加（{count}）: Add ({count})
+  清空选择: Clear Selection
+  清除全部筛选: Clear All Filters
+  满值锁定: Full-value lock
+  点击更改分组: Click to change the group
+  用户 {name}: User {name}
+  用户头像: User Avatar
+  用户数据模型定义: User Data Model Definition
+  用途（减少）: Use (decrease)
+  确定: OK
+  ? "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。"
+  : "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndoing writes a new reversed record."
+  ? "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。"
+  : "Permanently delete this history record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nDelta: {delta}\n\nDeletes history only — current values stay and no deletion record is added. This cannot be undone; deleting acquisition records may free source quotas accumulated from history."
+  确定要删除 key '{key}' 吗？: Delete key '{key}'?
+  确定要删除分组 '{name}' 吗？: Delete group '{name}'?
+  确定要删除这条便利贴吗？: Delete this sticky note?
+  确认撤销: Confirm Undo
+  确认重命名: Confirm Rename
+  第 {page} / {pages} 页 · {start}–{end} 条: Page {page} / {pages} · records {start}–{end}
+  类型：{value}: 'Type: {value}'
+  红警:>={val}: 'Red alert: >={val}'
+  编辑便利贴: Edit Sticky Note
+  编辑当前列: Edit Current Column
+  自定义增量 - {label}: Custom delta - {label}
+  至少保留一个分组: Keep at least one group
+  覆写 - {label}: Overwrite - {label}
+  覆写...: Overwrite...
+  覆盖: Overwrite
+  ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
+  : "Remove {user}'s lock on \"{label}\"?\nAfter unlocking, automated tasks will read and update this key again."
+  设备：{value}: 'Device: {value}'
+  该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: The value was updated by another process; this delta was not written. Refresh and try again.
+  该条历史记录已发生变化，请刷新后重试: That history record has changed; refresh and try again
+  详情摘要: Detail Summary
+  请停止所有任务后再重命名 Profile key: Stop all tasks before renaming a Profile key
+  请先选择变更脚本: Select a change script first
+  请先选择用户: Select a user first
+  请输入 Key: Enter a key
+  请输入{field}: Enter {field}
+  请输入标签: Enter a label
+  请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件: Pick a .wf file under config/system/workflows or config/local/workflows
+  读取便利贴失败：{error}: 'Failed to read sticky notes: {error}'
+  跳至: Go to
+  软上限: Soft cap
+  输入错误: Input Error
+  近 30 天: Last 30 days
+  近 7 天: Last 7 days
+  近 90 天: Last 90 days
+  选择...: Select...
+  选择变更脚本: Select Change Script
+  选择字段: Select Field
+  ? "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？"
+  : "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
+  重新读取用户数据: Reload User Data
+  重置:{time}: 'Reset: {time}'
+  重置日:{day}: 'Reset day: {day}'
+  重置日:{day}号: 'Reset day: the {day}th'
+  ? "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。"
+  : "Lock \"{label}\" for {user}?\nOnce locked the engine ignores this value: automated tasks stop reading or writing it, periodic resets stop, and the value stays at its current state.\nRight-click to unlock any time."
+  键: Key
+  键：{label}: 'Key: {label}'
+  键：{value}: 'Key: {value}'
+  首页: First Page
+  （清空）: (empty)
+  （请选择）: (select one)
+  ＋ 添加便利贴: ＋ Add Sticky Note
+profile_service:
+  仅可撤销写入记录: Only write records can be undone
+  历史记录不存在: The history record does not exist
+  只能撤销该用户此数据项的最新记录: Only the latest record of this data item for that user can be undone
+  当前数据项已不存在: The data item no longer exists
+  数据已发生变化，请刷新后重试: The data has changed; refresh and try again
+  自动恢复: Auto-restore
+  该条历史已不存在或归属不匹配，请刷新后重试: That history entry no longer exists or belongs to someone else; refresh and try again
+reference:
+  '  未导入图片': '  No image imported'
+  元数据字段定义已保存: Metadata field definitions saved
+  元数据定义: Metadata Definition
+  全部删除: Delete All
+  内置字段不可删除: Built-in fields cannot be deleted
+  内置字段，不可编辑或删除: Built-in field, cannot be edited or deleted
+  切割: Split
+  切割结果: Split Result
+  删除空间: Delete Space
+  删除选中的图库空间（含其全部参考图）: Delete the selected gallery space (including all its reference images)
+  匹配度阈值: Match Threshold
+  单cell尺寸: Cell Size
+  参数超出图片大小: Parameter exceeds image size
+  参考图信息: Reference Image Info
+  可筛选: Filterable
+  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
+  图片文件 (*.png *.jpg *.bmp *.webp): Image Files (*.png *.jpg *.bmp *.webp)
+  字段标识 (key): Field Identifier (key)
+  尚未切割: Not yet split
+  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
+  应用到全部: Apply to All
+  应用设置: Apply Settings
+  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
+  截图: Screenshot
+  执行切割: Execute Split
+  批量管理: Batch Management
+  提交到图库: Submit to Gallery
+  新增参考图: Add Reference Image
+  新增字段: Add Field
+  新建图库空间: New Gallery Space
+  新建空间: New Space
+  显示名: Display Name
+  未填写: Not Filled
+  未框选区域: No Area Selected
+  清除网格: Clear Grid
+  激活空间: Active Space
+  生成网格: Generate Grid
+  留空则不修改: Leave empty to keep unchanged
+  粘贴 (Ctrl+V): Paste (Ctrl+V)
+  系统空间：可编辑其中内容，但不能删除该空间: 'System Space: its contents can be edited, but the space itself cannot be deleted'
+  网格参数: Grid Parameters
+  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
+  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
+  请先导入图片: Please import an image first
+  请先框选区域: Please select an area first
+  请至少选择一个参考图: Please select at least one reference image
+  输入元数据（用于筛选管理）: Enter metadata (for filter management)
+  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
+  退出批量: Exit Batch
+  选择参考图片: Select Reference Image
+run_control:
+  ADB 模式: ADB mode
+  '[启动失败] {name}：{message}': '[Start failed] {name}: {message}'
+  '[执行目标] 当前方案不适用，已自动切换到「{name}」': "[Target] The current plan doesn't apply; switched to \"{name}\""
+  '[拒绝] 已有自动化在运行中，请等待结束': '[Rejected] An automation is already running; wait for it to finish'
+  '[提示] 上次选中的方案已不存在，已回到自定义': '[Notice] The previously selected plan no longer exists; back to Custom'
+  '[提示] 已收起恢复提示，任务仍在等待通道恢复；可点顶部横幅「重新检查」或按 F10 停止': '[Notice] Prompt hidden; the task still waits for the channel. Use the banner "Re-check" or press F10 to stop.'
+  '[提示] 当前没有正在运行的自动化': '[Notice] No automation is currently running'
+  '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用': '[Notice] The {missing} of plan "{name}" no longer exists; it was not fully applied'
+  '[提示] 没有适用于当前执行目标的方案，请配置连接方案': '[Notice] No plan applies to the current execution target; configure a connection plan'
+  '[提示] 选中的方案已不存在，已回到自定义': '[Notice] The selected plan no longer exists; back to Custom'
+  '[操作] ': '[Action] '
+  '[操作] 停止等待恢复的任务': '[Action] Stop the task waiting for recovery'
+  '[操作] 已停止': '[Action] Stopped'
+  '[操作] 已恢复，继续执行...': '[Action] Resumed, continuing...'
+  '[操作] 收到停止请求': '[Action] Stop request received'
+  '[操作] 重新检查执行通道': '[Action] Re-check the execution channel'
+  '[操作] 重新检查设备执行通道': '[Action] Re-checking the device execution channel'
+  '[警告] {name} 画面流中断：{reason}': '[Warning] {name} screen stream interrupted: {reason}'
+  '[警告] 以下 {n} 个脚本文件存在问题，请在脚本编辑器中修正：': '[Warning] These {n} script files have problems; fix them in the script editor:'
+  '[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；若无法恢复，请按 F10 停止任务后重新连接: {error}': "[Warning] The execution channel awaits confirmation; fix {name}'s problem and click Re-check. If it can't be recovered, press F10 to stop the task and reconnect: {error}"
+  '[错误] 请先定位窗口': '[Error] Please locate a window first'
+  '[错误] 请先连接并选择执行目标': '[Error] Connect and select an execution target first'
+  '[错误] 请先连接设备': '[Error] Please connect a device first'
+  '[错误] 请选择一个工作流': '[Error] Please select a workflow'
+  '[错误] 请选择有效的执行用户': '[Error] Select a valid user to run as'
+  ? "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。"
+  : "The screen stream of {name} was interrupted and automatic recovery failed.\n{error}\n\nCheck the phone (screen off, game switched away, USB or wireless link) and choose Yes to re-check, or No to stop this task. Closing this prompt does not stop the task; the banner stays."
+  ? "{name} 的连接恢复未完成。\n{error}\n\n请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。"
+  : "{name}'s connection recovery is incomplete.\n{error}\n\nRestore the ADB/phone-agent connection and choose Yes to re-check, or No to stop this target's task."
+  ⚠ 执行通道等待确认：处理问题后点击「重新检查」；无法恢复时请按 F10 停止任务: "⚠ The execution channel awaits confirmation: fix the issue and click \"Re-check\"; press F10 to stop the task if it can't be recovered"
+  ⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务: '⚠ Screen stream interrupted: fix it, then click "Re-check"; press F10 to stop if it cannot be recovered'
+  ⚠ 画面流已中断：点「重新检查」重试，或断开重连设备: '⚠ Screen stream interrupted: click "Re-check" to retry, or disconnect and reconnect the device'
+  任务暂停中，是否直接停止？: Task is paused. Stop it now?
+  任务运行中: Task running
+  停止中... | 等待当前步骤结束: Stopping... | Waiting for the current step to finish
+  停止任务: Stop Task
+  全部分组: All Groups
+  加载工作流文件: Load Workflow File
+  占用目标 {target}，运行 {run_id}: Target {target} occupied, run {run_id}
+  图库: Gallery
+  备战方案扫描失败，请查看逐方案结果和导航提示: Loadout scan failed; see per-plan results and navigation hints
+  工作流文件 (*.wf);;所有文件 (*): Workflow files (*.wf);;All files (*)
+  '工作流文件不存在: {path}': 'Workflow file does not exist: {path}'
+  工作流输入: Workflow Input
+  已恢复: Resumed
+  已有任务运行: A task is already running
+  布局: Layout
+  当前工作环境 {env} 不在该脚本支持的环境 {envs} 中: The current environment {env} is not among the environments this script supports ({envs})
+  ? "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的 {tolerance}。"
+  : "The current layout's canvas size doesn't meet the declared requirement; fix the layout and retry.\n\nLayout \"{layout}\" requires a canvas aspect of {expected}; the current canvas is {width}×{height} (ratio {actual}), deviation {deviation} exceeds the allowed {tolerance}."
+  当前方案「{name}」不支持{mode}: Plan "{name}" does not support {mode}
+  当前没有可执行目标: No executable target
+  批量任务运行中: Batch running
+  拒绝: Rejected
+  无法加载布局：{name}: 'Cannot load layout: {name}'
+  无法启动工作流: Failed to start the workflow
+  无法开始执行: Cannot start
+  无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。: LvJiang could not verify its administrator privileges. Connection plan "{name}" requires administrator privileges, so execution was rejected to prevent clicks or keyboard input from failing. Close LvJiang, restart it as administrator, and try again.
+  日常任务运行中: Daily tasks running
+  未分组: Ungrouped
+  未定位窗口 | 请先扫描窗口并点击定位: Window not located | Scan for windows and click Locate first
+  未连接 | 请先定位窗口或连接设备: Not connected | Locate a window or connect a device first
+  未连接设备 | 请先扫描并连接设备: Device not connected | Scan and connect a device first
+  正在重新检查设备执行通道...: Re-checking the device execution channel...
+  环境: Environment
+  用户正在执行任务: The user is running a task
+  画面已中断，正在恢复…: Screen interrupted; recovering…
+  画面流中断: Flux d'écran interrompu
+  画面流中断，任务正在等待恢复: Screen stream interrupted; the task is waiting for recovery
+  确认停止: Confirm Stop
+  窗口已消失或句柄失效，请重新定位: The window is gone or its handle is stale; locate it again
+  窗口模式: Window mode
+  等待画面恢复: Waiting for Screen Recovery
+  等待设备恢复: Waiting for Device Recovery
+  继续: Continue
+  自动化运行中: Automation Running
+  设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务: The device execution channel awaits confirmation; fix the issue and re-check, or stop the task if it can't be recovered
+  设备正在执行其他任务: The device is running another task
+  ? "设备正在执行其他任务，本次未启动。\n\n{reason}"
+  : "The device is running another task; not started this time.\n\n{reason}"
+  请选择一个脚本: Select a script
+  请选择一个脚本；列表为空时可刷新脚本或调整展示分组: Select a script; if the list is empty, refresh scripts or adjust display groups
+  调律任务运行中: Tuning tasks running
+  连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。: Connection plan "{name}" requires administrator privileges, but LvJiang is not running as administrator. Windows blocks lower-privileged processes from sending clicks and keyboard input to elevated game windows. Close LvJiang, choose "Run as administrator", and try again.
+  采集任务运行中: Gathering tasks running
+  错误: Erreur
+  需激活 Lv1: Lv1 activation required
+scene_editor:
+  '  (活动)': '    (active)'
+  '  · 同层': '  · same layer'
+  (未识别到): (Not Recognized)
+  OCR 清洗组: OCR Cleaning Group
+  PNG（无损，适合识别困难时）: PNG (lossless; for hard-to-recognize cases)
+  WebP（质量 90，默认）: WebP (quality 90, default)
+  '[错误] 主窗口正在执行任务，请先停止后再运行脚本': '[Error] The main window is running a task; stop it before running scripts'
+  '[错误] 无主窗口，无法获取运行环境': '[Error] No main window; cannot get the runtime environment'
+  '[错误] 没有已加载的布局': '[Error] No layout loaded'
+  '[错误] 脚本内容为空': '[Error] Script content is empty'
+  '[错误] 请先在主窗口定位游戏窗口': '[Error] Please locate the game window in the main window first'
+  '[错误] 请先在主窗口连接 ADB 设备': '[Error] Please connect an ADB device in the main window first'
+  key 必须以小写字母开头，仅含小写字母/数字/下划线: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores
+  key 必须以小写字母开头，仅含小写字母/数字/下划线。: Key must start with a lowercase letter, containing only lowercase letters/digits/underscores.
+  key 重复: Duplicate key
+  '{scenes} 仍由本地副本生效，请先还原本地覆盖': '{scenes} still use local copies; restore the local overrides first'
+  ● 有改动: ● Modified
+  一句话说明这个布局用在什么画面上: One line describing what screen this layout is for
+  上移视图: Move View Up
+  下一步：框选区域: 'Next: box a region'
+  下移视图: Move View Down
+  不跳转: "No transition\n{e}'"
+  中文名称: Chinese Name
+  为该区域绑定哪个字段？: Which field to bind for this region?
+  仅作用于当前布局；click 将改为按下该按键: Applies only to this layout; click will press this key
+  仅剩基底视图时可用，取消后所有定义归为无视图区分: Only available with base view remaining; canceling merges all definitions into no-view distinction
+  仅多视图场景可设置: Multi-view scenes only
+  仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: Only affects future refreshed or appended screenshots of the current layout, scene and view; existing screenshots keep their format.
+  从场景 YAML 中删除 Panel 定义: Delete Panel definition from scene YAML
+  从场景 YAML 中删除坐标点定义（meta 数据）: Delete coordinate point definition from scene YAML (meta data)
+  ? "以下 {n} 条没有加上：\n{detail}"
+  : "These {n} weren't added:\n{detail}"
+  以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: These scenes have unsaved changes; save or discard them manually before refreshing.
+  以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: Starts with a lowercase letter; only lowercase letters, digits and underscores; immutable after creation
+  位置和尺寸可在画布中拖动调整。: Position and size can be dragged on the canvas.
+  使用实时图像: Use Live Image
+  例如 20:9 或 2.22，留空表示不校验: e.g. 20:9 or 2.22; empty means no validation
+  例如：我的投屏布局: e.g. My mirroring layout
+  保存关系: Save Relations
+  保存场景定义: Save Scene Definition
+  保存布局「{name}」失败：{reason}: 'Failed to save layout "{name}": {reason}'
+  保存布局后将同时删除该绑定对应的模板截图。确定继续吗？: Saving the layout will also delete the template screenshots bound here. Continue?
+  保存布局失败: Failed to save the layout
+  保存截图失败：{reason}: 'Failed to save the screenshot: {reason}'
+  保存文件: Save File
+  保存脚本文件: Save Script File
+  允许的相对误差，默认 0.5%: Allowed relative deviation, default 0.5%
+  允许误差: Allowed deviation
+  先选中一个已放置的坐标点，再从它拉出一条方向箭头: First select a placed coordinate point, then drag to create a direction arrow
+  入口: Entry
+  全部视图: All Views
+  关闭场景编辑器: Close Scene Editor
+  兼容反色: Inverted-color fallback
+  分组非空，无法删除: Group is not empty, cannot delete
+  切换画布编辑模式，调整画布范围以排除窗口边框: Toggle canvas edit mode, adjust canvas range to exclude window borders
+  创建分组: Create Group
+  创建场景: Create Scene
+  创建坐标: Create Point
+  创建定义: Create Definition
+  创建引用: Create Reference
+  创建所有布局共用的场景定义；网格位置和行列数在布局绑定时设置。: Creates scene definitions shared by all layouts; grid position and rows/columns are set per layout binding.
+  创建网格: Create Grid
+  删除区域: Delete Region
+  删除区域定义及所有布局中的对应绑定: Delete the region definition and its bindings in all layouts
+  删除场景: Delete Scene
+  删除坐标: Delete Point
+  删除引用: Delete Reference
+  删除方向: Delete Direction
+  删除模板绑定: Delete Template Binding
+  删除网格: Delete Grid
+  删除视图: Delete View
+  别名布局创建失败，请检查日志。: Alias layout creation failed, please check logs.
+  别名布局禁止另存为，请使用原布局另存或者新建布局。: Alias layouts cannot be saved-as. Please use the original layout or create a new one.
+  加载文件: Load File
+  勾选后直接从设备实时截屏进行识别，不保存到场景文件: When checked, capture directly from device for recognition without saving to scene file
+  区域: Region
+  单视图: Single View
+  双向滚动: Bidirectional Scroll
+  取消多视图: Cancel Multi-View
+  另存为: Save As
+  另存为失败: Save As Failed
+  只清除当前布局的矩形，保留场景 YAML 中的定义: Clears only the current layout's rectangle, keeping the definition in the scene YAML
+  可作为引用子场景: Can be referenced as a sub-scene
+  可点击: Clickable
+  同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配: When the same icon's colors invert between dark and light backgrounds, also try inverted matching
+  同页取景，共享关联页面的调用方；可通过滚动或翻页到达: Same-page capture, sharing the related page's callers; reachable by scrolling or paging
+  含文本: Contains Text
+  命名方向: Name Direction
+  命名非法: Invalid Name
+  固定网格: Fixed Grid
+  图像检测: Image Detection
+  在场景 YAML 中新增 Panel 定义（声明式网格）: Add Panel definition to scene YAML (declarative grid)
+  在场景 YAML 中新增坐标点定义（meta 数据）: Add coordinate point definition to scene YAML (meta data)
+  在当前分组下新建场景: Create scene under current group
+  在此布局中禁用: Disable in this layout
+  在画布上放置一个坐标点（绑定到 YAML 定义）: Place a coordinate point on canvas (bound to YAML definition)
+  在画布上框选一个矩形区域，绑定到选中的 Panel 定义: Select a rectangular area on canvas, bound to selected Panel definition
+  在脚本光标处插入形如 [scene].[entity] 的引用。需要先在右侧选中一个实体，并把光标放在脚本编辑区: Inserts a [scene].[entity] reference at the cursor. Select an entity on the right first and place the cursor in the script editor
+  场景定义: Scene Definition
+  场景定义 · 所有布局: Scene Definition · All Layouts
+  场景定义：所有布局共用；保存后立即生效。: Scene definitions are shared by all layouts; saving takes effect immediately.
+  坐标: Coordinate
+  坐标、类型与名字都在源场景，这里可改跳转行为及它在本场景的哪些视图下看得见。: Coordinates, type and name live in the source scene; here you can change the jump behavior and which views of this scene it appears in.
+  基底  （单视图）: Base  (Single View)
+  基底视图是场景入口: Base view is the scene entry
+  基底视图的 key 是保留值，不可重命名: The base view's key is reserved and cannot be renamed
+  复制 DSL 引用: Copy DSL Reference
+  复制坐标: Copy Coordinates
+  多视图场景不能转为子场景，请先取消多视图: Multi-view scenes can't become sub-scenes; cancel multi-view first
+  多选状态下不支持删除，请先取消多选: Delete isn't supported in multi-select; cancel multi-select first
+  子场景: Sub-scene
+  实时截屏失败: Live screenshot failed
+  小写字母开头，仅含小写字母/数字/下划线: Starts with lowercase letter, containing only lowercase letters/digits/underscores
+  已从磁盘重载全部场景及当前布局: Reloaded all scenes and the current layout from disk
+  已保存布局「{name}」到系统层，但尚未生效：{reasons}: 'Layout "{name}" was saved to the system layer but is not yet effective: {reasons}'
+  已取消刷新截图: Screenshot refresh cancelled
+  已取消多选: Multi-select cancelled
+  已放弃布局「{name}」的全部未保存改动: Discarded all unsaved changes to layout "{name}"
+  已绑定: Bound
+  已绑定（待保存）: Bound (pending save)
+  已请求结束脚本测试，等它停下后再关闭窗口。: Script test stop requested; the window closes after it stops.
+  已请求结束脚本，等待当前指令完成...: Script stop requested; waiting for the current command to finish...
+  已退出点击标定模式: Exited tap-calibration mode
+  已退出画布编辑模式: Exited canvas edit mode
+  已选 {n}/{total}: Selected {n}/{total}
+  已选中 {total} 项（{detail}）；拖动任一项整组平移，点击空白处取消: '{total} items selected ({detail}); drag any item to move the group as one, click empty space to cancel'
+  布局 key: Layout key
+  布局 key 和布局名称都不能为空: Layout key and name cannot both be empty
+  布局 key「{key}」创建后不可修改。: The layout key "{key}" cannot be changed after creation.
+  布局信息: Layout Info
+  布局信息已保存: Layout info saved
+  布局写入失败，请检查日志。: Layout write failed, please check logs.
+  布局名称: Layout name
+  布局名称不能为空: Layout name cannot be empty
+  ? "布局已保存，但以下模板截图未能删除：\n{errors}"
+  : "The layout saved, but these template screenshots couldn't be deleted:\n{errors}"
+  布局清单里找不到当前布局，请先保存布局: The current layout isn't in the layout list; save it first
+  布局绑定: Layout Binding
+  应用到当前布局: Apply to Current Layout
+  开启多视图、新增/重命名/删除视图: Enable multi-view, add/rename/delete views
+  引用: References
+  引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读: Reference a point from another top-level scene; it stays read-only here
+  引用区域: Reference Area
+  引用区域只读，请回到源场景截取模板: The referenced region is read-only; capture the template in its source scene
+  引用坐标: Reference Point
+  引用的归属视图: Owner views of the reference
+  引用自 {scene}；双击可改它在本场景的归属视图: Referenced from {scene}; double-click to change which view of this scene it belongs to
+  当前场景无截图: The current scene has no screenshot
+  当前场景无截图，请先刷新截图: The current scene has no screenshot; refresh it first
+  当前场景没有 slot 类型的区域: The current scene has no slot-type regions
+  当前场景没有截图，无法截取模板: This scene has no screenshot; cannot capture a template
+  当前布局: Current Layout
+  当前布局不使用坐标；仍可在编辑属性中设置按键绑定: The current layout doesn't use coordinates; key bindings can still be set in edit properties
+  当前布局内，在 Region 中框定点击落点范围: Within the current layout, box the tap range inside the Region
+  当前布局尚未绑定此网格: The current layout hasn't bound this grid
+  当前布局尚未绑定此网格。: The current layout hasn't bound this grid.
+  当前布局没有未保存的改动: The current layout has no unsaved changes
+  当前布局绑定: Current Layout Binding
+  ? "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}"
+  : "The current screenshot size doesn't match. Confirm the new capture?\n\nCurrent: {old_width} × {old_height}\nNew: {new_width} × {new_height}"
+  当前激活布局不可删除: The currently active layout cannot be deleted
+  当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: "No region field is bindable in this view (all assigned, or not part of this view)\nLow precision produces editable commands; high precision saves a raw input trace,'\nThe result is inserted into the current script when recording stops'"
+  快速选择当前场景内的目标视图: Quickly select a target view in the current scene
+  恢复当前布局最近一次保存的状态: Restore the current layout's last saved state
+  截取新图并覆盖当前活动截图: Capture a new shot and overwrite the active screenshot
+  截取新图并追加为新的截图: Capture a new shot and append it as an extra screenshot
+  截取模版: Capture Template
+  截图尺寸不匹配: Screenshot size mismatch
+  截图管理: Screenshot Manager
+  截图：—　　画布：—: 'Screenshot: —　　Canvas: —'
+  所有引用都已绑定，或尚未创建引用。: All references are bound, or none have been created yet.
+  拖拽名称可调整 YAML 定义顺序: Drag names to reorder the YAML definitions
+  按键: Key Press
+  描述: Description
+  插入当前实体: Insert Current Entity
+  放弃改动: Discard Changes
+  放弃改动失败: Failed to discard changes
+  放弃未保存改动: Discard Unsaved Changes
+  新增视图: Add View
+  新建区域: New Region
+  新建场景: New Scene
+  新建场景分组: New Scene Group
+  新建坐标: New Point
+  新建布局: New Layout
+  无关联视图: No related views
+  无可用坐标: No Available Points
+  无可用引用: No available references
+  无场景改动: No Scene Changes
+  无布局: No layout
+  ? "无截图\n请连接投屏后点击「刷新截图」"
+  : "No screenshot\nConnect screen mirroring, then click \"Refresh Screenshot\""
+  无截图源，请先在主窗口定位窗口: No screenshot source; locate a window in the main window first
+  无法加载截图: Cannot load the screenshot
+  无法取消: Cannot Cancel
+  无法重新加载布局「{name}」，当前改动仍保留。: Cannot reload layout "{name}"; your current changes are kept.
+  显示在主界面布局下拉旁，过长会放不下: Shown beside the layout dropdown in the main window; too long won't fit
+  更新失败: Update Failed
+  未声明: Not declared
+  未声明入口，请补充按钮、快捷键或其他进入方式: No entry declared; add a button, hotkey or another way in
+  未绑定: Unbound
+  未通过: Failed
+  本场景视图: This Scene View
+  标定点击区域: Calibrate Tap Region
+  校准模式: Calibration Mode
+  模板: Template
+  模板已截取并暂存；保存布局后写入配置: Template captured and staged; saved to config when the layout saves
+  模板截图删除失败: Failed to delete template screenshots
+  模板文件写入失败，布局尚未保存：{error}: 'Failed to write template files; the layout was not saved: {error}'
+  模板至少需要 4×4 像素，请调整区域: A template needs at least 4×4 pixels; adjust the region
+  横向滚动: Horizontal Scroll
+  正在校准面板网格...: Calibrating panel grid...
+  正在结束...: Stopping...
+  正在识别...: Recognizing...
+  每次只提交当前页。关闭窗口会放弃未提交的表单内容。: Only the current page commits at a time. Closing the window discards uncommitted form content.
+  没有可引用的 area：一级场景中同名的 key 已被本场景占用。: 'No referenceable area: the same-named key in the top-level scene is already taken by this scene.'
+  没有子场景: No sub-scenes
+  没有已加载的布局: No layout loaded
+  没有已定义的区域: No regions defined
+  没有已定义的面板: No panels defined
+  测试当前区域的模板匹配: Test template matching for the current region
+  清除场景和布局定义缓存，从磁盘重新加载；请先保存或放弃未保存的改动: Clear scene and layout definition caches and reload from disk; save or discard unsaved changes first
+  清除点击区域: Clear Tap Region
+  激活布局不可删除: The active layout cannot be deleted
+  点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Click "Recognize All Fields" to see OCR results, or "Recognize All Reference Images" to see match results
+  点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: 'Tap-calibration mode: select a region, then drag inside it to box the tap range; Delete clears the calibration back to default'
+  画布尺寸: Canvas Size
+  画布尺寸无效: Invalid canvas size
+  画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Canvas edit mode: drag/resize yellow canvas frame to exclude window borders'
+  画布裁剪后应有的宽高比。启动任务前会按它校验目标窗口/设备，不符合就拒绝执行——形态错配不会报错，只会让坐标整体偏移。: The aspect ratio the canvas should have after cropping. Before starting a task the target window/device is validated against it and mismatched shapes are rejected — a mismatch wouldn't error, it would just shift every coordinate.
+  留空为本地入口；* 为全局，或逗号分隔场景 key: Empty for a local entry; * for global, or scene keys separated by commas
+  留空则与 key 相同: Leave empty to same as key
+  留空则点击坐标；可输入或下拉选择: Empty taps the coordinates; type or pick from the dropdown
+  目标场景不存在: The target scene doesn't exist
+  确定删除引用 {key} 吗？: Delete reference {key}?
+  ? "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。"
+  : "Delete screenshot {idx}?\nThe remaining screenshots are renumbered automatically."
+  ? "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。"
+  : "Restore layout \"{name}\" to its last saved state?\nAll unsaved layout calibrations, template captures and version adjustments will be lost."
+  确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。: Unreference {scene}.{entity} from the current scene? The source scene's definition and layout coordinates are unaffected.
+  移动场景: Move Scene
+  移动失败: Move Failed
+  移除当前场景的引用，保留源场景定义和布局坐标: Remove the current scene's reference, keeping the source scene definition and layout coordinates
+  等分网格: Equal-Split Grid
+  系统场景不可删除: System scenes cannot be deleted
+  系统场景不能修改 key: The key of a system scene cannot be changed
+  系统场景只能修改显示名称，不能修改 key: System scenes can only have their display name changed, not the key
+  系统布局不可删除；不使用时切换到其他布局即可: System layouts cannot be deleted; switch to another layout if you don't need it
+  纵向滚动: Vertical Scroll
+  绑定到当前布局: Bind to Current Layout
+  绑定坐标: Bind Point
+  绑定引用: Bind Reference
+  绑定网格: Bind Grid
+  结束运行: Stop Run
+  结果集：(空): 'Result Set: (Empty)'
+  继承失败: Inherit Failed
+  编辑区域: Edit Region
+  编辑坐标: Edit Point
+  编辑引用: Edit Reference
+  编辑当前布局的名称、描述与画布尺寸要求: Edit the current layout's name, description and canvas size requirement
+  编辑当前布局绑定: Edit Current Layout Binding
+  编辑画布: Edit Canvas
+  网格: Grid
+  脚本仍在运行: The script is still running
+  脚本内容为空，无法保存: Script content is empty; cannot save
+  脚本已结束运行: The script has finished
+  脚本测试失败: Script Test Failed
+  脚本测试完成: Script Test Completed
+  脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。: User for script test execution, defaults to current user on main page. Switching does not affect main page.
+  脚本测试运行中...: Script test running...
+  自动模式: Auto Mode
+  至少需要保留一张截图: At least one screenshot must remain
+  英文，如 my_group: English, e.g. my_group
+  英文，如 my_point: English, e.g. my_point
+  英文，如 my_region: English, e.g. my_region
+  英文，如 my_scene: English, e.g. my_scene
+  行 × 列: Rows × Columns
+  裁剪画布: Crop Canvas
+  覆盖引用的跳转行为: Override the reference's jump behavior
+  视图: View
+  视图关系无效: Invalid view relations
+  视图管理: View Management
+  解除: Unbind
+  解除引用: Unreference
+  解除引用失败: Failed to unreference
+  解除引用绑定: Unbind Reference
+  解除当前区域的模板绑定: Unbind the current region's template
+  解除绑定: Unbind
+  设为活动: Set Active
+  设置失败: Failed to set
+  识别全部字段: Recognize All Fields
+  识别参考图: Reference Images
+  该场景在此视图下没有可引用的 area: This scene has no referenceable area in this view
+  该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
+  该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
+  该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
+  请先在当前布局中放置该实体，或将其标记为禁用后设置按键: Place this entity in the current layout first, or mark it disabled before setting a key
+  请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。: Please select a placed coordinate point on canvas or in the list first, then create direction.
+  请先在目标场景的「场景管理」中标记为引用子场景。: Mark the target scene as a referenced sub-scene in its "Scene Manager" first.
+  请先处理未保存的改动: Handle unsaved changes first
+  请先导入或刷新当前场景截图。: Import or refresh the current scene screenshot first.
+  请先新建或加载布局: Please create or load a layout first
+  请先选中一个已绑定坐标的区域: Select a region with bound coordinates first
+  请先选中坐标: Please select a point first
+  请先选择一个网格定义。: Select a grid definition first.
+  请先选择已绑定模板且有截图的区域: Select a region with a bound template and a screenshot first
+  请先选择布局。: Select a layout first.
+  请填写名称；Key 以小写字母开头，仅含小写字母、数字、下划线。: Fill in the name; the key starts with a lowercase letter and contains only lowercase letters, digits and underscores.
+  请检查日志: Check the log
+  调用方: Callers
+  跳转: Goes To
+  输入 DSL 脚本内容...: Enter DSL script content...
+  输入不完整: Incomplete input
+  输入方向 key（小写字母开头，可含数字/下划线）：: 'Enter direction key (starts with lowercase letter, may contain digits/underscores):'
+  迁移失败: Migration Failed
+  运行脚本: Run Script
+  返回值：(无): 'Return Value: (None)'
+  还原位置: Restore Position
+  追加截图失败: Failed to append the screenshot
+  退出点击标定: Exit Tap Calibration
+  退出画布编辑: Exit Canvas Edit
+  退出裁剪画布: Exit Canvas Cropping
+  选中截图以预览: Select a screenshot to preview
+  选择脚本文件: Select Script File
+  通过: Passed
+  重命名场景: Rename Scene
+  重命名失败: Rename Failed
+  重命名方向: Rename Direction
+  重命名视图: Rename View
+  重载失败: Reload failed
+  '阈值 ': 'Threshold '
+  限定参考图识别的分组范围: Restrict the group scope of reference-image recognition
+  隐藏「全部」选项，打开场景时直接展示基底视图: Hide the "All" option; opening a scene shows the base view directly
+  隐藏全部视图: Hide All Views
+scrcpy_capture:
+  3 次尝试均无法读取视频流协议头（scrcpy server 未就绪或版本不符）: Failed to read the video stream header after 3 attempts (scrcpy server not ready or version mismatch)
+  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry
+  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy server failed to start (exit code {rc}): {detail}'
+  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'scrcpy protocol version changed unexpectedly: client implements {version}; {detail}'
+  亮屏但 {n:.0f} 秒没有收到任何画面数据（连接无响应或画面采集已停摆）: Screen is on but no stream data for {n:.0f} s (connection not responding or capture has stalled)
+  亮屏但 {n:.0f} 秒没有新画面: Screen is on but no new frames for {n:.0f} s
+  启动 scrcpy server 失败：{error}: 'Failed to start the scrcpy server: {error}'
+  启动视频流失败：{error}: 'Failed to start the video stream: {error}'
+  找不到 scrcpy-server.jar：{path}: 'scrcpy-server.jar not found: {path}'
+  推送 scrcpy-server.jar 失败：{detail}: 'Failed to push scrcpy-server.jar: {detail}'
+  无法建立 scrcpy 视频端口转发: Could not set up the scrcpy video port forward
+  未安装 PyAV，无法解码视频流（请安装 av 依赖）: PyAV is not installed; the video stream cannot be decoded (install the av dependency)
+  画面尺寸切换后超过 {n:.0f} 秒仍未恢复: Not recovered within {n:.0f} s after a screen size switch
+  画面流不可用: The screen stream is unavailable
+  等待新画面超时: Timed out waiting for a new frame
+  视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: The video stream connection was closed by the peer (scrcpy session ended or cleaned up by another program)
+  视频流连接被中断：{error}: 'The video stream connection was interrupted: {error}'
+  读取视频流异常：{error}: 'Error while reading the video stream: {error}'
+  连接 scrcpy 视频端口超时（端口 {port}）: Timed out connecting to the scrcpy video port ({port})
+  连续 {n} 个视频包无法解码: '{n} consecutive video packets could not be decoded'
+scripts:
+  ADB 模式暂不支持录制: ADB mode doesn't support recording yet
+  Unicode 字母/数字/下划线: Unicode letters/digits/underscores
+  '{path} 已存在。覆盖该位置的脚本？': '{path} already exists. Overwrite the script there?'
+  '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'
+  ■ 停止录制: ■ Stop Recording
+  ● 录制脚本: ● Record Script
+  ? "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n"
+  : "⚠ Script metadata unrecognizable; this script won't appear in the run list:\n"
+  上移选项: Move Option Up
+  下移选项: Move Option Down
+  不会被录制: Not recorded
+  不勾选: Unchecked
+  不支持：{kind}（请选择有效类型）: 'Unsupported: {kind} (pick a valid type)'
+  与内置函数重名，脚本运行时会被拒绝: Conflicts with a builtin name; the script will be rejected at runtime
+  丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。: Discard local changes to {name} and restore the {target} version? This cannot be undone.
+  主窗口有工作流在运行，先停止它: The main window has a workflow running; stop it first
+  仅用于脚本展示分组，不改变脚本性质或执行顺序: Only for script display grouping; doesn't change script nature or execution order
+  从代码重新加载: Reload from Code
+  代码: Code
+  代码中的元数据已变化，重新加载会丢弃元数据页尚未应用的修改。重新加载？: Metadata in the code has changed; reloading discards metadata-page changes not yet applied. Reload?
+  低精度: Low precision
+  低精度录制中…连续移动将合并: Low-precision recording… continuous moves will be merged
+  保存为工作流文件: Save as Workflow File
+  保存到 workflows/{dir}: Save to workflows/{dir}
+  保存到 workflows/{dir}；显示名留空则用 id: Saves to workflows/{dir}; empty display name falls back to the id
+  修改会写回代码缓冲区，仍需点击“保存”才会落盘。: Changes write back to the code buffer; still click "Save" to persist.
+  值: Value
+  停在第 {n} 行（单步 = 执行这一行）: Stopped at line {n} (Step = execute this line)
+  停止中…: Stopping…
+  元数据: Metadata
+  元数据与代码均已修改: Both metadata and code changed
+  元数据尚未应用: Metadata not yet applied
+  元数据无效: Invalid Metadata
+  元数据根节点必须是键值映射: The metadata root must be a mapping
+  元数据表单不可编辑：{error}: "The metadata form isn't editable: {error}"
+  内置: Built-in
+  内置函数: Built-in Functions
+  写入编辑区域: Write to Editor
+  切换类型会移除旧类型专属的设置。继续？: Switching the type removes the old type's settings. Continue?
+  删除脚本: Delete Script
+  删除脚本 {rel}？此操作不可恢复。: Delete script {rel}? This cannot be undone.
+  删除选项: Delete Option
+  勾选: Checked
+  '区域 ': 'Region '
+  单步: Step
+  单步…: Step…
+  单步模式：在第一条语句前停住: 'Step Mode: pause before the first statement'
+  占位提示: Placeholder
+  参数名: Parameter name
+  参数定义: Parameter Definitions
+  参数数: Params
+  参数解析失败: Failed to parse parameters
+  取画布: Take Canvas
+  变量: Variable
+  变量名（不用写 $）: Variable name (no need to write $)
+  可批量运行: Batch-runnable
+  可独立运行: Standalone-runnable
+  同路径脚本已存在于 local。新建 system 文件后仍由 local 版本生效，继续？: A same-path script already exists in local. After creating the system file the local version still takes effect; continue?
+  同路径脚本已存在于另一保存位置。新建 local 文件会覆盖其运行效果，继续？: A same-path script already exists in another save location. Creating a local file overrides its runtime effect; continue?
+  含义: Meaning
+  启动失败: Startup Failed
+  '启动失败: {e}': 'Start failed: {e}'
+  声明默认值: Declared default value
+  复制到本地以修改: Copy to Local for Editing
+  复制录制结果: Copy Recording
+  多个条件（每行一个，全部满足）: Multiple conditions (one per line; all must hold)
+  存在尚未支持的声明：{keys}；请先在代码页处理: 'Unsupported declarations present: {keys}; handle them on the Code page first'
+  '完成，返回值: {rv}': 'Done, return value: {rv}'
+  定位到脚本: Locate in Script
+  将在下一条语句前暂停: Will pause before the next statement
+  展开: Expand
+  属性单元准备工作流: Attribute-unit prepare workflow
+  工作流运行中，无法录制: A workflow is running; cannot record
+  左侧选择脚本，或点「新建」: Select a script on the left, or click "New"
+  ? "已保存 {path}，但校验未通过：\n"
+  : "Saved {path}, but validation failed:\n"
+  已保存 {path}，语法与布局引用校验通过: Saved {path}; syntax and layout-reference checks passed
+  已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: "Written to the target, but the original file couldn't be removed: {error}. Check both scripts."
+  已写入编辑区域；请在编辑器中保存脚本: Written to the editor; save the script in the editor
+  已创建 {path}: Created {path}
+  已删除 {rel}: Deleted {rel}
+  已复制到剪贴板: Copied to the clipboard
+  已复制到本地，现在可以编辑: Copied to local; you can edit it now
+  已存在: Already Exists
+  已截图 {w}×{h}（画布裁剪后）: Captured {w}x{h} (after canvas crop)
+  已改名；原名：{name}: 'Renamed; was: {name}'
+  已有未清除的录制内容，请清除后再次点击「录制脚本」，避免覆盖丢失。: Uncleared recording content exists; clear it before clicking "Record Script" again to avoid overwriting.
+  已清除: Cleared
+  已用外部编辑器打开: Opened in the external editor
+  已还原为{target}版本: Restored to the {target} version
+  应用到代码: Apply to Code
+  开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: When enabled, pointer movement is recorded. When disabled, only standalone movement is ignored; clicks, holds, drags, and wheel events are still captured. It is usually unnecessary for ordinary UI actions, but should be enabled for game-camera rotation or other continuous movement.
+  异常退出: Exit on Exception
+  当前脚本不可编辑（系统脚本请先复制到本地），或已带有高精度轨迹: The current script isn't editable (copy system scripts to local first), or it already carries a high-precision track
+  录制: Record
+  录制内容尚未保存或复制到剪贴板，确定要关闭吗？: The recording hasn't been saved or copied; close anyway?
+  录制结束，可修改结果后「写入编辑区域」或「复制录制结果」: Recording finished; edit the result then "Write to Editor" or "Copy Recording"
+  录制结束，可编辑后保存为 .wf: Recording finished; edit then save as .wf
+  录制结束，未捕获到有效操作: Recording finished; no valid actions captured
+  录制结果: Recording
+  ? "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？"
+  : "The recording hasn't been written into the script that started it.\nSwitching scripts clears this recording; continue?"
+  录制轨迹引用超出工作流目录：{ref}: 'The recording track reference escapes the workflows directory: {ref}'
+  录制鼠标移动: Record Mouse Movement
+  待机 | 点击「录制脚本」: Standby | click "Record Script"
+  待机 | 点击「录制脚本」或按: Idle | Click "Record Script" or press
+  或点击停止: or click Stop
+  所需能力: Required Capability
+  执行: Run
+  执行结果显示在这里: Results appear here
+  批量检查: Batch Check
+  找不到录制轨迹：{path}: 'Recording track not found: {path}'
+  找不到该函数: Function not found
+  找不到过程 {name} 的定义: Definition of proc {name} not found
+  把录制结果按语句插入代码编辑器的光标处: Inserts the recording into the code editor at the cursor, as statements
+  ? "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？"
+  : "System script {name} must be copied to local before it can be modified.\nAfter copying, this file no longer follows system updates. Continue?"
+  指令: Command
+  插件: Plugins
+  插入到脚本: Insert into Script
+  插入区域: Insert Region
+  插入坐标: Insert Coordinate
+  插入颜色: Insert Color
+  搜索函数名或说明: Search function names or descriptions
+  搜索指令：点击 / 等待 / 找图 / 颜色…: 'Search commands: Click / Wait / Find Image / Color…'
+  收起: Collapse
+  放弃修改？: Discard changes?
+  放弃录制结果？: Discard the recording?
+  新增选项: Add Option
+  新建脚本: New Script
+  无主窗口，无法截图: No main window; cannot take a screenshot
+  无主窗口，无法获取运行环境: No main window; cannot get the runtime environment
+  无效的保存位置: Invalid save location
+  '无法加载布局: {layout_name}': 'Cannot load layout: {layout_name}'
+  无法加载当前布局: Failed to load the current layout
+  无法加载当前布局做引用校验: Failed to load the current layout to validate references
+  '无法加载当前布局做引用校验: {e}': 'Failed to load the current layout to validate references: {e}'
+  无法开始录制: Cannot start recording
+  显示条件: Show Condition
+  显示环境: Show Environment
+  暴露: Expose
+  更改参数类型: Change Parameter Type
+  未声明（勾选）: Undeclared (checked)
+  未能写入：当前脚本不可编辑或已带有高精度轨迹: "Write failed: the current script isn't editable or already carries a high-precision track"
+  本地 (local): Local (local)
+  本地脚本: Local Scripts
+  本地覆盖系统: Local override of system
+  检查: Check
+  清除录制结果: Clear Recording
+  点: Point
+  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: Generates readable, directly editable WF DSL. On stop, key press/hold/release and following waits are merged where safe; continuous mouse moves and short waits are merged at ~100ms granularity. Good for regular UI flows and later hand-tuning; not for game camera moves that need exact raw-input replay.
+  留空 = id: Empty = id
+  留空使用默认值: Leave empty for defaults
+  目标位置已有 {path}。继续会覆盖目标，并在成功保存后移除原文件。: The target already has {path}. Continuing overwrites it and removes the original after a successful save.
+  目标位置已有不同的录制轨迹：{path}: 'The target already has a different recording track: {path}'
+  确定清除已录制的 DSL 内容吗？: Clear the recorded DSL content?
+  确认保存位置: Confirm Save Location
+  稳定脚本标识；修改后已有引用不会自动更新: Stable script identifier; existing references don't update automatically after a change
+  第 {index} 个参数不是字段映射: Parameter {index} is not a field mapping
+  第 {index} 个参数有未支持的字段：{keys}: 'Parameter {index} has unsupported fields: {keys}'
+  第 {index} 个参数的选项包含未支持的字段: Parameter {index}'s options contain unsupported fields
+  第 {line} 行第 {col} 列：语法错误: 'Line {line}, column {col}: syntax error'
+  系统 (system): System (system)
+  系统脚本不可删除；不想展示请在「脚本配置」取消勾选: System scripts cannot be deleted; uncheck them in "Script Config" instead
+  系统脚本只读——右键「复制到本地以修改」后才能保存: System scripts are read-only — right-click and choose "Copy to Local for Editing" before saving
+  系统脚本只读——右键「复制到本地以修改」后才能编辑: System scripts are read-only — right-click and choose "Copy to Local for Editing" to edit
+  系统（只读）: System (read-only)
+  脚本 id 不能为空: Script id cannot be empty
+  脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: Script id cannot start with _ (the discovery layer treats it as a temp file and skips it)
+  脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: Script id may only use Unicode letters, digits, and underscores, and must start with a letter
+  脚本 id（文件名）: Script id (file name)
+  脚本 {rel} 已存在，覆盖？: Script {rel} already exists. Overwrite?
+  脚本、录制结果或脚本配置有未保存的修改，放弃？: Scripts, recordings or script config have unsaved changes; discard?
+  脚本为空: Script Is Empty
+  脚本声明: Script Declarations
+  脚本录制: Script Recording
+  脚本性质: Script Nature
+  脚本配置: Script Config
+  脚本问题：{reason}: 'Script problem: {reason}'
+  覆盖目标脚本？: Overwrite the target script?
+  记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: Records the raw timeline of keyboard input, mouse buttons, wheel events, and optional pointer movement. Saving also creates a companion trace under workflows/lvtrace for timing closer to the original recording. This is suitable for timing-sensitive game-camera actions; the WF text cannot be moved without its companion trace file.
+  试算: Try Run
+  试算会真的执行脚本再调这个函数：别拿它跑耗时或来源不明的脚本，界面会一直卡到它返回。: "Try Run actually executes the script before calling this function: don't use it on slow or untrusted scripts — the UI blocks until it returns."
+  该函数需要引擎注入（_engine/_wf），只能在脚本执行时调用: This function needs engine injection (_engine/_wf) and can only be called while a script runs
+  语法检查通过（保存后会再做布局引用校验）: Syntax check passed (a layout-reference check runs again on save)
+  请先在“元数据”页点击“应用到代码”，再保存脚本。: Click "Apply to Code" on the Metadata page before saving the script.
+  请先在主窗口定位游戏窗口: Please locate the game window in the main window first
+  请先在主窗口扫描并定位窗口: Scan and locate a window in the main window first
+  请先选择或新建一个可编辑脚本，并保存已有高精度录制: Select or create an editable script first, and save any existing high-precision recording
+  '读取失败: {e}': 'Failed to read: {e}'
+  调试: Debug
+  迁移未完成: Migration incomplete
+  运行: Run
+  运行中…: Running…
+  运行时使用多行输入: Use multi-line input at runtime
+  运行环境: Runtime Environment
+  返回: Returns
+  还原为{target}: Restore to {target}
+  还原失败: Restore Failed
+  这份录制结果已写入编辑区域；清除后可开始新录制: This recording is already written to the editor; clear it to start a new recording
+  这份录制结果已写入，请清除后重新录制: This recording is written; clear it before recording again
+  这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改: This is a local copy of a {target} script and can't be deleted; right-click → Restore to drop local changes
+  选项: Options
+  面板: Panel
+  高精度: High precision
+  高精度 WF 依赖配套轨迹文件，不能单独复制: The high-precision WF depends on its companion track file and can't be copied alone
+  高精度录制中…原始输入写入统一时间线: High-precision recording… raw inputs are written to a unified timeline
+  默认值: Default
+  默认勾选: Checked by default
+  默认状态: Default State
+  默认选项: Default Option
+  默认隐藏: Hidden by default
+  （无说明）: (no description)
+  （未声明）: (undeclared)
+  （未截图）: (No Screenshot)
+settings_dialog:
+  (未命名): (Unnamed)
+  ADB screencap 单帧截图: ADB screencap (single frame)
+  ADB shell input 指令执行: ADB shell input (command channel)
+  ADB 重连次数: ADB reconnect attempts
+  AI 设置: AI Settings
+  Android 连接设置: Android Connection Settings
+  Scrcpy 流式截图: Scrcpy Streaming Capture
+  一次性码首次激活需要联网，请先关闭完全离线模式。: One-time codes need internet on first activation; turn off full offline mode first.
+  不公开发布原始数据。: Raw data is never published.
+  了解详情: Learn More
+  仅 Windows 生效：开始执行前要求律匠以管理员身份运行: 'Windows only: require LvJiang to run as administrator before execution'
+  仅上报匿名的运行环境信息，不含任何游戏内数据。: Only reports anonymous runtime environment info, no in-game data of any kind.
+  从当前组合新建: New from current
+  代理不可用时允许降级为 ADB 输入: Allow fallback to ADB input when the agent is unavailable
+  代理重连次数: Agent reconnect attempts
+  以下为系统级全局热键，保存后立即生效。: The following are system-wide global hotkeys; changes take effect immediately after saving.
+  会员包 v{version}: Member package v{version}
+  停止 / 结束: Stop / End
+  免绑定: No machine binding
+  公开配置修订 r{version}（{date} 同步）: Public config revision r{version} (synced {date})
+  公开配置：预置 r0: 'Public config: bundled r0'
+  写入 app.yaml，随安装包分发: Write into app.yaml and ship with the installer
+  分发: Distribute
+  删除应用: Delete App
+  前台截图 (mss): Foreground capture (mss)
+  前台输入 (SendInput): Foreground Input (SendInput)
+  功能激活: Activation
+  参与匿名数据收集，帮助改进内置规则: Opt in to anonymous data collection to help improve built-in rules
+  参数 key: Parameter key
+  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Adjusts only the content font size below the refresh toolbar in "User Overview" and "User Info", including list headers; the top toolbar buttons are unchanged.
+  可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Below you can control announcements, version updates, remote config, and anonymous data reporting independently.
+  后台截图 (WGC，Beta): Background capture (WGC, Beta)
+  后台输入 (PostMessage): Background input (PostMessage)
+  启动时检查公告: Check Announcements on Startup
+  启动时检查新版本: Check for New Version on Startup
+  在线会员授权: Online Member Authorization
+  基础设置: Basic Settings
+  如 com.example.game: e.g. com.example.game
+  如 game: e.g. game
+  如 ios: e.g. ios
+  如 my_wait: e.g. my_wait
+  完全离线模式（暂停全部联网功能）: Fully Offline Mode (pause all network features)
+  ? 实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。
+  : "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted. Background capture screenshots the game even when covered by other windows, at slightly slower speed; it requires background window input too, and neither works when the window is minimized. This sets the default: the main window only auto-checks \"Background capture\" after you check \"Background mode\", and you can still change it any time during a run."
+  实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Experimental: the phone must have the LvJiang App installed with Accessibility Service enabled; this only changes the channel used for taps and swipes, not the screenshot method. Falls back to ADB shell input if the connection fails.'
+  尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: No connection info of this type yet; connect a device or locate a window in the main window first.
+  已下载待安装：{parts}（下次启动生效）: 'Downloaded pending install: {parts} (effective next launch)'
+  已复制: Copied
+  已开放: Open
+  已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
+  已绑定本机: Bound to this machine
+  常规设置: General Settings
+  '应用「{name}」的 Activity 格式无效: {activity}': 'App "{name}" has an invalid Activity format: {activity}'
+  '应用「{name}」的包名格式无效: {package}': 'App "{name}" has an invalid package name format: {package}'
+  应用「{name}」至少需要一个 Android 或 Windows 绑定: App "{name}" needs at least an Android or Windows binding
+  应用名不能为空: App name cannot be empty
+  '应用名重复: {name}': 'Duplicate app name: {name}'
+  应用注册: App Registration
+  建立流式传输尝试次数: Video Stream Attempts
+  ? "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。"
+  : "What to do when a click/drag coordinate computed by the engine falls outside the captured frame.\nUnchecked (default): raise an error and end the run — out of bounds means the script's drag distance does not match the current panel geometry, and silently truncating turns \"scroll two rows\" into \"scroll one row\" with nothing in the script or the log to show it.\nChecked: the engine truncates to the frame edge, logs a warning and keeps running.\nThe check lives in the engine: on-device gestures reject such coordinates outright while desktop input and adb shell input accept them silently, so the backends cannot be relied on."
+  当前标识：未生成（未开启）: 'Current ID: not generated (disabled)'
+  手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: The Shizuku service process dies after a phone reboot, and tasks that restart the game depend on it. When enabled, connecting in on-device mode detects and starts it once (only if not already running).
+  执行参数: Execution Parameters
+  把激活码粘贴到这里，换行和空格会被自动忽略: Paste the activation code here; newlines and spaces are ignored
+  按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式，建议保留带 Alt 的组合键。: Press once to minimize to the system tray, press again to bring the main window back. The tray icon may be hidden by notification settings, so this hotkey is the only reliable way back once hidden — keep an Alt combo for it.
+  接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。: Receives official config and task updates matching the current app version, applied at next launch after verification. Your local configs always take priority; running tasks keep using what this process already loaded. Turning this off or going offline restores bundled content and removes member content at next launch, without touching local data.
+  接收在线配置更新: Receive Remote Config Updates
+  新方案: New plan
+  方案「{name}」至少要勾选一种连接模式: Plan "{name}" needs at least one connection mode
+  方案名称不能为空: Plan name cannot be empty
+  方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。: A plan binds gallery, environment and layout together and declares its connection modes and launch privilege requirements.
+  方案设置: Plan Settings
+  无法读取所连接窗口的可执行文件。: Cannot read the executable of the connected window.
+  显示名称: Display Name
+  暂停 / 恢复: Pause / Resume
+  最小化 / 恢复窗口: Minimize / Restore window
+  有效期: Validity
+  未单独标定点击区域时，落点框从区域中心向四边延伸的比例。0.25 = 落点覆盖区域中间的一半；必须小于 0.5: When no tap region is calibrated separately, the ratio the tap box extends from the region center to each edge. 0.25 = the tap covers the middle half; must be below 0.5
+  未知日期: Unknown Date
+  未识别到设备当前前台应用。: Could not identify the device's current foreground app.
+  本地激活：已激活: 'Local activation: active'
+  本地激活：未激活，高级功能不可用。: 'Local activation: inactive; advanced features unavailable.'
+  本机序列号: Machine serial
+  查看待上报数据: View Data to Be Reported
+  模式: Mode
+  横屏: Landscape
+  正在激活，请等待联网操作完成后关闭。: Activating; wait for the online operation to finish before closing.
+  正在验证激活码；一次性码将联网绑定本机…: Verifying the activation code; one-time codes will bind to this machine online…
+  每个应用可同时绑定 Android 与 Windows。运行时按当前实际连接目标选择绑定，与工作流环境无关；连接后可用对应的「获取连接信息」自动回填。: Each app can bind Android and Windows at once. At runtime the binding follows the actual connected target, independent of workflow environment; after connecting, the matching "Get connection info" fills it in automatically.
+  每次点击前的随机等待，模拟人类反应时间: Random wait before each click, simulating human reaction time
+  每次点击后的随机等待: Random wait after each click
+  永久: Permanent
+  添加参数: Add Parameter
+  添加应用: Add App
+  添加环境: "Add Environment\nSave first?'"
+  清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。: Clearing disables local advanced features. You can paste an activation code again to re-check local and online authorization.
+  清除激活: Clear Activation
+  激活: Activate
+  激活失败: Activation failed
+  激活成功。部分功能需要重新定位窗口后生效。: Activated. Some features take effect after re-locating the window.
+  激活码: Activation Code
+  点击前延迟(秒): Delay Before Click (sec)
+  点击后延迟(秒): Delay After Click (sec)
+  点击坐标附加 ±N 像素的随机偏移: Add a +/-N pixel random offset to the click coordinate
+  热键不能重复绑定同一个按键，请检查后重试: Hotkeys cannot be bound to the same key twice; please check and retry
+  环境 key: Environment key
+  用于重启后重新发现窗口: Used to rediscover the window after a restart
+  用户信息字号: User Info font size
+  用户总览字号: User Overview font size
+  界面语言: Interface Language
+  留空自动解析 Launcher: Leave empty to resolve the Launcher automatically
+  目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: Target Environment determines what env() returns in the DSL, used to distinguish navigation strategy between PC and mobile games. This is the environment the game runs in, not this machine's OS.
+  确定删除方案「{name}」吗？: Delete plan "{name}"?
+  空串不自动定位窗口: Empty string disables automatic window location
+  竖屏: Portrait
+  等待参数: Wait Parameters
+  等待范围(秒): Wait Range (sec)
+  管理员权限: Administrator privileges
+  系统参数: System Parameters
+  网络与隐私: Network & Privacy
+  获取信息: Get Info
+  获取连接信息: Get Connection Info
+  该热键只在「脚本编辑」工作台打开期间临时全局注册，对话框关闭后立即注销；其余热键在软件运行期间始终生效。: This hotkey is only temporarily registered globally while the "Script Editor" workbench is open, and unregistered the moment the dialog closes; all other hotkeys stay active while the app runs.
+  请先粘贴激活码: Paste an activation code first
+  读不到硬件标识（非 Windows 平台）: Hardware identity unavailable (non-Windows platform)
+  越界坐标自动截断: Auto-truncate out-of-bounds coordinates
+  输入参数: Input Parameters
+  连接方案: Connection Plans
+  连接端侧执行时自动启动 Shizuku 服务: Auto-start the Shizuku service when connecting in on-device mode
+  部分激活码不绑定机器，直接粘贴即可，不需要提供序列号。: Some activation codes aren't machine-bound — just paste them; no serial needed.
+  重置匿名标识: Reset Anonymous ID
+  重置后服务端会把你当成一个新用户，之前的记录无法再与新标识关联。确定重置吗？: After resetting, the server will treat you as a new user; previous records can no longer be linked to the new ID. Reset anyway?
+  重置标识: Reset ID
+  重试间隔（秒）: Retry interval (seconds)
+  需要绑定本机的激活码时，把这串序列号发给作者。它由主板标识算出，每次启动现算、不会存盘，也不包含任何可还原的硬件信息。: If your activation code is machine-bound, send this serial to the author. It's derived from the motherboard identity, computed at each launch, never stored, and contains no reversible hardware information.
+  首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: Used for both the initial stream setup and automatic recovery after a disconnect. Once exhausted the task waits for manual handling and never gives up by itself.
+  首次窗口定位后可自动获取: Can be filled automatically after the first window location
+  高级设置: Advanced Settings
+  ? "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。"
+  : "By default the video stream is set up 5 times, then the agent is reconnected 5 times and ADB 5 times, 2 s apart. If it still fails, the task waits for manual handling with no timeout: Yes re-checks, No stops the task; closing the prompt does not stop it and the banner stays.\nMulti-touch and concurrent gestures are not downgraded. Inputs that may already have been sent are never replayed automatically. Applies to tasks started afterwards."
+  鼠标/触控移动到目标位置的耗时: Time for the mouse/touch to move to the target position
+  鼠标移动时长(秒): Mouse Move Duration (sec)
+static_check:
+  区域未绑定模板: Region has no bound template
+  场景未绑定任何坐标: The scene has no coordinates bound
+  场景未绑定任何子场景引用: The scene has no sub-scene references bound
+  子场景引用未定义: Sub-scene reference undefined
+  子场景引用未绑定坐标: Sub-scene reference has no bound coordinates
+  引用目标不是子场景: The reference target is not a sub-scene
+  请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: Check the key spelling in the script (the DSL only recognizes keys, not Chinese names), or bind it in the Scene Editor
+story_dialog:
+  」: ”
+  为什么选这个（可选）: Why this choice (optional)
+  删除文件: Delete File
+  删除文案: Delete Entry
+  删除这条文案？: Delete this entry?
+  删除配置文件「{name}」及其全部文案？: Delete config file "{name}" and all its entries?
+  匹配阈值已保存到: Match threshold saved to
+  如 主线-第三章-问剑: e.g. Main-Chapter 3-Sword
+  已保存到: Saved to
+  已删除: Deleted
+  搜索场景 / 选项 / 答案: Search scenes / choices / answers
+  文件名（如 主线-第三章 / 活动-夏日）：: 'File name (e.g. Main-Chapter 3 / Event-Summer):'
+  新建文案：填写选项与正确答案后保存: 'New entry: fill in the choices and the correct answer, then save'
+  新建配置文件: New Config File
+  无配置文件: No config files
+  普通用户只能保存到本地；系统为随发布内容: Regular users save locally only; system ships with releases
+  未创建: Not created
+  本地覆盖生效: Local override active
+  来自随发布的系统配置: From the bundled system config
+  正确答案必须是选项之一: The correct answer must be one of the choices
+  每行一个选项: One choice per line
+  没有可删除的配置文件: No config files to delete
+  激活时全部配置文件一起生效；这里只切换要编辑的那一个: All config files apply together when active; this only switches which one you edit
+  系统（仅开发者）: System (developers only)
+  系统（随发布）: System (bundled)
+  该文件还没有落盘，保存后创建: This file isn't on disk yet; it's created on save
+  该配置文件已存在: That config file already exists
+  请先在左侧选择要删除的文案: Select an entry on the left to delete first
+  请先新建一个配置文件: Create a config file first
+  选项和正确答案不能为空: Choices and the correct answer cannot be empty
+  选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择: If the choice-set similarity falls below this, it counts as unknown and the workflow pauses for manual selection
+  问题或旁白关键文本（可选）: Key text of the question or narration (optional)
+  ＋ 新增文案: ＋ New Entry
+  ＋ 新建: ＋ New
+  ，配置文件「: ', config file "'
+  ；系统也有副本: ; the system also has a copy
+tray_ops:
+  另有 {count} 个任务运行: '{count} other tasks running'
+  已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Minimized to the tray; double-click the icon or right-click -> "Open Main Window" to restore.
+  开始: Démarrer
+  打开主界面: Open Main Window
+  未就绪: Not ready
+  空闲: Idle
+  等待重连: Waiting for reconnect
+  结束中: Finishing
+  结束当前目标: Stop current target
+ui_state:
+  参数保存失败，请检查配置文件权限或占用后重试：{error}: 'Failed to save parameters; check config file permissions or locks and retry: {error}'
+  参数设置（{name}独立）: Parameters ({name}, per-user)
+  参数设置（共享）: Parameters (shared)
+  说明: Description
+update:
+  当前为离线模式，请关闭离线模式后检查更新: Offline mode is on; turn it off to check for updates
+  无法获取版本信息: Failed to get version info
+  无法访问 {url} 获取更新：HTTP {code}: 'Unable to access {url} for updates: HTTP {code}'
+user_avatar:
+  从剪贴板粘贴: Paste from clipboard
+  从当前设备或窗口获取最新截图: Grab the latest screenshot from the current device or window
+  使用此头像: Use This Avatar
+  保存头像失败：{error}: 'Failed to save avatar: {error}'
+  保存并使用: Save and Use
+  删除历史头像: Delete History Avatar
+  删除历史头像失败：{error}: 'Failed to delete history avatar: {error}'
+  刷新截图: Refresh Screenshot
+  剪贴板中没有图片: No image in the clipboard
+  双击编辑头像: Double-click to edit avatar
+  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Drag the image to position; zoom with wheel or slider · Ctrl+V to paste
+  图片尺寸过大，请选择不超过 4000 万像素的图片: Image too large; pick one no larger than 40 megapixels
+  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Image files (*.png *.jpg *.jpeg *.webp *.bmp)
+  头像库: Avatar Library
+  头像文件不存在或文件名无效: Avatar file missing or invalid file name
+  头像正在使用: Avatar in use
+  导入图片: Import Image
+  导入图片或从剪贴板粘贴: Import an image or paste from the clipboard
+  导入头像图片: Import Avatar Image
+  当前使用: Current
+  截图功能不可用，请先在主窗口定位窗口或连接设备: Screenshot unavailable, please position window or connect device in main window first
+  截图失败: Screenshot Failed
+  无法更新用户头像引用: Cannot update the user's avatar reference
+  无法粘贴: Cannot paste
+  无法读取图片：{error}: 'Cannot read the image: {error}'
+  没有可保存的裁剪图片: No cropped image to save
+  没有读取到有效图片: No valid image was read
+  确定永久删除这张历史头像吗？此操作无法撤销。: Permanently delete this history avatar? This cannot be undone.
+  移除头像失败：{error}: 'Failed to remove avatar: {error}'
+  移除当前头像: Remove Current Avatar
+  编辑“{name}”的头像: Edit avatar for "{name}"
+  编辑头像: Edit Avatar
+  缩放: Zoom
+  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
+  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
+  选择之前保存的头像，或导入一张新图片: Pick a previously saved avatar or import a new image
+  重置: Reset
+user_manager:
+  保存属性: Save Attributes
+  删除属性: Delete Attributes
+  同步全部头像: Sync All Avatars
+  属性 Key 不能为空: Attribute key cannot be empty
+  属性 Key 不能重复：{key}: 'Duplicate attribute key: {key}'
+  当前用户: Current User
+  悬浮点击编辑，或双击头像: Hover and click to edit, or double-click the avatar
+  把本机与云端的头像做一次双向合并；不参与日常自动同步: One-time two-way merge of local and cloud avatars; not part of daily auto sync
+  新增属性: Add Attribute
+  新建用户: New User
+  无法删除该用户: This user cannot be deleted
+  正在同步头像…: Syncing avatars…
+  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters.
+  用户名已存在: Username already exists
+  用户属性: User Attributes
+  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
+  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
+  ＋ 新建用户: ＋ New User
+user_toolbar:
+  上一个用户: Previous User
+  下一个用户: Next User
+wgc_capture:
+  后台截图仅支持 Windows: Background capture is Windows-only
+  '后台截图组件加载失败: ': 'Failed to load the background capture component: '
+  缺少 windows-capture 依赖，请重新安装或更新程序: The windows-capture dependency is missing; reinstall or update the program
+window_ops:
+  '[定位刷新] {name} · {old} → {new} · {details}': '[Re-located] {name} · {old} → {new} · {details}'
+  '[定位失效] {name}：{message}': '[Location lost] {name}: {message}'
+  '[定位失败] {message}': '[Locate failed] {message}'
+  '[截图] 后台截图不可用：': '[Capture] Background capture unavailable: '
+  '[截图] 后台截图启动失败，保留原截图方式': '[Capture] Background capture failed to start; keeping the original capture method'
+  '[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）': '[Capture] Background capture failed; fell back to foreground capture (unavailable when minimized)'
+  '[执行目标] 已切换到 {name}': '[Target] Switched to {name}'
+  '[扫描] 局域网内未发现可连接的 ADB 设备': '[Scan] No connectable ADB device found on the LAN'
+  '[扫描] 本机未发现开放的模拟器 ADB 端口': '[Scan] No open emulator ADB ports found on this machine'
+  '[扫描] 正在探测本机模拟器 ADB 端口...': '[Scan] Probing local emulator ADB ports...'
+  '[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的「{name}」是同一台设备。请先断开该目标再连接。': '[Rejected] Cannot read a stable device identity for {serial}; it may be the same device as the connected "{name}". Disconnect that target first.'
+  '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': "[Notice] The current platform doesn't support window-mirroring mode; use \"Scan Devices\" instead"
+  '[提示] 未发现 USB 连接的 ADB 设备': '[Notice] No USB-connected ADB device found'
+  '[提示] 窗口目标正在执行任务，不能重新定位': '[Notice] The window target is running a task; cannot re-locate'
+  '[提示] 该目标正在执行任务，不能切换截图方式': '[Notice] This target is running a task; cannot switch the capture method'
+  '[提示] 该目标正在执行任务，不能切换输入方式': '[Notice] This target is running a task; cannot switch the input method'
+  '[提示] 该目标正在执行任务，不能断开': '[Notice] This target is running a task; cannot disconnect'
+  '[模式] {name} 已切换到{mode}': '[Mode] {name} switched to {mode}'
+  '[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标': '[Warning] This device provides no stable identity; USB and wireless connections will be treated as two targets'
+  '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input': '[On-device Execution] App is unreachable or no on-device execution channel is ready; falling back to adb shell input'
+  '[错误] {method} 截图后端不可用，保留原截图方式': '[Error] The {method} capture backend is unavailable; keeping the original capture method'
+  '[错误] 未找到可见窗口': '[Error] No visible window found'
+  '{input_mode} · {capture_mode}': '{input_mode} · {capture_mode}'
+  '{method} 截图后端不可用': The {method} capture backend is unavailable
+  切换截图方式: Switch Screenshot Method
+  刷新位置: Refresh Position
+  前台截图: Foreground Capture
+  前台输入: Foreground Input
+  单帧截图: Single-Frame Capture
+  取消中...: Cancelling...
+  取消扫描: Cancel Scan
+  启动中: Starting
+  ? "实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。\n用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效"
+  : "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted.\nCaptures via Windows Graphics Capture so the game window can be occluded by others; still unavailable when minimized. This run only"
+  ? "局域网内未发现可连接的 ADB 设备。\n\n请确认：\n1. 设备与电脑在同一局域网\n2. 设备已开启无线调试（开发者选项）\n3. 多网卡时可在下拉框改选目标网段，或改用本地扫描"
+  : "No connectable ADB device found on the LAN.\n\nCheck:\n1. The device is on the same LAN as this PC\n2. Wireless debugging is enabled on the device (developer options)\n3. With multiple NICs, pick the right subnet in the dropdown, or use local scan"
+  已刷新窗口位置: Window position refreshed
+  已取消扫描: Scan cancelled
+  已扫描窗口 | 请下拉选择目标窗口并点击定位: Windows scanned | Pick a target window and click Locate
+  已扫描设备 | 请选择设备并点击连接: Devices scanned | Pick a device and click Connect
+  已断开目标：{name}: 'Disconnected target: {name}'
+  已离线: Offline
+  已连接: Connected
+  截屏失败: Screenshot failed
+  所选窗口已消失，请重新扫描窗口: The selected window is gone; scan windows again
+  扫描失败 | 详见日志: Scan failed | See the log
+  扫描局域网...: Scanning LAN...
+  扫描本机...: Scanning local machine...
+  指令执行: Command Execution
+  指令执行（adb shell input）: Command Execution (adb shell input)
+  断开定位: Disconnect
+  断开执行目标: Disconnect Execution Target
+  断开连接: Disconnect
+  无法获取设备分辨率: Failed to get device resolution
+  暂无缓存画面，请点击刷新: No cached frame; click Refresh
+  未发现 ADB 设备: No ADB devices found
+  未发现设备: No devices found
+  未发现设备 | 可尝试局域网扫描: No devices found | Try a LAN scan
+  未发现设备 | 请确认模拟器已启动: No devices found | Make sure the emulator is running
+  未发现设备 | 请确认设备已开启无线调试: No devices found | Make sure wireless debugging is enabled on the device
+  未定位窗口 | 未找到可见窗口: Window not located | No visible window found
+  ? "本机未发现开放的模拟器 ADB 端口。\n\n请确认：\n1. 模拟器已启动\n2. 模拟器已开启 ADB 调试"
+  : "No open emulator ADB ports found on this machine.\n\nCheck:\n1. The emulator is running\n2. ADB debugging is enabled on the emulator"
+  正在取消扫描...: Cancelling scan...
+  正在扫描局域网...: Scanning the LAN...
+  正在扫描本机模拟器...: Scanning local emulators...
+  正在扫描窗口...: Scanning windows...
+  正在扫描设备...: Scanning devices...
+  正在连接设备...: Connecting to the device...
+  窗口位置已刷新，但红框移动失败: Window position refreshed, but moving the red border failed
+  端侧执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
+  设备已经连接，已切换为执行目标: The device was already connected; switched to it as the execution target
+  设备标识未确认，已拒绝连接: Device identity unconfirmed; connection rejected
+  设备标识未确认：只能按当前连接地址区分，重启或换用另一种连接方式后会被视为新目标: 'Device identity unconfirmed: identified only by the current address; after a reboot or a different connection method it counts as a new target'
+  设备端代理不可用，且高级设置已禁用 ADB 输入降级；请恢复手机代理后重新连接: The on-device agent is unavailable and ADB input fallback is disabled in settings; restore the phone agent and reconnect
+  该目标正在执行任务，不能重新定位或连接: This target is running a task; cannot re-locate or reconnect
+  请先在主窗口定位窗口: Please locate a window in the main window first
+  请先在主窗口连接设备: Please connect a device in the main window first
+  运行中不能修改下一次连接参数: Cannot change next-connection parameters while running
+  连接: Connecter
+  连接中...: Connecting...
+  连接失败 | 详见日志: Connection failed | See the log
+  连接目标后可预览: Preview available after connecting a target
+  重新连接: Reconnect
+  需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义: 'Check "Background mode" first: foreground input requires the window to be foreground, so pairing it with background capture makes no sense'
+workflow_references:
+  区域/坐标点/面板: Region/Point/Panel
+  区域/面板: Region/Panel
+  坐标点: Coordinate Point
+  方向/区域: Direction/Region
+  模板来源区域: Template Source Region
+workflows_common:
+  'color_ratio: 缺少颜色参数': 'color_ratio: missing color parameter'
+  'find: 模板 {name} 不存在（config/system/templates/）': 'find: template {name} does not exist (config/system/templates/)'
+  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: offset point should be [dx, dy, "#rrggbb"], got: {v!r}'
+  'find_multi_color: 缺少锚点颜色': 'find_multi_color: missing anchor color'
+  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules must be a non-empty mapping'
+  '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
+  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], a find result, or an (x, y[, w, h]) literal), got: {t}'
+  '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'
+  图色函数需要在工作流引擎中调用: Pixel-color functions must be called inside the workflow engine
+  图色函数：截图失败: 'Pixel-color function: screenshot failed'
+  图色函数：画布裁剪为空（检查布局 canvas 配置）: "Pixel-color function: canvas crop is empty (check the layout's canvas config)"
+  工作流已暂停，点击确定继续: Workflow paused; click OK to continue
+  无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: Failed to get screenshot size; cannot convert to screen coordinates (check the screenshot backend)
+  等分降级: Equal-Split Fallback

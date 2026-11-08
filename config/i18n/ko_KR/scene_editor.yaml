@@ -1,339 +1,363 @@
-auto_strings:
-  "  (活动)": "    (active)"
-  "  · 同层": "  · same layer"
-  "(无)": "(None)"
-  "(未识别到)": "(Not Recognized)"
-  "OCR 清洗组": "OCR Cleaning Group"
-  "PNG（无损，适合识别困难时）": "PNG (lossless; for hard-to-recognize cases)"
-  "WebP（质量 90，默认）": "WebP (quality 90, default)"
-  "[错误] 主窗口正在执行任务，请先停止后再运行脚本": "[Error] The main window is running a task; stop it before running scripts"
-  "[错误] 无主窗口，无法获取运行环境": "[Error] No main window; cannot get the runtime environment"
-  "[错误] 没有已加载的布局": "[Error] No layout loaded"
-  "[错误] 脚本内容为空": "[Error] Script content is empty"
-  "[错误] 请先在主窗口定位游戏窗口": "[Error] Please locate the game window in the main window first"
-  "[错误] 请先在主窗口连接 ADB 设备": "[Error] Please connect an ADB device in the main window first"
-  "key 必须以小写字母开头，仅含小写字母/数字/下划线": "Key must start with a lowercase letter, containing only lowercase letters/digits/underscores"
-  "key 必须以小写字母开头，仅含小写字母/数字/下划线。": "Key must start with a lowercase letter, containing only lowercase letters/digits/underscores."
-  "key 重复": "Duplicate key"
-  "{scenes} 仍由本地副本生效，请先还原本地覆盖": "{scenes} still use local copies; restore the local overrides first"
-  "● 有改动": "● Modified"
-  "」": "”"
-  "一句话说明这个布局用在什么画面上": "One line describing what screen this layout is for"
-  "上移视图": "Move View Up"
-  "下一步：框选区域": "Next: box a region"
-  "下移视图": "Move View Down"
-  "不跳转": "No transition\n{e}'"
-  "中文名称": "Chinese Name"
-  "为该区域绑定哪个字段？": "Which field to bind for this region?"
-  "仅作用于当前布局；click 将改为按下该按键": "Applies only to this layout; click will press this key"
-  "仅剩基底视图时可用，取消后所有定义归为无视图区分": "Only available with base view remaining; canceling merges all definitions into no-view distinction"
-  "仅多视图场景可设置": "Multi-view scenes only"
-  "仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。": "Only affects future refreshed or appended screenshots of the current layout, scene and view; existing screenshots keep their format."
-  "从场景 YAML 中删除 Panel 定义": "Delete Panel definition from scene YAML"
-  "从场景 YAML 中删除坐标点定义（meta 数据）": "Delete coordinate point definition from scene YAML (meta data)"
-  "以下 {n} 条没有加上：\n{detail}": "These {n} weren't added:\n{detail}"
-  "以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。": "These scenes have unsaved changes; save or discard them manually before refreshing."
-  "以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改": "Starts with a lowercase letter; only lowercase letters, digits and underscores; immutable after creation"
-  "位置 / 尺寸": "Position / size"
-  "位置和尺寸可在画布中拖动调整。": "Position and size can be dragged on the canvas."
-  "使用实时图像": "Use Live Image"
-  "例如 20:9 或 2.22，留空表示不校验": "e.g. 20:9 or 2.22; empty means no validation"
-  "例如：我的投屏布局": "e.g. My mirroring layout"
-  "保存关系": "Save Relations"
-  "保存场景定义": "Save Scene Definition"
-  "保存布局「{name}」失败：{reason}": "Failed to save layout \"{name}\": {reason}"
-  "保存布局后将同时删除该绑定对应的模板截图。确定继续吗？": "Saving the layout will also delete the template screenshots bound here. Continue?"
-  "保存布局失败": "Failed to save the layout"
-  "保存截图失败：{reason}": "Failed to save the screenshot: {reason}"
-  "保存文件": "Save File"
-  "保存脚本文件": "Save Script File"
-  "允许的相对误差，默认 0.5%": "Allowed relative deviation, default 0.5%"
-  "允许误差": "Allowed deviation"
-  "先选中一个已放置的坐标点，再从它拉出一条方向箭头": "First select a placed coordinate point, then drag to create a direction arrow"
-  "入口": "Entry"
-  "入口作用范围": "Entry scope"
-  "全部视图": "All Views"
-  "关系": "Relation"
-  "关联视图": "Related views"
-  "关闭场景编辑器": "Close Scene Editor"
-  "兼容反色": "Inverted-color fallback"
-  "分组非空，无法删除": "Group is not empty, cannot delete"
-  "切换画布编辑模式，调整画布范围以排除窗口边框": "Toggle canvas edit mode, adjust canvas range to exclude window borders"
-  "创建分组": "Create Group"
-  "创建场景": "Create Scene"
-  "创建坐标": "Create Point"
-  "创建失败": "Creation Failed"
-  "创建定义": "Create Definition"
-  "创建引用": "Create Reference"
-  "创建所有布局共用的场景定义；网格位置和行列数在布局绑定时设置。": "Creates scene definitions shared by all layouts; grid position and rows/columns are set per layout binding."
-  "创建网格": "Create Grid"
-  "删除分组": "Delete Group"
-  "删除区域": "Delete Region"
-  "删除区域定义及所有布局中的对应绑定": "Delete the region definition and its bindings in all layouts"
-  "删除场景": "Delete Scene"
-  "删除坐标": "Delete Point"
-  "删除引用": "Delete Reference"
-  "删除方向": "Delete Direction"
-  "删除模板绑定": "Delete Template Binding"
-  "删除网格": "Delete Grid"
-  "删除视图": "Delete View"
-  "别名布局创建失败，请检查日志。": "Alias layout creation failed, please check logs."
-  "别名布局禁止另存为，请使用原布局另存或者新建布局。": "Alias layouts cannot be saved-as. Please use the original layout or create a new one."
-  "加载文件": "Load File"
-  "勾选后直接从设备实时截屏进行识别，不保存到场景文件": "When checked, capture directly from device for recognition without saving to scene file"
-  "单视图": "Single View"
-  "双向滚动": "Bidirectional Scroll"
-  "取消多视图": "Cancel Multi-View"
-  "另存为": "Save As"
-  "另存为失败": "Save As Failed"
-  "只清除当前布局的矩形，保留场景 YAML 中的定义": "Clears only the current layout's rectangle, keeping the definition in the scene YAML"
-  "可作为引用子场景": "Can be referenced as a sub-scene"
-  "可点击": "Clickable"
-  "同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配": "When the same icon's colors invert between dark and light backgrounds, also try inverted matching"
-  "同页取景，共享关联页面的调用方；可通过滚动或翻页到达": "Same-page capture, sharing the related page's callers; reachable by scrolling or paging"
-  "含文本": "Contains Text"
-  "命名方向": "Name Direction"
-  "命名非法": "Invalid Name"
-  "固定网格": "Fixed Grid"
-  "图像检测": "Image Detection"
-  "在场景 YAML 中新增 Panel 定义（声明式网格）": "Add Panel definition to scene YAML (declarative grid)"
-  "在场景 YAML 中新增坐标点定义（meta 数据）": "Add coordinate point definition to scene YAML (meta data)"
-  "在当前分组下新建场景": "Create scene under current group"
-  "在此布局中禁用": "Disable in this layout"
-  "在画布上放置一个坐标点（绑定到 YAML 定义）": "Place a coordinate point on canvas (bound to YAML definition)"
-  "在画布上框选一个矩形区域，绑定到选中的 Panel 定义": "Select a rectangular area on canvas, bound to selected Panel definition"
-  "在脚本光标处插入形如 [scene].[entity] 的引用。需要先在右侧选中一个实体，并把光标放在脚本编辑区": "Inserts a [scene].[entity] reference at the cursor. Select an entity on the right first and place the cursor in the script editor"
-  "场景定义": "Scene Definition"
-  "场景定义 · 所有布局": "Scene Definition · All Layouts"
-  "场景定义：所有布局共用；保存后立即生效。": "Scene definitions are shared by all layouts; saving takes effect immediately."
-  "场景来源": "Scene source"
-  "场景管理": "Scene Manager"
-  "坐标、类型与名字都在源场景，这里可改跳转行为及它在本场景的哪些视图下看得见。": "Coordinates, type and name live in the source scene; here you can change the jump behavior and which views of this scene it appears in."
-  "基底": "Base"
-  "基底  （单视图）": "Base  (Single View)"
-  "基底视图是场景入口": "Base view is the scene entry"
-  "复制 DSL 引用": "Copy DSL Reference"
-  "复制坐标": "Copy Coordinates"
-  "多选状态下不支持删除，请先取消多选": "Delete isn't supported in multi-select; cancel multi-select first"
-  "子场景": "Sub-scene"
-  "实时截屏失败": "Live screenshot failed"
-  "小写字母开头，仅含小写字母/数字/下划线": "Starts with lowercase letter, containing only lowercase letters/digits/underscores"
-  "已从磁盘重载全部场景及当前布局": "Reloaded all scenes and the current layout from disk"
-  "已保存布局「{name}」到系统层，但尚未生效：{reasons}": "Layout \"{name}\" was saved to the system layer but is not yet effective: {reasons}"
-  "已取消刷新截图": "Screenshot refresh cancelled"
-  "已取消多选": "Multi-select cancelled"
-  "已放弃布局「{name}」的全部未保存改动": "Discarded all unsaved changes to layout \"{name}\""
-  "已绑定": "Bound"
-  "已绑定（待保存）": "Bound (pending save)"
-  "已请求结束脚本测试，等它停下后再关闭窗口。": "Script test stop requested; the window closes after it stops."
-  "已请求结束脚本，等待当前指令完成...": "Script stop requested; waiting for the current command to finish..."
-  "已退出点击标定模式": "Exited tap-calibration mode"
-  "已退出画布编辑模式": "Exited canvas edit mode"
-  "已选 {n}/{total}": "Selected {n}/{total}"
-  "已选中 {total} 项（{detail}）；拖动任一项整组平移，点击空白处取消": "{total} items selected ({detail}); drag any item to move the group as one, click empty space to cancel"
-  "布局 key": "Layout key"
-  "布局 key 和布局名称都不能为空": "Layout key and name cannot both be empty"
-  "布局 key「{key}」创建后不可修改。": "The layout key \"{key}\" cannot be changed after creation."
-  "布局信息": "Layout Info"
-  "布局信息已保存": "Layout info saved"
-  "布局写入失败，请检查日志。": "Layout write failed, please check logs."
-  "布局名称": "Layout name"
-  "布局已保存，但以下模板截图未能删除：\n{errors}": "The layout saved, but these template screenshots couldn't be deleted:\n{errors}"
-  "布局来源": "Layout source"
-  "布局清单里找不到当前布局，请先保存布局": "The current layout isn't in the layout list; save it first"
-  "布局绑定": "Layout Binding"
-  "应用到当前布局": "Apply to Current Layout"
-  "开启多视图、新增/重命名/删除视图": "Enable multi-view, add/rename/delete views"
-  "引用": "References"
-  "引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读": "Reference a point from another top-level scene; it stays read-only here"
-  "引用区域": "Reference Area"
-  "引用区域只读，请回到源场景截取模板": "The referenced region is read-only; capture the template in its source scene"
-  "引用坐标": "Reference Point"
-  "引用的归属视图": "Owner views of the reference"
-  "引用自 {scene}；双击可改它在本场景的归属视图": "Referenced from {scene}; double-click to change which view of this scene it belongs to"
-  "当前场景无截图": "The current scene has no screenshot"
-  "当前场景无截图，请先刷新截图": "The current scene has no screenshot; refresh it first"
-  "当前场景没有 slot 类型的区域": "The current scene has no slot-type regions"
-  "当前场景没有截图，无法截取模板": "This scene has no screenshot; cannot capture a template"
-  "当前布局": "Current Layout"
-  "当前布局不使用坐标；仍可在编辑属性中设置按键绑定": "The current layout doesn't use coordinates; key bindings can still be set in edit properties"
-  "当前布局内，在 Region 中框定点击落点范围": "Within the current layout, box the tap range inside the Region"
-  "当前布局尚未绑定此网格": "The current layout hasn't bound this grid"
-  "当前布局尚未绑定此网格。": "The current layout hasn't bound this grid."
-  "当前布局没有未保存的改动": "The current layout has no unsaved changes"
-  "当前布局绑定": "Current Layout Binding"
-  "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}": "The current screenshot size doesn't match. Confirm the new capture?\n\nCurrent: {old_width} × {old_height}\nNew: {new_width} × {new_height}"
-  "当前激活布局不可删除": "The currently active layout cannot be deleted"
-  "当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）": "No region field is bindable in this view (all assigned, or not part of this view)\nLow precision produces editable commands; high precision saves a raw input trace,'\nThe result is inserted into the current script when recording stops'"
-  "当前视图新截图格式": "New screenshot format for this view"
-  "快速选择当前场景内的目标视图": "Quickly select a target view in the current scene"
-  "恢复当前布局最近一次保存的状态": "Restore the current layout's last saved state"
-  "截取新图并覆盖当前活动截图": "Capture a new shot and overwrite the active screenshot"
-  "截取新图并追加为新的截图": "Capture a new shot and append it as an extra screenshot"
-  "截取模版": "Capture Template"
-  "截图": "Screenshot"
-  "截图尺寸不匹配": "Screenshot size mismatch"
-  "截图管理": "Screenshot Manager"
-  "截图：—　　画布：—": "Screenshot: —　　Canvas: —"
-  "所有引用都已绑定，或尚未创建引用。": "All references are bound, or none have been created yet."
-  "拖拽名称可调整 YAML 定义顺序": "Drag names to reorder the YAML definitions"
-  "按键": "Key Press"
-  "描述": "Description"
-  "插入当前实体": "Insert Current Entity"
-  "放弃改动": "Discard Changes"
-  "放弃改动失败": "Failed to discard changes"
-  "放弃未保存改动": "Discard Unsaved Changes"
-  "新增视图": "Add View"
-  "新建区域": "New Region"
-  "新建场景": "New Scene"
-  "新建场景分组": "New Scene Group"
-  "新建坐标": "New Point"
-  "新建布局": "New Layout"
-  "无关联视图": "No related views"
-  "无可用坐标": "No Available Points"
-  "无可用引用": "No available references"
-  "无场景改动": "No Scene Changes"
-  "无布局": "No layout"
-  "无截图\n请连接投屏后点击「刷新截图」": "No screenshot\nConnect screen mirroring, then click \"Refresh Screenshot\""
-  "无截图源，请先在主窗口定位窗口": "No screenshot source; locate a window in the main window first"
-  "无法加载截图": "Cannot load the screenshot"
-  "无法取消": "Cannot Cancel"
-  "无法重新加载布局「{name}」，当前改动仍保留。": "Cannot reload layout \"{name}\"; your current changes are kept."
-  "显示在主界面布局下拉旁，过长会放不下": "Shown beside the layout dropdown in the main window; too long won't fit"
-  "更新失败": "Update Failed"
-  "最小可见比例": "Min visible ratio"
-  "未声明": "Not declared"
-  "未声明入口，请补充按钮、快捷键或其他进入方式": "No entry declared; add a button, hotkey or another way in"
-  "未绑定": "Unbound"
-  "未通过": "Failed"
-  "本场景视图": "This Scene View"
-  "标定点击区域": "Calibrate Tap Region"
-  "校准模式": "Calibration Mode"
-  "模板已截取并暂存；保存布局后写入配置": "Template captured and staged; saved to config when the layout saves"
-  "模板截图删除失败": "Failed to delete template screenshots"
-  "模板文件写入失败，布局尚未保存：{error}": "Failed to write template files; the layout was not saved: {error}"
-  "模板至少需要 4×4 像素，请调整区域": "A template needs at least 4×4 pixels; adjust the region"
-  "横向滚动": "Horizontal Scroll"
-  "正在校准面板网格...": "Calibrating panel grid..."
-  "正在结束...": "Stopping..."
-  "正在识别...": "Recognizing..."
-  "每次只提交当前页。关闭窗口会放弃未提交的表单内容。": "Only the current page commits at a time. Closing the window discards uncommitted form content."
-  "没有可引用的 area：一级场景中同名的 key 已被本场景占用。": "No referenceable area: the same-named key in the top-level scene is already taken by this scene."
-  "没有子场景": "No sub-scenes"
-  "没有已加载的布局": "No layout loaded"
-  "没有已定义的区域": "No regions defined"
-  "没有已定义的面板": "No panels defined"
-  "测试当前区域的模板匹配": "Test template matching for the current region"
-  "清除场景和布局定义缓存，从磁盘重新加载；请先保存或放弃未保存的改动": "Clear scene and layout definition caches and reload from disk; save or discard unsaved changes first"
-  "清除点击区域": "Clear Tap Region"
-  "激活布局不可删除": "The active layout cannot be deleted"
-  "点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果": "Click \"Recognize All Fields\" to see OCR results, or \"Recognize All Reference Images\" to see match results"
-  "点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认": "Tap-calibration mode: select a region, then drag inside it to box the tap range; Delete clears the calibration back to default"
-  "画布尺寸": "Canvas Size"
-  "画布尺寸无效": "Invalid canvas size"
-  "画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框": "Canvas edit mode: drag/resize yellow canvas frame to exclude window borders"
-  "画布裁剪后应有的宽高比。启动任务前会按它校验目标窗口/设备，不符合就拒绝执行——形态错配不会报错，只会让坐标整体偏移。": "The aspect ratio the canvas should have after cropping. Before starting a task the target window/device is validated against it and mismatched shapes are rejected — a mismatch wouldn't error, it would just shift every coordinate."
-  "留空为本地入口；* 为全局，或逗号分隔场景 key": "Empty for a local entry; * for global, or scene keys separated by commas"
-  "留空则与 key 相同": "Leave empty to same as key"
-  "留空则点击坐标；可输入或下拉选择": "Empty taps the coordinates; type or pick from the dropdown"
-  "目标场景不存在": "The target scene doesn't exist"
-  "确定": "OK"
-  "确定删除引用 {key} 吗？": "Delete reference {key}?"
-  "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。": "Delete screenshot {idx}?\nThe remaining screenshots are renumbered automatically."
-  "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。": "Restore layout \"{name}\" to its last saved state?\nAll unsaved layout calibrations, template captures and version adjustments will be lost."
-  "确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。": "Unreference {scene}.{entity} from the current scene? The source scene's definition and layout coordinates are unaffected."
-  "移动场景": "Move Scene"
-  "移动失败": "Move Failed"
-  "移除当前场景的引用，保留源场景定义和布局坐标": "Remove the current scene's reference, keeping the source scene definition and layout coordinates"
-  "等分网格": "Equal-Split Grid"
-  "系统场景不可删除": "System scenes cannot be deleted"
-  "系统场景不能修改 key": "The key of a system scene cannot be changed"
-  "系统场景只能修改显示名称，不能修改 key": "System scenes can only have their display name changed, not the key"
-  "系统布局不可删除；不使用时切换到其他布局即可": "System layouts cannot be deleted; switch to another layout if you don't need it"
-  "纵向滚动": "Vertical Scroll"
-  "绑定到当前布局": "Bind to Current Layout"
-  "绑定坐标": "Bind Point"
-  "绑定引用": "Bind Reference"
-  "绑定网格": "Bind Grid"
-  "结束运行": "Stop Run"
-  "结果集：(空)": "Result Set: (Empty)"
-  "继承失败": "Inherit Failed"
-  "编辑区域": "Edit Region"
-  "编辑坐标": "Edit Point"
-  "编辑引用": "Edit Reference"
-  "编辑当前布局的名称、描述与画布尺寸要求": "Edit the current layout's name, description and canvas size requirement"
-  "编辑当前布局绑定": "Edit Current Layout Binding"
-  "编辑画布": "Edit Canvas"
-  "网格": "Grid"
-  "脚本仍在运行": "The script is still running"
-  "脚本内容为空，无法保存": "Script content is empty; cannot save"
-  "脚本已结束运行": "The script has finished"
-  "脚本测试失败": "Script Test Failed"
-  "脚本测试完成": "Script Test Completed"
-  "脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。": "User for script test execution, defaults to current user on main page. Switching does not affect main page."
-  "脚本测试运行中...": "Script test running..."
-  "自动模式": "Auto Mode"
-  "至少需要保留一张截图": "At least one screenshot must remain"
-  "英文，如 my_group": "English, e.g. my_group"
-  "英文，如 my_point": "English, e.g. my_point"
-  "英文，如 my_region": "English, e.g. my_region"
-  "英文，如 my_scene": "English, e.g. my_scene"
-  "获取图像失败": "Failed to grab the image"
-  "行 × 列": "Rows × Columns"
-  "裁剪画布": "Crop Canvas"
-  "覆盖引用的跳转行为": "Override the reference's jump behavior"
-  "视图": "View"
-  "视图关系无效": "Invalid view relations"
-  "视图管理": "View Management"
-  "解除": "Unbind"
-  "解除引用": "Unreference"
-  "解除引用失败": "Failed to unreference"
-  "解除引用绑定": "Unbind Reference"
-  "解除当前区域的模板绑定": "Unbind the current region's template"
-  "解除绑定": "Unbind"
-  "设为活动": "Set Active"
-  "设置失败": "Failed to set"
-  "识别全部字段": "Recognize All Fields"
-  "识别参考图": "Reference Images"
-  "该场景在此视图下没有可引用的 area": "This scene has no referenceable area in this view"
-  "该场景所有 YAML 坐标点都已放置。": "All YAML coordinate points for this scene have been placed."
-  "该场景所有 YAML 坐标点都已放置，无法再复制新坐标。": "All YAML coordinate points for this scene have been placed, cannot copy new points."
-  "该坐标被方向引用，请先删除关联的方向。": "This point is referenced by a direction, please delete the associated direction first."
-  "请先在当前布局中放置该实体，或将其标记为禁用后设置按键": "Place this entity in the current layout first, or mark it disabled before setting a key"
-  "请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。": "Please select a placed coordinate point on canvas or in the list first, then create direction."
-  "请先在目标场景的「场景管理」中标记为引用子场景。": "Mark the target scene as a referenced sub-scene in its \"Scene Manager\" first."
-  "请先处理未保存的改动": "Handle unsaved changes first"
-  "请先导入或刷新当前场景截图。": "Import or refresh the current scene screenshot first."
-  "请先新建或加载布局": "Please create or load a layout first"
-  "请先选中一个已绑定坐标的区域": "Select a region with bound coordinates first"
-  "请先选中坐标": "Please select a point first"
-  "请先选择一个网格定义。": "Select a grid definition first."
-  "请先选择已绑定模板且有截图的区域": "Select a region with a bound template and a screenshot first"
-  "请先选择布局。": "Select a layout first."
-  "请填写名称；Key 以小写字母开头，仅含小写字母、数字、下划线。": "Fill in the name; the key starts with a lowercase letter and contains only lowercase letters, digits and underscores."
-  "请检查日志": "Check the log"
-  "调用方": "Callers"
-  "跳转": "Goes To"
-  "输入 DSL 脚本内容...": "Enter DSL script content..."
-  "输入不完整": "Incomplete input"
-  "输入方向 key（小写字母开头，可含数字/下划线）：": "Enter direction key (starts with lowercase letter, may contain digits/underscores):"
-  "迁移失败": "Migration Failed"
-  "运行脚本": "Run Script"
-  "返回值：(无)": "Return Value: (None)"
-  "还原位置": "Restore Position"
-  "追加截图失败": "Failed to append the screenshot"
-  "退出点击标定": "Exit Tap Calibration"
-  "退出画布编辑": "Exit Canvas Edit"
-  "退出裁剪画布": "Exit Canvas Cropping"
-  "选中截图以预览": "Select a screenshot to preview"
-  "选择脚本文件": "Select Script File"
-  "重命名": "Rename"
-  "重命名场景": "Rename Scene"
-  "重命名失败": "Rename Failed"
-  "重命名方向": "Rename Direction"
-  "重命名视图": "Rename View"
-  "重载失败": "Reload failed"
-  "阈值 ": "Threshold "
-  "限定参考图识别的分组范围": "Restrict the group scope of reference-image recognition"
-  "隐藏「全部」选项，打开场景时直接展示基底视图": "Hide the \"All\" option; opening a scene shows the base view directly"
-  "隐藏全部视图": "Hide All Views"
+common:
+  位置 / 尺寸: Position / size
+  入口作用范围: Entry scope
+  关系: Relation
+  关联视图: Related views
+  创建失败: Creation Failed
+  场景来源: Scene source
+  布局来源: Layout source
+  当前视图新截图格式: New screenshot format for this view
+  最小可见比例: Min visible ratio
+core_common:
+  基底: Base
+menu_ops:
+  场景管理: Scene Manager
+ocr_dialog:
+  (无): (None)
+  获取图像失败: Failed to grab the image
+profile:
+  删除分组: Delete Group
+  确定: 확인
+reference:
+  截图: 스크린샷
+scene_editor:
+  '  (活动)': '    (active)'
+  '  · 同层': '  · same layer'
+  (未识别到): (Not Recognized)
+  OCR 清洗组: OCR Cleaning Group
+  PNG（无损，适合识别困难时）: PNG (lossless; for hard-to-recognize cases)
+  WebP（质量 90，默认）: WebP (quality 90, default)
+  '[错误] 主窗口正在执行任务，请先停止后再运行脚本': '[Error] The main window is running a task; stop it before running scripts'
+  '[错误] 无主窗口，无法获取运行环境': '[Error] No main window; cannot get the runtime environment'
+  '[错误] 没有已加载的布局': '[Error] No layout loaded'
+  '[错误] 脚本内容为空': '[Error] Script content is empty'
+  '[错误] 请先在主窗口定位游戏窗口': '[Error] Locate the game window in the main window first'
+  '[错误] 请先在主窗口连接 ADB 设备': '[Error] Connect an ADB device in the main window first'
+  key 必须以小写字母开头，仅含小写字母/数字/下划线: key must start with a lowercase letter and contain only lowercase letters, digits and underscores
+  key 必须以小写字母开头，仅含小写字母/数字/下划线。: key must start with a lowercase letter and contain only lowercase letters, digits and underscores.
+  key 重复: Duplicate key
+  '{scenes} 仍由本地副本生效，请先还原本地覆盖': '{scenes} still has a local override; restore first'
+  ● 有改动: ● Modified
+  一句话说明这个布局用在什么画面上: One line describing what screen this layout is for
+  上移视图: Move View Up
+  下一步：框选区域: 'Next: box a region'
+  下移视图: Move View Down
+  不跳转: No Jump
+  中文名称: Chinese Name
+  为该区域绑定哪个字段？: Which field to bind to this region?
+  仅作用于当前布局；click 将改为按下该按键: Only affects the current layout; click will press this key instead
+  仅剩基底视图时可用，取消后所有定义归为无视图区分: Available only when the base view remains; after cancelling, all definitions lose view distinction
+  仅多视图场景可设置: Multi-view scenes only
+  仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: Only affects future refreshed or appended screenshots of the current layout, scene and view; existing screenshots keep their format.
+  从场景 YAML 中删除 Panel 定义: Delete the Panel definition from scene YAML
+  从场景 YAML 中删除坐标点定义（meta 数据）: Delete the point definition from scene YAML (meta data)
+  ? "以下 {n} 条没有加上：\n{detail}"
+  : "These {n} weren't added:\n{detail}"
+  以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: These scenes have unsaved changes; save or discard them manually before refreshing.
+  以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: Starts with a lowercase letter; only lowercase letters, digits and underscores; immutable after creation
+  位置和尺寸可在画布中拖动调整。: Position and size can be dragged on the canvas.
+  使用实时图像: Use live image
+  例如 20:9 或 2.22，留空表示不校验: e.g. 20:9 or 2.22; empty means no validation
+  例如：我的投屏布局: e.g. My mirroring layout
+  保存关系: Save Relations
+  保存场景定义: Save Scene Definition
+  保存布局「{name}」失败：{reason}: 'Failed to save layout "{name}": {reason}'
+  保存布局后将同时删除该绑定对应的模板截图。确定继续吗？: Saving the layout will also delete the template screenshots bound here. Continue?
+  保存布局失败: Failed to save the layout
+  保存截图失败：{reason}: 'Failed to save the screenshot: {reason}'
+  保存文件: Save File
+  保存脚本文件: Save Script File
+  允许的相对误差，默认 0.5%: Allowed relative deviation, default 0.5%
+  允许误差: Allowed deviation
+  先选中一个已放置的坐标点，再从它拉出一条方向箭头: Select a placed point first, then drag a direction arrow from it
+  入口: Entry
+  全部视图: All Views
+  关闭场景编辑器: Close Scene Manager
+  兼容反色: Inverted-color fallback
+  分组非空，无法删除: Group is not empty; cannot delete
+  切换画布编辑模式，调整画布范围以排除窗口边框: Toggle canvas editing mode to adjust the canvas range, excluding the window border
+  创建分组: Create Group
+  创建场景: Create Scene
+  创建坐标: Create Point
+  创建定义: Create Definition
+  创建引用: Create Reference
+  创建所有布局共用的场景定义；网格位置和行列数在布局绑定时设置。: Creates scene definitions shared by all layouts; grid position and rows/columns are set per layout binding.
+  创建网格: Create Grid
+  删除区域: Delete Region
+  删除区域定义及所有布局中的对应绑定: Delete the region definition and its bindings in all layouts
+  删除场景: Delete Scene
+  删除坐标: Delete Point
+  删除引用: Delete Reference
+  删除方向: Delete Direction
+  删除模板绑定: Delete Template Binding
+  删除网格: Delete Grid
+  删除视图: Delete View
+  别名布局创建失败，请检查日志。: Alias layout creation failed, please check logs.
+  别名布局禁止另存为，请使用原布局另存或者新建布局。: Alias layouts cannot be saved-as. Please use the original layout or create a new one.
+  加载文件: Load File
+  勾选后直接从设备实时截屏进行识别，不保存到场景文件: When checked, capture directly from device for recognition without saving to scene file
+  单视图: Single View
+  双向滚动: Bidirectional Scroll
+  取消多视图: Cancel Multi-View
+  另存为: Save As
+  另存为失败: Save As Failed
+  只清除当前布局的矩形，保留场景 YAML 中的定义: Clears only the current layout's rectangle, keeping the definition in the scene YAML
+  可作为引用子场景: Can be referenced as a sub-scene
+  可点击: Clickable
+  同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配: When the same icon's colors invert between dark and light backgrounds, also try inverted matching
+  同页取景，共享关联页面的调用方；可通过滚动或翻页到达: Same-page capture, sharing the related page's callers; reachable by scrolling or paging
+  含文本: Contains Text
+  命名方向: Name Direction
+  命名非法: Invalid Name
+  固定网格: Fixed Grid
+  图像检测: Image Detection
+  在场景 YAML 中新增 Panel 定义（声明式网格）: Add Panel definition to scene YAML (declarative grid)
+  在场景 YAML 中新增坐标点定义（meta 数据）: Add coordinate point definition to scene YAML (meta data)
+  在当前分组下新建场景: Create scene under current group
+  在此布局中禁用: Disable in this layout
+  在画布上放置一个坐标点（绑定到 YAML 定义）: Place a coordinate point on canvas (bound to YAML definition)
+  在画布上框选一个矩形区域，绑定到选中的 Panel 定义: Select a rectangular area on canvas, bound to selected Panel definition
+  在脚本光标处插入形如 [scene].[entity] 的引用。需要先在右侧选中一个实体，并把光标放在脚本编辑区: Inserts a [scene].[entity] reference at the cursor. Select an entity on the right first and place the cursor in the script editor
+  场景定义: Scene Definition
+  场景定义 · 所有布局: Scene Definition · All Layouts
+  场景定义：所有布局共用；保存后立即生效。: Scene definitions are shared by all layouts; saving takes effect immediately.
+  坐标: Coordinate
+  坐标、类型与名字都在源场景，这里可改跳转行为及它在本场景的哪些视图下看得见。: Coordinates, type and name live in the source scene; here you can change the jump behavior and which views of this scene it appears in.
+  基底  （单视图）: Base  (Single View)
+  基底视图是场景入口: Base view is the scene entry
+  复制 DSL 引用: Copy DSL Reference
+  复制坐标: Copy Coordinates
+  多选状态下不支持删除，请先取消多选: Delete isn't supported in multi-select; cancel multi-select first
+  子场景: Sub-scene
+  实时截屏失败: Live screenshot failed
+  小写字母开头，仅含小写字母/数字/下划线: Starts with lowercase letter, containing only lowercase letters/digits/underscores
+  已从磁盘重载全部场景及当前布局: Reloaded all scenes and the current layout from disk
+  已保存布局「{name}」到系统层，但尚未生效：{reasons}: 'Layout "{name}" was saved to the system layer but is not yet effective: {reasons}'
+  已取消刷新截图: Screenshot refresh cancelled
+  已取消多选: Multi-select cancelled
+  已放弃布局「{name}」的全部未保存改动: Discarded all unsaved changes to layout "{name}"
+  已绑定: Bound
+  已绑定（待保存）: Bound (pending save)
+  已请求结束脚本测试，等它停下后再关闭窗口。: Script test stop requested; the window closes after it stops.
+  已请求结束脚本，等待当前指令完成...: Script stop requested; waiting for the current command to finish...
+  已退出点击标定模式: Exited tap-calibration mode
+  已退出画布编辑模式: Exited canvas edit mode
+  已选 {n}/{total}: Selected {n}/{total}
+  已选中 {total} 项（{detail}）；拖动任一项整组平移，点击空白处取消: '{total} items selected ({detail}); drag any item to move the group as one, click empty space to cancel'
+  布局 key: Layout key
+  布局 key 和布局名称都不能为空: Layout key and name cannot both be empty
+  布局 key「{key}」创建后不可修改。: The layout key "{key}" cannot be changed after creation.
+  布局信息: Layout Info
+  布局信息已保存: Layout info saved
+  布局写入失败，请检查日志。: Layout write failed, please check logs.
+  布局名称: Layout name
+  ? "布局已保存，但以下模板截图未能删除：\n{errors}"
+  : "The layout saved, but these template screenshots couldn't be deleted:\n{errors}"
+  布局清单里找不到当前布局，请先保存布局: The current layout isn't in the layout list; save it first
+  布局绑定: Layout Binding
+  应用到当前布局: Apply to Current Layout
+  开启多视图、新增/重命名/删除视图: Enable multi-view, add/rename/delete views
+  引用: References
+  引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读: Reference a point from another top-level scene; it stays read-only here
+  引用区域: Reference Area
+  引用区域只读，请回到源场景截取模板: The referenced region is read-only; capture the template in its source scene
+  引用坐标: Reference Point
+  引用的归属视图: Owner views of the reference
+  引用自 {scene}；双击可改它在本场景的归属视图: Referenced from {scene}; double-click to change which view of this scene it belongs to
+  当前场景无截图: The current scene has no screenshot
+  当前场景无截图，请先刷新截图: The current scene has no screenshot; refresh it first
+  当前场景没有 slot 类型的区域: The current scene has no slot-type regions
+  当前场景没有截图，无法截取模板: This scene has no screenshot; cannot capture a template
+  当前布局: Current Layout
+  当前布局不使用坐标；仍可在编辑属性中设置按键绑定: The current layout doesn't use coordinates; key bindings can still be set in edit properties
+  当前布局内，在 Region 中框定点击落点范围: Within the current layout, box the tap range inside the Region
+  当前布局尚未绑定此网格: The current layout hasn't bound this grid
+  当前布局尚未绑定此网格。: The current layout hasn't bound this grid.
+  当前布局没有未保存的改动: The current layout has no unsaved changes
+  当前布局绑定: Current Layout Binding
+  ? "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}"
+  : "The current screenshot size doesn't match. Confirm the new capture?\n\nCurrent: {old_width} × {old_height}\nNew: {new_width} × {new_height}"
+  当前激活布局不可删除: The currently active layout cannot be deleted
+  当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: "No region field is bindable in this view (all assigned, or not part of this view)\nLow precision produces editable commands; high precision saves a raw input trace,'\nThe result is inserted into the current script when recording stops'"
+  快速选择当前场景内的目标视图: Quickly select a target view in the current scene
+  恢复当前布局最近一次保存的状态: Restore the current layout's last saved state
+  截取新图并覆盖当前活动截图: Capture a new shot and overwrite the active screenshot
+  截取新图并追加为新的截图: Capture a new shot and append it as an extra screenshot
+  截取模版: Capture Template
+  截图尺寸不匹配: Screenshot size mismatch
+  截图管理: Screenshot Manager
+  截图：—　　画布：—: 'Screenshot: —　　Canvas: —'
+  所有引用都已绑定，或尚未创建引用。: All references are bound, or none have been created yet.
+  拖拽名称可调整 YAML 定义顺序: Drag names to reorder the YAML definitions
+  按键: Key Press
+  描述: Description
+  插入当前实体: Insert Current Entity
+  放弃改动: Discard Changes
+  放弃改动失败: Failed to discard changes
+  放弃未保存改动: Discard Unsaved Changes
+  新增视图: Add View
+  新建区域: New Region
+  新建场景: New Scene
+  新建场景分组: New Scene Group
+  新建坐标: New Point
+  新建布局: New Layout
+  无关联视图: No related views
+  无可用坐标: No Available Points
+  无可用引用: No available references
+  无场景改动: No Scene Changes
+  无布局: No layout
+  ? "无截图\n请连接投屏后点击「刷新截图」"
+  : "No screenshot\nConnect screen mirroring, then click \"Refresh Screenshot\""
+  无截图源，请先在主窗口定位窗口: No screenshot source; locate a window in the main window first
+  无法加载截图: Cannot load the screenshot
+  无法取消: Cannot Cancel
+  无法重新加载布局「{name}」，当前改动仍保留。: Cannot reload layout "{name}"; your current changes are kept.
+  显示在主界面布局下拉旁，过长会放不下: Shown beside the layout dropdown in the main window; too long won't fit
+  更新失败: Update Failed
+  未声明: Not declared
+  未声明入口，请补充按钮、快捷键或其他进入方式: No entry declared; add a button, hotkey or another way in
+  未绑定: Unbound
+  未通过: Failed
+  本场景视图: This Scene View
+  标定点击区域: Calibrate Tap Region
+  校准模式: Calibration Mode
+  模板: Template
+  模板已截取并暂存；保存布局后写入配置: Template captured and staged; saved to config when the layout saves
+  模板截图删除失败: Failed to delete template screenshots
+  模板文件写入失败，布局尚未保存：{error}: 'Failed to write template files; the layout was not saved: {error}'
+  模板至少需要 4×4 像素，请调整区域: A template needs at least 4×4 pixels; adjust the region
+  横向滚动: Horizontal Scroll
+  正在校准面板网格...: Calibrating panel grid...
+  正在结束...: Stopping...
+  正在识别...: Recognizing...
+  每次只提交当前页。关闭窗口会放弃未提交的表单内容。: Only the current page commits at a time. Closing the window discards uncommitted form content.
+  没有可引用的 area：一级场景中同名的 key 已被本场景占用。: 'No referenceable area: the same-named key in the top-level scene is already taken by this scene.'
+  没有子场景: No sub-scenes
+  没有已加载的布局: No layout loaded
+  没有已定义的区域: No regions defined
+  没有已定义的面板: No panels defined
+  测试当前区域的模板匹配: Test template matching for the current region
+  清除场景和布局定义缓存，从磁盘重新加载；请先保存或放弃未保存的改动: Clear scene and layout definition caches and reload from disk; save or discard unsaved changes first
+  清除点击区域: Clear Tap Region
+  激活布局不可删除: The active layout cannot be deleted
+  点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Click "Recognize All Fields" to see OCR results, or "Recognize All Reference Images" to see match results
+  点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: 'Tap-calibration mode: select a region, then drag inside it to box the tap range; Delete clears the calibration back to default'
+  画布尺寸: Canvas Size
+  画布尺寸无效: Invalid canvas size
+  画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Canvas edit mode: drag/resize yellow canvas frame to exclude window borders'
+  画布裁剪后应有的宽高比。启动任务前会按它校验目标窗口/设备，不符合就拒绝执行——形态错配不会报错，只会让坐标整体偏移。: The aspect ratio the canvas should have after cropping. Before starting a task the target window/device is validated against it and mismatched shapes are rejected — a mismatch wouldn't error, it would just shift every coordinate.
+  留空为本地入口；* 为全局，或逗号分隔场景 key: Empty for a local entry; * for global, or scene keys separated by commas
+  留空则与 key 相同: Leave empty to same as key
+  留空则点击坐标；可输入或下拉选择: Empty taps the coordinates; type or pick from the dropdown
+  目标场景不存在: The target scene doesn't exist
+  确定删除引用 {key} 吗？: Delete reference {key}?
+  ? "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。"
+  : "Delete screenshot {idx}?\nThe remaining screenshots are renumbered automatically."
+  ? "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。"
+  : "Restore layout \"{name}\" to its last saved state?\nAll unsaved layout calibrations, template captures and version adjustments will be lost."
+  确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。: Unreference {scene}.{entity} from the current scene? The source scene's definition and layout coordinates are unaffected.
+  移动场景: Move Scene
+  移动失败: Move Failed
+  移除当前场景的引用，保留源场景定义和布局坐标: Remove the current scene's reference, keeping the source scene definition and layout coordinates
+  等分网格: Equal-Split Grid
+  系统场景不可删除: System scenes cannot be deleted
+  系统场景不能修改 key: The key of a system scene cannot be changed
+  系统场景只能修改显示名称，不能修改 key: System scenes can only have their display name changed, not the key
+  系统布局不可删除；不使用时切换到其他布局即可: System layouts cannot be deleted; switch to another layout if you don't need it
+  纵向滚动: Vertical Scroll
+  绑定到当前布局: Bind to Current Layout
+  绑定坐标: Bind Point
+  绑定引用: Bind Reference
+  绑定网格: Bind Grid
+  结束运行: Stop Run
+  结果集：(空): 'Result Set: (Empty)'
+  继承失败: Inherit Failed
+  编辑区域: Edit Region
+  编辑坐标: Edit Point
+  编辑引用: Edit Reference
+  编辑当前布局的名称、描述与画布尺寸要求: Edit the current layout's name, description and canvas size requirement
+  编辑当前布局绑定: Edit Current Layout Binding
+  编辑画布: Edit Canvas
+  网格: Grid
+  脚本仍在运行: The script is still running
+  脚本内容为空，无法保存: Script content is empty; cannot save
+  脚本已结束运行: The script has finished
+  脚本测试失败: Script Test Failed
+  脚本测试完成: Script Test Completed
+  脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。: User for script test execution, defaults to current user on main page. Switching does not affect main page.
+  脚本测试运行中...: Script test running...
+  自动模式: Auto Mode
+  至少需要保留一张截图: At least one screenshot must remain
+  英文，如 my_group: English, e.g. my_group
+  英文，如 my_point: English, e.g. my_point
+  英文，如 my_region: English, e.g. my_region
+  英文，如 my_scene: English, e.g. my_scene
+  行 × 列: Rows × Columns
+  裁剪画布: Crop Canvas
+  覆盖引用的跳转行为: Override the reference's jump behavior
+  视图: View
+  视图关系无效: Invalid view relations
+  视图管理: View Management
+  解除: Unbind
+  解除引用: Unreference
+  解除引用失败: Failed to unreference
+  解除引用绑定: Unbind Reference
+  解除当前区域的模板绑定: Unbind the current region's template
+  解除绑定: Unbind
+  设为活动: Set Active
+  设置失败: Failed to set
+  识别全部字段: Recognize All Fields
+  识别参考图: Reference Images
+  该场景在此视图下没有可引用的 area: This scene has no referenceable area in this view
+  该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
+  该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
+  该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
+  请先在当前布局中放置该实体，或将其标记为禁用后设置按键: Place this entity in the current layout first, or mark it disabled before setting a key
+  请先在画布上或坐标列表中选中一个已放置的坐标点，再创建方向。: Please select a placed coordinate point on canvas or in the list first, then create direction.
+  请先在目标场景的「场景管理」中标记为引用子场景。: Mark the target scene as a referenced sub-scene in its "Scene Manager" first.
+  请先处理未保存的改动: Handle unsaved changes first
+  请先导入或刷新当前场景截图。: Import or refresh the current scene screenshot first.
+  请先新建或加载布局: Please create or load a layout first
+  请先选中一个已绑定坐标的区域: Select a region with bound coordinates first
+  请先选中坐标: Please select a point first
+  请先选择一个网格定义。: Select a grid definition first.
+  请先选择已绑定模板且有截图的区域: Select a region with a bound template and a screenshot first
+  请先选择布局。: Select a layout first.
+  请填写名称；Key 以小写字母开头，仅含小写字母、数字、下划线。: Fill in the name; the key starts with a lowercase letter and contains only lowercase letters, digits and underscores.
+  请检查日志: Check the log
+  调用方: Callers
+  跳转: Goes To
+  输入 DSL 脚本内容...: Enter DSL script content...
+  输入不完整: Incomplete input
+  输入方向 key（小写字母开头，可含数字/下划线）：: 'Enter direction key (starts with lowercase letter, may contain digits/underscores):'
+  迁移失败: Migration Failed
+  运行脚本: Run Script
+  返回值：(无): 'Return Value: (None)'
+  还原位置: Restore Position
+  追加截图失败: Failed to append the screenshot
+  退出点击标定: Exit Tap Calibration
+  退出画布编辑: Exit Canvas Edit
+  退出裁剪画布: Exit Canvas Cropping
+  选中截图以预览: Select a screenshot to preview
+  选择脚本文件: Select Script File
+  重命名场景: Rename Scene
+  重命名失败: Rename Failed
+  重命名方向: Rename Direction
+  重命名视图: Rename View
+  重载失败: Reload failed
+  '阈值 ': 'Threshold '
+  限定参考图识别的分组范围: Restrict the group scope of reference-image recognition
+  隐藏「全部」选项，打开场景时直接展示基底视图: Hide the "All" option; opening a scene shows the base view directly
+  隐藏全部视图: Hide All Views
+  ? "\n\n当前有如下场景发生变更：{names}"
+  : "\n\nThe following scenes have changed: {names}"
+  (无): (None)
+  创建区域: Create Region
+  创建方向: Create Direction
+  删除分组: Delete Group
+  模板测试：{state}，分数 {score:.3f}，阈值 {threshold:.2f}，缩放 {scale:.2f}: 'Template test: {state}, score {score:.3f}, threshold {threshold:.2f}, scale {scale:.2f}'
+  管理当前截图列表: Manage the screenshot list
+story_dialog:
+  」: ”
+user_manager:
+  当前用户: Current User

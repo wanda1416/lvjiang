@@ -1,165 +1,170 @@
-auto_strings:
-  "ADB 直传到设备": "Push to device via ADB"
-  "Android 安装包 (*.apk)": "Android package (*.apk)"
-  "Shizuku": "Shizuku"
-  "{label}回传失败：{message}": "{label} upload failed: {message}"
-  "{label}有 {count} 条旧记录缺少可确认的手机来源，未导入；原记录保留在手机。": "{label}: {count} old records lack a confirmable phone origin and were not imported; the originals remain on the phone."
-  "{label}：新增 {count} 条记录": "{label}: {count} new records"
-  "{n} 路": "{n} connections"
-  "ℹ️ shell 通道不可用（Shizuku 未授权）。普通点击与截图不受影响": "ℹ️ shell channel unavailable (Shizuku not authorized). Regular taps and screenshots are unaffected"
-  "✅ Shizuku 已授权：shell 通道可用": "✅ Shizuku authorized: shell channel available"
-  "✅ 支持输入时间线（并发手势）：声明 #% requires: [device_gesture] 的脚本可以运行": "✅ Input timeline supported (concurrent gestures): scripts declaring #% requires: [device_gesture] can run"
-  "❌ 不支持输入时间线：声明 #% requires: [device_gesture] 的脚本会在加载时被拒绝，需要先开启无障碍服务": "❌ Input timeline unsupported: scripts declaring #% requires: [device_gesture] are rejected at load; enable the accessibility service first"
-  "上一设备操作已完成；当前设备已切换，请刷新状态": "The previous device operation finished; the current device has switched — refresh the status"
-  "下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。": "Push all users, task configs and Profile, carrying only the selected layout and its inherited dependencies; phone history, logs and results are kept."
-  "下发配置": "Push Config"
-  "下发配置（需激活功能）": "Push Config (activation required)"
-  "下载 APK 到本机": "Download APK to PC"
-  "下载失败": "Download failed"
-  "不下发总览数据；手机 Profile 继续按账号云端同步更新。": "Overview data is not pushed; the phone's Profile keeps updating via account cloud sync."
-  "不含总览数据（Profile 由账号云端同步）": "Excludes overview data (Profile syncs from the cloud by account)"
-  "二维码来源": "QR code source"
-  "二维码生成失败，请手动打开上面的链接": "QR code generation failed; open the link above manually"
-  "仅合并已结束的手机记录；参数、Profile 和装备数据不回传。重复回传不会重复导入。": "Only finished phone records are merged; parameters, Profile and equipment data are not uploaded. Re-uploading doesn't duplicate imports."
-  "任务状态：{state}": "Task status: {state}"
-  "体检失败：{err}": "Health check failed: {err}"
-  "使用应用预置配置；执行用户：{user}": "Uses the app's bundled config; executing user: {user}"
-  "保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。": "Keeps each user's task settings (including auto-tuning) and phone-only users; scripts, layouts and the Profile DB still update."
-  "保留手机任务参数": "Keep phone task parameters"
-  "保留手机任务参数及手机独有用户。": "Keeps phone task parameters and phone-only users."
-  "保留手机批量配置": "Keep phone batch configs"
-  "保留手机批量配置。": "Keeps the phone's batch configs."
-  "保留手机整份批量配置组；取消后使用电脑配置组。本次运行草稿仍保留。": "Keeps the phone's entire batch configuration groups; unchecking uses the PC's groups. This run's draft is still kept."
-  "先「下载 APK 到本机」或选择一个本地安装包": "First \"Download APK to PC\" or pick a local package"
-  "先准备一个本地安装包": "Prepare a local package first"
-  "全部网卡（默认）": "All NICs (default)"
-  "其他连接": "Other connections"
-  "勾选后不下发 Profile 数据库和定义，手机总览数据继续由账号云端同步更新。手机处于云端模式（默认）时必须勾选，否则手机会拒绝接收。": "When checked, the Profile database and definitions are not pushed; the phone's overview keeps updating via account cloud sync. Must be checked when the phone is in cloud mode (default), or the phone rejects the transfer."
-  "协议": "Protocol"
-  "协议不匹配会直接连不上。{newer}端较新，请升级另一边": "A protocol mismatch prevents connection entirely. The {newer} side is newer; upgrade the other one"
-  "协议版本": "Protocol version"
-  "协议版本不匹配，无法执行手势测试": "Protocol version mismatch; cannot run the gesture test"
-  "取消下载": "Cancel Download"
-  "只影响 shell 通道；手势与无障碍截图不需要它": "Only affects the shell channel; gestures and accessibility screenshots don't need it"
-  "可选能力，不装也能用无障碍通道": "Optional capability; the accessibility channel works without it"
-  "同步到手机": "Sync to Phone"
-  "同步布局（请选择安卓布局）": "Sync layout (pick an Android layout)"
-  "同步配置": "Sync Config"
-  "回传到电脑": "Upload to PC"
-  "回传完成；重复记录已跳过，手机原件保留。": "Upload finished; duplicate records skipped, phone originals kept."
-  "回传已处理，但刷新手机状态失败：{message}": "Upload processed, but refreshing the phone state failed: {message}"
-  "在线下载（GitHub）": "Online download (GitHub)"
-  "在运行但未授权": "Running but not authorized"
-  "复制诊断报告": "Copy Diagnostics Report"
-  "安装失败：{err}": "Install failed: {err}"
-  "安装完成：{out}": "Install finished: {out}"
-  "将更新脚本、布局和用户数据。": "Will update scripts, layouts and user data."
-  "将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。": "Will update scripts, layouts and user data; Profile is overwritten by the PC snapshot."
-  "尚未扫描": "Not scanned yet"
-  "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。": "LAN scan discovers devices with wireless ADB; local port scan discovers emulators listening only on 127.0.0.1.\nScanning only establishes ADB connections; it doesn't switch the main window's execution target."
-  "屏幕": "Screen"
-  "屏幕标定": "Screen Calibration"
-  "已下载 {mb:.1f} MB": "Downloaded {mb:.1f} MB"
-  "已发现并连接 {count} 台设备": "Found and connected {count} devices"
-  "已开启": "Enabled"
-  "已授权": "Authorized"
-  "已结束": "Finished"
-  "并发手势上限": "Concurrent gesture limit"
-  "应用安装": "App Install"
-  "开始体检": "Start Health Check"
-  "开始测试": "Start Test"
-  "当前版本 <b>{v}</b> · 对应安装包 {name}": "Current version <b>{v}</b> · matching package {name}"
-  "往返延迟：中位 {mid:.0f} ms（{n} 次，最快 {lo:.0f} / 最慢 {hi:.0f}）": "Round-trip latency: median {mid:.0f} ms ({n} tries, fastest {lo:.0f} / slowest {hi:.0f})"
-  "律匠 移动设备诊断报告": "LvJiang Mobile Device Diagnostics Report"
-  "恒等（未标定）": "Identity (uncalibrated)"
-  "截图坐标与输入坐标一致。非 20:9 机型若点位整体偏移，在手机端悬浮球里做一次屏幕标定": "Screenshot and input coordinates match. On non-20:9 devices with an overall offset, run one screen calibration from the floating ball on the phone"
-  "手势、点击与截图都依赖它。在 app 内按引导开启；部分系统会在「受限设置」里额外拦一道，需要先允许": "Gestures, taps and screenshots all depend on it. Enable it in the app as guided; some systems additionally gate it behind \"Restricted settings\" — allow it there first"
-  "手势测试": "Gesture Test"
-  "手势测试失败：{err}": "Gesture test failed: {err}"
-  "手势测试已取消": "Gesture test cancelled"
-  "手机": "Phone"
-  "手机内置任务，可独立配置和执行，无需先连接 PC。可向手机下发脚本、配置和 Profile，也可独立回传手机历史与日志。": "Tasks built into the phone, configurable and runnable without a PC. You can push scripts, configs and Profile to the phone, and upload phone history and logs independently."
-  "手机历史、日志和结果保留；回传需单独操作。确认下发？": "Phone history, logs and results are kept; uploading is a separate action. Confirm the push?"
-  "手机执行用户：{user}；最近同步：{time}": "Phone executing user: {user}; last sync: {time}"
-  "手机缺失 {count} 个附件，相关历史不完整；请检查手机原文件。": "The phone is missing {count} attachments; related history is incomplete. Check the original files on the phone."
-  "手机要访问的本机地址。多网卡时选与手机同网段的那个；换地址只改链接，不会中断共享": "The local address the phone will access. With multiple NICs pick the one on the phone's subnet; changing it only updates the link and doesn't interrupt sharing"
-  "执行任务": "Run Task"
-  "执行用户（手机资料）": "Executing user (phone profile)"
-  "扫描失败": "Scan failed"
-  "扫描失败：{error}": "Scan failed: {error}"
-  "扫描局域网": "Scan LAN"
-  "扫描已取消": "Scan cancelled"
-  "扫描本机端口": "Scan Local Ports"
-  "扫描网段": "Subnets"
-  "扫码安装": "Scan to Install"
-  "拿不到屏幕尺寸，无法下发手势": "Cannot get the screen size; cannot send gestures"
-  "按住时长（秒）": "Hold duration (seconds)"
-  "新增附件：{count} 个": "New attachments: {count}"
-  "旋转": "Rotation"
-  "无可用局域网地址": "No available LAN address"
-  "无法启动本机共享": "Cannot start local sharing"
-  "无法连接离线执行接口，请先打开手机 App 并更新 APK": "Cannot reach the offline execution API; open the phone app and update the APK first"
-  "无法连接设备端代理": "Cannot connect to the on-device agent"
-  "无障碍服务": "Accessibility Service"
-  "无障碍服务未开启，无法执行手势测试": "Accessibility service is off; cannot run the gesture test"
-  "旧版 app 不上报版本，建议升级到与 PC 相同的版本": "The old app doesn't report its version; upgrading to match the PC is recommended"
-  "旧版 app 不上报该值，升级后可见": "The old app doesn't report this value; visible after upgrading"
-  "最近一次操作": "Last operation"
-  "未上报": "Not reported"
-  "未发现可连接的设备": "No connectable devices found"
-  "未开启": "False"
-  "未比对（取不到 SHA256SUMS）": "Not verified (SHA256SUMS unavailable)"
-  "未运行": "Not running"
-  "未连接设备，无法判断可用能力": "No device connected; cannot determine available capabilities"
-  "本地 APK 校验失败：{err}": "Local APK verification failed: {err}"
-  "本地安装包": "Local package"
-  "本机不支持多路并发，输入时间线无法落地": "This machine doesn't support multi-channel concurrency; the input timeline can't be realized"
-  "本机共享（局域网）": "Local Sharing (LAN)"
-  "本机地址": "Local address"
-  "本机尚无安装包": "No local package yet"
-  "校验不一致": "Checksum mismatch"
-  "校验通过": "Validation passed"
-  "正在传输：{done}/{total} KiB": "Transferring: {done}/{total} KiB"
-  "正在刷新设备列表，请稍后重试": "Refreshing the device list; try again shortly"
-  "正在取消扫描…": "Cancelling scan…"
-  "正在扫描…": "Scanning…"
-  "正在扫描局域网设备…": "Scanning LAN devices…"
-  "正在扫描本机模拟器端口…": "Scanning local emulator ports…"
-  "正在操作…": "Working…"
-  "正在暂停": "Pausing"
-  "正在校验…": "Verifying…"
-  "正在校验本地 APK…": "Verifying the local APK…"
-  "正在结束": "Stopping"
-  "正在连接设备端代理…": "Connecting to the on-device agent…"
-  "正在通过 ADB 安装…": "Installing via ADB…"
-  "比例": "Ratio"
-  "没有可用的局域网地址": "No available LAN address"
-  "没有可用的局域网地址：确认本机已连接网络": "No available LAN address: make sure this PC is connected to a network"
-  "没有已连接的 ADB 设备": "No ADB device connected"
-  "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。": "The test holds the bottom-left of the screen for a while while tapping the bottom-right twice — \"holding the joystick while tapping\".\nPut the phone on a game screen where movement and jumping are visible, then click Start."
-  "版本": "Version"
-  "版本不一致时协议和随包配置都可能对不上。建议把低的那一边升到高的": "With mismatched versions, protocol and bundled configs may disagree. Upgrade the lower side to match"
-  "用 PC 配置覆盖手机任务参数和用户名册。": "Overwrite the phone's task parameters and user roster with PC configs."
-  "用 PC 配置覆盖手机批量配置。": "Overwrite the phone's batch configs with PC configs."
-  "用手机扫码，从本机下载安装。手机需要和电脑在同一局域网，但不需要能上网。": "Scan with the phone to download and install from this PC. The phone must be on the same LAN but needs no internet."
-  "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。": "Scan with the phone to download and install directly from GitHub.\nIf the phone has no internet, use \"Local Sharing\" on the right instead."
-  "由本机提供下载，手机不需要能上网": "Downloads are served by this PC; the phone needs no internet"
-  "电脑": "PC"
-  "确认手机已安装律匠 app、与本机同一局域网或已用 USB 连接，并在 app 内开启无障碍服务": "Make sure the LvJiang app is installed on the phone, on the same LAN or connected via USB, and the accessibility service is enabled in the app"
-  "离线任务": "Offline Tasks"
-  "移动设备（正在停止后台操作…）": "Mobile device (stopping background operation…)"
-  "落点：按住 {push}，期间点击 {tap}": "Landing: hold {push} while tapping {tap}"
-  "设备": "Device"
-  "设备体检": "Device Health Check"
-  "设备已切换，请刷新离线任务状态": "The device has switched; refresh the offline task status"
-  "设备序列号": "Device serial"
-  "设备扫描": "Device Scan"
-  "设备端收到了指令但执行失败，展开日志看原因": "The device received the command but execution failed; expand the log for the reason"
-  "设备端版本": "Device-side version"
-  "请先更新 APK：旧版本不支持独立保留任务参数和批量配置": "Update the APK first: the old version doesn't support keeping task parameters and batch configs separately"
-  "请先选择在线设备": "Select an online device first"
-  "远程执行": "Remote Execution"
-  "选择 APK": "Select APK"
-  "选择本地 APK…": "Select local APK…"
-  "重新扫描": "Rescan"
-  "除本窗口外还有 {n} 路连接连着这台手机，可能来自另一个窗口或另一台电脑，操作会互相打断": "Besides this window, {n} other connections are attached to this phone — possibly another window or computer; operations will interrupt each other"
+account_dialog:
+  设备: Thiết bị
+common:
+  扫描网段: Subnets
+  按住时长（秒）: Hold duration (seconds)
+  本机地址: Local address
+mobile:
+  ADB 直传到设备: Push to device via ADB
+  Android 安装包 (*.apk): Android package (*.apk)
+  Shizuku: Shizuku
+  '{label}回传失败：{message}': '{label} upload failed: {message}'
+  '{label}有 {count} 条旧记录缺少可确认的手机来源，未导入；原记录保留在手机。': '{label}: {count} old records lack a confirmable phone origin and were not imported; the originals remain on the phone.'
+  '{label}：新增 {count} 条记录': '{label}: {count} new records'
+  '{n} 路': '{n} connections'
+  ℹ️ shell 通道不可用（Shizuku 未授权）。普通点击与截图不受影响: ℹ️ shell channel unavailable (Shizuku not authorized). Regular taps and screenshots are unaffected
+  ✅ Shizuku 已授权：shell 通道可用: '✅ Shizuku authorized: shell channel available'
+  '✅ 支持输入时间线（并发手势）：声明 #% requires: [device_gesture] 的脚本可以运行': '✅ Input timeline supported (concurrent gestures): scripts declaring #% requires: [device_gesture] can run'
+  '❌ 不支持输入时间线：声明 #% requires: [device_gesture] 的脚本会在加载时被拒绝，需要先开启无障碍服务': '❌ Input timeline unsupported: scripts declaring #% requires: [device_gesture] are rejected at load; enable the accessibility service first'
+  上一设备操作已完成；当前设备已切换，请刷新状态: The previous device operation finished; the current device has switched — refresh the status
+  下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。: Push all users, task configs and Profile, carrying only the selected layout and its inherited dependencies; phone history, logs and results are kept.
+  下发配置: Push Config
+  下发配置（需激活功能）: Push Config (activation required)
+  下载 APK 到本机: Download APK to PC
+  下载失败: Download failed
+  不下发总览数据；手机 Profile 继续按账号云端同步更新。: Overview data is not pushed; the phone's Profile keeps updating via account cloud sync.
+  不含总览数据（Profile 由账号云端同步）: Excludes overview data (Profile syncs from the cloud by account)
+  二维码来源: QR code source
+  二维码生成失败，请手动打开上面的链接: QR code generation failed; open the link above manually
+  仅合并已结束的手机记录；参数、Profile 和装备数据不回传。重复回传不会重复导入。: Only finished phone records are merged; parameters, Profile and equipment data are not uploaded. Re-uploading doesn't duplicate imports.
+  任务状态：{state}: 'Task status: {state}'
+  体检失败：{err}: 'Health check failed: {err}'
+  使用应用预置配置；执行用户：{user}: "Uses the app's bundled config; executing user: {user}"
+  保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。: Keeps each user's task settings (including auto-tuning) and phone-only users; scripts, layouts and the Profile DB still update.
+  保留手机任务参数: Keep phone task parameters
+  保留手机任务参数及手机独有用户。: Keeps phone task parameters and phone-only users.
+  保留手机批量配置: Keep phone batch configs
+  保留手机批量配置。: Keeps the phone's batch configs.
+  保留手机整份批量配置组；取消后使用电脑配置组。本次运行草稿仍保留。: Keeps the phone's entire batch configuration groups; unchecking uses the PC's groups. This run's draft is still kept.
+  先「下载 APK 到本机」或选择一个本地安装包: First "Download APK to PC" or pick a local package
+  先准备一个本地安装包: Prepare a local package first
+  全部网卡（默认）: All NICs (default)
+  其他连接: Other connections
+  勾选后不下发 Profile 数据库和定义，手机总览数据继续由账号云端同步更新。手机处于云端模式（默认）时必须勾选，否则手机会拒绝接收。: When checked, the Profile database and definitions are not pushed; the phone's overview keeps updating via account cloud sync. Must be checked when the phone is in cloud mode (default), or the phone rejects the transfer.
+  协议: Protocol
+  协议不匹配会直接连不上。{newer}端较新，请升级另一边: A protocol mismatch prevents connection entirely. The {newer} side is newer; upgrade the other one
+  协议版本: Protocol version
+  协议版本不匹配，无法执行手势测试: Protocol version mismatch; cannot run the gesture test
+  取消下载: Cancel Download
+  只影响 shell 通道；手势与无障碍截图不需要它: Only affects the shell channel; gestures and accessibility screenshots don't need it
+  可选能力，不装也能用无障碍通道: Optional capability; the accessibility channel works without it
+  同步到手机: Sync to Phone
+  同步布局（请选择安卓布局）: Sync layout (pick an Android layout)
+  同步配置: Sync Config
+  回传到电脑: Upload to PC
+  回传完成；重复记录已跳过，手机原件保留。: Upload finished; duplicate records skipped, phone originals kept.
+  回传已处理，但刷新手机状态失败：{message}: 'Upload processed, but refreshing the phone state failed: {message}'
+  在线下载（GitHub）: Online download (GitHub)
+  在运行但未授权: Running but not authorized
+  复制诊断报告: Copy Diagnostics Report
+  安装失败：{err}: 'Install failed: {err}'
+  安装完成：{out}: 'Install finished: {out}'
+  将更新脚本、布局和用户数据。: Will update scripts, layouts and user data.
+  将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。: Will update scripts, layouts and user data; Profile is overwritten by the PC snapshot.
+  尚未扫描: Not scanned yet
+  ? "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。"
+  : "LAN scan discovers devices with wireless ADB; local port scan discovers emulators listening only on 127.0.0.1.\nScanning only establishes ADB connections; it doesn't switch the main window's execution target."
+  屏幕: Screen
+  屏幕标定: Screen Calibration
+  已下载 {mb:.1f} MB: Downloaded {mb:.1f} MB
+  已发现并连接 {count} 台设备: Found and connected {count} devices
+  已开启: Enabled
+  已授权: Authorized
+  已结束: Finished
+  并发手势上限: Concurrent gesture limit
+  应用安装: App Install
+  开始体检: Start Health Check
+  开始测试: Start Test
+  当前版本 <b>{v}</b> · 对应安装包 {name}: Current version <b>{v}</b> · matching package {name}
+  往返延迟：中位 {mid:.0f} ms（{n} 次，最快 {lo:.0f} / 最慢 {hi:.0f}）: 'Round-trip latency: median {mid:.0f} ms ({n} tries, fastest {lo:.0f} / slowest {hi:.0f})'
+  律匠 移动设备诊断报告: LvJiang Mobile Device Diagnostics Report
+  恒等（未标定）: Identity (uncalibrated)
+  截图坐标与输入坐标一致。非 20:9 机型若点位整体偏移，在手机端悬浮球里做一次屏幕标定: Screenshot and input coordinates match. On non-20:9 devices with an overall offset, run one screen calibration from the floating ball on the phone
+  手势、点击与截图都依赖它。在 app 内按引导开启；部分系统会在「受限设置」里额外拦一道，需要先允许: Gestures, taps and screenshots all depend on it. Enable it in the app as guided; some systems additionally gate it behind "Restricted settings" — allow it there first
+  手势测试: Gesture Test
+  手势测试失败：{err}: 'Gesture test failed: {err}'
+  手势测试已取消: Gesture test cancelled
+  手机: Phone
+  手机内置任务，可独立配置和执行，无需先连接 PC。可向手机下发脚本、配置和 Profile，也可独立回传手机历史与日志。: Tasks built into the phone, configurable and runnable without a PC. You can push scripts, configs and Profile to the phone, and upload phone history and logs independently.
+  手机历史、日志和结果保留；回传需单独操作。确认下发？: Phone history, logs and results are kept; uploading is a separate action. Confirm the push?
+  手机执行用户：{user}；最近同步：{time}: 'Phone executing user: {user}; last sync: {time}'
+  手机缺失 {count} 个附件，相关历史不完整；请检查手机原文件。: The phone is missing {count} attachments; related history is incomplete. Check the original files on the phone.
+  手机要访问的本机地址。多网卡时选与手机同网段的那个；换地址只改链接，不会中断共享: The local address the phone will access. With multiple NICs pick the one on the phone's subnet; changing it only updates the link and doesn't interrupt sharing
+  执行任务: Run Task
+  执行用户（手机资料）: Executing user (phone profile)
+  扫描失败: Scan failed
+  扫描失败：{error}: 'Scan failed: {error}'
+  扫描局域网: Scan LAN
+  扫描已取消: Scan cancelled
+  扫描本机端口: Scan Local Ports
+  扫码安装: Scan to Install
+  拿不到屏幕尺寸，无法下发手势: Cannot get the screen size; cannot send gestures
+  新增附件：{count} 个: 'New attachments: {count}'
+  旋转: Rotation
+  无可用局域网地址: No available LAN address
+  无法启动本机共享: Cannot start local sharing
+  无法连接离线执行接口，请先打开手机 App 并更新 APK: Cannot reach the offline execution API; open the phone app and update the APK first
+  无法连接设备端代理: Cannot connect to the on-device agent
+  无障碍服务: Accessibility Service
+  无障碍服务未开启，无法执行手势测试: Accessibility service is off; cannot run the gesture test
+  旧版 app 不上报版本，建议升级到与 PC 相同的版本: The old app doesn't report its version; upgrading to match the PC is recommended
+  旧版 app 不上报该值，升级后可见: The old app doesn't report this value; visible after upgrading
+  最近一次操作: Last operation
+  未上报: Not reported
+  未发现可连接的设备: No connectable devices found
+  未开启: 'False'
+  未比对（取不到 SHA256SUMS）: Not verified (SHA256SUMS unavailable)
+  未运行: Not running
+  未连接设备，无法判断可用能力: No device connected; cannot determine available capabilities
+  本地 APK 校验失败：{err}: 'Local APK verification failed: {err}'
+  本地安装包: Local package
+  本机不支持多路并发，输入时间线无法落地: This machine doesn't support multi-channel concurrency; the input timeline can't be realized
+  本机共享（局域网）: Local Sharing (LAN)
+  本机尚无安装包: No local package yet
+  校验不一致: Checksum mismatch
+  校验通过: Validation passed
+  正在传输：{done}/{total} KiB: 'Transferring: {done}/{total} KiB'
+  正在刷新设备列表，请稍后重试: Refreshing the device list; try again shortly
+  正在取消扫描…: Cancelling scan…
+  正在扫描…: Scanning…
+  正在扫描局域网设备…: Scanning LAN devices…
+  正在扫描本机模拟器端口…: Scanning local emulator ports…
+  正在操作…: Working…
+  正在暂停: Pausing
+  正在校验…: Verifying…
+  正在校验本地 APK…: Verifying the local APK…
+  正在结束: Stopping
+  正在连接设备端代理…: Connecting to the on-device agent…
+  正在通过 ADB 安装…: Installing via ADB…
+  比例: Ratio
+  没有可用的局域网地址: No available LAN address
+  没有可用的局域网地址：确认本机已连接网络: 'No available LAN address: make sure this PC is connected to a network'
+  没有已连接的 ADB 设备: No ADB device connected
+  ? "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。"
+  : "The test holds the bottom-left of the screen for a while while tapping the bottom-right twice — \"holding the joystick while tapping\".\nPut the phone on a game screen where movement and jumping are visible, then click Start."
+  版本: Version
+  版本不一致时协议和随包配置都可能对不上。建议把低的那一边升到高的: With mismatched versions, protocol and bundled configs may disagree. Upgrade the lower side to match
+  用 PC 配置覆盖手机任务参数和用户名册。: Overwrite the phone's task parameters and user roster with PC configs.
+  用 PC 配置覆盖手机批量配置。: Overwrite the phone's batch configs with PC configs.
+  用手机扫码，从本机下载安装。手机需要和电脑在同一局域网，但不需要能上网。: Scan with the phone to download and install from this PC. The phone must be on the same LAN but needs no internet.
+  ? "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。"
+  : "Scan with the phone to download and install directly from GitHub.\nIf the phone has no internet, use \"Local Sharing\" on the right instead."
+  由本机提供下载，手机不需要能上网: Downloads are served by this PC; the phone needs no internet
+  电脑: PC
+  确认手机已安装律匠 app、与本机同一局域网或已用 USB 连接，并在 app 内开启无障碍服务: Make sure the LvJiang app is installed on the phone, on the same LAN or connected via USB, and the accessibility service is enabled in the app
+  离线任务: Offline Tasks
+  移动设备（正在停止后台操作…）: Mobile device (stopping background operation…)
+  落点：按住 {push}，期间点击 {tap}: 'Landing: hold {push} while tapping {tap}'
+  设备体检: Device Health Check
+  设备已切换，请刷新离线任务状态: The device has switched; refresh the offline task status
+  设备序列号: Device serial
+  设备扫描: Device Scan
+  设备端收到了指令但执行失败，展开日志看原因: The device received the command but execution failed; expand the log for the reason
+  设备端版本: Device-side version
+  请先更新 APK：旧版本不支持独立保留任务参数和批量配置: "Update the APK first: the old version doesn't support keeping task parameters and batch configs separately"
+  请先选择在线设备: Select an online device first
+  远程执行: Remote Execution
+  选择 APK: Select APK
+  选择本地 APK…: Select local APK…
+  重新扫描: Rescan
+  除本窗口外还有 {n} 路连接连着这台手机，可能来自另一个窗口或另一台电脑，操作会互相打断: Besides this window, {n} other connections are attached to this phone — possibly another window or computer; operations will interrupt each other

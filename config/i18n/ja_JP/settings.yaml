@@ -1,188 +1,244 @@
-auto_strings:
-  " 秒": " s"
-  "(未命名)": "(Unnamed)"
-  "ADB screencap 单帧截图": "ADB screencap (single frame)"
-  "ADB shell input 指令执行": "ADB shell input (command channel)"
-  "ADB 模式": "ADB mode"
-  "ADB 重连次数": "ADB reconnect attempts"
-  "AI 设置": "AI Settings"
-  "AI 配置已保存": "AI settings saved"
-  "Activity": "Activity"
-  "Agent 名称": "Agent name"
-  "Agent 设置已保存": "Agent settings saved"
-  "Android 连接设置": "Android Connection Settings"
-  "MCP 连接名称": "MCP connection name"
-  "Scrcpy 流式截图": "Scrcpy Streaming Capture"
-  "package": "Member package is missing or disabled"
-  "一次性码首次激活需要联网，请先关闭完全离线模式。": "One-time codes need internet on first activation; turn off full offline mode first."
-  "下载 Agent 链接": "Agent download link"
-  "不公开发布原始数据。": "Raw data is never published."
-  "不收集": "Not Collected"
-  "了解详情": "Learn More"
-  "仅 Windows 生效：开始执行前要求律匠以管理员身份运行": "Windows only: require LvJiang to run as administrator before execution"
-  "仅上报匿名的运行环境信息，不含任何游戏内数据。": "Only reports anonymous runtime environment info, no in-game data of any kind."
-  "从当前组合新建": "New from current"
-  "代理不可用时允许降级为 ADB 输入": "Allow fallback to ADB input when the agent is unavailable"
-  "代理重连次数": "Agent reconnect attempts"
-  "以下为系统级全局热键，保存后立即生效。": "The following are system-wide global hotkeys; changes take effect immediately after saving."
-  "会员包 v{version}": "Member package v{version}"
-  "保存 AI 配置": "Save AI Settings"
-  "保存 Agent 设置": "Save Agent Settings"
-  "保存失败，请检查配置目录权限": "Save failed; check the config directory permissions"
-  "停止 / 结束": "Stop / End"
-  "免绑定": "No machine binding"
-  "公开配置修订 r{version}（{date} 同步）": "Public config revision r{version} (synced {date})"
-  "公开配置：预置 r0": "Public config: bundled r0"
-  "写入 app.yaml，随安装包分发": "Write into app.yaml and ship with the installer"
-  "分发": "Distribute"
-  "删除应用": "Delete App"
-  "删除所选": "Delete Selected"
-  "前台截图 (mss)": "Foreground capture (mss)"
-  "前台输入 (SendInput)": "Foreground Input (SendInput)"
-  "功能激活": "Activation"
-  "包名": "Package name"
-  "参与匿名数据收集，帮助改进内置规则": "Opt in to anonymous data collection to help improve built-in rules"
-  "参数 key": "Parameter key"
-  "取消请求": "Cancel Request"
-  "只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。": "Adjusts only the content font size below the refresh toolbar in \"User Overview\" and \"User Info\", including list headers; the top toolbar buttons are unchanged."
-  "可在下方分别控制公告、版本更新、在线配置和匿名数据上报。": "Below you can control announcements, version updates, remote config, and anonymous data reporting independently."
-  "可执行文件": "Executable"
-  "后台截图 (WGC，Beta)": "Background capture (WGC, Beta)"
-  "后台输入 (PostMessage)": "Background input (PostMessage)"
-  "启动时检查公告": "Check Announcements on Startup"
-  "启动时检查新版本": "Check for New Version on Startup"
-  "在线会员授权": "Online Member Authorization"
-  "基础设置": "Basic Settings"
-  "外部 Agent": "External Agent"
-  "如 com.example.game": "e.g. com.example.game"
-  "如 game": "e.g. game"
-  "如 ios": "e.g. ios"
-  "如 my_wait": "e.g. my_wait"
-  "安卓截图": "Android capture"
-  "安卓输入": "Android input"
-  "完全离线模式（暂停全部联网功能）": "Fully Offline Mode (pause all network features)"
-  "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。": "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted. Background capture screenshots the game even when covered by other windows, at slightly slower speed; it requires background window input too, and neither works when the window is minimized. This sets the default: the main window only auto-checks \"Background capture\" after you check \"Background mode\", and you can still change it any time during a run."
-  "实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。": "Experimental: the phone must have the LvJiang App installed with Accessibility Service enabled; this only changes the channel used for taps and swipes, not the screenshot method. Falls back to ADB shell input if the connection fails."
-  "尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。": "No connection info of this type yet; connect a device or locate a window in the main window first."
-  "已下载待安装：{parts}（下次启动生效）": "Downloaded pending install: {parts} (effective next launch)"
-  "已复制": "Copied"
-  "已开放": "Open"
-  "已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。": "Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices."
-  "已绑定本机": "Bound to this machine"
-  "已获取 {count} 个模型；请选择模型后测试连接": "Fetched {count} models; pick one and test the connection"
-  "常规设置": "General Settings"
-  "应用「{name}」的 Activity 格式无效: {activity}": "App \"{name}\" has an invalid Activity format: {activity}"
-  "应用「{name}」的包名格式无效: {package}": "App \"{name}\" has an invalid package name format: {package}"
-  "应用「{name}」至少需要一个 Android 或 Windows 绑定": "App \"{name}\" needs at least an Android or Windows binding"
-  "应用名不能为空": "App name cannot be empty"
-  "应用名重复: {name}": "Duplicate app name: {name}"
-  "应用注册": "App Registration"
-  "建立流式传输尝试次数": "Video Stream Attempts"
-  "开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。": "Enabling telemetry uploads related, unreported history from the last {days} days; records created while disabled remain stored locally."
-  "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。": "What to do when a click/drag coordinate computed by the engine falls outside the captured frame.\nUnchecked (default): raise an error and end the run — out of bounds means the script's drag distance does not match the current panel geometry, and silently truncating turns \"scroll two rows\" into \"scroll one row\" with nothing in the script or the log to show it.\nChecked: the engine truncates to the frame edge, logs a warning and keeps running.\nThe check lives in the engine: on-device gestures reject such coordinates outright while desktop input and adb shell input accept them silently, so the backends cannot be relied on."
-  "当前标识：未生成（未开启）": "Current ID: not generated (disabled)"
-  "手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。": "The Shizuku service process dies after a phone reboot, and tasks that restart the game depend on it. When enabled, connecting in on-device mode detects and starts it once (only if not already running)."
-  "执行参数": "Execution Parameters"
-  "把激活码粘贴到这里，换行和空格会被自动忽略": "Paste the activation code here; newlines and spaces are ignored"
-  "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式，建议保留带 Alt 的组合键。": "Press once to minimize to the system tray, press again to bring the main window back. The tray icon may be hidden by notification settings, so this hotkey is the only reliable way back once hidden — keep an Alt combo for it."
-  "接口根地址": "API base URL"
-  "接口根地址通常以 /v1 结尾，不包含 /chat/completions。API Key 保存到系统凭据库，不进入配置文件或手机同步数据。": "The API base URL usually ends with /v1 and excludes /chat/completions. The API key is stored in the system credential store, not in config files or phone sync data."
-  "接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。": "Receives official config and task updates matching the current app version, applied at next launch after verification. Your local configs always take priority; running tasks keep using what this process already loaded. Turning this off or going offline restores bundled content and removes member content at next launch, without touching local data."
-  "接收在线配置更新": "Receive Remote Config Updates"
-  "新方案": "New plan"
-  "方案「{name}」至少要勾选一种连接模式": "Plan \"{name}\" needs at least one connection mode"
-  "方案名称不能为空": "Plan name cannot be empty"
-  "方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。": "A plan binds gallery, environment and layout together and declares its connection modes and launch privilege requirements."
-  "方案设置": "Plan Settings"
-  "无法读取所连接窗口的可执行文件。": "Cannot read the executable of the connected window."
-  "无需鉴权的本地服务可留空": "Leave empty for local services that need no auth"
-  "显示名称": "Display Name"
-  "暂停 / 恢复": "Pause / Resume"
-  "最小化 / 恢复窗口": "Minimize / Restore window"
-  "有效期": "Validity"
-  "服务返回的模型列表为空，可手动填写模型名称后测试连接": "The service returned an empty model list; fill in a model name manually and test the connection"
-  "期望方向": "Expected orientation"
-  "未单独标定点击区域时，落点框从区域中心向四边延伸的比例。0.25 = 落点覆盖区域中间的一半；必须小于 0.5": "When no tap region is calibrated separately, the ratio the tap box extends from the region center to each edge. 0.25 = the tap covers the middle half; must be below 0.5"
-  "未知日期": "Unknown Date"
-  "未识别到设备当前前台应用。": "Could not identify the device's current foreground app."
-  "本地激活：已激活": "Local activation: active"
-  "本地激活：未激活，高级功能不可用。": "Local activation: inactive; advanced features unavailable."
-  "本机序列号": "Machine serial"
-  "查看待上报数据": "View Data to Be Reported"
-  "模型名称": "Model name"
-  "模型接口": "Model API"
-  "模式": "Mode"
-  "横屏": "Landscape"
-  "正在测试连接…": "Testing connection…"
-  "正在激活，请等待联网操作完成后关闭。": "Activating; wait for the online operation to finish before closing."
-  "正在获取模型列表…": "Fetching model list…"
-  "正在验证激活码；一次性码将联网绑定本机…": "Verifying the activation code; one-time codes will bind to this machine online…"
-  "每个应用可同时绑定 Android 与 Windows。运行时按当前实际连接目标选择绑定，与工作流环境无关；连接后可用对应的「获取连接信息」自动回填。": "Each app can bind Android and Windows at once. At runtime the binding follows the actual connected target, independent of workflow environment; after connecting, the matching \"Get connection info\" fills it in automatically."
-  "每次点击前的随机等待，模拟人类反应时间": "Random wait before each click, simulating human reaction time"
-  "每次点击后的随机等待": "Random wait after each click"
-  "永久": "Permanent"
-  "测试连接": "Test Connection"
-  "添加 Agent": "Add Agent"
-  "添加参数": "Add Parameter"
-  "添加应用": "Add App"
-  "添加环境": "Add Environment\nSave first?'"
-  "清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。": "Clearing disables local advanced features. You can paste an activation code again to re-check local and online authorization."
-  "清除激活": "Clear Activation"
-  "激活": "Activate"
-  "激活失败": "Activation failed"
-  "激活成功。部分功能需要重新定位窗口后生效。": "Activated. Some features take effect after re-locating the window."
-  "激活码": "Activation Code"
-  "点击前延迟(秒)": "Delay Before Click (sec)"
-  "点击后延迟(秒)": "Delay After Click (sec)"
-  "点击坐标附加 ±N 像素的随机偏移": "Add a +/-N pixel random offset to the click coordinate"
-  "热键不能重复绑定同一个按键，请检查后重试": "Hotkeys cannot be bound to the same key twice; please check and retry"
-  "热键设置": "Hotkey Settings"
-  "环境 key": "Environment key"
-  "用于重启后重新发现窗口": "Used to rediscover the window after a restart"
-  "用户信息字号": "User Info font size"
-  "用户总览字号": "User Overview font size"
-  "界面语言": "Interface Language"
-  "留空自动解析 Launcher": "Leave empty to resolve the Launcher automatically"
-  "目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。": "Target Environment determines what env() returns in the DSL, used to distinguish navigation strategy between PC and mobile games. This is the environment the game runs in, not this machine's OS."
-  "确定删除方案「{name}」吗？": "Delete plan \"{name}\"?"
-  "空串不自动定位窗口": "Empty string disables automatic window location"
-  "窗口截图": "Window capture"
-  "窗口标题": "Window title"
-  "窗口模式": "Window mode"
-  "窗口输入": "Window input"
-  "竖屏": "Portrait"
-  "端侧执行（需安装律匠 App）": "On-Device Execution (requires the LvJiang App)"
-  "等待参数": "Wait Parameters"
-  "等待范围(秒)": "Wait Range (sec)"
-  "管理员权限": "Administrator privileges"
-  "系统参数": "System Parameters"
-  "网络与隐私": "Network & Privacy"
-  "脚本录制": "Script Recording"
-  "获取信息": "Get Info"
-  "获取模型": "Fetch Models"
-  "获取连接信息": "Get Connection Info"
-  "该热键只在「脚本编辑」工作台打开期间临时全局注册，对话框关闭后立即注销；其余热键在软件运行期间始终生效。": "This hotkey is only temporarily registered globally while the \"Script Editor\" workbench is open, and unregistered the moment the dialog closes; all other hotkeys stay active while the app runs."
-  "请先粘贴激活码": "Paste an activation code first"
-  "请求超时": "Request timed out"
-  "读不到硬件标识（非 Windows 平台）": "Hardware identity unavailable (non-Windows platform)"
-  "越界坐标自动截断": "Auto-truncate out-of-bounds coordinates"
-  "连接可用，模型已返回文本回复（耗时 {seconds} 秒）": "Connection works; the model replied with text (took {seconds} s)"
-  "连接方案": "Connection Plans"
-  "连接端侧执行时自动启动 Shizuku 服务": "Auto-start the Shizuku service when connecting in on-device mode"
-  "部分激活码不绑定机器，直接粘贴即可，不需要提供序列号。": "Some activation codes aren't machine-bound — just paste them; no serial needed."
-  "配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。": "Configure an OpenAI-compatible API for upcoming AI features. The connection test sends a short request to the selected model and may cost a little."
-  "配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。": "Configure external Agent names and default export files, all via Streamable HTTP. Smart tuning chooses which Agent to use; access tokens are not stored here."
-  "配置管理": "Settings"
-  "重置匿名标识": "Reset Anonymous ID"
-  "重置后服务端会把你当成一个新用户，之前的记录无法再与新标识关联。确定重置吗？": "After resetting, the server will treat you as a new user; previous records can no longer be linked to the new ID. Reset anyway?"
-  "重置标识": "Reset ID"
-  "重试间隔（秒）": "Retry interval (seconds)"
-  "需要绑定本机的激活码时，把这串序列号发给作者。它由主板标识算出，每次启动现算、不会存盘，也不包含任何可还原的硬件信息。": "If your activation code is machine-bound, send this serial to the author. It's derived from the motherboard identity, computed at each launch, never stored, and contains no reversible hardware information."
-  "首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。": "Used for both the initial stream setup and automatic recovery after a disconnect. Once exhausted the task waits for manual handling and never gives up by itself."
-  "首次窗口定位后可自动获取": "Can be filled automatically after the first window location"
-  "高级设置": "Advanced Settings"
-  "默认导出文件": "Default export file"
-  "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。": "By default the video stream is set up 5 times, then the agent is reconnected 5 times and ADB 5 times, 2 s apart. If it still fails, the task waits for manual handling with no timeout: Yes re-checks, No stops the task; closing the prompt does not stop it and the banner stays.\nMulti-touch and concurrent gestures are not downgraded. Inputs that may already have been sent are never replayed automatically. Applies to tasks started afterwards."
-  "默认点击范围半径": "Default tap range radius"
-  "鼠标/触控移动到目标位置的耗时": "Time for the mouse/touch to move to the target position"
-  "鼠标移动时长(秒)": "Mouse Move Duration (sec)"
+agent_settings:
+  Agent 名称: Agent name
+  Agent 设置已保存: Agent settings saved
+  MCP 连接名称: MCP connection name
+  下载 Agent 链接: Agent download link
+  保存 Agent 设置: Save Agent Settings
+  删除所选: Delete Selected
+  添加 Agent: Add Agent
+  配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。: Configure external Agent names and default export files, all via Streamable HTTP. Smart tuning chooses which Agent to use; access tokens are not stored here.
+  默认导出文件: Default export file
+ai_settings:
+  AI 配置已保存: AI settings saved
+  保存 AI 配置: Save AI Settings
+  保存失败，请检查配置目录权限: Save failed; check the config directory permissions
+  取消请求: Cancel Request
+  外部 Agent: External Agent
+  已获取 {count} 个模型；请选择模型后测试连接: Fetched {count} models; pick one and test the connection
+  接口根地址: API base URL
+  接口根地址通常以 /v1 结尾，不包含 /chat/completions。API Key 保存到系统凭据库，不进入配置文件或手机同步数据。: The API base URL usually ends with /v1 and excludes /chat/completions. The API key is stored in the system credential store, not in config files or phone sync data.
+  无需鉴权的本地服务可留空: Leave empty for local services that need no auth
+  服务返回的模型列表为空，可手动填写模型名称后测试连接: The service returned an empty model list; fill in a model name manually and test the connection
+  模型名称: Model name
+  模型接口: Model API
+  正在测试连接…: Testing connection…
+  正在获取模型列表…: Fetching model list…
+  测试连接: Test Connection
+  获取模型: Fetch Models
+  请求超时: Request timed out
+  连接可用，模型已返回文本回复（耗时 {seconds} 秒）: Connection works; the model replied with text (took {seconds} s)
+  配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。: Configure an OpenAI-compatible API for upcoming AI features. The connection test sends a short request to the selected model and may cost a little.
+common:
+  Activity: Activity
+  adb_capture_label: 'ADB Capture Mode:'
+  adb_capture_scrcpy: Streaming (scrcpy)
+  adb_capture_screencap: Static (screencap)
+  adb_input_agent: On-device execution (Lvjiang app accessibility)
+  adb_input_label: 'ADB Input Mode:'
+  adb_input_shell: adb shell input
+  adb_input_tip: With the Lvjiang app installed and accessibility enabled, taps/drags/screenshots are performed by the app; falls back to adb when unreachable
+  ai: AI Settings
+  btn_close: Close
+  btn_save: Save
+  execution: Execution Parameters
+  font_scope_tip: Only changes content below the refresh toolbar in User Overview and User Info, including table headers. The top toolbar and bottom Data Model button remain unchanged.
+  general: General Settings
+  input_mode_label: 'Window Input Mode:'
+  input_postmessage: Background (PostMessage)
+  input_sendinput: Foreground (SendInput)
+  language_label: Interface Language
+  status_saved: Settings saved
+  tab_basic: Basic
+  tab_fonts: Font Settings
+  tab_input: Input Simulation
+  tab_wait: Wait Parameters
+  text_0: Fetch Models
+  text_1: Cancel Request
+  text_10: Save failed. Check configuration directory permissions.
+  text_11: AI configuration saved
+  text_12: Testing connection…
+  text_13: 'Connection available: the model returned text ({seconds} seconds)'
+  text_14: Connection test cancelled
+  text_15: Connection test failed. Check connection settings.
+  text_16: Invalid API address
+  text_17: Enter a complete HTTP/HTTPS base URL without credentials, query parameters, or fragments.
+  text_18: Enter a model name
+  text_19: Request timeout must be between 1 and 300 seconds
+  text_2: AI request cancelled
+  text_20: Request timed out. Check the network or increase the timeout.
+  text_21: Connection failed. Check the API address, network, and certificate.
+  text_22: Authentication failed. Check the API key and model access permissions.
+  text_23: API endpoint or model not found. Check the base URL and model name.
+  text_24: Rate limit or insufficient quota. Check your provider account.
+  text_25: The model refused the request
+  text_26: The model response was truncated
+  text_27: No valid text response. Check that the service supports Chat Completions.
+  text_28: System credential store unavailable. You can enter a key temporarily for testing; enable the credential store to save it.
+  text_29: Cannot read system credentials. Check that the credential store is unlocked.
+  text_3: AI request failed. Check connection settings.
+  text_30: Cannot update system credentials. Connection settings were not saved.
+  text_4: Fetching model list…
+  text_5: Fetched {count} models. Select a model and test the connection.
+  text_6: The model list is empty. Enter a model name manually and test the connection.
+  text_7: No valid model list was returned. Enter a model name manually and test the connection.
+  text_8: Test Connection
+  text_9: Cancel Test
+  title: Settings
+  user_info_font_size: User Info Font Size
+  user_overview_font_size: User Overview Font Size
+  window_title_label: 'Default Window Title:'
+  window_title_placeholder: Empty = no auto-locate
+  包名: Package name
+  可执行文件: Executable
+  安卓截图: Android capture
+  安卓输入: Android input
+  期望方向: Expected orientation
+  窗口截图: Window capture
+  窗口标题: Window title
+  窗口输入: Window input
+  默认点击范围半径: Default tap range radius
+menu_ops:
+  配置管理: Settings
+settings_dialog:
+  (未命名): (Unnamed)
+  ADB screencap 单帧截图: ADB screencap (single frame)
+  ADB shell input 指令执行: ADB shell input (command channel)
+  ADB 重连次数: ADB reconnect attempts
+  AI 设置: AI Settings
+  Android 连接设置: Android Connection Settings
+  Scrcpy 流式截图: Scrcpy Streaming Capture
+  一次性码首次激活需要联网，请先关闭完全离线模式。: One-time codes need internet on first activation; turn off full offline mode first.
+  不公开发布原始数据。: Raw data is not published.
+  了解详情: Learn More
+  仅 Windows 生效：开始执行前要求律匠以管理员身份运行: 'Windows only: requires LvJiang to run as administrator before starting'
+  仅上报匿名的运行环境信息，不含任何游戏内数据。: Only anonymous runtime environment info is reported; no in-game data.
+  从当前组合新建: New from Current Build
+  代理不可用时允许降级为 ADB 输入: Allow fallback to ADB input when the agent is unavailable
+  代理重连次数: Agent reconnect attempts
+  以下为系统级全局热键，保存后立即生效。: System-level global hotkeys below take effect immediately after saving.
+  会员包 v{version}: Member package v{version}
+  停止 / 结束: Stop / End
+  免绑定: No machine binding
+  公开配置修订 r{version}（{date} 同步）: Public config revision r{version} (synced {date})
+  公开配置：预置 r0: 'Public config: bundled r0'
+  写入 app.yaml，随安装包分发: Written to app.yaml, distributed with the installer
+  分发: Distribution
+  删除应用: Delete App
+  前台截图 (mss): Foreground capture (mss)
+  前台输入 (SendInput): Foreground Input (SendInput)
+  功能激活: Activation
+  参与匿名数据收集，帮助改进内置规则: Opt in to anonymous data collection to help improve built-in rules
+  参数 key: Parameter key
+  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Adjusts only the content font size below the refresh toolbar in "User Overview" and "User Info", including list headers; the top toolbar buttons are unchanged.
+  可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Below you can control announcements, version updates, remote config, and anonymous data reporting independently.
+  后台截图 (WGC，Beta): Background capture (WGC, Beta)
+  后台输入 (PostMessage): Background input (PostMessage)
+  启动时检查公告: Check Announcements on Startup
+  启动时检查新版本: Check for New Version on Startup
+  在线会员授权: Online Member Authorization
+  基础设置: Basic Settings
+  如 com.example.game: e.g. com.example.game
+  如 game: e.g. game
+  如 ios: e.g. ios
+  如 my_wait: e.g. my_wait
+  完全离线模式（暂停全部联网功能）: Fully Offline Mode (pause all network features)
+  ? 实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。
+  : "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted. Background capture screenshots the game even when covered by other windows, at slightly slower speed; it requires background window input too, and neither works when the window is minimized. This sets the default: the main window only auto-checks \"Background capture\" after you check \"Background mode\", and you can still change it any time during a run."
+  实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Experimental: the phone must have the LvJiang App installed with Accessibility Service enabled; this only changes the channel used for taps and swipes, not the screenshot method. Falls back to ADB shell input if the connection fails.'
+  尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: No connection info of this type yet; connect a device or locate a window in the main window first.
+  已下载待安装：{parts}（下次启动生效）: 'Downloaded pending install: {parts} (effective next launch)'
+  已复制: Copied
+  已开放: Open
+  已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
+  已绑定本机: Bound to this machine
+  常规设置: General Settings
+  '应用「{name}」的 Activity 格式无效: {activity}': 'App "{name}" has an invalid Activity format: {activity}'
+  '应用「{name}」的包名格式无效: {package}': 'App "{name}" has an invalid package name format: {package}'
+  应用「{name}」至少需要一个 Android 或 Windows 绑定: App "{name}" needs at least an Android or Windows binding
+  应用名不能为空: App name cannot be empty
+  '应用名重复: {name}': 'Duplicate app name: {name}'
+  应用注册: App Registration
+  建立流式传输尝试次数: Video Stream Attempts
+  ? "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。"
+  : "What to do when a click/drag coordinate computed by the engine falls outside the captured frame.\nUnchecked (default): raise an error and end the run — out of bounds means the script's drag distance does not match the current panel geometry, and silently truncating turns \"scroll two rows\" into \"scroll one row\" with nothing in the script or the log to show it.\nChecked: the engine truncates to the frame edge, logs a warning and keeps running.\nThe check lives in the engine: on-device gestures reject such coordinates outright while desktop input and adb shell input accept them silently, so the backends cannot be relied on."
+  当前标识：未生成（未开启）: 'Current ID: not generated (disabled)'
+  手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: The Shizuku service process dies after a phone reboot, and tasks that restart the game depend on it. When enabled, connecting in on-device mode detects and starts it once (only if not already running).
+  执行参数: Execution Parameters
+  把激活码粘贴到这里，换行和空格会被自动忽略: Paste the activation code here; newlines and spaces are ignored
+  按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式，建议保留带 Alt 的组合键。: Press once to minimize to the system tray, press again to bring the main window back. The tray icon may be hidden by notification settings, so this hotkey is the only reliable way back once hidden — keep an Alt combo for it.
+  接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。: Receives official config and task updates matching the current app version, applied at next launch after verification. Your local configs always take priority; running tasks keep using what this process already loaded. Turning this off or going offline restores bundled content and removes member content at next launch, without touching local data.
+  接收在线配置更新: Receive Remote Config Updates
+  新方案: New plan
+  方案「{name}」至少要勾选一种连接模式: Plan "{name}" needs at least one connection mode
+  方案名称不能为空: Plan name cannot be empty
+  方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。: A plan binds gallery, environment and layout together and declares its connection modes and launch privilege requirements.
+  方案设置: Plan Settings
+  无法读取所连接窗口的可执行文件。: Cannot read the executable of the connected window.
+  显示名称: Display Name
+  暂停 / 恢复: Pause / Resume
+  最小化 / 恢复窗口: Minimize / Restore window
+  有效期: Validity
+  未单独标定点击区域时，落点框从区域中心向四边延伸的比例。0.25 = 落点覆盖区域中间的一半；必须小于 0.5: When no tap region is calibrated separately, the ratio the tap box extends from the region center to each edge. 0.25 = the tap covers the middle half; must be below 0.5
+  未知日期: Unknown Date
+  未识别到设备当前前台应用。: Could not identify the device's current foreground app.
+  本地激活：已激活: 'Local activation: active'
+  本地激活：未激活，高级功能不可用。: 'Local activation: inactive; advanced features unavailable.'
+  本机序列号: Machine serial
+  查看待上报数据: View Data to Be Reported
+  模式: Mode
+  横屏: Landscape
+  正在激活，请等待联网操作完成后关闭。: Activating; wait for the online operation to finish before closing.
+  正在验证激活码；一次性码将联网绑定本机…: Verifying the activation code; one-time codes will bind to this machine online…
+  每个应用可同时绑定 Android 与 Windows。运行时按当前实际连接目标选择绑定，与工作流环境无关；连接后可用对应的「获取连接信息」自动回填。: Each app can bind Android and Windows at once. At runtime the binding follows the actual connected target, independent of workflow environment; after connecting, the matching "Get connection info" fills it in automatically.
+  每次点击前的随机等待，模拟人类反应时间: Random wait before each click, simulating human reaction time
+  每次点击后的随机等待: Random wait after each click
+  永久: Permanent
+  添加参数: Add Parameter
+  添加应用: Add App
+  添加环境: "Add Environment\nSave first?'"
+  清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。: Clearing disables local advanced features. You can paste an activation code again to re-check local and online authorization.
+  清除激活: Clear Activation
+  激活: Activate
+  激活失败: Activation failed
+  激活成功。部分功能需要重新定位窗口后生效。: Activated. Some features take effect after re-locating the window.
+  激活码: Activation Code
+  点击前延迟(秒): Delay Before Click (sec)
+  点击后延迟(秒): Delay After Click (sec)
+  点击坐标附加 ±N 像素的随机偏移: Add a +/-N pixel random offset to the click coordinate
+  热键不能重复绑定同一个按键，请检查后重试: Hotkeys cannot be bound to the same key twice; please check and retry
+  环境 key: Environment key
+  用于重启后重新发现窗口: Used to rediscover the window after a restart
+  用户信息字号: User Info font size
+  用户总览字号: User Overview font size
+  界面语言: Interface Language
+  留空自动解析 Launcher: Leave empty to resolve the Launcher automatically
+  目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: Target Environment determines what env() returns in the DSL, used to distinguish navigation strategy between PC and mobile games. This is the environment the game runs in, not this machine's OS.
+  确定删除方案「{name}」吗？: Delete plan "{name}"?
+  空串不自动定位窗口: Empty string disables automatic window location
+  竖屏: Portrait
+  等待参数: Wait Parameters
+  等待范围(秒): Wait Range (sec)
+  管理员权限: Administrator privileges
+  系统参数: System Parameters
+  网络与隐私: Network & Privacy
+  获取信息: Get Info
+  获取连接信息: Get Connection Info
+  该热键只在「脚本编辑」工作台打开期间临时全局注册，对话框关闭后立即注销；其余热键在软件运行期间始终生效。: This hotkey is only temporarily registered globally while the "Script Editor" workbench is open, and unregistered the moment the dialog closes; all other hotkeys stay active while the app runs.
+  请先粘贴激活码: Paste an activation code first
+  读不到硬件标识（非 Windows 平台）: Hardware identity unavailable (non-Windows platform)
+  越界坐标自动截断: Auto-truncate out-of-bounds coordinates
+  连接方案: Connection Plans
+  连接端侧执行时自动启动 Shizuku 服务: Auto-start the Shizuku service when connecting in on-device mode
+  部分激活码不绑定机器，直接粘贴即可，不需要提供序列号。: Some activation codes aren't machine-bound — just paste them; no serial needed.
+  重置匿名标识: Reset Anonymous ID
+  重置后服务端会把你当成一个新用户，之前的记录无法再与新标识关联。确定重置吗？: After resetting, the server will treat you as a new user; previous records can no longer be linked to the new ID. Reset anyway?
+  重置标识: Reset ID
+  重试间隔（秒）: Retry interval (seconds)
+  需要绑定本机的激活码时，把这串序列号发给作者。它由主板标识算出，每次启动现算、不会存盘，也不包含任何可还原的硬件信息。: If your activation code is machine-bound, send this serial to the author. It's derived from the motherboard identity, computed at each launch, never stored, and contains no reversible hardware information.
+  首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: Used for both the initial stream setup and automatic recovery after a disconnect. Once exhausted the task waits for manual handling and never gives up by itself.
+  首次窗口定位后可自动获取: Can be filled automatically after the first window location
+  高级设置: Advanced Settings
+  ? "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。"
+  : "By default the video stream is set up 5 times, then the agent is reconnected 5 times and ADB 5 times, 2 s apart. If it still fails, the task waits for manual handling with no timeout: Yes re-checks, No stops the task; closing the prompt does not stop it and the banner stays.\nMulti-touch and concurrent gestures are not downgraded. Inputs that may already have been sent are never replayed automatically. Applies to tasks started afterwards."
+  鼠标/触控移动到目标位置的耗时: Time for the mouse/touch to move to the target position
+  鼠标移动时长(秒): Mouse Move Duration (sec)

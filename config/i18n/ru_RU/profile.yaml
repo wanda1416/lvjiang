@@ -1,232 +1,358 @@
-auto_strings:
-  "Key '{key}' 已在该分组中显示": "Key '{key}' is already shown in this group"
-  "Key '{key}' 已存在": "Key '{key}' already exists"
-  "Key 只能包含字母、数字和下划线": "Keys may contain only letters, digits and underscores"
-  "Profile 关联脚本处理中（待处理 {count}）": "Profile-related scripts processing ({count} pending)"
-  "{field}不能大于 999999": "{field} cannot exceed 999999"
-  "{field}不能小于 {min}": "{field} cannot be less than {min}"
-  "{field}必须是有效数字": "{field} must be a valid number"
-  "{first} +{rest}": "{first} +{rest}"
-  "{label} 必须是整数": "{label} must be an integer"
-  "{noun} · {count} 项": "{noun} · {count} items"
-  "{title} Key ({model})": "{title} Key ({model})"
-  "一次只能复制一条定义": "Only one definition can be duplicated at a time"
-  "上一个": "Previous"
-  "上一页": "Previous Page"
-  "上限": "Cap"
-  "下一个": "Next"
-  "下一页": "Next Page"
-  "不提醒": "Don't remind"
-  "为零": "Zero"
-  "仅删除历史，不修改当前值；会影响按历史统计的额度": "Deletes history only, leaving current values unchanged; affects quotas that accumulate from history"
-  "今天": "Today"
-  "便利贴": "Sticky Note"
-  "便利贴内容": "Sticky note content"
-  "便利贴内容不能超过 {limit} 个字符": "Sticky note content cannot exceed {limit} characters"
-  "保存便利贴失败：{error}": "Failed to save the sticky note: {error}"
-  "倍率": "Multiplier"
-  "全选当前结果": "Select All Results"
-  "全部用户参数": "All User Parameters"
-  "共 {total} 条": "{total} records total"
-  "其他设备": "Other Devices"
-  "写入冲突": "Write Conflict"
-  "准点/{unit}": "At reset/{unit}"
-  "准点:{val}/{period}": "At reset: {val}/{period}"
-  "准点周期": "Reset cycle"
-  "准点恢复": "Restore at reset"
-  "减少": "Decrease"
-  "减少 {value}": "Decrease {value}"
-  "减少...": "Decrease..."
-  "减少后数值不能小于 0（当前值: {cur}，输入: {inp}）": "The value after decreasing cannot go below 0 (current: {cur}, entered: {inp})"
-  "减少量": "Decrease amount"
-  "分组名不能为空": "Group name cannot be empty"
-  "分钟": "minutes"
-  "删除便利贴失败：{error}": "Failed to delete the sticky note: {error}"
-  "勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。": "When checked the script runs before the write lands; a rejection or failure rolls back the whole sync write chain. Unchecked, it queues after commit. Sync scripts should be short — not for long waits."
-  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Checked: handled as an action, triggering sync of the config's sync_targets.\nUnchecked: handled as a pure overwrite, writing only this key without triggering any sync."
-  "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。": "Checked: once the target caps out this item locks (the overview shows — and becomes read-only).\nUnchecked: the item displays and edits normally even when the target is full; increments just stop writing to the capped target."
-  "包含": "Contains"
-  "单向增加": "Increase-only"
-  "原 key 已不存在，请重新打开编辑对话框": "The original key no longer exists. Reopen the editor"
-  "原分组已被移除，请重新选择": "The original group was removed; pick again"
-  "参数来源：全局参数": "Parameter source: global parameters"
-  "参数来源：独立参数": "Parameter source: per-user parameters"
-  "双击修改来源": "Double-click to edit the source"
-  "取消本项「满值锁定」后可继续记录，增量不再写入已满目标": "Uncheck this item's \"full-value lock\" to keep recording; increments stop writing to the capped target"
-  "取消这个条件": "Remove this condition"
-  "变动规则": "Change rules"
-  "变动规则第 {row} 行至少添加一个快捷数量": "Change rule row {row} needs at least one quick amount"
-  "变动规则第 {row} 行设置了快捷数量，请填写来源或用途": "Change rule row {row} has quick amounts; fill in the source or use"
-  "变动量": "Delta"
-  "变动量：{value}": "Delta: {value}"
-  "变更类型：{label}": "Change type: {label}"
-  "变更脚本": "Change script"
-  "变更脚本不存在: workflows/{path}": "Change script doesn't exist: workflows/{path}"
-  "变更记录": "Change History"
-  "另有 {count} 项未列出，输入可搜索": "{count} more items not listed; type to search"
-  "同步:{sync}": "Sync: {sync}"
-  "同步修改": "Sync changes"
-  "同步变更依赖方": "Sync dependent parties of the change"
-  "同步来源": "Synced From"
-  "同步来源：{value}": "Sync source: {value}"
-  "同步目标": "Sync targets"
-  "同步目标 {targets} 已达上限": "Sync target {targets} has reached its cap"
-  "同步目标不能指向自身": "Sync targets cannot point at themselves"
-  "周": "weeks"
-  "周一": "Mon"
-  "周三": "Wed"
-  "周二": "Tue"
-  "周五": "Fri"
-  "周六": "Sat"
-  "周四": "Thu"
-  "周期": "Cycle"
-  "回到打开这个对话框时的默认范围": "Back to the default range from when this dialog opened"
-  "增加": "Increase"
-  "增加 {value}": "Increase {value}"
-  "增加...": "Increase..."
-  "增加量": "Increase amount"
-  "增量": "Delta"
-  "增量（正增负减）": "Delta (positive adds, negative subtracts)"
-  "复制定义": "Duplicate Definition"
-  "定义数据模型 key": "Define Data-Model Keys"
-  "定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。": "Defines the data model's keys. Double-click non-group columns to edit; right-click to change groups in bulk."
-  "实时/{unit}": "Realtime/{unit}"
-  "实时:{val}/{unit}": "Realtime: {val}/{unit}"
-  "实时恢复": "Realtime restore"
-  "小时": "hours"
-  "展示上限": "Display cap"
-  "展示总和行": "Show total row"
-  "工作流语法正确": "Workflow syntax OK"
-  "当前值: {val}": "Current value: {val}"
-  "当前分组没有可添加的字段": "The current group has no fields to add"
-  "当前显示全部记录": "Showing all records"
-  "当前用户已锁定": "Locked for the current user"
-  "快捷数量": "Quick amounts"
-  "快捷规则:{count}项": "Quick rules: {count}"
-  "总和": "Total"
-  "恢复入口范围": "Restore Entry Scope"
-  "恢复类型": "Restore type"
-  "按{title}筛选": "Filter by {title}"
-  "搜索 值 / 来源 / 用户 / 键": "Search value / source / user / key"
-  "搜索{title}（可输入未列出的值）": "Search {title} (values not listed can be typed)"
-  "搜索字段名称或 key": "Search field names or keys"
-  "搜索：{value}": "Search: {value}"
-  "撤销失败": "Undo failed"
-  "支持小数": "Decimals supported"
-  "数值无效": "Invalid number"
-  "数据变化后执行；路径相对于 workflows 目录": "Runs after data changes; path relative to the workflows directory"
-  "数据模型": "Data Model"
-  "新值": "New Value"
-  "新值包含：{value}": "New value contains: {value}"
-  "新名称": "New name"
-  "新增": "Add"
-  "新增便利贴": "New Sticky Note"
-  "新增列": "Add Column"
-  "新建分组": "New Group"
-  "无上限": "No cap"
-  "旧值": "Old Value"
-  "旧值包含：{value}": "Old value contains: {value}"
-  "时间": "Time"
-  "时间：{value}": "Time: {value}"
-  "暂无便利贴": "No sticky notes"
-  "更改分组": "Change Group"
-  "未完成": "Incomplete"
-  "未记录": "Not recorded"
-  "未记录设备": "Unrecorded device"
-  "末页": "Last Page"
-  "本机": "This PC"
-  "条": "records"
-  "来源": "Source"
-  "来源/用途": "Source/Use"
-  "来源（增加）": "Source (increase)"
-  "来源：{value}": "Source: {value}"
-  "查看全部用户、全部 key 的变更记录": "View change history for all users and all keys"
-  "查看历史记录": "View History"
-  "标签": "Label"
-  "校验": "Validate"
-  "校验失败": "Validation Failed"
-  "橙色阈值": "Orange threshold"
-  "橙警:>={val}": "Orange alert: >={val}"
-  "每次恢复": "Each restore"
-  "每页": "Per page"
-  "没有可用的数据模型 key，请先在数据模型定义中添加": "No data-model keys available; add some in the data-model definition first"
-  "没有符合筛选条件的记录": "No records match the filters"
-  "添加同步目标": "Add Sync Target"
-  "添加来源": "Add Source"
-  "添加用途": "Add Use"
-  "添加（{count}）": "Add ({count})"
-  "清空选择": "Clear Selection"
-  "清除": "Clear"
-  "清除全部筛选": "Clear All Filters"
-  "满值锁定": "Full-value lock"
-  "点击更改分组": "Click to change the group"
-  "用户 {name}": "User {name}"
-  "用户数据模型定义": "User Data Model Definition"
-  "用途": "Use"
-  "用途（减少）": "Use (decrease)"
-  "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。": "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndoing writes a new reversed record."
-  "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。": "Permanently delete this history record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nDelta: {delta}\n\nDeletes history only — current values stay and no deletion record is added. This cannot be undone; deleting acquisition records may free source quotas accumulated from history."
-  "确定要删除 key '{key}' 吗？": "Delete key '{key}'?"
-  "确定要删除分组 '{name}' 吗？": "Delete group '{name}'?"
-  "确定要删除这条便利贴吗？": "Delete this sticky note?"
-  "确认撤销": "Confirm Undo"
-  "确认重命名": "Confirm Rename"
-  "第 {page} / {pages} 页 · {start}–{end} 条": "Page {page} / {pages} · records {start}–{end}"
-  "类型：{value}": "Type: {value}"
-  "红色阈值": "Red threshold"
-  "红警:>={val}": "Red alert: >={val}"
-  "编辑便利贴": "Edit Sticky Note"
-  "编辑当前列": "Edit Current Column"
-  "自定义增量 - {label}": "Custom delta - {label}"
-  "至少保留一个分组": "Keep at least one group"
-  "覆写 - {label}": "Overwrite - {label}"
-  "覆写...": "Overwrite..."
-  "覆盖": "Overwrite"
-  "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。": "Remove {user}'s lock on \"{label}\"?\nAfter unlocking, automated tasks will read and update this key again."
-  "设备：{value}": "Device: {value}"
-  "该任务没有可配置参数": "This task has no configurable parameters"
-  "该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。": "The value was updated by another process; this delta was not written. Refresh and try again."
-  "该条历史记录已发生变化，请刷新后重试": "That history record has changed; refresh and try again"
-  "该用户使用全局参数": "This user uses global parameters"
-  "该用户使用独立参数": "This user uses per-user parameters"
-  "该用户已保存独立参数，任务运行时优先使用下列值。": "This user has saved per-user parameters; the values below take priority at runtime."
-  "该用户未设置独立参数，任务运行时使用全局参数。": "This user has no per-user parameters; global parameters apply at runtime."
-  "详情摘要": "Detail Summary"
-  "请停止所有任务后再重命名 Profile key": "Stop all tasks before renaming a Profile key"
-  "请先选择变更脚本": "Select a change script first"
-  "请先选择用户": "Select a user first"
-  "请输入 Key": "Enter a key"
-  "请输入{field}": "Enter {field}"
-  "请输入标签": "Enter a label"
-  "请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件": "Pick a .wf file under config/system/workflows or config/local/workflows"
-  "读取便利贴失败：{error}": "Failed to read sticky notes: {error}"
-  "跳至": "Go to"
-  "软上限": "Soft cap"
-  "输入错误": "Input Error"
-  "近 30 天": "Last 30 days"
-  "近 7 天": "Last 7 days"
-  "近 90 天": "Last 90 days"
-  "选择...": "Select..."
-  "选择变更脚本": "Select Change Script"
-  "选择字段": "Select Field"
-  "速率单位": "Rate unit"
-  "速率数值": "Rate value"
-  "重命名分组": "Rename Group"
-  "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
-  "重新读取用户数据": "Reload User Data"
-  "重置:{time}": "Reset: {time}"
-  "重置日(几号)": "Reset day (day of month)"
-  "重置日(周几)": "Reset day (weekday)"
-  "重置日:{day}": "Reset day: {day}"
-  "重置日:{day}号": "Reset day: the {day}th"
-  "重置时刻": "Reset time"
-  "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。": "Lock \"{label}\" for {user}?\nOnce locked the engine ignores this value: automated tasks stop reading or writing it, periodic resets stop, and the value stays at its current state.\nRight-click to unlock any time."
-  "错误": "Error"
-  "键": "Key"
-  "键：{label}": "Key: {label}"
-  "键：{value}": "Key: {value}"
-  "首页": "First Page"
-  "默认": "Default"
-  "（清空）": "(empty)"
-  "（请选择）": "(select one)"
-  "＋ 添加便利贴": "＋ Add Sticky Note"
+all_user_params:
+  上一个: Previous
+  下一个: Next
+  参数来源：全局参数: 'Parameter source: global parameters'
+  参数来源：独立参数: 'Parameter source: per-user parameters'
+  该用户使用全局参数: This user uses global parameters
+  该用户使用独立参数: This user uses per-user parameters
+  该用户已保存独立参数，任务运行时优先使用下列值。: This user has saved per-user parameters; the values below take priority at runtime.
+  该用户未设置独立参数，任务运行时使用全局参数。: This user has no per-user parameters; global parameters apply at runtime.
+  激活码已被云端停用: License code has been disabled in the cloud
+common:
+  allowed: Latest check passed
+  change_type_tip: 'Change type: {label}'
+  checking: Checking cloud member authorization
+  chip_delta: 'Change: {value}'
+  chip_key: 'Key: {value}'
+  chip_keyword: 'Search: {value}'
+  chip_new_text: 'New value contains: {value}'
+  chip_old_text: 'Old value contains: {value}'
+  chip_source: 'Source: {value}'
+  chip_sync_from: 'Sync source: {value}'
+  chip_time: 'Time: {value}'
+  chip_type: 'Type: {value}'
+  chip_user: 'User: {value}'
+  claim_disabled: License code has been disabled in the cloud
+  claim_expired: License code has expired
+  claim_other: License code is bound to another device
+  claim_pending: License code has not been bound online
+  claim_unregistered: License code is not registered; contact the issuer
+  clear_filters: Clear all filters
+  contains: contains
+  delete_confirm_message: "Delete this history row permanently?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nChange: {delta}\n\nOnly the history row is removed; current values stay. This cannot be undone; deleting a gain row may release a quota accumulated from history."
+  delete_history_only_tip: Deletes the history row only; current values stay; history-based quotas change
+  delta_column: Change
+  delta_decrease: Decrease
+  delta_increase: Increase
+  delta_zero: Zero
+  denied: 'Cloud authorization denied: unregistered, disabled, expired, or insufficient level'
+  disabled: License code has been disabled in the cloud
+  done: Done
+  empty_result: No records match the filters
+  expired: Cloud authorization for the license code has expired
+  facet_all_tip: Filter by {title}
+  facet_more_hint: '{count} more not listed; type to search'
+  facet_multi_label: '{first} +{rest}'
+  facet_search_placeholder: Search {title} (type values not listed)
+  first_page: First
+  invalid: Invalid member authorization request
+  jump_page: Go to
+  key_column: Key
+  keyword_placeholder: Search values / sources / users / keys
+  label: Online member authorization
+  last_page: Last
+  level: License level is insufficient for this member package
+  member_expired: Member authorization has expired
+  multi_value_summary: '{noun} · {count} selected'
+  next_page: Next
+  no_package: No member package matches this version; cloud authorization has not been checked
+  not_recorded: Not recorded
+  package: Member package is missing or disabled
+  package_denied: Cloud member package unavailable or license level insufficient
+  page_status: Page {page} / {pages} · {start}–{end}
+  page_unit: rows
+  per_page: Per page
+  previous_page: Previous
+  read_failed: Read Failed
+  remove_condition: Remove this condition
+  restore_scope: Restore entry scope
+  restore_scope_tip: Go back to the range this dialog opened with
+  scope_key: 'Key: {label}'
+  scope_user: User {name}
+  showing_all: Showing all records
+  source_edit_tip: Double-click to edit the source
+  source_update_conflict: This record has changed; refresh and try again
+  source_update_failed: Update Failed
+  summary_gained: Increase {value}
+  summary_spent: Decrease {value}
+  sync_from_column: Sync Source
+  time_custom: Custom
+  time_month: Last 30 days
+  time_quarter: Last 90 days
+  time_today: Today
+  time_week: Last 7 days
+  total_records: '{total} records'
+  type_increment: Increment
+  type_overwrite: Overwrite
+  unavailable: Online check incomplete; review configuration sync logs and retry
+  unchecked: Not checked; cloud authorization is not confirmed
+  undo: Undo
+  undo_confirm_message: "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndo writes a new record in the opposite direction."
+  undo_confirm_title: Confirm Undo
+  undo_failed: Undo Failed
+  unregistered: License code has not been registered in the cloud
+  version: Application version does not meet member package requirements
+  便利贴内容: Sticky note content
+  准点周期: Reset cycle
+  减少量: Decrease amount
+  变动规则: Change rules
+  变更脚本: Change script
+  同步目标: Sync targets
+  增加量: Increase amount
+  增量（正增负减）: Delta (positive adds, negative subtracts)
+  恢复类型: Restore type
+  新名称: New name
+  未记录: Not recorded
+  来源: Source
+  橙色阈值: Orange threshold
+  每次恢复: Each restore
+  红色阈值: Red threshold
+  速率单位: Rate unit
+  速率数值: Rate value
+  重命名分组: Rename Group
+  重置日(几号): Reset day (day of month)
+  重置日(周几): Reset day (weekday)
+  重置时刻: Reset time
+  默认: Default
+daily_history:
+  清除: Clear
+profile:
+  Key '{key}' 已在该分组中显示: Key '{key}' is already shown in this group
+  Key '{key}' 已存在: Key '{key}' already exists
+  Key 只能包含字母、数字和下划线: Keys may contain only letters, digits and underscores
+  Profile 关联脚本处理中（待处理 {count}）: Profile-related scripts processing ({count} pending)
+  '{field}不能大于 999999': '{field} cannot exceed 999999'
+  '{field}不能小于 {min}': '{field} cannot be less than {min}'
+  '{field}必须是有效数字': '{field} must be a valid number'
+  '{first} +{rest}': '{first} +{rest}'
+  '{label} 必须是整数': '{label} must be an integer'
+  '{noun} · {count} 项': '{noun} · {count} items'
+  '{title} Key ({model})': '{title} Key ({model})'
+  一次只能复制一条定义: Only one definition can be copied at a time
+  上一页: Previous Page
+  下一页: Next Page
+  不提醒: Don't remind
+  为零: Zero
+  仅删除历史，不修改当前值；会影响按历史统计的额度: Deletes history only, leaving current values unchanged; affects quotas that accumulate from history
+  今天: Today
+  便利贴: Sticky Note
+  便利贴内容不能超过 {limit} 个字符: Sticky note content cannot exceed {limit} characters
+  保存便利贴失败：{error}: 'Failed to save the sticky note: {error}'
+  倍率: Multiplier
+  全选当前结果: Select All Results
+  共 {total} 条: '{total} records total'
+  其他设备: Other Devices
+  写入冲突: Write Conflict
+  准点/{unit}: At reset/{unit}
+  准点:{val}/{period}: 'At reset: {val}/{period}'
+  准点恢复: Restore at reset
+  减少: Decrease
+  减少 {value}: Decrease {value}
+  减少...: Decrease...
+  '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）': 'The value after decreasing cannot go below 0 (current: {cur}, entered: {inp})'
+  分组名不能为空: Group name cannot be empty
+  分钟: minutes
+  删除便利贴失败：{error}: 'Failed to delete the sticky note: {error}'
+  勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: When checked the script runs before the write lands; a rejection or failure rolls back the whole sync write chain. Unchecked, it queues after commit. Sync scripts should be short — not for long waits.
+  ? "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
+  : "Checked: handled as an action, triggering sync of the config's sync_targets.\nUnchecked: handled as a pure overwrite, writing only this key without triggering any sync."
+  ? "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"
+  : "Checked: once the target caps out this item locks (the overview shows — and becomes read-only).\nUnchecked: the item displays and edits normally even when the target is full; increments just stop writing to the capped target."
+  包含: Contains
+  单向增加: Increase-only
+  原 key 已不存在，请重新打开编辑对话框: The original key no longer exists. Reopen the editor
+  原分组已被移除，请重新选择: The original group was removed; pick again
+  双击修改来源: Double-click to edit the source
+  取消本项「满值锁定」后可继续记录，增量不再写入已满目标: Uncheck this item's "full-value lock" to keep recording; increments stop writing to the capped target
+  取消这个条件: Remove this condition
+  变动规则第 {row} 行至少添加一个快捷数量: Change rule row {row} needs at least one quick amount
+  变动规则第 {row} 行设置了快捷数量，请填写来源或用途: Change rule row {row} has quick amounts; fill in the source or use
+  变动量: Delta
+  变动量：{value}: 'Delta: {value}'
+  变更类型：{label}: 'Change type: {label}'
+  '变更脚本不存在: workflows/{path}': "Change script doesn't exist: workflows/{path}"
+  变更记录: Change History
+  另有 {count} 项未列出，输入可搜索: '{count} more items not listed; type to search'
+  同步:{sync}: 'Sync: {sync}'
+  同步修改: Sync changes
+  同步变更依赖方: Sync dependent parties of the change
+  同步来源: Synced From
+  同步来源：{value}: 'Sync source: {value}'
+  同步目标 {targets} 已达上限: Sync target {targets} has reached its cap
+  同步目标不能指向自身: Sync targets cannot point at themselves
+  周: weeks
+  周一: Mon
+  周三: Wed
+  周二: Tue
+  周五: Fri
+  周六: Sat
+  周四: Thu
+  周期: Cycle
+  回到打开这个对话框时的默认范围: Back to the default range from when this dialog opened
+  增加: Increase
+  增加 {value}: Increase {value}
+  增加...: Increase...
+  增量: Delta
+  复制定义: Duplicate Definition
+  定义数据模型 key: Define Data-Model Keys
+  定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Defines the data model's keys. Double-click non-group columns to edit; right-click to change groups in bulk.
+  实时/{unit}: Realtime/{unit}
+  实时:{val}/{unit}: 'Realtime: {val}/{unit}'
+  实时恢复: Realtime restore
+  小时: hours
+  展示上限: Display cap
+  展示总和行: Show total row
+  工作流语法正确: Workflow syntax OK
+  '当前值: {val}': 'Current value: {val}'
+  当前分组没有可添加的字段: The current group has no fields to add
+  当前显示全部记录: Showing all records
+  当前用户已锁定: Locked for the current user
+  快捷数量: Quick amounts
+  快捷规则:{count}项: 'Quick rules: {count}'
+  总和: Total
+  恢复入口范围: Restore Entry Scope
+  按{title}筛选: Filter by {title}
+  搜索 值 / 来源 / 用户 / 键: Search value / source / user / key
+  搜索{title}（可输入未列出的值）: Search {title} (values not listed can be typed)
+  搜索字段名称或 key: Search field names or keys
+  搜索：{value}: 'Search: {value}'
+  撤销失败: Undo failed
+  支持小数: Decimals supported
+  数值无效: Invalid number
+  数据变化后执行；路径相对于 workflows 目录: Runs after data changes; path relative to the workflows directory
+  数据模型: Data Model
+  新值: New Value
+  新值包含：{value}: 'New value contains: {value}'
+  新增: Add
+  新增便利贴: New Sticky Note
+  新增列: Add Column
+  新建分组: New Group
+  无上限: No cap
+  旧值: Old Value
+  旧值包含：{value}: 'Old value contains: {value}'
+  时间: Time
+  时间：{value}: 'Time: {value}'
+  暂无便利贴: No sticky notes
+  更改分组: Change Group
+  未完成: Incomplete
+  未记录设备: Unrecorded device
+  末页: Last Page
+  本机: This PC
+  条: records
+  来源/用途: Source/Use
+  来源（增加）: Source (increase)
+  来源：{value}: 'Source: {value}'
+  查看全部用户、全部 key 的变更记录: View change history for all users and all keys
+  查看历史记录: View History
+  标签: Label
+  校验: Validate
+  校验失败: Validation Failed
+  橙警:>={val}: 'Orange alert: >={val}'
+  每页: Per page
+  没有可用的数据模型 key，请先在数据模型定义中添加: No data-model keys available; add some in the data-model definition first
+  没有符合筛选条件的记录: No records match the filters
+  添加同步目标: Add Sync Target
+  添加来源: Add Source
+  添加用途: Add Use
+  添加（{count}）: Add ({count})
+  清空选择: Clear Selection
+  清除全部筛选: Clear All Filters
+  满值锁定: Full-value lock
+  点击更改分组: Click to change the group
+  用户 {name}: User {name}
+  用户头像: User Avatar
+  用户数据模型定义: User Data Model Definition
+  用途: Use
+  用途（减少）: Use (decrease)
+  ? "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。"
+  : "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndoing writes a new reversed record."
+  ? "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。"
+  : "Permanently delete this history record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nDelta: {delta}\n\nDeletes history only — current values stay and no deletion record is added. This cannot be undone; deleting acquisition records may free source quotas accumulated from history."
+  确定要删除 key '{key}' 吗？: Delete key '{key}'?
+  确定要删除分组 '{name}' 吗？: Delete group '{name}'?
+  确定要删除这条便利贴吗？: Delete this sticky note?
+  确认撤销: Confirm Undo
+  确认重命名: Confirm Rename
+  第 {page} / {pages} 页 · {start}–{end} 条: Page {page} / {pages} · records {start}–{end}
+  类型：{value}: 'Type: {value}'
+  红警:>={val}: 'Red alert: >={val}'
+  编辑便利贴: Edit Sticky Note
+  编辑当前列: Edit Current Column
+  自定义增量 - {label}: Custom delta - {label}
+  至少保留一个分组: Keep at least one group
+  覆写 - {label}: Overwrite - {label}
+  覆写...: Overwrite...
+  覆盖: Overwrite
+  ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
+  : "Remove {user}'s lock on \"{label}\"?\nAfter unlocking, automated tasks will read and update this key again."
+  设备：{value}: 'Device: {value}'
+  该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: The value was updated by another process; this delta was not written. Refresh and try again.
+  该条历史记录已发生变化，请刷新后重试: That history record has changed; refresh and try again
+  详情摘要: Detail Summary
+  请停止所有任务后再重命名 Profile key: Stop all tasks before renaming a Profile key
+  请先选择变更脚本: Select a change script first
+  请先选择用户: Select a user first
+  请输入 Key: Enter a key
+  请输入{field}: Enter {field}
+  请输入标签: Enter a label
+  请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件: Pick a .wf file under config/system/workflows or config/local/workflows
+  读取便利贴失败：{error}: 'Failed to read sticky notes: {error}'
+  跳至: Go to
+  软上限: Soft cap
+  输入错误: Input Error
+  近 30 天: Last 30 days
+  近 7 天: Last 7 days
+  近 90 天: Last 90 days
+  选择...: Select...
+  选择变更脚本: Select Change Script
+  选择字段: Select Field
+  ? "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？"
+  : "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
+  重新读取用户数据: Reload User Data
+  重置:{time}: 'Reset: {time}'
+  重置日:{day}: 'Reset day: {day}'
+  重置日:{day}号: 'Reset day: the {day}th'
+  ? "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。"
+  : "Lock \"{label}\" for {user}?\nOnce locked the engine ignores this value: automated tasks stop reading or writing it, periodic resets stop, and the value stays at its current state.\nRight-click to unlock any time."
+  键: Key
+  键：{label}: 'Key: {label}'
+  键：{value}: 'Key: {value}'
+  首页: First Page
+  （清空）: (empty)
+  （请选择）: (select one)
+  ＋ 添加便利贴: ＋ Add Sticky Note
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: A Profile change script is still running; wait for the queue to finish before renaming
+  '下一点恢复: 已达上限': 'Next-point restore: cap reached'
+  便利贴内容不能为空: Sticky note content cannot be empty
+  ? "保存 profile.yaml 失败:\n{e}"
+  : "Failed to save profile.yaml:\n{e}"
+  删除当前列: Delete Current Column
+  升序: Ascending
+  右侧新增列: Add column on the right
+  ? "回写用户数据失败:\n{e}"
+  : "Failed to write user data:\n{e}"
+  库存: Inventory
+  开启后允许输入小数，UI 使用 DoubleValidator: When checked, decimals are allowed (UI uses DoubleValidator)
+  当前配置: Current Config
+  '恢复类型: 准点恢复': 'Restore type: at reset'
+  '恢复类型: 实时恢复': 'Restore type: realtime'
+  无法编辑: Cannot edit
+  橙色: Orange
+  正向: Positive
+  用户总览: User Overview
+  用户：{value}: 'User: {value}'
+  红色: Red
+  编辑备注 - {label}: Edit note - {label}
+  编辑文本...: Edit text...
+  负向: Negative
+  配额: Quota
+  降序: Descending
+run_control:
+  错误: Ошибка
+profile_service:
+  profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: profile.yaml uses the old format (with fields/groups); update it manually to the new format
+  仅可撤销写入记录: Only write records can be undone
+  全向: Omni
+  再生: Regenerate
+loadout:
+  删除方案: Delete Plan

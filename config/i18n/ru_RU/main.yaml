@@ -1,280 +1,441 @@
-auto_strings:
-  "[加载] 已加载工作流: ": "[Loaded] Workflow loaded: "
-  "[启动失败] {name}：{message}": "[Start failed] {name}: {message}"
-  "[定位刷新] {name} · {old} → {new} · {details}": "[Re-located] {name} · {old} → {new} · {details}"
-  "[定位失效] {name}：{message}": "[Location lost] {name}: {message}"
-  "[定位失败] {message}": "[Locate failed] {message}"
-  "[录屏] 仅流式截图模式支持录屏": "[Recording] Screen recording is only supported in streaming screenshot mode"
-  "[录屏] 保存失败（详见日志）": "[Recording] Save failed (see log for details)"
-  "[录屏] 启动失败（详见日志）": "[Recording] Failed to start (see log for details)"
-  "[录屏] 已放弃本次录制，文件已删除": "[Recording] Recording discarded, file deleted"
-  "[录屏] 无法获取画面尺寸": "[Recording] Failed to get frame size"
-  "[截图] 后台截图不可用：": "[Capture] Background capture unavailable: "
-  "[截图] 后台截图启动失败，保留原截图方式": "[Capture] Background capture failed to start; keeping the original capture method"
-  "[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）": "[Capture] Background capture failed; fell back to foreground capture (unavailable when minimized)"
-  "[截屏] PNG 编码失败": "[Screenshot] PNG encoding failed"
-  "[截屏] 截屏失败：无可用画面": "[Screenshot] Failed: no frame available"
-  "[执行目标] 已切换到 {name}": "[Target] Switched to {name}"
-  "[执行目标] 当前方案不适用，已自动切换到「{name}」": "[Target] The current plan doesn't apply; switched to \"{name}\""
-  "[扫描] 局域网内未发现可连接的 ADB 设备": "[Scan] No connectable ADB device found on the LAN"
-  "[扫描] 本机未发现开放的模拟器 ADB 端口": "[Scan] No open emulator ADB ports found on this machine"
-  "[扫描] 正在探测本机模拟器 ADB 端口...": "[Scan] Probing local emulator ADB ports..."
-  "[拒绝] 已有自动化在运行中，请等待结束": "[Rejected] An automation is already running; wait for it to finish"
-  "[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的「{name}」是同一台设备。请先断开该目标再连接。": "[Rejected] Cannot read a stable device identity for {serial}; it may be the same device as the connected \"{name}\". Disconnect that target first."
-  "[提示] 上次选中的方案已不存在，已回到自定义": "[Notice] The previously selected plan no longer exists; back to Custom"
-  "[提示] 已收起恢复提示，任务仍在等待通道恢复；可点顶部横幅「重新检查」或按 F10 停止": "[Notice] Prompt hidden; the task still waits for the channel. Use the banner \"Re-check\" or press F10 to stop."
-  "[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」": "[Notice] The current platform doesn't support window-mirroring mode; use \"Scan Devices\" instead"
-  "[提示] 当前没有正在运行的自动化": "[Notice] No automation is currently running"
-  "[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用": "[Notice] The {missing} of plan \"{name}\" no longer exists; it was not fully applied"
-  "[提示] 未发现 USB 连接的 ADB 设备": "[Notice] No USB-connected ADB device found"
-  "[提示] 没有适用于当前执行目标的方案，请配置连接方案": "[Notice] No plan applies to the current execution target; configure a connection plan"
-  "[提示] 窗口目标正在执行任务，不能重新定位": "[Notice] The window target is running a task; cannot re-locate"
-  "[提示] 该目标正在执行任务，不能切换截图方式": "[Notice] This target is running a task; cannot switch the capture method"
-  "[提示] 该目标正在执行任务，不能切换输入方式": "[Notice] This target is running a task; cannot switch the input method"
-  "[提示] 该目标正在执行任务，不能断开": "[Notice] This target is running a task; cannot disconnect"
-  "[提示] 选中的方案已不存在，已回到自定义": "[Notice] The selected plan no longer exists; back to Custom"
-  "[操作] ": "[Action] "
-  "[操作] 停止等待恢复的任务": "[Action] Stop the task waiting for recovery"
-  "[操作] 已停止": "[Action] Stopped"
-  "[操作] 已恢复，继续执行...": "[Action] Resumed, continuing..."
-  "[操作] 收到停止请求": "[Action] Stop request received"
-  "[操作] 重新检查执行通道": "[Action] Re-check the execution channel"
-  "[操作] 重新检查设备执行通道": "[Action] Re-checking the device execution channel"
-  "[模式] {name} 已切换到{mode}": "[Mode] {name} switched to {mode}"
-  "[警告] {name} 画面流中断：{reason}": "[Warning] {name} screen stream interrupted: {reason}"
-  "[警告] 以下 {n} 个脚本文件存在问题，请在脚本编辑器中修正：": "[Warning] These {n} script files have problems; fix them in the script editor:"
-  "[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；若无法恢复，请按 F10 停止任务后重新连接: {error}": "[Warning] The execution channel awaits confirmation; fix {name}'s problem and click Re-check. If it can't be recovered, press F10 to stop the task and reconnect: {error}"
-  "[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标": "[Warning] This device provides no stable identity; USB and wireless connections will be treated as two targets"
-  "[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input": "[On-device Execution] App is unreachable or no on-device execution channel is ready; falling back to adb shell input"
-  "[错误] {method} 截图后端不可用，保留原截图方式": "[Error] The {method} capture backend is unavailable; keeping the original capture method"
-  "[错误] 当前环境不支持以下脚本：": "[Error] The current environment doesn't support these scripts:"
-  "[错误] 未找到可见窗口": "[Error] No visible window found"
-  "[错误] 请先定位窗口": "[Error] Please locate a window first"
-  "[错误] 请先连接并选择执行目标": "[Error] Connect and select an execution target first"
-  "[错误] 请先连接设备": "[Error] Please connect a device first"
-  "[错误] 请选择一个工作流": "[Error] Please select a workflow"
-  "[错误] 请选择有效的执行用户": "[Error] Select a valid user to run as"
-  "[预览] 刷新失败：无可用画面": "[Preview] Refresh failed: no frame available"
-  "{input_mode} · {capture_mode}": "{input_mode} · {capture_mode}"
-  "{method} 截图后端不可用": "The {method} capture backend is unavailable"
-  "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。": "The screen stream of {name} was interrupted and automatic recovery failed.\n{error}\n\nCheck the phone (screen off, game switched away, USB or wireless link) and choose Yes to re-check, or No to stop this task. Closing this prompt does not stop the task; the banner stays."
-  "{name} 的连接恢复未完成。\n{error}\n\n请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。": "{name}'s connection recovery is incomplete.\n{error}\n\nRestore the ADB/phone-agent connection and choose Yes to re-check, or No to stop this target's task."
-  "⏸ 暂停": "⏸ Pause"
-  "■ 停止": "■ Stop"
-  "▶ 继续": "▶ Resume"
-  "● 录屏": "● Record"
-  "⚠ 执行通道等待确认：处理问题后点击「重新检查」；无法恢复时请按 F10 停止任务": "⚠ The execution channel awaits confirmation: fix the issue and click \"Re-check\"; press F10 to stop the task if it can't be recovered"
-  "⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务": "⚠ Screen stream interrupted: fix it, then click \"Re-check\"; press F10 to stop if it cannot be recovered"
-  "⚠ 画面流已中断：点「重新检查」重试，或断开重连设备": "⚠ Screen stream interrupted: click \"Re-check\" to retry, or disconnect and reconnect the device"
-  "【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，": "[Emulator Aspect Ratio] If the target emulator has no built-in 20:9 preset,"
-  "【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，": "[Important] When using a PC emulator (e.g. MuMu, LDPlayer) you must select \"Android\","
-  "仅流式截图模式支持录屏": "Screen recording is only supported in streaming capture mode"
-  "以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。": "These tasks haven't finished safely, so the program won't close yet:\n{tasks}\n\nTry closing again later; if a task is stuck, force-quit LvJiang from the system."
-  "任务仍在收尾": "Tasks are still finishing"
-  "任务暂停中，是否直接停止？": "Task is paused. Stop it now?"
-  "任务运行中": "Task running"
-  "使用独立参数": "Use per-user parameters"
-  "停止中... | 等待当前步骤结束": "Stopping... | Waiting for the current step to finish"
-  "停止任务": "Stop Task"
-  "全部任务": "All Tasks"
-  "全部分组": "All Groups"
-  "公告": "Announcements"
-  "关于": "About"
-  "关闭程序": "Close the Program"
-  "切换到浅色主题": "Switch to light theme"
-  "切换到深色主题": "Switch to dark theme"
-  "切换截图方式": "Switch Screenshot Method"
-  "切换日志显示级别：低于选中级别的日志将被隐藏": "Switch log level: logs below the selected level will be hidden"
-  "刷新位置": "Refresh Position"
-  "前台截图": "Foreground Capture"
-  "前台输入": "Foreground Input"
-  "加载": "Load"
-  "加载工作流文件": "Load Workflow File"
-  "单帧截图": "Single-Frame Capture"
-  "占用目标 {target}，运行 {run_id}": "Target {target} occupied, run {run_id}"
-  "参数保存失败，本次批量未启动：{error}": "Failed to save parameters; the batch didn't start: {error}"
-  "参数保存失败，请检查配置文件权限或占用后重试：{error}": "Failed to save parameters; check config file permissions or locks and retry: {error}"
-  "参数设置": "Parameter Settings"
-  "参数设置（{name}独立）": "Parameters ({name}, per-user)"
-  "参数设置（共享）": "Parameters (shared)"
-  "反馈": "Feedback"
-  "取一帧、更新预览并保存到 data/capture/picture": "Capture a frame, update the preview, and save it to data/capture/picture"
-  "取消中...": "Cancelling..."
-  "取消扫描": "Cancel Scan"
-  "另有 {count} 个任务运行": "{count} other tasks running"
-  "可采用自定义设置 2000:900（等效 20:9）。": "You can use a custom 2000:900 setting (equivalent to 20:9)."
-  "后台截图": "Background Capture"
-  "后台输入": "Background Input"
-  "否则导航流程会因输入方式不匹配而失败。": "otherwise the navigation flow will fail due to a mismatched input method."
-  "启动中": "Starting"
-  "启动失败": "Startup Failed"
-  "图像已复制到剪贴板，可用 Ctrl+V 粘贴": "Image copied to clipboard; paste with Ctrl+V"
-  "图库": "Gallery"
-  "图库已刷新": "Gallery Refreshed"
-  "地图管理": "Map Manager"
-  "备战方案扫描失败，请查看逐方案结果和导航提示": "Loadout scan failed; see per-plan results and navigation hints"
-  "复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件": "Copy the preview's original image to the clipboard (paste with Ctrl+V); nothing is saved to disk"
-  "安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入": "Android (android): phone or emulator, uses ADB screenshot + touch input"
-  "定位": "Locate"
-  "定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效": "After locating, the red border shows for 1 second; check this to keep it visible until disconnect (this run only)"
-  "定位窗口后自动截屏": "Auto-screenshot after locating the window"
-  "实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。\n用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效": "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted.\nCaptures via Windows Graphics Capture so the game window can be occluded by others; still unavailable when minimized. This run only"
-  "局域网内未发现可连接的 ADB 设备。\n\n请确认：\n1. 设备与电脑在同一局域网\n2. 设备已开启无线调试（开发者选项）\n3. 多网卡时可在下拉框改选目标网段，或改用本地扫描": "No connectable ADB device found on the LAN.\n\nCheck:\n1. The device is on the same LAN as this PC\n2. Wireless debugging is enabled on the device (developer options)\n3. With multiple NICs, pick the right subnet in the dropdown, or use local scan"
-  "展示分组，仅筛选脚本列表": "Display group; only filters the script list"
-  "工作流文件 (*.wf);;所有文件 (*)": "Workflow files (*.wf);;All files (*)"
-  "工作流文件不存在: {path}": "Workflow file does not exist: {path}"
-  "工作流确认": "Workflow Confirmation"
-  "工作流输入": "Workflow Input"
-  "工作流运行中": "Workflow running"
-  "工具": "Tools"
-  "已刷新窗口位置": "Window position refreshed"
-  "已取消扫描": "Scan cancelled"
-  "已扫描窗口 | 请下拉选择目标窗口并点击定位": "Windows scanned | Pick a target window and click Locate"
-  "已扫描设备 | 请选择设备并点击连接": "Devices scanned | Pick a device and click Connect"
-  "已断开目标：{name}": "Disconnected target: {name}"
-  "已是最新版本": "Already up to date"
-  "已暂停": "Paused"
-  "已最小化到状态栏，双击图标或右键「打开主界面」可恢复。": "Minimized to the tray; double-click the icon or right-click -> \"Open Main Window\" to restore."
-  "已有任务运行": "A task is already running"
-  "已离线": "Offline"
-  "已连接": "Connected"
-  "布局": "Layout"
-  "帮助": "Help"
-  "开始": "Start"
-  "开始执行": "Start"
-  "当前工作环境 {env} 不在该脚本支持的环境 {envs} 中": "The current environment {env} is not among the environments this script supports ({envs})"
-  "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的 {tolerance}。": "The current layout's canvas size doesn't meet the declared requirement; fix the layout and retry.\n\nLayout \"{layout}\" requires a canvas aspect of {expected}; the current canvas is {width}×{height} (ratio {actual}), deviation {deviation} exceeds the allowed {tolerance}."
-  "当前方案「{name}」不支持{mode}": "Plan \"{name}\" does not support {mode}"
-  "当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n确定要退出吗？": "{count} workflows are running; closing will stop them and wait for cleanup.\nAre you sure you want to quit?"
-  "当前正在使用方案，如需手动调整请先切换为「自定义」": "A plan is in use; switch to \"Custom\" first to adjust these manually"
-  "当前没有可执行目标": "No executable target"
-  "当前版本 v{current} 已是最新版本": "Current version v{current} is up to date"
-  "当前目标": "Current Target"
-  "录制中": "Recording"
-  "待保存": "Pending Save"
-  "待机": "Standby"
-  "律匠 - 通用视觉 RPA 引擎": "LvJiang - General-purpose Visual RPA Engine"
-  "恢复": "Resume"
-  "截屏": "Screenshot"
-  "截屏失败": "Screenshot failed"
-  "所选窗口已消失，请重新扫描窗口": "The selected window is gone; scan windows again"
-  "打开主界面": "Open Main Window"
-  "扫描失败 | 详见日志": "Scan failed | See the log"
-  "扫描局域网...": "Scanning LAN..."
-  "扫描本机...": "Scanning local machine..."
-  "扫描窗口": "Scan Windows"
-  "扫描设备": "Scan Devices"
-  "批量": "Batch"
-  "批量任务运行中": "Batch running"
-  "批量任务运行过程中不可修改环境和布局": "Environment and layout cannot be changed while a batch task is running"
-  "批量执行": "Batch Run"
-  "持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）": "Keeps pulling frames from the mirroring stream; unchecked grabs one frame per request (single-frame capture)"
-  "指令执行": "Command Execution"
-  "指令执行（adb shell input）": "Command Execution (adb shell input)"
-  "放弃": "Discard"
-  "断开定位": "Disconnect"
-  "断开执行目标": "Disconnect Execution Target"
-  "断开连接": "Disconnect"
-  "新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。": "New hotkeys were saved, but the current process failed to rebuild the global listener; this run keeps using the old hotkeys, and the new settings will be retried after restart."
-  "无法加载布局：{name}": "Cannot load layout: {name}"
-  "无法启动工作流": "Failed to start the workflow"
-  "无法开始执行": "Cannot start"
-  "无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。": "LvJiang could not verify its administrator privileges. Connection plan \"{name}\" requires administrator privileges, so execution was rejected to prevent clicks or keyboard input from failing. Close LvJiang, restart it as administrator, and try again."
-  "无法获取设备分辨率": "Failed to get device resolution"
-  "日常任务运行中": "Daily tasks running"
-  "显示标题": "Show Header"
-  "显示连接控制台": "Show Connection Console"
-  "显示预览": "Show Preview"
-  "暂停": "Pause"
-  "暂无可复制的画面，请先刷新或截屏": "Nothing to copy yet; refresh or take a screenshot first"
-  "暂无可复制的画面，请先连接目标并刷新或截屏": "Nothing to copy yet; connect a target, then refresh or screenshot"
-  "暂无缓存画面，请点击刷新": "No cached frame; click Refresh"
-  "最小化到状态栏": "Minimize to Tray"
-  "未发现 ADB 设备": "No ADB devices found"
-  "未发现设备": "No devices found"
-  "未发现设备 | 可尝试局域网扫描": "No devices found | Try a LAN scan"
-  "未发现设备 | 请确认模拟器已启动": "No devices found | Make sure the emulator is running"
-  "未发现设备 | 请确认设备已开启无线调试": "No devices found | Make sure wireless debugging is enabled on the device"
-  "未定位窗口 | 未找到可见窗口": "Window not located | No visible window found"
-  "未定位窗口 | 请先扫描窗口并点击定位": "Window not located | Scan for windows and click Locate first"
-  "未就绪": "Not ready"
-  "未连接 | 请先定位窗口或连接设备": "Not connected | Locate a window or connect a device first"
-  "未连接设备 | 请先扫描并连接设备": "Device not connected | Scan and connect a device first"
-  "本机未发现开放的模拟器 ADB 端口。\n\n请确认：\n1. 模拟器已启动\n2. 模拟器已开启 ADB 调试": "No open emulator ADB ports found on this machine.\n\nCheck:\n1. The emulator is running\n2. ADB debugging is enabled on the emulator"
-  "桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击": "Desktop (desktop): PC game window, uses window mirroring + mouse click"
-  "正在取消扫描...": "Cancelling scan..."
-  "正在扫描局域网...": "Scanning the LAN..."
-  "正在扫描本机模拟器...": "Scanning local emulators..."
-  "正在扫描窗口...": "Scanning windows..."
-  "正在扫描设备...": "Scanning devices..."
-  "正在连接设备...": "Connecting to the device..."
-  "正在重新检查设备执行通道...": "Re-checking the device execution channel..."
-  "流式截图": "Streaming Capture"
-  "清理日志": "Clear Logs"
-  "清空当前窗口的全部日志，包括被级别筛选隐藏的日志": "Clear all logs in the current window, including those hidden by the level filter"
-  "游戏窗口": "Game Window"
-  "热键已更新并立即生效": "Hotkeys updated and took effect immediately"
-  "环境": "Environment"
-  "用户信息": "User Info"
-  "用户正在执行任务": "The user is running a task"
-  "画面已中断，正在恢复…": "Screen interrupted; recovering…"
-  "画面流中断": "Screen stream interrupted"
-  "画面流中断，任务正在等待恢复": "Screen stream interrupted; the task is waiting for recovery"
-  "目标大小": "Target Size"
-  "目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：": "Target Environment determines navigation strategy and input method (the environment the game runs in, not this machine's OS):"
-  "目标环境说明": "Target Environment Explained"
-  "确认停止": "Confirm Stop"
-  "离线模式下不能检查更新": "Cannot check for updates in offline mode"
-  "移动设备": "Mobile Device"
-  "空闲": "Idle"
-  "窗口位置已刷新，但红框移动失败": "Window position refreshed, but moving the red border failed"
-  "窗口已消失或句柄失效，请重新定位": "The window is gone or its handle is stale; locate it again"
-  "端侧执行": "On-Device Execution"
-  "等待画面恢复": "Waiting for Screen Recovery"
-  "等待设备恢复": "Waiting for Device Recovery"
-  "等待重连": "Waiting for reconnect"
-  "红框标定": "Red-Box Marking"
-  "结束中": "Finishing"
-  "结束当前目标": "Stop current target"
-  "继续": "Continue"
-  "自动化运行中": "Automation Running"
-  "设备已经连接，已切换为执行目标": "The device was already connected; switched to it as the execution target"
-  "设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务": "The device execution channel awaits confirmation; fix the issue and re-check, or stop the task if it can't be recovered"
-  "设备标识未确认，已拒绝连接": "Device identity unconfirmed; connection rejected"
-  "设备标识未确认：只能按当前连接地址区分，重启或换用另一种连接方式后会被视为新目标": "Device identity unconfirmed: identified only by the current address; after a reboot or a different connection method it counts as a new target"
-  "设备正在执行其他任务": "The device is running another task"
-  "设备正在执行其他任务，本次未启动。\n\n{reason}": "The device is running another task; not started this time.\n\n{reason}"
-  "设备端代理": "On-device Agent"
-  "设备端代理不可用，且高级设置已禁用 ADB 输入降级；请恢复手机代理后重新连接": "The on-device agent is unavailable and ADB input fallback is disabled in settings; restore the phone agent and reconnect"
-  "该目标正在执行任务，不能重新定位或连接": "This target is running a task; cannot re-locate or reconnect"
-  "说明": "Description"
-  "请先在主窗口定位窗口": "Please locate a window in the main window first"
-  "请先在主窗口连接设备": "Please connect a device in the main window first"
-  "请选择一个脚本": "Select a script"
-  "请选择一个脚本；列表为空时可刷新脚本或调整展示分组": "Select a script; if the list is empty, refresh scripts or adjust display groups"
-  "请选择有效的执行用户": "Select a valid user to run as"
-  "调律任务运行中": "Tuning tasks running"
-  "账户管理": "Account Management"
-  "赞助": "Sponsor"
-  "运行中": "Running"
-  "运行中不能修改下一次连接参数": "Cannot change next-connection parameters while running"
-  "运行日志": "Run Log"
-  "连接": "Connect"
-  "连接中...": "Connecting..."
-  "连接信息": "Connection Info"
-  "连接失败 | 详见日志": "Connection failed | See the log"
-  "连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。": "Connection plan \"{name}\" requires administrator privileges, but LvJiang is not running as administrator. Windows blocks lower-privileged processes from sending clicks and keyboard input to elevated game windows. Close LvJiang, choose \"Run as administrator\", and try again."
-  "连接目标后可预览": "Preview available after connecting a target"
-  "配置已保存": "Settings saved"
-  "采集任务运行中": "Gathering tasks running"
-  "重新取一帧并更新预览，不保存文件": "Grab a fresh frame and update the preview; nothing is saved"
-  "重新检查": "Re-check"
-  "重新连接": "Reconnect"
-  "隐藏标题": "Hide Header"
-  "隐藏连接控制台": "Hide Connection Console"
-  "隐藏预览": "Hide Preview"
-  "需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input": "Requires the LvJiang App with accessibility enabled; changes only the execution channel, not the capture method; falls back to ADB shell input when unreachable"
-  "需激活 Lv1": "Lv1 activation required"
-  "需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义": "Check \"Background mode\" first: foreground input requires the window to be foreground, so pairing it with background capture makes no sense"
-  "预览已刷新": "Preview refreshed"
-  "，请选择 保存 或 放弃": ", please choose Save or Discard"
+account_dialog:
+  账户管理: Account Management
+all_user_params:
+  全部用户参数: All User Parameters
+batch:
+  开始执行: Запустить выполнение
+batch_scheduler:
+  运行中: Running
+capture_ops:
+  '[录屏] 仅流式截图模式支持录屏': '[Recording] Screen recording is only supported in streaming capture mode'
+  '[录屏] 保存失败（详见日志）': '[Recording] Save failed (see log for details)'
+  '[录屏] 启动失败（详见日志）': '[Recording] Failed to start (see log for details)'
+  '[录屏] 已放弃本次录制，文件已删除': '[Recording] Recording discarded, file deleted'
+  '[录屏] 无法获取画面尺寸': '[Recording] Failed to get frame size'
+  '[截屏] PNG 编码失败': '[Screenshot] PNG encoding failed'
+  '[截屏] 截屏失败：无可用画面': '[Screenshot] Failed: no frame available'
+  '[预览] 刷新失败：无可用画面': '[Preview] Refresh failed: no frame available'
+  ⏸ 暂停: ⏸ Pause
+  ■ 停止: ■ Stop
+  ▶ 继续: ▶ Resume
+  ● 录屏: ● Record
+  仅流式截图模式支持录屏: Screen recording is only supported in streaming capture mode
+  取一帧、更新预览并保存到 data/capture/picture: Capture a frame, update the preview, and save it to data/capture/picture
+  图像已复制到剪贴板，可用 Ctrl+V 粘贴: Image copied to clipboard; paste with Ctrl+V
+  复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件: Copy the preview's original image to the clipboard (paste with Ctrl+V); nothing is saved to disk
+  已暂停: Paused
+  录制中: Recording
+  待保存: Pending Save
+  待机: Standby
+  截屏: Screenshot
+  放弃: Discard
+  暂无可复制的画面，请先刷新或截屏: Nothing to copy yet; refresh or take a screenshot first
+  暂无可复制的画面，请先连接目标并刷新或截屏: Nothing to copy yet; connect a target, then refresh or screenshot
+  重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
+  预览已刷新: Preview refreshed
+  ，请选择 保存 或 放弃: ', please choose Save or Discard'
+common:
+  '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
+  btn_cancel: Cancel
+  btn_connect: Connect
+  btn_continue_tuning: Continue Tuning
+  btn_discard: Discard
+  btn_disconnect: Disconnect
+  btn_end_tuning: End This Tuning Session
+  btn_hide_preview: Hide Preview
+  btn_load: Load
+  btn_locate: Locate
+  btn_pause: ⏸ Pause
+  btn_record: ● Record
+  btn_resume: ▶ Resume
+  btn_save: Save
+  btn_scan: Scan
+  btn_scan_device: Scan Devices
+  btn_scan_lan: Scan LAN...
+  btn_scan_lan_action: Scan LAN
+  btn_scan_local: Local Scan (Emulator)
+  btn_scan_local_running: Scanning local...
+  btn_scan_window: Scan Windows
+  btn_scanning: Scanning...
+  btn_screenshot: Screenshot
+  btn_show_preview: Show Preview
+  btn_skip_current: Skip Current Equipment
+  btn_start: Start
+  btn_stop: Stop
+  btn_stop_f10: Stop (F10)
+  chk_agent: On-device Execution
+  chk_bg_mode: Background Mode
+  chk_scrcpy: Streaming Capture
+  confirm_exit_message: "A workflow is currently running. Closing will terminate it.\nAre you sure you want to exit?"
+  confirm_exit_title: Confirm Exit
+  devices_found: Found {count} device(s)
+  disconnected: Disconnected
+  dismiss: Dismiss
+  err_no_workflow: Please select a workflow
+  err_streaming_only: Recording requires streaming capture mode
+  group_params: Parameters
+  group_script: Script
+  label_current_layout: Current Layout
+  label_current_user: Current User
+  label_log_level: Log Level
+  label_no_window: No window selected
+  label_not_connected: No device connected
+  label_not_located: No window located
+  label_preview_placeholder: Locate window to capture
+  label_scan_subnet: 'Scan subnet:'
+  label_select_device: Please select a device and click connect...
+  label_select_window: Please select a target window...
+  local_no_device_msg: "No open emulator ADB port found on this machine.\n\nPlease ensure:\n1. The emulator is running\n2. ADB debugging is enabled in the emulator"
+  log_local_no_device: '[Scan] No open emulator ADB port found on this machine'
+  log_scanning_local: '[Scan] Probing local emulator ADB ports...'
+  menu_about: About
+  menu_announcements: Announcements
+  menu_batch_config: Batch Config
+  menu_check_update: Check for Updates
+  menu_docs: Documentation
+  menu_feedback: Feedback
+  menu_general: General
+  menu_help: Help
+  menu_ocr: Image Recognition
+  menu_reference_mgr: Reference Manager
+  menu_scene_editor: Scene Editor
+  menu_script_config: Script Config
+  menu_script_record: Script Recording
+  menu_settings: Settings
+  menu_tools: Tools
+  menu_user_mgmt: User Management
+  no_adb_device_msg: "No USB-connected ADB device found.\n\nPick a subnet to scan the LAN (device needs wireless debugging on),\nor scan local ports to find an emulator."
+  no_adb_device_title: No ADB Device Found
+  no_device_found: No Device Found
+  no_window_found: No window found
+  ocr_canvas_placeholder: Ctrl+V to paste screenshot, or click "Upload Image"
+  preview_stopped: Preview stopped
+  status_connect_failed: Connection failed | See logs
+  status_connecting: Connecting to device...
+  status_device_connected: Device connected
+  status_device_scanned: Devices scanned | Select device and click Connect
+  status_disconnected: Device disconnected
+  status_done: Execution completed
+  status_error: Execution error
+  status_idle: Idle
+  status_no_device_hint: No device found | Try LAN scan
+  status_no_local_hint: No device found | Make sure the emulator is running
+  status_no_wireless_hint: No device found | Check wireless debugging
+  status_paused: Paused
+  status_pending_save: Pending save
+  status_ready: Ready | F9 Start | F11 Pause/Resume | F10 Stop
+  status_recording: Recording
+  status_scan_cancelled: Scan cancelled
+  status_scan_failed: Scan failed | See logs
+  status_scanning_device: Scanning devices...
+  status_scanning_lan: Scanning LAN...
+  status_scanning_local: Scanning local emulators...
+  status_scanning_window: Scanning windows...
+  status_stopped: Execution stopped
+  status_window_located: Window located
+  status_window_scanned: Windows scanned | Select target and click Locate
+  status_window_unlocated: Window location cleared
+  status_workflow_done: Workflow completed
+  status_workflow_error: Execution error
+  status_workflow_stopped: Workflow stopped
+  subnet_all: All adapters (default)
+  tab_batch: Batch
+  tab_daily: Daily
+  tab_log: Run Log
+  tab_profile: User Overview
+  tab_user_info: User Info
+  theme_to_dark: Switch to dark theme
+  theme_to_light: Switch to light theme
+  title: LvJiang - Universal Visual RPA Engine
+  window_closed: Window closed
+  window_located: Window located
+  wireless_no_device_msg: "No connectable ADB device found on LAN.\n\nPlease ensure:\n1. Device and PC are on the same LAN\n2. Wireless debugging is enabled (Developer Options)\n3. With multiple adapters, pick the target subnet or use Local Scan"
+  wireless_no_device_title: No Device Found
+  workflow_confirm: Workflow Confirmation
+  workflow_input: Workflow Input
+  workflow_pause: Workflow Paused
+  workflow_running: Workflow Running
+  恢复: Resume
+  暂停: Pause
+  请选择有效的执行用户: Select a valid user to run as
+execution_targets:
+  游戏窗口: Game Window
+main_window:
+  '[错误] 当前环境不支持以下脚本：': "[Error] The current environment doesn't support these scripts:"
+  【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，: '[Emulator Aspect Ratio] If the target emulator has no built-in 20:9 preset,'
+  【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，: '[Important] When using a PC emulator (e.g. MuMu, LDPlayer) you must select "Android",'
+  ? "以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。"
+  : "These tasks haven't finished safely, so the program won't close yet:\n{tasks}\n\nTry closing again later; if a task is stuck, force-quit LvJiang from the system."
+  任务仍在收尾: Tasks are still finishing
+  使用独立参数: Use per-user parameters
+  全部任务: All Tasks
+  关闭程序: Close Program
+  切换日志显示级别：低于选中级别的日志将被隐藏: 'Switch log display level: logs below the selected level are hidden'
+  加载: Load
+  参数保存失败，本次批量未启动：{error}: "Failed to save parameters; the batch didn't start: {error}"
+  参数设置: Parameter Settings
+  可采用自定义设置 2000:900（等效 20:9）。: You can use a custom 2000:900 setting (equivalent to 20:9).
+  后台截图: Background Capture
+  后台输入: Background Input
+  否则导航流程会因输入方式不匹配而失败。: otherwise the navigation flow will fail due to a mismatched input method.
+  安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入: 'Android (android): phone or emulator, uses ADB screenshot + touch input'
+  定位: Locate
+  定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效: After locating, the red border shows for 1 second; check this to keep it visible until disconnect (this run only)
+  定位窗口后自动截屏: Auto-screenshot after locating the window
+  展示分组，仅筛选脚本列表: Display group; only filters the script list
+  工作流运行中: Workflow running
+  ? "当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n确定要退出吗？"
+  : "{count} workflows are running; closing will stop them and wait for cleanup.\nAre you sure you want to quit?"
+  当前正在使用方案，如需手动调整请先切换为「自定义」: A plan is in use; switch to "Custom" first to adjust these manually
+  当前目标: Current Target
+  律匠 - 通用视觉 RPA 引擎: LvJiang - General-purpose Visual RPA Engine
+  扫描窗口: Scan Windows
+  扫描设备: Scan Devices
+  批量: Batch
+  批量任务运行过程中不可修改环境和布局: Environment and layout cannot be changed while a batch task is running
+  批量执行: Batch Run
+  持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）: Keeps pulling frames from the mirroring stream; unchecked grabs one frame per request (single-frame capture)
+  显示标题: Show Header
+  显示连接控制台: Show Connection Console
+  最小化到状态栏: Minimize to Tray
+  桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击: 'Desktop (desktop): PC game window, uses window mirroring + mouse click'
+  流式截图: Streaming Capture
+  清理日志: Clear Logs
+  清空当前窗口的全部日志，包括被级别筛选隐藏的日志: Clear all logs in the current window, including those hidden by the level filter
+  用户信息: User Info
+  目标大小: Target Size
+  目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：: "Target Environment determines navigation strategy and input method (the environment the game runs in, not this machine's OS):"
+  目标环境说明: Target Environment Explained
+  端侧执行: On-Device Execution
+  红框标定: Red-Box Marking
+  运行日志: Run Log
+  连接信息: Connection Info
+  重新检查: Re-check
+  隐藏标题: Hide Header
+  隐藏连接控制台: Hide Connection Console
+  需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input: Requires the LvJiang App with accessibility enabled; changes only the execution channel, not the capture method; falls back to ADB shell input when unreachable
+  '[错误] 请先定位窗口': '[Error] Locate a window first'
+  '[错误] 请先连接并选择执行目标': '[Error] Connect and select an execution target first'
+  '[错误] 请先连接设备': '[Error] Connect a device first'
+  全部分组: All Groups
+  全部用户参数: All User Parameters
+menu_ops:
+  公告: Announcements
+  关于: About
+  切换到浅色主题: Switch to light theme
+  切换到深色主题: Switch to dark theme
+  反馈: Feedback
+  图库已刷新: Gallery Refreshed
+  地图管理: Map Manager
+  工具: Tools
+  已是最新版本: Already up to date
+  帮助: Help
+  当前版本 v{current} 已是最新版本: Current version v{current} is up to date
+  新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。: New hotkeys were saved, but the current process failed to rebuild the global listener; this run keeps using the old hotkeys, and the new settings will be retried after restart.
+  显示预览: Show Preview
+  热键已更新并立即生效: Hotkeys updated and took effect immediately
+  热键设置: Hotkey Settings
+  用户管理: User Management
+  离线模式下不能检查更新: Cannot check for updates in offline mode
+  移动设备: Mobile Device
+  自动剧情: Auto Story
+  赞助: Sponsor
+  配置已保存: Settings saved
+  隐藏预览: Hide Preview
+  任务历史: Task History
+mobile:
+  设备端代理: On-device Agent
+platforms:
+  工作流确认: Workflow Confirmation
+run_control:
+  ADB 模式: ADB Mode
+  '[启动失败] {name}：{message}': '[Start failed] {name}: {message}'
+  '[执行目标] 当前方案不适用，已自动切换到「{name}」': "[Target] The current plan doesn't apply; switched to \"{name}\""
+  '[拒绝] 已有自动化在运行中，请等待结束': '[Rejected] An automation is already running; wait for it to finish'
+  '[提示] 上次选中的方案已不存在，已回到自定义': '[Notice] The previously selected plan no longer exists; back to Custom'
+  '[提示] 已收起恢复提示，任务仍在等待通道恢复；可点顶部横幅「重新检查」或按 F10 停止': '[Notice] Prompt hidden; the task still waits for the channel. Use the banner "Re-check" or press F10 to stop.'
+  '[提示] 当前没有正在运行的自动化': '[Notice] No automation is currently running'
+  '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用': '[Notice] Plan "{name}": {missing} no longer exists; not fully applied'
+  '[提示] 没有适用于当前执行目标的方案，请配置连接方案': '[Notice] No plan applies to the current execution target; configure a connection plan'
+  '[提示] 选中的方案已不存在，已回到自定义': '[Notice] The selected plan no longer exists; back to Custom'
+  '[操作] ': '[Action] '
+  '[操作] 停止等待恢复的任务': '[Action] Stop the task waiting for recovery'
+  '[操作] 已停止': '[Action] Stopped'
+  '[操作] 已恢复，继续执行...': '[Action] Recovered; continuing...'
+  '[操作] 收到停止请求': '[Action] Stop request received'
+  '[操作] 重新检查执行通道': '[Action] Re-checking the execution channel'
+  '[操作] 重新检查设备执行通道': '[Action] Re-checking the device execution channel'
+  '[警告] {name} 画面流中断：{reason}': '[Warning] {name} screen stream interrupted: {reason}'
+  '[警告] 以下 {n} 个脚本文件存在问题，请在脚本编辑器中修正：': '[Warning] These {n} script files have problems; fix them in the script editor:'
+  '[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；若无法恢复，请按 F10 停止任务后重新连接: {error}': "[Warning] The execution channel awaits confirmation; fix {name}'s problem and click Re-check. If it can't be recovered, press F10 to stop the task and reconnect: {error}"
+  '[错误] 请先定位窗口': '[Error] Please locate a window first'
+  '[错误] 请先连接并选择执行目标': '[Error] Connect and select an execution target first'
+  '[错误] 请先连接设备': '[Error] Please connect a device first'
+  '[错误] 请选择一个工作流': '[Error] Select a workflow'
+  '[错误] 请选择有效的执行用户': '[Error] Select a valid executing user'
+  ? "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。"
+  : "{name}'s screen stream was interrupted and automatic recovery failed.\n{error}\n\nCheck the phone (screen off, game switched away, USB or wireless link) and choose Yes to re-check, or No to stop this task. Closing this prompt does not stop the task; the banner stays."
+  ? "{name} 的连接恢复未完成。\n{error}\n\n请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。"
+  : "{name}'s connection recovery is incomplete.\n{error}\n\nRestore the ADB/phone-agent connection and choose Yes to re-check, or No to stop this target's task."
+  ⚠ 执行通道等待确认：处理问题后点击「重新检查」；无法恢复时请按 F10 停止任务: "⚠ The execution channel awaits confirmation: fix the issue and click \"Re-check\"; press F10 to stop the task if it can't be recovered"
+  ⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务: "⚠ Screen stream interrupted: fix it and click \"Re-check\"; press F10 to stop if it can't be recovered"
+  ⚠ 画面流已中断：点「重新检查」重试，或断开重连设备: '⚠ Screen stream interrupted: click "Re-check" to retry, or disconnect and reconnect the device'
+  任务暂停中，是否直接停止？: The task is paused. Stop it directly?
+  任务运行中: Task running
+  停止中... | 等待当前步骤结束: Stopping... | waiting for the current step to finish
+  停止任务: Stop Task
+  全部分组: All Groups
+  加载工作流文件: Load Workflow File
+  占用目标 {target}，运行 {run_id}: Target {target} occupied, run {run_id}
+  图库: Gallery
+  备战方案扫描失败，请查看逐方案结果和导航提示: Loadout scan failed; see per-plan results and navigation hints
+  工作流文件 (*.wf);;所有文件 (*): Workflow files (*.wf);;All files (*)
+  '工作流文件不存在: {path}': 'Workflow file does not exist: {path}'
+  工作流输入: Workflow Input
+  已有任务运行: A task is already running
+  布局: Layout
+  当前工作环境 {env} 不在该脚本支持的环境 {envs} 中: The current environment {env} is not among the environments this script supports ({envs})
+  ? "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的 {tolerance}。"
+  : "The current layout's canvas size doesn't meet the declared requirement; fix the layout and retry.\n\nLayout \"{layout}\" requires a canvas aspect of {expected}; the current canvas is {width}×{height} (ratio {actual}), deviation {deviation} exceeds the allowed {tolerance}."
+  当前方案「{name}」不支持{mode}: Plan "{name}" does not support {mode}
+  当前没有可执行目标: No executable target
+  批量任务运行中: Batch running
+  无法加载布局：{name}: 'Cannot load layout: {name}'
+  无法启动工作流: Failed to start the workflow
+  无法开始执行: Cannot start
+  无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。: LvJiang could not verify its administrator privileges. Connection plan "{name}" requires administrator privileges, so execution was rejected to prevent clicks or keyboard input from failing. Close LvJiang, restart it as administrator, and try again.
+  日常任务运行中: Daily tasks running
+  未定位窗口 | 请先扫描窗口并点击定位: Window not located | Scan for windows and click Locate first
+  未连接 | 请先定位窗口或连接设备: Not connected | Locate a window or connect a device first
+  未连接设备 | 请先扫描并连接设备: Device not connected | Scan and connect a device first
+  正在重新检查设备执行通道...: Re-checking the device execution channel...
+  环境: Environment
+  用户正在执行任务: The user is running a task
+  画面已中断，正在恢复…: Screen interrupted; recovering…
+  画面流中断: Поток экрана прерван
+  画面流中断，任务正在等待恢复: Screen stream interrupted; the task is waiting for recovery
+  确认停止: Confirm Stop
+  窗口已消失或句柄失效，请重新定位: The window is gone or its handle is stale; locate it again
+  窗口模式: Window mode
+  等待画面恢复: Waiting for Screen Recovery
+  等待设备恢复: Waiting for Device Recovery
+  继续: Continue
+  自动化运行中: Automation Running
+  设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务: The device execution channel awaits confirmation; fix the issue and re-check, or stop the task if it can't be recovered
+  设备正在执行其他任务: The device is running another task
+  ? "设备正在执行其他任务，本次未启动。\n\n{reason}"
+  : "The device is running another task; not started this time.\n\n{reason}"
+  请选择一个脚本: Select a script
+  请选择一个脚本；列表为空时可刷新脚本或调整展示分组: Select a script; if the list is empty, refresh scripts or adjust display groups
+  调律任务运行中: Tuning tasks running
+  连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。: Connection plan "{name}" requires administrator privileges, but LvJiang is not running as administrator. Windows blocks lower-privileged processes from sending clicks and keyboard input to elevated game windows. Close LvJiang, choose "Run as administrator", and try again.
+  采集任务运行中: Gathering tasks running
+  需激活 Lv1: Lv1 activation required
+scripts:
+  启动失败: Startup Failed
+tray_ops:
+  另有 {count} 个任务运行: '{count} other tasks running'
+  已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Minimized to the tray; double-click the icon or right-click -> "Open Main Window" to restore.
+  开始: Запустить
+  打开主界面: Open Main Window
+  未就绪: Not ready
+  空闲: Idle
+  等待重连: Waiting for reconnect
+  结束中: Finishing
+  结束当前目标: Stop current target
+  不能启动: Cannot start
+ui_state:
+  参数保存失败，请检查配置文件权限或占用后重试：{error}: 'Failed to save parameters; check config file permissions or locks and retry: {error}'
+  参数设置（{name}独立）: Parameters ({name}, per-user)
+  参数设置（共享）: Parameters (shared)
+  说明: Description
+window_ops:
+  '[定位刷新] {name} · {old} → {new} · {details}': '[Re-located] {name} · {old} → {new} · {details}'
+  '[定位失效] {name}：{message}': '[Location lost] {name}: {message}'
+  '[定位失败] {message}': '[Locate failed] {message}'
+  '[截图] 后台截图不可用：': '[Capture] Background capture unavailable: '
+  '[截图] 后台截图启动失败，保留原截图方式': '[Capture] Background capture failed to start; keeping the original capture method'
+  '[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）': '[Capture] Background capture failed; fell back to foreground capture (unavailable when minimized)'
+  '[执行目标] 已切换到 {name}': '[Target] Switched to {name}'
+  '[扫描] 局域网内未发现可连接的 ADB 设备': '[Scan] No connectable ADB device found on the LAN'
+  '[扫描] 本机未发现开放的模拟器 ADB 端口': '[Scan] No open emulator ADB ports found on this machine'
+  '[扫描] 正在探测本机模拟器 ADB 端口...': '[Scan] Probing local emulator ADB ports...'
+  '[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的「{name}」是同一台设备。请先断开该目标再连接。': '[Rejected] Cannot read a stable device identity for {serial}; it may be the same device as the connected "{name}". Disconnect that target first.'
+  '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': "[Notice] The current platform doesn't support window-mirroring mode; use \"Scan Devices\""
+  '[提示] 未发现 USB 连接的 ADB 设备': '[Notice] No USB-connected ADB device found'
+  '[提示] 窗口目标正在执行任务，不能重新定位': '[Notice] The window target is running a task; cannot re-locate'
+  '[提示] 该目标正在执行任务，不能切换截图方式': '[Notice] This target is running a task; cannot switch the capture method'
+  '[提示] 该目标正在执行任务，不能切换输入方式': '[Notice] This target is running a task; cannot switch the input method'
+  '[提示] 该目标正在执行任务，不能断开': '[Notice] This target is running a task; cannot disconnect'
+  '[模式] {name} 已切换到{mode}': '[Mode] {name} switched to {mode}'
+  '[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标': '[Warning] This device provides no stable identity; USB and wireless connections will be treated as two targets'
+  '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input': '[On-device] App unreachable or execution channel not ready; falling back to adb shell input'
+  '[错误] {method} 截图后端不可用，保留原截图方式': '[Error] The {method} capture backend is unavailable; keeping the original capture method'
+  '[错误] 未找到可见窗口': '[Error] No visible window found'
+  '{input_mode} · {capture_mode}': '{input_mode} · {capture_mode}'
+  '{method} 截图后端不可用': The {method} capture backend is unavailable
+  切换截图方式: Switch Capture Method
+  刷新位置: Refresh Position
+  前台截图: Foreground Capture
+  前台输入: Foreground Input
+  单帧截图: Single-Frame Capture
+  取消中...: Cancelling...
+  取消扫描: Cancel Scan
+  启动中: Starting
+  ? "实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。\n用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效"
+  : "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted.\nCaptures via Windows Graphics Capture so the game window can be occluded by others; still unavailable when minimized. This run only"
+  ? "局域网内未发现可连接的 ADB 设备。\n\n请确认：\n1. 设备与电脑在同一局域网\n2. 设备已开启无线调试（开发者选项）\n3. 多网卡时可在下拉框改选目标网段，或改用本地扫描"
+  : "No connectable ADB device found on the LAN.\n\nCheck:\n1. The device is on the same LAN as this PC\n2. Wireless debugging is enabled on the device (developer options)\n3. With multiple NICs, pick the right subnet in the dropdown, or use local scan"
+  已刷新窗口位置: Window position refreshed
+  已取消扫描: Scan cancelled
+  已扫描窗口 | 请下拉选择目标窗口并点击定位: Windows scanned | Pick a target window and click Locate
+  已扫描设备 | 请选择设备并点击连接: Devices scanned | Pick a device and click Connect
+  已断开目标：{name}: 'Disconnected target: {name}'
+  已离线: Offline
+  已连接: Connected
+  截屏失败: Screenshot failed
+  所选窗口已消失，请重新扫描窗口: The selected window is gone; scan windows again
+  扫描失败 | 详见日志: Scan failed | See the log
+  扫描局域网...: Scanning LAN...
+  扫描本机...: Scanning local machine...
+  指令执行: Command Execution
+  指令执行（adb shell input）: Command Execution (adb shell input)
+  断开定位: Disconnect
+  断开执行目标: Disconnect Execution Target
+  断开连接: Disconnect
+  无法获取设备分辨率: Failed to get device resolution
+  暂无缓存画面，请点击刷新: No cached frame; click Refresh
+  未发现 ADB 设备: No ADB devices found
+  未发现设备: No devices found
+  未发现设备 | 可尝试局域网扫描: No devices found | Try a LAN scan
+  未发现设备 | 请确认模拟器已启动: No devices found | Make sure the emulator is running
+  未发现设备 | 请确认设备已开启无线调试: No devices found | Make sure wireless debugging is enabled on the device
+  未定位窗口 | 未找到可见窗口: Window not located | No visible window found
+  ? "本机未发现开放的模拟器 ADB 端口。\n\n请确认：\n1. 模拟器已启动\n2. 模拟器已开启 ADB 调试"
+  : "No open emulator ADB ports found on this machine.\n\nCheck:\n1. The emulator is running\n2. ADB debugging is enabled on the emulator"
+  正在取消扫描...: Cancelling scan...
+  正在扫描局域网...: Scanning the LAN...
+  正在扫描本机模拟器...: Scanning local emulators...
+  正在扫描窗口...: Scanning windows...
+  正在扫描设备...: Scanning devices...
+  正在连接设备...: Connecting to the device...
+  窗口位置已刷新，但红框移动失败: Window position refreshed, but moving the red border failed
+  端侧执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
+  设备已经连接，已切换为执行目标: The device was already connected; switched to it as the execution target
+  设备标识未确认，已拒绝连接: Device identity unconfirmed; connection rejected
+  设备标识未确认：只能按当前连接地址区分，重启或换用另一种连接方式后会被视为新目标: 'Device identity unconfirmed: identified only by the current address; after a reboot or a different connection method it counts as a new target'
+  设备端代理不可用，且高级设置已禁用 ADB 输入降级；请恢复手机代理后重新连接: The on-device agent is unavailable and ADB input fallback is disabled in settings; restore the phone agent and reconnect
+  该目标正在执行任务，不能重新定位或连接: This target is running a task; cannot re-locate or reconnect
+  请先在主窗口定位窗口: Please locate a window in the main window first
+  请先在主窗口连接设备: Please connect a device in the main window first
+  运行中不能修改下一次连接参数: Cannot change next-connection parameters while running
+  连接: Подключить
+  连接中...: Connecting...
+  连接失败 | 详见日志: Connection failed | See the log
+  连接目标后可预览: Preview available after connecting a target
+  重新连接: Reconnect
+  需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义: 'Check "Background mode" first: foreground input requires the window to be foreground, so pairing it with background capture makes no sense'
+alert_panel:
+  关闭此告警: Dismiss this alert
+pressable_combo:
+  不绑定（使用坐标点击）: Unbound (use coordinate tap)

@@ -153,15 +153,8 @@ class AndroidStreamCapture(CaptureBackend):
         self._stream_recovery = None
         self._recover_lock = threading.Lock()
         self._lifecycle_lock = threading.RLock()
-        self._watchdog_stop = threading.Event()
-        self._watchdog_thread: threading.Thread | None = None
         #: 按策略暂停（如空闲停流）期间不该有帧，看门狗必须豁免
         self.paused_by_policy = threading.Event()
-        self._stall_seconds = 5.0
-        self._rx_idle_seconds = 3.0
-        self._transition_timeout_seconds = 10.0
-        self._awake_cache_ttl = 10.0
-        self._awake_cache: tuple[float, bool] = (0.0, True)
 
     @property
     def last_error(self) -> str:
@@ -415,7 +408,6 @@ class AndroidStreamCapture(CaptureBackend):
             self._decode_thread.start()
             self._last_rx_at = time.monotonic()
             self._last_frame_at = time.monotonic()
-            self._start_watchdog()
 
             # 7. 等待首帧
             deadline = time.monotonic() + 5.0
@@ -449,7 +441,6 @@ class AndroidStreamCapture(CaptureBackend):
         """停止解码线程 → 关闭 socket → 终止 server → 清理 forward"""
         # 主动停止不算故障：置位后解码线程与看门狗都不会再报错
         self._user_stop = True
-        self._stop_watchdog()
         self._running = False
         self._ready_event.clear()
         self._transitioning = True
@@ -919,94 +910,10 @@ class AndroidStreamCapture(CaptureBackend):
     # ─── 内部：健康看门狗 ─────────────────────────────────
 
     def _note_decode_error(self) -> None:
-        """统计解码失败：数据在流、但画面出不来同样是故障。"""
+        """统计解码失败（诊断计数）。不声明 fault：解码器可能自行恢复。"""
         self._decode_errors += 1
         self._consecutive_decode_errors += 1
-        if self._consecutive_decode_errors >= 30:
-            self._declare_fault(
-                FAULT_DECODE,
-                tr("连续 {n} 个视频包无法解码").format(n=self._consecutive_decode_errors))
 
-    def _start_watchdog(self) -> None:
-        self._stop_watchdog()
-        self._watchdog_stop = threading.Event()
-        thread = threading.Thread(
-            target=self._watchdog_loop, daemon=True, name="android-stream-watchdog")
-        self._watchdog_thread = thread
-        thread.start()
-
-    def _stop_watchdog(self) -> None:
-        event = getattr(self, "_watchdog_stop", None)
-        if event is not None:
-            event.set()
-        self._watchdog_thread = None
-
-    def _watchdog_loop(self) -> None:
-        """每 0.5s 复核一次通道健康；规则见 __init__ 里的判定说明。"""
-        while not self._watchdog_stop.wait(0.5):
-            self._check_health_once()
-
-    def _check_health_once(self) -> None:
-        """单次健康复核（独立出来便于单测覆盖三条判定分支）。"""
-        if not self._running or self._user_stop or self.paused_by_policy.is_set():
-            return
-        if self._fault:
-            return
-        now = time.monotonic()
-        try:
-            if self._transitioning:
-                # 尺寸/方向切换期间本来就没有帧，只防它永远切不完
-                if now - self._last_rx_at > self._transition_timeout_seconds:
-                    self._declare_fault(
-                        FAULT_STALL,
-                        tr("画面尺寸切换后超过 {n:.0f} 秒仍未恢复").format(
-                            n=self._transition_timeout_seconds))
-                return
-            if now - self._last_rx_at > self._rx_idle_seconds:
-                if self._device_awake():
-                    # 半开连接与"编码器停摆"都表现为零字节（编码器不产出，
-                    # socket 上自然没有数据）；恢复动作相同，文案两者都提。
-                    self._declare_fault(
-                        FAULT_RX_IDLE,
-                        tr("亮屏但 {n:.0f} 秒没有收到任何画面数据"
-                           "（连接无响应或画面采集已停摆）").format(
-                            n=now - self._last_rx_at))
-                return
-            if (now - self._last_frame_at > self._stall_seconds
-                    and self._device_awake()):
-                self._declare_fault(
-                    FAULT_STALL,
-                    tr("亮屏但 {n:.0f} 秒没有新画面").format(
-                        n=now - self._last_frame_at))
-        except Exception as exc:  # noqa: BLE001 - 看门狗自身不能把主流程带崩
-            logger.debug(f"[AndroidStream] 看门狗检查异常: {exc}")
-
-    def _device_awake(self) -> bool:
-        """设备屏幕是否亮着（带 10s 缓存）。
-
-        实测（V2415A/MTK）：息屏时编码器 0 帧 0 字节，与"编码器停摆"在客户端
-        完全同构，只能靠设备显示状态区分；亮屏静止时仍有 2–4 帧/秒。查询失败
-        按"亮着"处理：宁可多重启一次会话，也不要把真故障咽下去。
-        """
-        now = time.monotonic()
-        cached_at, cached = self._awake_cache
-        if now - cached_at < self._awake_cache_ttl:
-            return cached
-        awake = True
-        try:
-            result = subprocess.run(
-                [*self._device._base(), "shell",
-                 "dumpsys power | grep -m1 mWakefulness="],
-                capture_output=True, timeout=5,
-                **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
-            )
-            awake = "Awake" in str(result.stdout or "")
-        except Exception as exc:  # noqa: BLE001
-            logger.debug(f"[AndroidStream] 读取屏幕状态失败: {exc}")
-        self._awake_cache = (now, awake)
-        return awake
-
-    @staticmethod
     def _frame_to_bgr(frame) -> np.ndarray:
         """将 PyAV VideoFrame 转换为 BGR numpy 数组
 

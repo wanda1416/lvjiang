@@ -63,15 +63,38 @@ class UiStateMixin:
     """UI 状态与日常页配置持久化混入类"""
 
     def _restore_ui_state(self):
-        """启动时恢复窗口大小、左右分栏比例和当前 Tab 页签"""
+        """启动时恢复窗口几何、左右分栏比例和当前 Tab 页签。
+
+        优先用 ``window_geometry``（``QWidget.saveGeometry()`` 的 base64）：
+        它一次带回尺寸、屏幕位置、最大化状态和多屏 DPI，换显示器后 Qt 会
+        把落到不可见区域的窗口拉回。``window_size`` 只作旧配置的回退，
+        避免只有尺寸时"最大化关闭 → 下次变超大普通窗口"的跳变。
+        """
+        from PyQt6.QtCore import QByteArray
+
         from ...core.config import load_ui_page_state
         page = load_ui_page_state("main_page")
-        size = page.get("window_size")
-        if isinstance(size, list) and len(size) == 2:
-            self.resize(int(size[0]), int(size[1]))
+
+        geometry_restored = False
+        raw_geometry = page.get("window_geometry")
+        if isinstance(raw_geometry, str) and raw_geometry:
+            try:
+                geometry_restored = self.restoreGeometry(
+                    QByteArray.fromBase64(raw_geometry.encode("ascii")))
+            except (UnicodeEncodeError, ValueError, TypeError):
+                geometry_restored = False
+        if not geometry_restored:
+            size = page.get("window_size")
+            if isinstance(size, list) and len(size) == 2:
+                self.resize(int(size[0]), int(size[1]))
+
         sizes = page.get("splitter_sizes")
         if isinstance(sizes, list) and len(sizes) == 2 and all(s > 0 for s in sizes):
             self._main_splitter.setSizes([int(s) for s in sizes])
+        connection_sizes = page.get("connection_splitter_sizes")
+        if (isinstance(connection_sizes, list) and len(connection_sizes) == 2
+                and all(s > 0 for s in connection_sizes)):
+            self._connection_splitter.setSizes([int(s) for s in connection_sizes])
         # 恢复左右 Tab 页签
         left_idx = page.get("left_tab_index", 0)
         right_idx = page.get("right_tab_index", 0)
@@ -84,12 +107,18 @@ class UiStateMixin:
         """退出时安全合并 ui_state.main_page。"""
         from ...core.config import update_ui_page_state
         try:
-            update_ui_page_state("main_page", {
+            patch = {
+                "window_geometry": bytes(self.saveGeometry().toBase64()).decode("ascii"),
+                # 回退值：旧版本或几何串损坏时仍能还原出接近的窗口大小
                 "window_size": [self.width(), self.height()],
                 "splitter_sizes": self._main_splitter.sizes(),
                 "left_tab_index": self._left_tabs.currentIndex(),
                 "right_tab_index": self.tabs.currentIndex(),
-            })
+            }
+            connection_splitter = getattr(self, "_connection_splitter", None)
+            if connection_splitter is not None:
+                patch["connection_splitter_sizes"] = connection_splitter.sizes()
+            update_ui_page_state("main_page", patch)
         except Exception as e:
             logger.warning(f"保存 UI 状态失败: {e}")
 

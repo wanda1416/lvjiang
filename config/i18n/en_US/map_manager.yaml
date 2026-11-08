@@ -1,8 +1,7 @@
-# map_manager 模块文案（en_US）——由 tools 拆分生成，可手工修订
-auto_strings:
+# map_manager.yaml — 按模块段落组织
+map_manager:
   "HUD 场景": "HUD Scene"
   "HUD 场景绑定（坐标在场景编辑器里标定）": "HUD scene bindings (calibrate coordinates in the Scene Manager)"
-  "POI key 重复: {key}": "Duplicate POI key: {key}"
   "{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。": "{scene}.{point} is outside the minimap; heading detection uses the region center for now."
   "⚠ 缺失：{key}": "⚠ Missing: {key}"
   "不能删除": "Cannot delete"
@@ -19,7 +18,6 @@ auto_strings:
   "图片文件 (*.png *.jpg *.jpeg *.bmp *.webp)": "Image files (*.png *.jpg *.jpeg *.bmp *.webp)"
   "在底图上点击新增 POI；点击已有标记选中它。坐标为底图归一化坐标。": "Click the base map to add a POI; click an existing marker to select it. Coordinates are base-map normalized."
   "地图 key": "Map key"
-  "地图 key 已存在: {key}": "Map key already exists: {key}"
   "地域与探查": "Regions & Surveys"
   "地域仍被使用": "Region still in use"
   "地域名称": "Region name"
@@ -50,7 +48,6 @@ auto_strings:
   "当前无法读取布局，未能定位地图区域。": "Cannot read the layout; cannot locate the map region."
   "当前未选择地图，无法解析地图区域。": "No map selected; cannot resolve the map region."
   "截取当前画面": "Capture the current frame"
-  "截图功能不可用，请先在主窗口定位窗口或连接设备": "Screenshot unavailable, please position window or connect device in main window first"
   "截图所属地域": "Region of this screenshot"
   "按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。": "Register regions with the game's area selector. Survey images and the base map are stored separately; switch views on the base-map page."
   "探查": "Surveys"
@@ -94,3 +91,8 @@ auto_strings:
   "选择底图": "Select Base Map"
   "重新识别": "Re-detect"
   "（尚未载入截图）": "(no screenshot loaded)"
+maps:
+  "POI key 重复: {key}": "Duplicate POI key: {key}"
+  "地图 key 已存在: {key}": "Map key already exists: {key}"
+user_avatar:
+  "截图功能不可用，请先在主窗口定位窗口或连接设备": "Screenshot unavailable, please position window or connect device in main window first"

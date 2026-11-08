@@ -1,5 +1,5 @@
-# maps 模块文案（en_US）——由 tools 拆分生成，可手工修订
-auto_strings:
+# maps.yaml — 按模块段落组织
+maps:
   "HUD 场景不存在: {scene}": "HUD scene does not exist: {scene}"
   "HUD 绑定 minimap_center 必须属于基础视图": "HUD binding minimap_center must belong to the base view"
   "HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}": "HUD binding minimap_center must reference a point; not found: {key}"

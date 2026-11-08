@@ -1,5 +1,17 @@
-# story 模块文案（en_US）——由 tools 拆分生成，可手工修订
-auto_strings:
+# story.yaml — 按模块段落组织
+common:
+  "保存到": "Saved to"
+  "匹配阈值": "Match threshold"
+  "场景/任务": "Scene/quest"
+  "已删除配置文件": "Deleted config file"
+  "已新建配置文件": "Created config file"
+  "文案库来源": "Story library source"
+  "正在编辑": "Editing"
+  "正确答案": "Correct answer"
+  "配置文件": "Config file"
+  "问题/旁白": "Question/narration"
+  "阈值保存失败": "Failed to save the threshold"
+story_dialog:
   "为什么选这个（可选）": "Why this choice (optional)"
   "删除文件": "Delete File"
   "删除文案": "Delete Entry"
@@ -35,14 +47,3 @@ auto_strings:
   "＋ 新建": "＋ New"
   "，配置文件「": ", config file \""
   "；系统也有副本": "; the system also has a copy"
-  保存到: "Saved to"
-  匹配阈值: "Match threshold"
-  场景/任务: "Scene/quest"
-  已删除配置文件: "Deleted config file"
-  已新建配置文件: "Created config file"
-  文案库来源: "Story library source"
-  正在编辑: "Editing"
-  正确答案: "Correct answer"
-  配置文件: "Config file"
-  问题/旁白: "Question/narration"
-  阈值保存失败: "Failed to save the threshold"

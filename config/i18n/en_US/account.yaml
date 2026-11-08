@@ -1,5 +1,5 @@
-# account 模块文案（en_US）——由 tools 拆分生成，可手工修订
-auto_strings:
+# account.yaml — 按模块段落组织
+account_dialog:
   "上行": "Upload"
   "下列用户的数据将以云端快照为准，本机数据会被覆盖：": "Data for the following users will follow the cloud snapshot; local data will be overwritten:"
   "下行": "Download"
@@ -39,7 +39,6 @@ auto_strings:
   "正在登录…": "Signing in…"
   "注册": "Register"
   "清除同步": "Clear Sync"
-  "用户": "User"
   "登出": "Sign out"
   "登录": "Sign in"
   "登录后可同步角色名册、文档与总览数据": "Sign in to sync rosters, documents and overview data"
@@ -62,3 +61,5 @@ auto_strings:
   "隐藏密码": "Hide password"
   "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。": "First time: establish sync state between this machine and the cloud. If the cloud already has data, local\nusers, overview definitions and overview data are backed up to config/session/_backup-* before pulling."
   "；等 {} 项": "; {} more items"
+common:
+  "用户": "User"

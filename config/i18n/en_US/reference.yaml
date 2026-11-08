@@ -1,12 +1,17 @@
-# reference 模块文案（en_US）——由 tools 拆分生成，可手工修订
-auto_strings:
+# reference.yaml — 按模块段落组织
+common:
+  "分组": "Group"
+  "数字": "Number"
+  "文本": "Text"
+menu_ops:
+  "图库管理": "Reference Manager"
+reference:
   "  未导入图片": "  No image imported"
   "元数据字段定义已保存": "Metadata field definitions saved"
   "元数据定义": "Metadata Definition"
   "全部删除": "Delete All"
   "内置字段不可删除": "Built-in fields cannot be deleted"
   "内置字段，不可编辑或删除": "Built-in field, cannot be edited or deleted"
-  "分组": "Group"
   "切割": "Split"
   "切割结果": "Split Result"
   "删除空间": "Delete Space"
@@ -17,10 +22,8 @@ auto_strings:
   "参考图信息": "Reference Image Info"
   "可筛选": "Filterable"
   "图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格": "Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter"
-  "图库管理": "Reference Manager"
   "图片文件 (*.png *.jpg *.bmp *.webp)": "Image Files (*.png *.jpg *.bmp *.webp)"
   "字段标识 (key)": "Field Identifier (key)"
-  "导入图片": "Import Image"
   "尚未切割": "Not yet split"
   "已填写的字段将应用到所有选中项": "Filled fields will be applied to all selected items"
   "应用到全部": "Apply to All"
@@ -29,8 +32,6 @@ auto_strings:
   "执行切割": "Execute Split"
   "批量管理": "Batch Management"
   "提交到图库": "Submit to Gallery"
-  "数字": "Number"
-  "文本": "Text"
   "新增参考图": "Add Reference Image"
   "新增字段": "Add Field"
   "新建图库空间": "New Gallery Space"
@@ -53,3 +54,5 @@ auto_strings:
   "输出元数据（识别时按区域 OCR）": "Output metadata (OCR by region during recognition)"
   "退出批量": "Exit Batch"
   "选择参考图片": "Select Reference Image"
+user_avatar:
+  "导入图片": "Import Image"

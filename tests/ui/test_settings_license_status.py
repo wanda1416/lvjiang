@@ -57,4 +57,4 @@ def test_corrupt_activation_remains_clearable_and_online_reason_is_translated(tm
     monkeypatch.setattr(protected_remote, "member_access_status", lambda: protected_remote.MemberAccessStatus(
         state="denied", reason="激活码已被云端停用"))
     dialog._refresh_online_license_status()
-    assert dialog._online_license_status.text() == "Online member authorization：License code has been disabled in the cloud"
+    assert dialog._online_license_status.text() == "Online Member Authorization：License code has been disabled in the cloud"

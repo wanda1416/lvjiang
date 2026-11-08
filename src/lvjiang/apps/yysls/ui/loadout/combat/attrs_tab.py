@@ -1002,7 +1002,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if current_field:
             value = values[current_field]
             self._attr_bonus_name.setText(
-                tr("属攻伤害加成（{name}）").format(name=current_name)
+                tr("属攻伤害加成（{name}）").format(name=tr(current_name or ""))
             )
         else:
             non_zero = [(name, field) for name, field in attr_fields
@@ -1011,7 +1011,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 current_name, current_field = non_zero[0]
                 value = values[current_field]
                 self._attr_bonus_name.setText(
-                    tr("属攻伤害加成（{name}）").format(name=current_name)
+                    tr("属攻伤害加成（{name}）").format(name=tr(current_name))
                 )
             else:
                 value = 0.0
@@ -1019,7 +1019,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         self._attr_bonus_label.setText(format_value(value, "%"))
         tooltip = "\n".join(
-            f"{name}伤害加成：{format_value(values[field], '%')}"
+            tr("{name}伤害加成：{value}").format(
+                name=tr(name), value=format_value(values[field], "%"))
             for name, field in attr_fields
         )
         self._attr_bonus_name.setToolTip(tooltip)

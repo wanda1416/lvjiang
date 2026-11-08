@@ -960,11 +960,15 @@ class SchoolPanel(QWidget):
                 name, *fields = item
                 values = [getattr(attrs, field, 0.0) for field in fields]
                 if kind == "攻击":
-                    lines.append(f"{name}攻击：{values[0]:.2f} - {values[1]:.2f}")
+                    lines.append(tr("{name}攻击：{value}").format(
+                        name=tr(name),
+                        value=f"{values[0]:.2f} - {values[1]:.2f}"))
                 elif kind == "伤害加成":
-                    lines.append(f"{name}伤害加成：{values[0] * 100:.2f}%")
+                    lines.append(tr("{name}伤害加成：{value}").format(
+                        name=tr(name), value=f"{values[0] * 100:.2f}%"))
                 else:
-                    lines.append(f"{name}穿透：{values[0]:.2f}")
+                    lines.append(tr("{name}穿透：{value}").format(
+                        name=tr(name), value=f"{values[0]:.2f}"))
             return "\n".join(lines)
 
         def make_cell(

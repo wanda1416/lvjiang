@@ -708,6 +708,39 @@ yysls:
   未选择用户: No user selected
   所选用户没有冷却装备: The selected users have no cooling equipment
   '{shown} / {total} 件': '{shown} / {total} items'
+  外功: Physical
+  属攻攻击: Attribute Attack
+  无相攻击: Formless Attack
+  最小鸣金攻击: Min Bellstrike Attack
+  最大鸣金攻击: Max Bellstrike Attack
+  最小裂石攻击: Min Stonesplit Attack
+  最大裂石攻击: Max Stonesplit Attack
+  最小破竹攻击: Min Bamboocut Attack
+  最大破竹攻击: Max Bamboocut Attack
+  最小牵丝攻击: Min Silkbind Attack
+  最大牵丝攻击: Max Silkbind Attack
+  直接会心率: Direct Critical Rate
+  直接会意率: Direct Affinity Rate
+  会心率(白字): Critical Rate (White)
+  会意率(白字): Affinity Rate (White)
+  会心伤害加成: Critical Damage Bonus
+  会意伤害加成: Affinity Damage Bonus
+  外功伤害加成: Physical Damage Bonus
+  鸣金伤害加成: Bellstrike Damage Bonus
+  裂石伤害加成: Stonesplit Damage Bonus
+  破竹伤害加成: Bamboocut Damage Bonus
+  牵丝伤害加成: Silkbind Damage Bonus
+  外功伤害减免: Physical Damage Reduction
+  属攻伤害减免: Attribute Damage Reduction
+  外功穿透: Physical Penetration
+  鸣金穿透: Bellstrike Penetration
+  裂石穿透: Stonesplit Penetration
+  破竹穿透: Bamboocut Penetration
+  牵丝穿透: Silkbind Penetration
+  增伤效果: Damage Boost
+  '{name}攻击：{value}': '{name} Attack: {value}'
+  '{name}伤害加成：{value}': '{name} Damage Bonus: {value}'
+  '{name}穿透：{value}': '{name} Penetration: {value}'
 auto_strings:
   '   - 词条未记录': '   - Affix Not Recorded'
   ' 等+': ' ...+'

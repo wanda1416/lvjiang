@@ -4,7 +4,7 @@ map_manager:
   "HUD 场景绑定（坐标在场景编辑器里标定）": "HUD scene bindings (calibrate coordinates in the Scene Manager)"
   "{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。": "{scene}.{point} is outside the minimap; heading detection uses the region center for now."
   "⚠ 缺失：{key}": "⚠ Missing: {key}"
-  "不能删除": "Cannot delete"
+  "不能删除": "Cannot Delete"
   "从当前画面截取": "Capture from the current frame"
   "会同时生成 HUD 场景 map_<key>，之后在场景编辑器里标定小地图与大地图区域。": "This also generates the HUD scene map_<key>; calibrate the minimap and world-map regions in the Scene Manager afterwards."
   "保存当前画面为探查图片": "Save the current frame as a survey image"
@@ -91,6 +91,7 @@ map_manager:
   "选择底图": "Select Base Map"
   "重新识别": "Re-detect"
   "（尚未载入截图）": "(no screenshot loaded)"
+  'POI key 重复: {key}': "Duplicate POI key: {key}"
 maps:
   "POI key 重复: {key}": "Duplicate POI key: {key}"
   "地图 key 已存在: {key}": "Map key already exists: {key}"

@@ -65,6 +65,7 @@ daily_history:
   "耗时": "Duration"
   "返回全部任务": "Back to all tasks"
   "配置": "Config"
+  任务: "Task"
 history_viewer:
   "刷新日志": "Refresh Log"
   "当前级别没有日志": "No logs at this level"

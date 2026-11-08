@@ -91,6 +91,7 @@ map_manager:
   "选择底图": "选择底图"
   "重新识别": "重新识别"
   "（尚未载入截图）": "（尚未载入截图）"
+  'POI key 重复: {key}': 'POI key 重复: {key}'
 maps:
   "POI key 重复: {key}": "POI key 重复: {key}"
   "地图 key 已存在: {key}": "地图 key 已存在: {key}"

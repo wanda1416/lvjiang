@@ -12,7 +12,8 @@ action_catalog:
 apk_release:
   "下载 {url} 失败：{err}": "Failed to download {url}: {err}"
   "下载已取消": "Download cancelled"
-  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "Checksum mismatch; the file may be corrupted or tampered with\nExpected {want}\nActual {got}"
+  ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
+  : "Checksum mismatch; the file may be corrupted or tampered with\nExpected {want}\nActual {got}"
 batch_report:
   "## 汇总": "## Summary"
   "成功": "Succeeded"
@@ -42,7 +43,7 @@ core_common:
   "[ShellCapture] screencap 返回空数据（Shizuku 未授权？）": "[ShellCapture] screencap returned empty data (Shizuku not authorized?)"
   "config 中缺少 model_path": "config is missing model_path"
   "initial_variables 必须是 JSON 对象": "initial_variables must be a JSON object"
-  "pynput 未安装，无法录制": "pynput not installed; cannot record"
+  "pynput 未安装，无法录制": "pynput is not installed; cannot record"
   "全量": "Full"
   "分组名称不能为空": "Group name cannot be empty"
   "可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试": "The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again."
@@ -136,3 +137,19 @@ wgc_capture:
   "缺少 windows-capture 依赖，请重新安装或更新程序": "The windows-capture dependency is missing; reinstall or update the program"
 workflows_common:
   "pixel_ratios: rules 必须是非空字典": "pixel_ratios: rules must be a non-empty mapping"
+android:
+  3 次尝试均无法读取视频流协议头（scrcpy server 未就绪或版本不符）: "Failed to read the video stream header after 3 attempts (scrcpy server not ready or version mismatch)"
+  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: "No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry"
+  scrcpy server 启动失败（返回码 {rc}）：{detail}: "scrcpy server failed to start (exit code {rc}): {detail}"
+  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: "scrcpy protocol version changed unexpectedly: client implements {version}; {detail}"
+  下载 {url} 失败：{err}: "Failed to download {url}: {err}"
+  下载已取消: "Download cancelled"
+  亮屏但 {n:.0f} 秒没有收到任何画面数据（连接无响应或画面采集已停摆）: "Screen is on but no stream data for {n:.0f} s (connection not responding or capture has stalled)"
+  亮屏但 {n:.0f} 秒没有新画面: "Screen is on but no new frames for {n:.0f} s"
+desktop:
+  DesktopCapture 已停止: "DesktopCapture stopped"
+ondevice:
+  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': "[A11yCapture] Accessibility Service not connected (switch off or disabled by system); re-enable it"
+  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': "[ShellCapture] screencap returned empty data (Shizuku not authorized?)"
+  config 中缺少 model_path: "model_path missing from config"
+  initial_variables 必须是 JSON 对象: "initial_variables must be a JSON object"

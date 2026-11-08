@@ -116,6 +116,14 @@ action_catalog:
   "高出其他通道": "高出其他通道"
 builtin_profile:
   "DSL OCR 观测": "DSL OCR 观测"
+  DSL 写入: DSL 写入
+  'color_ratio: 缺少颜色参数': 'color_ratio: 缺少颜色参数'
+  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}'
+  'find_multi_color: 缺少锚点颜色': 'find_multi_color: 缺少锚点颜色'
+  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules 必须是非空字典'
+  '{name}: 需要数值，实际: {v!r}': '{name}: 需要数值，实际: {v!r}'
+  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}'
+  '{what}: 需要坐标引用，实际: {t}': '{what}: 需要坐标引用，实际: {t}'
 core_common:
   "场景": "场景"
 profile:

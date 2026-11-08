@@ -95,7 +95,8 @@ user_avatar:
   "编辑“{name}”的头像": "Edit avatar for \"{name}\""
   "编辑头像": "Edit Avatar"
   "缩放": "Zoom"
-  "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。": "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
+  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
+  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
   "选择之前保存的头像，或导入一张新图片": "Pick a previously saved avatar or import a new image"
 user_manager:
   "保存属性": "Save Attributes"
@@ -112,7 +113,8 @@ user_manager:
   "用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。": "Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters."
   "用户名已存在": "Username already exists"
   "用户属性": "User Attributes"
-  "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
+  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
+  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
   "＋ 新建用户": "＋ New User"
 user_toolbar:
   "上一个用户": "Previous User"

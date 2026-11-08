@@ -136,7 +136,7 @@ yysls:
   养成扫描装备: Develop Scanned Equipment
   记录扫描装备的转律、承音或培养: Record transmutation, Chengyin, or cultivation
   扫描装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Fixed properties of scanned equipment are read-only · Only transmutation, Chengyin, and value cultivation are supported
-  此装备没有可培养的定音词条: This equipment has no Dingyin affix to cultivate
+  此装备没有可培养的定音词条: This equipment has no Attunement affix to cultivate
   当前装备不支持继续承音，或没有更高的已配置等级: This equipment cannot be upgraded through Chengyin, or no higher configured level exists
   培养只能提高词条数值，不能降低: Cultivation can only increase affix values
   一次转律只能修改一个词条: Only one affix can be transmuted at a time
@@ -353,7 +353,7 @@ yysls:
   副武学: Off Martial
   勾选该词条可出现的装备部位_全选_全部: Check equipment slots where this affix can appear (Select All = All)
   反选: Invert
-  定音词组: Dingyin Phrase
+  定音词组: Attunement Phrase
   将选中赛季上移一行: Move selected season up one row
   将选中赛季下移一行: Move selected season down one row
   将选中配置上移一行: Move selected config up one row
@@ -724,7 +724,7 @@ auto_strings:
   '## 运行结束': '## Run Finished'
   '### 成品清单（一般及以上）': '### Finished Items (Common and above)'
   100%毕业率基准 DPS: 100% Graduation Rate Baseline DPS
-  <止戈定音>: <Zhige Dingyin>
+  <止戈定音>: <Zhige Attunement>
   DPS: DPS
   Excel 工作簿 (*.xlsx): Excel Workbook (*.xlsx)
   Excel 文件 (*.xlsx): Excel File (*.xlsx)
@@ -778,8 +778,8 @@ auto_strings:
   仅首词条: First Affix Only
   仅展示黄字三率和增效: Show Effective Rates and Bonuses Only
   以下装备存在词条组合异常，已排除培养计算；请先校正：: 'The following equipment has an invalid affix combination and has been excluded from the graduation calculation; please correct it first:'
-  会心率: Crit Rate
-  会意率: Insight Rate
+  会心率: Critical Rate
+  会意率: Affinity Rate
   伞: Umbrella
   伞武学增伤: Umbrella Martial Damage
   传入规则: Passed-in Rules
@@ -877,7 +877,7 @@ auto_strings:
   基础属性：未声明（YAML 中通过 _attr 配置）: 'Base attributes: Not declared (configured via _attr in YAML)'
   基础方案: Base Plan
   基础规则组顶层必须是 dict: The top level of a base rule group must be a dict
-  填写这套基础配置对应的面板属性。装备专属属性无需填写；外功穿透和属攻穿透仅填写基础值，不包含装备定音。: Fill in the panel attributes for this base config. Equipment-exclusive attributes don't need to be filled in; External Penetration and Elemental Penetration should only include the base value, not equipment Dingyin.
+  填写这套基础配置对应的面板属性。装备专属属性无需填写；外功穿透和属攻穿透仅填写基础值，不包含装备定音。: Fill in the panel attributes for this base config. Equipment-exclusive attributes don't need to be filled in; Physical Penetration and Attribute Penetration should only include the base value, not equipment attunement.
   增效类: Enhancement
   增益抗性百分比（可选，>= 0）: Bonus resistance percentage (optional, >= 0)
   增益效果: Bonus Effects
@@ -887,14 +887,14 @@ auto_strings:
   备战方案: Loadout Plan
   复制失败: Copy Failed
   复制装备数据到创建对话框: Copy equipment data into the Create dialog
-  外功攻击: External ATK
-  外功类: External
-  外功防御: External DEF
+  外功攻击: Physical Attack
+  外功类: Physical
+  外功防御: Physical Defense
   如：踏雪云珑: e.g. Taxue Yunlong
   如：黄钟长鸣: e.g. Huangzhong Changming
   字体设置: Font Settings
   完成：{rounds} 轮，{status}: 'Done: {rounds} rounds, {status}'
-  定音: Dingyin
+  定音: Attunement
   最终评级：: 'Final Rating:'
   最终评级：-: 'Final Rating: -'
   实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源: 'Experimental: import a graduation-rate calculator Excel file to view the race axis and damage sources'
@@ -914,20 +914,20 @@ auto_strings:
   导出数据: Export Data
   导出装备数据: Export Equipment Data
   将低于最高等级的装备视为最高等级参与计算: Treat equipment below the max level as max level for the calculation
-  将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定: Treat equipment below the max level as max level (raises base attributes); affix/Dingyin values are determined by full Chengyin/full Dingyin
-  将已装备的定音词条数值视为上限（100%）参与计算: Treat the equipped Dingyin affix values as the cap (100%) in the calculation
+  将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定: Treat equipment below the max level as max level (raises base attributes); affix/Attunement values are determined by full Chengyin/full Attunement
+  将已装备的定音词条数值视为上限（100%）参与计算: Treat the equipped Attunement affix values as the cap (100%) in the calculation
   将已装备的承音装备词条数值视为承音上限参与计算: Treat the equipped Chengyin equipment's affix values as the Chengyin cap in the calculation
   尚未导入。选择毕业率计算器 Excel 查看其竞速轴。: Not imported yet. Select a graduation-rate calculator Excel file to view its race axis.
-  属性攻击: Elemental Attack
+  属性攻击: Attribute Attack
   属性跟随: Attribute Follow
-  属攻: Elemental ATK
-  属攻伤害加成: Elemental ATK Damage Bonus
-  属攻伤害加成（{name}）: Elemental ATK Damage Bonus ({name})
-  属攻穿透: Elemental Penetration
-  属攻穿透（{name}）: Elemental Penetration ({name})
-  属攻类: Elemental
-  属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Elemental ATK affixes (including Formless) allowed at most 2; affixes 2-5 currently have {n}
-  已定音: Dingyin Applied
+  属攻: Attribute ATK
+  属攻伤害加成: Attribute ATK Damage Bonus
+  属攻伤害加成（{name}）: Attribute ATK Damage Bonus ({name})
+  属攻穿透: Attribute Penetration
+  属攻穿透（{name}）: Attribute Penetration ({name})
+  属攻类: Attribute
+  属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Attribute ATK affixes (including Formless) allowed at most 2; affixes 2-5 currently have {n}
+  已定音: Attunement Applied
   ? "已导出到\n{path}"
   : "Exported to\n{path}"
   已应用: Applied
@@ -1045,18 +1045,18 @@ auto_strings:
   最低材料数量: Min Material Count
   最多同时选择 3 件装备。: Select up to 3 pieces of equipment at once.
   最大: Max
-  最大外功攻击: Max External ATK
-  最大外属攻击: Max External Elemental ATK
-  最大无相攻击: Max Formless ATK
-  最大本属攻击: Max Innate Elemental ATK
+  最大外功攻击: Max Physical Attack
+  最大外属攻击: Max External Attribute Attack
+  最大无相攻击: Max Void Attack
+  最大本属攻击: Max Innate Attribute Attack
   最大预期：: 'Max Expected:'
   最大预期：-: 'Max Expected: -'
   最大预期：判定中...: 'Max Expected: judging...'
   最小: Min
-  最小外功攻击: Min External ATK
-  最小外属攻击: Min External Elemental ATK
-  最小无相攻击: Min Formless ATK
-  最小本属攻击: Min Innate Elemental ATK
+  最小外功攻击: Min Physical Attack
+  最小外属攻击: Min External Attribute Attack
+  最小无相攻击: Min Void Attack
+  最小本属攻击: Min Innate Attribute Attack
   最高单项提升: Highest Single-Item Uplift
   未归类: Uncategorized
   未找到「添加」入口: '"Add" entry point not found'
@@ -1118,7 +1118,7 @@ auto_strings:
   测高: Measure Height
   添加词条名: Add Affix Name
   游戏账号、角色名、装备名称、装备指纹、截图和日志: Game account, character name, equipment name, equipment fingerprint, screenshots, and logs
-  满定音: Full Dingyin
+  满定音: Full Attunement
   满承音: Full Chengyin
   满数值: Max Value
   满等级: Max Level
@@ -1127,14 +1127,14 @@ auto_strings:
   满调律: Fully Tuned
   漂移补滚后对齐失败: Alignment failed after drift compensation reroll
   燕云十六声: Yan Yun Shi Liu Sheng
-  牵丝: Qianzi
+  牵丝: Silkbind
   环: Ring
   环 · 佩: Ring · Pendant
   生存类: Survival
   用于备战方案比较  ·  不会修改真实背包装备: For comparing loadout plans  ·  does not modify your real inventory equipment
   用于改进律匠内置的调律规则: Used to improve LvJiang's built-in tuning rules
   用户中断: User Interrupted
-  破竹: Pozhu
+  破竹: Bamboocut
   确定删除基础属性「{name}」？: Delete base attributes "{name}"?
   ? "确定要从背包中删除【{name}】吗？\n此操作不可撤销。"
   : "Delete [{name}] from your inventory?\nThis cannot be undone."
@@ -1156,7 +1156,7 @@ auto_strings:
   等级字号: Level Font Size
   等级正序: Level Ascending
   筛选: Filter
-  精准率: Accuracy Rate
+  精准率: Precision Rate
   系统规则不可删除或修改 key；不使用时请取消启用: System rules cannot be deleted or have their key changed; disable them instead of deleting
   系统规则组不可删除: System rule groups cannot be deleted
   系统配置不可删除。如不需要，请改用停用/取消勾选。: System config cannot be deleted. If you don't need it, disable/uncheck it instead.
@@ -1196,7 +1196,7 @@ auto_strings:
   蓝装及以下: Blue Equipment and Below
   '行 ': 'Row '
   补滚后对齐失败: Alignment failed after reroll
-  裂石: Rock-Splitting
+  裂石: Stonesplit
   装备: Equipment
   装备信息: Equipment Info
   装备名字号: Equipment Name Font Size
@@ -1308,7 +1308,7 @@ auto_strings:
   首词条 %: First Affix %
   首词条「{name}」不能出现在{part}: First affix "{name}" cannot appear on {part}
   首词条不限: First Affix Unrestricted
-  鸣金: Mingjin
+  鸣金: Bellstrike
   默认（跟随基础规则）: Default (follow base rule)
   （本方案）: (Current Plan)
   （本流派）: (Current School)
@@ -1631,7 +1631,7 @@ auto_strings:
   推导值: Derived
   推导失败: Derivation failed
   推导失败：{msg}: 'Derivation failed: {msg}'
-  攻具定音: Attack Gear Dingyin
+  攻具定音: Attack Gear Attunement
   新增失败: Add Failed
   新增条目: New Entry
   新增武学: New Martial Art
@@ -1678,7 +1678,7 @@ auto_strings:
   重命名分组: Rename Group
   重复: Duplicate
   重置: Reset
-  防具定音: Armor Dingyin
+  防具定音: Armor Attunement
   随武学: From art
   高级编辑 - {name}: Advanced edit - {name}
   （不对照）: (no reference)
@@ -1746,20 +1746,20 @@ auto_strings:
   不选择流派: No school
   不选择玩法: No playstyle
   不需要增伤: No damage boost needed
-  与另一件同类型装备互换普通定音属性: Swap normal Dingyin affixes with another piece of the same type
+  与另一件同类型装备互换普通定音属性: Swap normal Attunement affixes with another piece of the same type
   与备战方案一致: Matches the loadout plan
   与当前备战方案一致，无需更换: Matches the current loadout plan; no change needed
   与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）: Different source from the paired plan; the coefficient table may be outdated (re-import the Excel to fix)
   个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。留空时自动跟随当前赛季等级。: Personal level determines the resistance used in graduation rate calculations and caps the plan level you can load. Leave empty to follow the current season level.
   为当前用户创建一件模拟装备，不修改角色基础属性: Create a mock equipment for the current user without modifying base attributes
   为当前用户和当前基础规则组启用智能调律。运行前请为相关备战方案扫描完整的八件穿戴装备。: Enable smart tuning for the current user and base rule group. Scan all eight equipped pieces for the relevant loadout plan before running.
-  为本赛季等级的原生装备额外创建同等级承音分支；只将普通词条拉到承音上限，定音保持原值: Additionally create a same-level Chimera branch for native gear at this season's level; only normal affixes are raised to the Chimera cap, Dingyin stays as-is
+  为本赛季等级的原生装备额外创建同等级承音分支；只将普通词条拉到承音上限，定音保持原值: Additionally create a same-level Chimera branch for native gear at this season's level; only normal affixes are raised to the Chimera cap, Attunement stays as-is
   主增伤词条: Primary damage affix
   主武学和副武学不能相同: Main and sub martial arts cannot be the same
   主武学增伤: Main martial arts damage boost
   互换失败: Swap failed
-  互换定音: Swap Dingyin
-  互换普通定音: Swap normal Dingyin
+  互换定音: Swap Attunement
+  互换普通定音: Swap normal Attunement
   仅勾选无歧义候选；有多个可能版本的组请人工核对: Only unambiguous candidates are checked; manually review groups with multiple possible versions
   仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。: PC only; when off, the more precise drag-scroll is used.
   仅在现有调律处理决定继续调律后执行。系统会基于备战方案和承音上限推演当前装备的最大可能毕业率；计算失败或结果不可靠时始终放行。: Runs only after the tuning handler decides to continue. The system projects the gear's maximum possible graduation rate from the loadout plan and Chimera cap; always passes through if the calculation fails or is unreliable.
@@ -1767,7 +1767,7 @@ auto_strings:
   从备战方案进入可加载角色基础属性并计算毕业率: Entering from a loadout plan allows loading character base attributes and computing graduation rate
   从当前方案开始: From the current plan
   以下词条未计入（按部位规则或同名只取最高处理）：: 'These affixes were not counted (slot rules or same-name highest-only):'
-  会意转化: Intent Conversion
+  会意转化: Affinity Conversion
   传入玩法: Playstyle (passed in)
   传律石不够: Not enough Chimera Stones
   传律石不够（持有 {held} < 要求 {need}），跳过该装备: Not enough Chimera Stones (have {held} < need {need}); skipping this piece
@@ -1810,10 +1810,10 @@ auto_strings:
   出装搭配: Loadout
   出装搭配名称: Loadout Name
   切换到: Switch to
-  切换卡片当前展示的定音: Toggle the Dingyin shown on this card
+  切换卡片当前展示的定音: Toggle the Attunement shown on this card
   切换后扫描处理/材料处理/调律处理页同步对准该组，不会修改用户在自动调律页选择的规则组: After switching, the Scan/Material/Tuning handler pages align to this group; rule groups selected on the Auto Tuning page are not modified
   切换失败: Switch failed
-  切换定音: Toggle Dingyin
+  切换定音: Toggle Attunement
   切换等级可查看该等级的词条上限与传律石估算；选到本装备的承音目标等级时会同时勾选承音: Switch levels to view affix caps and Chimera Stone estimates for that level; selecting this gear's Chimera target level also checks Chimera
   初始跳过: Initial skip
   删除全部模拟装备: Delete All Mock Equipment
@@ -1837,11 +1837,11 @@ auto_strings:
   删除选中规则: Delete Selected Rule
   删除选中规则组（至少保留一个）: Delete selected rule groups (keep at least one)
   判定会心: Judged Critical
-  判定会意: Judged Intent
+  判定会意: Judged Affinity
   判定抗性 {judge:.1f}%，增益抗性 {buff:.1f}%；黄字按公共规则折算与封顶。: Judge resistance {judge:.1f}%, buff resistance {buff:.1f}%; yellow text is converted and capped by shared rules.
   判定条件: Judgment Condition
   判定精准: Judged Precision
-  判定精准、判定会心、判定会意取面板黄字；直接会心、直接会意不受抗性。: Judged Precision/Critical/Intent use panel yellow text; Direct Critical and Direct Intent are unaffected by resistance.
+  判定精准、判定会心、判定会意取面板黄字；直接会心、直接会意不受抗性。: Judged Precision/Critical/Affinity use panel yellow text; Direct Critical and Direct Affinity are unaffected by resistance.
   判定顺序：垃圾 → 一般 → 优秀 → 顶级，命中即定档: 'Judgment order: Junk → Common → Excellent → Top; first match sets the grade'
   刷新生成方案: Refresh Generated Plan
   刷新装备数据: Refresh Equipment Data
@@ -1874,7 +1874,7 @@ auto_strings:
   发现 {count} 处部位/品阶无启用规则覆盖：: 'Found {count} slot/quality combinations with no active rule coverage:'
   发现同时配置 动态属攻和真实属攻，建议修正: Both dynamic and true element attack are configured; consider fixing
   取最大值: Take Maximum
-  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: After cancelling, normal affix cap values are used; base attributes and Dingyin still follow the selected level
+  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: After cancelling, normal affix cap values are used; base attributes and Attunement still follow the selected level
   另存为新搭配: Save As New Loadout
   只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。: Only ignores other existing affixes for the tuning threshold check; the first affix's maximum potential decides whether tuning starts.
   不会改写装备；进入后的调律处理仍使用完整实际词条。: Does not modify equipment; the tuning handler still uses the full actual affixes after entry.
@@ -1924,7 +1924,7 @@ auto_strings:
   回收补位循环上限：回收后重读同格续处理的最大次数，必须大于 0: 'Recycle refill loop cap: max times to re-read the same slot after recycling and continue; must be > 0'
   在原始装备与应用当前计算假设后的内存副本之间切换: Toggle between the original equipment and the in-memory copy after applying current assumptions
   在独立窗口中查看本轮全部装备处理结果: View all equipment processing results for this round in a separate window
-  培养只能提高定音数值: Growing can only raise Dingyin values
+  培养只能提高定音数值: Growing can only raise Attunement values
   培养只能提高词条数值: Growing can only raise affix values
   基于当前用户基础属性调整出装搭配: Adjust the loadout based on the current user's base attributes
   基础定义: Base Definitions
@@ -1957,7 +1957,7 @@ auto_strings:
   字段: Field
   存在多个可能版本或兼容性分歧，请人工核对；一键勾选不选择本组。: Multiple possible versions or compatibility conflicts; review manually. Check-all skips this group.
   完整且满足强制要求: Complete and meets forced requirements
-  定音词组: Dingyin Group
+  定音词组: Attunement Group
   对单位增伤: Single-target damage boost
   对战类型: Battle Type
   导入出装搭配: Import Loadout
@@ -2016,10 +2016,10 @@ auto_strings:
   强制调律: Force Tune
   强制调律：无视进入门槛，强制进入调律流程: 'Force Tune: bypass the entry threshold and force into the tuning flow'
   当前任务: Current Task
-  当前入口不支持互换定音，请在装备页操作: This entry doesn't support Dingyin swap; do it on the Equipment page
+  当前入口不支持互换定音，请在装备页操作: This entry doesn't support Attunement swap; do it on the Equipment page
   当前入口不支持修改套装: This entry doesn't support set editing
   当前入口不支持修改计算设置: This entry doesn't support calculation settings
-  当前入口不支持切换定音，请在装备页操作: This entry doesn't support Dingyin toggle; do it on the Equipment page
+  当前入口不支持切换定音，请在装备页操作: This entry doesn't support Attunement toggle; do it on the Equipment page
   当前图库空间缺少 levels/counts 输出字段，无法启动自动调律: The current gallery space lacks levels/counts output fields; cannot start auto tuning
   当前方案: Current Plan
   当前方案三满极限: Current plan full-cap limit
@@ -2063,7 +2063,7 @@ auto_strings:
   技能名不能为空: Skill name cannot be empty
   指定调律: Designated Tuning
   按 {level} 阶承音上限估算：: 'Estimated at Lv {level} Chimera cap:'
-  按当前备战方案玩法将定音视为目标满值参与计算: Per the current plan's playstyle, Dingyin is treated as target cap for calculation
+  按当前备战方案玩法将定音视为目标满值参与计算: Per the current plan's playstyle, Attunement is treated as target cap for calculation
   按照满承音装备计算: Calculated as full-Chimera gear
   按装备上已保存的转律目标计算（目标由「毕业率分析 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: Calculates from the transfer target saved on the gear (set via Graduation Analysis → Transfer Suggestions); uses saved targets only, no search triggered
   换下：{name}: 'Swap out: {name}'
@@ -2093,7 +2093,7 @@ auto_strings:
   新建属性…: New Attribute…
   新穿戴: Newly Equipped
   ? "方案极限：原穿戴方案按满等级、满承音、满定音计算；\n当前实值：备战方案当前八件的实际毕业率，仅供参考；\n七件极限：排除当前部位后，其余装备按三项全满计算；\n候选极限：替换当前装备后，整套方案按三项全满计算。"
-  : "Plan limit: the original plan at full level, full Chimera, full Dingyin;\nCurrent actual: the plan's eight pieces' actual graduation rate, for reference;\nSeven-piece limit: excluding this slot, the rest at all-three-max;\nCandidate limit: after swapping this piece, the whole plan at all-three-max."
+  : "Plan limit: the original plan at full level, full Chimera, full Attunement;\nCurrent actual: the plan's eight pieces' actual graduation rate, for reference;\nSeven-piece limit: excluding this slot, the rest at all-three-max;\nCandidate limit: after swapping this piece, the whole plan at all-three-max."
   方案等级: Plan Level
   方案：{name} · {level}级 v{version}（满值属性，不含食物加成）: 'Plan: {name} · Lv {level} v{version} (max-value attributes, no food buffs)'
   无可展示词条: No affixes to display
@@ -2106,7 +2106,7 @@ auto_strings:
   无法识别重置次数: Cannot read reset count
   无法识别重置次数，跳过该装备: Cannot read reset count; skipping this piece
   无法重命名: Cannot rename
-  无特定定音: No specific Dingyin
+  无特定定音: No specific Attunement
   无需增伤: No damage boost
   无静态加成: No static bonus
   旧版本 {index}: Old version {index}
@@ -2128,7 +2128,7 @@ auto_strings:
   最大连续回收次数: Max consecutive recycles
   最少: Min
   最终会心: Final Critical
-  最终会意: Final Intent
+  最终会意: Final Affinity
   最终伤害判定率: Final Damage Judgment Rate
   最终评级未达优秀 → 结束并保留装备: Final grade below Excellent → stop and keep the gear
   最终词条: Final Affixes
@@ -2182,14 +2182,14 @@ auto_strings:
   模拟调律: Mock Tuning
   次数用尽后: After count exhausted
   次数耗尽转回收: Recycle after count exhausted
-  止戈定音具体类型尚未配置，暂不支持互换: Zhige Dingyin sub-type not configured; swap not supported yet
+  止戈定音具体类型尚未配置，暂不支持互换: Zhige Attunement sub-type not configured; swap not supported yet
   正在处理：{name}: 'Processing: {name}'
   正在处理：{name}（{idx}/{total}）: 'Processing: {name} ({idx}/{total})'
   正在拖动: Dragging
   正在重新计算…: Recalculating…
   此操作不可撤销。: This cannot be undone.
-  此装备没有可切换的普通定音词条: This gear has no swappable normal Dingyin affixes
-  此装备没有可培养的定音词条: This gear has no growable Dingyin affixes
+  此装备没有可切换的普通定音词条: This gear has no swappable normal Attunement affixes
+  此装备没有可培养的定音词条: This gear has no growable Attunement affixes
   武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。: Weapon candidates come from equipment-config weapon types. Martial arts boosts have moved to equipment-config weapon types.
   武器类型「{name}」已存在。: Weapon type "{name}" already exists.
   武器类型「{name}」正被流派 {users} 引用，请先在流派配置中解除绑定。: Weapon type "{name}" is referenced by school {users}; unbind it in school config first.
@@ -2205,7 +2205,7 @@ auto_strings:
   比较前，候选装备与当前穿戴装备的毕业率都会按所选精度向下取整。例如 94.59% 在 0.1% 精度下按 94.5% 判断。: Before comparison, both candidate and worn gear graduation rates are floored to the selected precision. E.g. 94.59% at 0.1% precision is judged as 94.5%.
   毕业率方案: Graduation Plan
   毕业率精度: Graduation Precision
-  没有其他具有普通定音的同类型装备: No other same-type gear with normal Dingyin
+  没有其他具有普通定音的同类型装备: No other same-type gear with normal Attunement
   没有可估算的承音词条: No Chimera-estimable affixes
   没有更高的已配置等级: No higher configured level
   流派「{name}」已存在。: School "{name}" already exists.
@@ -2254,7 +2254,7 @@ auto_strings:
   用户：{user}　方案：{plan}　流派：{school}　基础属性：{base}　世界等级：{level}　弓玦：{gongjue}（{gongjue_level}级）: 'User: {user}　Plan: {plan}　School: {school}　Base: {base}　World level: {level}　Gongjue: {gongjue} (Lv {gongjue_level})'
   由流派决定；改流派，或把流派切到「自定义」后再单独编辑: Determined by school; change the school, or switch to "Custom" to edit individually
   白字会心率: White Critical Rate
-  白字会意率: White Intent Rate
+  白字会意率: White Affinity Rate
   白字精准率: White Precision Rate
   白装: White Gear
   目标用户：{user}　备战方案：{plan}　玩法：{style}: 'Target user: {user}　Plan: {plan}　Playstyle: {style}'
@@ -2262,8 +2262,8 @@ auto_strings:
   目标词条：-: 'Target affix: —'
   目标：-: 'Target: —'
   相邻赛季日期必须衔接：赛季 {previous} 的结束日期必须等于赛季 {following} 的开始日期（05:00 切换）: "Adjacent season dates must align: season {previous}'s end date must equal season {following}'s start date (05:00 switchover)"
-  真实装备不能删除定音词条: Real equipment cannot have Dingyin affixes removed
-  真实装备不能新增定音词条: Real equipment cannot have Dingyin affixes added
+  真实装备不能删除定音词条: Real equipment cannot have Attunement affixes removed
+  真实装备不能新增定音词条: Real equipment cannot have Attunement affixes added
   真实装备不能新增或删除词条: Real equipment cannot have affixes added or removed
   真实装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Real equipment's inherent attributes are immutable  ·  only transfer, Chimera and affix-value growing are supported
   '真实装备的既定属性不可修改: ': "Real equipment's inherent attributes are immutable: "
@@ -2327,7 +2327,7 @@ auto_strings:
   自选词条: Custom Affixes
   至少保留一个规则组: Keep at least one rule group
   草稿／要求未满足: Draft / requirements not met
-  蓄力技定音: Charged Skill Dingyin
+  蓄力技定音: Charged Skill Attunement
   蓝色装备，忽略: Blue gear; ignoring
   装备从起始等级（或更低）升到目标等级（或更高）时，原词条自动变成目标词条；只影响升级投影，不改真实扫描结果: When gear goes from the start level (or lower) to the target level (or higher), the original affix automatically becomes the target affix; only affects upgrade projection, not real scan results
   装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: Equipment distribution prioritizes validity and keeping original positions, not global graduation-rate optimality. Saving doesn't modify the current user's gear or base attributes.
@@ -2382,10 +2382,10 @@ auto_strings:
   该用户当前使用的方案: The plan currently used by this user
   该等级的装备不支持承音: Gear at this level doesn't support Chimera
   该等级重置调律不返还律准石，重置返还固定按 0 计。: Reset tuning at this level returns no Lv Stones; reset return is fixed at 0.
-  该装备两种定音都有，可在装备属性中切换: This gear has both Dingyin types; switch in gear attributes
-  该装备只扫描到一种定音，无法切换: Only one Dingyin type scanned; cannot toggle
+  该装备两种定音都有，可在装备属性中切换: This gear has both Attunement types; switch in gear attributes
+  该装备只扫描到一种定音，无法切换: Only one Attunement type scanned; cannot toggle
   该装备已经承音，承音状态不能撤销: Already Chimera-enhanced; state cannot be undone
-  该装备没有普通定音: This gear has no normal Dingyin
+  该装备没有普通定音: This gear has no normal Attunement
   该项固定为 0，无需配置: This is fixed at 0; no config needed
   请一次添加一个名称，无需使用逗号分隔。: Add one name at a time; no commas needed.
   请先为当前备战方案选择玩法: Pick a playstyle for the current loadout plan first
@@ -2455,7 +2455,7 @@ auto_strings:
   进入调律前及每轮结束后自上而下匹配；全部不命中时未满继续、已满保留: Before tuning starts and after each round, match top-down; no hit → continue if not full, keep if full
   选择 Agent 接入配置文件: Select Agent connection config file
   选择{title}词条: Select {title} affix
-  选择一件同类型装备，互换两者的普通定音属性。装备展示的定音类别和备战方案引用不会改变。: Pick a same-type piece to swap both gears' normal Dingyin affixes. The displayed Dingyin category and loadout plan references are unchanged.
+  选择一件同类型装备，互换两者的普通定音属性。装备展示的定音类别和备战方案引用不会改变。: Pick a same-type piece to swap both gears' normal Attunement affixes. The displayed Attunement category and loadout plan references are unchanged.
   选择原词条: Select Original Affix
   选择文件: Select File
   选择条件词条: Select Condition Affix

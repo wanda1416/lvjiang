@@ -17,6 +17,7 @@
 | [05-ui-pages-and-relations.md](05-ui-pages-and-relations.md) | 游戏 UI 页面、叠层、视图状态及自动化流程关联图 |
 | [06-mechanics-conventions.md](06-mechanics-conventions.md) | 游戏机制约定登记表：写死在代码、未进配置的规则事实（五维系数、弓玦、三率上限、调律铁律、部位归并等），含位置与依据 |
 | [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
+| [20-translation/](20-translation/README.md) | 游戏独有术语中英对照：基于国际服官方翻译表（武学/心法/流派/战斗属性/装备/定音等） |
 | [../40-development/analysis/](../40-development/analysis/README.md)（仅源码检出） | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（方法与过程，落户开发层） |
 
 ## 待补充（尚未创建）

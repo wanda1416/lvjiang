@@ -36,6 +36,7 @@ from .regen import (
     is_realtime_regen,
     normalize_realtime_write,
 )
+from .regen_gate import period_recovery_allowed
 from .repository import (
     db_get_history,
     db_get_history_record,
@@ -490,6 +491,13 @@ def profile_action(
         _raw = _read_current_value(username, model_type, key, kd)
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
+    # 闸门关闭（本进程尚未完成首次同步）时，准点恢复还没物化：这里必须用**存储值**
+    # 作基线，否则「未落库的恢复量」会被并进本次消耗/观测，历史行出现
+    # new != old + delta，当天的恢复也会从账本里消失。实时恢复没有独立账本行，
+    # 无此问题，基线照旧用计算值。
+    if (model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef)
+            and not _is_continuous_regen(kd) and not period_recovery_allowed()):
+        current_value = float((current_entry or {}).get("value", 0) or 0)
 
     # ── 1.5 regen 固化：先把「上次写入至今的恢复」落成一条 tick ──
     # 不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
@@ -505,25 +513,33 @@ def profile_action(
         else:
             restored_at = restored.updated_at
         if int(restored_value) != int(stored_value):
-            db_upsert(
-                username, model_type, key, restored_value,
-                updated_at=restored_at,
-                # 物化用 set 而非 tick：set 会随上行通道推送，消耗前的
-                # 「锚点 set + delta」成对到达回放端，delta 加在新锚点上，
-                # 回放端无需做任何 regen 计算即天然正确（tick 不上行，
-                # 锚点全靠快照收编，是跨端 regen 错乱的根源）。
-                change_type="set",
-                delta_value=_normalize_float_noise(restored_value - stored_value),
-                source=tr("自动恢复"),
-            )
-            current_entry = db_read_entry(username, model_type, key)
-            # 计算基线保持带小数的实时值：入库取整只在 tick 那一行做，若这里降级成
-            # 整数，后面的 normalize 会认为小数进度为 0 并把锚点设成 now，白丢一点。
-            current_value = float(restored.value)
-            if expected_entry is not None:
-                # 固化是本事务自己写的：CAS 的期望值必须跟着换，否则会被误判成
-                # 「其他进程更新过」，单进程一次消耗也会报冲突。
-                expected_entry = current_entry
+            # 闸门：本次进程尚未完成首次同步时不得物化。否则会把「基于过期锚点
+            # 算出的恢复」写成绝对值 set 上行，覆盖别的设备上真实发生的消耗
+            # （2026-11-09 体力事故）。同步完成后锚点已在本周期，这里自然不触发。
+            if period_recovery_allowed():
+                db_upsert(
+                    username, model_type, key, restored_value,
+                    updated_at=restored_at,
+                    # 物化用 set 而非 tick：set 会随上行通道推送，消耗前的
+                    # 「锚点 set + delta」成对到达回放端，delta 加在新锚点上，
+                    # 回放端无需做任何 regen 计算即天然正确（tick 不上行，
+                    # 锚点全靠快照收编，是跨端 regen 错乱的根源）。
+                    change_type="set",
+                    delta_value=_normalize_float_noise(restored_value - stored_value),
+                    source=tr("自动恢复"),
+                )
+                current_entry = db_read_entry(username, model_type, key)
+                # 计算基线保持带小数的实时值：入库取整只在 tick 那一行做，若这里降级成
+                # 整数，后面的 normalize 会认为小数进度为 0 并把锚点设成 now，白丢一点。
+                current_value = float(restored.value)
+                if expected_entry is not None:
+                    # 固化是本事务自己写的：CAS 的期望值必须跟着换，否则会被误判成
+                    # 「其他进程更新过」，单进程一次消耗也会报冲突。
+                    expected_entry = current_entry
+            elif _is_continuous_regen(kd):
+                # 实时恢复没有独立的账本行：闸门只挡落库，实时值仍参与本次计算，
+                # 否则一次消耗会按归档整数少算零点几个点。
+                current_value = float(restored.value)
 
     # ── 2. 计算目标新值 ──
     if set_value is not None:

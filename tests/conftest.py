@@ -192,6 +192,24 @@ def _isolate_profile_store(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _regen_gate_synced(tmp_path, monkeypatch):
+    """默认把周期恢复闸门当作「已完成首次同步」。
+
+    闸门的真实判据是本机登录态 + 本次进程是否完成过 pull；用例既不该依赖开发机
+    的凭据库，也不该在每次用例里手工打开闸门。需要验证闸门的用例自己
+    ``regen_gate.reset()`` 后按场景设置 ``_has_session``。
+    """
+    from lvjiang.core.profile import regen_gate
+
+    # 默认把闸门当作「本进程已完成首次同步」：用例既不依赖开发机登录态，也不必
+    # 每次手工打开。需要验证关闭路径的用例自行 reset() 并按需替换登录态探针。
+    regen_gate.reset()
+    regen_gate.mark_pull_completed()
+    yield
+    regen_gate.reset()
+
+
+@pytest.fixture(autouse=True)
 def _reset_game_config():
     """每个用例前重置 GameConfigManager 单例
 

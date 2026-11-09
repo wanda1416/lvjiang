@@ -214,6 +214,7 @@ def _store_refresh_token(token: str) -> None:
     if not user:
         if token:
             raise AccountError("缺少实例标识，无法保存登录态")
+        _invalidate_session_cache()
         return
     try:
         backend = _credentials()
@@ -225,6 +226,33 @@ def _store_refresh_token(token: str) -> None:
         raise
     except Exception as error:
         raise AccountError(f"无法写入系统凭据库：{error}") from None
+    finally:
+        # 登录 / 恢复 / 登出都从这里过：登录态一变就作废观测缓存，否则周期恢复
+        # 闸门会拿着 60 秒前的结论放行或拦住（2026-11-09 闸门评审意见 ①）。
+        _invalidate_session_cache()
+
+
+def _invalidate_session_cache() -> None:
+    """通知周期恢复闸门：登录态可能已变化。函数内导入避免与 profile 包循环。"""
+    from ..profile.regen_gate import invalidate_session_cache
+
+    invalidate_session_cache()
+
+
+def stored_session_state() -> bool | None:
+    """登录态三值探针：``True`` 有凭据、``False`` 确实没有、``None`` 读不到。
+
+    与 :meth:`AccountSession.has_stored_session` 的区别是**不把"读不到"当成
+    "没有"**：周期恢复闸门用它决定是否放行本地推算，凭据库偶发失败时误判成
+    "未登录"会放行本不该产生的派生物化。读不到时记一条 warning 并返回 None，
+    由调用方按保守方向处理。
+    """
+    try:
+        return bool(_stored_refresh_token())
+    except AccountError as error:
+        logger.warning("凭据库不可用，登录态未知：{}", error)
+        return None
+
 
 
 def _clear_stored_session() -> None:
@@ -429,8 +457,8 @@ class AccountSession:
         # 整写 account.json 会抹掉 profile_sync/users_sync，下一轮同步退回
         # bootstrap，把云端旧快照静默盖到本地新数据上（2026-11-04 事故根源）。
         # 只有切换到不同账号时才换一份干净的运行态。
-        profile = (load_profile()
-                   if load_profile().get("account_id") == result["account_id"] else {})
+        same_account = load_profile().get("account_id") == result["account_id"]
+        profile = load_profile() if same_account else {}
         profile.update({
             "login": result["login"], "account_id": result["account_id"],
             "display_name": result["display_name"], "instance_id": result["instance_id"],
@@ -438,6 +466,12 @@ class AccountSession:
         })
         e2e.persist_key_into(self.e2e_key, profile)
         _save_profile(profile)
+        if not same_account:
+            # 换账号等于换一份运行态：周期恢复闸门必须重新关闭，等新账号完成首次
+            # 干净拉取再推算（否则会用旧账号的锚点在新数据上物化周期恢复）。
+            from ..profile.regen_gate import reset as reset_regen_gate
+
+            reset_regen_gate()
         self.access_token = result["access_token"]
         self.access_expires_at = result["access_expires_at"]
         if not fetch_summary:

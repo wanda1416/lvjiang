@@ -22,7 +22,7 @@ from loguru import logger
 
 from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
-from . import repository
+from . import regen_gate, repository
 
 
 @dataclass
@@ -523,7 +523,14 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
         state["remote_history_id"] = since
         save_profile_sync_state(state)
     state["remote_history_id"] = since
+    # 只有「干净」的拉取才算完成首次同步：单条 op 回放失败只进 report.errors，
+    # 游标照样前移（那一行就此跳过），所以不能只看 HTTP 是否成功。
+    completed = not report.errors and not report.pending
+    if completed:
+        state["last_pull_ok_at"] = datetime.now().isoformat(timespec="seconds")
     save_profile_sync_state(state)
+    if completed:
+        regen_gate.mark_pull_completed()
     return report
 
 

@@ -36,6 +36,8 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 - 变更历史：区分主动操作 action、覆写 override、自动恢复 tick 和周期重置 reset
 - 周期自动重置：quota 到期自动清零，支持 day/week/month/season/half_season
 - 再生自动计算：regen 显式区分 realtime（按速率连续恢复）与 boundary（按准点边界恢复），封顶 cap
+- 周期恢复闸门：本次进程完成首次同步前不推算/物化周期恢复，避免基于过期基线的派生
+  值经同步覆盖其它设备上真实发生的消耗（2026-11-09 事故回归）
 - 超标预警：regen 达到 alert_above 阈值时触发提醒
 
 **配置层**

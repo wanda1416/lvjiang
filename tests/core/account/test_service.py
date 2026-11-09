@@ -229,12 +229,12 @@ def test_android_reports_model_name_and_android_platform(monkeypatch) -> None:
     """Android 上 sys.platform 是 linux、gethostname 是 localhost：
     上报必须换成机型 + android，否则设备列表里全是认不出的条目。"""
     monkeypatch.setattr(account_service, "_on_android", lambda: True)
-    monkeypatch.setattr(account_service, "_android_device_name", lambda: "vivo V2415A")
+    monkeypatch.setattr(account_service, "_android_device_name", lambda: "Pixel 7")
     monkeypatch.setattr(account_identity, "stable_instance_id", lambda: "inst-1")
 
     instance, device_name, instance_uuid = account_service._device_identity()
 
-    assert (instance, device_name, instance_uuid) == ("inst-1", "vivo V2415A", "inst-1")
+    assert (instance, device_name, instance_uuid) == ("inst-1", "Pixel 7", "inst-1")
     assert account_service._platform_tag() == "android"
 
 
@@ -386,3 +386,19 @@ def test_restore_fast_path_returns_truthy_without_summary(monkeypatch) -> None:
     assert session.restore(fetch_summary=False)
     assert calls == ["/api/refresh"]
     assert session.access_token == "at"
+
+
+def test_stored_session_state_distinguishes_unknown(monkeypatch) -> None:
+    """凭据库读不到时返回 None，让周期恢复闸门按 fail-closed 处理。"""
+    monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "")
+    assert account_service.stored_session_state() is False
+
+    monkeypatch.setattr(account_service, "_stored_refresh_token",
+                        lambda: "refresh-x")
+    assert account_service.stored_session_state() is True
+
+    def broken() -> str:
+        raise AccountError("keyring down")
+
+    monkeypatch.setattr(account_service, "_stored_refresh_token", broken)
+    assert account_service.stored_session_state() is None

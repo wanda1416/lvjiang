@@ -379,7 +379,7 @@ def _android_device_name() -> str:
 
     ``socket.gethostname()`` 在 Android 恒为 "localhost"，设备列表里全是
     localhost 没法分辨是哪台手机，所以这里读系统机型；品牌名已经在机型里
-    （如 "vivo V2415A"）就不重复拼。取不到时返回空串，由调用方兜底。
+    （如 "Pixel 7"）就不重复拼。取不到时返回空串，由调用方兜底。
     """
     try:
         from java import jclass  # Chaquopy 的 Java 桥，桌面端不存在

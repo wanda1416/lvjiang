@@ -86,9 +86,9 @@ def _roster(tmp) -> list[str]:
 
 def test_first_push_sets_order_and_signature(env) -> None:
     tmp, users = env["tmp"], env["users"]
-    _write_roster(tmp, ["楚湘菱", "蔡元君"])
-    _write_user(users, "楚湘菱", {"level": 50})
-    (users / "蔡元君.json").write_text(json.dumps({
+    _write_roster(tmp, ["李四", "张三"])
+    _write_user(users, "李四", {"level": 50})
+    (users / "张三.json").write_text(json.dumps({
         "attributes": {"level": 60}, "ui_state": {"filter": ["x"]}}, ensure_ascii=False),
         encoding="utf-8")
     report = users_sync.sync_users("t")
@@ -96,9 +96,9 @@ def test_first_push_sets_order_and_signature(env) -> None:
     push = env["server"].pushes[0]
     assert push["order_changed"] is True                    # 首次（无签名）
     payload = {u["username"]: u for u in push["users"]}
-    assert payload["蔡元君"]["data"]["attributes"]["level"] == 60
-    assert "ui_state" not in payload["蔡元君"]["data"]       # 界面偏好不上云
-    assert users_sync._sync_state()["roster"] == ["楚湘菱", "蔡元君"]
+    assert payload["张三"]["data"]["attributes"]["level"] == 60
+    assert "ui_state" not in payload["张三"]["data"]       # 界面偏好不上云
+    assert users_sync._sync_state()["roster"] == ["李四", "张三"]
 
 
 def test_unchanged_roster_pushes_without_reordering_cloud(env) -> None:
@@ -140,15 +140,15 @@ def test_local_reorder_propagates(env) -> None:
 
 def test_pull_merges_profile_preserving_local_ui_state(env) -> None:
     tmp, users, server = env["tmp"], env["users"], env["server"]
-    _write_roster(tmp, ["蔡元君"])
-    (users / "蔡元君.json").write_text(json.dumps({
+    _write_roster(tmp, ["张三"])
+    (users / "张三.json").write_text(json.dumps({
         "attributes": {"level": 1}, "ui_state": {"filter": ["本地"]}},
         ensure_ascii=False), encoding="utf-8")
-    server.rows["蔡元君"] = {"position": 0,
+    server.rows["张三"] = {"position": 0,
                             "data": {"attributes": {"level": 99}},
                             "updated_at": "2999-01-01T00:00:00"}   # 云端更新
     report = users_sync.sync_users("t")
-    merged = json.loads((users / "蔡元君.json").read_text(encoding="utf-8"))
+    merged = json.loads((users / "张三.json").read_text(encoding="utf-8"))
     assert merged["attributes"]["level"] == 99               # 资料取云端（LWW）
     assert merged["ui_state"]["filter"] == ["本地"]           # ui_state 永远本机
     assert report.pulled == 1

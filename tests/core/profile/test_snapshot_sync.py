@@ -154,15 +154,15 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
         "id": 1, "snapshot_remote_id": 2, "origin_instance_id": "other",
         "origin_name": "书房PC", "created_at": "2026-11-03T10:00:00", "entry_count": 2,
         "entries": json.dumps([
-            {"username": "蔡元君", "type": "stock", "key": "energy", "value": 20,
+            {"username": "张三", "type": "stock", "key": "energy", "value": 20,
              "value_text": "", "updated_at": "2026-11-03T10:00:00"},
-            {"username": "楚湘菱", "type": "stock", "key": "energy", "value": 8,
+            {"username": "李四", "type": "stock", "key": "energy", "value": 8,
              "value_text": "", "updated_at": "2026-11-03T10:00:00"}])}]
     report = snapshot_sync.pull_and_replay("t", allow_overwrite=True)
     assert report.snapshots == 1
     # 一份快照含全部用户，落地时按条目里的 username 归属
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 20
-    assert env["entries"]["楚湘菱"]["stock"]["energy"]["value"] == 8
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 20
+    assert env["entries"]["李四"]["stock"]["energy"]["value"] == 8
     assert env["state"]["remote_history_id"] == 2
     assert env["state"]["profile_snapshot_id"] == 1
     # 落地前的本地历史不上行：快照已代表当前状态，自己的陈年账本推上去
@@ -180,7 +180,7 @@ def test_push_refuses_backlog_over_limit(env) -> None:
     env["state"]["profile_snapshot_id"] = 1
     env["state"]["remote_history_id"] = 5
     env["history"].extend([
-        {"id": i, "username": "蔡元君", "type": "stock", "key": f"k{i}",
+        {"id": i, "username": "张三", "type": "stock", "key": f"k{i}",
          "new_value": 1, "new_value_text": "", "change_type": "set",
          "delta_value": None, "ts": "2026-11-04T07:00:00"}
         for i in range(1, snapshot_sync.MAX_PUSH_BACKLOG + 2)])
@@ -193,20 +193,20 @@ def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
     """回放按操作时间合并：远端旧 set 不覆盖本地新值（delta 恒应用）。"""
     env["state"]["remote_history_id"] = 1
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"].setdefault("蔡元君", {})["stock"] = {
+    env["entries"].setdefault("张三", {})["stock"] = {
         "energy": {"value": 120, "updated_at": "2026-11-04T07:00:00"}}
     env["server"].rows = [
         {"remote_id": 1},
         {"remote_id": 2, "instance_id": "phone", "local_id": 2,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "set", "value": 100, "happened_at": "2026-11-03T10:00:00"},   # 旧值
         {"remote_id": 3, "instance_id": "phone", "local_id": 3,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "delta", "delta": 5, "happened_at": "2026-11-03T10:00:01"},
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.pulled == 1                          # 只有 delta 生效
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 125
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 125
 
 
 def test_replay_stamps_entry_with_source_time_not_local_clock(env) -> None:
@@ -221,15 +221,15 @@ def test_replay_stamps_entry_with_source_time_not_local_clock(env) -> None:
     env["server"].rows = [
         {"remote_id": 1},
         {"remote_id": 2, "instance_id": "phone", "local_id": 2,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "set", "value": 7, "happened_at": "2026-11-01T09:00:00"},
         {"remote_id": 3, "instance_id": "phone", "local_id": 3,
-         "username": "蔡元君", "type": "stock", "key": "moon",
+         "username": "张三", "type": "stock", "key": "moon",
          "op": "set", "value": 8, "happened_at": "2026-11-02T09:00:00"},
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.pulled == 2
-    entries = env["entries"]["蔡元君"]["stock"]
+    entries = env["entries"]["张三"]["stock"]
     assert entries["energy"]["updated_at"] == "2026-11-01T09:00:00"
     assert entries["moon"]["updated_at"] == "2026-11-02T09:00:00"
 
@@ -246,15 +246,15 @@ def test_replayed_set_wins_over_later_stale_replay_of_same_key(env) -> None:
         {"remote_id": 1},
         # 到达序：先旧后新（离线设备补传 + 在线设备新写的典型混排）
         {"remote_id": 2, "instance_id": "phone", "local_id": 2,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "set", "value": 100, "happened_at": "2026-11-01T09:00:00"},
         {"remote_id": 3, "instance_id": "phone", "local_id": 3,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "set", "value": 200, "happened_at": "2026-11-03T09:00:00"},
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.pulled == 2
-    entry = env["entries"]["蔡元君"]["stock"]["energy"]
+    entry = env["entries"]["张三"]["stock"]["energy"]
     assert entry["value"] == 200
     assert entry["updated_at"] == "2026-11-03T09:00:00"
 
@@ -262,33 +262,33 @@ def test_replayed_set_wins_over_later_stale_replay_of_same_key(env) -> None:
 def test_incremental_pull_applies_set_and_delta(env) -> None:
     env["state"]["remote_history_id"] = 1
     env["state"]["profile_snapshot_id"] = 1   # 已落地过，不得重新 bootstrap
-    env["entries"].setdefault("蔡元君", {})["stock"] = {"energy": {"value": 10}}
+    env["entries"].setdefault("张三", {})["stock"] = {"energy": {"value": 10}}
     env["server"].rows = [
         {"remote_id": 1},
         {"remote_id": 2, "instance_id": "phone", "local_id": 2,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "delta", "delta": 5, "value": None},
         {"remote_id": 3, "instance_id": "phone", "local_id": 3,
-         "username": "蔡元君", "type": "stock", "key": "moon",
+         "username": "张三", "type": "stock", "key": "moon",
          "op": "set", "value": 7},
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.pulled == 2
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 15   # 10 + 5
-    assert env["entries"]["蔡元君"]["stock"]["moon"]["value"] == 7
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 15   # 10 + 5
+    assert env["entries"]["张三"]["stock"]["moon"]["value"] == 7
     assert env["state"]["remote_history_id"] == 3
 
 
 def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
     env["state"]["local_history_id"] = 100
     env["history"].extend([
-        {"id": 100, "username": "蔡元君", "type": "stock", "key": "old",
+        {"id": 100, "username": "张三", "type": "stock", "key": "old",
          "new_value": 1, "new_value_text": "", "change_type": "set",
          "delta_value": None, "ts": "2026-11-03T09:00:00"},
-        {"id": 101, "username": "蔡元君", "type": "stock", "key": "energy",
+        {"id": 101, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 5, "new_value_text": "", "change_type": "set",
          "delta_value": None, "ts": "2026-11-03T10:00:00"},
-        {"id": 102, "username": "蔡元君", "type": "stock", "key": "energy",
+        {"id": 102, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 3, "new_value_text": "", "change_type": "delta",
          "delta_value": -2, "ts": "2026-11-03T10:05:00"},
     ])
@@ -305,10 +305,10 @@ def test_push_stores_newer_row_and_skips_older_ones(env, monkeypatch) -> None:
     """同批里早于快照的行不能挡住后面的新修改，水位要划过整批。"""
     env["state"]["local_history_id"] = 0
     env["history"].extend([
-        {"id": 1, "username": "蔡元君", "type": "stock", "key": "energy",
+        {"id": 1, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 1, "new_value_text": "", "change_type": "set",
          "delta_value": None, "ts": "2000-01-01T00:00:00"},
-        {"id": 2, "username": "蔡元君", "type": "stock", "key": "energy",
+        {"id": 2, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 9, "new_value_text": "", "change_type": "set",
          "delta_value": None, "ts": "2099-01-01T00:00:00"},
     ])
@@ -335,17 +335,17 @@ def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
         {"id": 3, "snapshot_remote_id": 7, "origin_instance_id": "other",
          "origin_name": "手机", "created_at": "T3", "entry_count": 2,
          "entries": json.dumps([
-             {"username": "蔡元君", "type": "stock", "key": "energy", "value": 1},
-             {"username": "宛元芷", "type": "stock", "key": "energy", "value": 2}])},
+             {"username": "张三", "type": "stock", "key": "energy", "value": 1},
+             {"username": "王五", "type": "stock", "key": "energy", "value": 2}])},
         {"id": 2, "snapshot_remote_id": 5, "origin_instance_id": "mine",
          "origin_name": "本机", "created_at": "T2", "entry_count": 1,
-         "entries": json.dumps([{"username": "楚湘菱", "type": "stock", "key": "e", "value": 1}])},
+         "entries": json.dumps([{"username": "李四", "type": "stock", "key": "e", "value": 1}])},
     ]
-    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 1}, "moon": {"value": 2}}}
-    env["entries"]["楚湘菱"] = {"stock": {"energy": {"value": 1}}}
-    # 宛元芷：本地无数据 → 不需要警告；楚湘菱 只出现在旧快照里 → 也不算
+    env["entries"]["张三"] = {"stock": {"energy": {"value": 1}, "moon": {"value": 2}}}
+    env["entries"]["李四"] = {"stock": {"energy": {"value": 1}}}
+    # 王五：本地无数据 → 不需要警告；李四 只出现在旧快照里 → 也不算
     warnings = snapshot_sync.overwrite_warnings("t")
-    assert [row["username"] for row in warnings] == ["蔡元君"]
+    assert [row["username"] for row in warnings] == ["张三"]
     assert warnings[0]["entries"] == 2
     assert warnings[0]["origin_name"] == "手机"
 
@@ -355,24 +355,24 @@ def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
 
     # 本机快照但本地有快照创建之后、未推送的新行 → 必须确认
     # （2026-11-04 事故：本机旧快照静默盖掉未推送的 323 行更新）
-    env["history"].append({"id": 900, "username": "蔡元君", "type": "stock",
+    env["history"].append({"id": 900, "username": "张三", "type": "stock",
                            "key": "energy", "new_value": 8, "new_value_text": "",
                            "change_type": "set", "delta_value": None,
                            "ts": "T9", "device_id": "mine"})
     warnings = snapshot_sync.overwrite_warnings("t")
-    assert [row["username"] for row in warnings] == ["蔡元君"]
+    assert [row["username"] for row in warnings] == ["张三"]
 
 
 def test_pull_stops_with_pending_when_overwrite_not_confirmed(env) -> None:
     env["server"].snapshots = [{
         "id": 2, "snapshot_remote_id": 9, "origin_instance_id": "other",
         "origin_name": "书房PC", "created_at": "T2", "entry_count": 1,
-        "entries": json.dumps([{"username": "蔡元君", "type": "stock", "key": "energy",
+        "entries": json.dumps([{"username": "张三", "type": "stock", "key": "energy",
                                 "value": 99}])}]
-    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 5}}}
+    env["entries"]["张三"] = {"stock": {"energy": {"value": 5}}}
     report = snapshot_sync.pull_and_replay("t")
-    assert [row["username"] for row in report.pending] == ["蔡元君"]
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 5   # 未被覆盖
+    assert [row["username"] for row in report.pending] == ["张三"]
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 5   # 未被覆盖
     assert env["state"].get("remote_history_id", 0) == 0
     # sync_all 同样停在 pending，且不做上行
     combined = snapshot_sync.sync_all("t")
@@ -388,18 +388,18 @@ def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
     """
     env["state"]["remote_history_id"] = 1
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"regen": {"wumu": {"value": 0.0,
+    env["entries"]["张三"] = {"regen": {"wumu": {"value": 0.0,
                                                   "updated_at": "2026-11-06T07:23:18"}}}
     env["server"].rows = [
         {"remote_id": 1},
         {"remote_id": 2, "instance_id": "other-device", "local_id": 45,
-         "username": "蔡元君", "type": "regen", "key": "wumu",
+         "username": "张三", "type": "regen", "key": "wumu",
          "op": "set", "value": 20, "value_text": "",
          "source": "太平武墓", "happened_at": "2026-11-06T07:45:19"},
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.pulled == 1
-    assert env["entries"]["蔡元君"]["regen"]["wumu"]["value"] == 20.0
+    assert env["entries"]["张三"]["regen"]["wumu"]["value"] == 20.0
     row = env["history"][-1]
     assert row["device_id"] == "other-device"       # 谁写的
     assert row["origin_local_id"] == 45             # 那台设备上的第几号操作
@@ -416,19 +416,19 @@ def test_replay_is_idempotent_on_repeated_pull(env) -> None:
     """
     env["state"]["remote_history_id"] = 1
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 100}}}
+    env["entries"]["张三"] = {"stock": {"energy": {"value": 100}}}
     op = {"remote_id": 2, "instance_id": "other-device", "local_id": 7,
-          "username": "蔡元君", "type": "stock", "key": "energy",
+          "username": "张三", "type": "stock", "key": "energy",
           "op": "delta", "delta": 40, "value": None, "value_text": "",
           "happened_at": "2026-11-03T11:00:00"}
     env["server"].rows = [{"remote_id": 1}, op]
     assert snapshot_sync.pull_and_replay("t").pulled == 1
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 140
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 140
 
     # 水位被回退（模拟没存盘就崩溃），同一条 op 重新拉一遍
     env["state"]["remote_history_id"] = 1
     assert snapshot_sync.pull_and_replay("t").pulled == 0
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 140
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 140
     assert len(env["history"]) == 1
 
 
@@ -437,29 +437,29 @@ def test_own_echo_ops_are_skipped_by_ledger_identity(env) -> None:
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1          # 已落地，不触发 bootstrap
     # 本机写过 id=51 的 delta（效果已在 entries 里：energy=100）
-    env["history"].append({"id": 51, "username": "蔡元君", "type": "stock",
+    env["history"].append({"id": 51, "username": "张三", "type": "stock",
                            "key": "energy", "new_value": 100, "new_value_text": "",
                            "change_type": "delta", "delta_value": 40,
                            "ts": "2026-11-03T10:00:00",
                            "device_id": "mine", "origin_local_id": 51})
-    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 100}}}
+    env["entries"]["张三"] = {"stock": {"energy": {"value": 100}}}
     # 云端回放流：自己的 echo（local_id=51）+ 别的设备的新 delta
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "mine", "local_id": 51,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "delta", "delta": 40, "value": None, "value_text": "",
          "happened_at": "2026-11-03T10:00:00"},
         {"remote_id": 2, "instance_id": "other", "local_id": 9,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "delta", "delta": 5, "value": None, "value_text": "",
          "happened_at": "2026-11-03T11:00:00"},
     ]
     report = snapshot_sync.pull_and_replay("t")
     # echo 被跳过（不双算 +40），他机 delta 正常应用（100+5）
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 105
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 105
     assert report.pulled == 1
     assert env["writes"] == [(  # 只有他机那一条写入了 entries
-        "蔡元君", "stock", "energy", 105.0, "", "delta")]
+        "张三", "stock", "energy", 105.0, "", "delta")]
 
 
 def test_replay_of_unchanged_value_touches_nothing(env) -> None:
@@ -470,18 +470,18 @@ def test_replay_of_unchanged_value_touches_nothing(env) -> None:
     """
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"stock": {"energy": {
+    env["entries"]["张三"] = {"stock": {"energy": {
         "value": 5, "updated_at": "2026-11-03T09:00:00"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 3,
-         "username": "蔡元君", "type": "stock", "key": "energy",
+         "username": "张三", "type": "stock", "key": "energy",
          "op": "set", "value": 5, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
     assert snapshot_sync.pull_and_replay("t").pulled == 0
     assert env["writes"] == []
     assert env["history"] == []
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["updated_at"] == "2026-11-03T09:00:00"
+    assert env["entries"]["张三"]["stock"]["energy"]["updated_at"] == "2026-11-03T09:00:00"
 
 
 def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
@@ -493,15 +493,15 @@ def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
     """
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1   # 已落地过（哪怕水位是 0）
-    env["entries"]["蔡元君"] = {"stock": {"energy": {"value": 42}}}   # 本地新值
+    env["entries"]["张三"] = {"stock": {"energy": {"value": 42}}}   # 本地新值
     env["server"].snapshots = [{
         "id": 1, "snapshot_remote_id": 0, "origin_instance_id": "mine",
         "origin_name": "本机", "created_at": "T0", "entry_count": 1,
-        "entries": json.dumps([{"username": "蔡元君", "type": "stock",
+        "entries": json.dumps([{"username": "张三", "type": "stock",
                                 "key": "energy", "value": 7}])}]       # 旧快照值
     report = snapshot_sync.pull_and_replay("t")
     # 不重新落地：本地 42 保留，快照里的 7 不得覆盖
-    assert env["entries"]["蔡元君"]["stock"]["energy"]["value"] == 42
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 42
     assert report.snapshots == 0
     assert env["writes"] == []
 
@@ -523,10 +523,10 @@ def test_push_skips_reset_and_sends_following_delta(env) -> None:
     """周期重置留在本地，不上传。后面的增量照常上行。"""
     env["state"]["local_history_id"] = 0
     env["history"].extend([
-        {"id": 10, "username": "蔡元君", "type": "quota", "key": "weekly",
+        {"id": 10, "username": "张三", "type": "quota", "key": "weekly",
          "new_value": 0, "new_value_text": "", "change_type": "reset",
          "delta_value": -5, "ts": "2026-11-04T05:00:00"},
-        {"id": 11, "username": "蔡元君", "type": "quota", "key": "weekly",
+        {"id": 11, "username": "张三", "type": "quota", "key": "weekly",
          "new_value": 3, "new_value_text": "", "change_type": "delta",
          "delta_value": 3, "ts": "2026-11-04T09:00:00"},
     ])
@@ -541,16 +541,16 @@ def test_cross_period_replay_zeros_before_delta(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
+    env["entries"]["张三"] = {"quota": {"weekly": {"value": 5,
                                                      "updated_at": "2026-11-03T09:00:00"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 3, "value": None, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 3.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 3.0
     # 跨周期归零是本机派生的，不写一条 reset 账本行把远端覆盖改成"用户重置"
     assert all(write[5] != "reset" for write in env["writes"])
 
@@ -560,32 +560,32 @@ def test_cross_period_replay_set_replaces_stale_value(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
+    env["entries"]["张三"] = {"quota": {"weekly": {"value": 5,
                                                      "updated_at": "2026-11-03T09:00:00"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "set", "value": 15, "delta": None, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 15.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 15.0
 
 
 def test_same_period_delta_adds_to_current_value(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 10,
+    env["entries"]["张三"] = {"quota": {"weekly": {"value": 10,
                                                      "updated_at": "2026-11-04T08:00:00"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 5, "value": None, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 15.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 15.0
 
 
 def test_previous_period_delta_is_discarded(env, monkeypatch) -> None:
@@ -593,16 +593,16 @@ def test_previous_period_delta_is_discarded(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 4,
+    env["entries"]["张三"] = {"quota": {"weekly": {"value": 4,
                                                      "updated_at": "2026-11-04T06:00:00"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 3, "value": None, "value_text": "",
          "happened_at": "2026-11-03T20:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 4
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 4
     assert env["writes"] == []
 
 
@@ -611,33 +611,33 @@ def test_offset_timestamp_keeps_clock_face(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 5,
+    env["entries"]["张三"] = {"quota": {"weekly": {"value": 5,
                                                      "updated_at": "2026-11-03T09:00:00"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 3, "value": None, "value_text": "",
          "happened_at": "2026-11-04T09:00:00+08:00"},
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.errors == []
-    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 3.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 3.0
 
 
 def test_unparseable_local_time_does_not_zero_base(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
     env["state"]["profile_snapshot_id"] = 1
-    env["entries"]["蔡元君"] = {"quota": {"weekly": {"value": 10,
+    env["entries"]["张三"] = {"quota": {"weekly": {"value": 10,
                                                      "updated_at": "not-a-time"}}}
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 1, "value": None, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["蔡元君"]["quota"]["weekly"]["value"] == 11.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 11.0
 
 
 def test_old_period_delta_does_not_seed_empty_entry(env, monkeypatch) -> None:
@@ -647,12 +647,12 @@ def test_old_period_delta_does_not_seed_empty_entry(env, monkeypatch) -> None:
     env["state"]["profile_snapshot_id"] = 1
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "other", "local_id": 1,
-         "username": "蔡元君", "type": "quota", "key": "weekly",
+         "username": "张三", "type": "quota", "key": "weekly",
          "op": "delta", "delta": 3, "value": None, "value_text": "",
          "happened_at": "2000-01-01T20:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert "蔡元君" not in env["entries"]
+    assert "张三" not in env["entries"]
 
 
 def test_bootstrap_skips_locked_entries_silently(env) -> None:
@@ -662,13 +662,13 @@ def test_bootstrap_skips_locked_entries_silently(env) -> None:
         "id": 1, "snapshot_remote_id": 1, "origin_instance_id": "other",
         "origin_name": "手机", "created_at": "2026-11-04T13:20:00", "entry_count": 2,
         "entries": json.dumps([
-            {"username": "宛元芷", "type": "quota", "key": "locked_key", "value": 9,
+            {"username": "王五", "type": "quota", "key": "locked_key", "value": 9,
              "updated_at": "2026-11-04T13:00:00"},
-            {"username": "蔡元君", "type": "quota", "key": "free_key", "value": 7,
+            {"username": "张三", "type": "quota", "key": "free_key", "value": 7,
              "updated_at": "2026-11-04T13:00:00"}])}]
-    env["locked"].add(("宛元芷", "quota", "locked_key"))
+    env["locked"].add(("王五", "quota", "locked_key"))
     report = snapshot_sync.pull_and_replay("t", allow_overwrite=True)
     assert report.snapshots == 1
-    assert "宛元芷" not in env["entries"]        # 锁定的没被覆盖
-    assert env["entries"]["蔡元君"]["quota"]["free_key"]["value"] == 7
+    assert "王五" not in env["entries"]        # 锁定的没被覆盖
+    assert env["entries"]["张三"]["quota"]["free_key"]["value"] == 7
     assert not report.errors

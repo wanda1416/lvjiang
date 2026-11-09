@@ -428,7 +428,7 @@
 
 | 步骤 | 结论 |
 |---|---|
-| 设备连接 | `192.168.0.103:5555`，vivo V2415A，无线 adb 在线（会话间会断，`adb connect` 重连即可） |
+| 设备连接 | `192.168.1.103:5555`，Android 设备，无线 adb 在线（会话间会断，`adb connect` 重连即可） |
 | release v11 安装 | ✅ 覆盖安装成功（**屏幕必须亮着**，息屏装包被 vivo 直接拒，见踩坑） |
 | 无障碍绑定 | ✅ `enable_a11y.py` 一次成功（本次未被 vivo 拦截；覆盖安装后绑定会丢，需重跑） |
 | 调律配置页首验 | ✅ 能打开、能保存；发现两个 bug 并已修复（见下） |
@@ -456,7 +456,7 @@
 $adb = ".tooling\android-sdk\platform-tools\adb.exe"
 
 # 0. 无线 adb 会话间会断，先重连
-& $adb connect 192.168.0.103:5555
+& $adb connect 192.168.1.103:5555
 
 # 1. 装包（屏幕必须亮着，先 WAKEUP；手机上点「继续安装」）
 & $adb shell input keyevent KEYCODE_WAKEUP

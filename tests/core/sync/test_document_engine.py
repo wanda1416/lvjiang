@@ -130,39 +130,39 @@ def test_unregistered_plugin_document_not_uploaded_as_user_doc(monkeypatch) -> N
             users, avatars, session = root / "users", root / "avatars", root / "session"
             for directory in (users, avatars, session):
                 directory.mkdir()
-            (users / "蔡元君.json").write_text('{"username": "蔡元君"}', encoding="utf-8")
-            (users / "蔡元君.loadouts.json").write_text("{}", encoding="utf-8")
+            (users / "张三.json").write_text('{"username": "张三"}', encoding="utf-8")
+            (users / "张三.loadouts.json").write_text("{}", encoding="utf-8")
             documents = engine.iter_local_documents(users)
     finally:
         loguru_logger.remove(handler)
     assert [(d.label, d.kind) for d in documents] == []   # 纯资料文件不入文档通道
     warnings = "".join(messages)
-    assert "蔡元君.json" not in warnings                  # 资料文件不告警
-    assert "蔡元君.loadouts.json" in warnings             # 残留 kind 文件仍告警
+    assert "张三.json" not in warnings                  # 资料文件不告警
+    assert "张三.loadouts.json" in warnings             # 残留 kind 文件仍告警
 
 
 def test_core_notes_suffix_wins_over_plugin_registry(env) -> None:
     """便利贴必须归类为 notes；曾被误当 user_doc（label「某用户.notes」）。"""
     users = env["dirs"]["users"]
-    (users / "蔡元君.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
-    (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
-    env["doc_state"]["dirty"] = {"蔡元君/notes": True, "蔡元君/loadouts": True}
+    (users / "张三.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
+    (users / "张三.loadouts.json").write_text("{}\n", encoding="utf-8")
+    env["doc_state"]["dirty"] = {"张三/notes": True, "张三/loadouts": True}
     _sync(env)
     kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
-    assert ("蔡元君", "notes") in kinds
-    assert ("蔡元君", "loadouts") in kinds
+    assert ("张三", "notes") in kinds
+    assert ("张三", "loadouts") in kinds
     assert not any(label.endswith(".notes") for label, _ in kinds)
 
 
 def test_stale_local_pull_makes_no_conflict_copy(env) -> None:
     """本地只是旧版时直接覆盖，不留副本——否则每次同步都在堆 .conflict 文件。"""
     users = env["dirs"]["users"]
-    path = users / "蔡元君.notes.json"
+    path = users / "张三.notes.json"
     path.write_text('{"notes": [], "old": true}\n', encoding="utf-8")
     remote = json.dumps({"notes": []}, ensure_ascii=False).encode("utf-8")
-    env["fake"].set_remote_future("蔡元君", "notes", remote, "2099-01-01T00:00:00Z")
+    env["fake"].set_remote_future("张三", "notes", remote, "2099-01-01T00:00:00Z")
     report = _sync(env)
-    assert report.pulled == ["蔡元君/notes"]
+    assert report.pulled == ["张三/notes"]
     assert report.conflicts == []
     assert not any(".conflict-" in p.name for p in users.iterdir())
 
@@ -170,16 +170,16 @@ def test_stale_local_pull_makes_no_conflict_copy(env) -> None:
 def test_user_profile_and_avatar_not_in_document_channel(env) -> None:
     """资料入 account_users、头像入用户级头像表、定义走 definition——文档通道全都不带。"""
     users = env["dirs"]["users"]
-    (users / "蔡元君.json").write_text(json.dumps({
-        "username": "蔡元君", "avatar": "avatar_a.png",
+    (users / "张三.json").write_text(json.dumps({
+        "username": "张三", "avatar": "avatar_a.png",
         "attributes": {"level": 60}}, ensure_ascii=False), encoding="utf-8")
-    (users / "蔡元君.loadouts.json").write_text("{}\n", encoding="utf-8")
+    (users / "张三.loadouts.json").write_text("{}\n", encoding="utf-8")
     (env["dirs"]["avatars"] / "avatar_a.png").write_bytes(b"\x89PNG")
     (env["dirs"]["session"] / "profile.yaml").write_text("quota: []\n", encoding="utf-8")
-    env["doc_state"]["dirty"] = {"蔡元君/loadouts": True}
+    env["doc_state"]["dirty"] = {"张三/loadouts": True}
     _sync(env)
     kinds = {(p["label"], p["kind"]) for p in env["fake"].pushes}
-    assert ("蔡元君", "loadouts") in kinds               # 用户内容照常
+    assert ("张三", "loadouts") in kinds               # 用户内容照常
     assert ("avatar_a.png", "avatar") not in kinds       # 头像已退出文档通道
     assert ("__global__", "profile_yaml") not in kinds   # 定义已退出文档通道
 
@@ -187,40 +187,40 @@ def test_user_profile_and_avatar_not_in_document_channel(env) -> None:
 def test_remote_only_user_doc_left_alone(env) -> None:
     """远端遗留的 user_doc 文档（资料已入表）不再下行，也不落本地。"""
     users = env["dirs"]["users"]
-    env["fake"].docs[("蔡元君", "user_doc")] = {
+    env["fake"].docs[("张三", "user_doc")] = {
         "sha256": "x", "size": 3, "zipped": True, "payload": "e30=",
         "updated_at": "2099-01-01T00:00:00Z"}
     report = _sync(env)
     assert report.pulled == []
-    assert not (users / "蔡元君.json").exists()
+    assert not (users / "张三.json").exists()
 
 
 def test_local_newer_pushes_with_remote_sha_as_lock(env) -> None:
-    path = env["dirs"]["users"] / "蔡元君.loadouts.json"
+    path = env["dirs"]["users"] / "张三.loadouts.json"
     path.write_text("{\"revision\": 2}\n", encoding="utf-8")
-    env["fake"].docs[("蔡元君", "loadouts")] = {
+    env["fake"].docs[("张三", "loadouts")] = {
         "sha256": "old", "size": 3, "zipped": True, "payload": "",
         "updated_at": "2020-01-01T00:00:00Z"}
-    env["doc_state"]["dirty"] = {"蔡元君/loadouts": True}
+    env["doc_state"]["dirty"] = {"张三/loadouts": True}
     report = _sync(env)
-    assert report.pushed == ["蔡元君/loadouts"]
+    assert report.pushed == ["张三/loadouts"]
     push = env["fake"].pushes[0]
     assert push["expected"] == "old"
 
 
 def test_push_conflict_falls_back_to_remote_win(env, monkeypatch) -> None:
-    path = env["dirs"]["users"] / "蔡元君.notes.json"
+    path = env["dirs"]["users"] / "张三.notes.json"
     path.write_text("{\"revision\": 9, \"notes\": []}\n", encoding="utf-8")
     env["fake"].fail_expected = True
-    env["fake"].docs[("蔡元君", "notes")] = {
+    env["fake"].docs[("张三", "notes")] = {
         "sha256": "cloud-new", "size": 3, "zipped": True,
         "payload": base64.b64encode(gzip.compress(b"{\"notes\": []}\n")).decode(),
         "updated_at": "2020-01-01T00:00:00Z"}
-    env["doc_state"]["dirty"] = {"蔡元君/notes": True}
+    env["doc_state"]["dirty"] = {"张三/notes": True}
     report = _sync(env)
     # 推送失败回退为拉取：远端胜，本地另存冲突
-    assert report.conflicts and "蔡元君/notes" in report.conflicts[0]
-    assert report.pulled == ["蔡元君/notes"]
+    assert report.conflicts and "张三/notes" in report.conflicts[0]
+    assert report.pulled == ["张三/notes"]
 
 
 def test_document_channel_has_no_avatar_kind(env) -> None:
@@ -299,7 +299,7 @@ def test_session_document_stale_local_is_overwritten_without_copy(session_env) -
 def test_session_document_with_user_label_is_not_laid_down(session_env) -> None:
     """label 不是 __global__ 的同 kind 远端文档不认——账户级文档只有一份。"""
     session_env["fake"].set_remote_future(
-        "蔡元君", "play_styles", b"{}\n", "2099-01-01T00:00:00Z")
+        "张三", "play_styles", b"{}\n", "2099-01-01T00:00:00Z")
     report = _sync(session_env)
     assert report.pulled == []
     assert not (session_env["dirs"]["session"] / "yysls" / "play_styles.json").exists()
@@ -324,7 +324,7 @@ def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
         "documents": [], "next_id": 1})
     monkeypatch.setattr(engine.dirty, "remote_document_id", lambda: 0)
     monkeypatch.setattr(engine.dirty, "dirty_keys",
-                        lambda: {"蔡元君/notes"})
+                        lambda: {"张三/notes"})
     monkeypatch.setattr(engine.dirty, "stamps", lambda: {"__baseline__/none": [0, 0]})
     monkeypatch.setattr(engine.dirty, "save_sync_state",
                         lambda rid, d, stamps=None: None)
@@ -332,10 +332,10 @@ def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
     users, session = tmp_path / "users", tmp_path / "session"
     users.mkdir()
     session.mkdir()
-    (users / "蔡元君.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
+    (users / "张三.notes.json").write_text('{"notes": []}\n', encoding="utf-8")
     report = engine.sync_documents("t", users_dir=users, session_dir=session)
     assert report.errors == []
-    assert report.pushed == ["蔡元君/notes"]
+    assert report.pushed == ["张三/notes"]
 
 
 def _remote_note_payload(raw: bytes) -> str:

@@ -57,20 +57,20 @@ def _env(tmp_path, monkeypatch):
 def test_untracked_local_edit_is_detected_and_pushed(tmp_path, monkeypatch):
     """没有 mark_dirty 的改动（只读实例写入）靠磁盘戳被主实例发现并上行。"""
     fake, state, users, session = _env(tmp_path, monkeypatch)
-    doc = users / "蔡元君.loadouts.json"
+    doc = users / "张三.loadouts.json"
     doc.write_text('{"revision": 2}\n', encoding="utf-8")
 
     engine.sync_documents("t", users_dir=users, session_dir=session)
 
-    assert [(p["label"], p["kind"]) for p in fake.pushes] == [("蔡元君", "loadouts")]
+    assert [(p["label"], p["kind"]) for p in fake.pushes] == [("张三", "loadouts")]
     # 同步后戳被记下
-    assert "蔡元君/loadouts" in state["stamps"]
+    assert "张三/loadouts" in state["stamps"]
 
 
 def test_unchanged_file_is_not_pushed_again(tmp_path, monkeypatch):
     """改过一次并同步之后，文件没再动就不再上行。"""
     fake, state, users, session = _env(tmp_path, monkeypatch)
-    doc = users / "蔡元君.loadouts.json"
+    doc = users / "张三.loadouts.json"
     doc.write_text('{"revision": 2}\n', encoding="utf-8")
 
     engine.sync_documents("t", users_dir=users, session_dir=session)
@@ -83,13 +83,13 @@ def test_unchanged_file_is_not_pushed_again(tmp_path, monkeypatch):
 def test_size_change_without_mtime_change_is_detected(tmp_path, monkeypatch):
     """戳同时看 size 与 mtime：只改大小也能识别（同一秒内的写入）。"""
     fake, state, users, session = _env(tmp_path, monkeypatch)
-    doc = users / "蔡元君.loadouts.json"
+    doc = users / "张三.loadouts.json"
     doc.write_text('{"revision": 2}\n', encoding="utf-8")
     engine.sync_documents("t", users_dir=users, session_dir=session)
     assert len(fake.pushes) == 1
 
     # 只改内容长度，并把 mtime 固定成原来的值
-    original = state["stamps"]["蔡元君/loadouts"][1]
+    original = state["stamps"]["张三/loadouts"][1]
     doc.write_text('{"revision": 3, "extra": true}\n', encoding="utf-8")
     os.utime(doc, ns=(original, original))
 
@@ -101,11 +101,11 @@ def test_first_run_without_stamps_does_full_compare(tmp_path, monkeypatch):
     """没有任何戳（首次运行）时不做盲目上行，交给 mtime 全量对比。"""
     fake, state, users, session = _env(tmp_path, monkeypatch)
     state["stamps"] = {}
-    doc = users / "蔡元君.loadouts.json"
+    doc = users / "张三.loadouts.json"
     doc.write_text('{"revision": 2}\n', encoding="utf-8")
 
     engine.sync_documents("t", users_dir=users, session_dir=session)
 
     # 云端没有该文档 → 正常上行（全量对比结果）
-    assert [(p["label"], p["kind"]) for p in fake.pushes] == [("蔡元君", "loadouts")]
+    assert [(p["label"], p["kind"]) for p in fake.pushes] == [("张三", "loadouts")]
     assert state["stamps"]           # 戳已建立

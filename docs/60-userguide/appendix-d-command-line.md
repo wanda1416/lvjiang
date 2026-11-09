@@ -18,7 +18,7 @@ lvjiang-cli --list
 lvjiang-cli --list --id haoyun_lianji
 
 # 运行一次
-lvjiang-cli --exec --id haoyun_lianji --user 蔡元君 --target adb --yes
+lvjiang-cli --exec --id haoyun_lianji --user 张三 --target adb --yes
 ```
 
 源码检出下等价写法：
@@ -52,7 +52,7 @@ python -m lvjiang --list
 参数示例：
 
 ```powershell
-lvjiang-cli --exec --id haoyun_lianji --user 蔡元君 --param max_rolls=10 --json
+lvjiang-cli --exec --id haoyun_lianji --user 张三 --param max_rolls=10 --json
 ```
 
 未在脚本里声明的参数会直接报错，而不是被静默忽略。
@@ -74,9 +74,9 @@ lvjiang-cli --exec --id haoyun_lianji --user 蔡元君 --param max_rolls=10 --js
 
 ```json
 {"ok": true, "code": 0, "script": "haoyun_lianji", "name": "好运连叽摇骰子",
- "user": "蔡元君", "target": "192.168.0.100:5555", "layout": "android",
+ "user": "张三", "target": "192.168.1.100:5555", "layout": "android",
  "started_at": "2026-10-29T05:42:07.224+08:00", "duration_ms": 18200,
- "result_path": "…/output/蔡元君/2026-10/29/haoyun_lianji_….json",
+ "result_path": "…/output/张三/2026-10/29/haoyun_lianji_….json",
  "result": {}, "error": ""}
 ```
 

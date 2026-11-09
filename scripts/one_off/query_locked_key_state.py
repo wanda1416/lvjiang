@@ -5,7 +5,7 @@ from lvjiang.core.account.service import AccountSession
 from lvjiang.core.profile import repository
 
 KEY = "baiye_raoliang_shengwang_of_month"
-USERS = ["宛元芷", "寒铁岚"]
+USERS = ["王五", "赵六"]
 
 
 def main() -> int:

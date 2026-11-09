@@ -137,7 +137,7 @@ def test_console_level_quiet_only_silences_stdout_noise():
 
 def test_outcome_keeps_stable_json_shape():
     started = __import__("datetime").datetime.now().astimezone()
-    payload = _outcome(ok=True, config=SCRIPTS[0], username="宛元芷",
+    payload = _outcome(ok=True, config=SCRIPTS[0], username="王五",
                        target="adb:1", layout="android", started=started,
                        result={"ok": 1})
     assert payload["ok"] is True and payload["code"] == EXIT_OK

@@ -2,10 +2,10 @@
 
 用法::
 
-    python -m lvjiang --exec --id haoyun_lianji --user 宛元芷 --target adb
+    python -m lvjiang --exec --id haoyun_lianji --user 王五 --target adb
     python -m lvjiang --exec --name 好运连叽摇骰子 --yes
     python -m lvjiang --exec --file D:/tmp/临时脚本.wf --dry-run
-    lvjiang-cli --exec --id haoyun_lianji --target adb:192.168.0.100:5555 --json
+    lvjiang-cli --exec --id haoyun_lianji --target adb:192.168.1.100:5555 --json
     lvjiang-cli --list
     lvjiang-cli --list --id haoyun_lianji
 

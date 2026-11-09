@@ -16,7 +16,7 @@ def _report() -> BatchReport:
 def test_channel_fault_is_reported_as_abort_not_success():
     report = _report()
     report.start_batch()
-    report.start_entry("用户A · 第 1 次", "刁刁青")
+    report.start_entry("用户A · 第 1 次", "钱七")
     report.record_prepare("跳过")
     report.record_channel_fault("画面流恢复失败：亮屏但 30 秒没有新画面")
     report.end_entry()
@@ -34,7 +34,7 @@ def test_zero_script_batch_is_not_reported_as_completed():
     """一个脚本都没执行（只有生命周期失败）时，不能说「正常完成」。"""
     report = _report()
     report.start_batch()
-    report.start_entry("用户A · 第 1 次", "刁刁青")
+    report.start_entry("用户A · 第 1 次", "钱七")
     report.record_prepare("失败")
     report.end_entry()
     report.end_batch()

@@ -1,3 +1,5 @@
+**简体中文** | [English](README.en.md)
+
 # 律匠（lvjiang）
 
 > 通用视觉 RPA 引擎 + 插件架构
@@ -23,29 +25,33 @@
 
 ### 通用特性
 
-- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；可选择前台 SendInput、后台 PostMessage 或后台截图 Graphics Capture）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入 / 设备端代理通道）两种模式。
+- **双输入后端**：支持「窗口模式」（捕捉任意 PC 窗口：游戏窗口化、手机投屏、模拟器；可选择前台 SendInput、后台 PostMessage 或后台截图 Graphics Capture）与「ADB 模式」（screencap / scrcpy 视频流截图 + 触控注入 / 设备端代理通道）两种模式。画面流断开后进入等待恢复而不是拿着最后一帧继续识别和点击。
 - **开箱即用的连接方案**：内置「手游 / 端游 / 手游投屏」三个预置方案，把图库、环境、布局这三项必须配套的配置绑成一个整体，按运行方式选一次即可；连接方式与方案不匹配时直接拦下执行，避免坐标整体偏移却不报错。
 - **视觉识别流水线**：`mss` / scrcpy 截图 → RapidOCR（ONNX）文字识别 → 结构化解析 → 品阶与数值评分。
 - **声明式场景与布局**：以 YAML 定义游戏界面的 Scene / Area / Point / Region，配合内置可视化编辑器标注坐标，分辨率自适应缩放；提供图库管理（参考图 / 分组 / 模板匹配）与大地图管理（地域目录 / 探查底图拼接）。
-- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算；支持 `full by` 全量匹配与短路匹配双模式、panel 范围索引、工作流暂停/恢复。配套脚本工作台（可视化编排、取点取色、单步调试）与宏录制、图色原语。
+- **工作流 DSL 引擎**：自研 `.wf` 领域特定语言，支持变量、条件、循环、子工作流调用与内置函数，把「扫描 → 识别 → 决策 → 点击」编排成可复用流程。内置 CoordRef 坐标类型体系，支持坐标向量运算；支持 `full by` 全量匹配与短路匹配双模式、panel 范围索引、工作流暂停/恢复。配套脚本工作台（可视化编排、取点取色、单步调试、内置函数浏览）与宏录制、图色原语、脚本分组。
+- **命令行执行入口**：`lvjiang-cli`（源码环境用 `python -m lvjiang`）不开界面即可列出脚本、查看参数并执行任务，与 GUI 共用同一套引擎、配置快照与用户锁，适合计划任务与外部编排。
 - **拟人化输入**：点击前后随机延迟、坐标随机偏移、区域中心抖动，降低机械化特征。
-- **i18n 国际化**：核心模块 `tr()` 全覆盖，支持中文 / 英文界面切换。
+- **自动剧情文案库**：维护剧情选项文案库，任务运行时按 OCR 相似度自动选择匹配的答案，内置可直接调度的跳过剧情工作流。
+- **账户与多端同步**：登录账户后可把角色名册、文档与玩家档案总览同步到云端，按「初始同步 + 增量对账」只拉云端变化、只推本地改动；手机上可选择与云端对等同步或继续使用 PC 下发的离线包。不登录、不同步时全部数据只留在本机。
+- **i18n 国际化**：核心模块 `tr()` 全覆盖，界面语言 12 种（简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español、Português、Русский、ไทย、Tiếng Việt），可跟随系统语言，也可在设置里手动切换。
+- **编辑器辅助**：随仓提供 VS Code 扩展（`editors/vscode/lvjiang-wf`），为 `.wf` 提供语法高亮、补全、跳转定义与跨文件诊断；编辑辅助只读，不会替你保存或运行脚本。
 
 ### 燕云十六声插件
 
 - **装备数据管理**：玩家档案（SQLite）与装备池，已穿戴 / 背包装备扫描、OCR 词条解析、指纹去重，支持真实 / 模拟装备的穿戴、卸下、复制校正与导出。
-- **自动调律**：背包滚动遍历 + fps 数据完整性校验，批量筛选与精调；调律历史与实时总览，支持承音 / 转律 / 双定音模型。
+- **自动调律**：背包滚动遍历 + fps 数据完整性校验，批量筛选与精调；调律历史与实时总览，支持承音 / 转律 / 双定音模型，并提供装备养成材料（传律石）估算。
 - **毕业率分析**：角色基础属性反推与战斗属性聚合，真实 DPS 与毕业率；最优组合 Top 10 搜索（智能剪枝）、出装搭配模拟计算器、技能轴查看、词条收益率与培养 / 转律建议。
-- **智能调律（外部 Agent）**：通过 MCP 接入外部 Agent（如 WorkBuddy），分析培养与组合、生成全新调律方案并一键启动。
+- **智能调律（外部 Agent）**：通过 MCP 接入外部 Agent（如 WorkBuddy、QoderWork），分析培养与组合、生成全新调律方案并一键启动。
 - **备战方案管理**：草稿编辑与显式保存，按流派规则预筛无效候选。
 - **日常任务工作流**：江湖号令、不肝商店、每日签到等日常任务编排。
 
 ### 移动应用（燕云插件专属）
 
-- **手机端独立执行**：律匠 APK 内置 Material 四区工作台（工作台 / 任务 / 用户 / 设置），无需 PC 即可在手机上执行单任务与批量任务。
+- **手机端独立执行**：律匠 APK 内置 Material 3 四区工作台（工作台 / 任务 / 用户 / 设置），无需 PC 即可在手机上执行单任务与批量任务。
 - **手机批量与无人值守**：按配置组勾选任务、用户与单元，支持拖动排序、轮数与无人值守；暂停、继续、结束控制整批。
 - **PC ↔ 手机同步**：下发配置（可保留手机任务参数与批量配置），手机任务历史、调律历史、日志与结果单向回传 PC。
-- **悬浮控制**：悬浮图标三态（logo / 播放 / 暂停），单击直接启动、暂停任务，无需切回律匠。
+- **悬浮控制**：悬浮球三态（logo / 播放 / 暂停），单击直接启动、暂停任务，支持贴边吸附收起，无需切回律匠。
 
 ---
 
@@ -67,13 +73,17 @@ PC 端或手机端执行操作
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
 | 场景 / 布局 | `src/lvjiang/core/scene_definition.py`、`core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
 | 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征 / 参考图） |
-| 配置管理 | `src/lvjiang/core/config/` | 应用配置、会话管理、用户数据、工作流配置加载与合并 |
+| 配置管理 | `src/lvjiang/core/config/` | 应用配置、会话管理、用户数据、工作流配置加载与合并、在线配置安装 |
 | 工作流 | `src/lvjiang/workflows/` | `.wf` DSL 语法解析（grammar/）、执行引擎（engine/）、通用内置函数（builtins/） |
-| 智能调律 | `src/lvjiang/core/ai/` | 外部 Agent 接入（MCP）、文档发现与业务操作契约 |
+| 命令行 | `src/lvjiang/core/task_cli.py` | 不开界面的 `--list` / `--exec` 入口，与 GUI 共用引擎、配置快照与用户锁 |
+| 账户 / 同步 | `src/lvjiang/core/account/`、`core/sync/` | 账户身份与登录态；定义、用户、文档与总览账本的初始同步与增量对账 |
+| 自动剧情 | `src/lvjiang/core/story/` | 剧情选项文案库匹配（OCR 相似度） |
+| 智能调律 | `src/lvjiang/core/ai/`、`core/agent_*.py` | 外部 Agent 接入（MCP）、文档发现与业务操作契约 |
 | 匿名统计 | `src/lvjiang/core/telemetry/` | 匿名调律数据收集、字段白名单校验与传输 |
-| 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、脚本工作台、运行控制 |
+| 国际化 | `src/lvjiang/i18n/`、`config/i18n/` | `tr()` 运行时翻译、12 种语言表与 Qt 标准对话框翻译装载 |
+| 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、脚本工作台、批量、移动设备、账户与运行控制 |
 | 插件 | `src/lvjiang/apps/<name>/` | 游戏/场景专属插件（识别器、工作流、UI Tab） |
-| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备管理、评分、调律、材料识别、毕业率、出装搭配、智能调律、专属 UI（config/ + core/ + workflows/ + ui/） |
+| 燕云插件 | `src/lvjiang/apps/yysls/` | 装备管理、评分、调律、材料识别、毕业率、出装搭配、智能调律、专属 UI（config/ + core/ + workflows/ + sync/ + ui/） |
 | 设备端 | `src/lvjiang/core/ondevice/`、`android/` | 安卓独立执行端：无障碍截图/手势桥接、rapidocr 设备端适配、Kotlin 宿主工程 |
 
 更多细节见 [架构文档](docs/30-architecture/README.md) 与 [DSL 语法文档](docs/30-architecture/32-grammar/README.md)。
@@ -85,21 +95,25 @@ PC 端或手机端执行操作
 ```
 lvjiang/
 ├── src/lvjiang/               # 通用视觉 RPA 引擎（src-layout，唯一可导入包）
-│   ├── __main__.py            # 启动入口（python -m lvjiang [-reg <plugin>]）
+│   ├── __main__.py            # 启动入口（python -m lvjiang [-reg <plugin> | --list | --exec]）
 │   ├── app.py                 # QApplication 入口
 │   ├── _version.py            # 版本号
 │   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局 / 坐标类型
 │   │   ├── coord_types.py     # CoordRef 坐标类型体系（CoordRef/RectCoordRef/CircleCoordRef/Offset）
 │   │   ├── capture_base.py    # 截图抽象（桌面窗口 / ADB / scrcpy / 后台截图）
-│   │   ├── config/            # 配置加载与会话管理（app.yaml / session / 用户 / 工作流配置）
+│   │   ├── config/            # 配置加载与会话管理（app.yaml / session / 用户 / 工作流 / 在线配置）
 │   │   ├── desktop/           # 桌面投屏窗口后端（截图 + SendInput / PostMessage 点击）
 │   │   ├── android/           # ADB / scrcpy 后端
 │   │   ├── ondevice/          # 设备端（Chaquopy）无障碍截图/输入与 OCR 适配
 │   │   ├── recognizers/       # 可插拔识别器插件包（OCR / 模板 / 颜色 / 参考图）
+│   │   ├── account/           # 账户身份与登录态
+│   │   ├── sync/              # 云端对等同步（定义 / 用户 / 文档 / 增量对账）
+│   │   ├── story/             # 自动剧情文案库匹配
 │   │   ├── ai/                # 智能调律：外部 Agent 接入（MCP）与契约
 │   │   ├── telemetry/         # 匿名调律数据收集与传输
 │   │   ├── license/           # 功能激活与授权
 │   │   ├── profile/           # 玩家档案
+│   │   ├── task_cli.py        # 命令行 list / exec 入口
 │   │   ├── scene_definition.py      # 声明式场景模型加载
 │   │   ├── layout_manager.py        # 布局索引与坐标换算
 │   │   ├── reference_db.py          # 参考图库管理
@@ -111,17 +125,18 @@ lvjiang/
 │   │   ├── base/              # DSL 原语基类（识别 / 坐标 / 面板 / 动作）
 │   │   ├── builtins/          # 通用内置函数（算术 / 字符串 / 系统）
 │   │   └── implementations/   # 插件级工作流实现（背包遍历 / 调律）
-│   ├── i18n/                  # 国际化
+│   ├── i18n/                  # 国际化运行时
 │   ├── ui/                    # PyQt6 通用图形界面
 │   │   ├── scene_editor/      # 场景编辑器（坐标标注 / 区域绘制）
 │   │   ├── reference/         # 参考图库管理 UI
 │   │   ├── reference_manager/ # 参考图库管理
 │   │   ├── batch/             # 批量运行面板
+│   │   ├── background/        # 后台任务：在线配置更新与匿名统计上传
 │   │   ├── main/              # 主窗口本体与各功能混入（运行控制 / 窗口操作 / 菜单 / 托盘）
 │   │   ├── scripts/           # 脚本工作台（编排、取点取色、单步调试）
 │   │   ├── macros/            # 宏录制
 │   │   ├── map_manager/       # 大地图管理（地域目录 / 底图拼接）
-│   │   ├── mobile/            # 手机端同步
+│   │   ├── mobile/            # 手机端同步与设备工具
 │   │   ├── profile/           # 用户 / 档案 UI
 │   │   ├── ocr/               # 图像识别对话框与画布
 │   │   └── notices/           # 公告 / 更新 / 关于 / 反馈
@@ -146,6 +161,7 @@ lvjiang/
 │           ├── workflows/     # 燕云专属工作流与内置函数
 │           │   ├── builtins/      # 背包 / 装备 / Profile 专属函数
 │           │   └── implementations/ # 自动调律 / 背包遍历实现
+│           ├── sync/          # 燕云文档同步适配（配置组、玩法、剧本等文档）
 │           ├── ondevice/      # 燕云设备端适配
 │           ├── telemetry/     # 燕云调律数据收集 schema
 │           └── ui/            # 燕云专属 UI Tab
@@ -166,13 +182,17 @@ lvjiang/
 │   │   ├── layouts.yaml       # 布局索引
 │   │   ├── scenes.yaml        # 场景索引
 │   │   └── ocr.yaml           # OCR 识别与文本规范化配置
+│   ├── i18n/                  # 界面翻译表（12 种语言，随版本发布）
+│   ├── updates/               # 在线配置更新包的下载归档与安装状态（运行期生成）
 │   ├── local/                 # 用户覆盖配置（已 .gitignore）
 │   └── session/               # 运行时会话数据
-├── data/                      # 材料模板图、scrcpy-server 等资源
+├── data/                      # 材料模板图、scrcpy-server、ADB / APK 等资源
 ├── docs/                      # 分层文档
+├── editors/vscode/lvjiang-wf/ # .wf 语法高亮与语言服务的 VS Code 扩展
+├── ops/                       # 匿名统计：stats-worker（服务端）与 stats-client（本地控制台）
 ├── packaging/                 # PyInstaller 打包配置与脚本
 ├── scripts/                   # 辅助脚本与手动测试
-├── tests/                     # pytest 测试（按 core / ui / workflows / yysls 分包）
+├── tests/                     # pytest 测试（按 core / ui / workflows / apps / yysls 分包）
 ├── dev.bat                    # Windows 快捷启动脚本
 ├── dev.sh                     # macOS 快捷启动脚本
 └── pyproject.toml             # 项目元数据与依赖
@@ -182,7 +202,7 @@ lvjiang/
 
 ## 🔧 环境要求
 
-- **操作系统**：Windows（桌面窗口 / 后台截图模式依赖 Win32 API）、macOS 11+（ADB 模式；窗口模式尚未实现）或 Android 设备（安装律匠 APK）
+- **操作系统**：Windows（桌面窗口 / 后台截图模式依赖 Win32 API）、macOS 11+（ADB 模式；窗口模式尚未实现）或 Android 8.0+ 设备（安装律匠 APK）
 - **Python**：3.11–3.12（3.11+ 才有 Windows 高精度 `time.sleep`，木桩测伤等精确计时依赖它；RapidOCR 1.4.4 要求 Python <3.13）
 - **游戏侧**：《燕云十六声》，并满足以下任一运行方式：
   - **手机端**（手游）：通过 **投屏模式**（PC 端存在可截屏、且支持鼠标点击转发到手机的投屏窗口，以 vivo 自带投屏为参考，不绑定特定品牌）或 **ADB 模式**（手机开启 USB / 无线调试，可选启用 scrcpy 视频流）
@@ -207,7 +227,7 @@ pip install -e ".[dev]"
 
 项目亦支持 [uv](https://docs.astral.sh/uv/)：`uv sync` 即可按 `pyproject.toml` 与 `uv.lock` 安装。
 
-核心依赖：`PyQt6`、`mss`、`pynput`、`rapidocr-onnxruntime`、`onnxruntime`、`PyYAML`、`lark`（DSL 解析器）、`loguru`、`av`（scrcpy 模式的 H.264 解码）、`openpyxl`（毕业率 Excel 公式）、`mcp`（智能调律）、`keyring`（授权令牌）、`cryptography`（授权码验签）。
+核心依赖：`PyQt6`、`mss`、`pynput`、`rapidocr-onnxruntime`、`onnxruntime`、`PyYAML`、`lark`（DSL 解析器）、`loguru`、`av`（scrcpy 模式的 H.264 解码）、`openpyxl`（毕业率 Excel 公式）、`mcp`（智能调律）、`keyring`（授权令牌）、`cryptography`（授权码验签）、`httpx`（联网与同步）、`windows-capture`（Windows 后台截图）。
 
 ---
 
@@ -241,7 +261,22 @@ python -m lvjiang -reg yysls
 
 > src-layout 下 `lvjiang` 包位于 `src/` 内：已 `pip install -e .` 则直接可用；否则需先将 `src` 加入 `PYTHONPATH`（`dev.bat` 已处理）。
 
-启动后进入 PyQt6 主窗口，基本流程：
+**命令行运行**（不开界面，适合计划任务与外部编排）：
+
+```powershell
+# 列出可运行的脚本
+python -m lvjiang --list
+
+# 查看某个脚本的参数定义
+python -m lvjiang --list --id haoyun_lianji
+
+# 运行一次（发行包里是 lvjiang-cli.exe，参数相同）
+python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --json
+```
+
+> 完整参数、退出码与 JSON 输出见 [附录 D：命令行执行脚本](docs/60-userguide/appendix-d-command-line.md)。
+
+启动界面后进入 PyQt6 主窗口，基本流程：
 
 1. **选择连接**：刷新并选择投屏窗口、PC 端游窗口，或连接 ADB 设备。
 2. **选择方案**：顶部「方案」下拉框按运行方式选「手游」「端游」或「手游投屏」，图库 / 环境 / 布局随之自动配好。
@@ -262,9 +297,10 @@ python -m lvjiang -reg yysls
 |---|---|---|---|
 | 系统默认 | `config/system/` | 场景 / 工作流（`.wf`）/ 布局 / 输入参数 / 预置连接方案 / 调律规则 / 参考图 | ✅ |
 | 用户覆盖 | `config/local/` | 配置键级差异、用户脚本和其他本地实体；开发版还提供与外置插件配套的资源 | ❌ |
-| 运行时会话 | `config/session/` | `session.json`（当前状态、自建连接方案）、用户数据、工作流输出日志 | ❌ |
+| 运行时会话 | `config/session/` | `session.json`（运行状态）、`interface.json`（当前用户 / 布局 / 方案等界面选择）、用户数据与锁文件 | ❌ |
+| 更新归档 | `config/updates/` | 下载的在线配置更新包与安装状态，用于增量安装到 `system` 与回退 | ❌ |
 
-公开版不会自动上传 `config/local/` 或 `config/session/` 的内容。开发者可分别使用独立仓库同步开发版资源和运行数据；匿名安装标识始终不应进入仓库。律匠的联网行为见 [隐私说明](PRIVACY.md)。
+任务结果与日志不在 `config/` 下：结果 JSON 在 `logs/output/`，任务 / 批量 / 调律日志分别在 `logs/daily/`、`logs/batch/`、`logs/tuning/`。界面翻译表是独立的一层资源（`config/i18n/`，12 种语言），随版本发布、不参与上述覆盖链。公开版不会自动上传 `config/local/` 或 `config/session/` 的内容。开发者可分别使用独立仓库同步开发版资源和运行数据；匿名安装标识始终不应进入仓库。律匠的联网行为见 [隐私说明](PRIVACY.md)。
 
 `config/system/app.yaml` 示例（输入模拟 + 命名延迟参数）：
 
@@ -272,19 +308,24 @@ python -m lvjiang -reg yysls
 input_simulation:
   before_click_wait: [0.1, 0.3]     # 点击前随机延迟（秒）
   after_click_wait: [0.1, 0.3]      # 点击后随机延迟（秒）
+  mouse_move_duration: [0.5, 0.7]   # 鼠标移动耗时（秒）
   click_random_offset: 5            # 坐标随机偏移像素
   region_jitter_ratio: 0.25         # 区域中心抖动比例
 
 delay_params:
   page_refresh:
-    label: 页面刷新等待
+    label:
+      zh_CN: 页面刷新等待
+      en_US: Page Refresh Wait
     range: [2.0, 3.0]
   scroll_settle:
-    label: 滚动惯性等待
+    label:
+      zh_CN: 滚动惯性等待
+      en_US: Scroll Settle Wait
     range: [3.0, 4.0]
 ```
 
-工作流通过 `wait <key>`（DSL）/ `wait_delay(key)`（代码）按 key 引用命名延迟参数。
+配置里的显示名使用 `zh_CN` / `en_US` 双语映射，未提供的语言回退到中文。工作流通过 `wait <key>`（DSL）/ `wait_delay(key)`（代码）按 key 引用命名延迟参数。
 
 ---
 
@@ -294,11 +335,15 @@ delay_params:
 # 运行测试
 pytest
 
-# 运行单个测试文件（测试目录按 core / ui / workflows / yysls 分包）
+# 运行单个测试文件（测试目录按 core / ui / workflows / apps / yysls 分包）
 pytest tests/workflows/test_parser.py
+
+# 静态检查
+python -m ruff check src tests scripts
+python -m mypy
 ```
 
-测试基线要求干净：`pyproject.toml` 中已将未处理警告升级为错误（`filterwarnings = ["error"]`）。
+测试基线要求干净：`pyproject.toml` 中已将未处理警告升级为错误（`filterwarnings = ["error"]`）。源码内的文本读写一律显式指定 UTF-8，不得依赖系统默认编码。
 
 ---
 
@@ -308,12 +353,12 @@ pytest tests/workflows/test_parser.py
 
 | 目录 | 内容 |
 |------|------|
-| [`PRIVACY.md`](PRIVACY.md) | 隐私说明：联网行为、匿名调律数据收集发出什么/不发出什么 |
+| [`PRIVACY.md`](PRIVACY.md) | 隐私说明：联网行为、账户同步、匿名调律数据收集发出什么/不发出什么 |
 | [`docs/`](docs/README.md) | 完整文档中心与按读者导航 |
 | [`docs/50-releases/`](docs/50-releases/README.md) | 发布记录与版本说明 |
 | [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
 | [`docs/70-agent/`](docs/70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 |
-| [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、文档组织约定 |
+| [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、待办、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
 | [`docs/20-requirements/`](docs/20-requirements/README.md) | 需求文档：运行环境、操作流程、配置模型、Profile、毕业率、国际化 |
 | [`docs/30-architecture/`](docs/30-architecture/README.md) | 技术架构：主窗口状态机、插件系统 |
@@ -332,7 +377,7 @@ pytest tests/workflows/test_parser.py
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流编排 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端。历史阶段快照见 [roadmap](docs/00-meta/01-roadmap.md)，当前待办见 [backlog](docs/00-meta/02-backlog.md)；平台计划见 [Android](docs/00-meta/archive/android-platform-progress.md) 与 [macOS](docs/00-meta/platforms/macos.md)。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/00-meta/02-backlog.md)，平台计划见 [Android](docs/00-meta/archive/android-platform-progress.md) 与 [macOS](docs/00-meta/platforms/macos.md)；历史阶段快照见 [roadmap](docs/00-meta/01-roadmap.md)（仅作存档，不代表当前范围）。
 
 ---
 
@@ -340,9 +385,9 @@ pytest tests/workflows/test_parser.py
 
 欢迎通过 Issue 与 Pull Request 参与改进。提交前请：
 
-1. 保证 `pytest` 全部通过；
+1. 保证 `pytest` 全部通过，代码改动至少运行 `ruff check`（涉及类型时运行 `mypy`）；
 2. 遵循现有代码风格与文档分层约定；
-3. 涉及新场景 / 工作流时，同步更新 `config/system/` 与对应文档。
+3. 涉及新场景 / 工作流时，同步更新 `config/system/` 与对应文档，并递增受影响配置文件的 `content_version`。
 
 ---
 
@@ -386,11 +431,12 @@ pytest tests/workflows/test_parser.py
 
 ## 🔒 数据与隐私
 
-律匠只在少数情况下联网：查公告、查有没有新版本、同步在线配置（0.8.0 起）、功能激活与在线会员授权（0.15.0 起）、以及（0.7.0 起）收集匿名调律数据。
+律匠只在少数情况下联网：查公告、查有没有新版本、同步在线配置（0.8.0 起）、功能激活与在线会员授权（0.15.0 起）、账户与多端同步（0.15.9 起，需你主动登录并点同步）、以及（0.7.0 起）收集匿名调律数据。
 
 - 查公告、查新版本、同步在线配置**只下载不上传**：查公告和查新版本从第一个版本起就是如此；在线配置用来远程修复
   坐标偏移、调律规则这类跑偏问题，默认开启但可在「配置管理 → 网络与隐私」逐项关闭。
 - 功能激活与在线会员授权用于验证授权码与获取会员内容，首次激活需联网；激活成功后可离线使用至到期。
+- 账户与多端同步只在你登录并点「初始同步 / 同步」后发生，上传的是角色名册、同步文档与玩家档案总览账本，用于多端对等；手机端默认只拉不推。不登录、不同步时这些数据只留在本机。
 - 匿名调律数据收集需要你在首次启动时明确同意，不同意就一条都不会发；同意之后也能随时在设置里关掉，并一键删除本地未上传的记录。
 - 律匠**不会上传**你的截图、日志、装备数据、游戏账号或角色名，也不会上传 `config/` 目录里的任何内容。
 

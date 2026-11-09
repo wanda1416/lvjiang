@@ -292,3 +292,85 @@ def test_status_column_never_leaks_implementation_keys() -> None:
                     device_execution=device_execution, method=method))
             assert method not in text
             assert "ADB" not in text
+
+
+# ─── 连接信息列的运行状态配色 ───────────────────────────
+
+
+def _run(state) -> SimpleNamespace:
+    return SimpleNamespace(state=state)
+
+
+def test_run_state_distinguishes_idle_running_paused_and_fault() -> None:
+    """配色只认这四档：未运行/运行中/暂停中/异常。"""
+    from lvjiang.ui.main.execution_runs import RunState
+
+    target = _device_target(device_execution=False, method="scrcpy")
+    assert WindowOpsMixin._target_run_state(target, None) == "idle"
+    assert WindowOpsMixin._target_run_state(target, _run(RunState.STARTING)) == "running"
+    assert WindowOpsMixin._target_run_state(target, _run(RunState.RUNNING)) == "running"
+    assert WindowOpsMixin._target_run_state(target, _run(RunState.PAUSING)) == "paused"
+    assert WindowOpsMixin._target_run_state(target, _run(RunState.PAUSED)) == "paused"
+    assert WindowOpsMixin._target_run_state(
+        target, _run(RunState.WAITING_TARGET)) == "fault"
+
+
+def test_offline_target_and_stream_fault_count_as_fault() -> None:
+    """离线与空闲断流都算异常——断流时目标仍「已连接」，但不能显示成正常。"""
+    offline = _device_target(device_execution=False, method="scrcpy")
+    offline.status = "offline"
+    assert WindowOpsMixin._target_run_state(offline, None) == "fault"
+
+    broken = _device_target(device_execution=False, method="scrcpy")
+    broken.capture = SimpleNamespace(last_fault="decoder_stall")
+    assert WindowOpsMixin._target_run_state(broken, None) == "fault"
+
+
+def test_selected_target_row_is_never_tinted(qtbot) -> None:
+    """选中行不叠状态色；取消选中后才恢复——否则选中动作会带一次颜色突变。"""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QTreeWidget
+
+    from lvjiang.ui.main.execution_runs import RunState
+    from lvjiang.ui.theme import get_theme_manager
+
+    running = ExecutionTarget(
+        id=android_target_id("A"), kind="adb", display_name="运行中设备",
+        capture=object(), input_ctrl=object(), status="connected",
+    )
+    idle = ExecutionTarget(
+        id=android_target_id("B"), kind="adb", display_name="空闲设备",
+        capture=object(), input_ctrl=object(), status="connected",
+    )
+    registry = ExecutionTargetRegistry()
+    registry.put(running)
+    registry.put(idle)
+
+    host = type("Host", (WindowOpsMixin,), {})()
+    host._execution_targets = registry
+    host._run_manager = SimpleNamespace(
+        run_for_target=lambda tid: (
+            SimpleNamespace(state=RunState.RUNNING) if tid == running.id else None))
+    host._resize_execution_target_columns = lambda: None
+    host.execution_target_list = QTreeWidget()
+    host.execution_target_list.setColumnCount(5)
+
+    host._refresh_execution_targets_ui()
+
+    tree = host.execution_target_list
+    items = {tree.topLevelItem(row).text(0): tree.topLevelItem(row)
+             for row in range(tree.topLevelItemCount())}
+    running_item, idle_item = items["运行中设备"], items["空闲设备"]
+    column = WindowOpsMixin._CONNECTION_INFO_COLUMN
+    # 当前查看目标是运行中那台，但它被选中 → 不着色
+    assert running_item.foreground(column).style() == Qt.BrushStyle.NoBrush
+    assert idle_item.foreground(column).style() == Qt.BrushStyle.NoBrush
+
+    # 切到空闲目标：运行中那台取消选中后恢复状态色
+    tree.setCurrentItem(idle_item)
+    host._apply_execution_target_colors()
+
+    assert idle_item.foreground(column).style() == Qt.BrushStyle.NoBrush
+    brush = running_item.foreground(column)
+    assert brush.style() == Qt.BrushStyle.SolidPattern
+    assert brush.color().name().lower() == get_theme_manager().tokens.success.lower()

@@ -431,6 +431,8 @@ class RunControlMixin:
     _ui_helper = None           # 工作流交互对话框 helper（运行期注入）
     #: 空闲重建画面流的工作桥；None 表示当前没有重建在跑。
     _stream_recheck_bridge: _StreamRecheckBridge | None = None
+    #: 通道横幅当前归属的目标；None 表示没有显示。
+    _adb_banner_target_id: str | None = None
     _param_panel = None         # 参数面板（MainWindow._setup_ui 构建）
     _left_tabs = None           # 左侧页签（MainWindow._setup_ui 构建）
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
@@ -1824,8 +1826,21 @@ class RunControlMixin:
             target_id,
             tr("⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务"))
 
+    def _channel_banner_texts(self) -> dict[str, str]:
+        """每条横幅的文案按目标保存。
+
+        切到别的目标时不能继续显示这台设备的提示，切回来又得能恢复——所以文案
+        必须按目标记住，而不是只留最后一次设置的那一条。
+        """
+        texts = getattr(self, "_channel_banner_text_by_target", None)
+        if texts is None:
+            texts = {}
+            self._channel_banner_text_by_target = texts
+        return texts
+
     def _show_channel_banner(self, target_id: str, text: str) -> None:
-        """只在当前查看目标上显示通道横幅，按钮统一指向「重新检查」。"""
+        """记录并显示通道横幅；非当前查看目标只记录，等切回来再显示。"""
+        self._channel_banner_texts()[target_id] = text
         if target_id != self._execution_targets.active_target_id:
             return
         banner = getattr(self, "_adb_banner", None)
@@ -1841,7 +1856,40 @@ class RunControlMixin:
             except TypeError:
                 pass
             btn.clicked.connect(self._resume_adb)
+        self._adb_banner_target_id = target_id
         banner.setVisible(True)
+
+    def _hide_channel_banner(self, target_id: str) -> None:
+        """收起某目标的横幅。
+
+        按**归属**判断而不是「它此刻是不是当前目标」：目标被移除后
+        ``active_target_id`` 会变，按 active 判断会把这些横幅变成谁也收不掉的
+        无主残留（断开连接后横幅一直挂着就是这个原因）。
+        """
+        self._channel_banner_texts().pop(target_id, None)
+        if self._adb_banner_target_id != target_id:
+            return
+        self._drop_channel_banner()
+
+    def _drop_channel_banner(self) -> None:
+        """无条件收起横幅：目标已断开/被移除，没有可归属的对象了。"""
+        self._adb_banner_target_id = None
+        banner = getattr(self, "_adb_banner", None)
+        if banner is not None:
+            banner.setVisible(False)
+
+    def _sync_channel_banner(self) -> None:
+        """按当前查看目标重新应用横幅。
+
+        横幅显示时要求「它就是当前目标」，但切换目标并不重新评估横幅，
+        于是看 B 目标时会继续挂着 A 的「画面流已中断」。切目标统一走这里。
+        """
+        target_id = self._execution_targets.active_target_id
+        text = self._channel_banner_texts().get(target_id) if target_id else None
+        if text is None:
+            self._drop_channel_banner()
+            return
+        self._show_channel_banner(target_id, text)
 
     def _show_connection_recovery_question(self, target, run_context, error_msg,
                                            *, kind: str = "connection"):
@@ -1934,14 +1982,6 @@ class RunControlMixin:
                 self._emit_run_instance_state(run_context, state.value)
         self._refresh_execution_targets_ui()
         self._hide_channel_banner(target_id)
-
-    def _hide_channel_banner(self, target_id: str) -> None:
-        """只在当前查看目标上收起通道横幅。"""
-        if target_id != self._execution_targets.active_target_id:
-            return
-        banner = getattr(self, '_adb_banner', None)
-        if banner is not None:
-            banner.setVisible(False)
 
     def _has_run_waiter(self) -> bool:
         """是否真有一条命令阻塞在恢复等待里。
@@ -2635,6 +2675,12 @@ class RunControlMixin:
         # 锁不能继续残留在 B 上；切回 A 时又必须恢复。运行锁本来就是按
         # 当前目标计算的，批量锁也在同一个刷新点按当前 RunContext 重算。
         self._sync_projected_context_locks()
+        # 运行状态变化统一从这里过（开始/暂停/恢复/结束），连接信息列的颜色
+        # 跟着这里刷新，不必在每个状态迁移点各写一遍。宿主可能只带部分混入
+        # （测试替身、插件页），缺这个方法时跳过。
+        apply_colors = getattr(self, "_apply_execution_target_colors", None)
+        if callable(apply_colors):
+            apply_colors()
         for combo_name in ("plan_combo", "reference_space_combo", "_env_combo",
                            "layout_combo"):
             combo = getattr(self, combo_name, None)

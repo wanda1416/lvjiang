@@ -7,7 +7,7 @@ from ctypes import wintypes
 import numpy as np
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QImage, QPixmap
 from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
 from ...core.config import load_user_config
@@ -469,6 +469,74 @@ class WindowOpsMixin:
             tree.setCurrentItem(selected_item)
         self._resize_execution_target_columns()
         tree.blockSignals(False)
+        self._apply_execution_target_colors()
+
+    #: 连接信息列（第 4 列）：运行状态配色只作用于这一列，不动其他列。
+    _CONNECTION_INFO_COLUMN = 3
+
+    @staticmethod
+    def _target_run_state(target, run_context) -> str:
+        """目标此刻的可观察状态：idle / running / paused / fault。"""
+        if run_context is not None and run_context.state.value == "waiting_target":
+            return "fault"
+        # 空闲断流时目标仍是「已连接」（能重连、能开任务），但画面不可用，
+        # 不能把它显示成正常——横幅在提示同一件事。capture 是资源代理，当前代次
+        # 没有绑定资源时取属性会抛错，配色不能因此打断列表刷新。
+        try:
+            fault = str(getattr(target.capture, "last_fault", "") or "")
+        except Exception:  # noqa: BLE001 代理无可用资源
+            fault = ""
+        if fault:
+            return "fault"
+        if not target.ready:
+            return "fault"
+        if run_context is None:
+            return "idle"
+        if run_context.state.value in {"pausing", "paused"}:
+            return "paused"
+        return "running"
+
+    def _target_state_brush(self, target, run_context) -> QBrush:
+        """连接信息列的文字色：未运行默认、运行中绿、暂停黄、异常红。
+
+        取主题令牌而不是写死色值，深浅色主题各自成立。
+        """
+        from ..theme import get_theme_manager
+
+        tokens = get_theme_manager().tokens
+        color = {
+            "running": tokens.success,
+            "paused": tokens.warning,
+            "fault": tokens.danger,
+        }.get(self._target_run_state(target, run_context))
+        return QBrush(QColor(color)) if color else QBrush()
+
+    def _apply_execution_target_colors(self) -> None:
+        """按运行状态给连接信息列上色；**当前选中行不着色**。
+
+        显式 ForegroundRole 会盖掉选中态的高亮文字，选中一行时颜色突变很扎眼，
+        所以选中行一律回到默认画刷；取消选中后再恢复状态色。
+        """
+        tree = getattr(self, "execution_target_list", None)
+        if tree is None:
+            return
+        current = tree.currentItem()
+        manager = getattr(self, "_run_manager", None)
+        tree.blockSignals(True)
+        try:
+            for row in range(tree.topLevelItemCount()):
+                item = tree.topLevelItem(row)
+                target = self._execution_targets.get(
+                    self._execution_target_id_from_item(item))
+                if target is None:
+                    continue
+                run_context = (manager.run_for_target(target.id)
+                               if manager is not None else None)
+                brush = (QBrush() if item is current
+                         else self._target_state_brush(target, run_context))
+                item.setForeground(self._CONNECTION_INFO_COLUMN, brush)
+        finally:
+            tree.blockSignals(False)
 
     def _resize_execution_target_columns(self) -> None:
         """四个信息列均分剩余空间；文本放不下时滚动，操作列保持独立留白。"""
@@ -635,6 +703,16 @@ class WindowOpsMixin:
             redraw_logs()
 
     def _refresh_active_target_ui(self) -> None:
+        # 横幅按目标归属：切到别的目标不能继续挂着上一台的「画面流已中断」，
+        # 切回来还要能恢复，所以每次切换当前目标都重新应用一次。
+        # 宿主可能只带部分混入（测试替身、插件页），缺方法时跳过。
+        sync_banner = getattr(self, "_sync_channel_banner", None)
+        if callable(sync_banner):
+            sync_banner()
+        # 选中行不着色、取消选中恢复状态色，切换目标时同样要重算一次。
+        apply_colors = getattr(self, "_apply_execution_target_colors", None)
+        if callable(apply_colors):
+            apply_colors()
         target = self._active_execution_target()
         preview_enabled = bool(getattr(self, "_preview_enabled", False))
         if target is None:
@@ -1306,6 +1384,12 @@ class WindowOpsMixin:
             self.append_log(tr("[提示] 该目标正在执行任务，不能断开"))
             return
         was_active = target.id == self._execution_targets.active_target_id
+        # 主动断开一个空闲目标后，它的通道横幅必须跟着消失：目标都没了，
+        # 「画面流已中断，点重新检查或断开重连设备」就成了一条永远点不掉的提示。
+        # 有运行实例的目标在上面已经被拦住，能走到这里的一定是空闲目标。
+        hide_banner = getattr(self, "_hide_channel_banner", None)
+        if callable(hide_banner):
+            hide_banner(target.id)
         self._abort_recording_for_target(target.id, tr("断开执行目标"))
         removed = self._execution_targets.remove(target.id)
         if removed is not None:

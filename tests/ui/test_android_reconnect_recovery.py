@@ -270,12 +270,15 @@ class _Banner:
         return not self.visible
 
 
-def _attach_banner(host) -> _Banner:
+def _attach_banner(host, target_id: str = TARGET_ID) -> _Banner:
+    """装一个横幅替身，并用真实入口把它显示出来（含归属）。"""
     banner = _Banner()
+    banner.visible = False
     host._adb_banner = banner
     host._adb_banner_label = SimpleNamespace(
         setText=lambda text: setattr(banner, 'text', text))
     host._adb_banner_btn = Mock()
+    host._show_channel_banner(target_id, "⚠ 画面流已中断")
     return banner
 
 

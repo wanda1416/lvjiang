@@ -68,3 +68,76 @@ def test_recheck_does_not_resume_task_and_verified_recovery_preserves_user_pause
     host._on_adb_connection_restored(target.id)
     host._run_manager.set_state.assert_called_once_with(context.task_run_id, RunState.PAUSED)
     assert not pause.is_set()
+
+
+class _Banner:
+    """够用的横幅替身：只关心显隐与文案。"""
+
+    def __init__(self) -> None:
+        self.visible = True
+        self.text = ""
+
+    def setVisible(self, value: bool) -> None:  # noqa: N802 - Qt 接口
+        self.visible = bool(value)
+
+    def isHidden(self) -> bool:  # noqa: N802 - Qt 接口
+        return not self.visible
+
+
+def _idle_host(qtbot, capture):
+    """空闲（没有运行实例）的目标宿主，横幅按钮全指向「重新检查」。"""
+    class Host(RunControlMixin, QWidget):
+        def append_log(self, text: str) -> None:
+            self.logs.append(text)
+
+    host = Host()
+    qtbot.addWidget(host)
+    host.logs = []
+    host.statusBar = lambda: SimpleNamespace(showMessage=Mock())
+    host._current_run_context = None
+    banner = _Banner()
+    host._adb_banner = banner
+    host._adb_banner_label = SimpleNamespace(setText=lambda text: setattr(banner, "text", text))
+    host._adb_banner_btn = Mock()
+    binding = SimpleNamespace(capture=capture)
+    target = SimpleNamespace(id="idle-target", handle=SimpleNamespace(binding=lambda: binding))
+    host._execution_targets = SimpleNamespace(
+        get=lambda _tid: target, active_target_id=target.id)
+    return host, banner
+
+
+def _fake_stream_capture(*, restart_ok: bool, reason: str = ""):
+    from lvjiang.core.android.scrcpy_capture import AndroidStreamCapture
+
+    capture = object.__new__(AndroidStreamCapture)   # 不跑 __init__：只要能 restart
+    capture.restart = lambda: restart_ok
+    capture._last_error = reason
+    capture._fault_detail = ""
+    return capture
+
+
+def test_idle_recheck_rebuilds_stream_and_clears_banner(qtbot):
+    """空闲时点「重新检查」必须真的重建画面流。
+
+    回归：空闲分支只往一个没人等待的 Event 上 set 一次，横幅永远消不掉——用户
+    明明已经重连好了，界面还挂着「画面流已中断」，只能重启应用。
+    """
+    host, banner = _idle_host(qtbot, _fake_stream_capture(restart_ok=True))
+
+    host._resume_adb()
+
+    qtbot.waitUntil(lambda: host._stream_recheck_bridge is None)
+    assert not banner.visible
+    assert any("重新检查画面流" in line for line in host.logs)
+
+
+def test_idle_recheck_failure_keeps_banner_with_reason(qtbot):
+    """重建失败要保留横幅并写清原因，允许再试——不能假装恢复也不留死提示。"""
+    host, banner = _idle_host(
+        qtbot, _fake_stream_capture(restart_ok=False, reason="协议头读取超时"))
+
+    host._resume_adb()
+
+    qtbot.waitUntil(lambda: host._stream_recheck_bridge is None)
+    assert banner.visible
+    assert "协议头读取超时" in banner.text

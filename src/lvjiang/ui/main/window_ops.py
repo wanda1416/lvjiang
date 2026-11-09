@@ -61,7 +61,6 @@ class _AdbConnSignalBridge(QObject):
     adb_lost = pyqtSignal(str, str, object)
     adb_restored = pyqtSignal(str)
     stream_lost = pyqtSignal(str, str, str)   # target_id, 归因, 说明
-    stream_restored = pyqtSignal(str)
 
     def __init__(self, target_id: str):
         super().__init__()
@@ -77,9 +76,6 @@ class _AdbConnSignalBridge(QObject):
     def notify_stream_lost(self, kind: str, detail: str):
         """画面流故障：来自解码线程或看门狗线程，必须经信号转回主线程。"""
         self.stream_lost.emit(self._target_id, kind, detail)
-
-    def notify_stream_restored(self):
-        self.stream_restored.emit(self._target_id)
 
 
 class _DeviceWorker(QObject):
@@ -1146,7 +1142,6 @@ class WindowOpsMixin:
         bridge.adb_lost.connect(self._on_adb_connection_lost)
         bridge.adb_restored.connect(self._on_adb_connection_restored)
         bridge.stream_lost.connect(self._on_stream_lost)
-        bridge.stream_restored.connect(self._on_stream_restored)
 
         def wire(dev) -> None:
             """同一个目标的所有 AdbDevice 共用一套恢复回调。
@@ -1223,10 +1218,17 @@ class WindowOpsMixin:
                     else RunState.RUNNING)
                 self._run_manager.set_state(run_context.task_run_id, next_state)
                 self._emit_run_instance_state(run_context, next_state.value)
-                banner = getattr(self, "_adb_banner", None)
-                if banner is not None and target_id == self._execution_targets.active_target_id:
-                    banner.setVisible(False)
         self._activate_connected_target(target, old)
+        # 连接成功就该收起上一个会话留下的通道横幅。原先只有「运行实例正处于
+        # waiting_target」才收，空闲重连时横幅会一直挂着「画面流已中断」——用户
+        # 明明已经连上了，却只能重启应用把它消掉。通道好了不等于用户确认了那个
+        # 「已发出、结果不确定」的动作，那种情况下横幅保留、只换说法。
+        if holds_confirmation:
+            self._show_channel_banner(target_id, tr(
+                "⚠ 执行通道等待确认：处理问题后点击「重新检查」；"
+                "无法恢复时请按 F10 停止任务"))
+        else:
+            self._hide_channel_banner(target_id)
 
         method_label = tr("流式截图") if capture_method == "scrcpy" \
             else tr("单帧截图")

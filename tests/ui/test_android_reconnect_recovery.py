@@ -34,7 +34,7 @@ from lvjiang.ui.main.window_ops import (
 
 STABLE_ID = 'stable-device-id'
 TARGET_ID = android_target_id(STABLE_ID)
-NEW_SERIAL = '192.168.0.100:5555'
+NEW_SERIAL = '192.168.1.100:5555'
 
 
 class _Backend:
@@ -254,3 +254,55 @@ def test_reconnect_releases_connection_wait(reconnect_case) -> None:
         case.run_context.task_run_id, RunState.RUNNING)
     case.host._emit_run_instance_state.assert_called_once_with(
         case.run_context, RunState.RUNNING.value)
+
+
+class _Banner:
+    """够用的横幅替身：只关心显隐与文案。"""
+
+    def __init__(self) -> None:
+        self.visible = True
+        self.text = ""
+
+    def setVisible(self, value: bool) -> None:  # noqa: N802 - Qt 接口
+        self.visible = bool(value)
+
+    def isHidden(self) -> bool:  # noqa: N802 - Qt 接口
+        return not self.visible
+
+
+def _attach_banner(host) -> _Banner:
+    banner = _Banner()
+    host._adb_banner = banner
+    host._adb_banner_label = SimpleNamespace(
+        setText=lambda text: setattr(banner, 'text', text))
+    host._adb_banner_btn = Mock()
+    return banner
+
+
+def test_connect_clears_stale_channel_banner(reconnect_case) -> None:
+    """空闲重连成功后，上一会话留下的「画面流已中断」横幅必须收起。
+
+    回归：原先只有「运行实例正处于 waiting_target」才收横幅，空闲重连时
+    run_context 为 None，那条分支永远不成立，横幅会一直挂着——用户明明已经
+    连上了，却只能重启应用把它消掉。
+    """
+    case = reconnect_case
+    banner = _attach_banner(case.host)
+    case.run_manager.run_for_target = lambda _tid: None   # 空闲：没有运行实例
+    case.mark_waiting('connection')
+
+    case.connect()
+
+    assert not banner.visible
+
+
+def test_connect_keeps_banner_while_uncertain_action_awaits(reconnect_case) -> None:
+    """通道好了不等于用户确认了「已发出、结果不确定」的动作，横幅要保留并换说法。"""
+    case = reconnect_case
+    banner = _attach_banner(case.host)
+    case.mark_waiting('uncertain_action')
+
+    case.connect()
+
+    assert banner.visible
+    assert '等待确认' in banner.text

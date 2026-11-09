@@ -95,6 +95,19 @@ class _AcknowledgedPauseEvent(threading.Event):
         self._ack_if_paused()
         return super().wait(timeout)
 
+class _StreamRecheckBridge(QObject):
+    """空闲重建画面流的工作线程 → 主线程结果回调。
+
+    ``AndroidStreamCapture.restart()`` 会阻塞（adb push / forward / 等协议头与
+    首帧），必须离开 UI 线程执行；结果经信号回到主线程再碰控件。
+    """
+    finished = pyqtSignal(str, bool, str)   # target_id, ok, 失败原因
+
+    def __init__(self, target_id: str) -> None:
+        super().__init__()
+        self.target_id = target_id
+
+
 def _to_serializable(obj):
     """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
     if isinstance(obj, list):
@@ -416,6 +429,8 @@ class RunControlMixin:
     # 运行态属性的类级兜底：实例赋值前直接访问也有明确默认值
     _current_engine = None      # type: ignore[assignment]  # 运行中的 WorkflowEngine（_execute_workflow 赋值）
     _ui_helper = None           # 工作流交互对话框 helper（运行期注入）
+    #: 空闲重建画面流的工作桥；None 表示当前没有重建在跑。
+    _stream_recheck_bridge: _StreamRecheckBridge | None = None
     _param_panel = None         # 参数面板（MainWindow._setup_ui 构建）
     _left_tabs = None           # 左侧页签（MainWindow._setup_ui 构建）
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
@@ -1809,10 +1824,6 @@ class RunControlMixin:
             target_id,
             tr("⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务"))
 
-    def _on_stream_restored(self, target_id: str):
-        """画面流恢复：与 ADB 恢复走同一套状态复位（横幅收起、WAITING→RUNNING）。"""
-        self._on_adb_connection_restored(target_id)
-
     def _show_channel_banner(self, target_id: str, text: str) -> None:
         """只在当前查看目标上显示通道横幅，按钮统一指向「重新检查」。"""
         if target_id != self._execution_targets.active_target_id:
@@ -1922,13 +1933,41 @@ class RunControlMixin:
                 self._run_manager.set_state(run_context.task_run_id, state)
                 self._emit_run_instance_state(run_context, state.value)
         self._refresh_execution_targets_ui()
-        if target_id == self._execution_targets.active_target_id:
-            banner = getattr(self, '_adb_banner', None)
-            if banner is not None:
-                banner.setVisible(False)
+        self._hide_channel_banner(target_id)
+
+    def _hide_channel_banner(self, target_id: str) -> None:
+        """只在当前查看目标上收起通道横幅。"""
+        if target_id != self._execution_targets.active_target_id:
+            return
+        banner = getattr(self, '_adb_banner', None)
+        if banner is not None:
+            banner.setVisible(False)
+
+    def _has_run_waiter(self) -> bool:
+        """是否真有一条命令阻塞在恢复等待里。
+
+        ``waiting`` 只在 ``AndroidRecovery.wait_for_user`` 期间为真。任务已经结束
+        但 ``_current_run_context`` 还留着旧引用时它为假——此时点「重新检查」只是
+        往一个没人等的 Event 上 set 一次，横幅不会动。横幅的空闲分支因此必须能
+        分辨「有人在等」和「只是提示」，否则那个按钮点了等于没点。
+        """
+        target = self._execution_targets.get(self._execution_targets.active_target_id)
+        coordinator = getattr(
+            getattr(target, "device", None), "recovery_coordinator", None)
+        if coordinator is not None:
+            return bool(getattr(coordinator, "waiting", False))
+        # 没有恢复协调器（窗口目标、测试替身）：退回按运行实例状态判断。
+        from .execution_runs import RunState
+        context = getattr(self, "_current_run_context", None)
+        return getattr(context, "state", None) == RunState.WAITING_TARGET
 
     def _resume_adb(self):
-        """唤醒对应线程重新检查；不能在尚未成功时宣告恢复。"""
+        """响应横幅上的「重新检查」。
+
+        有人在等恢复时唤醒它继续原来的重试链；空闲时没有任何等待者，横幅只是
+        一条提示，改为**直接重建画面流**——否则这个按钮点了没有任何效果，横幅
+        会一直挂在那里直到重启应用。
+        """
         # 横幅只为当前查看目标显示，因此唤醒的也必须是该目标的运行实例
         run_context = getattr(self, "_current_run_context", None)
         if run_context is not None:
@@ -1939,10 +1978,78 @@ class RunControlMixin:
                 box.done(QMessageBox.StandardButton.Yes)
                 return
         resume_event = self._run_resume_event(run_context)
-        if resume_event is not None:
+        if resume_event is not None and self._has_run_waiter():
             resume_event.set()
             self.statusBar().showMessage(tr("正在重新检查设备执行通道..."))
             self.append_log(tr("[操作] 重新检查设备执行通道"))
+            return
+        self._recheck_active_stream()
+
+    def _recheck_active_stream(self) -> bool:
+        """空闲时重建当前目标的画面流；返回是否已接管这次点击。
+
+        横幅在空闲状态下也会显示（避免启动任务后才发现断流），所以必须给它一条
+        真的能消掉的路：``restart()`` 会重建整个 scrcpy 会话并清故障标记，成功
+        即收起横幅，失败则把原因写回横幅，允许再试。
+
+        ``restart()`` 是阻塞调用（adb push / forward / 等协议头与首帧），必须放到
+        工作线程，否则点一下按钮界面就冻住。
+        """
+        from ...core.android import AndroidStreamCapture
+
+        target_id = self._execution_targets.active_target_id
+        target = self._execution_targets.get(target_id) if target_id else None
+        if target is None or target.handle is None:
+            return False
+        capture = target.handle.binding().capture
+        if not isinstance(capture, AndroidStreamCapture):
+            # 单帧截图没有流可重建；横幅只可能来自上一次 scrcpy 会话，直接收掉。
+            self._hide_channel_banner(target_id)
+            self.append_log(tr("[操作] 当前目标是单帧截图，没有可重建的画面流，已收起提示"))
+            return True
+        if getattr(self, "_stream_recheck_bridge", None) is not None:
+            self.append_log(tr("[画面流] 正在重建中，请稍候"))
+            return True
+
+        bridge = _StreamRecheckBridge(target_id)
+        bridge.finished.connect(self._on_stream_recheck_finished)
+        self._stream_recheck_bridge = bridge
+        self.statusBar().showMessage(tr("正在重建画面流..."))
+        self.append_log(tr("[操作] 重新检查画面流"))
+
+        def work() -> None:
+            ok = False
+            detail = ""
+            try:
+                ok = bool(capture.restart())
+                if not ok:
+                    detail = str(
+                        getattr(capture, "last_error", "")
+                        or getattr(capture, "last_fault_detail", "") or "")
+            except Exception as exc:  # noqa: BLE001 重建失败要回落到横幅，不能炸线程
+                detail = str(exc)
+            bridge.finished.emit(target_id, ok, detail)
+
+        threading.Thread(target=work, name="stream-recheck", daemon=True).start()
+        return True
+
+    def _on_stream_recheck_finished(self, target_id: str, ok: bool, detail: str) -> None:
+        """空闲重建结果回到主线程：成功收横幅，失败把原因留在横幅上允许再试。"""
+        self._stream_recheck_bridge = None
+        if self._execution_targets.get(target_id) is None:
+            return
+        if ok:
+            self.append_log(tr("[画面流] 已恢复"))
+            self.statusBar().showMessage(tr("画面流已恢复"))
+            self._hide_channel_banner(target_id)
+            return
+        reason = detail or tr("未知原因")
+        self.append_log(tr("[警告] 画面流重建失败：{reason}").format(reason=reason))
+        self.statusBar().showMessage(tr("画面流仍未恢复"))
+        self._show_channel_banner(
+            target_id,
+            tr("⚠ 画面流仍不可用：{reason}；可再次点「重新检查」或断开重连设备")
+            .format(reason=reason))
 
     # ─── 后端就绪判定 ──────────────────────────────────
 

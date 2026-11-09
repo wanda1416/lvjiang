@@ -197,6 +197,16 @@ run_control:
   画面已中断，正在恢复…: Screen interrupted; recovering…
   画面流中断: 画面ストリーム中断
   画面流中断，任务正在等待恢复: Screen stream interrupted; the task is waiting for recovery
+  "[操作] 当前目标是单帧截图，没有可重建的画面流，已收起提示": "[Op] The current target uses single-frame capture; there is no stream to rebuild. Notice dismissed"
+  "[操作] 重新检查画面流": "[Op] Re-checking the screen stream"
+  "[画面流] 已恢复": "[Stream] Recovered"
+  "[画面流] 正在重建中，请稍候": "[Stream] Rebuilding, please wait"
+  "[警告] 画面流重建失败：{reason}": "[Warning] Failed to rebuild the screen stream: {reason}"
+  "⚠ 画面流仍不可用：{reason}；可再次点「重新检查」或断开重连设备": "⚠ Screen stream still unavailable: {reason}; click \"Re-check\" again or disconnect and reconnect the device"
+  "未知原因": "Unknown reason"
+  "正在重建画面流...": "Rebuilding the screen stream..."
+  "画面流仍未恢复": "Screen stream is still not recovered"
+  "画面流已恢复": "Screen stream recovered"
   确认停止: Confirm Stop
   窗口已消失或句柄失效，请重新定位: The window is gone or its handle is stale; locate it again
   窗口模式: Window mode

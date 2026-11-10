@@ -3,8 +3,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QTableWidget, QWidget
 
-from lvjiang.core.config import get_interface_store
-from lvjiang.core.profile import store
+from lvjiang.core.profile import layout, store
 from lvjiang.core.profile.models import QuotaKeyDef, StockKeyDef
 from lvjiang.core.profile.schema import ProfileSchema
 from lvjiang.ui.profile import column_management
@@ -61,7 +60,9 @@ def test_search_keeps_choices_and_group_selection_only_checks_matches(qtbot, sch
 def overview(qtbot, monkeypatch, schema):
     store.insert_overview_columns('group', None, ['missing', 'a', 'z'])
     store.insert_overview_columns('other', None, ['b'])
-    column_management._save_column_widths({'group': [70, 110, 130], 'other': [80, 90]})
+    # 用户名列宽只存一份（先写 80，再被 group 的 70 覆盖），列宽按分组各存。
+    store.set_group_widths('other', 80, {'b': 90})
+    store.set_group_widths('group', 70, {'a': 110, 'z': 130})
     monkeypatch.setattr(column_management, 'get_profile_config', lambda: schema)
 
     class Overview(ProfileColumnMixin, QWidget):
@@ -89,24 +90,24 @@ def test_batch_add_merges_current_columns_preserves_widths_and_refreshes_once(ov
         items['daily'].setCheckState(0, Qt.CheckState.Checked)
         # 模拟窗口打开期间另一个编辑入口新增了一列及其列宽。
         store.insert_overview_column('group', 0, 'b')
-        column_management._save_column_widths({'group': [70, 220, 110, 130], 'other': [80, 90]})
+        store.set_group_widths('group', 70, {'b': 220, 'a': 110, 'z': 130})
         return QDialog.DialogCode.Accepted
 
     monkeypatch.setattr(ProfileKeyMultiSelectDialog, 'exec', choose)
     overview._add_column('group', 0)
     assert store.get_groups()['group']['columns'] == ['b', 'missing', 'a', 'daily', 'c', 'z']
     assert store.get_groups()['other']['columns'] == ['b']
-    width = overview._tables['group'].horizontalHeader().defaultSectionSize()
-    assert column_management._get_column_widths() == {
-        'group': [70, 220, 110, width, width, 130], 'other': [80, 90]}
+    # 列宽按 key 存：新增列不搬动任何已有记录，共用用户名列宽也不受影响。
+    assert store.get_group_widths('group') == (70, {'b': 220, 'a': 110, 'z': 130})
+    assert store.get_group_widths('other') == (70, {'b': 90})
     assert overview.refreshes == ['group']
 
 
 def test_cancel_does_not_save_or_refresh(overview, monkeypatch):
-    before = get_interface_store().path.read_bytes()
+    before = layout.layout_path().read_bytes()
     monkeypatch.setattr(ProfileKeyMultiSelectDialog, 'exec', lambda _: QDialog.DialogCode.Rejected)
     overview._add_column('group', -1)
-    assert get_interface_store().path.read_bytes() == before
+    assert layout.layout_path().read_bytes() == before
     assert overview.refreshes == []
 
 
@@ -114,7 +115,7 @@ def test_store_inserts_ordered_unique_batch_and_rejects_removed_anchor():
     assert store.insert_overview_columns('group', None, ['a', 'z']) == ['a', 'z']
     assert store.insert_overview_columns('group', 'a', ['b', 'c', 'b', 'z']) == ['b', 'c']
     assert store.get_groups()['group']['columns'] == ['a', 'b', 'c', 'z']
-    before = get_interface_store().path.read_bytes()
+    before = layout.layout_path().read_bytes()
     with pytest.raises(ValueError, match='原列'):
         store.insert_overview_columns('group', 'removed', ['new'])
-    assert get_interface_store().path.read_bytes() == before
+    assert layout.layout_path().read_bytes() == before

@@ -5,8 +5,9 @@
 """
 import pytest
 
+from lvjiang import constants
 from lvjiang.core.config import InterfaceStore
-from lvjiang.core.profile import store
+from lvjiang.core.profile import layout, store
 from lvjiang.core.profile.models import (
     MODEL_NOTE,
     MODEL_QUOTA,
@@ -21,10 +22,11 @@ from lvjiang.ui.profile.tab import ProfileTab
 
 
 @pytest.fixture
-def interface(tmp_path, monkeypatch):
-    """隔离的 interface.json；store 的读写全部指向它。"""
-    session = InterfaceStore(tmp_path / "interface.json")
+def interface(monkeypatch):
+    """隔离的 interface.json（活跃分组、提醒历史）；分组结构在 profile.json。"""
+    session = InterfaceStore(constants.SESSION_CONFIG_DIR / "interface.json")
     monkeypatch.setattr(store, "get_interface_store", lambda: session)
+    monkeypatch.setattr(layout, "get_interface_store", lambda: session)
     return session
 
 
@@ -43,11 +45,11 @@ def test_totals_are_saved_per_group(interface):
     assert store.get_overview_totals("乙组") is False
 
 
-def test_totals_survive_reload(interface, tmp_path, monkeypatch):
-    """落盘后重新加载依然生效。"""
+def test_totals_survive_reload(interface):
+    """落盘后重新打开依然生效：每次读取都走磁盘上的 profile.json。"""
     store.set_overview_totals("甲组", True)
-    reloaded = InterfaceStore(tmp_path / "interface.json")
-    monkeypatch.setattr(store, "get_interface_store", lambda: reloaded)
+    doc = layout.load()
+    assert doc.overview.groups["甲组"].show_totals is True
     assert store.get_overview_totals("甲组") is True
 
 
@@ -118,10 +120,11 @@ def _tab(monkeypatch, users=USERS) -> ProfileTab:
 
 @pytest.fixture
 def group_table(interface):
-    interface.set_node("profile", {
-        "overview_groups": {"甲组": {"columns": ["a", "n"]}},
-        "overview_active_group": "甲组",
-    })
+    layout.save(layout.ProfileLayout(overview=layout.OverviewLayout(
+        group_order=["甲组"],
+        groups={"甲组": layout.GroupLayout(columns=["a", "n"])},
+    )))
+    interface.update_node("ui_state", {"profile_active_group": "甲组"})
 
 
 def test_totals_row_is_appended_last(qtbot, interface, monkeypatch, group_table):

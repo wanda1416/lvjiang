@@ -55,11 +55,7 @@ from .cell_formatting import (
     locked_sync_targets,
     sum_profile_column,
 )
-from .column_management import (
-    ProfileColumnMixin,
-    _get_column_widths,
-    _save_column_widths,
-)
+from .column_management import ProfileColumnMixin
 
 
 def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> QTimer:
@@ -256,6 +252,25 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         btn_remove_group.setMinimumHeight(32)
         btn_remove_group.clicked.connect(self._remove_group)
         toolbar.addWidget(btn_remove_group)
+
+        # 页面结构的上传/下载是独立动作（不跟常规同步走），跟在分组管理后面，
+        # 与「刷新 → 分组管理」同样的间距，避免看起来像分组操作的一部分。
+        toolbar.addSpacing(24)
+
+        btn_upload_layout = QPushButton(tr("上传页面结构"))
+        btn_upload_layout.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_upload_layout.setMinimumHeight(32)
+        btn_upload_layout.setToolTip(
+            tr("把本机的分组、列与列宽上传到云端；远端已有其它设备写入的结构时会先询问是否覆盖"))
+        btn_upload_layout.clicked.connect(self._upload_page_structure)
+        toolbar.addWidget(btn_upload_layout)
+
+        btn_download_layout = QPushButton(tr("下载页面结构"))
+        btn_download_layout.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_download_layout.setMinimumHeight(32)
+        btn_download_layout.setToolTip(tr("用云端的页面结构替换本机结构，需要两次确认"))
+        btn_download_layout.clicked.connect(self._download_page_structure)
+        toolbar.addWidget(btn_download_layout)
 
         toolbar.addStretch()
 
@@ -582,6 +597,19 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         from .dialogs import HistoryDialog, HistoryScope
         HistoryDialog(HistoryScope(), self).exec()
 
+    def _upload_page_structure(self) -> None:
+        """上传页面结构；远端来自别的设备时先问是否覆盖（默认不覆盖）。"""
+        from .layout_transfer import upload_page_structure
+
+        upload_page_structure(self)
+
+    def _download_page_structure(self) -> None:
+        """下载页面结构：两次确认后替换本机结构，并按新结构重建总览。"""
+        from .layout_transfer import download_page_structure
+
+        if download_page_structure(self):
+            self._build_groups()
+
     # ─── 分组管理 ──────────────────────────────────────────────
 
     def _on_groups_reordered(self, _from: int, _to: int) -> None:
@@ -649,11 +677,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         else:
             # 用户明确重命名临时默认分组，此时直接以新名称首次落盘。
             create_overview_group(new_name)
-        # 同步更新列宽字典的 key
-        all_widths = _get_column_widths()
-        if old_name in all_widths:
-            all_widths[new_name] = all_widths.pop(old_name)
-            _save_column_widths(all_widths)
+        # 列宽挂在分组对象上，改名时由结构层一起搬过去，这里不再单独搬数组。
         if get_active_group() == old_name:
             set_active_group(new_name)
         self._build_groups()

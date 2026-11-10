@@ -1,12 +1,19 @@
 """档案总览列管理 Mix-in
 
 ProfileColumnMixin: 列增删、拖拽排序、列宽持久化、表头右键菜单、字段选择器。
+
+列宽按列 key 存在 ``profile.json``（见 :mod:`lvjiang.core.profile.layout`）：
+增删列不再需要手工搬宽度数组，用户名列宽只存一份、各分组天然一致。像素宽度
+跨机器使用时按度量环境折算后 clamp，折算结果**不回写**文件——只有用户自己
+拖动列宽才更新记录，否则两台机器会互相拉扯。
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -16,9 +23,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.core.config import get_interface_store
 from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
+from ...core.profile import layout
+from ...core.profile.layout import LayoutMetric
 from ...core.profile.schema import get_profile_config
 from ...core.profile.store import (
     get_groups,
@@ -27,28 +35,42 @@ from ...core.profile.store import (
     remove_overview_column,
     reorder_overview_columns,
     replace_overview_column,
+    set_group_widths,
     set_overview_totals,
 )
-from ...i18n import tr
+from ...i18n import current_language, tr
 
 if TYPE_CHECKING:
     from .tab import ProfileTab
 
-# 列宽配置存储在 ui_state 下
-_COLUMN_WIDTHS_KEY = "profile_overview"
+#: 拖动列宽时只更新内存，停下这么久才落盘——拖动会连续触发 sectionResized。
+_WIDTH_SAVE_DELAY_MS = 400
+
+#: 表头文字之外的留白（左右边距 + 排序/边框余量）。
+_HEADER_PADDING = 24
 
 
-def _get_column_widths() -> dict:
-    """获取各分组列宽配置 {group_name: [width, ...]}"""
-    ui_state = get_interface_store().get_node("ui_state", {})
-    if isinstance(ui_state, dict):
-        return ui_state.get(_COLUMN_WIDTHS_KEY, {})
-    return {}
+def metric_for_table(table: QTableWidget) -> LayoutMetric:
+    """当前控件的度量环境：解释记录宽度、写回宽度时都带上它。"""
+    font = table.font()
+    pixel_size = font.pixelSize()
+    if pixel_size <= 0:
+        point_size = font.pointSizeF()
+        pixel_size = round(point_size * table.logicalDpiY() / 72.0) if point_size > 0 else 0
+    return LayoutMetric(
+        ui_scale=round(float(table.devicePixelRatioF() or 1.0), 3),
+        font_px=max(0, int(pixel_size)),
+        lang=current_language(),
+    )
 
 
-def _save_column_widths(widths: dict) -> None:
-    """保存各分组列宽到 ui_state"""
-    get_interface_store().update_node("ui_state", {_COLUMN_WIDTHS_KEY: widths})
+def header_min_width(table: QTableWidget, column: int) -> int:
+    """够显示该列表头的最小宽度；折算后的列宽不得小于它。"""
+    header = table.horizontalHeader()
+    item = table.horizontalHeaderItem(column)
+    text = item.text() if item is not None else ""
+    font = header.font() if header is not None else table.font()
+    return QFontMetrics(font).horizontalAdvance(text) + _HEADER_PADDING
 
 
 class ProfileColumnMixin:
@@ -110,84 +132,80 @@ class ProfileColumnMixin:
         finally:
             self._reordering = False
 
+    # ─── 列宽 ────────────────────────────────────────────────
+
     def _on_column_resized(self: ProfileTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
-        """列宽拖拽调整后持久化，并同步用户名列宽到所有分组"""
+        """列宽被拖动：按列 key 记录，用户名列宽对所有分组生效。"""
         if self._restoring_widths or self._loading:
             return
         h_header = table.horizontalHeader()
         assert h_header is not None
-        widths = [h_header.sectionSize(i) for i in range(h_header.count())]
-        all_widths = _get_column_widths()
-        all_widths[group_name] = widths
+        if h_header.count() == 0:
+            return
+        widths: dict[str, int] = {}
+        for index, key in enumerate(self._visible_columns(group_name), start=1):
+            if index < h_header.count():
+                widths[key] = int(h_header.sectionSize(index))
+        self._schedule_width_save(group_name, int(h_header.sectionSize(0)), widths)
 
-        # 同步用户名列宽（第 0 列）到所有其他分组，并更新持久化数据
-        name_col_width = widths[0] if widths else 0
-        if name_col_width > 0:
-            for other_group, other_table in self._tables.items():
-                if other_group == group_name:
-                    continue
-                other_header = other_table.horizontalHeader()
-                if other_header is not None and other_header.count() > 0:
-                    self._restoring_widths = True
-                    other_header.resizeSection(0, name_col_width)
-                    self._restoring_widths = False
-                    # 同步更新持久化的列宽，如果没有记录则创建
-                    other_widths = all_widths.get(other_group)
-                    col_count = other_header.count()
-                    if not other_widths or len(other_widths) != col_count:
-                        # 创建默认列宽记录
-                        other_widths = [other_header.sectionSize(i) for i in range(col_count)]
-                        all_widths[other_group] = other_widths
-                    other_widths[0] = name_col_width
+    def _schedule_width_save(  # type: ignore[misc]
+        self: ProfileTab, group_name: str, name_width: int, widths: dict[str, int],
+    ) -> None:
+        """拖动过程中只攒内存，停手后一次落盘。"""
+        pending = getattr(self, "_pending_widths", None)
+        if pending is None:
+            pending = {}
+            self._pending_widths = pending
+        pending[group_name] = (name_width, dict(widths))
+        timer = getattr(self, "_width_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(_WIDTH_SAVE_DELAY_MS)
+            timer.timeout.connect(self._flush_pending_widths)
+            self._width_timer = timer
+        timer.start()
 
-        _save_column_widths(all_widths)
+    def _flush_pending_widths(self: ProfileTab) -> None:  # type: ignore[misc]
+        """把攒下的列宽写进结构文件（同一分组以最后一次为准）。"""
+        pending = getattr(self, "_pending_widths", {})
+        self._pending_widths = {}
+        for group_name, (name_width, widths) in pending.items():
+            set_group_widths(group_name, name_width, widths)
 
     def _restore_column_widths(self: ProfileTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
-        """恢复指定分组的列宽配置"""
-        all_widths = _get_column_widths()
-        widths = all_widths.get(group_name)
-        if not widths:
-            return
+        """按列 key 恢复列宽：记录值折算到当前度量环境后 clamp。"""
+        doc = layout.load()
+        current = metric_for_table(table)
+        layout.set_environment(current)
+        group = doc.overview.groups.get(group_name)
         h_header = table.horizontalHeader()
         assert h_header is not None
-        col_count = h_header.count()
-        if len(widths) != col_count:
-            default_w = h_header.defaultSectionSize()
-            widths = [*widths[:col_count], *([default_w] * max(0, col_count - len(widths)))]
-            all_widths[group_name] = widths
-            _save_column_widths(all_widths)
+        visible = self._visible_columns(group_name)
         self._restoring_widths = True
-        for idx, w in enumerate(widths):
-            h_header.resizeSection(idx, w)
-        self._restoring_widths = False
-
-    def _insert_column_widths(self: ProfileTab, group_name: str, data_insert_idx: int, table: QTableWidget, count: int) -> None:  # type: ignore[misc]
-        """批量新增数据列时同步列宽数组；第 0 列为用户名。"""
-        h_header = table.horizontalHeader()
-        assert h_header is not None
-        all_widths = _get_column_widths()
-        widths = list(all_widths.get(group_name) or [])
-        if not widths:
-            widths = [h_header.sectionSize(i) for i in range(h_header.count())]
-        width_idx = max(1, min(data_insert_idx + 1, len(widths)))
-        new_width = h_header.defaultSectionSize()
-        widths[width_idx:width_idx] = [new_width] * count
-        all_widths[group_name] = widths
-        _save_column_widths(all_widths)
-
-    def _remove_column_width(self: ProfileTab, group_name: str, data_idx: int, table: QTableWidget) -> None:  # type: ignore[misc]
-        """删除数据列时同步列宽数组；第 0 列为用户名。"""
-        h_header = table.horizontalHeader()
-        assert h_header is not None
-        all_widths = _get_column_widths()
-        widths = list(all_widths.get(group_name) or [])
-        if not widths:
-            widths = [h_header.sectionSize(i) for i in range(h_header.count())]
-        width_idx = data_idx + 1
-        if 0 <= width_idx < len(widths):
-            del widths[width_idx]
-            all_widths[group_name] = widths
-            _save_column_widths(all_widths)
+        try:
+            header_width = layout.scaled_width(
+                group.name_column_width if group else 0,
+                stored=doc.metric,
+                current=current,
+                minimum=header_min_width(table, 0),
+            )
+            h_header.resizeSection(0, header_width)
+            for index, key in enumerate(visible, start=1):
+                if index >= h_header.count():
+                    break
+                raw = group.column_widths.get(key, 0) if group else 0
+                h_header.resizeSection(
+                    index,
+                    layout.scaled_width(
+                        raw,
+                        stored=doc.metric,
+                        current=current,
+                        minimum=header_min_width(table, index),
+                    ),
+                )
+        finally:
+            self._restoring_widths = False
 
     def _on_header_context_menu(self: ProfileTab, pos, group_name: str):  # type: ignore[misc]
         """表头右键菜单（分组上下文）"""
@@ -294,11 +312,11 @@ class ProfileColumnMixin:
         dialog = QDialog(self)
         dialog.setWindowTitle(tr("选择字段"))
         dialog.setMinimumWidth(250)
-        layout = QVBoxLayout(dialog)
+        layout_box = QVBoxLayout(dialog)
 
         selected = [current_key]  # 可变容器，供级联菜单回调
         btn = self._create_key_picker(config, all_keys, current_key, selected)
-        layout.addWidget(btn)
+        layout_box.addWidget(btn)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -311,7 +329,7 @@ class ProfileColumnMixin:
         apply_button_style(btn_ok)
         apply_button_style(btn_cancel, variant="neutral")
         fit_button_width(btn_ok, btn_cancel)
-        layout.addLayout(btn_row)
+        layout_box.addLayout(btn_row)
 
         if dialog.exec():
             if selected[0]:
@@ -345,16 +363,12 @@ class ProfileColumnMixin:
             QMessageBox.information(self, tr("提示"), tr("原分组已被移除，请重新选择"))
             return
         try:
-            inserted = insert_overview_columns(group_name, after_key, selected)
+            insert_overview_columns(group_name, after_key, selected)
         except ValueError:
             QMessageBox.information(self, tr("提示"), tr("原列已被移除，请重新选择插入位置"))
             return
-        table = self._tables[group_name]
-        if inserted:
-            columns = get_groups()[group_name]["columns"]
-            visible_keys = [key for key in columns if config.get_key(key) is not None]
-            self._insert_column_widths(group_name, visible_keys.index(inserted[0]), table, len(inserted))
-        self._refresh_group(group_name, table)
+        # 新列没有宽度记录，重建时按表头实测给默认宽度，无需搬动他人列宽。
+        self._refresh_group(group_name, self._tables[group_name])
 
     def _remove_column(self: ProfileTab, group_name: str, logical_index: int):  # type: ignore[misc]
         """从指定分组中删除指定列"""
@@ -365,7 +379,6 @@ class ProfileColumnMixin:
         if configured_index is not None:
             removed_key = column_keys[configured_index]
             remove_overview_column(group_name, removed_key)
-            self._remove_column_width(group_name, logical_index, self._tables[group_name])
             self._refresh_group(group_name, self._tables[group_name])
 
     def _create_key_picker(  # type: ignore[misc]

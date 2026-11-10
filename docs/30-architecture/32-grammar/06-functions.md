@@ -19,7 +19,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **100 个**内置函数（core 73 个 + yysls 插件 27 个），按功能分为 15 类。
+按功能分组列出全部内置函数；分组与注册表一一对应，新增函数落到对应分组即可。
 
 > 分组、简介、参数含义与返回值声明在 `@builtin_func(...)` 装饰器里，运行期由
 > `describe_function()` / `signature_params()` 读取；应用内「脚本编辑 → 内置函数」
@@ -32,10 +32,10 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > from lvjiang.workflows import builtins as b
 > from lvjiang.apps import load_app, register_hooks
 > register_hooks(load_app("yysls"))    # 插件函数靠 hooks 注册，直接 import 空包不生效
-> print(sorted(b.list_functions()))    # → 100 个
+> print(sorted(b.list_functions()))    # 与本文清单逐项对齐
 > ```
 
-### 基础运算（5）
+### 基础运算
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -45,7 +45,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `abs` | `(a) -> int \| float` | 取绝对值，保持类型 |
 | `to_flag` | `(x) -> int` | 按语言真值（与 `if $x` 同口径）压成 `1` / `0`；不解析文本，`"0"` 记 1 |
 
-### 字典/列表操作（12）
+### 字典/列表操作
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -62,7 +62,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `find_key` | `(dict, str) -> str` | 查找 value 包含指定文本的 key，找不到返回 `""` |
 | `append` | `(list, val) / (dict, key, val) -> ""` | 向列表追加或向字典写入（副作用操作） |
 
-### 字符串处理（13）
+### 字符串处理
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -80,7 +80,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `extract_num` | `(str) -> int \| float` | 提取文本中第一项非负数（可含小数点），找不到返回 `-1` |
 | `extract_progress` | `(str) -> dict` | 提取 `当前/总量` 进度对，返回 `{valid, current, total}` |
 
-### 装备处理（8）
+### 装备处理
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -93,7 +93,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `yysls_rich_parse` | `(dict) -> dict` | `as rich` 的转换函数：解析 `level_text`/`count_text` 并删除原字段 |
 | `equipment_lock_status` | `(ref) -> str` | 从紧邻的装备详情截图识别锁定状态，返回 `"locked"` / `"unlock"` / `""` |
 
-### 背包遍历（3）
+### 背包遍历
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -101,7 +101,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `notify_scroll` | `(col, row, fingerprint) -> ""` | 记录已处理装备指纹到滚动管理器 |
 | `scroll_advance` | `() -> ""` | 校验通过后推进状态，移除已滚出的行指纹 |
 
-### 背包扫描游标（3）
+### 背包扫描游标
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -109,7 +109,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `bag_cursor_visit` | `(fingerprint) -> str` | 登记行首锚点，返回 `"new"` / `"skip"` / `"end"` |
 | `bag_cursor_finish_window` | `(visible_rows, expected_rows) -> str` | 提交一个窗口，返回 `"scroll"`（继续滚动）或 `"end"`（到底） |
 
-### 装备入库与角色属性（12）
+### 装备入库与角色属性
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -126,20 +126,20 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `has_scanned_base_attrs` | `(name?, main_art?, sub_art?) -> bool` | 该用户在该备战方案下的基础属性是否已保存；无法确定时返回 false |
 | `save_scanned_base_attrs` | `(dict) -> str` | 把识别出的基础属性静默写入已绑定方案所属流派；未绑定方案或结果不完整时报错 |
 
-### 游戏属性（1）
+### 游戏属性
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `game_attr` | `(attr_name) -> str` | 查询游戏配置里的属性；当前支持 `season_name`（当前赛季名称），未支持的属性名返回 `""` |
 
-### 时间（2）
+### 时间
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `clock` | `() -> float` | 返回 Unix 时间戳（秒精度 float），可用于计时、超时判断 |
 | `datetime` | `(fmt?) -> str` / `(ts, fmt?) -> str` | 格式化时间：无参默认当前时间，首参为数值则作为时间戳，字符串则作为 strftime 格式 |
 
-### 用户交互与系统（7）
+### 用户交互与系统
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -151,7 +151,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
 
-### 应用生命周期（6）
+### 应用生命周期
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -166,7 +166,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > Android/PC 绑定，不依据工作流环境。指令形式 `app stop "game" timeout 15` 等价于
 > `eval app_stop("game", 15)`。
 
-### 运行环境与后端（6）
+### 运行环境与后端
 
 这六个函数回答的是**不同层面**的问题，不能互相替代：
 
@@ -192,7 +192,7 @@ if is_device()
 end
 ```
 
-### 图色（8）
+### 图色
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -208,7 +208,7 @@ end
 > 坐标入参是 `$ref = [scene].[region]` 的求值结果、4 元矩形字面量或 find 产出；
 > 距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
 
-### 玩家档案（11）
+### 玩家档案
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -224,7 +224,7 @@ end
 | `profile_reject` | `(message)` | 同步变更脚本拒绝当前事务，原始写入及同步子链一起回滚 |
 | `profile_locked` | `(key, username?) -> bool` | 该用户是否把这个 key 标记为失效（锁定后引擎忽略其值：读空、写拒绝、不再重置） |
 
-### 自动剧情（3）
+### 自动剧情
 
 | 函数 | 签名 | 说明 |
 |---|---|---|

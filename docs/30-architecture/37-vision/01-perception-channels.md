@@ -67,7 +67,7 @@
 
 - 实现：`src/lvjiang/core/recognizers/color_ops.py`
 - DSL 层：`src/lvjiang/workflows/builtins/vision.py`
-- 8 个内置函数：`pixel` / `bright` / `color_ratio` / `pixel_ratios` / `bright_segs` / `color_vec` / `find_icons` / `find_multi_color`
+- 内置函数：`pixel` / `bright` / `color_ratio` / `pixel_ratios` / `bright_segs` / `color_vec` / `find_icons` / `find_multi_color`
 - 详细展开见 [02-color-ops-internals.md](02-color-ops-internals.md)
 
 **典型用法**：判定"在对局中"→ `color_ratio(HUD 顶部, 白, 30) >= 0.05`；找地图标记 → `find_icons(绿主导)` 返回列表。

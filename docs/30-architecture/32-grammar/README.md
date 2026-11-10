@@ -484,28 +484,27 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（99 个）
+## 十、内置函数
 
-> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 72 + yysls 插件 27，可
-> 用 `list_functions()` 复核。
+> 完整签名与说明见 [06-functions.md](06-functions.md)；实际注册表以 `list_functions()` 为准。
 
 | 类别 | 函数 |
 |------|------|
-| **基础运算（4）** | `mod` `min` `max` `abs` |
-| **字典/列表（12）** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
-| **字符串（13）** | `concat` `substr` `split` `split_lines` `replace` `match` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
-| **装备（8）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` `equipment_lock_status` |
-| **背包遍历（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
-| **背包游标（3）** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |
-| **入库与角色属性（12）** | `scanned_loadout_names` `ensure_scanned_loadout` `bind_scanned_loadout` `loadout_scan_target` `write_bag_item` `mark_equipment_seen` `write_equipped` `set_scanned_loadout_gongjue` `has_scanned_base_attrs` `save_scanned_base_attrs` `to_role_base_attrs` `open_base_attr_form` |
-| **游戏属性（1）** | `game_attr` |
-| **时间（2）** | `clock` `datetime` |
-| **用户交互与系统（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
-| **应用生命周期（6）** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
-| **运行环境与后端（6）** | `env` `check_env` `is_send` `is_post` `is_device` `is_unattended` |
-| **图色（8）** | `pixel` `bright` `color_ratio` `pixel_ratios` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
-| **玩家档案（11）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `profile_locked` `user_get` `profile_history_aggregate` `profile_reject` |
-| **自动剧情（3）** | `story_options` `story_pick` `story_learn` |
+| **基础运算** | `mod` `min` `max` `abs` `to_flag` |
+| **字典/列表** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
+| **字符串** | `concat` `substr` `split` `split_lines` `replace` `match` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
+| **装备** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` `equipment_lock_status` |
+| **背包遍历** | `check_scroll` `notify_scroll` `scroll_advance` |
+| **背包游标** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |
+| **入库与角色属性** | `scanned_loadout_names` `ensure_scanned_loadout` `bind_scanned_loadout` `loadout_scan_target` `write_bag_item` `mark_equipment_seen` `write_equipped` `set_scanned_loadout_gongjue` `has_scanned_base_attrs` `save_scanned_base_attrs` `to_role_base_attrs` `open_base_attr_form` |
+| **游戏属性** | `game_attr` |
+| **时间** | `clock` `datetime` |
+| **用户交互与系统** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
+| **应用生命周期** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
+| **运行环境与后端** | `env` `check_env` `is_send` `is_post` `is_device` `is_unattended` |
+| **图色** | `pixel` `bright` `color_ratio` `pixel_ratios` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
+| **玩家档案** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `profile_locked` `user_get` `profile_history_aggregate` `profile_reject` |
+| **自动剧情** | `story_options` `story_pick` `story_learn` |
 
 ## 十一、模块化
 

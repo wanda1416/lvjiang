@@ -86,3 +86,36 @@ end
 '''
         v = run(code, {"times": 5, "sum": 0})
         assert v["sum"] == 5
+
+
+class TestSingleLineGuard:
+    """`if <条件> -> <语句>` 是块式 if 的行内写法，真假行为必须一致。"""
+
+    def test_action_runs_only_when_condition_true(self):
+        code = 'if $ready -> eval $hit = 1\n'
+        assert run(code, {"ready": 1})["hit"] == 1
+        assert "hit" not in run(code, {"ready": 0})
+
+    def test_guard_only_skips_its_own_action(self):
+        """条件为假只跳过那一条语句，后面的语句照常执行。"""
+        code = 'if not $ready -> eval $stopped = 1\neval $after = 1\n'
+        v = run(code, {"ready": 0})
+        assert v["stopped"] == 1 and v["after"] == 1
+
+    def test_guard_return_exits_proc(self):
+        """守卫里的 return 与块式 if 里的 return 一样退出过程。"""
+        code = '''def probe($ready)
+    if $ready -> return 1
+    return 0
+end
+call $a = probe(1)
+call $b = probe(0)
+'''
+        v = run(code)
+        assert v["a"] == 1
+        assert v["b"] == 0
+
+    def test_guard_matches_block_if_result(self):
+        inline = run('if $ready -> eval $hit = 1\n', {"ready": 1})
+        block = run('if $ready\n    eval $hit = 1\nend\n', {"ready": 1})
+        assert inline["hit"] == block["hit"]

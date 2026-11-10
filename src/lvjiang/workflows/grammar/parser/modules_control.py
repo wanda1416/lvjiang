@@ -133,26 +133,44 @@ class _ModuleControlMixin:
                 result.append(item)
         return result
 
-    def env_guard_stmt(self, items):
-        """env:"desktop" -> <单行语句> → 现有 If(env(...)) AST。"""
-        line_no = self._line(items)
-        env_name = self._unquote(str(items[0]))
-        if not env_name:
-            raise WorkflowUserError("env 单行守卫的环境名不能为空")
-        body = self._flatten_body(items[1:])
+    def _single_guard(self, condition, body, line_no: int, what: str):
+        """把「条件 + 一条语句」归一成与块式 if 相同的 AST。
+
+        ``->`` 只是行内写法，不引入新的控制流节点：守卫与 ``if ... end``
+        产出同一个 ``If``，所以引擎、引用收集、按 run_env 的静态剪枝都
+        不需要为它加分支。
+        """
         if not body:
-            raise WorkflowUserError("env 单行守卫必须包含一条语句")
-        condition = FuncCall(
-            func_name="env",
-            func_args=[Literal(value=env_name)],
-            line_no=line_no,
-        )
+            raise WorkflowUserError(f"{what}必须包含一条语句")
         return If(
             condition=condition,
             then_body=body,
             else_body=[],
             line_no=line_no,
         )
+
+    def if_guard_stmt(self, items):
+        """if <条件> -> <单行语句> → If(条件, [语句])。"""
+        line_no = self._line(items)
+        return self._single_guard(
+            items[0], self._flatten_body(items[1:]), line_no, "if 单行守卫")
+
+    def env_guard_stmt(self, items):
+        """env:"desktop" -> <单行语句> → If(env("desktop"), [语句])。
+
+        ``env:"x"`` 是 ``env("x")`` 的简写，与 ``if env("x") -> ...`` 同义。
+        """
+        line_no = self._line(items)
+        env_name = self._unquote(str(items[0]))
+        if not env_name:
+            raise WorkflowUserError("env 单行守卫的环境名不能为空")
+        condition = FuncCall(
+            func_name="env",
+            func_args=[Literal(value=env_name)],
+            line_no=line_no,
+        )
+        return self._single_guard(
+            condition, self._flatten_body(items[1:]), line_no, "env 单行守卫")
 
     def if_stmt(self, items):
         condition = items[0]

@@ -7,6 +7,7 @@
 | 指令 | 语法 | 说明 | 详见 |
 |---|---|---|---|
 | if | `if <cond> ... [else ...] end` | 条件分支，可嵌套 | [05.1](05.1-loops-branches.md#一if--else--条件分支) |
+| 单行守卫 | `if <cond> -> <一条非块语句>` / `env:"desktop" -> <一条非块语句>` | `if` 的行内写法，无 else；`env:"x"` 是 `env("x")` 的简写 | [05.1](05.1-loops-branches.md#单行守卫) |
 | for | `for $var in ["a", "b"] ... end` / `for $var in $list ... end` / `for $var in [1...$n] ... end` | 枚举循环，迭代静态列表、列表变量或整数范围 | [05.1](05.1-loops-branches.md#二for--枚举循环) |
 | loop | `loop <N> ... end` | 计数循环，N 为正整数或变量引用 | [05.1](05.1-loops-branches.md#loop-n--计数循环) |
 | loop while | `loop while <cond> ... end` | 条件循环，每轮前求值，truthy 则执行 | [05.1](05.1-loops-branches.md#loop-while--条件为真时循环) |

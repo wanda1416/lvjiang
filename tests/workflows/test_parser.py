@@ -348,6 +348,42 @@ def test_env_guard_rejects_empty_environment_name():
         parse_text('env:"" -> press "F"\n')
 
 
+def test_if_guard_desugars_to_block_if():
+    """`if <条件> -> <语句>` 与块式 if 是同一个 If 节点，只是行内写法。"""
+    guard = parse_text('if not $ready -> return 0\n').body[0]
+
+    assert isinstance(guard, If)
+    assert len(guard.then_body) == 1
+    assert type(guard.then_body[0]).__name__ == "Return"
+    assert guard.else_body == []
+    assert guard.line_no == 1
+
+
+def test_if_guard_and_block_if_yield_the_same_condition():
+    """两种写法必须共用条件表达式与 AST 形态，静态剪枝才能只走一条路径。"""
+    inline = parse_text('if env("desktop") -> press "F"\n').body[0]
+    block = parse_text('if env("desktop")\n    press "F"\nend\n').body[0]
+    env_guard = parse_text('env:"desktop" -> press "F"\n').body[0]
+
+    for node in (inline, block, env_guard):
+        assert isinstance(node, If)
+        assert isinstance(node.condition, FuncCall)
+        assert node.condition.func_name == "env"
+        assert node.condition.func_args == [Literal("desktop")]
+        assert [type(n).__name__ for n in node.then_body] == ["Press"]
+
+
+@case_matrix("code", [
+    'if $ready -> for i in range(1, 3)\nend\n',
+    'if $ready -> if $other\n',
+    'if $ready ->\n',
+])
+def test_if_guard_rejects_block_or_empty_forms(code):
+    """`->` 只跟一条非块语句：块语句或空动作一律在解析期拒绝。"""
+    with pytest.raises(LarkError):
+        parse_text(code)
+
+
 # ─── press wait_clause 测试 ────────────────────────────────────
 
 

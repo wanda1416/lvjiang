@@ -35,6 +35,7 @@ start: (_NL | statement)*
           | def_stmt
           | call_proc_stmt
           | env_guard_stmt
+          | if_guard_stmt
           | if_stmt
           | for_stmt
           | loop_count_stmt
@@ -367,35 +368,40 @@ call_arg_list: expression ("," expression)*
 
 // ─── 控制流 ───────────────────────────────────────────────
 
-// 环境单行守卫：只接受常量字符串环境名和一条非块语句。
-// env:"desktop" -> press "F"
-env_guard_stmt: "env"i ":" STRING "->" env_guard_action
+// 单行守卫：<条件> -> <一条非块语句>，等价于 if <条件> / 那条语句 / end。
+// 只接受一条非块语句（块式语句会让「一行」失去意义，退回 if ... end）。
+//   if not $ready -> return 0
+//   env:"desktop" -> press "F"        // env:"x" 是 env("x") 的简写
+// 两种写法归一成同一个 If 节点，见 parser/env_guard_stmt 与 if_guard_stmt。
+if_guard_stmt: "if"i expression "->" guard_action
 
-?env_guard_action: click_stmt
-                 | place_stmt
-                 | move_stmt
-                 | replay_input_trace_stmt
-                 | scroll_stmt
-                 | drag_stmt
-                 | press_stmt
-                 | paste_stmt
-                 | wait_stable_stmt
-                 | wait_stmt
-                 | scan_stmt
-                 | recognize_stmt
-                 | collect_stmt
-                 | log_stmt
-                 | screenshot_stmt
-                 | eval_stmt
-                 | implicit_eval_stmt
-                 | default_stmt
-                 | align_stmt
-                 | find_stmt
-                 | call_proc_stmt
-                 | break_stmt
-                 | continue_stmt
-                 | return_stmt
-                 | goto_stmt
+env_guard_stmt: "env"i ":" STRING "->" guard_action
+
+?guard_action: click_stmt
+             | place_stmt
+             | move_stmt
+             | replay_input_trace_stmt
+             | scroll_stmt
+             | drag_stmt
+             | press_stmt
+             | paste_stmt
+             | wait_stable_stmt
+             | wait_stmt
+             | scan_stmt
+             | recognize_stmt
+             | collect_stmt
+             | log_stmt
+             | screenshot_stmt
+             | eval_stmt
+             | implicit_eval_stmt
+             | default_stmt
+             | align_stmt
+             | find_stmt
+             | call_proc_stmt
+             | break_stmt
+             | continue_stmt
+             | return_stmt
+             | goto_stmt
 
 if_stmt: "if"i expression _NL (_NL | statement)* else_clause? "end"i _NL
 

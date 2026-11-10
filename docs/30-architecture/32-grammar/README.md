@@ -452,9 +452,11 @@ return <value>                        # 返回值给调用方
 @label_name                           # 定义标签
 goto label_name                       # 跳转到标签
 
-# 环境单行守卫（-> 后只能跟一条非块语句）
-env:"desktop" -> press "F"            # 等价于 if env("desktop") ... end
-env:"android" -> click [game_main_page].[menu] after wait @page_refresh
+# 单行守卫（-> 后只能跟一条非块语句，等价于 if <条件> / 该语句 / end）
+if not $ready -> return 0
+if $seen -> call finish_scan()
+if env("desktop") -> press "F"
+env:"android" -> click [game_main_page].[menu] after wait @page_refresh   # env:"x" 是 env("x") 的简写
 ```
 
 ## 九、条件表达式
@@ -572,7 +574,7 @@ call proc() as $output                # 接收子过程 output
 | `by image` 可用面 | 只有 `scan` Region（无 target）与 `find`（必须带 target）支持；`recognize` 完全不支持 |
 | `by image` 与清洗组互斥 | `by image` 不能与 `with "<清洗组>"` 同时写 |
 | `as rich` 与 `by` 互斥 | recognize 两种返回语义冲突，组合即报错 |
-| `env:"..." ->` 守卫 | 环境名必须是非空常量字符串，`->` 后必须恰有一条非块语句 |
+| `->` 单行守卫 | `->` 后必须恰有一条非块语句（块语句与空动作在解析期拒绝）；`env:"..." ->` 的环境名还必须是非空常量字符串 |
 
 **执行期**才校验的项：`with <func>` 必须与 `as rich` 搭配、panel 行列越界（越界写空串）、
 命名延迟 `@name` 是否存在、press 键名是否在 VK 映射表内。

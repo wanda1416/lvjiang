@@ -693,7 +693,7 @@ end
 #
 # 参数：无
 # 前置：已经点击「进入游戏」。
-# 后置：回到主页；8 拍内没确认到主页时 pause 交给人工。
+# 后置：回到主页；超过 $main_max_attempt 拍仍未确认主页时 pause 交给人工。
 # 返回：2=发现更新，交调用方恢复；其它路径保持隐式 null。
 #
 # 等待加载条消失 → 检测主页元素 → 处理战令领奖/关闭弹窗
@@ -701,7 +701,8 @@ def login_to_main_page()
     # 等待加载完成：检测 loading 区域的「加载」文字
     # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
     eval $loading_done = 0
-    loop 20
+    eval $loading_max_polls = 20
+    loop $loading_max_polls
         scan [game_login_page].[loading, online_label] as $load_state
         call $notice = login_notice_kind($load_state.online_label)
         if $notice == "update"
@@ -721,8 +722,9 @@ def login_to_main_page()
 
     # 等待主页加载完成：检测主界面入口按钮
     # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
+    eval $main_max_attempt = 10
     eval $main_attempt = 0
-    loop 10
+    loop $main_max_attempt
         eval $main_attempt = $main_attempt + 1
         call $in_main = is_in_main_page()
         if $in_main
@@ -732,7 +734,7 @@ def login_to_main_page()
             return
         end
 
-        if $main_attempt == 8
+        if $main_attempt == $main_max_attempt
             log warn "最后一轮登录主页校验未命中，记录判断帧"
             screenshot from last
         end

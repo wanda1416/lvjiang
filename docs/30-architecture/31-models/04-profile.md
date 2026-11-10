@@ -35,7 +35,8 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 - `profile_key_renames` 保存全用户重命名时间、操作 ID、模型、旧新 key，以及
   entries/history/sync_from 更新数量；独立的 key 重命名记录对话框按链显示曾用名，
   不混入数值历史页。
-- `session.json.profile` 中的分组、活跃分组和告警历史节点不变。
+- `interface.json` 只留 `alert_history`（提醒去重）与 `ui_state.profile_active_group`
+  （本机活跃分组）；分组、列与列宽已迁到 `profile.json`（见下节）。
 
 定义分组不另建顶层或模型内的 `groups` 节点。编辑器从一个模型的完整 `KeyDef`
 序列按 `group` 首次出现顺序派生分组，组内保持 key 的相对顺序；没有 key 的组随即
@@ -44,8 +45,39 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 表格右键菜单通过可编辑下拉框选择已有分组或输入新分组，并将结果一次应用到全部
 选中行；双击分组列不进入编辑。
 
-`session.json.profile.overview_groups` 继续由用户总览拥有，负责用户可见列和布局。
-它与 `KeyDef.group` 没有同步、重命名或默认选择关系。
+用户总览的可见结构（分组、列顺序、合计开关、列宽）不在 `profile.yaml` 里，也不在
+`interface.json` 里，而是独立文件 `config/session/profile.json`——细节见下面的
+「页面结构文件」。它与 `KeyDef.group`（定义分组）没有同步、重命名或默认选择关系。
+
+## 页面结构文件（`profile.json`）
+
+定义管「有哪些数据」，可见结构管「怎么看这些数据」。两者对称地各占一个文件：
+
+| 文件 | 内容 | 同步通道 |
+|---|---|---|
+| `config/session/profile.yaml` | key 定义：模型、标签、上限、周期、同步目标 | `profile_definition` 表，随常规同步 |
+| `config/session/profile.json` | 分组、列顺序、合计开关、列宽 | `profile_layout` 表，**只有用户点按钮才走** |
+
+结构文件的形状：`version` + `metric` + `overview{group_order, groups{name: columns /
+show_totals / name_column_width / column_widths}}`。
+
+四条硬约定：
+
+- **列宽按列 key 存**（不按下标数组），用户名列宽全局一份；因此增删列不需要搬数组，
+  分组改名或换字段时宽度跟着走。
+- **活跃分组不进文件**：它留在 `interface.json` 的 `ui_state.profile_active_group`，
+  属于本机视图状态。
+- **失效列保留**：`profile.yaml` 里已删的 key 继续留在 `columns` 里，渲染层跳过。
+- **文件不带机器信息**：写入来源由服务端按认证会话记录（`origin_*` 三列），客户端据此
+  判断「远端是不是本实例写的」，据此决定上传时是否提醒覆盖。
+
+列宽是像素值，跨机器使用时按 `metric`（字体像素、设备缩放）折算后再按当前字体实测的
+表头宽度 clamp，折算结果**不回写**文件——只有用户拖动列宽才更新记录。
+
+旧版本的 `interface.json.profile.overview_groups` 与 `ui_state.profile_overview` 在启动
+首次访问时一次性迁入（带 `_backup-<时间戳>/` 备份并清理旧节点），迁移后不存在双源。
+实现见 `core/profile/layout.py`，跨端搬运见 `core/sync/layout_sync.py`；
+需求与确认流程见 [用户总览页面结构](../../20-requirements/40-profile/06-overview-layout-sync.md)。
 
 ## 周期恢复的同步闸门
 

@@ -26,6 +26,8 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 | 毕业率分析 | [01-graduation-rate.md](01-graduation-rate.md) | 角色装备 → 毕业率模型 → 毕业率展示 | P2 | ✅ 已实现（实现方式与子文档早期方案不同） |
 | 货币追踪 | [02-currency-tracking.md](02-currency-tracking.md) | 钱袋 OCR 识别 → Profile stock 模型 | P1 | ✅ 已实现（实现方式与子文档早期方案不同） |
 | 心力体力管理 | [03-stamina-management.md](03-stamina-management.md) | 资源监控 → 恢复预测 → 超标预警 | P0 | ✅ 已完成（基础框架） |
+| 总览多列与历史 | [04-overview-multi-columns.md](04-overview-multi-columns.md)、[05-history-dialog.md](05-history-dialog.md) | 表头批量加列、变更记录对话框 | P1 | ✅ 已实现 |
+| 页面结构与搬运 | [06-overview-layout-sync.md](06-overview-layout-sync.md) | 分组/列/列宽独立成 `profile.json`，手动上传下载 + 网页只读展示 | P1 | ✅ 已实现 |
 
 ### 2.1 已完成功能（v0.2.0+）
 

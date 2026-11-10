@@ -22,7 +22,7 @@ class TestRegistry:
     def test_all_general_functions_registered(self):
         registered = set(list_functions())
         expected = {
-            "mod", "min", "max", "abs",
+            "mod", "min", "max", "abs", "to_flag",
             "concat", "range", "count_nonempty", "contains", "find_key", "append",
             "clock", "datetime",
         }
@@ -77,6 +77,33 @@ class TestArithmetic:
     def test_abs(self):
         assert _fn("abs")(-5) == 5
         assert _fn("abs")("3") == 3
+
+    @case_matrix("value,expected", [
+        (None, 0),
+        ("", 0),
+        ([], 0),
+        ({}, 0),
+        (0, 0),
+        (0.0, 0),
+        (False, 0),
+        (True, 1),
+        (1, 1),
+        (-3, 1),
+        ("abc", 1),
+        ("0", 1),       # 非空字符串按真值记 1，与 if $x 同口径
+        ("false", 1),
+        ([0], 1),
+    ])
+    def test_to_flag_uses_language_truthiness(self, value, expected):
+        """to_flag 只做真值→1/0，不解析文本；口径必须与 if $x 一致。"""
+        assert _fn("to_flag")(value) == expected
+
+    def test_to_flag_replaces_arithmetic_negation(self):
+        """1 - $x 只在 x∈{0,1} 时成立；to_flag 对非数值输入也成立。"""
+        flag = _fn("to_flag")
+        assert flag(not True) == 0 and flag(not False) == 1
+        assert flag(None) == 0            # 1 - None 会抛 TypeError
+        assert flag("abc") == 1           # 1 - "abc" 会抛 TypeError
         assert _fn("abs")("abc") == 0
 
 

@@ -1,6 +1,6 @@
 """内置函数 - 基础运算
 
-只保留运算符无法表达的三类能力：取模、最值、绝对值。四则运算由文法里的
+只保留运算符无法表达的四类能力：取模、最值、绝对值、真假压平。四则运算由文法里的
 ``+ - * /`` 直接表达，这里不再提供 add/sub/mul/div——同名函数与运算符完全
 重复，且变参形式容易让调用点误以为能一次连加多值。
 
@@ -8,7 +8,7 @@ int/float 双类型语义：参数保持原始类型，int+int→int，int+float
 无法转成数字时返回 0。
 """
 
-from ._coerce import to_number
+from ._coerce import to_flag_value, to_number
 from ._registry import builtin_func
 
 #: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
@@ -102,3 +102,27 @@ def _abs(a, *args):
     if a_num is None:
         return 0
     return abs(a_num)
+
+
+@builtin_func(
+    "to_flag",
+    params={
+        "x": "任意值：按语言真值判定（与 if $x 同口径），非空/非零/true 记 1",
+    },
+    returns="int",
+)
+def _to_flag(x):
+    """把真假结果压成 1 / 0
+
+    判定口径与 ``if $x`` 完全一致，只把结果写成数字，供需要「1/0 数字」的
+    场合使用（返回页面判定、与其他数字比较、累加计数）。不要用 ``1 - $x``
+    表达取反：那只在 x 恰为 0/1 时成立，x 是 bool/null/字符串时会算错或报错。
+
+    ``"0"`` / ``"false"`` 是非空字符串，按真值记 **1**；要让字段文本按布尔
+    解释，先用 ``contains`` / ``==`` 判定再传入。
+
+    .wf 用法:
+        return to_flag(not $in_bag)
+        eval $hits = $hits + to_flag($found)
+    """
+    return to_flag_value(x)

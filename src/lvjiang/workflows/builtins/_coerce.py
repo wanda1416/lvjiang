@@ -42,6 +42,19 @@ def is_bool_text(val) -> bool:
     return isinstance(val, str) and val.strip().lower() in BOOL_TEXT
 
 
+def to_flag_value(val) -> int:
+    """把任意值按语言层真假压成 ``1`` / ``0``。
+
+    口径与 ``if $x`` 完全一致（Python 真值性），只把结果写成数字：
+    null、空串、空列表、空字典、``0``、``false`` → 0，其余 → 1。
+
+    **不解析文本**：``"0"``、``"false"`` 是非空字符串，按真值记 1——这与
+    ``if $x`` 一致，也与 :func:`to_bool` 的严格文本语义（只认 true/false/1/0）
+    不同。要让字段文本按布尔解释，先用 ``contains`` / ``==`` 判定再传入。
+    """
+    return 1 if val else 0
+
+
 def to_bool(val) -> bool:
     """把参数值解释为布尔。
 

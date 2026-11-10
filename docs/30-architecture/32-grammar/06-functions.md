@@ -19,7 +19,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **99 个**内置函数（core 72 个 + yysls 插件 27 个），按功能分为 15 类。
+共 **100 个**内置函数（core 73 个 + yysls 插件 27 个），按功能分为 15 类。
 
 > 分组、简介、参数含义与返回值声明在 `@builtin_func(...)` 装饰器里，运行期由
 > `describe_function()` / `signature_params()` 读取；应用内「脚本编辑 → 内置函数」
@@ -32,10 +32,10 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 > from lvjiang.workflows import builtins as b
 > from lvjiang.apps import load_app, register_hooks
 > register_hooks(load_app("yysls"))    # 插件函数靠 hooks 注册，直接 import 空包不生效
-> print(sorted(b.list_functions()))    # → 99 个
+> print(sorted(b.list_functions()))    # → 100 个
 > ```
 
-### 基础运算（4）
+### 基础运算（5）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -43,6 +43,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `min` | `(a, b, ...) -> int \| float` | 取最小值（支持两个以上参数），跳过无效值 |
 | `max` | `(a, b, ...) -> int \| float` | 取最大值（支持两个以上参数），跳过无效值 |
 | `abs` | `(a) -> int \| float` | 取绝对值，保持类型 |
+| `to_flag` | `(x) -> int` | 按语言真值（与 `if $x` 同口径）压成 `1` / `0`；不解析文本，`"0"` 记 1 |
 
 ### 字典/列表操作（12）
 

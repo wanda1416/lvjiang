@@ -81,15 +81,11 @@ end
 # 上限：连续关闭 10 次仍然命中，说明存在点不掉的浮窗或模板误匹配——此时记 error
 # 并立即结束，绝不允许「一直点下去」把无人值守的任务卡死在这里。
 def close_item_prompts()
-   if not env("android")
-      return 0
-   end
+   if not env("android") -> return 0
    eval $closed_count = 0
    loop while 1 == 1
       scan [general_control].[close_item] as $close_item by image
-      if not $close_item
-         break
-      end
+      if not $close_item -> break
       click [general_control].[close_item] after wait @step_interval
       eval $closed_count = $closed_count + 1
       if $closed_count >= 10

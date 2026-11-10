@@ -82,9 +82,7 @@ end
 def attr_attack_has_school($detail)
     for school in ["mingjin", "lieshi", "qiansi", "pozhu"]
         call $complete = attr_range_complete($detail, $school)
-        if $complete
-            return true
-        end
+        if $complete -> return true
     end
     return false
 end

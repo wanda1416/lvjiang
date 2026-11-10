@@ -16,9 +16,7 @@
 # 返回：1=已按过 F；0=画面上没有「躺下」提示。
 def lie_down_desktop()
     find as $lie by contains "躺下"
-    if not $lie
-        return 0
-    end
+    if not $lie -> return 0
     log info "看到「躺下」提示，按 F 躺下（只按一次，重复按会起身）。"
     press "f" after wait (1.0, 1.0)
     return 1
@@ -38,17 +36,11 @@ end
 def go_to_bed_desktop()
     global $bed
     eval $bed_name = "1 号床"
-    if $bed == "bed2"
-        eval $bed_name = "2 号床"
-    end
-    if $bed == "bed3"
-        eval $bed_name = "3 号床"
-    end
+    if $bed == "bed2" -> eval $bed_name = "2 号床"
+    if $bed == "bed3" -> eval $bed_name = "3 号床"
     # ① 原地先试：视角刚好正对床时，「躺下」提示一开始就在。
     call $ok = try_lie_down()
-    if $ok > 0
-        return 0
-    end
+    if $ok > 0 -> return 0
 
     # ①b 2、3 号床：后台输入模式（PostMessage）不支持相对鼠标位移，转不了视角，
     #     改用键盘按 D 键转身对向床（每按一次试一下躺下，最多 3 次），再按住 W 走过去。
@@ -61,18 +53,14 @@ def go_to_bed_desktop()
             press "D" hold (0.6, 0.9)
             wait (0.6, 0.9)
             call $ok = try_lie_down()
-            if $ok > 0
-                return 0
-            end
+            if $ok > 0 -> return 0
             eval $turn = $turn + 1
         end
         log info "方向转好，按住 W 走到床边。"
         press "W" hold (0.5, 0.8)
         wait (0.4, 0.7)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         log warn "按 D 转身并前进后仍没看到「躺下」，继续用键盘扫房间。"
     end
 
@@ -85,9 +73,7 @@ def go_to_bed_desktop()
         press "W" hold (0.5, 0.8)
         wait (0.4, 0.7)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         eval $step = $step + 1
     end
 
@@ -98,9 +84,7 @@ def go_to_bed_desktop()
         press "D" hold (0.5, 0.8)
         wait (0.4, 0.7)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         eval $step = $step + 1
     end
 
@@ -111,9 +95,7 @@ def go_to_bed_desktop()
         press "A" hold (0.5, 0.8)
         wait (0.4, 0.7)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         eval $step = $step + 1
     end
 
@@ -124,9 +106,7 @@ def go_to_bed_desktop()
         press "S" hold (0.5, 0.8)
         wait (0.4, 0.7)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         eval $step = $step + 1
     end
 
@@ -144,15 +124,11 @@ def dismiss_clue_dialog_desktop()
     find as $dlg by contains "未查看的线索"
     if not $dlg
         find as $dlg2 by contains "未查看线索"
-        if not $dlg2
-            return 0
-        end
+        if not $dlg2 -> return 0
     end
     log info "检测到「未查看线索」弹窗：勾选今日不再提醒，按 Space 确认。"
     find as $tip by contains "不再提醒"
-    if $tip
-        click $tip after wait (0.5, 0.8)
-    end
+    if $tip -> click $tip after wait (0.5, 0.8)
     press "space" after wait (0.4, 0.6)
     wait (0.6, 0.9)
     return 1
@@ -215,9 +191,7 @@ def finish_night_desktop()
                 press "f" after wait (0.6, 0.9)
                 log info "【结算】已按 F，等待标准开局场景。"
                 call $ok = wait_standard_scene()
-                if $ok > 0
-                    return 0
-                end
+                if $ok > 0 -> return 0
                 log warn "【结算】按 F 后没等到标准开局场景，补按一次 F 再验一次。"
                 press "f" after wait (0.5, 0.8)
                 call wait_standard_scene()

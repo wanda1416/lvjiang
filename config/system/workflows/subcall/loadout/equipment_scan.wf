@@ -39,12 +39,8 @@ def scan_equipment_detail($detail_scene)
                 affix_zhi, affix_yu, dingyin, zaoyi, status, cooldown_tips] \
                 as $raw with "equip"
         end
-        if len($raw) > 0
-            break
-        end
-        if $attempt < 3
-            wait 0.4
-        end
+        if len($raw) > 0 -> break
+        if $attempt < 3 -> wait 0.4
     end
     if len($raw) == 0
         log error "装备详情截图连续失败，未执行锁状态和后续同帧扫描"

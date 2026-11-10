@@ -50,15 +50,9 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
     eval $role = user_get($username, "role")
     eval $role_index = user_get($username, "role_index")
     eval $tail = user_get($username, "tail")
-    if not $account
-        return {"status": "failed", "message": "用户未配置账号名", "state": $batch_state}
-    end
-    if not $role
-        return {"status": "failed", "message": "用户未配置角色名", "state": $batch_state}
-    end
-    if not $role_index
-        return {"status": "failed", "message": "用户未配置角色序号", "state": $batch_state}
-    end
+    if not $account -> return {"status": "failed", "message": "用户未配置账号名", "state": $batch_state}
+    if not $role -> return {"status": "failed", "message": "用户未配置角色名", "state": $batch_state}
+    if not $role_index -> return {"status": "failed", "message": "用户未配置角色序号", "state": $batch_state}
     # 自动流程停下来求助时，人工要能一眼看出该把客户端摆成什么样。批量里
     # 多个用户轮流跑，隔了几分钟回来看到一句「请手动选定账号」是没法操作的。
     eval $login_target = "账号 " + $account + "（尾号 " + $tail + "）、角色 " + $role
@@ -81,22 +75,16 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
                 + $login_target)
             call $in_login_page = is_in_login_page()
         end
-        if not $in_login_page
-            return {"status": "failed", "message": "未能回到登录主页", "state": $batch_state}
-        end
+        if not $in_login_page -> return {"status": "failed", "message": "未能回到登录主页", "state": $batch_state}
     end
 
     log "目标账号：" + $account
     if $batch_state.account != $account
-        if not $tail
-            return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
-        end
+        if not $tail -> return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
         log "需要切换账号: " + $account
         call $switched = switch_account(
             $tail, $account, $batch_state, $max_roll_account, $login_target)
-        if not $switched
-            return {"status": "failed", "message": "未能切换到目标账号", "state": $batch_state}
-        end
+        if not $switched -> return {"status": "failed", "message": "未能切换到目标账号", "state": $batch_state}
     end
 
     log "切换角色: " + $role
@@ -116,14 +104,10 @@ end
 # 容忍刚切回登录页时页面还没渲染完的情况。
 def is_in_login_page()
     scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
-    if $login_check
-        return 1
-    end
+    if $login_check -> return 1
     wait 5
     scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
-    if $login_check
-        return 1
-    end
+    if $login_check -> return 1
     return 0
 end
 
@@ -151,20 +135,14 @@ def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_ro
     if env("desktop")
         scene [game_login_page] view [users]
         call $ready = wait_for_switch_users_page()
-        if not $ready
-            return 0
-        end
+        if not $ready -> return 0
         call $logged_in = select_account_and_login(
             $tail, $max_roll_account, $login_target)
-        if not $logged_in
-            return 0
-        end
+        if not $logged_in -> return 0
         # PC 仅在重启后的首次账号登录会进入启动页；关闭后即回到登录主页。
         # 账号已经在本分支选定，prepare_user 随后会直接选择角色，不再重复切换账号。
         call $in_login_page = leave_startup_page()
-        if not $in_login_page
-            return 0
-        end
+        if not $in_login_page -> return 0
         eval $batch_state.account = $account
         eval $batch_state.role = ""
         eval $batch_state.page_state = 1
@@ -178,12 +156,8 @@ end
 
 # 登录提示只按“更新”和“在线”分流，更新优先；一帧文字只识别一次。
 def login_notice_kind($text)
-    if $text contains "更新"
-        return "update"
-    end
-    if $text contains "在线"
-        return "online"
-    end
+    if $text contains "更新" -> return "update"
+    if $text contains "在线" -> return "online"
     return ""
 end
 
@@ -210,16 +184,12 @@ def recover_login_after_update($batch_state)
     if env("desktop")
         scene [game_login_page] view [users]
         call $ready = wait_for_switch_users_page()
-        if not $ready
-            return 0
-        end
+        if not $ready -> return 0
         click [game_login_page].[login] after wait @page_refresh
     end
     scene [game_login_page] view [init]
     call $ready = leave_startup_page()
-    if not $ready
-        return 0
-    end
+    if not $ready -> return 0
     eval $batch_state.role = ""
     eval $batch_state.page_state = 1
     log info "更新后已恢复登录主页，继续选择原账号下的目标角色"
@@ -237,9 +207,7 @@ end
 # 判据：启动 logo（图像匹配），启动过程有动画，只认 logo 不认其它元素。
 def is_in_startup_page()
     scan [game_login_page].[yysls_logo] as $logo by image
-    if $logo
-        return 1
-    end
+    if $logo -> return 1
     return 0
 end
 
@@ -257,18 +225,14 @@ def leave_startup_page()
     eval $startup_ready = 0
     loop 60
         call $startup_ready = is_in_startup_page()
-        if $startup_ready
-            break
-        end
+        if $startup_ready -> break
         wait @page_refresh
     end
     if not $startup_ready
         screenshot from last
         eval pause("未检测到游戏启动页标志，请手动回到登录主页后点击继续")
         call $in_login_page = is_in_login_page()
-        if $in_login_page
-            return 1
-        end
+        if $in_login_page -> return 1
         call $startup_ready = is_in_startup_page()
         if not $startup_ready
             screenshot from last
@@ -281,9 +245,7 @@ def leave_startup_page()
         screenshot from last
         eval pause("点击启动页返回后未进入登录主页，请手动处理后点击继续")
         call $in_login_page = is_in_login_page()
-        if not $in_login_page
-            screenshot from last
-        end
+        if not $in_login_page -> screenshot from last
     end
     return $in_login_page
 end
@@ -300,17 +262,13 @@ def wait_for_switch_users_page()
     eval $ready = 0
     loop 60
         scan [game_login_page].[login] as $ready by contains "进入游戏"
-        if $ready
-            return 1
-        end
+        if $ready -> return 1
         wait @page_refresh
     end
     screenshot from last
     eval pause("未检测到切换用户页的「进入游戏」，请手动定位后点击继续")
     scan [game_login_page].[login] as $ready by contains "进入游戏"
-    if $ready
-        return 1
-    end
+    if $ready -> return 1
     screenshot from last
     return 0
 end
@@ -329,9 +287,7 @@ def exit_to_login()
     # 1. 主页 → 菜单
     # 走标准导航并自带到位校验；click 由布局选择点菜单或按 ESC。
     call $in_menu = nav_main_to_menu()
-    if $in_menu < 0
-        log "未能进入菜单页，退出流程可能落空"
-    end
+    if $in_menu < 0 -> log "未能进入菜单页，退出流程可能落空"
 
     # 2. 菜单 → 退出（两端行为一致）
     click [game_menu_page].[exit] after wait @page_refresh
@@ -374,9 +330,7 @@ def switch_account($tail, $account, $batch_state, $max_roll_account, $login_targ
         if not $found
             # 疑似登出太浅无法识别，此时继续识别是否存在 进入游戏，如果不存在那就是没有登出
             scan [game_login_page].[login] as $login_game by contains "进入游戏"
-            if not $login_game
-                $found = "登出"
-            end
+            if not $login_game -> $found = "登出"
         end
         if $found
             click [game_login_page].[switch_user] after wait @page_refresh
@@ -389,9 +343,7 @@ def switch_account($tail, $account, $batch_state, $max_roll_account, $login_targ
 
     call $logged_in = select_account_and_login(
         $tail, $max_roll_account, $login_target)
-    if not $logged_in
-        return 0
-    end
+    if not $logged_in -> return 0
     # 非重启账号切换登录后直接回到登录主页，不经过启动页。
     eval $batch_state.account = $account
     eval $batch_state.role = ""
@@ -429,14 +381,10 @@ def select_account_and_login($tail, $max_roll_account, $login_target)
     eval $found_user = 0
     loop while $pass <= $extra_passes
         call $found_user = search_account_down($tail, $max_roll_account)
-        if $found_user
-            break
-        end
+        if $found_user -> break
         eval $pass_no = $pass + 1
         log warn "第 " + $pass_no + " 轮翻到底仍未找到账号：" + $login_target
-        if $pass >= $extra_passes
-            break
-        end
+        if $pass >= $extra_passes -> break
         call $at_top = scroll_user_list_to_top($max_roll_account)
         if not $at_top
             log warn "回顶时已达单轮滚动上限 " + $max_roll_account \
@@ -486,17 +434,11 @@ end
 # OCR 抖动只会让两帧「看起来不同」从而多滚一步，不会误判成到边；反过来两屏
 # 不同内容恰好识别成完全相同在这个面板上不现实。
 def user_list_unchanged($a, $b)
-    if $a is_empty
-        return 0
-    end
-    if len($a) != len($b)
-        return 0
-    end
+    if $a is_empty -> return 0
+    if len($a) != len($b) -> return 0
     eval $col = 1
     for r in keys($b)
-        if $a.$r.$col != $b.$r.$col
-            return 0
-        end
+        if $a.$r.$col != $b.$r.$col -> return 0
     end
     return 1
 end
@@ -550,9 +492,7 @@ def scroll_user_list_to_top($max_steps)
     loop $max_steps
         scan [game_login_page].[user_list] as $snap
         call $stuck = user_list_unchanged($prev, $snap)
-        if $stuck
-            return 1
-        end
+        if $stuck -> return 1
         eval $prev = $snap
         env:"android" -> drag [game_login_page].[point_1] to [game_login_page].[point_2]
         env:"desktop" -> scroll [game_login_page].[user_list] up 2
@@ -589,21 +529,15 @@ def select_role_with_policy($role_index, $role, $batch_state, $skip_online_role,
         loop while $role_attempt < 5
             click [game_login_page].[switch_role] after wait @secondary_confirm
             call $online = resolve_role_entry_notice($batch_state, $skip_online_role, $online_deadline, $force_online)
-            if $online < 0
-                return {"status": "failed", "message": "更新后未能恢复登录主页", "state": $batch_state}
-            end
+            if $online < 0 -> return {"status": "failed", "message": "更新后未能恢复登录主页", "state": $batch_state}
             if $online == 2
                 # 更新不计入页面失败次数；恢复后重启在线等待计时。
                 eval $online_deadline = clock() + to_num($online_role_max_wait)
                 continue
             end
-            if $online == 1
-                return {"status": "skipped", "message": "角色在线", "state": $batch_state}
-            end
+            if $online == 1 -> return {"status": "skipped", "message": "角色在线", "state": $batch_state}
             call $role_page = is_in_role_select_page()
-            if $role_page
-                break
-            end
+            if $role_page -> break
             eval $role_attempt = $role_attempt + 1
             log "未进入选择角色页面，重试"
         end
@@ -617,9 +551,7 @@ def select_role_with_policy($role_index, $role, $batch_state, $skip_online_role,
         call $landed = login_to_main_page()
         if $landed == 2
             call $recovered = recover_login_after_update($batch_state)
-            if not $recovered
-                return {"status": "failed", "message": "更新后未能恢复登录主页", "state": $batch_state}
-            end
+            if not $recovered -> return {"status": "failed", "message": "更新后未能恢复登录主页", "state": $batch_state}
             continue
         end
         eval $batch_state.page_state = 2
@@ -657,14 +589,10 @@ def resolve_role_entry_notice($batch_state, $skip_online_role, $online_deadline,
         call $notice = read_login_notice()
         if $notice == "update"
             call $recovered = recover_login_after_update($batch_state)
-            if $recovered
-                return 2
-            end
+            if $recovered -> return 2
             return -1
         end
-        if $notice != "online"
-            return 0
-        end
+        if $notice != "online" -> return 0
         if $force_online
             log info "角色仍被服务端认为在线，确认后继续重新登录"
             click [game_login_page].[confirm] after wait @page_refresh
@@ -705,9 +633,7 @@ def login_to_main_page()
     loop $loading_max_polls
         scan [game_login_page].[loading, online_label] as $load_state
         call $notice = login_notice_kind($load_state.online_label)
-        if $notice == "update"
-            return 2
-        end
+        if $notice == "update" -> return 2
         if not $load_state.loading contains "加载"
             eval $loading_done = 1
             break
@@ -740,9 +666,7 @@ def login_to_main_page()
         end
 
         call $notice = read_login_notice()
-        if $notice == "update"
-            return 2
-        end
+        if $notice == "update" -> return 2
 
         # 未检测到主页，先检查战令领奖
         scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"

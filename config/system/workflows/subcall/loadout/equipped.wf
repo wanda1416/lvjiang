@@ -29,9 +29,7 @@ def scan_equipped_plan($name, $main_art, $sub_art)
         return -2
     end
     call $nav_result = nav_main_to_equip()
-    if $nav_result < 0
-        return -1
-    end
+    if $nav_result < 0 -> return -1
     eval $scan_error = ""
     eval $written = -2
     try
@@ -40,16 +38,12 @@ def scan_equipped_plan($name, $main_art, $sub_art)
         eval $scan_error = $err
     end
     call $nav_result = nav_back_to_main()
-    if $nav_result < 0
-        return -1
-    end
+    if $nav_result < 0 -> return -1
     if $scan_error
         log warn "跳过备战方案装备扫描: " + $name + "；" + $scan_error
         return -2
     end
-    if $written < 0
-        return -2
-    end
+    if $written < 0 -> return -2
     return $written
 end
 

@@ -57,9 +57,7 @@ def sync_weekly_progress($raw, $key, $last, $label, $source)
         return $observed.value
     end
     if $observed.reason == "regressed"
-        if $observed.value < $last
-            return $last
-        end
+        if $observed.value < $last -> return $last
         log error $label + "识别值 " + $current + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
         return $observed.value
     end
@@ -120,9 +118,7 @@ def sync_weekly_remaining($raw, $key, $last, $expected_total, $label, $source)
         return $observed.value
     end
     if $observed.reason == "regressed"
-        if $observed.value < $last
-            return $last
-        end
+        if $observed.value < $last -> return $last
         log warn $label + "识别值 " + $consumed + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
         return $observed.value
     end

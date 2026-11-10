@@ -52,9 +52,7 @@ def nav_main_to_bag($ask_confirm)
                     screenshot from last
                     if $ask_confirm
                         eval $continue_nav = confirm("未进入菜单页面，请手动导航后选择是继续检查，选择否放弃本次导航")
-                        if not $continue_nav
-                            return -1
-                        end
+                        if not $continue_nav -> return -1
                     else
                         eval pause("未进入菜单页面，请手动导航后点击继续")
                     end
@@ -70,18 +68,10 @@ def nav_main_to_bag($ask_confirm)
     # 通过 sub_baoguo 判定当前 tab
     scan [bag_detail].[sub_baoguo] as $tab_text
     eval $tab = 0
-    if $tab_text.sub_baoguo contains "培养"
-        eval $tab = 1
-    end
-    if $tab_text.sub_baoguo contains "道具"
-        eval $tab = 2
-    end
-    if $tab_text.sub_baoguo contains "任务"
-        eval $tab = 3
-    end
-    if $tab_text.sub_baoguo contains "钱袋"
-        eval $tab = 4
-    end
+    if $tab_text.sub_baoguo contains "培养" -> eval $tab = 1
+    if $tab_text.sub_baoguo contains "道具" -> eval $tab = 2
+    if $tab_text.sub_baoguo contains "任务" -> eval $tab = 3
+    if $tab_text.sub_baoguo contains "钱袋" -> eval $tab = 4
 
     if $tab == 0
         # tab 未识别，通过 zhengli 区域二次确认是否在背包页
@@ -106,9 +96,7 @@ end
 
 def nav_main_to_equip($ask_confirm)
     call $tab = nav_main_to_bag($ask_confirm)
-    if $tab < 0
-        return -1
-    end
+    if $tab < 0 -> return -1
 
     # 不在培养 tab 则点击切换
     if $tab != 1
@@ -125,9 +113,7 @@ def nav_main_to_equip($ask_confirm)
         screenshot from last
         if $ask_confirm
             eval $continue_nav = confirm("未进入装备列表，请手动导航后选择是继续检查，选择否放弃本次导航")
-            if not $continue_nav
-                return -1
-            end
+            if not $continue_nav -> return -1
         else
             eval pause("未进入装备列表，请手动导航后点击继续")
         end
@@ -148,9 +134,7 @@ end
 
 def nav_main_to_wallet()
     call $tab = nav_main_to_bag()
-    if $tab < 0
-        return -1
-    end
+    if $tab < 0 -> return -1
 
     # 不在钱袋 tab 则点击切换
     if $tab != 4
@@ -182,9 +166,7 @@ end
 
 def nav_main_to_item()
     call $tab = nav_main_to_bag()
-    if $tab < 0
-        return -1
-    end
+    if $tab < 0 -> return -1
 
     # 不在道具 tab 则点击切换
     if $tab != 2
@@ -212,9 +194,7 @@ end
 
 def nav_main_to_menu()
     call $in_menu = is_in_menu_page()
-    if $in_menu
-        return 0
-    end
+    if $in_menu -> return 0
     click [game_main_page].[menu] after wait @page_refresh
     call $in_menu = is_in_menu_page()
     if not $in_menu
@@ -245,9 +225,7 @@ end
 
 def nav_main_to_role()
     call $in_menu = nav_main_to_menu()
-    if $in_menu < 0
-        return -1
-    end
+    if $in_menu < 0 -> return -1
 
     find [game_menu_page].[menu] as $found by contains "角色"
     if not $found
@@ -290,9 +268,7 @@ def nav_back_to_main()
     end
 
     call $in_menu = is_in_menu_page()
-    if $in_menu
-        click [game_menu_page].[back] after wait @step_interval
-    end
+    if $in_menu -> click [game_menu_page].[back] after wait @step_interval
 
     call $in_main = is_in_main_page()
     if not $in_main
@@ -352,9 +328,7 @@ def nav_equip_to_tune($ask_confirm)
         screenshot from last
         if $ask_confirm
             eval $continue_nav = confirm("未进入调律页面，请手动导航后选择是继续检查，选择否放弃本次导航")
-            if not $continue_nav
-                return -1
-            end
+            if not $continue_nav -> return -1
         else
             eval pause("未进入调律页面，请手动导航后点击继续")
         end

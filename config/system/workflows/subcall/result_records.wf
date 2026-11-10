@@ -45,14 +45,10 @@ end
 # 前置：可选调用；$record_result 未声明时直接返回。
 # 后置：写入 $record_result.items.$key.records；首次写入时自动建该分组。
 def record_item($key, $name, $status, $reason, $data)
-    if not $record_result
-        return
-    end
+    if not $record_result -> return
     log debug $name + ": " + $status + " " + $reason
     eval $record = {"status": $status}
-    if not $reason is_empty
-        eval $record.reason = $reason
-    end
+    if not $reason is_empty -> eval $record.reason = $reason
     # 位置、OCR、过程返回值是日志信息；只保留必要业务数据。
     eval $details = {}
     for field in [
@@ -70,13 +66,9 @@ def record_item($key, $name, $status, $reason, $data)
         "purchased",
         "total"
     ]
-        if has_key($data, $field)
-            eval append($details, $field, $data.$field)
-        end
+        if has_key($data, $field) -> eval append($details, $field, $data.$field)
     end
-    if len($details) > 0
-        eval $record.data = $details
-    end
+    if len($details) > 0 -> eval $record.data = $details
     if not has_key($record_result.items, $key)
         eval append($record_result.items, $key, {"name": $name, "records": []})
     end
@@ -97,16 +89,12 @@ end
 #       "_goods" 结尾的键（商品余量属于快照而非进度）都不进 values，避免下游
 #       把「一次读数」当成「进度变化」。
 def record_observation($key, $raw, $value)
-    if not $record_result
-        return
-    end
+    if not $record_result -> return
     log debug $key + " 观察: " + $raw + "；采用: " + $value
     # 原文和历次观察只进日志，结果保留最终采用值。
     if $key != "regional_currency"
         if not $key contains "_goods"
-            if not has_key($record_result, "values")
-                eval $record_result.values = {}
-            end
+            if not has_key($record_result, "values") -> eval $record_result.values = {}
             eval append($record_result.values, $key, $value)
         end
     end
@@ -121,19 +109,11 @@ end
 # 前置：$record_result 已声明。
 # 后置：$record_result.counts.$key += $amount（首次写入时建 counts）。
 def record_count($key, $amount)
-    if not $record_result
-        return
-    end
-    if $amount == 0
-        return
-    end
-    if not has_key($record_result, "counts")
-        eval $record_result.counts = {}
-    end
+    if not $record_result -> return
+    if $amount == 0 -> return
+    if not has_key($record_result, "counts") -> eval $record_result.counts = {}
     eval $count = 0
-    if has_key($record_result.counts, $key)
-        eval $count = $record_result.counts.$key
-    end
+    if has_key($record_result.counts, $key) -> eval $count = $record_result.counts.$key
     eval append($record_result.counts, $key, $count + $amount)
 end
 
@@ -150,9 +130,7 @@ def record_finish($status, $reason)
     if $record_result
         eval $record_result.status = $status
         if $status != "processed"
-            if not $reason is_empty
-                eval $record_result.reason = $reason
-            end
+            if not $reason is_empty -> eval $record_result.reason = $reason
         end
     end
 end
@@ -165,9 +143,7 @@ end
 # 后置：只在 status == "running" 时改状态，用于异常兜底与「多个出口都想收尾」
 #       的流程，避免后到的出口覆盖真实结论。
 def record_finish_if_open($status, $reason)
-    if $record_result and $record_result.status == "running"
-        call record_finish($status, $reason)
-    end
+    if $record_result and $record_result.status == "running" -> call record_finish($status, $reason)
 end
 
 # ─── record_set ───────────────────────────────────────────
@@ -184,16 +160,10 @@ end
 # 与 record_item 的区别：这个用于「一项奖励一个结论」的场景，重复调用是改判，
 # 不是新增一条记录。
 def record_set($key, $name, $status, $reason, $data)
-    if not $record_result
-        return
-    end
+    if not $record_result -> return
     eval $item = {"name": $name, "status": $status}
-    if not $reason is_empty
-        eval $item.reason = $reason
-    end
-    if len($data) > 0
-        eval $item.data = $data
-    end
+    if not $reason is_empty -> eval $item.reason = $reason
+    if len($data) > 0 -> eval $item.data = $data
     eval append($record_result.items, $key, $item)
     log debug $name + ": " + $status + " " + $reason
 end

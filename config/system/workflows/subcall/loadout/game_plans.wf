@@ -23,9 +23,7 @@ import "subcall/navigation.wf"
 # collect_game_plan_names / select_game_plan 暴露。
 def nav_main_to_game_plans()
     call $result = nav_main_to_menu()
-    if $result < 0
-        return -1
-    end
+    if $result < 0 -> return -1
     scan [game_menu_page].[peiyang] as $entry by contains "培养"
     if not $entry
         log error "菜单页未识别到培养入口，无法进入游戏方案"
@@ -78,9 +76,7 @@ def collect_game_plan_names()
     eval $names = []
     for row in keys($grid)
         eval $name = trim($grid.$row.[1])
-        if len($name) > 0
-            eval append($names, $name)
-        end
+        if len($name) > 0 -> eval append($names, $name)
     end
     return $names
 end

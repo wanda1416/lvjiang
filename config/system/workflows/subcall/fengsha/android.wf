@@ -31,9 +31,7 @@ end
 # 返回：1=已点过；0=画面上没有「躺下」按钮。
 def lie_down_android()
     find as $lie by contains "躺下"
-    if not $lie
-        return 0
-    end
+    if not $lie -> return 0
     log info "看到「躺下」提示，点击（只点一次，重复点会起身。OCR 读到：" + $lie.text + "）。"
     click $lie after wait (1.0, 1.0)
     return 1
@@ -62,33 +60,23 @@ end
 def go_to_bed_android()
     global $bed
     eval $bed_name = "1 号床"
-    if $bed == "bed2"
-        eval $bed_name = "2 号床"
-    end
-    if $bed == "bed3"
-        eval $bed_name = "3 号床"
-    end
+    if $bed == "bed2" -> eval $bed_name = "2 号床"
+    if $bed == "bed3" -> eval $bed_name = "3 号床"
     # ①b 2、3 号床：开局朝向偏开，先原地右滑转一次约 45°，再向前走。
     #     （1 号床与单人模式完全一致，直接进入下面的扫描循环。）
     if $bed != "bed1"
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         log info "位置 " + $bed_name + "：摇杆向右偏后方移动（右下），再向前走到床边。"
         drag (0.12, 0.80) to (0.30, 0.88) duration [0.5, 0.7] exact
         wait (0.5, 0.8)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         log info "已向右后方移动过，再向上推摇杆走到床边。"
         drag (0.12, 0.80) to (0.12, 0.64) duration [0.5, 0.7] exact
         wait (0.5, 0.8)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         log info "该位置专用路线没躺下，退回常规扫描流程。"
     end
 
@@ -101,17 +89,13 @@ def go_to_bed_android()
         drag (0.12, 0.80) to (0.12, 0.64) duration [0.5, 0.7] exact
         wait (0.5, 0.8)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
 
         log info "第 " + $cn + " 轮：没看到「躺下」，向右转约 45°。"
         drag (0.62, 0.50) to (0.73, 0.50) duration [0.6, 0.9]
         wait (0.4, 0.6)
         call $ok = try_lie_down()
-        if $ok > 0
-            return 0
-        end
+        if $ok > 0 -> return 0
         eval $cycle = $cycle + 1
     end
 
@@ -133,9 +117,7 @@ def dismiss_clue_dialog_android()
     # 真的弹窗一定会带「未查看的线索 / 请先查看」这类提示文案；
     # 「今日不再提醒」单独出现（比如公屏聊天）不算弹窗。
     find as $head by contains_any $words_clue_head
-    if not $head
-        return 0
-    end
+    if not $head -> return 0
     log info "检测到弹窗「" + $head.text + "」：勾选今日不再提醒，点确认按钮。"
     find as $tip by contains "不再提醒"
     if $tip
@@ -292,14 +274,10 @@ def finish_night_android()
                 click $again after wait (0.6, 0.9)
                 log info "【结算】已点「再来一局」，等待标准开局场景。"
                 call $ok = wait_standard_scene()
-                if $ok > 0
-                    return 0
-                end
+                if $ok > 0 -> return 0
                 log warn "【结算】没等到标准开局场景，补点一次「再来一局」再验一次。"
                 find as $again2 by contains "再来一局"
-                if $again2
-                    click $again2 after wait (0.5, 0.8)
-                end
+                if $again2 -> click $again2 after wait (0.5, 0.8)
                 call wait_standard_scene()
                 return 0
             end

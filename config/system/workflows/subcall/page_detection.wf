@@ -20,16 +20,40 @@
 # 后置：无副作用（只截图识别），不切换页面。
 # 返回：1=在主界面；0=不在主界面。
 # 判据：主界面入口（菜单/活动/武林录/限时）命中任一，且 is_in_bag_page() 为 0。
+#      文本全部未命中时，按环境用**唯一指定**的主页图标再复核一次：
+#      「限时」这类小字号条目在缩放、低对比和过场动画下会被 OCR 整批漏读，
+#      而图标走灰度模板匹配，不依赖文字识别，两条通道互补。
+#
+#      这里只扫这两个区域，不做整场景扫描：整场景会把以后在 game_main_page 上
+#      新增的任何模板绑定都算进主页判据，与其它场景重复的图标还会直接造成误判。
+#      对应的区域必须在本端布局里绑定模板，否则按配置错误终止（不静默降级）。
 def is_in_main_page()
     eval $main_items = ["菜单", "活动", "武林录", "限时"]
     scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
-    if $found
-        call $in_bag = is_in_bag_page()
-        if $in_bag == 0
-            return 1
+    eval $on_main = $found
+    if not $on_main
+        # 文本全灭：图标模板复核（只扫本端指定的那一个区域）
+        eval $icon = ""
+        if env("android")
+            scan [game_main_page].[ditu] as $icon by image
+        else if env("desktop")
+            scan [game_main_page].[dongzuo] as $icon by image
+        end
+        if $icon
+            log info "主页文本未命中，由图标模板确认主页: " + $icon
+            eval $on_main = 1
         end
     end
-    return 0
+    if not $on_main
+        return 0
+    end
+
+    # 文本或图标只说明「像主页」，背包页共用同一套图标/入口词，统一排除一次
+    call $in_bag = is_in_bag_page()
+    if $in_bag
+        return 0
+    end
+    return 1
 end
 
 # ─── is_in_menu_page ──────────────────────────────────────

@@ -179,14 +179,20 @@ def _isolate_profile_store(tmp_path, monkeypatch):
     模块级单例。只隔离 session.json 仍会让工作流测试因已有业务周期定义而
     失败，或者在调用 profile_declare 时尝试修改真实配置。
     """
-    from lvjiang.core.profile import repository, schema
+    from lvjiang.core.profile import layout, repository, schema
 
     profile_dir = tmp_path / "session"
     monkeypatch.setattr(schema, "_PROFILE_PATH", profile_dir / "profile.yaml")
     monkeypatch.setattr(repository, "_DB_PATH", profile_dir / "profile.db")
+    # 总览可见结构（profile.json）随 constants.SESSION_CONFIG_DIR 隔离；这里清掉
+    # 模块级缓冲，免得上一个用例记录的度量环境或读盘错误串到这一条。
+    layout.set_environment(layout.LayoutMetric())
+    layout.last_read_error = ""
     schema._config = None
     repository.reset_profile_db()
     yield
+    layout.set_environment(layout.LayoutMetric())
+    layout.last_read_error = ""
     schema._config = None
     repository.reset_profile_db()
 

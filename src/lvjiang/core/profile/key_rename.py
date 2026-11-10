@@ -65,9 +65,12 @@ def _write_references(schema, renames: list[tuple[str, str, str]]) -> None:
     """把改名应用到定义文件与引用文件；重复执行结果相同（幂等）。"""
     from ... import constants
     from ..config.interface import interface_path
+    from . import layout as layout_module
     from . import schema as schema_module
 
     schema_module.save_profile_config(rename_schema_references(schema, renames))
+    # 总览的列引用与列宽住在 profile.json（可见结构），不在 interface.json。
+    layout_module.rename_column_keys(lambda key: replace_key(key, renames))
     if interface_path().exists():
         data = json.loads(interface_path().read_text(encoding="utf-8"))
         _rename_interface(data, renames)
@@ -108,9 +111,11 @@ def recover_rename(db: ProfileDB) -> None:
 
 
 def _rename_interface(data: dict, renames: list[tuple[str, str, str]]) -> None:
-    profile = data.get("profile", {})
-    for group in profile.get("overview_groups", {}).values():
-        group["columns"] = [replace_key(key, renames) for key in group.get("columns", [])]
+    """interface.json 里与改名相关的只剩告警标识与批量草稿。
+
+    总览分组的列引用与列宽已迁到 ``profile.json``（见
+    :func:`lvjiang.core.profile.layout.rename_column_keys`）。
+    """
     alerts = data.get("alert_history", {})
     # 告警标识为 username:key:level:current，与引擎生成格式一致。
     for name in list(alerts):

@@ -8,7 +8,7 @@ import pytest
 
 from lvjiang import constants
 from lvjiang.core.config.interface import interface_path
-from lvjiang.core.profile import key_rename, repository, schema
+from lvjiang.core.profile import key_rename, layout, repository, schema
 from lvjiang.core.profile.models import QuotaKeyDef, StockKeyDef, SyncTargetDef
 from lvjiang.core.profile.repository import ProfileDB
 
@@ -40,10 +40,19 @@ def test_rename_failure_keeps_journal_and_restart_converges(tmp_path, monkeypatc
     ]})
     schema.save_profile_config(old)
     schema.reload_profile_config()
-    interface_path().write_text(json.dumps({"profile": {
-        "overview_groups": {"group": {"columns": ["stock:credits"]}}}}))
+    # 总览的列引用与列宽住在 profile.json；提醒标识仍留在 interface.json。
+    layout.save(layout.ProfileLayout(overview=layout.OverviewLayout(
+        group_order=["group"],
+        groups={"group": layout.GroupLayout(
+            columns=["stock:credits"], column_widths={"stock:credits": 120})},
+    )))
+    layout_file = layout.layout_path()
+    # 告警标识是 username:key:level:current，key 不带模型前缀。
+    interface_path().write_text(
+        json.dumps({"alert_history": {"tester:credits:orange:current": "2026-11-10"}}),
+        encoding="utf-8")
     constants.BATCH_CONFIG_PATH.write_text(json.dumps({"groups": {"group": {"profile_sort_key": "credits"}}}))
-    paths = (schema._PROFILE_PATH, interface_path(), constants.BATCH_CONFIG_PATH)
+    paths = (schema._PROFILE_PATH, layout_file, interface_path(), constants.BATCH_CONFIG_PATH)
     before = {path: path.read_bytes() for path in paths}
     db = repository.get_profile_db()
     db.upsert("tester", "stock", "credits", 12)
@@ -80,7 +89,12 @@ def test_rename_failure_keeps_journal_and_restart_converges(tmp_path, monkeypatc
     assert not journal_path.exists()
     assert db.get_entry("tester", "stock", "coins")["value"] == 12
     assert schema.get_profile_config().get_key("reward").sync_targets[0].key == "stock:coins"
-    assert json.loads(interface_path().read_text())["profile"]["overview_groups"]["group"]["columns"] == ["stock:coins"]
+    doc = layout.load()
+    assert doc.overview.groups["group"].columns == ["stock:coins"]
+    # 列宽跟着改名走，否则用户调好的宽度会被改名清掉。
+    assert doc.overview.groups["group"].column_widths == {"stock:coins": 120}
+    assert "tester:coins:orange:current" in json.loads(
+        interface_path().read_text(encoding="utf-8"))["alert_history"]
     assert json.loads(constants.BATCH_CONFIG_PATH.read_text())["groups"]["group"]["profile_sort_key"] == "coins"
 
 

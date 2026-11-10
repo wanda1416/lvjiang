@@ -39,7 +39,10 @@ _LAYER_PATTERNS = (
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",
 )
-_SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "batch.json")
+# profile.json 是用户总览的可见结构：手机端没有结构编辑能力，带上 PC 的结构
+# 才能直接看到一致的分组与列；手机上要换结构只能点「下载页面结构」。
+_SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "profile.json",
+                  "batch.json")
 _DATABASE_FILES = ("profile.db",)
 
 #: 配置目录里**由本机独占**的文件（相对 ``config/``）：实例出生标识、登录令牌、

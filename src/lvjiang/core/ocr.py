@@ -39,11 +39,33 @@ class OCREngine:
         self._rapidocr_options = dict(rapidocr_options or {})
         self._backend_factory = backend_factory
         self._region_pixel_budget = region_pixel_budget
+        #: 加载时用的参数指纹；配置改了要重建会话，不能只换字段
+        self._loaded_options: tuple[tuple[str, Any], ...] = ()
+
+    def _resolve_options(self) -> dict[str, Any]:
+        """本次加载应使用的参数。
+
+        显式传入的 options 最高优先；手机原生后端自带一套预算，不走这里。
+        其余情况统一读 ``ocr.yaml``——RapidOCR 出厂的 ``-1/-1`` 会让三个模型
+        各开满物理核互相争抢，必须由配置覆盖掉。
+        """
+        if self._rapidocr_options:
+            return dict(self._rapidocr_options)
+        if self._backend_factory is not None:
+            return {}
+        from .ocr_config import ocr_engine_options
+
+        try:
+            return ocr_engine_options()
+        except Exception as exc:  # 手改配置写坏时不能让整条识别链崩掉
+            logger.warning(f"OCR 线程/尺寸配置无效，本次改用出厂默认：{exc}")
+            return {}
 
     def close(self) -> None:
         """释放后端会话；设备端不能仅丢弃 Python 引用来回收 JNI 原生资源。"""
         backend, self._ocr = self._ocr, None
         self._available = False
+        self._loaded_options = ()
         failure = None
         close_backend = getattr(backend, "close", None)
         if callable(close_backend):
@@ -61,15 +83,27 @@ class OCREngine:
             raise failure
 
     def _ensure_loaded(self) -> bool:
-        """懒加载 RapidOCR，首次调用时初始化"""
+        """懒加载 RapidOCR；配置变了就重建会话。
+
+        「图像识别 → 识别配置」保存后不需要重启：下次识别比对参数指纹，
+        不同则先 ``close()`` 再按新参数重建。
+        """
+        options = self._resolve_options()
+        fingerprint = tuple(sorted(options.items()))
         if self._ocr is not None:
-            return self._available
+            # 空指纹说明会话不是本方法建的（外部注入的后端），来源不明就不要
+            # 擅自重连；只要是我们自己按配置加载的，参数一变就重建。
+            if not self._loaded_options or fingerprint == self._loaded_options:
+                return self._available
+            logger.info("OCR 参数已变更，重建识别会话：{}", options or "出厂默认")
+            self.close()
         try:
             if self._backend_factory is not None:
                 self._ocr = self._backend_factory()
             else:
                 from rapidocr_onnxruntime import RapidOCR
-                self._ocr = RapidOCR(**self._rapidocr_options)
+                self._ocr = RapidOCR(**options)
+            self._loaded_options = fingerprint
             self._available = True
             logger.info("OCR 引擎加载成功（{}）", "native" if self._backend_factory else "RapidOCR")
         except MemoryError:

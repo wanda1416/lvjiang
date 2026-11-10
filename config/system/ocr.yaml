@@ -1,9 +1,18 @@
-content_version: 2
+content_version: 3
 recognition:
   region_batch:
     min_canvas_side: 736
     max_content_height: 1200
     gap: 16
+  # PC 端单次识别的并行度。RapidOCR 出厂的 -1 会让 Det/Cls/Rec 各开满物理核，
+  # 多线程池互相争抢：实测同一帧默认 8.44 CPU 秒，限到 2 线程只要 2.38 CPU 秒，
+  # 墙钟还更短。界面入口：图像识别 → 识别配置 → 识别性能。
+  pc_ocr:
+    threads: 2
+    inter_threads: 1
+  # 检测模型的输入短边上限：调小更快更省，但小字号更容易漏检。
+  detect:
+    limit_side_len: 736
 normalization:
   default:
     replacements: {}

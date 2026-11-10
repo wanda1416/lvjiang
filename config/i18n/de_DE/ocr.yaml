@@ -77,5 +77,14 @@ ocr_dialog:
   ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
   : "Default rules apply globally to all OCR; scan/find with clauses stack the selected business group on top of the defaults.\nClick \"Save\" to apply — no restart needed; use \"Undo\" to revert unsaved changes."
   默认规则（全局）: Default Rules (Global)
+  "识别性能": "Performance"
+  "识别线程数": "Recognition threads"
+  "并行算子线程数": "Operator threads"
+  "检测输入短边": "Detection input short side"
+  ? "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。"
+  : "Recognition performance applies to every recognition call: higher parallelism is faster but uses proportionally more CPU.\nSaved changes take effect from the next recognition — no restart needed."
+  "单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。": "Threads used inside one recognition. Default 2: going higher is no faster in practice and only raises whole-machine CPU usage; use 1 for the lowest CPU cost on long background runs."
+  "同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。": "How many operator lanes run concurrently. Detection, classification and recognition each already own a thread pool, so raising this mostly adds scheduling contention; default 1."
+  "检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。": "Before detection the frame is rescaled so its short side equals this value (large frames shrink, small crops grow). Smaller is faster and cheaper but more likely to miss small text; 736 is the factory value — leave it unless you have a reason."
 user_avatar:
   刷新截图: Refresh Screenshot

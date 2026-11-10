@@ -35,9 +35,17 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.ocr_cleaner import OCRCleaner
 from ...core.ocr_config import (
+    LIMIT_SIDE_LEN_MAX,
+    LIMIT_SIDE_LEN_MIN,
+    PC_OCR_INTER_THREADS_MAX,
+    PC_OCR_THREADS_MAX,
+    DetectConfig,
+    PcOCRConfig,
     RegionBatchConfig,
+    load_detect_config,
+    load_pc_ocr_config,
     load_region_batch_config,
-    save_region_batch_config,
+    save_recognition_settings,
 )
 from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
@@ -224,6 +232,44 @@ class OCRDialog(QDialog):
         form.addRow(tr_label('区域间隔'), self._region_gap)
 
         layout.addWidget(group)
+
+        layout.addWidget(QLabel(tr(
+            "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n"
+            "保存后从下一次识别开始生效，不需要重启。"
+        )))
+        perf = QGroupBox(tr("识别性能"))
+        perf_form = QFormLayout(perf)
+
+        self._pc_threads = QSpinBox()
+        self._pc_threads.setObjectName("ocr_pc_threads")
+        self._pc_threads.setRange(1, PC_OCR_THREADS_MAX)
+        self._pc_threads.setToolTip(tr(
+            "单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；"
+            "填 1 最省 CPU，适合后台长跑。"
+        ))
+        perf_form.addRow(tr_label('识别线程数'), self._pc_threads)
+
+        self._pc_inter_threads = QSpinBox()
+        self._pc_inter_threads.setObjectName("ocr_pc_inter_threads")
+        self._pc_inter_threads.setRange(1, PC_OCR_INTER_THREADS_MAX)
+        self._pc_inter_threads.setToolTip(tr(
+            "同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，"
+            "调大通常只增加调度争抢，默认 1。"
+        ))
+        perf_form.addRow(tr_label('并行算子线程数'), self._pc_inter_threads)
+
+        self._detect_limit_side = QSpinBox()
+        self._detect_limit_side.setObjectName("ocr_detect_limit_side")
+        self._detect_limit_side.setRange(LIMIT_SIDE_LEN_MIN, LIMIT_SIDE_LEN_MAX)
+        self._detect_limit_side.setSingleStep(32)
+        self._detect_limit_side.setSuffix(" px")
+        self._detect_limit_side.setToolTip(tr(
+            "检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，"
+            "但小字号更容易漏检；736 是出厂值，没有特别需求不要动。"
+        ))
+        perf_form.addRow(tr_label('检测输入短边'), self._detect_limit_side)
+
+        layout.addWidget(perf)
         layout.addStretch()
 
         self._config_status_label = QLabel("")
@@ -246,6 +292,9 @@ class OCRDialog(QDialog):
             self._min_canvas_side,
             self._max_content_height,
             self._region_gap,
+            self._pc_threads,
+            self._pc_inter_threads,
+            self._detect_limit_side,
         ):
             spinbox.valueChanged.connect(self._mark_config_dirty)
         self._refresh_recognition_config()
@@ -254,10 +303,15 @@ class OCRDialog(QDialog):
 
     def _refresh_recognition_config(self) -> None:
         config = load_region_batch_config()
+        pc = load_pc_ocr_config()
+        detect = load_detect_config()
         controls = (
             (self._min_canvas_side, config.min_canvas_side),
             (self._max_content_height, config.max_content_height),
             (self._region_gap, config.gap),
+            (self._pc_threads, pc.threads),
+            (self._pc_inter_threads, pc.inter_threads),
+            (self._detect_limit_side, detect.limit_side_len),
         )
         for spinbox, value in controls:
             spinbox.blockSignals(True)
@@ -273,11 +327,18 @@ class OCRDialog(QDialog):
         self._set_config_dirty(True)
 
     def _on_save_recognition_config(self) -> None:
-        save_region_batch_config(RegionBatchConfig(
-            min_canvas_side=self._min_canvas_side.value(),
-            max_content_height=self._max_content_height.value(),
-            gap=self._region_gap.value(),
-        ))
+        save_recognition_settings(
+            region_batch=RegionBatchConfig(
+                min_canvas_side=self._min_canvas_side.value(),
+                max_content_height=self._max_content_height.value(),
+                gap=self._region_gap.value(),
+            ),
+            pc_ocr=PcOCRConfig(
+                threads=self._pc_threads.value(),
+                inter_threads=self._pc_inter_threads.value(),
+            ),
+            detect=DetectConfig(limit_side_len=self._detect_limit_side.value()),
+        )
         self._set_config_dirty(False)
         self._config_status_label.setText(tr("识别配置已保存"))
 

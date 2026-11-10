@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.account import ACCOUNT_SERVICE, AccountError, AccountSession
+from ..core.account import ACCOUNT_SERVICE, AccountError, get_session
 from ..i18n import tr
 from .button_styles import apply_button_style
 
@@ -204,7 +204,7 @@ class AccountHolder(QObject):
 
     def __init__(self):
         super().__init__()
-        self.session = AccountSession()
+        self.session = get_session()
         self.summary: dict | None = None
         self.done = False
         self.sync_attempted = False

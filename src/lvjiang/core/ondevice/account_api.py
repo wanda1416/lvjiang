@@ -20,13 +20,13 @@ from ..account.service import (
     AccountError,
     AccountSession,
     current_keyring_user,
+    get_session,
     load_profile,
     stored_token_owner,
 )
 
-# 进程内唯一会话：access 令牌只存在内存里，每次调用都新建一个 AccountSession
-# 就等于每次都要重新 refresh（进一次设置页白打两个网络请求）。
-_SESSION: AccountSession | None = None
+# 进程内唯一会话由 core.account.service.get_session() 提供：新建第二个持有者会与
+# 服务端的「单行会话 + 轮换令牌」打架，两边各自 refresh 就互相顶掉令牌。
 # 登录态快照。首次询问后常驻内存，之后读它即可；登录/登出/令牌失效时刷新。
 _STATUS_CACHE: dict | None = None
 # 只是"现在连不上服务"，与登录态无关，别混进 logged_in。
@@ -34,10 +34,7 @@ _OFFLINE_CODES = frozenset({"network", "service_unavailable", "rejected"})
 
 
 def _session() -> AccountSession:
-    global _SESSION
-    if _SESSION is None:
-        _SESSION = AccountSession()
-    return _SESSION
+    return get_session()
 
 
 def _remember_status(value: dict) -> None:

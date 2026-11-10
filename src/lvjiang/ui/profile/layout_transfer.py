@@ -19,8 +19,8 @@ from ...core.sync import layout_sync
 from ...core.sync.client import SyncError
 from ...i18n import tr
 
-#: 复用同一个会话，避免每点一次按钮就 refresh 一次令牌。
-_SESSION = None
+#: 账号能力一律走进程内唯一会话：自己 new 一个 AccountSession 会与服务端的
+#: 「单行会话 + 轮换令牌」打架——两边各自 refresh 就把对方的 access 令牌顶掉。
 
 
 def is_android() -> bool:
@@ -30,12 +30,9 @@ def is_android() -> bool:
 
 def access_token() -> str:
     """当前登录的 access 令牌；未登录或换不到时返回空串。"""
-    global _SESSION
-    from ...core.account.service import AccountError, AccountSession
+    from ...core.account.service import AccountError, get_session
 
-    if _SESSION is None:
-        _SESSION = AccountSession()
-    session = _SESSION
+    session = get_session()
     if session.access_token:
         return session.access_token
     if not session.has_stored_session():

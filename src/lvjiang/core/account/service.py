@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import socket
 import sys
+import threading
 import time
 from http.client import HTTPException
 from pathlib import Path
@@ -428,6 +429,10 @@ class AccountSession:
         self.access_expires_at = ""
         # E2E 密钥：登录派生 / 恢复时从 account.json 加载（见 login/restore）
         self.e2e_key: bytes | None = None
+        # 刷新单飞：服务端 refresh 会轮换 access/refresh 两枚令牌，同一进程里两个
+        # 线程同时刷新会互相把对方的令牌顶掉（2026-11-11 事件）。同一会话的刷新
+        # 必须串行，见 refresh_token_for。
+        self._refresh_lock = threading.RLock()
 
     # ─── 登录态生命周期 ─────────────────────────────────
 
@@ -506,18 +511,19 @@ class AccountSession:
         token = _stored_refresh_token()
         if not token:
             return None
-        try:
-            result = _request("POST", "/api/refresh", {"refresh_token": token},
-                              timeout=_AUTH_TIMEOUT_S)
-        except AccountError as error:
-            if error.code in AUTH_REJECTED_CODES:
-                logger.warning("登录态已被服务端拒绝（{}），清除本地令牌", error.code)
-                _clear_stored_session()
-                return None
-            raise
-        _store_refresh_token(result["refresh_token"])
-        self.access_token = result["access_token"]
-        self.access_expires_at = result["access_expires_at"]
+        with self._refresh_lock:
+            try:
+                result = _request("POST", "/api/refresh", {"refresh_token": token},
+                                  timeout=_AUTH_TIMEOUT_S)
+            except AccountError as error:
+                if error.code in AUTH_REJECTED_CODES:
+                    logger.warning("登录态已被服务端拒绝（{}），清除本地令牌", error.code)
+                    _clear_stored_session()
+                    return None
+                raise
+            _store_refresh_token(result["refresh_token"])
+            self.access_token = result["access_token"]
+            self.access_expires_at = result["access_expires_at"]
         # restore 不经口令：E2E 密钥从 account.json 缓存加载
         from . import e2e
         if self.e2e_key is None:
@@ -525,6 +531,23 @@ class AccountSession:
             e2e.set_key(self.e2e_key)
         # 不取详情时也要返回一个真值，调用方靠"返回 None"判断失败
         return self.summary() if fetch_summary else {"ok": True}
+
+    def refresh_token_for(self, stale: str) -> str:
+        """把调用方手上的 ``stale`` 换成一枚当前有效的 access 令牌。
+
+        供同步通道用（它们只拿到一个字符串令牌，不是本会话的引用）：
+
+        - 内存里的令牌已经不是 ``stale`` → 说明别处刚刷新过，直接用，不再打
+          ``/api/refresh``（refresh 会轮换两枚令牌，多刷一次就把别人的顶掉）；
+        - 否则单飞刷新一次；被服务端明确拒绝（``restore`` 返回 None）→ 返回空串，
+          由调用方给出「需要重新登录」。
+        """
+        with self._refresh_lock:
+            if self.access_token and self.access_token != stale:
+                return self.access_token
+            if self.restore(fetch_summary=False) is None:
+                return ""
+            return self.access_token
 
     def logout(self) -> None:
         if _stored_refresh_token():
@@ -577,20 +600,23 @@ class AccountSession:
         return self._authorized("POST", "/api/sync/clear", {"password": password})
 
     def _authorized(self, method: str, route: str, data: dict | None = None) -> dict:
-        if not self.access_token:
+        stale = self.access_token
+        if not stale:
             raise AccountError("尚未登录")
         try:
-            return _request(method, route, data, token=self.access_token)
+            return _request(method, route, data, token=stale)
         except AccountError as error:
             # ``unauthorized`` 和 ``token_expired`` 都是「这个 access 令牌不再
             # 被会话认」，必须一样滑动重试：refresh 会轮换 access，同一会话在
             # 别的进程/实例里刷新过之后，本进程手上的旧令牌就查不到行。
             if error.code not in ("token_expired", "unauthorized"):
                 raise
-        # 滑动一次再试；refresh 也失效则要求重新登录。
-        if self.restore() is None:
+        # 滑动一次再试；刷新走单飞（refresh_token_for），与同步通道共用同一把锁，
+        # 避免两个调用方同时 refresh 把对方的令牌顶掉。
+        fresh = self.refresh_token_for(stale)
+        if not fresh:
             raise AccountError("登录已过期，请重新登录", code="token_expired")
-        return _request(method, route, data, token=self.access_token)
+        return _request(method, route, data, token=fresh)
 
     def heartbeat(self) -> dict:
         """在线心跳：刷新设备与会话活跃时间（设备列表「在线」的数据源）。
@@ -599,3 +625,34 @@ class AccountSession:
         健康状况，无需等下一次业务请求才发现。
         """
         return self._authorized("POST", "/api/heartbeat", {})
+
+# ─── 进程内唯一会话 ────────────────────────────────────────
+#
+# 服务端 ``/api/refresh`` 是「单行会话 + 轮换令牌」：每刷新一次就改写
+# access_hash 与 refresh_hash，别人手里的旧 access 令牌立刻变成孤儿。
+# 所以一个进程里**只能有一个** AccountSession 持有者；各 UI 模块各自 new
+# 一个就等于互相顶掉令牌（2026-11-11：页面结构上传下载与账号同步同时持有，
+# 同步侧开始成批报「未登录或会话已失效」）。
+
+_session_lock = threading.RLock()
+_session: "AccountSession | None" = None
+
+
+def get_session() -> AccountSession:
+    """取进程内唯一的登录态对象。
+
+    所有需要账号能力的地方（账号对话框、页面结构上传下载、手机端账户桥接）
+    都必须经这里拿会话，不要再各自 ``AccountSession()``。
+    """
+    global _session
+    with _session_lock:
+        if _session is None:
+            _session = AccountSession()
+        return _session
+
+
+def reset_session() -> None:
+    """丢弃进程内会话（测试用：换账号或需要干净令牌时）。"""
+    global _session
+    with _session_lock:
+        _session = None

@@ -4,6 +4,8 @@ from .service import (
     AccountError,
     AccountSession,
     account_config_path,
+    get_session,
+    reset_session,
 )
 
 __all__ = [
@@ -11,4 +13,6 @@ __all__ = [
     "AccountError",
     "AccountSession",
     "account_config_path",
+    "get_session",
+    "reset_session",
 ]

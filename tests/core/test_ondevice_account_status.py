@@ -17,8 +17,14 @@ from lvjiang.core.ondevice import account_api
 
 @pytest.fixture(autouse=True)
 def reset_module_state(monkeypatch):
-    monkeypatch.setattr(account_api, "_SESSION", None)
+    # 会话已收敛到进程内单例（core.account.service.get_session），这里改成重置它；
+    # 手机端桥接不再自己持有 _SESSION。
+    from lvjiang.core.account import service
+
+    service.reset_session()
     monkeypatch.setattr(account_api, "_STATUS_CACHE", None)
+    yield
+    service.reset_session()
 
 
 def test_status_probes_only_once_per_process(monkeypatch) -> None:

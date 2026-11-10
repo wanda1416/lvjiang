@@ -9,6 +9,9 @@ from ..account.service import ACCOUNT_SERVICE
 
 _USER_AGENT = "lvjiang-account-client"
 
+#: 服务端判定「这枚令牌不再被会话认」的两种码；遇到就换一枚再试一次。
+_AUTH_RETRY_CODES = frozenset({"unauthorized", "token_expired"})
+
 
 class SyncError(Exception):
     """文档通道请求失败；message 可直接展示。"""
@@ -26,7 +29,22 @@ class SyncConflict(SyncError):
         self.remote = remote
 
 
-def _request(method: str, route: str, data: dict | None, token: str) -> dict:
+def _fresh_token(stale: str) -> str:
+    """把失效的 ``stale`` 换成一枚新 access 令牌；刷新不了返回空串。
+
+    服务端 ``/api/refresh`` 是「单行会话 + 轮换令牌」，所以统一走会话的单飞
+    刷新：别处已经刷新过就直接复用，不重复打接口把别人的令牌顶掉。
+    """
+    from ..account.service import AccountError, get_session
+
+    try:
+        return get_session().refresh_token_for(stale)
+    except AccountError:
+        return ""
+
+
+def _request(method: str, route: str, data: dict | None, token: str, *,
+             allow_refresh: bool = True) -> dict:
     headers = {"Content-Type": "application/json", "Accept": "application/json",
                "User-Agent": _USER_AGENT, "Authorization": f"Bearer {token}"}
     request = urlrequest.Request(
@@ -44,6 +62,12 @@ def _request(method: str, route: str, data: dict | None, token: str) -> dict:
         if exc.code == 409 and isinstance(details, dict) and details.get("error") == "conflict":
             raise SyncConflict(details) from None
         code = details.get("error") if isinstance(details, dict) and isinstance(details.get("error"), str) else ""
+        # 令牌被判失效：同一进程里可能刚被别处刷新轮换过，换一枚再试一次。只重试
+        # 一次，再失败就是真的需要重新登录，交给上层报表。
+        if allow_refresh and code in _AUTH_RETRY_CODES:
+            fresh = _fresh_token(token)
+            if fresh and fresh != token:
+                return _request(method, route, data, fresh, allow_refresh=False)
         # 与账户层共用一套中文文案：界面只展示 message，不把 error code 抛给用户。
         from ..account.service import ERROR_MESSAGES
 

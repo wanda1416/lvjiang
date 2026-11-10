@@ -1,4 +1,4 @@
-content_version: 2
+content_version: 3
 key: game_main_page
 name: 主页
 views:
@@ -8,6 +8,7 @@ views:
   name: 九宫格
 - key: more
   name: 检查区
+hide_all_views: true
 regions:
 - key: menu
   name: 菜单

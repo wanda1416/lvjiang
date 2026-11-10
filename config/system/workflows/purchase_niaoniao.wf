@@ -66,9 +66,7 @@ end
 
 eval $bought_week = profile_get("niaoniao_of_week")
 call record_observation("niaoniao_of_week", null, $bought_week)
-if $bought_week == null
-    eval $bought_week = 0
-end
+if $bought_week == null -> eval $bought_week = 0
 if $bought_week >= 2
     call record_finish("already_done", "本周已买满")
     log "本周袅袅之音·绑已买满（niaoniao_of_week=" + $bought_week + " >= 2），跳过购买"
@@ -89,9 +87,7 @@ if $want <= 0
     log "长鸣玉不足：购买 1 个需 200，现有 " + $cmyu + "，跳过购买"
     return 0
 end
-if $want < $remaining
-    log "长鸣玉现有 " + $cmyu + "，本次可购买 " + $want + " 个 袅袅之音·绑"
-end
+if $want < $remaining -> log "长鸣玉现有 " + $cmyu + "，本次可购买 " + $want + " 个 袅袅之音·绑"
 
 # ─── 导航：菜单 → 商店 → 精选 → 道具 ─────────────────────────────────
 call $nav_result = nav_main_to_menu()
@@ -170,9 +166,7 @@ end
 eval $back_tries = 0
 loop while $back_tries < 5
     call $in_main = is_in_main_page()
-    if $in_main
-        break
-    end
+    if $in_main -> break
     call $in_menu = is_in_menu_page()
     if $in_menu
         click [game_menu_page].[back] after wait @step_interval
@@ -197,19 +191,11 @@ call record_finish_if_open("purchase_attempted", "已提交购买，成交数量
 #
 # 余额未知时沿用原行为，交给购买面板的「最大」按钮按实际条件选择数量。
 def niaoniao_purchase_count($bought_week, $cmyu)
-    if $bought_week >= 2
-        return 0
-    end
+    if $bought_week >= 2 -> return 0
     eval $remaining = 2 - $bought_week
-    if $cmyu == null
-        return $remaining
-    end
-    if $cmyu < 200
-        return 0
-    end
-    if $remaining >= 2 and $cmyu < 400
-        return 1
-    end
+    if $cmyu == null -> return $remaining
+    if $cmyu < 200 -> return 0
+    if $remaining >= 2 and $cmyu < 400 -> return 1
     return $remaining
 end
 

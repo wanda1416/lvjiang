@@ -97,9 +97,7 @@ default $open_words = "开门,放进来,请他进来,让他进来,请他入内"
 default $refuse_words = "不开门,不开,拒绝,不理会,关门,赶走,撵走"
 
 eval $rounds = to_num($rounds)
-if $rounds < 1
-    eval $rounds = 1
-end
+if $rounds < 1 -> eval $rounds = 1
 
 # ─── 词表 ─────────────────────────────────────────────────────────────
 # 违禁物品：只要看到任意一项就判坏人。注意别写单字「刀」「镖」——
@@ -146,25 +144,19 @@ eval $words_waiting = ["等待其他玩家", "等待其他侠士", "等待队友
 eval $open_list = []
 for part in split($open_words, ",")
     eval $word = trim($part)
-    if not $word is_empty
-        eval append($open_list, $word)
-    end
+    if not $word is_empty -> eval append($open_list, $word)
 end
 eval $refuse_list = []
 for part in split($refuse_words, ",")
     eval $word = trim($part)
-    if not $word is_empty
-        eval append($refuse_list, $word)
-    end
+    if not $word is_empty -> eval append($refuse_list, $word)
 end
 
 # 保守放行的序号表：字典 key 是字符串，查的时候把序号转成字符串。
 eval $safe_map = {}
 for part in split($safe_slots, ",")
     eval $slot = trim($part)
-    if not $slot is_empty
-        eval $safe_map.$slot = true
-    end
+    if not $slot is_empty -> eval $safe_map.$slot = true
 end
 
 # only25 策略写死的放行位：第 2、第 5 位。不受 safe_slots 参数影响，
@@ -210,18 +202,14 @@ loop while $round < $rounds
     # 开完下一局后人物仍站在房间里，不是躺在床上的——
     # 所以每一轮都要重新找「躺下」提示 / 走向床上的金色发光点。
     call $in_bed = go_to_bed()
-    if $in_bed < 0
-        log warn "没找到「躺下」提示，可能已经躺在床上，直接守夜。"
-    end
+    if $in_bed < 0 -> log warn "没找到「躺下」提示，可能已经躺在床上，直接守夜。"
 
     call $paid = play_night($round)
     eval $guests_total = $guests_total + $paid
 
     call finish_night()
 
-    if $round < $rounds
-        wait (1, 2)
-    end
+    if $round < $rounds -> wait (1, 2)
 end
 
 log info "夜宿谜影跑完 " + $round + " 轮，累计判断 " + $guests_total + " 位访客。"
@@ -293,9 +281,7 @@ def try_lie_down()
     else
         call $seen = lie_down_android()
     end
-    if $seen < 1
-        return 0
-    end
+    if $seen < 1 -> return 0
     find as $still by contains "躺下"
     if $still
         wait (1.0, 1.0)
@@ -315,9 +301,7 @@ def try_lie_down()
         log info "「躺下」提示已消失，已躺下。"
     end
     call $started = wait_night_start(200)
-    if $started > 0
-        return 1
-    end
+    if $started > 0 -> return 1
     return 2
 end
 
@@ -354,9 +338,7 @@ def wait_night_start($limit)
         # 等待期间若弹出「未查看线索」拦截框，先关掉：
         # 它会盖住画面，导致「门外来客」判断一直看不到，白等到超时。
         # 每 10 次轮询试一次（没弹窗时内部直接返回，不会误操作）。
-        if $tick == 0
-            call $dismissed = dismiss_clue_dialog()
-        end
+        if $tick == 0 -> call $dismissed = dismiss_clue_dialog()
         eval $tick = $tick + 1
         if $tick >= 10
             log info "【守夜】已等 " + $waited + " 秒，还没开始（多人模式要等队友都躺下）。"
@@ -387,9 +369,7 @@ def play_night($round)
         call handle_guest($index, $round)
         # 等这扇门收起来，避免同一帧里把同一个人认两遍。
         call $closed = wait_door_closed(8)
-        if $closed < 0
-            log warn "门边交互一直没消失，按已处理一位继续。"
-        end
+        if $closed < 0 -> log warn "门边交互一直没消失，按已处理一位继续。"
     end
     return $index
 end
@@ -404,14 +384,10 @@ def wait_knock($timeout)
     eval $waited = 0
     loop while $waited < $timeout
         find as $ask by contains_any $words_ask
-        if $ask
-            return 0
-        end
+        if $ask -> return 0
         # 画面已经进结算、没有下一扇门了。
         find as $settle by contains_any $words_settle
-        if $settle
-            return -1
-        end
+        if $settle -> return -1
         # 等待期间如果弹出「未查看线索」拦截框，顺手处理掉。
         call dismiss_clue_dialog()
         wait (0.8, 1.1)
@@ -430,9 +406,7 @@ def wait_door_closed($timeout)
     loop while $waited < $timeout
         wait (0.6, 0.9)
         find as $ask by contains_any $words_ask
-        if not $ask
-            return 0
-        end
+        if not $ask -> return 0
         eval $waited = $waited + 1
     end
     return -1
@@ -477,9 +451,7 @@ def handle_guest($index, $round)
             eval $reason = "只开第 2、5 位，不做识别"
         end
         call $should_open = decide($slot, $verdict)
-        if $rehearsal
-            eval $should_open = 0
-        end
+        if $rehearsal -> eval $should_open = 0
         call $final_open = act_on_decision($slot, $should_open, $reason)
         eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
         eval append($records, $record)
@@ -490,9 +462,7 @@ def handle_guest($index, $round)
         # 只看序号：不做任何识别，直接交给 decide 按人数规则开门。
         eval $reason = "序号模式，不做识别"
         call $should_open = decide($slot, $verdict)
-        if $rehearsal
-            eval $should_open = 0
-        end
+        if $rehearsal -> eval $should_open = 0
         call $final_open = act_on_decision($slot, $should_open, $reason)
         eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
         eval append($records, $record)
@@ -527,9 +497,7 @@ def handle_guest($index, $round)
     end
 
     call $should_open = decide($slot, $verdict)
-    if $rehearsal
-        eval $should_open = 0
-    end
+    if $rehearsal -> eval $should_open = 0
     call $final_open = act_on_decision($slot, $should_open, $reason)
 
     eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
@@ -552,23 +520,13 @@ end
 def decide($index, $verdict)
     eval $key = "" + $index
     if $strategy == "only25"
-        if has_key($only25_map, $key)
-            return 1
-        end
+        if has_key($only25_map, $key) -> return 1
         return 0
     end
-    if $verdict == "bad"
-        return 0
-    end
-    if $verdict == "good"
-        return 1
-    end
-    if $strategy == "ocr"
-        return 0
-    end
-    if has_key($safe_map, $key)
-        return 1
-    end
+    if $verdict == "bad" -> return 0
+    if $verdict == "good" -> return 1
+    if $strategy == "ocr" -> return 0
+    if has_key($safe_map, $key) -> return 1
     return 0
 end
 

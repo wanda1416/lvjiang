@@ -155,9 +155,7 @@ else if env("desktop")
 end
 
 # 购买宝钱会消耗体力，尝试购买后再同步一次最新值
-if $baoqian_attempted
-    call sync_current_tili("宝钱")
-end
+if $baoqian_attempted -> call sync_current_tili("宝钱")
 
 # ─── 逐战（类目4）：首页礼盒优先，再买剩余配额的袅袅之音 ───────────────
 call buy_zhuzhan()
@@ -296,12 +294,8 @@ end
 # 返回：命中的第一个关键词；未命中返回 ""。
 def match_keyword($text, $keywords)
     for kw in keys($keywords)
-        if not $keywords.$kw
-            continue
-        end
-        if $text contains $kw
-            return $kw
-        end
+        if not $keywords.$kw -> continue
+        if $text contains $kw -> return $kw
     end
     return ""
 end
@@ -315,12 +309,8 @@ end
 # 后置：无副作用。
 # 返回：不可购买原因（"库存不足" / "条件不足"）；可购买返回 ""。
 def buy_block_reason($cell)
-    if $cell contains "库存不足"
-        return "库存不足"
-    end
-    if $cell contains "条件不足"
-        return "条件不足"
-    end
+    if $cell contains "库存不足" -> return "库存不足"
+    if $cell contains "条件不足" -> return "条件不足"
     return ""
 end
 
@@ -345,13 +335,9 @@ end
 def buy_zhuzhan()
     click [bugan_detail].[cat_4] after wait @page_refresh
     eval $balance = profile_get("huaruizhi")
-    if $balance == null
-        eval $balance = 0
-    end
+    if $balance == null -> eval $balance = 0
     eval $boxes = profile_get("zhuzhanbox_of_halfseason")
-    if $boxes == null
-        eval $boxes = 0
-    end
+    if $boxes == null -> eval $boxes = 0
     if $boxes >= 5
         call record_item("zhuzhanbox", "逐战惊喜礼盒", "already_done", "本周已买满", {})
     else if $balance == null or $balance < 1000
@@ -367,9 +353,7 @@ def buy_zhuzhan()
     end
 
     eval $nn = profile_get("nn_of_halfseason")
-    if $nn == null
-        eval $nn = 0
-    end
+    if $nn == null -> eval $nn = 0
     if $nn >= 2
         call record_item("zhuzhan_nn", "袅袅之音·绑", "already_done", "本半赛季已买满", {})
         return 0
@@ -404,9 +388,7 @@ def buy_zhuzhan_item($query, $key, $limit, $want, $category)
     end
     eval $before = extract_progress($details.supply_stock)
     eval $previous = profile_get($key)
-    if $previous == null
-        eval $previous = 0
-    end
+    if $previous == null -> eval $previous = 0
     # 余额与周期配额已在调用方检查，不用库存/数量/总价 OCR 阻止购买。
     click [general_purchase].[supply_max] after wait @step_interval
     click [general_purchase].[supply_buy] after wait @page_refresh
@@ -483,9 +465,7 @@ def buy_panel($panel_key, $keywords)
         for c in [1...$cols]
             eval $cell = $grid.$r.$c
             call $hit = match_keyword($cell, $keywords)
-            if not $hit
-                continue
-            end
+            if not $hit -> continue
             call $reason = buy_block_reason($cell)
             if $reason
                 call record_item("combat", "不肝商店商品", "blocked", $reason, {"raw": $cell, "row": $r, "col": $c})
@@ -496,9 +476,7 @@ def buy_panel($panel_key, $keywords)
             call buy_cell($panel_key, $r, $c)
             call record_observation("combat_goods", $cell, {"keyword": $hit, "panel": $panel_key, "row": $r, "col": $c})
             # 字符串直接用 == 精确比较。
-            if $hit == "宝钱"
-                eval $baoqian_attempted = 1
-            end
+            if $hit == "宝钱" -> eval $baoqian_attempted = 1
         end
     end
     return $baoqian_attempted
@@ -516,12 +494,8 @@ end
 # 同时含「音」与「绑」：OCR 会把袅误识为枭（袅袅之音→枭袅之音），
 # 所以不匹配「袅」；「音+绑」既容错误字又与绕梁之音区分。
 def is_niaoniao_bind($text)
-    if not $text contains "音"
-        return 0
-    end
-    if not $text contains "绑"
-        return 0
-    end
+    if not $text contains "音" -> return 0
+    if not $text contains "绑" -> return 0
     return 1
 end
 

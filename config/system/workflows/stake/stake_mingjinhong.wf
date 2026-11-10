@@ -62,12 +62,8 @@ default $qishu_dz = "qishu_3"
 # 后置：整套循环打完即结束，不校验页面、不回收现场，也没有返回值。
 # 返回：无返回值（隐式 null）；环境既不是 desktop 也不是 android 时记错误日志后结束。
 
-if env("desktop")
-    goto desktop
-end
-if env("android")
-    goto android
-end
+if env("desktop") -> goto desktop
+if env("android") -> goto android
 log error "无名木桩测伤仅支持 desktop/android 环境"
 return
 

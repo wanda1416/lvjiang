@@ -135,15 +135,9 @@ if env("android")
             # 的旧第1行）；只用滚动后重新取到的结果填补滚动前仍然缺失的项，
             # 避免"为了补另一项而滚动"顺带把已经拿到的值又冲掉。
             call $vals_rescan = scan_targets($money2, $rows)
-            if $vals.bugan <= 0
-                eval $vals.bugan = $vals_rescan.bugan
-            end
-            if $vals.baoqian <= 0
-                eval $vals.baoqian = $vals_rescan.baoqian
-            end
-            if $vals.changmingyu <= 0
-                eval $vals.changmingyu = $vals_rescan.changmingyu
-            end
+            if $vals.bugan <= 0 -> eval $vals.bugan = $vals_rescan.bugan
+            if $vals.baoqian <= 0 -> eval $vals.baoqian = $vals_rescan.baoqian
+            if $vals.changmingyu <= 0 -> eval $vals.changmingyu = $vals_rescan.changmingyu
 
             # 么玉的点击坐标只信任重建后的 $money2——它已经准确反映滚动后
             # 的当前画面，不需要再单独区分"是不是这次补扫才找到的"。
@@ -152,9 +146,7 @@ if env("android")
     end
 end
 
-if $vals.bugan > 0
-    call safe_set("bugan", $vals.bugan, $tol_bugan, "么玉", "日常活动")
-end
+if $vals.bugan > 0 -> call safe_set("bugan", $vals.bugan, $tol_bugan, "么玉", "日常活动")
 
 if $vals.baoqian > 0
     eval $baoqian_wan = $vals.baoqian / 10000

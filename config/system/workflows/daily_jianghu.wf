@@ -267,9 +267,7 @@ def process_jianghu_cards($is_rescan)
          log "任务 " + $idx + " 在处理前已经完成，跳过任务切换与执行"
          # 首轮已经处理过全部可领取奖励；补扫只补漏任务，不重复点击
          # 已完成卡片。补扫中新执行完成的任务仍走下方正常领奖分支。
-         if $claim_reward and not $is_rescan
-            call claim_completed_reward($label, $idx)
-         end
+         if $claim_reward and not $is_rescan -> call claim_completed_reward($label, $idx)
          continue
       end
 
@@ -278,9 +276,7 @@ def process_jianghu_cards($is_rescan)
 
       # 复用上面的 OCR 文字判断是否为目标任务，不重复扫描。
       eval $task_text = $text_result.label
-      if $jianghu_item
-         eval $jianghu_item.initial_text = $task_text
-      end
+      if $jianghu_item -> eval $jianghu_item.initial_text = $task_text
       call $task = classify_jianghu_task($task_text)
       eval $hit = $task
       if $hit
@@ -290,16 +286,12 @@ def process_jianghu_cards($is_rescan)
             $label, $idx, $task_text)
          eval $refresh_status = $refresh_result.status
          eval $task_text = $refresh_result.task_text
-         if $jianghu_item
-            eval $jianghu_item.task_text = $task_text
-         end
+         if $jianghu_item -> eval $jianghu_item.task_text = $task_text
 
          if $refresh_status == "completed"
             call record_jianghu_outcome("already_done", "completed_during_refresh")
             call record_jianghu_completion("completed", false)
-            if $claim_reward
-               call claim_completed_reward($label, $idx)
-            end
+            if $claim_reward -> call claim_completed_reward($label, $idx)
             continue
          end
 
@@ -370,9 +362,7 @@ end
 # 模板，避免 OCR 文案长度造成误判。
 def is_task_completed($label)
    scan [activity_jianghu].$label.[refresh] as $refresh_found by image
-   if $refresh_found
-      return 0
-   end
+   if $refresh_found -> return 0
    return 1
 end
 
@@ -424,24 +414,12 @@ end
 # 后置：无副作用。
 # 返回：对应执行开关；未知 key 返回 0。
 def should_execute_task($task_key)
-   if $task_key == "heying"
-      return $do_heying
-   end
-   if $task_key == "huanzhuang"
-      return $do_huanzhuang
-   end
-   if $task_key == "qingjing"
-      return $do_qingjing
-   end
-   if $task_key == "kanbao"
-      return $do_kanbao
-   end
-   if $task_key == "yinjiu"
-      return $do_yinjiu
-   end
-   if $task_key == "juezhanglin"
-      return $do_juezhanglin
-   end
+   if $task_key == "heying" -> return $do_heying
+   if $task_key == "huanzhuang" -> return $do_huanzhuang
+   if $task_key == "qingjing" -> return $do_qingjing
+   if $task_key == "kanbao" -> return $do_kanbao
+   if $task_key == "yinjiu" -> return $do_yinjiu
+   if $task_key == "juezhanglin" -> return $do_juezhanglin
    return 0
 end
 
@@ -457,24 +435,12 @@ end
 # 返回：1=饮酒未找到黄泉酿，主流程跳过领奖检测；0=沿用原流程继续判领奖。
 def execute_target_task($task_key, $label, $idx)
    eval $skip_reward_check = 0
-   if $task_key == "huanzhuang"
-      call action_huanzhuang($label)
-   end
-   if $task_key == "heying"
-      call action_heying($label, $idx)
-   end
-   if $task_key == "qingjing"
-      call action_qingjing($label)
-   end
-   if $task_key == "kanbao"
-      call action_kanbao($label, $idx)
-   end
-   if $task_key == "yinjiu"
-      call $skip_reward_check = action_yinjiu($label, $idx)
-   end
-   if $task_key == "juezhanglin"
-      call action_juezhanglin($label)
-   end
+   if $task_key == "huanzhuang" -> call action_huanzhuang($label)
+   if $task_key == "heying" -> call action_heying($label, $idx)
+   if $task_key == "qingjing" -> call action_qingjing($label)
+   if $task_key == "kanbao" -> call action_kanbao($label, $idx)
+   if $task_key == "yinjiu" -> call $skip_reward_check = action_yinjiu($label, $idx)
+   if $task_key == "juezhanglin" -> call action_juezhanglin($label)
    return $skip_reward_check
 end
 
@@ -512,9 +478,7 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
 
       scan [activity_jianghu].$label.[label] as $text_result
       eval $task_text = trim($text_result.label)
-      if $jianghu_item
-         eval $jianghu_item.task_text = $task_text
-      end
+      if $jianghu_item -> eval $jianghu_item.task_text = $task_text
       log "任务 " + $idx + "（" + $label + "）刷新扫描：" + $task_text
 
       call $task = classify_jianghu_task($task_text)
@@ -550,9 +514,7 @@ def claim_completed_reward($label, $idx)
    end
    if $haoling_of_week < $max_claim_reputation
       call $reward_state = detect_jianghu_card_reward_state($label)
-      if $jianghu_item
-         eval $jianghu_item.reward.observed_state = $reward_state
-      end
+      if $jianghu_item -> eval $jianghu_item.reward.observed_state = $reward_state
       if $reward_state == "claimed"
          log "任务 " + $idx + " 已完成且奖励已领取，跳过重复点击"
          call record_jianghu_reward("already_claimed", "reward_already_claimed")
@@ -610,9 +572,7 @@ end
 # 返回：0=已在号令页；-1=补救后仍不在，调用方应终止流程。
 def ensure_at_haoling($idx, $auto_nav)
    call $at_haoling = is_in_haoling_page()
-   if $at_haoling
-      return 0
-   end
+   if $at_haoling -> return 0
 
    if $auto_nav
       log $idx + "：未识别到号令标题，视为当前在游戏首页，先导航至江湖号令页"
@@ -624,9 +584,7 @@ def ensure_at_haoling($idx, $auto_nav)
    end
 
    call $at_haoling = is_in_haoling_page()
-   if $at_haoling
-      return 0
-   end
+   if $at_haoling -> return 0
 
    screenshot from last
    log "仍未进入江湖号令页，终止流程"
@@ -744,9 +702,7 @@ end
 def action_qingjing($label)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
-   if env("android")
-      click [activity_jianghu].[expand_up] after wait @step_interval
-   end
+   if env("android") -> click [activity_jianghu].[expand_up] after wait @step_interval
    click [activity_jianghu].[goto_qingjing] after wait @secondary_confirm
 
    # 外观入口为衣柜（基底）；若未直达编辑页，切换情境 tab 后进入独立编辑页
@@ -773,9 +729,7 @@ def action_qingjing($label)
       eval $save_i = $save_i + 1
       wait @step_interval
       scan [appearance_main].[save] as $save_found by contains "保存"
-      if $save_found
-         break
-      end
+      if $save_found -> break
    end
    if not $save_found
       screenshot from last
@@ -884,9 +838,7 @@ def perform_kanbao()
 
    # 如果已经完成过任务，可能导致此时已经在主页，所以需要额外判断
    call $in_main_page = is_in_main_page()
-   if $in_main_page == 0
-       click [general_action].[kanbao_back] after wait @step_interval
-   end
+   if $in_main_page == 0 -> click [general_action].[kanbao_back] after wait @step_interval
 end
 
 # ─── action_yinjiu ────────────────────────────────────────
@@ -941,9 +893,7 @@ def action_yinjiu($label, $idx)
             wait 1
             # 食用后可能弹出确认弹窗，识别到"确认"则点击"取消"关闭
             scan [general_control].[confirm] as $has_confirm by contains "确认"
-            if $has_confirm
-               click [general_control].[cancel] after wait @step_interval
-            end
+            if $has_confirm -> click [general_control].[cancel] after wait @step_interval
          else
             log "找不到食用按钮"
             call record_jianghu_outcome("blocked", "use_button_not_found")
@@ -960,9 +910,7 @@ def action_yinjiu($label, $idx)
    call nav_back_to_main()
 
    call finish_external_task($idx, "醉意")
-   if not $result
-      return 1
-   end
+   if not $result -> return 1
    return 0
 end
 
@@ -994,13 +942,9 @@ end
 # 起始定位时菜单已经打开，所以这次读取是零成本的。
 def detect_game_mode()
    scan [game_menu_page].[mode] as $current_mode by contains "单人"
-   if $current_mode
-      return "sp"
-   end
+   if $current_mode -> return "sp"
    scan [game_menu_page].[mode] as $current_mode by contains "多人"
-   if $current_mode
-      return "mp"
-   end
+   if $current_mode -> return "mp"
    return ""
 end
 
@@ -1024,9 +968,7 @@ def switch_game_mode($target)
       eval $target_name = "单人模式"
    end
    scan [game_menu_page].[mode] as $need_switch by contains $from_text
-   if not $need_switch
-      return 0
-   end
+   if not $need_switch -> return 0
 
    log "检测到" + $from_text + "模式，切换至" + $target_name
    eval $mode_key = $target + "_mode"
@@ -1127,9 +1069,7 @@ def back_to_haoling()
             # 记下本次切换过，收尾时切回；切换后落在游戏主页，重新打开菜单继续导航
             eval $mode_switched = true
             call $nav_result = nav_main_to_menu()
-            if $nav_result < 0
-               return -1
-            end
+            if $nav_result < 0 -> return -1
          end
       end
    end
@@ -1201,9 +1141,7 @@ end
 # 领奖状态按本次配置预置 disabled，避免把「没开领奖」写成「领奖失败」。
 def make_jianghu_record($pass, $idx)
    eval $reward = "not_checked"
-   if not $claim_reward
-      eval $reward = "disabled"
-   end
+   if not $claim_reward -> eval $reward = "disabled"
    return {
       "summary": {"status": "unknown"},
       "pass": $pass,
@@ -1248,9 +1186,7 @@ def identify_jianghu_record($is_rescan, $idx, $text, $allowed)
          return 0
       end
    else
-      if $task_key is_empty
-         return 0
-      end
+      if $task_key is_empty -> return 0
       eval remove($jianghu_result.unidentified, $jianghu_item)
       eval remove($jianghu_result.summary.unidentified, $jianghu_item.summary)
    end
@@ -1372,17 +1308,11 @@ def finish_jianghu_result()
    for record in $records
       eval $outcome = $record.outcome
       eval $count = 0
-      if has_key($counts, $outcome)
-         eval $count = $counts.$outcome
-      end
+      if has_key($counts, $outcome) -> eval $count = $counts.$outcome
       eval append($counts, $outcome, $count + 1)
       if $record.outcome != "disabled" and $record.outcome != "already_done"
-         if $status == "skipped"
-            eval $status = "success"
-         end
-         if $record.outcome != "completed"
-            eval $status = "partial"
-         end
+         if $status == "skipped" -> eval $status = "success"
+         if $record.outcome != "completed" -> eval $status = "partial"
       end
       if $record.action.status == "blocked" or $record.action.status == "failed"
          eval $status = "partial"
@@ -1392,9 +1322,7 @@ def finish_jianghu_result()
       end
    end
    if $status == "skipped" and has_key($counts, "already_done")
-      if $counts.already_done == len($records)
-         eval $status = "already_done"
-      end
+      if $counts.already_done == len($records) -> eval $status = "already_done"
    end
    if $jianghu_result.cleanup.mode == "failed"
       eval $status = "failed"
@@ -1433,8 +1361,6 @@ def jianghu_reason_text($reason)
       "rescan_processing_failed": "补扫处理失败",
       "page_check_failed": "号令页面检查失败"
    }
-   if has_key($descriptions, $reason)
-      return $descriptions.$reason
-   end
+   if has_key($descriptions, $reason) -> return $descriptions.$reason
    return $reason
 end

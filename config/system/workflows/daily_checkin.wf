@@ -143,14 +143,10 @@ loop 6
     for activity_name in keys($pending)
         eval $reward_keyword = $pending.$activity_name
         call $claimed = claim_visible_activity($activity_name, $reward_keyword)
-        if $claimed > 0
-            eval del_key($pending, $activity_name)
-        end
+        if $claimed > 0 -> eval del_key($pending, $activity_name)
     end
 
-    if len($pending) == 0
-        break
-    end
+    if len($pending) == 0 -> break
     if $scroll_count >= 5
         log "领奖活动列表已达到最大滚动次数。"
         break
@@ -189,9 +185,7 @@ call record_finish("processed", "已处理可见活动；具体结果见活动�
 # 活动列表与领奖区处于同一页面；这里只切换活动并领奖，不执行返回。
 def claim_visible_activity($activity_name, $reward_keyword)
     find [activity_main].[reward_list] as $found by contains $activity_name
-    if not $found
-        return 0
-    end
+    if not $found -> return 0
 
     log "定位到活动“" + $activity_name + "”，准备领奖。"
     click $found after wait @page_refresh

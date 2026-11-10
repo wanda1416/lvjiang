@@ -118,9 +118,7 @@ end
 def binary_search($items, $value)
     call $index = lower_bound($items, $value)
     if $index < len($items)
-        if $items[$index] == $value
-            return $index
-        end
+        if $items[$index] == $value -> return $index
     end
     return -1
 end

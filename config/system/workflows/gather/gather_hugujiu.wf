@@ -69,9 +69,7 @@ def wait_for_prompt($region, $text)
     eval $prompt = null
     loop 4
         scan [general_combat].$region as $prompt by contains $text
-        if $prompt
-            return 0
-        end
+        if $prompt -> return 0
         wait @page_refresh
     end
     log warn "等不到「" + $text + "」提示，本轮跳过"

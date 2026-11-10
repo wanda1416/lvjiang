@@ -107,9 +107,7 @@ def recover_to_login_page($username, $max_roll_account, $batch_state)
         log "当前在启动页，点击返回回到登录主页"
         click [game_login_page].[back] after wait @page_refresh
         call $in_login = is_in_login_page()
-        if $in_login
-            return 1
-        end
+        if $in_login -> return 1
     end
 
     log warn "登录主页与启动页均未命中，重启客户端恢复"
@@ -176,9 +174,7 @@ def relogin_current_role($username, $batch_state)
         end
         wait @page_refresh
     end
-    if not $kicked
-        log "未出现角色在线提示，直接等待登录落地"
-    end
+    if not $kicked -> log "未出现角色在线提示，直接等待登录落地"
 
     # 复用正常登录的落地流程：它顺带处理战令领奖和活动弹窗。它内部在超时后会
     # pause，无人值守下那会中止本次恢复并如实报 failed，不会把批量挂在弹窗上。
@@ -188,18 +184,14 @@ def relogin_current_role($username, $batch_state)
         return $result
     end
     call $in_main = is_in_main_page()
-    if not $in_main
-        return 0
-    end
+    if not $in_main -> return 0
     return 1
 end
 
 # 更新后回到角色入口，沿异常恢复的在线确认策略选择本次目标角色。
 def relogin_after_update($username, $batch_state)
     call $recovered = recover_login_after_update($batch_state)
-    if not $recovered
-        return 0
-    end
+    if not $recovered -> return 0
     eval $role_index = user_get($username, "role_index")
     eval $role = user_get($username, "role")
     if not $role_index or not $role
@@ -207,8 +199,6 @@ def relogin_after_update($username, $batch_state)
         return 0
     end
     call $result = select_role_with_policy($role_index, $role, $batch_state, false, 0, true)
-    if $result.status == "success"
-        return 1
-    end
+    if $result.status == "success" -> return 1
     return 0
 end

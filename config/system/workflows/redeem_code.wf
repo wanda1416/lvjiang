@@ -43,9 +43,7 @@ if env("desktop")
     eval $codes = []
     for line in split_lines($redeem_code)
         eval $code = trim($line)
-        if not $code is_empty
-            eval append($codes, $code)
-        end
+        if not $code is_empty -> eval append($codes, $code)
     end
     if len($codes) == 0
         log error "请输入兑换码，每行一个"
@@ -114,9 +112,7 @@ end
 click [game_settings].[back] after wait @page_refresh
 
 call $in_menu = is_in_menu_page()
-if $in_menu
-    click [game_menu_page].[back] after wait @step_interval
-end
+if $in_menu -> click [game_menu_page].[back] after wait @step_interval
 
 call $in_main = is_in_main_page()
 if not $in_main
@@ -143,17 +139,13 @@ def finish_redeem()
     eval $result = {"result": 0, "status": "closed_by_user", "reason": "用户已关闭窗口，兑换结果未知"}
     # 安卓用户可能已自行关闭弹窗；是否仍在兑换窗口只看“兑换奖励”。
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
-    if not $in_redeem
-        return $result
-    end
+    if not $in_redeem -> return $result
 
     click [game_settings].[confirm] after wait @page_refresh
     eval $result.status = "submit_attempted"
     eval $result.reason = "已提交，兑换结果未确认"
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
-    if not $in_redeem
-        return $result
-    end
+    if not $in_redeem -> return $result
 
     # 已使用的兑换码会使 confirm 无效，标题仍为“兑换奖励”，需取消关闭。
     log warn "确认后兑换码弹窗仍在，按已兑换或确认无效处理，取消一次。"

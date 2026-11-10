@@ -57,9 +57,7 @@ if not $names
     return -1
 end
 eval $existing_names = {}
-if $skip_existing
-    eval $existing_names = scanned_loadout_names()
-end
+if $skip_existing -> eval $existing_names = scanned_loadout_names()
 eval $in_game_plans = true
 eval $completed = 0
 eval $attempted = 0
@@ -82,9 +80,7 @@ for name in $names
     eval $attempted = $attempted + 1
     if not $in_game_plans
         call $nav_result = nav_main_to_game_plans()
-        if $nav_result < 0
-            return -1
-        end
+        if $nav_result < 0 -> return -1
         eval $in_game_plans = true
     end
     call $selected = select_game_plan($name)
@@ -99,9 +95,7 @@ for name in $names
         return -1
     end
     call $nav_result = nav_game_plans_to_main()
-    if $nav_result < 0
-        return -1
-    end
+    if $nav_result < 0 -> return -1
     eval $in_game_plans = false
     eval $target_error = ""
     try
@@ -122,9 +116,7 @@ for name in $names
     end
     call $written = scan_equipped_plan(
         $target.name, $target.main_art, $target.sub_art)
-    if $written == -1
-        return -1
-    end
+    if $written == -1 -> return -1
     if $written != 8
         eval $scan_record.reason = "incomplete_equipment"
         log warn "备战方案装备未完整扫描，跳过基础属性: " + $target.name
@@ -149,9 +141,7 @@ for name in $names
     end
     call $saved = scan_role_base_attr_for_plan(
         $target.name, $target.main_art, $target.sub_art, true, $scroll_count)
-    if $saved == -1
-        return -1
-    end
+    if $saved == -1 -> return -1
     if $saved == -2
         eval $scan_record.base_attributes = "failed"
         continue
@@ -163,9 +153,7 @@ end
 # ─── 收尾：回到主页并汇报结果 ─────────────────────────────────────────
 if $in_game_plans
     call $nav_result = nav_game_plans_to_main()
-    if $nav_result < 0
-        return -1
-    end
+    if $nav_result < 0 -> return -1
 end
 if $completed == 0
     if $attempted == 0 and $skipped_existing > 0

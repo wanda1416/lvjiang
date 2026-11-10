@@ -59,9 +59,7 @@ for member in $batch_unit_members
     eval $username = $member.username
     eval $value = profile_get($profile_key, $username)
     # 尚无记录的配额按零进度参与选择。
-    if $value is_empty
-        eval $value = 0
-    end
+    if $value is_empty -> eval $value = 0
     eval $number = to_num($value)
     if not $chosen or $number < $minimum
         eval $minimum = $number

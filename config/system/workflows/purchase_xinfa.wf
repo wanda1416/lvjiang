@@ -147,9 +147,7 @@ end
 # 未补位），继续扫描只会对同一个格子反复点击。
 def open_all_bag_xinfa($max_xinfa_boxes)
     call $nav_result = nav_main_to_item()
-    if $nav_result < 0
-        return -1
-    end
+    if $nav_result < 0 -> return -1
 
     eval $scrolled = false
     eval $opened_count = 0

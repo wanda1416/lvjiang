@@ -37,8 +37,6 @@ import "subcall/loadout/equipped.wf"
 
 eval $target = loadout_scan_target($plan_name, $main_art, $sub_art)
 call $written = scan_equipped_plan($target.name, $target.main_art, $target.sub_art)
-if $written < 0
-    return -1
-end
+if $written < 0 -> return -1
 log info "备战方案装备扫描完成: " + $target.name + "，成功写入 " + $written + "/8 件"
 return $written

@@ -701,7 +701,7 @@ def login_to_main_page()
     # 等待加载完成：检测 loading 区域的「加载」文字
     # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
     eval $loading_done = 0
-    loop 10
+    loop 20
         scan [game_login_page].[loading, online_label] as $load_state
         call $notice = login_notice_kind($load_state.online_label)
         if $notice == "update"
@@ -722,7 +722,7 @@ def login_to_main_page()
     # 等待主页加载完成：检测主界面入口按钮
     # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
     eval $main_attempt = 0
-    loop 8
+    loop 10
         eval $main_attempt = $main_attempt + 1
         call $in_main = is_in_main_page()
         if $in_main

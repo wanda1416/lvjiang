@@ -57,5 +57,4 @@ scenes:
     name: 组件
     items:
     - jianghu_card
-    - huoyun_card
     - baiye_activity_card

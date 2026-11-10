@@ -72,10 +72,26 @@ def env(tmp_path, monkeypatch) -> Path:
     assert session_dir in Path(schema._PROFILE_PATH).parents
 
 
+def _crossing_anchor() -> str:
+    """最近一个 05:00 边界之前一分钟：不论在一天中什么时刻跑，都恰好跨过一次边界。
+
+    原实现取「昨天 06:00」：在 00:00–05:00 之间运行时，今天这轮边界还没到，跨过的
+    边界数是 0，用例会随运行时刻变红（2026-11-11 02:2x 复现过）。
+    """
+    now = datetime.now()
+    boundary = now.replace(hour=5, minute=0, second=0, microsecond=0)
+    if boundary > now:
+        boundary -= timedelta(days=1)
+    return (boundary - timedelta(minutes=1)).isoformat(timespec="seconds")
+
+
+#: 整个用例文件共用同一个锚点，避免恰好跨过边界分钟时前后两次取值不同。
+_STALE_ANCHOR = _crossing_anchor()
+
+
 def _stale_anchor() -> str:
-    """昨天的 05:00 边界之后——即"今天这一轮恢复还没算过"。"""
-    return (datetime.now() - timedelta(days=1)).replace(
-        hour=6, minute=0, second=0, microsecond=0).isoformat(timespec="seconds")
+    """"今天这一轮恢复还没算过"的锚点（跨一次边界，且与运行时刻无关）。"""
+    return _STALE_ANCHOR
 
 
 def _seed(value: float) -> None:

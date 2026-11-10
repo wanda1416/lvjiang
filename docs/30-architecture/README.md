@@ -1,6 +1,6 @@
 # 架构说明文档（技术层）
 
-> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-11-10（基线 v0.15.12）。本层描述如与代码或配置不符，以代码与配置为准。
 
 律匠系统的技术架构、分层设计、数据流与接口契约。
 
@@ -13,7 +13,7 @@
 | [32-grammar/](32-grammar/README.md) | 工作流 DSL 语法与语义 |
 | [33-engine/](33-engine/README.md) | DSL 引擎内部机制与静态检查 |
 | [34-scene/](34-scene/README.md) | 场景、布局语义与编辑器 |
-| [35-workflows/](35-workflows/README.md) | 跨场景业务流程编排 |
+| [35-workflows/](35-workflows/README.md) | 跨场景业务流程编排、系统脚本库分层 |
 | [36-graduation/](36-graduation/README.md) | 毕业率计算引擎 |
 | [37-vision/](37-vision/README.md) | 视觉感知子系统：四通道选型、图色与模板匹配、坐标一致性、调优与失败模式 |
 | [38-platform/](38-platform/README.md) | 平台与接入：设备端代理协议、实例执行锁、IO 后端矩阵、匿名统计 |

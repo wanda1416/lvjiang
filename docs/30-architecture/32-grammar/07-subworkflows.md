@@ -52,6 +52,8 @@ import "subcall/navigation.wf"
 `import "lib/ordering.wf"` 后可用 `call $ordered = quicksort($numbers)`。
 这些文件只定义过程，不声明 `runnable` 或 `batchable`，不会进入脚本列表。
 它们的执行与 DSL 能力边界由 `tests/workflows/dsl_capabilities/` 验证。
+系统脚本库里其他过程库（`subcall/`、`batch/` 钩子等）的分层与职责见
+[系统脚本库分层](../35-workflows/README.md)。
 
 ```
 # 循环 import 示例（会报错）

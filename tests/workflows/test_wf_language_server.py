@@ -316,3 +316,31 @@ def test_definition_in_same_file_survives_client_encoded_uri(
     assert location is not None
     assert wf_server._uri_to_path(location.uri).resolve() == source.resolve()
     assert location.range.start.line == 0
+
+
+def _assert_selection_inside(symbol) -> None:
+    """客户端会拒绝 selectionRange 不落在 fullRange 内的符号。"""
+    full, selection = symbol.range, symbol.selection_range
+    assert (full.start.line, full.start.character) <= (
+        selection.start.line, selection.start.character)
+    assert (selection.end.line, selection.end.character) <= (
+        full.end.line, full.end.character)
+
+
+def test_document_symbol_range_ignores_single_line_guards(parse_cache_server):
+    """`if <条件> -> <语句>` 没有 end，不能让它把 def 的范围算窄到零宽区间。"""
+    text = (
+        "def outer($flag)\n"
+        "    if $flag -> return 1\n"
+        "    timeline\n"
+        '        @0.0 press "S"\n'
+        "    end\n"
+        "    return 0\n"
+        "end\n"
+    )
+    symbols = parse_cache_server._document_symbols(text)
+    assert [s.name for s in symbols] == ["outer"]
+    # def 的范围覆盖到自身的 end 行，单行守卫和 timeline 都不能干扰深度。
+    assert symbols[0].range.start.line == 0
+    assert symbols[0].range.end.line == 6
+    _assert_selection_inside(symbols[0])

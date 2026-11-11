@@ -653,7 +653,8 @@ def _find_def_line(name: str, lines: list[str]) -> int:
     """Find the line index of 'def name(' in source lines. Returns 0-based or -1."""
     pattern = re.compile(rf"^def\s+{re.escape(name)}\s*\(")
     for i, line_text in enumerate(lines):
-        if pattern.match(line_text.strip()):
+        # 首行的 BOM 不属于缩进，strip() 去不掉，需要单独忽略。
+        if pattern.match(line_text.strip().lstrip("\ufeff")):
             return i
     return -1
 
@@ -685,54 +686,80 @@ def on_folding(params: FoldingRangeParams) -> list[FoldingRange]:
     return ranges
 
 
-# Block-opening keywords for depth tracking in document symbols
-_BLOCK_OPENERS = ("def ", "def(", "if ", "while ", "for ", "loop ", "loop\t",
-                  "try ", "try\t", "elif ", "elif\t")
+# 需要由 'end' 闭合的块关键字。'else'/'catch' 只属于外层块，不额外增加一层；
+# 'else if' 是同一条 if 的 else 子句，同样不增加一层。
+_BLOCK_KEYWORD_RE = re.compile(r"^(def|if|for|loop|try|timeline)\b", re.I)
+
+
+def _code_part(line: str) -> str:
+    """去掉行首尾空白，只留下用于结构判断的代码部分。"""
+    return line.strip()
+
+
+def _opens_block(code: str) -> bool:
+    """该行是否开启一个需要 'end' 闭合的块。"""
+    match = _BLOCK_KEYWORD_RE.match(code)
+    if match is None:
+        return False
+    # 单行守卫 `if <条件> -> <一条语句>` 归一成 If 节点，但源码里没有 end。
+    return not (match.group(1).lower() == "if" and "->" in code)
+
+
+def _find_block_end(start_line: int, lines: list[str]) -> int:
+    """返回 start_line 起始的块所对应的 'end' 行号（0-based），找不到返回 -1。"""
+    depth = 1
+    for i in range(start_line + 1, len(lines)):
+        code = _code_part(lines[i])
+        if code == "end":
+            depth -= 1
+            if depth == 0:
+                return i
+        elif _opens_block(code):
+            depth += 1
+    return -1
+
+
+def _document_symbols(source: str) -> list[DocumentSymbol]:
+    """构造 Outline 符号；返回的范围必须始终包含各自的 selection 范围。"""
+    try:
+        program = _parse_cached(source)
+    except Exception:
+        return []
+    lines = source.splitlines()
+    symbols: list[DocumentSymbol] = []
+    for name, proc in program.procs.items():
+        if not isinstance(proc, ProcDef):
+            continue
+        def_line = _find_def_line(name, lines)
+        if def_line < 0:
+            continue
+        end_line = _find_block_end(def_line, lines)
+        if end_line < 0:
+            # 未闭合的 def（正在输入或漏了 end）：退到最后一个非空行，
+            # 既有的零宽区间会被客户端校验拒绝，不能原样保留。
+            end_line = max((i for i, text in enumerate(lines) if text.strip()),
+                           default=def_line)
+            end_line = max(end_line, def_line)
+        symbols.append(DocumentSymbol(
+            name=name,
+            kind=SymbolKind.Function,
+            range=Range(
+                start=Position(line=def_line, character=0),
+                end=Position(line=end_line, character=len(lines[end_line])),
+            ),
+            selection_range=Range(
+                start=Position(line=def_line, character=0),
+                end=Position(line=def_line, character=len(lines[def_line])),
+            ),
+        ))
+    return symbols
 
 
 @server.feature(TEXT_DOCUMENT_DOCUMENT_SYMBOL)
 def on_document_symbol(params: DocumentSymbolParams) -> list[DocumentSymbol]:
     """Provide document symbols for Outline panel (all def definitions)."""
     doc = server.workspace.get_text_document(params.text_document.uri)
-    try:
-        program = _parse_cached(doc.source)
-    except Exception:
-        return []
-    symbols: list[DocumentSymbol] = []
-    lines = doc.source.splitlines()
-    for name, proc in program.procs.items():
-        if not isinstance(proc, ProcDef):
-            continue
-        # Find the 'def' line using regex for exact match
-        def_line = _find_def_line(name, lines)
-        if def_line < 0:
-            def_line = 0
-        # Find the matching 'end' line using depth tracking
-        end_line = def_line
-        depth = 1
-        for i in range(def_line + 1, len(lines)):
-            stripped = lines[i].strip()
-            if stripped == "end":
-                depth -= 1
-                if depth == 0:
-                    end_line = i
-                    break
-            elif (any(stripped == kw.rstrip() for kw in _BLOCK_OPENERS) or
-                  any(stripped.startswith(kw) for kw in _BLOCK_OPENERS)):
-                depth += 1
-        symbols.append(DocumentSymbol(
-            name=name,
-            kind=SymbolKind.Function,
-            range=Range(
-                start=Position(line=def_line, character=0),
-                end=Position(line=end_line, character=0),
-            ),
-            selection_range=Range(
-                start=Position(line=def_line, character=0),
-                end=Position(line=def_line, character=len(lines[def_line]) if def_line < len(lines) else 0),
-            ),
-        ))
-    return symbols
+    return _document_symbols(doc.source)
 
 
 @server.feature(TEXT_DOCUMENT_HOVER)

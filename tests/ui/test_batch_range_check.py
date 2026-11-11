@@ -1,7 +1,8 @@
-"""批量页脚本/单元列表的 Shift 区间勾选契约。
+"""批量页脚本/单元列表的勾选契约。
 
 Shift+点击勾选框：以最近一次普通勾选行为锚点，把 [锚点, 点击行] 闭区间
 统一设成点击行的目标状态；无锚点或行序变化后退化为单行勾选。
+「反选」则逐行翻转勾选状态，并按当前行序重建执行顺序。
 """
 from types import SimpleNamespace
 
@@ -151,4 +152,41 @@ def test_apply_script_range_check_updates_checked_order_and_persists_once(qtbot)
     # 之前已勾的 c（第 2 行）在区间内保持勾选；执行顺序按行序取勾选项。
     assert batch._script_order == ["a", "b", "c", "d"]
     assert batch._script_candidate_order == ["a", "b", "c", "d", "e"]
+    assert len(persisted) == 1
+
+
+def test_invert_script_checks_flips_every_row(qtbot):
+    """反选逐行翻转：原本勾选的取消，原本未勾的勾上，顺序按行序重建。"""
+    from lvjiang.ui.batch.batch_tab import BatchTab
+
+    tree = _make_tree(qtbot)
+    persisted: list[bool] = []
+    batch = SimpleNamespace(
+        _script_list=tree,
+        _script_candidate_order=["a", "b", "c", "d", "e"],
+        _script_order=["c"],
+        _updating_script_list=False,
+    )
+    batch._script_id = BatchTab._script_id.__get__(batch)
+    batch._refresh_script_order_column = lambda: None
+    batch._persist_script_order = lambda: persisted.append(True)
+    batch._sync_script_order_from_rows = (
+        BatchTab._sync_script_order_from_rows.__get__(batch))
+    batch._invert_script_checks = BatchTab._invert_script_checks.__get__(batch)
+
+    for index, script_id in enumerate(batch._script_candidate_order):
+        tree.topLevelItem(index).setData(
+            0, Qt.ItemDataRole.UserRole, {"id": script_id})
+    tree.topLevelItem(2).setCheckState(0, Qt.CheckState.Checked)
+
+    batch._invert_script_checks()
+
+    assert [tree.topLevelItem(i).checkState(0) for i in range(5)] == [
+        Qt.CheckState.Checked,
+        Qt.CheckState.Checked,
+        Qt.CheckState.Unchecked,
+        Qt.CheckState.Checked,
+        Qt.CheckState.Checked,
+    ]
+    assert batch._script_order == ["a", "b", "d", "e"]
     assert len(persisted) == 1

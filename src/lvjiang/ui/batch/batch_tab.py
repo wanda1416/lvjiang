@@ -441,16 +441,15 @@ class BatchTab(QWidget):
         actions.addWidget(script_label)
         actions.addStretch()
         self._btn_script_all = QPushButton(tr("全选"))
-        self._btn_script_none = QPushButton(tr("全不选"))
+        self._btn_script_invert = QPushButton(tr("反选"))
         self._btn_script_all.clicked.connect(
             lambda: self._set_all_scripts_checked(True))
-        self._btn_script_none.clicked.connect(
-            lambda: self._set_all_scripts_checked(False))
+        self._btn_script_invert.clicked.connect(self._invert_script_checks)
         apply_button_style(
-            self._btn_script_all, self._btn_script_none,
+            self._btn_script_all, self._btn_script_invert,
             variant="neutral",
         )
-        for button in (self._btn_script_all, self._btn_script_none):
+        for button in (self._btn_script_all, self._btn_script_invert):
             actions.addWidget(button)
         layout.addLayout(actions)
 
@@ -1319,6 +1318,22 @@ class BatchTab(QWidget):
         self._refresh_script_order_column()
         self._persist_script_order()
 
+    def _invert_script_checks(self) -> None:
+        """反选：逐行翻转勾选状态，执行顺序按当前行序重建。"""
+        self._script_list.reset_check_anchor()
+        self._updating_script_list = True
+        try:
+            for index in range(self._script_list.topLevelItemCount()):
+                item = self._script_list.topLevelItem(index)
+                if item is None:
+                    continue
+                checked = item.checkState(0) == Qt.CheckState.Checked
+                item.setCheckState(
+                    0, Qt.CheckState.Unchecked if checked else Qt.CheckState.Checked)
+        finally:
+            self._updating_script_list = False
+        self._sync_script_order_from_rows()
+
     def _refresh_script_order_column(self):
         """第二列仅为已勾选脚本显示连续的 1..N。"""
         order_by_id = {
@@ -1880,7 +1895,7 @@ class BatchTab(QWidget):
         """运行期间锁定配置组、脚本、用户和参数。"""
         self._script_list.setEnabled(enabled)
         self._btn_script_all.setEnabled(enabled)
-        self._btn_script_none.setEnabled(enabled)
+        self._btn_script_invert.setEnabled(enabled)
         self._config_combo.setEnabled(enabled)
         self._btn_user_all.setEnabled(enabled)
         self._btn_user_none.setEnabled(enabled)

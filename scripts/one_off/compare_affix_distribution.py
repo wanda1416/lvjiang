@@ -2,6 +2,11 @@
 
 用法（主工程根目录）：
     python scripts/one_off/compare_affix_distribution.py
+    python scripts/one_off/compare_affix_distribution.py --loadouts <某用户的 .loadouts.json>
+
+不带参数用规则构造的合成配比；带 `--loadouts` 则直接拿本机真实方案（该文件里的
+plans + equipment_items）构造输入——真实配比来自实际装备，两端应**逐格一致**。
+真实用户数据只在本地读取，不写进仓库、提交信息或输出之外的任何地方。
 
 做三件事：
 1. 用真实规则构造若干配比（含最少 8 条、满配 40 条、属攻超限、承音口径）；
@@ -107,7 +112,9 @@ def run_pc(cases: list[dict], templates: dict) -> list[dict]:
     out = []
     for case in cases:
         result = distribute_affixes(
-            case["counts"], templates, attribute=ATTRIBUTE, level=LEVEL,
+            case["counts"], case.get("templates") or templates,
+            attribute=str(case.get("attribute") or ATTRIBUTE),
+            level=int(case.get("level") or LEVEL),
             chengyin=case["chengyin"], game_config=gc)
         out.append({
             "name": case["name"],
@@ -139,7 +146,12 @@ def run_web(cases: list[dict], templates: dict, workdir: Path) -> list[dict]:
         "configPath": str(CONFIG).replace("\\", "/"),
         "level": LEVEL, "attribute": ATTRIBUTE, "templates": templates,
         "attrNames": ["鸣金", "裂石", "破竹", "牵丝", "无相"],
-        "cases": cases,
+        "cases": [{
+            "name": c["name"], "counts": c["counts"], "chengyin": c["chengyin"],
+            "templates": c.get("templates") or templates,
+            "attribute": str(c.get("attribute") or ATTRIBUTE),
+            "level": int(c.get("level") or LEVEL),
+        } for c in cases],
     }, ensure_ascii=False), encoding="utf-8")
 
     runner = workdir / "run.js"
@@ -156,9 +168,9 @@ const rules = {
 };
 const attrNames = new Set(input.attrNames);
 const out = input.cases.map(c => {
-  const r = distributeAffixes(c.counts, input.templates,
-    {rules, level: input.level, chengyin: c.chengyin,
-     attribute: input.attribute, attrNames});
+  const r = distributeAffixes(c.counts, c.templates || input.templates,
+    {rules, level: c.level || input.level, chengyin: c.chengyin,
+     attribute: c.attribute || input.attribute, attrNames});
   const equipment = {};
   for (const [slot, equip] of Object.entries(r.equipment)) {
     const row = {};
@@ -231,10 +243,57 @@ def compare(pc: list[dict], web: list[dict]) -> int:
     return problems
 
 
+def load_real_cases(path: Path, cfg: dict) -> tuple[list[dict], dict]:
+    """从本机真实方案构造输入：counts 用 PC 的 distribution_counts（含本属折叠）。"""
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.core.loadout.affix_distribution import distribution_counts
+
+    gc = get_game_config()
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    plans = doc.get("plans") or {}
+    pool = doc.get("equipment_items") or {}
+    order = doc.get("plan_order") or list(plans)
+    cases, first_templates = [], None
+    for plan_id in order:
+        plan = plans.get(plan_id) or {}
+        equipment = {slot: (pool.get(fp) or {})
+                     for slot, fp in (plan.get("equipment") or {}).items()}
+        if len(equipment) != 8:
+            continue
+        playstyle = str(plan.get("playstyle") or "")
+        attr = str((cfg.get("playstyles", {}).get(playstyle) or {}).get("attr") or "")
+        level = next((int(item.get("level") or 0) for item in equipment.values()
+                      if item.get("level")), LEVEL)
+        templates = {slot: {k: v for k, v in item.items() if k in (
+            "type", "equipment_set", "affix_1", "affix_2", "affix_3",
+            "affix_4", "affix_5")} for slot, item in equipment.items()}
+        cases.append({
+            "name": f"真实方案 {plan_id[:8]}",
+            "counts": distribution_counts(equipment, attr, gc),
+            "chengyin": False,
+            "templates": templates,
+            "attribute": attr,
+            "level": level,
+        })
+        if first_templates is None:
+            first_templates = templates
+    if not cases:
+        raise SystemExit(f"{path} 里没有八件装备齐全的方案")
+    return cases, first_templates or {}
+
+
 def main() -> int:
     cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
-    templates = build_templates(cfg)
-    cases = build_cases(cfg, templates)
+    loadouts = None
+    if "--loadouts" in sys.argv:
+        loadouts = Path(sys.argv[sys.argv.index("--loadouts") + 1])
+
+    if loadouts is not None:
+        cases, templates = load_real_cases(loadouts, cfg)
+        print(f"真实方案数据：{loadouts.name}｜{len(cases)} 组")
+    else:
+        templates = build_templates(cfg)
+        cases = build_cases(cfg, templates)
     pc = run_pc(cases, templates)
     with tempfile.TemporaryDirectory() as tmp:
         web = run_web(cases, templates, Path(tmp))

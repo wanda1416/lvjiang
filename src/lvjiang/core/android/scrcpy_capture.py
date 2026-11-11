@@ -20,6 +20,7 @@ scrcpy 4.1 协议要点（已通过源码 + 实测验证）：
   media packet 为 12 字节帧头（flags + PTS + size）+ H.264 payload
 """
 
+import os
 import random
 import socket
 import struct
@@ -76,6 +77,15 @@ _BASELINE_RATE_MIN_FPS = 1.0
 _BASELINE_RATE_MAX_RATIO = 1.5
 #: 压测摘要：每秒 debug，每 10 秒 info 给阈值分析看分布。
 _METRICS_SUMMARY_SECONDS = 10.0
+
+#: 流式截图滞后指标（压测/诊断用）。默认关闭，正常任务不输出也不采样。
+_STREAM_METRICS_ENV = "LVJIANG_STREAM_METRICS"
+
+
+def _stream_metrics_enabled() -> bool:
+    return os.environ.get(_STREAM_METRICS_ENV, "").strip().lower() in {
+        "1", "true", "yes", "on"}
+
 
 # ── 画面流故障归因 ──────────────────────────────────────
 # 日志与界面文案共用同一套固定取值，避免事后只有自由文本无法统计。
@@ -214,6 +224,8 @@ class AndroidStreamCapture(CaptureBackend):
         # ── 帧时延观测（只记录，不参与取帧决策）──────────────
         # 锚点 = (首个 media 包 PTS, 收到它时的本机单调秒)。之后的滞后
         # 全部用增量差求，不需要和设备的单调时钟做绝对对齐。
+        # 默认关闭，只有设置 LVJIANG_STREAM_METRICS=1 的压测/诊断进程才采样和输出。
+        self._metrics_enabled = _stream_metrics_enabled()
         self._metrics_lock = threading.Lock()
         self._pts_anchor: tuple[int, float] | None = None
         self._last_pts: int | None = None
@@ -375,12 +387,13 @@ class AndroidStreamCapture(CaptureBackend):
         self.ensure_channel_healthy()
         # 观测：后续门控必须看「最新已解码帧」的 lag（lag_seconds），不能看
         # _last_frame_at——不发布期间它不前进，会把滞后误判成编码器停摆。
-        lag = self.lag_seconds
-        excess = self.lag_excess_seconds
-        logger.debug(
-            "[AndroidStream] 取帧观测 "
-            f"lag={'-' if lag is None else f'{lag * 1000:.0f}ms'} "
-            f"excess={'-' if excess is None else f'{excess * 1000:.0f}ms'}")
+        if self._metrics_enabled:
+            lag = self.lag_seconds
+            excess = self.lag_excess_seconds
+            logger.debug(
+                "[AndroidStream] 取帧观测 "
+                f"lag={'-' if lag is None else f'{lag * 1000:.0f}ms'} "
+                f"excess={'-' if excess is None else f'{excess * 1000:.0f}ms'}")
         frame = self.capture(timeout=timeout)
         if frame is not None:
             return frame
@@ -1172,7 +1185,7 @@ class AndroidStreamCapture(CaptureBackend):
                     self._lag_current = candidate
                     lag = candidate
         if confirmed_now:
-            logger.info(
+            logger.debug(
                 "[AndroidStream] bit61 已确认为关键帧位（IDR NAL 与 flag 同步出现）")
         return lag
 
@@ -1186,6 +1199,8 @@ class AndroidStreamCapture(CaptureBackend):
 
     def _record_decoded_frame(self, pts_us: int, now: float) -> float | None:
         """记录每个解码帧的滞后，包括随后被限频丢弃的帧。"""
+        if not self._metrics_enabled:
+            return None
         lag = self._lag_at(pts_us, now)
         with self._metrics_lock:
             self._decoded_frames += 1
@@ -1216,6 +1231,8 @@ class AndroidStreamCapture(CaptureBackend):
 
     def _maybe_log_metrics(self, now: float) -> None:
         """每秒输出接收/解码/发布帧率与滞后分布，用来确认观测口径。"""
+        if not self._metrics_enabled:
+            return
         with self._metrics_lock:
             elapsed = now - self._metrics_at
             if elapsed < 1.0:

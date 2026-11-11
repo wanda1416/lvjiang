@@ -44,6 +44,7 @@ class _EofSocket:
 
 def _stream(*, alive: bool = True) -> AndroidStreamCapture:
     cap = AndroidStreamCapture(MagicMock())
+    cap._metrics_enabled = True
     cap._running = True
     cap._user_stop = False
     cap._decode_thread = _AliveThread(alive)
@@ -289,3 +290,32 @@ def test_metrics_summary_is_info_level():
     finally:
         logger.remove(sink)
     assert any("压测摘要" in message for message in records)
+
+
+def test_metrics_summary_is_silent_when_disabled():
+    """正常任务默认关闭观测，不应输出压测摘要。"""
+    cap = _stream()
+    cap._metrics_enabled = False
+    now = time.monotonic()
+    with cap._metrics_lock:
+        cap._metrics_at = now - 1.0
+        cap._metrics_summary_at = now - 11.0
+        cap._lag_interval_samples.extend([0.1, 0.2, 0.3])
+
+    records: list[str] = []
+    sink = logger.add(lambda message: records.append(str(message)), level="INFO")
+    try:
+        cap._maybe_log_metrics(now)
+    finally:
+        logger.remove(sink)
+    assert not any("压测摘要" in message for message in records)
+
+
+def test_metrics_disabled_skips_lag_sampling():
+    """关闭观测时不累积滞后样本，避免长跑内存增长。"""
+    cap = _stream()
+    cap._metrics_enabled = False
+    cap._baseline_window_open = True
+    cap._record_decoded_frame(2_000_000, 101.0)
+    assert cap._lag_samples == []
+    assert cap._lag_interval_samples == []

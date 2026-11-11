@@ -1,13 +1,13 @@
 # 别名解析规则
 
-Excel 工作簿中使用简称（如"全武增""首领增""蓄力技定音"）引用装备词条。别名解析的任务是将这些简称映射为 `game_config.yaml` 中的标准词条名。这是一个多步约束求解过程，任何一步失败都会阻断导入。
+Excel 工作簿中使用简称（如"全武增""首领增""蓄力技定音"）引用装备词条。别名解析的任务是将这些简称映射为 `yysls/game_config/` 中的标准词条名。这是一个多步约束求解过程，任何一步失败都会阻断导入。
 
 ## 输入与输出
 
 **输入**：
 
 - Excel 工作簿（`期望` 工作表第 15 行起到「固伤加成」行之前的 A 列简称）
-- `game_config.yaml` 中的配置：`affix_caps`、`affix_aliases`、`weapon_types`、`schools`
+- `yysls/game_config/` 中的配置：`affix_caps`、`affix_aliases`、`weapon_types`、`schools`
 
 **输出**：
 
@@ -50,12 +50,12 @@ Excel 工作簿中使用简称（如"全武增""首领增""蓄力技定音"）�
 
 ### 第 2 步：构建别名索引
 
-从 `game_config.yaml` 构建两个索引：
+从 `yysls/game_config/` 构建两个索引：
 
 **alias_index**：别名 → 标准词条名列表（反向映射）
 
 ```yaml
-# game_config.yaml 中的 affix_aliases 结构
+# affixes.yaml 中的 affix_aliases 结构
 affix_aliases:
   全武学增效:
     - 全武增
@@ -112,7 +112,7 @@ affix_aliases:
 `weapon_bonus_primary` 和 `weapon_bonus_secondary` 的候选集合由流派的武器绑定决定：
 
 ```yaml
-# game_config.yaml
+# schools.yaml
 schools:
   鸣金·虹:
     main:

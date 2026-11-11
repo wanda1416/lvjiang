@@ -195,6 +195,7 @@ class GameConfigManager:
         loader.parse_basic(self, data)
         loader.parse_weapons(self, data)
         loader.parse_arts(self, data)
+        loader.parse_schools(self, data)
         loader.parse_sets(self, data)
         loader.parse_affix_catalogue(self, data)
         loader.parse_base_attrs(self, data)

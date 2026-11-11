@@ -153,7 +153,8 @@ def _ensure_scanned_loadout(
 
     school = resolve_school(main_art, sub_art, game_config.get_schools())
     arts = {main_art, sub_art}
-    # get_playstyles() 保留配置声明顺序；UI 候选接口按名称排序，不能用于默认项。
+    # get_playstyles() 保留配置声明顺序，和 UI 候选（get_playstyles_for_arts）
+    # 现在是同一口径；`_match_playstyle` 回落「第一个候选」就按这个顺序取。
     playstyles = game_config.get_playstyles()
     candidates = [style for style, definition in playstyles.items()
                   if set(definition.get("arts") or []) == arts

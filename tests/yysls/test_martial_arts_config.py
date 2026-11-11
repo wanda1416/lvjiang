@@ -123,7 +123,7 @@ class TestPlaystyleRegistry:
         """主副只是顺序标签，判别式是「要谁的增伤」。
 
         选了 (斩雪刀法, 十方破阵) 时纯唐和双切都该列出来由用户挑，而不是按
-        主副顺序只给一个。
+        主副顺序只给一个。返回顺序跟随玩法配置的声明顺序，不按名称重排。
         """
         g = get_game_config()
         styles = g.get_playstyles()
@@ -135,9 +135,9 @@ class TestPlaystyleRegistry:
         }
         try:
             assert g.get_playstyles_for_arts(
-                ["斩雪刀法", "十方破阵"]) == ["双切", "纯唐"]
+                ["斩雪刀法", "十方破阵"]) == ["纯唐", "双切"]
             assert g.get_playstyles_for_arts(
-                ["十方破阵", "斩雪刀法"]) == ["双切", "纯唐"]
+                ["十方破阵", "斩雪刀法"]) == ["纯唐", "双切"]
             assert g.get_playstyles_for_arts(["斩雪刀法"]) == []
         finally:
             g.reload()

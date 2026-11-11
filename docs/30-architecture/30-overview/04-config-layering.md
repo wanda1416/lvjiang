@@ -83,6 +83,15 @@ local 文件可直接删除；system 官方文件不允许用户删除，也不�
 | `schools.yaml` | 流派 |
 | `playstyles.yaml` | 玩法 |
 
+武学、流派、玩法都是 `名称 → 定义` 的**映射**，键序就是展示顺序（YAML 与
+Python 都保留插入序），不另设 `order`。顺序属于配置内容而不是用户偏好：系统
+配置（开发）模式写的就是 system，列表可以拖动调整；用户模式写的是 local 覆盖，
+而键序不参与 diff，所以用户侧不给排序入口（拖动只会改出一份存不下来的顺序）。
+用户改动按 key 覆盖进 local（`schools.鸣金·虹.attr: 裂石` 这样的键级 diff），
+新增条目排在末尾，系统后续新增照常进合并视图。列表型系统内容里只有
+`weapon_types` / `level_configs` / `season_configs` 走整键替换，因此它们才需要
+在 `PROTECTED_LIST_PATHS` 登记身份。
+
 `scenes.yaml` 的当前结构版本为 2，与 `layouts.yaml` 一样使用单一领域顶层键：
 
 ```yaml

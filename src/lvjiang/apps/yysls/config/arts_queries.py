@@ -45,9 +45,10 @@ def get_martial_art_attr(self: GameConfigManager, name: str) -> str:
 
 
 def get_martial_arts_by_weapon(self: GameConfigManager, weapon: str) -> list[str]:
+    """该武器下的武学，顺序跟随武学配置。"""
     target = str(weapon or "").strip()
-    return sorted(k for k, v in self._martial_arts.items()
-                  if v.get("weapon") == target)
+    return [k for k, v in self._martial_arts.items()
+            if v.get("weapon") == target]
 
 
 def check_school_weapon_consistency(self: GameConfigManager) -> list[str]:
@@ -94,8 +95,8 @@ def get_playstyles_for_arts(self: GameConfigManager, arts) -> list[str]:
     target = {str(a).strip() for a in (arts or []) if str(a).strip()}
     if not target:
         return []
-    return sorted(name for name, cfg in self._playstyles.items()
-                  if set(cfg.get("arts") or []) == target)
+    return [name for name, cfg in self._playstyles.items()
+            if set(cfg.get("arts") or []) == target]
 
 
 def get_playstyle_dingyin(self: GameConfigManager, name: str, part: str) -> str:
@@ -112,7 +113,11 @@ def get_playstyle_dingyin(self: GameConfigManager, name: str, part: str) -> str:
 
 
 def get_schools(self: GameConfigManager) -> dict[str, dict]:
-    """流派配置（顶层 schools：流派名 → {main: {武器: 词条}, sub: [武器]}）"""
+    """流派配置（顶层 schools 列表 → 名称索引）
+
+    返回 ``流派名 → 定义`` 的映射，遍历顺序即配置声明顺序：流派下拉、表格
+    候选和 ``resolve_school`` 都依赖它，调用方不要再排序。
+    """
     return dict(self._schools)
 
 

@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QListWidget,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -26,6 +25,7 @@ from lvjiang.ui.layout_helpers import config_field_card, configure_navigation_li
 
 from .....i18n import tr, tr_label
 from ...config import get_game_config
+from .order_list import DragOrderListWidget, reorder_mapping
 
 _ATTRS_REL = "yysls/game_config"
 
@@ -54,9 +54,10 @@ class MartialArtPanel(QWidget):
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(QLabel(tr("武学类型")))
-        self._list = QListWidget()
+        self._list = DragOrderListWidget()
         configure_navigation_list(self._list, minimum_width=200)
         self._list.currentTextChanged.connect(self._on_selected)
+        self._list.order_changed.connect(self._on_order_changed)
         left_layout.addWidget(self._list)
 
         btns = QHBoxLayout()
@@ -109,9 +110,13 @@ class MartialArtPanel(QWidget):
                 self._data = {}
         self._reload()
 
-    def _entries(self) -> list[dict]:
-        return [e for e in (self._data.get("martial_arts") or [])
-                if isinstance(e, dict) and e.get("name")]
+    def _names(self) -> list[str]:
+        """武学名列表；键序即配置声明顺序，直接用于候选与列表。"""
+        return [str(name) for name in (self._data.get("martial_arts") or {})]
+
+    def _entry(self, name: str) -> dict:
+        raw = (self._data.get("martial_arts") or {}).get(name)
+        return raw if isinstance(raw, dict) else {}
 
     def _save_data(self) -> None:
         if self._on_changed is not None:
@@ -132,7 +137,7 @@ class MartialArtPanel(QWidget):
         current = self._list.currentItem()
         keep = current.text() if current else ""
         self._list.clear()
-        self._list.addItems([e["name"] for e in self._entries()])
+        self._list.addItems(self._names())
         self._loading = False
         if keep:
             items = self._list.findItems(keep, Qt.MatchFlag.MatchExactly)
@@ -141,8 +146,23 @@ class MartialArtPanel(QWidget):
         elif self._list.count():
             self._list.setCurrentRow(0)
 
+    def _on_order_changed(self) -> None:
+        """拖动后按当前行序重写武学键序，保持选中项（用户模式无入口）。"""
+        if not self._list.is_reorderable():
+            return
+        names = [item.text() for index in range(self._list.count())
+                 if (item := self._list.item(index)) is not None]
+        entries = self._data.get("martial_arts") or {}
+        ordered = reorder_mapping(entries, names)
+        if list(ordered) != list(entries):
+            self._data["martial_arts"] = ordered
+            self._save_data()
+        # 重建列表并保持选中项：_reload 会按当前行文本恢复选中，拖动后仍是
+        # 被拖的那一条。
+        self._reload()
+
     def _on_selected(self, name: str) -> None:
-        cfg = next((e for e in self._entries() if e["name"] == name), {})
+        cfg = self._entry(name)
         self._loading = True
         self._combo_weapon.setCurrentText(cfg.get("weapon", ""))
         self._combo_attr.setCurrentText(cfg.get("attr", ""))
@@ -158,16 +178,13 @@ class MartialArtPanel(QWidget):
                     self._combo_attr.currentText())
 
     def _write(self, name: str, weapon: str, attr: str) -> None:
-        entries = self._entries()
-        for e in entries:
-            if e["name"] == name:
-                e["weapon"], e["attr"] = weapon, attr
-                break
+        """写一条武学：已有条目原位改值，新条目追加到末尾（键序即顺序）。"""
+        entries = self._data.setdefault("martial_arts", {})
+        entry = entries.get(name)
+        if isinstance(entry, dict):
+            entry["weapon"], entry["attr"] = weapon, attr
         else:
-            entries.append({"name": name, "weapon": weapon, "attr": attr})
-        entries.sort(key=lambda e: (str(e.get("attr") or ""),
-                                    str(e.get("weapon") or ""), e["name"]))
-        self._data["martial_arts"] = entries
+            entries[name] = {"weapon": weapon, "attr": attr}
         self._save_data()
 
     def _on_add(self) -> None:
@@ -175,7 +192,7 @@ class MartialArtPanel(QWidget):
         name = (name or "").strip()
         if not ok or not name:
             return
-        if any(e["name"] == name for e in self._entries()):
+        if name in (self._data.get("martial_arts") or {}):
             QMessageBox.warning(self, tr("新增武学"), tr("该武学已存在"))
             return
         self._write(name, self._combo_weapon.currentText() or "",
@@ -187,17 +204,24 @@ class MartialArtPanel(QWidget):
         if item is None:
             return
         name = item.text()
-        used = [s for s, cfg in (self._data.get("schools") or {}).items()
+        # 武学被流派和玩法同时引用：两处都要查，只查流派会留下玩法 arts 里的
+        # 悬空引用（匹配不到任何玩法，用户也没有修复入口）。
+        used = [str(school) for school, cfg in
+                (self._data.get("schools") or {}).items()
                 if any((cfg.get(side) or {}).get("martial_art") == name
                        for side in ("main", "sub"))]
+        used += [str(style) for style, cfg in
+                 (self._data.get("playstyles") or {}).items()
+                 if name in (cfg.get("arts") or [])]
         if used:
-            # 删了会让流派引用悬空，而悬空引用正是这次拆分要消灭的东西
+            # 删了会让引用悬空，而悬空引用正是这次拆分要消灭的东西
             QMessageBox.warning(
                 self, tr("无法删除"),
-                tr("以下流派仍在使用该武学：{schools}").format(
+                tr("以下流派或玩法仍在使用该武学：{schools}").format(
                     schools="、".join(used)))
             return
-        self._data["martial_arts"] = [
-            e for e in self._entries() if e["name"] != name]
+        entries = self._data.get("martial_arts")
+        if isinstance(entries, dict):
+            entries.pop(name, None)
         self._save_data()
         self._reload()

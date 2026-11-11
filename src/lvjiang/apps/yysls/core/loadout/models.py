@@ -4,6 +4,8 @@ import copy
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from loguru import logger
+
 from ...config.equipment_slots import EQUIPMENT_SLOTS
 
 EQUIPMENT_CREATED_AT = "created_at"
@@ -274,12 +276,17 @@ def plan_school(plan: LoadoutPlan, schools: dict) -> str:
 
 
 def resolve_school(main_art: str, sub_art: str, schools: dict) -> str | None:
-    """Resolve a school by matching two selected arts as an unordered pair."""
+    """Resolve a school by matching two selected arts as an unordered pair.
+
+    同一组武学被多个流派声明是不合法配置（反查口径只能给一个答案），
+    这里取配置里的第一个并记 warning，避免它悄悄变成「谁排前面谁赢」。
+    """
     if not main_art or not sub_art:
         return None
     selected_arts = {str(main_art).strip(), str(sub_art).strip()}
     if len(selected_arts) != 2:
         return None
+    matches = []
     for school, config in schools.items():
         main = config.get("main") or {}
         sub = config.get("sub") or {}
@@ -288,5 +295,9 @@ def resolve_school(main_art: str, sub_art: str, schools: dict) -> str | None:
             str(sub.get("martial_art") or "").strip(),
         }
         if school_arts == selected_arts:
-            return school
-    return None
+            matches.append(school)
+    if len(matches) > 1:
+        logger.warning(
+            f"武学组合 {sorted(selected_arts)} 同时属于多个流派 {matches}，"
+            f"按配置顺序取「{matches[0]}」；请在流派配置里修正重复")
+    return matches[0] if matches else None

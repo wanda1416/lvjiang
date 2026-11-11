@@ -20,7 +20,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLayout,
     QLineEdit,
-    QListWidget,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -37,6 +36,7 @@ from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_co
 
 from .....i18n import tr, tr_label
 from ...config import get_game_config
+from .order_list import DragOrderListWidget, reorder_mapping
 
 _ATTRS_REL = "yysls/game_config"
 _GENERIC = "通用"
@@ -146,9 +146,10 @@ class PlaystylePanel(QWidget):
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(QLabel(tr("玩法类型")))
-        self._list = QListWidget()
+        self._list = DragOrderListWidget()
         configure_navigation_list(self._list, minimum_width=200)
         self._list.currentTextChanged.connect(self._on_selected)
+        self._list.order_changed.connect(self._on_order_changed)
         left_layout.addWidget(self._list)
 
         row = QHBoxLayout()
@@ -332,9 +333,13 @@ class PlaystylePanel(QWidget):
                 self._data = {}
         self._reload()
 
-    def _entries(self) -> list[dict]:
-        return [e for e in (self._data.get("playstyles") or [])
-                if isinstance(e, dict) and e.get("name")]
+    def _names(self) -> list[str]:
+        """玩法名列表；键序即配置声明顺序，直接用于列表与候选。"""
+        return [str(name) for name in (self._data.get("playstyles") or {})]
+
+    def _entry(self, name: str) -> dict:
+        raw = (self._data.get("playstyles") or {}).get(name)
+        return raw if isinstance(raw, dict) else {}
 
     def _save_data(self) -> None:
         if self._on_changed is not None:
@@ -348,15 +353,12 @@ class PlaystylePanel(QWidget):
             logger.error(f"保存配置失败: {exc}")
 
     def _arts(self) -> list[str]:
-        raw = [e for e in (self._data.get("martial_arts") or [])
-               if isinstance(e, dict) and e.get("name")]
-        raw.sort(key=lambda e: (str(e.get("attr") or ""),
-                                str(e.get("weapon") or ""), str(e["name"])))
-        return [str(e["name"]) for e in raw]
+        """武学候选：键序即武学配置声明顺序，不再按属性/武器重排。"""
+        return [str(name) for name in (self._data.get("martial_arts") or {})]
 
     def _art_of(self, name: str) -> dict:
-        return next((e for e in (self._data.get("martial_arts") or [])
-                     if isinstance(e, dict) and e.get("name") == name), {})
+        raw = (self._data.get("martial_arts") or {}).get(name)
+        return raw if isinstance(raw, dict) else {}
 
     def _reload(self) -> None:
         gc = get_game_config()
@@ -379,7 +381,7 @@ class PlaystylePanel(QWidget):
         current_item = self._list.currentItem()
         keep = current_item.text() if current_item else ""
         self._list.clear()
-        self._list.addItems([e["name"] for e in self._entries()])
+        self._list.addItems(self._names())
         self._loading = False
         if keep:
             found = self._list.findItems(keep, Qt.MatchFlag.MatchExactly)
@@ -389,9 +391,23 @@ class PlaystylePanel(QWidget):
         if self._list.count():
             self._list.setCurrentRow(0)
 
+    def _on_order_changed(self) -> None:
+        """拖动后按当前行序重写玩法键序，保持选中项（用户模式无入口）。"""
+        if not self._list.is_reorderable():
+            return
+        names = [item.text() for index in range(self._list.count())
+                 if (item := self._list.item(index)) is not None]
+        entries = self._data.get("playstyles") or {}
+        ordered = reorder_mapping(entries, names)
+        if list(ordered) != list(entries):
+            self._data["playstyles"] = ordered
+            self._save_data()
+        # _reload 按当前行文本恢复选中，拖动后仍是被拖的那一条。
+        self._reload()
+
     def _on_selected(self, name: str) -> None:
         self._builds_panel.set_playstyle(name)
-        cfg = next((e for e in self._entries() if e["name"] == name), {})
+        cfg = self._entry(name)
         school = str(cfg.get("school") or "")
         school_cfg = (self._data.get("schools") or {}).get(school) or {}
         if school:
@@ -451,8 +467,7 @@ class PlaystylePanel(QWidget):
         """
         if cfg is None:
             item = self._list.currentItem()
-            cfg = next((e for e in self._entries()
-                        if item and e["name"] == item.text()), {})
+            cfg = self._entry(item.text()) if item else {}
         gc = get_game_config()
         loading, self._loading = self._loading, True
         picked = [self._combo_art_a.currentText().strip(),
@@ -509,27 +524,25 @@ class PlaystylePanel(QWidget):
         arts = [c.currentText().strip()
                 for c in (self._combo_art_a, self._combo_art_b)]
         school = str(self._combo_school.currentData() or "")
-        entries = self._entries()
-        for e in entries:
-            if e["name"] == item.text():
-                e.update({
-                    "school": school,
-                    "arts": [a for a in arts if a],
-                    "attr": self._combo_attr.currentText(),
-                    "main_weapon": self._art_of(arts[0]).get("weapon", ""),
-                    "sub_weapon": self._art_of(arts[1]).get("weapon", ""),
-                    "main_damage": self._combo_damage_a.currentData() or "",
-                    "sub_damage": self._combo_damage_b.currentData() or "",
-                    "output_dingyin": self._combo_output.currentData() or "",
-                    "defense_dingyin": self._combo_defense.currentData() or "",
-                    "all_skill_requirement":
-                        self._combo_all_skill.currentText(),
-                    "qishu_requirement": self._combo_qishu.currentText(),
-                    "unit_requirement": self._combo_unit.currentText(),
-                    "match_keywords": list(self._keyword_values),
-                })
-                break
-        self._data["playstyles"] = entries
+        entry = (self._data.get("playstyles") or {}).get(item.text())
+        if not isinstance(entry, dict):
+            return
+        entry.update({
+            "school": school,
+            "arts": [a for a in arts if a],
+            "attr": self._combo_attr.currentText(),
+            "main_weapon": self._art_of(arts[0]).get("weapon", ""),
+            "sub_weapon": self._art_of(arts[1]).get("weapon", ""),
+            "main_damage": self._combo_damage_a.currentData() or "",
+            "sub_damage": self._combo_damage_b.currentData() or "",
+            "output_dingyin": self._combo_output.currentData() or "",
+            "defense_dingyin": self._combo_defense.currentData() or "",
+            "all_skill_requirement":
+                self._combo_all_skill.currentText(),
+            "qishu_requirement": self._combo_qishu.currentText(),
+            "unit_requirement": self._combo_unit.currentText(),
+            "match_keywords": list(self._keyword_values),
+        })
         self._save_data()
 
     def _on_add(self) -> None:
@@ -537,15 +550,16 @@ class PlaystylePanel(QWidget):
         name = (name or "").strip()
         if not ok or not name:
             return
-        if any(e["name"] == name for e in self._entries()):
+        if name in (self._data.get("playstyles") or {}):
             QMessageBox.warning(self, tr("新增玩法"), tr("该玩法已存在"))
             return
-        self._data["playstyles"] = self._entries() + [
-            {"name": name, "school": _CUSTOM_SCHOOL,
-             "attr": _GENERIC, "arts": [],
-             "all_skill_requirement": "需要",
-             "qishu_requirement": "不需要",
-             "unit_requirement": "不需要"}]
+        self._data.setdefault("playstyles", {})[name] = {
+            "school": _CUSTOM_SCHOOL,
+            "attr": _GENERIC, "arts": [],
+            "all_skill_requirement": "需要",
+            "qishu_requirement": "不需要",
+            "unit_requirement": "不需要",
+        }
         self._save_data()
         self._reload()
 
@@ -569,8 +583,9 @@ class PlaystylePanel(QWidget):
                 tr("以下调律规则仍在引用该玩法：{rules}").format(
                     rules="、".join(used)))
             return
-        self._data["playstyles"] = [
-            e for e in self._entries() if e["name"] != name]
+        entries = self._data.get("playstyles")
+        if isinstance(entries, dict):
+            entries.pop(name, None)
         self._save_data()
         self._reload()
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 
+import yaml
 from loguru import logger
 
 from ....core.config.resolver import ConfigResolver, get_resolver
@@ -114,11 +115,23 @@ def _same_content(current: Mapping[str, object], document: Mapping[str, object])
 
     版本号由写盘自动递增，且生效层（system/local）的版本与即将写入的版本
     本来就可能不同；拿它参与比对会让每份文件都被判成「有变化」。
+
+    **比对必须对键序敏感**：武学/流派/玩法是「名称 → 定义」的映射，键序就是
+    展示顺序，纯排序保存时 Python 的 dict 相等判定认为「没变化」，会把开发模式
+    下的拖动结果整次丢掉。这里改用规范化文本比对（``sort_keys=False``）。
     """
     def payload(doc: Mapping[str, object]) -> dict[str, object]:
         return {key: value for key, value in doc.items() if key != "content_version"}
 
-    return payload(current) == payload(document)
+    if payload(current) == payload(document):
+        # 值完全相同，但键序可能不同——用文本序列化再确认一次
+        dumped = [
+            yaml.safe_dump(payload(doc), allow_unicode=True,
+                           default_flow_style=False, sort_keys=False)
+            for doc in (current, document)
+        ]
+        return dumped[0] == dumped[1]
+    return False
 
 
 def system_game_config_section(

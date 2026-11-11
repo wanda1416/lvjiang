@@ -14,13 +14,27 @@
 自然的而不是异常，因为混搭本来就没有人做毕业率表格。旧结构里玩法藏在规则里、
 规则又和流派耦合，混搭玩家要么被硬塞一个流派，要么什么都用不了。
 
+### 结构与顺序
+
+三张配置都是 **`名称 → 定义` 的映射**，**键序就是展示顺序**（YAML 与 Python
+都保留插入序），没有第二份 `order` 字段：
+
+- 顺序是**配置内容**，不是用户偏好：它决定下拉候选、`resolve_school` 的反查
+  和 `_match_playstyle` 的回落默认值。系统配置（开发）模式下列表可拖动排序
+  （写 system）；用户模式写的是 local 覆盖、键序不参与 diff，所以用户侧不提供
+  排序入口，避免改出一份存不下来的顺序；
+- 用户改一个条目 → local 只存那一个键，加载时按 key 覆盖 system 那份；
+- 用户新增条目 → local 只多一个键，排在末尾；
+- 系统后续新增或改值照常进合并视图；系统条目在用户层不可删除
+  （见 [配置分层](../30-overview/04-config-layering.md)）。
+
 ## 2. 武学：武器和属性的唯一真源
 
 ```yaml
 martial_arts:
-- name: 无名剑法
-  weapon: 剑
-  attr: 鸣金
+  无名剑法:
+    weapon: 剑
+    attr: 鸣金
 ```
 
 拆分之前 `weapon` 和 `martial_art` 是流派里两个**独立录入、互不校验**的字段。
@@ -35,13 +49,13 @@ martial_arts:
 
 ```yaml
 playstyles:
-- name: 纯唐
-  school: 裂石·钧
-  attr: 裂石
-  arts: [斩雪刀法, 十方破阵]
-  main_damage: 横刀武学增伤
-  output_dingyin: 外功穿透
-  defense_dingyin: 无名剑法蓄力技增伤
+  纯唐:
+    school: 裂石·钧
+    attr: 裂石
+    arts: [斩雪刀法, 十方破阵]
+    main_damage: 横刀武学增伤
+    output_dingyin: 外功穿透
+    defense_dingyin: 无名剑法蓄力技增伤
 ```
 
 玩法可以绑定正式流派，也可以选择“自定义”：

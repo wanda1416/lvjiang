@@ -1987,7 +1987,8 @@ auto_strings:
   仅战斗内: 僅戦闘内
   以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: The three above describe the build only; they do not affect rating, auto-tuning or graduation rate
   以下文件解析失败，已跳过：{files}: 'These files failed to parse and were skipped: {files}'
-  以下流派仍在使用该武学：{schools}: 'Still used by these schools: {schools}'
+  以下流派或玩法仍在使用该武学：{schools}: 'Still used by these schools or playstyles: {schools}'
+  顺序由系统配置决定；你新增的条目会排在最后。: The order comes from the system configuration; entries you add go last.
   以下调律规则仍在引用该玩法：{rules}: 'Still referenced by these tuning rules: {rules}'
   作用域: 作用域
   保存时包含未建模补足: 保存時包含未建模補足

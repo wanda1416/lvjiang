@@ -1,4 +1,4 @@
-content_version: 5
+content_version: 8
 schools:
   鸣金·虹:
     attr: 鸣金
@@ -23,6 +23,21 @@ schools:
     sub:
       weapon: 枪
       martial_art: 九曲惊神枪
+    transmute_pool:
+    - 最大外功攻击
+    - 势
+    - 劲
+    - 会意率
+    - 最大本属攻击
+    - 会心率
+  鸣金·霆:
+    attr: 鸣金
+    main:
+      martial_art: 决狱悬锋枪
+      weapon: 枪
+    sub:
+      martial_art: 拨山取月枪
+      weapon: 枪
     transmute_pool:
     - 最大外功攻击
     - 势
@@ -165,18 +180,3 @@ schools:
     - 会心率
     - 敏
     - 劲
-  鸣金·霆:
-    attr: 鸣金
-    main:
-      martial_art: 决狱悬锋枪
-      weapon: 枪
-    sub:
-      martial_art: 拨山取月枪
-      weapon: 枪
-    transmute_pool:
-    - 最大外功攻击
-    - 势
-    - 劲
-    - 会意率
-    - 最大本属攻击
-    - 会心率

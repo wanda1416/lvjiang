@@ -61,6 +61,7 @@ from ..domain_labels import domain_label
 from ..tune_settings.affix_picker import AffixSelectSortDialog
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo
+from .order_list import DragOrderListWidget, reorder_mapping
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config"
@@ -94,10 +95,11 @@ class SchoolPanel(QWidget):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(QLabel(tr("流派类型")))
 
-        self._school_list = QListWidget()
+        self._school_list = DragOrderListWidget()
         configure_navigation_list(self._school_list, minimum_width=200)
         self._school_list.currentRowChanged.connect(self._on_school_changed)
         self._school_list.itemChanged.connect(self._on_item_renamed)
+        self._school_list.order_changed.connect(self._on_order_changed)
         left_layout.addWidget(self._school_list)
 
         btn_layout = QHBoxLayout()
@@ -308,20 +310,13 @@ class SchoolPanel(QWidget):
         return self._data.get("schools") or {}
 
     def _martial_art_candidates(self) -> list[str]:
-        """武学下拉候选，按属性+武器排序，便于用户成组挑选。"""
-        raw = self._data.get("martial_arts") or []
-        entries = [e for e in raw if isinstance(e, dict) and e.get("name")]
-        entries.sort(key=lambda e: (str(e.get("attr") or ""),
-                                    str(e.get("weapon") or ""),
-                                    str(e["name"])))
-        return [str(e["name"]) for e in entries]
+        """武学下拉候选：键序即武学配置声明顺序，不再按属性/武器重排。"""
+        return [str(name) for name in (self._data.get("martial_arts") or {})]
 
     def _weapon_of(self, martial_art: str) -> str:
         """武器由武学派生，不接受独立录入。"""
-        for e in (self._data.get("martial_arts") or []):
-            if isinstance(e, dict) and e.get("name") == martial_art:
-                return str(e.get("weapon") or "")
-        return ""
+        entry = (self._data.get("martial_arts") or {}).get(martial_art)
+        return str(entry.get("weapon") or "") if isinstance(entry, dict) else ""
 
     def _sync_derived_weapons(self) -> None:
         for combo, edit in ((self._combo_main_martial, self._edit_main_weapon),
@@ -357,6 +352,21 @@ class SchoolPanel(QWidget):
             self._on_school_changed(row)
         else:
             self._on_school_changed(-1)
+
+    def _on_order_changed(self) -> None:
+        """拖动后按当前行序重写流派键序，保持选中项（用户模式无入口）。"""
+        if not self._school_list.is_reorderable():
+            return
+        current = self._school_list.currentItem()
+        select = current.text() if current else None
+        names = [item.text() for index in range(self._school_list.count())
+                 if (item := self._school_list.item(index)) is not None]
+        entries = self._data.get("schools") or {}
+        ordered = reorder_mapping(entries, names)
+        if list(ordered) != list(entries):
+            self._data["schools"] = ordered
+            self._save_data()
+        self._refresh_list(select=select)
 
     def _current_school(self) -> str | None:
         row = self._school_list.currentRow()

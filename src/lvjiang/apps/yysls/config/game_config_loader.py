@@ -86,23 +86,35 @@ def parse_weapons(self: GameConfigManager, data: dict) -> None:
 
 
 def parse_arts(self: GameConfigManager, data: dict) -> None:
-    for entry in (data.get("martial_arts") or []):
+    raw_arts = data.get("martial_arts")
+    if raw_arts is not None and not isinstance(raw_arts, dict):
+        logger.error(
+            "武学配置必须是 名称→定义 的映射；当前 martial_arts 为 "
+            f"{type(raw_arts).__name__}，请手工更新配置后重启")
+        raw_arts = {}
+    for name, entry in (raw_arts or {}).items():
         if not isinstance(entry, dict):
             continue
-        name = str(entry.get("name") or "").strip()
-        if not name:
+        key = str(name).strip()
+        if not key:
             continue
-        self._martial_arts[name] = {
+        self._martial_arts[key] = {
             "weapon": str(entry.get("weapon") or "").strip(),
             "attr": str(entry.get("attr") or "").strip(),
         }
-    for entry in (data.get("playstyles") or []):
+    raw_playstyles = data.get("playstyles")
+    if raw_playstyles is not None and not isinstance(raw_playstyles, dict):
+        logger.error(
+            "玩法配置必须是 名称→定义 的映射；当前 playstyles 为 "
+            f"{type(raw_playstyles).__name__}，请手工更新配置后重启")
+        raw_playstyles = {}
+    for name, entry in (raw_playstyles or {}).items():
         if not isinstance(entry, dict):
             continue
-        name = str(entry.get("name") or "").strip()
-        if not name:
+        key = str(name).strip()
+        if not key:
             continue
-        self._playstyles[name] = {
+        self._playstyles[key] = {
             "school": str(entry.get("school") or "").strip(),
             "attr": str(entry.get("attr") or "").strip(),
             "arts": [str(a).strip() for a in (entry.get("arts") or [])
@@ -126,7 +138,25 @@ def parse_arts(self: GameConfigManager, data: dict) -> None:
             # 并存多个玩法（火拳/纯奶），方案名未必写着玩法名，靠它兜底。
             "match_keywords": _string_list(entry.get("match_keywords")),
         }
-    self._schools = dict(data.get("schools") or {})
+
+
+def parse_schools(self: GameConfigManager, data: dict) -> None:
+    """流派按名称→定义的映射解析；键序即系统定义的展示顺序。"""
+    raw_schools = data.get("schools")
+    if raw_schools is None:
+        return
+    if not isinstance(raw_schools, dict):
+        logger.error(
+            "流派配置必须是 名称→定义 的映射；当前 schools 为 "
+            f"{type(raw_schools).__name__}，请手工更新配置后重启")
+        return
+    for name, entry in raw_schools.items():
+        if not isinstance(entry, dict):
+            continue
+        key = str(name).strip()
+        if not key:
+            continue
+        self._schools[key] = dict(entry)
 
 
 def parse_sets(self: GameConfigManager, data: dict) -> None:

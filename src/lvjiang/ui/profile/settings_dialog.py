@@ -1192,10 +1192,11 @@ class ProfileDefinitionDialog(QDialog):
         self._refresh_model_tab(model_type, kd.group, kd.key)
 
     def _duplicate_key(self, model_type: str, row: int) -> None:
-        """复制定义：除 Key / 标签外全部字段照抄，落成同分组末尾的新 key。
+        """复制定义：Key / 标签及其余字段原样照抄，落成同分组的新 key。
 
         复制的是**定义**，不是各用户的当前值——新 key 没有任何 entry，取值从
         0 起步（quota 首次初始化、note 空文本），与手工新增一个 key 一致。
+        原样带出 Key 与标签，是否改名由用户在编辑器里决定；沿用原 Key 无法保存。
         """
         tab = self._tabs[model_type]
         key_item = tab.table.item(row, 0)
@@ -1396,9 +1397,9 @@ class ProfileDefinitionDialog(QDialog):
     ) -> KeyDef | None:
         """打开 key 编辑对话框，返回新的 KeyDef 或 None
 
-        ``template`` 供「复制定义」用：按它预填**除 Key / 标签以外**的全部字段，
-        但对话框仍按新增处理——标题是「新增」、Key 可编辑且留空、标签留空，
-        重复校验也不把模板的 key 排除在外（它还在被占用）。
+        ``template`` 供「复制定义」用：按它原样预填**全部字段**（含 Key 与标签），
+        但对话框仍按新增处理——标题是「新增」、Key 可编辑，重复校验也不把模板的
+        key 排除在外（它还在被占用），因此沿用原 Key 时保存会被拒绝。
 
         两个参数都只决定预填与标题：最终 KeyDef 由控件值重新构造，传入对象
         不会被改写。
@@ -1416,7 +1417,7 @@ class ProfileDefinitionDialog(QDialog):
             margins.left(), margins.top(), margins.right(), dialog.fontMetrics().lineSpacing() // 3)
 
         # 通用字段
-        key_input = QLineEdit(existing.key if existing else "")
+        key_input = QLineEdit(source.key if source else "")
         key_input.setReadOnly(existing is not None)
         key_input.setObjectName("key_input")
         key_row = QHBoxLayout()
@@ -1434,7 +1435,7 @@ class ProfileDefinitionDialog(QDialog):
             key_row.addWidget(edit_key)
         layout.addRow("Key:", key_row)
 
-        label_input = QLineEdit(existing.label if existing else "")
+        label_input = QLineEdit(source.label if source else "")
         label_input.setObjectName("label_input")
         layout.addRow(tr_label('标签'), label_input)
 

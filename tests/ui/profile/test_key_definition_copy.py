@@ -1,4 +1,4 @@
-"""复制定义：除 Key / 标签以外，其余字段全部照抄原定义。
+"""复制定义：Key / 标签及其余字段全部原样照抄原定义。
 
 契约的核心是"漏一个字段就静默丢配置"，所以断言按 dataclasses.fields 逐个对齐，
 而不是挑几个代表性字段——模型将来加字段时会立刻暴露。
@@ -117,8 +117,8 @@ def test_regen_copy_keeps_regen_and_alert_fields(qapp, monkeypatch) -> None:
         assert getattr(kd, field.name) == getattr(template, field.name), field.name
 
 
-def test_copy_keeps_key_and_label_empty_until_filled(qapp, monkeypatch) -> None:
-    """模板只提供其余字段：Key 必须可编辑且留空，标签留空，否则用户改不了。"""
+def test_copy_prefills_key_and_label_verbatim(qapp, monkeypatch) -> None:
+    """模板原样带出 Key 与标签，Key 仍可编辑，改名由用户自己决定。"""
     seen: dict[str, object] = {}
 
     def fake_exec(dialog):
@@ -136,7 +136,31 @@ def test_copy_keeps_key_and_label_empty_until_filled(qapp, monkeypatch) -> None:
         None, MODEL_QUOTA, None, {"src_key"}, template=template)
 
     assert result is None
-    assert seen == {"key_text": "", "key_editable": True, "label_text": ""}
+    assert seen == {"key_text": "src_key", "key_editable": True, "label_text": "原标签"}
+
+
+def test_copy_keeps_original_key_but_cannot_save_it(qapp, monkeypatch) -> None:
+    """沿用原 Key 保存会被拒绝，且不会写入 profile.yaml。"""
+
+    def fake_exec(dialog):
+        for button in dialog.findChildren(QPushButton):
+            if button.text() == tr("保存"):
+                button.click()
+                return 0     # 保存被拒绝后关闭
+        raise AssertionError("找不到保存按钮")
+
+    monkeypatch.setattr(settings_dialog.QDialog, "exec", fake_exec)
+    saved: list[object] = []
+    monkeypatch.setattr(
+        ProfileDefinitionDialog, "_save_key_definition",
+        staticmethod(lambda *args, **kwargs: saved.append(args)))
+
+    template = QuotaKeyDef(key="src_key", group="甲组", label="原标签", cap=7)
+    result = ProfileDefinitionDialog.open_key_editor(
+        None, MODEL_QUOTA, None, {"src_key"}, template=template)
+
+    assert result is None
+    assert saved == []
 
 
 def test_context_menu_puts_duplicate_under_change_group(qapp, monkeypatch) -> None:

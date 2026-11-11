@@ -43,6 +43,34 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 | `[name]` | `[equip_detail]` | 配置引用 |
 | `$var` | `$scene_name` | 变量引用（运行时解析） |
 
+## 截图来源 from last
+
+三条指令都在 `as $var`（`recognize` rich 为 `as rich $var`）之后支持可选的
+`from last`，再接原有 `by` / `where` / `with` 子句：
+
+```text
+<指令> [scene].[region] as $result from last
+```
+
+- **复用最近一次完整原始截图**，重新裁剪并识别；不增加帧序号，不改变返回值格式。
+- 省略时保持「重新截图」行为。
+- 无最近帧时抛出可由 `try/catch` 捕获的错误，**不会**重新截图兜底。
+- 最近帧可能来自 `wait stable`、图色、`align` 或 `screenshot`；点击与普通 `wait`
+  不会更新它——要读取操作后的画面就省略 `from last`。
+- 识别日志带 `frame_seq`，可与 `screenshot from last` 的保存日志对应。
+- 各指令支持的目标形式不同（区域 / 动态区域 / 子场景 / 面板模式 / 全画布），
+  见各自文档。
+
+## 过滤与后处理子句
+
+`where` 与 `with` 都是**只影响结果、不改变返回类型**的子句：
+
+- `where confidence >= <threshold>`：纯过滤，丢弃低于阈值的命中；`<threshold>`
+  可为数字常量或变量引用，取值范围 `[0.0, 1.0]`，越界输出警告。三条指令通用。
+- `with "<清洗组>"`：在全局默认清洗之后叠加业务规则组（`scan` / `find` 的 OCR 结果）；
+  recognize 的 `with <func>` 是另一件事——它指定 rich dict 的转换函数，只在
+  `as rich` 时可用。逐条差异见各指令文档。
+
 ## 返回值总对比表
 
 | 指令 | 目标 | 默认 | `as rich` | `by ...` |

@@ -257,7 +257,18 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         # 与「刷新 → 分组管理」同样的间距，避免看起来像分组操作的一部分。
         toolbar.addSpacing(24)
 
-        btn_upload_layout = QPushButton(tr("上传页面结构"))
+        # 「创建快照」原在账户管理页；总览结构变化后要补一份基线，放在这里更顺手，
+        # 与上传/下载排版同属"云端基线"这一组动作。
+        btn_create_snapshot = QPushButton(tr("创建快照"))
+        btn_create_snapshot.setStyleSheet(USER_ACTION_BTN_STYLE)
+        btn_create_snapshot.setMinimumHeight(32)
+        btn_create_snapshot.setToolTip(tr(
+            "把本机当前全部角色数据上传为云端总览基线。\n"
+            "初始同步会自动创建一次；之后需要时手动点。"))
+        btn_create_snapshot.clicked.connect(self._create_snapshot)
+        toolbar.addWidget(btn_create_snapshot)
+
+        btn_upload_layout = QPushButton(tr("上传排版"))
         btn_upload_layout.setStyleSheet(USER_ACTION_BTN_STYLE)
         btn_upload_layout.setMinimumHeight(32)
         btn_upload_layout.setToolTip(
@@ -265,7 +276,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         btn_upload_layout.clicked.connect(self._upload_page_structure)
         toolbar.addWidget(btn_upload_layout)
 
-        btn_download_layout = QPushButton(tr("下载页面结构"))
+        btn_download_layout = QPushButton(tr("下载排版"))
         btn_download_layout.setStyleSheet(USER_ACTION_BTN_STYLE)
         btn_download_layout.setMinimumHeight(32)
         btn_download_layout.setToolTip(tr("用云端的页面结构替换本机结构，需要两次确认"))
@@ -596,6 +607,12 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         """全量变更记录：入口不带范围，用户/键/类型等条件都在对话框里筛。"""
         from .dialogs import HistoryDialog, HistoryScope
         HistoryDialog(HistoryScope(), self).exec()
+
+    def _create_snapshot(self) -> None:
+        """把本机当前全部角色数据上传为云端总览基线（原账户管理页的动作）。"""
+        from .layout_transfer import create_snapshot
+
+        create_snapshot(self)
 
     def _upload_page_structure(self) -> None:
         """上传页面结构；远端来自别的设备时先问是否覆盖（默认不覆盖）。"""

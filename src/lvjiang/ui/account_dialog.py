@@ -619,33 +619,20 @@ class AccountManagerDialog(QDialog):
         sync_tab = QWidget()
         sync_layout = QVBoxLayout(sync_tab)
 
-        self.sync_table = QTableWidget(4, 6)
+        self.sync_table = QTableWidget(4, 5)
         self.sync_table.setHorizontalHeaderLabels(
-            [tr("通道"), tr("进度"), tr("上行"), tr("下行"), tr("失败"), tr("功能")])
-        _tune_table(self.sync_table, fixed={2: 72, 3: 72, 4: 72, 5: 104},
+            [tr("通道"), tr("进度"), tr("上行"), tr("下行"), tr("失败")])
+        _tune_table(self.sync_table, fixed={2: 72, 3: 72, 4: 72},
                     row_height=36, stretch_column=1)
         for row, name in enumerate((tr("定义"), tr("用户"), tr("文档"), tr("总览"))):
             item = QTableWidgetItem(name)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.sync_table.setItem(row, 0, item)
-            for column in (1, 2, 3, 4, 5):
+            for column in (1, 2, 3, 4):
                 cell = QTableWidgetItem("")
                 cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.sync_table.setItem(row, column, cell)
-        # 只有总览行有「创建快照」，其余三行功能列留白。
-        snapshot_host = QWidget()
-        snap_layout = QHBoxLayout(snapshot_host)
-        snap_layout.setContentsMargins(4, 0, 4, 0)
-        snap_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.snapshot_button = QPushButton(tr("创建快照"))
-        apply_button_style(self.snapshot_button, variant="neutral")
-        self.snapshot_button.setToolTip(tr(
-            "把本机当前全部角色数据上传为云端总览基线。\n"
-            "初始同步会自动创建一次；之后需要时手动点。"))
-        self.snapshot_button.clicked.connect(self._refresh_snapshot)
-        snap_layout.addWidget(self.snapshot_button)
-        self.sync_table.setCellWidget(3, 5, snapshot_host)
         sync_layout.addWidget(self.sync_table, stretch=1)
 
         # 错误行：固定高度常驻，只换文字，不随失败出现/消失顶跳布局。
@@ -871,8 +858,6 @@ class AccountManagerDialog(QDialog):
                            variant="danger" if established else "action")
         self.initial_clear_button.setText(
             tr("清除同步") if established else tr("初始同步"))
-        self.snapshot_button.setEnabled(established and not running
-                                        and self.holder.summary is not None)
         self.stop_sync_button.setVisible(self.holder.syncing)
 
     def _fill_sync_table(self, rows: list[tuple[str, int | None, int | None, int | None]] | None) -> None:
@@ -1088,17 +1073,6 @@ class AccountManagerDialog(QDialog):
             return
         self._set_sync_note(tr("正在清除同步…"))
         self.holder.clear_sync_async(password)
-
-    def _refresh_snapshot(self) -> None:
-        """把本机当前 profile 值作为新快照上传，绑到最新远端 history id。
-
-        新设备此后从这里取基线回放；已有设备各自按自己的水位继续，不受影响。
-        """
-        from ..core.profile.snapshot_sync import refresh_snapshot
-        if self.holder.syncing or self.holder.busy:
-            return
-        self._set_sync_note(tr("正在刷新快照…"))
-        self.holder._start(lambda: refresh_snapshot(self.holder.session.access_token), "sync")
 
     def _on_sync_finished(self, ok: bool, result) -> None:
         if not self._alive():

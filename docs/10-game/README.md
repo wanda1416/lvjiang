@@ -16,13 +16,15 @@
 | [04-tuning-mechanics.md](04-tuning-mechanics.md) | 调律相关文档的边界与索引 |
 | [05-ui-pages-and-relations.md](05-ui-pages-and-relations.md) | 游戏 UI 页面、叠层、视图状态及自动化流程关联图 |
 | [06-mechanics-conventions.md](06-mechanics-conventions.md) | 游戏机制约定登记表：写死在代码、未进配置的规则事实（五维系数、弓玦、三率上限、调律铁律、部位归并等），含位置与依据 |
+| [07-nanlu-season.md](07-nanlu-season.md) | 南吕相和赛季（115 阶）：赛季等级、承音作废线、词条产出范围、跨等级升级、冷却与抗性口径 |
+| [affix-compendium.md](affix-compendium.md) | 词条大全：普通词条名称、出现部位与单位 |
 | [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
 | [20-translation/](20-translation/README.md) | 游戏独有术语中英对照：基于国际服官方翻译表（武学/心法/流派/战斗属性/装备/定音等） |
 | [../40-development/analysis/](../40-development/analysis/README.md)（仅源码检出） | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（方法与过程，落户开发层） |
 
 ## 待补充（尚未创建）
 
-- `affix-compendium.md` — 词条大全：名称、类型、数值范围、出现规则
+- `affix-compendium.md` 的**数值范围与出现规则**（名称/部位/单位已收录）
 - `rarity-rules.md` — 稀有词条规则
 
 这两篇要填的是**结论**（游戏实际怎么出词条），而结论得先从观测数据里推出来——

@@ -42,12 +42,19 @@
 | [03-unattended-batch.md](30-batch/03-unattended-batch.md) | 无人值守批量：弹窗改道与异常恢复工作流 | 已实现 |
 | [04-batch-state-layers.md](30-batch/04-batch-state-layers.md) | 批量状态分层：定义 / 运行草稿 / 执行快照 | 已实现 |
 
-### 40-profile（用户档案域：Profile 数据模型、毕业率、货币、心力体力）
+### 40-profile（Profile 子系统：跨域共享的玩家档案，供调律 / 装备 / 总览共用）
+
+架构与存储契约见 [31-models/04-profile.md](../30-architecture/31-models/04-profile.md)，本组只放需求。
 
 | 文档 | 内容 | 状态 |
 |------|------|------|
-| [README.md](40-profile/README.md) | 玩家档案系统：四模型数据层、心力体力管理、货币追踪与毕业率分析 | 部分实现（四模型已实现，角色基础数据与材料库存待补） |
+| [README.md](40-profile/README.md) | 玩家档案子系统总览：四模型数据层、范围与实施路线 | 部分实现（四模型已实现，角色基础数据与材料库存待补） |
+| [01-graduation-rate.md](40-profile/01-graduation-rate.md) | 毕业率分析：角色装备 → 毕业率模型 → 展示 | 已实现 |
+| [02-currency-tracking.md](40-profile/02-currency-tracking.md) | 货币追踪：钱袋 OCR → Profile stock 模型 | 部分实现 |
+| [03-stamina-management.md](40-profile/03-stamina-management.md) | 心力体力管理：资源监控 → 恢复预测 → 超标预警 | 部分实现（基础框架） |
 | [04-overview-multi-columns.md](40-profile/04-overview-multi-columns.md) | 数据总览字段多选、批量新增列与列宽保持 | 已实现 |
+| [05-history-dialog.md](40-profile/05-history-dialog.md) | 变更记录对话框：三入口统一、筛选与聚合 | 已实现 |
+| [06-overview-layout-sync.md](40-profile/06-overview-layout-sync.md) | 页面结构（`profile.json`）独立成文件、手动上传下载与网页只读展示 | 已实现 |
 
 ### 50-platform（平台与执行域：多语言、局内导航、输入时间线、执行目标与并发）
 

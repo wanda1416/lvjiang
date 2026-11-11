@@ -18,13 +18,37 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 「用户信息」→ app hook 注册的页面。yysls 只在此后追加「备战方案」
 和「调律管理」。
 
+## 模块与数据流
+
+| 模块 | 职责 |
+|---|---|
+| `core/profile/models.py` | quota / regen / stock / note 四类 `KeyDef` 与解析 |
+| `core/profile/schema.py` | `profile.yaml` 加载、校验与写回（定义是用户资产，只增改不删除） |
+| `core/profile/store.py` | 可见结构（`profile.json` 分组/列/列宽）与 `interface.json` 的 `alert_history`、活跃分组 |
+| `core/profile/layout.py` | `profile.json` 读写、v1 迁移、列宽折算与 clamp |
+| `core/profile/repository.py` | `profile.db` 存储层与 `_ensure_schema` 逐版迁移 |
+| `core/profile/engine.py` / `regen.py` / `periods.py` | 周期重置、再生计算与周期注册表 |
+| `core/profile/service.py` / `sync.py` / `triggers.py` | 统一读写语义、`sync_targets` 同步链与变更脚本 |
+| `core/profile/snapshot_sync.py` / `key_rename.py` | 账本同步、全用户改名与引用维护 |
+| `ui/profile/` | 用户总览、用户信息、定义编辑器、变更记录 |
+| `workflows/builtins/profile.py` | `profile_action` / `profile_read` 等 DSL 函数 |
+| `apps/yysls/core/season_periods.py` | 燕云的 season / half_season 周期边界 |
+
+数据流：场景截图 → 业务工作流（`subcall/profile_registry.wf` 先声明所需 key）→ OCR/识别 →
+`profile_action` 写入 `profile.db`（附变更记录）→ 引擎做周期重置与再生推算 → 用户总览 /
+用户信息渲染 → 定义与账本按各自的通道同步（`profile_definition`、`profile_layout`、
+账本行）。
+
 ## 存储契约
 
-以下为 v0.13.12 起的当前契约，数据模型数据库使用 schema v7：
+以下为当前契约，数据模型数据库使用 **schema v10**：
 
 - `config/session/profile.yaml` 仍以四个模型的列表保存 key。每个 `KeyDef` 带
   `group`；旧条目缺失或空白时归入稳定 key `default`，下次保存显式写出。
-- `config/session/profile.db` 为 schema v7，按 `schema_version` 顺序升级。
+- `config/session/profile.db` 当前 schema v10，按 `schema_version` 顺序升级；逐版迁移
+  写在 `core/profile/repository.py` 的 `_ensure_schema`（v8 加 locked、v9 把历史改为同步
+  账本并删审计表、v10 给史行加源实例标识）。升级前用 SQLite backup 保存 `profile.before-
+  vN.db`，含 WAL 中已提交内容。
 - `profile_entries` 仍以 `(username, type, key)` 为复合主键。
 - `profile_history` 保留 ID、时间、用户、模型、key、数值/文本旧新值和来源；
   `detail` 替换为 `delta_value REAL NULL` 与 `sync_from TEXT NULL`。

@@ -200,11 +200,64 @@ def build_config() -> dict:
             "output_dingyin": cfg.get("output_dingyin", ""),
             "defense_dingyin": cfg.get("defense_dingyin", ""),
         }
+    # 模拟计算器的词条分配器要用的表：部位规格、首词条候选、普通词条候选、
+    # 词条分类上限，以及按**具体词条名** × 等级预计算的上限值（affix_caps 只到
+    # 词组级，网页端直接查具体名会全空）。
+    from lvjiang.apps.yysls.config.equipment_slots import SLOT_SPECS
+    from lvjiang.apps.yysls.core.combat.affix_rules import normal_affix_candidates
+    from lvjiang.apps.yysls.core.equip_validator import (
+        MAX_ATTRIBUTE_AFFIXES,
+        MAX_DIVINE_AFFIXES,
+        _categories,
+    )
+
+    levels = _candidate_levels(gc)
+    groups = sorted(set(gc.get_type_to_group().values()))
+    equip_types = sorted(gc.get_type_to_group())
+    attack_category, divine_categories = _categories()
+    first_affix_names = sorted({
+        name
+        for group in groups
+        for level in levels
+        for name in gc.get_first_affixes(group, level)
+    })
+    distribution_tables = {
+        "slot_specs": [
+            {"key": spec.key, "label": str(spec.label), "part": spec.part,
+             "filter_type": spec.filter_type, "is_weapon": bool(spec.is_weapon)}
+            for spec in SLOT_SPECS
+        ],
+        "first_affixes": {
+            group: {str(level): list(gc.get_first_affixes(group, level)) for level in levels}
+            for group in groups
+        },
+        "normal_candidates": {
+            equip_type: {
+                str(level): list(normal_affix_candidates(
+                    {"type": equip_type, "level": level}, gc))
+                for level in levels
+            }
+            for equip_type in equip_types
+        },
+        "attr_affix_max": MAX_ATTRIBUTE_AFFIXES,
+        "divine_affix_max": MAX_DIVINE_AFFIXES,
+        "affix_categories": {"attack": attack_category, "divine": sorted(divine_categories)},
+        "affix_values": {
+            name: {
+                str(level): dict(entry)
+                for level in levels
+                if (entry := gc.get_affix_caps(level, name)) is not None
+            }
+            for name in sorted(set(gc.get_normal_affix_names()) | set(first_affix_names))
+        },
+    }
+
     config = {
         "_generated_by": "scripts/export_yysls_web_assets.py",
         "_source": "config/system/yysls/",
         "schema_version": 1,
         **_affix_tables(gc),
+        **distribution_tables,
         "base_attrs": _base_attr_table(gc),
         **_season_table(gc),
         "equipment_sets": gc.get_equipment_sets(),

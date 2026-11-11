@@ -23,19 +23,18 @@ python -m lvjiang --all-plugins        # 内置插件 + plugins/ 默认目录全
 插件通过 `AppHooks` 数据类向引擎声明扩展点：
 
 ```python
-# src/lvjiang/apps/base.py
+# src/lvjiang/apps/base.py（节选；完整字段见下面的扩展点全表）
 @dataclass
 class AppHooks:
-    name: str                                  # 插件显示名
-    requires_app_ids: tuple[str, ...] = ()      # 必须先注册的插件稳定 ID
-    window_title: str | None = None            # 覆盖主窗口标题（多插件时后注册者覆盖）
-    left_tab_builders: list = field(default_factory=list)   # [(label, builder), ...]
-    right_tab_builders: list = field(default_factory=list)  # builder(host) -> QWidget
-    menu_builders: list = field(default_factory=list)       # [fn(host, menubar), ...]
-    recognizer_classes: list = field(default_factory=list)
-    workflow_implementations: dict = field(default_factory=dict)
-    builtin_modules: list = field(default_factory=list)
+    id: str = ""                              # 稳定机器标识：小写 ASCII、不可翻译（如 "yysls"）
+    name: str = ""                            # 显示名，可翻译；不参与任何匹配
+    requires_app_ids: tuple[str, ...] = ()    # 必须先注册的插件 ID，缺失则整个插件被拒绝
+    ...
 ```
+
+`id` 与 `name` 是两件东西：`id` 用于菜单登记、依赖声明、`AppEvent.app_id`、插件页归属
+与日志定位；`name` 只用于展示。把翻译后的显示名当 ID 用，会在切换语言或改名后让引用
+全部失效。
 
 主应用创建唯一的通用 MainWindow；插件**不能替换主窗口类**，只能通过
 builder 注入左/右 Tab 与菜单。多插件的 Tab/菜单按 `-reg` 顺序叠加。
@@ -72,6 +71,70 @@ builder 约定：
 - 信号 `automation_state_changed(str)`（"running"/"not_ready"/"ready"）、
   `user_changed(str)`
 - F9 分发：当前左侧 Tab 若实现 `f9_run()` 则交由其处理，否则走通用工作流
+
+### 扩展点全表
+
+字段按用途分四组。**每行都是真实契约**：写错通常不会报错，而是静默不生效，新插件按表
+逐项核对即可。控制台（`module: 行号`）为当前实现位置。
+
+**身份与加载顺序**
+
+| 字段 | 默认 | 用途 | 消费方 / 写错的后果 |
+|---|---|---|---|
+| `id` | `""` | 稳定机器标识，小写 ASCII、不可翻译 | `apps/__init__.py:register_hooks` 记入 `registry["app_ids"]`；被 `requires_app_ids`、`AppEvent.app_id`、菜单登记引用。留空则插件不进名册，依赖它的插件加载失败 |
+| `name` | `""` | 显示名（可翻译） | 日志、插件页标签、窗口标题回退。**不要用它做任何匹配** |
+| `requires_app_ids` | `()` | 必须先注册的插件 ID | `register_hooks` 首步校验；缺失时抛 `RuntimeError`，整个插件拒绝注册（不是降级加载） |
+| `startup_callbacks` | `[]` | 注册后、其余扩展装配前的无 UI 初始化（一次性数据迁移等） | `register_hooks` 逐个执行；**单个回调异常只记日志**，不阻断本插件其余扩展，也不影响其他插件 |
+
+**UI 注入**（只能注入，不能替换主窗口类）
+
+| 字段 | 默认 | 用途 | 消费方 / 约定 |
+|---|---|---|---|
+| `window_title` | `None` | 覆盖主窗口标题 | `ui/main/window.py`；多插件时后注册者覆盖 |
+| `left_tab_builders` | `[]` | `[(label, builder)]`，左栏 Tab | `builder(host) -> QWidget`，函数体内延迟 import PyQt6 |
+| `right_tab_builders` | `[]` | `[(label, builder)]`，右栏 Tab | 同上 |
+| `menu_builders` | `[]` | `[fn(host, menubar)]`，插入到「帮助」之前 | 弹窗以 `host` 作 parent；按 `ui.plugin_menus` 的 ID 登记定位 |
+| `theme_stylesheet_builders` | `[]` | 追加 QSS 片段 | `ui/theme.py`；只加样式，不改主题判定逻辑 |
+
+**能力注册**（import 即注册的模块，或直接给类/路径）
+
+| 字段 | 默认 | 用途 | 消费方 / 写错的后果 |
+|---|---|---|---|
+| `recognizer_classes` | `[]` | 识别器协议实现类 | `core.recognizers.register_recognizer`；单个失败只记日志 |
+| `workflow_implementations` | `{}` | `{名称: "dotted.path.ClassName"}` | `workflows.implementations.register_workflow`；专属 Tab 通过 `host.run_workflow_implementation` 启动 |
+| `builtin_modules` | `[]` | `@builtin_func` 模块路径列表 | 导入触发注册；**与内置函数或别的插件重名会在加载期报错**，见 [32-grammar/07-subworkflows.md](../32-grammar/07-subworkflows.md) |
+| `profile_period_modules` | `[]` | 注册 Profile 自定义周期（赛季/半赛季等） | `core.profile.register_profile_period`；**这里的导入失败会向上抛**（周期语义错会让账本算错，不能静默） |
+| `telemetry_modules` | `[]` | 统计事件 schema 模块 | `core.telemetry`；导入失败只记日志 |
+| `telemetry_disclosures` | `[]` | 数据用途声明（`TelemetryDisclosure`） | 通用同意框统一呈现；新增采集项必须在此声明 |
+
+**配置、同步与离线包**（详见下节）
+
+| 字段 | 默认 | 用途 | 消费方 |
+|---|---|---|---|
+| `config_policy_modules` | `[]` | 声明哪些列表是登记表、哪些系统条目不可删 | `core.config.resolver`（`register_registry_list_paths` / `register_protected_list_paths`） |
+| `sync_document_modules` | `[]` | 声明插件用户文档的 kind 与文件后缀 | `core.sync.registry.register_user_document_kind` |
+| `configuration_reload_callbacks` | `[]` | 外部完整配置快照应用后清理插件自己的只读缓存 | `core/ondevice/offline.py`（装包后调用） |
+| `offline_configuration_patterns` | `()` | PC→手机同步的配置白名单，路径相对 `system`/`local` | `core/offline_bundle.py` |
+| `offline_session_files` | `None` | 额外会话文件，相对 `session` | 同上 |
+| `offline_database_files` | `()` | `session` 内的 SQLite，公共同步器做 backup 与完整性检查 | 同上 |
+| `history_channels` | `None` | 手机历史独立回传通道 | `core/history_transfer.py`（聚合各插件的声明） |
+
+### 注册顺序与失败边界
+
+`register_hooks` 的处理顺序固定，插件的初始化逻辑依赖它：
+
+1. **依赖校验** —— 缺 `requires_app_ids` 直接抛错，插件不注册（也不注册它的配置策略）。
+2. **配置策略** —— `import config_policy_modules`（`register_config_policies`，离线工具走同一入口）。
+3. **启动回调** —— 执行 `startup_callbacks`，异常只记日志。
+4. **UI 与能力** —— 登记 `id`、`window_title`、Tab/菜单/主题 builders，注册识别器、工作流、
+   内置函数模块、Profile 周期、统计 schema、同步文档声明。
+
+失败边界：识别器 / 工作流 / 内置函数 / 统计 / 同步声明这几处的 import 或注册失败都只写
+`exception` 日志并继续；`profile_period_modules` 是唯一会上抛的分支。`load_app` 阶段
+（插件模块本身 import 失败、未导出 `hooks`）则整体失败——这不是"可降级"的错误。
+
+`load_config_policies(app_ids)` 只装配第 2 步，不注入 UI 与工作流：离线工具
+（`scripts/add_content_version.py`、配置层单测）需要完整登记表但不需要副作用。
 ```
 
 ## 插件目录结构
@@ -159,7 +222,8 @@ def _build_menu(host, menubar):
 
 
 hooks = AppHooks(
-    name="我的游戏",
+    id="mygame",                              # 稳定标识：菜单登记、依赖声明、事件归属都用它
+    name="我的游戏",                           # 显示名，可翻译
     window_title="律匠 - 我的游戏自动化工具",
     # 可选：左/右 Tab 与菜单（注入通用 MainWindow）
     left_tab_builders=[
@@ -205,6 +269,9 @@ def _get_item_name(_engine, item_id: str) -> str:
     return ITEMS.get(item_id, "未知物品")
 ```
 
+函数名在全局命名空间里唯一：与内置函数或其他插件重名会在加载阶段直接报错（不静默覆盖），
+首参命名为 `_engine` / `_wf` 时分别注入引擎与工作流实例。
+
 ### 6. 添加复杂工作流（可选）
 
 ```python
@@ -218,6 +285,29 @@ class AutoFarmWorkflow(BaseWorkflow):
         # 实现工作流逻辑
         pass
 ```
+
+## 插件测试与门禁
+
+插件代码的回归网分三层，新增插件时按这三层补齐：
+
+| 层 | 位置 | 保护什么 |
+|---|---|---|
+| 发现与加载 | `tests/core/test_plugin_discovery.py` | 内置名册与实际源码目录一致（漏登/多登都会失败）、三级扫描、"子目录 + `__init__.py`"识别、非法目录名只跳过、`-reg NAME@PATH` 挂载、`--all-plugins` 去重追加 |
+| 无 Qt 契约 | `tests/core/test_plugin_contracts.py` | 公共插件契约（`AppEvent`、`PluginRuntimePort`、`ProfileProcessor` 等）在屏蔽 PyQt6 的子进程里仍能 import；插件碰到的公共层不得偷偷依赖 Qt |
+| 领域行为 | `tests/yysls/`、外置插件自己的 `tests/` | 装备解析、调律规则、采集流程等业务契约 |
+
+跑法与全局约束：
+
+- 统一 `QT_QPA_PLATFORM=offscreen`；不要指望人工点对话框，模态弹窗在测试里一律被换成
+  立即抛错。
+- 测试进程装了写门禁（`tests/config_write_guard.py`）：任何对仓库真实 `config/` 的写入都会
+  失败。插件测试必须把配置、数据库、session 全指向 `tmp_path`，绝不写真实
+  `config/session`、`config/local` 或用户数据库。
+- 外置插件在主仓库根执行：
+  `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest plugins/<name>/tests`。
+- 改完插件目录或 `_BUILTIN_APP_IDS` 名册，至少跑 `tests/core/test_plugin_discovery.py`；
+  改配置声明跑 `python scripts/add_content_version.py --check`。
+- 打包侧另行校验插件清单与对应 `local` 资源是否随包（见 `plugins/README.md`）。
 
 ## 注册机制
 
@@ -237,6 +327,27 @@ class AutoFarmWorkflow(BaseWorkflow):
 3. **内置函数**：导入 `builtin_modules` 中的模块，触发 `@builtin_func` 装饰器注册
 4. **UI 扩展**：将 tab/menu builders 收集到注册表，由通用 MainWindow 构建时消费
    （多插件 extend 叠加，按 `-reg` 顺序）
+
+## 插件参与离线包与同步的声明面
+
+手机端的配置下发、数据库同步与历史回传都由公共层执行，**公共层不认识任何插件领域词汇**。
+插件只声明"我这里有什么"，具体是哪些文件、哪些表由公共同步器决定怎么搬：
+
+| 字段 | 路径基准 | 公共层怎么用 |
+|---|---|---|
+| `offline_configuration_patterns` | 相对 `system` / `local` | 打包 PC→手机离线包时按通配符收集配置文件；未声明就不下发 |
+| `offline_session_files` | 相对 `session` | 追加会话级文件（函数形式，便于按当前状态决定）；下载安装时同样按白名单处理 |
+| `offline_database_files` | `session` 内的文件名 | 公共同步器对 SQLite 统一做 backup、安装时按包内实际数据库检查完整性；**不按"调律"等领域名称猜需要哪些库** |
+| `sync_document_modules` | Python 模块路径 | 导入即注册插件用户文档的 kind 与后缀（如出装 `.loadouts.json`），账号服务文档通道据此识别 |
+| `history_channels` | 函数，返回 `HistoryChannel` 元组 | 手机历史独立回传（如调律历史）：这些库**不属于配置下发**，走自己的通道 |
+| `configuration_reload_callbacks` | 回调列表 | 手机装完外部完整配置快照后调用，让插件清掉自己的只读缓存；**不重注册 UI、不执行任务** |
+
+两条纪律：
+
+- 声明面只描述"文件/表属于谁"，不要在公共层加领域分支；反过来，插件也不该自己
+  复制一套打包或同步逻辑。
+- 新增数据库必须同时确认它属于哪一类：配置下发（`offline_*`）、历史回传
+  （`history_channels`），还是都不参与。漏声明不会报错，表现是手机上就是缺这份数据。
 
 ## 设计决策
 
@@ -264,6 +375,17 @@ class AutoFarmWorkflow(BaseWorkflow):
 
 ## 相关实现边界
 
+- [插件与宿主运行边界](../../20-requirements/50-platform/22-plugin-runtime.md)：`PluginRuntimePort`
+  的契约与线程约束（需求侧）
+- [插件领域数据归属](../../20-requirements/50-platform/21-plugin-data.md)：插件数据与公共
+  Profile / 同步的边界（需求侧）
+- [配置策略装配](../../20-requirements/50-platform/24-config-policy-bootstrap.md)：
+  `config_policy_modules` 的 bootstrap 顺序与门禁
+- [配置分层：system / local](04-config-layering.md)：插件声明自己的合并策略与受保护列表
+- [DSL 模块化与内置函数](../32-grammar/07-subworkflows.md)：`@builtin_func` 注册、
+  重名拒绝与 `_engine` / `_wf` 注入
+- [插件国际化](../38-platform/08-i18n.md)：`config/i18n/apps/<app>/<lang>.yaml` 与
+  `load_app_i18n`
 - [公共后台服务](../38-platform/11-background-services.md)
 - [游戏配置加载与查询](../31-models/01-equipment-models.md#游戏配置加载与查询)
 - [布局实现职责](../34-scene/02-scene-layout-editing.md#布局实现职责)

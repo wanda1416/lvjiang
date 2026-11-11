@@ -101,7 +101,7 @@ show_totals / name_column_width / column_widths}}`。
 旧版本的 `interface.json.profile.overview_groups` 与 `ui_state.profile_overview` 在启动
 首次访问时一次性迁入（带 `_backup-<时间戳>/` 备份并清理旧节点），迁移后不存在双源。
 实现见 `core/profile/layout.py`，跨端搬运见 `core/sync/layout_sync.py`；
-需求与确认流程见 [用户总览页面结构](../../20-requirements/40-profile/06-overview-layout-sync.md)。
+需求与确认流程见 [用户总览页面结构](../../20-requirements/40-profile/06-overview-layout-sync.md)（仅源码检出）。
 
 ## 周期恢复的同步闸门
 

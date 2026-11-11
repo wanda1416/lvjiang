@@ -47,9 +47,17 @@ def test_rename_failure_keeps_journal_and_restart_converges(tmp_path, monkeypatc
             columns=["stock:credits"], column_widths={"stock:credits": 120})},
     )))
     layout_file = layout.layout_path()
-    # 告警标识是 username:key:level:current，key 不带模型前缀。
+    # 告警标识是 username:key:level:current，key 不带模型前缀；批量运行草稿里的
+    # 生命周期参数（属性单元靠 profile_key 选人）也属于改名要维护的引用。
     interface_path().write_text(
-        json.dumps({"alert_history": {"tester:credits:orange:current": "2026-11-10"}}),
+        json.dumps({
+            "alert_history": {"tester:credits:orange:current": "2026-11-10"},
+            "batch": {"drafts": {"group": {
+                "rounds": 1, "unattended": False, "allow_portrait": False,
+                "workflow_params": {"prepare_item": {
+                    "profile_key": "stock:credits", "max_roll_account": 5}},
+            }}},
+        }),
         encoding="utf-8")
     constants.BATCH_CONFIG_PATH.write_text(json.dumps({"groups": {"group": {"profile_sort_key": "credits"}}}))
     paths = (schema._PROFILE_PATH, layout_file, interface_path(), constants.BATCH_CONFIG_PATH)
@@ -95,6 +103,10 @@ def test_rename_failure_keeps_journal_and_restart_converges(tmp_path, monkeypatc
     assert doc.overview.groups["group"].column_widths == {"stock:coins": 120}
     assert "tester:coins:orange:current" in json.loads(
         interface_path().read_text(encoding="utf-8"))["alert_history"]
+    # 批量运行草稿里的 profile_key 必须跟着改名，否则属性单元的条目准备会拿旧 key 失败。
+    draft_params = json.loads(interface_path().read_text(encoding="utf-8"))[
+        "batch"]["drafts"]["group"]["workflow_params"]["prepare_item"]
+    assert draft_params == {"profile_key": "stock:coins", "max_roll_account": 5}
     assert json.loads(constants.BATCH_CONFIG_PATH.read_text())["groups"]["group"]["profile_sort_key"] == "coins"
 
 

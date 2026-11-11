@@ -111,10 +111,12 @@ def recover_rename(db: ProfileDB) -> None:
 
 
 def _rename_interface(data: dict, renames: list[tuple[str, str, str]]) -> None:
-    """interface.json 里与改名相关的只剩告警标识与批量草稿。
+    """interface.json 里与改名相关的是告警标识、批量草稿的排序键与生命周期参数。
 
     总览分组的列引用与列宽已迁到 ``profile.json``（见
-    :func:`lvjiang.core.profile.layout.rename_column_keys`）。
+    :func:`lvjiang.core.profile.layout.rename_column_keys`）；生命周期参数住在运行
+    草稿（``batch.drafts[*].workflow_params``），其中的 ``profile_key`` 同样是引用，
+    漏改会让属性单元的条目准备拿着旧 key 直接失败。
     """
     alerts = data.get("alert_history", {})
     # 告警标识为 username:key:level:current，与引擎生成格式一致。
@@ -127,12 +129,25 @@ def _rename_interface(data: dict, renames: list[tuple[str, str, str]]) -> None:
                 alerts[":".join(parts)] = alerts.pop(name)
     batch = data.get("batch", {})
     for draft in batch.get("drafts", {}).values():
+        if not isinstance(draft, dict):
+            continue
+        # 旧草稿曾带排序键（现由定义层持有），保留这段只为兼容历史数据。
         if "profile_sort_key" in draft:
             draft["profile_sort_key"] = replace_key(draft["profile_sort_key"], renames)
+        params_by_phase = draft.get("workflow_params")
+        if not isinstance(params_by_phase, dict):
+            continue
+        for params in params_by_phase.values():
+            if not isinstance(params, dict):
+                continue
+            profile_key = params.get("profile_key")
+            if isinstance(profile_key, str) and profile_key:
+                params["profile_key"] = replace_key(profile_key, renames)
 
 
 def _rename_batch_parameters(data: dict, renames: list[tuple[str, str, str]]) -> None:
-    """批量配置组只剩定义层字段；生命周期参数已迁到运行草稿，不再处理。"""
+    """batch.json 只剩定义层字段：排序键在这里改；生命周期参数在运行草稿里，
+    由 :func:`_rename_interface` 处理。"""
     for group in data.get("groups", {}).values():
         if "profile_sort_key" in group:
             group["profile_sort_key"] = replace_key(group["profile_sort_key"], renames)

@@ -186,6 +186,10 @@ def save(group_id: str, payload: str, reset: bool = False) -> str:
                 draft = BatchRunDraft.from_dict(values)
                 if draft.unattended and not item.workflows.recover_unattended:
                     raise ValueError("配置组未设置异常恢复工作流，不能开启无人值守")
+                if (draft.allow_portrait and item.workflows.recover_unattended
+                        and not item.workflows.prepare_item):
+                    raise ValueError(
+                        "允许竖屏需要配置条目准备工作流：启动会先把客户端收回登录主页")
             draft.reconcile(task_candidates=[i for i in item.task_ids if i in tasks],
                             task_defaults=item.default_task_ids, entry_candidates=current["entry_candidates"],
                             entry_defaults=(item.default_usernames if item.execution_unit_key == "user" else item.default_units.get(item.execution_unit_key, [e["id"] for e in current["entries"]])),

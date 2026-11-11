@@ -29,11 +29,13 @@ from lvjiang.ui.batch.batch_runner import (
 )
 
 _RECOVER_WF = "batch/recover_to_login.wf"
+_PREPARE_WF = "batch/prepare_item.wf"
 
 
 def _spec(**kwargs) -> BatchRunSpec:
     """按"定义 + 草稿 → 快照"的真实路径构造，有效值不手写。"""
     recover = kwargs.pop("recover_wf", _RECOVER_WF)
+    prepare = kwargs.pop("prepare_wf", "")
     unattended = kwargs.pop("unattended", True)
     allow_portrait = kwargs.pop("allow_portrait", False)
     skip_lifecycle = kwargs.pop("skip_lifecycle", True)
@@ -43,7 +45,8 @@ def _spec(**kwargs) -> BatchRunSpec:
     item = BatchConfigItem(
         name="group", usernames=list(entries),
         skip_lifecycle_for_single_item=skip_lifecycle,
-        workflows=BatchWorkflows(recover_unattended=recover), **kwargs)
+        workflows=BatchWorkflows(
+            recover_unattended=recover, prepare_item=prepare), **kwargs)
     return BatchRunSpec.build(
         item,
         BatchRunDraft(
@@ -62,11 +65,13 @@ def test_effective_unattended_requires_a_recovery_workflow():
     assert _spec(unattended=False).unattended is False
 
 
-def test_effective_allow_portrait_requires_a_recovery_workflow():
-    """允许竖屏放行后必须有人把客户端收回登录主页，否则不放行。"""
-    assert _spec(allow_portrait=True, recover_wf="").allow_portrait is False
-    assert _spec(allow_portrait=True).allow_portrait is True
-    assert _spec(allow_portrait=False).allow_portrait is False
+def test_effective_allow_portrait_requires_recovery_and_prepare_workflows():
+    """竖屏放行后先回登录主页，必须有人再把客户端送进游戏，否则整批空跑。"""
+    assert _spec(allow_portrait=True, recover_wf="",
+                 prepare_wf=_PREPARE_WF).allow_portrait is False
+    assert _spec(allow_portrait=True, prepare_wf="").allow_portrait is False
+    assert _spec(allow_portrait=True, prepare_wf=_PREPARE_WF).allow_portrait is True
+    assert _spec(allow_portrait=False, prepare_wf=_PREPARE_WF).allow_portrait is False
 
 
 def test_snapshot_freezes_lifecycle_params_from_the_run_draft():
@@ -241,6 +246,7 @@ def _run_start_scenario(tmp_path, monkeypatch, *, size, allow_portrait=True):
         tmp_path,
         _spec(
             scripts=[BatchScript("task0", "任务0")],
+            prepare_wf=_PREPARE_WF,
             allow_portrait=allow_portrait),
         size)
     executed: list[str] = []

@@ -155,9 +155,13 @@ class BatchRunSpec:
             # 无人值守必须配套恢复 wf，否则改道弹窗只会让整批在错误页面上连环失败
             unattended=bool(
                 draft.unattended and item.workflows.recover_unattended),
-            # 允许竖屏同样离不开恢复 wf：放行后要先回到登录主页再进入游戏
+            # 允许竖屏同样离不开恢复 wf：放行后要先回到登录主页再进入游戏；
+            # 也离不开条目准备——把客户端收回登录页之后只有它能再把人送进游戏，
+            # 少了它整批会在登录页上逐条失败。
             allow_portrait=bool(
-                draft.allow_portrait and item.workflows.recover_unattended),
+                draft.allow_portrait
+                and item.workflows.recover_unattended
+                and item.workflows.prepare_item),
         )
 
 
@@ -475,6 +479,13 @@ class BatchScheduler:
             )
             or portrait_start
         )
+        if portrait_start and not self._spec.workflows.prepare_item:
+            # 启动会先把客户端收回登录主页；没有条目准备就没人把它送回游戏，
+            # 整批只会在登录页上逐条失败。UI 与快照都会先拦，这里是外部入口的兜底。
+            raise RuntimeError(
+                "允许竖屏需要条目准备工作流：启动会先回到登录主页，"
+                "没有条目准备无法把客户端送回游戏。"
+                "请先在「工具 → 批量配置」为该配置组配置条目准备 wf")
         self._log(f"[批量] 开始：{len(self._usernames)} 用户 × "
                       f"{len(self._scripts)} 脚本 × {rounds} 轮")
         self._log("[批量] 执行用户：" + "、".join(self._usernames))

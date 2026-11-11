@@ -2,7 +2,7 @@
 #% env: [android, desktop]
 #% parameters:
 #%   - name: max_roll_account
-#%     label: 单轮最大滚动次数
+#%     label: 最大滚动次数
 #%     type: number
 #%     default: 50
 #%     min: 1

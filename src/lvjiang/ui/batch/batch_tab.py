@@ -780,6 +780,7 @@ class BatchTab(QWidget):
         self._summary_form.setRowVisible(self._profile_sort_label, user_unit)
         recover_wf = (item.workflows.recover_unattended
                       if item is not None else "")
+        prepare_wf = (item.workflows.prepare_item if item is not None else "")
         self._unattended_check.blockSignals(True)
         self._unattended_check.setChecked(
             self._draft.unattended and bool(recover_wf))
@@ -792,18 +793,21 @@ class BatchTab(QWidget):
         ) if recover_wf else tr(
             "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守"
             "撞上异常暂停后要靠它把游戏收回登录主页"))
+        # 允许竖屏必然先把客户端收回登录页，所以还要有条目准备把它送进游戏。
+        portrait_ready = bool(recover_wf and prepare_wf)
         self._allow_portrait_check.blockSignals(True)
         self._allow_portrait_check.setChecked(
-            self._draft.allow_portrait and bool(recover_wf))
+            self._draft.allow_portrait and portrait_ready)
         self._allow_portrait_check.blockSignals(False)
-        self._allow_portrait_check.setEnabled(bool(recover_wf))
+        self._allow_portrait_check.setEnabled(portrait_ready)
         self._allow_portrait_check.setToolTip(tr(
             "安卓目标批量开始时若处于竖屏，只要交换宽高后与布局画布比例一致就"
-            "允许启动；启动后先由配置组的「异常恢复 wf」回到登录主页，再按生命"
-            "周期进入游戏。需要先在「工具 → 批量配置」配置该工作流"
-        ) if recover_wf else tr(
-            "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：允许竖屏"
-            "启动后要靠它把游戏从竖屏主页收回到登录主页"))
+            "允许启动；启动后先由配置组的「异常恢复 wf」回到登录主页，再由"
+            "「条目准备工作流」把人送回游戏。两者的工作流都要在「工具 → 批量配置」里配置"
+        ) if portrait_ready else tr(
+            "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」与"
+            "「条目准备工作流」：允许竖屏启动会先把游戏收回登录主页，"
+            "没有条目准备就无法再把人送回游戏"))
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
@@ -1453,6 +1457,23 @@ class BatchTab(QWidget):
             self._show_start_error(tr("暂无配置组，请先通过「工具 → 批量配置」添加"))
             return
 
+        # 允许竖屏会先把客户端收回登录主页，只有条目准备能再把人送进游戏；
+        # 缺它时整批会在登录页上逐条失败，所以在动客户端之前就拦住。
+        if (
+            self._draft.allow_portrait
+            and config.workflows.recover_unattended
+            and not config.workflows.prepare_item
+        ):
+            from PyQt6.QtWidgets import QMessageBox
+            self._show_start_error(tr("允许竖屏需要先配置条目准备工作流"))
+            QMessageBox.warning(
+                self, tr("无法开始批量任务"),
+                tr("「允许竖屏」启动时会先由异常恢复 wf 把客户端收回登录主页，"
+                   "需要条目准备工作流再把人送回游戏。请先在「工具 → 批量配置」"
+                   "为该配置组配置条目准备 wf。"),
+            )
+            return
+
         # 设备执行占用原本只在每个条目准备时获取，手机端正在跑任务时整批会逐条失败
         # 并重复同一句原因。这里先确认一次，占用就整批不启动。
         busy = self._device_busy()
@@ -1872,5 +1893,6 @@ class BatchTab(QWidget):
         self._allow_portrait_check.setEnabled(
             enabled and bool(
                 self._item is not None
-                and self._item.workflows.recover_unattended))
+                and self._item.workflows.recover_unattended
+                and self._item.workflows.prepare_item))
         self._lifecycle_panel.setEnabled(enabled)

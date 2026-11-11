@@ -101,6 +101,27 @@ def test_lifecycle_parameters_are_validated_against_the_workflow(
     assert "条目准备 · 滚动次数" in rejected["message"]
 
 
+def test_allow_portrait_requires_item_preparation_workflow(batch_state):
+    """允许竖屏会先把客户端收回登录页，没有条目准备就没人把它送进游戏。"""
+    from lvjiang.core.batch_run import load_draft
+
+    item, _ = batch_state
+    item.workflows.recover_unattended = "batch/recover_to_login.wf"
+
+    draft = json.loads(batch.view(item.id))["draft"]
+    draft["allow_portrait"] = True
+    rejected = json.loads(batch.save(item.id, json.dumps(draft)))
+    assert not rejected["ok"]
+    assert "条目准备" in rejected["message"]
+    assert load_draft(item.id).allow_portrait is False
+
+    item.workflows.prepare_item = "batch/prepare_item.wf"
+    draft = json.loads(batch.view(item.id))["draft"]
+    draft["allow_portrait"] = True
+    assert json.loads(batch.save(item.id, json.dumps(draft)))["ok"]
+    assert load_draft(item.id).allow_portrait is True
+
+
 def test_running_batch_blocks_single_task_and_draft_edits(batch_state):
     item, _ = batch_state
     task_runner._STATE.begin("batch:group", "测试批量")

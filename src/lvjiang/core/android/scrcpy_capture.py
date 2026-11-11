@@ -53,6 +53,30 @@ _DEVICE_META_SIZE = 64
 # server 版本（必须与 jar 匹配）
 _SERVER_VERSION = "4.1"
 
+# ── media packet 头与帧时延观测 ─────────────────────────
+# scrcpy server/Streamer.java 的位定义：
+#   bit63 = session 包、bit62 = codec config、bit61 = 关键帧，
+#   低 61 位是设备端 MediaCodec 的 PTS（微秒）。
+# PTS 是设备的单调时钟，不能直接和本机 wall clock 比；滞后只能用
+# 「本机时间增量 - PTS 增量」求，这样天然覆盖内核 socket、adb forward
+# 与解码队列里的全部积压。
+_PTS_MASK = (1 << 61) - 1
+_FLAG_CONFIG = 1 << 62
+_FLAG_KEY_FRAME = 1 << 61
+#: H.264 IDR slice 的 NAL 单元类型，仅用于交叉验证 bit61 的关键帧语义。
+_H264_NAL_IDR = 5
+#: media packet 声明 payload 的合理上限。2800x1260 的关键帧远小于 1MB，
+#: 超过该值只可能是把裸字节读成了长度，缓冲已与包边界失步。
+_MAX_MEDIA_PAYLOAD = 4 * 1024 * 1024
+#: 滞后基线：帧率连续稳定后才开采样窗，取低分位并冻结。
+_LAG_BASELINE_SAMPLES = 150
+_LAG_BASELINE_PERCENTILE = 0.1
+_BASELINE_STABLE_SECONDS = 3
+_BASELINE_RATE_MIN_FPS = 1.0
+_BASELINE_RATE_MAX_RATIO = 1.5
+#: 压测摘要：每秒 debug，每 10 秒 info 给阈值分析看分布。
+_METRICS_SUMMARY_SECONDS = 10.0
+
 # ── 画面流故障归因 ──────────────────────────────────────
 # 日志与界面文案共用同一套固定取值，避免事后只有自由文本无法统计。
 FAULT_SOCKET_EOF = "socket_eof"    # 通道断开：socket EOF / 读异常
@@ -76,6 +100,36 @@ class ScrcpyProtocolError(RuntimeError):
     只可能是设备上的 scrcpy-server 版本与 _SERVER_VERSION 对不上。
     必须立刻中止并把原因原样告诉用户，不能退化成通用的连接失败。
     """
+
+
+class _OversizePacketError(RuntimeError):
+    """media packet 声明的长度超过合理上限：缓冲已与包边界失步。
+
+    这种数据不能按字节截断（会从包里切开），只能整段丢弃并重建解码器。
+    """
+
+    def __init__(self, size: int):
+        super().__init__(f"media packet payload 声明为 {size} 字节")
+        self.size = size
+
+
+def _first_slice_nal_type(payload: bytes) -> int | None:
+    """返回 Annex-B payload 前几个 NAL 中第一个 slice 类型（1=P, 5=IDR）。
+
+    关键帧包可能先带 SEI/SPS，因此不能只看第一个 NAL；只在前 4 个 NAL、
+    前 128 字节里找，避免把压缩数据里的随机字节当成起始码。
+    """
+    pos = 0
+    limit = min(len(payload), 128)
+    for _ in range(4):
+        idx = payload.find(b"\x00\x00\x01", pos, limit)
+        if idx < 0 or idx + 3 >= len(payload):
+            return None
+        nal_type = payload[idx + 3] & 0x1F
+        if nal_type in (1, _H264_NAL_IDR):
+            return nal_type
+        pos = idx + 3
+    return None
 
 
 class AndroidStreamCapture(CaptureBackend):
@@ -157,6 +211,39 @@ class AndroidStreamCapture(CaptureBackend):
         #: 按策略暂停（如空闲停流）期间不该有帧，看门狗必须豁免
         self.paused_by_policy = threading.Event()
 
+        # ── 帧时延观测（只记录，不参与取帧决策）──────────────
+        # 锚点 = (首个 media 包 PTS, 收到它时的本机单调秒)。之后的滞后
+        # 全部用增量差求，不需要和设备的单调时钟做绝对对齐。
+        self._metrics_lock = threading.Lock()
+        self._pts_anchor: tuple[int, float] | None = None
+        self._last_pts: int | None = None
+        self._lag_current: float | None = None
+        self._lag_decoded: float | None = None
+        self._lag_min: float | None = None
+        self._lag_max_interval: float | None = None
+        self._lag_baseline: float | None = None
+        self._lag_samples: list[float] = []
+        self._baseline_window_open = False
+        self._baseline_rate_window: list[float] = []
+        self._lag_interval_samples: list[float] = []
+        self._metrics_summary_at = time.monotonic()
+        self._recv_frames = 0
+        self._decoded_frames = 0
+        self._published_frames = 0
+        #: pts_flags 高 3 位分布：索引即 (flags >> 61) & 0x7。
+        self._flag_hist = [0] * 8
+        self._idr_seen = 0
+        self._idr_with_flag = 0
+        self._flag_without_idr = 0
+        self._key_flag_state = 0  # 0=待确认, 1=bit61 确认为关键帧, -1=不符
+        self._key_flag_warned = False
+        self._oversize_packets = 0
+        self._oversize_warned_at = 0.0
+        self._metrics_at = time.monotonic()
+        self._metrics_recv = 0
+        self._metrics_decoded = 0
+        self._metrics_published = 0
+
     @property
     def last_error(self) -> str:
         """最近一次 start() 失败的具体原因，供上层直接展示给用户。"""
@@ -176,6 +263,28 @@ class AndroidStreamCapture(CaptureBackend):
     def frame_sequence(self) -> int:
         """每发布一个新解码帧递增，等待方可据此排除冻结的旧帧。"""
         return self._frame_sequence
+
+    @property
+    def lag_seconds(self) -> float | None:
+        """最近解码帧相对设备采集时刻的滞后（秒，含固定管线延迟）。
+
+        观测用。后续做取帧门控时必须用它，而不是 ``_last_frame_at``：
+        后者只在「发布」时前进，不发布期间会被误判成编码器停摆。
+        """
+        with self._metrics_lock:
+            return self._lag_decoded
+
+    @property
+    def lag_excess_seconds(self) -> float | None:
+        """扣掉健康基线后的可行动滞后（秒）；基线未建立时返回原始滞后。"""
+        with self._metrics_lock:
+            lag = self._lag_decoded
+            baseline = self._lag_baseline
+        if lag is None:
+            return None
+        if baseline is None:
+            return lag
+        return max(0.0, lag - baseline)
 
     @property
     def is_transitioning(self) -> bool:
@@ -259,10 +368,19 @@ class AndroidStreamCapture(CaptureBackend):
         """运行期取帧：通道故障时先阻塞等待恢复，再返回最新帧。
 
         与 :meth:`capture`（永远返回最后一帧，UI 预览/截屏用）不同，这条路径
-        在拿不到画面时宁可阻塞或抛错，也绝不把陈旧帧当成当前画面交给识别——
-        那正是「流断了却静默跑完」的成因。
+        在拿不到画面时宁可阻塞或抛错，绝不把「断流后的冻结帧」交给识别。
+        注意：它目前只防通道故障，不防解码积压造成的滞后；滞后值见
+        ``lag_seconds`` / ``lag_excess_seconds``（目前只记录，不改变取帧）。
         """
         self.ensure_channel_healthy()
+        # 观测：后续门控必须看「最新已解码帧」的 lag（lag_seconds），不能看
+        # _last_frame_at——不发布期间它不前进，会把滞后误判成编码器停摆。
+        lag = self.lag_seconds
+        excess = self.lag_excess_seconds
+        logger.debug(
+            "[AndroidStream] 取帧观测 "
+            f"lag={'-' if lag is None else f'{lag * 1000:.0f}ms'} "
+            f"excess={'-' if excess is None else f'{excess * 1000:.0f}ms'}")
         frame = self.capture(timeout=timeout)
         if frame is not None:
             return frame
@@ -330,6 +448,7 @@ class AndroidStreamCapture(CaptureBackend):
             self._transitioning = True
             self._pending_session = True
             self._codec_config = b""
+            self._reset_lag_metrics(full=True)
             self._scid = random.randint(1, 0x7FFFFFFF)
             self._socket_name = f"scrcpy_{self._scid:08x}"
 
@@ -747,6 +866,8 @@ class AndroidStreamCapture(CaptureBackend):
         self._ready_event.clear()
         with self._frame_lock:
             self._latest_frame = None
+        # 编码器重建后 PTS 可能换基准，旧锚点会把跳变算成巨大滞后。
+        self._reset_lag_metrics()
         logger.info(
             f"[AndroidStream] session {'初始化' if initial else '切换'}: "
             f"{previous or '-'} -> {width}x{height}")
@@ -773,6 +894,8 @@ class AndroidStreamCapture(CaptureBackend):
         if header[0] & 0x80:
             return "session", header, b"", buf[12:]
         payload_size = struct.unpack(">I", header[8:12])[0]
+        if payload_size > _MAX_MEDIA_PAYLOAD:
+            raise _OversizePacketError(payload_size)
         if len(buf) < 12 + payload_size:
             return None
         return (
@@ -786,8 +909,9 @@ class AndroidStreamCapture(CaptureBackend):
         """后台线程：持续读取 scrcpy 视频流 → 增量解码 → 更新最新帧
 
         scrcpy media packet 格式（12 字节帧头 + payload）：
-        - byte 0: flags (MSB=media_packet, C=config, K=keyframe) + PTS 高 7 位
-        - byte 1-7: PTS 低 56 位
+        - byte 0-7: PTS + flags
+          bit63=session packet（session 包不进入本循环）、bit62=codec config、
+          bit61=keyframe；低 61 位是设备端 MediaCodec 的 PTS（微秒）
         - byte 8-11: packet size (H.264 payload 大小，big-endian)
         - byte 12+: raw H.264 payload
         """
@@ -809,6 +933,7 @@ class AndroidStreamCapture(CaptureBackend):
 
     def _decode_loop_inner(self, frame_interval: float, last_frame_time: float, buf: bytes) -> None:
         while self._running:
+            self._maybe_log_metrics(time.monotonic())
             if self._sock is None:
                 break
             try:
@@ -843,7 +968,16 @@ class AndroidStreamCapture(CaptureBackend):
             # scrcpy 在方向/显示属性变化时会在同一流中再次插入无 payload
             # session packet，不能将其 byte 8-11 的 height 当成 payload size。
             while len(buf) >= 12:
-                parsed = self._pop_stream_packet(buf)
+                try:
+                    parsed = self._pop_stream_packet(buf)
+                except _OversizePacketError as exc:
+                    # 剩余 payload 还在 socket 里，清空缓冲无法恢复包边界；
+                    # 声明故障让恢复链重建会话。
+                    self._count_oversize_packet(exc.size, time.monotonic())
+                    self._declare_fault(
+                        FAULT_DECODE,
+                        tr("视频包长度异常，画面流已失步（需要重建会话）"))
+                    return
                 if parsed is None:
                     break
                 kind, header, h264_data, buf = parsed
@@ -856,11 +990,16 @@ class AndroidStreamCapture(CaptureBackend):
                     logger.warning("[AndroidStream] 忽略空 media packet")
                     continue
 
-                is_config = bool(pts_flags & (1 << 62))
+                is_config = bool(pts_flags & _FLAG_CONFIG)
                 if is_config:
                     # scrcpy 官方客户端对 H.26x 将 codec config 前置到下一帧。
                     self._codec_config += h264_data
                     continue
+
+                now = time.monotonic()
+                pts_us = pts_flags & _PTS_MASK
+                # 用未拼接 SPS/PPS 的原始 payload 判断首个 slice 类型。
+                self._observe_media_packet(pts_flags, h264_data, now)
                 if self._codec_config:
                     h264_data = self._codec_config + h264_data
                     self._codec_config = b""
@@ -885,10 +1024,13 @@ class AndroidStreamCapture(CaptureBackend):
                         self._note_decode_error()
                         continue
                     for frame in frames:
-                        now = time.monotonic()
-                        if frame_interval and now - last_frame_time < frame_interval:
+                        frame_now = time.monotonic()
+                        # 先记滞后再限频：被限频丢掉的帧同样是「已解码」，
+                        # 后续门控必须能看到解码队列的真实滞后。
+                        self._record_decoded_frame(pts_us, frame_now)
+                        if frame_interval and frame_now - last_frame_time < frame_interval:
                             continue
-                        last_frame_time = now
+                        last_frame_time = frame_now
 
                         bgr = self._frame_to_bgr(frame)
                         h, w = bgr.shape[:2]
@@ -901,6 +1043,9 @@ class AndroidStreamCapture(CaptureBackend):
                         with self._frame_lock:
                             self._latest_frame = bgr
                             self._frame_sequence += 1
+                        with self._metrics_lock:
+                            self._published_frames += 1
+                            self._metrics_published += 1
                         self._last_frame_at = time.monotonic()
                         self._consecutive_decode_errors = 0
                         self._size = (w, h)
@@ -919,9 +1064,14 @@ class AndroidStreamCapture(CaptureBackend):
                             except Exception as e:
                                 logger.debug(f"[AndroidStream] 帧回调异常: {e}")
 
-            # buffer 过大时截断防止内存膨胀
-            if len(buf) > 1024 * 1024:
-                buf = buf[-65536:]
+            # 解析循环结束时 buf 只可能残留「一个包的前半段」；能涨到上限
+            # 说明长度字段本身就是错的，没有可保留的包边界，只能整段丢弃。
+            if len(buf) > _MAX_MEDIA_PAYLOAD + 12:
+                self._count_oversize_packet(len(buf), time.monotonic())
+                self._declare_fault(
+                    FAULT_DECODE,
+                    tr("视频包长度异常，画面流已失步（需要重建会话）"))
+                return
 
         # flush decoder 仅在正常退出时执行（非停止信号触发），避免退出时阻塞
         if self._running:
@@ -936,7 +1086,228 @@ class AndroidStreamCapture(CaptureBackend):
                 except Exception:
                     pass
 
-    # ─── 内部：健康看门狗 ─────────────────────────────────
+    # ─── 内部：帧时延观测（Phase 1 只记录）────────────────
+
+    def _reset_lag_metrics(self, *, full: bool = False) -> None:
+        """重建/切换会话后重置 PTS 锚点与基线。
+
+        编码器重建后 PTS 可能换基准，旧锚点会把跳变算成巨大滞后；基线
+        也必须重学，否则会沿用上一个 session 的管线延迟。
+        """
+        with self._metrics_lock:
+            self._pts_anchor = None
+            self._last_pts = None
+            self._lag_current = None
+            self._lag_decoded = None
+            self._lag_min = None
+            self._lag_max_interval = None
+            self._lag_baseline = None
+            self._lag_samples.clear()
+            self._baseline_window_open = False
+            self._baseline_rate_window.clear()
+            self._lag_interval_samples.clear()
+            self._metrics_summary_at = time.monotonic()
+            self._metrics_at = time.monotonic()
+            self._metrics_recv = 0
+            self._metrics_decoded = 0
+            self._metrics_published = 0
+            if full:
+                self._recv_frames = 0
+                self._decoded_frames = 0
+                self._published_frames = 0
+                self._flag_hist = [0] * 8
+                self._idr_seen = 0
+                self._idr_with_flag = 0
+                self._flag_without_idr = 0
+                self._key_flag_state = 0
+                self._key_flag_warned = False
+                self._oversize_packets = 0
+                self._oversize_warned_at = 0.0
+
+    def _observe_media_packet(
+        self, pts_flags: int, payload: bytes, now: float,
+    ) -> float | None:
+        """记录一个 media 包的 PTS / flags，返回相对锚点的滞后。
+
+        首包只建立锚点。关键帧位是协议假设，先靠 IDR NAL 交叉验证；
+        验证通过前滞后照常采样，但日志会标 ``keyflag=0`` 便于复核。
+        """
+        pts_us = pts_flags & _PTS_MASK
+        has_key_flag = bool(pts_flags & _FLAG_KEY_FRAME)
+        nal_type = _first_slice_nal_type(payload)
+        confirmed_now = False
+        with self._metrics_lock:
+            self._recv_frames += 1
+            self._metrics_recv += 1
+            self._flag_hist[(pts_flags >> 61) & 0x7] += 1
+            if nal_type == _H264_NAL_IDR:
+                self._idr_seen += 1
+                if has_key_flag:
+                    self._idr_with_flag += 1
+                    if self._key_flag_state == 0:
+                        self._key_flag_state = 1
+                        confirmed_now = True
+            elif has_key_flag:
+                self._flag_without_idr += 1
+
+            anchor = self._pts_anchor
+            lag: float | None = None
+            if anchor is None:
+                self._pts_anchor = (pts_us, now)
+                self._last_pts = pts_us
+            elif self._last_pts is not None and pts_us < self._last_pts:
+                # PTS 回退：编码器换了时间基准却没有发 session 包。此时
+                # Δpts 是负数，算出来会像「巨大积压」，必须重建锚点。
+                self._pts_anchor = (pts_us, now)
+                self._last_pts = pts_us
+                self._lag_current = None
+            else:
+                self._last_pts = pts_us
+                candidate = (now - anchor[1]) - (pts_us - anchor[0]) / 1_000_000.0
+                if candidate < -1.0:
+                    # 反向跳变（PTS 前跳）同样说明基准变了。
+                    self._pts_anchor = (pts_us, now)
+                    self._lag_current = None
+                else:
+                    self._lag_current = candidate
+                    lag = candidate
+        if confirmed_now:
+            logger.info(
+                "[AndroidStream] bit61 已确认为关键帧位（IDR NAL 与 flag 同步出现）")
+        return lag
+
+    def _lag_at(self, pts_us: int, now: float) -> float | None:
+        """用锚点计算指定 PTS 在本机时刻 ``now`` 的滞后（秒）。"""
+        with self._metrics_lock:
+            anchor = self._pts_anchor
+        if anchor is None:
+            return None
+        return (now - anchor[1]) - (pts_us - anchor[0]) / 1_000_000.0
+
+    def _record_decoded_frame(self, pts_us: int, now: float) -> float | None:
+        """记录每个解码帧的滞后，包括随后被限频丢弃的帧。"""
+        lag = self._lag_at(pts_us, now)
+        with self._metrics_lock:
+            self._decoded_frames += 1
+            self._metrics_decoded += 1
+            if lag is None:
+                return None
+            self._lag_decoded = lag
+            if self._lag_min is None or lag < self._lag_min:
+                self._lag_min = lag
+            if self._lag_max_interval is None or lag > self._lag_max_interval:
+                self._lag_max_interval = lag
+            self._lag_interval_samples.append(lag)
+            if self._lag_baseline is None and self._baseline_window_open:
+                self._lag_samples.append(lag)
+        return lag
+
+    def _count_oversize_packet(self, size: int, now: float) -> None:
+        """记一次包头失步；剩余字节无法按包边界恢复，由调用方声明故障重建会话。"""
+        with self._metrics_lock:
+            self._oversize_packets += 1
+            should_warn = now - self._oversize_warned_at >= 5.0
+            if should_warn:
+                self._oversize_warned_at = now
+        if should_warn:
+            logger.warning(
+                f"[AndroidStream] 视频包声明 {size} 字节，缓冲已与包边界失步："
+                "当前会话无法继续按包解析，等待重建")
+
+    def _maybe_log_metrics(self, now: float) -> None:
+        """每秒输出接收/解码/发布帧率与滞后分布，用来确认观测口径。"""
+        with self._metrics_lock:
+            elapsed = now - self._metrics_at
+            if elapsed < 1.0:
+                return
+            recv_fps = self._metrics_recv / elapsed
+            dec_fps = self._metrics_decoded / elapsed
+            pub_fps = self._metrics_published / elapsed
+            self._metrics_recv = 0
+            self._metrics_decoded = 0
+            self._metrics_published = 0
+            self._metrics_at = now
+
+            baseline_window_open = False
+            if self._lag_baseline is None and not self._baseline_window_open:
+                self._baseline_rate_window.append(dec_fps)
+                if len(self._baseline_rate_window) > _BASELINE_STABLE_SECONDS:
+                    self._baseline_rate_window.pop(0)
+                rates = self._baseline_rate_window
+                if (len(rates) == _BASELINE_STABLE_SECONDS
+                        and min(rates) >= _BASELINE_RATE_MIN_FPS
+                        and max(rates) <= min(rates) * _BASELINE_RATE_MAX_RATIO):
+                    self._baseline_window_open = True
+                    baseline_window_open = True
+
+            if (self._key_flag_state == 0 and self._idr_seen >= 3
+                    and self._idr_with_flag == 0):
+                self._key_flag_state = -1
+
+            lag = self._lag_current
+            lag_decoded = self._lag_decoded
+            lag_min = self._lag_min
+            lag_max = self._lag_max_interval
+            self._lag_max_interval = None
+            baseline = self._lag_baseline
+            flag_hist = {f"{i:03b}": n for i, n in enumerate(self._flag_hist) if n}
+            idr_seen = self._idr_seen
+            idr_with_flag = self._idr_with_flag
+            flag_without_idr = self._flag_without_idr
+            oversize = self._oversize_packets
+            key_flag_state = self._key_flag_state
+            frozen = False
+            if baseline is None and len(self._lag_samples) >= _LAG_BASELINE_SAMPLES:
+                samples = sorted(self._lag_samples)
+                baseline = max(
+                    0.0, samples[int(len(samples) * _LAG_BASELINE_PERCENTILE)])
+                self._lag_baseline = baseline
+                self._lag_samples.clear()
+                frozen = True
+
+            summary = None
+            if now - self._metrics_summary_at >= _METRICS_SUMMARY_SECONDS:
+                self._metrics_summary_at = now
+                if self._lag_interval_samples:
+                    samples = sorted(self._lag_interval_samples)
+                    summary = (
+                        samples[int(len(samples) * 0.5)],
+                        samples[int(len(samples) * 0.9)],
+                        samples[-1],
+                        len(samples),
+                    )
+                    self._lag_interval_samples.clear()
+
+        def _ms(value: float | None) -> str:
+            return "-" if value is None else f"{value * 1000:.0f}"
+
+        logger.debug(
+            f"[AndroidStream] 观测 recv={recv_fps:.1f}fps dec={dec_fps:.1f}fps "
+            f"pub={pub_fps:.1f}fps lag={_ms(lag)}ms dec_lag={_ms(lag_decoded)}ms "
+            f"base={_ms(baseline)}ms min={_ms(lag_min)}ms max={_ms(lag_max)}ms "
+            f"flags={flag_hist} idr={idr_seen}/flag={idr_with_flag} "
+            f"flag_non_idr={flag_without_idr} keyflag={key_flag_state} "
+            f"oversize={oversize}")
+        if frozen:
+            logger.info(f"[AndroidStream] 滞后基线冻结 baseline={baseline:.3f}s")
+        if baseline_window_open:
+            logger.info("[AndroidStream] 帧率稳定，开始采样滞后基线")
+        if summary is not None:
+            p50, p90, max_lag, count = summary
+            logger.info(
+                f"[AndroidStream] 压测摘要 samples={count} "
+                f"lag_p50={_ms(p50)}ms lag_p90={_ms(p90)}ms "
+                f"lag_max={_ms(max_lag)}ms base={_ms(baseline)}ms "
+                f"recv={recv_fps:.1f}fps dec={dec_fps:.1f}fps "
+                f"pub={pub_fps:.1f}fps keyflag={key_flag_state} "
+                f"oversize={oversize}")
+        if key_flag_state == -1 and not self._key_flag_warned:
+            self._key_flag_warned = True
+            logger.warning(
+                "[AndroidStream] 已看到 IDR 帧但 pts_flags 的 bit61 从未置位，"
+                "关键帧位假设不成立，PTS 掩码需要复核")
+
+    # ─── 内部：健康观测 ───────────────────────────────────
 
     def _note_decode_error(self) -> None:
         """统计解码失败（诊断计数）。不声明 fault：解码器可能自行恢复。"""
@@ -946,15 +1317,13 @@ class AndroidStreamCapture(CaptureBackend):
     def _frame_to_bgr(self, frame) -> np.ndarray:
         """将 PyAV VideoFrame 转换为 BGR numpy 数组
 
-        注意：reformat / to_ndarray 期间必须保持 frame 引用，
-        防止底层 AVFrame 被提前释放导致 numpy 数组指向已释放内存（use-after-free）。
+        PyAV 的 to_ndarray 是否共享 AVFrame 缓冲取决于格式与版本；这里显式
+        拷贝，保证发布出去的数据不依赖 frame 生命周期（解码线程随后会释放它）。
         """
         if frame.format.name != "bgr24":
             frame = frame.reformat(format="bgr24")
         arr = frame.to_ndarray()
-        # 显式保持 frame 生命周期至 ndarray 拷贝完成
-        _ = frame
-        return arr
+        return np.array(arr, copy=True, order="C")
 
     # ─── 内部：forward 清理 ───────────────────────────────
 

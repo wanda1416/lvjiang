@@ -6,16 +6,22 @@
 """
 from __future__ import annotations
 
+import struct
 import threading
+import time
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from loguru import logger
 
 from lvjiang.core.android.recovery import AndroidRecovery, ChannelFaultError
 from lvjiang.core.android.scrcpy_capture import (
+    FAULT_DECODE,
     FAULT_SOCKET_EOF,
     AndroidStreamCapture,
+    _first_slice_nal_type,
+    _OversizePacketError,
 )
 from lvjiang.core.config.models import AndroidRecoveryConfig
 
@@ -162,3 +168,124 @@ def test_recover_stream_without_manual_channel_raises_channel_fault():
 
     with pytest.raises(ChannelFaultError):
         coordinator.recover_stream(_Stream())
+
+
+# ─── 帧时延观测 / 包边界 ──────────────────────────────────
+
+def test_first_slice_nal_type_skips_sei_to_idr():
+    """关键帧包可能先带 SEI/SPS，交叉校验必须找到真正的 slice NAL。"""
+    payload = b"\x00\x00\x00\x01\x06\x05" + b"\x00\x00\x01\x65\x88\x84"
+    assert _first_slice_nal_type(payload) == 5
+    assert _first_slice_nal_type(b"\x00\x00\x01\x41\x9a") == 1
+    assert _first_slice_nal_type(b"\x12\x34") is None
+
+
+def test_pop_stream_packet_rejects_oversize_payload():
+    """长度字段越界说明缓冲已失步，必须整包丢弃而不是从包里截断。"""
+    header = struct.pack(">QI", 12345, 8 * 1024 * 1024)
+    with pytest.raises(_OversizePacketError):
+        AndroidStreamCapture._pop_stream_packet(header)
+
+
+def test_lag_uses_pts_and_wall_delta():
+    """滞后 = 本机时间增量 - PTS 增量，不需要设备时钟对齐。"""
+    cap = _stream()
+    assert cap._observe_media_packet(1_000_000, b"", 100.0) is None
+    lag = cap._observe_media_packet(3_000_000, b"", 102.5)
+    assert lag == pytest.approx(0.5)
+    assert cap.lag_seconds is None  # 还没有解码帧
+
+    cap._record_decoded_frame(3_000_000, 102.5)
+    assert cap.lag_seconds == pytest.approx(0.5)
+    # 基线尚未建立时，可行动滞后等于原始滞后
+    assert cap.lag_excess_seconds == pytest.approx(0.5)
+
+
+def test_pts_backwards_jump_rebuilds_anchor():
+    """PTS 大幅回退（编码器换基准）不能算成负滞后。"""
+    cap = _stream()
+    cap._observe_media_packet(10_000_000, b"", 100.0)
+    assert cap._observe_media_packet(1_000_000, b"", 100.1) is None
+    assert cap._observe_media_packet(3_000_000, b"", 102.6) == pytest.approx(0.5)
+
+
+def test_keyframe_flag_confirmed_by_idr_nal():
+    """bit61 与 IDR NAL 同步出现后才标记关键帧位已确认。"""
+    cap = _stream()
+    cap._observe_media_packet(
+        (1 << 61) | 5_000_000, b"\x00\x00\x00\x01\x65\x88", 100.0)
+    assert cap._key_flag_state == 1
+    assert cap._idr_seen == 1
+    assert cap._idr_with_flag == 1
+
+
+def test_lag_baseline_freezes_at_low_percentile():
+    """基线取低分位而不是均值/中位数，避免把少量积压算进正常延迟。"""
+    cap = _stream()
+    with cap._metrics_lock:
+        cap._lag_samples.extend([0.2] * 135 + [5.0] * 15)
+        now = cap._metrics_at + 1.0
+    cap._maybe_log_metrics(now)
+    assert cap._lag_baseline == pytest.approx(0.2)
+
+
+def test_frame_to_bgr_returns_owned_array():
+    """发布出去的帧必须拥有自己的缓冲，不能是 AVFrame 的视图。"""
+    import av
+
+    cap = _stream()
+    frame = av.VideoFrame(4, 4, format="yuv420p")
+    bgr = cap._frame_to_bgr(frame)
+    assert bgr.flags["C_CONTIGUOUS"]
+    assert bgr.flags["OWNDATA"]
+
+
+def test_baseline_samples_wait_for_stable_window():
+    """帧率稳定前不攒基线，避免构建期积压被冻进基线。"""
+    cap = _stream()
+    cap._observe_media_packet(1_000_000, b"", 100.0)
+    cap._record_decoded_frame(2_000_000, 101.0)
+    assert cap._lag_samples == []
+
+    cap._baseline_window_open = True
+    cap._record_decoded_frame(3_000_000, 102.0)
+    assert len(cap._lag_samples) == 1
+
+
+def test_oversize_packet_declares_desync_fault():
+    """声明长度越界后剩余字节仍在 socket 里，必须声明故障重建会话。"""
+    class _OversizeSocket:
+        def __init__(self):
+            self._sent = False
+
+        def recv(self, _n):
+            if self._sent:
+                return b""
+            self._sent = True
+            return struct.pack(">QI", 0, 8 * 1024 * 1024)
+
+        def close(self):
+            pass
+
+    cap = _stream()
+    cap._sock = _OversizeSocket()
+    cap._decode_loop()
+    assert cap.last_fault == FAULT_DECODE
+
+
+def test_metrics_summary_is_info_level():
+    """压测只看 info 时也要能看到滞后 p50/p90/max。"""
+    cap = _stream()
+    now = time.monotonic()
+    with cap._metrics_lock:
+        cap._metrics_at = now - 1.0
+        cap._metrics_summary_at = now - 11.0
+        cap._lag_interval_samples.extend([0.1, 0.2, 0.3])
+
+    records: list[str] = []
+    sink = logger.add(lambda message: records.append(str(message)), level="INFO")
+    try:
+        cap._maybe_log_metrics(now)
+    finally:
+        logger.remove(sink)
+    assert any("压测摘要" in message for message in records)

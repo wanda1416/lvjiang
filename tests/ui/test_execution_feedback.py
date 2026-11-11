@@ -36,6 +36,9 @@ def controls():
         _host=host, _btn_run=QPushButton(), _btn_pause_resume=QPushButton(),
         _start_feedback=ExecutionFeedback(), _item=BatchConfigItem(name="测试配置"),
         _script_order=["example"], _user_order=["example"],
+        # 真实 BatchTab 开始前会把防抖中的生命周期参数落盘；本用例只验提示文案，
+        # 假对象按"无需落盘"处理即可（否则要连 _params_save_timer 一起造假）。
+        _flush_lifecycle_params=lambda *args, **kwargs: None,
     )
     tuning = SimpleNamespace(
         _host=host, btn_run_tuning=QPushButton(), btn_pause_resume=QPushButton(),

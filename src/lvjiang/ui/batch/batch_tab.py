@@ -87,6 +87,7 @@ from .batch_runner import (
     BatchScript,
     PlannedTask,
 )
+from .lifecycle_params import LifecycleParamsPanel
 
 
 @dataclass
@@ -361,6 +362,10 @@ class BatchTab(QWidget):
         self._unattended_check = QCheckBox()
         self._unattended_check.toggled.connect(self._on_unattended_toggled)
         summary_form.addRow(tr_label('无人值守'), self._unattended_check)
+        self._allow_portrait_check = QCheckBox()
+        self._allow_portrait_check.toggled.connect(
+            self._on_allow_portrait_toggled)
+        summary_form.addRow(tr_label('允许竖屏'), self._allow_portrait_check)
         self._workflow_labels: dict[str, QLabel] = {}
         for key, label in (
             ("batch_setup", tr("批次准备") + "："),
@@ -376,8 +381,20 @@ class BatchTab(QWidget):
             self._workflow_labels[key] = value
             add_top_aligned_row(summary_form, label, value)
         layout.addWidget(summary_group)
-
-        layout.addStretch()
+        # 生命周期参数按 wf 文件头实时生成，值写运行草稿；配置窗口只选文件。
+        self._lifecycle_panel = LifecycleParamsPanel()
+        self._lifecycle_panel.changed.connect(
+            self._on_lifecycle_params_changed)
+        self._params_save_timer = QTimer(self)
+        self._params_save_timer.setSingleShot(True)
+        self._params_save_timer.setInterval(400)
+        self._params_save_timer.timeout.connect(self._save_draft)
+        self._lifecycle_scroll = QScrollArea()
+        self._lifecycle_scroll.setWidgetResizable(True)
+        self._lifecycle_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._lifecycle_scroll.setWidget(self._lifecycle_panel)
+        self._lifecycle_scroll.setVisible(False)
+        layout.addWidget(self._lifecycle_scroll, 1)
         return widget
 
     def _build_progress_page(self) -> QWidget:
@@ -726,6 +743,7 @@ class BatchTab(QWidget):
         """切换配置组 → 换到它自己的运行草稿，并记下主页面活动组。"""
         if index < 0:
             return
+        self._flush_lifecycle_params()
         group_id = str(self._config_combo.itemData(index) or "")
         set_active_group_id(group_id)
         self._refresh_group_contents(group_id)
@@ -774,9 +792,41 @@ class BatchTab(QWidget):
         ) if recover_wf else tr(
             "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守"
             "撞上异常暂停后要靠它把游戏收回登录主页"))
+        self._allow_portrait_check.blockSignals(True)
+        self._allow_portrait_check.setChecked(
+            self._draft.allow_portrait and bool(recover_wf))
+        self._allow_portrait_check.blockSignals(False)
+        self._allow_portrait_check.setEnabled(bool(recover_wf))
+        self._allow_portrait_check.setToolTip(tr(
+            "安卓目标批量开始时若处于竖屏，只要交换宽高后与布局画布比例一致就"
+            "允许启动；启动后先由配置组的「异常恢复 wf」回到登录主页，再按生命"
+            "周期进入游戏。需要先在「工具 → 批量配置」配置该工作流"
+        ) if recover_wf else tr(
+            "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：允许竖屏"
+            "启动后要靠它把游戏从竖屏主页收回到登录主页"))
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
+        if item is None:
+            self._lifecycle_scroll.setVisible(False)
+        else:
+            self._lifecycle_panel.set_workflows(
+                item.workflows, self._draft.workflow_params)
+            self._lifecycle_scroll.setVisible(
+                self._lifecycle_panel.has_content())
+
+    def _on_lifecycle_params_changed(self) -> None:
+        """参数属于本次执行：立即进草稿，落盘做短防抖。"""
+        if self._item is None:
+            return
+        self._draft.workflow_params = self._lifecycle_panel.values()
+        self._params_save_timer.start()
+
+    def _flush_lifecycle_params(self) -> None:
+        """切换配置组或开始前把防抖中的参数落盘。"""
+        if self._params_save_timer.isActive():
+            self._params_save_timer.stop()
+            self._save_draft()
 
     def _on_rounds_changed(self, rounds: int) -> None:
         self._draft.rounds = int(rounds)
@@ -784,6 +834,10 @@ class BatchTab(QWidget):
 
     def _on_unattended_toggled(self, checked: bool) -> None:
         self._draft.unattended = bool(checked)
+        self._save_draft()
+
+    def _on_allow_portrait_toggled(self, checked: bool) -> None:
+        self._draft.allow_portrait = bool(checked)
         self._save_draft()
 
     def _unit_candidates(self, config: BatchConfigItem) -> list[str]:
@@ -1358,6 +1412,8 @@ class BatchTab(QWidget):
             self._refresh_run_button(state)
             self._host.append_log(f"[批量] {self._start_feedback.text()}")
             return
+        # 参数防抖还没落盘时先落一次，保证快照与界面显示的是同一份值。
+        self._flush_lifecycle_params()
         usernames = self._get_enabled_usernames()
         scripts = self._checked_scripts()
 
@@ -1813,3 +1869,8 @@ class BatchTab(QWidget):
             enabled and bool(
                 self._item is not None
                 and self._item.workflows.recover_unattended))
+        self._allow_portrait_check.setEnabled(
+            enabled and bool(
+                self._item is not None
+                and self._item.workflows.recover_unattended))
+        self._lifecycle_panel.setEnabled(enabled)

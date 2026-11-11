@@ -95,6 +95,20 @@ def _state(group_id: str = ""):
         meta, _ = metadata_for_script_config(path) if path else ({}, "")
         labels[phase] = meta.get("name") or (Path(name).stem if name else "")
     view["workflow_names"] = labels
+    from ..batch_config import lifecycle_parameter_definitions
+    from ..task_params import merge_task_params, parameters_for_values
+    lifecycle: dict[str, dict] = {}
+    for phase, definitions in lifecycle_parameter_definitions(
+            item.workflows).items():
+        if not definitions:
+            continue
+        params, _ = merge_task_params(
+            definitions, draft.workflow_params.get(phase, {}), None)
+        lifecycle[phase] = {
+            "definitions": parameters_for_values(definitions, params),
+            "values": params,
+        }
+    view["lifecycle"] = lifecycle
     if item.execution_unit_key == "user" and item.profile_sort_key:
         from ..profile.schema import get_profile_config
         try:
@@ -106,6 +120,47 @@ def _state(group_id: str = ""):
     view["definition_token"] = _definition_token(item)
     view["draft"]["definition_token"] = view["definition_token"]
     return item, draft, tasks, usernames, view
+
+
+def _validate_workflow_params(item, draft: BatchRunDraft) -> None:
+    """按当前工作流定义校验并裁剪本次参数，丢弃已不再声明的键。"""
+    from ..batch_config import lifecycle_parameter_definitions
+    from ..task_params import merge_task_params, parameters_for_values
+    from .task_settings import _validate
+    phase_names = {
+        "batch_setup": "批次准备",
+        "prepare_item": "条目准备",
+        "finish_item": "条目收尾",
+        "batch_teardown": "批次收尾",
+        "recover_unattended": "异常恢复",
+    }
+    cleaned: dict[str, dict] = {}
+    for phase, definitions in lifecycle_parameter_definitions(
+            item.workflows).items():
+        source = draft.workflow_params.get(phase, {})
+        if not definitions or not isinstance(source, dict) or not source:
+            continue
+        params, _ = merge_task_params(definitions, source, None)
+        visible = {
+            definition["name"]
+            for definition in parameters_for_values(definitions, params)
+        }
+        kept: dict = {}
+        for definition in definitions:
+            key = definition["name"]
+            if key not in source:
+                continue
+            try:
+                kept[key] = _validate(definition, params.get(key))
+            except (ValueError, TypeError):
+                if key in visible:
+                    raise ValueError(
+                        f"{phase_names.get(phase, phase)} · "
+                        f"{definition.get('label', key)}：参数不符合当前定义"
+                    ) from None
+        if kept:
+            cleaned[phase] = kept
+    draft.workflow_params = cleaned
 
 
 def view(group_id: str = "") -> str:
@@ -135,6 +190,7 @@ def save(group_id: str, payload: str, reset: bool = False) -> str:
                             task_defaults=item.default_task_ids, entry_candidates=current["entry_candidates"],
                             entry_defaults=(item.default_usernames if item.execution_unit_key == "user" else item.default_units.get(item.execution_unit_key, [e["id"] for e in current["entries"]])),
                             unit_key=item.execution_unit_key)
+            _validate_workflow_params(item, draft)
             save_draft(item.id, draft)
             set_active_group_id(item.id)
             return view(item.id)
@@ -393,11 +449,8 @@ def save_definition(group_id: str, token: str, payload: str) -> str:
         try:
             from ..batch_config import (
                 BatchConfigItem,
-                lifecycle_parameter_definitions,
                 mutate_batch_config,
             )
-            from ..task_params import merge_task_params, parameters_for_values
-            from .task_settings import _validate
             if task_runner.is_running():
                 raise ValueError("结束执行后可修改配置组")
             current = _groups().get(group_id) if group_id else None
@@ -422,19 +475,6 @@ def save_definition(group_id: str, token: str, payload: str) -> str:
             paths = {x["id"] for x in catalog.get("workflows", [])}
             if any(path and path not in paths for path in item.workflows.to_dict().values()):
                 raise ValueError("生命周期工作流不可用，请重新选择")
-            for phase, definitions in lifecycle_parameter_definitions(item.workflows).items():
-                params, _ = merge_task_params(definitions, item.workflow_params.get(phase, {}), None)
-                visible = {definition["name"] for definition in parameters_for_values(definitions, params)}
-                for definition in definitions:
-                    key = definition["name"]
-                    if key in params:
-                        try:
-                            params[key] = _validate(definition, params[key])
-                        except (ValueError, TypeError):
-                            if key in visible:
-                                label = next((wf["name"] for wf in catalog["workflows"] if wf["id"] == item.workflows.to_dict()[phase]), "生命周期")
-                                raise ValueError(f"{label} · {definition.get('label', key)}：参数不符合当前定义") from None
-                item.workflow_params[phase] = params
             def merge(config):
                 live = config.get(group_id) if group_id else None
                 if group_id and (live is None or _definition_token(live) != token):

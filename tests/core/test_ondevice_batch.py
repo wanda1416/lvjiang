@@ -63,6 +63,44 @@ def test_prepared_plan_freezes_params_and_rejects_changed_start(batch_state):
     assert not task_runner.is_running()
 
 
+def test_lifecycle_parameters_are_validated_against_the_workflow(
+    batch_state, monkeypatch,
+):
+    """参数属于运行草稿：视图按 wf 定义下发，保存时裁剪未声明键并校验可见值。"""
+    from lvjiang.core import batch_config
+    from lvjiang.core.batch_run import load_draft
+    item, _ = batch_state
+    item.workflows.prepare_item = "batch/prepare_item.wf"
+    definitions = [
+        {"name": "count", "label": "滚动次数", "type": "number",
+         "default": 5, "min": 1, "max": 10},
+        {"name": "skip", "label": "跳过等待", "type": "bool", "default": False},
+        {"name": "wait", "label": "等待时间", "type": "number", "default": 60,
+         "require": "$skip"},
+    ]
+    monkeypatch.setattr(
+        batch_config, "lifecycle_parameter_definitions",
+        lambda _workflows: {"prepare_item": definitions})
+
+    view = json.loads(batch.view(item.id))
+    lifecycle = view["lifecycle"]["prepare_item"]
+    assert lifecycle["values"] == {"count": 5, "skip": False, "wait": 60}
+    assert [d["name"] for d in lifecycle["definitions"]] == ["count", "skip"]
+
+    draft = view["draft"]
+    draft["workflow_params"] = {"prepare_item": {
+        "count": 7, "skip": True, "wait": 30, "gone": 1}}
+    assert json.loads(batch.save(item.id, json.dumps(draft)))["ok"]
+    assert load_draft(item.id).workflow_params == {
+        "prepare_item": {"count": 7, "skip": True, "wait": 30}}
+
+    draft = json.loads(batch.view(item.id))["draft"]
+    draft["workflow_params"] = {"prepare_item": {"count": 99}}
+    rejected = json.loads(batch.save(item.id, json.dumps(draft)))
+    assert not rejected["ok"]
+    assert "条目准备 · 滚动次数" in rejected["message"]
+
+
 def test_running_batch_blocks_single_task_and_draft_edits(batch_state):
     item, _ = batch_state
     task_runner._STATE.begin("batch:group", "测试批量")

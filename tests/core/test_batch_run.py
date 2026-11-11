@@ -92,15 +92,40 @@ def test_drafts_are_isolated_per_group_and_survive_round_trip():
     """草稿按配置组的稳定 ID 隔离，不同组互不影响。"""
     save_draft("gid-1", BatchRunDraft(
         tasks=BatchSelection(order=["a"], checked=["a"]),
-        rounds=3, unattended=True))
+        rounds=3, unattended=True, allow_portrait=True,
+        workflow_params={"prepare_item": {"count": 2}}))
     save_draft("gid-2", BatchRunDraft(rounds=7))
 
     first = load_draft("gid-1")
     assert first.tasks.checked == ["a"]
     assert first.rounds == 3
     assert first.unattended is True
+    assert first.allow_portrait is True
+    assert first.workflow_params == {"prepare_item": {"count": 2}}
     assert load_draft("gid-2").rounds == 7
+    assert load_draft("gid-2").allow_portrait is False
+    assert load_draft("gid-2").workflow_params == {}
     assert load_draft("gid-unknown") == BatchRunDraft(), "没草稿就是空草稿"
+
+
+def test_draft_drops_unknown_phase_and_malformed_workflow_params():
+    """参数键按生命周期阶段裁剪：换 wf 或旧数据里的残留值不能继续生效。"""
+    restored = BatchRunDraft.from_dict({
+        "rounds": 2,
+        "workflow_params": {
+            "prepare_item": {"count": 2},
+            "recover_unattended": {"skip": True},
+            "unknown_phase": {"count": 9},
+            "finish_item": {},
+            "batch_teardown": "not-a-mapping",
+        },
+    })
+
+    assert restored.workflow_params == {
+        "prepare_item": {"count": 2},
+        "recover_unattended": {"skip": True},
+    }
+    assert restored.to_dict()["workflow_params"] == restored.workflow_params
 
 
 def test_active_group_is_session_state():

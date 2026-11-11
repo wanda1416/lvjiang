@@ -112,3 +112,26 @@ class TestBlocks:
         assert "2560×1600" in message      # 画布实际尺寸
         assert "10.00%" in message         # 偏差
         assert "0.50%" in message          # 容差
+
+
+class TestPortraitAllowed:
+    """安卓批量允许竖屏：只有交换宽高后能匹配才放行。"""
+
+    def test_swapped_aspect_passes_when_allowed(self, qtbot):
+        host = _host(aspect="20:9", tolerance=0.015,
+                     canvas=CanvasConfig(), size=(1080, 2400))
+        qtbot.addWidget(host)
+        assert host._layout_aspect_error(allow_portrait=True) == ""
+
+    def test_swapped_aspect_is_still_blocked_without_option(self, qtbot):
+        host = _host(aspect="20:9", tolerance=0.015,
+                     canvas=CanvasConfig(), size=(1080, 2400))
+        qtbot.addWidget(host)
+        assert host._layout_aspect_error() != ""
+
+    def test_portrait_with_incompatible_swapped_aspect_is_blocked(self, qtbot):
+        """1080×1920 交换后是 16:9，和 20:9 布局仍然不是一路。"""
+        host = _host(aspect="20:9", tolerance=0.015,
+                     canvas=CanvasConfig(), size=(1080, 1920))
+        qtbot.addWidget(host)
+        assert host._layout_aspect_error(allow_portrait=True) != ""

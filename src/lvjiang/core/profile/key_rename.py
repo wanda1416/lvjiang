@@ -132,12 +132,10 @@ def _rename_interface(data: dict, renames: list[tuple[str, str, str]]) -> None:
 
 
 def _rename_batch_parameters(data: dict, renames: list[tuple[str, str, str]]) -> None:
+    """批量配置组只剩定义层字段；生命周期参数已迁到运行草稿，不再处理。"""
     for group in data.get("groups", {}).values():
         if "profile_sort_key" in group:
             group["profile_sort_key"] = replace_key(group["profile_sort_key"], renames)
-        for params in group.get("workflow_params", {}).values():
-            if isinstance(params, dict) and isinstance(params.get("profile_key"), str):
-                params["profile_key"] = replace_key(params["profile_key"], renames)
 
 
 def save_renamed_definitions(

@@ -18,7 +18,7 @@ import time
 from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from loguru import logger
 
@@ -37,6 +37,8 @@ from .batch_run import BatchRunDraft
 from .config.resolver import get_resolver
 from .config.users import SessionManager
 from .fs_util import task_result_path
+from .layout_config import canvas_aspect_matches
+from .layout_models import Layout
 
 # 进度状态常量
 ST_PENDING = tr("待执行")
@@ -106,6 +108,12 @@ class BatchRunSpec:
 
     `unattended` 存的是**有效值**：草稿勾了无人值守、且配置组确实配了异常恢复
     wf，才会是真。这个与运算只在构造快照时做一次，调度器不必再判断前提。
+
+    `allow_portrait` 同样是有效值：草稿勾了允许竖屏、且配置组配了异常恢复 wf，
+    才允许安卓批量在竖屏画面下启动；启动后先走一次异常恢复回到登录主页。
+
+    生命周期参数也来自运行草稿。真实生效的键仍由 wf 文件头实时声明的参数集合
+    决定，草稿里换工作流后残留的同名旧值不会生效。
     """
 
     group_id: str = ""
@@ -121,6 +129,7 @@ class BatchRunSpec:
     workflow_params: dict[str, dict] = field(default_factory=dict)
     skip_lifecycle_for_single_item: bool = True
     unattended: bool = False
+    allow_portrait: bool = False
 
     @staticmethod
     def build(
@@ -141,11 +150,14 @@ class BatchRunSpec:
             execution_unit_key=item.execution_unit_key,
             rounds=draft.rounds,
             workflows=copy.deepcopy(item.workflows),
-            workflow_params=copy.deepcopy(item.workflow_params),
+            workflow_params=copy.deepcopy(draft.workflow_params),
             skip_lifecycle_for_single_item=item.skip_lifecycle_for_single_item,
             # 无人值守必须配套恢复 wf，否则改道弹窗只会让整批在错误页面上连环失败
             unattended=bool(
                 draft.unattended and item.workflows.recover_unattended),
+            # 允许竖屏同样离不开恢复 wf：放行后要先回到登录主页再进入游戏
+            allow_portrait=bool(
+                draft.allow_portrait and item.workflows.recover_unattended),
         )
 
 
@@ -455,16 +467,23 @@ class BatchScheduler:
             for run_idx, username in enumerate(self._usernames)
         ]
         total = len(visits)
-        use_lifecycle = not (
-            len(self._usernames) == 1
-            and self._spec.skip_lifecycle_for_single_item
+        portrait_start = self._needs_portrait_recovery()
+        use_lifecycle = (
+            not (
+                len(self._usernames) == 1
+                and self._spec.skip_lifecycle_for_single_item
+            )
+            or portrait_start
         )
         self._log(f"[批量] 开始：{len(self._usernames)} 用户 × "
                       f"{len(self._scripts)} 脚本 × {rounds} 轮")
         self._log("[批量] 执行用户：" + "、".join(self._usernames))
         self._log("[批量] 执行任务：" + "、".join(
             script.name for script in self._scripts))
-        if not use_lifecycle:
+        if portrait_start:
+            self._log("[批量] 启动画面为竖屏：本次强制使用批量生命周期，"
+                      "先执行异常恢复再按条目进入游戏")
+        elif not use_lifecycle:
             self._log("[批量] 单用户直通：跳过批量生命周期工作流")
         for run_idx, username in enumerate(self._usernames):
             for script in self._scripts:
@@ -488,6 +507,8 @@ class BatchScheduler:
         report.start_batch()
 
         batch_state: dict = {}
+        if portrait_start:
+            batch_state = self._recover_to_login_at_start(batch_state)
         can_run = True
         if use_lifecycle:
             setup = self._run_stage(
@@ -876,6 +897,8 @@ class BatchScheduler:
         )
         report.start_batch()
         batch_state: dict = {}
+        if self._needs_portrait_recovery():
+            batch_state = self._recover_to_login_at_start(batch_state)
         setup = self._run_stage(
             "batch_setup", self._spec.workflows.batch_setup,
             -1, "", batch_state)
@@ -1401,6 +1424,67 @@ class BatchScheduler:
         text = str(kwargs.get("message") or kind)
         self._unattended_hit = text
         raise UnattendedInterrupt(text)
+
+    def _needs_portrait_recovery(self) -> bool:
+        """批量起步画面是竖屏、且交换宽高后才匹配布局时，先收回登录主页。
+
+        与启动门禁共用 ``canvas_aspect_matches``：本来就按竖屏设计的布局
+        在正常比较时就已匹配，不会被误判成临时竖屏而多跑一次恢复。
+        """
+        if not self._spec.allow_portrait:
+            return False
+        if self._ctx.target_kind != "adb":
+            return False
+        layout = cast(Layout | None, self._ctx.layout)
+        capture: Any = self._ctx.capture
+        if layout is None or not layout.aspect or capture is None:
+            return False
+        try:
+            width, height = capture.get_capture_size()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"批量启动取截图尺寸失败，跳过竖屏恢复: {exc}")
+            return False
+        if width <= 0 or height <= width:
+            return False
+        passed, portrait_used = canvas_aspect_matches(
+            layout, float(width), float(height), allow_portrait=True)
+        return bool(passed and portrait_used)
+
+    def _start_recovery_username(self) -> str:
+        """挑一个能支撑客户端重启的用户：优先带账号和区服后缀的候选。"""
+        if self._spec.execution_unit_key == "user":
+            candidates = list(self._usernames)
+        else:
+            candidates = []
+            for unit in self._usernames:
+                candidates.extend(self._unit_members.get(unit, []))
+        for name in candidates:
+            attributes = self._user_attributes.get(name, {})
+            if attributes.get("account") and attributes.get("tail"):
+                return name
+        return candidates[0] if candidates else ""
+
+    def _recover_to_login_at_start(self, batch_state: dict) -> dict:
+        """批量起步于竖屏时，先借异常恢复 wf 把客户端带到登录主页。
+
+        只回登录主页（pending=False），不代登录当前角色：具体用户由随后的
+        prepare_item 按本次批量的第一条目正常选择。
+        """
+        wf_name = self._spec.workflows.recover_unattended
+        if not wf_name:
+            return batch_state
+        username = self._start_recovery_username()
+        self._log("[批量] 启动画面为竖屏，执行异常恢复 wf 回到登录主页")
+        result = self._run_stage(
+            "recover_unattended", wf_name, -1, username, batch_state,
+            extra_variables={
+                "batch_recover_pending": False,
+                "batch_recover_username": username,
+            })
+        if result.status != RESULT_SUCCESS:
+            self._log(f"[批量] 启动时异常恢复未成功：{result.message}", "warning")
+            return batch_state
+        return result.state if result.state is not None else batch_state
 
     def _recover_unattended(self, run_idx: int, username: str,
                             batch_state: dict, *, pending: bool) -> None:

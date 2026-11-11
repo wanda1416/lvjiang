@@ -5,8 +5,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.*
-import android.text.Editable
-import android.text.TextWatcher
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
 import com.google.android.material.button.MaterialButton
@@ -119,7 +117,7 @@ class BatchConfigActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.settings_notice).text = when {
             busy -> "正在处理，请稍候…"
             readonly -> "执行中，结束后可修改配置组。"
-            else -> "配置只保存在手机；同步时可选择保留。本次执行选择在任务页调整。"
+            else -> "配置只保存在手机；同步时可选择保留。执行轮数与生命周期参数在任务页调整。"
         }
     }
 
@@ -168,9 +166,8 @@ class BatchConfigActivity : AppCompatActivity() {
         val workflows = draft.getJSONObject("workflows")
         for ((phase, title) in phaseNames) {
             row(content, title, nameOf("workflows", workflows.optString(phase))) {
-                picker(title, listOf(JSONObject().put("id", "").put("name", "不设置")) + objects(model.optJSONArray("workflows"))) { workflows.put(phase, it); draft.getJSONObject("workflow_params").remove(phase) }
+                picker(title, listOf(JSONObject().put("id", "").put("name", "不设置")) + objects(model.optJSONArray("workflows"))) { workflows.put(phase, it) }
             }
-            if (workflows.optString(phase).isNotEmpty()) row(content, "$title 参数", "查看与修改") { parameters(phase) }
         }
         if (unit == "user") toggle(content, "单个用户时跳过生命周期", draft.optBoolean("skip_lifecycle_for_single_item", true)) { draft.put("skip_lifecycle_for_single_item", it) }
         label(content, "属性单元始终执行生命周期。保存定义不会改变活动组或本次执行顺序。", 12f)
@@ -223,60 +220,5 @@ class BatchConfigActivity : AppCompatActivity() {
         val flags = values.map { it in checked }.toBooleanArray()
         MaterialAlertDialogBuilder(this).setTitle("默认单元").setMultiChoiceItems(values.toTypedArray(), flags) { _, index, selected -> flags[index] = selected }
             .setNegativeButton("取消", null).setPositiveButton("确定") { _, _ -> defaults.put(unit, JSONArray(values.filterIndexed { index, _ -> flags[index] })); render() }.show()
-    }
-    private fun parameters(phase: String) {
-        val original = draft.getJSONObject("workflow_params")
-        val values = JSONObject(original.toString())
-        request({ PyBridge.batchLifecycle(this, draft.getJSONObject("workflows").toString(), values.toString()) }) { result ->
-            if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
-            val phaseView = result.getJSONObject("phases").getJSONObject(phase)
-            val params = JSONObject(phaseView.getJSONObject("values").toString())
-            val body = SettingsUi.dialogContent(this)
-            val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(rows)
-            val dialog = MaterialAlertDialogBuilder(this).setTitle(phaseNames[phase]).setView(SettingsUi.dialogScroll(this, body)).setNegativeButton("取消", null).setPositiveButton("确定") { _, _ -> original.put(phase, params); render() }.create()
-            var definitions = objects(phaseView.getJSONArray("definitions")); var pending: Runnable? = null
-            fun draw() {
-                rows.removeAllViews()
-                if (definitions.isEmpty()) label(rows, "没有可配置参数")
-                fun update() {
-                    values.put(phase, params)
-                    pending?.let { rows.removeCallbacks(it) }
-                    val action = Runnable { request({ PyBridge.batchLifecycle(this, draft.getJSONObject("workflows").toString(), values.toString()) }) { preview ->
-                        if (dialog.isShowing && preview.optBoolean("ok")) {
-                            val fresh = objects(preview.getJSONObject("phases").getJSONObject(phase).getJSONArray("definitions"))
-                            if (fresh.map { it.optString("name") } != definitions.map { it.optString("name") }) { definitions = fresh; draw() }
-                        }
-                    } }; pending = action; rows.postDelayed(action, 250)
-                }
-                for (definition in definitions) {
-                    val name = definition.optString("name"); val heading = definition.optString("label", name)
-                    when (definition.optString("type", "select")) {
-                        "bool" -> toggle(rows, heading, params.optBoolean(name)) { params.put(name, it); update() }
-                        "number", "text" -> {
-                            val number = definition.optString("type") == "number"
-                            val box = TextInputLayout(this).apply { hint = heading; if (number) helperText = "范围：${definition.optInt("min", 0)}～${definition.optInt("max", 999999)}" }
-                            val edit = TextInputEditText(this).apply { setText(params.opt(name)?.toString().orEmpty()); setSingleLine(!definition.optBoolean("multiline")); inputType = if (number) android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED else android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE }
-                            box.addView(edit); rows.addView(box)
-                            edit.addTextChangedListener(object : TextWatcher {
-                                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                                override fun afterTextChanged(s: Editable?) {}
-                                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { params.put(name, s?.toString().orEmpty()); update() }
-                            })
-                        }
-                        else -> {
-                            val options = definition.optJSONArray("options") ?: JSONArray()
-                            val pairs = (0 until options.length()).map { index -> val value = options.get(index); if (value is JSONObject) value.optString("value") to value.optString("label", value.optString("value")) else value.toString() to value.toString() }
-                            val multiple = definition.optString("type") == "checkgroup"
-                            row(rows, heading, if (multiple) "选择项目" else pairs.firstOrNull { it.first == params.optString(name) }?.second ?: "请选择") {
-                                if (multiple) {
-                                    val flags = pairs.map { params.optJSONObject(name)?.optBoolean(it.first) == true }.toBooleanArray()
-                                    MaterialAlertDialogBuilder(this).setTitle(heading).setMultiChoiceItems(pairs.map { it.second }.toTypedArray(), flags) { _, index, selected -> flags[index] = selected }.setPositiveButton("确定") { _, _ -> params.put(name, JSONObject().apply { pairs.forEachIndexed { index, pair -> put(pair.first, flags[index]) } }); update(); draw() }.setNegativeButton("取消", null).show()
-                                } else MaterialAlertDialogBuilder(this).setTitle(heading).setItems(pairs.map { it.second }.toTypedArray()) { _, index -> params.put(name, pairs[index].first); update(); draw() }.show()
-                            }
-                        }
-                    }
-                }
-            }; draw(); dialog.setOnDismissListener { pending?.let { rows.removeCallbacks(it) } }; dialog.show()
-        }
     }
 }

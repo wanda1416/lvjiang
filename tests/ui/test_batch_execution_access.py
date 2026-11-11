@@ -422,14 +422,14 @@ def test_lifecycle_stage_receives_saved_workflow_parameters(
         name="test",
         usernames=["alice"],
         workflows=BatchWorkflows(prepare_item="batch/prepare_item.wf"),
-        workflow_params={"prepare_item": {
-            "skip_online_role": False,
-            "online_role_max_wait": 120,
-        }},
     )
     worker = BatchWorker(
         BatchRunSpec.build(
-            config, BatchRunDraft(),
+            config,
+            BatchRunDraft(workflow_params={"prepare_item": {
+                "skip_online_role": False,
+                "online_role_max_wait": 120,
+            }}),
             entries=["alice"], scripts=[BatchScript("test", "test")]),
         BatchContext(None, None, None, None), SessionManager(tmp_path), lambda: False,
     )

@@ -17,12 +17,16 @@
 
 定义层：可见任务与初始顺序 `task_ids`、可见用户与初始顺序 `usernames`、默认勾选
 `default_task_ids` / `default_usernames` / `default_units`、调度单元
-`execution_unit_key`、Profile 排序键与方向、五个生命周期 wf 及其 `workflow_params`、
-`skip_lifecycle_for_single_item`。
+`execution_unit_key`、Profile 排序键与方向、五个生命周期 wf 路径、
+`skip_lifecycle_for_single_item`。定义层**不保存**生命周期参数。
 
 运行草稿：本次勾选与实际顺序（`BatchSelection.order` / `checked`）、本次轮数、本次
-是否无人值守，以及主页面当前配置组 `active_group_id`。草稿按稳定配置组 ID 隔离，
-存在会话里只是为了应用重启后恢复页面状态。
+是否无人值守、本次是否允许竖屏启动（`allow_portrait`）、生命周期参数
+`workflow_params`（按阶段存取值），以及主页面当前配置组 `active_group_id`。草稿按
+稳定配置组 ID 隔离，存在会话里只是为了应用重启后恢复页面状态。
+
+旧版 `batch.json` 里的 `workflow_params` 不再读取，也不写迁移：`from_dict` 忽略该键，
+下次在配置窗口保存配置组时自然不再写出，参数回落到 wf 文件头的默认值。
 
 两者同在根节点 `batch` 下。活动组与运行草稿对所有实例持久化，应用重启后恢复
 上次页面状态；跨实例并发由 interface.json 的跨进程锁串行化。
@@ -36,6 +40,12 @@
   不读 session、不看控件。
 - `unattended` 存的是有效值：草稿勾了无人值守、且定义层确实配了异常恢复 wf，才为真；
   这个与运算只做一次。
+- `allow_portrait` 也存有效值：草稿勾了允许竖屏、且定义层配了异常恢复 wf，才为真。
+  调度器用它判断安卓起步画面是否为“交换宽高后才匹配布局”的临时竖屏；是则先执行
+  一次 `recover_unattended`（只回登录主页），并在本次强制补上生命周期。
+- 生命周期参数随快照深拷贝自运行草稿，按阶段存。参数定义仍从 wf 文件头实时读取，
+  快照合成时用实际声明的参数名过滤：换工作流后草稿里的残留键不会生效。wf 脚本文件
+  不缓存，运行中修改脚本仍作用于后续阶段。
 
 ## batch.json v2 迁移
 
@@ -52,6 +62,7 @@ ID、`selected_*` 读进 `default_*`（只保留「初始值」这一半语义�
 | 运行草稿、协调规则、session 读写 | `core/batch_run.py` |
 | 执行快照 | `core/batch_scheduler.py`（`BatchRunSpec`） |
 | 定义层唯一入口 | `ui/batch/batch_config_dialog.py` |
+| 生命周期参数编辑面板 | `ui/batch/lifecycle_params.py` |
 | 运行草稿唯一入口 | `ui/batch/batch_tab.py` |
 
 一个可以直接检查的结构性证据：`batch_tab.py` **不再导入** `save_batch_config`，

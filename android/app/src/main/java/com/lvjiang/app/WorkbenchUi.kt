@@ -495,7 +495,7 @@ class WorkbenchUi(
             button(summary, "生命周期") {
                 val names = mapOf("batch_setup" to "批次准备", "prepare_item" to "条目准备", "finish_item" to "条目收尾", "batch_teardown" to "批次收尾", "recover_unattended" to "异常恢复")
                 val workflows = data.getJSONObject("workflow_names")
-                detail("生命周期", names.entries.joinToString("\n") { "${it.value}：${workflows.optString(it.key).ifEmpty { "未设置" }}" } + "\n\n配置组定义在任务页菜单「批量配置」中编辑。")
+                detail("生命周期", names.entries.joinToString("\n") { "${it.value}：${workflows.optString(it.key).ifEmpty { "未设置" }}" } + "\n\n工作流文件在任务页菜单「批量配置」中编辑；参数在「执行」里按本次运行调整。")
             }
             if (data.optInt("unavailable_users") > 0 || (data.optJSONArray("unavailable_tasks")?.length() ?: 0) > 0) text(summary, "部分配置项在手机不可用，当前仅展示可执行项。", 12f)
             val hasSelection = selection(false).getJSONArray("checked").length() > 0 && selection(true).getJSONArray("checked").length() > 0
@@ -572,12 +572,108 @@ class WorkbenchUi(
             text = "无人值守"; isChecked = draft.optBoolean("unattended"); isEnabled = batchData.optBoolean("can_unattended")
         }; content.addView(unattended)
         if (!unattended.isEnabled) text(content, "配置组未设置异常恢复工作流", 12f)
+        // 生命周期参数属于本次执行：工作流文件在配置组里选，值在这里调。
+        val paramsRoot = draft.optJSONObject("workflow_params") ?: JSONObject().also { draft.put("workflow_params", it) }
+        val lifecycle = batchData.optJSONObject("lifecycle") ?: JSONObject()
+        val phaseTitles = mapOf("batch_setup" to "批次准备", "prepare_item" to "条目准备", "finish_item" to "条目收尾", "batch_teardown" to "批次收尾", "recover_unattended" to "异常恢复")
+        for ((phase, title) in phaseTitles) {
+            val phaseData = lifecycle.optJSONObject(phase) ?: continue
+            val definitions = objects(phaseData.optJSONArray("definitions"))
+            if (definitions.isEmpty()) continue
+            val params = JSONObject(phaseData.optJSONObject("values")?.toString() ?: "{}")
+            paramsRoot.optJSONObject(phase)?.let { saved -> for (key in saved.keys()) params.put(key, saved.get(key)) }
+            content.addView(SettingsUi.row(activity, "$title 参数", "调整").apply {
+                isEnabled = !batchData.optBoolean("readonly")
+                setOnClickListener { editLifecycleParams(phase, title, params) { updated -> paramsRoot.put(phase, updated) } }
+            })
+        }
         val dialog = MaterialAlertDialogBuilder(activity).setTitle("执行").setView(content).setNegativeButton("取消", null).setPositiveButton("保存", null).create()
         dialog.setOnShowListener { dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val value = rounds.text.toString().toIntOrNull()
             if (value == null || value !in 1..999) { rounds.error = "请输入 1–999"; return@setOnClickListener }
-            draft.put("rounds", value).put("unattended", unattended.isChecked); saveBatchDraft(draft); dialog.dismiss()
+            draft.put("rounds", value).put("unattended", unattended.isChecked).put("workflow_params", paramsRoot); saveBatchDraft(draft); dialog.dismiss()
         } }; dialog.show()
+    }
+
+    /** 编辑一个阶段的生命周期参数；依赖变化时按新取值重新拉取可见字段。 */
+    private fun editLifecycleParams(
+        phase: String,
+        title: String,
+        params: JSONObject,
+        onDone: (JSONObject) -> Unit,
+    ) {
+        val values = JSONObject(batchData.getJSONObject("draft").getJSONObject("workflow_params").toString())
+        values.put(phase, params)
+        request({ PyBridge.batchLifecycle(activity, batchData.getJSONObject("workflows").toString(), values.toString()) }) { result ->
+            if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
+            val phaseView = result.getJSONObject("phases").getJSONObject(phase)
+            var edited = JSONObject(phaseView.getJSONObject("values").toString())
+            val body = SettingsUi.dialogContent(activity)
+            val rows = column(); body.addView(rows)
+            val dialog = MaterialAlertDialogBuilder(activity).setTitle(title)
+                .setView(SettingsUi.dialogScroll(activity, body))
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确定") { _, _ -> onDone(edited) }.create()
+            var definitions = objects(phaseView.getJSONArray("definitions"))
+            var pending: Runnable? = null
+            var draw: () -> Unit = {}
+            fun refresh() {
+                if (!dialog.isShowing) return
+                values.put(phase, edited)
+                pending?.let { rows.removeCallbacks(it) }
+                val action = Runnable {
+                    request({ PyBridge.batchLifecycle(activity, batchData.getJSONObject("workflows").toString(), values.toString()) }) { preview ->
+                        if (!dialog.isShowing || !preview.optBoolean("ok")) return@request
+                        val view = preview.getJSONObject("phases").getJSONObject(phase)
+                        val fresh = objects(view.getJSONArray("definitions"))
+                        if (fresh.map { it.optString("name") } != definitions.map { it.optString("name") }) {
+                            definitions = fresh
+                            edited = JSONObject(view.getJSONObject("values").toString())
+                            draw()
+                        }
+                    }
+                }
+                pending = action; rows.postDelayed(action, 250)
+            }
+            draw = {
+                rows.removeAllViews()
+                if (definitions.isEmpty()) text(rows, "没有可配置参数", 12f)
+                for (definition in definitions) {
+                    val name = definition.optString("name"); val heading = definition.optString("label", name)
+                    when (definition.optString("type", "select")) {
+                        "bool" -> rows.addView(com.google.android.material.checkbox.MaterialCheckBox(activity).apply {
+                            text = heading; isChecked = edited.optBoolean(name)
+                            setOnCheckedChangeListener { _, checked -> edited.put(name, checked); refresh() }
+                        })
+                        "number", "text" -> {
+                            val number = definition.optString("type") == "number"
+                            val box = TextInputLayout(activity).apply { hint = heading; if (number) helperText = "范围：${definition.optInt("min", 0)}～${definition.optInt("max", 999999)}" }
+                            val edit = TextInputEditText(activity).apply { setText(edited.opt(name)?.toString().orEmpty()); setSingleLine(!definition.optBoolean("multiline")); inputType = if (number) android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED else android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE }
+                            box.addView(edit); rows.addView(box)
+                            edit.addTextChangedListener(object : TextWatcher {
+                                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                                override fun afterTextChanged(s: Editable?) {}
+                                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { edited.put(name, s?.toString().orEmpty()); refresh() }
+                            })
+                        }
+                        else -> {
+                            val options = definition.optJSONArray("options") ?: JSONArray()
+                            val pairs = (0 until options.length()).map { index -> val value = options.get(index); if (value is JSONObject) value.optString("value") to value.optString("label", value.optString("value")) else value.toString() to value.toString() }
+                            val multiple = definition.optString("type") == "checkgroup"
+                            rows.addView(SettingsUi.row(activity, heading, if (multiple) "选择项目" else pairs.firstOrNull { it.first == edited.optString(name) }?.second ?: "请选择").apply {
+                                setOnClickListener {
+                                    if (multiple) {
+                                        val flags = pairs.map { edited.optJSONObject(name)?.optBoolean(it.first) == true }.toBooleanArray()
+                                        MaterialAlertDialogBuilder(activity).setTitle(heading).setMultiChoiceItems(pairs.map { it.second }.toTypedArray(), flags) { _, index, selected -> flags[index] = selected }.setPositiveButton("确定") { _, _ -> edited.put(name, JSONObject().apply { pairs.forEachIndexed { index, pair -> put(pair.first, flags[index]) } }); refresh(); draw() }.setNegativeButton("取消", null).show()
+                                    } else MaterialAlertDialogBuilder(activity).setTitle(heading).setItems(pairs.map { it.second }.toTypedArray()) { _, index -> edited.put(name, pairs[index].first); refresh(); draw() }.show()
+                                }
+                            })
+                        }
+                    }
+                }
+            }
+            draw(); dialog.setOnDismissListener { pending?.let { rows.removeCallbacks(it) } }; dialog.show()
+        }
     }
 
     private fun batchSelection(entries: Boolean) {

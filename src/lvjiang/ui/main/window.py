@@ -1275,6 +1275,7 @@ class MainWindow(
         # 获取用户执行锁，并按既有语义记录跳过原因后继续。
         if not self._begin_automation(
             tr("批量执行"), username="", execution_scope="batch",
+            allow_portrait=spec.allow_portrait,
         ):
             return False
 

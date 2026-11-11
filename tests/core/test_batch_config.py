@@ -34,10 +34,6 @@ def test_group_round_trip_preserves_definition(tmp_path):
         execution_unit_key="account",
         profile_sort_key="weekly_work",
         profile_sort_direction="desc",
-        workflow_params={
-            "prepare_item": {"skip_online_role": False,
-                             "online_role_max_wait": 300},
-        },
         skip_lifecycle_for_single_item=False,
     )
     store = BatchConfigStore(path)
@@ -54,8 +50,20 @@ def test_group_round_trip_preserves_definition(tmp_path):
     assert restored.execution_unit_key == "account"
     assert restored.profile_sort_key == "weekly_work"
     assert restored.profile_sort_direction == "desc"
-    assert restored.workflow_params == group.workflow_params
     assert restored.skip_lifecycle_for_single_item is False
+
+
+def test_legacy_workflow_params_are_ignored_and_dropped_on_save():
+    """旧版把生命周期参数固化在定义层；现在参数属于运行草稿。
+
+    不做迁移：读取时忽略旧字段，重新保存配置组时自然不再写出。
+    """
+    item = BatchConfigItem.from_dict("组", {
+        "task_ids": ["a"],
+        "workflow_params": {"prepare_item": {"count": 3}},
+    })
+    assert not hasattr(item, "workflow_params")
+    assert "workflow_params" not in item.to_dict()
 
 
 def test_definition_has_no_runtime_fields():

@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .config.resolver import ConfigResolver, get_resolver
+
+if TYPE_CHECKING:
+    from .layout_models import Layout
 
 LAYOUTS_SCHEMA_VERSION = 2
 LAYOUT_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -83,6 +87,41 @@ def canvas_aspect_deviation(
         return None
     actual = canvas_width_px / canvas_height_px
     return abs(actual - expected_ratio) / expected_ratio
+
+
+def canvas_aspect_matches(
+    layout: Layout | None,
+    width: float,
+    height: float,
+    *,
+    allow_portrait: bool = False,
+) -> tuple[bool, bool]:
+    """判断截图尺寸与布局声明的画布宽高比是否相容。
+
+    返回 ``(是否通过, 是否由交换宽高后的竖屏匹配通过)``。``allow_portrait``
+    为真时，正常比较失败后会把宽高互换，再按同一套画布比例与容差比较；
+    只有交换后通过才标记为竖屏匹配。未声明宽高比、尺寸非法时放行——门禁
+    只拦已知错配，不拦「还不知道」。
+    """
+    if layout is None or not layout.aspect or width <= 0 or height <= 0:
+        return True, False
+    try:
+        expected = parse_aspect_ratio(layout.aspect)
+    except ValueError:
+        return True, False
+    if expected is None:
+        return True, False
+    canvas = layout.canvas
+    deviation = canvas_aspect_deviation(
+        expected, canvas.w_ratio * width, canvas.h_ratio * height)
+    if deviation is None or deviation <= layout.aspect_tolerance:
+        return True, False
+    if allow_portrait:
+        swapped = canvas_aspect_deviation(
+            expected, canvas.w_ratio * height, canvas.h_ratio * width)
+        if swapped is not None and swapped <= layout.aspect_tolerance:
+            return True, True
+    return False, False
 
 
 @dataclass(frozen=True)

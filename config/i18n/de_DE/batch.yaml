@@ -103,6 +103,9 @@ common:
   批次收尾工作流: Batch teardown workflow
   指定排序: Sort by
   无人值守: Unattended
+  允许竖屏: Allow Portrait
+  "安卓目标批量开始时若处于竖屏，只要交换宽高后与布局画布比例一致就允许启动；启动后先由配置组的「异常恢复 wf」回到登录主页，再按生命周期进入游戏。需要先在「工具 → 批量配置」配置该工作流": "On Android targets, a batch starting in portrait may proceed as long as the resolution matches the layout canvas ratio after swapping width and height. After starting, the group's \"recovery workflow\" first returns the game to the login page, then the lifecycle enters the game. Configure that workflow in \"Tools → Batch Configuration\" first"
+  "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：允许竖屏启动后要靠它把游戏从竖屏主页收回到登录主页": "First configure this group's \"recovery workflow\" in \"Tools → Batch Configuration\": portrait start relies on it to bring the game back from the portrait home screen to the login page"
   未配置: not configured
   条目准备工作流: Item prepare workflow
   条目收尾工作流: Item finish workflow

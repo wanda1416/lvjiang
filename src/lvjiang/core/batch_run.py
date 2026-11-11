@@ -3,9 +3,10 @@
 批量有三层状态，边界见 `docs/20-requirements/30-batch/04-batch-state-layers.md`：
 
 - **配置组定义** `BatchConfigItem`（`batch.json`）——可见范围、初始顺序、默认勾选、
-  调度单元、生命周期 wf 及其参数。只在「批量配置」窗口里改。
+  调度单元、生命周期 wf。只在「批量配置」窗口里改。
 - **运行草稿** `BatchRunDraft`（`interface.json` 根节点的 `batch`）——本次要跑哪些、
-  按什么顺序、跑几轮、有没有人看守。主页面改它，**永不反写定义层**。
+  按什么顺序、跑几轮、有没有人看守、生命周期参数怎么填。主页面改它，**永不反写
+  定义层**。
 - **执行快照** `BatchRunSpec`（内存，见 `core/batch_scheduler.py`）——点开始那一刻
   把上面两层合成一份冻结数据，调度器只认它。
 
@@ -16,6 +17,19 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+
+from .batch_config import WORKFLOW_PHASES
+
+
+def _workflow_params(value: object) -> dict[str, dict]:
+    """只保留已知阶段的参数映射；其它形状一律丢弃。"""
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, dict] = {}
+    for phase, values in value.items():
+        if phase in WORKFLOW_PHASES and isinstance(values, dict) and values:
+            result[str(phase)] = dict(values)
+    return result
 
 
 def _unique(values: object) -> list[str]:
@@ -109,6 +123,10 @@ class BatchRunDraft:
     units: dict[str, BatchSelection] = field(default_factory=dict)
     rounds: int = 1
     unattended: bool = False
+    allow_portrait: bool = False
+    #: 生命周期参数，按阶段存。参数定义仍从 wf 文件头实时读取，这里只存取值；
+    #: 换工作流后由快照按实际声明的参数名过滤，不会有残留值生效。
+    workflow_params: dict[str, dict] = field(default_factory=dict)
 
     def entry_selection(self, unit_key: str) -> BatchSelection:
         """当前调度单元对应的条目选择（用户名或属性值）。"""
@@ -131,6 +149,8 @@ class BatchRunDraft:
             self.rounds = 1
         self.rounds = min(999, max(1, self.rounds))
         self.unattended = bool(self.unattended)
+        self.allow_portrait = bool(self.allow_portrait)
+        self.workflow_params = _workflow_params(self.workflow_params)
 
     def to_dict(self) -> dict:
         return {
@@ -141,6 +161,11 @@ class BatchRunDraft:
             },
             "rounds": self.rounds,
             "unattended": self.unattended,
+            "allow_portrait": self.allow_portrait,
+            "workflow_params": {
+                phase: dict(values)
+                for phase, values in self.workflow_params.items()
+            },
         }
 
     @staticmethod
@@ -160,6 +185,8 @@ class BatchRunDraft:
             rounds=rounds if isinstance(rounds, int)
             and not isinstance(rounds, bool) else 1,
             unattended=bool(source.get("unattended", False)),
+            allow_portrait=bool(source.get("allow_portrait", False)),
+            workflow_params=_workflow_params(source.get("workflow_params")),
         )
 
 

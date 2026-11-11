@@ -1,4 +1,8 @@
-"""批量配置换布局不能重置隐藏参数、草稿或主页面活动组。"""
+"""批量配置只编辑定义层：工作流文件、调度单元与可见范围。
+
+生命周期参数属于运行草稿，在主页面的「参数」页编辑；这个窗口不应该再出现
+第二套参数控件，也不应该把参数写回 batch.json。
+"""
 from copy import deepcopy
 from types import SimpleNamespace
 
@@ -16,8 +20,9 @@ from lvjiang.ui.theme import get_theme_manager
 @pytest.fixture
 def dialog(qtbot, monkeypatch):
     first = BatchConfigItem(id='first', name='甲组', usernames=['tester'],
-                            workflows=BatchWorkflows(prepare_item='prepare.wf', recover_unattended='recover.wf'),
-                            workflow_params={'prepare_item': {'skip': False, 'wait': 600, 'note': '多行内容'}})
+                            workflows=BatchWorkflows(
+                                prepare_item='prepare.wf',
+                                recover_unattended='recover.wf'))
     second = BatchConfigItem(id='second', name='乙组', usernames=['tester'])
     config = BatchConfig(configs={'first': first, 'second': second})
     monkeypatch.setattr(module, 'load_batch_config', lambda: deepcopy(config))
@@ -25,19 +30,6 @@ def dialog(qtbot, monkeypatch):
     monkeypatch.setattr(module, 'save_batch_config', lambda value: saved.append(deepcopy(value)))
     monkeypatch.setattr('lvjiang.workflows.discovery.list_exposed_scripts', lambda: [])
     monkeypatch.setattr('lvjiang.core.profile.schema.get_profile_config', lambda: ProfileSchema())
-    definitions = {
-        'prepare_item': [
-            {'name': 'count', 'label': '滚动次数', 'type': 'number', 'default': 50},
-            {'name': 'skip', 'label': '在线跳过', 'type': 'bool', 'default': True},
-            {'name': 'wait', 'label': '等待时间', 'type': 'number', 'max': 3600, 'require': 'not $skip'},
-            {'name': 'restart', 'label': '允许重启', 'type': 'bool', 'default': False},
-            {'name': 'mode', 'label': '模式', 'type': 'select', 'options': ['a', 'b'], 'default': 'b'},
-            {'name': 'note', 'label': '备注', 'type': 'text', 'multiline': True},
-            {'name': 'options', 'label': '选项', 'type': 'checkgroup', 'options': ['one', 'two']},
-        ],
-        'recover_unattended': [{'name': 'count', 'label': '恢复次数', 'type': 'number', 'default': 20}],
-    }
-    monkeypatch.setattr(module, 'lifecycle_parameter_definitions', lambda _: definitions)
     users = SimpleNamespace(list_users=lambda: ['tester'],
                             get_user=lambda _: SimpleNamespace(attributes={'team': 'demo'}))
     get_interface_store().update_node('batch', {'active_group_id': 'first'})
@@ -48,25 +40,15 @@ def dialog(qtbot, monkeypatch):
     return widget, saved
 
 
-def test_require_and_resize_keep_hidden_values_until_explicit_save(dialog, qtbot):
+def test_dialog_only_edits_workflows_and_saves_no_parameters(dialog):
+    """参数已搬到主页面；保存配置组时不能重新写出 workflow_params。"""
     widget, saved = dialog
-    before = widget._collect_workflow_params()
-    assert before['prepare_item']['wait'] == 600
-    wait = widget._workflow_param_widgets[('prepare_item', 'wait')]
-    skip = widget._workflow_param_widgets[('prepare_item', 'skip')]
-    assert not wait.isHidden()
-    skip.setChecked(True)
-    assert wait.isHidden()
-    widget.resize(860, 560)
-    qtbot.wait(1)
-    values = widget._collect_workflow_params()
-    assert values['prepare_item'] == {**before['prepare_item'], 'skip': True}
-    assert values['recover_unattended'] == before['recover_unattended']
-    assert saved == []
+    assert not hasattr(widget, '_workflow_param_widgets')
+    widget._selectors['prepare_item'].setCurrentText('batch/prepare_item.wf')
     widget._on_save()
-    assert saved[-1].configs['first'].workflow_params == values
-    skip.setChecked(False)
-    assert not wait.isHidden() and wait.value() == 600
+    group = saved[-1].configs['first']
+    assert group.workflows.prepare_item == 'batch/prepare_item.wf'
+    assert 'workflow_params' not in group.to_dict()
 
 
 def test_unit_and_editor_switch_do_not_change_skip_preference_or_active_group(dialog):

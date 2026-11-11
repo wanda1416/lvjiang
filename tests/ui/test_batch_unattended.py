@@ -14,6 +14,7 @@ import pytest
 from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
 from lvjiang.core.batch_run import BatchRunDraft
 from lvjiang.core.config.users import SessionManager
+from lvjiang.core.layout_models import CanvasConfig, Layout
 from lvjiang.core.user_config import User, save_user_metadata
 from lvjiang.ui.batch.batch_report import BatchReport
 from lvjiang.ui.batch.batch_runner import (
@@ -34,13 +35,20 @@ def _spec(**kwargs) -> BatchRunSpec:
     """按"定义 + 草稿 → 快照"的真实路径构造，有效值不手写。"""
     recover = kwargs.pop("recover_wf", _RECOVER_WF)
     unattended = kwargs.pop("unattended", True)
+    allow_portrait = kwargs.pop("allow_portrait", False)
+    skip_lifecycle = kwargs.pop("skip_lifecycle", True)
     scripts = kwargs.pop("scripts", [])
     entries = kwargs.pop("entries", ["u1"])
+    workflow_params = kwargs.pop("workflow_params", {})
     item = BatchConfigItem(
         name="group", usernames=list(entries),
+        skip_lifecycle_for_single_item=skip_lifecycle,
         workflows=BatchWorkflows(recover_unattended=recover), **kwargs)
     return BatchRunSpec.build(
-        item, BatchRunDraft(unattended=unattended),
+        item,
+        BatchRunDraft(
+            unattended=unattended, allow_portrait=allow_portrait,
+            workflow_params=workflow_params),
         entries=entries, scripts=scripts)
 
 
@@ -52,6 +60,21 @@ def test_effective_unattended_requires_a_recovery_workflow():
     assert _spec(unattended=True, recover_wf="").unattended is False
     assert _spec(unattended=True).unattended is True
     assert _spec(unattended=False).unattended is False
+
+
+def test_effective_allow_portrait_requires_a_recovery_workflow():
+    """允许竖屏放行后必须有人把客户端收回登录主页，否则不放行。"""
+    assert _spec(allow_portrait=True, recover_wf="").allow_portrait is False
+    assert _spec(allow_portrait=True).allow_portrait is True
+    assert _spec(allow_portrait=False).allow_portrait is False
+
+
+def test_snapshot_freezes_lifecycle_params_from_the_run_draft():
+    """参数属于本次执行：快照取草稿，改配置组不影响已冻结的这一批。"""
+    spec = _spec(workflow_params={"prepare_item": {"count": 3}})
+
+    assert spec.workflow_params == {"prepare_item": {"count": 3}}
+    assert _spec(workflow_params={}).workflow_params == {}
 
 
 def _worker(tmp_path, spec) -> BatchWorker:
@@ -184,6 +207,88 @@ def test_task_failing_for_other_reasons_does_not_restart_the_client(
     worker.run()
 
     assert "recover_unattended" not in stages
+
+
+class _SizedCapture:
+    def __init__(self, size: tuple[int, int]) -> None:
+        self._size = size
+
+    def get_capture_size(self) -> tuple[int, int]:
+        return self._size
+
+
+def _android_worker(tmp_path, spec, size: tuple[int, int]) -> BatchWorker:
+    """构造一个安卓目标 + 指定起步画面尺寸的调度器。"""
+    save_user_metadata(
+        User("u1", attributes={"account": "acc", "tail": ".com"}), tmp_path)
+    layout = Layout(
+        key="android", name="安卓", canvas=CanvasConfig(),
+        aspect="20:9", aspect_tolerance=0.015)
+    return BatchWorker(
+        spec,
+        BatchContext(_SizedCapture(size), None, None, layout,
+                     target_kind="adb"),
+        SessionManager(tmp_path), lambda: False)
+
+
+def _run_start_scenario(tmp_path, monkeypatch, *, size, allow_portrait=True):
+    import lvjiang.core.daily_history as history
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
+    monkeypatch.setattr(history, "try_create_task_run", lambda **_kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+
+    worker = _android_worker(
+        tmp_path,
+        _spec(
+            scripts=[BatchScript("task0", "任务0")],
+            allow_portrait=allow_portrait),
+        size)
+    executed: list[str] = []
+    stages: list[tuple[str, dict]] = []
+
+    def run_stage(phase, _wf, _idx, _username, _state, *_args, **kwargs):
+        stages.append((phase, kwargs.get("extra_variables") or {}))
+        return BatchStageResult(state={})
+
+    monkeypatch.setattr(worker, "_run_script",
+                        lambda script, *_a, **_kw: executed.append(script.id) or {})
+    monkeypatch.setattr(worker, "_run_stage", run_stage)
+    monkeypatch.setattr(worker, "_save_result", lambda *_args: None)
+    worker.run()
+    return executed, stages
+
+
+def test_portrait_start_recovers_to_login_and_forces_lifecycle(
+    tmp_path, monkeypatch, qapp,
+):
+    """竖屏起步：先回登录主页，再强制走生命周期把用户送进游戏。
+
+    单用户直通默认会跳过 prepare_item；竖屏恢复只到登录主页，若继续直通，
+    脚本会在登录页上必然失败，所以这一次必须把生命周期补回来。
+    """
+    executed, stages = _run_start_scenario(
+        tmp_path, monkeypatch, size=(1080, 2400))
+
+    assert [phase for phase, _ in stages] == [
+        "recover_unattended", "batch_setup", "prepare_item",
+        "finish_item", "batch_teardown"]
+    recovery = stages[0][1]
+    assert recovery["batch_recover_pending"] is False
+    assert recovery["batch_recover_username"] == "u1"
+    assert executed == ["task0"]
+
+
+def test_landscape_start_keeps_single_user_shortcut(
+    tmp_path, monkeypatch, qapp,
+):
+    """横屏起步行为不变：不跑恢复，单用户直通也不补生命周期。"""
+    executed, stages = _run_start_scenario(
+        tmp_path, monkeypatch, size=(2400, 1080))
+
+    phases = [phase for phase, _ in stages]
+    assert "recover_unattended" not in phases
+    assert "prepare_item" not in phases
+    assert executed == ["task0"]
 
 
 def test_stage_abort_is_recorded_as_a_redirect_not_a_stage_error(

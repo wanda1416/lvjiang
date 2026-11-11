@@ -19,7 +19,8 @@ _WRITE_LOCK = threading.RLock()
 
 class BatchConfigConflict(ValueError):
     """编辑期间磁盘定义改变，需用户确认覆盖。"""
-_WORKFLOW_PHASES = (
+#: 生命周期工作流阶段。运行草稿也用这份列表裁剪参数键。
+WORKFLOW_PHASES = (
     "batch_setup", "prepare_item", "finish_item", "batch_teardown",
     # 无人值守恢复：不在正常流程里排程，只在引擎撞到弹窗后由调度器调用。
     "recover_unattended",
@@ -48,7 +49,7 @@ class BatchWorkflows:
         source = data if isinstance(data, dict) else {}
         return BatchWorkflows(**{
             key: str(source.get(key, ""))
-            for key in _WORKFLOW_PHASES
+            for key in WORKFLOW_PHASES
         })
 
 
@@ -87,7 +88,8 @@ class BatchConfigItem:
     profile_sort_key: str = ""
     profile_sort_direction: str = "asc"
     workflows: BatchWorkflows = field(default_factory=BatchWorkflows)
-    workflow_params: dict[str, dict] = field(default_factory=dict)
+    #: 生命周期参数属于本次执行，存在运行草稿里；定义层不再保存，也不再读取
+    #: 旧文件里的 workflow_params 字段——下次保存配置组时自然消失。
     skip_lifecycle_for_single_item: bool = True
 
     def __post_init__(self) -> None:
@@ -129,11 +131,6 @@ class BatchConfigItem:
             self.profile_sort_key = ""
         if self.profile_sort_direction not in ("asc", "desc"):
             self.profile_sort_direction = "asc"
-        self.workflow_params = {
-            phase: dict(values)
-            for phase, values in self.workflow_params.items()
-            if phase in _WORKFLOW_PHASES and isinstance(values, dict)
-        }
         if not isinstance(self.skip_lifecycle_for_single_item, bool):
             self.skip_lifecycle_for_single_item = True
 
@@ -153,7 +150,6 @@ class BatchConfigItem:
             "profile_sort_key": self.profile_sort_key,
             "profile_sort_direction": self.profile_sort_direction,
             "workflows": self.workflows.to_dict(),
-            "workflow_params": self.workflow_params,
             "skip_lifecycle_for_single_item": self.skip_lifecycle_for_single_item,
         }
 
@@ -170,10 +166,6 @@ class BatchConfigItem:
         workflow_source = (
             raw_workflows if isinstance(raw_workflows, dict) else {}
         )
-        workflow_params = (
-            dict(source.get("workflow_params", {}))
-            if isinstance(source.get("workflow_params"), dict) else {}
-        )
         default_tasks = source.get("default_task_ids")
         default_users = source.get("default_usernames")
         default_units = source.get("default_units")
@@ -189,7 +181,6 @@ class BatchConfigItem:
             profile_sort_key=source.get("profile_sort_key", ""),
             profile_sort_direction=source.get("profile_sort_direction", "asc"),
             workflows=BatchWorkflows.from_dict(workflow_source),
-            workflow_params=workflow_params,
             skip_lifecycle_for_single_item=(
                 source.get("skip_lifecycle_for_single_item", True)
                 if isinstance(
@@ -209,7 +200,7 @@ def lifecycle_parameter_definitions(
     from .config.resolver import get_resolver
 
     definitions: dict[str, list[dict]] = {}
-    for phase in _WORKFLOW_PHASES:
+    for phase in WORKFLOW_PHASES:
         wf_name = getattr(workflows, phase)
         path = (get_resolver().resolve_read(f"workflows/{wf_name}")
                 if wf_name else None)

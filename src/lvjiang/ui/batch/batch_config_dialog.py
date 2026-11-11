@@ -1,8 +1,6 @@
 """批量配置对话框：选择用户、排列顺序并配置生命周期工作流。"""
 from __future__ import annotations
 
-from typing import Any, cast
-
 from loguru import logger
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor
@@ -11,19 +9,13 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
-    QFrame,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QMessageBox,
-    QPlainTextEdit,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
-    QSpinBox,
     QSplitter,
     QTreeWidget,
     QTreeWidgetItem,
@@ -31,19 +23,17 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.batch_config import (
     BatchConfigConflict,
     BatchConfigItem,
     BatchWorkflows,
-    lifecycle_parameter_definitions,
     load_batch_config,
     save_batch_config,
 )
 from ...core.user_config import UserConfigManager
 from ...i18n import tr, tr_label
-from ...workflows.builtins._coerce import to_bool
 from ..button_styles import apply_button_style
 from ..layout_helpers import fit_combo_popup_to_contents
 from ..theme import get_theme_manager
@@ -206,35 +196,17 @@ class BatchConfigDialog(QDialog):
         recover_widget.setLayout(recover_row)
         wf_form.add_field(tr_label('异常恢复工作流'), recover_widget, new_row=True)
         wf_form.add_field(None, self._skip_single_lifecycle)
-        # 生命周期参数紧跟它所属的 wf：wf 在这里选，参数却要去另一个窗口填，
-        # 是上一版把同一件事拆到两处的典型。
-        self._workflow_params_panel = QWidget()
-        self._workflow_params_layout = QVBoxLayout(self._workflow_params_panel)
-        self._workflow_params_layout.setContentsMargins(0, 0, 0, 0)
-        self._workflow_param_groups: list[QGroupBox] = []
-        self._workflow_param_widgets: dict[tuple[str, str], QWidget] = {}
-        self._workflow_param_types: dict[tuple[str, str], str] = {}
-        self._workflow_params_scroll = QScrollArea(self)
-        self._workflow_params_scroll.setWidgetResizable(True)
-        self._workflow_params_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._workflow_params_scroll.setWidget(self._workflow_params_panel)
-        self._workflow_params_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        # 三块都放进一个纵向 splitter：选择树不再靠 stretch 独占全部富余高度，
-        # 参数区也不再需要"按对话框高度//3"手算上限——那条路径依赖 resizeEvent
-        # 重算，首帧 height()/sizeHint() 还没就绪时会把参数区压没，只有用户
-        # 缩放对话框才"刷出来"。
+        # 生命周期参数属于本次执行，在主页面「批量 - 参数」里随时调整；这里只
+        # 决定工作流文件，避免同一个值出现两个编辑入口。
         main_splitter = QSplitter(Qt.Orientation.Vertical)
         main_splitter.addWidget(choices)
         main_splitter.addWidget(wf_form)
-        main_splitter.addWidget(self._workflow_params_scroll)
         main_splitter.setStretchFactor(0, 1)
         main_splitter.setStretchFactor(1, 0)
-        main_splitter.setStretchFactor(2, 0)
         main_splitter.setCollapsible(1, False)
         main_splitter.setSizes([
             max(180, choices.minimumSizeHint().height()),
             max(140, wf_form.sizeHint().height()),
-            200,
         ])
         layout.addWidget(main_splitter, 1)
         # QSplitter 不把表单的 Maximum 策略当成 pane 上限：表单内容变化
@@ -464,136 +436,6 @@ class BatchConfigDialog(QDialog):
         # 勾选状态统一由 _apply_unit_dependent_state 决定（它要按调度单元
         # 判断是否适用），这里不再单独设一次，免得两处争同一个控件。
         self._refresh_scope_controls(item)
-        self._rebuild_workflow_params(item)
-
-    def _rebuild_workflow_params(self, item: BatchConfigItem | None) -> None:
-        while self._workflow_params_layout.count():
-            layout_item = self._workflow_params_layout.takeAt(0)
-            old_widget = layout_item.widget() if layout_item is not None else None
-            if old_widget is not None:
-                old_widget.deleteLater()
-        self._workflow_param_groups.clear()
-        self._workflow_param_widgets.clear()
-        self._workflow_param_types.clear()
-        # require 控制整个字段，不依赖会随双列重排变化的行号。
-        self._workflow_param_forms: dict[str, CompactFields] = {}
-        self._workflow_param_defs: dict[str, list[dict]] = {}
-        if item is None:
-            self._workflow_params_scroll.setVisible(False)
-            return
-
-        phase_labels = {
-            "batch_setup": tr("批次准备"),
-            "prepare_item": tr("条目准备"),
-            "finish_item": tr("条目收尾"),
-            "batch_teardown": tr("批次收尾"),
-            # 异常恢复也可声明参数，不能遗漏这个阶段的编辑入口。
-            "recover_unattended": tr("异常恢复"),
-        }
-        definitions = lifecycle_parameter_definitions(item.workflows)
-        for phase, params in definitions.items():
-            if not params:
-                continue
-            group = QGroupBox(phase_labels[phase])
-            group_layout = QVBoxLayout(group)
-            form = CompactFields(group)
-            group_layout.addWidget(form)
-            self._workflow_param_groups.append(group)
-            self._workflow_param_forms[phase] = form
-            self._workflow_param_defs[phase] = list(params)
-            saved = item.workflow_params.get(phase, {})
-            for definition in params:
-                name = str(definition["name"])
-                label = str(definition.get("label") or name)
-                value = saved.get(name, definition.get("default"))
-                param_type = definition.get("type", "select")
-                widget: QWidget
-                if param_type == "bool":
-                    checkbox = QCheckBox()
-                    checkbox.setChecked(to_bool(value))
-                    checkbox.toggled.connect(self._on_workflow_param_changed)
-                    widget = checkbox
-                elif param_type == "number":
-                    spin = QSpinBox()
-                    spin.setRange(
-                        int(definition.get("min", 0)),
-                        int(definition.get("max", 999999)),
-                    )
-                    spin.setValue(int(value) if value is not None else 0)
-                    spin.valueChanged.connect(self._on_workflow_param_changed)
-                    widget = spin
-                elif param_type == "select":
-                    combo = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
-                    for option in definition.get("options", []):
-                        if isinstance(option, dict):
-                            combo.addItem(str(option.get("label", option["value"])),
-                                          option["value"])
-                        else:
-                            combo.addItem(str(option), str(option))
-                    selected = combo.findData(value)
-                    if selected >= 0:
-                        combo.setCurrentIndex(selected)
-                    combo.currentIndexChanged.connect(self._on_workflow_param_changed)
-                    widget = combo
-                elif param_type == "checkgroup":
-                    container = QWidget()
-                    options_layout = QHBoxLayout(container)
-                    options_layout.setContentsMargins(0, 0, 0, 0)
-                    selected_values = value if isinstance(value, dict) else {}
-                    for option in definition.get("options", []):
-                        if isinstance(option, dict):
-                            option_name = str(option["value"])
-                            option_label = str(option.get("label", option_name))
-                        else:
-                            option_name = option_label = str(option)
-                        checkbox = QCheckBox(option_label)
-                        checkbox.setObjectName(option_name)
-                        checkbox.setChecked(bool(selected_values.get(option_name, True)))
-                        checkbox.toggled.connect(self._on_workflow_param_changed)
-                        options_layout.addWidget(checkbox)
-                    options_layout.addStretch()
-                    widget = container
-                else:
-                    edit = QPlainTextEdit() if definition.get("multiline") else QLineEdit()
-                    if isinstance(edit, QPlainTextEdit):
-                        edit.setMaximumHeight(100)
-                        edit.setPlainText(str(value or ""))
-                        edit.textChanged.connect(self._on_workflow_param_changed)
-                    else:
-                        edit.setText(str(value or ""))
-                        edit.textChanged.connect(self._on_workflow_param_changed)
-                    widget = edit
-                widget.setObjectName(name)
-                self._workflow_param_widgets[(phase, name)] = widget
-                self._workflow_param_types[(phase, name)] = str(param_type)
-                form.add_field(f"{label}：", widget, full_row=param_type not in ("bool", "number", "select"))
-            self._workflow_params_layout.addWidget(group)
-        self._refresh_workflow_param_visibility()
-        self._workflow_params_scroll.setVisible(bool(self._workflow_param_groups))
-
-    def _refresh_workflow_param_visibility(self) -> None:
-        """按 require 依赖隐藏当前取值下不适用的生命周期参数行。
-
-        只改显隐：控件和值都留着，运行时参数快照照旧包含它们。
-        """
-        defs_by_phase = getattr(self, "_workflow_param_defs", {})
-        if not any(item.get("require")
-                   for params in defs_by_phase.values() for item in params):
-            return
-        from ...core.param_require import RequireError, visible_parameter_names
-        collected = self._collect_workflow_params()
-        for phase, params in defs_by_phase.items():
-            form = self._workflow_param_forms.get(phase)
-            if form is None:
-                continue
-            try:
-                visible = visible_parameter_names(params, collected.get(phase, {}))
-            except RequireError as exc:
-                logger.warning(f"生命周期参数依赖求值失败，本次全部展示: {exc}")
-                continue
-            for (row_phase, name), widget in self._workflow_param_widgets.items():
-                if row_phase == phase:
-                    form.set_field_visible(widget, name in visible)
 
     def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API
         from PyQt6.QtCore import QEvent, QTimer
@@ -610,49 +452,16 @@ class BatchConfigDialog(QDialog):
         if splitter is None or form is None or self._clamping_form_pane:
             return
         sizes = splitter.sizes()
-        if len(sizes) != 3:
+        if len(sizes) != 2:
             return
         hint = form.sizeHint().height()
         if sizes[1] == hint:
             return
         self._clamping_form_pane = True
         try:
-            splitter.setSizes([sizes[0] + sizes[1] - hint, hint, sizes[2]])
+            splitter.setSizes([sizes[0] + sizes[1] - hint, hint])
         finally:
             self._clamping_form_pane = False
-
-    def _collect_workflow_params(self) -> dict[str, dict]:
-        """从控件读出各阶段参数值；写回配置与算 require 可见性共用这一份。"""
-        values: dict[str, dict] = {}
-        for key, widget in self._workflow_param_widgets.items():
-            phase, name = key
-            param_type = self._workflow_param_types[key]
-            value: Any
-            if isinstance(widget, QCheckBox):
-                value = widget.isChecked()
-            elif isinstance(widget, QSpinBox):
-                value = widget.value()
-            elif isinstance(widget, AutoWidthComboBox):
-                value = widget.currentData()
-            elif isinstance(widget, QPlainTextEdit):
-                value = widget.toPlainText()
-            elif param_type == "checkgroup":
-                value = {
-                    checkbox.objectName(): checkbox.isChecked()
-                    for checkbox in widget.findChildren(QCheckBox)
-                }
-            else:
-                value = cast(QLineEdit, widget).text()
-            values.setdefault(phase, {})[name] = value
-        return values
-
-    def _on_workflow_param_changed(self, *_args) -> None:
-        """参数值改动只刷新 require 显隐；落盘统一在「保存」时进行。
-
-        这与对话框里其他控件一致：编辑期只动草稿，点保存才写配置组。
-        """
-        self._refresh_workflow_param_visibility()
-
 
     def _refresh_scope_controls(self, item: BatchConfigItem | None) -> None:
         """填充调度单元与 Profile 排序：两者都是配置组定义。"""
@@ -774,19 +583,14 @@ class BatchConfigDialog(QDialog):
         self._scope_form.set_field_visible(self._profile_sort_widget, user_unit)
 
     def _on_workflow_changed(self, *_args) -> None:
-        """wf 换了就重读它声明的参数，参数面板跟着变。"""
+        """wf 选择属于配置组定义；参数由主页面按文件头实时展示。"""
         item = self._cfg.configs.get(self._current_id)
         if item is None:
             return
-        # 任意一个 wf 改动都会重建全部阶段的参数控件。先把当前控件值收回
-        # 对话框草稿，否则用户刚改完条目准备参数、再选择异常恢复 wf 时，
-        # 前面的未保存修改会被旧值覆盖。
-        item.workflow_params = self._collect_workflow_params()
         item.workflows = BatchWorkflows(**{
             key: combo.currentText().strip()
             for key, combo in self._selectors.items()
         })
-        self._rebuild_workflow_params(item)
 
     def _clear_editor(self) -> None:
         self._current_id = ""
@@ -795,7 +599,6 @@ class BatchConfigDialog(QDialog):
         for combo in self._selectors.values():
             combo.setCurrentText("")
         self._refresh_scope_controls(None)
-        self._rebuild_workflow_params(None)
         # 没有配置组时没什么可编辑的；要放在 _refresh_scope_controls 之后，
         # 否则会被它按"用户名单元"重新启用。
         self._skip_single_lifecycle.setEnabled(False)
@@ -821,7 +624,6 @@ class BatchConfigDialog(QDialog):
         item.profile_sort_key = self._profile_sort_key_value
         item.profile_sort_direction = str(
             self._profile_sort_direction.currentData() or "asc")
-        item.workflow_params = self._collect_workflow_params()
 
     def _populate_user_list(self, item: BatchConfigItem) -> None:
         candidates = self._users.list_users()

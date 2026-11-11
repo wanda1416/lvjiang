@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import cv2
 import numpy as np
 import pytest
+from lark.exceptions import UnexpectedToken
 from loguru import logger
 
 from lvjiang.core.layout_models import Region, TemplateBinding
@@ -64,6 +65,204 @@ screenshot
     assert not nodes[-1].from_last
     assert nodes[6].cleaning_group == "equip"
     assert nodes[6].where.min_confidence.value == 0.8
+
+
+def test_from_screen_grammar_covers_vision_statements():
+    # 与 from last 同一位置，二选一；screenshot 不接受 from screen。
+    source = '''
+scan [s].[left] as $raw from screen
+scan [s].[panel][1][1] as $cell from screen by contains "20"
+find as $found from screen by contains "20"
+recognize [s].[left] as $reference from screen
+'''
+    nodes = parse_text(source).body
+    assert all(node.screen for node in nodes)
+    assert not any(node.from_last for node in nodes)
+    with pytest.raises(UnexpectedToken):
+        parse_text("screenshot from screen\n")
+
+
+class _ScreenCapture:
+    """真实后端形状的替身：同时提供流帧与直取帧两条通道。"""
+
+    min_capture_interval = 0.0
+
+    def __init__(self, stream_frame, screen_frame):
+        self._stream = stream_frame
+        self._screen = screen_frame
+        self.capture_calls = 0
+        self.lossless_calls = 0
+        self.last_timeout = None
+
+    def get_capture_size(self):
+        return self._stream.shape[1], self._stream.shape[0]
+
+    def capture(self, timeout=5.0):
+        self.capture_calls += 1
+        return self._stream
+
+    def capture_lossless(self, timeout=10.0):
+        self.lossless_calls += 1
+        self.last_timeout = timeout
+        if isinstance(self._screen, Exception):
+            raise self._screen
+        if isinstance(self._screen, (list, tuple)):
+            index = min(self.lossless_calls, len(self._screen)) - 1
+            return self._screen[index]
+        return self._screen
+
+
+def test_from_screen_bypasses_stream_and_keeps_snapshot_consistent(tmp_path, monkeypatch):
+    monkeypatch.setattr("lvjiang.workflows.engine.core.PROJECT_ROOT", tmp_path)
+    engine, stream_frame = _engine()
+    screen_frame = np.full_like(stream_frame, 30)
+    capture = _ScreenCapture(stream_frame, screen_frame)
+    engine._capture = capture
+
+    _run(engine, 'scan [s].[left] as $raw from screen\n')
+
+    assert capture.lossless_calls == 1
+    assert capture.capture_calls == 0
+    assert capture.last_timeout == 3.0
+    assert engine.variables["raw"] == {"left": "30"}
+    assert engine.get_last_capture_frame() is screen_frame
+    assert engine.last_capture_seq == 1
+    assert engine.last_capture_source == "ocr_scene+screen"
+    assert engine.last_capture_fallback is False
+
+    _run(engine, 'screenshot from last\n')
+    path, = (tmp_path / "logs" / "image").glob("*.png")
+    np.testing.assert_array_equal(cv2.imread(str(path)), screen_frame)
+    assert capture.lossless_calls == 1
+
+
+def test_from_screen_reuses_one_frame_across_regions():
+    engine, stream_frame = _engine()
+    screen_frame = np.full_like(stream_frame, 30)
+    capture = _ScreenCapture(stream_frame, screen_frame)
+    engine._capture = capture
+
+    _run(engine, 'scan [s].[left, right] as $raw from screen\n')
+
+    assert capture.lossless_calls == 1
+    assert capture.capture_calls == 0
+    assert engine.variables["raw"] == {"left": "30", "right": "30"}
+
+
+@pytest.mark.parametrize("screen_frame", [None, RuntimeError("screencap failed")])
+def test_from_screen_falls_back_to_stream_with_warning(screen_frame):
+    engine, stream_frame = _engine()
+    capture = _ScreenCapture(stream_frame, screen_frame)
+    engine._capture = capture
+    records = []
+    sink = logger.add(records.append, level="WARNING")
+    try:
+        _run(engine, 'scan [s].[left] as $raw from screen\n')
+    finally:
+        logger.remove(sink)
+
+    assert engine.variables["raw"] == {"left": "10"}
+    assert capture.capture_calls == 1
+    assert engine.get_last_capture_frame() is stream_frame
+    assert engine.last_capture_source == "ocr_scene+screen_fallback"
+    assert engine.last_capture_fallback is True
+    assert any("回退视频流最新帧" in r.record["message"] for r in records)
+
+
+def test_from_screen_retries_once_on_orientation_mismatch():
+    """设备旋转中取到竖屏帧时，等一拍重取一次，方向对上就用新帧。"""
+    engine, stream_frame = _engine()
+    rotated = np.full((40, 20, 3), 30)          # 宽高与流对调
+    fixed = np.full_like(stream_frame, 40)
+    capture = _ScreenCapture(stream_frame, [rotated, fixed])
+    engine._capture = capture
+
+    _run(engine, 'scan [s].[left] as $raw from screen\n')
+
+    assert capture.lossless_calls == 2
+    assert engine.variables["raw"] == {"left": "40"}
+    assert engine.get_last_capture_frame() is fixed
+    assert engine.last_capture_source == "ocr_scene+screen"
+    assert engine.last_capture_fallback is False
+
+
+def test_from_screen_falls_back_when_orientation_stays_mismatched():
+    """重取后方向仍不符，回退视频流并留下可识别的来源标记。"""
+    engine, stream_frame = _engine()
+    rotated = np.full((40, 20, 3), 30)
+    capture = _ScreenCapture(stream_frame, [rotated, rotated])
+    engine._capture = capture
+
+    _run(engine, 'scan [s].[left] as $raw from screen\n')
+
+    assert capture.lossless_calls == 2
+    assert capture.capture_calls == 1
+    assert engine.variables["raw"] == {"left": "10"}
+    assert engine.get_last_capture_frame() is stream_frame
+    assert engine.last_capture_source == "ocr_scene+screen_fallback"
+    assert engine.last_capture_fallback is True
+
+
+def test_page_probe_first_check_uses_stream_and_confirm_uses_direct():
+    """首次页面判定走流；失败后的二次确认才直取。"""
+    engine, stream_frame = _engine()
+    engine._layout.get_scene_regions.return_value = [
+        Region(key="baoguo", x_ratio=0, y_ratio=0, w_ratio=0.5, h_ratio=1),
+        Region(key="peiyang", x_ratio=0.5, y_ratio=0, w_ratio=0.5, h_ratio=1),
+    ]
+    root = Path(__file__).parents[2] / "config" / "system" / "workflows" / "subcall"
+    engine._procs.update(
+        parse_text((root / "page_detection.wf").read_text(encoding="utf-8")).procs)
+    screen_frame = np.full_like(stream_frame, 30)
+    capture = _ScreenCapture(stream_frame, screen_frame)
+    engine._capture = capture
+
+    _run(engine, 'call $first = is_in_menu_page()\n')
+    assert capture.lossless_calls == 0
+    assert capture.capture_calls == 1
+
+    _run(engine, 'call $second = is_in_menu_page(1)\n')
+    assert capture.lossless_calls == 1
+    assert capture.capture_calls == 1
+
+    # 子过程参数支持运行期表达式：变量为真时同样走二次确认通道
+    engine.variables["want_fresh"] = True
+    _run(engine, 'call $third = is_in_menu_page($want_fresh)\n')
+    assert capture.lossless_calls == 2
+    assert capture.capture_calls == 1
+
+
+def test_from_dynamic_source_grammar():
+    nodes = parse_text('''
+scan [s].[left] as $a from $source
+find as $b from $source by contains "20"
+recognize [s].[left] as $c from $source
+''').body
+    assert all(node.source_var is not None for node in nodes)
+    assert not any(node.from_last or node.screen for node in nodes)
+
+
+def test_from_dynamic_source_switches_capture_path():
+    engine, stream_frame = _engine()
+    screen_frame = np.full_like(stream_frame, 30)
+    capture = _ScreenCapture(stream_frame, screen_frame)
+    engine._capture = capture
+
+    engine.variables["source"] = "screen"
+    _run(engine, 'scan [s].[left] as $raw from $source\n')
+    assert capture.lossless_calls == 1
+    assert capture.capture_calls == 0
+
+    engine.variables["source"] = "default"
+    _run(engine, 'scan [s].[left] as $raw from $source\n')
+    assert capture.capture_calls == 1
+
+
+def test_from_dynamic_source_rejects_unknown_value():
+    engine, _ = _engine()
+    engine.variables["source"] = "stream"
+    with pytest.raises(WorkflowUserError, match="default/last/screen"):
+        _run(engine, 'scan [s].[left] as $raw from $source\n')
 
 
 def test_reuse_cross_region_recognition_and_screenshot_share_frame(tmp_path, monkeypatch):

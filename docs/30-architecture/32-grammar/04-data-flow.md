@@ -61,6 +61,47 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 - 各指令支持的目标形式不同（区域 / 动态区域 / 子场景 / 面板模式 / 全画布），
   见各自文档。
 
+## 截图来源 from screen / from $var
+
+同一位置可改用 `from screen`；缺省则不干预，走后端默认取帧路径
+（scrcpy 流式后端取流最新帧，其它后端按各自的 `capture()` 实现）：
+
+```text
+<指令> [scene].[region] as $result from screen
+```
+
+- **跳过推送式视频流，直取设备当下画面**。安卓 scrcpy 后端走
+  `adb exec-out screencap`；其它后端沿用 `capture_lossless` 的基类默认实现
+  （等价于普通截图）。
+- 一条语句只直取一次，随后同一语句内的区域裁剪、panel 与模板匹配复用这张帧；
+  它同时写入引擎最近帧并递增 `frame_seq`，因此 `screenshot from last` 与
+  `from last` 拿到的是同一张图。
+- 直取失败（超时、空画面、后端异常）记录警告并回退默认取帧，不中止语句；
+  日志区分两条路径。
+- 直取帧与默认帧尺寸可能不同（如流被 `max_size` 缩放），布局坐标按比例换算
+  不受影响，尺寸差异只记 debug 日志。
+- `screenshot` 语句仍只有 `from last` 一种来源子句，不接受 `from screen`。
+
+### 动态来源 from $var
+
+来源可以写成变量，由运行期决定：
+
+```text
+eval $source = "screen"
+scan [game_main_page].[menu] as $found from $source by contains "菜单"
+```
+
+取值（大小写不敏感）：
+
+| 值 | 含义 |
+|---|---|
+| `default` | 不干预，走后端默认取帧（推荐作为缺省分支） |
+| `last` | 复用引擎最近一帧 |
+| `screen` | 直取设备当下画面 |
+
+未定义、空值或其它取值会抛 `WorkflowUserError`，不会静默回退。
+静态 `from last` / `from screen` 与 `from $var` 可以共存，按行选择。
+
 ## 过滤与后处理子句
 
 `where` 与 `with` 都是**只影响结果、不改变返回类型**的子句：

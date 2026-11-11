@@ -201,13 +201,13 @@ def nav_main_to_menu()
         log error "打开菜单后未识别到包裹或培养"
         screenshot from last
         wait @secondary_confirm
-        call $in_menu = is_in_menu_page()
+        call $in_menu = is_in_menu_page(1)
     end
     if not $in_menu
         log error "二次确认仍未识别到包裹或培养"
         screenshot from last
         eval pause("未进入菜单页面，请手动导航后点击继续")
-        call $in_menu = is_in_menu_page()
+        call $in_menu = is_in_menu_page(1)
         if not $in_menu
             screenshot from last
             return -1
@@ -275,7 +275,7 @@ def nav_back_to_main()
         log warn "返回后未确认游戏主页"
         screenshot from last
         eval confirm("当前未回到主页，请手动回到主页后点击确定")
-        call $in_main = is_in_main_page()
+        call $in_main = is_in_main_page(1)
         if not $in_main
             screenshot from last
             return -1

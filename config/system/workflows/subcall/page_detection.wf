@@ -11,11 +11,21 @@
 #   is_in_equip_tune_page()  — 是否在装备调律页
 #   is_in_role_select_page() — 是否在登录页的角色选择视图
 #   is_in_haoling_page()     — 是否在江湖号令页
+#
+# 主页/菜单/背包判定接受可选 $fresh：缺省/0=走后端默认取帧（流或设备截图由连接方式决定）；
+# 1=失败后的二次确认，通过 from $source 直取当下画面，避免把「设备已经到位、
+# 流还停在上一页」误判成失败。
+
+# 页面判定的取帧来源：缺省/0 走后端默认路径，1（失败后的二次确认）直取。
+def vision_source_of($fresh)
+    if $fresh -> return "screen"
+    return "default"
+end
 
 # ─── is_in_main_page ──────────────────────────────────────
 # 是否在主界面。
 #
-# 参数：无
+# 参数：$fresh（可选，缺省 0）— 1=二次确认，直取当下画面
 # 前置：无，任意页面均可调用。
 # 后置：无副作用（只截图识别），不切换页面。
 # 返回：1=在主界面；0=不在主界面。
@@ -27,17 +37,20 @@
 #      这里只扫这两个区域，不做整场景扫描：整场景会把以后在 game_main_page 上
 #      新增的任何模板绑定都算进主页判据，与其它场景重复的图标还会直接造成误判。
 #      对应的区域必须在本端布局里绑定模板，否则按配置错误终止（不静默降级）。
-def is_in_main_page()
+# $fresh：缺省/0=首次判定，走后端默认取帧；1=失败后的二次确认，直取当前画面。
+# 文本命中时只取一次；文本未命中时图标复核再取一次；背包排除与主页判定同源取帧。
+def is_in_main_page($fresh)
+    call $source = vision_source_of($fresh)
     eval $main_items = ["菜单", "活动", "武林录", "限时"]
-    scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
+    scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found from $source by contains_any $main_items
     eval $on_main = $found
     if not $on_main
         # 文本全灭：图标模板复核（只扫本端指定的那一个区域）
         eval $icon = ""
         if env("android")
-            scan [game_main_page].[ditu] as $icon by image
+            scan [game_main_page].[ditu] as $icon from $source by image
         else if env("desktop")
-            scan [game_main_page].[dongzuo] as $icon by image
+            scan [game_main_page].[dongzuo] as $icon from $source by image
         end
         if $icon
             log info "主页文本未命中，由图标模板确认主页: " + $icon
@@ -47,35 +60,37 @@ def is_in_main_page()
     if not $on_main -> return 0
 
     # 文本或图标只说明「像主页」，背包页共用同一套图标/入口词，统一排除一次
-    call $in_bag = is_in_bag_page()
+    call $in_bag = is_in_bag_page($fresh)
     return to_flag(not $in_bag)
 end
 
 # ─── is_in_menu_page ──────────────────────────────────────
 # 是否在菜单页。
 #
-# 参数：无
+# 参数：$fresh（可选，缺省 0）— 1=二次确认，直取当下画面
 # 前置：无。
 # 后置：无副作用。
 # 返回：1=在菜单页；0=不在。
 # 判据：菜单项「包裹」「培养」命中任一。
-def is_in_menu_page()
+def is_in_menu_page($fresh)
+   call $source = vision_source_of($fresh)
    eval $menu_items = ["包裹", "培养"]
-   scan [game_menu_page].[baoguo, peiyang] as $found by contains_any $menu_items
+   scan [game_menu_page].[baoguo, peiyang] as $found from $source by contains_any $menu_items
    return to_flag($found)
 end
 
 # ─── is_in_bag_page ───────────────────────────────────────
 # 是否在背包页（不区分当前 tab）。
 #
-# 参数：无
+# 参数：$fresh（可选，缺省 0）— 1=二次确认，直取当下画面
 # 前置：无。
 # 后置：无副作用。
 # 返回：1=在背包页；0=不在。
 # 判据：制造、整理或任一 tab 文案（培养/道具/任务/钱袋）命中。
-def is_in_bag_page()
+def is_in_bag_page($fresh)
+   call $source = vision_source_of($fresh)
    eval $bag_items = ["制造", "整理", "培养", "道具", "任务", "钱袋"]
-   scan [bag_detail].[zhizao, zhengli, sub_baoguo] as $found by contains_any $bag_items
+   scan [bag_detail].[zhizao, zhengli, sub_baoguo] as $found from $source by contains_any $bag_items
    return to_flag($found)
 end
 

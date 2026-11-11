@@ -1384,13 +1384,16 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             case Align():
                 self._exec_align(node)
             case Scan():
-                with self.capture_source(from_last=node.from_last):
+                from_last, screen = self._vision_source_args(node)
+                with self.capture_source(from_last=from_last, screen=screen):
                     self._exec_scan(node)
             case Recognize():
-                with self.capture_source(from_last=node.from_last):
+                from_last, screen = self._vision_source_args(node)
+                with self.capture_source(from_last=from_last, screen=screen):
                     self._exec_recognize(node)
             case Find():
-                with self.capture_source(from_last=node.from_last):
+                from_last, screen = self._vision_source_args(node)
+                with self.capture_source(from_last=from_last, screen=screen):
                     self._exec_find(node)
             case Collect():
                 self._exec_collect(node)
@@ -1507,6 +1510,31 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             stop_check=self._stop_check,
             pause_event=self._pause_event,
         )
+
+    def _vision_source_args(self, node) -> tuple[bool, bool]:
+        """把 scan/find/recognize 的取帧来源解析成 (from_last, screen)。
+
+        静态 ``from last`` / ``from screen`` 直接取 AST 布尔；``from $var``
+        在运行期取值，只接受 default/last/screen（大小写不敏感）。
+        default 表示不干预，走后端默认取帧路径（流或设备截图由连接方式决定）。
+        """
+        source_var = getattr(node, "source_var", None)
+        if source_var is None:
+            return node.from_last, node.screen
+        raw = self._resolve(source_var)
+        line_no = getattr(node, "line_no", 0)
+        suffix = f"(行 {line_no})" if line_no else ""
+        if raw is None:
+            raise WorkflowUserError(f"from 变量未定义{suffix}")
+        value = str(raw).strip().lower()
+        if value == "default":
+            return False, False
+        if value == "last":
+            return True, False
+        if value == "screen":
+            return False, True
+        raise WorkflowUserError(
+            f"from 变量取值 {value!r} 无效：只支持 default/last/screen{suffix}")
 
     def _exec_screenshot(self, *, from_last: bool = False):
         """Save the explicitly selected frame; recording failure is non-fatal."""

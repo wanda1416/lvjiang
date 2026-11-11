@@ -388,6 +388,7 @@ find [scene].[area] as $var by image [game_menu_page].[back]
 | `with "<清洗组>"` | 在全局默认清洗后叠加业务规则组 | scan / find |
 | `where confidence >= <n>` | 过滤 | scan / recognize / find |
 | `on group "<name>"` | 限定分组 | 仅 recognize |
+| `from last` / `from screen` / `from $var` | 切换取帧来源；`$var` 取 default/last/screen | scan / recognize / find |
 
 by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list`；
 `scan` Region 另支持无 target 的 `by image`；`find` 支持

@@ -170,6 +170,8 @@ class Scan:
     cleaning_group: str | None = None  # with "key" 指定 OCR 清洗组
     line_no: int = 0
     from_last: bool = False
+    screen: bool = False  # from screen：跳过视频流直取当下画面
+    source_var: Any = None  # from $var：运行期解析为 default/last/screen
 
 
 @dataclass(frozen=True)
@@ -185,6 +187,8 @@ class Recognize:
     with_func: Any = None  # Literal(函数名) | None — with 子句指定的 dict->dict 转换函数
     line_no: int = 0
     from_last: bool = False
+    screen: bool = False  # from screen：跳过视频流直取当下画面
+    source_var: Any = None  # from $var：运行期解析为 default/last/screen
 
 
 @dataclass(frozen=True)
@@ -205,6 +209,8 @@ class Find:
     cleaning_group: str | None = None  # with "key" 指定 OCR 清洗组
     line_no: int = 0
     from_last: bool = False
+    screen: bool = False  # from screen：跳过视频流直取当下画面
+    source_var: Any = None  # from $var：运行期解析为 default/last/screen
 
 
 @dataclass(frozen=True)

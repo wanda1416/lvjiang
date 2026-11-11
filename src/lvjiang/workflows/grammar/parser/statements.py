@@ -247,6 +247,7 @@ class _StmtMixin:
     def scan_subscene_stmt(self, items):
         ref = SubsceneEntityRef(*(self._resolve_const_or_var(i) for i in items[:3]))
         target = items[3]
+        from_last, screen, source_var = self._vision_source(items)
         by_clause = next((i for i in items[4:] if isinstance(i, ByClause)), None)
         where_clause = next((i for i in items[4:] if isinstance(i, WhereClause)), None)
         cleaning_group = next((i[1] for i in items[4:]
@@ -256,10 +257,11 @@ class _StmtMixin:
             raise WorkflowUserError("scan by image 不支持 OCR 清洗组")
         return Scan(scene=ref, target=target, by=by_clause, where=where_clause,
                     cleaning_group=cleaning_group,
-                    from_last=("__from_last__",) in items, line_no=self._line(items))
+                    from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items))
 
     def recognize_subscene_stmt(self, items):
         ref = SubsceneEntityRef(*(self._resolve_const_or_var(i) for i in items[:3]))
+        from_last, screen, source_var = self._vision_source(items)
         rich = any(isinstance(i, Token) and i.type == "RICH_KEYWORD" for i in items)
         values = [i for i in items[3:]
                   if not (isinstance(i, Token) and i.type == "RICH_KEYWORD")]
@@ -274,7 +276,7 @@ class _StmtMixin:
         self._reject_recognize_rich_by(rich, by_clause, items)
         return Recognize(scene=ref, target=target, by=by_clause, group=group,
                          where=where_clause, rich=rich, with_func=with_func,
-                         from_last=("__from_last__",) in items, line_no=self._line(items))
+                         from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items))
 
     def click_coord_target(self, items):
         """click (rx, ry) — 画布归一化坐标点"""
@@ -676,6 +678,7 @@ class _StmtMixin:
         scene_name = scene_target[0]
         var_ref = items[1]       # var_ref → VarRef
         var_name = var_ref.name
+        from_last, screen, source_var = self._vision_source(items)
         by_clause = next(i for i in items[2:] if isinstance(i, ByClause))     # ByClause（必填）
         if by_clause.full:
             raise WorkflowUserError(
@@ -704,13 +707,14 @@ class _StmtMixin:
             search_scene=scene_name, search_region=search_region,
             where=where_clause,
             cleaning_group=cleaning_group,
-            from_last=("__from_last__",) in items, line_no=self._line(items),
+            from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items),
         )
 
     def find_stmt_full(self, items):
         """find as $var by ... [where ...] — 全画布搜索"""
         var_ref = items[0]       # var_ref → VarRef
         var_name = var_ref.name
+        from_last, screen, source_var = self._vision_source(items)
         by_clause = next(i for i in items[1:] if isinstance(i, ByClause))     # ByClause（必填）
         if by_clause.full:
             raise WorkflowUserError(
@@ -729,7 +733,7 @@ class _StmtMixin:
             search_scene=None, search_region=None,
             where=where_clause,
             cleaning_group=cleaning_group,
-            from_last=("__from_last__",) in items, line_no=self._line(items),
+            from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items),
         )
 
     # ─── panel 索引 ─────────────────────────────────────────
@@ -948,6 +952,30 @@ class _StmtMixin:
     def capture_source_clause(self, items):
         return ("__from_last__",)
 
+    def vision_source_last(self, items):
+        return ("__vision_source__", "last")
+
+    def vision_source_screen(self, items):
+        return ("__vision_source__", "screen")
+
+    def vision_source_var(self, items):
+        return ("__vision_source__", "var", items[0])
+
+    @staticmethod
+    def _vision_source(items) -> tuple[bool, bool, object | None]:
+        """解析 scan/find/recognize 的取帧来源子句。
+
+        返回 ``(from_last, screen, source_var)``：静态 last/screen 走前两个布尔，
+        ``from $var`` 把变量引用交给引擎在运行期解析成 default/last/screen。
+        """
+        for item in items:
+            if isinstance(item, tuple) and item and item[0] == "__vision_source__":
+                kind = item[1]
+                if kind == "var":
+                    return False, False, item[2]
+                return kind == "last", kind == "screen", None
+        return False, False, None
+
     def scan_stmt(self, items):
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
@@ -955,6 +983,7 @@ class _StmtMixin:
         fields = None
         region_var = None
         target = items[1]  # var_ref → VarRef (as 子句)
+        from_last, screen, source_var = self._vision_source(items)
         if len(scene_target) > 1 and scene_target[1] is not None:
             second = scene_target[1]
             if isinstance(second, list):
@@ -978,7 +1007,7 @@ class _StmtMixin:
         self._validate_scan_image_by(by_clause, items)
         if by_clause is not None and by_clause.match_mode == "image" and cleaning_group:
             raise WorkflowUserError("scan by image 不支持 OCR 清洗组")
-        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, cleaning_group=cleaning_group, from_last=("__from_last__",) in items, line_no=self._line(items))
+        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, cleaning_group=cleaning_group, from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items))
 
     def scan_panel_stmt(self, items):
         """scan [scene].[panel][row][col] as $var [by ...] [where ...]"""
@@ -987,6 +1016,7 @@ class _StmtMixin:
         row = items[2]
         col = items[3]
         target = items[4]  # var_ref → VarRef
+        from_last, screen, source_var = self._vision_source(items)
         by_clause = None
         where_clause = None
         cleaning_group = None
@@ -999,7 +1029,7 @@ class _StmtMixin:
                 cleaning_group = item[1]
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
         self._reject_image_by(by_clause, "scan", items)
-        return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, cleaning_group=cleaning_group, from_last=("__from_last__",) in items, line_no=self._line(items))
+        return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, cleaning_group=cleaning_group, from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items))
 
     def recognize_stmt(self, items):
         """recognize [scene].[f1, f2, ...] as [rich] $var [by ...] [group ...] [where ...] [with ...]"""
@@ -1013,6 +1043,7 @@ class _StmtMixin:
         # 仅过滤 RICH_KEYWORD Token，保留 const_or_var 可能产生的 STRING Token
         non_token = [it for it in items if not (isinstance(it, Token) and it.type == "RICH_KEYWORD")]
         target = non_token[1]  # var_ref → VarRef (as 子句)
+        from_last, screen, source_var = self._vision_source(items)
         if len(scene_target) > 1 and scene_target[1] is not None:
             second = scene_target[1]
             if isinstance(second, list):
@@ -1035,7 +1066,7 @@ class _StmtMixin:
                 with_func = Literal(value=item[1])
         self._reject_image_by(by_clause, "recognize", items)
         self._reject_recognize_rich_by(rich, by_clause, items)
-        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, from_last=("__from_last__",) in items, line_no=self._line(items))
+        return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items))
 
     def recognize_panel_stmt(self, items):
         """recognize [scene].[panel][row][col] as [rich] $var [by ...] [on group ...] [where ...] [with ...]"""
@@ -1048,6 +1079,7 @@ class _StmtMixin:
         row = non_token[2]
         col = non_token[3]
         target = non_token[4]  # var_ref → VarRef
+        from_last, screen, source_var = self._vision_source(items)
         by_clause = None
         group_clause = None
         where_clause = None
@@ -1064,7 +1096,7 @@ class _StmtMixin:
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
         self._reject_image_by(by_clause, "recognize", items)
         self._reject_recognize_rich_by(rich, by_clause, items)
-        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, from_last=("__from_last__",) in items, line_no=self._line(items))
+        return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, from_last=from_last, screen=screen, source_var=source_var, line_no=self._line(items))
 
     def with_clause(self, items):
         """with <func_name> — 指定 rich 模式的 dict->dict 转换函数"""

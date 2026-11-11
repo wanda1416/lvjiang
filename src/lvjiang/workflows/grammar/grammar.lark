@@ -95,8 +95,8 @@ align_stmt: "align"i bracket_expr "." bracket_expr _NL
 //   find [scene].[area] as $var by contains "文字"  — 指定区域搜索
 //   find as $var by contains "文字"                 — 全画布搜索
 // by image 的目标可为显式模板名，或当前布局中的 [scene].[region] 模板绑定
-find_stmt: "find"i scene_target "as"i var_ref capture_source_clause? by_clause where_clause? cleaning_clause? _NL -> find_stmt_area
-         | "find"i "as"i var_ref capture_source_clause? by_clause where_clause? cleaning_clause? _NL              -> find_stmt_full
+find_stmt: "find"i scene_target "as"i var_ref vision_source_clause? by_clause where_clause? cleaning_clause? _NL -> find_stmt_area
+         | "find"i "as"i var_ref vision_source_clause? by_clause where_clause? cleaning_clause? _NL              -> find_stmt_full
 
 // click 支持四种目标：
 //   1. [scene].[panel][row][col] — panel 三级索引（点击格子中心）
@@ -254,9 +254,9 @@ tuple_elem: number | var_ref
 //   1. [scene].[region] — 场景区域 OCR
 //   2. [scene].[panel][row][col] — panel cell 级 OCR
 //      row/col 支持范围索引 [start...end]，仅扫描指定行列子集
-scan_stmt: "scan"i const_or_var "." const_or_var "." const_or_var "as"i var_ref capture_source_clause? by_clause? where_clause? cleaning_clause? _NL -> scan_subscene_stmt
-         | "scan"i scene_target "as"i var_ref capture_source_clause? by_clause? where_clause? cleaning_clause? _NL
-         | "scan"i const_or_var "." const_or_var vision_panel_index vision_panel_index "as"i var_ref capture_source_clause? by_clause? where_clause? cleaning_clause? _NL -> scan_panel_stmt
+scan_stmt: "scan"i const_or_var "." const_or_var "." const_or_var "as"i var_ref vision_source_clause? by_clause? where_clause? cleaning_clause? _NL -> scan_subscene_stmt
+         | "scan"i scene_target "as"i var_ref vision_source_clause? by_clause? where_clause? cleaning_clause? _NL
+         | "scan"i const_or_var "." const_or_var vision_panel_index vision_panel_index "as"i var_ref vision_source_clause? by_clause? where_clause? cleaning_clause? _NL -> scan_panel_stmt
 
 // scan 专用 panel 索引：在单格 [INT] / [$var] 基础上，额外支持范围 [start...end]
 vision_panel_index: "[" INT "]" -> vision_panel_index_int
@@ -271,9 +271,9 @@ vision_range_endpoint: INT | var_ref
 // rich 关键字：as rich $var 返回包含输入/输出元数据的富 dict
 // with 子句：as rich $var with func_name — 指定 dict→dict 转换函数
 RICH_KEYWORD: "rich"i
-recognize_stmt: "recognize"i const_or_var "." const_or_var "." const_or_var "as"i RICH_KEYWORD? var_ref capture_source_clause? by_clause? group_clause? where_clause? with_clause? _NL -> recognize_subscene_stmt
-              | "recognize"i scene_target "as"i RICH_KEYWORD? var_ref capture_source_clause? by_clause? group_clause? where_clause? with_clause? _NL
-              | "recognize"i const_or_var "." const_or_var vision_panel_index vision_panel_index "as"i RICH_KEYWORD? var_ref capture_source_clause? by_clause? group_clause? where_clause? with_clause? _NL -> recognize_panel_stmt
+recognize_stmt: "recognize"i const_or_var "." const_or_var "." const_or_var "as"i RICH_KEYWORD? var_ref vision_source_clause? by_clause? group_clause? where_clause? with_clause? _NL -> recognize_subscene_stmt
+              | "recognize"i scene_target "as"i RICH_KEYWORD? var_ref vision_source_clause? by_clause? group_clause? where_clause? with_clause? _NL
+              | "recognize"i const_or_var "." const_or_var vision_panel_index vision_panel_index "as"i RICH_KEYWORD? var_ref vision_source_clause? by_clause? group_clause? where_clause? with_clause? _NL -> recognize_panel_stmt
 
 // recognize 专用 panel 索引：在单格 [INT] / [$var] 基础上，额外支持范围 [start...end]
 
@@ -333,6 +333,14 @@ LOG_LEVEL.1: /debug/i | /info/i | /warn/i | /error/i
 capture_source_clause: "from"i "last"i
 
 screenshot_stmt: "screenshot"i capture_source_clause? _NL
+
+// scan/find/recognize 的取帧来源，缺省取视频流最新帧：
+//   from last   — 复用引擎最近一帧，不重新截图
+//   from screen — 跳过视频流直取当下画面（Android 走 screencap），
+//                 直取失败时记录警告并回退到流最新帧
+vision_source_clause: "from"i "last"i   -> vision_source_last
+                    | "from"i "screen"i -> vision_source_screen
+                    | "from"i var_ref   -> vision_source_var
 
 eval_stmt: "eval"i "$" NAME "=" expression _NL                 -> eval_assign_expr
          | "eval"i field_access "=" expression _NL              -> eval_field_assign

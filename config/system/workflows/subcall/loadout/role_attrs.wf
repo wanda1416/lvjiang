@@ -59,6 +59,10 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
     end
     call $in_main = is_in_main_page()
     if not $in_main
+        # 首次判定可能读到 back 之前的流帧：直取当下画面再确认一次
+        call $in_main = is_in_main_page(1)
+    end
+    if not $in_main
         screenshot from last
         log error "退出角色页后未识别到主页"
         return -1

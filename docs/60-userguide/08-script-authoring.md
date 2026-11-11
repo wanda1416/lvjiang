@@ -155,6 +155,47 @@ end
 原因。引擎不会自动判断异常并保存图片，其他失败分支可按脚本需要显式添加
 留图，也可写在已有的 `try/catch` 中。
 
+### 强制取当下画面（from screen）
+
+流式截图后端（安卓 scrcpy）返回的是解码线程的最新一帧：机器繁忙时它可能比
+设备当前画面落后一两秒。页面判定这类「错一帧就报废」的检查，可以在
+`scan`、`find`、`recognize` 的 `as $var` 后写 `from screen`，跳过视频流直接
+向设备取当下画面（安卓走 `adb exec-out screencap`，其它后端等价于普通截图）。
+
+```text
+scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found from screen by contains_any $main_items
+```
+
+- 与 `from last` 互斥，只能二选一；`screenshot` 不接受 `from screen`。
+- 一条语句只直取一次：随后的区域裁剪、panel 和模板匹配复用这同一张帧；
+  它同时成为引擎最近帧，`screenshot from last` 保存的就是这张图。
+- 直取失败（超时、返回空、后端异常），或直取帧方向/尺寸与视频流不一致
+  （等待后重取一次仍不一致）时，记录警告并回退到视频流最新帧，脚本不会因此
+  中断；快照来源会标成 `xxx+screen` / `xxx+screen_fallback`，日志与
+  `screenshot from last` 能区分这两条路径。每次直取最多等待 3 秒。
+  Python 侧可用 `engine.last_capture_fallback` 判断本次是否回退。
+- 每次直取多花几百毫秒。只给关键页面校验加，整段流程都加会明显变慢，也
+  掩盖视频流本身的滞后问题。
+
+### 动态取帧来源（from $var）
+
+页面判定这类需要「首次便宜、失败后再确认」的场景，可以把来源写成变量：
+
+```text
+eval $source = "screen"
+scan [game_main_page].[menu] as $found from $source by contains "菜单"
+```
+
+变量取值（大小写不敏感）：
+
+- `default`：不干预，走后端默认取帧路径（scrcpy 是流最新帧，其它后端按各自
+  `capture()` 实现）；
+- `last`：复用引擎最近一帧；
+- `screen`：直取设备当下画面。
+
+未定义、空值或其它取值会直接报错并带行号，不会静默降级。静态
+`from last` / `from screen` 仍然可用。
+
 ### 页面校验诊断的记录范围
 
 公共导航、登录、购买、签到、江湖号令、兑换码和游戏方案扫描已在明确的

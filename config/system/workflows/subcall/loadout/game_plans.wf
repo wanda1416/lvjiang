@@ -57,7 +57,7 @@ def nav_game_plans_to_main()
             log warn "用户选择停止：未能确认已返回主页"
             return -1
         end
-        call $in_main = is_in_main_page()
+        call $in_main = is_in_main_page(1)
     end
     return 0
 end

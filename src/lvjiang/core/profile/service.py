@@ -35,7 +35,6 @@ from .regen import (
     compute_regen_entry,
     is_realtime_regen,
 )
-from .regen_gate import period_recovery_allowed
 from .repository import (
     db_get_history,
     db_get_history_record,
@@ -498,9 +497,6 @@ def profile_action(
         _raw = _read_current_value(username, model_type, key, kd)
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
-    # 消耗把读时函数的结果写回去。绝对值 set / 观测不走这里。
-    if set_value is None and not period_recovery_allowed():
-        raise ProfileOperationRefused("请先完成一次同步，再记录消耗")
 
     # ── 2. 计算目标新值 ──
     if set_value is not None:
@@ -615,8 +611,6 @@ def sync_write_adapter(
             f"sync 目标已锁定，跳过同步写入：{user_name}.{model_type}.{key}")
         return None
 
-    if not period_recovery_allowed():
-        raise ProfileOperationRefused("请先完成一次同步，再记录消耗")
     current_value = _read_current_value(user_name, model_type, key, kd)
     # sync 适配器仅用于数值模型
     if current_value is None or isinstance(current_value, str):

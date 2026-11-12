@@ -39,9 +39,9 @@
 5. 待上传不看可能失真的 `local_history_id`。一条本机 `set`/`delta` 在 `remote_id IS NULL`
    且新于该 key 的快照候选时才上传；更旧的行标成放弃，避免补传整段旧账。
 6. 每个 key 的当前值只由 `(event_at, op_id)` 仲裁；来源实例只作展示，不参与比较。
-7. 手机端与 PC 端共用同一套模型、读时函数与写入闸门。周期告警仍只在 PC 的
+7. 手机端与 PC 端共用同一套模型与读时函数。周期告警仍只在 PC 的
    `ProfileEngine` 上根据读时函数发出。regen/reset 不写账本，因此不再触发
-   `change_script`。手机不跑这套引擎。
+   `change_script`。手机不跑这套引擎。本地消耗当时落库，不要求先同步。
 8. **原地升级**：本地与云端都只对现有表加列、改索引、回填数据，不新建表、不改表名；
    新增列压到最小：本地 3 列（`entries.op_id`、`history.op_id`、`history.remote_id`），
    云端 1 列（`history.op_id`）。默认迁移不碰 `accounts`。
@@ -111,9 +111,9 @@ op = {
 
 | 写入类型 | 是否产生 op | 是否上传 | 说明 |
 | --- | --- | --- | --- |
-| `profile_set` / 单元格 / `profile_observe` | 是 | 是 | 绝对值，不过闸，离线也落库 |
-| `undo` | 是 | 是 | 把账本行的 `old_value`（note 用 `old_value_text`）写成新的绝对值；不过闸 |
-| `profile_inc` / 消耗 | 是（绝对值） | 是 | 读当前值 → 加增量 → clamp → 写绝对 set；**过闸** |
+| `profile_set` / 单元格 / `profile_observe` | 是 | 是 | 绝对值，离线也落库 |
+| `undo` | 是 | 是 | 把账本行的 `old_value`（note 用 `old_value_text`）写成新的绝对值 |
+| `profile_inc` / 消耗 | 是（绝对值） | 是 | 读当前值 → 加增量 → clamp → 写绝对 set。当时落库，不要求先同步 |
 | quota reset | 否 | 否 | 读时函数隐含；旧库里的 `reset` 行只作审计 |
 | regen realtime / boundary | 否 | 否 | 读时函数计算；旧库里的 `tick` 行只作审计 |
 
@@ -121,22 +121,11 @@ op = {
 若它新于快照候选，上传体取当时的 `new_value`。`tick` / `reset` 不上传。
 上表的「是否上传」说的是新写入有没有上传资格；迁移存量还要满足 §3 的待上传条件。
 
-### 4.4 写入闸门
+### 4.4 本地写入不等人同步
 
-闸门只挡住「把读时函数的结果写回去」：
+消耗、绝对值编辑、观测和撤销都在发生时写入本地账本。是否已经登录、这次进程有没有完成拉取，都不参与这次写入。同步只合并已经记下的行。
 
-- `profile_inc`，以及任何先读当前值再写回的路径；
-- `ProfileEngine` 不得再把 regen / quota 的推算结果写成 `set` 或 `reset`。
-
-闸门关闭时，上述写入返回明确错误，任务先同步再继续。下面这些不过闸，离线、未完成 pull
-时也要落库：
-
-- `profile_set`、单元格编辑、`profile_observe`（屏幕上的绝对值是真实事件）；
-- `undo`（写的是账本里已经记下的 `old_value`，不是读时函数的结果）；
-- 只读展示和告警计算。
-
-闸门是进程内状态，不用时间戳或数据库字段表达。没有登录凭据时放行：本地推进没有上行面。
-已登录但本次进程还没完成一次干净 pull 时，只拒绝 §4.4 列出的写回路径。
+`ProfileEngine` 不把 regen / quota 的推算结果写成 `set` 或 `reset`。展示和告警直接用读时函数。
 
 ## 5. 本地数据库结构（原地升级）
 
@@ -235,7 +224,7 @@ CREATE INDEX IF NOT EXISTS idx_history_pending
 
 - `local_history_id` 可以留在文件里作诊断，同步逻辑不读它。
 - 定义摘要继续由定义同步自己维护；库结构版本继续用现有 `schema_version` 表
-  （下一个版本号是 11）；pull 完成闸门是进程内状态。
+  （下一个版本号是 11）。
 - 待上传集合以 `profile_history.remote_id` 为准。`account.json` 损坏时，仍能扫出
   `remote_id IS NULL` 的行，再按快照候选决定上传或标 `-1`。
 
@@ -348,12 +337,12 @@ ALTER TABLE accounts ADD COLUMN profile_migration_cursor INTEGER NOT NULL DEFAUL
 
 ### 7.1 写入
 
-| 入口 | 行为 | 闸门 |
-| --- | --- | --- |
-| `profile_set` / 单元格编辑 / `profile_observe` | 直接写绝对值 | 不过 |
-| `profile_inc` / 消耗 | 读当前值（函数）→ 加增量 → clamp → 写绝对值 | 过 |
-| `undo` | 读该行 `old_value` / `old_value_text`，写成新的绝对值 | 不过 |
-| reset / regen | 不写 canonical、不产生 op | 引擎不再写回 |
+| 入口 | 行为 |
+| --- | --- |
+| `profile_set` / 单元格编辑 / `profile_observe` | 直接写绝对值 |
+| `profile_inc` / 消耗 | 读当前值（函数）→ 加增量 → clamp → 写绝对值 |
+| `undo` | 读该行 `old_value` / `old_value_text`，写成新的绝对值 |
+| reset / regen | 不写 canonical、不产生 op。引擎不再写回 |
 
 - `event_at = now`（真实墙钟），写入 `ts`，格式见 §3。
 - trigger / 告警仍按 `old_value` / `new_value` / 展示用 `delta_value` 在本地触发。
@@ -434,7 +423,7 @@ push:  取 §3 的待上传行，200 条一批
   手机不跑 ticker。周期 `change_script` 不再触发：没有 reset/regen 写入，
   就不存在一次「周期变化」事件去挂钩脚本。
 - 引擎不再把 regen 物化或 quota 重置写进账本。展示和 `profile_inc` 用 §4.2。
-- `profile_inc` 走 §4.4。绝对值写入不走闸门。
+- `profile_inc` 按 §4.4 当时落库。
 
 ## 8. 迁移
 
@@ -554,9 +543,8 @@ push:  取 §3 的待上传行，200 条一批
 3. **执行**：在 `_ensure_schema` 的同一事务内完成加列、回填和索引。
 4. **幂等**：`schema_version` 只前进一次。回填语句带 `WHERE op_id=''`。
 5. **失败**：事务回滚，`schema_version` 不前进。提示迁移失败和备份路径，下次启动重试。
-6. **迁移后**：`regen_gate` 回到「本次进程尚未 pull」。这只影响 §4.4 的写回路径。
-7. **同步状态**：继续用 `account.json` 的 `profile_sync`。不读 `local_history_id`。
-8. **用户可见**：迁移期间显示「正在迁移本地总览数据」。完成后显示「待核对的本地记录 N 条」，
+6. **同步状态**：继续用 `account.json` 的 `profile_sync`。不读 `local_history_id`。
+7. **用户可见**：迁移期间显示「正在迁移本地总览数据」。完成后显示「待核对的本地记录 N 条」，
    N 是 `remote_id IS NULL` 且 `change_type IN ('set','delta')` 的本机行数。
    第一次同步把其中不新于快照的标成 `-1`，真正上传的数量可以更小。
 
@@ -585,8 +573,8 @@ push:  取 §3 的待上传行，200 条一批
 
 | 情况 | 行为 |
 | --- | --- |
-| 升级时离线 | 本地迁移照常完成。绝对值写入可以继续。`profile_inc` 在本次进程 pull 成功前返回错误 |
-| 未登录 | 本地迁移照常完成。无上行面，闸门放行，包含 `profile_inc` |
+| 升级时离线 | 本地迁移照常完成。消耗和绝对值写入照常落库 |
+| 未登录 | 本地迁移照常完成。消耗和绝对值写入照常落库 |
 | 迁移中崩溃 | 本地事务回滚。云端脚本在停写窗口内可重跑，已有 v2 基线的账户跳过。备份保留 |
 | 重复启动 | `schema_version` 与云端「已有 v2 基线则跳过」防止做第二次归约 |
 | 手机与 PC 先后升级 | 各自做本地迁移。服务端基线只有一份。后同步的一端按快照候选仲裁，新于候选的本地行再上传 |
@@ -656,8 +644,8 @@ LWW 结果 = 9，而不是 8
    绝对值推上去只增加账本尾巴，不改变当前值。不出现「先清除本地数据」。
 10. **真实时间戳**：realtime 迁移后 `updated_at` 是胜出写入的墙钟，`value` 含迁移前锚点还原出的小数。
     同一锚点上两端当前值的浮点误差小于 `1e-6`。
-11. **写入闸门**：已登录且尚未完成本次 pull 时，`profile_inc` 不落库并返回明确错误。
-    `profile_set`、`profile_observe`、单元格编辑和 `undo` 在离线时仍落库。未登录时 `profile_inc` 放行。
+11. **消耗当时落库**：已登录且本次进程尚未 pull 时，`profile_inc` 仍写入一条绝对值 `set`。
+    `profile_set`、`profile_observe`、单元格编辑和 `undo` 同样不依赖同步。
 12. **锁定语义**：锁定期间的 op 入库但不改 entry，也不改 `locked`。解锁后按最新 op 重建 entry。
 13. **幂等与坏行**：同一 `op_id` 重复上传得到 `duplicate` 和已有 `remote_id`，账本只有一行。
     一批里的一条 `invalid_event_at` 只把该行标成 `-1`，其余行继续。过去的合法时间不是非法时间。

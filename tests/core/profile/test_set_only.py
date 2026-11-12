@@ -1,13 +1,11 @@
-"""set-only 账本：迁移身份、读时配额、消耗闸门、事件时间仲裁。"""
+"""set-only 账本：迁移身份、读时配额、离线消耗、事件时间仲裁。"""
 
 from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timedelta
 
-import pytest
-
-from lvjiang.core.profile import regen_gate, repository, schema, service
+from lvjiang.core.profile import repository, schema, service
 from lvjiang.core.profile.arbitrate import is_strictly_newer
 from lvjiang.core.profile.models import QuotaKeyDef
 
@@ -130,25 +128,28 @@ def test_unlock_rebuilds_entry_from_latest_op(tmp_path, monkeypatch) -> None:
     assert "locked" not in entry
 
 
-def test_absolute_write_is_allowed_when_inc_is_gated(tmp_path, monkeypatch) -> None:
+def test_inc_persists_without_a_prior_sync(tmp_path, monkeypatch) -> None:
+    """消耗当时落库，不要求本进程先完成一次拉取。"""
     monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
     repository.reset_profile_db()
-    regen_gate.reset()
-    monkeypatch.setattr(regen_gate, "_session_state", lambda: True)
     schema._PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     schema._PROFILE_PATH.write_text(
-        "stock:\n  - {key: coin, label: 币}\n", encoding="utf-8")
+        "regen:\n"
+        "  - {key: xinli, label: 心力, regen_type: realtime,\n"
+        "     regen_rate_value: 0.125, regen_rate_unit: minute, cap: 600}\n",
+        encoding="utf-8",
+    )
     schema._config = None
-    with pytest.raises(service.ProfileOperationRefused):
-        service.profile_action("u", "coin", delta=1)
-    written = service.profile_action("u", "coin", set_value=4, source="观测")
-    assert written == 4
-    entry = repository.db_read_entry("u", "stock", "coin")
-    assert entry["value"] == 4
-    assert entry["op_id"]
-    history = repository.db_get_history("u", "stock", "coin")
+    repository.db_upsert(
+        "u", "regen", "xinli", 10,
+        updated_at=datetime.now().isoformat(timespec="seconds"),
+    )
+    written = service.profile_action("u", "xinli", delta=-1, source="消耗")
+    assert abs(written - 9) < 0.02
+    history = repository.db_get_history("u", "regen", "xinli")
     assert history[0]["change_type"] == "set"
-    assert not history[0]["op_id"].startswith("unscoped:")
+    assert abs(history[0]["new_value"] - 9) < 0.02
+    assert history[0]["source"] == "消耗"
 
 
 def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -> None:

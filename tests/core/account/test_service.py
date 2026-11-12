@@ -389,7 +389,7 @@ def test_restore_fast_path_returns_truthy_without_summary(monkeypatch) -> None:
 
 
 def test_stored_session_state_distinguishes_unknown(monkeypatch) -> None:
-    """凭据库读不到时返回 None，让周期恢复闸门按 fail-closed 处理。"""
+    """凭据库读不到时返回 None，不能当成未登录。"""
     monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "")
     assert account_service.stored_session_state() is False
 

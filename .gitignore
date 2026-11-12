@@ -39,7 +39,8 @@ logs/
 /pip-*.log
 
 # 外置插件默认目录（独立检出，可容纳多个私有插件）
-/plugins/
+/plugins/*
+!/plugins/shuijiao_tuning/
 
 # Private administration checkout and its nested public site repository.
 /admin/

@@ -1,0 +1,158 @@
+{
+  "content_version": 1,
+  "profiles": {
+    "hong": {
+      "label": "虹虹",
+      "mode": "large",
+      "playstyle": "无名",
+      "rule": "huiyi_general",
+      "skills": [
+        "required",
+        "junk"
+      ]
+    },
+    "ying": {
+      "label": "影影",
+      "mode": "large",
+      "playstyle": "九剑",
+      "rule": "huiyi_general",
+      "skills": [
+        "required",
+        "junk"
+      ],
+      "qishu_allowed": true
+    },
+    "zun": {
+      "label": "樽樽",
+      "mode": "small",
+      "playstyle": "樽樽",
+      "rule": "huixin_small",
+      "skills": [
+        "required",
+        "required"
+      ]
+    },
+    "feng": {
+      "label": "风风",
+      "mode": "small",
+      "playstyle": "双刀",
+      "rule": "huixin_small",
+      "skills": [
+        "required",
+        "required"
+      ]
+    },
+    "yuan": {
+      "label": "鸢鸢",
+      "mode": "small",
+      "playstyle": "鸢鸢",
+      "rule": "huixin_small",
+      "skills": [
+        "required",
+        "junk"
+      ]
+    },
+    "chen": {
+      "label": "尘尘",
+      "mode": "small",
+      "playstyle": "尘尘",
+      "rule": "huixin_small",
+      "skills": [
+        "required",
+        "junk"
+      ]
+    },
+    "jun_double": {
+      "label": "钧钧·双切",
+      "mode": "small",
+      "playstyle": "双切",
+      "rule": "huixin_small",
+      "skills": [
+        "junk",
+        "required"
+      ]
+    },
+    "jun_tang": {
+      "label": "钧钧·纯唐",
+      "mode": "small",
+      "playstyle": "纯唐",
+      "rule": "huixin_small",
+      "skills": [
+        "required",
+        "junk"
+      ]
+    },
+    "yi": {
+      "label": "翊翊",
+      "mode": "small",
+      "playstyle": "翊翊",
+      "rule": "huixin_small",
+      "skills": [
+        "required",
+        "junk"
+      ]
+    },
+    "yu": {
+      "label": "玉玉",
+      "mode": "middle",
+      "playstyle": "走地玉",
+      "rule": "huixin_yuyu",
+      "skills": [
+        "required",
+        "junk"
+      ],
+      "qishu_allowed": true,
+      "weapon_first": [
+        "最大外功攻击",
+        "最大外功攻击"
+      ]
+    },
+    "wei": {
+      "label": "威威",
+      "mode": "wei",
+      "playstyle": "威威",
+      "rule": "huixin_modao",
+      "skills": [
+        "required",
+        "junk"
+      ],
+      "weapon_first": [
+        "最小外功攻击",
+        "最大外功攻击"
+      ],
+      "set_goal": "整套40词条目标：5条势，或1条会意率＋3条势；逐件保留候选，不能把整套数量当成单件门槛。"
+    },
+    "lin_heal": {
+      "label": "霖霖·纯奶",
+      "mode": "middle",
+      "playstyle": "纯奶",
+      "rule": "heal_pure",
+      "skills": [
+        "optional",
+        "optional"
+      ],
+      "unit": "对玩家单位增效",
+      "weapon_first": [
+        "最大外功攻击",
+        "最大外功攻击"
+      ]
+    },
+    "lin_fire": {
+      "label": "霖霖·火拳",
+      "mode": "middle",
+      "playstyle": "火拳",
+      "rule": "heal_fire",
+      "skills": [
+        "junk",
+        "junk"
+      ],
+      "all_skill": false,
+      "qishu": true,
+      "qishu_allowed": true,
+      "weapon_first": [
+        "最大外功攻击",
+        "最大外功攻击"
+      ]
+    }
+  }
+}

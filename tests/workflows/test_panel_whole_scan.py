@@ -70,6 +70,17 @@ def _write_wf(tmp_path, text: str):
     return wf
 
 
+def test_per_call_even_alignment_does_not_rewrite_layout():
+    engine = _make_engine()
+    panel = engine._layout.get_scene_panels("s")[0]
+    panel.calibration = "image"
+    alignment = engine.align_panel("s", "actions", calibration_override="even")
+    assert (alignment.n_rows, alignment.n_cols) == (2, 2)
+    assert panel.calibration == "image"
+    engine._capture_panel_image = lambda obj: None
+    assert engine.align_panel("s", "actions") is None
+
+
 def test_whole_panel_scan_nested_result(tmp_path):
     """scan [s].[actions] → {"1": {"1": t1, "2": t2}, "2": {...}}（行优先）"""
     wf = _write_wf(tmp_path, (

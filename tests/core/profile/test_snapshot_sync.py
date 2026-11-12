@@ -234,6 +234,24 @@ def test_old_protocol_blocks_sync(env, monkeypatch) -> None:
     report = snapshot_sync.sync_all("t")
     assert report.pushed == 0
     assert any("尚未升级" in item for item in report.errors)
+    followed = snapshot_sync.pull_and_replay("t")
+    assert followed.pulled == 0
+    assert any("尚未升级" in item for item in followed.errors)
+
+
+def test_snapshot_without_event_time_uses_snapshot_clock(env) -> None:
+    env["server"].snapshots = [{
+        "id": 1, "snapshot_remote_id": 0, "origin_instance_id": "other",
+        "origin_name": "旧PC", "created_at": "2026-11-06T18:00:00.000Z", "entry_count": 1,
+        "entries": json.dumps([{
+            "username": "张三", "type": "stock", "key": "energy", "value": 4,
+        }]),
+    }]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.snapshots == 1
+    entry = env["entries"]["张三"]["stock"]["energy"]
+    assert entry["value"] == 4
+    assert entry["updated_at"] == "2026-11-06T18:00:00"
 
 
 def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:

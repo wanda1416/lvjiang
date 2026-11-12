@@ -418,7 +418,10 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
             "key": key,
             "value": entry.get("value"),
             "value_text": entry.get("value_text") or "",
-            "updated_at": canonical_event(entry.get("updated_at") or ""),
+            "updated_at": (
+                canonical_event(entry.get("updated_at") or "")
+                or canonical_event(str(snapshot.get("created_at") or ""))
+            ),
             "op_id": str(entry.get("op_id") or ""),
         })
     applied = repository.db_merge_snapshot_candidates(candidates)
@@ -459,6 +462,10 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     """
     del allow_overwrite, tolerate_no_snapshot
     report = ProfileSyncReport()
+    blocked = profile_protocol_block(token)
+    if blocked:
+        report.errors.append(blocked)
+        return report
     state = _state()
     head = remote_head(token)
     if isinstance(head, int) and int(state.get("remote_history_id") or 0) > head:

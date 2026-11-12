@@ -257,16 +257,9 @@ ALTER TABLE profile_history ADD COLUMN op_id TEXT NOT NULL DEFAULT '';
 | `source` | 来源展示 | 保留，不参与仲裁 |
 | （新增）`op_id` | 同步幂等键 | 先加列，回填后再建唯一索引 |
 
-回填与索引切换见 §8.3，完成形态是：
-
-```sql
-DROP INDEX IF EXISTS profile_history_idempotent;
-CREATE UNIQUE INDEX IF NOT EXISTS profile_history_op_id
-    ON profile_history(account_id, op_id);
-```
+回填与索引切换见 §8.3。`0010` 先建 `op_id <> ''` 的部分唯一索引。`0011` 把空 `op_id` 回填成 `legacy:<instance_id>:<local_id>`，再删除 `profile_history_idempotent`。协议保持 2，不退回 1。
 
 - 旧行：`op_id = 'legacy:' || instance_id || ':' || local_id`。
-- `profile_history_idempotent` 在协议仍为 1、旧客户端还在推送时必须保留。
 - 新 pull 只取 `op='set'`。旧 `delta` 留在表里作审计，不回放；它们对当前值的影响只通过
   §8.2 的一次性归约进入新快照。
 
@@ -503,6 +496,14 @@ push:  取 §3 的待上传行，200 条一批
    新快照行自己的 `created_at` 只表示这份快照何时生成，**不写进任何条目**。
 5. 不改旧账本行。旧 `delta` 仍是 `op='delta'`。
 
+归约函数在 `server/src/profile_baseline.mjs`。对指定 SQLite 文件执行：
+
+```bash
+node scripts/one_off/profile_v2_baseline.mjs <sqlite-path>
+```
+
+最新快照的条目已经带 `op_id` 字段时跳过。线上协议已经是 2，脚本不改协议版本。
+
 到达序会算错。例如起点 10，`set 15 @ 12:00` 先入库，`delta +5 @ 11:00` 后入库：按
 `remote_id` 得到 20，按事件时间得到 15。手机上 12:30 的未上传写入必须和 12:00 比，而不是和
 迁移脚本的运行时间比。
@@ -522,7 +523,7 @@ push:  取 §3 的待上传行，200 条一批
    不允许先开协议 2、稍后再拒 delta。
 5. 客户端看到版本 2 之后，按 §8.5.3 做快照合并和补传。
 
-全部账户的第 3 步成功之前，不把常量拨到 2。拨早了，没有新基线的账户会被客户端当成 v2。
+线上协议已经是 2，不再退回 1。索引删除由迁移 `0011` 完成，基线归约由上面的脚本完成。没有这份基线的账户，新设备只会落到旧快照，水位之后的旧 `delta` 不会被 pull 读到。
 
 ### 8.4 回滚
 

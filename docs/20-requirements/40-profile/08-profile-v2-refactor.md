@@ -3,8 +3,10 @@
 > 状态：规划中（未实施）。最后更新：2026-11-13。
 >
 > 本文档取代 [07-set-only-sync.md](07-set-only-sync.md) 的 v1.5 同步方案。v1.5 保留为历史记录，
-> 不再继续打补丁；新服务端、新客户端直接使用本文的 v2 表与 v2 接口，v1 表与 v1 接口保持原样，
-> 不主动停用，也不做双写。
+> 不再继续打补丁；新服务端、新客户端直接使用本文的 v2 表与 v2 接口。
+> **旧 v1 接口（`/api/sync/profile/*`）彻底作废，当做不存在**：不维护、不排障、不保留可用性承诺，
+> 也不做双写；线上旧实现（含其 `/api/sync/state` 返回的 `protocol_version: 2`）**不计入协议版本**，
+> v2 协议版本只以 `/api/v2/profile/state` 的 `protocol_version` 为准，**从 2 开始算**。
 
 ## 1. 为什么要重构
 
@@ -180,7 +182,7 @@ CREATE TABLE profile_sync_v2 (
 - 本地只有一份同步状态；切换云端账号时由账号流程重置 `remote_id`/`local_id`/快照引用，
   **不修改 entries/history 数据**。
 - `remote_id` 是拉取水位，`local_id` 是推送水位；`snapshot_ref_id` 是本地快照主键，
-  `snapshot_id` 是该快照覆盖的云端水位。只有这两个 id 概念。
+  `snapshot_id` 是该快照覆盖的云端水位。水位只有这两个。
 - 不再把同步状态放 `account.json`；与 history 同库，掉电不会出现「行写了、水位没写」。
 
 ## 4. 云端数据库 v2
@@ -384,8 +386,8 @@ CREATE TABLE profile_accounts_v2 (
 
 ## 5. v2 接口
 
-统一前缀 `/api/v2/profile`；认证沿用现有 Bearer 会话。v1 `/api/sync/profile/*` 保持原样，
-但新客户端只走 v2，不做 v1/v2 双写。
+统一前缀 `/api/v2/profile`；认证沿用现有 Bearer 会话。旧 v1 接口彻底作废（见文首），
+新客户端只走 v2，不做双写；协议版本只认 `/api/v2/profile/state`，从 2 开始计。
 
 ### 5.0 通用约定
 
@@ -446,9 +448,10 @@ CREATE TABLE profile_accounts_v2 (
 - `oldest_remote_id`：云端仍保留的最小 `profile_history_v2.remote_id`；0 表示没有历史行。
   客户端用它检测自己的水位是否已经落到已清理区间。
 - `snapshot_required` / `snapshot_state`：`none` 只可能是账户还没有任何 history（`head=0`）：
-  - `true` / `none`：直接 `POST /snapshot` 创建空快照（`snapshot_id=0`、entries 为空），再 pull；
-  - `false` / `ready`：先 `GET /snapshot` 取基线，再 pull。基线可能是服务端自动补的
-    `snapshot_id=0` 空快照（首份 push 时创建，见 §4.2）。
+  - `true` / `none`：客户端**唯一允许自动创建快照**的场景——直接 `POST /snapshot`
+    创建空快照（`snapshot_id=0`、entries 为空），再 pull；
+  - `false` / `ready`：**只拉取**最新快照取基线，再 pull；不得自动创建快照
+    （数据快照的自动创建仅限云端尚无数据快照时，见 §6.4；刷新须用户确认）。
 
 请求参数：无。
 
@@ -493,11 +496,10 @@ CREATE TABLE profile_accounts_v2 (
 - 一旦有任何 push 写入 history，服务端会在同一事务内自动补一份 `snapshot_id=0` 的空快照
   （§4.2），所以 `head>0` 时一定存在快照。
 - 因此 `/pull` 不以快照为前置，不存在「必须先建快照才能 pull」的死锁。
-
-建快照前仍需 pull 到 head 并追平 `local_id`（§5.4），不要用局部 entries 直接建快照：
-
-> 反例：云端已有 1..100，本机只 push 了 101..150 就建快照 150，entries 并不代表
-> 水位 150 的全量；必须先把 1..150 拉全再建快照。
+- 客户端流程：先 `GET /state` 感知；本地不知道云端有没有快照前不 push、不 pull。
+  `none` → 自动建空快照（唯一自动建快照场景）；`ready` → 拉最新快照为基线。
+  只有远端快照被清理消失（pull 返回 `410 snapshot_expired`）时，才走「拉取最新快照
+  继续同步」的失效分支（§5.3）。
 
 ### 5.2 `POST /api/v2/profile/push`
 
@@ -686,6 +688,9 @@ HTTP：整批 200 即返回逐条结果；整批形状错误 400；未登录 401
   **必须再跑一轮 push**：远端行/`delta` 行跳过并推进 `local_id`，
   直到 `local_id` 追平本机最新记录。**只有 `remote_id == head` 且 `local_id` 追平后才能建快照**；
   push ack 不算 pull，rejected 行跳过、不进入快照。
+  不要用局部 entries 直接建快照：
+  > 反例：云端已有 1..100，本机只 push 了 101..150 就建快照 150，entries 并不代表
+  > 水位 150 的全量；必须先把 1..150 拉全再建快照。
 - 若 `POST` 时 head 已前进，导致 `snapshot_id < head`，返回
   `409 snapshot_behind_head`；客户端重新 pull 到新 head 后再提交。
 - 写入：同一事务内完成：
@@ -798,7 +803,7 @@ HTTP：整批 200 即返回逐条结果；整批形状错误 400；未登录 401
 - `as_of_remote_id` 缺省等于 `head_remote_id`。
 - 如果 `as_of_remote_id > head_remote_id`，返回 `400 invalid_as_of`。
 - 如果 `as_of_remote_id < 最新快照的 snapshot_id`，取**不晚于** `as_of_remote_id` 的最新一份快照；
-  没有这样的快照时返回 `409 snapshot_too_old`。
+  没有这样的快照时返回 `409 snapshot_too_old`（仅在全部快照被清理后可能触发）。
 - 如果尾巴过大（例如超过 5000 行），返回 **200 + `stale=true`**、
   `stale_reason="tail_too_large"`，并带 `head_remote_id` / `latest_snapshot_id`；
   网页退化展示最新快照并标记「可能过期」，不应直接 500。
@@ -865,21 +870,19 @@ HTTP：整批 200 即返回逐条结果；整批形状错误 400；未登录 401
 1. `GET /state`，确认 `protocol_version=2`。
 2. 选择基线：
    - **本地 history 为空（新设备/重装）**：
-     - 先 push 本机待推送 history（若有），**push ack 不推进 `remote_id`**；
-       若云端还没有快照，本批 push 会自动补 `snapshot_id=0` 的空快照。
-     - 看 `error_code` / `snapshot_required`：
-       - `true`（无快照，只可能 `head=0`）：先创建空快照（`snapshot_id=0`、entries 为空），
-         再继续 pull（无行）；
-       - `false`（已有快照）：先 `GET /snapshot` 取基线：
-         - 只要最新状态：取最新快照，`remote_id = snapshot_id`；
-         - 要最早快照之后的全量历史：取**最早有效**的快照，`remote_id = 该水位`；
-     - 设置好 `snapshot_ref_id` / `snapshot_id` / `remote_id` 后再 pull 到 head；
-       pull 写入的远端行会占用本地 `local_id` 但不推进推送水位，所以 pull 到 head 后
-       **必须再跑一轮 push**：远端行、`delta` 行跳过并推进 `local_id`，
-       直到 `local_id` 追平本机最新记录；只有 `remote_id == head_remote_id`
-       且 `local_id` 已追平后，才用当前 entries 创建 `snapshot_id=head` 的数据快照。
+      - **先 `GET /state` 感知云端快照状态**；本地还不知道云端有没有快照前，不 push 也不 pull。
+      - `snapshot_state="none"`（云端没有任何快照，只可能 `head=0`）：
+        这是**唯一允许客户端自动创建快照**的场景——直接 `POST /snapshot` 创建空快照
+        （`snapshot_id=0`、entries 为空），然后 pull（无行）。
+      - `ready`（云端已有快照）：**只拉取最新快照为基线**（`remote_id = snapshot_id`）；
+        要最早快照之后的全量历史，取最早有效的快照。**不得自动创建快照**；
+        云端没有数据快照（最新仍是水位 0 空基线）时，才允许在 pull 到 head 且
+        `local_id` 追平后自动创建 `snapshot_id=head` 的数据快照。
+      - **云端已有数据快照时，刷新快照必须由用户确认后手动触发**，
+        避免「新设备自动建快照 → 覆盖云端 entries」相互冲刷数据。
    - **本地 history 非空（已有设备）**：
-     - 本地还没有快照引用时，先按第 4 步 push；服务端会自动补空快照，再取基线；
+     - **先 `GET /state` 感知云端快照状态**（不知晓远端快照前不 push、不 pull）；
+     - 云端无快照（`head=0`）：push 本机待推送 history（服务端自动补空基线）→ pull；
      - 已有快照引用时先校验：`GET /snapshot?id=本地快照`；
      - 若 `410 snapshot_expired` 且本地 `remote_id >= oldest_remote_id - 1`：
        只把 `snapshot_ref_id` / `snapshot_id` 切到最新快照作为兜底，**不推进 `remote_id`**，
@@ -938,10 +941,12 @@ pull → 应用 → push → 应用 ack
 
 - **任意已认证客户端都可以创建**（PC / Android 能力对齐），不再限制 PC。
 - **空基线自动补**：服务端在首份 push 事务内补 `snapshot_id=0` 的空快照；`head=0` 时由客户端
-  直接创建空快照。空快照也是合法快照，`/pull` 不因无快照失败。
-- **首份数据快照由第一个客户端创建**：第一个有数据的客户端 pull 到 head、再 push 追平后，
-  用回放后的 entries 创建 `snapshot_id=head` 的快照；后续客户端拉取这份快照。
-- **后续快照手动刷新**：不再自动周期创建；由用户在 PC 或 Android 上触发 `POST /snapshot`。
+  在 `/state` 感知到 `none` 后自动创建空快照（这是客户端唯一允许自动建快照的场景）。
+  空快照也是合法快照，`/pull` 不因无快照失败。
+- **首份数据快照自动创建**：仅当云端还没有任何数据快照（最新只有水位 0 空基线）时，
+  客户端 pull 到 head、`local_id` 追平后自动创建 `snapshot_id=head` 的数据快照。
+- **其余快照一律手动刷新**：云端已有数据快照时，客户端不得自动创建；由用户确认后触发
+  `POST /snapshot`，避免多端自动建快照相互冲刷 entries。
 - 启动顺序见 §6.1；建快照前必须 `remote_id == head_remote_id` 且 `local_id` 追平本机最新记录。
   push 不要求快照存在，但 push ack 不推进 `remote_id`。
 - 快照幂等见 §5.4；快照不修改 history，不删除旧行。
@@ -1027,7 +1032,7 @@ pull → 应用 → push → 应用 ack
 
 ### 7.1 云端
 
-1. 部署 v2 表、v2 接口；v1 表与 v1 接口只保留，**网页不再使用 v1**。
+1. 部署 v2 表、v2 接口；v1 接口作废不保留，**网页不再使用 v1**。
 2. 网页只读 v2：默认页 `#/profile/entries` 展示实时数据，`#/profile/snapshot` 查看历史快照，
    历史读 `/history`；没有 v2 数据时直接为空，不回退 v1。
    这部分随 v2 接口一起上线；v2 未部署前网页保持 v1，不提前改路由或调用 v2。
@@ -1036,11 +1041,8 @@ pull → 应用 → push → 应用 ack
    - push 迁移出的 history（`profile_sync_v2.local_id=0`）；
    - pull 到 head；
    - 创建第一份 v2 快照。
-4. v1 表与接口保持原样，**不主动停用**；新客户端只走 v2。不做 v1→v2 双写或写入转换。
-   用户只保留一个真源，旧客户端在 v2 基线之后的写入不会进入 v2。
-   发布说明和旧客户端提示必须明确这一点：升级后继续用 v1 写入，数据只留在 v1，
-   不会出现在 v2 网页/客户端；避免用户以为记录丢失。
-5. 回滚：v1 表未动；切回 v1 前先停 v2 写入，验证后恢复；v2 数据保留。
+4. v1 接口作废，旧客户端写入不再受支持、不做转换；发布说明明确需升级客户端。
+5. 回滚：无「切回 v1」路径；停写 v2、保留数据与备份，修复后恢复。
 
 ### 7.2 本地
 
@@ -1051,21 +1053,26 @@ pull → 应用 → push → 应用 ack
 2. **entries 无损迁移**：见 §7.3。
 3. **history 迁移**：全部行迁入本地 v2 history；`set/regen/reset` 按 `local_id` 顺序推送，
    `delta` 只作本地只读历史、推送时跳过；v1 的 `tick` 统一改名为 `regen`。
-4. 首次 v2 按 §6.1 建立快照：push 迁移出的 history → pull 到 head → 再 push 追平 `local_id`
-   → 用回放后的 entries 创建首份快照；`head=0` 时为空快照。
+4. 首次 v2 按 §6.1：`/state` 感知 → push 迁移出的 history（自动补空基线）→ pull 到 head
+   → 再 push 追平 `local_id` → 云端尚无数据快照时，用回放后的 entries 自动创建首份数据快照。
 5. 不再读 v1；v1 同步引擎冻结。
 
 **Android：**
 
-1. 新建 v2 三张表；**彻底放弃旧表**，不保留 v1 同步路径。
-2. **只迁移 entries（当前值）；不迁移 v1 history 表，直接丢弃**，避免复杂度堆积。
+1. 新建 v2 三张表；**彻底放弃旧表与 v1 同步路径**，相关兼容措施（旧账本迁移、rebase、
+   同步状态机分支等）一并删除，同步逻辑按 §6 简化实现。
+2. **自动清理全部本地历史，只迁移 entries（当前值）；不生成 set 行、不迁 history**。
    迁移时保证 `entries.event_at` 非空（规则同 §7.3），否则无法创建快照。
-3. 首次 v2：
+3. **Android entries 允许 snapshot-only**：本机 entries 可以只进快照、不产生 history 行；
+   允许云端创建快照时没有对应历史数据。代价是这份快照被清理后该数据不可恢复，明确接受。
+4. 首次 v2：
    - 云端已有快照：拉取快照，按 per-key LWW 合并本机 entries，再从快照水位 pull；
    - 云端没有快照且 `head_remote_id=0`：用本机 entries 创建快照；本机也没有 entries 时创建空快照；
-   - 不能只用本机 entries 在 `head>0` 上建快照，否则快照不代表该水位全量；
-     `head>0` 时服务端已有自动空快照，按它 pull 到 head 后再建快照。
-4. 能力与 PC 对齐：可建快照、可 push/pull、可迁移 entries；只是没有旧历史。
+   - 云端 `head>0`：服务端已有自动空/数据快照，取基线 pull 到 head 后按 LWW 合并。
+5. **彻底禁用从 PC 同步 profile**：PC 不再向 Android 下发 profile 数据；
+   文档/定义/用户等其他通道同步时**忽略其中 profile 相关内容**，Android profile 只走云端 v2 同步。
+6. 同步节奏简化：后台默认 **1 分钟一轮 pull + push**（无更新跳过），另提供手动同步入口。
+   周期引擎闸门（§2.5）不变。
 
 ### 7.3 PC 迁移字段映射（迁移脚本单独 review）
 
@@ -1115,11 +1122,10 @@ history：
 
 ### 7.4 客户端切换
 
-1. 新客户端**不再回退 v1**；`GET /state` 不是 2 时提示服务端未升级，Profile 同步暂停，
+1. 新客户端**不再回退 v1**；`/api/v2/profile/state` 不是 2 时提示服务端未升级，Profile 同步暂停，
    文档/定义/用户等其他通道照常同步。
 2. 服务端 v2 可用后，客户端首次同步按 §6.1 建立快照。
-3. v1 客户端可以继续存在，但不再是新客户端的真源；新客户端只走 v2。
-   旧客户端提示必须明确：v1 写入不会进入 v2，需要继续同步请升级。
+3. 旧 v1 客户端不再受支持；需要继续同步请升级客户端。
 
 ## 8. 从 v1.5 删除/冻结的内容
 
@@ -1131,6 +1137,9 @@ v2 上线后，以下不再进入新路径：
 - `_period_relation`、周期归零/恢复写账本。
 - 快照候选比较、`remote_id=-1`、`reopen_abandoned`、abandon/reject 分流。
 - 客户端 rebase 分支、`state_problem`、协议分阶段开关。
+- PC 向 Android 下发 profile 的通道：Android profile 只走云端 v2；其他同步通道忽略 profile 内容。
+- Android 的 v1 同步兼容措施（旧账本迁移、同步状态机分支等）；Android 同步简化为
+  后台 1 分钟 pull + push（无更新跳过）+ 手动同步。
 - 服务端 `profile_baseline.mjs` 不再使用；v1→v2 由 PC 客户端迁移，云端 v2 从空开始。
 - 网页历史窗口回放；旧值直接读 history 列。
 - `old_value` 由服务端重建；改为客户端上传、云端原样存。
@@ -1145,13 +1154,16 @@ v2 上线后，以下不再进入新路径：
    - 对快照上传加设备白名单。
 2. **future / 并发 set**：未来时间戳照常入库，回放时只进 history；同一 key 并发 set 后到覆盖。
    这两条都是 set-only 的预期行为，见 §2.3。
-3. **v1/v2 并存**：v1 接口不主动停用，新客户端只走 v2；用户只保留一个真源。
-   旧客户端在 v2 基线之后的写入不会进入 v2，也不做转换。
+3. **v1 作废**：旧客户端不再受支持，用户只保留一个真源。
 4. **云端实时表回放**：`profile_entries_v2` 是 history 的物化缓存，在 push 事务内同步回放，
    失败整体回滚（history 也不落库），因此实时表始终等于 head。
    `/entries` 只在 `as_of == head` 读实时表，更早水位走折叠；不引入 `entries_remote_id` 水位。
 5. **快照新鲜度**：网页矩阵读 `/entries` 的实时表/折叠结果，不依赖 PC 快照的实时性；
    快照只影响折叠成本。
+6. **Android snapshot-only**：Android entries 无 history 行兜底，其快照被清理后数据不可恢复；
+   以「Android 本地也自动清理历史」为前提接受该取舍，不为此增加兼容机制。
+7. **PC 下发禁用**：PC 与 Android 之间不存在 profile 直传通道；其他同步通道忽略 profile 内容，
+   Android profile 只经云端 v2。通道误发按「未知字段忽略」处理。
 
 ## 10. 验收标准
 
@@ -1163,7 +1175,7 @@ v2 上线后，以下不再进入新路径：
    取最新快照时历史从该水位开始，取最早保留快照时可得到该水位之后的全量历史。
 6. **旧值展示**：网页历史页直接显示上传的 `old_value/new_value`，不依赖窗口回放。
 7. **周期引擎**：未完成干净 pull + push 时，`ProfileEngine` 不执行周期处理。
-8. **v1 保留**：v1 表/接口原样可用；新客户端只走 v2，不依赖 v1。
+8. **v1 作废**：新客户端只走 v2，任何路径不依赖、不回退 v1；v1 接口视为不存在。
 9. **无 v1.5 机制**：v2 不出现领号式 `remote_id`、`delta`、快照候选比较、`-1`、rebase。
 10. **清理与漏拉检测**：全量历史模式保留最早快照水位之后的全部行；`/state` 返回
     `oldest_remote_id`；pull 在 `since_remote_id < oldest_remote_id - 1` 时返回 `409 history_gap`，
@@ -1184,28 +1196,31 @@ v2 上线后，以下不再进入新路径：
     客户端跳过 rejected 行并推进 `local_id`，只记日志，不保存逐行状态。
 16. **历史不丢段**：基线 W0 后，云端 `remote_id > W0` 的每一行都出现在已建立基线设备的本地
     history，包含过期、无效、未来、LWW 淘汰行。
-17. **网页 v2 化**：网页只读 v2；v1 接口保留但网页不再使用；没有 v2 数据时网页为空。
+17. **网页 v2 化**：网页只读 v2，不回退 v1；没有 v2 数据时网页为空。
 18. **PC 迁移范围**：v1 entries/history 全部迁入 v2；`delta` 只作本地只读历史，不推送；
     行数、old/new、op_type、source、sync_from、device_id、event_at（entries 非空）抽查一致；
     迁移后 `profile_sync_v2.local_id=0`。
-19. **Android 迁移范围**：只迁 entries，不迁 v1 history；旧表彻底放弃；可建快照、
-    可 push/pull，能力与 PC 对齐。
+19. **Android 迁移范围**：自动清理本地历史，只迁 entries、不迁 v1 history、不生成 set 行；
+    entries 允许 snapshot-only（快照被清理数据不可恢复，明确接受）；旧表与 v1 同步兼容措施
+    彻底删除；禁用从 PC 下发 profile，其他通道忽略 profile 内容；后台默认 1 分钟
+    pull + push（无更新跳过）+ 手动同步；可建快照、可 push/pull。
 20. **快照契约**：`/state` 始终 200；无快照只可能是 `head=0`，返回
     `error_code=PROFILE_SNAPSHOT_REQUIRED` / `next_action=create_snapshot`，客户端创建空快照。
     首份 push 自动补 `snapshot_id=0` 的空快照，`head>0` 必有快照，`/pull` 不以快照为前置。
-    新客户端先 push 待推送 history、再取基线、pull 到 head、再 push 追平 `local_id`，
-    然后创建/复用 `snapshot_id=head` 的数据快照。
+    客户端先 `/state` 感知快照状态（不知晓前不 push 不 pull）：`none` → 建空快照；
+    `ready` → 取基线 → pull 到 head → push 追平 `local_id`。
+    数据快照只在云端尚无数据快照（最新仅水位 0 空基线）时自动创建；
+    云端已有数据快照时刷新必须由用户确认，避免相互冲刷。
     快照失效返回 `410 snapshot_expired`：本地水位仍有效时只切快照引用、不推进 `remote_id`，
-    落入 `history_gap` 才重建基线并记录缺口；后续快照手动刷新。
+    落入 `history_gap` 才重建基线并记录缺口。
 21. **迁移脚本单独 review**：迁移脚本与同步逻辑分开评审；通过 §7.3 清单。
 22. **PC 备份目录**：旧库/旧表导出到 `config/session/_profile-v1-backup-<timestamp>/`，
     由用户自行删除。
-23. **回滚**：v1 表未动；停写 v2 后可切回 v1，备份完整。
+23. **回滚**：无「切回 v1」路径；停写 v2 后数据与备份完整，修复后恢复。
 24. **as_of 语义**：`/entries` 缺省 `as_of_remote_id=head`；超前返回 400；过旧且无可用快照返回
     409 `snapshot_too_old`；尾巴过大返回 200 + `stale=true`，网页退化为最新快照 + 过期标记。
 25. **快照校验**：按 §5.4 的六项形状校验；不校验 cap/周期等业务范围。
-26. **旧客户端可见性**：v1 在 v2 基线后的写入只留在 v1，不进入 v2；发布说明/客户端提示
-    必须明确。
+26. **旧客户端不再受支持**：发布说明明确需升级客户端。
 27. **快照接口**：`/snapshot` 支持 `latest/earliest/list/id`；`reused` 仅同水位且 entries
     排序后哈希一致（数值按 `toFixed(6)` 归一化），不同 entries 新建快照。
 28. **空账户**：`/entries` 在 `head=0` 且无快照时 200 空；`head>0` 必有快照（首份 push 自动补）；
@@ -1235,14 +1250,15 @@ v2 上线后，以下不再进入新路径：
    `/entries` 仅在 `as_of == head` 读实时表，更早水位折叠快照 + tail；
    首份 push 事务自动补 `snapshot_id=0` 的空快照，`/pull` 不以快照为前置；
    `/state` 无快照（仅 head=0）返回 `PROFILE_SNAPSHOT_REQUIRED`；
-   网页只读 v2；v1 接口原样保留。
+   网页只读 v2；旧 v1 接口彻底作废、不保留。
 2. PC：v2 三张表 + entries/history 无损迁移脚本（单独 review）；旧库/旧表导出到
    `config/session/_profile-v1-backup-<timestamp>/`，用户自行删除。
-3. Android：v2 三张表 + entries 迁移；不迁 history；旧表彻底放弃。
+3. Android：v2 三张表 + entries 迁移（不迁 history、不生成 set 行）；删除 v1 同步兼容措施；
+   禁用 PC 下发 profile，其他通道忽略 profile 内容；后台 1 分钟 pull + push + 手动同步。
 4. 客户端：v2 repository（entries/history/local_id）+ 同步循环 + 首份数据快照自动创建，
    后续手动刷新。
 5. 网页：矩阵改 `/entries`；历史页直接读 v2 old/new；无 v2 数据时为空。
-6. 端到端验证：PC 迁移行数与字段、Android 无旧历史、空基线自动补、首份数据快照、
+6. 端到端验证：PC 迁移行数与字段、Android 无旧历史且无 PC 下发、空基线自动补、首份数据快照、
    空账户文档仍同步、历史一一对应、过期/无效/未来行保留、重复上传、周期引擎闸门。
-7. 清理 v1.5 死代码；保留 v1 接口与备份。
+7. 清理 v1.5 / v1 接口死代码；保留 PC 本地备份目录。
 

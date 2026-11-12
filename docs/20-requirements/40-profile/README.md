@@ -28,7 +28,8 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 | 心力体力管理 | [03-stamina-management.md](03-stamina-management.md) | 资源监控 → 恢复预测 → 超标预警 | P0 | ✅ 已完成（基础框架） |
 | 总览多列与历史 | [04-overview-multi-columns.md](04-overview-multi-columns.md)、[05-history-dialog.md](05-history-dialog.md) | 表头批量加列、变更记录对话框 | P1 | ✅ 已实现 |
 | 页面结构与搬运 | [06-overview-layout-sync.md](06-overview-layout-sync.md) | 分组/列/列宽独立成 `profile.json`，手动上传下载 + 网页只读展示 | P1 | ✅ 已实现 |
-| 同步模型重构 | [07-set-only-sync.md](07-set-only-sync.md) | 账本只同步绝对值 set，周期变化在读取时计算 | P0 | ✅ 已实现 |
+| 同步模型重构（v1.5） | [07-set-only-sync.md](07-set-only-sync.md) | 账本只同步绝对值 set，周期变化在读取时计算 | P0 | ✅ 已实现（历史方案，已被 08 取代） |
+| v2 数据与同步重构 | [08-profile-v2-refactor.md](08-profile-v2-refactor.md) | 本地/云端 v2 表、v2 接口、快照基线、v1 只读迁移 | P0 | 规划中 |
 
 ### 2.1 已完成功能（v0.2.0+）
 

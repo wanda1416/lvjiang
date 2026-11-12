@@ -23,6 +23,7 @@ from loguru import logger
 from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
 from . import regen_gate, repository
+from .arbitrate import canonical_event, is_strictly_newer
 
 
 @dataclass
@@ -30,6 +31,7 @@ class ProfileSyncReport:
     pushed: int = 0
     pulled: int = 0
     snapshots: int = 0
+    rejected: int = 0
     errors: list[str] = field(default_factory=list)
     #: 需用户确认才能覆盖的用户（远端快照来自别的设备，且本地已有数据）
     pending: list[dict] = field(default_factory=list)
@@ -44,6 +46,8 @@ class ProfileSyncReport:
         parts = [f"上行 {self.pushed} 条", f"下行 {self.pulled} 条"]
         if self.snapshots:
             parts.append(f"快照 {self.snapshots} 个")
+        if self.rejected:
+            parts.append(f"时间异常放弃 {self.rejected} 条")
         if self.backup:
             parts.append(f"已备份到 {self.backup}")
         if self.skipped_pre_snapshot:
@@ -86,20 +90,19 @@ def remote_head(token: str) -> int | None:
 
 
 def state_problem(token: str) -> str:
-    """同步前的进度校验：返回提示文案，没问题返回空串。
+    """同步前的进度校验。水位超前不再要求用户清除，交给 rebase 把水位拉回。"""
+    del token
+    return ""
 
-    只做「发现并告知」，不修正任何本地状态。只比较 ``remote_history_id``：
-    它与 head 同在远端编号空间；``local_history_id`` 是本地编号，与 head
-    不可比（新库 head 归零不代表本地编号要归零）。
-    鉴权失败（head 未知）时跳过校验——那是令牌问题，不是进度问题。
-    """
-    state = _state()
-    head = remote_head(token)
-    if head is None:
-        return ""                       # 令牌/网络问题：让后续真正的同步调用报准确的错
-    remote = int(state.get("remote_history_id") or 0)
-    if remote > head:
-        return RESET_HINT
+
+def profile_protocol_block(token: str) -> str:
+    """协议不是 2 时返回提示，调用方不得再发 Profile op。"""
+    try:
+        body = post("/api/sync/state", {}, token)
+    except SyncError as error:
+        return str(error)
+    if body.get("protocol_version") != 2:
+        return "服务端尚未升级，已停止总览同步"
     return ""
 
 
@@ -201,67 +204,64 @@ def _apply_op(op: dict) -> bool:
     此后到达的远端 set，护栏从此永久误跳（2026-11-04 手机端 3179 事故的
     根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
     """
+    if op.get("op") not in (None, "set"):
+        return False
     origin = str(op.get("instance_id") or "")
     origin_local_id = op.get("local_id")
-    if not origin or not isinstance(origin_local_id, int):
-        logger.warning("[profile sync] 忽略缺来源身份的 op：remote_id={}",
+    op_id = str(op.get("op_id") or "")
+    if not op_id and origin and isinstance(origin_local_id, int):
+        op_id = f"legacy:{origin}:{origin_local_id}"
+    if not op_id:
+        logger.warning("[profile sync] 忽略缺 op_id 的 op：remote_id={}",
                        op.get("remote_id"))
         return False
-    if repository.db_ledger_op_seen(origin, origin_local_id):
-        logger.debug("[profile sync] 已回放过，跳过：{}/{}", origin, origin_local_id)
+    if repository.db_op_id_seen(op_id):
         return False
 
     username, type_, key = op["username"], op["type"], op["key"]
-    happened = op.get("happened_at") or ""
+    happened = canonical_event(op.get("happened_at") or "")
     current = repository.db_read_entry(username, type_, key)
     if not isinstance(current, dict):
         current = {}
-    relation = _period_relation(op, current)
-    if relation == "old":
-        logger.debug("[profile sync] 跳过旧周期 op：{}/{} {}@{}",
-                     username, type_, key, happened)
-        return False
-    fresh_period = relation == "new"
-    raw = op.get("value")
     text = op.get("value_text") or ""
-    if op["op"] == "delta":
-        if fresh_period:
-            base = 0.0
-        else:
-            raw_base = current.get("value")
-            base = float(raw_base) if isinstance(raw_base, (int, float)) else 0.0
-        value = base + float(op.get("delta") or 0)
-        value_text = ""
-    elif type_ == "note" or (text and raw is None):
+    raw = op.get("value")
+    if type_ == "note" or (text and raw is None):
         value = float(current.get("value") or 0)
         value_text = text
     else:
-        if not fresh_period and type_ != "note" and raw is not None:
-            local_at = _wall_clock(current.get("updated_at") or "")
-            happened_at = _wall_clock(happened)
-            if local_at and happened_at and happened_at < local_at:
-                logger.info("[profile sync] 跳过旧 set：{}/{} {}@{} < 本地@{}",
-                            username, type_, key, happened, local_at)
-                return False
         value = float(raw or 0)
         value_text = ""
-    # 值没变就不写：不抬条目 updated_at（远端噪声会把本地时间戳推高，让
-    # 之后更早的真实 op 被时间护栏误挡），也不在账本里刷一行空记录。
-    if current:
-        same_value = (isinstance(current.get("value"), (int, float))
-                      and float(current["value"]) == value)
-        if same_value and (current.get("value_text") or "") == value_text:
-            return False
+    remote_id = op.get("remote_id")
+    remote_mark = remote_id if isinstance(remote_id, int) else None
+    newer = is_strictly_newer(
+        happened, op_id, current.get("updated_at") or "", current.get("op_id") or "",
+    )
+    locked = bool(current.get("locked")) or repository.db_is_locked(username, type_, key)
+    if locked or not newer:
+        repository.db_upsert(
+            username, type_, key, value,
+            change_type="set",
+            source=str(op.get("source") or ""),
+            value_text=value_text,
+            device_id=origin,
+            origin_local_id=origin_local_id if isinstance(origin_local_id, int) else None,
+            history_ts=happened or None,
+            op_id=op_id,
+            remote_id=remote_mark,
+            touch_entry=False,
+        )
+        return False
     repository.db_upsert(
         username, type_, key, value,
-        updated_at=hadwent(happened),
-        change_type=op["op"],
-        delta_value=op.get("delta") if op["op"] == "delta" else None,
+        updated_at=happened or None,
+        change_type="set",
         source=str(op.get("source") or ""),
         value_text=value_text,
         device_id=origin,
-        origin_local_id=origin_local_id,
+        origin_local_id=origin_local_id if isinstance(origin_local_id, int) else None,
         history_ts=happened or None,
+        op_id=op_id,
+        remote_id=remote_mark,
     )
     return True
 
@@ -398,9 +398,7 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
     except ValueError:
         report.errors.append("快照格式无效")
         return
-    applied = 0
-    from collections import defaultdict
-    grouped: dict[str, list[tuple]] = defaultdict(list)
+    candidates = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -414,81 +412,68 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
         # 锁定条目拒绝快照覆盖是**预期内**的（锁的语义就是物理失效），静默
         # 跳过即可——upsert 的锁拒绝分支会记 ERROR，整份落地会刷一屏误导
         # 性"写入被拒绝"，让人误以为数据事故（2026-11-04 13:20 的日志）。
-        if repository.db_is_locked(username, type_, key):
-            continue
-        value = entry.get("value")
-        grouped[username].append((
-            type_, key,
-            float(value) if isinstance(value, (int, float)) else 0.0,
-            entry.get("updated_at") or None,
-            None, None, "", entry.get("value_text") or "", None))
-    # 按用户批量事务落地：1244 条逐条 upsert 是 1244 个独立事务，慢到分钟级；
-    # 19 个用户 = 19 个事务，量级回到秒级。
-    for username, batch in grouped.items():
-        repository.db_upsert_many(username, batch)
-        applied += len(batch)
+        candidates.append({
+            "username": username,
+            "type": type_,
+            "key": key,
+            "value": entry.get("value"),
+            "value_text": entry.get("value_text") or "",
+            "updated_at": canonical_event(entry.get("updated_at") or ""),
+            "op_id": str(entry.get("op_id") or ""),
+        })
+    applied = repository.db_merge_snapshot_candidates(candidates)
     # 两个编号别混：profile_snapshot_id 是「哪一份快照」（表主键），
     # snapshot_remote_id 是「该快照覆盖到账本的哪个水位」。
     snapshot_row_id = int(snapshot.get("id") or 0)
     watermark = int(snapshot.get("snapshot_remote_id") or 0)
     state["profile_snapshot_id"] = snapshot_row_id
     state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
-    # 落地前的本地历史不上行：快照已代表全部用户的当前状态，自己的陈年
-    # 账本推上去只会把旧值回放给别的设备（Android 首次同步曾因此倾倒
-    # 22853 条历史，覆盖了别的设备刚写入的新值）。与 refresh_snapshot
-    # 的语义一致。
-    state["local_history_id"] = repository.db_max_history_id()
+    state["snapshot_remote_id"] = watermark
     save_profile_sync_state(state)
     report.snapshots += 1
     logger.info("[profile sync] 已应用快照 #{}（水位 {}，{} 项）",
                 snapshot_row_id, watermark, applied)
 
 
+def _needs_snapshot_rebase(state: dict, summaries: list[dict]) -> bool:
+    """本地快照 id 与云端最新一份不同，或水位低于那份快照时要按 key 合并。"""
+    if not summaries:
+        return False
+    latest = summaries[0]
+    snap_id = int(latest.get("id") or 0)
+    snap_wm = int(latest.get("snapshot_remote_id") or 0)
+    local_id = int(state.get("profile_snapshot_id") or 0)
+    local_wm = int(state.get("remote_history_id") or 0)
+    if snap_id and local_id != snap_id:
+        return True
+    return local_wm < snap_wm
+
+
 def pull_and_replay(token: str, *, allow_overwrite: bool = False,
                     tolerate_no_snapshot: bool = False,
                     on_progress=None, stop=None) -> ProfileSyncReport:
-    """把远端增量折进 entries。首次（无水位）先取快照作基线。
+    """先按需合并最新快照，再回放水位之后的 set。
 
-    非初始设备（远端快照来自别的实例、本地又有数据）**不覆盖**：只回填
-    ``report.pending`` 让界面确认。确认后带 ``allow_overwrite=True`` 再来一次，
-    此时先整份备份本地 profile 数据再落地。
-    ``tolerate_no_snapshot``：远端还没有任何快照时不视为错误（首建快照的
-    refresh 路径用它——那里 bootstrap 本来就没有可取的基线）。
+    ``allow_overwrite`` 保留给旧调用方，不再阻断同步。
+    ``tolerate_no_snapshot`` 保留给创建第一份快照的路径。
     """
+    del allow_overwrite, tolerate_no_snapshot
     report = ProfileSyncReport()
     state = _state()
-    problem = state_problem(token)
-    if problem:
-        report.errors.append(problem)     # 只提示，本地数据不动
-        return report
-    # bootstrap 只做一次：以「从未落地过快照」为准（profile_snapshot_id==0）。
-    # **不能**用 remote_history_id==0 判断——新库的快照水位就是 0，那样会
-    # 每次同步都把 entries 回滚到旧快照，抹掉 tick 累计与未推送的改动
-    # （这正是 2026-11-03 数据损坏事故的根源）。
-    if not state.get("profile_snapshot_id"):
-        snapshots = [row for row in remote_snapshots(token)]
-        if not snapshots:
-            if tolerate_no_snapshot:
-                pass                      # 远端还没有基线，直接从 0 回放
-            else:
-                report.errors.append(NO_SNAPSHOT_HINT)
-                return report
-        else:
-            pending = overwrite_warnings(token)
-            if pending and not allow_overwrite:
-                report.pending = pending
-                return report
-            if pending:
-                report.backup = backup_local()
-                if not report.backup:
-                    report.errors.append("本地备份失败，已中止覆盖")
-                    return report
-            try:
-                _bootstrap(token, report)
-            except SyncError as error:
-                report.errors.append(str(error))
-                return report
-            state = _state()
+    head = remote_head(token)
+    if isinstance(head, int) and int(state.get("remote_history_id") or 0) > head:
+        state["remote_history_id"] = 0
+        save_profile_sync_state(state)
+    summaries = remote_snapshots(token)
+    if not summaries:
+        logger.info("[profile sync] 云端还没有总览快照，直接上传本机记录")
+    elif _needs_snapshot_rebase(state, summaries):
+        try:
+            _bootstrap(token, report)
+        except SyncError as error:
+            report.errors.append(str(error))
+            return report
+        state = _state()
     since = int(state.get("remote_history_id") or 0)
     page = 0
     while True:
@@ -541,64 +526,114 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
 MAX_PUSH_BACKLOG = 1000
 
 
-def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
-    """把本地 ``history.id`` 水位之后的 set/delta 上行——**只推本机写的行**。
+def _snapshot_candidates(token: str) -> dict[tuple[str, str, str], tuple[str, str]]:
+    """最新快照里每个 key 的 ``(updated_at, op_id)``。没有快照时为空。"""
+    state = _state()
+    if not state.get("profile_snapshot_id"):
+        return {}
+    snapshot = latest_snapshot(token)
+    if not snapshot:
+        return {}
+    try:
+        entries = json.loads(snapshot.get("entries") or "[]")
+    except ValueError:
+        return {}
+    candidates: dict[tuple[str, str, str], tuple[str, str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        username, type_, key = entry.get("username"), entry.get("type"), entry.get("key")
+        if isinstance(username, str) and isinstance(type_, str) and isinstance(key, str):
+            candidates[(username, type_, key)] = (
+                str(entry.get("updated_at") or ""), str(entry.get("op_id") or ""),
+            )
+    return candidates
 
-    - 请求携带 ``base_remote_id``（自己的拉取水位）：云端发现落后于 head
-      即拒绝，强制「先拉最新再上传」，防止基于过期基线的 op 混入。
-    - 积压超过 :data:`MAX_PUSH_BACKLOG` 直接拒绝并提示刷新快照。
-    """
+
+def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
+    """上传新于快照候选的本机 set/delta。更旧的行标成 -1，不进云端。"""
     from .repository import _author_stamp
 
     report = ProfileSyncReport()
-    state = _state()
-    since = _local_history_id(state)
-    author = _author_stamp()
-    first = repository.db_get_history_since(since, MAX_PUSH_BACKLOG + 1, author=author)
-    if len(first) > MAX_PUSH_BACKLOG:
-        report.errors.append(
-            f"待上行积压超过 {MAX_PUSH_BACKLOG} 条；请先「刷新快照」重建基线后再同步")
+    blocked = profile_protocol_block(token)
+    if blocked:
+        report.errors.append(blocked)
         return report
+    author = _author_stamp()
+    if not repository.db_list_unacked(author, 1):
+        return report
+    candidates = _snapshot_candidates(token)
     batch = 0
     while True:
         if stop and stop():
             report.errors.append("已停止")
             break
-        rows = repository.db_get_history_since(since, 200, author=author)
+        rows = repository.db_list_unacked(author, 200)
         if not rows:
             break
+        upload = []
+        abandon: list[tuple[int, int]] = []
+        for row in rows:
+            candidate = candidates.get((row["username"], row["type"], row["key"]))
+            other_at, other_id = candidate if candidate is not None else ("", "")
+            if is_strictly_newer(row.get("ts") or "", row.get("op_id") or "", other_at, other_id):
+                upload.append(row)
+            else:
+                abandon.append((int(row["id"]), -1))
+        if abandon:
+            repository.db_mark_remote_ids(abandon)
+        if not upload:
+            continue
         batch += 1
         if on_progress:
             on_progress({"step": "overview", "detail": f"上行 第{batch}批",
                          "pushed": report.pushed})
         ops = [{
-            "local_id": row["id"], "username": row["username"],
-            "type": row["type"], "key": row["key"],
-            "op": "delta" if row["change_type"] == "delta" else "set",
-            "value": (row["new_value"] if row["change_type"] != "delta" else None),
-            "delta": (row["delta_value"] if row["change_type"] == "delta" else None),
+            "op_id": row["op_id"],
+            "local_id": int(row.get("origin_local_id") or row["id"]),
+            "username": row["username"],
+            "type": row["type"],
+            "key": row["key"],
+            "op": "set",
+            "value": row["new_value"],
             "value_text": row["new_value_text"],
             "source": row.get("source") or "",
             "happened_at": row["ts"],
-        } for row in rows]
+        } for row in upload]
         try:
-            response = post("/api/sync/profile/push", {
-                "ops": ops,
-                "base_remote_id": int(state.get("remote_history_id") or 0),
-                "tz_offset_minutes": local_tz_offset_minutes()}, token)
+            response = post("/api/sync/profile/push", {"ops": ops}, token)
         except SyncError as error:
             report.errors.append(str(error))
             break
-        skipped = _skipped_pre_snapshot(response.get("skipped_pre_snapshot"))
-        if skipped:
-            report.skipped_pre_snapshot.extend(skipped)
-            logger.warning("[profile sync] 早于快照的本地修改已跳过，不再重传：{}", skipped)
-        report.pushed += int(response.get("accepted") or 0)
-        # 水位划过整批，包括被跳过的旧行。否则旧行会一直占着队头，
-        # 后面的新修改永远送不出去。
-        since = rows[-1]["id"]
-        state["local_history_id"] = since
-        save_profile_sync_state(state)
+        results = response.get("results")
+        if not isinstance(results, list):
+            report.errors.append("服务端没有按条返回 ack")
+            break
+        by_op = {row["op_id"]: row for row in upload}
+        marks: list[tuple[int, int]] = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            local = by_op.get(str(item.get("op_id") or ""))
+            if local is None:
+                continue
+            status = item.get("status")
+            if status in ("accepted", "duplicate") and isinstance(item.get("remote_id"), int):
+                marks.append((int(local["id"]), int(item["remote_id"])))
+                if status == "accepted":
+                    report.pushed += 1
+            elif status == "rejected":
+                marks.append((int(local["id"]), -1))
+                report.rejected += 1
+                logger.warning("[profile sync] 放弃上传 {}：{}",
+                               local["op_id"], item.get("error") or status)
+        repository.db_mark_remote_ids(marks)
+        if len(marks) != len(upload):
+            report.errors.append("有上行结果无法对应本地行，下轮重试")
+            break
+    if report.rejected:
+        report.errors.append(
+            f"有 {report.rejected} 条记录因时间异常未上传，请校准系统时间")
     return report
 
 
@@ -686,7 +721,8 @@ def _snapshot_entries() -> tuple[list[dict], int]:
                     {"username": username, "type": type_, "key": key,
                      "value": entry.get("value"),
                      "value_text": entry.get("value_text") or "",
-                     "updated_at": entry.get("updated_at") or ""})
+                     "updated_at": entry.get("updated_at") or "",
+                     "op_id": entry.get("op_id") or ""})
     return payload, orphan
 
 
@@ -744,10 +780,8 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     # entries 里」。漏记会让本机后续拉取从 0 开始重复回放。
     watermark = int(response.get("snapshot_remote_id") or 0)
     state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
+    state["snapshot_remote_id"] = watermark
     report.snapshots += 1
-    # 快照已经代表了此刻全部用户的完整状态：本地既有历史无需再逐行上行，否则
-    # 首次同步要把几万条陈年账本全推一遍（而新设备根本不需要它们）。
-    state["local_history_id"] = repository.db_max_history_id()
     save_profile_sync_state(state)
     logger.info("[profile sync] 快照刷新完成：{}", report.describe())
     return report
@@ -755,17 +789,16 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
 
 def sync_all(token: str, *, allow_overwrite: bool = False,
              on_progress=None, stop=None) -> ProfileSyncReport:
-    """一轮完整同步：先拉后推（先拿到远端状态，再把自己的新变更补上）。
-
-    ``allow_overwrite=False`` 时若本机是「非初始设备」，只回报 pending 并
-    停下——绝不静默覆盖本地数据。
-    """
-    pull = pull_and_replay(token, allow_overwrite=allow_overwrite,
-                         on_progress=on_progress, stop=stop)
-    if pull.pending or pull.errors and not pull.snapshots and not pull.pulled:
+    """一轮完整同步：先确认协议，再拉后推。"""
+    del allow_overwrite
+    blocked = profile_protocol_block(token)
+    if blocked:
+        return ProfileSyncReport(errors=[blocked])
+    pull = pull_and_replay(token, on_progress=on_progress, stop=stop)
+    if pull.errors and not pull.snapshots and not pull.pulled:
         return pull
     push = push_local(token, on_progress=on_progress, stop=stop)
-    return ProfileSyncReport(pushed=push.pushed, pulled=pull.pulled,
-                             snapshots=pull.snapshots, pending=pull.pending,
-                             backup=pull.backup,
-                             errors=[*pull.errors, *push.errors])
+    return ProfileSyncReport(
+        pushed=push.pushed, pulled=pull.pulled, snapshots=pull.snapshots,
+        rejected=push.rejected, pending=pull.pending, backup=pull.backup,
+        errors=[*pull.errors, *push.errors])

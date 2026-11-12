@@ -233,7 +233,10 @@ class TestSchemaMigration:
             )
         ]
 
-        assert CURRENT_VERSION == 10
+        assert CURRENT_VERSION == 11
+        assert "op_id" in entry_columns
+        assert "op_id" in history_columns
+        assert "remote_id" in history_columns
         assert primary_key == ["username", "type", "key"]
         assert "app_id" not in entry_columns
         assert "app_id" not in history_columns
@@ -530,10 +533,11 @@ class TestHistory:
         assert history[0]["ts"] == "2026-11-06T07:45:19"
         assert history[0]["source"] == "太平武墓"
         assert db.ledger_op_seen("other-device", 45)
+        op_id = history[0]["op_id"]
 
-        # 同一条 op 再回放一次：唯一索引挡掉，不会写出第二行
+        # 同一 op_id 再回放一次：唯一索引挡掉，不会写出第二行
         db.upsert("u", "quota", "k", 20, change_type="set",
-                  device_id="other-device", origin_local_id=45)
+                  device_id="other-device", origin_local_id=45, op_id=op_id)
         assert len(db.get_history("u")) == 1
 
     def test_pending_push_only_covers_own_rows(self, db: ProfileDB):
@@ -660,9 +664,10 @@ class TestCleanupHistory:
             old_ts = "2020-01-01T00:00:00"
             conn.execute(
                 "INSERT INTO profile_history "
-                "(ts, username, type, key, old_value, new_value, change_type, delta_value) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (old_ts, "u", "quota", "k", None, 10, "tick", None),
+                "(ts, username, type, key, old_value, new_value, change_type, delta_value, "
+                "op_id, remote_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (old_ts, "u", "quota", "k", None, 10, "tick", None, "legacy:old:1", 1),
             )
             conn.commit()
         finally:

@@ -51,8 +51,8 @@ def test_undo_delta_record_writes_reverse_delta(undo_env):
 
     assert profile_read("u", "credits") == 0
     latest = _history("u", "stock", "credits")[0]
-    assert latest["change_type"] == "delta"
-    assert latest["delta_value"] == -5
+    assert latest["change_type"] == "set"
+    assert latest["new_value"] == 0
     assert latest["source"] == "撤销：手动登记"
 
 

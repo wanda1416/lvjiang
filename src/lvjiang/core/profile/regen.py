@@ -54,12 +54,9 @@ def is_boundary_regen(kd: RegenKeyDef) -> bool:
 
 
 def _parse_entry_time(value: str) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except (TypeError, ValueError):
-        return None
+    from .arbitrate import parse_event
+
+    return parse_event(value)
 
 
 def compute_realtime_value(

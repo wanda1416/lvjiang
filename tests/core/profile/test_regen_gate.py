@@ -146,8 +146,8 @@ def test_tick_skips_periodic_recovery_before_first_pull(env, monkeypatch):
     assert repository.db_get_history("u1", "regen", "energy") == []
 
 
-def test_tick_materializes_after_first_pull(env, monkeypatch):
-    """同一场景，仅把闸门打开——证明"拦住"的是闸门而不是别的条件。"""
+def test_tick_does_not_materialize_after_first_pull(env, monkeypatch):
+    """回复是读时函数。闸门打开后 tick 仍然不把恢复写成账本。"""
     _session(monkeypatch, True)
     regen_gate.mark_pull_completed()
     _seed(90)
@@ -155,9 +155,8 @@ def test_tick_materializes_after_first_pull(env, monkeypatch):
     _processor().tick()
 
     entry = repository.db_read_entry("u1", "regen", "energy")
-    assert entry["value"] == 90 + ENERGY_AMOUNT
-    rows = repository.db_get_history("u1", "regen", "energy")
-    assert len(rows) == 1 and rows[0]["new_value"] == 100
+    assert entry["value"] == 90
+    assert repository.db_get_history("u1", "regen", "energy") == []
 
 
 # ─── 作用点二：profile_action 的 regen 固化 ──────────────────
@@ -165,21 +164,17 @@ def test_tick_materializes_after_first_pull(env, monkeypatch):
 
 def test_profile_action_skips_solidify_when_gate_closed(env, monkeypatch):
     """同步完成前点一次消耗：不得顺带把「过期基线算出的恢复」写成 set。"""
-    from lvjiang.core.profile.service import profile_action
+    from lvjiang.core.profile.service import ProfileOperationRefused, profile_action
 
     _session(monkeypatch, True)
     _seed(90)
 
-    profile_action("u1", "energy", delta=-30, source="做菜")
+    with pytest.raises(ProfileOperationRefused):
+        profile_action("u1", "energy", delta=-30, source="做菜")
 
     entry = repository.db_read_entry("u1", "regen", "energy")
-    assert entry["value"] == 60                      # 90 - 30，没有夹带 +10
-    rows = repository.db_get_history("u1", "regen", "energy")
-    assert len(rows) == 1
-    assert rows[0]["change_type"] == "delta"
-    assert rows[0]["source"] == "做菜"
-    # 不变式：new == old + delta
-    assert rows[0]["new_value"] == rows[0]["old_value"] - 30
+    assert entry["value"] == 90
+    assert repository.db_get_history("u1", "regen", "energy") == []
 
 
 def test_profile_action_solidifies_when_gate_open(env, monkeypatch):
@@ -192,10 +187,11 @@ def test_profile_action_solidifies_when_gate_open(env, monkeypatch):
     profile_action("u1", "energy", delta=-30, source="做菜")
 
     entry = repository.db_read_entry("u1", "regen", "energy")
-    assert entry["value"] == 90 + ENERGY_AMOUNT - 30
     rows = repository.db_get_history("u1", "regen", "energy")
-    assert any(row["change_type"] == "set" and row["delta_value"] == ENERGY_AMOUNT
-               for row in rows), "闸门打开时应先物化这次准点恢复"
+    assert len(rows) == 1
+    assert rows[0]["change_type"] == "set"
+    assert rows[0]["source"] == "做菜"
+    assert entry["value"] == rows[0]["new_value"]
 
 
 # ─── 干净拉取才置位 ─────────────────────────────────────────
@@ -245,16 +241,21 @@ def test_pull_does_not_mark_completed_when_single_op_fails(pull_env, monkeypatch
     assert "last_pull_ok_at" not in state
 
 
-def test_pull_pending_does_not_mark_completed(pull_env, monkeypatch):
-    """非初始设备未允许覆盖时 pull 提前返回，闸门必须保持关闭。"""
+def test_pull_snapshot_error_does_not_mark_completed(pull_env, monkeypatch):
+    """快照详情失败时不把这次 pull 当成干净完成。"""
     snapshot_sync, state = pull_env
     monkeypatch.setattr(snapshot_sync, "remote_snapshots", lambda token: [{"id": 8}])
-    monkeypatch.setattr(snapshot_sync, "overwrite_warnings", lambda token: [{"user": "u1"}])
+
+    def fail(route, body, token=None):
+        raise snapshot_sync.SyncError("快照详情获取失败")
+
+    monkeypatch.setattr(snapshot_sync, "post", fail)
     regen_gate.reset()
 
     report = snapshot_sync.pull_and_replay("token")
 
-    assert report.pending
+    assert report.errors
+    assert not report.pending
     assert not regen_gate.pull_completed()
     assert "last_pull_ok_at" not in state
 
@@ -273,19 +274,14 @@ def test_realtime_recovery_not_persisted_but_progress_conserved(env, monkeypatch
     repository.db_upsert("u1", "regen", "stamina", 10,
                          updated_at=started.isoformat(timespec="seconds"))
 
-    profile_action("u1", "stamina", delta=-1, source="试剑")
+    from lvjiang.core.profile.service import ProfileOperationRefused
+
+    with pytest.raises(ProfileOperationRefused):
+        profile_action("u1", "stamina", delta=-1, source="试剑")
 
     entry = repository.db_read_entry("u1", "regen", "stamina")
-    assert entry["value"] == 10                      # 11.6 − 1 = 10.6，入库取整为 10
-    backdated = datetime.fromisoformat(entry["updated_at"])
-    # 0.6 点进度回拨进锚点：0.6 × 60s / 0.125 = 288s
-    assert 280 <= (datetime.now() - backdated).total_seconds() <= 300
-
-    rows = repository.db_get_history("u1", "regen", "stamina")
-    assert len(rows) == 1 and rows[0]["change_type"] == "delta"
-    assert rows[0]["old_value"] == 10 and rows[0]["new_value"] == 10
-    assert rows[0]["delta_value"] == 0               # 净值为入库值之差
-    assert all(row["change_type"] != "set" for row in rows), "闸门关时不得写固化 set"
+    assert entry["value"] == 10
+    assert repository.db_get_history("u1", "regen", "stamina") == []
 
 
 # ─── 登录态缓存：主动作废 + 「读不到」按有登录态处理 ────────────

@@ -112,26 +112,27 @@ def _sync(token: str) -> dict:
     if profile_source.mode() == profile_source.PC:
         return {"synced": True, "skipped": "profile",
                 "message": "总览数据处于 PC端模式，已跳过在线同步"}
-    from ..profile.snapshot_sync import NO_SNAPSHOT_HINT, pull_and_replay, push_local
+    from ..profile.snapshot_sync import (
+        profile_protocol_block,
+        pull_and_replay,
+        push_local,
+    )
     from ..sync.definition_sync import sync_definition
 
+    blocked = profile_protocol_block(token)
+    if blocked:
+        return {"synced": False, "reason": "protocol", "message": blocked}
     definition = sync_definition(token, allow_push=False)
     pulled = pull_and_replay(token)
     errors = [*definition.errors, *pulled.errors]
-    if any(error == NO_SNAPSHOT_HINT for error in pulled.errors):
-        return {"synced": False, "reason": "no_snapshot",
-                "message": "云端还没有总览快照；请先在 PC 端完成初始同步后继续"}
-    if getattr(pulled, "pending", None):
-        # 本地有数据但从未落地过快照（典型：离线包重建后重新登录）。绝不
-        # 静默跳过——必须让用户知道 profile 没同步、该怎么处理。
-        return {"synced": False, "reason": "pending_overwrite",
-                "message": "检测到本地已有总览数据；请先在「设置 → 总览数据」"
-                           "点「清除数据」，再执行同步"}
-    # 先拉后推：拿到远端状态再补自己的新变更，与 PC 端 sync_all 同序
+    # 先拉后推。没有快照、本地已有数据都不再要求用户清除。
     pushed = push_local(token)
     errors.extend(pushed.errors)
+    if pushed.rejected and not any("校准" in item for item in errors):
+        errors.append(f"有 {pushed.rejected} 条记录因时间异常未上传，请校准系统时间")
     return {"synced": not errors,
             "pulled": pulled.pulled, "pushed": pushed.pushed,
+            "rejected": pushed.rejected,
             "message": "；".join(errors[:3]) if errors else ""}
 
 

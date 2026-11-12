@@ -12,8 +12,10 @@
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
 import threading
+import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -205,6 +207,116 @@ def _migrate_v10(conn: sqlite3.Connection) -> None:
         "ON profile_history(device_id, origin_local_id)")
 
 
+def _realtime_rate_table() -> dict[str, tuple[float, str, float | None]]:
+    """从 profile.yaml 读取 realtime regen 的速率。迁移时只读，打不开就跳过还原。"""
+    import yaml
+
+    from lvjiang.constants import SESSION_CONFIG_DIR
+
+    path = SESSION_CONFIG_DIR / "profile.yaml"
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    rates: dict[str, tuple[float, str, float | None]] = {}
+    for item in data.get("regen") or []:
+        if not isinstance(item, dict):
+            continue
+        key = item.get("key")
+        if item.get("regen_type") != "realtime" or not isinstance(key, str):
+            continue
+        try:
+            rate = float(item.get("regen_rate_value") or 0)
+        except (TypeError, ValueError):
+            continue
+        unit = item.get("regen_rate_unit") or "hour"
+        cap = item.get("cap")
+        cap_value = float(cap) if isinstance(cap, (int, float)) else None
+        if rate > 0:
+            rates[key] = (rate, str(unit), cap_value)
+    return rates
+
+
+def _rewrite_entries_v11(conn: sqlite3.Connection) -> None:
+    """用账本里最新的 set/delta 重写条目锚点。realtime 在改写前先还原小数。"""
+    from .arbitrate import canonical_event, event_rank, parse_event
+    from .regen import period_seconds
+
+    rates = _realtime_rate_table()
+    entries = conn.execute(
+        "SELECT username, type, key, value, updated_at FROM profile_entries"
+    ).fetchall()
+    history = conn.execute(
+        "SELECT username, type, key, new_value, ts, op_id FROM profile_history "
+        "WHERE change_type IN ('set', 'delta')"
+    ).fetchall()
+    best: dict[tuple[str, str, str], tuple] = {}
+    for username, type_, key, new_value, ts, op_id in history:
+        ident = (username, type_, key)
+        rank = event_rank(ts, op_id)
+        current = best.get(ident)
+        if current is None or rank > current[0]:
+            best[ident] = (rank, new_value, ts, op_id)
+    for username, type_, key, value, updated_at in entries:
+        winner = best.get((username, type_, key))
+        if winner is None:
+            continue
+        _rank, new_value, ts, op_id = winner
+        stored = float(value or 0)
+        written = float(new_value or 0)
+        event_at = canonical_event(ts) or canonical_event(updated_at) or (ts or "")
+        if type_ == "regen" and key in rates and written == stored:
+            rate, unit, cap = rates[key]
+            anchor = parse_event(updated_at)
+            event = parse_event(ts)
+            exact = stored
+            if anchor is not None and event is not None:
+                elapsed = max((event - anchor).total_seconds(), 0.0)
+                exact = stored + elapsed / period_seconds(unit) * rate
+                if cap is not None:
+                    exact = min(exact, float(cap))
+            written = exact
+        conn.execute(
+            "UPDATE profile_entries SET value=?, updated_at=?, op_id=? "
+            "WHERE username=? AND type=? AND key=?",
+            (written, event_at, op_id, username, type_, key),
+        )
+
+
+def _migrate_v11(conn: sqlite3.Connection) -> None:
+    """set-only：加 op_id / remote_id，按来源身份回填，再重写条目锚点。"""
+    history_cols = [
+        row[1] for row in conn.execute("PRAGMA table_info(profile_history)").fetchall()
+    ]
+    if "op_id" not in history_cols:
+        conn.execute(
+            "ALTER TABLE profile_history ADD COLUMN op_id TEXT NOT NULL DEFAULT ''")
+    if "remote_id" not in history_cols:
+        conn.execute("ALTER TABLE profile_history ADD COLUMN remote_id INTEGER")
+    entry_cols = [
+        row[1] for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
+    ]
+    if "op_id" not in entry_cols:
+        conn.execute(
+            "ALTER TABLE profile_entries ADD COLUMN op_id TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        "UPDATE profile_history "
+        "SET op_id = 'legacy:' || device_id || ':' || origin_local_id "
+        "WHERE op_id = '' AND device_id <> '' AND origin_local_id IS NOT NULL")
+    conn.execute(
+        "UPDATE profile_history SET op_id = 'unscoped:' || id WHERE op_id = ''")
+    conn.execute("DROP INDEX IF EXISTS idx_history_origin")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_history_op_id ON profile_history(op_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_history_pending "
+        "ON profile_history(device_id, id) "
+        "WHERE remote_id IS NULL AND change_type IN ('set', 'delta')")
+    _rewrite_entries_v11(conn)
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
@@ -217,6 +329,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (8, "entries add locked column", _migrate_v8),
     (9, "history becomes sync ledger; drop audit tables", _migrate_v9),
     (10, "history gains origin row identity", _migrate_v10),
+    (11, "profile set-only in-place", _migrate_v11),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -231,7 +344,7 @@ CURRENT_VERSION = MIGRATIONS[-1][0]
 _HISTORY_COLUMNS = (
     "id, ts, username, type, key, old_value, new_value, "
     "old_value_text, new_value_text, change_type, delta_value, source, sync_from, "
-    "device_id"
+    "device_id, op_id, remote_id"
 )
 
 #: 聚合候选的维度表达式。``key`` 是「模型:key」，与 UI 的「键」列同一口径。
@@ -391,35 +504,37 @@ def _record_history(
     sync_from: str | None = None,
     device_id: str,
     origin_local_id: int | None = None,
-) -> bool:
-    """写一行账本记录；``(device_id, origin_local_id)`` 已存在时跳过。
+    op_id: str | None = None,
+    remote_id: int | None = None,
+) -> str | None:
+    """写一行账本记录。``op_id`` 已存在时跳过。
 
-    行身份是「哪台设备上的第几号操作」：本机写入插入后回填成自己的 id，
-    跨端回放写入来源实例 id 与该实例的 ``local_id``。唯一索引让回放幂等
-    ——页级重试、水位没落盘就崩溃都不会写出第二行。
+    本机写入不传 ``op_id``，这里生成 uuid。跨端回放传入云端的 ``op_id``，
+    并带上已经分配的 ``remote_id``，这样回放行不会再次进入待上传集合。
 
-    返回是否真的新增了一行。
+    返回新行的 ``op_id``；冲突时返回 None。
     """
+    identity = op_id or str(uuid.uuid4())
     cursor = conn.execute(
         "INSERT INTO profile_history "
         "(ts, username, type, key, old_value, new_value, "
         "old_value_text, new_value_text, change_type, delta_value, source, "
-        "sync_from, device_id, origin_local_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-        "ON CONFLICT(device_id, origin_local_id) DO NOTHING",
+        "sync_from, device_id, origin_local_id, op_id, remote_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(op_id) DO NOTHING",
         (ts, username, type_, key, old_value, float(new_value),
          old_value_text or "", new_value_text or "",
-         change_type, delta_value, source, sync_from, device_id, origin_local_id),
+         change_type, delta_value, source, sync_from, device_id, origin_local_id,
+         identity, remote_id),
     )
     if not cursor.rowcount:
-        return False
+        return None
     if origin_local_id is None:
-        # 本机写入：行身份就是自己的 id，插入后才知道
         conn.execute(
             "UPDATE profile_history SET origin_local_id=? WHERE id=?",
             (cursor.lastrowid, cursor.lastrowid),
         )
-    return True
+    return identity
 
 
 class ProfileDB:
@@ -517,6 +632,13 @@ class ProfileDB:
                         conn.backup(backup)
                     finally:
                         backup.close()
+                    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    folder = self._db_path.parent / f"_migration-backup-{stamp}"
+                    folder.mkdir(exist_ok=True)
+                    shutil.copy2(backup_path, folder / backup_path.name)
+                    account = self._db_path.parent / "account.json"
+                    if account.is_file():
+                        shutil.copy2(account, folder / "account.json")
             # 在读取版本前取得写锁。并发初始化者会在 busy_timeout 范围内
             # 等待，取得锁后重新读取已经提交的新版本，不会重复执行迁移。
             self._begin(conn)
@@ -556,7 +678,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             row = conn.execute(
-                "SELECT value, value_text, updated_at, updated_time, locked "
+                "SELECT value, value_text, updated_at, updated_time, locked, op_id "
                 "FROM profile_entries WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
@@ -566,7 +688,8 @@ class ProfileDB:
         if row is None:
             return {}
         entry = {"value": row[0], "value_text": row[1],
-                 "updated_at": row[2], "updated_time": row[3]}
+                 "updated_at": row[2], "updated_time": row[3],
+                 "op_id": row[5] or ""}
         if row[4]:
             entry["locked"] = True
         return entry
@@ -580,7 +703,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT type, key, value, value_text, updated_at, updated_time, locked "
+                "SELECT type, key, value, value_text, updated_at, updated_time, locked, op_id "
                 "FROM profile_entries WHERE username=?",
                 (username,),
             ).fetchall()
@@ -588,13 +711,14 @@ class ProfileDB:
             self._release_connection(conn)
 
         result: dict[str, dict[str, dict]] = {}
-        for type_, key, value, value_text, updated_at, updated_time, locked in rows:
+        for type_, key, value, value_text, updated_at, updated_time, locked, op_id in rows:
             model_data = result.setdefault(type_, {})
             entry = {
                 "value": value,
                 "value_text": value_text,
                 "updated_at": updated_at,
                 "updated_time": updated_time,
+                "op_id": op_id or "",
             }
             if locked:
                 entry["locked"] = True
@@ -654,7 +778,9 @@ class ProfileDB:
             self._release_connection(conn)
 
     def unlock(self, username: str, type_: str, key: str) -> bool:
-        """解除锁定；返回是否发生了变化。值保持锁定时的样子。"""
+        """解除锁定，并用该 key 账本里最新的 set/delta 重建条目。"""
+        from .arbitrate import canonical_event, event_rank
+
         conn = self._borrow_connection()
         try:
             self._begin(conn)
@@ -663,8 +789,76 @@ class ProfileDB:
                 "WHERE username=? AND type=? AND key=? AND locked=1",
                 (username, type_, key),
             )
+            if cursor.rowcount != 1:
+                self._commit(conn)
+                return False
+            rows = conn.execute(
+                "SELECT new_value, new_value_text, ts, op_id FROM profile_history "
+                "WHERE username=? AND type=? AND key=? "
+                "AND change_type IN ('set', 'delta')",
+                (username, type_, key),
+            ).fetchall()
+            winner = None
+            for new_value, new_value_text, ts, op_id in rows:
+                rank = event_rank(ts, op_id)
+                if winner is None or rank > winner[0]:
+                    winner = (rank, new_value, new_value_text, ts, op_id)
+            if winner is not None:
+                _rank, new_value, new_value_text, ts, op_id = winner
+                conn.execute(
+                    "UPDATE profile_entries SET value=?, value_text=?, updated_at=?, op_id=? "
+                    "WHERE username=? AND type=? AND key=?",
+                    (float(new_value or 0), new_value_text or "",
+                     canonical_event(ts) or (ts or ""), op_id or "",
+                     username, type_, key),
+                )
             self._commit(conn)
-            return cursor.rowcount == 1
+            return True
+        except Exception:
+            self._rollback(conn)
+            raise
+        finally:
+            self._release_connection(conn)
+
+    def merge_snapshot_candidates(self, rows: list[dict]) -> int:
+        """按 key 仲裁落地快照条目。一个事务，不写账本，不改 locked。"""
+        from .arbitrate import canonical_event, is_strictly_newer
+
+        applied = 0
+        conn = self._borrow_connection()
+        try:
+            self._begin(conn)
+            now = datetime.now().isoformat(timespec="seconds")
+            for row in rows:
+                username, type_, key = row["username"], row["type"], row["key"]
+                current = conn.execute(
+                    "SELECT value, value_text, updated_at, op_id, locked "
+                    "FROM profile_entries WHERE username=? AND type=? AND key=?",
+                    (username, type_, key),
+                ).fetchone()
+                if current is not None and current[4]:
+                    continue
+                event_at = canonical_event(row.get("updated_at") or "")
+                op_id = str(row.get("op_id") or "")
+                if current is not None and not is_strictly_newer(
+                        event_at, op_id, current[2] or "", current[3] or ""):
+                    continue
+                value = row.get("value")
+                number = float(value) if isinstance(value, (int, float)) else 0.0
+                text = row.get("value_text") or ""
+                conn.execute(
+                    "INSERT INTO profile_entries "
+                    "(username, type, key, value, value_text, updated_at, updated_time, op_id) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(username, type, key) DO UPDATE SET "
+                    "value=excluded.value, value_text=excluded.value_text, "
+                    "updated_at=excluded.updated_at, updated_time=excluded.updated_time, "
+                    "op_id=excluded.op_id",
+                    (username, type_, key, number, text, event_at, now, op_id),
+                )
+                applied += 1
+            self._commit(conn)
+            return applied
         except Exception:
             self._rollback(conn)
             raise
@@ -689,6 +883,9 @@ class ProfileDB:
         device_id: str | None = None,
         origin_local_id: int | None = None,
         history_ts: str | None = None,
+        op_id: str | None = None,
+        remote_id: int | None = None,
+        touch_entry: bool = True,
     ) -> None:
         """写入单条 entry（ON CONFLICT 更新，不用 INSERT OR REPLACE）
 
@@ -717,23 +914,24 @@ class ProfileDB:
             ).fetchone()
             old_value = old_row[0] if old_row else None
             old_value_text = old_row[1] if old_row and len(old_row) > 1 else ""
-            if old_row and len(old_row) > 2 and old_row[2]:
+            if touch_entry and old_row and len(old_row) > 2 and old_row[2]:
                 self._rollback(conn)
                 logger.error(
                     f"profile 写入被拒绝：{username}.{type_}.{key} 已锁定"
                     f"（来源 {source or '未标注'}）")
                 return
 
-            # upsert entry：显式列更新，锁定列不在 SET 里，不会被清掉
-            conn.execute(
-                "INSERT INTO profile_entries "
-                "(username, type, key, value, value_text, updated_at, updated_time) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) "
-                "ON CONFLICT(username, type, key) DO UPDATE SET "
-                "value=excluded.value, value_text=excluded.value_text, "
-                "updated_at=excluded.updated_at, updated_time=excluded.updated_time",
-                (username, type_, key, float(value), value_text, ts, write_ts),
-            )
+            if touch_entry:
+                # 显式列更新，锁定列不在 SET 里，不会被清掉
+                conn.execute(
+                    "INSERT INTO profile_entries "
+                    "(username, type, key, value, value_text, updated_at, updated_time) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(username, type, key) DO UPDATE SET "
+                    "value=excluded.value, value_text=excluded.value_text, "
+                    "updated_at=excluded.updated_at, updated_time=excluded.updated_time",
+                    (username, type_, key, float(value), value_text, ts, write_ts),
+                )
 
             # history 记录
             if change_type is not None:
@@ -750,7 +948,7 @@ class ProfileDB:
                     should_record = True
 
                 if should_record:
-                    _record_history(
+                    written = _record_history(
                         conn,
                         ts=history_ts or write_ts,
                         username=username, type_=type_, key=key,
@@ -760,6 +958,20 @@ class ProfileDB:
                         source=source, sync_from=sync_from,
                         device_id=device_id or _author_stamp(),
                         origin_local_id=origin_local_id,
+                        op_id=op_id,
+                        remote_id=remote_id,
+                    )
+                    if written and touch_entry:
+                        conn.execute(
+                            "UPDATE profile_entries SET op_id=? "
+                            "WHERE username=? AND type=? AND key=?",
+                            (written, username, type_, key),
+                        )
+                elif op_id and touch_entry:
+                    conn.execute(
+                        "UPDATE profile_entries SET op_id=? "
+                        "WHERE username=? AND type=? AND key=?",
+                        (op_id, username, type_, key),
                     )
 
             self._commit(conn)
@@ -899,7 +1111,7 @@ class ProfileDB:
                     should_record = True
 
                 if should_record:
-                    _record_history(
+                    written = _record_history(
                         conn,
                         ts=write_ts,
                         username=username, type_=type_, key=key,
@@ -908,6 +1120,12 @@ class ProfileDB:
                         source=source, sync_from=sync_from,
                         device_id=_author_stamp(),
                     )
+                    if written:
+                        conn.execute(
+                            "UPDATE profile_entries SET op_id=? "
+                            "WHERE username=? AND type=? AND key=?",
+                            (written, username, type_, key),
+                        )
 
             self._commit(conn)
             return True
@@ -1012,6 +1230,8 @@ class ProfileDB:
             "old_value_text": row[7] or "", "new_value_text": row[8] or "",
             "change_type": row[9], "delta_value": row[10], "source": row[11],
             "sync_from": row[12], "device_id": row[13] or "",
+            "op_id": row[14] or "",
+            "remote_id": row[15],
         }
 
     def get_history(
@@ -1212,15 +1432,76 @@ class ProfileDB:
         return self.history_count(_single_history_query(username, type_, key))
 
     def count_pending_push(self, since_id: int, author: str) -> int:
-        """水位之上、本机产生的待上行 history 行数（切模式风险评估用）。"""
+        """本机尚未 ack、也未放弃的 set/delta 行数。``since_id`` 不再参与判定。"""
+        del since_id
         conn = self._borrow_connection()
         try:
             row = conn.execute(
                 "SELECT COUNT(*) FROM profile_history "
-                "WHERE id>? AND device_id=? AND change_type IN ('set','delta')",
-                (since_id, author),
+                "WHERE device_id=? AND remote_id IS NULL "
+                "AND change_type IN ('set','delta') "
+                "AND op_id NOT LIKE 'unscoped:%'",
+                (author,),
             ).fetchone()
             return int(row[0]) if row else 0
+        finally:
+            self._release_connection(conn)
+
+    def list_unacked(self, author: str, limit: int) -> list[dict]:
+        """待决定的本机 set/delta。调用方再按快照候选分成上传或放弃。"""
+        conn = self._borrow_connection()
+        try:
+            rows = conn.execute(
+                "SELECT id, op_id, username, type, key, new_value, new_value_text, "
+                "change_type, ts, source, origin_local_id "
+                "FROM profile_history "
+                "WHERE device_id=? AND remote_id IS NULL "
+                "AND change_type IN ('set', 'delta') "
+                "AND op_id NOT LIKE 'unscoped:%' "
+                "ORDER BY id ASC LIMIT ?",
+                (author, limit),
+            ).fetchall()
+        finally:
+            self._release_connection(conn)
+        return [
+            {
+                "id": row[0], "op_id": row[1], "username": row[2], "type": row[3],
+                "key": row[4], "new_value": row[5], "new_value_text": row[6] or "",
+                "change_type": row[7], "ts": row[8], "source": row[9] or "",
+                "origin_local_id": row[10] if row[10] is not None else row[0],
+            }
+            for row in rows
+        ]
+
+    def mark_remote_ids(self, pairs: list[tuple[int, int]]) -> None:
+        """写入 ack 序号或放弃标记 ``-1``。已经有 remote_id 的行不动。"""
+        if not pairs:
+            return
+        conn = self._borrow_connection()
+        try:
+            self._begin(conn)
+            conn.executemany(
+                "UPDATE profile_history SET remote_id=? "
+                "WHERE id=? AND remote_id IS NULL",
+                [(remote_id, history_id) for history_id, remote_id in pairs],
+            )
+            self._commit(conn)
+        except Exception:
+            self._rollback(conn)
+            raise
+        finally:
+            self._release_connection(conn)
+
+    def op_id_seen(self, op_id: str) -> bool:
+        if not op_id:
+            return False
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM profile_history WHERE op_id=? LIMIT 1",
+                (op_id,),
+            ).fetchone()
+            return row is not None
         finally:
             self._release_connection(conn)
 
@@ -1282,7 +1563,8 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             cursor = conn.execute(
-                "DELETE FROM profile_history WHERE ts < ?", (cutoff,)
+                "DELETE FROM profile_history WHERE ts < ? AND remote_id IS NOT NULL",
+                (cutoff,),
             )
             self._commit(conn)
             deleted = cursor.rowcount
@@ -1356,6 +1638,10 @@ def db_unlock(username: str, type_: str, key: str) -> bool:
     return get_profile_db().unlock(username, type_, key)
 
 
+def db_merge_snapshot_candidates(rows: list[dict]) -> int:
+    return get_profile_db().merge_snapshot_candidates(rows)
+
+
 def db_upsert(
     username: str,
     type_: str,
@@ -1371,12 +1657,16 @@ def db_upsert(
     device_id: str | None = None,
     origin_local_id: int | None = None,
     history_ts: str | None = None,
+    op_id: str | None = None,
+    remote_id: int | None = None,
+    touch_entry: bool = True,
 ) -> None:
     get_profile_db().upsert(
         username, type_, key, value, updated_at, change_type, delta_value,
         source, value_text, sync_from,
         device_id=device_id, origin_local_id=origin_local_id,
-        history_ts=history_ts)
+        history_ts=history_ts, op_id=op_id, remote_id=remote_id,
+        touch_entry=touch_entry)
 
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:
@@ -1497,6 +1787,18 @@ def db_users_with_history_since(since_ts: str, author: str = "") -> set[str]:
 
 def db_count_pending_push(since_id: int, author: str) -> int:
     return get_profile_db().count_pending_push(since_id, author)
+
+
+def db_list_unacked(author: str, limit: int = 200) -> list[dict]:
+    return get_profile_db().list_unacked(author, limit)
+
+
+def db_mark_remote_ids(pairs: list[tuple[int, int]]) -> None:
+    get_profile_db().mark_remote_ids(pairs)
+
+
+def db_op_id_seen(op_id: str) -> bool:
+    return get_profile_db().op_id_seen(op_id)
 
 
 def db_ledger_op_seen(device_id: str, origin_local_id: int) -> bool:

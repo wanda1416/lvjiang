@@ -446,8 +446,6 @@ def _seed_or_repair(token: str, state: dict, report: InitialSyncReport,
 
 def _follow_cloud(token: str, state: dict, report: InitialSyncReport,
                   on_progress, stop) -> InitialSyncReport:
-    from ..account.service import profile_sync_state, save_profile_sync_state
-    from ..profile import repository
     from ..profile.snapshot_sync import pull_and_replay
     from .definition_sync import sync_definition
     from .engine import sync_documents
@@ -483,9 +481,6 @@ def _follow_cloud(token: str, state: dict, report: InitialSyncReport,
             report.errors.append("云端有用户，但本地名册仍为空")
         if report.errors:
             raise RuntimeError("跟随云端未完成")
-        sync_state = profile_sync_state()
-        sync_state["local_history_id"] = repository.db_max_history_id()
-        save_profile_sync_state(sync_state)
     except Exception as error:  # noqa: BLE001 - 备份已经剪走，失败必须搬回
         if not report.errors:
             report.errors.append(str(error))

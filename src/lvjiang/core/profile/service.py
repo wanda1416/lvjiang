@@ -34,7 +34,6 @@ from .regen import (
     compute_realtime_value,
     compute_regen_entry,
     is_realtime_regen,
-    normalize_realtime_write,
 )
 from .regen_gate import period_recovery_allowed
 from .repository import (
@@ -114,8 +113,10 @@ def undo_profile_history(history_id: int) -> None:
         profile_action(username, key, set_value=record.get("old_value_text") or "",
                        source=source, trigger_sync=False)
         return
-    reverse = float(record.get("old_value") or 0) - float(record.get("new_value") or 0)
-    profile_action(username, key, delta=reverse, source=source, trigger_sync=False)
+    profile_action(
+        username, key, set_value=float(record.get("old_value") or 0),
+        source=source, trigger_sync=False,
+    )
 
 
 @profile_write
@@ -128,10 +129,6 @@ def delete_profile_history(history_id: int, username: str, model_type: str, key:
 
 def _is_continuous_regen(kd) -> bool:
     return isinstance(kd, RegenKeyDef) and is_realtime_regen(kd)
-
-
-def _normalize_continuous_regen_write(kd: RegenKeyDef, raw_value: float) -> tuple[float, str]:
-    return normalize_realtime_write(kd, max(0.0, float(raw_value)))
 
 
 def _normalize_float_noise(value: float) -> float:
@@ -156,6 +153,8 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
     profile_data = db_read_all(username)
     entry = profile_data.get(model_type, {}).get(key, {})
     current = entry.get("value", 0) or 0
+    if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
+        current = _quota_display_value(entry, kd)
     if model_type == MODEL_REGEN and kd and isinstance(kd, RegenKeyDef):
         if _is_continuous_regen(kd):
             current = compute_realtime_value(
@@ -166,6 +165,26 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         else:
             current = compute_regen_entry(entry, kd).value
     return current
+
+
+def _quota_display_value(entry: dict, kd: QuotaKeyDef) -> float:
+    """配额跨过周期边界后读出来是 0，不另写一条 reset。"""
+    stored = float(entry.get("value", 0) or 0)
+    updated_at = entry.get("updated_at") or ""
+    from .arbitrate import parse_event
+
+    event = parse_event(updated_at)
+    if event is None:
+        return 0.0
+    try:
+        boundary = get_period_boundary(
+            kd.period, kd.reset_time, datetime.now(), getattr(kd, "reset_day", 0),
+        )
+    except (TypeError, ValueError):
+        return stored
+    if event < boundary:
+        return 0.0
+    return stored
 
 
 def normalize_note_text(text: str, kd) -> str:
@@ -268,6 +287,12 @@ def profile_read_all(username: str) -> dict:
             if locked_entry.get("locked"):
                 locked_entry["value"] = None
                 locked_entry["value_text"] = ""
+    for kd in config.get_keys_by_model(MODEL_QUOTA):
+        if not isinstance(kd, QuotaKeyDef):
+            continue
+        entry = data.get(MODEL_QUOTA, {}).get(kd.key)
+        if entry and not entry.get("locked"):
+            entry["value"] = _quota_display_value(entry, kd)
     for kd in config.get_keys_by_model(MODEL_REGEN):
         if not isinstance(kd, RegenKeyDef):
             continue
@@ -329,27 +354,9 @@ def profile_observe(
             except (TypeError, ValueError):
                 is_current_period = False
 
+        current = _quota_display_value(entry, kd) if entry else 0.0
         if not is_current_period:
-            reset = db_update_if_current(
-                username,
-                MODEL_QUOTA,
-                key,
-                expected_value=entry.get("value", 0) or 0,
-                expected_updated_at=entry.get("updated_at", ""),
-                expected_entry_exists=bool(entry),
-                new_value=0,
-                change_type="reset",
-                delta_value=-float(entry.get("value", 0) or 0),
-            )
-            if not reset:
-                continue
-            if candidate == 0:
-                return {"accepted": True, "value": 0.0, "reason": "updated"}
-            # 已原子推进到当前周期；下一轮按普通同周期观测写入并触发同步。
-            continue
-
-        # 走到这里必然是同周期条目：上面的分支要么 return 要么 continue。
-        current = float(entry.get("value", 0) or 0)
+            current = 0.0
         if candidate < current:
             return {"accepted": False, "value": current, "reason": "regressed"}
         if candidate == current:
@@ -362,9 +369,9 @@ def profile_observe(
                 set_value=candidate,
                 source=source,
                 current_value=current,
-                expected_entry=entry,
+                expected_entry=entry or None,
                 trigger_sync=True,
-                use_cas=True,
+                use_cas=bool(entry),
             )
         except ProfileWriteConflict:
             continue
@@ -491,55 +498,9 @@ def profile_action(
         _raw = _read_current_value(username, model_type, key, kd)
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
-    # 闸门关闭（本进程尚未完成首次同步）时，准点恢复还没物化：这里必须用**存储值**
-    # 作基线，否则「未落库的恢复量」会被并进本次消耗/观测，历史行出现
-    # new != old + delta，当天的恢复也会从账本里消失。实时恢复没有独立账本行，
-    # 无此问题，基线照旧用计算值。
-    if (model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef)
-            and not _is_continuous_regen(kd) and not period_recovery_allowed()):
-        current_value = float((current_entry or {}).get("value", 0) or 0)
-
-    # ── 1.5 regen 固化：先把「上次写入至今的恢复」落成一条 tick ──
-    # 不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
-    # 两处基线不一致：回放（delta 相加）、撤销（old−new 反向）、按来源聚合都会算错。
-    # 固化是时间派生，不触发「同步变更依赖方」。
-    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-        stored_value = float((current_entry or {}).get("value", 0) or 0)
-        restored = compute_regen_entry(current_entry or {}, kd)
-        restored_value = float(restored.value)
-        if _is_continuous_regen(kd):
-            restored_value, restored_at = _normalize_continuous_regen_write(
-                kd, restored_value)
-        else:
-            restored_at = restored.updated_at
-        if int(restored_value) != int(stored_value):
-            # 闸门：本次进程尚未完成首次同步时不得物化。否则会把「基于过期锚点
-            # 算出的恢复」写成绝对值 set 上行，覆盖别的设备上真实发生的消耗
-            # （2026-11-09 体力事故）。同步完成后锚点已在本周期，这里自然不触发。
-            if period_recovery_allowed():
-                db_upsert(
-                    username, model_type, key, restored_value,
-                    updated_at=restored_at,
-                    # 物化用 set 而非 tick：set 会随上行通道推送，消耗前的
-                    # 「锚点 set + delta」成对到达回放端，delta 加在新锚点上，
-                    # 回放端无需做任何 regen 计算即天然正确（tick 不上行，
-                    # 锚点全靠快照收编，是跨端 regen 错乱的根源）。
-                    change_type="set",
-                    delta_value=_normalize_float_noise(restored_value - stored_value),
-                    source=tr("自动恢复"),
-                )
-                current_entry = db_read_entry(username, model_type, key)
-                # 计算基线保持带小数的实时值：入库取整只在 tick 那一行做，若这里降级成
-                # 整数，后面的 normalize 会认为小数进度为 0 并把锚点设成 now，白丢一点。
-                current_value = float(restored.value)
-                if expected_entry is not None:
-                    # 固化是本事务自己写的：CAS 的期望值必须跟着换，否则会被误判成
-                    # 「其他进程更新过」，单进程一次消耗也会报冲突。
-                    expected_entry = current_entry
-            elif _is_continuous_regen(kd):
-                # 实时恢复没有独立的账本行：闸门只挡落库，实时值仍参与本次计算，
-                # 否则一次消耗会按归档整数少算零点几个点。
-                current_value = float(restored.value)
+    # 消耗把读时函数的结果写回去。绝对值 set / 观测不走这里。
+    if set_value is None and not period_recovery_allowed():
+        raise ProfileOperationRefused("请先完成一次同步，再记录消耗")
 
     # ── 2. 计算目标新值 ──
     if set_value is not None:
@@ -559,35 +520,10 @@ def profile_action(
     actual_delta = _normalize_float_noise(new_value - current_value)
     semantic_new_value = new_value
 
-    # ── 6. regen 连续恢复规范化 ──
-    custom_updated_at = None
-    write_value = new_value  # 默认：语义值 = 入库值
-    if model_type == MODEL_REGEN and kd and _is_continuous_regen(kd):
-        assert isinstance(kd, RegenKeyDef)  # mypy narrowing
-        progress_value = new_value if regen_progress_source == "target" else current_value
-        write_value, custom_updated_at = _normalize_continuous_regen_write(
-            kd, progress_value
-        )
-        new_value = float(math.floor(new_value))
-        cap = kd.cap
-        if cap is not None and new_value >= cap:
-            new_value = float(cap)
-            semantic_new_value = float(cap)
-            actual_delta = _normalize_float_noise(semantic_new_value - current_value)
-            write_value = float(cap)
-            custom_updated_at = datetime.now().isoformat(timespec="seconds")
-        elif regen_progress_source == "current":
-            write_value = new_value
-
-    # ── 7. 写入 DB ──
-    # 账本只有两种写入：给了绝对值就是 set，给了增量就是 delta。
-    change_type = "set" if set_value is not None else "delta"
-    # 账本记的变动量取「入库值之差」：regen 会取整并回拨时间，语义 delta 与入库差可能
-    # 差不到 1 点；不变式 new = old + delta 必须按入库值成立，触发器仍用语义 delta。
+    # realtime 直接存精确小数和真实时间，不再回拨 updated_at。
+    write_value = new_value
+    change_type = "set"
     ledger_delta = actual_delta
-    if model_type == MODEL_REGEN and current_entry:
-        ledger_delta = _normalize_float_noise(
-            float(write_value) - float(current_entry.get("value", 0) or 0))
     from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
     event = None
     if actual_delta != 0:
@@ -614,7 +550,7 @@ def profile_action(
             expected_updated_at=expected_entry.get("updated_at", ""),
             expected_entry_exists=bool(expected_entry),
             new_value=write_value,
-            new_updated_at=custom_updated_at,
+            new_updated_at=None,
             change_type=change_type,
             delta_value=ledger_delta,
             source=source,
@@ -624,7 +560,6 @@ def profile_action(
     else:
         db_upsert(
             username, model_type, key, write_value,
-            updated_at=custom_updated_at,
             change_type=change_type,
             delta_value=ledger_delta,
             source=source,
@@ -680,6 +615,8 @@ def sync_write_adapter(
             f"sync 目标已锁定，跳过同步写入：{user_name}.{model_type}.{key}")
         return None
 
+    if not period_recovery_allowed():
+        raise ProfileOperationRefused("请先完成一次同步，再记录消耗")
     current_value = _read_current_value(user_name, model_type, key, kd)
     # sync 适配器仅用于数值模型
     if current_value is None or isinstance(current_value, str):
@@ -692,19 +629,6 @@ def sync_write_adapter(
     if new_value == current_value:
         return current_value, 0
 
-    custom_updated_at = None
-    if model_type == MODEL_REGEN and kd and _is_continuous_regen(kd):
-        assert isinstance(kd, RegenKeyDef)  # mypy narrowing
-        progress_value = semantic_new_value  # 保留 floor 前的小数进度，用于回拨 updated_at
-        new_value = float(math.floor(semantic_new_value))
-        _, custom_updated_at = _normalize_continuous_regen_write(kd, progress_value)
-        cap = kd.cap
-        if cap is not None and new_value >= cap:
-            new_value = float(cap)
-            semantic_new_value = float(cap)
-            actual_delta = _normalize_float_noise(semantic_new_value - current_value)
-            custom_updated_at = datetime.now().isoformat(timespec="seconds")
-
     from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
     event = prepare_trigger_event(
         username=user_name,
@@ -714,7 +638,7 @@ def sync_write_adapter(
         new_value=semantic_new_value,
         delta=actual_delta,
         source=source,
-        change_type=change_type,
+        change_type="set",
         script=kd.change_script if kd else "",
         synchronous=kd.change_script_sync if kd else False,
     )
@@ -727,8 +651,7 @@ def sync_write_adapter(
     try:
         db_upsert(
             user_name, model_type, key, new_value,
-            updated_at=custom_updated_at,
-            change_type=change_type,
+            change_type="set",
             delta_value=actual_delta,
             sync_from=sync_from,
             source=source,

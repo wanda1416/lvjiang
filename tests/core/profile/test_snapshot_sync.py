@@ -22,6 +22,8 @@ class FakeServer:
     def post(self, route: str, data: dict, token: str) -> dict:
         if self.fail:
             raise snapshot_sync.SyncError("账号服务暂时不可用")
+        if route == "/api/sync/state":
+            return {"protocol_version": 2}
         if route == "/api/sync/profile/snapshot":
             if isinstance(data.get("id"), int):
                 match = next((row for row in self.snapshots if row["id"] == data["id"]), None)
@@ -36,19 +38,23 @@ class FakeServer:
             return {"ops": rows, "last_remote_id": rows[-1]["remote_id"] if rows else since}
         if route == "/api/sync/profile/push":
             self.push_bodies.append(data)
-            before = len(self.rows)
+            results = []
             for op in data["ops"]:
-                self.rows.append({"remote_id": len(self.rows) + 1,
+                remote_id = len(self.rows) + 1
+                self.rows.append({"remote_id": remote_id,
                                   "instance_id": "mine", "local_id": op["local_id"],
                                   "username": op["username"], "type": op["type"],
                                   "key": op["key"], "op": op["op"],
                                   "value": op.get("value"), "delta": op.get("delta"),
                                   "value_text": op.get("value_text", ""),
                                   "source": op.get("source", ""),
-                                  "happened_at": op["happened_at"]})
+                                  "happened_at": op["happened_at"],
+                                  "op_id": op.get("op_id")})
                 self.pushed.append(op)
-            return {"accepted": len(self.rows) - before,
-                    "skipped": 0, "remote_id": len(self.rows)}
+                results.append({"op_id": op.get("op_id"), "remote_id": remote_id,
+                                "status": "accepted"})
+            return {"accepted": len(results), "skipped": 0,
+                    "remote_id": len(self.rows), "results": results}
         if route == "/api/sync/profile/snapshot/put":
             snapshot = {"id": len(self.snapshots) + 1,
                         "snapshot_remote_id": len(self.rows),
@@ -74,12 +80,16 @@ def env(monkeypatch, tmp_path):
 
     def db_upsert(username, type_, key, value, updated_at=None, change_type=None,
                   delta_value=None, source="", value_text="", sync_from=None,
-                  *, device_id=None, origin_local_id=None, history_ts=None):
+                  *, device_id=None, origin_local_id=None, history_ts=None,
+                  op_id=None, remote_id=None, touch_entry=True):
         writes.append((username, type_, key, value, value_text, change_type))
-        previous = entries.setdefault(username, {}).setdefault(type_, {}).get(key, {})
-        entries[username][type_][key] = {
-            "value": value, "value_text": value_text,
-            "updated_at": updated_at or "2026-11-03T10:00:00"}
+        bucket = entries.setdefault(username, {}).setdefault(type_, {})
+        previous = bucket.get(key, {})
+        if touch_entry:
+            bucket[key] = {
+                "value": value, "value_text": value_text,
+                "updated_at": updated_at or "2026-11-03T10:00:00",
+                "op_id": op_id or previous.get("op_id") or ""}
         if change_type is not None:
             history.append({
                 "id": max((r["id"] for r in history), default=0) + 1,
@@ -91,6 +101,8 @@ def env(monkeypatch, tmp_path):
                 "source": source,
                 "device_id": device_id or mine,
                 "origin_local_id": origin_local_id,
+                "op_id": op_id or "",
+                "remote_id": remote_id,
             })
 
     monkeypatch.setattr(snapshot_sync, "post", server.post)
@@ -136,6 +148,42 @@ def env(monkeypatch, tmp_path):
                 and r.get("device_id", who) == who][:limit]
 
     monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since", _rows_of)
+    monkeypatch.setattr(snapshot_sync.repository, "db_op_id_seen",
+                        lambda op_id: any(r.get("op_id") == op_id for r in history))
+    def _unacked(author, limit):
+        return [r for r in history
+                if r.get("device_id") == author and r.get("remote_id") is None
+                and r.get("change_type") in ("set", "delta")
+                and not str(r.get("op_id") or "").startswith("unscoped:")][:limit]
+    monkeypatch.setattr(snapshot_sync.repository, "db_list_unacked", _unacked)
+    def _mark(pairs):
+        by_id = {r["id"]: r for r in history}
+        for history_id, remote in pairs:
+            row = by_id.get(history_id)
+            if row is not None and row.get("remote_id") is None:
+                row["remote_id"] = remote
+    monkeypatch.setattr(snapshot_sync.repository, "db_mark_remote_ids", _mark)
+
+    def _merge(rows):
+        applied = 0
+        for row in rows:
+            username, type_, key = row["username"], row["type"], row["key"]
+            if (username, type_, key) in locked:
+                continue
+            current = entries.get(username, {}).get(type_, {}).get(key, {})
+            event_at = row.get("updated_at") or ""
+            op_id = row.get("op_id") or ""
+            if current and not snapshot_sync.is_strictly_newer(
+                    event_at, op_id, current.get("updated_at") or "",
+                    current.get("op_id") or ""):
+                continue
+            db_upsert(username, type_, key, row.get("value") or 0,
+                      updated_at=event_at or None, value_text=row.get("value_text") or "",
+                      op_id=op_id or None)
+            applied += 1
+        return applied
+
+    monkeypatch.setattr(snapshot_sync.repository, "db_merge_snapshot_candidates", _merge)
     monkeypatch.setattr(snapshot_sync.repository, "_author_stamp", lambda: mine)
     # 不 mock 的话 push/bootstrap 会走真库（config/session/profile.db）——
     # 既违反测试隔离门禁，泄漏的连接还会在后续用例里以
@@ -146,6 +194,37 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync, "backup_local", lambda: str(tmp_path / "backup"))
     return {"server": server, "entries": entries, "history": history,
             "state": state, "writes": writes, "locked": locked}
+
+
+def test_rebase_when_cloud_snapshot_is_newer(env) -> None:
+    env["state"]["profile_snapshot_id"] = 1
+    env["state"]["remote_history_id"] = 2
+    env["entries"]["张三"] = {"stock": {"energy": {
+        "value": 1, "updated_at": "2026-11-01T00:00:00", "op_id": "old"}}}
+    env["server"].snapshots = [{
+        "id": 2, "snapshot_remote_id": 9, "origin_instance_id": "other",
+        "origin_name": "书房PC", "created_at": "2026-11-12T00:00:00", "entry_count": 1,
+        "entries": json.dumps([{
+            "username": "张三", "type": "stock", "key": "energy", "value": 40,
+            "updated_at": "2026-11-12T08:00:00+08:00", "op_id": "snap"}])}]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.snapshots == 1
+    entry = env["entries"]["张三"]["stock"]["energy"]
+    assert entry["value"] == 40
+    assert entry["updated_at"] == "2026-11-12T08:00:00"
+    assert env["state"]["profile_snapshot_id"] == 2
+
+
+def test_old_protocol_blocks_sync(env, monkeypatch) -> None:
+    def post(route, data, token):
+        if route == "/api/sync/state":
+            return {"protocol_version": 1}
+        raise AssertionError(route)
+
+    monkeypatch.setattr(snapshot_sync, "post", post)
+    report = snapshot_sync.sync_all("t")
+    assert report.pushed == 0
+    assert any("尚未升级" in item for item in report.errors)
 
 
 def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
@@ -165,28 +244,33 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
     assert env["entries"]["李四"]["stock"]["energy"]["value"] == 8
     assert env["state"]["remote_history_id"] == 2
     assert env["state"]["profile_snapshot_id"] == 1
-    # 落地前的本地历史不上行：快照已代表当前状态，自己的陈年账本推上去
-    # 只会把旧值回放给别的设备（Android 首次同步曾倾倒两万余条）。
-    assert env["state"]["local_history_id"] == max(
-        (row["id"] for row in env["history"]), default=0)
-    # 回放不写本地 history（因此无从回声上行）
+    assert env["state"]["local_history_id"] == 0
     assert all(write[5] is None for write in env["writes"])
 
 
-def test_push_refuses_backlog_over_limit(env) -> None:
-    """积压超过上限（1000）拒绝上传，提示刷新快照——防止水位异常时全量倾倒。
-    周期 reset 不计入这条积压。"""
-    env["state"]["local_history_id"] = 0
+def test_push_marks_rows_older_than_snapshot_and_uploads_newer(env) -> None:
+    """不新于快照候选的行标 -1；更晚的本机行照常上传，不因条数上限拒绝。"""
     env["state"]["profile_snapshot_id"] = 1
-    env["state"]["remote_history_id"] = 5
+    env["server"].snapshots = [{
+        "id": 1, "snapshot_remote_id": 5, "origin_instance_id": "other",
+        "created_at": "2026-11-04T08:00:00", "entry_count": 1,
+        "entries": json.dumps([{
+            "username": "张三", "type": "stock", "key": "energy",
+            "value": 10, "updated_at": "2026-11-04T08:00:00", "op_id": "snap"}])}]
     env["history"].extend([
-        {"id": i, "username": "张三", "type": "stock", "key": f"k{i}",
+        {"id": 1, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 1, "new_value_text": "", "change_type": "set",
-         "delta_value": None, "ts": "2026-11-04T07:00:00"}
-        for i in range(1, snapshot_sync.MAX_PUSH_BACKLOG + 2)])
+         "ts": "2026-11-04T07:00:00", "device_id": "mine", "op_id": "old",
+         "remote_id": None, "origin_local_id": 1},
+        {"id": 2, "username": "张三", "type": "stock", "key": "energy",
+         "new_value": 12, "new_value_text": "", "change_type": "set",
+         "ts": "2026-11-04T09:00:00", "device_id": "mine", "op_id": "new-op-id",
+         "remote_id": None, "origin_local_id": 2},
+    ])
     report = snapshot_sync.push_local("t")
-    assert report.pushed == 0
-    assert any("刷新快照" in e for e in report.errors)
+    assert report.pushed == 1
+    assert env["history"][0]["remote_id"] == -1
+    assert env["history"][1]["remote_id"] == 1
 
 
 def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
@@ -205,8 +289,8 @@ def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
          "op": "delta", "delta": 5, "happened_at": "2026-11-03T10:00:01"},
     ]
     report = snapshot_sync.pull_and_replay("t")
-    assert report.pulled == 1                          # 只有 delta 生效
-    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 125
+    assert report.pulled == 0
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 120
 
 
 def test_replay_stamps_entry_with_source_time_not_local_clock(env) -> None:
@@ -273,8 +357,8 @@ def test_incremental_pull_applies_set_and_delta(env) -> None:
          "op": "set", "value": 7},
     ]
     report = snapshot_sync.pull_and_replay("t")
-    assert report.pulled == 2
-    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 15   # 10 + 5
+    assert report.pulled == 1
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 10
     assert env["entries"]["张三"]["stock"]["moon"]["value"] == 7
     assert env["state"]["remote_history_id"] == 3
 
@@ -284,49 +368,56 @@ def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
     env["history"].extend([
         {"id": 100, "username": "张三", "type": "stock", "key": "old",
          "new_value": 1, "new_value_text": "", "change_type": "set",
-         "delta_value": None, "ts": "2026-11-03T09:00:00"},
+         "delta_value": None, "ts": "2026-11-03T09:00:00",
+         "device_id": "mine", "op_id": "already", "remote_id": 8,
+         "origin_local_id": 100},
         {"id": 101, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 5, "new_value_text": "", "change_type": "set",
-         "delta_value": None, "ts": "2026-11-03T10:00:00"},
+         "delta_value": None, "ts": "2026-11-03T10:00:00",
+         "device_id": "mine", "op_id": "set-row", "remote_id": None,
+         "origin_local_id": 101},
         {"id": 102, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 3, "new_value_text": "", "change_type": "delta",
-         "delta_value": -2, "ts": "2026-11-03T10:05:00"},
+         "delta_value": -2, "ts": "2026-11-03T10:05:00",
+         "device_id": "mine", "op_id": "delta-row", "remote_id": None,
+         "origin_local_id": 102},
     ])
     report = snapshot_sync.push_local("t")
     assert report.pushed == 2
-    assert [op["local_id"] for op in env["server"].pushed] == [101, 102]
-    assert isinstance(env["server"].push_bodies[-1]["tz_offset_minutes"], int)
-    assert env["server"].pushed[1]["op"] == "delta"
-    assert env["server"].pushed[1]["delta"] == -2
-    assert env["state"]["local_history_id"] == 102
+    assert [op["op_id"] for op in env["server"].pushed] == ["set-row", "delta-row"]
+    assert env["server"].pushed[1]["op"] == "set"
+    assert env["server"].pushed[1]["value"] == 3
 
 
-def test_push_stores_newer_row_and_skips_older_ones(env, monkeypatch) -> None:
-    """同批里早于快照的行不能挡住后面的新修改，水位要划过整批。"""
-    env["state"]["local_history_id"] = 0
+def test_push_rejected_row_does_not_block_the_rest(env, monkeypatch) -> None:
+    """一条非法时间只放弃自己，同批其余行继续拿到 remote_id。"""
     env["history"].extend([
         {"id": 1, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 1, "new_value_text": "", "change_type": "set",
-         "delta_value": None, "ts": "2000-01-01T00:00:00"},
+         "ts": "2000-01-01T00:00:00", "device_id": "mine", "op_id": "old-row",
+         "remote_id": None, "origin_local_id": 1},
         {"id": 2, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 9, "new_value_text": "", "change_type": "set",
-         "delta_value": None, "ts": "2099-01-01T00:00:00"},
+         "ts": "2026-11-12T09:00:00", "device_id": "mine", "op_id": "new-row",
+         "remote_id": None, "origin_local_id": 2},
     ])
 
     def post(route, data, token):
         if route == "/api/sync/profile/push":
-            return {"accepted": 1, "skipped": 0, "remote_id": 1,
-                    "skipped_pre_snapshot": [
-                        {"local_id": 1, "happened_at": "2000-01-01T00:00:00"}]}
+            return {"results": [
+                {"op_id": "old-row", "remote_id": None, "status": "rejected",
+                 "error": "invalid_event_at"},
+                {"op_id": "new-row", "remote_id": 4, "status": "accepted"},
+            ]}
         return env["server"].post(route, data, token)
 
     monkeypatch.setattr(snapshot_sync, "post", post)
     report = snapshot_sync.push_local("t")
-    assert report.errors == []
     assert report.pushed == 1
-    assert report.skipped_pre_snapshot == [1]
-    assert env["state"]["local_history_id"] == 2
-    assert "早于快照跳过 1 条" in report.describe()
+    assert report.rejected == 1
+    assert any("校准" in item for item in report.errors)
+    assert env["history"][0]["remote_id"] == -1
+    assert env["history"][1]["remote_id"] == 4
 
 
 def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
@@ -371,12 +462,10 @@ def test_pull_stops_with_pending_when_overwrite_not_confirmed(env) -> None:
                                 "value": 99}])}]
     env["entries"]["张三"] = {"stock": {"energy": {"value": 5}}}
     report = snapshot_sync.pull_and_replay("t")
-    assert [row["username"] for row in report.pending] == ["张三"]
-    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 5   # 未被覆盖
-    assert env["state"].get("remote_history_id", 0) == 0
-    # sync_all 同样停在 pending，且不做上行
-    combined = snapshot_sync.sync_all("t")
-    assert combined.pending and combined.pushed == 0
+    assert report.pending == []
+    # 两边都没有事件时间时，快照不覆盖已有本地值；水位仍然前进。
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 5
+    assert env["state"]["remote_history_id"] == 9
 
 
 def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
@@ -419,7 +508,7 @@ def test_replay_is_idempotent_on_repeated_pull(env) -> None:
     env["entries"]["张三"] = {"stock": {"energy": {"value": 100}}}
     op = {"remote_id": 2, "instance_id": "other-device", "local_id": 7,
           "username": "张三", "type": "stock", "key": "energy",
-          "op": "delta", "delta": 40, "value": None, "value_text": "",
+          "op": "set", "value": 140, "value_text": "",
           "happened_at": "2026-11-03T11:00:00"}
     env["server"].rows = [{"remote_id": 1}, op]
     assert snapshot_sync.pull_and_replay("t").pulled == 1
@@ -441,25 +530,25 @@ def test_own_echo_ops_are_skipped_by_ledger_identity(env) -> None:
                            "key": "energy", "new_value": 100, "new_value_text": "",
                            "change_type": "delta", "delta_value": 40,
                            "ts": "2026-11-03T10:00:00",
-                           "device_id": "mine", "origin_local_id": 51})
+                           "device_id": "mine", "origin_local_id": 51,
+                           "op_id": "legacy:mine:51"})
     env["entries"]["张三"] = {"stock": {"energy": {"value": 100}}}
     # 云端回放流：自己的 echo（local_id=51）+ 别的设备的新 delta
     env["server"].rows = [
         {"remote_id": 1, "instance_id": "mine", "local_id": 51,
          "username": "张三", "type": "stock", "key": "energy",
-         "op": "delta", "delta": 40, "value": None, "value_text": "",
+         "op": "set", "value": 100, "value_text": "",
          "happened_at": "2026-11-03T10:00:00"},
         {"remote_id": 2, "instance_id": "other", "local_id": 9,
          "username": "张三", "type": "stock", "key": "energy",
-         "op": "delta", "delta": 5, "value": None, "value_text": "",
+         "op": "set", "value": 105, "value_text": "",
          "happened_at": "2026-11-03T11:00:00"},
     ]
     report = snapshot_sync.pull_and_replay("t")
-    # echo 被跳过（不双算 +40），他机 delta 正常应用（100+5）
     assert env["entries"]["张三"]["stock"]["energy"]["value"] == 105
     assert report.pulled == 1
-    assert env["writes"] == [(  # 只有他机那一条写入了 entries
-        "张三", "stock", "energy", 105.0, "", "delta")]
+    assert env["writes"] == [(
+        "张三", "stock", "energy", 105.0, "", "set")]
 
 
 def test_replay_of_unchanged_value_touches_nothing(env) -> None:
@@ -478,10 +567,8 @@ def test_replay_of_unchanged_value_touches_nothing(env) -> None:
          "op": "set", "value": 5, "value_text": "",
          "happened_at": "2026-11-04T09:00:00"},
     ]
-    assert snapshot_sync.pull_and_replay("t").pulled == 0
-    assert env["writes"] == []
-    assert env["history"] == []
-    assert env["entries"]["张三"]["stock"]["energy"]["updated_at"] == "2026-11-03T09:00:00"
+    assert snapshot_sync.pull_and_replay("t").pulled == 1
+    assert env["entries"]["张三"]["stock"]["energy"]["updated_at"] == "2026-11-04T09:00:00"
 
 
 def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
@@ -525,15 +612,18 @@ def test_push_skips_reset_and_sends_following_delta(env) -> None:
     env["history"].extend([
         {"id": 10, "username": "张三", "type": "quota", "key": "weekly",
          "new_value": 0, "new_value_text": "", "change_type": "reset",
-         "delta_value": -5, "ts": "2026-11-04T05:00:00"},
+         "delta_value": -5, "ts": "2026-11-04T05:00:00",
+         "device_id": "mine", "op_id": "reset-row", "remote_id": None},
         {"id": 11, "username": "张三", "type": "quota", "key": "weekly",
          "new_value": 3, "new_value_text": "", "change_type": "delta",
-         "delta_value": 3, "ts": "2026-11-04T09:00:00"},
+         "delta_value": 3, "ts": "2026-11-04T09:00:00",
+         "device_id": "mine", "op_id": "delta-row", "remote_id": None,
+         "origin_local_id": 11},
     ])
     snapshot_sync.push_local("t")
-    assert [op["local_id"] for op in env["server"].pushed] == [11]
-    assert env["server"].pushed[0]["op"] == "delta"
-    assert env["state"]["local_history_id"] == 11
+    assert [op["op_id"] for op in env["server"].pushed] == ["delta-row"]
+    assert env["server"].pushed[0]["op"] == "set"
+    assert env["server"].pushed[0]["value"] == 3
 
 
 def test_cross_period_replay_zeros_before_delta(env, monkeypatch) -> None:
@@ -550,8 +640,7 @@ def test_cross_period_replay_zeros_before_delta(env, monkeypatch) -> None:
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 3.0
-    # 跨周期归零是本机派生的，不写一条 reset 账本行把远端覆盖改成"用户重置"
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 5
     assert all(write[5] != "reset" for write in env["writes"])
 
 
@@ -585,7 +674,7 @@ def test_same_period_delta_adds_to_current_value(env, monkeypatch) -> None:
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 15.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 10
 
 
 def test_previous_period_delta_is_discarded(env, monkeypatch) -> None:
@@ -621,7 +710,7 @@ def test_offset_timestamp_keeps_clock_face(env, monkeypatch) -> None:
     ]
     report = snapshot_sync.pull_and_replay("t")
     assert report.errors == []
-    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 3.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 5
 
 
 def test_unparseable_local_time_does_not_zero_base(env, monkeypatch) -> None:
@@ -637,7 +726,7 @@ def test_unparseable_local_time_does_not_zero_base(env, monkeypatch) -> None:
          "happened_at": "2026-11-04T09:00:00"},
     ]
     snapshot_sync.pull_and_replay("t")
-    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 11.0
+    assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 10
 
 
 def test_old_period_delta_does_not_seed_empty_entry(env, monkeypatch) -> None:

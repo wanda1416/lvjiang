@@ -84,11 +84,9 @@ def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
     monkeypatch.setattr(triggers, "submit_profile_trigger", events.append)
     worker = SimpleNamespace(_notify_updated=lambda _: None)
     engine.ProfileProcessor._tick_user(worker, "tester", config)
-    assert len(events) == 1
-    assert events[0].old_value == events[0].new_value == 0
-    assert events[0].change_type == "reset"
+    assert events == []
     engine.ProfileProcessor._tick_user(worker, "tester", config)
-    assert len(events) == 1
+    assert events == []
 
 
 def test_profile_write_enqueues_script_and_returns_before_execution(tmp_path, monkeypatch):

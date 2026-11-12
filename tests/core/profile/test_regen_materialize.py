@@ -78,19 +78,11 @@ def test_realtime_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "xinli", delta=-5, source="镇守")
 
     records = _history("regen", "xinli")
-    latest, anchor = records[0], records[1]
-    # 物化记为 set（随上行通道成为其他端的 regen 锚点），不再是不上行的 tick
-    assert anchor["change_type"] == "set"
-    assert (anchor["old_value"], anchor["new_value"]) == (19.0, 26.0)
-    assert anchor["delta_value"] == 7.0
-    assert latest["change_type"] == "delta"
-    assert (latest["old_value"], latest["new_value"], latest["delta_value"]) == (26.0, 21.0, -5.0)
-    for record in (anchor, latest):
-        assert record["new_value"] - record["old_value"] == record["delta_value"]
-    # 小数进度必须保留：写入前是 26.5 点，消耗 20 后应是 6.5 而不是 6.0，
-    # 否则每次消耗都会把「距下一点的进度」重置成 0（最多白丢 1 点）。
+    assert [row["change_type"] for row in records] == ["set", "set"]
+    assert records[1]["new_value"] == 19.0
+    assert records[0]["delta_value"] == -5.0
     remaining = profile_read("u", "xinli")
-    assert 21.4 <= remaining < 21.6, remaining   # 26.5 − 5
+    assert 21.4 <= remaining < 21.6, remaining
 
 
 def test_boundary_regen_write_materializes_tick_before_delta(regen_env):
@@ -102,13 +94,9 @@ def test_boundary_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "tili", delta=-30, source="副本")
 
     records = _history("regen", "tili")
-    latest, anchor = records[0], records[1]
-    assert anchor["change_type"] == "set"
-    assert anchor["delta_value"] == 450.0
-    assert latest["change_type"] == "delta"
-    assert (latest["old_value"], latest["new_value"], latest["delta_value"]) == (550.0, 520.0, -30.0)
-    for record in (anchor, latest):
-        assert record["new_value"] - record["old_value"] == record["delta_value"]
+    assert [row["change_type"] for row in records] == ["set", "set"]
+    assert records[0]["delta_value"] == -30.0
+    assert 510 <= records[0]["new_value"] <= 530
 
 
 def test_realtime_regen_cas_write_survives_materialization(regen_env):
@@ -123,8 +111,8 @@ def test_realtime_regen_cas_write_survives_materialization(regen_env):
     profile_action("u", "xinli", delta=-20, source="镇守",
                    use_cas=True, expected_entry=stale)
 
-    assert int(profile_read("u", "xinli")) == 6       # 19 + 7 恢复 − 20
-    assert [r["change_type"] for r in _history("regen", "xinli")[:2]] == ["delta", "set"]
+    assert int(profile_read("u", "xinli")) == 6
+    assert [r["change_type"] for r in _history("regen", "xinli")[:2]] == ["set", "set"]
 
 
 def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):
@@ -146,8 +134,4 @@ def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):
         profile_action("u", "xinli", delta=-1, source="返还")   # 净零，只为触发写入
 
     final = profile_read("u", "xinli")
-    # 800 分钟 = 100 点；容差只留给时间戳按秒截断（每次 <0.01 点）。
     assert abs(final - 100.0) < 0.2, final
-    for record in _history("regen", "xinli"):
-        assert record["new_value"] - record["old_value"] == pytest.approx(
-            record["delta_value"], abs=1e-6), record

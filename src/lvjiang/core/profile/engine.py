@@ -19,17 +19,16 @@ from lvjiang.core.config.interface import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
 from ...i18n import tr
-from .maintenance import profile_operation, profile_write
+from .maintenance import profile_operation
 from .models import RegenKeyDef
-from .periods import (
+from .periods import (  # noqa: F401  # 测试仍从本模块引用周期边界
     get_period_boundary as _get_period_boundary,
 )
 from .periods import (
     parse_reset_time as _parse_reset_time,
 )
 from .regen import compute_regen_entry
-from .regen_gate import period_recovery_allowed
-from .repository import db_read_all, db_update_if_current, db_upsert
+from .repository import db_read_all
 from .schema import (
     get_profile_config,
 )
@@ -40,39 +39,6 @@ from .store import (
     set_alert_history,
     unmark_alert,
 )
-
-
-@profile_write
-def _write_background_change(user_name, model, kd, entry, new_value, delta, change_type, *, updated_at=None):
-    """周期重置/准点恢复也先执行同步脚本，CAS 和子链在同一事务内。"""
-    from .repository import db_read_entry
-    from .triggers import prepare_trigger_event, submit_profile_trigger
-
-    current = db_read_entry(user_name, model, kd.key)
-    if (current.get('value', 0), current.get('updated_at', '')) != (
-        entry.get('value', 0), entry.get('updated_at', ''),
-    ):
-        return False
-    event = prepare_trigger_event(
-        username=user_name, model=model, key=kd.key,
-        old_value=entry.get('value', 0), new_value=new_value, delta=delta,
-        source='周期重置' if change_type == 'reset' else '自动恢复',
-        change_type=change_type, script=kd.change_script, synchronous=kd.change_script_sync,
-    )
-    assert event is not None
-    if event.synchronous:
-        submit_profile_trigger(event)
-    updated = db_update_if_current(
-        user_name, model, kd.key, expected_value=entry.get('value', 0) or 0,
-        expected_updated_at=entry.get('updated_at', ''), expected_entry_exists=bool(current),
-        new_value=new_value, new_updated_at=updated_at, change_type=change_type, delta_value=delta,
-    )
-    if not updated:
-        from .service import ProfileWriteConflict
-        raise ProfileWriteConflict('Profile 后台计算写入冲突')
-    if not event.synchronous:
-        submit_profile_trigger(event)
-    return True
 
 # ─── 周期边界计算 ────────────────────────────────────────────
 
@@ -304,49 +270,8 @@ class ProfileProcessor:
         if not profile_data:
             return
 
-        now = datetime.now()
-        modified = False
-
-        # ── Step 1: 周期检查与重置（quota）──
-        quota_keys = config.get_keys_by_model("quota")
-        for kd in quota_keys:
-            entry = profile_data.get("quota", {}).get(kd.key, {})
-            if entry.get("locked"):
-                # 锁定 key 物理失效：既不首次建值，也不做周期重置
-                continue
-            if not entry:
-                # 首次初始化：entry 不存在，直接 upsert 创建
-                db_upsert(user_name, "quota", kd.key, 0,
-                          change_type="reset", delta_value=0)
-                logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 首次初始化")
-                modified = True
-                continue
-            stored_value = entry.get("value", 0) or 0
-            updated_at_str = entry.get("updated_at", "")
-
-            boundary = _get_period_boundary(
-                kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
-            )
-            if not _should_reset(updated_at_str, boundary):
-                continue
-
-            # 周期已过期，CAS 重置到 DB
-            try:
-                updated = _write_background_change(user_name, 'quota', kd, entry, 0, -stored_value, 'reset')
-            except Exception as error:  # noqa: BLE001 - 单字段拒绝不能中断其他周期字段
-                logger.warning('Profile 周期重置未提交 {}: {}', kd.key, error)
-                continue
-            if updated:
-                logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
-                modified = True
-            else:
-                logger.warning(f"{user_name} quota.{kd.key} CAS 失败，放弃本轮")
-
-        # ── Step 2: 再生计算（regen）──
-        # 本次进程还没完成首次同步时不得推算：本地锚点可能已经过期，任何物化都会把
-        # 「基于旧基线的恢复」写成绝对值 set 上行，覆盖别的设备上真实发生的消耗
-        # （2026-11-09 体力事故）。同步到位后锚点已落在本周期，边界数为 0，自然跳过。
-        regen_keys = config.get_keys_by_model("regen") if period_recovery_allowed() else ()
+        # 配额归零和回复都在读取时计算，引擎不再把它们写成账本行。
+        regen_keys = config.get_keys_by_model("regen")
         for kd in regen_keys:
             if not isinstance(kd, RegenKeyDef):
                 continue
@@ -357,29 +282,10 @@ class ProfileProcessor:
             if not entry:
                 # 首次：以 0 值、空时间戳构造虚拟 entry，走正常计算路径
                 entry = {"value": 0, "updated_at": ""}
-            stored_value = entry.get("value", 0)
-            updated_at_str = entry.get("updated_at", "")
-
             regen_result = compute_regen_entry(entry, kd)
             computed = regen_result.value
 
-            # realtime 由 UI 基于 value + updated_at 实时计算展示，不落库；
-            # boundary 经过准点边界后持久化，避免日/周等回复遗漏。物化记为
-            # set（上行后成为其他端的 regen 锚点），不再用不上行的 tick。
-            if regen_result.persisted and int(computed) != int(stored_value):
-                delta = computed - (stored_value or 0)
-                try:
-                    updated = _write_background_change(
-                        user_name, 'regen', kd, entry, computed, delta, 'set', updated_at=regen_result.updated_at)
-                except Exception as error:  # noqa: BLE001
-                    logger.warning('Profile 自动恢复未提交 {}: {}', kd.key, error)
-                    continue
-                if updated:
-                    modified = True
-                else:
-                    logger.warning(f"{user_name} regen.{kd.key} CAS 失败，放弃本轮")
-
-            # 检查双阈值告警（用最新计算值，不论是否写入成功）
+            # 检查双阈值告警。只读计算值，不把回复写进账本。
             # 橙色和红色各自独立触发和清理
             for level, threshold in [("orange", kd.alert_orange), ("red", kd.alert_red)]:
                 if threshold is None:
@@ -402,7 +308,3 @@ class ProfileProcessor:
                     if is_alert_marked(alert_key):
                         unmark_alert(alert_key)
                         # 注意：不清理 alert_info，由用户手动关闭
-
-        # ── 通知 UI 刷新 ──
-        if modified:
-            self._notify_updated(user_name)

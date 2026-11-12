@@ -617,7 +617,7 @@ class BatchTab(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        # 全选/全不选行
+        # 全选/反选行
         select_row = QHBoxLayout()
         self._unit_label = QLabel(tr("<b>选择执行单元</b>"))
         self._unit_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
@@ -628,15 +628,14 @@ class BatchTab(QWidget):
         self._btn_user_all.clicked.connect(
             lambda: self._set_all_entries_checked(True))
         select_row.addWidget(self._btn_user_all)
-        self._btn_user_none = QPushButton(tr("全不选"))
-        self._btn_user_none.setFixedWidth(60)
-        self._btn_user_none.clicked.connect(
-            lambda: self._set_all_entries_checked(False))
-        select_row.addWidget(self._btn_user_none)
+        self._btn_user_invert = QPushButton(tr("反选"))
+        self._btn_user_invert.setFixedWidth(60)
+        self._btn_user_invert.clicked.connect(self._invert_entry_checks)
+        select_row.addWidget(self._btn_user_invert)
         apply_button_style(
-            self._btn_user_all, self._btn_user_none, variant="neutral")
+            self._btn_user_all, self._btn_user_invert, variant="neutral")
         fit_button_width(
-            self._btn_user_all, self._btn_user_none, minimum=60)
+            self._btn_user_all, self._btn_user_invert, minimum=60)
         layout.addLayout(select_row)
 
         self._user_list = _ReorderTreeWidget(profile_order=True)
@@ -959,7 +958,7 @@ class BatchTab(QWidget):
         self._refresh_start_feedback()
 
     def _set_all_entries_checked(self, checked: bool):
-        """全选/全不选行"""
+        """全选行"""
         self._user_list.reset_check_anchor()
         self._updating_user_list = True
         try:
@@ -975,6 +974,22 @@ class BatchTab(QWidget):
         self._user_order = list(self._user_candidate_order) if checked else []
         self._refresh_user_order_column()
         self._store_entry_selection()
+
+    def _invert_entry_checks(self) -> None:
+        """反选：逐行翻转勾选状态，执行顺序按当前行序重建。"""
+        self._user_list.reset_check_anchor()
+        self._updating_user_list = True
+        try:
+            for index in range(self._user_list.topLevelItemCount()):
+                item = self._user_list.topLevelItem(index)
+                if item is None:
+                    continue
+                checked = item.checkState(0) == Qt.CheckState.Checked
+                item.setCheckState(
+                    0, Qt.CheckState.Unchecked if checked else Qt.CheckState.Checked)
+        finally:
+            self._updating_user_list = False
+        self._sync_user_order_from_rows()
 
     @staticmethod
     def _user_name(item: QTreeWidgetItem | None) -> str:
@@ -1898,7 +1913,7 @@ class BatchTab(QWidget):
         self._btn_script_invert.setEnabled(enabled)
         self._config_combo.setEnabled(enabled)
         self._btn_user_all.setEnabled(enabled)
-        self._btn_user_none.setEnabled(enabled)
+        self._btn_user_invert.setEnabled(enabled)
         self._user_list.setEnabled(enabled)
         self._rounds_spin.setEnabled(enabled)
         self._unattended_check.setEnabled(

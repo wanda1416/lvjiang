@@ -190,3 +190,37 @@ def test_invert_script_checks_flips_every_row(qtbot):
     ]
     assert batch._script_order == ["a", "b", "d", "e"]
     assert len(persisted) == 1
+
+
+def test_invert_entry_checks_flips_every_row(qtbot):
+    """用户页反选同样逐行翻转，并按行序重建执行单元顺序。"""
+    from lvjiang.ui.batch.batch_tab import BatchTab
+
+    tree = _make_tree(qtbot, count=3)
+    stored: list[bool] = []
+    batch = SimpleNamespace(
+        _user_list=tree,
+        _user_candidate_order=["甲", "乙", "丙"],
+        _user_order=["乙"],
+        _updating_user_list=False,
+    )
+    batch._user_name = lambda item: item.data(0, Qt.ItemDataRole.UserRole)
+    batch._refresh_user_order_column = lambda: None
+    batch._store_entry_selection = lambda: stored.append(True)
+    batch._sync_user_order_from_rows = (
+        BatchTab._sync_user_order_from_rows.__get__(batch))
+    batch._invert_entry_checks = BatchTab._invert_entry_checks.__get__(batch)
+
+    for index, name in enumerate(batch._user_candidate_order):
+        tree.topLevelItem(index).setData(0, Qt.ItemDataRole.UserRole, name)
+    tree.topLevelItem(1).setCheckState(0, Qt.CheckState.Checked)
+
+    batch._invert_entry_checks()
+
+    assert [tree.topLevelItem(i).checkState(0) for i in range(3)] == [
+        Qt.CheckState.Checked,
+        Qt.CheckState.Unchecked,
+        Qt.CheckState.Checked,
+    ]
+    assert batch._user_order == ["甲", "丙"]
+    assert len(stored) == 1

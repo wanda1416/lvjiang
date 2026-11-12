@@ -149,3 +149,44 @@ def test_absolute_write_is_allowed_when_inc_is_gated(tmp_path, monkeypatch) -> N
     history = repository.db_get_history("u", "stock", "coin")
     assert history[0]["change_type"] == "set"
     assert not history[0]["op_id"].startswith("unscoped:")
+
+
+def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -> None:
+    """时间规则收紧后标成 -1 的本机 set/delta 要能再判一次。"""
+    monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
+    repository.reset_profile_db()
+    db = repository.ProfileDB(tmp_path / "profile.db")
+    conn = sqlite3.connect(tmp_path / "profile.db")
+    try:
+        conn.executemany(
+            "INSERT INTO profile_history "
+            "(ts, username, type, key, new_value, change_type, device_id, "
+            "origin_local_id, op_id, remote_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            [
+                ("2026-11-04T08:23:56", "u", "stock", "k", 1, "set", "dev",
+                 9, "legacy:dev:9", -1),
+                ("2026-11-04T08:23:57", "u", "stock", "k", 2, "tick", "dev",
+                 10, "tick-row", -1),
+                ("2026-11-04T08:23:58", "u", "stock", "k", 3, "set", "other",
+                 11, "legacy:other:11", -1),
+                ("2026-11-04T08:23:59", "u", "stock", "k", 4, "set", "dev",
+                 12, "unscoped:12", -1),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    db.reopen_abandoned("dev")
+    conn = sqlite3.connect(tmp_path / "profile.db")
+    try:
+        rows = conn.execute(
+            "SELECT op_id, remote_id FROM profile_history ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+    assert rows == [
+        ("legacy:dev:9", None),
+        ("tick-row", -1),
+        ("legacy:other:11", -1),
+        ("unscoped:12", -1),
+    ]

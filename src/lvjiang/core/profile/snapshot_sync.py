@@ -560,6 +560,7 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         report.errors.append(blocked)
         return report
     author = _author_stamp()
+    repository.db_reopen_abandoned(author)
     if not repository.db_list_unacked(author, 1):
         return report
     candidates = _snapshot_candidates(token)
@@ -598,7 +599,7 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
             "value": row["new_value"],
             "value_text": row["new_value_text"],
             "source": row.get("source") or "",
-            "happened_at": row["ts"],
+            "happened_at": canonical_event(row.get("ts") or "") or row.get("ts") or "",
         } for row in upload]
         try:
             response = post("/api/sync/profile/push", {"ops": ops}, token)

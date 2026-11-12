@@ -164,6 +164,15 @@ def env(monkeypatch, tmp_path):
                 row["remote_id"] = remote
     monkeypatch.setattr(snapshot_sync.repository, "db_mark_remote_ids", _mark)
 
+    def _reopen(author):
+        for row in history:
+            if (row.get("device_id") == author and row.get("remote_id") == -1
+                    and row.get("change_type") in ("set", "delta")
+                    and not str(row.get("op_id") or "").startswith("unscoped:")):
+                row["remote_id"] = None
+
+    monkeypatch.setattr(snapshot_sync.repository, "db_reopen_abandoned", _reopen)
+
     def _merge(rows):
         applied = 0
         for row in rows:
@@ -418,6 +427,35 @@ def test_push_rejected_row_does_not_block_the_rest(env, monkeypatch) -> None:
     assert any("校准" in item for item in report.errors)
     assert env["history"][0]["remote_id"] == -1
     assert env["history"][1]["remote_id"] == 4
+
+
+def test_abandoned_rows_are_rejudged_against_the_snapshot(env) -> None:
+    """上次因时间被标 -1 的行，下一轮按快照候选重判，不永久放弃。"""
+    env["state"]["profile_snapshot_id"] = 1
+    env["server"].snapshots = [{
+        "id": 1, "remote_id": 0, "snapshot_remote_id": 0,
+        "entries": json.dumps([{
+            "username": "张三", "type": "stock", "key": "energy",
+            "value": 1, "updated_at": "2026-11-04T12:00:00", "op_id": "snap",
+        }]),
+    }]
+    env["history"].extend([
+        {"id": 50, "username": "张三", "type": "stock", "key": "energy",
+         "new_value": 8, "new_value_text": "", "change_type": "set",
+         "ts": "2026-11-04T16:00:00", "device_id": "mine",
+         "op_id": "legacy:mine:50", "remote_id": -1, "origin_local_id": 50},
+        {"id": 51, "username": "张三", "type": "stock", "key": "energy",
+         "new_value": 2, "new_value_text": "", "change_type": "set",
+         "ts": "2026-11-04T08:00:00", "device_id": "mine",
+         "op_id": "legacy:mine:51", "remote_id": -1, "origin_local_id": 51},
+    ])
+    report = snapshot_sync.push_local("t")
+    assert report.pushed == 1
+    assert report.rejected == 0
+    assert [op["op_id"] for op in env["server"].pushed] == ["legacy:mine:50"]
+    assert env["server"].pushed[0]["happened_at"] == "2026-11-04T16:00:00"
+    assert env["history"][0]["remote_id"] == 1
+    assert env["history"][1]["remote_id"] == -1
 
 
 def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:

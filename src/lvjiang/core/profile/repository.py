@@ -1447,6 +1447,25 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
+    def reopen_abandoned(self, author: str) -> None:
+        """把上次标成放弃的本机行放回待决定。快照候选或时间规则变了要重判。"""
+        conn = self._borrow_connection()
+        try:
+            self._begin(conn)
+            conn.execute(
+                "UPDATE profile_history SET remote_id=NULL "
+                "WHERE device_id=? AND remote_id=-1 "
+                "AND change_type IN ('set', 'delta') "
+                "AND op_id NOT LIKE 'unscoped:%'",
+                (author,),
+            )
+            self._commit(conn)
+        except Exception:
+            self._rollback(conn)
+            raise
+        finally:
+            self._release_connection(conn)
+
     def list_unacked(self, author: str, limit: int) -> list[dict]:
         """待决定的本机 set/delta。调用方再按快照候选分成上传或放弃。"""
         conn = self._borrow_connection()
@@ -1791,6 +1810,10 @@ def db_count_pending_push(since_id: int, author: str) -> int:
 
 def db_list_unacked(author: str, limit: int = 200) -> list[dict]:
     return get_profile_db().list_unacked(author, limit)
+
+
+def db_reopen_abandoned(author: str) -> None:
+    get_profile_db().reopen_abandoned(author)
 
 
 def db_mark_remote_ids(pairs: list[tuple[int, int]]) -> None:

@@ -214,6 +214,9 @@ CREATE INDEX IF NOT EXISTS idx_history_pending
   新行必须写入非空 uuid，不能依赖默认空串。
 - 已 ack 的行写入服务端返回的正整数 `remote_id`。重复上传返回已有 `remote_id`，客户端照写。
 - 被拒绝或不新于快照候选的行写 `remote_id = -1`。待上传查询只认 `NULL`，因此 `-1` 不会堵在队首。
+  每次推送开始时，本机 `set`/`delta` 里 `remote_id = -1` 且不是 `unscoped:` 的行先改回 `NULL`，
+  再按当前快照候选重判。时间规则或候选变了，原先误放弃的行还能上传；仍然不新于候选的行
+  再次标 `-1`，这一步不访问网络。
 - `local_history_id` 不再参与待上传判定，也不再作为扫描下限。
 
 ### 5.3 同步状态
@@ -322,15 +325,15 @@ ALTER TABLE accounts ADD COLUMN profile_migration_cursor INTEGER NOT NULL DEFAUL
 
 协议 2 的服务端只做这些事：
 
-1. 字段校验，包括 `event_at` 必须是无时区本地秒串，且落在服务器时间允许窗口内；
-2. 按 `(account_id, op_id)` 幂等去重；
+1. 字段校验。`event_at` 先收成无时区本地秒串。过去的真实时间收下。无法解析，或比服务器时间超前超过 2 天，按条拒绝；
+2. 按 `op_id` 幂等去重。插入使用 `ON CONFLICT DO NOTHING`，因此旧的 `(account_id, instance_id, local_id)` 冲突也返回已有行，不让整批 503。命中的旧行若 `op_id` 仍为空，补上这次的 `op_id`；
 3. 为成功入库的 op 分配账户内单调 `remote_id`；
-4. 原样存储，不改写 `happened_at`；
+4. 入库前把 `happened_at` 收成 `YYYY-MM-DDTHH:MM:SS`。只去掉偏移、小数和空格，不换时区，也不改成服务器当前时间；
 5. **按条**返回 `{op_id, remote_id, status}`。`status` 为 `accepted`、`duplicate` 或 `rejected`。
    一条被拒绝不让整批失败。
 
 `rejected` 时 `remote_id` 为空，响应里带 `invalid_event_at`。客户端把该行写成
-`remote_id = -1`，界面提示校准时间，队列继续上传后面的行。
+`remote_id = -1`，界面提示校准时间，队列继续上传后面的行。下一轮推送会把这类 `-1` 放回待决定再判。
 
 明确不做：快照前置校验、`base_remote_id` 校验、按 `happened_at` 过滤、按 key 仲裁、
 改写 `event_at`。`profile_definition`、`profile_layout` 两套通道保持不变。
@@ -423,7 +426,7 @@ push:  取 §3 的待上传行，200 条一批
 - 合并快照不修改 `locked`，只更新 `value` / `value_text` / `updated_at` / `op_id`。
 - 水位已经不低于快照水位、且本地 `profile_snapshot_id` 就是这份快照时，按自己的水位回放，
   不再落地一次。
-- 快照不决定「某条 op 该不该收」。服务端照单全收窗口内的 op。
+- 快照不决定「某条 op 该不该收」。服务端收下能解析、且不是明显未来时间的 `set`。
 
 ### 7.6 周期引擎
 
@@ -608,9 +611,7 @@ LWW 结果 = 9，而不是 8
 
 ### 9.2 时钟可信度
 
-`event_at` 是客户端墙钟。超出服务器时间允许窗口的 op 按条 `rejected`，不改写时间戳。
-改写会移动 regen 锚点，使 `value` 和事件时间不再是同一次写入。客户端把该行标 `-1` 并提示
-校准时间。
+`event_at` 是客户端墙钟。过去的真实时间都收下，包括几天前的补传。只拒绝无法解析的串，以及比服务器时间超前超过 2 天的串。拒绝时不把钟面改成服务器当前时间：改写会移动 regen 锚点，使 `value` 和事件时间不再是同一次写入。客户端把该行标 `-1` 并提示校准时间。下一轮同步先把本机这些 `-1` 放回待决定；规则放宽后，原先被误拒的行会重新上传。
 
 ### 9.3 历史展示
 
@@ -659,7 +660,8 @@ LWW 结果 = 9，而不是 8
     `profile_set`、`profile_observe`、单元格编辑和 `undo` 在离线时仍落库。未登录时 `profile_inc` 放行。
 12. **锁定语义**：锁定期间的 op 入库但不改 entry，也不改 `locked`。解锁后按最新 op 重建 entry。
 13. **幂等与坏行**：同一 `op_id` 重复上传得到 `duplicate` 和已有 `remote_id`，账本只有一行。
-    一批里的一条 `invalid_event_at` 只把该行标成 `-1`，其余行继续。
+    一批里的一条 `invalid_event_at` 只把该行标成 `-1`，其余行继续。过去的合法时间不是非法时间。
+    下一轮同步会重判已标 `-1` 的本机 `set`/`delta`。
 14. **协议门**：`protocol_version != 2` 时客户端不向旧接口发 op。版本变为 2 的部署同时拒绝新的 `delta`。
 15. **身份回填**：回放行的 `op_id` 是 `legacy:<device_id>:<origin_local_id>`，与云端
     `legacy:<instance_id>:<local_id>` 相同。拉取已存在的 op 不插入第二行。

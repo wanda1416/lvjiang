@@ -2,7 +2,7 @@
 
 from loguru import logger
 
-from ...core.input_base import InputBackendKind
+from ...core.input.base import InputBackendKind
 from ...core.platforms import native_confirm, native_notify, native_pause
 from ...i18n import tr
 from ._registry import builtin_func

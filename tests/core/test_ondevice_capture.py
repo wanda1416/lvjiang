@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from lvjiang.core import capture_base
+from lvjiang.core.input import capture_base
 from lvjiang.core.ondevice import a11y
 from lvjiang.core.ondevice.capture import A11yCapture
 

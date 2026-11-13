@@ -14,10 +14,10 @@ from typing import Callable
 from loguru import logger
 
 from ...core.config import InputSimConfig
-from ...core.input_trace import InputTrace
-from ...core.key_names import normalize_key
 from ...core.timing import NS_PER_SECOND, precise_wait, precise_wait_until
-from ..input_base import InputBackend, InputBackendKind
+from ..input.base import InputBackend, InputBackendKind
+from ..input.key_names import normalize_key
+from ..input.trace import InputTrace
 from .win32_keyboard import (
     KEYEVENTF_EXTENDEDKEY,
     KEYEVENTF_KEYUP,
@@ -466,7 +466,7 @@ class SendInputInput(InputBackend):
 
     def run_timeline(self, steps) -> None:
         """按声明的偏移并发下发按键；退出路径一律释放已按下的键。"""
-        from ..timeline import run_key_timeline, validate_timeline
+        from ..input.timeline import run_key_timeline, validate_timeline
         self.check_timeline_kinds(steps)
         validate_timeline(steps, touch=False)
         run_key_timeline(

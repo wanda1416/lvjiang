@@ -1,7 +1,7 @@
 # 截图与输入后端矩阵
 
 > Layer owner：L6 后端选择（`run_control` 按方案连接模式与设备状态挑选）
-> Feeds/Affects：`core/desktop/*`、`core/android/*`、`core/ondevice/*`、`core/input_base.py`；DSL 各指令在不同后端上的实际行为
+> Feeds/Affects：`core/desktop/*`、`core/android/*`、`core/ondevice/*`、`core/input/base.py`；DSL 各指令在不同后端上的实际行为
 > Stability：随后端实现演进；新增/删除后端或改变某条能力时必须同步本表
 
 同一条 DSL 在不同连接方式下落到的物理机制差别很大：`drag ... hold` 在 a11y
@@ -140,7 +140,7 @@ capture/input；业务配置在任务起点按磁盘内容解析，不另建副�
 
 运行期取帧与输入闸门：
 
-- `capture_for_run(capture)` / `ensure_capture_channel(capture)`（`core/capture_base.py`）
+- `capture_for_run(capture)` / `ensure_capture_channel(capture)`（`core/input/capture_base.py`）
   按**类型**做能力探测，只对声明了 `capture_blocking` / `ensure_channel_healthy` 的后端
   生效，PC／screencap／代理后端语义不变。
 - 引擎在每条语句前调用闸门：`只点击不截图` 的脚本因此同样被拦住。

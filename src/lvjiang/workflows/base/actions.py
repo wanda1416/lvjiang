@@ -10,8 +10,8 @@ import time
 
 from loguru import logger
 
-from ...core.capture_base import capture_for_run
-from ...core.key_names import normalize_pressable
+from ...core.input.capture_base import capture_for_run
+from ...core.input.key_names import normalize_pressable
 from ...core.timing import precise_wait
 from ..runtime_layout import require_enabled
 from .engine_ref import require_engine

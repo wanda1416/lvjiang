@@ -8,7 +8,7 @@ from lvjiang.core.desktop.win32_keyboard import (
     _make_key_lparam,
     post_keyboard_input,
 )
-from lvjiang.core.key_names import (
+from lvjiang.core.input.key_names import (
     KNOWN_KEY_NAMES,
     mouse_button_from_pressable,
     normalize_key,

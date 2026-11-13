@@ -7,9 +7,9 @@ if TYPE_CHECKING:
     from ...core.recognizers import ReferenceRecognizer
     from ..engine.core import WorkflowEngine
 
-from ...core.capture_base import CaptureBackend
 from ...core.config import DelayParam, InputSimConfig
-from ...core.input_base import InputBackend
+from ...core.input.base import InputBackend
+from ...core.input.capture_base import CaptureBackend
 from ...core.layout.models import Layout
 from ...core.ocr import OCREngine
 from .. import builtins  # noqa: F401  触发内置函数注册

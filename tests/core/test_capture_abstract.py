@@ -6,7 +6,7 @@
 3. ADB 工厂 create_capture_backend 返回 AdbCapture 实例
 """
 
-from lvjiang.core.capture_base import CaptureBackend
+from lvjiang.core.input.capture_base import CaptureBackend
 
 # ─── fake 子类 ────────────────────────────────────────────────
 

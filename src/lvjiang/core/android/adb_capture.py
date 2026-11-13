@@ -12,7 +12,7 @@
 import numpy as np
 from loguru import logger
 
-from ..capture_base import CaptureBackend
+from ..input.capture_base import CaptureBackend
 from .device import AdbConnectionError, AdbDevice
 
 

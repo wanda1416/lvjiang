@@ -14,7 +14,7 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from .fs_util import atomic_write_bytes
+from ..fs_util import atomic_write_bytes
 from .key_names import normalize_key
 
 TRACE_PLACEHOLDER = "__LVTRACE__"

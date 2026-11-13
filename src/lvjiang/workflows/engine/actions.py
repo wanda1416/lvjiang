@@ -19,7 +19,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from .key_state import KeyStateRegistry
 
-from ...core.key_names import normalize_pressable
+from ...core.input.key_names import normalize_pressable
 from ...core.layout.coord_types import CircleCoordRef, CoordRef, RectCoordRef
 from ...core.layout.models import Point as _LayoutPoint
 from ...core.timing import precise_wait
@@ -923,7 +923,7 @@ class _ActionsMixin:
 
         # SendInput 进入系统全局键盘钩子；发送当前配置的开始/停止/暂停/录制
         # 热键会反过来控制本程序。PostMessage 只投递目标窗口，不作此限制。
-        from ...core.input_base import InputBackendKind
+        from ...core.input.base import InputBackendKind
         if getattr(self._input, "kind", InputBackendKind.UNKNOWN) is InputBackendKind.SEND:
             from ...core.config import HotkeyConfig, load_settings
             raw_hotkeys = load_settings().get("hotkeys", {})

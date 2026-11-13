@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import Enum
 
-from ..core.config import InputSimConfig
+from ..config import InputSimConfig
 from .timeline import TimelineStep
 
 

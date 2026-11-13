@@ -1172,7 +1172,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if not text.endswith("\n"):
             text += "\n"
         if self._pending_trace is not None:
-            from ...core.input_trace import save_input_trace_bundle
+            from ...core.input.trace import save_input_trace_bundle
             resolver = get_resolver()
             workflow_root = target_root / "workflows"
             try:

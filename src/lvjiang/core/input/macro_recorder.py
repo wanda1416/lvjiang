@@ -11,7 +11,7 @@ wait 语句行。产物即合法 .wf 脚本，可直接剪切复用，回放完�
 高精度产物由一条 replay input_trace 指令和 workflows/lvtrace 配套文件组成，
 由专用实时调度器回放。两种模式都以画布为归一化基准。
 
-本模块不依赖 Qt：录制是纯 pynput/Win32 的无头采集，与 core.screen_recorder
+本模块不依赖 Qt：录制是纯 pynput/Win32 的无头采集，与 core.input.screen_recorder
 同层，UI 侧只有 ui.scripts.record_dialog 调用它。
 """
 
@@ -22,14 +22,14 @@ import time
 
 from loguru import logger
 
-from ..i18n import tr
-from .input_trace import (
+from ...i18n import tr
+from .key_names import CHARACTER_TO_KEY_NAME, KNOWN_KEY_NAMES
+from .trace import (
     TRACE_PLACEHOLDER,
     VALID_BUTTONS,
     InputTrace,
     InputTraceEvent,
 )
-from .key_names import CHARACTER_TO_KEY_NAME, KNOWN_KEY_NAMES
 
 try:
     from pynput import keyboard as pynput_keyboard
@@ -331,7 +331,7 @@ class MacroRecorder:
 
             self._foreground_user32 = ctypes.windll.user32
             self._foreground_user32.GetForegroundWindow.restype = wintypes.HWND
-            from .desktop.raw_input import RawMouseListener
+            from ..desktop.raw_input import RawMouseListener
             try:
                 self._raw_listener = RawMouseListener(
                     self._on_raw_move, self._on_raw_button)

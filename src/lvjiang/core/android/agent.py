@@ -30,9 +30,9 @@ import numpy as np
 from loguru import logger
 
 from ...core.config import InputSimConfig
-from ..capture_base import A11yScreenshotThrottle, CaptureBackend
 from ..config.models import AndroidRecoveryConfig
-from ..input_base import InputBackend, InputBackendKind
+from ..input.base import InputBackend, InputBackendKind
+from ..input.capture_base import A11yScreenshotThrottle, CaptureBackend
 from .device import AdbDevice
 from .input import _KEY_TO_ANDROID_KEYCODE, AdbInput
 from .recovery import RecoveryAction
@@ -705,7 +705,7 @@ class AgentInput(InputBackend):
         为什么必须是**一次**：多 stroke 同属一个 GestureDescription 才是真并发；
         拆成多次 dispatch 就变回顺序执行，而调用方看到的仍是"并发已生效"。
         """
-        from ..timeline import describe_timeline, validate_timeline
+        from ..input.timeline import describe_timeline, validate_timeline
         self.check_timeline_kinds(steps)
         validate_timeline(steps, touch=True)
         strokes = [

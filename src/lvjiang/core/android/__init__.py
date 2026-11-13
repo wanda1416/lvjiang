@@ -17,8 +17,8 @@
 """
 
 from ...core.config import InputSimConfig
-from ..capture_base import CaptureBackend
-from ..input_base import InputBackend
+from ..input.base import InputBackend
+from ..input.capture_base import CaptureBackend
 from .adb_capture import AdbCapture
 from .agent import (
     AgentCapture,

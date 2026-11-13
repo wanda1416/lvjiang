@@ -69,7 +69,7 @@ PC 端或手机端执行操作
 
 | 层 | 模块 | 职责 |
 |----|------|------|
-| 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口（含后台截图）与 ADB / scrcpy / 设备端代理后端 |
+| 捕获 / 输入 | `src/lvjiang/core/input/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口（含后台截图）与 ADB / scrcpy / 设备端代理后端 |
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
 | 场景 / 布局 | `src/lvjiang/core/scene/`、`core/layout/manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
 | 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征 / 参考图） |
@@ -99,7 +99,7 @@ lvjiang/
 │   ├── app.py                 # QApplication 入口
 │   ├── _version.py            # 版本号
 │   ├── core/                  # 截图 / 输入 / OCR / 场景 / 布局 / 坐标类型
-│   │   ├── capture_base.py    # 截图抽象（桌面窗口 / ADB / scrcpy / 后台截图）
+│   │   ├── input/            # 截图与输入抽象、按键名、输入轨迹、时间线、宏/录屏采集
 │   │   ├── config/            # 配置加载与会话管理（app.yaml / session / 用户 / 工作流 / 在线配置）
 │   │   ├── desktop/           # 桌面投屏窗口后端（截图 + SendInput / PostMessage 点击）
 │   │   ├── android/           # ADB / scrcpy 后端

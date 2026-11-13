@@ -308,7 +308,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             main._capture = DesktopCapture()
         main._capture.set_capture_region(
             w["left"], w["top"], w["width"], w["height"])
-        from ...core.macro_recorder import MacroRecorder
+        from ...core.input.macro_recorder import MacroRecorder
         hk = main._user_config.hotkeys
         from ...core.access import is_readonly
         self._target_id = (
@@ -460,7 +460,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             text = self._with_script_traits(
                 self.text_edit.toPlainText(), path)
             if self._pending_trace is not None:
-                from ...core.input_trace import (
+                from ...core.input.trace import (
                     TRACE_PLACEHOLDER,
                     save_input_trace_bundle,
                 )

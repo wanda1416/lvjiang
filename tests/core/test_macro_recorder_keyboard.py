@@ -1,6 +1,6 @@
 """脚本录制器的键盘名称转换。"""
 
-from lvjiang.core import macro_recorder
+from lvjiang.core.input import macro_recorder
 from lvjiang.workflows.grammar import parse_text
 
 

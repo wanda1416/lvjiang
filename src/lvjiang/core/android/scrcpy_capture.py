@@ -34,7 +34,7 @@ import numpy as np
 from loguru import logger
 
 from ...i18n import tr
-from ..capture_base import CaptureBackend
+from ..input.capture_base import CaptureBackend
 from ..paths import data_directory
 from ..platforms import SUBPROCESS_NO_WINDOW, SUBPROCESS_TEXT
 from .device import AdbDevice

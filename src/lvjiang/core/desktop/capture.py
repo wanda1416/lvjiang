@@ -18,7 +18,7 @@ import numpy as np
 from loguru import logger
 
 from ...i18n import tr
-from ..capture_base import CaptureBackend
+from ..input.capture_base import CaptureBackend
 
 
 class DesktopCapture(CaptureBackend):

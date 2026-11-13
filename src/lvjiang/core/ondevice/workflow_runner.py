@@ -18,14 +18,14 @@ from typing import Callable
 
 from loguru import logger
 
-from ...core.capture_base import CaptureBackend
 from ...core.config import load_user_config
 from ...core.config.interface import get_interface_store
 from ...core.config.resolver import get_resolver
-from ...core.input_base import InputBackend
 from ...core.ocr import OCREngine
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
+from ..input.base import InputBackend
+from ..input.capture_base import CaptureBackend
 from ..layout.models import Layout
 from .capture import A11yCapture
 from .input import A11yInput

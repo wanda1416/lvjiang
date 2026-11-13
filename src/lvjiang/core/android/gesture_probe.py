@@ -28,7 +28,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from ..timeline import TimelineStep
+from ..input.timeline import TimelineStep
 from .agent import AgentInput, connect_agent
 from .device import AdbDevice
 

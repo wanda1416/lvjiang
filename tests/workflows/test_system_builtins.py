@@ -7,7 +7,7 @@ confirm / pause / notify 依赖平台原生弹窗，不纳入。
 
 import pytest
 
-from lvjiang.core.input_base import InputBackendKind
+from lvjiang.core.input.base import InputBackendKind
 from lvjiang.workflows.builtins import get_function
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text

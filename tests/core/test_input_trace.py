@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.core import input_trace as trace_module
-from lvjiang.core.input_trace import (
+from lvjiang.core.input import trace as trace_module
+from lvjiang.core.input.trace import (
     TRACE_MAGIC,
     TRACE_VERSION,
     InputTrace,

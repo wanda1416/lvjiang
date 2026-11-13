@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QWidget
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ..core.key_names import normalize_pressable
+from ..core.input.key_names import normalize_pressable
 from ..i18n import tr
 
 _PUNCTUATION_LABELS = {

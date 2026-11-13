@@ -16,7 +16,6 @@ from loguru import logger
 
 from ...constants import PROJECT_ROOT
 from ...core.access import user_execution
-from ...core.capture_base import CaptureBackend
 from ...core.config import (
     AndroidAppConfig,
     DelayParam,
@@ -24,8 +23,9 @@ from ...core.config import (
     parse_android_apps,
 )
 from ...core.config.resolver import get_resolver
-from ...core.input_base import InputBackend, InputBackendKind
-from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
+from ...core.input.base import InputBackend, InputBackendKind
+from ...core.input.capture_base import CaptureBackend
+from ...core.input.trace import InputTrace, InputTraceError, load_input_trace
 from ...core.layout.key_validation import validate_key_name
 from ...core.layout.models import Layout
 from ...core.ocr import OCREngine
@@ -374,7 +374,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         capture = getattr(self, "_capture", None)
         if capture is None:
             return
-        from ...core.capture_base import ensure_capture_channel
+        from ...core.input.capture_base import ensure_capture_channel
         ensure_capture_channel(capture)
 
     # ─── 外置脚本函数入口 ──────────────────────────────────

@@ -15,7 +15,7 @@ import time
 from loguru import logger
 
 from ...core.config import InputSimConfig
-from ..input_base import InputBackend, InputBackendKind
+from ..input.base import InputBackend, InputBackendKind
 from .device import AdbDevice
 
 # 标准键名 → Android keycode（adb shell input keyevent 参数）

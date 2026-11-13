@@ -9,8 +9,8 @@
 
 import pytest
 
-from lvjiang.core.input_base import InputBackendKind, TimelineUnsupported
-from lvjiang.core.timeline import (
+from lvjiang.core.input.base import InputBackendKind, TimelineUnsupported
+from lvjiang.core.input.timeline import (
     MAX_TIMELINE_SECONDS,
     TimelineStep,
     expand_key_events,
@@ -119,7 +119,7 @@ class TestBackendCapability:
     """通道不支持要明确拒绝——静默降级的现象是「脚本点了没反应」"""
 
     def test_default_backend_refuses(self):
-        from lvjiang.core.input_base import InputBackend
+        from lvjiang.core.input.base import InputBackend
 
         class _Bare(InputBackend):
             kind = InputBackendKind.ADB
@@ -139,7 +139,7 @@ class TestBackendCapability:
             _Bare.run_timeline(_Bare.__new__(_Bare), [])
 
     def test_kind_mismatch_names_the_step_type(self):
-        from lvjiang.core.input_base import InputBackend
+        from lvjiang.core.input.base import InputBackend
 
         class _KeyOnly(InputBackend):
             kind = InputBackendKind.SEND

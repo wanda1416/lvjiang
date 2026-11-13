@@ -7,7 +7,7 @@
 主通道选无障碍而不是 Shizuku：后者必须由 adb 引导启动，手机重启一次就失效，
 对普通用户不成立。两边都返回同一形状的 BGR numpy，上层无需区分。
 
-无障碍通道的框架限流节拍由 core.capture_base.A11yScreenshotThrottle 统一提供，
+无障碍通道的框架限流节拍由 core.input.capture_base.A11yScreenshotThrottle 统一提供，
 与 PC 代理通道共用一份实现。
 
 失败原因通过任务日志暴露，截图失败返回 None，内存耗尽向上传播。
@@ -19,7 +19,7 @@ import numpy as np
 from loguru import logger
 
 from ...i18n import tr
-from ..capture_base import A11yScreenshotThrottle, CaptureBackend
+from ..input.capture_base import A11yScreenshotThrottle, CaptureBackend
 from . import a11y, shell
 
 

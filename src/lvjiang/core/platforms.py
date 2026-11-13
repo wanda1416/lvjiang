@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from pynput.keyboard import GlobalHotKeys
 
     from ..core.config import InputSimConfig
-    from .input_base import InputBackend
+    from .input.base import InputBackend
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MACOS = sys.platform == "darwin"
@@ -168,7 +168,7 @@ def start_global_hotkeys(hotkeys: dict[str, Callable]) -> "GlobalHotKeys | None"
         # 直接跳过，由调用方降级为 Qt keyPressEvent 窗口内热键。
         logger.info("macOS 上跳过 pynput 全局热键（libffi 递归问题），使用窗口内热键")
         return None
-    from .pynput_patch import install as _install_pynput_patch
+    from .input.pynput_patch import install as _install_pynput_patch
     _install_pynput_patch()
     try:
         from pynput import keyboard as pynput_keyboard

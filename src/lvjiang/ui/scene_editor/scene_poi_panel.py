@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.key_names import normalize_pressable
+from ...core.input.key_names import normalize_pressable
 from ...core.layout.manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,

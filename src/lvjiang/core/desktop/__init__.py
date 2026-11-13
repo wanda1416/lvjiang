@@ -13,7 +13,7 @@
 """
 
 from ...core.config import InputSimConfig
-from ..input_base import InputBackend
+from ..input.base import InputBackend
 from .capture import DesktopCapture
 from .post_message import PostMessageInput
 from .send_input import SendInputInput

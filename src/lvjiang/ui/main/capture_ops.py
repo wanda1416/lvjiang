@@ -251,7 +251,7 @@ class CaptureOpsMixin:
         if w <= 0 or h <= 0:
             self.append_log(tr("[录屏] 无法获取画面尺寸"))
             return
-        from ...core.screen_recorder import ScreenRecorder
+        from ...core.input.screen_recorder import ScreenRecorder
         # 流式模式已确认，_capture 必为 AndroidStreamCapture
         fps = self._capture.max_fps
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -9,8 +9,8 @@
 
 from loguru import logger
 
-from ...core.input_base import InputBackend
-from ...core.key_names import mouse_button_from_pressable
+from ...core.input.base import InputBackend
+from ...core.input.key_names import mouse_button_from_pressable
 from .signals import WorkflowUserError
 
 

@@ -9,7 +9,7 @@
 import pytest
 
 from lvjiang.core.config import InputSimConfig
-from lvjiang.core.input_base import InputBackend
+from lvjiang.core.input.base import InputBackend
 
 # ─── fake 子类 ────────────────────────────────────────────────
 

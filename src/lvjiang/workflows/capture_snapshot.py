@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import numpy as np
 from loguru import logger
 
-from ..core.capture_base import capture_for_run
+from ..core.input.capture_base import capture_for_run
 from .errors import WorkflowUserError
 
 #: from screen 直取超时：页面校验不该被设备卡顿拖到 capture_lossless 的 10s 默认值。

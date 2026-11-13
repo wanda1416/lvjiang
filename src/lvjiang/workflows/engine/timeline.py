@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from loguru import logger
 
-from ...core.input_base import TimelineUnsupported
-from ...core.timeline import TimelineStep, describe_timeline
+from ...core.input.base import TimelineUnsupported
+from ...core.input.timeline import TimelineStep, describe_timeline
 from ..grammar import (
     Click,
     Drag,

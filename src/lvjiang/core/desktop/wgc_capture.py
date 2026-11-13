@@ -28,7 +28,7 @@ import numpy as np
 from loguru import logger
 
 from ...i18n import tr
-from ..capture_base import CaptureBackend
+from ..input.capture_base import CaptureBackend
 from .win32_util import get_window_rect, get_window_visible_rect
 
 

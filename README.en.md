@@ -69,7 +69,7 @@ Action performed on PC or phone
 
 | Layer | Modules | Responsibility |
 |-------|---------|----------------|
-| Capture / input | `src/lvjiang/core/capture_base.py`, `core/desktop/`, `core/android/` | Unified screenshot and click abstraction; desktop windows (including background capture) plus ADB / scrcpy / on-device proxy backends |
+| Capture / input | `src/lvjiang/core/input/capture_base.py`, `core/desktop/`, `core/android/` | Unified screenshot and click abstraction; desktop windows (including background capture) plus ADB / scrcpy / on-device proxy backends |
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR (ONNX Runtime) wrapper |
 | Scenes / layouts | `src/lvjiang/core/scene/`, `core/layout/manager.py` | Declarative UI model loading, coordinate conversion, region alignment |
 | Recognizers | `src/lvjiang/core/recognizers/` | Pluggable recognizers (OCR / template matching / color features / reference images) |
@@ -99,7 +99,7 @@ lvjiang/
 │   ├── app.py                 # QApplication entry
 │   ├── _version.py            # Version number
 │   ├── core/                  # Capture / input / OCR / scenes / layouts / coordinate types
-│   │   ├── capture_base.py    # Capture abstraction (desktop window / ADB / scrcpy / background capture)
+│   │   ├── input/            # Capture and input abstractions, key names, input trace, timeline, macro/screen recorders
 │   │   ├── config/            # Config loading and sessions (app.yaml / session / users / workflows / online config)
 │   │   ├── desktop/           # Desktop mirroring-window backend (capture + SendInput / PostMessage clicks)
 │   │   ├── android/           # ADB / scrcpy backend

@@ -486,7 +486,11 @@ class SceneOpsMixin:
 
     def _on_group_tab_context_menu(self, pos):
         """分组 Tab 右键菜单：新建 / 重命名 / 删除"""
-        tab_index = self._group_tab_widget.tabBar().tabAt(pos)
+        bar = self._group_tab_widget.tabBar()
+        # 页面（画布）的右键事件会冒泡到 Tab 容器，只有展示列那一行才算。
+        if pos.y() > bar.geometry().bottom():
+            return
+        tab_index = bar.tabAt(pos)
         group_key = ""
         if tab_index >= 0:
             group_key = getattr(
@@ -507,6 +511,8 @@ class SceneOpsMixin:
             menu.addSeparator()
         new_action = menu.addAction(tr("新建分组"))
         action = menu.exec(self._group_tab_widget.mapToGlobal(pos))
+        if action is None:
+            return
         if action == new_action:
             self._on_new_group()
         elif action == rename_action:
@@ -544,7 +550,10 @@ class SceneOpsMixin:
         scene_tab_widget = self._group_tabs.get(group_key)
         if scene_tab_widget is None:
             return
-        tab_index = scene_tab_widget.tabBar().tabAt(pos)
+        bar = scene_tab_widget.tabBar()
+        if pos.y() > bar.geometry().bottom():
+            return
+        tab_index = bar.tabAt(pos)
         scene_key = ""
         if tab_index >= 0:
             scene_key = getattr(
@@ -576,6 +585,8 @@ class SceneOpsMixin:
             menu.addSeparator()
         new_action = menu.addAction(tr("新建场景"))
         action = menu.exec(scene_tab_widget.mapToGlobal(pos))
+        if action is None:
+            return
         if action == new_action:
             self._on_new_scene(group_key)
         elif action == rename_action:

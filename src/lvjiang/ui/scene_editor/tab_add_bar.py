@@ -47,6 +47,8 @@ class InlineAddTabWidget(QTabWidget):
             max(24, self.fontMetrics().height() + 12))
         self.setTabBar(self._add_bar)
         self._button = QPushButton("+", self)
+        # 不参与焦点链：点过一次后按空格/回车不会再次触发新建。
+        self._button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._button.setToolTip(tooltip)
         self._button.setAccessibleName(tooltip)
         self._button.setCursor(Qt.CursorShape.PointingHandCursor)

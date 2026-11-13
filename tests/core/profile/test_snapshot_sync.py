@@ -81,7 +81,8 @@ def env(monkeypatch, tmp_path):
     def db_upsert(username, type_, key, value, event_at=None, op_type=None,
                   delta_value=None, source="", value_text="", sync_from=None,
                   *, instance_id=None, local_id=None, history_ts=None,
-                  op_id=None, remote_id=None, touch_entry=True):
+                  op_id=None, remote_id=None, touch_entry=True,
+                  history_old_value_text=None):
         writes.append((username, type_, key, value, value_text, op_type))
         bucket = entries.setdefault(username, {}).setdefault(type_, {})
         previous = bucket.get(key, {})
@@ -99,6 +100,8 @@ def env(monkeypatch, tmp_path):
                 "delta_value": delta_value,
                 "event_at": history_ts or "2026-11-03T10:00:00",
                 "source": source,
+                "sync_from": sync_from or "",
+                "old_value_text": history_old_value_text or "",
                 "instance_id": instance_id or mine,
                 "local_id": local_id,
                 "op_id": op_id or "",
@@ -535,6 +538,7 @@ def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
         {"remote_id": 2, "instance_id": "other-device", "local_id": 45,
          "username": "张三", "type": "regen", "key": "wumu",
          "op": "set", "value": 20, "value_text": "",
+         "old_value_text": "旧备注", "sync_from": "体能",
          "source": "太平武墓", "happened_at": "2026-11-06T07:45:19"},
     ]
     report = snapshot_sync.pull_and_replay("t")
@@ -545,6 +549,8 @@ def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
     assert row["op_id"] == "legacy:other-device:45"  # 行身份：来源设备的操作
     assert row["event_at"] == "2026-11-06T07:45:19"  # 业务时间，不是本机墙钟
     assert row["source"] == "太平武墓"               # 为什么变
+    assert row["sync_from"] == "体能"                # 同步链上游（云端下发）
+    assert row["old_value_text"] == "旧备注"          # note 撤销用的旧文本
     assert (row["old_value"], row["new_value"]) == (0.0, 20.0)
 
 

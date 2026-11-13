@@ -259,11 +259,13 @@ def _apply_op(op: dict) -> bool:
             op_type="set",
             source=str(op.get("source") or ""),
             value_text=value_text,
+            sync_from=str(op.get("sync_from") or "") or None,
             instance_id=origin,
             history_ts=happened or None,
             op_id=op_id,
             remote_id=remote_mark,
             touch_entry=False,
+            history_old_value_text=str(op.get("old_value_text") or ""),
         )
         return False
     repository.db_upsert(
@@ -272,11 +274,12 @@ def _apply_op(op: dict) -> bool:
         op_type="set",
         source=str(op.get("source") or ""),
         value_text=value_text,
+        sync_from=str(op.get("sync_from") or "") or None,
         instance_id=origin,
-
         history_ts=happened or None,
         op_id=op_id,
         remote_id=remote_mark,
+        history_old_value_text=str(op.get("old_value_text") or ""),
     )
     return True
 

@@ -563,7 +563,7 @@ def _record_history(
         "ON CONFLICT(op_id) DO NOTHING",
         (event_at, username, type_, key, old_value, float(new_value),
          old_value_text or "", value_text or "",
-         op_type, delta_value, source, sync_from, instance_id,
+         op_type, delta_value, source or "", sync_from or "", instance_id,
          identity, remote_id,
          # created_at：真实写入时刻（审计用，不参与任何裁决）
          datetime.now().isoformat(timespec="seconds")),
@@ -897,11 +897,12 @@ class ProfileDB:
         sync_from: str | None = None,
         *,
         instance_id: str | None = None,
-        origin_local_id: int | None = None,
         history_ts: str | None = None,
         op_id: str | None = None,
         remote_id: int | None = None,
         touch_entry: bool = True,
+        # 回放时用来源方记录的旧文本；None 表示按本地当前值计算（本机写入）
+        history_old_value_text: str | None = None,
     ) -> None:
         """写入单条 entry（ON CONFLICT 更新，不用 INSERT OR REPLACE）
 
@@ -929,7 +930,9 @@ class ProfileDB:
                 (username, type_, key),
             ).fetchone()
             old_value = old_row[0] if old_row else None
-            old_value_text = old_row[1] if old_row and len(old_row) > 1 else ""
+            old_value_text = (
+                history_old_value_text if history_old_value_text is not None
+                else (old_row[1] if old_row and len(old_row) > 1 else ""))
             if touch_entry and old_row and len(old_row) > 2 and old_row[2]:
                 self._rollback(conn)
                 logger.error(
@@ -1677,13 +1680,15 @@ def db_upsert(
     op_id: str | None = None,
     remote_id: int | None = None,
     touch_entry: bool = True,
+    history_old_value_text: str | None = None,
 ) -> None:
     get_profile_db().upsert(
         username, type_, key, value, event_at, op_type, delta_value,
         source, value_text, sync_from,
         instance_id=instance_id,
         history_ts=history_ts, op_id=op_id, remote_id=remote_id,
-        touch_entry=touch_entry)
+        touch_entry=touch_entry,
+        history_old_value_text=history_old_value_text)
 
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:

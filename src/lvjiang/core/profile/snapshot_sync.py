@@ -625,6 +625,8 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
             "value": row["new_value"],
             "value_text": row["value_text"],
             "source": row.get("source") or "",
+            "old_value_text": row.get("old_value_text") or "",
+            "sync_from": row.get("sync_from") or "",
             "happened_at": canonical_event(row.get("event_at") or "") or row.get("event_at") or "",
         } for row in upload]
         try:

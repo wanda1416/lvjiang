@@ -1488,7 +1488,7 @@ class ProfileDB:
         try:
             rows = conn.execute(
                 "SELECT local_id, op_id, username, type, key, new_value, value_text, "
-                "op_type, event_at, source "
+                "op_type, event_at, source, old_value_text, sync_from "
                 "FROM profile_history "
                 "WHERE instance_id=? AND remote_id IS NULL "
                 "AND op_type IN ('set', 'delta') "
@@ -1500,9 +1500,10 @@ class ProfileDB:
             self._release_connection(conn)
         return [
             {
-                "id": row[0], "op_id": row[1], "username": row[2], "type": row[3],
+                "local_id": row[0], "op_id": row[1], "username": row[2], "type": row[3],
                 "key": row[4], "new_value": row[5], "value_text": row[6] or "",
                 "op_type": row[7], "event_at": row[8], "source": row[9] or "",
+                "old_value_text": row[10] or "", "sync_from": row[11] or "",
             }
             for row in rows
         ]

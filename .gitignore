@@ -103,3 +103,7 @@ ops/stats-client/.env
 .tail.json
 .tail.err
 
+
+.tail*.json
+.tail*.err
+

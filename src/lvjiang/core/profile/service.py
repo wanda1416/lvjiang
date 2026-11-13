@@ -45,7 +45,7 @@ from .repository import (
     db_update_if_current,
     db_upsert,
 )
-from .rows import Entry
+from .rows import Entry, HistoryRow
 from .schema import get_profile_config
 
 # ─── 内部工具函数 ─────────────────────────────────────────────
@@ -71,7 +71,7 @@ class ProfileOperationRefused(ValueError, ExpectedError):
     log_level = "WARNING"
 
 
-def profile_history_undo_unavailable_reason(record: dict) -> str | None:
+def profile_history_undo_unavailable_reason(record: HistoryRow) -> str | None:
     """撤销前的准入判断；可撤销时返回 ``None``。"""
     if not record:
         return tr("历史记录不存在")
@@ -104,6 +104,8 @@ def undo_profile_history(history_id: int) -> None:
     「撤销：<原来源>」，所以它进同一份账本，也可以再被撤销。
     """
     record = db_get_history_record(history_id)
+    if record is None:
+        raise ProfileOperationRefused(tr("历史记录不存在"))
     reason = profile_history_undo_unavailable_reason(record)
     if reason is not None:
         raise ProfileOperationRefused(reason)

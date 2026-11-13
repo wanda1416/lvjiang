@@ -173,7 +173,7 @@ class _RowActions(QWidget):
 
     def __init__(self, dialog: HistoryDialog, table: QTableWidget) -> None:
         super().__init__(table)
-        self._record: dict = {}
+        self._record: HistoryRow | None = None
         layout = QHBoxLayout(self)
         layout.setContentsMargins(2, 1, 6, 1)
         layout.setSpacing(4)
@@ -189,7 +189,7 @@ class _RowActions(QWidget):
         layout.addWidget(self._undo)
         layout.addWidget(self._delete)
 
-    def set_record(self, record: dict) -> None:
+    def set_record(self, record: HistoryRow) -> None:
         self._record = record
         reason = profile_history_undo_unavailable_reason(record)
         self._undo.setEnabled(reason is None)
@@ -583,7 +583,7 @@ class HistoryDialog(QDialog):
         self._shown = len(rows)
         self._update_empty_state()
 
-    def _fill_row(self, table: QTableWidget, row: int, record: dict) -> None:
+    def _fill_row(self, table: QTableWidget, row: int, record: HistoryRow) -> None:
         for index, column in enumerate(self._columns):
             if column.key == "actions":
                 self._apply_actions(table, row, index, record)
@@ -598,7 +598,7 @@ class HistoryDialog(QDialog):
             self._decorate(item, column.key, record)
             table.setItem(row, index, item)
 
-    def _decorate(self, item: QTableWidgetItem, key: str, record: dict) -> None:
+    def _decorate(self, item: QTableWidgetItem, key: str, record: HistoryRow) -> None:
         if key == "event_at":
             item.setToolTip(str(record.event_at))
         elif key == "op_type":
@@ -627,7 +627,7 @@ class HistoryDialog(QDialog):
         elif key == "source":
             item.setToolTip(item.text() or tr("未记录"))
 
-    def _cell_text(self, key: str, record: dict) -> str:
+    def _cell_text(self, key: str, record: HistoryRow) -> str:
         if key == "event_at":
             return _format_timestamp(str(record.event_at or ""))
         if key == "username":
@@ -653,7 +653,7 @@ class HistoryDialog(QDialog):
         return ""
 
     def _apply_actions(
-        self, table: QTableWidget, row: int, index: int, record: dict,
+        self, table: QTableWidget, row: int, index: int, record: HistoryRow,
     ) -> None:
         cell = table.cellWidget(row, index)
         if not isinstance(cell, _RowActions):
@@ -956,12 +956,12 @@ class HistoryDialog(QDialog):
                 return index
         return None
 
-    def _record_label(self, record: dict) -> str:
+    def _record_label(self, record: HistoryRow) -> str:
         raw = f"{record.type}:{record.key}"
         label = format_sync_label(raw)
         return raw if label == raw else f"{label}（{raw}）"
 
-    def _confirm_undo(self, record: dict) -> None:
+    def _confirm_undo(self, record: HistoryRow) -> None:
         message = tr(
             '确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n'
             '时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。'
@@ -990,7 +990,7 @@ class HistoryDialog(QDialog):
         self.values_changed = True
         self._reload(reset_page=False, refresh_facets=True)
 
-    def _confirm_delete(self, record: dict) -> None:
+    def _confirm_delete(self, record: HistoryRow) -> None:
         message = tr(
             '确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n'
             '时间：{time}\n来源：{source}\n变动量：{delta}\n\n'
@@ -1084,7 +1084,7 @@ def _format_timestamp(raw: str) -> str:
         return raw
 
 
-def _delta_amount(record: dict) -> float | None:
+def _delta_amount(record: HistoryRow) -> float | None:
     """与仓储层的方向筛选同一口径：没有 delta_value 时按新旧值补算。
 
     两者都缺（旧值未知，例如某键的第一条记录）时返回 ``None``，界面显示「—」，

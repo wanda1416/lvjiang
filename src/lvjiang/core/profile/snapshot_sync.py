@@ -722,7 +722,7 @@ def _key_definitions() -> list[dict]:
         for item in items:
             if not isinstance(item, dict):
                 continue
-            key = item.key
+            key = item.get("key")
             if not isinstance(key, str) or not key:
                 continue
             entry: dict[str, str | int | float] = {
@@ -742,8 +742,8 @@ def _skipped_pre_snapshot(raw) -> list[int]:
         return []
     ids: list[int] = []
     for item in raw:
-        if isinstance(item, dict) and isinstance(item.local_id, int):
-            ids.append(item.local_id)
+        if isinstance(item, dict) and isinstance(item.get("local_id"), int):
+            ids.append(int(item["local_id"]))
         elif isinstance(item, int):
             ids.append(item)
     return ids
@@ -761,7 +761,7 @@ def _snapshot_entries() -> tuple[list[dict], int]:
     """本机有定义的总览条目，以及被跳过的无定义残留条数。"""
     from ..user_config import list_user_names
 
-    defined = {(item.type, item.key) for item in _key_definitions()}
+    defined = {(item["type"], item["key"]) for item in _key_definitions()}
     payload: list[dict] = []
     orphan = 0
     for username in list_user_names():

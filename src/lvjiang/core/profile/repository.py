@@ -1244,7 +1244,7 @@ class ProfileDB:
         key: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[dict]:
+    ) -> list[HistoryRow]:
         """单用户 / 单键的便捷查询，内部走 ``history_page``；复杂条件用后者。"""
         query = _single_history_query(username, type_, key)
         return self.history_page(query, limit=limit, offset=offset)
@@ -1387,7 +1387,7 @@ class ProfileDB:
             self._release_connection(conn)
         return [HistoryRow.from_row(r) for r in rows]
 
-    def get_history_record(self, history_id: int) -> dict:
+    def get_history_record(self, history_id: int) -> HistoryRow | None:
         """按稳定 id 读取单条变更历史；不存在返回空 dict。"""
         conn = self._borrow_connection()
         try:
@@ -1397,7 +1397,7 @@ class ProfileDB:
             ).fetchone()
         finally:
             self._release_connection(conn)
-        return self._history_row(row) if row is not None else {}
+        return self._history_row(row) if row is not None else None
 
     def update_history_source(
         self, history_id: int, *, expected_source: str, new_source: str,
@@ -1716,7 +1716,7 @@ def db_get_history(
     key: str | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> list[dict]:
+) -> list[HistoryRow]:
     """单用户 / 单键的便捷查询；多条件查询用 ``db_history_page``。"""
     return get_profile_db().get_history(username, type_, key, limit, offset)
 
@@ -1755,12 +1755,12 @@ def db_history_delta_totals(query: HistoryQuery) -> tuple[float, float]:
     return get_profile_db().history_delta_totals(query)
 
 
-def db_get_history_record(history_id: int) -> dict:
+def db_get_history_record(history_id: int) -> HistoryRow | None:
     return get_profile_db().get_history_record(history_id)
 
 
 def db_get_history_since(since_id: int, limit: int = 200,
-                         author: str = "") -> list[dict]:
+                         author: str = "") -> list[HistoryRow]:
     """本地水位之后待上行的账本行（``set`` / ``delta``，按 id 升序）。"""
     return get_profile_db().get_history_since(since_id, limit, author=author)
 

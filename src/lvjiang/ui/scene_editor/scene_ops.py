@@ -4,6 +4,7 @@ import re
 
 from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -127,6 +128,14 @@ class SceneOpsMixin:
             self._group_tabs[group_key] = scene_tab_widget
             idx = self._group_tab_widget.addTab(scene_tab_widget, group_name)
             self._group_tab_widget.setTabToolTip(idx, group_key)
+            # 加完分组页再挂 "+"：按钮高度取自一级 Tab 条，空条量不到真实高度。
+            scene_tab_widget.setCornerWidget(
+                self._make_tab_add_button(
+                    tr("在当前分组下新建场景"),
+                    lambda _checked=False, gk=group_key: self._on_new_scene(gk),
+                ),
+                Qt.Corner.TopRightCorner,
+            )
             # 构建该分组下的场景 Tab
             self._rebuild_scene_tabs(group_key)
         self._group_tab_widget.blockSignals(False)
@@ -145,6 +154,10 @@ class SceneOpsMixin:
             idx = scene_tab_widget.addTab(placeholder, scene_name)
             scene_tab_widget.setTabToolTip(idx, scene_key)
         scene_tab_widget.blockSignals(False)
+        if scene_tab_widget.count() == 0:
+            # 0 页时 Tab 条会塌成 0 高，右侧 "+" 只剩一条浮在内容区上的细边。
+            scene_tab_widget.tabBar().setMinimumHeight(
+                self._tab_add_button_height() + 4)
 
     def _ensure_scene_tab_loaded(self, scene_key: str) -> SceneTab | None:
         """首次访问场景时用真正的 SceneTab 原位替换轻量占位页。"""
@@ -201,15 +214,6 @@ class SceneOpsMixin:
         widget = scene_tab_widget.currentWidget()
         return getattr(widget, "scene_key", "")
 
-    def _current_group_key(self) -> str:
-        """获取当前激活的分组 key"""
-        widget = self._group_tab_widget.currentWidget()
-        group_key = getattr(widget, "group_key", "")
-        if group_key:
-            return group_key
-        groups = get_registry().get_groups()
-        return groups[0][0] if groups else ""
-
     def _select_scene(self, scene_key: str):
         """重建 Tab 后将选中态定位到指定场景（一级分组 + 二级场景）
 
@@ -231,10 +235,9 @@ class SceneOpsMixin:
         """重建场景 Tab 前处理未保存的布局编辑。"""
         return self._confirm_discard_changes(action)
 
-    def _on_new_scene(self):
-        """新建场景：弹窗输入 key 和 name，创建到当前分组"""
-        current_group = self._current_group_key()
-        dialog = QDialog(self)
+    def _on_new_scene(self, group_key: str):
+        """新建场景：弹窗输入 key 和 name，创建到指定分组"""
+        dialog = QDialog(self)  # type: ignore[arg-type]
         dialog.setWindowTitle(tr("新建场景"))
         form = QFormLayout(dialog)
         hint = QLabel(tr("创建所有布局共用的场景定义；网格位置和行列数在布局绑定时设置。"))
@@ -296,9 +299,9 @@ class SceneOpsMixin:
             return
         registry = get_registry()
         try:
-            registry.create_scene(key, name, group_key=current_group)
+            registry.create_scene(key, name, group_key=group_key)
         except ValueError as e:
-            QMessageBox.warning(self, tr("创建失败"), str(e))
+            QMessageBox.warning(self, tr("创建失败"), str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
         reload_scene_registry()
@@ -485,27 +488,31 @@ class SceneOpsMixin:
     # ─── 分组 Tab 右键菜单 ────────────────────────────────
 
     def _on_group_tab_context_menu(self, pos):
-        """分组 Tab 右键菜单：重命名 / 删除"""
+        """分组 Tab 右键菜单：新建 / 重命名 / 删除"""
         tab_index = self._group_tab_widget.tabBar().tabAt(pos)
-        if tab_index < 0:
-            return
-        group_widget = self._group_tab_widget.widget(tab_index)
-        group_key = getattr(group_widget, "group_key", "")
-        if not group_key:
-            return
-        groups = get_registry().get_groups()
+        group_key = ""
+        if tab_index >= 0:
+            group_key = getattr(
+                self._group_tab_widget.widget(tab_index), "group_key", "")
         menu = QMenu(self)  # type: ignore[arg-type]
-        rename_action = menu.addAction(tr("重命名分组"))
-        delete_action = menu.addAction(tr("删除分组"))
-        # 非空分组不允许删除
-        if len(groups) <= 1:
-            delete_action.setEnabled(False)
-            delete_action.setToolTip(tr("至少需要保留一个场景分组"))
-        elif get_registry().get_group_scenes(group_key):
-            delete_action.setEnabled(False)
-            delete_action.setToolTip(tr("分组非空，无法删除"))
+        rename_action: QAction | None = None
+        delete_action: QAction | None = None
+        if group_key:
+            rename_action = menu.addAction(tr("重命名分组"))
+            delete_action = menu.addAction(tr("删除分组"))
+            # 非空分组不允许删除
+            if len(get_registry().get_groups()) <= 1:
+                delete_action.setEnabled(False)
+                delete_action.setToolTip(tr("至少需要保留一个场景分组"))
+            elif get_registry().get_group_scenes(group_key):
+                delete_action.setEnabled(False)
+                delete_action.setToolTip(tr("分组非空，无法删除"))
+            menu.addSeparator()
+        new_action = menu.addAction(tr("新建分组"))
         action = menu.exec(self._group_tab_widget.mapToGlobal(pos))
-        if action == rename_action:
+        if action == new_action:
+            self._on_new_group()
+        elif action == rename_action:
             self._do_rename_group(group_key)
         elif action == delete_action:
             self._do_delete_group(group_key)
@@ -536,42 +543,49 @@ class SceneOpsMixin:
     # ─── 场景 Tab 右键菜单 ────────────────────────────────
 
     def _on_scene_tab_context_menu(self, pos, group_key: str):
-        """场景 Tab 右键菜单：重命名 / 删除 / 更改分组"""
+        """场景 Tab 右键菜单：新建 / 重命名 / 删除 / 更改分组"""
         scene_tab_widget = self._group_tabs.get(group_key)
         if scene_tab_widget is None:
             return
         tab_index = scene_tab_widget.tabBar().tabAt(pos)
-        if tab_index < 0:
-            return
-        scene_key = getattr(scene_tab_widget.widget(tab_index), "scene_key", "")
-        if not scene_key:
-            return
+        scene_key = ""
+        if tab_index >= 0:
+            scene_key = getattr(
+                scene_tab_widget.widget(tab_index), "scene_key", "")
         menu = QMenu(self)  # type: ignore[call-overload]
-        rename_action = menu.addAction(tr("重命名"))
-        delete_action = menu.addAction(tr("删除"))
-        resolver = get_resolver()
-        protected = (
-            not resolver.is_dev_mode()
-            and resolver.is_system_entity(f"scenes/{scene_key}.yaml")
-        )
-        if protected:
-            delete_action.setEnabled(False)
-            delete_action.setToolTip(tr("系统场景不可删除"))
-            rename_action.setToolTip(tr("系统场景只能修改显示名称，不能修改 key"))
-        # 更改分组子菜单
-        move_menu = menu.addMenu(tr("更改分组"))
-        registry = get_registry()
-        current_group = registry.get_scene_group(scene_key)
-        for gk, gn in registry.get_groups():
-            if gk != current_group:
-                move_action = move_menu.addAction(gn)
-                move_action.setData(gk)
+        rename_action: QAction | None = None
+        delete_action: QAction | None = None
+        if scene_key:
+            rename_action = menu.addAction(tr("重命名"))
+            delete_action = menu.addAction(tr("删除"))
+            resolver = get_resolver()
+            protected = (
+                not resolver.is_dev_mode()
+                and resolver.is_system_entity(f"scenes/{scene_key}.yaml")
+            )
+            if protected:
+                delete_action.setEnabled(False)
+                delete_action.setToolTip(tr("系统场景不可删除"))
+                rename_action.setToolTip(
+                    tr("系统场景只能修改显示名称，不能修改 key"))
+            # 更改分组子菜单
+            move_menu = menu.addMenu(tr("更改分组"))
+            registry = get_registry()
+            current_group = registry.get_scene_group(scene_key)
+            for gk, gn in registry.get_groups():
+                if gk != current_group:
+                    move_action = move_menu.addAction(gn)
+                    move_action.setData(gk)
+            menu.addSeparator()
+        new_action = menu.addAction(tr("新建场景"))
         action = menu.exec(scene_tab_widget.mapToGlobal(pos))
-        if action == rename_action:
+        if action == new_action:
+            self._on_new_scene(group_key)
+        elif action == rename_action:
             self._do_rename_scene(scene_key)
         elif action == delete_action:
             self._do_delete_scene(scene_key)
-        elif action and action.data() is not None:
+        elif action is not None and action.data() is not None:
             target_group = action.data()
             if target_group:
                 self._do_move_scene_group(scene_key, target_group)

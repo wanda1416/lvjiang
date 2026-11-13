@@ -1,5 +1,6 @@
 """编辑器对话框 - 场景编辑器主框架、Tab/画布管理"""
 
+from collections.abc import Callable
 from math import gcd
 
 from loguru import logger
@@ -42,7 +43,10 @@ from ...core.scene.registry import (
 )
 from ...i18n import tr, tr_label
 from ..reference.combo_sizing import set_combo_minimum_character_capacity
-from ..widgets.button_styles import apply_button_style
+from ..widgets.button_styles import (
+    apply_button_style,
+    apply_compact_button_style,
+)
 from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
 from ..widgets.theme import get_theme_manager
 from .layout_ops import LayoutOpsMixin
@@ -211,6 +215,32 @@ class SceneEditorDialog(
             return ""
         return tab.selected_entity_key()
 
+    def _make_tab_add_button(
+        self, tooltip: str, slot: Callable[[], None],
+    ) -> QPushButton:
+        """Tab 条末端的 "+"，与 Tab 条同高。
+
+        高度必须固定：0 个 Tab 的空条 sizeHint 高为 0，交给布局算出来按钮
+        会塌成 0 高，新分组就再也建不出第一个场景。
+        """
+        button = QPushButton("+")
+        button.setFixedSize(28, self._tab_add_button_height())
+        button.setToolTip(tooltip)
+        button.setAccessibleName(tooltip)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setAutoDefault(False)
+        apply_compact_button_style(button, variant="neutral")
+        button.clicked.connect(slot)
+        return button
+
+    def _tab_add_button_height(self) -> int:
+        """对齐 Tab 条高度；空 Tab 条的 sizeHint 高为 0，退回字体高度。"""
+        bar = self._group_tab_widget.tabBar()
+        height = bar.sizeHint().height() if bar is not None else 0
+        if height <= 0:
+            height = self.fontMetrics().height() + 8
+        return max(20, height - 4)
+
     # ─── UI 构建 ───────────────────────────────────────────
 
     def _setup_ui(self):
@@ -293,26 +323,10 @@ class SceneEditorDialog(
         self._btn_canvas_mode.setToolTip(tr("切换画布编辑模式，调整画布范围以排除窗口边框"))
         top_bar.addWidget(self._btn_canvas_mode)
 
-        top_bar.addSpacing(20)
-
-        self._btn_new_group = QPushButton(tr("创建分组"))
-        self._btn_new_group.setToolTip(tr("新建场景分组"))
-        self._btn_new_group.clicked.connect(self._on_new_group)
-        top_bar.addWidget(self._btn_new_group)
-
-        top_bar.addSpacing(20)
-
-        self._btn_new_scene = QPushButton(tr("创建场景"))
-        self._btn_new_scene.setToolTip(tr("在当前分组下新建场景"))
-        self._btn_new_scene.clicked.connect(self._on_new_scene)
-        top_bar.addWidget(self._btn_new_scene)
-
         apply_button_style(
             self._btn_save,
             self._btn_new,
             self._btn_save_as,
-            self._btn_new_group,
-            self._btn_new_scene,
         )
         apply_button_style(
             self._btn_edit,
@@ -364,7 +378,12 @@ class SceneEditorDialog(
         self._group_tab_widget.tabBar().tabMoved.connect(self._on_group_tab_moved)
         self._group_tab_widget.currentChanged.connect(self._on_group_tab_changed)
         self._splitter.addWidget(self._group_tab_widget)
+        # 先建 Tab 再挂 "+"：按钮高度取自 Tab 条，空条量不到真实高度。
         self._rebuild_group_tabs()
+        self._btn_new_group = self._make_tab_add_button(
+            tr("新建场景分组"), self._on_new_group)
+        self._group_tab_widget.setCornerWidget(
+            self._btn_new_group, Qt.Corner.TopRightCorner)
 
         # 底部面板：左侧 OCR 结果区 + 右侧脚本测试器
         self._bottom_splitter = QSplitter(Qt.Orientation.Horizontal)

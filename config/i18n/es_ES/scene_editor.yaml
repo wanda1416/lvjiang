@@ -76,8 +76,6 @@ scene_editor:
   兼容反色: Inverted-color fallback
   分组非空，无法删除: Group is not empty; cannot delete
   切换画布编辑模式，调整画布范围以排除窗口边框: Toggle canvas editing mode to adjust the canvas range, excluding the window border
-  创建分组: Create Group
-  创建场景: Create Scene
   创建坐标: Create Point
   创建定义: Create Definition
   创建引用: Create Reference

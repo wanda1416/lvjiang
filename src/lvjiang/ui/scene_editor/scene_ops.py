@@ -1,6 +1,7 @@
 """场景管理混入类 - 分组/场景 CRUD、右键菜单、Tab 排序"""
 
 import re
+from collections.abc import Callable
 
 from loguru import logger
 from PyQt6.QtCore import Qt
@@ -31,6 +32,7 @@ from ...core.scene.registry import (
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_dialog_button_box_style
 from .scene_tab import SceneTab
+from .tab_add_bar import InlineAddTabWidget
 
 # key 格式校验：小写字母开头，仅含小写字母/数字/下划线
 _RE_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -44,11 +46,14 @@ class _SceneTabPlaceholder(QWidget):
         self.scene_key = scene_key
 
 
-class _SceneGroupTabWidget(QTabWidget):
+class _SceneGroupTabWidget(InlineAddTabWidget):
     """携带稳定分组身份的二级 Tab 容器。"""
 
-    def __init__(self, group_key: str):
-        super().__init__()
+    def __init__(
+        self, group_key: str, tooltip: str,
+        on_click: Callable[[], None],
+    ):
+        super().__init__(tooltip, on_click)
         self.group_key = group_key
 
 
@@ -115,7 +120,11 @@ class SceneOpsMixin:
         self._tabs.clear()
         registry = get_registry()
         for group_key, group_name in registry.get_groups():
-            scene_tab_widget = _SceneGroupTabWidget(group_key)
+            scene_tab_widget = _SceneGroupTabWidget(
+                group_key,
+                tr("在当前分组下新建场景"),
+                lambda _checked=False, gk=group_key: self._on_new_scene(gk),
+            )
             scene_tab_widget.setMovable(True)
             scene_tab_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             scene_tab_widget.customContextMenuRequested.connect(
@@ -128,14 +137,6 @@ class SceneOpsMixin:
             self._group_tabs[group_key] = scene_tab_widget
             idx = self._group_tab_widget.addTab(scene_tab_widget, group_name)
             self._group_tab_widget.setTabToolTip(idx, group_key)
-            # 加完分组页再挂 "+"：按钮高度取自一级 Tab 条，空条量不到真实高度。
-            scene_tab_widget.setCornerWidget(
-                self._make_tab_add_button(
-                    tr("在当前分组下新建场景"),
-                    lambda _checked=False, gk=group_key: self._on_new_scene(gk),
-                ),
-                Qt.Corner.TopRightCorner,
-            )
             # 构建该分组下的场景 Tab
             self._rebuild_scene_tabs(group_key)
         self._group_tab_widget.blockSignals(False)
@@ -154,10 +155,6 @@ class SceneOpsMixin:
             idx = scene_tab_widget.addTab(placeholder, scene_name)
             scene_tab_widget.setTabToolTip(idx, scene_key)
         scene_tab_widget.blockSignals(False)
-        if scene_tab_widget.count() == 0:
-            # 0 页时 Tab 条会塌成 0 高，右侧 "+" 只剩一条浮在内容区上的细边。
-            scene_tab_widget.tabBar().setMinimumHeight(
-                self._tab_add_button_height() + 4)
 
     def _ensure_scene_tab_loaded(self, scene_key: str) -> SceneTab | None:
         """首次访问场景时用真正的 SceneTab 原位替换轻量占位页。"""

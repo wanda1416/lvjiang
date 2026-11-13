@@ -1,6 +1,5 @@
 """编辑器对话框 - 场景编辑器主框架、Tab/画布管理"""
 
-from collections.abc import Callable
 from math import gcd
 
 from loguru import logger
@@ -43,10 +42,7 @@ from ...core.scene.registry import (
 )
 from ...i18n import tr, tr_label
 from ..reference.combo_sizing import set_combo_minimum_character_capacity
-from ..widgets.button_styles import (
-    apply_button_style,
-    apply_compact_button_style,
-)
+from ..widgets.button_styles import apply_button_style
 from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
 from ..widgets.theme import get_theme_manager
 from .layout_ops import LayoutOpsMixin
@@ -54,6 +50,7 @@ from .recognition_ops import RecognitionOpsMixin
 from .scene_ops import SceneOpsMixin
 from .scene_tab import SceneTab
 from .script_ops import ScriptOpsMixin, _InsertEntityButton
+from .tab_add_bar import InlineAddTabWidget
 
 _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY = 8
 
@@ -215,32 +212,6 @@ class SceneEditorDialog(
             return ""
         return tab.selected_entity_key()
 
-    def _make_tab_add_button(
-        self, tooltip: str, slot: Callable[[], None],
-    ) -> QPushButton:
-        """Tab 条末端的 "+"，与 Tab 条同高。
-
-        高度必须固定：0 个 Tab 的空条 sizeHint 高为 0，交给布局算出来按钮
-        会塌成 0 高，新分组就再也建不出第一个场景。
-        """
-        button = QPushButton("+")
-        button.setFixedSize(28, self._tab_add_button_height())
-        button.setToolTip(tooltip)
-        button.setAccessibleName(tooltip)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setAutoDefault(False)
-        apply_compact_button_style(button, variant="neutral")
-        button.clicked.connect(slot)
-        return button
-
-    def _tab_add_button_height(self) -> int:
-        """对齐 Tab 条高度；空 Tab 条的 sizeHint 高为 0，退回字体高度。"""
-        bar = self._group_tab_widget.tabBar()
-        height = bar.sizeHint().height() if bar is not None else 0
-        if height <= 0:
-            height = self.fontMetrics().height() + 8
-        return max(20, height - 4)
-
     # ─── UI 构建 ───────────────────────────────────────────
 
     def _setup_ui(self):
@@ -371,19 +342,15 @@ class SceneEditorDialog(
         self._splitter = QSplitter(Qt.Orientation.Vertical)
 
         # 一级 Tab：分组 Tab
-        self._group_tab_widget = QTabWidget()
+        self._group_tab_widget = InlineAddTabWidget(
+            tr("新建场景分组"), self._on_new_group)
         self._group_tab_widget.setMovable(True)
         self._group_tab_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._group_tab_widget.customContextMenuRequested.connect(self._on_group_tab_context_menu)
         self._group_tab_widget.tabBar().tabMoved.connect(self._on_group_tab_moved)
         self._group_tab_widget.currentChanged.connect(self._on_group_tab_changed)
         self._splitter.addWidget(self._group_tab_widget)
-        # 先建 Tab 再挂 "+"：按钮高度取自 Tab 条，空条量不到真实高度。
         self._rebuild_group_tabs()
-        self._btn_new_group = self._make_tab_add_button(
-            tr("新建场景分组"), self._on_new_group)
-        self._group_tab_widget.setCornerWidget(
-            self._btn_new_group, Qt.Corner.TopRightCorner)
 
         # 底部面板：左侧 OCR 结果区 + 右侧脚本测试器
         self._bottom_splitter = QSplitter(Qt.Orientation.Horizontal)

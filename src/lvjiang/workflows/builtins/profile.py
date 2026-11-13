@@ -402,7 +402,7 @@ def _profile_all(_engine, *args) -> dict:
     走共享读取管线 core.profile.service.profile_read_all()，与 UI 读取路径一致：
     读全部 entry → regen 条目按当前时间计算。
 
-    返回 {model_type: {key: {value, updated_at}}} 结构的字典。
+    返回 {model_type: {key: {value, event_at}}} 结构的字典。
 
     .wf 用法:
         eval $all = profile_all()

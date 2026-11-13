@@ -37,7 +37,7 @@ def test_tick_does_not_materialize_recovery(tmp_path, monkeypatch) -> None:
     if boundary > now:
         boundary -= timedelta(days=1)
     anchor = (boundary - timedelta(minutes=1)).isoformat(timespec="seconds")
-    repository.db_upsert("u1", "regen", "energy", 90, updated_at=anchor)
+    repository.db_upsert("u1", "regen", "energy", 90, event_at=anchor)
 
     from lvjiang.core.profile.engine import ProfileProcessor
 
@@ -47,6 +47,6 @@ def test_tick_does_not_materialize_recovery(tmp_path, monkeypatch) -> None:
 
     entry = repository.db_read_entry("u1", "regen", "energy")
     assert entry["value"] == 90
-    assert entry["updated_at"] == anchor
+    assert entry["event_at"] == anchor
     assert repository.db_get_history("u1", "regen", "energy") == []
     repository.reset_profile_db()

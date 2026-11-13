@@ -317,6 +317,39 @@ def _migrate_v11(conn: sqlite3.Connection) -> None:
     _rewrite_entries_v11(conn)
 
 
+def _migrate_v12(conn: sqlite3.Connection) -> None:
+    """统一账本字段命名（原地 ALTER，不搬数据），与云端保持同构。
+
+    云端已用同一套列名，本地因此成为云端的子集（只少 account_id）。
+    时间语义：``event_at`` 为业务事件时刻，``created_at`` 为真实写入时刻。
+    """
+
+    def columns(table: str) -> set[str]:
+        return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+    entry_cols = columns("profile_entries")
+    if "updated_at" in entry_cols and "event_at" not in entry_cols:
+        conn.execute("ALTER TABLE profile_entries RENAME COLUMN updated_at TO event_at")
+    if "updated_time" in entry_cols and "created_at" not in entry_cols:
+        conn.execute("ALTER TABLE profile_entries RENAME COLUMN updated_time TO created_at")
+
+    history_cols = columns("profile_history")
+    for old, new in (("ts", "event_at"), ("change_type", "op_type"),
+                     ("device_id", "instance_id"), ("id", "local_id"),
+                     ("new_value_text", "value_text")):
+        if old in history_cols and new not in history_cols:
+            conn.execute(f"ALTER TABLE profile_history RENAME COLUMN {old} TO {new}")
+            history_cols.discard(old)
+            history_cols.add(new)
+    if "created_at" not in history_cols:
+        conn.execute("ALTER TABLE profile_history ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
+        # 旧行不知道真实写入时刻，用事件时刻回填（唯一可用的近似值）。
+        conn.execute("UPDATE profile_history SET created_at = event_at")
+    # 已被 local_id 取代的簿记列：直接丢弃（不是业务数据）。
+    if "origin_local_id" in history_cols:
+        conn.execute("ALTER TABLE profile_history DROP COLUMN origin_local_id")
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
@@ -330,6 +363,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (9, "history becomes sync ledger; drop audit tables", _migrate_v9),
     (10, "history gains origin row identity", _migrate_v10),
     (11, "profile set-only in-place", _migrate_v11),
+    (12, "unify profile ledger columns with cloud", _migrate_v12),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -342,19 +376,19 @@ CURRENT_VERSION = MIGRATIONS[-1][0]
 
 #: SELECT 的列顺序；``_history_row`` 与它一一对应，改这里要同时改那边。
 _HISTORY_COLUMNS = (
-    "id, ts, username, type, key, old_value, new_value, "
-    "old_value_text, new_value_text, change_type, delta_value, source, sync_from, "
-    "device_id, op_id, remote_id"
+    "local_id, event_at, username, type, key, old_value, new_value, "
+    "old_value_text, value_text, op_type, delta_value, source, sync_from, "
+    "instance_id, op_id, remote_id"
 )
 
 #: 聚合候选的维度表达式。``key`` 是「模型:key」，与 UI 的「键」列同一口径。
 _FACET_COLUMNS = {
     "username": "username",
     "key": "type || ':' || key",
-    "change_type": "change_type",
+    "op_type": "op_type",
     "source": "COALESCE(source, '')",
     "sync_from": "COALESCE(sync_from, '')",
-    "device": "COALESCE(device_id, '')",
+    "device": "COALESCE(instance_id, '')",
 }
 
 #: 变动量：优先用记账时写下的 ``delta_value``；没有就按新旧值补算；两者都
@@ -370,10 +404,10 @@ _DELTA_COMPARATORS = {"pos": " > 0", "neg": " < 0", "zero": " = 0"}
 
 #: 允许的排序：白名单，绝不拼接调用方传入的字符串。
 _HISTORY_ORDERS = {
-    "id_desc": "id DESC",
-    "id_asc": "id ASC",
-    "ts_desc": "ts DESC, id DESC",
-    "ts_asc": "ts ASC, id ASC",
+    "id_desc": "local_id DESC",
+    "id_asc": "local_id ASC",
+    "ts_desc": "event_at DESC, local_id DESC",
+    "ts_asc": "event_at ASC, local_id ASC",
 }
 
 _ESCAPE = "ESCAPE '\\'"
@@ -394,10 +428,16 @@ def _like_pattern(text: str) -> str:
 
 
 def _value_text_clause(column: str) -> str:
-    """文本值与数值都按"包含"匹配：数值列 CAST 成文本再比。"""
+    """文本值与数值都按"包含"匹配：数值列 CAST 成文本再比。
+
+    ``new`` 的文本列统一叫 ``value_text``（与云端同构），旧值文本仍是
+    ``old_value_text``。
+    """
+    text_col = "value_text" if column == "new" else "old_value_text"
+    number_col = "new_value" if column == "new" else "old_value"
     return (
-        f"(COALESCE({column}_value_text, '') LIKE ? {_ESCAPE} "
-        f"OR CAST({column}_value AS TEXT) LIKE ? {_ESCAPE})"
+        f"(COALESCE({text_col}, '') LIKE ? {_ESCAPE} "
+        f"OR CAST({number_col} AS TEXT) LIKE ? {_ESCAPE})"
     )
 
 
@@ -421,7 +461,7 @@ def _history_where(query: HistoryQuery) -> tuple[str, list[object]]:
         clauses.append(f"key IN ({_marks(len(query.key_names))})")
         params.extend(query.key_names)
     if query.change_types:
-        clauses.append(f"change_type IN ({_marks(len(query.change_types))})")
+        clauses.append(f"op_type IN ({_marks(len(query.change_types))})")
         params.extend(query.change_types)
     if query.sources:
         clauses.append(f"COALESCE(source, '') IN ({_marks(len(query.sources))})")
@@ -432,13 +472,13 @@ def _history_where(query: HistoryQuery) -> tuple[str, list[object]]:
         params.extend(query.sync_froms)
     if query.devices:
         clauses.append(
-            f"COALESCE(device_id, '') IN ({_marks(len(query.devices))})")
+            f"COALESCE(instance_id, '') IN ({_marks(len(query.devices))})")
         params.extend(query.devices)
     if query.ts_from:
-        clauses.append("ts >= ?")
+        clauses.append("event_at >= ?")
         params.append(query.ts_from)
     if query.ts_until:
-        clauses.append("ts < ?")
+        clauses.append("event_at < ?")
         params.append(query.ts_until)
     if query.delta_scope != "all":
         clauses.append(_DELTA_AMOUNT_SQL + _DELTA_COMPARATORS[query.delta_scope])
@@ -458,7 +498,7 @@ def _history_where(query: HistoryQuery) -> tuple[str, list[object]]:
                 f"type LIKE ? {_ESCAPE}",
                 f"key LIKE ? {_ESCAPE}",
                 f"COALESCE(old_value_text, '') LIKE ? {_ESCAPE}",
-                f"COALESCE(new_value_text, '') LIKE ? {_ESCAPE}",
+                f"COALESCE(value_text, '') LIKE ? {_ESCAPE}",
             ])
             params.extend([pattern] * len(parts))
         for model_type, key in query.key_matches:
@@ -490,20 +530,19 @@ def _single_history_query(
 def _record_history(
     conn: sqlite3.Connection,
     *,
-    ts: str,
+    event_at: str,
     username: str,
     type_: str,
     key: str,
     old_value: float | None,
     new_value: float,
     old_value_text: str = "",
-    new_value_text: str = "",
-    change_type: str,
+    value_text: str = "",
+    op_type: str,
     delta_value: float | None = None,
     source: str = "",
     sync_from: str | None = None,
-    device_id: str,
-    origin_local_id: int | None = None,
+    instance_id: str,
     op_id: str | None = None,
     remote_id: int | None = None,
 ) -> str | None:
@@ -517,23 +556,20 @@ def _record_history(
     identity = op_id or str(uuid.uuid4())
     cursor = conn.execute(
         "INSERT INTO profile_history "
-        "(ts, username, type, key, old_value, new_value, "
-        "old_value_text, new_value_text, change_type, delta_value, source, "
-        "sync_from, device_id, origin_local_id, op_id, remote_id) "
+        "(event_at, username, type, key, old_value, new_value, "
+        "old_value_text, value_text, op_type, delta_value, source, "
+        "sync_from, instance_id, op_id, remote_id, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(op_id) DO NOTHING",
-        (ts, username, type_, key, old_value, float(new_value),
-         old_value_text or "", new_value_text or "",
-         change_type, delta_value, source, sync_from, device_id, origin_local_id,
-         identity, remote_id),
+        (event_at, username, type_, key, old_value, float(new_value),
+         old_value_text or "", value_text or "",
+         op_type, delta_value, source, sync_from, instance_id,
+         identity, remote_id,
+         # created_at：真实写入时刻（审计用，不参与任何裁决）
+         datetime.now().isoformat(timespec="seconds")),
     )
     if not cursor.rowcount:
         return None
-    if origin_local_id is None:
-        conn.execute(
-            "UPDATE profile_history SET origin_local_id=? WHERE id=?",
-            (cursor.lastrowid, cursor.lastrowid),
-        )
     return identity
 
 
@@ -678,7 +714,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             row = conn.execute(
-                "SELECT value, value_text, updated_at, updated_time, locked, op_id "
+                "SELECT value, value_text, event_at, created_at, locked, op_id "
                 "FROM profile_entries WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
@@ -688,7 +724,7 @@ class ProfileDB:
         if row is None:
             return {}
         entry = {"value": row[0], "value_text": row[1],
-                 "updated_at": row[2], "updated_time": row[3],
+                 "event_at": row[2], "created_at": row[3],
                  "op_id": row[5] or ""}
         if row[4]:
             entry["locked"] = True
@@ -697,13 +733,13 @@ class ProfileDB:
     def get_all(self, username: str) -> dict[str, dict[str, dict]]:
         """读取用户全部 profile
 
-        Returns: {type: {key: {value, value_text, updated_at[, locked]}}}
+        Returns: {type: {key: {value, value_text, event_at[, locked]}}}
         格式与早期 user.json 的 profile 节点兼容；只有锁定条目带 ``locked``。
         """
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT type, key, value, value_text, updated_at, updated_time, locked, op_id "
+                "SELECT type, key, value, value_text, event_at, created_at, locked, op_id "
                 "FROM profile_entries WHERE username=?",
                 (username,),
             ).fetchall()
@@ -711,13 +747,13 @@ class ProfileDB:
             self._release_connection(conn)
 
         result: dict[str, dict[str, dict]] = {}
-        for type_, key, value, value_text, updated_at, updated_time, locked, op_id in rows:
+        for type_, key, value, value_text, event_at, created_at, locked, op_id in rows:
             model_data = result.setdefault(type_, {})
             entry = {
                 "value": value,
                 "value_text": value_text,
-                "updated_at": updated_at,
-                "updated_time": updated_time,
+                "event_at": event_at,
+                "created_at": created_at,
                 "op_id": op_id or "",
             }
             if locked:
@@ -743,7 +779,7 @@ class ProfileDB:
     def set_locked(self, username: str, type_: str, key: str) -> bool:
         """锁定该用户的这个 key；返回是否发生了变化。
 
-        从未写过的 key 也要能锁：插入一条占位行（value/value_text/updated_at
+        从未写过的 key 也要能锁：插入一条占位行（value/value_text/event_at
         全为默认空值），锁定期间这些值不会被任何路径读取或展示。
         """
         conn = self._borrow_connection()
@@ -764,7 +800,7 @@ class ProfileDB:
                 if exists is None:
                     conn.execute(
                         "INSERT INTO profile_entries "
-                        "(username, type, key, value, value_text, updated_at, updated_time, locked) "
+                        "(username, type, key, value, value_text, event_at, created_at, locked) "
                         "VALUES (?, ?, ?, 0, '', '', '', 1)",
                         (username, type_, key),
                     )
@@ -812,13 +848,13 @@ class ProfileDB:
             for row in rows:
                 username, type_, key = row["username"], row["type"], row["key"]
                 current = conn.execute(
-                    "SELECT value, value_text, updated_at, op_id, locked "
+                    "SELECT value, value_text, event_at, op_id, locked "
                     "FROM profile_entries WHERE username=? AND type=? AND key=?",
                     (username, type_, key),
                 ).fetchone()
                 if current is not None and current[4]:
                     continue
-                event_at = canonical_event(row.get("updated_at") or "")
+                event_at = canonical_event(row.get("event_at") or "")
                 op_id = str(row.get("op_id") or "")
                 if current is not None and not is_strictly_newer(
                         event_at, op_id, current[2] or "", current[3] or ""):
@@ -828,11 +864,11 @@ class ProfileDB:
                 text = row.get("value_text") or ""
                 conn.execute(
                     "INSERT INTO profile_entries "
-                    "(username, type, key, value, value_text, updated_at, updated_time, op_id) "
+                    "(username, type, key, value, value_text, event_at, created_at, op_id) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(username, type, key) DO UPDATE SET "
                     "value=excluded.value, value_text=excluded.value_text, "
-                    "updated_at=excluded.updated_at, updated_time=excluded.updated_time, "
+                    "event_at=excluded.event_at, created_at=excluded.created_at, "
                     "op_id=excluded.op_id",
                     (username, type_, key, number, text, event_at, now, op_id),
                 )
@@ -853,14 +889,14 @@ class ProfileDB:
         type_: str,
         key: str,
         value: float | int,
-        updated_at: str | None = None,
-        change_type: str | None = None,
+        event_at: str | None = None,
+        op_type: str | None = None,
         delta_value: float | None = None,
         source: str = "",
         value_text: str = "",
         sync_from: str | None = None,
         *,
-        device_id: str | None = None,
+        instance_id: str | None = None,
         origin_local_id: int | None = None,
         history_ts: str | None = None,
         op_id: str | None = None,
@@ -869,11 +905,11 @@ class ProfileDB:
     ) -> None:
         """写入单条 entry（ON CONFLICT 更新，不用 INSERT OR REPLACE）
 
-        change_type 非 None 时记录 history（内部对比 old/new 值，无变化跳过）。
+        op_type 非 None 时记录 history（内部对比 old/new 值，无变化跳过）。
         source: 变更来源描述，随 history 一并记录。
         value_text: note 模型存储文本，其他模型传默认空串。
 
-        跨端回放必须显式传 ``device_id``（来源实例）、``origin_local_id``
+        跨端回放必须显式传 ``instance_id``（来源实例）、``origin_local_id``
         （来源实例的 local_id）与 ``history_ts``（源写入时刻）：缺省值会把
         回放行记成本机操作，下一轮上行就代传出去。
 
@@ -881,7 +917,7 @@ class ProfileDB:
         锁冲突抛 sqlite3.OperationalError。
         """
         write_ts = datetime.now().isoformat(timespec="seconds")
-        ts = updated_at or write_ts
+        event_at = event_at or write_ts
         conn = self._borrow_connection()
         try:
             self._begin(conn)
@@ -905,18 +941,18 @@ class ProfileDB:
                 # 显式列更新，锁定列不在 SET 里，不会被清掉
                 conn.execute(
                     "INSERT INTO profile_entries "
-                    "(username, type, key, value, value_text, updated_at, updated_time) "
+                    "(username, type, key, value, value_text, event_at, created_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(username, type, key) DO UPDATE SET "
                     "value=excluded.value, value_text=excluded.value_text, "
-                    "updated_at=excluded.updated_at, updated_time=excluded.updated_time",
-                    (username, type_, key, float(value), value_text, ts, write_ts),
+                    "event_at=excluded.event_at, created_at=excluded.created_at",
+                    (username, type_, key, float(value), value_text, event_at, write_ts),
                 )
 
             # history 记录
-            if change_type is not None:
+            if op_type is not None:
                 should_record = False
-                if change_type in ("set", "delta", "reset"):
+                if op_type in ("set", "delta", "reset"):
                     # 用户主动操作始终记录
                     should_record = True
                 elif type_ == "note":
@@ -930,14 +966,13 @@ class ProfileDB:
                 if should_record:
                     written = _record_history(
                         conn,
-                        ts=history_ts or write_ts,
+                        event_at=history_ts or write_ts,
                         username=username, type_=type_, key=key,
                         old_value=old_value, new_value=float(value),
-                        old_value_text=old_value_text or "", new_value_text=value_text,
-                        change_type=change_type, delta_value=delta_value,
+                        old_value_text=old_value_text or "", value_text=value_text,
+                        op_type=op_type, delta_value=delta_value,
                         source=source, sync_from=sync_from,
-                        device_id=device_id or _author_stamp(),
-                        origin_local_id=origin_local_id,
+                        instance_id=instance_id or _author_stamp(),
                         op_id=op_id,
                         remote_id=remote_id,
                     )
@@ -963,7 +998,7 @@ class ProfileDB:
     ) -> None:
         """批量 upsert（事务包裹），用于 tick 写入
 
-        entries 元素: (type_, key, value, updated_at, change_type, delta_value[, source[, value_text[, sync_from]]])
+        entries 元素: (type_, key, value, event_at, op_type, delta_value[, source[, value_text[, sync_from]]])
         """
         conn = self._borrow_connection()
         try:
@@ -972,10 +1007,10 @@ class ProfileDB:
             for entry in entries:
                 source = entry[6] if len(entry) > 6 else ""
                 value_text = entry[7] if len(entry) > 7 else ""
-                type_, key, value, updated_at, change_type, delta_value = entry[:6]
+                type_, key, value, event_at, op_type, delta_value = entry[:6]
                 sync_from = entry[8] if len(entry) > 8 else None
                 write_ts = datetime.now().isoformat(timespec="seconds")
-                ts = updated_at or write_ts
+                event_at = event_at or write_ts
 
                 old_row = conn.execute(
                     "SELECT value, value_text, locked FROM profile_entries "
@@ -993,17 +1028,17 @@ class ProfileDB:
 
                 conn.execute(
                     "INSERT INTO profile_entries "
-                    "(username, type, key, value, value_text, updated_at, updated_time) "
+                    "(username, type, key, value, value_text, event_at, created_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(username, type, key) DO UPDATE SET "
                     "value=excluded.value, value_text=excluded.value_text, "
-                    "updated_at=excluded.updated_at, updated_time=excluded.updated_time",
-                    (username, type_, key, float(value), value_text, ts, write_ts),
+                    "event_at=excluded.event_at, created_at=excluded.created_at",
+                    (username, type_, key, float(value), value_text, event_at, write_ts),
                 )
 
-                if change_type is not None:
+                if op_type is not None:
                     should_record = False
-                    if change_type in ("set", "delta", "reset"):
+                    if op_type in ("set", "delta", "reset"):
                         should_record = True
                     elif type_ == "note":
                         if old_value_text != value_text:
@@ -1014,14 +1049,14 @@ class ProfileDB:
                     if should_record:
                         _record_history(
                             conn,
-                            ts=write_ts,
+                            event_at=write_ts,
                             username=username, type_=type_, key=key,
                             old_value=old_value, new_value=float(value),
                             old_value_text=old_value_text or "",
-                            new_value_text=value_text,
-                            change_type=change_type, delta_value=delta_value,
+                            value_text=value_text,
+                            op_type=op_type, delta_value=delta_value,
                             source=source, sync_from=sync_from,
-                            device_id=_author_stamp(),
+                            instance_id=_author_stamp(),
                         )
 
             self._commit(conn)
@@ -1039,14 +1074,14 @@ class ProfileDB:
         expected_entry_exists: bool = True,
         new_value: float | int,
         new_updated_at: str | None = None,
-        change_type: str | None = None,
+        op_type: str | None = None,
         delta_value: float | None = None,
         source: str = "",
         sync_from: str | None = None,
     ) -> bool:
         """CAS 更新单条 entry。
 
-        仅当当前条目的存在状态、value 与 updated_at 仍等于调用方
+        仅当当前条目的存在状态、value 与 event_at 仍等于调用方
         读到的快照时才写入。预期条目不存在时使用原子插入；若已被
         其他进程先行创建，则仍返回冲突。
         返回 True 表示更新成功；False 表示状态已被其他进程修改，本轮调用方应放弃。
@@ -1054,18 +1089,18 @@ class ProfileDB:
         old_value = float(expected_value)
         value = float(new_value)
         write_ts = datetime.now().isoformat(timespec="seconds")
-        ts = new_updated_at or write_ts
+        event_at = new_updated_at or write_ts
         conn = self._borrow_connection()
         try:
             self._begin(conn)
             if expected_entry_exists:
                 cursor = conn.execute(
                     "UPDATE profile_entries "
-                    "SET value=?, updated_at=?, updated_time=? "
+                    "SET value=?, event_at=?, created_at=? "
                     "WHERE username=? AND type=? AND key=? "
-                    "AND value=? AND updated_at=? AND locked=0",
+                    "AND value=? AND event_at=? AND locked=0",
                     (
-                        value, ts, write_ts, username, type_, key,
+                        value, event_at, write_ts, username, type_, key,
                         old_value, expected_updated_at,
                     ),
                 )
@@ -1073,19 +1108,19 @@ class ProfileDB:
             else:
                 cursor = conn.execute(
                     "INSERT INTO profile_entries "
-                    "(username, type, key, value, value_text, updated_at, updated_time) "
+                    "(username, type, key, value, value_text, event_at, created_at) "
                     "VALUES (?, ?, ?, ?, '', ?, ?) "
                     "ON CONFLICT(username, type, key) DO NOTHING",
-                    (username, type_, key, value, ts, write_ts),
+                    (username, type_, key, value, event_at, write_ts),
                 )
                 history_old_value = None
             if cursor.rowcount != 1:
                 self._rollback(conn)
                 return False
 
-            if change_type is not None:
+            if op_type is not None:
                 should_record = False
-                if change_type in ("set", "delta", "reset"):
+                if op_type in ("set", "delta", "reset"):
                     should_record = True
                 elif history_old_value != value:
                     should_record = True
@@ -1093,12 +1128,13 @@ class ProfileDB:
                 if should_record:
                     written = _record_history(
                         conn,
-                        ts=write_ts,
+                        # 与 entry 用同一个事件时间：同一个写入只有一个业务时刻
+                        event_at=event_at,
                         username=username, type_=type_, key=key,
                         old_value=history_old_value, new_value=value,
-                        change_type=change_type, delta_value=delta_value,
+                        op_type=op_type, delta_value=delta_value,
                         source=source, sync_from=sync_from,
-                        device_id=_author_stamp(),
+                        instance_id=_author_stamp(),
                     )
                     if written:
                         conn.execute(
@@ -1179,14 +1215,14 @@ class ProfileDB:
         params: list[object] = [username, type_, key]
         # 老历史可能未记录 delta；由已有旧新值计算，不写回历史。
         amount = 'COALESCE(delta_value, new_value - COALESCE(old_value, 0))'
-        for column, value, comparator in (('source', source, '='), ('ts', since, '>='), ('ts', until, '<')):
+        for column, value, comparator in (('source', source, '='), ('event_at', since, '>='), ('event_at', until, '<')):
             if value is not None:
                 conditions.append(f'{column}{comparator}?')
                 params.append(value)
         if change_types is not None:
             if not change_types:
                 return 0.0
-            conditions.append('change_type IN (' + ','.join('?' for _ in change_types) + ')')
+            conditions.append('op_type IN (' + ','.join('?' for _ in change_types) + ')')
             params.extend(change_types)
         if direction != 'all':
             conditions.append(amount + (' > 0' if direction == 'pos' else ' < 0'))
@@ -1204,12 +1240,12 @@ class ProfileDB:
     def _history_row(row: tuple) -> dict:
         """历史行 → dict；列顺序由 ``_HISTORY_COLUMNS`` 决定。"""
         return {
-            "id": row[0], "ts": row[1], "username": row[2],
+            "local_id": row[0], "event_at": row[1], "username": row[2],
             "type": row[3], "key": row[4],
             "old_value": row[5], "new_value": row[6],
-            "old_value_text": row[7] or "", "new_value_text": row[8] or "",
-            "change_type": row[9], "delta_value": row[10], "source": row[11],
-            "sync_from": row[12], "device_id": row[13] or "",
+            "old_value_text": row[7] or "", "value_text": row[8] or "",
+            "op_type": row[9], "delta_value": row[10], "source": row[11],
+            "sync_from": row[12], "instance_id": row[13] or "",
             "op_id": row[14] or "",
             "remote_id": row[15],
         }
@@ -1334,7 +1370,7 @@ class ProfileDB:
         """本地 history 当前最大 id（无历史时为 0）。"""
         conn = self._borrow_connection()
         try:
-            row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM profile_history").fetchone()
+            row = conn.execute("SELECT COALESCE(MAX(local_id), 0) FROM profile_history").fetchone()
         finally:
             self._release_connection(conn)
         return int(row[0]) if row else 0
@@ -1354,12 +1390,12 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT id, username, type, key, new_value, new_value_text, "
-                "change_type, delta_value, ts, source "
+                "SELECT local_id, username, type, key, new_value, value_text, "
+                "op_type, delta_value, event_at, source "
                 "FROM profile_history "
-                "WHERE id>? AND change_type IN ('set', 'delta')"
-                + (" AND device_id=?" if author else "") +
-                " ORDER BY id ASC LIMIT ?",
+                "WHERE local_id>? AND op_type IN ('set', 'delta')"
+                + (" AND instance_id=?" if author else "") +
+                " ORDER BY local_id ASC LIMIT ?",
                 ((since_id, author, limit) if author else (since_id, limit)),
             ).fetchall()
         finally:
@@ -1367,8 +1403,8 @@ class ProfileDB:
         return [
             {
                 "id": r[0], "username": r[1], "type": r[2], "key": r[3],
-                "new_value": r[4], "new_value_text": r[5] or "",
-                "change_type": r[6], "delta_value": r[7], "ts": r[8],
+                "new_value": r[4], "value_text": r[5] or "",
+                "op_type": r[6], "delta_value": r[7], "event_at": r[8],
                 "source": r[9] or "",
             }
             for r in rows
@@ -1379,7 +1415,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             row = conn.execute(
-                f"SELECT {_HISTORY_COLUMNS} FROM profile_history WHERE id=?",
+                f"SELECT {_HISTORY_COLUMNS} FROM profile_history WHERE local_id=?",
                 (history_id,),
             ).fetchone()
         finally:
@@ -1394,7 +1430,7 @@ class ProfileDB:
         try:
             cursor = conn.execute(
                 "UPDATE profile_history SET source=? "
-                "WHERE id=? AND COALESCE(source, '')=?",
+                "WHERE local_id=? AND COALESCE(source, '')=?",
                 (new_source, history_id, expected_source),
             )
             self._commit(conn)
@@ -1418,8 +1454,8 @@ class ProfileDB:
         try:
             row = conn.execute(
                 "SELECT COUNT(*) FROM profile_history "
-                "WHERE device_id=? AND remote_id IS NULL "
-                "AND change_type IN ('set','delta') "
+                "WHERE instance_id=? AND remote_id IS NULL "
+                "AND op_type IN ('set','delta') "
                 "AND op_id NOT LIKE 'unscoped:%'",
                 (author,),
             ).fetchone()
@@ -1434,8 +1470,8 @@ class ProfileDB:
             self._begin(conn)
             conn.execute(
                 "UPDATE profile_history SET remote_id=NULL "
-                "WHERE device_id=? AND remote_id=-1 "
-                "AND change_type IN ('set', 'delta') "
+                "WHERE instance_id=? AND remote_id=-1 "
+                "AND op_type IN ('set', 'delta') "
                 "AND op_id NOT LIKE 'unscoped:%'",
                 (author,),
             )
@@ -1451,13 +1487,13 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT id, op_id, username, type, key, new_value, new_value_text, "
-                "change_type, ts, source, origin_local_id "
+                "SELECT local_id, op_id, username, type, key, new_value, value_text, "
+                "op_type, event_at, source "
                 "FROM profile_history "
-                "WHERE device_id=? AND remote_id IS NULL "
-                "AND change_type IN ('set', 'delta') "
+                "WHERE instance_id=? AND remote_id IS NULL "
+                "AND op_type IN ('set', 'delta') "
                 "AND op_id NOT LIKE 'unscoped:%' "
-                "ORDER BY id ASC LIMIT ?",
+                "ORDER BY local_id ASC LIMIT ?",
                 (author, limit),
             ).fetchall()
         finally:
@@ -1465,8 +1501,8 @@ class ProfileDB:
         return [
             {
                 "id": row[0], "op_id": row[1], "username": row[2], "type": row[3],
-                "key": row[4], "new_value": row[5], "new_value_text": row[6] or "",
-                "change_type": row[7], "ts": row[8], "source": row[9] or "",
+                "key": row[4], "new_value": row[5], "value_text": row[6] or "",
+                "op_type": row[7], "event_at": row[8], "source": row[9] or "",
                 "origin_local_id": row[10] if row[10] is not None else row[0],
             }
             for row in rows
@@ -1481,7 +1517,7 @@ class ProfileDB:
             self._begin(conn)
             conn.executemany(
                 "UPDATE profile_history SET remote_id=? "
-                "WHERE id=? AND remote_id IS NULL",
+                "WHERE local_id=? AND remote_id IS NULL",
                 [(remote_id, history_id) for history_id, remote_id in pairs],
             )
             self._commit(conn)
@@ -1505,7 +1541,7 @@ class ProfileDB:
             self._release_connection(conn)
 
     def users_with_history_since(self, since_ts: str, author: str = "") -> set[str]:
-        """ts 晚于 ``since_ts`` 的 history 行涉及的用户集合（快照覆盖告警用）。
+        """event_at 晚于 ``since_ts`` 的 history 行涉及的用户集合（快照覆盖告警用）。
 
         ``author`` 非空时只算该作者写的行：跨端回放行同样落在这张表里，把它们
         算进来会让用户"看起来有未推送的新数据"，白白弹一次覆盖确认。
@@ -1513,32 +1549,11 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT DISTINCT username FROM profile_history WHERE ts > ?"
-                + (" AND device_id=?" if author else ""),
+                "SELECT DISTINCT username FROM profile_history WHERE event_at > ?"
+                + (" AND instance_id=?" if author else ""),
                 (since_ts, author) if author else (since_ts,),
             ).fetchall()
             return {row[0] for row in rows if row[0]}
-        finally:
-            self._release_connection(conn)
-
-    def ledger_op_seen(self, device_id: str, origin_local_id: int) -> bool:
-        """这条账本操作是否已经落过本地（回放幂等判据）。
-
-        判据是行身份 ``(device_id, origin_local_id)``，不是本地自增 id：库重建
-        后本地 id 会重新编号，而 ``origin_local_id`` 由来源设备给出、重建前后
-        一致。因此同一台设备自己推上去的 op 回声回来时也天然命中，不再需要
-        "id 匹配 + 内容指纹" 那套启发式。
-        """
-        if not device_id or not origin_local_id:
-            return False
-        conn = self._borrow_connection()
-        try:
-            row = conn.execute(
-                "SELECT 1 FROM profile_history "
-                "WHERE device_id=? AND origin_local_id=? LIMIT 1",
-                (device_id, origin_local_id),
-            ).fetchone()
-            return row is not None
         finally:
             self._release_connection(conn)
 
@@ -1547,7 +1562,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             cursor = conn.execute(
-                'DELETE FROM profile_history WHERE id=? AND username=? AND type=? AND key=?',
+                'DELETE FROM profile_history WHERE local_id=? AND username=? AND type=? AND key=?',
                 (history_id, username, type_, key),
             )
             self._commit(conn)
@@ -1566,7 +1581,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             cursor = conn.execute(
-                "DELETE FROM profile_history WHERE ts < ?",
+                "DELETE FROM profile_history WHERE event_at < ?",
                 (cutoff,),
             )
             self._commit(conn)
@@ -1650,24 +1665,23 @@ def db_upsert(
     type_: str,
     key: str,
     value: float | int,
-    updated_at: str | None = None,
-    change_type: str | None = None,
+    event_at: str | None = None,
+    op_type: str | None = None,
     delta_value: float | None = None,
     source: str = "",
     value_text: str = "",
     sync_from: str | None = None,
     *,
-    device_id: str | None = None,
-    origin_local_id: int | None = None,
+    instance_id: str | None = None,
     history_ts: str | None = None,
     op_id: str | None = None,
     remote_id: int | None = None,
     touch_entry: bool = True,
 ) -> None:
     get_profile_db().upsert(
-        username, type_, key, value, updated_at, change_type, delta_value,
+        username, type_, key, value, event_at, op_type, delta_value,
         source, value_text, sync_from,
-        device_id=device_id, origin_local_id=origin_local_id,
+        instance_id=instance_id,
         history_ts=history_ts, op_id=op_id, remote_id=remote_id,
         touch_entry=touch_entry)
 
@@ -1686,7 +1700,7 @@ def db_update_if_current(
     expected_entry_exists: bool = True,
     new_value: float | int,
     new_updated_at: str | None = None,
-    change_type: str | None = None,
+    op_type: str | None = None,
     delta_value: float | None = None,
     source: str = "",
     sync_from: str | None = None,
@@ -1700,7 +1714,7 @@ def db_update_if_current(
         expected_entry_exists=expected_entry_exists,
         new_value=new_value,
         new_updated_at=new_updated_at,
-        change_type=change_type,
+        op_type=op_type,
         delta_value=delta_value,
         sync_from=sync_from,
         source=source,
@@ -1808,10 +1822,9 @@ def db_op_id_seen(op_id: str) -> bool:
     return get_profile_db().op_id_seen(op_id)
 
 
-def db_ledger_op_seen(device_id: str, origin_local_id: int) -> bool:
-    """该设备的这条操作是否已落过本地（回放幂等判据）。"""
-    return get_profile_db().ledger_op_seen(device_id, origin_local_id)
-
-
 def db_cleanup_history(days: int = 90) -> int:
     return get_profile_db().cleanup_history(days)
+
+
+
+

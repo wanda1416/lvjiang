@@ -75,7 +75,7 @@ def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
     repository.reset_profile_db()
     repository.db_upsert(
         "tester", "quota", "daily", 0,
-        updated_at=(datetime.now() - timedelta(days=2)).isoformat(),
+        event_at=(datetime.now() - timedelta(days=2)).isoformat(),
     )
     kd = QuotaKeyDef(key="daily", label="每日", period="day",
                      change_script="profile/change.wf")
@@ -86,7 +86,7 @@ def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
     engine.ProfileProcessor._tick_user(worker, "tester", config)
     # 周期到期：即使 0→0 也要落库归零并触发同步脚本
     assert len(events) == 1
-    assert events[0].change_type == "reset"
+    assert events[0].op_type == "reset"
     engine.ProfileProcessor._tick_user(worker, "tester", config)
     # 已落在本周期，第二次不再重置
     assert len(events) == 1
@@ -193,7 +193,7 @@ def test_cas_conflict_rolls_back_synchronous_children(tmp_path, monkeypatch):
     runner = _install_runner(tmp_path, monkeypatch, wf)
     with pytest.raises(ProfileWriteConflict):
         profile_action('tester', 'source', delta=1, use_cas=True,
-                       expected_entry={'value': 0, 'updated_at': 'stale'})
+                       expected_entry={'value': 0, 'event_at': 'stale'})
     assert profile_read('tester', 'target') is None
     assert not repository.db_get_history('tester')
     runner.request_stop()
@@ -299,7 +299,7 @@ def test_runner_submit_is_non_blocking_and_events_run_in_fifo_order(
         new_value=1,
         delta=1,
         source="test",
-        change_type="set",
+        op_type="set",
         script="profile/test.wf",
         origin_key=key,
         origin_model="stock",

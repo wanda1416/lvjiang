@@ -47,11 +47,11 @@ def test_undo_delta_record_writes_reverse_delta(undo_env):
     record = _history("u", "stock", "credits")[0]
     assert profile_read("u", "credits") == 5
 
-    undo_profile_history(record["id"])
+    undo_profile_history(record["local_id"])
 
     assert profile_read("u", "credits") == 0
     latest = _history("u", "stock", "credits")[0]
-    assert latest["change_type"] == "set"
+    assert latest["op_type"] == "set"
     assert latest["new_value"] == 0
     assert latest["source"] == "撤销：手动登记"
 
@@ -66,9 +66,9 @@ def test_undo_set_record_restores_previous_value(undo_env):
     profile_action("u", "credits", delta=5, source="先攒分")
     profile_action("u", "credits", set_value=2, source="扫描到的真实值")
     record = _history("u", "stock", "credits")[0]
-    assert record["change_type"] == "set"
+    assert record["op_type"] == "set"
 
-    undo_profile_history(record["id"])
+    undo_profile_history(record["local_id"])
 
     assert profile_read("u", "credits") == 5
     latest = _history("u", "stock", "credits")[0]
@@ -86,11 +86,11 @@ def test_undo_note_writes_back_old_text(undo_env):
     profile_action("u", "memo", set_value="新内容", source="第二次")
     record = _history("u", "note", "memo")[0]
 
-    undo_profile_history(record["id"])
+    undo_profile_history(record["local_id"])
 
     assert profile_read("u", "memo") == "旧内容"
     latest = _history("u", "note", "memo")[0]
-    assert latest["change_type"] == "set"
+    assert latest["op_type"] == "set"
     assert latest["source"] == "撤销：第二次"
 
 
@@ -106,4 +106,4 @@ def test_undo_refuses_stale_record(undo_env):
     profile_action("u", "credits", delta=-1, source="第二笔")
 
     with pytest.raises(ProfileOperationRefused):
-        undo_profile_history(record["id"])
+        undo_profile_history(record["local_id"])

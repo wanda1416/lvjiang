@@ -24,7 +24,7 @@ VALID_BOUNDARY_PERIODS = ("minute", "hour", "day", "week")
 @dataclass(frozen=True)
 class RegenResult:
     value: float
-    updated_at: str
+    event_at: str
     persisted: bool
 
 
@@ -61,13 +61,13 @@ def _parse_entry_time(value: str) -> datetime | None:
 
 def compute_realtime_value(
     stored_value: float,
-    updated_at: str,
+    event_at: str,
     kd: RegenKeyDef,
     now: datetime | None = None,
 ) -> float:
     if kd.regen_rate_value <= 0:
         return float(stored_value or 0)
-    stored_ts = _parse_entry_time(updated_at)
+    stored_ts = _parse_entry_time(event_at)
     if stored_ts is None:
         return float(stored_value or 0)
     now = now or datetime.now()
@@ -83,10 +83,10 @@ def normalize_realtime_write(
     raw_value: float,
     now: datetime | None = None,
 ) -> tuple[float, str]:
-    """把实时恢复写入规范化为整数 value + 回拨 updated_at。
+    """把实时恢复写入规范化为整数 value + 回拨 event_at。
 
     用户输入 120.5 表示当前显示值为 120，距离下一点已经走完 0.5 点进度。
-    SQLite 只保存 120，并把 updated_at 回拨到相应时间。
+    SQLite 只保存 120，并把 event_at 回拨到相应时间。
     """
     now = now or datetime.now()
     whole = math.floor(float(raw_value))
@@ -98,12 +98,12 @@ def normalize_realtime_write(
     if kd.regen_rate_value <= 0:
         return float(whole), now.isoformat(timespec="seconds")
     rollback = fraction * period_seconds(kd.regen_rate_unit) / kd.regen_rate_value
-    updated_at = now - timedelta(seconds=rollback)
-    return float(whole), updated_at.isoformat(timespec="seconds")
+    event_at = now - timedelta(seconds=rollback)
+    return float(whole), event_at.isoformat(timespec="seconds")
 
 
 def next_realtime_point_seconds(entry: dict, kd: RegenKeyDef, now: datetime | None = None) -> float | None:
-    current = compute_realtime_value(entry.get("value", 0) or 0, entry.get("updated_at", ""), kd, now)
+    current = compute_realtime_value(entry.get("value", 0) or 0, entry.get("event_at", ""), kd, now)
     if kd.cap is not None and current >= kd.cap:
         return None
     fraction = current - math.floor(current)
@@ -181,35 +181,35 @@ def _count_boundaries(prev: datetime, now: datetime, kd: RegenKeyDef) -> tuple[i
 
 def compute_boundary_value(
     stored_value: float,
-    updated_at: str,
+    event_at: str,
     kd: RegenKeyDef,
     now: datetime | None = None,
 ) -> tuple[float, str]:
     if kd.regen_amount <= 0:
-        return float(stored_value or 0), updated_at
-    stored_ts = _parse_entry_time(updated_at)
+        return float(stored_value or 0), event_at
+    stored_ts = _parse_entry_time(event_at)
     if stored_ts is None:
-        return float(stored_value or 0), updated_at
+        return float(stored_value or 0), event_at
     now = now or datetime.now()
     count, last_boundary = _count_boundaries(stored_ts, now, kd)
     computed = float(stored_value or 0) + count * kd.regen_amount
     if kd.cap is not None:
         computed = min(computed, kd.cap)
-    new_ts = last_boundary.isoformat(timespec="seconds") if count else updated_at
+    new_ts = last_boundary.isoformat(timespec="seconds") if count else event_at
     return computed, new_ts
 
 
 def compute_regen_entry(entry: dict, kd: RegenKeyDef, now: datetime | None = None) -> RegenResult:
     stored_value = entry.get("value", 0) or 0
-    updated_at = entry.get("updated_at", "")
+    event_at = entry.get("event_at", "")
     if kd.regen_type == REGEN_REALTIME:
-        value = compute_realtime_value(stored_value, updated_at, kd, now)
-        return RegenResult(value=value, updated_at=updated_at, persisted=False)
+        value = compute_realtime_value(stored_value, event_at, kd, now)
+        return RegenResult(value=value, event_at=event_at, persisted=False)
     if kd.regen_type == REGEN_BOUNDARY:
-        value, new_ts = compute_boundary_value(stored_value, updated_at, kd, now)
-        return RegenResult(value=value, updated_at=new_ts, persisted=True)
+        value, new_ts = compute_boundary_value(stored_value, event_at, kd, now)
+        return RegenResult(value=value, event_at=new_ts, persisted=True)
     logger.error(f"非法 regen_type={kd.regen_type!r}，不计算回复")
-    return RegenResult(value=float(stored_value or 0), updated_at=updated_at, persisted=False)
+    return RegenResult(value=float(stored_value or 0), event_at=event_at, persisted=False)
 
 
 def format_seconds(seconds: float) -> str:

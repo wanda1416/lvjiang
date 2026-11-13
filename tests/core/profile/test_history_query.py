@@ -23,17 +23,17 @@ from lvjiang.core.profile.repository import ProfileDB
 @pytest.fixture
 def db(tmp_path: Path) -> ProfileDB:
     db = ProfileDB(tmp_path / "history_query.db")
-    db.upsert("甲", "stock", "jinbi", 5, updated_at="2026-10-01T08:00:00",
-              change_type="set", source="日常")
-    db.upsert("甲", "stock", "jinbi", 8, updated_at="2026-10-02T08:00:00",
-              change_type="delta", delta_value=3, source="",
+    db.upsert("甲", "stock", "jinbi", 5, event_at="2026-10-01T08:00:00",
+              op_type="set", source="日常")
+    db.upsert("甲", "stock", "jinbi", 8, event_at="2026-10-02T08:00:00",
+              op_type="delta", delta_value=3, source="",
               sync_from="quota:weekly")
-    db.upsert("甲", "quota", "weekly", 2, updated_at="2026-10-03T08:00:00",
-              change_type="delta", delta_value=2, source="限时活动：商城")
-    db.upsert("乙", "quota", "weekly", 1, updated_at="2026-10-04T08:00:00",
-              change_type="set", source="日常")
-    db.upsert("乙", "quota", "weekly", 0, updated_at="2026-10-05T08:00:00",
-              change_type="reset", delta_value=-1, source="周期重置")
+    db.upsert("甲", "quota", "weekly", 2, event_at="2026-10-03T08:00:00",
+              op_type="delta", delta_value=2, source="限时活动：商城")
+    db.upsert("乙", "quota", "weekly", 1, event_at="2026-10-04T08:00:00",
+              op_type="set", source="日常")
+    db.upsert("乙", "quota", "weekly", 0, event_at="2026-10-05T08:00:00",
+              op_type="reset", delta_value=-1, source="周期重置")
     return db
 
 
@@ -108,7 +108,7 @@ class TestPaging:
     def test_newest_first_and_offset(self, db: ProfileDB):
         first = db.history_page(HistoryQuery(), limit=2)
         second = db.history_page(HistoryQuery(), limit=2, offset=2)
-        assert [row["id"] for row in first] > [row["id"] for row in second]
+        assert [row["local_id"] for row in first] > [row["local_id"] for row in second]
         assert len(second) == 2
         assert len(db.history_page(HistoryQuery(), limit=10, offset=4)) == 1
 
@@ -125,7 +125,7 @@ class TestQueryObject:
             usernames=("甲",), keys=(("quota", "weekly"),),
             change_types=("set",), sources=("日常",),
         )
-        relaxed = query.relaxed("change_type")
+        relaxed = query.relaxed("op_type")
         assert relaxed.change_types == ()
         assert relaxed.usernames == ("甲",)
         assert relaxed.sources == ("日常",)

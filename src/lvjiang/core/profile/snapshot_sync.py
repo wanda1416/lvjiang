@@ -140,7 +140,7 @@ def _quota_key(key: str):
 def _wall_clock(value: str) -> datetime | None:
     """解析时间并留下钟面。带偏移的时间去掉时区，不换算到本机时区。
 
-    周期边界是本地钟面（例如每天 05:00），库存的 ``updated_at`` 也是无时区钟面。
+    周期边界是本地钟面（例如每天 05:00），库存的 ``event_at`` 也是无时区钟面。
     把 ``09:00+08:00`` 按运行机器的时区换算，会在非东八区把周期判错。
     """
     if not value:
@@ -174,7 +174,7 @@ def _period_relation(op: dict, current: dict) -> str | None:
             key_def.period, key_def.reset_time, datetime.now(), reset_day)
     except (TypeError, ValueError):
         return None
-    local_at = current.get("updated_at") or ""
+    local_at = current.get("event_at") or ""
     if not local_at:
         # 没有本地时间：操作自己已经落在过去的周期里，就不要写进当前值。
         if boundary < now_boundary:
@@ -198,24 +198,24 @@ def _period_relation(op: dict, current: dict) -> str | None:
 def _apply_op(op: dict) -> bool:
     """把一条远端 op 折进本地 entries 与账本；返回是否实际生效。
 
-    **回放照常写账本**（``change_type`` 取 op 语义，``device_id`` 取来源实例，
+    **回放照常写账本**（``op_type`` 取 op 语义，``instance_id`` 取来源实例，
     ``origin_local_id`` 取来源设备的 local_id）。账本行的身份是
-    ``(device_id, origin_local_id)``，与本地自增 id 无关，所以：
+    ``(instance_id, origin_local_id)``，与本地自增 id 无关，所以：
 
     - 重复回放（页级重试、水位没落盘就崩溃）天然幂等，见
       :func:`repository.db_ledger_op_seen`；
-    - 上行按 ``device_id = 本机`` 过滤，回放行永不被代传，构不成回声。
+    - 上行按 ``instance_id = 本机`` 过滤，回放行永不被代传，构不成回声。
 
     以前这里刻意不写 history 来"防回声"，代价是跨端写入完全不可见：值被改
     回去却查不到是谁、什么时候、从哪台设备改的（2026-11-06 太平武墓被另一
     实例的陈旧 set 覆盖就是这么丢的）。
 
     回放按 remote_id（到达序）驱动，但**合并按操作时间**：同一周期里，
-    远端来的旧 set（``happened_at`` 早于本地现值的 ``updated_at``）不覆盖
+    远端来的旧 set（``happened_at`` 早于本地现值的 ``event_at``）不覆盖
     新值。配额跨进新周期时先把本机底数当成 0 再套用；属于上一周期的操作
     直接丢弃。两种情况都不另写 reset 历史。delta 在同一周期内加在当前值上。
 
-    回放写入时把条目 ``updated_at`` 定为 op 的 ``happened_at`` 而不是本地
+    回放写入时把条目 ``event_at`` 定为 op 的 ``happened_at`` 而不是本地
     墙钟：两台设备的时钟互不可信，本地墙钟会让回放后的所有条目都"新于"
     此后到达的远端 set，护栏从此永久误跳（2026-11-04 手机端 3179 事故的
     根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
@@ -223,10 +223,10 @@ def _apply_op(op: dict) -> bool:
     if op.get("op") not in (None, "set"):
         return False
     origin = str(op.get("instance_id") or "")
-    origin_local_id = op.get("local_id")
+    source_local_id = op.get("local_id")
     op_id = str(op.get("op_id") or "")
-    if not op_id and origin and isinstance(origin_local_id, int):
-        op_id = f"legacy:{origin}:{origin_local_id}"
+    if not op_id and origin and isinstance(source_local_id, int):
+        op_id = f"legacy:{origin}:{source_local_id}"
     if not op_id:
         logger.warning("[profile sync] 忽略缺 op_id 的 op：remote_id={}",
                        op.get("remote_id"))
@@ -250,17 +250,16 @@ def _apply_op(op: dict) -> bool:
     remote_id = op.get("remote_id")
     remote_mark = remote_id if isinstance(remote_id, int) else None
     newer = is_strictly_newer(
-        happened, op_id, current.get("updated_at") or "", current.get("op_id") or "",
+        happened, op_id, current.get("event_at") or "", current.get("op_id") or "",
     )
     locked = bool(current.get("locked")) or repository.db_is_locked(username, type_, key)
     if locked or not newer:
         repository.db_upsert(
             username, type_, key, value,
-            change_type="set",
+            op_type="set",
             source=str(op.get("source") or ""),
             value_text=value_text,
-            device_id=origin,
-            origin_local_id=origin_local_id if isinstance(origin_local_id, int) else None,
+            instance_id=origin,
             history_ts=happened or None,
             op_id=op_id,
             remote_id=remote_mark,
@@ -269,12 +268,12 @@ def _apply_op(op: dict) -> bool:
         return False
     repository.db_upsert(
         username, type_, key, value,
-        updated_at=happened or None,
-        change_type="set",
+        event_at=happened or None,
+        op_type="set",
         source=str(op.get("source") or ""),
         value_text=value_text,
-        device_id=origin,
-        origin_local_id=origin_local_id if isinstance(origin_local_id, int) else None,
+        instance_id=origin,
+
         history_ts=happened or None,
         op_id=op_id,
         remote_id=remote_mark,
@@ -285,7 +284,7 @@ def _apply_op(op: dict) -> bool:
 def hadwent(happened: str) -> str | None:
     """回放写入用的条目时间戳：源 op 时间；缺失时 None（upsert 落本地墙钟）。
 
-    独立小函数只为命名意图清晰：条目的 ``updated_at`` 必须"曾经发生"在
+    独立小函数只为命名意图清晰：条目的 ``event_at`` 必须"曾经发生"在
     源写入时刻，而不是本机回放时刻。
     """
     return happened or None
@@ -434,8 +433,8 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
             "key": key,
             "value": entry.get("value"),
             "value_text": entry.get("value_text") or "",
-            "updated_at": (
-                canonical_event(entry.get("updated_at") or "")
+            "event_at": (
+                canonical_event(entry.get("event_at") or "")
                 or canonical_event(str(snapshot.get("created_at") or ""))
             ),
             "op_id": str(entry.get("op_id") or ""),
@@ -554,7 +553,7 @@ MAX_PUSH_BACKLOG = 1000
 
 
 def _snapshot_candidates(token: str) -> dict[tuple[str, str, str], tuple[str, str]]:
-    """最新快照里每个 key 的 ``(updated_at, op_id)``。没有快照时为空。"""
+    """最新快照里每个 key 的 ``(event_at, op_id)``。没有快照时为空。"""
     state = _state()
     if not state.get("profile_snapshot_id"):
         return {}
@@ -572,7 +571,7 @@ def _snapshot_candidates(token: str) -> dict[tuple[str, str, str], tuple[str, st
         username, type_, key = entry.get("username"), entry.get("type"), entry.get("key")
         if isinstance(username, str) and isinstance(type_, str) and isinstance(key, str):
             candidates[(username, type_, key)] = (
-                str(entry.get("updated_at") or ""), str(entry.get("op_id") or ""),
+                str(entry.get("event_at") or ""), str(entry.get("op_id") or ""),
             )
     return candidates
 
@@ -604,10 +603,10 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         for row in rows:
             candidate = candidates.get((row["username"], row["type"], row["key"]))
             other_at, other_id = candidate if candidate is not None else ("", "")
-            if is_strictly_newer(row.get("ts") or "", row.get("op_id") or "", other_at, other_id):
+            if is_strictly_newer(row.get("event_at") or "", row.get("op_id") or "", other_at, other_id):
                 upload.append(row)
             else:
-                abandon.append((int(row["id"]), -1))
+                abandon.append((int(row["local_id"]), -1))
         if abandon:
             repository.db_mark_remote_ids(abandon)
         if not upload:
@@ -618,15 +617,15 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
                          "pushed": report.pushed})
         ops = [{
             "op_id": row["op_id"],
-            "local_id": int(row.get("origin_local_id") or row["id"]),
+            "local_id": int(row["local_id"]),
             "username": row["username"],
             "type": row["type"],
             "key": row["key"],
             "op": "set",
             "value": row["new_value"],
-            "value_text": row["new_value_text"],
+            "value_text": row["value_text"],
             "source": row.get("source") or "",
-            "happened_at": canonical_event(row.get("ts") or "") or row.get("ts") or "",
+            "happened_at": canonical_event(row.get("event_at") or "") or row.get("event_at") or "",
         } for row in upload]
         try:
             response = post("/api/sync/profile/push", {"ops": ops}, token)
@@ -749,7 +748,7 @@ def _snapshot_entries() -> tuple[list[dict], int]:
                     {"username": username, "type": type_, "key": key,
                      "value": entry.get("value"),
                      "value_text": entry.get("value_text") or "",
-                     "updated_at": entry.get("updated_at") or "",
+                     "event_at": entry.get("event_at") or "",
                      "op_id": entry.get("op_id") or ""})
     return payload, orphan
 
@@ -854,4 +853,5 @@ def sync_all(token: str, *, allow_overwrite: bool = False,
         snapshots=pull.snapshots + (seeded.snapshots if seeded else 0),
         rejected=push.rejected, pending=pull.pending, backup=pull.backup,
         errors=[*pull.errors, *push.errors, *(seeded.errors if seeded else [])])
+
 

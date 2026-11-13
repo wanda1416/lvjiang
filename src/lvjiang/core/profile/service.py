@@ -74,19 +74,19 @@ def profile_history_undo_unavailable_reason(record: dict) -> str | None:
     """撤销前的准入判断；可撤销时返回 ``None``。"""
     if not record:
         return tr("历史记录不存在")
-    if record.get("change_type") not in ("set", "delta"):
+    if record.get("op_type") not in ("set", "delta"):
         return tr("仅可撤销写入记录")
     username = str(record.get("username", ""))
     model_type = str(record.get("type", ""))
     key = str(record.get("key", ""))
     latest = db_get_history(username, model_type, key, limit=1)
-    if not latest or latest[0].get("id") != record.get("id"):
+    if not latest or latest[0].get("local_id") != record.get("local_id"):
         return tr("只能撤销该用户此数据项的最新记录")
     current = db_read_entry(username, model_type, key)
     if not current:
         return tr("当前数据项已不存在")
     if model_type == MODEL_NOTE:
-        if (current.get("value_text") or "") != (record.get("new_value_text") or ""):
+        if (current.get("value_text") or "") != (record.get("value_text") or ""):
             return tr("数据已发生变化，请刷新后重试")
     else:
         expected = record.get("new_value")
@@ -157,7 +157,7 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         if _is_continuous_regen(kd):
             current = compute_realtime_value(
                 entry.get("value", 0) or 0,
-                entry.get("updated_at", ""),
+                entry.get("event_at", ""),
                 kd,
             )
         else:
@@ -168,10 +168,10 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
 def _quota_display_value(entry: dict, kd: QuotaKeyDef) -> float:
     """配额跨过周期边界后读出来是 0，不另写一条 reset。"""
     stored = float(entry.get("value", 0) or 0)
-    updated_at = entry.get("updated_at") or ""
+    event_at = entry.get("event_at") or ""
     from .arbitrate import parse_event
 
-    event = parse_event(updated_at)
+    event = parse_event(event_at)
     if event is None:
         return 0.0
     try:
@@ -271,7 +271,7 @@ def profile_is_locked(username: str, key: str) -> bool:
 def profile_read_all(username: str) -> dict:
     """读取全部 profile 数据（regen 自动实时计算）
 
-    返回 {model_type: {key: {value, updated_at, ...}}} 结构。
+    返回 {model_type: {key: {value, event_at, ...}}} 结构。
     regen 条目的 value 已按当前时间计算。
 
     锁定条目保留 key 的存在性（带 ``locked: True``），但 value/value_text 一律
@@ -347,7 +347,7 @@ def profile_observe(
         if entry:
             try:
                 is_current_period = datetime.fromisoformat(
-                    entry.get("updated_at", "")
+                    entry.get("event_at", "")
                 ) >= boundary
             except (TypeError, ValueError):
                 is_current_period = False
@@ -361,10 +361,10 @@ def profile_observe(
                 MODEL_QUOTA,
                 key,
                 expected_value=entry.get("value", 0) or 0,
-                expected_updated_at=entry.get("updated_at", ""),
+                expected_updated_at=entry.get("event_at", ""),
                 expected_entry_exists=bool(entry),
                 new_value=0,
-                change_type="reset",
+                op_type="reset",
                 delta_value=-float(entry.get("value", 0) or 0),
                 source="周期重置",
             )
@@ -491,7 +491,7 @@ def profile_action(
             new_value=text,
             delta=None,
             source=source,
-            change_type="set",
+            op_type="set",
             script=kd.change_script,
             synchronous=kd.change_script_sync,
         )
@@ -501,7 +501,7 @@ def profile_action(
             submit_profile_trigger(event)
         db_upsert(
             username, model_type, key, 0,
-            change_type="set",
+            op_type="set",
             value_text=text,
             source=source,
         )
@@ -524,7 +524,7 @@ def profile_action(
         stored_value = float((current_entry or {}).get("value", 0) or 0)
         restored = compute_regen_entry(current_entry or {}, kd)
         restored_value = float(restored.value)
-        restored_at = restored.updated_at
+        restored_at = restored.event_at
         if int(restored_value) != int(stored_value):
             # 闸门：本次进程尚未完成首次同步时不得物化，否则会把「基于过期锚点
             # 算出的恢复」写成绝对值 set 上行，覆盖别的设备真实发生的消耗
@@ -532,10 +532,10 @@ def profile_action(
             if period_recovery_allowed():
                 db_upsert(
                     username, model_type, key, restored_value,
-                    updated_at=restored_at,
+                    event_at=restored_at,
                     # 物化用 set 而非 tick：set 会随上行通道推送，「锚点 set + delta」
                     # 成对到达回放端，delta 加在新锚点上，回放端无需再算 regen。
-                    change_type="set",
+                    op_type="set",
                     delta_value=_normalize_float_noise(restored_value - stored_value),
                     source=tr("自动恢复"),
                 )
@@ -564,9 +564,9 @@ def profile_action(
     actual_delta = _normalize_float_noise(new_value - current_value)
     semantic_new_value = new_value
 
-    # realtime 直接存精确小数和真实时间，不再回拨 updated_at。
+    # realtime 直接存精确小数和真实时间，不再回拨 event_at。
     write_value = new_value
-    change_type = "set"
+    op_type = "set"
     ledger_delta = actual_delta
     from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
     event = None
@@ -579,7 +579,7 @@ def profile_action(
             new_value=semantic_new_value,
             delta=actual_delta,
             source=source,
-            change_type=change_type,
+            op_type=op_type,
             script=kd.change_script if kd else "",
             synchronous=kd.change_script_sync if kd else False,
         )
@@ -591,11 +591,11 @@ def profile_action(
         updated = db_update_if_current(
             username, model_type, key,
             expected_value=expected_entry.get("value", 0) or 0,
-            expected_updated_at=expected_entry.get("updated_at", ""),
+            expected_updated_at=expected_entry.get("event_at", ""),
             expected_entry_exists=bool(expected_entry),
             new_value=write_value,
             new_updated_at=None,
-            change_type=change_type,
+            op_type=op_type,
             delta_value=ledger_delta,
             source=source,
         )
@@ -604,7 +604,7 @@ def profile_action(
     else:
         db_upsert(
             username, model_type, key, write_value,
-            change_type=change_type,
+            op_type=op_type,
             delta_value=ledger_delta,
             source=source,
         )
@@ -641,7 +641,7 @@ def sync_write_adapter(
     key: str,
     *,
     delta: int | float,
-    change_type: str = "delta",
+    op_type: str = "delta",
     sync_from: str | None = None,
     source: str = "",
 ) -> tuple[int | float, int | float] | None:
@@ -680,7 +680,7 @@ def sync_write_adapter(
         new_value=semantic_new_value,
         delta=actual_delta,
         source=source,
-        change_type="set",
+        op_type="set",
         script=kd.change_script if kd else "",
         synchronous=kd.change_script_sync if kd else False,
     )
@@ -693,7 +693,7 @@ def sync_write_adapter(
     try:
         db_upsert(
             user_name, model_type, key, new_value,
-            change_type="set",
+            op_type="set",
             delta_value=actual_delta,
             sync_from=sync_from,
             source=source,
@@ -706,3 +706,4 @@ def sync_write_adapter(
         if not event.synchronous:
             submit_profile_trigger(event)
     return semantic_new_value, actual_delta
+

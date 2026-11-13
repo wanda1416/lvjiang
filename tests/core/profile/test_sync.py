@@ -45,13 +45,13 @@ def _mock_write_fn(applied_by_key: dict[str, int | float] | None = None, fail_ke
     applied_by_key: 指定目标的实际生效量（模拟 clamp 截断），默认等于请求 delta。
     fail_keys: 写入失败的目标 key 集合，返回 None。
     """
-    def write_fn(user_name, model_type, key, *, delta, change_type, sync_from, source):
+    def write_fn(user_name, model_type, key, *, delta, op_type, sync_from, source):
         write_fn.calls.append({
             "user_name": user_name,
             "model_type": model_type,
             "key": key,
             "delta": delta,
-            "change_type": change_type,
+            "op_type": op_type,
             "sync_from": sync_from,
             "source": source,
         })
@@ -496,3 +496,4 @@ class TestFireSyncTargets:
             write_fn = _mock_write_fn()
             fire_sync_targets(write_fn, "p", source_kd, delta=d, source="s")
             assert len(write_fn.calls) == 1
+

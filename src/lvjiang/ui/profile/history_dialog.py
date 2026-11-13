@@ -131,14 +131,14 @@ class HistoryScope:
 
 
 def _local_author() -> str:
-    """本机账本作者标记（实例出生标识，与上行/回放写入的 device_id 同源）。"""
+    """本机账本作者标记（实例出生标识，与上行/回放写入的 instance_id 同源）。"""
     from ...core.account.identity import device_author_id
 
     return device_author_id()
 
 
 def _device_label(raw: str) -> str:
-    """把账本的 ``device_id`` 变成人能读的设备名。
+    """把账本的 ``instance_id`` 变成人能读的设备名。
 
     账本里存的是实例标识，不是设备显示名：显示名会随用户改名而变，标识不会。
     本机直接标「本机」，其余显示前 8 位——足够在两三台设备之间分辨，完整
@@ -327,14 +327,14 @@ class HistoryDialog(QDialog):
             metrics.horizontalAdvance(tr("本机")),
         ) + _COLUMN_CHROME_WIDTH
         return [
-            _Column("ts", tr("时间"), fixed, time_width),
+            _Column("event_at", tr("时间"), fixed, time_width),
             # 「键 → 用户 → 类型」：先看是哪个数据项，再看是谁、怎么变。
             _Column("key", tr("键"), fixed, _cjk_column_width(self, 10),
                     facet="key", filter_kind="facet"),
             _Column("username", tr("用户名"), fixed, user_width,
                     facet="username", filter_kind="facet"),
-            _Column("change_type", tr("类型"), fixed, 92,
-                    facet="change_type", filter_kind="facet"),
+            _Column("op_type", tr("类型"), fixed, 92,
+                    facet="op_type", filter_kind="facet"),
             _Column("old", tr("旧值"), fixed, 88, filter_kind="text"),
             _Column("new", tr("新值"), fixed, 88, filter_kind="text"),
             _Column("delta", tr("变动量"), fixed, 100, filter_kind="delta"),
@@ -456,7 +456,7 @@ class HistoryDialog(QDialog):
         return HistoryQuery(
             usernames=values.get("username", ()),
             keys=tuple(_split_key_value(raw) for raw in values.get("key", ())),
-            change_types=values.get("change_type", ()),
+            change_types=values.get("op_type", ()),
             sources=values.get("source", ()),
             sync_froms=values.get("sync_from", ()),
             devices=values.get("device", ()),
@@ -588,7 +588,7 @@ class HistoryDialog(QDialog):
                 self._apply_actions(table, row, index, record)
                 continue
             item = QTableWidgetItem(self._cell_text(column.key, record))
-            item.setData(_HISTORY_ID_ROLE, record.get("id"))
+            item.setData(_HISTORY_ID_ROLE, record.get("local_id"))
             if column.key != "source":
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             else:
@@ -598,10 +598,10 @@ class HistoryDialog(QDialog):
             table.setItem(row, index, item)
 
     def _decorate(self, item: QTableWidgetItem, key: str, record: dict) -> None:
-        if key == "ts":
-            item.setToolTip(str(record.get("ts", "")))
-        elif key == "change_type":
-            color = self._type_color(str(record.get("change_type") or ""))
+        if key == "event_at":
+            item.setToolTip(str(record.get("event_at", "")))
+        elif key == "op_type":
+            color = self._type_color(str(record.get("op_type") or ""))
             if color is not None:
                 item.setForeground(QBrush(color))
             item.setToolTip(tr("变更类型：{label}").format(
@@ -621,18 +621,18 @@ class HistoryDialog(QDialog):
             if raw:
                 item.setToolTip(raw)
         elif key == "device":
-            raw = record.get("device_id") or ""
+            raw = record.get("instance_id") or ""
             item.setToolTip(raw or tr("未记录设备"))
         elif key == "source":
             item.setToolTip(item.text() or tr("未记录"))
 
     def _cell_text(self, key: str, record: dict) -> str:
-        if key == "ts":
-            return _format_timestamp(str(record.get("ts") or ""))
+        if key == "event_at":
+            return _format_timestamp(str(record.get("event_at") or ""))
         if key == "username":
             return str(record.get("username") or "")
-        if key == "change_type":
-            raw = str(record.get("change_type") or "")
+        if key == "op_type":
+            raw = str(record.get("op_type") or "")
             return self._TYPE_LABEL.get(raw, raw)
         if key == "key":
             raw = f"{record.get('type', '')}:{record.get('key', '')}"
@@ -645,7 +645,7 @@ class HistoryDialog(QDialog):
         if key == "source":
             return str(record.get("source") or "")
         if key == "device":
-            return _device_label(str(record.get("device_id") or ""))
+            return _device_label(str(record.get("instance_id") or ""))
         if key == "sync_from":
             raw = record.get("sync_from") or ""
             return format_sync_label(str(raw)) if raw else ""
@@ -660,7 +660,7 @@ class HistoryDialog(QDialog):
             table.setCellWidget(row, index, cell)
         cell.set_record(record)
 
-    def _type_color(self, change_type: str) -> QColor | None:
+    def _type_color(self, op_type: str) -> QColor | None:
         """类型徽标用主题语义色，深色主题下不会变成刺眼的纯色。"""
         tokens = self._theme_tokens()
         if tokens is None:
@@ -671,7 +671,7 @@ class HistoryDialog(QDialog):
             "reset": tokens.warning,
             "tick": tokens.text_muted,
         }
-        value = mapping.get(change_type)
+        value = mapping.get(op_type)
         return QColor(value) if value else None
 
     def _delta_color(self, delta: object) -> QColor | None:
@@ -816,7 +816,7 @@ class HistoryDialog(QDialog):
                         tr("键"))),
                 "、".join(f"{pair[0]}:{pair[1]}" for pair in query.keys)))
         if query.change_types:
-            chips.append(("change_type", tr("类型：{value}").format(
+            chips.append(("op_type", tr("类型：{value}").format(
                 value=summary(
                     query.change_types,
                     lambda raw: self._TYPE_LABEL.get(raw, raw), tr("类型"))), ""))
@@ -913,7 +913,7 @@ class HistoryDialog(QDialog):
     def _facet_display(self, dimension: str) -> Callable[[str], str]:
         if dimension in ("key", "sync_from"):
             return lambda raw: format_sync_label(raw) if raw else tr("未记录")
-        if dimension == "change_type":
+        if dimension == "op_type":
             return lambda raw: self._TYPE_LABEL.get(raw, raw) if raw else tr("未记录")
         if dimension == "device":
             return _device_label
@@ -967,7 +967,7 @@ class HistoryDialog(QDialog):
         ).format(
             username=record.get("username", ""),
             label=self._record_label(record),
-            time=_format_timestamp(str(record.get("ts") or "")),
+            time=_format_timestamp(str(record.get("event_at") or "")),
             source=record.get("source", "") or tr("无"),
         )
         answer = QMessageBox.question(
@@ -978,7 +978,7 @@ class HistoryDialog(QDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            undo_profile_history(int(record["id"]))
+            undo_profile_history(int(record["local_id"]))
         except (ProfileWriteConflict, ValueError) as exc:
             log_failure(
                 f"{record.get('username', '')} {record.get('type', '')}."
@@ -998,7 +998,7 @@ class HistoryDialog(QDialog):
         ).format(
             username=record.get("username", ""),
             label=self._record_label(record),
-            time=_format_timestamp(str(record.get("ts") or "")),
+            time=_format_timestamp(str(record.get("event_at") or "")),
             source=record.get("source", "") or tr("无"),
             delta=record.get("delta_value"),
         )
@@ -1011,7 +1011,7 @@ class HistoryDialog(QDialog):
             return
         try:
             delete_profile_history(
-                int(record["id"]), str(record["username"]),
+                int(record["local_id"]), str(record["username"]),
                 str(record["type"]), str(record["key"]))
         except Exception as error:  # noqa: BLE001 - 失败保留界面并给出可行动提示
             log_failure(
@@ -1066,7 +1066,7 @@ def _values_for_dimension(query: HistoryQuery, dimension: str) -> tuple[str, ...
         return query.usernames
     if dimension == "key":
         return tuple(f"{pair[0]}:{pair[1]}" for pair in query.keys)
-    if dimension == "change_type":
+    if dimension == "op_type":
         return query.change_types
     if dimension == "source":
         return query.sources
@@ -1130,3 +1130,4 @@ def _format_value(record: dict, side: str, model_type: str) -> str:
     except (TypeError, ValueError):
         return str(value)
     return str(int(numeric)) if numeric == int(numeric) else str(numeric)
+

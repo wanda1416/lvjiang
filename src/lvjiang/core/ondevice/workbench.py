@@ -62,7 +62,7 @@ def profile_view(username: str) -> str:
                           "value": (entry.get("value_text", "") if model == MODEL_NOTE else entry.get("value")) if entry else None,
                           "collected": bool(entry), "cap": kd.cap if kd.show_cap else None,
                           "locked": bool(entry and entry.get("locked")),
-                          "updated_at": entry.get("updated_at", "") if entry else ""})
+                          "event_at": entry.get("event_at", "") if entry else ""})
         return _json({"ok": True, "items": items, "username": username})
     except Exception as exc:
         return _json({"ok": False, "message": str(exc)})

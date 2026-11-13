@@ -42,18 +42,18 @@ def _history(model: str, key: str) -> list[dict]:
 
 
 def _rewind(key: str, *, minutes: int) -> None:
-    """把 updated_at 拨回过去，模拟这段时间的自动恢复。"""
+    """把 event_at 拨回过去，模拟这段时间的自动恢复。"""
     from lvjiang.core.profile.repository import db_read_entry, db_upsert
 
     entry = db_read_entry("u", "regen", key)
     stamp = (datetime.now() - timedelta(minutes=minutes)).isoformat(timespec="seconds")
-    db_upsert("u", "regen", key, entry["value"], updated_at=stamp)
+    db_upsert("u", "regen", key, entry["value"], event_at=stamp)
 
 
 def _rewind_before_last_boundary(key: str, *, hour: int = 5) -> None:
-    """把 updated_at 拨到「最近一次准点边界之前 1 分钟」。
+    """把 event_at 拨到「最近一次准点边界之前 1 分钟」。
 
-    这样 ``(updated_at, now]`` 之间**恰好**跨过一个边界，与当前钟点无关。
+    这样 ``(event_at, now]`` 之间**恰好**跨过一个边界，与当前钟点无关。
     固定回拨 30 小时并不等价：当本机时刻早于约 11:00 时，那 30 小时会跨过
     **两个** 05:00 边界（恢复 900 而非 450），测试因此在特定时段失败
     （CI 在 UTC 09:56 跑就撞上了）。
@@ -66,7 +66,7 @@ def _rewind_before_last_boundary(key: str, *, hour: int = 5) -> None:
         boundary -= timedelta(days=1)
     entry = db_read_entry("u", "regen", key)
     stamp = (boundary - timedelta(minutes=1)).isoformat(timespec="seconds")
-    db_upsert("u", "regen", key, entry["value"], updated_at=stamp)
+    db_upsert("u", "regen", key, entry["value"], event_at=stamp)
 
 
 def test_realtime_regen_write_materializes_tick_before_delta(regen_env):
@@ -78,7 +78,7 @@ def test_realtime_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "xinli", delta=-5, source="镇守")
 
     records = _history("regen", "xinli")
-    assert [row["change_type"] for row in records] == ["set", "set"]
+    assert [row["op_type"] for row in records] == ["set", "set"]
     assert records[1]["new_value"] == 19.0
     assert records[0]["delta_value"] == -5.0
     remaining = profile_read("u", "xinli")
@@ -94,7 +94,7 @@ def test_boundary_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "tili", delta=-30, source="副本")
 
     records = _history("regen", "tili")
-    assert [row["change_type"] for row in records] == ["set", "set"]
+    assert [row["op_type"] for row in records] == ["set", "set"]
     assert records[0]["delta_value"] == -30.0
     assert 510 <= records[0]["new_value"] <= 530
 
@@ -112,13 +112,13 @@ def test_realtime_regen_cas_write_survives_materialization(regen_env):
                    use_cas=True, expected_entry=stale)
 
     assert int(profile_read("u", "xinli")) == 6
-    assert [r["change_type"] for r in _history("regen", "xinli")[:2]] == ["set", "set"]
+    assert [r["op_type"] for r in _history("regen", "xinli")[:2]] == ["set", "set"]
 
 
 def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):
     """800 分钟里穿插多次写入，最终心力必须稳定增加 100，不产生累计误差。
 
-    心力 0.125/分钟：800 分钟正好 100 点。每次写入都要先把小数进度固化进 updated_at，
+    心力 0.125/分钟：800 分钟正好 100 点。每次写入都要先把小数进度固化进 event_at，
     若某次写入把锚点重置到 now（丢到多的小数点），几十次写入就会累计丢几个点。
     """
     # 直接种一行 0 值（set_value=0 因为「值未变」不会落库）
@@ -126,7 +126,7 @@ def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):
     from lvjiang.core.profile.service import profile_action, profile_read
 
     db_upsert("u", "regen", "xinli", 0,
-              updated_at=datetime.now().isoformat(timespec="seconds"))
+              event_at=datetime.now().isoformat(timespec="seconds"))
     rounds = 20
     for _ in range(rounds):
         _rewind("xinli", minutes=800 // rounds)      # 每轮过去 40 分钟 = 5 点

@@ -17,7 +17,7 @@ def _seed(count: int, sources: tuple[str, ...] = ("日常", "限流")) -> None:
     for index in range(count):
         repository.db_upsert(
             "tester", "stock", "jinbi", index + 1,
-            change_type="delta", delta_value=1,
+            op_type="delta", delta_value=1,
             source=sources[index % len(sources)],
         )
 
@@ -34,16 +34,16 @@ def test_history_delete_requires_confirmation_and_refreshes_without_value_change
     from lvjiang.core.profile import repository
 
     # 真实临时 DB 验证按钮只删除这一行，不写余额或删除审计。
-    repository.db_upsert('tester', 'stock', 'item', 2, change_type='delta',
+    repository.db_upsert('tester', 'stock', 'item', 2, op_type='delta',
                          delta_value=2, source='example')
-    repository.db_upsert('tester', 'stock', 'item', 3, change_type='delta',
+    repository.db_upsert('tester', 'stock', 'item', 3, op_type='delta',
                          delta_value=1, source='example')
     # 未定义 key 不影响历史删除，按钮不复用撤销的限制。
     dialog = HistoryDialog(
         HistoryScope(username='tester', model_type='stock', key='item',
                      key_label='示例'))
     table = dialog._table
-    first = repository.db_get_history('tester', 'stock', 'item')[0]['id']
+    first = repository.db_get_history('tester', 'stock', 'item')[0]['local_id']
     monkeypatch.setattr(
         QMessageBox, 'question', lambda *a, **kw: QMessageBox.StandardButton.No)
     next(b for b in _actions_cell(dialog, 1).findChildren(QPushButton)

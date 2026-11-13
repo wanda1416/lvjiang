@@ -16,8 +16,8 @@ from lvjiang.core.profile.repository import ProfileDB
 def test_rename_updates_all_users_refs_without_changing_values(tmp_path):
     db = ProfileDB(tmp_path / "profile.db")
     for user in ("tester_a", "tester_b"):
-        db.upsert(user, "stock", "credits", 10, change_type="delta", delta_value=10)
-        db.upsert(user, "stock", "reward", 1, change_type="delta", delta_value=1,
+        db.upsert(user, "stock", "credits", 10, op_type="delta", delta_value=10)
+        db.upsert(user, "stock", "reward", 1, op_type="delta", delta_value=1,
                   sync_from="stock:credits")
     original = db.get_entry("tester_a", "stock", "credits")
     db.rename_keys([("stock", "credits", "coins")], save_references=lambda: None)
@@ -119,7 +119,7 @@ def test_rename_emits_baselines_for_all_users(tmp_path):
     """
     db = ProfileDB(tmp_path / "profile.db")
     for user in ("tester_a", "tester_b"):
-        db.upsert(user, "quota", "weekly_old", 5, change_type="delta", delta_value=5)
+        db.upsert(user, "quota", "weekly_old", 5, op_type="delta", delta_value=5)
     db.upsert("tester_c", "quota", "weekly_old", 0)          # 空占位用户
     db.set_locked("tester_b", "quota", "weekly_old")          # 锁定用户
     schema.save_profile_config(schema.ProfileSchema(keys_by_model={"quota": [
@@ -134,18 +134,18 @@ def test_rename_emits_baselines_for_all_users(tmp_path):
 
     # 只有 tester_a 的非零值获得基线行；锁定与空占位不发
     rows = db.get_history("tester_a", "quota", "weekly_new")
-    baseline = [r for r in rows if r["change_type"] == "set"]
+    baseline = [r for r in rows if r["op_type"] == "set"]
     assert len(baseline) == 1
     assert baseline[0]["new_value"] == 5.0
     assert baseline[0]["source"] == "key 改名重设"
     # 锁定用户：旧历史行随改名重写（审计保留），但**不发新基线 set**
     locked_rows = db.get_history("tester_b", "quota", "weekly_new")
-    assert locked_rows and all(r["change_type"] != "set" for r in locked_rows)
+    assert locked_rows and all(r["op_type"] != "set" for r in locked_rows)
     # 空占位用户同样不发
     assert not db.get_history("tester_c", "quota", "weekly_new")
     # 基线行的 id 在改名前的行之上：随水位推进自然上行
-    older = [r for r in rows if r["change_type"] == "delta"]
-    assert all(baseline[0]["id"] > r["id"] for r in older)
+    older = [r for r in rows if r["op_type"] == "delta"]
+    assert all(baseline[0]["local_id"] > r["local_id"] for r in older)
 
 
 def _write_journal(db, renames) -> None:
@@ -167,7 +167,7 @@ def test_recover_renames_definition_from_disk_before_files_were_written():
     schema.save_profile_config(old)
     schema.reload_profile_config()
     db = repository.get_profile_db()
-    db.upsert("tester", "stock", "credits", 4, change_type="delta", delta_value=4)
+    db.upsert("tester", "stock", "credits", 4, op_type="delta", delta_value=4)
     _write_journal(db, [("stock", "credits", "coins")])
 
     key_rename.recover_rename(db)
@@ -189,7 +189,7 @@ def test_recover_rewrites_stale_yaml_when_database_already_has_new_key():
     schema.save_profile_config(old)
     schema.reload_profile_config()
     db = repository.get_profile_db()
-    db.upsert("tester", "stock", "credits", 4, change_type="delta", delta_value=4)
+    db.upsert("tester", "stock", "credits", 4, op_type="delta", delta_value=4)
     db.rename_keys([("stock", "credits", "coins")], save_references=lambda: None)
     schema.reload_profile_config()
     assert schema.get_profile_config().get_key("credits") is not None
@@ -218,7 +218,7 @@ def test_save_renamed_definitions_publishes_new_key_and_one_baseline_round():
     schema.save_profile_config(old)
     schema.reload_profile_config()
     db = repository.get_profile_db()
-    db.upsert("tester", "quota", "weekly_old", 5, change_type="delta", delta_value=5)
+    db.upsert("tester", "quota", "weekly_old", 5, op_type="delta", delta_value=5)
     updated = deepcopy(old)
     updated.keys_by_model["quota"][0].key = "weekly_new"
     updated._rebuild_index()
@@ -233,7 +233,7 @@ def test_save_renamed_definitions_publishes_new_key_and_one_baseline_round():
     assert "weekly_old" not in disk
     sets = [
         row for row in db.get_history("tester", "quota", "weekly_new")
-        if row["change_type"] == "set" and row["source"] == "key 改名重设"
+        if row["op_type"] == "set" and row["source"] == "key 改名重设"
     ]
     assert len(sets) == 1
     assert sets[0]["new_value"] == 5.0
@@ -242,7 +242,7 @@ def test_save_renamed_definitions_publishes_new_key_and_one_baseline_round():
 
 def test_emit_skips_baseline_when_definition_is_still_old_key(tmp_path):
     db = ProfileDB(tmp_path / "emit-skip.db")
-    db.upsert("tester", "quota", "weekly_old", 5, change_type="delta", delta_value=5)
+    db.upsert("tester", "quota", "weekly_old", 5, op_type="delta", delta_value=5)
     db.rename_keys([("quota", "weekly_old", "weekly_new")], save_references=lambda: None)
     schema.save_profile_config(schema.ProfileSchema(keys_by_model={"quota": [
         QuotaKeyDef(key="weekly_old", label="周"),
@@ -253,5 +253,5 @@ def test_emit_skips_baseline_when_definition_is_still_old_key(tmp_path):
 
     assert not [
         row for row in db.get_history("tester", "quota", "weekly_new")
-        if row["change_type"] == "set"
+        if row["op_type"] == "set"
     ]

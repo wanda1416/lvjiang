@@ -66,9 +66,9 @@ def test_typing_zero_into_blank_cell_creates_entry(
 
         entry = repository.db_read_entry("甲", "stock", "a")
         assert entry.get("value") == 0
-        assert entry.get("updated_at")
+        assert entry.get("event_at")
         history = repository.db_get_history("甲", "stock", "a")
-        assert [(row["change_type"], row["new_value"]) for row in history] == [
+        assert [(row["op_type"], row["new_value"]) for row in history] == [
             ("set", 0.0),
         ]
         assert table.item(0, 1).text() == "0"

@@ -27,7 +27,7 @@ class ProfileTriggerEvent:
     new_value: float | str | None
     delta: float | None
     source: str
-    change_type: str
+    op_type: str
     script: str = ""
     origin_key: str = ""
     origin_model: str = ""
@@ -48,7 +48,7 @@ class ProfileTriggerEvent:
             "new_value": self.new_value,
             "delta": self.delta,
             "source": self.source,
-            "change_type": self.change_type,
+            "op_type": self.op_type,
         }
 
 
@@ -79,7 +79,7 @@ def prepare_trigger_event(
     new_value: float | str | None,
     delta: float | None,
     source: str,
-    change_type: str,
+    op_type: str,
     script: str,
     synchronous: bool = False,
 ) -> ProfileTriggerEvent | None:
@@ -108,7 +108,7 @@ def prepare_trigger_event(
         new_value=new_value,
         delta=delta,
         source=source,
-        change_type=change_type,
+        op_type=op_type,
         script=script,
         origin_key=origin_key,
         origin_model=origin_model,

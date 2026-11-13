@@ -5,11 +5,11 @@ ProfileTab: 宽表展示所有用户的概要信息，交互式列头配置。
 数据来源：profile.db（按 username 隔离）
     profile:
       quota:
-        key_name: { value: ..., updated_at: ... }
+        key_name: { value: ..., event_at: ... }
       regen:
-        key_name: { value: ..., updated_at: ... }
+        key_name: { value: ..., event_at: ... }
       stock:
-        key_name: { value: ..., updated_at: ... }
+        key_name: { value: ..., event_at: ... }
 """
 
 from __future__ import annotations

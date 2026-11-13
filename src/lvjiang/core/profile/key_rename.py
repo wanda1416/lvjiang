@@ -247,7 +247,7 @@ def _emit_rename_baselines(db: ProfileDB,
                 continue      # 空占位不值得基线行
             db.upsert(username, model, new, float(value or 0),
                       value_text=value_text or "",
-                      change_type="set", source=_tr("key 改名重设"))
+                      op_type="set", source=_tr("key 改名重设"))
             emitted += 1
         if emitted:
             from loguru import logger as _logger

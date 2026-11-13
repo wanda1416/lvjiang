@@ -339,8 +339,8 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         return tr("当前用户已锁定")
     lines = [f"【{kd.label}】"]
 
-    updated_at = entry.get("updated_at")
-    updated_time = entry.get("updated_time")
+    event_at = entry.get("event_at")
+    created_at = entry.get("created_at")
 
     # 再生模型显示额外信息
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
@@ -351,10 +351,10 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         period_label = period_labels.get(kd.regen_period, kd.regen_period)
 
         if is_realtime_regen(kd):
-            if updated_at:
-                lines.append(f"更新时间: {updated_at}")
-            if updated_time:
-                lines.append(f"写入时间: {updated_time}")
+            if event_at:
+                lines.append(f"更新时间: {event_at}")
+            if created_at:
+                lines.append(f"写入时间: {created_at}")
             lines.append(tr("恢复类型: 实时恢复"))
             lines.append(f"恢复速率: {kd.regen_rate_value}/{rate_label}")
             seconds = next_realtime_point_seconds(entry, kd)
@@ -365,10 +365,10 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
             if kd.cap is not None:
                 lines.append(f"上限: {kd.cap}")
         else:
-            if updated_at:
-                lines.append(f"更新时间: {updated_at}")
-            if updated_time:
-                lines.append(f"写入时间: {updated_time}")
+            if event_at:
+                lines.append(f"更新时间: {event_at}")
+            if created_at:
+                lines.append(f"写入时间: {created_at}")
             lines.append(tr("恢复类型: 准点恢复"))
             lines.append(f"恢复周期: 每{period_label}")
             lines.append(f"每次恢复: {kd.regen_amount}")
@@ -377,15 +377,15 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
                 lines.append(f"下次恢复: {next_ts.isoformat(timespec='seconds')}")
             except (ValueError, TypeError):
                 pass
-            if result.updated_at and result.updated_at != updated_at:
-                lines.append(f"计算至: {result.updated_at}")
+            if result.event_at and result.event_at != event_at:
+                lines.append(f"计算至: {result.event_at}")
             if kd.cap is not None:
                 lines.append(f"上限: {kd.cap}")
 
-    if model_type != MODEL_REGEN and updated_at:
-        lines.append(f"更新时间: {updated_at}")
-    if model_type != MODEL_REGEN and updated_time:
-        lines.append(f"写入时间: {updated_time}")
+    if model_type != MODEL_REGEN and event_at:
+        lines.append(f"更新时间: {event_at}")
+    if model_type != MODEL_REGEN and created_at:
+        lines.append(f"写入时间: {created_at}")
 
     # note 模型显示文本值
     if model_type == MODEL_NOTE:

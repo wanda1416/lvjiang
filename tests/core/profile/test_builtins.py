@@ -64,8 +64,8 @@ def test_profile_all_computes_realtime_regen_value(profile_func_env):
         _profile_get,
     )
 
-    updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
-    db_upsert(profile_func_env.username, "regen", "resource_meter", 100, updated_at=updated_at)
+    event_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
+    db_upsert(profile_func_env.username, "regen", "resource_meter", 100, event_at=event_at)
 
     engine = SimpleNamespace(run_username=profile_func_env.username)
     by_get = _profile_get(engine, "resource_meter")
@@ -108,13 +108,13 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     )
     from lvjiang.workflows.builtins.profile import _profile_inc
 
-    updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
-    db_upsert(profile_func_env.username, "regen", "resource_meter", 100, updated_at=updated_at)
+    event_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
+    db_upsert(profile_func_env.username, "regen", "resource_meter", 100, event_at=event_at)
 
     engine = SimpleNamespace(run_username=profile_func_env.username)
     returned = _profile_inc(engine, "resource_meter", -20)
     entry = db_read_entry(profile_func_env.username, "regen", "resource_meter")
-    stored_ts = datetime.fromisoformat(entry["updated_at"])
+    stored_ts = datetime.fromisoformat(entry["event_at"])
 
     assert returned == pytest.approx(80.5, abs=0.02)
     assert entry["value"] == pytest.approx(80.5, abs=0.02)
@@ -189,7 +189,7 @@ def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_
         "quota",
         "weekly_progress",
         800,
-        updated_at=old_ts,
+        event_at=old_ts,
     )
     engine = SimpleNamespace(run_username=profile_func_env.username)
 
@@ -199,7 +199,7 @@ def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_
     assert result == {"accepted": True, "value": 0.0, "reason": "updated"}
     entry = db_read_entry(profile_func_env.username, "quota", "weekly_progress")
     assert entry["value"] == 0
-    assert entry["updated_at"] != old_ts
+    assert entry["event_at"] != old_ts
 
 
 def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):
@@ -228,8 +228,8 @@ def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func
     )
     from lvjiang.core.profile.service import sync_write_adapter
 
-    updated_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
-    db_upsert(profile_func_env.username, "regen", "resource_meter", 100, updated_at=updated_at)
+    event_at = (datetime.now() - timedelta(minutes=4)).isoformat(timespec="seconds")
+    db_upsert(profile_func_env.username, "regen", "resource_meter", 100, event_at=event_at)
     db_upsert(profile_func_env.username, "stock", "target_stock", 1000)
 
     result = sync_write_adapter(

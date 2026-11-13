@@ -27,7 +27,7 @@ from typing import TypeVar
 _T = TypeVar("_T")
 
 #: 可聚合成候选的维度；与仓储层的列表达式一一对应。
-FACET_DIMENSIONS = ("username", "key", "change_type", "source", "sync_from", "device")
+FACET_DIMENSIONS = ("username", "key", "op_type", "source", "sync_from", "device")
 
 #: 变动量方向：全部 / 增加 / 减少 / 为零。
 DELTA_SCOPES = ("all", "pos", "neg", "zero")
@@ -101,7 +101,7 @@ class HistoryQuery:
             # 「键」这一维度同时包含模型类型与键名，放松时一起去掉。
             return replace(
                 self, keys=(), key_matches=(), model_types=(), key_names=())
-        if dimension == "change_type":
+        if dimension == "op_type":
             return replace(self, change_types=())
         if dimension == "source":
             return replace(self, sources=())

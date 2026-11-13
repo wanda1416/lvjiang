@@ -37,7 +37,7 @@ def test_replayed_row_keeps_origin_identity(tmp_path, monkeypatch) -> None:
     repository.ProfileDB(db_path)
     conn = sqlite3.connect(db_path)
     try:
-        row = conn.execute("SELECT op_id, id FROM profile_history").fetchone()
+        row = conn.execute("SELECT op_id, local_id FROM profile_history").fetchone()
     finally:
         conn.close()
     assert row[0] == "legacy:phone:42"
@@ -56,14 +56,14 @@ def test_newer_event_wins_and_empty_op_id_loses() -> None:
 def test_quota_read_is_zero_after_period_boundary() -> None:
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     yesterday = (datetime.now() - timedelta(days=2)).replace(microsecond=0)
-    entry = {"value": 9, "updated_at": yesterday.isoformat(timespec="seconds")}
+    entry = {"value": 9, "event_at": yesterday.isoformat(timespec="seconds")}
     assert service._quota_display_value(entry, kd) == 0
 
 
 def test_offset_timestamp_does_not_break_quota_read() -> None:
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     recent = datetime.now().replace(microsecond=0).isoformat(timespec="seconds")
-    entry = {"value": 4, "updated_at": recent + "+08:00"}
+    entry = {"value": 4, "event_at": recent + "+08:00"}
     assert service._quota_display_value(entry, kd) == 4
 
 
@@ -107,16 +107,16 @@ def test_unlock_keeps_value_frozen(tmp_path, monkeypatch) -> None:
     """解锁只解除标记：值保持锁定时的样子，不用账本重建（否则解锁瞬间跳变）。"""
     monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
     repository.reset_profile_db()
-    repository.db_upsert("u", "stock", "k", 3, change_type="set",
-                         updated_at="2026-11-01T00:00:00",
+    repository.db_upsert("u", "stock", "k", 3, op_type="set",
+                         event_at="2026-11-01T00:00:00",
                          history_ts="2026-11-01T00:00:00")
     assert repository.db_set_locked("u", "stock", "k")
     conn = sqlite3.connect(tmp_path / "profile.db")
     try:
         conn.execute(
             "INSERT INTO profile_history "
-            "(ts, username, type, key, old_value, new_value, change_type, "
-            "device_id, origin_local_id, op_id) "
+            "(event_at, username, type, key, old_value, new_value, op_type, "
+            "instance_id, local_id, op_id) "
             "VALUES ('2026-11-12T10:00:00', 'u', 'stock', 'k', 3, 9, 'set', "
             "'phone', 3, 'later-op')")
         conn.commit()
@@ -142,12 +142,12 @@ def test_inc_persists_without_a_prior_sync(tmp_path, monkeypatch) -> None:
     schema._config = None
     repository.db_upsert(
         "u", "regen", "xinli", 10,
-        updated_at=datetime.now().isoformat(timespec="seconds"),
+        event_at=datetime.now().isoformat(timespec="seconds"),
     )
     written = service.profile_action("u", "xinli", delta=-1, source="消耗")
     assert abs(written - 9) < 0.02
     history = repository.db_get_history("u", "regen", "xinli")
-    assert history[0]["change_type"] == "set"
+    assert history[0]["op_type"] == "set"
     assert abs(history[0]["new_value"] - 9) < 0.02
     assert history[0]["source"] == "消耗"
 
@@ -161,8 +161,8 @@ def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -
     try:
         conn.executemany(
             "INSERT INTO profile_history "
-            "(ts, username, type, key, new_value, change_type, device_id, "
-            "origin_local_id, op_id, remote_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "(event_at, username, type, key, new_value, op_type, instance_id, "
+            "local_id, op_id, remote_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
             [
                 ("2026-11-04T08:23:56", "u", "stock", "k", 1, "set", "dev",
                  9, "legacy:dev:9", -1),
@@ -181,7 +181,7 @@ def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -
     conn = sqlite3.connect(tmp_path / "profile.db")
     try:
         rows = conn.execute(
-            "SELECT op_id, remote_id FROM profile_history ORDER BY id"
+            "SELECT op_id, remote_id FROM profile_history ORDER BY local_id"
         ).fetchall()
     finally:
         conn.close()

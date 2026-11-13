@@ -735,7 +735,7 @@ class ProfileCellEditingMixin:
             return
 
         # sync_checked=True: 走 action 路径（触发 sync_targets 同步）
-        # sync_checked=False: 纯覆写语义（change_type="override"，不触发同步）
+        # sync_checked=False: 纯覆写语义（op_type="override"，不触发同步）
         self._adjust_value(
             user_name, model_type, key, kd, current_value, delta,
             trigger_sync=sync_checked, source=source, use_cas=False,

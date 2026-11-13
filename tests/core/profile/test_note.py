@@ -176,7 +176,7 @@ class TestNoteProfileAction:
         db: ProfileDB = pdb._db
         history = db.get_history(note_env.username)
         assert len(history) == 1
-        assert history[0]["new_value_text"] == "已完成"
+        assert history[0]["value_text"] == "已完成"
         assert history[0]["type"] == "note"
 
     def test_note_no_sync_targets(self, note_env):
@@ -371,9 +371,9 @@ class TestNoteHistory:
 
         history = db_get_history(note_env.username, type_="note", key="user_note")
         assert len(history) == 1
-        assert history[0]["new_value_text"] == "已完成"
+        assert history[0]["value_text"] == "已完成"
         assert history[0]["old_value_text"] == ""
-        assert history[0]["change_type"] == "set"
+        assert history[0]["op_type"] == "set"
 
 
     def test_note_same_value_no_history(self, note_env):
@@ -384,9 +384,9 @@ class TestNoteHistory:
         )
 
         # 先写入初始值
-        db_upsert(note_env.username, "note", "user_note", 0, change_type="set", value_text="已完成")
+        db_upsert(note_env.username, "note", "user_note", 0, op_type="set", value_text="已完成")
         # 再次写入相同值
-        db_upsert(note_env.username, "note", "user_note", 0, change_type="set", value_text="已完成")
+        db_upsert(note_env.username, "note", "user_note", 0, op_type="set", value_text="已完成")
 
         history = db_get_history(note_env.username, type_="note", key="user_note")
         # action 类型始终记录，所以会有 2 条
@@ -400,9 +400,9 @@ class TestNoteHistory:
         )
 
         # tick 写入新值
-        db_upsert(note_env.username, "note", "user_note", 0, change_type="tick", value_text="新值")
+        db_upsert(note_env.username, "note", "user_note", 0, op_type="tick", value_text="新值")
         # tick 写入相同值
-        db_upsert(note_env.username, "note", "user_note", 0, change_type="tick", value_text="新值")
+        db_upsert(note_env.username, "note", "user_note", 0, op_type="tick", value_text="新值")
 
         history = db_get_history(note_env.username, type_="note", key="user_note")
         # tick 只在值变化时记录，所以只有 1 条

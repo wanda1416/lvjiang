@@ -149,14 +149,14 @@ class TestShouldReset:
 
     def test_reset_requires_timestamp_before_boundary(self):
         # before_boundary
-        updated_at = (datetime.now() - timedelta(hours=2)).isoformat()
+        event_at = (datetime.now() - timedelta(hours=2)).isoformat()
         boundary = datetime.now() - timedelta(hours=1)
-        assert _should_reset(updated_at, boundary) is True
+        assert _should_reset(event_at, boundary) is True
 
         # after_boundary
-        updated_at = datetime.now().isoformat()
+        event_at = datetime.now().isoformat()
         boundary = datetime.now() - timedelta(hours=1)
-        assert _should_reset(updated_at, boundary) is False
+        assert _should_reset(event_at, boundary) is False
 
 
     def test_invalid_format(self):
@@ -232,14 +232,14 @@ class TestComputeRealtimeValue:
     def test_regeneration_time_units(self):
         # minute_regen
         now = datetime.now()
-        updated_at = (now - timedelta(minutes=60)).isoformat(timespec="seconds")
-        val, new_ts = _compute_regen_value(100, updated_at, "minute", 0.125, 2500)
+        event_at = (now - timedelta(minutes=60)).isoformat(timespec="seconds")
+        val, new_ts = _compute_regen_value(100, event_at, "minute", 0.125, 2500)
         assert val == 107.5  # 100 + 60 * 0.125
 
         # hour_regen
         now = datetime.now()
-        updated_at = (now - timedelta(minutes=150)).isoformat(timespec="seconds")
-        val, new_ts = _compute_regen_value(100, updated_at, "hour", 10, 2500)
+        event_at = (now - timedelta(minutes=150)).isoformat(timespec="seconds")
+        val, new_ts = _compute_regen_value(100, event_at, "hour", 10, 2500)
         # 150 分钟 = 2 整小时
         assert val == 120  # 100 + 2 * 10
 
@@ -248,11 +248,11 @@ class TestComputeRealtimeValue:
         # 使用固定的 now 时间（10:00，确保在 05:00 之后）
         fixed_now = datetime(2026, 8, 8, 10, 0, 0)
         yesterday_3am = datetime(2026, 8, 7, 3, 0, 0)
-        updated_at = yesterday_3am.isoformat(timespec="seconds")
+        event_at = yesterday_3am.isoformat(timespec="seconds")
         with patch('lvjiang.core.profile.engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val, ts = _compute_regen_value(100, updated_at, "day", 450, 2500, "05:00")
+            val, ts = _compute_regen_value(100, event_at, "day", 450, 2500, "05:00")
         # Should have crossed at least 1 day boundary
         assert val >= 550  # 100 + 1 * 450
 
@@ -261,23 +261,23 @@ class TestComputeRealtimeValue:
         """能量：04:40 → 05:09 应跨过 05:00 并增加 450"""
         from unittest.mock import patch
         fixed_now = datetime(2026, 8, 9, 5, 9, 0)
-        updated_at = datetime(2026, 8, 9, 4, 40, 6).isoformat(timespec="seconds")
+        event_at = datetime(2026, 8, 9, 4, 40, 6).isoformat(timespec="seconds")
         with patch('lvjiang.core.profile.engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
-            val, ts = _compute_regen_value(1256, updated_at, "day", 450, 2500, "05:00")
+            val, ts = _compute_regen_value(1256, event_at, "day", 450, 2500, "05:00")
         assert val == 1706
         assert ts == "2026-08-09T05:09:00"
 
     def test_regen_capped(self):
         """回复封顶"""
         now = datetime.now()
-        updated_at = (now - timedelta(minutes=6000)).isoformat(timespec="seconds")
-        val, _ = _compute_regen_value(2400, updated_at, "minute", 0.125, 2500)
+        event_at = (now - timedelta(minutes=6000)).isoformat(timespec="seconds")
+        val, _ = _compute_regen_value(2400, event_at, "minute", 0.125, 2500)
         assert val == 2500
 
     def test_no_updated_at(self):
-        """无 updated_at 返回原始值"""
+        """无 event_at 返回原始值"""
         val, ts = _compute_regen_value(100, "", "minute", 0.125, 2500)
         assert val == 100
         assert ts == ""
@@ -291,8 +291,8 @@ class TestComputeRealtimeValue:
     def test_minute_alignment(self):
         """整分钟对齐：秒数误差不累积"""
         now = datetime.now()
-        updated_at = (now - timedelta(minutes=5, seconds=20)).isoformat(timespec="seconds")
-        val, new_ts = _compute_regen_value(100, updated_at, "minute", 1.0, None)
+        event_at = (now - timedelta(minutes=5, seconds=20)).isoformat(timespec="seconds")
+        val, new_ts = _compute_regen_value(100, event_at, "minute", 1.0, None)
         # 5 整分钟 * 1.0 = 5
         assert val == 105.0
 
@@ -301,12 +301,12 @@ class TestComputeRealtimeValue:
         from unittest.mock import patch
 
         fixed_now = datetime(2026, 8, 9, 10, 4, 0)
-        updated_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
+        event_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
         with patch('lvjiang.core.profile.engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val, new_ts = _compute_regen_value(
-                100.5, updated_at, "minute", 0.125, 600
+                100.5, event_at, "minute", 0.125, 600
             )
 
         assert val == 101.0
@@ -319,13 +319,13 @@ class TestComputeRealtimeValue:
         start = datetime(2026, 8, 9, 10, 0, 0)
         first_now = datetime(2026, 8, 9, 10, 3, 30)
         second_now = datetime(2026, 8, 9, 10, 8, 0)
-        updated_at = start.isoformat(timespec="seconds")
+        event_at = start.isoformat(timespec="seconds")
 
         with patch('lvjiang.core.profile.engine.datetime') as mock_dt:
             mock_dt.now.return_value = first_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val1, ts1 = _compute_regen_value(
-                100.5, updated_at, "minute", 0.125, 600
+                100.5, event_at, "minute", 0.125, 600
             )
 
         with patch('lvjiang.core.profile.engine.datetime') as mock_dt:
@@ -335,24 +335,24 @@ class TestComputeRealtimeValue:
                 val1, ts1, "minute", 0.125, 600
             )
             single_val, single_ts = _compute_regen_value(
-                100.5, updated_at, "minute", 0.125, 600
+                100.5, event_at, "minute", 0.125, 600
             )
 
         assert stepped_val == single_val == 101.5
         assert stepped_ts == single_ts == "2026-08-09T10:08:00"
 
     def test_sub_minute_progress_does_not_advance_timestamp(self):
-        """未满一个 minute 周期时，不推进 updated_at，剩余秒数保留在时间差里"""
+        """未满一个 minute 周期时，不推进 event_at，剩余秒数保留在时间差里"""
         from unittest.mock import patch
 
         fixed_now = datetime(2026, 8, 9, 10, 0, 59)
-        updated_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
+        event_at = datetime(2026, 8, 9, 10, 0, 0).isoformat(timespec="seconds")
         with patch('lvjiang.core.profile.engine.datetime') as mock_dt:
             mock_dt.now.return_value = fixed_now
             mock_dt.fromisoformat = datetime.fromisoformat
             val, new_ts = _compute_regen_value(
-                100.5, updated_at, "minute", 0.125, 600
+                100.5, event_at, "minute", 0.125, 600
             )
 
         assert val == 100.5
-        assert new_ts == updated_at
+        assert new_ts == event_at

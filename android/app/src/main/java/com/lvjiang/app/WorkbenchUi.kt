@@ -1206,13 +1206,11 @@ class WorkbenchUi(
         entry(tools, "高级功能", "悬浮控制、电脑连接与屏幕标定") { openTools("ADVANCED") }
         entry(tools, "自检与诊断", "检查环境、复制与分享报告") { openTools("DIAGNOSTICS") }
         accountCard()
-        val sourceRow = SettingsUi.row(activity, "数据同步", "正在读取数据来源…")
+        val sourceRow = SettingsUi.row(activity, "数据同步", "正在读取同步状态…")
         sourceRow.setOnClickListener { showProfileSource() }
         tools.addView(sourceRow)
         profileSourceSummary = (sourceRow.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
-        request({ PyBridge.accountProfileMode(activity) }) { result ->
-            updateProfileSourceSummary(result.optString("mode"))
-        }
+        request({ PyBridge.accountProfileStatus(activity) }) { updateProfileSourceSummary(it) }
         val about = card()
         text(about, "关于与反馈", 18f)
         val versionRow = SettingsUi.row(activity, "版本与发布说明", "正在读取版本…")
@@ -1341,38 +1339,31 @@ class WorkbenchUi(
         dialog.show()
     }
 
-    /** 总览数据行的摘要：模式 + 云端同步位置。 */
+    /** 总览数据行的摘要：来源 + 云端同步位置。 */
     private var profileSourceSummary: TextView? = null
 
-    private fun updateProfileSourceSummary(mode: String) {
-        request({ PyBridge.accountProfileMode(activity) }) { result ->
-            val snapshot = result.optInt("snapshot_id", 0)
-            val watermark = result.optInt("snapshot_remote_id", 0)
-            val source = if (mode == "pc") "数据来源：PC端" else "数据来源：云端"
-            profileSourceSummary?.text = if (snapshot > 0)
-                "$source · 快照#$snapshot · 历史水位 $watermark" else source
-        }
+    private fun updateProfileSourceSummary(result: JSONObject) {
+        val snapshot = result.optInt("snapshot_id", 0)
+        val watermark = result.optInt("snapshot_remote_id", 0)
+        profileSourceSummary?.text = if (snapshot > 0)
+            "数据来源：云端 · 快照#$snapshot · 历史水位 $watermark" else "数据来源：云端"
     }
 
     /**
      * 数据同步对话框。布局定案：
      * - 标题行右上角：「清除数据」（destructive，与标题同一行）；
-     * - 状态行（模式 / 云端位置 / 未同步数）；
-     * - 底部按钮行：云端模式 = 「立即同步」在左、「关闭」在最右（同一行）；
-     *   PC端模式没有同步概念，底部只有「关闭」；
-     * - 「切换为 云端/PC端」独立成行、靠最左，不与上述按钮混排。
+     * - 状态行（云端位置 / 未同步数）；
+     * - 底部按钮行：「立即同步」在左、「关闭」在最右（同一行）。
      */
     private fun showProfileSource() {
-        request({ PyBridge.accountProfileMode(activity) }) { result ->
+        request({ PyBridge.accountProfileStatus(activity) }) { result ->
             if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
-            val isPc = result.optString("mode") == "pc"
             val snapshot = result.optInt("snapshot_id", 0)
             val watermark = result.optInt("snapshot_remote_id", 0)
             val pending = result.optInt("pending_push", 0)
-            val lines = mutableListOf(if (isPc) "当前来源：PC端" else "当前来源：云端")
+            val lines = mutableListOf("当前来源：云端")
             if (snapshot > 0) lines.add("云端快照 #$snapshot · 历史水位 $watermark")
-            if (!isPc) lines.add(
-                if (pending > 0) "未同步变更 $pending 条" else "变更已全部同步")
+            lines.add(if (pending > 0) "未同步变更 $pending 条" else "变更已全部同步")
 
             val content = SettingsUi.dialogContent(activity)
 
@@ -1392,7 +1383,7 @@ class WorkbenchUi(
             }, LinearLayout.LayoutParams(0, -2, 1f))
             titleBar.addView(profileActionButton("清除数据", destructive = true) {
                 dialog.dismiss()
-                confirmClearProfile(keepMode = true)
+                confirmClearProfile()
             }, LinearLayout.LayoutParams(-2, -2))
             content.addView(titleBar, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = (6 * activity.resources.displayMetrics.density).toInt()
@@ -1400,51 +1391,14 @@ class WorkbenchUi(
 
             lines.forEach { text(content, it) }
 
-            // 切换模式：独立一行，靠最左
-            val switchRow = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.START
-            }
-            switchRow.addView(profileActionButton(if (isPc) "切换为云端" else "切换为 PC端") {
-                dialog.dismiss()
-                if (isPc) {
-                    confirmClearProfile(keepMode = false)   // PC端→云端必须先清除
-                } else {
-                    // 云端→PC端：破坏性操作，一律二次确认（带未同步数据评估）
-                    request({ PyBridge.accountSetProfileMode(activity, "pc") }) { r ->
-                        if (r.optBoolean("need_confirm")) {
-                            MaterialAlertDialogBuilder(activity)
-                                .setTitle("切换为 PC端")
-                                .setMessage(r.optString("message"))
-                                .setNegativeButton("取消", null)
-                                .setPositiveButton("确认切换") { _, _ ->
-                                    request({ PyBridge.accountSetProfileModeForce(activity, "pc") }) { rr ->
-                                        if (rr.optBoolean("ok")) updateProfileSourceSummary("pc")
-                                        toast(if (rr.optBoolean("ok")) "已切换为 PC端"
-                                              else "失败：${rr.optString("message")}")
-                                    }
-                                }.show()
-                            return@request
-                        }
-                        if (r.optBoolean("ok")) updateProfileSourceSummary("pc")
-                        toast(if (r.optBoolean("ok")) "已切换为 PC端" else "失败：${r.optString("message")}")
-                    }
-                }
-            }, LinearLayout.LayoutParams(-2, -2))
-            content.addView(switchRow, LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = (8 * activity.resources.displayMetrics.density).toInt()
-            })
-
-            // 底部按钮行：立即同步（仅云端）在左、关闭在最右
+            // 底部按钮行：立即同步在左、关闭在最右
             val bottom = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
-            if (!isPc) {
-                bottom.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
-                    LinearLayout.LayoutParams(-2, -2))
-                bottom.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
-            }
+            bottom.addView(profileActionButton("立即同步") { dialog.dismiss(); syncNow() },
+                LinearLayout.LayoutParams(-2, -2))
+            bottom.addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
             bottom.addView(profileActionButton("关闭") { dialog.dismiss() },
                 LinearLayout.LayoutParams(-2, -2))
             content.addView(bottom, LinearLayout.LayoutParams(-1, -2).apply {
@@ -1471,20 +1425,22 @@ class WorkbenchUi(
             setOnClickListener { action() }
         }
 
-    /** 清除本地总览数据。keepMode=true 保持当前模式（云端=从云端重拉，
-     *  PC端=等下一次离线包）；false 为切换到云门前置清除。 */
-    private fun confirmClearProfile(keepMode: Boolean) {
-        val afterClear = if (keepMode) "下次同步将按当前来源重新获取。"
-                         else "清除后将切换为云端，下次同步从云端快照重新获取。"
+    /** 清除本地总览数据：删库 + 水位归零，下次同步自动重建。 */
+    private fun confirmClearProfile() {
         MaterialAlertDialogBuilder(activity).setTitle("清除本地总览数据")
-            .setMessage("将删除手机上的全部总览数据并清空同步进度；$afterClear")
+            .setMessage("将删除手机上的全部总览数据并清空同步进度；下次同步自动从云端重建。")
             .setNegativeButton("取消", null)
             .setPositiveButton("清除") { _, _ ->
-                request({ PyBridge.accountClearProfile(activity, keepMode) }) { r ->
-                    if (r.optBoolean("ok") && !keepMode) updateProfileSourceSummary("remote")
+                request({ PyBridge.accountClearProfile(activity) }) { r ->
+                    if (r.optBoolean("ok")) refreshProfileSummary()
                     toast(if (r.optBoolean("ok")) r.optString("message") else "失败：${r.optString("message")}")
                 }
             }.show()
+    }
+
+    /** 重新拉取一次 profile 同步状态并刷新摘要行。 */
+    private fun refreshProfileSummary() {
+        request({ PyBridge.accountProfileStatus(activity) }) { updateProfileSourceSummary(it) }
     }
 
     /** 账户对话框：只保留修改密码（浏览器）与退出登录（红色警示）。 */

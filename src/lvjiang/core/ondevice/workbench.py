@@ -59,10 +59,11 @@ def profile_view(username: str) -> str:
             entry = data.get(model, {}).get(kd.key)
             items.append({"key": kd.key, "model": model, "model_label": MODEL_LABELS.get(model or "", "数据"), "label": kd.label or kd.key,
                           "group": "默认" if kd.group == "default" else kd.group,
-                          "value": (entry.value_text if model == MODEL_NOTE else entry.value) if entry else None,
+                          # read_all 的 payload 已含 regen 实时计算值，锁定行 value=None
+                          "value": (entry.get("value_text", "") if model == MODEL_NOTE else entry.get("value")) if entry else None,
                           "collected": bool(entry), "cap": kd.cap if kd.show_cap else None,
-                          "locked": bool(entry and entry.locked),
-                          "event_at": entry.event_at if entry else ""})
+                          "locked": bool(entry and entry.get("locked")),
+                          "event_at": entry.get("event_at", "") if entry else ""})
         return _json({"ok": True, "items": items, "username": username})
     except Exception as exc:
         return _json({"ok": False, "message": str(exc)})
@@ -106,11 +107,15 @@ def profile_all_users(model: str = "", key: str = "") -> str:
         per_user = {name: profile_read_all(name) for name in users}
 
         def display_value(model: str, entry: dict):
-            """单个值：note 用文本，其余数值取整；返回字符串或 None。"""
+            """单个值：note 用文本，其余数值取整；返回字符串或 None。
+
+            ``entry`` 是 ``profile_read_all`` 的 payload dict：regen 的 value
+            已按当前时间算好（周期型/速率型都不再读库存值）。
+            """
             if model == MODEL_NOTE:
-                text = entry.value_text
+                text = entry["value_text"]
                 return text if text else None
-            value = entry.value
+            value = entry["value"]
             if value is None:
                 return None
             try:
@@ -146,9 +151,9 @@ def profile_all_users(model: str = "", key: str = "") -> str:
                     "value": value,
                     "collected": bool(entry),
                 })
-                if summable and entry and entry.value is not None:
+                if summable and entry and entry["value"] is not None:
                     try:
-                        total += float(entry.value)
+                        total += float(entry["value"])
                         has_total = True
                     except (TypeError, ValueError):
                         pass

@@ -159,14 +159,10 @@ object PyBridge {
         callJson(context, "account_heartbeat_start", moduleName = ACCOUNT_MODULE)
     fun accountHeartbeatStop(context: Context): JSONObject =
         callJson(context, "account_heartbeat_stop", moduleName = ACCOUNT_MODULE)
-    fun accountProfileMode(context: Context): JSONObject =
-        callJson(context, "account_profile_mode", moduleName = ACCOUNT_MODULE)
-    fun accountSetProfileMode(context: Context, mode: String): JSONObject =
-        callJson(context, "account_set_profile_mode", mode, moduleName = ACCOUNT_MODULE)
-    fun accountSetProfileModeForce(context: Context, mode: String): JSONObject =
-        callJson(context, "account_set_profile_mode", mode, true, moduleName = ACCOUNT_MODULE)
-    fun accountClearProfile(context: Context, keepMode: Boolean = false): JSONObject =
-        callJson(context, "account_clear_profile", keepMode, moduleName = ACCOUNT_MODULE)
+    fun accountProfileStatus(context: Context): JSONObject =
+        callJson(context, "account_profile_status", moduleName = ACCOUNT_MODULE)
+    fun accountClearProfile(context: Context): JSONObject =
+        callJson(context, "account_clear_profile", moduleName = ACCOUNT_MODULE)
 
     fun checkRuntime(context: Context, ocr: Boolean = true, screenRepetitions: Int = 0): JSONObject =
         callJson(context, "check_runtime", ocr, screenRepetitions, moduleName = OFFLINE_MODULE)

@@ -72,17 +72,13 @@ def reset_configuration() -> None:
 
 def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_config: bool = True) -> str:
     from ..offline_bundle import install_offline_bundle
-    from . import profile_source
     from .task_runner import CONTROL_LOCK, is_running
 
     with CONTROL_LOCK:
         if is_running():
             return json.dumps({"ok": False, "message": "请先结束手机任务再同步"}, ensure_ascii=False)
-        # 总览数据来源模式是手机的主权设置：remote 模式下 profile 只认云端，
-        # PC 包携带 profile 数据时必须拒收。manifest["profile"]=false 的
-        # 配置包（云端模式配置下发）不携带总览数据，按声明放行；旧版本 PC
-        # 的包没有该字段，缺省按携带处理维持拒收。读不了/坏包按携带处理，
-        # 宁可拒绝也不能绕过模式闸门。
+        # profile 全面在线化：离线包不再携带总览数据。旧版本 PC 打的包带着
+        # profile.db/profile.yaml，同样拒绝——重新打包即可（总览由账号云端同步）。
         try:
             import json as _json
             import zipfile
@@ -92,18 +88,16 @@ def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_conf
                 carries_profile = bool(manifest.get("profile", True))
         except (OSError, ValueError, KeyError, zipfile.BadZipFile):
             carries_profile = True
-        if carries_profile and profile_source.mode() == profile_source.REMOTE:
+        if carries_profile:
             return json.dumps({"ok": False,
-                "message": "Android 拒绝接收：总览数据处于云端模式。"
-                           "请在手机「设置 → 总览数据」切换为 PC端后重试"},
+                "message": "Android 拒绝接收：同步包携带总览数据。"
+                           "总览由账号云端同步，请用新版 PC 重新打包"},
                 ensure_ascii=False)
         try:
             summary = install_offline_bundle(Path(path), constants.PROJECT_ROOT,
                                              preserve_task_params=preserve_task_params,
                                              preserve_batch_config=preserve_batch_config, on_applied=reset_configuration)
-            message = ("脚本与配置已同步到手机；总览数据由账号云端同步更新"
-                       if not summary.get("profile", True)
-                       else "脚本、配置与 DB 已同步到手机")
+            message = "脚本、配置与 DB 已同步到手机；总览数据由账号云端同步"
             return json.dumps({"ok": True, "message": message, "sync": summary}, ensure_ascii=False)
         except Exception as exc:
             # 安装器已恢复旧配置；同时丢弃重载失败前创建的部分缓存。

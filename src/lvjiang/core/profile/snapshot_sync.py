@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import socket
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -788,10 +787,8 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     """把本机**全部用户**的当前 entries 作为一份账户级快照上传，
     绑到「此刻的远端最大 remote_id」。
 
-    **谁能建快照**：云端已有快照时只有 PC 能覆盖——Android 是没有总览编辑能力的
-    镜像端，覆盖等于把手机那份库当成全网基线。云端**一份快照都没有**时例外：
-    任何端（含手机）都可以建立第一份基线，否则纯手机用户永远没有基线、云端
-    总览永远空白。这是「首份基线自动授权」，不需要用户确认。
+    **谁能建快照**：任何登录端（PC / Android）都可以创建与刷新——快照只是
+    「当前值的全网基线」，上传前必然先拉取，各端数据同源。
     **上传前先拉一遍**：快照绑定的 ``snapshot_remote_id`` 语义是「该 id 及之前
     的变更都已体现在这份 entries 里」。若不先同步，别的设备刚推上来的行会被
     这个水位"吞掉"——新设备拿到的是旧基线，且那些行再也不会被回放。
@@ -801,10 +798,6 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     初始播种传 True，允许用空列表建立第一份基线。
     """
     report = ProfileSyncReport()
-    cloud_has_snapshot = bool(remote_snapshots(token))
-    if hasattr(sys, "getandroidapilevel") and cloud_has_snapshot:
-        report.errors.append("手机端不能覆盖云端总览快照；请用 PC 创建")
-        return report
     pulled = pull_and_replay(token, tolerate_no_snapshot=True)
     report.pulled = pulled.pulled
     report.errors.extend(pulled.errors)

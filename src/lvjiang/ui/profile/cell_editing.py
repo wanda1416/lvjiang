@@ -249,13 +249,17 @@ class ProfileCellEditingMixin:
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
 
+        # 空白单元格表示没有记录，但引擎读到的同样是 0。用户显式输入 0 是要求
+        # 留下「明确为零」的记录，不能当成同值无操作丢掉；只有清空输入才放弃。
+        missing_entry_write = not entry and raw_value.strip() != ""
+
         delta = parsed_value - current_value
         force_target_write = (
             model_type == MODEL_REGEN
             and _is_continuous_regen(kd)
             and abs(parsed_value - math.floor(parsed_value)) > 1e-9
         )
-        if delta == 0:
+        if delta == 0 and not missing_entry_write:
             return
 
         # Cell 编辑路径根据变动方向选择对应词表（增加→来源，减少→用途）
@@ -269,6 +273,7 @@ class ProfileCellEditingMixin:
             trigger_sync=True, source=cell_source, expected_entry=dict(entry),
             regen_progress_source="target",
             force_write=force_target_write,
+            missing_entry=missing_entry_write,
             set_value=parsed_value,
         )
 
@@ -541,12 +546,16 @@ class ProfileCellEditingMixin:
         regen_progress_source: str = "current",
         force_write: bool = False,
         set_value: float | None = None,
+        missing_entry: bool = False,
     ):
         """按增量数值写回。
 
         UI 只负责收集上下文、处理提示和刷新；写入语义统一委托 profile.service.profile_action。
+
+        missing_entry: 空白单元格本来没有记录。用户显式输入 0 时 delta 为 0，
+        但这次写入的语义是「留下明确为零的记录」，不能按同值无操作丢弃。
         """
-        if delta == 0:
+        if delta == 0 and not missing_entry:
             return
         from ...core.profile.service import (
             ProfileWriteConflict,
@@ -579,7 +588,8 @@ class ProfileCellEditingMixin:
             trigger_sync=trigger_sync,
             use_cas=use_cas,
             regen_progress_source=regen_progress_source,
-            force_write=force_write,
+            # 建记录时新值仍是 0，必须让 service 也跳过同值短路。
+            force_write=force_write or missing_entry,
         ), complete)
 
     def _register_new_source(self: ProfileTab, kd: KeyDef, source: str, vocab: list[str]) -> None:  # type: ignore[misc]

@@ -1,5 +1,7 @@
 """只读节点不能落盘配置；长快照不能覆盖新数据；安装刷新不持临界区。"""
 import json
+import subprocess
+import sys
 import threading
 from contextlib import contextmanager
 
@@ -93,18 +95,94 @@ def test_installed_callback_can_read_configuration_from_another_thread(tmp_path)
     assert not (tmp_path / "session/config.lock").exists()
 
 
+def _readline_with_timeout(stream, timeout: float) -> str:
+    """跨平台地给管道 ``readline`` 加超时（Windows 的 select 不能用于管道）。"""
+    box: list[str] = []
+
+    def _read() -> None:
+        box.append(stream.readline())
+
+    reader = threading.Thread(target=_read, daemon=True)
+    reader.start()
+    reader.join(timeout)
+    if reader.is_alive() or not box:
+        raise RuntimeError(f"lock holder did not report ready within {timeout}s")
+    return box[0].strip()
+
+
+def _release_lock_holder(proc: subprocess.Popen) -> None:
+    """关闭 stdin 让子进程释放锁，并收干净所有管道以免 ResourceWarning。"""
+    try:
+        if proc.stdin is not None and not proc.stdin.closed:
+            proc.stdin.close()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=2)
+    finally:
+        for stream in (proc.stdout, proc.stderr, proc.stdin):
+            if stream is not None and not stream.closed:
+                stream.close()
+
+
 @contextmanager
 def _occupied_user_lease(users_dir_path, username: str):
     """模拟另一个进程持有该用户的执行租约。
 
-    直接占住锁文件而不经过 ``Lease``，这样本进程的 ``_held`` 缓存不会命中，
-    等价于跨进程占用。
+    必须在子进程里占锁：Windows 的 ``msvcrt.locking`` 按文件句柄互斥，
+    同进程第二个句柄会失败；Linux 的 ``fcntl.lockf`` 按进程算，同进程再锁
+    会直接成功，测不出跨进程占用。子进程不走 ``Lease``，本进程的
+    ``_held`` 缓存也不会命中。
     """
-    from fasteners import InterProcessLock
-
     lease = access.user_lease(username, users_dir_path)
-    with InterProcessLock(lease.key):
+    child = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from fasteners import InterProcessLock\n"
+        "lock_path = sys.argv[1]\n"
+        "Path(lock_path).parent.mkdir(parents=True, exist_ok=True)\n"
+        "lock = InterProcessLock(lock_path)\n"
+        "if not lock.acquire(blocking=True):\n"
+        "    raise SystemExit('failed to acquire lock')\n"
+        "print('LOCKED', flush=True)\n"
+        "try:\n"
+        "    sys.stdin.read()\n"
+        "finally:\n"
+        "    lock.release()\n"
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-c", child, lease.key],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    try:
+        try:
+            line = _readline_with_timeout(proc.stdout, 10.0)
+        except RuntimeError as exc:
+            err = ""
+            if proc.poll() is not None and proc.stderr is not None:
+                err = proc.stderr.read()
+            raise RuntimeError(
+                f"lock holder did not become ready (rc={proc.poll()}): {err}"
+            ) from exc
+        if line != "LOCKED":
+            err = ""
+            if proc.poll() is not None and proc.stderr is not None:
+                err = proc.stderr.read()
+            raise RuntimeError(
+                f"lock holder ready line was {line!r} (rc={proc.poll()}): {err}"
+            )
         yield
+    finally:
+        _release_lock_holder(proc)
 
 
 def test_ui_state_write_is_not_blocked_by_user_execution_lease(tmp_path):

@@ -114,6 +114,7 @@ scrcpy_capture:
   未安装 PyAV，无法解码视频流（请安装 av 依赖）: PyAV is not installed; the video stream cannot be decoded (install the av dependency)
   画面流不可用: The screen stream is unavailable
   等待新画面超时: Timed out waiting for a new frame
+  视频包长度异常，画面流已失步（需要重建会话）: Abnormal video packet length; the screen stream is out of sync (the session needs to be rebuilt)
   视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: The video stream connection was closed by the peer (scrcpy session ended or cleaned up by another program)
   视频流连接被中断：{error}: 'The video stream connection was interrupted: {error}'
   读取视频流异常：{error}: 'Error while reading the video stream: {error}'

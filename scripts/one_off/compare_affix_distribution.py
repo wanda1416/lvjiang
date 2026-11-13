@@ -199,7 +199,7 @@ def compare(pc: list[dict], web: list[dict]) -> int:
     3. 规则断言：词条 2-5 互不重复、首词条可与普通词条同名、数值非空。
     """
     problems = 0
-    for a, b in zip(pc, web):
+    for a, b in zip(pc, web, strict=False):
         name = a["name"]
         if bool(a["errors"]) != bool(b["errors"]):
             print(f"[{name}] 报错不一致：PC={a['errors']} WEB={b['errors']}")
@@ -211,10 +211,10 @@ def compare(pc: list[dict], web: list[dict]) -> int:
 
         diffs: list[str] = []
         for slot in SLOTS:
-            def bag(source: dict) -> list[tuple[str, float]]:
+            def bag(source: dict, _slot: str = slot) -> list[tuple[str, float]]:
                 items = []
                 for i in range(1, 6):
-                    affix = (source.get(slot, {}).get(f"affix_{i}") or {})
+                    affix = (source.get(_slot, {}).get(f"affix_{i}") or {})
                     if affix.get("name"):
                         items.append((affix["name"], round(float(affix.get("value") or 0), 6)))
                 return sorted(items)

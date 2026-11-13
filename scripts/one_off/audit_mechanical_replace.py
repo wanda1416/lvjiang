@@ -9,11 +9,8 @@
 """
 from __future__ import annotations
 
-import io
 import re
 import subprocess
-import sys
-from pathlib import Path
 
 FILES = [
     "src/lvjiang/core/profile/snapshot_sync.py",
@@ -84,7 +81,7 @@ for path in FILES:
     lines = text.split("\n")
     # 变量 → 类型 的局部推断（赋值自已知工厂/构造）
     var_type: dict[str, str] = {}
-    for index, line in enumerate(lines):
+    for index, line in enumerate(lines):  # noqa: B007
         # x = factory(...)
         for fname in DICT_FACTORIES:
             m = re.search(rf"(\w+)\s*=\s*(?:\w+\.)?{fname}\(", line)
@@ -105,7 +102,7 @@ for path in FILES:
         if m and re.search(r'"\w+":', line):
             var_type[m.group(1)] = "dict"
 
-    for index, line in enumerate(lines):
+    for index, line in enumerate(lines):  # noqa: B007
         stripped = line.strip()
         if stripped.startswith("#"):
             continue
@@ -123,7 +120,7 @@ for path in FILES:
         # dataclass 变量的下标访问：var["attr"]
         for var, kind in var_type.items():
             if kind in DATACLASSES:
-                for m in re.finditer(rf"(?<![\w.]){var}\[", line):
+                for _m in re.finditer(rf"(?<![\w.]){var}\[", line):
                     problems.append(
                         f"{path}:{index + 1}  dataclass `{kind}` 变量 `{var}` 用了下标访问"
                         f"  ← {stripped[:90]}")

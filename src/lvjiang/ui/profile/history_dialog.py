@@ -184,8 +184,11 @@ class _RowActions(QWidget):
         apply_compact_button_style(self._undo, self._delete, variant="neutral")
         fit_button_width(self._undo, self._delete)
         self._delete.setToolTip(tr("仅删除历史，不修改当前值；会影响按历史统计的额度"))
-        self._undo.clicked.connect(lambda: dialog._confirm_undo(self._record))
-        self._delete.clicked.connect(lambda: dialog._confirm_delete(self._record))
+        # 晚绑定：点击时才读 self._record（set_record 在构造之后才调用）
+        self._undo.clicked.connect(
+            lambda: dialog._confirm_undo_or_ignore(self._record))
+        self._delete.clicked.connect(
+            lambda: dialog._confirm_delete_or_ignore(self._record))
         layout.addWidget(self._undo)
         layout.addWidget(self._delete)
 
@@ -558,7 +561,7 @@ class HistoryDialog(QDialog):
 
     # ─── 表格渲染 ─────────────────────────────────────────────
 
-    def _render(self, rows: list[dict]) -> None:
+    def _render(self, rows: list[HistoryRow]) -> None:
         table = self._table
         target = len(rows) + 1
         # 行数缩减时主动摘掉多余的按钮控件：只靠 setRowCount 让 Qt 延迟销毁，
@@ -989,6 +992,16 @@ class HistoryDialog(QDialog):
             return
         self.values_changed = True
         self._reload(reset_page=False, refresh_facets=True)
+
+    def _confirm_delete_or_ignore(self, record: HistoryRow | None) -> None:
+        if record is None:
+            return
+        self._confirm_delete(record)
+
+    def _confirm_undo_or_ignore(self, record: HistoryRow | None) -> None:
+        if record is None:
+            return
+        self._confirm_undo(record)
 
     def _confirm_delete(self, record: HistoryRow) -> None:
         message = tr(

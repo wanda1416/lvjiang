@@ -103,7 +103,8 @@ def normalize_realtime_write(
     return float(whole), event_at.isoformat(timespec="seconds")
 
 
-def next_realtime_point_seconds(entry: dict, kd: RegenKeyDef, now: datetime | None = None) -> float | None:
+def next_realtime_point_seconds(entry: Entry | None, kd: RegenKeyDef,
+                                now: datetime | None = None) -> float | None:
     current = compute_realtime_value(
         (entry.value if entry is not None else 0) or 0,
         entry.event_at if entry is not None else "", kd, now)

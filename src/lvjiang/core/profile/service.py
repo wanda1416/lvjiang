@@ -150,7 +150,7 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         return None
     if model_type == MODEL_NOTE:
         entry = db_read_entry(username, model_type, key)
-        return entry.value_text or None
+        return (entry.value_text if entry is not None else "") or None
     entry = db_read_entry(username, model_type, key)
     if entry is None:
         return 0.0
@@ -169,10 +169,13 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
     return current
 
 
-def _quota_display_value(entry: dict, kd: QuotaKeyDef) -> float:
-    """配额跨过周期边界后读出来是 0，不另写一条 reset。"""
-    stored = float(entry.value or 0)
-    event_at = entry.event_at or ""
+def _quota_display_value(entry: Entry | None, kd: QuotaKeyDef) -> float:
+    """配额跨过周期边界后读出来是 0，不另写一条 reset。
+
+    ``entry=None``（条目不存在）视为 0 值、无时间戳。
+    """
+    stored = float((entry.value if entry is not None else 0) or 0)
+    event_at = (entry.event_at if entry is not None else "") or ""
     from .arbitrate import parse_event
 
     event = parse_event(event_at)
@@ -284,29 +287,28 @@ def profile_read_all(username: str) -> dict:
     """
     entries = db_read_all(username)
     config = get_profile_config()
-    for entry in entries:
-        if entry.locked:
-            entry.value = None
-            entry.value_text = ""
     index = {(entry.type, entry.key): entry for entry in entries}
+    display: dict[tuple[str, str], float] = {}
     for kd in config.get_keys_by_model(MODEL_QUOTA):
         if not isinstance(kd, QuotaKeyDef):
             continue
         entry = index.get((MODEL_QUOTA, kd.key))
-        if entry and not entry.locked:
-            entry.value = _quota_display_value(entry, kd)
+        if entry is not None and not entry.locked:
+            display[(entry.type, entry.key)] = _quota_display_value(entry, kd)
     for kd in config.get_keys_by_model(MODEL_REGEN):
         if not isinstance(kd, RegenKeyDef):
             continue
         entry = index.get((MODEL_REGEN, kd.key))
-        if entry and not entry.locked:
-            entry.value = compute_regen_entry(entry, kd).value
-    # JSON 边界：DSL / workbench 读的是可序列化结构，只在这里转一次
+        if entry is not None and not entry.locked:
+            display[(entry.type, entry.key)] = compute_regen_entry(entry, kd).value
+    # JSON 边界：DSL / workbench 读的是可序列化结构，只在这里转一次。
+    # 锁定行的值在输出层置 None/""（值停在锁定时的样子，但对外不可读）。
     payload: dict[str, dict[str, dict]] = {}
     for entry in entries:
         payload.setdefault(entry.type, {})[entry.key] = {
-            "value": entry.value,
-            "value_text": entry.value_text,
+            "value": None if entry.locked else display.get(
+                (entry.type, entry.key), entry.value),
+            "value_text": "" if entry.locked else entry.value_text,
             "event_at": entry.event_at,
             "created_at": entry.created_at,
             "op_id": entry.op_id,
@@ -367,7 +369,7 @@ def profile_observe(
             except (TypeError, ValueError):
                 is_current_period = False
 
-        current = _quota_display_value(entry, kd) if entry else 0.0
+        current = _quota_display_value(entry, kd) if entry is not None else 0.0
         if not is_current_period:
             # 跨周期：先把旧周期满值原子归零落库（历史里留一条 reset），
             # 再按新周期从 0 起算写入本次观测；只做显示归零会让库里长期留着旧值。
@@ -430,7 +432,7 @@ def profile_action(
     set_value: float | str | None = None,
     source: str = tr("DSL 写入"),
     current_value: float | None = None,
-    expected_entry: Entry | None = None,
+    expected_entry: Entry | _ExpectAbsent | None = None,
     trigger_sync: bool = True,
     use_cas: bool = False,
     regen_progress_source: str = "target",
@@ -606,11 +608,12 @@ def profile_action(
     if trigger_sync and use_cas and expected_entry is not None:
         # 三态：None=调用方不做 CAS；EXPECT_ABSENT=期望该行不存在（原空 dict）；
         # Entry=按打开界面时的快照做 CAS。
-        absent = expected_entry is EXPECT_ABSENT
+        snapshot = expected_entry if isinstance(expected_entry, Entry) else None
+        absent = snapshot is None
         updated = db_update_if_current(
             username, model_type, key,
-            expected_value=(0 if absent else expected_entry.value) or 0,
-            expected_updated_at="" if absent else expected_entry.event_at,
+            expected_value=(snapshot.value if snapshot else 0) or 0,
+            expected_updated_at=snapshot.event_at if snapshot else "",
             expected_entry_exists=not absent,
             new_value=write_value,
             new_updated_at=None,
@@ -654,7 +657,11 @@ def profile_action(
 
 
 #: CAS 期望「该条目还不存在」的哨兵（对应旧协议里传空 dict 的语义）。
-EXPECT_ABSENT = object()
+class _ExpectAbsent:
+    """CAS 期望「该条目不存在」的哨兵（对应旧协议传空 dict 的语义）。"""
+
+
+EXPECT_ABSENT = _ExpectAbsent()
 
 @profile_write
 def sync_write_adapter(

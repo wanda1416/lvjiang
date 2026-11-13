@@ -41,7 +41,7 @@ from ...core.profile.schema import (
     get_profile_config,
     save_profile_config,
 )
-from ...core.profile.service import EXPECT_ABSENT
+from ...core.profile.service import EXPECT_ABSENT, _ExpectAbsent
 from ...core.profile.store import get_groups
 from ...errors import log_failure
 from ...i18n import tr, tr_label
@@ -317,13 +317,13 @@ class ProfileCellEditingMixin:
         # 获取当前值（从 DB 读取）
         profile_data = db_read_index(user_name)
         entry = (profile_data.get(model_type) or {}).get(key_str)
-        current_value = entry.value
+        current_value = (entry.value if entry is not None else None)
         if current_value is None:
             current_value = 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
         expected_entry = entry if entry is not None else EXPECT_ABSENT
-        is_locked = bool(entry.locked)
+        is_locked = bool(entry.locked) if entry is not None else False
 
         # 构建菜单
         menu = QMenu(self)
@@ -387,7 +387,9 @@ class ProfileCellEditingMixin:
         if model_type == MODEL_NOTE:
             action_edit = menu.addAction(tr("编辑文本..."))
             if action_edit:
-                current_text = expected_entry.value_text if expected_entry else ""
+                current_text = (
+                    expected_entry.value_text
+                    if isinstance(expected_entry, Entry) else "")
                 action_edit.triggered.connect(
                     lambda: self._edit_note_text(
                         user_name, model_type, key_str, kd, current_text,
@@ -544,7 +546,7 @@ class ProfileCellEditingMixin:
         delta: int | float,
         trigger_sync: bool = True,
         source: str = "",
-        expected_entry: Entry | None = None,
+        expected_entry: Entry | _ExpectAbsent | None = None,
         use_cas: bool = True,
         regen_progress_source: str = "current",
         force_write: bool = False,
@@ -620,7 +622,7 @@ class ProfileCellEditingMixin:
         kd,
         current_value,
         direction: int = 0,
-        expected_entry: Entry | None = None,
+        expected_entry: Entry | _ExpectAbsent | None = None,
     ):
         """自定义增量数值（带来源/用途选择）
 

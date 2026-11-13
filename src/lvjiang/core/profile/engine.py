@@ -30,6 +30,7 @@ from .periods import (
 from .regen import compute_regen_entry
 from .regen_gate import period_recovery_allowed
 from .repository import db_read_index, db_upsert
+from .rows import Entry
 from .schema import (
     get_profile_config,
 )
@@ -353,13 +354,13 @@ class ProfileProcessor:
         for kd in regen_keys:
             if not isinstance(kd, RegenKeyDef):
                 continue
-            entry = profile_data.get("regen", {}).get(kd.key, {})
+            entry = (profile_data.get("regen") or {}).get(kd.key)
             if entry is not None and entry.locked:
                 # 锁定 key 既不自动恢复，也不产生阈值告警
                 continue
-            if not entry:
+            if entry is None:
                 # 首次：以 0 值、空时间戳构造虚拟 entry，走正常计算路径
-                entry = {"value": 0, "event_at": ""}
+                entry = Entry(username=user_name, type="regen", key=kd.key, value=0)
             stored_value = entry.value
 
             regen_result = compute_regen_entry(entry, kd)

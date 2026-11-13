@@ -196,7 +196,7 @@ def _period_relation(op: dict, current: dict) -> str | None:
     return "same"
 
 
-def _apply_op(op: dict) -> bool:
+def _apply_op(op: RemoteOp) -> bool:
     """把一条远端 op 折进本地 entries 与账本；返回是否实际生效。
 
     **回放照常写账本**（``op_type`` 取 op 语义，``instance_id`` 取来源实例，
@@ -562,7 +562,7 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
                 if _apply_op(op):
                     applied += 1
             except Exception as error:      # 单条失败不拖垮整轮
-                report.errors.append(f"{op.get('username')}/{op.get('key')}: {error}")
+                report.errors.append(f"{op.username}/{op.key}: {error}")
         report.pulled += applied
         cursor = int(response.get("last_remote_id") or since)
         if cursor <= since or not ops:

@@ -18,7 +18,12 @@ from loguru import logger  # noqa: E402
 
 logger.remove()
 
-from lvjiang.core.profile import engine, regen_gate, repository, snapshot_sync  # noqa: E402
+from lvjiang.core.profile import (  # noqa: E402
+    engine,
+    regen_gate,
+    repository,
+    snapshot_sync,
+)
 from lvjiang.core.profile.models import QuotaKeyDef  # noqa: E402
 
 

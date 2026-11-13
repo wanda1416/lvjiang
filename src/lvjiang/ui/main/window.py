@@ -54,7 +54,7 @@ from ...core.plugin_runtime import PluginRuntimePort
 from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager
 from ...i18n import tr
-from ..overlay import BorderOverlay
+from ..execution.overlay import BorderOverlay
 from ..widgets.button_styles import (
     apply_button_style,
     apply_compact_button_style,
@@ -847,7 +847,7 @@ class MainWindow(
         right_layout.addWidget(self.tabs, stretch=1)
 
         # 告警面板（在 Tab 下方）
-        from ..alert_panel import AlertPanel
+        from ..execution.alert_panel import AlertPanel
         self._alert_panel = AlertPanel()
         right_layout.addWidget(self._alert_panel)
 
@@ -923,11 +923,11 @@ class MainWindow(
         btn_layout.addWidget(self.btn_pause_resume, 1)
         daily_layout.addLayout(btn_layout)
 
-        from ..execution_feedback import ExecutionFeedback
+        from ..execution.feedback import ExecutionFeedback
         self._daily_start_feedback = ExecutionFeedback()
         daily_layout.addWidget(self._daily_start_feedback)
 
-        from ..execution_user_selector import ExecutionUserSelector
+        from ..execution.user_selector import ExecutionUserSelector
         self._daily_execution_user_selector = ExecutionUserSelector(
             self._user_manager)
         self._daily_execution_user_selector.resolved_user_changed.connect(
@@ -1245,7 +1245,7 @@ class MainWindow(
         try:
             self._save_displayed_params()
         except (OSError, RuntimeError) as exc:
-            from ..execution_feedback import report_start_failure
+            from ..execution.feedback import report_start_failure
             message = tr("参数保存失败，本次批量未启动：{error}").format(error=exc)
             self._log_append(message)
             report_start_failure(self, message, "batch")
@@ -1437,12 +1437,12 @@ class MainWindow(
 
     @staticmethod
     def _hotkey_label(label: str, key: str) -> str:
-        from ..hotkeys import hotkey_label
+        from ..execution.hotkeys import hotkey_label
         return hotkey_label(label, key)
 
     @staticmethod
     def _hotkey_status(base: str, *items: tuple[str, str]) -> str:
-        from ..hotkeys import hotkey_status
+        from ..execution.hotkeys import hotkey_status
         return hotkey_status(base, *items)
 
     def closeEvent(self, event):

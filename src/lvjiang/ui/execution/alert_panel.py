@@ -11,8 +11,8 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from ..core.config.interface import dismiss_alert, get_alerts
-from ..i18n import tr
+from ...core.config.interface import dismiss_alert, get_alerts
+from ...i18n import tr
 
 
 class AlertPanel(QWidget):
@@ -99,7 +99,7 @@ class AlertPanel(QWidget):
             message: 告警文本
             timestamp: 时间戳（ISO 格式）
         """
-        from ..core.config.interface import add_alert
+        from ...core.config.interface import add_alert
 
         if add_alert(alert_id, message, timestamp):
             # 新增成功，立即显示

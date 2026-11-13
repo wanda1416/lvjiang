@@ -116,7 +116,7 @@ def test_batch_drilldown_clears_stale_filters_and_covers_midnight(qtbot, tmp_pat
 
 
 def test_preview_refresh_missing_files_invalid_json_and_large_log(qtbot, tmp_path, monkeypatch):
-    from lvjiang.ui import history_viewer
+    from lvjiang.ui.execution import history_viewer
 
     viewer = history_viewer.HistoryViewer()
     qtbot.addWidget(viewer)

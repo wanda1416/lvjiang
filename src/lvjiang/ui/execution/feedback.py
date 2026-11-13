@@ -6,8 +6,8 @@ from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QPushButton
 
-from ..i18n import tr
-from .widgets.button_styles import apply_execution_button_style
+from ...i18n import tr
+from ..widgets.button_styles import apply_execution_button_style
 
 
 class ExecutionFeedback(QLabel):
@@ -48,7 +48,7 @@ def apply_idle_start(
     state: str, start_text: str, local_reason: str = "",
 ) -> None:
     """空闲入口允许点击解释，真正启动仍由原有启动预检和授权门禁决定。"""
-    from .main.run_control import STATE_PLAN_UNSUPPORTED, STATE_START_DENIED
+    from ..main.run_control import STATE_PLAN_UNSUPPORTED, STATE_START_DENIED
 
     text, reason, variant = start_text, local_reason, "disabled" if local_reason else "run"
     ready = getattr(host, "_backend_ready", None)
@@ -81,7 +81,7 @@ def apply_idle_start(
 
 def idle_start_state(host: Any) -> str:
     """仅投影宿主既有的连接、方案与授权检查，不维护第二份状态。"""
-    from .main.run_control import STATE_PLAN_UNSUPPORTED, STATE_START_DENIED
+    from ..main.run_control import STATE_PLAN_UNSUPPORTED, STATE_START_DENIED
     if not host._backend_ready():
         return "not_ready"
     if not host._plan_allows_backend():

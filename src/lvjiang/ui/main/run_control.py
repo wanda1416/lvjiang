@@ -18,7 +18,7 @@ from ...core.fs_util import task_result_path
 from ...errors import log_failure
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
-from ..execution_feedback import (
+from ..execution.feedback import (
     apply_idle_start,
     idle_start_state,
     report_start_failure,
@@ -870,7 +870,7 @@ class RunControlMixin:
         self.user_combo.blockSignals(False)
         # 日常/调律的执行用户选择是纯运行期状态；用户增删后刷新候选，
         # 仍保留有效的固定选择，不参与 session/config 持久化。
-        from ..execution_user_selector import ExecutionUserSelector
+        from ..execution.user_selector import ExecutionUserSelector
         for selector in self.findChildren(ExecutionUserSelector):
             selector.refresh_users()
         if hasattr(self, "_daily_execution_user_selector"):
@@ -2704,7 +2704,7 @@ class RunControlMixin:
         param_panel = getattr(self, "_param_panel", None)
         if param_panel is not None:
             param_panel.setEnabled(not self._running)
-        from ..execution_user_selector import ExecutionUserSelector
+        from ..execution.user_selector import ExecutionUserSelector
         for selector in self.findChildren(ExecutionUserSelector):
             selector.setEnabled(not self._running)
         target_list = getattr(self, "execution_target_list", None)

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
-from ..i18n import tr
+from ...i18n import tr
 
 
 def execution_context_label(text: str) -> QLabel:

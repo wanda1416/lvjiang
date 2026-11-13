@@ -16,8 +16,8 @@ from lvjiang.core.user_config import (
     save_user_metadata,
     set_user_workflow_params,
 )
-from lvjiang.ui.execution_feedback import ExecutionFeedback
-from lvjiang.ui.execution_user_selector import ExecutionUserSelector
+from lvjiang.ui.execution.feedback import ExecutionFeedback
+from lvjiang.ui.execution.user_selector import ExecutionUserSelector
 from lvjiang.ui.main.run_control import RunControlMixin
 from lvjiang.ui.main.ui_state import UiStateMixin
 from lvjiang.ui.main.window import MainWindow

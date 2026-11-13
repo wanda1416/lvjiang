@@ -42,7 +42,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.execution_feedback import (
+from lvjiang.ui.execution.feedback import (
     ExecutionFeedback,
     apply_idle_start,
     idle_start_state,
@@ -293,7 +293,7 @@ class BatchTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        from ..hotkeys import hotkey_label
+        from ..execution.hotkeys import hotkey_label
         self._btn_run = QPushButton(hotkey_label(
             tr("开始执行"), self._host._user_config.hotkeys.start))
         apply_execution_button_style(self._btn_run, "run")
@@ -314,7 +314,7 @@ class BatchTab(QWidget):
         config_row = QHBoxLayout()
         config_row.setContentsMargins(0, 0, 0, 0)
         config_row.setSpacing(8)
-        from ..execution_user_selector import execution_context_label
+        from ..execution.user_selector import execution_context_label
         config_row.addWidget(execution_context_label(tr("当前配置")))
         self._config_combo = AutoWidthComboBox()
         self._config_combo.setMinimumWidth(150)
@@ -1861,7 +1861,7 @@ class BatchTab(QWidget):
             self._refresh_run_button(idle_start_state(self._host))
 
     def _refresh_run_button(self, state: str):
-        from ..hotkeys import hotkey_label
+        from ..execution.hotkeys import hotkey_label
         from ..main.run_control import other_task_running_label
         hk = self._host._user_config.hotkeys
         if label := other_task_running_label(self._host, "batch"):

@@ -1,6 +1,6 @@
 """只读实例的快捷键展示策略。"""
 
-from ..core.access import is_readonly
+from ...core.access import is_readonly
 
 
 def hotkey_label(label: str, key: str) -> str:

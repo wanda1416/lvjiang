@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
 from ...core.config import load_user_config
 from ...i18n import tr
-from ..execution_feedback import clear_start_failures
+from ..execution.feedback import clear_start_failures
 from ..mobile.device_scan import DeviceScanPanel
 
 

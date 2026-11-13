@@ -3,7 +3,7 @@ from contextlib import nullcontext
 from functools import wraps
 
 from ...core.access import AccessDeniedError, acquire_user
-from ..execution_feedback import report_start_failure
+from ..execution.feedback import report_start_failure
 
 
 def guarded_launch(method=None, *, user_selector: str | None = None):

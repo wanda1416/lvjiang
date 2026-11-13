@@ -15,7 +15,7 @@
 | 菜单与对话框入口混入 | `lvjiang/ui/main/menu_ops.py` |
 | 启动检查链混入（公告/更新/统计） | `lvjiang/ui/main/startup_ops.py` |
 | 会话状态持久化混入 | `lvjiang/ui/main/ui_state.py` |
-| 覆盖层边框绘制 | `lvjiang/ui/overlay.py` |
+| 覆盖层边框绘制 | `lvjiang/ui/execution/overlay.py` |
 | 截屏与捕获区域 | `lvjiang/core/desktop/capture.py` |
 | 日志线程安全桥 | `main/window._LogBridge`（模块级 `QObject` + `pyqtSignal`） |
 | 连接目标注册表 | `main/execution_targets.py` |

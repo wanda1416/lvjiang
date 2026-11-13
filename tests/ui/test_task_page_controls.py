@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QPushButton
 
 from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
 from lvjiang.ui.batch.batch_tab import BatchTab
-from lvjiang.ui.hotkeys import hotkey_label
+from lvjiang.ui.execution.hotkeys import hotkey_label
 from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.main.run_control import RunControlMixin
 

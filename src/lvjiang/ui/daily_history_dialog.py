@@ -39,7 +39,7 @@ from ..core.daily_history import (
     resolve_history_path,
 )
 from ..i18n import tr, tr_label
-from .history_viewer import HistoryViewer
+from .execution.history_viewer import HistoryViewer
 from .widgets.button_styles import apply_button_style
 
 _STATUS_LABELS = {

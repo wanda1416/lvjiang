@@ -6,12 +6,12 @@ from PyQt6.QtWidgets import QPushButton, QTabWidget, QWidget
 from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
 from lvjiang.core.batch_config import BatchConfigItem
 from lvjiang.ui.batch.batch_tab import BatchTab
-from lvjiang.ui.execution_feedback import (
+from lvjiang.ui.execution.feedback import (
     ExecutionFeedback,
     clear_start_failures,
     report_start_failure,
 )
-from lvjiang.ui.hotkeys import hotkey_label
+from lvjiang.ui.execution.hotkeys import hotkey_label
 from lvjiang.ui.main.execution_access import guarded_launch
 from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.main.run_control import RunControlMixin

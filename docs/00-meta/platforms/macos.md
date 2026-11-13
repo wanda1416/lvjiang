@@ -148,7 +148,7 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
 - `_backend` 未改默认值：仍为 `None`（未选模式），非 Windows 上因「扫描窗口」入口已隐藏，
   用户只能走「扫描设备」→ `_backend = "adb"`，无需硬编码默认值
 - 脚本录制（script_record_dialog）依赖桌面投屏模式，ADB 模式本就禁用，mac 上自然不可用
-- `ui/overlay.py`（Win32 边框层）所有方法均有 `_hwnd` 门控，mac 上从不创建窗口，无需改动
+- `ui/execution/overlay.py`（Win32 边框层）所有方法均有 `_hwnd` 门控，mac 上从不创建窗口，无需改动
 - 主流程平台差异已收口到 `core/platforms.py` 适配层（桌面输入后端创建、全局热键
   启动策略、原生弹窗回退、adb 候选路径、投屏入口可见性）；具体实现内部的门控
   （win32_util、capture、pynput_patch 等）保持原位不抽象

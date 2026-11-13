@@ -132,7 +132,7 @@ def test_unregistered_plugin_document_not_uploaded_as_user_doc(monkeypatch) -> N
                 directory.mkdir()
             (users / "张三.json").write_text('{"username": "张三"}', encoding="utf-8")
             (users / "张三.loadouts.json").write_text("{}", encoding="utf-8")
-            documents = engine.iter_local_documents(users)
+            documents = engine.iter_local_documents(users, session)
     finally:
         loguru_logger.remove(handler)
     assert [(d.label, d.kind) for d in documents] == []   # 纯资料文件不入文档通道

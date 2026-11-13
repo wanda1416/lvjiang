@@ -112,6 +112,9 @@ class _AccountWorker(QThread):
         except AccountError as error:
             self.completed.emit(False, error)
         except Exception as error:   # 凭据库异常等非协议错误也要落到界面
+            # 界面只显示一句话；真实原因必须进日志，否则线上只剩
+            # 「操作未完成：'id'」这种没有任何定位价值的告警。
+            logger.exception("[account] 后台任务失败：{}", error)
             self.completed.emit(False, AccountError(f"{tr('操作未完成')}：{error}"))
 
 

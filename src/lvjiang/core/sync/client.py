@@ -76,8 +76,16 @@ def _request(method: str, route: str, data: dict | None, token: str, *,
         if detail:
             message = f"{message}（{detail}）"
         raise SyncError(message, code=str(code)) from None
-    except (urlerror.URLError, TimeoutError, OSError):
-        raise SyncError("账号服务暂时不可用，同步未完成") from None
+    except TimeoutError:
+        # socket 超时（30 秒）走这里：服务端可能仍在处理，但本机不再等。
+        raise SyncError("账号服务响应超时（30 秒），同步未完成", code="timeout") from None
+    except urlerror.URLError as exc:
+        reason = getattr(exc, "reason", exc)
+        if isinstance(reason, TimeoutError):
+            raise SyncError("账号服务响应超时（30 秒），同步未完成", code="timeout") from None
+        raise SyncError("连不上账号服务，同步未完成", code="offline") from None
+    except OSError:
+        raise SyncError("连不上账号服务，同步未完成", code="offline") from None
     try:
         result = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):

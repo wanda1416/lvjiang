@@ -70,7 +70,7 @@ PC 端或手机端执行操作
 | 层 | 模块 | 职责 |
 |----|------|------|
 | 捕获 / 输入 | `src/lvjiang/core/input/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口（含后台截图）与 ADB / scrcpy / 设备端代理后端 |
-| OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
+| OCR | `src/lvjiang/core/ocr/engine.py` | RapidOCR（ONNX Runtime）文字识别封装 |
 | 场景 / 布局 | `src/lvjiang/core/scene/`、`core/layout/manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
 | 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征 / 参考图） |
 | 配置管理 | `src/lvjiang/core/config/` | 应用配置、会话管理、用户数据、工作流配置加载与合并、在线配置安装 |
@@ -78,7 +78,7 @@ PC 端或手机端执行操作
 | 命令行 | `src/lvjiang/core/task_cli.py` | 不开界面的 `--list` / `--exec` 入口，与 GUI 共用引擎、配置快照与用户锁 |
 | 账户 / 同步 | `src/lvjiang/core/account/`、`core/sync/` | 账户身份与登录态；定义、用户、文档与总览账本的初始同步与增量对账 |
 | 自动剧情 | `src/lvjiang/core/story/` | 剧情选项文案库匹配（OCR 相似度） |
-| 智能调律 | `src/lvjiang/core/ai/`、`core/agent_*.py` | 外部 Agent 接入（MCP）、文档发现与业务操作契约 |
+| 智能调律 | `src/lvjiang/core/ai/`（含 `agent_*.py`） | 外部 Agent 接入（MCP）、文档发现与业务操作契约 |
 | 匿名统计 | `src/lvjiang/core/telemetry/` | 匿名调律数据收集、字段白名单校验与传输 |
 | 国际化 | `src/lvjiang/i18n/`、`config/i18n/` | `tr()` 运行时翻译、12 种语言表与 Qt 标准对话框翻译装载 |
 | 界面 | `src/lvjiang/ui/` | PyQt6 通用主窗口、场景编辑器、识别测试、脚本工作台、批量、移动设备、账户与运行控制 |

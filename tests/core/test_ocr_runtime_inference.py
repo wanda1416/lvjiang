@@ -3,7 +3,7 @@
 import cv2
 import numpy as np
 
-from lvjiang.core.ocr import OCREngine
+from lvjiang.core.ocr.engine import OCREngine
 
 
 def test_shipped_ocr_models_recognize_digits():

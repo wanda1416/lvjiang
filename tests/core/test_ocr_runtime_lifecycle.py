@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from lvjiang.core.ocr import OCREngine
-from lvjiang.core.ocr_config import ocr_engine_options
+from lvjiang.core.ocr.config import ocr_engine_options
+from lvjiang.core.ocr.engine import OCREngine
 from lvjiang.core.ondevice import offline, task_runner, workflow_runner
 
 
@@ -147,7 +147,7 @@ def test_engine_rebuilds_when_recognition_options_change(monkeypatch):
     monkeypatch.setitem(sys.modules, "rapidocr_onnxruntime", SimpleNamespace(RapidOCR=backend))
     state = {"options": {"intra_op_num_threads": 2, "inter_op_num_threads": 1,
                          "det_limit_side_len": 736}}
-    monkeypatch.setattr("lvjiang.core.ocr_config.ocr_engine_options",
+    monkeypatch.setattr("lvjiang.core.ocr.config.ocr_engine_options",
                         lambda: dict(state["options"]))
 
     engine = OCREngine()

@@ -27,13 +27,13 @@ def test_page_service_connection_survives_user_changes_without_packaging(qtbot, 
     from lvjiang.apps.yysls.ui.tuning import agent_page
 
     root = Path(__file__).parents[2]
-    from lvjiang.core.agent_docs import DOCUMENT_DIRECTORIES
+    from lvjiang.core.ai.agent_docs import DOCUMENT_DIRECTORIES
     for directory in DOCUMENT_DIRECTORIES:
         shutil.copytree(root / "docs" / directory, tmp_path / "docs" / directory)
     monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path)
-    from lvjiang.core import agent_connection
+    from lvjiang.core.ai import agent_connection
     monkeypatch.setattr(agent_connection, "settings_path", lambda _root: tmp_path / "mcp-settings.json")
-    from lvjiang.core.agent_settings import AgentSettings, AgentTarget
+    from lvjiang.core.ai.agent_settings import AgentSettings, AgentTarget
     monkeypatch.setattr(agent_page, "load_agent_settings", lambda: AgentSettings((
         AgentTarget("example", "Agent 示例", str(tmp_path / "workbuddy/mcp.json")),)))
     licensed = [True]
@@ -164,12 +164,13 @@ def test_bridge_selects_requested_connected_target_and_reports_busy_at_call_time
 def test_menu_dialog_autostarts_persisted_service_and_close_keeps_it_running(qtbot, tmp_path, monkeypatch, free_tcp_port):
     from lvjiang import constants
     from lvjiang.apps.yysls.ui.tuning import agent_page
-    from lvjiang.core import access, agent_connection
-    from lvjiang.core.agent_connection import AgentConnection
+    from lvjiang.core import access
+    from lvjiang.core.ai import agent_connection
+    from lvjiang.core.ai.agent_connection import AgentConnection
 
     monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(agent_connection, "settings_path", lambda _root: tmp_path / "connection.json")
-    from lvjiang.core.agent_settings import AgentSettings, AgentTarget
+    from lvjiang.core.ai.agent_settings import AgentSettings, AgentTarget
     monkeypatch.setattr(agent_page, "load_agent_settings", lambda: AgentSettings((
         AgentTarget("example", "Agent 示例", str(tmp_path / "workbuddy.json")),)))
     monkeypatch.setattr(agent_page, "has_agent_access", lambda: True)

@@ -81,7 +81,7 @@
 跨仓库链接只用于主工程下检出 admin 的开发环境；客户端使用指南不得依赖私有 admin 正文。
 admin 可以保留导航页，但操作正文不复制维护两份。
 
-发行文档收录范围以 `core.agent_docs.DOCUMENT_DIRECTORIES` 为准。
+发行文档收录范围以 `core.ai.agent_docs.DOCUMENT_DIRECTORIES` 为准。
 指向源码、配置或未随包交付文档的引用，在链接后标注“（仅源码检出）”；
 随包文档之间的链接必须真实可达，不能用该标注跳过校验。
 

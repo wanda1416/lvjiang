@@ -43,7 +43,7 @@ def reset_configuration() -> None:
     from ...apps import load_app, load_config_policies
     from ..config.resolver import get_resolver
     from ..config.session import reset_session_store
-    from ..ocr_cleaner import OCRCleaner
+    from ..ocr.cleaner import OCRCleaner
     from ..profile.repository import reset_profile_db
     from ..profile.schema import reload_profile_config
     from ..recognizers.template_locator import get_template_store

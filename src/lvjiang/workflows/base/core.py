@@ -11,7 +11,7 @@ from ...core.config import DelayParam, InputSimConfig
 from ...core.input.base import InputBackend
 from ...core.input.capture_base import CaptureBackend
 from ...core.layout.models import Layout
-from ...core.ocr import OCREngine
+from ...core.ocr.engine import OCREngine
 from .. import builtins  # noqa: F401  触发内置函数注册
 from .actions import _ActionMixin
 from .coords import _CoordMixin

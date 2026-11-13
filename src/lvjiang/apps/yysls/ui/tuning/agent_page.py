@@ -27,10 +27,14 @@ from PyQt6.QtWidgets import (
 
 from ..... import constants
 from .....core.access import is_readonly
-from .....core.agent_connection import AgentConnection, export_agent
-from .....core.agent_docs import AgentDocuments
-from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_access
-from .....core.agent_settings import AgentSettings, load_agent_settings
+from .....core.ai.agent_connection import AgentConnection, export_agent
+from .....core.ai.agent_docs import AgentDocuments
+from .....core.ai.agent_mcp import (
+    LV1_REQUIRED_MESSAGE,
+    LocalMCPServer,
+    has_agent_access,
+)
+from .....core.ai.agent_settings import AgentSettings, load_agent_settings
 from .....core.plugin_runtime import PluginRuntimePort, RuntimeTarget
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style

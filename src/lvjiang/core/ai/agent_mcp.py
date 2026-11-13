@@ -17,7 +17,7 @@ DEFAULT_MCP_PORT = 18765
 
 def has_agent_access() -> bool:
     """Use the application's authoritative current entitlement."""
-    from .license import has_feature
+    from ..license import has_feature
 
     return has_feature("lv1")
 
@@ -64,7 +64,7 @@ class LocalMCPServer:
     def start(self) -> None:
         import uvicorn
 
-        from .access import is_readonly
+        from ..access import is_readonly
 
         if is_readonly():
             raise PermissionError("只有主实例可以启动 MCP 服务")

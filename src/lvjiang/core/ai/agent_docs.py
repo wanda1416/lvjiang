@@ -69,7 +69,7 @@ class AgentDocuments:
 
     def _manifest(self) -> dict:
         if self.source_mode:
-            from .._version import __version__
+            from ..._version import __version__
             documents = []
             for doc_id, relative in document_catalog(self.root).items():
                 data = self._source_bytes(relative)

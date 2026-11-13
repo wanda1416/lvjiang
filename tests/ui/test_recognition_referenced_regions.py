@@ -63,7 +63,7 @@ def test_recognize_all_references_includes_referenced_slot(
         ),
     )
     monkeypatch.setattr(
-        "lvjiang.core.ocr.OCREngine", lambda: object())
+        "lvjiang.core.ocr.engine.OCREngine", lambda: object())
     monkeypatch.setattr(
         "lvjiang.core.recognizers.ReferenceRecognizer",
         lambda _ocr: recognizer,

@@ -28,7 +28,7 @@ from ...core.input.capture_base import CaptureBackend
 from ...core.input.trace import InputTrace, InputTraceError, load_input_trace
 from ...core.layout.key_validation import validate_key_name
 from ...core.layout.models import Layout
-from ...core.ocr import OCREngine
+from ...core.ocr.engine import OCREngine
 from ...core.recognizers import ReferenceRecognizer
 from ..align import GridAlignment
 from ..base import BaseWorkflow

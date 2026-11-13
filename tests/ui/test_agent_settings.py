@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import yaml
 from PyQt6.QtWidgets import QWidget
 
-from lvjiang.core import agent_connection
-from lvjiang.core.agent_settings import load_agent_settings
+from lvjiang.core.ai import agent_connection
+from lvjiang.core.ai.agent_settings import load_agent_settings
 from lvjiang.core.config import resolver
 from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.settings.agent import AgentSettingsPage
@@ -45,7 +45,7 @@ def test_global_agent_drafts_only_save_agents_node(qtbot, tmp_path, monkeypatch)
 def test_instance_selection_override_and_download_leave_global_defaults_unchanged(qtbot, tmp_path, monkeypatch):
     from lvjiang import constants
     from lvjiang.apps.yysls.ui.tuning import agent_page
-    from lvjiang.core.agent_settings import AgentSettings, AgentTarget
+    from lvjiang.core.ai.agent_settings import AgentSettings, AgentTarget
 
     settings = AgentSettings((AgentTarget("first", "Agent 甲", str(tmp_path / "first.json")),
                               AgentTarget("second", "Agent 乙", str(tmp_path / "second.json"))),

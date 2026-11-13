@@ -33,8 +33,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
-from ...core.ocr_cleaner import OCRCleaner
-from ...core.ocr_config import (
+from ...core.ocr.cleaner import OCRCleaner
+from ...core.ocr.config import (
     LIMIT_SIDE_LEN_MAX,
     LIMIT_SIDE_LEN_MIN,
     PC_OCR_INTER_THREADS_MAX,
@@ -964,7 +964,7 @@ class OCRDialog(QDialog):
         QApplication.processEvents()
 
         try:
-            from lvjiang.core.ocr import OCREngine
+            from lvjiang.core.ocr.engine import OCREngine
             engine = OCREngine()
             results = engine.recognize(image)
 
@@ -1012,7 +1012,7 @@ class OCRDialog(QDialog):
         QApplication.processEvents()
 
         try:
-            from lvjiang.core.ocr import OCREngine
+            from lvjiang.core.ocr.engine import OCREngine
             from lvjiang.core.recognizers import ReferenceRecognizer
 
             ocr = OCREngine()

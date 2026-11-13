@@ -3,13 +3,13 @@
 import numpy as np
 
 from lvjiang.core.layout.models import CanvasConfig, Region
-from lvjiang.core.ocr import OCREngine, OCRResult
+from lvjiang.core.ocr.engine import OCREngine, OCRResult
 from lvjiang.core.scene.definition_models import RegionDef
 
 
 def test_ocr_scene_regions_includes_referenced_text_definition(monkeypatch):
     monkeypatch.setattr(
-        "lvjiang.core.ocr.get_effective_region_defs",
+        "lvjiang.core.ocr.engine.get_effective_region_defs",
         lambda _scene: [
             RegionDef(
                 key="shared_text",

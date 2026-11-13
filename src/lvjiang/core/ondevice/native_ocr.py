@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from ..ocr_config import DeviceOCRConfig
+from ..ocr.config import DeviceOCRConfig
 
 
 class NativeOCRBackend:

@@ -3,8 +3,8 @@
 import numpy as np
 
 from lvjiang.core.layout.models import CanvasConfig, Region
-from lvjiang.core.ocr import OCREngine, OCRResult
-from lvjiang.core.ocr_config import RegionBatchConfig
+from lvjiang.core.ocr.config import RegionBatchConfig
+from lvjiang.core.ocr.engine import OCREngine, OCRResult
 from lvjiang.core.scene.definition_models import RegionDef
 
 
@@ -14,7 +14,7 @@ def _bbox(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
 
 def _patch_text_defs(monkeypatch, *keys: str) -> None:
     monkeypatch.setattr(
-        "lvjiang.core.ocr.get_effective_region_defs",
+        "lvjiang.core.ocr.engine.get_effective_region_defs",
         lambda _scene: [
             RegionDef(key=key, name=key, type="attr", is_text=True)
             for key in keys
@@ -24,7 +24,7 @@ def _patch_text_defs(monkeypatch, *keys: str) -> None:
 
 def test_pixel_budget_splits_wide_batches_without_losing_field_mapping(monkeypatch):
     engine = OCREngine(region_pixel_budget=400_000)
-    monkeypatch.setattr("lvjiang.core.ocr.load_region_batch_config",
+    monkeypatch.setattr("lvjiang.core.ocr.engine.load_region_batch_config",
                         lambda: RegionBatchConfig(min_canvas_side=16, gap=16))
     shapes = []
 

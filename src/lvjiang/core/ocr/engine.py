@@ -11,11 +11,11 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from ..workflows.align import GridAlignment
-from .layout.models import CanvasConfig, Region
-from .ocr_cleaner import OCRCleaner
-from .ocr_config import load_region_batch_config
-from .scene.registry import get_effective_region_defs
+from ...workflows.align import GridAlignment
+from ..layout.models import CanvasConfig, Region
+from ..scene.registry import get_effective_region_defs
+from .cleaner import OCRCleaner
+from .config import load_region_batch_config
 
 
 @dataclass
@@ -53,7 +53,7 @@ class OCREngine:
             return dict(self._rapidocr_options)
         if self._backend_factory is not None:
             return {}
-        from .ocr_config import ocr_engine_options
+        from .config import ocr_engine_options
 
         try:
             return ocr_engine_options()
@@ -424,7 +424,7 @@ class OCREngine:
         Returns:
             list of (x1, y1, x2, y2) 像素坐标，按 row-major 顺序
         """
-        from ..workflows.align import _make_even_alignment, detect_grid
+        from ...workflows.align import _make_even_alignment, detect_grid
 
         h, w = image.shape[:2]
         # panel 区域像素坐标

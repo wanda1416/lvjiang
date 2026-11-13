@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from ..ocr import OCREngine
+from ..ocr.engine import OCREngine
 from ._registry import register_recognizer
 
 

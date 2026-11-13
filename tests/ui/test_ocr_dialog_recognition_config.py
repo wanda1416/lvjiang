@@ -7,7 +7,7 @@ import yaml
 from PyQt6.QtWidgets import QMessageBox
 
 from lvjiang.core.config import resolver
-from lvjiang.core.ocr_config import (
+from lvjiang.core.ocr.config import (
     load_detect_config,
     load_ocr_config,
     load_pc_ocr_config,

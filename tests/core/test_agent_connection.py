@@ -4,8 +4,8 @@ import shutil
 
 import pytest
 
-from lvjiang.core import agent_connection, agent_mcp
-from lvjiang.core.agent_connection import (
+from lvjiang.core.ai import agent_connection, agent_mcp
+from lvjiang.core.ai.agent_connection import (
     AgentConnection,
     export_agent,
 )

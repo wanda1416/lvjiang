@@ -359,7 +359,7 @@ class MainWindow(
         self._preview_frame_emit_at: dict[str, float] = {}
 
         # ── OCR / 输入 ──
-        from ...core.ocr import OCREngine
+        from ...core.ocr.engine import OCREngine
         self._ocr = OCREngine()
         # 非 Windows 时返回 None（无桌面投屏后端，仅支持 ADB 模式）
         from ...core.platforms import create_desktop_input

@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from ..ocr import OCREngine
+from ..ocr.engine import OCREngine
 from ..reference_db import REFERENCE_OUTPUT_RESERVED_KEYS, ReferenceDatabase
 from .reference_matcher import MatchResult, ReferenceMatcher
 

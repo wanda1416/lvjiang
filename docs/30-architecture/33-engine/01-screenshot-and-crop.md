@@ -85,7 +85,7 @@ numpy 切片是**视图**,不复制像素数据,所以裁剪本身几乎零成�
 
 ### scan → OCR
 ```python
-# core/ocr.py: ocr_scene_regions
+# core/ocr/engine.py: ocr_scene_regions
 for region in regions:
     if region.key not in text_keys:   # 跳过 is_text=False 的区域
         continue

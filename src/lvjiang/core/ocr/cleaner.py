@@ -18,7 +18,7 @@ from typing import Any
 
 from loguru import logger
 
-from .ocr_config import OCR_CONFIG_PATH, load_ocr_config
+from .config import OCR_CONFIG_PATH, load_ocr_config
 
 
 class OCRCleaner:
@@ -238,7 +238,7 @@ class OCRCleaner:
         必须保存 self._config 全量内容，而非仅已知键；
         否则开发模式下 save_merged 全量写 system 会丢失未来新增的键。
         """
-        from .config import get_resolver
+        from ..config import get_resolver
         doc: dict[str, Any] = {k: v for k, v in self._config.items() if v is not None}
         try:
             get_resolver().save_merged(OCR_CONFIG_PATH, doc)

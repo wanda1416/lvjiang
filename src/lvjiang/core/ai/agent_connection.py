@@ -9,9 +9,9 @@ from pathlib import Path
 
 from fasteners import InterProcessLock
 
+from ..fs_util import atomic_write_text, lock_file
+from ..paths import config_directory, session_directory
 from .agent_mcp import DEFAULT_MCP_PORT
-from .fs_util import atomic_write_text, lock_file
-from .paths import config_directory, session_directory
 
 
 def settings_path(root: Path) -> Path:

@@ -21,12 +21,12 @@ from loguru import logger
 from ...core.config import load_user_config
 from ...core.config.interface import get_interface_store
 from ...core.config.resolver import get_resolver
-from ...core.ocr import OCREngine
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..input.base import InputBackend
 from ..input.capture_base import CaptureBackend
 from ..layout.models import Layout
+from ..ocr.engine import OCREngine
 from .capture import A11yCapture
 from .input import A11yInput
 
@@ -43,7 +43,7 @@ def _create_input(input_sim=None) -> InputBackend:
 
 def _create_ocr() -> OCREngine:
     """设备端原生 OCR；共享清洗、区域归属和业务解析保持不变。"""
-    from ..ocr_config import load_device_ocr_config
+    from ..ocr.config import load_device_ocr_config
     from .native_ocr import NativeOCRBackend
     config = load_device_ocr_config()
     return OCREngine(backend_factory=lambda: NativeOCRBackend(config),

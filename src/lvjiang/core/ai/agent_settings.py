@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .config.resolver import load_app_config
+from ..config.resolver import load_app_config
 
 DEFAULT_SERVER_NAME = "律匠(lvjiang)"
 

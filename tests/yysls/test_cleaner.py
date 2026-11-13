@@ -9,7 +9,7 @@
 import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
-from lvjiang.core.ocr_cleaner import OCRCleaner
+from lvjiang.core.ocr.cleaner import OCRCleaner
 from tests.case_matrix import case_matrix
 
 

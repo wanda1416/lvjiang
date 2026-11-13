@@ -309,7 +309,7 @@ OCR 识别输出为原始文本，需经过清洗才能转换为上述结构化�
 | `XX阶` | 提取数字为 `level` |
 | `攻击100~232` | 解析为二元组 `[100, 232]` |
 
-**数据清洗模块**：词条清洗逻辑已实现——`src/lvjiang/core/ocr_cleaner.py` 负责 OCR 文本规范化，`src/lvjiang/apps/yysls/core/equip_parser/parser.py` 把清洗后的文本解析为结构化装备，作为 OCR 后处理集成在 `WorkflowEngine` 的 `scan` / `to_equipment` 路径中。
+**数据清洗模块**：词条清洗逻辑已实现——`src/lvjiang/core/ocr/cleaner.py` 负责 OCR 文本规范化，`src/lvjiang/apps/yysls/core/equip_parser/parser.py` 把清洗后的文本解析为结构化装备，作为 OCR 后处理集成在 `WorkflowEngine` 的 `scan` / `to_equipment` 路径中。
 
 ---
 

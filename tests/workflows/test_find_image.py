@@ -474,7 +474,7 @@ def test_bound_template_search_never_escapes_region(synthetic_store):
 
 def test_runtime_area_locates_icon_then_reads_adjacent_text(synthetic_store):
     """动态标记必须能排除小地图，并在命中位置附近读文字，不依赖固定场景。"""
-    from lvjiang.core.ocr import OCRResult
+    from lvjiang.core.ocr.engine import OCRResult
 
     frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
     frame[40:80, 40:80] = synthetic_store  # 相同图标在左侧，必须排除。

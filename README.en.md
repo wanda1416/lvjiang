@@ -70,7 +70,7 @@ Action performed on PC or phone
 | Layer | Modules | Responsibility |
 |-------|---------|----------------|
 | Capture / input | `src/lvjiang/core/input/capture_base.py`, `core/desktop/`, `core/android/` | Unified screenshot and click abstraction; desktop windows (including background capture) plus ADB / scrcpy / on-device proxy backends |
-| OCR | `src/lvjiang/core/ocr.py` | RapidOCR (ONNX Runtime) wrapper |
+| OCR | `src/lvjiang/core/ocr/engine.py` | RapidOCR (ONNX Runtime) wrapper |
 | Scenes / layouts | `src/lvjiang/core/scene/`, `core/layout/manager.py` | Declarative UI model loading, coordinate conversion, region alignment |
 | Recognizers | `src/lvjiang/core/recognizers/` | Pluggable recognizers (OCR / template matching / color features / reference images) |
 | Configuration | `src/lvjiang/core/config/` | App config, session management, user data, workflow config loading and merging, online config installation |
@@ -78,7 +78,7 @@ Action performed on PC or phone
 | Command line | `src/lvjiang/core/task_cli.py` | `--list` / `--exec` entry point that shares the engine, config snapshot and user locks with the GUI |
 | Accounts / sync | `src/lvjiang/core/account/`, `core/sync/` | Account identity and session; initial sync and incremental reconciliation of definitions, users, documents and the overview ledger |
 | Auto-plot | `src/lvjiang/core/story/` | Dialogue option library matching by OCR similarity |
-| Smart tuning | `src/lvjiang/core/ai/`, `core/agent_*.py` | External agent access over MCP, document discovery and the business-operation contract |
+| Smart tuning | `src/lvjiang/core/ai/` (including `agent_*.py`) | External agent access over MCP, document discovery and the business-operation contract |
 | Anonymous telemetry | `src/lvjiang/core/telemetry/` | Anonymous tuning data collection, field allow-list validation and transport |
 | i18n | `src/lvjiang/i18n/`, `config/i18n/` | Runtime `tr()` translation, 12 language tables and Qt standard-dialog translations |
 | UI | `src/lvjiang/ui/` | PyQt6 main window, scene editor, recognition test, script workbench, batch, mobile device, account dialogs and run control |

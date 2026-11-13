@@ -454,7 +454,7 @@ def execute(request: RunRequest) -> dict[str, Any]:
         return _outcome(ok=True, config=config, username=username,
                         target="dry-run", layout=layout_name, started=started)
 
-    from .ocr import OCREngine
+    from .ocr.engine import OCREngine
     target = open_adb_target(request.target, user_config)
     try:
         engine = DeviceWorkflowEngineBuilder(

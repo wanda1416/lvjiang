@@ -13,8 +13,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang.apps.yysls.core.agent.catalog import tool_catalog  # noqa: E402
 from lvjiang.apps.yysls.core.agent.service import AgentService  # noqa: E402
-from lvjiang.core.agent_docs import AGENT_DOCUMENTS, AgentDocuments  # noqa: E402
-from lvjiang.core.agent_mcp import LocalMCPServer  # noqa: E402
+from lvjiang.core.ai.agent_docs import AGENT_DOCUMENTS, AgentDocuments  # noqa: E402
+from lvjiang.core.ai.agent_mcp import LocalMCPServer  # noqa: E402
 
 
 def build_bundle(output: Path, *, archive: Path | None = None) -> dict:

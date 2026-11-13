@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, has_agent_access
+from .....core.ai.agent_mcp import LV1_REQUIRED_MESSAGE, has_agent_access
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style
 from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode

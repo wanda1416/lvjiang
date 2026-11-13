@@ -85,7 +85,7 @@
 | `baseline.json` | 官方预置基底身份 | `core/system_preset.py`、`core/config/remote.py` | 只用于生成和确认预置，不参与远端比对 |
 | `preset.json` | 预置已初始化的标记 | `core/system_preset.py`、`core/ondevice/offline.py` | 安卓端据此判断「用预置配置」而不是「已从 PC 同步」 |
 | `offline.json` | 手机离线同步的来源与时间 | `core/ondevice/offline.py` | 只读状态，无同步记录表示从未同步 |
-| `mcp.json` | 外部 Agent 接入：端口、启用开关、`token`、`agent_key`、导出路径 | `core/agent_connection.py` | **含凭据**，见第七节 |
+| `mcp.json` | 外部 Agent 接入：端口、启用开关、`token`、`agent_key`、导出路径 | `core/ai/agent_connection.py` | **含凭据**，见第七节 |
 | `agent/results.json`、`agent/tasks.json` | 外部 Agent 的生成结果与任务表 | `apps/yysls/core/agent/service.py` | 经 `DocumentDirectoryStore`（`_meta.json` + 可恢复事务） |
 | `screenshots/{布局}/{场景}(__{视图}).(png|webp)` | 布局参考截图 | `core/layout/screenshots.py` | 目录体积第一大项，删掉重截即可 |
 | `feedback-qrcode.jpg` | 交流群二维码缓存 | `core/group_qrcode.py` | 可重建，缺失时从站点拉取 |
@@ -104,7 +104,7 @@
 | `profile_<摘要8位>.lock` | `profile.yaml` 写入 | `core/profile/schema.py` |
 | `document_<摘要8位>.lock` | 文档目录事务恢复（`yysls/`、`agent/`） | `core/config/document_store.py` |
 | `execution_<摘要8位>.lock` | 用户执行租约，表达「这个用户正被任务独占」 | `core/access.py` |
-| `agent_<摘要8位>.lock` | 外部 Agent 配置合并写入 | `core/agent_connection.py` |
+| `agent_<摘要8位>.lock` | 外部 Agent 配置合并写入 | `core/ai/agent_connection.py` |
 
 集中存放带来两个直接好处：不往 `config/local` 等数据目录写运行时文件；退出所有节点后
 整个 `.locks` 目录删掉即为干净重置，下次按需重建。用户资料的读改写只在进程内串行，

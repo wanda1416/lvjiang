@@ -9,8 +9,8 @@ import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from lvjiang.core.agent_docs import DOCUMENT_DIRECTORIES, AgentDocuments
-from lvjiang.core.agent_mcp import LocalMCPServer
+from lvjiang.core.ai.agent_docs import DOCUMENT_DIRECTORIES, AgentDocuments
+from lvjiang.core.ai.agent_mcp import LocalMCPServer
 
 
 def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
@@ -109,7 +109,7 @@ def test_official_client_can_discover_and_call_with_token_and_reject_without(fre
 
 def test_lv1_gates_whole_protocol_and_rechecks_existing_connections(monkeypatch, free_tcp_port):
     from lvjiang.core import license
-    from lvjiang.core.agent_mcp import LV1_REQUIRED_MESSAGE
+    from lvjiang.core.ai.agent_mcp import LV1_REQUIRED_MESSAGE
 
     licensed = [False]
     calls = []

@@ -87,7 +87,7 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在识别..."))
         QApplication.processEvents()
 
-        from ...core.ocr import OCREngine
+        from ...core.ocr.engine import OCREngine
         engine = OCREngine()
         canvas = current_tab.get_canvas_config()
 
@@ -126,7 +126,7 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在校准面板网格..."))
         QApplication.processEvents()
 
-        from ...core.ocr import OCREngine
+        from ...core.ocr.engine import OCREngine
         engine = OCREngine()
         canvas_config = current_tab.get_canvas_config()
 
@@ -202,7 +202,7 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在匹配参考图..."))
         QApplication.processEvents()
 
-        from ...core.ocr import OCREngine
+        from ...core.ocr.engine import OCREngine
         from ...core.recognizers import ReferenceRecognizer
         ocr_engine = OCREngine()
         recognizer = ReferenceRecognizer(ocr_engine)
@@ -264,7 +264,7 @@ class RecognitionOpsMixin:
         self._status_bar.showMessage(tr("正在校准面板网格..."))
         QApplication.processEvents()
 
-        from ...core.ocr import OCREngine
+        from ...core.ocr.engine import OCREngine
         from ...core.recognizers import ReferenceRecognizer
 
         ocr_engine = OCREngine()

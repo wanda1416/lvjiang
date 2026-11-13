@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.agent_settings import AgentSettings, load_agent_settings
+from ...core.ai.agent_settings import AgentSettings, load_agent_settings
 from ...core.config.resolver import save_app_config_node
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style

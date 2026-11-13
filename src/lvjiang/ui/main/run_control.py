@@ -1232,7 +1232,7 @@ class RunControlMixin:
         run_context.lease = getattr(self, "_execution_lease", None)
         # RapidOCR/ONNX 的同实例并发安全没有契约保证；每个运行实例持有
         # 独立的懒加载引擎，避免多设备推理互相污染。
-        from ...core.ocr import OCREngine
+        from ...core.ocr.engine import OCREngine
         run_context.ocr = OCREngine()
         self._stop_requested = False
         self._run_state = "running"

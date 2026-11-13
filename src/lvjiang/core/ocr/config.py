@@ -86,7 +86,7 @@ def load_device_ocr_config() -> DeviceOCRConfig:
 
 def load_ocr_config() -> dict[str, Any]:
     """读取统一 OCR 配置；清洗规则使用 normalization.default/groups。"""
-    from .config import get_resolver
+    from ..config import get_resolver
 
     return get_resolver().load_merged(OCR_CONFIG_PATH)
 
@@ -165,7 +165,7 @@ def save_recognition_settings(
     只覆盖调用方传入的分组，其余分组（含清洗规则）原样保留——OCR 配置里
     还有用户手改的 ``normalization``，多个保存入口各自读改写容易把它回滚。
     """
-    from .config import get_resolver
+    from ..config import get_resolver
 
     doc = load_ocr_config()
     recognition = dict(doc.get("recognition") or {})

@@ -4,8 +4,8 @@ import yaml
 
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.core.ocr_cleaner import OCRCleaner
-from lvjiang.core.ocr_config import (
+from lvjiang.core.ocr.cleaner import OCRCleaner
+from lvjiang.core.ocr.config import (
     LIMIT_SIDE_LEN_MAX,
     PC_OCR_THREADS_MAX,
     DetectConfig,

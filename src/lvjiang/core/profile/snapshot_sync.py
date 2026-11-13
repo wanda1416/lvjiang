@@ -488,6 +488,9 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
         state["remote_history_id"] = 0
         save_profile_sync_state(state)
     summaries = remote_snapshots(token)
+    # 记下「云端有没有快照」：同步末尾自动补建基线时用它判断，避免每分钟多一次请求。
+    state["cloud_has_snapshot"] = bool(summaries)
+    save_profile_sync_state(state)
     if not summaries:
         logger.info("[profile sync] 云端还没有总览快照，直接上传本机记录")
     elif _needs_snapshot_rebase(state, summaries):
@@ -761,9 +764,10 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     """把本机**全部用户**的当前 entries 作为一份账户级快照上传，
     绑到「此刻的远端最大 remote_id」。
 
-    **只有 PC 能建快照**：Android 是没有总览编辑能力的镜像端，建快照等于把
-    手机那份 db 当成全网基线；这里做硬门禁，任何调用路径都挡住。
-
+    **谁能建快照**：云端已有快照时只有 PC 能覆盖——Android 是没有总览编辑能力的
+    镜像端，覆盖等于把手机那份库当成全网基线。云端**一份快照都没有**时例外：
+    任何端（含手机）都可以建立第一份基线，否则纯手机用户永远没有基线、云端
+    总览永远空白。这是「首份基线自动授权」，不需要用户确认。
     **上传前先拉一遍**：快照绑定的 ``snapshot_remote_id`` 语义是「该 id 及之前
     的变更都已体现在这份 entries 里」。若不先同步，别的设备刚推上来的行会被
     这个水位"吞掉"——新设备拿到的是旧基线，且那些行再也不会被回放。
@@ -773,8 +777,9 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     初始播种传 True，允许用空列表建立第一份基线。
     """
     report = ProfileSyncReport()
-    if hasattr(sys, "getandroidapilevel"):
-        report.errors.append("手机端不能创建总览快照；请在 PC 端完成初始同步")
+    cloud_has_snapshot = bool(remote_snapshots(token))
+    if hasattr(sys, "getandroidapilevel") and cloud_has_snapshot:
+        report.errors.append("手机端不能覆盖云端总览快照；请用 PC 创建")
         return report
     pulled = pull_and_replay(token, tolerate_no_snapshot=True)
     report.pulled = pulled.pulled
@@ -812,9 +817,29 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     return report
 
 
+def _ensure_baseline(token: str) -> ProfileSyncReport | None:
+    """云端一份快照都没有、而本机有数据时，自动建立首份基线。
+
+    基线是「云端当前值」的唯一来源（物化表按它建立，之后靠增量维护）。
+    没有基线时谁也无法稳定读到云端当前值，所以首份基线自动授权建立——
+    不区分平台，纯手机用户也能建，否则永远没有基线。
+    云端已有快照则什么都不做：覆盖是另一回事，手机端不允许覆盖。
+    """
+    if not local_profile_has_entries():
+        return None
+    # 拉取阶段已记录过云端有无快照；没有记录时才额外问一次。
+    known = _state().get("cloud_has_snapshot")
+    if known is True:
+        return None
+    if known is None and remote_snapshots(token):
+        return None
+    logger.info("[profile sync] 云端没有总览基线，用本机数据建立首份快照")
+    return refresh_snapshot(token)
+
+
 def sync_all(token: str, *, allow_overwrite: bool = False,
              on_progress=None, stop=None) -> ProfileSyncReport:
-    """一轮完整同步：先确认协议，再拉后推。"""
+    """一轮完整同步：先确认协议，再拉、推，最后补建基线（仅云端一份都没有时）。"""
     del allow_overwrite
     blocked = profile_protocol_block(token)
     if blocked:
@@ -823,7 +848,10 @@ def sync_all(token: str, *, allow_overwrite: bool = False,
     if pull.errors and not pull.snapshots and not pull.pulled:
         return pull
     push = push_local(token, on_progress=on_progress, stop=stop)
+    seeded = _ensure_baseline(token)
     return ProfileSyncReport(
-        pushed=push.pushed, pulled=pull.pulled, snapshots=pull.snapshots,
+        pushed=push.pushed, pulled=pull.pulled,
+        snapshots=pull.snapshots + (seeded.snapshots if seeded else 0),
         rejected=push.rejected, pending=pull.pending, backup=pull.backup,
-        errors=[*pull.errors, *push.errors])
+        errors=[*pull.errors, *push.errors, *(seeded.errors if seeded else [])])
+

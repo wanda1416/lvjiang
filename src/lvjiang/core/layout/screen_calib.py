@@ -29,10 +29,10 @@ import cv2
 import numpy as np
 from loguru import logger
 
-from .config.resolver import get_resolver
-from .layout_config import load_layout_doc, parse_layout_entries, save_layout_doc
-from .layout_manager import _LAYOUTS_YAML_REL, _safe_name
-from .layout_models import CanvasConfig
+from ..config.resolver import get_resolver
+from .config import load_layout_doc, parse_layout_entries, save_layout_doc
+from .manager import _LAYOUTS_YAML_REL, _safe_name
+from .models import CanvasConfig
 
 #: 布局目录下的参照截图文件名（下划线开头：布局加载只枚举场景 json，不会误读）
 REFERENCE_IMAGE = "_reference.png"

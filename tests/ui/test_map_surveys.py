@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import cv2
 import numpy as np
 
-from lvjiang.core.maps import MapDef, MapPoi, MapRegion, MapSurvey, image_sha256
+from lvjiang.core.layout.maps import MapDef, MapPoi, MapRegion, MapSurvey, image_sha256
 from lvjiang.ui.map_manager.dialog import MapManagerDialog
 
 

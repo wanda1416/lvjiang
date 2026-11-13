@@ -26,8 +26,8 @@ from ...core.config import (
 from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend, InputBackendKind
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
-from ...core.key_validation import validate_key_name
-from ...core.layout_models import Layout
+from ...core.layout.key_validation import validate_key_name
+from ...core.layout.models import Layout
 from ...core.ocr import OCREngine
 from ...core.recognizers import ReferenceRecognizer
 from ..align import GridAlignment

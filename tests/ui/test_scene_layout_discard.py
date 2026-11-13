@@ -5,8 +5,8 @@ from unittest.mock import Mock
 
 from PyQt6.QtWidgets import QComboBox, QMessageBox
 
-from lvjiang.core.layout_config import LayoutEntry
-from lvjiang.core.layout_models import Layout
+from lvjiang.core.layout.config import LayoutEntry
+from lvjiang.core.layout.models import Layout
 from lvjiang.ui.main.run_control import RunControlMixin
 from lvjiang.ui.scene_editor.layout_ops import LayoutOpsMixin
 

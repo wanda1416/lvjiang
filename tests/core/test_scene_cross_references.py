@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lvjiang.core.layout_manager import (
+from lvjiang.core.layout.manager import (
     _drop_orphan_coords,
     _expand_scene_references,
     refresh_scene_references,
 )
-from lvjiang.core.layout_models import Layout, Point, Region
+from lvjiang.core.layout.models import Layout, Point, Region
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.scene.definition import SceneRegistry
 
@@ -154,7 +154,7 @@ def test_expansion_copies_coordinates_verbatim_and_marks_the_source():
         references = [type("R", (), {"scene": "general_control",
                                      "entity": "confirm"})()]
 
-    import lvjiang.core.layout_manager as lm
+    import lvjiang.core.layout.manager as lm
     original = lm.get_registry if hasattr(lm, "get_registry") else None
     import lvjiang.core.scene.registry as sr
     saved = sr.get_registry
@@ -193,7 +193,7 @@ def test_dsl_addressing_works_without_touching_the_action_layer():
     click [equip_tune_detail].[confirm] 走的就是这条路径，
     click_region / click_any / _validate_refs_bound 一行都不用改。
     """
-    from lvjiang.core.layout_models import Layout
+    from lvjiang.core.layout.models import Layout
 
     regions = {"general_control": [
         Region(key="confirm", x_ratio=0.4, y_ratio=0.5,
@@ -235,8 +235,8 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
     """目标场景只保存引用位置，尺寸和其他属性继续来自源场景。"""
     import lvjiang.constants as constants
     import lvjiang.core.config.resolver as cr
-    from lvjiang.core.layout_manager import LayoutConfigManager
-    from lvjiang.core.layout_models import CanvasConfig, Layout
+    from lvjiang.core.layout.manager import LayoutConfigManager
+    from lvjiang.core.layout.models import CanvasConfig, Layout
 
     monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
     monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
@@ -502,7 +502,7 @@ def test_a_single_reference_can_be_expanded_without_reloading_the_layout():
     画布上还没保存的改动就没了；不展开的话列表里有、画布上没有，看着
     像加失败了。
     """
-    from lvjiang.core.layout_manager import expand_one_reference
+    from lvjiang.core.layout.manager import expand_one_reference
 
     regions = {"src": [Region(key="btn", x_ratio=0.1, y_ratio=0.2,
                               w_ratio=0.3, h_ratio=0.4)]}
@@ -519,7 +519,7 @@ def test_a_single_reference_can_be_expanded_without_reloading_the_layout():
 
 def test_expanding_a_reference_with_no_source_coords_reports_failure():
     """源场景在本布局里没标坐标就展开不出东西，调用方据此保持「未放置」。"""
-    from lvjiang.core.layout_manager import expand_one_reference
+    from lvjiang.core.layout.manager import expand_one_reference
 
     regions: dict = {"src": []}
     points: dict = {}
@@ -530,7 +530,7 @@ def test_expanding_a_reference_with_no_source_coords_reports_failure():
 
 def test_expanding_over_an_existing_key_refuses_rather_than_overwrites():
     """覆盖等于让运行期点到另一个位置，而且完全静默。"""
-    from lvjiang.core.layout_manager import expand_one_reference
+    from lvjiang.core.layout.manager import expand_one_reference
 
     regions = {
         "src": [Region(key="btn", x_ratio=0.1, y_ratio=0.1,

@@ -10,10 +10,10 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .config.resolver import ConfigResolver, get_resolver
+from ..config.resolver import ConfigResolver, get_resolver
 
 if TYPE_CHECKING:
-    from .layout_models import Layout
+    from .models import Layout
 
 LAYOUTS_SCHEMA_VERSION = 2
 LAYOUT_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")

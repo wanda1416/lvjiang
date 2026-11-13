@@ -3,7 +3,7 @@
 import numpy as np
 from loguru import logger
 
-from ...core.layout_models import CanvasConfig, FoundRegion, Region
+from ...core.layout.models import CanvasConfig, FoundRegion, Region
 from ...core.recognizers import ReferenceInfo
 from ...i18n import tr
 from ..capture_snapshot import CaptureSnapshotMixin

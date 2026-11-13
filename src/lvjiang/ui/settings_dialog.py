@@ -811,7 +811,7 @@ class SettingsDialog(QDialog):
     def _available_layouts(self):
         host_manager = getattr(self.parent(), "_layout_manager", None)
         if host_manager is None:
-            from ..core.layout_manager import LayoutConfigManager
+            from ..core.layout.manager import LayoutConfigManager
             host_manager = LayoutConfigManager()
         return host_manager.list_layout_entries()
 

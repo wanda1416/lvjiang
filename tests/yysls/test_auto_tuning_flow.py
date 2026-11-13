@@ -58,7 +58,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import get_resolver
-from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.workflows.engine import WorkflowEngine
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL

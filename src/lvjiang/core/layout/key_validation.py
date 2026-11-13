@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .key_names import KNOWN_PRESS_NAMES, normalize_pressable
-from .layout_models import Layout
+from ..key_names import KNOWN_PRESS_NAMES, normalize_pressable
+from .models import Layout
 
 # 对外提供只读合法键名库；别名仍由 normalize_key 统一收敛。
 VALID_KEY_NAMES = KNOWN_PRESS_NAMES

@@ -14,7 +14,7 @@ import pytest
 from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
 from lvjiang.core.batch_run import BatchRunDraft
 from lvjiang.core.config.users import SessionManager
-from lvjiang.core.layout_models import CanvasConfig, Layout
+from lvjiang.core.layout.models import CanvasConfig, Layout
 from lvjiang.core.user_config import User, save_user_metadata
 from lvjiang.ui.batch.batch_report import BatchReport
 from lvjiang.ui.batch.batch_runner import (

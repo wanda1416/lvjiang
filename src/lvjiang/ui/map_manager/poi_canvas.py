@@ -1,6 +1,6 @@
 """地图底图画布：显示底图、点选 POI、缩放平移。
 
-坐标一律用底图归一化坐标（0–1），与 :class:`~lvjiang.core.maps.MapPoi`
+坐标一律用底图归一化坐标（0–1），与 :class:`~lvjiang.core.layout.maps.MapPoi`
 一致；像素只在绘制时出现。
 """
 
@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QGraphicsView,
 )
 
-from ...core.maps import MapPoi
+from ...core.layout.maps import MapPoi
 from ..theme import get_theme_manager
 
 #: 点击落在已有 POI 这个归一化半径内视为选中它，而不是新增

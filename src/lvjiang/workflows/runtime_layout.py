@@ -36,7 +36,7 @@ def resolve_subscene_target_scene(parent_scene: str, reference_key: str) -> str:
 def resolve_subscene_entity(layout, parent_scene: str, reference_key: str,
                             entity_key: str):
     """把子场景局部实体组合为父场景画布中的临时运行时实体。"""
-    from ..core.layout_models import Panel, Point, Region
+    from ..core.layout.models import Panel, Point, Region
 
     target_scene = resolve_subscene_target_scene(parent_scene, reference_key)
     instance = resolve_subscene_instance(layout, parent_scene, reference_key)
@@ -97,7 +97,7 @@ def resolve_subscene_instance(layout, parent_scene: str, reference_key: str):
 def resolve_subscene_region(layout, parent_scene: str, reference_key: str,
                             entity_key: str):
     """解析只接受矩形区域的 scan/recognize 目标。"""
-    from ..core.layout_models import Region
+    from ..core.layout.models import Region
     item = resolve_subscene_entity(
         layout, parent_scene, reference_key, entity_key)
     if not isinstance(item, Region):

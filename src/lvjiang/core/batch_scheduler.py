@@ -37,8 +37,8 @@ from .batch_run import BatchRunDraft
 from .config.resolver import get_resolver
 from .config.users import SessionManager
 from .fs_util import task_result_path
-from .layout_config import canvas_aspect_matches
-from .layout_models import Layout
+from .layout.config import canvas_aspect_matches
+from .layout.models import Layout
 
 # 进度状态常量
 ST_PENDING = tr("待执行")

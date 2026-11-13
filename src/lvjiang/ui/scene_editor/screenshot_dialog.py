@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.layout_manager import (
+from ...core.layout.manager import (
     delete_scene_screenshot,
     get_active_screenshot_index,
     get_scene_screenshot_format,

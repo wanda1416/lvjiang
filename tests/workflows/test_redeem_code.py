@@ -7,7 +7,7 @@ import pytest
 from loguru import logger
 
 from lvjiang.core.config import load_user_config
-from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.metadata import parse_metadata
 

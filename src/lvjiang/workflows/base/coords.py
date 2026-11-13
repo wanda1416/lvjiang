@@ -7,7 +7,7 @@
 import math
 import random
 
-from ...core.layout_models import Point, Region, effective_click_rect
+from ...core.layout.models import Point, Region, effective_click_rect
 from ...i18n import tr
 
 

@@ -11,8 +11,8 @@ import math
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import PurePosixPath
 
+from ..key_names import normalize_pressable
 from .coord_types import CircleCoordRef, RectCoordRef
-from .key_names import normalize_pressable
 
 
 @dataclass

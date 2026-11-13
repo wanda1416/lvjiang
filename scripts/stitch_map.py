@@ -9,8 +9,8 @@ import cv2
 import numpy as np
 
 from lvjiang.core.json_files import formatted_json
-from lvjiang.core.map_stitching import stitch_map_frames
-from lvjiang.core.maps import MapError
+from lvjiang.core.layout.map_stitching import stitch_map_frames
+from lvjiang.core.layout.maps import MapError
 
 
 def main() -> None:

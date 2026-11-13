@@ -18,8 +18,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.layout_config import load_layout_entries
-from ...core.layout_manager import (
+from ...core.layout.config import load_layout_entries
+from ...core.layout.manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
     shared_layout_bindings,

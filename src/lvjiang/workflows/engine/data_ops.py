@@ -5,7 +5,7 @@ from typing import Any
 
 from loguru import logger
 
-from ...core.coord_types import RectCoordRef
+from ...core.layout.coord_types import RectCoordRef
 from ..grammar import (
     ArithOp,
     ByClause,
@@ -698,7 +698,7 @@ class _DataOpsMixin:
         未找到时变量存入空字符串 ""（falsy），可用 if $var 判断。
         支持 region 和 panel 作为搜索区域（两者都有矩形坐标，对 find 等价）。
         """
-        from ...core.layout_models import Region
+        from ...core.layout.models import Region
 
         # 解析 by 子句（必填）：匹配模式 + 搜索目标
         by_clause: ByClause = node.by

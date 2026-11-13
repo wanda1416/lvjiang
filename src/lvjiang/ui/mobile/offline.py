@@ -27,7 +27,7 @@ from ...core.android.device import AdbDevice
 from ...core.android.history_transfer import pull_history
 from ...core.android.offline import require_offline_sync_access, sync_offline_bundle
 from ...core.history_transfer import history_channels
-from ...core.layout_config import load_layout_entries
+from ...core.layout.config import load_layout_entries
 from ...core.license import has_feature
 from ...core.offline_bundle import build_offline_bundle
 from ...i18n import tr

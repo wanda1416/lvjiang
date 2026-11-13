@@ -36,7 +36,7 @@ import java.util.concurrent.Executors
  * 截图手法：本页是透明主题叠在游戏上面的，截图前把内容藏起来、窗口底色设全透明，
  * 无障碍 takeScreenshot 拍到的就是底下的游戏画面；拍完再显示回来。用户不用来回切应用。
  *
- * 算法全在 Python 侧（core/screen_calib.py，PC 与设备共用），这里只画图、收点、调接口。
+ * 算法全在 Python 侧（core/layout/screen_calib.py，PC 与设备共用），这里只画图、收点、调接口。
  */
 class CalibActivity : AppCompatActivity() {
 

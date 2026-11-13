@@ -21,7 +21,7 @@ from .._version import __version__
 from ..apps import get_registered_app_ids, load_app
 from .config.resolver import ConfigResolver
 from .json_files import formatted_json, formatted_json_bytes
-from .layout_config import load_layout_doc
+from .layout.config import load_layout_doc
 from .paths import (
     config_directory,
     get_config_local_dir,

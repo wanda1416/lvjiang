@@ -431,7 +431,7 @@ def execute(request: RunRequest) -> dict[str, Any]:
 
     username = _resolve_user(request.user)
     layout_name = request.layout.strip() or "android"
-    from .layout_storage import load_layout_by_key
+    from .layout.storage import load_layout_by_key
     layout = load_layout_by_key(layout_name)
     if layout is None:
         raise CliError(f"布局不存在: {layout_name}", EXIT_ENVIRONMENT)

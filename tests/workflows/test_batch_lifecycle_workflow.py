@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from lvjiang.core.config import load_user_config
-from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text

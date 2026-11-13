@@ -7,8 +7,8 @@
 
 import pytest
 
-from lvjiang.core.layout_manager import LayoutConfigManager, migrate_layout_item
-from lvjiang.core.layout_models import Arrow, Layout, Panel, Point, Region
+from lvjiang.core.layout.manager import LayoutConfigManager, migrate_layout_item
+from lvjiang.core.layout.models import Arrow, Layout, Panel, Point, Region
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
 
@@ -170,7 +170,7 @@ class TestDeleteAcrossLayouts:
         return json.loads(path.read_text(encoding="utf-8"))
 
     def test_a_region_is_removed_from_every_layout(self, manager):
-        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+        from lvjiang.core.layout.manager import delete_item_key_across_all_layouts
 
         changed = delete_item_key_across_all_layouts("src", "region", "btn")
 
@@ -181,7 +181,7 @@ class TestDeleteAcrossLayouts:
 
     def test_deleting_a_point_takes_its_arrows_with_it(self, manager):
         """端点没了的 arrow 既画不出来也跑不了，留着就是下一条残留。"""
-        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+        from lvjiang.core.layout.manager import delete_item_key_across_all_layouts
 
         delete_item_key_across_all_layouts("src", "point", "origin")
 
@@ -192,7 +192,7 @@ class TestDeleteAcrossLayouts:
 
     def test_a_layout_without_that_key_is_left_alone(self, manager):
         from lvjiang.core.config.resolver import get_resolver
-        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+        from lvjiang.core.layout.manager import delete_item_key_across_all_layouts
 
         path = get_resolver().resolve_read("layouts/layout_c/src.json")
         assert path is not None
@@ -203,14 +203,14 @@ class TestDeleteAcrossLayouts:
         assert path.read_text(encoding="utf-8") == before
 
     def test_panels_are_covered_too(self, manager):
-        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+        from lvjiang.core.layout.manager import delete_item_key_across_all_layouts
 
         delete_item_key_across_all_layouts("src", "panel", "grid")
 
         assert self._scene_json("layout_a")["panels"] == []
 
     def test_an_unknown_kind_changes_nothing(self, manager):
-        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+        from lvjiang.core.layout.manager import delete_item_key_across_all_layouts
 
         assert delete_item_key_across_all_layouts("src", "arrow", "fwd") == []
         assert len(self._scene_json("layout_a")["arrows"]) == 2

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.core.layout_models import Region, effective_click_rect
+from lvjiang.core.layout.models import Region, effective_click_rect
 from lvjiang.workflows.base.coords import _CoordMixin
 
 

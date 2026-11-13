@@ -1,6 +1,6 @@
 # 地图定义与地图管理
 
-> Layer owner：`core/maps.py`（数据模型与读写）、`core/recognizers/heading.py`（小地图朝向解析）、`ui/map_manager/`（对话框）
+> Layer owner：`core/layout/maps.py`（数据模型与读写）、`core/recognizers/heading.py`（小地图朝向解析）、`ui/map_manager/`（对话框）
 > Feeds/Affects：场景注册表（每张地图自带一个 HUD 场景）、布局（HUD 实体坐标）、后续的导航状态机与 locomotion 原语
 > Stability：第一版；导航运行时尚未接入
 
@@ -127,7 +127,7 @@ POI 坐标是**底图归一化坐标**。`kind` 只是标签（`exit` / `spawn` 
 新增/编辑底图 POI。底图 POI 仍是底图归一化坐标，地域定位后的界碑点击位置仍属
 场景/布局坐标，二者不合并。
 
-`core/map_stitching.py` 支持同一缩放、具有重叠地图纹理的截图平移拼接。
+`core/layout/map_stitching.py` 支持同一缩放、具有重叠地图纹理的截图平移拼接。
 调用方必须通过有效像素掩码排除固定 UI。SIFT 匹配与 RANSAC 验证共同纹理，
 只接受接近平移的匹配；无法连接全部图片时明确报错。未覆盖像素保留为空白，
 选择重叠区域中离遮挡边缘更远的观察值，避免混入固定面板。

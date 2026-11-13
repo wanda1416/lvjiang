@@ -22,12 +22,12 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.layout_manager import (
+from ...core.layout.manager import (
     get_active_screenshot_index,
     list_scene_screenshots,
     set_active_screenshot_index,
 )
-from ...core.layout_models import (
+from ...core.layout.models import (
     Arrow,
     CanvasConfig,
     Panel,
@@ -444,7 +444,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             return ""
         if self._layout_rel_path:
             return self._layout_rel_path
-        from ...core.layout_manager import scene_layout_rel
+        from ...core.layout.manager import scene_layout_rel
         return scene_layout_rel(self._layout_name, self._scene_key)
 
     def _refresh_version_control(self, kind: str, value: QLabel, title: QLabel) -> None:

@@ -12,7 +12,7 @@ import numpy as np
 from loguru import logger
 
 from ..workflows.align import GridAlignment
-from .layout_models import CanvasConfig, Region
+from .layout.models import CanvasConfig, Region
 from .ocr_cleaner import OCRCleaner
 from .ocr_config import load_region_batch_config
 from .scene.registry import get_effective_region_defs

@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.layout_manager import rename_view_screenshots
+from ...core.layout.manager import rename_view_screenshots
 from ...core.scene.definition import BASE_VIEW_KEY
 from ...core.scene.registry import get_registry, sync_scene_cache
 from ...core.scene.transitions import entries_of_view, exits_of_view

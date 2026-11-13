@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.layout_manager import (
+from ...core.layout.manager import (
     LayoutConfigManager,
     expand_one_reference,
     get_active_screenshot_index,
@@ -33,7 +33,7 @@ from ...core.layout_manager import (
     save_scene_screenshot,
     set_active_screenshot_index,
 )
-from ...core.layout_models import Layout
+from ...core.layout.models import Layout
 from ...core.scene.registry import (
     get_registry,
     get_scene_name,
@@ -505,7 +505,7 @@ class SceneEditorDialog(
         layout_key = self._current_layout.key
         layout_name = self._current_layout.name
         self._loaded_scenes = set()  # 布局变更，所有底图待重新加载
-        from ...core.layout_manager import scene_layout_rels
+        from ...core.layout.manager import scene_layout_rels
         scene_keys = get_registry().all_scene_keys()
         self._scene_layout_paths = scene_layout_rels(layout_key, scene_keys)
         self._applying_layout = True

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from PyQt6.QtWidgets import QComboBox, QWidget
 
-from lvjiang.core.layout_models import CanvasConfig, Layout
+from lvjiang.core.layout.models import CanvasConfig, Layout
 from lvjiang.ui.main.run_control import RunControlMixin
 
 pytestmark = pytest.mark.usefixtures('qapp')

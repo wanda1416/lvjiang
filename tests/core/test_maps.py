@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
-from lvjiang.core.maps import (
+from lvjiang.core.layout.maps import (
     HUD_SCENE_GROUP_KEY,
     HeadingDetector,
     MapDef,
@@ -317,7 +317,7 @@ def test_create_rolls_back_generated_scene_when_map_save_fails(
 
 def test_region_surveys_save_reload_copy_and_delete(tmp_path):
     """探查图片随地图复制和删除；缺失图片不得伪装成可用截图。"""
-    from lvjiang.core.maps import MapRegion, MapSurvey, image_sha256
+    from lvjiang.core.layout.maps import MapRegion, MapSurvey, image_sha256
 
     resolver, registry, manager = _env(tmp_path)
     definition = manager.create("north", "北部地图")
@@ -338,7 +338,7 @@ def test_region_surveys_save_reload_copy_and_delete(tmp_path):
 def test_survey_save_conflict_does_not_replace_image(tmp_path):
     """窗口打开后配置被修改，保存截图草稿不能先覆盖旧图片。"""
     from lvjiang.core.config.conflicts import ConfigWriteConflict
-    from lvjiang.core.maps import MapRegion, MapSurvey, image_sha256
+    from lvjiang.core.layout.maps import MapRegion, MapSurvey, image_sha256
 
     _, _, manager = _env(tmp_path)
     definition = manager.create("north", "北部地图")

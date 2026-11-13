@@ -4,8 +4,8 @@ from typing import Any
 
 from loguru import logger
 
-from ...core.coord_types import CoordRef, Offset, RectCoordRef, to_offset
-from ...core.layout_models import FoundRegion
+from ...core.layout.coord_types import CoordRef, Offset, RectCoordRef, to_offset
+from ...core.layout.models import FoundRegion
 from ..builtins._coerce import to_number
 from ..grammar import (
     And,

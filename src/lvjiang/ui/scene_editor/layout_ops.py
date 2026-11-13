@@ -20,20 +20,20 @@ from ...core.config.resolver import (
     EntityOrigin,
     get_resolver,
 )
-from ...core.key_validation import validate_layout_activation_keys
-from ...core.layout_config import (
+from ...core.layout.config import (
     DEFAULT_ASPECT_TOLERANCE,
     MAX_ASPECT_TOLERANCE,
     load_layout_doc,
     parse_aspect_ratio,
     save_layout_doc,
 )
-from ...core.layout_manager import (
+from ...core.layout.key_validation import validate_layout_activation_keys
+from ...core.layout.manager import (
     copy_screenshots,
     delete_screenshots,
     scene_layout_rels,
 )
-from ...core.layout_models import Layout
+from ...core.layout.models import Layout
 from ...core.scene.registry import get_registry
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width

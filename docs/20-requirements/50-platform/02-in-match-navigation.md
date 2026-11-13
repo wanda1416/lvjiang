@@ -8,7 +8,7 @@
 > | `drag` 语法：`duration` / `A to B` / `scale` / `exact`，抖动统一 | ✅ | `32-grammar/03.3-mouse.md` |
 > | `click ... hold` 命中 `activation_key` 转 `press hold` | ✅ | `workflows/base/actions.py` |
 > | 各后端 hold 语义（a11y 两段 stroke、ADB `motionevent`、桌面可停止） | ✅ | `30-architecture/38-platform/03-io-backends.md` |
-> | 地图实体、地图管理对话框、HUD 场景自动生成 | ✅ | `core/maps.py`、`ui/map_manager/`，见 `30-architecture/39-runtime/02-maps.md` |
+> | 地图实体、地图管理对话框、HUD 场景自动生成 | ✅ | `core/layout/maps.py`、`ui/map_manager/`，见 `30-architecture/39-runtime/02-maps.md` |
 > | 小地图朝向解析（黄色内凹箭头） | 🟡 诊断实现，待真机样本验收 | `core/recognizers/heading.py` |
 > | locomotion 原语（`move_begin/steer/end`、`look_turn`）与布局级行动绑定 | 🔲 | 见 §4.5 |
 > | 大地图定位（玩家/POI 检测器、视口/缩放匹配） | 🔲 | 见 §5.2、§10 |

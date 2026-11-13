@@ -34,7 +34,7 @@ def _load_manifest():
 # ─── 场景注册表（从 YAML 加载） ─────────────────────────
 
 # 模块导入不构造注册表：构造会立刻 _load_all 并打印每条场景日志，任何一条
-# 模块级 ``from .scene.registry import ...``（core.ocr、core.layout_manager
+# 模块级 ``from .scene.registry import ...``（core.ocr、core.layout.manager
 # 等）都会因此抢在插件注册完成前触发场景加载。改为显式初始化：启动时由
 # run_app 调用 initialize_scene_registry()，首次 get_registry() /
 # reload_scene_registry() 也会兜底初始化。

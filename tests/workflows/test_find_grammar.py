@@ -42,7 +42,7 @@ class TestFoundRegion:
     """FoundRegion 数据类测试"""
 
     def test_center_ratios(self):
-        from lvjiang.core.layout_models import FoundRegion
+        from lvjiang.core.layout.models import FoundRegion
         fr = FoundRegion(x_ratio=0.1, y_ratio=0.2, w_ratio=0.3, h_ratio=0.4)
         cx, cy = fr.center_ratios()
         assert abs(cx - 0.25) < 1e-9

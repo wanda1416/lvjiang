@@ -213,7 +213,7 @@ class TestCompiler:
     def _host():
         from types import SimpleNamespace
 
-        from lvjiang.core.layout_models import Arrow, Point, Region
+        from lvjiang.core.layout.models import Arrow, Point, Region
         from lvjiang.workflows.engine.actions import _ActionsMixin
         from lvjiang.workflows.engine.timeline import _TimelineMixin
 

@@ -4,13 +4,13 @@ import json
 
 from loguru import logger
 
-from . import layout_screenshots as screenshots
-from .config.resolver import get_resolver
-from .layout_config import (
+from ..config.resolver import get_resolver
+from . import screenshots
+from .config import (
     load_layout_entries,
 )
-from .layout_models import Layout
-from .layout_storage import (
+from .models import Layout
+from .storage import (
     _scene_rel,
 )
 

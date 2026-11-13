@@ -13,8 +13,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from lvjiang.core.coord_types import CircleCoordRef, RectCoordRef
-from lvjiang.core.layout_models import FoundRegion, Region
+from lvjiang.core.layout.coord_types import CircleCoordRef, RectCoordRef
+from lvjiang.core.layout.models import FoundRegion, Region
 from lvjiang.workflows.builtins import get_function
 from lvjiang.workflows.builtins.vision import last_frame_region
 from tests.workflows.conftest import make_engine

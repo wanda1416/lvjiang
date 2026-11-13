@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.core.layout_models import FoundRegion, Region, SubsceneRef, TemplateBinding
+from lvjiang.core.layout.models import FoundRegion, Region, SubsceneRef, TemplateBinding
 from lvjiang.core.recognizers import template_locator as tl
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text

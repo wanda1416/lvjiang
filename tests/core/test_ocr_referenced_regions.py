@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from lvjiang.core.layout_models import CanvasConfig, Region
+from lvjiang.core.layout.models import CanvasConfig, Region
 from lvjiang.core.ocr import OCREngine, OCRResult
 from lvjiang.core.scene.definition_models import RegionDef
 

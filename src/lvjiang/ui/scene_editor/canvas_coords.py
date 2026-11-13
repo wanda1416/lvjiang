@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QPointF, QRectF
 
-from ...core.layout_models import (
+from ...core.layout.models import (
     CanvasConfig,
     Point,
     Region,

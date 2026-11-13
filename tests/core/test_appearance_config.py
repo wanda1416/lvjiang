@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from lvjiang.core import layout_manager
 from lvjiang.core.config.resolver import ConfigResolver
+from lvjiang.core.layout import manager as layout_manager
 from lvjiang.core.paths import get_config_system_dir
 from lvjiang.core.scene.definition import SceneRegistry
 from lvjiang.core.scene.transitions import find_unreachable_views, validate_transitions

@@ -87,7 +87,7 @@
 | `offline.json` | 手机离线同步的来源与时间 | `core/ondevice/offline.py` | 只读状态，无同步记录表示从未同步 |
 | `mcp.json` | 外部 Agent 接入：端口、启用开关、`token`、`agent_key`、导出路径 | `core/agent_connection.py` | **含凭据**，见第七节 |
 | `agent/results.json`、`agent/tasks.json` | 外部 Agent 的生成结果与任务表 | `apps/yysls/core/agent/service.py` | 经 `DocumentDirectoryStore`（`_meta.json` + 可恢复事务） |
-| `screenshots/{布局}/{场景}(__{视图}).(png|webp)` | 布局参考截图 | `core/layout_screenshots.py` | 目录体积第一大项，删掉重截即可 |
+| `screenshots/{布局}/{场景}(__{视图}).(png|webp)` | 布局参考截图 | `core/layout/screenshots.py` | 目录体积第一大项，删掉重截即可 |
 | `feedback-qrcode.jpg` | 交流群二维码缓存 | `core/group_qrcode.py` | 可重建，缺失时从站点拉取 |
 | `yysls/{play_styles,graduations,attr_loadout,attr_derivations}.json` + `_meta.json` | 燕云插件的会话文档 | `apps/yysls/config/session_node.py` | `DocumentDirectoryStore`，storage v1；跨文档更新走可恢复事务 |
 

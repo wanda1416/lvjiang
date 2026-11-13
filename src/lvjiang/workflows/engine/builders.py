@@ -10,7 +10,7 @@ from ...core.capture_base import CaptureBackend
 from ...core.config import AndroidAppConfig, DelayParam, InputSimConfig
 from ...core.config.users import SessionManager
 from ...core.input_base import InputBackend
-from ...core.layout_models import Layout
+from ...core.layout.models import Layout
 from ...core.ocr import OCREngine
 from ...core.user_config import load_user_metadata
 from .core import WorkflowEngine

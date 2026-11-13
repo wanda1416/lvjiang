@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.key_names import normalize_pressable
-from ...core.layout_manager import (
+from ...core.layout.manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
 )
@@ -419,7 +419,7 @@ class RegionPanelMixin:
         region = self._canvas.selected_region()
         if region is None or region.template is None:
             return
-        from ...core.layout_models import TemplateBinding
+        from ...core.layout.models import TemplateBinding
         self._canvas.set_selected_template(TemplateBinding(
             region.template.name, self._template_score.value(),
             region.template.record_w, region.template.record_h,
@@ -430,7 +430,7 @@ class RegionPanelMixin:
         region = self._canvas.selected_region()
         if region is None or region.template is None:
             return
-        from ...core.layout_models import TemplateBinding
+        from ...core.layout.models import TemplateBinding
         binding = region.template
         self._canvas.set_selected_template(TemplateBinding(
             binding.name, binding.min_score, binding.record_w,

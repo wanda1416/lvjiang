@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from lvjiang.core.map_stitching import stitch_map_frames
-from lvjiang.core.maps import MapError
+from lvjiang.core.layout.map_stitching import stitch_map_frames
+from lvjiang.core.layout.maps import MapError
 
 
 def test_stitch_translation_excludes_fixed_overlay():

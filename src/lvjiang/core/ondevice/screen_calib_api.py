@@ -2,7 +2,7 @@
 
 Kotlin 侧只管画图和收点：参照图 / 实时截图的路径从这里拿，用户在两张图上点的
 地标对发回来求解，解出的画布再由这里写进 layouts.yaml 的本地覆盖。算法全部在
-core/screen_calib.py（PC 与设备共用），本模块只做跨语言适配。
+core/layout/screen_calib.py（PC 与设备共用），本模块只做跨语言适配。
 
 与 task_runner 相同的约定：对外函数返回 JSON 文本、自己吞异常（{ok:false, error}）。
 """
@@ -16,8 +16,8 @@ import numpy as np
 
 from ...constants import PROJECT_ROOT
 from ...i18n import tr
-from .. import screen_calib as sc
-from ..layout_models import CanvasConfig
+from ..layout import screen_calib as sc
+from ..layout.models import CanvasConfig
 
 #: 实时截图落盘位置（filesDir/lvjiang/calib/live.png），Kotlin 按路径读显示
 _CALIB_DIR = PROJECT_ROOT / "calib"

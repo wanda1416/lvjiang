@@ -19,9 +19,9 @@ from loguru import logger
 if TYPE_CHECKING:
     from .key_state import KeyStateRegistry
 
-from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
 from ...core.key_names import normalize_pressable
-from ...core.layout_models import Point as _LayoutPoint
+from ...core.layout.coord_types import CircleCoordRef, CoordRef, RectCoordRef
+from ...core.layout.models import Point as _LayoutPoint
 from ...core.timing import precise_wait
 from ...i18n import tr
 from ..grammar import (
@@ -52,7 +52,7 @@ _FoundRegion = None
 def _get_found_region_cls():
     global _FoundRegion
     if _FoundRegion is None:
-        from ...core.layout_models import FoundRegion
+        from ...core.layout.models import FoundRegion
         _FoundRegion = FoundRegion
     return _FoundRegion
 
@@ -77,7 +77,7 @@ class _ActionsMixin:
         entity = str(self._resolve(target.entity))
         item = resolve_subscene_entity(
             self._layout, scene, reference, entity)
-        from ...core.layout_models import Point, Region
+        from ...core.layout.models import Point, Region
         workflow = self._ensure_workflow()
         if isinstance(item, Region):
             x, y = workflow._region_to_screen(item, jitter=True)

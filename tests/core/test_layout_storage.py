@@ -11,9 +11,9 @@ import json
 
 import pytest
 
-from lvjiang.core import layout_manager
-from lvjiang.core.layout_manager import LayoutConfigManager, load_layout_by_key
-from lvjiang.core.layout_models import (
+from lvjiang.core.layout import manager as layout_manager
+from lvjiang.core.layout.manager import LayoutConfigManager, load_layout_by_key
+from lvjiang.core.layout.models import (
     Arrow,
     CanvasConfig,
     Layout,
@@ -510,13 +510,13 @@ class TestSceneLayoutRel:
 
     def test_unknown_layout_falls_back_to_its_own_name(self, env):
         """布局missing时不该抛异常，退回按名字拼（调用方自会得到空来源）。"""
-        from lvjiang.core.layout_manager import scene_layout_rel
+        from lvjiang.core.layout.manager import scene_layout_rel
         assert scene_layout_rel("unknown_layout", "scene_a") == \
             "layouts/unknown_layout/scene_a.json"
 
     def test_batch_paths_parse_layout_registry_once(self, env, monkeypatch):
         from lvjiang.core.config.resolver import get_resolver
-        from lvjiang.core.layout_manager import scene_layout_rels
+        from lvjiang.core.layout.manager import scene_layout_rels
 
         mgr = LayoutConfigManager()
         mgr.save_layout(_make_layout("root_layout"))

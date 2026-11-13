@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from lvjiang.core.layout_models import CanvasConfig, Region
+from lvjiang.core.layout.models import CanvasConfig, Region
 from lvjiang.workflows.base.recognition import _RecognitionMixin
 
 SCENE = "activity_jianghu"

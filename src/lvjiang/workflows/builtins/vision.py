@@ -21,8 +21,8 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
-from ...core.layout_models import FoundRegion
+from ...core.layout.coord_types import CircleCoordRef, CoordRef, RectCoordRef
+from ...core.layout.models import FoundRegion
 from ...core.recognizers import color_ops
 from ...i18n import tr
 from ._coerce import to_number

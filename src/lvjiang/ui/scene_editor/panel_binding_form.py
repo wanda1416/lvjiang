@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.layout_models import Panel
+from ...core.layout.models import Panel
 from ...i18n import tr, tr_label
 
 

@@ -23,10 +23,10 @@ from ...core.config import load_user_config
 from ...core.config.interface import get_interface_store
 from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend
-from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
+from ..layout.models import Layout
 from .capture import A11yCapture
 from .input import A11yInput
 
@@ -56,7 +56,7 @@ def _default_layout_name() -> str:
     Raises:
         RuntimeError: 无任何可用布局时
     """
-    from ..layout_config import load_layout_entries
+    from ..layout.config import load_layout_entries
     keys = list(load_layout_entries())
     name = get_interface_store().get_active("layout", "")
     if name:
@@ -77,7 +77,7 @@ def _load_layout(name: str) -> Layout:
     Returns:
         Layout 实例
     """
-    from ..layout_manager import load_layout_by_key
+    from ..layout.manager import load_layout_by_key
     layout = load_layout_by_key(name)
     if layout is None:
         logger.warning(f"布局不存在: {name}，使用空布局")

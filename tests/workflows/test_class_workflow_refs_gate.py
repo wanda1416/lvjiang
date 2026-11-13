@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from lvjiang.apps import load_app
-from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.core.paths import get_config_system_dir
 from tests.case_matrix import case_matrix
 

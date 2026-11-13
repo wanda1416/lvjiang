@@ -49,7 +49,7 @@ from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.config import load_available_envs, load_env, load_user_config
 from ...core.config.users import SessionManager
-from ...core.layout_manager import LayoutConfigManager
+from ...core.layout.manager import LayoutConfigManager
 from ...core.plugin_runtime import PluginRuntimePort
 from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager

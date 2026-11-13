@@ -325,7 +325,7 @@ def _check_layout_refs(program) -> list[Diagnostic]:
     layout_key = os.environ.get("LVJIANG_WF_LAYOUT_KEY", "").strip()
     if not layout_key:
         return []
-    from lvjiang.core.layout_manager import load_layout_by_key
+    from lvjiang.core.layout.manager import load_layout_by_key
     from lvjiang.workflows.static_check import check_refs
 
     layout = load_layout_by_key(layout_key)

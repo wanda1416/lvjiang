@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from lvjiang.core.layout_models import CanvasConfig, Region
+from lvjiang.core.layout.models import CanvasConfig, Region
 from lvjiang.core.scene.definition_models import RegionDef
 from lvjiang.ui.scene_editor.recognition_ops import RecognitionOpsMixin
 

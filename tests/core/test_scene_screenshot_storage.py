@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.core import layout_screenshots as screenshots
+from lvjiang.core.layout import screenshots
 
 
 def _frame(value: int) -> np.ndarray:

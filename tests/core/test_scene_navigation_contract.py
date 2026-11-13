@@ -104,8 +104,8 @@ def test_navigation_roundtrip_and_view_reference_rename(tmp_path):
 
 
 def test_system_navigation_and_desktop_shortcuts():
-    from lvjiang.core import layout_manager
-    from lvjiang.core.key_validation import validate_layout_activation_keys
+    from lvjiang.core.layout import manager as layout_manager
+    from lvjiang.core.layout.key_validation import validate_layout_activation_keys
     from lvjiang.core.scene.registry import get_registry
 
     scenes = get_registry().all_scenes()

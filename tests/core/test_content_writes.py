@@ -64,9 +64,9 @@ def test_cancelled_immediate_scene_edit_does_not_leak_into_registry(tmp_path, mo
 def test_new_layout_keeps_own_baselines_and_batches_multi_file_save(tmp_path, monkeypatch):
     from unittest.mock import Mock
 
-    from lvjiang.core import layout_manager
     from lvjiang.core.config import content
     from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.core.layout import manager as layout_manager
     from lvjiang.core.scene import registry as scene_registry
 
     resolver = ConfigResolver(config_dir=tmp_path, dev_mode=True)

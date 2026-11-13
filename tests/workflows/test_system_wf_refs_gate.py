@@ -13,7 +13,7 @@ config/local 影子文件影响，CI 与开发机结论一致。
 import pytest
 
 from lvjiang.core.config import load_user_config
-from lvjiang.core.key_validation import validate_layout_activation_keys
+from lvjiang.core.layout.key_validation import validate_layout_activation_keys
 from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.engine import WorkflowEngine
 
@@ -68,7 +68,7 @@ def _validator(layout_name: str) -> WorkflowEngine:
     """
     if layout_name in _VALIDATOR_CACHE:
         return _VALIDATOR_CACHE[layout_name]
-    from lvjiang.core.layout_manager import load_layout_by_key
+    from lvjiang.core.layout.manager import load_layout_by_key
     layout = load_layout_by_key(layout_name)
     assert layout is not None, f"布局加载失败: {layout_name}"
     user_config = load_user_config()

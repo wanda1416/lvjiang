@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lvjiang.core.layout_config import parse_layout_entries
+from lvjiang.core.layout.config import parse_layout_entries
 
 
 def test_layout_v2_separates_stable_key_and_display_name():
@@ -83,7 +83,7 @@ class TestAspectDeclaration:
     """画布尺寸要求：声明写法、非法值和随包预置值"""
 
     def test_accepts_ratio_pair_and_decimal(self):
-        from lvjiang.core.layout_config import parse_aspect_ratio
+        from lvjiang.core.layout.config import parse_aspect_ratio
         assert parse_aspect_ratio("16:9") == pytest.approx(16 / 9)
         assert parse_aspect_ratio("20:9") == pytest.approx(20 / 9)
         # 写法不同但同一块屏幕必须算出同一个数，否则同一台机器会一个过一个不过
@@ -95,18 +95,18 @@ class TestAspectDeclaration:
 
     def test_rejects_sexagesimal_accident(self):
         """YAML 1.1 把不加引号的 20:9 读成 1209，不能让它静默变成永不满足的要求。"""
-        from lvjiang.core.layout_config import parse_aspect_ratio
+        from lvjiang.core.layout.config import parse_aspect_ratio
         with pytest.raises(ValueError, match="六十进制"):
             parse_aspect_ratio(1209)
 
     def test_rejects_garbage(self):
-        from lvjiang.core.layout_config import parse_aspect_ratio
+        from lvjiang.core.layout.config import parse_aspect_ratio
         for bad in ("abc", "16:0", "-2", True):
             with pytest.raises(ValueError):
                 parse_aspect_ratio(bad)
 
     def test_manifest_rejects_invalid_aspect_and_tolerance(self):
-        from lvjiang.core.layout_config import parse_layout_entries
+        from lvjiang.core.layout.config import parse_layout_entries
         base = {"schema_version": 2, "layouts": {"x": {"name": "X"}}}
 
         doc = {**base, "layouts": {"x": {"name": "X", "aspect": "abc"}}}
@@ -126,7 +126,7 @@ class TestAspectDeclaration:
         带边框的布局容差必须放得下 1280x720~3840x2160 这一段漂移，同时拦住真正的
         形态错配（窗口模式配「桌面全屏」约 2.7%）。
         """
-        from lvjiang.core.layout_config import canvas_aspect_deviation
+        from lvjiang.core.layout.config import canvas_aspect_deviation
         root = Path(__file__).resolve().parents[2]
         doc = yaml.safe_load(
             (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))

@@ -1,7 +1,7 @@
 import pytest
 
-from lvjiang.core.key_validation import validate_layout_activation_keys
-from lvjiang.core.layout_models import Layout, Region
+from lvjiang.core.layout.key_validation import validate_layout_activation_keys
+from lvjiang.core.layout.models import Layout, Region
 
 
 def _region(key: str) -> Region:

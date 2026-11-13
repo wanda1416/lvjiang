@@ -28,9 +28,9 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from ..i18n import tr
-from .config.resolver import LAYER_LOCAL, ConfigResolver, get_resolver
-from .scene.definition_models import PointDef, RegionDef
+from ...i18n import tr
+from ..config.resolver import LAYER_LOCAL, ConfigResolver, get_resolver
+from ..scene.definition_models import PointDef, RegionDef
 
 MAPS_DIR = "maps"
 BASE_IMAGE_NAME = "base.png"
@@ -401,7 +401,7 @@ class MapManager:
 
     def _scene_registry(self):
         if self._registry is None:
-            from .scene.registry import get_registry
+            from ..scene.registry import get_registry
             self._registry = get_registry()
         return self._registry
 
@@ -433,7 +433,7 @@ class MapManager:
         data.pop("content_version", None)
         origin = self._resolver.describe_entity(rel)
         map_def = MapDef.from_dict(data, layer=origin.layer)
-        from .config.conflicts import file_baseline
+        from ..config.conflicts import file_baseline
         map_def._file_baseline = file_baseline(self._resolver, rel)
         if map_def.key != key:
             raise MapError(
@@ -481,7 +481,7 @@ class MapManager:
     # ─── 写入 ──────────────────────────────────────────────
 
     def save(self, map_def: MapDef, *, force: bool = False) -> Path:
-        from .config.conflicts import checked_write, file_baseline
+        from ..config.conflicts import checked_write, file_baseline
         rel_path = map_rel_path(map_def.key)
         expected = map_def._file_baseline
         if expected is None:
@@ -543,7 +543,7 @@ class MapManager:
 
     def save_with_assets(self, map_def: MapDef, assets: dict[str, bytes], *, force: bool = False) -> Path:
         """保存底图和探查图片；配置冲突或失败时回滚图片，保留编辑草稿。"""
-        from .config.conflicts import checked_write, file_baseline
+        from ..config.conflicts import checked_write, file_baseline
 
         allowed = {map_def.base_image: map_def.base_image_sha256,
                    **{survey.image: survey.image_sha256 for survey in map_def.surveys}}
@@ -644,7 +644,7 @@ class MapManager:
         map_def = self.load(key)
         self._resolver.ensure_entity_deletable(map_rel_path(key))
         layer = LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None
-        from .config.conflicts import checked_write
+        from ..config.conflicts import checked_write
         checked_write(self._resolver, {map_rel_path(key): map_def._file_baseline},
                       lambda: self._resolver.delete_entity(map_rel_path(key), layer=layer))
         image_rel = base_image_rel_path(key, map_def.base_image)

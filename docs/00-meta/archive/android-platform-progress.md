@@ -535,7 +535,7 @@ PC 经 `adb forward tcp:<port> localabstract:lvjiang-agent` 连入，截图走 `
 
 换机后布局整体偏移的对齐方案，设计与实测见开发日志 `2026-08-23-screen-calibration.md`：
 
-- [x] `core/screen_calib.py`：参照图（`layouts/<布局>/_reference.png` + sidecar）、地标模板匹配、逐轴最小二乘解画布、
+- [x] `core/layout/screen_calib.py`：参照图（`layouts/<布局>/_reference.png` + sidecar）、地标模板匹配、逐轴最小二乘解画布、
   `layouts.yaml` 本地覆盖读写（PC / 设备共用，单测 8 例）
 - [x] `core/ondevice/screen_calib_api.py` + `CalibActivity`：悬浮面板「屏幕标定」→ 藏起自己截底下的游戏 → 参照图上点地标、
   本机图自动定位/手点纠正 → 绿框预览 → 保存/恢复默认；「本机画面设为参照图」给作者生成参照图

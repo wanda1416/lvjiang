@@ -107,7 +107,7 @@ class TestFocusWatchLifetime:
     def test_connection_is_dropped_on_close(self, qtbot):
         from PyQt6.QtWidgets import QApplication
 
-        from lvjiang.core.layout_manager import LayoutConfigManager
+        from lvjiang.core.layout.manager import LayoutConfigManager
         from lvjiang.ui.scene_editor import SceneEditorDialog
 
         app = QApplication.instance()
@@ -127,7 +127,7 @@ class TestFocusWatchLifetime:
         """真实现场：退出场景管理后继续在别处切焦点。"""
         from PyQt6.QtWidgets import QApplication, QLineEdit
 
-        from lvjiang.core.layout_manager import LayoutConfigManager
+        from lvjiang.core.layout.manager import LayoutConfigManager
         from lvjiang.ui.scene_editor import SceneEditorDialog
 
         host = QWidget()

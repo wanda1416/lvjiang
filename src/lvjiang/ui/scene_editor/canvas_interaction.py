@@ -8,7 +8,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QInputDialog, QMenu
 
-from ...core.layout_models import (
+from ...core.layout.models import (
     CanvasConfig,
     Region,
     SubsceneRef,

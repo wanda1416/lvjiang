@@ -44,7 +44,7 @@ from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ...core.config.conflicts import ConfigWriteConflict
 from ...core.config.resolver import LAYER_LOCAL, SystemContentProtected
-from ...core.maps import (
+from ...core.layout.maps import (
     FULL_VIEW_KEY,
     NAV_MODE_CLOSED_LOOP,
     NAV_MODE_PATHFIND,

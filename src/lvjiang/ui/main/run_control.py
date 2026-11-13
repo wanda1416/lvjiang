@@ -1297,7 +1297,7 @@ class RunControlMixin:
         未声明尺寸、未定位窗口、拿不到截图尺寸时一律放行：门禁只拦已知的错配，
         不拦「还不知道」。
         """
-        from ...core.layout_config import (
+        from ...core.layout.config import (
             canvas_aspect_deviation,
             canvas_aspect_matches,
             parse_aspect_ratio,

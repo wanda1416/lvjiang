@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.config.resolver import get_resolver
-from ...core.layout_manager import (
+from ...core.layout.manager import (
     delete_scene_across_all_layouts,
     rename_scene_across_all_layouts,
 )

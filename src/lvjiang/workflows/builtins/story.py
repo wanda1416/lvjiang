@@ -20,7 +20,7 @@ import uuid
 from loguru import logger
 
 from lvjiang.core.config.resolver import get_resolver
-from lvjiang.core.layout_models import FoundRegion
+from lvjiang.core.layout.models import FoundRegion
 from lvjiang.core.story import (
     StoryEntry,
     load_all,

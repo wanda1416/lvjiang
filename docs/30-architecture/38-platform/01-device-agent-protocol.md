@@ -118,7 +118,7 @@ PC 侧 `python -m lvjiang.core.android.calib -s <serial> probe [--apply]` 自动
 标定一次两边生效。
 
 它只管"截图像素 → 触摸像素"。**换机后游戏内容区位置不同**（挖孔安全区 / 宽高比留黑）是另一层问题，
-由布局画布解决：app 内「屏幕标定」页，见 `core/screen_calib.py` 与开发日志 2026-08-23。
+由布局画布解决：app 内「屏幕标定」页，见 `core/layout/screen_calib.py` 与开发日志 2026-08-23。
 
 ## PC 端使用
 

@@ -20,6 +20,6 @@
 
 ## 布局实现职责
 
-`core.layout_manager` 保留 CRUD、活动选择和保存冲突，`layout_storage` 负责文件加载、
+`core.layout.manager` 保留 CRUD、活动选择和保存冲突，`layout_storage` 负责文件加载、
 别名及引用展开，`layout_screenshots` 负责截图资源，`layout_references` 协调跨布局键维护。
 管理器继续提供既有公开入口，实际实现只存在于各职责模块中。

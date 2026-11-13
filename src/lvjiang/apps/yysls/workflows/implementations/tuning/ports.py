@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from lvjiang.workflows.ports import SceneAutomationPort, SubcallEnginePort
 
 if TYPE_CHECKING:
-    from lvjiang.core.layout_models import Region
+    from lvjiang.core.layout.models import Region
     from lvjiang.core.recognizers import ReferenceInfo
 
     from .state import TuningRunState

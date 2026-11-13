@@ -14,11 +14,15 @@ from functools import wraps
 
 from loguru import logger
 
-from ..i18n import tr
-from .config.interface import get_interface_store
-from .config.resolver import get_resolver
-from .key_validation import validate_layout_activation_keys
-from .layout_config import (
+from ...i18n import tr
+from ..config.interface import get_interface_store
+from ..config.resolver import get_resolver
+from ..scene.registry import (
+    get_panel_defs,
+    get_point_defs,
+    get_region_defs,
+)
+from .config import (
     DEFAULT_ASPECT_TOLERANCE,
     LayoutEntry,
     load_layout_doc,
@@ -27,142 +31,138 @@ from .layout_config import (
     save_layout_doc,
     validate_layout_key,
 )
-from .layout_models import CanvasConfig, Layout
-from .layout_references import (
+from .key_validation import validate_layout_activation_keys
+from .models import CanvasConfig, Layout
+from .references import (
     _delete_layout_item_key as _delete_layout_item_key,
 )
-from .layout_references import (
+from .references import (
     _rename_layout_item_key as _rename_layout_item_key,
 )
-from .layout_references import (
+from .references import (
     delete_item_key_across_all_layouts as delete_item_key_across_all_layouts,
 )
-from .layout_references import (
+from .references import (
     delete_scene_across_all_layouts as delete_scene_across_all_layouts,
 )
-from .layout_references import (
+from .references import (
     migrate_layout_item as migrate_layout_item,
 )
-from .layout_references import (
+from .references import (
     rename_item_key_across_all_layouts as rename_item_key_across_all_layouts,
 )
-from .layout_references import (
+from .references import (
     rename_layout_scene_key as rename_layout_scene_key,
 )
-from .layout_references import (
+from .references import (
     rename_scene_across_all_layouts as rename_scene_across_all_layouts,
 )
-from .layout_screenshots import (
+from .screenshots import (
     _existing_screenshot_path as _existing_screenshot_path,
 )
-from .layout_screenshots import (
+from .screenshots import (
     _load_screenshot_meta as _load_screenshot_meta,
 )
-from .layout_screenshots import (
+from .screenshots import (
     _safe_name as _safe_name,
 )
-from .layout_screenshots import (
+from .screenshots import (
     _save_screenshot_meta as _save_screenshot_meta,
 )
-from .layout_screenshots import (
+from .screenshots import (
     _screenshot_base_stem as _screenshot_base_stem,
 )
-from .layout_screenshots import (
+from .screenshots import (
     _screenshot_meta_path as _screenshot_meta_path,
 )
-from .layout_screenshots import (
+from .screenshots import (
     copy_screenshots as copy_screenshots,
 )
-from .layout_screenshots import (
+from .screenshots import (
     delete_scene_screenshot as delete_scene_screenshot,
 )
-from .layout_screenshots import (
+from .screenshots import (
     delete_screenshots as delete_screenshots,
 )
-from .layout_screenshots import (
+from .screenshots import (
     get_active_screenshot_index as get_active_screenshot_index,
 )
-from .layout_screenshots import (
+from .screenshots import (
     get_scene_screenshot_format as get_scene_screenshot_format,
 )
-from .layout_screenshots import (
+from .screenshots import (
     layout_screenshots_dir as layout_screenshots_dir,
 )
-from .layout_screenshots import (
+from .screenshots import (
     list_scene_screenshots as list_scene_screenshots,
 )
-from .layout_screenshots import (
+from .screenshots import (
     load_scene_screenshot as load_scene_screenshot,
 )
-from .layout_screenshots import (
+from .screenshots import (
     reindex_scene_screenshots as reindex_scene_screenshots,
 )
-from .layout_screenshots import (
+from .screenshots import (
     rename_scene_screenshots as rename_scene_screenshots,
 )
-from .layout_screenshots import (
+from .screenshots import (
     rename_view_screenshots as rename_view_screenshots,
 )
-from .layout_screenshots import (
+from .screenshots import (
     save_scene_screenshot as save_scene_screenshot,
 )
-from .layout_screenshots import (
+from .screenshots import (
     scene_screenshot_name as scene_screenshot_name,
 )
-from .layout_screenshots import (
+from .screenshots import (
     set_active_screenshot_index as set_active_screenshot_index,
 )
-from .layout_screenshots import (
+from .screenshots import (
     set_scene_screenshot_format as set_scene_screenshot_format,
 )
-from .layout_storage import _LAYOUTS_YAML_REL
-from .layout_storage import (
+from .storage import _LAYOUTS_YAML_REL
+from .storage import (
     _drop_orphan_coords as _drop_orphan_coords,
 )
-from .layout_storage import (
+from .storage import (
     _enumerate_scene_files as _enumerate_scene_files,
 )
-from .layout_storage import (
+from .storage import (
     _expand_scene_references as _expand_scene_references,
 )
-from .layout_storage import (
+from .storage import (
     _layout_dir_rel as _layout_dir_rel,
 )
-from .layout_storage import (
+from .storage import (
     _resolve_layout_entry as _resolve_layout_entry,
 )
-from .layout_storage import (
+from .storage import (
     _scene_rel as _scene_rel,
 )
-from .layout_storage import (
+from .storage import (
     expand_one_reference as expand_one_reference,
 )
-from .layout_storage import (
+from .storage import (
     load_layout_by_key as load_layout_by_key,
 )
-from .layout_storage import (
+from .storage import (
     refresh_scene_references as refresh_scene_references,
 )
-from .layout_storage import (
+from .storage import (
     scene_layout_rel as scene_layout_rel,
 )
-from .layout_storage import (
+from .storage import (
     scene_layout_rels as scene_layout_rels,
 )
-from .layout_storage import (
+from .storage import (
     shared_layout_bindings as shared_layout_bindings,
-)
-from .scene.registry import (
-    get_panel_defs,
-    get_point_defs,
-    get_region_defs,
 )
 
 
 def _checked_layout_save(function):
     @wraps(function)
     def wrapped(self, layout, changed_scenes=None, **kwargs):
-        from .config.conflicts import ConfigWriteConflict, checked_write, file_baseline
+        from ..config.conflicts import ConfigWriteConflict, checked_write, file_baseline
         resolver = get_resolver()
         self.last_save_error = ""
         scenes = (set(layout.regions) | set(layout.points) | set(layout.arrows)
@@ -244,7 +244,7 @@ class LayoutConfigManager:
         key = validate_layout_key(key)
         name = name.strip()
         self.validate_new_identity(key, name)
-        from .scene.registry import SCENE_REGIONS
+        from ..scene.registry import SCENE_REGIONS
         layout = Layout(key=key, name=name)
         for scene_key in SCENE_REGIONS:
             layout.regions[scene_key] = []
@@ -324,8 +324,8 @@ class LayoutConfigManager:
             logger.warning(f"布局不存在: {name}")
         else:
             logger.info(f"布局已加载: {name}")
-            from .config.conflicts import file_baseline
-            from .scene.registry import get_registry
+            from ..config.conflicts import file_baseline
+            from ..scene.registry import get_registry
             paths = set(scene_layout_rels(name, get_registry().all_scene_keys()).values()) | {"layouts.yaml"}
             layout._file_baselines = {path: file_baseline(get_resolver(), path) for path in paths}
         return layout

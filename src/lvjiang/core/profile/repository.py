@@ -798,6 +798,17 @@ class ProfileDB:
                         (username, type_, key),
                     )
                     changed = True
+            if changed:
+                # 锁定传播：meta 账本行（old/new_value = 锁定前后 0/1），
+                # 随上行通道同步到其他设备；meta 是机制分类，source 留空。
+                now = datetime.now().isoformat(timespec="seconds")
+                _record_history(
+                    conn,
+                    event_at=now, username=username, type_=type_, key=key,
+                    old_value=0, new_value=1, op_type="meta",
+                    source="", instance_id=_author_stamp(),
+                    op_id=str(uuid.uuid4()),
+                )
             self._commit(conn)
             return changed
         except Exception:
@@ -821,6 +832,16 @@ class ProfileDB:
                 "WHERE username=? AND type=? AND key=? AND locked=1",
                 (username, type_, key),
             )
+            if cursor.rowcount == 1:
+                # 解锁同样传播：meta 行 new_value=0，其他设备回放后解除锁定。
+                now = datetime.now().isoformat(timespec="seconds")
+                _record_history(
+                    conn,
+                    event_at=now, username=username, type_=type_, key=key,
+                    old_value=1, new_value=0, op_type="meta",
+                    source="", instance_id=_author_stamp(),
+                    op_id=str(uuid.uuid4()),
+                )
             self._commit(conn)
             return cursor.rowcount == 1
         except Exception:
@@ -855,15 +876,16 @@ class ProfileDB:
                 value = row.get("value")
                 number = float(value) if isinstance(value, (int, float)) else 0.0
                 text = row.get("value_text") or ""
+                locked_val = 1 if row.get("locked") else 0
                 conn.execute(
                     "INSERT INTO profile_entries "
-                    "(username, type, key, value, value_text, event_at, created_at, op_id) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "(username, type, key, value, value_text, event_at, created_at, op_id, locked) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(username, type, key) DO UPDATE SET "
                     "value=excluded.value, value_text=excluded.value_text, "
                     "event_at=excluded.event_at, created_at=excluded.created_at, "
-                    "op_id=excluded.op_id",
-                    (username, type_, key, number, text, event_at, now, op_id),
+                    "op_id=excluded.op_id, locked=excluded.locked",
+                    (username, type_, key, number, text, event_at, now, op_id, locked_val),
                 )
                 applied += 1
             self._commit(conn)
@@ -926,14 +948,26 @@ class ProfileDB:
             old_value_text = (
                 history_old_value_text if history_old_value_text is not None
                 else (old_row[1] if old_row and len(old_row) > 1 else ""))
-            if touch_entry and old_row and len(old_row) > 2 and old_row[2]:
+            if (touch_entry and op_type != "meta"
+                    and old_row and len(old_row) > 2 and old_row[2]):
+                # meta 例外：它本身就是锁定/解锁指令，必须穿透守卫传播锁状态。
                 self._rollback(conn)
                 logger.error(
                     f"profile 写入被拒绝：{username}.{type_}.{key} 已锁定"
                     f"（来源 {source or '未标注'}）")
                 return
 
-            if touch_entry:
+            if touch_entry and op_type == "meta":
+                # meta 只传锁状态：locked 单列更新，value/value_text/event_at
+                # 一律不动——meta 的 new_value 是锁标记 0/1，写成 value 会污染当前值。
+                conn.execute(
+                    "INSERT INTO profile_entries "
+                    "(username, type, key, value, value_text, event_at, created_at, locked) "
+                    "VALUES (?, ?, ?, 0, '', '', ?, ?) "
+                    "ON CONFLICT(username, type, key) DO UPDATE SET locked=excluded.locked",
+                    (username, type_, key, write_ts, 1 if float(value) >= 1 else 0),
+                )
+            elif touch_entry:
                 # 显式列更新，锁定列不在 SET 里，不会被清掉
                 conn.execute(
                     "INSERT INTO profile_entries "
@@ -1378,7 +1412,7 @@ class ProfileDB:
         try:
             rows = conn.execute(
                 f"SELECT {_HISTORY_COLUMNS} FROM profile_history "
-                "WHERE local_id>? AND op_type IN ('set', 'reset', 'regen')"
+                "WHERE local_id>? AND op_type IN ('set', 'reset', 'regen', 'meta')"
                 + (" AND instance_id=?" if author else "") +
                 " ORDER BY local_id ASC LIMIT ?",
                 ((since_id, author, limit) if author else (since_id, limit)),
@@ -1432,7 +1466,7 @@ class ProfileDB:
             row = conn.execute(
                 "SELECT COUNT(*) FROM profile_history "
                 "WHERE instance_id=? AND remote_id IS NULL "
-                "AND op_type IN ('set','reset','regen') "
+                "AND op_type IN ('set','reset','regen','meta') "
                 "AND op_id NOT LIKE 'unscoped:%'",
                 (author,),
             ).fetchone()
@@ -1481,7 +1515,7 @@ class ProfileDB:
                 "op_type, event_at, source, old_value_text, sync_from "
                 "FROM profile_history "
                 "WHERE instance_id=? AND remote_id IS NULL "
-                "AND local_id>? AND op_type IN ('set', 'reset', 'regen') "
+                "AND local_id>? AND op_type IN ('set', 'reset', 'regen', 'meta') "
                 "AND op_id NOT LIKE 'unscoped:%' "
                 "ORDER BY local_id ASC LIMIT ?",
                 (author, since_local_id, limit),
@@ -1763,6 +1797,40 @@ def db_get_history_since(since_id: int, limit: int = 200,
                          author: str = "") -> list[HistoryRow]:
     """本地水位之后待上行的账本行（``set`` / ``delta``，按 id 升序）。"""
     return get_profile_db().get_history_since(since_id, limit, author=author)
+
+
+def db_apply_meta_locked(username: str, type_: str, key: str, locked: int,
+                         *, instance_id: str, event_at: str, op_id: str,
+                         remote_id: int | None) -> None:
+    """回放他端的 meta 行：只改 locked，不碰 value/event_at（v2 §2.3）。
+
+    条目不存在时插占位行（与本地锁定行为一致）。账本行照记（op_type=meta），
+    remote_id 随行写入，避免回声。
+    """
+    db = get_profile_db()
+    conn = db._borrow_connection()
+    try:
+        db._begin(conn)
+        now = datetime.now().isoformat(timespec="seconds")
+        conn.execute(
+            "INSERT INTO profile_entries "
+            "(username, type, key, value, value_text, event_at, created_at, locked) "
+            "VALUES (?, ?, ?, 0, '', '', ?, ?) "
+            "ON CONFLICT(username, type, key) DO UPDATE SET locked=excluded.locked",
+            (username, type_, key, now, locked),
+        )
+        _record_history(
+            conn,
+            event_at=event_at or now, username=username, type_=type_, key=key,
+            old_value=1 - locked, new_value=locked, op_type="meta",
+            source="", instance_id=instance_id, op_id=op_id, remote_id=remote_id,
+        )
+        db._commit(conn)
+    except Exception:
+        db._rollback(conn)
+        raise
+    finally:
+        db._release_connection(conn)
 
 
 def db_max_synced_local_id() -> int:

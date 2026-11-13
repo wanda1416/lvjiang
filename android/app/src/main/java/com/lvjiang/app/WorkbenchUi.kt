@@ -911,8 +911,12 @@ class WorkbenchUi(
         val first = entries.first()
         text(section, "${first.optString("model_label")} · ${first.optString("group")}", 18f)
         entries.forEach { entry ->
-            val value = if (!entry.optBoolean("collected")) "未采集" else entry.optString("value") +
-                if (entry.isNull("cap")) "" else "/${entry.optString("cap") }"
+            val value = when {
+                entry.optBoolean("locked") -> "[锁定]"
+                !entry.optBoolean("collected") -> "未采集"
+                else -> entry.optString("value") +
+                    if (entry.isNull("cap")) "" else "/${entry.optString("cap") }"
+            }
             val row = LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
                 val pad = (10 * resources.displayMetrics.density).toInt()
@@ -1181,10 +1185,13 @@ class WorkbenchUi(
         request({ PyBridge.profileHistory(activity, user, entry.optString("model"), entry.optString("key"), offset) }) { result ->
             if (!result.optBoolean("ok")) { toast(result.optString("message")); return@request }
             val rows = objects(result.optJSONArray("records"))
+            val opLabel = mapOf("meta" to "[锁定]", "reset" to "[重置]",
+                "regen" to "[恢复]", "set" to "[更新]", "delta" to "[增量]")
             val body = rows.joinToString("\n\n") { row ->
+                val op = row.optString("op_type").ifEmpty { row.optString("change_type") }
                 val old = if (entry.optString("model") == "note") row.optString("old_value_text") else row.optString("old_value")
-                val new = if (entry.optString("model") == "note") row.optString("new_value_text") else row.optString("new_value")
-                "${row.optString("ts")}\n$old → $new\n${row.optString("source")} ${row.optString("reason")}".trim()
+                val new = if (entry.optString("model") == "note") row.optString("value_text") else row.optString("new_value")
+                "${opLabel[op] ?: ""} ${row.optString("event_at").ifEmpty { row.optString("ts") }}\n$old → $new\n${row.optString("source")} ${row.optString("reason")}".trim()
             }.ifEmpty { "暂无变更记录" }
             val content = SettingsUi.dialogContent(activity)
             content.addView(SettingsUi.label(activity, body).apply { setTextIsSelectable(true) })

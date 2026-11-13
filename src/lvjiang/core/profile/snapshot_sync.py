@@ -221,8 +221,9 @@ def _apply_op(op: RemoteOp) -> bool:
     根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
     """
     # 值语义都是覆盖（new_value 绝对值）；类型只是分类，照抄进本地账本。
+    # meta 是锁状态传播：只改 locked，不参与 value LWW。
     # delta 是已废弃的上行类型，服务端直接拒绝；本地防御性忽略。
-    if op.op not in ("", "set", "reset", "regen"):
+    if op.op not in ("", "set", "reset", "regen", "meta"):
         return False
     origin = op.instance_id
     op_id = op.op_id
@@ -236,6 +237,18 @@ def _apply_op(op: RemoteOp) -> bool:
 
     username, type_, key = op.username, op.type, op.key
     happened = canonical_event(op.happened_at)
+
+    # meta：锁状态传播。只改 locked，不碰 value/event_at——meta 的 event_at
+    # 是锁定时刻，参与 value LWW 会让它压住之后真实写入的 value 比较。
+    if op.op == "meta":
+        locked_state = 1 if (op.value or 0) >= 1 else 0
+        repository.db_apply_meta_locked(
+            username, type_, key, locked_state,
+            instance_id=origin, event_at=happened or "",
+            op_id=op_id, remote_id=op.remote_id,
+        )
+        return True
+
     current = repository.db_read_entry(username, type_, key)
     if current is None:
         current = Entry(username=username, type=type_, key=key, value=0)
@@ -439,6 +452,7 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
                 or canonical_event(str(snapshot.get("created_at") or ""))
             ),
             "op_id": str(entry.get("op_id") or ""),
+            "locked": 1 if entry.get("locked") else 0,
         })
     applied = repository.db_merge_snapshot_candidates(candidates)
     # 两个编号别混：profile_snapshot_id 是「哪一份快照」（表主键），
@@ -773,7 +787,8 @@ def _snapshot_entries() -> tuple[list[dict], int]:
                  "value": entry.value,
                  "value_text": entry.value_text or "",
                  "event_at": entry.event_at or "",
-                 "op_id": entry.op_id or ""})
+                 "op_id": entry.op_id or "",
+                 "locked": 1 if entry.locked else 0})
     return payload, orphan
 
 

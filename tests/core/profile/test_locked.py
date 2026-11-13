@@ -167,6 +167,73 @@ class TestMigration:
 # ─── 锁定 / 解锁 ─────────────────────────────────────────────
 
 
+class TestMetaRows:
+
+    def test_lock_unlock_write_meta_rows(self, tmp_path, monkeypatch):
+        import lvjiang.core.profile.repository as repository
+
+        monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "meta.db")
+        repository.reset_profile_db()
+        db = repository.ProfileDB(tmp_path / "meta.db")
+        db.upsert("u1", "quota", "k", 1)
+        assert db.set_locked("u1", "quota", "k")
+        assert db.unlock("u1", "quota", "k")
+        rows = db.get_history("u1", "quota", "k")
+        metas = [r for r in rows if r.op_type == "meta"]
+        assert [(r.old_value, r.new_value) for r in metas] == [(1.0, 0.0), (0.0, 1.0)]
+        assert all(r.source == "" for r in metas)          # 机制行不占业务字段
+        assert all(r.remote_id is None for r in metas)     # 待上行
+        # 解锁后再锁定是真实状态变化：写第三条 meta；已锁再锁无变化不写
+        assert db.set_locked("u1", "quota", "k")
+        assert not db.set_locked("u1", "quota", "k")
+        metas = [r for r in db.get_history("u1", "quota", "k")
+                 if r.op_type == "meta"]
+        assert len(metas) == 3 and metas[0].new_value == 1.0
+
+    def test_meta_rows_enter_upload_queue(self, tmp_path, monkeypatch):
+        import lvjiang.core.profile.repository as repository
+        from lvjiang.core.profile.repository import _author_stamp, reset_profile_db
+
+        monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "meta.db")
+        reset_profile_db()
+        db = repository.ProfileDB(tmp_path / "meta.db")
+        db.upsert("u1", "quota", "k", 1)
+        assert db.set_locked("u1", "quota", "k")
+        pending = repository.db_list_unacked(_author_stamp(), 50)
+        assert [p.op_type for p in pending] == ["meta"]
+        assert pending[0].value == 1
+        assert pending[0].payload("T")["op"] == "meta"
+
+    def test_replayed_meta_updates_locked_without_touching_value(self, tmp_path, monkeypatch):
+        import lvjiang.core.profile.repository as repository
+
+        monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "meta.db")
+        repository.reset_profile_db()
+        db = repository.ProfileDB(tmp_path / "meta.db")
+        # 本地已有较新的 value 写入
+        db.upsert("u1", "quota", "k", 7, op_type="set",
+                  event_at="2026-11-14T10:00:00")
+        # 他端的 meta 行（event_at 早于本地写入：不参与 value LWW，只传锁）
+        db.upsert("u1", "quota", "k", 1, op_type="meta",
+                  event_at="2026-11-14T09:00:00",
+                  instance_id="other", op_id="meta-op-1",
+                  history_ts="2026-11-14T09:00:00", remote_id=9000)
+        entry = db.get_entry("u1", "quota", "k")
+        assert entry.value == 7                        # value 不被 meta 覆盖
+        assert entry.locked is True                    # 锁状态被传播
+        assert db.is_locked("u1", "quota", "k")
+        # 解锁传播：new_value=0 → 本地解除锁定
+        db.upsert("u1", "quota", "k", 0, op_type="meta",
+                  event_at="2026-11-14T11:00:00",
+                  instance_id="other", op_id="meta-op-2",
+                  history_ts="2026-11-14T11:00:00", remote_id=9001)
+        assert db.is_locked("u1", "quota", "k") is False
+
+
+
+
+
+
 class TestLockState:
 
     def test_lock_existing_entry_keeps_value(self, db: ProfileDB):

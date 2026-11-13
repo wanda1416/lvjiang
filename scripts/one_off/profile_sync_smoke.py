@@ -76,7 +76,8 @@ class FakeCloud:
             return {"ops": ops, "last_remote_id": ops[-1]["remote_id"] if ops else since}
         if route == "/api/sync/state":
             return {"instance_id": "test-inst", "account": {"id": "acc"},
-                    "not_inited": [], "profile_sync": {}}
+                    "protocol_version": 2, "not_inited": [], "profile_sync": {},
+                    "snapshot_count": len(self.snapshots), "snapshot_head": self.head}
         raise AssertionError(f"未模拟的接口: {route}")
 
 
@@ -147,6 +148,20 @@ def main() -> int:
     ok &= step("本机待上传行", lambda: len(repository.db_list_unacked(
         repository._author_stamp())))
     ok &= step("全量读值", lambda: len(repository.db_read_all("tester")))
+
+    # ── 场景：同步状态丢失（退出登录 / 删 account.json）后能否「恢复」而非「重建」
+    before = dict(repository.db_read_all("tester"))
+    local_max = repository.db_max_remote_id()
+    state.clear()                                   # 模拟 account.json 被删
+    ok &= step("状态清空后 pull_and_replay", lambda: snapshot_sync.pull_and_replay("t").__dict__)
+    print("     恢复后 state:", {k: state.get(k) for k in
+                                 ("remote_history_id", "profile_snapshot_id", "snapshot_remote_id")})
+    print("     本地已应用 remote_id:", local_max,
+          "| 恢复后水位:", state.get("remote_history_id"))
+    after = dict(repository.db_read_all("tester"))
+    changed = [k for k in before if before[k] != after.get(k)]
+    print("     条目是否被覆盖:", "无变化" if not changed else f"变了 {changed}")
+    ok &= step("恢复后 push 仍可继续", lambda: snapshot_sync.push_local("t").__dict__)
 
     print("\n调用过的接口:", sorted(set(cloud.calls)))
     print("云端 head:", cloud.head, "| 快照数:", len(cloud.snapshots))

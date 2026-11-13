@@ -1466,6 +1466,21 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
+    def max_remote_id(self) -> int:
+        """已应用的最大远端序号。
+
+        只认真正落过账的远端行（``remote_id > 0``）：``-1`` 是「放弃上传」
+        标记，NULL 是还没上传的本机行，两者都不能算同步进度。
+        """
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                "SELECT COALESCE(MAX(remote_id), 0) FROM profile_history WHERE remote_id > 0"
+            ).fetchone()
+            return int(row[0]) if row and row[0] else 0
+        finally:
+            self._release_connection(conn)
+
     def reopen_abandoned(self, author: str) -> None:
         """把上次标成放弃的本机行放回待决定。快照候选或时间规则变了要重判。"""
         conn = self._borrow_connection()
@@ -1813,6 +1828,11 @@ def db_count_pending_push(since_id: int, author: str) -> int:
 
 def db_list_unacked(author: str, limit: int = 200) -> list[dict]:
     return get_profile_db().list_unacked(author, limit)
+
+
+def db_max_remote_id() -> int:
+    """本机账本里已应用的最大远端序号（同步状态丢失时用它恢复水位）。"""
+    return get_profile_db().max_remote_id()
 
 
 def db_reopen_abandoned(author: str) -> None:

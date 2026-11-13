@@ -456,6 +456,35 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
                 snapshot_row_id, watermark, applied)
 
 
+def _recover_state(state: dict, summaries: list[dict]) -> bool:
+    """同步状态丢失（退出登录 / 删 account.json）时，从云端 + 本地账本恢复。
+
+    云端已经给了「最新快照 id / 它的水位 / 当前 head」，本地账本里也留着每一行
+    已应用的 ``remote_id``——这三样足够算出水位，**不需要重放，也不需要按快照
+    重建**（重建会覆盖本地值，并把比快照更旧的未上传行判成放弃）。
+
+    只有当本地确实落后于最新快照（本机最大 remote_id < 快照水位）时，才留给
+    :func:`_bootstrap` 按 key 合并——那时本地缺的正是快照里的数据。
+
+    返回是否发生了恢复。
+    """
+    if not summaries:
+        return False
+    latest = max(summaries, key=lambda item: int(item.get("id") or 0))
+    snap_id = int(latest.get("id") or 0)
+    snap_wm = int(latest.get("snapshot_remote_id") or 0)
+    local_max = repository.db_max_remote_id()
+    if not local_max or local_max < snap_wm:
+        return False          # 真·新设备，或确实落后于快照 → 交给 bootstrap
+    state["profile_snapshot_id"] = snap_id
+    state["snapshot_remote_id"] = snap_wm
+    state["remote_history_id"] = local_max
+    save_profile_sync_state(state)
+    logger.info("[profile sync] 已从云端恢复同步水位：本地已应用到 {}，快照 #{}（水位 {}）",
+                local_max, snap_id, snap_wm)
+    return True
+
+
 def _needs_snapshot_rebase(state: dict, summaries: list[dict]) -> bool:
     """本地快照 id 与云端最新一份不同，或水位低于那份快照时要按 key 合并。"""
     if not summaries:
@@ -493,6 +522,10 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     # 记下「云端有没有快照」：同步末尾自动补建基线时用它判断，避免每分钟多一次请求。
     state["cloud_has_snapshot"] = bool(summaries)
     save_profile_sync_state(state)
+    # 同步状态丢失时按「云端快照 + 本地已应用水位」恢复，不重建、不重放。
+    if summaries and not int(state.get("profile_snapshot_id") or 0):
+        if _recover_state(state, summaries):
+            state = _state()
     if not summaries:
         logger.info("[profile sync] 云端还没有总览快照，直接上传本机记录")
     elif _needs_snapshot_rebase(state, summaries):
@@ -651,11 +684,11 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
                 continue
             status = item.get("status")
             if status in ("accepted", "duplicate") and isinstance(item.get("remote_id"), int):
-                marks.append((int(local["id"]), int(item["remote_id"])))
+                marks.append((int(local["local_id"]), int(item["remote_id"])))
                 if status == "accepted":
                     report.pushed += 1
             elif status == "rejected":
-                marks.append((int(local["id"]), -1))
+                marks.append((int(local["local_id"]), -1))
                 report.rejected += 1
                 logger.warning("[profile sync] 放弃上传 {}：{}",
                                local["op_id"], item.get("error") or status)

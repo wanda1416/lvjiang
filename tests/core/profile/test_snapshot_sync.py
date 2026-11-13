@@ -197,6 +197,12 @@ def env(monkeypatch, tmp_path):
     # PytestUnraisableExceptionWarning 的形式炸出来。
     monkeypatch.setattr(snapshot_sync.repository, "db_max_history_id",
                         lambda: max((r["id"] for r in history), default=0))
+    # 同步状态丢失时用它恢复水位：只认真正落过账的远端行
+    monkeypatch.setattr(
+        snapshot_sync.repository, "db_max_remote_id",
+        lambda: max((r["remote_id"] for r in history
+                     if isinstance(r.get("remote_id"), int) and r["remote_id"] > 0),
+                    default=0))
     monkeypatch.setattr(snapshot_sync, "current_instance_id", lambda: "mine")
     monkeypatch.setattr(snapshot_sync, "backup_local", lambda: str(tmp_path / "backup"))
     return {"server": server, "entries": entries, "history": history,
@@ -220,6 +226,41 @@ def test_rebase_when_cloud_snapshot_is_newer(env) -> None:
     assert entry["value"] == 40
     assert entry["event_at"] == "2026-11-12T08:00:00"
     assert env["state"]["profile_snapshot_id"] == 2
+
+
+def test_state_loss_recovers_watermark_instead_of_rebuilding(env) -> None:
+    """删 account.json / 退出登录后，用云端快照信息 + 本地已应用水位恢复同步。
+
+    状态丢了不代表要按快照重建：本地账本里留着已应用的 remote_id，
+    云端给了最新快照 id 与 head，据此恢复水位即可——既不重放历史，
+    也不让快照覆盖本地值。
+    """
+    # 本机已同步过：账本里有已落账的远端行（remote_id 5），条目是本地更新的值
+    env["history"].append({
+        "id": 1, "username": "张三", "type": "stock", "key": "energy",
+        "old_value": 0, "new_value": 40, "value_text": "", "op_type": "set",
+        "delta_value": None, "event_at": "2026-11-12T09:00:00", "source": "",
+        "sync_from": "", "old_value_text": "", "instance_id": "mine",
+        "local_id": 1, "op_id": "mine-1", "remote_id": 5,
+    })
+    env["entries"]["张三"] = {"stock": {"energy": {
+        "value": 40, "event_at": "2026-11-12T09:00:00", "op_id": "mine-1"}}}
+    # 云端有一份更早的快照（水位 3），值更旧
+    env["server"].snapshots = [{
+        "id": 7, "snapshot_remote_id": 3, "origin_instance_id": "other",
+        "origin_name": "书房PC", "created_at": "2026-11-10T00:00:00", "entry_count": 1,
+        "entries": json.dumps([{
+            "username": "张三", "type": "stock", "key": "energy", "value": 1,
+            "event_at": "2026-11-10T00:00:00", "op_id": "snap-old"}])}]
+    assert env["state"] == {}          # 状态全丢
+
+    report = snapshot_sync.pull_and_replay("t")
+
+    assert report.snapshots == 0       # 没有按快照重建
+    assert env["entries"]["张三"]["stock"]["energy"]["value"] == 40   # 本地值没被覆盖
+    assert env["state"]["remote_history_id"] == 5                     # 水位按本地已应用恢复
+    assert env["state"]["profile_snapshot_id"] == 7                   # 记下云端最新快照
+    assert env["state"]["snapshot_remote_id"] == 3
 
 
 def test_old_protocol_blocks_sync(env, monkeypatch) -> None:

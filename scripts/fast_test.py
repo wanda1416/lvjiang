@@ -5,7 +5,7 @@
 
 常用命令：
     python scripts/fast_test.py
-    python scripts/fast_test.py tests/core/test_config_resolver.py::TestModeDetection::test_env_forces_dev
+    python scripts/fast_test.py tests/core/config/test_config_resolver.py::TestModeDetection::test_env_forces_dev
     python scripts/fast_test.py -k config_resolver
     python scripts/fast_test.py --lf
     python scripts/fast_test.py --all

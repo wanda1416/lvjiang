@@ -174,7 +174,7 @@ finally:
 
 ```bash
 QT_QPA_PLATFORM=offscreen python -m pytest -q \
-  tests/core/test_device_agent.py \
+  tests/core/android/test_device_agent.py \
   tests/ui/test_android_method_settings.py \
   tests/core/test_user_config.py
 cd android && ./gradlew :app:assembleDebug

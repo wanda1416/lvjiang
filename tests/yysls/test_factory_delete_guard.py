@@ -1,6 +1,6 @@
 """系统内容删除守卫：用户模式下不给删除系统配置的入口
 
-后端已拦下删除（见 tests/core/test_config_resolver.py::TestDeletionAllowlist），
+后端已拦下删除（见 tests/core/config/test_config_resolver.py::TestDeletionAllowlist），
 但用户点了按钮却静默失败是糟糕的体验——面板要把按钮置灰并说明替代方案。
 开发模式不受限：编排系统配置是开发者的职责。
 """

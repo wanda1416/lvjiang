@@ -61,7 +61,7 @@ class TestNodeOps:
 
 
 # actives（当前在用哪个）属于状态层，读写已归 InterfaceStore，见
-# tests/core/test_interface_store.py::TestActives。
+# tests/core/config/test_interface_store.py::TestActives。
 class TestDiskSemantics:
 
     def test_corrupt_file_treated_as_empty(self, tmp_path):

@@ -87,7 +87,7 @@ references:
 - `Region.to_dict()` / `Point.to_dict()` 无条件 `pop("source_scene")`
 - `save_layout` 写盘前按 `source_scene` 非空过滤
 
-`tests/core/test_scene_cross_references.py` 对两道闸都有用例，其中保存那条走的是
+`tests/core/scene/test_scene_cross_references.py` 对两道闸都有用例，其中保存那条走的是
 真实的 `save_layout` 落盘再读文件。
 
 ## 6. 区域和坐标都可引用

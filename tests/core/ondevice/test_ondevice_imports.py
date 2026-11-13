@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 def test_ondevice_entrypoints_import_without_pyqt6(tmp_path) -> None:
-    shutil.copytree(Path(__file__).parents[2] / "config/system", tmp_path / "config/system")
+    shutil.copytree(Path(__file__).parents[3] / "config/system", tmp_path / "config/system")
     script = textwrap.dedent(
         """
         import importlib.abc

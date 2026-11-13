@@ -4,7 +4,7 @@ from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import QMenu, QPushButton
 
 from lvjiang.core.scene import registry as scene_registry
-from tests.ui.test_scene_editor_reload import editor as editor
+from tests.ui.scene_editor.test_scene_editor_reload import editor as editor
 
 
 def test_scene_tab_add_button_follows_its_group(editor, qtbot):

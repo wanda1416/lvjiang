@@ -145,7 +145,7 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 - 不兼容的协议修改必须同时改 `AgentServer.kt` 与 `agent.py`，并 bump 两边的 `PROTOCOL_VERSION`
   （v1 基础 op；v2 加 `calib_*` 与 status 的 `calib_identity` / `screen`）；
   PC 端握手时版本不一致直接拒绝（提示升级手机 app），避免静默错位。
-- PC 侧单测 `tests/core/test_device_agent.py` 用本地假服务端覆盖线协议与后端行为；
+- PC 侧单测 `tests/core/android/test_device_agent.py` 用本地假服务端覆盖线协议与后端行为；
   Kotlin 侧可用 `kotlinc -cp android.jar` 做编译检查（见开发日志 2026-08-22）。
 
 ## 离线执行扩展（offline_protocol = 4）

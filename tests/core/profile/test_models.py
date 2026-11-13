@@ -4,7 +4,6 @@
 """
 
 import pytest
-from tests.case_matrix import case_matrix
 
 from lvjiang.core.profile.models import (
     DEFAULT_KEY_GROUP,
@@ -27,6 +26,7 @@ from lvjiang.core.profile.models import (
     parse_sync_key,
     parse_sync_targets,
 )
+from tests.case_matrix import case_matrix
 
 # ─── KeyDef 基类 ─────────────────────────────────────────────
 

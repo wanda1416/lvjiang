@@ -34,7 +34,7 @@ def test_default_uses_testmon(monkeypatch) -> None:
 def test_exact_node_id_bypasses_testmon(monkeypatch) -> None:
     commands = _capture_commands(monkeypatch)
     node_id = (
-        "tests/core/test_config_resolver.py"
+        "tests/core/config/test_config_resolver.py"
         "::TestModeDetection::test_env_forces_dev"
     )
 
@@ -63,7 +63,7 @@ def test_last_failed_mode_and_passthrough(monkeypatch) -> None:
 def test_subprocess_failure_is_returned(monkeypatch) -> None:
     _capture_commands(monkeypatch, returncode=7)
 
-    assert fast_test.main(["--no-lint", "tests/core/test_config_resolver.py"]) == 7
+    assert fast_test.main(["--no-lint", "tests/core/config/test_config_resolver.py"]) == 7
 
 
 def test_missing_testmon_has_actionable_error(monkeypatch, capsys) -> None:

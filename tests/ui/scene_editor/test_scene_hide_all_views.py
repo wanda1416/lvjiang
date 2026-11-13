@@ -7,7 +7,7 @@ from lvjiang.core.scene import registry as scene_registry
 from lvjiang.core.scene.definition import SceneRegistry
 from lvjiang.core.scene.definition_models import RegionDef
 from lvjiang.ui.scene_editor.scene_tab import SceneTab
-from tests.ui.test_scene_editor_reload import editor as editor
+from tests.ui.scene_editor.test_scene_editor_reload import editor as editor
 
 
 def test_scene_manage_hides_all_and_reopens_base(editor, qtbot, monkeypatch):

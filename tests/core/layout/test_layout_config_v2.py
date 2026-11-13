@@ -59,7 +59,7 @@ def test_layout_key_must_be_stable_lower_snake_case(key):
 
 
 def test_system_layout_keys_have_matching_layout_and_template_directories():
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[3]
     doc = yaml.safe_load(
         (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
     entries = parse_layout_entries(doc)
@@ -127,7 +127,7 @@ class TestAspectDeclaration:
         形态错配（窗口模式配「桌面全屏」约 2.7%）。
         """
         from lvjiang.core.layout.config import canvas_aspect_deviation
-        root = Path(__file__).resolve().parents[2]
+        root = Path(__file__).resolve().parents[3]
         doc = yaml.safe_load(
             (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
         entry = parse_layout_entries(doc)["desktop"]

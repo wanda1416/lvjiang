@@ -14,7 +14,7 @@ from lvjiang.core.ai.agent_mcp import LocalMCPServer
 
 
 def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
-    script = Path(__file__).parents[2] / "scripts/build_agent_bundle.py"
+    script = Path(__file__).parents[3] / "scripts/build_agent_bundle.py"
     spec = importlib.util.spec_from_file_location("build_agent_bundle", script)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -29,7 +29,7 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     assert "plan_targets" in payload["properties"]
     assert "skip_tuning" not in payload["properties"]["run_config"]["properties"]
     docs = AgentDocuments(output)
-    source = AgentDocuments(Path(__file__).parents[2] / "docs", source_mode=True,
+    source = AgentDocuments(Path(__file__).parents[3] / "docs", source_mode=True,
                             schema_provider=lambda: (output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
     assert source.list_docs() == docs.list_docs()
     for entry in source.list_docs()["documents"]:

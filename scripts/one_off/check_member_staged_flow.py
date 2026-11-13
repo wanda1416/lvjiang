@@ -1,6 +1,6 @@
 """一次性核对：真实服务器下「后台下载会员包 → 下次启动安装」的完整链路。
 
-与 ``tests/core/test_member_staged_install.py`` 的区别是**不打桩**：真实激活码、
+与 ``tests/core/config/test_member_staged_install.py`` 的区别是**不打桩**：真实激活码、
 真实会员索引/密文包、真实授权接口，只把更新存储换到临时目录，绝不写入本机
 ``config/updates`` 或 ``config/system``。
 

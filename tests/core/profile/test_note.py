@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+
 from tests.case_matrix import case_matrix
 
 

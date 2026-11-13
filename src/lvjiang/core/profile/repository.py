@@ -1503,7 +1503,6 @@ class ProfileDB:
                 "id": row[0], "op_id": row[1], "username": row[2], "type": row[3],
                 "key": row[4], "new_value": row[5], "value_text": row[6] or "",
                 "op_type": row[7], "event_at": row[8], "source": row[9] or "",
-                "origin_local_id": row[10] if row[10] is not None else row[0],
             }
             for row in rows
         ]

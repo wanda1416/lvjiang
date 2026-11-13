@@ -98,3 +98,8 @@ ops/stats-client/.local/
 # 旧目录（已迁到 .local/，留着忽略以防残留文件被误提交）
 ops/stats-client/data/
 ops/stats-client/.env
+
+# 临时诊断输出
+.tail.json
+.tail.err
+

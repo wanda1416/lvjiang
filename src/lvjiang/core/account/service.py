@@ -144,6 +144,17 @@ def current_instance_id() -> str:
     return identity.stable_instance_id()
 
 
+def sync_paused() -> bool:
+    """是否已暂停自动同步（落 account.json，重启后保持）。"""
+    return bool(load_profile().get("sync_paused"))
+
+
+def set_sync_paused(paused: bool) -> None:
+    profile = load_profile()
+    profile["sync_paused"] = bool(paused)
+    _save_profile(profile)
+
+
 def profile_sync_state() -> dict:
     """profile 账本同步状态（落 account.json）：
 

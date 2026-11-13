@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.account import ACCOUNT_SERVICE, AccountError, get_session
+from ..core.account.service import set_sync_paused, sync_paused
 from ..i18n import tr
 from .widgets.button_styles import apply_button_style
 
@@ -249,8 +250,11 @@ class AccountHolder(QObject):
         self.summary = summary
         if readonly_instance():
             summary = None              # 只读实例永不启动节拍
+        paused = sync_paused()
         for timer in (self._sync_timer, self._heartbeat_timer):
-            if summary:
+            # 暂停同步只停分钟同步节拍；心跳照常（在线状态与同步开关无关）
+            run = summary and not (timer is self._sync_timer and paused)
+            if run:
                 timer.start()
             else:
                 timer.stop()
@@ -680,8 +684,16 @@ class AccountManagerDialog(QDialog):
         self.sync_button = QPushButton(tr("立即同步"))
         apply_button_style(self.sync_button)
         self.sync_button.clicked.connect(self._sync_now)
+        self.pause_sync_button = QPushButton(tr("暂停同步"))
+        apply_button_style(self.pause_sync_button, variant="neutral")
+        self.pause_sync_button.setToolTip(tr(
+            "暂停后不再每分钟自动同步（心跳与在线状态不受影响）。"
+            "手动「立即同步」仍可用；重启后保持暂停状态。"))
+        self.pause_sync_button.clicked.connect(self._toggle_sync_pause)
         sync_actions.addWidget(self.stop_sync_button)
         sync_actions.addWidget(self.sync_button)
+        sync_actions.addWidget(self.pause_sync_button)
+        self._render_sync_pause()
         sync_layout.addLayout(sync_actions)
         self.tabs.addTab(sync_tab, tr("数据同步"))
 
@@ -993,6 +1005,21 @@ class AccountManagerDialog(QDialog):
         if self.holder.sync_async():
             self._render_sync()
 
+    def _render_sync_pause(self) -> None:
+        """按钮文案反映当前暂停状态（account.json 持久化，重启保持）。"""
+        paused = sync_paused()
+        self.pause_sync_button.setText(tr("恢复同步") if paused else tr("暂停同步"))
+
+    def _toggle_sync_pause(self) -> None:
+        paused = not sync_paused()
+        set_sync_paused(paused)
+        self.holder.apply(self.holder.summary)   # 重新套用分钟节拍的启停
+        self._render_sync_pause()
+        if paused:
+            self._set_sync_note(tr("已暂停自动同步；手动「立即同步」仍可用"))
+        else:
+            self._set_sync_note(tr("已恢复每分钟自动同步"))
+
     def _initial_or_clear(self) -> None:
         from ..core.sync.initial import sync_established
         if sync_established():
@@ -1142,3 +1169,4 @@ class AccountManagerDialog(QDialog):
             return
         self._set_sync_note(tr("正在备份并应用云端快照…"))
         self.holder.sync_async(allow_overwrite=True)
+

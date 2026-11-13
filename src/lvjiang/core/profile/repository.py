@@ -26,6 +26,7 @@ from lvjiang.constants import SESSION_CONFIG_DIR
 
 from .history_migration import migrate_structured_history
 from .history_query import HistoryQuery
+from .rows import Entry, HistoryRow, PendingOp
 from .transactions import current_transaction
 
 # 数据库路径
@@ -378,7 +379,7 @@ CURRENT_VERSION = MIGRATIONS[-1][0]
 _HISTORY_COLUMNS = (
     "local_id, event_at, username, type, key, old_value, new_value, "
     "old_value_text, value_text, op_type, delta_value, source, sync_from, "
-    "instance_id, op_id, remote_id"
+    "instance_id, op_id, remote_id, created_at"
 )
 
 #: 聚合候选的维度表达式。``key`` 是「模型:key」，与 UI 的「键」列同一口径。
@@ -705,61 +706,38 @@ class ProfileDB:
 
     # ─── 读取 ───
 
-    def get_entry(self, username: str, type_: str, key: str) -> dict:
-        """读取单条 entry，不存在返回空 dict
-
-        锁定条目返回的 dict 带 ``locked: True``；未锁定条目不出现该键，
-        调用方据此区分"有没有锁"，不必再查一次。
-        """
+    def get_entry(self, username: str, type_: str, key: str) -> Entry | None:
+        """读取单条 entry；不存在返回 ``None``。"""
         conn = self._borrow_connection()
         try:
             row = conn.execute(
-                "SELECT value, value_text, event_at, created_at, locked, op_id "
+                "SELECT username, type, key, value, value_text, event_at, created_at, op_id, locked "
                 "FROM profile_entries WHERE username=? AND type=? AND key=?",
                 (username, type_, key),
             ).fetchone()
         finally:
             self._release_connection(conn)
+        return Entry.from_row(row) if row is not None else None
 
-        if row is None:
-            return {}
-        entry = {"value": row[0], "value_text": row[1],
-                 "event_at": row[2], "created_at": row[3],
-                 "op_id": row[5] or ""}
-        if row[4]:
-            entry["locked"] = True
-        return entry
-
-    def get_all(self, username: str) -> dict[str, dict[str, dict]]:
-        """读取用户全部 profile
-
-        Returns: {type: {key: {value, value_text, event_at[, locked]}}}
-        格式与早期 user.json 的 profile 节点兼容；只有锁定条目带 ``locked``。
-        """
+    def get_all(self, username: str) -> list[Entry]:
+        """读取用户全部 profile 条目（扁平列表，调用方按 type/key 自行索引）。"""
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT type, key, value, value_text, event_at, created_at, locked, op_id "
-                "FROM profile_entries WHERE username=?",
+                "SELECT username, type, key, value, value_text, event_at, created_at, op_id, locked "
+                "FROM profile_entries WHERE username=? ORDER BY type, key",
                 (username,),
             ).fetchall()
         finally:
             self._release_connection(conn)
+        return [Entry.from_row(row) for row in rows]
 
-        result: dict[str, dict[str, dict]] = {}
-        for type_, key, value, value_text, event_at, created_at, locked, op_id in rows:
-            model_data = result.setdefault(type_, {})
-            entry = {
-                "value": value,
-                "value_text": value_text,
-                "event_at": event_at,
-                "created_at": created_at,
-                "op_id": op_id or "",
-            }
-            if locked:
-                entry["locked"] = True
-            model_data[key] = entry
-        return result
+    def get_index(self, username: str) -> dict[str, dict[str, Entry]]:
+        """``type → key → Entry`` 索引；值仍是 dataclass，不是 dict。"""
+        index: dict[str, dict[str, Entry]] = {}
+        for entry in self.get_all(username):
+            index.setdefault(entry.type, {})[entry.key] = entry
+        return index
 
     # ─── 锁定 ───
 
@@ -1240,18 +1218,9 @@ class ProfileDB:
             self._release_connection(conn)
 
     @staticmethod
-    def _history_row(row: tuple) -> dict:
-        """历史行 → dict；列顺序由 ``_HISTORY_COLUMNS`` 决定。"""
-        return {
-            "local_id": row[0], "event_at": row[1], "username": row[2],
-            "type": row[3], "key": row[4],
-            "old_value": row[5], "new_value": row[6],
-            "old_value_text": row[7] or "", "value_text": row[8] or "",
-            "op_type": row[9], "delta_value": row[10], "source": row[11],
-            "sync_from": row[12], "instance_id": row[13] or "",
-            "op_id": row[14] or "",
-            "remote_id": row[15],
-        }
+    def _history_row(row: tuple) -> HistoryRow:
+        """历史行 → :class:`HistoryRow`；列顺序由 ``_HISTORY_COLUMNS`` 决定。"""
+        return HistoryRow.from_row(row)
 
     def get_history(
         self,
@@ -1271,7 +1240,7 @@ class ProfileDB:
         limit: int = 100,
         offset: int = 0,
         order: str = "id_desc",
-    ) -> list[dict]:
+    ) -> list[HistoryRow]:
         """按条件分页取变更历史。"""
         where, params = _history_where(query)
         ordering = _HISTORY_ORDERS.get(order, _HISTORY_ORDERS["id_desc"])
@@ -1379,7 +1348,7 @@ class ProfileDB:
         return int(row[0]) if row else 0
 
     def get_history_since(self, since_id: int, limit: int,
-                         author: str = "") -> list[dict]:
+                         author: str = "") -> list[HistoryRow]:
         """取 id 大于水位的账本行（``set`` / ``delta``），按 id 升序。
 
         供同步上行使用。``reset`` 是本机周期语义，不上传；回放端按操作时间
@@ -1393,9 +1362,7 @@ class ProfileDB:
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
-                "SELECT local_id, username, type, key, new_value, value_text, "
-                "op_type, delta_value, event_at, source "
-                "FROM profile_history "
+                f"SELECT {_HISTORY_COLUMNS} FROM profile_history "
                 "WHERE local_id>? AND op_type IN ('set', 'delta')"
                 + (" AND instance_id=?" if author else "") +
                 " ORDER BY local_id ASC LIMIT ?",
@@ -1403,15 +1370,7 @@ class ProfileDB:
             ).fetchall()
         finally:
             self._release_connection(conn)
-        return [
-            {
-                "id": r[0], "username": r[1], "type": r[2], "key": r[3],
-                "new_value": r[4], "value_text": r[5] or "",
-                "op_type": r[6], "delta_value": r[7], "event_at": r[8],
-                "source": r[9] or "",
-            }
-            for r in rows
-        ]
+        return [HistoryRow.from_row(r) for r in rows]
 
     def get_history_record(self, history_id: int) -> dict:
         """按稳定 id 读取单条变更历史；不存在返回空 dict。"""
@@ -1500,7 +1459,7 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
-    def list_unacked(self, author: str, limit: int) -> list[dict]:
+    def list_unacked(self, author: str, limit: int) -> list[PendingOp]:
         """待决定的本机 set/delta。调用方再按快照候选分成上传或放弃。"""
         conn = self._borrow_connection()
         try:
@@ -1516,15 +1475,7 @@ class ProfileDB:
             ).fetchall()
         finally:
             self._release_connection(conn)
-        return [
-            {
-                "local_id": row[0], "op_id": row[1], "username": row[2], "type": row[3],
-                "key": row[4], "new_value": row[5], "value_text": row[6] or "",
-                "op_type": row[7], "event_at": row[8], "source": row[9] or "",
-                "old_value_text": row[10] or "", "sync_from": row[11] or "",
-            }
-            for row in rows
-        ]
+        return [PendingOp.from_row(row) for row in rows]
 
     def mark_remote_ids(self, pairs: list[tuple[int, int]]) -> None:
         """写入 ack 序号或放弃标记 ``-1``。已经有 remote_id 的行不动。"""
@@ -1654,12 +1605,17 @@ def wipe_profile_data() -> None:
     get_profile_db().wipe()
 
 
-def db_read_entry(username: str, type_: str, key: str) -> dict:
+def db_read_entry(username: str, type_: str, key: str) -> Entry | None:
     return get_profile_db().get_entry(username, type_, key)
 
 
-def db_read_all(username: str) -> dict[str, dict[str, dict]]:
+def db_read_all(username: str) -> list[Entry]:
     return get_profile_db().get_all(username)
+
+
+def db_read_index(username: str) -> dict[str, dict[str, Entry]]:
+    """``type → key → Entry`` 索引（UI / 引擎按 type+key 取单条时用）。"""
+    return get_profile_db().get_index(username)
 
 
 def db_is_locked(username: str, type_: str, key: str) -> bool:
@@ -1757,7 +1713,7 @@ def db_history_page(
     limit: int = 100,
     offset: int = 0,
     order: str = "id_desc",
-) -> list[dict]:
+) -> list[HistoryRow]:
     return get_profile_db().history_page(query, limit, offset, order)
 
 
@@ -1826,7 +1782,7 @@ def db_count_pending_push(since_id: int, author: str) -> int:
     return get_profile_db().count_pending_push(since_id, author)
 
 
-def db_list_unacked(author: str, limit: int = 200) -> list[dict]:
+def db_list_unacked(author: str, limit: int = 200) -> list[PendingOp]:
     return get_profile_db().list_unacked(author, limit)
 
 
@@ -1849,6 +1805,7 @@ def db_op_id_seen(op_id: str) -> bool:
 
 def db_cleanup_history(days: int = 90) -> int:
     return get_profile_db().cleanup_history(days)
+
 
 
 

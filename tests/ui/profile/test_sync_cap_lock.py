@@ -48,9 +48,10 @@ def _schema(xinli_lock: bool = True) -> ProfileSchema:
 
 
 def _data(xinli: float, mid: float) -> dict:
+    from lvjiang.core.profile.rows import Entry
     return {
-        "regen": {"xinli": {"value": xinli}},
-        "quota": {"mid": {"value": mid}},
+        "regen": {"xinli": Entry(username="u", type="regen", key="xinli", value=xinli)},
+        "quota": {"mid": Entry(username="u", type="quota", key="mid", value=mid)},
     }
 
 
@@ -100,7 +101,11 @@ def test_one_unchecked_edge_does_not_hide_another_capped_edge():
     }))
     reload_profile_config()
     source = get_profile_config().get_key("source")
-    data = {"quota": {"open": {"value": 1}, "closed": {"value": 1}}}
+    from lvjiang.core.profile.rows import Entry
+    data = {"quota": {
+        "open": Entry(username="u", type="quota", key="open", value=1),
+        "closed": Entry(username="u", type="quota", key="closed", value=1),
+    }}
     locked = locked_sync_targets(source, data)
     assert [target.key for target in locked] == ["quota:closed"]
 

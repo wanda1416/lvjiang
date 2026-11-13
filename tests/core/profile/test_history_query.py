@@ -108,7 +108,7 @@ class TestPaging:
     def test_newest_first_and_offset(self, db: ProfileDB):
         first = db.history_page(HistoryQuery(), limit=2)
         second = db.history_page(HistoryQuery(), limit=2, offset=2)
-        assert [row["local_id"] for row in first] > [row["local_id"] for row in second]
+        assert [row.local_id for row in first] > [row.local_id for row in second]
         assert len(second) == 2
         assert len(db.history_page(HistoryQuery(), limit=10, offset=4)) == 1
 

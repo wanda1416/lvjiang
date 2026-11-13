@@ -35,7 +35,8 @@ class FakeServer:
         if route == "/api/sync/profile/pull":
             since = data.get("since_remote_id", 0)
             rows = [r for r in self.rows if r["remote_id"] > since]
-            return {"ops": rows, "last_remote_id": rows[-1]["remote_id"] if rows else since}
+            return {"ops": rows,
+                    "last_remote_id": rows[-1]["remote_id"] if rows else since}
         if route == "/api/sync/profile/push":
             self.push_bodies.append(data)
             results = []
@@ -120,10 +121,32 @@ def env(monkeypatch, tmp_path):
             db_upsert(username, type_, key, value, event_at=event_at,
                       value_text=value_text)
     monkeypatch.setattr(snapshot_sync.repository, "db_upsert_many", db_upsert_many)
-    monkeypatch.setattr(snapshot_sync.repository, "db_read_all",
-                        lambda username: entries.get(username, {}))
-    monkeypatch.setattr(snapshot_sync.repository, "db_read_entry",
-                        lambda u, t, k: entries.get(u, {}).get(t, {}).get(k, {}))
+    def _read_all(username):
+        from lvjiang.core.profile.rows import Entry
+        rows = []
+        for type_, group in entries.get(username, {}).items():
+            for key, raw in group.items():
+                rows.append(Entry(username=username, type=type_, key=key,
+                                  value=float(raw.get("value") or 0),
+                                  value_text=raw.get("value_text") or "",
+                                  event_at=raw.get("event_at") or "",
+                                  op_id=raw.get("op_id") or ""))
+        return rows
+
+    monkeypatch.setattr(snapshot_sync.repository, "db_read_all", _read_all)
+    def _read_entry(u, t, k):
+        from lvjiang.core.profile.rows import Entry
+        raw = entries.get(u, {}).get(t, {}).get(k)
+        if not raw:
+            return None
+        return Entry(username=u, type=t, key=k,
+                     value=float(raw.get("value") or 0),
+                     value_text=raw.get("value_text") or "",
+                     event_at=raw.get("event_at") or "",
+                     op_id=raw.get("op_id") or "",
+                     locked=bool(raw.get("locked")))
+
+    monkeypatch.setattr(snapshot_sync.repository, "db_read_entry", _read_entry)
     monkeypatch.setattr(snapshot_sync.repository, "db_count_history",
                         lambda username: len([r for r in history if r["username"] == username]))
 
@@ -149,24 +172,34 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync.repository, "db_op_id_seen",
                         lambda op_id: any(r.get("op_id") == op_id for r in history))
     def _unacked(author, limit):
-        return [r for r in history
+        from lvjiang.core.profile.rows import PendingOp
+        rows = [r for r in history
                 if r.get("instance_id") == author and r.get("remote_id") is None
                 and r.get("op_type") in ("set", "delta")
                 and not str(r.get("op_id") or "").startswith("unscoped:")][:limit]
+        return [PendingOp(
+            local_id=int(r["id"]), op_id=str(r.get("op_id") or ""),
+            username=r["username"], type=r["type"], key=r["key"],
+            value=float(r.get("new_value") or 0),
+            value_text=r.get("value_text") or "",
+            op_type=r.get("op_type") or "set",
+            event_at=r.get("event_at") or "",
+            source=r.get("source") or "",
+        ) for r in rows]
     monkeypatch.setattr(snapshot_sync.repository, "db_list_unacked", _unacked)
     def _mark(pairs):
         by_id = {r["id"]: r for r in history}
         for history_id, remote in pairs:
             row = by_id.get(history_id)
-            if row is not None and row.get("remote_id") is None:
+            if row is not None and row["remote_id"] is None:
                 row["remote_id"] = remote
     monkeypatch.setattr(snapshot_sync.repository, "db_mark_remote_ids", _mark)
 
     def _reopen(author):
         for row in history:
-            if (row.get("instance_id") == author and row.get("remote_id") == -1
-                    and row.get("op_type") in ("set", "delta")
-                    and not str(row.get("op_id") or "").startswith("unscoped:")):
+            if (row["instance_id"] == author and row["remote_id"] == -1
+                    and row["op_type"] in ("set", "delta")
+                    and not str(row["op_id"] or "").startswith("unscoped:")):
                 row["remote_id"] = None
 
     monkeypatch.setattr(snapshot_sync.repository, "db_reopen_abandoned", _reopen)
@@ -185,7 +218,8 @@ def env(monkeypatch, tmp_path):
                     current.get("op_id") or ""):
                 continue
             db_upsert(username, type_, key, row.get("value") or 0,
-                      event_at=event_at or None, value_text=row.get("value_text") or "",
+                      event_at=event_at or None,
+                      value_text=row.get("value_text") or "",
                       op_id=op_id or None)
             applied += 1
         return applied
@@ -252,7 +286,7 @@ def test_state_loss_recovers_watermark_instead_of_rebuilding(env) -> None:
         "entries": json.dumps([{
             "username": "张三", "type": "stock", "key": "energy", "value": 1,
             "event_at": "2026-11-10T00:00:00", "op_id": "snap-old"}])}]
-    assert env["state"] == {}          # 状态全丢
+    assert env["state"] == {}            # 状态全丢
 
     report = snapshot_sync.pull_and_replay("t")
 
@@ -590,8 +624,8 @@ def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
     assert row["op_id"] == "legacy:other-device:45"  # 行身份：来源设备的操作
     assert row["event_at"] == "2026-11-06T07:45:19"  # 业务时间，不是本机墙钟
     assert row["source"] == "太平武墓"               # 为什么变
-    assert row["sync_from"] == "体能"                # 同步链上游（云端下发）
-    assert row["old_value_text"] == "旧备注"          # note 撤销用的旧文本
+    assert row["sync_from"] == "体能"            # 同步链上游（云端下发）
+    assert row["old_value_text"] == "旧备注"      # note 撤销用的旧文本
     assert (row["old_value"], row["new_value"]) == (0.0, 20.0)
 
 

@@ -24,6 +24,7 @@ from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
 from . import regen_gate, repository
 from .arbitrate import canonical_event, is_strictly_newer
+from .rows import Entry, RemoteOp
 
 
 @dataclass
@@ -174,7 +175,7 @@ def _period_relation(op: dict, current: dict) -> str | None:
             key_def.period, key_def.reset_time, datetime.now(), reset_day)
     except (TypeError, ValueError):
         return None
-    local_at = current.get("event_at") or ""
+    local_at = current.event_at or ""
     if not local_at:
         # 没有本地时间：操作自己已经落在过去的周期里，就不要写进当前值。
         if boundary < now_boundary:
@@ -220,66 +221,63 @@ def _apply_op(op: dict) -> bool:
     此后到达的远端 set，护栏从此永久误跳（2026-11-04 手机端 3179 事故的
     根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
     """
-    if op.get("op") not in (None, "set"):
+    if op.op not in ("", "set"):
         return False
-    origin = str(op.get("instance_id") or "")
-    source_local_id = op.get("local_id")
-    op_id = str(op.get("op_id") or "")
-    if not op_id and origin and isinstance(source_local_id, int):
-        op_id = f"legacy:{origin}:{source_local_id}"
+    origin = op.instance_id
+    op_id = op.op_id
+    if not op_id and origin and op.local_id is not None:
+        op_id = f"legacy:{origin}:{op.local_id}"
     if not op_id:
-        logger.warning("[profile sync] 忽略缺 op_id 的 op：remote_id={}",
-                       op.get("remote_id"))
+        logger.warning("[profile sync] 忽略缺 op_id 的 op：remote_id={}", op.remote_id)
         return False
     if repository.db_op_id_seen(op_id):
         return False
 
-    username, type_, key = op["username"], op["type"], op["key"]
-    happened = canonical_event(op.get("happened_at") or "")
+    username, type_, key = op.username, op.type, op.key
+    happened = canonical_event(op.happened_at)
     current = repository.db_read_entry(username, type_, key)
-    if not isinstance(current, dict):
-        current = {}
-    text = op.get("value_text") or ""
-    raw = op.get("value")
+    if current is None:
+        current = Entry(username=username, type=type_, key=key, value=0)
+    text = op.value_text
+    raw = op.value
     if type_ == "note" or (text and raw is None):
-        value = float(current.get("value") or 0)
+        value = float(current.value or 0)
         value_text = text
     else:
         value = float(raw or 0)
         value_text = ""
-    remote_id = op.get("remote_id")
-    remote_mark = remote_id if isinstance(remote_id, int) else None
+    remote_mark = op.remote_id
     newer = is_strictly_newer(
-        happened, op_id, current.get("event_at") or "", current.get("op_id") or "",
+        happened, op_id, current.event_at or "", current.op_id or "",
     )
-    locked = bool(current.get("locked")) or repository.db_is_locked(username, type_, key)
+    locked = bool(current.locked) or repository.db_is_locked(username, type_, key)
     if locked or not newer:
         repository.db_upsert(
             username, type_, key, value,
             op_type="set",
-            source=str(op.get("source") or ""),
+            source=op.source,
             value_text=value_text,
-            sync_from=str(op.get("sync_from") or "") or None,
+            sync_from=op.sync_from or None,
             instance_id=origin,
             history_ts=happened or None,
             op_id=op_id,
             remote_id=remote_mark,
             touch_entry=False,
-            history_old_value_text=str(op.get("old_value_text") or ""),
+            history_old_value_text=op.old_value_text,
         )
         return False
     repository.db_upsert(
         username, type_, key, value,
         event_at=happened or None,
         op_type="set",
-        source=str(op.get("source") or ""),
+        source=op.source,
         value_text=value_text,
-        sync_from=str(op.get("sync_from") or "") or None,
+        sync_from=op.sync_from or None,
         instance_id=origin,
         history_ts=happened or None,
         op_id=op_id,
         remote_id=remote_mark,
-        history_old_value_text=str(op.get("old_value_text") or ""),
+        history_old_value_text=op.old_value_text,
     )
     return True
 
@@ -360,8 +358,7 @@ def overwrite_warnings(token: str) -> list[dict]:
         if isinstance(name, str)
     })
     for username in names:
-        local = repository.db_read_all(username) or {}
-        total = sum(len(group) for group in local.values() if isinstance(group, dict))
+        total = len(repository.db_read_all(username))
         if not total:
             continue
         if from_mine and username not in newer_users:
@@ -551,7 +548,8 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
         except SyncError as error:
             report.errors.append(str(error))
             break
-        ops = response.get("ops") or []
+        ops = [RemoteOp.from_json(item) for item in (response.get("ops") or [])
+               if isinstance(item, dict)]
         applied = 0
         for op in ops:
             # 判重与回声护栏都在 _apply_op 里，依据是账本行身份
@@ -637,12 +635,12 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         upload = []
         abandon: list[tuple[int, int]] = []
         for row in rows:
-            candidate = candidates.get((row["username"], row["type"], row["key"]))
+            candidate = candidates.get((row.username, row.type, row.key))
             other_at, other_id = candidate if candidate is not None else ("", "")
-            if is_strictly_newer(row.get("event_at") or "", row.get("op_id") or "", other_at, other_id):
+            if is_strictly_newer(row.event_at or "", row.op_id or "", other_at, other_id):
                 upload.append(row)
             else:
-                abandon.append((int(row["local_id"]), -1))
+                abandon.append((int(row.local_id), -1))
         if abandon:
             repository.db_mark_remote_ids(abandon)
         if not upload:
@@ -651,20 +649,8 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         if on_progress:
             on_progress({"step": "overview", "detail": f"上行 第{batch}批",
                          "pushed": report.pushed})
-        ops = [{
-            "op_id": row["op_id"],
-            "local_id": int(row["local_id"]),
-            "username": row["username"],
-            "type": row["type"],
-            "key": row["key"],
-            "op": "set",
-            "value": row["new_value"],
-            "value_text": row["value_text"],
-            "source": row.get("source") or "",
-            "old_value_text": row.get("old_value_text") or "",
-            "sync_from": row.get("sync_from") or "",
-            "happened_at": canonical_event(row.get("event_at") or "") or row.get("event_at") or "",
-        } for row in upload]
+        ops = [row.payload(canonical_event(row.event_at) or row.event_at)
+               for row in upload]
         try:
             response = post("/api/sync/profile/push", {"ops": ops}, token)
         except SyncError as error:
@@ -674,7 +660,7 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         if not isinstance(results, list):
             report.errors.append("服务端没有按条返回 ack")
             break
-        by_op = {row["op_id"]: row for row in upload}
+        by_op = {row.op_id: row for row in upload}
         marks: list[tuple[int, int]] = []
         for item in results:
             if not isinstance(item, dict):
@@ -684,14 +670,14 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
                 continue
             status = item.get("status")
             if status in ("accepted", "duplicate") and isinstance(item.get("remote_id"), int):
-                marks.append((int(local["local_id"]), int(item["remote_id"])))
+                marks.append((local.local_id, int(item["remote_id"])))
                 if status == "accepted":
                     report.pushed += 1
             elif status == "rejected":
-                marks.append((int(local["local_id"]), -1))
+                marks.append((local.local_id, -1))
                 report.rejected += 1
                 logger.warning("[profile sync] 放弃上传 {}：{}",
-                               local["op_id"], item.get("error") or status)
+                               local.op_id, item.get("error") or status)
         repository.db_mark_remote_ids(marks)
         if len(marks) != len(upload):
             report.errors.append("有上行结果无法对应本地行，下轮重试")
@@ -733,7 +719,7 @@ def _key_definitions() -> list[dict]:
         for item in items:
             if not isinstance(item, dict):
                 continue
-            key = item.get("key")
+            key = item.key
             if not isinstance(key, str) or not key:
                 continue
             entry: dict[str, str | int | float] = {
@@ -753,8 +739,8 @@ def _skipped_pre_snapshot(raw) -> list[int]:
         return []
     ids: list[int] = []
     for item in raw:
-        if isinstance(item, dict) and isinstance(item.get("local_id"), int):
-            ids.append(item["local_id"])
+        if isinstance(item, dict) and isinstance(item.local_id, int):
+            ids.append(item.local_id)
         elif isinstance(item, int):
             ids.append(item)
     return ids
@@ -772,22 +758,20 @@ def _snapshot_entries() -> tuple[list[dict], int]:
     """本机有定义的总览条目，以及被跳过的无定义残留条数。"""
     from ..user_config import list_user_names
 
-    defined = {(item["type"], item["key"]) for item in _key_definitions()}
+    defined = {(item.type, item.key) for item in _key_definitions()}
     payload: list[dict] = []
     orphan = 0
     for username in list_user_names():
-        entries = repository.db_read_all(username)
-        for type_, group in entries.items():
-            for key, entry in group.items():
-                if (type_, key) not in defined:
-                    orphan += 1
-                    continue
-                payload.append(
-                    {"username": username, "type": type_, "key": key,
-                     "value": entry.get("value"),
-                     "value_text": entry.get("value_text") or "",
-                     "event_at": entry.get("event_at") or "",
-                     "op_id": entry.get("op_id") or ""})
+        for entry in repository.db_read_all(username):
+            if (entry.type, entry.key) not in defined:
+                orphan += 1
+                continue
+            payload.append(
+                {"username": username, "type": entry.type, "key": entry.key,
+                 "value": entry.value,
+                 "value_text": entry.value_text or "",
+                 "event_at": entry.event_at or "",
+                 "op_id": entry.op_id or ""})
     return payload, orphan
 
 
@@ -891,5 +875,7 @@ def sync_all(token: str, *, allow_overwrite: bool = False,
         snapshots=pull.snapshots + (seeded.snapshots if seeded else 0),
         rejected=push.rejected, pending=pull.pending, backup=pull.backup,
         errors=[*pull.errors, *push.errors, *(seeded.errors if seeded else [])])
+
+
 
 

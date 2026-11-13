@@ -16,6 +16,7 @@ from lvjiang.core.profile.models import (
     QuotaKeyDef,
     StockKeyDef,
 )
+from lvjiang.core.profile.rows import Entry
 from lvjiang.core.profile.schema import ProfileSchema
 from lvjiang.ui.profile import cell_formatting
 from lvjiang.ui.profile.tab import ProfileTab
@@ -67,7 +68,8 @@ def test_toggle_keeps_columns(interface):
 def test_note_column_is_left_empty():
     """备注是自由文本，合计行必须留空而不是填 0。"""
     kd = NoteKeyDef(key="n", label="备注")
-    users = {"甲": {"note": {"n": {"value_text": "已完成"}}}}
+    users = {"甲": {"note": {"n": Entry(username="甲", type="note", key="n",
+                                      value=0, value_text="已完成")}}}
     assert cell_formatting.sum_profile_column(kd, MODEL_NOTE, users) == ""
 
 
@@ -80,8 +82,8 @@ def test_unknown_model_is_left_empty():
 def test_numeric_columns_are_summed():
     kd = StockKeyDef(key="a", label="资源甲")
     users = {
-        "甲": {"stock": {"a": {"value": 3}}},
-        "乙": {"stock": {"a": {"value": 4}}},
+        "甲": {"stock": {"a": Entry(username="甲", type="stock", key="a", value=3)}},
+        "乙": {"stock": {"a": Entry(username="乙", type="stock", key="a", value=4)}},
         "丙": {},  # 没有该 key，按不参与累加处理
     }
     assert cell_formatting.sum_profile_column(kd, MODEL_STOCK, users) == "7"
@@ -90,8 +92,8 @@ def test_numeric_columns_are_summed():
 def test_empty_values_do_not_break_sum():
     kd = QuotaKeyDef(key="q", label="每日")
     users = {
-        "甲": {"quota": {"q": {"value": None}}},
-        "乙": {"quota": {"q": {"value": 2}}},
+        "甲": {"quota": {"q": Entry(username="甲", type="quota", key="q", value=None)}},
+        "乙": {"quota": {"q": Entry(username="乙", type="quota", key="q", value=2)}},
     }
     assert cell_formatting.sum_profile_column(kd, MODEL_QUOTA, users) == "2"
 
@@ -100,8 +102,8 @@ def test_empty_values_do_not_break_sum():
 
 
 USERS = {
-    "甲": {"stock": {"a": {"value": 3}}, "note": {"n": {"value_text": "已完成"}}},
-    "乙": {"stock": {"a": {"value": 4}}},
+    "甲": {"stock": {"a": Entry(username="甲", type="stock", key="a", value=3)}}, "note": {"n": {"note": {"n": Entry(username="甲", type="note", key="n", value=0, value_text="已完成")}}},
+    "乙": {"stock": {"a": Entry(username="乙", type="stock", key="a", value=4)}},
 }
 
 

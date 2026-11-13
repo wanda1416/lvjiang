@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 
 from .models import RegenKeyDef
+from .rows import Entry
 
 REGEN_REALTIME = "realtime"
 REGEN_BOUNDARY = "boundary"
@@ -103,7 +104,9 @@ def normalize_realtime_write(
 
 
 def next_realtime_point_seconds(entry: dict, kd: RegenKeyDef, now: datetime | None = None) -> float | None:
-    current = compute_realtime_value(entry.get("value", 0) or 0, entry.get("event_at", ""), kd, now)
+    current = compute_realtime_value(
+        (entry.value if entry is not None else 0) or 0,
+        entry.event_at if entry is not None else "", kd, now)
     if kd.cap is not None and current >= kd.cap:
         return None
     fraction = current - math.floor(current)
@@ -199,9 +202,10 @@ def compute_boundary_value(
     return computed, new_ts
 
 
-def compute_regen_entry(entry: dict, kd: RegenKeyDef, now: datetime | None = None) -> RegenResult:
-    stored_value = entry.get("value", 0) or 0
-    event_at = entry.get("event_at", "")
+def compute_regen_entry(entry: Entry | None, kd: RegenKeyDef,
+                        now: datetime | None = None) -> RegenResult:
+    stored_value = (entry.value if entry is not None else 0) or 0
+    event_at = entry.event_at if entry is not None else ""
     if kd.regen_type == REGEN_REALTIME:
         value = compute_realtime_value(stored_value, event_at, kd, now)
         return RegenResult(value=value, event_at=event_at, persisted=False)
@@ -227,3 +231,4 @@ def format_seconds(seconds: float) -> str:
     if secs or not parts:
         parts.append(f"{secs}秒")
     return "".join(parts)
+

@@ -488,9 +488,9 @@ def test_engine_state_reset_between_runs(monkeypatch):
     task_runner.start_task("t1")
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
 
-    assert engine.variables == {}
-    assert engine.output == {}
-    assert engine.context == {}
+    assert engine.variables is None
+    assert engine.output is None
+    assert engine.context is None
 
 
 def test_logs_are_capped():

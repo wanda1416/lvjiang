@@ -25,7 +25,7 @@ def test_aggregate_filters_user_source_type_direction_and_time():
     assert _profile_history_aggregate(env, 'stock:item', 'max', 'supply', None, 'pos') == 3
     assert _profile_history_aggregate(env, 'stock:item', 'min', 'supply', None, 'pos') == 2
     assert _profile_history_aggregate(env, 'stock:item', 'avg', 'supply', None, 'pos') == 2.5
-    timestamp = db.get_history('tester', 'stock', 'item')[0]['event_at']
+    timestamp = db.get_history('tester', 'stock', 'item')[0].event_at
     assert _profile_history_aggregate(env, 'stock:item', 'sum', 'supply', None, 'pos', timestamp, timestamp) == 0
     assert _profile_history_aggregate(env, 'stock:item', 'sum', 'missing') == 0
     with pytest.raises(ValueError):
@@ -37,7 +37,7 @@ def test_aggregate_sees_transaction_writes_but_rollback_discards_history():
     with pytest.raises(RuntimeError, match='rollback'):
         with profile_transaction(db):
             db.upsert('tester', 'stock', 'item', 2, op_type='delta', delta_value=2, source='supply')
-            assert db.get_entry('tester', 'stock', 'item')['value'] == 2
+            assert db.get_entry('tester', 'stock', 'item').value == 2
             assert db.aggregate_history('tester', 'stock', 'item', source='supply') == 2
             raise RuntimeError('rollback')
     assert db.aggregate_history('tester', 'stock', 'item', source='supply') == 0

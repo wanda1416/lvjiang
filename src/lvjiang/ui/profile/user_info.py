@@ -31,7 +31,7 @@ from ...core.profile.models import (
     RegenKeyDef,
 )
 from ...core.profile.regen import compute_regen_entry
-from ...core.profile.repository import db_read_all
+from ...core.profile.repository import db_read_index
 from ...i18n import tr
 from ..avatar_editor_dialog import AvatarEditorDialog
 from ..user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
@@ -292,7 +292,7 @@ class _DetailPage(QWidget):
         user = self._user_manager.get_user(self._user_name)
         self._schedule_avatar_load(user.avatar if user is not None else "")
         try:
-            data = db_read_all(self._user_name)
+            data = db_read_index(self._user_name)
         except Exception as e:
             logger.warning(f"加载用户 {self._user_name} profile 失败: {e}")
             return
@@ -353,7 +353,7 @@ def _format_detail_label(kd: KeyDef, model_type: str, data: dict) -> tuple[str, 
     主动决定，必须能一眼看出来。
     """
     entry = data.get(model_type, {}).get(kd.key, {})
-    if entry.get("locked"):
+    if entry.locked:
         return tr("已锁定"), True
     return _format_detail_value(kd, model_type, data), False
 
@@ -365,21 +365,21 @@ def _format_detail_value(kd: KeyDef, model_type: str, data: dict) -> str:
     详情页再显示冻结值只会让人以为它还生效。界面层用
     :func:`_format_detail_label` 把它换成一个明确的「已锁定」提示。
     """
-    entry = data.get(model_type, {}).get(kd.key, {})
-    if not entry:
+    entry = (data.get(model_type) or {}).get(kd.key)
+    if entry is None:
         return ""
-    if entry.get("locked"):
+    if entry.locked:
         return ""
 
     if model_type == MODEL_NOTE:
-        text = entry.get("value_text", "")
+        text = entry.value_text
         if text:
             return str(text)
         # 兼容旧数据：尚未迁入 value_text 时仍可展示原数值。
-        value = entry.get("value")
+        value = entry.value
         return str(int(value)) if value else ""
 
-    value = entry.get("value")
+    value = entry.value
     if value is None:
         return ""
 

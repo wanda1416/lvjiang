@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from lvjiang.core.profile.rows import Entry
 from lvjiang.core.profile.triggers import ProfileTriggerEvent
 
 
@@ -193,7 +194,8 @@ def test_cas_conflict_rolls_back_synchronous_children(tmp_path, monkeypatch):
     runner = _install_runner(tmp_path, monkeypatch, wf)
     with pytest.raises(ProfileWriteConflict):
         profile_action('tester', 'source', delta=1, use_cas=True,
-                       expected_entry={'value': 0, 'event_at': 'stale'})
+                       expected_entry=Entry(username='tester', type='stock', key='source',
+                                          value=0, event_at='stale'))
     assert profile_read('tester', 'target') is None
     assert not repository.db_get_history('tester')
     runner.request_stop()
@@ -354,3 +356,4 @@ def test_set_value_also_fires_sync_targets(tmp_path, monkeypatch):
     # 关掉联动时只写本项，目标值不动。
     assert profile_action("tester", "lonely", set_value=9, trigger_sync=False) == 9
     assert profile_read("tester", "target") == 5
+

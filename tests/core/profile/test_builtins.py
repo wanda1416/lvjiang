@@ -97,8 +97,8 @@ def test_profile_builtins_reject_unbound_username(profile_func_env):
     ):
         with pytest.raises(ValueError, match="缺少执行用户名"):
             operation()
-    assert db_read_entry("default", "quota", "weekly_progress") == {}
-    assert db_read_entry(profile_func_env.username, "quota", "weekly_progress")["value"] == 17
+    assert db_read_entry("default", "quota", "weekly_progress") is None
+    assert db_read_entry(profile_func_env.username, "quota", "weekly_progress").value == 17
 
 
 def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
@@ -114,10 +114,10 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     engine = SimpleNamespace(run_username=profile_func_env.username)
     returned = _profile_inc(engine, "resource_meter", -20)
     entry = db_read_entry(profile_func_env.username, "regen", "resource_meter")
-    stored_ts = datetime.fromisoformat(entry["event_at"])
+    stored_ts = datetime.fromisoformat(entry.event_at)
 
     assert returned == pytest.approx(80.5, abs=0.02)
-    assert entry["value"] == pytest.approx(80.5, abs=0.02)
+    assert entry.value == pytest.approx(80.5, abs=0.02)
     assert datetime.now() - timedelta(seconds=5) <= stored_ts <= datetime.now()
 
 
@@ -142,11 +142,11 @@ def test_profile_write_builtins_record_explicit_business_sources(profile_func_en
         profile_func_env.username, type_="quota", key="weekly_progress"
     )
 
-    assert [item["source"] for item in regen_history[:2]] == [
+    assert [item.source for item in regen_history[:2]] == [
         "资源消耗",
         "首次扫描",
     ]
-    assert quota_history[0]["source"] == "每周任务"
+    assert quota_history[0].source == "每周任务"
 
 
 def test_profile_observe_rejects_regression_in_same_period(profile_func_env):
@@ -161,7 +161,7 @@ def test_profile_observe_rejects_regression_in_same_period(profile_func_env):
     assert result == {"accepted": False, "value": 800.0, "reason": "regressed"}
     assert db_read_entry(
         profile_func_env.username, "quota", "weekly_progress"
-    )["value"] == 800
+    ).value == 800
 
 
 def test_profile_observe_accepts_increase_in_same_period(profile_func_env):
@@ -176,7 +176,7 @@ def test_profile_observe_accepts_increase_in_same_period(profile_func_env):
     assert result == {"accepted": True, "value": 800.0, "reason": "updated"}
     assert db_read_entry(
         profile_func_env.username, "quota", "weekly_progress"
-    )["value"] == 800
+    ).value == 800
 
 
 def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_env):
@@ -198,8 +198,8 @@ def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_
     # 跨周期观测 0：先原子归零落库（历史留一条 reset），不能只做显示归零
     assert result == {"accepted": True, "value": 0.0, "reason": "updated"}
     entry = db_read_entry(profile_func_env.username, "quota", "weekly_progress")
-    assert entry["value"] == 0
-    assert entry["event_at"] != old_ts
+    assert entry.value == 0
+    assert entry.event_at != old_ts
 
 
 def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):
@@ -212,13 +212,13 @@ def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):
         model_type="regen",
         delta=10,
         current_value=0,
-        expected_entry={},
+        expected_entry=None,
         use_cas=True,
     )
 
     assert result == 10
     entry = db_read_entry(profile_func_env.username, "regen", "resource_meter")
-    assert entry["value"] == 10
+    assert entry.value == 10
 
 
 def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func_env):
@@ -245,7 +245,7 @@ def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func
     new_value, applied_delta = result
     assert new_value == pytest.approx(80.5, abs=0.02)
     assert applied_delta == pytest.approx(-20, abs=0.02)
-    assert target["value"] == 1000
+    assert target.value == 1000
 
 
 def test_profile_declare_creates_missing_key_and_takes_effect(profile_func_env):

@@ -14,6 +14,7 @@ import pytest
 import yaml
 
 from lvjiang.core.profile.repository import CURRENT_VERSION, ProfileDB
+from lvjiang.core.profile.rows import Entry
 
 
 @pytest.fixture
@@ -139,8 +140,8 @@ class TestMigration:
 
         upgraded = ProfileDB(db_path)
 
-        assert upgraded.get_entry("u1", "quota", "k")["value"] == 5
-        assert upgraded.get_entry("u1", "quota", "k")["event_at"] == "2026-01-01T00:00:00"
+        assert upgraded.get_entry("u1", "quota", "k").value == 5
+        assert upgraded.get_entry("u1", "quota", "k").event_at == "2026-01-01T00:00:00"
         conn = sqlite3.connect(db_path)
         try:
             cols = {row[1] for row in conn.execute(
@@ -159,8 +160,8 @@ class TestMigration:
         _make_v7_db(db_path)
         ProfileDB(db_path)
         again = ProfileDB(db_path)
-        assert again.get_entry("u1", "quota", "k")["value"] == 5
-        assert "locked" not in again.get_entry("u1", "quota", "k")
+        assert again.get_entry("u1", "quota", "k").value == 5
+        assert again.get_entry("u1", "quota", "k").locked is False
 
 
 # ─── 锁定 / 解锁 ─────────────────────────────────────────────
@@ -172,17 +173,17 @@ class TestLockState:
         db.upsert("u1", "quota", "k", 1, event_at="2026-01-01T00:00:00")
         assert db.set_locked("u1", "quota", "k") is True
         entry = db.get_entry("u1", "quota", "k")
-        assert entry["locked"] is True
-        assert entry["value"] == 1
-        assert entry["event_at"] == "2026-01-01T00:00:00"
+        assert entry.locked is True
+        assert entry.value == 1
+        assert entry.event_at == "2026-01-01T00:00:00"
 
     def test_lock_missing_entry_creates_placeholder(self, db: ProfileDB):
         """从未写过的 key 也能锁：占位行不带任何值。"""
         assert db.set_locked("u1", "quota", "never") is True
         entry = db.get_entry("u1", "quota", "never")
-        assert entry["locked"] is True
-        assert entry["value"] == 0
-        assert entry["event_at"] == ""
+        assert entry.locked is True
+        assert entry.value == 0
+        assert entry.event_at == ""
 
     def test_lock_is_idempotent(self, db: ProfileDB):
         assert db.set_locked("u1", "quota", "k") is True
@@ -194,7 +195,7 @@ class TestLockState:
         assert db.unlock("u1", "quota", "k") is True
         assert db.unlock("u1", "quota", "k") is False
         db.upsert("u1", "quota", "k", 2)
-        assert db.get_entry("u1", "quota", "k")["value"] == 2
+        assert db.get_entry("u1", "quota", "k").value == 2
 
     def test_lock_is_per_user(self, db: ProfileDB):
         db.upsert("u1", "quota", "k", 1)
@@ -207,9 +208,9 @@ class TestLockState:
         db.upsert("u1", "quota", "free", 1)
         db.upsert("u1", "quota", "locked", 1)
         db.set_locked("u1", "quota", "locked")
-        data = db.get_all("u1")
-        assert "locked" not in data["quota"]["free"]
-        assert data["quota"]["locked"]["locked"] is True
+        data = {(entry.type, entry.key): entry for entry in db.get_all("u1")}
+        assert data[("quota", "free")].locked is False
+        assert data[("quota", "locked")].locked is True
 
 
 # ─── 写入挡板 ────────────────────────────────────────────────
@@ -221,7 +222,7 @@ class TestWriteGuards:
         db.upsert("u1", "quota", "k", 1)
         db.set_locked("u1", "quota", "k")
         db.upsert("u1", "quota", "k", 99)
-        assert db.get_entry("u1", "quota", "k")["value"] == 1
+        assert db.get_entry("u1", "quota", "k").value == 1
 
     def test_upsert_keeps_lock_flag(self, db: ProfileDB):
         """upsert 不能像 INSERT OR REPLACE 那样把 locked 清掉。"""
@@ -229,8 +230,8 @@ class TestWriteGuards:
         db.set_locked("u1", "quota", "free")
         db.unlock("u1", "quota", "free")
         db.upsert("u1", "quota", "free", 5)
-        assert db.get_entry("u1", "quota", "free")["value"] == 5
-        assert not db.get_entry("u1", "quota", "free").get("locked")
+        assert db.get_entry("u1", "quota", "free").value == 5
+        assert db.get_entry("u1", "quota", "free").locked is False
 
     def test_upsert_many_skips_only_locked_entry(self, db: ProfileDB):
         db.upsert("u1", "quota", "locked", 1)
@@ -239,8 +240,8 @@ class TestWriteGuards:
             ("quota", "locked", 99, None, "tick", 98),
             ("quota", "free", 5, None, "tick", 5),
         ])
-        assert db.get_entry("u1", "quota", "locked")["value"] == 1
-        assert db.get_entry("u1", "quota", "free")["value"] == 5
+        assert db.get_entry("u1", "quota", "locked").value == 1
+        assert db.get_entry("u1", "quota", "free").value == 5
 
     def test_cas_update_returns_false_for_locked(self, db: ProfileDB):
         db.upsert("u1", "quota", "k", 1, event_at="2026-01-01T00:00:00")
@@ -249,7 +250,7 @@ class TestWriteGuards:
             "u1", "quota", "k", expected_value=1,
             expected_updated_at="2026-01-01T00:00:00", new_value=2)
         assert updated is False
-        assert db.get_entry("u1", "quota", "k")["value"] == 1
+        assert db.get_entry("u1", "quota", "k").value == 1
 
     def test_rename_keys_keeps_lock(self, db: ProfileDB):
         db.upsert("u1", "quota", "old", 1)
@@ -258,8 +259,8 @@ class TestWriteGuards:
             [("quota", "old", "new")],
             save_references=lambda: None)
         entry = db.get_entry("u1", "quota", "new")
-        assert entry["value"] == 1
-        assert entry.get("locked") is True
+        assert entry.value == 1
+        assert entry.locked is True
 
 
 # ─── 服务层：读返回空、写被拒绝 ─────────────────────────────
@@ -295,7 +296,7 @@ class TestServiceSemantics:
         result = service.profile_action(
             profile_env.username, "weekly_quota", delta=1, source="测试")
         assert result == 0
-        assert db_read_entry(profile_env.username, "quota", "weekly_quota")["value"] == 0
+        assert db_read_entry(profile_env.username, "quota", "weekly_quota").value == 0
         assert errors and "已锁定" in errors[0]
 
     def test_note_write_refused_for_locked(self, profile_env):
@@ -309,7 +310,7 @@ class TestServiceSemantics:
         profile_action(
             profile_env.username, "user_note", set_value="新文本", source="测试")
         assert db_read_entry(
-            profile_env.username, "note", "user_note")["value_text"] == ""
+            profile_env.username, "note", "user_note").value_text == ""
 
 
     def test_profile_observe_reports_locked_instead_of_accepted(self, profile_env):
@@ -382,8 +383,8 @@ class TestEngineSkipsLocked:
         processor.tick()
 
         entry = db_read_entry(profile_env.username, "quota", "weekly_quota")
-        assert entry["value"] == 1
-        assert entry["event_at"] == "2020-01-01T00:00:00"
+        assert entry.value == 1
+        assert entry.event_at == "2020-01-01T00:00:00"
 
     def test_regen_and_alert_skipped_for_locked(self, profile_env):
         from lvjiang.core.profile.engine import ProfileProcessor
@@ -404,8 +405,8 @@ class TestEngineSkipsLocked:
         processor.tick()
 
         entry = db_read_entry(profile_env.username, "regen", "energy")
-        assert entry["value"] == 95
-        assert entry["event_at"] == "2020-01-01T00:00:00"
+        assert entry.value == 95
+        assert entry.event_at == "2020-01-01T00:00:00"
         assert alerts == []
 
 
@@ -419,7 +420,8 @@ class TestOverviewRendering:
         from lvjiang.ui.profile.cell_formatting import format_profile_cell
 
         kd = KeyDef(key="k", label="配额")
-        data = {"quota": {"k": {"value": 2, "locked": True, "event_at": ""}}}
+        data = {"quota": {"k": Entry(username="u", type="quota", key="k",
+                                    value=2, locked=True)}}
         assert format_profile_cell(kd, "quota", data) == ("", "locked")
 
     def test_tooltip_explains_lock(self):
@@ -427,7 +429,8 @@ class TestOverviewRendering:
         from lvjiang.ui.profile.cell_formatting import format_cell_tooltip
 
         kd = KeyDef(key="k", label="配额")
-        data = {"quota": {"k": {"value": 2, "locked": True, "event_at": ""}}}
+        data = {"quota": {"k": Entry(username="u", type="quota", key="k",
+                                    value=2, locked=True)}}
         tooltip = format_cell_tooltip(kd, "quota", data)
         assert "锁定" in tooltip
 
@@ -437,7 +440,9 @@ class TestOverviewRendering:
 
         kd = QuotaKeyDef(key="k", label="配额", cap=5)
         users = {
-            "u1": {"quota": {"k": {"value": 2}}},
-            "u2": {"quota": {"k": {"value": 3, "locked": True}}},
+            "u1": {"quota": {"k": Entry(username="u1", type="quota", key="k", value=2)}},
+            "u2": {"quota": {"k": Entry(username="u2", type="quota", key="k",
+                                        value=3, locked=True)}},
         }
         assert sum_profile_column(kd, "quota", users) == "2"
+

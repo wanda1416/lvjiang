@@ -43,7 +43,7 @@ def test_history_delete_requires_confirmation_and_refreshes_without_value_change
         HistoryScope(username='tester', model_type='stock', key='item',
                      key_label='示例'))
     table = dialog._table
-    first = repository.db_get_history('tester', 'stock', 'item')[0]['local_id']
+    first = repository.db_get_history('tester', 'stock', 'item')[0].local_id
     monkeypatch.setattr(
         QMessageBox, 'question', lambda *a, **kw: QMessageBox.StandardButton.No)
     next(b for b in _actions_cell(dialog, 1).findChildren(QPushButton)
@@ -55,7 +55,7 @@ def test_history_delete_requires_confirmation_and_refreshes_without_value_change
          if b.text() == '删除').click()
     assert not repository.db_get_history_record(first)
     assert repository.db_count_history('tester', 'stock', 'item') == 1
-    assert repository.db_read_entry('tester', 'stock', 'item')['value'] == 3
+    assert repository.db_read_entry('tester', 'stock', 'item').value == 3
     assert table.rowCount() == 2 and not dialog.values_changed
     dialog.close()
 

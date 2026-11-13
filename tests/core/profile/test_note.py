@@ -124,8 +124,8 @@ class TestNoteDB:
 
         db_upsert(note_env.username, "note", "user_note", 0, value_text="已完成")
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == "已完成"
-        assert entry["value"] == 0
+        assert entry.value_text == "已完成"
+        assert entry.value == 0
 
 
 # ─── profile_action note 短路 ──────────────────────────────────
@@ -145,7 +145,7 @@ class TestNoteProfileAction:
         )
         assert result == "已完成"
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == "已完成"
+        assert entry.value_text == "已完成"
 
     def test_note_short_circuit_empty_text(self, note_env):
         """note 写入空文本"""
@@ -159,7 +159,7 @@ class TestNoteProfileAction:
         )
         assert result == ""
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == ""
+        assert entry.value_text == ""
 
     def test_note_records_history(self, note_env):
         """note 写入记入 history"""
@@ -176,8 +176,8 @@ class TestNoteProfileAction:
         db: ProfileDB = pdb._db
         history = db.get_history(note_env.username)
         assert len(history) == 1
-        assert history[0]["value_text"] == "已完成"
-        assert history[0]["type"] == "note"
+        assert history[0].value_text == "已完成"
+        assert history[0].type == "note"
 
     def test_note_no_sync_targets(self, note_env):
         """note 不触发 sync_targets"""
@@ -198,7 +198,7 @@ class TestNoteProfileAction:
 
         # 同步目标值不变
         target = db_read_entry(note_env.username, "stock", "target_stock")
-        assert target["value"] == 1000
+        assert target.value == 1000
 
 
 # ─── profile_read note 返回文本 ────────────────────────────────
@@ -247,8 +247,8 @@ class TestNoteEngineTick:
 
         # tick 后 note 值不变
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == "已完成"
-        assert entry["value"] == 0
+        assert entry.value_text == "已完成"
+        assert entry.value == 0
 
 
 # ─── DSL profile_inc note 防护 ─────────────────────────────
@@ -272,7 +272,7 @@ class TestNoteProfileInc:
 
         assert result == 0
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == "已完成"
+        assert entry.value_text == "已完成"
 
 
 # ─── DSL profile_set note 对 bool/0 的处理 ───────────────
@@ -296,7 +296,7 @@ class TestNoteProfileSetFalsy:
         _profile_set(engine, "user_note", 0)
 
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == ""
+        assert entry.value_text == ""
 
     def test_profile_set_note_string_stores(self, note_env):
         """profile_set(key, '已完成') 正常存储字符串"""
@@ -309,7 +309,7 @@ class TestNoteProfileSetFalsy:
         _profile_set(engine, "user_note", "已完成")
 
         entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == "已完成"
+        assert entry.value_text == "已完成"
 
 
 # ─── sync_targets 校验：note 不能作为同步目标 ────────────
@@ -371,9 +371,9 @@ class TestNoteHistory:
 
         history = db_get_history(note_env.username, type_="note", key="user_note")
         assert len(history) == 1
-        assert history[0]["value_text"] == "已完成"
-        assert history[0]["old_value_text"] == ""
-        assert history[0]["op_type"] == "set"
+        assert history[0].value_text == "已完成"
+        assert history[0].old_value_text == ""
+        assert history[0].op_type == "set"
 
 
     def test_note_same_value_no_history(self, note_env):
@@ -450,16 +450,16 @@ def note_cap_env(tmp_path, monkeypatch):
 def _write_then_render(env, key: str, value: str) -> tuple[str, str]:
     """写入 note 值，返回 (落库文本, 总览单元格显示文本)"""
     from lvjiang.core.profile.models import MODEL_NOTE
-    from lvjiang.core.profile.repository import db_read_all
+    from lvjiang.core.profile.repository import db_read_index
     from lvjiang.core.profile.schema import get_profile_config
     from lvjiang.core.profile.service import profile_action
     from lvjiang.ui.profile.cell_formatting import format_profile_cell
 
     profile_action(env.username, key, model_type=MODEL_NOTE,
                    set_value=value, source="")
-    data = db_read_all(env.username)
+    data = db_read_index(env.username)
     kd = get_profile_config().get_key(key, model_type=MODEL_NOTE)
-    stored = data[MODEL_NOTE][key].get("value_text")
+    stored = data[MODEL_NOTE][key].value_text
     text, _style = format_profile_cell(kd, MODEL_NOTE, data)
     return stored, text
 
@@ -529,3 +529,4 @@ class TestNoteNumericPredicate:
             numeric = note_numeric_value(stored) is not None
             assert ("/" in text) is numeric, (
                 f"{raw!r} 存成 {stored!r} 显示 {text!r}：存/显对数字的判断不一致")
+

@@ -107,3 +107,11 @@ ops/stats-client/.env
 .tail*.json
 .tail*.err
 
+
+# 改造期临时脚本与日志
+.conv*.py
+.x*.log
+.t*.log
+.te*.log
+.pt*.log
+

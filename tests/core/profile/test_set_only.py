@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from lvjiang.core.profile import repository, schema, service
 from lvjiang.core.profile.arbitrate import is_strictly_newer
 from lvjiang.core.profile.models import QuotaKeyDef
+from lvjiang.core.profile.rows import Entry
 
 
 def test_replayed_row_keeps_origin_identity(tmp_path, monkeypatch) -> None:
@@ -56,14 +57,14 @@ def test_newer_event_wins_and_empty_op_id_loses() -> None:
 def test_quota_read_is_zero_after_period_boundary() -> None:
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     yesterday = (datetime.now() - timedelta(days=2)).replace(microsecond=0)
-    entry = {"value": 9, "event_at": yesterday.isoformat(timespec="seconds")}
+    entry = Entry(username="u", type="quota", key="daily", value=9, event_at=yesterday.isoformat(timespec="seconds"))
     assert service._quota_display_value(entry, kd) == 0
 
 
 def test_offset_timestamp_does_not_break_quota_read() -> None:
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     recent = datetime.now().replace(microsecond=0).isoformat(timespec="seconds")
-    entry = {"value": 4, "event_at": recent + "+08:00"}
+    entry = Entry(username="u", type="quota", key="daily", value=4, event_at=recent + "+08:00")
     assert service._quota_display_value(entry, kd) == 4
 
 
@@ -124,8 +125,8 @@ def test_unlock_keeps_value_frozen(tmp_path, monkeypatch) -> None:
         conn.close()
     assert repository.db_unlock("u", "stock", "k")
     entry = repository.db_read_entry("u", "stock", "k")
-    assert entry["value"] == 3
-    assert "locked" not in entry
+    assert entry.value == 3
+    assert entry.locked is False
 
 
 def test_inc_persists_without_a_prior_sync(tmp_path, monkeypatch) -> None:
@@ -147,9 +148,9 @@ def test_inc_persists_without_a_prior_sync(tmp_path, monkeypatch) -> None:
     written = service.profile_action("u", "xinli", delta=-1, source="消耗")
     assert abs(written - 9) < 0.02
     history = repository.db_get_history("u", "regen", "xinli")
-    assert history[0]["op_type"] == "set"
-    assert abs(history[0]["new_value"] - 9) < 0.02
-    assert history[0]["source"] == "消耗"
+    assert history[0].op_type == "set"
+    assert abs(history[0].new_value - 9) < 0.02
+    assert history[0].source == "消耗"
 
 
 def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -> None:

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QMessageBox
 
+from lvjiang.core.profile.rows import Entry
 from lvjiang.ui.profile.cell_editing import ProfileCellEditingMixin
 
 
@@ -84,7 +85,8 @@ def test_detail_page_marks_locked_value():
     )
 
     kd = KeyDef(key="k", label="配额")
-    data = {"quota": {"k": {"value": 2, "locked": True, "updated_at": ""}}}
+    data = {"quota": {"k": Entry(username="u1", type="quota", key="k",
+                                 value=2, locked=True)}}
     # 纯格式化层仍是空串（值不可信），界面层负责换成提示
     assert _format_detail_value(kd, "quota", data) == ""
     text, locked = _format_detail_label(kd, "quota", data)
@@ -97,7 +99,8 @@ def test_detail_page_formats_unlocked_value():
     from lvjiang.ui.profile.user_info import _format_detail_label
 
     kd = KeyDef(key="k", label="配额")
-    data = {"quota": {"k": {"value": 2, "updated_at": "2026-11-01T00:00:00"}}}
+    data = {"quota": {"k": Entry(username="u1", type="quota", key="k",
+                                 value=2, event_at="2026-11-01T00:00:00")}}
     text, locked = _format_detail_label(kd, "quota", data)
     assert locked is False
     assert text == "2"

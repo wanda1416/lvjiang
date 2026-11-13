@@ -45,6 +45,7 @@ from .repository import (
     db_update_if_current,
     db_upsert,
 )
+from .rows import Entry
 from .schema import get_profile_config
 
 # ─── 内部工具函数 ─────────────────────────────────────────────
@@ -74,23 +75,23 @@ def profile_history_undo_unavailable_reason(record: dict) -> str | None:
     """撤销前的准入判断；可撤销时返回 ``None``。"""
     if not record:
         return tr("历史记录不存在")
-    if record.get("op_type") not in ("set", "delta"):
+    if record.op_type not in ("set", "delta"):
         return tr("仅可撤销写入记录")
-    username = str(record.get("username", ""))
-    model_type = str(record.get("type", ""))
-    key = str(record.get("key", ""))
+    username = str(record.username)
+    model_type = str(record.type)
+    key = str(record.key)
     latest = db_get_history(username, model_type, key, limit=1)
-    if not latest or latest[0].get("local_id") != record.get("local_id"):
+    if not latest or latest[0].local_id != record.local_id:
         return tr("只能撤销该用户此数据项的最新记录")
     current = db_read_entry(username, model_type, key)
     if not current:
         return tr("当前数据项已不存在")
     if model_type == MODEL_NOTE:
-        if (current.get("value_text") or "") != (record.get("value_text") or ""):
+        if (current.value_text or "") != (record.value_text or ""):
             return tr("数据已发生变化，请刷新后重试")
     else:
-        expected = record.get("new_value")
-        if expected is None or float(current.get("value", 0) or 0) != float(expected):
+        expected = record.new_value
+        if expected is None or float(current.value or 0) != float(expected):
             return tr("数据已发生变化，请刷新后重试")
     return None
 
@@ -106,14 +107,14 @@ def undo_profile_history(history_id: int) -> None:
     reason = profile_history_undo_unavailable_reason(record)
     if reason is not None:
         raise ProfileOperationRefused(reason)
-    username = str(record["username"])
-    key = str(record["key"])
-    source = f"撤销：{record.get('source') or '手动'}"
-    if str(record["type"]) == MODEL_NOTE:
-        profile_action(username, key, set_value=record.get("old_value_text") or "",
+    username = str(record.username)
+    key = str(record.key)
+    source = f"撤销：{record.source or '手动'}"
+    if str(record.type) == MODEL_NOTE:
+        profile_action(username, key, set_value=record.old_value_text or "",
                        source=source, trigger_sync=False)
         return
-    reverse = float(record.get("old_value") or 0) - float(record.get("new_value") or 0)
+    reverse = float(record.old_value or 0) - float(record.new_value or 0)
     profile_action(username, key, delta=reverse, source=source, trigger_sync=False)
 
 
@@ -147,17 +148,18 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         return None
     if model_type == MODEL_NOTE:
         entry = db_read_entry(username, model_type, key)
-        return entry.get("value_text", "") or None
-    profile_data = db_read_all(username)
-    entry = profile_data.get(model_type, {}).get(key, {})
-    current = entry.get("value", 0) or 0
+        return entry.value_text or None
+    entry = db_read_entry(username, model_type, key)
+    if entry is None:
+        return 0.0
+    current = entry.value or 0
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
         current = _quota_display_value(entry, kd)
     if model_type == MODEL_REGEN and kd and isinstance(kd, RegenKeyDef):
         if _is_continuous_regen(kd):
             current = compute_realtime_value(
-                entry.get("value", 0) or 0,
-                entry.get("event_at", ""),
+                entry.value or 0,
+                entry.event_at,
                 kd,
             )
         else:
@@ -167,8 +169,8 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
 
 def _quota_display_value(entry: dict, kd: QuotaKeyDef) -> float:
     """配额跨过周期边界后读出来是 0，不另写一条 reset。"""
-    stored = float(entry.get("value", 0) or 0)
-    event_at = entry.get("event_at") or ""
+    stored = float(entry.value or 0)
+    event_at = entry.event_at or ""
     from .arbitrate import parse_event
 
     event = parse_event(event_at)
@@ -253,7 +255,7 @@ def profile_read(username: str, key: str) -> float | str | None:
     entry = db_read_entry(username, model_type, key)
     if not entry:
         return None
-    if entry.get("locked"):
+    if entry.locked:
         return None
     kd = config.get_key(key)
     return _read_current_value(username, model_type, key, kd)
@@ -278,26 +280,37 @@ def profile_read_all(username: str) -> dict:
     为 None/"" —— 与 ``profile_read`` 返回 None 的口径一致：锁定的 key 对这个
     用户物理失效，`profile_all` 的消费方不该再读到冻结值。
     """
-    data = db_read_all(username)
+    entries = db_read_all(username)
     config = get_profile_config()
-    for entries in data.values():
-        for locked_entry in entries.values():
-            if locked_entry.get("locked"):
-                locked_entry["value"] = None
-                locked_entry["value_text"] = ""
+    for entry in entries:
+        if entry.locked:
+            entry.value = None
+            entry.value_text = ""
+    index = {(entry.type, entry.key): entry for entry in entries}
     for kd in config.get_keys_by_model(MODEL_QUOTA):
         if not isinstance(kd, QuotaKeyDef):
             continue
-        entry = data.get(MODEL_QUOTA, {}).get(kd.key)
-        if entry and not entry.get("locked"):
-            entry["value"] = _quota_display_value(entry, kd)
+        entry = index.get((MODEL_QUOTA, kd.key))
+        if entry and not entry.locked:
+            entry.value = _quota_display_value(entry, kd)
     for kd in config.get_keys_by_model(MODEL_REGEN):
         if not isinstance(kd, RegenKeyDef):
             continue
-        entry = data.get(MODEL_REGEN, {}).get(kd.key)
-        if entry and not entry.get("locked"):
-            entry["value"] = compute_regen_entry(entry, kd).value
-    return data
+        entry = index.get((MODEL_REGEN, kd.key))
+        if entry and not entry.locked:
+            entry.value = compute_regen_entry(entry, kd).value
+    # JSON 边界：DSL / workbench 读的是可序列化结构，只在这里转一次
+    payload: dict[str, dict[str, dict]] = {}
+    for entry in entries:
+        payload.setdefault(entry.type, {})[entry.key] = {
+            "value": entry.value,
+            "value_text": entry.value_text,
+            "event_at": entry.event_at,
+            "created_at": entry.created_at,
+            "op_id": entry.op_id,
+            "locked": entry.locked,
+        }
+    return payload
 
 
 @profile_operation
@@ -347,7 +360,7 @@ def profile_observe(
         if entry:
             try:
                 is_current_period = datetime.fromisoformat(
-                    entry.get("event_at", "")
+                    entry.event_at
                 ) >= boundary
             except (TypeError, ValueError):
                 is_current_period = False
@@ -360,12 +373,12 @@ def profile_observe(
                 username,
                 MODEL_QUOTA,
                 key,
-                expected_value=entry.get("value", 0) or 0,
-                expected_updated_at=entry.get("event_at", ""),
-                expected_entry_exists=bool(entry),
+                expected_value=(entry.value if entry else 0) or 0,
+                expected_updated_at=entry.event_at if entry else "",
+                expected_entry_exists=entry is not None,
                 new_value=0,
                 op_type="reset",
-                delta_value=-float(entry.get("value", 0) or 0),
+                delta_value=-float((entry.value if entry else 0) or 0),
                 source="周期重置",
             )
             if not reset:
@@ -415,7 +428,7 @@ def profile_action(
     set_value: float | str | None = None,
     source: str = tr("DSL 写入"),
     current_value: float | None = None,
-    expected_entry: dict | None = None,
+    expected_entry: Entry | None = None,
     trigger_sync: bool = True,
     use_cas: bool = False,
     regen_progress_source: str = "target",
@@ -459,13 +472,13 @@ def profile_action(
     # 记 error 而不是 warning：走到这里说明调用方没先查 profile_locked，
     # 属于漏判，需要在日志里暴露出来（正常流程应当先判锁再决定是否写）。
     current_entry = db_read_entry(username, model_type, key)
-    if current_entry.get("locked"):
+    if current_entry is not None and current_entry.locked:
         logger.error(
             f"profile 写入被拒绝：{username}.{model_type}.{key} 已锁定"
             f"（来源 {source}）")
         if model_type == MODEL_NOTE:
-            return current_entry.get("value_text", "") or ""
-        return current_entry.get("value", 0) or 0
+            return current_entry.value_text or ""
+        return current_entry.value or 0
 
     # ── note 短路：文本直接写入，不走数值管线 ──
     if model_type == MODEL_NOTE:
@@ -475,7 +488,7 @@ def profile_action(
         text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
         text = normalize_note_text(text, kd)
         old_entry = db_read_entry(username, model_type, key)
-        old_text = old_entry.get("value_text", "") if old_entry else None
+        old_text = old_entry.value_text if old_entry else None
         if old_entry and text == (old_text or "") and not force_write:
             return text
         from .triggers import (
@@ -521,8 +534,8 @@ def profile_action(
     # 两处基线不一致：回放（delta 相加）、撤销、按来源聚合都会算错，
     # 当天的恢复也会从账本里消失。
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-        stored_value = float((current_entry or {}).get("value", 0) or 0)
-        restored = compute_regen_entry(current_entry or {}, kd)
+        stored_value = float((current_entry.value if current_entry else 0) or 0)
+        restored = compute_regen_entry(current_entry, kd)
         restored_value = float(restored.value)
         restored_at = restored.event_at
         if int(restored_value) != int(stored_value):
@@ -588,11 +601,14 @@ def profile_action(
         if event.synchronous:
             submit_profile_trigger(event)
     if trigger_sync and use_cas and expected_entry is not None:
+        # 三态：None=调用方不做 CAS；EXPECT_ABSENT=期望该行不存在（原空 dict）；
+        # Entry=按打开界面时的快照做 CAS。
+        absent = expected_entry is EXPECT_ABSENT
         updated = db_update_if_current(
             username, model_type, key,
-            expected_value=expected_entry.get("value", 0) or 0,
-            expected_updated_at=expected_entry.get("event_at", ""),
-            expected_entry_exists=bool(expected_entry),
+            expected_value=(0 if absent else expected_entry.value) or 0,
+            expected_updated_at="" if absent else expected_entry.event_at,
+            expected_entry_exists=not absent,
             new_value=write_value,
             new_updated_at=None,
             op_type=op_type,
@@ -633,6 +649,9 @@ def profile_action(
 
 # ─── sync_engine 独立写入适配器 ──────────────────────────────
 
+
+#: CAS 期望「该条目还不存在」的哨兵（对应旧协议里传空 dict 的语义）。
+EXPECT_ABSENT = object()
 
 @profile_write
 def sync_write_adapter(
@@ -706,4 +725,5 @@ def sync_write_adapter(
         if not event.synchronous:
             submit_profile_trigger(event)
     return semantic_new_value, actual_delta
+
 

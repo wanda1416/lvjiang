@@ -38,6 +38,7 @@ from ...core.profile.regen import (
     next_boundary_after,
     next_realtime_point_seconds,
 )
+from ...core.profile.rows import Entry
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import DISABLED_BUTTON_BG
 
@@ -137,7 +138,8 @@ def quota_reset_remaining(
 # ─── 单元格格式化 ────────────────────────────────────────────
 
 
-def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, str]:
+def format_profile_cell(kd: KeyDef, model_type: str,
+                        data: dict[str, dict[str, Entry]]) -> tuple[str, str]:
     """根据模型类型格式化 profile 值用于总览显示
 
     返回 (display_text, style)，style 为
@@ -146,13 +148,13 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
     锁定条目一律显示为空白（style="locked"）：锁定表示该用户这个 key 物理
     失效，引擎完全忽略其值，展示值只会误导。
     """
-    entry = data.get(model_type, {}).get(kd.key, {})
-    if not entry:
+    entry = (data.get(model_type) or {}).get(kd.key)
+    if entry is None:
         return "", ""
-    if entry.get("locked"):
+    if entry.locked:
         return "", "locked"
 
-    value = entry.get("value")
+    value = entry.value
     if value is None:
         return "", ""
 
@@ -211,7 +213,7 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
         return str(int(value)), ""
 
     if model_type == MODEL_NOTE:
-        text = entry.get("value_text", "")
+        text = entry.value_text
         if not text:
             # 兼容：如果 value_text 为空但有数值 value，显示数值
             text = str(int(value)) if value else ""
@@ -234,7 +236,8 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
 SUMMABLE_MODELS = frozenset({MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK})
 
 
-def sum_profile_column(kd: KeyDef, model_type: str, users_data: dict[str, dict]) -> str:
+def sum_profile_column(kd: KeyDef, model_type: str,
+                       users_data: dict[str, dict[str, dict[str, Entry]]]) -> str:
     """合计行单元格文本：可累加模型返回该列数值之和，其余一律返回空串。
 
     regen 用与单元格显示同一套计算值（`compute_regen_entry`），否则合计会和
@@ -244,13 +247,13 @@ def sum_profile_column(kd: KeyDef, model_type: str, users_data: dict[str, dict])
         return ""
     total = 0.0
     for data in users_data.values():
-        entry = data.get(model_type, {}).get(kd.key, {})
-        if not entry:
+        entry = (data.get(model_type) or {}).get(kd.key)
+        if entry is None:
             continue
-        if entry.get("locked"):
+        if entry.locked:
             # 锁定 key 对这个用户物理失效，值不存在于任何计算里
             continue
-        value = entry.get("value")
+        value = entry.value
         if value is None:
             continue
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
@@ -273,10 +276,10 @@ def is_sync_target_at_hard_cap(sync_key: str, data: dict) -> bool:
     model_type, key = parse_sync_key(sync_key)
     if not model_type:
         return False
-    entry = data.get(model_type, {}).get(key, {})
-    if not entry:
+    entry = (data.get(model_type) or {}).get(key)
+    if entry is None:
         return False
-    value = entry.get("value", 0) or 0
+    value = entry.value or 0
     config = get_profile_config()
     kd = config.get_key(key, model_type=model_type)
     if kd is None:
@@ -329,23 +332,24 @@ def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
         item.setBackground(QColor(DISABLED_BUTTON_BG))
 
 
-def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
+def format_cell_tooltip(kd: KeyDef, model_type: str,
+                        data: dict[str, dict[str, Entry]]) -> str:
     """生成单元格悬停提示，显示元信息（更新时间等）"""
-    entry = data.get(model_type, {}).get(kd.key, {})
-    if not entry:
+    entry = (data.get(model_type) or {}).get(kd.key)
+    if entry is None:
         return ""
 
-    if entry.get("locked"):
+    if entry.locked:
         return tr("当前用户已锁定")
     lines = [f"【{kd.label}】"]
 
-    event_at = entry.get("event_at")
-    created_at = entry.get("created_at")
+    event_at = entry.event_at
+    created_at = entry.created_at
 
     # 再生模型显示额外信息
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
         result = compute_regen_entry(entry, kd)
-        stored_value = entry.get("value", 0) or 0
+        stored_value = entry.value or 0
         period_labels = {"minute": tr("分钟"), "hour": tr("小时"), "day": tr("天"), "week": tr("周")}
         rate_label = period_labels.get(kd.regen_rate_unit, kd.regen_rate_unit)
         period_label = period_labels.get(kd.regen_period, kd.regen_period)
@@ -389,7 +393,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
 
     # note 模型显示文本值
     if model_type == MODEL_NOTE:
-        text = entry.get("value_text", "")
+        text = entry.value_text
         if text:
             lines.append(f"备注值: {text}")
 
@@ -412,7 +416,7 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             exact = compute_regen_entry(entry, kd).value
         else:
-            exact = entry.get("value", 0) or 0
+            exact = entry.value or 0
         if abs(exact - int(exact)) > 1e-9:
             lines.append(f"精确值: {exact:.4f}".rstrip("0").rstrip("."))
 
@@ -425,3 +429,4 @@ def format_cell_tooltip(kd: KeyDef, model_type: str, data: dict) -> str:
             lines.append(f"  • {label} (x{t.ratio:g}){suffix}")
 
     return "\n".join(lines) if len(lines) > 1 else ""
+

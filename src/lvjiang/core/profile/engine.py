@@ -29,7 +29,7 @@ from .periods import (
 )
 from .regen import compute_regen_entry
 from .regen_gate import period_recovery_allowed
-from .repository import db_read_all, db_upsert
+from .repository import db_read_index, db_upsert
 from .schema import (
     get_profile_config,
 )
@@ -52,13 +52,13 @@ def _write_background_change(user_name, model, kd, entry, new_value, delta, op_t
     from .triggers import prepare_trigger_event, submit_profile_trigger
 
     current = db_read_entry(user_name, model, kd.key)
-    if (current.get("value", 0), current.get("event_at", "")) != (
-        entry.get("value", 0), entry.get("event_at", ""),
+    if (current.value, current.event_at) != (
+        entry.value, entry.event_at,
     ):
         return False
     event = prepare_trigger_event(
         username=user_name, model=model, key=kd.key,
-        old_value=entry.get("value", 0), new_value=new_value, delta=delta,
+        old_value=entry.value, new_value=new_value, delta=delta,
         source="周期重置" if op_type == "reset" else "自动恢复",
         op_type=op_type, script=kd.change_script, synchronous=kd.change_script_sync,
     )
@@ -66,8 +66,8 @@ def _write_background_change(user_name, model, kd, entry, new_value, delta, op_t
     if event.synchronous:
         submit_profile_trigger(event)
     updated = db_update_if_current(
-        user_name, model, kd.key, expected_value=entry.get("value", 0) or 0,
-        expected_updated_at=entry.get("event_at", ""), expected_entry_exists=bool(current),
+        user_name, model, kd.key, expected_value=entry.value or 0,
+        expected_updated_at=entry.event_at, expected_entry_exists=bool(current),
         new_value=new_value, new_updated_at=event_at, op_type=op_type,
         delta_value=delta, source=event.source,
     )
@@ -303,7 +303,7 @@ class ProfileProcessor:
         从 DB 读取 profile 数据，逐条计算并 CAS 更新。
         CAS 失败表示其他进程已经更新，本轮放弃该 entry，下轮重试。
         """
-        profile_data = db_read_all(user_name)
+        profile_data = db_read_index(user_name)
         if not profile_data:
             return
 
@@ -314,8 +314,8 @@ class ProfileProcessor:
         # 历史里也没有重置记录（各端、网页、脚本读到的都是旧值）。
         now = datetime.now()
         for kd in config.get_keys_by_model("quota"):
-            entry = profile_data.get("quota", {}).get(kd.key, {})
-            if entry.get("locked"):
+            entry = (profile_data.get("quota") or {}).get(kd.key)
+            if entry is not None and entry.locked:
                 # 锁定 key 物理失效：既不首次建值，也不做周期重置
                 continue
             if not entry:
@@ -324,11 +324,11 @@ class ProfileProcessor:
                           op_type="reset", delta_value=0)
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 首次初始化")
                 continue
-            stored_value = entry.get("value", 0) or 0
+            stored_value = entry.value or 0
             boundary = _get_period_boundary(
                 kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
             )
-            if not _should_reset(entry.get("event_at", ""), boundary):
+            if not _should_reset(entry.event_at, boundary):
                 continue
             try:
                 updated = _write_background_change(
@@ -352,13 +352,13 @@ class ProfileProcessor:
             if not isinstance(kd, RegenKeyDef):
                 continue
             entry = profile_data.get("regen", {}).get(kd.key, {})
-            if entry.get("locked"):
+            if entry is not None and entry.locked:
                 # 锁定 key 既不自动恢复，也不产生阈值告警
                 continue
             if not entry:
                 # 首次：以 0 值、空时间戳构造虚拟 entry，走正常计算路径
                 entry = {"value": 0, "event_at": ""}
-            stored_value = entry.get("value", 0)
+            stored_value = entry.value
 
             regen_result = compute_regen_entry(entry, kd)
             computed = regen_result.value

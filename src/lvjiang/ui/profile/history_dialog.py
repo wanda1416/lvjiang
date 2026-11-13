@@ -54,6 +54,7 @@ from ...core.profile.repository import (
     db_history_page,
     db_update_history_source,
 )
+from ...core.profile.rows import HistoryRow
 from ...core.profile.schema import get_profile_config
 from ...core.profile.service import (
     ProfileWriteConflict,
@@ -588,26 +589,26 @@ class HistoryDialog(QDialog):
                 self._apply_actions(table, row, index, record)
                 continue
             item = QTableWidgetItem(self._cell_text(column.key, record))
-            item.setData(_HISTORY_ID_ROLE, record.get("local_id"))
+            item.setData(_HISTORY_ID_ROLE, record.local_id)
             if column.key != "source":
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             else:
-                item.setData(_ORIGINAL_SOURCE_ROLE, record.get("source") or "")
+                item.setData(_ORIGINAL_SOURCE_ROLE, record.source or "")
                 item.setToolTip(tr("双击修改来源"))
             self._decorate(item, column.key, record)
             table.setItem(row, index, item)
 
     def _decorate(self, item: QTableWidgetItem, key: str, record: dict) -> None:
         if key == "event_at":
-            item.setToolTip(str(record.get("event_at", "")))
+            item.setToolTip(str(record.event_at))
         elif key == "op_type":
-            color = self._type_color(str(record.get("op_type") or ""))
+            color = self._type_color(str(record.op_type or ""))
             if color is not None:
                 item.setForeground(QBrush(color))
             item.setToolTip(tr("变更类型：{label}").format(
                 label=item.text()))
         elif key == "key":
-            item.setToolTip(f"{record.get('type', '')}:{record.get('key', '')}")
+            item.setToolTip(f"{record.type}:{record.key}")
         elif key == "old" or key == "new":
             item.setToolTip(item.text())
         elif key == "delta":
@@ -617,37 +618,37 @@ class HistoryDialog(QDialog):
             if color is not None:
                 item.setForeground(QBrush(color))
         elif key == "sync_from":
-            raw = record.get("sync_from") or ""
+            raw = record.sync_from or ""
             if raw:
                 item.setToolTip(raw)
         elif key == "device":
-            raw = record.get("instance_id") or ""
+            raw = record.instance_id or ""
             item.setToolTip(raw or tr("未记录设备"))
         elif key == "source":
             item.setToolTip(item.text() or tr("未记录"))
 
     def _cell_text(self, key: str, record: dict) -> str:
         if key == "event_at":
-            return _format_timestamp(str(record.get("event_at") or ""))
+            return _format_timestamp(str(record.event_at or ""))
         if key == "username":
-            return str(record.get("username") or "")
+            return str(record.username or "")
         if key == "op_type":
-            raw = str(record.get("op_type") or "")
+            raw = str(record.op_type or "")
             return self._TYPE_LABEL.get(raw, raw)
         if key == "key":
-            raw = f"{record.get('type', '')}:{record.get('key', '')}"
+            raw = f"{record.type}:{record.key}"
             return format_sync_label(raw)
         if key in ("old", "new"):
-            return _format_value(record, key, str(record.get("type") or ""))
+            return _format_value(record, key, str(record.type or ""))
         if key == "delta":
             amount = _delta_amount(record)
             return _format_amount(amount) if amount is not None else "—"
         if key == "source":
-            return str(record.get("source") or "")
+            return str(record.source or "")
         if key == "device":
-            return _device_label(str(record.get("instance_id") or ""))
+            return _device_label(str(record.instance_id or ""))
         if key == "sync_from":
-            raw = record.get("sync_from") or ""
+            raw = record.sync_from or ""
             return format_sync_label(str(raw)) if raw else ""
         return ""
 
@@ -956,7 +957,7 @@ class HistoryDialog(QDialog):
         return None
 
     def _record_label(self, record: dict) -> str:
-        raw = f"{record.get('type', '')}:{record.get('key', '')}"
+        raw = f"{record.type}:{record.key}"
         label = format_sync_label(raw)
         return raw if label == raw else f"{label}（{raw}）"
 
@@ -965,10 +966,10 @@ class HistoryDialog(QDialog):
             '确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n'
             '时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。'
         ).format(
-            username=record.get("username", ""),
+            username=record.username,
             label=self._record_label(record),
-            time=_format_timestamp(str(record.get("event_at") or "")),
-            source=record.get("source", "") or tr("无"),
+            time=_format_timestamp(str(record.event_at or "")),
+            source=record.source or tr("无"),
         )
         answer = QMessageBox.question(
             self, tr("确认撤销"), message,
@@ -978,11 +979,11 @@ class HistoryDialog(QDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            undo_profile_history(int(record["local_id"]))
+            undo_profile_history(int(record.local_id))
         except (ProfileWriteConflict, ValueError) as exc:
             log_failure(
-                f"{record.get('username', '')} {record.get('type', '')}."
-                f"{record.get('key', '')} 历史撤销失败", exc)
+                f"{record.username} {record.type}."
+                f"{record.key} 历史撤销失败", exc)
             QMessageBox.warning(self, tr("撤销失败"), str(exc))
             self._reload(reset_page=False)
             return
@@ -996,11 +997,11 @@ class HistoryDialog(QDialog):
             '仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；'
             '删除获取记录可能释放按历史累计的来源额度。'
         ).format(
-            username=record.get("username", ""),
+            username=record.username,
             label=self._record_label(record),
-            time=_format_timestamp(str(record.get("event_at") or "")),
-            source=record.get("source", "") or tr("无"),
-            delta=record.get("delta_value"),
+            time=_format_timestamp(str(record.event_at or "")),
+            source=record.source or tr("无"),
+            delta=record.delta_value,
         )
         answer = QMessageBox.question(
             self, tr("确认删除"), message,
@@ -1011,12 +1012,12 @@ class HistoryDialog(QDialog):
             return
         try:
             delete_profile_history(
-                int(record["local_id"]), str(record["username"]),
-                str(record["type"]), str(record["key"]))
+                int(record.local_id), str(record.username),
+                str(record.type), str(record.key))
         except Exception as error:  # noqa: BLE001 - 失败保留界面并给出可行动提示
             log_failure(
-                f"{record.get('username', '')} {record.get('type', '')}."
-                f"{record.get('key', '')} 历史删除失败", error)
+                f"{record.username} {record.type}."
+                f"{record.key} 历史删除失败", error)
             QMessageBox.warning(self, tr("删除失败"), str(error))
         self._reload(reset_page=False, refresh_facets=True)
 
@@ -1089,14 +1090,14 @@ def _delta_amount(record: dict) -> float | None:
     两者都缺（旧值未知，例如某键的第一条记录）时返回 ``None``，界面显示「—」，
     不把"不清楚起点"说成"从 0 增加了这么多"。
     """
-    delta = record.get("delta_value")
+    delta = record.delta_value
     if delta is not None:
         try:
             return float(delta)
         except (TypeError, ValueError):
             return None
-    old_value = record.get("old_value")
-    new_value = record.get("new_value")
+    old_value = record.old_value
+    new_value = record.new_value
     if old_value is None or new_value is None:
         return None
     try:
@@ -1117,12 +1118,13 @@ def _format_amount(value: float) -> str:
     return f"{value:+,.2f}".rstrip("0").rstrip(".")
 
 
-def _format_value(record: dict, side: str, model_type: str) -> str:
+def _format_value(record: HistoryRow, side: str, model_type: str) -> str:
     """note 模型展示文本值，其它模型展示整数化后的数值。"""
     if model_type == "note":
-        text = record.get(f"{side}_value_text") or ""
+        text = (record.value_text if side == "new"
+                else record.old_value_text) or ""
         return text or "—"
-    value = record.get(f"{side}_value")
+    value = record.new_value if side == "new" else record.old_value
     if value is None:
         return "—"
     try:
@@ -1130,4 +1132,5 @@ def _format_value(record: dict, side: str, model_type: str) -> str:
     except (TypeError, ValueError):
         return str(value)
     return str(int(numeric)) if numeric == int(numeric) else str(numeric)
+
 

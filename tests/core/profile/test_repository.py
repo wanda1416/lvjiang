@@ -41,24 +41,24 @@ class TestCRUD:
         db.upsert("user1", "quota", "k2", 20)
         db.upsert("user1", "regen", "energy", 2500)
 
-        all_data = db.get_all("user1")
-        assert all_data["quota"]["k1"]["value"] == 10
-        assert all_data["quota"]["k1"]["created_at"] != ""
-        assert all_data["quota"]["k2"]["value"] == 20
-        assert all_data["regen"]["energy"]["value"] == 2500
+        all_data = {(e.type, e.key): e for e in db.get_all("user1")}
+        assert all_data[("quota", "k1")].value == 10
+        assert all_data[("quota", "k1")].created_at != ""
+        assert all_data[("quota", "k2")].value == 20
+        assert all_data[("regen", "energy")].value == 2500
 
 
     def test_upsert_replaces(self, db: ProfileDB):
         db.upsert("user1", "quota", "k1", 10)
         db.upsert("user1", "quota", "k1", 20)
-        assert db.get_entry("user1", "quota", "k1")["value"] == 20
+        assert db.get_entry("user1", "quota", "k1").value == 20
 
     def test_upsert_custom_updated_at(self, db: ProfileDB):
         db.upsert("user1", "quota", "k1", 10, event_at="2026-01-01T00:00:00")
         entry = db.get_entry("user1", "quota", "k1")
-        assert entry["event_at"] == "2026-01-01T00:00:00"
-        assert entry["created_at"] != "2026-01-01T00:00:00"
-        assert entry["created_at"] != ""
+        assert entry.event_at == "2026-01-01T00:00:00"
+        assert entry.created_at != "2026-01-01T00:00:00"
+        assert entry.created_at != ""
 
     def test_upsert_many(self, db: ProfileDB):
         entries = [
@@ -68,29 +68,29 @@ class TestCRUD:
         ]
         db.upsert_many("user1", entries)
 
-        all_data = db.get_all("user1")
+        all_data = db.get_index("user1")
         assert len(all_data["quota"]) == 2
-        assert all_data["regen"]["energy"]["value"] == 2500
+        assert all_data["regen"]["energy"].value == 2500
 
     def test_different_users_isolated(self, db: ProfileDB):
         db.upsert("user1", "quota", "k1", 10)
         db.upsert("user2", "quota", "k1", 99)
-        assert db.get_entry("user1", "quota", "k1")["value"] == 10
-        assert db.get_entry("user2", "quota", "k1")["value"] == 99
+        assert db.get_entry("user1", "quota", "k1").value == 10
+        assert db.get_entry("user2", "quota", "k1").value == 99
 
     def test_upsert_value_text(self, db: ProfileDB):
         """note 模型写入 value_text 列"""
         db.upsert("user1", "note", "user_note", 0, value_text="已完成")
         entry = db.get_entry("user1", "note", "user_note")
-        assert entry["value_text"] == "已完成"
-        assert entry["value"] == 0
+        assert entry.value_text == "已完成"
+        assert entry.value == 0
 
 
     def test_get_all_includes_value_text(self, db: ProfileDB):
         """get_all 返回的 entry 包含 value_text 字段"""
         db.upsert("user1", "note", "k1", 0, value_text="备注内容")
-        all_data = db.get_all("user1")
-        assert all_data["note"]["k1"]["value_text"] == "备注内容"
+        all_data = {(e.type, e.key): e for e in db.get_all("user1")}
+        assert all_data[("note", "k1")].value_text == "备注内容"
 
     def test_update_if_current_success(self, db: ProfileDB):
         db.upsert("user1", "regen", "resource_meter", 100, event_at="2026-08-11T10:00:00")
@@ -106,14 +106,14 @@ class TestCRUD:
 
         assert updated is True
         entry = db.get_entry("user1", "regen", "resource_meter")
-        assert entry["value"] == 101
-        assert entry["event_at"] == "2026-08-11T10:08:00"
-        assert entry["created_at"] != "2026-08-11T10:08:00"
-        assert entry["created_at"] != ""
+        assert entry.value == 101
+        assert entry.event_at == "2026-08-11T10:08:00"
+        assert entry.created_at != "2026-08-11T10:08:00"
+        assert entry.created_at != ""
         history = db.get_history("user1")
         assert len(history) == 1
-        assert history[0]["old_value"] == 100
-        assert history[0]["new_value"] == 101
+        assert history[0].old_value == 100
+        assert history[0].new_value == 101
 
     def test_update_if_current_value_mismatch_fails(self, db: ProfileDB):
         db.upsert("user1", "regen", "resource_meter", 100, event_at="2026-08-11T10:00:00")
@@ -129,8 +129,8 @@ class TestCRUD:
 
         assert updated is False
         entry = db.get_entry("user1", "regen", "resource_meter")
-        assert entry["value"] == 100
-        assert entry["event_at"] == "2026-08-11T10:00:00"
+        assert entry.value == 100
+        assert entry.event_at == "2026-08-11T10:00:00"
         assert db.get_history("user1") == []
 
     def test_update_if_current_updated_at_mismatch_fails(self, db: ProfileDB):
@@ -147,8 +147,8 @@ class TestCRUD:
 
         assert updated is False
         entry = db.get_entry("user1", "regen", "resource_meter")
-        assert entry["value"] == 100
-        assert entry["event_at"] == "2026-08-11T10:01:00"
+        assert entry.value == 100
+        assert entry.event_at == "2026-08-11T10:01:00"
         assert db.get_history("user1") == []
 
     def test_update_if_current_missing_entry_fails(self, db: ProfileDB):
@@ -161,7 +161,7 @@ class TestCRUD:
         )
 
         assert updated is False
-        assert db.get_entry("user1", "regen", "resource_meter") == {}
+        assert db.get_entry("user1", "regen", "resource_meter") is None
 
     def test_update_if_current_inserts_when_missing_is_expected(self, db: ProfileDB):
         updated = db.update_if_current(
@@ -177,12 +177,12 @@ class TestCRUD:
 
         assert updated is True
         entry = db.get_entry("user1", "regen", "resource_meter")
-        assert entry["value"] == 10
-        assert entry["event_at"] == "2026-08-11T10:08:00"
+        assert entry.value == 10
+        assert entry.event_at == "2026-08-11T10:08:00"
         history = db.get_history("user1")
         assert len(history) == 1
-        assert history[0]["old_value"] is None
-        assert history[0]["new_value"] == 10
+        assert history[0].old_value is None
+        assert history[0].new_value == 10
 
     def test_update_if_current_missing_snapshot_rejects_concurrent_insert(
         self, db: ProfileDB,
@@ -198,7 +198,7 @@ class TestCRUD:
         )
 
         assert updated is False
-        assert db.get_entry("user1", "regen", "resource_meter")["value"] == 5
+        assert db.get_entry("user1", "regen", "resource_meter").value == 5
 
 
 # ─── Schema 版本管理 ──────────────────────────────────────────
@@ -283,7 +283,7 @@ class TestSchemaMigration:
         finally:
             conn.close()
         assert "idx_history_type_key" in indexes
-        assert migrated.get_history("u", "quota", "target")[0]["new_value"] == 7
+        assert migrated.get_history("u", "quota", "target")[0].new_value == 7
 
     def test_reopen_is_idempotent(self, tmp_path: Path):
         """重复打开同一 DB 不报错（幂等性）"""
@@ -293,7 +293,7 @@ class TestSchemaMigration:
         db1.upsert("u", "quota", "k", 10)
 
         db2 = ProfileDB(db_path)
-        assert db2.get_entry("u", "quota", "k")["value"] == 10
+        assert db2.get_entry("u", "quota", "k").value == 10
 
     def test_concurrent_initialization_serializes_migrations(self, tmp_path: Path):
         """多个线程首次打开同一 DB 时只执行一轮 schema 迁移。"""
@@ -340,7 +340,7 @@ class TestSchemaMigration:
         # 再次执行 v2 已验证 source 列存在时不会报错；重开不伪造历史版本。
         db2 = ProfileDB(db_path)
         db2.upsert("u", "quota", "k", 10, op_type="delta", delta_value=10.0, source="导入")
-        assert db2.get_history("u")[0]["source"] == "导入"
+        assert db2.get_history("u")[0].source == "导入"
 
     def test_migrate_v3_adds_updated_time_to_legacy_entries(self, tmp_path: Path):
         """v2 旧库升级到 v3 时补 updated_time，且不覆盖业务 updated_at。"""
@@ -382,8 +382,8 @@ class TestSchemaMigration:
         db = ProfileDB(db_path)
         entry = db.get_entry("u", "regen", "resource_meter")
 
-        assert entry["event_at"] == "2026-08-12T10:00:00"
-        assert entry["created_at"] != ""
+        assert entry.event_at == "2026-08-12T10:00:00"
+        assert entry.created_at != ""
 
     def test_migrate_v3_idempotent_when_column_exists_but_version_old(self, tmp_path: Path):
         """模拟并发迁移后半程：列已存在但版本号仍旧，不应 duplicate column。"""
@@ -426,7 +426,7 @@ class TestSchemaMigration:
         db = ProfileDB(db_path)
         entry = db.get_entry("u", "regen", "resource_meter")
 
-        assert entry["created_at"] != ""
+        assert entry.created_at != ""
 
     def test_migrate_v4_adds_value_text_column(self, tmp_path: Path):
         """v4: profile_entries 增加 value_text 列"""
@@ -481,7 +481,7 @@ class TestSchemaMigration:
         db1.upsert("u", "note", "k", 0, value_text="test")
         # 重新打开应幂等
         db2 = ProfileDB(db_path)
-        assert db2.get_entry("u", "note", "k")["value_text"] == "test"
+        assert db2.get_entry("u", "note", "k").value_text == "test"
 
 
 # ─── 变更历史 ─────────────────────────────────────────────────
@@ -495,8 +495,8 @@ class TestHistory:
 
         history = db.get_history("u")
         assert len(history) == 2
-        assert history[0]["op_type"] == "delta"
-        assert history[0]["delta_value"] == 0
+        assert history[0].op_type == "delta"
+        assert history[0].delta_value == 0
 
     def test_source_recorded_in_history(self, db: ProfileDB):
         """upsert 传入的 source 应随 history 落盘并可读回"""
@@ -505,8 +505,8 @@ class TestHistory:
 
         history = db.get_history("u")
         assert len(history) == 2
-        assert history[0]["source"] == "同步"   # 最新在前
-        assert history[1]["source"] == "导入"
+        assert history[0].source == "同步"   # 最新在前
+        assert history[1].source == "导入"
 
     def test_local_row_identity_is_its_own_id(self, db: ProfileDB):
         """本机写入的账本行身份 = (本机作者, 自己的 history id)。"""
@@ -514,7 +514,7 @@ class TestHistory:
 
         db.upsert("u", "quota", "k", 10, op_type="set")
         record = db.get_history("u")[0]
-        assert record["instance_id"] == _author_stamp()
+        assert record.instance_id == _author_stamp()
 
     def test_replayed_row_keeps_origin_identity(self, db: ProfileDB):
         """跨端回放按来源设备 + 来源 local_id 落库，且重复回放不再新增。
@@ -529,10 +529,10 @@ class TestHistory:
 
         history = db.get_history("u")
         assert len(history) == 1
-        assert history[0]["instance_id"] == "other-device"
-        assert history[0]["event_at"] == "2026-11-06T07:45:19"
-        assert history[0]["source"] == "太平武墓"
-        op_id = history[0]["op_id"]
+        assert history[0].instance_id == "other-device"
+        assert history[0].event_at == "2026-11-06T07:45:19"
+        assert history[0].source == "太平武墓"
+        op_id = history[0].op_id
 
         # 同一 op_id 再回放一次：唯一索引挡掉，不会写出第二行
         db.upsert("u", "quota", "k", 20, op_type="set",
@@ -548,8 +548,8 @@ class TestHistory:
                   instance_id="other-device")
 
         mine = db.get_history_since(0, 100, author=_author_stamp())
-        assert [row["key"] for row in mine] == ["mine"]
-        assert {row["key"] for row in db.get_history_since(0, 100)} == {"mine", "theirs"}
+        assert [row.key for row in mine] == ["mine"]
+        assert {row.key for row in db.get_history_since(0, 100)} == {"mine", "theirs"}
 
     def test_history_source_edit_uses_original_value_as_guard(self, db: ProfileDB):
         db.upsert(
@@ -559,12 +559,12 @@ class TestHistory:
         record = db.get_history("u")[0]
 
         assert db.update_history_source(
-            record["local_id"], expected_source="误填来源", new_source="正确来源",
+            record.local_id, expected_source="误填来源", new_source="正确来源",
         )
         assert not db.update_history_source(
-            record["local_id"], expected_source="误填来源", new_source="过期覆盖",
+            record.local_id, expected_source="误填来源", new_source="过期覆盖",
         )
-        assert db.get_history("u")[0]["source"] == "正确来源"
+        assert db.get_history("u")[0].source == "正确来源"
 
     def test_override_always_records(self, db: ProfileDB):
         """override 类型：即使值不变也记录"""
@@ -584,8 +584,8 @@ class TestHistory:
 
         history = db.get_history("u")
         assert len(history) == 2
-        assert history[0]["delta_value"] == 10
-        assert history[1]["delta_value"] == 0
+        assert history[0].delta_value == 10
+        assert history[1].delta_value == 0
 
     def test_no_change_type_no_history(self, db: ProfileDB):
         """op_type=None 时不记录 history"""
@@ -600,10 +600,10 @@ class TestHistory:
 
         history = db.get_history("u")
         # 按 id 倒序：最新在前
-        assert history[0]["old_value"] == 10  # 第二次写入：旧值 10 → 新值 20
-        assert history[0]["new_value"] == 20
-        assert history[1]["old_value"] is None  # 首次写入无旧值
-        assert history[1]["new_value"] == 10
+        assert history[0].old_value == 10  # 第二次写入：旧值 10 → 新值 20
+        assert history[0].new_value == 20
+        assert history[1].old_value is None  # 首次写入无旧值
+        assert history[1].new_value == 10
 
     def test_history_filter_by_type(self, db: ProfileDB):
         db.upsert("u", "quota", "k1", 10, op_type="set", delta_value=None)
@@ -611,7 +611,7 @@ class TestHistory:
 
         daily_history = db.get_history("u", type_="quota")
         assert len(daily_history) == 1
-        assert daily_history[0]["type"] == "quota"
+        assert daily_history[0].type == "quota"
 
     def test_history_filter_by_key(self, db: ProfileDB):
         db.upsert("u", "quota", "k1", 10, op_type="set", delta_value=None)
@@ -619,7 +619,7 @@ class TestHistory:
 
         k1_history = db.get_history("u", key="k1")
         assert len(k1_history) == 1
-        assert k1_history[0]["key"] == "k1"
+        assert k1_history[0].key == "k1"
 
     def test_history_limit(self, db: ProfileDB):
         for i in range(20):
@@ -628,7 +628,7 @@ class TestHistory:
         limited = db.get_history("u", limit=5)
         assert len(limited) == 5
         # 最新在前
-        assert limited[0]["new_value"] == 19
+        assert limited[0].new_value == 19
 
     def test_cross_user_history_filters_and_pages_by_key(self, db: ProfileDB):
         db.upsert("u1", "quota", "target", 1, op_type="set")
@@ -640,13 +640,13 @@ class TestHistory:
         assert db.count_history(None, "quota", "target") == 3
         assert db.count_history("u1", "quota", "target") == 2
         assert db.count_history("u2", "quota", "target") == 1
-        assert [row["new_value"] for row in db.get_history(
+        assert [row.new_value for row in db.get_history(
             None, "quota", "target", limit=2,
         )] == [5, 2]
-        assert [row["new_value"] for row in db.get_history(
+        assert [row.new_value for row in db.get_history(
             None, "quota", "target", limit=2, offset=2,
         )] == [1]
-        assert [row["new_value"] for row in db.get_history(
+        assert [row.new_value for row in db.get_history(
             "u1", "quota", "target", limit=1, offset=1,
         )] == [1]
 
@@ -680,7 +680,7 @@ class TestCleanupHistory:
         assert deleted == 1
         remaining = db.get_history("u")
         assert len(remaining) == 1
-        assert remaining[0]["delta_value"] is None
+        assert remaining[0].delta_value is None
 
 
 # ─── 并发 upsert ──────────────────────────────────────────────
@@ -697,7 +697,7 @@ class TestConcurrentUpsert:
 
         # 最终值一定是 0-19 中的某一个（取决于执行顺序）
         entry = db.get_entry("u", "quota", "counter")
-        assert entry["value"] in range(20)
+        assert entry.value in range(20)
 
         # history 行数 = 20（action/manual 每次记录，tick 每次值变化记录）
         # 由于并发，某些 tick 可能读到与写入相同的值 → history 行数 ≤ 20
@@ -723,7 +723,7 @@ class TestConcurrentUpsert:
             results = list(executor.map(tick, range(8)))
 
         assert results.count(True) == 1
-        assert db.get_entry("u", "regen", "resource_meter")["value"] == 101
+        assert db.get_entry("u", "regen", "resource_meter").value == 101
         history = db.get_history("u", limit=100)
         assert len(history) == 1
-        assert history[0]["delta_value"] == 1
+        assert history[0].delta_value == 1

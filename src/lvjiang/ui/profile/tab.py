@@ -34,7 +34,8 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.profile.models import format_sync_label
-from ...core.profile.repository import db_read_all
+from ...core.profile.repository import db_read_index
+from ...core.profile.rows import Entry
 from ...core.profile.store import (
     create_overview_group,
     get_active_group,
@@ -579,17 +580,17 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
 
         for user_name in ordered_names:
             try:
-                result[user_name] = db_read_all(user_name)
+                result[user_name] = db_read_index(user_name)
             except Exception as e:
                 logger.warning(f"加载用户 {user_name} profile 失败: {e}")
                 result[user_name] = {}
 
         return result
 
-    def _load_user_data(self, user_name: str) -> dict:
+    def _load_user_data(self, user_name: str) -> dict[str, dict[str, Entry]]:
         """加载单个用户 profile 数据（从 DB 读取）"""
         try:
-            return db_read_all(user_name)
+            return db_read_index(user_name)
         except Exception as e:
             logger.warning(f"加载用户 {user_name} profile 失败: {e}")
             return {}

@@ -46,7 +46,7 @@ def _tab(monkeypatch) -> ProfileTab:
     monkeypatch.setattr(ProfileTab, "_connect_profile_script_runner", lambda self: None)
     monkeypatch.setattr(
         ProfileTab, "_load_all_users",
-        lambda self: {"甲": repository.db_read_all("甲")},
+        lambda self: {"甲": repository.db_read_index("甲")},
     )
     return ProfileTab(None)
 
@@ -65,10 +65,10 @@ def test_typing_zero_into_blank_cell_creates_entry(
         item.setText("0")
 
         entry = repository.db_read_entry("甲", "stock", "a")
-        assert entry.get("value") == 0
-        assert entry.get("event_at")
+        assert entry.value == 0
+        assert entry.event_at
         history = repository.db_get_history("甲", "stock", "a")
-        assert [(row["op_type"], row["new_value"]) for row in history] == [
+        assert [(row.op_type, row.new_value) for row in history] == [
             ("set", 0.0),
         ]
         assert table.item(0, 1).text() == "0"

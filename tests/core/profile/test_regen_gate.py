@@ -46,7 +46,7 @@ def test_tick_does_not_materialize_recovery(tmp_path, monkeypatch) -> None:
     processor.tick()
 
     entry = repository.db_read_entry("u1", "regen", "energy")
-    assert entry["value"] == 90
-    assert entry["event_at"] == anchor
+    assert entry.value == 90
+    assert entry.event_at == anchor
     assert repository.db_get_history("u1", "regen", "energy") == []
     repository.reset_profile_db()

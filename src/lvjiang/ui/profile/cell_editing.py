@@ -35,11 +35,13 @@ from ...core.profile.regen import (
     compute_regen_entry,
     is_realtime_regen,
 )
-from ...core.profile.repository import db_read_all
+from ...core.profile.repository import db_read_index
+from ...core.profile.rows import Entry
 from ...core.profile.schema import (
     get_profile_config,
     save_profile_config,
 )
+from ...core.profile.service import EXPECT_ABSENT
 from ...core.profile.store import get_groups
 from ...errors import log_failure
 from ...i18n import tr, tr_label
@@ -105,7 +107,7 @@ def _is_continuous_regen(kd) -> bool:
     return isinstance(kd, RegenKeyDef) and is_realtime_regen(kd)
 
 
-def _current_regen_value(entry: dict, kd: RegenKeyDef) -> float:
+def _current_regen_value(entry: Entry | None, kd: RegenKeyDef) -> float:
     return compute_regen_entry(entry, kd).value
 
 
@@ -243,9 +245,9 @@ class ProfileCellEditingMixin:
             return
 
         # 读取当前值，计算 delta，走 action 路径（触发 sync）
-        profile_data = db_read_all(user_name)
-        entry = profile_data.get(model_type, {}).get(key_str, {})
-        current_value = entry.get("value", 0) or 0
+        profile_data = db_read_index(user_name)
+        entry = (profile_data.get(model_type) or {}).get(key_str)
+        current_value = (entry.value if entry else 0) or 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
 
@@ -270,7 +272,8 @@ class ProfileCellEditingMixin:
 
         self._adjust_value(
             user_name, model_type, key_str, kd, current_value, delta,
-            trigger_sync=True, source=cell_source, expected_entry=dict(entry),
+            trigger_sync=True, source=cell_source,
+            expected_entry=entry if entry is not None else EXPECT_ABSENT,
             regen_progress_source="target",
             force_write=force_target_write,
             missing_entry=missing_entry_write,
@@ -312,15 +315,15 @@ class ProfileCellEditingMixin:
         user_name = name_item.text()
 
         # 获取当前值（从 DB 读取）
-        profile_data = db_read_all(user_name)
-        entry = profile_data.get(model_type, {}).get(key_str, {})
-        current_value = entry.get("value", 0)
+        profile_data = db_read_index(user_name)
+        entry = (profile_data.get(model_type) or {}).get(key_str)
+        current_value = entry.value
         if current_value is None:
             current_value = 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
-        expected_entry = dict(entry)
-        is_locked = bool(entry.get("locked"))
+        expected_entry = entry if entry is not None else EXPECT_ABSENT
+        is_locked = bool(entry.locked)
 
         # 构建菜单
         menu = QMenu(self)
@@ -384,7 +387,7 @@ class ProfileCellEditingMixin:
         if model_type == MODEL_NOTE:
             action_edit = menu.addAction(tr("编辑文本..."))
             if action_edit:
-                current_text = expected_entry.get("value_text", "")
+                current_text = expected_entry.value_text if expected_entry else ""
                 action_edit.triggered.connect(
                     lambda: self._edit_note_text(
                         user_name, model_type, key_str, kd, current_text,
@@ -541,7 +544,7 @@ class ProfileCellEditingMixin:
         delta: int | float,
         trigger_sync: bool = True,
         source: str = "",
-        expected_entry: dict | None = None,
+        expected_entry: Entry | None = None,
         use_cas: bool = True,
         regen_progress_source: str = "current",
         force_write: bool = False,
@@ -558,7 +561,7 @@ class ProfileCellEditingMixin:
         if delta == 0 and not missing_entry:
             return
         from ...core.profile.service import (
-            ProfileWriteConflict,
+    ProfileWriteConflict,
             profile_action,
         )
         def complete(error):
@@ -617,7 +620,7 @@ class ProfileCellEditingMixin:
         kd,
         current_value,
         direction: int = 0,
-        expected_entry: dict | None = None,
+        expected_entry: Entry | None = None,
     ):
         """自定义增量数值（带来源/用途选择）
 

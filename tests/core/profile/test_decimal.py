@@ -82,7 +82,7 @@ def test_profile_action_normalizes_tiny_float_noise(decimal_env):
     entry = db_read_entry(decimal_env.username, MODEL_STOCK, "decimal_resource")
 
     assert result == 12.0
-    assert entry["value"] == 12.0
+    assert entry.value == 12.0
 
 
 def test_profile_action_keeps_real_decimal(decimal_env):
@@ -93,7 +93,7 @@ def test_profile_action_keeps_real_decimal(decimal_env):
     entry = db_read_entry(decimal_env.username, MODEL_STOCK, "decimal_resource")
 
     assert result == 12.5
-    assert entry["value"] == 12.5
+    assert entry.value == 12.5
 
 
 def test_profile_action_does_not_block_real_decimal_on_non_decimal_key(decimal_env):
@@ -104,4 +104,4 @@ def test_profile_action_does_not_block_real_decimal_on_non_decimal_key(decimal_e
     entry = db_read_entry(decimal_env.username, MODEL_STOCK, "tokens")
 
     assert result == 12.5
-    assert entry["value"] == 12.5
+    assert entry.value == 12.5

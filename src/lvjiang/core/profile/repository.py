@@ -352,6 +352,20 @@ def _migrate_v12(conn: sqlite3.Connection) -> None:
 
 
 # 有序迁移列表: (版本号, 描述, 迁移函数)
+
+def _migrate_v13(conn: sqlite3.Connection) -> None:
+    """系统写入类型正名：tick → regen（存量不回填由水位门保证）。
+
+    tick 是时间派生中间物的旧名；概念强化后系统行分 reset（重置）/regen（恢复），
+    source 语义只留给人的写入。历史行**只改类型名**，source 与数值一律不动。
+
+    tick 是时间派生中间物的旧名；概念强化后系统行分 reset（重置）/regen（恢复），
+    source 语义只留给人的写入。历史行**只改类型名**，source 与数值一律不动。
+    存量行不上传由上传侧的快照水位门保证（local_id > 水位才是候选），
+    不需要任何标记。
+    """
+    conn.execute("UPDATE profile_history SET op_type='regen' WHERE op_type='tick'")
+
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
     (2, "history add source column", _migrate_v2),
@@ -365,6 +379,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (10, "history gains origin row identity", _migrate_v10),
     (11, "profile set-only in-place", _migrate_v11),
     (12, "unify profile ledger columns with cloud", _migrate_v12),
+    (13, "rename tick op_type to regen", _migrate_v13),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -1363,7 +1378,7 @@ class ProfileDB:
         try:
             rows = conn.execute(
                 f"SELECT {_HISTORY_COLUMNS} FROM profile_history "
-                "WHERE local_id>? AND op_type IN ('set', 'delta')"
+                "WHERE local_id>? AND op_type IN ('set', 'reset', 'regen')"
                 + (" AND instance_id=?" if author else "") +
                 " ORDER BY local_id ASC LIMIT ?",
                 ((since_id, author, limit) if author else (since_id, limit)),
@@ -1417,7 +1432,7 @@ class ProfileDB:
             row = conn.execute(
                 "SELECT COUNT(*) FROM profile_history "
                 "WHERE instance_id=? AND remote_id IS NULL "
-                "AND op_type IN ('set','delta') "
+                "AND op_type IN ('set','reset','regen') "
                 "AND op_id NOT LIKE 'unscoped:%'",
                 (author,),
             ).fetchone()
@@ -1440,27 +1455,25 @@ class ProfileDB:
         finally:
             self._release_connection(conn)
 
-    def reopen_abandoned(self, author: str) -> None:
-        """把上次标成放弃的本机行放回待决定。快照候选或时间规则变了要重判。"""
+    def max_synced_local_id(self) -> int:
+        """最后一条已拿到云端编号的本地行号（恢复路径的基线推导）。"""
         conn = self._borrow_connection()
         try:
-            self._begin(conn)
-            conn.execute(
-                "UPDATE profile_history SET remote_id=NULL "
-                "WHERE instance_id=? AND remote_id=-1 "
-                "AND op_type IN ('set', 'delta') "
-                "AND op_id NOT LIKE 'unscoped:%'",
-                (author,),
-            )
-            self._commit(conn)
-        except Exception:
-            self._rollback(conn)
-            raise
+            row = conn.execute(
+                "SELECT COALESCE(MAX(local_id), 0) FROM profile_history "
+                "WHERE remote_id > 0").fetchone()
         finally:
             self._release_connection(conn)
+        return int(row[0]) if row else 0
 
-    def list_unacked(self, author: str, limit: int) -> list[PendingOp]:
-        """待决定的本机 set/delta。调用方再按快照候选分成上传或放弃。"""
+    def list_unacked(self, author: str, limit: int,
+                     since_local_id: int = 0) -> list[PendingOp]:
+        """快照水位之后的待上行行。
+
+        ``since_local_id`` 是建快照那一刻的本地最大 local_id：快照已经覆盖了
+        它之前的全部状态，只有更大的行才需要上行。没有这道门，每轮同步都会
+        把所有 ``remote_id IS NULL`` 的历史行翻出来重判一遍。
+        """
         conn = self._borrow_connection()
         try:
             rows = conn.execute(
@@ -1468,10 +1481,10 @@ class ProfileDB:
                 "op_type, event_at, source, old_value_text, sync_from "
                 "FROM profile_history "
                 "WHERE instance_id=? AND remote_id IS NULL "
-                "AND op_type IN ('set', 'delta') "
+                "AND local_id>? AND op_type IN ('set', 'reset', 'regen') "
                 "AND op_id NOT LIKE 'unscoped:%' "
                 "ORDER BY local_id ASC LIMIT ?",
-                (author, limit),
+                (author, since_local_id, limit),
             ).fetchall()
         finally:
             self._release_connection(conn)
@@ -1752,6 +1765,16 @@ def db_get_history_since(since_id: int, limit: int = 200,
     return get_profile_db().get_history_since(since_id, limit, author=author)
 
 
+def db_max_synced_local_id() -> int:
+    """账本里最后一条已知云端编号的行（local_id）。
+
+    恢复路径用：account 同步状态丢失时，「local_id > 该值 且 remote_id IS NULL」
+    就是基线之后的待上行行——引导回放的行带 remote_id 落在账本尾部，
+    天然把存量旧行挡在基线之下，无需任何标记。
+    """
+    return get_profile_db().max_synced_local_id()
+
+
 def db_max_history_id() -> int:
     """本地 history 最大 id。"""
     return get_profile_db().get_max_history_id()
@@ -1782,17 +1805,14 @@ def db_count_pending_push(since_id: int, author: str) -> int:
     return get_profile_db().count_pending_push(since_id, author)
 
 
-def db_list_unacked(author: str, limit: int = 200) -> list[PendingOp]:
-    return get_profile_db().list_unacked(author, limit)
+def db_list_unacked(author: str, limit: int = 200,
+                    since_local_id: int = 0) -> list[PendingOp]:
+    return get_profile_db().list_unacked(author, limit, since_local_id)
 
 
 def db_max_remote_id() -> int:
     """本机账本里已应用的最大远端序号（同步状态丢失时用它恢复水位）。"""
     return get_profile_db().max_remote_id()
-
-
-def db_reopen_abandoned(author: str) -> None:
-    get_profile_db().reopen_abandoned(author)
 
 
 def db_mark_remote_ids(pairs: list[tuple[int, int]]) -> None:

@@ -153,8 +153,12 @@ def test_inc_persists_without_a_prior_sync(tmp_path, monkeypatch) -> None:
     assert history[0].source == "消耗"
 
 
-def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -> None:
-    """时间规则收紧后标成 -1 的本机 set/delta 要能再判一次。"""
+def test_recovery_baseline_derives_from_ledger(tmp_path, monkeypatch) -> None:
+    """状态丢失后的恢复：基线从账本推导（MAX(local_id) WHERE remote_id>0）。
+
+    引导回放行带 remote_id 落在账本尾部，存量旧行（remote_id IS NULL 或 -1）
+    自然落在基线之下——不需要任何标记，也不会回填。
+    """
     monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
     repository.reset_profile_db()
     db = repository.ProfileDB(tmp_path / "profile.db")
@@ -165,30 +169,22 @@ def test_reopen_abandoned_returns_only_this_device_sets(tmp_path, monkeypatch) -
             "(event_at, username, type, key, new_value, op_type, instance_id, "
             "local_id, op_id, remote_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
             [
-                ("2026-11-04T08:23:56", "u", "stock", "k", 1, "set", "dev",
-                 9, "legacy:dev:9", -1),
-                ("2026-11-04T08:23:57", "u", "stock", "k", 2, "tick", "dev",
-                 10, "tick-row", -1),
-                ("2026-11-04T08:23:58", "u", "stock", "k", 3, "set", "other",
-                 11, "legacy:other:11", -1),
-                ("2026-11-04T08:23:59", "u", "stock", "k", 4, "set", "dev",
-                 12, "unscoped:12", -1),
+                # v1 存量：从未上传（NULL）
+                ("2026-11-01T00:00:00", "u", "stock", "old", 1, "set", "dev",
+                 9, "legacy:dev:9", None),
+                # 引导回放行：带 remote_id，local_id 更大（账本尾部）
+                ("2026-11-10T00:00:00", "u", "stock", "pulled", 2, "set", "other",
+                 10, "cloud-op-1", 7350),
             ],
         )
         conn.commit()
     finally:
         conn.close()
-    db.reopen_abandoned("dev")
-    conn = sqlite3.connect(tmp_path / "profile.db")
-    try:
-        rows = conn.execute(
-            "SELECT op_id, remote_id FROM profile_history ORDER BY local_id"
-        ).fetchall()
-    finally:
-        conn.close()
-    assert rows == [
-        ("legacy:dev:9", None),
-        ("tick-row", -1),
-        ("legacy:other:11", -1),
-        ("unscoped:12", -1),
-    ]
+    baseline = repository.db_max_synced_local_id()
+    assert baseline == 10
+    # 水位之后的本机新写入才是候选；存量旧行被基线排除
+    db.upsert("u", "stock", "fresh", 3, op_type="set",
+              event_at="2026-11-10T08:00:00")
+    author = repository._author_stamp()
+    pending = repository.db_list_unacked(author, 100, since_local_id=baseline)
+    assert [row.key for row in pending] == ["fresh"]

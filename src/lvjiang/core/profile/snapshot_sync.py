@@ -221,7 +221,9 @@ def _apply_op(op: dict) -> bool:
     此后到达的远端 set，护栏从此永久误跳（2026-11-04 手机端 3179 事故的
     根因）。条目时间戳必须是**源写入时间**，护栏比较的才是同一种时间。
     """
-    if op.op not in ("", "set"):
+    # 值语义都是覆盖（new_value 绝对值）；类型只是分类，照抄进本地账本。
+    # delta 是已废弃的上行类型，服务端直接拒绝；本地防御性忽略。
+    if op.op not in ("", "set", "reset", "regen"):
         return False
     origin = op.instance_id
     op_id = op.op_id
@@ -254,7 +256,7 @@ def _apply_op(op: dict) -> bool:
     if locked or not newer:
         repository.db_upsert(
             username, type_, key, value,
-            op_type="set",
+            op_type=op.op or "set",
             source=op.source,
             value_text=value_text,
             sync_from=op.sync_from or None,
@@ -269,7 +271,7 @@ def _apply_op(op: dict) -> bool:
     repository.db_upsert(
         username, type_, key, value,
         event_at=happened or None,
-        op_type="set",
+        op_type=op.op or "set",
         source=op.source,
         value_text=value_text,
         sync_from=op.sync_from or None,
@@ -447,6 +449,8 @@ def _bootstrap(token: str, report: ProfileSyncReport) -> None:
     state["profile_snapshot_id"] = snapshot_row_id
     state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
     state["snapshot_remote_id"] = watermark
+    # 本地水位同步推进：快照落地的状态之前的本地行不再参与上行
+    state["local_history_id"] = repository.db_max_history_id()
     save_profile_sync_state(state)
     report.snapshots += 1
     logger.info("[profile sync] 已应用快照 #{}（水位 {}，{} 项）",
@@ -611,7 +615,15 @@ def _snapshot_candidates(token: str) -> dict[tuple[str, str, str], tuple[str, st
 
 
 def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
-    """上传新于快照候选的本机 set/delta。更旧的行标成 -1，不进云端。"""
+    """上传基线之后的本机写入（set/reset/regen）。
+
+    基线（水位门）：``local_id ≤ 基线`` 的行已由快照整体覆盖，永不上传、
+    永不重判。基线取值两级：
+
+    - 主路径：account 状态里的 ``local_history_id``（建快照那一刻推进）；
+    - 恢复路径：状态丢失时从账本推导 ``MAX(local_id) WHERE remote_id > 0``——
+      引导回放的行带 remote_id 落在账本尾部，天然把存量旧行挡在基线之下。
+    """
     from .repository import _author_stamp
 
     report = ProfileSyncReport()
@@ -620,31 +632,22 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
         report.errors.append(blocked)
         return report
     author = _author_stamp()
-    repository.db_reopen_abandoned(author)
-    if not repository.db_list_unacked(author, 1):
+    since = _local_history_id(_state())
+    if since <= 0:
+        # 恢复路径：同步状态丢失，从账本自己推导基线
+        since = repository.db_max_synced_local_id()
+        logger.info("[profile sync] 状态缺失，按账本推导上行基线 local_id={}", since)
+    if not repository.db_list_unacked(author, 1, since_local_id=since):
         return report
-    candidates = _snapshot_candidates(token)
     batch = 0
     while True:
         if stop and stop():
             report.errors.append("已停止")
             break
-        rows = repository.db_list_unacked(author, 200)
+        rows = repository.db_list_unacked(author, 200, since_local_id=since)
         if not rows:
             break
-        upload = []
-        abandon: list[tuple[int, int]] = []
-        for row in rows:
-            candidate = candidates.get((row.username, row.type, row.key))
-            other_at, other_id = candidate if candidate is not None else ("", "")
-            if is_strictly_newer(row.event_at or "", row.op_id or "", other_at, other_id):
-                upload.append(row)
-            else:
-                abandon.append((int(row.local_id), -1))
-        if abandon:
-            repository.db_mark_remote_ids(abandon)
-        if not upload:
-            continue
+        upload = rows
         batch += 1
         if on_progress:
             on_progress({"step": "overview", "detail": f"上行 第{batch}批",
@@ -832,6 +835,8 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     watermark = int(response.get("snapshot_remote_id") or 0)
     state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
     state["snapshot_remote_id"] = watermark
+    # 快照上传时的本地最大行号：之后的行才需要上行（水位门）
+    state["local_history_id"] = repository.db_max_history_id()
     report.snapshots += 1
     save_profile_sync_state(state)
     logger.info("[profile sync] 快照刷新完成：{}", report.describe())

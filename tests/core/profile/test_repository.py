@@ -233,7 +233,7 @@ class TestSchemaMigration:
             )
         ]
 
-        assert CURRENT_VERSION == 12
+        assert CURRENT_VERSION == 13
         assert "op_id" in entry_columns
         assert "op_id" in history_columns
         assert "remote_id" in history_columns
@@ -727,3 +727,4 @@ class TestConcurrentUpsert:
         history = db.get_history("u", limit=100)
         assert len(history) == 1
         assert history[0].delta_value == 1
+

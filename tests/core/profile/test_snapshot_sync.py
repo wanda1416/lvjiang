@@ -69,7 +69,6 @@ class FakeServer:
                     "entries": snapshot["entry_count"]}
         raise AssertionError(route)
 
-
 @pytest.fixture()
 def env(monkeypatch, tmp_path):
     server = FakeServer()
@@ -171,11 +170,12 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since", _rows_of)
     monkeypatch.setattr(snapshot_sync.repository, "db_op_id_seen",
                         lambda op_id: any(r.get("op_id") == op_id for r in history))
-    def _unacked(author, limit):
+    def _unacked(author, limit, since_local_id=0):
         from lvjiang.core.profile.rows import PendingOp
         rows = [r for r in history
                 if r.get("instance_id") == author and r.get("remote_id") is None
-                and r.get("op_type") in ("set", "delta")
+                and r["id"] > since_local_id
+                and r.get("op_type") in ("set", "reset", "regen")
                 and not str(r.get("op_id") or "").startswith("unscoped:")][:limit]
         return [PendingOp(
             local_id=int(r["id"]), op_id=str(r.get("op_id") or ""),
@@ -194,15 +194,6 @@ def env(monkeypatch, tmp_path):
             if row is not None and row["remote_id"] is None:
                 row["remote_id"] = remote
     monkeypatch.setattr(snapshot_sync.repository, "db_mark_remote_ids", _mark)
-
-    def _reopen(author):
-        for row in history:
-            if (row["instance_id"] == author and row["remote_id"] == -1
-                    and row["op_type"] in ("set", "delta")
-                    and not str(row["op_id"] or "").startswith("unscoped:")):
-                row["remote_id"] = None
-
-    monkeypatch.setattr(snapshot_sync.repository, "db_reopen_abandoned", _reopen)
 
     def _merge(rows):
         applied = 0
@@ -242,7 +233,6 @@ def env(monkeypatch, tmp_path):
     return {"server": server, "entries": entries, "history": history,
             "state": state, "writes": writes, "locked": locked}
 
-
 def test_rebase_when_cloud_snapshot_is_newer(env) -> None:
     env["state"]["profile_snapshot_id"] = 1
     env["state"]["remote_history_id"] = 2
@@ -260,7 +250,6 @@ def test_rebase_when_cloud_snapshot_is_newer(env) -> None:
     assert entry["value"] == 40
     assert entry["event_at"] == "2026-11-12T08:00:00"
     assert env["state"]["profile_snapshot_id"] == 2
-
 
 def test_state_loss_recovers_watermark_instead_of_rebuilding(env) -> None:
     """删 account.json / 退出登录后，用云端快照信息 + 本地已应用水位恢复同步。
@@ -296,7 +285,6 @@ def test_state_loss_recovers_watermark_instead_of_rebuilding(env) -> None:
     assert env["state"]["profile_snapshot_id"] == 7                   # 记下云端最新快照
     assert env["state"]["snapshot_remote_id"] == 3
 
-
 def test_old_protocol_blocks_sync(env, monkeypatch) -> None:
     def post(route, data, token):
         if route == "/api/sync/state":
@@ -311,7 +299,6 @@ def test_old_protocol_blocks_sync(env, monkeypatch) -> None:
     assert followed.pulled == 0
     assert any("尚未升级" in item for item in followed.errors)
 
-
 def test_snapshot_without_event_time_uses_snapshot_clock(env) -> None:
     env["server"].snapshots = [{
         "id": 1, "snapshot_remote_id": 0, "origin_instance_id": "other",
@@ -325,7 +312,6 @@ def test_snapshot_without_event_time_uses_snapshot_clock(env) -> None:
     entry = env["entries"]["张三"]["stock"]["energy"]
     assert entry["value"] == 4
     assert entry["event_at"] == "2026-11-06T18:00:00"
-
 
 def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
     env["server"].rows = [{"remote_id": 1}, {"remote_id": 2}]
@@ -347,10 +333,11 @@ def test_bootstrap_applies_snapshot_and_sets_watermarks(env) -> None:
     assert env["state"]["local_history_id"] == 0
     assert all(write[5] is None for write in env["writes"])
 
-
-def test_push_marks_rows_older_than_snapshot_and_uploads_newer(env) -> None:
-    """不新于快照候选的行标 -1；更晚的本机行照常上传，不因条数上限拒绝。"""
+def test_push_excludes_rows_below_watermark(env) -> None:
+    """水位门：local_id ≤ 水位的行（快照已覆盖）不扫描、不标记、不上传；
+    水位之后的行照常上传，不因条数上限拒绝。"""
     env["state"]["profile_snapshot_id"] = 1
+    env["state"]["local_history_id"] = 1
     env["server"].snapshots = [{
         "id": 1, "snapshot_remote_id": 5, "origin_instance_id": "other",
         "created_at": "2026-11-04T08:00:00", "entry_count": 1,
@@ -369,9 +356,9 @@ def test_push_marks_rows_older_than_snapshot_and_uploads_newer(env) -> None:
     ])
     report = snapshot_sync.push_local("t")
     assert report.pushed == 1
-    assert env["history"][0]["remote_id"] == -1
+    # 水位之下的行保持原样（没有 -1 标记——它根本不该被扫描）
+    assert env["history"][0]["remote_id"] is None
     assert env["history"][1]["remote_id"] == 1
-
 
 def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
     """回放按操作时间合并：远端旧 set 不覆盖本地新值（delta 恒应用）。"""
@@ -391,7 +378,6 @@ def test_replay_stale_set_loses_to_newer_local_value(env) -> None:
     report = snapshot_sync.pull_and_replay("t")
     assert report.pulled == 0
     assert env["entries"]["张三"]["stock"]["energy"]["value"] == 120
-
 
 def test_replay_stamps_entry_with_source_time_not_local_clock(env) -> None:
     """回放后条目的 event_at 必须是源 op 的 happened_at，不是本机墙钟。
@@ -417,7 +403,6 @@ def test_replay_stamps_entry_with_source_time_not_local_clock(env) -> None:
     assert entries["energy"]["event_at"] == "2026-11-01T09:00:00"
     assert entries["moon"]["event_at"] == "2026-11-02T09:00:00"
 
-
 def test_replayed_set_wins_over_later_stale_replay_of_same_key(env) -> None:
     """先回放新 set 再回放旧 set：旧的被护栏拦下，且不污染时间戳。
 
@@ -442,7 +427,6 @@ def test_replayed_set_wins_over_later_stale_replay_of_same_key(env) -> None:
     assert entry["value"] == 200
     assert entry["event_at"] == "2026-11-03T09:00:00"
 
-
 def test_incremental_pull_applies_set_and_delta(env) -> None:
     env["state"]["remote_history_id"] = 1
     env["state"]["profile_snapshot_id"] = 1   # 已落地过，不得重新 bootstrap
@@ -462,7 +446,6 @@ def test_incremental_pull_applies_set_and_delta(env) -> None:
     assert env["entries"]["张三"]["stock"]["moon"]["value"] == 7
     assert env["state"]["remote_history_id"] == 3
 
-
 def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
     env["state"]["local_history_id"] = 100
     env["history"].extend([
@@ -477,17 +460,16 @@ def test_push_uploads_only_ledger_rows_above_watermark(env) -> None:
          "instance_id": "mine", "op_id": "set-row", "remote_id": None,
          "local_id": 101},
         {"id": 102, "username": "张三", "type": "stock", "key": "energy",
-         "new_value": 3, "value_text": "", "op_type": "delta",
-         "delta_value": -2, "event_at": "2026-11-03T10:05:00",
-         "instance_id": "mine", "op_id": "delta-row", "remote_id": None,
+         "new_value": 3, "value_text": "", "op_type": "regen",
+         "delta_value": None, "event_at": "2026-11-03T10:05:00",
+         "instance_id": "mine", "op_id": "regen-row", "remote_id": None,
          "local_id": 102},
     ])
     report = snapshot_sync.push_local("t")
     assert report.pushed == 2
-    assert [op["op_id"] for op in env["server"].pushed] == ["set-row", "delta-row"]
-    assert env["server"].pushed[1]["op"] == "set"
+    assert [op["op_id"] for op in env["server"].pushed] == ["set-row", "regen-row"]
+    assert env["server"].pushed[1]["op"] == "regen"
     assert env["server"].pushed[1]["value"] == 3
-
 
 def test_push_rejected_row_does_not_block_the_rest(env, monkeypatch) -> None:
     """一条非法时间只放弃自己，同批其余行继续拿到 remote_id。"""
@@ -519,35 +501,33 @@ def test_push_rejected_row_does_not_block_the_rest(env, monkeypatch) -> None:
     assert env["history"][0]["remote_id"] == -1
     assert env["history"][1]["remote_id"] == 4
 
-
-def test_abandoned_rows_are_rejudged_against_the_snapshot(env) -> None:
-    """上次因时间被标 -1 的行，下一轮按快照候选重判，不永久放弃。"""
+def test_recovery_derives_baseline_when_state_missing(env) -> None:
+    """状态丢失（local_history_id=0）时，基线从账本推导：
+    MAX(local_id) WHERE remote_id>0 —— 引导回放行天然把存量挡在基线之下。"""
     env["state"]["profile_snapshot_id"] = 1
-    env["server"].snapshots = [{
-        "id": 1, "remote_id": 0, "snapshot_remote_id": 0,
-        "entries": json.dumps([{
-            "username": "张三", "type": "stock", "key": "energy",
-            "value": 1, "event_at": "2026-11-04T12:00:00", "op_id": "snap",
-        }]),
-    }]
+    env["state"]["local_history_id"] = 0     # 状态丢失
     env["history"].extend([
+        # 存量旧行：从未上传（NULL），local_id 小
         {"id": 50, "username": "张三", "type": "stock", "key": "energy",
          "new_value": 8, "value_text": "", "op_type": "set",
          "event_at": "2026-11-04T16:00:00", "instance_id": "mine",
-         "op_id": "legacy:mine:50", "remote_id": -1, "local_id": 50},
-        {"id": 51, "username": "张三", "type": "stock", "key": "energy",
+         "op_id": "legacy:mine:50", "remote_id": None, "local_id": 50},
+        # 引导回放行：带 remote_id，落在账本尾部 → 推导基线 = 51
+        {"id": 51, "username": "李四", "type": "stock", "key": "gold",
          "new_value": 2, "value_text": "", "op_type": "set",
-         "event_at": "2026-11-04T08:00:00", "instance_id": "mine",
-         "op_id": "legacy:mine:51", "remote_id": -1, "local_id": 51},
+         "event_at": "2026-11-04T08:00:00", "instance_id": "cloud",
+         "op_id": "cloud-51", "remote_id": 7350, "local_id": 51},
+        # 基线之后的本机新写入：候选
+        {"id": 52, "username": "张三", "type": "stock", "key": "energy",
+         "new_value": 3, "value_text": "", "op_type": "set",
+         "event_at": "2026-11-04T17:00:00", "instance_id": "mine",
+         "op_id": "fresh-52", "remote_id": None, "local_id": 52},
     ])
-    report = snapshot_sync.push_local("t")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(snapshot_sync.repository, "db_max_synced_local_id", lambda: 51)
+        report = snapshot_sync.push_local("t")
+    assert [op["op_id"] for op in env["server"].pushed] == ["fresh-52"]
     assert report.pushed == 1
-    assert report.rejected == 0
-    assert [op["op_id"] for op in env["server"].pushed] == ["legacy:mine:50"]
-    assert env["server"].pushed[0]["happened_at"] == "2026-11-04T16:00:00"
-    assert env["history"][0]["remote_id"] == 1
-    assert env["history"][1]["remote_id"] == -1
-
 
 def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
     # 快照是账户级多份：只看最新一份（列表首位），旧的忽略
@@ -582,7 +562,6 @@ def test_overwrite_warning_lists_users_from_latest_snapshot(env) -> None:
     warnings = snapshot_sync.overwrite_warnings("t")
     assert [row["username"] for row in warnings] == ["张三"]
 
-
 def test_pull_stops_with_pending_when_overwrite_not_confirmed(env) -> None:
     env["server"].snapshots = [{
         "id": 2, "snapshot_remote_id": 9, "origin_instance_id": "other",
@@ -595,7 +574,6 @@ def test_pull_stops_with_pending_when_overwrite_not_confirmed(env) -> None:
     # 两边都没有事件时间时，快照不覆盖已有本地值；水位仍然前进。
     assert env["entries"]["张三"]["stock"]["energy"]["value"] == 5
     assert env["state"]["remote_history_id"] == 9
-
 
 def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
     """回放必须落一行本地账本：来源设备、业务时间、来源描述全都要留住。
@@ -628,7 +606,6 @@ def test_replay_writes_ledger_row_with_origin_identity(env) -> None:
     assert row["old_value_text"] == "旧备注"      # note 撤销用的旧文本
     assert (row["old_value"], row["new_value"]) == (0.0, 20.0)
 
-
 def test_replay_is_idempotent_on_repeated_pull(env) -> None:
     """同一条 op 回放两次只生效一次：水位没落盘就崩溃、页级重试都靠这条。
 
@@ -651,7 +628,6 @@ def test_replay_is_idempotent_on_repeated_pull(env) -> None:
     assert snapshot_sync.pull_and_replay("t").pulled == 0
     assert env["entries"]["张三"]["stock"]["energy"]["value"] == 140
     assert len(env["history"]) == 1
-
 
 def test_own_echo_ops_are_skipped_by_ledger_identity(env) -> None:
     """自己的 op 回声回来不重放：本机写入的行身份就是 (本机, 本地 id)。"""
@@ -682,7 +658,6 @@ def test_own_echo_ops_are_skipped_by_ledger_identity(env) -> None:
     assert env["writes"] == [(
         "张三", "stock", "energy", 105.0, "", "set")]
 
-
 def test_replay_of_unchanged_value_touches_nothing(env) -> None:
     """回放的值与本地现值相同就不写：不抬 event_at，也不刷空账本行。
 
@@ -701,7 +676,6 @@ def test_replay_of_unchanged_value_touches_nothing(env) -> None:
     ]
     assert snapshot_sync.pull_and_replay("t").pulled == 1
     assert env["entries"]["张三"]["stock"]["energy"]["event_at"] == "2026-11-04T09:00:00"
-
 
 def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
     """事故回归：新库快照水位为 0 时，已落地的设备不得每次同步都被快照回滚。
@@ -724,22 +698,20 @@ def test_no_rebootstrap_when_watermark_is_zero(env) -> None:
     assert report.snapshots == 0
     assert env["writes"] == []
 
-
 def test_network_failure_reports_error_without_crashing(env) -> None:
     env["server"].fail = True
     report = snapshot_sync.pull_and_replay("t")
     assert report.errors
     assert env["entries"] == {}
 
-
 class _DayQuota:
     period = "day"
     reset_time = "05:00"
     reset_day = 0
 
-
-def test_push_skips_reset_and_sends_following_delta(env) -> None:
-    """周期重置留在本地，不上传。后面的增量照常上行。"""
+def test_push_sends_reset_and_skips_legacy_delta(env) -> None:
+    """reset/regen 是系统行，照常上行（值语义是覆盖）；
+    delta 是 v1 遗留类型，新协议不再上行，留在本地。"""
     env["state"]["local_history_id"] = 0
     env["history"].extend([
         {"id": 10, "username": "张三", "type": "quota", "key": "weekly",
@@ -753,10 +725,10 @@ def test_push_skips_reset_and_sends_following_delta(env) -> None:
          "local_id": 11},
     ])
     snapshot_sync.push_local("t")
-    assert [op["op_id"] for op in env["server"].pushed] == ["delta-row"]
-    assert env["server"].pushed[0]["op"] == "set"
-    assert env["server"].pushed[0]["value"] == 3
-
+    # reset 上行且保留类型；delta（遗留）不上行
+    assert [op["op_id"] for op in env["server"].pushed] == ["reset-row"]
+    assert env["server"].pushed[0]["op"] == "reset"
+    assert env["server"].pushed[0]["value"] == 0
 
 def test_cross_period_replay_zeros_before_delta(env, monkeypatch) -> None:
     """回放不依赖对端上传的 reset。本地还停在上个周期时，增量从 0 加。"""
@@ -775,7 +747,6 @@ def test_cross_period_replay_zeros_before_delta(env, monkeypatch) -> None:
     assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 5
     assert all(write[5] != "reset" for write in env["writes"])
 
-
 def test_cross_period_replay_set_replaces_stale_value(env, monkeypatch) -> None:
     """跟上的设备已是 15。落后的设备上个周期还是 5，回放 set(15) 得到 15。"""
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
@@ -792,7 +763,6 @@ def test_cross_period_replay_set_replaces_stale_value(env, monkeypatch) -> None:
     snapshot_sync.pull_and_replay("t")
     assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 15.0
 
-
 def test_same_period_delta_adds_to_current_value(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
@@ -807,7 +777,6 @@ def test_same_period_delta_adds_to_current_value(env, monkeypatch) -> None:
     ]
     snapshot_sync.pull_and_replay("t")
     assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 10
-
 
 def test_previous_period_delta_is_discarded(env, monkeypatch) -> None:
     """本地已在新周期时，上一周期的增量不能加进来。"""
@@ -826,7 +795,6 @@ def test_previous_period_delta_is_discarded(env, monkeypatch) -> None:
     assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 4
     assert env["writes"] == []
 
-
 def test_offset_timestamp_keeps_clock_face(env, monkeypatch) -> None:
     """带偏移的发生时间按钟面参加周期判断，不因时区比较抛错而丢掉。"""
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
@@ -844,7 +812,6 @@ def test_offset_timestamp_keeps_clock_face(env, monkeypatch) -> None:
     assert report.errors == []
     assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 5
 
-
 def test_unparseable_local_time_does_not_zero_base(env, monkeypatch) -> None:
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
     env["state"]["remote_history_id"] = 0
@@ -860,7 +827,6 @@ def test_unparseable_local_time_does_not_zero_base(env, monkeypatch) -> None:
     snapshot_sync.pull_and_replay("t")
     assert env["entries"]["张三"]["quota"]["weekly"]["value"] == 10
 
-
 def test_old_period_delta_does_not_seed_empty_entry(env, monkeypatch) -> None:
     """没有本地条目时，已经过去的周期增量也不写入当前值。"""
     monkeypatch.setattr(snapshot_sync, "_quota_key", lambda key: _DayQuota())
@@ -874,7 +840,6 @@ def test_old_period_delta_does_not_seed_empty_entry(env, monkeypatch) -> None:
     ]
     snapshot_sync.pull_and_replay("t")
     assert "张三" not in env["entries"]
-
 
 def test_bootstrap_skips_locked_entries_silently(env) -> None:
     """锁定条目拒绝快照覆盖是锁的语义，静默跳过——不得刷误导性 ERROR。"""

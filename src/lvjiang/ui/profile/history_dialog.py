@@ -200,8 +200,8 @@ class HistoryDialog(QDialog):
     """按条件浏览、筛选并撤销单条变更记录。"""
 
     _TYPE_LABEL = {
-        "tick": tr("恢复"), "reset": tr("重置"),
-        "set": tr("覆盖"), "delta": tr("增量"),
+        "regen": tr("恢复"), "reset": tr("重置"),
+        "set": tr("更新"), "delta": tr("增量"),
     }  # runtime tr()
     _PAGE_SIZES = (50, 100, 200, 500)
 
@@ -1132,5 +1132,6 @@ def _format_value(record: HistoryRow, side: str, model_type: str) -> str:
     except (TypeError, ValueError):
         return str(value)
     return str(int(numeric)) if numeric == int(numeric) else str(numeric)
+
 
 

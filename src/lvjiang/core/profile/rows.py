@@ -110,7 +110,7 @@ class PendingOp:
             "username": self.username,
             "type": self.type,
             "key": self.key,
-            "op": "set",
+            "op": self.op_type,
             "value": self.value,
             "value_text": self.value_text,
             "source": self.source,

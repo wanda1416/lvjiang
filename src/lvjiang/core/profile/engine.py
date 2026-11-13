@@ -59,7 +59,9 @@ def _write_background_change(user_name, model, kd, entry, new_value, delta, op_t
     event = prepare_trigger_event(
         username=user_name, model=model, key=kd.key,
         old_value=entry.value, new_value=new_value, delta=delta,
-        source="周期重置" if op_type == "reset" else "自动恢复",
+        # source 是业务语境，只属于人的写入；系统行（reset/regen）留空，
+        # 机制分类由 op_type 表达，不占用业务字段。
+        source="",
         op_type=op_type, script=kd.change_script, synchronous=kd.change_script_sync,
     )
     assert event is not None
@@ -69,7 +71,7 @@ def _write_background_change(user_name, model, kd, entry, new_value, delta, op_t
         user_name, model, kd.key, expected_value=entry.value or 0,
         expected_updated_at=entry.event_at, expected_entry_exists=bool(current),
         new_value=new_value, new_updated_at=event_at, op_type=op_type,
-        delta_value=delta, source=event.source,
+        delta_value=delta, source="",
     )
     if not updated:
         from .service import ProfileWriteConflict

@@ -379,7 +379,7 @@ def profile_observe(
                 new_value=0,
                 op_type="reset",
                 delta_value=-float((entry.value if entry else 0) or 0),
-                source="周期重置",
+                source="",
             )
             if not reset:
                 continue
@@ -543,14 +543,15 @@ def profile_action(
             # 算出的恢复」写成绝对值 set 上行，覆盖别的设备真实发生的消耗
             # （2026-11-09 体力事故）。同步完成后锚点已在本周期，这里自然不触发。
             if period_recovery_allowed():
+                # 速率型 regen 写入时先落一条 regen 行：描述「至今实际恢复了
+                # 多少」，值是恢复后的绝对值（覆盖语义），source 留空——恢复是
+                # 机制不是业务。随后业务写入（set/delta）另行成行。
                 db_upsert(
                     username, model_type, key, restored_value,
                     event_at=restored_at,
-                    # 物化用 set 而非 tick：set 会随上行通道推送，「锚点 set + delta」
-                    # 成对到达回放端，delta 加在新锚点上，回放端无需再算 regen。
-                    op_type="set",
+                    op_type="regen",
                     delta_value=_normalize_float_noise(restored_value - stored_value),
-                    source=tr("自动恢复"),
+                    source="",
                 )
                 current_entry = db_read_entry(username, model_type, key)
                 current_value = float(restored.value)

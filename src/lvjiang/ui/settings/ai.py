@@ -25,10 +25,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.ai import AIError, AIModelList, AIReply, AIService, AISettings, AIStore
-from ..i18n import tr
-from .widgets.button_styles import apply_button_style
-from .widgets.combo_box import AutoWidthComboBox, ComboWidthMode
+from ...core.ai import AIError, AIModelList, AIReply, AIService, AISettings, AIStore
+from ...i18n import tr
+from ..widgets.button_styles import apply_button_style
+from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 
 class _Signals(QObject):
@@ -90,7 +90,7 @@ class AISettingsPage(QWidget):
         tabs = QTabWidget()
         model_page = QWidget()
         layout = QVBoxLayout(model_page)
-        from .agent_settings import AgentSettingsPage
+        from .agent import AgentSettingsPage
         self.agents_page = AgentSettingsPage()
         tabs.addTab(model_page, tr("模型接口"))
         tabs.addTab(self.agents_page, tr("外部 Agent"))

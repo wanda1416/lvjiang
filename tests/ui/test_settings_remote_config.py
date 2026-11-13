@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QDialog, QLabel, QMessageBox, QPlainTextEdit
 
-from lvjiang.ui import settings_dialog
+from lvjiang.ui.settings import dialog as settings_dialog
 
 
 def test_settings_actions_do_not_install_configuration(qtbot, monkeypatch):

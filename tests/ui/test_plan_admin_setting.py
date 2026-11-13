@@ -4,7 +4,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from lvjiang.core.config.plans import PLAN_MODE_WINDOW, Plan
-from lvjiang.ui.settings_dialog import SettingsDialog
+from lvjiang.ui.settings.dialog import SettingsDialog
 
 
 class _Combo:

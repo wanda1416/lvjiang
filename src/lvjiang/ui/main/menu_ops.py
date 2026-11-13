@@ -483,7 +483,7 @@ class MenuOpsMixin:
         self._refresh_user_combo()
 
     def _open_settings_manager(self):
-        from ..settings_dialog import SettingsDialog
+        from ..settings.dialog import SettingsDialog
         dialog = SettingsDialog(self)
         dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
         dialog.font_sizes_saved.connect(self._apply_font_size_settings)

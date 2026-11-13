@@ -534,7 +534,7 @@ class UiStateMixin:
         if not flow_cfg:
             return
         self._save_displayed_params()
-        from ..all_user_params_dialog import AllUserParamsDialog
+        from ..settings.all_user_params_dialog import AllUserParamsDialog
         dialog = AllUserParamsDialog(
             self._workflow_configs,
             self._user_manager.list_users(),

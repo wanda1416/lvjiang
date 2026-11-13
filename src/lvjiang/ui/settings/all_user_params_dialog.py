@@ -24,13 +24,13 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
-from ..core.task_params import parameters_for_env, resolve_task_params
-from ..i18n import tr
-from .widgets.button_styles import (
+from ...core.task_params import parameters_for_env, resolve_task_params
+from ...i18n import tr
+from ..widgets.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
-from .widgets.misc import add_top_aligned_row
+from ..widgets.misc import add_top_aligned_row
 
 
 def _format_value(value) -> str:
@@ -63,7 +63,7 @@ class AllUserParamsDialog(QDialog):
         self._users = list(usernames)
         self._users_dir = users_dir
         self._current_env = current_env
-        from ..workflows.discovery import script_supports_env
+        from ...workflows.discovery import script_supports_env
         self._configs = [
             cfg for cfg in workflow_configs
             if cfg.get("scope", "daily") == "daily"
@@ -77,7 +77,7 @@ class AllUserParamsDialog(QDialog):
         task_row.addWidget(QLabel(tr("任务")))
         self._task_combo = AutoWidthComboBox()
         self._task_combo.setObjectName("all_user_params_task")
-        from ..workflows.discovery import script_display_name
+        from ...workflows.discovery import script_display_name
         for config in self._configs:
             self._task_combo.addItem(
                 script_display_name(config),

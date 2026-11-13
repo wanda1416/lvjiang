@@ -2,7 +2,7 @@
 import asyncio
 
 from lvjiang.core.ai import AIReply, AIService, AIStore
-from lvjiang.ui.ai_settings import AISettingsPage
+from lvjiang.ui.settings.ai import AISettingsPage
 
 
 def test_test_connection_does_not_save_draft(qtbot, tmp_path, monkeypatch):

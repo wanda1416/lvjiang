@@ -39,14 +39,14 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
-from ..core.config import (
+from ...core.config import (
     load_available_envs,
     load_user_config,
     save_app_config,
     save_settings,
 )
-from ..i18n import tr, tr_in, tr_label
-from .widgets.button_styles import apply_button_style, apply_compact_tool_button_style
+from ...i18n import tr, tr_in, tr_label
+from ..widgets.button_styles import apply_button_style, apply_compact_tool_button_style
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -95,7 +95,7 @@ class _ActivationWorker(QThread):
         self.code = code
 
     def run(self):
-        from ..core.license import Entitlement, try_activate
+        from ...core.license import Entitlement, try_activate
         try:
             result = try_activate(self.code)
         except Exception:
@@ -179,7 +179,7 @@ class SettingsDialog(QDialog):
             (tr("等待参数"), self._build_wait_tab()),
         ]), tr("执行参数"))
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
-        from .ai_settings import AISettingsPage
+        from .ai import AISettingsPage
         self._ai_page = AISettingsPage(self)
         self._ai_tab_index = self._tabs.addTab(self._ai_page, tr("AI 设置"))
         self.finished.connect(self._ai_page.cancel_test)
@@ -257,7 +257,7 @@ class SettingsDialog(QDialog):
         目标语言查表；一旦用户改回当前语言，提示立刻收起。提示跟着保存按钮
         显示——按钮被隐藏的页签上不该留下孤立的一行字。
         """
-        from ..i18n import current_language
+        from ...i18n import current_language
 
         target = self._lang_combo.currentData()
         if not target or target == current_language():
@@ -363,7 +363,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout(tab)
 
         # ── 语言 ──
-        from ..i18n import available_languages, current_language
+        from ...i18n import available_languages, current_language
         self._lang_combo = AutoWidthComboBox()
         for lang in available_languages():
             self._lang_combo.addItem(
@@ -582,7 +582,7 @@ class SettingsDialog(QDialog):
         entry["window_title"].textChanged.connect(self._mark_dirty)
 
     def _apply_connected_app_info(self, entry: dict) -> None:
-        from ..core.app_controller import get_active_connected_app_info
+        from ...core.app_controller import get_active_connected_app_info
 
         info = get_active_connected_app_info()
         if info is None:
@@ -726,7 +726,7 @@ class SettingsDialog(QDialog):
 
     def _build_plan_manager_layout(self) -> QHBoxLayout:
         """左侧方案列表 + 右侧方案详情。"""
-        from ..core.config.plans import load_plans
+        from ...core.config.plans import load_plans
 
         self._plans = load_plans()
         row = QHBoxLayout()
@@ -805,19 +805,19 @@ class SettingsDialog(QDialog):
         host_db = getattr(self.parent(), "_reference_db", None)
         if host_db is not None:
             return list(host_db.get_spaces())
-        from ..core.reference_db import ReferenceDatabase
+        from ...core.reference_db import ReferenceDatabase
         return list(ReferenceDatabase().get_spaces())
 
     def _available_layouts(self):
         host_manager = getattr(self.parent(), "_layout_manager", None)
         if host_manager is None:
-            from ..core.layout.manager import LayoutConfigManager
+            from ...core.layout.manager import LayoutConfigManager
             host_manager = LayoutConfigManager()
         return host_manager.list_layout_entries()
 
     @staticmethod
     def _plan_dev_mode() -> bool:
-        from ..core.config.resolver import get_resolver
+        from ...core.config.resolver import get_resolver
         return get_resolver().is_dev_mode()
 
     def _plan_is_editable(self, plan) -> bool:
@@ -844,7 +844,7 @@ class SettingsDialog(QDialog):
         self._load_plan_into_form(self._current_plan())
 
     def _load_plan_into_form(self, plan) -> None:
-        from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
+        from ...core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
 
         widgets = (self._plan_name_edit, self._plan_space_combo,
                    self._plan_env_combo, self._plan_layout_combo,
@@ -900,7 +900,7 @@ class SettingsDialog(QDialog):
 
         所见即所存：表单上显示什么，方案里就必须存什么。
         """
-        from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
+        from ...core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
 
         modes = []
         if self._plan_mode_window.isChecked():
@@ -938,12 +938,12 @@ class SettingsDialog(QDialog):
         self._mark_dirty()
 
     def _on_new_plan(self) -> None:
-        from ..core.config.plans import PLAN_MODES, Plan
+        from ...core.config.plans import PLAN_MODES, Plan
         self._append_plan(Plan.create(tr("新方案"), modes=list(PLAN_MODES)))
 
     def _on_new_plan_from_current(self) -> None:
         """拿主界面手上那套组合直接建方案——迁移成本最低的一条路。"""
-        from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW, Plan
+        from ...core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW, Plan
 
         host = self.parent()
         space_combo = getattr(host, "reference_space_combo", None)
@@ -1285,7 +1285,7 @@ class SettingsDialog(QDialog):
         激活是即时动作，不走对话框底部的「保存」——那个按钮管的是配置项，
         而激活码要么当场验通过写盘，要么当场告诉你为什么不行。
         """
-        from ..core.license import current_serial
+        from ...core.license import current_serial
 
         tab = QWidget()
         vbox = QVBoxLayout(tab)
@@ -1358,7 +1358,7 @@ class SettingsDialog(QDialog):
 
     def _refresh_license_status(self):
         """刷新授权状态文字"""
-        from ..core.license import current_entitlement
+        from ...core.license import current_entitlement
 
         result = current_entitlement()
         self._refresh_online_license_status()
@@ -1367,7 +1367,7 @@ class SettingsDialog(QDialog):
             self._license_status.setText(
                 tr("本地激活：未激活，高级功能不可用。") + f"（{result.reason}）")
             self._license_status.setStyleSheet("color: palette(mid);")
-            from ..core.license.store import activation_path, license_path
+            from ...core.license.store import activation_path, license_path
             self._clear_license_btn.setEnabled(
                 (activation_path().exists() or license_path().exists())
                 and not getattr(self, "_activation_busy", False))
@@ -1386,7 +1386,7 @@ class SettingsDialog(QDialog):
         self._clear_license_btn.setEnabled(not getattr(self, "_activation_busy", False))
 
     def _refresh_online_license_status(self):
-        from ..core.config.protected_remote import member_access_status
+        from ...core.config.protected_remote import member_access_status
 
         status = member_access_status()
         text = tr("在线会员授权") + "：" + tr(status.reason)
@@ -1410,7 +1410,7 @@ class SettingsDialog(QDialog):
         if not code:
             QMessageBox.information(self, tr("激活"), tr("请先粘贴激活码"))
             return
-        from ..core.license import LicenseError, verify_code
+        from ...core.license import LicenseError, verify_code
         try:
             issued = verify_code(code)
         except LicenseError as error:
@@ -1455,7 +1455,7 @@ class SettingsDialog(QDialog):
             self._activation_message = tr("激活失败") + "：" + result.reason
 
     def _on_clear_license(self):
-        from ..core.license import clear_code, refresh_entitlement
+        from ...core.license import clear_code, refresh_entitlement
 
         confirm = QMessageBox.question(
             self, tr("清除激活"),
@@ -1568,7 +1568,7 @@ class SettingsDialog(QDialog):
         （ui/notices/telemetry_consent_dialog.py）读的是同一份声明，两处
         描述天然一致，不会各说各的。
         """
-        from ..apps import get_registry
+        from ...apps import get_registry
 
         parts = [
             f"{item.purpose}；{tr('不收集')}：{'、'.join(item.excluded)}"
@@ -1592,7 +1592,7 @@ class SettingsDialog(QDialog):
         下载在后台进行，装好的内容下次启动才生效；这里必须把两件事分开写，
         否则用户下完就以为已经生效。
         """
-        from ..core.config.remote import (
+        from ...core.config.remote import (
             get_config_version,
             get_last_synced_at,
             pending_versions,
@@ -1618,16 +1618,16 @@ class SettingsDialog(QDialog):
                 version=version, date=synced or tr("未知日期")) + pending_text)
 
     def _on_offline_toggled(self, checked: bool):
-        from ..core.telemetry.settings import set_network_feature
+        from ...core.telemetry.settings import set_network_feature
         set_network_feature("offline", checked)
         self._refresh_privacy_tab_state()
 
     def _on_net_feature_toggled(self, feature: str, checked: bool):
-        from ..core.telemetry.settings import set_network_feature
+        from ...core.telemetry.settings import set_network_feature
         set_network_feature(feature, checked)
 
     def _on_telemetry_toggled(self, checked: bool):
-        from ..core.telemetry.settings import set_telemetry_enabled
+        from ...core.telemetry.settings import set_telemetry_enabled
         set_telemetry_enabled(checked)
         self._refresh_privacy_tab_state()
         if checked:
@@ -1644,13 +1644,13 @@ class SettingsDialog(QDialog):
             QMessageBox.StandardButton.No)
         if reply != QMessageBox.StandardButton.Yes:
             return
-        from ..core.telemetry.identity import reset_identity
+        from ...core.telemetry.identity import reset_identity
         identity = reset_identity()
         # 直接使用本次重置的返回值，避免页面继续展示重置前的标识。
         self._show_telemetry_identity(identity.install_id)
 
     def _on_view_pending_telemetry(self):
-        from ..core.telemetry.paths import spool_dir
+        from ...core.telemetry.paths import spool_dir
         d = spool_dir()
         d.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(d)))
@@ -1662,7 +1662,7 @@ class SettingsDialog(QDialog):
 
     def _refresh_privacy_tab_state(self):
         """展示实际生效状态，同时保留离线前的联网功能偏好。"""
-        from ..core.telemetry.identity import get_identity
+        from ...core.telemetry.identity import get_identity
 
         offline = self._offline_check.isChecked()
         network = load_user_config().network
@@ -1851,7 +1851,7 @@ class SettingsDialog(QDialog):
         input_sim["clamp_out_of_bounds"] = self._clamp_oob_cb.isChecked()
         envs = self._collect_envs()
         save_app_config(input_sim, delay_params, envs, android_apps)
-        from ..core.config.plans import save_plans
+        from ...core.config.plans import save_plans
         save_plans(self._collect_plans())
         self.plans_saved.emit()
         self.hotkeys_saved.emit(hotkeys)

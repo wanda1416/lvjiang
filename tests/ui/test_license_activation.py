@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from PyQt6.QtWidgets import QDialog, QLabel, QPlainTextEdit, QPushButton
 
 from lvjiang.core import license
-from lvjiang.ui import settings_dialog
+from lvjiang.ui.settings import dialog as settings_dialog
 
 
 def test_activation_is_nonblocking_and_dialog_waits_for_worker(qtbot, monkeypatch):

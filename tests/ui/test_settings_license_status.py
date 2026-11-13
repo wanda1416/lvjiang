@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QVBoxLayout
 from lvjiang.core import license
 from lvjiang.core.config import UserConfig, protected_remote
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
-from lvjiang.ui import settings_dialog
+from lvjiang.ui.settings import dialog as settings_dialog
 
 
 def test_local_activation_and_cloud_denial_are_shown_separately(qtbot, monkeypatch):

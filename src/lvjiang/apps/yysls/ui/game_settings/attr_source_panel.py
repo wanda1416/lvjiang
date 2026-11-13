@@ -48,13 +48,16 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
-from lvjiang.ui.theme import get_theme_manager
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import (
+    configure_navigation_list,
+    fit_combo_to_contents,
+)
+from lvjiang.ui.widgets.theme import get_theme_manager
 
 from .....i18n import tr, tr_label
 from ...config import get_game_config

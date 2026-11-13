@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ...core.config.conflicts import ConfigWriteConflict
 from ...core.config.resolver import LAYER_LOCAL, SystemContentProtected
@@ -60,9 +60,9 @@ from ...core.layout.maps import (
 )
 from ...core.recognizers.heading import detect_arrow_heading, draw_heading_overlay
 from ...i18n import tr
-from ..button_styles import apply_button_style
-from ..dialog_guards import EscapeCloseConfirmationMixin
-from ..theme import get_theme_manager
+from ..widgets.button_styles import apply_button_style
+from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
+from ..widgets.theme import get_theme_manager
 from .poi_canvas import PoiCanvas, bgr_to_qimage
 
 _NAV_MODE_LABELS = (
@@ -1128,7 +1128,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     def _on_new(self) -> None:
         if not self._confirm_discard():
             return
-        from ..form_dialog import FormField, ask_form
+        from ..widgets.form_dialog import FormField, ask_form
 
         def key_error(key: str) -> str | None:
             try:

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from .....ui.presentation import (
+from .....ui.widgets.presentation import (
     highlight_pill,
     is_dark_theme,
     make_pill,
@@ -20,10 +20,10 @@ from .....ui.presentation import (
     muted_pill,
     style_document_tabs,
 )
-from .....ui.presentation import (
+from .....ui.widgets.presentation import (
     metric_card as _metric_card,
 )
-from .....ui.presentation import (
+from .....ui.widgets.presentation import (
     set_metric_value as _set_metric_value,
 )
 

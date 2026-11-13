@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 
 
 class TelemetryConsentDialog(QDialog):

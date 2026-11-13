@@ -27,8 +27,8 @@ from PyQt6.QtWidgets import (
 
 from ..core.ai import AIError, AIModelList, AIReply, AIService, AISettings, AIStore
 from ..i18n import tr
-from .button_styles import apply_button_style
-from .combo_box import AutoWidthComboBox, ComboWidthMode
+from .widgets.button_styles import apply_button_style
+from .widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 
 class _Signals(QObject):

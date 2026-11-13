@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.layout.manager import (
     get_active_screenshot_index,
@@ -48,7 +48,7 @@ from ...core.scene.registry import (
     sync_scene_cache,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, apply_dialog_button_box_style
+from ..widgets.button_styles import apply_button_style, apply_dialog_button_box_style
 from .canvas import EditMode, RegionCanvas
 from .entity_order_table import EntityOrderTable
 from .scene_panel_editor import PanelEditorMixin

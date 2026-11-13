@@ -40,7 +40,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     DYNAMIC_AFFIXES,
     DYNAMIC_CATEGORY,
 )
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )

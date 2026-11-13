@@ -28,7 +28,7 @@ from ...core.update import (
 )
 from ...i18n import tr
 from ..background.update import UpdateChecker
-from ..button_styles import apply_button_style, exec_styled_message_box
+from ..widgets.button_styles import apply_button_style, exec_styled_message_box
 
 # 导出供外部使用
 __all__ = ["AboutDialog", "GITHUB_REPO"]

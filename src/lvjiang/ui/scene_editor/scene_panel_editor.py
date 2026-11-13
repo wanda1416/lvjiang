@@ -31,8 +31,8 @@ from ...core.scene.registry import (
     sync_scene_cache,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, apply_dialog_button_box_style
-from ..widgets import centered_cell_widget, strip_focus_rect
+from ..widgets.button_styles import apply_button_style, apply_dialog_button_box_style
+from ..widgets.misc import centered_cell_widget, strip_focus_rect
 from .entity_order_table import EntityOrderTable
 from .panel_binding_form import PanelBindingConfig, PanelBindingForm
 from .scene_select import (

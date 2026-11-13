@@ -77,9 +77,9 @@ from ...workflows.file_tree import (
     list_workflow_files,
 )
 from ...workflows.metadata import SCRIPT_ID_RE, metadata_error
-from ..button_styles import apply_button_style
-from ..dialog_guards import EscapeCloseConfirmationMixin
-from ..theme import get_theme_manager
+from ..widgets.button_styles import apply_button_style
+from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
+from ..widgets.theme import get_theme_manager
 from .wf_code_edit import WfCodeEdit
 
 # ─── 纯逻辑（可离线测试）────────────────────────────────
@@ -394,7 +394,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.tree.setIndentation(16)
         self.tree.setIconSize(QSize(16, 16))
         self.tree.setAnimated(True)
-        # 只调间距，不写颜色：颜色归全局主题样式表管（见 ui.theme），
+        # 只调间距，不写颜色：颜色归全局主题样式表管（见 ui.widgets.theme），
         # 在这里硬编码 token 会在切换深浅色时留一块不跟着变的死角。
         self.tree.setStyleSheet(
             "QTreeWidget::item { padding: 5px 4px; }")
@@ -1035,7 +1035,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _ask_script_id(self, title: str, default: str = "") -> str | None:
         """问一个 id，返回 workflows 内相对路径（含 .wf）；取消返回 None"""
-        from ..form_dialog import FormField, ask_form
+        from ..widgets.form_dialog import FormField, ask_form
 
         parent = self._target_dir()
         hint = tr("保存到 workflows/{dir}").format(dir=f"{parent}/" if parent else "")
@@ -1057,7 +1057,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     def _on_new(self):
         if not self._confirm_discard():
             return
-        from ..form_dialog import FormField, ask_form
+        from ..widgets.form_dialog import FormField, ask_form
 
         parent = self._target_dir()
         hint = tr("保存到 workflows/{dir}；显示名留空则用 id").format(

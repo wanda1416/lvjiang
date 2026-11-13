@@ -15,12 +15,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.scene.definition import BASE_VIEW_KEY
 from ...core.scene.registry import get_registry, get_scene_views, is_view_visible
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 
 
 def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:
@@ -352,7 +352,7 @@ def prompt_scene_area_references(
     """
     from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
 
-    from ..button_styles import apply_dialog_button_box_style
+    from ..widgets.button_styles import apply_dialog_button_box_style
 
     picker = SceneAreaReferenceBatchPicker(scene_key, taken_keys)
     if not picker.has_candidates:
@@ -385,7 +385,7 @@ def prompt_reference_views(parent, scene_key: str,
     """只改归属视图的小对话框；取消返回 None。"""
     from PyQt6.QtWidgets import QDialog, QDialogButtonBox
 
-    from ..button_styles import apply_dialog_button_box_style
+    from ..widgets.button_styles import apply_dialog_button_box_style
 
     dialog = QDialog(parent)
     dialog.setWindowTitle(tr("引用的归属视图"))

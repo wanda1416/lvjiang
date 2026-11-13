@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.widgets import install_wheel_guard
+from lvjiang.ui.widgets.misc import install_wheel_guard
 
 
 def _wheel(widget) -> bool:

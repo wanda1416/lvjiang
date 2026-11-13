@@ -29,7 +29,7 @@ from lvjiang.core.user_config import UserConfigManager
 
 from ..i18n import tr, tr_label
 from .avatar_editor_dialog import AvatarEditorDialog
-from .avatar_widget import AvatarWidget
+from .widgets.avatar_widget import AvatarWidget
 
 # ─── 样式常量 ────────────────────────────────────────────
 

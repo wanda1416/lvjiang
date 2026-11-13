@@ -33,8 +33,8 @@ from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_
 from .....core.agent_settings import AgentSettings, load_agent_settings
 from .....core.plugin_runtime import PluginRuntimePort, RuntimeTarget
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_button_style
-from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 from ...core.agent.service import AgentService, revision
 
 

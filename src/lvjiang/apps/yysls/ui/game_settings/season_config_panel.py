@@ -34,7 +34,7 @@ from lvjiang.apps.yysls.config import (
     get_game_config,
     validate_season_configs,
 )
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.widgets.button_styles import apply_button_style
 
 from .....i18n import tr
 from .factory_guard import (

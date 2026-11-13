@@ -31,13 +31,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
+from lvjiang.ui.user_toolbar import add_user_nav_buttons
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
-from lvjiang.ui.user_toolbar import add_user_nav_buttons
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ......i18n import tr, tr_label
 from ....config.equipment_slots import SLOT_SPECS
@@ -107,7 +107,7 @@ class _MultiSelectMenu(QMenu):
 
 def _fit_filter_combo(combo: AutoWidthComboBox) -> int:
     """按主题边框、箭头和最长选项计算筛选框与弹出列表的宽度。"""
-    from lvjiang.ui.layout_helpers import fit_combo_to_contents
+    from lvjiang.ui.widgets.layout_helpers import fit_combo_to_contents
 
     return fit_combo_to_contents(combo)
 

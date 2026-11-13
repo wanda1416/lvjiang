@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 from ...core import support_qrcode
 from ...core.public_links import SUPPORT_PAGE_URL
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 from .qrcode_refresher import ImageRefreshThread
 
 #: 收款码显示边长。图片按 2x 生成（512px），这里缩到 240 既不糊也不占屏。

@@ -24,15 +24,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
-from lvjiang.ui.widgets import FlowLayout
+from lvjiang.ui.widgets.misc import FlowLayout
 
 from .....i18n import tr, tr_label
-from .....ui.presentation import (
+from .....ui.widgets.presentation import (
     highlight_pill,
     make_pill,
     muted_pill,

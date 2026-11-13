@@ -20,19 +20,19 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.layout.manager import rename_view_screenshots
 from ...core.scene.definition import BASE_VIEW_KEY
 from ...core.scene.registry import get_registry, sync_scene_cache
 from ...core.scene.transitions import entries_of_view, exits_of_view
 from ...i18n import tr, tr_label
-from ..button_styles import (
+from ..reference.combo_sizing import set_combo_minimum_character_capacity
+from ..widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
     fit_button_width,
 )
-from ..reference.combo_sizing import set_combo_minimum_character_capacity
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 

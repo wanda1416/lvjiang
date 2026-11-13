@@ -31,8 +31,8 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from .....ui.button_styles import apply_button_style
-from .....ui.presentation import is_dark_theme
+from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.presentation import is_dark_theme
 from ...config.equipment_slots import grid_layout
 from ...config.tune_slots import SLOT_LABELS
 from ...core.combat.combat_attrs import map_affix_to_attr

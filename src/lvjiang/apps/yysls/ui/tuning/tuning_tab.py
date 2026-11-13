@@ -27,14 +27,9 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.config.resolver import get_resolver
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from .....i18n import tr, tr_label
-from .....ui.button_styles import (
-    apply_button_style,
-    apply_execution_button_style,
-    fit_button_width,
-)
 from .....ui.execution_feedback import (
     ExecutionFeedback,
     apply_idle_start,
@@ -47,6 +42,11 @@ from .....ui.main.run_control import (
     STATE_PAUSING,
     STATE_STOPPING,
     other_task_running_label,
+)
+from .....ui.widgets.button_styles import (
+    apply_button_style,
+    apply_execution_button_style,
+    fit_button_width,
 )
 from ...config.auto_tuning_config import (
     load_user_auto_tuning_config,

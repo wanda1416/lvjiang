@@ -501,7 +501,7 @@ class WindowOpsMixin:
 
         取主题令牌而不是写死色值，深浅色主题各自成立。
         """
-        from ..theme import get_theme_manager
+        from ..widgets.theme import get_theme_manager
 
         tokens = get_theme_manager().tokens
         color = {

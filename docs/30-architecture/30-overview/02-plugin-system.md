@@ -94,7 +94,7 @@ builder 约定：
 | `left_tab_builders` | `[]` | `[(label, builder)]`，左栏 Tab | `builder(host) -> QWidget`，函数体内延迟 import PyQt6 |
 | `right_tab_builders` | `[]` | `[(label, builder)]`，右栏 Tab | 同上 |
 | `menu_builders` | `[]` | `[fn(host, menubar)]`，插入到「帮助」之前 | 弹窗以 `host` 作 parent；按 `ui.plugin_menus` 的 ID 登记定位 |
-| `theme_stylesheet_builders` | `[]` | 追加 QSS 片段 | `ui/theme.py`；只加样式，不改主题判定逻辑 |
+| `theme_stylesheet_builders` | `[]` | 追加 QSS 片段 | `ui/widgets/theme.py`；只加样式，不改主题判定逻辑 |
 
 **能力注册**（import 即注册的模块，或直接给类/路径）
 
@@ -159,7 +159,7 @@ plugins/<name>/                   # 外置插件（独立检出，公开仓库�
   跨文档事务恢复的 JSON 文档目录；插件通过初始化钩子实现自己的旧数据迁移。
 - `workflows.ports`：工作流实现使用的场景自动化与子流程引擎 Protocol；插件端
   Protocol 组合这些能力并补充领域常量和状态。
-- `ui.layout_helpers`、`ui.presentation`：配置布局、主题判断和轻量展示组件。
+- `ui.widgets.layout_helpers`、`ui.widgets.presentation`：配置布局、主题判断和轻量展示组件。
 
 `core.app_events.AppEvent` 是无 GUI 依赖的公共事件信封；领域主题由插件自己的
 `core/events.py` 声明，Qt 路由与去抖仍留在插件 UI。

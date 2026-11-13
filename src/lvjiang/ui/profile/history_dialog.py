@@ -37,8 +37,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.i18n import tr
-from lvjiang.ui.button_styles import apply_compact_button_style, fit_button_width
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.widgets.button_styles import (
+    apply_compact_button_style,
+    fit_button_width,
+)
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ...core.config import load_ui_page_state, update_ui_page_state
 from ...core.profile.history_query import HistoryQuery
@@ -688,7 +691,7 @@ class HistoryDialog(QDialog):
     @staticmethod
     def _theme_tokens():
         try:
-            from lvjiang.ui.theme import get_theme_manager
+            from lvjiang.ui.widgets.theme import get_theme_manager
 
             return get_theme_manager().tokens
         except Exception:  # noqa: BLE001 - 主题不可用时退化为默认前景色

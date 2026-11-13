@@ -22,10 +22,10 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 
 THUMB_SIZE = 96  # 图库缩略图尺寸
 _CHECK_SIZE = 20  # 批量模式复选框尺寸

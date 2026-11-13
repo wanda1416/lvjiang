@@ -26,12 +26,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.config.resolver import load_available_envs
 from ...i18n import tr
 from ...workflows.metadata import CAPABILITIES, parse_metadata
-from ..button_styles import (
+from ..widgets.button_styles import (
     apply_button_style,
     apply_compact_button_style,
     fit_button_width,

@@ -5,10 +5,10 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QWidget
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
-from ..core.input.key_names import normalize_pressable
-from ..i18n import tr
+from ...core.input.key_names import normalize_pressable
+from ...i18n import tr
 
 _PUNCTUATION_LABELS = {
     "GRAVE": "GRAVE(`)",

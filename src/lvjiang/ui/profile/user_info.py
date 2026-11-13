@@ -34,8 +34,8 @@ from ...core.profile.regen import compute_regen_entry
 from ...core.profile.repository import db_read_all
 from ...i18n import tr
 from ..avatar_editor_dialog import AvatarEditorDialog
-from ..avatar_widget import AvatarWidget
 from ..user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
+from ..widgets.avatar_widget import AvatarWidget
 from .user_info_styles import USER_INFO_GROUP_STYLE
 from .user_notes import UserNotesPanel
 

@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.profile.models import (
     DEFAULT_KEY_GROUP,
@@ -65,8 +65,8 @@ from ...core.profile.models import (
 )
 from ...core.profile.periods import get_profile_period, list_profile_periods
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, fit_button_width
-from ..tag_input import TagInputWidget
+from ..widgets.button_styles import apply_button_style, fit_button_width
+from ..widgets.tag_input import TagInputWidget
 
 # 模型 TAB 顺序
 _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]

@@ -5,7 +5,7 @@ from typing import cast
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox, QWidget
 
-from ..i18n import tr
+from ...i18n import tr
 from .button_styles import exec_styled_message_box
 
 

@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.input.key_names import normalize_pressable
 from ...core.layout.manager import (
@@ -35,8 +35,8 @@ from ...core.scene.registry import (
     sync_scene_cache,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, apply_dialog_button_box_style
-from ..widgets import centered_cell_widget, strip_focus_rect
+from ..widgets.button_styles import apply_button_style, apply_dialog_button_box_style
+from ..widgets.misc import centered_cell_widget, strip_focus_rect
 from .entity_edit_form import (
     add_activation_key_row,
     add_attribute_row,

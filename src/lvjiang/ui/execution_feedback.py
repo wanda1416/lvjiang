@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QPushButton
 
 from ..i18n import tr
-from .button_styles import apply_execution_button_style
+from .widgets.button_styles import apply_execution_button_style
 
 
 class ExecutionFeedback(QLabel):

@@ -26,8 +26,8 @@ from lvjiang.apps import get_registry
 
 from ...core.config import load_user_config
 from ...i18n import tr
-from ..button_styles import exec_styled_message_box
-from ..theme import get_theme_manager
+from ..widgets.button_styles import exec_styled_message_box
+from ..widgets.theme import get_theme_manager
 
 
 class MenuOpsMixin:

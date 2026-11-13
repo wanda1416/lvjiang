@@ -45,7 +45,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps import get_registry
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.config import load_available_envs, load_env, load_user_config
 from ...core.config.users import SessionManager
@@ -54,14 +54,14 @@ from ...core.plugin_runtime import PluginRuntimePort
 from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager
 from ...i18n import tr
-from ..button_styles import (
+from ..overlay import BorderOverlay
+from ..widgets.button_styles import (
     apply_button_style,
     apply_compact_button_style,
     apply_execution_button_style,
 )
-from ..layout_helpers import fit_combo_popup_to_contents
-from ..overlay import BorderOverlay
-from ..widgets import TrimmedLogEdit
+from ..widgets.layout_helpers import fit_combo_popup_to_contents
+from ..widgets.misc import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
 from .execution_targets import (
     AndroidConnectionDraft,
@@ -944,7 +944,7 @@ class MainWindow(
             self.workflow_combo, 10, expanding=True)
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
         wf_layout.addWidget(self.workflow_combo)
-        from ..combo_box import ComboWidthMode
+        from ..widgets.combo_box import ComboWidthMode
         wf_actions = QHBoxLayout()
         wf_actions.setSpacing(max(8, self.fontMetrics().horizontalAdvance("测")))
         self.workflow_group_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)

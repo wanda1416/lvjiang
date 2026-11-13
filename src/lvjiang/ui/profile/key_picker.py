@@ -19,7 +19,7 @@ from ...core.profile.models import (
     group_key_definitions,
 )
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 
 
 def profile_key_label(config, key: str) -> str:

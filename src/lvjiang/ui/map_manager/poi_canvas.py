@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.layout.maps import MapPoi
-from ..theme import get_theme_manager
+from ..widgets.theme import get_theme_manager
 
 #: 点击落在已有 POI 这个归一化半径内视为选中它，而不是新增
 POI_HIT_RATIO = 0.012

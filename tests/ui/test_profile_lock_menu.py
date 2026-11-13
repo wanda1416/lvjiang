@@ -111,8 +111,8 @@ def test_locked_cell_uses_pause_button_grey_background():
     from PyQt6.QtGui import QColor
     from PyQt6.QtWidgets import QApplication, QTableWidgetItem
 
-    from lvjiang.ui.button_styles import DISABLED_BUTTON_BG
     from lvjiang.ui.profile.cell_formatting import apply_cell_style
+    from lvjiang.ui.widgets.button_styles import DISABLED_BUTTON_BG
 
     app = QApplication.instance() or QApplication([])  # noqa: F841 - 供控件使用
     item = QTableWidgetItem("")

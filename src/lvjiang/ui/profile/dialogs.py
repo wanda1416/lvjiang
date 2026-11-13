@@ -19,10 +19,10 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
-from ..button_styles import apply_dialog_button_box_style
+from ..widgets.button_styles import apply_dialog_button_box_style
 
 # 变更记录对话框与数据模型定义对话框的实际实现分居两个模块，
 # 这里 re-export 让调用方只需认 ``profile.dialogs``。

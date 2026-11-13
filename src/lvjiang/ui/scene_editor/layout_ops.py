@@ -36,7 +36,7 @@ from ...core.layout.manager import (
 from ...core.layout.models import Layout
 from ...core.scene.registry import get_registry
 from ...i18n import tr
-from ..button_styles import apply_button_style, fit_button_width
+from ..widgets.button_styles import apply_button_style, fit_button_width
 
 
 class LayoutOpsMixin:

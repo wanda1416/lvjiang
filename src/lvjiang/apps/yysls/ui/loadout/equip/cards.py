@@ -32,11 +32,11 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr, tr_label
-from ......ui.button_styles import (
+from ......ui.widgets.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
-from ......ui.presentation import is_dark_theme, make_tag
+from ......ui.widgets.presentation import is_dark_theme, make_tag
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.constants import ASSUME_CHENGYIN_KEY
 from ....core.equip_parser.dingyin_parser import (

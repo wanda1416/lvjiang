@@ -49,13 +49,13 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 from lvjiang.core.config.edit_session import ConfigEditSession
 from lvjiang.core.config.resolver import get_resolver
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.config_origin import layer_style, origin_tooltip
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.config_origin import layer_style, origin_tooltip
-from lvjiang.ui.layout_helpers import (
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import (
     configure_navigation_list,
     fit_combo_to_contents,
     mark_navigation_list,

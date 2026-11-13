@@ -25,7 +25,7 @@ from ...core.announcement import (
     cache_manifest,
 )
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 from .announcement_checker import AnnouncementChecker
 
 _LEVEL_LABELS = {

@@ -22,10 +22,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
+from lvjiang.ui.widgets.layout_helpers import (
+    configure_navigation_list,
+    fit_combo_to_contents,
+)
 
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_button_style
+from .....ui.widgets.button_styles import apply_button_style
 from ...config import GameConfigManager, get_game_config
 from ...core.loadout import (
     LoadoutPlan,

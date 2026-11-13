@@ -28,7 +28,7 @@ from ...core.scene.registry import (
     reload_scene_registry,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_dialog_button_box_style
+from ..widgets.button_styles import apply_dialog_button_box_style
 from .scene_tab import SceneTab
 
 # key 格式校验：小写字母开头，仅含小写字母/数字/下划线

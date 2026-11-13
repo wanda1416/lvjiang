@@ -37,7 +37,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ..core.config import (
     load_available_envs,
@@ -46,7 +46,7 @@ from ..core.config import (
     save_settings,
 )
 from ..i18n import tr, tr_in, tr_label
-from .button_styles import apply_button_style, apply_compact_tool_button_style
+from .widgets.button_styles import apply_button_style, apply_compact_tool_button_style
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看

@@ -30,7 +30,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
     specific_attr_names,
 )
-from lvjiang.ui.layout_helpers import (
+from lvjiang.ui.widgets.layout_helpers import (
     configure_navigation_list,
     mark_navigation_list,
     navigation_width_for_chars,

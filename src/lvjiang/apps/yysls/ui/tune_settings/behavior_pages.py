@@ -68,12 +68,12 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
 )
 from lvjiang.apps.yysls.ui.game_settings.level_combo import LevelCombo
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import (
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import (
     fit_combo_popup_to_contents,
     fit_combo_to_contents,
 )

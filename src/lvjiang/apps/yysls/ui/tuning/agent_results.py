@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
 
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, has_agent_access
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_button_style
-from .....ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 
 class AgentResultsDialog(QDialog):

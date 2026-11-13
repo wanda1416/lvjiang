@@ -32,15 +32,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_compact_button_style,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import fit_combo_to_contents
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr, tr_label
-from .....ui.presentation import (
+from .....ui.widgets.presentation import (
     style_document_tabs,
 )
 from ...core.combat.combat_attrs import (

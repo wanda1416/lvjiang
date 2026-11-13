@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.ocr_cleaner import OCRCleaner
 from ...core.ocr_config import (
@@ -48,7 +48,7 @@ from ...core.ocr_config import (
     save_recognition_settings,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 from .canvas import OCRBox, OCRCanvas
 
 
@@ -577,7 +577,7 @@ class OCRDialog(QDialog):
         if getattr(self, "_rules_dirty", False):
             self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
             return
-        from ..form_dialog import FormField, ask_form
+        from ..widgets.form_dialog import FormField, ask_form
 
         values = ask_form(
             self, tr("创建规则组"),

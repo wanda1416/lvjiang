@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.scene.definition_models import SubsceneRefDef
 from ...core.scene.registry import (
@@ -23,7 +23,7 @@ from ...core.scene.registry import (
     is_view_visible,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, apply_dialog_button_box_style
+from ..widgets.button_styles import apply_button_style, apply_dialog_button_box_style
 from .entity_order_table import EntityOrderTable
 
 

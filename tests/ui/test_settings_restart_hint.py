@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QLabel, QPushButton, QTabWidget
 
 from lvjiang.core.config import UserConfig
 from lvjiang.ui import settings_dialog
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 ENGLISH_HINT = "Takes effect after restarting the app"
 

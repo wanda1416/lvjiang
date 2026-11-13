@@ -14,7 +14,7 @@ from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflo
 from lvjiang.core.config import get_interface_store
 from lvjiang.core.profile.schema import ProfileSchema
 from lvjiang.ui.batch import batch_config_dialog as module
-from lvjiang.ui.theme import get_theme_manager
+from lvjiang.ui.widgets.theme import get_theme_manager
 
 
 @pytest.fixture

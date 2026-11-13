@@ -26,10 +26,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ......i18n import tr
-from ......ui.button_styles import apply_dialog_button_box_style
+from ......ui.widgets.button_styles import apply_dialog_button_box_style
 from ....core.combat.combat_attrs import (
     COMBAT_ATTR_FIELDS,
     PLAY_STYLE_FIELD_GROUPS,

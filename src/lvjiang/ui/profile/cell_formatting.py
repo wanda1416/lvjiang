@@ -39,7 +39,7 @@ from ...core.profile.regen import (
     next_realtime_point_seconds,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import DISABLED_BUTTON_BG
+from ..widgets.button_styles import DISABLED_BUTTON_BG
 
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
 

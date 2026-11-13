@@ -14,7 +14,7 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import (
 )
 from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
 from lvjiang.apps.yysls.ui.loadout.combat.cards import CombatCardsMixin
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 
 def test_title_link_opens_readonly_sources_and_refreshes_snapshot(qtbot):

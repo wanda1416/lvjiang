@@ -39,7 +39,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import LevelConfig, get_game_config
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_compact_button_style,
     apply_dialog_button_box_style,

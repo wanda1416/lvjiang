@@ -16,7 +16,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.ui.button_styles import apply_button_style, apply_dialog_button_box_style
+from lvjiang.ui.widgets.button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+)
 
 from ......i18n import tr
 from ....core.combat.attribute_sources import SOURCE_CATEGORIES, AttributeSourceReport

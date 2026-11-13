@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ..core.config import load_ui_page_state, update_ui_page_state
 from ..core.daily_history import (
@@ -39,8 +39,8 @@ from ..core.daily_history import (
     resolve_history_path,
 )
 from ..i18n import tr, tr_label
-from .button_styles import apply_button_style
 from .history_viewer import HistoryViewer
+from .widgets.button_styles import apply_button_style
 
 _STATUS_LABELS = {
     "running": tr("进行中"), "completed": tr("已完成"),

@@ -23,11 +23,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.i18n import tr
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
-from lvjiang.ui.widgets import MultiSelectButton
+from lvjiang.ui.widgets.misc import MultiSelectButton
 
 from ....core.loadout import LoadoutRepository
 from .cards import (

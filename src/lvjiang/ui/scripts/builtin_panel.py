@@ -47,7 +47,7 @@ from ...workflows.builtins import (
     validate_function_meta,
 )
 from ...workflows.builtins.script_meta import scan_directory, script_problems
-from ..button_styles import apply_compact_button_style
+from ..widgets.button_styles import apply_compact_button_style
 
 #: 元数据问题与重名冲突的提示色
 _WARN_COLOR = "#c62828"

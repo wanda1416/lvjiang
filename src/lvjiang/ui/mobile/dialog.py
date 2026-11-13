@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.android.agent import PROTOCOL_VERSION, connect_agent_diagnostic
 from ...core.android.apk_release import (
@@ -56,7 +56,7 @@ from ...core.android.gesture_probe import (
 )
 from ...core.update import get_version
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 from .device_scan import DeviceDiscoveryWorker, DeviceScanPanel
 from .diagnostics import build_checks, build_report, capability_notes
 from .qr_widget import QrCodeWidget

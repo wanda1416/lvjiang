@@ -24,10 +24,10 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, validate_crop
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 from .combo_sizing import set_combo_minimum_character_capacity
 
 # 内置固定字段（只读展示，不可编辑/删除）

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.input.key_names import normalize_pressable
 from ...i18n import tr, tr_label
-from ..pressable_combo import PressableSelector
+from ..widgets.pressable_combo import PressableSelector
 
 
 def add_attribute_row(

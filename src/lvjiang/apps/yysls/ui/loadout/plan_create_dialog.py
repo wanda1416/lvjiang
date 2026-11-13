@@ -15,11 +15,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import config_field_card, fit_combo_to_contents
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import config_field_card, fit_combo_to_contents
 
 from .....i18n import tr
-from .....ui.button_styles import apply_dialog_button_box_style
+from .....ui.widgets.button_styles import apply_dialog_button_box_style
 from ...config import GameConfigManager
 from ...core.loadout import (
     LoadoutPlan,

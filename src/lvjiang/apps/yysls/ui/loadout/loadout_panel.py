@@ -18,9 +18,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import apply_compact_button_style
-from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
+from lvjiang.ui.widgets.button_styles import apply_compact_button_style
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr

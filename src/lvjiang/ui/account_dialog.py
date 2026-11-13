@@ -35,7 +35,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.account import ACCOUNT_SERVICE, AccountError, get_session
 from ..i18n import tr
-from .button_styles import apply_button_style
+from .widgets.button_styles import apply_button_style
 
 
 def _eye_icon(visible: bool) -> QIcon:

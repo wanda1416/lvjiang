@@ -332,7 +332,7 @@ def test_selected_target_row_is_never_tinted(qtbot) -> None:
     from PyQt6.QtWidgets import QTreeWidget
 
     from lvjiang.ui.main.execution_runs import RunState
-    from lvjiang.ui.theme import get_theme_manager
+    from lvjiang.ui.widgets.theme import get_theme_manager
 
     running = ExecutionTarget(
         id=android_target_id("A"), kind="adb", display_name="运行中设备",

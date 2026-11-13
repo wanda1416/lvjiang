@@ -22,11 +22,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import ReferenceDatabase
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
-from ..dialog_guards import EscapeCloseConfirmationMixin
+from ..widgets.button_styles import apply_button_style
+from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
 from .browser_panel import BrowserPanel
 from .canvas import ReferenceCanvas
 from .combo_sizing import set_combo_minimum_character_capacity

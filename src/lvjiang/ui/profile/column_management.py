@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.ui.button_styles import apply_button_style, fit_button_width
+from lvjiang.ui.widgets.button_styles import apply_button_style, fit_button_width
 
 from ...core.profile import layout
 from ...core.profile.layout import LayoutMetric

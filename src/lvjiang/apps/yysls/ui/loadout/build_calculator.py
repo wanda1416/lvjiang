@@ -34,12 +34,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_button_style, apply_compact_button_style
-from .....ui.layout_helpers import fit_combo_to_contents
-from .....ui.widgets import strip_focus_rect
+from .....ui.widgets.button_styles import apply_button_style, apply_compact_button_style
+from .....ui.widgets.layout_helpers import fit_combo_to_contents
+from .....ui.widgets.misc import strip_focus_rect
 from ...config import get_game_config
 from ...config.builds import (
     BuildDefinition,

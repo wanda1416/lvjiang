@@ -36,9 +36,9 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_CATEGORY
-from lvjiang.ui.button_styles import apply_button_style
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import configure_navigation_list
+from lvjiang.ui.widgets.button_styles import apply_button_style
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import configure_navigation_list
 
 from .....i18n import tr, tr_label
 from ...config.affix_levels import OPEN as OPEN_LEVEL_RANGE

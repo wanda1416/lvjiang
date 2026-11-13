@@ -30,8 +30,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.core.tuning_rules import RATING_KEYS, RATING_LABELS
-from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.button_styles import (
+    apply_button_style,
+    apply_compact_tool_button_style,
+)
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 from .affix_picker import AffixSelectSortDialog

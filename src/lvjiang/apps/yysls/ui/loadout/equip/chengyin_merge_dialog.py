@@ -27,7 +27,7 @@ from lvjiang.apps.yysls.core.loadout import (
     find_chengyin_merge_candidates,
 )
 from lvjiang.i18n import tr
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.widgets.button_styles import apply_button_style
 
 from .cards import _CompactEquipCard
 

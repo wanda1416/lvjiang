@@ -14,7 +14,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QPlainTextEdit, QTextEdit
 
 from ...workflows.proc_location import ProcCallSite, index_proc_calls
-from ..theme import get_theme_manager
+from ..widgets.theme import get_theme_manager
 
 
 class WfCodeEdit(QPlainTextEdit):

@@ -35,7 +35,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     QUALITY_PARTS,
     TuneConfigManager,
 )
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.widgets.button_styles import apply_button_style
 
 from .....i18n import tr
 from ..domain_labels import domain_label

@@ -5,7 +5,7 @@ from __future__ import annotations
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ..i18n import tr
 

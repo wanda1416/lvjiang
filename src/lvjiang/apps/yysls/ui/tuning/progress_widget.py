@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_button_style
+from .....ui.widgets.button_styles import apply_button_style
 from .progress_hub import TuningProgressHub
 from .result_store import TuningResultStore
 from .styles import HEADER_TITLE_STYLE

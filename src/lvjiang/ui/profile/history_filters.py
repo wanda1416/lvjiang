@@ -34,8 +34,8 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.i18n import tr
-from lvjiang.ui.button_styles import apply_compact_button_style
-from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+from lvjiang.ui.widgets.button_styles import apply_compact_button_style
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 #: 聚合候选默认展示条数；超过这个数只能靠搜索框输入来找。
 FACET_VISIBLE_LIMIT = 10

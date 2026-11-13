@@ -48,9 +48,12 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     standard_playstyle_attrs,
 )
 from lvjiang.core.config.resolver import EntityOrigin
-from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
-from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
+from lvjiang.ui.widgets.button_styles import (
+    apply_button_style,
+    apply_compact_tool_button_style,
+)
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from .....i18n import tr, tr_label
 from ..domain_labels import domain_label

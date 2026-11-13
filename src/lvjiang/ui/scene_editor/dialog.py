@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.layout.manager import (
     LayoutConfigManager,
@@ -41,10 +41,10 @@ from ...core.scene.registry import (
     is_subscene,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
-from ..dialog_guards import EscapeCloseConfirmationMixin
 from ..reference.combo_sizing import set_combo_minimum_character_capacity
-from ..theme import get_theme_manager
+from ..widgets.button_styles import apply_button_style
+from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
+from ..widgets.theme import get_theme_manager
 from .layout_ops import LayoutOpsMixin
 from .recognition_ops import RecognitionOpsMixin
 from .scene_ops import SceneOpsMixin

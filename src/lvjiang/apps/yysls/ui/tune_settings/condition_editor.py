@@ -27,11 +27,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import fit_combo_to_contents
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_button_style
+from .....ui.widgets.button_styles import apply_button_style
 from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）

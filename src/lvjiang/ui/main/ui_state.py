@@ -28,12 +28,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.config.wf_configs import TRANSIENT_ID_PREFIX
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
-from ..widgets import FlowLayout
+from ..widgets.misc import FlowLayout
 
 
 class _FlowContainer(QWidget):

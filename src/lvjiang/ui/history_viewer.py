@@ -17,8 +17,8 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
-from .button_styles import apply_button_style
-from .combo_box import AutoWidthComboBox, ComboWidthMode
+from .widgets.button_styles import apply_button_style
+from .widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 # 预览读取有界，避免长任务的日志一次性占满 UI 内存。
 _PREVIEW_BYTES = 2 * 1024 * 1024

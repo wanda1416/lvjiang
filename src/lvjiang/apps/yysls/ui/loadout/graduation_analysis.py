@@ -27,11 +27,11 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from .....ui.button_styles import (
+from .....ui.widgets.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
-from .....ui.presentation import style_document_tabs
+from .....ui.widgets.presentation import style_document_tabs
 from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.transmute_optimizer import TransmutePlanResult
 from .affix_analysis_pages import AffixAnalysisPages

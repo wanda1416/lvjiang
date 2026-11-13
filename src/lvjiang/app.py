@@ -16,8 +16,8 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
 from .ui.main import MainWindow
-from .ui.theme import get_theme_manager, reset_theme_manager
-from .ui.widgets import install_wheel_guard
+from .ui.widgets.misc import install_wheel_guard
+from .ui.widgets.theme import get_theme_manager, reset_theme_manager
 
 # ── 模块级 Qt 对象引用 ──────────────────────────────────────────────
 # 必须保持在模块级（而非函数局部），确保 QApplication 比窗口及其他

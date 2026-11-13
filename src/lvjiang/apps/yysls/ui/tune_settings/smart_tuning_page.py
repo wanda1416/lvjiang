@@ -24,7 +24,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_LABELS,
     TuningGroupManager,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 

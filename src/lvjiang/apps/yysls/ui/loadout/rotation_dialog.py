@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from .....ui.button_styles import (
+from .....ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )

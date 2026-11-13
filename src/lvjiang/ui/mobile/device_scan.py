@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.android import (
     list_adb_devices,
@@ -24,7 +24,7 @@ from ...core.android import (
     scan_and_connect_wireless,
 )
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, fit_button_width
+from ..widgets.button_styles import apply_button_style, fit_button_width
 
 
 class DeviceDiscoveryWorker(QThread):

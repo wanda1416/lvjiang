@@ -27,11 +27,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ...workflows import action_catalog as cat
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 
 
 @dataclass

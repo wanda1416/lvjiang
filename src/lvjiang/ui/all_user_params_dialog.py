@@ -22,12 +22,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ..core.task_params import parameters_for_env, resolve_task_params
 from ..i18n import tr
-from .button_styles import apply_compact_button_style, apply_dialog_button_box_style
-from .widgets import add_top_aligned_row
+from .widgets.button_styles import (
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
+from .widgets.misc import add_top_aligned_row
 
 
 def _format_value(value) -> str:

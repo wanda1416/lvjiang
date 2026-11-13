@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.layout.manager import (
     delete_scene_screenshot,
@@ -27,7 +27,7 @@ from ...core.layout.manager import (
 )
 from ...core.scene.registry import get_scene_name
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style, fit_button_width
+from ..widgets.button_styles import apply_button_style, fit_button_width
 
 _PREVIEW_HEIGHT = 200
 

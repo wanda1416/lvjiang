@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr, tr_label
-from ..dialog_guards import EscapeCloseConfirmationMixin
+from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
 
 _STYLE_IDLE = (
     "background-color: #607D8B; color: white; font-weight: bold; "

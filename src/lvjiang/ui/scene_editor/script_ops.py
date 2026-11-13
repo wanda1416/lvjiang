@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
+from ..widgets.button_styles import apply_button_style
 
 
 def _format_value(value) -> str:

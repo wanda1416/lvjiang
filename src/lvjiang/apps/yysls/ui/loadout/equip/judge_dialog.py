@@ -42,8 +42,8 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_group,
 )
 from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
-from lvjiang.ui.button_styles import apply_button_style
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.button_styles import apply_button_style
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ......i18n import tr, tr_label
 from ...domain_labels import domain_label

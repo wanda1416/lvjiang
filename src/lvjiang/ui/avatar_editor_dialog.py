@@ -44,7 +44,7 @@ from PyQt6.QtWidgets import (
 from ..core.user_avatars import UserAvatarStore
 from ..core.user_config import UserConfigManager
 from ..i18n import tr
-from .button_styles import apply_button_style, fit_button_width
+from .widgets.button_styles import apply_button_style, fit_button_width
 
 MAX_SOURCE_PIXELS = 40_000_000
 

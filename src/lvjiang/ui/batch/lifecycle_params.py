@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 from ...core.batch_config import BatchWorkflows, lifecycle_parameter_definitions
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
-from ..combo_box import AutoWidthComboBox, ComboWidthMode
+from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 from .compact_fields import CompactFields
 
 

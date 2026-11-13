@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.batch_config import (
     BatchConfigConflict,
@@ -34,9 +34,9 @@ from ...core.batch_config import (
 )
 from ...core.user_config import UserConfigManager
 from ...i18n import tr, tr_label
-from ..button_styles import apply_button_style
-from ..layout_helpers import fit_combo_popup_to_contents
-from ..theme import get_theme_manager
+from ..widgets.button_styles import apply_button_style
+from ..widgets.layout_helpers import fit_combo_popup_to_contents
+from ..widgets.theme import get_theme_manager
 from .compact_fields import CompactFields
 
 

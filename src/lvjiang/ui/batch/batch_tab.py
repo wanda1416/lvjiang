@@ -42,13 +42,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.execution_feedback import (
     ExecutionFeedback,
     apply_idle_start,
     idle_start_state,
     show_running_feedback,
 )
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.batch_config import (
     BatchConfigItem,
@@ -66,17 +66,17 @@ from ...core.batch_run import (
 )
 from ...core.profile.schema import get_profile_config
 from ...i18n import tr, tr_label
-from ..button_styles import (
-    apply_button_style,
-    apply_execution_button_style,
-    fit_button_width,
-)
 from ..main.run_control import (
     STATE_PAUSING,
     STATE_STOPPING,
 )
-from ..theme import get_theme_manager
-from ..widgets import add_top_aligned_row
+from ..widgets.button_styles import (
+    apply_button_style,
+    apply_execution_button_style,
+    fit_button_width,
+)
+from ..widgets.misc import add_top_aligned_row
+from ..widgets.theme import get_theme_manager
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,

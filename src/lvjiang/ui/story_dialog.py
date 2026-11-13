@@ -49,13 +49,13 @@ from lvjiang.core.story import (
     upsert_entry,
 )
 from lvjiang.i18n import tr, tr_label
-from lvjiang.ui.button_styles import (
+from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
     exec_styled_message_box,
 )
-from lvjiang.ui.combo_box import AutoWidthComboBox
-from lvjiang.ui.layout_helpers import (
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.layout_helpers import (
     configure_navigation_list,
     navigation_width_for_chars,
 )

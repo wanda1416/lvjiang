@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
 
 from .....core.config.resolver import get_resolver
 from .....i18n import tr, tr_label
-from .....ui.button_styles import apply_dialog_button_box_style
 from .....ui.config_origin import layer_style, origin_tooltip
+from .....ui.widgets.button_styles import apply_dialog_button_box_style
 from ...config import get_game_config
 from ...config.game_config_files import GAME_CONFIG_FILES
 from .config_tab import GameConfigTab

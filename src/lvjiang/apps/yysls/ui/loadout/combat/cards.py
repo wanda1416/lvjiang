@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import apply_compact_tool_button_style
+from lvjiang.ui.widgets.button_styles import apply_compact_tool_button_style
 
 from ......i18n import tr
 

@@ -9,10 +9,10 @@ from PyQt6.QtWidgets import QWidget
 from lvjiang.core.batch_config import BatchConfigItem
 from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
 from lvjiang.ui.batch.batch_tab import BatchTab, _ReorderTreeWidget
-from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.main.run_control import RunControlMixin
 from lvjiang.ui.main.ui_state import UiStateMixin
 from lvjiang.ui.scripts.metadata_panel import MetadataPanel
+from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 from lvjiang.workflows.metadata import parse_metadata
 
 

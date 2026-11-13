@@ -31,8 +31,8 @@ from ...core.layout.config import load_layout_entries
 from ...core.license import has_feature
 from ...core.offline_bundle import build_offline_bundle
 from ...i18n import tr
-from ..button_styles import apply_button_style
-from ..combo_box import AutoWidthComboBox, ComboWidthMode
+from ..widgets.button_styles import apply_button_style
+from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 
 class _OfflineWorker(QThread):

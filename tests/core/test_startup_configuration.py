@@ -1,10 +1,10 @@
 """在线配置只在读取场景之前安装上次下载好的候选；启动不再联网。"""
-from lvjiang.core import scene_registry
 from lvjiang.core.config import remote
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.member_download import MemberDownload
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.config.update_download import PublicDownload
+from lvjiang.core.scene import registry as scene_registry
 from lvjiang.core.system_preset import write_baseline_identity
 from lvjiang.core.update_bundle import json_bytes, make_manifest, read_tree
 

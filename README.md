@@ -71,7 +71,7 @@ PC 端或手机端执行操作
 |----|------|------|
 | 捕获 / 输入 | `src/lvjiang/core/capture_base.py`、`core/desktop/`、`core/android/` | 截图与点击的统一抽象，桌面窗口（含后台截图）与 ADB / scrcpy / 设备端代理后端 |
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR（ONNX Runtime）文字识别封装 |
-| 场景 / 布局 | `src/lvjiang/core/scene_definition.py`、`core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
+| 场景 / 布局 | `src/lvjiang/core/scene/`、`core/layout_manager.py` | 声明式界面模型加载、坐标换算、区域对齐 |
 | 识别器 | `src/lvjiang/core/recognizers/` | 可插拔识别器（OCR / 模板匹配 / 颜色特征 / 参考图） |
 | 配置管理 | `src/lvjiang/core/config/` | 应用配置、会话管理、用户数据、工作流配置加载与合并、在线配置安装 |
 | 工作流 | `src/lvjiang/workflows/` | `.wf` DSL 语法解析（grammar/）、执行引擎（engine/）、通用内置函数（builtins/） |
@@ -114,7 +114,7 @@ lvjiang/
 │   │   ├── license/           # 功能激活与授权
 │   │   ├── profile/           # 玩家档案
 │   │   ├── task_cli.py        # 命令行 list / exec 入口
-│   │   ├── scene_definition.py      # 声明式场景模型加载
+│   │   ├── scene/                   # 声明式场景模型加载、注册表与流转
 │   │   ├── layout_manager.py        # 布局索引与坐标换算
 │   │   ├── reference_db.py          # 参考图库管理
 │   │   ├── platforms.py             # 跨平台统一收口

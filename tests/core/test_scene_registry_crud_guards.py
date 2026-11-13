@@ -4,9 +4,9 @@ import pytest
 import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
-from lvjiang.core.scene_config import load_scene_manifest
-from lvjiang.core.scene_definition import SceneRegistry
-from lvjiang.core.scene_definition_models import PointDef, RegionDef
+from lvjiang.core.scene.config import load_scene_manifest
+from lvjiang.core.scene.definition import SceneRegistry
+from lvjiang.core.scene.definition_models import PointDef, RegionDef
 from tests.case_matrix import case_matrix
 
 

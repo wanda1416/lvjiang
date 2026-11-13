@@ -119,7 +119,7 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     from .core.config.resolver import get_resolver
     rebuild_content(get_resolver())
     get_resolver().reset_edit_baselines()
-    from .core.scene_registry import initialize_scene_registry
+    from .core.scene.registry import initialize_scene_registry
     initialize_scene_registry()
     _app = QApplication(sys.argv)
     from .core.config.conflicts import set_conflict_handler

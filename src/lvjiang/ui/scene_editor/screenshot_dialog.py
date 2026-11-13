@@ -25,7 +25,7 @@ from ...core.layout_manager import (
     set_active_screenshot_index,
     set_scene_screenshot_format,
 )
-from ...core.scene_registry import get_scene_name
+from ...core.scene.registry import get_scene_name
 from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style, fit_button_width
 

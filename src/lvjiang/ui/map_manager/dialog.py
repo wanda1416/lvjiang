@@ -827,7 +827,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     # ─── 场景绑定 ──────────────────────────────────────────
 
     def _scene_registry(self):
-        from ...core.scene_registry import get_registry
+        from ...core.scene.registry import get_registry
         return get_registry()
 
     def _fill_scene_combo(self, current: str) -> None:

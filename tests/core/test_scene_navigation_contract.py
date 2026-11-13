@@ -1,11 +1,11 @@
 """页面归属、动态返回和公共入口的声明契约。"""
-from lvjiang.core.scene_definition_models import (
+from lvjiang.core.scene.definition_models import (
     RegionDef,
     SceneDef,
     SceneRefDef,
     ViewDef,
 )
-from lvjiang.core.scene_transitions import (
+from lvjiang.core.scene.transitions import (
     collect_transitions,
     page_owner,
     validate_transitions,
@@ -71,7 +71,7 @@ def test_navigation_roundtrip_and_view_reference_rename(tmp_path):
     import yaml
 
     from lvjiang.core.config.resolver import ConfigResolver
-    from lvjiang.core.scene_definition import SceneRegistry
+    from lvjiang.core.scene.definition import SceneRegistry
 
     system = tmp_path / 'system'
     directory = system / 'scenes'
@@ -106,7 +106,7 @@ def test_navigation_roundtrip_and_view_reference_rename(tmp_path):
 def test_system_navigation_and_desktop_shortcuts():
     from lvjiang.core import layout_manager
     from lvjiang.core.key_validation import validate_layout_activation_keys
-    from lvjiang.core.scene_registry import get_registry
+    from lvjiang.core.scene.registry import get_registry
 
     scenes = get_registry().all_scenes()
     assert not validate_transitions(scenes)

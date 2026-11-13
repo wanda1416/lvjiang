@@ -16,8 +16,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.scene_definition_models import SubsceneRefDef
-from ...core.scene_registry import (
+from ...core.scene.definition_models import SubsceneRefDef
+from ...core.scene.registry import (
     get_registry,
     get_subscene_scenes,
     is_view_visible,

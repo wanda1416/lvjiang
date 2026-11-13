@@ -16,7 +16,7 @@ from PyQt6.QtGui import QBrush, QColor, QCursor, QFont, QPainter, QPen, QPolygon
 from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 
 from ...core.layout_models import Arrow, Point
-from ...core.scene_registry import get_point_name
+from ...core.scene.registry import get_point_name
 from ...i18n import tr, tr_label
 
 # ─── 常量 ────────────────────────────────────────────────

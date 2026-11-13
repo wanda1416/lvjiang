@@ -4,7 +4,7 @@ import numpy as np
 
 from lvjiang.core.layout_models import CanvasConfig, Region
 from lvjiang.core.ocr import OCREngine, OCRResult
-from lvjiang.core.scene_definition_models import RegionDef
+from lvjiang.core.scene.definition_models import RegionDef
 
 
 def test_ocr_scene_regions_includes_referenced_text_definition(monkeypatch):

@@ -21,7 +21,7 @@ from ...core.layout_manager import (
     delete_scene_across_all_layouts,
     rename_scene_across_all_layouts,
 )
-from ...core.scene_registry import (
+from ...core.scene.registry import (
     get_group_name,
     get_registry,
     get_scene_name,

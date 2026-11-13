@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import QWidget
 
 from ...core.key_names import normalize_pressable
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
-from ...core.scene_registry import (
+from ...core.scene.registry import (
     get_panel_name,
     get_region_name,
     get_subscene_ref_def,

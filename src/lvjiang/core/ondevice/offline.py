@@ -47,7 +47,7 @@ def reset_configuration() -> None:
     from ..profile.repository import reset_profile_db
     from ..profile.schema import reload_profile_config
     from ..recognizers.template_locator import get_template_store
-    from ..scene_registry import reload_scene_registry
+    from ..scene.registry import reload_scene_registry
     from . import plugins, task_runner
 
     load_config_policies(plugins.configured_apps())

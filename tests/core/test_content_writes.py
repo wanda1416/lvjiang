@@ -49,7 +49,7 @@ def test_edit_conflict_cancel_keeps_disk_and_confirm_saves_draft(tmp_path, monke
 
 
 def test_cancelled_immediate_scene_edit_does_not_leak_into_registry(tmp_path, monkeypatch):
-    from lvjiang.core.scene_definition import SceneRegistry
+    from lvjiang.core.scene.definition import SceneRegistry
     resolver = ConfigResolver(tmp_path / "system", tmp_path / "local", dev_mode=True)
     path = resolver.write_entity("scenes/sample.yaml", "key: sample\nname: 示例\n")
     registry = SceneRegistry(resolver=resolver)
@@ -64,9 +64,10 @@ def test_cancelled_immediate_scene_edit_does_not_leak_into_registry(tmp_path, mo
 def test_new_layout_keeps_own_baselines_and_batches_multi_file_save(tmp_path, monkeypatch):
     from unittest.mock import Mock
 
-    from lvjiang.core import layout_manager, scene_registry
+    from lvjiang.core import layout_manager
     from lvjiang.core.config import content
     from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.core.scene import registry as scene_registry
 
     resolver = ConfigResolver(config_dir=tmp_path, dev_mode=True)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)

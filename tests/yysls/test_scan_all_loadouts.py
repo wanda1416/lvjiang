@@ -21,7 +21,7 @@ from lvjiang.apps.yysls.workflows.builtins.role_attr_ingest import (
     _has_scanned_base_attrs,
     _save_scanned_base_attrs,
 )
-from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.core.scene.definition import SceneRegistry
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import CallProc

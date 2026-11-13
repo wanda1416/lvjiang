@@ -15,7 +15,7 @@ from ..workflows.align import GridAlignment
 from .layout_models import CanvasConfig, Region
 from .ocr_cleaner import OCRCleaner
 from .ocr_config import load_region_batch_config
-from .scene_registry import get_effective_region_defs
+from .scene.registry import get_effective_region_defs
 
 
 @dataclass

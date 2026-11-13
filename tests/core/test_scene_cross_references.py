@@ -14,7 +14,7 @@ from lvjiang.core.layout_manager import (
 )
 from lvjiang.core.layout_models import Layout, Point, Region
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
-from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.core.scene.definition import SceneRegistry
 
 
 def _write(dir_path, key, doc):
@@ -156,7 +156,7 @@ def test_expansion_copies_coordinates_verbatim_and_marks_the_source():
 
     import lvjiang.core.layout_manager as lm
     original = lm.get_registry if hasattr(lm, "get_registry") else None
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
     saved = sr.get_registry
     sr.get_registry = lambda: type(
         "Reg", (), {"all_scenes": lambda self: {"equip_tune_detail": _Scene()}})()
@@ -203,7 +203,7 @@ def test_dsl_addressing_works_without_touching_the_action_layer():
         references = [type("R", (), {"scene": "general_control",
                                      "entity": "confirm"})()]
 
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
     saved = sr.get_registry
     sr.get_registry = lambda: type(
         "Reg", (), {"all_scenes": lambda self: {"equip_tune_detail": _Scene()}})()
@@ -292,7 +292,7 @@ def test_view_filter_includes_references(scenes_dir, monkeypatch):
         ]})
 
     reg = _registry(scenes_dir)
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
     monkeypatch.setattr(sr, "_registry", reg)
 
     visible = sr.get_view_visible_keys("equip_tune_detail", "reset")
@@ -325,7 +325,7 @@ def test_point_references_expand_into_the_point_table():
             type("R", (), {"scene": "src", "entity": "btn"})(),
         ]
 
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
     saved = sr.get_registry
     sr.get_registry = lambda: type(
         "Reg", (), {"all_scenes": lambda self: {"dst": _Scene()}})()
@@ -366,7 +366,7 @@ def test_orphan_coords_are_dropped_so_the_reference_can_expand(monkeypatch):
     于是每次加载都撞名、引用永远展不开，click 一直点那份再也不会同步的陈旧
     坐标，而且完全静默。
     """
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
 
     regions = {
         "general_control": [
@@ -405,7 +405,7 @@ def test_orphan_cleanup_refuses_to_run_without_definitions(monkeypatch):
     这两种情况下“已定义 key 集合”要么拿不到要么是空的，照清等于把整套布局
     的坐标抹掉——比留着孤儿糟得多，而且下次保存就永久写死。
     """
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
 
     regions = {"s": [Region(key="a", x_ratio=0.1, y_ratio=0.1,
                             w_ratio=0.1, h_ratio=0.1)]}
@@ -430,7 +430,7 @@ def test_referenced_entity_shows_the_source_name_not_its_key(
     引用只存 (scene, entity)，本场景的 regions/points 里查不到它；名称查询
     若就此退回 key，画布标签和面板列表里就只有引用项标着 key。
     """
-    import lvjiang.core.scene_registry as scene_registry
+    import lvjiang.core.scene.registry as scene_registry
 
     _write(scenes_dir, "general_control", {
         "regions": [{"key": "confirm", "name": "确认", "type": "func"}],
@@ -456,7 +456,7 @@ def test_referenced_entity_shows_the_source_name_not_its_key(
 def test_effective_region_defs_include_references_in_target_view(
         scenes_dir, monkeypatch):
     """识别等消费者应把引用当作目标场景当前视图中的完整定义。"""
-    import lvjiang.core.scene_registry as scene_registry
+    import lvjiang.core.scene.registry as scene_registry
 
     _write(scenes_dir, "shared", {
         "regions": [
@@ -545,7 +545,7 @@ def test_expanding_over_an_existing_key_refuses_rather_than_overwrites():
 
 def test_refresh_references_replaces_stale_projection(monkeypatch):
     """源场景在编辑器内改坐标后，目标画布不能继续拿加载时的旧克隆。"""
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
 
     ref = type("R", (), {"scene": "equip_detail", "entity": "status"})()
     target = type("S", (), {"references": [ref]})()
@@ -579,7 +579,7 @@ def test_refresh_references_replaces_stale_projection(monkeypatch):
 def test_refresh_reference_keeps_target_position_and_updates_source_size(
         monkeypatch):
     """拖动只覆盖 x/y；源区域尺寸变化仍应传到目标场景。"""
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
 
     ref = type("R", (), {"scene": "source", "entity": "back"})()
     target = type("S", (), {"references": [ref]})()
@@ -604,7 +604,7 @@ def test_refresh_reference_keeps_target_position_and_updates_source_size(
 
 
 def test_expansion_applies_target_position_to_region_and_point(monkeypatch):
-    import lvjiang.core.scene_registry as sr
+    import lvjiang.core.scene.registry as sr
 
     refs = [
         type("R", (), {"scene": "source", "entity": "back"})(),
@@ -725,7 +725,7 @@ def test_renaming_a_key_carries_the_references_along(referenced) -> None:
 
 def test_migrating_an_entity_retargets_the_references(referenced) -> None:
     """搬家不是删除：实体还在，只是换了地址。"""
-    from lvjiang.core.scene_definition_models import RegionDef
+    from lvjiang.core.scene.definition_models import RegionDef
 
     referenced.create_scene("destination", "目标")
     referenced.add_region_to_scene("destination", RegionDef("ok_btn", "确认", type="func"))
@@ -745,7 +745,7 @@ def test_retargeting_to_the_same_address_is_a_no_op(referenced) -> None:
 
 
 def test_migration_preflight_rejects_self_reference_and_name_collision(referenced):
-    from lvjiang.core.scene_definition_models import RegionDef
+    from lvjiang.core.scene.definition_models import RegionDef
 
     with pytest.raises(ValueError, match="不能引用自身"):
         referenced.validate_reference_retarget("general_control", "bag", "confirm", "ok_btn")

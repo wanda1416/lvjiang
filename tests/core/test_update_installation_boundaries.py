@@ -94,7 +94,7 @@ def test_empty_scene_registry_does_not_abort_next_startup(tmp_path):
     env = {**os.environ, "LVJIANG_ROOT": str(tmp_path),
            "PYTHONPATH": str(Path(__file__).parents[2] / "src")}
     result = subprocess.run(
-        [sys.executable, "-c", "from lvjiang.core.scene_registry import get_registry; assert not get_registry().get_groups()"],
+        [sys.executable, "-c", "from lvjiang.core.scene.registry import get_registry; assert not get_registry().get_groups()"],
         env=env, capture_output=True, text=True, encoding="utf-8", timeout=15,
     )
     assert result.returncode == 0, result.stderr

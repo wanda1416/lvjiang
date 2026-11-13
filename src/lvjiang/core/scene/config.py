@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 import yaml
 
-from .config.resolver import LAYER_LOCAL, ConfigResolver, merge_doc
+from ..config.resolver import LAYER_LOCAL, ConfigResolver, merge_doc
 
 SCENES_SCHEMA_VERSION = 2
 SCENES_REGISTRY_PATHS = ("scenes.*.items", "scenes.*.disabled")

@@ -216,7 +216,7 @@ def _drop_orphan_coords(regions: dict, points: dict) -> None:
     加载期统一清一次，存量自愈，不必手工改 JSON。**必须排在
     ``_expand_scene_references`` 之前**，否则孤儿仍然挡着展开。
     """
-    from .scene_registry import get_registry
+    from .scene.registry import get_registry
 
     try:
         registry = get_registry()
@@ -260,7 +260,7 @@ def _expand_scene_references(
     展开项带 ``source_scene`` 标记。编辑器只允许移动，并把目标场景的位置
     单独保存为 ``reference_positions``；完整实体仍由保存路径过滤。
     """
-    from .scene_registry import get_registry
+    from .scene.registry import get_registry
 
     try:
         scenes = get_registry().all_scenes()
@@ -286,7 +286,7 @@ def refresh_scene_references(
     仍是旧克隆。保存前调用本函数，先移除指定源场景的旧投影，再从 Layout
     当前快照重新展开，使已打开的引用场景无需重进布局管理器即可同步。
     """
-    from .scene_registry import get_registry
+    from .scene.registry import get_registry
 
     try:
         scenes = get_registry().all_scenes()

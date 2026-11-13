@@ -24,8 +24,8 @@ from ...core.layout_manager import (
     rename_item_key_across_all_layouts,
     shared_layout_bindings,
 )
-from ...core.scene_definition import PanelDef
-from ...core.scene_registry import (
+from ...core.scene.definition import PanelDef
+from ...core.scene.registry import (
     get_registry,
     is_view_visible,
     sync_scene_cache,

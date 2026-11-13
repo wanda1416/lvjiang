@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from .scene_definition_models import BASE_VIEW_KEY
+from .definition_models import BASE_VIEW_KEY
 
 
 @dataclass(frozen=True)

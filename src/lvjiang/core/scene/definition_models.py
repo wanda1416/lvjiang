@@ -9,7 +9,7 @@
 
 from dataclasses import dataclass, field
 
-from ..i18n import tr
+from ...i18n import tr
 
 # 合法的 region type 枚举
 VALID_REGION_TYPES = {"attr", "slot", "func"}

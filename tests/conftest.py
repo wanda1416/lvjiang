@@ -67,7 +67,7 @@ def _initialize_scene_registry_from_real_config():
     报「区域未绑定」「子场景引用未定义」正是这个症状）。这里在任何用例之前固定一次
     真实配置，让每个 worker 的起点一致。
     """
-    from lvjiang.core.scene_registry import initialize_scene_registry
+    from lvjiang.core.scene.registry import initialize_scene_registry
 
     initialize_scene_registry()
 

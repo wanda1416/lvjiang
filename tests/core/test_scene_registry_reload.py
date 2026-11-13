@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-import lvjiang.core.scene_registry as scene_registry
+import lvjiang.core.scene.registry as scene_registry
 
 
 class _RegistryStub:

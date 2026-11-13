@@ -1,13 +1,13 @@
 """页面切换契约：to: 声明的解析、校验与查询。"""
 from __future__ import annotations
 
-from lvjiang.core.scene_definition_models import (
+from lvjiang.core.scene.definition_models import (
     PointDef,
     RegionDef,
     SceneDef,
     ViewDef,
 )
-from lvjiang.core.scene_transitions import (
+from lvjiang.core.scene.transitions import (
     collect_transitions,
     entries_of_view,
     exits_of_view,

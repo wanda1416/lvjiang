@@ -136,7 +136,7 @@ _REGISTRY_KEYS = (ADDED_KEY, REMOVED_KEY, ORDER_KEY)
 #: 「import 即注册」接入（同 `builtin_modules`/`telemetry_modules` 的约定）。
 REGISTRY_LIST_PATHS: dict[str, tuple[str, ...]] = {
     # v1 路径保留给通用 resolver 的存量兼容；v2 的专用跨 schema 合并见
-    # core.scene_config（必须先分别转换 system/local，不能直接混合结构）。
+    # core.scene.config（必须先分别转换 system/local，不能直接混合结构）。
     "scenes.yaml": ("scenes.*.items", "scenes.*.disabled"),
     # 环境与方案都是带稳定 key 的登记表：local 存整张表会把系统后续新增的
     # 环境/方案挡在合并视图之外。按身份对齐见 REGISTRY_LIST_IDENTITY。

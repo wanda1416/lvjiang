@@ -35,8 +35,8 @@ from ...core.layout_models import (
     Region,
     TemplateBinding,
 )
-from ...core.scene_definition_models import BASE_VIEW_KEY
-from ...core.scene_registry import (
+from ...core.scene.definition_models import BASE_VIEW_KEY
+from ...core.scene.registry import (
     get_point_def,
     get_region_def,
     get_registry,

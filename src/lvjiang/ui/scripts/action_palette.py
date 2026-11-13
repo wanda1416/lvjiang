@@ -48,8 +48,8 @@ class PaletteProviders:
 
 def default_providers(main_window, debug_panel=None) -> PaletteProviders:
     """从主窗口 / 调试面板组装真实数据源"""
-    from ...core import scene_registry as sr
     from ...core.config.resolver import get_resolver
+    from ...core.scene import registry as sr
     from .workbench import snippet_color, snippet_point, snippet_rect
 
     def scenes():

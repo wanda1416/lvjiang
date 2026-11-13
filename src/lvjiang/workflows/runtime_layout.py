@@ -22,7 +22,7 @@ _KIND_NAMES = {
 
 def resolve_subscene_target_scene(parent_scene: str, reference_key: str) -> str:
     """返回引用指向的真实子场景 key，并校验引用定义。"""
-    from ..core.scene_registry import get_subscene_ref_def, is_subscene
+    from ..core.scene.registry import get_subscene_ref_def, is_subscene
 
     ref_def = get_subscene_ref_def(parent_scene, reference_key)
     if ref_def is None:

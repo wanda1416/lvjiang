@@ -17,8 +17,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
-from ...core.scene_definition import BASE_VIEW_KEY
-from ...core.scene_registry import get_registry, get_scene_views, is_view_visible
+from ...core.scene.definition import BASE_VIEW_KEY
+from ...core.scene.registry import get_registry, get_scene_views, is_view_visible
 from ...i18n import tr, tr_label
 from ..button_styles import apply_button_style
 

@@ -6,11 +6,11 @@ import json
 
 import pytest
 
-from lvjiang.core import scene_registry
 from lvjiang.core.config import remote
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.content import rebuild_content
 from lvjiang.core.config.resolver import ConfigResolver
+from lvjiang.core.scene import registry as scene_registry
 from lvjiang.core.system_preset import write_baseline_identity
 
 

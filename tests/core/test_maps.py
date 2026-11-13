@@ -14,8 +14,8 @@ from lvjiang.core.maps import (
     MapUiBinding,
     hud_scene_key_for,
 )
-from lvjiang.core.scene_config import load_scene_manifest
-from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.core.scene.config import load_scene_manifest
+from lvjiang.core.scene.definition import SceneRegistry
 
 
 def _write(path, data):

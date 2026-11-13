@@ -71,7 +71,7 @@ Action performed on PC or phone
 |-------|---------|----------------|
 | Capture / input | `src/lvjiang/core/capture_base.py`, `core/desktop/`, `core/android/` | Unified screenshot and click abstraction; desktop windows (including background capture) plus ADB / scrcpy / on-device proxy backends |
 | OCR | `src/lvjiang/core/ocr.py` | RapidOCR (ONNX Runtime) wrapper |
-| Scenes / layouts | `src/lvjiang/core/scene_definition.py`, `core/layout_manager.py` | Declarative UI model loading, coordinate conversion, region alignment |
+| Scenes / layouts | `src/lvjiang/core/scene/`, `core/layout_manager.py` | Declarative UI model loading, coordinate conversion, region alignment |
 | Recognizers | `src/lvjiang/core/recognizers/` | Pluggable recognizers (OCR / template matching / color features / reference images) |
 | Configuration | `src/lvjiang/core/config/` | App config, session management, user data, workflow config loading and merging, online config installation |
 | Workflows | `src/lvjiang/workflows/` | `.wf` DSL parsing (grammar/), execution engine (engine/), shared built-in functions (builtins/) |
@@ -114,7 +114,7 @@ lvjiang/
 │   │   ├── license/           # Feature activation and licensing
 │   │   ├── profile/           # Player profiles
 │   │   ├── task_cli.py        # Command-line list / exec entry point
-│   │   ├── scene_definition.py      # Declarative scene model loading
+│   │   ├── scene/                   # Declarative scene model loading, registry and transitions
 │   │   ├── layout_manager.py        # Layout index and coordinate conversion
 │   │   ├── reference_db.py          # Reference image library
 │   │   ├── platforms.py             # Cross-platform unification point

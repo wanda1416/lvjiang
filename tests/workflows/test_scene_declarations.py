@@ -1,5 +1,5 @@
 """位置声明有源码位置和静态诊断，执行时完全无操作。"""
-from lvjiang.core.scene_definition_models import SceneDef, ViewDef
+from lvjiang.core.scene.definition_models import SceneDef, ViewDef
 from lvjiang.workflows.engine.core import WorkflowEngine
 from lvjiang.workflows.grammar import SceneDeclaration, parse_text
 from lvjiang.workflows.scene_declarations import (

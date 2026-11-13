@@ -278,7 +278,7 @@ def _get_scene_registry():
     if _scene_registry is not None or _scene_registry_error is not None:
         return _scene_registry
     try:
-        from lvjiang.core.scene_registry import get_registry, reload_scene_registry
+        from lvjiang.core.scene.registry import get_registry, reload_scene_registry
         if _scene_stamp and current_stamp != _scene_stamp:
             reload_scene_registry()
         _scene_registry = get_registry()

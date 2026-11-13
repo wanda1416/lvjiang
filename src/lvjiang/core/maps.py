@@ -30,7 +30,7 @@ from loguru import logger
 
 from ..i18n import tr
 from .config.resolver import LAYER_LOCAL, ConfigResolver, get_resolver
-from .scene_definition_models import PointDef, RegionDef
+from .scene.definition_models import PointDef, RegionDef
 
 MAPS_DIR = "maps"
 BASE_IMAGE_NAME = "base.png"
@@ -401,7 +401,7 @@ class MapManager:
 
     def _scene_registry(self):
         if self._registry is None:
-            from .scene_registry import get_registry
+            from .scene.registry import get_registry
             self._registry = get_registry()
         return self._registry
 

@@ -1,7 +1,7 @@
 """场景定义加载器 - 从 YAML 文件加载场景配置
 
 定义时数据类（ViewDef / RegionDef / PointDef / PanelDef / SceneDef）
-已拆分至 scene_definition_models.py。
+已拆分至 definition_models.py。
 """
 
 import re
@@ -12,10 +12,10 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from ..i18n import tr
-from .config.resolver import get_resolver
-from .scene_config import build_scene_doc, save_scene_doc
-from .scene_definition_models import (
+from ...i18n import tr
+from ..config.resolver import get_resolver
+from .config import build_scene_doc, save_scene_doc
+from .definition_models import (
     BASE_VIEW_KEY,
     BASE_VIEW_NAME,
     VALID_REGION_TYPES,
@@ -102,7 +102,7 @@ class SceneRegistry:
             try:
                 scene = self._load_scene(yaml_file)
                 self._scenes[scene.key] = scene
-                from .config.conflicts import file_baseline
+                from ..config.conflicts import file_baseline
                 self._file_baselines[f"scenes/{name}"] = file_baseline(self._resolver, f"scenes/{name}")
                 logger.debug(f"已加载场景: {scene.key}（{len(scene.regions)} 个区域）")
             except Exception as e:
@@ -692,7 +692,7 @@ class SceneRegistry:
                 if v and v not in renamed:
                     renamed.append(v)
             item.views = renamed
-        from .scene_transitions import parse_target
+        from .transitions import parse_target
         for owner in self._scenes.values():
             changed = False
             for obj in (*owner.views, *owner.regions, *owner.points, *owner.references):
@@ -739,7 +739,7 @@ class SceneRegistry:
         ]
         if used:
             raise ValueError(f"视图非空，无法删除: {view_key}（包含 {len(used)} 个定义）")
-        from .scene_transitions import parse_target
+        from .transitions import parse_target
         for owner in self._scenes.values():
             for obj in (*owner.views, *owner.regions, *owner.points, *owner.references):
                 if obj is next((v for v in scene.views if v.key == view_key), None):
@@ -1216,7 +1216,7 @@ class SceneRegistry:
                 for r in scene.references
             ]
         rel_path = f"scenes/{scene.key}.yaml"
-        from .config.conflicts import ConfigWriteConflict, checked_write, file_baseline
+        from ..config.conflicts import ConfigWriteConflict, checked_write, file_baseline
         baseline = self._file_baselines.get(rel_path, file_baseline(self._resolver, rel_path))
         try:
             checked_write(self._resolver, {rel_path: baseline}, lambda: self._resolver.write_entity(

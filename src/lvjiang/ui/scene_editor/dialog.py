@@ -34,7 +34,7 @@ from ...core.layout_manager import (
     set_active_screenshot_index,
 )
 from ...core.layout_models import Layout
-from ...core.scene_registry import (
+from ...core.scene.registry import (
     get_registry,
     get_scene_name,
     get_subscene_ref_defs,

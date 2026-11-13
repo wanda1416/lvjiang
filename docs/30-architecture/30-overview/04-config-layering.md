@@ -64,7 +64,7 @@ local 文件可直接删除；system 官方文件不允许用户删除，也不�
 | 文件 | 顶层键 | 主要消费方 |
 |------|--------|-----------|
 | `app.yaml` | `input_simulation` / `delay_params` / `envs` | `load_app_config()` |
-| `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene_config.py`、`scene_registry.py`、`scene_definition.py` |
+| `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene/config.py`、`registry.py`、`definition.py` |
 | `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
 | `yysls/game_config/*.yaml` | 七份领域配置合并为统一视图 | `apps/yysls/config/game_config_files.py`、`manager.py` |

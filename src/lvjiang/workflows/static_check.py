@@ -79,7 +79,7 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
     cache: dict[str, dict[str, set[str]]] = {}
     for ref in refs:
         if ref.is_subscene:
-            from ..core.scene_registry import get_subscene_ref_def, is_subscene
+            from ..core.scene.registry import get_subscene_ref_def, is_subscene
             instances = layout.get_scene_subscene_refs(ref.scene)
             # 引用 key 为变量时无法知道具体实例，但仍可像普通动态区域一样
             # 校验到父场景层级，不能把整条三段引用从预检中丢掉。

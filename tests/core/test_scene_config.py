@@ -5,14 +5,14 @@ import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.paths import get_config_system_dir
-from lvjiang.core.scene_config import (
+from lvjiang.core.scene.config import (
     build_scene_doc,
     load_scene_doc,
     load_scene_manifest,
     normalize_scene_doc,
     save_scene_doc,
 )
-from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.core.scene.definition import SceneRegistry
 
 
 def _write(path, doc):
@@ -133,7 +133,7 @@ def test_v2_disabled_must_reference_registered_item():
                 },
             },
         }
-        from lvjiang.core.scene_config import parse_scene_manifest
+        from lvjiang.core.scene.config import parse_scene_manifest
         parse_scene_manifest(load)
 
 

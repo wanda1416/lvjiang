@@ -25,9 +25,9 @@ from ...core.layout_manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
 )
-from ...core.scene_definition import VALID_REGION_TYPES, RegionDef
-from ...core.scene_definition_models import SceneRefDef
-from ...core.scene_registry import (
+from ...core.scene.definition import VALID_REGION_TYPES, RegionDef
+from ...core.scene.definition_models import SceneRefDef
+from ...core.scene.registry import (
     get_region_def,
     get_registry,
     get_scene_name,

@@ -152,7 +152,7 @@ from .layout_storage import (
 from .layout_storage import (
     shared_layout_bindings as shared_layout_bindings,
 )
-from .scene_registry import (
+from .scene.registry import (
     get_panel_defs,
     get_point_defs,
     get_region_defs,
@@ -244,7 +244,7 @@ class LayoutConfigManager:
         key = validate_layout_key(key)
         name = name.strip()
         self.validate_new_identity(key, name)
-        from .scene_registry import SCENE_REGIONS
+        from .scene.registry import SCENE_REGIONS
         layout = Layout(key=key, name=name)
         for scene_key in SCENE_REGIONS:
             layout.regions[scene_key] = []
@@ -325,7 +325,7 @@ class LayoutConfigManager:
         else:
             logger.info(f"布局已加载: {name}")
             from .config.conflicts import file_baseline
-            from .scene_registry import get_registry
+            from .scene.registry import get_registry
             paths = set(scene_layout_rels(name, get_registry().all_scene_keys()).values()) | {"layouts.yaml"}
             layout._file_baselines = {path: file_baseline(get_resolver(), path) for path in paths}
         return layout

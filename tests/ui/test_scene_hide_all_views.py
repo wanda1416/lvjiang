@@ -3,9 +3,9 @@
 import yaml
 from PyQt6.QtWidgets import QCheckBox, QDialog
 
-from lvjiang.core import scene_registry
-from lvjiang.core.scene_definition import SceneRegistry
-from lvjiang.core.scene_definition_models import RegionDef
+from lvjiang.core.scene import registry as scene_registry
+from lvjiang.core.scene.definition import SceneRegistry
+from lvjiang.core.scene.definition_models import RegionDef
 from lvjiang.ui.scene_editor.scene_tab import SceneTab
 from tests.ui.test_scene_editor_reload import editor as editor
 

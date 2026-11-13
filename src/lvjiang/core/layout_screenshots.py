@@ -80,7 +80,7 @@ def scene_screenshot_name(
     index >= 2 时追加 __N 后缀，index=1 无额外后缀（向后兼容）。
     视图 key 必须以小写字母开头，纯数字后缀不会与视图名冲突。
     """
-    from .scene_definition_models import BASE_VIEW_KEY
+    from .scene.definition_models import BASE_VIEW_KEY
     if not view or view == BASE_VIEW_KEY:
         base = scene_key
     else:
@@ -278,7 +278,7 @@ def set_scene_screenshot_format(
 
 def _screenshot_base_stem(scene_key: str, view: str) -> str:
     """Return the filename stem shared by all screenshots of (scene, view)."""
-    from .scene_definition_models import BASE_VIEW_KEY
+    from .scene.definition_models import BASE_VIEW_KEY
     if not view or view == BASE_VIEW_KEY:
         return scene_key
     return f"{scene_key}__{view}"

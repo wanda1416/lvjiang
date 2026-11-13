@@ -34,7 +34,7 @@ from ...core.layout_manager import (
     scene_layout_rels,
 )
 from ...core.layout_models import Layout
-from ...core.scene_registry import get_registry
+from ...core.scene.registry import get_registry
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
 

@@ -3,7 +3,7 @@
 from loguru import logger
 from PyQt6.QtWidgets import QApplication
 
-from ...core.scene_registry import (
+from ...core.scene.registry import (
     get_effective_region_defs,
     get_region_name,
     get_scene_name,

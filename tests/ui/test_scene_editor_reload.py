@@ -6,12 +6,12 @@ import os
 import pytest
 from PyQt6.QtWidgets import QMessageBox
 
-from lvjiang.core import scene_registry
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.layout_manager import LayoutConfigManager
-from lvjiang.core.scene_config import load_scene_manifest
-from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.core.scene import registry as scene_registry
+from lvjiang.core.scene.config import load_scene_manifest
+from lvjiang.core.scene.definition import SceneRegistry
 from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
 
 

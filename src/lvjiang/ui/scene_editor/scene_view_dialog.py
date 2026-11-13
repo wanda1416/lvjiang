@@ -23,9 +23,9 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_manager import rename_view_screenshots
-from ...core.scene_definition import BASE_VIEW_KEY
-from ...core.scene_registry import get_registry, sync_scene_cache
-from ...core.scene_transitions import entries_of_view, exits_of_view
+from ...core.scene.definition import BASE_VIEW_KEY
+from ...core.scene.registry import get_registry, sync_scene_cache
+from ...core.scene.transitions import entries_of_view, exits_of_view
 from ...i18n import tr, tr_label
 from ..button_styles import (
     apply_button_style,
@@ -386,7 +386,7 @@ class ViewManagerDialog(QDialog):
             entry_lines = [(
                 tr("未声明入口，请补充按钮、快捷键或其他进入方式"), "")]
         if view is not None:
-            from ...core.scene_transitions import page_owner
+            from ...core.scene.transitions import page_owner
             owner = page_owner(scenes, self._scene_key, view_key)
             description = ("共享页面调用方：" + _scene_view_name(*owner)
                            if view.relation in ("tab", "viewport") and owner
@@ -611,7 +611,7 @@ class ViewManagerDialog(QDialog):
         view = next((v for v in self._registry.get_scene_views(self._scene_key) if v.key == key), None)
         if view is None:
             return
-        from ...core.scene_transitions import validate_view_relations
+        from ...core.scene.transitions import validate_view_relations
         old = (view.kind, view.owner, view.same_layer)
         view.kind = self._relation.currentData()
         view.owner = self._owner_value()

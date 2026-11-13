@@ -391,7 +391,7 @@ class UserConfigManager:
         if self._active_user == name:
             self._active_user = next(iter(self._users))
         self._save_order()
-        from .batch_config import remove_username_from_batch_configs
+        from .batch.config import remove_username_from_batch_configs
         remove_username_from_batch_configs(name)
         logger.info(f"用户已从列表移除，数据文件已保留: {name}")
         return True

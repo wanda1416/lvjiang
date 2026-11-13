@@ -50,7 +50,7 @@
 
 | 关注点 | 位置 |
 |---|---|
-| 配置字段与前置校验 | `core/batch_config.py`（`unattended` / `recover_unattended`） |
+| 配置字段与前置校验 | `core/batch/config.py`（`unattended` / `recover_unattended`） |
 | 弹窗改道与恢复调度 | `ui/batch/batch_runner.py`（`UnattendedInterrupt`、`_unattended_ui_callback`、`_recover_unattended`） |
 | 界面联动 | `ui/batch/batch_config_dialog.py` |
 | 随包恢复流程 | `config/system/workflows/batch/recover_to_login.wf` |

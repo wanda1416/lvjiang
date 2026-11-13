@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from lvjiang.core.batch_report import BatchReport
+from lvjiang.core.batch.report import BatchReport
 
 
 def _report() -> BatchReport:

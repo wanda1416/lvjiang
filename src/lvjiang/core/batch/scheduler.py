@@ -22,23 +22,23 @@ from typing import Any, Callable, cast
 
 from loguru import logger
 
-from ..errors import log_failure
-from ..i18n import tr
-from ..workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
-from ..workflows.errors import WorkflowAbort
-from .android.recovery import ChannelFaultError
-from .batch_config import (
+from ...errors import log_failure
+from ...i18n import tr
+from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
+from ...workflows.errors import WorkflowAbort
+from ..android.recovery import ChannelFaultError
+from ..config.resolver import get_resolver
+from ..config.users import SessionManager
+from ..fs_util import task_result_path
+from ..layout.config import canvas_aspect_matches
+from ..layout.models import Layout
+from .config import (
     BatchConfigItem,
     BatchWorkflows,
     lifecycle_parameter_definitions,
 )
-from .batch_report import BatchReport
-from .batch_run import BatchRunDraft
-from .config.resolver import get_resolver
-from .config.users import SessionManager
-from .fs_util import task_result_path
-from .layout.config import canvas_aspect_matches
-from .layout.models import Layout
+from .report import BatchReport
+from .run import BatchRunDraft
 
 # 进度状态常量
 ST_PENDING = tr("待执行")
@@ -343,9 +343,9 @@ class BatchScheduler:
 
     def _build_execution_plan(self) -> None:
         """在工作线程启动前冻结全部任务参数和用户配置。"""
-        from .config.wf_configs import get_wf_config
-        from .task_params import merge_task_params
-        from .user_config import load_user_metadata
+        from ..config.wf_configs import get_wf_config
+        from ..task_params import merge_task_params
+        from ..user_config import load_user_metadata
 
         shared = {
             script.id: get_wf_config(script.id)
@@ -380,7 +380,7 @@ class BatchScheduler:
                 params, source = merge_task_params(
                     script.parameters or [], shared[script.id], override)
                 if script.class_name:
-                    from ..workflows.implementations import get_workflow_class
+                    from ...workflows.implementations import get_workflow_class
                     loader = getattr(get_workflow_class(script.class_name), "CONFIG_SNAPSHOT_LOADER", None)
                     if loader is not None:
                         self._dedicated_configs[(username, script.id)] = copy.deepcopy(loader(username, self._session_manager._users_dir))
@@ -440,7 +440,7 @@ class BatchScheduler:
         if self._spec.execution_unit_key != "user":
             self._run_locked_by_attr()
             return
-        from .daily_history import try_create_batch_run
+        from ..daily_history import try_create_batch_run
         batch_run = try_create_batch_run(
             config_name=self._spec.name,
             **self._history_target_kwargs(),
@@ -570,7 +570,7 @@ class BatchScheduler:
                 self._execution_lease.release()
                 self._execution_lease = None
             if username:
-                from .access import AccessDeniedError, acquire_user
+                from ..access import AccessDeniedError, acquire_user
                 try:
                     self._execution_lease = acquire_user(
                         username, self._session_manager._users_dir)
@@ -686,7 +686,7 @@ class BatchScheduler:
                 report.start_script(script.id, script.name)
                 planned = self._task_plan[(run_idx, script.id)]
                 params = copy.deepcopy(planned.params)
-                from .daily_history import try_create_task_run
+                from ..daily_history import try_create_task_run
                 task_started_at = datetime.now().astimezone()
                 task_run = try_create_task_run(
                     username=username or "unknown", task_id=script.id,
@@ -873,8 +873,8 @@ class BatchScheduler:
 
     def _run_locked_by_attr(self) -> None:
         """属性单元的运行态调度；旧用户执行路径不受影响。"""
-        from .access import AccessDeniedError, acquire_user
-        from .daily_history import try_create_batch_run, try_create_task_run
+        from ..access import AccessDeniedError, acquire_user
+        from ..daily_history import try_create_batch_run, try_create_task_run
 
         if not self._spec.workflows.prepare_item:
             raise ValueError("属性执行单元必须配置条目准备工作流")
@@ -1646,7 +1646,7 @@ class BatchScheduler:
                 message=tr("批量可执行性检查只支持 DSL 工作流"),
             )
 
-        from ..workflows.discovery import resolve_workflow_path
+        from ...workflows.discovery import resolve_workflow_path
         wf_path, _resolved = resolve_workflow_path(script.wf_file, script.id)
         if wf_path is None:
             return BatchCheckResult(
@@ -1698,7 +1698,7 @@ class BatchScheduler:
             params = {}
 
         if script.class_name:
-            from ..workflows.implementations import get_workflow_class
+            from ...workflows.implementations import get_workflow_class
             ctx = self._ctx
             wf_class = get_workflow_class(script.class_name)
             wf_instance = wf_class(
@@ -1717,7 +1717,7 @@ class BatchScheduler:
 
         # DSL 工作流。批量页的候选快照可能滞后于脚本发现（升级迁移、
         # 「脚本配置」改动），所以和日常页一样按 id 自愈一次再判缺失。
-        from ..workflows.discovery import resolve_workflow_path
+        from ...workflows.discovery import resolve_workflow_path
         wf_path, _resolved = resolve_workflow_path(script.wf_file, script.id)
         if wf_path is None:
             raise FileNotFoundError(f"工作流文件不存在: {script.wf_file}")

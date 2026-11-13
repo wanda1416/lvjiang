@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import datetime
 from types import SimpleNamespace
 
-from lvjiang.core import batch_report as report_module
+from lvjiang.core.batch import report as report_module
 from lvjiang.core.daily_history import (
     TaskHistoryRepository,
     TaskRunSession,
@@ -86,7 +86,7 @@ def test_workflow_result_filename_contains_task_run_id(tmp_path, monkeypatch):
 def test_batch_result_uses_task_start_date(tmp_path, monkeypatch):
     monkeypatch.setattr("lvjiang.constants.OUTPUT_DIR", tmp_path)
     _freeze_datetime(
-        monkeypatch, "lvjiang.core.batch_scheduler.datetime", datetime(2026, 1, 1, 0, 1),
+        monkeypatch, "lvjiang.core.batch.scheduler.datetime", datetime(2026, 1, 1, 0, 1),
     )
     path = BatchWorker._save_result(
         "用户甲", SimpleNamespace(id="daily"), {"ok": True},
@@ -100,13 +100,13 @@ def test_batch_result_uses_task_start_date(tmp_path, monkeypatch):
 def test_batch_report_filename_contains_batch_run_id(tmp_path, monkeypatch):
     monkeypatch.setattr(report_module, "BATCH_REPORT_DIR", tmp_path)
     _freeze_datetime(
-        monkeypatch, "lvjiang.core.batch_report.datetime", datetime(2025, 12, 31, 23, 59),
+        monkeypatch, "lvjiang.core.batch.report.datetime", datetime(2025, 12, 31, 23, 59),
     )
     report = BatchReport(
         "配置", [("daily", "日常")], {}, batch_run_id="batch-456")
     report.start_batch()
     _freeze_datetime(
-        monkeypatch, "lvjiang.core.batch_report.datetime", datetime(2026, 1, 1, 0, 1),
+        monkeypatch, "lvjiang.core.batch.report.datetime", datetime(2026, 1, 1, 0, 1),
     )
     report.start_entry("用户甲", "用户甲")
     report.end_entry()

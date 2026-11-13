@@ -3,7 +3,7 @@
 from loguru import logger as logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ...core.batch_scheduler import (  # noqa: F401
+from ...core.batch.scheduler import (  # noqa: F401
     RESULT_FAILED,
     RESULT_SKIPPED,
     RESULT_STOPPED,

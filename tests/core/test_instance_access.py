@@ -220,8 +220,8 @@ def test_readonly_instance_persists_batch_drafts_and_active_group(
     tmp_path, monkeypatch,
 ):
     """只读实例调整执行草稿与活动组后，重启照常恢复。"""
-    from lvjiang.core import batch_run
-    from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
+    from lvjiang.core.batch import run as batch_run
+    from lvjiang.core.batch.run import BatchRunDraft, BatchSelection
 
     path = tmp_path / "interface.json"
     store = InterfaceStore(path)

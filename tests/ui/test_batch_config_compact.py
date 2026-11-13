@@ -10,7 +10,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch.config import BatchConfig, BatchConfigItem, BatchWorkflows
 from lvjiang.core.config import get_interface_store
 from lvjiang.core.profile.schema import ProfileSchema
 from lvjiang.ui.batch import batch_config_dialog as module

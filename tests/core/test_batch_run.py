@@ -3,7 +3,7 @@
 这些规则是分层之后最容易悄悄出错的地方：配置组改了可见范围，用户刚在主页面
 调好的本次顺序不该被清掉；而定义层删掉的条目必须真的消失。
 """
-from lvjiang.core.batch_run import (
+from lvjiang.core.batch.run import (
     BatchRunDraft,
     BatchSelection,
     active_group_id,
@@ -173,7 +173,7 @@ def test_two_session_instances_merge_batch_fields_atomically(
 def test_profile_sort_is_stable_and_distinguishes_missing_quota(monkeypatch):
     from types import SimpleNamespace
 
-    from lvjiang.core.batch_run import profile_user_order
+    from lvjiang.core.batch.run import profile_user_order
     from lvjiang.core.profile import schema, service
     from lvjiang.core.profile.models import MODEL_QUOTA
     monkeypatch.setattr(schema, "get_profile_config", lambda: SimpleNamespace(get_key=lambda key: object(), get_model_type=lambda key: MODEL_QUOTA if key == "quota" else "stock"))

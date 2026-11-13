@@ -58,9 +58,9 @@ ID、`selected_*` 读进 `default_*`（只保留「初始值」这一半语义�
 
 | 关注点 | 位置 |
 |---|---|
-| 定义层模型与持久化 | `core/batch_config.py` |
-| 运行草稿、协调规则、session 读写 | `core/batch_run.py` |
-| 执行快照 | `core/batch_scheduler.py`（`BatchRunSpec`） |
+| 定义层模型与持久化 | `core/batch/config.py` |
+| 运行草稿、协调规则、session 读写 | `core/batch/run.py` |
+| 执行快照 | `core/batch/scheduler.py`（`BatchRunSpec`） |
 | 定义层唯一入口 | `ui/batch/batch_config_dialog.py` |
 | 生命周期参数编辑面板 | `ui/batch/lifecycle_params.py` |
 | 运行草稿唯一入口 | `ui/batch/batch_tab.py` |
@@ -68,4 +68,4 @@ ID、`selected_*` 读进 `default_*`（只保留「初始值」这一半语义�
 一个可以直接检查的结构性证据：`batch_tab.py` **不再导入** `save_batch_config`，
 `batch_config_dialog.py` **不再有**任何读盘反向合并。
 
-公共调度器与报告位于 `core/batch_scheduler.py`、`core/batch_report.py`。桌面 `BatchWorker` 只适配 Qt 线程及信号，手机适配器使用后台线程与同一套编排；详情见 [Android 批量执行架构](../38-platform/10-android-batch.md)。
+公共调度器与报告位于 `core/batch/scheduler.py`、`core/batch/report.py`。桌面 `BatchWorker` 只适配 Qt 线程及信号，手机适配器使用后台线程与同一套编排；详情见 [Android 批量执行架构](../38-platform/10-android-batch.md)。

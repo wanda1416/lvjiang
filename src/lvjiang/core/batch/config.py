@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from loguru import logger
 
-from .fs_util import atomic_write_text
+from ..fs_util import atomic_write_text
 
 BATCH_DOCUMENT_TYPE = "lvjiang.batch"
 BATCH_CONFIG_VERSION = 2
@@ -64,7 +64,7 @@ class BatchConfigItem:
     """一个配置组的**定义**：可见范围、初始顺序、默认勾选与生命周期结构。
 
     这里只放"配置组是什么"。"本次要跑哪些、跑几轮、有没有人看守"属于运行草稿
-    （`core/batch_run.py`），存在 session 里，由主页面维护——定义层永远不被
+    （`core/batch/run.py`），存在 session 里，由主页面维护——定义层永远不被
     主页面的一次临时选择改写。
     """
 
@@ -99,7 +99,7 @@ class BatchConfigItem:
             self.id = uuid4().hex
 
     def normalize(self) -> None:
-        from .user_config import is_valid_username
+        from ..user_config import is_valid_username
 
         if not isinstance(self.id, str) or not self.id:
             self.id = uuid4().hex
@@ -196,8 +196,8 @@ def lifecycle_parameter_definitions(
     workflows: BatchWorkflows,
 ) -> dict[str, list[dict]]:
     """读取四个生命周期工作流声明的参数定义。"""
-    from ..workflows.metadata import metadata_for_script_config
-    from .config.resolver import get_resolver
+    from ...workflows.metadata import metadata_for_script_config
+    from ..config.resolver import get_resolver
 
     definitions: dict[str, list[dict]] = {}
     for phase in WORKFLOW_PHASES:
@@ -220,8 +220,8 @@ def declares_unit_prepare(wf_name: str) -> bool:
     协议错误被丢弃。作者用 ``#% batch_unit_prepare: true`` 显式声明，批量层据此
     在开始前拦截，而不是靠猜 wf 内容或写死文件名——用户自写的准备 wf 同样可以声明。
     """
-    from ..workflows.metadata import metadata_for_script_config
-    from .config.resolver import get_resolver
+    from ...workflows.metadata import metadata_for_script_config
+    from ..config.resolver import get_resolver
 
     if not wf_name:
         return False
@@ -311,7 +311,7 @@ class BatchConfig:
 class BatchConfigStore:
     def __init__(self, path: Path | None = None):
         if path is None:
-            from .. import constants
+            from ... import constants
             path = constants.BATCH_CONFIG_PATH
         self.path = Path(path)
         self._thread_lock = _WRITE_LOCK

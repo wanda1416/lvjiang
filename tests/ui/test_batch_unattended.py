@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
-from lvjiang.core.batch_run import BatchRunDraft
+from lvjiang.core.batch.config import BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch.run import BatchRunDraft
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.layout.models import CanvasConfig, Layout
 from lvjiang.core.user_config import User, save_user_metadata
@@ -334,7 +334,7 @@ def test_task_stop_signal_is_distinct_from_batch_stop(tmp_path, qapp):
     """
     import threading
 
-    from lvjiang.core.batch_scheduler import RESULT_STOPPED, ST_STOPPED
+    from lvjiang.core.batch.scheduler import RESULT_STOPPED, ST_STOPPED
 
     task_event = threading.Event()
     batch_event = threading.Event()

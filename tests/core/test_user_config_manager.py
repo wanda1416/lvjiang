@@ -328,7 +328,7 @@ class TestUserConfigManagerCRUD:
         }
 
     def test_delete_user_removes_it_from_batch_configs(self, session_env):
-        from lvjiang.core.batch_config import (
+        from lvjiang.core.batch.config import (
             BatchConfig,
             BatchConfigItem,
             load_batch_config,

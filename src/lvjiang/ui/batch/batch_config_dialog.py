@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
-from ...core.batch_config import (
+from ...core.batch.config import (
     BatchConfigConflict,
     BatchConfigItem,
     BatchWorkflows,

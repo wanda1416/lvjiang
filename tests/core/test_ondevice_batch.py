@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from lvjiang.core.batch_config import BatchConfig, BatchConfigItem
+from lvjiang.core.batch.config import BatchConfig, BatchConfigItem
 from lvjiang.core.ondevice import batch, task_runner
 
 
@@ -19,7 +19,7 @@ def batch_state(monkeypatch, tmp_path):
                            usernames=["viewer"], default_task_ids=["first", "second"], default_usernames=["viewer"])
     store = BatchConfig({item.id: item})
     monkeypatch.setattr(batch, "load_batch_config", lambda: store)
-    from lvjiang.core import batch_config
+    from lvjiang.core.batch import config as batch_config
     def mutate(mutator):
         mutator(store)
         return store
@@ -67,8 +67,8 @@ def test_lifecycle_parameters_are_validated_against_the_workflow(
     batch_state, monkeypatch,
 ):
     """参数属于运行草稿：视图按 wf 定义下发，保存时裁剪未声明键并校验可见值。"""
-    from lvjiang.core import batch_config
-    from lvjiang.core.batch_run import load_draft
+    from lvjiang.core.batch import config as batch_config
+    from lvjiang.core.batch.run import load_draft
     item, _ = batch_state
     item.workflows.prepare_item = "batch/prepare_item.wf"
     definitions = [
@@ -103,7 +103,7 @@ def test_lifecycle_parameters_are_validated_against_the_workflow(
 
 def test_allow_portrait_requires_item_preparation_workflow(batch_state):
     """允许竖屏会先把客户端收回登录页，没有条目准备就没人把它送进游戏。"""
-    from lvjiang.core.batch_run import load_draft
+    from lvjiang.core.batch.run import load_draft
 
     item, _ = batch_state
     item.workflows.recover_unattended = "batch/recover_to_login.wf"
@@ -141,14 +141,14 @@ def test_attribute_unit_requires_preparation_protocol(batch_state):
 
 
 def test_definition_editor_does_not_change_active_group_or_run_draft(batch_state):
-    from lvjiang.core.batch_run import active_group_id, set_active_group_id
+    from lvjiang.core.batch.run import active_group_id, set_active_group_id
     item, _ = batch_state
     set_active_group_id(item.id)
     view = json.loads(batch.view(item.id))
     draft = view["draft"]
     draft["tasks"]["order"] = ["second", "first"]
     assert json.loads(batch.save(item.id, json.dumps(draft)))["ok"]
-    from lvjiang.core.batch_run import load_draft
+    from lvjiang.core.batch.run import load_draft
     before = load_draft(item.id).to_dict()
     model = json.loads(batch.editor(item.id))
     definition = model["definition"]
@@ -166,7 +166,7 @@ def test_definition_editor_does_not_change_active_group_or_run_draft(batch_state
 
 
 def test_delete_definition_only_repairs_deleted_reference(batch_state):
-    from lvjiang.core.batch_run import active_group_id, set_active_group_id
+    from lvjiang.core.batch.run import active_group_id, set_active_group_id
     item, _ = batch_state
     payload = json.loads(batch.editor())["definition"]
     payload["name"] = "另一个配置"

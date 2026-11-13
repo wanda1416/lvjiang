@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.batch_config import BatchWorkflows, lifecycle_parameter_definitions
+from ...core.batch.config import BatchWorkflows, lifecycle_parameter_definitions
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
 from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode

@@ -1,7 +1,7 @@
 """配置组定义层：只存"配置组是什么"，运行态一律不进 batch.json。"""
 import json
 
-from lvjiang.core.batch_config import (
+from lvjiang.core.batch.config import (
     BATCH_DOCUMENT_TYPE,
     BatchConfig,
     BatchConfigItem,
@@ -169,7 +169,7 @@ def test_lifecycle_parameter_definitions_reads_workflow_metadata():
     assert stop_app[0]["label"]
 def test_v2_does_not_interpret_v1_selection_fields(monkeypatch):
     messages = []
-    monkeypatch.setattr("lvjiang.core.batch_config.logger.warning", messages.append)
+    monkeypatch.setattr("lvjiang.core.batch.config.logger.warning", messages.append)
     config = BatchConfig.from_dict({
         "document_type": BATCH_DOCUMENT_TYPE, "version": 2,
         "groups": {"group": {

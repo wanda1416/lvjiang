@@ -4,8 +4,8 @@ from types import SimpleNamespace
 import pytest
 
 from lvjiang.core.access import AccessDeniedError, acquire_user
-from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
-from lvjiang.core.batch_run import BatchRunDraft
+from lvjiang.core.batch.config import BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch.run import BatchRunDraft
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.config.wf_configs import set_wf_config

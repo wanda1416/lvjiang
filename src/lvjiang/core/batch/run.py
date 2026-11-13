@@ -7,7 +7,7 @@
 - **运行草稿** `BatchRunDraft`（`interface.json` 根节点的 `batch`）——本次要跑哪些、
   按什么顺序、跑几轮、有没有人看守、生命周期参数怎么填。主页面改它，**永不反写
   定义层**。
-- **执行快照** `BatchRunSpec`（内存，见 `core/batch_scheduler.py`）——点开始那一刻
+- **执行快照** `BatchRunSpec`（内存，见 `core/batch/scheduler.py`）——点开始那一刻
   把上面两层合成一份冻结数据，调度器只认它。
 
 草稿按配置组的**稳定 ID** 隔离：用名称做 key 的话，重命名要搬迁状态，删掉再建
@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from .batch_config import WORKFLOW_PHASES
+from .config import WORKFLOW_PHASES
 
 
 def _workflow_params(value: object) -> dict[str, dict]:
@@ -202,14 +202,14 @@ _BATCH_NODE = "batch"
 
 
 def _batch_node() -> dict:
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
 
     node = get_interface_store().get_node(_BATCH_NODE, {})
     return node if isinstance(node, dict) else {}
 
 
 def _mutate_batch_node(mutator: Callable[[dict], None]) -> None:
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
 
     def _merge(old: object) -> dict:
         node = dict(old) if isinstance(old, dict) else {}
@@ -289,9 +289,9 @@ def profile_user_order(order: list[str], key: str, direction: str) -> tuple[list
 
     from loguru import logger
 
-    from .profile.models import MODEL_QUOTA
-    from .profile.schema import get_profile_config
-    from .profile.service import profile_read
+    from ..profile.models import MODEL_QUOTA
+    from ..profile.schema import get_profile_config
+    from ..profile.service import profile_read
     schema = get_profile_config()
     if schema.get_key(key) is None:
         raise ValueError("指定排序的数据项已不可用，请在批量配置中重新选择")

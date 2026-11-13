@@ -11,15 +11,15 @@ from uuid import uuid4
 from loguru import logger
 
 from ...errors import log_failure
-from ..batch_config import declares_unit_prepare, load_batch_config
-from ..batch_run import (
+from ..batch.config import declares_unit_prepare, load_batch_config
+from ..batch.run import (
     BatchRunDraft,
     active_group_id,
     load_draft,
     save_draft,
     set_active_group_id,
 )
-from ..batch_scheduler import (
+from ..batch.scheduler import (
     ST_FAILED,
     ST_PENDING,
     ST_SKIPPED,
@@ -95,7 +95,7 @@ def _state(group_id: str = ""):
         meta, _ = metadata_for_script_config(path) if path else ({}, "")
         labels[phase] = meta.get("name") or (Path(name).stem if name else "")
     view["workflow_names"] = labels
-    from ..batch_config import lifecycle_parameter_definitions
+    from ..batch.config import lifecycle_parameter_definitions
     from ..task_params import merge_task_params, parameters_for_values
     lifecycle: dict[str, dict] = {}
     for phase, definitions in lifecycle_parameter_definitions(
@@ -124,7 +124,7 @@ def _state(group_id: str = ""):
 
 def _validate_workflow_params(item, draft: BatchRunDraft) -> None:
     """按当前工作流定义校验并裁剪本次参数，丢弃已不再声明的键。"""
-    from ..batch_config import lifecycle_parameter_definitions
+    from ..batch.config import lifecycle_parameter_definitions
     from ..task_params import merge_task_params, parameters_for_values
     from .task_settings import _validate
     phase_names = {
@@ -374,7 +374,7 @@ def editor(group_id: str = "") -> str:
             from ...workflows.discovery import discover_scripts, script_display_name
             from ...workflows.file_tree import list_workflow_files
             from ...workflows.metadata import metadata_for_script_config
-            from ..batch_config import BatchConfigItem
+            from ..batch.config import BatchConfigItem
             from ..config.resolver import get_resolver
             from ..profile.schema import get_profile_config
             from ..user_config import load_user_metadata
@@ -427,7 +427,7 @@ def _definition_token(item) -> str:
 def lifecycle_preview(workflows: str, values: str) -> str:
     with task_runner.CONTROL_LOCK:
         try:
-            from ..batch_config import BatchWorkflows, lifecycle_parameter_definitions
+            from ..batch.config import BatchWorkflows, lifecycle_parameter_definitions
             from ..task_params import merge_task_params, parameters_for_values
             from .task_settings import _validate
             wf = BatchWorkflows.from_dict(json.loads(workflows))
@@ -451,7 +451,7 @@ def lifecycle_preview(workflows: str, values: str) -> str:
 def save_definition(group_id: str, token: str, payload: str) -> str:
     with task_runner.CONTROL_LOCK:
         try:
-            from ..batch_config import (
+            from ..batch.config import (
                 BatchConfigItem,
                 mutate_batch_config,
             )
@@ -496,8 +496,8 @@ def save_definition(group_id: str, token: str, payload: str) -> str:
 def delete_definition(group_id: str, token: str) -> str:
     with task_runner.CONTROL_LOCK:
         try:
-            from ..batch_config import mutate_batch_config
-            from ..batch_run import forget_draft
+            from ..batch.config import mutate_batch_config
+            from ..batch.run import forget_draft
             if task_runner.is_running():
                 raise ValueError("结束执行后可删除配置组")
             def remove(config):
@@ -515,7 +515,7 @@ def delete_definition(group_id: str, token: str) -> str:
 def sort_users(group_id: str) -> str:
     with task_runner.CONTROL_LOCK:
         try:
-            from ..batch_run import profile_user_order
+            from ..batch.run import profile_user_order
             if task_runner.is_running():
                 raise ValueError("结束执行后可调整顺序")
             item, draft, _, _, _ = _state(group_id)

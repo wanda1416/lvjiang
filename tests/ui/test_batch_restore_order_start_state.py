@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QTreeWidget
 
-from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
+from lvjiang.core.batch.run import BatchRunDraft, BatchSelection
 from lvjiang.ui.batch.batch_tab import BatchTab, _ReorderTreeWidget
 
 

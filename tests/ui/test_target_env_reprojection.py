@@ -20,8 +20,8 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QTreeWidgetItem
 
-from lvjiang.core.batch_config import BatchConfigItem
-from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
+from lvjiang.core.batch.config import BatchConfigItem
+from lvjiang.core.batch.run import BatchRunDraft, BatchSelection
 from lvjiang.ui.batch.batch_tab import BatchTab, _ReorderTreeWidget
 from lvjiang.ui.main.execution_targets import (
     ExecutionTarget,

@@ -12,7 +12,7 @@ from unittest.mock import patch
 from PyQt6.QtWidgets import QApplication, QSplitter
 
 import lvjiang.ui.batch.batch_config_dialog as m
-from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch.config import BatchConfig, BatchConfigItem, BatchWorkflows
 from lvjiang.core.profile.schema import ProfileSchema
 
 app = QApplication(sys.argv)

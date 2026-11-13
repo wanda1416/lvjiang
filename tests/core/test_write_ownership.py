@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import pytest
 
 from lvjiang.core import access
-from lvjiang.core.batch_config import (
+from lvjiang.core.batch.config import (
     BatchConfigConflict,
     BatchConfigItem,
     BatchConfigStore,

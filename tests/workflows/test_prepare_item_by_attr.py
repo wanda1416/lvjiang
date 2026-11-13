@@ -52,7 +52,7 @@ def test_only_the_attribute_wf_declares_the_unit_prepare_protocol():
     以前配错只能等跑起来抛「未返回本单元可执行的用户名」，每个单元都被丢弃、
     整批空跑。声明放在 wf 头部，批量层据此在开始前拦截。
     """
-    from lvjiang.core.batch_config import declares_unit_prepare
+    from lvjiang.core.batch.config import declares_unit_prepare
 
     assert declares_unit_prepare("batch/prepare_item_by_attr.wf") is True
     assert declares_unit_prepare("batch/prepare_item.wf") is False

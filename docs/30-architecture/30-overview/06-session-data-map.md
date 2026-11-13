@@ -60,7 +60,7 @@
 |------|------|----------|------|
 | `logs/output/{用户}/{年-月}/DD/` | 工作流结果 JSON | `core/fs_util.task_result_path` | 历史库以相对 `PROJECT_ROOT` 的路径记录（`result_path`）；旧版本写在 `config/session/output`，旧记录直接指向旧目录，照旧打得开 |
 | `logs/daily/{用户}/{年-月}/DD/` | 逐任务日志 | `core/daily_history.default_log_root` | 历史库以 `log_path` 指向 |
-| `logs/batch/{年-月}/DD/` | 批量报告 | `core/batch_report.py` | 历史库以 `report_path` 指向 |
+| `logs/batch/{年-月}/DD/` | 批量报告 | `core/batch/report.py` | 历史库以 `report_path` 指向 |
 | `logs/tuning/{用户}/{年-月}/DD/` | 调律说明 Markdown | `apps/yysls/workflows/tuning_doc.py` | 历史库以 `markdown_path` 指向 |
 
 这四类路径都存在历史库里，移动目录要让旧记录继续可用：历史库记录的是相对 `PROJECT_ROOT`
@@ -72,7 +72,7 @@
 |------|------|----------|------|
 | `session.json` | `users`（用户名册与顺序）、`settings`、`daily.scripts`（脚本顺序/启停/显示名）、`wf_configs`（按 `wf_id` 的工作流参数）、`plans`（不分发的机器级方案） | `SessionStore`（`core/config/session.py`） | 节点语义见 04-config-layering；写入口是 `get_node`/`set_node`/`update_node`/`mutate_node`，禁止外部直接读写文件 |
 | `interface.json` | `actives`（当前用户/布局/空间/环境/方案）、`daily`（当前脚本与分组）、`ui_state`（窗口、分栏、页签、列宽）、`batch`（活动组 ID 与草稿）、`profile`（总览分组与顺序）、`alert_info`、`alert_history`、`server_config`（公告、遥测、在线配置状态） | `InterfaceStore`（`core/config/interface.py`） | 页面级状态唯一写入口是 `update_ui_page_state`，不得整节点替换 |
-| `batch.json` | 批量活动组的**定义**（`groups`） | `core/batch_run.py` | 与 `interface.json.batch` 分工：定义在 batch.json，当前选中与草稿在 interface.json |
+| `batch.json` | 批量活动组的**定义**（`groups`） | `core/batch/run.py` | 与 `interface.json.batch` 分工：定义在 batch.json，当前选中与草稿在 interface.json |
 | `content.json` | 内容修订索引：按实体记 revision | `core/config/content.py` | 可重建；任务读取不依赖它，缺失或损坏只影响这份记录本身 |
 
 `session.json` 与 `users/{名}.session.json` 只是名字像，归属完全不同：前者是 App/UI 状态，

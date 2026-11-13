@@ -1,5 +1,5 @@
 """生命周期参数面板：类型往返与 require 显隐，值只属于本次运行草稿。"""
-from lvjiang.core.batch_config import BatchWorkflows
+from lvjiang.core.batch.config import BatchWorkflows
 from lvjiang.ui.batch import lifecycle_params as module
 from lvjiang.ui.batch.lifecycle_params import LifecycleParamsPanel
 

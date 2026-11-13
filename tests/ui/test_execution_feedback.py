@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from PyQt6.QtWidgets import QPushButton, QTabWidget, QWidget
 
 from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
-from lvjiang.core.batch_config import BatchConfigItem
+from lvjiang.core.batch.config import BatchConfigItem
 from lvjiang.ui.batch.batch_tab import BatchTab
 from lvjiang.ui.execution.feedback import (
     ExecutionFeedback,

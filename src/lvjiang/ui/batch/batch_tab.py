@@ -50,12 +50,12 @@ from lvjiang.ui.execution.feedback import (
 )
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
-from ...core.batch_config import (
+from ...core.batch.config import (
     BatchConfigItem,
     declares_unit_prepare,
     load_batch_config,
 )
-from ...core.batch_run import (
+from ...core.batch.run import (
     BatchRunDraft,
     BatchSelection,
     active_group_id,
@@ -1082,7 +1082,7 @@ class BatchTab(QWidget):
             logger.warning(f"指定顺序排序已取消：Profile 定义不存在: {key}")
             return
         order = self._tree_order(self._user_list, self._user_name)
-        from ...core.batch_run import profile_user_order
+        from ...core.batch.run import profile_user_order
         sorted_order, missing = profile_user_order(order, key, group.profile_sort_direction)
         self._updating_user_list = True
         try:

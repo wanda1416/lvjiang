@@ -195,10 +195,11 @@ def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_
 
     result = _profile_observe(engine, "weekly_progress", 0)
 
-    assert result == {"accepted": True, "value": 0.0, "reason": "unchanged"}
+    # 跨周期观测 0：先原子归零落库（历史留一条 reset），不能只做显示归零
+    assert result == {"accepted": True, "value": 0.0, "reason": "updated"}
     entry = db_read_entry(profile_func_env.username, "quota", "weekly_progress")
-    assert entry["value"] == 800
-    assert entry["updated_at"] == old_ts
+    assert entry["value"] == 0
+    assert entry["updated_at"] != old_ts
 
 
 def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):

@@ -22,7 +22,7 @@ from loguru import logger
 
 from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
-from . import repository
+from . import regen_gate, repository
 from .arbitrate import canonical_event, is_strictly_newer
 
 
@@ -90,17 +90,33 @@ def remote_head(token: str) -> int | None:
 
 
 def state_problem(token: str) -> str:
-    """同步前的进度校验。水位超前不再要求用户清除，交给 rebase 把水位拉回。"""
-    del token
+    """同步前的进度校验：返回提示文案，没问题返回空串。
+
+    只做「发现并告知」，不修正任何本地状态。只比较 ``remote_history_id``：
+    它与 head 同在远端编号空间；``local_history_id`` 是本地编号，与 head 不可比。
+    鉴权失败 / 网络失败（head 未知）时跳过校验——那是连接问题，不是进度问题，
+    让后续真正的同步调用报准确的错。
+    """
+    state = _state()
+    head = remote_head(token)
+    if head is None:
+        return ""
+    remote = int(state.get("remote_history_id") or 0)
+    if remote > head:
+        return RESET_HINT
     return ""
 
 
 def profile_protocol_block(token: str) -> str:
-    """协议不是 2 时返回提示，调用方不得再发 Profile op。"""
+    """协议不是 2 时返回提示，调用方不得再发 Profile op。
+
+    只有在**拿到响应且版本不符**时才阻断；网络/鉴权失败返回空串，
+    由真正的同步调用报错，避免一次探测超时把整轮同步停摆。
+    """
     try:
         body = post("/api/sync/state", {}, token)
-    except SyncError as error:
-        return str(error)
+    except SyncError:
+        return ""
     if body.get("protocol_version") != 2:
         return "服务端尚未升级，已停止总览同步"
     return ""
@@ -516,9 +532,14 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
         save_profile_sync_state(state)
     state["remote_history_id"] = since
     # 干净拉取记一笔诊断时间。单条 op 回放失败只进 report.errors，游标照样前移。
-    if not report.errors and not report.pending:
+    completed = not report.errors and not report.pending
+    if completed:
         state["last_pull_ok_at"] = datetime.now().isoformat(timespec="seconds")
     save_profile_sync_state(state)
+    if completed:
+        # 只有干净拉取才算「本进程已完成首次同步」：周期恢复闸门据此放行推算，
+        # 否则会用过期锚点算出恢复值并写坏跨端数据（2026-11-09 体力事故）。
+        regen_gate.mark_pull_completed()
     return report
 
 

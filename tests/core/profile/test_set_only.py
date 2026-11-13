@@ -103,7 +103,8 @@ def test_unscoped_history_still_rewrites_entry(tmp_path, monkeypatch) -> None:
     assert value == 7
 
 
-def test_unlock_rebuilds_entry_from_latest_op(tmp_path, monkeypatch) -> None:
+def test_unlock_keeps_value_frozen(tmp_path, monkeypatch) -> None:
+    """解锁只解除标记：值保持锁定时的样子，不用账本重建（否则解锁瞬间跳变）。"""
     monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
     repository.reset_profile_db()
     repository.db_upsert("u", "stock", "k", 3, change_type="set",
@@ -123,8 +124,7 @@ def test_unlock_rebuilds_entry_from_latest_op(tmp_path, monkeypatch) -> None:
         conn.close()
     assert repository.db_unlock("u", "stock", "k")
     entry = repository.db_read_entry("u", "stock", "k")
-    assert entry["value"] == 9
-    assert entry["op_id"] == "later-op"
+    assert entry["value"] == 3
     assert "locked" not in entry
 
 

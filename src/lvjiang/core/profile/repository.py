@@ -778,9 +778,12 @@ class ProfileDB:
             self._release_connection(conn)
 
     def unlock(self, username: str, type_: str, key: str) -> bool:
-        """解除锁定，并用该 key 账本里最新的 set/delta 重建条目。"""
-        from .arbitrate import canonical_event, event_rank
+        """解除锁定；返回是否发生了变化。值保持锁定时的样子。
 
+        锁定期间的值写入被拒绝，但账本里可能有他机写过的行；解锁时**不得**用账本
+        重建值——那会让值在解锁瞬间跳变（regen 会按旧锚点补算上千点），
+        与「锁定期间冻结」的承诺相反。
+        """
         conn = self._borrow_connection()
         try:
             self._begin(conn)
@@ -789,31 +792,8 @@ class ProfileDB:
                 "WHERE username=? AND type=? AND key=? AND locked=1",
                 (username, type_, key),
             )
-            if cursor.rowcount != 1:
-                self._commit(conn)
-                return False
-            rows = conn.execute(
-                "SELECT new_value, new_value_text, ts, op_id FROM profile_history "
-                "WHERE username=? AND type=? AND key=? "
-                "AND change_type IN ('set', 'delta')",
-                (username, type_, key),
-            ).fetchall()
-            winner = None
-            for new_value, new_value_text, ts, op_id in rows:
-                rank = event_rank(ts, op_id)
-                if winner is None or rank > winner[0]:
-                    winner = (rank, new_value, new_value_text, ts, op_id)
-            if winner is not None:
-                _rank, new_value, new_value_text, ts, op_id = winner
-                conn.execute(
-                    "UPDATE profile_entries SET value=?, value_text=?, updated_at=?, op_id=? "
-                    "WHERE username=? AND type=? AND key=?",
-                    (float(new_value or 0), new_value_text or "",
-                     canonical_event(ts) or (ts or ""), op_id or "",
-                     username, type_, key),
-                )
             self._commit(conn)
-            return True
+            return cursor.rowcount == 1
         except Exception:
             self._rollback(conn)
             raise
@@ -1576,13 +1556,17 @@ class ProfileDB:
             self._release_connection(conn)
 
     def cleanup_history(self, days: int = 90) -> int:
-        """清理 N 天前的历史记录，返回删除行数"""
+        """清理 N 天前的历史记录，返回删除行数
+
+        只按时间删：升级前遗留的行 ``remote_id`` 恒为 NULL，若要求已 ack
+        就永远清不掉，库只增不减。待上传的行本来就在天数之内（新写入）。
+        """
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
 
         conn = self._borrow_connection()
         try:
             cursor = conn.execute(
-                "DELETE FROM profile_history WHERE ts < ? AND remote_id IS NOT NULL",
+                "DELETE FROM profile_history WHERE ts < ?",
                 (cutoff,),
             )
             self._commit(conn)

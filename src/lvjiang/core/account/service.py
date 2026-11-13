@@ -218,6 +218,7 @@ def _store_refresh_token(token: str) -> None:
     if not user:
         if token:
             raise AccountError("缺少实例标识，无法保存登录态")
+        _invalidate_session_cache()
         return
     try:
         backend = _credentials()
@@ -229,6 +230,17 @@ def _store_refresh_token(token: str) -> None:
         raise
     except Exception as error:
         raise AccountError(f"无法写入系统凭据库：{error}") from None
+    finally:
+        # 登录 / 恢复 / 登出都从这里过：登录态一变就作废观测缓存，否则周期恢复
+        # 闸门会拿着 60 秒前的结论放行或拦住（2026-11-09 闸门评审意见 ①）。
+        _invalidate_session_cache()
+
+
+def _invalidate_session_cache() -> None:
+    """通知周期恢复闸门：登录态可能已变化。函数内导入避免与 profile 包循环。"""
+    from ..profile.regen_gate import invalidate_session_cache
+
+    invalidate_session_cache()
 
 
 def stored_session_state() -> bool | None:

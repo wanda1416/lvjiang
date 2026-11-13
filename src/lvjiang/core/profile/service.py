@@ -35,6 +35,7 @@ from .regen import (
     compute_regen_entry,
     is_realtime_regen,
 )
+from .regen_gate import period_recovery_allowed
 from .repository import (
     db_get_history,
     db_get_history_record,
@@ -112,10 +113,8 @@ def undo_profile_history(history_id: int) -> None:
         profile_action(username, key, set_value=record.get("old_value_text") or "",
                        source=source, trigger_sync=False)
         return
-    profile_action(
-        username, key, set_value=float(record.get("old_value") or 0),
-        source=source, trigger_sync=False,
-    )
+    reverse = float(record.get("old_value") or 0) - float(record.get("new_value") or 0)
+    profile_action(username, key, delta=reverse, source=source, trigger_sync=False)
 
 
 @profile_write
@@ -355,7 +354,26 @@ def profile_observe(
 
         current = _quota_display_value(entry, kd) if entry else 0.0
         if not is_current_period:
-            current = 0.0
+            # 跨周期：先把旧周期满值原子归零落库（历史里留一条 reset），
+            # 再按新周期从 0 起算写入本次观测；只做显示归零会让库里长期留着旧值。
+            reset = db_update_if_current(
+                username,
+                MODEL_QUOTA,
+                key,
+                expected_value=entry.get("value", 0) or 0,
+                expected_updated_at=entry.get("updated_at", ""),
+                expected_entry_exists=bool(entry),
+                new_value=0,
+                change_type="reset",
+                delta_value=-float(entry.get("value", 0) or 0),
+                source="周期重置",
+            )
+            if not reset:
+                continue
+            if candidate == 0:
+                return {"accepted": True, "value": 0.0, "reason": "updated"}
+            # 已原子推进到当前周期；下一轮按同周期观测写入并触发同步。
+            continue
         if candidate < current:
             return {"accepted": False, "value": current, "reason": "regressed"}
         if candidate == current:
@@ -368,9 +386,9 @@ def profile_observe(
                 set_value=candidate,
                 source=source,
                 current_value=current,
-                expected_entry=entry or None,
+                expected_entry=entry,
                 trigger_sync=True,
-                use_cas=bool(entry),
+                use_cas=True,
             )
         except ProfileWriteConflict:
             continue
@@ -497,6 +515,36 @@ def profile_action(
         _raw = _read_current_value(username, model_type, key, kd)
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
+
+    # ── 1.5 regen 固化：先把「上次写入至今的恢复」落成一条 set ──
+    # 不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
+    # 两处基线不一致：回放（delta 相加）、撤销、按来源聚合都会算错，
+    # 当天的恢复也会从账本里消失。
+    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+        stored_value = float((current_entry or {}).get("value", 0) or 0)
+        restored = compute_regen_entry(current_entry or {}, kd)
+        restored_value = float(restored.value)
+        restored_at = restored.updated_at
+        if int(restored_value) != int(stored_value):
+            # 闸门：本次进程尚未完成首次同步时不得物化，否则会把「基于过期锚点
+            # 算出的恢复」写成绝对值 set 上行，覆盖别的设备真实发生的消耗
+            # （2026-11-09 体力事故）。同步完成后锚点已在本周期，这里自然不触发。
+            if period_recovery_allowed():
+                db_upsert(
+                    username, model_type, key, restored_value,
+                    updated_at=restored_at,
+                    # 物化用 set 而非 tick：set 会随上行通道推送，「锚点 set + delta」
+                    # 成对到达回放端，delta 加在新锚点上，回放端无需再算 regen。
+                    change_type="set",
+                    delta_value=_normalize_float_noise(restored_value - stored_value),
+                    source=tr("自动恢复"),
+                )
+                current_entry = db_read_entry(username, model_type, key)
+                current_value = float(restored.value)
+                if expected_entry is not None:
+                    # 固化是本事务自己写的：CAS 期望值必须跟着换，否则会被误判成
+                    # 「其他进程更新过」，单进程一次消耗也会报冲突。
+                    expected_entry = current_entry
 
     # ── 2. 计算目标新值 ──
     if set_value is not None:

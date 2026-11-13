@@ -211,8 +211,11 @@ def compute_regen_entry(entry: Entry | None, kd: RegenKeyDef,
         value = compute_realtime_value(stored_value, event_at, kd, now)
         return RegenResult(value=value, event_at=event_at, persisted=False)
     if kd.regen_type == REGEN_BOUNDARY:
+        # 准点恢复也改为读时计算：边界触发不再自动落库（多端同时固化会基于
+        # 各自基线产出不同绝对值，LWW 无法收敛）。真实写入发生时才在写路径
+        # 固化（service 的两行模式），与 realtime 同构。
         value, new_ts = compute_boundary_value(stored_value, event_at, kd, now)
-        return RegenResult(value=value, event_at=new_ts, persisted=True)
+        return RegenResult(value=value, event_at=new_ts, persisted=False)
     logger.error(f"非法 regen_type={kd.regen_type!r}，不计算回复")
     return RegenResult(value=float(stored_value or 0), event_at=event_at, persisted=False)
 

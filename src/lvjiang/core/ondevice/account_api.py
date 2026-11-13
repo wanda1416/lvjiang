@@ -1,13 +1,7 @@
 """Android 账户桥接 —— 登录/登出/状态/同步四个 JSON 入口，供 PyBridge 调用。
 
-与 PC 端的差异（按定案）：
-- **只收不发**：手机 profile 只从云端快照 + 历史回放获取，永不上行——
-  手机的 db 可能被离线包整库重建，推上去的是 PC 旧账，自己写的行又被
-  下一次包冲掉；上行数据走既有的离线回传通道（手机 → PC → 云）。
-- **不建快照**：Android 没有 profile 编辑能力，快照永远由 PC 刷新。
-- **服从总览数据来源模式**：``profile_source`` 为 pc 模式时整体跳过
-  profile 同步（离线包独占这份 db）。
-- 云端没有快照时不做同步（无基线可回放）。
+profile 行为与 PC 一致：pull + push 全量、云端无快照时自动建首份基线；
+本地数据可用「清除数据」重置，之后同步自动重建。
 """
 from __future__ import annotations
 
@@ -107,12 +101,8 @@ def _sync(token: str) -> dict:
     上行会把云端定义回退成旧版；建快照等于把手机 db 当成全网基线。两条都
     在底层做了硬门禁（``allow_push=False`` / ``refresh_snapshot`` 拒绝）。
     """
-    from . import profile_source
-
-    if profile_source.mode() == profile_source.PC:
-        return {"synced": True, "skipped": "profile",
-                "message": "总览数据处于 PC端模式，已跳过在线同步"}
     from ..profile.snapshot_sync import (
+        _ensure_baseline,
         profile_protocol_block,
         pull_and_replay,
         push_local,
@@ -125,13 +115,18 @@ def _sync(token: str) -> dict:
     definition = sync_definition(token, allow_push=False)
     pulled = pull_and_replay(token)
     errors = [*definition.errors, *pulled.errors]
-    # 先拉后推。没有快照、本地已有数据都不再要求用户清除。
+    # 先拉后推，与 PC 的 sync_all 同序；云端没有基线且本机有数据时自动建
+    # （_ensure_baseline 内部经 refresh_snapshot，手机门禁已随模式一起删除）。
     pushed = push_local(token)
     errors.extend(pushed.errors)
+    seeded = _ensure_baseline(token)
+    if seeded is not None:
+        errors.extend(seeded.errors)
     if pushed.rejected and not any("校准" in item for item in errors):
         errors.append(f"有 {pushed.rejected} 条记录因时间异常未上传，请校准系统时间")
     return {"synced": not errors,
             "pulled": pulled.pulled, "pushed": pushed.pushed,
+            "snapshots": pulled.snapshots + (seeded.snapshots if seeded else 0),
             "rejected": pushed.rejected,
             "message": "；".join(errors[:3]) if errors else ""}
 

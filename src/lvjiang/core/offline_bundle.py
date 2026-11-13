@@ -39,11 +39,10 @@ _LAYER_PATTERNS = (
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",
 )
-# profile.json 是用户总览的可见结构：手机端没有结构编辑能力，带上 PC 的结构
-# 才能直接看到一致的分组与列；手机上要换结构只能点「下载页面结构」。
-_SESSION_FILES = ("session.json", "interface.json", "profile.yaml", "profile.json",
-                  "batch.json")
-_DATABASE_FILES = ("profile.db",)
+_SESSION_FILES = ("session.json", "interface.json", "batch.json")
+
+#: profile.db 不进离线包：总览数据由账号云端同步；其余数据库由 app 钩子声明。
+_DATABASE_FILES: tuple[str, ...] = ()
 
 #: 配置目录里**由本机独占**的文件（相对 ``config/``）：实例出生标识、登录令牌、
 #: 账号名等本机登录态。它们不属于同步契约，打包侧不得收进清单，安装侧一个字节
@@ -83,13 +82,11 @@ def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple
             yield from ((Path("session") / name, session / name) for name in app.offline_session_files())
 
 
-def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str,
-                         include_profile: bool = True) -> dict:
+def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str) -> dict:
     """构造配置副本和 SQLite backup 快照；不修改 PC 的活动选择或数据库。
 
-    ``include_profile=False``（云端模式配置包）：不携带 profile.db 与
-    profile.yaml——手机总览数据由账号云端同步更新，配置部分照常下发。
-    manifest 用 ``profile`` 布尔字段声明，安装端据此校验与放行。
+    profile（总览数据与定义）不进离线包：手机登录后由账号云端同步，
+    与 PC 在线行为一致。
     """
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
@@ -111,13 +108,10 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
         "username": username, "layout": layout,
         "synced_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "files": {},
-        "profile": include_profile,
     }
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:
         snapshots = []
         for name in _database_files():
-            if not include_profile and name == "profile.db":
-                continue
             database = session_directory(config) / name
             snapshot = Path(temp) / name
             snapshot.parent.mkdir(parents=True, exist_ok=True)
@@ -137,8 +131,6 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
             for rel, path in _configuration_files(config, layout_scope):
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
-                    continue
-                if not include_profile and rel.as_posix() == "session/profile.yaml":
                     continue
                 data = path.read_bytes()
                 if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml"}:
@@ -368,15 +360,15 @@ def install_offline_bundle(
             guarded = {f"config/{name}" for name in LOCAL_ONLY_CONFIG_FILES}
             if guarded & set(files):
                 raise ValueError("同步包包含本机独占文件，已拒绝安装")
-            # manifest["profile"] 声明包是否携带总览数据（PC 新版本始终写入；
-            # 旧版本包缺省按携带处理，保持原有拒收语义）。声明与内容不一致
-            # 视为包损坏，宁可拒绝也不能绕过模式闸门。
-            declared_profile = manifest.get("profile", True)
+            # profile 全面在线化：离线包不再携带总览数据，装了就拒绝。
+            # 旧版本 PC 打的包带 profile.db/profile.yaml，同样拒绝——重新打包即可。
             carries_profile = any(name == "config/session/profile.db" or name.endswith("/profile.db")
                                   or name == "config/session/profile.yaml"
+                                  or name == "config/session/profile.json"
                                   for name in files)
-            if declared_profile != carries_profile:
-                raise ValueError("同步包总览数据声明与内容不一致，已拒绝安装")
+            if carries_profile:
+                raise ValueError(
+                    "同步包携带总览数据，已拒绝安装；总览由账号云端同步，请用新版 PC 重新打包")
             for name, digest in files.items():
                 relative = PurePosixPath(name)
                 if (relative.is_absolute() or ".." in relative.parts or "\\" in name

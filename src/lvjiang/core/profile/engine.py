@@ -361,27 +361,12 @@ class ProfileProcessor:
             if entry is None:
                 # 首次：以 0 值、空时间戳构造虚拟 entry，走正常计算路径
                 entry = Entry(username=user_name, type="regen", key=kd.key, value=0)
-            stored_value = entry.value
-
+            # 所有 regen 类型都读时计算，不落库：库里只存「上次真实写入的锚点」，
+            # 边界/速率推算在读取端（UI、DSL、profile_read、web）现算。
+            # 固化只发生在真实写入的事务里（service 两行模式），同步面上
+            # 不存在任何基于本地基线的自动写入。
             regen_result = compute_regen_entry(entry, kd)
             computed = regen_result.value
-
-            # realtime 由 UI 基于 value + event_at 实时计算展示，不落库；
-            # boundary 经过准点边界后必须持久化，否则库里永远停在旧值（云端快照、
-            # 其他设备、历史都拿不到这次恢复）。物化记为 set，上行后成为其他端的锚点。
-            if regen_result.persisted and int(computed) != int(stored_value):
-                delta = computed - (stored_value or 0)
-                try:
-                    updated = _write_background_change(
-                        user_name, "regen", kd, entry, computed, delta, "set",
-                        event_at=regen_result.event_at)
-                except Exception as error:  # noqa: BLE001 - 单字段失败不中断其他字段
-                    logger.warning("Profile 自动恢复未提交 {}: {}", kd.key, error)
-                    continue
-                if updated:
-                    modified = True
-                else:
-                    logger.warning(f"{user_name} regen.{kd.key} CAS 失败，放弃本轮")
 
             # 检查双阈值告警（用最新计算值，不论是否写入成功）
             # 橙色和红色各自独立触发和清理

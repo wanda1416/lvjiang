@@ -1273,6 +1273,7 @@ profile:
   增加...: Increase...
   增量: Delta
   复制定义: Duplicate Definition
+  复制当前键名: Aktuellen Schlüsselnamen kopieren
   定义数据模型 key: Define Data-Model Keys
   定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Defines the data model's keys. Double-click non-group columns to edit; right-click to change groups in bulk.
   实时/{unit}: Realtime/{unit}

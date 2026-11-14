@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QHBoxLayout,
     QMessageBox,
@@ -251,11 +252,24 @@ class ProfileColumnMixin:
                         lambda: self._show_history_dialog(
                             None, model_type, key, key_def.label),
                     )
+                # 复制的是数据模型里的原始 key 名，不是显示标签；重命名后
+                # 仍能直接粘到工作流或配置里。
+                menu.addAction(
+                    tr("复制当前键名"),
+                    lambda: self._copy_key_name(key),
+                )
             menu.addSeparator()
             menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, data_index))
             menu.addAction(tr("删除当前列"), lambda: self._remove_column(group_name, data_index))
 
         menu.exec(h_header.mapToGlobal(pos))
+
+    @staticmethod
+    def _copy_key_name(key: str) -> None:
+        """把数据模型 key 原名复制到剪贴板（不复制界面上的显示标签）。"""
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(key)
 
     def _set_group_totals(self: ProfileTab, group_name: str, enabled: bool) -> None:  # type: ignore[misc]
         """切换该分组的合计行并立即重绘；只影响这一个分组。"""

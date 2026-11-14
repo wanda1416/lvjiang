@@ -2,7 +2,8 @@
 
 翻译文件分层加载：
   - 主体：config/i18n/{lang}.yaml（启动时加载）
-  - 插件：config/i18n/apps/{app_name}/{lang}.yaml（插件加载时按需加载）
+  - 插件：AppHooks.i18n_directory 声明的插件自带目录（外置插件），
+    或内置插件的 config/i18n/apps/{app_name}/{lang}.yaml
 tr(text) 以中文原文为 key 查找翻译，找不到则返回原文。
 """
 from __future__ import annotations
@@ -84,12 +85,13 @@ def tr_in(text: str, language: str) -> str:
     return table.get(text, text)
 
 
-def load_app_i18n(app_name: str) -> None:
+def load_app_i18n(app_name: str, directory: Path | None = None) -> None:
     """加载插件的翻译文件，合并到全局翻译表。
 
-    在 init_i18n() 之后调用，仅当语言非 zh_CN 时实际加载。
-    插件翻译文件位于 config/i18n/apps/{app_name}/{lang}.yaml。
-    同一插件重复调用时幂等跳过。
+    在 init_i18n() 之后调用，仅当语言非 zh_CN 时实际加载。词表目录优先用
+    ``AppHooks.i18n_directory`` 声明的插件自带目录（外置插件不往主仓库
+    ``config/i18n/apps`` 写文件）；未声明时回退到内置插件的
+    ``config/i18n/apps/{app_name}`` 约定。同一插件重复调用时幂等跳过。
     """
     global _translations
 
@@ -98,7 +100,7 @@ def load_app_i18n(app_name: str) -> None:
     if app_name in _loaded_app_i18n:
         return
 
-    app_dir = get_config_i18n_dir() / "apps" / app_name
+    app_dir = directory if directory is not None else get_config_i18n_dir() / "apps" / app_name
     if not app_dir.is_dir():
         return
 

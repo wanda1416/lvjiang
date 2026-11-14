@@ -149,6 +149,22 @@ def _restore_i18n_state() -> Iterator[None]:
         i18n._loaded_app_i18n.update(saved_apps)
 
 
+def test_plugin_declared_i18n_directory_is_loaded(tmp_path, monkeypatch):
+    """外置插件从自己包内声明词表目录，不依赖主仓库 config/i18n/apps。"""
+    (tmp_path / "zh_CN.yaml").write_text(
+        'demo:\n  "采集任务运行中": "采集任务运行中"\n', encoding="utf-8")
+    (tmp_path / "en_US.yaml").write_text(
+        'demo:\n  "采集任务运行中": "Gathering tasks running"\n', encoding="utf-8")
+    # 主仓库没有该插件的 apps/ 目录：只有声明目录能提供词表。
+    monkeypatch.setattr(
+        "lvjiang.i18n.get_config_i18n_dir", lambda: tmp_path / "missing")
+
+    init_i18n("en_US")
+    load_app_i18n("demo", directory=tmp_path)
+
+    assert i18n.tr("采集任务运行中") == "Gathering tasks running"
+
+
 @pytest.mark.parametrize("language", _shipped_languages())
 def test_every_tr_literal_has_a_translation(language: str) -> None:
     """tr() 的每句字面量都必须能在该语言查到译文。

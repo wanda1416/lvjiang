@@ -113,6 +113,7 @@ builder 约定：
 |---|---|---|---|
 | `config_policy_modules` | `[]` | 声明哪些列表是登记表、哪些系统条目不可删 | `core.config.resolver`（`register_registry_list_paths` / `register_protected_list_paths`） |
 | `sync_document_modules` | `[]` | 声明插件用户文档的 kind 与文件后缀 | `core.sync.registry.register_user_document_kind` |
+| `i18n_directory` | `None` | 插件自带词表目录（含 `<lang>.yaml`），词表随插件分发 | `core/plugins/__init__.py:register_hooks` 调 `i18n.load_app_i18n`；未声明时回退内置约定 `config/i18n/apps/<app>` |
 | `configuration_reload_callbacks` | `[]` | 外部完整配置快照应用后清理插件自己的只读缓存 | `core/ondevice/offline.py`（装包后调用） |
 | `offline_configuration_patterns` | `()` | PC→手机同步的配置白名单，路径相对 `system`/`local` | `core/offline_bundle.py` |
 | `offline_session_files` | `None` | 额外会话文件，相对 `session` | 同上 |
@@ -146,6 +147,7 @@ src/lvjiang/apps/<name>/          # 内置插件（随包分发）
 plugins/<name>/                   # 外置插件（独立检出，公开仓库不含）
 ├── __init__.py        # 导出 hooks: AppHooks 实例
 ├── constants.py       # 插件专属常量
+├── i18n/              # 插件自带词表（由 AppHooks.i18n_directory 声明）
 ├── core/              # 插件专属能力（识别器、数据库等）
 ├── workflows/
 │   ├── implementations/  # 复杂工作流实现

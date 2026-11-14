@@ -136,9 +136,10 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     # 主体翻译加载完成后，加载已注册插件的专属翻译
     for h in hooks_list:
-        if h.id:
+        key = h.id or h.name
+        if key:
             try:
-                load_app_i18n(h.id)
+                load_app_i18n(key, directory=h.i18n_directory)
             except Exception:  # noqa: BLE001
                 pass
 

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
@@ -94,6 +95,11 @@ class AppHooks:
     # 由插件自己在这些模块里调用 core.sync.registry 的
     # register_user_document_kind 声明。
     sync_document_modules: list[str] = field(default_factory=list)
+
+    # 插件自带的翻译词表目录（含 <lang>.yaml，结构与 config/i18n 一致）。
+    # 外置插件用它声明自己的词表，不往主仓库 config/i18n/apps 写文件；
+    # 未声明时宿主回退到内置插件的 config/i18n/apps/<app> 约定。
+    i18n_directory: Path | None = None
 
     # 外部完整配置快照应用后清理插件自己的只读缓存，不重注册 UI 或执行任务。
     configuration_reload_callbacks: list[Callable[[], None]] = field(default_factory=list)

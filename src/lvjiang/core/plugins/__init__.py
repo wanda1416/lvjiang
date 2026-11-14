@@ -232,6 +232,11 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     register_config_policies(hooks)
 
+    if hooks.i18n_directory is not None:
+        # 插件自带词表：目录由插件声明，宿主不往主仓库 config/i18n/apps 写文件。
+        from ...i18n import load_app_i18n
+        load_app_i18n(hooks.id or hooks.name, directory=hooks.i18n_directory)
+
     logger.info("[plugin] 注册插件: {}", hooks.name or "<unnamed>")
 
     for callback in hooks.startup_callbacks:

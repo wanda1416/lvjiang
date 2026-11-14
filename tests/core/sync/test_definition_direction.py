@@ -91,24 +91,30 @@ def test_pc_end_still_pushes_when_cloud_differs(monkeypatch, tmp_path):
     assert report.pushed == 1
 
 
-def test_android_cannot_overwrite_existing_snapshot(monkeypatch):
-    """云端已有快照时，Android 不允许覆盖（PC 独占覆盖权）。"""
+def test_any_client_may_refresh_existing_snapshot(monkeypatch):
+    """快照刷新不区分平台：Android 与 PC 同权。"""
     from lvjiang.core.profile import snapshot_sync
 
-    monkeypatch.setattr(snapshot_sync.sys, "getandroidapilevel", lambda: 34, raising=False)
-    monkeypatch.setattr(snapshot_sync, "remote_snapshots", lambda token: [{"id": 1}])
+    monkeypatch.setattr(snapshot_sync, "pull_and_replay",
+                        lambda token, **kw: snapshot_sync.ProfileSyncReport())
+    monkeypatch.setattr(snapshot_sync, "_snapshot_entries", lambda: ([{"key": "k"}], 0))
+    monkeypatch.setattr(snapshot_sync, "_state", lambda: {})
+    monkeypatch.setattr(snapshot_sync, "post",
+                        lambda route, data, token: {"id": 7, "snapshot_remote_id": 3})
+    monkeypatch.setattr(snapshot_sync, "save_profile_sync_state", lambda state: None)
+
     report = snapshot_sync.refresh_snapshot("t")
-    assert report.errors
-    assert "PC" in report.errors[0]
-    assert report.snapshots == 0
+    assert report.errors == []
+    assert report.snapshots == 1
 
 
-def test_android_may_seed_first_baseline(monkeypatch):
-    """云端一份快照都没有时，Android 允许建立首份基线（否则纯手机用户永远没有基线）。"""
+def test_empty_local_is_not_uploaded_as_baseline(monkeypatch):
+    """本机一条条目都没有时不允许上传空快照。"""
     from lvjiang.core.profile import snapshot_sync
 
-    monkeypatch.setattr(snapshot_sync.sys, "getandroidapilevel", lambda: 34, raising=False)
-    monkeypatch.setattr(snapshot_sync, "remote_snapshots", lambda token: [])
+    monkeypatch.setattr(snapshot_sync, "pull_and_replay",
+                        lambda token, **kw: snapshot_sync.ProfileSyncReport())
+    monkeypatch.setattr(snapshot_sync, "_state", lambda: {})
     called = {}
 
     def fake_pull(token, **kwargs):
@@ -118,7 +124,7 @@ def test_android_may_seed_first_baseline(monkeypatch):
     monkeypatch.setattr(snapshot_sync, "pull_and_replay", fake_pull)
     monkeypatch.setattr(snapshot_sync, "_snapshot_entries", lambda: ([], 0))
     report = snapshot_sync.refresh_snapshot("t")
-    assert called.get("pull"), "应当走到上传流程，而不是被平台门禁拦下"
+    assert called.get("pull"), "应当先拉取再判断可上传条目"
     assert report.errors == ["本机没有可上传的 profile 数据"]
 
 

@@ -294,6 +294,7 @@ def _make_batch(host, qtbot):
                  "_unavailable_script_ids", "_persist_script_order"):
         setattr(batch, name, getattr(BatchTab, name).__get__(batch))
     batch._refresh_start_feedback = lambda: None
+    batch._refresh_task_params_page = lambda: None
     batch._save_draft = lambda: None
     return batch
 

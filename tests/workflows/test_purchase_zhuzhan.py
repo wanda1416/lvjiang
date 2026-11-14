@@ -57,7 +57,7 @@ def test_bugan_claims_before_progress_and_rejects_regression(
     assert engine.variables["progress"] == 13000
     assert profile_read("tester", "huaruizhi_of_week") == 1432
     assert profile_read("tester", "huaruizhi") == 6032
-    assert db_get_history("tester", "stock", "huaruizhi")[0]["source"] == "日常"
+    assert db_get_history("tester", "stock", "huaruizhi")[0].source == "日常"
     assert not errors
 
     engine._exec_body(code)

@@ -34,6 +34,6 @@ def test_zhuzhan_quotas_keep_distinct_periods_and_currency_costs(isolated_profil
     assert profile_read("tester", "huaruizhi") == 0
     assert profile_read("tester", "niaoniao") == 4
     spending = db_get_history("tester", "stock", "huaruizhi")
-    assert [row["source"] for row in spending] == ["袅袅之音", "逐战礼盒"]
+    assert [row.source for row in spending] == ["袅袅之音", "逐战礼盒"]
     incoming = db_get_history("tester", "stock", "niaoniao")
-    assert incoming[0]["source"] == "逐战商店"
+    assert incoming[0].source == "逐战商店"

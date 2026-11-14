@@ -11,7 +11,11 @@ import yaml
 
 @pytest.fixture
 def regen_env(tmp_path: Path, monkeypatch) -> None:
-    from lvjiang.core.profile import repository, schema
+    from lvjiang.core.profile import regen_gate, repository, schema
+
+    # 固定「本进程已完成首次同步」：闸门是模块级全局，其它用例（同步相关）
+    # 会把它留在不同状态，导致这里是否物化 regen 行随执行顺序变化。
+    monkeypatch.setattr(regen_gate, "_pull_completed", True)
 
     profile_path = tmp_path / "profile.yaml"
     profile_path.write_text(
@@ -78,8 +82,9 @@ def test_realtime_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "xinli", delta=-5, source="镇守")
 
     records = _history("regen", "xinli")
-    assert [row.op_type for row in records] == ["set", "set"]
-    assert records[1].new_value == 19.0
+    assert [row.op_type for row in records] == ["set", "regen", "set"]
+    assert records[2].new_value == 19.0
+    assert abs(records[1].new_value - 26.5) < 0.1
     assert records[0].delta_value == -5.0
     remaining = profile_read("u", "xinli")
     assert 21.4 <= remaining < 21.6, remaining
@@ -94,7 +99,9 @@ def test_boundary_regen_write_materializes_tick_before_delta(regen_env):
     profile_action("u", "tili", delta=-30, source="副本")
 
     records = _history("regen", "tili")
-    assert [row.op_type for row in records] == ["set", "set"]
+    assert [row.op_type for row in records] == ["set", "regen", "set"]
+    assert records[2].new_value == 100.0
+    assert abs(records[1].new_value - 550.0) < 0.1
     assert records[0].delta_value == -30.0
     assert 510 <= records[0].new_value <= 530
 
@@ -112,7 +119,7 @@ def test_realtime_regen_cas_write_survives_materialization(regen_env):
                    use_cas=True, expected_entry=stale)
 
     assert int(profile_read("u", "xinli")) == 6
-    assert [r.op_type for r in _history("regen", "xinli")[:2]] == ["set", "set"]
+    assert [r.op_type for r in _history("regen", "xinli")[:2]] == ["set", "regen"]
 
 
 def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):

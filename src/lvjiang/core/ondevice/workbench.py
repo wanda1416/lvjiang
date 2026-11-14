@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 
 from ..daily_history import TaskHistoryRepository, resolve_history_path
@@ -76,7 +76,11 @@ def profile_history(username: str, model: str, key: str, offset: int = 0) -> str
     try:
         if username not in task_runner._local_user_names() or get_profile_config().get_key(key, model) is None:
             raise ValueError("用户或数据项不可用")
-        return _json({"ok": True, "records": db_get_history(username, model, key, limit=50, offset=max(0, offset)),
+        records = [
+            asdict(row) if is_dataclass(row) else row
+            for row in db_get_history(username, model, key, limit=50, offset=max(0, offset))
+        ]
+        return _json({"ok": True, "records": records,
                       "total": db_count_history(username, model, key)})
     except Exception as exc:
         return _json({"ok": False, "message": str(exc)})

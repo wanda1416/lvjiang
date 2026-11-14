@@ -54,13 +54,15 @@ def other_task_running_label(host: Any, scope: str) -> str:
     execution_scope = context.metadata.get("execution_scope", "daily")
     if execution_scope == scope:
         return ""
-    labels = {
-        "daily": tr("日常任务运行中"),
-        "batch": tr("批量任务运行中"),
-        "auto_tuning": tr("调律任务运行中"),
-        "auto_gather": tr("采集任务运行中"),
-    }
-    return labels.get(execution_scope, tr("任务运行中"))
+    if execution_scope == "daily":
+        return tr("日常任务运行中")
+    if execution_scope == "batch":
+        return tr("批量任务运行中")
+    # 代码工作流的执行范围即其注册名；专属文案由工作流类自己声明，
+    # 宿主不认识任何具体工作流。
+    from ...workflows.implementations import workflow_running_label
+    declared = workflow_running_label(str(execution_scope))
+    return tr(declared) if declared else tr("任务运行中")
 
 
 class _AcknowledgedPauseEvent(threading.Event):

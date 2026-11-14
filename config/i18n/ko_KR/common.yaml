@@ -1545,9 +1545,7 @@ run_control:
   : "The device is running another task; not started this time.\n\n{reason}"
   请选择一个脚本: Select a script
   请选择一个脚本；列表为空时可刷新脚本或调整展示分组: Select a script; if the list is empty, refresh scripts or adjust display groups
-  调律任务运行中: Tuning tasks running
   连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。: Connection plan "{name}" requires administrator privileges, but LvJiang is not running as administrator. Windows blocks lower-privileged processes from sending clicks and keyboard input to elevated game windows. Close LvJiang, choose "Run as administrator", and try again.
-  采集任务运行中: Gathering tasks running
   错误: 오류
   需激活 Lv1: Lv1 activation required
 scene_editor:

@@ -8,9 +8,21 @@ from lvjiang.ui.batch.batch_tab import BatchTab
 from lvjiang.ui.execution.hotkeys import hotkey_label
 from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.main.run_control import RunControlMixin
+from lvjiang.workflows import implementations
 
 
-def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp):
+class _ExternalGatherWorkflow:
+    """模拟外置插件的代码工作流：占用文案由类自己声明。"""
+
+    RUNNING_LABEL = "采集任务运行中"
+
+
+def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp, monkeypatch):
+    monkeypatch.setitem(
+        implementations._REGISTRY, "auto_tuning",
+        "lvjiang.apps.yysls.workflows.implementations.auto_tuning.AutoTuningWorkflow")
+    monkeypatch.setitem(
+        implementations._REGISTRY, "auto_gather", f"{__name__}._ExternalGatherWorkflow")
     host = SimpleNamespace(
         _user_config=SimpleNamespace(hotkeys=SimpleNamespace(
             start="F9", stop="F10", pause="F11")),

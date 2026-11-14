@@ -123,6 +123,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     # 脚本元数据（供发现层暴露到日常下拉与设备端悬浮面板）。
     # 暂不定义 PARAMETERS：本流程由专用配置页管理，并强制按用户独立存储。
     DISPLAY_NAME = "自动调律"
+    # 其它页面在本流程运行期间显示的占用文案（宿主 tr() 后展示）。
+    RUNNING_LABEL = "调律任务运行中"
     # 专用脚本：日常 Tab 不画其参数面板，由专属配置页自行管理
     SCOPE = "dedicated"
     # 手机配置入口使用专用适配器，运行仍复用公共配置快照。

@@ -42,3 +42,19 @@ def get_workflow_class(name: str):
 def list_workflows() -> list[str]:
     """返回所有已注册工作流名字。"""
     return list(_REGISTRY.keys())
+
+
+def workflow_running_label(name: str) -> str:
+    """返回代码工作流自己声明的「运行中」占用文案（类属性 ``RUNNING_LABEL``）。
+
+    文案是中文原文，由调用方 ``tr()``；译文随声明方（插件）词表分发。
+    未注册、类无法导入或未声明时返回空串，调用方回落到通用文案。
+    """
+    if name not in _REGISTRY:
+        return ""
+    try:
+        cls = get_workflow_class(name)
+    except Exception:  # noqa: BLE001 - 坏注册只影响文案，不影响占用判定
+        logger.warning("读取工作流运行文案失败: {}", name)
+        return ""
+    return str(getattr(cls, "RUNNING_LABEL", "") or "")

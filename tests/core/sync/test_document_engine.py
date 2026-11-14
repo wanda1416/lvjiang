@@ -384,3 +384,33 @@ def test_pull_legacy_plaintext_note_reuploads_ciphertext(monkeypatch, tmp_path) 
     pushed_raw = gzip.decompress(base64.b64decode(pushed_payload))
     from lvjiang.core.account.e2e import is_encrypted_text
     assert is_encrypted_text(pushed_raw.decode("utf-8"))
+
+
+def test_document_pull_skipped_when_version_row_head_matches(env, monkeypatch) -> None:
+    """同步版本行的 document_head 等于本地水位 → 不发 documents/pull；不等就拉。"""
+    routes: list[str] = []
+    cloud = {"document_head": 5}
+
+    def fake_post(route, data, token):
+        routes.append(route)
+        if route == "/api/sync/state":
+            return dict(cloud)
+        return {"documents": [], "next_id": int(data.get("since_revision") or 0) + 1}
+
+    monkeypatch.setattr(engine, "post", fake_post)
+    env["doc_state"]["remote_document_id"] = 5
+    report = _sync(env)
+    assert report.errors == []
+    assert routes == ["/api/sync/state"]
+    assert env["doc_state"]["remote_document_id"] == 5
+
+    routes.clear()
+    cloud["document_head"] = 6                    # 他机推了新文档
+    _sync(env)
+    assert "/api/sync/documents/pull" in routes
+
+    routes.clear()
+    cloud["document_head"] = 0                    # 云端清空：不等就拉，不会漏
+    _sync(env)
+    assert "/api/sync/documents/pull" in routes
+

@@ -19,6 +19,7 @@ from pathlib import Path
 from loguru import logger
 
 from ..sync.client import SyncError, post
+from ..sync.round_state import cloud_state, invalidate, version
 
 
 #: 本地用户名册所在（session.json 的 users 数组）
@@ -141,6 +142,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     state = _sync_state()
     signature = state.get("roster") if isinstance(state.get("roster"), list) else None
     order_changed = roster != signature
+    pushed_now = False
 
     if roster:
         from ..account.e2e import current_key, encrypt_json
@@ -180,12 +182,24 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
                     # 服务端回报真实变更行数（新增/资料更新/顺序变更），
                     # 没变就是 0，不再把「发了多少行」当「上行了多少」。
                     report.pushed = int(response.get("changed", len(payload)))
+                    pushed_now = True
+                    invalidate()
                     state["content_sig"] = content_sig
                     _save_sync_state(state)
                     _prog("已推送", pushed=report.pushed)
                 except SyncError as error:
                     report.errors.append(f"上行失败: {error}")
 
+    # 名册版本号（同步版本行 users_rev）与上次拉取时记下的相同、本轮没推、本地
+    # 名册也没动过 → 云端名册没变，本轮不拉（空闲轮省掉整份名册 ⟕ 头像的读取）。
+    # 版本行取不到（网络/老服务端）就照常拉取。
+    try:
+        cloud_rev = version(cloud_state(token, post), "users_rev")
+    except SyncError:
+        cloud_rev = None
+    if (cloud_rev is not None and not pushed_now and not order_changed
+            and state.get("users_rev") == cloud_rev):
+        return report
     try:
         _prog("拉取")
         response = post("/api/sync/users/pull", {}, token)
@@ -193,6 +207,11 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
         report.errors.append(f"下行失败: {error}")
         return report
     remote_users = response.get("users") or []
+    # 记下这次拉取对应的版本：版本号取在拉取之前，之间若有别处写入，下一轮
+    # 会看到不同的版本号再拉一次（只会多拉，不会漏）。
+    if cloud_rev is not None:
+        state["users_rev"] = cloud_rev
+        _save_sync_state(state)
 
     # 资料落地：密文解密后合并回本地 json（保留本机 ui_state）
     from ..account.e2e import current_key, is_encrypted

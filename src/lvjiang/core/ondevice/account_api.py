@@ -87,6 +87,14 @@ def _probe_status() -> dict:
 
 
 def _sync(token: str) -> dict:
+    """一轮镜像端同步；一轮只取一次云端版本行，没变化的通道不发请求。"""
+    from ..sync.round_state import sync_round
+
+    with sync_round():
+        return _sync_round(token)
+
+
+def _sync_round(token: str) -> dict:
     """镜像端同步：定义只拉不推、总览只拉快照+历史、绝不建快照。
 
     顺序是硬约束：**profile.yaml 先提交（拉取并重载 schema），再回放账本**。

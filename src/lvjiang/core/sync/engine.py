@@ -27,6 +27,7 @@ from loguru import logger
 from ...constants import SESSION_CONFIG_DIR, USERS_DIR
 from . import client, dirty, registry
 from .client import SyncConflict, SyncError, post
+from .round_state import cloud_state, invalidate, version
 
 
 @dataclass
@@ -136,6 +137,7 @@ def _push(document: LocalDocument, token: str, raw: bytes, sha256: str,
         payload = base64.b64encode(gzip.compress(raw)).decode("ascii")
     client.push(token, document.label, document.kind, sha256, payload,
                 expected_sha256=expected)
+    invalidate()                          # 写过云端：后续步骤重新取版本行
     report.pushed.append(key)
 
 
@@ -288,11 +290,21 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
         return report
 
     remote_id = dirty.remote_document_id()
+    # 同步版本行的文档 head 与本地水位相同 = 云端没有新文档：不发增量拉取。
+    # head 取不到（网络/老服务端）就照常拉增量页判断。
     try:
-        changed, next_id = _delta_page(token, remote_id)
-    except SyncError as error:
-        report.errors.append(str(error))
-        return report
+        cloud_head = version(cloud_state(token, post), "document_head")
+    except SyncError:
+        cloud_head = None
+    changed: list[dict]
+    if isinstance(cloud_head, int) and cloud_head == remote_id:
+        changed, next_id = [], remote_id + 1
+    else:
+        try:
+            changed, next_id = _delta_page(token, remote_id)
+        except SyncError as error:
+            report.errors.append(str(error))
+            return report
     remote_changed = bool(changed)
     local_changed = bool(local_dirty)
 

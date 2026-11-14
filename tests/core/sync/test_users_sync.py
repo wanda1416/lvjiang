@@ -15,8 +15,12 @@ class FakeServer:
     def __init__(self):
         self.rows: dict[str, dict] = {}          # username → {position, data, updated_at}
         self.pushes: list[dict] = []
+        self.pulls = 0
+        self.users_rev = 0                       # 同步版本行的名册版本号
 
     def post(self, route: str, data: dict, token: str) -> dict:
+        if route == "/api/sync/state":
+            return {"protocol_version": 2, "users_rev": self.users_rev}
         if route == "/api/sync/users/push":
             self.pushes.append(data)
             order_changed = data.get("order_changed") is True
@@ -34,8 +38,10 @@ class FakeServer:
                     if newer:
                         prev["data"] = user.get("data", {})
                         prev["updated_at"] = user["updated_at"]
+            self.users_rev += 1
             return {"users": len(data["users"]), "total": len(self.rows)}
         if route == "/api/sync/users/pull":
+            self.pulls += 1
             rows = [{"username": name, **row}
                     for name, row in sorted(self.rows.items(),
                                             key=lambda kv: (kv[1]["position"], kv[0]))]
@@ -113,6 +119,7 @@ def test_unchanged_roster_pushes_without_reordering_cloud(env) -> None:
     users_sync.sync_users("t")                              # 建立签名 甲,乙
     # 云端被另一台设备排成 乙,甲
     server.rows["乙"]["position"], server.rows["甲"]["position"] = 0, 1
+    server.users_rev += 1                                   # 他机写入会推进名册版本号
     push_count = len(server.pushes)
     report = users_sync.sync_users("t")                     # 本地仍 甲,乙（签名一致）
     assert len(server.pushes) == push_count                 # 无变化：推送跳过
@@ -120,6 +127,23 @@ def test_unchanged_roster_pushes_without_reordering_cloud(env) -> None:
     # 下行：本地按云端重排为 乙,甲
     assert _roster(tmp) == ["乙", "甲"]
     assert report.reordered
+
+
+def test_idle_round_skips_roster_pull_when_users_rev_unchanged(env) -> None:
+    """名册版本号没变、本轮没推、本地名册没动 → 不发 users/pull；版本一变就拉。"""
+    tmp, users, server = env["tmp"], env["users"], env["server"]
+    _write_roster(tmp, ["甲"])
+    _write_user(users, "甲", {"level": 1})
+    users_sync.sync_users("t")
+    pulls = server.pulls
+    users_sync.sync_users("t")                              # 空闲轮
+    assert server.pulls == pulls
+    server.users_rev += 1                                   # 他机改了名册/资料/头像
+    users_sync.sync_users("t")
+    assert server.pulls == pulls + 1
+    server.users_rev = 0                                    # 云端清空：版本归零也要拉
+    users_sync.sync_users("t")
+    assert server.pulls == pulls + 2
 
 
 def test_local_reorder_propagates(env) -> None:

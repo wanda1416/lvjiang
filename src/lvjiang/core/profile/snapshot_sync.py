@@ -21,6 +21,7 @@ from loguru import logger
 
 from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
+from ..sync.round_state import cloud_state, invalidate, version
 from . import regen_gate, repository
 from .arbitrate import canonical_event, is_strictly_newer
 from .rows import Entry, RemoteOp
@@ -80,12 +81,18 @@ NO_SNAPSHOT_HINT = "云端还没有总览快照；请先在 PC 端完成初始�
 
 def remote_head(token: str) -> int | None:
     """云端账本当前最大 remote_id。**鉴权失败返回 None**（不能当 0——否则
-    会误导出「进度比云端新」的错误结论）；网络失败也返回 None 让调用方跳过。"""
+    会误导出「进度比云端新」的错误结论）；网络失败也返回 None 让调用方跳过。
+
+    取自同步版本行（``history_head``，轮内共享同一次 state），不再为它单独请求
+    快照清单（原来不带 limit，服务端按默认 50 份读清单）。"""
     try:
-        response = post("/api/sync/profile/snapshot", {}, token)
+        state = cloud_state(token, post)
+        if "history_head" in state:
+            head = version(state, "history_head")
+        else:                               # 版本行没有该字段（老服务端）
+            head = post("/api/sync/profile/snapshot", {"limit": 1}, token).get("head_remote_id")
     except SyncError:
         return None
-    head = response.get("head_remote_id")
     return head if isinstance(head, int) and head >= 0 else None
 
 
@@ -114,7 +121,7 @@ def profile_protocol_block(token: str) -> str:
     由真正的同步调用报错，避免一次探测超时把整轮同步停摆。
     """
     try:
-        body = post("/api/sync/state", {}, token)
+        body = cloud_state(token, post)
     except SyncError:
         return ""
     if body.get("protocol_version") != 2:
@@ -308,9 +315,20 @@ def hadwent(happened: str) -> str | None:
 def remote_snapshots(token: str, limit: int = 1) -> list[dict]:
     """云端快照清单（最新在前；只带摘要）。
 
-    同步路径只消费 ``[0]``（最新一份），默认 ``limit=1`` 只取一条；
-    需要完整清单的调用方显式传更大的 limit。
+    同步路径只消费 ``[0]``（最新一份）：``limit=1`` 直接取同步版本行里的
+    最新快照摘要（轮内共享同一次 state，不发请求）；需要完整清单的调用方显式
+    传更大的 limit。
     """
+    if limit == 1:
+        try:
+            state = cloud_state(token, post)
+        except SyncError as error:
+            logger.warning("[profile sync] 快照摘要获取失败：{}", error)
+            return []
+        if "snapshot" in state:
+            latest = state.get("snapshot")
+            return [latest] if isinstance(latest, dict) else []
+        # 版本行没有该字段（老服务端）：退回快照清单
     try:
         response = post("/api/sync/profile/snapshot", {"limit": limit}, token)
     except SyncError as error:
@@ -554,8 +572,11 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
             return report
         state = _state()
     since = int(state.get("remote_history_id") or 0)
+    # 云端账本 head 与本地水位相同 = 没有新行：整条拉取跳过（空闲轮不发 pull）。
+    # 回放后的快照合并会改水位，所以用合并之后的 since 比较。
+    unchanged = isinstance(head, int) and head == since
     page = 0
-    while True:
+    while not unchanged:
         if stop and stop():
             report.errors.append("已停止")
             break
@@ -699,6 +720,7 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
                 logger.warning("[profile sync] 放弃上传 {}：{}",
                                local.op_id, item.get("error") or status)
         repository.db_mark_remote_ids(marks)
+        invalidate()                      # 写过云端：后续步骤重新取版本行
         if len(marks) != len(upload):
             report.errors.append("有上行结果无法对应本地行，下轮重试")
             break
@@ -817,6 +839,9 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     初始播种传 True，允许用空列表建立第一份基线。
     """
     report = ProfileSyncReport()
+    # 建快照前的这次拉取必须基于最新版本行：快照水位会「吞掉」它之前的所有行，
+    # 不能拿本轮开头缓存的 head 判断「没有新行」而跳过拉取。
+    invalidate()
     pulled = pull_and_replay(token, tolerate_no_snapshot=True)
     report.pulled = pulled.pulled
     report.errors.extend(pulled.errors)
@@ -841,6 +866,7 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     except SyncError as error:
         report.errors.append(str(error))
         return report
+    invalidate()
     state["profile_snapshot_id"] = int(response.get("id") or 0) or None
     # 快照水位必须一并记下：快照语义是「该 remote_id 及之前的变更都已体现在
     # entries 里」。漏记会让本机后续拉取从 0 开始重复回放。

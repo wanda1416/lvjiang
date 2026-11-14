@@ -18,12 +18,20 @@ class FakeServer:
         self.pushed: list[dict] = []
         self.push_bodies: list[dict] = []
         self.fail = False
+        self.legacy_state = False
+        self.routes: list[str] = []
 
     def post(self, route: str, data: dict, token: str) -> dict:
+        self.routes.append(route)
         if self.fail:
             raise snapshot_sync.SyncError("账号服务暂时不可用")
         if route == "/api/sync/state":
-            return {"protocol_version": 2}
+            if self.legacy_state:                # 老服务端：版本行没有各通道字段
+                return {"protocol_version": 2}
+            latest = ({k: v for k, v in self.snapshots[0].items() if k != "entries"}
+                      if self.snapshots else None)
+            return {"protocol_version": 2, "snapshot": latest,
+                    "history_head": max((r["remote_id"] for r in self.rows), default=0)}
         if route == "/api/sync/profile/snapshot":
             if isinstance(data.get("id"), int):
                 match = next((row for row in self.snapshots if row["id"] == data["id"]), None)
@@ -858,3 +866,50 @@ def test_bootstrap_skips_locked_entries_silently(env) -> None:
     assert "王五" not in env["entries"]        # 锁定的没被覆盖
     assert env["entries"]["张三"]["quota"]["free_key"]["value"] == 7
     assert not report.errors
+
+def _seed_caught_up(env) -> None:
+    env["server"].snapshots = [{"id": 1, "snapshot_remote_id": 1, "origin_instance_id": "pc",
+                                "origin_name": "", "created_at": "2026-11-03T10:00:00",
+                                "entry_count": 0, "entries": "[]"}]
+    env["server"].rows = [{"remote_id": 1}, {"remote_id": 2, "instance_id": "phone",
+                                             "local_id": 2, "username": "张三",
+                                             "type": "stock", "key": "moon",
+                                             "op": "set", "value": 7}]
+    env["state"].update({"remote_history_id": 2, "profile_snapshot_id": 1,
+                         "snapshot_remote_id": 1})
+
+
+def test_idle_round_reads_version_row_once_and_skips_pull(env) -> None:
+    """一轮内只取一次版本行；账本 head 与本地水位相同就不发 pull。"""
+    from lvjiang.core.sync.round_state import sync_round
+
+    _seed_caught_up(env)
+    with sync_round():
+        report = snapshot_sync.pull_and_replay("t")
+    assert report.errors == []
+    assert env["server"].routes == ["/api/sync/state"]
+
+
+def test_new_cloud_rows_are_still_pulled(env) -> None:
+    from lvjiang.core.sync.round_state import sync_round
+
+    _seed_caught_up(env)
+    env["server"].rows.append({"remote_id": 3, "instance_id": "phone", "local_id": 3,
+                               "username": "张三", "type": "stock", "key": "energy",
+                               "op": "set", "value": 9})
+    with sync_round():
+        report = snapshot_sync.pull_and_replay("t")
+    assert report.pulled == 1
+    assert env["server"].routes.count("/api/sync/state") == 1
+    assert "/api/sync/profile/pull" in env["server"].routes
+    assert env["state"]["remote_history_id"] == 3
+
+
+def test_legacy_state_without_version_fields_falls_back(env) -> None:
+    """版本行缺字段（服务端还没部署）时退回原来的快照清单 + 增量拉取。"""
+    _seed_caught_up(env)
+    env["server"].legacy_state = True
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.errors == []
+    assert "/api/sync/profile/snapshot" in env["server"].routes
+    assert "/api/sync/profile/pull" not in env["server"].routes   # head 仍可比较

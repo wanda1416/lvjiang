@@ -18,6 +18,7 @@ from loguru import logger
 
 from ..account.service import profile_sync_state, save_profile_sync_state
 from .client import SyncError, post
+from .round_state import cloud_state, invalidate
 
 
 @dataclass
@@ -54,13 +55,18 @@ def sync_definition(token: str, yaml_path: Path | None = None,
 
     local_sha = _local_sha256(yaml_path)
 
+    # 云端定义摘要直接取同步版本行（轮内共用同一次 state）：相同就结束，不再
+    # 每轮下载整份定义只为比 sha。版本行没给这个字段（老服务端）才退回 GET。
     try:
-        remote = post("/api/sync/profile/definition", {}, token).get("definition")
+        cloud = cloud_state(token, post)
+        if "definition_sha256" in cloud:
+            remote_sha = cloud.get("definition_sha256") or None
+        else:
+            remote = post("/api/sync/profile/definition", {}, token).get("definition")
+            remote_sha = remote.get("sha256") if isinstance(remote, dict) else None
     except SyncError as error:
         report.errors.append(str(error))
         return report
-
-    remote_sha = remote.get("sha256") if isinstance(remote, dict) else None
     if remote_sha == local_sha:
         state["definition_sha"] = local_sha      # 云端已是同内容（他机推过）
         save_profile_sync_state(state)
@@ -78,6 +84,7 @@ def sync_definition(token: str, yaml_path: Path | None = None,
         body = {"payload_base64": base64.b64encode(gzip.compress(yaml_path.read_bytes())).decode(),
                 "sha256": local_sha, "expected_sha": remote_sha}
         post("/api/sync/profile/definition", body, token)
+        invalidate()
         state["definition_sha"] = local_sha
         save_profile_sync_state(state)
         report.pushed = 1

@@ -398,6 +398,14 @@ class AccountHolder(QObject):
         self._sync_cancel.clear()
 
         def action():
+            from ..core.sync.round_state import sync_round
+
+            # 一轮只取一次云端版本行（/api/sync/state）：各通道据此跳过没变化的拉取，
+            # 空闲轮只有这一个请求。
+            with sync_round():
+                return _round()
+
+        def _round():
             from ..core.profile.snapshot_sync import sync_all
             from ..core.sync.definition_sync import sync_definition
             from ..core.sync.initial import (

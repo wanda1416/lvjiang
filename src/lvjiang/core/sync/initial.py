@@ -284,8 +284,10 @@ def cloud_not_inited(token: str) -> bool | None:
     ``None`` 必须按「未知」处理，**不能当成空**——否则一次网络抖动就会把本地
     同步状态清掉，用户被迫重做初始同步。
     """
+    from .round_state import cloud_state
+
     try:
-        state = post("/api/sync/state", {}, token)
+        state = cloud_state(token, post)  # 轮内与后续各通道共用这一次 state
     except SyncError:
         return None
     flag = state.get("not_inited")

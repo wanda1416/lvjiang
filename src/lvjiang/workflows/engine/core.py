@@ -192,6 +192,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._window_top = window_top
         # 客户端重启换窗口后由宿主同步自身窗口状态（UI 层注入）。
         self.window_rebind_hook: Callable[[dict], None] | None = None
+        # 运行实例结束回调（宿主在实例终态确定后按序调用）：
+        # ``callback(task_run_id, final_state)``，final_state 取
+        # completed / failed / interrupted。由工作流或插件在配置阶段注册，
+        # 宿主不认识注册方的任何概念。
+        self.run_finished_callbacks: list[Callable[[str, str], None]] = []
         self._stop_check = stop_check or (lambda: False)
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event

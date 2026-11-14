@@ -612,7 +612,9 @@ class TuningTab(QWidget):
                         getattr(target, "display_name", "") or tr("未知目标"))
                     title = f"{target_label} · {execution_username}"
                     if task_run_id and hasattr(widget, "register_run"):
-                        engine._tuning_management = widget
+                        engine.run_finished_callbacks.append(
+                            lambda run_id, state, w=widget: w.mark_run_done(
+                                run_id, state))
                         widget.register_run(
                             task_run_id, engine._progress_hub, title=title)
                     else:

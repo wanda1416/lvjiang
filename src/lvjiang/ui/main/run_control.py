@@ -1377,9 +1377,13 @@ class RunControlMixin:
                 final_state = RunState.INTERRUPTED
             else:
                 final_state = RunState.COMPLETED
-            management = getattr(context.engine, "_tuning_management", None)
-            if management is not None:
-                management.mark_run_done(context.task_run_id, final_state.value)
+            for callback in tuple(
+                getattr(context.engine, "run_finished_callbacks", None) or ()
+            ):
+                try:
+                    callback(context.task_run_id, final_state.value)
+                except Exception:  # noqa: BLE001
+                    logger.exception("运行结束回调执行失败: {}", context.task_run_id)
             self._emit_run_instance_state(context, final_state.value)
             self._run_manager.finish(
                 context.task_run_id, final_state,

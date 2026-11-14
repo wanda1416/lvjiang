@@ -44,7 +44,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps import get_registry
+from lvjiang.core.plugins import get_registry
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.config import load_available_envs, load_env, load_user_config

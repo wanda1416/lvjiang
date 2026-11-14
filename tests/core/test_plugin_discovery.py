@@ -15,15 +15,15 @@ from pathlib import Path
 
 import pytest
 
-import lvjiang.apps as apps
-from lvjiang.apps import (
+import lvjiang.core.plugins as apps
+from lvjiang.core.plugins import (
+    AppHooks,
     app_name,
     discover_app_ids,
     load_app,
     parse_app_spec,
     resolve_app_specs,
 )
-from lvjiang.apps.base import AppHooks
 
 
 def _write_plugin(root: Path, directory_name: str, plugin_id: str) -> Path:
@@ -103,3 +103,14 @@ def test_registered_hooks_are_kept_in_registry_in_order():
     apps.register_hooks(second, registry)
     apps.register_hooks(AppHooks(name="no-id"), registry)
     assert list(registry["hooks"].values()) == [first, second]
+
+
+def test_legacy_plugin_entry_points_reexport_host_contract():
+    """宿主迁到 core.plugins 后，既有插件 / 脚本的旧导入路径仍指向同一对象。"""
+    import lvjiang.apps as legacy
+    import lvjiang.apps.base as legacy_base
+
+    assert legacy_base.AppHooks is AppHooks
+    assert legacy.load_app is apps.load_app
+    assert legacy.register_hooks is apps.register_hooks
+    assert legacy.get_registry is apps.get_registry

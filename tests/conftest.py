@@ -30,7 +30,7 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 install_project_config_write_guard(Path(__file__).parents[1] / "config")
 
 # 测试组合根显式装配配置声明；底层读取不再代替调用方发现插件。
-from lvjiang.apps import builtin_app_ids, load_config_policies  # noqa: E402
+from lvjiang.core.plugins import builtin_app_ids, load_config_policies  # noqa: E402
 
 load_config_policies(builtin_app_ids())
 

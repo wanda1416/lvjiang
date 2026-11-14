@@ -23,8 +23,8 @@ from lvjiang.core.history_transfer import export_history, import_history
 
 @pytest.fixture
 def histories(tmp_path, monkeypatch):
-    from lvjiang import apps
     from lvjiang.apps import yysls
+    from lvjiang.core import plugins as apps
     monkeypatch.setattr(apps, "get_registered_hooks", lambda: (yysls.hooks,))
     phone = tmp_path / "phone"
     pc = tmp_path / "pc"
@@ -91,8 +91,8 @@ def test_roundtrip_keeps_details_and_paths_without_repeating_telemetry(histories
 
 def test_legacy_session_output_attachment_is_still_accepted(tmp_path, monkeypatch):
     """旧版产出在 config/session/output；两端混用时回传仍须接受该前缀。"""
-    from lvjiang import apps
     from lvjiang.apps import yysls
+    from lvjiang.core import plugins as apps
     monkeypatch.setattr(apps, "get_registered_hooks", lambda: (yysls.hooks,))
     phone = tmp_path / "phone"
     monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", phone)

@@ -377,7 +377,7 @@ warning），在开发模式下则会直接从系统配置里消失——后者�
 `scenes.yaml`），插件经 `register_registry_list_paths()` /
 `register_protected_list_paths()`（`resolver.py` 里的两个函数）自己注册。
 接入方式沿用 `builtin_modules`/`telemetry_modules` 已有的「import 即注册」
-约定（见 `apps/base.py` 的 `AppHooks.config_policy_modules`）：
+约定（见 `core/plugins/hooks.py` 的 `AppHooks.config_policy_modules`）：
 
 ```python
 # apps/yysls/config/merge_policy.py —— import 即触发注册，不做其他事

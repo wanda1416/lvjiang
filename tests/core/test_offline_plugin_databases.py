@@ -3,8 +3,8 @@ import sqlite3
 import zipfile
 from contextlib import closing
 
-from lvjiang.apps.base import AppHooks
 from lvjiang.core import offline_bundle
+from lvjiang.core.plugins import AppHooks
 
 
 def test_database_selection_uses_plugin_declarations(tmp_path, monkeypatch):

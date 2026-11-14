@@ -26,7 +26,7 @@ _ARCH_PATTERN = r"^[A-Za-z0-9_]{1,20}$"
 
 def _plugin_choices() -> tuple[str, ...]:
     """已装配插件的稳定 ID + ``none``；core 不硬编码任何具体插件名。"""
-    from ...apps import get_registered_app_ids
+    from ..plugins import get_registered_app_ids
 
     return tuple(get_registered_app_ids()) or ("none",)
 
@@ -82,7 +82,7 @@ def _detect_plugin() -> str:
     里的说明），真要上报多个得先改服务端。目前只有一个插件，取第一个与
     历史行为完全一致。
     """
-    from ...apps import get_registered_app_ids
+    from ..plugins import get_registered_app_ids
     ids = get_registered_app_ids()
     return ids[0] if ids else "none"
 

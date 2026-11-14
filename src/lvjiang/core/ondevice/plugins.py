@@ -41,7 +41,7 @@ def configure_apps(app_ids: str | tuple[str, ...] | list[str]) -> None:
         _configured_app_ids = tuple(
             dict.fromkeys(str(item).strip() for item in values if str(item).strip())
         )
-        from ...apps import load_config_policies
+        from ..plugins import load_config_policies
         load_config_policies(_configured_app_ids)
 
 
@@ -54,7 +54,7 @@ def ensure_loaded(app_ids: tuple[str, ...] | list[str] | None = None) -> None:
     """
     targets = tuple(app_ids) if app_ids is not None else _configured_app_ids
     with _lock:
-        from ...apps import load_app, register_hooks
+        from ..plugins import load_app, register_hooks
 
         for name in targets:
             if name in _loaded_app_ids:

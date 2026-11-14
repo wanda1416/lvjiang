@@ -2,8 +2,7 @@
 import sys
 import textwrap
 
-from lvjiang.apps import register_hooks
-from lvjiang.apps.base import AppHooks
+from lvjiang.core.plugins import AppHooks, register_hooks
 from lvjiang.workflows.builtins import _registry
 from lvjiang.workflows.builtins._registry import FunctionMeta, describe_function
 

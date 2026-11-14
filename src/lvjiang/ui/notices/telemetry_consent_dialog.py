@@ -83,7 +83,7 @@ class TelemetryConsentDialog(QDialog):
 
     @staticmethod
     def _disclosure_markdown() -> str:
-        from ...apps import get_registry
+        from ...core.plugins import get_registry
         lines: list[str] = []
         for item in get_registry().get("telemetry_disclosures", ()):
             lines.append(f"- **{item.title}**：{item.purpose}")

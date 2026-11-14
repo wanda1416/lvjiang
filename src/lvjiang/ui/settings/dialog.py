@@ -1568,7 +1568,7 @@ class SettingsDialog(QDialog):
         （ui/notices/telemetry_consent_dialog.py）读的是同一份声明，两处
         描述天然一致，不会各说各的。
         """
-        from ...apps import get_registry
+        from ...core.plugins import get_registry
 
         parts = [
             f"{item.purpose}；{tr('不收集')}：{'、'.join(item.excluded)}"

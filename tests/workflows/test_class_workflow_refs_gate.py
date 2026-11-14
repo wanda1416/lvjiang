@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.apps import load_app
 from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.core.paths import get_config_system_dir
+from lvjiang.core.plugins import load_app
 from tests.case_matrix import case_matrix
 
 # 方法名 → (场景参数位, region/key 参数位, kind)

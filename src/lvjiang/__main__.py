@@ -188,7 +188,7 @@ def _bootstrap(
     install_crash_handler()
 
     # 延迟导入 PyQt6 / 内部模块，确保 logging 先配置好
-    from lvjiang.apps import (
+    from lvjiang.core.plugins import (
         app_name,
         load_app,
         load_config_policies,

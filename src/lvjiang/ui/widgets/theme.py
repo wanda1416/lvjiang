@@ -328,7 +328,7 @@ QToolButton#themeToggleButton:hover {{ background-color: {t.surface_hover}; }}
 def _extension_stylesheet(tokens: ThemeTokens) -> str:
     """渲染已注册 app 的 QSS；单个扩展失败不影响基础主题。"""
 
-    from ...apps import get_registry
+    from ...core.plugins import get_registry
 
     chunks: list[str] = []
     for builder in get_registry().get("theme_stylesheet_builders", ()):

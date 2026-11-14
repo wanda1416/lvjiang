@@ -18,7 +18,6 @@ from typing import Any
 import yaml
 
 from .._version import __version__
-from ..apps import get_registered_hooks
 from .config.resolver import ConfigResolver
 from .json_files import formatted_json, formatted_json_bytes
 from .layout.config import load_layout_doc
@@ -28,6 +27,7 @@ from .paths import (
     get_config_system_dir,
     session_directory,
 )
+from .plugins import get_registered_hooks
 from .user_config import is_valid_username
 
 FORMAT_VERSION = 3

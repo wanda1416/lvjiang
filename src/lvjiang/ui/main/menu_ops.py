@@ -22,7 +22,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QDialog, QMessageBox, QToolButton, QWidget
 
-from lvjiang.apps import get_registry
+from lvjiang.core.plugins import get_registry
 
 from ...core.config import load_user_config
 from ...i18n import tr

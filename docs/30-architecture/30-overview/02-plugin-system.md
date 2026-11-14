@@ -23,7 +23,7 @@ python -m lvjiang --all-plugins        # 内置插件 + plugins/ 默认目录全
 插件通过 `AppHooks` 数据类向引擎声明扩展点：
 
 ```python
-# src/lvjiang/apps/base.py（节选；完整字段见下面的扩展点全表）
+# src/lvjiang/core/plugins/hooks.py（节选；完整字段见下面的扩展点全表；旧路径 lvjiang.apps.base 保留再导出）
 @dataclass
 class AppHooks:
     id: str = ""                              # 稳定机器标识：小写 ASCII、不可翻译（如 "yysls"）
@@ -81,7 +81,7 @@ builder 约定：
 
 | 字段 | 默认 | 用途 | 消费方 / 写错的后果 |
 |---|---|---|---|
-| `id` | `""` | 稳定机器标识，小写 ASCII、不可翻译 | `apps/__init__.py:register_hooks` 记入 `registry["app_ids"]`；被 `requires_app_ids`、`AppEvent.app_id`、菜单登记引用。留空则插件不进名册，依赖它的插件加载失败 |
+| `id` | `""` | 稳定机器标识，小写 ASCII、不可翻译 | `core/plugins/__init__.py:register_hooks` 记入 `registry["app_ids"]`（完整声明存 `registry["hooks"]`，消费方经 `get_registered_hooks()` 读取）；被 `requires_app_ids`、`AppEvent.app_id`、菜单登记引用。留空则插件不进名册，依赖它的插件加载失败 |
 | `name` | `""` | 显示名（可翻译） | 日志、插件页标签、窗口标题回退。**不要用它做任何匹配** |
 | `requires_app_ids` | `()` | 必须先注册的插件 ID | `register_hooks` 首步校验；缺失时抛 `RuntimeError`，整个插件拒绝注册（不是降级加载） |
 | `startup_callbacks` | `[]` | 注册后、其余扩展装配前的无 UI 初始化（一次性数据迁移等） | `register_hooks` 逐个执行；**单个回调异常只记日志**，不阻断本插件其余扩展，也不影响其他插件 |
@@ -292,7 +292,7 @@ class AutoFarmWorkflow(BaseWorkflow):
 
 | 层 | 位置 | 保护什么 |
 |---|---|---|
-| 发现与加载 | `tests/core/test_plugin_discovery.py` | 内置名册与实际源码目录一致（漏登/多登都会失败）、三级扫描、"子目录 + `__init__.py`"识别、非法目录名只跳过、`-reg NAME@PATH` 挂载、`--all-plugins` 去重追加 |
+| 发现与加载 | `tests/core/test_plugin_discovery.py` | 内置名册由 `pkgutil.iter_modules` 列举 apps 子包、与源码目录一致（宿主不写死插件名）、三级扫描、"子目录 + `__init__.py`"识别、非法目录名只跳过、`-reg NAME@PATH` 挂载、`--all-plugins` 去重追加 |
 | 无 Qt 契约 | `tests/core/test_plugin_contracts.py` | 公共插件契约（`AppEvent`、`PluginRuntimePort`、`ProfileProcessor` 等）在屏蔽 PyQt6 的子进程里仍能 import；插件碰到的公共层不得偷偷依赖 Qt |
 | 领域行为 | `tests/yysls/`、外置插件自己的 `tests/` | 装备解析、调律规则、采集流程等业务契约 |
 
@@ -305,7 +305,7 @@ class AutoFarmWorkflow(BaseWorkflow):
   `config/session`、`config/local` 或用户数据库。
 - 外置插件在主仓库根执行：
   `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest plugins/<name>/tests`。
-- 改完插件目录或 `_BUILTIN_APP_IDS` 名册，至少跑 `tests/core/test_plugin_discovery.py`；
+- 改完插件目录或插件发现逻辑，至少跑 `tests/core/test_plugin_discovery.py`；
   改配置声明跑 `python scripts/add_content_version.py --check`。
 - 打包侧另行校验插件清单与对应 `local` 资源是否随包（见 `plugins/README.md`）。
 

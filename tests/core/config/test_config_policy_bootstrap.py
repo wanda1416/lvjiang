@@ -3,10 +3,10 @@ import sys
 
 import yaml
 
-from lvjiang import apps
-from lvjiang.apps.base import AppHooks
+from lvjiang.core import plugins as apps
 from lvjiang.core.config import versioning
 from lvjiang.core.config.resolver import ConfigResolver
+from lvjiang.core.plugins import AppHooks
 
 
 def test_policy_only_bootstrap_does_not_start_plugin_and_readers_do_not_reload_it(tmp_path, monkeypatch):

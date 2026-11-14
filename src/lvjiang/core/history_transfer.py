@@ -43,8 +43,8 @@ class HistoryChannel:
 
 
 def history_channels() -> dict[str, HistoryChannel]:
-    from ..apps import get_registered_hooks
     from .daily_history import TaskHistoryRepository
+    from .plugins import get_registered_hooks
 
     batches = "status != 'running' AND finished_at != '' AND target_id='ondevice' AND target_kind='android'"
     tasks = ("source='ondevice' AND status != 'running' AND finished_at != '' "

@@ -5,8 +5,7 @@ from types import ModuleType
 
 import pytest
 
-from lvjiang.apps import load_app, register_hooks
-from lvjiang.apps.base import AppHooks
+from lvjiang.core.plugins import AppHooks, load_app, register_hooks
 
 
 def test_uninstalled_optional_app_has_clear_error():

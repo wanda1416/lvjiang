@@ -40,10 +40,10 @@ def configuration_status() -> dict:
 
 
 def reset_configuration() -> None:
-    from ...apps import get_registered_hooks, load_config_policies
     from ..config.resolver import get_resolver
     from ..config.session import reset_session_store
     from ..ocr.cleaner import OCRCleaner
+    from ..plugins import get_registered_hooks, load_config_policies
     from ..profile.repository import reset_profile_db
     from ..profile.schema import reload_profile_config
     from ..recognizers.template_locator import get_template_store

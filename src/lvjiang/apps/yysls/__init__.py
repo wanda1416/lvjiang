@@ -7,8 +7,8 @@
 from __future__ import annotations
 
 from ..._version import __version__
+from ...core.plugins import AppHooks, TelemetryDisclosure
 from ...i18n import tr
-from ..base import AppHooks, TelemetryDisclosure
 
 
 def _history_channels():

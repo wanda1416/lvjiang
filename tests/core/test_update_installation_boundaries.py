@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import yaml
 
-from lvjiang import apps
+from lvjiang.core import plugins as apps
 from lvjiang.core.config import protected_remote, remote, resolver
 from lvjiang.core.config.member_download import MemberDownload
 from lvjiang.core.config.update_store import UpdateStore

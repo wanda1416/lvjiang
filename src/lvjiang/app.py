@@ -102,7 +102,7 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     global _app, _window, _hooks
 
     hooks_list = hooks_list or []
-    from .apps import register_config_policies
+    from .core.plugins import register_config_policies
     for hooks in hooks_list:
         register_config_policies(hooks)
 

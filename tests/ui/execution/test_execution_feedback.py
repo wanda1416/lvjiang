@@ -3,7 +3,6 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QPushButton, QTabWidget, QWidget
 
-from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
 from lvjiang.core.batch.config import BatchConfigItem
 from lvjiang.ui.batch.batch_tab import BatchTab
 from lvjiang.ui.execution.feedback import (
@@ -15,6 +14,7 @@ from lvjiang.ui.execution.hotkeys import hotkey_label
 from lvjiang.ui.main.execution_access import guarded_launch
 from lvjiang.ui.main.plugin_runtime import PluginRuntime
 from lvjiang.ui.main.run_control import RunControlMixin
+from tests.ui.fake_plugin_page import FAKE_SCOPE, FakePluginPage
 
 
 def controls():
@@ -40,61 +40,57 @@ def controls():
         # 假对象按"无需落盘"处理即可（否则要连 _params_save_timer 一起造假）。
         _flush_lifecycle_params=lambda *args, **kwargs: None,
     )
-    tuning = SimpleNamespace(
-        _host=host, btn_run_tuning=QPushButton(), btn_pause_resume=QPushButton(),
-        _status_label=ExecutionFeedback(), _find_progress_widget=lambda: None,
-        _execution_user_selector=SimpleNamespace(resolve_username=lambda: "example"),
-    )
-    return host, batch, tuning
+    plugin = FakePluginPage(host)
+    return host, batch, plugin
 
 
-def refresh(host, batch, tuning, state):
+def refresh(host, batch, plugin, state):
     RunControlMixin._refresh_run_button(host)
     BatchTab._refresh_run_button(batch, state)
-    TuningTab._on_automation_state(tuning, state)
+    plugin.on_automation_state(state)
 
 
-def test_three_pages_share_connection_feedback_and_recover_without_old_errors(qapp):
-    host, batch, tuning = controls()
-    buttons = [host.btn_run_workflow, batch._btn_run, tuning.btn_run_tuning]
-    feedbacks = [host._daily_start_feedback, batch._start_feedback, tuning._status_label]
+def test_host_and_plugin_pages_share_connection_feedback_and_recover_without_old_errors(qapp):
+    host, batch, plugin = controls()
+    buttons = [host.btn_run_workflow, batch._btn_run, plugin.btn_run]
+    feedbacks = [host._daily_start_feedback, batch._start_feedback, plugin.execution_feedback]
     host._backend_ready = lambda: False
-    refresh(host, batch, tuning, "not_ready")
+    refresh(host, batch, plugin, "not_ready")
     assert {button.text() for button in buttons} == {"未定位"}
     assert all(button.isEnabled() for button in buttons)
     assert all("定位" in feedback.text() for feedback in feedbacks)
     host._backend = "adb"
-    refresh(host, batch, tuning, "not_ready")
+    refresh(host, batch, plugin, "not_ready")
     assert {button.text() for button in buttons} == {"未连接"}
     host._backend_ready = lambda: True
-    refresh(host, batch, tuning, "idle")
+    refresh(host, batch, plugin, "idle")
     assert all(not feedback.text() for feedback in feedbacks)
     assert all("开始" in button.text() for button in buttons)
     host._plan_allows_backend = lambda: False
-    refresh(host, batch, tuning, "plan_unsupported")
+    refresh(host, batch, plugin, "plan_unsupported")
     assert {button.text() for button in buttons} == {"方案不支持"}
     assert len({feedback.text() for feedback in feedbacks}) == 1
     host._plan_allows_backend = lambda: True
     host.start_denied_label = lambda: "需激活 Lv1"
-    refresh(host, batch, tuning, "start_denied")
+    refresh(host, batch, plugin, "start_denied")
     assert {button.text() for button in buttons} == {"需激活 Lv1"}
 
 
 def test_empty_choices_are_explained_without_affecting_other_pages(qapp):
-    host, batch, tuning = controls()
+    host, batch, plugin = controls()
     host._workflow_configs = []
     host._get_selected_flow_config = lambda: None
     batch._script_order = []
-    tuning._execution_user_selector.resolve_username = lambda: ""
-    refresh(host, batch, tuning, "idle")
+    plugin.username = ""
+    refresh(host, batch, plugin, "idle")
     assert "脚本" in host._daily_start_feedback.text()
     assert "勾选" in batch._start_feedback.text()
-    assert "执行用户" in tuning._status_label.text()
+    assert "执行用户" in plugin.execution_feedback.text()
     batch._script_order = ["example"]
     BatchTab._refresh_run_button(batch, "idle")
     assert not batch._start_feedback.text()
     assert "脚本" in host._daily_start_feedback.text()
-    assert "执行用户" in tuning._status_label.text()
+    assert "执行用户" in plugin.execution_feedback.text()
     messages = []
     batch._host.append_log = messages.append
     batch._get_enabled_usernames = lambda: []
@@ -109,12 +105,12 @@ def test_failure_is_routed_to_owner_and_survives_availability_refresh(qtbot):
     tabs = QTabWidget()
     qtbot.addWidget(tabs)
     page = QWidget()
-    page.execution_scope = "auto_tuning"
+    page.execution_scope = FAKE_SCOPE
     page.execution_feedback = ExecutionFeedback(page)
     tabs.addTab(QWidget(), "其他页面")
-    tabs.addTab(page, "调律")
+    tabs.addTab(page, "示例插件")
     host = SimpleNamespace(_left_tabs=tabs, _daily_start_feedback=ExecutionFeedback())
-    report_start_failure(host, "启动检查失败", "auto_tuning")
+    report_start_failure(host, "启动检查失败", FAKE_SCOPE)
     assert page.execution_feedback.text() == "启动检查失败"
     assert not host._daily_start_feedback.text()
     page.execution_feedback.set_reason("请选择有效用户")
@@ -128,9 +124,9 @@ def test_keyword_plugin_launch_rejection_reports_to_owner(qtbot, monkeypatch, tm
     tabs = QTabWidget()
     qtbot.addWidget(tabs)
     page = QWidget()
-    page.execution_scope = "auto_tuning"
+    page.execution_scope = FAKE_SCOPE
     page.execution_feedback = ExecutionFeedback(page)
-    tabs.addTab(page, "调律")
+    tabs.addTab(page, "示例插件")
     messages = []
     host = SimpleNamespace(
         _left_tabs=tabs, _daily_start_feedback=ExecutionFeedback(), _running=False,
@@ -149,7 +145,7 @@ def test_keyword_plugin_launch_rejection_reports_to_owner(qtbot, monkeypatch, tm
     def launch(self, impl_name, flow_name, configure):
         raise AssertionError("授权拒绝后不应执行启动")
 
-    launch(host, impl_name="auto_tuning", flow_name="调律", configure=None)
+    launch(host, impl_name=FAKE_SCOPE, flow_name="示例插件任务", configure=None)
     assert "被占用" in page.execution_feedback.text()
     assert not host._daily_start_feedback.text()
     assert messages

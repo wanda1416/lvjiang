@@ -149,11 +149,34 @@ def _no_qt_modal_dialogs(monkeypatch):
         QtWidgets.QDialog, "exec", _banned("QDialog.exec()"))
 
 
+_PLUGIN_RELOAD_CALLBACKS: list | None = None
+
+
+def _reload_plugin_configuration() -> None:
+    """按内置插件声明的 configuration_reload_callbacks 清理插件缓存。
+
+    测试组合根不认识任何具体插件：插件自己的会话存储、游戏配置等单例由插件
+    通过 hook 声明的回调复位（与生产环境配置快照重载走同一入口）。
+    """
+    global _PLUGIN_RELOAD_CALLBACKS
+    if _PLUGIN_RELOAD_CALLBACKS is None:
+        from lvjiang.core.plugins import builtin_app_ids, load_app
+
+        callbacks = []
+        for app_id in builtin_app_ids():
+            try:
+                callbacks.extend(load_app(app_id).configuration_reload_callbacks)
+            except Exception:  # noqa: BLE001 - 缺失或损坏的插件不拖垮整套测试
+                continue
+        _PLUGIN_RELOAD_CALLBACKS = callbacks
+    for callback in _PLUGIN_RELOAD_CALLBACKS:
+        callback()
+
+
 @pytest.fixture(autouse=True)
 def _isolate_session_store(tmp_path, monkeypatch):
     """每个用例使用独立的 session.json 和插件会话目录。"""
     from lvjiang import constants
-    from lvjiang.apps.yysls.config.session_node import reset_session_storage
     from lvjiang.core.config.session import reset_session_store
 
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "session")
@@ -165,10 +188,10 @@ def _isolate_session_store(tmp_path, monkeypatch):
         constants, "BATCH_CONFIG_PATH", tmp_path / "session" / "batch.json",
     )
     reset_session_store()
-    reset_session_storage()
+    _reload_plugin_configuration()
     yield
     reset_session_store()
-    reset_session_storage()
+    _reload_plugin_configuration()
 
 
 @pytest.fixture(autouse=True)
@@ -195,19 +218,6 @@ def _isolate_profile_store(tmp_path, monkeypatch):
     layout.last_read_error = ""
     schema._config = None
     repository.reset_profile_db()
-
-
-@pytest.fixture(autouse=True)
-def _reset_game_config():
-    """每个用例前重置 GameConfigManager 单例
-
-    并行执行时同一 worker 内多个测试共享单例，前一个测试的 monkeypatch
-    或配置修改会污染后续测试。生产环境不受影响。
-    """
-    from lvjiang.apps.yysls.config.manager import reset_game_config
-    reset_game_config()
-    yield
-    reset_game_config()
 
 
 class _FakeClipboard:

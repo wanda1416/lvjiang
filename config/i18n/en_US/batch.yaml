@@ -83,6 +83,15 @@ batch:
   "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」与「条目准备工作流」：允许竖屏启动会先把游戏收回登录主页，没有条目准备就无法再把人送回游戏": "Configure both the \"recovery workflow\" and the \"item prep workflow\" for this group under Tools → Batch Configuration first: a portrait start first returns the game to the login screen, and without item prep nobody can send the player back into the game."
   "允许竖屏需要先配置条目准备工作流": "Portrait start requires an item prep workflow"
   "「允许竖屏」启动时会先由异常恢复 wf 把客户端收回登录主页，需要条目准备工作流再把人送回游戏。请先在「工具 → 批量配置」为该配置组配置条目准备 wf。": "\"Allow portrait\" first has the recovery workflow return the client to the login screen, then the item prep workflow sends the player back into the game. Configure an item prep workflow for this group under Tools → Batch Configuration first."
+  "上一轮": "Previous round"
+  "下一轮": "Next round"
+  "第 {round}/{rounds} 轮": "Round {round}/{rounds}"
+  "跳到最新一轮并持续跟随；按下表示正在跟随": "Jump to the latest round and keep following; pressed means following"
+  "全局参数": "Global parameters"
+  "编辑范围": "Edit scope"
+  "用户：{name}": "User: {name}"
+  "勾选的脚本没有可配置的任务参数": "Selected scripts have no configurable task parameters"
+  "改动立即生效，与日常任务共用同一份参数": "Changes take effect immediately and share the same parameters as daily tasks"
 batch_report:
   "（执行通道中断，整批中止）": " (execution channel lost, batch aborted)"
   "（用户中断）": "(User Interrupted)"
@@ -99,6 +108,7 @@ batch_scheduler:
   "生命周期 wf 返回了无效角色": "The lifecycle workflow returned an invalid role"
   "用户结束当前任务，继续下一项": "User ended the current task; continue with the next one"
   "通道中断": "Channel interrupted"
+  "未执行": "Not run"
 common:
   "停止中": "Stopping"
   "全不选": "Deselect All"

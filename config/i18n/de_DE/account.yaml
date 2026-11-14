@@ -62,5 +62,10 @@ account_dialog:
   ? "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"
   : "First time: establish sync state between this machine and the cloud. If the cloud already has data, local\nusers, overview definitions and overview data are backed up to config/session/_backup-* before pulling."
   ；等 {} 项: ; {} more items
+  "已恢复每分钟自动同步": "Automatic sync every minute resumed"
+  "已暂停自动同步；手动「立即同步」仍可用": "Automatic sync paused; manual \"Sync now\" still works"
+  "恢复同步": "Resume sync"
+  "暂停同步": "Pause sync"
+  "暂停后不再每分钟自动同步（心跳与在线状态不受影响）。手动「立即同步」仍可用；重启后保持暂停状态。": "After pausing, automatic sync every minute stops (heartbeat and online status are unaffected). Manual \"Sync now\" still works; the paused state persists after restart."
 common:
   用户: User

@@ -604,7 +604,6 @@ yysls:
   '{field}不能大于_999999': '{field} cannot exceed 999999'
   '{field}不能小于_{min}': '{field} cannot be less than {min}'
   '{field}必须是有效数字': '{field} must be a valid number'
-  变更记录: Change Log
   同步变更依赖方: Sync change dependents
   旧值: Old Value
   时间: Time

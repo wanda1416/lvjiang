@@ -93,7 +93,6 @@ profile_service:
   "只能撤销该用户此数据项的最新记录": "Only the latest record of this data item for that user can be undone"
   "当前数据项已不存在": "The data item no longer exists"
   "数据已发生变化，请刷新后重试": "The data has changed; refresh and try again"
-  "自动恢复": "Auto-restore"
   "该条历史已不存在或归属不匹配，请刷新后重试": "That history entry no longer exists or belongs to someone else; refresh and try again"
 run_control:
   "已恢复": "Resumed"

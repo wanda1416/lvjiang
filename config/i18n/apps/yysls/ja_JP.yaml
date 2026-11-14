@@ -608,7 +608,6 @@ yysls:
   '{field}不能大于_999999': '{field} cannot exceed 999999'
   '{field}不能小于_{min}': '{field} cannot be less than {min}'
   '{field}必须是有效数字': '{field} must be a valid number'
-  变更记录: 変更記録
   同步变更依赖方: 同步変更依頼方
   旧值: 旧値
   时间: 時間

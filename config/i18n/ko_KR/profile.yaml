@@ -103,13 +103,10 @@ profile:
   变动量：{value}: 'Delta: {value}'
   变更类型：{label}: 'Change type: {label}'
   '变更脚本不存在: workflows/{path}': "Change script doesn't exist: workflows/{path}"
-  变更记录: Change History
   另有 {count} 项未列出，输入可搜索: '{count} more items not listed; type to search'
   同步:{sync}: 'Sync: {sync}'
   同步修改: Sync changes
   同步变更依赖方: Sync dependent parties of the change
-  同步来源: Synced From
-  同步来源：{value}: 'Sync source: {value}'
   同步目标 {targets} 已达上限: Sync target {targets} has reached its cap
   同步目标不能指向自身: Sync targets cannot point at themselves
   周: weeks
@@ -214,7 +211,6 @@ profile:
   至少保留一个分组: Keep at least one group
   覆写 - {label}: Overwrite - {label}
   覆写...: Overwrite...
-  覆盖: Overwrite
   ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
   : "Remove {user}'s lock on \"{label}\"?\nAfter unlocking, automated tasks will read and update this key again."
   设备：{value}: 'Device: {value}'
@@ -281,6 +277,11 @@ profile:
   降序: Descending
   "同步到": "Synced To"
   "备注内容": "Note Content"
+  "总览历史记录": "Overview history"
+  "更新": "Updated"
+  "未同步": "Not synced"
+  "来自": "From"
+  "来自：{value}": "From: {value}"
 run_control:
   错误: 오류
 profile_service:

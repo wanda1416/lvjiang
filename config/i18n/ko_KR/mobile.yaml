@@ -22,8 +22,6 @@ mobile:
   下发配置（需激活功能）: Push Config (activation required)
   下载 APK 到本机: Download APK to PC
   下载失败: Download failed
-  不下发总览数据；手机 Profile 继续按账号云端同步更新。: Overview data is not pushed; the phone's Profile keeps updating via account cloud sync.
-  不含总览数据（Profile 由账号云端同步）: Excludes overview data (Profile syncs from the cloud by account)
   二维码来源: QR code source
   二维码生成失败，请手动打开上面的链接: QR code generation failed; open the link above manually
   "仅合并已结束的手机记录；参数、Profile 和插件业务数据不回传。重复回传不会重复导入。": "Only finished phone records are merged; parameters, Profile and plugin data are not uploaded. Re-uploading doesn't duplicate imports."
@@ -40,7 +38,6 @@ mobile:
   先准备一个本地安装包: Prepare a local package first
   全部网卡（默认）: All NICs (default)
   其他连接: Other connections
-  勾选后不下发 Profile 数据库和定义，手机总览数据继续由账号云端同步更新。手机处于云端模式（默认）时必须勾选，否则手机会拒绝接收。: When checked, the Profile database and definitions are not pushed; the phone's overview keeps updating via account cloud sync. Must be checked when the phone is in cloud mode (default), or the phone rejects the transfer.
   协议: Protocol
   协议不匹配会直接连不上。{newer}端较新，请升级另一边: A protocol mismatch prevents connection entirely. The {newer} side is newer; upgrade the other one
   协议版本: Protocol version
@@ -49,7 +46,6 @@ mobile:
   只影响 shell 通道；手势与无障碍截图不需要它: Only affects the shell channel; gestures and accessibility screenshots don't need it
   可选能力，不装也能用无障碍通道: Optional capability; the accessibility channel works without it
   同步到手机: Sync to Phone
-  同步布局（请选择安卓布局）: Sync layout (pick an Android layout)
   同步配置: Sync Config
   回传到电脑: Upload to PC
   回传完成；重复记录已跳过，手机原件保留。: Upload finished; duplicate records skipped, phone originals kept.
@@ -59,8 +55,6 @@ mobile:
   复制诊断报告: Copy Diagnostics Report
   安装失败：{err}: 'Install failed: {err}'
   安装完成：{out}: 'Install finished: {out}'
-  将更新脚本、布局和用户数据。: Will update scripts, layouts and user data.
-  将更新脚本、布局和用户数据，Profile 由 PC 快照覆盖。: Will update scripts, layouts and user data; Profile is overwritten by the PC snapshot.
   尚未扫描: Not scanned yet
   ? "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。"
   : "LAN scan discovers devices with wireless ADB; local port scan discovers emulators listening only on 127.0.0.1.\nScanning only establishes ADB connections; it doesn't switch the main window's execution target."
@@ -168,3 +162,5 @@ mobile:
   选择本地 APK…: Select local APK…
   重新扫描: Rescan
   除本窗口外还有 {n} 路连接连着这台手机，可能来自另一个窗口或另一台电脑，操作会互相打断: Besides this window, {n} other connections are attached to this phone — possibly another window or computer; operations will interrupt each other
+  "同步布局": "Sync layouts"
+  "将更新脚本、布局和用户数据；总览数据不随包下发，由手机账号云端同步。": "Will update scripts, layouts and user data; overview data is not included in the bundle and syncs through the phone account cloud."

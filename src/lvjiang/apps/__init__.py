@@ -274,13 +274,17 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     if hooks.builtin_modules:
         registry.setdefault("builtin_modules", []).extend(hooks.builtin_modules)
-        # 实际导入模块触发 @builtin_func 装饰器注册
+        # 实际导入模块触发 @builtin_func 装饰器注册，并把归属登记进元数据
+        from ..workflows.builtins._registry import assign_app, list_functions
+        before = set(list_functions())
         try:
             for mod_path in hooks.builtin_modules:
                 importlib.import_module(mod_path)
                 logger.info("[plugin]   builtin module 已加载: {}", mod_path)
         except Exception:  # noqa: BLE001
             logger.exception("[plugin] 内置函数模块加载失败")
+        assign_app(hooks.id or hooks.name, hooks.builtin_modules,
+                   set(list_functions()) - before)
         logger.info("[plugin]   builtin modules: {}", len(hooks.builtin_modules))
 
     if hooks.profile_period_modules:

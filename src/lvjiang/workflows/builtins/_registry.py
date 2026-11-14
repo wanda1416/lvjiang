@@ -13,9 +13,9 @@
 import inspect
 import sys
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # 全局函数注册表
 _FUNCTION_REGISTRY: dict[str, Callable] = {}
@@ -52,6 +52,9 @@ class FunctionMeta:
     returns: str = ""
     module: str = ""
     line: int | None = None
+    #: 声明该函数的插件 ID；宿主内置函数为空。由插件加载器登记，
+    #: 界面据此显示归属，不靠解析模块路径猜。
+    app_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -127,6 +130,31 @@ def capture_registrations():
         yield bucket
     finally:
         stack.pop()
+
+
+def assign_app(app_id: str, module_paths: Iterable[str],
+               names: Iterable[str] = ()) -> int:
+    """把插件声明的内置函数归属登记进元数据，返回登记数量。
+
+    命中条件：函数名在 ``names``（本次插件模块导入新注册的）里，或函数定义
+    模块属于插件声明的 ``builtin_modules``（模块可能在加载器之前已被导入）。
+    """
+    if not app_id:
+        return 0
+    modules = tuple(module_paths)
+    wanted = set(names)
+    count = 0
+    for name, fn in _FUNCTION_REGISTRY.items():
+        meta = getattr(fn, "_meta", None)
+        if meta is None or meta.app_id:
+            continue
+        owned = name in wanted or any(
+            meta.module == module or meta.module.startswith(module + ".")
+            for module in modules)
+        if owned:
+            fn._meta = replace(meta, app_id=app_id)
+            count += 1
+    return count
 
 
 def get_function(name: str) -> Callable | None:

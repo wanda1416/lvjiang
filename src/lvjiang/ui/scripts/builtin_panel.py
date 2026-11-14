@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
 from ...workflows.builtins import (
+    FunctionMeta,
     capture_registrations,
     get_function,
     iter_function_metas,
@@ -114,7 +115,7 @@ class BuiltinFunctionPanel(QWidget):
                 summary=meta.summary,
                 params=params,
                 returns=meta.returns,
-                source=self._source_label(meta.module),
+                source=self._source_label(meta),
                 injected=getattr(fn, "_inject", None),
                 fn=fn,
                 issues=validate_function_meta(meta.name),
@@ -153,15 +154,12 @@ class BuiltinFunctionPanel(QWidget):
         return get_resolver().local_dir / "workflows"
 
     @staticmethod
-    def _source_label(module: str) -> str:
-        if not module:
-            return tr("内置")
-        parts = module.split(".")
-        if "apps" in parts:
-            index = parts.index("apps")
-            tail = [p for p in parts[index + 1:] if p not in {"workflows", "builtins"}]
-            return f"{tr('插件')} · {'/'.join(tail)}"
-        return f"{tr('内置')} · {parts[-1]}"
+    def _source_label(meta: FunctionMeta) -> str:
+        # 归属由插件加载器登记在元数据里，不解析模块路径猜插件目录布局。
+        leaf = meta.module.rsplit(".", 1)[-1] if meta.module else ""
+        if meta.app_id:
+            return f"{tr('插件')} · {meta.app_id}/{leaf}" if leaf else f"{tr('插件')} · {meta.app_id}"
+        return f"{tr('内置')} · {leaf}" if leaf else tr("内置")
 
     # ─── 左侧树 ───────────────────────────────────────────
 

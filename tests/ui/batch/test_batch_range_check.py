@@ -44,6 +44,20 @@ def _indicator_center(tree: _ReorderTreeWidget, row: int) -> QPoint:
     return rect.center()
 
 
+def _shift_click(tree, pos: QPoint) -> None:
+    """Shift+点击后松开 Shift。
+
+    QTest.mouseClick 带修饰键时会把修饰键写进 QGuiApplication 的全局键盘状态，
+    却不会自动「松开」：之后同一进程里所有读 keyboardModifiers() 的控件（如
+    QTableWidget.selectRow 的选择命令）都会当作 Shift 仍按住。必须像真实用户
+    一样补一个 Shift 松开事件，不能把状态漏给后续用例。
+    """
+    QTest.mouseClick(
+        tree.viewport(), Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.ShiftModifier, pos=pos)
+    QTest.keyRelease(tree.viewport(), Qt.Key.Key_Shift)
+
+
 def test_shift_click_checks_range_from_anchor(qtbot):
     tree = _make_tree(qtbot)
     emitted: list[tuple[int, int, int]] = []
@@ -58,10 +72,7 @@ def test_shift_click_checks_range_from_anchor(qtbot):
     assert tree._check_anchor_row == 0
 
     # Shift+点击第 3 行勾选框：区间 [0, 3]，目标状态 = 勾选（第 3 行原本未勾）。
-    QTest.mouseClick(
-        tree.viewport(), Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.ShiftModifier,
-        pos=_indicator_center(tree, 3))
+    _shift_click(tree, _indicator_center(tree, 3))
     assert emitted == [(0, 3, Qt.CheckState.Checked.value)]
     assert tree._check_anchor_row == 3
 
@@ -72,10 +83,7 @@ def test_shift_click_without_anchor_degrades_to_single_click(qtbot):
     tree.range_check_requested.connect(
         lambda start, end, target: emitted.append((start, end, target)))
 
-    QTest.mouseClick(
-        tree.viewport(), Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.ShiftModifier,
-        pos=_indicator_center(tree, 2))
+    _shift_click(tree, _indicator_center(tree, 2))
     assert emitted == []
     assert tree._check_anchor_row == 2
 
@@ -92,10 +100,7 @@ def test_shift_click_on_row_body_does_not_emit_range(qtbot):
     item = tree.topLevelItem(4)
     assert item is not None
     body = tree.visualItemRect(item)
-    QTest.mouseClick(
-        tree.viewport(), Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.ShiftModifier,
-        pos=QPoint(body.right() - 4, body.center().y()))
+    _shift_click(tree, QPoint(body.right() - 4, body.center().y()))
     assert emitted == []
 
 
@@ -109,10 +114,7 @@ def test_reset_anchor_forgets_previous_row(qtbot):
         tree.viewport(), Qt.MouseButton.LeftButton,
         pos=_indicator_center(tree, 0))
     tree.reset_check_anchor()
-    QTest.mouseClick(
-        tree.viewport(), Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.ShiftModifier,
-        pos=_indicator_center(tree, 3))
+    _shift_click(tree, _indicator_center(tree, 3))
     assert emitted == []
 
 

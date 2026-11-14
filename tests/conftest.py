@@ -43,6 +43,41 @@ install_closed_directory_scan()
 
 
 @pytest.fixture(autouse=True)
+def _no_stuck_keyboard_modifiers():
+    """用例结束时不得留下「按住」的键盘修饰键。
+
+    ``QTest.mouseClick(..., ShiftModifier)`` 会把修饰键写进 QGuiApplication 的
+    全局键盘状态且不会自动松开；之后同一 worker 里读 ``keyboardModifiers()``
+    的控件（``QTableWidget.selectRow`` 等）都按「Shift 仍按住」处理，失败却落在
+    xdist 恰好排在后面的无关用例上。在这里让泄漏的那条用例自己报错。
+    """
+    yield
+    import sys
+
+    if "PyQt6.QtWidgets" not in sys.modules:
+        return
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QApplication
+
+    if QApplication.instance() is None:
+        return
+    stuck = QApplication.keyboardModifiers()
+    if stuck == Qt.KeyboardModifier.NoModifier:
+        return
+    # 先复位，避免同一 worker 里后续用例被连带判错，再让本条用例报错。
+    from PyQt6.QtGui import QWindow
+    from PyQt6.QtTest import QTest
+
+    window = QWindow()
+    for key in (Qt.Key.Key_Shift, Qt.Key.Key_Control, Qt.Key.Key_Alt, Qt.Key.Key_Meta):
+        QTest.keyRelease(window, key)
+    window.destroy()
+    assert stuck == Qt.KeyboardModifier.NoModifier, (
+        f"用例结束时键盘修饰键仍处于按下状态：{stuck!r}；"
+        "带修饰键的 QTest 鼠标操作之后须补 QTest.keyRelease 松开")
+
+
+@pytest.fixture(autouse=True)
 def _isolated_instance_id(tmp_path_factory):
     """把实例出生标识隔离到测试临时目录。
 

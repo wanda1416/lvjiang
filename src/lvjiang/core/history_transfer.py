@@ -38,6 +38,8 @@ class HistoryChannel:
     initialize: Callable[[Path], Any]
     tables: tuple[HistoryTable, ...]
     unattributed: str = ""
+    #: 该类别附件额外允许的相对落点（如插件自己的报告目录），由声明方给出。
+    attachment_prefixes: tuple[str, ...] = ()
 
 
 def history_channels() -> dict[str, HistoryChannel]:
@@ -61,16 +63,25 @@ def history_channels() -> dict[str, HistoryChannel]:
     return channels
 
 
-#: 历史附件允许的落点。`logs/output/` 是当前产出根；`config/session/output/` 是旧版
+#: 宿主历史附件允许的落点。`logs/output/` 是当前产出根；`config/session/output/` 是旧版
 #: 产出根——旧记录、以及「新 APK 回传旧记录 / 旧 APK 回传新记录」这类混用都会出现，
-#: 两个前缀都要接受。
+#: 两个前缀都要接受。插件附件目录由各自 HistoryChannel.attachment_prefixes 声明。
 _ATTACHMENT_PREFIXES = (
-    "logs/daily/", "logs/batch/", "logs/tuning/", "logs/output/",
+    "logs/daily/", "logs/batch/", "logs/output/",
     "config/session/output/",
 )
 
 
-def _attachment(root: Path, name: str, *, legacy: bool = False) -> tuple[str, Path]:
+def attachment_prefixes(channels: dict[str, HistoryChannel]) -> tuple[str, ...]:
+    """宿主落点 + 已注册类别声明的落点（去重保序）。"""
+    ordered = dict.fromkeys(_ATTACHMENT_PREFIXES)
+    for channel in channels.values():
+        ordered.update(dict.fromkeys(channel.attachment_prefixes))
+    return tuple(ordered)
+
+
+def _attachment(root: Path, name: str, prefixes: tuple[str, ...], *,
+                legacy: bool = False) -> tuple[str, Path]:
     # 旧调律记录曾存绝对路径，仅允许将本实例内的路径规范化。
     path = Path(name)
     if path.is_absolute() and legacy:
@@ -78,7 +89,7 @@ def _attachment(root: Path, name: str, *, legacy: bool = False) -> tuple[str, Pa
     relative = PurePosixPath(name)
     if (not name or relative.is_absolute() or ".." in relative.parts or "\\" in name
             or relative.as_posix() != name
-            or not name.startswith(_ATTACHMENT_PREFIXES)):
+            or not prefixes or not name.startswith(prefixes)):
         raise ValueError(f"历史附件路径不在允许范围：{name}")
     path = root.joinpath(*relative.parts)
     if not path.resolve().is_relative_to(root.resolve()):
@@ -109,6 +120,7 @@ def _file_digest(path: Path) -> str:
 
 def export_history(root: Path, destination: Path, selected: list[str]) -> dict:
     channels = history_channels()
+    prefixes = attachment_prefixes(channels)
     if not selected or len(set(selected)) != len(selected) or set(selected) - {*channels, "logs"}:
         raise ValueError("请选择有效的回传类别")
     payload: dict[str, Any] = {"format": FORMAT, "app_version": __version__, "selected": selected,
@@ -134,7 +146,7 @@ def export_history(root: Path, destination: Path, selected: list[str]) -> dict:
                     columns.append("log_path")
                 for column in columns:
                     if row.get(column):
-                        name, path = _attachment(root, row[column], legacy=True)
+                        name, path = _attachment(root, row[column], prefixes, legacy=True)
                         row[column] = name
                         if path.is_file():
                             files[name] = path
@@ -142,7 +154,8 @@ def export_history(root: Path, destination: Path, selected: list[str]) -> dict:
                             payload["missing"].append(name)
                 # 未选日志时仍规范化记录引用，但不携带日志文件。
                 if key == "tasks" and row.get("log_path"):
-                    row["log_path"] = _attachment(root, row["log_path"], legacy=True)[0]
+                    row["log_path"] = _attachment(
+                        root, row["log_path"], prefixes, legacy=True)[0]
         if key in selected:
             payload["channels"][key] = tables
     total = 0
@@ -167,7 +180,8 @@ def export_history(root: Path, destination: Path, selected: list[str]) -> dict:
     return {"size": destination.stat().st_size, "sha256": _file_digest(destination)}
 
 
-def _merge_channel(root: Path, channel: HistoryChannel, tables: dict) -> int:
+def _merge_channel(root: Path, channel: HistoryChannel, tables: dict,
+                   prefixes: tuple[str, ...]) -> int:
     if set(tables) != {table.name for table in channel.tables}:
         raise ValueError(f"{channel.label} 表范围不一致，请更新两端程序")
     path = root / "config/session" / channel.database
@@ -186,7 +200,7 @@ def _merge_channel(root: Path, channel: HistoryChannel, tables: dict) -> int:
                     raise ValueError(f"{channel.label} 字段不一致，请更新两端程序")
                 for column in (*table.paths, *(('log_path',) if 'log_path' in columns else ())):
                     if row[column]:
-                        _attachment(root, row[column])
+                        _attachment(root, row[column], prefixes)
                 existing = conn.execute(f'SELECT * FROM "{table.name}" WHERE {where}',
                                         [row[key] for key in table.keys]).fetchone()
                 if existing is not None:
@@ -203,6 +217,7 @@ def _merge_channel(root: Path, channel: HistoryChannel, tables: dict) -> int:
 
 def import_history(root: Path, archive_path: Path, selected: list[str]) -> dict:
     channels = history_channels()
+    prefixes = attachment_prefixes(channels)
     if not selected or set(selected) - {*channels, "logs"}:
         raise ValueError("回传类别不合法")
     result: dict[str, Any] = {"imported": {}, "files": 0, "missing": [], "errors": {}}
@@ -219,21 +234,21 @@ def import_history(root: Path, archive_path: Path, selected: list[str]) -> dict:
             raise ValueError("回传文件清单不一致")
         # 校验整个包及同名文件，之后才落盘；不替换任何已有不同内容。
         for name, digest in payload["files"].items():
-            _, path = _attachment(root, name)
+            _, path = _attachment(root, name, prefixes)
             data = archive.read(name)
             if hashlib.sha256(data).hexdigest() != digest:
                 raise ValueError(f"回传附件校验失败：{name}")
             if path.exists() and _file_digest(path) != digest:
                 raise ValueError(f"同名附件内容不同，已保留 PC 原文件：{name}")
         for name in payload["files"]:
-            _, path = _attachment(root, name)
+            _, path = _attachment(root, name, prefixes)
             if not path.exists():
                 atomic_write_bytes(path, archive.read(name), prefix="history-")
                 result["files"] += 1
         # 各类别独立事务：插件历史失败不回滚已完成的任务历史，重试自然去重。
         for key, tables in payload["channels"].items():
             try:
-                result["imported"][key] = _merge_channel(root, channels[key], tables)
+                result["imported"][key] = _merge_channel(root, channels[key], tables, prefixes)
             except (ValueError, sqlite3.Error) as exc:
                 result["errors"][key] = str(exc)
         result["missing"] = payload["missing"]

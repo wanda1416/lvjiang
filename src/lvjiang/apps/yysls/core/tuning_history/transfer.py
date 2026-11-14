@@ -12,4 +12,5 @@ def history_channels() -> tuple[HistoryChannel, ...]:
         HistoryTable("tuning_equipment", ("run_id", "sequence_id"),
                      f"run_id IN (SELECT run_id FROM tuning_runs WHERE {finished})", omitted=("id",)),
     ), unattributed=("SELECT COUNT(*) FROM tuning_runs WHERE status != 'running' AND finished_at != '' "
-                     "AND target_id='' AND markdown_path NOT LIKE :root_prefix")),)
+                     "AND target_id='' AND markdown_path NOT LIKE :root_prefix"),
+        attachment_prefixes=("logs/tuning/",)),)

@@ -242,3 +242,28 @@ def test_running_task_is_skipped_while_transfer_continues(histories, monkeypatch
     records = TaskHistoryRepository(pc / "config/session/daily_history.db").list_task_runs()
     assert [r.task_run_id for r in records] == [task.task_run_id]
     assert running.task_run_id not in {r.task_run_id for r in records}
+
+
+def test_plugin_attachment_prefixes_are_declared_by_channels(tmp_path):
+    """宿主只认识自己的附件落点；插件目录由插件 HistoryChannel 自己声明。"""
+    from lvjiang.apps.yysls.core.tuning_history.transfer import (
+        history_channels as tuning,
+    )
+    from lvjiang.core.history_transfer import (
+        HistoryChannel,
+        _attachment,
+        attachment_prefixes,
+    )
+
+    host_only = attachment_prefixes({})
+    assert "logs/tuning/" not in host_only
+    with pytest.raises(ValueError):
+        _attachment(tmp_path, "logs/tuning/report.md", host_only)
+
+    declared = {channel.key: channel for channel in tuning()}
+    prefixes = attachment_prefixes(declared)
+    assert "logs/tuning/" in prefixes
+    assert _attachment(tmp_path, "logs/tuning/report.md", prefixes)[0] == "logs/tuning/report.md"
+
+    fake = HistoryChannel("x", "x", "x.db", lambda _p: None, (), attachment_prefixes=("logs/x/",))
+    assert attachment_prefixes({"x": fake})[-1] == "logs/x/"

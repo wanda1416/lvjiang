@@ -42,6 +42,37 @@ from tests.fake_plugin import fake_app  # noqa: E402,F401
 install_closed_directory_scan()
 
 
+def pytest_collection_modifyitems(config, items):
+    """xdist 下把 ``slow`` 用例均匀撒进收集顺序，避免长尾全落在一个 worker。
+
+    xdist 默认的 load 调度按收集顺序**成段**派发（保持同模块相邻以复用夹具），
+    空闲 worker 不会从忙碌 worker 的队列里偷任务。同一文件里的 Excel 转换类
+    用例（每条数秒、合计约 100s）总是排在一起，于是整段被派给同一个 worker：
+    其余 worker 22s 就跑完空等，这一个要跑到 95s。均匀间隔插入后，每段派发
+    只分到一两条慢用例。
+
+    只在 worker 里重排（各 worker 算法相同、结果一致，满足 xdist 收集一致性
+    校验）；串行运行保持原有顺序。``--dist worksteal`` 在 CI 会静默退出（见
+    ci.yml），所以在收集顺序这一层解决。
+    """
+    if not hasattr(config, "workerinput"):
+        return
+    slow = [item for item in items if item.get_closest_marker("slow")]
+    if not slow or len(slow) == len(items):
+        return
+    rest = [item for item in items if not item.get_closest_marker("slow")]
+    stride = len(rest) / len(slow)
+    ordered: list[pytest.Item] = []
+    taken = 0
+    for index, item in enumerate(slow):
+        upto = int((index + 0.5) * stride)
+        ordered.extend(rest[taken:upto])
+        taken = upto
+        ordered.append(item)
+    ordered.extend(rest[taken:])
+    items[:] = ordered
+
+
 @pytest.fixture(autouse=True)
 def _no_stuck_keyboard_modifiers():
     """用例结束时不得留下「按住」的键盘修饰键。

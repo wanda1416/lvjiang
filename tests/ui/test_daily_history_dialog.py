@@ -146,8 +146,23 @@ def test_preview_refresh_missing_files_invalid_json_and_large_log(qtbot, tmp_pat
 
 
 def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot, tmp_path):
+    from PyQt6.QtWidgets import QApplication
+
     from lvjiang.core.config import load_ui_page_state, update_ui_page_state
     from lvjiang.core.config.session import reset_session_store
+
+    # 恢复时尺寸会按当前屏幕可用区域收敛（见 test_window_size_is_clamped_...），
+    # 所以保存的尺寸必须放得进屏幕，才能验证「原样恢复」。offscreen 平台的虚拟
+    # 屏幕只有 800×800，写死 1400 宽会被正确地收敛成 800。尺寸从屏幕推出来，
+    # 且与默认尺寸（1220×660 收敛后）不同，确保真的是读回了保存值。
+    screen = QApplication.primaryScreen()
+    assert screen is not None
+    available = screen.availableGeometry()
+    assert available.width() >= 800 and available.height() >= 760, available
+    saved = [available.width() - 40, available.height() - 80]
+    resized = [available.width() - 20, available.height() - 50]
+    default = [min(1220, available.width()), min(660, available.height())]
+    assert saved != default and resized != saved
 
     repository, _, _ = _history(tmp_path)
     update_ui_page_state("main_page", {"window_size": [1200, 700]})
@@ -155,8 +170,8 @@ def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot
     dialog = DailyHistoryDialog(repository=repository)
     qtbot.addWidget(dialog)
     dialog.show()
-    dialog.resize(1400, 720)
-    qtbot.waitUntil(lambda: dialog.width() == 1400)
+    dialog.resize(*saved)
+    qtbot.waitUntil(lambda: [dialog.width(), dialog.height()] == saved)
     dialog._task_splitter.setSizes([700, 660])
     dialog._tabs.setCurrentIndex(1)
     dialog._batch_splitter.setSizes([590, 770])
@@ -168,22 +183,22 @@ def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot
     reset_session_store()
     state = load_ui_page_state("task_history")
     assert state == {
-        "window_size": [1400, 720], "window_maximized": False,
+        "window_size": saved, "window_maximized": False,
         "task_splitter_sizes": task_sizes,
         "batch_splitter_sizes": batch_sizes, "other_field": "keep", "new_field": "keep too"}
     assert load_ui_page_state("main_page") == {"window_size": [1200, 700]}
     reopened = DailyHistoryDialog(repository=repository)
     qtbot.addWidget(reopened)
     reopened.show()
-    assert [reopened.width(), reopened.height()] == [1400, 720]
+    assert [reopened.width(), reopened.height()] == saved
     actual = reopened._task_splitter.sizes()
     assert abs(actual[0] / sum(actual) - task_sizes[0] / sum(task_sizes)) < 0.01
     reopened._tabs.setCurrentIndex(1)
     actual = reopened._batch_splitter.sizes()
     assert abs(actual[0] / sum(actual) - batch_sizes[0] / sum(batch_sizes)) < 0.01
-    reopened.resize(1450, 750)
+    reopened.resize(*resized)
     reopened.close()  # 标题栏关闭路径。
-    assert load_ui_page_state("task_history")["window_size"] == [1450, 750]
+    assert load_ui_page_state("task_history")["window_size"] == resized
 
 
 def test_window_size_is_clamped_to_screen_and_can_maximize(

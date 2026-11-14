@@ -127,7 +127,7 @@ class HistoryScope:
         if self.has_key:
             parts.append(
                 tr("键：{label}").format(label=self.key_label or self.key))
-        title = tr("变更记录")
+        title = tr("总览历史记录")
         return title + (" · " + " · ".join(parts) if parts else "")
 
 
@@ -347,9 +347,10 @@ class HistoryDialog(QDialog):
                     facet="source", filter_kind="facet"),
             _Column("device", tr("设备"), fixed, device_width,
                     facet="device", filter_kind="facet"),
-            _Column("sync_from", tr("同步来源"), fixed,
+            _Column("sync_from", tr("来自"), fixed,
                     _cjk_column_width(self, _SOURCE_CHARACTER_CAPACITY),
                     facet="sync_from", filter_kind="facet"),
+            _Column("remote", tr("状态"), fixed, 88),
             _Column("actions", tr("操作"), fixed, 150),
         ]
 
@@ -653,6 +654,9 @@ class HistoryDialog(QDialog):
         if key == "sync_from":
             raw = record.sync_from or ""
             return format_sync_label(str(raw)) if raw else ""
+        if key == "remote":
+            # 上行状态：NULL = 还没上过云端；其余直接显示云端编号
+            return tr("未同步") if record.remote_id is None else str(record.remote_id)
         return ""
 
     def _apply_actions(
@@ -833,8 +837,8 @@ class HistoryDialog(QDialog):
             chips.append(("device", tr("设备：{value}").format(
                 value=summary(query.devices, _device_label, tr("设备"))), ""))
         if query.sync_froms:
-            chips.append(("sync_from", tr("同步来源：{value}").format(
-                value=summary(query.sync_froms, format_sync_label, tr("同步来源"))), ""))
+            chips.append(("sync_from", tr("来自：{value}").format(
+                value=summary(query.sync_froms, format_sync_label, tr("来自"))), ""))
         if query.keyword:
             chips.append(("keyword", tr("搜索：{value}").format(value=query.keyword), ""))
         if query.old_text:

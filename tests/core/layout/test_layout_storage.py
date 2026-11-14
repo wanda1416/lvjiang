@@ -586,6 +586,8 @@ class TestSaveLayoutScope:
         mgr.save_layout(layout, changed_scenes={"scene_a"})
         data = json.loads((scene_dir / "scene_a.json").read_text(encoding="utf-8"))
         assert data["content_version"] == 2
+
+
 def test_old_central_disabled_section_is_rejected():
     with pytest.raises(ValueError, match="旧集中 disabled 段不再兼容"):
         Layout.from_dict("test", {"scenes": {"main": {"disabled": {"point": ["close"]}}}})
@@ -607,3 +609,36 @@ def test_disk_layout_skips_old_scene_without_modifying_it(env, monkeypatch):
     assert loaded.panels["scene_b"]
     assert path.read_bytes() == before
     assert any("旧集中 disabled 段不再兼容" in message for message in messages)
+
+
+class TestManifestFieldsNotCarriedByLayout:
+    """保存场景坐标不能抹掉清单里不由内存布局携带的字段。
+
+    ``Layout`` 只带 name/desc/aspect/canvas 等内存字段，``env``（适配环境）只有
+    清单里有。``save_layout`` 按内存对象重建条目时漏掉它，于是场景编辑器里随手
+    保存一次坐标就把 `env: android` 删掉，手机下发又会把桌面布局列进可选列表。
+    """
+
+    @staticmethod
+    def _patch_entry(env_root, key: str, **fields):
+        import yaml
+        path = env_root / "system" / "layouts.yaml"
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        doc["layouts"][key].update(fields)
+        path.write_text(
+            yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
+            encoding="utf-8")
+
+    def test_scene_save_keeps_declared_env(self, env):
+        mgr = LayoutConfigManager()
+        assert mgr.save_layout(_make_layout("phone"))
+        self._patch_entry(env, "phone", env="android")
+
+        layout = mgr.load_layout("phone")
+        layout.set_scene_regions("scene_a", [Region("btn", 0.2, 0.2, 0.2, 0.2)])
+        assert mgr.save_layout(layout, changed_scenes={"scene_a"})
+
+        import yaml
+        saved = yaml.safe_load(
+            (env / "system" / "layouts.yaml").read_text(encoding="utf-8"))
+        assert saved["layouts"]["phone"]["env"] == "android"

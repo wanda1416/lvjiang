@@ -383,6 +383,11 @@ class LayoutConfigManager:
             entry_out["desc"] = layout.desc
         elif existing.get("desc"):
             entry_out["desc"] = existing["desc"]
+        # env（适配环境）与 desc 同理：内存布局不携带这个字段，保存场景坐标必须
+        # 沿用清单里的旧值，否则一次保存就把它抹掉，手机下发又会把桌面布局列出来。
+        # 改/清空它走「布局信息」编辑，那条路径直接改清单。
+        if existing.get("env"):
+            entry_out["env"] = existing["env"]
         entry_out["canvas"] = layout.canvas.to_dict()
         # 与 desc 同理：内存布局没带就沿用清单里的旧值。清空要走布局信息编辑，
         # 那条路径直接改清单——保存场景坐标顺手抹掉画布尺寸要求太容易了

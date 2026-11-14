@@ -354,7 +354,12 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 ### 实例数据
 
 布局清单由 `layouts.yaml` schema v2 维护：key 是稳定存储标识，
-`name` 是可读展示名；每个场景的实例数据分开存在
+`name` 是可读展示名；条目还可以声明 `desc`、`env`（适配环境）、`aspect` /
+`aspect_tolerance`（画布尺寸门禁）和 `extends`（别名布局）。`env` 取
+`app.yaml` `envs` 的环境 key，只是**推荐值**：供消费方过滤布局（手机下发只列
+未声明或安卓的布局），不参与运行期的 `env()` 判定，留空表示不限制；别名布局
+未声明时跟随根布局。这些字段由「布局信息」对话框编辑，保存场景坐标时原样保留。
+每个场景的实例数据分开存在
 `config/{system|local}/layouts/{layout_key}/{scene_key}.json`：
 
 ```json

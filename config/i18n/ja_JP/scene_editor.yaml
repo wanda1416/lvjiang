@@ -147,6 +147,9 @@ scene_editor:
   布局 key「{key}」创建后不可修改。: The layout key "{key}" cannot be changed after creation.
   布局信息: Layout Info
   布局信息已保存: Layout info saved
+  "适配环境": "Target env"
+  "这个布局适配哪种运行环境。只供消费方过滤布局（如手机下发只列安卓布局），不参与运行期的 env() 判定；留空表示任何环境都可选。": "Which runtime environment this layout is for. Only used by consumers to filter layouts (e.g. phone config push lists Android layouts only); it does not affect runtime env() checks. Leave empty to allow any environment."
+  "别名布局的「适配环境」留空时跟随根布局「{parent}」。": "When the alias layout's target env is left empty, it follows root layout {parent}."
   布局写入失败，请检查日志。: Layout write failed, please check logs.
   布局名称: Layout name
   ? "布局已保存，但以下模板截图未能删除：\n{errors}"

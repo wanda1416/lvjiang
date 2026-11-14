@@ -19,6 +19,7 @@ from ...core.config.resolver import (
     LAYER_SYSTEM,
     EntityOrigin,
     get_resolver,
+    load_available_envs,
 )
 from ...core.layout.config import (
     DEFAULT_ASPECT_TOLERANCE,
@@ -37,6 +38,7 @@ from ...core.layout.models import Layout
 from ...core.scene.registry import get_registry
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style, fit_button_width
+from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 
 class LayoutOpsMixin:
@@ -90,7 +92,7 @@ class LayoutOpsMixin:
         return key, name
 
     def _on_edit_layout_info(self):
-        """编辑当前布局的清单信息：名称、描述、画布尺寸要求。
+        """编辑当前布局的清单信息：名称、描述、适配环境、画布尺寸要求。
 
         直接改 layouts.yaml，不走 save_layout：那条路径是「保存场景坐标」，会按
         内存布局重建条目，清空 aspect 这类声明反而要靠它保留旧值，语义正好相反。
@@ -114,6 +116,21 @@ class LayoutOpsMixin:
         desc_input = QLineEdit(str(entry.get("desc") or ""))
         desc_input.setPlaceholderText(tr("一句话说明这个布局用在什么画面上"))
         desc_input.setToolTip(tr("显示在主界面布局下拉旁，过长会放不下"))
+        env_combo = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        env_combo.addItem(tr("不限"), "")
+        for env_key, env_display in load_available_envs():
+            env_combo.addItem(env_display or env_key, env_key)
+        current_env = str(entry.get("env") or "").strip()
+        if current_env and env_combo.findData(current_env) < 0:
+            # 清单里的值已不在 app.yaml envs 里（环境被删或改名）时照样列出来，
+            # 否则一打开对话框就等于替用户改了这项配置。
+            env_combo.addItem(current_env, current_env)
+        if current_env:
+            env_combo.setCurrentIndex(env_combo.findData(current_env))
+        env_combo.setToolTip(tr(
+            "这个布局适配哪种运行环境。只供消费方过滤布局（如手机下发只列安卓"
+            "布局），不参与运行期的 env() 判定；留空表示任何环境都可选。"))
+        extends_name = str(entry.get("extends") or "")
         aspect_input = QLineEdit(str(entry.get("aspect") or ""))
         aspect_input.setPlaceholderText(tr("例如 20:9 或 2.22，留空表示不校验"))
         aspect_input.setToolTip(tr(
@@ -129,12 +146,18 @@ class LayoutOpsMixin:
         tolerance_input.setToolTip(tr("允许的相对误差，默认 0.5%"))
         form.addRow(tr("布局名称"), name_input)
         form.addRow(tr("描述"), desc_input)
+        form.addRow(tr("适配环境"), env_combo)
         form.addRow(tr("画布尺寸"), aspect_input)
         form.addRow(tr("允许误差"), tolerance_input)
         box.addLayout(form)
-        hint = QLabel(tr("布局 key「{key}」创建后不可修改。").format(key=layout.key))
-        hint.setStyleSheet("color: palette(mid);")
-        box.addWidget(hint)
+        hint = tr("布局 key「{key}」创建后不可修改。").format(key=layout.key)
+        if extends_name:
+            hint += tr("别名布局的「适配环境」留空时跟随根布局「{parent}」。").format(
+                parent=extends_name)
+        hint_label = QLabel(hint)
+        hint_label.setWordWrap(True)
+        hint_label.setStyleSheet("color: palette(mid);")
+        box.addWidget(hint_label)
 
         buttons = QHBoxLayout()
         ok_button = QPushButton(tr("确定"))
@@ -169,6 +192,12 @@ class LayoutOpsMixin:
             entry["desc"] = desc_input.text().strip()
         else:
             entry.pop("desc", None)
+        env = str(env_combo.currentData() or "").strip()
+        if env:
+            entry["env"] = env
+        else:
+            # 留空即「不限环境」，不留下空字符串键
+            entry.pop("env", None)
         if aspect:
             entry["aspect"] = aspect
             entry["aspect_tolerance"] = round(tolerance_input.value() / 100, 5)

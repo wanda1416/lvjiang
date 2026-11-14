@@ -227,6 +227,9 @@ class AccountHolder(QObject):
         self._sync_timer = QTimer(self)
         self._sync_timer.setInterval(60_000)
         self._sync_timer.timeout.connect(lambda: self.sync_async(auto=True))
+        #: 恢复登录态后是否已经补过一次「立即同步」。只补一次：之后交给分钟节拍，
+        #: 避免每次 apply()（登录、刷新摘要）都多跑一轮。
+        self._startup_sync_done = False
         self._heartbeat_timer = QTimer(self)
         self._heartbeat_timer.setInterval(600_000)
         self._heartbeat_timer.timeout.connect(self._on_heartbeat)
@@ -256,6 +259,11 @@ class AccountHolder(QObject):
             run = summary and not (timer is self._sync_timer and paused)
             if run:
                 timer.start()
+                if timer is self._sync_timer and not self._startup_sync_done:
+                    # 启动/恢复登录态后立刻同步一轮：分钟节拍要等满 60 秒才首次
+                    # 触发，刚打开客户端的人会以为没在同步。只补这一次。
+                    self._startup_sync_done = True
+                    QTimer.singleShot(0, lambda: self.sync_async(auto=True))
             else:
                 timer.stop()
         self.changed.emit(summary)

@@ -169,6 +169,9 @@ class LayoutOpsMixin:
         buttons.addWidget(ok_button)
         buttons.addWidget(cancel_button)
         box.addLayout(buttons)
+        # 表单只有自然宽度，描述/环境/尺寸这类单行输入挤得连常用值都看不全；
+        # 按内容自然宽度翻倍，随字体和语言变化，不写死像素。
+        dialog.setMinimumWidth(dialog.sizeHint().width() * 2)
         ok_button.clicked.connect(dialog.accept)
         cancel_button.clicked.connect(dialog.reject)
         if dialog.exec() != QDialog.DialogCode.Accepted:

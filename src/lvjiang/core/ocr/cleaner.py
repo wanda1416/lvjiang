@@ -174,16 +174,16 @@ class OCRCleaner:
     def _rules_config(self, group: str | None) -> dict[str, Any]:
         return self._default() if group is None else self._group(group)
 
-    def get_replacements(self, group: str | None = "equip") -> dict[str, str]:
+    def get_replacements(self, group: str | None = None) -> dict[str, str]:
         """获取所有文本替换规则"""
         return dict(self._rules_config(group).get("replacements", {}))
 
-    def get_patterns(self, group: str | None = "equip") -> dict[str, str]:
+    def get_patterns(self, group: str | None = None) -> dict[str, str]:
         """获取所有正则替换规则"""
         return dict(self._rules_config(group).get("patterns", {}))
 
     def set_replacements(
-        self, replacements: dict[str, str], group: str | None = "equip",
+        self, replacements: dict[str, str], group: str | None = None,
     ) -> None:
         """批量设置文本替换规则并保存一次"""
         normalization = self._normalization()
@@ -194,7 +194,7 @@ class OCRCleaner:
         self._save_config()
 
     def set_patterns(
-        self, patterns: dict[str, str], group: str | None = "equip",
+        self, patterns: dict[str, str], group: str | None = None,
     ) -> None:
         """批量设置正则替换规则并保存一次"""
         normalization = self._normalization()
@@ -208,7 +208,7 @@ class OCRCleaner:
         self,
         replacements: dict[str, str],
         patterns: dict[str, str],
-        group: str | None = "equip",
+        group: str | None = None,
     ) -> None:
         """同时保存两类规范化规则。"""
         normalization = self._normalization()

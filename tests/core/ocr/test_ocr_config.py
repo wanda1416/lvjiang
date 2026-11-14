@@ -104,6 +104,9 @@ def test_default_rules_apply_before_selected_group(monkeypatch, tmp_path):
     cleaner = OCRCleaner()
     assert cleaner.clean("甲") == "丙"
     assert cleaner.clean("甲", "equip") == "戊"
+    # 规则读写 API 不带分组时只作用于全局默认层，core 不预设任何业务分组。
+    assert cleaner.get_replacements() == {"甲": "乙"}
+    assert cleaner.get_patterns() == {"乙": "丙"}
 
 
 def test_cleaning_group_create_rename_delete(monkeypatch, tmp_path):

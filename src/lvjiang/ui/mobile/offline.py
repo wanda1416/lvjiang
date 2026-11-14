@@ -27,7 +27,7 @@ from ...core.android.device import AdbDevice
 from ...core.android.history_transfer import pull_history
 from ...core.android.offline import require_offline_sync_access, sync_offline_bundle
 from ...core.history_transfer import history_channels
-from ...core.layout.config import load_layout_entries
+from ...core.layout.config import layouts_for_env, load_layout_entries
 from ...core.license import has_feature
 from ...core.offline_bundle import build_offline_bundle
 from ...i18n import tr
@@ -119,14 +119,16 @@ class OfflineControlPage(QWidget):
         sync_layout = QVBoxLayout(sync_group)
         sync_form = QFormLayout()
         self.layout_choice = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
-        for key, entry in load_layout_entries().items():
+        # 手机固定运行在 android 环境：声明了其他适配环境的布局直接不出现，
+        # 防止把桌面布局发到手机上后 wf 静态检查全炸（ditu 事件）。
+        for key, entry in layouts_for_env(load_layout_entries(), "android").items():
             self.layout_choice.addItem(entry.name, key)
         if host is not None and hasattr(host, "layout_combo"):
             index = self.layout_choice.findData(host.layout_combo.currentData())
             if index >= 0:
                 self.layout_choice.setCurrentIndex(index)
         self.task = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
-        sync_form.addRow(tr("同步布局（请选择安卓布局）"), self.layout_choice)
+        sync_form.addRow(tr("同步布局"), self.layout_choice)
         sync_layout.addLayout(sync_form)
         scope = QLabel(tr("下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。"))
         scope.setWordWrap(True)

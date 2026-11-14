@@ -77,6 +77,49 @@ def test_system_layout_keys_have_matching_layout_and_template_directories():
     for key in ("android_cast", "desktop_fullscreen"):
         assert entries[key].extends
         assert not (root / "config/system/layouts" / key).exists()
+    # 适配环境声明：根布局显式声明，别名布局继承根布局
+    assert entries["android"].env == "android"
+    assert entries["android_cast"].env == "android"
+    assert entries["desktop"].env == "desktop"
+    assert entries["desktop_fullscreen"].env == "desktop"
+
+
+class TestEnvDeclaration:
+    """布局适配环境（推荐值）：解析、继承与按环境过滤"""
+
+    @staticmethod
+    def _doc(**android_extra):
+        return {
+            "schema_version": 2,
+            "layouts": {
+                "android": {"name": "安卓布局", "env": "android",
+                            "canvas": {"w_ratio": 1.0, "h_ratio": 1.0},
+                            **android_extra},
+                "android_cast": {"name": "投屏布局", "extends": "android",
+                                 "canvas": {"w_ratio": 1.0, "h_ratio": 0.9}},
+                "desktop": {"name": "桌面布局", "env": "desktop",
+                            "canvas": {"w_ratio": 1.0, "h_ratio": 1.0}},
+                "legacy": {"name": "旧布局",
+                           "canvas": {"w_ratio": 1.0, "h_ratio": 1.0}},
+            },
+        }
+
+    def test_alias_layout_inherits_env_from_root(self):
+        entries = parse_layout_entries(self._doc())
+        assert entries["android_cast"].env == "android"
+
+    def test_filter_for_env_keeps_undeclared_and_drops_other_env(self):
+        from lvjiang.core.layout.config import layouts_for_env
+        entries = parse_layout_entries(self._doc())
+        android = layouts_for_env(entries, "android")
+        # desktop 被过滤；未声明 env 的旧配置不因信息缺失被隐藏
+        assert set(android) == {"android", "android_cast", "legacy"}
+        assert "desktop" not in android
+
+    def test_invalid_env_key_is_rejected(self):
+        doc = self._doc(env="Desktop")
+        with pytest.raises(ValueError, match="env 必须是环境 key"):
+            parse_layout_entries(doc)
 
 
 class TestAspectDeclaration:

@@ -3,6 +3,7 @@ layouts:
   android:
     name: 安卓布局
     desc: 安卓设备，横屏无边框 20:9
+    env: android
     canvas:
       x_ratio: 0.0
       y_ratio: 0.0
@@ -21,6 +22,7 @@ layouts:
   desktop:
     name: 桌面布局
     desc: PC 端游，建议窗口模式 1920*1080
+    env: desktop
     canvas:
       x_ratio: 0.0041322314049587
       y_ratio: 0.0277033065236819

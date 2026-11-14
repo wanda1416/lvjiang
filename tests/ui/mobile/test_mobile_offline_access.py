@@ -9,7 +9,7 @@ from lvjiang.ui.mobile import offline
 def test_sync_is_disabled_but_existing_task_controls_remain_available(qapp, monkeypatch):
     monkeypatch.setattr(offline, "has_feature", lambda _level: False)
     monkeypatch.setattr(transfer, "has_feature", lambda _level: False)
-    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android")})
+    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android", env="")})
     manager = SimpleNamespace(list_users=lambda: ["tester"], get_active_user_name=lambda: "tester")
     page = offline.OfflineControlPage(SimpleNamespace(user_manager=manager), lambda: "", lambda _: None)
     try:
@@ -68,7 +68,7 @@ def test_unlicensed_worker_cannot_connect_or_build_snapshot(qapp, monkeypatch):
 
 def test_sync_scope_is_independent_of_remote_user_and_task_choices(qapp, monkeypatch):
     monkeypatch.setattr(offline, "has_feature", lambda _level: True)
-    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android")})
+    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android", env="")})
     manager = SimpleNamespace(get_active_user_name=lambda: "pc_user")
     page = offline.OfflineControlPage(SimpleNamespace(user_manager=manager), lambda: "fake-device", lambda _: None)
     try:

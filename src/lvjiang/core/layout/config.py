@@ -6,6 +6,7 @@ never be used to construct paths or persisted references.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -134,6 +135,11 @@ class LayoutEntry:
     #: 画布裁剪后应有的宽高比，形如 ``20:9`` / ``2.22``；空串表示不校验
     aspect: str = ""
     aspect_tolerance: float = DEFAULT_ASPECT_TOLERANCE
+    #: 适配环境（推荐值）：取 app.yaml ``envs`` 的环境 key（android/desktop）。
+    #: 只作消费者过滤与提示用，**不参与运行环境判定**——env() 仍以实际运行
+    #: 环境为准；布局声明与运行环境不符时由消费者（如手机下发）自行拦截。
+    #: 空串表示未声明（旧配置），消费者不得据此隐藏布局。
+    env: str = ""
 
     @property
     def aspect_ratio(self) -> float | None:
@@ -214,8 +220,21 @@ def parse_layout_entries(doc: dict) -> dict[str, LayoutEntry]:
             if normalized_parent != extends:
                 raise ValueError(
                     f"布局 {key} 的 extends 不能包含首尾空白")
+        env_raw = raw_entry.get("env", "")
+        if isinstance(env_raw, bool):
+            raise ValueError(f"布局 {key} 的 env 不能是布尔值")
+        env = ("" if env_raw is None
+               else str(env_raw).strip() if isinstance(env_raw, str)
+               else str(env_raw))
+        if env:
+            try:
+                validate_layout_key(env)
+            except ValueError:
+                raise ValueError(
+                    f"布局 {key} 的 env 必须是环境 key（app.yaml envs 的小写"
+                    f"标识，如 android / desktop）: {env!r}") from None
         entries[key] = LayoutEntry(
-            key, name, desc, canvas, extends, aspect, tolerance)
+            key, name, desc, canvas, extends, aspect, tolerance, env)
 
     for entry in entries.values():
         if not entry.extends:
@@ -231,6 +250,13 @@ def parse_layout_entries(doc: dict) -> dict[str, LayoutEntry]:
             raise ValueError(
                 f"布局 {entry.key} 的 extends 只能指向根布局，禁止多级继承"
             )
+
+    # env 是推荐值：别名布局跟随根布局的目标环境，不要求逐条重复声明。
+    for key, entry in entries.items():
+        if entry.extends and not entry.env:
+            parent = entries[entry.extends]
+            if parent.env:
+                entries[key] = dataclasses.replace(entry, env=parent.env)
     return entries
 
 
@@ -247,6 +273,19 @@ def load_layout_entries(
     resolver: ConfigResolver | None = None,
 ) -> dict[str, LayoutEntry]:
     return parse_layout_entries(load_layout_doc(resolver))
+
+
+def layouts_for_env(
+    entries: dict[str, LayoutEntry], env: str,
+) -> dict[str, LayoutEntry]:
+    """按适配环境过滤布局（env 是推荐值，不是运行环境判定）。
+
+    - 声明了 env 且等于目标的：入选；
+    - 声明了 env 且不同的：剔除（手机下发据此挡掉桌面布局）；
+    - 未声明 env 的（旧配置 / 用户自建未补）：保留——不因信息缺失隐藏布局。
+    """
+    return {key: entry for key, entry in entries.items()
+            if not entry.env or entry.env == env}
 
 
 def save_layout_doc(doc: dict, resolver: ConfigResolver | None = None) -> None:

@@ -183,10 +183,11 @@ def _all_procs() -> dict:
 
 
 def test_login_always_goes_through_the_role_selection_page():
-    """登录必须走「切换角色」→ 角色列表 → 进入游戏，不走当前角色快捷入口。
+    """登录必须经角色列表进入，不走当前角色快捷入口。
 
     快捷入口点的是登录页上停留的角色：同账号多角色时，它会在目标角色还没
     选中的情况下直接进游戏，静默进错角色，还把 batch_state.role 记成目标。
+    已经在角色列表时不再补点「选择角色」——那是一次没有判据的坐标点击。
     """
     screen = _Screen({
         # 角色列表已就绪（is_in_role_select_page 认「进入游戏」）
@@ -209,8 +210,8 @@ def test_login_always_goes_through_the_role_selection_page():
         'call $result = select_role(2, "role", $batch_state, true, 0)\n').body)
 
     assert engine.variables["result"]["status"] == "success"
+    # 已经在角色列表时不再补点「选择角色」：那是一次没有判据的坐标点击。
     assert screen.clicks == [
-        ("game_login_page", "switch_role"),
         ("game_login_page", "role_list[2][1]"),
         ("game_login_page", "enter"),
     ]
@@ -258,14 +259,19 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
         return original_call(name, args, engine=engine)
 
     def fake_scan(node):
-        key = node.fields[0].value if node.fields else ""
-        matches = {
-            "switch_role": page == "base",
-            "switch_user": page == "accounts",
-            "yysls_logo": page == "startup" and logo_ready,
-            "login": page == "users" and users_ready,
+        values = {
+            "switch_role": "选择角色" if page == "base" else "",
+            "switch_user": "登出" if page == "accounts" else "",
+            "yysls_logo": "logo" if page == "startup" and logo_ready else "",
+            "login": "进入游戏" if page == "users" and users_ready else "",
         }
-        engine.variables[node.target.name] = key if matches.get(key) else ""
+        keys = [field.value for field in node.fields]
+        if node.by:
+            engine.variables[node.target.name] = next(
+                (values.get(key, "") for key in keys if values.get(key)), "")
+        else:
+            engine.variables[node.target.name] = {
+                key: values.get(key, "") for key in keys}
 
     def fake_click(node):
         nonlocal page

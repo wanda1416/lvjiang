@@ -22,6 +22,21 @@ def git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def release_notes_path(root: Path, tag: str) -> Path:
+    """定位发布说明文件。
+
+    早期平铺在 ``docs/50-releases/v<tag>.md``；0.15 起按系列归档到子目录
+    （``docs/50-releases/v0.15/v<tag>.md``），所以两种位置都要认。
+    """
+    flat = root / f"docs/50-releases/v{tag}.md"
+    if flat.is_file():
+        return flat
+    for candidate in sorted((root / "docs/50-releases").glob(f"*/v{tag}.md")):
+        if candidate.is_file():
+            return candidate
+    raise ValueError(f"缺少发布说明：docs/50-releases/[<系列>/]v{tag}.md")
+
+
 def validate_release(root: Path, tag: str, *, test_only: bool = False) -> dict[str, str]:
     version = application_version(tag)
     if len(version.release) != 3:
@@ -40,8 +55,8 @@ def validate_release(root: Path, tag: str, *, test_only: bool = False) -> dict[s
         raise ValueError("标签、pyproject.toml、_version.py 与 Android versionName 必须完全一致")
     if code is None or int(code.group(1)) <= 0:
         raise ValueError("Android versionCode 必须为正整数")
-    notes = f"docs/50-releases/v{tag}.md"
-    body = (root / notes).read_text(encoding="utf-8")
+    notes = release_notes_path(root, tag)
+    body = notes.read_text(encoding="utf-8")
     title = next((line[2:].strip() for line in body.splitlines() if line.startswith("# ")), "")
     if not re.match(rf"^v{re.escape(tag)}(?:\s|$)", title):
         raise ValueError(f"发布说明首个一级标题必须以 v{tag} 开头")

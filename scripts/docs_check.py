@@ -39,6 +39,9 @@ FRESH = re.compile(r"v?\d+\.\d+\.\d+|20\d\d-\d\d-\d\d|20\d\d\s*年")
 #: 每层索引文件必须覆盖同目录全部 .md
 INDEX_DIRS = ("40-development/2026-07", "40-development/2026-08",
               "40-development/2026-09", "50-releases")
+#: 这些目录的索引必须覆盖**递归**全部 .md：发布说明按系列归档到子目录，
+#: 每个子目录不再各配一份 README，登记责任仍归顶层索引。
+RECURSIVE_INDEX_DIRS = ("50-releases",)
 SKIP_PREFIX = ("http://", "https://", "mailto:", "#")
 
 #: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 00-doc-standard.md）
@@ -252,7 +255,8 @@ def check_index_coverage() -> list[str]:
             for match in LINK.finditer(read(index))
             if not match.group(1).startswith(SKIP_PREFIX)
         }
-        for path in sorted(directory.glob("*.md")):
+        pattern = "**/*.md" if name in RECURSIVE_INDEX_DIRS else "*.md"
+        for path in sorted(directory.glob(pattern)):
             if path.name != "README.md" and path.resolve() not in linked:
                 problems.append(
                     f"索引漏登记 {name}/README.md -> {path.name}")

@@ -33,7 +33,7 @@ tree hash 校验和精确 `--force-with-lease` 流程执行；本文件继续作
 
 ```powershell
 # 查看上一个发布版本的 tag 或 commit
-git log --oneline docs/50-releases/v*.md | Select-Object -First 5
+git log --oneline docs/50-releases/**/v*.md | Select-Object -First 5
 
 # 对比上一个版本到当前的所有变更（以 0.1.1 为例）
 git log 0.1.1..HEAD --oneline
@@ -41,7 +41,9 @@ git log 0.1.1..HEAD --oneline
 
 ### 第二步：编写发布声明
 
-在 `docs/50-releases/` 目录下创建新版本发布文档（如 `v0.1.2.md`），格式参考已有发布文档。
+在对应系列目录下创建新版本发布文档（如 `docs/50-releases/v0.15/v0.15.15.md`；
+当前开发线是 `v0.15/`，旧系列按段归档在 `v0.13/`、`v0.10-v0.12/` 等目录），
+格式参考同目录已有发布文档。
 发布不得批量刷新全库文档的日期、基线或“最后更新”描述。正文未实际修改的
 文档保持原样；版本基线不同于当前应用版本，不构成文档检查失败。
 
@@ -174,7 +176,8 @@ Release 工作流先统一校验，再由 Windows 与 Android 各自构建并上
 `build-windows`：
 
 1. `validate` 作业使用 `scripts/check_release.py` 校验正式/测试标签与三份源码版本字段完全一致；
-2. 确认 `docs/50-releases/v<版本>.md` 存在、一级标题以 `v<版本>` 开头；正式标签提交必须属于远端 `master`；
+2. 确认 `docs/50-releases/[<系列>/]v<版本>.md` 存在、一级标题以 `v<版本>` 开头；
+   正式标签提交必须属于远端 `master`；
 3. 检查配置 `content_version` 完整性，运行 Ruff、mypy 与全量 pytest；
 4. 执行 `packaging\\package.bat`，并强制检查 ZIP 和 Inno Setup 安装器均已生成。
 
@@ -257,7 +260,7 @@ APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 
 测试发布也必须明确获得用户授权；普通功能实现不授权修改版本号、versionCode、
 创建标签或公开测试源码。测试准备同步三份版本字段、递增 versionCode，并提供
-`docs/50-releases/vX.Y.ZbN.md` 或 `vX.Y.ZrcN.md`，明确标注测试性质及已验证边界。
+`docs/50-releases/<系列>/vX.Y.ZbN.md` 或 `vX.Y.ZrcN.md`，明确标注测试性质及已验证边界。
 不把测试版本说明冒充正式声明。
 
 测试标签可指向独立测试提交，不要求先合入 master，但需要把用户授权公开的源码
@@ -286,7 +289,7 @@ Windows/Android 构建、签名核验及四项产物检查，不允许绕过失�
 - [ ] `src/lvjiang/_version.py` 版本号已更新（通常在进入本版本开发时就已改好）
 - [ ] `android/app/build.gradle.kts` versionName 已更新
 - [ ] `android/app/build.gradle.kts` versionCode 已按正式发布递增（与 config/布局下发独立）
-- [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
+- [ ] `docs/50-releases/<系列>/vX.Y.Z.md` 发布文档已编写
 - [ ] **不兼容变动已逐项排查**（对照上表八类），每条都写了「现象 / 原因 / 如何调整」；确认无不兼容时也已明确写出
 - [ ] 文件修订号由实际保存自动递增，不为发布批量提升；在线配置发布按应用系列及 rN 管理，与 content_version 无关。会被 `config/local` 遮蔽的内容已在发布说明里提示用户
 - [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全）

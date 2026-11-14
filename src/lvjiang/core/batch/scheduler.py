@@ -48,6 +48,8 @@ ST_FAILED = tr("失败")
 ST_SKIPPED = tr("跳过")
 ST_STOPPED = tr("已停止")
 ST_CHANNEL_FAULT = tr("通道中断")
+#: 只用于进度页：批次已结束（或正在查看历史轮）时，该轮没有留下状态的行。
+ST_NOT_RUN = tr("未执行")
 
 RESULT_SUCCESS = "success"
 RESULT_SKIPPED = "skipped"
@@ -232,12 +234,14 @@ class BatchScheduler:
     """批量执行工作线程
 
     Signals:
-        progress(entry_label, script_id, status): 进度更新
+        progress(round_number, run_idx, entry_label, script_id, status):
+            进度更新。轮次是显式字段：进度页据此区分「本轮」与「历史轮」，
+            不需要再从标签文本里反解，也不需要用标签定位行。
         log(str): 日志行（由 host 转发到日志面板）
         finished_all(dict): 全部结束，携带汇总
     """
-    # (run_idx, 条目标签, script_id, 状态)：run_idx 是用户名序列中的
-    # 位置，进度表按它直接定位，不靠标签文本匹配（标签会重名）。
+    # (round_number, run_idx, 条目标签, script_id, 状态)：run_idx 是条目
+    # 序列中的位置，进度表按它直接定位，不靠标签文本匹配（标签会重名）。
 
     progress: Any
     selected_task_plan: Any
@@ -288,8 +292,8 @@ class BatchScheduler:
         self._build_execution_plan()
 
     def _abort_channel_fault(self, fault, *, report, label: str, script, run_idx: int,
-                             attempt: int, task_run, username: str,
-                             started_at=None) -> None:
+                             round_number: int, attempt: int, task_run,
+                             username: str, started_at=None) -> None:
         """通道级故障：详细记日志、按「通道中断」记账，并中止整批。
 
         与另外两类失败的区别：任务内异常只废掉当前条目，无人值守中断还会跑
@@ -305,7 +309,7 @@ class BatchScheduler:
             f"（第 {attempt} 次尝试，用户={username or '-'}，启动后 {elapsed:.0f}s）：{detail}")
         logger.error(message)
         self.log.emit(message)
-        self.progress.emit(run_idx, label, script.id, ST_CHANNEL_FAULT)
+        self.progress.emit(round_number, run_idx, label, script.id, ST_CHANNEL_FAULT)
         report.record_channel_fault(detail)
         report.end_script(ST_CHANNEL_FAULT)
         if task_run is not None:
@@ -544,7 +548,8 @@ class BatchScheduler:
                     report.record_prepare(ST_SKIPPED)
                     report.end_entry()
                     for script in self._scripts:
-                        self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        self.progress.emit(
+                            round_number, run_idx, label, script.id, ST_SKIPPED)
 
         for visit_index, (round_number, run_idx, username) in enumerate(visits):
             if not can_run:
@@ -554,14 +559,15 @@ class BatchScheduler:
                 break
 
             if run_idx == 0:
+                # 轮次边界先全量复位，再去做任何条目准备/检查：进度页在这一刻
+                # 就能把上一轮的结果归档并清空，不必等第一个条目真正开始。
                 self._log(f"[批量] 开始第 {round_number}/{rounds} 轮")
-                if round_number > 1:
-                    for pending_idx, pending_user in enumerate(self._usernames):
-                        for pending_script in self._scripts:
-                            self.progress.emit(
-                                pending_idx, pending_user,
-                                pending_script.id, ST_PENDING,
-                            )
+                for pending_idx, pending_user in enumerate(self._usernames):
+                    for pending_script in self._scripts:
+                        self.progress.emit(
+                            round_number, pending_idx, pending_user,
+                            pending_script.id, ST_PENDING,
+                        )
 
             label = (username if rounds == 1 else
                      f"第 {round_number} 轮 · {username}")
@@ -591,7 +597,7 @@ class BatchScheduler:
                     report.end_entry()
                     for script in self._scripts:
                         self.progress.emit(
-                            run_idx, label, script.id, ST_SKIPPED)
+                            round_number, run_idx, label, script.id, ST_SKIPPED)
                     self._log(f"[批量] {label} 跳过: {reason}")
                     continue
                 self._user_scope.enter_context(self._execution_lease.authorized())
@@ -628,7 +634,8 @@ class BatchScheduler:
                 for script, checked in check_results:
                     ui_status = self._result_to_ui_status(checked.status)
                     entry_result["scripts"][script.id] = ui_status
-                    self.progress.emit(run_idx, label, script.id, ui_status)
+                    self.progress.emit(
+                        round_number, run_idx, label, script.id, ui_status)
                     report.start_script(script.id, script.name)
                     report.end_script(ui_status)
                     reason = checked.message or checked.status
@@ -657,7 +664,8 @@ class BatchScheduler:
                     report.end_entry()
                     for s in self._scripts:
                         entry_result["scripts"][s.id] = ST_SKIPPED
-                        self.progress.emit(run_idx, label, s.id, ST_SKIPPED)
+                        self.progress.emit(
+                            round_number, run_idx, label, s.id, ST_SKIPPED)
                     self._log(self._stage_message(label, prepared))
                     if prepared.status == RESULT_STOPPED:
                         self._stopped = True
@@ -681,7 +689,8 @@ class BatchScheduler:
                     self._stopped = True
                     break
 
-                self.progress.emit(run_idx, label, script.id, ST_RUNNING)
+                self.progress.emit(
+                    round_number, run_idx, label, script.id, ST_RUNNING)
                 self._log(f"[批量] {label} → {script.name} ...")
                 report.start_script(script.id, script.name)
                 planned = self._task_plan[(run_idx, script.id)]
@@ -720,7 +729,8 @@ class BatchScheduler:
                     task_stopped = self._task_was_stopped()
                     script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
                     entry_result["scripts"][script.id] = script_ui_status
-                    self.progress.emit(run_idx, label, script.id, script_ui_status)
+                    self.progress.emit(
+                        round_number, run_idx, label, script.id, script_ui_status)
                     self._log(
                         f"[批量] {label} → {script.name} "
                         + ("已停止，继续下一项" if task_stopped else "完成"))
@@ -764,7 +774,8 @@ class BatchScheduler:
                             logger.warning(
                                 f"任务历史收尾失败，继续批量任务: {history_exc}")
                     entry_result["scripts"][script.id] = ST_FAILED
-                    self.progress.emit(run_idx, label, script.id, ST_FAILED)
+                    self.progress.emit(
+                        round_number, run_idx, label, script.id, ST_FAILED)
                     self._log(f"[批量] {label} → {script.name} 失败: {e}", "error")
                     report.end_script(ST_FAILED)
                     self._recover_unattended(
@@ -777,9 +788,9 @@ class BatchScheduler:
                     # 本身不可用，恢复流程只会连环失败）。
                     self._abort_channel_fault(
                         fault, report=report, label=label, script=script,
-                        run_idx=run_idx, attempt=script_idx + 1,
-                        task_run=task_run, username=username,
-                        started_at=task_started_at)
+                        run_idx=run_idx, round_number=round_number,
+                        attempt=script_idx + 1, task_run=task_run,
+                        username=username, started_at=task_started_at)
 
             # 用户中断或通道故障时，关闭尚未结束的脚本记录
             if self._stopped or self._aborted:
@@ -937,7 +948,8 @@ class BatchScheduler:
                     report.start_entry(label, "")
                     report.record_prepare(ST_SKIPPED)
                     for script in self._scripts:
-                        self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        self.progress.emit(
+                            round_number, run_idx, label, script.id, ST_SKIPPED)
                         report.start_script(script.id, script.name)
                         report.end_script(ST_SKIPPED)
                     report.end_entry()
@@ -965,6 +977,11 @@ class BatchScheduler:
             round_number = counts[unit] + 1
             label = f"{unit} · 第 {round_number} 次 · 尝试 {attempt}"
             self._log(f"[批量] {unit_key}={unit}，第 {round_number}/{self._spec.rounds} 次")
+            # 属性单元各自推进轮次，没有全局轮屏障：这里只复位本单元的行，
+            # 其它单元仍保留它们自己那一轮的结果。
+            for pending_script in self._scripts:
+                self.progress.emit(
+                    round_number, run_idx, unit, pending_script.id, ST_PENDING)
             report.start_entry(label, "")
             entry: dict = {"prepare": ST_SKIPPED, "finish": ST_SKIPPED,
                            "username": "", "scripts": {}}
@@ -999,7 +1016,8 @@ class BatchScheduler:
                             status = (ST_FAILED if RESULT_FAILED in statuses
                                       else ST_SKIPPED)
                             entry["scripts"][script.id] = status
-                            self.progress.emit(run_idx, label, script.id, status)
+                            self.progress.emit(
+                                round_number, run_idx, label, script.id, status)
                             report.start_script(script.id, script.name)
                             report.end_script(status)
                         report.record_prepare(ST_SKIPPED)
@@ -1017,7 +1035,8 @@ class BatchScheduler:
                         self._log(self._stage_message(label, prepared))
                         for script in self._scripts:
                             entry["scripts"][script.id] = ST_SKIPPED
-                            self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                            self.progress.emit(
+                            round_number, run_idx, label, script.id, ST_SKIPPED)
                         if prepared.status == RESULT_STOPPED:
                             self._stopped = True
                             done.add(unit)
@@ -1055,7 +1074,8 @@ class BatchScheduler:
                         if checked.status != RESULT_SUCCESS:
                             status = self._result_to_ui_status(checked.status)
                             entry["scripts"][script.id] = status
-                            self.progress.emit(run_idx, label, script.id, status)
+                            self.progress.emit(
+                                round_number, run_idx, label, script.id, status)
                             report.start_script(script.id, script.name)
                             report.end_script(status)
                             reason = checked.message or checked.status
@@ -1082,7 +1102,8 @@ class BatchScheduler:
                                     logger.warning(
                                         f"任务历史收尾失败，继续批量任务: {history_exc}")
                             continue
-                        self.progress.emit(run_idx, label, script.id, ST_RUNNING)
+                        self.progress.emit(
+                    round_number, run_idx, label, script.id, ST_RUNNING)
                         report.start_script(script.id, script.name)
                         task_started_at = datetime.now().astimezone()
                         task_run = try_create_task_run(
@@ -1106,7 +1127,8 @@ class BatchScheduler:
                             script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
                             entry["scripts"][script.id] = script_ui_status
                             report.end_script(script_ui_status, result)
-                            self.progress.emit(run_idx, label, script.id, script_ui_status)
+                            self.progress.emit(
+                        round_number, run_idx, label, script.id, script_ui_status)
                             self._log(
                                 f"[批量] {label} → {script.name} "
                                 + ("已停止，继续下一项" if task_stopped else "完成"))
@@ -1133,9 +1155,9 @@ class BatchScheduler:
                         except ChannelFaultError as fault:
                             self._abort_channel_fault(
                                 fault, report=report, label=label, script=script,
-                                run_idx=run_idx, attempt=script_idx + 1,
-                                task_run=task_run, username=username,
-                                started_at=task_started_at)
+                                run_idx=run_idx, round_number=round_number,
+                                attempt=script_idx + 1, task_run=task_run,
+                                username=username, started_at=task_started_at)
                         except Exception as exc:  # noqa: BLE001
                             if isinstance(exc, WorkflowAbort):
                                 logger.info(
@@ -1155,7 +1177,8 @@ class BatchScheduler:
                                 logger.warning(f"批量失败结果保存失败: {output_exc}")
                             entry["scripts"][script.id] = ST_FAILED
                             report.end_script(ST_FAILED)
-                            self.progress.emit(run_idx, label, script.id, ST_FAILED)
+                            self.progress.emit(
+                                round_number, run_idx, label, script.id, ST_FAILED)
                             self._log(f"[批量] {label} → {script.name} 失败: {exc}", "error")
                             if task_run is not None:
                                 try:
@@ -1201,7 +1224,8 @@ class BatchScheduler:
                     self._log(f"[批量] {unit} 连续 30 次无法取得用户锁，本次停止调度该单元", "warning")
                     for script in self._scripts:
                         entry["scripts"][script.id] = ST_SKIPPED
-                        self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        self.progress.emit(
+                            round_number, run_idx, label, script.id, ST_SKIPPED)
                         report.start_script(script.id, script.name)
                         report.end_script(ST_SKIPPED)
                     done.add(unit)

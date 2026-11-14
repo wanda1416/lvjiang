@@ -305,10 +305,14 @@ def hadwent(happened: str) -> str | None:
     return happened or None
 
 
-def remote_snapshots(token: str) -> list[dict]:
-    """云端快照清单（账户级、可多份历史，最新在前；只带摘要）。"""
+def remote_snapshots(token: str, limit: int = 1) -> list[dict]:
+    """云端快照清单（最新在前；只带摘要）。
+
+    同步路径只消费 ``[0]``（最新一份），默认 ``limit=1`` 只取一条；
+    需要完整清单的调用方显式传更大的 limit。
+    """
     try:
-        response = post("/api/sync/profile/snapshot", {}, token)
+        response = post("/api/sync/profile/snapshot", {"limit": limit}, token)
     except SyncError as error:
         logger.warning("[profile sync] 快照清单获取失败：{}", error)
         return []

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import random
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import cast
 
 from loguru import logger
@@ -79,6 +79,7 @@ from ..widgets.misc import add_top_aligned_row
 from ..widgets.theme import get_theme_manager
 from .batch_runner import (
     ST_FAILED,
+    ST_NOT_RUN,
     ST_PENDING,
     ST_RUNNING,
     ST_SKIPPED,
@@ -89,11 +90,29 @@ from .batch_runner import (
 )
 from .lifecycle_params import LifecycleParamsPanel
 
+#: 不会再变化的状态：用于历史轮汇总和「未执行」判定。
+_TERMINAL_STATUSES = frozenset({ST_SUCCESS, ST_FAILED, ST_SKIPPED})
+
 
 @dataclass
 class _BatchProgressState:
-    rows: list[tuple[int, str, str, str, str]]
+    """一次批量运行在进度页里的完整状态。
+
+    轮次是一等维度：``statuses`` 以 ``(轮次, 条目序号, 脚本 ID)`` 为键，
+    新一轮的写入不会覆盖上一轮，历史轮因此可以随时回看。
+    """
+
+    entries: list[str]
+    scripts: list[tuple[str, str]]
     plans: dict[tuple[int, str], PlannedTask]
+    rounds_total: int = 1
+    #: 属性单元各自推进轮次，没有全局轮屏障；用户模式下所有条目同轮。
+    attr_mode: bool = False
+    statuses: dict[tuple[int, int, str], str] = field(default_factory=dict)
+    #: 条目序号 → 该条目最近一次进入的轮次。
+    unit_rounds: dict[int, int] = field(default_factory=dict)
+    #: 0 = 看当前轮；>0 = 只读查看该历史轮。
+    viewing_round: int = 0
     terminal: bool = False
 
 
@@ -103,6 +122,7 @@ def _status_color(status: str):
     tokens = get_theme_manager().tokens
     colours = {
         ST_PENDING: tokens.surface_alt,
+        ST_NOT_RUN: tokens.surface_alt,
         ST_RUNNING: tokens.info_surface,
         ST_SUCCESS: tokens.success_surface,
         ST_FAILED: tokens.danger_surface,
@@ -266,6 +286,10 @@ class BatchTab(QWidget):
         self._progress_task_plan: dict[tuple[int, str], PlannedTask] = {}
         self._params_popup: QFrame | None = None
         self._run_progress: dict[str, _BatchProgressState] = {}
+        #: (条目列表, [(脚本 ID, 名称)], 总轮数, 是否属性调度)：建表时冻结，
+        #: bind_run 据此构造运行状态，不再从表格文本里反推。
+        self._progress_build: tuple[
+            list[str], list[tuple[str, str]], int, bool] = ([], [], 1, False)
         self._visible_run_id = ""
         # 三层状态在本页的落点：_item 是配置组定义（只读），_draft 是本次运行
         # 草稿（本页唯一可写的东西），_group_id 是两者的关联键。
@@ -398,7 +422,7 @@ class BatchTab(QWidget):
         return widget
 
     def _build_progress_page(self) -> QWidget:
-        """进度页：执行进度表"""
+        """进度页：执行进度表 + 底部轮次导航"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -427,6 +451,33 @@ class BatchTab(QWidget):
         assert vheader is not None
         vheader.setVisible(False)
         layout.addWidget(self._progress_table, stretch=1)
+
+        # 轮次导航：< 上一轮 | 当前第N轮/共N轮 | 下一轮 > | >> 跳到最新并跟随
+        round_row = QHBoxLayout()
+        round_row.setContentsMargins(0, 4, 0, 0)
+        round_row.setSpacing(6)
+        round_row.addStretch(1)
+        self._round_prev_btn = QPushButton("<")
+        self._round_prev_btn.setFixedWidth(36)
+        self._round_prev_btn.setToolTip(tr("上一轮"))
+        self._round_prev_btn.clicked.connect(self._on_prev_round)
+        round_row.addWidget(self._round_prev_btn)
+        self._round_label = QLabel()
+        self._round_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        round_row.addWidget(self._round_label)
+        self._round_next_btn = QPushButton(">")
+        self._round_next_btn.setFixedWidth(36)
+        self._round_next_btn.setToolTip(tr("下一轮"))
+        self._round_next_btn.clicked.connect(self._on_next_round)
+        round_row.addWidget(self._round_next_btn)
+        self._round_latest_btn = QPushButton(">>")
+        self._round_latest_btn.setFixedWidth(40)
+        self._round_latest_btn.setToolTip(tr("跳到最新一轮，并跟随后续轮次"))
+        self._round_latest_btn.clicked.connect(self._on_latest_round)
+        round_row.addWidget(self._round_latest_btn)
+        round_row.addStretch(1)
+        layout.addLayout(round_row)
+        self._set_round_controls_visible(False)
         return widget
 
     def _build_script_page(self) -> QWidget:
@@ -1517,7 +1568,8 @@ class BatchTab(QWidget):
             )
             return
 
-        self._build_progress_table(usernames, config, scripts)
+        self._build_progress_table(
+            usernames, config, scripts, rounds=self._draft.rounds)
         self._set_config_enabled(False)
 
         # 定义 + 草稿 → 不可变快照。之后再改配置组、改用户资料或在本页重新勾选，
@@ -1532,37 +1584,159 @@ class BatchTab(QWidget):
         if not ok:
             self._set_config_enabled(True)
 
-    def _build_progress_table(self, usernames: list[str],
-                              config: BatchConfigItem | None,
-                              scripts: list[BatchScript]):
-        """初始化进度表：行×脚本 全量行"""
-        self._progress_table.setRowCount(0)
-        # (run_idx, script_id) → 表行号。执行侧按同样的 行×脚本 顺序推进，
-        # 所以这个映射是精确的；靠标签文本反查则会在标签重名、或两边标签
-        # 算法不一致时把状态刷到别人的行上（甚至一行都刷不到）。
-        self._progress_row_index = {}
-        self._progress_row_context = {}
-        self._progress_task_plan = {}
-        for run_idx, username in enumerate(usernames):
-            label = username
-            for script in scripts:
-                row = self._progress_table.rowCount()
-                self._progress_row_index[(run_idx, script.id)] = row
-                self._progress_row_context[row] = (run_idx, script.id)
-                self._progress_table.insertRow(row)
-                label_item = QTableWidgetItem(label)
-                label_item.setToolTip(label)
-                self._progress_table.setItem(row, 0, label_item)
-                script_name = str(script.name)
-                script_item = QTableWidgetItem(script_name)
-                script_item.setToolTip(script_name)
-                self._progress_table.setItem(row, 1, script_item)
-                status_item = QTableWidgetItem(ST_PENDING)
-                status_item.setToolTip(ST_PENDING)
-                status_item.setBackground(_status_color(ST_PENDING))
-                self._progress_table.setItem(row, 2, status_item)
+    def _build_progress_table(
+        self, usernames: list[str], config: BatchConfigItem | None,
+        scripts: list[BatchScript], *, rounds: int = 1,
+    ):
+        """初始化进度表：条目×脚本 全量行。
+
+        轮次不展开成额外行：同一批行复用，历史轮结果存在运行状态里按轮索引。
+        这样 20 用户 × 5 脚本 × 10 轮也不会变成 1000 行。
+        """
+        attr_mode = config is not None and config.execution_unit_key != "user"
+        entries = list(usernames)
+        script_pairs = [(str(script.id), str(script.name)) for script in scripts]
+        rounds_total = max(1, int(rounds))
+        self._progress_build = (entries, script_pairs, rounds_total, attr_mode)
+        self._render_progress_rows(_BatchProgressState(
+            entries=entries, scripts=script_pairs, plans={},
+            rounds_total=rounds_total, attr_mode=attr_mode,
+        ))
+        self._refresh_round_header(None)
         # Rows may make the vertical scrollbar appear, changing viewport width.
         QTimer.singleShot(0, self._set_progress_column_widths)
+
+    @staticmethod
+    def _row_round(state: _BatchProgressState, run_idx: int) -> int:
+        """该行当前应显示的轮次：用户模式全局同轮，属性模式各单元独立。"""
+        if state.attr_mode:
+            return state.unit_rounds.get(run_idx, 1)
+        return max(state.unit_rounds.values(), default=1)
+
+    @staticmethod
+    def _row_label(state: _BatchProgressState, run_idx: int) -> str:
+        """条目列只放条目名：轮次由底部导航表达，不混进条目文本。"""
+        return state.entries[run_idx]
+
+    def _set_status_item(self, row: int, status: str, *, scroll: bool = False):
+        item = QTableWidgetItem(status)
+        item.setToolTip(status)
+        color = _status_color(status)
+        if color is not None:
+            item.setBackground(color)
+        self._progress_table.setItem(row, 2, item)
+        if scroll:
+            self._progress_table.scrollToItem(item)
+
+    def _render_progress_rows(self, state: _BatchProgressState) -> None:
+        """按「当前轮」或选中的「历史轮」重建表格。"""
+        self._progress_table.setUpdatesEnabled(False)
+        try:
+            self._progress_table.setRowCount(0)
+            self._progress_row_index = {}
+            self._progress_row_context = {}
+            viewing = state.viewing_round > 0
+            for run_idx in range(len(state.entries)):
+                round_number = (state.viewing_round
+                                or self._row_round(state, run_idx))
+                for script_id, script_name in state.scripts:
+                    row = self._progress_table.rowCount()
+                    self._progress_row_index[(run_idx, script_id)] = row
+                    self._progress_row_context[row] = (run_idx, script_id)
+                    self._progress_table.insertRow(row)
+                    label = self._row_label(state, run_idx)
+                    label_item = QTableWidgetItem(label)
+                    label_item.setToolTip(label)
+                    self._progress_table.setItem(row, 0, label_item)
+                    script_item = QTableWidgetItem(script_name)
+                    script_item.setToolTip(script_name)
+                    self._progress_table.setItem(row, 1, script_item)
+                    status = state.statuses.get(
+                        (round_number, run_idx, script_id))
+                    if status is None:
+                        # 看历史轮或批次已结束时，缺失就是没跑到，不能算「待执行」。
+                        status = (ST_NOT_RUN if viewing or state.terminal
+                                  else ST_PENDING)
+                    self._set_status_item(row, status)
+        finally:
+            self._progress_table.setUpdatesEnabled(True)
+
+    # ─── 轮次导航 ─────────────────────────────────────────
+
+    def _set_round_controls_visible(self, visible: bool) -> None:
+        for widget in (
+            self._round_prev_btn, self._round_label,
+            self._round_next_btn, self._round_latest_btn,
+        ):
+            widget.setVisible(visible)
+
+    @staticmethod
+    def _display_round(state: _BatchProgressState) -> int:
+        """导航当前停留的轮次：0 表示跟随最新，其它为固定轮次。"""
+        if state.viewing_round:
+            return state.viewing_round
+        return max(state.unit_rounds.values(), default=1)
+
+    def _refresh_round_header(
+        self, state: _BatchProgressState | None,
+    ) -> None:
+        if state is None or state.rounds_total <= 1:
+            self._set_round_controls_visible(False)
+            return
+        self._set_round_controls_visible(True)
+        number = self._display_round(state)
+        self._round_label.setText(
+            tr("当前第 {round}/{rounds} 轮").format(
+                round=number, rounds=state.rounds_total)
+            if state.viewing_round == 0
+            else tr("第 {round}/{rounds} 轮").format(
+                round=number, rounds=state.rounds_total))
+        self._round_prev_btn.setEnabled(number > 1)
+        self._round_next_btn.setEnabled(number < state.rounds_total)
+        # >> 只有在停留在历史轮时才可用：它同时恢复「跟随最新」。
+        self._round_latest_btn.setEnabled(state.viewing_round != 0)
+
+    def _show_round(self, number: int) -> None:
+        """切到指定轮次；0 表示回到最新并恢复自动跟随。"""
+        state = self._run_progress.get(self._visible_run_id)
+        if state is None:
+            return
+        latest = max(state.unit_rounds.values(), default=1)
+        if number:
+            number = max(1, min(number, state.rounds_total))
+            # 停在当前最新轮时仍然固定，不自动跟随；只有 >> 才恢复跟随。
+            state.viewing_round = number
+        else:
+            state.viewing_round = 0
+        self._render_progress_rows(state)
+        self.apply_task_plan(state.plans)
+        self._refresh_round_header(state)
+        if not state.viewing_round and latest:
+            self._scroll_to_running_row(state)
+
+    def _on_prev_round(self) -> None:
+        state = self._run_progress.get(self._visible_run_id)
+        if state is None:
+            return
+        self._show_round(max(1, self._display_round(state) - 1))
+
+    def _on_next_round(self) -> None:
+        state = self._run_progress.get(self._visible_run_id)
+        if state is None:
+            return
+        self._show_round(min(state.rounds_total,
+                             self._display_round(state) + 1))
+
+    def _on_latest_round(self) -> None:
+        self._show_round(0)
+
+    def _scroll_to_running_row(self, state: _BatchProgressState) -> None:
+        """跟随最新时把视图定位到当前正在跑的行，避免要手动往下翻。"""
+        for row in range(self._progress_table.rowCount()):
+            item = self._progress_table.item(row, 2)
+            if item is not None and item.text() == ST_RUNNING:
+                self._progress_table.scrollToItem(item)
+                return
 
     def apply_task_plan(
         self, plan: dict[tuple[int, str], PlannedTask],
@@ -1585,21 +1759,17 @@ class BatchTab(QWidget):
 
     def bind_run(self, task_run_id: str) -> None:
         """将当前刚初始化的进度表绑定到运行实例。"""
-        rows: list[tuple[int, str, str, str, str]] = []
-        for row, context in self._progress_row_context.items():
-            run_idx, script_id = context
-            label_item = self._progress_table.item(row, 0)
-            script_item = self._progress_table.item(row, 1)
-            status_item = self._progress_table.item(row, 2)
-            rows.append((
-                run_idx, script_id,
-                label_item.text() if label_item else "",
-                script_item.text() if script_item else "",
-                status_item.text() if status_item else ST_PENDING,
-            ))
-        self._run_progress[task_run_id] = _BatchProgressState(
-            rows=rows, plans=dict(self._progress_task_plan))
+        entries, scripts, rounds_total, attr_mode = self._progress_build
+        state = _BatchProgressState(
+            entries=list(entries),
+            scripts=list(scripts),
+            plans=dict(self._progress_task_plan),
+            rounds_total=rounds_total,
+            attr_mode=attr_mode,
+        )
+        self._run_progress[task_run_id] = state
         self._visible_run_id = task_run_id
+        self._refresh_round_header(state)
 
     def show_run(self, task_run_id: str) -> None:
         self._progress_table.setUpdatesEnabled(False)
@@ -1617,28 +1787,16 @@ class BatchTab(QWidget):
             self._progress_row_index = {}
             self._progress_row_context = {}
             self._progress_task_plan = {}
+            self._refresh_round_header(None)
             self._running = False
             self._refresh_run_button("idle")
             self._set_config_enabled(True)
             return
         self._visible_run_id = task_run_id
-        self._progress_table.setRowCount(0)
-        self._progress_row_index = {}
-        self._progress_row_context = {}
         self._progress_task_plan = dict(state.plans)
-        for run_idx, script_id, label, script_name, status in state.rows:
-            row = self._progress_table.rowCount()
-            self._progress_table.insertRow(row)
-            self._progress_row_index[(run_idx, script_id)] = row
-            self._progress_row_context[row] = (run_idx, script_id)
-            self._progress_table.setItem(row, 0, QTableWidgetItem(label))
-            self._progress_table.setItem(row, 1, QTableWidgetItem(script_name))
-            status_item = QTableWidgetItem(status)
-            color = _status_color(status)
-            if color is not None:
-                status_item.setBackground(color)
-            self._progress_table.setItem(row, 2, status_item)
+        self._render_progress_rows(state)
         self.apply_task_plan(state.plans)
+        self._refresh_round_header(state)
         self._running = not state.terminal
         self._refresh_run_button("running" if self._running else "idle")
         self._set_config_enabled(not self._running)
@@ -1750,37 +1908,55 @@ class BatchTab(QWidget):
         popup.show()
         self._params_popup = popup
 
-    def update_progress(self, run_idx: int, entry_label: str,
-                        script_id: str, status: str):
-        """更新进度表中该 (条目, 脚本) 行的状态（由 host 调用）"""
+    def update_run_progress(
+        self, task_run_id: str, round_number: int, run_idx: int,
+        entry_label: str, script_id: str, status: str,
+    ) -> None:
+        """执行侧唯一的进度入口：轮次是显式维度，历史轮不会被覆盖。"""
+        state = self._run_progress.get(task_run_id)
+        if state is None:
+            return
+        state.statuses[(round_number, run_idx, script_id)] = status
+        previous_max = max(state.unit_rounds.values(), default=0)
+        entered_round = round_number > state.unit_rounds.get(run_idx, 0)
+        if entered_round:
+            state.unit_rounds[run_idx] = round_number
+        if self._visible_run_id != task_run_id:
+            return
+        if entered_round and state.attr_mode:
+            self._refresh_unit_row_labels(state, run_idx)
+        if entered_round and round_number > previous_max:
+            # 新的一轮真正开始了：重建下拉候选并刷新标题。
+            self._refresh_round_header(state)
+        elif self._round_label.isVisible():
+            # 只更新标题里的进度计数，不每个事件都重建下拉候选。
+            self._round_label.setText(self._round_header_text(state))
+        if state.viewing_round and state.viewing_round != round_number:
+            # 正在只读查看历史轮：状态继续入库，但不打断当前视图。
+            return
         row = self._progress_row_index.get((run_idx, script_id))
         if row is None or row >= self._progress_table.rowCount():
             logger.warning(
-                f"批量进度无处安放，已忽略: run_idx={run_idx} "
-                f"script_id={script_id} label={entry_label!r}"
+                f"批量进度无处安放，已忽略: round={round_number} "
+                f"run_idx={run_idx} script_id={script_id} label={entry_label!r}"
             )
             return
-        status_item = QTableWidgetItem(status)
-        status_item.setToolTip(status)
-        color = _status_color(status)
-        if color:
-            status_item.setBackground(color)
-        self._progress_table.setItem(row, 2, status_item)
-        self._progress_table.scrollToItem(status_item)
+        self._set_status_item(row, status, scroll=not state.viewing_round)
 
-    def update_run_progress(
-        self, task_run_id: str, run_idx: int, entry_label: str,
-        script_id: str, status: str,
+    def _refresh_unit_row_labels(
+        self, state: _BatchProgressState, run_idx: int,
     ) -> None:
-        state = self._run_progress.get(task_run_id)
-        if state is not None:
-            for index, row in enumerate(state.rows):
-                if row[0] == run_idx and row[1] == script_id:
-                    state.rows[index] = (
-                        row[0], row[1], entry_label or row[2], row[3], status)
-                    break
-        if self._visible_run_id == task_run_id:
-            self.update_progress(run_idx, entry_label, script_id, status)
+        """属性模式：单元进入新一轮时，行标题里的轮次要跟着变。"""
+        round_number = state.unit_rounds.get(run_idx, 1)
+        label = self._row_label(state, run_idx, round_number)
+        for script_id, _name in state.scripts:
+            row = self._progress_row_index.get((run_idx, script_id))
+            if row is None:
+                continue
+            item = self._progress_table.item(row, 0)
+            if item is not None:
+                item.setText(label)
+                item.setToolTip(label)
 
     def _refresh_status_colors(self, _theme: str) -> None:
         """实时切换主题后重绘现有进度行。"""
@@ -1803,6 +1979,11 @@ class BatchTab(QWidget):
         if state is not None:
             state.terminal = True
         if self._visible_run_id == task_run_id:
+            if state is not None:
+                # 结束后当前轮里没跑到的行改为「未执行」，历史轮汇总也用它。
+                self._render_progress_rows(state)
+                self.apply_task_plan(state.plans)
+                self._refresh_round_header(state)
             self.on_batch_finished({})
 
     def refresh_config(self):

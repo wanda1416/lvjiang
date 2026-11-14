@@ -6,6 +6,7 @@
 from .batch_config_dialog import BatchConfigDialog
 from .batch_runner import (
     ST_FAILED,
+    ST_NOT_RUN,
     ST_PENDING,
     ST_RUNNING,
     ST_SKIPPED,
@@ -23,6 +24,7 @@ __all__ = [
     "BatchTab",
     "BatchWorker",
     "ST_FAILED",
+    "ST_NOT_RUN",
     "ST_PENDING",
     "ST_RUNNING",
     "ST_SKIPPED",

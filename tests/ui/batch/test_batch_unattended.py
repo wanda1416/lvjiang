@@ -133,7 +133,7 @@ def _run_with_pause_on(tmp_path, monkeypatch, *, pause_index: int,
     stages: list[tuple[str, dict]] = []
     statuses: list[tuple[str, str]] = []
     worker.progress.connect(
-        lambda _idx, _label, script_id, status: statuses.append(
+        lambda _round, _idx, _label, script_id, status: statuses.append(
             (script_id, status)))
 
     def run_script(script, _session, _username, **_kwargs):

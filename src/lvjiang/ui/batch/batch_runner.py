@@ -9,6 +9,7 @@ from ...core.batch.scheduler import (  # noqa: F401
     RESULT_STOPPED,
     RESULT_SUCCESS,
     ST_FAILED,
+    ST_NOT_RUN,
     ST_PENDING,
     ST_RUNNING,
     ST_SKIPPED,
@@ -26,7 +27,8 @@ from ...core.batch.scheduler import (  # noqa: F401
 
 
 class BatchWorker(BatchScheduler, QThread):
-    progress = pyqtSignal(int, str, str, str)
+    #: (轮次, 条目序号, 条目标签, 脚本 ID, 状态)
+    progress = pyqtSignal(int, int, str, str, str)
     selected_task_plan = pyqtSignal(int, object)
     log = pyqtSignal(str)
     finished_all = pyqtSignal(dict)

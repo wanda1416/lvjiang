@@ -1362,10 +1362,10 @@ class MainWindow(
         # 信号连接：进度 → batch_tab，日志 → log_text
         # （批量层显式传递用户，不再联动主页面用户下拉）
         worker.progress.connect(
-            lambda run_idx, label, script_id, status,
+            lambda round_number, run_idx, label, script_id, status,
             run_id=run_context.task_run_id:
             self._batch_tab.update_run_progress(
-                run_id, run_idx, label, script_id, status))
+                run_id, round_number, run_idx, label, script_id, status))
         worker.selected_task_plan.connect(
             lambda run_idx, plan, run_id=run_context.task_run_id:
             self._batch_tab.apply_run_selected_unit_plan(run_id, run_idx, plan))

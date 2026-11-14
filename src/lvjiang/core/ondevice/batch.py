@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import threading
 from dataclasses import asdict
 from uuid import uuid4
@@ -303,17 +302,21 @@ def _run(worker):
                 label = entry if worker._spec.rounds == 1 else f"第 {number} 轮 · {entry}"
                 for script in worker._scripts:
                     rows[(index, number, script.id)] = {"entry": label, "task_id": script.id, "task_name": script.name, "status": ST_PENDING}
-        state.set_batch({"rows": list(rows.values()), "processed": 0})
-        def progress(index, label, task_id, status):
-            match = re.search(r"第 (\d+) (?:轮|次)", label)
-            if status == ST_PENDING and worker._spec.rounds > 1 and match is None:
-                return
-            number = int(match.group(1)) if match else 1
-            key = (index, number, task_id)
-            rows[key] = {"entry": label, "task_id": task_id,
-                         "task_name": next((s.name for s in worker._scripts if s.id == task_id), task_id), "status": status}
+        state.set_batch({"rows": list(rows.values()),
+                         "rounds": worker._spec.rounds, "processed": 0})
+        def progress(round_number, index, label, task_id, status):
+            # 轮次由调度器显式给出，不再从标签文本里反解。
+            key = (index, round_number, task_id)
+            previous = rows.get(key, {})
+            rows[key] = {
+                "entry": previous.get("entry") or label,
+                "task_id": task_id,
+                "task_name": previous.get("task_name") or next(
+                    (s.name for s in worker._scripts if s.id == task_id), task_id),
+                "status": status,
+            }
             state.set_batch({"rows": list(rows.values()), "current_entry": label,
-                             "current_task": rows[key]["task_name"], "round": number, "rounds": worker._spec.rounds, "processed": sum(r["status"] in {ST_SUCCESS, ST_FAILED, ST_SKIPPED} for r in rows.values())})
+                             "current_task": rows[key]["task_name"], "round": round_number, "rounds": worker._spec.rounds, "processed": sum(r["status"] in {ST_SUCCESS, ST_FAILED, ST_SKIPPED} for r in rows.values())})
             state.set_message(f"{label} · {rows[key]['task_name']} · {status}")
         worker.progress.connect(progress)
         def log(message):

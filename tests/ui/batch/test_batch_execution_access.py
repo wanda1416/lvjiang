@@ -71,8 +71,8 @@ def test_batch_repeats_complete_user_sequence_by_round(tmp_path, monkeypatch, qa
         lambda **kwargs: task_history.append(kwargs) or None,
     )
     worker.progress.connect(
-        lambda index, user, script, status: progress.append(
-            (index, user, script, status)))
+        lambda round_number, index, user, script, status: progress.append(
+            (round_number, index, user, script, status)))
 
     def stage(stage_name, wf, index=-1, username="", *args, **kwargs):
         if stage_name in ("prepare_item", "finish_item"):
@@ -93,9 +93,11 @@ def test_batch_repeats_complete_user_sequence_by_round(tmp_path, monkeypatch, qa
     assert [item["username"] for item in task_history] == [
         "alice", "bob", "alice", "bob",
     ]
-    assert [item for item in progress if item[3] == ST_PENDING] == [
-        (0, "alice", "test", ST_PENDING),
-        (1, "bob", "test", ST_PENDING),
+    assert [item for item in progress if item[4] == ST_PENDING] == [
+        (1, 0, "alice", "test", ST_PENDING),
+        (1, 1, "bob", "test", ST_PENDING),
+        (2, 0, "alice", "test", ST_PENDING),
+        (2, 1, "bob", "test", ST_PENDING),
     ]
 
 

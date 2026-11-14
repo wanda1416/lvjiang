@@ -352,8 +352,10 @@ def _format_detail_label(kd: KeyDef, model_type: str, data: dict) -> tuple[str, 
     锁定项直接写「已锁定」：只留空白会被当成"这项没数据"，而锁定是用户的
     主动决定，必须能一眼看出来。
     """
-    entry = data.get(model_type, {}).get(kd.key, {})
-    if entry.locked:
+    # 缺失的 key 必须按「没有这条」处理：默认值不能用 `{}`，否则后面取
+    # `entry.locked` 会在用户还没这个 key 的数据时抛 AttributeError。
+    entry = (data.get(model_type) or {}).get(kd.key)
+    if entry is not None and entry.locked:
         return tr("已锁定"), True
     return _format_detail_value(kd, model_type, data), False
 

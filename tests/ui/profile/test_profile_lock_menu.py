@@ -106,6 +106,24 @@ def test_detail_page_formats_unlocked_value():
     assert text == "2"
 
 
+def test_detail_page_tolerates_missing_key():
+    """用户还没有某个 key 的数据时，详情页只是空白，不能崩。
+
+    回归：索引里没有这条时默认值曾写成 `{}`，随后取 `entry.locked` 抛
+    AttributeError —— 新建用户/新加列后打开用户信息页会直接崩溃。
+    """
+    from lvjiang.core.profile.models import KeyDef
+    from lvjiang.ui.profile.user_info import _format_detail_label
+
+    kd = KeyDef(key="k", label="配额")
+    assert _format_detail_label(kd, "quota", {}) == ("", False)
+    assert _format_detail_label(kd, "quota", {"quota": {}}) == ("", False)
+    # 同类型的其它 key 有值，本条仍然缺失
+    data = {"quota": {"other": Entry(username="u1", type="quota",
+                                     key="other", value=1)}}
+    assert _format_detail_label(kd, "quota", data) == ("", False)
+
+
 def test_locked_cell_uses_pause_button_grey_background():
     """锁定单元格必须填**底色**，且用的是「暂停按钮默认那档灰」。
 

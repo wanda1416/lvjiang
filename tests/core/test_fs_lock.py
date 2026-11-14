@@ -169,34 +169,58 @@ def test_cross_process_read_modify_write_does_not_lose_updates(tmp_path):
 
 # ─── 配置写锁顺序 ─────────────────────────────────────────
 
-def test_config_write_and_batch_write_do_not_deadlock(tmp_path):
+def test_config_write_and_batch_write_do_not_deadlock(tmp_path, monkeypatch):
     """``batch_changes``（线程锁→文件锁）与单文件写必须能并发完成。
 
     顺序反了就会：批量写入持线程锁等文件锁，单文件写持文件锁等线程锁，
-    两边永久互等。这里用事件强制两者交叉进入临界区。
+    两边永久互等。这里强制两者交叉：批量写入先进临界区，等单文件写**确实
+    阻塞在配置锁上**之后才去写文件。
+
+    单文件写在批量块退出前不可能完成（批量期间整段持有配置锁，这是设计），
+    所以不能等它「写完」——那样只会白等到超时。改为在配置锁上装探针，
+    观察到第二个线程发生争用再继续。
     """
+    from lvjiang.core.config import content
     from lvjiang.core.config.resolver import ConfigResolver
 
     resolver = ConfigResolver(config_dir=tmp_path, dev_mode=False)
     resolver.local_dir.mkdir(parents=True, exist_ok=True)
+
+    class ContentionProbe:
+        """``configuration_lock`` 只用 acquire/release；争用时先发信号再阻塞。"""
+
+        def __init__(self) -> None:
+            self._lock = threading.RLock()
+            self.contended = threading.Event()
+
+        def acquire(self, blocking: bool = True) -> bool:
+            if self._lock.acquire(blocking=False):
+                return True
+            self.contended.set()
+            return self._lock.acquire() if blocking else False
+
+        def release(self) -> None:
+            self._lock.release()
+
+    probe = ContentionProbe()
+    monkeypatch.setitem(content._mutexes, resolver.config_dir.resolve(), probe)
     batch_entered = threading.Event()
-    other_done = threading.Event()
     failures: list[BaseException] = []
 
     def batch_writer():
         try:
             with resolver.batch_changes():
                 batch_entered.set()
-                other_done.wait(5.0)      # 等另一线程真的进到写锁里
+                # 等另一线程真的卡在配置锁上，再在持锁状态下去拿文件锁
+                assert probe.contended.wait(5.0), "单文件写没有进入配置锁争用"
                 resolver.save_merged("app.yaml", {"plans": [{"name": "batch"}]})
         except BaseException as exc:      # noqa: BLE001 - 断言时原样抛出
             failures.append(exc)
 
     def single_writer():
         try:
-            batch_entered.wait(5.0)
+            assert batch_entered.wait(5.0), "批量写入没有进入临界区"
             resolver.save_merged("app.yaml", {"plans": [{"name": "single"}]})
-            other_done.set()
         except BaseException as exc:      # noqa: BLE001 - 断言时原样抛出
             failures.append(exc)
 

@@ -208,8 +208,15 @@ class _ReorderTreeWidget(QTreeWidget):
             QStyle.SubElement.SE_ItemViewItemCheckIndicator, option, self)
 
     def eventFilter(self, watched: QObject | None, event: QEvent | None) -> bool:
-        if (watched is not None and event is not None
-                and watched is self.viewport()
+        if watched is None or event is None:
+            return super().eventFilter(watched, event)
+        try:
+            viewport = self.viewport()
+        except RuntimeError:
+            # 窗口销毁阶段 C++ 对象可能先于事件队列消失；此时再访问 self
+            # 会在 Qt 事件循环里抛 RuntimeError（离屏下还会拖垮整个进程）。
+            return False
+        if (watched is viewport
                 and event.type() == QEvent.Type.MouseButtonPress):
             mouse = cast(QMouseEvent, event)
             if mouse.button() == Qt.MouseButton.LeftButton:

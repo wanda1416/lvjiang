@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang.apps.yysls.core.agent.catalog import tool_catalog  # noqa: E402
-from lvjiang.apps.yysls.core.agent.service import AgentService  # noqa: E402
 from lvjiang.apps.yysls.core.agent.documents import AGENT_DOCUMENT_LAYOUT  # noqa: E402
+from lvjiang.apps.yysls.core.agent.service import AgentService  # noqa: E402
 from lvjiang.core.ai.agent_docs import AgentDocuments  # noqa: E402
 from lvjiang.core.ai.agent_mcp import LocalMCPServer  # noqa: E402
 

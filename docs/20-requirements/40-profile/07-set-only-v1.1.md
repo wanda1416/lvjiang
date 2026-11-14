@@ -1,6 +1,6 @@
 # Profile 同步 v1.1：set-only 数据模型与周期裁决（历史方案）
 
-> 状态：已被 [08-profile-sync.md](08-profile-sync.md)（v1.2）取代。本文保留为 v1.1
+> 状态：已实现（2026-11-14，基线 v0.15.13）——历史方案，已被 [08-profile-sync.md](08-profile-sync.md)（v1.2）取代。本文保留为 v1.1
 > 过程记录，不再继续打补丁；当前实现按 v1.2 文档执行。最后更新：2026-11-14（仅改版本名）。
 >
 > 云端唯一索引是部分索引（`op_id <> ''`），这样协议 1 的空 `op_id` 插入不会互相冲突。
@@ -663,5 +663,5 @@ LWW 结果 = 9，而不是 8
 
 - [用户 Profile 系统需求总览](README.md)
 - [页面结构与搬运](06-overview-layout-sync.md)
-- [账户与同步架构（历史背景）](../../../admin/docs/30-architecture/07-account-and-sync.md)
+- 账户与同步架构（历史背景）：独立 admin 仓库 `docs/30-architecture/07-account-and-sync.md`（不随主工程发布）
 - [公共服务与桌面适配](../../30-architecture/38-platform/11-background-services.md)

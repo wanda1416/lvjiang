@@ -9,7 +9,11 @@ import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from lvjiang.core.ai.agent_docs import DOCUMENT_DIRECTORIES, AgentDocuments
+from lvjiang.apps.yysls.core.agent.documents import (
+    AGENT_DOCUMENT_LAYOUT,
+    DOCUMENT_DIRECTORIES,
+)
+from lvjiang.core.ai.agent_docs import AgentDocuments
 from lvjiang.core.ai.agent_mcp import LocalMCPServer
 
 
@@ -28,14 +32,14 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     assert not payload["additionalProperties"]
     assert "plan_targets" in payload["properties"]
     assert "skip_tuning" not in payload["properties"]["run_config"]["properties"]
-    docs = AgentDocuments(output)
-    source = AgentDocuments(Path(__file__).parents[3] / "docs", source_mode=True,
+    docs = AgentDocuments(output, AGENT_DOCUMENT_LAYOUT)
+    source = AgentDocuments(Path(__file__).parents[3] / "docs", AGENT_DOCUMENT_LAYOUT, source_mode=True,
                             schema_provider=lambda: (output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
     assert source.list_docs() == docs.list_docs()
     for entry in source.list_docs()["documents"]:
         assert source.read_doc(entry["id"]) == docs.read_doc(entry["id"])
     # A source edit is immediately visible without a package build.
-    edited = AgentDocuments(tmp_path / "source/docs", source_mode=True)
+    edited = AgentDocuments(tmp_path / "source/docs", AGENT_DOCUMENT_LAYOUT, source_mode=True)
     (edited.root / "70-agent").mkdir(parents=True)
     (edited.root / "70-agent/README.md").write_text("live source", encoding="utf-8")
     assert edited.read_doc("entry")["text"] == "live source"

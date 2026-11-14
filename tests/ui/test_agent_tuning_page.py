@@ -27,7 +27,7 @@ def test_page_service_connection_survives_user_changes_without_packaging(qtbot, 
     from lvjiang.apps.yysls.ui.tuning import agent_page
 
     root = Path(__file__).parents[2]
-    from lvjiang.core.ai.agent_docs import DOCUMENT_DIRECTORIES
+    from lvjiang.apps.yysls.core.agent.documents import DOCUMENT_DIRECTORIES
     for directory in DOCUMENT_DIRECTORIES:
         shutil.copytree(root / "docs" / directory, tmp_path / "docs" / directory)
     monkeypatch.setattr(constants, "PROJECT_ROOT", tmp_path)

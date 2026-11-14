@@ -13,7 +13,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang.apps.yysls.core.agent.catalog import tool_catalog  # noqa: E402
 from lvjiang.apps.yysls.core.agent.service import AgentService  # noqa: E402
-from lvjiang.core.ai.agent_docs import AGENT_DOCUMENTS, AgentDocuments  # noqa: E402
+from lvjiang.apps.yysls.core.agent.documents import AGENT_DOCUMENT_LAYOUT  # noqa: E402
+from lvjiang.core.ai.agent_docs import AgentDocuments  # noqa: E402
 from lvjiang.core.ai.agent_mcp import LocalMCPServer  # noqa: E402
 
 
@@ -21,14 +22,14 @@ def build_bundle(output: Path, *, archive: Path | None = None) -> dict:
     source_root = ROOT / "docs"
     output.mkdir(parents=True, exist_ok=True)
     service = AgentService(ROOT, dispatch=lambda *_args: {})
-    server = LocalMCPServer(tool_catalog(service, AgentDocuments(output)), instructions="律匠公开工具")
+    server = LocalMCPServer(tool_catalog(service, AgentDocuments(output, AGENT_DOCUMENT_LAYOUT)), instructions="律匠公开工具")
     tools = asyncio.run(server.mcp.list_tools())
     schemas = json.dumps([tool.model_dump(mode="json") for tool in tools], ensure_ascii=False, indent=2)
-    schema_path = output / AGENT_DOCUMENTS["tool-schema"]
+    schema_path = output / AGENT_DOCUMENT_LAYOUT.schema_path
     schema_path.parent.mkdir(parents=True, exist_ok=True)
     # The manifest hashes these exact UTF-8 bytes; Windows text I/O must not add CRLF.
     schema_path.write_bytes((schemas + "\n").encode("utf-8"))
-    source = AgentDocuments(source_root, source_mode=True,
+    source = AgentDocuments(source_root, AGENT_DOCUMENT_LAYOUT, source_mode=True,
                             schema_provider=lambda: schemas + "\n")
     manifest = source.list_docs()
     documents = manifest["documents"]
@@ -38,9 +39,9 @@ def build_bundle(output: Path, *, archive: Path | None = None) -> dict:
         target = output / entry["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((source_root / entry["path"]).read_bytes())
-    (output / "70-agent/manifest.json").write_text(
+    (output / AGENT_DOCUMENT_LAYOUT.manifest).write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    allowed = {d["path"] for d in documents} | {"70-agent/manifest.json"}
+    allowed = {d["path"] for d in documents} | {AGENT_DOCUMENT_LAYOUT.manifest}
     unexpected = [p for p in output.rglob("*") if p.is_file() and p.relative_to(output).as_posix() not in allowed]
     if unexpected:
         raise ValueError("输出目录含清单外文件，请使用新的空目录")

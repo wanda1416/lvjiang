@@ -438,7 +438,8 @@ class AgentTuningPage(QWidget):
             import sys
 
             from ...core.agent.catalog import tool_catalog
-            docs = AgentDocuments(constants.PROJECT_ROOT / "docs",
+            from ...core.agent.documents import AGENT_DOCUMENT_LAYOUT
+            docs = AgentDocuments(constants.PROJECT_ROOT / "docs", AGENT_DOCUMENT_LAYOUT,
                                   source_mode=not getattr(sys, "frozen", False))
             server = LocalMCPServer(tool_catalog(self.service, docs), instructions=(
                 "先调用 get_capabilities、list_users 和 read_doc('entry')。游戏机制读 10-game，操作指导读 60-userguide，DSL 与架构读 30-architecture，接口契约读 70-agent。"

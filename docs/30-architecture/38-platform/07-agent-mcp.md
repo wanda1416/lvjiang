@@ -44,11 +44,12 @@ Future 和 Qt 信号进入主线程；若调用本来就在主线程则直接执
 ## 共享文档与构建
 
 文档继续由原层维护：10-game 为机制，30-architecture 为架构与 DSL，
-60-userguide 为操作，70-agent 为接入契约。DOCUMENT_DIRECTORIES 定义发布四层，
-document_catalog 发现其中全部 Markdown；AGENT_DOCUMENTS 只定义常用 ID 别名。
+60-userguide 为操作，70-agent 为接入契约。发布布局由插件声明
+（`apps/yysls/core/agent/documents.py` 的 AGENT_DOCUMENT_LAYOUT：DOCUMENT_DIRECTORIES 定义发布四层，
+AGENT_DOCUMENTS 只定义常用 ID 别名）；core 的 DocumentLayout.catalog 发现其中全部 Markdown。
 list_docs/search_docs 可按 category 筛选，清单带标题、分类、路径和哈希。
 
-开发环境 AgentDocuments(root=PROJECT_ROOT/docs, source_mode=True) 实时读正文，
+开发环境 AgentDocuments(root=PROJECT_ROOT/docs, layout, source_mode=True) 实时读正文，
 运行时生成工具 schema，无需打包。发行构建按完全相同路径复制到 dist/lvjiang/docs，
 在 70-agent 中输出 manifest 和 schemas/tools.json。独立 ZIP 使用 docs 前缀，
 保持四层结构；发行读取核对文档清单、目录和哈希，不开放其他路径。

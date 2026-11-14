@@ -28,7 +28,7 @@ class AgentSettingsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        note = QLabel(tr("配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。"))
+        note = QLabel(tr("配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。具体使用哪个 Agent 在调用它的功能页中选择；接入令牌不会保存在这里。"))
         note.setWordWrap(True)
         layout.addWidget(note)
         form = QFormLayout()

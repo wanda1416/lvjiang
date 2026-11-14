@@ -197,7 +197,7 @@ agent_settings:
   保存 Agent 设置: Save Agent Settings
   删除所选: Delete Selected
   添加 Agent: Add Agent
-  配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。: Configure external Agent names and default export files, all via Streamable HTTP. Smart tuning chooses which Agent to use; access tokens are not stored here.
+  "配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。具体使用哪个 Agent 在调用它的功能页中选择；接入令牌不会保存在这里。": "Configure external Agent names and default export files, all via Streamable HTTP. Choose which Agent to use on the feature page that calls it; access tokens are not stored here."
   默认导出文件: Default export file
 ai_settings:
   ' 秒': ' s'
@@ -892,11 +892,11 @@ mobile:
   不含总览数据（Profile 由账号云端同步）: Excludes overview data (Profile syncs from the cloud by account)
   二维码来源: QR code source
   二维码生成失败，请手动打开上面的链接: QR code generation failed; open the link above manually
-  仅合并已结束的手机记录；参数、Profile 和装备数据不回传。重复回传不会重复导入。: Only finished phone records are merged; parameters, Profile and equipment data are not uploaded. Re-uploading doesn't duplicate imports.
+  "仅合并已结束的手机记录；参数、Profile 和插件业务数据不回传。重复回传不会重复导入。": "Only finished phone records are merged; parameters, Profile and plugin data are not uploaded. Re-uploading doesn't duplicate imports."
   任务状态：{state}: 'Task status: {state}'
   体检失败：{err}: 'Health check failed: {err}'
   使用应用预置配置；执行用户：{user}: "Uses the app's bundled config; executing user: {user}"
-  保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。: Keeps each user's task settings (including auto-tuning) and phone-only users; scripts, layouts and the Profile DB still update.
+  "保留各用户的任务设置（含插件任务）和手机独有用户；脚本、布局和 Profile DB 仍更新。": "Keeps each user's task settings (including plugin tasks) and phone-only users; scripts, layouts and the Profile DB still update."
   保留手机任务参数: Keep phone task parameters
   保留手机任务参数及手机独有用户。: Keeps phone task parameters and phone-only users.
   保留手机批量配置: Keep phone batch configs

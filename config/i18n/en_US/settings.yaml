@@ -7,7 +7,7 @@ agent_settings:
   "保存 Agent 设置": "Save Agent Settings"
   "删除所选": "Delete Selected"
   "添加 Agent": "Add Agent"
-  "配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。": "Configure external Agent names and default export files, all via Streamable HTTP. Smart tuning chooses which Agent to use; access tokens are not stored here."
+  "配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。具体使用哪个 Agent 在调用它的功能页中选择；接入令牌不会保存在这里。": "Configure external Agent names and default export files, all via Streamable HTTP. Choose which Agent to use on the feature page that calls it; access tokens are not stored here."
   "默认导出文件": "Default export file"
 ai_settings:
   "AI 配置已保存": "AI settings saved"

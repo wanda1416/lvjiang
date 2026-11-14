@@ -23,6 +23,7 @@ from lvjiang.apps import (
     parse_app_spec,
     resolve_app_specs,
 )
+from lvjiang.apps.base import AppHooks
 
 
 def _write_plugin(root: Path, directory_name: str, plugin_id: str) -> Path:
@@ -40,23 +41,13 @@ def test_discover_app_ids_includes_builtin_yysls():
     assert "yysls" in discover_app_ids()
 
 
-def test_builtin_app_ids_in_sync_with_source_tree():
-    """内置插件名册常量必须与实际源码目录一致。
-
-    新增内置插件（src/lvjiang/apps/<name>/__init__.py）却忘记更新
-    ``_BUILTIN_APP_IDS`` 时此用例失败，提醒同步登记；反之名册里登记了
-    不存在（或已删除/拼错）的 ID 也会失败。frozen 环境下没有可扫的源码
-    目录，跳过比对。
-    """
+def test_builtin_app_ids_follow_source_tree_without_hardcoded_names():
+    """内置插件名册由本包子包列举得到，与源码目录一致，宿主不写死插件名。"""
     builtin_root = apps._BUILTIN_ROOT
     if not builtin_root.is_dir():
         pytest.skip("frozen 环境无内置插件源码目录，名册无法与磁盘比对")
-    actual = apps._scan_root(builtin_root)
-    assert tuple(sorted(actual)) == tuple(sorted(apps._BUILTIN_APP_IDS)), (
-        "内置插件名册 _BUILTIN_APP_IDS 与源码目录不一致："
-        f"源码目录={sorted(actual)}，名册={sorted(apps._BUILTIN_APP_IDS)}。"
-        "新增内置插件请同步更新 src/lvjiang/apps/__init__.py 的 _BUILTIN_APP_IDS"
-    )
+    assert apps.builtin_app_ids() == apps._scan_root(builtin_root)
+    assert "base" not in apps.builtin_app_ids()
 
 
 def test_scan_skips_non_plugin_entries(tmp_path, monkeypatch):
@@ -101,3 +92,14 @@ def test_resolve_app_specs_keeps_order_and_appends_scanned(tmp_path, monkeypatch
 def test_parse_app_spec_rejects_bad_name():
     with pytest.raises(KeyError, match="无效的插件名"):
         parse_app_spec("bad-name")
+
+
+def test_registered_hooks_are_kept_in_registry_in_order():
+    """声明式字段的消费方只读注册表：register_hooks 保存完整 AppHooks。"""
+    registry: dict = {}
+    first = AppHooks(id="first_app", offline_database_files=("a.db",))
+    second = AppHooks(id="second_app", offline_configuration_patterns=("x/*.yaml",))
+    apps.register_hooks(first, registry)
+    apps.register_hooks(second, registry)
+    apps.register_hooks(AppHooks(name="no-id"), registry)
+    assert list(registry["hooks"].values()) == [first, second]

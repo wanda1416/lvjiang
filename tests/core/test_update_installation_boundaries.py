@@ -46,9 +46,8 @@ def test_member_installs_without_business_selfcheck_or_global_refresh_failure(tm
         raise ValueError("单个配置加载失败")
     config.add_batch_change_listener(broken)
     config.add_batch_change_listener(lambda changes: refreshed.append("listener"))
-    monkeypatch.setattr(apps, "get_registered_app_ids", lambda: ("example",))
-    monkeypatch.setattr(apps, "load_app", lambda app: SimpleNamespace(
-        configuration_reload_callbacks=[broken, lambda: refreshed.append("plugin")]))
+    monkeypatch.setattr(apps, "get_registered_hooks", lambda: (SimpleNamespace(
+        configuration_reload_callbacks=[broken, lambda: refreshed.append("plugin")]),))
     job = remote.SyncJob(tmp_path, "0.15.0", tree_digest(baseline), protected=access)
     result = remote.run_sync(job)
     assert not (system / "workflows/new.wf").exists()

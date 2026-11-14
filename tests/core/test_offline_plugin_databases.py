@@ -8,9 +8,8 @@ from lvjiang.core import offline_bundle
 
 
 def test_database_selection_uses_plugin_declarations(tmp_path, monkeypatch):
-    hooks = {"sample": AppHooks(id="sample", offline_database_files=("sample.db",))}
-    monkeypatch.setattr(offline_bundle, "get_registered_app_ids", lambda: ("sample",))
-    monkeypatch.setattr(offline_bundle, "load_app", hooks.__getitem__)
+    hooks = (AppHooks(id="sample", offline_database_files=("sample.db",)),)
+    monkeypatch.setattr(offline_bundle, "get_registered_hooks", lambda: hooks)
     config = tmp_path / "config"
     (config / "system").mkdir(parents=True)
     (config / "system/layouts.yaml").write_text(
@@ -29,7 +28,7 @@ def test_database_selection_uses_plugin_declarations(tmp_path, monkeypatch):
         # profile.db 属于账号云端的总览数据，永远不进离线包。
         assert "config/session/profile.db" not in package.namelist()
     # 未装配插件时不携带其声明的数据库。
-    monkeypatch.setattr(offline_bundle, "get_registered_app_ids", tuple)
+    monkeypatch.setattr(offline_bundle, "get_registered_hooks", tuple)
     offline_bundle.build_offline_bundle(tmp_path, archive, username="tester", layout="android")
     with zipfile.ZipFile(archive) as package:
         assert "config/session/sample.db" not in package.namelist()

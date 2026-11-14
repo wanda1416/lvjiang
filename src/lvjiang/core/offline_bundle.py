@@ -18,7 +18,7 @@ from typing import Any
 import yaml
 
 from .._version import __version__
-from ..apps import get_registered_app_ids, load_app
+from ..apps import get_registered_hooks
 from .config.resolver import ConfigResolver
 from .json_files import formatted_json, formatted_json_bytes
 from .layout.config import load_layout_doc
@@ -59,12 +59,12 @@ MIRRORED_LAYERS: tuple[str, ...] = ("system", "local")
 
 def _database_files() -> tuple[str, ...]:
     return tuple(dict.fromkeys((*_DATABASE_FILES, *(
-        name for app_id in get_registered_app_ids()
-        for name in load_app(app_id).offline_database_files))))
+        name for app in get_registered_hooks()
+        for name in app.offline_database_files))))
 
 
 def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple[Path, Path]]:
-    hooks = [load_app(name) for name in get_registered_app_ids()]
+    hooks = get_registered_hooks()
     patterns = (*_LAYER_PATTERNS, *(
         pattern for app in hooks for pattern in app.offline_configuration_patterns))
     for layer, root in (("system", get_config_system_dir(config)), ("local", get_config_local_dir(config))):

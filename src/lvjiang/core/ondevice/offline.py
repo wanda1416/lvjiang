@@ -40,7 +40,7 @@ def configuration_status() -> dict:
 
 
 def reset_configuration() -> None:
-    from ...apps import load_app, load_config_policies
+    from ...apps import get_registered_hooks, load_config_policies
     from ..config.resolver import get_resolver
     from ..config.session import reset_session_store
     from ..ocr.cleaner import OCRCleaner
@@ -65,8 +65,8 @@ def reset_configuration() -> None:
     reload_scene_registry()
     OCRCleaner.reset_instance()
     get_template_store().invalidate()
-    for name in plugins.configured_apps():
-        for callback in load_app(name).configuration_reload_callbacks:
+    for app in get_registered_hooks():
+        for callback in app.configuration_reload_callbacks:
             callback()
 
 

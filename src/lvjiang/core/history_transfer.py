@@ -43,7 +43,7 @@ class HistoryChannel:
 
 
 def history_channels() -> dict[str, HistoryChannel]:
-    from ..apps import get_registered_app_ids, load_app
+    from ..apps import get_registered_hooks
     from .daily_history import TaskHistoryRepository
 
     batches = "status != 'running' AND finished_at != '' AND target_id='ondevice' AND target_kind='android'"
@@ -53,8 +53,8 @@ def history_channels() -> dict[str, HistoryChannel]:
         HistoryTable("batch_runs", ("batch_run_id",), batches, ("report_path",)),
         HistoryTable("task_runs", ("task_run_id",), tasks, ("result_path",)),
     ))}
-    for app_id in get_registered_app_ids():
-        factory = load_app(app_id).history_channels
+    for app in get_registered_hooks():
+        factory = app.history_channels
         if factory is not None:
             for channel in factory():
                 if channel.key in channels:

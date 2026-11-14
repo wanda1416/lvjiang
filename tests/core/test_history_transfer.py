@@ -25,8 +25,7 @@ from lvjiang.core.history_transfer import export_history, import_history
 def histories(tmp_path, monkeypatch):
     from lvjiang import apps
     from lvjiang.apps import yysls
-    monkeypatch.setattr(apps, "get_registered_app_ids", lambda: ("yysls",))
-    monkeypatch.setattr(apps, "load_app", lambda _: yysls.hooks)
+    monkeypatch.setattr(apps, "get_registered_hooks", lambda: (yysls.hooks,))
     phone = tmp_path / "phone"
     pc = tmp_path / "pc"
     monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", phone)
@@ -94,8 +93,7 @@ def test_legacy_session_output_attachment_is_still_accepted(tmp_path, monkeypatc
     """旧版产出在 config/session/output；两端混用时回传仍须接受该前缀。"""
     from lvjiang import apps
     from lvjiang.apps import yysls
-    monkeypatch.setattr(apps, "get_registered_app_ids", lambda: ("yysls",))
-    monkeypatch.setattr(apps, "load_app", lambda _: yysls.hooks)
+    monkeypatch.setattr(apps, "get_registered_hooks", lambda: (yysls.hooks,))
     phone = tmp_path / "phone"
     monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", phone)
     repository = TaskHistoryRepository(phone / "config/session/daily_history.db")

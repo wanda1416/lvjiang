@@ -8,19 +8,20 @@
 插件分三级，宿主主动发现前两级：
 
 1. 内置插件：``src/lvjiang/apps/<name>/``，随本包分发，public 打包自动携带；
-   名册由 ``_BUILTIN_APP_IDS`` 显式登记（编译期已知，frozen 下无法靠磁盘扫描）。
+   名册由 ``pkgutil.iter_modules`` 列举本包子包得到，宿主不写死任何插件名
+   （frozen 下 PyInstaller 的 pkgutil 运行时钩子可列举 PYZ 内的子包）。
 2. 外置默认目录：``<PROJECT_ROOT>/plugins/<name>/``，打包按目录是否存在决定
    是否携带（public 仓库没有该目录，因此发布包不含外置插件）；
 3. 外置任意目录：``-reg <name>@<path>`` 显式声明，目录名不必等于插件名。
 
 外置插件（第 2、3 级）以「子目录 + ``__init__.py``」识别，不读取任何清单文件；
 目录名必须是合法 Python 标识符，否则记 warning 跳过，不影响其它插件与主程序启动。
-内置插件名册必须与实际源码目录保持一致，由回归测试约束。
 """
 from __future__ import annotations
 
 import importlib
 import importlib.util
+import pkgutil
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -35,13 +36,6 @@ from .base import AppHooks
 _BUILTIN_ROOT = Path(__file__).parent
 # 外置默认插件根：仓库根 / 安装目录旁的 plugins/。
 _DEFAULT_PLUGINS_ROOT = PROJECT_ROOT / "plugins"
-
-# 内置插件名册：随本包分发的插件，编译期已知。
-# ⚠️ 新增内置插件（src/lvjiang/apps/<name>/）必须同步在此登记。frozen 环境下
-# 内置插件代码在 PYZ 归档里、磁盘上不存在 apps/ 目录，不能用文件系统扫描发现，
-# 只能靠这份显式名册；tests/core/test_plugin_discovery.py 会校验名册与实际
-# 源码目录一致，漏登/多登都会让该用例失败。
-_BUILTIN_APP_IDS: tuple[str, ...] = ("yysls",)
 
 if _DEFAULT_PLUGINS_ROOT.is_dir() and str(_DEFAULT_PLUGINS_ROOT) not in __path__:
     # 目录名等于插件名时，靠包搜索路径即可解析 lvjiang.apps.<name>；
@@ -77,20 +71,25 @@ def _scan_root(root: Path) -> tuple[str, ...]:
 
 
 def builtin_app_ids() -> tuple[str, ...]:
-    """随本包分发的内置插件名册（编译期登记的稳定 ID，不扫外置目录）。
+    """随本包分发的内置插件名册（只列本包子包，不扫外置目录）。
 
     离线工具（``scripts/add_content_version.py``、配置层单测）靠它选择插件
-    声明，因此必须保持「与安装目录内容无关」的语义。frozen 环境下内置插件
-    代码在 PYZ 归档里、磁盘上不存在 apps/ 目录，文件系统扫描必然落空，
-    所以返回 ``_BUILTIN_APP_IDS`` 显式名册而不是扫描 ``_BUILTIN_ROOT``。
+    声明，因此必须保持「与安装目录内容无关」的语义：只列举 ``_BUILTIN_ROOT``
+    下的子包。用 ``pkgutil.iter_modules`` 而不是直接扫磁盘：frozen 环境下内置
+    插件代码在 PYZ 归档里，磁盘上没有 apps/ 目录，PyInstaller 的 pkgutil
+    运行时钩子会按归档内容列举。
     """
-    return _BUILTIN_APP_IDS
+    names = {
+        info.name for info in pkgutil.iter_modules([str(_BUILTIN_ROOT)])
+        if info.ispkg and _is_valid_app_name(info.name)
+    }
+    return tuple(sorted(names, key=str.lower))
 
 
 def discover_app_ids() -> tuple[str, ...]:
     """内置名册 + 外置默认目录的插件名册，内置优先、去重。"""
     ordered: dict[str, None] = {}
-    for name in (*_BUILTIN_APP_IDS, *_scan_root(_DEFAULT_PLUGINS_ROOT)):
+    for name in (*builtin_app_ids(), *_scan_root(_DEFAULT_PLUGINS_ROOT)):
         ordered.setdefault(name, None)
     return tuple(ordered)
 
@@ -228,6 +227,9 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         app_ids = registry.setdefault("app_ids", [])
         if hooks.id not in app_ids:
             app_ids.append(hooks.id)
+        # 已装配插件的完整声明：离线同步、历史回传、配置重载等消费方只读
+        # 注册表，不再各自 load_app 取值。
+        registry.setdefault("hooks", {})[hooks.id] = hooks
 
     if hooks.window_title:
         registry["window_title"] = hooks.window_title
@@ -379,6 +381,11 @@ def _get_global_registry() -> dict[str, Any]:
 def get_registry() -> dict[str, Any]:
     """返回当前全局注册表（供 MainWindow / 引擎读取）。"""
     return _GLOBAL_REGISTRY
+
+
+def get_registered_hooks() -> tuple[AppHooks, ...]:
+    """返回已装配 app 的 ``AppHooks``，保持注册顺序。"""
+    return tuple(_GLOBAL_REGISTRY.get("hooks", {}).values())
 
 
 def get_registered_app_ids() -> tuple[str, ...]:

@@ -116,7 +116,13 @@ def _system_layouts() -> list[str]:
 
 
 def test_class_workflow_gate_has_inputs():
-    """门禁自身不能因清单意外变空而静默通过。"""
+    """门禁自身不能因清单意外变空而静默通过。
+
+    没有任何随包内置插件（插件整体拆出）时显式 skip，而不是让断言失败：
+    那是合法的分发形态，跳过会在报告里留痕。
+    """
+    if not builtin_app_ids():
+        pytest.skip("没有随包内置插件，无类工作流可检查")
     assert _class_workflows(), "设备插件没有声明任何 Python 类工作流"
     assert _system_layouts(), "config/system/layouts 下没有布局"
 

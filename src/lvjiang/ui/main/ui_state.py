@@ -23,7 +23,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QSizePolicy,
     QSpinBox,
     QWidget,
 )
@@ -33,30 +32,7 @@ from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 from ...core.config.wf_configs import TRANSIENT_ID_PREFIX
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
-from ..widgets.misc import FlowLayout
-
-
-class _FlowContainer(QWidget):
-    """FlowLayout 容器，正确传递 heightForWidth 给外层 QFormLayout。"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._flow = None
-        policy = self.sizePolicy()
-        policy.setHeightForWidth(True)
-        policy.setVerticalPolicy(QSizePolicy.Policy.Fixed)
-        self.setSizePolicy(policy)
-
-    def set_flow_layout(self, flow: FlowLayout):
-        self._flow = flow
-
-    def hasHeightForWidth(self):
-        return self._flow is not None and self._flow.hasHeightForWidth()
-
-    def heightForWidth(self, width: int) -> int:
-        if self._flow is not None:
-            return self._flow.heightForWidth(width)
-        return super().heightForWidth(width)
+from ..widgets.misc import FlowContainer, FlowLayout
 
 
 class UiStateMixin:
@@ -158,12 +134,6 @@ class UiStateMixin:
         而慢慢走偏。
         """
         params: dict = {}
-        from PyQt6.QtWidgets import (
-            QCheckBox,
-            QLineEdit,
-            QSpinBox,
-            QWidget,
-        )
         for param_def in parameters:
             name = param_def["name"]
             # checkgroup：从容器内收集各复选框状态为 dict
@@ -439,7 +409,7 @@ class UiStateMixin:
                     self._param_layout.addRow(label + ":", edit)
             elif param_type == "checkgroup":
                 # 分组复选框：值为 dict {key: bool}，使用 FlowLayout 自动换行
-                container = _FlowContainer()
+                container = FlowContainer()
                 container.setObjectName(name)
                 flow = FlowLayout(container, spacing=6)
                 flow.setContentsMargins(0, 0, 0, 0)

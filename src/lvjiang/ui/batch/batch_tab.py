@@ -89,6 +89,7 @@ from .batch_runner import (
     PlannedTask,
 )
 from .lifecycle_params import LifecycleParamsPanel
+from .task_params_page import TaskParamsPage
 
 
 @dataclass
@@ -344,13 +345,19 @@ class BatchTab(QWidget):
         config_row.addWidget(self._config_combo, stretch=1)
         layout.addLayout(config_row)
 
-        # ── 四页子 Tab ──
+        # ── 五页子 Tab ──
         self._sub_tabs = QTabWidget()
         self._sub_tabs.addTab(self._build_script_page(), tr("脚本"))
         self._sub_tabs.addTab(self._build_config_page(), tr("单元"))
         self._sub_tabs.addTab(self._build_progress_page(), tr("进度"))
         self._sub_tabs.addTab(self._build_params_page(), tr("参数"))
+        self._sub_tabs.addTab(self._build_task_page(), tr("任务"))
         layout.addWidget(self._sub_tabs)
+
+    def _build_task_page(self) -> QWidget:
+        """任务页：按全局/用户快速编辑勾选脚本的任务参数。"""
+        self._task_params_page = TaskParamsPage()
+        return self._task_params_page
 
     def _build_params_page(self) -> QWidget:
         """参数页：保存当前配置组的执行参数。"""
@@ -795,7 +802,52 @@ class BatchTab(QWidget):
         self._refresh_script_list()
         self._refresh_entry_list()
         self._refresh_params()
+        self._refresh_task_params_page()
         self._refresh_start_feedback()
+
+    def _refresh_task_params_page(self) -> None:
+        """把当前勾选脚本与用户投影到「任务」页。
+
+        任务参数与日常共用 wf_configs / 用户元数据，这里只决定画哪些脚本、
+        可以切到哪些用户，不持有任何独立副本。
+        """
+        page = getattr(self, "_task_params_page", None)
+        if page is None:
+            return
+        manager = getattr(self._host, "_user_manager", None)
+        users_dir = getattr(manager, "_users_dir", None)
+        run_env_getter = getattr(self._host, "_selected_run_env", None)
+        run_env = run_env_getter() if callable(run_env_getter) else ""
+        scripts = [
+            self._script_configs_by_id[script_id]
+            for script_id in self._script_order
+            if script_id in self._script_configs_by_id
+        ]
+        page.set_context(
+            scripts, self._task_param_usernames(),
+            users_dir=users_dir, run_env=str(run_env or ""),
+        )
+
+    def _task_param_usernames(self) -> list[str]:
+        """任务参数可切换的用户：用户模式取勾选用户，属性模式取所选单元的成员。"""
+        config = self._item
+        if config is None:
+            return []
+        if config.execution_unit_key == "user":
+            return [name for name in self._user_order if name]
+        selected = set(self._user_order)
+        manager = getattr(self._host, "_user_manager", None)
+        if manager is None:
+            return list(config.usernames)
+        key = config.execution_unit_key
+        names: list[str] = []
+        for username in config.usernames:
+            user = manager.get_user(username)
+            value = (str(user.attributes.get(key, "")).strip()
+                     if user is not None else "")
+            if value in selected:
+                names.append(username)
+        return names
 
     def _refresh_params(self) -> None:
         item = self._item
@@ -1180,6 +1232,7 @@ class BatchTab(QWidget):
         selection.order = list(self._user_candidate_order)
         selection.checked = list(self._user_order)
         self._save_draft()
+        self._refresh_task_params_page()
 
     def _get_enabled_usernames(self) -> list[str]:
         """本次实际执行顺序（用户名或属性值）。"""
@@ -1440,6 +1493,7 @@ class BatchTab(QWidget):
         ]
         self._draft.tasks.checked = self._merged_script_ids()
         self._save_draft()
+        self._refresh_task_params_page()
 
     def _checked_script_ids(self) -> list[str]:
         """获取勾选的脚本 ID 列表"""
@@ -1966,6 +2020,7 @@ class BatchTab(QWidget):
         的显示名不更新，取消暴露的脚本仍留在列表里并且照跑不误。
         """
         self._refresh_script_list()
+        self._refresh_task_params_page()
         if hasattr(self, "_start_feedback"):
             self._refresh_start_feedback()
 

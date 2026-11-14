@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QLayout,
     QMenu,
     QPushButton,
+    QSizePolicy,
     QTextEdit,
     QWidget,
 )
@@ -224,6 +225,29 @@ class FlowLayout(QLayout):
             line_height = max(line_height, item_size.height())
 
         return y + line_height - rect.y()
+
+
+class FlowContainer(QWidget):
+    """FlowLayout 容器，正确传递 heightForWidth 给外层 QFormLayout。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._flow = None
+        policy = self.sizePolicy()
+        policy.setHeightForWidth(True)
+        policy.setVerticalPolicy(QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(policy)
+
+    def set_flow_layout(self, flow: FlowLayout):
+        self._flow = flow
+
+    def hasHeightForWidth(self):
+        return self._flow is not None and self._flow.hasHeightForWidth()
+
+    def heightForWidth(self, width: int) -> int:
+        if self._flow is not None:
+            return self._flow.heightForWidth(width)
+        return super().heightForWidth(width)
 
 
 class MultiSelectMenu(QMenu):

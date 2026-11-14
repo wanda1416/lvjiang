@@ -138,6 +138,11 @@ class DailyHistoryDialog(QDialog):
                  repository: TaskHistoryRepository | None = None):
         super().__init__(parent)
         self.setWindowTitle(tr("任务历史"))
+        # QDialog 默认只给关闭和「?」，没有最大化/最小化。这个窗口是长时间
+        # 并排使用的非模态工具，必须允许放大。
+        self.setWindowFlag(Qt.WindowType.WindowMinimizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         self.resize(1220, 660)
         self._repository = repository
         self._task_records: list[TaskRunRecord] = []
@@ -150,13 +155,31 @@ class DailyHistoryDialog(QDialog):
 
     def _restore_ui_state(self, state: dict) -> None:
         size = state.get("window_size")
-        if self._valid_sizes(size):
-            self.resize(*size)
+        width, height = (size if self._valid_sizes(size)
+                         else (self.width(), self.height()))
+        # 上次可能是在更大的显示器（或最大化状态）下保存的尺寸。按当前
+        # 显示器可用区域收敛并居中，避免在副屏上开出一个比屏幕还大的窗口。
+        available = self._target_screen().availableGeometry()
+        width = max(720, min(width, available.width()))
+        height = max(480, min(height, available.height()))
+        self.resize(width, height)
+        self.move(
+            available.x() + max(0, (available.width() - width) // 2),
+            available.y() + max(0, (available.height() - height) // 2),
+        )
+        if state.get("window_maximized") is True:
+            self.setWindowState(
+                self.windowState() | Qt.WindowState.WindowMaximized)
         for key, splitter in (("task_splitter_sizes", self._task_splitter),
                               ("batch_splitter_sizes", self._batch_splitter)):
             sizes = state.get(key)
             if self._valid_sizes(sizes):
                 splitter.setSizes(sizes)
+
+    def _target_screen(self):
+        """窗口将出现在哪块屏幕上：跟随父窗口，独立打开时用主屏。"""
+        parent = self.parentWidget()
+        return parent.screen() if parent is not None else self.screen()
 
     @staticmethod
     def _valid_sizes(value: object) -> TypeGuard[list[int]]:
@@ -166,8 +189,13 @@ class DailyHistoryDialog(QDialog):
     def done(self, result: int) -> None:
         # QDialog 的窗口关闭、Esc 和 accept/reject 都经由 done 收尾。
         try:
+            normal = self.normalGeometry()
+            size = ([normal.width(), normal.height()]
+                    if self.isMaximized() and normal.width() > 0
+                    else [self.width(), self.height()])
             update_ui_page_state("task_history", {
-                "window_size": [self.width(), self.height()],
+                "window_size": size,
+                "window_maximized": self.isMaximized(),
                 "task_splitter_sizes": self._task_splitter.sizes(),
                 "batch_splitter_sizes": self._batch_splitter.sizes(),
             })

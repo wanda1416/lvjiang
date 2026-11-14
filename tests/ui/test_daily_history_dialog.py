@@ -168,7 +168,8 @@ def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot
     reset_session_store()
     state = load_ui_page_state("task_history")
     assert state == {
-        "window_size": [1400, 720], "task_splitter_sizes": task_sizes,
+        "window_size": [1400, 720], "window_maximized": False,
+        "task_splitter_sizes": task_sizes,
         "batch_splitter_sizes": batch_sizes, "other_field": "keep", "new_field": "keep too"}
     assert load_ui_page_state("main_page") == {"window_size": [1200, 700]}
     reopened = DailyHistoryDialog(repository=repository)
@@ -183,3 +184,26 @@ def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot
     reopened.resize(1450, 750)
     reopened.close()  # 标题栏关闭路径。
     assert load_ui_page_state("task_history")["window_size"] == [1450, 750]
+
+
+def test_window_size_is_clamped_to_screen_and_can_maximize(
+    qtbot, tmp_path,
+):
+    """旧尺寸可能来自更大的显示器：恢复时必须收敛到当前屏幕可用区域。"""
+    from PyQt6.QtWidgets import QApplication
+
+    from lvjiang.core.config import update_ui_page_state
+
+    repository, _, _ = _history(tmp_path)
+    screen = QApplication.primaryScreen()
+    assert screen is not None
+    available = screen.availableGeometry()
+    update_ui_page_state("task_history", {
+        "window_size": [available.width() + 900, available.height() + 900],
+    })
+    dialog = DailyHistoryDialog(repository=repository)
+    qtbot.addWidget(dialog)
+    assert dialog.width() <= available.width()
+    assert dialog.height() <= available.height()
+    # QDialog 默认没有最大化按钮，任务历史必须显式打开。
+    assert dialog.windowFlags() & Qt.WindowType.WindowMaximizeButtonHint

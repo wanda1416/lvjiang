@@ -9,6 +9,9 @@
 2. 字面量门禁：主模块的字符串字面量（不含 docstring）不得出现插件 ID、插件
    显示名、插件注册的代码工作流 ID，以及历史上出现过的插件私有概念。插件需要
    宿主配合的地方必须通过 hook 在加载时声明，而不是让宿主认识它。
+3. 测试层门禁：``tests/`` 下除插件测试目录（``tests/<插件>/``、
+   ``tests/apps/<插件>/``）以外的测试不得导入具体插件包或插件测试包，也不得按
+   插件名加载插件；框架机制用 ``tests/fake_plugin.py`` 的假插件验证。
 
 违规清单是迁移棘轮：只能删除，不能增加。
 """
@@ -178,3 +181,100 @@ def test_literal_gate_catches_known_shapes(tmp_path):
         ("from lvjiang.core.plugins import load_app\n", set()),
     ):
         assert _app_imports(package_file, source) == expected, source
+
+
+# ── 测试层门禁：框架测试不依赖任何具体插件 ────────────────────────────────
+#
+# 框架测试（tests/ 下除插件测试目录以外的全部代码）验证的是宿主机制，载体用
+# ``tests/fake_plugin.py`` 的假插件；某个插件自己的行为放在该插件的测试目录
+# （``tests/<插件>/`` 或 ``tests/apps/<插件>/``）。这样插件测试目录可以整体
+# 拿掉（插件不随包分发、拆到别的仓库），框架测试照样能跑。
+
+TESTS_ROOT = Path(__file__).parent
+
+#: ``{相对 tests/ 的文件: 放行原因}``。确实无法避免时才加，必须写明原因。
+TEST_LAYER_ALLOWLIST: dict[str, str] = {}
+
+
+def _plugin_test_dirs(app_ids: tuple[str, ...]) -> tuple[Path, ...]:
+    return tuple(path for app_id in app_ids
+                 for path in (TESTS_ROOT / app_id, TESTS_ROOT / "apps" / app_id))
+
+
+def _plugin_references_in_test(source: str, app_ids: tuple[str, ...]) -> list[tuple[int, str]]:
+    """测试源码里对具体插件的依赖：导入插件包/插件测试包、按插件名加载、字符串模块路径。"""
+    tree = ast.parse(source)
+    banned_modules = tuple(
+        prefix for app_id in app_ids
+        for prefix in (f"lvjiang.apps.{app_id}", f"tests.{app_id}", f"tests.apps.{app_id}"))
+
+    def banned(target: str) -> bool:
+        return any(target == prefix or target.startswith(prefix + ".") for prefix in banned_modules)
+
+    found: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        targets: list[str] = []
+        if isinstance(node, ast.Import):
+            targets.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
+            targets.append(node.module)
+            targets.extend(f"{node.module}.{alias.name}" for alias in node.names)
+        targets = [target for target in targets if banned(target)]
+        if targets:
+            found.append((node.lineno, targets[0]))
+    for node in _string_literals(tree):
+        value = node.value
+        # ``load_app("x")`` / ``configure_apps("x")`` / ``I18N_DIR / "apps" / "x"``，
+        # 以及 monkeypatch 目标、import_module 参数这类字符串模块路径。
+        if value in app_ids or banned(value):
+            found.append((node.lineno, value))
+    return sorted(set(found))
+
+
+def test_framework_tests_do_not_depend_on_concrete_plugins():
+    from lvjiang.core.plugins import builtin_app_ids
+
+    app_ids = builtin_app_ids()
+    assert app_ids, "没有内置插件，测试层门禁失去意义"
+    plugin_dirs = _plugin_test_dirs(app_ids)
+    offenders: list[str] = []
+    allowed_seen: set[str] = set()
+    for path in sorted(TESTS_ROOT.rglob("*.py")):
+        if any(directory == path.parent or directory in path.parents for directory in plugin_dirs):
+            continue
+        relative = path.relative_to(TESTS_ROOT).as_posix()
+        references = _plugin_references_in_test(path.read_text(encoding="utf-8"), app_ids)
+        if not references:
+            continue
+        if relative in TEST_LAYER_ALLOWLIST:
+            allowed_seen.add(relative)
+            continue
+        offenders.extend(f"tests/{relative}:{line}: {target!r}" for line, target in references)
+    assert not offenders, (
+        "框架测试依赖了具体插件；改用 tests/fake_plugin.py 的假插件，"
+        "或把插件自己的用例移到 tests/<插件>/：\n" + "\n".join(offenders))
+    stale = set(TEST_LAYER_ALLOWLIST) - allowed_seen
+    assert not stale, f"以下放行项已不再需要，请删除以收紧门禁：{sorted(stale)}"
+
+
+def test_test_layer_gate_catches_known_shapes():
+    """门禁自检：典型的测试层插件依赖写法都能被识别，中立写法不误伤。"""
+    app_ids = ("demo",)
+    for source in (
+        "from lvjiang.apps.demo.core import thing\n",
+        "from lvjiang.apps import demo\n",
+        "import lvjiang.apps.demo.ui\n",
+        "from tests.demo.test_x import helper\n",
+        "load_app('demo')\n",
+        "monkeypatch.setattr('lvjiang.apps.demo.mod.func', None)\n",
+        "importlib.import_module('lvjiang.apps.demo')\n",
+        "ROOT / 'apps' / 'demo'\n",
+    ):
+        assert _plugin_references_in_test(source, app_ids), source
+    for source in (
+        '"""文档里提到 lvjiang.apps.demo 不算。"""\n',
+        "register('demo_app/state.json')\n",
+        "scan('demo_logo')\n",
+        "from lvjiang.core.plugins import load_app\n",
+    ):
+        assert not _plugin_references_in_test(source, app_ids), source

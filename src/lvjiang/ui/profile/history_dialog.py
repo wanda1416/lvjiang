@@ -204,7 +204,7 @@ class HistoryDialog(QDialog):
 
     _TYPE_LABEL = {
         "regen": tr("恢复"), "reset": tr("重置"),
-        "set": tr("更新"), "delta": tr("增量"),
+        "set": tr("更新"), "delta": tr("增量"), "meta": tr("锁定"),
     }  # runtime tr()
     _PAGE_SIZES = (50, 100, 200, 500)
 

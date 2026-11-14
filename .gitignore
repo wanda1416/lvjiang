@@ -115,3 +115,14 @@ ops/stats-client/.env
 .te*.log
 .pt*.log
 
+
+# 本地工具临时输出（mypy/ruff/tail/网桥）
+.my*.log
+.my*.err
+.ruff*.log
+.ruff*.err
+.i.log
+.ie.log
+.x.log
+.xe.log
+.aud2.py

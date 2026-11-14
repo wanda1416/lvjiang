@@ -128,6 +128,9 @@ core_common:
   "场景": "Scene"
 profile:
   "方向": "Direction"
+result_protocol:
+  "脚本返回失败": "Script returned failure"
+  "脚本返回失败（返回值 {value}）": "Script returned failure (return value {value})"
 scene_editor:
   "区域": "Region"
 scripts:

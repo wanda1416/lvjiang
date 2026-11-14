@@ -1504,7 +1504,6 @@ run_control:
   加载工作流文件: Load Workflow File
   占用目标 {target}，运行 {run_id}: Target {target} occupied, run {run_id}
   图库: Gallery
-  备战方案扫描失败，请查看逐方案结果和导航提示: Loadout scan failed; see per-plan results and navigation hints
   工作流文件 (*.wf);;所有文件 (*): Workflow files (*.wf);;All files (*)
   '工作流文件不存在: {path}': 'Workflow file does not exist: {path}'
   工作流输入: Workflow Input

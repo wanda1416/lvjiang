@@ -18,6 +18,7 @@ from ...core.fs_util import task_result_path
 from ...errors import log_failure
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
+from ...workflows.result_protocol import return_failure_message
 from ..execution.feedback import (
     apply_idle_start,
     idle_start_state,
@@ -2449,18 +2450,21 @@ class RunControlMixin:
             # 异常不保存 session
         else:
             result = result_or_exception
-            # 工作流预检失败返回 {"error": ...}：拒绝启动，不按正常完成处理
-            if (flow_id == "scan_all_loadouts" and isinstance(result, dict)
-                    and getattr(run_context.engine, "return_value", None) == -1
-                    and not run_context.stop_event.is_set()):
-                result = {**result, "error": tr("备战方案扫描失败，请查看逐方案结果和导航提示")}
-                # All consumers, including MCP persistence, read the normalized
-                # outcome rather than the DSL's raw return value.
+            # 顶层 return 按通用返回协议判定失败（{"status": "failed"} 或负数）；
+            # 用户停止仍按中断处理。归一化结果写回 worker，MCP 等消费方读到同一结论。
+            failure = (None if run_context.stop_event.is_set() else
+                       return_failure_message(
+                           getattr(run_context.engine, "return_value", None)))
+            if failure is not None and not (
+                    isinstance(result, dict) and result.get("error")):
+                result = ({**result, "error": failure} if isinstance(result, dict)
+                          else {"error": failure, "result": result})
                 worker.result_or_exception = result
+            # 预检拒绝（{"error": ...}）与脚本返回失败：都不按正常完成处理
             if isinstance(result, dict) and result.get("error"):
                 run_context.metadata["terminal_state"] = "failed"
                 self.append_log(f"[错误] {flow_name}: {result['error']}")
-                logger.error(f"工作流 {flow_id} 启动被拒绝: {result['error']}")
+                logger.error(f"工作流 {flow_id} 失败: {result['error']}")
                 result_path = self._save_workflow_result(
                     flow_id, result,
                     task_run_id=task_run_id, run_context=run_context)

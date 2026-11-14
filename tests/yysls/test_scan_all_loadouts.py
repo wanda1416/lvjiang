@@ -619,10 +619,14 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
     assert "click [training_plan].[back]" in navigation
 
 
+#: 脚本按框架通用返回协议报告失败，任务专属文案留在脚本内。
+SCAN_FAILED = {"status": "failed", "message": "备战方案扫描失败，请查看逐方案结果和导航提示"}
+
+
 @pytest.mark.parametrize("unsafe_failure,second_succeeds,expected_names,expected_result", [
     (False, True, ["方案甲", "方案乙"], 0),
-    (False, False, ["方案甲", "方案乙"], -1),
-    (True, False, ["方案甲"], -1),
+    (False, False, ["方案甲", "方案乙"], SCAN_FAILED),
+    (True, False, ["方案甲"], SCAN_FAILED),
 ])
 def test_batch_retries_next_plan_without_reentering_after_safe_failure(
     monkeypatch, unsafe_failure, second_succeeds, expected_names, expected_result,

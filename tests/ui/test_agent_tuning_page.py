@@ -99,7 +99,8 @@ def test_scan_failure_and_user_stop_have_distinct_terminal_states(stopped, expec
     stop = threading.Event()
     if stopped:
         stop.set()
-    run = SimpleNamespace(worker=worker, engine=SimpleNamespace(return_value=-1),
+    failed = {"status": "failed", "message": "备战方案扫描失败，请查看逐方案结果和导航提示"}
+    run = SimpleNamespace(worker=worker, engine=SimpleNamespace(return_value=failed),
                           stop_event=stop, metadata={})
     saved = []
     host = SimpleNamespace(

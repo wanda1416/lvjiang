@@ -26,6 +26,12 @@ from ...errors import log_failure
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ...workflows.errors import WorkflowAbort
+from ...workflows.result_protocol import (
+    RESULT_FAILED,
+    RESULT_SKIPPED,
+    RESULT_STOPPED,
+    RESULT_SUCCESS,
+)
 from ..android.recovery import ChannelFaultError
 from ..config.resolver import get_resolver
 from ..config.users import SessionManager
@@ -51,10 +57,6 @@ ST_CHANNEL_FAULT = tr("通道中断")
 #: 只用于进度页：批次已结束（或正在查看历史轮）时，该轮没有留下状态的行。
 ST_NOT_RUN = tr("未执行")
 
-RESULT_SUCCESS = "success"
-RESULT_SKIPPED = "skipped"
-RESULT_FAILED = "failed"
-RESULT_STOPPED = "stopped"
 _RESULT_STATUSES = {
     RESULT_SUCCESS, RESULT_SKIPPED, RESULT_FAILED, RESULT_STOPPED,
 }

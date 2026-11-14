@@ -24,12 +24,6 @@ def test_installed_optional_app_registers_by_module_name(monkeypatch):
     assert registry["app_ids"] == ["optional_demo"]
 
 
-def test_builtin_app_does_not_include_optional_gather():
-    hooks = load_app("yysls")
-    assert "auto_gather" not in hooks.workflow_implementations
-    assert [name for name, _ in hooks.left_tab_builders] == ["调律"]
-
-
 def test_required_app_is_checked_before_any_registration():
     callbacks = []
     hooks = AppHooks(

@@ -62,7 +62,7 @@ def _run(script: str, *, cwd: Path, timeout: float = 30.0) -> subprocess.Complet
 def test_all_locks_live_in_one_root(tmp_path):
     """不同目标、不同目录的锁都落在同一个锁根，目标旁不留锁文件。"""
     inside = tmp_path / "config" / "local"
-    nested = tmp_path / "config" / "local" / "yysls" / "gear_sets"
+    nested = tmp_path / "config" / "local" / "demo_app" / "records"
     nested.mkdir(parents=True)
     with interprocess_lock(inside, suffix="install"):
         with interprocess_lock(nested / "sample.json", suffix="state"):

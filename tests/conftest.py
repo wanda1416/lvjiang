@@ -34,6 +34,9 @@ from lvjiang.core.plugins import builtin_app_ids, load_config_policies  # noqa: 
 
 load_config_policies(builtin_app_ids())
 
+# 框架测试共用的假插件夹具（``fake_app``）；框架测试不借真实插件当载体。
+from tests.fake_plugin import fake_app  # noqa: E402,F401
+
 # 收集阶段就修正 pytest 的目录句柄生命周期，覆盖 controller、worker 和会话收尾。
 # 用例级 monkeypatch 会在临时目录清理前撤销，不能在 fixture 里安装。
 install_closed_directory_scan()

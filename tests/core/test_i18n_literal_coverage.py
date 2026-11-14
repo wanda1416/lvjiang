@@ -185,7 +185,7 @@ def test_language_tables_cover_every_en_key(language: str) -> None:
     """en_US 的每个键路径都必须以同一段落出现在该语言里。
 
     配对是纯路径配对：段落名或键路径对不上就整条跳过，既不报错也不记日志。
-    真实事故：10 个新语言的插件表把 zh/en 的 ``yysls`` 段（709 条游戏术语）
+    真实事故：10 个新语言的插件表把 zh/en 的插件段（709 条游戏术语）
     整段生成进了 ``auto_strings`` 段，235 条在 10 个语言里静默回退中文，
     而两边的条目总数看起来还都对得上。
 
@@ -223,17 +223,21 @@ def test_app_fallback_values_match_en(language: str) -> None:
     ``Dingyin`` / ``Attunement``、``Cap Value`` / ``Maximum``、
     ``Loadout`` / ``Equipment Builds``。这些语言本来就以英文回退，值不一致
     只说明复制品腐烂，不是本地化。
+
+    对 ``config/i18n/apps/`` 下每个随包插件词表逐一检查，不认识具体插件。
     """
-    en_file = I18N_DIR / "apps" / "yysls" / "en_US.yaml"
-    target = en_file.parent / f"{language}.yaml"
-    if not target.exists():  # 插件可以只随包部分语言
-        return
-    en_values = _flat_values(en_file)
-    drifted = {
-        "/".join(path): (value, en_values[path])
-        for path, value in _flat_values(target).items()
-        if value.isascii() and path in en_values and en_values[path] != value
-    }
+    apps_root = I18N_DIR / "apps"
+    drifted: dict[str, tuple[str, str]] = {}
+    for en_file in sorted(apps_root.glob("*/en_US.yaml")) if apps_root.is_dir() else []:
+        target = en_file.parent / f"{language}.yaml"
+        if not target.exists():  # 插件可以只随包部分语言
+            continue
+        en_values = _flat_values(en_file)
+        drifted.update({
+            f"apps/{en_file.parent.name}:" + "/".join(path): (value, en_values[path])
+            for path, value in _flat_values(target).items()
+            if value.isascii() and path in en_values and en_values[path] != value
+        })
     assert not drifted, (
         f"{language} 插件层有 {len(drifted)} 条英文值与 en_US 不一致"
         f"（应随 en 一起改，不要各存一份）：{sorted(drifted)[:8]}")

@@ -1,6 +1,5 @@
 """Exercise the actual SDK handshake/transport and the packaged document boundary."""
 import asyncio
-import importlib.util
 import json
 from pathlib import Path
 
@@ -9,69 +8,60 @@ import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from lvjiang.apps.yysls.core.agent.documents import (
-    AGENT_DOCUMENT_LAYOUT,
-    DOCUMENT_DIRECTORIES,
-)
-from lvjiang.core.ai.agent_docs import AgentDocuments
+from lvjiang.core.ai.agent_docs import AgentDocuments, DocumentLayout
 from lvjiang.core.ai.agent_mcp import LocalMCPServer
 
 
-def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
-    script = Path(__file__).parents[3] / "scripts/build_agent_bundle.py"
-    spec = importlib.util.spec_from_file_location("build_agent_bundle", script)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    output = tmp_path / "installed/docs"
-    module.build_bundle(output, archive=tmp_path / "agent.zip")
-    tools = json.loads((output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
-    generation = next(tool for tool in tools if tool["name"] == "create_generated_tuning")
-    payload = generation["inputSchema"]["properties"]["payload"]
-    assert payload["required"] == ["base_group", "rules"]
-    assert not payload["additionalProperties"]
-    assert "plan_targets" in payload["properties"]
-    assert "skip_tuning" not in payload["properties"]["run_config"]["properties"]
-    docs = AgentDocuments(output, AGENT_DOCUMENT_LAYOUT)
-    source = AgentDocuments(Path(__file__).parents[3] / "docs", AGENT_DOCUMENT_LAYOUT, source_mode=True,
-                            schema_provider=lambda: (output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
-    assert source.list_docs() == docs.list_docs()
-    for entry in source.list_docs()["documents"]:
-        assert source.read_doc(entry["id"]) == docs.read_doc(entry["id"])
-    # A source edit is immediately visible without a package build.
-    edited = AgentDocuments(tmp_path / "source/docs", AGENT_DOCUMENT_LAYOUT, source_mode=True)
-    (edited.root / "70-agent").mkdir(parents=True)
-    (edited.root / "70-agent/README.md").write_text("live source", encoding="utf-8")
-    assert edited.read_doc("entry")["text"] == "live source"
-    (edited.root / "70-agent/README.md").write_text("updated source", encoding="utf-8")
-    assert edited.read_doc("entry")["text"] == "updated source"
-    manifest = docs.list_docs()
-    assert "生成" in docs.read_doc("entry")["text"]
-    assert docs.search_docs("培养", "10-game")["matches"]
-    assert docs.list_docs("60-userguide")["documents"]
-    assert docs.search_docs("连接", "60-userguide")["matches"]
-    assert docs.list_docs("30-architecture")["documents"]
-    assert "语法" in docs.read_doc("dsl")["text"]
-    assert {entry["path"] for entry in manifest["documents"]} >= {
-        "10-game/01-equipment-system.md", "60-userguide/01-quick-start.md",
-        "30-architecture/32-grammar/01-basics.md", "70-agent/README.md"}
-    assert {entry["category"] for entry in manifest["documents"]} == set(DOCUMENT_DIRECTORIES)
-    with pytest.raises(ValueError):
-        source.read_doc("20-requirements:README")
-    with pytest.raises(ValueError):
-        source.read_doc("40-development:README")
-    with pytest.raises(ValueError):
-        docs.list_docs("40-development")
+def _published_tree(root: Path) -> None:
+    for relative, text in {
+        "guide/README.md": "# 入口\n总览说明",
+        "guide/sub/details.md": "# 细节\n关键词 needle 在这里",
+        "private/secret.md": "# 私有\n不能发布",
+    }.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
+
+_LAYOUT = DocumentLayout(
+    directories=("guide",), manifest="guide/manifest.json",
+    aliases={"entry": "guide/README.md", "schema": "guide/schema.json"}, schema_id="schema")
+
+
+def test_document_layout_is_declared_by_the_caller(tmp_path):
+    """宿主只按调用方（插件）声明的布局发布文档：目录层、别名、清单、schema。"""
+    _published_tree(tmp_path)
+    source = AgentDocuments(tmp_path, _LAYOUT, source_mode=True, schema_provider=lambda: '{"tools": []}')
+    manifest = source.list_docs()
+    assert {entry["id"] for entry in manifest["documents"]} == {"entry", "guide:sub:details", "schema"}
+    assert {entry["category"] for entry in manifest["documents"]} == {"guide"}
+    assert source.read_doc("entry")["text"].startswith("# 入口")
+    assert source.read_doc("schema")["text"] == '{"tools": []}'
+    assert source.search_docs("needle")["matches"][0]["id"] == "guide:sub:details"
     with pytest.raises(ValueError):
-        docs.read_doc("../../config/session/session.json")
-    manifest = docs.list_docs()
-    assert {p.relative_to(output).as_posix() for p in output.rglob("*") if p.is_file()} == {
-        "70-agent/manifest.json", *[d["path"] for d in manifest["documents"]]}
-    entry = output / "70-agent/README.md"
-    entry.write_text("tampered", encoding="utf-8")
+        source.read_doc("private:secret")
+    with pytest.raises(ValueError, match="guide"):
+        source.list_docs("private")
+    # 源码模式下的编辑立即可见，不需要重新打包。
+    (tmp_path / "guide/README.md").write_text("# 入口\n已更新", encoding="utf-8")
+    assert "已更新" in source.read_doc("entry")["text"]
+
+    # 安装模式只读清单里的文档，并校验内容摘要。
+    (tmp_path / _LAYOUT.manifest).write_text(json.dumps(source.list_docs()), encoding="utf-8")
+    (tmp_path / "guide/schema.json").write_text('{"tools": []}', encoding="utf-8")
+    installed = AgentDocuments(tmp_path, _LAYOUT)
+    assert installed.list_docs() == source.list_docs()
+    assert installed.read_doc("entry") == source.read_doc("entry")
+    with pytest.raises(ValueError):
+        installed.read_doc("../../private/secret.md")
+    (tmp_path / "guide/README.md").write_text("tampered", encoding="utf-8")
     with pytest.raises(ValueError, match="清单不符"):
-        docs.read_doc("entry")
+        installed.read_doc("entry")
+
+
+def test_missing_installed_manifest_is_reported(tmp_path):
+    with pytest.raises(ValueError, match="未安装"):
+        AgentDocuments(tmp_path, _LAYOUT).list_docs()
 
 
 def test_official_client_can_discover_and_call_with_token_and_reject_without(free_tcp_port):

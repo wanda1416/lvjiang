@@ -8,9 +8,9 @@
 "en 比 zh 还多 26 条"——看起来翻译过、实际全是死键。
 
 范围：核心层按全段落硬性归零（2026-11-08 清掉 486 条标识符自映射与 5 条
-重构后残留的 Android 采集文案）；插件层还有 252/231 条 CJK 存量——其中大半
-是自动抽取遗留的伪键（用下划线拼接整句），其余可能是远端游戏配置才驱动的
-术语，删除前要确认来源，所以先用棘轮锁住只许下降。
+重构后残留的 Android 采集文案）。插件词表（``config/i18n/apps/<插件>``）的存量
+棘轮属于各插件自己，在插件测试目录里维护（如 ``tests/yysls/test_i18n_tables.py``），
+本文件只提供判定工具与核心层用例。
 """
 from __future__ import annotations
 
@@ -24,16 +24,12 @@ from lvjiang.i18n import available_languages
 
 ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = ROOT / "config" / "i18n"
-APPS_DIR = I18N_DIR / "apps" / "yysls"
 
 #: 已人工确认要保留的例外（加入时必须写明原因）
 ALLOWED_STALE: set[str] = {
     # 配置分组名：由 config 下发，源码里没有字面量，运行时 tr(分组名)
     "general",
 }
-
-#: 插件层仍未被源码字面量引用的 CJK 存量（2026-11-08 排查值），只许下降。
-MAX_APP_STALE_CJK = {"zh_CN": 252, "en_US": 231}
 
 _HAS_CJK = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
 
@@ -88,19 +84,6 @@ def test_core_tables_have_no_stale_cjk_keys() -> None:
     )
 
 
-def test_app_tables_stale_cjk_do_not_grow() -> None:
-    """插件层 CJK 死键只许减少：棘轮锁住 2026-11-08 的存量。"""
-    pool = _literal_pool()
-    grown = {}
-    for code, limit in MAX_APP_STALE_CJK.items():
-        count = len(_stale_cjk_keys(APPS_DIR / f"{code}.yaml", pool))
-        if count > limit:
-            grown[code] = f"{count} > {limit}"
-    assert not grown, (
-        f"插件层 CJK 死键上涨 {grown}——新增文案请先写进源码再翻译，"
-        f"不要让词表自己长出键。修复存量后同步下调 MAX_APP_STALE_CJK。")
-
-
 def _leaf_paths(data: object, trail: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
     """键路径集合（跳过多模块文件顶层的 meta 段）。"""
     if not isinstance(data, dict):
@@ -144,9 +127,9 @@ def test_zh_and_en_key_sets_match_per_module() -> None:
 
 
 #: 同源两译：同一句中文在不同段落配了不同译法时，扁平查表由后加载者静默取胜，
-#: 出现两处显示不一致且无法从代码看出用哪条。基线是 2026-11-08 排查的存量
-#: （核心 7 条、游戏插件 322 条），只许下降；修复时同步下调这里的数字。
-MAX_SOURCE_CONFLICTS = {"core": 7, "apps/yysls": 322}
+#: 出现两处显示不一致且无法从代码看出用哪条。基线是 2026-11-08 排查的核心层存量
+#: （7 条），只许下降；修复时同步下调这里的数字。插件词表的上限由插件测试维护。
+MAX_SOURCE_CONFLICTS = {"core": 7}
 
 
 def _merged(language: str, base: Path = I18N_DIR) -> dict:
@@ -199,10 +182,6 @@ def test_duplicate_source_translations_do_not_grow() -> None:
     """
     layers = {
         "core": _source_conflicts(_merged("zh_CN"), _merged("en_US")),
-        "apps/yysls": _source_conflicts(
-            _merged("zh_CN", I18N_DIR / "apps" / "yysls"),
-            _merged("en_US", I18N_DIR / "apps" / "yysls"),
-        ),
     }
     grown = {
         name: sorted(conflicts)[:5]

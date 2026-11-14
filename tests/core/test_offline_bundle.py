@@ -8,13 +8,18 @@ import pytest
 
 from lvjiang.core import offline_bundle
 from lvjiang.core.offline_bundle import build_offline_bundle, install_offline_bundle
+from tests.fake_plugin import fake_hooks, use_registered_hooks
+
+#: 假插件声明的离线同步范围：配置层一类规则文件 + 会话层一份文档。
+DEMO_HOOKS = fake_hooks(
+    offline_configuration_patterns=("demo_app/rules/*.yaml",),
+    offline_session_files=lambda: ("demo_app/state.json",),
+)
 
 
 @pytest.fixture
 def bundle(tmp_path, monkeypatch):
-    from lvjiang.apps import yysls
-    monkeypatch.setattr(offline_bundle, "get_registered_hooks", lambda: (yysls.hooks,))
-    monkeypatch.setattr("lvjiang.core.plugins.get_registered_hooks", lambda: (yysls.hooks,))
+    use_registered_hooks(monkeypatch, DEMO_HOOKS)
     source = tmp_path / "pc"
     (source / "config/system").mkdir(parents=True)
     (source / "config/system/layouts.yaml").write_text(
@@ -42,7 +47,7 @@ def bundle(tmp_path, monkeypatch):
     # PC 的总览库保持打开（WAL 有未 checkpoint 数据）：打包必须整体跳过它们，
     # 而不是把打开的库快照进包——总览数据由账号云端同步。
     with (closing(sqlite3.connect(session / "profile.db")) as db,
-          closing(sqlite3.connect(session / "tuning_history.db")) as history):
+          closing(sqlite3.connect(session / "demo_history.db")) as history):
         for connection in (db, history):
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("CREATE TABLE entries (value INTEGER)")
@@ -79,7 +84,7 @@ def test_sync_installs_config_only_and_keeps_phone_profile(bundle, tmp_path):
     assert "actives" not in session
     with closing(sqlite3.connect(old / "profile.db")) as db:
         assert db.execute("SELECT value FROM entries").fetchone() == (42,)
-    assert not (old / "tuning_history.db").exists()
+    assert not (old / "demo_history.db").exists()
     # 不再整目录交换：session 里不在清单的文件原地保留，也不产出旧配置备份
     assert (old / "old.json").read_text() == "previous"
     assert not (phone / "offline-backup").exists()
@@ -98,14 +103,15 @@ def test_bundle_whitelist_preserves_runtime_assets_not_editor_files(bundle, tmp_
         "local/workflows/custom.wf", "local/scenes/custom.yaml",
         "local/references/custom.yaml", "local/references/custom/bucket/reference.png",
         "system/templates/android/scene/match.png", "local/maps/custom/map.yaml",
-        "local/maps/custom/base.png", "local/yysls/tuning_rules/custom.yaml",
-        "local/yysls/gear_sets/custom.yaml", "session/users/tester.session.json",
-        "session/yysls/play_styles.json",
+        "local/maps/custom/base.png", "local/demo_app/rules/custom.yaml",
+        "system/demo_app/rules/base.yaml", "session/users/tester.session.json",
+        "session/demo_app/state.json",
     }
     excluded = {
         "session/profile.yaml", "session/profile.json",
         "session/screenshots/android/scene.png", "session/output/report.json",
-        "session/yysls/unknown.json", "session/unknown.json",
+        "session/demo_app/unknown.json", "session/unknown.json",
+        "local/demo_app/other/unknown.yaml",
         "local/data/calculator/screenshot.png", "local/data/notes.xlsx",
         "local/data/axis.json", "local/new_directory/unknown.yaml",
         "system/new_directory/unknown.yaml", "remote/new_directory/unknown.yaml",
@@ -535,17 +541,40 @@ def test_downstream_preserves_phone_history_and_result_files(bundle, tmp_path):
     result.parent.mkdir(parents=True)
     result.write_text('{"结果": true}\n', encoding="utf-8")
     with (closing(sqlite3.connect(session / "daily_history.db")) as tasks,
-          closing(sqlite3.connect(session / "tuning_history.db")) as tuning):
-        for conn in (tasks, tuning):
+          closing(sqlite3.connect(session / "demo_history.db")) as plugin):
+        for conn in (tasks, plugin):
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("CREATE TABLE records (value TEXT)")
             conn.execute("INSERT INTO records VALUES ('phone')")
             conn.commit()
     install_offline_bundle(archive, phone, preserve_task_params=False)
-    for name in ("daily_history.db", "tuning_history.db"):
+    for name in ("daily_history.db", "demo_history.db"):
         with closing(sqlite3.connect(session / name)) as conn:
             assert conn.execute("SELECT value FROM records").fetchall() == [("phone",)]
     assert json.loads(result.read_text(encoding="utf-8")) == {"结果": True}
     with zipfile.ZipFile(archive) as package:
         assert "config/session/daily_history.db" not in package.namelist()
-        assert "config/session/tuning_history.db" not in package.namelist()
+        assert "config/session/demo_history.db" not in package.namelist()
+
+
+def test_plugin_declarations_are_the_only_extension_of_the_whitelist(monkeypatch, tmp_path):
+    """没有插件声明时，插件目录一个文件都不进包；声明后只进声明的范围。"""
+    source = tmp_path / "pc"
+    (source / "config/system").mkdir(parents=True)
+    (source / "config/system/layouts.yaml").write_text(
+        "schema_version: 2\nlayouts:\n  android:\n    name: Android\n")
+    (source / "config/session/users").mkdir(parents=True)
+    (source / "config/session/users/tester.json").write_text("{}")
+    for relative in ("local/demo_app/rules/custom.yaml", "session/demo_app/state.json"):
+        path = source / "config" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("synthetic")
+    use_registered_hooks(monkeypatch)
+    build_offline_bundle(source, tmp_path / "bare.zip", username="tester", layout="android")
+    with zipfile.ZipFile(tmp_path / "bare.zip") as package:
+        assert not any("demo_app" in name for name in package.namelist())
+    use_registered_hooks(monkeypatch, DEMO_HOOKS)
+    build_offline_bundle(source, tmp_path / "declared.zip", username="tester", layout="android")
+    with zipfile.ZipFile(tmp_path / "declared.zip") as package:
+        assert {"config/local/demo_app/rules/custom.yaml",
+                "config/session/demo_app/state.json"} <= set(package.namelist())

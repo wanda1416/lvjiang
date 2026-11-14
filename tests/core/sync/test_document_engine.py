@@ -63,7 +63,7 @@ class FakeClient:
 
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
-    # yysls 生产环境经 AppHooks.sync_document_modules 登记；测试直接登记同一映射。
+    # 生产环境由插件经 AppHooks.sync_document_modules 登记；测试直接登记同一映射。
     from lvjiang.core.sync import registry
     registry.register_user_document_kind("loadouts", ".loadouts.json")
     fake = FakeClient()
@@ -238,18 +238,18 @@ def test_document_channel_has_no_avatar_kind(env) -> None:
 
 @pytest.fixture()
 def session_env(env, monkeypatch):
-    """在 env 基础上登记一份账户级文档 yysls/play_styles.json。"""
+    """在 env 基础上登记一份账户级文档 demo_app/play_styles.json。"""
     from lvjiang.core.sync import registry
 
     monkeypatch.setattr(registry, "_SESSION_DOCUMENTS", {})
-    registry.register_session_document("play_styles", "yysls/play_styles.json")
-    (env["dirs"]["session"] / "yysls").mkdir(parents=True, exist_ok=True)
+    registry.register_session_document("play_styles", "demo_app/play_styles.json")
+    (env["dirs"]["session"] / "demo_app").mkdir(parents=True, exist_ok=True)
     return env
 
 
 def test_session_document_pushes_under_global_label(session_env) -> None:
     """账户级文档与角色无关：label 必须是 __global__，不能带用户名。"""
-    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path = session_env["dirs"]["session"] / "demo_app" / "play_styles.json"
     path.write_text('{"牵丝·霖": {"火拳": {"min_outer": 1}}}\n', encoding="utf-8")
     session_env["doc_state"]["dirty"] = {"__global__/play_styles": True}
     _sync(session_env)
@@ -263,14 +263,14 @@ def test_session_document_pulls_to_registered_path(session_env) -> None:
     session_env["fake"].set_remote_future(
         "__global__", "play_styles", raw, "2099-01-01T00:00:00Z")
     report = _sync(session_env)
-    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path = session_env["dirs"]["session"] / "demo_app" / "play_styles.json"
     assert report.pulled == ["__global__/play_styles"]
     assert path.read_text(encoding="utf-8") == raw.decode()
 
 
 def test_session_document_race_conflict_keeps_local_copy(session_env) -> None:
     """两边都改过（推送时被云端抢先）时云端赢，但本地这版必须另存不被静默丢弃。"""
-    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path = session_env["dirs"]["session"] / "demo_app" / "play_styles.json"
     path.write_text('{"local": 1}\n', encoding="utf-8")
     session_env["fake"].docs[("__global__", "play_styles")] = {
         "sha256": "cloud-new", "size": 3, "zipped": True,
@@ -286,7 +286,7 @@ def test_session_document_race_conflict_keeps_local_copy(session_env) -> None:
 
 def test_session_document_stale_local_is_overwritten_without_copy(session_env) -> None:
     """本地只是旧版时直接覆盖，不留副本——否则每次同步都在堆 .conflict 文件。"""
-    path = session_env["dirs"]["session"] / "yysls" / "play_styles.json"
+    path = session_env["dirs"]["session"] / "demo_app" / "play_styles.json"
     path.write_text('{"local": 1}\n', encoding="utf-8")
     session_env["fake"].set_remote_future(
         "__global__", "play_styles", b'{"cloud": 2}\n', "2099-01-01T00:00:00Z")
@@ -302,7 +302,7 @@ def test_session_document_with_user_label_is_not_laid_down(session_env) -> None:
         "张三", "play_styles", b"{}\n", "2099-01-01T00:00:00Z")
     report = _sync(session_env)
     assert report.pulled == []
-    assert not (session_env["dirs"]["session"] / "yysls" / "play_styles.json").exists()
+    assert not (session_env["dirs"]["session"] / "demo_app" / "play_styles.json").exists()
 
 
 def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:

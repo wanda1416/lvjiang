@@ -14,6 +14,8 @@ from lvjiang.core.user_config import (
     set_user_workflow_params,
 )
 
+_real_adapter = task_settings._adapter
+
 
 @pytest.fixture
 def editor(tmp_path, monkeypatch):
@@ -124,25 +126,50 @@ def test_restore_shared_only_changes_selected_user_and_task(editor):
     assert get_interface_store().get_active("user") == "runner"
 
 
-def test_tuning_adapter_keeps_execution_user_and_desktop_parameters(editor, monkeypatch):
-    from lvjiang.apps.yysls.ondevice import tuning_config
+def test_plugin_settings_adapter_keeps_execution_user(editor, monkeypatch):
+    """类工作流通过 DEVICE_SETTINGS_MODULE 声明设备设置适配器；宿主只负责
+    令牌、编辑隔离与执行用户不被切换，取值和落盘交给插件适配器。"""
+    import sys
+    from types import ModuleType
+
     from lvjiang.core.ondevice import plugins
+    from lvjiang.workflows import implementations
+
+    adapter = ModuleType("demo_app_device_settings")
+
+    def get_settings(username):
+        saved = get_user_workflow_params(username, "demo_task") or {}
+        return {"kind": "demo", "values": {"level": 1, **saved}}
+
+    def save_settings(username, values):
+        set_user_workflow_params(username, "demo_task", {"level": int(values["level"])})
+
+    adapter.get_settings = get_settings
+    adapter.save_settings = save_settings
+    monkeypatch.setitem(sys.modules, adapter.__name__, adapter)
+
+    class DemoWorkflow:
+        DEVICE_SETTINGS_MODULE = adapter.__name__
 
     monkeypatch.setattr(plugins, "ensure_loaded", lambda *_args: None)
-    monkeypatch.setattr(task_settings, "_adapter", lambda _task: tuning_config)
-    monkeypatch.setattr(task_settings, "_tasks", lambda: [{"id": "auto_tuning", "name": "自动调律"}])
-    set_user_workflow_params("editor", "auto_tuning", {"skip_tuning": True})
-    view = json.loads(task_settings.get_settings("editor", "auto_tuning"))
-    assert view["ok"] and view["kind"] == "tuning"
-    values = {**view["values"], "selected_slots": ["ring"]}
-    values["rules"]["huiyi_general"]["enabled"] = True
-    result = json.loads(task_settings.save_settings("editor", "auto_tuning", view["token"], json.dumps(values)))
+    monkeypatch.setattr(implementations, "get_workflow_class", lambda _name: DemoWorkflow)
+    monkeypatch.setattr(task_settings, "_adapter", _real_adapter)
+    monkeypatch.setattr(task_settings, "_tasks", lambda: [
+        {"id": "demo_task", "name": "示例插件任务", "class": "demo_task"}])
+    listed = json.loads(task_settings.list_settings("editor"))["tasks"]
+    assert listed == [{"id": "demo_task", "name": "示例插件任务", "dedicated": True, "source": "user"}]
+    view = json.loads(task_settings.get_settings("editor", "demo_task"))
+    assert view["ok"] and view["kind"] == "demo" and view["values"] == {"level": 1}
+    result = json.loads(task_settings.save_settings(
+        "editor", "demo_task", view["token"], json.dumps({"level": 3})))
     assert result["ok"], result
-    assert get_user_workflow_params("editor", "auto_tuning")["skip_tuning"] is True
-    assert get_user_workflow_params("runner", "auto_tuning") is None
+    assert get_user_workflow_params("editor", "demo_task") == {"level": 3}
+    assert get_user_workflow_params("runner", "demo_task") is None
     assert get_interface_store().get_active("user") == "runner"
-    view = json.loads(task_settings.get_settings("editor", "auto_tuning"))
-    assert not json.loads(task_settings.save_settings("editor", "auto_tuning", view["token"], "{}", True))["ok"]
+    view = json.loads(task_settings.get_settings("editor", "demo_task"))
+    assert view["values"] == {"level": 3}
+    # 用户专属配置没有「通用配置」可恢复。
+    assert not json.loads(task_settings.save_settings("editor", "demo_task", view["token"], "{}", True))["ok"]
 
 
 def test_one_missing_editor_module_does_not_hide_other_task_settings(editor, monkeypatch):

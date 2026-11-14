@@ -56,10 +56,10 @@ def test_default_directories_resolve_current_root_without_import_time_freeze(tmp
     assert get_config_system_dir() == tmp_path / "second/system"
 
 
-def test_standalone_models_use_their_own_lock_without_client_index(tmp_path):
-    from lvjiang.apps.yysls.core.attr_model.manager import AttrModelManager
-    first = AttrModelManager(tmp_path / "first")._resolver
-    second = AttrModelManager(tmp_path / "second")._resolver
+def test_single_directory_resolvers_use_their_own_lock_without_client_index(tmp_path):
+    """插件独立模型目录走 ``for_single_directory``：不碰客户端锁与内容索引。"""
+    first = ConfigResolver.for_single_directory(tmp_path / "first")
+    second = ConfigResolver.for_single_directory(tmp_path / "second")
     assert first.config_dir == tmp_path / "first"
     assert second.config_dir == tmp_path / "second"
     first.write_entity("sample.yaml", "name: 示例\n")

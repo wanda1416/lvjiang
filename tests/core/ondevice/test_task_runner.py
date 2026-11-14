@@ -219,15 +219,20 @@ def test_list_tasks_swallows_discovery_error(monkeypatch):
     assert "OSError" in data["error"]
 
 
-def test_device_lists_tuning_without_exposing_other_dedicated_tasks(monkeypatch):
-    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
-        AutoTuningWorkflow,
-    )
+class _DemoDedicatedWorkflow:
+    """假插件的类工作流：专属任务，但声明在设备端可见。"""
+
+    DISPLAY_NAME = "示例专属任务"
+    SCOPE = "dedicated"
+    DEVICE_VISIBLE = True
+
+
+def test_device_lists_visible_class_workflow_without_exposing_other_dedicated_tasks(monkeypatch):
     from lvjiang.workflows import discovery, implementations
     from lvjiang.workflows.preferences import DailyScriptPrefs
 
-    monkeypatch.setattr(implementations, "list_workflows", lambda: ["auto_tuning"])
-    monkeypatch.setattr(implementations, "get_workflow_class", lambda _name: AutoTuningWorkflow)
+    monkeypatch.setattr(implementations, "list_workflows", lambda: ["demo_task"])
+    monkeypatch.setattr(implementations, "get_workflow_class", lambda _name: _DemoDedicatedWorkflow)
     monkeypatch.setattr(discovery, "_discover_wf_scripts", lambda *_: {
         "helper": {"id": "helper", "scope": "dedicated", "source_layer": "system"},
         "pc_only": {"id": "pc_only", "env": ["windows"], "source_layer": "system"},
@@ -235,11 +240,11 @@ def test_device_lists_tuning_without_exposing_other_dedicated_tasks(monkeypatch)
     monkeypatch.setattr(discovery, "load_preferences", lambda: DailyScriptPrefs([], {}, {}))
     monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
 
-    assert "auto_tuning" not in [item["id"] for item in discovery.list_exposed_scripts("android")]
+    assert "demo_task" not in [item["id"] for item in discovery.list_exposed_scripts("android")]
     tasks = json.loads(task_runner.list_tasks())["tasks"]
-    assert tasks == [{"id": "auto_tuning", "name": "自动调律", "source": "class"}]
+    assert tasks == [{"id": "demo_task", "name": "示例专属任务", "source": "class"}]
     monkeypatch.setattr(discovery, "load_preferences",
-                        lambda: DailyScriptPrefs([], {"auto_tuning": False}, {}))
+                        lambda: DailyScriptPrefs([], {"demo_task": False}, {}))
     assert json.loads(task_runner.list_tasks())["tasks"] == []
 
 
@@ -379,31 +384,57 @@ def test_synced_user_and_parameter_override_are_bound_before_execution(monkeypat
     assert engine.session["current_user"] == "tester"
 
 
-def test_tuning_freezes_synced_user_config_instead_of_shared_config(monkeypatch):
+def test_class_workflow_snapshot_loader_freezes_user_config_instead_of_shared_config(monkeypatch):
+    """类工作流通过 CONFIG_SNAPSHOT_LOADER 声明自己的配置来源；宿主冻结一份深拷贝。"""
     from lvjiang import constants
-    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
-        AutoTuningWorkflow,
-    )
     from lvjiang.core.config.wf_configs import set_wf_config
-    from lvjiang.core.user_config import set_user_workflow_params
+    from lvjiang.core.user_config import (
+        get_user_workflow_params,
+        set_user_workflow_params,
+    )
 
-    _patch_discovery(monkeypatch, _fake_tasks({"id": "auto_tuning", "class": "auto_tuning"}))
+    loaded = []
+
+    def load_user_config(username, users_dir=None):
+        loaded.append(username)
+        return get_user_workflow_params(username, "demo_task", users_dir) or {}
+
+    class DemoWorkflow:
+        CONFIG_SNAPSHOT_LOADER = staticmethod(load_user_config)
+
+    _patch_discovery(monkeypatch, _fake_tasks({"id": "demo_task", "class": "demo_task"}))
     monkeypatch.setattr("lvjiang.workflows.implementations.get_workflow_class",
-                        lambda _name: AutoTuningWorkflow)
-    set_wf_config("auto_tuning", {"selected_slots": ["head"]})
-    saved = {"selected_slots": ["ring"], "rules": {"huiyi_general": {"enabled": True}}}
-    set_user_workflow_params("tester", "auto_tuning", saved, constants.USERS_DIR)
+                        lambda _name: DemoWorkflow)
+    set_wf_config("demo_task", {"selected": ["shared"]})
+    saved = {"selected": ["user"], "nested": {"enabled": True}}
+    set_user_workflow_params("tester", "demo_task", saved, constants.USERS_DIR)
     engine = _FakeEngine("ok")
     _patch_engine(monkeypatch, engine)
     _patch_source(monkeypatch)
 
-    assert json.loads(task_runner.start_task("auto_tuning"))["ok"]
+    assert json.loads(task_runner.start_task("demo_task"))["ok"]
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
+    assert loaded == ["tester"]
     snapshot = engine.workflow_config_snapshot
-    assert snapshot["selected_slots"] == ["ring"]
-    assert snapshot["rules"] == saved["rules"]
-    set_user_workflow_params("tester", "auto_tuning", {"selected_slots": ["chest"]}, constants.USERS_DIR)
-    assert snapshot["selected_slots"] == ["ring"]
+    assert snapshot == saved
+    set_user_workflow_params("tester", "demo_task", {"selected": ["later"]}, constants.USERS_DIR)
+    assert snapshot["selected"] == ["user"]
+
+
+def test_workflow_without_snapshot_loader_freezes_shared_config(monkeypatch):
+    from lvjiang.core.config.wf_configs import set_wf_config
+
+    _patch_discovery(monkeypatch, _fake_tasks({"id": "plain", "class": "plain"}))
+    monkeypatch.setattr("lvjiang.workflows.implementations.get_workflow_class",
+                        lambda _name: type("PlainWorkflow", (), {}))
+    set_wf_config("plain", {"selected": ["shared"]})
+    engine = _FakeEngine("ok")
+    _patch_engine(monkeypatch, engine)
+    _patch_source(monkeypatch)
+
+    assert json.loads(task_runner.start_task("plain"))["ok"]
+    assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
+    assert engine.workflow_config_snapshot == {"selected": ["shared"]}
 
 
 def test_wrapped_workflow_oom_keeps_reason_and_releases_engine(monkeypatch):

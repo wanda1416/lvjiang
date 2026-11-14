@@ -45,11 +45,11 @@ class TestNodeOps:
 
     def test_mutate_node_atomic(self, store):
         """mutate_node 在锁内读-改-写，返回新值"""
-        store.set_node("yysls", {"tuning": {"a": 1}})
+        store.set_node("demo_app", {"tuning": {"a": 1}})
         new = store.mutate_node(
-            "yysls", lambda old: {**(old or {}), "extra": True})
+            "demo_app", lambda old: {**(old or {}), "extra": True})
         assert new == {"tuning": {"a": 1}, "extra": True}
-        assert store.get_node("yysls") == new
+        assert store.get_node("demo_app") == new
 
     def test_get_node_returns_deepcopy(self, store):
         """调用方修改返回值不影响内部态"""

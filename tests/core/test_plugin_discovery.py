@@ -37,8 +37,14 @@ def _write_plugin(root: Path, directory_name: str, plugin_id: str) -> Path:
     return directory
 
 
-def test_discover_app_ids_includes_builtin_yysls():
-    assert "yysls" in discover_app_ids()
+def test_discover_app_ids_lists_builtin_before_external(tmp_path, monkeypatch):
+    """发现名册 = 内置名册在前 + 外置默认目录追加，同名去重。"""
+    _write_plugin(tmp_path, "zz_external", "zz_external")
+    monkeypatch.setattr(apps, "_DEFAULT_PLUGINS_ROOT", tmp_path)
+    builtin = apps.builtin_app_ids()
+    discovered = discover_app_ids()
+    assert discovered[:len(builtin)] == builtin
+    assert discovered[len(builtin):] == ("zz_external",)
 
 
 def test_builtin_app_ids_follow_source_tree_without_hardcoded_names():
@@ -82,10 +88,10 @@ def test_resolve_app_specs_keeps_order_and_appends_scanned(tmp_path, monkeypatch
     _write_plugin(tmp_path, "extra_plugin", "extra_plugin")
     monkeypatch.setattr(apps, "_DEFAULT_PLUGINS_ROOT", tmp_path)
 
-    ordered = resolve_app_specs(["yysls", "yysls"], all_plugins=True)
+    ordered = resolve_app_specs(["demo_app", "demo_app"], all_plugins=True)
 
-    assert ordered[0] == "yysls"  # 显式项在前
-    assert ordered.count("yysls") == 1  # 同名去重
+    assert ordered[0] == "demo_app"  # 显式项在前
+    assert ordered.count("demo_app") == 1  # 同名去重
     assert "extra_plugin" in ordered  # 扫描结果被追加
 
 

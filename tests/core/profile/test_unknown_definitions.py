@@ -122,19 +122,19 @@ def test_unknown_top_level_section_survives(profile_path):
 quota:
   - key: weekly_ok
     period: week
-yysls_custom:
+plugin_custom:
   - key: plugin_only
     whatever: 1
 """)
     schema = reload_profile_config()
-    assert schema.unknown_sections["yysls_custom"] == [
+    assert schema.unknown_sections["plugin_custom"] == [
         {"key": "plugin_only", "whatever": 1}]
 
     save_profile_config(schema)
 
     data = __import__("yaml").safe_load(
         profile_path.read_text(encoding="utf-8"))
-    assert data["yysls_custom"] == [{"key": "plugin_only", "whatever": 1}]
+    assert data["plugin_custom"] == [{"key": "plugin_only", "whatever": 1}]
 
 
 def test_unknown_fields_on_a_known_key_survive(profile_path):
@@ -222,7 +222,7 @@ quota:
     period: week
   - key: zhige_of_season
     period: season
-yysls_custom:
+plugin_custom:
   - key: plugin_only
 """)
     reload_profile_config()
@@ -237,7 +237,7 @@ yysls_custom:
     assert [item["key"] for item in data["quota"]] == [
         "weekly_ok", "zhige_of_season"]
     assert data["quota"][1]["period"] == "season"
-    assert data["yysls_custom"] == [{"key": "plugin_only"}]
+    assert data["plugin_custom"] == [{"key": "plugin_only"}]
 
 
 def test_deleting_a_recognized_key_still_works(profile_path):

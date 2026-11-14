@@ -14,10 +14,10 @@ import pytest
 from lvjiang.core import app_controller as ac
 from lvjiang.core.config import AndroidAppConfig
 
-_OLD = {"executable": r"C:\Game\yyslscn.exe", "title": "燕云十六声",
+_OLD = {"executable": r"C:\Game\demogame.exe", "title": "示例游戏",
         "hwnd": 111, "pid": 222,
         "left": 10, "top": 20, "width": 1936, "height": 1119}
-_NEW = {"executable": r"C:\Game\yyslscn.exe", "title": "燕云十六声",
+_NEW = {"executable": r"C:\Game\demogame.exe", "title": "示例游戏",
         "hwnd": 333, "pid": 444,
         "left": 10, "top": 20, "width": 1936, "height": 1119}
 
@@ -30,12 +30,12 @@ def located(monkeypatch):
     # record_connected_window 写的是模块级全局，别把它漏给其他用例。
     monkeypatch.setattr(ac, "_connected_apps", {}, raising=False)
     monkeypatch.setattr(ac, "_active_connection_platform", "", raising=False)
-    return AndroidAppConfig(package="com.netease.yyslscn", platform="both")
+    return AndroidAppConfig(package="com.netease.demogame", platform="both")
 
 
 def _controller(app, visible, *, alive, on_window_rebound=None):
     controller = ac.WindowsAppController(
-        {"yyslscn": app}, on_window_rebound=on_window_rebound)
+        {"demogame": app}, on_window_rebound=on_window_rebound)
     controller._windows = staticmethod(lambda: list(visible))
     controller._window_is_current = lambda window: (
         alive[0] and window["hwnd"] == _OLD["hwnd"])
@@ -46,7 +46,7 @@ def test_dead_client_still_binds_the_executable_for_the_restart(located):
     """客户端已经退出时也要完成身份绑定，重启才枚举得到新窗口。"""
     controller = _controller(located, [], alive=[False])
 
-    assert controller.is_running("yyslscn") is False
+    assert controller.is_running("demogame") is False
     assert located.executable == _OLD["executable"]
 
     # 重启后新窗口只能靠可执行文件认出来（hwnd/pid 全变了）
@@ -58,7 +58,7 @@ def test_live_client_keeps_reporting_the_observed_window(located):
     """旧窗口还活着时仍然直接复用定位结果，不去枚举。"""
     controller = _controller(located, [], alive=[True])
 
-    assert controller.is_running("yyslscn") is True
+    assert controller.is_running("demogame") is True
     assert controller._find(located)["hwnd"] == _OLD["hwnd"]
 
 
@@ -79,12 +79,12 @@ def test_restart_publishes_the_new_window(located, monkeypatch):
     controller = _controller(located, visible, alive=[False],
                              on_window_rebound=rebound.append)
     controller._windows = staticmethod(lambda: list(visible))
-    controller._placements["yyslscn"] = {
+    controller._placements["demogame"] = {
         "left": 10, "top": 20, "width": 1936, "height": 1119}
     monkeypatch.setattr(ac.subprocess, "Popen",
                         lambda *a, **k: visible.append(dict(_NEW)))
 
-    assert controller.start("yyslscn", timeout=5) is True
+    assert controller.start("demogame", timeout=5) is True
 
     assert [item["hwnd"] for item in rebound] == [_NEW["hwnd"]]
     assert ac.get_connected_app_info("pc")["hwnd"] == _NEW["hwnd"]
@@ -96,5 +96,5 @@ def test_already_running_client_is_not_republished(located):
     controller = _controller(located, [dict(_OLD)], alive=[True],
                              on_window_rebound=rebound.append)
 
-    assert controller.start("yyslscn", timeout=5) is True
+    assert controller.start("demogame", timeout=5) is True
     assert rebound == []

@@ -523,14 +523,14 @@ def test_scan_and_find_with_cleaning_group():
     assert n.with_func is None
 
     # panel cell + rich + with
-    program = parse_text("recognize [s].[p][1][2] as rich $cell with yysls_rich_parse")
+    program = parse_text("recognize [s].[p][1][2] as rich $cell with demo_rich_parse")
     n = program.body[0]
     assert isinstance(n, Recognize)
     assert n.rich is True
     assert isinstance(n.scene, PanelRef)
     assert n.with_func is not None
     assert isinstance(n.with_func, Literal)
-    assert n.with_func.value == "yysls_rich_parse"
+    assert n.with_func.value == "demo_rich_parse"
 
     # rich + with + group + where 全组合（with 在末尾）
     program = parse_text(
@@ -544,7 +544,7 @@ def test_scan_and_find_with_cleaning_group():
     assert n.where is not None
 
     # panel + rich + with — 改用 [sc].[pn] 形式
-    program = parse_text('recognize [sc].[pn][1][2] as rich $cell with yysls_rich_parse')
+    program = parse_text('recognize [sc].[pn][1][2] as rich $cell with demo_rich_parse')
     n = program.body[0]
     assert isinstance(n, Recognize)
     assert isinstance(n.scene, PanelRef)
@@ -552,7 +552,7 @@ def test_scan_and_find_with_cleaning_group():
     assert n.scene.panel == "pn"
     assert n.rich is True
     assert n.with_func is not None
-    assert n.with_func.value == "yysls_rich_parse"
+    assert n.with_func.value == "demo_rich_parse"
 
 
 # ─── collect 测试 ───────────────────────────────────────────

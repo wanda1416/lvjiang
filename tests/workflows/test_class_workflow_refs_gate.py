@@ -16,7 +16,7 @@ import pytest
 
 from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.core.paths import get_config_system_dir
-from lvjiang.core.plugins import load_app
+from lvjiang.core.plugins import builtin_app_ids, load_app
 from tests.case_matrix import case_matrix
 
 # 方法名 → (场景参数位, region/key 参数位, kind)
@@ -89,10 +89,13 @@ def _collect(path: Path, cls) -> list[tuple[str, str, str, int]]:
 
 
 def _class_workflows() -> list[tuple[str, type]]:
-    """从设备端实际插件声明取类工作流，避免维护硬编码名册。"""
+    """从随包内置插件的声明取类工作流，避免维护硬编码名册。
+
+    门禁不认识具体插件：内置名册由 ``builtin_app_ids()`` 列举（与 Android 构建
+    显式配置的插件一致，都是随包分发的内置插件）。
+    """
     workflows: list[tuple[str, type]] = []
-    # 测试组合根显式声明当前 Android 构建包含的 app。
-    for app_name in ("yysls",):
+    for app_name in builtin_app_ids():
         hooks = load_app(app_name)
         for workflow_id, class_path in hooks.workflow_implementations.items():
             module_path, class_name = class_path.rsplit(".", 1)

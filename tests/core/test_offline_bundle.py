@@ -38,7 +38,8 @@ def bundle(tmp_path, monkeypatch):
     (source / "config/local/.git/config").write_text("excluded")
     (source / "config/local/license.txt").write_text("synthetic-license-not-for-phone")
     archive = tmp_path / "snapshot.zip"
-    # 保持 WAL 连接打开，验收快照是否含未 checkpoint 的已提交数据。
+    # PC 的总览库保持打开（WAL 有未 checkpoint 数据）：打包必须整体跳过它们，
+    # 而不是把打开的库快照进包——总览数据由账号云端同步。
     with (closing(sqlite3.connect(session / "profile.db")) as db,
           closing(sqlite3.connect(session / "tuning_history.db")) as history):
         for connection in (db, history):
@@ -50,12 +51,17 @@ def bundle(tmp_path, monkeypatch):
     return source, archive
 
 
-def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path):
+def test_sync_installs_config_only_and_keeps_phone_profile(bundle, tmp_path):
     source, archive = bundle
     phone = tmp_path / "phone"
     old = phone / "config/session"
     old.mkdir(parents=True)
     (old / "old.json").write_text("previous")
+    # 手机已有的总览库：同步后必须一个字节不动（总览走账号云端通道）。
+    with closing(sqlite3.connect(old / "profile.db")) as db:
+        db.execute("CREATE TABLE entries (value INTEGER)")
+        db.execute("INSERT INTO entries VALUES (42)")
+        db.commit()
 
     install_offline_bundle(archive, phone)
 
@@ -63,23 +69,26 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     pc_interface = json.loads((source / "config/session/interface.json").read_text())
     assert pc_interface["actives"] == {
         "user": "other", "layout": "desktop", "env": "desktop"}
-    session = json.loads((phone / "config/session/session.json").read_text())
-    interface = json.loads((phone / "config/session/interface.json").read_text())
+    session = json.loads((old / "session.json").read_text())
+    interface = json.loads((old / "interface.json").read_text())
     assert interface["actives"] == {
         "user": "tester", "layout": "android", "env": "android"}
     assert session["settings"]["ai"] == pc_session["settings"]["ai"]
     assert interface["alert_history"] == {"tester:demo": "now"}
     assert "actives" not in session
-    assert not (phone / "config/session/tuning_history.db").exists()
-    for name in ("profile.db",):
-        with closing(sqlite3.connect(phone / "config/session" / name)) as db:
-            assert db.execute("SELECT value FROM entries").fetchone() == (7,)
+    with closing(sqlite3.connect(old / "profile.db")) as db:
+        assert db.execute("SELECT value FROM entries").fetchone() == (42,)
+    assert not (old / "tuning_history.db").exists()
     # 不再整目录交换：session 里不在清单的文件原地保留，也不产出旧配置备份
-    assert (phone / "config/session/old.json").read_text() == "previous"
+    assert (old / "old.json").read_text() == "previous"
     assert not (phone / "offline-backup").exists()
     with zipfile.ZipFile(archive) as package:
         assert all(".git" not in name and "diagnostics" not in name for name in package.namelist())
         assert "config/local/license.txt" not in package.namelist()
+        # 打包侧契约：总览数据与结构一个都不进包，manifest 显式声明。
+        assert "config/session/profile.db" not in package.namelist()
+        assert "config/session/profile.yaml" not in package.namelist()
+        assert json.loads(package.read("manifest.json"))["profile"] is False
 
 
 def test_bundle_whitelist_preserves_runtime_assets_not_editor_files(bundle, tmp_path):
@@ -90,9 +99,10 @@ def test_bundle_whitelist_preserves_runtime_assets_not_editor_files(bundle, tmp_
         "system/templates/android/scene/match.png", "local/maps/custom/map.yaml",
         "local/maps/custom/base.png", "local/yysls/tuning_rules/custom.yaml",
         "local/yysls/gear_sets/custom.yaml", "session/users/tester.session.json",
-        "session/profile.yaml", "session/yysls/play_styles.json",
+        "session/yysls/play_styles.json",
     }
     excluded = {
+        "session/profile.yaml", "session/profile.json",
         "session/screenshots/android/scene.png", "session/output/report.json",
         "session/yysls/unknown.json", "session/unknown.json",
         "local/data/calculator/screenshot.png", "local/data/notes.xlsx",
@@ -177,8 +187,22 @@ def connections(monkeypatch):
         connection.close()
 
 
-def test_snapshot_and_integrity_check_release_database_handles(bundle, connections, tmp_path):
-    source, _ = bundle
+@pytest.fixture
+def plugin_database(monkeypatch, tmp_path):
+    """通用层不再自带数据库；句柄释放契约由 app 钩子声明的库继续覆盖。"""
+    source = tmp_path / "pc"
+    database = source / "config/session/sample.db"
+    with closing(sqlite3.connect(database)) as db:
+        db.execute("CREATE TABLE entries (value INTEGER)")
+        db.execute("INSERT INTO entries VALUES (7)")
+        db.commit()
+    monkeypatch.setattr(offline_bundle, "_DATABASE_FILES", ("sample.db",))
+    return source, database
+
+
+def test_snapshot_and_integrity_check_release_database_handles(
+        bundle, connections, plugin_database, tmp_path):
+    source, _ = plugin_database
     archive = tmp_path / "handles.zip"
     build_offline_bundle(source, archive, username="tester", layout="android")
 
@@ -198,8 +222,9 @@ def test_snapshot_and_integrity_check_release_database_handles(bundle, connectio
     install_offline_bundle(archive, tmp_path / "phone", on_applied=before_directory_swap_finishes)
 
 
-def test_snapshot_creation_failure_releases_source_handle(bundle, connections, monkeypatch, tmp_path):
-    source, _ = bundle
+def test_snapshot_creation_failure_releases_source_handle(
+        bundle, connections, monkeypatch, plugin_database, tmp_path):
+    source, _ = plugin_database
     connect = offline_bundle.sqlite3.connect
 
     def fail_target_creation(*args, **kwargs):
@@ -225,14 +250,14 @@ def test_reload_failure_keeps_applied_config_and_reports(bundle, tmp_path):
     (phone / "config/keep").write_text("original")
 
     def reload_failed():
-        assert (phone / "config/session/profile.db").exists()
+        assert (phone / "config/session/session.json").is_file()
         raise RuntimeError("reload failed")
 
     with pytest.raises(RuntimeError, match="reload failed"):
         install_offline_bundle(archive, phone, on_applied=reload_failed)
 
     assert (phone / "config/keep").read_text() == "original"   # 会话层之外没被碰
-    assert (phone / "config/session/profile.db").exists()       # 已应用的配置保留
+    assert (phone / "config/session/session.json").is_file()    # 已应用的配置保留
 
 
 def test_install_mirrors_system_and_local_removing_stale_files(bundle, tmp_path):
@@ -319,6 +344,11 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
         (users / f"{name}.json").write_text(json.dumps({"username": name, "attributes": {"role": "phone"},
                                                        "workflow_params": {"existing": {"phone": True}}}))
     (users.parent / "preset.json").write_text('{"preset_id":"original"}')
+    # 手机已有总览库带哨兵值：参数保留与否都不影响「总览不进包」的边界。
+    with closing(sqlite3.connect(users.parent / "profile.db")) as db:
+        db.execute("CREATE TABLE entries (value INTEGER)")
+        db.execute("INSERT INTO entries VALUES (42)")
+        db.commit()
     install_offline_bundle(archive, phone, preserve_task_params=True)
     session = json.loads((users.parent / "session.json").read_text())
     assert session["users"] == ["tester", "phone_only"]
@@ -331,7 +361,7 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     assert user["workflow_params"] == {"existing": {"phone": True}, "new": {"new": True}}
     assert json.loads((users / "phone_only.json").read_text())["attributes"] == {"role": "phone"}
     with closing(sqlite3.connect(users.parent / "profile.db")) as db:
-        assert db.execute("SELECT value FROM entries").fetchone() == (7,)
+        assert db.execute("SELECT value FROM entries").fetchone() == (42,)
     assert json.loads((users.parent / "preset.json").read_text())["preset_id"] == "original"
 
     # 明确取消保留后恢复全量覆盖；APK 代次标记仍不能被 PC 同步丢掉。
@@ -343,28 +373,31 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     assert (users.parent / "preset.json").exists()
 
 
-def test_exclude_profile_builds_config_only_bundle(bundle, tmp_path):
-    """云端模式配置包：清单不含 profile 数据，manifest 显式声明，其余文件齐全。"""
+def test_bundle_never_carries_profile_data(bundle, tmp_path):
+    """云端模式配置包：清单不含任何 profile 文件，manifest 显式声明，其余文件齐全。"""
     source, _ = bundle
-    (source / "config/session/profile.yaml").write_text("schema_version: 2\n", encoding="utf-8")
+    session = source / "config/session"
+    session.joinpath("profile.yaml").write_text("schema_version: 2\n", encoding="utf-8")
+    session.joinpath("profile.json").write_text('{}', encoding="utf-8")
     archive = tmp_path / "no-profile.zip"
-    build_offline_bundle(source, archive, username="tester", layout="android", include_profile=False)
+    build_offline_bundle(source, archive, username="tester", layout="android")
     with zipfile.ZipFile(archive) as package:
         names = set(package.namelist())
         manifest = json.loads(package.read("manifest.json"))
     assert manifest["profile"] is False
-    assert "config/session/profile.db" not in names
-    assert "config/session/profile.yaml" not in names
+    for name in ("config/session/profile.db", "config/session/profile.yaml",
+                 "config/session/profile.json"):
+        assert name not in names
     assert "config/session/session.json" in names
     assert "config/system/layouts.yaml" in names
 
 
-def test_exclude_profile_install_keeps_phone_profile_intact(bundle, tmp_path):
-    """安装端：配置包正常落地，手机 profile.db 一个字节不动。"""
+def test_install_keeps_phone_profile_intact(bundle, tmp_path):
+    """安装端：配置包正常落地，手机已有 profile.db / profile.yaml 一个字节不动。"""
     source, _ = bundle
     (source / "config/session/profile.yaml").write_text("schema_version: 2\n", encoding="utf-8")
     archive = tmp_path / "no-profile.zip"
-    build_offline_bundle(source, archive, username="tester", layout="android", include_profile=False)
+    build_offline_bundle(source, archive, username="tester", layout="android")
     phone = tmp_path / "phone"
     session = phone / "config/session"
     session.mkdir(parents=True)
@@ -384,25 +417,28 @@ def test_exclude_profile_install_keeps_phone_profile_intact(bundle, tmp_path):
     assert (phone / "config/system/layouts.yaml").is_file()
 
 
-def test_profile_declaration_mismatch_rejected(bundle, tmp_path):
-    """manifest 声明与内容不一致视为包损坏，宁可拒绝也不能绕过模式闸门。"""
+def test_bundle_smuggling_profile_files_is_rejected(bundle, tmp_path):
+    """旧版 PC 的包带着 profile.db/profile.yaml：无论 manifest 怎么声明，装了就拒绝。"""
     _, archive = bundle
-    tampered = tmp_path / "mismatch.zip"
-    with zipfile.ZipFile(archive) as original, zipfile.ZipFile(tampered, "w") as target:
+    smuggled = tmp_path / "legacy.zip"
+    with zipfile.ZipFile(archive) as original, zipfile.ZipFile(smuggled, "w") as target:
         for name in original.namelist():
             data = original.read(name)
             if name == "manifest.json":
                 manifest = json.loads(data)
-                manifest["profile"] = False
+                manifest["files"]["config/session/profile.db"] = "0" * 64
                 data = json.dumps(manifest).encode("utf-8")
             target.writestr(name, data)
+        target.writestr("config/session/profile.db", b"legacy profile database")
 
-    with pytest.raises(ValueError, match="总览数据声明与内容不一致"):
-        install_offline_bundle(tampered, tmp_path / "phone")
+    with pytest.raises(ValueError, match="携带总览数据"):
+        install_offline_bundle(smuggled, tmp_path / "phone")
 
 
-def test_legacy_bundle_without_profile_field_behaves_as_carrying_profile(bundle, tmp_path):
-    """旧版本 PC 的包没有 profile 字段：缺省按携带处理，保持原有语义。"""
+def test_legacy_manifest_without_profile_field_still_installs(bundle, tmp_path):
+    """旧清单没有 profile 字段但内容干净：安装本身不受影响（拒收旧包是手机端
+    ondevice/offline 按 manifest.get("profile", True) 的职责，这里只验证清单
+    校验不因缺字段误伤）。"""
     _, archive = bundle
     stripped = tmp_path / "legacy.zip"
     with zipfile.ZipFile(archive) as original, zipfile.ZipFile(stripped, "w") as target:
@@ -414,10 +450,11 @@ def test_legacy_bundle_without_profile_field_behaves_as_carrying_profile(bundle,
                 data = json.dumps(manifest).encode("utf-8")
             target.writestr(name, data)
     assert json.loads(zipfile.ZipFile(stripped).read("manifest.json")).get("profile") is None
-    # 安装本身仍成功（闸门按携带处理是手机端 ondevice/offline 的职责，这里
-    # 只验证清单校验不因缺字段拒绝旧包）。
     install_offline_bundle(stripped, tmp_path / "phone")
-    assert (tmp_path / "phone/config/session/profile.db").is_file()
+    assert (tmp_path / "phone/config/session/session.json").is_file()
+
+
+def test_offline_install_preserves_phone_update_baseline(bundle, tmp_path):
     source, archive = bundle
     config = source / "config"
     script = config / "system/workflows/shared.wf"

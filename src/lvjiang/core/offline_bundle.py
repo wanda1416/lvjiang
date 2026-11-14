@@ -107,6 +107,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
         "format": FORMAT_VERSION, "app_version": __version__,
         "username": username, "layout": layout,
         "synced_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        # 显式声明不带总览数据；安卓端按 manifest.get("profile", True) 拒收旧包。
+        "profile": False,
         "files": {},
     }
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:

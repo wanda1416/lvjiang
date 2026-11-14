@@ -151,24 +151,38 @@ def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot
     from lvjiang.core.config import load_ui_page_state, update_ui_page_state
     from lvjiang.core.config.session import reset_session_store
 
-    # 恢复时尺寸会按当前屏幕可用区域收敛（见 test_window_size_is_clamped_...），
-    # 所以保存的尺寸必须放得进屏幕，才能验证「原样恢复」。offscreen 平台的虚拟
-    # 屏幕只有 800×800，写死 1400 宽会被正确地收敛成 800。尺寸从屏幕推出来，
-    # 且与默认尺寸（1220×660 收敛后）不同，确保真的是读回了保存值。
-    screen = QApplication.primaryScreen()
-    assert screen is not None
-    available = screen.availableGeometry()
-    assert available.width() >= 800 and available.height() >= 760, available
-    saved = [available.width() - 40, available.height() - 80]
-    resized = [available.width() - 20, available.height() - 50]
-    default = [min(1220, available.width()), min(660, available.height())]
-    assert saved != default and resized != saved
-
     repository, _, _ = _history(tmp_path)
     update_ui_page_state("main_page", {"window_size": [1200, 700]})
     update_ui_page_state("task_history", {"other_field": "keep"})
     dialog = DailyHistoryDialog(repository=repository)
     qtbot.addWidget(dialog)
+
+    # 恢复时尺寸会按当前屏幕可用区域收敛（见 test_window_size_is_clamped_...），
+    # 所以保存的尺寸必须放得进屏幕，才能验证「原样恢复」。offscreen 平台的虚拟
+    # 屏幕只有 800×800，写死 1400 宽会被正确地收敛成 800。
+    #
+    # 另一半约束是**内容决定的最小尺寸**：面板内容（`minimumSizeHint`）在 800 宽的
+    # 虚拟屏上约 774，`可用宽 - 40` 只有 760，`resize` 会被 Qt 抬到 774，就不再是
+    # 「原样恢复」。所以两个尺寸都要同时满足「不小于最小尺寸」与「与默认尺寸不同」。
+    screen = QApplication.primaryScreen()
+    assert screen is not None
+    available = screen.availableGeometry()
+    min_w = dialog.minimumSizeHint().width()
+    min_h = dialog.minimumSizeHint().height()
+    assert available.width() >= min_w and available.height() >= min_h, (
+        available, min_w, min_h)
+    default = [min(1220, available.width()), min(660, available.height())]
+    # 宽度留 4px 余量，避免正好压在最小宽度边界上被舍入。
+    saved = [max(min_w + 4, available.width() - 40),
+             max(min_h + 4, available.height() - 80)]
+    if saved == default:  # 与默认值撞了就无法证明「读回了保存值」，错开一点。
+        saved = [min(default[0] + 8, available.width()),
+                 max(min_h + 4, default[1] - 8)]
+    resized = [min(saved[0] + 16, available.width()),
+               max(min_h + 4, saved[1] - 24)]
+    assert saved != default and resized != saved, (saved, resized, default)
+    assert saved[0] <= available.width() and saved[1] <= available.height()
+
     dialog.show()
     dialog.resize(*saved)
     qtbot.waitUntil(lambda: [dialog.width(), dialog.height()] == saved)

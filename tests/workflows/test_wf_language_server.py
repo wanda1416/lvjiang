@@ -1,5 +1,6 @@
 """The VS Code server must agree with runtime workflow import semantics."""
 
+import asyncio
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,7 +18,15 @@ def wf_server():
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    try:
+        yield module
+    finally:
+        # server.py 按独立进程设计：模块级 LanguageServer 构造时自建事件循环并
+        # set_event_loop，正常由 start_io 退出时 shutdown 关闭。测试只导入不启动，
+        # 必须在这里收尾；否则循环及其自管道 socketpair 留到 GC 时才回收，
+        # ResourceWarning 会在同一 worker 里随机落到后面某条用例上被判失败。
+        module.server.shutdown()
+        asyncio.set_event_loop(None)
 
 
 @pytest.fixture

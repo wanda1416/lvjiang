@@ -90,6 +90,15 @@ def _tr_literals() -> dict[str, str]:
     return found
 
 
+@lru_cache(maxsize=None)
+def _load_yaml(path: Path) -> object:
+    """按路径缓存解析结果：en_US 等基准词表会被每个语言的用例重复读取。
+
+    返回值由多个用例共享，调用方只读不改。
+    """
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
 def _string_leaves(language: str) -> Iterator[tuple[str, object]]:
     """该语言全部模块文件里的叶子值（跳过多模块文件的 meta 段）。"""
     files = sorted((I18N_DIR / language).glob("*.yaml"))
@@ -97,7 +106,7 @@ def _string_leaves(language: str) -> Iterator[tuple[str, object]]:
     for path in files:
         if not path.exists():
             continue
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = _load_yaml(path)
         yield from _walk(data, path)
 
 
@@ -116,7 +125,7 @@ def _walk(node: object, path: Path, trail: tuple[str, ...] = ()) -> Iterator[tup
 
 def _key_paths(path: Path) -> set[tuple[str, ...]]:
     """词表文件的键路径集合（跳过多模块文件顶层的 meta 段）。"""
-    return _paths(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+    return _paths(_load_yaml(path))
 
 
 def _paths(node: object, trail: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
@@ -261,7 +270,7 @@ def test_app_fallback_values_match_en(language: str) -> None:
 
 def _flat_values(path: Path) -> dict[tuple[str, ...], str]:
     """词表文件的 {键路径: 字符串值}（跳过多模块文件顶层 meta）。"""
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = _load_yaml(path)
     values: dict[tuple[str, ...], str] = {}
 
     def walk(node: object, trail: tuple[str, ...]) -> None:

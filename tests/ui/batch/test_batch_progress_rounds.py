@@ -1,16 +1,14 @@
-"""批量进度页的轮次维度。
+"""批量进度页的轮次导航。
 
-三个必须成立的行为：
+必须成立的三个行为：
 1. 进入新一轮时整表复位，上一轮的成功不会挂在新一轮未执行的行上；
-2. 上一轮结果仍可回看，不会被新一轮覆盖；
-3. 属性单元模式没有全局轮屏障，各单元只看自己的轮次。
-
-这些用例直接绑定 BatchTab 的进度页方法到替身上，避免拉起整页依赖。
+2. 上一轮结果仍可回看，条目列本身不掺轮次文本；
+3. 只有「跳到最新」才恢复自动跟随，属性单元模式下各单元轮次各自推进。
 """
 import inspect
 from types import SimpleNamespace
 
-from PyQt6.QtWidgets import QComboBox, QLabel, QTableWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QTableWidget
 
 from lvjiang.ui.batch.batch_tab import (
     ST_NOT_RUN,
@@ -35,12 +33,19 @@ def _make_progress(qtbot):
     qtbot.addWidget(table)
     label = QLabel()
     qtbot.addWidget(label)
-    combo = QComboBox()
-    qtbot.addWidget(combo)
+    buttons = []
+    for _ in range(3):
+        button = QPushButton()
+        qtbot.addWidget(button)
+        buttons.append(button)
+    # 「跳到最新」在真实界面里是 checkable：按下态表示正在跟随。
+    buttons[2].setCheckable(True)
     progress = SimpleNamespace(
         _progress_table=table,
         _round_label=label,
-        _round_combo=combo,
+        _round_prev_btn=buttons[0],
+        _round_next_btn=buttons[1],
+        _round_latest_btn=buttons[2],
         _progress_row_index={},
         _progress_row_context={},
         _progress_task_plan={},
@@ -50,10 +55,9 @@ def _make_progress(qtbot):
     _bind(
         progress,
         "_render_progress_rows", "_row_round", "_row_label",
-        "_set_status_item", "_set_round_controls_visible",
-        "_refresh_round_header", "_round_header_text", "_round_option_text",
-        "_round_progress", "_completed_unit_rounds", "_round_summary_text",
-        "_on_round_view_changed", "_refresh_unit_row_labels",
+        "_set_status_item", "_set_round_controls_visible", "_display_round",
+        "_refresh_round_header", "_show_round", "_on_prev_round",
+        "_on_next_round", "_on_latest_round", "_scroll_to_running_row",
         "apply_task_plan", "update_run_progress",
     )
     return progress
@@ -81,24 +85,33 @@ def test_new_round_resets_table_and_keeps_previous_round(qtbot):
     for index, name in enumerate(("alice", "bob")):
         progress.update_run_progress("run", 1, index, name, "s1", ST_SUCCESS)
     assert [_status(progress, row) for row in (0, 1)] == [ST_SUCCESS, ST_SUCCESS]
-    assert "第 1/2 轮" in progress._round_label.text()
+    assert progress._round_label.text() == "第 1/2 轮"
+    assert progress._round_latest_btn.isChecked()
 
     # 第 2 轮边界：调度器先补发全量待执行
     for index, name in enumerate(("alice", "bob")):
         progress.update_run_progress("run", 2, index, name, "s1", ST_PENDING)
     assert [_status(progress, row) for row in (0, 1)] == [ST_PENDING, ST_PENDING]
-    assert "第 2/2 轮" in progress._round_label.text()
+    assert progress._round_label.text() == "第 2/2 轮"
+    assert progress._round_latest_btn.isChecked()
 
-    # 上一轮仍然可回看
-    history_index = progress._round_combo.findData(1)
-    assert history_index > 0
-    progress._on_round_view_changed(history_index)
+    # 上一轮仍然可回看；条目列不掺轮次
+    progress._on_prev_round()
     assert [_status(progress, row) for row in (0, 1)] == [ST_SUCCESS, ST_SUCCESS]
-    assert "查看第 1/2 轮" in progress._round_label.text()
+    assert progress._round_label.text() == "第 1/2 轮"
+    assert not progress._round_latest_btn.isChecked()
+    assert [progress._progress_table.item(row, 0).text()
+            for row in (0, 1)] == ["alice", "bob"]
 
-    # 切回当前轮恢复实时视图
-    progress._on_round_view_changed(0)
-    assert [_status(progress, row) for row in (0, 1)] == [ST_PENDING, ST_PENDING]
+    # 「下一轮」到最新轮仍是固定视图，不自动跟随
+    progress._on_next_round()
+    assert progress._round_label.text() == "第 2/2 轮"
+    assert not progress._round_latest_btn.isChecked()
+
+    # 只有「跳到最新」才恢复跟随（按下态）
+    progress._on_latest_round()
+    assert progress._round_label.text() == "第 2/2 轮"
+    assert progress._round_latest_btn.isChecked()
 
 
 def test_finished_round_marks_unreached_rows_not_run(qtbot):
@@ -140,6 +153,12 @@ def test_attr_mode_rounds_are_per_unit(qtbot):
     progress.update_run_progress("run", 1, 1, "单元乙", "s1", ST_SUCCESS)
 
     assert [_status(progress, row) for row in (0, 1)] == [ST_PENDING, ST_SUCCESS]
-    # 行标题带着各自的轮次，不会把别人的轮次套到自己头上
-    assert "第 2/3 轮" in progress._progress_table.item(0, 0).text()
-    assert "第 1/3 轮" in progress._progress_table.item(1, 0).text()
+    # 条目列只放单元名，轮次只在底部导航
+    assert [progress._progress_table.item(row, 0).text()
+            for row in (0, 1)] == ["单元甲", "单元乙"]
+    assert progress._round_label.text() == "第 2/3 轮"
+    assert progress._round_latest_btn.isChecked()
+
+    # 回看第 1 轮时两个单元都显示各自那一轮的结果
+    progress._on_prev_round()
+    assert [_status(progress, row) for row in (0, 1)] == [ST_SUCCESS, ST_SUCCESS]

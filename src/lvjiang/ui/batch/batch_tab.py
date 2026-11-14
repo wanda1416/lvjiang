@@ -90,9 +90,6 @@ from .batch_runner import (
 )
 from .lifecycle_params import LifecycleParamsPanel
 
-#: 不会再变化的状态：用于历史轮汇总和「未执行」判定。
-_TERMINAL_STATUSES = frozenset({ST_SUCCESS, ST_FAILED, ST_SKIPPED})
-
 
 @dataclass
 class _BatchProgressState:
@@ -457,28 +454,41 @@ class BatchTab(QWidget):
         round_row.setContentsMargins(0, 4, 0, 0)
         round_row.setSpacing(6)
         round_row.addStretch(1)
-        self._round_prev_btn = QPushButton("<")
-        self._round_prev_btn.setFixedWidth(36)
-        self._round_prev_btn.setToolTip(tr("上一轮"))
+        self._round_prev_btn = self._make_round_button(
+            QStyle.StandardPixmap.SP_ArrowLeft, tr("上一轮"))
         self._round_prev_btn.clicked.connect(self._on_prev_round)
         round_row.addWidget(self._round_prev_btn)
         self._round_label = QLabel()
         self._round_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         round_row.addWidget(self._round_label)
-        self._round_next_btn = QPushButton(">")
-        self._round_next_btn.setFixedWidth(36)
-        self._round_next_btn.setToolTip(tr("下一轮"))
+        self._round_next_btn = self._make_round_button(
+            QStyle.StandardPixmap.SP_ArrowRight, tr("下一轮"))
         self._round_next_btn.clicked.connect(self._on_next_round)
         round_row.addWidget(self._round_next_btn)
-        self._round_latest_btn = QPushButton(">>")
-        self._round_latest_btn.setFixedWidth(40)
-        self._round_latest_btn.setToolTip(tr("跳到最新一轮，并跟随后续轮次"))
+        self._round_latest_btn = self._make_round_button(
+            QStyle.StandardPixmap.SP_MediaSkipForward,
+            tr("跳到最新一轮并持续跟随；按下表示正在跟随"))
+        # 「跟随最新」是持续状态，用按下态表达，避免在轮次文本里塞「当前」。
+        self._round_latest_btn.setCheckable(True)
         self._round_latest_btn.clicked.connect(self._on_latest_round)
         round_row.addWidget(self._round_latest_btn)
         round_row.addStretch(1)
         layout.addLayout(round_row)
         self._set_round_controls_visible(False)
         return widget
+
+    def _make_round_button(
+        self, pixmap: QStyle.StandardPixmap, tooltip: str,
+    ) -> QPushButton:
+        """轮次导航按钮统一用 Qt 标准图标，不拿文本符号充数。"""
+        button = QPushButton()
+        style = self.style()
+        if style is not None:
+            button.setIcon(style.standardIcon(pixmap))
+        button.setIconSize(QSize(16, 16))
+        button.setFixedSize(32, 28)
+        button.setToolTip(tooltip)
+        return button
 
     def _build_script_page(self) -> QWidget:
         """脚本页：勾选要执行的脚本"""
@@ -525,11 +535,16 @@ class BatchTab(QWidget):
         self._script_list.setToolTip(
             tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；"
                "批量配置中的顺序仅作为初始顺序"))
+        # 只有两列：候选列吃掉面板剩余宽度，顺序列固定四字宽，
+        # 合计永远等于视口宽度，因此不该出现横向滚动。
+        self._script_list.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         header = self._script_list.header()
         assert header is not None
         header.setMinimumHeight(32)
         header.setMinimumSectionSize(48)
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setStretchLastSection(False)
         self._script_list.setColumnWidth(
             1, _four_cjk_column_width(self._script_list)
@@ -555,34 +570,7 @@ class BatchTab(QWidget):
         return widget
 
     def _set_initial_column_widths(self) -> None:
-        """Give content columns the free space while keeping metadata compact."""
-        order_width = _four_cjk_column_width(self._script_list)
-        script_viewport = cast(QWidget, self._script_list.viewport())
-        script_header = cast(QHeaderView, self._script_list.header())
-        script_available = max(
-            script_viewport.width() - _TABLE_VIEWPORT_SAFETY_MARGIN,
-            0,
-        )
-        script_name_width = max(
-            script_header.minimumSectionSize(),
-            script_available - order_width,
-        )
-        self._script_list.setColumnWidth(0, script_name_width)
-        self._script_list.setColumnWidth(1, order_width)
-
-        user_viewport = cast(QWidget, self._user_list.viewport())
-        user_header = cast(QHeaderView, self._user_list.header())
-        user_available = max(
-            user_viewport.width() - _TABLE_VIEWPORT_SAFETY_MARGIN,
-            0,
-        )
-        user_name_width = max(
-            user_header.minimumSectionSize(),
-            user_available - order_width,
-        )
-        self._user_list.setColumnWidth(0, user_name_width)
-        self._user_list.setColumnWidth(1, order_width)
-
+        """列表列宽由 Stretch/Fixed 管住，这里只初始化进度表。"""
         self._set_progress_column_widths()
 
     def _set_progress_column_widths(self) -> None:
@@ -705,11 +693,16 @@ class BatchTab(QWidget):
         self._user_list.setToolTip(
             tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱；"
                "批量配置中的顺序仅作为初始顺序"))
+        # 与脚本页一致：候选列拉伸占满剩余宽度，顺序列固定四字宽，
+        # 两列合计始终等于面板宽度，不产生横向滚动。
+        self._user_list.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         header = self._user_list.header()
         assert header is not None
         header.setMinimumHeight(32)
         header.setMinimumSectionSize(48)
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setStretchLastSection(False)
         self._user_list.setColumnWidth(
             1, _four_cjk_column_width(self._user_list))
@@ -1685,23 +1678,18 @@ class BatchTab(QWidget):
             return
         self._set_round_controls_visible(True)
         number = self._display_round(state)
-        self._round_label.setText(
-            tr("当前第 {round}/{rounds} 轮").format(
-                round=number, rounds=state.rounds_total)
-            if state.viewing_round == 0
-            else tr("第 {round}/{rounds} 轮").format(
-                round=number, rounds=state.rounds_total))
+        self._round_label.setText(tr("第 {round}/{rounds} 轮").format(
+            round=number, rounds=state.rounds_total))
         self._round_prev_btn.setEnabled(number > 1)
         self._round_next_btn.setEnabled(number < state.rounds_total)
-        # >> 只有在停留在历史轮时才可用：它同时恢复「跟随最新」。
-        self._round_latest_btn.setEnabled(state.viewing_round != 0)
+        # ⏭ 的按下态就是「正在跟随最新」：下一轮开始视图会自动跟上。
+        self._round_latest_btn.setChecked(state.viewing_round == 0)
 
     def _show_round(self, number: int) -> None:
         """切到指定轮次；0 表示回到最新并恢复自动跟随。"""
         state = self._run_progress.get(self._visible_run_id)
         if state is None:
             return
-        latest = max(state.unit_rounds.values(), default=1)
         if number:
             number = max(1, min(number, state.rounds_total))
             # 停在当前最新轮时仍然固定，不自动跟随；只有 >> 才恢复跟随。
@@ -1711,8 +1699,8 @@ class BatchTab(QWidget):
         self._render_progress_rows(state)
         self.apply_task_plan(state.plans)
         self._refresh_round_header(state)
-        if not state.viewing_round and latest:
-            self._scroll_to_running_row(state)
+        if not state.viewing_round:
+            self._scroll_to_running_row()
 
     def _on_prev_round(self) -> None:
         state = self._run_progress.get(self._visible_run_id)
@@ -1730,7 +1718,7 @@ class BatchTab(QWidget):
     def _on_latest_round(self) -> None:
         self._show_round(0)
 
-    def _scroll_to_running_row(self, state: _BatchProgressState) -> None:
+    def _scroll_to_running_row(self) -> None:
         """跟随最新时把视图定位到当前正在跑的行，避免要手动往下翻。"""
         for row in range(self._progress_table.rowCount()):
             item = self._progress_table.item(row, 2)
@@ -1917,20 +1905,14 @@ class BatchTab(QWidget):
         if state is None:
             return
         state.statuses[(round_number, run_idx, script_id)] = status
-        previous_max = max(state.unit_rounds.values(), default=0)
         entered_round = round_number > state.unit_rounds.get(run_idx, 0)
         if entered_round:
             state.unit_rounds[run_idx] = round_number
         if self._visible_run_id != task_run_id:
             return
-        if entered_round and state.attr_mode:
-            self._refresh_unit_row_labels(state, run_idx)
-        if entered_round and round_number > previous_max:
-            # 新的一轮真正开始了：重建下拉候选并刷新标题。
+        if entered_round:
+            # 轮次推进：更新底部导航的轮次与按钮状态。
             self._refresh_round_header(state)
-        elif self._round_label.isVisible():
-            # 只更新标题里的进度计数，不每个事件都重建下拉候选。
-            self._round_label.setText(self._round_header_text(state))
         if state.viewing_round and state.viewing_round != round_number:
             # 正在只读查看历史轮：状态继续入库，但不打断当前视图。
             return
@@ -1942,21 +1924,6 @@ class BatchTab(QWidget):
             )
             return
         self._set_status_item(row, status, scroll=not state.viewing_round)
-
-    def _refresh_unit_row_labels(
-        self, state: _BatchProgressState, run_idx: int,
-    ) -> None:
-        """属性模式：单元进入新一轮时，行标题里的轮次要跟着变。"""
-        round_number = state.unit_rounds.get(run_idx, 1)
-        label = self._row_label(state, run_idx, round_number)
-        for script_id, _name in state.scripts:
-            row = self._progress_row_index.get((run_idx, script_id))
-            if row is None:
-                continue
-            item = self._progress_table.item(row, 0)
-            if item is not None:
-                item.setText(label)
-                item.setToolTip(label)
 
     def _refresh_status_colors(self, _theme: str) -> None:
         """实时切换主题后重绘现有进度行。"""

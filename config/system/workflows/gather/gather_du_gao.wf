@@ -58,11 +58,10 @@ end
 
 eval $loop_count = 0
 
-# 安卓端进场：非战斗姿态下战斗面板不显示奇术等按钮，先点一次轻击进入战斗姿态。
-# 只做一次——循环期间角色一直在战斗中，面板不会收起。等待复用「操作间隔」。
-env:"android" -> click [general_combat].[qingji] after wait @step_interval
-
 @one_round
+
+# 安卓端进场：非战斗姿态下战斗面板不显示奇术等按钮，先点一次轻击进入战斗姿态。
+env:"android" -> click [general_combat].[qingji] after wait @step_interval
 
 eval $loop_count = $loop_count + 1
 log info "毒塔挂机：第 " + $loop_count + " 轮"
@@ -74,16 +73,13 @@ env:"android" -> click [general_combat].[qishu] hold 0.05 after wait 1.8
 # 多人挂机：进卸势前多等一拍
 if $multiplayer -> wait 0.3
 
-
 # 卸势
 click [general_combat].[xieshi] hold 0.1 after wait 0.2
-
 # 多人挂机：进重击 1 前多等一拍
 if $multiplayer -> wait 0.3
 
 # 重击1
 click [general_combat].[xuli] hold 0.2 after wait 0.2
-
 # 多人挂机：进重击 2 前多等一拍
 if $multiplayer -> wait 0.2
 
@@ -91,13 +87,16 @@ if $multiplayer -> wait 0.2
 click [general_combat].[xuli] hold 0.2 after wait 0.6
 
 # 后退
-env:"desktop" -> press "S" hold 1.5 after wait 0.1
-env:"android" -> drag [general_move].[move_backward] duration 0.1 hold 1.5 after wait 0.1
+env:"desktop" -> press "S" hold 2 after wait 0.1
+env:"android" -> drag [general_move].[move_backward] duration 0.1 hold 2 after wait 0.1
+
+wait @page_refresh
 
 # 跳跃
 click [general_combat].[tiaoyue] hold 0.05 after wait 0.4
 click [general_combat].[tiaoyue] hold 0.05 after wait 1
-wait 2
+
+wait @secondary_confirm
 
 # 前跳：按住前进，期间跳两次（第一跳起跳、第二跳收尾），再松开前进。桌面按住 W、
 # 安卓推前进摇杆——移动非分不可；跳跃两端都写 [general_combat].[tiaoyue]，各端按
@@ -114,5 +113,7 @@ wait 0.6
 
 # 千斤坠
 click [general_combat].[wuxueji] hold 0.05 after wait @page_refresh
+
+wait @page_refresh
 
 goto one_round

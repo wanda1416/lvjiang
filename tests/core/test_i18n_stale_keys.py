@@ -235,3 +235,39 @@ def test_available_languages_follows_directory(tmp_path, monkeypatch):
         "meta:\n  display_name: English\n", encoding="utf-8")
     found = {item["code"]: item["name"] for item in available_languages()}
     assert found == {"zh_CN": "简体中文", "en_US": "English"}
+
+
+def _literal_pool_split() -> tuple[set[str], set[str]]:
+    """(宿主源码字面量, 插件源码字面量)：插件 = ``src/lvjiang/apps/**``。"""
+    apps_root = ROOT / "src" / "lvjiang" / "apps"
+    host: set[str] = set()
+    plugin: set[str] = set()
+    for py in (ROOT / "src").rglob("*.py"):
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        bucket = plugin if apps_root in py.parents else host
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                bucket.add(node.value)
+    return host, plugin
+
+
+def test_core_tables_do_not_carry_plugin_only_keys() -> None:
+    """核心词表不替插件维护文案：只被插件源码使用的键必须放在插件词表。
+
+    2026-11-14 依赖反转清理：核心 common.yaml 里 113 条只给插件用的条目
+    （插件词表已有同键，属重复残留）整体删除，这里防止再长回来。
+    """
+    host, plugin = _literal_pool_split()
+    offenders: dict[str, list[str]] = {}
+    for code in ("zh_CN", "en_US"):
+        for path in sorted((I18N_DIR / code).glob("*.yaml")):
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            for key in _leaf_keys(data):
+                if _HAS_CJK.search(key) and key in plugin and key not in host:
+                    offenders.setdefault(key, []).append(str(path.relative_to(ROOT)))
+    assert not offenders, (
+        f"核心词表有 {len(offenders)} 条只被插件使用的文案，请移到 "
+        f"config/i18n/apps/<app>/：{sorted(offenders)[:20]}")

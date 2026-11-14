@@ -26,7 +26,9 @@ from pathlib import Path
 
 import pytest
 
-SRC_ROOT = Path(__file__).parents[1] / "src"
+from tests.source_scan import parsed, source_files
+
+SRC_ROOT = Path(__file__).resolve().parents[1] / "src"
 PACKAGE_ROOT = SRC_ROOT / "lvjiang"
 APPS_ROOT = PACKAGE_ROOT / "apps"
 
@@ -44,7 +46,8 @@ EXTRA_PLUGIN_TERMS = frozenset({
 
 
 def _guarded_files() -> list[Path]:
-    return sorted(path for path in PACKAGE_ROOT.rglob("*.py") if APPS_ROOT not in path.parents)
+    return [path for path in source_files()
+            if PACKAGE_ROOT in path.parents and APPS_ROOT not in path.parents]
 
 
 def _module_package(path: Path) -> str:
@@ -82,8 +85,8 @@ def _is_apps_module(target: str) -> bool:
 
 
 def _app_imports(path: Path, source: str | None = None) -> set[str]:
-    text = path.read_text(encoding="utf-8") if source is None else source
-    tree = ast.parse(text, filename=str(path))
+    tree = parsed(path) if source is None else ast.parse(source, filename=str(path))
+    assert tree is not None, f"语法错误：{path}"
     imports: set[str] = set()
     for node in ast.walk(tree):
         targets: list[str] = []
@@ -151,7 +154,8 @@ def test_generic_layers_hold_no_plugin_literals():
         + r")(?![A-Za-z0-9_])")
     offenders: list[str] = []
     for path in _guarded_files():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        tree = parsed(path)
+        assert tree is not None, f"语法错误：{path}"
         for node in _string_literals(tree):
             match = pattern.search(node.value)
             if match:

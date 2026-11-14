@@ -26,6 +26,7 @@ import yaml
 
 from lvjiang import i18n
 from lvjiang.i18n import init_i18n, load_app_i18n
+from tests.source_scan import parsed, source_files
 
 ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = ROOT / "config" / "i18n"
@@ -72,10 +73,9 @@ def _tr_literals() -> dict[str, str]:
     它按目标语言查表，缺条目时同样静默回退中文，缺口性质完全一样。
     """
     found: dict[str, str] = {}
-    for path in sorted((ROOT / "src").rglob("*.py")):
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except SyntaxError:  # 语法错误的文件由 ruff/mypy 拦，这里不误报
+    for path in source_files():
+        tree = parsed(path)
+        if tree is None:  # 语法错误的文件由 ruff/mypy 拦，这里不误报
             continue
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):

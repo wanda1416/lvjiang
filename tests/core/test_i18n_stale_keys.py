@@ -14,13 +14,13 @@
 """
 from __future__ import annotations
 
-import ast
 import re
 from pathlib import Path
 
 import yaml
 
 from lvjiang.i18n import available_languages
+from tests.source_scan import source_files, string_constants
 
 ROOT = Path(__file__).resolve().parents[2]
 I18N_DIR = ROOT / "config" / "i18n"
@@ -36,14 +36,8 @@ _HAS_CJK = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
 
 def _literal_pool() -> set[str]:
     pool: set[str] = set()
-    for py in (ROOT / "src").rglob("*.py"):
-        try:
-            tree = ast.parse(py.read_text(encoding="utf-8"))
-        except SyntaxError:
-            continue
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                pool.add(node.value)
+    for py in source_files():
+        pool |= string_constants(py)
     return pool
 
 
@@ -221,15 +215,9 @@ def _literal_pool_split() -> tuple[set[str], set[str]]:
     apps_root = ROOT / "src" / "lvjiang" / "apps"
     host: set[str] = set()
     plugin: set[str] = set()
-    for py in (ROOT / "src").rglob("*.py"):
-        try:
-            tree = ast.parse(py.read_text(encoding="utf-8"))
-        except SyntaxError:
-            continue
+    for py in source_files():
         bucket = plugin if apps_root in py.parents else host
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                bucket.add(node.value)
+        bucket |= string_constants(py)
     return host, plugin
 
 

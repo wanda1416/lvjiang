@@ -508,3 +508,42 @@ MVP 已可用（总览 / 调律分析 / 数据同步）。明确不在第一阶�
 **优先级**: 🟢 **低**（开发阶段先不动，两处的迭代节奏还不一样）
 
 ---
+
+### 11. profile 记账判定三份重复，note 文本分支缺失 {#p2-profile-record-policy}
+
+**位置**: `src/lvjiang/core/profile/entries.py`（`upsert` / `upsert_many` / `update_if_current`）
+
+「这次写入该不该记一行账本」的判定抄了三份：`upsert` 与 `upsert_many` 对
+`type == "note"` 比对文本，`update_if_current` 只比数值、没有 note 分支。
+
+**现状不是缺陷**：note 的写入走 `service.py` 的专用路径（直接 `db_upsert`），
+`update_if_current` 拿不到 note 类型，所以三份判定的差异目前不会触发。
+
+**风险**: 三份逻辑一旦合并成一份（下一步就值得合并），必须先补齐 note 分支，
+否则 CAS 路径上的 note 写入会静默不记账。
+
+**计划（后续）**:
+- [ ] 抽出单条 `should_record()` 判定并让三处共用，同时补 note 文本分支
+- [ ] 补一条「note 走 CAS 写入仍记账」的回归用例
+
+**优先级**: 🟢 **低**（不影响当前行为，但会随下一次合并变成真缺陷）
+
+---
+
+### 12. meta 锁写入的 SQL 在三处独立维护 {#p2-meta-lock-sql}
+
+**位置**: `src/lvjiang/core/profile/entries.py`（`set_locked` / `unlock`）、
+`src/lvjiang/core/profile/repository.py`（`db_apply_meta_locked`）
+
+「只改 locked 列、不碰 value/event_at」这条约定被 `set_locked`、`unlock`、
+`db_apply_meta_locked` 各写了一遍 INSERT ... ON CONFLICT DO UPDATE SET locked，
+语义相同但三处独立演化；`db_apply_meta_locked` 还是模块级函数，靠伸手进
+`ProfileDB` 的私有连接方法才能参与事务。
+
+**计划（后续）**:
+- [ ] 收成一个 `apply_locked(username, type, key, locked, *, instance_id, ...)` 方法
+- [ ] 模块级 `db_apply_meta_locked` 只做转发，不再自己拼连接
+
+**优先级**: 🟢 **低**（当前三份 SQL 一致，纯重复）
+
+---

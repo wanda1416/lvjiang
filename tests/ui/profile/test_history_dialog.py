@@ -1,8 +1,9 @@
 """变更记录对话框的交互契约。
 
 保护的是用户能看到、能操作的行为：删除只删这一条、单用户视图收起用户列但
-条件可以再放宽、改筛选后回到第一页、页码可任意跳转、聚合候选默认只列前 10
-项且可以搜索。列号一律按列 key 定位，不再依赖手写偏移量。
+条件可以再放宽、改筛选后回到第一页、页码可任意跳转、聚合候选默认只列前
+``FACET_VISIBLE_LIMIT`` 项且可以搜索、筛选弹层不能是 Popup（Popup 窗口不激活，
+输入法挂不上，搜索框输不进中文）。列号一律按列 key 定位，不再依赖手写偏移量。
 """
 
 from PyQt6.QtWidgets import QMessageBox, QPushButton, QWidget
@@ -147,17 +148,40 @@ def test_jump_to_page_clamps_to_last_page(qapp):
     dialog.close()
 
 
-def test_facet_candidates_show_top_ten_and_can_be_searched(qapp):
-    sources = tuple(f"来源{index:02d}" for index in range(14))
-    _seed(28, sources=sources)
+def test_facet_candidates_show_limited_top_and_can_be_searched(qapp):
+    sources = tuple(f"来源{index:02d}" for index in range(FACET_VISIBLE_LIMIT + 4))
+    _seed(len(sources), sources=sources)
     dialog = HistoryDialog(HistoryScope())
     button = dialog._facet_buttons["source"]
     assert len(button.candidates) == FACET_VISIBLE_LIMIT
     assert button.candidate_total == len(sources)
 
-    dialog._on_facet_search("source", "来源13")
-    assert [raw for raw, _count in button.candidates] == ["来源13"]
+    dialog._on_facet_search("source", sources[-1])
+    assert [raw for raw, _count in button.candidates] == [sources[-1]]
     dialog.close()
+
+
+def test_facet_panel_is_a_tool_window_not_a_popup(qapp):
+    """弹层必须是可激活的 Tool 窗口。
+
+    ``Qt.Popup`` 窗口从不激活，Windows 的输入法只把候选窗挂到被激活的顶层窗口上，
+    弹层里的搜索框因此打不进中文（2026-11-15）。这条用例防它被改回 Popup。
+    """
+    from PyQt6.QtCore import Qt
+
+    _seed(4)
+    dialog = HistoryDialog(HistoryScope())
+    button = dialog._facet_buttons["source"]
+    button.open_panel()
+    panel = button._panel
+    assert panel is not None and panel.isVisible()
+    # 窗型按 windowType() 判：Popup/Tool 在 windowFlags() 里共用位，掩码比较会误判。
+    assert panel.windowType() == Qt.WindowType.Tool
+    assert panel.windowType() != Qt.WindowType.Popup
+    assert button._search_edit is not None and button._search_edit.isVisible()
+    # 关对话框时要把独立窗口的弹层收掉（Popup 会自己关，Tool 不会）。
+    dialog.done(0)
+    assert not panel.isVisible()
 
 
 def test_picking_facet_value_filters_rows(qapp):

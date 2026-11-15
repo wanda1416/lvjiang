@@ -5,7 +5,7 @@
 - :class:`ConditionBar`：顶部"当前生效条件"的标签条，每个标签可单独取消，
   适合展示被表格列挡住的维度（例如单用户视图里被隐藏的「用户」条件）。
 - :class:`FacetFilterButton`：表头筛选行里的聚合按钮。候选按出现次数倒序，
-  默认只给前 10 项；要在更多取值里找，就在弹层搜索框里输入，由调用方去数据库
+  默认只给前 20 项；要在更多取值里找，就在弹层搜索框里输入，由调用方去数据库
   做候选内的模糊查找（不是新的查询条件）。
 - :class:`KeywordFilterBar`：关键词 + 时间范围，这两个维度放不进某一列。
 
@@ -15,10 +15,11 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterable
 
-from PyQt6.QtCore import QDate, QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QResizeEvent
+from PyQt6.QtCore import QDate, QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QResizeEvent, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDateEdit,
@@ -38,7 +39,10 @@ from lvjiang.ui.widgets.button_styles import apply_compact_button_style
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 #: 聚合候选默认展示条数；超过这个数只能靠搜索框输入来找。
-FACET_VISIBLE_LIMIT = 10
+FACET_VISIBLE_LIMIT = 20
+
+#: 弹层刚因失活被收起后，这么短时间内的再次点击算「收起」而不是「重新打开」。
+_TOGGLE_GRACE_SECONDS = 0.25
 
 #: 时间快捷档位：label 与 days（``None`` 表示全部，0 表示今天）。
 _TIME_PRESETS: tuple[tuple[str, int | None], ...] = (
@@ -168,6 +172,11 @@ class FacetFilterButton(QPushButton):
 
     弹层里是「搜索框 + 复选列表 + 提示」。列表默认只有前 ``FACET_VISIBLE_LIMIT``
     项，提示里写明还有多少项没列出来；输入即请求调用方拉取新的候选。
+
+    弹层是 ``Qt.Tool`` 无边框窗口，不是 ``Qt.Popup``：Windows 的输入法只把候选
+    窗口挂到被激活的顶层窗口上，而 Popup 窗口从不激活，弹层里的搜索框因此打不进
+    中文（2026-11-15）。代价是 Popup 原本自带的「点外面自动关」要自己补——失活
+    （``WindowDeactivate``）即收起，同时保证同一次只开一个。
     """
 
     values_changed = pyqtSignal(tuple)
@@ -195,6 +204,7 @@ class FacetFilterButton(QPushButton):
         self._search_edit: QLineEdit | None = None
         self._list: QListWidget | None = None
         self._hint: QLabel | None = None
+        self._closed_at = 0.0
         apply_compact_button_style(self, variant="neutral")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.clicked.connect(self.open_panel)
@@ -246,6 +256,15 @@ class FacetFilterButton(QPushButton):
 
     def open_panel(self) -> None:
         panel = self._ensure_panel()
+        if panel.isVisible():
+            self.close_panel()
+            return
+        if time.monotonic() - self._closed_at < _TOGGLE_GRACE_SECONDS:
+            # 这次点击其实是「收起」：它刚刚因为失活被收起（点按钮本身也算失活），
+            # 不能再立刻弹回来，否则按钮永远关不掉面板。
+            self._closed_at = 0.0
+            return
+        self._close_sibling_panels()
         if self._search_edit is not None:
             # 每次打开从"全部候选"起步，避免上次的查找词在关掉后仍然生效。
             self._search_edit.blockSignals(True)
@@ -256,11 +275,53 @@ class FacetFilterButton(QPushButton):
         self.search_requested.emit("")
         self._resize_panel()
         panel.adjustSize()
-        panel.move(self.mapToGlobal(QPoint(0, self.height())))
+        panel.move(self._panel_position(panel))
         panel.show()
+        # 输入法只认被激活的窗口：显式激活，别指望父窗口的激活状态能传下来。
+        panel.activateWindow()
         panel.raise_()
         if self._search_edit is not None:
             self._search_edit.setFocus()
+
+    def close_panel(self) -> None:
+        """收起弹层：失活、Esc、「完成」、换维度、对话框关闭都走这里。"""
+        if self._panel is not None and self._panel.isVisible():
+            self._panel.hide()
+        self._closed_at = time.monotonic()
+
+    def _close_sibling_panels(self) -> None:
+        """同一个窗口里只留一个弹层；``Qt.Tool`` 不像 Popup 会互相顶掉。"""
+        window = self.window()
+        if window is None:
+            return
+        for other in window.findChildren(FacetFilterButton):
+            if other is not self:
+                other.close_panel()
+
+    def _available_rect(self) -> QRect:
+        screen = self.screen()
+        return screen.availableGeometry() if screen is not None else QRect()
+
+    def _panel_position(self, panel: QWidget) -> QPoint:
+        """贴着按钮下沿展开；下面放不下就翻到上方，再不行就夹进可用屏幕。
+
+        候选从 10 项扩到 20 项后弹层明显变高，靠窗口底部的表头必须能往上翻。
+        """
+        size = panel.size()
+        avail = self._available_rect()
+        below = self.mapToGlobal(QPoint(0, self.height()))
+        y = below.y()
+        if not avail.isNull() and y + size.height() > avail.bottom():
+            above = self.mapToGlobal(QPoint(0, -size.height()))
+            if above.y() >= avail.top():
+                y = above.y()
+            else:
+                y = max(avail.top(), avail.bottom() - size.height())
+        x = below.x()
+        if not avail.isNull():
+            x = min(x, avail.right() - size.width())
+            x = max(avail.left(), x)
+        return QPoint(x, y)
 
     def _resize_panel(self) -> None:
         """弹层宽度按最长候选项算，不跟着窄列宽被截断。"""
@@ -280,13 +341,32 @@ class FacetFilterButton(QPushButton):
             hint_width = metrics.horizontalAdvance(
                 self._search_edit.placeholderText()) + 48
         listing.setMinimumWidth(min(560, max(widest + 96, hint_width)))
+        # 20 项在高 DPI 小屏上可能比屏幕还高：压一个不超过可用高度的上限，
+        # 多出来的交给滚动条，不让弹层顶到屏幕外。
+        avail = self._available_rect()
+        if not avail.isNull():
+            listing.setMaximumHeight(max(140, int(avail.height() * 0.6)))
+
+    def eventFilter(self, source, event) -> bool:  # noqa: N802 - Qt API
+        # Tool 窗口没有 Popup 的自动关闭：一失活（点对话框、切到别的窗口）就收起。
+        if (source is self._panel and event is not None
+                and event.type() == QEvent.Type.WindowDeactivate):
+            self.close_panel()
+        return super().eventFilter(source, event)
 
     def _ensure_panel(self) -> QFrame:
         if self._panel is not None:
             return self._panel
-        panel = QFrame(self, Qt.WindowType.Popup)
+        # Tool + 无边框 = 能激活、能被输入法挂上的轻量弹层（见类说明）。
+        panel = QFrame(
+            self, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         panel.setObjectName("historyFacetPanel")
         panel.setFrameShape(QFrame.Shape.StyledPanel)
+        panel.installEventFilter(self)
+        # Popup 原本按 Esc 就收起；换成 Tool 后 Esc 会落到对话框上，这里自己补。
+        escape = QShortcut(QKeySequence("Esc"), panel)
+        escape.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        escape.activated.connect(self.close_panel)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
@@ -301,7 +381,8 @@ class FacetFilterButton(QPushButton):
         listing = QListWidget(panel)
         listing.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         listing.setTextElideMode(Qt.TextElideMode.ElideNone)
-        # 默认只列前 10 项，列表高度就按 10 行给，不靠滚动条硬凑。
+        # 默认列 FACET_VISIBLE_LIMIT 项，列表高度就按这么多行给，不靠滚动条硬凑；
+        # 小屏上限由 _resize_panel 按可用高度压。
         listing.setMinimumHeight(
             listing.fontMetrics().height() * FACET_VISIBLE_LIMIT + 8)
         listing.itemChanged.connect(self._on_item_changed)
@@ -318,7 +399,7 @@ class FacetFilterButton(QPushButton):
         clear = QPushButton(tr("清除"), panel)
         clear.clicked.connect(self._clear_values)
         done = QPushButton(tr("完成"), panel)
-        done.clicked.connect(panel.hide)
+        done.clicked.connect(self.close_panel)
         apply_compact_button_style(clear, done, variant="neutral")
         buttons.addWidget(clear)
         buttons.addStretch(1)

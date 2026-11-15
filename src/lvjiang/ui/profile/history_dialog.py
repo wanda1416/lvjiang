@@ -1060,6 +1060,9 @@ class HistoryDialog(QDialog):
 
     def done(self, result: int) -> None:
         # QDialog 的关闭、Esc 与 accept/reject 都经由 done 收尾。
+        # 表头筛选项的弹层是独立 Tool 窗口，不像 Popup 会随对话框一起收起，这里显式关。
+        for button in self._facet_buttons.values():
+            button.close_panel()
         try:
             update_ui_page_state(_UI_STATE_PAGE, {
                 "window_size": [self.width(), self.height()],

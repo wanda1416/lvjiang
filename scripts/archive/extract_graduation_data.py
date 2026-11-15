@@ -1,11 +1,16 @@
-"""Convert bundled graduation workbooks into named JSON schemes."""
+"""Convert bundled graduation workbooks into named JSON schemes.
+
+已归档：该脚本只扫 ``data/excel`` 顶层且默认 110 级，表按等级分目录后
+已经找不到源文件。当前流程用 ``scripts/check_graduation_updates.py``
+下载源表，再通过「游戏设置 → 对应流派 → 导入毕业率方案」导入模型。
+"""
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang.apps.yysls.core.graduation.graduation_converter import (  # noqa: E402

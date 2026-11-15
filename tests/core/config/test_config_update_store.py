@@ -6,7 +6,7 @@ import zipfile
 import pytest
 
 from lvjiang.core.config.update_store import UpdateStore
-from lvjiang.core.update_bundle import (
+from lvjiang.core.updates.bundle import (
     digest,
     json_bytes,
     make_manifest,
@@ -178,7 +178,7 @@ def test_public_revision_preserves_member_registry_fragments(tmp_path):
 
 def test_member_install_and_withdrawal_ignore_public_revision_dependency(tmp_path, monkeypatch):
     """会员包按授权安装与撤回，不因发布方修订序号拒绝。"""
-    monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
+    monkeypatch.setattr("lvjiang.core.updates.release.get_version", lambda: "0.15.0")
     base = {"base.bin": b"base"}
     write_files(tmp_path / "system", base)
     store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))

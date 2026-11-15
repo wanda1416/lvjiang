@@ -14,7 +14,7 @@ def test_public_plugin_contracts_import_without_qt(tmp_path):
          "from lvjiang.core.app_events import AppEvent; "
          "from lvjiang.core.plugin_runtime import PluginRuntimePort; "
          "from lvjiang.core.profile.engine import ProfileProcessor; "
-         "from lvjiang.core.update import fetch_latest_release; "
+         "from lvjiang.core.updates.release import fetch_latest_release; "
          "from lvjiang.core.telemetry.reporter import run_report; "
          "from lvjiang.core.config.remote import run_sync; "
          "assert AppEvent('sample', 'changed').app_id == 'sample'"],

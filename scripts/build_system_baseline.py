@@ -10,15 +10,15 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang._version import __version__  # noqa: E402
 from lvjiang.core.paths import get_config_system_dir  # noqa: E402
-from lvjiang.core.preset_sources import (  # noqa: E402
+from lvjiang.core.updates.bundle import read_tree  # noqa: E402
+from lvjiang.core.updates.preset_sources import (  # noqa: E402
     excluded_files,
     format_excluded,
     normalize_tree,
     present_files,
     tracked_files,
 )
-from lvjiang.core.system_preset import write_baseline_identity  # noqa: E402
-from lvjiang.core.update_bundle import read_tree  # noqa: E402
+from lvjiang.core.updates.system_preset import write_baseline_identity  # noqa: E402
 
 
 def main() -> None:

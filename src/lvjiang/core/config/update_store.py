@@ -17,7 +17,7 @@ from loguru import logger
 from ..fs_util import atomic_write_bytes
 from ..json_files import formatted_json_bytes
 from ..paths import get_config_local_dir, get_config_system_dir, get_config_updates_dir
-from ..update_bundle import (
+from ..updates.bundle import (
     digest,
     file_hashes,
     json_bytes,

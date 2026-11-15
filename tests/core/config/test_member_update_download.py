@@ -11,7 +11,7 @@ from lvjiang.core.config.protected_remote import (
     manifest_url,
     parse_manifest,
 )
-from lvjiang.core.update_bundle import json_bytes
+from lvjiang.core.updates.bundle import json_bytes
 
 
 def test_member_integrity_and_authorization_failure_semantics(monkeypatch):

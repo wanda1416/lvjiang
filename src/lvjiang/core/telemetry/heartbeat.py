@@ -93,7 +93,7 @@ def normalized_app_version() -> str:
     信封（reporter._envelope）也要带这个值：心跳每 UTC 日只发一次，同一天
     第 2..N 次上报没有心跳可取，服务端就只能把批次记成 unknown。
     """
-    from ..update import get_version
+    from ..updates.release import get_version
 
     version = get_version()
     if not re.fullmatch(_VERSION_PATTERN, version or ""):

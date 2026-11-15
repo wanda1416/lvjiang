@@ -31,7 +31,7 @@ from lvjiang.core.config.protected_remote import (  # noqa: E402
     parse_manifest,
     select_package,
 )
-from lvjiang.core.update import get_version  # noqa: E402
+from lvjiang.core.updates.release import get_version  # noqa: E402
 
 logger.remove()
 logger.add(sys.stdout, level="INFO", format="{message}")

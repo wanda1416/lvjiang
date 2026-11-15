@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.announcement import (
+from ...core.updates.announcement import (
     Announcement,
     AnnouncementFetchResult,
     AnnouncementManifest,

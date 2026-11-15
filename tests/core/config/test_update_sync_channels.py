@@ -36,7 +36,7 @@ def test_unknown_authorization_does_not_withdraw_member(tmp_path, monkeypatch):
 def test_download_does_not_touch_system_until_apply(tmp_path, monkeypatch):
     from lvjiang.core.config import protected_remote
     from lvjiang.core.config.update_download import PublicDownload
-    from lvjiang.core.update_bundle import json_bytes, make_manifest, tree_digest
+    from lvjiang.core.updates.bundle import json_bytes, make_manifest, tree_digest
 
     system = tmp_path / "system"
     system.mkdir()
@@ -69,7 +69,7 @@ def test_download_does_not_touch_system_until_apply(tmp_path, monkeypatch):
 def test_successful_empty_index_withdraws_public_but_failure_preserves_it(tmp_path, monkeypatch):
     from lvjiang.core.config import protected_remote
     from lvjiang.core.config.update_store import UpdateStore
-    from lvjiang.core.update_bundle import json_bytes, make_manifest, tree_digest
+    from lvjiang.core.updates.bundle import json_bytes, make_manifest, tree_digest
 
     (tmp_path / "system").mkdir()
     (tmp_path / "local").mkdir()

@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 
 from loguru import logger
 
-from ..update_bundle import digest
+from ..updates.bundle import digest
 from .member_download import MemberDownload, fetch_member_update, install_staged_member
 from .protected_remote import ProtectedAccess
 from .update_download import PublicDownload, fetch_public_update
@@ -102,8 +102,8 @@ def is_enabled() -> bool:
 
 def _installed_store() -> UpdateStore | None:
     from ..paths import session_directory
-    from ..update import get_version
-    from ..update_bundle import series
+    from ..updates.bundle import series
+    from ..updates.release import get_version
     from .resolver import get_resolver
     resolver = get_resolver()
     # 开发工作区不允许在线安装器覆盖 git 管理的配置。
@@ -168,7 +168,7 @@ def prepare_startup_configuration() -> None:
 
 
 def build_sync_job() -> SyncJob:
-    from ..update import get_version
+    from ..updates.release import get_version
     from .protected_remote import snapshot
     store = _installed_store()
     if store is None:

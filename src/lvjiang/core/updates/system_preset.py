@@ -9,17 +9,17 @@ import zipfile
 from collections.abc import Callable, Collection
 from pathlib import Path, PurePosixPath
 
-from .._version import __version__
-from .fs_util import atomic_write_bytes
-from .json_files import formatted_json, formatted_json_bytes
-from .preset_sources import normalize_tree
-from .update_bundle import (
+from ..._version import __version__
+from ..fs_util import atomic_write_bytes
+from ..json_files import formatted_json, formatted_json_bytes
+from .bundle import (
     json_bytes,
     read_tree,
     series,
     tree_digest,
     validate_names,
 )
+from .preset_sources import normalize_tree
 
 PRESET_FORMAT = 2
 MAX_PRESET_BYTES = 256 << 20
@@ -61,7 +61,7 @@ def build_system_preset(system_dir: Path, destination: Path, *,
 
 def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callable[[], None] | None = None) -> bool:
     """只交换 system；按预置内容摘要去重，PC 同步后重启不反向覆盖。"""
-    from .paths import config_directory, get_config_system_dir, session_directory
+    from ..paths import config_directory, get_config_system_dir, session_directory
     config = config_directory(root)
     config.mkdir(parents=True, exist_ok=True)
     marker = session_directory(config) / "preset.json"
@@ -101,7 +101,7 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
             old = stage / "old"
-            from .paths import session_directory
+            from ..paths import session_directory
             identity = session_directory(config) / "baseline.json"
             old_identity = identity.read_bytes() if identity.exists() else None
             if target.exists():
@@ -146,6 +146,6 @@ def write_baseline_identity(system_dir: Path, app_version: str, *, config_dir: P
     files = read_tree(system_dir)
     version = series(app_version)
     identity = {"app_series": version, "sha256": tree_digest(files)}
-    from .paths import session_directory
+    from ..paths import session_directory
     atomic_write_bytes(session_directory(config_dir) / "baseline.json", formatted_json_bytes(identity), prefix=".baseline-", fsync=True)
     return identity

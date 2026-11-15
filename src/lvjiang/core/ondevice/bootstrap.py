@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ... import constants
 from ..config.interface import get_interface_store
-from ..system_preset import install_system_preset
+from ..updates.system_preset import install_system_preset
 from ..users.document import UserConfigManager
 from .offline import reset_configuration
 from .task_runner import CONTROL_LOCK, is_running

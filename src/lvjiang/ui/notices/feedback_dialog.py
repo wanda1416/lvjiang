@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core import group_qrcode
-from ...core.update import GITHUB_REPO
+from ...core.updates.release import GITHUB_REPO
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style
 from .qrcode_refresher import QrCodeRefresher

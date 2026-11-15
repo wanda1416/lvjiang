@@ -20,8 +20,8 @@ from lvjiang.core.config.content_service import ServiceError
 from lvjiang.core.config.protected_bundle import digest, encrypt
 from lvjiang.core.config.protected_remote import ProtectedAccess, manifest_url
 from lvjiang.core.config.resolver import ConfigResolver
-from lvjiang.core.system_preset import write_baseline_identity
-from lvjiang.core.update_bundle import json_bytes
+from lvjiang.core.updates.bundle import json_bytes
+from lvjiang.core.updates.system_preset import write_baseline_identity
 
 KEY = b"k" * 32
 CODE = "synthetic-member-code"
@@ -34,7 +34,7 @@ def _release_resolver(tmp_path, monkeypatch):
     (system / "opaque.bin").write_bytes(b"old")
     resolver = ConfigResolver(system, tmp_path / "local", dev_mode=False, config_dir=tmp_path)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
-    monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
+    monkeypatch.setattr("lvjiang.core.updates.release.get_version", lambda: "0.15.0")
     write_baseline_identity(system, "0.15.0", config_dir=tmp_path)
     monkeypatch.setattr(remote, "is_enabled", lambda: True)
     monkeypatch.setattr(remote, "fetch_public_update", lambda *_a, **_k: None)

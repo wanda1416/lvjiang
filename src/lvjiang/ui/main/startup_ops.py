@@ -33,7 +33,7 @@ class StartupOpsMixin:
         if not is_network_feature_enabled(NetFeature.ANNOUNCEMENT):
             self._start_update_check_on_startup()
             return
-        from ...core.announcement import (
+        from ...core.updates.announcement import (
             AnnouncementFetchResult,
             applicable_notices,
             cache_manifest,
@@ -79,7 +79,7 @@ class StartupOpsMixin:
         if not is_network_feature_enabled(NetFeature.UPDATE):
             self._continue_after_update_check()
             return
-        from ...core.update import should_prompt_update
+        from ...core.updates.release import should_prompt_update
         from ..background.update import UpdateChecker
 
         checker = UpdateChecker(self)

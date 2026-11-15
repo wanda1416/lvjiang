@@ -172,7 +172,8 @@ def test_recovery_only_marks_interrupted_ondevice_runs(tmp_path, monkeypatch):
 
 
 def test_notices_fall_back_to_cached_applicable_content(monkeypatch):
-    from lvjiang.core import announcement, version_info
+    from lvjiang.core import version_info
+    from lvjiang.core.updates import announcement
 
     manifest = announcement.AnnouncementManifest(1, 1, "", (
         announcement.Announcement("visible", "info", "可见公告", "正文"),

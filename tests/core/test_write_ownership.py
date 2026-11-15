@@ -18,7 +18,7 @@ from lvjiang.core.config.document_store import DocumentDirectoryStore
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.config.update_store import UpdateStore
 from lvjiang.core.config.users import SessionManager, UserSessionConflict
-from lvjiang.core.update_bundle import tree_digest
+from lvjiang.core.updates.bundle import tree_digest
 
 
 def test_stale_user_session_rejects_same_field_and_preserves_both_unrelated_changes(tmp_path):

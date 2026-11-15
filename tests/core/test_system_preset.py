@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.core.system_preset import build_system_preset, install_system_preset
+from lvjiang.core.updates.system_preset import (
+    build_system_preset,
+    install_system_preset,
+)
 
 
 @pytest.fixture
@@ -71,7 +74,7 @@ def test_crlf_workspace_yields_same_preset_id(tmp_path):
 
 def test_read_tree_only_skips_unlisted_entries_entirely(official):
     """include 之外的条目连名字校验和体积统计都不做，草稿不参与构建。"""
-    from lvjiang.core.update_bundle import read_tree
+    from lvjiang.core.updates.bundle import read_tree
     (official / "workflows/_draft.wf").write_text("wait 0.02", encoding="utf-8")
     files = read_tree(official, only={"app.yaml", "workflows/task.wf"})
     assert sorted(files) == ["app.yaml", "workflows/task.wf"]
@@ -80,8 +83,8 @@ def test_read_tree_only_skips_unlisted_entries_entirely(official):
 def test_packaging_only_writes_identity_and_first_install_creates_r0(official, monkeypatch):
     from lvjiang.core.config import remote
     from lvjiang.core.config.update_store import UpdateStore
-    from lvjiang.core.system_preset import write_baseline_identity
-    from lvjiang.core.update_bundle import make_manifest, read_tree, unpack
+    from lvjiang.core.updates.bundle import make_manifest, read_tree, unpack
+    from lvjiang.core.updates.system_preset import write_baseline_identity
     identity = write_baseline_identity(official, "0.15.0", config_dir=official.parent)
     store = UpdateStore(official.parent, "0.15.0", identity["sha256"])
     baseline = store.root / "r0.zip"
@@ -112,7 +115,7 @@ def test_upgrade_preserves_parameters_database_and_pc_sync_until_new_preset(offi
     assert (phone / "config/system/workflows/task.wf").read_text(encoding="utf-8") == "PC synced task"
     (official / "workflows/task.wf").unlink()
     (official / "workflows/new.wf").write_text("wait 0.02", encoding="utf-8")
-    monkeypatch.setattr("lvjiang.core.system_preset.__version__", "9.1.0")
+    monkeypatch.setattr("lvjiang.core.updates.system_preset.__version__", "9.1.0")
     build_system_preset(official, archive)
     assert install_system_preset(archive, phone)
     assert not (phone / "config/system/workflows/task.wf").exists()
@@ -151,7 +154,7 @@ class BuildOnly(importlib.abc.MetaPathFinder):
             raise ImportError('Build host must not import runtime: ' + fullname)
 sys.meta_path.insert(0, BuildOnly())
 sys.path.insert(0, sys.argv[1])
-from lvjiang.core.system_preset import build_system_preset, write_baseline_identity
+from lvjiang.core.updates.system_preset import build_system_preset, write_baseline_identity
 build_system_preset(Path(sys.argv[2]), Path(sys.argv[3]))
 write_baseline_identity(Path(sys.argv[2]), '0.15.0', config_dir=Path(sys.argv[2]).parent)
 """

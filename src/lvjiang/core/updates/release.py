@@ -18,21 +18,21 @@ from urllib.request import Request, urlopen
 from loguru import logger
 from packaging.version import InvalidVersion
 
-from ..i18n import tr
+from ...i18n import tr
 
 # GitHub 仓库信息
-from .public_links import GITHUB_REPO
-from .public_links import RELEASES_URL as GITHUB_RELEASES_URL
-from .version_info import (
+from ..public_links import GITHUB_REPO
+from ..public_links import RELEASES_URL as GITHUB_RELEASES_URL
+from ..version_info import (
     get_version as get_version,
 )
-from .version_info import (
+from ..version_info import (
     network_access_error_message as network_access_error_message,
 )
-from .version_info import (
+from ..version_info import (
     parse_version as parse_version,
 )
-from .versioning import application_version
+from ..versioning import application_version
 
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -122,14 +122,14 @@ def is_newer_version(latest: str, current: str) -> bool:
 
 def get_skip_version() -> str:
     """获取用户选择跳过的版本号"""
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
     node = get_interface_store().get_node("server_config") or {}
     return node.get("skip_version", "")
 
 
 def set_skip_version(version: str) -> None:
     """设置用户选择跳过的版本号"""
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
     get_interface_store().update_node("server_config", {"skip_version": version})
 
 
@@ -160,7 +160,7 @@ class UpdateCheckError(RuntimeError):
 
 def fetch_latest_release() -> ReleaseInfo:
     """检查正式发行版本，不依赖线程或 GUI。"""
-    from .telemetry.consent import is_offline_mode
+    from ..telemetry.consent import is_offline_mode
     if is_offline_mode():
         raise UpdateCheckError(tr("当前为离线模式，请关闭离线模式后检查更新"))
     try:

@@ -5,8 +5,8 @@ from lvjiang.core.config.member_download import MemberDownload
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.config.update_download import PublicDownload
 from lvjiang.core.scene import registry as scene_registry
-from lvjiang.core.system_preset import write_baseline_identity
-from lvjiang.core.update_bundle import json_bytes, make_manifest, read_tree
+from lvjiang.core.updates.bundle import json_bytes, make_manifest, read_tree
+from lvjiang.core.updates.system_preset import write_baseline_identity
 
 
 def _release_resolver(tmp_path, monkeypatch):
@@ -15,7 +15,7 @@ def _release_resolver(tmp_path, monkeypatch):
     (system / "opaque.bin").write_bytes(b"old")
     resolver = ConfigResolver(system, tmp_path / "local", dev_mode=False, config_dir=tmp_path)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
-    monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
+    monkeypatch.setattr("lvjiang.core.updates.release.get_version", lambda: "0.15.0")
     write_baseline_identity(system, "0.15.0", config_dir=tmp_path)
     monkeypatch.setattr(remote, "is_enabled", lambda: True)
     monkeypatch.setattr("lvjiang.core.config.protected_remote.snapshot", lambda: None)

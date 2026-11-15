@@ -30,7 +30,7 @@ _CHUNK = 256 * 1024
 
 
 def _repo() -> str:
-    from ..update import GITHUB_REPO
+    from ..updates.release import GITHUB_REPO
 
     return GITHUB_REPO
 

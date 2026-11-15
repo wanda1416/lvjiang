@@ -14,7 +14,7 @@ from typing import Any
 from loguru import logger
 from packaging.version import Version
 
-from ..update_bundle import json_bytes
+from ..updates.bundle import json_bytes
 from .content_service import ServiceError, request_json
 from .protected_bundle import MAX_BUNDLE_BYTES, decrypt, digest
 from .protected_remote import (

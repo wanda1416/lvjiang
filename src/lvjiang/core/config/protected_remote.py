@@ -18,7 +18,7 @@ from .protected_bundle import (
 
 
 def manifest_url() -> str:
-    from ..update_bundle import MEMBER_INDEX_URL
+    from ..updates.bundle import MEMBER_INDEX_URL
     return MEMBER_INDEX_URL
 
 
@@ -118,7 +118,7 @@ def parse_manifest(manifest: Any) -> dict[str, Any]:
         maximum = package.get("max_app_version_exclusive", "")
         if not isinstance(minimum, str) or not isinstance(maximum, str):
             raise ValueError("加密包客户端版本范围无效")
-        from ..update_bundle import series
+        from ..updates.bundle import series
         if series(minimum) != minimum or maximum and series(maximum) != maximum:
             raise ValueError("加密包客户端版本范围只允许三段版本号")
         if maximum and Version(minimum) >= Version(maximum):

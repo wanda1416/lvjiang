@@ -384,7 +384,10 @@ class MenuOpsMixin:
 
     def _open_announcements(self):
         """打开公告中心：先显示缓存，并在窗口内异步获取最新内容。"""
-        from ...core.announcement import load_cached_manifest, mark_notice_version
+        from ...core.updates.announcement import (
+            load_cached_manifest,
+            mark_notice_version,
+        )
         from ..notices.announcement_dialog import AnnouncementDialog
 
         dialog = AnnouncementDialog(load_cached_manifest(), parent=self)
@@ -399,7 +402,7 @@ class MenuOpsMixin:
         from PyQt6.QtWidgets import QMessageBox
 
         from ...core.telemetry.consent import is_offline_mode
-        from ...core.update import get_version, is_newer_version
+        from ...core.updates.release import get_version, is_newer_version
         from ..background.update import UpdateChecker
         from ..notices.update_dialog import UpdateDialog
         if is_offline_mode():
@@ -442,7 +445,7 @@ class MenuOpsMixin:
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
 
-        from ...core.update import GITHUB_REPO
+        from ...core.updates.release import GITHUB_REPO
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
 
     def _open_feedback(self):

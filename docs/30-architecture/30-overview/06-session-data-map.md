@@ -82,8 +82,8 @@
 
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
-| `baseline.json` | 官方预置基底身份 | `core/system_preset.py`、`core/config/remote.py` | 只用于生成和确认预置，不参与远端比对 |
-| `preset.json` | 预置已初始化的标记 | `core/system_preset.py`、`core/ondevice/offline.py` | 安卓端据此判断「用预置配置」而不是「已从 PC 同步」 |
+| `baseline.json` | 官方预置基底身份 | `core/updates/system_preset.py`、`core/config/remote.py` | 只用于生成和确认预置，不参与远端比对 |
+| `preset.json` | 预置已初始化的标记 | `core/updates/system_preset.py`、`core/ondevice/offline.py` | 安卓端据此判断「用预置配置」而不是「已从 PC 同步」 |
 | `offline.json` | 手机离线同步的来源与时间 | `core/ondevice/offline.py` | 只读状态，无同步记录表示从未同步 |
 | `mcp.json` | 外部 Agent 接入：端口、启用开关、`token`、`agent_key`、导出路径 | `core/ai/agent_connection.py` | **含凭据**，见第七节 |
 | `agent/results.json`、`agent/tasks.json` | 外部 Agent 的生成结果与任务表 | `apps/yysls/core/agent/service.py` | 经 `DocumentDirectoryStore`（`_meta.json` + 可恢复事务） |

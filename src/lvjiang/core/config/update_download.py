@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from ..update_bundle import (
+from ..updates.bundle import (
     MAX_ARCHIVE_BYTES,
     PUBLIC_INDEX_URL,
     digest,

@@ -17,7 +17,7 @@ from urllib.request import Request, urlopen
 
 from loguru import logger
 
-from .version_info import get_version, network_access_error_message, parse_version
+from ..version_info import get_version, network_access_error_message, parse_version
 
 ANNOUNCEMENT_URL = "https://wanda1416.github.io/lvjiang/notices.json"
 ANNOUNCEMENT_SCHEMA_VERSION = 1
@@ -194,7 +194,7 @@ def applicable_notices(
 
 
 def _announcement_state() -> dict[str, Any]:
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
     server = get_interface_store().get_node("server_config", {})
     if not isinstance(server, dict):
         return {}
@@ -224,7 +224,7 @@ def get_cached_etag() -> str:
 
 
 def _update_announcement_state(patch: dict[str, Any]) -> None:
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
 
     def update(server: Any) -> dict[str, Any]:
         result = dict(server) if isinstance(server, dict) else {}
@@ -276,7 +276,7 @@ def fetch_announcement_manifest(
     timeout: float = 5.0,
 ) -> AnnouncementFetchResult:
     """从固定 GitHub Pages 地址获取公告，支持 ETag/304。"""
-    from .telemetry.consent import is_offline_mode
+    from ..telemetry.consent import is_offline_mode
     if is_offline_mode():
         raise AnnouncementNetworkError("当前为离线模式，请关闭离线模式后刷新公告")
     req = Request(ANNOUNCEMENT_URL)

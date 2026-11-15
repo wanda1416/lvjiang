@@ -102,7 +102,7 @@ def test_cached_claim_expires_at_boundary(grant, monkeypatch):
 def test_claim_snapshot_and_package_request_verify_signed_denial(grant, monkeypatch):
     from lvjiang.core.config import member_download, protected_remote
     from lvjiang.core.config.content_service import ServiceError
-    from lvjiang.core.update_bundle import json_bytes
+    from lvjiang.core.updates.bundle import json_bytes
     voucher, serial, receipt, activated = grant
     store.save_activation(voucher, receipt())
     monkeypatch.setattr(licensing, "current_serial", lambda: serial)
@@ -135,7 +135,7 @@ def test_package_key_and_denial_cannot_be_modified_outside_signed_proof(grant, m
 
     from lvjiang.core.config import member_download, protected_remote
     from lvjiang.core.config.protected_bundle import digest, encrypt
-    from lvjiang.core.update_bundle import json_bytes
+    from lvjiang.core.updates.bundle import json_bytes
     voucher, serial, receipt, activated = grant
     store.save_activation(voucher, receipt())
     key = b"k" * 32
@@ -192,7 +192,7 @@ def test_rechecking_selected_code_persists_authenticated_revocation(grant, monke
 
 def test_activation_secrets_are_rejected_by_public_and_encrypted_bundle_contracts():
     from lvjiang.core.config.protected_bundle import encrypt
-    from lvjiang.core.update_bundle import safe_path
+    from lvjiang.core.updates.bundle import safe_path
     assert not safe_path("license-activation.json")
     assert not safe_path("nested/LICENSE.TXT")
     assert not safe_path(".license-unfinished")

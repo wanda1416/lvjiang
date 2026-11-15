@@ -21,7 +21,7 @@ if TYPE_CHECKING:  # pragma: no cover - 仅类型标注
     from fasteners import InterProcessLock
 
 # 这个模块被「裸 Python」构建脚本导入：`scripts/build_android_preset.py` 在
-# 没有安装项目依赖的构建机上 import `core.system_preset` → `core.fs_util`。
+# 没有安装项目依赖的构建机上 import `core.updates.system_preset` → `core.fs_util`。
 # 因此第三方依赖一律在真正加锁处再导入，模块顶层只允许标准库。
 
 #: 等待其它实例释放写锁的上限（秒）。没有上限会让 UI 线程无声卡死，

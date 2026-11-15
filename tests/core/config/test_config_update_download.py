@@ -2,7 +2,7 @@
 import pytest
 
 from lvjiang.core.config.update_download import fetch_public_update
-from lvjiang.core.update_bundle import (
+from lvjiang.core.updates.bundle import (
     PUBLIC_INDEX_URL,
     digest,
     json_bytes,

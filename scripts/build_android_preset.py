@@ -1,4 +1,4 @@
-"""为 Gradle 构建官方预置配置；宿主需标准库、packaging 和 core.system_preset。"""
+"""为 Gradle 构建官方预置配置；宿主需标准库、packaging 和 core.updates.system_preset。"""
 from __future__ import annotations
 
 import argparse
@@ -9,13 +9,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from lvjiang.core.paths import get_config_system_dir  # noqa: E402
-from lvjiang.core.preset_sources import (  # noqa: E402
+from lvjiang.core.updates.preset_sources import (  # noqa: E402
     excluded_files,
     format_excluded,
     present_files,
     tracked_files,
 )
-from lvjiang.core.system_preset import build_system_preset  # noqa: E402
+from lvjiang.core.updates.system_preset import build_system_preset  # noqa: E402
 
 
 def main() -> None:

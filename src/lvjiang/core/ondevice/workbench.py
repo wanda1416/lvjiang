@@ -223,7 +223,7 @@ def public_content(kind: str, refresh: bool = False) -> str:
             from ..about import about_content
             return _json({"ok": True, **about_content()})
         if kind == "notices":
-            from ..announcement import (
+            from ..updates.announcement import (
                 applicable_notices,
                 cache_manifest,
                 fetch_announcement_manifest,

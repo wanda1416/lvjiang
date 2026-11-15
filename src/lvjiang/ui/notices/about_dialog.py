@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.about import about_content
-from ...core.update import (
+from ...core.updates.release import (
     GITHUB_REPO,
     ReleaseInfo,
     get_version,

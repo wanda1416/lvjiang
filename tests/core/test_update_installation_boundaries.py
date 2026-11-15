@@ -13,7 +13,7 @@ from lvjiang.core.config import protected_remote, remote, resolver
 from lvjiang.core.config.member_download import MemberDownload
 from lvjiang.core.config.update_store import UpdateStore
 from lvjiang.core.layout.maps import MapManager
-from lvjiang.core.update_bundle import make_manifest, tree_digest
+from lvjiang.core.updates.bundle import make_manifest, tree_digest
 from lvjiang.workflows.grammar.parser.api import parse_text
 
 

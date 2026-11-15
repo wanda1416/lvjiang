@@ -6,9 +6,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from lvjiang.core import announcement, config, update
+from lvjiang.core import config
 from lvjiang.core.config.models import NetworkConfig
 from lvjiang.core.telemetry import consent
+from lvjiang.core.updates import announcement
+from lvjiang.core.updates import release as update
 from lvjiang.ui.main.startup_ops import StartupOpsMixin
 
 

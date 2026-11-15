@@ -54,7 +54,7 @@ from ...core.android.gesture_probe import (
     run_concurrent_probe,
     screen_size,
 )
-from ...core.update import get_version
+from ...core.updates.release import get_version
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style
 from .device_scan import DeviceDiscoveryWorker, DeviceScanPanel

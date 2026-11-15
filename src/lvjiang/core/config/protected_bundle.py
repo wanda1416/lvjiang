@@ -10,8 +10,8 @@ from pathlib import PurePosixPath
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from ..update_bundle import safe_path as configuration_path
-from ..update_bundle import validate_names
+from ..updates.bundle import safe_path as configuration_path
+from ..updates.bundle import validate_names
 
 AAD = b"lvjiang-protected-bundle-v1"
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024

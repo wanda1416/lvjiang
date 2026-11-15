@@ -2,7 +2,7 @@
 import pytest
 from packaging.version import InvalidVersion
 
-from lvjiang.core import update
+from lvjiang.core.updates import release as update
 from lvjiang.core.versioning import (
     application_version,
     config_version,

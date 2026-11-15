@@ -24,9 +24,9 @@ from loguru import logger  # noqa: E402
 from lvjiang.core.config import member_download, protected_remote, remote  # noqa: E402
 from lvjiang.core.config import resolver as resolver_module  # noqa: E402
 from lvjiang.core.config.resolver import ConfigResolver  # noqa: E402
-from lvjiang.core.system_preset import write_baseline_identity  # noqa: E402
-from lvjiang.core.update import get_version  # noqa: E402
-from lvjiang.core.update_bundle import read_tree  # noqa: E402
+from lvjiang.core.updates.bundle import read_tree  # noqa: E402
+from lvjiang.core.updates.release import get_version  # noqa: E402
+from lvjiang.core.updates.system_preset import write_baseline_identity  # noqa: E402
 
 logger.remove()
 logger.add(sys.stdout, level="INFO", format="{message}")

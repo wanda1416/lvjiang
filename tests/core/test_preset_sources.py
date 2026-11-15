@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lvjiang.core.preset_sources import (
+from lvjiang.core.updates.preset_sources import (
     TEXT_SUFFIXES,
     excluded_files,
     format_excluded,
@@ -41,7 +41,7 @@ def test_tracked_files_returns_none_when_git_unavailable(monkeypatch, tmp_path, 
             raise OSError("git 不存在")
         return subprocess.CompletedProcess(args=[], returncode=128, stdout=b"", stderr=b"")
 
-    monkeypatch.setattr("lvjiang.core.preset_sources.subprocess.run", fake_run)
+    monkeypatch.setattr("lvjiang.core.updates.preset_sources.subprocess.run", fake_run)
     assert tracked_files(tmp_path, "config/system") is None
 
 

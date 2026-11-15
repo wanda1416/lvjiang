@@ -11,7 +11,7 @@ from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.content import rebuild_content
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.scene import registry as scene_registry
-from lvjiang.core.system_preset import write_baseline_identity
+from lvjiang.core.updates.system_preset import write_baseline_identity
 
 
 def project(tmp_path, monkeypatch, *, dev):
@@ -29,7 +29,7 @@ def project(tmp_path, monkeypatch, *, dev):
         '{"content_version":1,"regions":[]}', encoding="utf-8")
     resolver = ConfigResolver(system, tmp_path / "local", dev_mode=dev, config_dir=tmp_path)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
-    monkeypatch.setattr("lvjiang.core.update.get_version", lambda: "0.15.0")
+    monkeypatch.setattr("lvjiang.core.updates.release.get_version", lambda: "0.15.0")
     return resolver
 
 

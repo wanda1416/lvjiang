@@ -1,14 +1,11 @@
-"""随包模型记录的源 Excel 必须真的在 `data/excel` 的对应等级目录下。
+"""随包模型记录的源 Excel 必须能找到。
 
-这些计算器表会被持续替换、改名和归档。而两条消费路径对"找不到源文件"的反应
-完全不同：
+模型和表格会持续替换、改名和归档。这里只守一件事：``source.file`` 还能不能在
+``data/excel`` 下找到，而不是要求它必须停在等级目录的根上——归档到「过期版本」
+是正常维护动作，不应把每次数据导入都变成一次测试修复。
 
-- `test_damage_model` 用 `glob("*/<file>")` 后断言恰好 1 个命中，改名后**直接
-  失败**，但报错只有 `('牵丝·玉.yaml', [])`，看不出是谁改了什么；
-- `test_rotation_real_workbooks` 配不上就把那一组**静默跳过**，于是改名或归档
-  会悄悄抽掉一个流派的轴对账覆盖，全绿但其实少测了。
-
-所以这里单独守一道：谁的 `source.file` 失效、现在文件在哪，一次说清。
+毕业率模型按身份只校验最新版本：历史版本允许指向已归档的旧表，运行时也不会
+再选中它们。
 """
 from __future__ import annotations
 
@@ -23,39 +20,45 @@ _DAMAGE_DIR = _ROOT / "config" / "system" / "yysls" / "damage_model"
 _GRADUATION_DIR = _ROOT / "config" / "system" / "yysls" / "graduation"
 
 
-def _elsewhere(name: str) -> list[str]:
-    """同名文件是不是被挪到了别处（最典型是归进「过期版本」子目录）。"""
-    return [
-        str(path.relative_to(_EXCEL_DIR))
-        for path in _EXCEL_DIR.rglob(name)
-    ]
+def _workbook_hits(name: str) -> list[Path]:
+    """同名源表可能同时存在于等级目录和「过期版本」子目录。"""
+    return sorted(_EXCEL_DIR.rglob(name))
 
 
 def test_damage_models_point_at_an_existing_workbook() -> None:
     missing = []
     for path in sorted(_DAMAGE_DIR.glob("*.yaml")):
         name = yaml.safe_load(path.read_text(encoding="utf-8"))["source"]["file"]
-        hits = list(_EXCEL_DIR.glob(f"*/{name}"))
-        if len(hits) != 1:
+        if not _workbook_hits(name):
             missing.append(
-                f"{path.name}: source.file={name!r} 在 data/excel/*/ 下命中 "
-                f"{len(hits)} 个；全树同名文件={_elsewhere(name) or '无'}")
+                f"{path.name}: source.file={name!r} 在 data/excel 下找不到")
     assert not missing, "\n".join(missing)
 
 
-def test_graduation_schemes_point_at_an_existing_workbook() -> None:
-    """轴对账按「<等级>级/<source.file>」配对，配不上会静默跳过整组。"""
-    missing = []
+def test_latest_graduation_schemes_point_at_an_existing_workbook() -> None:
+    """只校验每个身份的最新模型；旧版本可以指向「过期版本」里的历史表。"""
+    latest: dict[tuple[str, str, int], tuple[int, Path, dict]] = {}
     for path in sorted(_GRADUATION_DIR.glob("*/*.json")):
         scheme = json.loads(path.read_text(encoding="utf-8"))
-        name = scheme.get("source", {}).get("file", "")
+        school = scheme.get("school")
+        name = scheme.get("scheme")
         level = scheme.get("model_level")
-        if not name:
+        version = scheme.get("model_version")
+        if not (isinstance(school, str) and isinstance(name, str)
+                and isinstance(level, int) and isinstance(version, int)):
+            continue
+        key = (school, name, level)
+        if key not in latest or version > latest[key][0]:
+            latest[key] = (version, path, scheme)
+    missing = []
+    for (_school, _scheme, _level), (_version, path, scheme) in sorted(
+            latest.items()):
+        file_name = scheme.get("source", {}).get("file", "")
+        if not file_name:
             missing.append(f"{path.name}: 没有记录 source.file")
             continue
-        if not (_EXCEL_DIR / f"{level}级" / name).is_file():
+        if not _workbook_hits(file_name):
             missing.append(
-                f"{path.parent.name}/{path.name}: source.file={name!r} 不在 "
-                f"data/excel/{level}级/ 下；全树同名文件="
-                f"{_elsewhere(name) or '无'}")
+                f"{path.parent.name}/{path.name}: source.file={file_name!r} "
+                "在 data/excel 下找不到")
     assert not missing, "\n".join(missing)

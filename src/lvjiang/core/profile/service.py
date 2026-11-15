@@ -503,8 +503,14 @@ def _write_note(
     set_value: float | str | None,
     source: str,
     force_write: bool,
+    expected_entry: Entry | _ExpectAbsent | None = None,
+    use_cas: bool = False,
 ) -> str:
-    """note 模型：文本直接进 ``value_text`` 列，不走数值管线、不触发同步。"""
+    """note 模型：文本直接进 ``value_text`` 列，不走数值管线、不触发同步。
+
+    给了 CAS 快照时按**文本**做乐观并发：用户看到的文本已被别人改过就抛
+    :class:`ProfileWriteConflict`，而不是静默覆盖。
+    """
     if kd is None:
         logger.warning(f"profile_action: note key '{key}' 未在 profile.yaml 中定义")
         return ""
@@ -522,12 +528,30 @@ def _write_note(
     if event is None:
         return old_text or ""
     _submit_synchronous(event)
-    db_upsert(
-        username, model_type, key, 0,
-        op_type="set",
-        value_text=text,
-        source=source,
-    )
+    if use_cas and expected_entry is not None:
+        snapshot = expected_entry if isinstance(expected_entry, Entry) else None
+        updated = db_update_if_current(
+            username, model_type, key,
+            expected_value=0,
+            expected_updated_at=snapshot.event_at if snapshot else "",
+            expected_entry_exists=snapshot is not None,
+            new_value=0,
+            op_type="set",
+            delta_value=0,
+            source=source,
+            # 文本维度：比对用户看到的那段文本，而不是数值列。
+            expected_value_text=(snapshot.value_text if snapshot else ""),
+            value_text=text,
+        )
+        if not updated:
+            raise ProfileWriteConflict(f"{username} {model_type}.{key} CAS failed")
+    else:
+        db_upsert(
+            username, model_type, key, 0,
+            op_type="set",
+            value_text=text,
+            source=source,
+        )
     _dispatch_event(
         event, fire_targets=False, username=username, model_type=model_type,
         key=key, kd=kd, delta=0.0, source=source,
@@ -717,6 +741,7 @@ def profile_action(
             username, key, model_type, kd,
             delta=delta, set_value=set_value, source=source,
             force_write=force_write,
+            expected_entry=expected_entry, use_cas=use_cas,
         )
 
     if current_value is None or set_value is not None:

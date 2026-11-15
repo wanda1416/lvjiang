@@ -227,6 +227,8 @@ def db_update_if_current(
     delta_value: float | None = None,
     source: str = "",
     sync_from: str | None = None,
+    expected_value_text: str | None = None,
+    value_text: str = "",
 ) -> bool:
     return get_profile_db().update_if_current(
         username,
@@ -241,6 +243,8 @@ def db_update_if_current(
         delta_value=delta_value,
         sync_from=sync_from,
         source=source,
+        expected_value_text=expected_value_text,
+        value_text=value_text,
     )
 
 

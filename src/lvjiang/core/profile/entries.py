@@ -467,13 +467,19 @@ class EntriesMixin:
         delta_value: float | None = None,
         source: str = "",
         sync_from: str | None = None,
+        expected_value_text: str | None = None,
+        value_text: str = "",
     ) -> bool:
         """CAS 更新单条 entry。
 
-        仅当当前条目的存在状态、value 与 event_at 仍等于调用方
-        读到的快照时才写入。预期条目不存在时使用原子插入；若已被
-        其他进程先行创建，则仍返回冲突。
-        返回 True 表示更新成功；False 表示状态已被其他进程修改，本轮调用方应放弃。
+        仅当当前条目的存在状态、value（或 ``value_text``）与 event_at 仍等于调用方
+        读到的快照时才写入。预期条目不存在时使用原子插入；若已被其他进程先行创建，
+        则仍返回冲突。返回 True 表示更新成功；False 表示状态已被其他进程修改，
+        本轮调用方应放弃。
+
+        ``expected_value_text`` 非 ``None`` 时按**文本**比对（note 模型），此时
+        ``value`` 列仍写入调用方给的值（note 恒为 0）；``None`` 表示按数值比对。
+        两者互斥，调用方只能选一种快照维度。
         """
         old_value = float(expected_value)
         value = float(new_value)
@@ -482,7 +488,21 @@ class EntriesMixin:
         conn = self._borrow_connection()
         try:
             self._begin(conn)
-            if expected_entry_exists:
+            text_cas = expected_value_text is not None
+            if expected_entry_exists and text_cas:
+                # 文本维度：WHERE 里比对 COALESCE(value_text,'')，其余同数值 CAS。
+                cursor = conn.execute(
+                    "UPDATE profile_entries "
+                    "SET value=?, value_text=?, event_at=?, created_at=? "
+                    "WHERE username=? AND type=? AND key=? "
+                    "AND COALESCE(value_text, '')=? AND event_at=? AND locked=0",
+                    (
+                        value, value_text, event_at, write_ts, username, type_, key,
+                        expected_value_text, expected_updated_at,
+                    ),
+                )
+                history_old_value = old_value
+            elif expected_entry_exists:
                 cursor = conn.execute(
                     "UPDATE profile_entries "
                     "SET value=?, event_at=?, created_at=? "
@@ -493,14 +513,14 @@ class EntriesMixin:
                         old_value, expected_updated_at,
                     ),
                 )
-                history_old_value: float | None = old_value
+                history_old_value = old_value
             else:
                 cursor = conn.execute(
                     "INSERT INTO profile_entries "
                     "(username, type, key, value, value_text, event_at, created_at) "
-                    "VALUES (?, ?, ?, ?, '', ?, ?) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(username, type, key) DO NOTHING",
-                    (username, type_, key, value, event_at, write_ts),
+                    (username, type_, key, value, value_text, event_at, write_ts),
                 )
                 history_old_value = None
             if cursor.rowcount != 1:
@@ -509,6 +529,7 @@ class EntriesMixin:
 
             if op_type is not None and should_record(
                 op_type, type_=type_, old_value=history_old_value, new_value=value,
+                old_value_text=expected_value_text or "", value_text=value_text,
             ):
                 written = record_history(
                     conn,
@@ -516,6 +537,7 @@ class EntriesMixin:
                     event_at=event_at,
                     username=username, type_=type_, key=key,
                     old_value=history_old_value, new_value=value,
+                    old_value_text=expected_value_text or "", value_text=value_text,
                     op_type=op_type, delta_value=delta_value,
                     source=source, sync_from=sync_from,
                     instance_id=author_stamp(),

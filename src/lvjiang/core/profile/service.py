@@ -421,6 +421,235 @@ def profile_observe(
 # ─── 共享写入管线 ─────────────────────────────────────────────
 
 
+def _prepare_event(
+    username: str,
+    model_type: str,
+    key: str,
+    *,
+    old_value,
+    new_value,
+    delta: float | None,
+    source: str,
+    kd,
+    op_type: str = "set",
+):
+    """构造一次变更事件；返回 ``None`` 表示被变更脚本拒绝，本次写入应放弃。"""
+    from .triggers import prepare_trigger_event
+
+    return prepare_trigger_event(
+        username=username,
+        model=model_type,
+        key=key,
+        old_value=old_value,
+        new_value=new_value,
+        delta=delta,
+        source=source,
+        op_type=op_type,
+        script=kd.change_script if kd else "",
+        synchronous=kd.change_script_sync if kd else False,
+    )
+
+
+def _submit_synchronous(event) -> None:
+    """同步变更脚本必须「跑完再写值」，所以在落库之前就地执行。"""
+    if event is not None and event.synchronous:
+        from .triggers import submit_profile_trigger
+
+        submit_profile_trigger(event)
+
+
+def _dispatch_event(
+    event,
+    *,
+    fire_targets: bool,
+    username: str,
+    model_type: str,
+    key: str,
+    kd,
+    delta: float,
+    source: str,
+) -> None:
+    """落库之后的触发器派发：异步脚本与 ``sync_targets`` 链都在这里发生。
+
+    ``fire_targets`` 只在调用方本身不是同步目标写入器时为真——同步适配器
+    再触发一次 sync_targets 会沿链无限递归。
+    """
+    if event is None:
+        return
+    from .triggers import submit_profile_trigger, trigger_context
+
+    with trigger_context(event):
+        if not event.synchronous:
+            submit_profile_trigger(event)
+        if fire_targets and kd and kd.sync_targets:
+            from .sync import fire_sync_targets
+
+            fire_sync_targets(
+                write_fn=sync_write_adapter,
+                user_name=username,
+                source_kd=kd,
+                delta=delta,
+                source=source,
+            )
+
+
+def _write_note(
+    username: str,
+    key: str,
+    model_type: str,
+    kd,
+    *,
+    delta: float | None,
+    set_value: float | str | None,
+    source: str,
+    force_write: bool,
+) -> str:
+    """note 模型：文本直接进 ``value_text`` 列，不走数值管线、不触发同步。"""
+    if kd is None:
+        logger.warning(f"profile_action: note key '{key}' 未在 profile.yaml 中定义")
+        return ""
+    text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
+    text = normalize_note_text(text, kd)
+    old_entry = db_read_entry(username, model_type, key)
+    old_text = old_entry.value_text if old_entry else None
+    if old_entry and text == (old_text or "") and not force_write:
+        return text
+    event = _prepare_event(
+        username, model_type, key,
+        old_value=old_text, new_value=text, delta=None,
+        source=source, kd=kd, op_type="set",
+    )
+    if event is None:
+        return old_text or ""
+    _submit_synchronous(event)
+    db_upsert(
+        username, model_type, key, 0,
+        op_type="set",
+        value_text=text,
+        source=source,
+    )
+    _dispatch_event(
+        event, fire_targets=False, username=username, model_type=model_type,
+        key=key, kd=kd, delta=0.0, source=source,
+    )
+    return text
+
+
+def _read_numeric_current(username: str, model_type: str, key: str, kd) -> float:
+    """步骤 1：读当前值。regen 按实时计算，锁定 key 已在调用方短路。"""
+    raw = _read_current_value(username, model_type, key, kd)
+    # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
+    return float(raw or 0) if raw is None or isinstance(raw, str) else raw
+
+
+def _materialize_regen(
+    username: str,
+    model_type: str,
+    key: str,
+    kd,
+    *,
+    current_entry: Entry | None,
+    current_value: float,
+    expected_entry: Entry | _ExpectAbsent | None,
+) -> tuple[Entry | None, float, Entry | _ExpectAbsent | None]:
+    """步骤 1.5：把「上次写入至今的恢复」先单独落成一条 regen 行。
+
+    不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
+    两处基线不一致：回放（delta 相加）、撤销、按来源聚合都会算错，当天的恢复
+    也会从账本里消失。
+
+    这一步不看「本进程是否同步过」：周期自动写已经取消，固化只发生在真实写入
+    事务里，而那笔业务写入写的就是现场真值（OCR / DSL / 手动），不依赖远端基线。
+    即使他端把这条 regen 行认成最新值，下一次观测写回的绝对真值会覆盖回来。
+    """
+    if model_type != MODEL_REGEN or not isinstance(kd, RegenKeyDef):
+        return current_entry, current_value, expected_entry
+
+    stored_value = float((current_entry.value if current_entry else 0) or 0)
+    restored = compute_regen_entry(current_entry, kd)
+    restored_value = float(restored.value)
+    # 速率型的锚点就是上次写入时刻，把它写进条目会让下一次读重复累加这段恢复，
+    # 所以落当前时刻；周期型用跨过的边界时刻，语义才是「该边界之后的值」。
+    restored_at = None if is_realtime_regen(kd) else restored.event_at
+    # 只要「确实恢复过」就落这一行，不按整数点位判断：不到 1 点的小数恢复
+    # 若被合并进业务行，那一行就又不满足 new = old + delta 了。
+    if _normalize_float_noise(restored_value - stored_value) == 0:
+        return current_entry, current_value, expected_entry
+
+    # 先落一条 regen 行：描述「至今实际恢复了多少」，值是恢复后的绝对值
+    # （覆盖语义），source 留空——恢复是机制不是业务。随后业务写入（set/delta）
+    # 另行成行。
+    db_upsert(
+        username, model_type, key, restored_value,
+        event_at=restored_at,
+        op_type="regen",
+        delta_value=_normalize_float_noise(restored_value - stored_value),
+        source="",
+    )
+    current_entry = db_read_entry(username, model_type, key)
+    if expected_entry is not None:
+        # 固化是本事务自己写的：CAS 期望值必须跟着换，否则会被误判成
+        # 「其他进程更新过」，单进程一次消耗也会报冲突。
+        expected_entry = current_entry
+    return current_entry, float(restored.value), expected_entry
+
+
+def _resolve_new_value(
+    current_value: float,
+    model_type: str,
+    kd,
+    *,
+    delta: float | None,
+    set_value: float | str | None,
+) -> float:
+    """目标新值 = 绝对值或旧值 ± 增量，再按模型规则 clamp。"""
+    if set_value is not None:
+        target = float(set_value)
+    else:
+        target = current_value + float(delta or 0)
+    return _normalize_float_noise(_clamp(_normalize_float_noise(target), model_type, kd))
+
+
+def _persist_numeric(
+    username: str,
+    model_type: str,
+    key: str,
+    *,
+    value: float,
+    delta_value: float,
+    source: str,
+    expected_entry: Entry | _ExpectAbsent | None,
+    use_cas: bool,
+    trigger_sync: bool,
+) -> None:
+    """写入数值并记账：调用方给了 CAS 期望值就走 compare-and-set，否则直接 upsert。"""
+    if trigger_sync and use_cas and expected_entry is not None:
+        # 三态：None=调用方不做 CAS；EXPECT_ABSENT=期望该行不存在（原空 dict）；
+        # Entry=按打开界面时的快照做 CAS。
+        snapshot = expected_entry if isinstance(expected_entry, Entry) else None
+        absent = snapshot is None
+        updated = db_update_if_current(
+            username, model_type, key,
+            expected_value=(snapshot.value if snapshot else 0) or 0,
+            expected_updated_at=snapshot.event_at if snapshot else "",
+            expected_entry_exists=not absent,
+            new_value=value,
+            new_updated_at=None,
+            op_type="set",
+            delta_value=delta_value,
+            source=source,
+        )
+        if not updated:
+            raise ProfileWriteConflict(f"{username} {model_type}.{key} CAS failed")
+        return
+    db_upsert(
+        username, model_type, key, value,
+        op_type="set",
+        delta_value=delta_value,
+        source=source,
+    )
+
+
 @profile_write
 def profile_action(
     username: str,
@@ -471,7 +700,7 @@ def profile_action(
         return 0
     kd = config.get_key(key, model_type=model_type)
 
-    # ── 锁定短路：锁定 key 物理失效，任何写入一律拒绝 ──
+    # 锁定短路：锁定 key 物理失效，任何写入一律拒绝。
     # 记 error 而不是 warning：走到这里说明调用方没先查 profile_locked，
     # 属于漏判，需要在日志里暴露出来（正常流程应当先判锁再决定是否写）。
     current_entry = db_read_entry(username, model_type, key)
@@ -483,177 +712,51 @@ def profile_action(
             return current_entry.value_text or ""
         return current_entry.value or 0
 
-    # ── note 短路：文本直接写入，不走数值管线 ──
     if model_type == MODEL_NOTE:
-        if kd is None:
-            logger.warning(f"profile_action: note key '{key}' 未在 profile.yaml 中定义")
-            return ""
-        text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
-        text = normalize_note_text(text, kd)
-        old_entry = db_read_entry(username, model_type, key)
-        old_text = old_entry.value_text if old_entry else None
-        if old_entry and text == (old_text or "") and not force_write:
-            return text
-        from .triggers import (
-            prepare_trigger_event,
-            submit_profile_trigger,
-            trigger_context,
+        return _write_note(
+            username, key, model_type, kd,
+            delta=delta, set_value=set_value, source=source,
+            force_write=force_write,
         )
-        event = prepare_trigger_event(
-            username=username,
-            model=model_type,
-            key=key,
-            old_value=old_text,
-            new_value=text,
-            delta=None,
-            source=source,
-            op_type="set",
-            script=kd.change_script,
-            synchronous=kd.change_script_sync,
-        )
-        if event is None:
-            return old_text or ""
-        if event.synchronous:
-            submit_profile_trigger(event)
-        db_upsert(
-            username, model_type, key, 0,
-            op_type="set",
-            value_text=text,
-            source=source,
-        )
-        with trigger_context(event):
-            if not event.synchronous:
-                submit_profile_trigger(event)
-        return text
 
-    # ── 1. 读当前值 ──
     if current_value is None or set_value is not None:
-        _raw = _read_current_value(username, model_type, key, kd)
-        # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
-        current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
-
-    # ── 1.5 regen 固化：先把「上次写入至今的恢复」单独落成一条 regen 行 ──
-    # 不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
-    # 两处基线不一致：回放（delta 相加）、撤销、按来源聚合都会算错，
-    # 当天的恢复也会从账本里消失。
-    #
-    # 这一步不再看「本进程是否同步过」：周期自动写已经取消，固化只发生在真实写入
-    # 事务里，而那笔业务写入写的就是现场真值（OCR / DSL / 手动），不依赖远端基线。
-    # 即使他端把这条 regen 行认成最新值，下一次观测写回的绝对真值会覆盖回来。
-    if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
-        stored_value = float((current_entry.value if current_entry else 0) or 0)
-        restored = compute_regen_entry(current_entry, kd)
-        restored_value = float(restored.value)
-        # 速率型的锚点就是上次写入时刻，把它写进条目会让下一次读重复累加这段恢复，
-        # 所以落当前时刻；周期型用跨过的边界时刻，语义才是「该边界之后的值」。
-        restored_at = None if is_realtime_regen(kd) else restored.event_at
-        # 只要「确实恢复过」就落这一行，不按整数点位判断：不到 1 点的小数恢复
-        # 若被合并进业务行，那一行就又不满足 new = old + delta 了。
-        if _normalize_float_noise(restored_value - stored_value) != 0:
-            # 先落一条 regen 行：描述「至今实际恢复了多少」，值是恢复后的绝对值
-            # （覆盖语义），source 留空——恢复是机制不是业务。随后业务写入
-            # （set/delta）另行成行。
-            db_upsert(
-                username, model_type, key, restored_value,
-                event_at=restored_at,
-                op_type="regen",
-                delta_value=_normalize_float_noise(restored_value - stored_value),
-                source="",
-            )
-            current_entry = db_read_entry(username, model_type, key)
-            current_value = float(restored.value)
-            if expected_entry is not None:
-                # 固化是本事务自己写的：CAS 期望值必须跟着换，否则会被误判成
-                # 「其他进程更新过」，单进程一次消耗也会报冲突。
-                expected_entry = current_entry
-
-    # ── 2. 计算目标新值 ──
-    if set_value is not None:
-        target = float(set_value)
-    else:
-        target = current_value + float(delta or 0)
-    target = _normalize_float_noise(target)
-
-    # ── 3. clamp ──
-    new_value = _normalize_float_noise(_clamp(target, model_type, kd))
-
-    # clamp 后值未变 → 不产生写入
+        current_value = _read_numeric_current(username, model_type, key, kd)
+    current_entry, current_value, expected_entry = _materialize_regen(
+        username, model_type, key, kd,
+        current_entry=current_entry, current_value=current_value,
+        expected_entry=expected_entry,
+    )
+    new_value = _resolve_new_value(
+        current_value, model_type, kd, delta=delta, set_value=set_value)
     if new_value == current_value and not force_write:
         return current_value
 
-    # ── 4. 计算 clamp 后的实际 delta ──
     actual_delta = _normalize_float_noise(new_value - current_value)
-    semantic_new_value = new_value
-
-    # realtime 直接存精确小数和真实时间，不再回拨 event_at。
-    write_value = new_value
-    op_type = "set"
-    ledger_delta = actual_delta
-    from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
     event = None
     if actual_delta != 0:
-        event = prepare_trigger_event(
-            username=username,
-            model=model_type,
-            key=key,
-            old_value=current_value,
-            new_value=semantic_new_value,
-            delta=actual_delta,
-            source=source,
-            op_type=op_type,
-            script=kd.change_script if kd else "",
-            synchronous=kd.change_script_sync if kd else False,
+        event = _prepare_event(
+            username, model_type, key,
+            old_value=current_value, new_value=new_value, delta=actual_delta,
+            source=source, kd=kd,
         )
         if event is None:
             return current_value
-        if event.synchronous:
-            submit_profile_trigger(event)
-    if trigger_sync and use_cas and expected_entry is not None:
-        # 三态：None=调用方不做 CAS；EXPECT_ABSENT=期望该行不存在（原空 dict）；
-        # Entry=按打开界面时的快照做 CAS。
-        snapshot = expected_entry if isinstance(expected_entry, Entry) else None
-        absent = snapshot is None
-        updated = db_update_if_current(
-            username, model_type, key,
-            expected_value=(snapshot.value if snapshot else 0) or 0,
-            expected_updated_at=snapshot.event_at if snapshot else "",
-            expected_entry_exists=not absent,
-            new_value=write_value,
-            new_updated_at=None,
-            op_type=op_type,
-            delta_value=ledger_delta,
-            source=source,
-        )
-        if not updated:
-            raise ProfileWriteConflict(f"{username} {model_type}.{key} CAS failed")
-    else:
-        db_upsert(
-            username, model_type, key, write_value,
-            op_type=op_type,
-            delta_value=ledger_delta,
-            source=source,
-        )
+        _submit_synchronous(event)
+
+    _persist_numeric(
+        username, model_type, key, value=new_value,
+        delta_value=actual_delta, source=source,
+        expected_entry=expected_entry, use_cas=use_cas, trigger_sync=trigger_sync,
+    )
     logger.debug(
         f"profile_action: {username}.{model_type}.{key} = "
-        f"{semantic_new_value} (delta={actual_delta:+g})"
+        f"{new_value} (delta={actual_delta:+g})"
     )
-
-    # ── 8. 触发器同步 ──
-    if event is not None:
-        with trigger_context(event):
-            if not event.synchronous:
-                submit_profile_trigger(event)
-            if trigger_sync and kd and kd.sync_targets:
-                from .sync import fire_sync_targets
-                fire_sync_targets(
-                    write_fn=sync_write_adapter,
-                    user_name=username,
-                    source_kd=kd,
-                    delta=actual_delta,
-                    source=source,
-                )
-
-    return semantic_new_value
+    _dispatch_event(
+        event, fire_targets=trigger_sync, username=username,
+        model_type=model_type, key=key, kd=kd, delta=actual_delta, source=source,
+    )
+    return new_value
 
 
 # ─── sync_engine 独立写入适配器 ──────────────────────────────
@@ -695,32 +798,22 @@ def sync_write_adapter(
     # sync 适配器仅用于数值模型
     if current_value is None or isinstance(current_value, str):
         current_value = 0.0
-    new_value = _normalize_float_noise(_clamp(current_value + delta, model_type, kd))
-    semantic_new_value = new_value
-    actual_delta = _normalize_float_noise(semantic_new_value - current_value)
+    new_value = _resolve_new_value(
+        current_value, model_type, kd, delta=delta, set_value=None)
+    actual_delta = _normalize_float_noise(new_value - current_value)
 
     # clamp 后值未变 → 不产生写入
     if new_value == current_value:
         return current_value, 0
 
-    from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
-    event = prepare_trigger_event(
-        username=user_name,
-        model=model_type,
-        key=key,
-        old_value=current_value,
-        new_value=semantic_new_value,
-        delta=actual_delta,
-        source=source,
-        op_type="set",
-        script=kd.change_script if kd else "",
-        synchronous=kd.change_script_sync if kd else False,
+    event = _prepare_event(
+        user_name, model_type, key,
+        old_value=current_value, new_value=new_value, delta=actual_delta,
+        source=source, kd=kd,
     )
     if event is None:
         return current_value, 0
-
-    if event.synchronous:
-        submit_profile_trigger(event)
+    _submit_synchronous(event)
 
     try:
         db_upsert(
@@ -734,9 +827,11 @@ def sync_write_adapter(
         logger.error(f"sync_write_adapter failed: {user_name}.{model_type}.{key}: {e}")
         raise
 
-    with trigger_context(event):
-        if not event.synchronous:
-            submit_profile_trigger(event)
-    return semantic_new_value, actual_delta
+    # 本函数就是同步目标的写入器，再派发 sync_targets 会沿链无限递归。
+    _dispatch_event(
+        event, fire_targets=False, username=user_name, model_type=model_type,
+        key=key, kd=kd, delta=actual_delta, source=source,
+    )
+    return new_value, actual_delta
 
 

@@ -34,11 +34,11 @@
 
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
-| `users/{名}.json` | 用户资料：`created_at`、`avatar`（存 basename）、`attributes`、`workflow_params`、`ui_state`，余下字段按插件扩展保留 | `core/user_config.py` | `document_type=lvjiang.user`、schema v2；`ui_state` 是**按用户隔离**的界面偏好（出装筛选、战斗属性页开关），与 `interface.json` 的页面级 `ui_state` 同名不同义：前者随角色切换，后者随机器 |
+| `users/{名}.json` | 用户资料：`created_at`、`avatar`（存 basename）、`attributes`、`workflow_params`、`ui_state`，余下字段按插件扩展保留 | `core/users/document.py` | `document_type=lvjiang.user`、schema v2；`ui_state` 是**按用户隔离**的界面偏好（出装筛选、战斗属性页开关），与 `interface.json` 的页面级 `ui_state` 同名不同义：前者随角色切换，后者随机器 |
 | `users/{名}.loadouts.json` | 配装方案文档：`revision` + 方案列表，单文档实测可达约 170 KB | `apps/yysls/core/loadout/repository.py` | 整文档读写，靠文档内 `revision` 做乐观并发，不是逐条同步 |
-| `users/{名}.notes.json` | 用户笔记 | `core/user_notes.py` | |
+| `users/{名}.notes.json` | 用户笔记 | `core/users/notes.py` | |
 | `users/{名}.session.json` | DSL `session` 关键字的落点 | `core/config/users.py`（`SessionManager`） | 机制可用但当前无系统脚本写入，见 03-session-and-context |
-| `avatars/avatar_<16hex>.png` | 内容寻址的头像 PNG 库 | `core/user_avatars.py` | 资料里只存 basename，可直接删（改回默认头像） |
+| `avatars/avatar_<16hex>.png` | 内容寻址的头像 PNG 库 | `core/users/avatars.py` | 资料里只存 basename，可直接删（改回默认头像） |
 | `profile.db` | 四模型数值（`profile_entries`）、变更账本（`profile_history`） | `core/profile/repository.py`（`ProfileDB`，读写分布在 `entries.py` / `ledger.py` / `sync_log.py`） | schema v13，`entries.locked` 是「用户 × key」的失效标记；迁移定义在 `core/profile/migrations.py` |
 | `profile.yaml` | 按模型归档的 key 定义 | `core/profile/schema.py` | **是用户数据，不是系统配置**：保存时必须保留未识别定义，不得因升级覆盖 |
 

@@ -159,7 +159,7 @@ DSL 文件不扫描、不自动全文替换。确认窗口只提示用户自行�
 
 「用户信息」页的便利贴不属于 Profile：它不需要预先在
 `profile.yaml` 定义 key，也不参与 DSL、周期计算或变更历史。便利贴
-由 `core/user_notes.py` 按用户独立存储在
+由 `core/users/notes.py` 按用户独立存储在
 `config/session/users/{username}.notes.json`，避免被工作流的
 `{username}.json` session 快照整体回写覆盖。
 

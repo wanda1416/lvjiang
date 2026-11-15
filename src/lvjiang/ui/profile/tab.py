@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.profile.models import format_sync_label
+from ...core.profile.models import MODEL_NOTE, format_sync_label
 from ...core.profile.repository import db_read_index
 from ...core.profile.rows import Entry
 from ...core.profile.store import (
@@ -50,6 +50,7 @@ from ...i18n import tr, tr_label
 from ..user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_refresh_button
 from .cell_editing import ProfileCellEditingMixin
 from .cell_formatting import (
+    ENTRY_SNAPSHOT_ROLE,
     apply_cell_style,
     format_cell_tooltip,
     format_profile_cell,
@@ -508,6 +509,12 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
 
                 item = QTableWidgetItem(display_text)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if model_type == MODEL_NOTE:
+                    # 备注走 CAS：这里记下"渲染这一刻"的条目，用户提交时用它做快照。
+                    # 不能拿单元格文本当快照——note 有 show_cap 时会显示成 12/20，
+                    # 与库里的 value_text（12）不是一个东西。
+                    item.setData(
+                        ENTRY_SNAPSHOT_ROLE, (data.get(model_type) or {}).get(kd.key))
 
                 if sync_capped:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)

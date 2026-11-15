@@ -138,6 +138,12 @@ def quota_reset_remaining(
 # ─── 单元格格式化 ────────────────────────────────────────────
 
 
+#: 单元格上保存"渲染这一刻的条目"的 Qt 角色，供 note 的 CAS 快照使用。
+#: 不能用单元格文本当快照：note 开了 show_cap 时显示成 ``12/20``，
+#: 与库里的 ``value_text``（``12``）不是一个东西。
+ENTRY_SNAPSHOT_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+
+
 def format_profile_cell(kd: KeyDef, model_type: str,
                         data: dict[str, dict[str, Entry]]) -> tuple[str, str]:
     """根据模型类型格式化 profile 值用于总览显示

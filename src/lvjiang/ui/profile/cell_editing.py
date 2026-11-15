@@ -46,6 +46,7 @@ from ...core.profile.store import get_groups
 from ...errors import log_failure
 from ...i18n import tr, tr_label
 from .cell_formatting import (
+    ENTRY_SNAPSHOT_ROLE,
     apply_cell_style,
     format_profile_cell,
     locked_sync_targets,
@@ -226,11 +227,15 @@ class ProfileCellEditingMixin:
                     QMessageBox.warning(self, tr("保存失败"), tr("回写用户数据失败:\n{e}").format(e=error))
                 if group_name in self._tables:
                     self._refresh_group(group_name, self._tables[group_name])
+            # 快照取自渲染那一刻的条目；别人已经改过就报冲突，而不是静默覆盖。
+            snapshot = item.data(ENTRY_SNAPSHOT_ROLE)
+            expected = snapshot if isinstance(snapshot, Entry) else EXPECT_ABSENT
             _write_profile(self, lambda: profile_action(
                 user_name, key_str,
                 model_type=model_type,
                 set_value=raw_value,
                 source="",
+                expected_entry=expected, use_cas=True,
             ), complete_note)
             return
 
@@ -393,7 +398,7 @@ class ProfileCellEditingMixin:
                 action_edit.triggered.connect(
                     lambda: self._edit_note_text(
                         user_name, model_type, key_str, kd, current_text,
-                        group_name, table,
+                        group_name, table, expected_entry,
                     )
                 )
             # note 历史记录
@@ -758,6 +763,7 @@ class ProfileCellEditingMixin:
         current_text: str,
         group_name: str = "",
         table: QTableWidget | None = None,
+        expected_entry: Entry | _ExpectAbsent | None = None,
     ) -> None:
         """弹出多行文本输入框编辑 note 文本"""
         from ...core.profile.service import profile_action
@@ -784,6 +790,8 @@ class ProfileCellEditingMixin:
             model_type=model_type,
             set_value=text,
             source="",
+            # 对话框开着的时候别人改过这段备注 → 报冲突，不覆盖。
+            expected_entry=expected_entry, use_cas=True,
         ), complete)
 
     def _show_history_dialog(  # type: ignore[misc]

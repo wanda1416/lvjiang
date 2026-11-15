@@ -51,7 +51,7 @@
 - `profile_history`（19 列 = 本地 17 + account_id + id）：`remote_id` 由插入后一条批量 `UPDATE … ROW_NUMBER()` 按账号顺延赋值（先以 `remote_id=0` 落占位行，重推被 `DO NOTHING` 跳过因而不占号，所以无空洞）；索引：op_id 唯一（部分索引，查询须显式 `op_id <> ''` 蕴含谓词）、(account_id, remote_id)、(account_id, instance_id, local_id)
 - `profile_entries`（~1320 行）：物化缓存，value 只由 set/reset/regen 推进（meta 的 0/1 不得进入），locked 由最新 meta 行维护；可随时从快照+账本重建
 - `profile_snapshot`：账户级基线（含 locked），保留 20 份；上传时整表替换 entries
-- `account_sync_version`（每账号一行，只剩两列：`documents_head` 文档发号基准、`users_rev` 名册版本号）：**其余状态全部按表查**——`history_head`/条数 = `MAX(remote_id)`（`profile_history_pull` 的 max 反向 seek，1 行；账本无空洞，所以 head 即条数，历史页第一页另做 `COUNT(*)`）、`document_head` = `documents_head`（缺行时回 `MAX(documents.revision)`）、快照摘要 = `profile_snapshot` 最新一行 + `COUNT(*)`、`users` = `COUNT(account_users)`、定义/页面结构摘要 = 两张专表的 `sha256` 点查
+- `account_sync_version`（每账号一行，只剩两列：`documents_head` 文档发号基准、`users_rev` 名册版本号）：**其余状态全部按表查**——`history_head`/条数 = `MAX(remote_id)`（`profile_history_pull` 的 max 反向 seek，1 行；账本无空洞，所以 head 即条数，历史页第一页另做 `COUNT(*)`）、`document_head`/`documents` = `documents_head`（缺行时回 `MAX(documents.revision)`）、快照摘要 = `profile_snapshot` 最新一行、`snapshot_count`/`users` = 有没有快照行 / 有没有名册行（0/1，`EXISTS` 各 1 行）、定义/页面结构摘要 = 两张专表的 `sha256` 点查
 - 旧的 `account_remote_seq` 序号表，以及 `history_head` / `history_rows` / `documents_count` / `snapshot_id` / `snapshot_remote_id` / `snapshot_origin` / `snapshot_created_at` / `snapshot_entries` / `snapshot_count` / `definition_sha256` / `layout_sha256` / `users_count` 这些派生列均已下线：报告值与准确值都来自索引表查询，不再有「缓存副本与真实数据漂移」的两处状态
 
 ## 5. 同步流程

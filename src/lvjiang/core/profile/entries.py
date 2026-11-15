@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -17,7 +18,7 @@ from datetime import datetime
 from loguru import logger
 
 from .author import author_stamp
-from .ledger import record_history
+from .ledger import record_history, should_record
 from .rows import ENTRY_COLUMNS, Entry
 
 
@@ -94,53 +95,91 @@ class EntriesMixin:
             self._release_connection(conn)
         return bool(row and row[0])
 
-    def set_locked(self, username: str, type_: str, key: str) -> bool:
-        """锁定该用户的这个 key；返回是否发生了变化。
+    def _current_locked(
+        self, conn: sqlite3.Connection, username: str, type_: str, key: str,
+    ) -> bool | None:
+        """当前锁状态；行不存在返回 ``None``（区别于"存在但未锁"）。"""
+        row = conn.execute(
+            "SELECT locked FROM profile_entries "
+            "WHERE username=? AND type=? AND key=?",
+            (username, type_, key),
+        ).fetchone()
+        return None if row is None else bool(row[0])
 
-        从未写过的 key 也要能锁：插入一条占位行（value/value_text/event_at
-        全为默认空值），锁定期间这些值不会被任何路径读取或展示。
+    def _write_locked(
+        self,
+        conn: sqlite3.Connection,
+        username: str,
+        type_: str,
+        key: str,
+        locked: int,
+        *,
+        created_at: str,
+        ledger_event_at: str,
+        instance_id: str,
+        op_id: str,
+        remote_id: int | None = None,
+    ) -> None:
+        """把一行的锁状态写成 ``locked``，并补一条 meta 账本行。
+
+        「只动 ``locked``、不碰 ``value`` / ``value_text`` / ``event_at``」这条约定
+        的唯一实现：本地锁定、本地解锁与跨端回放都走这里。三者的差别只在入口条件
+        （本地只在状态真的变化时写）与 ``created_at``：本地新建的占位行没有值，
+        也不记创建时刻；回放行记真实写入时刻。
+
+        meta 行是锁状态的传播载体（``old/new_value`` 为锁定前后 0/1），
+        ``source`` 留空——锁是机制不是业务动作。
         """
+        conn.execute(
+            "INSERT INTO profile_entries "
+            "(username, type, key, value, value_text, event_at, created_at, locked) "
+            "VALUES (?, ?, ?, 0, '', '', ?, ?) "
+            "ON CONFLICT(username, type, key) DO UPDATE SET locked=excluded.locked",
+            (username, type_, key, created_at, locked),
+        )
+        record_history(
+            conn,
+            event_at=ledger_event_at, username=username, type_=type_, key=key,
+            old_value=1 - locked, new_value=locked, op_type="meta",
+            source="", instance_id=instance_id, op_id=op_id, remote_id=remote_id,
+        )
+
+    def _toggle_locked(
+        self, username: str, type_: str, key: str, *, locked: int,
+    ) -> bool:
+        """本地切换锁状态：只在状态真的变化时写库与记账，返回是否变化。"""
         conn = self._borrow_connection()
         try:
             self._begin(conn)
-            cursor = conn.execute(
-                "UPDATE profile_entries SET locked=1 "
-                "WHERE username=? AND type=? AND key=? AND locked=0",
-                (username, type_, key),
+            current = self._current_locked(conn, username, type_, key)
+            # 锁定：已锁就不用动；从未写过的 key 要建占位行才能锁。
+            # 解锁：未锁或行不存在都说明没有可解的状态。
+            already = current is True if locked else current is not True
+            if already:
+                self._rollback(conn)
+                return False
+            self._write_locked(
+                conn, username, type_, key, locked,
+                created_at="",
+                ledger_event_at=datetime.now().isoformat(timespec="seconds"),
+                instance_id=author_stamp(),
+                op_id=str(uuid.uuid4()),
             )
-            changed = cursor.rowcount == 1
-            if not changed:
-                exists = conn.execute(
-                    "SELECT locked FROM profile_entries "
-                    "WHERE username=? AND type=? AND key=?",
-                    (username, type_, key),
-                ).fetchone()
-                if exists is None:
-                    conn.execute(
-                        "INSERT INTO profile_entries "
-                        "(username, type, key, value, value_text, event_at, created_at, locked) "
-                        "VALUES (?, ?, ?, 0, '', '', '', 1)",
-                        (username, type_, key),
-                    )
-                    changed = True
-            if changed:
-                # 锁定传播：meta 账本行（old/new_value = 锁定前后 0/1），
-                # 随上行通道同步到其他设备；meta 是机制分类，source 留空。
-                now = datetime.now().isoformat(timespec="seconds")
-                record_history(
-                    conn,
-                    event_at=now, username=username, type_=type_, key=key,
-                    old_value=0, new_value=1, op_type="meta",
-                    source="", instance_id=author_stamp(),
-                    op_id=str(uuid.uuid4()),
-                )
             self._commit(conn)
-            return changed
+            return True
         except Exception:
             self._rollback(conn)
             raise
         finally:
             self._release_connection(conn)
+
+    def set_locked(self, username: str, type_: str, key: str) -> bool:
+        """锁定该用户的这个 key；返回是否发生了变化。
+
+        从未写过的 key 也要能锁：插入一条占位行（value / value_text / event_at
+        全为默认空值），锁定期间这些值不会被任何路径读取或展示。
+        """
+        return self._toggle_locked(username, type_, key, locked=1)
 
     def unlock(self, username: str, type_: str, key: str) -> bool:
         """解除锁定；返回是否发生了变化。值保持锁定时的样子。
@@ -149,26 +188,38 @@ class EntriesMixin:
         重建值——那会让值在解锁瞬间跳变（regen 会按旧锚点补算上千点），
         与「锁定期间冻结」的承诺相反。
         """
+        return self._toggle_locked(username, type_, key, locked=0)
+
+    def apply_locked(
+        self,
+        username: str,
+        type_: str,
+        key: str,
+        locked: int,
+        *,
+        instance_id: str,
+        event_at: str,
+        op_id: str,
+        remote_id: int | None = None,
+    ) -> None:
+        """回放他端的 meta 行：照抄锁状态，账本行带上远端的幂等键。
+
+        与本地切换的区别只有两点：不做「状态是否变化」的判断（远端说了算），
+        以及 ``created_at`` 记真实写入时刻。
+        """
         conn = self._borrow_connection()
         try:
             self._begin(conn)
-            cursor = conn.execute(
-                "UPDATE profile_entries SET locked=0 "
-                "WHERE username=? AND type=? AND key=? AND locked=1",
-                (username, type_, key),
+            now = datetime.now().isoformat(timespec="seconds")
+            self._write_locked(
+                conn, username, type_, key, 1 if locked else 0,
+                created_at=now,
+                ledger_event_at=event_at or now,
+                instance_id=instance_id,
+                op_id=op_id,
+                remote_id=remote_id,
             )
-            if cursor.rowcount == 1:
-                # 解锁同样传播：meta 行 new_value=0，其他设备回放后解除锁定。
-                now = datetime.now().isoformat(timespec="seconds")
-                record_history(
-                    conn,
-                    event_at=now, username=username, type_=type_, key=key,
-                    old_value=1, new_value=0, op_type="meta",
-                    source="", instance_id=author_stamp(),
-                    op_id=str(uuid.uuid4()),
-                )
             self._commit(conn)
-            return cursor.rowcount == 1
         except Exception:
             self._rollback(conn)
             raise
@@ -304,45 +355,34 @@ class EntriesMixin:
                     (username, type_, key, float(value), value_text, event_at, write_ts),
                 )
 
-            # history 记录
-            if op_type is not None:
-                should_record = False
-                if op_type in ("set", "delta", "reset"):
-                    # 用户主动操作始终记录
-                    should_record = True
-                elif type_ == "note":
-                    # note 模型对比文本值
-                    if old_value_text != value_text:
-                        should_record = True
-                elif old_value != float(value):
-                    # tick 仅在值变化时记录
-                    should_record = True
-
-                if should_record:
-                    written = record_history(
-                        conn,
-                        event_at=history_ts or write_ts,
-                        username=username, type_=type_, key=key,
-                        old_value=old_value, new_value=float(value),
-                        old_value_text=old_value_text or "", value_text=value_text,
-                        op_type=op_type, delta_value=delta_value,
-                        source=source, sync_from=sync_from,
-                        instance_id=instance_id or author_stamp(),
-                        op_id=op_id,
-                        remote_id=remote_id,
-                    )
-                    if written and touch_entry:
-                        conn.execute(
-                            "UPDATE profile_entries SET op_id=? "
-                            "WHERE username=? AND type=? AND key=?",
-                            (written, username, type_, key),
-                        )
-                elif op_id and touch_entry:
+            if op_type is not None and should_record(
+                op_type, type_=type_, old_value=old_value, new_value=float(value),
+                old_value_text=old_value_text, value_text=value_text,
+            ):
+                written = record_history(
+                    conn,
+                    event_at=history_ts or write_ts,
+                    username=username, type_=type_, key=key,
+                    old_value=old_value, new_value=float(value),
+                    old_value_text=old_value_text or "", value_text=value_text,
+                    op_type=op_type, delta_value=delta_value,
+                    source=source, sync_from=sync_from,
+                    instance_id=instance_id or author_stamp(),
+                    op_id=op_id,
+                    remote_id=remote_id,
+                )
+                if written and touch_entry:
                     conn.execute(
                         "UPDATE profile_entries SET op_id=? "
                         "WHERE username=? AND type=? AND key=?",
-                        (op_id, username, type_, key),
+                        (written, username, type_, key),
                     )
+            elif op_id and touch_entry:
+                conn.execute(
+                    "UPDATE profile_entries SET op_id=? "
+                    "WHERE username=? AND type=? AND key=?",
+                    (op_id, username, type_, key),
+                )
 
             self._commit(conn)
         finally:
@@ -391,28 +431,22 @@ class EntriesMixin:
                     (username, type_, key, float(value), value_text, event_at, write_ts),
                 )
 
-                if op_type is not None:
-                    should_record = False
-                    if op_type in ("set", "delta", "reset"):
-                        should_record = True
-                    elif type_ == "note":
-                        if old_value_text != value_text:
-                            should_record = True
-                    elif old_value != float(value):
-                        should_record = True
-
-                    if should_record:
-                        record_history(
-                            conn,
-                            event_at=write_ts,
-                            username=username, type_=type_, key=key,
-                            old_value=old_value, new_value=float(value),
-                            old_value_text=old_value_text or "",
-                            value_text=value_text,
-                            op_type=op_type, delta_value=delta_value,
-                            source=source, sync_from=sync_from,
-                            instance_id=author_stamp(),
-                        )
+                if op_type is not None and should_record(
+                    op_type, type_=type_, old_value=old_value,
+                    new_value=float(value), old_value_text=old_value_text,
+                    value_text=value_text,
+                ):
+                    record_history(
+                        conn,
+                        event_at=write_ts,
+                        username=username, type_=type_, key=key,
+                        old_value=old_value, new_value=float(value),
+                        old_value_text=old_value_text or "",
+                        value_text=value_text,
+                        op_type=op_type, delta_value=delta_value,
+                        source=source, sync_from=sync_from,
+                        instance_id=author_stamp(),
+                    )
 
             self._commit(conn)
         finally:
@@ -473,30 +507,25 @@ class EntriesMixin:
                 self._rollback(conn)
                 return False
 
-            if op_type is not None:
-                should_record = False
-                if op_type in ("set", "delta", "reset"):
-                    should_record = True
-                elif history_old_value != value:
-                    should_record = True
-
-                if should_record:
-                    written = record_history(
-                        conn,
-                        # 与 entry 用同一个事件时间：同一个写入只有一个业务时刻
-                        event_at=event_at,
-                        username=username, type_=type_, key=key,
-                        old_value=history_old_value, new_value=value,
-                        op_type=op_type, delta_value=delta_value,
-                        source=source, sync_from=sync_from,
-                        instance_id=author_stamp(),
+            if op_type is not None and should_record(
+                op_type, type_=type_, old_value=history_old_value, new_value=value,
+            ):
+                written = record_history(
+                    conn,
+                    # 与 entry 用同一个事件时间：同一个写入只有一个业务时刻
+                    event_at=event_at,
+                    username=username, type_=type_, key=key,
+                    old_value=history_old_value, new_value=value,
+                    op_type=op_type, delta_value=delta_value,
+                    source=source, sync_from=sync_from,
+                    instance_id=author_stamp(),
+                )
+                if written:
+                    conn.execute(
+                        "UPDATE profile_entries SET op_id=? "
+                        "WHERE username=? AND type=? AND key=?",
+                        (written, username, type_, key),
                     )
-                    if written:
-                        conn.execute(
-                            "UPDATE profile_entries SET op_id=? "
-                            "WHERE username=? AND type=? AND key=?",
-                            (written, username, type_, key),
-                        )
 
             self._commit(conn)
             return True

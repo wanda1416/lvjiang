@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from datetime import datetime
 from pathlib import Path
 
 from lvjiang.constants import SESSION_CONFIG_DIR
@@ -26,7 +25,7 @@ from ..db import Database, Migration, Schema
 from .author import author_stamp
 from .entries import EntriesMixin
 from .history_query import HistoryQuery
-from .ledger import LedgerMixin, record_history
+from .ledger import LedgerMixin
 from .migrations import (
     CURRENT_VERSION,  # noqa: F401  转出口：测试与发布校验按旧路径读
     MIGRATIONS,
@@ -308,30 +307,10 @@ def db_apply_meta_locked(username: str, type_: str, key: str, locked: int,
     条目不存在时插占位行（与本地锁定行为一致）。账本行照记（op_type=meta），
     remote_id 随行写入，避免回声。
     """
-    db = get_profile_db()
-    conn = db._borrow_connection()
-    try:
-        db._begin(conn)
-        now = datetime.now().isoformat(timespec="seconds")
-        conn.execute(
-            "INSERT INTO profile_entries "
-            "(username, type, key, value, value_text, event_at, created_at, locked) "
-            "VALUES (?, ?, ?, 0, '', '', ?, ?) "
-            "ON CONFLICT(username, type, key) DO UPDATE SET locked=excluded.locked",
-            (username, type_, key, now, locked),
-        )
-        record_history(
-            conn,
-            event_at=event_at or now, username=username, type_=type_, key=key,
-            old_value=1 - locked, new_value=locked, op_type="meta",
-            source="", instance_id=instance_id, op_id=op_id, remote_id=remote_id,
-        )
-        db._commit(conn)
-    except Exception:
-        db._rollback(conn)
-        raise
-    finally:
-        db._release_connection(conn)
+    get_profile_db().apply_locked(
+        username, type_, key, locked,
+        instance_id=instance_id, event_at=event_at, op_id=op_id, remote_id=remote_id,
+    )
 
 
 def db_max_synced_local_id() -> int:

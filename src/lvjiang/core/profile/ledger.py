@@ -25,6 +25,36 @@ from .history_sql import (
 from .rows import HistoryRow
 
 
+def should_record(
+    op_type: str | None,
+    *,
+    type_: str,
+    old_value: float | None,
+    new_value: float,
+    old_value_text: str = "",
+    value_text: str = "",
+) -> bool:
+    """这一次写入要不要落一行账本。
+
+    ``op_type`` 为空表示「只写条目、不记账」（回放、快照合并等路径）。
+
+    规则只有三条，别再在调用方各写一份：
+
+    - 用户主动操作（``set`` / ``delta`` / ``reset``）**一律记账**——包括「值没
+      变」的情况，那是用户意图的一部分；
+    - note 模型比较**文本**：写回同一段文本不产生新行；
+    - 其余系统行（``regen`` / ``meta``）只在值确实变化时记，否则账本会被每秒
+      一次的空转填满。
+    """
+    if op_type is None:
+        return False
+    if op_type in ("set", "delta", "reset"):
+        return True
+    if type_ == "note":
+        return (old_value_text or "") != (value_text or "")
+    return old_value != new_value
+
+
 def record_history(
     conn: sqlite3.Connection,
     *,

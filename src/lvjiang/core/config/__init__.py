@@ -28,6 +28,7 @@ from .interface import (
     save_reference_grid,
     update_ui_page_state,
 )
+from .merge import DELETED_KEY, compute_diff, merge_doc
 from .models import (
     AndroidAppConfig,
     DelayParam,
@@ -51,13 +52,10 @@ from .plans import (
     set_active_plan_id,
 )
 from .resolver import (
-    DELETED_KEY,
     ConfigResolver,
-    compute_diff,
     get_resolver,
     load_app_config,
     load_available_envs,
-    merge_doc,
     save_app_config,
     save_app_config_node,
 )

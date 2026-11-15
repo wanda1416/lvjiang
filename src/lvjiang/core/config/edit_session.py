@@ -13,7 +13,8 @@ from pathlib import Path
 import yaml
 
 from .conflicts import checked_write, file_baseline
-from .resolver import REGISTRY_LIST_PATHS, ConfigResolver, compute_diff, merge_doc
+from .merge import REGISTRY_LIST_PATHS, compute_diff, merge_doc
+from .resolver import ConfigResolver
 
 
 class ConfigEditSession:

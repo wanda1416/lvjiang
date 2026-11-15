@@ -9,12 +9,8 @@ import pytest
 import yaml
 
 from lvjiang.core.config.conflicts import ConfigWriteConflict
-from lvjiang.core.config.resolver import (
-    ConfigResolver,
-    SystemContentProtected,
-    compute_diff,
-    merge_doc,
-)
+from lvjiang.core.config.merge import compute_diff, merge_doc
+from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 from tests.case_matrix import case_matrix
 
 

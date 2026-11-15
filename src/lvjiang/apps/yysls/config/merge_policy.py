@@ -10,9 +10,7 @@ core.config 是通用引擎模块，不认识游戏领域词汇。`weapon_types`
 """
 from __future__ import annotations
 
-from ....core.config.resolver import (
-    register_protected_list_paths,
-)
+from ....core.config.merge import register_protected_list_paths
 from ....core.config.versioning import (
     register_versioned_dir,
     register_versioned_file,

@@ -27,15 +27,15 @@ from lvjiang.apps.yysls.config.game_config_files import (
 )
 from lvjiang.apps.yysls.ui.game_settings import factory_guard
 from lvjiang.apps.yysls.ui.game_settings.order_list import reorder_mapping
-from lvjiang.core.config.resolver import (
+from lvjiang.core.config.merge import (
     DELETABLE_PATHS,
     PROTECTED_LIST_PATHS,
     REGISTRY_LIST_IDENTITY,
     REGISTRY_LIST_PATHS,
-    ConfigResolver,
     compute_diff,
     merge_doc,
 )
+from lvjiang.core.config.resolver import ConfigResolver
 
 _REL = "yysls/game_config/schools.yaml"
 _SYSTEM_CONFIG = Path("config/system/yysls/game_config")

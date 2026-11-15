@@ -7,7 +7,7 @@ from typing import Any
 import yaml
 from loguru import logger
 
-from .resolver import merge_doc, merge_registry_list
+from .merge import merge_doc, merge_registry_list
 
 REGISTRIES = frozenset({"scenes.yaml", "layouts.yaml"})
 

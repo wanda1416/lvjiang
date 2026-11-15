@@ -71,7 +71,7 @@
 - `POST /api/sync/profile/pull`：下发四种类型，`since_remote_id` 增量
 - `POST /api/sync/profile/snapshot`：清单/详情/上传（空体=空基线播种）
 - `GET /api/v2/profile/entries`：物化视图（state 三态 + entries 含 locked）
-- `POST /api/sync/profile/history`：分页（`remote_id` 降序；总数走计数器）
+- `POST /api/sync/profile/history`：分页（`remote_id` 降序）；可按 `username` / `instance_id` / `op_types`（多选，白名单） / `type`+`key` 精确筛选，`total` 按同一条件 `COUNT(*)`（只在第一页算）。筛选列各有索引：`(account_id, op_type, remote_id)` 与 `(account_id, type, key, remote_id)`
 - 错误信封：`{error: name}`；`client_update_required_for_delta` = 409 提示升级
 
 ## 7. 展示

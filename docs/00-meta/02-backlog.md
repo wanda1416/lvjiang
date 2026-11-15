@@ -519,14 +519,18 @@ MVP 已可用（总览 / 调律分析 / 数据同步）。明确不在第一阶�
 **现状不是缺陷**：note 的写入走 `service.py` 的专用路径（直接 `db_upsert`），
 `update_if_current` 拿不到 note 类型，所以三份判定的差异目前不会触发。
 
-**风险**: 三份逻辑一旦合并成一份（下一步就值得合并），必须先补齐 note 分支，
-否则 CAS 路径上的 note 写入会静默不记账。
+**结论（2026-11-15 已处理）**: 「note 不该走 CAS」查无设计记录，只是 note 自己
+拥有写入旁路（`_write_note` 不接 `expected_entry` / `use_cas`）的副产物。已按
+「note 也应支持乐观并发」落地：
 
-**计划（后续）**:
-- [ ] 抽出单条 `should_record()` 判定并让三处共用，同时补 note 文本分支
-- [ ] 补一条「note 走 CAS 写入仍记账」的回归用例
-
-**优先级**: 🟢 **低**（不影响当前行为，但会随下一次合并变成真缺陷）
+- `should_record()` 定义在 `core/profile/ledger.py`，`upsert` / `upsert_many` /
+  `update_if_current` 三处共用，note 的文本分支因此可达（`e4f7de37`）；
+- 仓储层 CAS 增加文本维度（`expected_value_text` 非 None 时比对
+  `COALESCE(value_text,'')`），`_write_note` 接 `expected_entry`/`use_cas`，
+  冲突抛 `ProfileWriteConflict`（`a271849d`）；
+- UI 两个备注入口带上渲染时的条目快照（不能取单元格文本：`show_cap` 下显示
+  `12/20`、库里是 `12`），冲突不再静默覆盖（`3c9ea1fc`）；
+- 用例：`tests/core/profile/test_note_cas.py`、`tests/ui/profile/test_note_cas.py`。
 
 ---
 
@@ -540,10 +544,10 @@ MVP 已可用（总览 / 调律分析 / 数据同步）。明确不在第一阶�
 语义相同但三处独立演化；`db_apply_meta_locked` 还是模块级函数，靠伸手进
 `ProfileDB` 的私有连接方法才能参与事务。
 
-**计划（后续）**:
-- [ ] 收成一个 `apply_locked(username, type, key, locked, *, instance_id, ...)` 方法
-- [ ] 模块级 `db_apply_meta_locked` 只做转发，不再自己拼连接
-
-**优先级**: 🟢 **低**（当前三份 SQL 一致，纯重复）
+**结论（2026-11-15 已处理）**: `_write_locked()` 成为「只动 locked 列 + 补一条
+`op_type=meta` 账本行」的唯一实现；`set_locked`/`unlock` 收敛为
+`_toggle_locked()`（只在状态真的变化时写），跨端回放走 `apply_locked()`（远端说了算、
+`created_at` 记真实写入时刻）。模块级 `db_apply_meta_locked` 只做转发，不再伸手进
+`ProfileDB` 的私有连接方法（`e4f7de37`）。
 
 ---

@@ -47,7 +47,7 @@
 | B3 | `core/updates/` | `update.py`(198)、`update_bundle.py`(210)、`announcement.py`(323)、`preset_sources.py`(109)、`system_preset.py`(152) | 31 → 26 |
 | B4 | `core/qrcode/` + `core/about/` | 二维码四件套（`qr_image`/`qr_cache`/`group_qrcode`/`support_qrcode`）→ `core/qrcode/{image,cache,group,support}.py`；`about`/`public_links` → `core/about/{content,links}.py` | 26 → 18 |
 
-四批之后根目录只剩 18 个模块：14 个原语 + 4 个外壳，每屏能看完。
+四批之后根目录只剩 20 个模块：14 个原语 + 4 个外壳 + 2 个留在根目录的边界模块（device_app.py 平台端口、license_files.py 构建期过滤），每屏能看完。
 `core/history/` 的命名与 `core/profile/history_query.py`、`ProfileDB` 的账本不冲突：
 前者是**任务/批量历史的持久化**，后者是 profile 数值账本。
 

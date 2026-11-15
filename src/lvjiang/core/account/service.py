@@ -10,8 +10,7 @@ import json
 import socket
 import sys
 import threading
-import time
-from http.client import HTTPException
+import time  # noqa: F401 — 测试按 account_service.time 替换 sleep
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
@@ -20,7 +19,8 @@ from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR
 from ..json_files import formatted_json
-from . import identity
+from . import credentials, identity, transport
+from .errors import AccountError
 
 try:
     import keyring  # 桌面端系统凭据库；APK 未打包（Android 走沙箱文件存储）
@@ -37,40 +37,6 @@ def _android_token_path() -> Path:
     其他应用不可读——这是 Android 的安全边界，等价于桌面系统凭据库）。"""
     return SESSION_CONFIG_DIR / "account_token"
 
-
-class _AndroidTokenStore:
-    """极简 get/set/delete 接口，与 keyring 后端同形。"""
-
-    def get_password(self, service: str, username: str) -> str | None:
-        try:
-            data = json.loads(_android_token_path().read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-        if isinstance(data, dict) and data.get("user") == username:
-            value = data.get("token")
-            return value if isinstance(value, str) else None
-        return None
-
-    def set_password(self, service: str, username: str, password: str) -> None:
-        _android_token_path().parent.mkdir(parents=True, exist_ok=True)
-        _android_token_path().write_text(
-            json.dumps({"user": username, "token": password}, ensure_ascii=False),
-            encoding="utf-8")
-
-    def delete_password(self, service: str, username: str) -> None:
-        try:
-            _android_token_path().unlink()
-        except OSError:
-            pass
-
-    def stored_users(self) -> set[str]:
-        """文件里已经存了哪些实例键（诊断"登录态被实例变更孤立"用）。"""
-        try:
-            data = json.loads(_android_token_path().read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return set()
-        user = data.get("user") if isinstance(data, dict) else None
-        return {user} if isinstance(user, str) and user else set()
 
 ACCOUNT_SERVICE = "https://lvjiang.wyxj.net"
 _KEYRING_SERVICE = "lvjiang.account"
@@ -106,14 +72,6 @@ ERROR_MESSAGES = {
 AUTH_REJECTED_CODES = frozenset({
     "invalid_credentials", "token_expired", "account_disabled",
 })
-
-
-class AccountError(Exception):
-    """账号服务操作失败；message 是可直接展示的中文。"""
-
-    def __init__(self, message: str, code: str = ""):
-        super().__init__(message)
-        self.code = code
 
 
 def account_config_path() -> Path:
@@ -174,28 +132,16 @@ def save_profile_sync_state(state: dict) -> None:
 
 
 def _credentials():
-    """凭据后端。桌面端用系统凭据库；Android 用应用私有沙箱文件——进程隔离
-    由 OS 保证，等价于桌面的凭据库边界。
+    """凭据后端：桌面端系统凭据库，Android 应用私有沙箱文件。
 
-    **桌面端缺 keyring 时不退回明文文件**：否则 refresh 令牌会明文落到
-    ``config/session/account_token``，是静默的安全降级。宁可明确报错。
+    具体选型在 :func:`credentials.select_backend`；这里只把「当前平台、keyring
+    模块、令牌落点」三个平台事实交给它——测试替换本函数即可换掉整个后端。
     """
-    if _on_android():
-        return _AndroidTokenStore()
-    if keyring is None:
-        raise AccountError("系统凭据库不可用，无法保存登录态")
-    backend = keyring.get_keyring()
-    allowed = {
-        "keyring.backends.Windows", "keyring.backends.macOS",
-        "keyring.backends.SecretService", "keyring.backends.kwallet",
-        "keyring.backends.libsecret",
-    }
-    if type(backend).__module__ == "keyring.backends.chainer":
-        backend = next((candidate for candidate in backend.backends
-                        if type(candidate).__module__ in allowed), None)
-    if backend is None or type(backend).__module__ not in allowed:
-        raise AccountError("系统凭据库不可用，无法保存登录态")
-    return backend
+    return credentials.select_backend(
+        on_android=_on_android(),
+        keyring_module=keyring,
+        token_path=_android_token_path,
+    )
 
 
 def _instance_uuid() -> str:
@@ -213,33 +159,13 @@ def _keyring_user() -> str:
 
 
 def _stored_refresh_token() -> str:
-    user = _keyring_user()
-    if not user:
-        return ""
-    try:
-        return _credentials().get_password(_KEYRING_SERVICE, user) or ""
-    except AccountError:
-        raise
-    except Exception as error:
-        raise AccountError(f"无法读取系统凭据库：{error}") from None
+    """读本实例在凭据库里的 refresh 令牌；没有或不可用按空串处理。"""
+    return credentials.read_token(_credentials, _keyring_user())
 
 
 def _store_refresh_token(token: str) -> None:
-    user = _keyring_user()
-    if not user:
-        if token:
-            raise AccountError("缺少实例标识，无法保存登录态")
-        return
-    try:
-        backend = _credentials()
-        if token:
-            backend.set_password(_KEYRING_SERVICE, user, token)
-        elif backend.get_password(_KEYRING_SERVICE, user):
-            backend.delete_password(_KEYRING_SERVICE, user)
-    except AccountError:
-        raise
-    except Exception as error:
-        raise AccountError(f"无法写入系统凭据库：{error}") from None
+    """写入或清除本实例的 refresh 令牌（``token`` 为空即清除）。"""
+    credentials.write_token(_credentials, _keyring_user(), token)
 
 
 def _clear_stored_session() -> None:
@@ -252,17 +178,7 @@ def stored_token_owner() -> str:
     用途：区分「从没登录」与「登录态还在，但当前实例标识变了、匹配不上」——
     后者要明确告诉用户重新登录，而不是静默显示成未登录。
     """
-    try:
-        backend = _credentials()
-    except AccountError:
-        return ""
-    owners = getattr(backend, "stored_users", None)
-    if not callable(owners):
-        return ""
-    try:
-        return next(iter(owners()), "")
-    except Exception:                      # noqa: BLE001 — 诊断信息，取不到就算了
-        return ""
+    return credentials.token_owner(_credentials)
 
 
 def current_keyring_user() -> str:
@@ -272,93 +188,32 @@ def current_keyring_user() -> str:
 
 def _network_hint(error: BaseException) -> str:
     """把底层网络异常翻成用户能照着做的中文（原文只进日志）。"""
-    text = str(error)
-    if "handshake" in text.lower():
-        return "和账号服务握手超时"
-    if "Network is unreachable" in text or "Errno 101" in text:
-        return "手机当前网络连不到账号服务"
-    if "timed out" in text.lower() or isinstance(error, TimeoutError):
-        return "连接账号服务超时"
-    if "Name or service not known" in text or "getaddrinfo" in text:
-        return "域名解析失败"
-    return "连不上账号服务"
+    return transport.network_hint(error)
 
 
 def _open_once(request: urlrequest.Request, timeout: float | None = None) -> bytes:
-    """发一次请求；网络类异常原样抛出，交给调用方决定是否重试。"""
-    with urlrequest.build_opener().open(
-            request, timeout=timeout or _REQUEST_TIMEOUT_S) as response:
-        return response.read(1_000_001)
+    """发一次请求；网络类异常原样抛出，交给调用方决定是否重试。
+
+    只做转发：测试替换本函数即可让整条请求链（含重试与错误分类）走假实现。
+    """
+    return transport.open_once(request, timeout, default_timeout=_REQUEST_TIMEOUT_S)
 
 
 def _http_error(exc: urlerror.HTTPError) -> AccountError:
-    """把 HTTP 错误分成三类，**只有第一类允许清本地登录态**。
-
-    1. 认证被拒：响应体里带我们 Worker 的显式错误码（``invalid_credentials`` /
-       ``token_expired`` / ``account_disabled`` / ``device_revoked``）；
-    2. 服务不可用：5xx（Cloudflare 502 之类）、非 JSON 响应；
-    3. 其它请求错误：网关/防火墙拦截（典型：Cloudflare Bot 防护返回 403 HTML）。
-
-    第 2、3 类都是"现在拿不到答案"，绝不能当成"你密码错了"——否则一次网关
-    抖动就会把用户踢下线。
-    """
-    code = ""
-    try:
-        details = json.loads(exc.read(65_536).decode("utf-8"))
-        if isinstance(details, dict) and isinstance(details.get("error"), str):
-            code = details["error"]
-    except (ValueError, UnicodeDecodeError, OSError):
-        pass
-    if exc.code >= 500:
-        return AccountError(ERROR_MESSAGES["service_unavailable"],
-                            code=code or "service_unavailable")
-    if code in AUTH_REJECTED_CODES:
-        return AccountError(ERROR_MESSAGES.get(code, f"账号服务请求失败（HTTP {exc.code}）"),
-                            code=code)
-    if code:
-        return AccountError(ERROR_MESSAGES.get(code, f"账号服务请求失败（HTTP {exc.code}）"),
-                            code=code)
-    return AccountError(f"账号服务拒绝了请求（HTTP {exc.code}），请稍后重试",
-                        code="rejected")
+    """把 HTTP 错误分成三类，**只有第一类允许清本地登录态**（分类规则见
+    :func:`transport.http_error`；文案表与「认证被拒」集合由本模块给出）。"""
+    return transport.http_error(
+        exc, messages=ERROR_MESSAGES, rejected=AUTH_REJECTED_CODES)
 
 
 def _request(method: str, route: str, data: dict | None = None,
              token: str = "", timeout: float | None = None) -> dict:
-    headers = {"Content-Type": "application/json", "Accept": "application/json",
-               # 自定义 UA：urllib 默认的 Python-urllib 会被 Cloudflare Bot 防护
-               # 在边缘直接 403（请求到不了 Worker），网页与内容服务客户端同理。
-               "User-Agent": "lvjiang-account-client"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    request = urlrequest.Request(
-        ACCOUNT_SERVICE + route,
-        data=None if data is None else json.dumps(data, ensure_ascii=False).encode("utf-8"),
-        headers=headers, method=method)
-    # 网络类失败重试一次：手机（尤其 IPv6-only 的 5G）握手超时、短暂不可达很常见，
-    # 一次失败就报错会让用户看到"什么都没发生"。服务端返回的错误不重试。
-    errors: list[Exception] = []
-    for attempt in range(2):
-        try:
-            raw = _open_once(request, timeout)
-            break
-        except urlerror.HTTPError as exc:
-            raise _http_error(exc) from None
-        except (urlerror.URLError, TimeoutError, OSError, HTTPException) as exc:
-            errors.append(exc)
-            if attempt == 0:
-                logger.warning("账号服务连接失败（重试一次）：{}", exc)
-                time.sleep(0.8)
-    else:                                        # 两次都是网络类失败
-        logger.warning("账号服务连接失败（重试后仍失败）：{}", errors[-1])
-        raise AccountError(f"{_network_hint(errors[-1])}，请检查网络后重试",
-                           code="network") from None
-    try:
-        result = json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
-        raise AccountError("账号服务响应格式无效", code="service_unavailable") from None
-    if not isinstance(result, dict):
-        raise AccountError("账号服务响应格式无效", code="service_unavailable")
-    return result
+    """对账号服务发一次业务请求（组装、重试与错误分类见 :mod:`.transport`）。"""
+    return transport.request(
+        method, ACCOUNT_SERVICE + route, data,
+        token=token, timeout=timeout, default_timeout=_REQUEST_TIMEOUT_S,
+        open_once=_open_once, http_error=_http_error,
+    )
 
 
 def _android_device_name() -> str:

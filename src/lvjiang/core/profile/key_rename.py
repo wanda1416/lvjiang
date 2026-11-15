@@ -196,14 +196,7 @@ def save_renamed_definitions(
             schema_module.reload_profile_config()
         _emit_rename_baselines(db, renames)
         from .events import notify_updated
-        # _connect() 的连接必须显式关（同 _emit_rename_baselines）
-        conn = db._connect()
-        try:
-            users = conn.execute(
-                "SELECT DISTINCT username FROM profile_entries").fetchall()
-        finally:
-            conn.close()
-        for (username,) in users:
+        for username in db.list_usernames():
             notify_updated(username)
 
 
@@ -230,23 +223,14 @@ def _emit_rename_baselines(db: ProfileDB,
                 "[profile rename] 定义中没有 {}，跳过基线 set（{}→{}）",
                 new, old, new)
             continue
-        # _connect() 返回的连接必须显式关：sqlite3.connect 的上下文管理器
-        # 只提交事务不关连接（与 repository._ensure_schema 的备份连接同坑）
-        conn = db._connect()
-        try:
-            rows = conn.execute(
-                "SELECT username, value, value_text, locked FROM profile_entries "
-                "WHERE type=? AND key=?", (model, new)).fetchall()
-        finally:
-            conn.close()
         emitted = 0
-        for username, value, value_text, locked in rows:
-            if locked:
+        for entry in db.entries_for_key(model, new):
+            if entry.locked:
                 continue      # 锁定条目物理失效，不参与展示与同步
-            if value in (None, 0) and not value_text:
+            if not entry.value and not entry.value_text:
                 continue      # 空占位不值得基线行
-            db.upsert(username, model, new, float(value or 0),
-                      value_text=value_text or "",
+            db.upsert(entry.username, model, new, entry.value,
+                      value_text=entry.value_text,
                       op_type="set", source=_tr("key 改名重设"))
             emitted += 1
         if emitted:

@@ -11,6 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+#: ``profile_entries`` 的 SELECT 列顺序；与 :meth:`Entry.from_row` 一一对应。
+#: 读条目时一律引用这个常量，别处再抄一遍字面量就会在加列时静默错位。
+ENTRY_COLUMNS = (
+    "username, type, key, value, value_text, event_at, created_at, op_id, locked"
+)
+
 
 @dataclass(slots=True)
 class Entry:
@@ -28,7 +34,7 @@ class Entry:
 
     @classmethod
     def from_row(cls, row) -> "Entry":
-        """``SELECT username, type, key, value, value_text, event_at, created_at, op_id, locked``"""
+        """列顺序见 :data:`ENTRY_COLUMNS`。"""
         return cls(
             username=str(row[0]), type=str(row[1]), key=str(row[2]),
             value=float(row[3] or 0), value_text=str(row[4] or ""),
@@ -61,7 +67,7 @@ class HistoryRow:
 
     @classmethod
     def from_row(cls, row) -> "HistoryRow":
-        """列顺序见 ``repository._HISTORY_COLUMNS``。"""
+        """列顺序见 :data:`.history_sql.HISTORY_COLUMNS`。"""
         return cls(
             local_id=int(row[0]), event_at=str(row[1] or ""),
             username=str(row[2]), type=str(row[3]), key=str(row[4]),

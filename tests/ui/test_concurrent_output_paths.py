@@ -5,7 +5,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from lvjiang.core.batch import report as report_module
-from lvjiang.core.daily_history import (
+from lvjiang.core.history.daily import (
     TaskHistoryRepository,
     TaskRunSession,
     resolve_history_path,
@@ -34,7 +34,7 @@ def test_workflow_result_filename_contains_task_run_id(tmp_path, monkeypatch):
     monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", tmp_path)
     started_at = datetime(2025, 12, 31, 23, 59)
     next_day = datetime(2026, 1, 1, 0, 1)
-    _freeze_datetime(monkeypatch, "lvjiang.core.daily_history.datetime", next_day)
+    _freeze_datetime(monkeypatch, "lvjiang.core.history.daily.datetime", next_day)
     _freeze_datetime(monkeypatch, "lvjiang.ui.main.run_control.datetime", next_day)
     repository = TaskHistoryRepository(tmp_path / "history.db")
     task = TaskRunSession(

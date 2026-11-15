@@ -14,9 +14,9 @@ from typing import Any, Iterator
 
 from loguru import logger
 
-from .. import constants
-from .db import Database, Migration, Schema
-from .fs_util import dated_output_dir
+from ... import constants
+from ..db import Database, Migration, Schema
+from ..fs_util import dated_output_dir
 
 
 def default_db_path() -> Path:

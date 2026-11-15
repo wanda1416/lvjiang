@@ -13,7 +13,7 @@ import threading
 from uuid import uuid4
 
 from ... import constants
-from ..history_transfer import export_history
+from ..history.transfer import export_history
 
 _LOCK = threading.Lock()
 _TOKEN = ""

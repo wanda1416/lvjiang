@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .._version import __version__
-from .fs_util import atomic_write_bytes
-from .json_files import formatted_json_bytes
+from ..._version import __version__
+from ..fs_util import atomic_write_bytes
+from ..json_files import formatted_json_bytes
 
 MAX_BYTES = 256 << 20
 FORMAT = 1
@@ -43,8 +43,8 @@ class HistoryChannel:
 
 
 def history_channels() -> dict[str, HistoryChannel]:
-    from .daily_history import TaskHistoryRepository
-    from .plugins import get_registered_hooks
+    from ..plugins import get_registered_hooks
+    from .daily import TaskHistoryRepository
 
     batches = "status != 'running' AND finished_at != '' AND target_id='ondevice' AND target_kind='android'"
     tasks = ("source='ondevice' AND status != 'running' AND finished_at != '' "

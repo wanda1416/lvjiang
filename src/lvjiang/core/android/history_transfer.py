@@ -7,7 +7,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from ..history_transfer import MAX_BYTES, import_history
+from ..history.transfer import MAX_BYTES, import_history
 from .agent import AgentClient
 
 

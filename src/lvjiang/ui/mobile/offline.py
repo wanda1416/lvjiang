@@ -26,7 +26,7 @@ from ...core.android.agent import connect_agent_diagnostic
 from ...core.android.device import AdbDevice
 from ...core.android.history_transfer import pull_history
 from ...core.android.offline import require_offline_sync_access, sync_offline_bundle
-from ...core.history_transfer import history_channels
+from ...core.history.transfer import history_channels
 from ...core.layout.config import layouts_for_env, load_layout_entries
 from ...core.license import has_feature
 from ...core.offline_bundle import build_offline_bundle

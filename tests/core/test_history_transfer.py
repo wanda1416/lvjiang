@@ -8,12 +8,12 @@ from datetime import datetime
 
 import pytest
 
-from lvjiang.core.daily_history import (
+from lvjiang.core.history.daily import (
     BatchRunSession,
     TaskHistoryRepository,
     TaskRunSession,
 )
-from lvjiang.core.history_transfer import (
+from lvjiang.core.history.transfer import (
     HistoryChannel,
     HistoryTable,
     export_history,
@@ -262,7 +262,7 @@ def test_running_task_is_skipped_while_transfer_continues(histories, monkeypatch
 
 def test_plugin_attachment_prefixes_are_declared_by_channels(tmp_path):
     """宿主只认识自己的附件落点；插件目录由插件 HistoryChannel 自己声明。"""
-    from lvjiang.core.history_transfer import _attachment, attachment_prefixes
+    from lvjiang.core.history.transfer import _attachment, attachment_prefixes
 
     host_only = attachment_prefixes({})
     assert "logs/demo/" not in host_only
@@ -279,7 +279,7 @@ def test_plugin_attachment_prefixes_are_declared_by_channels(tmp_path):
 
 def test_plugin_channels_come_from_registered_hooks(monkeypatch):
     """历史类别 = 宿主 tasks + 已装配插件声明的类别；重复 key 直接拒绝。"""
-    from lvjiang.core.history_transfer import history_channels
+    from lvjiang.core.history.transfer import history_channels
 
     use_registered_hooks(monkeypatch)
     assert list(history_channels()) == ["tasks"]

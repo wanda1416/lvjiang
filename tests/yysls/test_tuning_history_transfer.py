@@ -18,12 +18,12 @@ from lvjiang.apps.yysls.core.tuning_history.models import (
     TuningRunSummary,
 )
 from lvjiang.apps.yysls.core.tuning_history.repository import TuningHistoryRepository
-from lvjiang.core.daily_history import (
+from lvjiang.core.history.daily import (
     BatchRunSession,
     TaskHistoryRepository,
     TaskRunSession,
 )
-from lvjiang.core.history_transfer import export_history, import_history
+from lvjiang.core.history.transfer import export_history, import_history
 from tests.fake_plugin import use_registered_hooks
 
 
@@ -117,7 +117,7 @@ def test_tuning_channel_declares_its_attachment_prefix(tmp_path):
     from lvjiang.apps.yysls.core.tuning_history.transfer import (
         history_channels as tuning,
     )
-    from lvjiang.core.history_transfer import _attachment, attachment_prefixes
+    from lvjiang.core.history.transfer import _attachment, attachment_prefixes
 
     host_only = attachment_prefixes({})
     assert "logs/tuning/" not in host_only

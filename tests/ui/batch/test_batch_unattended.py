@@ -121,7 +121,7 @@ def test_unattended_off_keeps_waiting_for_a_human(tmp_path, qapp):
 def _run_with_pause_on(tmp_path, monkeypatch, *, pause_index: int,
                        script_count: int, recover_wf: str = _RECOVER_WF):
     """让第 pause_index 个任务撞上 pause，回放整条批量。"""
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
     monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **_kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
@@ -193,7 +193,7 @@ def test_task_failing_for_other_reasons_does_not_restart_the_client(
     tmp_path, monkeypatch, qapp,
 ):
     """只有确实撞了弹窗才恢复：普通失败时画面通常还可用，没必要重启客户端。"""
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
     monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **_kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
@@ -237,7 +237,7 @@ def _android_worker(tmp_path, spec, size: tuple[int, int]) -> BatchWorker:
 
 
 def _run_start_scenario(tmp_path, monkeypatch, *, size, allow_portrait=True):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
     monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **_kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)

@@ -411,7 +411,7 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
             get_interface_store().set_active("user", username)
     except Exception as exc:
         return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
-    from ..daily_history import TaskHistoryRepository
+    from ..history.daily import TaskHistoryRepository
     from .workbench import recover_interrupted
     try:
         recover_interrupted(TaskHistoryRepository())
@@ -559,7 +559,7 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         sink = logger.add(lambda message: _STATE.log(str(message).strip(), message.record["level"].name),
                           filter=lambda record: record["thread"].id == worker_id,
                           format="{message}", level="INFO")
-        from ..daily_history import TaskRunSession
+        from ..history.daily import TaskRunSession
         from .workbench import SOURCE
         history = TaskRunSession(username=_STATE.snapshot()["username"], task_id=task["id"],
                                  task_name=name, task_scope=task.get("scope", "daily"), params={},

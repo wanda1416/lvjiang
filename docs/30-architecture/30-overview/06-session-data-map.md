@@ -50,7 +50,7 @@
 
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
-| `daily_history.db` | `batch_runs` / `task_runs` | `core/daily_history.py`（`TaskHistoryRepository`） | schema v2；同时被 `core/history_transfer.py` 作为回传通道登记 |
+| `daily_history.db` | `batch_runs` / `task_runs` | `core/history/daily.py`（`TaskHistoryRepository`） | schema v2；同时被 `core/history/transfer.py` 作为回传通道登记 |
 | `tuning_history.db` | `tuning_runs` / `tuning_equipment` / `telemetry_deliveries` | `apps/yysls/core/tuning_history/repository.py` | schema v3；投递状态供遥测使用，见 [39-runtime/01-tuning-history.md](../39-runtime/01-tuning-history.md) |
 | `history-transfer/` | 手机历史回传的收发 zip 与 `preferences.json` | `core/android/history_transfer.py`、`core/ondevice/history_transfer.py`、`ui/mobile/offline.py` | zip 是传输中产物，`preferences.json` 按设备序列号记上次选择，复用 `SessionStore` 原语 |
 
@@ -59,7 +59,7 @@
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
 | `logs/output/{用户}/{年-月}/DD/` | 工作流结果 JSON | `core/fs_util.task_result_path` | 历史库以相对 `PROJECT_ROOT` 的路径记录（`result_path`）；旧版本写在 `config/session/output`，旧记录直接指向旧目录，照旧打得开 |
-| `logs/daily/{用户}/{年-月}/DD/` | 逐任务日志 | `core/daily_history.default_log_root` | 历史库以 `log_path` 指向 |
+| `logs/daily/{用户}/{年-月}/DD/` | 逐任务日志 | `core/history/daily.py` 的 `default_log_root` | 历史库以 `log_path` 指向 |
 | `logs/batch/{年-月}/DD/` | 批量报告 | `core/batch/report.py` | 历史库以 `report_path` 指向 |
 | `logs/tuning/{用户}/{年-月}/DD/` | 调律说明 Markdown | `apps/yysls/workflows/tuning_doc.py` | 历史库以 `markdown_path` 指向 |
 

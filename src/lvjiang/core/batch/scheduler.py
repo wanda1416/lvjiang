@@ -295,7 +295,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
         if self._spec.execution_unit_key != "user":
             self._run_locked_by_attr()
             return
-        from ..daily_history import try_create_batch_run
+        from ..history.daily import try_create_batch_run
         batch_run = try_create_batch_run(
             config_name=self._spec.name,
             **self._history_target_kwargs(),
@@ -546,7 +546,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                 report.start_script(script.id, script.name)
                 planned = self._task_plan[(run_idx, script.id)]
                 params = copy.deepcopy(planned.params)
-                from ..daily_history import try_create_task_run
+                from ..history.daily import try_create_task_run
                 task_started_at = datetime.now().astimezone()
                 task_run = try_create_task_run(
                     username=username or "unknown", task_id=script.id,
@@ -737,7 +737,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
     def _run_locked_by_attr(self) -> None:
         """属性单元的运行态调度；旧用户执行路径不受影响。"""
         from ..access import AccessDeniedError, acquire_user
-        from ..daily_history import try_create_batch_run, try_create_task_run
+        from ..history.daily import try_create_batch_run, try_create_task_run
 
         if not self._spec.workflows.prepare_item:
             raise ValueError("属性执行单元必须配置条目准备工作流")

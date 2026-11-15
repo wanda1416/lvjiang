@@ -41,7 +41,7 @@ def test_batch_ui_waits_for_thread_exit_before_releasing_worker():
 
 
 def make_worker(tmp_path, monkeypatch, *, rounds=1):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
     monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
@@ -60,7 +60,7 @@ def make_worker(tmp_path, monkeypatch, *, rounds=1):
 
 
 def test_batch_repeats_complete_user_sequence_by_round(tmp_path, monkeypatch, qapp):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
 
     worker = make_worker(tmp_path, monkeypatch, rounds=2)
     visits = []
@@ -104,7 +104,7 @@ def test_batch_repeats_complete_user_sequence_by_round(tmp_path, monkeypatch, qa
 def test_single_user_direct_mode_skips_lifecycle_across_rounds(
     tmp_path, monkeypatch, qapp,
 ):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
 
     monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
@@ -146,7 +146,7 @@ def test_single_user_direct_mode_skips_lifecycle_across_rounds(
 
 
 def test_single_user_can_force_lifecycle(tmp_path, monkeypatch, qapp):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
 
     monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
@@ -300,7 +300,7 @@ def test_batch_check_runs_for_every_user_and_round_before_prepare(
 def test_any_executable_task_makes_the_user_run_all_tasks(
     tmp_path, monkeypatch, qapp,
 ):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
 
     monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
@@ -416,7 +416,7 @@ def test_batch_check_loads_only_subcalls_and_passes_frozen_params(
 def test_lifecycle_stage_receives_saved_workflow_parameters(
     tmp_path, monkeypatch, qapp,
 ):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
 
     monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
@@ -456,7 +456,7 @@ def test_lifecycle_stage_receives_saved_workflow_parameters(
 
 
 def test_batch_freezes_all_user_task_params_before_start(tmp_path, monkeypatch, qapp):
-    import lvjiang.core.daily_history as history
+    import lvjiang.core.history.daily as history
     from lvjiang import constants
 
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")

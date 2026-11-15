@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ..core.config import load_ui_page_state, update_ui_page_state
-from ..core.daily_history import (
+from ..core.history.daily import (
     BatchRunRecord,
     TaskHistoryRepository,
     TaskRunRecord,

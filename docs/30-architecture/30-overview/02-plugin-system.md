@@ -118,7 +118,7 @@ builder 约定：
 | `offline_configuration_patterns` | `()` | PC→手机同步的配置白名单，路径相对 `system`/`local` | `core/offline_bundle.py` |
 | `offline_session_files` | `None` | 额外会话文件，相对 `session` | 同上 |
 | `offline_database_files` | `()` | `session` 内的 SQLite，公共同步器做 backup 与完整性检查 | 同上 |
-| `history_channels` | `None` | 手机历史独立回传通道 | `core/history_transfer.py`（聚合各插件的声明） |
+| `history_channels` | `None` | 手机历史独立回传通道 | `core/history/transfer.py`（聚合各插件的声明） |
 
 ### 注册顺序与失败边界
 

@@ -153,7 +153,7 @@ def phase_startup(root: Path, session: Path, report: Report) -> None:
     report.phase("startup")
     from lvjiang import constants
     from lvjiang.apps.yysls.core.tuning_history import repository as tuning_repository
-    from lvjiang.core import daily_history
+    from lvjiang.core.history import daily as daily_history
     from lvjiang.core.profile import repository as profile_repository
 
     report.check(constants.PROJECT_ROOT == root, "startup.project_root",
@@ -334,7 +334,7 @@ def phase_history_io(root: Path, report: Report) -> None:
         TuningEquipmentResult,
         TuningRunSummary,
     )
-    from lvjiang.core.daily_history import (
+    from lvjiang.core.history.daily import (
         BatchRunRecord,
         TaskHistoryRepository,
         TaskRunRecord,
@@ -418,8 +418,8 @@ def phase_fresh_schema(root: Path, session: Path, report: Report) -> None:
     from lvjiang.apps.yysls.core.tuning_history import (
         repository as tuning_repository,
     )
-    from lvjiang.core.daily_history import CURRENT_SCHEMA_VERSION as TASK_VERSION
-    from lvjiang.core.daily_history import TaskHistoryRepository
+    from lvjiang.core.history.daily import CURRENT_SCHEMA_VERSION as TASK_VERSION
+    from lvjiang.core.history.daily import TaskHistoryRepository
     from lvjiang.core.profile.repository import CURRENT_VERSION as PROFILE_VERSION
     from lvjiang.core.profile.repository import ProfileDB
 
@@ -567,12 +567,12 @@ def phase_profile_migration(root: Path, report: Report) -> None:
 
 def phase_task_migration(root: Path, report: Report) -> None:
     report.phase("migrate_tasks")
-    from lvjiang.core.daily_history import (
+    from lvjiang.core.db import Migration, Schema, connect_database
+    from lvjiang.core.history.daily import (
         _MIGRATIONS,
         CURRENT_SCHEMA_VERSION,
         TaskHistoryRepository,
     )
-    from lvjiang.core.db import Migration, Schema, connect_database
 
     directory = root / "verify" / "migrate"
     directory.mkdir(parents=True, exist_ok=True)

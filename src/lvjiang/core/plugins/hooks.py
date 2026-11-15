@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from ..history_transfer import HistoryChannel
+    from ..history.transfer import HistoryChannel
 
 
 @dataclass(frozen=True)

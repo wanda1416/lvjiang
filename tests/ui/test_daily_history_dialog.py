@@ -3,7 +3,7 @@ import sqlite3
 
 from PyQt6.QtCore import QDate, Qt
 
-from lvjiang.core.daily_history import (
+from lvjiang.core.history.daily import (
     BatchRunSession,
     TaskHistoryRepository,
     TaskRunSession,

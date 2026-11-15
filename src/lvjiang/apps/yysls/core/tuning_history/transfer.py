@@ -1,5 +1,5 @@
 """调律历史回传声明；不携带装备仓库，也不在 PC 重建遥测发送队列。"""
-from .....core.history_transfer import HistoryChannel, HistoryTable
+from .....core.history.transfer import HistoryChannel, HistoryTable
 from .repository import TuningHistoryRepository
 
 

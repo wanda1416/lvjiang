@@ -5,7 +5,7 @@ import json
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 
-from ..daily_history import TaskHistoryRepository, resolve_history_path
+from ..history.daily import TaskHistoryRepository, resolve_history_path
 from . import task_runner
 
 SOURCE = "ondevice"

@@ -533,7 +533,7 @@ def _acquire(username: str) -> Any:
 
 def _start_history(*, username: str, config: dict[str, Any], params: dict[str, Any],
                    target: AdbTarget, layout: str, started: datetime) -> Any:
-    from .daily_history import try_create_task_run
+    from .history.daily import try_create_task_run
 
     return try_create_task_run(
         username=username,

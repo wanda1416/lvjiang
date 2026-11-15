@@ -2390,7 +2390,7 @@ class RunControlMixin:
         run_context.metadata["output_started_at"] = datetime.now().astimezone()
         task_run = None
         if record_history:
-            from ...core.daily_history import try_create_task_run
+            from ...core.history.daily import try_create_task_run
             target = run_context.target_snapshot
             target_kwargs = {
                 "target_id": target.id,

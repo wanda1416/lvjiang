@@ -176,7 +176,7 @@ def test_device_result_uses_pc_output_tree_and_relative_history(tmp_path, monkey
     from datetime import datetime
     from types import SimpleNamespace
 
-    from lvjiang.core import daily_history
+    from lvjiang.core.history import daily as daily_history
 
     started = datetime(2026, 1, 31, 23, 59, 58)
     repository = daily_history.TaskHistoryRepository(tmp_path / "history.db")

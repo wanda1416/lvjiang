@@ -154,7 +154,7 @@ def test_profile_all_users_filters_single_key(monkeypatch):
 
 
 def test_recovery_only_marks_interrupted_ondevice_runs(tmp_path, monkeypatch):
-    from lvjiang.core.daily_history import TaskHistoryRepository, TaskRunSession
+    from lvjiang.core.history.daily import TaskHistoryRepository, TaskRunSession
 
     repository = TaskHistoryRepository(tmp_path / "history.db")
     for source in ("single", "ondevice"):
@@ -194,7 +194,7 @@ def test_notices_fall_back_to_cached_applicable_content(monkeypatch):
 def test_batch_task_detail_is_available_outside_recent_page(tmp_path, monkeypatch):
     from datetime import datetime, timedelta
 
-    from lvjiang.core.daily_history import TaskHistoryRepository, TaskRunSession
+    from lvjiang.core.history.daily import TaskHistoryRepository, TaskRunSession
     repository = TaskHistoryRepository(tmp_path / "history.db")
     oldest = None
     for number in range(101):

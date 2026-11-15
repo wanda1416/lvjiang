@@ -243,7 +243,7 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
     - ``interface.json``：actives 跟清单，``batch`` 草稿永远属于手机；
     - ``batch.json``：明确保留手机本次选择时整份不写。
     """
-    from .history_transfer import history_channels
+    from .history.transfer import history_channels
 
     session_target = session_directory(target)
     session_staged = staged / "session"

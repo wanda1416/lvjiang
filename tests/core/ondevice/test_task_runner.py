@@ -66,7 +66,7 @@ def _clean_state(monkeypatch, tmp_path):
     monkeypatch.setattr(task_runner, "_ENGINE", None)
     monkeypatch.setattr(task_runner, "_PAUSE_GATE", task_runner._PauseGate())
     task_runner._PAUSE_GATE.set()
-    monkeypatch.setattr("lvjiang.core.daily_history.default_log_root", lambda: tmp_path / "logs")
+    monkeypatch.setattr("lvjiang.core.history.daily.default_log_root", lambda: tmp_path / "logs")
     from lvjiang import constants
     from lvjiang.core.config.interface import get_interface_store
     from lvjiang.core.user_config import User, save_user_metadata
@@ -341,7 +341,7 @@ def test_successful_run_reaches_done(monkeypatch):
     assert any("请核对游戏内结果" in line for line in status["logs"])
     assert status["elapsed"] >= 0
     task_runner._STATE._thread.join(2)
-    from lvjiang.core.daily_history import TaskHistoryRepository, resolve_history_path
+    from lvjiang.core.history.daily import TaskHistoryRepository, resolve_history_path
     record = TaskHistoryRepository().list_task_runs(source="ondevice")[0]
     assert record.status == "completed" and record.username == "tester"
     assert json.loads(resolve_history_path(record.result_path).read_text(encoding="utf-8")) == {"a": 1, "b": 2}
@@ -359,7 +359,7 @@ def test_initial_variables_reach_engine(monkeypatch):
 
     assert engine.variables == {"部位": "武器"}
     task_runner._STATE._thread.join(2)
-    from lvjiang.core.daily_history import TaskHistoryRepository
+    from lvjiang.core.history.daily import TaskHistoryRepository
     assert TaskHistoryRepository().list_task_runs(source="ondevice")[0].params == {"部位": "武器"}
 
 
@@ -472,7 +472,7 @@ def test_failure_is_captured_as_failed(monkeypatch):
     assert "boom" in status["message"]
     assert any("boom" in line for line in status["logs"])
     task_runner._STATE._thread.join(2)
-    from lvjiang.core.daily_history import TaskHistoryRepository
+    from lvjiang.core.history.daily import TaskHistoryRepository
     record = TaskHistoryRepository().list_task_runs(source="ondevice")[0]
     assert record.status == "failed" and "boom" in record.error_message
 
@@ -496,7 +496,7 @@ def test_stop_marks_stopped(monkeypatch):
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_STOPPED)
     assert "长任务" in _status()["message"]
     task_runner._STATE._thread.join(2)
-    from lvjiang.core.daily_history import TaskHistoryRepository
+    from lvjiang.core.history.daily import TaskHistoryRepository
     assert TaskHistoryRepository().list_task_runs(source="ondevice")[0].status == "stopped"
 
 

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from loguru import logger
 
-from lvjiang.core.daily_history import (
+from lvjiang.core.history.daily import (
     CURRENT_SCHEMA_VERSION,
     BatchRunSession,
     TaskHistoryRepository,

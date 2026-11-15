@@ -29,7 +29,7 @@ from ..batch.scheduler import (
     BatchScript,
 )
 from ..config.users import SessionManager
-from ..daily_history import TaskHistoryRepository, resolve_history_path
+from ..history.daily import TaskHistoryRepository, resolve_history_path
 from . import task_runner
 
 

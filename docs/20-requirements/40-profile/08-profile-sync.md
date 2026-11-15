@@ -48,10 +48,11 @@
 
 ## 4. 云端表（D1）
 
-- `profile_history`（19 列 = 本地 17 + account_id + id）：`remote_id` 为插入时按账号连续分配（无空洞）；索引：op_id 唯一（部分索引，查询须显式 `op_id <> ''` 蕴含谓词）、(account_id, remote_id)、(account_id, local_id)、(account_id, instance_id, local_id)
+- `profile_history`（19 列 = 本地 17 + account_id + id）：`remote_id` 由插入后一条批量 `UPDATE … ROW_NUMBER()` 按账号顺延赋值（先以 `remote_id=0` 落占位行，重推被 `DO NOTHING` 跳过因而不占号，所以无空洞）；索引：op_id 唯一（部分索引，查询须显式 `op_id <> ''` 蕴含谓词）、(account_id, remote_id)、(account_id, instance_id, local_id)
 - `profile_entries`（~1320 行）：物化缓存，value 只由 set/reset/regen 推进（meta 的 0/1 不得进入），locked 由最新 meta 行维护；可随时从快照+账本重建
 - `profile_snapshot`：账户级基线（含 locked），保留 20 份；上传时整表替换 entries
-- `account_remote_seq.history_rows`：按实际落库行数维护的计数器（历史页总数用它，不做全表 COUNT）
+- `account_sync_version`（每账号一行，只存无法从数据本身派生的东西）：`documents_head` 是文档通道的**发号基准**（新号 = head + 1，与文档写入同一个事务）；`users_rev` 是名册版本号；快照摘要与定义/页面结构摘要作为缓存一并放这一行。**条数一律按表查**：账本 head = `MAX(remote_id)`（`profile_history_pull` 的 max 反向 seek，1 行；账本无空洞，所以它同时就是条数），文档「有没有」由 `documents_head > 0` 表意，精确条数只有历史页第一页 `COUNT(*)`
+- 旧的 `account_remote_seq` 序号表与 `history_head` / `history_rows` / `documents_count` 三个派生计数列均已下线：报告值与准确值都来自索引表查询，不再有「计数器与实际行数」两处状态
 
 ## 5. 同步流程
 

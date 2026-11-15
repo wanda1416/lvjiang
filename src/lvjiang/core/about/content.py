@@ -1,7 +1,7 @@
 """桌面和手机共用的关于内容，界面仅负责排版。"""
-from ..i18n import tr
-from .public_links import GITHUB_REPO, RELEASES_URL
-from .version_info import get_version
+from ...i18n import tr
+from ..version_info import get_version
+from .links import GITHUB_REPO, RELEASES_URL
 
 
 def about_content() -> dict[str, str]:

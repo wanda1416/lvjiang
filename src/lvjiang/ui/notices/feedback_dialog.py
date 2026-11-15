@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...core import group_qrcode
+from ...core.qrcode import group as group_qrcode
 from ...core.updates.release import GITHUB_REPO
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style

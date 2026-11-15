@@ -1,5 +1,6 @@
 """首次打开扫码窗口自动异步获取，已有缓存时不自动联网。"""
-from lvjiang.core import group_qrcode, qr_cache
+from lvjiang.core.qrcode import cache as qr_cache
+from lvjiang.core.qrcode import group as group_qrcode
 from lvjiang.ui.notices.feedback_dialog import GroupQrDialog
 from lvjiang.ui.notices.qrcode_refresher import QrCodeRefresher
 

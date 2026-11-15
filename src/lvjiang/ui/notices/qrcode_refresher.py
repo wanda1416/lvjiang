@@ -4,7 +4,7 @@ from collections.abc import Callable
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ...core import group_qrcode
+from ...core.qrcode import group as group_qrcode
 
 
 class QrCodeRefresher(QThread):

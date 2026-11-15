@@ -18,8 +18,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from .fs_util import atomic_write_bytes
-from .paths import session_directory
+from ..fs_util import atomic_write_bytes
+from ..paths import session_directory
 
 #: 临时目录下的子目录名，与其它运行态文件区分开。
 TEMP_SUBDIR = "lvjiang-qrcode"

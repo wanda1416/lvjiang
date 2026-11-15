@@ -3,7 +3,8 @@ from urllib.error import URLError
 
 import pytest
 
-from lvjiang.core import group_qrcode, qr_cache
+from lvjiang.core.qrcode import cache as qr_cache
+from lvjiang.core.qrcode import group as group_qrcode
 
 
 @pytest.fixture
@@ -47,7 +48,7 @@ def test_network_failure_identifies_url_and_does_not_create_cache(caches, monkey
     temp, session = caches
     def unavailable(*_args, **_kwargs):
         raise URLError("offline")
-    monkeypatch.setattr("lvjiang.core.qr_image.urlopen", unavailable)
+    monkeypatch.setattr("lvjiang.core.qrcode.image.urlopen", unavailable)
     with pytest.raises(group_qrcode.QrCodeError, match="请检查网络") as failure:
         group_qrcode.load_qrcode_bytes()
     assert group_qrcode.QRCODE_URL in str(failure.value)

@@ -79,10 +79,10 @@ Android 不重新解析原始词条。菜单按页面限定可见性，维护二
 
 ## 公开内容与异步页面
 
-公告与二维码继续由 core.updates.announcement / core.group_qrcode 校验、获取和缓存，
+公告与二维码继续由 core.updates.announcement / core.qrcode 校验、获取和缓存，
 桌面 QThread 适配器分别移到 ui.notices.announcement_checker/qrcode_refresher；
 全部桌面调用点随迁移调整。core.version_info 提供不依赖 Qt 的版本解析和网络提示，
-core.updates.release 提供版本比较与发布信息。公开发布地址由 core.public_links 共同维护。
+core.updates.release 提供版本比较与发布信息。公开发布地址由 core.about.links 共同维护。
 手机只在手动操作时联网，失败保留上次可用内容，展示错误原因。
 
 WorkbenchUi 用页面代次丢弃切页/销毁后的异步结果；实时状态只刷新运行区域，

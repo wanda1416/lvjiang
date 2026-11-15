@@ -1,7 +1,8 @@
 """赞助收款码：图源在官方站点，两个渠道各自缓存。"""
 import pytest
 
-from lvjiang.core import qr_cache, support_qrcode
+from lvjiang.core.qrcode import cache as qr_cache
+from lvjiang.core.qrcode import support as support_qrcode
 
 
 def test_urls_point_at_site_static_assets():

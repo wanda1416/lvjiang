@@ -21,8 +21,8 @@ from packaging.version import InvalidVersion
 from ...i18n import tr
 
 # GitHub 仓库信息
-from ..public_links import GITHUB_REPO
-from ..public_links import RELEASES_URL as GITHUB_RELEASES_URL
+from ..about.links import GITHUB_REPO
+from ..about.links import RELEASES_URL as GITHUB_RELEASES_URL
 from ..version_info import (
     get_version as get_version,
 )

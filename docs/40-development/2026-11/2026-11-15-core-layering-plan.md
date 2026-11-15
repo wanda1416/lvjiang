@@ -45,7 +45,7 @@
 | B1 | `core/history/` | `daily_history.py`(537)、`history_transfer.py`(257) | 36 → 34 |
 | B2 | `core/users/` | `user_config.py`(476)、`user_notes.py`(215)、`user_avatars.py`(69) | 34 → 31 |
 | B3 | `core/updates/` | `update.py`(198)、`update_bundle.py`(210)、`announcement.py`(323)、`preset_sources.py`(109)、`system_preset.py`(152) | 31 → 26 |
-| B4 | `core/support/` | `support_qrcode.py`(86)、`group_qrcode.py`(58)、`qr_cache.py`(85)、`qr_image.py`(57)、`public_links.py`(10)、`about.py`(23)、`device_app.py`(10)、`license_files.py`(11) | 26 → 18 |
+| B4 | `core/qrcode/` + `core/about/` | 二维码四件套（`qr_image`/`qr_cache`/`group_qrcode`/`support_qrcode`）→ `core/qrcode/{image,cache,group,support}.py`；`about`/`public_links` → `core/about/{content,links}.py` | 26 → 18 |
 
 四批之后根目录只剩 18 个模块：14 个原语 + 4 个外壳，每屏能看完。
 `core/history/` 的命名与 `core/profile/history_query.py`、`ProfileDB` 的账本不冲突：

@@ -1,5 +1,6 @@
 """赞助对话框：只补缺的那张图，已有缓存时不自动联网。"""
-from lvjiang.core import qr_cache, support_qrcode
+from lvjiang.core.qrcode import cache as qr_cache
+from lvjiang.core.qrcode import support as support_qrcode
 from lvjiang.ui.notices.qrcode_refresher import ImageRefreshThread
 from lvjiang.ui.notices.sponsor_dialog import SponsorDialog
 

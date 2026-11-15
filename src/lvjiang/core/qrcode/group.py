@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .fs_util import atomic_write_bytes
-from .qr_cache import cache_path, cached_bytes, write_cache
-from .qr_image import MAX_QRCODE_BYTES, QrCodeError, fetch_image_bytes
+from ..fs_util import atomic_write_bytes
+from .cache import cache_path, cached_bytes, write_cache
+from .image import MAX_QRCODE_BYTES, QrCodeError, fetch_image_bytes
 
 # 与 announcement.py 的 notices.json 同域名，走 GitHub Pages 静态站点，
 # 不依赖 GitHub API，避免限流。

@@ -12,9 +12,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
-from .public_links import SUPPORT_QRCODE_BASE_URL
-from .qr_cache import cache_path, cached_bytes, write_cache
-from .qr_image import fetch_image_bytes
+from ..about.links import SUPPORT_QRCODE_BASE_URL
+from .cache import cache_path, cached_bytes, write_cache
+from .image import fetch_image_bytes
 
 #: 渠道顺序即界面展示顺序。
 KINDS: Final[tuple[str, ...]] = ("wechat", "alipay")

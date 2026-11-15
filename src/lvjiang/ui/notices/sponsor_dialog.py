@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...core import support_qrcode
-from ...core.public_links import SUPPORT_PAGE_URL
+from ...core.about.links import SUPPORT_PAGE_URL
+from ...core.qrcode import support as support_qrcode
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style
 from .qrcode_refresher import ImageRefreshThread

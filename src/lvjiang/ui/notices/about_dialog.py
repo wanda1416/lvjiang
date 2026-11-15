@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...core.about import about_content
+from ...core.about.content import about_content
 from ...core.updates.release import (
     GITHUB_REPO,
     ReleaseInfo,

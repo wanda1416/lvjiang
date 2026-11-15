@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -16,10 +15,8 @@ from typing import Any, Iterator
 from loguru import logger
 
 from .. import constants
+from .db import Database, Migration, Schema
 from .fs_util import dated_output_dir
-
-_SCHEMA_LOCK = threading.Lock()
-CURRENT_SCHEMA_VERSION = 2
 
 
 def default_db_path() -> Path:
@@ -110,8 +107,12 @@ class BatchRunRecord:
 
 
 def _migration_1(conn: sqlite3.Connection) -> None:
-    """建立 0.13.x 初始任务历史结构。"""
-    conn.executescript("""
+    """建立 0.13.x 初始任务历史结构。
+
+    不用 ``executescript``：它会先隐式提交外层迁移事务，让「版本读取与迁移同
+    一事务」的保护失效。逐条 ``execute`` 才能被 ``BEGIN IMMEDIATE`` 覆盖。
+    """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS batch_runs (
             batch_run_id TEXT PRIMARY KEY,
             config_name TEXT NOT NULL,
@@ -122,7 +123,9 @@ def _migration_1(conn: sqlite3.Connection) -> None:
             input_snapshot_json TEXT NOT NULL DEFAULT '{}',
             report_path TEXT NOT NULL DEFAULT '',
             error_message TEXT NOT NULL DEFAULT ''
-        );
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS task_runs (
             task_run_id TEXT PRIMARY KEY,
             batch_run_id TEXT REFERENCES batch_runs(batch_run_id),
@@ -139,18 +142,21 @@ def _migration_1(conn: sqlite3.Connection) -> None:
             result_path TEXT NOT NULL DEFAULT '',
             log_path TEXT NOT NULL DEFAULT '',
             error_message TEXT NOT NULL DEFAULT ''
-        );
-        CREATE INDEX IF NOT EXISTS idx_task_runs_started
-            ON task_runs(started_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_task_runs_user_started
-            ON task_runs(username, started_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_task_runs_task_started
-            ON task_runs(task_id, started_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_task_runs_batch
-            ON task_runs(batch_run_id, started_at);
-        CREATE INDEX IF NOT EXISTS idx_batch_runs_started
-            ON batch_runs(started_at DESC);
+        )
     """)
+    for statement in (
+        "CREATE INDEX IF NOT EXISTS idx_task_runs_started"
+        " ON task_runs(started_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_task_runs_user_started"
+        " ON task_runs(username, started_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_task_runs_task_started"
+        " ON task_runs(task_id, started_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_task_runs_batch"
+        " ON task_runs(batch_run_id, started_at)",
+        "CREATE INDEX IF NOT EXISTS idx_batch_runs_started"
+        " ON batch_runs(started_at DESC)",
+    ):
+        conn.execute(statement)
 
 
 def _migration_2(conn: sqlite3.Connection) -> None:
@@ -170,17 +176,16 @@ def _migration_2(conn: sqlite3.Connection) -> None:
 
 
 _MIGRATIONS = (
-    (1, _migration_1),
-    (2, _migration_2),
+    (1, "initial task history schema", _migration_1),
+    (2, "track execution target snapshot", _migration_2),
 )
 
+SCHEMA = Schema(
+    [Migration(*row) for row in _MIGRATIONS],
+    label="TaskHistoryDB",
+)
 
-class _ClosingConnection(sqlite3.Connection):
-    def __exit__(self, exc_type, exc_value, traceback):
-        try:
-            return super().__exit__(exc_type, exc_value, traceback)
-        finally:
-            self.close()
+CURRENT_SCHEMA_VERSION = SCHEMA.current_version
 
 
 class TaskHistoryRepository:
@@ -188,40 +193,14 @@ class TaskHistoryRepository:
 
     def __init__(self, db_path: Path | str | None = None):
         self.db_path = Path(db_path) if db_path else default_db_path()
-        self._ensure_schema()
-
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(
-            str(self.db_path), timeout=5.0, factory=_ClosingConnection)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA foreign_keys=ON")
-        with _SCHEMA_LOCK:
-            conn.execute("PRAGMA journal_mode=WAL")
-        return conn
-
-    def _ensure_schema(self) -> None:
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS schema_version "
-                "(version INTEGER PRIMARY KEY)")
-            row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-            current = int(row[0] or 0)
-            for version, migrate in _MIGRATIONS:
-                if version <= current:
-                    continue
-                migrate(conn)
-                conn.execute(
-                    "INSERT INTO schema_version(version) VALUES (?)", (version,))
+        self._db = Database(
+            self.db_path, SCHEMA, foreign_keys=True, row_factory=sqlite3.Row)
 
     def schema_version(self) -> int:
-        with self._connect() as conn:
-            row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-        return int(row[0] or 0)
+        return self._db.version()
 
     def create_task_run(self, record: TaskRunRecord) -> None:
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("""
                 INSERT INTO task_runs (
                     task_run_id, batch_run_id, username, task_id, task_name,
@@ -246,7 +225,7 @@ class TaskHistoryRepository:
         duration_ms: int, result_path: Path | None = None,
         error_message: str = "",
     ) -> None:
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("""
                 UPDATE task_runs SET status=?, finished_at=?, duration_ms=?,
                     result_path=?, error_message=? WHERE task_run_id=?
@@ -257,7 +236,7 @@ class TaskHistoryRepository:
 
     def update_task_params(self, task_run_id: str, params: dict[str, Any]) -> None:
         """引擎初始化后记录最终执行参数，终态记录不再修改。"""
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("UPDATE task_runs SET params_json=? WHERE task_run_id=? AND status='running'",
                          (_json(params), task_run_id))
 
@@ -296,7 +275,7 @@ class TaskHistoryRepository:
             args.append(f"{(end_date + timedelta(days=1)).isoformat()}T00:00:00")
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         args.append(max(1, int(limit)))
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM task_runs" + where
                 + " ORDER BY started_at DESC LIMIT ?", args).fetchall()
@@ -304,12 +283,12 @@ class TaskHistoryRepository:
 
     def get_task_run(self, task_run_id: str) -> TaskRunRecord | None:
         """按稳定 ID 打开历史详情，不受最近列表分页限制。"""
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             row = conn.execute("SELECT * FROM task_runs WHERE task_run_id=?", (task_run_id,)).fetchone()
         return self._task_from_row(row) if row is not None else None
 
     def create_batch_run(self, record: BatchRunRecord) -> None:
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("""
                 INSERT INTO batch_runs (
                     batch_run_id, config_name, status, started_at, finished_at,
@@ -329,7 +308,7 @@ class TaskHistoryRepository:
         duration_ms: int, report_path: Path | None = None,
         error_message: str = "",
     ) -> None:
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("""
                 UPDATE batch_runs SET status=?, finished_at=?, duration_ms=?,
                     report_path=?, error_message=? WHERE batch_run_id=?
@@ -360,7 +339,7 @@ class TaskHistoryRepository:
             args.append(target_kind)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         args.append(max(1, int(limit)))
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             rows = conn.execute("""
                 SELECT b.*, COUNT(t.task_run_id) AS task_count
                 FROM batch_runs b LEFT JOIN task_runs t
@@ -370,7 +349,7 @@ class TaskHistoryRepository:
         return [self._batch_from_row(row) for row in rows]
 
     def filter_options(self) -> tuple[list[str], list[tuple[str, str]]]:
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             users = [str(row[0]) for row in conn.execute(
                 "SELECT DISTINCT username FROM task_runs ORDER BY username")]
             tasks = [(str(row[0]), str(row[1])) for row in conn.execute("""
@@ -381,7 +360,7 @@ class TaskHistoryRepository:
 
     def date_bounds(self) -> tuple[date, date]:
         today = datetime.now().astimezone().date()
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             row = conn.execute("""
                 SELECT MIN(started_at), MAX(started_at) FROM (
                     SELECT started_at FROM task_runs

@@ -39,7 +39,7 @@
 | `users/{名}.notes.json` | 用户笔记 | `core/user_notes.py` | |
 | `users/{名}.session.json` | DSL `session` 关键字的落点 | `core/config/users.py`（`SessionManager`） | 机制可用但当前无系统脚本写入，见 03-session-and-context |
 | `avatars/avatar_<16hex>.png` | 内容寻址的头像 PNG 库 | `core/user_avatars.py` | 资料里只存 basename，可直接删（改回默认头像） |
-| `profile.db` | 四模型数值（`profile_entries`）、变更历史（`profile_history`）、key 重命名审计 | `core/profile/repository.py`（`ProfileDB`） | schema v8，`entries.locked` 是「用户 × key」的失效标记 |
+| `profile.db` | 四模型数值（`profile_entries`）、变更账本（`profile_history`） | `core/profile/repository.py`（`ProfileDB`，读写分布在 `entries.py` / `ledger.py` / `sync_log.py`） | schema v13，`entries.locked` 是「用户 × key」的失效标记；迁移定义在 `core/profile/migrations.py` |
 | `profile.yaml` | 按模型归档的 key 定义 | `core/profile/schema.py` | **是用户数据，不是系统配置**：保存时必须保留未识别定义，不得因升级覆盖 |
 
 用户域全部不可重建。用户目录自身不落任何锁文件，跨进程由执行租约负责，见第六节。
@@ -135,7 +135,7 @@
 | 跨进程文件锁（`.locks/` 下 `<类型>_<摘要8位>.lock`） | 所有 JSON 读改写与用户执行互斥 |
 | 加载基线 + 字段级合并（`SessionSnapshot`） | `users/*.session.json` |
 | 文档内 `revision` 乐观并发 | `users/*.loadouts.json` |
-| SQLite 事务（WAL + busy_timeout） | 三个 `.db` |
+| SQLite 事务（WAL + busy_timeout） | 三个 `.db`；连接、事务边界与「读版本 + 迁移」的写锁统一由 `core/db/` 提供，各库只声明自己的表与迁移 |
 | 事务日志 + 下次访问恢复（`_transaction.json`） | `yysls/`、`agent/` 多文档更新 |
 
 ## 八、生命周期与存续判断
@@ -143,8 +143,9 @@
 - **可删可重建**：`content.json`、`screenshots/`、`feedback-qrcode.jpg`、全部锁文件。
 - **可重置但会丢偏好**：`session.json`、`interface.json`、`batch.json`（重新配置即可，但批量组与脚本顺序会丢）。
 - **不可重建（用户资产）**：`users/*`、`profile.db`、`profile.yaml`、三个历史库、`logs/output/`、`agent/results.json`。
-- **迁移前必须备份**：`profile.db` 由 `schema_version` 表驱动有序迁移（当前 v8）；`profile.yaml` 与 `users/*.json` 靠文件内 schema 字段判定，升级失败时**不得**用默认值覆盖。
-- 磁盘上可能出现但不属于程序产物的文件（例如手工留存的 `profile.before-v8.db`）：代码既不读也不写，
+- **迁移前必须备份**：`profile.db` 由 `schema_version` 表驱动有序迁移（当前 v13，备份由 `core/db/schema.py` 在写锁前完成）；
+  `profile.yaml` 与 `users/*.json` 靠文件内 schema 字段判定，升级失败时**不得**用默认值覆盖。
+- 磁盘上可能出现但不属于程序产物的文件（例如手工留存的 `profile.before-v13.db`）：代码既不读也不写，
   不能当作迁移或恢复机制依赖。
 
 ## 九、隐私与打包边界

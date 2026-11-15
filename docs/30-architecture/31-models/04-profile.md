@@ -26,7 +26,12 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 | `core/profile/schema.py` | `profile.yaml` 加载、校验与写回（定义是用户资产，只增改不删除） |
 | `core/profile/store.py` | 可见结构（`profile.json` 分组/列/列宽）与 `interface.json` 的 `alert_history`、活跃分组 |
 | `core/profile/layout.py` | `profile.json` 读写、v1 迁移、列宽折算与 clamp |
-| `core/profile/repository.py` | `profile.db` 存储层与 `_ensure_schema` 逐版迁移 |
+| `core/profile/repository.py` | `profile.db` 组合根：连接借用、清空、单例与模块级 `db_*` 便捷函数 |
+| `core/profile/entries.py` | `profile_entries` 当前值：读取、锁定、快照仲裁、upsert / CAS、key 重命名 |
+| `core/profile/ledger.py` | `profile_history`：写一行账本、筛选/聚合/分页、逐条删除与来源修改 |
+| `core/profile/sync_log.py` | 账本同步簿记：水位、待上行行、ack、清理 |
+| `core/profile/history_sql.py` | 历史筛选条件 → WHERE 子句（无连接，可直接单测） |
+| `core/profile/migrations.py` | `profile.db` 的 schema 版本与逐版迁移（历史快照，不再改语义） |
 | `core/profile/engine.py` / `regen.py` / `periods.py` | 周期重置、再生计算与周期注册表 |
 | `core/profile/service.py` / `sync.py` / `triggers.py` | 统一读写语义、`sync_targets` 同步链与变更脚本 |
 | `core/profile/snapshot_sync.py` / `key_rename.py` | 账本同步、全用户改名与引用维护 |
@@ -41,14 +46,17 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 
 ## 存储契约
 
-以下为当前契约，数据模型数据库使用 **schema v10**：
+以下为当前契约，数据模型数据库使用 **schema v13**：
 
 - `config/session/profile.yaml` 仍以四个模型的列表保存 key。每个 `KeyDef` 带
   `group`；旧条目缺失或空白时归入稳定 key `default`，下次保存显式写出。
-- `config/session/profile.db` 当前 schema v10，按 `schema_version` 顺序升级；逐版迁移
-  写在 `core/profile/repository.py` 的 `_ensure_schema`（v8 加 locked、v9 把历史改为同步
-  账本并删审计表、v10 给史行加源实例标识）。升级前用 SQLite backup 保存 `profile.before-
-  vN.db`，含 WAL 中已提交内容。
+- `config/session/profile.db` 当前 schema v13，按 `schema_version` 顺序升级；逐版迁移
+  写在 `core/profile/migrations.py`（v8 加 locked、v9 把历史改为同步账本并删审计表、
+  v10 给历史行加源实例标识、v11 改 set-only 并重写条目锚点、v12 与云端列名同构、
+  v13 把 `tick` 正名为 `regen`）。版本推进与写锁由共享原语
+  `core/db/schema.py` 负责——读版本与迁移在同一 `BEGIN IMMEDIATE` 内，否则并发初始化
+  会对同一列执行两次 `ALTER TABLE`。升级前用 SQLite backup 保存 `profile.before-vN.db`，
+  含 WAL 中已提交内容。
 - `profile_entries` 仍以 `(username, type, key)` 为复合主键。
 - `profile_history` 保留 ID、时间、用户、模型、key、数值/文本旧新值和来源；
   `detail` 替换为 `delta_value REAL NULL` 与 `sync_from TEXT NULL`。

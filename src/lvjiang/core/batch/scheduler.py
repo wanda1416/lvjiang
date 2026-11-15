@@ -8,6 +8,10 @@
 
 批量配置和 BatchScript 不携带用户参数值。BatchScheduler 构造时根据
 “任务 ID + 用户”生成全部执行参数快照，运行过程中不再回读配置。
+
+结构：数据结构与进度常量在 :mod:`.models`，生命周期/脚本阶段在
+:mod:`.stages`，无人值守恢复在 :mod:`.unattended`；本模块只剩一轮批量的编排、
+执行计划冻结与结果落盘。
 """
 
 from __future__ import annotations
@@ -16,9 +20,8 @@ import copy
 import json
 import time
 from contextlib import ExitStack, nullcontext
-from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
 from loguru import logger
 
@@ -33,206 +36,46 @@ from ...workflows.result_protocol import (
     RESULT_SUCCESS,
 )
 from ..android.recovery import ChannelFaultError
-from ..config.resolver import get_resolver
 from ..config.users import SessionManager
 from ..fs_util import task_result_path
-from ..layout.config import canvas_aspect_matches
-from ..layout.models import Layout
 from .config import (
-    BatchConfigItem,
-    BatchWorkflows,
     lifecycle_parameter_definitions,
 )
+from .models import (
+    ST_CHANNEL_FAULT,
+    ST_FAILED,
+    ST_NOT_RUN,
+    ST_PENDING,
+    ST_RUNNING,
+    ST_SKIPPED,
+    ST_STOPPED,
+    ST_SUCCESS,
+    BatchCheckResult,
+    BatchContext,
+    BatchEvent,
+    BatchRunSpec,
+    BatchScript,
+    BatchStageResult,
+    PlannedTask,
+    UnattendedInterrupt,
+)
 from .report import BatchReport
-from .run import BatchRunDraft
+from .stages import StageExecutionMixin
+from .unattended import UnattendedMixin
 
-# 进度状态常量
-ST_PENDING = tr("待执行")
-ST_RUNNING = tr("运行中")
-ST_SUCCESS = tr("成功")
-ST_FAILED = tr("失败")
-ST_SKIPPED = tr("跳过")
-ST_STOPPED = tr("已停止")
-ST_CHANNEL_FAULT = tr("通道中断")
-#: 只用于进度页：批次已结束（或正在查看历史轮）时，该轮没有留下状态的行。
-ST_NOT_RUN = tr("未执行")
-
-_RESULT_STATUSES = {
-    RESULT_SUCCESS, RESULT_SKIPPED, RESULT_FAILED, RESULT_STOPPED,
-}
+#: 转出口：外部（ondevice 批量、UI 批量页）按 ``batch.scheduler`` 导入这些
+#: 名字，拆分后仍从这里取。
+__all__ = [
+    "ST_PENDING", "ST_RUNNING", "ST_SUCCESS", "ST_FAILED", "ST_SKIPPED",
+    "ST_STOPPED", "ST_CHANNEL_FAULT", "ST_NOT_RUN",
+    "RESULT_SUCCESS", "RESULT_FAILED", "RESULT_SKIPPED", "RESULT_STOPPED",
+    "BatchEvent", "BatchScript", "PlannedTask", "BatchRunSpec", "BatchContext",
+    "BatchStageResult", "BatchCheckResult", "UnattendedInterrupt",
+    "BatchScheduler",
+]
 
 
-class BatchEvent:
-    """宿主提供回调；调度器不依赖 GUI 线程或框架。"""
-
-    def __init__(self):
-        self._callbacks: list[Callable[..., object]] = []
-
-    def connect(self, callback: Callable[..., object]) -> None:
-        self._callbacks.append(callback)
-
-    def emit(self, *args) -> None:
-        for callback in self._callbacks:
-            callback(*args)
-
-
-@dataclass
-class BatchScript:
-    """批量执行中的脚本描述
-
-    不含任何参数值；parameters 只是脚本元数据中的参数定义。
-    """
-    id: str
-    name: str
-    wf_file: str = ""       # DSL 工作流文件（相对 workflows/ 或绝对路径）
-    class_name: str = ""    # Python 类实现（与 wf_file 二选一）
-    scope: str = "daily"    # 任务定义性质；daily / dedicated 都进入历史
-    parameters: list[dict] | None = None  # 仅参数定义，不携带任何参数值
-    env: list[str] | None = None  # 脚本级可运行环境，启动前二次校验
-    batch_check: str = ""  # 批量执行前调用的 wf 内部子过程；空表示直接执行
-
-
-@dataclass(frozen=True)
-class PlannedTask:
-    """批量启动时冻结的一个“用户 × 脚本”执行项。"""
-    run_idx: int
-    username: str
-    script: BatchScript
-    params: dict
-    parameter_source: str
-
-
-@dataclass(frozen=True)
-class BatchRunSpec:
-    """点下「开始」那一刻冻结的一次批量计划。
-
-    配置组定义 + 运行草稿 → 这份快照。调度器只认它：运行期不再读 `batch.json`、
-    不再读 session、也不再看主页面控件。所以启动之后去改配置组、改用户资料或
-    在主页面重新勾选，都不会影响正在跑的这一批。
-
-    `unattended` 存的是**有效值**：草稿勾了无人值守、且配置组确实配了异常恢复
-    wf，才会是真。这个与运算只在构造快照时做一次，调度器不必再判断前提。
-
-    `allow_portrait` 同样是有效值：草稿勾了允许竖屏、且配置组配了异常恢复 wf，
-    才允许安卓批量在竖屏画面下启动；启动后先走一次异常恢复回到登录主页。
-
-    生命周期参数也来自运行草稿。真实生效的键仍由 wf 文件头实时声明的参数集合
-    决定，草稿里换工作流后残留的同名旧值不会生效。
-    """
-
-    group_id: str = ""
-    name: str = ""
-    #: 本次执行顺序：用户模式是用户名，属性单元模式是属性值
-    entries: tuple[str, ...] = ()
-    #: 属性单元模式下参与分组的全部可见用户；用户模式与 entries 相同
-    candidate_usernames: tuple[str, ...] = ()
-    scripts: tuple[BatchScript, ...] = ()
-    execution_unit_key: str = "user"
-    rounds: int = 1
-    workflows: BatchWorkflows = field(default_factory=BatchWorkflows)
-    workflow_params: dict[str, dict] = field(default_factory=dict)
-    skip_lifecycle_for_single_item: bool = True
-    unattended: bool = False
-    allow_portrait: bool = False
-
-    @staticmethod
-    def build(
-        item: BatchConfigItem,
-        draft: BatchRunDraft,
-        *,
-        entries: list[str],
-        scripts: list[BatchScript],
-        candidate_usernames: list[str] | None = None,
-    ) -> "BatchRunSpec":
-        return BatchRunSpec(
-            group_id=item.id,
-            name=item.name,
-            entries=tuple(entries),
-            candidate_usernames=tuple(
-                entries if candidate_usernames is None else candidate_usernames),
-            scripts=tuple(copy.deepcopy(scripts)),
-            execution_unit_key=item.execution_unit_key,
-            rounds=draft.rounds,
-            workflows=copy.deepcopy(item.workflows),
-            workflow_params=copy.deepcopy(draft.workflow_params),
-            skip_lifecycle_for_single_item=item.skip_lifecycle_for_single_item,
-            # 无人值守必须配套恢复 wf，否则改道弹窗只会让整批在错误页面上连环失败
-            unattended=bool(
-                draft.unattended and item.workflows.recover_unattended),
-            # 允许竖屏同样离不开恢复 wf：放行后要先回到登录主页再进入游戏；
-            # 也离不开条目准备——把客户端收回登录页之后只有它能再把人送进游戏，
-            # 少了它整批会在登录页上逐条失败。
-            allow_portrait=bool(
-                draft.allow_portrait
-                and item.workflows.recover_unattended
-                and item.workflows.prepare_item),
-        )
-
-
-@dataclass
-class BatchContext:
-    """引擎创建所需的后端上下文（由 host 在启动时注入）"""
-    capture: object
-    ocr: object
-    input_ctrl: object
-    layout: object
-    target_id: str = ""
-    target_kind: str = ""
-    target_label: str = ""
-    task_run_id: str = ""
-    input_kind: str = ""
-    layout_name: str = ""
-    run_env: str = ""
-    input_sim: object | None = None
-    delay_params: dict | None = None
-    android_apps: dict | None = None
-    android_device: object | None = None
-    window_left: int = 0
-    window_top: int = 0
-    pause_event: object = None  # threading.Event | None
-    history_source: str = "batch"
-    ui_callback: Callable[..., object] | None = None
-    # 条目准备重启客户端后，宿主据此把定位状态跟到新窗口。
-    window_rebind_hook: Callable[[dict], None] | None = None
-    # 用户锁冲突时，宿主据此说明是哪个目标的哪个运行实例占着这个用户。
-    # 用户锁本身是进程级的，不知道目标，所以必须由持有 RunManager 的宿主回答。
-    user_conflict_describer: Callable[[str], str] | None = None
-
-
-@dataclass(frozen=True)
-class BatchStageResult:
-    """生命周期 wf 的通用返回结果。state 内容对控制层完全透明。"""
-    status: str = RESULT_SUCCESS
-    message: str = ""
-    state: dict | None = None
-    username: str = ""
-    #: wf 是否执行过顶层 return。跑到末尾一次 return 都没走时为 False——
-    #: 对「只做事不返回」的阶段无所谓，但属性单元的条目准备必须回传 username，
-    #: 这时要能把「没返回」和「返回了但内容不对」分开报。
-    returned: bool = True
-    #: 实际加载的 wf 路径。config/local 会顶替 system，
-    #: 报错时带上它，本地覆盖这类问题一眼可见，不用去翻编辑器。
-    source: str = ""
-
-
-@dataclass(frozen=True)
-class BatchCheckResult:
-    """业务 wf 的批量可执行性判定结果。"""
-    status: str = RESULT_SUCCESS
-    message: str = ""
-
-
-class UnattendedInterrupt(WorkflowAbort):
-    """无人值守模式下工作流通过 pause 声明异常阻断。
-
-    pause 经由 ``engine._ui_callback`` 走到宿主，所以
-    无人值守只需要在这一处改道，不必去改 wf 里几十个调用点。抛出后当前任务
-    按异常记失败、不重试，调度器随即调用配置的恢复 wf 把游戏收回公共初始页，
-    再继续下一个任务。
-    """
-
-
-class BatchScheduler:
+class BatchScheduler(StageExecutionMixin, UnattendedMixin):
     """批量执行工作线程
 
     Signals:
@@ -249,7 +92,6 @@ class BatchScheduler:
     selected_task_plan: Any
     log: Any
     finished_all: Any
-
     def __init__(
         self,
         spec: BatchRunSpec,
@@ -293,6 +135,7 @@ class BatchScheduler:
         self._unattended_hit = ""
         self._build_execution_plan()
 
+
     def _abort_channel_fault(self, fault, *, report, label: str, script, run_idx: int,
                              round_number: int, attempt: int, task_run,
                              username: str, started_at=None) -> None:
@@ -328,9 +171,11 @@ class BatchScheduler:
             except Exception as output_exc:  # noqa: BLE001
                 logger.warning(f"通道故障结果保存失败: {output_exc}")
 
+
     def _task_was_stopped(self) -> bool:
         """当前脚本被单独结束（弹窗「停止任务」），而整批没有要求停止。"""
         return self._task_stop_check() and not self._stop_check()
+
 
     def _history_target_kwargs(self) -> dict[str, str]:
         return {
@@ -339,6 +184,7 @@ class BatchScheduler:
             "target_label": self._ctx.target_label,
         }
 
+
     def _task_history_target_kwargs(self) -> dict[str, str]:
         return {
             **self._history_target_kwargs(),
@@ -346,6 +192,7 @@ class BatchScheduler:
             "layout": self._ctx.layout_name,
             "input_kind": self._ctx.input_kind,
         }
+
 
     def _build_execution_plan(self) -> None:
         """在工作线程启动前冻结全部任务参数和用户配置。"""
@@ -403,11 +250,11 @@ class BatchScheduler:
                 definitions, self._spec.workflow_params.get(phase, {}), None)
             self._lifecycle_params[phase] = params
 
+
     def task_plan_snapshot(self) -> dict[tuple[int, str], PlannedTask]:
         """供进度页展示与本轮执行完全一致的参数快照。"""
         return copy.deepcopy(self._task_plan)
 
-    # ─── 主循环 ─────────────────────────────────────────
 
     def run(self):
         self._run_started_at = time.monotonic()
@@ -420,6 +267,7 @@ class BatchScheduler:
             target_label=self._ctx.target_label,
         ):
             self._run_with_context()
+
 
     def _run_with_context(self):
         self._execution_lease = None
@@ -441,6 +289,7 @@ class BatchScheduler:
             if self._execution_lease is not None:
                 self._execution_lease.release()
                 self._execution_lease = None
+
 
     def _run_locked(self):
         if self._spec.execution_unit_key != "user":
@@ -884,6 +733,7 @@ class BatchScheduler:
 
         self.finished_all.emit(summary)
 
+
     def _run_locked_by_attr(self) -> None:
         """属性单元的运行态调度；旧用户执行路径不受影响。"""
         from ..access import AccessDeniedError, acquire_user
@@ -1278,128 +1128,6 @@ class BatchScheduler:
                 logger.warning(f"批量历史收尾失败，继续退出批量任务: {exc}")
         self.finished_all.emit(summary)
 
-    def _unit_prepare_protocol_error(
-        self, prepared: BatchStageResult, eligible: list[str],
-    ) -> str:
-        """属性单元条目准备违反协议时的报文。
-
-        「wf 一次 return 都没走」和「返回了但 username 不对」是两种完全不同的
-        排查方向，混成一句话会把人带到错误的地方；实际加载路径一并带上，因为
-        config/local 会顶替 system，用户自己改过的那份会永久生效。
-        """
-        wf_name = self._spec.workflows.prepare_item
-        where = f"（实际加载 {prepared.source}）" if prepared.source else ""
-        if not prepared.returned:
-            return (
-                f"条目准备工作流 {wf_name!r}{where} 没有返回任何值：属性单元要求它"
-                f"返回 {{status, state, username}}。请检查该 wf 是否有顶层 return，"
-                f"以及是否被 config/local 顶替成了旧版本")
-        return (
-            f"条目准备工作流 {wf_name!r}{where} 未返回本单元可执行的用户名"
-            f"（得到 {prepared.username!r}）：属性单元必须由它选定成员并回传"
-            f" username，可执行成员为 {eligible}")
-
-    # ─── 生命周期协议 ────────────────────────────────────
-
-    @staticmethod
-    def _normalize_stage_result(value, current_state: dict) -> BatchStageResult:
-        """校验 wf 返回协议；不解析 state 内任何业务字段。"""
-        if value is None:
-            return BatchStageResult(state=current_state, returned=False)
-        if not isinstance(value, dict):
-            return BatchStageResult(
-                status=RESULT_FAILED,
-                message=tr("生命周期 wf 必须返回 dict 或 null"),
-                state=current_state,
-            )
-        status = value.get("status", RESULT_SUCCESS)
-        message = value.get("message", "")
-        state = value.get("state", current_state)
-        username = value.get("username", "")
-        if status not in _RESULT_STATUSES:
-            return BatchStageResult(
-                status=RESULT_FAILED,
-                message=f"生命周期 wf 返回了未知 status: {status!r}",
-                state=current_state,
-            )
-        if not isinstance(message, str):
-            message = str(message)
-        if not isinstance(state, dict):
-            return BatchStageResult(
-                status=RESULT_FAILED,
-                message=tr("生命周期 wf 的 state 必须是 dict"),
-                state=current_state,
-            )
-        if not isinstance(username, str):
-            return BatchStageResult(
-                status=RESULT_FAILED, message=tr("生命周期 wf 返回了无效角色"),
-                state=current_state)
-        return BatchStageResult(
-            status=status, message=message, state=state,
-            username=username)
-
-    @staticmethod
-    def _normalize_check_result(value) -> BatchCheckResult:
-        """校验业务 wf 的批量可执行性返回协议。"""
-        if not isinstance(value, dict):
-            return BatchCheckResult(
-                status=RESULT_FAILED,
-                message=tr("批量可执行性子过程必须返回 dict"),
-            )
-        status = value.get("status", RESULT_SUCCESS)
-        message = value.get("message", "")
-        if status not in {RESULT_SUCCESS, RESULT_SKIPPED}:
-            return BatchCheckResult(
-                status=RESULT_FAILED,
-                message=f"批量可执行性子过程返回了未知 status: {status!r}",
-            )
-        if not isinstance(message, str):
-            message = str(message)
-        return BatchCheckResult(status=status, message=message)
-
-    @staticmethod
-    def _result_to_ui_status(status: str) -> str:
-        return {
-            RESULT_SUCCESS: ST_SUCCESS,
-            RESULT_SKIPPED: ST_SKIPPED,
-            RESULT_FAILED: ST_FAILED,
-            RESULT_STOPPED: ST_STOPPED,
-        }.get(status, ST_FAILED)
-
-    @staticmethod
-    def _ui_status_to_result(status: str) -> str:
-        return {
-            ST_SUCCESS: RESULT_SUCCESS,
-            ST_FAILED: RESULT_FAILED,
-            ST_SKIPPED: RESULT_SKIPPED,
-            ST_STOPPED: RESULT_STOPPED,
-            ST_PENDING: "pending",
-            ST_RUNNING: "running",
-        }.get(status, RESULT_FAILED)
-
-    def _describe_user_conflict(self, username: str, exc: Exception) -> str:
-        """把用户锁冲突补成「哪个用户 · 哪个目标 · 哪个运行实例」。
-
-        用户锁是进程级的，本身不知道目标，所以具体占用情况必须问宿主的
-        RunManager。拿不到时退回异常原文，绝不编一个目标名出来。
-        """
-        detail = str(exc)
-        describer = self._ctx.user_conflict_describer
-        if describer is None or not username:
-            return detail
-        try:
-            extra = describer(username)
-        except Exception as describe_exc:  # noqa: BLE001
-            logger.debug(f"查询用户锁占用情况失败: {describe_exc}")
-            return detail
-        return f"{detail}（{extra}）" if extra else detail
-
-    @staticmethod
-    def _stage_message(label: str, result: BatchStageResult) -> str:
-        text = result.message or result.status
-        return f"[批量] {label}: {text}"
-
-    # ─── 内部方法 ───────────────────────────────────────
 
     def _log(self, message: str, level: str = "info") -> None:
         """批量逐项消息：进批量页滚动区，同时写主日志。
@@ -1413,6 +1141,7 @@ class BatchScheduler:
         except Exception:  # noqa: BLE001 - 记日志失败不能影响批量执行
             pass
         self.log.emit(message)
+
 
     def _create_engine(self) -> WorkflowEngine:
         """创建新引擎（共享后端引用，每个脚本独立实例）"""
@@ -1444,310 +1173,6 @@ class BatchScheduler:
         engine.window_rebind_hook = ctx.window_rebind_hook
         return engine
 
-    def _unattended_active(self) -> bool:
-        """无人值守是否真的生效：必须同时配好恢复 wf。
-
-        少了恢复 wf 就改道 pause 只会把整批推到错误页面上连环失败，
-        不如照旧弹窗等人。配置层已经拦了一道，这里不依赖它。
-        """
-        return bool(self._spec.unattended
-                    and self._spec.workflows.recover_unattended)
-
-    def _unattended_ui_callback(self, kind: str, **kwargs) -> object:
-        """Only pause declares an abnormal interruption; forward other UI requests."""
-        if kind != "pause":
-            callback = self._ctx.ui_callback
-            return callback(kind, **kwargs) if callback is not None else None
-        text = str(kwargs.get("message") or kind)
-        self._unattended_hit = text
-        raise UnattendedInterrupt(text)
-
-    def _needs_portrait_recovery(self) -> bool:
-        """批量起步画面是竖屏、且交换宽高后才匹配布局时，先收回登录主页。
-
-        与启动门禁共用 ``canvas_aspect_matches``：本来就按竖屏设计的布局
-        在正常比较时就已匹配，不会被误判成临时竖屏而多跑一次恢复。
-        """
-        if not self._spec.allow_portrait:
-            return False
-        if self._ctx.target_kind != "adb":
-            return False
-        layout = cast(Layout | None, self._ctx.layout)
-        capture: Any = self._ctx.capture
-        if layout is None or not layout.aspect or capture is None:
-            return False
-        try:
-            width, height = capture.get_capture_size()
-        except Exception as exc:  # noqa: BLE001
-            logger.debug(f"批量启动取截图尺寸失败，跳过竖屏恢复: {exc}")
-            return False
-        if width <= 0 or height <= width:
-            return False
-        passed, portrait_used = canvas_aspect_matches(
-            layout, float(width), float(height), allow_portrait=True)
-        return bool(passed and portrait_used)
-
-    def _start_recovery_username(self) -> str:
-        """挑一个能支撑客户端重启的用户：优先带账号和区服后缀的候选。"""
-        if self._spec.execution_unit_key == "user":
-            candidates = list(self._usernames)
-        else:
-            candidates = []
-            for unit in self._usernames:
-                candidates.extend(self._unit_members.get(unit, []))
-        for name in candidates:
-            attributes = self._user_attributes.get(name, {})
-            if attributes.get("account") and attributes.get("tail"):
-                return name
-        return candidates[0] if candidates else ""
-
-    def _recover_to_login_at_start(self, batch_state: dict) -> dict:
-        """批量起步于竖屏时，先借异常恢复 wf 把客户端带到登录主页。
-
-        只回登录主页（pending=False），不代登录当前角色：具体用户由随后的
-        prepare_item 按本次批量的第一条目正常选择。
-        """
-        wf_name = self._spec.workflows.recover_unattended
-        if not wf_name:
-            return batch_state
-        username = self._start_recovery_username()
-        self._log("[批量] 启动画面为竖屏，执行异常恢复 wf 回到登录主页")
-        result = self._run_stage(
-            "recover_unattended", wf_name, -1, username, batch_state,
-            extra_variables={
-                "batch_recover_pending": False,
-                "batch_recover_username": username,
-            })
-        if result.status != RESULT_SUCCESS:
-            self._log(f"[批量] 启动时异常恢复未成功：{result.message}", "warning")
-            return batch_state
-        return result.state if result.state is not None else batch_state
-
-    def _recover_unattended(self, run_idx: int, username: str,
-                            batch_state: dict, *, pending: bool) -> None:
-        """无人值守中止后把游戏收回公共初始页（登录页 - 登录主页视图）。
-
-        所有批量任务都从这个视图起步，所以恢复目标只有这一个。具体怎么收——
-        先看是不是已经在登录主页、启动页点返回、还是强制重启客户端——交给
-        配置的恢复 wf：重启是框架能力，不该写进某个业务任务里。
-
-        只在确实撞了弹窗时动作：任务因别的原因失败时画面通常还在可用状态，
-        没有理由顺手重启一次客户端。
-
-        ``pending`` 为真表示本条目还有未执行的任务，恢复 wf 据此决定要不要
-        继续登录回游戏主页。
-        """
-        if not self._unattended_hit:
-            return
-        text, self._unattended_hit = self._unattended_hit, ""
-        wf_name = self._spec.workflows.recover_unattended
-        if not wf_name:
-            self._log(
-                f"[批量] 无人值守中止（{text}）；未配置恢复 wf，直接继续下一个任务")
-            return
-        self._log(f"[批量] 无人值守中止（{text}）；执行恢复 wf 收回登录主页")
-        result = self._run_stage(
-            "recover_unattended", wf_name, run_idx, username, batch_state,
-            extra_variables={
-                # 本条目还有没跑的任务时，恢复流程不止回登录主页，还要用当前
-                # 角色重新登录到游戏主页，调度器才能接着跑下一项；全跑完了就
-                # 停在登录主页等下一个用户。
-                "batch_recover_pending": bool(pending),
-                "batch_recover_username": username,
-            })
-        self._unattended_hit = ""
-        if result.status != RESULT_SUCCESS:
-            self._log(f"[批量] 无人值守恢复未成功：{result.message}", "warning")
-
-    def _run_stage(
-        self,
-        phase: str,
-        wf_name: str,
-        run_idx: int,
-        username: str,
-        batch_state: dict,
-        item_result: dict | None = None,
-        round_number: int = 0,
-        unit_members: list[str] | None = None,
-        extra_variables: dict | None = None,
-    ) -> BatchStageResult:
-        """执行一个生命周期 wf，并统一校验其返回协议。"""
-        if not wf_name:
-            return BatchStageResult(state=batch_state)
-        wf_path = get_resolver().resolve_read(f"workflows/{wf_name}")
-        if wf_path is None:
-            return BatchStageResult(
-                status=RESULT_FAILED,
-                message=f"工作流不存在: {wf_name}",
-                state=batch_state,
-            )
-
-        engine = self._create_engine()
-        engine.session = {}
-        engine.run_username = "" if unit_members is not None else username
-        engine.users_dir = self._session_manager._users_dir
-        engine.user_attributes_snapshot = copy.deepcopy(self._user_attributes)
-
-        # 每阶段获得独立工作副本；只有返回协议中的 state 会被调用方提交。
-        # 控制层不读取 state 内部的任何业务字段。
-        working_state = copy.deepcopy(batch_state)
-        variables: dict = copy.deepcopy(self._lifecycle_params.get(phase, {}))
-        variables.update({
-            "batch_phase": phase,
-            "batch_users": list(self._usernames),
-            "batch_index": run_idx,
-            "batch_round": round_number,
-            "batch_rounds": self._spec.rounds,
-            "batch_state": working_state,
-            "batch_item_result": item_result or {},
-        })
-        if extra_variables:
-            variables.update(copy.deepcopy(extra_variables))
-        if unit_members is not None:
-            variables.update({
-                "batch_unit_key": self._spec.execution_unit_key,
-                "batch_unit_value": self._usernames[run_idx],
-                "batch_unit_members": [
-                    {"username": name, "attributes": copy.deepcopy(
-                        self._user_attributes.get(name, {}))}
-                    for name in unit_members
-                ],
-            })
-
-        try:
-            self._task_stop_clear()
-            engine.execute(wf_path, initial_variables=variables)
-            result = self._normalize_stage_result(engine.return_value, batch_state)
-            if not result.returned:
-                if self._stop_check():
-                    # 停止请求让 _exec_body 提前 return，wf 没机会走到它的 return；
-                    # 这是用户按了停止，不是 wf 违反返回协议，不能报成协议错误。
-                    result = replace(
-                        result, status=RESULT_STOPPED,
-                        message=tr("执行被停止"))
-                elif self._task_stop_check():
-                    # 弹窗「停止任务」只结束当前阶段，批次继续下一项。
-                    result = replace(
-                        result, status=RESULT_SKIPPED,
-                        message=tr("用户结束当前任务，继续下一项"))
-            return replace(result, source=str(wf_path))
-        except WorkflowAbort as e:
-            # 无人值守改道，不是阶段 wf 出错。按失败记账（这条目不重试，直接
-            # 跳到下一个），但日志级别和文案都不该把预期分支说成异常。
-            logger.info(
-                f"批量阶段被无人值守中止 ({phase}, "
-                f"{username or 'batch'}): {e}")
-            return BatchStageResult(
-                status=RESULT_FAILED,
-                message=f"无人值守中止: {e}",
-                state=batch_state,
-            )
-        except Exception as e:
-            logger.error(
-                f"批量阶段失败 ({phase}, "
-                f"{username or 'batch'}): {e}")
-            return BatchStageResult(
-                status=RESULT_FAILED,
-                message=f"工作流异常: {e}",
-                state=batch_state,
-            )
-
-    def _check_script(
-        self,
-        script: BatchScript,
-        username: str,
-        *,
-        params: dict,
-    ) -> BatchCheckResult:
-        """调用业务 wf 元数据声明的批量可执行性子过程。
-
-        只加载 def/import，不执行 wf 顶层正文。未声明 ``batch_check`` 的任务
-        保持原行为；声明错误或检查异常按该任务检查失败处理，避免带病执行。
-        """
-        if not script.batch_check:
-            return BatchCheckResult()
-        if not script.wf_file or script.class_name:
-            return BatchCheckResult(
-                status=RESULT_FAILED,
-                message=tr("批量可执行性检查只支持 DSL 工作流"),
-            )
-
-        from ...workflows.discovery import resolve_workflow_path
-        wf_path, _resolved = resolve_workflow_path(script.wf_file, script.id)
-        if wf_path is None:
-            return BatchCheckResult(
-                status=RESULT_FAILED,
-                message=f"工作流文件不存在: {script.wf_file}",
-            )
-
-        engine = self._create_engine()
-        engine.session = {}
-        engine.run_username = username
-        engine.users_dir = self._session_manager._users_dir
-        engine.user_attributes_snapshot = copy.deepcopy(self._user_attributes)
-        engine.workflow_config_snapshot = copy.deepcopy(
-            self._dedicated_configs.get((username or "", script.id), self._workflow_configs.get(script.id, {})))
-        try:
-            engine.load_subcalls(wf_path)
-            value = engine.call_subcall(
-                script.batch_check, [copy.deepcopy(params)])
-            return self._normalize_check_result(value)
-        except Exception as exc:  # noqa: BLE001 — 单个任务的检查不得拖垮整批
-            logger.error(
-                f"批量可执行性检查失败 ({username}/{script.id}): {exc}")
-            return BatchCheckResult(
-                status=RESULT_FAILED,
-                message=f"可执行性检查异常: {exc}",
-            )
-
-    def _run_script(self, script: BatchScript, session: dict,
-                    username: str | None, *, params: dict | None = None) -> dict:
-        """执行单个脚本，返回 collect 结果
-
-        参数由批量启动时生成的执行计划传入，运行过程中不回读配置。
-        用户信息由批量层显式传递（username）：引擎绑定 run_username 与
-        save_fn，全程不读全局 active user。
-        """
-        engine = self._create_engine()
-        self._task_stop_clear()
-        engine.session = session
-        engine.run_username = username or ""
-        engine.users_dir = self._session_manager._users_dir
-        engine.user_attributes_snapshot = copy.deepcopy(self._user_attributes)
-        engine.workflow_config_snapshot = copy.deepcopy(
-            self._dedicated_configs.get((username or "", script.id), self._workflow_configs.get(script.id, {})))
-        if username:
-            engine._save_callback = self._session_manager.save_fn(username, session)
-
-        # 正常批量执行总会传入启动时冻结的参数；直接调用时按空参数执行。
-        if params is None:
-            params = {}
-
-        if script.class_name:
-            from ...workflows.implementations import get_workflow_class
-            ctx = self._ctx
-            wf_class = get_workflow_class(script.class_name)
-            wf_instance = wf_class(
-                capture=ctx.capture,
-                ocr=ctx.ocr,
-                input_ctrl=ctx.input_ctrl,
-                layout=ctx.layout,
-                input_sim=ctx.input_sim,
-                delay_params=ctx.delay_params,
-                window_left=ctx.window_left,
-                window_top=ctx.window_top,
-                stop_check=self._task_stop_check,
-                pause_event=ctx.pause_event,
-            )
-            return engine.execute(wf_instance, initial_variables=params)
-
-        # DSL 工作流。批量页的候选快照可能滞后于脚本发现（升级迁移、
-        # 「脚本配置」改动），所以和日常页一样按 id 自愈一次再判缺失。
-        from ...workflows.discovery import resolve_workflow_path
-        wf_path, _resolved = resolve_workflow_path(script.wf_file, script.id)
-        if wf_path is None:
-            raise FileNotFoundError(f"工作流文件不存在: {script.wf_file}")
-        return engine.execute(wf_path, initial_variables=params)
 
     @staticmethod
     def _save_result(

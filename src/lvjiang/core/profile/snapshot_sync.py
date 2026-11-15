@@ -9,6 +9,15 @@
 - ``tick`` / ``reset`` 是时间派生，永不上云，两端按同一份 profile.yaml 各自算
 
 新设备落地 = 远端 entries 快照 + ``remote_id`` 之后的增量回放。
+一轮同步（:func:`sync_all`）的顺序：
+
+1. 确认协议版本（:func:`profile_protocol_block`），不对就一个 op 都不发；
+2. 按需把最新快照并进本地、再回放水位之后的 set（:func:`pull_and_replay`）；
+3. 上传基线之后的本机写入（:func:`push_local`）；
+4. 云端一份快照都没有而本机有数据时，补建首份基线（:func:`refresh_snapshot`）。
+
+同步进度（水位、快照 id）记在**本机**；丢了由 :func:`_recover_state` 从云端与本地
+账本重新推导，所以「退出登录 / 删 account.json」不会把两端搞错位。
 """
 from __future__ import annotations
 
@@ -28,6 +37,9 @@ from .rows import Entry, RemoteOp
 
 
 @dataclass
+
+# ─── 结果、常量与同步进度 ──────────────────────────────────────
+
 class ProfileSyncReport:
     pushed: int = 0
     pulled: int = 0
@@ -58,6 +70,15 @@ class ProfileSyncReport:
         return "，".join(parts)
 
 
+RESET_HINT = "本地记录的同步进度比云端新（云端可能被重建或已换库）。请在账户管理中点「清除同步」后重新登录同步。"
+
+
+NO_SNAPSHOT_HINT = "云端还没有总览快照；请先在 PC 端完成初始同步后继续。"
+
+
+MAX_PUSH_BACKLOG = 1000
+
+
 def _state() -> dict:
     state = profile_sync_state()
     state.setdefault("remote_history_id", 0)
@@ -71,12 +92,6 @@ def _state() -> dict:
 def _local_history_id(state: dict) -> int:
     value = state.get("local_history_id")
     return value if isinstance(value, int) and value >= 0 else 0
-
-
-#: 同步进度与云端不一致时的提示。**只提示，绝不动本地数据**——自动重置水位
-#: 一旦判断出错就会静默丢数据，必须由用户自己决定「清除同步」。
-RESET_HINT = "本地记录的同步进度比云端新（云端可能被重建或已换库）。请在账户管理中点「清除同步」后重新登录同步。"
-NO_SNAPSHOT_HINT = "云端还没有总览快照；请先在 PC 端完成初始同步后继续。"
 
 
 def remote_head(token: str) -> int | None:
@@ -134,6 +149,58 @@ def clear_sync_state() -> None:
     save_profile_sync_state({})
     logger.info("[profile sync] 已按用户操作清除本地同步进度")
 
+
+def _recover_state(state: dict, summaries: list[dict]) -> bool:
+    """同步状态丢失（退出登录 / 删 account.json）时，从云端 + 本地账本恢复。
+
+    云端已经给了「最新快照 id / 它的水位 / 当前 head」，本地账本里也留着每一行
+    已应用的 ``remote_id``——这三样足够算出水位，**不需要重放，也不需要按快照
+    重建**（重建会覆盖本地值，并把比快照更旧的未上传行判成放弃）。
+
+    只有当本地确实落后于最新快照（本机最大 remote_id < 快照水位）时，才留给
+    :func:`_bootstrap` 按 key 合并——那时本地缺的正是快照里的数据。
+
+    返回是否发生了恢复。
+    """
+    if not summaries:
+        return False
+    latest = max(summaries, key=lambda item: int(item.get("id") or 0))
+    snap_id = int(latest.get("id") or 0)
+    snap_wm = int(latest.get("snapshot_remote_id") or 0)
+    local_max = repository.db_max_remote_id()
+    if not local_max or local_max < snap_wm:
+        return False          # 真·新设备，或确实落后于快照 → 交给 bootstrap
+    state["profile_snapshot_id"] = snap_id
+    state["snapshot_remote_id"] = snap_wm
+    state["remote_history_id"] = local_max
+    save_profile_sync_state(state)
+    logger.info("[profile sync] 已从云端恢复同步水位：本地已应用到 {}，快照 #{}（水位 {}）",
+                local_max, snap_id, snap_wm)
+    return True
+
+
+def _needs_snapshot_rebase(state: dict, summaries: list[dict]) -> bool:
+    """本地快照 id 与云端最新一份不同，或水位低于那份快照时要按 key 合并。"""
+    if not summaries:
+        return False
+    latest = summaries[0]
+    snap_id = int(latest.get("id") or 0)
+    snap_wm = int(latest.get("snapshot_remote_id") or 0)
+    local_id = int(state.get("profile_snapshot_id") or 0)
+    local_wm = int(state.get("remote_history_id") or 0)
+    if snap_id and local_id != snap_id:
+        return True
+    return local_wm < snap_wm
+
+
+def current_instance_id() -> str:
+    """本实例标识（已登录时必然存在）。"""
+    from ..account.service import current_instance_id as _current
+
+    return _current()
+
+
+# ─── 拉取与回放：远端 op → 本地 entries ──────────────────────────────────────
 
 def _quota_key(key: str):
     """配额定义。未注册周期或不是配额时返回 None，回放就不做周期归零。"""
@@ -312,229 +379,6 @@ def hadwent(happened: str) -> str | None:
     return happened or None
 
 
-def remote_snapshots(token: str, limit: int = 1) -> list[dict]:
-    """云端快照清单（最新在前；只带摘要）。
-
-    同步路径只消费 ``[0]``（最新一份）：``limit=1`` 直接取同步版本行里的
-    最新快照摘要（轮内共享同一次 state，不发请求）；需要完整清单的调用方显式
-    传更大的 limit。
-    """
-    if limit == 1:
-        try:
-            state = cloud_state(token, post)
-        except SyncError as error:
-            logger.warning("[profile sync] 快照摘要获取失败：{}", error)
-            return []
-        if "snapshot" in state:
-            latest = state.get("snapshot")
-            return [latest] if isinstance(latest, dict) else []
-        # 版本行没有该字段（老服务端）：退回快照清单
-    try:
-        response = post("/api/sync/profile/snapshot", {"limit": limit}, token)
-    except SyncError as error:
-        logger.warning("[profile sync] 快照清单获取失败：{}", error)
-        return []
-    return [row for row in (response.get("snapshots") or []) if isinstance(row, dict)]
-
-
-def latest_snapshot(token: str) -> dict | None:
-    """最新一份快照的完整内容（含全部用户 entries）；没有则 None。"""
-    snapshots = remote_snapshots(token)
-    if not snapshots:
-        return None
-    snapshot_id = snapshots[0].get("id")
-    if not isinstance(snapshot_id, int):
-        return None
-    try:
-        response = post("/api/sync/profile/snapshot", {"id": snapshot_id}, token)
-    except SyncError as error:
-        logger.warning("[profile sync] 快照详情获取失败：{}", error)
-        return None
-    snapshot = response.get("snapshot")
-    return snapshot if isinstance(snapshot, dict) else None
-
-
-def current_instance_id() -> str:
-    """本实例标识（已登录时必然存在）。"""
-    from ..account.service import current_instance_id as _current
-
-    return _current()
-
-def overwrite_warnings(token: str) -> list[dict]:
-    """本机将被云端快照覆盖的用户清单。
-
-    判定：快照来自别实例 **且** 本地那几个用户已有数据；或**无论快照来自谁**，
-    本地存在晚于快照创建时间的 history 行——快照是"过去某刻"的状态，本地
-    完全可能有快照之后、未推送的新数据，"快照来自本机"绝不构成静默覆盖的
-    通行证（2026-11-04 事故：本机旧快照静默盖掉 323 行未推送更新）。
-    本地为空（新设备）不需要警告——那里没有东西可丢。
-    """
-    mine = current_instance_id()
-    if not mine:
-        return []
-    snapshot = latest_snapshot(token)
-    if snapshot is None:
-        return []
-    created_at = snapshot.get("created_at") or ""
-    from_mine = snapshot.get("origin_instance_id") == mine
-    newer_users: set[str] = set()
-    if from_mine and created_at:
-        # 只算**本机写的**行：跨端回放行同样落在这张表里，把它们算进来会让
-        # "快照已包含本地全部状态"这个判断失效，白白弹一次覆盖确认。
-        newer_users = repository.db_users_with_history_since(
-            created_at, author=repository._author_stamp())
-    warnings: list[dict] = []
-    try:
-        entries = json.loads(snapshot.get("entries") or "[]")
-    except ValueError:
-        return []
-    names = sorted({
-        name for entry in entries if isinstance(entry, dict)
-        for name in [entry.get("username")]
-        if isinstance(name, str)
-    })
-    for username in names:
-        total = len(repository.db_read_all(username))
-        if not total:
-            continue
-        if from_mine and username not in newer_users:
-            continue   # 快照已包含该用户的全部本地状态，覆盖无损
-        warnings.append({
-            "username": username,
-            "entries": total,
-            "history": repository.db_count_history(username),
-            "origin_name": snapshot.get("origin_name") or "另一台设备",
-        })
-    return warnings
-
-
-def backup_local() -> str:
-    """覆盖前把本地 profile 数据整份备份，返回备份目录（失败返回空串）。
-
-    备份 ``profile.db``（含 -wal/-shm）与 ``users/``——正是快照会覆盖的范围。
-    """
-    import shutil
-    from datetime import datetime
-
-    from ...constants import SESSION_CONFIG_DIR, USERS_DIR
-
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    target = SESSION_CONFIG_DIR / f"_sync-backup-{stamp}"
-    try:
-        target.mkdir(parents=True, exist_ok=True)
-        database = SESSION_CONFIG_DIR / "profile.db"
-        for suffix in ("", "-wal", "-shm"):
-            source = database.with_name(database.name + suffix)
-            if source.is_file():
-                shutil.copy2(source, target / source.name)
-        users = USERS_DIR
-        if users.is_dir():
-            shutil.copytree(users, target / "users", dirs_exist_ok=True)
-    except OSError as error:
-        logger.error("[profile sync] 覆盖前备份失败：{}", error)
-        return ""
-    logger.info("[profile sync] 已备份本地 profile 数据到 {}", target)
-    return str(target)
-
-
-def _bootstrap(token: str, report: ProfileSyncReport) -> None:
-    """新设备落地：取**最新一份**账户级快照（含所有用户），作为本地基线。"""
-    state = _state()
-    snapshot = latest_snapshot(token)
-    if snapshot is None:
-        report.errors.append(NO_SNAPSHOT_HINT)
-        return
-    try:
-        entries = json.loads(snapshot.get("entries") or "[]")
-    except ValueError:
-        report.errors.append("快照格式无效")
-        return
-    candidates = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        username = entry.get("username")
-        type_ = entry.get("type")
-        key = entry.get("key")
-        if not isinstance(username, str) or not isinstance(type_, str) or not isinstance(key, str):
-            continue
-        if not username or not type_ or not key:
-            continue
-        # 锁定条目拒绝快照覆盖是**预期内**的（锁的语义就是物理失效），静默
-        # 跳过即可——upsert 的锁拒绝分支会记 ERROR，整份落地会刷一屏误导
-        # 性"写入被拒绝"，让人误以为数据事故（2026-11-04 13:20 的日志）。
-        candidates.append({
-            "username": username,
-            "type": type_,
-            "key": key,
-            "value": entry.get("value"),
-            "value_text": entry.get("value_text") or "",
-            "event_at": (
-                canonical_event(entry.get("event_at") or "")
-                or canonical_event(str(snapshot.get("created_at") or ""))
-            ),
-            "op_id": str(entry.get("op_id") or ""),
-            "locked": 1 if entry.get("locked") else 0,
-        })
-    applied = repository.db_merge_snapshot_candidates(candidates)
-    # 两个编号别混：profile_snapshot_id 是「哪一份快照」（表主键），
-    # snapshot_remote_id 是「该快照覆盖到账本的哪个水位」。
-    snapshot_row_id = int(snapshot.get("id") or 0)
-    watermark = int(snapshot.get("snapshot_remote_id") or 0)
-    state["profile_snapshot_id"] = snapshot_row_id
-    state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
-    state["snapshot_remote_id"] = watermark
-    # 本地水位同步推进：快照落地的状态之前的本地行不再参与上行
-    state["local_history_id"] = repository.db_max_history_id()
-    save_profile_sync_state(state)
-    report.snapshots += 1
-    logger.info("[profile sync] 已应用快照 #{}（水位 {}，{} 项）",
-                snapshot_row_id, watermark, applied)
-
-
-def _recover_state(state: dict, summaries: list[dict]) -> bool:
-    """同步状态丢失（退出登录 / 删 account.json）时，从云端 + 本地账本恢复。
-
-    云端已经给了「最新快照 id / 它的水位 / 当前 head」，本地账本里也留着每一行
-    已应用的 ``remote_id``——这三样足够算出水位，**不需要重放，也不需要按快照
-    重建**（重建会覆盖本地值，并把比快照更旧的未上传行判成放弃）。
-
-    只有当本地确实落后于最新快照（本机最大 remote_id < 快照水位）时，才留给
-    :func:`_bootstrap` 按 key 合并——那时本地缺的正是快照里的数据。
-
-    返回是否发生了恢复。
-    """
-    if not summaries:
-        return False
-    latest = max(summaries, key=lambda item: int(item.get("id") or 0))
-    snap_id = int(latest.get("id") or 0)
-    snap_wm = int(latest.get("snapshot_remote_id") or 0)
-    local_max = repository.db_max_remote_id()
-    if not local_max or local_max < snap_wm:
-        return False          # 真·新设备，或确实落后于快照 → 交给 bootstrap
-    state["profile_snapshot_id"] = snap_id
-    state["snapshot_remote_id"] = snap_wm
-    state["remote_history_id"] = local_max
-    save_profile_sync_state(state)
-    logger.info("[profile sync] 已从云端恢复同步水位：本地已应用到 {}，快照 #{}（水位 {}）",
-                local_max, snap_id, snap_wm)
-    return True
-
-
-def _needs_snapshot_rebase(state: dict, summaries: list[dict]) -> bool:
-    """本地快照 id 与云端最新一份不同，或水位低于那份快照时要按 key 合并。"""
-    if not summaries:
-        return False
-    latest = summaries[0]
-    snap_id = int(latest.get("id") or 0)
-    snap_wm = int(latest.get("snapshot_remote_id") or 0)
-    local_id = int(state.get("profile_snapshot_id") or 0)
-    local_wm = int(state.get("remote_history_id") or 0)
-    if snap_id and local_id != snap_id:
-        return True
-    return local_wm < snap_wm
-
-
 def pull_and_replay(token: str, *, allow_overwrite: bool = False,
                     tolerate_no_snapshot: bool = False,
                     on_progress=None, stop=None) -> ProfileSyncReport:
@@ -617,35 +461,26 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     return report
 
 
-#: 单次同步允许的最大上行积压。只数 set 与 delta；周期 reset 不上传。
-#: 分批（每批 200）上传。D1 免费额度 10 万行写/天，按每天 2000 行可支撑
-#: 50 个用户，1000 的上限绰绰有余。真正超过的（长期离线数月、水位错乱）
-#: 仍拒绝并提示刷新快照重建基线。
-MAX_PUSH_BACKLOG = 1000
+# ─── 上行：本地账本 → 远端 op ──────────────────────────────────────
+
+def _skipped_pre_snapshot(raw) -> list[int]:
+    if not isinstance(raw, list):
+        return []
+    ids: list[int] = []
+    for item in raw:
+        if isinstance(item, dict) and isinstance(item.get("local_id"), int):
+            ids.append(int(item["local_id"]))
+        elif isinstance(item, int):
+            ids.append(item)
+    return ids
 
 
-def _snapshot_candidates(token: str) -> dict[tuple[str, str, str], tuple[str, str]]:
-    """最新快照里每个 key 的 ``(event_at, op_id)``。没有快照时为空。"""
-    state = _state()
-    if not state.get("profile_snapshot_id"):
-        return {}
-    snapshot = latest_snapshot(token)
-    if not snapshot:
-        return {}
-    try:
-        entries = json.loads(snapshot.get("entries") or "[]")
-    except ValueError:
-        return {}
-    candidates: dict[tuple[str, str, str], tuple[str, str]] = {}
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        username, type_, key = entry.get("username"), entry.get("type"), entry.get("key")
-        if isinstance(username, str) and isinstance(type_, str) and isinstance(key, str):
-            candidates[(username, type_, key)] = (
-                str(entry.get("event_at") or ""), str(entry.get("op_id") or ""),
-            )
-    return candidates
+def local_tz_offset_minutes() -> int:
+    """本机相对 UTC 的偏移（分钟）。东八区为 480。"""
+    offset = datetime.now().astimezone().utcoffset()
+    if offset is None:
+        return 0
+    return int(offset.total_seconds() // 60)
 
 
 def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
@@ -726,6 +561,149 @@ def push_local(token: str, on_progress=None, stop=None) -> ProfileSyncReport:
     return report
 
 
+# ─── 快照与基线 ──────────────────────────────────────
+
+def remote_snapshots(token: str, limit: int = 1) -> list[dict]:
+    """云端快照清单（最新在前；只带摘要）。
+
+    同步路径只消费 ``[0]``（最新一份）：``limit=1`` 直接取同步版本行里的
+    最新快照摘要（轮内共享同一次 state，不发请求）；需要完整清单的调用方显式
+    传更大的 limit。
+    """
+    if limit == 1:
+        try:
+            state = cloud_state(token, post)
+        except SyncError as error:
+            logger.warning("[profile sync] 快照摘要获取失败：{}", error)
+            return []
+        if "snapshot" in state:
+            latest = state.get("snapshot")
+            return [latest] if isinstance(latest, dict) else []
+        # 版本行没有该字段（老服务端）：退回快照清单
+    try:
+        response = post("/api/sync/profile/snapshot", {"limit": limit}, token)
+    except SyncError as error:
+        logger.warning("[profile sync] 快照清单获取失败：{}", error)
+        return []
+    return [row for row in (response.get("snapshots") or []) if isinstance(row, dict)]
+
+
+def latest_snapshot(token: str) -> dict | None:
+    """最新一份快照的完整内容（含全部用户 entries）；没有则 None。"""
+    snapshots = remote_snapshots(token)
+    if not snapshots:
+        return None
+    snapshot_id = snapshots[0].get("id")
+    if not isinstance(snapshot_id, int):
+        return None
+    try:
+        response = post("/api/sync/profile/snapshot", {"id": snapshot_id}, token)
+    except SyncError as error:
+        logger.warning("[profile sync] 快照详情获取失败：{}", error)
+        return None
+    snapshot = response.get("snapshot")
+    return snapshot if isinstance(snapshot, dict) else None
+
+
+def overwrite_warnings(token: str) -> list[dict]:
+    """本机将被云端快照覆盖的用户清单。
+
+    判定：快照来自别实例 **且** 本地那几个用户已有数据；或**无论快照来自谁**，
+    本地存在晚于快照创建时间的 history 行——快照是"过去某刻"的状态，本地
+    完全可能有快照之后、未推送的新数据，"快照来自本机"绝不构成静默覆盖的
+    通行证（2026-11-04 事故：本机旧快照静默盖掉 323 行未推送更新）。
+    本地为空（新设备）不需要警告——那里没有东西可丢。
+    """
+    mine = current_instance_id()
+    if not mine:
+        return []
+    snapshot = latest_snapshot(token)
+    if snapshot is None:
+        return []
+    created_at = snapshot.get("created_at") or ""
+    from_mine = snapshot.get("origin_instance_id") == mine
+    newer_users: set[str] = set()
+    if from_mine and created_at:
+        # 只算**本机写的**行：跨端回放行同样落在这张表里，把它们算进来会让
+        # "快照已包含本地全部状态"这个判断失效，白白弹一次覆盖确认。
+        newer_users = repository.db_users_with_history_since(
+            created_at, author=repository._author_stamp())
+    warnings: list[dict] = []
+    try:
+        entries = json.loads(snapshot.get("entries") or "[]")
+    except ValueError:
+        return []
+    names = sorted({
+        name for entry in entries if isinstance(entry, dict)
+        for name in [entry.get("username")]
+        if isinstance(name, str)
+    })
+    for username in names:
+        total = len(repository.db_read_all(username))
+        if not total:
+            continue
+        if from_mine and username not in newer_users:
+            continue   # 快照已包含该用户的全部本地状态，覆盖无损
+        warnings.append({
+            "username": username,
+            "entries": total,
+            "history": repository.db_count_history(username),
+            "origin_name": snapshot.get("origin_name") or "另一台设备",
+        })
+    return warnings
+
+
+def backup_local() -> str:
+    """覆盖前把本地 profile 数据整份备份，返回备份目录（失败返回空串）。
+
+    备份 ``profile.db``（含 -wal/-shm）与 ``users/``——正是快照会覆盖的范围。
+    """
+    import shutil
+    from datetime import datetime
+
+    from ...constants import SESSION_CONFIG_DIR, USERS_DIR
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    target = SESSION_CONFIG_DIR / f"_sync-backup-{stamp}"
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        database = SESSION_CONFIG_DIR / "profile.db"
+        for suffix in ("", "-wal", "-shm"):
+            source = database.with_name(database.name + suffix)
+            if source.is_file():
+                shutil.copy2(source, target / source.name)
+        users = USERS_DIR
+        if users.is_dir():
+            shutil.copytree(users, target / "users", dirs_exist_ok=True)
+    except OSError as error:
+        logger.error("[profile sync] 覆盖前备份失败：{}", error)
+        return ""
+    logger.info("[profile sync] 已备份本地 profile 数据到 {}", target)
+    return str(target)
+
+
+def _snapshot_entries() -> tuple[list[dict], int]:
+    """本机有定义的总览条目，以及被跳过的无定义残留条数。"""
+    from ..user_config import list_user_names
+
+    defined = {(item["type"], item["key"]) for item in _key_definitions()}
+    payload: list[dict] = []
+    orphan = 0
+    for username in list_user_names():
+        for entry in repository.db_read_all(username):
+            if (entry.type, entry.key) not in defined:
+                orphan += 1
+                continue
+            payload.append(
+                {"username": username, "type": entry.type, "key": entry.key,
+                 "value": entry.value,
+                 "value_text": entry.value_text or "",
+                 "event_at": entry.event_at or "",
+                 "op_id": entry.op_id or "",
+                 "locked": 1 if entry.locked else 0})
+    return payload, orphan
+
+
 def _key_definitions() -> list[dict]:
     """profile.yaml 的定义摘要（type/key/label/group/cap），**直接解析原始 YAML**。
 
@@ -772,52 +750,103 @@ def _key_definitions() -> list[dict]:
     return keys
 
 
-def _skipped_pre_snapshot(raw) -> list[int]:
-    if not isinstance(raw, list):
-        return []
-    ids: list[int] = []
-    for item in raw:
-        if isinstance(item, dict) and isinstance(item.get("local_id"), int):
-            ids.append(int(item["local_id"]))
-        elif isinstance(item, int):
-            ids.append(item)
-    return ids
+def _snapshot_candidates(token: str) -> dict[tuple[str, str, str], tuple[str, str]]:
+    """最新快照里每个 key 的 ``(event_at, op_id)``。没有快照时为空。"""
+    state = _state()
+    if not state.get("profile_snapshot_id"):
+        return {}
+    snapshot = latest_snapshot(token)
+    if not snapshot:
+        return {}
+    try:
+        entries = json.loads(snapshot.get("entries") or "[]")
+    except ValueError:
+        return {}
+    candidates: dict[tuple[str, str, str], tuple[str, str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        username, type_, key = entry.get("username"), entry.get("type"), entry.get("key")
+        if isinstance(username, str) and isinstance(type_, str) and isinstance(key, str):
+            candidates[(username, type_, key)] = (
+                str(entry.get("event_at") or ""), str(entry.get("op_id") or ""),
+            )
+    return candidates
 
 
-def local_tz_offset_minutes() -> int:
-    """本机相对 UTC 的偏移（分钟）。东八区为 480。"""
-    offset = datetime.now().astimezone().utcoffset()
-    if offset is None:
-        return 0
-    return int(offset.total_seconds() // 60)
+def _bootstrap(token: str, report: ProfileSyncReport) -> None:
+    """新设备落地：取**最新一份**账户级快照（含所有用户），作为本地基线。"""
+    state = _state()
+    snapshot = latest_snapshot(token)
+    if snapshot is None:
+        report.errors.append(NO_SNAPSHOT_HINT)
+        return
+    try:
+        entries = json.loads(snapshot.get("entries") or "[]")
+    except ValueError:
+        report.errors.append("快照格式无效")
+        return
+    candidates = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        username = entry.get("username")
+        type_ = entry.get("type")
+        key = entry.get("key")
+        if not isinstance(username, str) or not isinstance(type_, str) or not isinstance(key, str):
+            continue
+        if not username or not type_ or not key:
+            continue
+        # 锁定条目拒绝快照覆盖是**预期内**的（锁的语义就是物理失效），静默
+        # 跳过即可——upsert 的锁拒绝分支会记 ERROR，整份落地会刷一屏误导
+        # 性"写入被拒绝"，让人误以为数据事故（2026-11-04 13:20 的日志）。
+        candidates.append({
+            "username": username,
+            "type": type_,
+            "key": key,
+            "value": entry.get("value"),
+            "value_text": entry.get("value_text") or "",
+            "event_at": (
+                canonical_event(entry.get("event_at") or "")
+                or canonical_event(str(snapshot.get("created_at") or ""))
+            ),
+            "op_id": str(entry.get("op_id") or ""),
+            "locked": 1 if entry.get("locked") else 0,
+        })
+    applied = repository.db_merge_snapshot_candidates(candidates)
+    # 两个编号别混：profile_snapshot_id 是「哪一份快照」（表主键），
+    # snapshot_remote_id 是「该快照覆盖到账本的哪个水位」。
+    snapshot_row_id = int(snapshot.get("id") or 0)
+    watermark = int(snapshot.get("snapshot_remote_id") or 0)
+    state["profile_snapshot_id"] = snapshot_row_id
+    state["remote_history_id"] = max(int(state.get("remote_history_id") or 0), watermark)
+    state["snapshot_remote_id"] = watermark
+    # 本地水位同步推进：快照落地的状态之前的本地行不再参与上行
+    state["local_history_id"] = repository.db_max_history_id()
+    save_profile_sync_state(state)
+    report.snapshots += 1
+    logger.info("[profile sync] 已应用快照 #{}（水位 {}，{} 项）",
+                snapshot_row_id, watermark, applied)
 
 
-def _snapshot_entries() -> tuple[list[dict], int]:
-    """本机有定义的总览条目，以及被跳过的无定义残留条数。"""
-    from ..user_config import list_user_names
+def _ensure_baseline(token: str) -> ProfileSyncReport | None:
+    """云端一份快照都没有、而本机有数据时，自动建立首份基线。
 
-    defined = {(item["type"], item["key"]) for item in _key_definitions()}
-    payload: list[dict] = []
-    orphan = 0
-    for username in list_user_names():
-        for entry in repository.db_read_all(username):
-            if (entry.type, entry.key) not in defined:
-                orphan += 1
-                continue
-            payload.append(
-                {"username": username, "type": entry.type, "key": entry.key,
-                 "value": entry.value,
-                 "value_text": entry.value_text or "",
-                 "event_at": entry.event_at or "",
-                 "op_id": entry.op_id or "",
-                 "locked": 1 if entry.locked else 0})
-    return payload, orphan
-
-
-def local_profile_has_entries() -> bool:
-    """本机是否已有能写入快照的总览值。"""
-    payload, _orphan = _snapshot_entries()
-    return bool(payload)
+    基线是「云端当前值」的唯一来源（物化表按它建立，之后靠增量维护）。
+    没有基线时谁也无法稳定读到云端当前值，所以首份基线自动授权建立——
+    不区分平台，纯手机用户也能建，否则永远没有基线。
+    云端已有快照则什么都不做：覆盖是另一回事，手机端不允许覆盖。
+    """
+    if not local_profile_has_entries():
+        return None
+    # 拉取阶段已记录过云端有无快照；没有记录时才额外问一次。
+    known = _state().get("cloud_has_snapshot")
+    if known is True:
+        return None
+    if known is None and remote_snapshots(token):
+        return None
+    logger.info("[profile sync] 云端没有总览基线，用本机数据建立首份快照")
+    return refresh_snapshot(token)
 
 
 def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncReport:
@@ -877,25 +906,13 @@ def refresh_snapshot(token: str, *, allow_empty: bool = False) -> ProfileSyncRep
     return report
 
 
-def _ensure_baseline(token: str) -> ProfileSyncReport | None:
-    """云端一份快照都没有、而本机有数据时，自动建立首份基线。
+def local_profile_has_entries() -> bool:
+    """本机是否已有能写入快照的总览值。"""
+    payload, _orphan = _snapshot_entries()
+    return bool(payload)
 
-    基线是「云端当前值」的唯一来源（物化表按它建立，之后靠增量维护）。
-    没有基线时谁也无法稳定读到云端当前值，所以首份基线自动授权建立——
-    不区分平台，纯手机用户也能建，否则永远没有基线。
-    云端已有快照则什么都不做：覆盖是另一回事，手机端不允许覆盖。
-    """
-    if not local_profile_has_entries():
-        return None
-    # 拉取阶段已记录过云端有无快照；没有记录时才额外问一次。
-    known = _state().get("cloud_has_snapshot")
-    if known is True:
-        return None
-    if known is None and remote_snapshots(token):
-        return None
-    logger.info("[profile sync] 云端没有总览基线，用本机数据建立首份快照")
-    return refresh_snapshot(token)
 
+# ─── 一轮编排 ──────────────────────────────────────
 
 def sync_all(token: str, *, allow_overwrite: bool = False,
              on_progress=None, stop=None) -> ProfileSyncReport:
@@ -914,7 +931,3 @@ def sync_all(token: str, *, allow_overwrite: bool = False,
         snapshots=pull.snapshots + (seeded.snapshots if seeded else 0),
         rejected=push.rejected, pending=pull.pending, backup=pull.backup,
         errors=[*pull.errors, *push.errors, *(seeded.errors if seeded else [])])
-
-
-
-

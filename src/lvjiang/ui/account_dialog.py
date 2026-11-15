@@ -141,7 +141,10 @@ def _open_in_browser(url: str) -> None:
     webbrowser.open(url)
 
 
-READONLY_ACCOUNT_HINT = "只读实例不能管理账户与同步数据，请在主实例中操作"
+#: 只读实例的账户页仍然可看、可手动同步，只是不自动同步、不做账户操作。
+READONLY_SYNC_HINT = (
+    "只读实例：不会每分钟自动同步，可点「立即同步」；"
+    "登录状态与账户操作请在主实例进行")
 
 
 class _CombinedReport:
@@ -251,12 +254,14 @@ class AccountHolder(QObject):
     def apply(self, summary: dict | None) -> None:
         self.done = True
         self.summary = summary
-        if readonly_instance():
-            summary = None              # 只读实例永不启动节拍
         paused = sync_paused()
+        readonly = readonly_instance()
         for timer in (self._sync_timer, self._heartbeat_timer):
-            # 暂停同步只停分钟同步节拍；心跳照常（在线状态与同步开关无关）
-            run = summary and not (timer is self._sync_timer and paused)
+            # 暂停同步只停分钟同步节拍；心跳照常（在线状态与同步开关无关）。
+            # 只读实例两个节拍都不起：它的节拍与主实例同时跑会让 account.json 的
+            # 水位与脏标记互相覆盖。手动「立即同步」不走节拍，不受这里影响。
+            run = (summary is not None and not readonly
+                   and not (timer is self._sync_timer and paused))
             if run:
                 timer.start()
                 if timer is self._sync_timer and not self._startup_sync_done:
@@ -346,13 +351,15 @@ class AccountHolder(QObject):
 
     # ─── 对外入口 ───────────────────────────────────────
 
-    def restore_async(self) -> None:
+    def restore_async(self, *, manual: bool = False) -> None:
         """启动时后台恢复登录态；只在第一次调用时真正执行。
 
         只读实例**不自动登录**：登录态与同步数据只归主实例，否则两个进程会
-        交叉覆盖 account.json 的水位与脏标记。
+        交叉覆盖 account.json 的水位与脏标记。``manual=True`` 是用户在只读窗口
+        里打开账户管理时的一次只读恢复——只换令牌、不写任何水位，用来让
+        「立即同步」可用。
         """
-        if readonly_instance():
+        if readonly_instance() and not manual:
             self.apply(None)
             return
         if self.done or self.busy:
@@ -368,12 +375,18 @@ class AccountHolder(QObject):
         return self._start(lambda: self.session.login(login_name, password), "operation")
 
     def logout_async(self) -> bool:
+        if readonly_instance():
+            return False            # 登出会清凭据库，等于把主实例也踢下线
         return self._start(self.session.logout, "operation")
 
     def logout_all_async(self) -> bool:
+        if readonly_instance():
+            return False
         return self._start(self.session.logout_all, "operation")
 
     def change_password_async(self, old_password: str, new_password: str) -> bool:
+        if readonly_instance():
+            return False
         def action():
             self.session.change_password(old_password, new_password)
             return self.session.summary()
@@ -392,9 +405,12 @@ class AccountHolder(QObject):
         ``auto=True`` 表示由分钟节拍自动触发：覆盖确认弹窗与红字报错被抑制
         （半夜的例行同步不该弹窗吵人），结果仍进表格与日志。
         未建立同步状态（没做过初始同步）时不执行——这是硬门禁。
+
+        只读实例也允许跑这一轮：它不起分钟节拍（见 ``apply``），只有用户手动
+        「立即同步」能走到这里。会话由打开账户管理时的只读恢复提供。
         """
         from ..core.sync.initial import sync_established
-        if readonly_instance() or not sync_established():
+        if not sync_established():
             return False
         from ..core.sync.engine import sync_documents
         token = self.session.access_token
@@ -557,6 +573,8 @@ class AccountManagerDialog(QDialog):
         self.setMinimumSize(760, 560)
         self.resize(760, 560)
         self._connections: list[tuple[object, object]] = []
+        #: 只读实例：可看账户与手动同步，不做账户操作、不起自动同步节拍
+        self._readonly = readonly_instance()
         layout = QVBoxLayout(self)
 
         # ════ 第一行：左侧账户身份 + 右侧「自助服务 / 修改密码 / 退出登录」 ════
@@ -579,6 +597,13 @@ class AccountManagerDialog(QDialog):
         head_row.addWidget(self.change_password_button)
         head_row.addWidget(self.logout_button)
         layout.addLayout(head_row)
+
+        # 只读实例的常驻说明：这里能看、能手动同步，只是不自动同步、不能做账户操作。
+        self.readonly_hint = QLabel()
+        self.readonly_hint.setWordWrap(True)
+        self.readonly_hint.setStyleSheet("color: palette(mid); font-size: 12px;")
+        self.readonly_hint.setVisible(False)
+        layout.addWidget(self.readonly_hint)
 
         # 一行临时反馈（正在登录…／登录失败）：固定高度常驻，空文本不占额外空间，
         # 避免登录时从无到有把整个对话框顶跳一下。
@@ -742,6 +767,23 @@ class AccountManagerDialog(QDialog):
 
         self._render(self.holder.summary)
         self._render_sync()
+        if self._readonly and self.holder.summary is None and not self.holder.busy:
+            # 只读实例不自动登录；用户主动打开账户管理时允许一次只读恢复，
+            # 否则「立即同步」拿不到会话（只换令牌，不写任何水位）。
+            self.holder.restore_async(manual=True)
+
+    def _apply_readonly_mode(self) -> None:
+        """只读实例的账户页：可看、可手动同步，账户操作一律禁用并给出原因。"""
+        if not self._readonly:
+            return
+        hint = tr(READONLY_SYNC_HINT)
+        self.readonly_hint.setText(hint)
+        self.readonly_hint.setVisible(True)
+        for widget in (self.login_button, self.change_password_button,
+                       self.logout_button, self.logout_all_button,
+                       self.initial_clear_button, self.pause_sync_button):
+            widget.setEnabled(False)
+            widget.setToolTip(hint)
 
     # ─── 信号连接（关闭时统一断开） ─────────────────────
 
@@ -798,6 +840,7 @@ class AccountManagerDialog(QDialog):
         self.tabs.setVisible(summary is not None)
         self.form_host.setVisible(summary is None)
         self._render_sync()
+        self._apply_readonly_mode()
 
     def _show_logged_in(self, summary: dict) -> None:
         account = summary["account"]
@@ -829,6 +872,9 @@ class AccountManagerDialog(QDialog):
             kick = QPushButton(tr("登出"))
             apply_button_style(kick, variant="neutral")
             kick.setFixedWidth(64)          # 固定宽度：不让按钮把列撑变形
+            if self._readonly:
+                kick.setEnabled(False)
+                kick.setToolTip(tr(READONLY_SYNC_HINT))
             device_id = device.get("id")
             kick.clicked.connect(
                 lambda _=False, did=device_id: self._revoke_device(did))
@@ -884,7 +930,8 @@ class AccountManagerDialog(QDialog):
         self.sync_button.setToolTip(
             "" if established else tr("请先点「初始同步」建立同步状态"))
         self.initial_clear_button.setEnabled(not running
-                                             and self.holder.summary is not None)
+                                             and self.holder.summary is not None
+                                             and not self._readonly)
         apply_button_style(self.initial_clear_button,
                            variant="danger" if established else "action")
         self.initial_clear_button.setText(

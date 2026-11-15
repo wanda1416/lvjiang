@@ -150,11 +150,10 @@ class MenuOpsMixin:
         account_mgmt.triggered.connect(self._open_account_manager)
         from ...core.access import is_readonly
         if is_readonly():
-            # 登录态与同步数据只归主实例：两个进程同时读写 account.json 的
-            # 水位与脏标记会互相覆盖，所以只读实例从入口就禁用。
-            from ..account_dialog import READONLY_ACCOUNT_HINT
-            account_mgmt.setEnabled(False)
-            account_mgmt.setToolTip(tr(READONLY_ACCOUNT_HINT))
+            # 只读实例不自动同步（节拍与 account.json 水位只归主实例），但账户页
+            # 里仍可手动「立即同步」——它是用户显式点出来的单次动作。
+            from ..account_dialog import READONLY_SYNC_HINT
+            account_mgmt.setToolTip(tr(READONLY_SYNC_HINT))
         settings_menu.addAction(account_mgmt)
 
         user_mgmt = QAction(tr("用户管理"), self)
@@ -459,12 +458,11 @@ class MenuOpsMixin:
         dialog.exec()
 
     def _open_account_manager(self):
-        """账户管理：登录、注销、改密码与账号信息；与游戏用户管理无关。"""
-        from ...core.access import is_readonly
-        if is_readonly():
-            from ..account_dialog import READONLY_ACCOUNT_HINT
-            QMessageBox.information(self, tr("账户管理"), tr(READONLY_ACCOUNT_HINT))
-            return
+        """账户管理：登录、注销、改密码、同步与账号信息；与游戏用户管理无关。
+
+        只读实例也开这个页：能看账户、能手动「立即同步」，只把账户操作禁掉
+        （禁用原因由对话框自己写明，不再弹一句「请在主实例操作」把人挡在门外）。
+        """
         from ..account_dialog import AccountManagerDialog
         AccountManagerDialog(self).exec()
 

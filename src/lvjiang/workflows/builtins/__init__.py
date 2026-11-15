@@ -5,7 +5,7 @@
 - ``arithmetic``: 基础运算 (mod/min/max/abs)
 - ``general``:    通用工具 (concat/range/count_nonempty/contains/find_key/append)
 - ``profile``:    用户档案 (profile_get/profile_set/profile_inc/profile_all)
-- ``strings``:    字符串处理 (substr/split/replace/match/trim/upper/lower/to_num)
+- ``strings``:    字符串处理 (substr/split/replace/join/match/regex_*)
 - ``system``:     系统与 UI (confirm/pause/notify/input/save/panel_rows/panel_cols)
 - ``vision``:     图色 (pixel/bright/color_ratio/pixel_ratios/bright_segs/color_vec/find_icons/find_multi_color)
 - ``story``:      自动剧情 (story_options/story_pick/story_learn)

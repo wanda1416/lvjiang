@@ -495,7 +495,8 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 |------|------|
 | **基础运算** | `mod` `min` `max` `abs` `to_flag` |
 | **字典/列表** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
-| **字符串** | `concat` `substr` `split` `split_lines` `replace` `match` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
+| **字符串** | `concat` `substr` `split` `split_lines` `replace` `join` `startswith` `endswith` `index_of` `repeat` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
+| **正则** | `match` `regex_find` `regex_find_all` `regex_replace` `regex_split` `regex_escape` |
 | **装备** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` `equipment_lock_status` |
 | **背包遍历** | `check_scroll` `notify_scroll` `scroll_advance` |
 | **背包游标** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |

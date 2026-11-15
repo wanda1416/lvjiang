@@ -71,7 +71,11 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `split` | `(str, sep) -> list` | 按分隔符拆分，返回列表 |
 | `split_lines` | `(str) -> list` | 按实际换行拆分，支持 LF/CRLF/CR，保留中间空行；null 返回空列表 |
 | `replace` | `(str, old, new) -> str` | 替换所有匹配 |
-| `match` | `(str, regex) -> bool` | 正则匹配（Python `re.search`），非法正则返回 False |
+| `join` | `(list, sep?) -> str` | 用分隔符拼接列表；非列表返回 `""`，null 元素按空串 |
+| `startswith` | `(str, prefix) -> bool` | 是否以指定前缀开头 |
+| `endswith` | `(str, suffix) -> bool` | 是否以指定后缀结尾 |
+| `index_of` | `(str, sub) -> int` | 子串首次出现的下标，找不到（含空子串）返回 `-1` |
+| `repeat` | `(str, count) -> str` | 重复文本，count ≤ 0 返回 `""`，结果超 1,000,000 字符报错 |
 | `trim` | `(str) -> str` | 去除两端空白 |
 | `upper` | `(str) -> str` | 转大写 |
 | `lower` | `(str) -> str` | 转小写 |
@@ -79,6 +83,17 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `extract_int` | `(str) -> int` | 提取文本中第一项非负整数，找不到返回 `-1` |
 | `extract_num` | `(str) -> int \| float` | 提取文本中第一项非负数（可含小数点），找不到返回 `-1` |
 | `extract_progress` | `(str) -> dict` | 提取 `当前/总量` 进度对，返回 `{valid, current, total}` |
+
+### 正则
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `match` | `(str, regex) -> bool` | 正则是否匹配（Python `re.search`，部分匹配）；非法正则抛错 |
+| `regex_find` | `(str, regex, group?) -> str` | 首个匹配的指定分组，group 缺省 0；无匹配返回 `""`，分组越界报错 |
+| `regex_find_all` | `(str, regex) -> list[list]` | 全部匹配，每项 `[整段, 分组1, ...]`；未参与匹配的分组按空串占位 |
+| `regex_replace` | `(str, regex, replacement) -> str` | 正则替换全部匹配，支持 `\1` 反向引用 |
+| `regex_split` | `(str, regex) -> list` | 按正则拆分；正则含捕获组时分隔符也会出现在结果里 |
+| `regex_escape` | `(str) -> str` | 转义为可安全嵌入正则的字面量，用于拼接变量 |
 
 ### 装备处理
 

@@ -1,0 +1,41 @@
+#% name: 纯逻辑文本解析过程
+
+# 纯逻辑文本解析过程库：从 OCR 原文中提取结构化数据，供各工作流 import 后调用。
+# 只处理内存中的字符串，不做识别、点击，也不读写配置或 profile。
+#
+# 包含过程：
+#   progress_of($text) — 解析「当前值/总量」进度对（返回 valid/current/total/hits）
+
+# ─── progress_of ──────────────────────────────────────────
+# 从一段文本中提取唯一的「当前值/总量」进度对。
+#
+# 参数：
+#   $text — 仅包含进度区域的 OCR 原文，例如 "@0/1500"、"1,950/2,500"、"12 ／ 30"
+# 前置：无。
+# 后置：无副作用（字符串不可变）。
+# 返回：{"valid", "current", "total", "hits"}。没有候选、候选不唯一、或存在
+#       current > total / total <= 0 的非法候选时 valid=false，且 current/total
+#       均为 -1；hits 是通过基本校验的候选数量，便于在日志里定位 OCR 噪声。
+#
+# 判定口径与内置 extract_progress 一致：允许进度对前后存在 OCR 噪声、斜杠两侧
+# 空白与全角斜杠；数字支持千分位（必须每三位一组，否则按噪声分隔符处理）；不猜
+# 测数字内部的乱码，也不从残缺文本中退化提取单个整数。
+def progress_of($text)
+    eval $pairs = regex_find_all($text, "(?<![\d.,，+\-])(\d{1,3}(?:[,，]\d{3})+|\d+)\s*[/／]\s*(\d{1,3}(?:[,，]\d{3})+|\d+)(?![\d.,，])")
+    eval $hits = 0
+    eval $current = -1
+    eval $total = -1
+    for pair in $pairs
+        eval $value = to_num(regex_replace($pair[1], "[,，]", ""))
+        eval $limit = to_num(regex_replace($pair[2], "[,，]", ""))
+        if $limit > 0 and $value <= $limit
+            eval $hits = $hits + 1
+            eval $current = $value
+            eval $total = $limit
+        end
+    end
+    if $hits != 1
+        return {"valid": false, "current": -1, "total": -1, "hits": $hits}
+    end
+    return {"valid": true, "current": $current, "total": $total, "hits": 1}
+end

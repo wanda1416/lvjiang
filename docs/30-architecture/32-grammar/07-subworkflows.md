@@ -48,8 +48,10 @@ import "subcall/navigation.wf"
 
 `workflows/lib/` 收纳不依赖游戏页面或用户资料的纯逻辑过程，当前提供
 `collections.wf`（去重、展开、分块、分组）、`ordering.wf`（快排、合并、
-二分查找）和 `numeric.wf`（最大公约数、前缀和）。例如
-`import "lib/ordering.wf"` 后可用 `call $ordered = quicksort($numbers)`。
+二分查找）、`numeric.wf`（最大公约数、前缀和）和 `text.wf`（进度对解析）。
+例如 `import "lib/ordering.wf"` 后可用 `call $ordered = quicksort($numbers)`；
+`import "lib/text.wf"` 后可用 `call $p = progress_of($raw)` 得到
+`{valid, current, total, hits}`，判定口径与内置 `extract_progress` 一致。
 这些文件只定义过程，不声明 `runnable` 或 `batchable`，不会进入脚本列表。
 它们的执行与 DSL 能力边界由 `tests/workflows/dsl_capabilities/` 验证。
 系统脚本库里其他过程库（`subcall/`、`batch/` 钩子等）的分层与职责见

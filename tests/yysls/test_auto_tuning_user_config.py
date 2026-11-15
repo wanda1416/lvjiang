@@ -5,7 +5,7 @@ from lvjiang.apps.yysls.config.auto_tuning_config import (
 )
 from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS
 from lvjiang.core.config.wf_configs import set_wf_config
-from lvjiang.core.user_config import User, save_user_metadata
+from lvjiang.core.users.document import User, save_user_metadata
 
 
 def test_new_user_uses_defaults_with_no_selected_rules(tmp_path):

@@ -7,7 +7,7 @@ from lvjiang.apps.yysls.config.analysis_settings import (
     get_graduation_analysis_settings,
     set_graduation_analysis_settings,
 )
-from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
+from lvjiang.core.users.document import User, load_user_metadata, save_user_metadata
 
 
 def test_analysis_settings_keep_file_shape_and_unrelated_fields(tmp_path):
@@ -33,7 +33,7 @@ def test_analysis_settings_keep_file_shape_and_unrelated_fields(tmp_path):
 
 
 def test_unchanged_analysis_settings_do_not_write_metadata(tmp_path, monkeypatch):
-    from lvjiang.core import user_config
+    from lvjiang.core.users import document as user_config
 
     save_user_metadata(User("tester"), tmp_path)
     value = {"minimum_rating": "优秀"}

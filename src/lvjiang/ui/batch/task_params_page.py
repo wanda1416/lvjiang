@@ -39,7 +39,7 @@ from ...core.task_params import (
     merge_task_params,
     parameters_for_env,
 )
-from ...core.user_config import (
+from ...core.users.document import (
     get_user_workflow_params,
     set_user_workflow_params,
 )

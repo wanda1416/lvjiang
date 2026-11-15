@@ -10,7 +10,7 @@ import hashlib
 import re
 from pathlib import Path
 
-from .fs_util import atomic_write_bytes
+from ..fs_util import atomic_write_bytes
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _AVATAR_NAME = re.compile(r"^avatar_[0-9a-f]{16}\.png$")
@@ -26,7 +26,7 @@ class UserAvatarStore:
 
     def __init__(self, avatars_dir: Path | str | None = None):
         if avatars_dir is None:
-            from .. import constants
+            from ... import constants
             avatars_dir = constants.AVATARS_DIR
         self.directory = Path(avatars_dir)
 

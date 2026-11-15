@@ -7,7 +7,10 @@ import json
 
 from lvjiang.core.config.interface import get_interface_store
 from lvjiang.core.ondevice import task_settings
-from lvjiang.core.user_config import get_user_workflow_params, set_user_workflow_params
+from lvjiang.core.users.document import (
+    get_user_workflow_params,
+    set_user_workflow_params,
+)
 from tests.core.ondevice.test_ondevice_task_settings import (
     editor,  # noqa: F401 - 共用夹具
 )

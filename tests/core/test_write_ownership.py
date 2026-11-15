@@ -191,7 +191,7 @@ def test_ui_state_write_is_not_blocked_by_user_execution_lease(tmp_path):
     历史崩溃：点击装备槽位保存筛选走 user_write_access，被对方进程的租约
     拒绝后直接冒到 Qt 事件循环。
     """
-    from lvjiang.core import user_config
+    from lvjiang.core.users import document as user_config
 
     users_dir = tmp_path / "users"
     users_dir.mkdir()
@@ -207,7 +207,7 @@ def test_ui_state_write_is_not_blocked_by_user_execution_lease(tmp_path):
 
 def test_user_metadata_write_still_respects_the_execution_lease(tmp_path):
     """任务执行期间仍然不允许别的进程改用户资料，界面偏好是唯一的例外。"""
-    from lvjiang.core import user_config
+    from lvjiang.core.users import document as user_config
 
     users_dir = tmp_path / "users"
     users_dir.mkdir()

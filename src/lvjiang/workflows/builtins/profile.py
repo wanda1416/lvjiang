@@ -72,7 +72,7 @@ def _user_get(_engine, username: str, key: str, *args):
     if isinstance(snapshot, dict) and str(username) in snapshot:
         attributes = snapshot[str(username)]
         return attributes.get(str(key)) if isinstance(attributes, dict) else None
-    from ...core.user_config import get_user_attribute
+    from ...core.users.document import get_user_attribute
 
     return get_user_attribute(
         str(username), str(key), getattr(_engine, "users_dir", None)

@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Callable, TypeVar
 from uuid import uuid4
 
-from .access import user_write_access
-from .fs_util import atomic_write_text
+from ..access import user_write_access
+from ..fs_util import atomic_write_text
 
 SCHEMA_VERSION = 1
 MAX_NOTES = 200
@@ -90,12 +90,12 @@ class UserNotesRepository:
     """Atomic CRUD for one user's sticky-note file."""
 
     def __init__(self, username: str, users_dir: Path | None = None):
-        from .user_config import is_valid_username
+        from .document import is_valid_username
 
         if not is_valid_username(username):
             raise ValueError(f"非法用户名: {username!r}")
         if users_dir is None:
-            from ..constants import USERS_DIR
+            from ...constants import USERS_DIR
 
             users_dir = USERS_DIR
         self.username = username
@@ -134,7 +134,7 @@ class UserNotesRepository:
     def _save_state(self, state: dict) -> None:
         payload = json.dumps(state, ensure_ascii=False, indent=2)
         atomic_write_text(self.path, payload, prefix=f".{self.path.stem}_")
-        from .sync.dirty import mark_dirty
+        from ..sync.dirty import mark_dirty
         mark_dirty(self.username, "notes")
 
     def _mutate(self, fn: Callable[[dict], _T]) -> _T:

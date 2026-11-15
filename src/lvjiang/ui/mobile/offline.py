@@ -247,7 +247,7 @@ class OfflineControlPage(QWidget):
         manager = getattr(self._host, "user_manager", None)
         if manager is not None:
             return str(manager.get_active_user_name() or "")
-        from ...core.user_config import resolve_active_username
+        from ...core.users.document import resolve_active_username
         return str(resolve_active_username() or "")
 
     def _run(self, action: str) -> None:

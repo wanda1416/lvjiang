@@ -684,7 +684,7 @@ def backup_local() -> str:
 
 def _snapshot_entries() -> tuple[list[dict], int]:
     """本机有定义的总览条目，以及被跳过的无定义残留条数。"""
-    from ..user_config import list_user_names
+    from ..users.document import list_user_names
 
     defined = {(item["type"], item["key"]) for item in _key_definitions()}
     payload: list[dict] = []

@@ -43,7 +43,7 @@ def _groups():
 
 def _state(group_id: str = ""):
     from ...workflows.discovery import list_exposed_scripts, script_display_name
-    from ..user_config import load_user_metadata
+    from ..users.document import load_user_metadata
     from .plugins import ensure_loaded
     ensure_loaded()
     groups = _groups()
@@ -380,7 +380,7 @@ def editor(group_id: str = "") -> str:
             from ..batch.config import BatchConfigItem
             from ..config.resolver import get_resolver
             from ..profile.schema import get_profile_config
-            from ..user_config import load_user_metadata
+            from ..users.document import load_user_metadata
             from .plugins import ensure_loaded
             ensure_loaded()
             groups = _groups()

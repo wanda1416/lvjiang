@@ -65,7 +65,7 @@ def _save_sync_state(state: dict) -> None:
 
 
 def _roster() -> list[str]:
-    from ..user_config import is_valid_username
+    from ..users.document import is_valid_username
 
     try:
         data = json.loads(_session_path().read_text(encoding="utf-8"))
@@ -259,7 +259,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
     # 顺序落地：远端顺序为准，本地独有名字 append。本地刚排过序（签名存在且
     # 与当前名册不同）时以本地为准——云端已被本次推送改写。首次同步（无签名）
     # 与常规同步都要采用远端顺序，并把远端新增用户纳入本地。
-    from ..user_config import is_valid_username
+    from ..users.document import is_valid_username
     remote_order: list[str] = []
     for row in remote_users:
         name = row.get("username")

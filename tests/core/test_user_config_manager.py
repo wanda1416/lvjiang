@@ -6,7 +6,7 @@
 import pytest
 
 from lvjiang.core.config.session import reset_session_store
-from lvjiang.core.user_config import (
+from lvjiang.core.users.document import (
     User,
     UserConfigManager,
     load_user_metadata,
@@ -121,7 +121,7 @@ class TestUserConfigManagerCRUD:
         self, session_env, tmp_path, monkeypatch,
     ):
         from lvjiang import constants
-        from lvjiang.core.user_notes import UserNotesRepository
+        from lvjiang.core.users.notes import UserNotesRepository
 
         monkeypatch.setattr(constants, "USERS_DIR", tmp_path)
         mgr = UserConfigManager()
@@ -265,7 +265,7 @@ class TestUserConfigManagerCRUD:
     def test_avatar_update_rolls_back_in_memory_when_save_fails(
         self, session_env, monkeypatch,
     ):
-        import lvjiang.core.user_config as user_config
+        import lvjiang.core.users.document as user_config
 
         mgr = UserConfigManager()
         mgr.create_user("头像用户")
@@ -363,7 +363,7 @@ class TestUsernameValidation:
         "", "../逃逸", "a/b", "a\\b", "含:冒号", "a b", "a.b", "x" * 33, "emoji😀",
     ])
     def test_rejects_unsafe_names(self, name):
-        from lvjiang.core.user_config import is_valid_username
+        from lvjiang.core.users.document import is_valid_username
         assert not is_valid_username(name)
 
     def test_create_user_rejects_invalid(self, session_env):

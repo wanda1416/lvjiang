@@ -66,7 +66,7 @@ class SessionManager:
 
     @staticmethod
     def _validate_username(username: str) -> None:
-        from ..user_config import is_valid_username
+        from ..users.document import is_valid_username
 
         if not is_valid_username(username):
             raise ValueError(f"非法用户名: {username!r}")

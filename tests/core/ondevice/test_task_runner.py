@@ -69,7 +69,7 @@ def _clean_state(monkeypatch, tmp_path):
     monkeypatch.setattr("lvjiang.core.history.daily.default_log_root", lambda: tmp_path / "logs")
     from lvjiang import constants
     from lvjiang.core.config.interface import get_interface_store
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
 
     monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
     constants.SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -163,7 +163,7 @@ def test_user_selection_only_changes_phone_active_user(monkeypatch):
     from lvjiang import constants
     from lvjiang.core.config.interface import get_interface_store
     from lvjiang.core.config.session import get_session_store
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
 
     save_user_metadata(User("second", workflow_params={"task": {"count": 2}}), constants.USERS_DIR)
     store = get_session_store()
@@ -271,7 +271,7 @@ def test_start_rejects_when_a11y_not_ready(monkeypatch):
 def test_remote_start_binds_selected_synced_user_before_execution(monkeypatch):
     from lvjiang import constants
     from lvjiang.core.config.session import get_session_store
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
 
     save_user_metadata(User("second"), constants.USERS_DIR)
     get_session_store().set_node("users", ["tester", "second"])
@@ -366,7 +366,7 @@ def test_initial_variables_reach_engine(monkeypatch):
 def test_synced_user_and_parameter_override_are_bound_before_execution(monkeypatch):
     from lvjiang import constants
     from lvjiang.core.config.wf_configs import set_wf_config
-    from lvjiang.core.user_config import set_user_workflow_params
+    from lvjiang.core.users.document import set_user_workflow_params
 
     _patch_discovery(monkeypatch, _fake_tasks({
         "id": "task", "parameters": [{"name": "count", "type": "number", "default": 1}],
@@ -388,7 +388,7 @@ def test_class_workflow_snapshot_loader_freezes_user_config_instead_of_shared_co
     """类工作流通过 CONFIG_SNAPSHOT_LOADER 声明自己的配置来源；宿主冻结一份深拷贝。"""
     from lvjiang import constants
     from lvjiang.core.config.wf_configs import set_wf_config
-    from lvjiang.core.user_config import (
+    from lvjiang.core.users.document import (
         get_user_workflow_params,
         set_user_workflow_params,
     )

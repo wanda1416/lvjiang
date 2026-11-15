@@ -3,7 +3,11 @@ import pytest
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.config.wf_configs import set_wf_config
 from lvjiang.core.task_params import resolve_task_params
-from lvjiang.core.user_config import User, save_user_metadata, set_user_workflow_params
+from lvjiang.core.users.document import (
+    User,
+    save_user_metadata,
+    set_user_workflow_params,
+)
 
 PARAMETERS = [
     {"name": "count", "type": "number", "default": 3},

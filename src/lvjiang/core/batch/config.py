@@ -99,7 +99,7 @@ class BatchConfigItem:
             self.id = uuid4().hex
 
     def normalize(self) -> None:
-        from ..user_config import is_valid_username
+        from ..users.document import is_valid_username
 
         if not isinstance(self.id, str) or not self.id:
             self.id = uuid4().hex

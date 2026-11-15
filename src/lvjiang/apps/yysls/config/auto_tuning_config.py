@@ -10,7 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from ....core.user_config import (
+from ....core.users.document import (
     get_user_workflow_params,
     set_user_workflow_params,
 )
@@ -68,6 +68,6 @@ def save_user_auto_tuning_config(
 
 def active_username() -> str:
     """当前执行用户；actives 缺记录时回退名册第一行，与界面保持一致。"""
-    from ....core.user_config import resolve_active_username
+    from ....core.users.document import resolve_active_username
 
     return resolve_active_username()

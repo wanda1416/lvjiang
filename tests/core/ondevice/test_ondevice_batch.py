@@ -11,7 +11,7 @@ from lvjiang.core.ondevice import batch, task_runner
 def batch_state(monkeypatch, tmp_path):
     from lvjiang import constants
     from lvjiang.core.config import wf_configs
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
     from lvjiang.workflows import discovery
     monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
     save_user_metadata(User(name="viewer", attributes={"role": "one"}), constants.USERS_DIR)

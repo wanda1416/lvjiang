@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config.wf_configs import get_wf_config
-from .user_config import get_user_workflow_params
+from .users.document import get_user_workflow_params
 
 
 def parameters_for_env(

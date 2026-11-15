@@ -810,13 +810,13 @@ class LoadoutRepository:
 
     def get_ui_state(self, key: str) -> dict:
         """从 ``{user}.json`` 读取按用户隔离的界面状态。"""
-        from lvjiang.core.user_config import get_user_ui_state
+        from lvjiang.core.users.document import get_user_ui_state
 
         return get_user_ui_state(self.username, key, self.users_dir)
 
     def set_ui_state(self, key: str, value: dict) -> None:
         """把按用户隔离的界面状态写入 ``{user}.json``。"""
-        from lvjiang.core.user_config import set_user_ui_state
+        from lvjiang.core.users.document import set_user_ui_state
 
         set_user_ui_state(self.username, key, value, self.users_dir)
 

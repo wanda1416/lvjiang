@@ -41,8 +41,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.user_avatars import UserAvatarStore
-from ..core.user_config import UserConfigManager
+from ..core.users.avatars import UserAvatarStore
+from ..core.users.document import UserConfigManager
 from ..i18n import tr
 from .widgets.button_styles import apply_button_style, fit_button_width
 

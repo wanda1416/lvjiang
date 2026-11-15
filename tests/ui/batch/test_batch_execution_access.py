@@ -9,7 +9,11 @@ from lvjiang.core.batch.run import BatchRunDraft
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.config.wf_configs import set_wf_config
-from lvjiang.core.user_config import User, save_user_metadata, set_user_workflow_params
+from lvjiang.core.users.document import (
+    User,
+    save_user_metadata,
+    set_user_workflow_params,
+)
 from lvjiang.ui.batch.batch_report import BatchReport
 from lvjiang.ui.batch.batch_runner import (
     ST_PENDING,

@@ -24,7 +24,7 @@ def sync_status() -> dict:
 def configuration_status() -> dict:
     """运行配置就绪与同步历史分开；预置初始化不伪造 PC 同步记录。"""
     from ..config.interface import get_interface_store
-    from ..user_config import resolve_active_username
+    from ..users.document import resolve_active_username
     sync = sync_status()
     marker = constants.SESSION_CONFIG_DIR / "preset.json"
     from ..paths import get_config_system_dir

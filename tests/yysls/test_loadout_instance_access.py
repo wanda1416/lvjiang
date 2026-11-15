@@ -34,7 +34,7 @@ def test_user_loadout_write_requires_free_or_authorized_user(tmp_path, monkeypat
 def test_execution_does_not_lock_equipment_ui_or_profile(tmp_path, monkeypatch, readonly):
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
     from lvjiang.core.profile.repository import ProfileDB
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
 
     users_dir = tmp_path / "users"
     save_user_metadata(User("alice"), users_dir)
@@ -81,7 +81,7 @@ def test_equipment_write_from_another_process_is_rejected_while_user_is_occupied
     config_target = tmp_path / "config/system/yysls/game_config"
     shutil.copytree(config_source, config_target)
     users = tmp_path / "config/session/users"
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
     save_user_metadata(User("alice"), users)
     repo = LoadoutRepository("alice", users)
     repo.upsert_item({"_fp": "first", "type": "环"})

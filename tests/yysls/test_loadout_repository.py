@@ -691,7 +691,7 @@ def test_old_plan_file_uses_existing_order_without_writing(tmp_path: Path):
 
 
 def test_ui_state_uses_user_metadata_and_ignores_existing_loadout_value(tmp_path):
-    from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
+    from lvjiang.core.users.document import User, load_user_metadata, save_user_metadata
 
     save_user_metadata(User("alice"), tmp_path)
     save_user_metadata(User("bob"), tmp_path)
@@ -866,7 +866,7 @@ def test_plan_school_is_the_single_source_for_current_school():
 def test_combat_prefs_live_in_user_json_without_creating_loadouts(tmp_path):
     """战斗属性偏好只写用户资料，不创建或改动装备数据文件。"""
     from lvjiang.apps.yysls.core.loadout import LoadoutRepository
-    from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
+    from lvjiang.core.users.document import User, load_user_metadata, save_user_metadata
 
     save_user_metadata(User("tester"), tmp_path)
     repo = LoadoutRepository("tester", tmp_path)

@@ -12,7 +12,7 @@ from ...core.input.base import InputBackend
 from ...core.input.capture_base import CaptureBackend
 from ...core.layout.models import Layout
 from ...core.ocr.engine import OCREngine
-from ...core.user_config import load_user_metadata
+from ...core.users.document import load_user_metadata
 from .core import WorkflowEngine
 
 

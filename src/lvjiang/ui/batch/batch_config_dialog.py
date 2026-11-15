@@ -32,7 +32,7 @@ from ...core.batch.config import (
     load_batch_config,
     save_batch_config,
 )
-from ...core.user_config import UserConfigManager
+from ...core.users.document import UserConfigManager
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style
 from ..widgets.layout_helpers import fit_combo_popup_to_contents

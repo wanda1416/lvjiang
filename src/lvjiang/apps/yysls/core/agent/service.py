@@ -72,7 +72,7 @@ class AgentService:
         return value
 
     def _check(self, user: str) -> None:
-        from .....core.user_config import is_valid_username
+        from .....core.users.document import is_valid_username
         self._ensure_enabled()
         if not is_valid_username(user) or user not in self.list_users()["users"]:
             raise ValueError("用户不存在，请调用 list_users 获取当前用户与全部用户")
@@ -199,7 +199,7 @@ class AgentService:
 
     def update_tuning_config(self, user: str, expected_revision: str, patch: TuningPatch) -> dict:
         """显式保存用户调律选择；字段级合并，不改共享定义或其他工作流，陈旧修订拒绝。"""
-        from .....core.user_config import mutate_user_metadata
+        from .....core.users.document import mutate_user_metadata
         from ...config.auto_tuning_config import default_auto_tuning_config
         from .launch import prepare_tuning
         self._check(user)

@@ -22,7 +22,7 @@ from lvjiang.apps.yysls.core.loadout import LoadoutRepository
 from lvjiang.apps.yysls.ui.events import EQUIPMENT_CHANGED, YyslsEventHub
 from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
 from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
-from lvjiang.core.user_config import User, save_user_metadata
+from lvjiang.core.users.document import User, save_user_metadata
 
 # ─── 事件载荷 ──────────────────────────────────────────────
 

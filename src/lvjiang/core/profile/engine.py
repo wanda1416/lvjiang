@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 
 from lvjiang.core.config.interface import add_alert
-from lvjiang.core.user_config import UserConfigManager
+from lvjiang.core.users.document import UserConfigManager
 
 from ...i18n import tr
 from .maintenance import profile_operation, profile_write

@@ -18,9 +18,9 @@ from typing import Any
 
 from loguru import logger
 
-from .access import user_write_access
-from .fs_util import atomic_write_text
-from .json_files import formatted_json
+from ..access import user_write_access
+from ..fs_util import atomic_write_text
+from ..json_files import formatted_json
 
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
@@ -53,7 +53,7 @@ def is_valid_username(name: str) -> bool:
 
 
 def _users_dir() -> Path:
-    from ..constants import USERS_DIR
+    from ...constants import USERS_DIR
     return USERS_DIR
 
 
@@ -97,7 +97,7 @@ class User:
 
     @staticmethod
     def from_dict(data: dict, *, fallback_name: str = "") -> "User":
-        from .user_avatars import is_safe_avatar_filename
+        from .avatars import is_safe_avatar_filename
 
         raw_avatar = data.get("avatar", "")
         raw_attributes = data.get("attributes", {})
@@ -274,7 +274,7 @@ def set_user_ui_state(
 
 def list_user_names() -> list[str]:
     """用户名册顺序；界面用户列表的第一行就是它。"""
-    from .config.session import get_session_store
+    from ..config.session import get_session_store
 
     raw = get_session_store().get_node("users", [])
     if not isinstance(raw, list):
@@ -294,7 +294,7 @@ def resolve_active_username() -> str:
     名册为空时不能反过来丢掉 actives 里已有的名字：手机端、离线包这类场景
     本就没有 PC 名册，但执行用户是明确的。
     """
-    from .config.interface import get_interface_store
+    from ..config.interface import get_interface_store
 
     active = get_interface_store().get_active("user", "")
     names = list_user_names()
@@ -316,8 +316,8 @@ class UserConfigManager:
         self._load()
 
     def _load(self) -> None:
-        from .config.interface import get_interface_store
-        from .config.session import get_session_store
+        from ..config.interface import get_interface_store
+        from ..config.session import get_session_store
 
         store = get_session_store()
         active_store = get_interface_store()
@@ -345,15 +345,15 @@ class UserConfigManager:
 
     def reload(self) -> None:
         """从磁盘重读名册（初始同步拉回用户后调用）；仍有效的当前用户保留。"""
-        from .config.session import get_session_store
+        from ..config.session import get_session_store
 
         get_session_store().reload()      # users_sync 直写文件，先让缓存重读盘
         self._users.clear()
         self._load()
 
     def _save_order(self) -> None:
-        from .config.interface import get_interface_store
-        from .config.session import get_session_store
+        from ..config.interface import get_interface_store
+        from ..config.session import get_session_store
 
         store = get_session_store()
         active_store = get_interface_store()
@@ -391,7 +391,7 @@ class UserConfigManager:
         if self._active_user == name:
             self._active_user = next(iter(self._users))
         self._save_order()
-        from .batch.config import remove_username_from_batch_configs
+        from ..batch.config import remove_username_from_batch_configs
         remove_username_from_batch_configs(name)
         logger.info(f"用户已从列表移除，数据文件已保留: {name}")
         return True
@@ -445,7 +445,7 @@ class UserConfigManager:
         return True
 
     def set_user_avatar(self, name: str, filename: str) -> bool:
-        from .user_avatars import is_safe_avatar_filename
+        from .avatars import is_safe_avatar_filename
 
         user = self._users.get(name)
         if user is None or (filename and not is_safe_avatar_filename(filename)):
@@ -469,7 +469,7 @@ class UserConfigManager:
         if name not in self._users:
             return False
         self._active_user = name
-        from .config.interface import get_interface_store
+        from ..config.interface import get_interface_store
         get_interface_store().set_active("user", name)
         logger.info(f"已切换到用户: {name}")
         return True

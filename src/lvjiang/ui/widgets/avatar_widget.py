@@ -5,7 +5,7 @@ from PyQt6.QtCore import QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QImage, QMouseEvent, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QPushButton, QWidget
 
-from ...core.user_avatars import UserAvatarStore
+from ...core.users.avatars import UserAvatarStore
 from ...i18n import tr
 
 

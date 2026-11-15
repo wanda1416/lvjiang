@@ -209,7 +209,7 @@ class UiStateMixin:
                 if (user_manager is not None
                         and username not in user_manager.list_users()):
                     return
-                from ...core.user_config import User, mutate_user_metadata
+                from ...core.users.document import User, mutate_user_metadata
 
                 def merge(user: User) -> None:
                     user.workflow_params.setdefault(sid, {}).update(patch)
@@ -488,12 +488,12 @@ class UiStateMixin:
             return
         workflow_id = str(flow_cfg["id"])
         if enabled:
-            from ...core.user_config import set_user_workflow_params
+            from ...core.users.document import set_user_workflow_params
             set_user_workflow_params(
                 username, workflow_id, self._collect_flow_params(),
                 self._user_manager._users_dir)
         else:
-            from ...core.user_config import delete_user_workflow_params
+            from ...core.users.document import delete_user_workflow_params
             delete_user_workflow_params(
                 username, workflow_id, self._user_manager._users_dir)
         self._rebuild_param_panel()

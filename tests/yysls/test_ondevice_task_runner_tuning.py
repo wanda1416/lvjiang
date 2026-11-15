@@ -49,7 +49,7 @@ def test_tuning_freezes_synced_user_config_instead_of_shared_config(monkeypatch)
         AutoTuningWorkflow,
     )
     from lvjiang.core.config.wf_configs import set_wf_config
-    from lvjiang.core.user_config import set_user_workflow_params
+    from lvjiang.core.users.document import set_user_workflow_params
 
     _patch_discovery(monkeypatch, _fake_tasks({"id": "auto_tuning", "class": "auto_tuning"}))
     monkeypatch.setattr("lvjiang.workflows.implementations.get_workflow_class",

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.user_notes import MAX_TEXT_LENGTH, UserNote, UserNotesRepository
+from ...core.users.notes import MAX_TEXT_LENGTH, UserNote, UserNotesRepository
 from ...i18n import tr, tr_label
 from ..user_toolbar import USER_TOOLBAR_BTN_STYLE
 from .user_info_styles import USER_INFO_GROUP_STYLE

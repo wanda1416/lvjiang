@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.core.user_config import UserConfigManager
+from lvjiang.core.users.document import UserConfigManager
 
 from ..i18n import tr, tr_label
 from .avatar_editor_dialog import AvatarEditorDialog
@@ -514,7 +514,7 @@ class UserManagerDialog(QDialog):
         values = self._read_attributes()
         if values is None:
             return
-        from ..core.user_config import UserMetadataConflictError
+        from ..core.users.document import UserMetadataConflictError
         try:
             saved = self._user_manager.replace_user_attributes(
                 name, values, self._attribute_baseline
@@ -565,7 +565,7 @@ class UserManagerDialog(QDialog):
 
         # 分开报错：名字非法与重名是两回事，合成一句话用户不知道该改什么。
         # 真正的校验在 UserManager.create_user 里（唯一入口），这里只为提示。
-        from ..core.user_config import is_valid_username
+        from ..core.users.document import is_valid_username
         if not is_valid_username(name):
             QMessageBox.warning(
                 self, tr("失败"),

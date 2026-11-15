@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from ..user_config import UserConfigManager, load_user_metadata
+from ..users.document import UserConfigManager, load_user_metadata
 from . import task_runner
 
 

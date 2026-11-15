@@ -268,7 +268,7 @@ def test_user_write_access_requires_free_or_authorized_user(tmp_path, monkeypatc
 def test_user_write_access_from_another_process_is_rejected_while_user_is_occupied(
         tmp_path, monkeypatch):
     from lvjiang import constants
-    from lvjiang.core.user_config import User, save_user_metadata
+    from lvjiang.core.users.document import User, save_user_metadata
 
     # 父进程与子进程（LVJIANG_ROOT=tmp_path）必须共用同一个锁根，占用才可见。
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "config/session")

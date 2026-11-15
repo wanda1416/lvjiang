@@ -270,7 +270,7 @@ def _reset_engine_state(engine) -> None:
 
     # 每次任务启动绑定手机已选择的用户，不要求该资料来自 PC。
     from ... import constants
-    from ..user_config import resolve_active_username
+    from ..users.document import resolve_active_username
 
     username = _STATE.snapshot()["username"] or resolve_active_username()
     engine.run_username = username if isinstance(username, str) else ""
@@ -278,7 +278,7 @@ def _reset_engine_state(engine) -> None:
     if not engine.run_username:
         raise RuntimeError("尚未选择执行用户，请在用户管理中创建资料并选择")
     from ..config.users import SessionManager
-    from ..user_config import load_user_metadata
+    from ..users.document import load_user_metadata
 
     manager = SessionManager(constants.USERS_DIR)
     engine.session = manager.load(engine.run_username)
@@ -401,7 +401,7 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
 
     try:
         from ..config.interface import get_interface_store
-        from ..user_config import resolve_active_username
+        from ..users.document import resolve_active_username
         from .task_settings import validate_for_run
         selected_user = username or resolve_active_username()
         validate_for_run(task, selected_user, variables)
@@ -465,7 +465,7 @@ def get_status() -> str:
     Returns:
         JSON 文本，字段见 ``_TaskState.snapshot``
     """
-    from ..user_config import resolve_active_username
+    from ..users.document import resolve_active_username
     from .offline import configuration_status
     sync = configuration_status()
     if sync.get("ready"):
@@ -476,7 +476,7 @@ def get_status() -> str:
 def _local_user_names() -> list[str]:
     from ...constants import USERS_DIR
     from ..config.session import get_session_store
-    from ..user_config import is_valid_username, load_user_metadata
+    from ..users.document import is_valid_username, load_user_metadata
     from .offline import configuration_status
 
     sync = configuration_status()
@@ -494,7 +494,7 @@ def _local_user_names() -> list[str]:
 def list_users() -> str:
     """只展示同步名册中有有效资料的用户，不创建/修复缺失资料。"""
     try:
-        from ..user_config import resolve_active_username
+        from ..users.document import resolve_active_username
         return json.dumps({"ok": True, "users": _local_user_names(),
                            "selected": resolve_active_username()}, ensure_ascii=False)
     except Exception as exc:

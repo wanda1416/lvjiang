@@ -6,7 +6,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from ...core.profile.engine import ProfileProcessor
 from ...core.profile.events import observe_updates
-from ...core.user_config import UserConfigManager
+from ...core.users.document import UserConfigManager
 
 
 class ProfileEngine(QThread):

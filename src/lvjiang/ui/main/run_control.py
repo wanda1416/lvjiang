@@ -2900,7 +2900,7 @@ class RunControlMixin:
         """Bind all user-scoped runtime data to the launch-time user snapshot."""
         engine.session = self._session_manager.load(username)
         engine.run_username = username
-        from ...core.user_config import load_user_metadata
+        from ...core.users.document import load_user_metadata
         user = load_user_metadata(username, self._session_manager._users_dir)
         engine.user_attributes_snapshot = {
             username: dict(user.attributes) if user is not None else {}

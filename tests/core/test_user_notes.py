@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from lvjiang.core.user_notes import (
+from lvjiang.core.users.notes import (
     MAX_NOTES,
     MAX_TEXT_LENGTH,
     UserNotesRepository,

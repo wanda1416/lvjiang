@@ -121,7 +121,7 @@ def test_generated_goal_uses_derived_plan_snapshot_not_persistent_defaults(setup
 def test_user_selection_patch_preserves_other_workflows_and_rejects_stale_revision(setup_service):
     from lvjiang.apps.yysls.config.auto_tuning_config import default_auto_tuning_config
     from lvjiang.apps.yysls.core.agent.service import revision
-    from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
+    from lvjiang.core.users.document import User, load_user_metadata, save_user_metadata
 
     service, _ = setup_service
     config = default_auto_tuning_config()

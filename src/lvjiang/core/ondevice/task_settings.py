@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 from ..task_params import parameters_for_env, parameters_for_values, resolve_task_params
-from ..user_config import (
+from ..users.document import (
     delete_user_workflow_params,
     get_user_workflow_params,
     set_user_workflow_params,

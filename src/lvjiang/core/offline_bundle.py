@@ -28,7 +28,7 @@ from .paths import (
     session_directory,
 )
 from .plugins import get_registered_hooks
-from .user_config import is_valid_username
+from .users.document import is_valid_username
 
 FORMAT_VERSION = 3
 MAX_BUNDLE_BYTES = 256 << 20

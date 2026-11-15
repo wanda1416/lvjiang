@@ -13,7 +13,10 @@ from lvjiang.core.ondevice import bootstrap, offline, task_runner, user_settings
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.profile import repository
 from lvjiang.core.system_preset import build_system_preset
-from lvjiang.core.user_config import get_user_workflow_params, set_user_workflow_params
+from lvjiang.core.users.document import (
+    get_user_workflow_params,
+    set_user_workflow_params,
+)
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ from lvjiang import constants
 from lvjiang.core.config.interface import get_interface_store
 from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
 from lvjiang.core.ondevice import task_runner, task_settings
-from lvjiang.core.user_config import (
+from lvjiang.core.users.document import (
     User,
     get_user_workflow_params,
     save_user_metadata,

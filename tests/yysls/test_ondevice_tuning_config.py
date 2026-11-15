@@ -15,7 +15,7 @@ from lvjiang.apps.yysls.ondevice.tuning_config import (
     save_tuning_config,
     validate_for_run,
 )
-from lvjiang.core.user_config import (
+from lvjiang.core.users.document import (
     User,
     get_user_workflow_params,
     save_user_metadata,

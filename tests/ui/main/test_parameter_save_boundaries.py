@@ -10,7 +10,7 @@ from lvjiang.core.config.wf_configs import (
     set_wf_config,
     update_wf_config,
 )
-from lvjiang.core.user_config import (
+from lvjiang.core.users.document import (
     User,
     get_user_workflow_params,
     save_user_metadata,

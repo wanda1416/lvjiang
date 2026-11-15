@@ -337,7 +337,7 @@ def open_adb_target(spec: str, user_config: Any) -> AdbTarget:
 # ─── 运行 ────────────────────────────────────────────────────
 
 def _resolve_user(requested: str) -> str:
-    from .user_config import load_user_metadata, resolve_active_username
+    from .users.document import load_user_metadata, resolve_active_username
 
     name = requested.strip() or resolve_active_username()
     if not name:
@@ -365,7 +365,7 @@ def _build_params(config: dict[str, Any], username: str,
 
 def _bind_user(engine: Any, username: str) -> None:
     from .config.users import SessionManager
-    from .user_config import load_user_metadata
+    from .users.document import load_user_metadata
 
     manager = SessionManager()
     engine.session = manager.load(username)

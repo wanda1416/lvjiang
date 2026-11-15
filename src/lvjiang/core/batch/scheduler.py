@@ -198,7 +198,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
         """在工作线程启动前冻结全部任务参数和用户配置。"""
         from ..config.wf_configs import get_wf_config
         from ..task_params import merge_task_params
-        from ..user_config import load_user_metadata
+        from ..users.document import load_user_metadata
 
         shared = {
             script.id: get_wf_config(script.id)

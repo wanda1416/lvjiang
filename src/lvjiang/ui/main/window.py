@@ -52,7 +52,7 @@ from ...core.config.users import SessionManager
 from ...core.layout.manager import LayoutConfigManager
 from ...core.plugin_runtime import PluginRuntimePort
 from ...core.reference_db import ReferenceDatabase
-from ...core.user_config import UserConfigManager
+from ...core.users.document import UserConfigManager
 from ...i18n import tr
 from ..execution.overlay import BorderOverlay
 from ..widgets.button_styles import (

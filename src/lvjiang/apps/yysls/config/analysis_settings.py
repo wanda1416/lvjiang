@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from lvjiang.core.user_config import User, load_user_metadata, mutate_user_metadata
+from lvjiang.core.users.document import User, load_user_metadata, mutate_user_metadata
 
 _FIELD = "graduation_analysis"
 

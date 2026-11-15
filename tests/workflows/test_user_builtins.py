@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from lvjiang.core.user_config import User, save_user_metadata
+from lvjiang.core.users.document import User, save_user_metadata
 from lvjiang.workflows.builtins import get_function
 
 

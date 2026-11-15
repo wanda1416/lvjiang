@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import tempfile
@@ -16,6 +15,7 @@ from openpyxl.worksheet.formula import ArrayFormula
 from lvjiang.core.config.resolver import get_resolver
 from lvjiang.core.paths import get_config_system_dir
 
+from .....core.json_files import formatted_json
 from ..combat.combat_attrs import AFFIX_TO_ATTR
 from .excel_formula import FormulaError, FormulaModel, parse_formula
 from .graduation_program import ProgramCompiler, ProgramRuntime
@@ -620,7 +620,7 @@ def scheme_path(
 
 def write_model(path: Path, model: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(model, ensure_ascii=False, indent=2) + "\n"
+    payload = formatted_json(model)
     fd, temp_name = tempfile.mkstemp(dir=path.parent, suffix=".json.tmp")
     temp_path = Path(temp_name)
     try:
@@ -647,7 +647,7 @@ def import_graduation_scheme(
         source, school, scheme, model_level, model_version)
     outputs = validate_model(model)
     rel_path = model_rel_path(school, scheme, model_level, model_version)
-    payload = json.dumps(model, ensure_ascii=False, indent=2) + "\n"
+    payload = formatted_json(model)
     destination = get_resolver().write_entity(rel_path, payload)
     invalidate_model_registry()
     return destination, outputs

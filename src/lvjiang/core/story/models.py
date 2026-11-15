@@ -14,6 +14,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from ..json_files import formatted_json
+
 #: 配置目录（相对配置层根）。
 AUTO_PLOT_DIR = "tools/auto_plot"
 
@@ -208,7 +210,7 @@ def load_all() -> StoryDoc:
 
 def save_group(name: str, doc: StoryDoc, *, layer: str) -> Path:
     """整份写入某个配置组到指定层。"""
-    text = json.dumps(doc.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    text = formatted_json(doc.to_dict())
     return _resolver().write_entity(f"{AUTO_PLOT_DIR}/{name}.json", text, layer=layer)
 
 

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from ..json_files import formatted_json
 from ..sync.client import SyncError, post
 from ..sync.round_state import cloud_state, invalidate, version
 
@@ -57,7 +58,7 @@ def _save_sync_state(state: dict) -> None:
         return
     data["users_sync"] = state
     try:
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        path.write_text(formatted_json(data),
                         encoding="utf-8")
     except OSError as error:
         logger.warning("[users sync] 同步状态写回失败：{}", error)
@@ -89,7 +90,7 @@ def _set_roster(names: list[str]) -> bool:
     data["users"] = names
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        path.write_text(formatted_json(data),
                         encoding="utf-8")
     except OSError as error:
         logger.warning("[users sync] 名册顺序写回失败：{}", error)
@@ -236,7 +237,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
             # 全新实例 / 初始同步备份后都要靠这条把远端用户补回本地。
             merged = {**data}
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+            path.write_text(formatted_json(merged),
                             encoding="utf-8")
             report.pulled += 1
             continue
@@ -251,7 +252,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
         if isinstance(ui_state, dict):
             merged["ui_state"] = ui_state
         if merged != local:
-            path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+            path.write_text(formatted_json(merged),
                             encoding="utf-8")
             report.pulled += 1
 

@@ -18,6 +18,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from ..json_files import formatted_json
+
 
 def writable() -> bool:
     """本实例是否有权写同步状态（只读实例没有）。"""
@@ -61,7 +63,7 @@ def _save(state: dict) -> None:
     data["document_sync"] = state
     try:
         tmp = path.with_name(f".{path.name}.dirty")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        tmp.write_text(formatted_json(data),
                        encoding="utf-8")
         os.replace(tmp, path)
     except Exception as error:      # noqa: BLE001 — 标记失败不能顶掉业务写入

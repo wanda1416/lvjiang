@@ -3,33 +3,21 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .....core.db import Database, Migration, Schema
 from .models import (
     RESET_ANOMALIES,
     TuningEquipmentResult,
     TuningRunSummary,
 )
 
-_setup_lock = threading.Lock()
-
 
 def default_db_path() -> Path:
     from .....core.paths import session_directory
     return session_directory() / "tuning_history.db"
-
-
-class _ClosingConnection(sqlite3.Connection):
-    """事务上下文退出时同时关闭连接，兼容 Python 3.13 资源检查。"""
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        try:
-            return super().__exit__(exc_type, exc_value, traceback)
-        finally:
-            self.close()
 
 
 def _json(value) -> str:
@@ -141,7 +129,13 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (2, "track equipment lock and cooldown state", _migrate_v2),
     (3, "track execution target snapshot", _migrate_v3),
 ]
-CURRENT_VERSION = MIGRATIONS[-1][0]
+
+SCHEMA = Schema(
+    [Migration(*row) for row in MIGRATIONS],
+    label="TuningHistoryDB",
+)
+
+CURRENT_VERSION = SCHEMA.current_version
 
 
 _ANOMALY_CODES = tuple(sorted(RESET_ANOMALIES))
@@ -160,39 +154,15 @@ class TuningHistoryRepository:
 
     def __init__(self, db_path: Path | str | None = None):
         self.db_path = Path(db_path) if db_path else default_db_path()
-        self._ensure_schema()
-
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(
-            str(self.db_path), timeout=5.0, factory=_ClosingConnection)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA foreign_keys=ON")
-        with _setup_lock:
-            conn.execute("PRAGMA journal_mode=WAL")
-        return conn
-
-    def _ensure_schema(self) -> None:
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)")
-            row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-            current = int(row[0] or 0)
-            for version, _description, migrate in MIGRATIONS:
-                if version <= current:
-                    continue
-                migrate(conn)
-                conn.execute("INSERT INTO schema_version(version) VALUES (?)", (version,))
+        self._db = Database(
+            self.db_path, SCHEMA, foreign_keys=True, row_factory=sqlite3.Row)
 
     def schema_version(self) -> int:
-        with self._connect() as conn:
-            row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
-            return int(row[0] or 0)
+        return self._db.version()
 
     def create_run(self, summary: TuningRunSummary) -> None:
         now = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("""
                 INSERT INTO tuning_runs (
                     run_id, started_at, finished_at, username, status,
@@ -212,7 +182,7 @@ class TuningHistoryRepository:
 
     def save_equipment(self, run_id: str, item: TuningEquipmentResult,
                        *, event_id: str | None = None) -> int:
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             cur = conn.execute("""
                 INSERT INTO tuning_equipment (
                     run_id, sequence_id, slot_key, name, equip_type, level,
@@ -275,7 +245,7 @@ class TuningHistoryRepository:
 
     def finish_run(self, summary: TuningRunSummary) -> None:
         now = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute("""
                 UPDATE tuning_runs SET
                     finished_at=?, status=?, stop_reason=?,
@@ -292,7 +262,7 @@ class TuningHistoryRepository:
             ))
 
     def list_runs(self, limit: int = 200) -> list[TuningRunSummary]:
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             rows = conn.execute(
                 "SELECT r.*, " + _ANOMALY_SUBQUERY +
                 " FROM tuning_runs r ORDER BY r.started_at DESC LIMIT ?",
@@ -301,7 +271,7 @@ class TuningHistoryRepository:
         return [self._run_from_row(row) for row in rows]
 
     def get_run(self, run_id: str) -> TuningRunSummary | None:
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             row = conn.execute(
                 "SELECT r.*, " + _ANOMALY_SUBQUERY +
                 " FROM tuning_runs r WHERE r.run_id=?",
@@ -311,7 +281,7 @@ class TuningHistoryRepository:
 
     def get_run_for_task(self, task_run_id: str, username: str) -> TuningRunSummary | None:
         """按执行任务与用户直接关联调律历史，不受列表条数限制。"""
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             row = conn.execute(
                 "SELECT r.*, " + _ANOMALY_SUBQUERY +
                 " FROM tuning_runs r WHERE r.task_run_id=? AND r.username=? ORDER BY r.started_at DESC LIMIT 1",
@@ -320,7 +290,7 @@ class TuningHistoryRepository:
         return self._run_from_row(row) if row else None
 
     def get_results(self, run_id: str) -> tuple[TuningEquipmentResult, ...]:
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             rows = conn.execute("""
                 SELECT * FROM tuning_equipment
                 WHERE run_id=? ORDER BY sequence_id ASC
@@ -329,13 +299,13 @@ class TuningHistoryRepository:
 
     def delete_run(self, run_id: str) -> bool:
         """删除一次任务及其装备、上报状态；外键负责级联清理。"""
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             cursor = conn.execute(
                 "DELETE FROM tuning_runs WHERE run_id=?", (run_id,))
             return cursor.rowcount > 0
 
     def aggregate_counts(self) -> dict[str, int]:
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             run_count = int(conn.execute(
                 "SELECT COUNT(*) FROM tuning_runs").fetchone()[0])
             row = conn.execute(f"""
@@ -359,7 +329,7 @@ class TuningHistoryRepository:
                           days: int = 7) -> int:
         current = now or datetime.now(timezone.utc)
         cutoff = (current - timedelta(days=days)).isoformat(timespec="milliseconds")
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             cur = conn.execute("""
                 UPDATE telemetry_deliveries SET state='expired'
                 WHERE state='unreported' AND eligible_at < ?
@@ -384,7 +354,7 @@ class TuningHistoryRepository:
                 timespec="milliseconds")
             if retry_after_hours > 0 else None
         )
-        with self._connect() as conn:
+        with self._db.connection() as conn:
             rows = conn.execute("""
                 SELECT d.*, e.*, r.rule_snapshot_json, r.config_snapshot_json
                 FROM telemetry_deliveries d
@@ -404,7 +374,7 @@ class TuningHistoryRepository:
         if not ids:
             return
         placeholders = ",".join("?" for _ in ids)
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute(f"""
                 UPDATE telemetry_deliveries SET
                     schema_version=?,
@@ -425,7 +395,7 @@ class TuningHistoryRepository:
         if not ids:
             return
         placeholders = ",".join("?" for _ in ids)
-        with self._connect() as conn:
+        with self._db.transaction() as conn:
             conn.execute(f"""
                 UPDATE telemetry_deliveries SET state=?, reported_at=?
                 WHERE equipment_id IN ({placeholders})

@@ -28,7 +28,6 @@ from .periods import (
     parse_reset_time as _parse_reset_time,
 )
 from .regen import compute_regen_entry
-from .regen_gate import period_recovery_allowed
 from .repository import db_read_index, db_upsert
 from .rows import Entry
 from .schema import (
@@ -347,10 +346,10 @@ class ProfileProcessor:
                 logger.warning(f"{user_name} quota.{kd.key} CAS 失败，放弃本轮")
 
         # ── Step 2: 再生计算（regen）──
-        # 本次进程还没完成首次同步时不得推算：本地锚点可能已经过期，任何物化都会把
-        # 「基于旧基线的恢复」写成绝对值 set 上行，覆盖别的设备上真实发生的消耗
-        # （2026-11-09 体力事故）。同步到位后锚点已落在本周期，边界数为 0，自然跳过。
-        regen_keys = config.get_keys_by_model("regen") if period_recovery_allowed() else ()
+        # 只算不写：库里只存「上次真实写入的锚点」，边界/速率推算在读取端现算，
+        # 固化只发生在真实写入的事务里（service 两行模式）。因此这里既不依赖
+        # 同步状态，也不受只读实例影响——告警是纯读，必须照常评估。
+        regen_keys = config.get_keys_by_model("regen")
         for kd in regen_keys:
             if not isinstance(kd, RegenKeyDef):
                 continue

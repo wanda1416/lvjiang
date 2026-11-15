@@ -35,7 +35,6 @@ from .regen import (
     compute_regen_entry,
     is_realtime_regen,
 )
-from .regen_gate import period_recovery_allowed
 from .repository import (
     db_get_history,
     db_get_history_record,
@@ -533,36 +532,40 @@ def profile_action(
         # note 模型已提前返回，此处必为数值类型；None/str 兜底为 0
         current_value = float(_raw or 0) if _raw is None or isinstance(_raw, str) else _raw
 
-    # ── 1.5 regen 固化：先把「上次写入至今的恢复」落成一条 set ──
+    # ── 1.5 regen 固化：先把「上次写入至今的恢复」单独落成一条 regen 行 ──
     # 不固化就直接写，历史行会出现「old 是陈旧存储值、delta 却按恢复后基线算」，
     # 两处基线不一致：回放（delta 相加）、撤销、按来源聚合都会算错，
     # 当天的恢复也会从账本里消失。
+    #
+    # 这一步不再看「本进程是否同步过」：周期自动写已经取消，固化只发生在真实写入
+    # 事务里，而那笔业务写入写的就是现场真值（OCR / DSL / 手动），不依赖远端基线。
+    # 即使他端把这条 regen 行认成最新值，下一次观测写回的绝对真值会覆盖回来。
     if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
         stored_value = float((current_entry.value if current_entry else 0) or 0)
         restored = compute_regen_entry(current_entry, kd)
         restored_value = float(restored.value)
-        restored_at = restored.event_at
-        if int(restored_value) != int(stored_value):
-            # 闸门：本次进程尚未完成首次同步时不得物化，否则会把「基于过期锚点
-            # 算出的恢复」写成绝对值 set 上行，覆盖别的设备真实发生的消耗
-            # （2026-11-09 体力事故）。同步完成后锚点已在本周期，这里自然不触发。
-            if period_recovery_allowed():
-                # 速率型 regen 写入时先落一条 regen 行：描述「至今实际恢复了
-                # 多少」，值是恢复后的绝对值（覆盖语义），source 留空——恢复是
-                # 机制不是业务。随后业务写入（set/delta）另行成行。
-                db_upsert(
-                    username, model_type, key, restored_value,
-                    event_at=restored_at,
-                    op_type="regen",
-                    delta_value=_normalize_float_noise(restored_value - stored_value),
-                    source="",
-                )
-                current_entry = db_read_entry(username, model_type, key)
-                current_value = float(restored.value)
-                if expected_entry is not None:
-                    # 固化是本事务自己写的：CAS 期望值必须跟着换，否则会被误判成
-                    # 「其他进程更新过」，单进程一次消耗也会报冲突。
-                    expected_entry = current_entry
+        # 速率型的锚点就是上次写入时刻，把它写进条目会让下一次读重复累加这段恢复，
+        # 所以落当前时刻；周期型用跨过的边界时刻，语义才是「该边界之后的值」。
+        restored_at = None if is_realtime_regen(kd) else restored.event_at
+        # 只要「确实恢复过」就落这一行，不按整数点位判断：不到 1 点的小数恢复
+        # 若被合并进业务行，那一行就又不满足 new = old + delta 了。
+        if _normalize_float_noise(restored_value - stored_value) != 0:
+            # 先落一条 regen 行：描述「至今实际恢复了多少」，值是恢复后的绝对值
+            # （覆盖语义），source 留空——恢复是机制不是业务。随后业务写入
+            # （set/delta）另行成行。
+            db_upsert(
+                username, model_type, key, restored_value,
+                event_at=restored_at,
+                op_type="regen",
+                delta_value=_normalize_float_noise(restored_value - stored_value),
+                source="",
+            )
+            current_entry = db_read_entry(username, model_type, key)
+            current_value = float(restored.value)
+            if expected_entry is not None:
+                # 固化是本事务自己写的：CAS 期望值必须跟着换，否则会被误判成
+                # 「其他进程更新过」，单进程一次消耗也会报冲突。
+                expected_entry = current_entry
 
     # ── 2. 计算目标新值 ──
     if set_value is not None:

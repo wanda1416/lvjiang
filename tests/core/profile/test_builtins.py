@@ -142,10 +142,12 @@ def test_profile_write_builtins_record_explicit_business_sources(profile_func_en
         profile_func_env.username, type_="quota", key="weekly_progress"
     )
 
-    assert [item.source for item in regen_history[:2]] == [
+    # 两行模式：业务写入带显式 source，恢复行 source 留空（恢复是机制不是业务）。
+    assert [item.source for item in regen_history if item.source] == [
         "资源消耗",
         "首次扫描",
     ]
+    assert any(item.source == "" for item in regen_history)
     assert quota_history[0].source == "每周任务"
 
 

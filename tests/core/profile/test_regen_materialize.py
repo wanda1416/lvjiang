@@ -11,11 +11,7 @@ import yaml
 
 @pytest.fixture
 def regen_env(tmp_path: Path, monkeypatch) -> None:
-    from lvjiang.core.profile import regen_gate, repository, schema
-
-    # 固定「本进程已完成首次同步」：闸门是模块级全局，其它用例（同步相关）
-    # 会把它留在不同状态，导致这里是否物化 regen 行随执行顺序变化。
-    monkeypatch.setattr(regen_gate, "_pull_completed", True)
+    from lvjiang.core.profile import repository, schema
 
     profile_path = tmp_path / "profile.yaml"
     profile_path.write_text(
@@ -142,3 +138,28 @@ def test_realtime_regen_progress_is_conserved_across_many_writes(regen_env):
 
     final = profile_read("u", "xinli")
     assert abs(final - 100.0) < 0.2, final
+
+
+def test_every_regen_ledger_row_satisfies_old_plus_delta(regen_env):
+    """账本硬约束：每行都满足 new = old + delta，恢复量单独成行。
+
+    2026-11-15 心力事故：固化被拦掉，只剩一行「更新」，于是出现
+    「old 是陈旧锚点、delta 却按恢复后基线算」的坏账（301.42 + 1.88 ≠ 501.25）。
+    """
+    from lvjiang.core.profile.service import profile_action
+
+    profile_action("u", "xinli", set_value=100, source="初始化")
+    _rewind("xinli", minutes=3)                    # 0.375 点：不到 1 点也要成行
+    profile_action("u", "xinli", set_value=150, source="修正")
+    profile_action("u", "tili", set_value=100, source="初始化")
+    _rewind_before_last_boundary("tili")
+    profile_action("u", "tili", delta=-30, source="副本")
+
+    for model, key in (("regen", "xinli"), ("regen", "tili")):
+        records = _history(model, key)
+        assert [row.op_type for row in records] == ["set", "regen", "set"], key
+        for row in records:
+            if row.old_value is None:       # 该 key 的第一条写入没有旧值
+                continue
+            assert row.old_value + row.delta_value == pytest.approx(
+                row.new_value, abs=1e-6), (key, row)

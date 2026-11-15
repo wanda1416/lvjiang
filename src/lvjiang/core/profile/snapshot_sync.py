@@ -22,7 +22,7 @@ from loguru import logger
 from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
 from ..sync.round_state import cloud_state, invalidate, version
-from . import regen_gate, repository
+from . import repository
 from .arbitrate import canonical_event, is_strictly_newer
 from .rows import Entry, RemoteOp
 
@@ -614,10 +614,6 @@ def pull_and_replay(token: str, *, allow_overwrite: bool = False,
     if completed:
         state["last_pull_ok_at"] = datetime.now().isoformat(timespec="seconds")
     save_profile_sync_state(state)
-    if completed:
-        # 只有干净拉取才算「本进程已完成首次同步」：周期恢复闸门据此放行推算，
-        # 否则会用过期锚点算出恢复值并写坏跨端数据（2026-11-09 体力事故）。
-        regen_gate.mark_pull_completed()
     return report
 
 

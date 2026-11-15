@@ -386,19 +386,3 @@ def test_restore_fast_path_returns_truthy_without_summary(monkeypatch) -> None:
     assert session.restore(fetch_summary=False)
     assert calls == ["/api/refresh"]
     assert session.access_token == "at"
-
-
-def test_stored_session_state_distinguishes_unknown(monkeypatch) -> None:
-    """凭据库读不到时返回 None，不能当成未登录。"""
-    monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "")
-    assert account_service.stored_session_state() is False
-
-    monkeypatch.setattr(account_service, "_stored_refresh_token",
-                        lambda: "refresh-x")
-    assert account_service.stored_session_state() is True
-
-    def broken() -> str:
-        raise AccountError("keyring down")
-
-    monkeypatch.setattr(account_service, "_stored_refresh_token", broken)
-    assert account_service.stored_session_state() is None

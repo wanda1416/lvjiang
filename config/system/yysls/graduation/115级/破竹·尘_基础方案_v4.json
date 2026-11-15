@@ -3,13 +3,13 @@
   "schema_version": 3,
   "school": "破竹·尘",
   "source": {
-    "file": "破竹尘115阶竞速轴属性毕业率进阶计算器3.4.xlsx",
-    "version": "3.4",
-    "sha256": "2094b505eedfc5cfc31599948d42452785ad4f36149384f3dc26b267984edaa0"
+    "file": "破竹尘115阶竞速轴属性毕业率进阶计算器4.0.xlsx",
+    "version": "4.0",
+    "sha256": "5c784d7f33c3b978adca169cb4061b7171f33b788d7a666c6f07c73847bb0b35"
   },
   "baseline_attrs": {
-    "min_outer": 4472.0,
-    "max_outer": 3339.6,
+    "min_outer": 4563.9,
+    "max_outer": 3498.2,
     "outer_pen": 63.78,
     "outer_bonus": 0.027999999999999997,
     "min_mingjin": 0.0,
@@ -24,15 +24,15 @@
     "max_qiansi": 0.0,
     "qiansi_pen": 0.0,
     "qiansi_bonus": 0.0,
-    "min_pozhu": 539.0,
-    "max_pozhu": 1554.2,
+    "min_pozhu": 563.0,
+    "max_pozhu": 1602.2,
     "pozhu_pen": 30.0,
     "pozhu_bonus": 0.15,
-    "min_wuxiang": 79.2,
-    "max_wuxiang": 250.8,
-    "precision": 0.9943,
-    "crit_rate": 0.7709,
-    "intent_rate": 0.0913,
+    "min_wuxiang": 92.4,
+    "max_wuxiang": 277.2,
+    "precision": 1.0043,
+    "crit_rate": 0.7849,
+    "intent_rate": 0.0945,
     "direct_crit": 0.087,
     "direct_intent": 0.0,
     "crit_dmg": 0.5,
@@ -52,7 +52,7 @@
       "min_outer": 240,
       "max_outer": 480
     },
-    "fixed_damage_bonus": 0.6,
+    "fixed_damage_bonus": 0.725,
     "team_buffs": [
       {
         "name": "威",
@@ -93,11 +93,11 @@
   },
   "reference": {
     "combat_time": 96.1,
-    "total_damage": 16703339.558913553,
-    "dps": 173812.06616975603,
-    "graduation_rate": 0.9999999779633026
+    "total_damage": 17396919.024702433,
+    "dps": 181029.3342841044,
+    "graduation_rate": 1.0000000236652504
   },
-  "graduation_baseline_dps": 173812.07,
+  "graduation_baseline_dps": 181029.33,
   "program": {
     "inputs": [
       {
@@ -3184,7 +3184,7 @@
       ],
       [
         "const",
-        494.40000000000003
+        533.025
       ],
       [
         "add",
@@ -3283,7 +3283,7 @@
       ],
       [
         "const",
-        403.20000000000005
+        434.70000000000005
       ],
       [
         "add",
@@ -3722,7 +3722,7 @@
       ],
       [
         "const",
-        348.8
+        376.05
       ],
       [
         "add",
@@ -3821,7 +3821,7 @@
       ],
       [
         "const",
-        285.6
+        307.9125
       ],
       [
         "add",
@@ -4245,7 +4245,7 @@
       ],
       [
         "const",
-        800.0
+        862.5
       ],
       [
         "add",
@@ -4390,7 +4390,7 @@
       ],
       [
         "const",
-        652.8000000000001
+        703.8000000000001
       ],
       [
         "add",
@@ -8718,7 +8718,7 @@
       ],
       [
         "const",
-        1246.4
+        1343.775
       ],
       [
         "add",
@@ -8848,7 +8848,7 @@
       ],
       [
         "const",
-        1017.6000000000001
+        1097.1000000000001
       ],
       [
         "add",
@@ -9276,7 +9276,7 @@
       ],
       [
         "const",
-        2617.6000000000004
+        2822.1000000000004
       ],
       [
         "add",
@@ -9375,7 +9375,7 @@
       ],
       [
         "const",
-        2140.8
+        2308.05
       ],
       [
         "add",
@@ -9784,7 +9784,7 @@
       ],
       [
         "const",
-        744.0
+        802.125
       ],
       [
         "add",
@@ -9883,7 +9883,7 @@
       ],
       [
         "const",
-        604.8000000000001
+        652.0500000000001
       ],
       [
         "add",
@@ -10556,7 +10556,7 @@
       ],
       [
         "const",
-        1019.2
+        1098.825
       ],
       [
         "add",
@@ -10686,7 +10686,7 @@
       ],
       [
         "const",
-        832.8000000000001
+        897.8625000000001
       ],
       [
         "add",
@@ -20263,5 +20263,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 3
+  "model_version": 4
 }

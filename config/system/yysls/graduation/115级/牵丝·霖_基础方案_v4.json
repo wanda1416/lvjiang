@@ -3,13 +3,13 @@
   "schema_version": 3,
   "school": "牵丝·霖",
   "source": {
-    "file": "牵丝霖115阶竞速轴属性毕业率进阶计算器3.2.xlsx",
-    "version": "3.2",
-    "sha256": "b9a8fe7103ed253d1f84d4421b02651bfed4881bd60a961d11f9af317a43f5bb"
+    "file": "牵丝霖115阶竞速轴属性毕业率进阶计算器4.0.xlsx",
+    "version": "4.0",
+    "sha256": "593c1e3217a1ae5351230779da4fa3bf50b8cbdd013307cb8c287224ac6b72ab"
   },
   "baseline_attrs": {
-    "min_outer": 4332.0,
-    "max_outer": 3339.6,
+    "min_outer": 4432.9,
+    "max_outer": 3498.2,
     "outer_pen": 63.78,
     "outer_bonus": 0.0,
     "min_mingjin": 0.0,
@@ -20,19 +20,19 @@
     "max_lieshi": 0.0,
     "lieshi_pen": 0.0,
     "lieshi_bonus": 0.0,
-    "min_qiansi": 539.0,
-    "max_qiansi": 1554.2,
+    "min_qiansi": 563.0,
+    "max_qiansi": 1602.2,
     "qiansi_pen": 30.0,
     "qiansi_bonus": 0.15,
     "min_pozhu": 0.0,
     "max_pozhu": 0.0,
     "pozhu_pen": 0.0,
     "pozhu_bonus": 0.0,
-    "min_wuxiang": 158.4,
-    "max_wuxiang": 250.8,
-    "precision": 1.0029,
-    "crit_rate": 0.7705,
-    "intent_rate": 0.0913,
+    "min_wuxiang": 171.60000000000002,
+    "max_wuxiang": 277.2,
+    "precision": 1.0096,
+    "crit_rate": 0.7846,
+    "intent_rate": 0.0945,
     "direct_crit": 0.092,
     "direct_intent": 0.0,
     "crit_dmg": 0.5,
@@ -50,7 +50,7 @@
       "min_outer": 240,
       "max_outer": 480
     },
-    "fixed_damage_bonus": 0.6,
+    "fixed_damage_bonus": 0.725,
     "team_buffs": [
       {
         "name": "威",
@@ -99,11 +99,11 @@
   },
   "reference": {
     "combat_time": 15.0,
-    "total_damage": 1709761.6714655198,
-    "dps": 113984.11143103466,
-    "graduation_rate": 1.0000000125546855
+    "total_damage": 1762891.3147354634,
+    "dps": 117526.08764903089,
+    "graduation_rate": 0.9999999799961939
   },
-  "graduation_baseline_dps": 113984.11,
+  "graduation_baseline_dps": 117526.09,
   "program": {
     "inputs": [
       {
@@ -7184,5 +7184,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 3
+  "model_version": 4
 }

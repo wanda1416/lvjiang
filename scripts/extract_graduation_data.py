@@ -20,6 +20,9 @@ from lvjiang.core.paths import data_directory, get_config_system_dir  # noqa: E4
 
 EXCEL_DIR = data_directory() / "excel"
 OUTPUT_DIR = get_config_system_dir() / "yysls" / "graduation"
+#: 表格作者的四舍五入与浮点误差会造成满值回算略高于/低于 100%，
+#: 0.1% 以内视为正常，不再要求精确的 100.00%。
+GRADUATION_RATE_TOLERANCE = 0.001
 FILE_TO_SCHOOL = {
     "鸣金虹": "鸣金·虹", "鸣金影": "鸣金·影",
     "裂石威": "裂石·威", "裂石钧": "裂石·钧",
@@ -58,10 +61,16 @@ def main() -> None:
         model = convert_workbook(
             path, school, args.scheme, args.level, args.version)
         outputs = validate_model(model)
-        if f"{outputs['graduation_rate'] * 100:.2f}%" != "100.00%":
+        rate = float(outputs["graduation_rate"])
+        if abs(rate - 1.0) > GRADUATION_RATE_TOLERANCE:
             raise RuntimeError(
-                f"{school} 官方满值表回算不是 100.00%："
-                f"{outputs['graduation_rate'] * 100:.8f}%"
+                f"{school} 官方满值表回算毕业率 {rate * 100:.8f}%，"
+                f"偏离 100% 超过允许的 {GRADUATION_RATE_TOLERANCE * 100:g}%"
+            )
+        if abs(rate - 1.0) > 1e-9:
+            print(
+                f"注意：{school} 满值回算毕业率 {rate * 100:.4f}%，"
+                f"在允许的 {GRADUATION_RATE_TOLERANCE * 100:g}% 偏差内"
             )
         if not args.check:
             write_model(

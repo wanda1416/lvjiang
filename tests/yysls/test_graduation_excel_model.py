@@ -33,6 +33,8 @@ SCHOOLS = [
     "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
     "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",
 ]
+#: 表格作者取整/浮点误差允许 0.1% 的满值偏差，与批量导入脚本保持一致。
+GRADUATION_RATE_TOLERANCE = 0.001
 
 
 def _load(school: str) -> dict:
@@ -204,7 +206,8 @@ def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     actual["graduation_rate"] = actual["dps"] / expected_baseline
     for name, expected in model["reference"].items():
         assert actual[name] == pytest.approx(expected, rel=1e-10, abs=1e-6)
-    assert f"{actual['graduation_rate'] * 100:.2f}%" == "100.00%"
+    assert actual["graduation_rate"] == pytest.approx(
+        1.0, abs=GRADUATION_RATE_TOLERANCE)
 
 
 def test_runtime_uses_non_mingjin_element_inputs() -> None:

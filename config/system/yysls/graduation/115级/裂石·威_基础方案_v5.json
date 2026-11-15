@@ -3,21 +3,21 @@
   "schema_version": 3,
   "school": "裂石·威",
   "source": {
-    "file": "裂石威115阶竞速轴属性毕业率进阶计算器3.4.xlsx",
-    "version": "3.4",
-    "sha256": "c6c3c71d296e56812cfd08bca5c1bc51edf382231f22d6fb135cc5f23e0c41af"
+    "file": "裂石威115阶竞速轴属性毕业率进阶计算器4.0.xlsx",
+    "version": "4.0",
+    "sha256": "f663641ea9f1d48cc85b8d34ca9e85d8f42248906ff74051ffa41d385137205c"
   },
   "baseline_attrs": {
-    "min_outer": 2177.2,
-    "max_outer": 6744.8,
+    "min_outer": 2260.7,
+    "max_outer": 6912.8,
     "outer_pen": 58.68,
     "outer_bonus": 0.0,
     "min_mingjin": 0.0,
     "max_mingjin": 0.0,
     "mingjin_pen": 0.0,
     "mingjin_bonus": 0.0,
-    "min_lieshi": 583.2,
-    "max_lieshi": 1167.6,
+    "min_lieshi": 610.4,
+    "max_lieshi": 1222.0,
     "lieshi_pen": 42.0,
     "lieshi_bonus": 0.15,
     "min_qiansi": 0.0,
@@ -28,11 +28,11 @@
     "max_pozhu": 0.0,
     "pozhu_pen": 0.0,
     "pozhu_bonus": 0.0,
-    "min_wuxiang": 79.2,
-    "max_wuxiang": 92.4,
-    "precision": 1.0025,
-    "crit_rate": 0.5494,
-    "intent_rate": 0.1512,
+    "min_wuxiang": 92.4,
+    "max_wuxiang": 118.8,
+    "precision": 1.0093,
+    "crit_rate": 0.5598,
+    "intent_rate": 0.1545,
     "direct_crit": 0.046,
     "direct_intent": 0.0,
     "crit_dmg": 0.644,
@@ -51,7 +51,7 @@
       "min_outer": 240,
       "max_outer": 480
     },
-    "fixed_damage_bonus": 0.6,
+    "fixed_damage_bonus": 0.725,
     "team_buffs": [
       {
         "name": "沧海帖",
@@ -96,11 +96,11 @@
   },
   "reference": {
     "combat_time": 88.4,
-    "total_damage": 14159297.07469385,
-    "dps": 160173.04383137837,
-    "graduation_rate": 1.000000023920245
+    "total_damage": 14843439.876194295,
+    "dps": 167912.2157940531,
+    "graduation_rate": 0.9999999749515139
   },
-  "graduation_baseline_dps": 160173.04000000004,
+  "graduation_baseline_dps": 167912.22,
   "program": {
     "inputs": [
       {
@@ -4433,7 +4433,7 @@
       ],
       [
         "const",
-        3203.2000000000003
+        3453.4500000000003
       ],
       [
         "add",
@@ -4482,7 +4482,7 @@
       ],
       [
         "const",
-        2616.0
+        2820.375
       ],
       [
         "add",
@@ -5024,7 +5024,7 @@
       ],
       [
         "const",
-        214.4
+        231.15
       ],
       [
         "add",
@@ -5073,7 +5073,7 @@
       ],
       [
         "const",
-        175.20000000000002
+        188.88750000000002
       ],
       [
         "add",
@@ -5881,7 +5881,7 @@
       ],
       [
         "const",
-        1894.4
+        2042.4
       ],
       [
         "add",
@@ -5961,7 +5961,7 @@
       ],
       [
         "const",
-        1548.0
+        1668.9375
       ],
       [
         "add",
@@ -10983,7 +10983,7 @@
       ],
       [
         "const",
-        140.8
+        151.8
       ],
       [
         "add",
@@ -11032,7 +11032,7 @@
       ],
       [
         "const",
-        115.20000000000002
+        124.20000000000002
       ],
       [
         "add",
@@ -14528,5 +14528,5 @@
   },
   "scheme": "基础方案",
   "model_level": 115,
-  "model_version": 4
+  "model_version": 5
 }

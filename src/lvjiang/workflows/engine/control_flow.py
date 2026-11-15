@@ -6,6 +6,10 @@ from ..grammar import For, ForRange, If, Loop, UntilLoop, WhileLoop
 from ..grammar.ast_nodes import Try
 from .signals import WorkflowUserError, _BreakSignal, _ContinueSignal
 
+#: 条件循环的默认迭代上限。脚本在文件头声明 ``#% requires: [unbounded_loops]``
+#: 时引擎把 ``_loop_limit`` 置 0，表示不设上限。
+_MAX_LOOP_ITERATIONS = 1_000_000
+
 
 class _ControlFlowMixin:
     """控制流语句执行"""
@@ -100,29 +104,42 @@ class _ControlFlowMixin:
         """loop while <condition> ... end — 条件为真继续"""
         logger.debug("loop while 开始")
         safety_counter = 0
+        limit = self._loop_limit
         while self._eval_condition(node.condition):
             if self._stop_check():
                 return
             self._wait_if_paused()  # 暂停检查
+            # 计数必须早于 try：continue 会跳过 try 之后的所有代码，曾经因此
+            # 让「每轮都 continue」的循环绕过上限，变成必须手动停止的死循环。
+            safety_counter += 1
+            if limit and safety_counter > limit:
+                logger.error(
+                    f"loop while 超过 {limit} 次迭代，强制退出防止死循环；"
+                    "确需更多轮次请在文件头声明 #% requires: [unbounded_loops]")
+                break
             try:
                 self._exec_body(node.body)
             except _BreakSignal:
                 break
             except _ContinueSignal:
                 continue
-            safety_counter += 1
-            if safety_counter > 1_000_000:
-                logger.error("loop while 超过 1,000,000 次迭代，强制退出防止死循环")
-                break
 
     def _exec_until_loop(self, node: UntilLoop):
         """loop until <condition> ... end — 条件为假继续（条件为真退出），至少执行一次"""
         logger.debug("loop until 开始")
         safety_counter = 0
+        limit = self._loop_limit
         while True:
             if self._stop_check():
                 return
             self._wait_if_paused()  # 暂停检查
+            # 同 loop while：continue 会跳过条件检查，计数必须放在 try 之前
+            safety_counter += 1
+            if limit and safety_counter > limit:
+                logger.error(
+                    f"loop until 超过 {limit} 次迭代，强制退出防止死循环；"
+                    "确需更多轮次请在文件头声明 #% requires: [unbounded_loops]")
+                break
             try:
                 self._exec_body(node.body)
             except _BreakSignal:
@@ -132,10 +149,6 @@ class _ControlFlowMixin:
                 continue
             # 本轮正常完成，检查退出条件
             if self._eval_condition(node.condition):
-                break
-            safety_counter += 1
-            if safety_counter > 1_000_000:
-                logger.error("loop until 超过 1,000,000 次迭代，强制退出防止死循环")
                 break
 
     def _exec_try(self, node: Try):

@@ -8,7 +8,8 @@
 - loop 次数变量引用
 """
 
-from tests.workflows.conftest import run
+from lvjiang.workflows.engine import control_flow
+from tests.workflows.conftest import make_engine, run
 
 
 class TestForDynamicIterable:
@@ -86,6 +87,60 @@ end
 '''
         v = run(code, {"times": 5, "sum": 0})
         assert v["sum"] == 5
+
+
+class TestLoopSafetyGuard:
+    """条件循环的迭代上限必须对 continue 路径同样生效。"""
+
+    def test_while_continue_cannot_bypass_guard(self, monkeypatch):
+        monkeypatch.setattr(control_flow, "_MAX_LOOP_ITERATIONS", 5)
+        code = '''loop while true
+    eval $n = $n + 1
+    continue
+end
+'''
+        assert run(code, {"n": 0})["n"] == 5
+
+    def test_until_continue_cannot_bypass_guard(self, monkeypatch):
+        monkeypatch.setattr(control_flow, "_MAX_LOOP_ITERATIONS", 5)
+        code = '''loop until false
+    eval $n = $n + 1
+    continue
+end
+'''
+        assert run(code, {"n": 0})["n"] == 5
+
+
+class TestUnboundedLoopsCapability:
+    """``#% requires: [unbounded_loops]`` 解除条件循环的迭代上限。"""
+
+    CODE = (
+        "eval $n = 0\n"
+        "loop while true\n"
+        "    eval $n = $n + 1\n"
+        "    if $n >= 20 -> break\n"
+        "end\n"
+        "return $n\n"
+    )
+
+    def _execute(self, wf_root, header: str):
+        path = wf_root / "probe.wf"
+        path.write_text(header + self.CODE, encoding="utf-8")
+        engine = make_engine()
+        engine.execute(path)
+        return engine
+
+    def test_capability_removes_iteration_limit(self, wf_root, monkeypatch):
+        monkeypatch.setattr(control_flow, "_MAX_LOOP_ITERATIONS", 5)
+        engine = self._execute(wf_root, "#% requires: [unbounded_loops]\n")
+        assert engine._loop_limit == 0
+        assert engine.return_value == 20
+
+    def test_scripts_without_capability_keep_the_default_cap(self, wf_root, monkeypatch):
+        monkeypatch.setattr(control_flow, "_MAX_LOOP_ITERATIONS", 5)
+        engine = self._execute(wf_root, "")
+        assert engine._loop_limit == 5
+        assert engine.return_value == 5
 
 
 class TestSingleLineGuard:

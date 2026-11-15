@@ -32,6 +32,7 @@ _TOP_LEVEL_FIELDS = {
 #: 那一条指令才失败——并发输入只有 a11y 手势能落地，ADB shell input 做不到。
 CAPABILITIES = {
     "device_gesture": "设备端执行（安卓输入设为「设备端执行」）",
+    "unbounded_loops": "不限循环次数（条件循环可超过 100 万次，需自行保证能退出）",
 }
 #: 脚本 id 是稳定逻辑标识，不是路径。首字符必须是 Unicode 字母，
 #: 后续允许 Unicode 字母、数字和下划线；中文脚本名属于合法 id。

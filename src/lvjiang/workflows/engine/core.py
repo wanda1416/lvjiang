@@ -84,6 +84,7 @@ from ..program_check import (
 )
 from ..static_check import check_refs, format_problems
 from ..workflow_references import collect_refs
+from . import control_flow
 from .actions import _ActionsMixin
 from .control_flow import _ControlFlowMixin
 from .data_ops import _DataOpsMixin
@@ -198,6 +199,9 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # 宿主不认识注册方的任何概念。
         self.run_finished_callbacks: list[Callable[[str, str], None]] = []
         self._stop_check = stop_check or (lambda: False)
+        # 条件循环的迭代上限。脚本在文件头声明 ``#% requires: [unbounded_loops]``
+        # 时置 0（不设上限），加载期由 _load_and_validate 按元数据重设。
+        self._loop_limit = control_flow._MAX_LOOP_ITERATIONS
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event
         # 引擎生命周期服务：DSL 委托与 Python 类工作流共享图库匹配缓存。
@@ -566,8 +570,16 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             raise WorkflowUserError(
                 f"check_env: 当前环境 {self.run_env!r} "
                 f"不在允许列表 {allowed_envs} 中，工作流中止")
+        required = metadata.get("requires") or []
         if enforce_run_env:
-            self._enforce_required_capabilities(metadata.get("requires") or [])
+            self._enforce_required_capabilities(required)
+        # 「不限循环次数」是脚本能力开关：默认仍用 100 万次上限兜住写错的
+        # 死循环，确需更多轮次的条件循环必须在文件头显式声明。0 表示不设
+        # 上限，停止/暂停检查仍在每轮执行，随时可以打断。
+        self._loop_limit = (
+            0 if "unbounded_loops" in required
+            else control_flow._MAX_LOOP_ITERATIONS
+        )
         program = parse_file(resolved)
 
         # 解析 import 图：同一物理文件在本次加载中只处理一次，

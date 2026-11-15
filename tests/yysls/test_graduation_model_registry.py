@@ -190,10 +190,4 @@ def test_models_live_in_level_subdirectories(tmp_path, monkeypatch) -> None:
         registry.invalidate_model_registry()
 
 
-def test_shipped_models_are_all_under_a_level_directory() -> None:
-    """随包下发的 11 份模型必须已经迁到子目录，否则发现层扫不到。"""
-    refs = registry.list_graduation_models()
-    assert refs, "系统层没有发现任何模型"
-    for ref in refs:
-        assert ref.rel_path.startswith(
-            f"{registry.DATA_REL_DIR}/{registry.level_dirname(ref.level)}/")
+

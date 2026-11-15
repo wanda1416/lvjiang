@@ -254,9 +254,13 @@ def test_all_shipped_models_match_excel_extraction(extractor):
     root = Path(__file__).resolve().parents[2]
     for path in sorted((root / "config/system/yysls/damage_model").glob("*.yaml")):
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
-        sources = list((root / "data/excel").glob(f"*/{doc['source']['file']}"))
-        assert len(sources) == 1, (path.name, sources)
-        excel = sources[0]
+        sources = sorted((root / "data/excel").rglob(doc["source"]["file"]))
+        assert sources, (path.name, doc["source"]["file"])
+        # 源表可能已归档到「过期版本」；优先用仍在等级目录下的那一份。
+        excel = next(
+            (item for item in sources if "过期版本" not in item.parts),
+            sources[0],
+        )
         book = openpyxl.load_workbook(excel, data_only=False)
         cached = openpyxl.load_workbook(excel, data_only=True)
         try:

@@ -33,7 +33,7 @@
 
 | 证据 | 当前来源 | 可以证明什么 | 不能单独证明什么 |
 |------|----------|--------------|------------------|
-| Scene 注册表 | `config/system/scenes.yaml` | 律匠管理哪些语义场景、如何分组 | 页面一定可达 |
+| Scene 注册表 | `config/system/scenes/`（分组定义 + `_meta.json`） | 律匠管理哪些语义场景、如何分组 | 页面一定可达 |
 | Scene 定义 | `config/system/scenes/*.yaml` | 页面、视图、按钮、文字区、网格和组件 | 实际坐标和跳转方向 |
 | Layout | `config/system/layouts/` | Android/桌面的区域坐标、网格、快捷键 | 页面何时出现 |
 | Workflow/代码 | `config/system/workflows/`、`AutoTuningWorkflow` | 已执行过的入口、校验、返回和异常分支 | 尚未编排页面的完整游戏规则 |
@@ -46,7 +46,8 @@
 
 ### 2.2 数量与覆盖
 
-- `scenes.yaml` 是编辑器分组登记表；某个场景属于哪一组以它为准。
+- `config/system/scenes/` 下的分组定义文件与 `_meta.json` 是编辑器分组登记表；
+  某个场景属于哪一组以它为准。
 - Scene 定义以 `config/system/scenes/` 下的文件为准，两端布局绑定以
   `config/system/layouts/<布局>/` 下的文件为准。场景、布局和分组每轮都在增删，
   本节不再写死数量。
@@ -430,7 +431,7 @@ AI 不能把桌面快捷键硬编码到语义流程里；正确模型是“执�
 
 ## 8. 不应从配置中过度推断的内容
 
-1. `scenes.yaml` 中的“通用/培养/物资/社交/活动/组件”是律匠编辑器分组，不等于
+1. Scene 注册表分组里的“通用/培养/物资/社交/活动/组件”是律匠编辑器分组，不等于
    游戏官方菜单层级。
 2. Scene 名称带 `detail` 不代表一定全屏跳转；装备详情明显是叠层。
 3. 一个区域存在并不表示活跃流程已使用。例如菜单中大量入口已建模，但当前没有
@@ -486,10 +487,8 @@ verify: equip_tune_detail.tune_btn contains 词库预览
 
 ## 10. 代码与配置索引
 
-- Scene 注册：[scenes.yaml](../../config/system/scenes.yaml)（仅源码检出）
-- Layout 注册：[layouts.yaml](../../config/system/layouts.yaml)（仅源码检出）
-- Scene 定义目录：[scenes/](../../config/system/scenes/)（仅源码检出）
-- Layout 目录：[layouts/](../../config/system/layouts/)（仅源码检出）
+- Scene 注册与定义目录：[scenes/](../../config/system/scenes/)（仅源码检出）
+- Layout 注册与布局目录：[layouts/](../../config/system/layouts/)（仅源码检出）
 - 公共导航：[navigation.wf](../../config/system/workflows/subcall/navigation.wf)（仅源码检出）
 - 页面检测：[page_detection.wf](../../config/system/workflows/subcall/page_detection.wf)（仅源码检出）
 - 通用确认：[page_action.wf](../../config/system/workflows/subcall/page_action.wf)（仅源码检出）

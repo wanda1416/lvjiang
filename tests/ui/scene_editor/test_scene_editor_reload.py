@@ -18,22 +18,31 @@ from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
 @pytest.fixture
 def editor(qtbot, tmp_path, monkeypatch):
     system = tmp_path / "system"
-    (system / "scenes").mkdir(parents=True)
+    (system / "scenes" / "general").mkdir(parents=True)
     (system / "layouts" / "phone").mkdir(parents=True)
-    (system / "scenes.yaml").write_text(
-        "schema_version: 2\nscenes:\n  general:\n    name: 通用\n    items: [sample]\n",
+    (system / "scenes" / "general.yaml").write_text(
+        "name: 通用\n", encoding="utf-8",
+    )
+    (system / "scenes" / "_meta.json").write_text(
+        '{"groups": [{"key": "general", "scenes": ["sample"]}]}',
         encoding="utf-8",
     )
-    (system / "layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  phone:\n    name: 手机\n"
-        "  main_layout:\n    name: 主页面布局\n",
-        encoding="utf-8",
+    (system / "layouts" / "phone.yaml").write_text(
+        "name: 手机\n", encoding="utf-8",
     )
-    (system / "scenes" / "sample.yaml").write_text(
+    (system / "layouts" / "main_layout.yaml").write_text(
+        "name: 主页面布局\n", encoding="utf-8",
+    )
+    (system / "layouts" / "_meta.json").write_text(
+        '{"layouts": ["phone", "main_layout"]}', encoding="utf-8",
+    )
+    (system / "scenes" / "general" / "sample.yaml").write_text(
         "key: sample\nname: 示例\nregions: []\n", encoding="utf-8",
     )
     # 磁盘上已有新坐标，但旧场景定义没有它，初次加载会过滤。
-    (system / "layouts" / "phone" / "sample.json").write_text(
+    phone_sample = system / "layouts" / "phone" / "general" / "sample.json"
+    phone_sample.parent.mkdir(parents=True, exist_ok=True)
+    phone_sample.write_text(
         json.dumps({"regions": [{"key": "new_button", "x_ratio": 0.1,
                                 "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1}]}),
         encoding="utf-8",
@@ -67,19 +76,20 @@ def test_reload_reads_external_changes_and_rebuilds_editor(editor):
     assert not old_tab.get_regions()
     dialog._img_cache[("phone", "sample", "", 0)] = object()
     dialog._script_text.setPlainText("未保存的脚本")
-    manifest = system / "scenes.yaml"
+    manifest = system / "scenes" / "general.yaml"
     stamp = manifest.stat()
     manifest.write_text(
         manifest.read_text(encoding="utf-8").replace("通用", "测试"), encoding="utf-8",
     )
     # 即使外部更新保留文件时间和大小，显式重载也不能命中旧 YAML 缓存。
     os.utime(manifest, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
-    (system / "scenes" / "sample.yaml").write_text(
+    (system / "scenes" / "general" / "sample.yaml").write_text(
         "key: sample\nname: 示例\nregions:\n"
         "  - key: new_button\n    name: 新按钮\n    type: func\n",
         encoding="utf-8",
     )
-    (system / "scenes" / "extra.yaml").write_text(
+    extra_path = system / "scenes" / "general" / "extra.yaml"
+    extra_path.write_text(
         "key: extra\nname: 新场景\nregions: []\n", encoding="utf-8",
     )
     before = {path: path.read_bytes() for path in system.rglob("*") if path.is_file()}

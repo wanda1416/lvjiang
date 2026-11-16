@@ -567,7 +567,7 @@ class SceneOpsMixin:
             resolver = get_resolver()
             protected = (
                 not resolver.is_dev_mode()
-                and resolver.is_system_entity(f"scenes/{scene_key}.yaml")
+                and resolver.is_system_entity(_scene_entity_rel(resolver, scene_key))
             )
             if protected:
                 delete_action.setEnabled(False)
@@ -627,7 +627,7 @@ class SceneOpsMixin:
         resolver = get_resolver()
         protected = (
             not resolver.is_dev_mode()
-            and resolver.is_system_entity(f"scenes/{scene_key}.yaml")
+            and resolver.is_system_entity(_scene_entity_rel(resolver, scene_key))
         )
         if protected:
             key_edit.setEnabled(False)
@@ -759,3 +759,11 @@ class SceneOpsMixin:
         registry.save_scene_order(all_order)
         reload_scene_registry()
         logger.info(f"分组 {group_key} 场景顺序已更新: {new_order}")
+
+
+def _scene_entity_rel(resolver, scene_key: str) -> str:
+    """场景定义文件路径：目录即归属，取注册表当前分组。"""
+    from ...core.scene.config import scene_rel
+    from ...core.scene.registry import get_scene_group
+    group = get_scene_group(scene_key)
+    return scene_rel(group, scene_key) if group else f"scenes/{scene_key}.yaml"

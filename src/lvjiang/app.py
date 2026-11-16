@@ -116,7 +116,16 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 启动时唯一一次场景加载，且发生在所有插件注册完成之后、创建 QApplication
     # 之前——插件内置函数/布局模块导入 scene_registry 都不会再提前触发加载。
     from .core.config.content import rebuild_content
+
+    # 旧聚合配置（scenes.yaml / layouts.yaml）一次性拆分为目录化结构；
+    # 幂等，聚合文件不存在时是空操作。必须在 rebuild_content 与场景
+    # 注册表初始化之前完成，保证索引用新结构建立。
+    from .core.config.content_split import ensure_content_split
     from .core.config.resolver import get_resolver
+    from .core.paths import get_config_local_dir, get_config_system_dir
+    ensure_content_split(
+        get_config_system_dir(get_resolver().config_dir),
+        get_config_local_dir(get_resolver().config_dir))
     rebuild_content(get_resolver())
     get_resolver().reset_edit_baselines()
     from .core.scene.registry import initialize_scene_registry

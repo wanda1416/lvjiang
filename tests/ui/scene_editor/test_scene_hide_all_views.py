@@ -44,7 +44,7 @@ def test_scene_manage_hides_all_and_reopens_base(editor, qtbot, monkeypatch):
     assert tab.current_view == "base"
     assert tab._region_table.rowCount() == 1
     assert tab._canvas._visible_keys == {"entry"}
-    saved_path = registry._resolver.resolve_read("scenes/sample.yaml")
+    saved_path = registry._resolver.resolve_read("scenes/general/sample.yaml")
     saved = yaml.safe_load(saved_path.read_text(encoding="utf-8"))
     assert saved["hide_all_views"] is True
 

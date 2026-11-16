@@ -439,6 +439,11 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
 
     def _version_rel_path(self, kind: str) -> str:
         if kind == "scene":
+            from ...core.scene.config import scene_rel
+            from ...core.scene.registry import get_scene_group
+            group = get_scene_group(self._scene_key)
+            if group:
+                return scene_rel(group, self._scene_key)
             return f"scenes/{self._scene_key}.yaml"
         if not self._layout_name:
             return ""

@@ -263,8 +263,9 @@ def _scene_files_stamp() -> tuple[tuple[str, int], ...]:
     resolver = get_resolver()
     files = []
     for root in (resolver.system_dir, resolver.remote_dir, resolver.local_dir):
-        files.extend(root.glob("scenes.yaml"))
+        files.extend((root / "scenes").glob("_meta.json"))
         files.extend((root / "scenes").glob("*.yaml"))
+        files.extend((root / "scenes").glob("*/*.yaml"))
     return tuple(sorted((str(path), path.stat().st_mtime_ns) for path in files))
 
 
@@ -314,7 +315,7 @@ def _check_scene_exists(program) -> list[Diagnostic]:
             seen_scenes.add(ref.scene)
             diagnostics.append(Diagnostic(
                 range=_line_range(ref.line_no),
-                message=f"场景 '{ref.scene}' 不存在于 scenes.yaml 中",
+                message=f"场景 '{ref.scene}' 不存在于 scenes/ 目录中",
                 severity=DiagnosticSeverity.Error,
             ))
     return diagnostics

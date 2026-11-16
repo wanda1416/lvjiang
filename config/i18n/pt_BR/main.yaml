@@ -346,3 +346,9 @@ task_params_dialog:
   "上一个": "Anterior"
   "下一个": "Próximo"
   "方向键 ← / → 切换上一个 / 下一个": "As setas ← / → alternam para o item anterior / próximo"
+
+hotkey_settings:
+  "菜单快捷键有冲突，请检查后重试：": "Há conflito entre atalhos de menu; verifique e tente novamente: "
+  "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Atalhos de menu (somente na janela; não capturam teclas quando ela está sem foco)"
+  "（不绑定）": "(não definido)"
+  "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Pressione uma vez para minimizar para a bandeja e outra para voltar. A configuração da área de notificação pode ocultar o ícone; este atalho é a única forma confiável de recuperar a janela oculta."

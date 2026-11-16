@@ -396,17 +396,18 @@ class MainWindow(
         self._pause_acknowledged.connect(self._on_pause_acknowledged)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
-        # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 使用当前配置）
+        # macOS 未授权、或系统热键注册失败且 pynput 也不可用时降级为窗口内热键
+        # （keyPressEvent 使用当前配置）。_global_hotkeys_active 记录"全局通道
+        # 是否真的在工作"，窗口内兜底绝不能与它同时响应同一次按键。
+        self._global_hotkeys_active = False
         self._hotkey_listener = self._start_main_global_hotkeys()
 
         logger.info("主窗口已初始化")
 
     def _main_global_hotkey_bindings(self, *, include_toggle: bool = False):
-        """主窗口常驻全局热键；F12 由录制对话框临时管理。
+        """pynput 兜底绑定表：只在系统热键不可用时使用。
 
-        按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F11）。
-        ``include_toggle`` 只在系统热键注册不上时为真，用来把窗口切换键
-        退回 pynput 监听。
+        按键位从「配置管理 → 热键设置」读取（默认 F9/F10/F11，窗口切换 F8）。
         """
         from ...core.platforms import hotkey_pynput_token
         hk = self._user_config.hotkeys
@@ -415,12 +416,6 @@ class MainWindow(
             hotkey_pynput_token(hk.stop): self._on_global_f10,
             hotkey_pynput_token(hk.pause): self._on_global_pause,
         }
-        # 「最小化到状态栏」把窗口藏起来之后，托盘图标属于系统通知区域，可能因为
-        # 通知区域策略、资源管理器重启而根本不出现——此时窗口既不可见也没有任何
-        # 恢复入口，只能杀进程（运行中的任务一起丢）。这个热键是隐藏后唯一的
-        # 兜底通道，因此优先交给系统 RegisterHotKey 注册（见 hotkey_native）；
-        # include_toggle 只在系统热键不可用时为真，退回 pynput 监听。
-        self._toggle_window_hotkey = hk.toggle_window
         if include_toggle:
             bindings[hotkey_pynput_token(hk.toggle_window)] = \
                 self._on_global_toggle_window
@@ -434,13 +429,24 @@ class MainWindow(
         """系统热键回调：WM_HOTKEY 在 GUI 线程分发，可直接切换窗口。"""
         self._toggle_window_visibility()
 
-    def _register_native_toggle_hotkey(self) -> bool:
-        """用系统热键承载窗口切换键，失败时返回 False 交给 pynput 兜底。
+    def _native_hotkey_specs(self) -> list[tuple[str, Callable[[], None]]]:
+        """系统热键要承载的动作。四个动作一视同仁地交给 OS 投递。"""
+        hk = self._user_config.hotkeys
+        return [
+            (hk.start, self._on_global_f9),
+            (hk.stop, self._on_global_f10),
+            (hk.pause, self._on_global_pause),
+            (hk.toggle_window, self._on_native_toggle_window),
+        ]
 
-        pynput 的 GlobalHotKeys 用「按下集合恰好等于目标集合」判定，Windows 上
-        Alt 的 release 会被系统菜单模式吞掉，残留一次之后该组合就永久不再
-        触发（实测一次成功、之后无任何回调）。这条键一旦失效，最小化的窗口
-        就再也回不来，所以它必须走 OS 投递的 WM_HOTKEY。
+    def _register_native_hotkeys(self) -> bool:
+        """把全部全局热键注册成系统热键；任一条失败就整组退回 pynput。
+
+        为什么不再只把窗口切换键交给系统：允许给热键加 Alt/Ctrl/Shift 之后，
+        pynput 的「按下集合恰好等于目标集合」判定在 Windows 上会被系统菜单
+        模式吞掉 release 事件，表现为第一次能触发、之后永久无响应（见
+        :mod:`core.desktop.hotkey_native`）。统一走 ``RegisterHotKey`` 后修饰
+        键组合也可靠；注册不上时整组降级，不会留下半死的手势。
         """
         from ...core.desktop.hotkey_native import NativeHotkeyManager
 
@@ -448,17 +454,22 @@ class MainWindow(
         if manager is None:
             manager = NativeHotkeyManager()
             self._native_hotkeys = manager
-        hotkey = self._user_config.hotkeys.toggle_window
-        self._toggle_window_hotkey = hotkey
         try:
             from PyQt6.QtWidgets import QApplication
             app = QApplication.instance()
             if app is None or not manager.install(app, int(self.winId())):
                 return False
             manager.unregister_all()
-            return manager.register(
-                NativeHotkeyManager.next_id(), hotkey,
-                self._on_native_toggle_window)
+            for hotkey, callback in self._native_hotkey_specs():
+                if not manager.register(
+                        manager.allocate_id(), hotkey, callback):
+                    logger.warning(
+                        f"系统热键 {hotkey} 注册失败（大概率被其他程序占用），"
+                        "整组回退到 pynput 绑定")
+                    manager.unregister_all()
+                    return False
+            self._toggle_window_hotkey = self._user_config.hotkeys.toggle_window
+            return True
         except Exception as exc:  # noqa: BLE001 - 失败要能降级，不能中断启动
             logger.warning(f"系统热键启用失败，回退到 pynput 绑定: {exc}")
             return False
@@ -475,15 +486,23 @@ class MainWindow(
             self._restore_from_tray()
 
     def _start_main_global_hotkeys(self):
-        """主实例注册系统热键；只读实例完全不创建全局监听器。"""
+        """主实例注册全局热键；只读实例完全不创建全局监听器。
+
+        系统热键能承载全部动作时不再启动 pynput 监听——两套同时生效会让同一次
+        按键触发两次（例如暂停/恢复互相抵消）。
+        """
         from ...core.access import is_readonly
         if is_readonly():
             logger.info("只读实例不注册全局热键")
             return None
+        if self._register_native_hotkeys():
+            self._global_hotkeys_active = True
+            return None
         from ...core.platforms import start_global_hotkeys
-        native_ok = self._register_native_toggle_hotkey()
-        return start_global_hotkeys(
-            self._main_global_hotkey_bindings(include_toggle=not native_ok))
+        listener = start_global_hotkeys(
+            self._main_global_hotkey_bindings(include_toggle=True))
+        self._global_hotkeys_active = listener is not None
+        return listener
 
     # ─── 热键回调 ────────────────────────────────────────────
 
@@ -1418,20 +1437,45 @@ class MainWindow(
     # ─── 快捷键 + 关闭 ───────────────────────────────────────
 
     def keyPressEvent(self, event: QKeyEvent):  # type: ignore[override]
-        # macOS 无全局热键时的窗口内兜底；按键位跟随「热键设置」配置。
-        hk = self._user_config.hotkeys
-        key = event.key()
-        if key == getattr(Qt.Key, f"Key_{hk.start}", None):
-            self._on_f9_start()
-        elif key == getattr(Qt.Key, f"Key_{hk.pause}", None):
-            # 全局热键已处理暂停键（避免双触发导致暂停/恢复互相抵消）
-            if self._hotkey_listener is not None:
+        """窗口内兜底：只在全局通道不可用时接管热键。
+
+        按键位跟随「热键设置」，且要按修饰键比对——配置允许 ``Ctrl+F9`` 这类
+        组合，只比主键会让带修饰键的配置在降级路径上永远不触发。
+        """
+        if not getattr(self, "_global_hotkeys_active", False):
+            hk = self._user_config.hotkeys
+            if self._hotkey_matches(event, hk.start):
+                self._on_f9_start()
                 return
-            self._on_pause_resume()
-        elif key == getattr(Qt.Key, f"Key_{hk.stop}", None):
-            self._request_stop()
-        else:
-            super().keyPressEvent(event)
+            if self._hotkey_matches(event, hk.pause):
+                self._on_pause_resume()
+                return
+            if self._hotkey_matches(event, hk.stop):
+                self._request_stop()
+                return
+        super().keyPressEvent(event)
+
+    @staticmethod
+    def _hotkey_matches(event: QKeyEvent, binding: str) -> bool:
+        """事件是否正好命中该配置（主键 + 修饰键都要对上）。"""
+        parts = [p for p in str(binding or "").replace(" ", "").split("+") if p]
+        if not parts:
+            return False
+        key = parts[-1].upper()
+        if event.key() != getattr(Qt.Key, f"Key_{key}", None):
+            return False
+        modifiers = event.modifiers()
+        wanted = (
+            any(p.lower() in ("ctrl", "control") for p in parts[:-1]),
+            any(p.lower() == "alt" for p in parts[:-1]),
+            any(p.lower() == "shift" for p in parts[:-1]),
+        )
+        actual = (
+            bool(modifiers & Qt.KeyboardModifier.ControlModifier),
+            bool(modifiers & Qt.KeyboardModifier.AltModifier),
+            bool(modifiers & Qt.KeyboardModifier.ShiftModifier),
+        )
+        return wanted == actual
 
     @staticmethod
     def _hotkey_label(label: str, key: str) -> str:

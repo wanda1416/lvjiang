@@ -8,12 +8,13 @@ system ← local 合并），保存后以配置文件为准覆盖代码默认值
 的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
 """
 
+from typing import Any
+
 from PyQt6.QtCore import Qt, QThread, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QCursor, QDesktopServices
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
@@ -69,22 +70,30 @@ _HOTKEY_FIELDS = [
     ("record", tr("脚本录制")),
     ("toggle_window", tr("最小化 / 恢复窗口")),
 ]
-_HOTKEY_CHOICES = [f"F{i}" for i in range(7, 13)]
-# 前四项保持纯 F7~F12 的候选；窗口切换是"窗口藏起来以后"的恢复入口，
-# 必须允许带修饰键，否则会和游戏/输入法的功能键抢占，而且它不影响任何
-# 游戏内按键（全局热键只在软件进程存活时响应）。
-_TOGGLE_WINDOW_CHOICES = (
-    [f"Alt+F{i}" for i in range(7, 13)]
-    + [f"Ctrl+F{i}" for i in range(7, 13)]
-    + [f"Shift+F{i}" for i in range(7, 13)]
-    + _HOTKEY_CHOICES
+_HOTKEY_LABELS = dict(_HOTKEY_FIELDS)
+# 主键只开放 F8~F12：F1~F4 归菜单、F5~F7 归插件，这两段留给窗口内快捷键，
+# 系统热键若占用裸键，窗口里的 QAction 就永远收不到。
+_HOTKEY_CHOICES = [f"F{i}" for i in range(8, 13)]
+#: 修饰键（值, 显示名）；值为空表示"不选修饰键"。
+_MODIFIER_CHOICES = [
+    ("", "无"),
+    ("Alt", "Alt"),
+    ("Ctrl", "Ctrl"),
+    ("Shift", "Shift"),
+]
+# 菜单快捷键候选：只在本区间内选（F1~F4 / Alt+F1~F4 / Alt+字母）。
+_MENU_SHORTCUT_CHOICES = (
+    [f"F{i}" for i in range(1, 5)]
+    + [f"Alt+F{i}" for i in range(1, 5)]
+    + [f"Alt+{letter}" for letter in "BCDEFGHIJKLMNOPQRSTUVWXYZ"]
 )
 
 # 数值输入框统一定宽，避免被布局拉满整行
 _SPIN_WIDTH = 90
-# 热键候选最长为 Ctrl+F12；显式定宽，避免“脚本录制”行与提示按钮
-# 共用子布局时 QComboBox 被压缩到只剩下部分文字。
-_HOTKEY_COMBO_WIDTH = 110
+# 热键行的两个下拉定宽：闭合框不随最长候选撑开，候选只在展开列表里体现。
+_HOTKEY_MODIFIER_WIDTH = 84
+_HOTKEY_KEY_WIDTH = 90
+_MENU_SHORTCUT_WIDTH = 110
 
 
 class _ActivationWorker(QThread):
@@ -143,6 +152,7 @@ class SettingsDialog(QDialog):
     """配置管理：按职责分块的设置页。"""
 
     hotkeys_saved = pyqtSignal(dict)
+    menu_shortcuts_saved = pyqtSignal(dict)
     font_sizes_saved = pyqtSignal(dict)
     android_apps_saved = pyqtSignal(dict)
     plans_saved = pyqtSignal()
@@ -295,7 +305,10 @@ class SettingsDialog(QDialog):
             self._connect_row_dirty(entry)
         for entry in self._env_rows:
             self._connect_env_row_dirty(entry)
-        for combo in self._hotkey_combos.values():
+        for modifier_combo, key_combo in self._hotkey_combos.values():
+            modifier_combo.currentIndexChanged.connect(self._mark_dirty)
+            key_combo.currentIndexChanged.connect(self._mark_dirty)
+        for combo in self._menu_shortcut_combos.values():
             combo.currentIndexChanged.connect(self._mark_dirty)
         self._overview_font_spin.valueChanged.connect(self._mark_dirty)
         self._user_info_font_spin.valueChanged.connect(self._mark_dirty)
@@ -1105,10 +1118,17 @@ class SettingsDialog(QDialog):
         vbox.addStretch()
         return tab
 
-    # ─── Tab6 热键设置（F7~F12 按键位）─────────────
+    # ─── Tab6 热键设置（全局热键 + 菜单快捷键）─────────────
 
     def _build_hotkey_tab(self) -> QWidget:
-        """热键设置 Tab：自定义全局热键按键位（限 F7~F12）。"""
+        """热键设置 Tab：全局热键（修饰键 + F8~F12）与菜单快捷键。
+
+        两段分开画：上半是系统级全局热键（软件运行期间始终响应），下半是窗口内
+        菜单快捷键（失焦即失效，不抢游戏按键）。键位区间也分开——菜单用 F1~F4
+        与 Alt+字母，全局热键用 F8~F12。
+        """
+        from ..menu_shortcuts import CORE_MENU_ITEMS, resolved
+
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
@@ -1119,18 +1139,31 @@ class SettingsDialog(QDialog):
 
         form = QFormLayout()
         hk = self._config.hotkeys
-        self._hotkey_combos: dict[str, QComboBox] = {}
+        self._hotkey_combos: dict[str, tuple[Any, Any]] = {}
         for name, label in _HOTKEY_FIELDS:
-            # POPUP：闭合框一律取固定宽度，候选长短只影响展开列表。默认的
-            # STRETCH 会按最长候选（Ctrl+F12）把最小宽度撑开，这一行就比
-            # 其它四行宽出一截。
-            combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
-            combo.addItems(_TOGGLE_WINDOW_CHOICES if name == "toggle_window"
-                           else _HOTKEY_CHOICES)
-            combo.setFixedWidth(_HOTKEY_COMBO_WIDTH)
-            idx = combo.findText(getattr(hk, name))
-            combo.setCurrentIndex(idx if idx >= 0 else 0)
-            self._hotkey_combos[name] = combo
+            modifier_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+            for value, modifier_label in _MODIFIER_CHOICES:
+                modifier_combo.addItem(
+                    modifier_label if value else tr("无"), value)
+            modifier_combo.setFixedWidth(_HOTKEY_MODIFIER_WIDTH)
+            key_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+            key_combo.addItems(_HOTKEY_CHOICES)
+            key_combo.setFixedWidth(_HOTKEY_KEY_WIDTH)
+            current = str(getattr(hk, name) or "")
+            modifier, _, key_part = current.rpartition("+")
+            if not key_part:
+                key_part, modifier = modifier, ""
+            modifier_index = modifier_combo.findData(modifier)
+            modifier_combo.setCurrentIndex(max(0, modifier_index))
+            key_index = key_combo.findText(key_part.upper())
+            key_combo.setCurrentIndex(key_index if key_index >= 0 else 0)
+            self._hotkey_combos[name] = (modifier_combo, key_combo)
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(6)
+            row.addWidget(modifier_combo)
+            row.addWidget(key_combo)
+            row.addStretch(1)
             tip = ""
             if name == "record":
                 tip = tr("该热键只在「脚本编辑」工作台打开期间临时全局注册，"
@@ -1138,31 +1171,107 @@ class SettingsDialog(QDialog):
             elif name == "toggle_window":
                 tip = tr("按一次最小化到系统状态栏，再按一次唤回主界面。"
                          "系统托盘图标可能因通知区域设置而不显示，这个热键是窗口"
-                         "隐藏后唯一可靠的恢复方式，建议保留带 Alt 的组合键。")
+                         "隐藏后唯一可靠的恢复方式。")
             if tip:
-                # 提示按钮放在标题一侧：塞进字段列会让这一行比其它行宽一个按钮，
-                # 五个下拉框的右边缘就对不齐了。
+                # 提示按钮放在标题一侧：塞进字段列会让这一行比其它行宽一个按钮。
                 label_box = QWidget()
                 label_row = QHBoxLayout(label_box)
                 label_row.setContentsMargins(0, 0, 0, 0)
                 label_row.addWidget(QLabel(f"{label}:"))
                 label_row.addWidget(self._tip_button(tip))
                 label_row.addStretch()
-                form.addRow(label_box, combo)
+                form.addRow(label_box, row)
             else:
-                form.addRow(f"{label}:", combo)
+                form.addRow(f"{label}:", row)
         vbox.addLayout(form)
+
+        # ── 菜单快捷键 ──
+        header = QLabel(tr("菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）"))
+        header.setStyleSheet("color: #1565C0; font-weight: bold;")
+        header.setWordWrap(True)
+        vbox.addWidget(header)
+        menu_form = QFormLayout()
+        self._menu_shortcut_combos: dict[str, Any] = {}
+        overrides = getattr(self._config, "menu_shortcuts", {}) or {}
+        for entry in CORE_MENU_ITEMS:
+            combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+            combo.addItem(tr("（不绑定）"), "")
+            combo.addItems(_MENU_SHORTCUT_CHOICES)
+            combo.setFixedWidth(_MENU_SHORTCUT_WIDTH)
+            current_shortcut = resolved(entry.item_id, overrides)
+            index = combo.findText(current_shortcut) if current_shortcut else 0
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            self._menu_shortcut_combos[entry.item_id] = combo
+            menu_form.addRow(f"{tr(entry.group)} · {tr(entry.label)}:", combo)
+        vbox.addLayout(menu_form)
 
         vbox.addStretch()
         return tab
 
     def _collect_hotkeys(self) -> dict | None:
-        """收集热键设置，校验四个动作不能绑定同一个按键"""
-        values = {name: combo.currentText() for name, combo in self._hotkey_combos.items()}
+        """收集全局热键，校验「互不重复」与「不与菜单快捷键撞车」。"""
+        values = {
+            name: self._compose_hotkey(*combos)
+            for name, combos in self._hotkey_combos.items()
+        }
         if len(set(values.values())) != len(values):
             QMessageBox.warning(self, tr("配置管理"), tr("热键不能重复绑定同一个按键，请检查后重试"))
             return None
+        problems = self._menu_shortcut_problems(values)
+        if problems:
+            QMessageBox.warning(
+                self, tr("配置管理"),
+                tr("菜单快捷键有冲突，请检查后重试：") + "\n" + "\n".join(problems))
+            return None
         return values
+
+    @staticmethod
+    def _compose_hotkey(modifier_combo, key_combo) -> str:
+        """修饰键 + 主键 → ``F9`` / ``Ctrl+F9``。"""
+        key = str(key_combo.currentText() or "")
+        modifier = str(modifier_combo.currentData() or "")
+        return f"{modifier}+{key}" if modifier else key
+
+    def _collect_menu_shortcuts(self) -> dict[str, str]:
+        """只收集非空的覆盖项（默认值不落盘，避免配置里堆满当前默认键位）。"""
+        from ..menu_shortcuts import item
+
+        values: dict[str, str] = {}
+        for item_id, combo in self._menu_shortcut_combos.items():
+            text = str(combo.currentText() or "").strip()
+            if text and text != item(item_id).default:
+                values[item_id] = text
+            elif not text and item(item_id).default:
+                # 显式解除绑定也要落盘，否则会被默认值顶回来。
+                values[item_id] = ""
+        return values
+
+    def _menu_shortcut_problems(self, hotkeys: dict) -> list[str]:
+        """菜单快捷键的整表校验：区间、保留组合、来源内重复、跨来源冲突。"""
+        from ...core.config.menu_shortcuts import (
+            ZONE_CORE_MENU,
+            cross_source_conflicts,
+            validate_menu_shortcuts,
+        )
+
+        collected = self._collect_menu_shortcuts()
+        effective = {}
+        from ..menu_shortcuts import current_shortcuts
+
+        effective = current_shortcuts(collected)
+        problems = validate_menu_shortcuts(effective, owner=ZONE_CORE_MENU)
+        label_map = {item_id: item_id for item_id in effective}
+        from ..menu_shortcuts import CORE_MENU_ITEMS
+
+        label_map.update(
+            {entry.item_id: f"{entry.group} · {entry.label}"
+             for entry in CORE_MENU_ITEMS})
+        merged = {f"菜单:{label_map[key]}": value
+                  for key, value in effective.items()}
+        for name, value in hotkeys.items():
+            merged[f"全局热键:{_HOTKEY_LABELS.get(name, name)}"] = value
+        problems.extend(cross_source_conflicts(merged))
+        return problems
 
     # ─── 通用控件 ──────────────────────────────────────────
 
@@ -1829,6 +1938,7 @@ class SettingsDialog(QDialog):
             "desktop_background_capture": self._desktop_capture_bg_radio.isChecked(),
             "desktop_window_title": self._title_edit.text().strip(),
             "hotkeys": hotkeys,
+            "menu_shortcuts": self._collect_menu_shortcuts(),
             "font_sizes": {
                 "user_overview": self._overview_font_spin.value(),
                 "user_info": self._user_info_font_spin.value(),
@@ -1855,6 +1965,7 @@ class SettingsDialog(QDialog):
         save_plans(self._collect_plans())
         self.plans_saved.emit()
         self.hotkeys_saved.emit(hotkeys)
+        self.menu_shortcuts_saved.emit(settings["menu_shortcuts"])
         self.font_sizes_saved.emit(settings["font_sizes"])
         self.android_apps_saved.emit(android_apps)
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改

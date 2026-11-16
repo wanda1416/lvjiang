@@ -157,17 +157,14 @@ class MenuOpsMixin:
         settings_menu.addAction(account_mgmt)
 
         user_mgmt = QAction(tr("用户管理"), self)
-        user_mgmt.setShortcut("F2")
         user_mgmt.triggered.connect(self._open_user_manager)
         settings_menu.addAction(user_mgmt)
 
         scene_editor = QAction(tr("场景管理"), self)
-        scene_editor.setShortcut("F3")
         scene_editor.triggered.connect(self._open_scene_editor)
         settings_menu.addAction(scene_editor)
 
         reference_mgr = QAction(tr("图库管理"), self)
-        reference_mgr.setShortcut("F4")
         reference_mgr.triggered.connect(self._open_reference_manager)
         settings_menu.addAction(reference_mgr)
 
@@ -204,6 +201,24 @@ class MenuOpsMixin:
         mobile_device.triggered.connect(
             lambda: MenuOpsMixin._open_mobile_device(self))
         tools_menu.addAction(mobile_device)
+
+        # 键位只在 ui/menu_shortcuts 里定义一次：这里按稳定 id 登记动作，
+        # 再按用户配置写回快捷键（默认值来自同一份清单）。
+        self._menu_actions = {
+            "account_mgmt": account_mgmt,
+            "user_mgmt": user_mgmt,
+            "scene_editor": scene_editor,
+            "reference_mgr": reference_mgr,
+            "map_mgr": map_mgr,
+            "ocr": ocr_action,
+            "script_editor": script_editor,
+            "batch_settings": batch_settings,
+            "task_params": task_params,
+            "task_history": daily_history,
+            "mobile_device": mobile_device,
+        }
+        self._apply_menu_shortcuts(
+            getattr(getattr(self, "_user_config", None), "menu_shortcuts", {}) or {})
 
         # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
         registry = get_registry()
@@ -488,6 +503,7 @@ class MenuOpsMixin:
         from ..settings.dialog import SettingsDialog
         dialog = SettingsDialog(self)
         dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
+        dialog.menu_shortcuts_saved.connect(self._apply_menu_shortcuts)
         dialog.font_sizes_saved.connect(self._apply_font_size_settings)
         dialog.android_apps_saved.connect(self._apply_android_app_settings)
         # 方案增删改后立刻重建顶部下拉，不用等下次启动
@@ -534,8 +550,14 @@ class MenuOpsMixin:
         if user_info_tab is not None:
             user_info_tab.apply_content_font_size(font_sizes.user_info)
 
+    def _apply_menu_shortcuts(self, overrides: dict[str, str]) -> None:
+        """把键位写到已登记的菜单动作上；保存后即时生效，无需重启。"""
+        from ..menu_shortcuts import apply_shortcuts
+
+        apply_shortcuts(getattr(self, "_menu_actions", {}), overrides or {})
+
     def _apply_hotkey_settings(self, values: dict) -> None:
-        """保存热键后替换全局监听并刷新相关界面文案。"""
+        """保存热键后重建全局注册并刷新相关界面文案。"""
         from ...core.config import HotkeyConfig
 
         hotkeys = HotkeyConfig(**values)
@@ -552,15 +574,15 @@ class MenuOpsMixin:
         old_hotkeys = self._user_config.hotkeys
         old_listener = self._hotkey_listener
 
-        # 先启动新监听；创建失败时旧监听仍可用，不会把
-        # 当前进程留在无全局热键的半切换状态。
+        # 先起新的一套，失败时旧通道仍可用，不会把当前进程留在无全局热键的
+        # 半切换状态。
         self._user_config.hotkeys = hotkeys
         try:
-            # 系统热键与 pynput 监听要一起重建：窗口切换键优先走
-            # RegisterHotKey，注册不上才退回 pynput 绑定。
-            native_ok = self._register_native_toggle_hotkey()
-            new_listener = start_global_hotkeys(
-                self._main_global_hotkey_bindings(include_toggle=not native_ok))
+            native_ok = self._register_native_hotkeys()
+            new_listener = None
+            if not native_ok:
+                new_listener = start_global_hotkeys(
+                    self._main_global_hotkey_bindings(include_toggle=True))
         except Exception as exc:
             self._user_config.hotkeys = old_hotkeys
             logger.error(f"热键立即生效失败: {exc}")
@@ -571,6 +593,7 @@ class MenuOpsMixin:
             return
 
         self._hotkey_listener = new_listener
+        self._global_hotkeys_active = bool(native_ok or new_listener is not None)
         if old_listener is not None:
             try:
                 old_listener.stop()

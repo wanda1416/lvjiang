@@ -2045,7 +2045,6 @@ settings_dialog:
   "手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。": "The Shizuku service process dies after a phone reboot, and tasks that restart the game depend on it. When enabled, connecting in on-device mode detects and starts it once (only if not already running)."
   "执行参数": "Execution Parameters"
   "把激活码粘贴到这里，换行和空格会被自动忽略": "Paste the activation code here; newlines and spaces are ignored"
-  "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式，建议保留带 Alt 的组合键。": "Press once to minimize to the system tray, press again to bring the main window back. The tray icon may be hidden by notification settings, so this hotkey is the only reliable way back once hidden — keep an Alt combo for it."
   "接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。": "Receives official config and task updates matching the current app version, applied at next launch after verification. Your local configs always take priority; running tasks keep using what this process already loaded. Turning this off or going offline restores bundled content and removes member content at next launch, without touching local data."
   "接收在线配置更新": "Receive Remote Config Updates"
   "新方案": "New plan"

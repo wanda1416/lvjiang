@@ -346,3 +346,9 @@ task_params_dialog:
   "上一个": "Zurück"
   "下一个": "Weiter"
   "方向键 ← / → 切换上一个 / 下一个": "Pfeiltasten ← / → wechseln zum vorherigen / nächsten Eintrag"
+
+hotkey_settings:
+  "菜单快捷键有冲突，请检查后重试：": "Menü-Tastenkürzel überschneiden sich; bitte prüfen und erneut versuchen: "
+  "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Menü-Tastenkürzel (nur im Fenster; bei inaktivem Fenster werden keine Tasten abgefangen)"
+  "（不绑定）": "(nicht belegt)"
+  "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Einmal drücken minimiert in den Infobereich, erneut drücken holt das Fenster zurück. Je nach Einstellung der Infobereichsymbole erscheint das Symbol möglicherweise nicht; dieses Kürzel ist der einzige verlässliche Weg zurück."

@@ -15,8 +15,8 @@
 
 **列宽存 key 不存下标**：旧实现把列宽按下标数组存，增删列必须手工搬数组。
 这里按列 key 存，增删列天然对齐；用户名列宽只存一份（``name_column_width``），
-各分组天然一致。列宽是像素值，下载到别的机器时要按度量环境折算后 clamp，
-见 :func:`scaled_width`。
+各分组天然一致。列宽是逻辑像素，跨机器只在面板字号不同时按字体比折算，
+**设备缩放不参与**，见 :func:`scaled_width`。
 """
 
 from __future__ import annotations
@@ -58,8 +58,16 @@ _ACTIVE_GROUP_KEY = "profile_active_group"
 class LayoutMetric:
     """记录列宽是在什么度量环境下量出来的。
 
-    列宽是像素值，跨机器直接照搬会在字体/缩放不同的机器上失真。这里只记录
-    解释宽度所必需的三项，不承载任何身份信息（谁写的是服务端的事）。
+    真正参与折算的只有 ``font_px``：面板字号变了，同样像素宽度的列能装下的
+    文字就变了，所以要跟着放大。``ui_scale`` 只是留档（当时窗口在哪块屏、什么
+    缩放下量的），**不参与折算**——两条理由：
+
+    - Qt 的列宽是逻辑像素，窗口所在屏幕缩放变化时整棵树已经按 DPR 渲染过，
+      再乘一次 DPR 比就是重复补偿；
+    - 窗口建立之前进程还没被标成 DPI 感知，``devicePixelRatioF()`` 恒为 1.0，
+      拿它折算会让首帧比真实宽度小一截，之后第一次重建才「变宽」。
+
+    ``ui_scale == 0`` 表示读不到（未知），不能当成「这台机器是 100%」写进文件。
     """
 
     ui_scale: float = 1.0
@@ -268,6 +276,8 @@ def mutate_groups(
     """锁内读-改-写分组；顺序以字典顺序为准并写回 ``group_order``。
 
     只碰结构文件，不动 ``interface.json``；活跃分组由调用方另行维护。
+    ``metric`` 只在环境确实读得到时更新——窗口建立前的 ``ui_scale`` 是假值
+    （见 :class:`LayoutMetric`），不能拿它覆盖文件里的真实记录。
     """
     target = path or layout_path()
     with interprocess_lock(target, suffix="layout"):
@@ -277,29 +287,45 @@ def mutate_groups(
         mutator(groups)
         doc.overview.groups = groups
         doc.overview.group_order = list(groups)
-        doc.metric = current_environment()
+        known = current_environment()
+        if known.font_px > 0 and known.ui_scale > 0:
+            doc.metric = known
         _write(target, doc)
 
 
-def set_group_widths(
-    group_name: str,
-    *,
-    name_column_width: int,
-    widths: dict[str, int],
-    path: Path | None = None,
+def set_name_column_width(
+    name_column_width: int, *, path: Path | None = None,
 ) -> None:
-    """写入一个分组的列宽；用户名列宽对所有分组生效（天然一致）。"""
-    clean = {
-        str(key): max(0, int(value)) for key, value in widths.items() if isinstance(key, str)
-    }
-    name_width = max(0, int(name_column_width))
+    """写入用户名列宽；它对所有分组生效，所以一次拖动就让各分组保持一致。"""
+    width = max(0, int(name_column_width))
+    if width <= 0:
+        return
 
     def _apply(groups: dict[str, GroupLayout]) -> None:
-        group = groups.setdefault(group_name, GroupLayout())
-        group.column_widths = clean
-        if name_width > 0:
-            for other in groups.values():
-                other.name_column_width = name_width
+        for group in groups.values():
+            group.name_column_width = width
+
+    mutate_groups(_apply, path=path)
+
+
+def set_column_width(
+    group_name: str, key: str, width: int, *, path: Path | None = None,
+) -> None:
+    """只写被拖动的那一列，其余列沿用记录值。
+
+    拖动时手上只有「当前渲染宽度」（折算 + clamp 之后的值）。若顺手把整行
+    ``sectionSize`` 都写回去，等于用屏幕值覆盖用户当初拖出来的记录：别的列
+    会跟着漂移，用户名列也会被一起改掉。
+    """
+    value = max(0, int(width))
+    if value <= 0:
+        return
+
+    def _apply(groups: dict[str, GroupLayout]) -> None:
+        group = groups.get(group_name)
+        if group is None or key not in group.columns:
+            return
+        group.column_widths = {**group.column_widths, key: value}
 
     mutate_groups(_apply, path=path)
 
@@ -362,11 +388,16 @@ def scaled_width(
 ) -> int:
     """把记录宽度折算到当前度量环境，并夹在 ``[minimum, maximum]``。
 
+    只按面板字号比折算（``font_px``），**不看设备缩放**：Qt 的列宽是逻辑像素，
+    屏幕缩放变化时整棵树已经按 DPR 渲染过，再乘一次 DPR 就是重复补偿；而且
+    窗口建立前 ``devicePixelRatioF()`` 恒为 1.0，会把首帧折算成另一个宽度。
+
     ``minimum`` 由调用方按当前字体实测（够显示表头即可），所以任何字体、
     语言下都不会把列标题截断；``maximum`` 挡住别机带来的离谱宽列。
 
     折算结果**不回写文件**：只有用户自己拖动列宽才更新记录，否则 A 下载→
-    按自己字体折算→回写→B 再折算，宽度会在两台机器之间来回漂。
+    按自己字体折算→回写→B 再折算，宽度会在两台机器之间来回漂。也正因为
+    不回写，折算必须是幂等的：同一台机器上重建几次都得是同一个宽度。
     """
     floor = max(1, int(minimum))
     ceiling = max(floor, int(maximum))
@@ -377,12 +408,7 @@ def scaled_width(
         if stored.font_px > 0 and current.font_px > 0
         else 1.0
     )
-    scale_ratio = (
-        current.ui_scale / stored.ui_scale
-        if stored.ui_scale > 0 and current.ui_scale > 0
-        else 1.0
-    )
-    value = int(round(raw * font_ratio * scale_ratio))
+    value = int(round(raw * font_ratio))
     return max(floor, min(value, ceiling))
 
 

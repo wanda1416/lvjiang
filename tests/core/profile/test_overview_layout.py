@@ -92,7 +92,9 @@ def test_widths_are_stored_per_key_and_shared_name_width():
     store.create_overview_group("甲组")
     store.create_overview_group("乙组")
     store.insert_overview_columns("甲组", None, ["a", "b"])
-    store.set_group_widths("甲组", 100, {"a": 120, "b": 130})
+    store.set_name_column_width(100)
+    store.set_column_width("甲组", "a", 120)
+    store.set_column_width("甲组", "b", 130)
     assert store.get_group_widths("甲组") == (100, {"a": 120, "b": 130})
     # 用户名列宽只存一份，改一个分组即对所有分组生效。
     assert store.get_group_widths("乙组")[0] == 100
@@ -101,10 +103,22 @@ def test_widths_are_stored_per_key_and_shared_name_width():
     assert store.get_group_widths("甲组") == (100, {"a": 120})
 
 
+def test_single_column_write_leaves_other_widths_alone():
+    """拖动只写被拖的那一列：别的记录不能被这次的屏幕值顶掉。"""
+    store.create_overview_group("甲组")
+    store.insert_overview_columns("甲组", None, ["a", "b"])
+    store.set_name_column_width(100)
+    store.set_column_width("甲组", "a", 120)
+    store.set_column_width("甲组", "z", 140)  # 该分组没有这一列，写入无效
+    store.set_column_width("甲组", "b", 130)
+    assert store.get_group_widths("甲组") == (100, {"a": 120, "b": 130})
+
+
 def test_rename_group_keeps_columns_and_widths():
     store.create_overview_group("甲组")
     store.insert_overview_column("甲组", 0, "a")
-    store.set_group_widths("甲组", 90, {"a": 120})
+    store.set_name_column_width(90)
+    store.set_column_width("甲组", "a", 120)
     store.rename_overview_group("甲组", "乙组")
     assert store.get_groups()["乙组"]["columns"] == ["a"]
     assert store.get_group_widths("乙组") == (90, {"a": 120})
@@ -113,7 +127,8 @@ def test_rename_group_keeps_columns_and_widths():
 def test_replace_column_carries_width_to_new_key():
     store.create_overview_group("甲组")
     store.insert_overview_column("甲组", 0, "a")
-    store.set_group_widths("甲组", 90, {"a": 120})
+    store.set_name_column_width(90)
+    store.set_column_width("甲组", "a", 120)
     store.replace_overview_column("甲组", "a", "b")
     assert store.get_groups()["甲组"]["columns"] == ["b"]
     assert store.get_group_widths("甲组") == (90, {"b": 120})
@@ -133,6 +148,24 @@ def test_scaled_width_scales_and_clamps():
     # 文件里没有度量环境（手写或很旧的文件）时按原值使用。
     assert layout.scaled_width(
         100, stored=layout.LayoutMetric(), current=current, minimum=10) == 100
+
+
+def test_scaled_width_ignores_device_scale():
+    """设备缩放比不进折算。
+
+    Qt 的列宽是逻辑像素，窗口所在屏幕缩放变化时整棵树已经按 DPR 渲染过，
+    再乘一次 DPR 就是重复补偿；而且窗口 show 之前 ``devicePixelRatioF()``
+    恒为 1.0——真按它折算，总览首帧会比真实宽度小一截，第一次重建（改一条
+    数据就会触发）才「变宽」。
+    """
+    same_font = layout.LayoutMetric(font_px=16)
+    assert layout.scaled_width(
+        115, stored=layout.LayoutMetric(ui_scale=1.0, font_px=16),
+        current=layout.LayoutMetric(ui_scale=1.25, font_px=16), minimum=10) == 115
+    # 未知缩放（0）同样不参与折算。
+    assert layout.scaled_width(
+        115, stored=same_font,
+        current=layout.LayoutMetric(ui_scale=0.0, font_px=16), minimum=10) == 115
 
 
 def test_broken_file_keeps_defaults_and_is_not_rebuilt():

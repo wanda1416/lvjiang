@@ -3,9 +3,9 @@
 ProfileColumnMixin: 列增删、拖拽排序、列宽持久化、表头右键菜单、字段选择器。
 
 列宽按列 key 存在 ``profile.json``（见 :mod:`lvjiang.core.profile.layout`）：
-增删列不再需要手工搬宽度数组，用户名列宽只存一份、各分组天然一致。像素宽度
-跨机器使用时按度量环境折算后 clamp，折算结果**不回写**文件——只有用户自己
-拖动列宽才更新记录，否则两台机器会互相拉扯。
+增删列不再需要手工搬宽度数组，用户名列宽只存一份、各分组天然一致。列宽是逻辑
+像素，跨机器只在面板字号不同时按字体比折算（设备缩放不参与），折算结果**不回写**
+文件——只有用户自己拖动列宽才更新记录，且只写被拖的那一列。
 """
 
 from __future__ import annotations
@@ -36,7 +36,8 @@ from ...core.profile.store import (
     remove_overview_column,
     reorder_overview_columns,
     replace_overview_column,
-    set_group_widths,
+    set_column_width,
+    set_name_column_width,
     set_overview_totals,
 )
 from ...i18n import current_language, tr
@@ -50,6 +51,9 @@ _WIDTH_SAVE_DELAY_MS = 400
 #: 表头文字之外的留白（左右边距 + 排序/边框余量）。
 _HEADER_PADDING = 24
 
+#: 待落盘的列宽里代表用户名列的 key（真实列 key 不会为空）。
+_NAME_COLUMN = ""
+
 
 def metric_for_table(table: QTableWidget) -> LayoutMetric:
     """当前控件的度量环境：解释记录宽度、写回宽度时都带上它。"""
@@ -59,10 +63,22 @@ def metric_for_table(table: QTableWidget) -> LayoutMetric:
         point_size = font.pointSizeF()
         pixel_size = round(point_size * table.logicalDpiY() / 72.0) if point_size > 0 else 0
     return LayoutMetric(
-        ui_scale=round(float(table.devicePixelRatioF() or 1.0), 3),
+        ui_scale=window_scale(table),
         font_px=max(0, int(pixel_size)),
         lang=current_language(),
     )
+
+
+def window_scale(table: QTableWidget) -> float:
+    """窗口已经建立后的设备缩放比；还没有窗口时返回 0（未知）。
+
+    窗口 show 之前进程尚未被标成 DPI 感知，``devicePixelRatioF()`` 恒为 1.0。
+    那是假值：写进结构文件会让别的机器和旧版本按错误的基准解释列宽，所以
+    「未知」要如实记成 0，不能记成 1.0。
+    """
+    if table.windowHandle() is None:
+        return 0.0
+    return round(float(table.devicePixelRatioF() or 1.0), 3)
 
 
 def header_min_width(table: QTableWidget, column: int) -> int:
@@ -135,29 +151,39 @@ class ProfileColumnMixin:
 
     # ─── 列宽 ────────────────────────────────────────────────
 
-    def _on_column_resized(self: ProfileTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
-        """列宽被拖动：按列 key 记录，用户名列宽对所有分组生效。"""
+    def _on_column_resized(  # type: ignore[misc]
+        self: ProfileTab, group_name: str, table: QTableWidget, logical_index: int,
+    ) -> None:
+        """列宽被拖动：只记录被拖的那一列，用户名列宽对所有分组生效。
+
+        Qt 的 ``sectionResized`` 每次拖动会连续触发，且一次只会改被拖的那一节；
+        这里不能顺手把整行 ``sectionSize`` 都写回去——那是「折算 + clamp 之后
+        的屏幕值」，会把用户当初拖出来的其它记录覆盖掉。
+        """
         if self._restoring_widths or self._loading:
             return
         h_header = table.horizontalHeader()
         assert h_header is not None
-        if h_header.count() == 0:
+        if not (0 <= logical_index < h_header.count()):
             return
-        widths: dict[str, int] = {}
-        for index, key in enumerate(self._visible_columns(group_name), start=1):
-            if index < h_header.count():
-                widths[key] = int(h_header.sectionSize(index))
-        self._schedule_width_save(group_name, int(h_header.sectionSize(0)), widths)
+        width = int(h_header.sectionSize(logical_index))
+        if logical_index == 0:
+            self._schedule_width_save(group_name, _NAME_COLUMN, width)
+            return
+        visible = self._visible_columns(group_name)
+        data_index = logical_index - 1
+        if 0 <= data_index < len(visible):
+            self._schedule_width_save(group_name, visible[data_index], width)
 
     def _schedule_width_save(  # type: ignore[misc]
-        self: ProfileTab, group_name: str, name_width: int, widths: dict[str, int],
+        self: ProfileTab, group_name: str, key: str, width: int,
     ) -> None:
         """拖动过程中只攒内存，停手后一次落盘。"""
         pending = getattr(self, "_pending_widths", None)
         if pending is None:
             pending = {}
             self._pending_widths = pending
-        pending[group_name] = (name_width, dict(widths))
+        pending[(group_name, key)] = int(width)
         timer = getattr(self, "_width_timer", None)
         if timer is None:
             timer = QTimer(self)
@@ -168,11 +194,18 @@ class ProfileColumnMixin:
         timer.start()
 
     def _flush_pending_widths(self: ProfileTab) -> None:  # type: ignore[misc]
-        """把攒下的列宽写进结构文件（同一分组以最后一次为准）。"""
+        """把攒下的列宽写进结构文件（同一列以最后一次为准）。"""
         pending = getattr(self, "_pending_widths", {})
         self._pending_widths = {}
-        for group_name, (name_width, widths) in pending.items():
-            set_group_widths(group_name, name_width, widths)
+        name_width = 0
+        for (group_name, key), width in pending.items():
+            if key == _NAME_COLUMN:
+                name_width = width
+                continue
+            set_column_width(group_name, key, width)
+        # 用户名列宽对所有分组生效，最后一次拖动为准，放在循环后统一写。
+        if name_width > 0:
+            set_name_column_width(name_width)
 
     def _restore_column_widths(self: ProfileTab, group_name: str, table: QTableWidget):  # type: ignore[misc]
         """按列 key 恢复列宽：记录值折算到当前度量环境后 clamp。"""

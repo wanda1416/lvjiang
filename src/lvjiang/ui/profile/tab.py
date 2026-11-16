@@ -405,7 +405,8 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             lambda _logical, _old, _new, gn=group_name, t=table: self._on_columns_reordered(gn, t)
         )
         h_header.sectionResized.connect(
-            lambda _logical, _old, _new, gn=group_name, t=table: self._on_column_resized(gn, t)
+            lambda logical, _old, _new, gn=group_name, t=table: self._on_column_resized(
+                gn, t, logical)
         )
 
         if self._content_point_size > 0:

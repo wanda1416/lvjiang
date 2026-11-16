@@ -225,11 +225,14 @@ def get_group_widths(group_name: str) -> tuple[int, dict[str, int]]:
     return layout.group_widths(group_name)
 
 
-def set_group_widths(group_name: str, name_column_width: int, widths: dict[str, int]) -> None:
-    """写入该分组列宽；用户名列宽对所有分组生效。"""
-    layout.set_group_widths(
-        group_name, name_column_width=name_column_width, widths=widths
-    )
+def set_name_column_width(name_column_width: int) -> None:
+    """写入用户名列宽；对所有分组生效，一次拖动就让各分组保持一致。"""
+    layout.set_name_column_width(name_column_width)
+
+
+def set_column_width(group_name: str, key: str, width: int) -> None:
+    """只写被拖动的那一列，其余列沿用记录值。"""
+    layout.set_column_width(group_name, key, width)
 
 
 # ─── 合计行 ────────────────────────────────────────────────

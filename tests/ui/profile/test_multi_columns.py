@@ -60,9 +60,12 @@ def test_search_keeps_choices_and_group_selection_only_checks_matches(qtbot, sch
 def overview(qtbot, monkeypatch, schema):
     store.insert_overview_columns('group', None, ['missing', 'a', 'z'])
     store.insert_overview_columns('other', None, ['b'])
-    # 用户名列宽只存一份（先写 80，再被 group 的 70 覆盖），列宽按分组各存。
-    store.set_group_widths('other', 80, {'b': 90})
-    store.set_group_widths('group', 70, {'a': 110, 'z': 130})
+    # 用户名列宽只存一份（先写 80，再被后面的 70 覆盖），数据列按分组各存。
+    store.set_name_column_width(80)
+    store.set_column_width('other', 'b', 90)
+    store.set_name_column_width(70)
+    store.set_column_width('group', 'a', 110)
+    store.set_column_width('group', 'z', 130)
     monkeypatch.setattr(column_management, 'get_profile_config', lambda: schema)
 
     class Overview(ProfileColumnMixin, QWidget):
@@ -70,6 +73,8 @@ def overview(qtbot, monkeypatch, schema):
             super().__init__()
             self._tables = {'group': QTableWidget(0, 3, self)}
             self._visible_column_keys = {'group': ['a', 'z']}
+            self._loading = False
+            self._reordering = False
             self.refreshes = []
 
         def _refresh_group(self, group, table):
@@ -90,7 +95,7 @@ def test_batch_add_merges_current_columns_preserves_widths_and_refreshes_once(ov
         items['daily'].setCheckState(0, Qt.CheckState.Checked)
         # 模拟窗口打开期间另一个编辑入口新增了一列及其列宽。
         store.insert_overview_column('group', 0, 'b')
-        store.set_group_widths('group', 70, {'b': 220, 'a': 110, 'z': 130})
+        store.set_column_width('group', 'b', 220)
         return QDialog.DialogCode.Accepted
 
     monkeypatch.setattr(ProfileKeyMultiSelectDialog, 'exec', choose)
@@ -119,3 +124,45 @@ def test_store_inserts_ordered_unique_batch_and_rejects_removed_anchor():
     with pytest.raises(ValueError, match='原列'):
         store.insert_overview_columns('group', 'removed', ['new'])
     assert layout.layout_path().read_bytes() == before
+
+
+# ─── 拖动列宽只写被拖的那一列 ────────────────────────────────
+
+
+def _three_columns(overview):
+    """把 group 的表做成「用户名 + a + z」并套用记录宽度。"""
+    table = overview._tables['group']
+    table.setColumnCount(3)
+    table.setHorizontalHeaderLabels(['用户名', '资源甲', '数量'])
+    overview._restore_column_widths('group', table)
+    return table
+
+
+def test_dragging_a_data_column_keeps_other_widths(overview):
+    """拖一列只改这一列，别人沿用记录值。
+
+    旧实现把整行 sectionSize 写回，等于用「折算 + clamp 之后的屏幕值」覆盖
+    用户当初拖出来的记录：其它列会跟着漂移，用户名列也会被一起改掉。
+    """
+    table = _three_columns(overview)
+    table.horizontalHeader().resizeSection(2, 240)
+    overview._on_column_resized('group', table, 2)
+    overview._flush_pending_widths()
+    assert store.get_group_widths('group') == (70, {'a': 110, 'z': 240})
+
+
+def test_dragging_name_column_applies_to_every_group(overview):
+    """用户名列宽只存一份：在哪一组拖都对所有分组生效，数据列不受影响。"""
+    table = _three_columns(overview)
+    table.horizontalHeader().resizeSection(0, 150)
+    overview._on_column_resized('group', table, 0)
+    overview._flush_pending_widths()
+    assert store.get_group_widths('group') == (150, {'a': 110, 'z': 130})
+    assert store.get_group_widths('other') == (150, {'b': 90})
+
+
+def test_recorded_scale_is_unknown_without_a_window(overview):
+    """窗口建立前 DPR 恒为 1.0，是假值：结构文件里不能记成「这台机器是 100%」。"""
+    table = overview._tables['group']
+    assert table.windowHandle() is None
+    assert column_management.metric_for_table(table).ui_scale == 0.0

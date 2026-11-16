@@ -103,8 +103,10 @@ show_totals / name_column_width / column_widths}}`。
 - **文件不带机器信息**：写入来源由服务端按认证会话记录（`origin_*` 三列），客户端据此
   判断「远端是不是本实例写的」，据此决定上传时是否提醒覆盖。
 
-列宽是像素值，跨机器使用时按 `metric`（字体像素、设备缩放）折算后再按当前字体实测的
-表头宽度 clamp，折算结果**不回写**文件——只有用户拖动列宽才更新记录。
+列宽是逻辑像素，跨机器只在面板字号不同时按 `metric.font_px` 折算，再按当前字体实测的
+表头宽度 clamp，折算结果**不回写**文件——只有用户拖动列宽才更新记录，且只写被拖的那一列。
+设备缩放（`metric.ui_scale`）只留档不参与折算：窗口 `show()` 前 `devicePixelRatioF()`
+恒为 1.0，拿它折算会让首帧比真实宽度小一截，第一次重建才「变宽」。
 
 旧版本的 `interface.json.profile.overview_groups` 与 `ui_state.profile_overview` 在启动
 首次访问时一次性迁入（带 `_backup-<时间戳>/` 备份并清理旧节点），迁移后不存在双源。

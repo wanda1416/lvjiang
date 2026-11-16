@@ -299,7 +299,6 @@ class MenuOpsMixin:
         dialog = OCRDialog(self, refresh_callback=self._refresh_capture)
         dialog.exec()
 
-
     def _open_script_editor(self):
         """打开统一脚本工作台；编辑、录制、元数据和配置都从这里进入。"""
         from ..scripts import ScriptEditorDialog

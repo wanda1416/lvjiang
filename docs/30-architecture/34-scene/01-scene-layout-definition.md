@@ -353,14 +353,17 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 
 ### 实例数据
 
-布局清单由 `layouts.yaml` schema v2 维护：key 是稳定存储标识，
-`name` 是可读展示名；条目还可以声明 `desc`、`env`（适配环境）、`aspect` /
-`aspect_tolerance`（画布尺寸门禁）和 `extends`（别名布局）。`env` 取
-`app.yaml` `envs` 的环境 key，只是**推荐值**：供消费方过滤布局（手机下发只列
-未声明或安卓的布局），不参与运行期的 `env()` 判定，留空表示不限制；别名布局
-未声明时跟随根布局。这些字段由「布局信息」对话框编辑，保存场景坐标时原样保留。
-每个场景的实例数据分开存在
-`config/{system|local}/layouts/{layout_key}/{scene_key}.json`：
+布局清单按**一布局一文件**维护：`config/{system|local}/layouts/{key}.yaml`。
+key 是稳定存储标识，`name` 是可读展示名；条目还可以声明 `desc`、`env`
+（适配环境）、`aspect` / `aspect_tolerance`（画布尺寸门禁）和 `extends`
+（别名布局）。`env` 取 `app.yaml` `envs` 的环境 key，只是**推荐值**：供消费方
+过滤布局（手机下发只列未声明或安卓的布局），不参与运行期的 `env()` 判定，
+留空表示不限制；别名布局未声明时跟随根布局。这些字段由「布局信息」对话框
+编辑，保存场景坐标时原样保留。布局间顺序由 `layouts/_meta.json` 描述；
+local 的同名清单文件是**字段级补丁**（屏幕标定只覆盖 `canvas`，不冻住其它
+字段的系统更新）。每个场景的实例数据分开存在
+`config/{system|local}/layouts/{layout_key}/{group_key}/{scene_key}.json`
+（布局内再按场景分组拆子目录）：
 
 ```json
 {
@@ -383,21 +386,29 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 
 ## 存储结构
 
+场景与布局均为**目录即归属**的目录化结构（分组/布局定义文件 + 同名内容
+子目录 + `_meta.json` 顺序），namespace 优先级链 `system > local`（> 插件）
+取代了跨层 diff 合并：合并视图按 namespace 依次拼接，system 区间恒在
+local 之前；local 的 `_meta.json` 充当各区间内部的排序补丁。
+
 ```
 config/
 ├── system/
-│   ├── layouts.yaml              # schema v2 布局清单、展示名和画布
-│   ├── scenes/                   # Scene YAML 定义（逻辑结构）
+│   ├── scenes/
+│   │   ├── _meta.json              # 分组顺序 + 各组内场景顺序
+│   │   ├── {group}.yaml            # 分组定义（name）；与同名分组目录共存合法
+│   │   └── {group}/{scene}.yaml    # 场景定义；目录决定分组归属
 │   ├── layouts/
-│   │   ├── android/               # layout key
-│   │   │   ├── bag_equip_detail.json
-│   │   │   └── ...
-│   │   └── desktop/
+│   │   ├── _meta.json              # 布局顺序
+│   │   ├── {key}.yaml              # 布局清单（name/desc/env/canvas/aspect/extends）
+│   │   └── {key}/{group}/{scene}.json
 │   └── templates/
 │       ├── android/
 │       └── desktop/
-└── local/                         # 同样按 layout key 覆盖
-    ├── layouts.yaml
-    ├── layouts/
-    └── templates/
+└── local/                          # 同构独立；local 清单文件 = 字段级补丁 / 自建布局
+    ├── scenes/
+    └── layouts/
 ```
+
+不变量：`scenes/*.yaml`（顶层）只有分组定义，场景文件必然位于
+`scenes/{group}/` 之下。分组 key 与场景 key 分属两个命名空间，允许同名。

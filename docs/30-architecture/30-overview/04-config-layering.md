@@ -64,11 +64,15 @@ local 文件可直接删除；system 官方文件不允许用户删除，也不�
 | 文件 | 顶层键 | 主要消费方 |
 |------|--------|-----------|
 | `app.yaml` | `input_simulation` / `delay_params` / `envs` | `load_app_config()` |
-| `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene/config.py`、`registry.py`、`definition.py` |
-| `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout/manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr/config.py` / `core/ocr/cleaner.py` |
 | `yysls/game_config/*.yaml` | 七份领域配置合并为统一视图 | `apps/yysls/config/game_config_files.py`、`manager.py` |
 | `yysls/tune_config.yaml` | `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
+
+> 场景与布局注册表不再是聚合文件：`scenes.yaml` / `layouts.yaml` 已退役，
+> 改为目录化结构（分组/布局定义文件 + 同名内容子目录 + `_meta.json` 顺序），
+> 由 namespace 优先级链 `system > local`（> 插件）合并，见
+> [34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)
+> 的「存储结构」一节。
 
 游戏配置目录现有七个文件；出装搭配独立放在 `yysls/gear_sets/`，不并入统一视图，
 见 [04-build-calculator.md](../39-runtime/04-build-calculator.md)：
@@ -92,40 +96,12 @@ Python 都保留插入序），不另设 `order`。顺序属于配置内容而�
 `weapon_types` / `level_configs` / `season_configs` 走整键替换，因此它们才需要
 在 `PROTECTED_LIST_PATHS` 登记身份。
 
-`scenes.yaml` 的当前结构版本为 2，与 `layouts.yaml` 一样使用单一领域顶层键：
-
-```yaml
-schema_version: 2
-scenes:
-  activity:
-    name: 活动
-    items:
-      - activity_main
-      - activity_mengzhu
-    disabled:
-      - activity_mengzhu
-```
-
-`disabled` 场景只从场景管理 UI 隐藏，定义仍注册并可被旧布局、工作流引用。
-仅接受当前 scenes 结构；无版本号的空覆盖、元数据与 scenes 增量仍有效。
-明确 v1 或旧 layout_scenes/group_names 字段报不兼容，不自动转换或落盘。
-system、local 分层验证后合并，保存也验证旧 local 覆盖。
-
-`layouts.yaml` 也使用 schema v2，但不提供旧格式兼容或自动迁移：
-
-```yaml
-schema_version: 2
-layouts:
-  android:
-    name: 安卓布局
-    canvas: {x_ratio: 0.0, y_ratio: 0.0, w_ratio: 1.0, h_ratio: 1.0}
-  android_cast:
-    name: 投屏布局
-    extends: android
-    canvas: {x_ratio: 0.0, y_ratio: 0.04, w_ratio: 1.0, h_ratio: 0.92}
-```
-
-`layouts` 下的 key 是不可变的存储标识，同时用于
+场景与布局的目录化结构与合并语义（namespace 区间恒序、local `_meta.json`
+排序补丁、字段级补丁只保留给 `local/layouts/{key}.yaml`）见
+[34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)。
+要点：目录是归属与存在的唯一事实源；`scenes/*.yaml`（顶层）只有分组定义；
+`disabled` 场景是场景文件自身的字段，只从场景管理 UI 隐藏，定义仍注册并可被
+旧布局、工作流引用；`layouts/{key}` 是不可变的存储标识，同时用于
 `layouts/{key}/`、`templates/{key}/`、会话激活值和运行方案；`name` 只用于
 UI 展示。key 和 name 都必须全局唯一，另存为不允许覆盖已有 key。
 
@@ -185,19 +161,19 @@ system 层扫出的空间即**系统空间**（`is_system_space()`）：用户�
 
 | 文件 | 路径 | 声明方 |
 |------|------|--------|
-| `scenes.yaml` | `scenes.*.items` / `scenes.*.disabled` | core（`resolver.py` 常量表） |
 | `app.yaml` | `envs` / `plans`（按身份对齐，见下） | core（`resolver.py` 常量表） |
 | `yysls/tune_config.yaml` | `base_rules`（仅为兼容旧 local diff 保留，现已无此键） | 插件（`apps/yysls/config/merge_policy.py`） |
 
-local 形如：
+> 场景/布局注册表已目录化（一物一文件 + `_meta.json`），不再走本机制：
+> 目录是归属事实源，local `_meta.json` 承担排序补丁，跨层不再有
+> `__added__/__removed__/__order__` 增量。
+
+以 `app.yaml` 的 `envs` 为例，local 形如：
 
 ```yaml
-scenes:
-  general:
-    items:
-      __added__: [my_scene]
-      __removed__: [some_scene]
-      __order__: [...]            # 仅在用户调过顺序时才写
+envs:
+  __added__: [my_env]
+  __order__: [...]            # 仅在用户调过顺序时才写
 ```
 
 读取时 `system 基底 − __removed__ + __added__`，再按 `__order__` 排序；
@@ -374,7 +350,7 @@ warning），在开发模式下则会直接从系统配置里消失——后者�
 里，core 和插件各自维护一套对同一份配置的理解，随时可能对不上。
 
 现在这两张表在 `resolver.py` 里只声明 core 自己拥有的路径（目前只有
-`scenes.yaml`），插件经 `register_registry_list_paths()` /
+`app.yaml`），插件经 `register_registry_list_paths()` /
 `register_protected_list_paths()`（`resolver.py` 里的两个函数）自己注册。
 接入方式沿用 `builtin_modules`/`telemetry_modules` 已有的「import 即注册」
 约定（见 `core/plugins/hooks.py` 的 `AppHooks.config_policy_modules`）：

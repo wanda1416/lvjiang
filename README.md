@@ -172,15 +172,13 @@ lvjiang/
 ├── android/                   # 安卓独立执行端（Kotlin + Chaquopy 宿主工程）
 ├── config/
 │   ├── system/                # 随版本发布的配置（在线配置与会员内容也安装到此）
-│   │   ├── layouts/           # 布局定义（按名称分目录）
-│   │   ├── scenes/            # 场景定义 YAML
+│   │   ├── layouts/           # 布局（{key}.yaml 清单 + {key}/{分组}/{场景}.json 坐标 + _meta.json 顺序）
+│   │   ├── scenes/            # 场景（{分组}.yaml 清单 + {分组}/{场景}.yaml 定义 + _meta.json 顺序）
 │   │   ├── workflows/         # 工作流脚本（.wf）
 │   │   ├── references/        # 参考图库（{空间}.yaml + 同名图片目录）
 │   │   ├── templates/         # 预置模板
 │   │   ├── yysls/             # 燕云插件专属配置（调律规则 / 玩法等）
 │   │   ├── app.yaml           # 应用配置
-│   │   ├── layouts.yaml       # 布局索引
-│   │   ├── scenes.yaml        # 场景索引
 │   │   └── ocr.yaml           # OCR 识别与文本规范化配置
 │   ├── i18n/                  # 界面翻译表（12 种语言，随版本发布）
 │   ├── updates/               # 在线配置更新包的下载归档与安装状态（运行期生成）

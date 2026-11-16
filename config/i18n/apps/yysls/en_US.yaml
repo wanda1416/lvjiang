@@ -740,6 +740,8 @@ yysls:
   '{name}攻击：{value}': '{name} Attack: {value}'
   '{name}伤害加成：{value}': '{name} Damage Bonus: {value}'
   '{name}穿透：{value}': '{name} Penetration: {value}'
+  "菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。": "Menu shortcuts work inside the window only; plugin menus may use F5~F7 or Alt+letters and must not duplicate the General/Tools menus."
+  "快捷键不可用：": "Shortcut unavailable: "
 auto_strings:
   '   - 词条未记录': '   - Affix Not Recorded'
   ' 等+': ' ...+'

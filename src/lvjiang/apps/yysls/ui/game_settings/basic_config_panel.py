@@ -18,6 +18,23 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr, tr_label
 from ...config import get_game_config
 
+#: 插件菜单可用键位：F5~F7（插件段）与 Alt+F5~F7、Alt+字母。
+#: 具体合法性（区间、系统保留组合、重复）由 core 的校验器统一判定。
+_PLUGIN_SHORTCUT_CHOICES = (
+    [f"F{i}" for i in range(5, 8)]
+    + [f"Alt+F{i}" for i in range(5, 8)]
+    + [f"Alt+{letter}" for letter in "BCDEFGHIJKLMNOPQRSTUVWXYZ"]
+)
+
+
+def _default_shortcut(item_id: str) -> str:
+    from ..menus import SHORTCUT_ITEMS
+
+    return next(
+        (entry.default for entry in SHORTCUT_ITEMS if entry.item_id == item_id),
+        "",
+    )
+
 
 class BasicConfigPanel(QWidget):
     """不依赖等级、装备类型等维度的全局游戏参数。"""
@@ -67,10 +84,35 @@ class BasicConfigPanel(QWidget):
         self._stone_percent.valueChanged.connect(self._apply)
         form.addRow(tr_label('传律石提升'), self._stone_percent)
         layout.addWidget(box)
+        layout.addWidget(self._build_hotkey_box())
 
         self._status_label = QLabel()
         layout.addWidget(self._status_label)
         layout.addStretch()
+
+    def _build_hotkey_box(self) -> QGroupBox:
+        """插件菜单的快捷键：区间 F5~F7 与 Alt+字母，与通用菜单共用查重。"""
+        from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
+        from ..menus import SHORTCUT_ITEMS
+
+        box = QGroupBox(tr("热键设置"))
+        form = QFormLayout(box)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        self._shortcut_combos: dict[str, object] = {}
+        for entry in SHORTCUT_ITEMS:
+            combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+            combo.addItem(tr("（不绑定）"), "")
+            combo.addItems(_PLUGIN_SHORTCUT_CHOICES)
+            combo.setFixedWidth(120)
+            combo.currentIndexChanged.connect(self._apply)
+            self._shortcut_combos[entry.item_id] = combo
+            form.addRow(f"{tr(entry.label)}:", combo)
+        hint = QLabel(tr(
+            "菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，"
+            "不能与通用/工具菜单重复。"))
+        hint.setWordWrap(True)
+        form.addRow(hint)
+        return box
 
     def _load(self) -> None:
         basic = (self._data or {}).get("basic_config", {})
@@ -84,6 +126,22 @@ class BasicConfigPanel(QWidget):
         self._stone_percent.setValue(float(basic.get(
             "chuanlv_stone_percent",
             manager.get_chuanlv_stone_percent())))
+        self._load_shortcuts(basic)
+
+    def _load_shortcuts(self, basic: dict) -> None:
+        from ..menus import SHORTCUT_ITEMS, resolved
+
+        overrides = basic.get("hotkeys")
+        overrides = overrides if isinstance(overrides, dict) else {}
+        for entry in SHORTCUT_ITEMS:
+            combo = self._shortcut_combos.get(entry.item_id)
+            if combo is None:
+                continue
+            current = resolved(entry.item_id, overrides)
+            combo.blockSignals(True)
+            index = combo.findText(current) if current else 0
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo.blockSignals(False)
 
     def _apply(self, _value: int | float | bool) -> None:
         if self._loading:
@@ -96,6 +154,13 @@ class BasicConfigPanel(QWidget):
             self._cooldown_carryover.isChecked())
         basic["chuanlv_stone_percent"] = round(
             self._stone_percent.value(), 2)
+        shortcuts = self._collect_shortcuts()
+        if shortcuts is None:
+            return
+        if shortcuts:
+            basic["hotkeys"] = shortcuts
+        else:
+            basic.pop("hotkeys", None)
         data["basic_config"] = basic
         if self._on_changed is not None:
             self._on_changed()
@@ -109,6 +174,39 @@ class BasicConfigPanel(QWidget):
             self._status_label.setStyleSheet("color: #c62828;")
             self._status_label.setText(tr("保存失败：{error}").format(error=exc))
             return
+        # 菜单快捷键即时生效：动作就在本窗口的菜单栏上，不需要重启。
+        try:
+            from ..menus import apply_shortcuts
+
+            apply_shortcuts(shortcuts)
+        except Exception as exc:  # noqa: BLE001 - 应用失败不影响保存结果
+            logger.warning(f"插件菜单快捷键应用失败: {exc}")
         self._status_label.setStyleSheet("color: #2e7d32;")
         self._status_label.setText(tr("已保存并生效（{time}）").format(
             time=datetime.now().strftime("%H:%M:%S")))
+
+    def _collect_shortcuts(self) -> dict[str, str] | None:
+        """收集插件菜单键位：越区间/重复时报错并返回 None。"""
+        from .....core.config.menu_shortcuts import (
+            ZONE_PLUGIN_MENU,
+            validate_menu_shortcuts,
+        )
+        from ..menus import SHORTCUT_ITEMS
+
+        values: dict[str, str] = {}
+        for entry in SHORTCUT_ITEMS:
+            combo = self._shortcut_combos.get(entry.item_id)
+            if combo is None:
+                continue
+            index = combo.currentIndex()
+            values[entry.item_id] = "" if index <= 0 else str(
+                combo.currentText() or "")
+        problems = validate_menu_shortcuts(values, owner=ZONE_PLUGIN_MENU)
+        if problems:
+            self._status_label.setStyleSheet("color: #c62828;")
+            self._status_label.setText(
+                tr("快捷键不可用：") + problems[0])
+            return None
+        # 只落盘与默认值不同的项，配置里不堆满当前默认键位。
+        return {item_id: value for item_id, value in values.items()
+                if value != _default_shortcut(item_id)}

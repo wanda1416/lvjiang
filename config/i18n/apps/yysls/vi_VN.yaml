@@ -740,6 +740,8 @@ yysls:
   '{name}攻击：{value}': '{name} Attack: {value}'
   '{name}伤害加成：{value}': '{name} Damage Bonus: {value}'
   '{name}穿透：{value}': '{name} Penetration: {value}'
+  "菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。": "Phím tắt menu chỉ có tác dụng trong cửa sổ; menu plugin có thể dùng F5~F7 hoặc Alt+chữ cái và không được trùng với menu Chung/Công cụ."
+  "快捷键不可用：": "Không dùng được phím tắt: "
 auto_strings:
   装备词条: Equipment Affixes
   词条约束: Affix Constraints

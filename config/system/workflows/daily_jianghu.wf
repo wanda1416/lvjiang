@@ -23,14 +23,14 @@
 #%     type: number
 #%     default: 1500
 #%     min: 0
-#%   - name: do_heying
-#%     label: 合影
-#%     type: bool
-#%     default: true
 #%   - name: keep_multiplayer
 #%     label: 多人模式保持
 #%     type: bool
 #%     default: false
+#%   - name: do_heying
+#%     label: 合影
+#%     type: bool
+#%     default: true
 #%   - name: do_huanzhuang
 #%     label: 换装
 #%     type: bool

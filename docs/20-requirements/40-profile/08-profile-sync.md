@@ -11,7 +11,7 @@
 
 | 层 | 含义 | 取值 |
 | --- | --- | --- |
-| **行为** | 值语义：`set` / `reset` / `regen` 三种一律「覆盖」——`new_value` 是绝对值，按 `(event_at, op_id)` LWW 裁决 | 三种相同 |
+| **行为** | 值语义：`set` / `reset` / `regen` 三种一律「覆盖」——`new_value` 是绝对值，按 `(event_at, 到达序)` LWW 裁决（同一秒内比 `remote_id`；`op_id` 是随机 uuid，不参与判先后） | 三种相同 |
 | **op_type** | 机制分类：谁干的 | `set` 更新 / `reset` 重置 / `regen` 恢复 / `meta` 锁传播 /（`delta` 增量，v1.1 遗留） |
 | **source** | 业务语境：为什么变 | 只属于人的写入；系统行（reset/regen/meta）一律留空 |
 
@@ -61,6 +61,8 @@
   `MAX(local_id) WHERE remote_id > 0`（回放行落在账本尾部，天然盖过存量）。
   低于基线的行永不扫描、永不重判——没有放弃/重开机器。
 - **下行**：`remote_id > since` 增量；回放按覆盖语义，meta 走 `db_apply_meta_locked`。
+  同一秒内的两条写入（物化 `regen` 行 + 紧随的 `set`）按到达序 `remote_id` 判先后——随机
+  `op_id` 分不出同一台设备连写的顺序，还会与云端物化（取到达最晚的一条）不一致。
 - **快照**：已完成一次干净 pull+push 后可上传（全部类型+locked）；新设备/状态丢失时用最新快照落地。
 - **锁定传播**：锁/解锁写 meta 行 → 上行 → 他端回放改 `entries.locked`；撤销守卫只认 set/delta，meta 不可撤销。
 

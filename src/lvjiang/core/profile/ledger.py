@@ -104,6 +104,27 @@ def record_history(
 class LedgerMixin:
     """``profile_history`` 的行写入与历史查询。"""
 
+    def remote_id_of_op(self, op_id: str) -> int | None:
+        """该账本行的到达序；本机待上传的行（``remote_id IS NULL``）返回 ``None``。
+
+        回放同一秒里的两条写入要靠它分先后，见
+        :func:`~.arbitrate.is_newer_write`。只有 ``op_id`` 是条目的锚点身份，
+        ``remote_id`` 才是「云端第几条到达」。
+        """
+        if not op_id:
+            return None
+        conn = self._borrow_connection()
+        try:
+            row = conn.execute(
+                "SELECT remote_id FROM profile_history WHERE op_id=? AND op_id<>''",
+                (op_id,),
+            ).fetchone()
+        finally:
+            self._release_connection(conn)
+        if row is None or row[0] is None:
+            return None
+        return int(row[0])
+
     def aggregate_history(
         self, username: str, type_: str, key: str, *, operation: str = 'sum',
         source: str | None = None, change_types: list[str] | None = None,

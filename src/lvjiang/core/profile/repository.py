@@ -181,6 +181,11 @@ def db_merge_snapshot_candidates(rows: list[dict]) -> int:
     return get_profile_db().merge_snapshot_candidates(rows)
 
 
+def db_remote_id_for_op(op_id: str) -> int | None:
+    """某条账本行的到达序；本机未上传的行返回 ``None``。回放分先后用。"""
+    return get_profile_db().remote_id_of_op(op_id)
+
+
 def db_upsert(
     username: str,
     type_: str,

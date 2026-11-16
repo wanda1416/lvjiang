@@ -32,7 +32,7 @@ from ..account.service import profile_sync_state, save_profile_sync_state
 from ..sync.client import SyncError, post
 from ..sync.round_state import cloud_state, invalidate, version
 from . import repository
-from .arbitrate import canonical_event, is_strictly_newer
+from .arbitrate import canonical_event, is_newer_write
 from .rows import Entry, RemoteOp
 
 
@@ -269,6 +269,18 @@ def _period_relation(op: dict, current: dict) -> str | None:
     return "same"
 
 
+def _beats_local(op: RemoteOp, happened: str, current: Entry) -> bool:
+    """远端 op 是否胜过本地现值。
+
+    时间相同时才去查本地那条的到达序（``remote_id``）；查不到（本机未上传的行、
+    快照条目）就不覆盖。见 :func:`~.arbitrate.is_newer_write`。
+    """
+    local_seq = None
+    if happened and happened == canonical_event(current.event_at or "") and current.op_id:
+        local_seq = repository.db_remote_id_for_op(current.op_id)
+    return is_newer_write(happened, op.remote_id, current.event_at or "", local_seq)
+
+
 def _apply_op(op: RemoteOp) -> bool:
     """把一条远端 op 折进本地 entries 与账本；返回是否实际生效。
 
@@ -288,6 +300,7 @@ def _apply_op(op: RemoteOp) -> bool:
     远端来的旧 set（``happened_at`` 早于本地现值的 ``event_at``）不覆盖
     新值。配额跨进新周期时先把本机底数当成 0 再套用；属于上一周期的操作
     直接丢弃。两种情况都不另写 reset 历史。delta 在同一周期内加在当前值上。
+    时间相同（同一秒）时按到达序判先后，比不出来就不覆盖，见 :func:`_beats_local`。
 
     回放写入时把条目 ``event_at`` 定为 op 的 ``happened_at`` 而不是本地
     墙钟：两台设备的时钟互不可信，本地墙钟会让回放后的所有条目都"新于"
@@ -335,9 +348,7 @@ def _apply_op(op: RemoteOp) -> bool:
         value = float(raw or 0)
         value_text = ""
     remote_mark = op.remote_id
-    newer = is_strictly_newer(
-        happened, op_id, current.event_at or "", current.op_id or "",
-    )
+    newer = _beats_local(op, happened, current)
     locked = bool(current.locked) or repository.db_is_locked(username, type_, key)
     if locked or not newer:
         repository.db_upsert(

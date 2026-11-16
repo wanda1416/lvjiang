@@ -1,38 +1,40 @@
 # TODO
 
-> 已完成/废弃条目定期清出本文件，历史见 git 与 docs/40-development/。
+> 已完成/废弃条目定期清出本文件；2026-10-06 之前的历史段已迁到
+> [archive/backlog-history-2026-10-06.md](archive/backlog-history-2026-10-06.md)。
 > 开启新对话时先读本文件。
-> 下方标为“历史”的进度只记录当时的状态，不能作为当前功能清单。
 > 当前发布功能与升级边界见
-> [v0.13.11 发布说明](../50-releases/v0.13/v0.13.11.md)。
+> [v0.15.9 发布说明](../50-releases/v0.15/v0.15.9.md)。
 
-## 当前基线（2026-10-06）
+## 当前基线（2026-11-17）
 
-- 正式版本为 **0.13.11**；`dev` 在此基础上还有开发期修正，不能把它们写成
-  已发布功能。
-- 批量配置以可见用户限定范围，执行时可按用户名或用户属性聚合调度单元；
-  主页面再勾选本次执行单元。见[批量执行单元](../20-requirements/30-batch/02-batch-execution-units.md)。
-- 装备分析已支持 115 阶赛季、按等级与版本选择毕业率模型、模拟转律和装备
-  假设视图；智能调律按用户与基础规则组启用。见
+- 正式版本为 **0.15.9**，`dev` 已到 **0.15.15**（开发期修正）；不能把 `dev` 上的
+  东西写成已发布功能。
+- 批量配置以可见用户限定范围，执行时可按用户名或用户属性聚合调度单元；主页面再
+  勾选本次执行单元，并可在「工具 → 任务参数」声明某用户跳过某任务。见
+  [批量执行单元](../20-requirements/30-batch/02-batch-execution-units.md)。
+- 装备分析已支持 115 阶赛季、按等级与版本选择毕业率模型、模拟转律和装备假设视图；
+  智能调律按用户与基础规则组启用。见
   [南吕赛季需求](../20-requirements/10-tuning/05-nanlu-season.md)和
   [智能调律需求](../20-requirements/10-tuning/03-smart-tuning.md)。
-- 本页「功能待办」列出仍未完成的方向；具体实施范围以最新代码及各需求文档
-  的未完成项为准。下面的 v0.10.4 进度不再用于判断是否已实现。
+- 本页「功能待办」列出仍未完成的方向；具体实施范围以最新代码及各需求文档的未完成项
+  为准。下方 P1/P2 是同一批事项的详情，重复项只留一处指针。
 
 ---
 
 ## 功能待办
 
-1. **OCR 三态语义分层**：`to_equipment` 的两条失败路径（输入为空、解析异常）
-   **都返回 `{}`**，于是「OCR 失败但有装备」与「空槽位」无法区分：后者应正常
-   终止扫描，前者应记 error 并继续下一件。v0.9.0 已在装备等级/类型这一层做了
-   部分区分（两者均无法确定按空槽，能定等级但类型未知记异常并跳过），但
-   `to_equipment` 这一层仍未拆，判空信号也仍来自解析结果而非 scan 层。需拆为三层：
+1. **OCR 三态语义分层**：`_to_equipment`（`apps/yysls/workflows/builtins/equipment.py`）
+   的两条失败路径（输入为空、解析异常）**都返回 `{}`**，于是「OCR 失败但有装备」与
+   「空槽位」无法区分：后者应正常终止扫描，前者应记 error 并继续下一件。v0.9.0 已在
+   装备等级/类型这一层做了部分区分（两者均无法确定按空槽，能定等级但类型未知记异常并
+   跳过），但 `_to_equipment` 这一层仍未拆，判空信号也仍来自解析结果而非 scan 层。
+   需拆为三层：
    - 层1 可解析：字段提取成功，有明确语义 → 正常处理
    - 层2 不可解析但存在数据：有内容但无法提取语义 → 记 error，跳过当前件，继续下一件
    - 层3 无法解析：完全空/无内容 → 视为空槽位，正常终止扫描
    涉及 `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/loadout/equipment_scan.wf` /
-   `auto_tuning.py` 门控逻辑。
+   `apps/yysls/workflows/implementations/auto_tuning.py` 门控逻辑。
 2. **统计报表面板**：跨任务的数据汇总视图（处理装备数、评级分布、材料消耗、
    狗粮投入），与叙事型调律说明文档互补。数据源已在 v0.10.0 齐备
    （`config/session/tuning_history.db` 结构化历史 + 实时总览 + 历史详情），
@@ -43,141 +45,35 @@
 4. **货币追踪补完**：`scan_wallet.wf` 已完成识别侧（整页 OCR、数字清洗、
    货币名匹配、桌面 4×6 / 安卓 3×6 自适应与补扫、容差防误识、写入 Profile）；
    缺 `CurrencySnapshot` 历史留存（JSONL）、90 天过期清理与趋势折线图。
-5. **心力 / 体力管理**：零实现。`docs/20-requirements/40-profile/03-stamina-management.md`
-   的 26 项待办全部未开始（代码里的 `stamina_*` 是战斗耐力属性，与本需求无关）。
+5. **心力 / 体力管理**：**部分实现**（需求文档状态 2026-10-09；律准石库存与记账策略
+   已在 `apps/yysls/workflows/implementations/tuning/stone_stock.py`）。剩余项见
+   `docs/20-requirements/40-profile/03-stamina-management.md` 的未完成清单；
    依赖定时轮询与多账号批量，工程量比看上去大。
 6. **局内地图目标闭环导航与撤离**：为渡尘墟、觉障林及后续同类玩法提供
    可复用的玩家/目标地图定位、目标锁定、短脉冲移动、重新定位、防卡和到达交互能力。
    导航核心不硬编码玩法名称，不直接关闭应用；具体机制、安全边界与分阶段计划见
    [`07-in-match-navigation.md`](../20-requirements/50-platform/02-in-match-navigation.md)。
 
-较早的分级与平台上机清单已并入本文件末尾的「待办明细」一节
-（基线 v0.10.4）；其中的版本号和完成状态不能直接当作当前结论。
+> 上面 6 条是当前唯一清单；下方 P1/P2 是同一批事项的详情，重复项只留一处指针。
 
 ---
 
-## 历史状态（2026-09-05，基线 `master` = v0.10.4）
+## 历史（截至 2026-10-06）
 
-- 主线功能全部就绪：自动调律端到端流水线可用，并已扩展为**结构化可持久化**
-  （`tuning_history.db` 增量落盘 + 本次装备总览 + 历史任务管理）。
-- 背包批量扫描已落地（`scan_unequipped.wf`，含 slots/min_level 参数与窗口游标去重）。
-- 配置四层就位：local > remote（`content_version` 严格更高才生效）> system，
-  外加随包分发的 `app.yaml`；`content_version` 由开发者显式提升。
-- 匿名统计与调律数据回收上线（客户端 + Cloudflare Workers/D1 + 本机 stats-client 控制台）。
-- 连接方案（plans）：图库/环境/布局/连接模式绑成具名整体，随包预置手游/端游/手游投屏三套。
-- DSL：CoordRef 坐标体系、click/drag 时序、单行环境分支、全局变量、`scroll interval`、
-  实参位字面量常数；`import` 已改根相对并封闭沙盒。
-- i18n 框架 + 一致性门禁（key 对称、同一句中文不得多译法）。
-
----
-
-## 历史版本回顾（2026-08-25 ~ 09-05）
-
-逐日细节见 [docs/40-development/2026-08/](../40-development/2026-08/) 与
-[2026-09/](../40-development/2026-09/)，此处只列版本主线：
-
-- **v0.6.0**（08-25）匿名使用统计与调律数据回收从 0 到 1；宏录制补完；图库空间目录化；技能轴查看器。
-- **v0.7.0 / v0.7.1**（08-26~27）ui/ 按业务域重构与 `main_window` 拆分；遥测事件粒度改为「一件装备一条」；stats-client 本地统计控制台；最小化到系统托盘。
-- **v0.8.0**（08-28）`config/remote` 在线下发 + `content_version` 仲裁；i18n 遮蔽事故修复与门禁；执行前静态校验只查可达过程；写盘纪律（画布死区、OCR 显式保存）；批量可见顺序即执行顺序。
-- **v0.9.0**（08-30）可复用引用场景与三段式访问；`import` 根相对与沙盒封闭；后台模式不再抢焦点；工作流文件树；Profile 升格为主引擎模块；江湖号令 PC 端可用。
-- **v0.10.0**（09-02）调律历史结构化持久化；场景 schema v2 与页面跳转契约；武学/流派/玩法三层拆分；用户头像与执行用户；自动调律安全性重做。
-- **v0.10.1**（09-03）机器级连接方案；Profile 快捷规则可视化；五维换算系数修正。
-- **v0.10.2**（09-04）装备冷却识别与到期时间；DSL 全局变量；通用确认弹窗联合判定。
-- **v0.10.3 / v0.10.4**（09-05~06）批量 PC 端账号切换与登录页重整；`scroll interval` 与实参字面量；布局孤儿坐标清理；PC 后台兼容调律滚轮策略。
-
----
-
-## 历史记录（2026-08-15 ~ 16）
-
-- **DSL click/drag 时序增强**：parser 支持 wait_clause（before/after/around）
-  任意组合；suppress_defaults 抑制引擎默认延迟；click_screen/drag_screen
-  扩展 pre_delay/post_delay 参数；全链路 **kw 透传。
-- **DSL 泛化元组语法**：wait_range/range_literal 支持数字/变量混合
-  （`($a, $b)`、`(1, $b)`）；TupleLiteral AST 节点 + __tuple__ 引擎处理；
-  _exec_wait 增加未定义变量错误保护。
-- **DSL clock/datetime 函数**：clock() 返回 Unix 时间戳；datetime() 支持
-  当前时间/自定义格式/时间戳格式化四种调用形式。
-- **i18n 国际化框架**：核心模块（i18n/__init__.py）+ 翻译文件
-  （zh_CN.yaml 1639 行、en_US.yaml 1618 行）+ 25+ 文件 tr() 改造 +
-  设置对话框语言选择 + 测试。
-
-## 历史记录（2026-08-15）
-
-- **DSL CoordRef 坐标统一体系**：新建 coord_types.py（CoordRef/RectCoordRef/
-  CircleCoordRef/Offset 类型 + 向量运算规则）；AST SceneRef→EntityRef 全局重命名
-  （13 文件，字段 region→entity）；布局模型 to_coord_ref()；引擎 _eval_arith
-  支持 CoordRef 运算 + tuple 隐式转换；click/drag 解析更新。
-
-## 历史记录（2026-08-02）
-
-- **场景编辑器增量保存**：per-scene dirty 追踪，修改单个场景只写该场景 JSON，
-  Tab 标题绿点指示变更，discard 提示列出变更场景名称。
-- **画布保存修复**：保存时从当前激活 Tab 获取 canvas 配置，而非字典第一个 Tab。
-- **画布尺寸实时刷新**：调整画布时顶部信息栏同步更新。
-- **场景/分组重命名**：右键重命名场景或分组，联动 layouts 文件名、截图文件、
-  scenes.yaml 配置。
-- **批量 Tab 三页子 Tab 重构**：脚本配置、用户配置、条目概览分离。
-- **关于对话框**：版本信息、GitHub Release 检查更新、版权信息。
-- **打包版本注入**：package.bat 从 pyproject.toml 读取版本注入 _version.py。
-
-## 最近完成（2026-07-31 ~ 08-01）
-
-- **布局存储目录化**（`2856ce5`）：单文件 `默认布局.json`（2001 行）
-  拆为 `layouts.yaml`（名册 + canvas 内联）+ `layouts/{布局名}/{场景}.json`
-  （每场景独立实体文件），沿用 ConfigResolver 双层「分离写 / 合并读」语义；
-  Android `syncSystemConfig` 整目录同步自动适配。
-- **重置调律语义修正**（07-31 `9efc158` → 08-01 `4a26c12`）：冷却期 OCR
-  三态检查（硬限单件一次）、已满装备走 scan 规则处理、品阶选项统一、
-  非首外功攻击改硬门槛（缺大外/小外能用封顶 `1eb5f3f`）。
-- **工作流引擎静态预检**（07-31 `219e7c0`）：新增 `validate_only` 预检 +
-  系统工作流引用门禁与上机预检脚本，跑脚本前校验区域是否已在布局绑定。
-- **Android 独立执行端**（07-30 ~ 08-01）：三通道 PoC 闭环、系统配置随 APK
-  分发、设备端工作流引擎装配、原生调律参数配置页（`5d51117`）、悬浮层
-  主题修复游戏不再被 LMK 击杀（`92fcb8e`）、release 实机复验通过。
-- **打包分发**（07-31 `d415aa6`）：PyInstaller onedir 一键打包（launcher +
-  spec + package.bat），内置 adb 随包分发（`fd45daf`），用户免装 platform-tools。
-- **调律规则引擎演进**（07-31）：判定语义下沉到逐条处置规则（`282809f`）、
-  顶档/普通条件结构演进 contains_all 组合条件（`934fbab`）、仅首词条逐规则化
-  + 首词条方向比较（`54fb43e`）。
-- **质量门禁**（07-31 `b5d1de0`）：接入 ruff + mypy，修掉全仓存量告警。
-- **平台适配**（07-31 `309bb04`）：抽离 `core/platforms.py` 平台适配层；
-  macOS 支持 Phase 0（依赖验证 + 退出崩溃修复 `2e72b30`）。
-
-## 较早完成（2026-07-26 ~ 07-30）
-
-- **调律规则开关化重构**（07-29 `6db9b32`）：`keep_pvp` 专用语义废弃，
-  改为通用开关机制（tune_config.yaml `switches` 注册表 + 条件组 `when`
-  前提）；评级四档定名 垃圾/一般/优秀/顶级（`Rating.USABLE`→`NORMAL`）；
-  条件原语收敛为 4 个（contains_all/not_together/count_max/count_min，
-  均支持 include_first）；规则级/部位级 `default_rating` 兜底。
-- **属攻词条双重身份匹配**（07-30 `a2e3467`）：非武器部位具体属攻以
-  字面名 + 动态词条（最大/最小本属攻击、最大/最小外属攻击）双重身份
-  参与匹配；武器部位仍引用字面无相。
-- **狗粮规则引擎重构**（07-30 `276b916`）：有序规则表替代品阶映射；
-  配套调律材料策略配置与规则模型扩展（`c422323`）、材料区同名幽灵槽
-  修复（`6f8ddee`）。
-- **自动调律链路补全**（07-27 `d380546` 等）：背包遍历策略化
-  （bag_traversal 包：dedup 滑动窗口去重为默认 / positional 位置对齐）、
-  整行列遍历、指纹漂移容错、狗粮返还二次弹窗兼容、F10 停止输出部分
-  结果、「跳过实际调律」测试开关。
-- **调律说明文档**（07-28 `ca9bbbe` → 07-30 `cb734e9`）：叙事型 Markdown
-  输出至 logs/tuning/，结尾含成品清单。
-- **UI 插件化注入架构**（07-29 `30534d2`）：插件通过注入点挂载 UI；
-  配套 loguru 落盘与崩溃防护安装位置修正（`3c1f4b5`）。
-- **崩溃根治**（07-30）：pynput 退出竞态（`b754132`）、
-  UnhandledExceptionFilter 回调防 GC（`48e9ab4`）。
-- **三层术语模型重命名**（07-28 `ad37a0e`）：流派/玩法/调律规则全面统一；
-  四个主体大文件拆为分层/Mixin 包（`5b5e3d3`）、DSL 引擎拆 engine/ 包
-  （`29c2121`）。
-- **CI**（07-28 `a75ecdd`）：GitHub Actions windows-latest + 离屏 pytest。
-- **品阶门槛按部位锁死 + 规则级覆盖**（07-29 `92d5505`）。
+2026-10-06 之前的进度快照、历史记录与完成清单已迁到
+[archive/backlog-history-2026-10-06.md](archive/backlog-history-2026-10-06.md)，只作追溯；
+本文件不再保留历史段。
 
 ---
 
 ## 特别注意事项（下一对话必读）
 
 1. **严禁自动提交**；提交时中文信息须写入 UTF-8 文件后 `git commit -F`。
-2. 运行环境：用**全局 python**（.venv 缺 yaml）；pytest 加 `-p no:cacheprovider`
+2. 运行环境：用**仓库 `.venv`**（`.venv\Scripts\python.exe`）。历史上这里写"用全局
+    python（.venv 缺 yaml）"，那条已不成立：`.venv` 现在是可编辑安装、dev 依赖齐全，
+   系统解释器反而缺 `pygls`/`lsprotocol` 和 `lvjiang` 包，会让
+   `test_wf_language_server`、`test_*_ondevice_imports`、OCR 推理等用例以环境错误的
+   形式失败（见 AGENTS.md 2.11）。pytest 加 `-p no:cacheprovider`
    可避开沙箱对 .pytest_cache 的权限报错；PowerShell 写中文用 `python -X utf8`。
    注意：pytest -q 在本机不打印 "N passed" 汇总行，以进度 100% 且无 F/E 为准。
 3. **SearchReplace 陷阱**：任何含 `───` U+2500 制表线的行做锚点必失败，
@@ -190,32 +86,28 @@
 6. 用户约定：开发期配置重构**不写迁移兼容代码**（旧 schema 直接废弃）。
 7. 提交推送遵循 /submit 一次性语义：完成后不自动 commit/push，等用户指令。
 
-## 待办明细（原根目录 TODO.md）
+## 待办明细（P1 / P2 详情）
 
-下面是 2026-09-05 整理时的逐条待办与当时的进度快照，条目状态只对当天有效；已完成项已删去，最新进展看上面的「功能待办」。
-
-> 本文档整合了源码注释、开发日志、阶段计划的所有待办事项，按优先级与模块组织。
-> 最后整理日期：2026-09-05（基线：`master` = v0.10.4）
->
-> 上一版整理于 2026-08-28，其中「安卓上机」一节引用的 `equip_analysis.wf` 早在
-> 08-19 就已更名（`equip_scan` → `scan_equipped`、`equip_analysis` → `scan_unequipped`），
-> 本次一并更正。
+> 逐条详情按优先级组织，状态以「功能待办」为准；勾选框只表示该条内部子步骤，
+> 带「外部依赖」的条目要真机或作者本人操作，AI 不可推进。
+> 最后整理：2026-11-17（基线 `dev` = 0.15.15）。
 
 ---
 
-## 📊 总体进度
+## 📊 总体进度（核对于 2026-11-17）
 
 | 模块 | 阶段 | 状态 | 优先级 |
 |------|------|------|--------|
-| **安卓端** | Phase 4（打包发布） | 🚧 进行中（仅剩上机验证） | 🔴 高 |
-| **macOS 支持** | Phase 1（ADB 模式）| 🔶 代码完成，真机未验 | 🟡 中 |
+| **安卓端** | 手机端独立执行 + 离线配置 | ✅ 可用（真机全流程回归待做） | 🟡 中 |
+| **macOS 支持** | Phase 1（ADB 模式）| 🔶 代码完成，真机未验（外部依赖） | 🟡 中 |
 | **在线配置下发** | `config/remote` + `content_version` | ✅ 桌面端可用 | 🟡 中 |
 | **匿名统计 / 数据回收** | 客户端 + Workers/D1 + 本地控制台 | ✅ 已上线 | — |
 | **调律 / 任务历史** | SQLite 持久化 + 总览 + 筛选 | ✅ | — |
 | **连接方案（plans）** | 机器级方案 + 随包预置三套 | ✅ | — |
 | **脚本工作台** | 完成 + 打磨中 | ✅ | 🟢 低 |
-| **图色原语** | 完成 + 真机验证待 | ✅ | 🔴 高 |
+| **图色原语** | 完成 + 真机验证待（外部依赖） | ✅ | 🟡 中 |
 | **窗口模式** | PC 端 / 投屏窗口（含后台兼容） | ✅ 可用 | — |
+| **键位分区** | 菜单 F1~F7 / 全局热键 F8~F12 可配 | ✅ | — |
 
 ---
 
@@ -243,7 +135,7 @@
 - [ ] 核对坐标系偏差（截图分辨率 vs 触控坐标）
 - [ ] 通过真机验证后更新设备端图色函数文档
 
-**优先级**: 🟡 **高**（直接影响设备端可用性）
+**优先级**: 🟡 **高**（直接影响设备端可用性）｜**外部依赖**：需真机或作者本人操作，AI 不可推进
 
 ---
 
@@ -257,7 +149,7 @@
 - [ ] 作者手机生成正式参照图，提交 `config/system/layouts/android/_reference.png`
 - [ ] 第二台不同挖孔/宽高比的真机上跑一遍「屏幕标定 → 跑 `.wf`」
 
-**优先级**: 🟡 **高**（换机适配的唯一路径）
+**优先级**: 🟡 **高**（换机适配的唯一路径）｜**外部依赖**：需真机或作者本人操作，AI 不可推进
 
 ---
 
@@ -280,7 +172,7 @@
 - [ ] 运行完整的调律工作流（`scan_unequipped.wf` + 自动调律）
 - [ ] 记录实测依赖版本矩阵差异（若有）
 
-**优先级**: 🟡 **高**（开启 macOS 支持）
+**优先级**: 🟡 **高**（开启 macOS 支持）｜**外部依赖**：需真机或作者本人操作，AI 不可推进
 
 ---
 
@@ -306,36 +198,15 @@
 - [ ] 百业货运、炸鱼、签到
 - [ ] 盟主争锋（当前在 `archived/`）
 
-**优先级**: 🟡 **高**（设备端主功能完整性）
+**优先级**: 🟡 **高**（设备端主功能完整性）｜**外部依赖**：需真机或作者本人操作，AI 不可推进
 
 ---
 
 ### 5. OCR 三态语义分层 {#p1-ocr-tristate}
 
-**位置**: `src/lvjiang/apps/yysls/workflows/builtins/equipment.py`（`_to_equipment`）
-
-当前 `to_equipment` 的两条失败路径**都 `return {}`**：
-
-```python
-if not isinstance(raw_data, dict) or not raw_data:   # 输入为空
-    return {}
-except Exception as e:                                # 解析失败
-    return {}
-```
-
-于是「OCR 失败但有装备」与「空槽位」无法区分：后者应正常终止扫描，前者应记 error
-并继续下一件。v0.9.0 已在**装备等级/类型**这一层做了部分区分（等级和类型均无法确定
-按空槽处理，能确定等级但类型未知记异常并跳过），但 `to_equipment` 这一层的三态拆分
-仍未做，判空信号也仍来自解析结果而非 scan 层。
-
-**待办**:
-- [ ] 层1 可解析：字段提取成功，有明确语义 → 正常处理
-- [ ] 层2 不可解析但存在数据：有内容但无法提取语义 → 记 error，跳过当前件，继续下一件
-- [ ] 层3 无法解析：完全空/无内容 → 视为空槽位，正常终止扫描
-- [ ] 判空信号改由 scan 层（raw dict 全空/纯噪声）给出
-
-**涉及**: `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/loadout/equipment_scan.wf` /
-`auto_tuning.py` 门控逻辑
+详见「功能待办 1」。实现要点：`_to_equipment`
+（`apps/yysls/workflows/builtins/equipment.py`）两条失败路径仍都 `return {}`，
+需拆成三层并把判空信号移到 scan 层。
 
 **优先级**: 🟡 **高**（当前会把 OCR 失败误当背包到底，静默提前结束扫描）
 
@@ -365,17 +236,8 @@ except Exception as e:                                # 解析失败
 
 ### 2. 统计报表面板 {#p2-stats-panel}
 
-调律/分析结束后的独立数据汇总视图（处理装备数、评级分布、材料消耗、狗粮投入），
-与叙事型调律说明文档互补。
-
-**现状**: 数据源齐备但视图缺席——`config/session/tuning_history.db` 已有完整结构化历史
-（v0.10.0），实时总览与历史详情已可查看单次任务，`apps/yysls/ui/` 下**没有任何跨任务
-的汇总模块**。
-
-**待办**:
-- [ ] 跨任务聚合视图（按时间段 / 按规则 / 按部位）
-- [ ] 材料与狗粮消耗统计
-- [ ] 评级分布与成功率趋势
+详见「功能待办 2」。数据源（`config/session/tuning_history.db`）齐备，
+缺跨任务聚合视图；`apps/yysls/ui/` 下仍无相关模块。
 
 **优先级**: 🟢 **中等**（数据现成，只差视图）
 
@@ -383,48 +245,28 @@ except Exception as e:                                # 解析失败
 
 ### 3. 转律 / 装上执行 {#p2-transmute-equip}
 
-当前「转律」全仓只出现在 `auto_tuning.py` 与 `tuning/judge.py`，**纯用于评级模拟**
-（judge 预测潜力、穷举可达上限），没有真实点击转律的工作流；毕业装备替换穿戴（装上）
-亦未做。
+详见「功能待办 3」。judge 已能预测潜力，缺真实点击转律与「装上」链路。
 
-**待办**:
-- [ ] 真实转律工作流（场景 + 布局 + `.wf`）
-- [ ] 毕业装备「装上」流程
-- [ ] 与自动调律的衔接（判定为可转律后是否自动执行，需要开关与二次确认）
-
-**优先级**: 🟢 **中等**（judge 已能预测，但用户仍需手动操作，链路是断的）
+**优先级**: 🟢 **中等**（链路是断的）
 
 ---
 
 ### 4. 货币追踪补完 {#p2-currency}
 
-**位置**: `docs/20-requirements/40-profile/02-currency-tracking.md`
+详见「功能待办 4」。识别侧已完成；缺 `CurrencySnapshot` JSONL 留存、
+90 天过期清理与趋势折线图。
 
-**已完成**（`scan_wallet.wf`，最难的识别部分）:
-- ✅ 整页 OCR + 数字提取与清洗 + 货币名匹配
-- ✅ 桌面 4×6 / 安卓 3×6 面板自适应，安卓端上拉补扫缺失货币
-- ✅ 容差参数防误识别（通宝/么玉/宝钱/长鸣玉）
-- ✅ 写入 Profile
-
-**未完成**:
-- [ ] `CurrencySnapshot` 历史留存（JSONL 追加写入）
-- [ ] 数据清理（90 天过期）
-- [ ] 趋势弹窗 + 折线图
-
-**优先级**: 🟢 **中等**（识别已通，补历史与视图即可收口一个完整需求）
+**优先级**: 🟢 **中等**
 
 ---
 
 ### 5. 心力 / 体力管理 {#p2-stamina}
 
-**位置**: `docs/20-requirements/40-profile/03-stamina-management.md`
+详见「功能待办 5」。**部分实现**（需求文档 2026-10-09 状态；
+`apps/yysls/workflows/implementations/tuning/stone_stock.py` 已有律准石库存与
+记账策略），剩余项见需求文档清单。
 
-**现状**: **零实现**。需求文档写得最细，但代码里 `stamina_*` 全部是战斗耐力属性
-（`attr_model/models.py` 的 `stamina_max` / `stamina_regen`），与本需求无关。
-
-依赖定时轮询与多账号批量，工程量比看上去大。文档中 26 项待办全部未开始。
-
-**优先级**: 🟢 **低**（排在货币追踪与统计报表之后）
+**优先级**: 🟢 **低**
 
 ---
 
@@ -509,45 +351,6 @@ MVP 已可用（总览 / 调律分析 / 数据同步）。明确不在第一阶�
 
 ---
 
-### 11. profile 记账判定三份重复，note 文本分支缺失 {#p2-profile-record-policy}
-
-**位置**: `src/lvjiang/core/profile/entries.py`（`upsert` / `upsert_many` / `update_if_current`）
-
-「这次写入该不该记一行账本」的判定抄了三份：`upsert` 与 `upsert_many` 对
-`type == "note"` 比对文本，`update_if_current` 只比数值、没有 note 分支。
-
-**现状不是缺陷**：note 的写入走 `service.py` 的专用路径（直接 `db_upsert`），
-`update_if_current` 拿不到 note 类型，所以三份判定的差异目前不会触发。
-
-**结论（2026-11-15 已处理）**: 「note 不该走 CAS」查无设计记录，只是 note 自己
-拥有写入旁路（`_write_note` 不接 `expected_entry` / `use_cas`）的副产物。已按
-「note 也应支持乐观并发」落地：
-
-- `should_record()` 定义在 `core/profile/ledger.py`，`upsert` / `upsert_many` /
-  `update_if_current` 三处共用，note 的文本分支因此可达（`e4f7de37`）；
-- 仓储层 CAS 增加文本维度（`expected_value_text` 非 None 时比对
-  `COALESCE(value_text,'')`），`_write_note` 接 `expected_entry`/`use_cas`，
-  冲突抛 `ProfileWriteConflict`（`a271849d`）；
-- UI 两个备注入口带上渲染时的条目快照（不能取单元格文本：`show_cap` 下显示
-  `12/20`、库里是 `12`），冲突不再静默覆盖（`3c9ea1fc`）；
-- 用例：`tests/core/profile/test_note_cas.py`、`tests/ui/profile/test_note_cas.py`。
-
----
-
-### 12. meta 锁写入的 SQL 在三处独立维护 {#p2-meta-lock-sql}
-
-**位置**: `src/lvjiang/core/profile/entries.py`（`set_locked` / `unlock`）、
-`src/lvjiang/core/profile/repository.py`（`db_apply_meta_locked`）
-
-「只改 locked 列、不碰 value/event_at」这条约定被 `set_locked`、`unlock`、
-`db_apply_meta_locked` 各写了一遍 INSERT ... ON CONFLICT DO UPDATE SET locked，
-语义相同但三处独立演化；`db_apply_meta_locked` 还是模块级函数，靠伸手进
-`ProfileDB` 的私有连接方法才能参与事务。
-
-**结论（2026-11-15 已处理）**: `_write_locked()` 成为「只动 locked 列 + 补一条
-`op_type=meta` 账本行」的唯一实现；`set_locked`/`unlock` 收敛为
-`_toggle_locked()`（只在状态真的变化时写），跨端回放走 `apply_locked()`（远端说了算、
-`created_at` 记真实写入时刻）。模块级 `db_apply_meta_locked` 只做转发，不再伸手进
-`ProfileDB` 的私有连接方法（`e4f7de37`）。
-
----
+> P2 #11（profile 记账判定三份重复）与 #12（meta 锁 SQL 三处维护）已于
+> 2026-11-15 收口（`e4f7de37`、`a271849d`、`3c9ea1fc`），按本文件约定清出；
+> 细节见 git 历史与 `docs/40-development/`。

@@ -9,3 +9,4 @@
 | 文件 | 内容 |
 |------|------|
 | [android-platform-progress.md](android-platform-progress.md) | 安卓独立执行端迁移的进度与下一步（状态止于 2026-08-01） |
+| [backlog-history-2026-10-06.md](backlog-history-2026-10-06.md) | `02-backlog.md` 迁出的历史段（进度快照、历史记录、完成清单，状态止于 2026-10-06） |

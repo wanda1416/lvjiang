@@ -10,9 +10,9 @@
 |------|------|
 | [00-doc-standard.md](00-doc-standard.md) | **文档规范**：分层职责、目录与编号、写作纪律、编目自动化 |
 | [01-roadmap.md](01-roadmap.md) | 项目阶段与长期路线（Phase 0~9 快照，不代表当前范围） |
-| [02-backlog.md](02-backlog.md) | 唯一待办来源（含原根目录 TODO.md 的明细） |
+| [02-backlog.md](02-backlog.md) | 唯一待办来源（功能待办 6 条 + P1/P2 详情；历史段已迁 archive） |
 | [platforms/](platforms/README.md) | 平台推进计划索引（现为 [macos.md](platforms/macos.md)） |
-| [archive/](archive/README.md) | 归档：过期规划与进度快照（如 [android-platform-progress.md](archive/android-platform-progress.md)，状态止于 2026-08-01） |
+| [archive/](archive/README.md) | 归档：过期规划与进度快照（如 [backlog-history-2026-10-06.md](archive/backlog-history-2026-10-06.md)、[android-platform-progress.md](archive/android-platform-progress.md)） |
 
 ## 文档体系
 

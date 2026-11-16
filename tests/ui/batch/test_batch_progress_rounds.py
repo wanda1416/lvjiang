@@ -133,6 +133,37 @@ def test_finished_round_marks_unreached_rows_not_run(qtbot):
     assert _status(progress, 1) == ST_NOT_RUN
 
 
+def test_round_boundary_resets_whole_table_and_only_current_entry_pending(
+    qtbot,
+):
+    """新一轮只有"轮到的那一条"是待执行，其余一律未执行。
+
+    这里刻意只补发第一条的复位事件：整表重绘必须让另一行也回到未执行，
+    不能把上一轮的成功留在新一轮未启动的格子上。
+    """
+    progress = _make_progress(qtbot)
+    state = _BatchProgressState(
+        entries=["alice", "bob"],
+        scripts=[("s1", "脚本1")],
+        plans={},
+        rounds_total=2,
+    )
+    progress._run_progress["run"] = state
+    progress._visible_run_id = "run"
+    progress._render_progress_rows(state)
+    progress._refresh_round_header(state)
+    for index in (0, 1):
+        progress.update_run_progress("run", 1, index, "x", "s1", ST_SUCCESS)
+
+    # 第 2 轮边界：只到达第一条的复位事件
+    progress.update_run_progress("run", 2, 0, "x", "s1", ST_NOT_RUN)
+    assert [_status(progress, row) for row in (0, 1)] == [ST_NOT_RUN, ST_NOT_RUN]
+
+    # 轮到 alice：只有它的格子推进到待执行
+    progress.update_run_progress("run", 2, 0, "x", "s1", ST_PENDING)
+    assert [_status(progress, row) for row in (0, 1)] == [ST_PENDING, ST_NOT_RUN]
+
+
 def test_attr_mode_rounds_are_per_unit(qtbot):
     progress = _make_progress(qtbot)
     state = _BatchProgressState(

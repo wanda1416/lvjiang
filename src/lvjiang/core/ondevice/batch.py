@@ -20,7 +20,7 @@ from ..batch.run import (
 )
 from ..batch.scheduler import (
     ST_FAILED,
-    ST_PENDING,
+    ST_NOT_RUN,
     ST_SKIPPED,
     ST_SUCCESS,
     BatchContext,
@@ -305,7 +305,9 @@ def _run(worker):
             for index, entry in enumerate(worker._spec.entries):
                 label = entry if worker._spec.rounds == 1 else f"第 {number} 轮 · {entry}"
                 for script in worker._scripts:
-                    rows[(index, number, script.id)] = {"entry": label, "task_id": script.id, "task_name": script.name, "status": ST_PENDING}
+                    # 初始一律「未执行」：还没轮到的格子不该显示成"待执行"，
+                    # 后者只表示调度器正在为这一条做条目准备。
+                    rows[(index, number, script.id)] = {"entry": label, "task_id": script.id, "task_name": script.name, "status": ST_NOT_RUN}
         state.set_batch({"rows": list(rows.values()),
                          "rounds": worker._spec.rounds, "processed": 0})
         def progress(round_number, index, label, task_id, status):

@@ -1707,7 +1707,6 @@ class BatchTab(QWidget):
             self._progress_table.setRowCount(0)
             self._progress_row_index = {}
             self._progress_row_context = {}
-            viewing = state.viewing_round > 0
             for run_idx in range(len(state.entries)):
                 round_number = (state.viewing_round
                                 or self._row_round(state, run_idx))
@@ -1726,9 +1725,10 @@ class BatchTab(QWidget):
                     status = state.statuses.get(
                         (round_number, run_idx, script_id))
                     if status is None:
-                        # 看历史轮或批次已结束时，缺失就是没跑到，不能算「待执行」。
-                        status = (ST_NOT_RUN if viewing or state.terminal
-                                  else ST_PENDING)
+                        # 缺失一律是「未执行」：待执行只由真实事件写入——轮到这个
+                        # 条目、调度器开始做条目准备时才会推进，无法从"没有状态"
+                        # 反推出来。
+                        status = ST_NOT_RUN
                     self._set_status_item(row, status)
         finally:
             self._progress_table.setUpdatesEnabled(True)
@@ -1836,6 +1836,8 @@ class BatchTab(QWidget):
         )
         self._run_progress[task_run_id] = state
         self._visible_run_id = task_run_id
+        # 上一条运行的表格内容还留在控件里；先按新状态整表重绘，第一帧就是对的。
+        self._render_progress_rows(state)
         self._refresh_round_header(state)
 
     def show_run(self, task_run_id: str) -> None:
@@ -1989,8 +1991,17 @@ class BatchTab(QWidget):
             state.unit_rounds[run_idx] = round_number
         if self._visible_run_id != task_run_id:
             return
+        if entered_round and not state.viewing_round:
+            # 轮次边界：整表按 statuses 重绘一次，而不是只改收到事件的这一格。
+            # 逐格补丁的逻辑要求"每格都收到一条复位事件"，丢一条或晚到一条就会
+            # 永久留着上一轮的文本；整表重绘让缺失状态自然回落到「未执行」。
+            self._render_progress_rows(state)
+            self.apply_task_plan(state.plans)
+            self._refresh_round_header(state)
+            self._scroll_to_running_row()
+            return
         if entered_round:
-            # 轮次推进：更新底部导航的轮次与按钮状态。
+            # 正在只读查看历史轮：只更新导航，不打断当前视图。
             self._refresh_round_header(state)
         if state.viewing_round and state.viewing_round != round_number:
             # 正在只读查看历史轮：状态继续入库，但不打断当前视图。

@@ -437,14 +437,15 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                 break
 
             if run_idx == 0:
-                # 轮次边界先全量复位，再去做任何条目准备/检查：进度页在这一刻
-                # 就能把上一轮的结果归档并清空，不必等第一个条目真正开始。
+                # 轮次边界先全量复位成「未执行」，再去做任何条目准备/检查：新一轮
+                # 里还没轮到的格子必须和上一轮的成功区分开。「待执行」只在轮到这个
+                # 条目、调度器开始跑条目准备时才给（见下面的推进点）。
                 self._log(f"[批量] 开始第 {round_number}/{rounds} 轮")
                 for pending_idx, pending_user in enumerate(self._usernames):
                     for pending_script in self._scripts:
                         self.progress.emit(
                             round_number, pending_idx, pending_user,
-                            pending_script.id, ST_PENDING,
+                            pending_script.id, ST_NOT_RUN,
                         )
 
             label = (username if rounds == 1 else
@@ -536,6 +537,12 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                     if all_declared_skipped
                     else f"[批量] {label} 没有可执行任务，忽略该用户")
                 continue
+
+            # 走到这里说明这一条确定要执行：把它的格子从「未执行」推进到
+            # 「待执行」，表示调度器正在为它做条目准备。
+            for script in self._scripts:
+                self.progress.emit(
+                    round_number, run_idx, label, script.id, ST_PENDING)
 
             prepared = BatchStageResult(state=batch_state)
             if use_lifecycle:
@@ -881,10 +888,11 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
             label = f"{unit} · 第 {round_number} 次 · 尝试 {attempt}"
             self._log(f"[批量] {unit_key}={unit}，第 {round_number}/{self._spec.rounds} 次")
             # 属性单元各自推进轮次，没有全局轮屏障：这里只复位本单元的行，
-            # 其它单元仍保留它们自己那一轮的结果。
+            # 其它单元仍保留它们自己那一轮的结果。复位成「未执行」，本轮这次
+            # 还没轮到的格子才不会挂上一轮的成功。
             for pending_script in self._scripts:
                 self.progress.emit(
-                    round_number, run_idx, unit, pending_script.id, ST_PENDING)
+                    round_number, run_idx, unit, pending_script.id, ST_NOT_RUN)
             report.start_entry(label, "")
             entry: dict = {"prepare": ST_SKIPPED, "finish": ST_SKIPPED,
                            "username": "", "scripts": {}}
@@ -939,6 +947,12 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                             report.end_script(status)
                         report.record_prepare(ST_SKIPPED)
                         continue
+
+                    # 同用户模式：轮到这个单元、开始条目准备时，把它的格子从
+                    # 「未执行」推进到「待执行」。
+                    for script in self._scripts:
+                        self.progress.emit(
+                            round_number, run_idx, label, script.id, ST_PENDING)
 
                     prepared = self._run_stage(
                         "prepare_item", self._spec.workflows.prepare_item,

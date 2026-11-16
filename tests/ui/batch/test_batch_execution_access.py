@@ -16,6 +16,7 @@ from lvjiang.core.users.document import (
 )
 from lvjiang.ui.batch.batch_report import BatchReport
 from lvjiang.ui.batch.batch_runner import (
+    ST_NOT_RUN,
     ST_PENDING,
     ST_SKIPPED,
     BatchCheckResult,
@@ -97,11 +98,14 @@ def test_batch_repeats_complete_user_sequence_by_round(tmp_path, monkeypatch, qa
     assert [item["username"] for item in task_history] == [
         "alice", "bob", "alice", "bob",
     ]
+    # 轮次边界先把整轮复位成「未执行」，轮到某个条目时才把它推进到「待执行」。
+    resets = [(item[0], item[1]) for item in progress if item[4] == ST_NOT_RUN]
+    assert resets == [(1, 0), (1, 1), (2, 0), (2, 1)]
     assert [item for item in progress if item[4] == ST_PENDING] == [
-        (1, 0, "alice", "test", ST_PENDING),
-        (1, 1, "bob", "test", ST_PENDING),
-        (2, 0, "alice", "test", ST_PENDING),
-        (2, 1, "bob", "test", ST_PENDING),
+        (1, 0, "第 1 轮 · alice", "test", ST_PENDING),
+        (1, 1, "第 1 轮 · bob", "test", ST_PENDING),
+        (2, 0, "第 2 轮 · alice", "test", ST_PENDING),
+        (2, 1, "第 2 轮 · bob", "test", ST_PENDING),
     ]
 
 

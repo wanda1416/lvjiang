@@ -1378,14 +1378,21 @@ class MainWindow(
 
         # 信号连接：进度 → batch_tab，日志 → log_text
         # （批量层显式传递用户，不再联动主页面用户下拉）
+        #
+        # 接收者是 lambda，不是 QObject 槽：AutoConnection 会走「直连」，于是
+        # update_run_progress 在批量工作线程里直接改 QTableWidget——进度更新可能
+        # 丢失或乱序，表现为新一轮的格子还挂着上一轮的结果。显式排队投递到 GUI
+        # 线程，与 apps/yysls 里后台任务的做法一致。
         worker.progress.connect(
             lambda round_number, run_idx, label, script_id, status,
             run_id=run_context.task_run_id:
             self._batch_tab.update_run_progress(
-                run_id, round_number, run_idx, label, script_id, status))
+                run_id, round_number, run_idx, label, script_id, status),
+            Qt.ConnectionType.QueuedConnection)
         worker.selected_task_plan.connect(
             lambda run_idx, plan, run_id=run_context.task_run_id:
-            self._batch_tab.apply_run_selected_unit_plan(run_id, run_idx, plan))
+            self._batch_tab.apply_run_selected_unit_plan(run_id, run_idx, plan),
+            Qt.ConnectionType.QueuedConnection)
         from .run_logs import RunLogEvent
         worker.log.connect(
             lambda text, context=run_context: self._log_append(
@@ -1394,7 +1401,8 @@ class MainWindow(
                     target_id=context.target_id,
                     target_label=context.target_snapshot.display_name,
                 )
-            )
+            ),
+            Qt.ConnectionType.QueuedConnection,
         )
         # finished_all 在 run() 尚未退出时发出；此时释放最后一个 QThread
         # 引用可能让 Qt 直接终止进程。等线程真正结束后再解锁界面。

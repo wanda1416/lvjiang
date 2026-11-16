@@ -1,9 +1,12 @@
-"""剧情文案库（通用工具）：多配置文件与 system/local 双层读写。
+"""剧情文案库（燕云剧情插件 yysls_story）：多配置文件与 system/local 双层读写。
 
-配置目录 ``tools/auto_plot/<组名>.json``，一组一个文件，便于按剧情/活动分类
+配置目录 ``yysls/auto_plot/<组名>.json``，一组一个文件，便于按剧情/活动分类
 维护；激活时加载**全部**组（system ∪ local，同名 local 覆盖）并合并条目。
 每个文件自带 ``entries`` 与 ``match_threshold``，**一个文件就是一个可搬运的
 完整文案库**（连同它自己的匹配阈值）；``_`` 前缀的文件不会被当成配置文件。
+
+目录放在插件命名空间（``yysls/`` 前缀）：content_version 由本插件经
+``config_policy_modules`` 登记，core 的登记表里没有这条路径。
 """
 
 from __future__ import annotations
@@ -14,13 +17,10 @@ from pathlib import Path
 
 from loguru import logger
 
-from ..json_files import formatted_json
+from lvjiang.core.json_files import formatted_json
 
-#: 配置目录（相对配置层根）。
-AUTO_PLOT_DIR = "tools/auto_plot"
-
-#: 全局参数文件名（下划线前缀，不参与配置组枚举）。
-
+#: 配置目录（相对配置层根）；插件命名空间下，content_version 由本插件登记。
+AUTO_PLOT_DIR = "yysls/auto_plot"
 
 #: 默认选项集合相似度阈值；每个配置文件可以用 ``match_threshold`` 覆盖自己的。
 DEFAULT_THRESHOLD = 0.7

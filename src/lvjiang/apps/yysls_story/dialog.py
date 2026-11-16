@@ -1,12 +1,15 @@
-"""自动剧情文案库编辑对话框（通用工具，挂在「工具」菜单）。
+"""剧情文案库编辑对话框（燕云剧情插件，入口在「燕云」菜单）。
 
-支持多个配置文件：一个文件 ``tools/auto_plot/<文件名>.json``，激活时全部文件
+支持多个配置文件：一个文件 ``yysls/auto_plot/<文件名>.json``，激活时全部文件
 一起生效。普通用户只能保存到 ``local``；``system`` 是随发布内容，仅在开发者
 模式可选。
 
 顶部两行：
 1. 配置文件下拉 + 新建/删除；
 2. 匹配阈值 / 保存到 / 文案库来源。
+
+本模块会 import PyQt6，所以只能由菜单构建器（GUI 线程）延迟导入；
+``apps/yysls_story/__init__.py`` 不得转出它的名字。
 """
 
 from __future__ import annotations
@@ -36,18 +39,6 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.config.resolver import get_resolver
-from lvjiang.core.story import (
-    AUTO_PLOT_DIR,
-    StoryDoc,
-    StoryEntry,
-    delete_entry,
-    delete_group,
-    list_groups,
-    load_group,
-    save_group,
-    set_group_threshold,
-    upsert_entry,
-)
 from lvjiang.i18n import tr, tr_label
 from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
@@ -58,6 +49,19 @@ from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 from lvjiang.ui.widgets.layout_helpers import (
     configure_navigation_list,
     navigation_width_for_chars,
+)
+
+from .models import (
+    AUTO_PLOT_DIR,
+    StoryDoc,
+    StoryEntry,
+    delete_entry,
+    delete_group,
+    list_groups,
+    load_group,
+    save_group,
+    set_group_threshold,
+    upsert_entry,
 )
 
 #: 各「标签 + 控件」行的统一间距（像素）。每行都是独立的 QHBoxLayout，

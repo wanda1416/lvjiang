@@ -1,4 +1,4 @@
-"""内置函数 - 自动剧情（通用工具）
+"""内置函数 - 自动剧情（燕云剧情插件 yysls_story）
 
 剧情跳过的工作流只做弱调度（推进对话、弹窗提示），所有「该选哪一项」的
 判断都交给这里查文案库，避免把大量文案硬编码进 .wf。
@@ -11,6 +11,9 @@
 
 未收录/匹配不可靠时 ``story_pick`` 返回 ``""``，调用方据此 ``pause`` 让人工
 处理，而不是猜一个可能不可逆的选项。
+
+这三个函数由本插件通过 ``AppHooks.builtin_modules`` 注册：不加载
+``yysls_story``（及其依赖的 ``yysls``）就没有它们，宿主不认识任何剧情概念。
 """
 
 from __future__ import annotations
@@ -21,14 +24,10 @@ from loguru import logger
 
 from lvjiang.core.config.resolver import get_resolver
 from lvjiang.core.layout.models import FoundRegion
-from lvjiang.core.story import (
-    StoryEntry,
-    load_all,
-    match,
-    similarity,
-    upsert_entry,
-)
 from lvjiang.workflows.builtins._registry import builtin_func
+
+from .matching import match, similarity
+from .models import StoryEntry, load_all, upsert_entry
 
 #: 本模块函数的缺省分组；个别函数用 @builtin_func(group=...) 覆盖
 GROUP = "自动剧情"
@@ -88,7 +87,7 @@ def story_pick(
         if $pick
             click $pick
         else
-            pause("遇到未收录选项，请手动选择后在「工具 → 自动剧情」补充")
+            pause("遇到未收录选项，请手动选择后在「燕云 → 自动剧情」补充")
         end
     """
     blocks = _blocks(_wf, scene, area)
@@ -129,7 +128,7 @@ def story_pick(
         "answer": "正确答案",
         "question": "问题文本",
         "scene": "场景名",
-        "group": "写入的文件名（即 tools/auto_plot/<文件名>.json）",
+        "group": "写入的文件名（即 yysls/auto_plot/<文件名>.json）",
         "layer": "写入层 local/system",
     },
 )

@@ -1383,18 +1383,18 @@ class MainWindow(
         # update_run_progress 在批量工作线程里直接改 QTableWidget——进度更新可能
         # 丢失或乱序，表现为新一轮的格子还挂着上一轮的结果。显式排队投递到 GUI
         # 线程，与 apps/yysls 里后台任务的做法一致。
-        worker.progress.connect(
+        worker.progress.connect(  # type: ignore[call-arg]  # PyQt6 存根未声明 type 参数
             lambda round_number, run_idx, label, script_id, status,
             run_id=run_context.task_run_id:
             self._batch_tab.update_run_progress(
                 run_id, round_number, run_idx, label, script_id, status),
             Qt.ConnectionType.QueuedConnection)
-        worker.selected_task_plan.connect(
+        worker.selected_task_plan.connect(  # type: ignore[call-arg]
             lambda run_idx, plan, run_id=run_context.task_run_id:
             self._batch_tab.apply_run_selected_unit_plan(run_id, run_idx, plan),
             Qt.ConnectionType.QueuedConnection)
         from .run_logs import RunLogEvent
-        worker.log.connect(
+        worker.log.connect(  # type: ignore[call-arg]  # PyQt6 存根未声明 type 参数
             lambda text, context=run_context: self._log_append(
                 RunLogEvent.from_text(
                     str(text), task_run_id=context.task_run_id,

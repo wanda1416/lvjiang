@@ -91,6 +91,20 @@ PC 端或手机端执行操作
 
 ---
 
+## 🖼️ 界面预览
+
+主窗口：日常任务与备战方案（装备属性、模拟装备与毕业率总览）：
+
+![主窗口：日常与备战方案](docs/assets/screenshots/main-battle-prep.png)
+
+批量任务与用户总览（多角色进度与档案数据一览）：
+
+![批量任务与用户总览](docs/assets/screenshots/main-batch-overview.png)
+
+> 游戏配置、调律配置与毕业率分析等界面见 [用户指南](docs/60-userguide/README.md)。截图中的用户（角色名）与设备信息均已做打码处理。
+
+---
+
 ## 📂 目录结构
 
 ```

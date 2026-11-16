@@ -525,8 +525,7 @@ class TestSaveAndRaw:
         monkeypatch.setitem(
             versioning.VERSIONED_DIRS,
             "yysls/tuning_rules",
-            versioning.VersionedDir(
-                "yysls/tuning_rules", "*.yaml", 1),
+            [versioning.VersionedDir("yysls/tuning_rules", "*.yaml", 1)],
         )
         system, local, remote = (tmp_path / n for n in ("system", "local", "remote"))
         for root, ver, name in ((system, 1, "系统规则"), (remote, 3, "远程规则")):

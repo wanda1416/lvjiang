@@ -366,7 +366,9 @@ def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
         ("android", (766, 321)),
         ("desktop", (542, 250)),
     ):
-        layout_path = get_config_system_dir() / "layouts" / platform / "jianghu_card.json"
+        layout_path = (
+            get_config_system_dir() / "layouts" / platform / "component"
+            / "jianghu_card.json")
         layout = json.loads(layout_path.read_text(encoding="utf-8"))
         refresh = next(item for item in layout["regions"] if item["key"] == "refresh")
         binding = refresh["template"]

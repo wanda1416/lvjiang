@@ -598,7 +598,7 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
     assert fill.is_text and fill.is_clickable
 
     for platform in ("android", "desktop"):
-        base = Path(f"config/system/layouts/{platform}")
+        base = Path(f"config/system/layouts/{platform}/training")
         main_layout = json.loads((base / "training_main.json").read_text(encoding="utf-8"))
         layout = json.loads((base / "training_plan.json").read_text(encoding="utf-8"))
         assert {region["key"] for region in main_layout["regions"]}.isdisjoint(

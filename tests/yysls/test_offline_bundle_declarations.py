@@ -13,9 +13,9 @@ from tests.fake_plugin import use_registered_hooks
 def test_yysls_offline_declarations_select_its_own_files(monkeypatch, tmp_path):
     use_registered_hooks(monkeypatch, yysls.hooks)
     source = tmp_path / "pc"
-    (source / "config/system").mkdir(parents=True)
-    (source / "config/system/layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  android:\n    name: Android\n")
+    (source / "config/system/layouts").mkdir(parents=True)
+    (source / "config/system/layouts/android.yaml").write_text(
+        "content_version: 1\nname: Android\nenv: android\n")
     (source / "config/session/users").mkdir(parents=True)
     (source / "config/session/users/tester.json").write_text("{}")
     included = {

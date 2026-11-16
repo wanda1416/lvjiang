@@ -93,8 +93,8 @@ class TestLoadUserConfig:
         assert config.font_sizes.user_overview == 0
         assert config.font_sizes.user_info == 0
 
-    def test_hotkeys_only_allow_f7_through_f12(self, session_env, monkeypatch):
-        """F1~F6 与现有菜单功能键隔离，非法值按动作回退默认。"""
+    def test_hotkeys_only_allow_f8_through_f12(self, session_env, monkeypatch):
+        """F1~F7 归菜单与插件，全局热键越界一律按动作回退默认。"""
         monkeypatch.setattr(
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
@@ -109,7 +109,7 @@ class TestLoadUserConfig:
         assert config.hotkeys.start == "F9"
         assert config.hotkeys.pause == "F11"
         assert config.hotkeys.stop == "F10"
-        assert config.hotkeys.record == "F7"
+        assert config.hotkeys.record == "F12"
 
     def test_duplicate_hotkeys_fall_back_as_a_complete_set(
             self, session_env, monkeypatch):
@@ -118,7 +118,7 @@ class TestLoadUserConfig:
             "lvjiang.core.config.load_app_config", lambda: {})
         session_env.write_text(json.dumps({
             "settings": {"hotkeys": {
-                "start": "F7", "pause": "F7", "stop": "F11", "record": "F12",
+                "start": "F9", "pause": "F9", "stop": "F11", "record": "F12",
             }}
         }), encoding="utf-8")
         reset_session_store()

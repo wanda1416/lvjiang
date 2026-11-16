@@ -26,14 +26,26 @@ def test_parse_plain_function_key() -> None:
 def test_parse_modifiers_are_order_insensitive() -> None:
     from lvjiang.core.desktop.hotkey_native import MOD_ALT, MOD_CONTROL, parse_hotkey
 
-    expected = (MOD_ALT | MOD_CONTROL, 0x76)
-    assert parse_hotkey("Alt+Ctrl+F7") == expected
-    assert parse_hotkey("Ctrl + Alt + F7") == expected
+    expected = (MOD_ALT | MOD_CONTROL, 0x78)
+    assert parse_hotkey("Alt+Ctrl+F9") == expected
+    assert parse_hotkey("Ctrl + Alt + F9") == expected
 
 
 def test_parse_rejects_unsupported_key_names() -> None:
     """注册一个系统热键失败不报错但会静默无效，所以非法写法必须提前拒绝。"""
     from lvjiang.core.desktop.hotkey_native import parse_hotkey
 
-    for raw in ("", "   ", "F1", "Alt+F1", "Alt+Space", "Alt+Bogus", "F8+Alt"):
+    # F1~F7 属于菜单与插件区间，系统热键解析层不接手。
+    for raw in ("", "   ", "F1", "F7", "Alt+F1", "Alt+F7", "Alt+Space",
+                "Alt+Bogus", "F8+Alt"):
         assert parse_hotkey(raw) is None
+
+
+def test_allocate_id_never_repeats() -> None:
+    """主窗口与录制对话框各自注册热键，ID 重复会串掉回调。"""
+    from lvjiang.core.desktop.hotkey_native import NativeHotkeyManager
+
+    manager = NativeHotkeyManager()
+    first = manager.allocate_id()
+    manager._filter.callbacks[first] = lambda: None
+    assert manager.allocate_id() != first

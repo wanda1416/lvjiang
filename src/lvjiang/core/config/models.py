@@ -153,15 +153,16 @@ class ReferenceGridConfig:
             setattr(self, name, value)
 
 
-_VALID_HOTKEYS = {f"F{i}" for i in range(7, 13)}
+_VALID_HOTKEYS = {f"F{i}" for i in range(8, 13)}
 _HOTKEY_MODIFIERS = {"alt": "Alt", "ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift"}
 
 
 def normalize_hotkey(value: str, default: str) -> str:
     """把热键文本规范成 ``F9`` / ``Alt+F8`` 形式，非法值回退默认键位。
 
-    修饰键顺序统一为 Alt → Ctrl → Shift，主键必须落在 F7~F12：这些键位既不
-    与游戏常用快捷键大面积重叠，也便于 pynput 在 Windows 上稳定捕获。
+    修饰键顺序统一为 Alt → Ctrl → Shift，主键必须落在 F8~F12：F1~F4 归菜单、
+    F5~F7 归插件、F8~F12 才是系统级全局热键——让菜单键与全局热键各占一段，
+    两条注册路径就不会抢同一个裸键。
     """
     text = str(value or "").replace(" ", "").strip()
     if not text:
@@ -190,16 +191,17 @@ def normalize_hotkey(value: str, default: str) -> str:
 class HotkeyConfig:
     """全局热键的按键位配置（配置管理「热键设置」页维护）。
 
-    字段名是固定的"动作"语义，值是当前绑定的按键（主键限 F7~F12，可带
+    字段名是固定的"动作"语义，值是当前绑定的按键（主键限 F8~F12，可带
     Alt/Ctrl/Shift 修饰）；改动写入 session.json 的 settings.hotkeys 节点，
-    保存后由主窗口重建 pynput 全局监听并立即生效。
+    保存后由主窗口重建系统热键注册并立即生效。
     """
     start: str = "F9"    # 开始执行工作流
     pause: str = "F11"   # 暂停 / 恢复
     stop: str = "F10"    # 停止 / 结束
     record: str = "F12"  # 脚本录制；仅在脚本编辑工作台打开期间临时全局注册
     # 最小化到状态栏 / 唤回主界面：托盘图标属于系统通知区域，可能根本不显示，
-    # 这个热键是窗口隐藏之后唯一不依赖系统界面的恢复通道，默认避开 F9~F12。
+    # 这个热键是窗口隐藏之后唯一不依赖系统界面的恢复通道。默认 Alt+F8——带修饰键
+    # 不会与游戏/输入法的裸 F 键抢，仍在 F8~F12 这段全局热键区间内。
     toggle_window: str = "Alt+F8"
 
     def __post_init__(self):
@@ -331,6 +333,9 @@ class UserConfig:
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
     android_apps: dict[str, AndroidAppConfig] = field(default_factory=dict)  # 应用注册表（兼容字段名）
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
+    #: 菜单快捷键覆盖：{稳定 action id: "F1" / "Alt+M" / ""（不绑定）}。
+    #: 只存用户改过的项；缺省项按 :mod:`lvjiang.ui.menu_shortcuts` 的默认值。
+    menu_shortcuts: dict[str, str] = field(default_factory=dict)
     network: NetworkConfig = field(default_factory=NetworkConfig)         # 联网行为开关
     font_sizes: FontSizeConfig = field(default_factory=FontSizeConfig)    # 用户页面内容字号
 
@@ -353,3 +358,10 @@ class UserConfig:
             self.font_sizes = _from_known(FontSizeConfig, self.font_sizes)
         self.delay_params = parse_delay_params(self.delay_params)
         self.android_apps = parse_android_apps(self.android_apps)
+        # 菜单快捷键只做形状裁剪：键位是否合法（区间、保留组合、重复）由
+        # core.config.menu_shortcuts 校验，加载期不静默改写用户的配置。
+        self.menu_shortcuts = {
+            str(key): str(value).strip()
+            for key, value in (self.menu_shortcuts or {}).items()
+            if isinstance(key, str) and key and isinstance(value, str)
+        }

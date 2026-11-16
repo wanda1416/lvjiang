@@ -34,8 +34,10 @@ _MODIFIERS = {
     "shift": MOD_SHIFT,
 }
 
-# 只接受 F7~F12，与 HotkeyConfig 的键位范围保持一致（VK_F7=0x76 … VK_F12=0x7B）
-_VK_KEYS = {f"F{i}": 0x6F + i for i in range(7, 13)}
+# 只接受 F8~F12，与 HotkeyConfig 的键位范围保持一致（VK_F8=0x77 … VK_F12=0x7B）。
+# F1~F4 归菜单、F5~F7 归插件，这两段留给窗口内快捷键：系统热键会先于窗口拿到
+# 裸键，占用了菜单就永远收不到。
+_VK_KEYS = {f"F{i}": 0x6F + i for i in range(8, 13)}
 
 _HOTKEY_ID_BASE = 0xA170
 
@@ -147,5 +149,18 @@ class NativeHotkeyManager:
 
     @staticmethod
     def next_id(offset: int = 0) -> int:
-        """热键 ID：同一个窗口内唯一即可，取固定基准避免与系统冲突。"""
+        """落单的热键 ID：同一个窗口内唯一即可，取固定基准避免与系统冲突。
+
+        主窗口与录制对话框会先后注册热键，两者各自从固定基准起分配就可能撞
+        同一个 ID（``WM_HOTKEY`` 按 ID 回调），所以持有者应改用
+        :meth:`allocate_id` 由管理器统一发号。
+        """
         return _HOTKEY_ID_BASE + offset
+
+    def allocate_id(self) -> int:
+        """分配一个本管理器内未被占用的热键 ID。"""
+        used = set(self._registered) | set(self._filter.callbacks)
+        candidate = _HOTKEY_ID_BASE
+        while candidate in used:
+            candidate += 1
+        return candidate

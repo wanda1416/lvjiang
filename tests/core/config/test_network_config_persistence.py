@@ -45,8 +45,12 @@ class TestNetworkRoundTrip:
 class TestHotkeyRoundTrip:
     @case_matrix("name", [f.name for f in fields(HotkeyConfig)])
     def test_every_field_survives_round_trip(self, name):
-        config = UserConfig(hotkeys={name: "F7"})
-        assert getattr(config.hotkeys, name) == "F7"
+        # 五个动作必须各不相同，否则构造期会把整组回退成默认组合；因此给每个
+        # 字段一个互不相同的合法键位（F8~F12 正好五个）。
+        names = [field.name for field in fields(HotkeyConfig)]
+        values = {field: f"F{8 + index}" for index, field in enumerate(names)}
+        config = UserConfig(hotkeys=values)
+        assert getattr(config.hotkeys, name) == values[name]
 
     def test_unknown_keys_ignored(self):
-        assert UserConfig(hotkeys={"没这个动作": "F7"}).hotkeys.start == "F9"
+        assert UserConfig(hotkeys={"没这个动作": "F9"}).hotkeys.start == "F9"

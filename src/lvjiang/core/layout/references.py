@@ -39,6 +39,34 @@ def rename_scene_across_all_layouts(old_key: str, new_key: str):
     screenshots.rename_scene_screenshots(old_key, new_key)
 
 
+def move_scene_group_across_all_layouts(
+        scene_key: str, old_group: str, new_group: str) -> None:
+    """场景换组后，把所有布局下的坐标文件移到新分组子目录。
+
+    坐标路径是 ``layouts/{layout}/{group}/{scene}.json``，目录即归属——场景
+    换组不改这里的路径，坐标就永远留在旧分组目录里成为孤儿。逐布局做
+    写新删旧；单布局失败记 error 并继续，不阻断其余布局的级联。
+    """
+    if old_group == new_group:
+        return
+    resolver = get_resolver()
+    for layout_name in load_layout_entries():
+        old_rel = f"layouts/{layout_name}/{old_group}/{scene_key}.json"
+        new_rel = f"layouts/{layout_name}/{new_group}/{scene_key}.json"
+        source = resolver.resolve_read(old_rel)
+        if source is None:
+            continue
+        try:
+            content = source.read_text(encoding="utf-8")
+            resolver.write_entity(new_rel, content)
+            resolver.delete_entity(old_rel)
+            logger.info(
+                f"布局坐标已随场景换组移动: {old_rel} -> {new_rel}")
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                f"布局坐标级联移动失败（该布局保持原状）: {old_rel}: {exc}")
+
+
 def delete_scene_across_all_layouts(scene_key: str):
     """彻底删除所有布局中的场景 JSON 及该场景的全部视图截图。"""
     resolver = get_resolver()

@@ -1,5 +1,7 @@
 """场景注册表 CRUD 边界保护。"""
 
+import json
+
 import pytest
 import yaml
 
@@ -46,8 +48,10 @@ def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
-    (scenes / "factory.yaml").write_text(
+    scenes.mkdir(parents=True, exist_ok=True)
+    _path = scenes / "general" / "factory.yaml"
+    _path.parent.mkdir(parents=True, exist_ok=True)
+    (_path).write_text(
         yaml.dump({"key": "factory", "name": "系统场景", "regions": []},
                   allow_unicode=True),
         encoding="utf-8",
@@ -60,7 +64,7 @@ def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
     with pytest.raises(SystemContentProtected):
         registry.rename_scene("factory", "renamed", "新名称")
 
-    assert not (local / "scenes" / "renamed.yaml").exists()
+    assert not (local / "scenes" / "general" / "renamed.yaml").exists()
     scene = registry.get_scene("factory")
     assert scene is not None
     assert scene.key == "factory"
@@ -71,12 +75,18 @@ def test_rename_scene_survives_in_place_hot_reload(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
+    _write_yaml = lambda path, doc: (  # noqa: E731
+        path.parent.mkdir(parents=True, exist_ok=True),
+        path.write_text(
+            yaml.dump(doc, allow_unicode=True, sort_keys=False),
+            encoding="utf-8"),
+    )
     documents = {
         "before": {"key": "before", "name": "前"},
         "old": {
             "key": "old",
             "name": "旧场景",
+            "disabled": True,
             "regions": [{
                 "key": "shared",
                 "name": "共享区域",
@@ -92,37 +102,27 @@ def test_rename_scene_survives_in_place_hot_reload(tmp_path):
             "references": [{"scene": "old", "entity": "shared"}],
         },
     }
+    group_of = {"before": "main", "old": "main", "after": "main",
+                "owner": "other"}
     for key, document in documents.items():
-        (scenes / f"{key}.yaml").write_text(
-            yaml.dump(document, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
+        _write_yaml(scenes / group_of[key] / f"{key}.yaml", document)
+    _write_yaml(scenes / "main.yaml", {"name": "主分组"})
+    _write_yaml(scenes / "other.yaml", {"name": "其他"})
+    meta_path = scenes / "_meta.json"
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps({"groups": [
+        {"key": "main", "scenes": ["before", "old", "after"]},
+        {"key": "other", "scenes": ["owner"]},
+    ]}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     resolver = ConfigResolver(
         system_dir=system, local_dir=local, dev_mode=True)
-    order = ["before", "old", "after", "owner"]
-    groups = {"main": ["before", "old", "after"], "other": ["owner"]}
-    names = {"main": "主分组", "other": "其他"}
-    (system / "scenes.yaml").write_text(
-        yaml.dump({
-            "schema_version": 2,
-            "scenes": {
-                "main": {
-                    "name": "主分组",
-                    "items": ["before", "old", "after"],
-                    "disabled": ["old"],
-                },
-                "other": {"name": "其他", "items": ["owner"]},
-            },
-        }, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
+    manifest = load_scene_manifest(resolver)
     registry = SceneRegistry(
         resolver=resolver,
-        scene_order=order,
-        group_config=groups,
-        group_names=names,
-        disabled_scenes={"old"},
+        scene_order=manifest.order,
+        group_config=manifest.groups,
+        group_names=manifest.group_names,
     )
 
     def reload_in_place(_rel_path: str) -> None:
@@ -132,17 +132,17 @@ def test_rename_scene_survives_in_place_hot_reload(tmp_path):
             scene_order=manifest.order,
             group_config=manifest.groups,
             group_names=manifest.group_names,
-            disabled_scenes=manifest.disabled,
         )
         registry.__dict__.clear()
         registry.__dict__.update(refreshed.__dict__)
 
     resolver.add_change_listener(reload_in_place)
+    assert registry._disabled_scenes == {"old"}
 
     registry.rename_scene("old", "new", "新场景")
 
-    assert not (scenes / "old.yaml").exists()
-    assert (scenes / "new.yaml").exists()
+    assert not (scenes / "main" / "old.yaml").exists()
+    assert (scenes / "main" / "new.yaml").exists()
     assert registry.get_scene("old") is None
     assert registry.get_scene("new").name == "新场景"
     assert registry.all_scene_keys() == ["before", "new", "after", "owner"]
@@ -152,14 +152,17 @@ def test_rename_scene_survives_in_place_hot_reload(tmp_path):
     owner = registry.get_scene("owner")
     assert owner.references[0].scene == "new"
     persisted_owner = yaml.safe_load(
-        (scenes / "owner.yaml").read_text(encoding="utf-8"))
+        (scenes / "other" / "owner.yaml").read_text(encoding="utf-8"))
     assert persisted_owner["references"][0]["scene"] == "new"
 
     # UI 紧接着保存分组配置，这次写入同样会热重载。
     registry.save_group_config()
     manifest = load_scene_manifest(resolver)
     assert manifest.groups["main"] == ["before", "new", "after"]
-    assert manifest.disabled == {"new"}
+    assert registry._disabled_scenes == {"new"}
+    saved_scene = yaml.safe_load(
+        (scenes / "main" / "new.yaml").read_text(encoding="utf-8"))
+    assert saved_scene.get("disabled") is True
     assert registry._group_scenes["main"] == ["before", "new", "after"]
 
 
@@ -167,8 +170,9 @@ def test_scene_revision_increments_on_actual_edit(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
-    path = scenes / "factory.yaml"
+    scenes.mkdir(parents=True, exist_ok=True)
+    path = scenes / "general" / "factory.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         yaml.dump(
             {"content_version": 2, "key": "factory", "name": "系统场景"},
@@ -193,8 +197,9 @@ def test_region_transition_survives_registry_reload(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
-    path = scenes / "factory.yaml"
+    scenes.mkdir(parents=True, exist_ok=True)
+    path = scenes / "general" / "factory.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         yaml.dump({
             "key": "factory", "name": "系统场景",
@@ -224,8 +229,9 @@ def test_non_clickable_entities_never_serialize_transitions(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
-    path = scenes / "factory.yaml"
+    scenes.mkdir(parents=True, exist_ok=True)
+    path = scenes / "general" / "factory.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         yaml.dump({"key": "factory", "name": "系统场景"},
                   allow_unicode=True, sort_keys=False),
@@ -252,8 +258,9 @@ def test_reorder_scene_entities_persists_visible_subset_in_original_slots(
     system = tmp_path / "system"
     local = tmp_path / "local"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
-    path = scenes / "factory.yaml"
+    scenes.mkdir(parents=True, exist_ok=True)
+    path = scenes / "general" / "factory.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         yaml.dump({
             "key": "factory",
@@ -286,8 +293,10 @@ def test_reorder_scene_entities_persists_visible_subset_in_original_slots(
 def test_reorder_scene_entities_rejects_invalid_requests(tmp_path):
     system = tmp_path / "system"
     scenes = system / "scenes"
-    scenes.mkdir(parents=True)
-    (scenes / "factory.yaml").write_text(
+    scenes.mkdir(parents=True, exist_ok=True)
+    _path = scenes / "general" / "factory.yaml"
+    _path.parent.mkdir(parents=True, exist_ok=True)
+    (_path).write_text(
         yaml.dump({
             "key": "factory", "name": "系统场景",
             "regions": [
@@ -326,7 +335,9 @@ def test_entity_rename_preserves_all_references_or_rejects_before_write(
     if collision:
         documents["second"]["regions"] = [{"key": "new", "name": "占用", "type": "func"}]
     for key, doc in documents.items():
-        (scenes / f"{key}.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+        _p = scenes / "general" / f"{key}.yaml"
+        _p.parent.mkdir(parents=True, exist_ok=True)
+        _p.write_text(yaml.safe_dump(doc), encoding="utf-8")
     resolver = ConfigResolver(system_dir=tmp_path, local_dir=tmp_path, dev_mode=True)
     registry = SceneRegistry(resolver=resolver)
     if hot_reload:
@@ -335,12 +346,12 @@ def test_entity_rename_preserves_all_references_or_rejects_before_write(
             registry.__dict__.clear()
             registry.__dict__.update(refreshed.__dict__)
         resolver.add_change_listener(reload_in_place)
-    before = {path: path.read_bytes() for path in scenes.iterdir()}
+    before = {path: path.read_bytes() for path in scenes.glob("*.yaml")}
     rename = getattr(registry, f"rename_{kind}_key")
     if collision:
         with pytest.raises(ValueError):
             rename("source", "old", "new")
-        assert {path: path.read_bytes() for path in scenes.iterdir()} == before
+        assert {path: path.read_bytes() for path in scenes.glob("*.yaml")} == before
         assert getattr(registry.get_scene("source"), kind + "s")[0].key == "old"
     else:
         rename("source", "old", "new")

@@ -15,7 +15,17 @@ from .models import CanvasConfig, Layout
 
 # ─── 布局目录辅助 ────────────────────────────────────────
 
-_LAYOUTS_YAML_REL = "layouts.yaml"
+#: 兜底分组：场景注册表不可用/场景未登记分组时，坐标仍按平铺路径读写
+_NO_GROUP = ""
+
+
+def _scene_group_of(scene_key: str) -> str:
+    """场景当前分组（目录即归属，坐标文件路径跟着分组走）；取不到返回空。"""
+    try:
+        from ..scene.registry import get_scene_group
+        return get_scene_group(scene_key) or _NO_GROUP
+    except Exception:  # noqa: BLE001 — 注册表不可用时退回平铺路径
+        return _NO_GROUP
 
 
 def _layout_dir_rel(name: str) -> str:
@@ -24,7 +34,14 @@ def _layout_dir_rel(name: str) -> str:
 
 
 def _scene_rel(name: str, scene_key: str) -> str:
-    """场景文件相对路径：layouts/{safe_name}/{scene_key}.json"""
+    """场景文件相对路径：layouts/{safe_name}/{group}/{scene_key}.json
+
+    分组段来自场景注册表（目录即归属）；场景未登记分组时退回平铺路径，
+    保证加载器对存量孤儿文件仍有兜底读取能力。
+    """
+    group = _scene_group_of(scene_key)
+    if group:
+        return f"layouts/{validate_layout_key(name)}/{group}/{scene_key}.json"
     return f"layouts/{validate_layout_key(name)}/{scene_key}.json"
 
 
@@ -72,7 +89,7 @@ def scene_layout_rels(name: str,
 
 
 def _enumerate_scene_files(name: str) -> list[str]:
-    """枚举布局目录下所有场景 JSON 文件名（system ∪ local 并集）
+    """枚举布局目录下所有场景 JSON 文件名（system ∪ local 并集，含分组子目录）
 
     Returns:
         排序后的 scene_key 列表（不含 .json 后缀）
@@ -85,6 +102,9 @@ def _enumerate_scene_files(name: str) -> list[str]:
         if not base.is_dir():
             continue
         for p in base.glob("*.json"):
+            if p.is_file() and not p.name.startswith("_"):
+                names.add(p.stem)
+        for p in base.glob("*/*.json"):
             if p.is_file() and not p.name.startswith("_"):
                 names.add(p.stem)
     return sorted(names)

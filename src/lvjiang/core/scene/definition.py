@@ -14,7 +14,12 @@ from loguru import logger
 
 from ...i18n import tr
 from ..config.resolver import get_resolver
-from .config import build_scene_doc, save_scene_doc
+from .config import (
+    ensure_group_dir,
+    save_group_name,
+    save_scene_meta,
+    scene_rel,
+)
 from .definition_models import (
     BASE_VIEW_KEY,
     BASE_VIEW_NAME,
@@ -67,6 +72,9 @@ class SceneRegistry:
     分组结构：
         group_config: {group_key: [scene_key, ...]}
         group_names:  {group_key: group_name}
+
+    场景文件位于 ``scenes/{group}/{scene}.yaml``，目录即分组归属；
+    分组顺序与组内场景顺序由 ``scenes/_meta.json`` 描述。
     """
 
     def __init__(
@@ -76,6 +84,8 @@ class SceneRegistry:
         group_config: dict[str, list[str]] | None = None,
         group_names: dict[str, str] | None = None,
         disabled_scenes: set[str] | None = None,
+        group_layers: dict[str, str] | None = None,
+        scene_layers: dict[str, str] | None = None,
     ):
         self._resolver = resolver or get_resolver()
         self._scenes: dict[str, SceneDef] = {}
@@ -86,6 +96,11 @@ class SceneRegistry:
         self._group_order: list[str] = []            # 分组顺序
         self._group_scenes: dict[str, list[str]] = {}  # group_key -> [scene_key, ...]
         self._disabled_scenes = set(disabled_scenes or ())
+        # namespace 归属：排序钳制（system 区间恒在 local 前）用
+        self._group_layers = dict(group_layers or {})
+        self._scene_layers = dict(scene_layers or {})
+        # 分组名落盘基线：save_group_config 只写名称有变化的分组 yaml
+        self._initial_group_names = dict(group_names or {})
         self._load_all(scene_order, group_config, group_names)
 
     def _load_all(
@@ -95,7 +110,11 @@ class SceneRegistry:
         group_names: dict[str, str] | None = None,
     ):
         """加载场景：按 scene_order 指定的顺序，未指定的按文件名追加"""
-        for name in self._resolver.enumerate_entities("scenes", "*.yaml"):
+        for name in self._resolver.enumerate_entity_tree("scenes", "*.yaml"):
+            # 不变量：scenes/*.yaml（顶层）只有分组定义；场景必然在
+            # scenes/{group}/ 之下。顶层文件不当场景加载。
+            if "/" not in name:
+                continue
             yaml_file = self._resolver.resolve_read(f"scenes/{name}")
             if yaml_file is None:
                 continue
@@ -107,6 +126,10 @@ class SceneRegistry:
                 logger.debug(f"已加载场景: {scene.key}（{len(scene.regions)} 个区域）")
             except Exception as e:
                 logger.error(f"加载场景配置失败 {yaml_file.name}: {e}")
+
+        # disabled 现在是场景文件自身的字段（scenes.yaml 已退役）
+        self._disabled_scenes = {
+            key for key, scene in self._scenes.items() if scene.disabled}
 
         self._drop_invalid_references()
 
@@ -289,7 +312,8 @@ class SceneRegistry:
         return SceneDef(key=key, name=name, regions=regions, points=points,
                         panels=panels, views=views, type=scene_type,
                         subscene_refs=subscene_refs, references=references,
-                        hide_all_views=bool(data.get("hide_all_views", False)))
+                        hide_all_views=bool(data.get("hide_all_views", False)),
+                        disabled=bool(data.get("disabled", False)))
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""
@@ -347,13 +371,14 @@ class SceneRegistry:
         return None
 
     def create_group(self, key: str, name: str):
-        """创建新分组"""
+        """创建新分组：分组定义文件 + 子目录，顺序/成员随后由 save_group_config 落盘"""
         _validate_key_and_name(key, name, tr("分组"))
         if key in self._groups:
             raise ValueError(f"分组 key 已存在: {key}")
         self._groups[key] = name
         self._group_order.append(key)
         self._group_scenes[key] = []
+        ensure_group_dir(self._resolver, key)
         logger.info(f"已创建分组: {key} ({name})")
 
     def rename_group(self, key: str, new_name: str):
@@ -366,7 +391,7 @@ class SceneRegistry:
         logger.info(f"已重命名分组: {key} -> {new_name}")
 
     def rename_group_key(self, old_key: str, new_key: str, new_name: str):
-        """重命名分组 key（修改 scenes.yaml 中的 group_key）
+        """重命名分组 key（分组定义文件与分组目录随之改名）
 
         同时更新内存中的 _groups / _group_order / _group_scenes。
         调用方需随后调用 save_group_config() 持久化。
@@ -385,6 +410,17 @@ class SceneRegistry:
         # 更新 _group_order
         idx = self._group_order.index(old_key)
         self._group_order[idx] = new_key
+        # 目录化结构：分组定义文件与分组目录随 key 改名，否则旧 yaml/目录会
+        # 以幽灵分组复活（目录即归属）。
+        self._resolver.ensure_entity_deletable(f"scenes/{old_key}.yaml")
+        self._resolver.delete_entity(f"scenes/{old_key}.yaml")
+        root = self._resolver.system_dir if self._resolver.is_dev_mode() \
+            else self._resolver.local_dir
+        old_dir = root / "scenes" / old_key
+        new_dir = root / "scenes" / new_key
+        if old_dir.is_dir():
+            new_dir.parent.mkdir(parents=True, exist_ok=True)
+            old_dir.rename(new_dir)
         logger.info(f"已重命名分组 key: {old_key} -> {new_key} ({new_name})")
 
     def delete_group(self, key: str):
@@ -396,39 +432,98 @@ class SceneRegistry:
         scenes = self._group_scenes.get(key, [])
         if scenes:
             raise ValueError(f"分组非空，无法删除: {key}（包含 {len(scenes)} 个场景）")
+        # 分组定义文件与空目录一并清理（用户模式删 system 内容会被拦下）
+        self._resolver.ensure_entity_deletable(f"scenes/{key}.yaml")
+        self._resolver.delete_entity(f"scenes/{key}.yaml")
+        root = self._resolver.system_dir if self._resolver.is_dev_mode() \
+            else self._resolver.local_dir
+        group_dir = root / "scenes" / key
+        try:
+            if group_dir.is_dir() and not any(group_dir.iterdir()):
+                group_dir.rmdir()
+        except OSError as exc:
+            logger.warning(f"分组目录清理失败（忽略）: {group_dir}: {exc}")
         del self._groups[key]
         self._group_order.remove(key)
         del self._group_scenes[key]
         logger.info(f"已删除分组: {key}")
 
     def move_scene_to_group(self, scene_key: str, new_group_key: str):
-        """移动场景到其他分组"""
+        """移动场景到其他分组：目录即归属，因此是物理移动场景文件。
+
+        连锁：所有布局下的坐标文件 ``layouts/{layout}/{旧组}/{scene}.json``
+        同步移到 ``{新组}/``。用户模式下系统场景的分组归属不可移动——移动
+        意味着删除 system 原文件；本组内 local 影子可正常移动。
+        """
         if scene_key not in self._scenes:
             raise ValueError(f"场景不存在: {scene_key}")
         if new_group_key not in self._groups:
             raise ValueError(f"目标分组不存在: {new_group_key}")
-        # 从原分组移除
         old_group = self.get_scene_group(scene_key)
+        if old_group == new_group_key:
+            return
+        old_rel = self._scene_rel_path(scene_key, old_group)
+        new_rel = scene_rel(new_group_key, scene_key)
+        source = self._resolver.resolve_read(old_rel)
+        if source is None:
+            raise ValueError(f"场景文件缺失: {old_rel}")
+        self._resolver.ensure_entity_deletable(old_rel)
+        layer = self._resolver.local_only_layer(old_rel)
+        content = source.read_text(encoding="utf-8")
+        from ..config.conflicts import checked_write, file_baseline
+        baselines = {old_rel: file_baseline(self._resolver, old_rel)}
+        def _move():
+            self._resolver.write_entity(new_rel, content, layer=layer)
+            self._resolver.delete_entity(old_rel, layer=layer)
+        checked_write(self._resolver, baselines, _move)
+        # 内存归属同步
         if old_group:
             self._group_scenes[old_group].remove(scene_key)
-        # 添加到新分组
         if scene_key not in self._group_scenes[new_group_key]:
             self._group_scenes[new_group_key].append(scene_key)
+        # 布局坐标文件级联移动（先于 save_group_config 的热重载亦可，彼此独立）
+        try:
+            from ..layout.references import move_scene_group_across_all_layouts
+            move_scene_group_across_all_layouts(
+                scene_key, old_group or "", new_group_key)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"布局坐标分组目录级联移动失败: {scene_key}: {exc}")
         logger.info(f"已移动场景 {scene_key} 到分组 {new_group_key}")
 
+    def _clamp_namespace_order(self, keys: list[str],
+                               layer_of) -> list[str]:
+        """把期望顺序钳制进 namespace 区间：system 区间在前、local 区间在后。
+
+        拖动/重排允许在各自区间内任意调整，但绝不允许 local 项排到 system
+        项前面——这是加载侧合并视图的同一不变量，写入侧再次强制。
+        """
+        system = [k for k in keys if layer_of(k) != "local"]
+        local = [k for k in keys if layer_of(k) == "local"]
+        return system + local
+
     def reorder_groups(self, new_order: list[str]):
-        """更新分组顺序（仅内存）"""
-        self._group_order = [k for k in new_order if k in self._groups]
+        """更新分组顺序（仅内存；local 分组不得越过 system 分组）"""
+        filtered = [k for k in new_order if k in self._groups]
         for k in self._groups:
-            if k not in self._group_order:
-                self._group_order.append(k)
+            if k not in filtered:
+                filtered.append(k)
+        self._group_order = self._clamp_namespace_order(
+            filtered, lambda k: self._group_layers.get(k, "local"))
 
     def save_group_config(self):
-        """将分组配置以 schema v2 写入 scenes.yaml。"""
-        data = build_scene_doc(
-            self._group_order, self._group_scenes, self._groups,
-            self._disabled_scenes)
-        save_scene_doc(self._resolver, data)
+        """将分组顺序、组内场景顺序与分组名写入目录化配置。
+
+        - 顺序（分组间 + 组内）→ ``scenes/_meta.json``；
+        - 分组名 → ``scenes/{group}.yaml``（仅在新建或名称变化时写）。
+        """
+        save_scene_meta(self._resolver, self._group_order, self._group_scenes)
+        initial = getattr(self, "_initial_group_names", {})
+        for group_key in self._group_order:
+            name = self._groups.get(group_key, group_key)
+            if initial.get(group_key) != name \
+                    or not self._resolver.resolve_read(f"scenes/{group_key}.yaml"):
+                save_group_name(self._resolver, group_key, name)
+        self._initial_group_names = dict(self._groups)
         logger.info(f"已保存分组配置: {self._group_order}")
 
     # ─── 场景 CRUD ──────────────────────────────────────────
@@ -439,10 +534,11 @@ class SceneRegistry:
         if key in self._scenes:
             raise ValueError(f"场景 key 已存在: {key}")
         scene = SceneDef(key=key, name=name)
-        self._save_scene_yaml(scene)
+        target_group = group_key if group_key and group_key in self._groups else (self._group_order[0] if self._group_order else None)
+        self._save_scene_yaml(scene, group_key=target_group)
 
         # write_entity 会同步通知 scene_registry 热重载。新文件此时尚未写入
-        # scenes.yaml，重载会把这个“未分组场景”临时归入第一个分组，并把
+        # _meta.json，重载会把目录里的新文件按兜底顺序临时归组，并把
         # 当前 SceneRegistry 原位替换。后续若直接 append，场景就会同时出现
         # 在第一个分组和用户选择的目标分组，最终把非法重复项写回配置。
         #
@@ -468,7 +564,8 @@ class SceneRegistry:
                   if any(r.scene == key for r in s.subscene_refs)]
         if owners:
             raise ValueError(f"场景 {key} 正被以下场景引用，不能删除: {', '.join(owners)}")
-        rel_path = f"scenes/{key}.yaml"
+        old_group = self.get_scene_group(key)
+        rel_path = self._scene_rel_path(key, old_group)
         self._resolver.delete_entity(
             rel_path, layer=self._resolver.local_only_layer(rel_path))
         del self._scenes[key]
@@ -490,8 +587,9 @@ class SceneRegistry:
         if new_key != key:
             # 重命名是写新删旧；先鉴权，禁止在用户模式下为 system 场景
             # 创建孤立的新 key 影子文件。
-            self._resolver.ensure_entity_deletable(f"scenes/{key}.yaml")
-        old_rel_path = f"scenes/{key}.yaml"
+            self._resolver.ensure_entity_deletable(self._scene_rel_path(key))
+        old_group = self.get_scene_group(key)
+        old_rel_path = self._scene_rel_path(key, old_group)
         old_layer = self._resolver.local_only_layer(old_rel_path)
         scene = self._scenes[key]
         old_name = scene.name
@@ -510,7 +608,7 @@ class SceneRegistry:
         scene.name = new_name
         try:
             # 先写新文件，成功后再删除旧文件，避免写入失败时丢失原定义。
-            self._save_scene_yaml(scene, layer=old_layer)
+            self._save_scene_yaml(scene, layer=old_layer, group_key=old_group)
         except Exception:
             scene.key = key
             scene.name = old_name
@@ -546,7 +644,7 @@ class SceneRegistry:
             self._scenes.pop(key, None)
             self._scenes.setdefault(new_key, scene)
 
-            # scenes.yaml 此时仍保留旧 key，热重载会把新 key 暂时
+            # _meta.json 此时仍保留旧 key，热重载会把新 key 暂时
             # 归到第一分组并放到末尾。用操作前快照恢复原位，
             # 由调用方紧接着 save_group_config 持久化。
             renamed_order = [
@@ -579,15 +677,20 @@ class SceneRegistry:
         logger.info(f"已重命名场景: {key} -> {new_key}")
 
     def reorder_scenes(self, new_order: list[str]):
-        """更新场景顺序（仅内存，不写文件）"""
-        # 过滤掉不存在的 key，补充遗漏的 key
-        self._order = [k for k in new_order if k in self._scenes]
+        """更新场景顺序（仅内存，不写文件）；组内 local 场景不得越过 system 场景"""
+        filtered = [k for k in new_order if k in self._scenes]
         for k in self._scenes:
-            if k not in self._order:
-                self._order.append(k)
+            if k not in filtered:
+                filtered.append(k)
+        self._order = self._clamp_namespace_order(
+            filtered, lambda k: self._scene_layers.get(k, "local"))
+        # 组内顺序同样按层钳制
+        for group_key, members in self._group_scenes.items():
+            self._group_scenes[group_key] = self._clamp_namespace_order(
+                members, lambda k: self._scene_layers.get(k, "local"))
 
     def save_scene_order(self, order: list[str]):
-        """将场景顺序写入 scenes.yaml（保持分组结构）"""
+        """将场景顺序写入 ``scenes/_meta.json``（保持分组结构）"""
         self.reorder_scenes(order)
         # 同步更新各分组内的场景顺序
         for gk in self._group_order:
@@ -1153,12 +1256,25 @@ class SceneRegistry:
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
 
+    def _scene_rel_path(self, scene_key: str, group_key: str | None = None) -> str:
+        """场景定义文件路径：分组即目录。
+
+        分组缺省时取该场景当前所在分组，再缺省落第一个分组——只在内存态
+        尚未登记的极端时刻出现，写入路径仍保证落在某个分组目录下。
+        """
+        group = group_key or self.get_scene_group(scene_key) \
+            or (self._group_order[0] if self._group_order else "general")
+        return scene_rel(group, scene_key)
+
     def _save_scene_yaml(self, scene: SceneDef,
-                         layer: str | None = None):
-        """将场景定义写入 YAML，保留 local 独有场景的所属层。"""
+                         layer: str | None = None,
+                         group_key: str | None = None):
+        """将场景定义写入 ``scenes/{group}/{key}.yaml``，保留 local 独有场景的所属层。"""
         data: dict[str, Any] = {"key": scene.key, "name": scene.name}
         if scene.type != "scene":
             data["type"] = scene.type
+        if scene.disabled:
+            data["disabled"] = True
         if scene.views:
             data["views"] = [v.to_dict() for v in scene.views]
         if scene.hide_all_views:
@@ -1215,7 +1331,7 @@ class SceneRegistry:
                  **({"navigation": r.navigation} if r.navigation is not None else {})}
                 for r in scene.references
             ]
-        rel_path = f"scenes/{scene.key}.yaml"
+        rel_path = self._scene_rel_path(scene.key, group_key)
         from ..config.conflicts import ConfigWriteConflict, checked_write, file_baseline
         baseline = self._file_baselines.get(rel_path, file_baseline(self._resolver, rel_path))
         try:

@@ -25,8 +25,9 @@ class VersionedDir:
     has_content_version: bool = True
 
 
-#: rel_dir → VersionedDir。core 只放自己的；插件经 register_versioned_dir 注册。
-VERSIONED_DIRS: dict[str, VersionedDir] = {}
+#: rel_dir → [VersionedDir, ...]。同一目录可以有多个规格（如 ``scenes/`` 顶层
+#: 是分组定义、子目录是场景文件）；core 只放自己的，插件经 register_versioned_dir 注册。
+VERSIONED_DIRS: dict[str, list[VersionedDir]] = {}
 #: 不适合用目录 glob 表达的单文件配置。键是相对配置层根的完整路径。
 VERSIONED_FILES: dict[str, VersionedDir] = {}
 
@@ -34,7 +35,8 @@ VERSIONED_FILES: dict[str, VersionedDir] = {}
 def register_versioned_dir(rel_dir: str, pattern: str, *, depth: int = 1,
                            has_content_version: bool = True) -> None:
     """登记已有加载器认识的配置类型；插件在配置策略模块导入时注册。"""
-    VERSIONED_DIRS[rel_dir] = VersionedDir(rel_dir, pattern, depth, has_content_version)
+    spec = VersionedDir(rel_dir, pattern, depth, has_content_version)
+    VERSIONED_DIRS.setdefault(rel_dir, []).append(spec)
 
 
 def register_versioned_file(rel_path: str) -> None:
@@ -45,32 +47,40 @@ def register_versioned_file(rel_path: str) -> None:
 
 
 # core 自己的几类：跨插件通用，不属于任何游戏领域
+# scenes/：顶层 *.yaml 是分组定义，{group}/*.yaml 是场景文件
 register_versioned_dir("scenes", "*.yaml", depth=1)
-register_versioned_dir("layouts", "*.json", depth=2)
+register_versioned_dir("scenes", "*.yaml", depth=2)
+register_versioned_dir("layouts", "*.yaml", depth=1)
+register_versioned_dir("layouts", "*.json", depth=3)
 register_versioned_dir("maps", "map.yaml", depth=2)
 register_versioned_dir("workflows", "*.wf", depth=0, has_content_version=False)
 register_versioned_file("ocr.yaml")
+# 目录化顺序描述文件（scenes/layouts 拆分后唯一的顶层顺序来源）
+register_versioned_file("scenes/_meta.json")
+register_versioned_file("layouts/_meta.json")
 
 
 def spec_for(rel_path: str) -> VersionedDir | None:
     """rel_path 属于哪一类带版本实体；不属于任何一类返回 None。
 
     按 rel_dir 前缀 + 层数 + 扩展名三者同时匹配——只匹配前缀会把
-    ``layouts.yaml``（聚合注册表文件，不带版本）也算进 ``layouts/``。
+    ``layouts.yaml``（旧聚合注册表文件，已退役）也算进 ``layouts/``。
+    同一目录的多个规格（如 scenes 顶层分组定义与分组内场景文件）逐个尝试。
     """
     exact = VERSIONED_FILES.get(rel_path)
     if exact is not None:
         return exact
     parts = rel_path.split("/")
-    for spec in VERSIONED_DIRS.values():
-        prefix = spec.rel_dir.split("/")
-        if parts[:len(prefix)] != prefix:
-            continue
-        child_depth = len(parts) - len(prefix)
-        if child_depth < 1 or (spec.depth and child_depth != spec.depth):
-            continue
-        if Path(rel_path).match(spec.pattern):
-            return spec
+    for specs in VERSIONED_DIRS.values():
+        for spec in specs:
+            prefix = spec.rel_dir.split("/")
+            if parts[:len(prefix)] != prefix:
+                continue
+            child_depth = len(parts) - len(prefix)
+            if child_depth < 1 or (spec.depth and child_depth != spec.depth):
+                continue
+            if Path(rel_path).match(spec.pattern):
+                return spec
     return None
 
 
@@ -176,14 +186,16 @@ def iter_versioned_files(layer_root: Path) -> Iterator[Path]:
         if path.is_file():
             yielded.add(path)
             yield path
-    for spec in VERSIONED_DIRS.values():
-        if not spec.has_content_version:
-            continue
-        base = layer_root / spec.rel_dir
-        if not base.is_dir():
-            continue
-        glob = "/".join(["*"] * (spec.depth - 1) + [spec.pattern])
-        for path in sorted(base.glob(glob)):
-            if (path.is_file() and path not in yielded
-                    and not path.name.startswith("_")):
-                yield path
+    for specs in VERSIONED_DIRS.values():
+        for spec in specs:
+            if not spec.has_content_version:
+                continue
+            base = layer_root / spec.rel_dir
+            if not base.is_dir():
+                continue
+            glob = "/".join(["*"] * (spec.depth - 1) + [spec.pattern])
+            for path in sorted(base.glob(glob)):
+                if (path.is_file() and path not in yielded
+                        and not path.name.startswith("_")):
+                    yielded.add(path)
+                    yield path

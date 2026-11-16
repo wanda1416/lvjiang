@@ -17,7 +17,8 @@ def test_reload_updates_registry_in_place(monkeypatch):
     monkeypatch.setattr(
         scene_registry, "_load_manifest",
         lambda: SimpleNamespace(
-            order=[], groups={}, group_names={}, disabled=set()),
+            order=[], groups={}, group_names={}, disabled=set(),
+            group_layers={}, scene_layers={}),
     )
     monkeypatch.setattr(
         scene_registry, "SceneRegistry", lambda **_kwargs: refreshed)

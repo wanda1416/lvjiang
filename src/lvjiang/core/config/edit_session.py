@@ -58,7 +58,7 @@ class ConfigEditSession:
                 data, allow_unicode=True,
                 sort_keys=False), encoding="utf-8")
         for rel_dir in self._entity_dirs:
-            for name in self._source.enumerate_entities(
+            for name in self._source.enumerate_entity_tree(
                     rel_dir, "*.yaml", include_internal=True):
                 rel_path = f"{rel_dir}/{name}"
                 system_source = self._source.system_dir / rel_path
@@ -77,7 +77,7 @@ class ConfigEditSession:
         """记录两个可编辑实体层；仅存生效内容会丢失保存位置。"""
         result: dict[tuple[str, str], bytes] = {}
         for rel_dir in self._entity_dirs:
-            for name in self.resolver.enumerate_entities(
+            for name in self.resolver.enumerate_entity_tree(
                     rel_dir, "*.yaml", include_internal=True):
                 rel_path = f"{rel_dir}/{name}"
                 for layer, root in (

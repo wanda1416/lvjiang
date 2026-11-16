@@ -11,9 +11,9 @@ def test_database_selection_uses_plugin_declarations(tmp_path, monkeypatch):
     hooks = (AppHooks(id="sample", offline_database_files=("sample.db",)),)
     monkeypatch.setattr(offline_bundle, "get_registered_hooks", lambda: hooks)
     config = tmp_path / "config"
-    (config / "system").mkdir(parents=True)
-    (config / "system/layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  android:\n    name: Android\n", encoding="utf-8")
+    (config / "system/layouts").mkdir(parents=True)
+    (config / "system/layouts/android.yaml").write_text(
+        "name: Android\n", encoding="utf-8")
     (config / "session/users").mkdir(parents=True)
     (config / "session/users/tester.json").write_text("{}", encoding="utf-8")
     for name in ("profile.db", "sample.db", "unregistered.db"):

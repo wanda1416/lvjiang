@@ -24,7 +24,8 @@ def appearance_config(tmp_path, monkeypatch):
 
 def test_appearance_tabs_and_independent_editors(appearance_config):
     resolver, registry = appearance_config
-    social = resolver.load_merged("scenes.yaml")["scenes"]["social"]["items"]
+    from lvjiang.core.scene.config import load_scene_manifest
+    social = load_scene_manifest(resolver).groups["social"]
     assert social.count("appearance_main") == 1
     assert not {"waiguan_yigui", "waiguan_qingjing"} & set(registry.all_scene_keys())
     assert not {"waiguan_yigui", "waiguan_qingjing"} & set(social)
@@ -96,7 +97,8 @@ def test_appearance_bindings_match_scene_definition(appearance_config):
                 assert bound[key].activation_key == "SPACE"
     # 实际存储文件也必须一对一绑定，不只依赖加载器可能做的去重。
     for name in ("android", "desktop"):
-        path = get_config_system_dir() / "layouts" / name / "appearance_main.json"
+        path = (get_config_system_dir() / "layouts" / name
+                / "social" / "appearance_main.json")
         data = json.loads(path.read_text(encoding="utf-8"))
         keys = [r["key"] for r in data["regions"]]
         assert len(keys) == len(set(keys)) == len(expected_keys)

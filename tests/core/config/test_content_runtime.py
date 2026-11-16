@@ -16,16 +16,21 @@ from lvjiang.core.updates.system_preset import write_baseline_identity
 
 def project(tmp_path, monkeypatch, *, dev):
     system = tmp_path / "system"
-    (system / "scenes").mkdir(parents=True)
-    (system / "layouts/phone").mkdir(parents=True)
-    (system / "scenes.yaml").write_text(
-        "schema_version: 2\nscenes:\n  general:\n    name: 通用\n    items: [sample]\n", encoding="utf-8")
-    (system / "layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  phone:\n    name: 手机\n", encoding="utf-8")
+    (system / "scenes/general").mkdir(parents=True)
+    (system / "layouts/phone/general").mkdir(parents=True)
+    (system / "scenes/general.yaml").write_text(
+        "name: 通用\n", encoding="utf-8")
+    (system / "scenes/_meta.json").write_text(
+        '{"groups": [{"key": "general", "scenes": ["sample"]}]}',
+        encoding="utf-8")
+    (system / "layouts/phone.yaml").write_text(
+        "name: 手机\nenv: android\n", encoding="utf-8")
+    (system / "layouts/_meta.json").write_text(
+        '{"layouts": ["phone"]}', encoding="utf-8")
     (system / "app.yaml").write_text("delay: 1\n", encoding="utf-8")
-    (system / "scenes/sample.yaml").write_text(
+    (system / "scenes/general/sample.yaml").write_text(
         "content_version: 1\nkey: sample\nname: 示例\nregions: []\n", encoding="utf-8")
-    (system / "layouts/phone/sample.json").write_text(
+    (system / "layouts/phone/general/sample.json").write_text(
         '{"content_version":1,"regions":[]}', encoding="utf-8")
     resolver = ConfigResolver(system, tmp_path / "local", dev_mode=dev, config_dir=tmp_path)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
@@ -50,12 +55,12 @@ def test_missing_or_damaged_index_rebuilds_from_disk(tmp_path, monkeypatch):
     index = tmp_path / "session/content.json"
     assert not index.exists()
     data = rebuild_content(resolver)
-    assert data["scenes"]["sample"] == 1
-    assert data["layouts"]["phone"]["sample"] == 1
+    assert data["scenes"]["general"]["sample"] == 1
+    assert data["layouts"]["phone"]["general"]["sample"] == 1
     assert json.loads(index.read_text(encoding="utf-8"))["update_at"] == data["update_at"]
     # 索引被手工改坏后重建必须补齐条目，而不是沿用旧内容。
     index.write_text("not json", encoding="utf-8")
-    assert rebuild_content(resolver)["scenes"]["sample"] == 1
+    assert rebuild_content(resolver)["scenes"]["general"]["sample"] == 1
 
 
 def test_scene_registry_sees_writes_and_external_edits(tmp_path, monkeypatch):
@@ -63,13 +68,13 @@ def test_scene_registry_sees_writes_and_external_edits(tmp_path, monkeypatch):
     isolated_registry(monkeypatch)
     assert not scene_registry.get_registry().get_scene("sample").regions
     # 走写入通道：修订自增；界面侧由 root resolver 的监听器触发原位重载。
-    resolver.write_entity("scenes/sample.yaml",
+    resolver.write_entity("scenes/general/sample.yaml",
                           "key: sample\nname: 示例\nregions:\n"
                           "  - key: button\n    name: 按钮\n    type: func\n")
     scene_registry.reload_scene_registry()
     assert scene_registry.get_registry().get_scene("sample").regions[0].key == "button"
     # 手工编辑不维护修订号，主动刷新仍必须使缓存失效。
-    path = resolver.system_dir / "scenes/sample.yaml"
+    path = resolver.system_dir / "scenes/general/sample.yaml"
     path.write_text(path.read_text(encoding="utf-8").replace("name: 示例", "name: 新名称"), encoding="utf-8")
     rebuild_content(resolver)
     scene_registry.reload_scene_registry()
@@ -86,7 +91,7 @@ def test_damaged_baseline_skips_online_restore_not_task_loading(tmp_path, monkey
     isolated_registry(monkeypatch)
     assert scene_registry.get_registry().get_scene("sample") is not None
     assert not remote.run_sync(remote.build_sync_job()).performed
-    assert (resolver.system_dir / "scenes/sample.yaml").is_file()
+    assert (resolver.system_dir / "scenes/general/sample.yaml").is_file()
 
 
 def test_release_baseline_identity_written_without_extra_cloud_state(tmp_path, monkeypatch):

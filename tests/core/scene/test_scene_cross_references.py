@@ -20,12 +20,13 @@ from lvjiang.core.scene.definition import SceneRegistry
 def _write(dir_path, key, doc):
     doc.setdefault("key", key)
     doc.setdefault("name", key)
-    (dir_path / f"{key}.yaml").write_text(
-        yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
+    path = dir_path / "general" / f"{key}.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(doc, allow_unicode=True), encoding="utf-8")
 
 
 class _Resolver:
-    """最小 resolver 替身：只从一个目录枚举/读取场景。"""
+    """最小 resolver 替身：只从一个目录枚举/读取场景（分组子目录形态）。"""
 
     def __init__(self, root):
         self.root = root
@@ -33,8 +34,10 @@ class _Resolver:
         self.system_dir = root.parent
         self.local_dir = root.parent / "local"
 
-    def enumerate_entities(self, _kind, _pattern):
-        return sorted(p.name for p in self.root.glob("*.yaml"))
+    def enumerate_entity_tree(self, _rel_dir, pattern):
+        return sorted(
+            p.relative_to(self.root).as_posix()
+            for p in self.root.glob(f"*/{pattern}") if p.is_file())
 
     def resolve_read(self, rel):
         return self.root / rel.split("/", 1)[1]
@@ -44,7 +47,9 @@ class _Resolver:
         return None
 
     def write_entity(self, rel, data, **_kwargs):
-        (self.root / rel.split("/", 1)[1]).write_text(data, encoding="utf-8")
+        target = self.root / rel.split("/", 1)[1]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(data, encoding="utf-8")
 
 
 @pytest.fixture

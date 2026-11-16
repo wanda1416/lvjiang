@@ -74,7 +74,7 @@ def test_navigation_roundtrip_and_view_reference_rename(tmp_path):
     from lvjiang.core.scene.definition import SceneRegistry
 
     system = tmp_path / 'system'
-    directory = system / 'scenes'
+    directory = system / 'scenes' / 'general'
     directory.mkdir(parents=True)
     docs = {
         'source': {'key': 'source', 'name': '源',

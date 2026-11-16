@@ -23,6 +23,13 @@ from .preset_sources import normalize_tree
 
 PRESET_FORMAT = 2
 MAX_PRESET_BYTES = 256 << 20
+#: 预置包必备的基础定义；布局清单已目录化（layouts/{key}.yaml），
+#: 这里只点名安卓默认布局作存在性锚点，完整清单仍以包内容为准。
+_PRESET_BASE_FILES = ("app.yaml", "ocr.yaml", "layouts/android.yaml")
+
+
+def _has_base_files(files: Collection[str]) -> bool:
+    return set(_PRESET_BASE_FILES) <= set(files)
 
 
 def build_system_preset(system_dir: Path, destination: Path, *,
@@ -43,7 +50,7 @@ def build_system_preset(system_dir: Path, destination: Path, *,
             raise ValueError(f"官方预置缺少文件: {missing[0]}")
     contents = normalize_tree(contents)
     files = {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()}
-    if not {"app.yaml", "ocr.yaml", "layouts.yaml"} <= files.keys():
+    if not _has_base_files(files.keys()):
         raise ValueError("官方预置包缺少应用、OCR 或布局定义")
     if sum(map(len, contents.values())) > MAX_PRESET_BYTES:
         raise ValueError("官方预置包展开后超过限制")
@@ -75,7 +82,8 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
         digest = hashlib.sha256(json_bytes(files)).hexdigest()
         if digest != manifest.get("preset_id"):
             raise ValueError("预置清单摘要不一致")
-        if marker.exists() and all((target / name).is_file() for name in ("app.yaml", "ocr.yaml", "layouts.yaml")):
+        if marker.exists() and all(
+                (target / name).is_file() for name in _PRESET_BASE_FILES):
             saved = json.loads(marker.read_text(encoding="utf-8"))
             if saved.get("preset_id") == digest:
                 return False
@@ -84,7 +92,7 @@ def install_system_preset(archive_path: Path, root: Path, *, on_applied: Callabl
             raise ValueError("预置包文件清单不一致")
         if sum(info.file_size for info in archive.infolist()) > MAX_PRESET_BYTES:
             raise ValueError("预置包展开后超过限制")
-        if not {"app.yaml", "ocr.yaml", "layouts.yaml"} <= files.keys():
+        if not _has_base_files(files.keys()):
             raise ValueError("预置包缺少基础定义")
         with tempfile.TemporaryDirectory(prefix=".preset-stage-", dir=config) as temporary:
             stage = Path(temporary)

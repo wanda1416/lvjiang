@@ -7,6 +7,7 @@ import json
 import pytest
 
 from lvjiang.core.profile import snapshot_sync
+from lvjiang.core.profile.arbitrate import is_strictly_newer
 
 
 class FakeServer:
@@ -178,6 +179,13 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(snapshot_sync.repository, "db_get_history_since", _rows_of)
     monkeypatch.setattr(snapshot_sync.repository, "db_op_id_seen",
                         lambda op_id: any(r.get("op_id") == op_id for r in history))
+    def _remote_id_of_op(op_id):
+        for r in history:
+            if op_id and r.get("op_id") == op_id:
+                return r.get("remote_id")
+        return None
+    monkeypatch.setattr(snapshot_sync.repository, "db_remote_id_for_op",
+                        _remote_id_of_op)
     def _unacked(author, limit, since_local_id=0):
         from lvjiang.core.profile.rows import PendingOp
         rows = [r for r in history
@@ -212,7 +220,7 @@ def env(monkeypatch, tmp_path):
             current = entries.get(username, {}).get(type_, {}).get(key, {})
             event_at = row.get("event_at") or ""
             op_id = row.get("op_id") or ""
-            if current and not snapshot_sync.is_strictly_newer(
+            if current and not is_strictly_newer(
                     event_at, op_id, current.get("event_at") or "",
                     current.get("op_id") or ""):
                 continue
@@ -434,6 +442,60 @@ def test_replayed_set_wins_over_later_stale_replay_of_same_key(env) -> None:
     entry = env["entries"]["张三"]["stock"]["energy"]
     assert entry["value"] == 200
     assert entry["event_at"] == "2026-11-03T09:00:00"
+
+def test_same_second_regen_row_then_set_keeps_the_set(env) -> None:
+    """同一秒里的「物化 regen 行 + 紧随的 set」：按到达序，set 必须赢。
+
+    账本时间只到秒，而一次写入会连写两行：先把「上次写入至今的恢复」物化成
+    regen 行（值就是恢复后的绝对值），再写用户的 set。旧实现用随机 op_id 给
+    同为这一秒的两行分先后，regen 行的 uuid 恰好更大时，回放就把用户紧接着
+    写的那条判成「不更新」直接丢掉——2026-11-17 刁刁蓝心力 172 被顶成 532、
+    速行一 23 被顶成 383、蔡元君 11 被顶成 71，全是同一个原因。
+    """
+    env["state"]["remote_history_id"] = 1
+    env["state"]["profile_snapshot_id"] = 1
+    env["server"].rows = [
+        {"remote_id": 1},
+        {"remote_id": 2, "instance_id": "phone", "local_id": 2,
+         "username": "刁刁蓝", "type": "regen", "key": "xinli",
+         "op": "regen", "value": 532.92, "happened_at": "2026-11-17T00:52:34",
+         "op_id": "ffffffff-1111-4111-8111-111111111111"},
+        {"remote_id": 3, "instance_id": "phone", "local_id": 3,
+         "username": "刁刁蓝", "type": "regen", "key": "xinli",
+         "op": "set", "value": 172.92, "happened_at": "2026-11-17T00:52:34",
+         "op_id": "00000000-2222-4222-8222-222222222222"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.pulled == 2
+    entry = env["entries"]["刁刁蓝"]["regen"]["xinli"]
+    assert entry["value"] == 172.92
+    assert entry["op_id"] == "00000000-2222-4222-8222-222222222222"
+
+
+def test_same_second_without_arrival_order_keeps_local_value(env) -> None:
+    """同秒又拿不到本地那条的到达序：判不出先后就不覆盖，不按 op_id 抽签。
+
+    本地这条还没上传（`remote_id` 为空）时没有远程序号可比，唯一能比的只有
+    `op_id`——随机 uuid。宁可保留现值让下一次观测写回修正，也不凭 uuid 大小
+    决定谁赢。
+    """
+    env["state"]["remote_history_id"] = 1
+    env["state"]["profile_snapshot_id"] = 1
+    env["entries"]["刁刁蓝"] = {"regen": {"xinli": {
+        "value": 88.0, "event_at": "2026-11-17T00:52:34", "op_id": "local-uuid"}}}
+    env["server"].rows = [
+        {"remote_id": 1},
+        {"remote_id": 2, "instance_id": "phone", "local_id": 2,
+         "username": "刁刁蓝", "type": "regen", "key": "xinli",
+         "op": "set", "value": 532.92, "happened_at": "2026-11-17T00:52:34",
+         "op_id": "zzzzzzzz-1111-4111-8111-111111111111"},
+    ]
+    report = snapshot_sync.pull_and_replay("t")
+    assert report.pulled == 0
+    entry = env["entries"]["刁刁蓝"]["regen"]["xinli"]
+    assert entry["value"] == 88.0
+    assert entry["op_id"] == "local-uuid"
+
 
 def test_incremental_pull_applies_set_and_delta(env) -> None:
     env["state"]["remote_history_id"] = 1

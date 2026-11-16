@@ -1,4 +1,18 @@
-"""``layouts.yaml`` v2 manifest parsing and persistence.
+"""布局目录化清单（一布局一文件 + ``_meta.json`` 顺序）的解析与持久化。
+
+``layouts.yaml`` 聚合注册表已退役。每个配置层的 ``layouts/`` 目录自洽成立::
+
+    layouts/_meta.json       # {"layouts": ["android", ...]} 布局顺序
+    layouts/{key}.yaml       # 布局清单条目（name/desc/env/canvas/aspect/extends）
+    layouts/{key}/{group}/{scene}.json   # 坐标，布局内再按场景分组拆子目录
+
+合并语义与场景侧同一 namespace 优先级链（``system > local``）：
+
+- 布局列表 = system 区间 + local 区间；local ``_meta.json`` 充当排序补丁，
+  区间之间永不交错。
+- 布局清单条目：system 为基底，local 同 key 文件按**字段级补丁**深合并
+  （屏幕标定只覆盖 ``canvas``，不冻住其它字段的系统更新）；local 独有 key
+  即用户新建布局，整文件生效。
 
 Layout keys are stable storage identities.  Display names are metadata and must
 never be used to construct paths or persisted references.
@@ -7,16 +21,20 @@ never be used to construct paths or persisted references.
 from __future__ import annotations
 
 import dataclasses
+import json
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from loguru import logger
 
 from ..config.resolver import ConfigResolver, get_resolver
 
 if TYPE_CHECKING:
     from .models import Layout
 
-LAYOUTS_SCHEMA_VERSION = 2
+LAYOUTS_SCHEMA_VERSION = 3
+LAYOUT_META_REL = "layouts/_meta.json"
 LAYOUT_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 #: 画布宽高比的默认容差（相对误差）。取 0.5%：1920 宽上约 10px，足以吸收
@@ -156,17 +174,121 @@ def validate_layout_key(key: str) -> str:
     return value
 
 
+# ─── 目录化清单读取 ──────────────────────────────────────
+
+def _read_meta_order(layouts_dir) -> list[str]:
+    """读一层 ``layouts/_meta.json``；缺失/损坏返回空列表（降级为文件名序）。"""
+    path = layouts_dir / "_meta.json"
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        keys = data.get("layouts")
+        if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
+            raise ValueError("layouts 必须是字符串列表")
+        return list(keys)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"layouts/_meta.json 解析失败，该层顺序降级为文件名序: {path}: {e}")
+        return []
+
+
+def _apply_order_patch(keys: list[str], owner_keys: list[str],
+                       patch: list[str]) -> list[str]:
+    """排序补丁：补丁中属于本区块的 key 按补丁顺序在前，其余按原顺序在后。"""
+    mine = set(owner_keys)
+    patched = [k for k in patch if k in mine]
+    patched.extend(k for k in keys if k not in patched)
+    return patched
+
+
+def _layer_layout_keys(layouts_dir) -> list[str]:
+    """一层的布局 key 清单：meta 顺序 ∪ ``{layouts}/*.yaml``（并集稳定追加）。"""
+    if not layouts_dir.is_dir():
+        return []
+    found = list(_read_meta_order(layouts_dir))
+    for path in sorted(layouts_dir.glob("*.yaml")):
+        key = path.stem
+        if not key.startswith("_") and key not in found:
+            found.append(key)
+    return [k for k in found if (layouts_dir / f"{k}.yaml").is_file()]
+
+
+def _load_entry_file(root, key: str) -> dict | None:
+    import yaml
+    path = root / f"{key}.yaml"
+    if not path.is_file():
+        return None
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"布局清单解析失败 {path}: {e}")
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _merge_entry(base: dict, patch: dict) -> dict:
+    """字段级补丁：dict 字段（canvas）递归合并，标量整键替换。"""
+    result = dict(base)
+    for key, value in patch.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _merge_entry(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def layout_manifest_rel(key: str) -> str:
+    """布局清单文件相对路径。"""
+    return f"layouts/{validate_layout_key(key)}.yaml"
+
+
+def load_layout_doc(resolver: ConfigResolver | None = None) -> dict:
+    """合并视图：system 区间在前、local 区间在后；local 同 key 字段级补丁。"""
+    resolver = resolver or get_resolver()
+    system_dir, local_dir = resolver.system_dir, resolver.local_dir
+    system_layouts = system_dir / "layouts"
+    local_layouts = local_dir / "layouts"
+    local_patch_order: list[str] = (
+        _read_meta_order(local_layouts) if local_layouts != system_layouts else [])
+
+    entries: dict[str, dict] = {}
+    ordered_keys: list[str] = []
+
+    # system 区间
+    system_keys = _layer_layout_keys(system_layouts)
+    system_keys = _apply_order_patch(system_keys, system_keys, local_patch_order)
+    for key in system_keys:
+        entry = _load_entry_file(system_layouts, key)
+        if entry is None:
+            continue
+        if local_layouts != system_layouts:
+            patch = _load_entry_file(local_layouts, key)
+            if patch is not None:
+                entry = _merge_entry(entry, patch)
+        entries[key] = entry
+        ordered_keys.append(key)
+
+    # local 区间（local 独有布局）
+    if local_layouts != system_layouts:
+        local_keys = [k for k in _layer_layout_keys(local_layouts) if k not in entries]
+        local_keys = _apply_order_patch(local_keys, local_keys, local_patch_order)
+        for key in local_keys:
+            entry = _load_entry_file(local_layouts, key)
+            if entry is None:
+                continue
+            entries[key] = entry
+            ordered_keys.append(key)
+
+    return {"schema_version": LAYOUTS_SCHEMA_VERSION,
+            "layouts": {k: entries[k] for k in ordered_keys}}
+
+
 def parse_layout_entries(doc: dict) -> dict[str, LayoutEntry]:
     if not isinstance(doc, dict):
-        raise ValueError("layouts.yaml 根节点必须是映射")
-    version = doc.get("schema_version")
-    if version != LAYOUTS_SCHEMA_VERSION or isinstance(version, bool):
-        raise ValueError(
-            "layouts.yaml 仅支持 schema_version: 2，旧布局配置不再兼容"
-        )
+        raise ValueError("布局合并视图必须是映射")
     raw_layouts = doc.get("layouts")
     if not isinstance(raw_layouts, dict):
-        raise ValueError("layouts.yaml 的 layouts 必须是映射")
+        raise ValueError("布局合并视图的 layouts 必须是映射")
 
     entries: dict[str, LayoutEntry] = {}
     names: set[str] = set()
@@ -260,18 +382,10 @@ def parse_layout_entries(doc: dict) -> dict[str, LayoutEntry]:
     return entries
 
 
-def load_layout_doc(resolver: ConfigResolver | None = None) -> dict:
-    resolver = resolver or get_resolver()
-    doc = resolver.load_merged("layouts.yaml")
-    if not doc:
-        return {"schema_version": LAYOUTS_SCHEMA_VERSION, "layouts": {}}
-    parse_layout_entries(doc)
-    return doc
-
-
 def load_layout_entries(
     resolver: ConfigResolver | None = None,
 ) -> dict[str, LayoutEntry]:
+    """合并视图的布局条目；插入顺序即 effective 顺序（system 区间在前）。"""
     return parse_layout_entries(load_layout_doc(resolver))
 
 
@@ -288,7 +402,88 @@ def layouts_for_env(
             if not entry.env or entry.env == env}
 
 
+# ─── 保存 ────────────────────────────────────────────────
+
+def _dump_entry(entry: dict) -> str:
+    import yaml
+    return yaml.safe_dump(entry, allow_unicode=True,
+                          default_flow_style=False, sort_keys=False)
+
+
 def save_layout_doc(doc: dict, resolver: ConfigResolver | None = None) -> None:
+    """把合并视图按 key 落盘（条目写入 ``layouts/{key}.yaml``）。
+
+    - 开发模式：全部条目写 system；
+    - 用户模式：system 布局写字段级补丁到 local（补丁为空则删除 local 覆盖）；
+      local 独有布局整文件写 local。
+
+    入参应是 :func:`load_layout_doc` 返回的完整合并视图；缺失的 key 不会被动
+    删除（删除走 ``delete_layout`` 显式路径）。
+    """
     resolver = resolver or get_resolver()
     parse_layout_entries(doc)
-    resolver.save_merged("layouts.yaml", doc)
+    raw_layouts = doc.get("layouts") or {}
+    system_dir, local_dir = resolver.system_dir, resolver.local_dir
+    user_mode = not resolver.is_dev_mode()
+    for key, entry in raw_layouts.items():
+        validate_layout_key(key)
+        system_entry = _load_entry_file(system_dir, key)
+        if user_mode and system_entry is not None:
+            from ..config.merge import compute_diff
+            patch = compute_diff(system_entry, entry)
+            local_path = local_dir / f"{key}.yaml"
+            if patch:
+                resolver.write_entity(f"layouts/{key}.yaml", _dump_entry(patch))
+            elif local_path.exists():
+                resolver.delete_entity(f"layouts/{key}.yaml")
+            continue
+        # dev 模式全部写 system；用户模式只写 local 独有布局（整文件）
+        resolver.write_entity(f"layouts/{key}.yaml", _dump_entry(entry))
+
+
+def save_layout_order(order: list[str],
+                      resolver: ConfigResolver | None = None) -> None:
+    """写布局顺序 ``layouts/_meta.json``（dev → system；user → local 排序补丁）。"""
+    resolver = resolver or get_resolver()
+    text = json.dumps({"layouts": list(order)}, ensure_ascii=False, indent=2) + "\n"
+    resolver.write_entity(LAYOUT_META_REL, text)
+
+
+def is_system_layout_key(key: str,
+                         resolver: ConfigResolver | None = None) -> bool:
+    """布局是否由 system 层声明（清单文件的单一事实源）。"""
+    resolver = resolver or get_resolver()
+    return (resolver.system_dir
+            / layout_manifest_rel(key)).is_file()
+
+
+def save_layout_entry_patch(key: str, fields: dict,
+                            resolver: ConfigResolver | None = None) -> None:
+    """只覆盖一个 system 布局的少数字段（屏幕标定的 canvas 等）。
+
+    用户模式写字段级补丁到 local（与 system 值一致则删覆盖文件）；
+    开发模式直接写完整条目到 system。
+    """
+    resolver = resolver or get_resolver()
+    key = validate_layout_key(key)
+    entries = load_layout_entries(resolver)
+    entry = entries.get(key)
+    if entry is None:
+        raise ValueError(f"布局 key 不存在: {key}")
+    merged = load_layout_doc(resolver).get("layouts", {}).get(key) or {}
+    merged.update(fields)
+    if resolver.is_dev_mode():
+        resolver.write_entity(f"layouts/{key}.yaml", _dump_entry(merged))
+        return
+    system_entry = _load_entry_file(resolver.system_dir, key)
+    if system_entry is None:
+        # local 独有布局：整文件更新
+        resolver.write_entity(f"layouts/{key}.yaml", _dump_entry(merged))
+        return
+    from ..config.merge import compute_diff
+    patch = compute_diff(system_entry, merged)
+    local_path = resolver.local_dir / f"{key}.yaml"
+    if patch:
+        resolver.write_entity(f"layouts/{key}.yaml", _dump_entry(patch))
+    elif local_path.exists():
+        resolver.delete_entity(f"layouts/{key}.yaml")

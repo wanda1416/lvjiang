@@ -1,8 +1,10 @@
 """布局配置管理器 - 布局 CRUD、截图管理、窗口标题配置
 
-存储结构（目录化）：
-- layouts.yaml          名册 + canvas 内联（聚合键值，local diff 合并）
-- layouts/{key}/{scene_key}.json   每场景独立文件（实体影子，整文件覆盖）
+存储结构（目录化，一布局一清单文件）：
+- layouts/_meta.json               布局顺序
+- layouts/{key}.yaml               布局清单（name/desc/env/canvas/aspect/extends）
+- layouts/{key}/{group}/{scene}.json  每场景独立文件（实体影子，整文件覆盖），
+                                   布局内再按场景分组拆子目录
 
 布局别名（extends）：条目带 `extends: 根布局名` 时，scene 全部复用根布局
 目录，仅 canvas 独立；别名自身不产生任何 scene 文件。
@@ -25,9 +27,9 @@ from ..scene.registry import (
 from .config import (
     DEFAULT_ASPECT_TOLERANCE,
     LayoutEntry,
+    is_system_layout_key,
     load_layout_doc,
     load_layout_entries,
-    parse_layout_entries,
     save_layout_doc,
     validate_layout_key,
 )
@@ -120,7 +122,6 @@ from .screenshots import (
 from .screenshots import (
     set_scene_screenshot_format as set_scene_screenshot_format,
 )
-from .storage import _LAYOUTS_YAML_REL
 from .storage import (
     _drop_orphan_coords as _drop_orphan_coords,
 )
@@ -170,7 +171,7 @@ def _checked_layout_save(function):
         if changed_scenes is not None:
             scenes &= changed_scenes
         names = scene_layout_rels(layout.key, scenes).values()
-        names = set(names) | {"layouts.yaml"}
+        names = set(names) | {"layouts/_meta.json", f"layouts/{layout.key}.yaml"}
         baselines = {name: layout._file_baselines.get(name, file_baseline(resolver, name))
                      for name in names}
         def save_batch():
@@ -193,9 +194,9 @@ def _checked_layout_save(function):
 class LayoutConfigManager:
     """管理布局配置的持久化
 
-    布局存储为目录结构：layouts.yaml（key/name 名册+canvas）+
-    layouts/{key}/{scene}.json；
-    读写经 ConfigResolver（开发→system，用户→local 影子）；
+    布局存储为目录结构：layouts/{key}.yaml（清单）+
+    layouts/{key}/{group}/{scene}.json；
+    读写经 ConfigResolver（开发→system，用户→local 影子/字段补丁）；
     session.json 只在 actives.layout 记录激活布局。
     """
 
@@ -222,7 +223,7 @@ class LayoutConfigManager:
     # ─── 布局 CRUD ──────────────────────────────────────
 
     def list_layout_keys(self) -> list[str]:
-        """返回稳定布局 key，顺序与 ``layouts.yaml`` 一致。"""
+        """返回稳定布局 key，顺序与合并视图（system 区间在前）一致。"""
         return list(load_layout_entries())
 
     def list_layout_entries(self) -> list[LayoutEntry]:
@@ -326,7 +327,8 @@ class LayoutConfigManager:
             logger.info(f"布局已加载: {name}")
             from ..config.conflicts import file_baseline
             from ..scene.registry import get_registry
-            paths = set(scene_layout_rels(name, get_registry().all_scene_keys()).values()) | {"layouts.yaml"}
+            paths = (set(scene_layout_rels(name, get_registry().all_scene_keys()).values())
+                     | {"layouts/_meta.json", f"layouts/{name}.yaml"})
             layout._file_baselines = {path: file_baseline(get_resolver(), path) for path in paths}
         return layout
 
@@ -373,7 +375,7 @@ class LayoutConfigManager:
                 return False
             _, scene_dir_name, _, _ = resolved
 
-        # 2. 更新 layouts.yaml 中的条目（别名布局保留 extends）
+        # 2. 更新清单条目 layouts/{key}.yaml（别名布局保留 extends）
         entry_out: dict = {}
         entry_out["name"] = layout.name
         if existing.get("extends"):
@@ -469,13 +471,9 @@ class LayoutConfigManager:
         """布局是否由 system 层声明。
 
         别名布局没有自己的场景目录，因此不能通过场景文件是否存在来判断来源。
-        ``layouts.yaml`` 的 system 名册才是布局身份的单一事实源。
+        ``layouts/{key}.yaml`` 的 system 清单文件才是布局身份的单一事实源。
         """
-        resolver = get_resolver()
-        system_doc = resolver.load_system(_LAYOUTS_YAML_REL)
-        if not system_doc:
-            return False
-        return name in parse_layout_entries(system_doc)
+        return is_system_layout_key(name)
 
     def delete_layout(self, name: str) -> bool:
         resolver = get_resolver()
@@ -501,10 +499,9 @@ class LayoutConfigManager:
         for sk in scene_keys:
             resolver.delete_entity(_scene_rel(name, sk))
 
-        # 从 layouts.yaml 移除条目
+        # 删除清单文件（用户模式删 system 内容会被 ensure_entity_deletable 拦下）
         if name in layouts_doc:
-            del layouts_doc[name]
-            save_layout_doc(merged, resolver)
+            resolver.delete_entity(f"layouts/{name}.yaml")
 
         # 开发模式额外清理空目录
         if resolver.is_dev_mode():

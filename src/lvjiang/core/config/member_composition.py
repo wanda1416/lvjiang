@@ -9,7 +9,10 @@ from loguru import logger
 
 from .merge import merge_doc, merge_registry_list
 
-REGISTRIES = frozenset({"scenes.yaml", "layouts.yaml"})
+#: 需要按 key 合并（而非整文件覆盖）的聚合登记表。场景/布局注册表已目录化
+#: （scenes/、layouts/ 一物一文件），会员包里的对应文件按普通实体覆盖即可；
+#: 本集合保留为扩展点。
+REGISTRIES: frozenset[str] = frozenset()
 
 
 def _merge(base: Any, addition: Any) -> Any:

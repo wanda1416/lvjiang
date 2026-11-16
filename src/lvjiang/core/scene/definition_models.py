@@ -245,6 +245,8 @@ class SceneDef:
     subscene_refs: list[SubsceneRefDef] = field(default_factory=list)
     references: list[SceneRefDef] = field(default_factory=list)
     hide_all_views: bool = False
+    #: 场景管理界面的展示开关；定义仍加载，旧工作流与布局引用不受影响
+    disabled: bool = False
 
     @property
     def is_subscene(self) -> bool:

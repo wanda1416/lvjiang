@@ -38,9 +38,10 @@ def phone(tmp_path, monkeypatch):
     monkeypatch.setattr(task_runner, "_STATE", task_runner._TaskState())
     monkeypatch.setattr(task_runner, "_ENGINE", None)
     system = tmp_path / "system"
-    system.mkdir()
-    for name in ("app.yaml", "ocr.yaml", "layouts.yaml"):
+    (system / "layouts").mkdir(parents=True)
+    for name in ("app.yaml", "ocr.yaml"):
         (system / name).write_text("{}")
+    (system / "layouts/android.yaml").write_text("name: Android\n")
     archive = tmp_path / "preset.zip"
     build_system_preset(system, archive)
     result = json.loads(bootstrap.initialize(str(archive)))

@@ -1,24 +1,32 @@
 from __future__ import annotations
 
-import pytest
+import json
+
 import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.paths import get_config_system_dir
 from lvjiang.core.scene.config import (
-    build_scene_doc,
-    load_scene_doc,
+    build_scene_meta,
     load_scene_manifest,
-    normalize_scene_doc,
-    save_scene_doc,
 )
 from lvjiang.core.scene.definition import SceneRegistry
 
 
-def _write(path, doc):
+def _write_yaml(path, doc):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.dump(doc, allow_unicode=True, sort_keys=False),
                     encoding="utf-8")
+
+
+def _write_meta(path, doc):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+
+
+def _meta(groups: dict[str, list[str]]) -> dict:
+    return {"groups": [{"key": k, "scenes": v} for k, v in groups.items()]}
 
 
 def test_system_general_combat_is_prominent_single_view_scene(tmp_path):
@@ -52,8 +60,8 @@ def test_system_general_combat_is_prominent_single_view_scene(tmp_path):
 
 def test_legacy_panel_calibration_fields_are_ignored_and_removed_on_save(tmp_path):
     system = tmp_path / "system"
-    path = system / "scenes" / "main.yaml"
-    _write(path, {
+    path = system / "scenes" / "general" / "main.yaml"
+    _write_yaml(path, {
         "key": "main", "name": "Main",
         "panels": [{"key": "grid", "name": "Grid", "rows": 8, "cols": 9,
                     "min_visible": .76, "calibration": "image",
@@ -70,188 +78,204 @@ def test_legacy_panel_calibration_fields_are_ignored_and_removed_on_save(tmp_pat
     assert saved["panels"] == [{"key": "grid", "name": "Renamed"}]
 
 
-def test_legacy_scene_structure_is_rejected():
-    with pytest.raises(ValueError, match="旧 v1 结构不再兼容"):
-        normalize_scene_doc({"layout_scenes": {"general": ["main"]}})
-    with pytest.raises(ValueError, match="旧 v1 结构不再兼容"):
-        normalize_scene_doc({"schema_version": 1})
+def test_group_yaml_and_dir_are_distinct_namespaces(tmp_path):
+    """scenes/{group}.yaml 是分组定义、scenes/{group}/ 是场景目录；两者同名共存合法。"""
+    system = tmp_path / "system"
+    _write_yaml(system / "scenes" / "map.yaml", {"name": "地图"})
+    _write_yaml(system / "scenes" / "map" / "map_common.yaml",
+                {"key": "map_common", "name": "常用"})
+    _write_meta(system / "scenes" / "_meta.json", _meta({"map": ["map_common"]}))
+    resolver = ConfigResolver(system_dir=system, local_dir=tmp_path / "local",
+                              dev_mode=False)
+    manifest = load_scene_manifest(resolver)
+    assert manifest.groups == {"map": ["map_common"]}
+    assert manifest.group_names == {"map": "地图"}
+    assert manifest.order == ["map_common"]
+    # 分组 key 与场景 key 允许同名（分属两个命名空间）
+    _write_yaml(system / "scenes" / "map" / "map.yaml",
+                {"key": "map", "name": "同名场景"})
+    manifest = load_scene_manifest(resolver)
+    # meta 已列 map_common；同名新场景（场景 key == 分组 key）稳定追加在后
+    assert manifest.groups["map"] == ["map_common", "map"]
 
 
-def test_current_scene_overrides_may_omit_version():
-    for doc in ({}, {"content_version": 3}, {"scenes": {"general": {"items": ["main"]}}}):
-        assert normalize_scene_doc(doc) == doc
+def test_meta_drift_degrades_stably_without_losing_entries(tmp_path):
+    """目录是归属事实源：_meta.json 未列出的条目排后且不消失。"""
+    system = tmp_path / "system"
+    _write_yaml(system / "scenes" / "general.yaml", {"name": "通用"})
+    for key in ("beta", "alpha"):
+        _write_yaml(system / "scenes" / "general" / f"{key}.yaml",
+                    {"key": key, "name": key})
+    # meta 只列了 alpha，beta 未列；另有孤儿文件 gamma.yaml 完全未登记
+    _write_meta(system / "scenes" / "_meta.json", _meta({"general": ["alpha"]}))
+    _write_yaml(system / "scenes" / "general" / "gamma.yaml",
+                {"key": "gamma", "name": "gamma"})
+    resolver = ConfigResolver(system_dir=system, local_dir=tmp_path / "local",
+                              dev_mode=False)
+    manifest = load_scene_manifest(resolver)
+    assert manifest.groups["general"] == ["alpha", "beta", "gamma"]
+    assert manifest.order == ["alpha", "beta", "gamma"]
 
 
-def test_v2_disabled_scene_is_hidden_but_kept_in_order(tmp_path):
+def test_local_meta_reorders_within_namespace_blocks_only(tmp_path):
+    """system 恒在 local 区间之前；local meta 只能在各区间内部重排。"""
     system = tmp_path / "system"
     local = tmp_path / "local"
-    _write(system / "scenes.yaml", {
-        "schema_version": 2,
-        "scenes": {
-            "activity": {
-                "name": "活动",
-                "items": ["active", "legacy"],
-                "disabled": ["legacy"],
-            },
-        },
-    })
-    manifest = load_scene_manifest(ConfigResolver(
-        system_dir=system, local_dir=local, dev_mode=False))
+    _write_yaml(system / "scenes" / "general.yaml", {"name": "通用"})
+    _write_yaml(system / "scenes" / "training.yaml", {"name": "培养"})
+    for key in ("main",):
+        _write_yaml(system / "scenes" / "general" / f"{key}.yaml",
+                    {"key": key, "name": key})
+    _write_yaml(system / "scenes" / "training" / "equip.yaml",
+                {"key": "equip", "name": "equip"})
+    _write_meta(system / "scenes" / "_meta.json",
+                _meta({"general": ["main"], "training": ["equip"]}))
+    # local 新建 map 分组 + local meta 把 training 排到 general 前（区间内重排）
+    _write_yaml(local / "scenes" / "map.yaml", {"name": "地图"})
+    _write_yaml(local / "scenes" / "map" / "mine.yaml",
+                {"key": "mine", "name": "mine"})
+    _write_meta(local / "scenes" / "_meta.json",
+                _meta({"training": ["equip"], "general": ["main"], "map": ["mine"]}))
+    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
+    manifest = load_scene_manifest(resolver)
+    assert list(manifest.groups) == ["training", "general", "map"]
+    assert manifest.scene_layers == {
+        "main": "system", "equip": "system", "mine": "local"}
+
+
+def test_disabled_scene_is_hidden_but_kept_in_order(tmp_path):
+    system = tmp_path / "system"
+    _write_yaml(system / "scenes" / "activity.yaml", {"name": "活动"})
+    _write_yaml(system / "scenes" / "activity" / "active.yaml",
+                {"key": "active", "name": "active"})
+    _write_yaml(system / "scenes" / "activity" / "legacy.yaml",
+                {"key": "legacy", "name": "legacy", "disabled": True})
+    _write_meta(system / "scenes" / "_meta.json",
+                _meta({"activity": ["active", "legacy"]}))
+    resolver = ConfigResolver(system_dir=system, local_dir=tmp_path / "local",
+                              dev_mode=False)
+    manifest = load_scene_manifest(resolver)
     assert manifest.order == ["active", "legacy"]
     assert manifest.groups == {"activity": ["active", "legacy"]}
-    assert manifest.disabled == {"legacy"}
-
-
-def test_disabled_scene_remains_resolvable_but_is_absent_from_group_ui(tmp_path):
-    system = tmp_path / "system"
-    local = tmp_path / "local"
-    for key in ("active", "legacy"):
-        _write(system / "scenes" / f"{key}.yaml", {
-            "key": key, "name": key, "regions": []})
-    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
     registry = SceneRegistry(
         resolver=resolver,
-        scene_order=["active", "legacy"],
-        group_config={"activity": ["active", "legacy"]},
-        group_names={"activity": "活动"},
-        disabled_scenes={"legacy"},
+        scene_order=manifest.order,
+        group_config=manifest.groups,
+        group_names=manifest.group_names,
+        disabled_scenes=manifest.disabled,
     )
+    # 定义仍加载、引用不失效，但分组 UI 不展示
     assert registry.get_scene("legacy") is not None
-    assert registry.all_scene_keys() == ["active", "legacy"]
     assert registry.get_group_scenes("activity") == ["active"]
-    assert registry.get_scene_group("legacy") == "activity"
 
 
-def test_v2_disabled_must_reference_registered_item():
-    with pytest.raises(ValueError, match="disabled 含未登记场景"):
-        load = {
-            "schema_version": 2,
-            "scenes": {
-                "activity": {
-                    "name": "活动", "items": ["active"],
-                    "disabled": ["missing"],
-                },
-            },
-        }
-        from lvjiang.core.scene.config import parse_scene_manifest
-        parse_scene_manifest(load)
-
-
-def test_v2_system_merges_unversioned_current_user_overlay(tmp_path):
+def test_user_save_writes_local_meta_patch_and_system_group_stays_first(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
-    _write(system / "scenes.yaml", {
-        "schema_version": 2,
-        "scenes": {
-            "general": {
-                "name": "通用",
-                "items": ["main", "old", "new_from_system"],
-            },
-        },
-    })
-    _write(local / "scenes.yaml", {
-        "scenes": {"general": {
-            "name": "自定义通用",
-            "items": {"__added__": ["mine"], "__removed__": ["old"],
-                      "__order__": ["main", "mine"]},
-        }},
-    })
+    _write_yaml(system / "scenes" / "general.yaml", {"name": "通用"})
+    _write_yaml(system / "scenes" / "general" / "main.yaml",
+                {"key": "main", "name": "main"})
+    _write_yaml(system / "scenes" / "general" / "system_scene.yaml",
+                {"key": "system_scene", "name": "system_scene"})
+    _write_meta(system / "scenes" / "_meta.json",
+                _meta({"general": ["main", "system_scene"]}))
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
-    merged = load_scene_doc(resolver)
-    assert merged["scenes"]["general"] == {
-        "name": "自定义通用",
-        "items": ["main", "mine", "new_from_system"],
-    }
-
-
-def test_user_save_uses_normalized_v2_base_and_does_not_freeze_registry(tmp_path):
-    system = tmp_path / "system"
-    local = tmp_path / "local"
-    # 保存不得把完整 system 清单复制到 local。
-    _write(system / "scenes.yaml", {
-        "schema_version": 2,
-        "scenes": {"general": {"name": "通用", "items": ["main", "system_scene"]}},
-    })
-    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
-    desired = build_scene_doc(
-        ["general"], {"general": ["main", "system_scene", "mine"]},
-        {"general": "通用"}, set())
-    save_scene_doc(resolver, desired)
-    saved = yaml.safe_load((local / "scenes.yaml").read_text(encoding="utf-8"))
-    assert saved == {
-        "scenes": {"general": {"items": {"__added__": ["mine"]}}},
-    }
-    # system 后续新增内容仍会进入用户合并视图。
-    _write(system / "scenes.yaml", {
-        "schema_version": 2,
-        "scenes": {"general": {
-            "name": "通用",
-            "items": ["main", "system_scene", "later",],
-        }},
-    })
-    assert load_scene_manifest(resolver).order == [
-        "main", "system_scene", "later", "mine"]
+    manifest = load_scene_manifest(resolver)
+    registry = SceneRegistry(
+        resolver=resolver,
+        scene_order=manifest.order,
+        group_config=manifest.groups,
+        group_names=manifest.group_names,
+        disabled_scenes=manifest.disabled,
+        group_layers=manifest.group_layers,
+        scene_layers=manifest.scene_layers,
+    )
+    # mine 先以 local 场景身份进入分组（本地新建的真实形态：有文件）
+    mine_path = local / "scenes" / "general" / "mine.yaml"
+    mine_path.parent.mkdir(parents=True, exist_ok=True)
+    mine_path.write_text(
+        yaml.safe_dump({"key": "mine", "name": "mine"}, allow_unicode=True),
+        encoding="utf-8")
+    registry._group_scenes["general"].append("mine")
+    registry._scene_layers["mine"] = "local"
+    registry.reorder_scenes(["mine", "main", "system_scene"])
+    registry.save_group_config()
+    assert not (local / "scenes.yaml").exists()
+    patch = json.loads((local / "scenes" / "_meta.json").read_text(encoding="utf-8"))
+    assert patch["groups"][0]["scenes"] == ["main", "system_scene", "mine"]
+    # system 后续新增仍进入用户合并视图（排在本区块已列条目之后）
+    _write_yaml(system / "scenes" / "general" / "later.yaml",
+                {"key": "later", "name": "later"})
+    merged = load_scene_manifest(resolver)
+    assert merged.groups["general"] == ["main", "system_scene", "later", "mine"]
 
 
 def test_dev_save_keeps_local_only_group_and_scene_in_local(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
-    _write(system / "scenes.yaml", {
-        "schema_version": 2,
-        "scenes": {"general": {"name": "通用", "items": ["main"]}},
-    })
-    _write(local / "scenes.yaml", {
-        "scenes": {"map": {"name": "地图", "items": ["map_one"]}},
-    })
-    _write(local / "scenes/map_one.yaml", {"key": "map_one", "name": "原名"})
+    _write_yaml(system / "scenes" / "general.yaml", {"name": "通用"})
+    _write_yaml(system / "scenes" / "general" / "main.yaml",
+                {"key": "main", "name": "main"})
+    _write_meta(system / "scenes" / "_meta.json", _meta({"general": ["main"]}))
+    _write_yaml(local / "scenes" / "map.yaml", {"name": "地图"})
+    _write_yaml(local / "scenes" / "map" / "map_one.yaml",
+                {"key": "map_one", "name": "原名"})
+    _write_meta(local / "scenes" / "_meta.json", _meta({"map": ["map_one"]}))
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
     manifest = load_scene_manifest(resolver)
     registry = SceneRegistry(
         resolver, manifest.order, manifest.groups, manifest.group_names,
-        manifest.disabled)
+        manifest.disabled,
+        group_layers=manifest.group_layers, scene_layers=manifest.scene_layers)
     registry.rename_scene("map_one", "map_two", "新名")
     registry.save_group_config()
 
-    assert not (system / "scenes/map_one.yaml").exists()
-    assert not (system / "scenes/map_two.yaml").exists()
-    assert not (local / "scenes/map_one.yaml").exists()
+    assert not (system / "scenes" / "map" / "map_one.yaml").exists()
+    assert not (system / "scenes" / "map" / "map_two.yaml").exists()
+    assert not (local / "scenes" / "map" / "map_one.yaml").exists()
     assert yaml.safe_load(
-        (local / "scenes/map_two.yaml").read_text(encoding="utf-8"))["name"] == "新名"
-    assert "map" not in yaml.safe_load(
-        (system / "scenes.yaml").read_text(encoding="utf-8"))["scenes"]
+        (local / "scenes" / "map" / "map_two.yaml").read_text(encoding="utf-8")
+    )["name"] == "新名"
+    assert not (system / "scenes" / "map.yaml").exists()
     assert load_scene_manifest(resolver).groups["map"] == ["map_two"]
 
 
-def test_save_rejects_old_scene_file_without_rewriting(tmp_path):
+def test_reorder_groups_clamps_local_after_system(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"
-    path = local / "scenes.yaml"
-    _write(system / "scenes.yaml", {"schema_version": 2, "scenes": {}})
-    _write(path, {"layout_scenes": {"general": ["main"]}})
-    before = path.read_bytes()
+    _write_yaml(system / "scenes" / "general.yaml", {"name": "通用"})
+    _write_yaml(system / "scenes" / "training.yaml", {"name": "培养"})
+    _write_meta(system / "scenes" / "_meta.json",
+                _meta({"general": [], "training": []}))
+    _write_yaml(local / "scenes" / "map.yaml", {"name": "地图"})
+    _write_meta(local / "scenes" / "_meta.json", _meta({"map": []}))
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
-    with pytest.raises(ValueError, match="旧 v1 结构不再兼容"):
-        save_scene_doc(resolver, build_scene_doc(
-            ["general"], {"general": ["main"]}, {"general": "通用"}, set()))
-    assert path.read_bytes() == before
+    manifest = load_scene_manifest(resolver)
+    registry = SceneRegistry(
+        resolver=resolver,
+        group_config=manifest.groups,
+        group_names=manifest.group_names,
+        group_layers=manifest.group_layers,
+    )
+    # 拖动把 local 分组顶到最前：写入/内存态必须被钳回 system 区间之后
+    registry.reorder_groups(["map", "training", "general"])
+    assert registry._group_order == ["training", "general", "map"]
 
 
-def test_future_schema_is_rejected():
-    with pytest.raises(ValueError, match="当前只支持到 2"):
-        normalize_scene_doc({"schema_version": 3, "scenes": {}})
+def test_build_scene_meta_is_canonical_shape():
+    doc = build_scene_meta(["a", "b"], {"a": ["x"], "b": []})
+    assert doc == {"groups": [{"key": "a", "scenes": ["x"]},
+                              {"key": "b", "scenes": []}]}
 
 
 def test_create_scene_survives_synchronous_registry_reload(tmp_path):
-    """新场景文件通知先于 manifest 保存时，不得产生临时分组的重复归属。"""
+    """新场景文件通知先于 _meta.json 保存时，不得产生临时分组的重复归属。"""
     system = tmp_path / "system"
     local = tmp_path / "local"
-    _write(system / "scenes.yaml", {
-        "schema_version": 2,
-        "scenes": {
-            "general": {"name": "通用", "items": []},
-            "target": {"name": "目标分组", "items": []},
-        },
-    })
+    _write_yaml(system / "scenes" / "general.yaml", {"name": "通用"})
+    _write_yaml(system / "scenes" / "target.yaml", {"name": "目标分组"})
+    _write_meta(system / "scenes" / "_meta.json",
+                _meta({"general": [], "target": []}))
     resolver = ConfigResolver(
         system_dir=system, local_dir=local, dev_mode=True)
     manifest = load_scene_manifest(resolver)
@@ -261,6 +285,8 @@ def test_create_scene_survives_synchronous_registry_reload(tmp_path):
         group_config=manifest.groups,
         group_names=manifest.group_names,
         disabled_scenes=manifest.disabled,
+        group_layers=manifest.group_layers,
+        scene_layers=manifest.scene_layers,
     )
 
     def reload_in_place(rel_path: str) -> None:
@@ -273,6 +299,8 @@ def test_create_scene_survives_synchronous_registry_reload(tmp_path):
             group_config=current.groups,
             group_names=current.group_names,
             disabled_scenes=current.disabled,
+            group_layers=current.group_layers,
+            scene_layers=current.scene_layers,
         )
         registry.__dict__.clear()
         registry.__dict__.update(refreshed.__dict__)

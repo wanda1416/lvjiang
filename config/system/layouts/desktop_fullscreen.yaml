@@ -1,0 +1,10 @@
+content_version: 1
+name: 桌面全屏
+extends: desktop
+desc: PC 端游全屏，画面无标题栏与边框
+canvas:
+  x_ratio: 0.0
+  y_ratio: 0.0
+  w_ratio: 1.0
+  h_ratio: 1.0
+aspect: '16:9'

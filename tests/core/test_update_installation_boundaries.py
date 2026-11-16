@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import yaml
-
 from lvjiang.core import plugins as apps
 from lvjiang.core.config import protected_remote, remote, resolver
 from lvjiang.core.config.member_download import MemberDownload
@@ -64,6 +62,11 @@ def test_member_installs_without_business_selfcheck_or_global_refresh_failure(tm
 
 
 def test_member_overlays_public_and_registry_keys_without_ownership_gate(tmp_path):
+    """会员文件叠加公开发布，撤回后回到公开内容；不需要所有权门槛。
+
+    场景/布局注册表已目录化（一物一文件），会员包里的对应文件按普通实体
+    整文件覆盖，不再按 key 合并（REGISTRIES 已清空）。
+    """
     system = tmp_path / "system"
     system.mkdir()
     baseline = {"shared.bin": b"r0", "scenes.yaml": b"scenes:\n  basic:\n    name: Base\n    items: [base]\n"}
@@ -74,22 +77,22 @@ def test_member_overlays_public_and_registry_keys_without_ownership_gate(tmp_pat
     member = {"shared.bin": b"member", "scenes.yaml": b"scenes:\n  basic:\n    name: Member\n    items: [member]\n"}
     store.install(manifest, archive, member_files=member, activate=lambda *_: None)
     assert (system / "shared.bin").read_bytes() == b"member"
-    registry = yaml.safe_load((system / "scenes.yaml").read_text(encoding="utf-8"))
-    assert registry["scenes"]["basic"] == {"name": "Member", "items": ["base", "member"]}
-    # 登记表损坏也只保留该文件原文，不阻断其它内容叠加。
+    # 注册表合并机制退役：会员文件整文件覆盖公开发布
+    assert (system / "scenes.yaml").read_bytes() == member["scenes.yaml"]
+    # 成员文件损坏也只保留该文件原文，不阻断其它内容叠加。
     member["scenes.yaml"] = b"[ invalid yaml"
     store.install(member_files=member, activate=lambda *_: None)
     assert (system / "scenes.yaml").read_bytes() == member["scenes.yaml"]
     assert (system / "shared.bin").read_bytes() == b"member"
     store.install(member_files={}, activate=lambda *_: None)
     assert (system / "shared.bin").read_bytes() == b"public"
-    assert (system / "scenes.yaml").read_bytes() == baseline["scenes.yaml"]
+    # 撤回会员：会员的 scenes.yaml 属普通会员文件，整文件移除（不再回退基底）
+    assert not (system / "scenes.yaml").exists()
 
 
 def test_empty_scene_registry_does_not_abort_next_startup(tmp_path):
     system = tmp_path / "config/system"
-    system.mkdir(parents=True)
-    (system / "scenes.yaml").write_text("schema_version: 2\nscenes: {}\n", encoding="utf-8")
+    (system / "scenes").mkdir(parents=True)
     env = {**os.environ, "LVJIANG_ROOT": str(tmp_path),
            "PYTHONPATH": str(Path(__file__).parents[2] / "src")}
     result = subprocess.run(

@@ -51,9 +51,9 @@ _REGISTRY_KEYS = (ADDED_KEY, REMOVED_KEY, ORDER_KEY)
 #: `apps/yysls/config/merge_policy.py`，经 `AppHooks.config_policy_modules`
 #: 「import 即注册」接入（同 `builtin_modules`/`telemetry_modules` 的约定）。
 REGISTRY_LIST_PATHS: dict[str, tuple[str, ...]] = {
-    # v1 路径保留给通用 resolver 的存量兼容；v2 的专用跨 schema 合并见
-    # core.scene.config（必须先分别转换 system/local，不能直接混合结构）。
-    "scenes.yaml": ("scenes.*.items", "scenes.*.disabled"),
+    # 场景/布局注册表已是目录化结构（scenes/、layouts/ 一物一文件），
+    # namespace 优先级链（system > local）取代了聚合文件 diff，见
+    # core.scene.config / core.layout.config。本表保留给仍用聚合文件的登记表。
     # 环境与方案都是带稳定 key 的登记表：local 存整张表会把系统后续新增的
     # 环境/方案挡在合并视图之外。按身份对齐见 REGISTRY_LIST_IDENTITY。
     "app.yaml": ("envs", "plans"),

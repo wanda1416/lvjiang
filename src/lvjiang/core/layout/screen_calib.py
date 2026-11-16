@@ -30,8 +30,11 @@ import numpy as np
 from loguru import logger
 
 from ..config.resolver import get_resolver
-from .config import load_layout_doc, parse_layout_entries, save_layout_doc
-from .manager import _LAYOUTS_YAML_REL, _safe_name
+from .config import (
+    load_layout_entries,
+    save_layout_entry_patch,
+)
+from .manager import _safe_name
 from .models import CanvasConfig
 
 #: 布局目录下的参照截图文件名（下划线开头：布局加载只枚举场景 json，不会误读）
@@ -129,30 +132,30 @@ def reference_canvas(layout_name: str) -> CanvasConfig:
 # ─── 画布读写 ──────────────────────────────────────────────
 
 def load_canvas(layout_name: str) -> CanvasConfig:
-    """layouts.yaml（system ← local 合并）里该布局当前的画布；缺省整屏"""
-    doc = load_layout_doc()
-    entry = doc.get("layouts", {}).get(layout_name) or {}
-    return CanvasConfig.from_dict(entry.get("canvas") or {})
+    """合并视图里该布局当前的画布；缺省整屏"""
+    entry = load_layout_entries().get(layout_name)
+    return CanvasConfig.from_dict(entry.canvas if entry else {})
 
 
 def system_canvas(layout_name: str) -> CanvasConfig:
     """随版本分发的画布（不含本地覆盖）——参照图就是按它拍的"""
     resolver = get_resolver()
-    doc = resolver._load_yaml(resolver.system_dir / _LAYOUTS_YAML_REL)  # noqa: SLF001
-    entry = parse_layout_entries(doc).get(layout_name)
-    return CanvasConfig.from_dict(entry.canvas if entry else {})
+    import yaml
+    path = resolver.system_dir / f"layouts/{layout_name}.yaml"
+    entry = {}
+    if path.is_file():
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                entry = data
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[Calib] 系统布局清单读取失败 {path}: {exc}")
+    return CanvasConfig.from_dict(entry.get("canvas") or {})
 
 
 def save_canvas(layout_name: str, canvas: CanvasConfig) -> None:
-    """把画布写成该布局的本地覆盖（用户态：只落 diff；与系统值一致则删覆盖）"""
-    resolver = get_resolver()
-    doc = load_layout_doc(resolver)
-    layouts = doc.setdefault("layouts", {})
-    entry = layouts.get(layout_name)
-    if not isinstance(entry, dict):
-        raise CalibError(f"布局 key 不存在: {layout_name}")
-    entry["canvas"] = canvas.to_dict()
-    save_layout_doc(doc, resolver)
+    """把画布写成该布局的本地覆盖（字段级补丁；与系统值一致则删覆盖）"""
+    save_layout_entry_patch(layout_name, {"canvas": canvas.to_dict()})
     logger.info(f"[Calib] 布局「{layout_name}」画布已保存: {canvas.to_dict()}")
 
 

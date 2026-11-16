@@ -1,9 +1,8 @@
-"""layouts.yaml schema v2 和稳定布局身份约束。"""
+"""布局目录化清单（layouts/{key}.yaml + _meta.json）和稳定布局身份约束。"""
 
 from pathlib import Path
 
 import pytest
-import yaml
 
 from lvjiang.core.layout.config import parse_layout_entries
 
@@ -28,16 +27,6 @@ def test_layout_v2_separates_stable_key_and_display_name():
     assert entries["android_cast"].extends == "android"
 
 
-@pytest.mark.parametrize("version", [None, 1, "2"])
-def test_old_or_malformed_layout_schema_is_rejected(version):
-    doc = {"layouts": {"android": {"name": "安卓布局"}}}
-    if version is not None:
-        doc["schema_version"] = version
-
-    with pytest.raises(ValueError, match="仅支持 schema_version: 2"):
-        parse_layout_entries(doc)
-
-
 def test_duplicate_display_names_are_rejected():
     with pytest.raises(ValueError, match="布局名称重复"):
         parse_layout_entries({
@@ -59,10 +48,9 @@ def test_layout_key_must_be_stable_lower_snake_case(key):
 
 
 def test_system_layout_keys_have_matching_layout_and_template_directories():
+    from lvjiang.core.layout.config import load_layout_entries
     root = Path(__file__).resolve().parents[3]
-    doc = yaml.safe_load(
-        (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
-    entries = parse_layout_entries(doc)
+    entries = load_layout_entries()
 
     assert list(entries) == [
         "android", "android_cast", "desktop", "desktop_fullscreen"]
@@ -74,9 +62,10 @@ def test_system_layout_keys_have_matching_layout_and_template_directories():
         assert (root / "config/system/layouts" / key).is_dir()
         assert (root / "config/system/templates" / key).is_dir()
     # 继承布局只有画布，区域实时读根布局——多出目录就说明它被当根布局标注过了
+    # （清单文件 layouts/{key}.yaml 存在是正常的，坐标目录不该存在）
     for key in ("android_cast", "desktop_fullscreen"):
         assert entries[key].extends
-        assert not (root / "config/system/layouts" / key).exists()
+        assert not (root / "config/system/layouts" / key).is_dir()
     # 适配环境声明：根布局显式声明，别名布局继承根布局
     assert entries["android"].env == "android"
     assert entries["android_cast"].env == "android"
@@ -169,11 +158,11 @@ class TestAspectDeclaration:
         带边框的布局容差必须放得下 1280x720~3840x2160 这一段漂移，同时拦住真正的
         形态错配（窗口模式配「桌面全屏」约 2.7%）。
         """
-        from lvjiang.core.layout.config import canvas_aspect_deviation
-        root = Path(__file__).resolve().parents[3]
-        doc = yaml.safe_load(
-            (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
-        entry = parse_layout_entries(doc)["desktop"]
+        from lvjiang.core.layout.config import (
+            canvas_aspect_deviation,
+            load_layout_entries,
+        )
+        entry = load_layout_entries()["desktop"]
         canvas = entry.canvas
         expected = entry.aspect_ratio
         assert expected is not None

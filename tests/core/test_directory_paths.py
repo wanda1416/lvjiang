@@ -35,8 +35,8 @@ def test_independent_layer_locations_share_logical_config_context(tmp_path, monk
     store = UpdateStore(config, "0.15.0", "digest")
     assert (store.system, store.updates) == (system, updates)
     assert get_config_i18n_dir() == language
-    (system / "layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  phone:\n    name: 手机\n", encoding="utf-8")
+    (system / "layouts").mkdir()
+    (system / "layouts/phone.yaml").write_text("name: 手机\n", encoding="utf-8")
     (session / "users").mkdir()
     (session / "users/example.json").write_text("{}", encoding="utf-8")
     (session / "session.json").write_text('{"users":["example"]}', encoding="utf-8")

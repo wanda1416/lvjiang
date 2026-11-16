@@ -53,15 +53,35 @@ def config_write_lock(local_dir: Path) -> Iterator[None]:
 
 
 def indexed_paths(resolver) -> dict[tuple[str, ...], Path]:
-    """只枚举名称；任务启动无需读取全部文件内容。"""
-    paths: dict[tuple[str, ...], Path] = {}
+    """只枚举名称；任务启动无需读取全部文件内容。
+
+    目录化结构里「分组定义文件 ``scenes/{group}.yaml``」与「分组目录
+    ``scenes/{group}/``」合法同名：去后缀的键在此处会撞车（叶子把分支顶成
+    int）。凡是同名冲突的叶子，键改用**带后缀的文件名**，与分支共存。
+    """
+    rels: list[Path] = []
     for root in (resolver.system_dir, resolver.local_dir):
         for path in versioning.iter_versioned_files(root):
             rel = path.relative_to(root)
             if len(rel.parts) == 1:
                 continue  # 根 YAML 每次直接读取，不参与实体索引。
-            paths[tuple(rel.with_suffix("").parts)] = path
-    return paths
+            rels.append(rel)
+    branches = {
+        keys[:i]
+        for keys in (tuple(rel.with_suffix("").parts) for rel in rels)
+        for i in range(1, len(keys))
+    }
+    result: dict[tuple[str, ...], Path] = {}
+    for root in (resolver.system_dir, resolver.local_dir):
+        for path in versioning.iter_versioned_files(root):
+            rel = path.relative_to(root)
+            if len(rel.parts) == 1:
+                continue
+            keys = tuple(rel.with_suffix("").parts)
+            if keys in branches:
+                keys = (*keys[:-1], rel.name)
+            result.setdefault(keys, path)
+    return result
 
 
 def rebuild_content(resolver) -> dict:

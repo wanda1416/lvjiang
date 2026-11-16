@@ -1,0 +1,9 @@
+content_version: 1
+name: 投屏布局
+extends: android
+desc: 模拟器/投屏窗口，画面带边框
+canvas:
+  x_ratio: 0.0
+  y_ratio: 0.040113312207636344
+  w_ratio: 1.0
+  h_ratio: 0.9214251493308252

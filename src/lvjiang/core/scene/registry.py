@@ -23,11 +23,17 @@ from .definition_models import (
 
 
 def _load_manifest():
-    """读取当前格式 scenes.yaml。"""
+    """读取目录化场景配置的合并视图。"""
+    # 兜底迁移：run_app 之外的读取路径（vscode LSP、独立脚本、测试）也可能
+    # 首个触达场景注册表；未迁移的旧聚合文件必须在这里拆分，否则旧平铺
+    # 场景文件会被当成顶层分组定义误读。已迁移时是两次 stat 的空操作。
+    from ..config.content_split import ensure_content_split
+    resolver = get_root_resolver()
+    ensure_content_split(resolver.system_dir, resolver.local_dir)
     try:
-        return load_scene_manifest(get_root_resolver())
+        return load_scene_manifest(resolver)
     except Exception as e:
-        logger.warning(f"读取 scenes.yaml 失败: {e}")
+        logger.warning(f"读取场景分组配置失败: {e}")
         return None
 
 
@@ -101,11 +107,13 @@ def initialize_scene_registry() -> None:
         group_config=manifest.groups if manifest else None,
         group_names=manifest.group_names if manifest else None,
         disabled_scenes=manifest.disabled if manifest else None,
+        group_layers=manifest.group_layers if manifest else None,
+        scene_layers=manifest.scene_layers if manifest else None,
     )
     _rebuild_scene_globals()
     # 配置可暂时没有场景分组，不能在首次加载时阻断应用启动。
     if not _registry.get_groups():
-        logger.warning("未加载场景分组，场景相关功能暂不可用；请检查 scenes.yaml，不影响程序启动")
+        logger.warning("未加载场景分组，场景相关功能暂不可用；请检查 scenes/ 目录，不影响程序启动")
 
 
 def get_registry() -> SceneRegistry:
@@ -133,6 +141,8 @@ def reload_scene_registry():
         group_config=manifest.groups if manifest else None,
         group_names=manifest.group_names if manifest else None,
         disabled_scenes=manifest.disabled if manifest else None,
+        group_layers=manifest.group_layers if manifest else None,
+        scene_layers=manifest.scene_layers if manifest else None,
     )
     # 配置写入会同步触发本函数。若直接替换模块单例，已打开的区域编辑器、
     # 视图管理器仍会继续修改旧 SceneRegistry，下一次写入就可能把刚保存的
@@ -144,7 +154,7 @@ def reload_scene_registry():
 
 def _on_config_change(paths: tuple[str, ...]):
     """配置写入后的失效通知：场景相关文件变更时重载注册表"""
-    if any(path == "scenes.yaml" or path.startswith("scenes/") for path in paths):
+    if any(path.startswith("scenes/") for path in paths):
         reload_scene_registry()
 
 

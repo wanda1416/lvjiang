@@ -17,8 +17,10 @@ from lvjiang.core.updates.system_preset import (
 def official(tmp_path):
     system = tmp_path / "official/system"
     system.mkdir(parents=True)
-    for name in ("app.yaml", "ocr.yaml", "layouts.yaml"):
+    for name in ("app.yaml", "ocr.yaml"):
         (system / name).write_text("{}", encoding="utf-8")
+    (system / "layouts").mkdir()
+    (system / "layouts/android.yaml").write_text("name: Android", encoding="utf-8")
     (system / "workflows").mkdir()
     (system / "workflows/task.wf").write_text("wait 0.01", encoding="utf-8")
     (system.parent / "local").mkdir()
@@ -32,13 +34,13 @@ def test_package_is_deterministic_and_only_contains_official_configuration(offic
     build_system_preset(official, second)
     assert first.read_bytes() == second.read_bytes()
     with zipfile.ZipFile(first) as package:
-        assert set(package.namelist()) == {"system/app.yaml", "system/ocr.yaml", "system/layouts.yaml", "system/workflows/task.wf", "manifest.json"}
+        assert set(package.namelist()) == {"system/app.yaml", "system/ocr.yaml", "system/layouts/android.yaml", "system/workflows/task.wf", "manifest.json"}
 
 
 def test_include_excludes_untracked_drafts_and_rejects_missing_files(official, tmp_path):
     """构建只打包 git 跟踪的官方文件；声明了却缺失的文件视为构建错误。"""
     (official / "workflows/_draft.wf").write_text("wait 0.02", encoding="utf-8")
-    included = ["app.yaml", "ocr.yaml", "layouts.yaml", "workflows/task.wf"]
+    included = ["app.yaml", "ocr.yaml", "layouts/android.yaml", "workflows/task.wf"]
     archive = tmp_path / "preset.zip"
     manifest = build_system_preset(official, archive, include=included)
     assert sorted(manifest["files"]) == sorted(included)
@@ -52,8 +54,11 @@ def test_include_excludes_untracked_drafts_and_rejects_missing_files(official, t
 def _official_tree(root: Path, newline: str) -> Path:
     system = root / "system"
     (system / "workflows").mkdir(parents=True)
-    for name in ("app.yaml", "ocr.yaml", "layouts.yaml"):
+    for name in ("app.yaml", "ocr.yaml"):
         (system / name).write_text("{}" + newline, encoding="utf-8", newline="")
+    (system / "layouts").mkdir()
+    (system / "layouts/android.yaml").write_text(
+        "name: Android" + newline, encoding="utf-8", newline="")
     (system / "workflows/task.wf").write_text("wait 0.01" + newline, encoding="utf-8", newline="")
     return system
 

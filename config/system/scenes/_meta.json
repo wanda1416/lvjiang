@@ -1,0 +1,75 @@
+{
+  "content_version": 1,
+  "groups": [
+    {
+      "key": "general",
+      "scenes": [
+        "game_main_page",
+        "game_menu_page",
+        "game_login_page",
+        "game_settings",
+        "general_combat",
+        "general_move",
+        "general_control",
+        "general_action",
+        "general_chat",
+        "general_purchase"
+      ]
+    },
+    {
+      "key": "training",
+      "scenes": [
+        "equip_detail",
+        "equip_weapon_detail",
+        "equip_armor_detail",
+        "equip_tune_detail",
+        "training_main",
+        "training_plan",
+        "training_xinfa",
+        "role_detail",
+        "tongyou_main"
+      ]
+    },
+    {
+      "key": "resource",
+      "scenes": [
+        "bag_detail",
+        "bag_equip_detail",
+        "bag_item_detail",
+        "bag_wallet_detail",
+        "bugan_detail",
+        "zhanling_detail",
+        "shop_detail",
+        "shop_bayinqiao"
+      ]
+    },
+    {
+      "key": "social",
+      "scenes": [
+        "school_main",
+        "baiye_main",
+        "baiye_residence",
+        "appearance_main",
+        "chat_main"
+      ]
+    },
+    {
+      "key": "activity",
+      "scenes": [
+        "activity_main",
+        "activity_jianghu",
+        "activity_huoyun",
+        "activity_fujingxingzhou",
+        "activity_mengzhu",
+        "activity_jianghuyi"
+      ]
+    },
+    {
+      "key": "component",
+      "scenes": [
+        "jianghu_card",
+        "baiye_activity_card"
+      ]
+    }
+  ]
+}

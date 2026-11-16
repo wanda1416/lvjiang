@@ -18,7 +18,10 @@ MAX_BUNDLE_BYTES = 32 * 1024 * 1024
 MAX_EXPANDED_BYTES = 64 * 1024 * 1024
 MAX_MEMBER_BYTES = 4 * 1024 * 1024
 MAX_MEMBERS = 2000
-REGISTRIES = frozenset({"scenes.yaml", "layouts.yaml"})
+#: 需要按 key 合并（而非整文件覆盖）的聚合登记表。场景/布局注册表已目录化
+#: （scenes/、layouts/ 一物一文件），包内对应文件按普通实体覆盖即可；
+#: 本集合保留为扩展点。
+REGISTRIES: frozenset[str] = frozenset()
 
 
 def is_asset(name: str) -> bool:

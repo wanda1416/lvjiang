@@ -160,22 +160,6 @@ def test_prerelease_baseline_and_recovery_do_not_touch_final_archives(tmp_path):
     assert not final_store.state_path.exists()
 
 
-def test_public_revision_preserves_member_registry_fragments(tmp_path):
-    base = {"scenes.yaml": b"schema_version: 2\nscenes:\n  basic:\n    items: [base]\n"}
-    write_files(tmp_path / "system", base)
-    store = UpdateStore(tmp_path, "0.15.0", tree_digest(base))
-    manifest, archive = make_manifest("0.15.0", 1, base, {})
-    member = {"scenes.yaml": b"scenes:\n  basic:\n    items: [member]\n", "scenes/member.yaml": b"key: member"}
-    store.install(manifest, archive, member_files=member,
-                  activate=lambda *args: None)
-    public = {"scenes.yaml": base["scenes.yaml"].replace(b"[base]", b"[base, new]")}
-    manifest, archive = make_manifest("0.15.0", 2, base, public)
-    store.install(manifest, archive, activate=lambda *args: None)
-    import yaml
-    data = yaml.safe_load((tmp_path / "system/scenes.yaml").read_text(encoding="utf-8"))
-    assert data["scenes"]["basic"]["items"] == ["base", "new", "member"]
-
-
 def test_member_install_and_withdrawal_ignore_public_revision_dependency(tmp_path, monkeypatch):
     """会员包按授权安装与撤回，不因发布方修订序号拒绝。"""
     monkeypatch.setattr("lvjiang.core.updates.release.get_version", lambda: "0.15.0")

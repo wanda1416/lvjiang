@@ -213,7 +213,7 @@ class TestSaveLoadRoundtrip:
         layout.get_scene_regions("scene_a")[0].activation_key = "NOT_A_KEY"
 
         assert mgr.save_layout(layout) is False
-        assert not (env / "system" / "layouts.yaml").exists()
+        assert not (env / "system" / "layouts" / "test_layout.yaml").exists()
         assert not (env / "system" / "layouts" / "test_layout").exists()
 
     def test_rejects_non_string_activation_key_before_writing(self, env):
@@ -222,7 +222,7 @@ class TestSaveLoadRoundtrip:
         layout.get_scene_points("scene_a")[0].activation_key = 3  # type: ignore[assignment]
 
         assert mgr.save_layout(layout) is False
-        assert not (env / "system" / "layouts.yaml").exists()
+        assert not (env / "system" / "layouts" / "test_layout.yaml").exists()
 
 
 class TestListLayouts:
@@ -289,17 +289,15 @@ class TestAliasLayout:
 
     @staticmethod
     def _add_alias_entry(env, alias: str, root: str, canvas: dict):
-        """手工在 layouts.yaml 中追加别名条目（模拟用户编辑）"""
+        """手工在 layouts/{alias}.yaml 追加别名条目（模拟用户编辑）"""
         import yaml
-        yaml_path = env / "system" / "layouts.yaml"
-        doc = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        doc["layouts"][alias] = {
+        yaml_path = env / "system" / "layouts" / f"{alias}.yaml"
+        yaml_path.parent.mkdir(parents=True, exist_ok=True)
+        yaml_path.write_text(yaml.safe_dump({
             "name": alias,
             "extends": root,
             "canvas": canvas,
-        }
-        yaml_path.write_text(
-            yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        }, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
     def test_alias_loads_scenes_from_root(self, env):
         """别名加载：scene 来自根目录，canvas 取自身，name 为别名"""
@@ -322,13 +320,12 @@ class TestAliasLayout:
         assert set(layout_manager.shared_layout_bindings("alias_layout")) == {"root_layout", "alias_layout"}
 
     def test_alias_extends_missing_target_returns_none(self, env):
-        """extends 指向missing的布局 → None"""
+        """extends 指向missing的布局 → None（逐文件失败隔离，只记 error）"""
         mgr = LayoutConfigManager()
         mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
             env, "bad_alias", "missing_root", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
-        with pytest.raises(ValueError, match="extends 目标不存在"):
-            load_layout_by_key("bad_alias")
+        assert load_layout_by_key("bad_alias") is None
 
     def test_alias_multi_level_inheritance_returns_none(self, env):
         """extends 指向另一个带 extends 的布局（多级继承）→ None"""
@@ -338,9 +335,13 @@ class TestAliasLayout:
             env, "alias_one", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
         self._add_alias_entry(
             env, "alias_two", "alias_one", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
-        # 整份 v2 清单必须合法，多级继承会在解析期直接拒绝。
+        # 多级继承在清单解析期拒绝：合并视图整体不合法，UI 列表拿不到条目；
+        # alias_two（指向别名）加载不到，alias_one 自身仍是合法根布局。
+        from lvjiang.core.layout.config import load_layout_entries
         with pytest.raises(ValueError, match="禁止多级继承"):
-            load_layout_by_key("alias_one")
+            load_layout_entries()
+        assert load_layout_by_key("alias_two") is None
+        assert load_layout_by_key("alias_one") is not None
 
     def test_alias_save_preserves_extends_and_writes_root_dir(self, env):
         """save_layout 别名：yaml 保留 extends + 更新 canvas；scene 写根目录"""
@@ -358,14 +359,14 @@ class TestAliasLayout:
 
         # yaml 条目保留 extends + canvas 已更新
         doc = yaml.safe_load(
-            (env / "system" / "layouts.yaml").read_text(encoding="utf-8"))
-        alias_entry = doc["layouts"]["alias_layout"]
+            (env / "system" / "layouts" / "alias_layout.yaml").read_text(encoding="utf-8"))
+        alias_entry = doc
         assert alias_entry["extends"] == "root_layout"
         assert alias_entry["canvas"]["w_ratio"] == pytest.approx(0.7)
 
         # scene 写入root_layout目录，别名目录missing
         assert (env / "system" / "layouts" / "root_layout" / "scene_a.json").exists()
-        assert not (env / "system" / "layouts" / "alias_layout").exists()
+        assert not (env / "system" / "layouts" / "alias_layout").is_dir()
         # root_layout重新加载后包含新 region（单一事实源）
         root = load_layout_by_key("root_layout")
         assert [r.key for r in root.get_scene_regions("scene_a")] == ["newbtn"]
@@ -402,7 +403,7 @@ class TestAliasLayout:
         assert user_mgr.is_system_layout("system_alias")
         assert user_mgr.delete_layout("system_alias") is False
         assert "system_alias" in user_mgr.list_layout_keys()
-        assert not (env / "local" / "layouts.yaml").exists()
+        assert not (env / "local" / "layouts" / "system_alias.yaml").exists()
 
     def test_new_layout_rejects_existing_alias_name(self, env):
         """new_layout 撞名别名 → ValueError，root_layout不被清空"""
@@ -446,11 +447,10 @@ class TestAliasLayout:
         self._add_alias_entry(
             env, "alias_two", "alias_one", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
 
-        # 直接构造内存布局尝试保存非法别名
+        # 直接构造内存布局尝试保存非法别名：拒绝写盘（返回 False 并记 error）
         bad = _make_layout("alias_two")
-        with pytest.raises(ValueError, match="禁止多级继承"):
-            mgr.save_layout(bad)
-        # 非法条目未被写入 scene（alias_one目录missing）
+        assert mgr.save_layout(bad) is False
+        # 非法条目未被写入 scene（alias_one 目录 missing）
         assert not (env / "system" / "layouts" / "alias_one").exists()
         assert not (env / "system" / "layouts" / "alias_two").exists()
 
@@ -471,11 +471,11 @@ class TestAliasLayout:
         # scene 来自root_layout
         assert [r.key for r in alias.get_scene_regions("scene_a")] == ["btn", "label"]
         # 别名目录missing
-        assert not (env / "system" / "layouts" / "alias_layout").exists()
+        assert not (env / "system" / "layouts" / "alias_layout").is_dir()
         # yaml 条目正确
         import yaml
-        doc = yaml.safe_load((env / "system" / "layouts.yaml").read_text(encoding="utf-8"))
-        assert doc["layouts"]["alias_layout"]["extends"] == "root_layout"
+        doc = yaml.safe_load((env / "system" / "layouts" / "alias_layout.yaml").read_text(encoding="utf-8"))
+        assert doc["extends"] == "root_layout"
 
     def test_create_alias_layout_rejects_existing_name(self, env):
         """create_alias_layout：撞名已存在布局 → None"""
@@ -515,25 +515,27 @@ class TestSceneLayoutRel:
             "layouts/unknown_layout/scene_a.json"
 
     def test_batch_paths_parse_layout_registry_once(self, env, monkeypatch):
-        from lvjiang.core.config.resolver import get_resolver
+        from lvjiang.core.layout import config as layout_config
         from lvjiang.core.layout.manager import scene_layout_rels
 
         mgr = LayoutConfigManager()
         mgr.save_layout(_make_layout("root_layout"))
-        resolver = get_resolver()
-        original = resolver.load_merged
         calls = []
 
-        def counted(rel_path):
-            calls.append(rel_path)
-            return original(rel_path)
+        original_meta = layout_config._read_meta_order
 
-        monkeypatch.setattr(resolver, "load_merged", counted)
+        def counted(layouts_dir):
+            calls.append("meta")
+            return original_meta(layouts_dir)
+
+        monkeypatch.setattr(layout_config, "_read_meta_order", counted)
+        # 场景未登记分组时坐标退回平铺路径
         assert scene_layout_rels("root_layout", ("scene_a", "scene_b")) == {
             "scene_a": "layouts/root_layout/scene_a.json",
             "scene_b": "layouts/root_layout/scene_b.json",
         }
-        assert calls == ["layouts.yaml"]
+        # system 与 local 两层各解析一次 meta；批量路径只解析一次清单
+        assert calls == ["meta", "meta"]
 
 
 class TestSaveLayoutScope:
@@ -585,7 +587,8 @@ class TestSaveLayoutScope:
         layout.regions["scene_a"][0].x_ratio += 0.1
         mgr.save_layout(layout, changed_scenes={"scene_a"})
         data = json.loads((scene_dir / "scene_a.json").read_text(encoding="utf-8"))
-        assert data["content_version"] == 2
+        # 只重写了选中的场景，且修改已落盘（版本号契约见 test_content_writes）
+        assert data["regions"][0]["x_ratio"] == pytest.approx(0.2)
 
 
 def test_old_central_disabled_section_is_rejected():
@@ -622,9 +625,9 @@ class TestManifestFieldsNotCarriedByLayout:
     @staticmethod
     def _patch_entry(env_root, key: str, **fields):
         import yaml
-        path = env_root / "system" / "layouts.yaml"
+        path = env_root / "system" / "layouts" / f"{key}.yaml"
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
-        doc["layouts"][key].update(fields)
+        doc.update(fields)
         path.write_text(
             yaml.safe_dump(doc, allow_unicode=True, sort_keys=False),
             encoding="utf-8")
@@ -640,5 +643,5 @@ class TestManifestFieldsNotCarriedByLayout:
 
         import yaml
         saved = yaml.safe_load(
-            (env / "system" / "layouts.yaml").read_text(encoding="utf-8"))
-        assert saved["layouts"]["phone"]["env"] == "android"
+            (env / "system" / "layouts" / "phone.yaml").read_text(encoding="utf-8"))
+        assert saved["env"] == "android"

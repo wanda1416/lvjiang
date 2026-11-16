@@ -15,8 +15,6 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import yaml
-
 from .._version import __version__
 from .config.resolver import ConfigResolver
 from .json_files import formatted_json, formatted_json_bytes
@@ -34,8 +32,10 @@ FORMAT_VERSION = 3
 MAX_BUNDLE_BYTES = 256 << 20
 # 同步契约按消费者登记；新增目录默认不下发，不能递归复制整个配置层。
 _LAYER_PATTERNS = (
-    "app.yaml", "ocr.yaml", "scenes.yaml", "layouts.yaml",
-    "workflows/**/*.wf", "scenes/*.yaml",
+    "app.yaml", "ocr.yaml",
+    "scenes/_meta.json", "scenes/*.yaml", "scenes/**/*.yaml",
+    "layouts/_meta.json", "layouts/*.yaml",
+    "workflows/**/*.wf",
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",
 )
@@ -69,7 +69,17 @@ def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple
         pattern for app in hooks for pattern in app.offline_configuration_patterns))
     for layer, root in (("system", get_config_system_dir(config)), ("local", get_config_local_dir(config))):
         paths = {path for pattern in patterns for path in root.glob(pattern)}
+        # 布局清单按同步范围过滤：未选中布局的清单不进包（坐标目录本就只
+        # 收集 scope 内的布局）。
+        layouts_root = root / "layouts"
+        paths = {
+            path for path in paths
+            if not (path.parent == layouts_root and path.suffix == ".yaml"
+                    and path.name != "_meta.json" and path.stem not in layout_scope)
+        }
         for layout in layout_scope:
+            paths.update((root / "layouts" / layout).glob("*.yaml"))
+            paths.update((root / "layouts" / layout).glob("*/*.json"))
             paths.update((root / "layouts" / layout).glob("*.json"))
         from .license_files import is_private_license_file
         yield from ((Path(layer) / path.relative_to(root), path)
@@ -135,14 +145,6 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                         or any(part.startswith(".") for part in rel.parts)):
                     continue
                 data = path.read_bytes()
-                if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml"}:
-                    doc = yaml.safe_load(data) or {}
-                    layouts = doc.get("layouts") or {}
-                    doc["layouts"] = {key: value for key, value in layouts.items() if key in layout_scope}
-                    deleted = [key for key in layouts.get("__deleted__", []) if key in layout_scope]
-                    if deleted:
-                        doc["layouts"]["__deleted__"] = deleted
-                    data = yaml.safe_dump(doc, allow_unicode=True, sort_keys=False).encode("utf-8")
                 if rel.as_posix() == "session/interface.json":
                     # 手机端只认「当前在用哪个」这一层：直接给到同步清单里的
                     # 执行用户与布局，环境固定为安卓。

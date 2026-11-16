@@ -29,7 +29,9 @@ def configuration_status() -> dict:
     marker = constants.SESSION_CONFIG_DIR / "preset.json"
     from ..paths import get_config_system_dir
     system = get_config_system_dir()
-    preset_ready = marker.is_file() and all((system / name).is_file() for name in ("app.yaml", "ocr.yaml", "layouts.yaml"))
+    preset_ready = marker.is_file() and all(
+        (system / name).is_file()
+        for name in ("app.yaml", "ocr.yaml", "layouts/android.yaml"))
     ready = bool(sync.get("synced") or preset_ready)
     store = get_interface_store()
     return {**sync, "ready": ready, "source": "pc" if sync.get("synced") else "preset",

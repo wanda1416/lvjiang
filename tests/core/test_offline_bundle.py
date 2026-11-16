@@ -21,9 +21,11 @@ DEMO_HOOKS = fake_hooks(
 def bundle(tmp_path, monkeypatch):
     use_registered_hooks(monkeypatch, DEMO_HOOKS)
     source = tmp_path / "pc"
-    (source / "config/system").mkdir(parents=True)
-    (source / "config/system/layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  android:\n    name: Android\n")
+    (source / "config/system/layouts").mkdir(parents=True)
+    (source / "config/system/layouts/android.yaml").write_text(
+        "name: Android\n")
+    (source / "config/system/layouts/_meta.json").write_text(
+        '{"layouts": ["android"]}', encoding="utf-8")
     session = source / "config/session"
     (session / "users").mkdir(parents=True)
     (session / "users/tester.json").write_text('{}')
@@ -136,14 +138,19 @@ def test_bundle_keeps_all_users_and_tasks_but_only_selected_layout_dependencies(
     config = source / "config"
     layouts = {"android": {"name": "Android"}, "cast": {"name": "Cast", "extends": "android"},
                "desktop": {"name": "Desktop"}}
-    (config / "system/layouts.yaml").write_text(yaml.safe_dump({"schema_version": 2, "layouts": layouts}))
+    for key, entry in layouts.items():
+        path = config / "system/layouts" / f"{key}.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump(entry, allow_unicode=True))
+    (config / "system/layouts/_meta.json").write_text(
+        '{"layouts": ["android", "cast", "desktop"]}', encoding="utf-8")
     for name in layouts:
         folder = config / "system/layouts" / name
-        folder.mkdir(parents=True)
+        folder.mkdir(parents=True, exist_ok=True)
         (folder / "scene.json").write_text('{}')
     (config / "session/users/second.json").write_text('{}')
     workflows = config / "system/workflows"
-    workflows.mkdir()
+    workflows.mkdir(exist_ok=True)
     (workflows / "first.wf").write_text("wait 1")
     (workflows / "second.wf").write_text("wait 2")
     archive = tmp_path / "selected.zip"
@@ -155,9 +162,12 @@ def test_bundle_keeps_all_users_and_tasks_but_only_selected_layout_dependencies(
         assert "config/system/workflows/second.wf" in names
         assert "config/system/layouts/desktop/scene.json" not in names
         assert "config/system/layouts/android/scene.json" in names
-        assert "config/system/layouts/cast/scene.json" in names
-        assert set(yaml.safe_load(package.read("config/system/layouts.yaml"))["layouts"]) == {"cast", "android"}
-    assert set(yaml.safe_load((config / "system/layouts.yaml").read_text())["layouts"]) == set(layouts)
+        assert "config/system/layouts/android.yaml" in names
+        assert "config/system/layouts/cast.yaml" in names
+        assert "config/system/layouts/desktop.yaml" not in names
+        assert "config/system/layouts/_meta.json" in names
+    assert (config / "system/layouts/desktop.yaml").is_file()
+    assert set(layouts) == {"android", "cast", "desktop"}
 
 
 def test_corrupted_package_preserves_phone_configuration(bundle, tmp_path):
@@ -289,7 +299,7 @@ def test_install_mirrors_system_and_local_removing_stale_files(bundle, tmp_path)
 
     for relative in stale:
         assert not (phone / relative).exists(), relative
-    assert (config / "system/layouts.yaml").is_file()            # 包里的文件已落地
+    assert (config / "system/layouts/android.yaml").is_file()   # 包里的文件已落地
     assert keep.read_text(encoding="utf-8") == '{"kept": true}'  # session 不在清单 → 保留
 
 
@@ -396,7 +406,7 @@ def test_bundle_never_carries_profile_data(bundle, tmp_path):
                  "config/session/profile.json"):
         assert name not in names
     assert "config/session/session.json" in names
-    assert "config/system/layouts.yaml" in names
+    assert "config/system/layouts/android.yaml" in names
 
 
 def test_install_keeps_phone_profile_intact(bundle, tmp_path):
@@ -421,7 +431,7 @@ def test_install_keeps_phone_profile_intact(bundle, tmp_path):
     with closing(sqlite3.connect(original_db)) as db:
         assert db.execute("SELECT value FROM entries").fetchone() == (42,)
     assert original_yaml.read_text(encoding="utf-8") == "schema_version: 1\n"
-    assert (phone / "config/system/layouts.yaml").is_file()
+    assert (phone / "config/system/layouts/android.yaml").is_file()
 
 
 def test_bundle_smuggling_profile_files_is_rejected(bundle, tmp_path):
@@ -560,9 +570,9 @@ def test_downstream_preserves_phone_history_and_result_files(bundle, tmp_path):
 def test_plugin_declarations_are_the_only_extension_of_the_whitelist(monkeypatch, tmp_path):
     """没有插件声明时，插件目录一个文件都不进包；声明后只进声明的范围。"""
     source = tmp_path / "pc"
-    (source / "config/system").mkdir(parents=True)
-    (source / "config/system/layouts.yaml").write_text(
-        "schema_version: 2\nlayouts:\n  android:\n    name: Android\n")
+    (source / "config/system/layouts").mkdir(parents=True)
+    (source / "config/system/layouts/android.yaml").write_text(
+        "name: Android\n", encoding="utf-8")
     (source / "config/session/users").mkdir(parents=True)
     (source / "config/session/users/tester.json").write_text("{}")
     for relative in ("local/demo_app/rules/custom.yaml", "session/demo_app/state.json"):

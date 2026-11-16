@@ -1,0 +1,9 @@
+{
+  "content_version": 1,
+  "layouts": [
+    "android",
+    "android_cast",
+    "desktop",
+    "desktop_fullscreen"
+  ]
+}

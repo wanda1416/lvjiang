@@ -22,7 +22,8 @@ import java.io.File
 object PyBridge {
 
     private const val TAG = "PyBridge"
-    private const val CONFIGURED_APPS = "yysls"
+    // 顺序即加载顺序：yysls_story 声明依赖 yysls，必须排在其后。
+    private const val CONFIGURED_APPS = "yysls,yysls_story"
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
     private const val SETTINGS_MODULE = "lvjiang.core.ondevice.task_settings"
     private const val USER_SETTINGS_MODULE = "lvjiang.core.ondevice.user_settings"

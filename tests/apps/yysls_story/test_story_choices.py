@@ -1,4 +1,4 @@
-"""自动剧情文案库：归一化 / 相似度 / 匹配 / 多配置组双层读写。"""
+"""自动剧情文案库（燕云剧情插件）：归一化 / 相似度 / 匹配 / 多配置组双层读写。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lvjiang.core.story import (
+from lvjiang.apps.yysls_story import (
     DEFAULT_THRESHOLD,
     StoryDoc,
     StoryEntry,
@@ -42,7 +42,7 @@ def _fake_resolver(tmp_path, monkeypatch):
 
 
 def _write_group(root, name: str, entries: list[dict]) -> None:
-    target = root / "tools" / "auto_plot" / f"{name}.json"
+    target = root / "yysls" / "auto_plot" / f"{name}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps({"version": 1, "entries": entries}, ensure_ascii=False),
@@ -134,7 +134,7 @@ def test_list_groups_skips_underscore_prefixed_files(tmp_path, monkeypatch):
     """``_`` 前缀是内部文件（临时/草稿），不算配置文件。"""
     system, _local = _fake_resolver(tmp_path, monkeypatch)
     _write_group(system, "主线", [{"id": "a", "options": ["x"], "answer": "x"}])
-    sidecar = system / "tools" / "auto_plot" / "_draft.json"
+    sidecar = system / "yysls" / "auto_plot" / "_draft.json"
     sidecar.write_text('{"entries": []}', encoding="utf-8")
     assert list_groups() == ["主线"]
 
@@ -151,7 +151,7 @@ def test_threshold_lives_in_the_file_and_roundtrips(tmp_path, monkeypatch):
     assert load_group("主线").match_threshold == pytest.approx(0.55)
     assert load_group("活动").match_threshold == DEFAULT_THRESHOLD
     raw = json.loads(
-        (local / "tools" / "auto_plot" / "主线.json").read_text(encoding="utf-8"))
+        (local / "yysls" / "auto_plot" / "主线.json").read_text(encoding="utf-8"))
     assert raw["match_threshold"] == pytest.approx(0.55)
     # 条目没被阈值写入碰掉
     assert [item["id"] for item in raw["entries"]] == ["a"]
@@ -194,9 +194,9 @@ def test_upsert_entry_only_writes_target_layer(tmp_path, monkeypatch):
         group="主线",
         layer="local",
     )
-    assert not (system / "tools" / "auto_plot" / "主线.json").exists()
+    assert not (system / "yysls" / "auto_plot" / "主线.json").exists()
     data = json.loads(
-        (local / "tools" / "auto_plot" / "主线.json").read_text(encoding="utf-8")
+        (local / "yysls" / "auto_plot" / "主线.json").read_text(encoding="utf-8")
     )
     assert [item["id"] for item in data["entries"]] == ["x"]
 
@@ -206,7 +206,7 @@ def test_upsert_entry_only_writes_target_layer(tmp_path, monkeypatch):
         layer="local",
     )
     data = json.loads(
-        (local / "tools" / "auto_plot" / "主线.json").read_text(encoding="utf-8")
+        (local / "yysls" / "auto_plot" / "主线.json").read_text(encoding="utf-8")
     )
     assert [item["id"] for item in data["entries"]] == ["x"]
     assert data["entries"][0]["answer"] == "选项C"

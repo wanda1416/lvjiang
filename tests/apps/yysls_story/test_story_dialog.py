@@ -1,4 +1,4 @@
-"""自动剧情对话框顶部字段行的对齐契约。
+"""自动剧情对话框顶部字段行的对齐契约（燕云插件 UI）。
 
 「配置文件 / 匹配阈值 / 保存到」都是四个字，但每行是独立的 QHBoxLayout：
 间距或标签宽度有任何差异，后面的输入框就会错开一格。这个用例锁住"两者
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 
 def test_field_rows_align_input_left_edges(qtbot):
-    from lvjiang.ui.story_dialog import StoryChoicesDialog
+    from lvjiang.apps.yysls_story.dialog import StoryChoicesDialog
 
     dialog = StoryChoicesDialog(None)
     qtbot.addWidget(dialog)

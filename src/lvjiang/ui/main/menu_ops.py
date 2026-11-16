@@ -190,10 +190,6 @@ class MenuOpsMixin:
         batch_settings.triggered.connect(self._open_batch_config)
         tools_menu.addAction(batch_settings)
 
-        story_choices = QAction(tr("自动剧情"), self)
-        story_choices.triggered.connect(self._open_story_choices)
-        tools_menu.addAction(story_choices)
-
         daily_history = QAction(tr("任务历史"), self)
         daily_history.triggered.connect(
             lambda: MenuOpsMixin._open_task_history(self))
@@ -298,11 +294,6 @@ class MenuOpsMixin:
         dialog = OCRDialog(self, refresh_callback=self._refresh_capture)
         dialog.exec()
 
-    def _open_story_choices(self):
-        """自动剧情文案库（通用工具，多配置组）。"""
-        from ..story_dialog import StoryChoicesDialog
-        dialog = StoryChoicesDialog(parent=self)
-        dialog.exec()
 
     def _open_script_editor(self):
         """打开统一脚本工作台；编辑、录制、元数据和配置都从这里进入。"""

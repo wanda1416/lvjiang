@@ -1,6 +1,7 @@
 """燕云菜单 —— 通过 AppHooks menu_builders 注入通用 MainWindow 的菜单栏。
 
-「燕云」菜单：游戏配置（F5）、调律配置（F6，内含调律验证入口）、属性配置。
+「燕云」菜单：游戏配置（F5）、调律配置（F6，内含调律验证入口）、属性配置、
+智能调律。
 """
 from __future__ import annotations
 

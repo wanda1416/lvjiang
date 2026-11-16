@@ -372,6 +372,17 @@ class AutoFarmWorkflow(BaseWorkflow):
 - **工作流**：`auto_tuning`（自动调律）
 - **内置函数**：`to_equipment`、`check_scroll`、`scroll_advance` 等
 
+### 燕云剧情（yysls_story）
+
+- **路径**：`src/lvjiang/apps/yysls_story/`（内置）
+- **依赖**：`requires_app_ids=("yysls",)`——单独加载或排在 `yysls` 之前会在
+  注册期明确报错；菜单入口「自动剧情」由本插件注入 `yysls` 创建的「燕云」菜单
+- **功能**：剧情选项文案库（`story_options`/`story_pick`/`story_learn` 内置
+  函数 + 匹配算法 + 文案编辑对话框）；配置目录 `yysls/auto_plot/`，
+  content_version 由本插件经 `config_policy_modules` 登记
+- **数据迁移**：`startup_callbacks` 把旧的 `tools/auto_plot/` 文案库搬进
+  `yysls/auto_plot/`（同名保留新文件，搬完源消失，天然幂等）
+
 外置插件（如会员功能）检出到 `plugins/<name>/`，形态与内置插件相同；公开发布
 的安装包只携带内置插件，外置插件由开发者放在 exe 旁的 `plugins/` 下。
 

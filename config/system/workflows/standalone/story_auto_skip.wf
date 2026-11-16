@@ -6,7 +6,7 @@
 #% note: |-
 #%   自动推进对话；检测到选项时查「剧情文案库」选正确答案。
 #%   未收录的选项会暂停，等你手动选择后点继续，再到
-#%   「工具 → 自动剧情」补充文案即可。
+#%   「燕云 → 自动剧情」补充文案即可（需要加载燕云插件）。
 #%   需要移动的剧情暂不支持：判定对话结束后提示你手动处理。
 #% parameters:
 #%   - name: max_rounds
@@ -29,7 +29,7 @@ loop while $round < $max_rounds
             click $pick after wait @step_interval
         else
             log warn "遇到未收录的剧情选项，已暂停等待手动处理"
-            eval pause("遇到未收录的选项，请手动选择后点击继续；可在「工具 → 自动剧情」补充文案")
+            eval pause("遇到未收录的选项，请手动选择后点击继续；可在「燕云 → 自动剧情」补充文案")
         end
     else
         scan [general_chat].[chat_area] as $chat

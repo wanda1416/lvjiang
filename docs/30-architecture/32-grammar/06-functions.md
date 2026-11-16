@@ -239,7 +239,11 @@ end
 | `profile_reject` | `(message)` | 同步变更脚本拒绝当前事务，原始写入及同步子链一起回滚 |
 | `profile_locked` | `(key, username?) -> bool` | 该用户是否把这个 key 标记为失效（锁定后引擎忽略其值：读空、写拒绝、不再重置） |
 
-### 自动剧情
+### 自动剧情（燕云插件专属）
+
+由燕云剧情插件（`lvjiang.apps.yysls_story`）通过 `AppHooks.builtin_modules` 注册；
+该插件声明 `requires_app_ids=("yysls",)`，不加载燕云主插件就没有这三个函数，
+宿主通用层不认识任何剧情概念。
 
 | 函数 | 签名 | 说明 |
 |---|---|---|

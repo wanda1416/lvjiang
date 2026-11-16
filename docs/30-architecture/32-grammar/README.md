@@ -508,7 +508,7 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **运行环境与后端** | `env` `check_env` `is_send` `is_post` `is_device` `is_unattended` |
 | **图色** | `pixel` `bright` `color_ratio` `pixel_ratios` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
 | **玩家档案** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `profile_locked` `user_get` `profile_history_aggregate` `profile_reject` |
-| **自动剧情** | `story_options` `story_pick` `story_learn` |
+| **自动剧情（燕云剧情插件）** | `story_options` `story_pick` `story_learn` |
 
 ## 十一、模块化
 

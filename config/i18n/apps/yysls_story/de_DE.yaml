@@ -1,5 +1,7 @@
-# story.yaml — 按模块段落组织
-common:
+plugin:
+  "燕云剧情": "YYSLS Story"
+
+story:
   "保存到": "Saved to"
   "匹配阈值": "Match threshold"
   "场景/任务": "Scene/quest"
@@ -11,7 +13,6 @@ common:
   "配置文件": "Config file"
   "问题/旁白": "Question/narration"
   "阈值保存失败": "Failed to save the threshold"
-story_dialog:
   "为什么选这个（可选）": "Why this choice (optional)"
   "删除文件": "Delete File"
   "删除文案": "Delete Entry"
@@ -47,3 +48,5 @@ story_dialog:
   "＋ 新建": "＋ New"
   "，配置文件「": ", config file \""
   "；系统也有副本": "; the system also has a copy"
+  "自动剧情": "Auto Story"
+  "修改暂存于当前对话框，点击保存后生效": "Edits are staged in this dialog; they take effect on Save"

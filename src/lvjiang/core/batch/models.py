@@ -8,6 +8,7 @@ status/message/state，不理解 state 内的业务字段。放在单独模块�
 from __future__ import annotations
 
 import copy
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -92,6 +93,12 @@ class BatchRunSpec:
 
     生命周期参数也来自运行草稿。真实生效的键仍由 wf 文件头实时声明的参数集合
     决定，草稿里换工作流后残留的同名旧值不会生效。
+
+    `excluded` 来自「用户声明跳过」：用户资料里的长期声明在启动那一刻被收集成
+    这份快照（见 :func:`core.batch.exclusions.collect_exclusions`），此后运行期
+    不再读用户资料。它是执行层的冻结值为准——启动后去改用户资料不会改变本批。
+    键是用户名（用户模式下就是条目，属性单元模式下是成员），值按 task id 排序
+    成元组，保证 ``asdict()`` 之后仍然可稳定序列化。
     """
 
     group_id: str = ""
@@ -108,6 +115,9 @@ class BatchRunSpec:
     skip_lifecycle_for_single_item: bool = True
     unattended: bool = False
     allow_portrait: bool = False
+    #: 用户声明跳过的「用户 × 任务」：{用户名: 排好序的 task id 元组}。
+    #: 只影响执行：任务列照旧生成，进度表照旧有这一行，状态记「跳过」。
+    excluded: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     @staticmethod
     def build(
@@ -117,6 +127,7 @@ class BatchRunSpec:
         entries: list[str],
         scripts: list[BatchScript],
         candidate_usernames: list[str] | None = None,
+        excluded: Mapping[str, Iterable[str]] | None = None,
     ) -> "BatchRunSpec":
         return BatchRunSpec(
             group_id=item.id,
@@ -140,6 +151,13 @@ class BatchRunSpec:
                 draft.allow_portrait
                 and item.workflows.recover_unattended
                 and item.workflows.prepare_item),
+            # 排序后存元组：快照会整体写进执行历史（asdict → JSON），set 既不能
+            # 序列化，顺序也会随进程变化。空集合不保留键。
+            excluded={
+                str(user): tuple(sorted(str(task_id) for task_id in tasks if task_id))
+                for user, tasks in (excluded or {}).items()
+                if tasks
+            },
         )
 
 

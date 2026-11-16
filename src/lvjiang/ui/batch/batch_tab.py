@@ -1627,13 +1627,31 @@ class BatchTab(QWidget):
         self._set_config_enabled(False)
 
         # 定义 + 草稿 → 不可变快照。之后再改配置组、改用户资料或在本页重新勾选，
-        # 都不会影响这一批：调度器只认这份快照。
+        # 都不会影响这一批：调度器只认这份快照。「用户声明跳过」在这一刻读一次
+        # 用户资料并冻结；运行中改声明不会改变本批。
+        from ...core.batch.exclusions import collect_exclusions
+
+        attr_mode = config.execution_unit_key != "user"
+        manager = getattr(self._host, "_user_manager", None)
+        excluded = collect_exclusions(
+            list(config.usernames) if attr_mode else usernames,
+            [script.id for script in scripts],
+            getattr(manager, "_users_dir", None),
+        )
         spec = BatchRunSpec.build(
             config, self._draft, entries=usernames, scripts=scripts,
             candidate_usernames=(
                 list(config.usernames)
-                if config.execution_unit_key != "user" else None),
+                if attr_mode else None),
+            excluded=excluded,
         )
+        if excluded:
+            total = sum(len(tasks) for tasks in excluded.values())
+            names = "、".join(
+                f"{user}×{task_id}" for user, tasks in excluded.items()
+                for task_id in tasks)
+            self._host.append_log(
+                f"[批量] 已按用户声明跳过 {total} 格：{names}")
         ok = self._host.run_batch(spec)
         if not ok:
             self._set_config_enabled(True)

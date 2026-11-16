@@ -224,7 +224,11 @@ def _plan(group_id: str):
     for username in candidates:
         for i in selected:
             validate_for_run(catalog[i], username, None)
-    spec = BatchRunSpec.build(item, draft, entries=entries, scripts=scripts, candidate_usernames=candidates)
+    from ..batch.exclusions import collect_exclusions
+    # 「用户声明跳过」在准备阶段读一次并冻结；手机端与桌面端共用同一份声明。
+    excluded = collect_exclusions(candidates, selected, constants.USERS_DIR)
+    spec = BatchRunSpec.build(item, draft, entries=entries, scripts=scripts,
+                              candidate_usernames=candidates, excluded=excluded)
     ctx = BatchContext(capture=None, ocr=None, input_ctrl=None, layout=None, run_env="android",
                        target_id="ondevice", target_kind="android", target_label="手机独立执行",
                        history_source="ondevice")

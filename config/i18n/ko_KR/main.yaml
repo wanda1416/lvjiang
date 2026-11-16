@@ -4,6 +4,7 @@ batch:
   开始执行: 실행 시작
 batch_scheduler:
   运行中: Running
+  "用户声明不执行该任务": "사용자가 이 작업을 실행하지 않는다고 선언했습니다"
 capture_ops:
   '[录屏] 仅流式截图模式支持录屏': '[Recording] Screen recording is only supported in streaming capture mode'
   '[录屏] 保存失败（详见日志）': '[Recording] Save failed (see log for details)'

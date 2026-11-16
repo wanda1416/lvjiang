@@ -74,6 +74,12 @@ __all__ = [
     "BatchScheduler",
 ]
 
+#: `_is_skipped` 的空集合：避免每次查表都新建一个 frozenset。
+_NO_EXCLUSIONS: frozenset[str] = frozenset()
+
+#: 用户声明跳过时写进结果与日志的原因文本。
+_SKIP_REASON = tr("用户声明不执行该任务")
+
 
 class BatchScheduler(StageExecutionMixin, UnattendedMixin):
     """批量执行工作线程
@@ -111,6 +117,11 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
         self._usernames = list(spec.entries)
         self._candidate_usernames = list(spec.candidate_usernames)
         self._scripts = copy.deepcopy(list(spec.scripts))
+        #: 用户声明跳过的「用户 × 任务」，启动时冻结（见 BatchRunSpec.excluded）。
+        #: 只影响执行：任务列与进度行照旧生成，执行时直接记「跳过」。
+        self._excluded = {
+            str(user): frozenset(tasks) for user, tasks in spec.excluded.items()
+        }
         self._ctx = ctx
         self._session_manager = session_manager
         # 批次级停止（F10 / 主停止按钮）与单任务级停止分开：弹窗里的「停止任务」
@@ -175,6 +186,20 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
     def _task_was_stopped(self) -> bool:
         """当前脚本被单独结束（弹窗「停止任务」），而整批没有要求停止。"""
         return self._task_stop_check() and not self._stop_check()
+
+
+    def _is_skipped(self, username: str, script_id: str) -> bool:
+        """该「用户 × 任务」是否被用户在资料里声明不执行。
+
+        跳过是执行性声明：这类组合不调 batch_check、不加载 wf、不求值参数，
+        进度与历史里直接记「跳过」。
+        """
+        return script_id in self._excluded.get(username, _NO_EXCLUSIONS)
+
+
+    def _excluded_snapshot(self) -> dict[str, list[str]]:
+        """写进批次历史的跳过声明，事后核对「这一格为什么是跳过」。"""
+        return {user: sorted(tasks) for user, tasks in self._excluded.items()}
 
 
     def _history_target_kwargs(self) -> dict[str, str]:
@@ -311,6 +336,8 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                 "workflow_params": copy.deepcopy(self._lifecycle_params),
                 "skip_lifecycle_for_single_item": (
                     self._spec.skip_lifecycle_for_single_item),
+                # 用户声明跳过：{用户名: [task id]}，启动时冻结，用于事后核对。
+                "excluded": self._excluded_snapshot(),
             },
         )
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
@@ -466,10 +493,18 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
             # 条目准备之前，因此 profile 已满足条件时不会为了“发现无需执行”
             # 而启动或登录客户端。
             check_results: list[tuple[BatchScript, BatchCheckResult]] = []
+            all_declared_skipped = True
             for script in self._scripts:
                 if self._stop_check():
                     self._stopped = True
                     break
+                if self._is_skipped(username, script.id):
+                    # 声明跳过：不加载 wf、不求值参数，按跳过计入检查结果，
+                    # 于是「全部跳过 → 整条忽略」沿用下面那条既有路径。
+                    check_results.append((script, BatchCheckResult(
+                        status=RESULT_SKIPPED, message=_SKIP_REASON)))
+                    continue
+                all_declared_skipped = False
                 planned = self._task_plan[(run_idx, script.id)]
                 checked = self._check_script(
                     script, username, params=planned.params)
@@ -496,7 +531,10 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         f"{reason}")
                 report.record_prepare(ST_SKIPPED)
                 report.end_entry()
-                self._log(f"[批量] {label} 没有可执行任务，忽略该用户")
+                self._log(
+                    f"[批量] {label} 没有可执行任务（已按用户声明跳过全部任务）"
+                    if all_declared_skipped
+                    else f"[批量] {label} 没有可执行任务，忽略该用户")
                 continue
 
             prepared = BatchStageResult(state=batch_state)
@@ -539,6 +577,18 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                 if self._stop_check():
                     self._stopped = True
                     break
+
+                if self._is_skipped(username, script.id):
+                    # 用户声明不执行：进度表这一格照旧存在，只是直接记为跳过，
+                    # 与用 batch_check 判成跳过时一致——不建任务历史。
+                    entry_result["scripts"][script.id] = ST_SKIPPED
+                    self.progress.emit(
+                        round_number, run_idx, label, script.id, ST_SKIPPED)
+                    report.start_script(script.id, script.name)
+                    report.end_script(ST_SKIPPED)
+                    self._log(
+                        f"[批量] {label} → {script.name} 跳过: {_SKIP_REASON}")
+                    continue
 
                 self.progress.emit(
                     round_number, run_idx, label, script.id, ST_RUNNING)
@@ -756,6 +806,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                 "rounds": self._spec.rounds,
                 "workflows": self._spec.workflows.to_dict(),
                 "workflow_params": copy.deepcopy(self._lifecycle_params),
+                "excluded": self._excluded_snapshot(),
             },
         )
         self._batch_run = batch_run
@@ -849,18 +900,32 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                     eligible: list[str] = []
                     checks_by_member: dict[str, dict[str, BatchCheckResult]] = {}
                     for name in members:
-                        checks = {
-                            script.id: self._check_script(
-                                script, name,
-                                params=self._member_task_plan[(name, script.id)].params,
-                            ) for script in self._scripts
-                        }
+                        checks: dict[str, BatchCheckResult] = {}
+                        for script in self._scripts:
+                            if self._is_skipped(name, script.id):
+                                # 声明跳过：不加载 wf、不求值参数。成员的全部
+                                # 任务都这样时，下面「无可执行任务」会自动成立。
+                                checks[script.id] = BatchCheckResult(
+                                    status=RESULT_SKIPPED, message=_SKIP_REASON)
+                                continue
+                            planned_member = self._member_task_plan[
+                                (name, script.id)]
+                            checks[script.id] = self._check_script(
+                                script, name, params=planned_member.params)
                         checks_by_member[name] = checks
                         if any(check.status == RESULT_SUCCESS
                                for check in checks.values()):
                             eligible.append(name)
                     if not eligible:
-                        self._log(f"[批量] {unit} 内所有角色均无可执行任务")
+                        all_declared_skipped = all(
+                            check.status == RESULT_SKIPPED
+                            for checks in checks_by_member.values()
+                            for check in checks.values())
+                        self._log(
+                            f"[批量] {unit} 没有可执行任务"
+                            "（已按用户声明跳过全部任务）"
+                            if all_declared_skipped
+                            else f"[批量] {unit} 内所有角色均无可执行任务")
                         done.add(unit)
                         for script in self._scripts:
                             statuses = [checks[script.id].status
@@ -918,6 +983,18 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         if self._stop_check():
                             self._stopped = True
                             break
+                        if self._is_skipped(username, script.id):
+                            # 声明跳过：连可执行性检查都不做，直接记跳过；与用户
+                            # 模式一致，不建任务历史。
+                            entry["scripts"][script.id] = ST_SKIPPED
+                            self.progress.emit(
+                                round_number, run_idx, label, script.id, ST_SKIPPED)
+                            report.start_script(script.id, script.name)
+                            report.end_script(ST_SKIPPED)
+                            self._log(
+                                f"[批量] {label} → {script.name} "
+                                f"跳过: {_SKIP_REASON}")
+                            continue
                         planned = self._member_task_plan[(username, script.id)]
                         # 资格筛选只用于选角色；前一个脚本可能已经修改 Profile，
                         # 因此每个脚本执行前都要重新检查当前角色。

@@ -84,9 +84,52 @@ def receipt_entitlement(code: str, serial: str | None, receipt: Any) -> Entitlem
 
 def stored_entitlement(serial: str | None) -> Entitlement:
     activation = load_activation()
-    if activation is not None:
-        return receipt_entitlement(activation.get("code", ""), serial, activation.get("receipt"))
-    return protocol.evaluate(load_code(), serial)
+    if activation is None:
+        return protocol.evaluate(load_code(), serial)
+    issued_code = activation.get("code", "")
+    receipt = activation.get("receipt")
+    try:
+        data = verify_receipt(issued_code, serial, receipt)
+    except LicenseError as error:
+        return Entitlement(reason=str(error))
+    if data["status"] == "active":
+        return receipt_entitlement(issued_code, serial, receipt)
+    return _recheck_status(issued_code, serial, data)
+
+
+#: 进程内只复核一次。停用/过期会走在线复核，若每次授权判定都发请求，
+#: 后台同步的每一轮都会打一次状态接口。
+_status_checked = False
+
+
+def _recheck_status(issued_code: str, serial: str | None, data: dict[str, Any]) -> Entitlement:
+    """本地签名回执是**上次检查的快照**，不是终局判决。
+
+    停用可能被撤销、到期可能续期；若快照永远一票否决，用户就只剩"清除激活
+    同机重试"一条路，云端重新启用后客户端永远自愈不了。所以非 active 结论
+    在进程首次判定时向云端复核一次（``/v1/license/status`` 现签当前状态）；
+    复核失败（离线、服务不可达）保留本地结论，不放大权限。
+    """
+    global _status_checked
+    if _status_checked:
+        return Entitlement(reason=STATUS_REASON[data["status"]])
+    _status_checked = True
+    from ..config.content_service import CONTENT_SERVICE_URL, ServiceError, request_json
+    nonce = secrets.token_hex(16)
+    try:
+        receipt = request_json(CONTENT_SERVICE_URL, "/v1/license/status",
+                               {"code": normalize_code(issued_code),
+                                "serial": normalize_serial(serial or ""), "nonce": nonce})
+        accept_status(issued_code, normalize_serial(serial or ""), receipt, nonce)
+        result = receipt_entitlement(issued_code, serial, receipt)
+        if result.active:
+            from loguru import logger
+            logger.info("[授权] 云端复核通过：{} 的停用/过期结论已被云端撤销", data.get("code_id", ""))
+        return result
+    except (LicenseError, ServiceError) as error:
+        from loguru import logger
+        logger.debug("[授权] 云端状态复核未完成，保留本地结论：{}", error)
+        return Entitlement(reason=STATUS_REASON[data["status"]])
 
 
 def activate_online(code: str, serial: str | None) -> Entitlement:
@@ -112,15 +155,14 @@ def accept_status(code: str, serial: str, receipt: Any, nonce: str) -> dict[str,
     """配置请求的可信状态；只更新仍选中本次原码的本地记录。"""
     data = verify_receipt(code, serial, receipt, nonce=nonce)
     if code_hash(load_code() or "") == code_hash(code):
-        if data["status"] == "active":
-            stored = load_activation() or {}
-            try:
-                previous = verify_receipt(code, serial, stored.get("receipt"))
-            except LicenseError:
-                previous = {}
-            fields = ("status", "features", "days", "activated_at", "expires_at")
-            if all(previous.get(key) == data.get(key) for key in fields):
-                return data
+        stored = load_activation() or {}
+        try:
+            previous = verify_receipt(code, serial, stored.get("receipt"))
+        except LicenseError:
+            previous = {}
+        fields = ("status", "features", "days", "activated_at", "expires_at")
+        if all(previous.get(key) == data.get(key) for key in fields):
+            return data
         if not save_activation(code, receipt):
             raise LicenseError("可信授权状态保存失败")
         from . import refresh_entitlement

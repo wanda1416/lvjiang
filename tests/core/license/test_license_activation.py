@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lvjiang.core import license as licensing
+from lvjiang.core.config.content_service import ServiceError
 from lvjiang.core.license import activation, code, hardware, store
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
@@ -26,6 +27,7 @@ def grant(tmp_path, monkeypatch):
     serial = hardware.encode_serial("test-activation-machine")
     monkeypatch.setattr(licensing, "current_serial", lambda: serial)
     monkeypatch.setattr(licensing, "_cached", None)
+    monkeypatch.setattr(activation, "_status_checked", False)
     payload = code.build_payload("test-claim", "claim", ["lv1"], days=2)
     voucher = code.format_code(payload, issuer.sign(payload))
     activated = int(time.time())
@@ -81,6 +83,10 @@ def test_signed_revocation_survives_restart_without_revoking_a_new_selection(gra
     voucher, serial, receipt, _ = grant
     assert store.save_activation(voucher, receipt())
     activation.accept_status(voucher, serial, receipt(status="disabled"), "a" * 32)
+    # 复核通道不可达（离线）时保留本地停用结论。
+    def down(base, route, body, **kwargs):
+        raise ServiceError("test offline", 0, code="network", reason="offline")
+    monkeypatch.setattr("lvjiang.core.config.content_service.request_json", down)
     assert not licensing.refresh_entitlement().active
     assert not activation.stored_entitlement(serial).active
     with pytest.raises(code.LicenseError):
@@ -125,10 +131,13 @@ def test_claim_snapshot_and_package_request_verify_signed_denial(grant, monkeypa
         assert body["serial"] == hardware.normalize_serial(serial)
         return {"error": "forbidden", "receipt": receipt(nonce=body["nonce"], status="disabled")}
     monkeypatch.setattr(member_download, "request_json", signed_denial)
+    # 停用回执落盘后，授权判定会走云端复核；测试环境没有状态服务，视为离线。
+    def status_down(base, route, body, **kwargs):
+        raise ServiceError("test offline", 0, code="network", reason="offline")
+    monkeypatch.setattr("lvjiang.core.config.content_service.request_json", status_down)
     assert member_download.fetch_member_update(access, "0.15.0", fetch=fetch).files == {}
     assert not licensing.refresh_entitlement().active
     assert protected_remote.snapshot() is None
-
 
 def test_package_key_and_denial_cannot_be_modified_outside_signed_proof(grant, monkeypatch):
     import hashlib
@@ -187,6 +196,46 @@ def test_rechecking_selected_code_persists_authenticated_revocation(grant, monke
                         lambda base, route, body: receipt(nonce=body["nonce"], status="disabled"))
     assert not licensing.try_activate(voucher).active
     assert not licensing.current_entitlement().active
+    assert not licensing.refresh_entitlement().active
+
+
+def test_disabled_status_rechecks_online_once_and_recovers(grant, monkeypatch):
+    """本地停用快照不再一票否决：进程首查在线复核，云端已恢复就恢复授权。"""
+    voucher, serial, receipt, _ = grant
+    store.save_activation(voucher, receipt(status="disabled"))
+    routes = []
+    def respond(base, route, body):
+        routes.append(route)
+        assert route == "/v1/license/status"
+        assert body["code"] == voucher
+        return receipt(nonce=body["nonce"])
+    monkeypatch.setattr("lvjiang.core.config.content_service.request_json", respond)
+    assert licensing.refresh_entitlement().active
+    assert routes == ["/v1/license/status"]
+    stored = store.load_activation()
+    assert stored is not None
+    assert activation.verify_receipt(voucher, serial, stored["receipt"])["status"] == "active"
+
+
+def test_disabled_status_recheck_happens_once_while_cloud_still_disables(grant, monkeypatch):
+    voucher, _, receipt, _ = grant
+    store.save_activation(voucher, receipt(status="disabled"))
+    calls = []
+    def still_disabled(base, route, body):
+        calls.append(route)
+        return receipt(nonce=body["nonce"], status="disabled")
+    monkeypatch.setattr("lvjiang.core.config.content_service.request_json", still_disabled)
+    assert not licensing.refresh_entitlement().active
+    assert not licensing.refresh_entitlement().active
+    assert calls == ["/v1/license/status"]
+
+
+def test_status_recheck_offline_failure_keeps_local_disabled(grant, monkeypatch):
+    voucher, _, receipt, _ = grant
+    store.save_activation(voucher, receipt(status="disabled"))
+    def down(base, route, body, **kwargs):
+        raise ServiceError("test offline", 0, code="network", reason="offline")
+    monkeypatch.setattr("lvjiang.core.config.content_service.request_json", down)
     assert not licensing.refresh_entitlement().active
 
 

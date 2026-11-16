@@ -337,8 +337,6 @@ task_params_dialog:
   "当前用户使用独立参数": "Use per-user parameters"
   "没有可编辑的任务": "No task to edit"
   "任务已不可用": "Task is no longer available"
-  "任务「{task}」：全局参数与全部用户": "Task {task}: global parameters and all users"
-  "用户「{user}」的全部日常任务": "All daily tasks for user {user}"
   "任务的全局参数，作用于所有未使用独立参数的用户": "Global parameters of the task; applies to every user without per-user parameters"
   "全局参数：作用于所有未使用独立参数的用户": "Global parameters: applies to every user without per-user parameters"
   "勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过": "When checked, this user skips the task in batch runs; the task row stays and is recorded as skipped"
@@ -348,3 +346,4 @@ task_params_dialog:
   "改动立即生效": "Changes apply immediately"
   "上一个": "Previous"
   "下一个": "Next"
+  "方向键 ← / → 切换上一个 / 下一个": "Arrow keys ← / → switch to the previous / next item"

@@ -336,8 +336,6 @@ task_params_dialog:
   "当前用户使用独立参数": "Usar parámetros propios"
   "没有可编辑的任务": "No hay tareas editables"
   "任务已不可用": "La tarea ya no está disponible"
-  "任务「{task}」：全局参数与全部用户": "Tarea {task}: parámetros globales y todos los usuarios"
-  "用户「{user}」的全部日常任务": "Todas las tareas diarias de {user}"
   "任务的全局参数，作用于所有未使用独立参数的用户": "Parámetros globales de la tarea; se aplican a los usuarios sin parámetros propios"
   "全局参数：作用于所有未使用独立参数的用户": "Parámetros globales: se aplican a los usuarios sin parámetros propios"
   "勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过": "Si se marca, este usuario omite la tarea en los lotes; la fila se mantiene y se registra como omitida"
@@ -347,3 +345,4 @@ task_params_dialog:
   "改动立即生效": "Los cambios se aplican al instante"
   "上一个": "Anterior"
   "下一个": "Siguiente"
+  "方向键 ← / → 切换上一个 / 下一个": "Las flechas ← / → cambian al elemento anterior / siguiente"

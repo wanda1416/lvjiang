@@ -336,8 +336,6 @@ task_params_dialog:
   "当前用户使用独立参数": "Eigene Parameter verwenden"
   "没有可编辑的任务": "Keine Aufgabe zum Bearbeiten"
   "任务已不可用": "Aufgabe ist nicht mehr verfügbar"
-  "任务「{task}」：全局参数与全部用户": "Aufgabe {task}: globale Parameter und alle Benutzer"
-  "用户「{user}」的全部日常任务": "Alle Tagesaufgaben von {user}"
   "任务的全局参数，作用于所有未使用独立参数的用户": "Globale Parameter der Aufgabe; gilt für alle Benutzer ohne eigene Parameter"
   "全局参数：作用于所有未使用独立参数的用户": "Globale Parameter: gilt für alle Benutzer ohne eigene Parameter"
   "勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过": "Aktiviert überspringt dieser Benutzer die Aufgabe im Stapellauf; die Zeile bleibt und wird als übersprungen erfasst"
@@ -347,3 +345,4 @@ task_params_dialog:
   "改动立即生效": "Änderungen gelten sofort"
   "上一个": "Zurück"
   "下一个": "Weiter"
+  "方向键 ← / → 切换上一个 / 下一个": "Pfeiltasten ← / → wechseln zum vorherigen / nächsten Eintrag"

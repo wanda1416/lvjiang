@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QColor, QKeyEvent
-from PyQt6.QtWidgets import QLineEdit, QSpinBox
+from PyQt6.QtWidgets import QLineEdit, QRadioButton, QSpinBox
 
 from lvjiang.core.config.wf_configs import get_wf_config
 from lvjiang.core.users.document import (
@@ -68,6 +68,19 @@ def test_task_view_lists_global_params_first_and_lists_daily_tasks_only(dialog):
     assert "专用任务" not in task_names
 
 
+def test_default_view_is_task_view_first_and_hides_other_combo(dialog):
+    """默认进任务视图：它在左侧第一位，且不显示用户下拉。"""
+    radios = [radio.text() for radio in dialog.findChildren(QRadioButton)]
+    assert radios == ["任务视图", "用户视图"]
+    assert dialog._task_view_radio.isChecked()
+    assert dialog._task_combo.isHidden() is False
+    assert dialog._user_combo.isHidden()
+
+    dialog._user_view_radio.setChecked(True)
+    assert dialog._user_combo.isHidden() is False
+    assert dialog._task_combo.isHidden()
+
+
 def test_global_entry_edits_global_parameters(dialog):
     dialog._list.setCurrentRow(0)
     assert dialog._current == ("global", "a")
@@ -125,6 +138,15 @@ def test_step_buttons_and_arrow_keys_follow_active_view_combo(dialog):
     assert dialog._current == ("global", "b")
     assert not dialog._next_button.isEnabled()
 
+    # 选中某个用户行后再用方向键切任务：选中行保持不变，不回到第一行。
+    dialog._list.setCurrentRow(_row_of(dialog, "alpha"))
+    assert dialog._current == ("alpha", "b")
+    dialog.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Left,
+                                   Qt.KeyboardModifier.NoModifier))
+    assert dialog._task_combo.currentData() == "a"
+    assert dialog._current == ("alpha", "a")
+    assert dialog._list.currentRow() == _row_of(dialog, "alpha")
+
     # 用户视图：同一个按钮切的是用户。
     dialog._user_view_radio.setChecked(True)
     assert dialog._user_combo.currentData() == "alpha"
@@ -137,3 +159,10 @@ def test_step_buttons_and_arrow_keys_follow_active_view_combo(dialog):
                                    Qt.KeyboardModifier.NoModifier))
     assert dialog._user_combo.currentData() == "alpha"
     assert isinstance(dialog._form.widget_for("text"), QLineEdit)
+
+
+def test_list_default_width_fits_fourteen_cjk_chars(dialog):
+    """左区默认宽度按 14 个汉字留位置，不再按最长条目收缩。"""
+    metrics = dialog._list.fontMetrics()
+    left_width = dialog._splitter.sizes()[0]
+    assert left_width >= metrics.horizontalAdvance("测" * 14)

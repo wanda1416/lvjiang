@@ -336,8 +336,6 @@ task_params_dialog:
   "当前用户使用独立参数": "Dùng tham số riêng"
   "没有可编辑的任务": "Không có tác vụ để sửa"
   "任务已不可用": "Tác vụ không còn khả dụng"
-  "任务「{task}」：全局参数与全部用户": "Tác vụ {task}: tham số toàn cục và toàn bộ người dùng"
-  "用户「{user}」的全部日常任务": "Toàn bộ tác vụ hằng ngày của {user}"
   "任务的全局参数，作用于所有未使用独立参数的用户": "Tham số toàn cục của tác vụ; áp dụng cho mọi người dùng không dùng tham số riêng"
   "全局参数：作用于所有未使用独立参数的用户": "Tham số toàn cục: áp dụng cho mọi người dùng không dùng tham số riêng"
   "勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过": "Khi chọn, người dùng này bỏ qua tác vụ khi chạy hàng loạt; dòng vẫn còn và trạng thái là bỏ qua"
@@ -347,3 +345,4 @@ task_params_dialog:
   "改动立即生效": "Thay đổi có hiệu lực ngay"
   "上一个": "Trước"
   "下一个": "Sau"
+  "方向键 ← / → 切换上一个 / 下一个": "Phím mũi tên ← / → chuyển sang mục trước / sau"

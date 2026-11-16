@@ -74,6 +74,9 @@ _GLOBAL_LABEL = tr("全局参数")
 #: 跳过声明造成的跳过状态在列表里的标记。
 _SKIP_MARK = "⊘"
 
+#: 左区默认宽度按多少个全角汉字计算。
+_LIST_WIDTH_CHARS = 14
+
 
 class TaskParamsDialog(QDialog):
     """「全部用户 × 全部日常任务」的参数与跳过声明编辑器。"""
@@ -142,10 +145,11 @@ class TaskParamsDialog(QDialog):
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         top.setSpacing(8)
-        self._user_view_radio = QRadioButton(tr("用户视图"))
+        # 任务视图是默认视图，排在左侧第一位；用户视图在它右边。
         self._task_view_radio = QRadioButton(tr("任务视图"))
+        self._user_view_radio = QRadioButton(tr("用户视图"))
         self._task_view_radio.setChecked(True)
-        for radio in (self._user_view_radio, self._task_view_radio):
+        for radio in (self._task_view_radio, self._user_view_radio):
             radio.setAutoExclusive(True)
             radio.toggled.connect(self._on_view_changed)
             top.addWidget(radio)
@@ -175,6 +179,7 @@ class TaskParamsDialog(QDialog):
         layout.addLayout(top)
         self._user_combo.currentIndexChanged.connect(self._on_combo_changed)
         self._task_combo.currentIndexChanged.connect(self._on_combo_changed)
+        self._apply_view_visibility()
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -182,9 +187,6 @@ class TaskParamsDialog(QDialog):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
-        self._list_caption = QLabel()
-        self._list_caption.setWordWrap(True)
-        left_layout.addWidget(self._list_caption)
         self._list = QListWidget()
         self._list.setObjectName("task_params_list")
         self._list.setSelectionMode(
@@ -192,8 +194,8 @@ class TaskParamsDialog(QDialog):
         # 条目之间留出行距，并对列表整体 +2 号字：默认字号下用户名与任务名
         # 挤在一起，扫读很容易看错行。
         self._list.setSpacing(4)
-        # 只保留下限：默认宽度按真实条目内容算（见 _apply_list_width），
-        # 用户名和任务名本来就不会长到需要一大片空白。
+        # 只保留下限：默认宽度按 14 个汉字留位（见 _apply_list_width），
+        # 用户拖动分隔条后不再回写。
         self._list.setMinimumWidth(120)
         list_font = self._list.font()
         list_font.setPointSize(list_font.pointSize() + 2)
@@ -211,16 +213,24 @@ class TaskParamsDialog(QDialog):
         splitter.setSizes([200, 700])
         layout.addWidget(splitter, 1)
 
-        # 只讲"立即生效"：这份数据日常与批量共用，点名某一个页面会让人以为
-        # 改动只对那里生效。
+        # 提示分两处：方向键说明贴在顶部导航下方，"改动立即生效"放到最底下
+        # 与「关闭」同一行的最左侧——它是一句状态说明，不占一行版面。
+        self._nav_hint = QLabel(tr("方向键 ← / → 切换上一个 / 下一个"))
+        self._nav_hint.setWordWrap(True)
+        layout.addWidget(self._nav_hint)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(8)
         self._hint = QLabel(tr("改动立即生效"))
         self._hint.setWordWrap(True)
-        layout.addWidget(self._hint)
-
+        bottom_row.addWidget(self._hint)
+        bottom_row.addStretch(1)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
         apply_dialog_button_box_style(buttons)
-        layout.addWidget(buttons)
+        bottom_row.addWidget(buttons)
+        layout.addLayout(bottom_row)
 
     def _build_detail(self) -> QWidget:
         box = QGroupBox(tr("任务参数"))
@@ -325,12 +335,20 @@ class TaskParamsDialog(QDialog):
                 return
         super().keyPressEvent(event)
 
+    def _apply_view_visibility(self) -> None:
+        """只显示当前视图那一维的下拉。
+
+        另一个维度的下拉跟这个视图无关，留着只会让人以为它也在生效——例如
+        任务视图里那排用户名没有任何作用。
+        """
+        self._user_combo.setVisible(self._view == "user")
+        self._task_combo.setVisible(self._view == "task")
+
     def _on_view_changed(self, *_args) -> None:
         self._view = "user" if self._user_view_radio.isChecked() else "task"
         self._save_timer.stop()
         self._save_current()
-        self._user_combo.setVisible(self._view == "user")
-        self._task_combo.setVisible(self._view == "task")
+        self._apply_view_visibility()
         self._refresh_step_buttons()
         self._reload_list(keep=False)
 
@@ -338,7 +356,9 @@ class TaskParamsDialog(QDialog):
         self._save_timer.stop()
         self._save_current()
         self._refresh_step_buttons()
-        self._reload_list(keep=False)
+        # 保留左列表里选中的那个对象：上一个/下一个只换另一维，不该把选中行
+        # 打回第一行（否则每按一次方向键都要重新找人）。
+        self._reload_list(keep=True)
 
     # ─── 左侧列表 ─────────────────────────────────────────
 
@@ -393,9 +413,6 @@ class TaskParamsDialog(QDialog):
             self._list.clear()
             if self._view == "task":
                 task_id = str(self._task_combo.currentData() or "")
-                self._list_caption.setText(
-                    tr("任务「{task}」：全局参数与全部用户").format(
-                        task=self._task_combo.currentText()))
                 global_item = QListWidgetItem(_GLOBAL_LABEL)
                 global_item.setData(Qt.ItemDataRole.UserRole, "")
                 self._style_item(global_item, bold=True, skipped=False)
@@ -416,8 +433,6 @@ class TaskParamsDialog(QDialog):
             else:
                 username = str(self._user_combo.currentData() or "")
                 skipped_tasks, overridden_tasks = self._user_sets(username)
-                self._list_caption.setText(
-                    tr("用户「{user}」的全部日常任务").format(user=username))
                 for cfg in self.configs():
                     task_id = str(cfg.get("id") or "")
                     name = script_display_name(cfg)
@@ -449,7 +464,7 @@ class TaskParamsDialog(QDialog):
         self._on_row_changed(self._list.currentRow())
 
     def _apply_list_width(self) -> None:
-        """按真实条目内容给左区一个默认宽度：够放最长名字，不多留空档。
+        """左区默认宽度按 14 个汉字定：够放常见用户名与任务名，不多留空档。
 
         只算一次：用户手动拖过分隔条之后，重建列表不应把他的宽度改回去。
         """
@@ -458,17 +473,13 @@ class TaskParamsDialog(QDialog):
         if not self._list.count():
             return
         metrics = self._list.fontMetrics()
-        widths = []
-        for index in range(self._list.count()):
-            item = self._list.item(index)
-            if item is not None:
-                widths.append(metrics.horizontalAdvance(item.text()))
-        text_width = max(widths, default=0)
+        # 「测」是全角汉字，宽度足以代表 CJK 用户名与任务名。
+        text_width = metrics.horizontalAdvance("测" * _LIST_WIDTH_CHARS)
         scrollbar = self._list.verticalScrollBar()
         scrollbar_width = scrollbar.sizeHint().width() if scrollbar else 0
         # 左右内边距 + 边框 + 滚动条 + 一点点余量。
         padding = 2 * self._list.frameWidth() + 24 + scrollbar_width
-        width = max(140, min(300, text_width + padding))
+        width = text_width + padding
         total = sum(self._splitter.sizes()) or 900
         self._splitter.setSizes([width, max(320, total - width)])
         self._list_width_applied = True

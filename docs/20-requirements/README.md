@@ -41,6 +41,7 @@
 | [02-batch-execution-units.md](30-batch/02-batch-execution-units.md) | 批量调度单元：可见用户、属性聚合、成员选择与运行快照 | 已实现 |
 | [03-unattended-batch.md](30-batch/03-unattended-batch.md) | 无人值守批量：弹窗改道与异常恢复工作流 | 已实现 |
 | [04-batch-state-layers.md](30-batch/04-batch-state-layers.md) | 批量状态分层：定义 / 运行草稿 / 执行快照 | 已实现 |
+| [05-user-task-skip.md](30-batch/05-user-task-skip.md) | 用户 × 任务跳过声明与「工具 → 任务参数」双视图编辑器 | 已实现 |
 
 ### 40-profile（Profile 子系统：跨域共享的玩家档案，供调律 / 装备 / 总览共用）
 
@@ -84,6 +85,7 @@
 | [24-config-policy-bootstrap.md](50-platform/24-config-policy-bootstrap.md) | 插件配置策略显式装配 | 已实现 |
 | [25-configuration-modules.md](50-platform/25-configuration-modules.md) | 配置、布局与组合展示职责拆分 | 已实现 |
 | [26-online-config-background-download.md](50-platform/26-online-config-background-download.md) | 在线配置后台下载、暂存与下次启动安装 | 部分实现 |
+| [27-hotkeys-and-menu-shortcuts.md](50-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 | 已实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

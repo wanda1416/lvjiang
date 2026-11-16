@@ -159,14 +159,14 @@ def upload(token: str, *, force: bool = False, path: Path | None = None) -> Uplo
     return UploadOutcome("uploaded", _parse(result.get("layout")) or remote)
 
 
-def download(token: str, *, remote: RemoteLayout | None = None) -> tuple[RemoteLayout, Path | None]:
+def download(token: str, *, remote: RemoteLayout | None = None) -> RemoteLayout:
     """把云端结构下载到本机。
 
     ``remote`` 已由界面取过一次时直接复用，避免「确认框显示一份、实际下载另一份」。
 
-    返回 ``(远端元信息, 备份路径)``。先解析校验再动文件：远端内容坏了、版本
-    比本程序新、或不是合法结构时抛 ``ValueError`` / ``SyncError``，本机文件
-    保持原样。
+    先解析校验再动文件：远端内容坏了、版本比本程序新、或不是合法结构时抛
+    ``ValueError`` / ``SyncError``，本机文件保持原样。下载不额外留备份副本——
+    每次下载都建一个目录只会污染 ``config/session``。
     """
     current = remote if remote is not None else fetch_remote(token)
     if current is None:
@@ -176,10 +176,9 @@ def download(token: str, *, remote: RemoteLayout | None = None) -> tuple[RemoteL
     except (ValueError, OSError) as exc:
         raise ValueError(f"云端页面结构无法解码：{exc}") from exc
     doc = layout.parse_bytes(raw)
-    backup = layout.backup_current(reason="before-download")
     layout.save(doc)
     logger.info(
-        "页面结构已下载：{}（{} 个分组），原结构备份: {}",
-        current.short_sha, len(doc.overview.groups), backup or "无",
+        "页面结构已下载：{}（{} 个分组）",
+        current.short_sha, len(doc.overview.groups),
     )
-    return current, backup
+    return current

@@ -519,23 +519,14 @@ def _cleanup_legacy(session) -> None:
 
 
 def _backup_legacy(target: Path, payload: dict) -> Path:
-    """迁移前把旧结构留一份，便于人工回退；不参与任何自动读取。"""
+    """迁移前把旧结构留一份，便于人工回退；不参与任何自动读取。
+
+    只用于一次性结构迁移。日常的下载覆盖**不留副本**：每次下载都建一个
+    ``_backup-<时间戳>`` 目录只会把 ``config/session`` 变成垃圾堆。
+    """
     return _write_backup(
         target, formatted_json_bytes(payload), name="profile-layout-before.json"
     )
-
-
-def backup_current(*, reason: str = "manual", path: Path | None = None) -> Path | None:
-    """把现有结构文件原样备份到 ``_backup-<时间戳>/``；没有文件时返回 ``None``。
-
-    下载覆盖与迁移都必须先留退路：结构是用户手工排出来的，丢了没法重建。
-    """
-    target = path or layout_path()
-    if not target.exists():
-        return None
-    backup = _write_backup(target, target.read_bytes(), name="profile-layout-before.json")
-    logger.info("页面结构已备份（{}）: {}", reason, backup)
-    return backup
 
 
 def _write_backup(target: Path, payload: bytes, *, name: str) -> Path:

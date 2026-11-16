@@ -173,8 +173,8 @@ def test_download_validates_before_touching_local_file(server):
     assert not list(layout.layout_path().parent.glob("_backup-*"))
 
 
-def test_download_backs_up_and_replaces(server):
-    """下载成功：先备份旧结构，再写入新结构。"""
+def test_download_replaces_without_backup(server):
+    """下载成功：直接用云端结构覆盖本机，不再造 _backup-* 目录。"""
     _local_doc(["a"])
     remote_doc = json.dumps(
         {"version": 1, "overview": {"group_order": ["乙组"],
@@ -185,12 +185,11 @@ def test_download_backs_up_and_replaces(server):
     server.sha = hashlib.sha256(remote_doc).hexdigest()
     server.origin_instance = "another-instance"
 
-    remote, backup = layout_sync.download("token")
+    remote = layout_sync.download("token")
 
     assert remote.short_sha == server.sha[:8]
-    assert backup is not None and backup.name == "profile-layout-before.json"
-    # 备份里是替换前的结构（旧分组 甲组 / 列 a 仍在）。
-    assert json.loads(backup.read_text(encoding="utf-8"))["overview"]["groups"]["甲组"]["columns"] == ["a"]
+    # 每次下载都建备份目录只会污染 config/session：这里断言没有留下任何备份。
+    assert not list(layout.layout_path().parent.glob("_backup-*"))
     doc = layout.load()
     assert doc.overview.groups["乙组"].columns == ["b"]
     assert doc.overview.groups["乙组"].show_totals is True

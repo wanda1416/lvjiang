@@ -172,15 +172,11 @@ def download_page_structure(parent: QWidget) -> bool:
     if first != QMessageBox.StandardButton.Yes:
         return False
 
-    # 第二次确认：明确「本机将被替换」并说明备份位置。
+    # 第二次确认：明确「本机将被替换」，且不会留副本。
     second = QMessageBox.warning(
         parent,
         tr("确认替换本机结构"),
-        tr(
-            "本机当前的页面结构将被云端结构替换。\n"
-            "现有结构会先备份到 config/session 下的 _backup-<时间戳> 目录，"
-            "需要时手工恢复即可。\n\n确认替换？"
-        ),
+        tr("本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？"),
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         QMessageBox.StandardButton.No,
     )
@@ -188,7 +184,7 @@ def download_page_structure(parent: QWidget) -> bool:
         return False
 
     try:
-        remote, backup = layout_sync.download(token, remote=remote)
+        remote = layout_sync.download(token, remote=remote)
     except (ValueError, SyncError) as error:
         QMessageBox.warning(
             parent, tr("下载排版"),
@@ -204,8 +200,7 @@ def download_page_structure(parent: QWidget) -> bool:
     QMessageBox.information(
         parent,
         tr("下载排版"),
-        tr("已下载页面结构。\n{detail}\n备份：{backup}").format(
-            detail=remote.describe(), backup=str(backup) if backup else tr("无（原结构不存在）")),
+        tr("已下载页面结构。\n{detail}").format(detail=remote.describe()),
     )
     return True
 

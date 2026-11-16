@@ -188,12 +188,3 @@ def test_parse_bytes_rejects_invalid_and_future_documents():
     with pytest.raises(ValueError, match="版本"):
         layout.parse_bytes(b'{"version": 99}')
     assert layout.parse_bytes(b'{"version": 1, "overview": {"groups": {}}}').version == 1
-
-
-def test_backup_current_copies_existing_file():
-    assert layout.backup_current() is None
-    layout.save(layout.ProfileLayout(overview=layout.OverviewLayout(
-        groups={"g": layout.GroupLayout(columns=["a"])})))
-    backup = layout.backup_current(reason="test")
-    assert backup is not None and backup.name == "profile-layout-before.json"
-    assert json.loads(backup.read_text(encoding="utf-8"))["overview"]["groups"]["g"]["columns"] == ["a"]

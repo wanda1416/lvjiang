@@ -1,7 +1,5 @@
 account_dialog:
   账户管理: Account Management
-all_user_params:
-  全部用户参数: All User Parameters
 batch:
   开始执行: Iniciar execução
 batch_scheduler:
@@ -101,7 +99,6 @@ main_window:
   '[错误] 请先连接并选择执行目标': '[Error] Connect and select an execution target first'
   '[错误] 请先连接设备': '[Error] Connect a device first'
   全部分组: All Groups
-  全部用户参数: All User Parameters
 menu_ops:
   公告: Announcements
   关于: About
@@ -125,6 +122,7 @@ menu_ops:
   配置已保存: Settings saved
   隐藏预览: Hide Preview
   任务历史: Task History
+  "任务参数": "Parâmetros de tarefas"
 mobile:
   设备端代理: On-device Agent
 platforms:
@@ -238,6 +236,7 @@ ui_state:
   参数设置（{name}独立）: Parameters ({name}, per-user)
   参数设置（共享）: Parameters (shared)
   说明: Description
+  "参数设置（全局参数）": "Parâmetros (global)"
 window_ops:
   '[定位刷新] {name} · {old} → {new} · {details}': '[Re-located] {name} · {old} → {new} · {details}'
   '[定位失效] {name}：{message}': '[Location lost] {name}: {message}'
@@ -328,3 +327,22 @@ alert_panel:
   关闭此告警: Dismiss this alert
 pressable_combo:
   不绑定（使用坐标点击）: Unbound (use coordinate tap)
+
+task_params_dialog:
+  "用户视图": "Visão de usuário"
+  "任务视图": "Visão de tarefa"
+  "当前用户跳过该任务": "Este usuário ignora esta tarefa"
+  "当前用户使用独立参数": "Usar parâmetros próprios"
+  "没有可编辑的任务": "Nenhuma tarefa editável"
+  "任务已不可用": "A tarefa não está mais disponível"
+  "任务「{task}」：全局参数与全部用户": "Tarefa {task}: parâmetros globais e todos os usuários"
+  "用户「{user}」的全部日常任务": "Todas as tarefas diárias de {user}"
+  "任务的全局参数，作用于所有未使用独立参数的用户": "Parâmetros globais da tarefa; valem para todos os usuários sem parâmetros próprios"
+  "全局参数：作用于所有未使用独立参数的用户": "Parâmetros globais: valem para todos os usuários sem parâmetros próprios"
+  "勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过": "Marcado, este usuário ignora a tarefa nos lotes; a linha permanece e o estado fica ignorado"
+  "该用户声明跳过此任务，批量执行时状态记为跳过": "Este usuário declarou ignorar esta tarefa; os lotes registram como ignorada"
+  "该用户已声明跳过此任务；取消勾选后可继续编辑参数": "Este usuário declarou ignorar esta tarefa; desmarque para editar os parâmetros"
+  "该用户使用独立参数": "Este usuário usa parâmetros próprios"
+  "改动立即生效": "As alterações valem na hora"
+  "上一个": "Anterior"
+  "下一个": "Próximo"

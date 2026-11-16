@@ -23,7 +23,6 @@ from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QFormLayout,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -57,7 +56,6 @@ from ...i18n import tr
 from ..execution.overlay import BorderOverlay
 from ..widgets.button_styles import (
     apply_button_style,
-    apply_compact_button_style,
     apply_execution_button_style,
 )
 from ..widgets.layout_helpers import fit_combo_popup_to_contents
@@ -993,25 +991,25 @@ class MainWindow(
         params_scope_row.setContentsMargins(0, 0, 0, 0)
         params_scope_row.setSpacing(8)
         params_scope_row.addWidget(self._independent_params_checkbox)
-        self._all_user_params_button = QPushButton(tr("全部用户参数"))
-        self._all_user_params_button.setObjectName("all_user_params")
-        self._all_user_params_button.setFixedHeight(24)
-        apply_compact_button_style(
-            self._all_user_params_button, variant="neutral")
-        self._all_user_params_button.setVisible(False)
-        self._all_user_params_button.clicked.connect(
-            self._on_show_all_user_params)
-        params_scope_row.addWidget(self._all_user_params_button)
         params_scope_row.addStretch(1)
         daily_layout.addLayout(params_scope_row)
 
         self._workflow_note_label = _create_workflow_note_label()
         daily_layout.addWidget(self._workflow_note_label)
 
+        # 生效参数面板：共享时它就是全局参数，独立时是该用户的合并生效值。
         self._param_panel = QGroupBox(tr("参数设置"))
-        self._param_layout = QFormLayout(self._param_panel)
+        self._param_panel_layout = QVBoxLayout(self._param_panel)
+        self._param_panel_layout.setContentsMargins(10, 8, 10, 8)
         self._param_panel.setVisible(False)
         daily_layout.addWidget(self._param_panel)
+
+        # 全局参数对照面板：只在勾选「使用独立参数」时出现，始终写全局配置。
+        self._global_param_panel = QGroupBox(tr("参数设置（全局参数）"))
+        self._global_param_panel_layout = QVBoxLayout(self._global_param_panel)
+        self._global_param_panel_layout.setContentsMargins(10, 8, 10, 8)
+        self._global_param_panel.setVisible(False)
+        daily_layout.addWidget(self._global_param_panel)
 
         daily_layout.addStretch()
         daily_scroll.setWidget(daily_panel)

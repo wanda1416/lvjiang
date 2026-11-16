@@ -1,6 +1,4 @@
 # batch.yaml — 按模块段落组织
-all_user_params:
-  "该任务没有可配置参数": "This task has no configurable parameters"
 batch:
   ? "* 表示当前用户使用独立参数\n"
   : "* means this user uses per-user parameters\n"

@@ -190,6 +190,11 @@ class MenuOpsMixin:
         batch_settings.triggered.connect(self._open_batch_config)
         tools_menu.addAction(batch_settings)
 
+        task_params = QAction(tr("任务参数"), self)
+        task_params.triggered.connect(
+            lambda: MenuOpsMixin._open_task_params(self))
+        tools_menu.addAction(task_params)
+
         daily_history = QAction(tr("任务历史"), self)
         daily_history.triggered.connect(
             lambda: MenuOpsMixin._open_task_history(self))
@@ -305,6 +310,12 @@ class MenuOpsMixin:
                 self._on_refresh_workflows() if dialog.changed else None
             ),
         )
+
+    def _open_task_params(self):
+        """打开「全部用户 × 全部日常任务」的参数与跳过声明编辑器。"""
+        from ..settings.task_params_dialog import TaskParamsDialog
+        self._show_modeless_tool(
+            "task_params", lambda: TaskParamsDialog(self))
 
     def _open_task_history(self):
         """打开日常与专用任务共用的历史查询窗口。"""

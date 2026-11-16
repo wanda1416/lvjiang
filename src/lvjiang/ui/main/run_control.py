@@ -558,62 +558,17 @@ class RunControlMixin:
         self._apply_launch_draft_parameters(draft.parameters)
 
     def _apply_launch_draft_parameters(self, values: dict[str, Any]) -> None:
+        """把冻结的运行快照投影到参数面板（只展示，不回写）。"""
         if not values:
             return
-        from PyQt6.QtWidgets import (
-            QCheckBox,
-            QComboBox,
-            QLineEdit,
-            QPlainTextEdit,
-            QSpinBox,
-            QWidget,
-        )
-        for name, value in values.items():
-            widget = self._param_panel.findChild(QSpinBox, name)
-            if widget is not None:
-                widget.blockSignals(True)
-                widget.setValue(int(value))
-                widget.blockSignals(False)
-                continue
-            widget = self._param_panel.findChild(QCheckBox, name)
-            if widget is not None:
-                widget.blockSignals(True)
-                widget.setChecked(bool(value))
-                widget.blockSignals(False)
-                continue
-            combo = self._param_panel.findChild(QComboBox, name)
-            if combo is not None:
-                combo.blockSignals(True)
-                index = combo.findData(value)
-                if index < 0:
-                    index = combo.findText(str(value))
-                if index >= 0:
-                    combo.setCurrentIndex(index)
-                combo.blockSignals(False)
-                continue
-            line = self._param_panel.findChild(QLineEdit, name)
-            if line is not None:
-                line.blockSignals(True)
-                line.setText(str(value))
-                line.blockSignals(False)
-                continue
-            plain = self._param_panel.findChild(QPlainTextEdit, name)
-            if plain is not None:
-                plain.blockSignals(True)
-                plain.setPlainText(str(value))
-                plain.blockSignals(False)
-                continue
-            container = self._param_panel.findChild(QWidget, name)
-            if container is not None and isinstance(value, dict):
-                for check in container.findChildren(QCheckBox):
-                    check.blockSignals(True)
-                    check.setChecked(bool(value.get(check.objectName(), False)))
-                    check.blockSignals(False)
+        form = getattr(self, "_effective_param_form", None)
+        if form is None:
+            return
+        form.set_values(values)
         self._refresh_param_visibility()
         if self._running and hasattr(self, "_displayed_param_baseline"):
             # 冻结运行快照只是只读展示，结束/退出时不能回写其历史参数。
-            self._displayed_param_baseline = copy.deepcopy(
-                self._collect_displayed_params(self._displayed_param_defs))
+            self._displayed_param_baseline = copy.deepcopy(form.collect())
 
     # ─── 工作流配置加载 ──────────────────────────────────
 
@@ -803,60 +758,6 @@ class RunControlMixin:
         """获取当前选中的工作流配置"""
         selected_id = self.workflow_combo.currentData()
         return next((cfg for cfg in self._workflow_configs if cfg["id"] == selected_id), None)
-
-    def _collect_flow_params(self) -> dict:
-        """从参数面板收集当前工作流的参数值"""
-        flow_cfg = self._get_selected_flow_config()
-        if not flow_cfg:
-            return {}
-        params: dict[str, Any] = {}
-        panel = self._param_panel
-        if panel is None:
-            return params
-        from PyQt6.QtWidgets import (
-            QCheckBox,
-            QComboBox,
-            QLineEdit,
-            QPlainTextEdit,
-            QSpinBox,
-            QWidget,
-        )
-        for param_def in flow_cfg.get("parameters", []):
-            name = param_def["name"]
-            # checkgroup：从容器内收集各复选框状态为 dict
-            if param_def.get("type") == "checkgroup":
-                container = panel.findChild(QWidget, name)
-                if container is not None:
-                    group = {}
-                    for chk in container.findChildren(QCheckBox):
-                        group[chk.objectName()] = chk.isChecked()
-                    params[name] = group
-                continue
-            # 先找 QSpinBox
-            widget = panel.findChild(QSpinBox, name)
-            if widget is not None:
-                params[name] = str(widget.value())
-                continue
-            # 再找 QCheckBox（bool 参数，传 True/False）
-            widget = panel.findChild(QCheckBox, name)
-            if widget is not None:
-                params[name] = widget.isChecked()
-                continue
-            # 再找 QComboBox
-            widget = panel.findChild(QComboBox, name)
-            if widget is not None:
-                data = widget.currentData()
-                params[name] = data if data is not None else widget.currentText()
-                continue
-            # 最后找 QLineEdit（text 参数，原样传字符串）
-            widget = panel.findChild(QLineEdit, name)
-            if widget is not None:
-                params[name] = widget.text()
-                continue
-            multiline = panel.findChild(QPlainTextEdit, name)
-            if multiline is not None:
-                params[name] = multiline.toPlainText()
-        return params
 
     # ─── 用户选择器 ────────────────────────────────────────
 

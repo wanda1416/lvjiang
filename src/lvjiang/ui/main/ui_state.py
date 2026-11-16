@@ -9,7 +9,7 @@
 
 依赖主类提供：
     _main_splitter / _left_tabs / tabs / workflow_combo / _param_panel /
-    _param_layout / _workflow_note_label / _workflow_configs /
+    _workflow_note_label / _workflow_configs /
     _displayed_script_id / _get_selected_flow_config
 """
 
@@ -18,21 +18,18 @@ from copy import deepcopy
 from loguru import logger
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QLabel,
+    QGroupBox,
     QLineEdit,
     QPlainTextEdit,
-    QSpinBox,
-    QWidget,
+    QVBoxLayout,
 )
-
-from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...core.config.wf_configs import TRANSIENT_ID_PREFIX
 from ...i18n import tr
-from ...workflows.builtins._coerce import to_bool
-from ..widgets.misc import FlowContainer, FlowLayout
+from ..widgets.task_param_form import TaskParamForm
+
+#: 参数保存防抖：连续输入只有在停顿后才落盘。
+_PARAM_SAVE_DELAY_MS = 250
 
 
 class UiStateMixin:
@@ -68,8 +65,8 @@ class UiStateMixin:
         if isinstance(sizes, list) and len(sizes) == 2 and all(s > 0 for s in sizes):
             self._main_splitter.setSizes([int(s) for s in sizes])
         connection_sizes = page.get("connection_splitter_sizes")
-        if (isinstance(connection_sizes, list) and len(connection_sizes) == 2
-                and all(s > 0 for s in connection_sizes)):
+        if isinstance(connection_sizes, list) and len(connection_sizes) == 2 \
+                and all(s > 0 for s in connection_sizes):
             self._connection_splitter.setSizes([int(s) for s in connection_sizes])
         # 恢复左右 Tab 页签
         left_idx = page.get("left_tab_index", 0)
@@ -121,70 +118,106 @@ class UiStateMixin:
         self._save_daily_config()
 
     def _on_daily_execution_user_changed(self, _username: str) -> None:
-        """切换执行用户时保存旧参数上下文，再加载新用户的生效参数。"""
+        """切换执行用户时保存旧参数上下文，再加载新用户的生效参数。
+
+        全局参数与用户无关，全局对照区不重建——重建会把用户正在输入的
+        全局改动重画掉，真正需要换归属的只有生效面板。
+        """
         if not hasattr(self, "_workflow_configs"):
             return
         self._save_displayed_params()
-        self._rebuild_param_panel()
+        self._rebuild_effective_panel()
+
+    # ─── 参数面板：生效参数 + 全局参数两块 ────────────────
+    #
+    # 数据仍然只有两份：会话里的 ``wf_configs[task]``（全局）与用户资料里的
+    # ``workflow_params[task]``（独立）。两块面板只是同一批参数定义的两个
+    # 投影，各写各的归属，互不覆盖：
+    #
+    # - 生效面板：共享时显示并写全局；独立时显示合并值并写该用户的独立参数。
+    # - 全局面板：只在「使用独立参数」勾选时出现，始终显示并写全局，
+    #   用于和独立值逐字段对照，也允许就地调整全局值。
+
+    def _param_form(self) -> TaskParamForm:
+        """生效参数表单（懒创建，精简宿主也能用）。"""
+        form = getattr(self, "_effective_param_form", None)
+        if form is not None:
+            return form
+        panel = self._param_panel
+        layout = panel.layout()
+        if layout is None:
+            layout = QVBoxLayout(panel)
+        form = TaskParamForm(panel)
+        layout.addWidget(form)
+        # 控件变化：文本类走防抖，其余立即落盘。
+        form.value_changed.connect(self._on_param_value_changed)
+        form.text_edited.connect(self._on_param_text_edited)
+        self._effective_param_form = form
+        return form
+
+    def _global_panel(self) -> QGroupBox:
+        """全局参数对照面板（懒创建）。"""
+        panel = getattr(self, "_global_param_panel", None)
+        if panel is not None:
+            return panel
+        panel = QGroupBox(tr("参数设置（全局参数）"))
+        parent = self._param_panel.parentWidget()
+        if parent is not None:
+            panel.setParent(parent)
+            layout = parent.layout()
+            if layout is not None:
+                layout.addWidget(panel)
+        panel.setVisible(False)
+        self._global_param_panel = panel
+        return panel
+
+    def _global_form(self) -> TaskParamForm:
+        form = getattr(self, "_global_param_form", None)
+        if form is not None:
+            return form
+        panel = self._global_panel()
+        layout = panel.layout()
+        if layout is None:
+            layout = QVBoxLayout(panel)
+        form = TaskParamForm(panel)
+        layout.addWidget(form)
+        form.value_changed.connect(self._on_param_value_changed)
+        form.text_edited.connect(self._on_param_text_edited)
+        self._global_param_form = form
+        return form
 
     def _collect_displayed_params(self, parameters: list[dict]) -> dict:
-        """从当前参数面板的控件读出各参数的值。
+        """读出生效面板的当前取值，只保留给定定义里声明的参数。
 
-        写回配置和按 ``require`` 算可见性都读这一份，避免两处各写一套控件遍历
-        而慢慢走偏。
+        启动草稿、按草稿重建与保存都读这一份，避免两处各写一套控件遍历
+        而慢慢走偏。全局对照面板不参与：草稿只关心本次实际生效的值。
         """
-        params: dict = {}
-        for param_def in parameters:
-            name = param_def["name"]
-            # checkgroup：从容器内收集各复选框状态为 dict
-            if param_def.get("type") == "checkgroup":
-                container = self._param_panel.findChild(QWidget, name)
-                if container is not None:
-                    group = {}
-                    for chk in container.findChildren(QCheckBox):
-                        group[chk.objectName()] = chk.isChecked()
-                    params[name] = group
-                continue
-            widget = self._param_panel.findChild(QSpinBox, name)
-            if widget is not None:
-                blocked = widget.blockSignals(True)
-                try:
-                    widget.interpretText()
-                finally:
-                    widget.blockSignals(blocked)
-                params[name] = str(widget.value())
-                continue
-            widget = self._param_panel.findChild(QCheckBox, name)
-            if widget is not None:
-                params[name] = widget.isChecked()
-                continue
-            widget = self._param_panel.findChild(QComboBox, name)
-            if widget is not None:
-                data = widget.currentData()
-                params[name] = data if data is not None else widget.currentText()
-                continue
-            widget = self._param_panel.findChild(QLineEdit, name)
-            if widget is not None:
-                params[name] = widget.text()
-                continue
-            multiline = self._param_panel.findChild(QPlainTextEdit, name)
-            if multiline is not None:
-                params[name] = multiline.toPlainText()
-        return params
+        names = {
+            str(item.get("name")) for item in parameters
+            if isinstance(item, dict) and item.get("name")
+        }
+        current = self._param_form().collect()
+        return {name: value for name, value in current.items() if name in names}
 
     def _save_displayed_params(self):
-        """保存面板固定归属的修改字段，停止待保存计时器。
-
-        仅对 scope=daily 的脚本生效；专用脚本的参数由专属页面管理，
-        日常页禁止读写。
-        """
+        """保存两块面板里已修改的字段；各自写回自己的归属。"""
         timer = getattr(self, "_param_save_timer", None)
         if timer is not None:
             timer.stop()
         target_cfg = getattr(self, "_displayed_param_cfg", None)
         # 切到批量 Tab 后参数面板不可见，但里面的控件和值仍然有效；批量启动
         # 前的兜底同步必须允许从这个隐藏面板收集。脚本 scope 在下方另行校验。
-        if target_cfg is None or not self._param_panel or not self._param_panel.isEnabled():
+        if target_cfg is None or not getattr(self, "_param_panel", None):
+            return
+        self._save_effective_params(target_cfg)
+        self._save_global_params(target_cfg)
+
+    def _save_effective_params(self, target_cfg: dict) -> None:
+        """生效面板：共享写全局、独立写该用户，临时脚本写内存草稿。"""
+        panel = getattr(self, "_param_panel", None)
+        form = getattr(self, "_effective_param_form", None)
+        # 运行时投影的面板被禁用：那里的值来自历史快照，回写会覆盖当前配置。
+        if panel is None or form is None or not panel.isEnabled():
             return
         sid = target_cfg["id"]
         # ⚠️ 专用脚本的参数由专属页面管理，日常页禁止读写
@@ -192,8 +225,8 @@ class UiStateMixin:
             return
         if not target_cfg.get("parameters"):
             return
-        params = self._collect_displayed_params(self._displayed_param_defs)
-        baseline = self._displayed_param_baseline
+        params = form.collect()
+        baseline = getattr(self, "_displayed_param_baseline", {})
         patch = {key: value for key, value in params.items()
                  if key not in baseline or baseline[key] != value}
         if not patch:
@@ -219,20 +252,98 @@ class UiStateMixin:
             from ...core.config.wf_configs import update_wf_config
             update_wf_config(sid, patch)
         self._displayed_param_baseline = deepcopy(params)
+        self._clear_param_failure()
+
+    def _save_global_params(self, target_cfg: dict) -> None:
+        """全局对照面板：始终写全局配置，改完同步生效面板未覆盖的字段。"""
+        panel = getattr(self, "_global_param_panel", None)
+        form = getattr(self, "_global_param_form", None)
+        # 有无对照内容由表单决定：切到没有独立参数的脚本时它会被清空。
+        # 不能看可见性——切到批量 Tab 后整块日常页都不可见，待保存的全局
+        # 编辑会因此永远不落盘。
+        if panel is None or form is None or not form.has_fields():
+            return
+        # 运行时投影期间两块面板一起禁用，历史快照绝不能被写回全局。
+        if not panel.isEnabled():
+            return
+        sid = target_cfg["id"]
+        if target_cfg.get("scope", "daily") != "daily":
+            return
+        if not target_cfg.get("parameters"):
+            return
+        params = form.collect()
+        baseline = getattr(self, "_global_param_baseline", {})
+        patch = {key: value for key, value in params.items()
+                 if key not in baseline or baseline[key] != value}
+        if not patch:
+            return
+        from ...core.config.wf_configs import update_wf_config
+        update_wf_config(sid, patch)
+        self._global_param_baseline = deepcopy(params)
+        self._sync_effective_from_global(patch)
+        self._clear_param_failure()
+
+    def _clear_param_failure(self) -> None:
         feedback = getattr(self, "_daily_start_feedback", None)
         if feedback is not None:
             feedback.clear_failure()
 
+    def _user_overridden_keys(self) -> set[str]:
+        """当前展示的用户对该任务实际覆盖了哪些字段。"""
+        if not getattr(self, "_displayed_param_is_user_override", False):
+            return set()
+        username = getattr(self, "_displayed_param_username", "")
+        cfg = getattr(self, "_displayed_param_cfg", None)
+        user_manager = getattr(self, "_user_manager", None)
+        if not username or cfg is None or user_manager is None:
+            return set()
+        from ...core.users.document import get_user_workflow_params
+        values = get_user_workflow_params(
+            username, str(cfg["id"]), user_manager._users_dir)
+        return set(values or {})
+
+    def _sync_effective_from_global(self, patch: dict) -> None:
+        """全局值改动后，同步生效面板里该用户没有覆盖、也没有正在编辑的字段。
+
+        已覆盖的字段保持用户值不动（这正是两块面板对照的意义）；正在编辑
+        尚未落盘的字段也不动，否则会把用户刚输入的文本盖掉。
+        """
+        form = getattr(self, "_effective_param_form", None)
+        if form is None or not patch:
+            return
+        current = form.collect()
+        baseline = getattr(self, "_displayed_param_baseline", {})
+        overridden = self._user_overridden_keys()
+        updates: dict = {}
+        for name, value in patch.items():
+            if name not in current or name in overridden:
+                continue
+            if baseline.get(name) != current.get(name):
+                continue
+            updates[name] = value
+        if not updates:
+            return
+        form.set_values(updates)
+        for name, value in updates.items():
+            baseline[name] = value
+
+    def _on_param_value_changed(self, *_args):
+        """非文本控件（勾选、下拉、数字）改动立即落盘。"""
+        self._save_displayed_params()
+
+    def _on_param_text_edited(self, *_args):
+        """文本输入合并保存，避免每敲一个字都写文件。"""
+        if not hasattr(self, "_param_save_timer"):
+            self._param_save_timer = QTimer(self)
+            self._param_save_timer.setSingleShot(True)
+            self._param_save_timer.setInterval(_PARAM_SAVE_DELAY_MS)
+            self._param_save_timer.timeout.connect(self._save_pending_params)
+        self._param_save_timer.start()
+
     def _persist_param_change(self, *_args):
-        """文本输入合并保存；显隐立即更新，所有启动入口先完成待保存编辑。"""
-        self._refresh_param_visibility()
+        """兼容入口：按触发源决定立即保存还是合并保存。"""
         if isinstance(self.sender(), (QLineEdit, QPlainTextEdit)):
-            if not hasattr(self, "_param_save_timer"):
-                self._param_save_timer = QTimer(self)
-                self._param_save_timer.setSingleShot(True)
-                self._param_save_timer.setInterval(250)
-                self._param_save_timer.timeout.connect(self._save_pending_params)
-            self._param_save_timer.start()
+            self._on_param_text_edited()
         else:
             self._save_displayed_params()
 
@@ -296,8 +407,107 @@ class UiStateMixin:
         self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
         self._rebuild_param_panel()
 
+    # ─── 面板重建 ─────────────────────────────────────────
+
+    def _param_context(self, flow_cfg: dict | None):
+        """算出绘制两块面板所需的一切：定义、生效值、来源、全局值。"""
+        from ...core.config.wf_configs import get_wf_config
+        from ...core.task_params import (
+            merge_task_params,
+            parameters_for_env,
+            resolve_task_params,
+        )
+
+        params = parameters_for_env(
+            flow_cfg.get("parameters", []) if flow_cfg else [],
+            self._selected_run_env(),
+        )
+        if not params:
+            return None
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        username = selector.resolve_username() if selector is not None else ""
+        user_manager = getattr(self, "_user_manager", None)
+        users_dir = getattr(user_manager, "_users_dir", None)
+        # 保持脚本配置对象的**同一性**：临时脚本的参数草稿写回该配置对象本身
+        # （``_saved_params``），复制一份会让改动落在一个无人读取的副本上。
+        cfg = flow_cfg if isinstance(flow_cfg, dict) else {}
+        temporary = str(cfg["id"]).startswith(TRANSIENT_ID_PREFIX)
+        if temporary:
+            saved, source = merge_task_params(
+                params, cfg.get("_saved_params", {}), None)
+        else:
+            saved, source = resolve_task_params(
+                str(cfg["id"]), username, params, users_dir)
+        global_values, _global_source = merge_task_params(
+            params, get_wf_config(str(cfg["id"])), None)
+        return {
+            "flow_cfg": cfg,
+            "definitions": params,
+            "values": saved,
+            "source": source,
+            "global_values": global_values,
+            "username": username,
+            "temporary": temporary,
+        }
+
+    def _current_param_context(self):
+        """当前脚本/用户下的面板上下文；脚本不适用时返回 None。"""
+        flow_cfg = self._get_selected_flow_config()
+        if flow_cfg is None or flow_cfg.get("scope", "daily") != "daily":
+            return None
+        return self._param_context(flow_cfg)
+
+    def _refresh_workflow_note(self) -> None:
+        flow_cfg = self._get_selected_flow_config()
+        note = str(flow_cfg.get("note") or "").strip() if flow_cfg else ""
+        label = getattr(self, "_workflow_note_label", None)
+        if label is not None:
+            label.setText(f"{tr('说明')}：{note}" if note else "")
+            label.setVisible(bool(note))
+
+    def _apply_panel_state(self, context: dict) -> None:
+        """按来源刷新标题、独立参数勾选与全局对照区。"""
+        independent = getattr(self, "_independent_params_checkbox", None)
+        global_panel = self._global_panel()
+        is_user = context["source"] == "user"
+        set_title = getattr(self._param_panel, "setTitle", None)
+        if callable(set_title):
+            set_title(
+                tr("参数设置（{name}独立）").format(name=context["username"])
+                if is_user else tr("参数设置（共享）"))
+        if independent is not None:
+            independent.blockSignals(True)
+            independent.setEnabled(bool(context["username"]))
+            independent.setChecked(is_user)
+            independent.blockSignals(False)
+            independent.setVisible(not context["temporary"])
+        # 全局对照区只在「使用独立参数」时出现；共享模式下本面板就是全局值，
+        # 再画一遍只会造成"两份全局"的错觉。
+        if is_user:
+            global_form = self._global_form()
+            global_form.set_parameters(
+                context["definitions"], context["global_values"], editable=True)
+            self._global_param_baseline = deepcopy(global_form.collect())
+        global_panel.setVisible(is_user)
+
+    def _rebuild_effective_panel(self) -> None:
+        """只重建生效面板（切执行用户用；全局值与用户无关）。"""
+        self._refresh_workflow_note()
+        context = self._current_param_context()
+        if context is None:
+            self._rebuild_param_panel()
+            return
+        self._displayed_param_cfg = context["flow_cfg"]
+        self._displayed_param_username = context["username"]
+        self._displayed_param_is_user_override = context["source"] == "user"
+        form = self._param_form()
+        form.set_parameters(
+            context["definitions"], context["values"], editable=True)
+        self._displayed_param_baseline = deepcopy(form.collect())
+        self._apply_panel_state(context)
+
     def _rebuild_param_panel(self):
-        """重建参数面板
+        """重建参数面板：生效参数，以及独立参数下方的全局参数对照区。
 
         仅对 scope=daily 的脚本绘制参数面板；专用脚本不画面板，
         其参数由专属配置页面管理。
@@ -305,212 +515,69 @@ class UiStateMixin:
         self._save_displayed_params()
         self._displayed_param_cfg = None
         self._displayed_param_baseline = {}
+        self._global_param_baseline = {}
         refresh_feedback = getattr(self, "_refresh_daily_start_feedback", None)
         if callable(refresh_feedback):
             refresh_feedback()
-        while self._param_layout.rowCount() > 0:
-            self._param_layout.removeRow(0)
-        flow_cfg = self._get_selected_flow_config()
-        note = str(flow_cfg.get("note") or "").strip() if flow_cfg else ""
-        self._workflow_note_label.setText(f"{tr('说明')}：{note}" if note else "")
-        self._workflow_note_label.setVisible(bool(note))
+        form = self._param_form()
+        global_panel = self._global_panel()
+        form.set_parameters([], {})
+        global_form = getattr(self, "_global_param_form", None)
+        if global_form is not None:
+            global_form.set_parameters([], {})
+        global_panel.setVisible(False)
+        self._refresh_workflow_note()
         independent = getattr(self, "_independent_params_checkbox", None)
         if independent is not None:
             independent.setVisible(False)
-        all_user_params = getattr(self, "_all_user_params_button", None)
-        if all_user_params is not None:
-            all_user_params.setVisible(False)
+
+        flow_cfg = self._get_selected_flow_config()
         # ⚠️ 专用脚本不画参数面板
         if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
             self._param_panel.setVisible(False)
             return
-        from ...core.task_params import parameters_for_env
-        params = parameters_for_env(
-            flow_cfg.get("parameters", []) if flow_cfg else [],
-            self._selected_run_env(),
-        )
-        if not params:
+        context = self._param_context(flow_cfg) if flow_cfg else None
+        if context is None:
             self._param_panel.setVisible(False)
             return
-        selector = getattr(self, "_daily_execution_user_selector", None)
-        username = selector.resolve_username() if selector is not None else ""
-        user_manager = getattr(self, "_user_manager", None)
-        users_dir = getattr(user_manager, "_users_dir", None)
-        from ...core.task_params import merge_task_params, resolve_task_params
-        temporary = str(flow_cfg["id"]).startswith(TRANSIENT_ID_PREFIX)
-        if temporary:
-            saved, source = merge_task_params(params, flow_cfg.get("_saved_params", {}), None)
-        else:
-            saved, source = resolve_task_params(str(flow_cfg["id"]), username, params, users_dir)
-        self._displayed_param_cfg = flow_cfg
-        self._displayed_param_username = username
-        self._displayed_param_is_user_override = source == "user"
-        set_title = getattr(self._param_panel, "setTitle", None)
-        if callable(set_title):
-            set_title(
-                tr("参数设置（{name}独立）").format(name=username)
-                if source == "user" else tr("参数设置（共享）"))
-        if selector is not None and independent is not None:
-            independent.blockSignals(True)
-            independent.setEnabled(bool(username))
-            independent.setChecked(source == "user")
-            independent.blockSignals(False)
-            independent.setVisible(not temporary)
-        if all_user_params is not None:
-            all_user_params.setVisible(not temporary)
-        # require 依赖要按行控制显隐，这里记下每个参数占用的行号（多行控件占两行）
-        self._displayed_param_defs = list(params)
-        self._param_rows: dict[str, list[int]] = {}
-        for param_def in params:
-            name = param_def["name"]
-            label = param_def.get("label", name)
-            param_type = param_def.get("type", "select")
-            rows_before = self._param_layout.rowCount()
-            # 已保存值优先于定义默认值
-            default = saved.get(name, param_def.get("default"))
-            options = param_def.get("options", [])
-            if param_type == "number":
-                spin = QSpinBox()
-                spin.setObjectName(name)
-                spin.setRange(param_def.get("min", 0), param_def.get("max", 999999))
-                spin.setValue(int(default) if default is not None else 1)
-                spin.setKeyboardTracking(False)
-                spin.valueChanged.connect(self._persist_param_change)
-                self._param_layout.addRow(label + ":", spin)
-            elif param_type == "bool":
-                chk = QCheckBox()
-                chk.setObjectName(name)
-                if isinstance(default, str):
-                    chk.setChecked(to_bool(default))
-                else:
-                    chk.setChecked(bool(default))
-                chk.toggled.connect(self._persist_param_change)
-                self._param_layout.addRow(label + ":", chk)
-            elif param_type == "text":
-                edit: QLineEdit | QPlainTextEdit
-                if param_def.get("multiline", False):
-                    edit = QPlainTextEdit()
-                    edit.setMaximumHeight(120)
-                    edit.setPlainText(str(default) if default is not None else "")
-                else:
-                    edit = QLineEdit()
-                    edit.setText(str(default) if default is not None else "")
-                edit.setObjectName(name)
-                placeholder = param_def.get("placeholder", "")
-                if placeholder:
-                    edit.setPlaceholderText(placeholder)
-                # 显隐即时更新，连续输入合并；启动/切换入口负责立即保存。
-                edit.textChanged.connect(self._persist_param_change)
-                if isinstance(edit, QPlainTextEdit):
-                    # 多行输入从标签下一行起占满表单宽度。
-                    self._param_layout.addRow(QLabel(label + ":"))
-                    self._param_layout.addRow(edit)
-                else:
-                    self._param_layout.addRow(label + ":", edit)
-            elif param_type == "checkgroup":
-                # 分组复选框：值为 dict {key: bool}，使用 FlowLayout 自动换行
-                container = FlowContainer()
-                container.setObjectName(name)
-                flow = FlowLayout(container, spacing=6)
-                flow.setContentsMargins(0, 0, 0, 0)
-                container.set_flow_layout(flow)
-                if isinstance(default, dict):
-                    saved_dict = default
-                else:
-                    saved_dict = {}
-                for opt in options:
-                    if isinstance(opt, dict):
-                        opt_key = opt["value"]
-                        opt_label = opt.get("label", opt_key)
-                    else:
-                        opt_key = str(opt)
-                        opt_label = str(opt)
-                    chk = QCheckBox(opt_label)
-                    chk.setObjectName(opt_key)
-                    chk.setChecked(bool(saved_dict.get(opt_key, True)))
-                    chk.toggled.connect(self._persist_param_change)
-                    flow.addWidget(chk)
-                # 标签独占一行；选项从下一行起使用表单的完整宽度。
-                self._param_layout.addRow(QLabel(label + ":"))
-                self._param_layout.addRow(container)
-            else:
-                combo = AutoWidthComboBox()
-                combo.setObjectName(name)
-                if param_type == "select" and options:
-                    for opt in options:
-                        if isinstance(opt, dict):
-                            combo.addItem(opt["label"], opt["value"])
-                        else:
-                            combo.addItem(str(opt), str(opt))
-                    if default is not None:
-                        idx = combo.findData(str(default))
-                        if idx >= 0:
-                            combo.setCurrentIndex(idx)
-                combo.currentIndexChanged.connect(self._persist_param_change)
-                self._param_layout.addRow(label + ":", combo)
-            self._param_rows[str(name)] = list(
-                range(rows_before, self._param_layout.rowCount()))
-        self._refresh_param_visibility()
-        self._displayed_param_baseline = deepcopy(self._collect_displayed_params(params))
+
+        self._displayed_param_cfg = context["flow_cfg"]
+        self._displayed_param_username = context["username"]
+        self._displayed_param_is_user_override = context["source"] == "user"
+        self._displayed_param_defs = list(context["definitions"])
+        form.set_parameters(
+            context["definitions"], context["values"], editable=True)
+        self._displayed_param_baseline = deepcopy(form.collect())
+        self._apply_panel_state(context)
         self._param_panel.setVisible(True)
 
     def _refresh_param_visibility(self) -> None:
-        """按 require 依赖隐藏当前取值下不适用的参数行。
-
-        只改显隐：控件和值都留着，运行时快照照旧包含这些参数（见
-        ``task_params.parameters_for_values``），wf 引用它们不会未定义。
-        """
-        rows = getattr(self, "_param_rows", None)
-        if not rows:
-            return
-        defs = getattr(self, "_displayed_param_defs", [])
-        if not any(item.get("require") for item in defs):
-            return
-        from ...core.param_require import RequireError, visible_parameter_names
-        try:
-            visible = visible_parameter_names(
-                defs, self._collect_displayed_params(defs))
-        except RequireError as exc:
-            # 元数据解析期已挡住非法 require；真落到这里说明定义绕过了校验，
-            # 此时全部展示，不能让面板变成空白。
-            logger.warning(f"参数依赖求值失败，本次全部展示: {exc}")
-            return
-        for name, indices in rows.items():
-            for index in indices:
-                self._param_layout.setRowVisible(index, name in visible)
+        """按 require 依赖重算显隐（表单内部维护行号，这里只转发）。"""
+        form = getattr(self, "_effective_param_form", None)
+        if form is not None:
+            form.refresh_visibility()
 
     def _on_independent_params_toggled(self, enabled: bool) -> None:
-        """在共享参数与当前用户的独立参数之间切换。"""
+        """在共享参数与当前用户的独立参数之间切换。
+
+        先落盘两块面板的待保存改动，再按归属切换；切换后重建面板，独立时
+        下方会多出全局参数对照区。关闭独立参数会丢弃该用户已保存的独立值，
+        因此由调用方负责二次确认。
+        """
         self._save_displayed_params()
         flow_cfg = self._get_selected_flow_config()
-        username = self._daily_execution_user_selector.resolve_username()
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        username = selector.resolve_username() if selector is not None else ""
         if not flow_cfg or not username:
             return
         workflow_id = str(flow_cfg["id"])
+        user_manager = getattr(self, "_user_manager", None)
+        users_dir = getattr(user_manager, "_users_dir", None)
         if enabled:
             from ...core.users.document import set_user_workflow_params
             set_user_workflow_params(
-                username, workflow_id, self._collect_flow_params(),
-                self._user_manager._users_dir)
+                username, workflow_id, self._param_form().collect(), users_dir)
         else:
             from ...core.users.document import delete_user_workflow_params
-            delete_user_workflow_params(
-                username, workflow_id, self._user_manager._users_dir)
+            delete_user_workflow_params(username, workflow_id, users_dir)
         self._rebuild_param_panel()
-
-    def _on_show_all_user_params(self) -> None:
-        """查看各用户对日常任务最终生效的参数与来源。"""
-        flow_cfg = self._get_selected_flow_config()
-        if not flow_cfg:
-            return
-        self._save_displayed_params()
-        from ..settings.all_user_params_dialog import AllUserParamsDialog
-        dialog = AllUserParamsDialog(
-            self._workflow_configs,
-            self._user_manager.list_users(),
-            self._user_manager._users_dir,
-            str(flow_cfg["id"]),
-            self,
-            current_env=self._selected_run_env(),
-        )
-        dialog.exec()

@@ -224,17 +224,10 @@ ai_settings:
 alert_panel:
   "关闭此告警": "Dismiss this alert"
 all_user_params:
-  "上一个": "Previous"
-  "下一个": "Next"
   "任务": "Task"
-  "全部用户参数": "All User Parameters"
   "参数来源：全局参数": "Parameter source: global parameters"
   "参数来源：独立参数": "Parameter source: per-user parameters"
   "该任务没有可配置参数": "This task has no configurable parameters"
-  "该用户使用全局参数": "This user uses global parameters"
-  "该用户使用独立参数": "This user uses per-user parameters"
-  "该用户已保存独立参数，任务运行时优先使用下列值。": "This user has saved per-user parameters; the values below take priority at runtime."
-  "该用户未设置独立参数，任务运行时使用全局参数。": "This user has no per-user parameters; global parameters apply at runtime."
 apk_release:
   "下载 {url} 失败：{err}": "Failed to download {url}: {err}"
   "下载已取消": "Download cancelled"

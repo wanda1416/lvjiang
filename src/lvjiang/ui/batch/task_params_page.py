@@ -8,6 +8,9 @@
 
 编辑即落盘：非文本控件立即保存，文本输入按 250ms 合并保存。用户作用域下
 只把改动过的字段合并进该用户的独立参数，其余字段继续跟随全局值。
+
+参数控件由 :class:`~lvjiang.ui.widgets.task_param_form.TaskParamForm` 绘制，
+与日常页、工具「任务参数」对话框共用同一份实现。
 """
 from __future__ import annotations
 
@@ -18,23 +21,16 @@ from typing import Any
 from loguru import logger
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QFormLayout,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QPlainTextEdit,
     QScrollArea,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from ...core.config.wf_configs import get_wf_config, update_wf_config
-from ...core.param_require import RequireError, visible_parameter_names
 from ...core.task_params import (
     merge_task_params,
     parameters_for_env,
@@ -44,10 +40,9 @@ from ...core.users.document import (
     set_user_workflow_params,
 )
 from ...i18n import tr
-from ...workflows.builtins._coerce import to_bool
 from ...workflows.discovery import script_display_name
 from ..widgets.combo_box import AutoWidthComboBox
-from ..widgets.misc import FlowContainer, FlowLayout
+from ..widgets.task_param_form import TaskParamForm
 
 
 @dataclass
@@ -57,10 +52,8 @@ class _ScriptForm:
     script_id: str
     name: str
     definitions: list[dict]
-    widgets: dict[str, QWidget]
-    rows: dict[str, list[int]] = field(default_factory=dict)
+    form: TaskParamForm
     baseline: dict[str, Any] = field(default_factory=dict)
-    layout: QFormLayout | None = None
 
 
 class TaskParamsPage(QWidget):
@@ -75,7 +68,6 @@ class TaskParamsPage(QWidget):
         #: "" 表示全局参数，其它值为用户名。
         self._scope = ""
         self._forms: list[_ScriptForm] = []
-        self._owners: dict[int, tuple[_ScriptForm, str]] = {}
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(250)
@@ -175,7 +167,6 @@ class TaskParamsPage(QWidget):
     def _rebuild(self) -> None:
         self._clear_body()
         self._forms = []
-        self._owners = {}
         shown = 0
         for script in self._scripts:
             definitions = parameters_for_env(
@@ -209,158 +200,28 @@ class TaskParamsPage(QWidget):
         values, _source = merge_task_params(definitions, shared, override)
 
         box = QGroupBox(name)
-        form_layout = QFormLayout(box)
-        form_layout.setContentsMargins(10, 8, 10, 8)
+        box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(10, 8, 10, 8)
+        param_form = TaskParamForm(box)
+        box_layout.addWidget(param_form)
+        param_form.set_parameters(definitions, values, editable=True)
         form = _ScriptForm(
             script_id=script_id, name=name, definitions=definitions,
-            widgets={}, layout=form_layout,
+            form=param_form,
         )
-        for param_def in definitions:
-            self._add_param_row(form, form_layout, param_def, values)
         # 基线必须取「控件实际值」而不是 merge 结果：数字参数在合并结果里是
         # int、控件读出来是 str，拿 merge 结果当基线会把默认值误判成改动。
-        form.baseline = self._collect(form)
-        self._apply_visibility(form, values)
+        form.baseline = param_form.collect()
+        param_form.value_changed.connect(
+            lambda _values, target=form: self._save_form(target))
+        param_form.text_edited.connect(lambda _values: self._save_timer.start())
         self._forms.append(form)
         self._body_layout.addWidget(box)
-
-    def _add_param_row(
-        self, form: _ScriptForm, layout: QFormLayout,
-        param_def: dict, values: dict[str, Any],
-    ) -> None:
-        name = str(param_def["name"])
-        label = str(param_def.get("label", name))
-        param_type = param_def.get("type", "select")
-        default = values.get(name, param_def.get("default"))
-        options = param_def.get("options", [])
-        rows_before = layout.rowCount()
-
-        if param_type == "number":
-            spin = QSpinBox()
-            spin.setObjectName(name)
-            spin.setRange(param_def.get("min", 0), param_def.get("max", 999999))
-            spin.setValue(int(default) if default is not None else 1)
-            spin.valueChanged.connect(self._on_param_changed)
-            layout.addRow(label + ":", spin)
-            widget: QWidget = spin
-        elif param_type == "bool":
-            check = QCheckBox()
-            check.setObjectName(name)
-            if isinstance(default, str):
-                check.setChecked(to_bool(default))
-            else:
-                check.setChecked(bool(default))
-            check.toggled.connect(self._on_param_changed)
-            layout.addRow(label + ":", check)
-            widget = check
-        elif param_type == "text":
-            placeholder = param_def.get("placeholder", "")
-            if param_def.get("multiline", False):
-                multiline = QPlainTextEdit()
-                multiline.setMaximumHeight(120)
-                multiline.setPlainText(
-                    str(default) if default is not None else "")
-                multiline.setObjectName(name)
-                if placeholder:
-                    multiline.setPlaceholderText(placeholder)
-                multiline.textChanged.connect(self._on_param_changed)
-                layout.addRow(QLabel(label + ":"))
-                layout.addRow(multiline)
-                widget = multiline
-            else:
-                line = QLineEdit()
-                line.setText(str(default) if default is not None else "")
-                line.setObjectName(name)
-                if placeholder:
-                    line.setPlaceholderText(placeholder)
-                line.textChanged.connect(self._on_param_changed)
-                layout.addRow(label + ":", line)
-                widget = line
-        elif param_type == "checkgroup":
-            container = FlowContainer()
-            container.setObjectName(name)
-            flow = FlowLayout(container, spacing=6)
-            flow.setContentsMargins(0, 0, 0, 0)
-            container.set_flow_layout(flow)
-            saved = default if isinstance(default, dict) else {}
-            for opt in options:
-                if isinstance(opt, dict):
-                    key, opt_label = str(opt["value"]), str(
-                        opt.get("label", opt["value"]))
-                else:
-                    key = opt_label = str(opt)
-                check = QCheckBox(opt_label)
-                check.setObjectName(key)
-                check.setChecked(bool(saved.get(key, True)))
-                check.toggled.connect(self._on_param_changed)
-                self._owners[id(check)] = (form, name)
-                flow.addWidget(check)
-            layout.addRow(QLabel(label + ":"))
-            layout.addRow(container)
-            widget = container
-        else:
-            combo = AutoWidthComboBox()
-            combo.setObjectName(name)
-            if param_type == "select" and options:
-                for opt in options:
-                    if isinstance(opt, dict):
-                        combo.addItem(str(opt["label"]), opt["value"])
-                    else:
-                        combo.addItem(str(opt), str(opt))
-                if default is not None:
-                    idx = combo.findData(str(default))
-                    if idx >= 0:
-                        combo.setCurrentIndex(idx)
-            combo.currentIndexChanged.connect(self._on_param_changed)
-            layout.addRow(label + ":", combo)
-            widget = combo
-
-        form.widgets[name] = widget
-        self._owners.setdefault(id(widget), (form, name))
-        form.rows[name] = list(range(rows_before, layout.rowCount()))
 
     # ─── 取值 / 保存 ──────────────────────────────────────
 
     def _collect(self, form: _ScriptForm) -> dict[str, Any]:
-        params: dict[str, Any] = {}
-        for param_def in form.definitions:
-            name = str(param_def["name"])
-            widget = form.widgets.get(name)
-            if widget is None:
-                continue
-            if param_def.get("type") == "checkgroup":
-                group: dict[str, bool] = {}
-                for check in widget.findChildren(QCheckBox):
-                    group[check.objectName()] = check.isChecked()
-                params[name] = group
-            elif isinstance(widget, QSpinBox):
-                blocked = widget.blockSignals(True)
-                try:
-                    widget.interpretText()
-                finally:
-                    widget.blockSignals(blocked)
-                params[name] = str(widget.value())
-            elif isinstance(widget, QCheckBox):
-                params[name] = widget.isChecked()
-            elif isinstance(widget, QComboBox):
-                data = widget.currentData()
-                params[name] = data if data is not None else widget.currentText()
-            elif isinstance(widget, QLineEdit):
-                params[name] = widget.text()
-            elif isinstance(widget, QPlainTextEdit):
-                params[name] = widget.toPlainText()
-        return params
-
-    def _on_param_changed(self, *_args) -> None:
-        owner = self._owners.get(id(self.sender()))
-        if owner is None:
-            return
-        form, _name = owner
-        self._apply_visibility(form, self._collect(form))
-        if isinstance(self.sender(), (QLineEdit, QPlainTextEdit)):
-            self._save_timer.start()
-        else:
-            self._save_form(form)
+        return form.form.collect()
 
     def _flush_text_edits(self) -> None:
         self._save_timer.stop()
@@ -400,24 +261,3 @@ class TaskParamsPage(QWidget):
         existing.update(patch)
         set_user_workflow_params(
             self._scope, script_id, existing, self._users_dir)
-
-    # ─── require 显隐 ─────────────────────────────────────
-
-    def _apply_visibility(
-        self, form: _ScriptForm, values: dict[str, Any],
-    ) -> None:
-        layout = form.layout
-        if layout is None or not any(
-            item.get("require") for item in form.definitions
-        ):
-            return
-        try:
-            visible = visible_parameter_names(form.definitions, values)
-        except RequireError as exc:
-            # 元数据校验期已挡住非法 require；真走到这里说明定义绕过了校验，
-            # 此时全部展示，不能让表单变成空白。
-            logger.warning(f"参数依赖求值失败，本次全部展示: {exc}")
-            return
-        for name, indices in form.rows.items():
-            for index in indices:
-                layout.setRowVisible(index, name in visible)

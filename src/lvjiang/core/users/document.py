@@ -66,6 +66,9 @@ class User:
     avatar: str = ""
     attributes: dict[str, str] = field(default_factory=dict)
     workflow_params: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: 该用户声明不执行的任务 id。稳定 key，跨批量配置组生效；只是执行性声明，
+    #: 与「是否使用独立参数」无关——跳过后独立参数值仍然保留。
+    skipped_task_ids: list[str] = field(default_factory=list)
     ui_state: dict[str, dict[str, Any]] = field(default_factory=dict)
     # 保留插件拥有的顶层字段；公共资料编辑不能丢弃未解释的数据。
     extra_fields: dict[str, Any] = field(default_factory=dict)
@@ -88,6 +91,9 @@ class User:
                 for workflow_id, params in self.workflow_params.items()
                 if workflow_id and isinstance(params, dict)
             },
+            "skipped_task_ids": list(dict.fromkeys(
+                str(task_id) for task_id in self.skipped_task_ids
+                if isinstance(task_id, str) and task_id)),
             "ui_state": {
                 str(key): dict(value)
                 for key, value in self.ui_state.items()
@@ -102,6 +108,7 @@ class User:
         raw_avatar = data.get("avatar", "")
         raw_attributes = data.get("attributes", {})
         raw_workflow_params = data.get("workflow_params", {})
+        raw_skipped_tasks = data.get("skipped_task_ids", [])
         raw_ui_state = data.get("ui_state", {})
         attributes = (
             {str(k): str(v) for k, v in raw_attributes.items() if k}
@@ -118,6 +125,12 @@ class User:
                  for wf_id, params in raw_workflow_params.items()
                  if wf_id and isinstance(params, dict)}
                 if isinstance(raw_workflow_params, dict) else {}
+            ),
+            skipped_task_ids=(
+                list(dict.fromkeys(
+                    str(task_id) for task_id in raw_skipped_tasks
+                    if isinstance(task_id, str) and task_id))
+                if isinstance(raw_skipped_tasks, list) else []
             ),
             ui_state=(
                 {str(key): dict(value)
@@ -230,6 +243,50 @@ def delete_user_workflow_params(
         lambda user: user.workflow_params.pop(workflow_id, None),
         users_dir,
     )
+
+
+def get_user_skipped_tasks(
+    username: str, users_dir: Path | None = None,
+) -> set[str]:
+    """读取该用户声明不执行的任务 id 集合。
+
+    只是执行性声明：批量调度据此把该用户的该任务记为跳过，不读任务参数、
+    也不跑可执行性检查。任务暂时不可用或已被删除时这里照样返回，调用方
+    按当前候选集过滤即可。
+    """
+    user = load_user_metadata(username, users_dir)
+    return set(user.skipped_task_ids) if user is not None else set()
+
+
+def set_user_skipped_tasks(
+    username: str, task_ids: set[str] | list[str],
+    users_dir: Path | None = None,
+) -> None:
+    """整体替换该用户的跳过任务集合（去重、按 id 排序后落盘）。"""
+    values = sorted({str(task_id) for task_id in task_ids if task_id})
+    mutate_user_metadata(
+        username,
+        lambda user: setattr(user, "skipped_task_ids", list(values)),
+        users_dir,
+    )
+
+
+def set_user_skipped_task(
+    username: str, task_id: str, skipped: bool,
+    users_dir: Path | None = None,
+) -> None:
+    """单个「用户 × 任务」的跳过声明；只动这一项，其余保持。"""
+    target = str(task_id or "")
+    if not target:
+        return
+
+    def apply(user: User) -> None:
+        current = [value for value in user.skipped_task_ids if value != target]
+        if skipped:
+            current.append(target)
+        user.skipped_task_ids = list(dict.fromkeys(current))
+
+    mutate_user_metadata(username, apply, users_dir)
 
 
 def get_user_ui_state(

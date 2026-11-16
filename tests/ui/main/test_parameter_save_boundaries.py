@@ -3,7 +3,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
-from PyQt6.QtWidgets import QFormLayout, QGroupBox, QLabel, QLineEdit, QSpinBox, QWidget
+from PyQt6.QtWidgets import QGroupBox, QLabel, QLineEdit, QSpinBox, QWidget
 
 from lvjiang.core.config.wf_configs import (
     get_wf_config,
@@ -47,7 +47,6 @@ class Host(QWidget, UiStateMixin, RunControlMixin):
             self.workflow_combo.addItem(cfg["name"], cfg["id"])
         self._displayed_script_id = "a"
         self._param_panel = QGroupBox(self)
-        self._param_layout = QFormLayout(self._param_panel)
         self._workflow_note_label = QLabel()
         self._rebuild_param_panel()
         self.workflow_combo.currentIndexChanged.connect(self._on_workflow_combo_changed)
@@ -204,3 +203,35 @@ def test_projected_running_snapshot_never_overwrites_current_configuration(host)
     text_field(host).setText("新的编辑")
     host._save_displayed_params()
     assert get_wf_config("a") == {"text": "新的编辑"}
+
+
+def test_global_panel_edits_global_and_syncs_uncovered_fields(host):
+    """独立参数下方多出一块可编辑的全局参数区：改全局只影响未覆盖的字段。"""
+    set_user_workflow_params(
+        "alpha", "a", {"text": "甲的独立值"}, host._user_manager._users_dir)
+    host._rebuild_param_panel()
+
+    panel = host._global_param_panel
+    assert not panel.isHidden()
+    # 被覆盖的字段：生效面板显示用户值，全局对照区显示全局值。
+    assert text_field(host).text() == "甲的独立值"
+    global_text = panel.findChild(QLineEdit, "text")
+    assert global_text.text() == ""
+
+    # 改全局值写的是全局配置，被覆盖字段不受影响。
+    global_text.setText("全局新值")
+    host._save_displayed_params()
+    assert get_wf_config("a") == {"text": "全局新值"}
+    assert text_field(host).text() == "甲的独立值"
+
+    # 未被覆盖的字段随全局值同步到生效面板，且不因此产生用户覆盖。
+    panel.findChild(QSpinBox, "count").setValue(9)
+    assert get_wf_config("a") == {"text": "全局新值", "count": "9"}
+    assert host._param_panel.findChild(QSpinBox, "count").value() == 9
+    assert get_user_workflow_params(
+        "alpha", "a", host._user_manager._users_dir) == {"text": "甲的独立值"}
+
+
+def test_shared_mode_does_not_duplicate_global_panel(host):
+    """共享模式下面板本身就是全局参数，不再多画一块全局面板。"""
+    assert host._global_param_panel.isHidden()

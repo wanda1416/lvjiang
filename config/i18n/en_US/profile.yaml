@@ -1,13 +1,7 @@
 # profile.yaml — 按模块段落组织
 all_user_params:
-  "上一个": "Previous"
-  "下一个": "Next"
   "参数来源：全局参数": "Parameter source: global parameters"
   "参数来源：独立参数": "Parameter source: per-user parameters"
-  "该用户使用全局参数": "This user uses global parameters"
-  "该用户使用独立参数": "This user uses per-user parameters"
-  "该用户已保存独立参数，任务运行时优先使用下列值。": "This user has saved per-user parameters; the values below take priority at runtime."
-  "该用户未设置独立参数，任务运行时使用全局参数。": "This user has no per-user parameters; global parameters apply at runtime."
   激活码已被云端停用: "License code has been disabled in the cloud"
 common:
   "allowed": "Latest check passed"

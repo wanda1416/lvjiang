@@ -9,4 +9,5 @@
 | 文件 | 内容 |
 |------|------|
 | [android-platform-progress.md](android-platform-progress.md) | 安卓独立执行端迁移的进度与下一步（状态止于 2026-08-01） |
+| [appendix-a-config-upgrade-0.15.0.md](appendix-a-config-upgrade-0.15.0.md) | 原用户指南「附录 A 配置升级调整」：0.13.15 → 0.15.0 的一次性格式调整清单（状态止于 2026-11-18） |
 | [backlog-history-2026-10-06.md](backlog-history-2026-10-06.md) | `02-backlog.md` 迁出的历史段（进度快照、历史记录、完成清单，状态止于 2026-10-06） |

@@ -41,10 +41,9 @@
 | [8. 脚本工作台与脚本作者须知](08-script-authoring.md) | 脚本工作台操作、指令选择、画布取点取色、单步调试，以及脚本文件与运行性质的约定（面向自己写脚本的用户） |
 | [9. 常见问题与反馈](09-faq-and-feedback.md) | 连接/识别/调律/批量/装备/工作流问题、常见误操作、术语速查；反馈受理范围、必填信息、日志与隐私脱敏要求 |
 | **附录** | |
-| [A. 配置升级调整](appendix-a-config-upgrade.md) | 旧入口清理后的手工调整、读取诊断与必要迁移边界 |
-| [B. 官方在线配置与会员内容](appendix-b-online-config.md) | 更新生效、本地覆盖、会员状态和人工恢复 |
-| [C. 功能激活与恢复](appendix-c-activation.md) | 首次激活、离线使用与同机恢复 |
-| [D. 命令行执行脚本](appendix-d-command-line.md) | 不开界面跑任务：list / schema / run、参数、退出码与 JSON 输出 |
+| [A. 在线配置、会员内容与功能激活](appendix-a-online-config.md) | 在线配置的获取与生效、功能激活与离线恢复、本地激活与在线会员授权的区别、关闭撤销与人工恢复、升级与版本口径 |
+| [B. 命令行执行脚本](appendix-b-command-line.md) | 不开界面跑任务：list / schema / run、参数、退出码与 JSON 输出 |
+| [C. 预置图库内容](appendix-c-preset-gallery.md) | 随包分发的端游/手游参考图清单：共有规格、逐分组对照、只在一边出现的图、工作流与自动调律实际用到的 label、已知差异 |
 
 ## 相关文档
 

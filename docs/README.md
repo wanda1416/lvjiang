@@ -27,5 +27,4 @@
 | 写工作流脚本 | [脚本工作台与作者须知](60-userguide/08-script-authoring.md)、[DSL 语法](30-architecture/32-grammar/README.md) |
 | 反馈问题 | [问题反馈](60-userguide/09-faq-and-feedback.md) |
 
-- [官方在线配置与会员内容](60-userguide/appendix-b-online-config.md)：更新生效、本地覆盖、会员状态和人工恢复。
-- [功能激活与恢复](60-userguide/appendix-c-activation.md)：首次激活、离线使用与同机恢复。
+- [在线配置、会员内容与功能激活](60-userguide/appendix-a-online-config.md)：更新生效、本地覆盖、本地激活与在线会员授权的区别、关闭撤销与人工恢复。

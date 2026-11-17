@@ -748,7 +748,7 @@ class TuneConfigManager:
                 f"开关仍被规则条件组引用，禁止删除: {removed}")
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._path, "w", encoding="utf-8") as f:
+            with open(self._path, "w", encoding="utf-8", newline="\n") as f:
                 yaml.dump(data, f, allow_unicode=True, sort_keys=False)
         else:
             self._resolver.save_merged(_CONFIG_REL_PATH, data)

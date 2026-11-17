@@ -59,7 +59,7 @@ def _save_sync_state(state: dict) -> None:
     data["users_sync"] = state
     try:
         path.write_text(formatted_json(data),
-                        encoding="utf-8")
+                        encoding="utf-8", newline="\n")
     except OSError as error:
         logger.warning("[users sync] 同步状态写回失败：{}", error)
 
@@ -91,7 +91,7 @@ def _set_roster(names: list[str]) -> bool:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(formatted_json(data),
-                        encoding="utf-8")
+                        encoding="utf-8", newline="\n")
     except OSError as error:
         logger.warning("[users sync] 名册顺序写回失败：{}", error)
         return False
@@ -238,7 +238,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
             merged = {**data}
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(formatted_json(merged),
-                            encoding="utf-8")
+                            encoding="utf-8", newline="\n")
             report.pulled += 1
             continue
         try:
@@ -253,7 +253,7 @@ def sync_users(token: str, on_progress=None, stop=None) -> UsersSyncReport:
             merged["ui_state"] = ui_state
         if merged != local:
             path.write_text(formatted_json(merged),
-                            encoding="utf-8")
+                            encoding="utf-8", newline="\n")
             report.pulled += 1
 
     # 顺序落地：远端顺序为准，本地独有名字 append。本地刚排过序（签名存在且

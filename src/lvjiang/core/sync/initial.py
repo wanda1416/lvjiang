@@ -54,7 +54,7 @@ def sync_established() -> bool:
 def _save_profile(profile: dict) -> None:
     path = account_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(formatted_json(profile), encoding="utf-8")
+    path.write_text(formatted_json(profile), encoding="utf-8", newline="\n")
 
 
 def set_sync_established(value: bool) -> None:

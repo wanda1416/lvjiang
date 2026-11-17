@@ -250,7 +250,7 @@ def _load_screenshot_meta(layout_name: str) -> dict:
 def _save_screenshot_meta(layout_name: str, meta: dict) -> None:
     p = _screenshot_meta_path(layout_name)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    p.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
 
 
 def get_scene_screenshot_format(

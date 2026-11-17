@@ -49,7 +49,7 @@ def _install_faulthandler():
     global _fault_file, _fault_path
     crash_path = _crash_log_path()
     try:
-        fp = open(crash_path, "w", encoding="utf-8")
+        fp = open(crash_path, "w", encoding="utf-8", newline="\n")
         faulthandler.enable(file=fp, all_threads=True)
         _fault_file, _fault_path = fp, crash_path
         atexit.register(_cleanup_empty_crash_log)
@@ -82,7 +82,7 @@ def _install_excepthook():
     def _hook(exc_type, exc_value, exc_tb):
         crash_path = _crash_log_path()
         try:
-            with open(crash_path, "w", encoding="utf-8") as f:
+            with open(crash_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(f"=== 未捕获异常 {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
                 traceback.print_exception(exc_type, exc_value, exc_tb, file=f)
         except Exception:
@@ -111,7 +111,7 @@ def _install_windows_handler():
         def _handler(exception_ptrs_raw):
             crash_path = _crash_log_path()
             try:
-                with open(crash_path, "w", encoding="utf-8") as f:
+                with open(crash_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(f"=== Native Crash {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
                     f.write(f"Raw pointer: 0x{exception_ptrs_raw:X}\n")
                     # dump 当前 Python 线程栈

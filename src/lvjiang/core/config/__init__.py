@@ -148,7 +148,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
 def save_yaml(path: Path, data: dict[str, Any]) -> None:
     """保存 YAML 文件（自动建父目录，保序不排序键）"""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 

@@ -64,7 +64,7 @@ def _save(state: dict) -> None:
     try:
         tmp = path.with_name(f".{path.name}.dirty")
         tmp.write_text(formatted_json(data),
-                       encoding="utf-8")
+                       encoding="utf-8", newline="\n")
         os.replace(tmp, path)
     except Exception as error:      # noqa: BLE001 — 标记失败不能顶掉业务写入
         logger.debug("[sync] 脏标记写回失败（不影响本地数据）：{}", error)

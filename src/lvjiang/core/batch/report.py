@@ -198,7 +198,7 @@ class BatchReport:
         ts = self._start_time.strftime("%Y%m%d_%H%M%S")
         run_suffix = f"_{self._batch_run_id}" if self._batch_run_id else ""
         path = output_dir / f"批量报告_{ts}{run_suffix}.md"
-        path.write_text(self.render(), encoding="utf-8")
+        path.write_text(self.render(), encoding="utf-8", newline="\n")
         return path
 
     def render(self) -> str:

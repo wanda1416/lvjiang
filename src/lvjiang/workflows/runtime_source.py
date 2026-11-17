@@ -34,7 +34,7 @@ def runtime_source(text: str):
     fd, filename = mkstemp(dir=directory, prefix="_editor_run_", suffix=".wf")
     path = Path(filename)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             stream.write(_normalized_source(text))
         yield path
     finally:

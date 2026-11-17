@@ -57,7 +57,7 @@ class _AndroidTokenStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps({"user": username, "token": password}, ensure_ascii=False),
-            encoding="utf-8")
+            encoding="utf-8", newline="\n")
 
     def delete_password(self, service: str, username: str) -> None:
         try:

@@ -624,7 +624,7 @@ def write_model(path: Path, model: dict[str, Any]) -> None:
     fd, temp_name = tempfile.mkstemp(dir=path.parent, suffix=".json.tmp")
     temp_path = Path(temp_name)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             stream.write(payload)
         os.replace(temp_path, path)
     except BaseException:

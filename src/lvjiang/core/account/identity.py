@@ -116,7 +116,7 @@ def stable_instance_id() -> str:
                 return value
         path.parent.mkdir(parents=True, exist_ok=True)
         value = uuid.uuid4().hex
-        path.write_text(value + "\n", encoding="utf-8")
+        path.write_text(value + "\n", encoding="utf-8", newline="\n")
         _stable_instance_id_cache = value
         return value
     except OSError as err:

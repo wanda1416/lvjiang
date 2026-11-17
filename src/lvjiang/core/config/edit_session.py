@@ -56,7 +56,7 @@ class ConfigEditSession:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(yaml.dump(
                 data, allow_unicode=True,
-                sort_keys=False), encoding="utf-8")
+                sort_keys=False), encoding="utf-8", newline="\n")
         for rel_dir in self._entity_dirs:
             for name in self._source.enumerate_entity_tree(
                     rel_dir, "*.yaml", include_internal=True):

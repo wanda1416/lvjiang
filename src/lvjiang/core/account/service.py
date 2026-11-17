@@ -92,7 +92,7 @@ def _save_profile(profile: dict) -> None:
     path = account_config_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(formatted_json(profile), encoding="utf-8")
+        path.write_text(formatted_json(profile), encoding="utf-8", newline="\n")
     except OSError as error:
         logger.warning("账号信息保存失败：{}（登录态仍保留在凭据库）", error)
 

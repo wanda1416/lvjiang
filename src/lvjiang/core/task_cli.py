@@ -389,7 +389,7 @@ def _save_result(username: str, script_id: str, started_at: datetime,
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(result, ensure_ascii=False, indent=2, default=str),
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
     return path
 
 
@@ -815,7 +815,7 @@ def cli_main(argv: Sequence[str], *, bootstrap: Bootstrap) -> int:
     if getattr(args, "result", ""):
         Path(args.result).write_text(
             json.dumps(outcome, ensure_ascii=False, indent=2, default=str),
-            encoding="utf-8")
+            encoding="utf-8", newline="\n")
     if args.as_json:
         _emit_outcome(outcome)
     else:

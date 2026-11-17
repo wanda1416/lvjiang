@@ -1289,6 +1289,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
         path.write_text(
             json.dumps(_ser(result), ensure_ascii=False, indent=2),
             encoding="utf-8",
+            newline="\n",
         )
         logger.info(f"批量结果已保存: {path}")
         return path

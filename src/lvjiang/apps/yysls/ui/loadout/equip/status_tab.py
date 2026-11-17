@@ -2175,7 +2175,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             tr("文本文件 (*.txt)"),
         )
         if path:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
             QMessageBox.information(
                 self, tr("导出成功"),

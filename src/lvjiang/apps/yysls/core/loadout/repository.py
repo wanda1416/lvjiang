@@ -166,7 +166,7 @@ class LoadoutRepository:
             dir=str(self.path.parent), prefix=f".{self.path.stem}_", suffix=".tmp")
         tmp_path = Path(tmp)
         try:
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
                 stream.write(payload)
             os.replace(tmp_path, self.path)
             from lvjiang.core.sync.dirty import mark_dirty

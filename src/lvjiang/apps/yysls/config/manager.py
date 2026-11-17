@@ -375,7 +375,7 @@ class GameConfigManager:
         # 写盘
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._path, "w", encoding="utf-8") as f:
+            with open(self._path, "w", encoding="utf-8", newline="\n") as f:
                 yaml.dump(data, f, allow_unicode=True, sort_keys=False)
         else:
             from .game_config_files import save_game_config

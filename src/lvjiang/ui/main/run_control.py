@@ -2461,6 +2461,7 @@ class RunControlMixin:
             save_path.write_text(
                 json.dumps(serializable, ensure_ascii=False, indent=2),
                 encoding="utf-8",
+                newline="\n",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"工作流结果保存失败，继续任务收尾: {exc}")

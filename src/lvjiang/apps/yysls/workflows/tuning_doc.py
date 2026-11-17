@@ -55,7 +55,7 @@ class TuningDocWriter:
         base.mkdir(parents=True, exist_ok=True)
         ts = started_at.strftime("%Y%m%d_%H%M%S")
         self.path = base / f"调律说明_{username}_{ts}.md"
-        self._fh = self.path.open("w", encoding="utf-8")
+        self._fh = self.path.open("w", encoding="utf-8", newline="\n")
 
     # ─── 底层写 ────────────────────────────────────────────
 

@@ -927,9 +927,9 @@ class ReferenceDatabase:
         self.load()
         return True
 
-    def create_space(self, name: str) -> bool:
-        """新建空图库空间（空 meta_schema + 空条目）。"""
-        return self.spaces.create(name)
+    def create_space(self, name: str, display_name: object | None = None) -> bool:
+        """新建空图库空间（空 meta_schema + 空条目）；可同时写入多语言展示名。"""
+        return self.spaces.create(name, display_name)
 
     def can_delete_space(self, name: str) -> str:
         """返回该空间不可删除的原因；可删返回空串。"""

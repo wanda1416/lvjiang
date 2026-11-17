@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -207,7 +206,8 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         from .space_name_dialog import SpaceNameDialog
 
         dialog = SpaceNameDialog(
-            self, space_key=name, current_name=self._current_space_name(name))
+            self, space_key=name, current_name=self._current_space_name(name),
+            existing_keys=self._db.get_spaces())
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         if not self._db.set_space_name(name, dialog.names()):
@@ -240,18 +240,23 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         logger.info("图库空间已刷新")
 
     def _on_new_space(self):
-        """新建空间：创建空空间 + 激活 + 刷新下拉与面板"""
-        name, ok = QInputDialog.getText(self, tr("新建图库空间"), tr_label('空间名'))
-        if not ok or not str(name).strip():
+        """新建空间：与「编辑」共用同一个对话框，只是 key 可填。
+
+        创建后只切到新空间查看/编辑（``open_space``），不改运行时空间。
+        """
+        from .space_name_dialog import SpaceNameDialog
+
+        dialog = SpaceNameDialog(
+            self, creating=True, existing_keys=self._db.get_spaces())
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name = str(name).strip()
-        if not self._db.create_space(name):
-            QMessageBox.warning(
-                self, tr("新建空间"), f"无法创建空间「{name}」（名称非法或已存在）")
+        key = dialog.space_key()
+        if not self._db.create_space(key, dialog.names()):
+            QMessageBox.warning(self, tr("新建空间"), tr("无法创建空间，详见日志"))
             return
-        self._db.open_space(name)   # 只切到新空间查看/编辑，不改运行时空间
         self._data_changed = True
-        self._reload_space_combo(name)
+        self._db.open_space(key)
+        self._reload_space_combo(key)
         self._refresh_panels()
 
     def _on_delete_space(self):

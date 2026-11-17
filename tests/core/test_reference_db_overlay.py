@@ -575,6 +575,17 @@ class TestSpaceDisplayName:
         assert [e.file for e in db.entries] == ["A.png"]
         assert db.space_label("android") == "手机端"
 
+    def test_create_space_writes_display_name_once(self, space_env):
+        """新建空间时展示名与空间写进同一份 yaml，不留「空间已建、名字没落下」。"""
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.create_space(
+            "myspace", {"zh_CN": "我的空间", "en_US": "My Space"}) is True
+        path = space_env["local_ref"] / "myspace.yaml"
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert doc["name"] == {"zh_CN": "我的空间", "en_US": "My Space"}
+        assert doc["references"] == []
+        assert db.space_label("myspace") == "我的空间"
+
     def test_none_clears_name_and_unknown_space_is_refused(self, space_env):
         ref = space_env["system_ref"]
         _write_yaml(ref / "android.yaml", {

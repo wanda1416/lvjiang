@@ -205,8 +205,11 @@ class ReferenceSpaces:
 
     # ─── 增删 ───
 
-    def create(self, name: str) -> bool:
-        """新建空图库空间（空 meta_schema + 空条目），按模式落盘即可见。"""
+    def create(self, name: str, display_name: object | None = None) -> bool:
+        """新建空图库空间（空 meta_schema + 空条目 + 可选多语言展示名）。
+
+        展示名与空间一次写进同一份 yaml，避免「空间已建、名字没落下」的半成品。
+        """
         name = str(name or "").strip()
         if not self.valid_name(name):
             return False
@@ -216,11 +219,12 @@ class ReferenceSpaces:
         base = self._system_root() if self._is_dev() else self._local_root()
         space_yaml = base / f"{name}.yaml"
         if not space_yaml.exists():
-            save_yaml(space_yaml, {
-                "version": 1,
-                "meta_schema": [],
-                "references": [],
-            })
+            doc: dict = {"version": 1}
+            if display_name is not None:
+                doc["name"] = display_name
+            doc["meta_schema"] = []
+            doc["references"] = []
+            save_yaml(space_yaml, doc)
         self.refresh()
         logger.info(f"新建图库空间: {name} -> {space_yaml}")
         return True

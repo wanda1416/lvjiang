@@ -86,6 +86,7 @@
 | [25-configuration-modules.md](50-platform/25-configuration-modules.md) | 配置、布局与组合展示职责拆分 | 已实现 |
 | [26-online-config-background-download.md](50-platform/26-online-config-background-download.md) | 在线配置后台下载、暂存与下次启动安装 | 部分实现 |
 | [27-hotkeys-and-menu-shortcuts.md](50-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 | 已实现 |
+| [28-account-document-sync.md](50-platform/28-account-document-sync.md) | 全局任务参数与批量配置上云：账户级文档通道、冲突不留副本与迁移 | 已实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

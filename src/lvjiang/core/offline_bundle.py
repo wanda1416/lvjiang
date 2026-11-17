@@ -39,7 +39,7 @@ _LAYER_PATTERNS = (
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",
 )
-_SESSION_FILES = ("session.json", "interface.json", "batch.json")
+_SESSION_FILES = ("session.json", "interface.json", "batch.json", "workflow.json")
 
 #: profile.db 不进离线包：总览数据由账号云端同步；其余数据库由 app 钩子声明。
 _DATABASE_FILES: tuple[str, ...] = ()
@@ -241,9 +241,10 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
     清单内的四类合并语义与以前一致：
     - ``users/*.json``：包内覆盖；保留任务参数时把手机参数并进同名用户，
       不保留时删掉包里没有的手机用户文件（否则名册里没有的幽灵用户会留着）；
-    - ``session.json``：名册与任务通用参数按保留开关合并；
+    - ``session.json``：名册按保留开关合并；
     - ``interface.json``：actives 跟清单，``batch`` 草稿永远属于手机；
-    - ``batch.json``：明确保留手机本次选择时整份不写。
+    - ``batch.json``：明确保留手机本次选择时整份不写；
+    - ``workflow.json``：全局任务参数按保留开关合并（PC 为底，手机覆盖）。
     """
     from .history.transfer import history_channels
 
@@ -258,7 +259,8 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
         relative = PurePosixPath(name)
         if len(relative.parts) < 3 or relative.parts[1] != "session":
             continue
-        if relative.parts[2] in {"session.json", "interface.json", "batch.json", "users"}:
+        if relative.parts[2] in {"session.json", "interface.json", "batch.json",
+                                 "workflow.json", "users"}:
             continue
         if relative.name in history_names:
             continue                      # 历史不属于参数快照
@@ -288,7 +290,7 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
             if path.name not in incoming_users:
                 path.unlink()
 
-    # 3) session.json：名册与任务通用参数
+    # 3) session.json：名册（全局任务参数在 workflow.json，见第 6 步）
     incoming_session = _read_json(session_staged / "session.json")
     if incoming_session:
         names = list(incoming_session.get("users") or [])
@@ -296,11 +298,6 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
             for name in phone_session.get("users") or []:
                 if name not in names and (session_target / "users" / f"{name}.json").is_file():
                     names.append(name)
-            shared = dict(incoming_session.get("wf_configs") or {})
-            phone_shared = phone_session.get("wf_configs")
-            if isinstance(phone_shared, dict):
-                shared.update(phone_shared)
-            incoming_session["wf_configs"] = shared
         incoming_session["users"] = names
         _write_json(session_target / "session.json", incoming_session)
 
@@ -328,6 +325,22 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
     phone_batch = session_target / "batch.json"
     if staged_batch.is_file() and (not preserve_batch_config or not phone_batch.is_file()):
         _write_bytes(phone_batch, staged_batch.read_bytes())
+
+    # 6) workflow.json：全局任务参数。保留手机任务参数时以 PC 为底、手机已有
+    #    参数按 wf_id 覆盖（与旧 session.json wf_configs 合并语义一致）；
+    #    不保留、或手机还没有时，整份落地 PC 版。
+    staged_workflow = session_staged / "workflow.json"
+    phone_workflow = session_target / "workflow.json"
+    if staged_workflow.is_file():
+        if preserve_task_params and phone_workflow.is_file():
+            shared = _read_json(staged_workflow).get("workflow_params")
+            shared = dict(shared) if isinstance(shared, dict) else {}
+            phone_params = _read_json(phone_workflow).get("workflow_params")
+            if isinstance(phone_params, dict):
+                shared.update(phone_params)
+            _write_json(phone_workflow, {"workflow_params": shared})
+        elif not preserve_task_params or not phone_workflow.is_file():
+            _write_bytes(phone_workflow, staged_workflow.read_bytes())
 
 
 def install_offline_bundle(

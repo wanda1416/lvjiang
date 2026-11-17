@@ -256,6 +256,9 @@ def _isolate_session_store(tmp_path, monkeypatch):
     monkeypatch.setattr(
         constants, "BATCH_CONFIG_PATH", tmp_path / "session" / "batch.json",
     )
+    monkeypatch.setattr(
+        constants, "WORKFLOW_CONFIG_PATH", tmp_path / "session" / "workflow.json",
+    )
     reset_session_store()
     _reload_plugin_configuration()
     yield

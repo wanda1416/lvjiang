@@ -1,48 +1,115 @@
-"""工作流配置统一存储 —— session.json wf_configs 节点
+"""全局任务参数存储 —— workflow.json 同步文档
 
-``{wf_id: {配置 dict}}``，日常 / 批量 / 调律三个 Tab 共享。
-各 Tab 只关心自己的 wf_id，核心层零感知工作流语义。
+文件结构：``{"workflow_params": {wf_id: {参数 dict}}}``，一级 key 只有
+``workflow_params``，存全部工作流的全局任务参数（日常 / 批量 / 调律共享）。
 
-读写委托 SessionStore（锁内原子读-改-写），与 session.json 其他
-节点（settings / daily 等）互不干扰。
+该文件是账户级同步文档：core/sync/core_documents.py 登记 ``kind=workflow``、
+云端 ``label=__global__``；冲突输方不留副本，按云端最新版直接覆盖。
+
+旧存储是 session.json 顶层 ``wf_configs`` 节点，首次访问时一次性迁出并删除
+旧节点（可重复执行）；没有旧节点即无事发生。
 """
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
 
-from .session import get_session_store
+from loguru import logger
 
-# session.json 顶层 key
-_NODE_KEY = "wf_configs"
+from ..fs_util import atomic_write_text
+from ..json_files import formatted_json
+
+# workflow.json 一级 key
+_NODE_KEY = "workflow_params"
+# 旧 session.json 顶层节点（迁移后删除）
+_LEGACY_NODE_KEY = "wf_configs"
+
+_WRITE_LOCK = threading.RLock()
 
 
-# ─── 对外接口 ──────────────────────────────────────────────
+# ─── 文档读写 ──────────────────────────────────────────────
+
+
+def _path():
+    from ... import constants
+
+    return constants.WORKFLOW_CONFIG_PATH
+
+
+def _read_document() -> dict[str, Any]:
+    """读取整份文档；文件缺失或损坏返回空文档（迁移先于读取执行）。"""
+    path = _path()
+    if not path.exists():
+        return {}
+    try:
+        import json
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        logger.error(f"全局任务参数读取失败: {path}: {error}")
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_document(document: dict[str, Any]) -> None:
+    atomic_write_text(_path(), formatted_json(document), prefix=".workflow_")
+
+
+def _migrate_legacy_node() -> None:
+    """session.json 的 ``wf_configs`` 节点 → workflow.json，只迁一次。"""
+    if _path().exists():
+        return
+    from .session import get_session_store
+
+    node = get_session_store().get_node(_LEGACY_NODE_KEY)
+    if not isinstance(node, dict) or not node:
+        return
+    _write_document({_NODE_KEY: deepcopy(node)})
+    get_session_store().delete_node(_LEGACY_NODE_KEY)
+    logger.info("全局任务参数已从 session.json 迁出至 workflow.json")
+
+
+def _read_params() -> dict[str, dict[str, Any]]:
+    with _WRITE_LOCK:
+        _migrate_legacy_node()
+        node = _read_document().get(_NODE_KEY)
+        return deepcopy(node) if isinstance(node, dict) else {}
+
+
+def _write_params(params: dict[str, dict[str, Any]]) -> None:
+    with _WRITE_LOCK:
+        _write_document({_NODE_KEY: params})
+        _mark_dirty()
+
+
+def _mark_dirty() -> None:
+    """写路径标脏：账户级 workflow 文档待同步。"""
+    from ..sync.dirty import mark_dirty
+    from ..sync.registry import GLOBAL_LABEL
+
+    mark_dirty(GLOBAL_LABEL, "workflow")
+
+
+# ─── 对外接口（与旧 session.json 节点存储等价） ────────────
 
 
 def get_wf_config(wf_id: str) -> dict[str, Any]:
     """读取指定工作流的配置（不存在返回空 dict）
 
-    返回独立副本，调用方修改不会影响 store 内部态。
+    返回独立副本，调用方修改不会影响落盘内容。
     """
-    node = get_session_store().get_node(_NODE_KEY, {})
-    if not isinstance(node, dict):
-        return {}
-    value = node.get(wf_id)
+    value = _read_params().get(wf_id)
     return deepcopy(value) if isinstance(value, dict) else {}
 
 
 def set_wf_config(wf_id: str, config: dict[str, Any]) -> None:
-    """写入指定工作流的配置（原子读-改-写，不影响其他 wf_id）
-
-    深拷贝 config 以切断调用方引用，防止外部篡改 store 内部态。
-    """
+    """写入指定工作流的配置（深拷贝切断调用方引用）"""
     config = deepcopy(config)
-    get_session_store().mutate_node(
-        _NODE_KEY,
-        lambda old: {**(old if isinstance(old, dict) else {}), wf_id: config},
-    )
+    params = _read_params()
+    params[wf_id] = config
+    _write_params(params)
 
 
 def update_wf_config(wf_id: str, patch: dict[str, Any]) -> dict[str, Any]:
@@ -52,30 +119,28 @@ def update_wf_config(wf_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     返回写入后的配置副本，便于测试或调用方继续使用快照。
     """
     patch = deepcopy(patch)
-
-    def _merge(old: Any) -> dict[str, dict[str, Any]]:
-        node = old if isinstance(old, dict) else {}
-        current = node.get(wf_id)
+    with _WRITE_LOCK:
+        params = _read_params()
+        current = params.get(wf_id)
         current = current if isinstance(current, dict) else {}
         merged = {**current, **patch}
-        return {**node, wf_id: merged}
-
-    node = get_session_store().mutate_node(_NODE_KEY, _merge)
-    value = node.get(wf_id) if isinstance(node, dict) else {}
-    return deepcopy(value) if isinstance(value, dict) else {}
+        params[wf_id] = merged
+        _write_params(params)
+        return deepcopy(merged)
 
 
 def delete_wf_config(wf_id: str) -> None:
     """删除指定工作流配置（不存在时静默）"""
-    get_session_store().mutate_node(
-        _NODE_KEY,
-        lambda old: {k: v for k, v in (old if isinstance(old, dict) else {}).items()
-                     if k != wf_id},
-    )
+    with _WRITE_LOCK:
+        params = _read_params()
+        if wf_id not in params:
+            return
+        params.pop(wf_id)
+        _write_params(params)
 
 
 #: 脚本编辑器临时加载的脚本 id 前缀（见 workflows/metadata.py）；这类 id
-#: 只在编辑器会话内有效，落到 wf_configs 里就是垃圾。
+#: 只在编辑器会话内有效，落到全局参数里就是垃圾。
 TRANSIENT_ID_PREFIX = "__loaded__:"
 
 
@@ -91,22 +156,19 @@ def prune_wf_configs(valid_ids: Iterable[str]) -> list[str]:
     """
     keep = set(valid_ids)
     removed: list[str] = []
-
-    def _prune(old: Any) -> dict[str, Any]:
-        node = old if isinstance(old, dict) else {}
+    with _WRITE_LOCK:
+        params = _read_params()
         kept: dict[str, Any] = {}
-        for wf_id, value in node.items():
+        for wf_id, value in params.items():
             if wf_id in keep and not str(wf_id).startswith(TRANSIENT_ID_PREFIX):
                 kept[wf_id] = value
             else:
                 removed.append(str(wf_id))
-        return kept
-
-    get_session_store().mutate_node(_NODE_KEY, _prune)
+        if removed:
+            _write_params(kept)
     return sorted(removed)
 
 
 def get_all_wf_configs() -> dict[str, dict[str, Any]]:
     """读取全部工作流配置（返回独立副本）"""
-    node = get_session_store().get_node(_NODE_KEY, {})
-    return deepcopy(node) if isinstance(node, dict) else {}
+    return _read_params()

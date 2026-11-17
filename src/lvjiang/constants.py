@@ -41,6 +41,8 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 SESSION_CONFIG_DIR = CONFIG_DIR / "session"
 SESSION_PATH = SESSION_CONFIG_DIR / "session.json"
 BATCH_CONFIG_PATH = SESSION_CONFIG_DIR / "batch.json"
+#: 全局任务参数文档（账户级同步文档，见 core/sync/core_documents.py）
+WORKFLOW_CONFIG_PATH = SESSION_CONFIG_DIR / "workflow.json"
 USERS_DIR = SESSION_CONFIG_DIR / "users"
 AVATARS_DIR = SESSION_CONFIG_DIR / "avatars"
 

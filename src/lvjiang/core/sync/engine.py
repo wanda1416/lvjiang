@@ -117,6 +117,13 @@ def _write_bytes(document: LocalDocument, payload: bytes) -> None:
     document.path.write_bytes(payload)
 
 
+def _conflict_copy(document: LocalDocument) -> bool:
+    """冲突输方是否另存副本；登记 ``conflict_copy=False`` 的会话文档不留
+    （数据可丢的文档，如任务参数/批量配置：云端最新版直接覆盖）。"""
+    session_document = registry.session_document_for(document.kind)
+    return True if session_document is None else session_document.conflict_copy
+
+
 def _save_conflict(document: LocalDocument, local_raw: bytes) -> Path | None:
     """本地将被远端覆盖前，把输的本地版本另存（可审计、可手工恢复）。"""
     if not document.path.is_file():
@@ -202,7 +209,7 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
         # 密文但本机解不开（改密后旧数据等）：保留本地明文，不制造冲突副本
         report.pulled.append(key)
         return
-    if keep_local and document.path.is_file():
+    if keep_local and _conflict_copy(document) and document.path.is_file():
         saved = _save_conflict(document, document.path.read_bytes())
         if saved is not None:
             report.conflicts.append(f"{key} → {saved.name}")

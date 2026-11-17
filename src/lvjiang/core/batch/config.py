@@ -316,6 +316,14 @@ class BatchConfigStore:
         self.path = Path(path)
         self._thread_lock = _WRITE_LOCK
 
+    @staticmethod
+    def _mark_dirty() -> None:
+        """落盘后标脏：batch.json 是账户级同步文档，待下一轮文档通道上传。"""
+        from ..sync.dirty import mark_dirty
+        from ..sync.registry import GLOBAL_LABEL
+
+        mark_dirty(GLOBAL_LABEL, "batch")
+
     def _read_document_unlocked(self) -> object:
         if not self.path.exists():
             return {}
@@ -340,6 +348,7 @@ class BatchConfigStore:
             text = json.dumps(config.to_dict(), ensure_ascii=False, indent=2)
             atomic_write_text(self.path, text, prefix=".batch_")
             config._file_baseline = self.path.read_bytes()
+            self._mark_dirty()
 
     def mutate(self, mutator: Callable[[BatchConfig], None]) -> BatchConfig:
         with self._thread_lock:

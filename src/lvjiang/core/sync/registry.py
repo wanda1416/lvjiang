@@ -14,7 +14,8 @@ import re
 from dataclasses import dataclass
 
 #: core 固有 kind；插件不得抢占。
-RESERVED_KINDS = frozenset({"user_doc", "notes", "profile_yaml", "avatar"})
+RESERVED_KINDS = frozenset(
+    {"user_doc", "notes", "profile_yaml", "avatar", "workflow", "batch"})
 #: 禁止登记的文件后缀（core 语义/排除项）。
 _RESERVED_SUFFIXES = frozenset({".json", ".notes.json", ".session.json"})
 #: 账户级文档在云端的固定 label。
@@ -31,10 +32,15 @@ _USER_DOCUMENT_KINDS: dict[str, str] = {}
 
 @dataclass(frozen=True)
 class SessionDocument:
-    """会话目录内的一份账户级文档：本地（相对路径）+ 云端（kind 即身份）。"""
+    """会话目录内的一份账户级文档：本地（相对路径）+ 云端（kind 即身份）。
+
+    ``conflict_copy`` 为 False 时同步裁决输掉的一版**不留冲突副本**，云端
+    最新版直接覆盖本地（数据可丢的文档用它，如任务参数/批量配置）。
+    """
 
     kind: str
     rel_path: str
+    conflict_copy: bool = True
 
 
 #: kind → 会话文档登记，由注册顺序决定枚举次序。
@@ -64,21 +70,27 @@ def user_document_kinds() -> dict[str, str]:
     return dict(_USER_DOCUMENT_KINDS)
 
 
-def register_session_document(kind: str, rel_path: str) -> None:
+def register_session_document(kind: str, rel_path: str,
+                              conflict_copy: bool = True,
+                              *, core: bool = False) -> None:
     """声明一个插件的**账户级**文档：会话目录内的固定相对路径。
 
     与用户级 kind 的区别是归属：账户级文档与角色无关，云端只存一份
     （``label = __global__``），本地落点也是固定路径，不随用户名变化。
+    ``conflict_copy`` 见 :class:`SessionDocument`。
     重复登记同一 kind+路径幂等跳过。
+
+    ``core=True`` 仅供 core 固有 kind（core_documents.py）登记，
+    允许占用 ``RESERVED_KINDS``。
     """
     if not _KIND_RE.match(kind):
         raise ValueError(f"非法文档 kind: {kind!r}（小写字母开头的 [a-z0-9_]）")
-    if kind in RESERVED_KINDS:
+    if kind in RESERVED_KINDS and not core:
         raise ValueError(f"kind {kind!r} 是 core 固有语义，插件不得登记")
     _check_rel_path(rel_path)
     existing = _SESSION_DOCUMENTS.get(kind)
     if existing is not None:
-        if existing.rel_path == rel_path:
+        if existing == SessionDocument(kind, rel_path, conflict_copy):
             return
         raise ValueError(
             f"kind {kind!r} 已登记为 {existing.rel_path!r}，不能改为 {rel_path!r}")
@@ -87,7 +99,7 @@ def register_session_document(kind: str, rel_path: str) -> None:
     for other in _SESSION_DOCUMENTS.values():
         if other.rel_path == rel_path:
             raise ValueError(f"文件路径 {rel_path!r} 已被 kind {other.kind!r} 登记")
-    _SESSION_DOCUMENTS[kind] = SessionDocument(kind, rel_path)
+    _SESSION_DOCUMENTS[kind] = SessionDocument(kind, rel_path, conflict_copy)
 
 
 def session_documents() -> dict[str, SessionDocument]:

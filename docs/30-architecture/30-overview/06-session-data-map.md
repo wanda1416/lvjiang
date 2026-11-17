@@ -24,7 +24,7 @@
 |------|------|----------|------------------|
 | A 用户域 | 按 username 隔离的资料、配装、笔记、Profile 数值与定义 | 否 | 是 |
 | B 历史 | 任务/批量/调律历史库、手机历史回传目录 | 否 | 是（终态归集） |
-| C 实例状态 | `session.json`、`interface.json`、`batch.json`、`content.json` | `content.json` 可重建，其余不可 | 否 |
+| C 实例状态 | `session.json`、`interface.json`、`workflow.json`、`batch.json`、`content.json` | `content.json` 可重建，其余不可 | `workflow.json`/`batch.json` 定义随账号跨设备，其余否 |
 | D 平台与接入 | 预置基底与标记、离线同步状态、MCP 接入、Agent 结果、截图、二维码 | 截图与二维码可重建 | 否 |
 | E 锁 | 主实例所有权、跨进程读写锁、用户执行租约 | 是（进程退出即失效） | 否 |
 
@@ -70,9 +70,10 @@
 
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
-| `session.json` | `users`（用户名册与顺序）、`settings`、`daily.scripts`（脚本顺序/启停/显示名）、`wf_configs`（按 `wf_id` 的工作流参数）、`plans`（不分发的机器级方案） | `SessionStore`（`core/config/session.py`） | 节点语义见 04-config-layering；写入口是 `get_node`/`set_node`/`update_node`/`mutate_node`，禁止外部直接读写文件 |
+| `session.json` | `users`（用户名册与顺序）、`settings`、`daily.scripts`（脚本顺序/启停/显示名）、`plans`（不分发的机器级方案） | `SessionStore`（`core/config/session.py`） | 节点语义见 04-config-layering；写入口是 `get_node`/`set_node`/`update_node`/`mutate_node`，禁止外部直接读写文件 |
 | `interface.json` | `actives`（当前用户/布局/空间/环境/方案）、`daily`（当前脚本与分组）、`ui_state`（窗口、分栏、页签、列宽）、`batch`（活动组 ID 与草稿）、`profile`（总览分组与顺序）、`alert_info`、`alert_history`、`server_config`（公告、遥测、在线配置状态） | `InterfaceStore`（`core/config/interface.py`） | 页面级状态唯一写入口是 `update_ui_page_state`，不得整节点替换 |
-| `batch.json` | 批量活动组的**定义**（`groups`） | `core/batch/run.py` | 与 `interface.json.batch` 分工：定义在 batch.json，当前选中与草稿在 interface.json |
+| `workflow.json` | 全局任务参数：`workflow_params`（按 wf_id，日常/批量/调律共享） | `core/config/wf_configs.py` | 账户级同步文档（kind=workflow），冲突按云端最新覆盖、不留副本；旧 session.json 的 wf_configs 节点已一次性迁出 |
+| `batch.json` | 批量活动组的**定义**（groups） | `core/batch/run.py` | 账户级同步文档（kind=batch），冲突同样不留副本；与 interface.json.batch 分工：定义在 batch.json，当前选中与草稿在 interface.json |
 | `content.json` | 内容修订索引：按实体记 revision | `core/config/content.py` | 可重建；任务读取不依赖它，缺失或损坏只影响这份记录本身 |
 
 `session.json` 与 `users/{名}.session.json` 只是名字像，归属完全不同：前者是 App/UI 状态，

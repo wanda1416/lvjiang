@@ -193,3 +193,15 @@ def test_unsupported_batch_version_is_ignored_without_rewriting(tmp_path):
     path.write_text(data, encoding="utf-8")
     assert BatchConfigStore(path).load().configs == {}
     assert path.read_text(encoding="utf-8") == data
+
+def test_save_marks_batch_document_dirty(tmp_path, monkeypatch):
+    """batch.json 是账户级同步文档：落盘后标脏，待下一轮文档通道上传。"""
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_CONFIG_DIR", tmp_path)
+    (tmp_path / "account.json").write_text('{"x": 1}\n', encoding="utf-8")
+    from lvjiang.core.sync.dirty import dirty_keys
+
+    store = BatchConfigStore(tmp_path / "batch.json")
+    store.save(BatchConfig())
+    assert "__global__/batch" in dirty_keys()

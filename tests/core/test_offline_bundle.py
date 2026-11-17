@@ -343,7 +343,8 @@ def test_bundle_never_carries_local_only_files(bundle, tmp_path):
 def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(bundle, tmp_path):
     source, _ = bundle
     pc = source / "config/session"
-    (pc / "session.json").write_text(json.dumps({"users": ["tester"], "wf_configs": {
+    (pc / "session.json").write_text(json.dumps({"users": ["tester"]}))
+    (pc / "workflow.json").write_text(json.dumps({"workflow_params": {
         "existing": {"pc": True}, "new": {"new": True}}}))
     (pc / "users/tester.json").write_text(json.dumps({"attributes": {"role": "pc"}, "workflow_params": {
         "existing": {"pc": True}, "new": {"new": True}}}))
@@ -352,9 +353,10 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     phone = tmp_path / "phone"
     users = phone / "config/session/users"
     users.mkdir(parents=True)
-    old_session = {"users": ["tester", "phone_only"],
-                   "wf_configs": {"existing": {"phone": True}}}
+    old_session = {"users": ["tester", "phone_only"]}
     (users.parent / "session.json").write_text(json.dumps(old_session))
+    (users.parent / "workflow.json").write_text(json.dumps(
+        {"workflow_params": {"existing": {"phone": True}}}))
     (users.parent / "interface.json").write_text(json.dumps({
         "actives": {"user": "phone_only", "layout": "other"}}))
     for name in old_session["users"]:
@@ -369,7 +371,8 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     install_offline_bundle(archive, phone, preserve_task_params=True)
     session = json.loads((users.parent / "session.json").read_text())
     assert session["users"] == ["tester", "phone_only"]
-    assert session["wf_configs"] == {"existing": {"phone": True}, "new": {"new": True}}
+    assert json.loads((users.parent / "workflow.json").read_text())[
+        "workflow_params"] == {"existing": {"phone": True}, "new": {"new": True}}
     interface = json.loads((users.parent / "interface.json").read_text())
     assert interface["actives"] == {
         "user": "phone_only", "layout": "android", "env": "android"}
@@ -385,7 +388,8 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     install_offline_bundle(archive, phone, preserve_task_params=False)
     session = json.loads((users.parent / "session.json").read_text())
     assert session["users"] == ["tester"]
-    assert session["wf_configs"]["existing"] == {"pc": True}
+    assert json.loads((users.parent / "workflow.json").read_text())[
+        "workflow_params"]["existing"] == {"pc": True}
     assert not (users / "phone_only.json").exists()
     assert (users.parent / "preset.json").exists()
 
@@ -517,28 +521,28 @@ def test_batch_definition_preservation_uses_explicit_sync_choice(bundle, tmp_pat
     source, archive = bundle
     pc = {"document_type": "lvjiang.batch", "version": 2, "groups": {}}
     (source / "config/session/batch.json").write_text(json.dumps(pc), encoding="utf-8")
-    pc_session = source / "config/session/session.json"
-    session = json.loads(pc_session.read_text(encoding="utf-8"))
-    session["wf_configs"] = {"task": {"value": "pc"}}
-    pc_session.write_text(json.dumps(session), encoding="utf-8")
+    (source / "config/session/workflow.json").write_text(
+        json.dumps({"workflow_params": {"task": {"value": "pc"}}}), encoding="utf-8")
     build_offline_bundle(source, archive, username="tester", layout="android")
     phone = tmp_path / "phone"
     config = phone / "config/session/batch.json"
     config.parent.mkdir(parents=True)
     mobile = {"document_type": "lvjiang.batch", "version": 2, "groups": {"mobile": {"name": "手机配置"}}}
     config.write_text(json.dumps(mobile), encoding="utf-8")
-    phone_session = config.parent / "session.json"
-    phone_session.write_text(json.dumps({"users": ["tester"], "wf_configs": {"task": {"value": "phone"}}}),
-                             encoding="utf-8")
+    phone_workflow = config.parent / "workflow.json"
+    phone_workflow.write_text(json.dumps({"workflow_params": {"task": {"value": "phone"}}}),
+                              encoding="utf-8")
     # 更新参数但保留批量配置，两项选择互不影响。
     install_offline_bundle(archive, phone, preserve_task_params=False, preserve_batch_config=True)
-    assert json.loads(phone_session.read_text(encoding="utf-8"))["wf_configs"]["task"]["value"] == "pc"
+    assert json.loads(phone_workflow.read_text(encoding="utf-8"))[
+        "workflow_params"]["task"]["value"] == "pc"
     assert json.loads(config.read_text(encoding="utf-8")) == mobile
-    phone_session.write_text(json.dumps({"users": ["tester"], "wf_configs": {"task": {"value": "phone"}}}),
-                             encoding="utf-8")
+    phone_workflow.write_text(json.dumps({"workflow_params": {"task": {"value": "phone"}}}),
+                              encoding="utf-8")
     # 更新批量配置但保留参数，防止新组仍被手机旧文件遮蔽。
     install_offline_bundle(archive, phone, preserve_task_params=True, preserve_batch_config=False)
-    assert json.loads(phone_session.read_text(encoding="utf-8"))["wf_configs"]["task"]["value"] == "phone"
+    assert json.loads(phone_workflow.read_text(encoding="utf-8"))[
+        "workflow_params"]["task"]["value"] == "phone"
     assert json.loads(config.read_text(encoding="utf-8")) == pc
 
 

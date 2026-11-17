@@ -305,6 +305,50 @@ def test_session_document_with_user_label_is_not_laid_down(session_env) -> None:
     assert not (session_env["dirs"]["session"] / "demo_app" / "play_styles.json").exists()
 
 
+# ─── core 固有会话文档（workflow / batch） ────────────────────
+
+
+def test_core_workflow_and_batch_documents_pushed(env) -> None:
+    """workflow.json 与 batch.json 是 core 固有账户级文档，label 固定 __global__。"""
+    session = env["dirs"]["session"]
+    (session / "workflow.json").write_text(
+        '{"workflow_params": {"daily": {"count": 1}}}\n', encoding="utf-8")
+    (session / "batch.json").write_text('{"groups": {}}\n', encoding="utf-8")
+    env["doc_state"]["dirty"] = {"__global__/workflow": True, "__global__/batch": True}
+    _sync(env)
+    assert sorted((p["label"], p["kind"]) for p in env["fake"].pushes) == [
+        ("__global__", "batch"), ("__global__", "workflow")]
+
+
+def test_workflow_document_race_conflict_discards_local(env) -> None:
+    """workflow 文档冲突不留副本：被云端抢先时本地版按最新云端覆盖后丢弃。"""
+    path = env["dirs"]["session"] / "workflow.json"
+    path.write_text('{"workflow_params": {"a": {"v": "local"}}}\n', encoding="utf-8")
+    env["fake"].docs[("__global__", "workflow")] = {
+        "sha256": "cloud-new", "size": 3, "zipped": True,
+        "payload": base64.b64encode(
+            gzip.compress(b'{"workflow_params": {"a": {"v": "cloud"}}}\n')).decode(),
+        "updated_at": "2020-01-01T00:00:00Z"}
+    env["fake"].fail_expected = True
+    env["doc_state"]["dirty"] = {"__global__/workflow": True}
+    report = _sync(env)
+    assert report.pulled == ["__global__/workflow"]
+    assert report.conflicts == []
+    assert not any(".conflict-" in p.name for p in path.parent.iterdir())
+    assert json.loads(path.read_text(encoding="utf-8"))[
+        "workflow_params"]["a"]["v"] == "cloud"
+
+
+def test_plugins_cannot_register_core_session_kinds() -> None:
+    """workflow/batch 是 core 固有语义，插件不得登记或抢占。"""
+    from lvjiang.core.sync import registry
+
+    with pytest.raises(ValueError):
+        registry.register_session_document("workflow", "plugin/x.json")
+    with pytest.raises(ValueError):
+        registry.register_session_document("batch", "plugin/x.json")
+
+
 def test_core_syncs_with_zero_plugins_registered(monkeypatch, tmp_path) -> None:
     """没有任何插件注册时文档通道照常工作——依赖方向只能是插件指向 core。
 

@@ -451,17 +451,140 @@ def _declare_spaces(ref_dir, spaces):
 
 
 class TestReferenceSpaces:
-    def test_factory_spaces_are_platform_named_and_mobile_is_default(self):
+    def test_factory_spaces_use_stable_keys_with_localized_names(self):
+        """随包空间用 desktop/android 作稳定 key，中文名只作展示。"""
         references_dir = (
             Path(__file__).parents[2] / "config" / "system" / "references"
         )
 
-        assert DEFAULT_SPACE == "手游"
+        assert DEFAULT_SPACE == "android"
         assert sorted(path.stem for path in references_dir.glob("*.yaml")) == [
-            "手游", "端游",
+            "android", "desktop",
         ]
         assert not (references_dir / "默认.yaml").exists()
         assert not (references_dir / "默认").exists()
+        # 图片目录与 key 同名（目录即空间）
+        for key in ("android", "desktop"):
+            assert (references_dir / key).is_dir()
+        # 展示名是双语映射，且与 app.yaml 里的方案/环境 key 对齐
+        import yaml as _yaml
+        for key, zh in (("android", "手游"), ("desktop", "端游")):
+            doc = _yaml.safe_load(
+                (references_dir / f"{key}.yaml").read_text(encoding="utf-8"))
+            assert doc["name"]["zh_CN"] == zh
+            assert doc["name"]["en_US"]
+
+    def test_space_label_resolves_localized_name(self, space_env):
+        """展示名读 yaml 顶层 name：dict 按语言取值，纯字符串/缺失回落 key。"""
+        ref = space_env["system_ref"]
+        _write_yaml(ref / "android.yaml", {
+            "version": 1, "name": {"zh_CN": "手游", "en_US": "Mobile"},
+            "references": []})
+        _write_yaml(ref / "legacy.yaml", {
+            "version": 1, "name": "旧空间", "references": []})
+        _write_yaml(ref / "plain.yaml", {"version": 1, "references": []})
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.space_label("android") == "手游"
+        assert db.space_label("legacy") == "旧空间"
+        assert db.space_label("plain") == "plain"
+        assert db.space_label("missing") == "missing"
+
+    def test_save_keeps_localized_space_name(self, space_env):
+        """保存条目不能把随包的双语空间名抹掉。"""
+        ref = space_env["system_ref"]
+        _write_yaml(ref / "android.yaml", {
+            "version": 1, "name": {"zh_CN": "手游", "en_US": "Mobile"},
+            "references": []})
+        db = ReferenceDatabase(dev_mode=True)
+        db.add_entry(label="甲", meta={"group": "g"},
+                     image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        doc = yaml.safe_load((ref / "android.yaml").read_text(encoding="utf-8"))
+        assert doc["name"] == {"zh_CN": "手游", "en_US": "Mobile"}
+        assert len(doc["references"]) == 1
+
+
+class TestPreviewWithoutActivating:
+    """管理界面切换"正在看的空间"不得改写运行时空间（actives.space）。"""
+
+    def test_open_space_keeps_actives_untouched(self, space_env):
+        _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.runtime_space() == DEFAULT_SPACE
+        assert db.open_space("空间A") is True
+        assert db.get_active_space() == "空间A"        # 本实例：正在编辑
+        assert db.runtime_space() == DEFAULT_SPACE     # 运行时：没动
+        assert not space_env["interface"].exists()     # 连 interface 都没写
+
+    def test_deleting_the_runtime_space_repoints_actives(self, space_env):
+        """删的是运行时空间：即使此刻正在看另一个，也要改 actives 并重载。"""
+        _declare_spaces(space_env["local_ref"], ["甲", "乙"])
+        space_env["interface"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["interface"].write_text(
+            json.dumps({"actives": {"space": "甲"}}), encoding="utf-8")
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.get_active_space() == "甲"
+        assert db.open_space("乙") is True
+        assert db.delete_space("甲") is True
+        data = json.loads(space_env["interface"].read_text(encoding="utf-8"))
+        assert data["actives"]["space"] == "乙"
+        assert db.get_active_space() == "乙"
+
+    def test_deleting_the_preview_space_keeps_actives(self, space_env):
+        """删的只是正在看的那个：运行空间不变，本实例回到它。"""
+        _declare_spaces(space_env["local_ref"], ["甲", "乙"])
+        space_env["interface"].parent.mkdir(parents=True, exist_ok=True)
+        space_env["interface"].write_text(
+            json.dumps({"actives": {"space": "甲"}}), encoding="utf-8")
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.open_space("乙") is True
+        assert db.delete_space("乙") is True
+        data = json.loads(space_env["interface"].read_text(encoding="utf-8"))
+        assert data["actives"]["space"] == "甲"
+        assert db.get_active_space() == "甲"
+
+
+class TestSpaceDisplayName:
+    """空间展示名可编辑（多语言），key 不可改、条目不变。"""
+
+    def test_dev_mode_writes_name_into_system_yaml(self, space_env):
+        ref = space_env["system_ref"]
+        _write_yaml(ref / "android.yaml", {
+            "version": 1, "references": [_entry("A.png", "甲", group="g")]})
+        db = ReferenceDatabase(dev_mode=True)
+        assert db.set_space_name("android", {"zh_CN": "手游", "en_US": "Mobile"}) is True
+        doc = yaml.safe_load((ref / "android.yaml").read_text(encoding="utf-8"))
+        assert doc["name"] == {"zh_CN": "手游", "en_US": "Mobile"}
+        assert [e["file"] for e in doc["references"]] == ["A.png"]  # 条目原样
+        assert db.space_label("android") == "手游"
+
+    def test_user_mode_writes_local_overlay_only(self, space_env):
+        """用户模式改系统空间的展示名：只写 local 覆盖层，系统文件与条目都不动。"""
+        sys_ref = space_env["system_ref"]
+        loc_ref = space_env["local_ref"]
+        _write_yaml(sys_ref / "android.yaml", {
+            "version": 1, "references": [_entry("A.png", "甲", group="g")]})
+        db = ReferenceDatabase(dev_mode=False)
+        assert db.set_space_name("android", {"zh_CN": "手机端"}) is True
+        overlay = yaml.safe_load(
+            (loc_ref / "android.yaml").read_text(encoding="utf-8"))
+        assert overlay["name"] == {"zh_CN": "手机端"}
+        sys_doc = yaml.safe_load(
+            (sys_ref / "android.yaml").read_text(encoding="utf-8"))
+        assert "name" not in sys_doc
+        # 只有 name 的覆盖层对条目合并是恒等操作
+        assert [e.file for e in db.entries] == ["A.png"]
+        assert db.space_label("android") == "手机端"
+
+    def test_none_clears_name_and_unknown_space_is_refused(self, space_env):
+        ref = space_env["system_ref"]
+        _write_yaml(ref / "android.yaml", {
+            "version": 1, "name": {"zh_CN": "手游"}, "references": []})
+        db = ReferenceDatabase(dev_mode=True)
+        assert db.set_space_name("android", None) is True
+        doc = yaml.safe_load((ref / "android.yaml").read_text(encoding="utf-8"))
+        assert "name" not in doc
+        assert db.space_label("android") == "android"   # 回落到 key
+        assert db.set_space_name("幽灵", {"zh_CN": "幽灵"}) is False
 
     def test_spaces_scanned_from_both_layers(self, space_env):
         """空间列表 = system 目录扫描 ∪ local 目录扫描，各自按名排序去重"""

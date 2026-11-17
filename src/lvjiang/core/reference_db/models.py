@@ -39,7 +39,11 @@ _PREDEFINED_INPUT_KEYS = frozenset({"label", "group", "notes"})
 
 REFERENCE_OUTPUT_RESERVED_KEYS = frozenset({"label", "group", "confidence", "meta"})
 
-DEFAULT_SPACE = "手游"
+#: 默认空间 key。与布局根 / 环境 / 模板命名空间同名：``android`` 与
+#: ``desktop`` 是稳定身份（目录名、``actives.space``、``plans[].space``、
+#: 模板根都用它），界面上显示的是空间 yaml 顶层 ``name`` 的本地化文本
+#: （手游 / Mobile、端游 / PC），见 ``ReferenceDatabase.space_label``。
+DEFAULT_SPACE = "android"
 
 #: 无分组参考图的图片目录名。它是**磁盘位置**而不是可编辑分组：界面上按
 #: ``meta.group`` 为空算「未分组」，:func:`validate_group_names` 拒绝把它

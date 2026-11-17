@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from lvjiang.core.config import load_yaml, save_yaml
+from lvjiang.core.config.localized import resolve_localized
 from lvjiang.core.config.resolver import get_resolver
 
 from .models import (
@@ -94,6 +95,10 @@ class ReferenceDatabase:
         self._local_schema: list[MetaFieldDef] | None = None
         self._system_threshold: float | None = None
         self._local_threshold: float | None = None
+        #: 空间 yaml 顶层 ``name`` 的磁盘原值（可能是按语言取值的映射）。
+        #: 只用于展示，保存时必须原样写回，见 save()。
+        self._system_space_name: object = None
+        self._local_space_name: object = None
         # 合并视图（查询方法统一消费）
         self._entries: list[ReferenceEntry] = []
         self._meta_schema: list[MetaFieldDef] = []
@@ -222,30 +227,59 @@ class ReferenceDatabase:
         return entries
 
     def load(self):
-        """扫描空间列表 + 加载激活空间的 system 层与 local 覆盖层，重建合并视图"""
+        """扫描空间列表 + 加载**运行时**空间的 system 层与 local 覆盖层。
+
+        运行时空间 = ``actives.space``（主页面下拉或方案决定）。管理界面要换一份
+        查看/编辑用 :meth:`open_space`，它不会改动这个持久化值。
+        """
         # 空间列表与激活空间（路径属性依赖 self.spaces.active，必须最先解析）
         self.spaces.refresh()
         if self._local_spaces_dir_override is None:  # override 场景（测试）不体检真实 config
             ReferenceSpaces.warn_legacy_roster(get_resolver().local_dir)
         self.spaces.resolve_active()
+        self._load_active_space()
 
+    def open_space(self, name: str) -> bool:
+        """切到某个空间查看/编辑，**不写** ``actives.space``（只影响本实例）。
+
+        图库管理器用它切换「正在编辑的空间」；运行时用哪个空间仍由主页面下拉 /
+        方案决定，关窗后主页面刷新即可回到那个空间。
+        """
+        self.spaces.refresh()
+        if not self.spaces.open(name):
+            return False
+        self._load_active_space()
+        return True
+
+    def runtime_space(self) -> str:
+        """运行时使用的空间 key（``actives.space``）；已失效时回落默认空间。"""
+        saved = self.spaces.persisted_active()
+        if saved and saved in self.spaces.names:
+            return saved
+        return self.spaces.default_space
+
+    def _load_active_space(self):
+        """按 ``spaces.active`` 重新加载两层内容与合并视图。"""
         # system 层
         if self.system_yaml_path.exists():
             data = load_yaml(self.system_yaml_path)
             self._system_entries = self._parse_entries(data.get("references"))
             self._system_schema = self._parse_schema(data.get("meta_schema"))
             self._system_threshold = self._parse_threshold(data.get("match_threshold"))
+            self._system_space_name = data.get("name")
         else:
             logger.info(f"空间 yaml 不存在，使用空数据库: {self.system_yaml_path}")
             self._system_entries = []
             self._system_schema = self._seed_schema()
             self._system_threshold = None
+            self._system_space_name = None
 
         # local 覆盖层（条目级 diff：references + deleted + 可选 meta_schema）
         self._local_entries = []
         self._deleted = set()
         self._local_schema = None
         self._local_threshold = None
+        self._local_space_name = None
         if self.local_yaml_path.exists():
             overlay = load_yaml(self.local_yaml_path)
             self._local_entries = self._parse_entries(overlay.get("references"))
@@ -253,6 +287,7 @@ class ReferenceDatabase:
             if overlay.get("meta_schema"):
                 self._local_schema = self._parse_schema(overlay["meta_schema"])
             self._local_threshold = self._parse_threshold(overlay.get("match_threshold"))
+            self._local_space_name = overlay.get("name")
 
         self._rebuild_merged()
         logger.info(
@@ -371,13 +406,18 @@ class ReferenceDatabase:
         return validate_crop(values)
 
     def save(self):
-        """按模式落盘：开发→system 全量；用户→local 条目级 diff（空则删覆盖文件）"""
+        """按模式落盘：开发→system 全量；用户→local 条目级 diff（空则删覆盖文件）
+
+        空间 yaml 顶层的 ``name`` 是本地化展示名（``{"zh_CN": …, "en_US": …}``），
+        本模块不编辑它，但保存时必须原样写回——否则一次普通的条目保存就会把
+        随包的双语名字抹掉。
+        """
         if self._is_dev():
-            data = {
-                "version": 1,
-                "meta_schema": [self._schema_to_dict(f) for f in self._system_schema],
-                "references": [asdict(e) for e in self._system_entries],
-            }
+            data: dict = {"version": 1}
+            if self._system_space_name is not None:
+                data["name"] = self._system_space_name
+            data["meta_schema"] = [self._schema_to_dict(f) for f in self._system_schema]
+            data["references"] = [asdict(e) for e in self._system_entries]
             if self._system_threshold is not None:
                 data["match_threshold"] = self._system_threshold
             save_yaml(self.system_yaml_path, data)
@@ -386,16 +426,17 @@ class ReferenceDatabase:
 
         has_overlay = bool(self._local_entries or self._deleted
                            or self._local_schema is not None
-                           or self._local_threshold is not None)
+                           or self._local_threshold is not None
+                           or self._local_space_name is not None)
         if not has_overlay:
             if self.local_yaml_path.exists():
                 self.local_yaml_path.unlink()
             return
-        overlay: dict = {
-            "version": 1,
-            "references": [asdict(e) for e in self._local_entries],
-            "deleted": sorted(self._deleted),
-        }
+        overlay: dict = {"version": 1}
+        if self._local_space_name is not None:
+            overlay["name"] = self._local_space_name
+        overlay["references"] = [asdict(e) for e in self._local_entries]
+        overlay["deleted"] = sorted(self._deleted)
         if self._local_schema is not None:
             overlay["meta_schema"] = [self._schema_to_dict(f) for f in self._local_schema]
         if self._local_threshold is not None:
@@ -827,8 +868,42 @@ class ReferenceDatabase:
     # ─── 图库空间（委托 ReferenceSpaces） ─────────────────
 
     def get_spaces(self) -> list[str]:
-        """空间列表（system 扫描 ∪ local 扫描，各自按名排序；全空回退默认空间）"""
+        """空间 key 列表（system 扫描 ∪ local 扫描，各自按名排序；全空回退默认空间）
+
+        返回的是**稳定 key**（``android`` / ``desktop`` / 用户自建的名字），
+        界面显示走 :meth:`space_label`。
+        """
         return list(self.spaces.names)
+
+    def space_label(self, name: str) -> str:
+        """空间 key → 展示名：读空间 yaml 顶层 ``name``（可本地化），无则回退 key。
+
+        local 层优先（用户自建空间只有 local yaml），再查 system 层。名字只用于
+        展示，任何路径、持久化引用与比较都用 key。
+        """
+        for root in (self.local_spaces_dir, self.system_spaces_dir):
+            path = root / f"{name}.yaml"
+            if not path.is_file():
+                continue
+            try:
+                doc = load_yaml(path)
+            except Exception as exc:  # noqa: BLE001 展示名读失败不该拖垮空间列表
+                logger.warning(f"空间展示名读取失败 {path}: {exc}")
+                continue
+            return resolve_localized(doc.get("name"), fallback=name)
+        return name
+
+    def set_space_name(self, name: str, value: object | None) -> bool:
+        """写入空间展示名（多语言映射）；``None`` 表示清空、显示名回落 key。
+
+        key 不可改——它是目录名与持久化引用，改名要新建空间。编辑的是**激活**
+        空间时重载一次，让内存里的名字缓存与面板一起跟上。
+        """
+        if not self.spaces.write_name(name, value):
+            return False
+        if name == self.spaces.active:
+            self.load()
+        return True
 
     def is_system_space(self, name: str) -> bool:
         """该空间是否由 system 层定义（系统内容，用户层只能覆盖不能删除）"""

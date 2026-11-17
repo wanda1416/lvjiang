@@ -34,7 +34,7 @@ def host(qtbot, monkeypatch):
     host._execution_targets.put(ExecutionTarget('window', 'windows', '窗口'))
     plans = [Plan('mobile', '移动方案', modes=['adb']),
              Plan('missing', '缺失布局', layout='deleted', modes=['windows']),
-             Plan('desktop', '桌面方案', space='PC', env='pc', layout='pc',
+             Plan('desktop', '桌面方案', space='desktop', env='pc', layout='pc',
                   modes=['windows'])]
     monkeypatch.setattr('lvjiang.core.config.plans.load_plans', lambda: plans)
     # 自动选择不得改变持久化默认方案。
@@ -49,7 +49,9 @@ def host(qtbot, monkeypatch):
     for plan in plans:
         host.plan_combo.addItem(plan.name, plan.id)
     host.plan_combo.setCurrentIndex(1)
-    host.reference_space_combo.addItems(['mobile', 'PC'])
+    # 空间下拉显示本地化名字、itemData 存稳定 key（与主页面一致）
+    host.reference_space_combo.addItem('手游', 'mobile')
+    host.reference_space_combo.addItem('端游', 'desktop')
     host._env_combo.addItem('移动', 'mobile')
     host._env_combo.addItem('桌面', 'pc')
     host.layout_combo.addItem('移动', 'mobile')
@@ -63,7 +65,7 @@ def host(qtbot, monkeypatch):
 def test_incompatible_plan_switches_with_its_full_context(host):
     host._ensure_target_plan()
     assert host.plan_combo.currentData() == 'desktop'
-    assert host.reference_space_combo.currentText() == 'PC'
+    assert host.reference_space_combo.currentData() == 'desktop'
     assert host._env_combo.currentData() == 'pc'
     assert host.layout_combo.currentData() == 'pc'
     assert host._execution_targets.active().launch_draft.plan_id == 'desktop'

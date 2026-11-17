@@ -29,7 +29,7 @@ class _Check:
 
 def test_plan_form_writes_admin_requirement():
     form = SimpleNamespace(
-        _plan_space_combo=_Combo("端游"),
+        _plan_space_combo=_Combo("端游", data="desktop"),
         _plan_env_combo=_Combo(data="desktop"),
         _plan_layout_combo=_Combo(data="desktop"),
         _plan_mode_window=_Check(True),
@@ -42,5 +42,6 @@ def test_plan_form_writes_admin_requirement():
     changed = SettingsDialog._write_form_into_plan(form, plan)
 
     assert changed
+    assert plan.space == "desktop"  # 存 key 而不是展示名
     assert plan.requires_admin is True
     assert plan.modes == [PLAN_MODE_WINDOW]

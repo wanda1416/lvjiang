@@ -810,23 +810,29 @@ class RunControlMixin:
         combo = self.reference_space_combo
         combo.blockSignals(True)
         combo.clear()
-        combo.addItems(self._reference_db.get_spaces())
-        combo.setCurrentText(self._reference_db.get_active_space())
+        # 显示本地化名字、itemData 存稳定 key：切换与方案套用一律按 key 比对
+        for key in self._reference_db.get_spaces():
+            combo.addItem(self._reference_db.space_label(key), key)
+        index = combo.findData(self._reference_db.get_active_space())
+        if index >= 0:
+            combo.setCurrentIndex(index)
         combo.blockSignals(False)
 
     def _on_reference_space_changed(self, index: int):
         """主页面选取图库空间即激活；失败时恢复实际激活项。"""
         if index < 0:
             return
-        name = self.reference_space_combo.itemText(index)
+        name = self.reference_space_combo.itemData(index)
         if not name or name == self._reference_db.get_active_space():
             return
         if self._reference_db.set_active_space(name):
             logger.info(f"已切换到图库: {name}")
             return
         self.reference_space_combo.blockSignals(True)
-        self.reference_space_combo.setCurrentText(
+        restored = self.reference_space_combo.findData(
             self._reference_db.get_active_space())
+        if restored >= 0:
+            self.reference_space_combo.setCurrentIndex(restored)
         self.reference_space_combo.blockSignals(False)
 
     def _on_env_changed(self, index: int):
@@ -946,7 +952,7 @@ class RunControlMixin:
         for candidate in load_plans():
             if not candidate.allows(target.kind):
                 continue
-            if ((candidate.space and self.reference_space_combo.findText(candidate.space) < 0)
+            if ((candidate.space and self.reference_space_combo.findData(candidate.space) < 0)
                     or (candidate.env and self._env_combo.findData(candidate.env) < 0)
                     or (candidate.layout and self.layout_combo.findData(candidate.layout) < 0)):
                 continue
@@ -1001,7 +1007,7 @@ class RunControlMixin:
         """把方案的三项写进选择器，返回未能套用的项名。"""
         missing: list[str] = []
         if plan.space:
-            idx = self.reference_space_combo.findText(plan.space)
+            idx = self.reference_space_combo.findData(plan.space)
             if idx >= 0:
                 self.reference_space_combo.setCurrentIndex(idx)
             else:

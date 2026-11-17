@@ -83,7 +83,7 @@ plans:
   name:
     zh_CN: 手游
     en_US: Mobile
-  space: 手游
+  space: android
   env: android
   layout: android
   requires_admin: false
@@ -93,7 +93,7 @@ plans:
   name:
     zh_CN: 端游
     en_US: PC
-  space: 端游
+  space: desktop
   env: desktop
   layout: desktop
   requires_admin: true
@@ -103,7 +103,7 @@ plans:
   name:
     zh_CN: 手游投屏
     en_US: Mobile Mirroring
-  space: 手游
+  space: android
   env: android
   layout: android_cast
   requires_admin: false
@@ -113,7 +113,7 @@ plans:
   name:
     zh_CN: 端游全屏
     en_US: PC Fullscreen
-  space: 端游
+  space: desktop
   env: desktop
   layout: desktop_fullscreen
   requires_admin: true

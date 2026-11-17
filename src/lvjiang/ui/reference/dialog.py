@@ -101,29 +101,36 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
 
-        # ── 图库空间切换栏（图库内部概念，外部消费方无感）──
+        # ── 图库空间栏（图库内部概念，外部消费方无感）──
+        # 这里只做「编辑哪些图」的空间管理与展示，不再提供「激活空间」：
+        # 运行时用哪个空间由主页面下拉或方案决定，两个入口各自持有一份状态会打架。
         space_bar = QHBoxLayout()
         space_bar.addWidget(QLabel(tr_label('图库空间')))
         self._space_combo = AutoWidthComboBox()
         self._fill_space_combo()
-        self._space_combo.setCurrentText(self._db.get_active_space())
+        self._select_space(self._db.get_active_space())
         _set_space_combo_minimum_capacity(self._space_combo)
-        self._space_combo.currentTextChanged.connect(self._on_space_changed)
+        self._space_combo.currentIndexChanged.connect(self._on_space_changed)
         space_bar.addWidget(self._space_combo)
-        btn_new_space = QPushButton(tr("新建空间"))
-        btn_new_space.clicked.connect(self._on_new_space)
-        space_bar.addWidget(btn_new_space)
-        btn_activate_space = QPushButton(tr("激活空间"))
-        btn_activate_space.clicked.connect(self._on_activate_space)
-        space_bar.addWidget(btn_activate_space)
-        self._btn_del_space = QPushButton(tr("删除空间"))
+        self._btn_edit_space = QPushButton(tr("编辑"))
+        self._btn_edit_space.clicked.connect(self._on_edit_space)
+        space_bar.addWidget(self._btn_edit_space)
+        self._btn_refresh_space = QPushButton(tr("刷新"))
+        self._btn_refresh_space.clicked.connect(self._on_refresh_spaces)
+        space_bar.addWidget(self._btn_refresh_space)
+        self._btn_new_space = QPushButton(tr("新建"))
+        self._btn_new_space.clicked.connect(self._on_new_space)
+        space_bar.addWidget(self._btn_new_space)
+        self._btn_del_space = QPushButton(tr("删除"))
         self._btn_del_space.clicked.connect(self._on_delete_space)
         space_bar.addWidget(self._btn_del_space)
-        apply_button_style(btn_new_space, btn_activate_space)
+        apply_button_style(
+            self._btn_edit_space, self._btn_refresh_space, self._btn_new_space)
         apply_button_style(self._btn_del_space, variant="danger")
         self._refresh_del_space_enabled()
         space_bar.addStretch()
-        self._active_space_label = QLabel(f"当前激活空间：{self._db.get_active_space()}")
+        self._active_space_label = QLabel()
+        self._update_space_labels()
         space_bar.addWidget(self._active_space_label)
         main_layout.addLayout(space_bar)
 
@@ -151,16 +158,17 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     # ── 图库空间切换 ──
 
     def _fill_space_combo(self):
-        """填充空间下拉：系统空间置灰（用户层只能覆盖内容，不能删除该空间）"""
+        """填充空间下拉：显示本地化名字、itemData 存稳定 key；系统空间置灰"""
         from PyQt6.QtGui import QBrush, QColor
         user_mode = self._db.is_user_mode()
         self._space_combo.clear()
-        self._space_combo.addItems(self._db.get_spaces())
+        for key in self._db.get_spaces():
+            self._space_combo.addItem(self._db.space_label(key), key)
         if not user_mode:
             return
         model = self._space_combo.model()
         for row in range(self._space_combo.count()):
-            if not self._db.is_system_space(self._space_combo.itemText(row)):
+            if not self._db.is_system_space(self._space_combo.itemData(row)):
                 continue
             item = model.item(row)
             item.setForeground(QBrush(QColor(Qt.GlobalColor.gray)))
@@ -168,30 +176,68 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _refresh_del_space_enabled(self):
         """删除按钮跟随下拉选中项：不可删时禁用并把原因写进 tooltip"""
-        reason = self._db.can_delete_space(self._space_combo.currentText())
+        reason = self._db.can_delete_space(self._space_combo.currentData())
         self._btn_del_space.setEnabled(not reason)
         self._btn_del_space.setToolTip(reason or tr("删除选中的图库空间（含其全部参考图）"))
 
-    def _on_space_changed(self, name: str):
-        """下拉切换空间：持久化 + 重载 + 刷新面板"""
+    def _on_space_changed(self, index: int):
+        """下拉切换**正在编辑的空间**：只重载本对话框，不改运行空间。
+
+        运行时用哪个图库由主页面下拉 / 连接方案决定（``actives.space``）；
+        管理界面不能反作用于它，否则方案固定的空间会被这里悄悄改掉。
+        """
         self._refresh_del_space_enabled()
+        if index < 0:
+            return
+        name = self._space_combo.itemData(index)
         if not name or name == self._db.get_active_space():
             return
-        if not self._db.set_active_space(name):
+        if not self._db.open_space(name):
             self._space_combo.blockSignals(True)
-            self._space_combo.setCurrentText(self._db.get_active_space())
+            self._select_space(self._db.get_active_space())
             self._space_combo.blockSignals(False)
             return
         self._refresh_panels()
 
-    def _on_activate_space(self):
-        """激活当前下拉选中的空间（显式确认）"""
-        name = self._space_combo.currentText()
-        if not name or name == self._db.get_active_space():
+    def _on_edit_space(self):
+        """编辑选中空间的展示名（多语言）；key 不可改。"""
+        name = self._space_combo.currentData()
+        if not name:
             return
-        if not self._db.set_active_space(name):
+        from .space_name_dialog import SpaceNameDialog
+
+        dialog = SpaceNameDialog(
+            self, space_key=name, current_name=self._current_space_name(name))
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        if not self._db.set_space_name(name, dialog.names()):
+            QMessageBox.warning(
+                self, tr("编辑图库空间"), tr("保存空间展示名失败，详见日志"))
+            return
+        self._data_changed = True
+        self._reload_space_combo(self._db.get_active_space())
         self._refresh_panels()
+
+    def _current_space_name(self, key: str) -> object:
+        """磁盘上该空间 ``name`` 的原值（dict / 字面值 / None），供编辑框预填。"""
+        from lvjiang.core.config import load_yaml
+
+        for root in (self._db.local_spaces_dir, self._db.system_spaces_dir):
+            path = root / f"{key}.yaml"
+            if path.is_file():
+                try:
+                    return load_yaml(path).get("name")
+                except Exception as exc:  # noqa: BLE001 读坏就当没有名字
+                    logger.warning(f"读取空间展示名失败 {path}: {exc}")
+                    return None
+        return None
+
+    def _on_refresh_spaces(self):
+        """重扫空间目录并重载当前空间：外部改过 yaml / 图片目录时用它对齐。"""
+        self._db.load()
+        self._reload_space_combo(self._db.get_active_space())
+        self._refresh_panels()
+        logger.info("图库空间已刷新")
 
     def _on_new_space(self):
         """新建空间：创建空空间 + 激活 + 刷新下拉与面板"""
@@ -203,13 +249,14 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             QMessageBox.warning(
                 self, tr("新建空间"), f"无法创建空间「{name}」（名称非法或已存在）")
             return
-        self._db.set_active_space(name)
+        self._db.open_space(name)   # 只切到新空间查看/编辑，不改运行时空间
+        self._data_changed = True
         self._reload_space_combo(name)
         self._refresh_panels()
 
     def _on_delete_space(self):
         """删除选中空间：二次确认（写明连带删除的参考图数量）后落盘"""
-        name = self._space_combo.currentText()
+        name = self._space_combo.currentData()
         reason = self._db.can_delete_space(name)
         if reason:
             QMessageBox.warning(self, tr("删除空间"), reason)
@@ -232,9 +279,26 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         """重填下拉并选中指定项（静默，不触发切换信号）"""
         self._space_combo.blockSignals(True)
         self._fill_space_combo()
-        self._space_combo.setCurrentText(current)
+        self._select_space(current)
         self._space_combo.blockSignals(False)
         self._refresh_del_space_enabled()
+
+    def _update_space_labels(self) -> None:
+        """左边是运行时空间（主页面/方案决定），右边是这里正在编辑的。"""
+        runtime = self._db.runtime_space()
+        editing = self._db.get_active_space()
+        runtime_label = self._db.space_label(runtime)
+        if runtime == editing:
+            text = f"运行用：{runtime_label}（正在编辑）"
+        else:
+            text = (f"运行用：{runtime_label} ｜ 正在编辑："
+                    f"{self._db.space_label(editing)}")
+        self._active_space_label.setText(text)
+
+    def _select_space(self, key: str) -> None:
+        """按空间 key 选中下拉项（显示的是本地化名字，不能用文本匹配）。"""
+        index = self._space_combo.findData(key)
+        self._space_combo.setCurrentIndex(index if index >= 0 else 0)
 
     def _refresh_panels(self):
         """空间切换后刷新依赖 db 的面板
@@ -250,7 +314,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._meta_panel.reload()
         self._grid_panel.set_known_groups(groups, self._db.get_all_labels_by_group())
         self._grid_panel.set_meta_fields(self._db.get_meta_schema())
-        self._active_space_label.setText(f"当前激活空间：{self._db.get_active_space()}")
+        self._update_space_labels()
 
     # ── Tab 1: 新增参考图 ──
 

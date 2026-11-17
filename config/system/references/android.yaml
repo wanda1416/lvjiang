@@ -1,4 +1,7 @@
 version: 1
+name:
+  zh_CN: 手游
+  en_US: Mobile
 meta_schema:
 - key: level
   name: 等级

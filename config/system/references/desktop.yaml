@@ -1,4 +1,7 @@
 version: 1
+name:
+  zh_CN: 端游
+  en_US: PC
 meta_schema:
 - key: level
   name: 等级

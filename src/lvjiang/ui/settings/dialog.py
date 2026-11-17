@@ -773,7 +773,9 @@ class SettingsDialog(QDialog):
         self._plan_name_edit.textChanged.connect(self._on_plan_name_edited)
         form.addRow(tr("名称") + ":", self._plan_name_edit)
         self._plan_space_combo = AutoWidthComboBox()
-        self._plan_space_combo.addItems(self._available_spaces())
+        space_db = self._space_db()
+        for key in self._available_spaces():
+            self._plan_space_combo.addItem(space_db.space_label(key), key)
         form.addRow(tr("图库") + ":", self._plan_space_combo)
         self._plan_env_combo = AutoWidthComboBox()
         for key, display in load_available_envs():
@@ -814,12 +816,17 @@ class SettingsDialog(QDialog):
         self._refresh_plan_list()
         return row
 
-    def _available_spaces(self) -> list[str]:
+    def _space_db(self):
+        """当前界面在用的图库库实例（缺省新建一个，仅用于取空间展示名）。"""
         host_db = getattr(self.parent(), "_reference_db", None)
         if host_db is not None:
-            return list(host_db.get_spaces())
+            return host_db
         from ...core.reference_db import ReferenceDatabase
-        return list(ReferenceDatabase().get_spaces())
+        return ReferenceDatabase()
+
+    def _available_spaces(self) -> list[str]:
+        """空间 **key** 列表；展示名由 :meth:`ReferenceDatabase.space_label` 解析。"""
+        return list(self._space_db().get_spaces())
 
     def _available_layouts(self):
         host_manager = getattr(self.parent(), "_layout_manager", None)
@@ -871,7 +878,7 @@ class SettingsDialog(QDialog):
             widget.setEnabled(editable)
         self._plan_delete_btn.setEnabled(editable)
         self._plan_name_edit.setText(plan.name if plan else "")
-        space_idx = self._plan_space_combo.findText(plan.space) if plan else -1
+        space_idx = self._plan_space_combo.findData(plan.space) if plan else -1
         self._plan_space_combo.setCurrentIndex(max(space_idx, 0))
         env_idx = self._plan_env_combo.findData(plan.env) if plan else -1
         self._plan_env_combo.setCurrentIndex(max(env_idx, 0))
@@ -921,7 +928,7 @@ class SettingsDialog(QDialog):
         if self._plan_mode_adb.isChecked():
             modes.append(PLAN_MODE_ADB)
         updated = (
-            self._plan_space_combo.currentText(),
+            self._plan_space_combo.currentData() or "",
             self._plan_env_combo.currentData() or "",
             self._plan_layout_combo.currentData() or "",
             modes,

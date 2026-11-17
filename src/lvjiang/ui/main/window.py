@@ -555,9 +555,13 @@ class MainWindow(
         self.reference_space_combo = _ContextComboBox()
         _set_combo_character_capacity(self.reference_space_combo)
         # ReferenceDatabase 构造时已经 load，启动构建不重复解析当前图库。
-        self.reference_space_combo.addItems(self._reference_db.get_spaces())
-        self.reference_space_combo.setCurrentText(
+        for key in self._reference_db.get_spaces():
+            self.reference_space_combo.addItem(
+                self._reference_db.space_label(key), key)
+        index = self.reference_space_combo.findData(
             self._reference_db.get_active_space())
+        if index >= 0:
+            self.reference_space_combo.setCurrentIndex(index)
         self.reference_space_combo.currentIndexChanged.connect(
             self._on_reference_space_changed)
         top_row.addWidget(self.reference_space_combo)

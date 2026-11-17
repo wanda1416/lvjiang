@@ -117,8 +117,10 @@ class ReferenceSpaces:
         return not self._is_dev()
 
     def set_active(self, name: str) -> bool:
-        """切换激活空间并持久化；非法名拒绝。
+        """切换**运行时**空间并持久化（``actives.space``）；非法名拒绝。
 
+        只有主页面下拉与连接方案用它——它们才是运行时空间的权威。管理界面
+        切换自己看的那一份用 :meth:`open`，不写 ``actives.space``。
         调用方负责在成功后重载条目（旧空间的内存态不能写进新空间 yaml）。
         """
         name = str(name or "").strip()
@@ -128,6 +130,77 @@ class ReferenceSpaces:
         self.write_active(name)
         self.active = name
         logger.info(f"图库空间已切换: {name}")
+        return True
+
+    def open(self, name: str) -> bool:
+        """在本实例内切到某个空间查看/编辑，**不写** ``actives.space``。
+
+        管理界面（场景、图库）只是切换自己看的那份数据，不能反作用于主页面
+        与方案：运行时用哪个空间只由主页面下拉 / 方案决定。
+        """
+        name = str(name or "").strip()
+        if name not in self.names:
+            logger.warning(f"图库空间不存在，无法打开: {name!r}")
+            return False
+        self.active = name
+        return True
+
+    @property
+    def default_space(self) -> str:
+        """默认空间 key（回退用）。"""
+        return self._default
+
+    def persisted_active(self) -> str:
+        """``actives.space`` 的当前值；可能已失效，调用方自行判断。"""
+        return self.read_active()
+
+    # ─── 展示名 ───
+
+    def name_target(self, name: str) -> Path | None:
+        """空间展示名该写进哪个 yaml；不存在可写目标时返回 None。
+
+        - 开发模式：system 有就写 system，只有 local（用户自建）就写 local；
+        - 用户模式：system 空间只能写 local 覆盖层（首次编辑会新建该覆盖层），
+          用户自建空间直接写它自己的 local yaml。
+        """
+        name = str(name or "").strip()
+        if name not in self.names:
+            logger.warning(f"图库空间不存在，无法编辑展示名: {name!r}")
+            return None
+        system_yaml = self._system_root() / f"{name}.yaml"
+        local_yaml = self._local_root() / f"{name}.yaml"
+        if self._is_dev():
+            return system_yaml if system_yaml.exists() else local_yaml
+        if system_yaml.exists():
+            return local_yaml          # 覆盖层：可能在编辑时首次创建
+        return local_yaml if local_yaml.exists() else None
+
+    def write_name(self, name: str, value: object | None) -> bool:
+        """写入空间展示名（``{"zh_CN": …, "en_US": …}``）；``None`` = 清空回落 key。
+
+        只改 ``name`` 一个键：目标 yaml 里已有的条目、meta_schema、阈值原样保留，
+        因此给系统空间写 local 覆盖层也不会影响条目合并（空 references + 空
+        deleted 对合并是恒等操作）。
+        """
+        target = self.name_target(name)
+        if target is None:
+            return False
+        doc: dict = {}
+        if target.is_file():
+            try:
+                doc = load_yaml(target)
+            except Exception as exc:  # noqa: BLE001 读坏文件时按空文档继续，下面会覆写
+                logger.warning(f"空间 yaml 读取失败，按空文档写入 {target}: {exc}")
+                doc = {}
+            if not isinstance(doc, dict):
+                doc = {}
+        doc.setdefault("version", 1)
+        if value is None:
+            doc.pop("name", None)
+        else:
+            doc["name"] = value
+        save_yaml(target, doc)
+        logger.info(f"图库空间展示名已更新: {name} -> {target}")
         return True
 
     # ─── 增删 ───
@@ -188,11 +261,17 @@ class ReferenceSpaces:
             self._remove_files(layer, name)
         self.refresh()
         active_changed = False
-        if self.active == name:      # 激活空间被删：改激活，由调用方重载
+        persisted = self.read_active()
+        if persisted == name or (persisted and persisted not in self.names):
+            # 删的是运行时空间（或持久化值已失效）：改激活，由调用方重载
             self.resolve_active()
             self.write_active(self.active)
             active_changed = True
-        logger.info(f"已删除图库空间: {name}（当前激活={self.active}）")
+        elif self.active == name or self.active not in self.names:
+            # 只是本实例正在看的那个被删：换到持久化空间，不回写 actives
+            self.active = persisted or self._default
+            active_changed = True
+        logger.info(f"已删除图库空间: {name}（运行用={persisted or self.active}）")
         return True, active_changed
 
     @staticmethod

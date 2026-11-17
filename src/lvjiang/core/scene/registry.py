@@ -27,9 +27,9 @@ def _load_manifest():
     # 兜底迁移：run_app 之外的读取路径（vscode LSP、独立脚本、测试）也可能
     # 首个触达场景注册表；未迁移的旧聚合文件必须在这里拆分，否则旧平铺
     # 场景文件会被当成顶层分组定义误读。已迁移时是两次 stat 的空操作。
-    from ..config.content_split import ensure_content_split
+    from ..config.content_split import prepare_content_split
     resolver = get_root_resolver()
-    ensure_content_split(resolver.system_dir, resolver.local_dir)
+    prepare_content_split(resolver)
     try:
         return load_scene_manifest(resolver)
     except Exception as e:

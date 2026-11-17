@@ -115,6 +115,8 @@ class SceneRegistry:
             # scenes/{group}/ 之下。顶层文件不当场景加载。
             if "/" not in name:
                 continue
+            if Path(name).stem in getattr(self._resolver, "content_split_blocked_scenes", set()):
+                continue
             yaml_file = self._resolver.resolve_read(f"scenes/{name}")
             if yaml_file is None:
                 continue

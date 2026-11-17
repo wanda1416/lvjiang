@@ -41,7 +41,7 @@ def _build_legacy(root: Path) -> None:
     _write_yaml(root / "scenes.yaml", {
         "schema_version": 2,
         "scenes": {
-            "map": {"name": "地图", "items": ["map_common"], "disabled": []},
+            "map": {"name": "地图", "items": ["map_common", "map"], "disabled": []},
             "general": {"name": "通用", "items": ["combat"]},
         },
     })

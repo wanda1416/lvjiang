@@ -175,6 +175,8 @@ def load_layout_by_key(name: str) -> Layout | None:
     reference_positions: dict[tuple[str, str, str], tuple[float, float]] = {}
 
     for scene_key in scene_keys:
+        if scene_key in getattr(resolver, "content_split_blocked_scenes", set()):
+            continue
         path = resolver.resolve_read(_scene_rel(scene_dir_name, scene_key))
         if path is None:
             continue

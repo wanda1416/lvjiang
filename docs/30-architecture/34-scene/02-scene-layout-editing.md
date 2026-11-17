@@ -23,3 +23,27 @@
 `core.layout.manager` 保留 CRUD、活动选择和保存冲突，`layout_storage` 负责文件加载、
 别名及引用展开，`layout_screenshots` 负责截图资源，`layout_references` 协调跨布局键维护。
 管理器继续提供既有公开入口，实际实现只存在于各职责模块中。
+
+
+## 旧目录升级与冲突恢复
+
+场景、坐标迁移必须使用显式 resolver 的 system/local 最终有效登记，不能仅根据
+local 片段选择分组。平铺坐标和场景覆盖即使没有旧聚合文件也会迁移；分组排序、
+disabled 差量与完整布局元数据保留。桌面重建内容索引之前、设备初始化场景之前执行。
+
+固定迁移计划先原子写入 `local/.migrations/content-split-v2/*.json`，其中保留
+所有原字节；完成写入再清理旧路径。中断后只恢复该计划，原件或目标被随后编辑时
+停止、不覆盖。请勿删除迁移记录后重试。
+
+旧版已迁错且没有来源记录时不能无歧义选定有效值：保留新旧文件、记录错误并禁用
+受影响场景的默认坐标回退。核对后可显式运行（路径均相对于 local）：
+
+```bash
+.venv/bin/python scripts/repair_content_split.py --config-dir config \
+  --source layouts/desktop/错误分组/场景.json \
+  --target layouts/desktop/有效分组/场景.json
+```
+
+默认不修改；确认来源后添加 `--apply`。目标必须符合最终登记的分组，若目标已有
+不同内容，拒绝覆盖，需用户先明确保留哪份；修复过程仍保存原字节与可重跑计划。
+该工具不发现插件，也不改变数据库、账户确认或云端协议。

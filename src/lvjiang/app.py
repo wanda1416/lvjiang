@@ -120,12 +120,9 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 旧聚合配置（scenes.yaml / layouts.yaml）一次性拆分为目录化结构；
     # 幂等，聚合文件不存在时是空操作。必须在 rebuild_content 与场景
     # 注册表初始化之前完成，保证索引用新结构建立。
-    from .core.config.content_split import ensure_content_split
+    from .core.config.content_split import prepare_content_split
     from .core.config.resolver import get_resolver
-    from .core.paths import get_config_local_dir, get_config_system_dir
-    ensure_content_split(
-        get_config_system_dir(get_resolver().config_dir),
-        get_config_local_dir(get_resolver().config_dir))
+    prepare_content_split(get_resolver())
     rebuild_content(get_resolver())
     get_resolver().reset_edit_baselines()
     from .core.scene.registry import initialize_scene_registry

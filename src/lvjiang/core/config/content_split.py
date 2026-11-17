@@ -1,239 +1,411 @@
-"""scenes.yaml / layouts.yaml → 目录化结构（拆分迁移）。
+"""场景/布局目录迁移 v2：跨层规划，原件留档，按固定计划恢复。
 
-目标结构（每个配置层根目录独立成立，层间零合并）::
-
-    <layer>/scenes/_meta.json          # {"groups": [{"key", "scenes": [...]}]}
-    <layer>/scenes/{group}.yaml        # 分组定义（name）
-    <layer>/scenes/{group}/{scene}.yaml
-    <layer>/layouts/_meta.json         # {"layouts": [key, ...]}
-    <layer>/layouts/{key}.yaml         # 布局清单（entry 映射）
-    <layer>/layouts/{key}/{group}/{scene}.json
-
-迁移必须严格两阶段，防止「场景 key 与分组 key 相同」时的整文件覆盖：
-分组定义文件位于 ``scenes/{key}.yaml``，与旧平铺场景文件同一路径——若某场景
-key 恰好等于某分组 key，先建分组文件就会把场景覆盖掉。因此：
-
-- 阶段一：只把平铺场景文件移入 ``scenes/{group}/`` 子目录，**不新建任何文件**；
-  目标已存在即报错停止（绝不覆盖）。
-- 阶段二：移动全部完成后才生成分组定义 / ``_meta.json`` / 布局清单，
-  最后删除旧聚合文件。布局侧同一纪律（先移坐标 JSON 入分组子目录）。
-
-幂等：两个聚合文件都不存在时返回 False，不做任何事。
+不发现插件、不初始化 registry；所有输入均来自显式的两个配置根。
+.migrations/content-split-v2 内的记录同时保存原字节和计划，不能删除后重试。
 """
+
 from __future__ import annotations
 
+import base64
 import json
-import shutil
 from pathlib import Path
 
 import yaml
 from loguru import logger
 
+from ..fs_util import atomic_write_bytes
+from ..json_files import formatted_json
+from .merge import merge_doc
+
 SCENES_META_NAME = "_meta.json"
 LAYOUTS_META_NAME = "_meta.json"
-#: 无分组信息可依时的兜底分组（迁移兜底 / 加载兜底一致）
 FALLBACK_GROUP = "general"
+_RECORDS = ".migrations/content-split-v2"
+_PATHS = ("scenes.*.items", "scenes.*.disabled")
 
 
-def _load_yaml(path: Path) -> dict:
-    if not path.is_file():
+class ContentSplitConflict(ValueError):
+    """原值受到保护；这些场景不得静默使用系统默认内容。"""
+
+    def __init__(self, message: str, scenes=()):
+        super().__init__(message)
+        self.scenes = set(scenes)
+
+
+def _encode(raw: bytes) -> str:
+    return base64.b64encode(raw).decode("ascii")
+
+
+def _decode(raw: str) -> bytes:
+    return base64.b64decode(raw)
+
+
+def _yaml(raw: bytes) -> dict:
+    data = yaml.safe_load(raw.decode("utf-8"))
+    if data is None:
         return {}
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception as e:  # noqa: BLE001
-        raise ValueError(f"迁移前解析失败 {path}: {e}") from None
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        raise ValueError("配置顶层必须是映射")
+    return data
 
 
-def _read_scene_groups(scenes_yaml: Path) -> dict[str, dict]:
-    """旧 scenes.yaml v2 的 scenes 映射：key → {name, items, disabled}"""
-    doc = _load_yaml(scenes_yaml)
-    groups = doc.get("scenes")
-    if not isinstance(groups, dict):
-        raise ValueError(f"{scenes_yaml} 缺少 scenes 映射，无法迁移")
-    return groups
-
-
-def _scene_to_group(groups: dict[str, dict]) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for group_key, group in groups.items():
-        items = group.get("items") or [] if isinstance(group, dict) else []
-        for scene_key in items:
-            mapping[str(scene_key)] = str(group_key)
-    return mapping
+def _dump(data: dict) -> bytes:
+    return yaml.safe_dump(data, allow_unicode=True, sort_keys=False).encode("utf-8")
 
 
 def _write_text(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    atomic_write_bytes(path, text.encode("utf-8"), prefix=".content-split-")
+
+
+def _commit_write(path: Path, raw: bytes) -> None:
+    atomic_write_bytes(path, raw, prefix=".content-split-")
+
+
+class _Plan:
+    def __init__(self, roots: dict[str, Path]):
+        self.roots = roots
+        self.originals: dict[str, str | None] = {}
+        self.writes: dict[str, str] = {}
+        self.deletes: list[str] = []
+        self.scenes: set[str] = set()
+
+    def key(self, layer: str, rel: str) -> str:
+        return f"{layer}/{rel}"
+
+    def read(self, layer: str, rel: str) -> bytes | None:
+        key = self.key(layer, rel)
+        if key not in self.originals:
+            path = self.roots[layer] / rel
+            self.originals[key] = _encode(path.read_bytes()) if path.is_file() else None
+        raw = self.originals[key]
+        return _decode(raw) if raw is not None else None
+
+    def put(self, layer: str, rel: str, raw: bytes, *, replace=False):
+        key = self.key(layer, rel)
+        old = self.read(layer, rel)
+        if old is not None and old != raw and not replace:
+            raise ContentSplitConflict(
+                f"迁移目标已存在，拒绝覆盖：{self.roots[layer] / rel}", self.scenes
+            )
+        if key in self.writes and self.writes[key] != _encode(raw):
+            raise ContentSplitConflict(f"同一目标有不同来源：{rel}", self.scenes)
+        self.writes[key] = _encode(raw)
+
+    def move(self, layer: str, old: str, new: str):
+        raw = self.read(layer, old)
+        assert raw is not None
+        self.put(layer, new, raw)
+        self.deletes.append(self.key(layer, old))
+
+    def record(self) -> dict:
+        return dict(
+            version=2,
+            state="pending",
+            originals=self.originals,
+            writes=self.writes,
+            deletes=self.deletes,
+            scenes=sorted(self.scenes),
+        )
+
+
+def _tree_groups(root: Path) -> dict:
+    from ..scene.config import load_scene_manifest
+    from .resolver import ConfigResolver
+
+    manifest = load_scene_manifest(
+        ConfigResolver(
+            system_dir=root, local_dir=root, dev_mode=False, track_content=False
+        )
+    )
+    return {
+        key: {"name": manifest.group_names[key], "items": items}
+        for key, items in manifest.groups.items()
+        if (root / "scenes" / key).is_dir()
+    }
+
+
+def _owners(groups: dict) -> dict[str, str]:
+    owners: dict[str, str] = {}
+    for group, data in groups.items():
+        for scene in data.get("items") or []:
+            if scene in owners and owners[scene] != group:
+                raise ContentSplitConflict(f"场景归属不唯一：{scene}", [scene])
+            owners[scene] = group
+    return owners
+
+
+def _build_plan(roots: dict[str, Path]) -> _Plan:
+    plan = _Plan(roots)
+    old: dict[str, dict] = {}
+    trees = {layer: _tree_groups(root) for layer, root in roots.items()}
+    for layer, root in roots.items():
+        raw = plan.read(layer, "scenes.yaml")
+        old[layer] = _yaml(raw).get("scenes", {}) if raw is not None else {}
+        if not isinstance(old[layer], dict):
+            raise ValueError(f"{root / 'scenes.yaml'} 缺少 scenes 映射")
+        plan.scenes.update(
+            p.stem
+            for p in (root / "layouts").glob("*/*.json")
+            if not p.stem.startswith("_")
+        )
+        for path in (root / "scenes").glob("*.yaml"):
+            data = _yaml(path.read_bytes())
+            if "key" in data:  # 严格验证场景身份；分组定义没有 key 字段
+                if data["key"] != path.stem:
+                    raise ContentSplitConflict(
+                        f"场景身份与文件名不符：{path}", [path.stem]
+                    )
+                plan.scenes.add(path.stem)
+    base = old.get("system") or trees.get("system", {})
+    effective = {"scenes": base}
+    if "local" in roots:
+        effective = merge_doc(effective, {"scenes": old.get("local", {})}, _PATHS)
+    groups = effective["scenes"]
+    owners = _owners(groups)
+    for scene, base_group in _owners(base).items():
+        owners.setdefault(scene, base_group)
+    # 当前目录归属也是事实源，local 同路径影子不改变系统场景归属。
+    for tree in trees.values():
+        for scene, tree_group in _owners(tree).items():
+            if scene in owners and owners[scene] != tree_group:
+                raise ContentSplitConflict(
+                    f"旧登记与当前目录归属冲突：{scene}", plan.scenes | {scene}
+                )
+            owners[scene] = tree_group
+    pending = set(plan.scenes)
+    for layer, root in roots.items():
+        flat_scenes = []
+        for path in sorted((root / "scenes").glob("*.yaml")):
+            if "key" in _yaml(path.read_bytes()):
+                flat_scenes.append(path)
+        # 规划全部场景移动后再生成分组定义，允许分组与场景同名。
+        for path in flat_scenes:
+            group = owners.get(path.stem)
+            if group is None:
+                raise ContentSplitConflict(
+                    f"场景没有可证明的分组，原件保留：{path}", pending
+                )
+            plan.move(
+                layer, path.relative_to(root).as_posix(), f"scenes/{group}/{path.name}"
+            )
+        for path in sorted((root / "layouts").glob("*/*.json")):
+            if path.stem.startswith("_"):
+                continue
+            group = owners.get(path.stem)
+            if group is None:
+                raise ContentSplitConflict(
+                    f"坐标没有可证明的场景归属，原件保留：{path}", pending
+                )
+            plan.move(
+                layer,
+                path.relative_to(root).as_posix(),
+                f"layouts/{path.parent.name}/{group}/{path.name}",
+            )
+        # 旧错误版本没有来源记录：不猜测非当前分组下的哪份坐标应当生效。
+        for path in sorted((root / "layouts").glob("*/*/*.json")):
+            group = owners.get(path.stem)
+            if group and path.parent.name != group:
+                raise ContentSplitConflict(
+                    f"发现可能迁错的坐标；请核对后选择原件：{path} -> {group}/",
+                    pending | {path.stem},
+                )
+        for group, data in old[layer].items():
+            if not isinstance(data, dict) or group.startswith("__"):
+                continue
+            rel = f"scenes/{group}.yaml"
+            if "name" in data:
+                # 该位置可能仍是刚规划移走的同名旧场景，原字节已在记录中。
+                plan.put(
+                    layer,
+                    rel,
+                    _dump({"name": data["name"]}),
+                    replace=plan.key(layer, rel) in plan.deletes,
+                )
+            if "disabled" in data:
+                desired = set(groups.get(group, {}).get("disabled") or [])
+                for scene in groups.get(group, {}).get("items") or []:
+                    if owners.get(scene) != group:
+                        continue
+                    target = f"scenes/{group}/{scene}.yaml"
+                    key = plan.key(layer, target)
+                    raw = (
+                        _decode(plan.writes[key])
+                        if key in plan.writes
+                        else plan.read(layer, target)
+                    )
+                    if raw is None and layer == "local":
+                        raw = plan.read("system", target)
+                    if raw is None:
+                        continue
+                    doc = _yaml(raw)
+                    disabled = scene in desired
+                    if bool(doc.get("disabled")) != disabled:
+                        doc["disabled"] = disabled
+                        # 已规划的移动可派生 disabled，但原字节仍保留在 originals。
+                        plan.writes.pop(key, None)
+                        plan.put(layer, target, _dump(doc), replace=True)
+        if plan.read(layer, "scenes.yaml") is not None:
+            meta = []
+            for group, data in old[layer].items():
+                if not isinstance(data, dict) or group.startswith("__"):
+                    continue
+                items = data.get("items") or []
+                if isinstance(items, dict):
+                    items = list(items.get("__order__") or []) + list(
+                        items.get("__added__") or []
+                    )
+                meta.append({"key": group, "scenes": list(dict.fromkeys(items))})
+            plan.put(
+                layer,
+                "scenes/_meta.json",
+                formatted_json({"groups": meta}).encode(),
+                replace=True,
+            )
+            plan.deletes.append(plan.key(layer, "scenes.yaml"))
+        raw = plan.read(layer, "layouts.yaml")
+        if raw is not None:
+            entries = _yaml(raw).get("layouts")
+            if not isinstance(entries, dict):
+                raise ValueError(f"{root / 'layouts.yaml'} 缺少 layouts 映射")
+            keys = []
+            for key, entry in entries.items():
+                if key.startswith("__"):
+                    continue
+                if not isinstance(entry, dict) or not entry:
+                    raise ValueError(f"布局定义无效：{key}")
+                keys.append(key)
+                plan.put(layer, f"layouts/{key}.yaml", _dump(entry))
+            plan.put(
+                layer,
+                "layouts/_meta.json",
+                formatted_json({"layouts": keys}).encode(),
+                replace=True,
+            )
+            plan.deletes.append(plan.key(layer, "layouts.yaml"))
+    return plan
+
+
+def _apply_record(roots: dict[str, Path], path: Path, record: dict) -> None:
+    def target(key):
+        layer, rel = key.split("/", 1)
+        return roots[layer] / rel
+
+    originals, writes = record["originals"], record["writes"]
+    # 开始落盘前核验所有输入；重跑允许本计划已经写入/移除的结果。
+    for key, original in originals.items():
+        file = target(key)
+        now = _encode(file.read_bytes()) if file.is_file() else None
+        allowed = [original]
+        if key in writes:
+            allowed.append(writes[key])
+        if key in record["deletes"]:
+            allowed.append(None)
+        if now not in allowed:
+            raise ContentSplitConflict(
+                f"迁移期间文件已变化，拒绝覆盖：{file}", record["scenes"]
+            )
+    for key, raw in writes.items():
+        file = target(key)
+        payload = _decode(raw)
+        if not file.is_file() or file.read_bytes() != payload:
+            _commit_write(file, payload)
+    for key in record["deletes"]:
+        if key not in writes:
+            target(key).unlink(missing_ok=True)
+    record["state"] = "complete"
+    _commit_write(path, formatted_json(record).encode())
+
+
+def ensure_content_split(system_root: Path, local_root: Path) -> bool:
+    from .content import config_write_lock, configuration_lock
+
+    roots = {"system": Path(system_root)}
+    if Path(local_root) != Path(system_root):
+        roots["local"] = Path(local_root)
+    records = Path(local_root) / _RECORDS
+    # 无旧路径/未完成记录时不建目录、不加文件锁，保持只读实例的常规读取无写入。
+    pending = [
+        p
+        for p in sorted(records.glob("*.json"))
+        if json.loads(p.read_text(encoding="utf-8"))["state"] == "pending"
+    ]
+    if not pending and not any(needs_migration(r) for r in roots.values()):
+        # 仍检查错误版本遗留的异组坐标，不能以完成标记掩盖冲突。
+        _build_plan(roots)
+        return False
+    with (
+        configuration_lock(Path(local_root).parent),
+        config_write_lock(Path(local_root)),
+    ):
+        for path in pending:
+            _apply_record(roots, path, json.loads(path.read_text(encoding="utf-8")))
+        plan = _build_plan(roots)
+        if not plan.writes and not plan.deletes:
+            return bool(pending)
+        records.mkdir(parents=True, exist_ok=True)
+        path = records / f"{len(list(records.glob('*.json'))) + 1:06d}.json"
+        record = plan.record()
+        _commit_write(path, formatted_json(record).encode())
+        _apply_record(roots, path, record)
+        return True
 
 
 def migrate_layer(root: Path) -> bool:
-    """迁移单个配置层根目录；发生迁移返回 True，无需迁移返回 False。
-
-    Raises:
-        ValueError: 聚合文件缺失映射、或移动目标已存在（绝不覆盖）。
-    """
-    root = Path(root)
-    scenes_yaml = root / "scenes.yaml"
-    layouts_yaml = root / "layouts.yaml"
-    if not scenes_yaml.is_file() and not layouts_yaml.is_file():
-        return False
-
-    scene_groups = _read_scene_groups(scenes_yaml) if scenes_yaml.is_file() else {}
-    scene_owner = _scene_to_group(scene_groups)
-    group_keys = list(scene_groups)
-    disabled: set[str] = set()
-    for group in scene_groups.values():
-        if isinstance(group, dict):
-            disabled.update(group.get("disabled") or [])
-
-    scenes_dir = root / "scenes"
-    layouts_dir = root / "layouts"
-    scenes_dir.mkdir(parents=True, exist_ok=True)
-
-    # ── 阶段一：移动平铺场景文件入分组子目录（不新建任何文件） ──
-    flat_scene_files = sorted(
-        p for p in scenes_dir.glob("*.yaml") if p.is_file())
-    for path in flat_scene_files:
-        scene_key = path.stem
-        group_key = scene_owner.get(scene_key)
-        if group_key is None:
-            group_key = group_keys[0] if group_keys else FALLBACK_GROUP
-            logger.warning(
-                f"[迁移] 场景 {scene_key} 未登记进 scenes.yaml 分组，"
-                f"归入兜底分组 {group_key}")
-        target = scenes_dir / group_key / path.name
-        if target.exists():
-            raise ValueError(
-                f"[迁移] 目标已存在，拒绝覆盖：{target}；"
-                f"请先人工处理该冲突再迁移")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(path), str(target))
-        logger.info(f"[迁移] 场景文件已入组: {path.name} -> scenes/{group_key}/")
-
-    # 旧 scenes.yaml 里的 disabled 落到场景文件自身（阶段二之前补写）
-    for scene_key in sorted(disabled):
-        group_key = scene_owner.get(scene_key)
-        if group_key is None:
-            continue
-        path = scenes_dir / group_key / f"{scene_key}.yaml"
-        if not path.is_file():
-            continue
-        data = _load_yaml(path)
-        if data.get("disabled"):
-            continue
-        data["disabled"] = True
-        _write_text(path, yaml.safe_dump(
-            data, allow_unicode=True, default_flow_style=False, sort_keys=False))
-
-    # ── 阶段二：生成分组定义 / _meta.json / 布局清单 ──
-    # 分组清单 = scenes.yaml 登记顺序 + 未登记但有文件的目录（按名追加）
-    meta_groups: list[str] = list(group_keys)
-    for path in scenes_dir.iterdir():
-        if path.is_dir() and path.name not in meta_groups \
-                and not path.name.startswith(("_", ".")):
-            meta_groups.append(path.name)
-            logger.warning(f"[迁移] 发现未登记的分组目录，追加到末尾: {path.name}")
-
-    meta_doc: dict = {"groups": []}
-    for group_key in meta_groups:
-        group_dir = scenes_dir / group_key
-        members = sorted(
-            p.stem for p in group_dir.glob("*.yaml")
-            if p.is_file()) if group_dir.is_dir() else []
-        registered = scene_groups.get(group_key)
-        name = (registered or {}).get("name", group_key) \
-            if isinstance(registered, dict) else group_key
-        # 顺序以 scenes.yaml 登记为准，目录里多出的文件追加在末尾
-        ordered = [s for s in (registered or {}).get("items") or []
-                   if s in members] if isinstance(registered, dict) else []
-        ordered.extend(s for s in members if s not in ordered)
-        meta_doc["groups"].append({"key": group_key, "scenes": ordered})
-        group_file = scenes_dir / f"{group_key}.yaml"
-        if group_file.exists():
-            raise ValueError(
-                f"[迁移] 分组定义目标已存在，拒绝覆盖：{group_file}")
-        _write_text(group_file, yaml.safe_dump(
-            {"name": name}, allow_unicode=True, default_flow_style=False,
-            sort_keys=False))
-    _write_text(
-        scenes_dir / SCENES_META_NAME,
-        json.dumps(meta_doc, ensure_ascii=False, indent=2) + "\n")
-
-    # ── 布局：先移坐标 JSON 入分组子目录，再写清单与 _meta.yaml 纪律同上 ──
-    layout_doc = _load_yaml(layouts_yaml) if layouts_yaml.is_file() else {}
-    layout_entries = layout_doc.get("layouts")
-    if layouts_yaml.is_file() and not isinstance(layout_entries, dict):
-        raise ValueError(f"{layouts_yaml} 缺少 layouts 映射，无法迁移")
-    # 聚合 diff 的元键（__deleted__ 等）不是布局条目。DELETABLE_PATHS 从未
-    # 放行 layouts 顶层删除，这里出现 __deleted__ 只可能是空占位，跳过即可。
-    layout_entries = {
-        key: value for key, value in (layout_entries or {}).items()
-        if not str(key).startswith("__")}
-    layout_keys = list(layout_entries)
-    if layouts_dir.is_dir():
-        for layout_dir in sorted(p for p in layouts_dir.iterdir() if p.is_dir()):
-            if layout_dir.name.startswith(("_", ".")):
-                continue
-            for json_path in sorted(layout_dir.glob("*.json")):
-                scene_key = json_path.stem
-                if scene_key.startswith("_"):
-                    continue
-                group_key = scene_owner.get(scene_key)
-                if group_key is None:
-                    group_key = meta_groups[0] if meta_groups else FALLBACK_GROUP
-                    logger.warning(
-                        f"[迁移] 布局坐标 {json_path.name} 的场景未登记分组，"
-                        f"归入兜底分组 {group_key}")
-                target = layout_dir / group_key / json_path.name
-                if target.exists():
-                    raise ValueError(
-                        f"[迁移] 目标已存在，拒绝覆盖：{target}")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(json_path), str(target))
-            # 清掉因移动而变空的目录层级残留（只删空目录，不碰别的文件）
-            for sub in sorted(layout_dir.glob("*"), reverse=True):
-                if sub.is_dir() and not any(sub.iterdir()):
-                    sub.rmdir()
-
-    for layout_key, entry in layout_entries.items():
-        layout_file = layouts_dir / f"{layout_key}.yaml"
-        if not isinstance(entry, dict) or not entry:
-            raise ValueError(f"布局 {layout_key} 的定义无效，无法迁移")
-        if layout_file.exists():
-            raise ValueError(
-                f"[迁移] 布局清单目标已存在，拒绝覆盖：{layout_file}")
-        _write_text(layout_file, yaml.safe_dump(
-            entry, allow_unicode=True, default_flow_style=False,
-            sort_keys=False))
-    if layout_keys:
-        _write_text(
-            layouts_dir / LAYOUTS_META_NAME,
-            json.dumps({"layouts": layout_keys}, ensure_ascii=False,
-                       indent=2) + "\n")
-
-    scenes_yaml.unlink(missing_ok=True)
-    layouts_yaml.unlink(missing_ok=True)
-    logger.info(f"[迁移] {root} 已切换为目录化结构（scenes/layouts 拆分完成）")
-    return True
+    return ensure_content_split(root, root)
 
 
 def needs_migration(root: Path) -> bool:
     root = Path(root)
-    return (root / "scenes.yaml").is_file() or (root / "layouts.yaml").is_file()
+    if (root / "scenes.yaml").is_file() or (root / "layouts.yaml").is_file():
+        return True
+    if any(not p.stem.startswith("_") for p in (root / "layouts").glob("*/*.json")):
+        return True
+    return any("key" in _yaml(p.read_bytes()) for p in (root / "scenes").glob("*.yaml"))
 
 
-def ensure_content_split(system_root: Path, local_root: Path) -> bool:
-    """运行时迁移入口：对 system 与 local 两层执行拆分；任一层迁移返回 True。
+def prepare_content_split(resolver) -> None:
+    """组合根入口：冲突只隔离受影响场景；失败不静默使用系统定义/坐标。"""
+    resolver.content_split_blocked_scenes = set()
+    try:
+        ensure_content_split(resolver.system_dir, resolver.local_dir)
+    except ContentSplitConflict as error:
+        resolver.content_split_blocked_scenes = error.scenes
+        logger.error("场景/布局迁移未完成，相关场景不可执行，原件已保留：{}", error)
 
-    幂等且可重复执行；失败即抛出，调用方自行决定是否阻断启动——半迁移状态
-    （场景已入组但聚合文件还在）重跑会从阶段二继续，不会重复移动。
-    """
-    changed = False
-    for label, root in (("system", system_root), ("local", local_root)):
-        if not needs_migration(root):
-            continue
-        logger.info(f"[迁移] 检测到旧聚合配置，开始拆分: {label} ({root})")
-        changed = migrate_layer(root) or changed
-    return changed
+
+def repair_misplaced_coordinate(resolver, source: str, target: str) -> None:
+    """用户明确选择的一份旧迁错坐标；不覆盖目标，原字节进入同一恢复记录。"""
+    from pathlib import PurePosixPath
+
+    from ..scene.config import load_scene_manifest
+    from .content import config_write_lock, configuration_lock
+
+    old, new = PurePosixPath(source), PurePosixPath(target)
+    if any(p.is_absolute() or ".." in p.parts or "\\" in str(p) for p in (old, new)):
+        raise ValueError("修复路径必须是 local 内的相对路径")
+    if (
+        len(old.parts) != 4
+        or len(new.parts) != 4
+        or old.parts[0] != "layouts"
+        or new.parts[:2] != old.parts[:2]
+        or new.name != old.name
+        or old.suffix != ".json"
+    ):
+        raise ValueError("只允许同布局、同场景的坐标改正分组")
+    manifest = load_scene_manifest(resolver)
+    group = next(
+        (g for g, scenes in manifest.groups.items() if old.stem in scenes), None
+    )
+    if group is None or new.parts[2] != group:
+        raise ValueError("目标不是该场景的有效分组")
+    roots = {"system": resolver.system_dir, "local": resolver.local_dir}
+    with configuration_lock(resolver.config_dir), config_write_lock(resolver.local_dir):
+        plan = _Plan(roots)
+        plan.scenes.add(old.stem)
+        plan.move("local", source, target)
+        records = resolver.local_dir / _RECORDS
+        records.mkdir(parents=True, exist_ok=True)
+        path = records / f"{len(list(records.glob('*.json'))) + 1:06d}.json"
+        record = plan.record()
+        _commit_write(path, formatted_json(record).encode())
+        _apply_record(roots, path, record)

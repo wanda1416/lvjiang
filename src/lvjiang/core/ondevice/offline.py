@@ -56,6 +56,8 @@ def reset_configuration() -> None:
 
     task_runner.release_engine()
     from ..config.content import rebuild_content
+    from ..config.content_split import prepare_content_split
+    prepare_content_split(get_resolver())
     rebuild_content(get_resolver())
     get_resolver().reset_edit_baselines()
     get_resolver().clear_read_cache()

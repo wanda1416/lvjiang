@@ -14,8 +14,10 @@ from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.reference_db import (
     DEFAULT_MATCH_THRESHOLD,
     DEFAULT_SPACE,
+    UNGROUPED_DIR,
     MetaFieldDef,
     ReferenceDatabase,
+    validate_group_names,
 )
 from tests.case_matrix import case_matrix
 
@@ -54,21 +56,21 @@ def _make_db(layers, dev_mode: bool) -> ReferenceDatabase:
     )
 
 
-# ─── 桶发现 ──────────────────────────────────────────────
+# ─── 图片目录（即分组目录）发现 ──────────────────────────
 
-class TestBucketDiscovery:
+class TestImageDirDiscovery:
     def test_discovers_all_subdirs_from_both_layers(self, layers):
         """扫描 local + system 层全部子目录，合并去重"""
         system_dir, system_yaml, local_dir, local_yaml = layers
-        (system_dir / "bucket_a").mkdir(parents=True)
-        (system_dir / "bucket_b").mkdir(parents=True)
-        (local_dir / "bucket_b").mkdir(parents=True)  # 重复
-        (local_dir / "bucket_c").mkdir(parents=True)
+        (system_dir / "调律材料").mkdir(parents=True)
+        (system_dir / "装备培养").mkdir(parents=True)
+        (local_dir / "装备培养").mkdir(parents=True)  # 重复
+        (local_dir / "货币资产").mkdir(parents=True)
         (system_dir / ".hidden").mkdir(parents=True)  # 应被排除
         _write_yaml(system_yaml, {"version": 1, "references": []})
         _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
         db = _make_db(layers, dev_mode=False)
-        assert db.buckets == ["bucket_a", "bucket_b", "bucket_c"]
+        assert db.image_dirs == sorted(["调律材料", "装备培养", "货币资产"])
 
 
 # ─── 合并视图 ────────────────────────────────────────────
@@ -102,14 +104,14 @@ class TestMergedView:
 # ─── 用户模式写路由 ──────────────────────────────────────
 
 class TestUserModeWrites:
-    def test_add_entry_image_lands_in_local(self, layers):
+    def test_add_entry_image_lands_in_local_group_dir(self, layers):
         _, system_yaml, local_dir, local_yaml = layers
         _write_yaml(system_yaml, {"version": 1, "references": []})
         db = _make_db(layers, dev_mode=False)
         img = np.zeros((2, 2, 3), dtype=np.uint8)
         entry = db.add_entry(label="定音石", meta={"group": "调律材料"},
                              image_data=img)
-        assert (local_dir / entry.file).exists()
+        assert (local_dir / "调律材料" / entry.file).exists()
         overlay = yaml.safe_load(local_yaml.read_text(encoding="utf-8"))
         assert [e["file"] for e in overlay["references"]] == [entry.file]
         # 合并视图可见
@@ -211,13 +213,155 @@ class TestDevModeWrites:
         db = _make_db(layers, dev_mode=True)
         img = np.zeros((2, 2, 3), dtype=np.uint8)
         entry = db.add_entry(label="甲", meta={"group": "g"}, image_data=img)
-        assert (system_dir / entry.file).exists()
+        assert (system_dir / "g" / entry.file).exists()
         assert not local_yaml.exists()
 
         assert db.remove_entry(entry.file) is True
-        assert not (system_dir / entry.file).exists()
+        assert not (system_dir / "g" / entry.file).exists()
         sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
         assert sys_doc["references"] == []
+
+
+# ─── 分组 → 图片目录 ─────────────────────────────────────
+
+class TestGroupDirectories:
+    """图片目录即分组名：写入取第一个分组，未分组落 default，改分组挪图。"""
+
+    def test_ungrouped_entry_lands_in_default_dir(self, layers):
+        """无分组条目的图片落 default/，仍能按文件名解析到。"""
+        _, system_yaml, local_dir, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        db = _make_db(layers, dev_mode=False)
+        entry = db.add_entry(
+            label="甲", image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        assert (local_dir / UNGROUPED_DIR / entry.file).exists()
+        assert db.image_path(entry.file) == local_dir / UNGROUPED_DIR / entry.file
+
+    def test_first_group_decides_directory(self, layers):
+        """多分组条目只落第一个分组对应的目录。"""
+        _, system_yaml, local_dir, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        db = _make_db(layers, dev_mode=False)
+        entry = db.add_entry(label="甲", meta={"group": "甲组, 乙组"},
+                             image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        assert (local_dir / "甲组" / entry.file).exists()
+        assert not (local_dir / "乙组").exists()
+
+    def test_group_change_moves_image_in_writable_layer(self, layers):
+        """开发模式改分组：图片跟着挪进新分组目录，旧目录不再有该文件。"""
+        system_dir, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        db = _make_db(layers, dev_mode=True)
+        entry = db.add_entry(label="甲", meta={"group": "旧组"},
+                             image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        assert db.update_entry(entry.file, meta={"group": "新组"}) is True
+        assert (system_dir / "新组" / entry.file).exists()
+        assert not (system_dir / "旧组" / entry.file).exists()
+
+    def test_user_mode_group_change_keeps_system_image(self, layers):
+        """用户模式改系统条目分组：只写 local 影子，系统图片原地不动。"""
+        system_dir, system_yaml, _, _ = layers
+        (system_dir / "旧组").mkdir(parents=True)
+        (system_dir / "旧组" / "A.png").write_bytes(b"sys")
+        _write_yaml(system_yaml, {"version": 1, "references": [
+            _entry("A.png", "甲", group="旧组")]})
+        db = _make_db(layers, dev_mode=False)
+        assert db.update_entry("A.png", meta={"group": "新组"}) is True
+        assert (system_dir / "旧组" / "A.png").exists()
+        assert not (system_dir / "新组" / "A.png").exists()
+        assert db.get_entry("A.png").group == "新组"
+
+    @case_matrix("bad", [
+        "default", "Default", "甲组,default", ".隐藏", "a/b", "a\\b", "a|b",
+    ])
+    def test_illegal_group_name_rejected_before_writing(self, layers, bad):
+        """保留名与非法分组名在写图片之前就拒绝，条目和文件都不落地。"""
+        _, system_yaml, local_dir, _ = layers
+        _write_yaml(system_yaml, {"version": 1, "references": []})
+        db = _make_db(layers, dev_mode=False)
+        with pytest.raises(ValueError):
+            db.add_entry(label="甲", meta={"group": bad},
+                         image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        assert db.entries == []
+        assert not list(local_dir.rglob("*.png"))
+
+    def test_validate_group_names_normalizes_text(self):
+        """校验函数只判合法性并返回去空白后的规范文本。"""
+        assert validate_group_names("  甲组 , 乙组  ") == "甲组,乙组"
+        assert validate_group_names("") == ""
+        assert validate_group_names(None) == ""
+
+
+# ─── 数字 meta 归一 ──────────────────────────────────────
+
+class TestNumericMetaCoercion:
+    """录入界面按文本收集 meta，写入口必须按 schema 归一成数字。"""
+
+    @staticmethod
+    def _schema_doc(*, extra: dict | None = None) -> dict:
+        return {
+            "version": 1,
+            "meta_schema": [
+                {"key": "level", "name": "等级", "type": "number", "scope": "input"},
+                {"key": "note", "name": "备注字段", "type": "text", "scope": "input"},
+            ],
+            "references": [extra] if extra else [],
+        }
+
+    def test_add_entry_stores_numeric_text_as_int(self, layers):
+        """'110' 落盘为 110：同一图库不会同时存在两种写法。"""
+        _, system_yaml, _, _ = layers
+        _write_yaml(system_yaml, self._schema_doc())
+        db = _make_db(layers, dev_mode=True)
+        entry = db.add_entry(
+            label="甲", meta={"group": "g", "level": "110"},
+            image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        assert entry.level == 110
+        assert isinstance(entry.meta["level"], int)
+        stored = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
+        assert stored["references"][0]["meta"]["level"] == 110
+        # 空文本 = 未填：不落空串
+        blank = db.add_entry(
+            label="乙", meta={"group": "g", "level": "  "},
+            image_data=np.zeros((2, 2, 3), dtype=np.uint8))
+        assert "level" not in blank.meta
+
+    def test_update_entry_coerces_text_level(self, layers):
+        """改等级按文本提交同样转数字；空文本视为未修改，不写空串。"""
+        system_dir, system_yaml, _, _ = layers
+        (system_dir / "g").mkdir(parents=True)
+        (system_dir / "g" / "A.png").write_bytes(b"sys")
+        _write_yaml(system_yaml, self._schema_doc(
+            extra=_entry("A.png", "甲", group="g", level=110)))
+        db = _make_db(layers, dev_mode=True)
+        assert db.update_entry("A.png", meta={"level": "105"}) is True
+        assert db.get_entry("A.png").level == 105
+        assert isinstance(db.get_entry("A.png").meta["level"], int)
+
+        assert db.update_entry("A.png", meta={"level": "  "}) is True
+        assert db.get_entry("A.png").level == 105  # 未填 → 保持原值
+
+    def test_non_numeric_text_is_kept_as_is(self, layers):
+        """解析不出来的文本原样保留——不能悄悄吞掉用户输入。"""
+        system_dir, system_yaml, _, _ = layers
+        (system_dir / "g").mkdir(parents=True)
+        (system_dir / "g" / "A.png").write_bytes(b"sys")
+        _write_yaml(system_yaml, self._schema_doc(
+            extra=_entry("A.png", "甲", group="g")))
+        db = _make_db(layers, dev_mode=True)
+        assert db.update_entry("A.png", meta={"level": "待定"}) is True
+        assert db.get_entry("A.png").meta["level"] == "待定"
+
+    def test_text_field_is_untouched(self, layers):
+        """非 number 字段不做数字转换。"""
+        system_dir, system_yaml, _, _ = layers
+        (system_dir / "g").mkdir(parents=True)
+        (system_dir / "g" / "A.png").write_bytes(b"sys")
+        _write_yaml(system_yaml, self._schema_doc(
+            extra=_entry("A.png", "甲", group="g")))
+        db = _make_db(layers, dev_mode=True)
+        assert db.update_entry("A.png", meta={"note": "110"}) is True
+        assert db.get_entry("A.png").meta["note"] == "110"
 
 
 # ─── meta_schema 输入/输出场景 ────────────────────────
@@ -393,11 +537,11 @@ class TestReferenceSpaces:
         db = ReferenceDatabase(dev_mode=True)
         img = np.zeros((2, 2, 3), dtype=np.uint8)
         entry = db.add_entry(label="甲", meta={"group": "g"}, image_data=img)
-        # 条目与图片都落在空间A 目录下（分组结构保留）
+        # 条目与图片都落在空间A 目录下（图片按分组落目录）
         doc = yaml.safe_load((space_env["system_ref"] / "空间A.yaml")
                              .read_text(encoding="utf-8"))
         assert [e["file"] for e in doc["references"]] == [entry.file]
-        assert (space_env["system_ref"] / "空间A" / entry.file).exists()
+        assert (space_env["system_ref"] / "空间A" / "g" / entry.file).exists()
 
     def test_image_path_resolves_within_active_space(self, space_env):
         """图片路径按激活空间解析，local 优先"""

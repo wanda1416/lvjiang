@@ -10,9 +10,13 @@ from .models import (
     DEFAULT_MATCH_THRESHOLD,
     DEFAULT_SPACE,
     REFERENCE_OUTPUT_RESERVED_KEYS,
+    UNGROUPED_DIR,
     MetaFieldDef,
     ReferenceEntry,
+    group_dir_name,
+    primary_group,
     validate_crop,
+    validate_group_names,
 )
 from .spaces import ReferenceSpaces
 
@@ -24,5 +28,9 @@ __all__ = [
     "ReferenceDatabase",
     "ReferenceEntry",
     "ReferenceSpaces",
+    "UNGROUPED_DIR",
+    "group_dir_name",
+    "primary_group",
     "validate_crop",
+    "validate_group_names",
 ]

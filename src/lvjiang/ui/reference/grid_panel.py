@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -16,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.core.reference_db import MetaFieldDef
+from lvjiang.core.reference_db import MetaFieldDef, validate_group_names
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr, tr_label
@@ -389,6 +390,11 @@ class GridPanel(QWidget):
             for editor in self._cell_editors:
                 editor.set_group_edit_visible(True)
             return
+        try:
+            validate_group_names(group)
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("分组名非法"), str(exc))
+            return
         # 应用批量分组，并隐藏单个分组编辑
         for editor in self._cell_editors:
             editor.group_edit.blockSignals(True)
@@ -412,7 +418,18 @@ class GridPanel(QWidget):
         self._submit_btn.setEnabled(len(cells) > 0)
 
     def _on_submit_cells(self):
-        """收集所有 cell 信息，发射 submit_cells 信号"""
+        """收集所有 cell 信息，发射 submit_cells 信号
+
+        提交前整批校验分组：非法分组名（保留目录 ``default``、含路径分隔符）
+        会在这里拦下，而不是写到一半才失败——切割结果留在界面上让用户改。
+        """
+        groups = [editor.cell_group for editor in self._cell_editors]
+        try:
+            for group in groups:
+                validate_group_names(group)
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("分组名非法"), str(exc))
+            return
         results = []
         for editor in self._cell_editors:
             results.append((

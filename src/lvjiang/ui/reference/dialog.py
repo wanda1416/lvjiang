@@ -571,6 +571,15 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         Args:
             cells_data: list of (image, label, group, notes, meta)
         """
+        from lvjiang.core.reference_db import validate_group_names
+        try:
+            for _image, _label, group, _notes, _cell_meta in cells_data:
+                validate_group_names(group)
+        except ValueError as exc:
+            # 提交是数据库边界：非法分组在这里兜底，避免写了一半才失败
+            QMessageBox.warning(self, tr("分组名非法"), str(exc))
+            return
+
         count = 0
         for image, label, group, notes, cell_meta in cells_data:
             if image is None:

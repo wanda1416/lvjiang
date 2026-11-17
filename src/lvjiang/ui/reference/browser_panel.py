@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -21,7 +22,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
+from lvjiang.core.reference_db import (
+    MetaFieldDef,
+    ReferenceDatabase,
+    ReferenceEntry,
+    validate_group_names,
+)
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr, tr_label
@@ -715,6 +721,12 @@ class BrowserPanel(QWidget):
             if val:
                 meta[key] = val
 
+        try:
+            validate_group_names(meta.get("group"))
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("分组名非法"), str(exc))
+            return
+
         self._db.update_entry(
             filename,
             label=self._label_edit.text().strip(),
@@ -754,6 +766,12 @@ class BrowserPanel(QWidget):
         meta = {}
         new_group = self._batch_group_edit.currentText().strip()
         if new_group:
+            # 批量改分组会同时移动多张图片：先整批校验，避免写了一半才发现非法
+            try:
+                validate_group_names(new_group)
+            except ValueError as exc:
+                QMessageBox.warning(self, tr("分组名非法"), str(exc))
+                return
             meta['group'] = new_group
         for key, edit in self._batch_meta_edits.items():
             val = edit.text().strip()

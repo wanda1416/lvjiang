@@ -776,9 +776,15 @@ class _DataOpsMixin:
     def _resolve_find_image_target(
         self, target,
     ) -> tuple[str, float | None, int, int, bool]:
-        """解析 find 模板来源；Region 即便 disabled 也可作为纯模板载体。"""
+        """解析 find 模板来源；Region 即便 disabled 也可作为纯模板载体。
+
+        按名引用（字符串 / 变量）时没有布局绑定，录制尺寸要从别处取——见
+        :meth:`_named_template_record`，否则换分辨率就会静默失配。
+        """
         if not isinstance(target, EntityRef):
-            return str(self._resolve(target)), None, 0, 0, False
+            name = str(self._resolve(target))
+            record_w, record_h = self._named_template_record(name)
+            return name, None, record_w, record_h, False
         scene = target.scene
         key = target.entity
         region = next(
@@ -797,3 +803,33 @@ class _DataOpsMixin:
             region.template.record_w, region.template.record_h,
             region.template.allow_inverted,
         )
+
+    def _named_template_record(self, name: str) -> tuple[int, int]:
+        """按名模板的录制尺寸：索引 → 当前布局里同名绑定 → 未登记(0, 0)。
+
+        ``templates.yaml`` 只登记没有布局绑定的普通分组模板；布局分组的尺寸权威在
+        Layout 绑定里，所以按名引用它们时从**当前布局**取——脚本本来就只在特定布局
+        下跑，跨布局换算没有意义。两处都没有就返回 0，维持"按原始像素匹配"的旧行为。
+        """
+        from ...core.recognizers.template_locator import normalize_template_name
+        from ...core.templates import load_index
+
+        try:
+            base = normalize_template_name(name)
+        except ValueError:
+            return 0, 0
+        entry = load_index().get(base) or {}
+        width = int(entry.get("record_w") or 0)
+        height = int(entry.get("record_h") or 0)
+        if width > 0 and height > 0:
+            return width, height
+
+        regions = getattr(self._layout, "regions", None)
+        if isinstance(regions, dict):
+            for scene_regions in regions.values():
+                for region in scene_regions:
+                    binding = getattr(region, "template", None)
+                    if (binding is not None and binding.name == base
+                            and binding.record_w > 0 and binding.record_h > 0):
+                        return int(binding.record_w), int(binding.record_h)
+        return 0, 0

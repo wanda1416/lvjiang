@@ -66,6 +66,8 @@ def locate(frame_bgr, tpl, x1, y1, x2, y2, scales=(1.0,), min_score=DEFAULT_MIN_
 - 录制时画布 1920 px，当前画布 1920 px → scale = 1.0
 - 录制时 1920，当前 1080（投屏/手机）→ scale ≈ 0.5625
 - `record_w = 0` → 返回 1.0（**不做跨分辨率适配**，桌面录的模板放手机上会不命中）
+  按名引用（`by image "名字"`）的模板没有布局绑定，`record_w` 由运行期先查
+  `templates/templates.yaml`、再查当前布局里同名绑定得到；都没有才落到这一档。
 
 **为什么不做多尺度金字塔**：律匠的 Region 是**归一化坐标**，模板绑定携带 `record_w/record_h`，"录制画布宽 → 当前画布宽"是**精确的线性映射**，一个尺度就能覆盖所有分辨率。加金字塔只会拖慢搜索（每层跑一次 matchTemplate）+ 引入误命中风险（多层峰值竞争）。
 

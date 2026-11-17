@@ -296,6 +296,66 @@ def test_engine_find_region_binding_uses_layout_record_size(
     assert hit.w_ratio == pytest.approx(40 / 640)
 
 
+def test_find_by_name_uses_index_record_size(tmp_path, monkeypatch):
+    """按名模板的录制尺寸来自 templates.yaml：1280 录的图在 640 画布上要缩一半。"""
+    from lvjiang.core import templates as tlib
+
+    icon40 = _icon(40)
+    icon80 = cv2.resize(icon40, (80, 80), interpolation=cv2.INTER_LINEAR)
+    # 带分组前缀的名字：先建子目录再写图，否则 imwrite 静默失败
+    grouped = tmp_path / "common" / "big.png"
+    grouped.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(grouped), icon80)
+    monkeypatch.setattr(tl, "_STORE", tl.TemplateStore(tmp_path))
+    monkeypatch.setattr(tlib, "load_index", lambda *_a, **_k: {
+        "common/big": {"record_w": 1280, "record_h": 720}})
+    eng = _engine_with(_frame_with_icon(icon40, at=(300, 120)))
+
+    hit = _run(eng, 'find as $hit by image "common/big"\n')["hit"]
+
+    assert isinstance(hit, FoundRegion)
+    assert hit.w_ratio == pytest.approx(40 / 640)
+
+
+def test_find_by_name_falls_back_to_current_layout_binding(tmp_path, monkeypatch):
+    """没有索引条目时，用当前布局里同名绑定的录制尺寸（布局分组模板的权威在 Layout）。"""
+    from lvjiang.core import templates as tlib
+
+    icon40 = _icon(40)
+    icon80 = cv2.resize(icon40, (80, 80), interpolation=cv2.INTER_LINEAR)
+    monkeypatch.setattr(tl, "_STORE", _store(tmp_path, "big", icon80))
+    monkeypatch.setattr(tlib, "load_index", lambda *_a, **_k: {})
+    eng = _engine_with(_frame_with_icon(icon40, at=(300, 120)))
+    eng._layout.regions = {
+        "game_menu_page": [
+            Region("back", 0, 0, 0, 0, disabled=True,
+                   template=TemplateBinding("big", 0.8, 1280, 720)),
+        ],
+    }
+
+    hit = _run(eng, 'find as $hit by image "big"\n')["hit"]
+
+    assert isinstance(hit, FoundRegion)
+    assert hit.w_ratio == pytest.approx(40 / 640)
+
+
+def test_find_by_name_without_record_keeps_original_size(
+    tmp_path, monkeypatch,
+):
+    """索引与布局都没有尺寸 → 仍按原始像素匹配（旧的同分辨率行为不变）。"""
+    from lvjiang.core import templates as tlib
+
+    icon40 = _icon(40)
+    monkeypatch.setattr(tl, "_STORE", _store(tmp_path, "plain", icon40))
+    monkeypatch.setattr(tlib, "load_index", lambda *_a, **_k: {})
+    eng = _engine_with(_frame_with_icon(icon40, at=(300, 120)))
+
+    hit = _run(eng, 'find as $hit by image "plain"\n')["hit"]
+
+    assert isinstance(hit, FoundRegion)
+    assert hit.w_ratio == pytest.approx(40 / 640)
+
+
 def test_engine_find_image_region_binding_requires_template(synthetic_store):
     eng = _engine_with(_frame_with_icon(synthetic_store))
     eng._layout.get_scene_regions.return_value = [

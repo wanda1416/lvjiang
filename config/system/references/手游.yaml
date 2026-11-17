@@ -33,88 +33,88 @@ references:
   label: 彩狗粮
   meta:
     group: 调律材料
-    level: '110'
+    level: 110
   source: screenshot
   notes: ''
 - file: D9C93ECE.png
   label: 装备碎片
   meta:
-    level: '110'
+    level: 110
     group: 装备培养
   source: screenshot
   notes: ''
 - file: 4E8AEBCB.png
   label: 金狗粮
   meta:
-    level: '110'
+    level: 110
     group: 调律材料
   source: screenshot
   notes: ''
 - file: CDC5D1DF.png
   label: 止戈定音石
   meta:
-    level: '110'
+    level: 110
     group: 定音转律
   source: screenshot
   notes: ''
 - file: D65E7DA0.png
   label: 啸玉
   meta:
-    level: '110'
+    level: 110
     group: 装备培养
   source: screenshot
   notes: ''
 - file: AF81246E.png
   label: 定音石
   meta:
-    level: '110'
+    level: 110
     group: 定音转律
   source: screenshot
   notes: ''
 - file: 1D6D85DB.png
   label: 传律石
   meta:
-    level: '110'
+    level: 110
     group: 装备培养
   source: screenshot
   notes: ''
 - file: 71F982EC.png
   label: 承音石
   meta:
-    level: '110'
+    level: 110
     group: 装备培养
   source: screenshot
   notes: ''
 - file: B3D1F2D7.png
   label: 止戈变音石
   meta:
-    level: '110'
+    level: 110
     group: 定音转律
   source: screenshot
   notes: ''
 - file: 3C2AFA55.png
   label: 转律石
   meta:
-    level: '110'
+    level: 110
     group: 定音转律
   source: screenshot
   notes: ''
 - file: 4BC52A1E.png
   label: 紫狗粮
   meta:
-    level: '110'
+    level: 110
     group: 调律材料
   source: screenshot
   notes: ''
 - file: 655A3918.png
   label: 大律准石
   meta:
-    level: '110'
+    level: 110
     group: 调律材料
   source: screenshot
   notes: ''
 - file: F77FFD73.png
-  label: 溯玉
+  label: 振玉·溯
   meta:
     group: 装备培养
   source: screenshot
@@ -134,7 +134,7 @@ references:
 - file: 453D365A.png
   label: 小律准石
   meta:
-    level: '110'
+    level: 110
     group: 调律材料
   source: screenshot
   notes: ''

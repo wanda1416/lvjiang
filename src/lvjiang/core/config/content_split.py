@@ -222,8 +222,9 @@ def _build_plan(roots: dict[str, Path]) -> _Plan:
                     replace=plan.key(layer, rel) in plan.deletes,
                 )
             if "disabled" in data:
-                desired = set(groups.get(group, {}).get("disabled") or [])
-                for scene in groups.get(group, {}).get("items") or []:
+                layer_view = groups if layer == "local" else old[layer]
+                desired = set(layer_view.get(group, {}).get("disabled") or [])
+                for scene in layer_view.get(group, {}).get("items") or []:
                     if owners.get(scene) != group:
                         continue
                     target = f"scenes/{group}/{scene}.yaml"
@@ -234,7 +235,9 @@ def _build_plan(roots: dict[str, Path]) -> _Plan:
                         else plan.read(layer, target)
                     )
                     if raw is None and layer == "local":
-                        raw = plan.read("system", target)
+                        system_key = plan.key("system", target)
+                        raw = (_decode(plan.writes[system_key]) if system_key in plan.writes
+                               else plan.read("system", target))
                     if raw is None:
                         continue
                     doc = _yaml(raw)

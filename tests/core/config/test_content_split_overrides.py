@@ -79,6 +79,7 @@ def test_existing_local_coordinate_override_survives_upgrade(
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
     manifest = load_scene_manifest(resolver)
     group = next(k for k, items in manifest.groups.items() if "activity_main" in items)
+    assert group == "activity"
     reg = SceneRegistry(
         resolver=resolver,
         scene_order=manifest.order,
@@ -88,7 +89,6 @@ def test_existing_local_coordinate_override_survives_upgrade(
     with (
         patch.object(registry_module, "get_registry", return_value=reg),
         patch.object(storage, "get_resolver", return_value=resolver),
-        patch.object(storage, "_scene_group_of", return_value=group),
     ):
         layout = storage.load_layout_by_key("desktop")
     actual = layout.regions["activity_main"][0].x_ratio

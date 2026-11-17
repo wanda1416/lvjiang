@@ -160,3 +160,59 @@ def test_explicit_repair_preserves_original_and_refuses_different_target(tmp_pat
         )
     )
     assert base64.b64decode(record["originals"][f"local/{source}"]) == raw
+
+
+def test_two_legacy_layers_keep_disabled_overlay_out_of_system(tmp_path):
+    import yaml
+    system, local = tmp_path / "system", tmp_path / "local"
+    _build_legacy(system)
+    registry = yaml.safe_load((system / "scenes.yaml").read_text(encoding="utf-8"))
+    registry["scenes"]["map"]["disabled"] = ["map_common"]
+    _write_yaml(system / "scenes.yaml", registry)
+    _write_yaml(local / "scenes.yaml", {"scenes": {"map": {
+        "disabled": {"__removed__": ["map_common"]}}}})
+    split.ensure_content_split(system, local)
+    assert yaml.safe_load((system / "scenes/map/map_common.yaml").read_bytes())["disabled"] is True
+    assert yaml.safe_load((local / "scenes/map/map_common.yaml").read_bytes())["disabled"] is False
+    resolver = ConfigResolver(config_dir=tmp_path, system_dir=system, local_dir=local, dev_mode=False)
+    manifest = load_scene_manifest(resolver)
+    reg = SceneRegistry(resolver=resolver, scene_order=manifest.order,
+                        group_config=manifest.groups, group_names=manifest.group_names)
+    assert not reg.get_scene("map_common").disabled
+
+
+def test_layout_full_metadata_partial_override_and_alias_use_migrated_coordinates(tmp_path, monkeypatch):
+    from lvjiang.core.layout import storage
+    from lvjiang.core.layout.config import load_layout_doc, load_layout_entries
+    from lvjiang.core.scene import registry as registry_module
+
+    system, local = tmp_path / "system", tmp_path / "local"
+    system_tree(system)
+    _write_yaml(system / "layouts/desktop.yaml", {
+        "name": "Desktop", "env": "desktop", "desc": "官方说明", "aspect": "16:9",
+        "canvas": {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1}})
+    _write_yaml(local / "layouts.yaml", {"layouts": {
+        "desktop": {"desc": "", "canvas": {"x_ratio": 0.2}},
+        "alias": {"name": "Alias", "extends": "desktop", "aspect": "4:3", "aspect_tolerance": 0.02,
+                  "canvas": {"x_ratio": 0, "y_ratio": 0, "w_ratio": 0.8, "h_ratio": 1}}}})
+    coords = {"regions": [{"key": "btn", "x_ratio": 0.75, "y_ratio": 0.2, "w_ratio": 0.15, "h_ratio": 0.4}]}
+    _write_json(local / "layouts/desktop/activity_main.json", coords)
+    raw = (local / "layouts/desktop/activity_main.json").read_bytes()
+    split.ensure_content_split(system, local)
+    resolver = ConfigResolver(config_dir=tmp_path, system_dir=system, local_dir=local, dev_mode=False)
+    document = load_layout_doc(resolver)["layouts"]
+    assert document["desktop"]["canvas"] == {"x_ratio": 0.2, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1}
+    assert document["desktop"]["desc"] == ""
+    assert document["desktop"]["env"] == "desktop"
+    assert document["alias"]["aspect"] == "4:3"
+    assert document["alias"]["aspect_tolerance"] == 0.02
+    assert load_layout_entries(resolver)["alias"].env == "desktop"
+    manifest = load_scene_manifest(resolver)
+    reg = SceneRegistry(resolver=resolver, scene_order=manifest.order,
+                        group_config=manifest.groups, group_names=manifest.group_names)
+    monkeypatch.setattr(storage, "get_resolver", lambda: resolver)
+    monkeypatch.setattr(registry_module, "get_registry", lambda: reg)
+    layout = storage.load_layout_by_key("alias")
+    assert layout.regions["activity_main"][0].x_ratio == 0.75
+    assert layout.canvas.w_ratio == 0.8
+    assert (local / "layouts/desktop/activity/activity_main.json").read_bytes() == raw

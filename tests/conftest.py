@@ -135,17 +135,21 @@ def _initialize_scene_registry_from_real_config(tmp_path_factory):
     """
     import shutil
 
+    from lvjiang import constants
     from lvjiang.core.config import resolver
+    from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
     from lvjiang.core.scene.registry import initialize_scene_registry
 
     root = tmp_path_factory.mktemp("published-config")
     source = Path(__file__).parents[1] / "config" / "system"
     shutil.copytree(source, root / "system")
+    shutil.copytree(source.parent / "i18n", root / "i18n")
     (root / "local").mkdir()
     with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(resolver, "_resolver", resolver.ConfigResolver(
-            config_dir=root, system_dir=root / "system", local_dir=root / "local",
-            dev_mode=False))
+        patch.setattr(constants, "CONFIG_DIR", root)
+        patch.setitem(CONFIG_SUBDIRECTORIES, "system", Path("system"))
+        patch.setitem(CONFIG_SUBDIRECTORIES, "local", Path("local"))
+        patch.setattr(resolver, "_resolver", resolver.ConfigResolver(config_dir=root, dev_mode=False))
         initialize_scene_registry()
         yield
 
@@ -252,11 +256,16 @@ def _reload_plugin_configuration() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_session_store(tmp_path, monkeypatch):
+def _isolate_session_store(tmp_path, tmp_path_factory, monkeypatch):
     """每个用例使用独立的 session.json 和插件会话目录。"""
     from lvjiang import constants
+    from lvjiang.core.config.resolver import get_resolver
     from lvjiang.core.config.session import reset_session_store
+    from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 
+    monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path_factory.mktemp("runtime-local"))
+    get_resolver().clear_read_cache()
+    get_resolver().reset_edit_baselines()
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "session")
     monkeypatch.setattr(constants, "OUTPUT_DIR", tmp_path / "logs" / "output")
     monkeypatch.setattr(

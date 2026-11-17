@@ -125,8 +125,12 @@ docs/60-userguide/09-faq-and-feedback.md），标识落在那里会让匿名性
 
 空间列表没有名册文件，由**目录扫描**得出：
 `config/system/references/*.yaml` ∪ `config/local/references/*.yaml`，
-文件名即空间名。落一个 yaml 就是新增一个空间，作者新增的系统空间无需用户
-删除本地文件即可见。两层同名 = local 是 system 的覆盖层，不是第二个空间。
+文件名即空间 **key**（`android` / `desktop` …，与布局根、环境、模板命名空间
+同名）。落一个 yaml 就是新增一个空间，作者新增的系统空间无需用户删除本地文件
+即可见。两层同名 = local 是 system 的覆盖层，不是第二个空间。
+key 只用于路径、`actives.space`、`plans[].space` 与比较；界面显示的是 yaml 顶层
+`name` 的本地化文本（`{"zh_CN": "手游", "en_US": "Mobile"}`），由
+`ReferenceDatabase.space_label()` 解析。
 
 system 层扫出的空间即**系统空间**（`is_system_space()`）：用户模式下可以改其中
 内容，但不能删除该空间——图库管理器的空间下拉将其置灰，「删除空间」按钮禁用

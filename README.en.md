@@ -6,7 +6,7 @@
 
 LvJiang is a desktop automation tool built on computer vision, using a "generic engine + plugins" architecture. It performs tedious operation flows automatically by capturing screenshots of a desktop window, running OCR, and simulating clicks. It works on **PC** (mainly Windows; macOS supports ADB mode) and on **Android phones** (the LvJiang APK runs standalone on the device). It **never reads process memory, never injects into the game process, and never uploads your game data**, which keeps anti-cheat risk out of the picture.
 
-The built-in plugin targets 《燕云十六声》 (*Where Winds Meet*) gear tuning, and the plugin mechanism can be extended to other games and scenarios.
+The built-in plugin targets Where Winds Meet gear tuning, and the plugin mechanism can be extended to other games and scenarios.
 
 > **Current status**: LvJiang can drive a PC game window directly (including background capture), drive Android through **screen mirroring**, an **Android emulator** or **ADB**, and run standalone on a phone via the LvJiang APK. When operating a PC game window directly, start LvJiang as administrator.
 
@@ -37,7 +37,7 @@ The built-in plugin targets 《燕云十六声》 (*Where Winds Meet*) gear tuni
 - **i18n**: `tr()` covers the core modules and the UI ships 12 languages (简体中文, 繁體中文, English, 日本語, 한국어, Deutsch, Français, Español, Português, Русский, ไทย, Tiếng Việt), either following the system language or selected manually in settings.
 - **Editor support**: a VS Code extension (`editors/vscode/lvjiang-wf`) provides `.wf` syntax highlighting, completion, go-to-definition and cross-file diagnostics. It is read-only: it never saves or runs a script for you.
 
-### 《燕云十六声》 plugin
+### Where Winds Meet plugin
 
 - **Gear data management**: player profiles (SQLite) and a gear pool, scanning of worn and bagged gear, OCR affix parsing, fingerprint de-duplication, and wearing, removing, copy-correcting and exporting of real or simulated gear.
 - **Auto-tuning**: bag scrolling traversal with fps data-completeness checks, batch filtering and fine-tuning; tuning history and a live overview covering the affix inheritance (承音), transmutation (转律) and dual dingyin (定音) models, plus material (传律石) estimates for gear progression.
@@ -46,7 +46,7 @@ The built-in plugin targets 《燕云十六声》 (*Where Winds Meet*) gear tuni
 - **Loadout plans**: draft editing with explicit saving and pre-filtering of invalid candidates by school rules.
 - **Daily task workflows**: orchestration of daily activities such as Jianghu Command, the No-Grind Shop and daily check-in.
 
-### Mobile app (bundled with the 《燕云十六声》 plugin)
+### Mobile app (bundled with the Where Winds Meet plugin)
 
 - **Standalone execution**: the LvJiang APK ships a Material 3 four-section workbench (Workbench / Tasks / Users / Settings) that runs single and batch tasks on the phone without a PC.
 - **Batch and unattended runs**: pick tasks, users and units by configuration group, with drag-ordering, round counts and unattended mode; pause, resume and stop control the whole batch.
@@ -83,7 +83,7 @@ Action performed on PC or phone
 | i18n | `src/lvjiang/i18n/`, `config/i18n/` | Runtime `tr()` translation, 12 language tables and Qt standard-dialog translations |
 | UI | `src/lvjiang/ui/` | PyQt6 main window, scene editor, recognition test, script workbench, batch, mobile device, account dialogs and run control |
 | Plugins | `src/lvjiang/apps/<name>/` | Game/scenario plugins (recognizers, workflows, UI tabs) |
-| 《燕云十六声》 plugin | `src/lvjiang/apps/yysls/` | Gear management, scoring, tuning, material recognition, graduation rate, loadouts, smart tuning and its UI (config/ + core/ + workflows/ + sync/ + ui/) |
+| Where Winds Meet plugin | `src/lvjiang/apps/yysls/` | Gear management, scoring, tuning, material recognition, graduation rate, loadouts, smart tuning and its UI (config/ + core/ + workflows/ + sync/ + ui/) |
 | On-device | `src/lvjiang/core/ondevice/`, `android/` | Android standalone runtime: accessibility capture/gesture bridge, device-side rapidocr adapter, Kotlin host project |
 
 See the [architecture docs](docs/30-architecture/README.md) and the [DSL grammar reference](docs/30-architecture/32-grammar/README.md) for more detail. (Both are in Chinese.)
@@ -141,7 +141,7 @@ lvjiang/
 │   │   └── notices/           # Announcements / updates / about / feedback
 │   └── apps/                  # Plugin registry
 │       ├── base.py            # AppHooks dataclass
-│       └── yysls/             # 《燕云十六声》 plugin
+│       └── yysls/             # Where Winds Meet plugin
 │           ├── config/        # Config management (manager / profile / graduation sessions / playstyles)
 │           ├── core/          # Core business logic
 │           │   ├── agent/         # Smart tuning
@@ -203,7 +203,7 @@ lvjiang/
 
 - **OS**: Windows (window mode and background capture rely on Win32 APIs), macOS 11+ (ADB mode; window mode is not implemented) or an Android 8.0+ device running the LvJiang APK
 - **Python**: 3.11–3.12 (3.11 is the first version with high-precision `time.sleep` on Windows, which precise timing such as training-dummy damage measurement depends on; RapidOCR 1.4.4 requires Python <3.13)
-- **Game**: 《燕云十六声》, with any one of these setups:
+- **Game**: Where Winds Meet, with any one of these setups:
   - **Mobile game**: **screen mirroring** (a PC-side window that can be captured and that forwards mouse clicks to the phone — vivo's built-in mirroring is the reference, not a brand requirement) or **ADB mode** (USB / wireless debugging enabled on the phone, optionally with the scrcpy video stream)
   - **PC game**: capture the game window directly, in the foreground or in the background (PostMessage, background capture)
 
@@ -244,7 +244,7 @@ Key dependencies: `PyQt6`, `mss`, `pynput`, `rapidocr-onnxruntime`, `onnxruntime
 # Option 1: generic engine only (scene editing + recognition tests)
 python -m lvjiang
 
-# Option 2: load the 《燕云十六声》 plugin (generic engine + gear tuning)
+# Option 2: load the Where Winds Meet plugin (generic engine + gear tuning)
 python -m lvjiang -reg yysls
 
 # Option 3: Windows helper script (sets PYTHONPATH, loads no plugin by default)

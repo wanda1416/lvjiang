@@ -187,6 +187,38 @@ def _season_table(gc) -> dict:
     }
 
 
+def _playstyle_affix_table(gc) -> dict[str, list[str]]:
+    """每个玩法在模拟计算器里值得列出的普通词条（PC ``build_calculator`` 口径）。
+
+    PC ``_populate_counts``：对包含当前玩法的每条调律规则，保留 `pool_set`
+    或动态别名归类（本属/外属视角）命中的词条，再并上玩法的主/副伤害词条。
+    这里按全量普通词条预计算**玩法侧集合**——部位/等级合法性由网页端拿
+    ``normal_candidates`` 再交一次，两边相乘才是 PC 的最终列表。
+    """
+    from lvjiang.apps.yysls.core.tuning_rules.manager import get_tuning_rule_manager
+    from lvjiang.apps.yysls.core.tuning_rules.models import dynamic_affix_map
+
+    normal = list(gc.get_normal_affix_names())
+    rules = list(get_tuning_rule_manager().get_rules().values())
+    table: dict[str, list[str]] = {}
+    for name, cfg in gc.get_playstyles().items():
+        aliases = dynamic_affix_map(str(cfg.get("attr") or ""), game_config=gc)
+        keep: set[str] = set()
+        for rule in rules:
+            if name not in rule.playstyles:
+                continue
+            pool = rule.pool_set
+            keep.update(affix for affix in normal
+                        if affix in pool or aliases.get(affix) in pool)
+        for key in ("main_damage", "sub_damage"):
+            value = str(cfg.get(key) or "")
+            if value:
+                keep.add(value)
+        if keep:
+            table[name] = sorted(keep)
+    return table
+
+
 def build_config() -> dict:
     """算出完整规则表（不落盘）——测试用它重新算一份与提交的产物比对。"""
     gc = get_game_config()
@@ -250,6 +282,7 @@ def build_config() -> dict:
             }
             for name in sorted(set(gc.get_normal_affix_names()) | set(first_affix_names))
         },
+        "playstyle_affixes": _playstyle_affix_table(gc),
     }
 
     config = {

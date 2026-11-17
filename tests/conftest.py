@@ -127,18 +127,27 @@ def _isolated_instance_id(tmp_path_factory):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _initialize_scene_registry_from_real_config():
-    """场景注册表是懒加载的：会话开头先按真实配置初始化一次。
+def _initialize_scene_registry_from_real_config(tmp_path_factory):
+    """真实发布内容在隔离根初始化；读取/重载不得迁移开发者的 local。
 
-    它以前在模块导入时就构造，测试天然拿到仓库里的真实场景。改成显式初始化后，
-    「第一个碰它的用例」决定全局内容——xdist 并行时可能是某个用 tmp 配置的用例，
-    之后整条 worker 上的场景/布局校验都对着错误数据跑（``test_system_wf_refs_gate``
-    报「区域未绑定」「子场景引用未定义」正是这个症状）。这里在任何用例之前固定一次
-    真实配置，让每个 worker 的起点一致。
+    不能只在 initialize 时临时替换 get_root_resolver：后续插件回调和 reload
+    也必须落回同一隔离根。用例自己的 monkeypatch 结束后恢复到此基线。
     """
+    import shutil
+
+    from lvjiang.core.config import resolver
     from lvjiang.core.scene.registry import initialize_scene_registry
 
-    initialize_scene_registry()
+    root = tmp_path_factory.mktemp("published-config")
+    source = Path(__file__).parents[1] / "config" / "system"
+    shutil.copytree(source, root / "system")
+    (root / "local").mkdir()
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(resolver, "_resolver", resolver.ConfigResolver(
+            config_dir=root, system_dir=root / "system", local_dir=root / "local",
+            dev_mode=False))
+        initialize_scene_registry()
+        yield
 
 
 @pytest.fixture(autouse=True)

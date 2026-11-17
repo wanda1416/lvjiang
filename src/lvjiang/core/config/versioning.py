@@ -54,6 +54,9 @@ register_versioned_dir("layouts", "*.yaml", depth=1)
 register_versioned_dir("layouts", "*.json", depth=3)
 register_versioned_dir("maps", "map.yaml", depth=2)
 register_versioned_dir("workflows", "*.wf", depth=0, has_content_version=False)
+# 模板索引：聚合配置，带 content_version，参与在线下发与修订索引；
+# 模板 PNG 与 .wf 同类——文件本身不带修订号，随整包修订下发，不进 content 索引。
+register_versioned_file("templates/templates.yaml")
 register_versioned_file("ocr.yaml")
 # 目录化顺序描述文件（scenes/layouts 拆分后唯一的顶层顺序来源）
 register_versioned_file("scenes/_meta.json")

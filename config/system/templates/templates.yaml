@@ -1,0 +1,10 @@
+content_version: 1
+version: 1
+templates:
+  common/tracked_person_avatar:
+    record_w: 2800
+    record_h: 1260
+  common/locked:
+    role: sample
+  common/unlock:
+    role: sample

@@ -94,7 +94,11 @@ def register_registry_list_paths(rel_path: str, paths: tuple[str, ...]) -> None:
 #:
 #: 键为聚合文件相对路径，值为允许删除的**父路径**模式（点分，``*`` 匹配单层
 #: 任意键）；``""`` 表示顶层。删除 layouts.<名字> 就写 "layouts"。
-DELETABLE_PATHS: dict[str, tuple[str, ...]] = {}
+DELETABLE_PATHS: dict[str, tuple[str, ...]] = {
+    # 模板索引：条目随模板图一起增删，系统侧的条目也必须允许被删掉
+    # （删系统模板要开发模式；用户删除只会清自己的 local 影子）。
+    "templates/templates.yaml": ("templates",),
+}
 
 #: 受保护的**列表**：系统条目不允许被移除，但可以改值、可以新增。
 #:

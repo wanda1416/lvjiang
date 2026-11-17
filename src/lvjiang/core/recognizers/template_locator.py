@@ -82,12 +82,17 @@ def write_template(name: str, image: np.ndarray) -> Path:
         f"{TEMPLATES_REL_DIR}/{base}.png", encoded.tobytes())
 
 
-def delete_template(name: str) -> bool:
-    """删除当前身份可写层的模板 PNG；不越权删除系统下发内容。"""
+def delete_template(name: str, resolver=None) -> bool:
+    """删除当前身份可写层的模板 PNG；不越权删除系统下发内容。
+
+    ``resolver`` 显式传入时在该配置层上操作（模板图库把同一个解析器贯穿到底，
+    测试也能指向临时目录）。
+    """
     base = normalize_template_name(name)
     rel_path = f"{TEMPLATES_REL_DIR}/{base}.png"
-    from ..config.resolver import get_resolver
-    resolver = get_resolver()
+    if resolver is None:
+        from ..config.resolver import get_resolver
+        resolver = get_resolver()
     if resolver.is_dev_mode():
         existed = (resolver.system_dir / rel_path).is_file()
         resolver.delete_entity(rel_path)

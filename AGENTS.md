@@ -1,10 +1,25 @@
 # AI Agent 协作规范
 
-本文件适用于整个仓库；目录内若有更具体的 `AGENTS.md`，以它为准。工作区存在独立的
-`admin/` 子仓库时，开始任务前必须读取 [`admin/AGENTS.md`](admin/AGENTS.md)（开发机凭据、
-Android 发行签名、真机通道、SSH），各仓库分别管理改动、提交与推送。发布清单与操作手册以
+本文件适用于整个仓库；目录内若有更具体的 `AGENTS.md`，以它为准。发布清单与操作手册以
 [`packaging/readme.md`](packaging/readme.md) 为唯一完整来源；本文件只规定授权边界、项目
 事实与执行门禁。
+
+### 子仓库检出约束（开工前先做）
+
+本工作区可能同时检出多个**相互独立的 Git 仓库**：`admin/`、`admin/site/`、`config/local/`、
+`config/session/`、`plugins/`、`server/`、`face_morph/`。判定方式是看该目录下是否有 `.git`
+（`git -C <目录> rev-parse --show-toplevel`），不要凭目录名或外层 `git status` 猜。
+
+- **检出 `admin/` 目录时，开始任务前必须再读 [`admin/AGENTS.md`](admin/AGENTS.md)**，之后
+  才能动 `admin/` 里的任何文件；该文件记录了开发机凭据、Android 发行签名、真机通道、SSH
+  与子仓库规范的完整说明。
+- 其余子仓库检出时同样先读它自己的 `AGENTS.md`（如 `config/session/AGENTS.md`、
+  `server/AGENTS.md`），没有则读该目录的 `README.md`。
+- 各仓库分别暂存、提交、推送：子仓库的改动不进入外层提交，外层 `git add` 也不得越界到
+  子仓库；一次任务跨多个仓库时按仓库分别提交、分别说明。子仓库的远端、分支与忽略规则以
+  它自己的配置为准，完整清单与边界见 `admin/AGENTS.md` 的「子仓库规范」。
+- 外层 `git status` 里不应出现子仓库条目；一旦出现（例如 `?? admin/`），说明忽略规则失效，
+  先修 `.gitignore` 再继续，不要用 `git add -f` 硬加。
 
 ## 一、操作授权
 

@@ -334,7 +334,7 @@ yysls:
   金色: Gold
   刷新: Refresh
   角色详情功能开发中: Character details under development…
-  燕云: "Yan Yun"
+  燕云: "WWM"
   调律配置: Tuning Config
   词组: "+ Phrase"
   词组_1: '- Phrase'
@@ -980,7 +980,7 @@ auto_strings:
   部位: Part
   金色: Gold
   刷新: Refresh
-  燕云: Yanyun
+  燕云: WWM
   调律配置: Tuning Config
   词组: Group
   上移: Move Up
@@ -1393,7 +1393,7 @@ auto_strings:
   当前阶段：等待下一件装备: 'Current Stage: Waiting for Next Equipment'
   当前阶段：等待开始: 'Current Stage: Waiting to Start'
   当前阶段：重置调律 — 重置完成，按新装备继续调律: 'Current Stage: Reset Tuning -- reset complete, continuing tuning as a new equipment'
-  律匠 - 燕云十六声装备调律工具: LvJiang - YYSLS Equipment Tuning Tool
+  律匠 - 燕云十六声装备调律工具: LvJiang - Where Winds Meet Equipment Tuning Tool
   御: Defense
   徵: Zhi
   必须同时绑定主武学和副武学: Both Main Martial and Off Martial must be bound
@@ -1554,7 +1554,7 @@ auto_strings:
   满词条，扫描完成: Affixes full; scan complete
   满调律: Fully Tuned
   漂移补滚后对齐失败: Alignment failed after drift compensation reroll
-  燕云十六声: Yan Yun Shi Liu Sheng
+  燕云十六声: Where Winds Meet
   牵丝: "Silkbind"
   环: Ring
   环 · 佩: Ring · Pendant

@@ -1,0 +1,64 @@
+#% id: gather_qingshisuo
+#% name: 刷青石锁
+#% runnable: true
+#% env: [android, desktop]
+#% requires: [device_gesture]
+#% note: |-
+#%   适用于 七次轮变-刷酒塔(全玩家通用版) 图纸，无限循环
+#%   面向精英怪背后，按固定节奏只暗杀（不拾取），再后跳复位（不做提示识别）
+#%   依赖「山月无影·三重」：它由默认心法自带，无需配置，也不占任何按键
+#%   最好将顶部背向的栅栏换成实体墙，否则容易后退起跳时卡脚
+#%   安卓端需要「设备端手势」：后跳那段是"后退键按住的同时按闪避"
+
+# 刷青石锁
+#
+# 一轮：暗杀精英怪（不拾取）→ 前跳两下 → 后跳闪避复位 → 武学技收招 → 前进归位。
+# 与刷虎骨酒同构，时序照搬原桌面脚本，只把表达方式换成跨端的写法。
+#
+# 与虎骨酒的两点差异：
+# 1. 不拾取：青石锁由暗杀直接掉落结算，没有「F」拾取环节，暗杀后直接进入跳跃；
+# 2. 依赖「山月无影·三重」，它由默认心法自带，只是生效前置，不占任何按键，
+#    脚本不需要为它多做动作；收招用的 Q 是武学技「千斤坠」。
+#
+# 原桌面脚本按键与实体的对应（见 general_combat 区域/点位定义）：
+# F = [general_combat].[assassinate] 暗杀；Q = [general_combat].[wuxueji] 千斤坠；
+# SPACE = [general_combat].[tiaoyue] 跳跃；SHIFT = [general_combat].[shanbi] 闪避；
+# W/S = 方向键，对应 [general_move].[move_forward] / [move_backward]。
+#
+# 两端差异只在"移动"这一项：桌面按 WASD，安卓推虚拟摇杆——它们不是同一个动作换
+# 绑定，而是两个不同动作（general_move 的方向是 arrow，arrow 没有 activation_key，
+# drag 在桌面不会转成按键）。其余动作都写 [场景].[实体]，各端按 activation_key
+# 自行决定按键还是触点，一份脚本两端通用。
+#
+# 前置：角色站在精英怪背后，面向它
+
+@start
+
+# ─── 暗杀（不拾取） ────────────────────────────────────
+# 按固定节奏盲打：不等「F」提示，靠等待吸收动画时长。青石锁不拾取，
+# 暗杀动作结束后直接进入前跳。
+click [general_combat].[assassinate] after wait 3.25
+
+# ─── 前跳 ──────────────────────────────────────────────
+# 两跳都是顺序动作，不需要时间线。
+click [general_combat].[tiaoyue] after wait 0.328
+click [general_combat].[tiaoyue] after wait 2.735
+
+# ─── 后跳复位 ──────────────────────────────────────────
+# 原桌面脚本靠 press "S" down / up 夹住一次 SHIFT 闪避，那种写法只有桌面能跑。
+# 两端只有第一路不同（桌面按 S、安卓推摇杆），用条目级 env 守卫表达；
+# 闪避写 [general_combat].[shanbi]，桌面转成 SHIFT、安卓点闪避按钮，共享一条。
+timeline
+    @0.0  env:"desktop" -> press "S" hold 0.563
+    @0.0  env:"android" -> drag [general_move].[move_backward] duration 0.1 hold 0.563
+    @0.062 click [general_combat].[shanbi]
+end
+
+# ─── 武学技收招：千斤坠（Q / 武学技按钮） ────────────────
+click [general_combat].[wuxueji] after wait 2.453
+
+# ─── 前进归位 ──────────────────────────────────────────
+env:"desktop" -> press "W" hold 0.828 after wait 2.578
+env:"android" -> drag [general_move].[move_forward] duration 0.1 hold 0.828 after wait 2.578
+
+goto start

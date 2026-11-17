@@ -1281,7 +1281,6 @@ profile_service:
 reference:
   '  未导入图片': '  No image imported'
   元数据字段定义已保存: Metadata field definitions saved
-  元数据定义: Metadata Definition
   全部删除: Delete All
   内置字段不可删除: Built-in fields cannot be deleted
   内置字段，不可编辑或删除: Built-in field, cannot be edited or deleted
@@ -1306,7 +1305,6 @@ reference:
   执行切割: Execute Split
   批量管理: Batch Management
   提交到图库: Submit to Gallery
-  新增参考图: Add Reference Image
   新增字段: Add Field
   新建图库空间: New Gallery Space
   新建空间: New Space

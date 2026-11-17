@@ -7,6 +7,7 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -14,6 +15,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QTabWidget,
     QToolBar,
     QVBoxLayout,
@@ -31,6 +33,30 @@ from .canvas import ReferenceCanvas
 from .combo_sizing import set_combo_minimum_character_capacity
 from .grid_panel import GridPanel
 from .meta_schema_panel import MetaSchemaPanel
+from .template_form_panel import TemplateFormPanel
+from .template_panel import TemplatePanel
+
+#: 右侧面板固定分配：画布 3 ∶ 右侧 2，且右侧有最小宽度，避免切换模式时重排
+_CANVAS_STRETCH = 3
+_RIGHT_STRETCH = 2
+_RIGHT_PANEL_MIN_WIDTH = 420
+
+#: 分段开关的共用样式：选中块上边距 +1、下边距 -1，视觉上压下去一格；
+#: 底色与边框都加深一档，与未选中的平铺态拉开层次（总高度不变，不会跳动）。
+_SEGMENT_BASE_STYLE = (
+    "QPushButton { background-color: palette(button); color: palette(button-text);"
+    " border: 1px solid palette(mid); padding: 4px 18px; font-weight: 600; }"
+    "QPushButton:hover { background-color: palette(midlight); }"
+    "QPushButton:checked { background-color: palette(midlight);"
+    " border: 1px solid palette(dark); padding: 5px 18px 3px 18px; }"
+)
+#: 左右两块只在外侧保留圆角、中间不留缝隙，读起来是一个控件
+_SEGMENT_CORNERS = (
+    "QPushButton { border-top-left-radius: 5px; border-bottom-left-radius: 5px;"
+    " border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }",
+    "QPushButton { border-top-right-radius: 5px; border-bottom-right-radius: 5px;"
+    " border-top-left-radius: 0; border-bottom-left-radius: 0; }",
+)
 
 _SPACE_COMBO_CHARACTER_CAPACITY = 6
 
@@ -51,7 +77,14 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
       - 元数据定义：定义名称/分组之外的 meta 字段
     """
 
-    def __init__(self, parent=None, screenshot_callback: Callable | None = None):
+    def __init__(self, parent=None, screenshot_callback: Callable | None = None,
+                 persist_ui_state: bool = True):
+        """``persist_ui_state=False`` 表示这是一次性实例（预览、测试、脚本）。
+
+        界面参数一律不落盘：窗口尺寸与网格默认值写在真实
+        ``config/session/interface.json``，测试或离屏预览改它等于污染用户配置，
+        所以由调用方显式关掉，而不是靠环境变量猜。
+        """
         super().__init__(parent)
         self.setWindowTitle(tr("图库管理"))
         self.resize(1200, 800)
@@ -71,6 +104,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._source_name = ""
         self._data_changed = False  # 跟踪是否有数据变动
         self._screenshot_callback = screenshot_callback
+        self._persist_ui_state = persist_ui_state
         self._init_ui()
         self._restore_window_size()
 
@@ -86,6 +120,8 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _save_window_size(self):
         """保存窗口大小到 interface.json（写入 ui_state.reference_manager）"""
+        if not self._persist_ui_state:
+            return
         try:
             from lvjiang.core.config import update_ui_page_state
             update_ui_page_state(
@@ -136,23 +172,30 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         # ── 顶级 Tab ──
         self._tabs = QTabWidget()
 
-        # Tab 1: 新增参考图（完整编辑工作流）
+        # Tab 1: 新增图像（右侧切换写参考图还是模板图）
         self._add_tab = self._build_add_tab()
-        self._tabs.addTab(self._add_tab, tr("新增参考图"))
+        self._tabs.addTab(self._add_tab, tr("新增图像"))
 
-        # Tab 2: 图库管理（浏览与编辑已有参考图）
+        # Tab 2: 参考图管理（浏览与编辑已有参考图）
         self._browser = BrowserPanel(self._db)
         self._browser.set_known_groups(self._db.get_groups())
         self._browser.refresh()
         self._browser.data_changed.connect(self._on_data_changed)
-        self._tabs.addTab(self._browser, tr("图库管理"))
+        self._tabs.addTab(self._browser, tr("参考图管理"))
 
-        # Tab 3: 元数据定义（定义名称/分组之外的 meta 字段）
+        # Tab 3: 参考图元数据（名称/分组之外的 meta 字段）
         self._meta_panel = MetaSchemaPanel(self._db)
         self._meta_panel.schema_changed.connect(self._on_schema_changed)
-        self._tabs.addTab(self._meta_panel, tr("元数据定义"))
+        self._tabs.addTab(self._meta_panel, tr("参考图元数据"))
 
+        # Tab 4: 模板图管理（分组 + 引用 + 所有权受控的操作）
+        self._template_panel = TemplatePanel()
+        self._template_panel.data_changed.connect(self._on_data_changed)
+        self._tabs.addTab(self._template_panel, tr("模板图管理"))
+
+        self._tabs.currentChanged.connect(self._on_tab_changed)
         main_layout.addWidget(self._tabs)
+        self._update_space_controls()
 
     # ── 图库空间切换 ──
 
@@ -324,9 +367,33 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     # ── Tab 1: 新增参考图 ──
 
     def _build_add_tab(self) -> QWidget:
-        """构建新增参考图 Tab 的完整 UI"""
+        """构建「新增图像」Tab：画布共用，右侧按目标切换参考图/模板图。"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
+
+        # 写入目标：同一张截图既可能切参考图，也可能截模板图。
+        # 两个互斥的切换按钮比下拉更直接（一眼看到只有两种选择、当前是哪个）。
+        target_row = QHBoxLayout()
+        target_row.setSpacing(0)
+        target_row.addWidget(QLabel(tr_label("写入目标")))
+        self._write_target = "reference"
+        self._target_group = QButtonGroup(self)
+        self._target_buttons: dict[str, QPushButton] = {}
+        for index, (key, text) in enumerate(
+                (("reference", tr("参考图")), ("template", tr("模板图")))):
+            button = QPushButton(text)
+            button.setCheckable(True)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            # 分段开关：两块拼成一个控件，选中那块用「下沉」的观感
+            button.setStyleSheet(
+                _SEGMENT_BASE_STYLE + _SEGMENT_CORNERS[index])
+            self._target_group.addButton(button)
+            self._target_buttons[key] = button
+            target_row.addWidget(button)
+        self._target_buttons["reference"].setChecked(True)
+        self._target_group.buttonClicked.connect(self._on_target_changed)
+        target_row.addStretch()
+        layout.addLayout(target_row)
 
         # 顶部工具栏
         toolbar = QToolBar()
@@ -375,17 +442,17 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         # 主体：画布 + 网格面板
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # 画布容器（包含信息栏 + 画布）
-        canvas_container = QWidget()
-        canvas_layout = QVBoxLayout(canvas_container)
-        canvas_layout.setContentsMargins(0, 0, 0, 0)
-        canvas_layout.setSpacing(2)
-
-        # 信息栏：显示区域规格和 cell 规格
+        # 信息栏放在画布与右侧面板之上：两列从同一条基线开始，不会错开
         self._info_label = QLabel(tr("未框选区域"))
         self._info_label.setStyleSheet("color: palette(mid); font-size: 11px;")
         self._info_label.setMaximumHeight(20)
-        canvas_layout.addWidget(self._info_label)
+        layout.addWidget(self._info_label)
+
+        # 画布容器
+        canvas_container = QWidget()
+        canvas_layout = QVBoxLayout(canvas_container)
+        canvas_layout.setContentsMargins(0, 0, 0, 0)
+        canvas_layout.setSpacing(0)
 
         self._canvas = ReferenceCanvas()
         self._canvas.region_changed.connect(self._on_region_changed)
@@ -419,10 +486,24 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         # 第三组：执行切割
         self._grid_panel.execute_requested.connect(self._on_execute_cut)
         self._grid_panel.submit_cells.connect(self._on_submit_cells)
-        splitter.addWidget(self._grid_panel)
+        # 模板图模式：单矩形裁剪 + 命名 + 录制尺寸 + 测试匹配
+        self._template_form = TemplateFormPanel()
+        self._template_form.saved.connect(self._on_template_saved)
 
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        # 右侧两块共用一个堆叠容器：容器宽高取两页的最大值，切换模式时
+        # 分割器不需要重新分配空间，画面不会跳一下
+        self._right_stack = QStackedWidget()
+        self._right_stack.addWidget(self._grid_panel)
+        self._right_stack.addWidget(self._template_form)
+        self._right_stack.setCurrentWidget(self._grid_panel)
+        self._right_stack.setMinimumWidth(_RIGHT_PANEL_MIN_WIDTH)
+        splitter.addWidget(self._right_stack)
+
+        # 固定分配：画布 3、右侧 2，切模式不改比例
+        splitter.setStretchFactor(0, _CANVAS_STRETCH)
+        splitter.setStretchFactor(1, _RIGHT_STRETCH)
+        splitter.setChildrenCollapsible(False)
+        self._add_splitter = splitter
 
         layout.addWidget(splitter)
         return widget
@@ -450,6 +531,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._source_name = path.split("/")[-1].split("\\")[-1]
         self._canvas.set_image(img)
         self._update_source_label()
+        self._sync_template_source()
 
     def _on_paste(self):
         from PyQt6.QtWidgets import QApplication
@@ -471,6 +553,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._source_name = "clipboard"
         self._canvas.set_image(bgr)
         self._update_source_label()
+        self._sync_template_source()
 
     def _on_screenshot(self):
         """通过回调截取当前窗口/设备截图，加载到画布"""
@@ -493,12 +576,14 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._source_name = "screenshot"
         self._canvas.set_image(new_image)
         self._update_source_label()
+        self._sync_template_source()
         logger.info(f"图库管理：截图载入画布 {new_image.shape[1]}x{new_image.shape[0]}")
 
     def _on_clear(self):
         self._canvas.clear_image()
         self._source_name = ""
         self._update_source_label()
+        self._sync_template_source()
 
     def _update_source_label(self):
         if self._source_name:
@@ -506,15 +591,86 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         else:
             self._source_label.setText(tr("  未导入图片"))
 
+    # ── 写入目标：参考图 / 模板图 ──
+
+    def _is_template_target(self) -> bool:
+        return self._write_target == "template"
+
+    def set_write_target(self, key: str) -> None:
+        """程序化切换写入目标（界面用上面的切换按钮，这里给外部/测试用）。"""
+        if key not in self._target_buttons:
+            raise ValueError(f"未知的写入目标: {key!r}")
+        self._write_target = key
+        for name, button in self._target_buttons.items():
+            button.setChecked(name == key)
+        self._on_target_changed()
+
+    def _on_target_changed(self, _button=None) -> None:
+        for name, button in self._target_buttons.items():
+            if button.isChecked():
+                self._write_target = name
+        template_mode = self._is_template_target()
+        # 两页共用同一个容器，切换只换显示内容；这里显式沿用切换前的分配，
+        # 连用户手动拖过的宽度也不会被重新协商
+        sizes = self._add_splitter.sizes()
+        self._right_stack.setCurrentWidget(
+            self._template_form if template_mode else self._grid_panel)
+        self._add_splitter.setSizes(sizes)
+        self._canvas.set_show_grid(
+            False if template_mode else self._canvas.get_grid_rect() is not None)
+        self._sync_template_source()
+        if template_mode:
+            self._template_form.refresh_groups()
+        self._update_space_controls()
+
+    def _sync_template_source(self) -> None:
+        """把画布图片与框选同步给模板表单（记录尺寸/裁剪都基于它）。"""
+        self._template_form.update_source(
+            self._canvas.get_image(), self._canvas.get_region_pixels())
+
+    def _on_template_saved(self, name: str) -> None:
+        self._data_changed = True
+        self._template_panel.refresh()
+        logger.info(f"模板图已保存: {name}")
+
+    # ── 页签切换与空间控件 ──
+
+    def _on_tab_changed(self, index: int) -> None:
+        if index == 3:
+            self._template_panel.refresh()
+        self._update_space_controls()
+
+    def _space_controls_apply(self) -> bool:
+        """当前页签/目标是否受「图库空间」影响（模板一律不受）。"""
+        index = self._tabs.currentIndex()
+        if index == 0:
+            return not self._is_template_target()
+        return index in (1, 2)
+
+    def _update_space_controls(self) -> None:
+        applies = self._space_controls_apply()
+        reason = tr("模板按分组存放，与图库空间无关")
+        for widget in (self._space_combo, self._btn_edit_space,
+                       self._btn_refresh_space, self._btn_new_space,
+                       self._btn_del_space):
+            widget.setEnabled(applies)
+            widget.setToolTip("" if applies else reason)
+
     # ── 画布事件 ──
 
     def _on_region_changed(self, x1, y1, x2, y2):
         """区域变化时启用/禁用切割按钮，更新信息栏"""
         has_region = (x2 - x1) > 0.01 and (y2 - y1) > 0.01
         self._grid_panel.set_execute_enabled(has_region)
+        self._sync_template_source()
         if has_region:
-            self._canvas.set_grid_size(self._grid_panel.rows, self._grid_panel.cols)
-            self._canvas.set_show_grid(True)
+            if self._is_template_target():
+                # 模板图只框一个矩形，不叠网格
+                self._canvas.set_show_grid(False)
+            else:
+                self._canvas.set_grid_size(
+                    self._grid_panel.rows, self._grid_panel.cols)
+                self._canvas.set_show_grid(True)
             # 启用全选/全不选按钮
             self._select_all_btn.setEnabled(True)
         else:
@@ -529,6 +685,8 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._update_info_label()
 
     def _on_grid_defaults_changed(self, grid: dict):
+        if not self._persist_ui_state:      # 预览/测试不改真实界面参数
+            return
         """五项网格参数手动改动后写入 interface.ui_state.reference_manager.grid。"""
         from lvjiang.core.config import save_reference_grid
         save_reference_grid(grid)

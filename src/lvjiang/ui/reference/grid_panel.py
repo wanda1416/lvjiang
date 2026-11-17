@@ -187,6 +187,8 @@ class GridPanel(QWidget):
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
+        # 与右侧模板表单共用同一个容器，四周边距必须一致，否则切换模式内容会跳
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
         # ── 第一组：网格参数 ──
         grid_group = QGroupBox(tr("网格参数"))

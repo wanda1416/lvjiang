@@ -38,7 +38,6 @@ reference:
   未填写: Not Filled
   未框选区域: No Area Selected
   清除网格: Clear Grid
-  激活空间: Active Space
   生成网格: Generate Grid
   留空则不修改: Leave empty to keep unchanged
   粘贴 (Ctrl+V): Paste (Ctrl+V)
@@ -61,5 +60,10 @@ reference:
   "批量分组": "Batch Group"
   "行": "Rows"
   "列": "Columns"
+  "分组名非法": "Invalid group name"
+  "编辑图库空间": "Edit Gallery Space"
+  "保存空间展示名失败，详见日志": "Failed to save the space display name; see the log"
+  "空间 key": "Space key"
+  "key 是目录名与方案里的引用，不可修改；要换 key 请新建空间。展示名留空则直接显示 key。": "The key is the directory name and how plans refer to this space, so it cannot be changed; create a new space if you need a different one. Leave the display name empty to show the key itself."
 user_avatar:
   导入图片: Import Image

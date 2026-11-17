@@ -12,7 +12,7 @@ import hashlib
 import os
 import tempfile
 import threading
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -148,6 +148,15 @@ def interprocess_lock(
         finally:
             depths.pop(key, None)
             _release_process_lock(process_lock)
+
+
+@contextmanager
+def locked_paths(*paths: Path):
+    """多文档按绝对路径稳定加锁，与单文档 state 锁共用；不持锁执行回调。"""
+    with ExitStack() as stack:
+        for path in sorted({p.resolve() for p in paths}):
+            stack.enter_context(interprocess_lock(path, suffix="state"))
+        yield
 
 
 def dated_output_dir(root: Path, started_at: datetime) -> Path:

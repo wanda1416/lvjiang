@@ -25,6 +25,7 @@ from pathlib import Path
 from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR, USERS_DIR
+from ..fs_util import atomic_write_bytes, locked_paths
 from . import client, dirty, registry
 from .client import SyncConflict, SyncError, post
 from .round_state import cloud_state, invalidate, version
@@ -112,9 +113,15 @@ def _read_bytes(document: LocalDocument) -> bytes:
     return document.path.read_bytes()
 
 
-def _write_bytes(document: LocalDocument, payload: bytes) -> None:
-    document.path.parent.mkdir(parents=True, exist_ok=True)
-    document.path.write_bytes(payload)
+def _write_bytes(document: LocalDocument, payload: bytes, *, expected: bytes | None) -> None:
+    if document.kind == "workflow":
+        from ..config.workflow_document import validate_workflow_document
+        validate_workflow_document(payload, document.path)
+    with locked_paths(document.path):
+        current = document.path.read_bytes() if document.path.exists() else None
+        if current != expected:
+            raise OSError(f"{document.path.name} 下行期间已被编辑，保留本地修改并稍后重试")
+        atomic_write_bytes(document.path, payload, prefix=".document-")
 
 
 def _conflict_copy(document: LocalDocument) -> bool:
@@ -194,6 +201,7 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
     ``raw`` 传入时不再逐份请求（批量拉取路径）；为 None 时按单份接口拉。
     """
     key = f"{document.label}/{document.kind}"
+    before = document.path.read_bytes() if document.path.exists() else None
     if raw is None:
         remote = client.pull(token, document.label, document.kind)
         raw = base64.b64decode(remote["payload_base64"])
@@ -213,7 +221,7 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
         saved = _save_conflict(document, document.path.read_bytes())
         if saved is not None:
             report.conflicts.append(f"{key} → {saved.name}")
-    _write_bytes(document, payload)
+    _write_bytes(document, payload, expected=before)
     report.pulled.append(key)
     # E2E 迁移钩子：拉到的是**明文**而本机有密钥 → 云端还没换密文。立即把
     # 密文推上去，否则会卡死在「明文 sha 相同 → 跳过推送」的循环里，明文
@@ -337,7 +345,8 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
                 report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
             except SyncError as error:
                 report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
-        dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
+        if not report.errors:
+            dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
         return report
 
     if local_changed and not remote_changed:
@@ -358,13 +367,15 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
                 report.errors.append(f"{key}: {error}")
             except SyncError as error:
                 report.errors.append(f"{key}: {error}")
-        dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
+        if not report.errors:
+            dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
         return report
 
     # 双变：全量 manifest + 本地 mtime 对比裁决，之后清脏、抬水位。
     _sync_documents_full(token, users_dir, session_dir, on_progress, stop, report)
-    dirty.save_sync_state(next_id - 1, set(),
-                          _local_stamps(iter_local_documents(users_dir, session_dir)))
+    if not report.errors:
+        dirty.save_sync_state(next_id - 1, set(),
+                              _local_stamps(iter_local_documents(users_dir, session_dir)))
     return report
 
 
@@ -435,7 +446,7 @@ def _sync_documents_full(token: str, users_dir: Path, session_dir: Path,
         try:
             _pull(document, token, report,
                   raw=remote_raw.get((label, kind)))
-        except SyncError as error:
+        except (SyncError, OSError, ValueError) as error:
             report.errors.append(f"{label}/{kind}: {error}")
 
 

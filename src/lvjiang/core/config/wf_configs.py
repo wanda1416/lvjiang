@@ -7,18 +7,17 @@
 云端 ``label=__global__``；冲突输方不留副本，按云端最新版直接覆盖。
 
 旧存储是 session.json 顶层 ``wf_configs`` 节点，首次访问时一次性迁出并删除
-旧节点（可重复执行）；没有旧节点即无事发生。
+旧节点（原字节留档，可重复执行）；新文件存在时（包括空）始终权威，损坏停止覆盖。
 """
 from __future__ import annotations
 
 import threading
 from collections.abc import Iterable
+from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any
 
-from loguru import logger
-
-from ..fs_util import atomic_write_text
+from ..fs_util import atomic_write_text, locked_paths
 from ..json_files import formatted_json
 
 # workflow.json 一级 key
@@ -38,19 +37,19 @@ def _path():
     return constants.WORKFLOW_CONFIG_PATH
 
 
-def _read_document() -> dict[str, Any]:
-    """读取整份文档；文件缺失或损坏返回空文档（迁移先于读取执行）。"""
-    path = _path()
-    if not path.exists():
-        return {}
-    try:
-        import json
+@contextmanager
+def _parameter_lock():
+    from ...constants import SESSION_PATH
 
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        logger.error(f"全局任务参数读取失败: {path}: {error}")
-        return {}
-    return data if isinstance(data, dict) else {}
+    with _WRITE_LOCK, locked_paths(SESSION_PATH, _path()):
+        yield
+
+
+def _read_document() -> dict[str, Any]:
+    from ...constants import SESSION_PATH
+    from .workflow_document import read_workflow_source
+
+    return read_workflow_source(SESSION_PATH, _path()).document or {}
 
 
 def _write_document(document: dict[str, Any]) -> None:
@@ -58,28 +57,21 @@ def _write_document(document: dict[str, Any]) -> None:
 
 
 def _migrate_legacy_node() -> None:
-    """session.json 的 ``wf_configs`` 节点 → workflow.json，只迁一次。"""
-    if _path().exists():
-        return
-    from .session import get_session_store
+    from ...constants import SESSION_PATH
+    from .workflow_document import migrate_workflow_document
 
-    node = get_session_store().get_node(_LEGACY_NODE_KEY)
-    if not isinstance(node, dict) or not node:
-        return
-    _write_document({_NODE_KEY: deepcopy(node)})
-    get_session_store().delete_node(_LEGACY_NODE_KEY)
-    logger.info("全局任务参数已从 session.json 迁出至 workflow.json")
+    migrate_workflow_document(SESSION_PATH, _path())
 
 
 def _read_params() -> dict[str, dict[str, Any]]:
-    with _WRITE_LOCK:
+    with _parameter_lock():
         _migrate_legacy_node()
         node = _read_document().get(_NODE_KEY)
         return deepcopy(node) if isinstance(node, dict) else {}
 
 
 def _write_params(params: dict[str, dict[str, Any]]) -> None:
-    with _WRITE_LOCK:
+    with _parameter_lock():
         _write_document({_NODE_KEY: params})
         _mark_dirty()
 
@@ -107,9 +99,10 @@ def get_wf_config(wf_id: str) -> dict[str, Any]:
 def set_wf_config(wf_id: str, config: dict[str, Any]) -> None:
     """写入指定工作流的配置（深拷贝切断调用方引用）"""
     config = deepcopy(config)
-    params = _read_params()
-    params[wf_id] = config
-    _write_params(params)
+    with _parameter_lock():
+        params = _read_params()
+        params[wf_id] = config
+        _write_params(params)
 
 
 def update_wf_config(wf_id: str, patch: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +112,7 @@ def update_wf_config(wf_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     返回写入后的配置副本，便于测试或调用方继续使用快照。
     """
     patch = deepcopy(patch)
-    with _WRITE_LOCK:
+    with _parameter_lock():
         params = _read_params()
         current = params.get(wf_id)
         current = current if isinstance(current, dict) else {}
@@ -131,7 +124,7 @@ def update_wf_config(wf_id: str, patch: dict[str, Any]) -> dict[str, Any]:
 
 def delete_wf_config(wf_id: str) -> None:
     """删除指定工作流配置（不存在时静默）"""
-    with _WRITE_LOCK:
+    with _parameter_lock():
         params = _read_params()
         if wf_id not in params:
             return
@@ -156,7 +149,7 @@ def prune_wf_configs(valid_ids: Iterable[str]) -> list[str]:
     """
     keep = set(valid_ids)
     removed: list[str] = []
-    with _WRITE_LOCK:
+    with _parameter_lock():
         params = _read_params()
         kept: dict[str, Any] = {}
         for wf_id, value in params.items():

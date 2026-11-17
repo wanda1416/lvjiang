@@ -17,6 +17,12 @@ from typing import Any
 
 from .._version import __version__
 from .config.resolver import ConfigResolver
+from .config.workflow_document import (
+    WorkflowSource,
+    commit_workflow_state,
+    read_workflow_source,
+)
+from .fs_util import locked_paths
 from .json_files import formatted_json, formatted_json_bytes
 from .layout.config import load_layout_doc
 from .paths import (
@@ -101,6 +107,9 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
     config = config_directory(root)
+    session_root = session_directory(config)
+    with locked_paths(session_root / "session.json", session_root / "workflow.json"):
+        workflow_source = read_workflow_source(session_root / "session.json", session_root / "workflow.json")
     # PC 已安装的有效 system 直接作为手机离线快照，local 保持独立覆盖层。
     from .config.interface import InterfaceStore
     InterfaceStore(session_directory(config) / "interface.json")
@@ -144,7 +153,13 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
                     continue
+                if rel.as_posix() == "session/workflow.json":
+                    continue  # 统一从锁内快照派生；打包不迁移 PC 本地。
                 data = path.read_bytes()
+                if rel.as_posix() == "session/session.json":
+                    session_data = dict(workflow_source.session)
+                    session_data.pop("wf_configs", None)
+                    data = formatted_json_bytes(session_data)
                 if rel.as_posix() == "session/interface.json":
                     # 手机端只认「当前在用哪个」这一层：直接给到同步清单里的
                     # 执行用户与布局，环境固定为安卓。
@@ -153,6 +168,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                         user=username, layout=layout, env="android")
                     data = formatted_json_bytes(interface)
                 add("config/" + rel.as_posix(), data)
+            if workflow_source.document is not None:
+                add("config/session/workflow.json", formatted_json_bytes(workflow_source.document))
             for name, snapshot in snapshots:
                 add("config/session/" + name, snapshot.read_bytes())
             # 不携带 PC 旧的同步状态；此记录只属于这次单向快照。
@@ -214,6 +231,8 @@ def _mirror_layers(target: Path, files: dict[str, str]) -> None:
         if not layer_root.is_dir():
             continue
         for path in sorted(layer_root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+            if ".migrations" in path.relative_to(layer_root).parts:
+                continue  # 本地升级原件不能因配置镜像而丢失，也不上传到 PC/云端。
             relative = path.relative_to(target).as_posix()
             if path.is_dir():
                 if not any(path.iterdir()):
@@ -235,7 +254,8 @@ def _write_mirrored_layers(target: Path, staged: Path, files: dict[str, str]) ->
 
 def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
                    username: str, layout: str,
-                   preserve_task_params: bool, preserve_batch_config: bool) -> None:
+                   preserve_task_params: bool, preserve_batch_config: bool,
+                   phone_workflow: WorkflowSource, incoming_workflow: WorkflowSource) -> None:
     """``session`` 只按清单覆盖：同目录里不在清单的文件一律不动。
 
     清单内的四类合并语义与以前一致：
@@ -251,7 +271,7 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
     session_target = session_directory(target)
     session_staged = staged / "session"
     history_names = {channel.database for channel in history_channels().values()}
-    phone_session = _read_json(session_target / "session.json")
+    phone_session = phone_workflow.session
     phone_interface = _read_json(session_target / "interface.json")
 
     # 1) 其余清单文件（profile.yaml、offline.json、*.db…）直接覆盖
@@ -290,16 +310,21 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
             if path.name not in incoming_users:
                 path.unlink()
 
-    # 3) session.json：名册（全局任务参数在 workflow.json，见第 6 步）
-    incoming_session = _read_json(session_staged / "session.json")
-    if incoming_session:
+    # 3) 名册与任务参数作为小范围保护提交：先新文档、后清旧节点。
+    # 必须使用镜像/解包覆盖之前取得的手机快照，不能依赖惰性 getter 已被调用。
+    incoming_session = dict(incoming_workflow.session) if (session_staged / "session.json").exists() else None
+    if incoming_session is not None:
         names = list(incoming_session.get("users") or [])
         if preserve_task_params:
             for name in phone_session.get("users") or []:
                 if name not in names and (session_target / "users" / f"{name}.json").is_file():
                     names.append(name)
         incoming_session["users"] = names
-        _write_json(session_target / "session.json", incoming_session)
+    document = incoming_workflow.document
+    if document is not None and preserve_task_params:
+        document = dict(document)
+        document["workflow_params"] = {**(incoming_workflow.params or {}), **(phone_workflow.params or {})}
+    commit_workflow_state(phone_workflow, document, incoming_session)
 
     # 4) interface.json：actives 跟清单，批量草稿属于手机
     incoming_interface = _read_json(session_staged / "interface.json")
@@ -326,21 +351,6 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
     if staged_batch.is_file() and (not preserve_batch_config or not phone_batch.is_file()):
         _write_bytes(phone_batch, staged_batch.read_bytes())
 
-    # 6) workflow.json：全局任务参数。保留手机任务参数时以 PC 为底、手机已有
-    #    参数按 wf_id 覆盖（与旧 session.json wf_configs 合并语义一致）；
-    #    不保留、或手机还没有时，整份落地 PC 版。
-    staged_workflow = session_staged / "workflow.json"
-    phone_workflow = session_target / "workflow.json"
-    if staged_workflow.is_file():
-        if preserve_task_params and phone_workflow.is_file():
-            shared = _read_json(staged_workflow).get("workflow_params")
-            shared = dict(shared) if isinstance(shared, dict) else {}
-            phone_params = _read_json(phone_workflow).get("workflow_params")
-            if isinstance(phone_params, dict):
-                shared.update(phone_params)
-            _write_json(phone_workflow, {"workflow_params": shared})
-        elif not preserve_task_params or not phone_workflow.is_file():
-            _write_bytes(phone_workflow, staged_workflow.read_bytes())
 
 
 def install_offline_bundle(
@@ -361,6 +371,7 @@ def install_offline_bundle(
     root.mkdir(parents=True, exist_ok=True)
     target = config_directory(root)
     staging = Path(tempfile.mkdtemp(prefix=".offline-stage-", dir=root))
+    changed = False
     try:
         with zipfile.ZipFile(archive_path) as archive:
             manifest = json.loads(archive.read("manifest.json"))
@@ -411,17 +422,32 @@ def install_offline_bundle(
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise ValueError(f"数据库快照校验失败：{database.name}")
-        # ▲ 校验全部通过，从这里开始才动本机配置 ▲
-        _mirror_layers(target, files)
-        _write_mirrored_layers(target, staged, files)
-        _apply_session(target, staged, files, username=manifest["username"],
-                       layout=manifest["layout"],
-                       preserve_task_params=preserve_task_params,
-                       preserve_batch_config=preserve_batch_config)
-        from .config.content import rebuild_content
-        rebuild_content(ConfigResolver(config_dir=target, dev_mode=False))
+        incoming_workflow = read_workflow_source(staged / "session/session.json", staged / "session/workflow.json")
+        # ▲ staging 及参数文档全部校验通过，从这里才读取/计算手机最终状态 ▲
+        from .config.content import (
+            config_write_lock,
+            configuration_lock,
+            rebuild_content,
+        )
+        session_root = session_directory(target)
+        with configuration_lock(target), config_write_lock(get_config_local_dir(target)), locked_paths(
+            session_root / "session.json", session_root / "workflow.json", session_root / "batch.json",
+        ):
+            phone_workflow = read_workflow_source(session_root / "session.json", session_root / "workflow.json")
+            changed = True
+            _mirror_layers(target, files)
+            _write_mirrored_layers(target, staged, files)
+            _apply_session(target, staged, files, username=manifest["username"],
+                           layout=manifest["layout"],
+                           preserve_task_params=preserve_task_params,
+                           preserve_batch_config=preserve_batch_config,
+                           phone_workflow=phone_workflow, incoming_workflow=incoming_workflow)
+            rebuild_content(ConfigResolver(config_dir=target, dev_mode=False))
         if on_applied is not None:
             on_applied()
         return {key: value for key, value in manifest.items() if key != "files"}
+    except Exception as exc:
+        exc.offline_configuration_changed = changed  # type: ignore[attr-defined]
+        raise
     finally:
         shutil.rmtree(staging, ignore_errors=True)

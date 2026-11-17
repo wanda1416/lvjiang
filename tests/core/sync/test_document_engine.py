@@ -458,3 +458,35 @@ def test_document_pull_skipped_when_version_row_head_matches(env, monkeypatch) -
     _sync(env)
     assert "/api/sync/documents/pull" in routes
 
+
+
+def test_workflow_pull_does_not_overwrite_edit_while_fetching(env, monkeypatch) -> None:
+    path = env["dirs"]["session"] / "workflow.json"
+    old = b'{"workflow_params":{"wf":{"n":1}}}'
+    edited = b'{"workflow_params":{"wf":{"n":7}}}'
+    path.write_bytes(old)
+    from lvjiang.core.sync import engine
+    document = engine.LocalDocument("__global__", "workflow", path)
+
+    def fetch(*_args, **_kwargs):
+        path.write_bytes(edited)
+        return {"payload_base64": base64.b64encode(b'{"workflow_params":{}}').decode()}
+
+    monkeypatch.setattr(engine.client, "pull", fetch)
+    report = engine.SyncReport()
+    with pytest.raises(OSError, match="下行期间已被编辑"):
+        engine._pull(document, "fixture", report)
+    assert path.read_bytes() == edited
+    assert not report.pulled
+
+
+def test_corrupt_workflow_downlink_keeps_valid_local(env):
+    from lvjiang.core.sync import engine
+    path = env["dirs"]["session"] / "workflow.json"
+    original = b'{"workflow_params":{"wf":{"n":0}}}'
+    path.write_bytes(original)
+    report = engine.SyncReport()
+    with pytest.raises(ValueError):
+        engine._pull(engine.LocalDocument("__global__", "workflow", path), "fixture", report, raw=b'{"workflow_params":null}')
+    assert path.read_bytes() == original
+    assert not report.pulled

@@ -104,12 +104,14 @@ def apply_sync(path: str, preserve_task_params: bool = True, preserve_batch_conf
             message = "脚本、配置与 DB 已同步到手机；总览数据由账号云端同步"
             return json.dumps({"ok": True, "message": message, "sync": summary}, ensure_ascii=False)
         except Exception as exc:
-            # 安装器已恢复旧配置；同时丢弃重载失败前创建的部分缓存。
-            try:
-                reset_configuration()
-            except Exception:
-                pass
-            return json.dumps({"ok": False, "message": f"同步失败: {exc}", "detail": traceback.format_exc()}, ensure_ascii=False)
+            # 校验失败未落盘，不触发升级/重载；提交后失败可能已部分应用，不能谎称恢复。
+            changed = getattr(exc, "offline_configuration_changed", False)
+            if changed:
+                try:
+                    reset_configuration()
+                except Exception:
+                    pass
+            return json.dumps({"ok": False, "message": f"同步失败{'（配置可能已部分应用，请重试；参数原件保留在本机）' if changed else '（原配置未覆盖）'}: {exc}", "detail": traceback.format_exc()}, ensure_ascii=False)
 
 
 def check_runtime(ocr: bool = True, screen_repetitions: int = 0) -> str:

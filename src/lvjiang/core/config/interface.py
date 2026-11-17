@@ -73,8 +73,11 @@ def reset_interface_store() -> None:
 
 def initialize_state_stores() -> None:
     """启动门禁：在创建任何页面前加载运行状态。"""
+    from ...constants import SESSION_PATH, WORKFLOW_CONFIG_PATH
     from .session import get_session_store
-    get_session_store()
+    from .workflow_document import migrate_workflow_document
+    migrate_workflow_document(SESSION_PATH, WORKFLOW_CONFIG_PATH)
+    get_session_store().reload()
     get_interface_store()
 
 

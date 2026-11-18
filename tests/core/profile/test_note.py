@@ -243,6 +243,8 @@ class TestNoteEngineTick:
         # 构造最小可用 engine，实际执行 tick
         config = _load_config()
         engine = ProfileProcessor.__new__(ProfileProcessor)
+        engine._quota_display = {}
+        engine._notify_updated = lambda _user_name: None
         engine._tick_user(note_env.username, config)
 
         # tick 后 note 值不变

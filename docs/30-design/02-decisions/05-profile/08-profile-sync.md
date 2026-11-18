@@ -94,8 +94,12 @@
 - 桌面总览 / 用户信息：quota 显示 `periods.quota_current_value` 派生的当前值，与 DSL 同口径
 - 网页总览：entries 矩阵（锁定条目显示 `[锁定]`）；再生型（速率/准点两种）与 quota 的周期归零都在
   前端读时推算（`web/src/regen.ts`、`web/src/quota.ts`，规则逐条对齐 `periods.py` / `regen.py`）。
-  内置周期 `day`/`week`/`month` 可直接算；插件自定义周期（燕云 `season`/`half_season`）的边界
-  来自客户端插件按游戏配置解析，云端没有那份数据，这类 key 退回存储值（不凭空清零）。
+  内置周期 `day`/`week`/`month` 就地实现；燕云插件周期（`season`/`half_season`）由
+  `web/src/yysls/periods.ts` 按赛季表判定——网页端是「自带燕云插件的包装」，自带的是**派生**
+  出来的赛季日期表（`web/src/yysls/seasons.ts`，由 `npm run seasons` 从主工程
+  `config/system/yysls/game_config/seasons.yaml` 生成，`npm run seasons:check` 是漂移门禁；
+  PC 侧仍是插件注册解析器，业务与框架分离不变）。
+  两层都算不出来时（表里没有的周期名、赛季表之外、缺时间戳）退回存储值，不凭空清零。
   写入仍只由客户端完成，网页当前只读。
 - 网页历史页：`remote_id` 降序、meta→锁定
 - Android：数据项锁定显示 `[锁定]`，历史行带类型标签，时间字段为 `event_at`；当前值与桌面共用
@@ -107,7 +111,8 @@
   不进账本；只有真实写入时才固化成 `reset` + `set` 两行（当前值为 0 时不落 0→0 行）。
   引擎取消周期性 reset 写入，只保留条目初始化与派生值变化时的界面刷新信号；桌面总览 /
   用户信息改用派生值显示，调度把 tick 对齐到周期边界，05:00:00 当秒归零。
-  网页总览同步跟上：quota 周期归零与再生（速率/准点）都在前端读时推算，与桌面同一套公式。
+  网页总览同步跟上：quota 周期归零与再生（速率/准点）都在前端读时推算，与桌面同一套公式；
+  燕云赛季周期由网页自带的派生赛季表解析（`npm run seasons` 生成、`seasons:check` 漂移门禁）。
 - **v1.3**（2026-11-15）：写明覆盖语义契约（`set`/`reset`/`regen` 的 `new_value` 被任一端
   承认为最新值，`meta` 例外）；删除「首次干净拉取前不推算周期恢复」的写入闸门——周期
   自动写已取消，固化只随真实写入发生，不再依赖同步状态，只读实例同样正常固化。

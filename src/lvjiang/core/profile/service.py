@@ -29,7 +29,7 @@ from .models import (
     RegenKeyDef,
     note_numeric_value,
 )
-from .periods import get_period_boundary
+from .periods import get_period_boundary, quota_current_value
 from .regen import (
     compute_realtime_value,
     compute_regen_entry,
@@ -155,7 +155,7 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         return 0.0
     current = entry.value or 0
     if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
-        current = _quota_display_value(entry, kd)
+        current = quota_current_value(entry, kd)
     if model_type == MODEL_REGEN and kd and isinstance(kd, RegenKeyDef):
         if _is_continuous_regen(kd):
             current = compute_realtime_value(
@@ -166,29 +166,6 @@ def _read_current_value(username: str, model_type: str, key: str, kd) -> float |
         else:
             current = compute_regen_entry(entry, kd).value
     return current
-
-
-def _quota_display_value(entry: Entry | None, kd: QuotaKeyDef) -> float:
-    """配额跨过周期边界后读出来是 0，不另写一条 reset。
-
-    ``entry=None``（条目不存在）视为 0 值、无时间戳。
-    """
-    stored = float((entry.value if entry is not None else 0) or 0)
-    event_at = (entry.event_at if entry is not None else "") or ""
-    from .arbitrate import parse_event
-
-    event = parse_event(event_at)
-    if event is None:
-        return 0.0
-    try:
-        boundary = get_period_boundary(
-            kd.period, kd.reset_time, datetime.now(), getattr(kd, "reset_day", 0),
-        )
-    except (TypeError, ValueError):
-        return stored
-    if event < boundary:
-        return 0.0
-    return stored
 
 
 def normalize_note_text(text: str, kd) -> str:
@@ -293,7 +270,7 @@ def profile_read_all(username: str) -> dict:
             continue
         entry = index.get((MODEL_QUOTA, kd.key))
         if entry is not None and not entry.locked:
-            display[(entry.type, entry.key)] = _quota_display_value(entry, kd)
+            display[(entry.type, entry.key)] = quota_current_value(entry, kd)
     for kd in config.get_keys_by_model(MODEL_REGEN):
         if not isinstance(kd, RegenKeyDef):
             continue
@@ -326,9 +303,12 @@ def profile_observe(
 ) -> dict:
     """将外部观测值按当前配额周期单调同步到 Profile。
 
-    同一周期内拒绝小于已存值的观测，避免 OCR 脏数据回写；若数据库条目
-    属于上一个周期，则以本周期初始值 0 比较，允许周/月/日重置后的合法
-    归零。返回值适合直接暴露给 DSL。
+    比较基线是**读时派生值**（:func:`~.periods.quota_current_value`）：同周期内
+    拒绝小于当前值的观测，避免 OCR 脏数据回写；条目属于上一个周期时当前值就是
+    0，新周期的合法归零与重启都天然通过。跨周期**不先落一条 reset 再写**——
+    归零由 ``profile_action`` 在真实写入时随业务行一起固化（``reset`` + ``set``
+    两行，见 :func:`_materialize_period_reset`），所以观测到 0 就什么都不写。
+    返回值适合直接暴露给 DSL。
     """
     config = get_profile_config()
     model_type = config.get_model_type(key)
@@ -355,41 +335,7 @@ def profile_observe(
 
     for _ in range(3):
         entry = db_read_entry(username, MODEL_QUOTA, key)
-        now = datetime.now()
-        boundary = get_period_boundary(
-            kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
-        )
-        is_current_period = False
-        if entry:
-            try:
-                is_current_period = datetime.fromisoformat(
-                    entry.event_at
-                ) >= boundary
-            except (TypeError, ValueError):
-                is_current_period = False
-
-        current = _quota_display_value(entry, kd) if entry is not None else 0.0
-        if not is_current_period:
-            # 跨周期：先把旧周期满值原子归零落库（历史里留一条 reset），
-            # 再按新周期从 0 起算写入本次观测；只做显示归零会让库里长期留着旧值。
-            reset = db_update_if_current(
-                username,
-                MODEL_QUOTA,
-                key,
-                expected_value=(entry.value if entry else 0) or 0,
-                expected_updated_at=entry.event_at if entry else "",
-                expected_entry_exists=entry is not None,
-                new_value=0,
-                op_type="reset",
-                delta_value=-float((entry.value if entry else 0) or 0),
-                source="",
-            )
-            if not reset:
-                continue
-            if candidate == 0:
-                return {"accepted": True, "value": 0.0, "reason": "updated"}
-            # 已原子推进到当前周期；下一轮按同周期观测写入并触发同步。
-            continue
+        current = quota_current_value(entry, kd)
         if candidate < current:
             return {"accepted": False, "value": current, "reason": "regressed"}
         if candidate == current:
@@ -402,7 +348,9 @@ def profile_observe(
                 set_value=candidate,
                 source=source,
                 current_value=current,
-                expected_entry=entry,
+                # 期望值必须是库里那一行（未归零的旧周期满值）：CAS 比的是
+                # 存储状态，派生值只用于业务计算，混用会让 CAS 永远失败。
+                expected_entry=entry if entry is not None else EXPECT_ABSENT,
                 trigger_sync=True,
                 use_cas=True,
             )
@@ -618,6 +566,70 @@ def _materialize_regen(
     return current_entry, float(restored.value), expected_entry
 
 
+def _materialize_period_reset(
+    username: str,
+    model_type: str,
+    key: str,
+    kd,
+    *,
+    current_entry: Entry | None,
+    expected_entry: Entry | _ExpectAbsent | None,
+) -> tuple[bool, Entry | _ExpectAbsent | None]:
+    """步骤 1.5：把「跨周期归零」先落成一条 ``reset`` 行（与 regen 同构）。
+
+    读时归零只影响显示——库里还留着上个周期的满值。真实写入若直接按派生基线
+    改值，账本就会出现「old 是旧周期满值、delta 却按 0 起算」的坏行：回放按
+    delta 相加、撤销按 ``old - new`` 反推、按来源聚合都会算错。所以先把归零
+    固化成一独立行（值 0、``event_at`` 取周期边界），再写业务行——每行都满足
+    ``new = old + delta``，与 :func:`_materialize_regen` 的两行模式完全一致。
+
+    判定照抄读取侧的单一入口 :func:`~.periods.quota_current_value`：派生值已经
+    是 0、库里却不是 0，说明这一行还停在旧周期。
+
+    **不落 0→0**：库里本来就是 0 时没有任何可固化的东西，写一条「0 变 0」的
+    重置只会把账本刷满，也违背「只有真实变化才落行」的账本约束。
+
+    返回 ``(是否落了 reset 行, 新的 CAS 期望值)``。
+    """
+    if (
+        model_type != MODEL_QUOTA
+        or not isinstance(kd, QuotaKeyDef)
+        or current_entry is None
+    ):
+        return False, expected_entry
+    stored_value = float(current_entry.value or 0)
+    if _normalize_float_noise(stored_value) == 0:
+        return False, expected_entry
+    if _normalize_float_noise(quota_current_value(current_entry, kd)) != 0:
+        return False, expected_entry
+    try:
+        boundary = get_period_boundary(
+            kd.period, kd.reset_time, datetime.now(), getattr(kd, "reset_day", 0),
+        )
+    except (TypeError, ValueError):
+        return False, expected_entry
+
+    boundary_stamp = boundary.isoformat(timespec="seconds")
+    db_upsert(
+        username, model_type, key, 0,
+        # 契约：reset 的 event_at 是周期边界时刻，不是执行墙钟。条目与账本行
+        # 必须写同一个时刻：两台设备各自固化同一个周期时落的是同一条语义
+        # （值 0、同一时刻），覆盖裁决不会因为谁先谁后而分叉；若这里记成当前
+        # 时刻，一次晚到的归零就会压住别端本周期内的真实写入。
+        event_at=boundary_stamp,
+        history_ts=boundary_stamp,
+        op_type="reset",
+        delta_value=-stored_value,
+        source="",
+    )
+    updated = db_read_entry(username, model_type, key)
+    if expected_entry is not None:
+        # 固化是本事务自己写的：CAS 期望值必须跟着换成刚落库的行，否则业务写入
+        # 会被误判成「其他进程更新过」。
+        expected_entry = updated
+    return True, expected_entry
+
+
 def _resolve_new_value(
     current_value: float,
     model_type: str,
@@ -768,6 +780,14 @@ def profile_action(
             return current_value
         _submit_synchronous(event)
 
+    # 这笔写入确实要落库了：先把跨周期归零固化成 reset 行，再写业务行。
+    # 放在「值没变」与变更脚本拒绝之后——纯读取、0→0、被脚本拦下的写入
+    # 都不该在库里留下任何东西。
+    _materialized, expected_entry = _materialize_period_reset(
+        username, model_type, key, kd,
+        current_entry=current_entry, expected_entry=expected_entry,
+    )
+
     _persist_numeric(
         username, model_type, key, value=new_value,
         delta_value=actual_delta, source=source,
@@ -793,6 +813,7 @@ class _ExpectAbsent:
 
 
 EXPECT_ABSENT = _ExpectAbsent()
+
 
 @profile_write
 def sync_write_adapter(
@@ -839,6 +860,14 @@ def sync_write_adapter(
     if event is None:
         return current_value, 0
     _submit_synchronous(event)
+
+    # quota 目标跨周期时同样先固化归零，否则这一行会拿旧周期满值当 old、
+    # 按 0 起算的 delta 记账（sync_targets 写 quota 是「逐战商店买配额」这类路径）。
+    _materialize_period_reset(
+        user_name, model_type, key, kd,
+        current_entry=db_read_entry(user_name, model_type, key),
+        expected_entry=None,
+    )
 
     try:
         db_upsert(

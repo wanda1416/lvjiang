@@ -30,7 +30,7 @@ from ...core.profile.models import (
     note_numeric_value,
     parse_sync_key,
 )
-from ...core.profile.periods import get_profile_period
+from ...core.profile.periods import get_profile_period, quota_current_value
 from ...core.profile.regen import (
     compute_regen_entry,
     format_seconds,
@@ -167,6 +167,10 @@ def format_profile_cell(kd: KeyDef, model_type: str,
     if model_type == MODEL_QUOTA:
         if not isinstance(kd, QuotaKeyDef):
             return str(int(value)), ""
+        # 与 regen 分支同一个口径：显示的是**当前有效值**。quota 跨过周期边界
+        # 就读作 0（`quota_current_value`），所以 05:00:00 一过总览立刻归零，
+        # 不再等后台 tick 把 reset 写进库里。
+        value = quota_current_value(entry, kd)
 
         # 已达上限 → 绿色（优先级最高）
         if kd.cap is not None and value >= kd.cap:
@@ -246,8 +250,9 @@ def sum_profile_column(kd: KeyDef, model_type: str,
                        users_data: dict[str, dict[str, dict[str, Entry]]]) -> str:
     """合计行单元格文本：可累加模型返回该列数值之和，其余一律返回空串。
 
-    regen 用与单元格显示同一套计算值（`compute_regen_entry`），否则合计会和
-    用户实际看到的数字对不上。空缺值按不参与累加处理；结果是整数时不带小数点。
+    regen / quota 都用与单元格显示同一套计算值（`compute_regen_entry` /
+    `quota_current_value`），否则合计会和用户实际看到的数字对不上。
+    空缺值按不参与累加处理；结果是整数时不带小数点。
     """
     if model_type not in SUMMABLE_MODELS:
         return ""
@@ -264,6 +269,8 @@ def sum_profile_column(kd: KeyDef, model_type: str,
             continue
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             value = compute_regen_entry(entry, kd).value
+        elif model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
+            value = quota_current_value(entry, kd)
         try:
             total += float(value)
         except (TypeError, ValueError):
@@ -292,6 +299,9 @@ def is_sync_target_at_hard_cap(sync_key: str, data: dict) -> bool:
         return False
     if config.get_model_type(key) != model_type:
         return False
+    if model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
+        # 「满值锁定」判的是当前有效值：上个周期的满值不能继续把目标当作已满。
+        value = quota_current_value(entry, kd)
     cap = getattr(kd, "cap", None)
     if cap is None:
         return False
@@ -421,6 +431,8 @@ def format_cell_tooltip(kd: KeyDef, model_type: str,
     if kd.decimal:
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             exact = compute_regen_entry(entry, kd).value
+        elif model_type == MODEL_QUOTA and isinstance(kd, QuotaKeyDef):
+            exact = quota_current_value(entry, kd)
         else:
             exact = entry.value or 0
         if abs(exact - int(exact)) > 1e-9:

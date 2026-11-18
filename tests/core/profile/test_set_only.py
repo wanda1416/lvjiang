@@ -55,17 +55,21 @@ def test_newer_event_wins_and_empty_op_id_loses() -> None:
 
 
 def test_quota_read_is_zero_after_period_boundary() -> None:
+    from lvjiang.core.profile.periods import quota_current_value
+
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     yesterday = (datetime.now() - timedelta(days=2)).replace(microsecond=0)
     entry = Entry(username="u", type="quota", key="daily", value=9, event_at=yesterday.isoformat(timespec="seconds"))
-    assert service._quota_display_value(entry, kd) == 0
+    assert quota_current_value(entry, kd) == 0
 
 
 def test_offset_timestamp_does_not_break_quota_read() -> None:
+    from lvjiang.core.profile.periods import quota_current_value
+
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     recent = datetime.now().replace(microsecond=0).isoformat(timespec="seconds")
     entry = Entry(username="u", type="quota", key="daily", value=4, event_at=recent + "+08:00")
-    assert service._quota_display_value(entry, kd) == 4
+    assert quota_current_value(entry, kd) == 4
 
 
 def test_unscoped_history_still_rewrites_entry(tmp_path, monkeypatch) -> None:

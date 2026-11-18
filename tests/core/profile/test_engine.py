@@ -16,7 +16,6 @@ from lvjiang.core.profile.engine import (
     _count_quota_regens,
     _get_period_boundary,
     _parse_reset_time,
-    _should_reset,
 )
 
 # ─── _parse_reset_time ───────────────────────────────────────
@@ -138,29 +137,6 @@ class TestGetPeriodBoundaryResetDay:
         boundary_default = _get_period_boundary("month", "05:00", now, reset_day=0)
         boundary_1st = _get_period_boundary("month", "05:00", now, reset_day=1)
         assert boundary_default == boundary_1st
-
-
-# ─── _should_reset ───────────────────────────────────────────
-
-
-class TestShouldReset:
-    def test_empty_updated_at(self):
-        assert _should_reset("", datetime.now()) is True
-
-    def test_reset_requires_timestamp_before_boundary(self):
-        # before_boundary
-        event_at = (datetime.now() - timedelta(hours=2)).isoformat()
-        boundary = datetime.now() - timedelta(hours=1)
-        assert _should_reset(event_at, boundary) is True
-
-        # after_boundary
-        event_at = datetime.now().isoformat()
-        boundary = datetime.now() - timedelta(hours=1)
-        assert _should_reset(event_at, boundary) is False
-
-
-    def test_invalid_format(self):
-        assert _should_reset("not-a-date", datetime.now()) is True
 
 
 # ─── _count_quota_regens ────────────────────────────────────────

@@ -1,10 +1,17 @@
 """用户 Profile 周期处理服务（不依赖 Qt）
 
 调用方调度 tick，负责：
-1. 周期检查与重置（quota 的 period 到期清零）
-2. 再生计算（regen 显式区分实时恢复与准点恢复，封顶 cap）
+1. 配额条目存在性与「周期派生值变了」的 UI 刷新信号
+   （quota 的周期归零是读时派生，这里**不写库**）
+2. 再生计算（regen 显式区分实时恢复与准点恢复，封顶 cap）与阈值告警
 
 通知回调由调用方提供；数据处理与桌面线程、信号和调度分离。
+
+周期派生值的口径只有一处：读取端与显示端一律走
+:func:`lvjiang.core.profile.periods.quota_current_value`，真实写入时才由
+``service._materialize_period_reset`` 固化成 ``reset`` 行。因此「周一 05:00
+归零」不依赖本引擎是否在跑，也不产生任何后台写入——见
+``docs/30-design/02-decisions/profile/08-profile-sync.md``。
 """
 
 from __future__ import annotations
@@ -19,10 +26,14 @@ from lvjiang.core.config.interface import add_alert
 from lvjiang.core.users.document import UserConfigManager
 
 from ...i18n import tr
-from .maintenance import profile_operation, profile_write
+from .maintenance import profile_operation
 from .models import RegenKeyDef
 from .periods import (  # noqa: F401  # 测试仍从本模块引用周期边界
     get_period_boundary as _get_period_boundary,
+)
+from .periods import (
+    next_period_boundary,
+    quota_current_value,
 )
 from .periods import (
     parse_reset_time as _parse_reset_time,
@@ -44,53 +55,21 @@ from .store import (
 # ─── 周期边界计算 ────────────────────────────────────────────
 
 
-@profile_write
-def _write_background_change(user_name, model, kd, entry, new_value, delta, op_type, *,
-                             event_at=None):
-    """周期重置/准点恢复也先执行同步脚本，CAS 和子链在同一事务内。"""
-    from .repository import db_read_entry, db_update_if_current
-    from .triggers import prepare_trigger_event, submit_profile_trigger
+def seconds_to_next_quota_boundary(config, now: datetime | None = None) -> float | None:
+    """最近的 quota 周期边界还有多少秒；没有 quota 定义或周期不可解析时返回 None。
 
-    current = db_read_entry(user_name, model, kd.key)
-    if (current.value, current.event_at) != (
-        entry.value, entry.event_at,
-    ):
-        return False
-    event = prepare_trigger_event(
-        username=user_name, model=model, key=kd.key,
-        old_value=entry.value, new_value=new_value, delta=delta,
-        # source 是业务语境，只属于人的写入；系统行（reset/regen）留空，
-        # 机制分类由 op_type 表达，不占用业务字段。
-        source="",
-        op_type=op_type, script=kd.change_script, synchronous=kd.change_script_sync,
-    )
-    assert event is not None
-    if event.synchronous:
-        submit_profile_trigger(event)
-    updated = db_update_if_current(
-        user_name, model, kd.key, expected_value=entry.value or 0,
-        expected_updated_at=entry.event_at, expected_entry_exists=bool(current),
-        new_value=new_value, new_updated_at=event_at, op_type=op_type,
-        delta_value=delta, source="",
-    )
-    if not updated:
-        from .service import ProfileWriteConflict
-
-        raise ProfileWriteConflict("Profile 后台计算写入冲突")
-    if not event.synchronous:
-        submit_profile_trigger(event)
-    return True
-
-
-def _should_reset(updated_at_str: str, boundary: datetime) -> bool:
-    """判断 event_at 是否在周期边界之前（即需要重置）"""
-    if not updated_at_str:
-        return True
-    try:
-        event_at = datetime.fromisoformat(updated_at_str)
-        return event_at < boundary
-    except (ValueError, TypeError):
-        return True
+    调度方用它把 tick 对齐到边界：归零是读时派生的，只有「正好在 05:00:00
+    之后刷新一次界面」才能让总览看上去当场归零，而不是最多晚一个 tick 周期。
+    """
+    now = now or datetime.now()
+    delays: list[float] = []
+    for kd in config.get_keys_by_model("quota"):
+        upcoming = next_period_boundary(
+            kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0),
+        )
+        if upcoming is not None:
+            delays.append((upcoming - now).total_seconds())
+    return min(delays) if delays else None
 
 
 # ─── 实时计算 ────────────────────────────────────────────────
@@ -277,6 +256,8 @@ class ProfileProcessor:
         self._notify_alert = notify_alert
         self._notify_updated = notify_updated
         self._last_clean = 0.0
+        #: {user: {key: 派生值}}，只用于判断「显示值变了」要不要通知界面。
+        self._quota_display: dict[str, dict[str, float | None]] = {}
 
     @profile_operation
     def tick(self):
@@ -299,51 +280,44 @@ class ProfileProcessor:
             _clean_old_alerts(all_keys)
             self._last_clean = now
 
+    def seconds_to_next_boundary(self) -> float | None:
+        """最近的 quota 周期边界还有多少秒（供调度方对齐 tick）。"""
+        try:
+            return seconds_to_next_quota_boundary(get_profile_config())
+        except Exception as error:  # noqa: BLE001 - 调度建议失败不能打断 tick
+            logger.warning(f"ProfileEngine 计算下一个周期边界失败: {error}")
+            return None
+
     def _tick_user(self, user_name: str, config) -> None:
         """处理单个用户的一次 tick
 
-        从 DB 读取 profile 数据，逐条计算并 CAS 更新。
-        CAS 失败表示其他进程已经更新，本轮放弃该 entry，下轮重试。
+        从 DB 读取 profile 数据，逐条计算。**这里不写 quota 的库**：
+        周期归零是读时派生的（:func:`~.periods.quota_current_value`），
+        真实写入时才由 ``service._materialize_period_reset`` 固化成 reset 行。
+        引擎只负责两件事：条目不存在时建 0 值（从 0 起步，不记账不同步），
+        以及派生值变了就通知界面重画——周一 00:00 不再有任何后台写入，
+        也不会有多端各自刷出一批 reset 行。
         """
         profile_data = db_read_index(user_name)
         if not profile_data:
             return
 
-        modified = False
-
-        # ── Step 1: 周期检查与重置（quota）──
-        # 周期到期必须落库归零：读取侧的归零只影响显示，库里仍会留着上个周期的满值，
-        # 历史里也没有重置记录（各端、网页、脚本读到的都是旧值）。
-        now = datetime.now()
+        # ── Step 1: quota 存在性与显示值变化（纯读，只有「建 0 值」这一处写入）──
+        display: dict[str, float | None] = {}
         for kd in config.get_keys_by_model("quota"):
             entry = (profile_data.get("quota") or {}).get(kd.key)
             if entry is not None and entry.locked:
-                # 锁定 key 物理失效：既不首次建值，也不做周期重置
+                # 锁定 key 物理失效：既不首次建值，也不参与显示
+                display[kd.key] = None
                 continue
-            if not entry:
-                # 首次初始化：entry 不存在，直接创建 0 值
-                db_upsert(user_name, "quota", kd.key, 0,
-                          op_type="reset", delta_value=0)
+            if entry is None:
+                # 首次初始化：建 0 值条目。op_type 留空 = 不记账、不同步，
+                # 它不是业务写入，只是「这个 key 从 0 起步」的物化。
+                db_upsert(user_name, "quota", kd.key, 0)
+                display[kd.key] = 0.0
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 首次初始化")
                 continue
-            stored_value = entry.value or 0
-            boundary = _get_period_boundary(
-                kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
-            )
-            if not _should_reset(entry.event_at, boundary):
-                continue
-            try:
-                updated = _write_background_change(
-                    user_name, "quota", kd, entry, 0, -stored_value, "reset",
-                    event_at=boundary.isoformat(timespec="seconds"))
-            except Exception as error:  # noqa: BLE001 - 单字段失败不能中断其他周期字段
-                logger.warning("Profile 周期重置未提交 {}: {}", kd.key, error)
-                continue
-            if updated:
-                logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
-                modified = True
-            else:
-                logger.warning(f"{user_name} quota.{kd.key} CAS 失败，放弃本轮")
+            display[kd.key] = quota_current_value(entry, kd)
 
         # ── Step 2: 再生计算（regen）──
         # 只算不写：库里只存「上次真实写入的锚点」，边界/速率推算在读取端现算，
@@ -391,6 +365,9 @@ class ProfileProcessor:
                         unmark_alert(alert_key)
                         # 注意：不清理 alert_info，由用户手动关闭
 
-        # ── 通知 UI 刷新（周期重置改了库里的值）──
-        if modified:
+        # ── 通知 UI 刷新（派生值变了，例如刚跨过周期边界）──
+        # 只在「界面显示的数字真的变了」时发信号：跨边界那一刻刷新一次，
+        # 之后条目进了新周期就不再重复刷新，不做无谓的整表重画。
+        if self._quota_display.get(user_name) != display:
+            self._quota_display[user_name] = display
             self._notify_updated(user_name)

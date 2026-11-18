@@ -31,6 +31,7 @@ from ...core.profile.models import (
     StockKeyDef,
     format_sync_label,
 )
+from ...core.profile.periods import quota_current_value
 from ...core.profile.regen import (
     compute_regen_entry,
     is_realtime_regen,
@@ -255,6 +256,10 @@ class ProfileCellEditingMixin:
         current_value = (entry.value if entry else 0) or 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
+        elif model_type == MODEL_QUOTA:
+            # 与单元格显示同一个口径：跨周期后当前值是 0，本次输入的 delta
+            # 必须从 0 起算；CAS 用的仍是库里那一行原始快照。
+            current_value = quota_current_value(entry, kd)
 
         # 空白单元格表示没有记录，但引擎读到的同样是 0。用户显式输入 0 是要求
         # 留下「明确为零」的记录，不能当成同值无操作丢掉；只有清空输入才放弃。
@@ -319,7 +324,7 @@ class ProfileCellEditingMixin:
             return
         user_name = name_item.text()
 
-        # 获取当前值（从 DB 读取）
+        # 获取当前值（从 DB 读取；quota 跨周期按派生值 0 起算，regen 实时推算）
         profile_data = db_read_index(user_name)
         entry = (profile_data.get(model_type) or {}).get(key_str)
         current_value = (entry.value if entry is not None else None)
@@ -327,6 +332,8 @@ class ProfileCellEditingMixin:
             current_value = 0
         if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
             current_value = _current_regen_value(entry, kd)
+        elif model_type == MODEL_QUOTA:
+            current_value = quota_current_value(entry, kd)
         expected_entry = entry if entry is not None else EXPECT_ABSENT
         is_locked = bool(entry.locked) if entry is not None else False
 

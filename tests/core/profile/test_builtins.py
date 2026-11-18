@@ -181,8 +181,13 @@ def test_profile_observe_accepts_increase_in_same_period(profile_func_env):
     ).value == 800
 
 
-def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_env):
-    from lvjiang.core.profile.repository import db_read_entry, db_upsert
+def test_profile_observe_zero_after_period_boundary_writes_nothing(profile_func_env):
+    """跨周期观测到 0：派生值本来就是 0，不该落下任何一行。
+
+    旧实现会先原子归零落一条 reset，周一每台设备每个 key 都刷一条；现在归零是
+    读时派生的，观测 0 与当前值相等即「无变化」，账本保持干净。
+    """
+    from lvjiang.core.profile.repository import db_get_history, db_read_entry, db_upsert
     from lvjiang.workflows.builtins.profile import _profile_observe
 
     old_ts = (datetime.now() - timedelta(days=8)).isoformat(timespec="seconds")
@@ -197,11 +202,49 @@ def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_
 
     result = _profile_observe(engine, "weekly_progress", 0)
 
-    # 跨周期观测 0：先原子归零落库（历史留一条 reset），不能只做显示归零
-    assert result == {"accepted": True, "value": 0.0, "reason": "updated"}
+    assert result == {"accepted": True, "value": 0.0, "reason": "unchanged"}
     entry = db_read_entry(profile_func_env.username, "quota", "weekly_progress")
-    assert entry.value == 0
-    assert entry.event_at != old_ts
+    assert entry.value == 800
+    assert entry.event_at == old_ts
+    assert db_get_history(
+        profile_func_env.username, type_="quota", key="weekly_progress"
+    ) == []
+
+
+def test_profile_observe_after_period_boundary_writes_reset_then_set(profile_func_env):
+    """跨周期观测到 N：先固化归零（reset 行），再写业务 set 行。"""
+    from lvjiang.core.profile.repository import (
+        db_get_history,
+        db_read_entry,
+        db_upsert,
+    )
+    from lvjiang.workflows.builtins.profile import _profile_observe
+
+    old_ts = (datetime.now() - timedelta(days=8)).isoformat(timespec="seconds")
+    db_upsert(
+        profile_func_env.username,
+        "quota",
+        "weekly_progress",
+        800,
+        event_at=old_ts,
+    )
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    result = _profile_observe(engine, "weekly_progress", 30)
+
+    assert result == {"accepted": True, "value": 30.0, "reason": "updated"}
+    records = db_get_history(
+        profile_func_env.username, type_="quota", key="weekly_progress"
+    )
+    # 降序：最后一行是业务写入，另一行是随它一起固化的归零。
+    assert [row.op_type for row in records] == ["set", "reset"]
+    assert records[1].new_value == 0
+    assert records[1].delta_value == -800
+    assert records[0].old_value == 0
+    assert records[0].new_value == 30
+    assert db_read_entry(
+        profile_func_env.username, "quota", "weekly_progress"
+    ).value == 30
 
 
 def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):

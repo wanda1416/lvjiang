@@ -30,6 +30,7 @@ from ...core.profile.models import (
     KeyDef,
     RegenKeyDef,
 )
+from ...core.profile.periods import quota_current_value
 from ...core.profile.regen import compute_regen_entry
 from ...core.profile.repository import db_read_index
 from ...i18n import tr
@@ -386,6 +387,8 @@ def _format_detail_value(kd: KeyDef, model_type: str, data: dict) -> str:
         return ""
 
     if model_type == MODEL_QUOTA:
+        # 跨周期的 quota 当前值是 0（读时派生），与总览单元格同一口径。
+        value = quota_current_value(entry, kd)
         if isinstance(value, bool):
             return tr("已完成") if value else tr("未完成")
         return str(int(value))

@@ -65,7 +65,12 @@ def test_manual_same_value_skips_write_even_with_force(monkeypatch):
         )
 
 
-def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
+def test_period_reset_no_longer_runs_change_script(tmp_path, monkeypatch):
+    """跨周期不再由引擎落 reset，所以也不会触发变更脚本。
+
+    归零是读时派生的：周一 05:00 没有任何后台写入，脚本要等真实业务写入才跑
+    （那笔写入会连带固化 reset 行）。
+    """
     from datetime import datetime, timedelta
     from types import SimpleNamespace
 
@@ -75,7 +80,7 @@ def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
     monkeypatch.setattr(repository, "_DB_PATH", tmp_path / "profile.db")
     repository.reset_profile_db()
     repository.db_upsert(
-        "tester", "quota", "daily", 0,
+        "tester", "quota", "daily", 5,
         event_at=(datetime.now() - timedelta(days=2)).isoformat(),
     )
     kd = QuotaKeyDef(key="daily", label="每日", period="day",
@@ -83,14 +88,12 @@ def test_period_reset_zero_to_zero_still_submits_script(tmp_path, monkeypatch):
     config = SimpleNamespace(get_keys_by_model=lambda model: [kd] if model == "quota" else [])
     events = []
     monkeypatch.setattr(triggers, "submit_profile_trigger", events.append)
-    worker = SimpleNamespace(_notify_updated=lambda _: None)
+    worker = SimpleNamespace(_quota_display={}, _notify_updated=lambda _: None)
     engine.ProfileProcessor._tick_user(worker, "tester", config)
-    # 周期到期：即使 0→0 也要落库归零并触发同步脚本
-    assert len(events) == 1
-    assert events[0].op_type == "reset"
     engine.ProfileProcessor._tick_user(worker, "tester", config)
-    # 已落在本周期，第二次不再重置
-    assert len(events) == 1
+    assert events == []
+    assert repository.db_read_entry("tester", "quota", "daily").value == 5
+    assert repository.db_get_history("tester", "quota", "daily") == []
 
 
 def test_profile_write_enqueues_script_and_returns_before_execution(tmp_path, monkeypatch):

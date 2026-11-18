@@ -1,8 +1,70 @@
 # Profile 共享模块
 
 Profile 是主引擎自带的用户数据模块，不属于任何具体 app。它提供
-quota / regen / stock / note 四类定义、SQLite 持久化、后台周期计算、
-DSL 读写函数，以及「用户总览」和「用户信息」两个通用页面。
+quota / regen / stock / note 四类定义、SQLite 持久化、周期派生值（读时归零与
+再生推算）与再生告警、DSL 读写函数，以及「用户总览」和「用户信息」两个通用页面。
+
+## 机制总览（先读这一节）
+
+四类模型只有**一条读入口**和**一条写入口**；周期与恢复都是「**读时派生、写时固化**」：
+
+```text
+读：profile_entries（库里只存「上次真实写入的值 + event_at」，没有周期概念）
+     ├─ quota  → periods.quota_current_value()  event_at 早于本周期边界即读作 0
+     ├─ regen  → regen.compute_regen_entry()    按速率 / 准点边界补上恢复量
+     └─ stock / note → 原值 / value_text
+    → 桌面总览、用户信息、DSL（profile_get / profile_all）、安卓工作台、网页总览
+
+写：OCR / DSL / 手动 / sync_targets
+    → profile_action()（网页将来支持写入时也走同一套语义）
+       ├─ 先固化 regen（确实有恢复量时）：regen 行 = 恢复后的绝对值
+       ├─ 再固化 quota 归零（跨周期且库里不是 0 时）：reset 行 = 0，event_at = 周期边界
+       ├─ 业务行 set：old = 上面的基线，new = old + delta
+       └─ 派发变更脚本与 sync_targets 链（事件里的 old / new / delta 用同一基线）
+
+同步：账本行（set / reset / regen / meta）→ 云端，一律**绝对值覆盖**
+      云端只存物化值、没有周期，网页按同一套规则自行派生后再展示
+```
+
+周期边界分两层：`day` / `week` / `month` 由 core 内建（`periods.py`），业务周期
+（燕云 `season` / `half_season`）由 app 插件注册解析器——PC 保持「框架不认识游戏」，
+网页端作为自带燕云插件的包装，自带一份由主工程**派生**出来的赛季日期表
+（`server/web` 里 `npm run seasons` 生成、`seasons:check` 是漂移门禁）。
+两边算不出来时（周期名未知、赛季表之外、缺时间戳）一律退回存储值，不凭空清零。
+
+### 关键不变量
+
+| 不变量 | 含义 | 守护位置 |
+|---|---|---|
+| 每行 `new = old + delta`（首行无前值时 `old` 为空） | 账本自洽；两行模式（先固化、再业务）就是为了守住它，回放相加、撤销、按来源聚合都依赖它 | `test_regen_materialize.py`、`test_quota_reset_materialize.py`、`test_sync_target_materialize.py` |
+| 读取绝不写库 | 读只算当前值：不落 history、不改 `event_at`、不触发同步；读多少次都一样 | `test_quota_reset_materialize.py::test_read_across_boundary_returns_zero_without_touching_db` |
+| 界面引擎不写周期值 | tick 只建缺失的 0 值条目、发现派生值变化时发一次刷新信号，不再周期性写 `reset` | `test_quota_reset_materialize.py::test_engine_tick_does_not_write_reset`、`test_triggers.py` |
+| 派生值精确到秒 | 05:00:00 当秒切新周期；同一份数据在桌面 / DSL / 安卓 / 网页上必须是同一个数 | `test_boundary_flip_is_exact_to_the_second`、`test_overview_cell_and_total_use_derived_value` |
+| CAS 用库里的值，业务用派生值 | 并发校验比对存储行（旧周期满值也算），业务增量从派生基线（0）起算；混用会永远冲突或覆盖并发写入 | `test_cas_write_uses_stored_value_not_derived_zero` |
+| `reset` 行的 `event_at` = 周期边界 | 多端各自固化同一周期时落同一时刻；补写的归零不会压掉别端本周期的新写入 | `test_late_reset_row_does_not_override_newer_write` |
+| 0→0 不落行 | 库里已是 0 时没有可固化的归零，直接写业务行；纯读取与「值没变」都不留行 | `test_zero_value_does_not_write_zero_to_zero_reset`、`test_write_that_changes_nothing_records_nothing` |
+| 变更脚本看到的口径 = 账本口径 | 事件里的 old / new / delta 与账本行同源，阈值类脚本（`zhige/juezhang/two_gold`）不会误判 | `test_trigger_event_uses_derived_baseline_across_period`、`test_sync_target_materialize.py::test_regen_target_trigger_event_carries_materialized_baseline` |
+| `reset` 照常上行 | 云端只做展示、没有周期概念；不上行会让网页在整个新周期显示旧值 | `test_snapshot_sync.py::test_push_sends_reset_and_skips_legacy_delta` |
+
+### 改这里之前先看
+
+1. **不要在读取路径写库**——那正是历史上「周一每台设备每个 key 各刷一批 reset」的来源。
+2. **不要把 `reset` 移出上行队列**，也不要为了「账本干净」删掉历史 reset 行；同步协议与云端展示都依赖它。
+3. **不要把两行合成一行**（把恢复量/归零量并进业务行），否则 `new = old + delta` 立刻破，撤销与聚合跟着错。
+4. **派生值不能当新写入**：快照上传用的是库里的原始状态，不是 UI 算出来的 0。
+5. **显示层不要直接读 `entry.value` 展示 quota**，一律走派生入口，否则三端会出现两个数。
+
+### 权威文档索引
+
+| 想知道 | 看 |
+|---|---|
+| 模块结构、数据流、存储契约、变更脚本语义 | 本文 |
+| 类型语义（`set` / `reset` / `regen` / `meta`）、两行物化边界、同步水位与回放、设计限制 | [08-profile-sync.md](../../02-decisions/05-profile/08-profile-sync.md)（v1.4，现行权威） |
+| 字段定义（`profile.yaml` / `entries` / `history` / 协议 op） | [01-data-model.md](../../../40-reference/03-profile/01-data-model.md) |
+| 同步协议与账户（契约 C） | [02-profile-and-account.md](../../../40-reference/04-sync/02-profile-and-account.md) |
+| 总览页面结构与布局同步、历史对话框交互 | [06-overview-layout-sync.md](../../02-decisions/05-profile/06-overview-layout-sync.md)、[05-history-dialog.md](../../02-decisions/05-profile/05-history-dialog.md) |
+| v1.1 旧协议（已被 08 取代，仅作历史） | [07-set-only-v1.1.md](../../02-decisions/05-profile/07-set-only-v1.1.md) |
+| 业务需求与目标（规划层，尚未全部实现，状态可能滞后） | [plans/02-profile](../../../20-plans/02-profile/README.md) |
 
 ## 模块边界
 
@@ -117,9 +179,9 @@ show_totals / name_column_width / column_widths}}`。
 
 ## 周期恢复与消耗
 
-准点恢复和实时恢复都是读时函数，`ProfileEngine.tick` 不把它们写成账本行。消耗读取这个当前值，加上增量，立刻写成一条绝对值 `set`；写之前先落一条 `regen` 行说明这段恢复。这次写入不查看登录态，也不等待本次进程的拉取。
+恢复与归零都是读时函数，`ProfileEngine.tick` 不把它们写成账本行（链路见上文「机制总览」）。消耗读取这个当前值、加上增量，立刻写成一条绝对值 `set`；写入前的两行固化（`regen` / `reset`）只随真实写入发生——不查看登录态，也不等待本次进程的拉取。
 
-quota 的周期归零同理：当前值由 `periods.quota_current_value` 读时派生（`event_at` 早于本周期边界即读作 0），引擎不再按周期落 `reset`。真实写入发生在跨周期之后时，先固化一条 `reset` 行（值 0、`event_at` 取周期边界），业务行再从 0 起算；当前值已经是 0 时不落 0→0 的 `reset`。显示层（总览、用户信息）、DSL、Android 工作台与写入基线共用这一个入口，因此 05:00:00 一过每个读面同时归零，引擎的 tick 只负责对齐边界发一次刷新信号。
+quota 的归零入口与显示口径同一条：`periods.quota_current_value`，`event_at` 早于本周期边界即读作 0；引擎的 tick 只对齐边界发一次刷新信号，因此 05:00:00 一过每个读面同时归零。
 
 `set` / `reset` / `regen` 三种行的 `new_value` 都是覆盖值：任一端回放落地后即为该端当前值，只受 `(event_at, 到达序)` 裁决，不因类型降级。`meta` 例外，只改 `locked`。多端把某条行认成最新值而算偏时，下一次真实观测写回的绝对真值会覆盖回来——账本按观测自愈。
 

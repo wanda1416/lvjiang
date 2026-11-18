@@ -3,7 +3,8 @@
 本文是 Profile 账本同步与账户同步状态的权威契约，只写当前事实。实现主源：
 `src/lvjiang/core/profile/snapshot_sync.py`（客户端一轮编排与回放）、
 `server/src/profile_sync.mjs`（服务端 push/pull/快照）、`server/src/profile_state.mjs`
-（同步状态与清空）。需求侧叙述见 `docs/30-design/02-decisions/profile/08-profile-sync.md`。
+（同步状态与清空）。物化时机、v1.3/v1.4 版本归属及主动接受的限制见
+[Profile 同步设计](../../30-design/02-decisions/05-profile/08-profile-sync.md)。
 
 ## 1. 编号与行身份
 

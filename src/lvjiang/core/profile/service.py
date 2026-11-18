@@ -861,6 +861,17 @@ def sync_write_adapter(
         return current_value, 0
     _submit_synchronous(event)
 
+    # 候选确实要写入后才固化恢复；目标写入与直接写入使用同一份恢复账本。
+    # 速率型恢复仍在增长，业务增量必须按实际固化的基线重算，不能混用前一次读值。
+    _, current_value, _ = _materialize_regen(
+        user_name, model_type, key, kd,
+        current_entry=db_read_entry(user_name, model_type, key),
+        current_value=current_value, expected_entry=None,
+    )
+    new_value = _resolve_new_value(
+        current_value, model_type, kd, delta=delta, set_value=None)
+    actual_delta = _normalize_float_noise(new_value - current_value)
+
     # quota 目标跨周期时同样先固化归零，否则这一行会拿旧周期满值当 old、
     # 按 0 起算的 delta 记账（sync_targets 写 quota 是「逐战商店买配额」这类路径）。
     _materialize_period_reset(

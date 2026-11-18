@@ -278,7 +278,7 @@ Windows/Android 构建、签名核验及四项产物检查，不允许绕过失�
 
 测试版本的配置仍按目标三段系列匹配，但 r0 与状态放在完整测试版本目录，
 例如 updates/v0.15.0b1，不能与 updates/v0.15.0 混用。详见
-[测试与预发布需求](../docs/30-design/decisions/platform/17-prerelease.md)。
+[测试与预发布需求](../docs/30-design/02-decisions/04-platform/17-prerelease.md)。
 
 ---
 

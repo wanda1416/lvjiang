@@ -1,0 +1,348 @@
+# DSL 模块化：import / def / call
+
+## 目录
+
+- [一、概述](#一概述)
+- [二、import — 引入外部 def 定义](#二import--引入外部-def-定义)
+- [三、def — 定义子过程](#三def--定义子过程)
+- [四、call — 执行调用](#四call--执行调用)
+  - [变量隔离](#变量隔离)
+  - [返回值绑定](#返回值绑定)
+- [五、完整示例](#五完整示例)
+- [六、import 外置 Python 脚本](#六import-外置-python-脚本)
+
+## 一、概述
+
+DSL 通过三个正交指令实现代码复用和模块化：
+
+| 指令 | 语义 | 说明 |
+|---|---|---|
+| `import "file.wf"` | 引入定义 | 解析目标文件的 `def` 块，注册到当前命名空间 |
+| `def name($p)` ... `end` | 定义过程 | 在当前文件内定义可复用过程 |
+| `call name($args)` | 执行调用 | 调用本地或导入的过程 |
+| `call $var = name($args)` | 返回值绑定 | 调用过程并接收返回值 |
+
+**命名空间**：平铺。`import "a.wf"` 后，a.wf 中的 `def foo()` 直接以 `call foo()` 调用。不同文件定义同名过程时会在解析期报冲突，不允许依赖 import 顺序隐式覆盖。
+
+## 二、import — 引入外部 def 定义
+
+```
+import "subcall/bag_process_slot.wf"
+import "subcall/navigation.wf"
+```
+
+- 路径一律**相对 workflows 根**，不是相对当前文件所在目录。所以 `subcall/` 内部互相 import 也要写全前缀：`import "subcall/page_detection.wf"`
+- 经配置层跨层解析：**local 影子优先 → system**。因此 local 里的脚本可以直接 import system 的 subcall；把某个 subcall 复制到 local 后，所有 import 它的脚本（含系统脚本）都会改用 local 那份——整文件替换，不做过程级合并
+- **沙盒限制**：只接受以文件名开头的相对路径。以下一律拒绝——
+  - 以 `/` `\` `~` `.` 开头（绝对路径、家目录、相对当前目录、`..` 逃逸）
+  - 含 `:`（Windows 盘符 `C:/x.wf`、UNC）或 `\`（反斜杠分隔符）
+  - 规范化后仍含 `..`（如 `subcall/../../x.wf`，以文件名开头但中段逃逸）
+
+  校验不依赖 `Path.is_absolute()`——它的结果随平台变（`C:/x.wf` 在 Linux 上判定为「非绝对」），用的是与平台无关的字符串规则
+- import 仅引入目标文件中的 `def` 定义，不执行任何过程体
+- 支持链式 import（A import B，B import C → A 可使用 B 和 C 的所有 def）
+- 每个文件应显式 import 它直接调用过程所在的文件，不把传递导入当作本文件的隐式依赖
+- **重复去重**：同一次根工作流加载中，解析到同一规范绝对路径时只加载一次；直接重复和菱形依赖均安全
+- **循环检测**：解析期检测循环 import，发现后抛出错误
+- **冲突检测**：不同文件的同名过程，以及根工作流与导入文件的同名过程，均直接报错并列出两个来源
+
+`workflows/lib/` 收纳不依赖游戏页面或用户资料的纯逻辑过程，当前提供
+`collections.wf`（去重、展开、分块、分组）、`ordering.wf`（快排、合并、
+二分查找）、`numeric.wf`（最大公约数、前缀和）和 `text.wf`（进度对解析）。
+例如 `import "lib/ordering.wf"` 后可用 `call $ordered = quicksort($numbers)`；
+`import "lib/text.wf"` 后可用 `call $p = progress_of($raw)` 得到
+`{valid, current, total, hits}`，判定口径与内置 `extract_progress` 一致。
+这些文件只定义过程，不声明 `runnable` 或 `batchable`，不会进入脚本列表。
+它们的执行与 DSL 能力边界由 `tests/workflows/dsl_capabilities/` 验证。
+系统脚本库里其他过程库（`subcall/`、`batch/` 钩子等）的分层与职责见
+[系统脚本库分层](../../30-design/01-architecture/09-workflows/README.md)。
+
+```
+# 循环 import 示例（会报错）
+# a.wf: import "b.wf"
+# b.wf: import "a.wf"
+# → 循环 import 检测: a.wf -> b.wf -> a.wf
+```
+
+`load_subcalls()` 的 import 图去重范围仅限于单次调用。下一次显式调用仍读取当前文件，
+并覆盖引擎中之前加载的同名过程，用于支持热更新；这不属于 import 冲突。
+
+公共 `parse_file()` 按规范绝对路径和实际文本缓存最多 128 份解析结果，根文件和导入文件
+共用此入口。每次返回深拷贝，运行变量、参数、注册表和校验结果不缓存；并发缓存未命中
+串行处理，避免相同文件重复解析。文件内容改变即重新解析，不依赖修改时间；删除仍报错。
+`parse_text()` 不缓存。首次加载或缓存淘汰后的解析仍有计算开销。
+
+## 三、def — 定义子过程
+
+```
+def process_slot($row, $col)
+    eval $slot_key = concat("r", $row, "c", $col)
+    click [bag_equip_detail].[bag_grid][$row][$col]
+    scan $detail_scene.[equip_type, equip_level] as $equip_scan
+    # ...
+end
+```
+
+- 过程定义在文件顶层（不在其他 def 体内）
+- 参数列表可选：`def navigate()` 无参数也合法
+- 参数以 `$` 前缀声明，调用时按位置绑定
+- 过程体内可使用 `return` 退出过程，或 `return <value>` 返回值给调用方
+- 过程体内可使用 `goto` 跳转到同过程内的标签
+
+## 四、call — 执行调用
+
+```
+call process_slot(1, 1)                    # 传两个参数
+call nav_main_to_equip()                   # 无参数
+call find_tune_material($target)           # 传变量值
+call apply(["a", "b"], {"k": $v})          # 传列表 / 字典字面量
+call toggle(true, null)                    # 传布尔 / null
+call click_area((0.1, 0.2, 0.3, 0.4))      # 传矩形 / 区间元组
+```
+
+- 调用已定义的过程（本地 def 或 import 引入的 def）
+- 参数按位置绑定到 def 的形参
+- 参数接受与 `eval` 内置函数实参**完全相同**的一套写法：字符串、数字、
+  `true` / `false` / `null`、列表 `[...]`、字典 `{...}`（可嵌套）、
+  `(x, y)` / `(x, y, w, h)` 元组、变量 `$v`、字段访问 `$d.k`。
+  列表/字典内的元素同样可以是变量，在调用方作用域求值后再注入形参
+
+### 变量隔离
+
+调用过程时 **save/restore caller variables**：
+
+- 过程内的局部变量不影响调用方
+- 参数作为局部变量注入，过程返回后自动恢复
+- 经 `global $name` 声明的名称不参与隔离，主流程与任意深度的子过程共享其最新值
+- `session` / `context` / `_coord_meta` 共享引用（不隔离）
+
+```
+# 调用方
+eval $x = "hello"
+call my_proc($x)
+# $x 仍然是 "hello"（过程内的修改不影响调用方）
+# 但 context 的修改会保留
+```
+
+需要共享简单变量时，可显式声明全局名称：
+
+```
+global $count
+eval $count = 0
+
+def increment()
+    eval $count = $count + 1
+end
+
+call increment()
+# $count == 1
+```
+
+`global` 也可写在子过程中；指令执行后，该名称及其后续写入会对调用方和
+其他子过程可见。其他未被 `global` 声明的变量仍保持原有隔离语义。
+
+### 返回值绑定
+
+使用 `call $var = proc()` 语法接收子过程的返回值：
+
+```
+def get_count()
+    return 42
+end
+
+call $n = get_count()
+# $n == 42
+```
+
+子过程内通过 `return <value>` 返回值，调用方通过 `$var` 接收：
+
+```
+# 被调用方
+def find_material($name)
+    recognize [equip_tune_detail].[material_1, material_2, material_3] as $found by contains $name
+    if $found
+        return $found
+    end
+    return null
+end
+
+# 调用方
+call $slot = find_material("紫色狗粮")
+if $slot
+    click [equip_tune_detail].$slot
+end
+```
+
+支持的返回值类型：数字、字符串、布尔值、null、变量、算术表达式、列表、**字典**。详见 [05.2-flow-jumps.md](05.2-flow-jumps.md#二return--结束工作流或返回子过程)。
+
+**返回字典用于结构化数据传递**：子过程可通过 `return {"field": value}` 返回字典，调用方通过字段访问（`.`）提取多个结果字段。这比用多个全局变量传递更清晰、更模块化：
+
+```
+# 子过程返回字典，一次性传递多个结果
+def scan_equip_info()
+    scan [equip].[name_area] as $name by equals "装备名"
+    scan [equip].[score_area] as $score by equals "评分"
+    return {"name": $name, "score": $score}
+end
+
+# 调用方通过字段访问提取各字段
+call $info = scan_equip_info()
+log concat("装备: ", $info.name, " 分数: ", $info.score)
+```
+
+### 异常返回值约定
+
+子过程使用负数（推荐 `-1`）表示异常或失败返回，调用方可通过检查返回值判断是否成功：
+
+```
+def find_target($name)
+    scan [scene].[areas] as $found by contains $name
+    if not $found
+        log concat("未找到: ", $name)
+        return -1
+    end
+    return $found
+end
+
+call $result = find_target("目标")
+if $result < 0
+    log "查找失败，执行备用逻辑"
+end
+```
+
+**约定**：
+- `return -1`（或任意 `< 0` 的数值）：异常/失败返回
+- `return 0` 或正数：正常返回（也可用于传递状态码）
+- `return null` 或 bare `return`：无返回值或空结果（语义上不同于错误）
+
+**默认返回值**：当子过程执行完毕但没有显式 `return` 值时，`call $var = proc()` 会将 `$var` 绑定为 `null`。这包括以下情况：
+- 子过程没有 `return` 语句，自然执行完毕
+- 子过程使用 bare `return`（不带值）退出
+
+调用方可以通过检查返回值判断执行结果：
+
+```
+call $result = some_proc()
+if $result < 0
+    log "执行失败"
+else if $result is null
+    log "无返回值"
+else
+    log concat("成功: ", $result)
+end
+```
+
+不绑定返回值时，`call proc()` 正常工作，返回值被丢弃：
+
+```
+call do_something()  # 不关心返回值
+```
+
+> **与旧版 context 传递的区别**：旧版通过 `context.slot = $value` 共享引用传递返回值，需要调用方额外读取 `context`。新版 `call $var = proc()` 直接绑定到局部变量，语义更清晰。旧方式仍然可用，特别是在需要传递多个返回值时。
+
+## 五、完整示例
+
+```
+# ── 主工作流：single_tuning.wf ──
+
+# 导入依赖
+import "subcall/navigation.wf"
+import "subcall/find_tune_material.wf"
+
+# 调用导航过程
+call nav_main_to_equip()
+
+# 点击装备并扫描
+click [bag_equip_detail].$equip_slot
+wait @step_interval
+scan [equip_weapon_detail] as $scan_result
+
+# 导航到调律页（带返回值检测）
+call $tune_status = nav_equip_to_tune()
+if not $tune_status
+    log "未进入调律页面"
+    return
+end
+
+# 查找材料
+call $slot = find_tune_material($target_material)
+if $slot
+    click [equip_tune_detail].$slot
+end
+```
+
+```
+# ── 子过程文件：subcall/navigation.wf 中的 nav_equip_to_tune ──
+
+def nav_equip_to_tune()
+    click [equip_detail].[more_func]
+    wait @step_interval
+
+    scan [equip_detail].[sub_func_1, sub_func_2, sub_func_3, sub_func_4] as $tune_key by contains "调律"
+    if not $tune_key
+        log "未找到调律按钮"
+        return false
+    end
+
+    click [equip_weapon_detail].$tune_key
+    wait @step_interval
+    return true
+end
+```
+
+工作流文件自身的显示信息、运行环境和外部参数通过文件头部 `#%` 元数据声明，
+详见 [07.1-metadata.md](07.1-metadata.md)。
+
+## 六、import 外置 Python 脚本
+
+`import` 也能引入单文件 Python 脚本，把脚本里声明的函数当成内置函数用。
+
+### 写法
+
+```python
+# config/local/workflows/lib/equip_rules.py
+from lvjiang.workflows.builtins import builtin_func
+
+
+@builtin_func("score_bonus")
+def score_bonus(_engine, score, threshold):
+    for _ in range(1000):
+        if _engine.should_stop():
+            return 0
+    return 10 if score >= threshold else 0
+```
+
+```
+import "lib/equip_rules.py"
+
+$bonus = score_bonus($score, 90)
+```
+
+- 必须用 `@builtin_func("名字")` 声明才对外可见；没装饰的普通函数不在命名空间里，调用它等于调用未知函数。
+- 调用形式与内置函数完全一致：`eval` 赋值、条件判断、作为其他函数的实参都可以，没有额外前缀。
+- 首参命名为 `_engine` 时自动注入引擎实例，用于在长循环里轮询 `should_stop()`——语句边界的停止检查管不到函数内部，耗时循环必须自己查。
+- 首参命名为 `_wf` 时注入工作流实例，语义与内置函数相同。
+
+### 安全边界
+
+- **只接受本地配置层**：脚本必须位于 `config/local/workflows/` 下。命中 `config/system/workflows/` 的 `.py` 一出现就报错，不做「忽略继续」的降级。
+  - 系统配置可被在线下发，允许它携带 Python 等于把下发通道变成任意代码执行入口。这条限制是它存在的唯一理由，不要为了方便绕过。
+- **路径沙盒与 `.wf` 相同**：相对 workflows 根、以文件名开头，拒绝绝对路径、盘符、反斜杠与 `..` 逃逸。
+- 外置脚本是**进程内全权限代码**：可以 import 标准库与已安装的第三方包，能力与写脚本的人一致。只在自己的机器上放自己信任的脚本。
+
+### 生命周期
+
+- 脚本函数只在**当前任务**内有效：任务开始时空命名空间，任务结束（正常返回、异常、被停止）即销毁。
+- 批处理里相邻任务互相隔离：前一个任务 import 的函数在下一个任务不可见，即使两个任务 import 同一个文件。
+- 函数注册进引擎私有命名空间，不写全局注册表——同时运行的多个引擎各持有各的，不会互相覆盖。
+- 每次执行都从源码重新编译，改完脚本直接再跑即生效；不经过字节码缓存，因此同一秒内改两次也不会读到旧版本。
+- 任务中途 `import` 子 `.wf` 时会重新加载**全部**已登记脚本（不只是新引入的那个），它们的模块顶层代码会再执行一次、模块级状态被重置；脚本顶层因此要保持无副作用。
+- 与内置函数重名、或两个脚本注册同名函数，在加载阶段直接报错，不静默覆盖。
+- 单文件：脚本内可以用绝对导入引标准库与第三方包，但不支持 import 同目录的另一个脚本文件。
+
+### 在应用里浏览
+
+「脚本编辑 → 内置函数」页会扫描本目录下的全部 `.py`，按分组列出 `@builtin_func`
+声明的函数，显示参数含义与返回值，并可「定位到脚本」用外部编辑器打开对应行。
+扫描是静态的（AST 解析），**浏览不会执行脚本**；只有页底「试算」会真正加载并调用函数，
+首参为 `_engine` / `_wf` 的函数需要运行环境，不提供试算。

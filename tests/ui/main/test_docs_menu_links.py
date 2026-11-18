@@ -35,4 +35,4 @@ def test_feedback_dialog_issue_guide_targets_the_faq_page(qtbot, opened_urls):
     """反馈对话框「提交规范」必须指向迁移后的常见问题与反馈页，旧路径不得复现。"""
     FeedbackDialog._open_issue_guide()
     assert opened_urls == [
-        f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-guide/desktop/09-faq-and-feedback.md"]
+        f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-guide/04-desktop/09-faq-and-feedback.md"]

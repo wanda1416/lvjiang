@@ -9,13 +9,13 @@
 
 | 文档 | 内容 |
 |------|------|
-| [doc-standard.md](doc-standard.md) | **文档规范**：分层职责、目录与编号、写作纪律、编目自动化 |
-| [platforms/](platforms/README.md) | 平台推进计划索引（现为 [macos.md](platforms/macos.md)） |
+| [doc-standard.md](01-doc-standard.md) | **文档规范**：分层职责、目录与编号、写作纪律、编目自动化 |
+| [platforms/](01-platforms/README.md) | 平台推进计划索引（现为 [macos.md](01-platforms/01-macos.md)） |
 
 ## 相关位置（原 00-meta 拆分）
 
 | 内容 | 位置 |
 |------|------|
-| 项目阶段快照（roadmap，仅存档） | [history/roadmap.md](../80-history/roadmap.md) |
-| 唯一待办来源（backlog） | [plans/backlog.md](../20-plans/backlog.md) |
-| 过期规划与进度快照归档 | [history/meta-archive/](../80-history/meta-archive/README.md) |
+| 项目阶段快照（roadmap，仅存档） | [history/roadmap.md](../80-history/01-roadmap.md) |
+| 唯一待办来源（backlog） | [plans/backlog.md](../20-plans/01-backlog.md) |
+| 过期规划与进度快照归档 | [history/meta-archive/](../80-history/01-meta-archive/README.md) |

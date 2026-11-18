@@ -4,1459 +4,1459 @@
   "documents": [
     {
       "id": "equipment",
-      "path": "10-domain/yysls/01-equipment-system.md",
+      "path": "10-domain/01-yysls/01-equipment-system.md",
       "title": "燕云十六声装备系统介绍",
       "category": "10-game",
       "sha256": "4debf9ac2f15fcbc4f5373d4d71b5852b1758728127d7fa8b434bb75e467c466"
     },
     {
       "id": "schools",
-      "path": "10-domain/yysls/02-school-system.md",
+      "path": "10-domain/01-yysls/02-school-system.md",
       "title": "燕云十六声流派系统介绍",
       "category": "10-game",
       "sha256": "49e42eb4f8a178ae078bb96e95896bfd643e66cf3fa5dbf3f4daa829c9a69f9a"
     },
     {
       "id": "damage",
-      "path": "10-domain/yysls/03-damage-mechanics.md",
+      "path": "10-domain/01-yysls/03-damage-mechanics.md",
       "title": "燕云十六声伤害与治疗机制",
       "category": "10-game",
       "sha256": "1aed4b416cbf185a40ca244e16e395d3605e05a117457b42c0aa8ad74c6b94d5"
     },
     {
-      "id": "10-domain:yysls:04-tuning-mechanics",
-      "path": "10-domain/yysls/04-tuning-mechanics.md",
+      "id": "10-domain:01-yysls:04-tuning-mechanics",
+      "path": "10-domain/01-yysls/04-tuning-mechanics.md",
       "title": "调律与转律：文档边界",
       "category": "10-game",
-      "sha256": "86ee6eb709f334f00195220dac866710d28d5028d6d8c8da18bc9f1a41e7ca59"
+      "sha256": "fde3ba052568721b9d974b4f16a5b0f495e712a05bdec1fbd58d623e2768121e"
     },
     {
-      "id": "10-domain:yysls:05-ui-pages-and-relations",
-      "path": "10-domain/yysls/05-ui-pages-and-relations.md",
+      "id": "10-domain:01-yysls:05-ui-pages-and-relations",
+      "path": "10-domain/01-yysls/05-ui-pages-and-relations.md",
       "title": "游戏机制：UI 页面及关联关系说明",
       "category": "10-game",
-      "sha256": "fd69854dfa1c41237d7125061ec3c7a531461d16ba999848a2e260d3cb3e6b9c"
+      "sha256": "00b178bb674a6c76b1f985845880e1363f4dfda2f3114abaeebadbd239efd386"
     },
     {
-      "id": "10-domain:yysls:06-mechanics-conventions",
-      "path": "10-domain/yysls/06-mechanics-conventions.md",
+      "id": "10-domain:01-yysls:06-mechanics-conventions",
+      "path": "10-domain/01-yysls/06-mechanics-conventions.md",
       "title": "游戏机制约定（代码内写死项登记）",
       "category": "10-game",
-      "sha256": "ba63149654e563f8d02b98061afbbce5700d09f297aee58cc9cb17f3dd84c3b1"
+      "sha256": "09266b723e745eb2b48cfb8177de2e870d77c0e12922884f9a4e942fc79b11e5"
     },
     {
-      "id": "10-domain:yysls:07-nanlu-season",
-      "path": "10-domain/yysls/07-nanlu-season.md",
+      "id": "10-domain:01-yysls:07-nanlu-season",
+      "path": "10-domain/01-yysls/07-nanlu-season.md",
       "title": "南吕相和赛季（115 阶）",
       "category": "10-game",
-      "sha256": "330c9d8b1cc19ae1d126bba1412439db4faab81603534bbaa552a433b2c675c8"
+      "sha256": "ff2f080b4d17f7d1be5ef4529440dc545c23a2fdd53fd7d970c4665853279f93"
+    },
+    {
+      "id": "10-domain:01-yysls:08-affix-compendium",
+      "path": "10-domain/01-yysls/08-affix-compendium.md",
+      "title": "词条大全",
+      "category": "10-game",
+      "sha256": "1ba561713f9d54a3e65f8f1ce61987bf717c96e2552171620d2313f444567be2"
     },
     {
       "id": "huiyi",
-      "path": "10-domain/yysls/10-tuning-rules/01-huiyi.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/01-huiyi.md",
       "title": "会意流派调律规则",
       "category": "10-game",
       "sha256": "fb067614ad06d150591a546c123f8cce9c7c865804a5a611e63c69e01b2433e4"
     },
     {
       "id": "huixin-big",
-      "path": "10-domain/yysls/10-tuning-rules/02-huixin-big.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/02-huixin-big.md",
       "title": "会心大外流调律规则",
       "category": "10-game",
       "sha256": "5b3ee5b897a1f1c143d289b49556167c539c30e9693884ef07ff01c019a10e6a"
     },
     {
       "id": "huixin-small",
-      "path": "10-domain/yysls/10-tuning-rules/03-huixin-small.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/03-huixin-small.md",
       "title": "会心小外流调律规则",
       "category": "10-game",
       "sha256": "6d565cdaa8b9d607d38851b1a4ac5a42aa34858ae05e16a6cad4f2aaab2e5586"
     },
     {
       "id": "heal-pure",
-      "path": "10-domain/yysls/10-tuning-rules/04-heal-pure.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/04-heal-pure.md",
       "title": "治疗纯奶调律规则",
       "category": "10-game",
       "sha256": "10202629841deb014d14ad118ec80dcb2a5386f76b5eff58651b1505a27d7689"
     },
     {
       "id": "heal-fire",
-      "path": "10-domain/yysls/10-tuning-rules/05-heal-fire.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/05-heal-fire.md",
       "title": "治疗火拳奶调律规则",
       "category": "10-game",
       "sha256": "7e53e1e2a445230af6da79371549f97b24c4ecb92fd3410d5668e2cff0aaf0fe"
     },
     {
       "id": "modao",
-      "path": "10-domain/yysls/10-tuning-rules/06-weiwei-dawang.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/06-weiwei-dawang.md",
       "title": "威威大王调律规则",
       "category": "10-game",
       "sha256": "ca0088e41c415bc31efabca77dd54500bc091dd3b005e255b59d30ce6efb660b"
     },
     {
       "id": "rules",
-      "path": "10-domain/yysls/10-tuning-rules/README.md",
+      "path": "10-domain/01-yysls/10-tuning-rules/README.md",
       "title": "调律评价规则",
       "category": "10-game",
       "sha256": "f61ea101c9883ba88b143b91d04b8ff48b5b8d513a9c32b6c8d3cde917db1294"
     },
     {
-      "id": "10-domain:yysls:20-translation:01-combat-stats",
-      "path": "10-domain/yysls/20-translation/01-combat-stats.md",
+      "id": "10-domain:01-yysls:20-translation:01-combat-stats",
+      "path": "10-domain/01-yysls/20-translation/01-combat-stats.md",
       "title": "01 战斗属性与伤害体系",
       "category": "10-game",
-      "sha256": "866b8429196e3e97c52d7ce33e891635f12a30db5721738882cb7cfa34b33c09"
+      "sha256": "68e2b3d0cf5091c77ce6a37c22aaa157e33da905c6a980a3342c9436b2cbd6cc"
     },
     {
-      "id": "10-domain:yysls:20-translation:02-martial-arts",
-      "path": "10-domain/yysls/20-translation/02-martial-arts.md",
+      "id": "10-domain:01-yysls:20-translation:02-martial-arts",
+      "path": "10-domain/01-yysls/20-translation/02-martial-arts.md",
       "title": "02 武学",
       "category": "10-game",
       "sha256": "ef842c632410c0ff99dc93e659d8cd1e64f4a552263f4151dab91232af763764"
     },
     {
-      "id": "10-domain:yysls:20-translation:03-innerway",
-      "path": "10-domain/yysls/20-translation/03-innerway.md",
+      "id": "10-domain:01-yysls:20-translation:03-innerway",
+      "path": "10-domain/01-yysls/20-translation/03-innerway.md",
       "title": "03 心法",
       "category": "10-game",
       "sha256": "7e74c6abd8baef3cd2f117ec19a944e666844606116988b183f75329308a5572"
     },
     {
-      "id": "10-domain:yysls:20-translation:04-skills",
-      "path": "10-domain/yysls/20-translation/04-skills.md",
+      "id": "10-domain:01-yysls:20-translation:04-skills",
+      "path": "10-domain/01-yysls/20-translation/04-skills.md",
       "title": "04 技能与持续伤害",
       "category": "10-game",
       "sha256": "02d447e766e2f7367eb1e5cab390caafc460bcd65d7acc0efb4f461536701148"
     },
     {
-      "id": "10-domain:yysls:20-translation:05-buffs-debuffs",
-      "path": "10-domain/yysls/20-translation/05-buffs-debuffs.md",
+      "id": "10-domain:01-yysls:20-translation:05-buffs-debuffs",
+      "path": "10-domain/01-yysls/20-translation/05-buffs-debuffs.md",
       "title": "05 增益与减益",
       "category": "10-game",
       "sha256": "83d72f06c49f6d07396dd32d472714514a6bd29d0ef6aee876d5bc15ce29a4d7"
     },
     {
-      "id": "10-domain:yysls:20-translation:06-equipment",
-      "path": "10-domain/yysls/20-translation/06-equipment.md",
+      "id": "10-domain:01-yysls:20-translation:06-equipment",
+      "path": "10-domain/01-yysls/20-translation/06-equipment.md",
       "title": "06 装备与定音",
       "category": "10-game",
-      "sha256": "529801839facff86f2dd9482c266566a5ba33909156795647d9505bf1c2e35bb"
+      "sha256": "9bf07e62200f851cd3acd6c740ce1c65845277f85f7ea820fc18397652ea4ec7"
     },
     {
-      "id": "10-domain:yysls:20-translation:07-consumables-misc",
-      "path": "10-domain/yysls/20-translation/07-consumables-misc.md",
+      "id": "10-domain:01-yysls:20-translation:07-consumables-misc",
+      "path": "10-domain/01-yysls/20-translation/07-consumables-misc.md",
       "title": "07 神工、帖、食物与突破",
       "category": "10-game",
-      "sha256": "5e102c696dbc17af079cb943855dcd9f7c42e742b12bfefa12fa1a4e5d3a4dc9"
+      "sha256": "e065297f409457d0ff7e9bba6f8bf55ae697282ddaf57372923912b9b228c1d4"
     },
     {
-      "id": "10-domain:yysls:20-translation:08-i18n-language-status",
-      "path": "10-domain/yysls/20-translation/08-i18n-language-status.md",
+      "id": "10-domain:01-yysls:20-translation:08-i18n-language-status",
+      "path": "10-domain/01-yysls/20-translation/08-i18n-language-status.md",
       "title": "多语言词表现状与日文术语生成",
       "category": "10-game",
-      "sha256": "738322143d9f5dde6b756c09b5e25c4b4b1a0020ebc8951e81db35c435d0f295"
+      "sha256": "0efed9bd1755a7a19fbca8b43ec4e99898f6da01af02fdcda26a0e4775cf285c"
     },
     {
-      "id": "10-domain:yysls:20-translation:README",
-      "path": "10-domain/yysls/20-translation/README.md",
+      "id": "10-domain:01-yysls:20-translation:README",
+      "path": "10-domain/01-yysls/20-translation/README.md",
       "title": "游戏术语中英对照（20-translation）",
       "category": "10-game",
-      "sha256": "a651318da1fae19f022b2ac3d35a84e0a270e16fb684e4289e73a6e5e9275b3f"
+      "sha256": "967184ffcbd2384491338c4311a8e22e307a23a4213b2cd2b366011084fa2ffd"
     },
     {
       "id": "domain",
-      "path": "10-domain/yysls/README.md",
+      "path": "10-domain/01-yysls/README.md",
       "title": "游戏领域知识",
       "category": "10-game",
-      "sha256": "ae2cea98cb883aac3b0e53f200ae87c3f4c7e72143fe66cffc380368eadc7106"
+      "sha256": "c8b85c73bfc5826d51579d7742e24dfbd7cce445ba0fdd4a3d242eb3c2fefac7"
     },
     {
-      "id": "10-domain:yysls:affix-compendium",
-      "path": "10-domain/yysls/affix-compendium.md",
-      "title": "词条大全",
-      "category": "10-game",
-      "sha256": "5ec2d33cad87e61fd59495cbabb91ac68f0f576deaeb5184b5a79dddf4fb4342"
-    },
-    {
-      "id": "architecture",
-      "path": "30-design/architecture/README.md",
-      "title": "架构与设计区",
-      "category": "30-architecture",
-      "sha256": "3adc6f623c040605ba808761e6181885849d8264a6d54e57d6ab24b1709aa1bf"
-    },
-    {
-      "id": "30-design:architecture:engine:01-screenshot-and-crop",
-      "path": "30-design/architecture/engine/01-screenshot-and-crop.md",
+      "id": "30-design:01-architecture:01-engine:01-screenshot-and-crop",
+      "path": "30-design/01-architecture/01-engine/01-screenshot-and-crop.md",
       "title": "scan / recognize 的截图-裁剪-识别数据流",
       "category": "30-architecture",
-      "sha256": "70a928b3cc5a97d3313898a1d46a179b38342b588158c6a1a297f613c9a6276a"
+      "sha256": "932b8527130ac2f938116570d0010515c26b7da694f423e1a3962240476efdd0"
     },
     {
-      "id": "30-design:architecture:engine:02-static-check",
-      "path": "30-design/architecture/engine/02-static-check.md",
+      "id": "30-design:01-architecture:01-engine:02-static-check",
+      "path": "30-design/01-architecture/01-engine/02-static-check.md",
       "title": "02-static-check — 跑脚本前的静态检查",
       "category": "30-architecture",
       "sha256": "7c8f959d7fc773c25a92c465faff0369952a9e413583e8cd6a31e12b8a9efb91"
     },
     {
-      "id": "30-design:architecture:engine:03-error-reporting",
-      "path": "30-design/architecture/engine/03-error-reporting.md",
+      "id": "30-design:01-architecture:01-engine:03-error-reporting",
+      "path": "30-design/01-architecture/01-engine/03-error-reporting.md",
       "title": "03-error-reporting — 异常记账：什么时候打堆栈",
       "category": "30-architecture",
       "sha256": "cb5eadedf587db081b4d6cf1024204c036f3085bff013b36d12417d00a8b0e95"
     },
     {
-      "id": "30-design:architecture:engine:README",
-      "path": "30-design/architecture/engine/README.md",
+      "id": "30-design:01-architecture:01-engine:README",
+      "path": "30-design/01-architecture/01-engine/README.md",
       "title": "33-engine — 引擎内部机制",
       "category": "30-architecture",
       "sha256": "b4d631a6b678fa9bcb27ef6609587ffb4926df6e896820020374221eb9f3c779"
     },
     {
-      "id": "30-design:architecture:graduation:01-data-flow",
-      "path": "30-design/architecture/graduation/01-data-flow.md",
-      "title": "端到端数据流",
-      "category": "30-architecture",
-      "sha256": "6340111447d925b3f8a030cf3b0a1f686718569c94e19ea9b2b8e2a1b786f91a"
-    },
-    {
-      "id": "30-design:architecture:graduation:02-formula-language",
-      "path": "30-design/architecture/graduation/02-formula-language.md",
-      "title": "Excel 公式子集规范",
-      "category": "30-architecture",
-      "sha256": "6fcb691500543146ccc094a19aa2c0cc4f39bd0db0f4eba93710b5bc0cf80a8c"
-    },
-    {
-      "id": "30-design:architecture:graduation:03-json-model",
-      "path": "30-design/architecture/graduation/03-json-model.md",
-      "title": "JSON v3 Schema 契约",
-      "category": "30-architecture",
-      "sha256": "ff54f69656740d795ecbe60f6f7efdb396ce4ca9dc7774fb9593944ad8d7795d"
-    },
-    {
-      "id": "30-design:architecture:graduation:04-alias-resolution",
-      "path": "30-design/architecture/graduation/04-alias-resolution.md",
-      "title": "别名解析规则",
-      "category": "30-architecture",
-      "sha256": "3cd13ea385aef52be4355bb5b30b762c5f926e036581d6db632fe468899308a3"
-    },
-    {
-      "id": "30-design:architecture:graduation:05-compiler-runtime",
-      "path": "30-design/architecture/graduation/05-compiler-runtime.md",
-      "title": "编译器与运行时",
-      "category": "30-architecture",
-      "sha256": "6208564d92edfe0c734fa91d0f0930d468068f2f4309462d534bb1e410f943a0"
-    },
-    {
-      "id": "30-design:architecture:graduation:06-operations",
-      "path": "30-design/architecture/graduation/06-operations.md",
-      "title": "毕业率导入验证与缓存契约",
-      "category": "30-architecture",
-      "sha256": "ddce3c36064d346de07472fdb4d64c3b85dd15d8cc6e7ac568896aac6eff888a"
-    },
-    {
-      "id": "30-design:architecture:graduation:07-skill-rotation",
-      "path": "30-design/architecture/graduation/07-skill-rotation.md",
-      "title": "技能轴查看",
-      "category": "30-architecture",
-      "sha256": "39c42850c9b8c02121361a953888e37f20042485717e835fd893c777cfd30b0e"
-    },
-    {
-      "id": "30-design:architecture:graduation:08-scoring-layer",
-      "path": "30-design/architecture/graduation/08-scoring-layer.md",
-      "title": "评分层：从备战方案到毕业率的公共骨架",
-      "category": "30-architecture",
-      "sha256": "afd8ad609d0ee99a05527961ea817bacd264de8e747163c5ba59e647c5646ee7"
-    },
-    {
-      "id": "30-design:architecture:graduation:09-transmute-simulation",
-      "path": "30-design/architecture/graduation/09-transmute-simulation.md",
-      "title": "模拟转律：候选、搜索、投影与持久化",
-      "category": "30-architecture",
-      "sha256": "5747e57ae45f4770dbe09ea83e17af69e87b703f4fddce03270d15a269b52ccd"
-    },
-    {
-      "id": "30-design:architecture:graduation:README",
-      "path": "30-design/architecture/graduation/README.md",
-      "title": "毕业率计算引擎",
-      "category": "30-architecture",
-      "sha256": "e6b1a1588d5a78d7c9cdfec39b6a979b2b6e64ad5813178c224519f71b6d8391"
-    },
-    {
-      "id": "30-design:architecture:graduation:references:leoq7-data-format",
-      "path": "30-design/architecture/graduation/references/leoq7-data-format.md",
-      "title": "装备数据外部交换格式（V2）",
-      "category": "30-architecture",
-      "sha256": "369e5f62302b6277e00a8f6834cc1ea692ce7d65dc39413c248e9d16747b892f"
-    },
-    {
-      "id": "30-design:architecture:models:01-equipment-models",
-      "path": "30-design/architecture/models/01-equipment-models.md",
-      "title": "装备领域模型定义",
-      "category": "30-architecture",
-      "sha256": "1f17fb0d81a65e014e1312e2e021dbc4548784d90114127aec8cdeffe3b49796"
-    },
-    {
-      "id": "30-design:architecture:models:02-scene-implementations",
-      "path": "30-design/architecture/models/02-scene-implementations.md",
-      "title": "场景实现定义",
-      "category": "30-architecture",
-      "sha256": "fa891eda16c3eacb53cd66444254d4b0ffedac1969f342a76657d3bada889eb7"
-    },
-    {
-      "id": "30-design:architecture:models:03-session-and-context",
-      "path": "30-design/architecture/models/03-session-and-context.md",
-      "title": "Session 与 Context 数据模型",
-      "category": "30-architecture",
-      "sha256": "1aa5a78c1e06adca18e89d6a0cf32a30fbeb380acb1795143f84c1d72d3ed848"
-    },
-    {
-      "id": "30-design:architecture:models:04-profile",
-      "path": "30-design/architecture/models/04-profile.md",
-      "title": "Profile 共享模块",
-      "category": "30-architecture",
-      "sha256": "40b98eb7d0cf7980fc38b6afd69b13bb6b8ee5d5dd2a6ade549a659ffb412697"
-    },
-    {
-      "id": "30-design:architecture:models:05-martial-arts-and-playstyles",
-      "path": "30-design/architecture/models/05-martial-arts-and-playstyles.md",
-      "title": "武学 / 流派 / 玩法",
-      "category": "30-architecture",
-      "sha256": "046bafdc45fa74150166467041f3397be0f866e0841c924784a31046cbe6760a"
-    },
-    {
-      "id": "30-design:architecture:models:06-base-attr-model",
-      "path": "30-design/architecture/models/06-base-attr-model.md",
-      "title": "基础属性来源模型",
-      "category": "30-architecture",
-      "sha256": "13a8a43f0b1f4495b598ca2224665779842efa1220283d555805d1ba6194ee3a"
-    },
-    {
-      "id": "30-design:architecture:models:README",
-      "path": "30-design/architecture/models/README.md",
-      "title": "数据模型",
-      "category": "30-architecture",
-      "sha256": "85880ba92b3914f8e87fa2952eef52e92dddb0955436d004dd10444f6781e97e"
-    },
-    {
-      "id": "30-design:architecture:overview:01-main-window-state-flow",
-      "path": "30-design/architecture/overview/01-main-window-state-flow.md",
-      "title": "主窗口状态机流程",
-      "category": "30-architecture",
-      "sha256": "5ef25b5abdf7a6501f74e1f0cc694b74321161f5826d32fe17e552ecc1f63a85"
-    },
-    {
-      "id": "30-design:architecture:overview:02-plugin-system",
-      "path": "30-design/architecture/overview/02-plugin-system.md",
-      "title": "插件系统架构与开发指南",
-      "category": "30-architecture",
-      "sha256": "727b37be16f1bb68b5dc1f48afa9fabbae23a27dda510ab85596ff55780cfb61"
-    },
-    {
-      "id": "30-design:architecture:overview:03-graduation-formula-model",
-      "path": "30-design/architecture/overview/03-graduation-formula-model.md",
-      "title": "毕业率公式模型（导航）",
-      "category": "30-architecture",
-      "sha256": "397fc65aec9834ec1876d4d2d7b49127e647361dfcbb455af119463e43fdfcc7"
-    },
-    {
-      "id": "30-design:architecture:overview:04-config-layering",
-      "path": "30-design/architecture/overview/04-config-layering.md",
-      "title": "配置分层：system / local",
-      "category": "30-architecture",
-      "sha256": "1c704286333121712a95b9760fe27c8d51f2c12fb61005863d53c6952ab159ea"
-    },
-    {
-      "id": "30-design:architecture:overview:05-content-cache",
-      "path": "30-design/architecture/overview/05-content-cache.md",
-      "title": "配置修订缓存与任务读取",
-      "category": "30-architecture",
-      "sha256": "4cad782f1227cdd68c58ff37a16f0a39e857b595514d6420a747471ae6e381ae"
-    },
-    {
-      "id": "30-design:architecture:overview:06-session-data-map",
-      "path": "30-design/architecture/overview/06-session-data-map.md",
-      "title": "config/session 数据划分与读写方",
-      "category": "30-architecture",
-      "sha256": "08866574dd6ab9d498f430e8f80031ee22b23d76fa3f3b803831c553ab4c7f73"
-    },
-    {
-      "id": "30-design:architecture:overview:README",
-      "path": "30-design/architecture/overview/README.md",
-      "title": "架构总览",
-      "category": "30-architecture",
-      "sha256": "0778083dfafdec6e17c41746b556878ee0dfb31c757a02a23471d6c01434d2de"
-    },
-    {
-      "id": "30-design:architecture:platform:01-device-agent-protocol",
-      "path": "30-design/architecture/platform/01-device-agent-protocol.md",
-      "title": "设备端代理协议（PC ↔ 律匠 app）",
-      "category": "30-architecture",
-      "sha256": "438e120de5b65c1c012c8ecac5520544a38ac1216108db6d4f5282e03cd6119b"
-    },
-    {
-      "id": "30-design:architecture:platform:02-instance-access",
-      "path": "30-design/architecture/platform/02-instance-access.md",
-      "title": "多实例与用户执行隔离",
-      "category": "30-architecture",
-      "sha256": "2693bfd5953b0dc4797d80de613ff98514d4a14458e979e59f086017961bb3a4"
-    },
-    {
-      "id": "30-design:architecture:platform:03-io-backends",
-      "path": "30-design/architecture/platform/03-io-backends.md",
-      "title": "截图与输入后端矩阵",
-      "category": "30-architecture",
-      "sha256": "0e820f5554ce09fe04879e0e624141d28431af810f6b09f447eac3008eb4d4e7"
-    },
-    {
-      "id": "30-design:architecture:platform:04-telemetry",
-      "path": "30-design/architecture/platform/04-telemetry.md",
-      "title": "匿名统计：数据库设计与分析",
-      "category": "30-architecture",
-      "sha256": "bd47592ada692e9f4995f59684e00eff805130a4600464018074518dbde86ab5"
-    },
-    {
-      "id": "30-design:architecture:platform:08-i18n",
-      "path": "30-design/architecture/platform/08-i18n.md",
-      "title": "国际化模块与翻译查找契约",
-      "category": "30-architecture",
-      "sha256": "c641c1eddc7edbbcc9873dbc2ee644aacdde64bd6bc72334d7251fd71f25f317"
-    },
-    {
-      "id": "30-design:architecture:platform:09-android-workbench",
-      "path": "30-design/architecture/platform/09-android-workbench.md",
-      "title": "Android 工作台架构",
-      "category": "30-architecture",
-      "sha256": "044d8619e8024a0b2d48c8286115303f6270e4f35296b0e890d4a1914aea61c0"
-    },
-    {
-      "id": "30-design:architecture:platform:10-android-batch",
-      "path": "30-design/architecture/platform/10-android-batch.md",
-      "title": "Android 批量执行架构",
-      "category": "30-architecture",
-      "sha256": "546cde8ca8f731e7ca9e75a6631f45898dec189a2495ce087f89c4498aecbd4f"
-    },
-    {
-      "id": "30-design:architecture:platform:11-background-services",
-      "path": "30-design/architecture/platform/11-background-services.md",
-      "title": "公共服务与桌面适配",
-      "category": "30-architecture",
-      "sha256": "c556674aff48e118c5cf7862d3831d5cb84213228c633847e8d9a1b81a8aec25"
-    },
-    {
-      "id": "30-design:architecture:platform:README",
-      "path": "30-design/architecture/platform/README.md",
-      "title": "平台与接入",
-      "category": "30-architecture",
-      "sha256": "cfc0963977c8250222f20cfd38434344902d171011917358a2d66bd70ae0cd22"
-    },
-    {
-      "id": "30-design:architecture:plugins",
-      "path": "30-design/architecture/plugins.md",
+      "id": "30-design:01-architecture:01-plugins",
+      "path": "30-design/01-architecture/01-plugins.md",
       "title": "契约 A：插件装配",
       "category": "30-architecture",
       "sha256": "5136c70256ac4a5b861c2780280eba599a3810e3be25c3e970359c14575ea57c"
     },
     {
-      "id": "30-design:architecture:runtime:01-tuning-history",
-      "path": "30-design/architecture/runtime/01-tuning-history.md",
-      "title": "调律历史与管理架构",
+      "id": "30-design:01-architecture:02-graduation:01-data-flow",
+      "path": "30-design/01-architecture/02-graduation/01-data-flow.md",
+      "title": "端到端数据流",
       "category": "30-architecture",
-      "sha256": "851f5ff71acd8589dd2c60d47bc948d7b84a970b706607c54fd40adf6a44275a"
+      "sha256": "1cf02e0e6f7e27587cc2a0c2a21519fe834b6968b5bb2e01ecf8b510c191451c"
     },
     {
-      "id": "30-design:architecture:runtime:02-maps",
-      "path": "30-design/architecture/runtime/02-maps.md",
+      "id": "30-design:01-architecture:02-graduation:01-references:01-leoq7-data-format",
+      "path": "30-design/01-architecture/02-graduation/01-references/01-leoq7-data-format.md",
+      "title": "装备数据外部交换格式（V2）",
+      "category": "30-architecture",
+      "sha256": "369e5f62302b6277e00a8f6834cc1ea692ce7d65dc39413c248e9d16747b892f"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:02-formula-language",
+      "path": "30-design/01-architecture/02-graduation/02-formula-language.md",
+      "title": "Excel 公式子集规范",
+      "category": "30-architecture",
+      "sha256": "578336db0a6e9d3a1387c55fb89b6af0ed166256ab3e2706dd62c1de03ce9602"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:03-json-model",
+      "path": "30-design/01-architecture/02-graduation/03-json-model.md",
+      "title": "JSON v3 Schema 契约",
+      "category": "30-architecture",
+      "sha256": "ff54f69656740d795ecbe60f6f7efdb396ce4ca9dc7774fb9593944ad8d7795d"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:04-alias-resolution",
+      "path": "30-design/01-architecture/02-graduation/04-alias-resolution.md",
+      "title": "别名解析规则",
+      "category": "30-architecture",
+      "sha256": "3cd13ea385aef52be4355bb5b30b762c5f926e036581d6db632fe468899308a3"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:05-compiler-runtime",
+      "path": "30-design/01-architecture/02-graduation/05-compiler-runtime.md",
+      "title": "编译器与运行时",
+      "category": "30-architecture",
+      "sha256": "6208564d92edfe0c734fa91d0f0930d468068f2f4309462d534bb1e410f943a0"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:06-operations",
+      "path": "30-design/01-architecture/02-graduation/06-operations.md",
+      "title": "毕业率导入验证与缓存契约",
+      "category": "30-architecture",
+      "sha256": "e7f6fa497e4cf1f61b73b376480d5754e7848a7ce30ff3f0c8f0b2de057ca67c"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:07-skill-rotation",
+      "path": "30-design/01-architecture/02-graduation/07-skill-rotation.md",
+      "title": "技能轴查看",
+      "category": "30-architecture",
+      "sha256": "39c42850c9b8c02121361a953888e37f20042485717e835fd893c777cfd30b0e"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:08-scoring-layer",
+      "path": "30-design/01-architecture/02-graduation/08-scoring-layer.md",
+      "title": "评分层：从备战方案到毕业率的公共骨架",
+      "category": "30-architecture",
+      "sha256": "f74acec30704bdd78979dff1688044bbf1c4a7783de96926faa7e902f543633d"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:09-transmute-simulation",
+      "path": "30-design/01-architecture/02-graduation/09-transmute-simulation.md",
+      "title": "模拟转律：候选、搜索、投影与持久化",
+      "category": "30-architecture",
+      "sha256": "749a6d48338f6850c0176719dca8b72465be50a74274a6788ffb8d93b66a3370"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:README",
+      "path": "30-design/01-architecture/02-graduation/README.md",
+      "title": "毕业率计算引擎",
+      "category": "30-architecture",
+      "sha256": "ac99733efc44bb74fe0d562fd82d4ed7978b58ba676c051824bb105286eabc19"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:01-equipment-models",
+      "path": "30-design/01-architecture/03-models/01-equipment-models.md",
+      "title": "装备领域模型定义",
+      "category": "30-architecture",
+      "sha256": "6925180da1f99c4b0c1e14bdc2f498a8cb8d87f9283b365f531007f784979d65"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:02-scene-implementations",
+      "path": "30-design/01-architecture/03-models/02-scene-implementations.md",
+      "title": "场景实现定义",
+      "category": "30-architecture",
+      "sha256": "a332d657c1b8e3f484fcd5da135cd4a3f21dfd470bad8253c576da21fd29e8a1"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:03-session-and-context",
+      "path": "30-design/01-architecture/03-models/03-session-and-context.md",
+      "title": "Session 与 Context 数据模型",
+      "category": "30-architecture",
+      "sha256": "bae81521cec28cfad063a54bf48672f561de8e54682fff12fc17169b8837efcd"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:04-profile",
+      "path": "30-design/01-architecture/03-models/04-profile.md",
+      "title": "Profile 共享模块",
+      "category": "30-architecture",
+      "sha256": "698ab0eac20dc09a25041eb893f4907f725db03727ed57925b6fd01f2b22259f"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:05-martial-arts-and-playstyles",
+      "path": "30-design/01-architecture/03-models/05-martial-arts-and-playstyles.md",
+      "title": "武学 / 流派 / 玩法",
+      "category": "30-architecture",
+      "sha256": "2aed479d46ff13182c2b1aedf325a8ea38919fbe09443132c6ec820e5f064638"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:06-base-attr-model",
+      "path": "30-design/01-architecture/03-models/06-base-attr-model.md",
+      "title": "基础属性来源模型",
+      "category": "30-architecture",
+      "sha256": "bdab7a5aed26bf28d0fadc773e4df0f64d010eb4958bcd721d8b7d5c9e7ec87e"
+    },
+    {
+      "id": "30-design:01-architecture:03-models:README",
+      "path": "30-design/01-architecture/03-models/README.md",
+      "title": "数据模型",
+      "category": "30-architecture",
+      "sha256": "42c63695a725157b55e26306ddd1b81e05c281979d6aaf3e68e6f1208684988b"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:01-main-window-state-flow",
+      "path": "30-design/01-architecture/04-overview/01-main-window-state-flow.md",
+      "title": "主窗口状态机流程",
+      "category": "30-architecture",
+      "sha256": "b5e34a6fce532ab3577cb94f73f4342e8b5d2d01fe72fdc730ee541bc78686da"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:02-plugin-system",
+      "path": "30-design/01-architecture/04-overview/02-plugin-system.md",
+      "title": "插件系统架构与开发指南",
+      "category": "30-architecture",
+      "sha256": "a34c8876013756d45319c9d51581d0899a409d329f5bc13c282d03769c1e9e2f"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:03-graduation-formula-model",
+      "path": "30-design/01-architecture/04-overview/03-graduation-formula-model.md",
+      "title": "毕业率公式模型（导航）",
+      "category": "30-architecture",
+      "sha256": "4d23301b18f64eb4d1ae0df011619f498fc9c445f7189e393e6e5eb953b74845"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:04-config-layering",
+      "path": "30-design/01-architecture/04-overview/04-config-layering.md",
+      "title": "配置分层：system / local",
+      "category": "30-architecture",
+      "sha256": "afbc655afceb67921f2a69a86b5d5df49b17e417444573514146e12efdf24f37"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:05-content-cache",
+      "path": "30-design/01-architecture/04-overview/05-content-cache.md",
+      "title": "配置修订缓存与任务读取",
+      "category": "30-architecture",
+      "sha256": "4cad782f1227cdd68c58ff37a16f0a39e857b595514d6420a747471ae6e381ae"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:06-session-data-map",
+      "path": "30-design/01-architecture/04-overview/06-session-data-map.md",
+      "title": "config/session 数据划分与读写方",
+      "category": "30-architecture",
+      "sha256": "2f6d95672a6f3785a29f09a11e9d37fbe32f97cafcb87398dc02eeed727a96d0"
+    },
+    {
+      "id": "30-design:01-architecture:04-overview:README",
+      "path": "30-design/01-architecture/04-overview/README.md",
+      "title": "架构总览",
+      "category": "30-architecture",
+      "sha256": "0778083dfafdec6e17c41746b556878ee0dfb31c757a02a23471d6c01434d2de"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:01-device-agent-protocol",
+      "path": "30-design/01-architecture/05-platform/01-device-agent-protocol.md",
+      "title": "设备端代理协议（PC ↔ 律匠 app）",
+      "category": "30-architecture",
+      "sha256": "438e120de5b65c1c012c8ecac5520544a38ac1216108db6d4f5282e03cd6119b"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:02-instance-access",
+      "path": "30-design/01-architecture/05-platform/02-instance-access.md",
+      "title": "多实例与用户执行隔离",
+      "category": "30-architecture",
+      "sha256": "38c6a0aa933af8784d9e4d4b0c47f5c067d7ab570fbe486c0b504463d70cc16e"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:03-io-backends",
+      "path": "30-design/01-architecture/05-platform/03-io-backends.md",
+      "title": "截图与输入后端矩阵",
+      "category": "30-architecture",
+      "sha256": "c4e9e28b6b8b7c708a34ddb4e8401248ea52661b1c1beda11a7d1545725dde8d"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:04-telemetry",
+      "path": "30-design/01-architecture/05-platform/04-telemetry.md",
+      "title": "匿名统计：数据库设计与分析",
+      "category": "30-architecture",
+      "sha256": "16ae7806d6fab8dc1b5d2aba4918537d39f7265a8e28519e7e29d46817e9990e"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:08-i18n",
+      "path": "30-design/01-architecture/05-platform/08-i18n.md",
+      "title": "国际化模块与翻译查找契约",
+      "category": "30-architecture",
+      "sha256": "069af20351a01fa1d7ebc2b416fbccdbed62e97fd175cf41e706bd3e9f6cbecd"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:09-android-workbench",
+      "path": "30-design/01-architecture/05-platform/09-android-workbench.md",
+      "title": "Android 工作台架构",
+      "category": "30-architecture",
+      "sha256": "f8d9188021fd0257344b20de2cce3bdb8b52a785aeecc45ef2e21e46487ea5ef"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:10-android-batch",
+      "path": "30-design/01-architecture/05-platform/10-android-batch.md",
+      "title": "Android 批量执行架构",
+      "category": "30-architecture",
+      "sha256": "546cde8ca8f731e7ca9e75a6631f45898dec189a2495ce087f89c4498aecbd4f"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:11-background-services",
+      "path": "30-design/01-architecture/05-platform/11-background-services.md",
+      "title": "公共服务与桌面适配",
+      "category": "30-architecture",
+      "sha256": "eb89310a05b7072218ef21937fad7cb2da6cd1bcbcf8027c71d91f75cf5c6e8a"
+    },
+    {
+      "id": "30-design:01-architecture:05-platform:README",
+      "path": "30-design/01-architecture/05-platform/README.md",
+      "title": "平台与接入",
+      "category": "30-architecture",
+      "sha256": "cfc0963977c8250222f20cfd38434344902d171011917358a2d66bd70ae0cd22"
+    },
+    {
+      "id": "30-design:01-architecture:06-runtime:01-tuning-history",
+      "path": "30-design/01-architecture/06-runtime/01-tuning-history.md",
+      "title": "调律历史与管理架构",
+      "category": "30-architecture",
+      "sha256": "1bc7f6c280cada3d9c93846737e88274e6e28e8df076bb2d9169cf35a9f73018"
+    },
+    {
+      "id": "30-design:01-architecture:06-runtime:02-maps",
+      "path": "30-design/01-architecture/06-runtime/02-maps.md",
       "title": "地图定义与地图管理",
       "category": "30-architecture",
       "sha256": "c7dff1f0078f73a06e02af99997788283ef322a65ce1570fb7df04a6d6398f29"
     },
     {
-      "id": "30-design:architecture:runtime:03-concurrent-execution",
-      "path": "30-design/architecture/runtime/03-concurrent-execution.md",
+      "id": "30-design:01-architecture:06-runtime:03-concurrent-execution",
+      "path": "30-design/01-architecture/06-runtime/03-concurrent-execution.md",
       "title": "多目标并发执行架构",
       "category": "30-architecture",
-      "sha256": "ad59ab818adfe8ae3befc5d0b9fdf12b051f2b894a3f5b97ad6ced2abcb7a899"
+      "sha256": "8b35e2cd489a858d07b2df863d680fcca3dced8d72c5a4e09dc469019b4b1521"
     },
     {
-      "id": "30-design:architecture:runtime:04-build-calculator",
-      "path": "30-design/architecture/runtime/04-build-calculator.md",
+      "id": "30-design:01-architecture:06-runtime:04-build-calculator",
+      "path": "30-design/01-architecture/06-runtime/04-build-calculator.md",
       "title": "出装搭配与总词条分配",
       "category": "30-architecture",
       "sha256": "a9785337e477af50e686985f5561fe21ddb5ffe967ea5036db8447cb489f32e3"
     },
     {
-      "id": "30-design:architecture:runtime:05-unattended-recovery",
-      "path": "30-design/architecture/runtime/05-unattended-recovery.md",
+      "id": "30-design:01-architecture:06-runtime:05-unattended-recovery",
+      "path": "30-design/01-architecture/06-runtime/05-unattended-recovery.md",
       "title": "无人值守的改道与恢复",
       "category": "30-architecture",
-      "sha256": "3512f86faa52979ccf418afaadc9c1cb66e546f36d40387601bec38f360638b8"
+      "sha256": "7a1e704348c3f4c3adf3877274903b69c0ddf7c41ed7bfd97b8be7f068893534"
     },
     {
-      "id": "30-design:architecture:runtime:06-batch-state-layers",
-      "path": "30-design/architecture/runtime/06-batch-state-layers.md",
+      "id": "30-design:01-architecture:06-runtime:06-batch-state-layers",
+      "path": "30-design/01-architecture/06-runtime/06-batch-state-layers.md",
       "title": "批量的状态分层",
       "category": "30-architecture",
-      "sha256": "6c364baef86c88125e2e87563790df47a49d1d883504c011768b902b04b741fa"
+      "sha256": "75778fd89a63f95833a1313a0fed0c069940aba4e7e3575c00b083c2d37becc0"
     },
     {
-      "id": "30-design:architecture:runtime:README",
-      "path": "30-design/architecture/runtime/README.md",
+      "id": "30-design:01-architecture:06-runtime:README",
+      "path": "30-design/01-architecture/06-runtime/README.md",
       "title": "运行期能力",
       "category": "30-architecture",
       "sha256": "408a0c7abe7a167cabdb219f94f80cbe975b378f197c77610f1d87ddcbd636b0"
     },
     {
-      "id": "30-design:architecture:scene:01-scene-layout-definition",
-      "path": "30-design/architecture/scene/01-scene-layout-definition.md",
+      "id": "30-design:01-architecture:07-scene:01-scene-layout-definition",
+      "path": "30-design/01-architecture/07-scene/01-scene-layout-definition.md",
       "title": "场景与布局 — 语义模型定义",
       "category": "30-architecture",
-      "sha256": "af7175fbe31a7d6d9f3e2d834547d6cbb1f86c646b671bb0219d4580399a3ccb"
+      "sha256": "37dc349f2b47d75d500c2d4770582f61bb3986141c4d135c4f6750fd2b1d437e"
     },
     {
-      "id": "30-design:architecture:scene:02-scene-layout-editing",
-      "path": "30-design/architecture/scene/02-scene-layout-editing.md",
+      "id": "30-design:01-architecture:07-scene:02-scene-layout-editing",
+      "path": "30-design/01-architecture/07-scene/02-scene-layout-editing.md",
       "title": "场景编辑器的配置、布局与运行边界",
       "category": "30-architecture",
-      "sha256": "934ba5b48fcc3d22b4bdf91099b97e599b08d29776e1f3e4bcfc7f205ddd8623"
+      "sha256": "265a890330f3e823904acfb7c7bafd54ca546dfea123110f98093b3bfd26076f"
     },
     {
-      "id": "30-design:architecture:scene:03-cross-scene-references",
-      "path": "30-design/architecture/scene/03-cross-scene-references.md",
+      "id": "30-design:01-architecture:07-scene:03-cross-scene-references",
+      "path": "30-design/01-architecture/07-scene/03-cross-scene-references.md",
       "title": "跨场景 area 引用",
       "category": "30-architecture",
       "sha256": "a23b816a602dbbd27bf192ab0d230dcd9112bbfb6a96df8ea55d5b2f41ae52d4"
     },
     {
-      "id": "30-design:architecture:scene:04-page-transition-contract",
-      "path": "30-design/architecture/scene/04-page-transition-contract.md",
+      "id": "30-design:01-architecture:07-scene:04-page-transition-contract",
+      "path": "30-design/01-architecture/07-scene/04-page-transition-contract.md",
       "title": "页面结构与跳转契约",
       "category": "30-architecture",
       "sha256": "9261ce1039fb4fab52ccbfb65408f0b621654ed4b8e6d5859e96d095d3b2c5bd"
     },
     {
-      "id": "30-design:architecture:scene:README",
-      "path": "30-design/architecture/scene/README.md",
+      "id": "30-design:01-architecture:07-scene:README",
+      "path": "30-design/01-architecture/07-scene/README.md",
       "title": "场景系统",
       "category": "30-architecture",
-      "sha256": "0c6268bca3a2af2fa70a7e05cf62409bdaa882066c6e852d665778a502185618"
+      "sha256": "984d80b5517c2579e116cbbbe4241bb0dece8073aba3bc54e0b2c433ed66ad14"
     },
     {
-      "id": "30-design:architecture:vision:01-perception-channels",
-      "path": "30-design/architecture/vision/01-perception-channels.md",
+      "id": "30-design:01-architecture:08-vision:01-perception-channels",
+      "path": "30-design/01-architecture/08-vision/01-perception-channels.md",
       "title": "01 · 四条感知通道",
       "category": "30-architecture",
-      "sha256": "c14754d8cd3aa2e57e19f8543b5b452aa6a93e4a1dec84a721cbf66c6041fca1"
+      "sha256": "1c56d51827abf5abd2f8c074c12fc681a7c459486b3b09da5ecca62a4da0c6a2"
     },
     {
-      "id": "30-design:architecture:vision:02-color-ops-internals",
-      "path": "30-design/architecture/vision/02-color-ops-internals.md",
+      "id": "30-design:01-architecture:08-vision:02-color-ops-internals",
+      "path": "30-design/01-architecture/08-vision/02-color-ops-internals.md",
       "title": "02 · 图色原语内部算法",
       "category": "30-architecture",
-      "sha256": "40f632781851460f9b89ef26b77a1ed2fc2fc38d56a188d9afb91305520b844d"
+      "sha256": "8f58526e556f6d3d84871775c7b2acfe15d9bcfea0548becf2117cec36419d90"
     },
     {
-      "id": "30-design:architecture:vision:03-template-matching",
-      "path": "30-design/architecture/vision/03-template-matching.md",
+      "id": "30-design:01-architecture:08-vision:03-template-matching",
+      "path": "30-design/01-architecture/08-vision/03-template-matching.md",
       "title": "03 · 模板匹配算法",
       "category": "30-architecture",
-      "sha256": "ff39984e4184d118b1fe7c7c14d08d4d05152b091aae4e6448d998ccf82dd577"
+      "sha256": "0a6093afe9bf5dd5731d4a601e899ac1d7fc1f81c58df2420a84d0be101aedb2"
     },
     {
-      "id": "30-design:architecture:vision:04-coordinate-system",
-      "path": "30-design/architecture/vision/04-coordinate-system.md",
+      "id": "30-design:01-architecture:08-vision:04-coordinate-system",
+      "path": "30-design/01-architecture/08-vision/04-coordinate-system.md",
       "title": "04 · 坐标系与取整一致性",
       "category": "30-architecture",
       "sha256": "745c3ac61a2e10e1657ae882bd15fae41c8e4a4e8e9d400c978c170ae089dee5"
     },
     {
-      "id": "30-design:architecture:vision:05-tuning-and-failures",
-      "path": "30-design/architecture/vision/05-tuning-and-failures.md",
+      "id": "30-design:01-architecture:08-vision:05-tuning-and-failures",
+      "path": "30-design/01-architecture/08-vision/05-tuning-and-failures.md",
       "title": "视觉感知失败语义与能力边界",
       "category": "30-architecture",
-      "sha256": "b0a40bd3144433ac2407be680f6492af013f19dd52d488e09647af46a93291e9"
+      "sha256": "91cbe78d544f8409a335584c4bc320cfe2d69e357b3e71bba445291a4396ed15"
     },
     {
-      "id": "30-design:architecture:vision:06-tooling-and-regression",
-      "path": "30-design/architecture/vision/06-tooling-and-regression.md",
+      "id": "30-design:01-architecture:08-vision:06-tooling-and-regression",
+      "path": "30-design/01-architecture/08-vision/06-tooling-and-regression.md",
       "title": "编辑器与运行期的感知一致性契约",
       "category": "30-architecture",
-      "sha256": "7a1b8a5c812e3fc185090b76a6526a5c0eaf6faaccc40b7f378b5b462f6010e4"
+      "sha256": "3ff95c2dda9910059cdaeb8d537e1745da92dc7352b9132e0ea7ffe8b76c978e"
     },
     {
-      "id": "30-design:architecture:vision:README",
-      "path": "30-design/architecture/vision/README.md",
+      "id": "30-design:01-architecture:08-vision:README",
+      "path": "30-design/01-architecture/08-vision/README.md",
       "title": "37 · 视觉感知子系统（Vision）",
       "category": "30-architecture",
-      "sha256": "4764059711711665c0bbbfd1f7b02d7cee7860042760439a42d6908ae76411fc"
+      "sha256": "635dc7f83330fa504b119e5e7fd2e49486f0e05836ebc2b19fd3e3ef17f855cb"
     },
     {
-      "id": "30-design:architecture:workflows:01-current-equip-analysis",
-      "path": "30-design/architecture/workflows/01-current-equip-analysis.md",
+      "id": "30-design:01-architecture:09-workflows:01-current-equip-analysis",
+      "path": "30-design/01-architecture/09-workflows/01-current-equip-analysis.md",
       "title": "流程：用户当前装备分析",
       "category": "30-architecture",
       "sha256": "914a929df3b51211830936cdc11c4fd0feacdfa27fb7808fb97d224a91c9f46d"
     },
     {
-      "id": "30-design:architecture:workflows:02-auto-tuning",
-      "path": "30-design/architecture/workflows/02-auto-tuning.md",
+      "id": "30-design:01-architecture:09-workflows:02-auto-tuning",
+      "path": "30-design/01-architecture/09-workflows/02-auto-tuning.md",
       "title": "流程：自动调律（Auto Tuning）",
       "category": "30-architecture",
-      "sha256": "27df21f47258014c0d5ce4a70d1ea5bc63e42d388e3acb0cf25055039615b857"
+      "sha256": "343eb52e7db0705ea8e92e40155761d760215a418ffeb2d5cadc1b19cb4efeda"
     },
     {
-      "id": "30-design:architecture:workflows:03-bag-traversal",
-      "path": "30-design/architecture/workflows/03-bag-traversal.md",
+      "id": "30-design:01-architecture:09-workflows:03-bag-traversal",
+      "path": "30-design/01-architecture/09-workflows/03-bag-traversal.md",
       "title": "背包遍历、去重与回收补位",
       "category": "30-architecture",
-      "sha256": "697a7ac4cbb35133ee2c4dcf0b35550be461a7c98ef25ce2fef7453ef899efba"
+      "sha256": "b5cd6f6860e91198bed7c1b9c5f546d0ce4798e94a8d1cf62aec939de2a68a6b"
     },
     {
-      "id": "30-design:architecture:workflows:04-tuning-decisions",
-      "path": "30-design/architecture/workflows/04-tuning-decisions.md",
+      "id": "30-design:01-architecture:09-workflows:04-tuning-decisions",
+      "path": "30-design/01-architecture/09-workflows/04-tuning-decisions.md",
       "title": "自动调律决策与执行保护",
       "category": "30-architecture",
-      "sha256": "e5b12562e3bb510babd22bf9f7e20ff3ca31092de70753824f7926a433dbfdff"
+      "sha256": "4ceb5a2cdfc1eeae88f0a8cb1ff3bb4afd825408fa9500132ceb690181dba17b"
     },
     {
-      "id": "30-design:architecture:workflows:05-execution-feedback",
-      "path": "30-design/architecture/workflows/05-execution-feedback.md",
+      "id": "30-design:01-architecture:09-workflows:05-execution-feedback",
+      "path": "30-design/01-architecture/09-workflows/05-execution-feedback.md",
       "title": "任务入口反馈边界",
       "category": "30-architecture",
       "sha256": "72f891af9e998c95a13398e35a0b6aaf6401c965c136d4b956c321a496118f73"
     },
     {
-      "id": "30-design:architecture:workflows:README",
-      "path": "30-design/architecture/workflows/README.md",
+      "id": "30-design:01-architecture:09-workflows:README",
+      "path": "30-design/01-architecture/09-workflows/README.md",
       "title": "流程编排（Workflows）",
       "category": "30-architecture",
-      "sha256": "cde207a54fd6b5e429d799e157fd3d678d1c65baa728c0d1f68c2ed14bc7e281"
+      "sha256": "5d97ab819fca5ae211516017d861d57369d8689984c7e8fb69a0002c23662118"
     },
     {
-      "id": "30-design:decisions:README",
-      "path": "30-design/decisions/README.md",
-      "title": "决策与规格记录（已实现需求）",
+      "id": "architecture",
+      "path": "30-design/01-architecture/README.md",
+      "title": "架构与设计区",
       "category": "30-architecture",
-      "sha256": "17e95cc061ca4fa24f0675b19fb6c4501f917de98f27af456bec80401f72aba6"
+      "sha256": "bf1a6fc875e7df16fb2f5805d8147667464f7b4b3c0033c429d2799d98721946"
     },
     {
-      "id": "30-design:decisions:batch:01-batch-task-eligibility",
-      "path": "30-design/decisions/batch/01-batch-task-eligibility.md",
+      "id": "30-design:02-decisions:01-batch:01-batch-task-eligibility",
+      "path": "30-design/02-decisions/01-batch/01-batch-task-eligibility.md",
       "title": "批量任务可执行性检查",
       "category": "30-architecture",
       "sha256": "2e87d4b04a7a81f6ffda6c42ea5cb15c05423988b4f6dcba2b5d344e847eb8f8"
     },
     {
-      "id": "30-design:decisions:batch:02-batch-execution-units",
-      "path": "30-design/decisions/batch/02-batch-execution-units.md",
+      "id": "30-design:02-decisions:01-batch:02-batch-execution-units",
+      "path": "30-design/02-decisions/01-batch/02-batch-execution-units.md",
       "title": "批量执行单元",
       "category": "30-architecture",
       "sha256": "a0adef21a281a3c34efa04ff58c8f1229bd2aa58463f02614d508f260a3e62d8"
     },
     {
-      "id": "30-design:decisions:batch:03-unattended-batch",
-      "path": "30-design/decisions/batch/03-unattended-batch.md",
+      "id": "30-design:02-decisions:01-batch:03-unattended-batch",
+      "path": "30-design/02-decisions/01-batch/03-unattended-batch.md",
       "title": "无人值守批量",
       "category": "30-architecture",
-      "sha256": "2e68099c639f60d5f4f8d792aa5be5fd5fffa3b33a612c8760256f4e3a8e49d8"
+      "sha256": "c042e25b16ed73dc66186645ba1307cf4ec9fa4c26612f0cf2316c2ec1e61ef2"
     },
     {
-      "id": "30-design:decisions:batch:04-batch-state-layers",
-      "path": "30-design/decisions/batch/04-batch-state-layers.md",
+      "id": "30-design:02-decisions:01-batch:04-batch-state-layers",
+      "path": "30-design/02-decisions/01-batch/04-batch-state-layers.md",
       "title": "批量的状态分层",
       "category": "30-architecture",
-      "sha256": "168b35bf596874f09024b509798ca8d21ad4c7ebdeb6e962cb3b8fad43ae4c1b"
+      "sha256": "a75cb5b3fe4e4b0856d6fa767f48fabd218803d63f8d59aaae8cd86299a95efb"
     },
     {
-      "id": "30-design:decisions:batch:05-user-task-skip",
-      "path": "30-design/decisions/batch/05-user-task-skip.md",
+      "id": "30-design:02-decisions:01-batch:05-user-task-skip",
+      "path": "30-design/02-decisions/01-batch/05-user-task-skip.md",
       "title": "用户 × 任务：跳过声明与「任务参数」工具",
       "category": "30-architecture",
       "sha256": "8804a1c0e0b3f4dfdc1030fb1e812bad895ed0d3715a2f19712019d2e3b5b8da"
     },
     {
-      "id": "30-design:decisions:editor:01-wf-editor-plugin",
-      "path": "30-design/decisions/editor/01-wf-editor-plugin.md",
+      "id": "30-design:02-decisions:02-editor:01-wf-editor-plugin",
+      "path": "30-design/02-decisions/02-editor/01-wf-editor-plugin.md",
       "title": "VS Code 工作流编辑支持",
       "category": "30-architecture",
-      "sha256": "de016b6b59e452f3e669331beea507ed33422e0052820fd806b6d193cb65ac38"
+      "sha256": "b45935196f07500f2c97e70e67e37b22b7c8b47a80eb3ee7f1f530d30566c7c0"
     },
     {
-      "id": "30-design:decisions:editor:02-task-history",
-      "path": "30-design/decisions/editor/02-task-history.md",
+      "id": "30-design:02-decisions:02-editor:02-task-history",
+      "path": "30-design/02-decisions/02-editor/02-task-history.md",
       "title": "任务历史与批量历史",
       "category": "30-architecture",
-      "sha256": "8d803cdfdf8db3278b11d7a3e5218fbc5fba7e83ad8459f0e4399db2749389ea"
+      "sha256": "bdd4aaba3e9c9c32c12640804685fdf8a2025a3d91a9809d1a599036e820c0b9"
     },
     {
-      "id": "30-design:decisions:editor:03-workflow-metadata-editor",
-      "path": "30-design/decisions/editor/03-workflow-metadata-editor.md",
+      "id": "30-design:02-decisions:02-editor:03-workflow-metadata-editor",
+      "path": "30-design/02-decisions/02-editor/03-workflow-metadata-editor.md",
       "title": "工作流元数据表单与保存位置",
       "category": "30-architecture",
       "sha256": "2c661613437174d17fb39fb1fd13cca961ab30e1f0b274e5bcd94f223b2d0a67"
     },
     {
-      "id": "30-design:decisions:editor:04-canvas-group-selection",
-      "path": "30-design/decisions/editor/04-canvas-group-selection.md",
+      "id": "30-design:02-decisions:02-editor:04-canvas-group-selection",
+      "path": "30-design/02-decisions/02-editor/04-canvas-group-selection.md",
       "title": "画布组选区与整组平移",
       "category": "30-architecture",
       "sha256": "189946e985b38559c4752354ef6f2da443d83fa42670ebbb084f2c9556d6706c"
     },
     {
-      "id": "30-design:decisions:editor:05-runtime-find-area",
-      "path": "30-design/decisions/editor/05-runtime-find-area.md",
+      "id": "30-design:02-decisions:02-editor:05-runtime-find-area",
+      "path": "30-design/02-decisions/02-editor/05-runtime-find-area.md",
       "title": "动态识别区域",
       "category": "30-architecture",
       "sha256": "a6fcb5c4557ecca34ebfaad40c7af64cf6174b7aa88afd5b0e0a06d8b7c5dd79"
     },
     {
-      "id": "30-design:decisions:editor:06-runtime-drag-hold",
-      "path": "30-design/decisions/editor/06-runtime-drag-hold.md",
+      "id": "30-design:02-decisions:02-editor:06-runtime-drag-hold",
+      "path": "30-design/02-decisions/02-editor/06-runtime-drag-hold.md",
       "title": "拖拽保持时长变量",
       "category": "30-architecture",
       "sha256": "62fb1fe2d8b25dba1c32454ccbebbcfea10dbf96bb505ce4d6dc8bfd25b0c38c"
     },
     {
-      "id": "30-design:decisions:editor:07-dsl-parser-performance",
-      "path": "30-design/decisions/editor/07-dsl-parser-performance.md",
+      "id": "30-design:02-decisions:02-editor:07-dsl-parser-performance",
+      "path": "30-design/02-decisions/02-editor/07-dsl-parser-performance.md",
       "title": "DSL 解析性能与行为一致性",
       "category": "30-architecture",
-      "sha256": "8a411151f82358d8c79a56b982c2e082c62278c8f56ae002010ed4e51ff848e0"
+      "sha256": "d87f821275ad816e38f886626bbcbb2de5bb7f7aa4d4c24b90778f96d8d59654"
     },
     {
-      "id": "30-design:decisions:editor:08-config-schema-boundaries",
-      "path": "30-design/decisions/editor/08-config-schema-boundaries.md",
+      "id": "30-design:02-decisions:02-editor:08-config-schema-boundaries",
+      "path": "30-design/02-decisions/02-editor/08-config-schema-boundaries.md",
       "title": "配置旧入口清理与读取边界",
       "category": "30-architecture",
-      "sha256": "82084fb17d3d68db982dac6d17542c6292699383900b581008c10425bdb0509e"
+      "sha256": "9c6f70228d91ddb57878442e4e3c3a7c536472387ea4e70d9341b79a1b7db66f"
     },
     {
-      "id": "30-design:decisions:editor:09-content-revisions",
-      "path": "30-design/decisions/editor/09-content-revisions.md",
+      "id": "30-design:02-decisions:02-editor:09-content-revisions",
+      "path": "30-design/02-decisions/02-editor/09-content-revisions.md",
       "title": "配置修订记录与任务加载",
       "category": "30-architecture",
       "sha256": "f02bc7e844c46a952120e3d5f3106e21b2c3db23b6f9043ae820dfcf3306acf2"
     },
     {
-      "id": "30-design:decisions:editor:10-script-groups",
-      "path": "30-design/decisions/editor/10-script-groups.md",
+      "id": "30-design:02-decisions:02-editor:10-script-groups",
+      "path": "30-design/02-decisions/02-editor/10-script-groups.md",
       "title": "脚本展示分组与刷新",
       "category": "30-architecture",
       "sha256": "e50e10b71e0987da8c55cc807955cc3f3bc002e9e65a69142aed754cd3b701cb"
     },
     {
-      "id": "30-design:decisions:editor:11-execution-feedback",
-      "path": "30-design/decisions/editor/11-execution-feedback.md",
+      "id": "30-design:02-decisions:02-editor:11-execution-feedback",
+      "path": "30-design/02-decisions/02-editor/11-execution-feedback.md",
       "title": "任务入口状态与启动反馈",
       "category": "30-architecture",
       "sha256": "e4501ebc9d8c43b2c364cd484dbce8d3b7661ff2e59fc5483d25d8e1735c92e6"
     },
     {
-      "id": "30-design:decisions:editor:12-parameter-save-boundaries",
-      "path": "30-design/decisions/editor/12-parameter-save-boundaries.md",
+      "id": "30-design:02-decisions:02-editor:12-parameter-save-boundaries",
+      "path": "30-design/02-decisions/02-editor/12-parameter-save-boundaries.md",
       "title": "日常参数保存边界与连续输入合并",
       "category": "30-architecture",
-      "sha256": "2ba4de769839146d2624127b82bb165769e9b234281c1c917619a61d9ca91bd2"
+      "sha256": "fe3b2526addcc64b97e3ec7d933ba2b04c7cf8855f4af834d9955d0454857cb9"
     },
     {
-      "id": "30-design:decisions:equipment:01-loadout-management",
-      "path": "30-design/decisions/equipment/01-loadout-management.md",
+      "id": "30-design:02-decisions:03-equipment:01-loadout-management",
+      "path": "30-design/02-decisions/03-equipment/01-loadout-management.md",
       "title": "备战方案管理",
       "category": "30-architecture",
       "sha256": "98a7d74d56a072a860cfbf378510f2e430aa3fc768501953f42ef062743d62f0"
     },
     {
-      "id": "30-design:decisions:equipment:02-build-calculator",
-      "path": "30-design/decisions/equipment/02-build-calculator.md",
+      "id": "30-design:02-decisions:03-equipment:02-build-calculator",
+      "path": "30-design/02-decisions/03-equipment/02-build-calculator.md",
       "title": "出装搭配与模拟计算器",
       "category": "30-architecture",
-      "sha256": "eb04fb04c10409ba2b57a955107bbd902497736c5d2eac0652b56dd976a4cba6"
+      "sha256": "97e58ff059dbe3dbd3ba614298fcd39bbef3ea3c0f22109c4d7d339160d574a0"
     },
     {
-      "id": "30-design:decisions:equipment:03-combat-attribute-sources",
-      "path": "30-design/decisions/equipment/03-combat-attribute-sources.md",
+      "id": "30-design:02-decisions:03-equipment:03-combat-attribute-sources",
+      "path": "30-design/02-decisions/03-equipment/03-combat-attribute-sources.md",
       "title": "当前方案战斗属性来源",
       "category": "30-architecture",
       "sha256": "a2827e88be402927737f67c0637626c05c175dfed8bad4f74a2e3b9425887764"
     },
     {
-      "id": "30-design:decisions:platform:03-input-timeline",
-      "path": "30-design/decisions/platform/03-input-timeline.md",
+      "id": "30-design:02-decisions:04-platform:03-input-timeline",
+      "path": "30-design/02-decisions/04-platform/03-input-timeline.md",
       "title": "输入时间线 — 描述严格并发的操作序列",
       "category": "30-architecture",
-      "sha256": "2b6fb439852336c37d1ed0a1d970fcb0eb9ebba6934618d963b233dba2134dde"
+      "sha256": "34248a3b0e5873820eb9a3f47e7b68ece2d457903c7f9f37a9594ee95320d7c8"
     },
     {
-      "id": "30-design:decisions:platform:04-execution-targets",
-      "path": "30-design/decisions/platform/04-execution-targets.md",
+      "id": "30-design:02-decisions:04-platform:04-execution-targets",
+      "path": "30-design/02-decisions/04-platform/04-execution-targets.md",
       "title": "连接目标与执行目标分离",
       "category": "30-architecture",
       "sha256": "92ab23e79326c0728a28d61a6526adf80c668d69e67228a1e5184e4c2bc1bb0f"
     },
     {
-      "id": "30-design:decisions:platform:05-concurrent-target-execution",
-      "path": "30-design/decisions/platform/05-concurrent-target-execution.md",
+      "id": "30-design:02-decisions:04-platform:05-concurrent-target-execution",
+      "path": "30-design/02-decisions/04-platform/05-concurrent-target-execution.md",
       "title": "多执行目标并发任务",
       "category": "30-architecture",
-      "sha256": "49a8716962fbf6c3236ee176c4f96150aead35ae11a635d469542d9a6b017ac4"
+      "sha256": "0c512fbaef25df6c9570b1e8939020883340c35421470593107070cd787db920"
     },
     {
-      "id": "30-design:decisions:platform:06-workflow-capture-reuse",
-      "path": "30-design/decisions/platform/06-workflow-capture-reuse.md",
+      "id": "30-design:02-decisions:04-platform:06-workflow-capture-reuse",
+      "path": "30-design/02-decisions/04-platform/06-workflow-capture-reuse.md",
       "title": "工作流截图复用与诊断记录",
       "category": "30-architecture",
       "sha256": "3fa17c841bcbcf17fd9c8951335c23e6e348a1559aae176ceaf30372ae4edc07"
     },
     {
-      "id": "30-design:decisions:platform:07-android-offline",
-      "path": "30-design/decisions/platform/07-android-offline.md",
+      "id": "30-design:02-decisions:04-platform:07-android-offline",
+      "path": "30-design/02-decisions/04-platform/07-android-offline.md",
       "title": "Android 离线任务执行",
       "category": "30-architecture",
       "sha256": "8d2e49e00360066cd45b87d9128e59a8554b9d53ee067cebdc1911fef3a14ce9"
     },
     {
-      "id": "30-design:decisions:platform:08-android-task-settings",
-      "path": "30-design/decisions/platform/08-android-task-settings.md",
+      "id": "30-design:02-decisions:04-platform:08-android-task-settings",
+      "path": "30-design/02-decisions/04-platform/08-android-task-settings.md",
       "title": "Android 任务参数设置",
       "category": "30-architecture",
       "sha256": "a6e4e7f88d060dd577216c0efa78c92dab5bdc49e0069c97db539d938f5719b3"
     },
     {
-      "id": "30-design:decisions:platform:09-android-preset",
-      "path": "30-design/decisions/platform/09-android-preset.md",
+      "id": "30-design:02-decisions:04-platform:09-android-preset",
+      "path": "30-design/02-decisions/04-platform/09-android-preset.md",
       "title": "Android 预置任务与保留手机参数",
       "category": "30-architecture",
       "sha256": "ea1aa2b9530177e43098677d18f2568ce9189a6e35b5bbfb76991a6dcff9f567"
     },
     {
-      "id": "30-design:decisions:platform:10-ai-connection",
-      "path": "30-design/decisions/platform/10-ai-connection.md",
+      "id": "30-design:02-decisions:04-platform:10-ai-connection",
+      "path": "30-design/02-decisions/04-platform/10-ai-connection.md",
       "title": "AI 连接基础能力",
       "category": "30-architecture",
       "sha256": "447d52e5899585667970f668dbebf262b7a614d4baa661d2daaf60fdc82da18c"
     },
     {
-      "id": "30-design:decisions:platform:15-android-workbench",
-      "path": "30-design/decisions/platform/15-android-workbench.md",
+      "id": "30-design:02-decisions:04-platform:15-android-workbench",
+      "path": "30-design/02-decisions/04-platform/15-android-workbench.md",
       "title": "Android 独立任务工作台（0.15.0 目标）",
       "category": "30-architecture",
-      "sha256": "48540ca9362b9356019edc71def571cb0f34803d106a7bbb9e21f6e8e3c6a02b"
+      "sha256": "928cd1f6d9ab0faaaf72f9c85946e31572175de62d812cb4d536e2e612660d1e"
     },
     {
-      "id": "30-design:decisions:platform:16-android-batch",
-      "path": "30-design/decisions/platform/16-android-batch.md",
+      "id": "30-design:02-decisions:04-platform:16-android-batch",
+      "path": "30-design/02-decisions/04-platform/16-android-batch.md",
       "title": "Android 批量执行",
       "category": "30-architecture",
       "sha256": "f6e6509e5c1f8db58bc0cfee6a39f756312fa8d7db83114b2ba9e397dc3dadbb"
     },
     {
-      "id": "30-design:decisions:platform:17-prerelease",
-      "path": "30-design/decisions/platform/17-prerelease.md",
+      "id": "30-design:02-decisions:04-platform:17-prerelease",
+      "path": "30-design/02-decisions/04-platform/17-prerelease.md",
       "title": "测试、预发布与正式版本",
       "category": "30-architecture",
       "sha256": "106a4017b5423f01d9184fcce40472a5745faa32a46b057962ff2b05306e667b"
     },
     {
-      "id": "30-design:decisions:platform:18-android-connection-recovery",
-      "path": "30-design/decisions/platform/18-android-connection-recovery.md",
+      "id": "30-design:02-decisions:04-platform:18-android-connection-recovery",
+      "path": "30-design/02-decisions/04-platform/18-android-connection-recovery.md",
       "title": "Android 连接恢复与输入降级",
       "category": "30-architecture",
       "sha256": "7d6b045b0cb11a9ec64d702a13e4d609e512a3178edaf7651cd11d964af5fce3"
     },
     {
-      "id": "30-design:decisions:platform:19-write-ownership",
-      "path": "30-design/decisions/platform/19-write-ownership.md",
+      "id": "30-design:02-decisions:04-platform:19-write-ownership",
+      "path": "30-design/02-decisions/04-platform/19-write-ownership.md",
       "title": "实例并发与用户占用",
       "category": "30-architecture",
       "sha256": "0639a638a521eecb7f08afb22b5c45dba53f988d93430f10547618fe9f8c8a71"
     },
     {
-      "id": "30-design:decisions:platform:21-plugin-data",
-      "path": "30-design/decisions/platform/21-plugin-data.md",
+      "id": "30-design:02-decisions:04-platform:21-plugin-data",
+      "path": "30-design/02-decisions/04-platform/21-plugin-data.md",
       "title": "插件领域数据归属",
       "category": "30-architecture",
       "sha256": "99e5fdaf3c2f382bbb12c5510956d25ad0aef40991cef0bab034e699840ae5cb"
     },
     {
-      "id": "30-design:decisions:platform:22-plugin-runtime",
-      "path": "30-design/decisions/platform/22-plugin-runtime.md",
+      "id": "30-design:02-decisions:04-platform:22-plugin-runtime",
+      "path": "30-design/02-decisions/04-platform/22-plugin-runtime.md",
       "title": "插件与宿主运行边界",
       "category": "30-architecture",
       "sha256": "aa19b7a69b35db035191f4549f6ce3e2cf406d92719b02344ce504e48dbf008b"
     },
     {
-      "id": "30-design:decisions:platform:23-service-boundaries",
-      "path": "30-design/decisions/platform/23-service-boundaries.md",
+      "id": "30-design:02-decisions:04-platform:23-service-boundaries",
+      "path": "30-design/02-decisions/04-platform/23-service-boundaries.md",
       "title": "公共服务与桌面适配边界",
       "category": "30-architecture",
       "sha256": "937d536d6f5bd5867b326ec6b5b59aeb64c1b5b9b0d2701f94ce8b28ea74b54e"
     },
     {
-      "id": "30-design:decisions:platform:24-config-policy-bootstrap",
-      "path": "30-design/decisions/platform/24-config-policy-bootstrap.md",
+      "id": "30-design:02-decisions:04-platform:24-config-policy-bootstrap",
+      "path": "30-design/02-decisions/04-platform/24-config-policy-bootstrap.md",
       "title": "插件配置策略显式装配",
       "category": "30-architecture",
       "sha256": "f80c0194fa24e8d5762b1b2b749f8f06729d4ecc8d35b7d98de665d5702e238b"
     },
     {
-      "id": "30-design:decisions:platform:25-configuration-modules",
-      "path": "30-design/decisions/platform/25-configuration-modules.md",
+      "id": "30-design:02-decisions:04-platform:25-configuration-modules",
+      "path": "30-design/02-decisions/04-platform/25-configuration-modules.md",
       "title": "配置、布局与组合展示职责拆分",
       "category": "30-architecture",
       "sha256": "99f1fe72e4ed4164f374bc51dd14aefb8c81f4899d19235313a8e56f5ed2e779"
     },
     {
-      "id": "30-design:decisions:platform:27-hotkeys-and-menu-shortcuts",
-      "path": "30-design/decisions/platform/27-hotkeys-and-menu-shortcuts.md",
+      "id": "30-design:02-decisions:04-platform:27-hotkeys-and-menu-shortcuts",
+      "path": "30-design/02-decisions/04-platform/27-hotkeys-and-menu-shortcuts.md",
       "title": "键位分区：菜单快捷键与全局热键",
       "category": "30-architecture",
       "sha256": "90a92323cf9771fdb3570347b4fc4641ff875bebab09f88e8734870b248e49c4"
     },
     {
-      "id": "30-design:decisions:platform:28-account-document-sync",
-      "path": "30-design/decisions/platform/28-account-document-sync.md",
+      "id": "30-design:02-decisions:04-platform:28-account-document-sync",
+      "path": "30-design/02-decisions/04-platform/28-account-document-sync.md",
       "title": "账户级文档：全局任务参数与批量配置上云",
       "category": "30-architecture",
       "sha256": "f4b025d3c68101aa6dc5ff3197d5d73449307f8ab2e5080b6eaa4e88df5e66c8"
     },
     {
-      "id": "30-design:decisions:profile:01-graduation-rate",
-      "path": "30-design/decisions/profile/01-graduation-rate.md",
+      "id": "30-design:02-decisions:05-profile:01-graduation-rate",
+      "path": "30-design/02-decisions/05-profile/01-graduation-rate.md",
       "title": "毕业率分析需求与现行边界",
       "category": "30-architecture",
-      "sha256": "f22ed52bd7b25e88fb2c8bffefa0f31da59e1a88ab8991ee45185a73cbf7318a"
+      "sha256": "34acb689a341a9438e271b6cb091b639f8ca06a61efacb5f7fdd6ee3dfc59015"
     },
     {
-      "id": "30-design:decisions:profile:04-overview-multi-columns",
-      "path": "30-design/decisions/profile/04-overview-multi-columns.md",
+      "id": "30-design:02-decisions:05-profile:04-overview-multi-columns",
+      "path": "30-design/02-decisions/05-profile/04-overview-multi-columns.md",
       "title": "数据总览批量新增列",
       "category": "30-architecture",
       "sha256": "4dc4babc8dda195b399c7bab53651003cd6863f4705fad13e8a6cc0c7ad83630"
     },
     {
-      "id": "30-design:decisions:profile:05-history-dialog",
-      "path": "30-design/decisions/profile/05-history-dialog.md",
+      "id": "30-design:02-decisions:05-profile:05-history-dialog",
+      "path": "30-design/02-decisions/05-profile/05-history-dialog.md",
       "title": "变更记录对话框（统一历史查看器）",
       "category": "30-architecture",
       "sha256": "5ed8b10b4b1f54234f01c13f8e2a1138447809b90ffb5ee3961a55b0ab1abd69"
     },
     {
-      "id": "30-design:decisions:profile:06-overview-layout-sync",
-      "path": "30-design/decisions/profile/06-overview-layout-sync.md",
+      "id": "30-design:02-decisions:05-profile:06-overview-layout-sync",
+      "path": "30-design/02-decisions/05-profile/06-overview-layout-sync.md",
       "title": "用户总览页面结构与上传下载",
       "category": "30-architecture",
-      "sha256": "e898c725534fa1fca69b72e07ed13469190030ab38134a029e1ea2caf6b2b6dd"
+      "sha256": "9fc92480b84a59537b817c0d687e603c0093f699ac5190eb3133c062fbffd41b"
     },
     {
-      "id": "30-design:decisions:profile:07-set-only-v1.1",
-      "path": "30-design/decisions/profile/07-set-only-v1.1.md",
+      "id": "30-design:02-decisions:05-profile:07-set-only-v1.1",
+      "path": "30-design/02-decisions/05-profile/07-set-only-v1.1.md",
       "title": "Profile 同步 v1.1：set-only 数据模型与周期裁决（历史方案）",
       "category": "30-architecture",
-      "sha256": "4e3230b493227c6d71bf11151ce6e248e90dd6b68165895b8816ae2825ec5a4b"
+      "sha256": "149ad9f82d4f663723127d314911395d0dd9028d22e8227aae6611af57a19e56"
     },
     {
-      "id": "30-design:decisions:profile:08-profile-sync",
-      "path": "30-design/decisions/profile/08-profile-sync.md",
-      "title": "Profile 同步 v1.3：类型三分类、覆盖语义、水位门与 meta 锁传播",
+      "id": "30-design:02-decisions:05-profile:08-profile-sync",
+      "path": "30-design/02-decisions/05-profile/08-profile-sync.md",
+      "title": "Profile 同步 v1.4：类型三分类、覆盖语义、水位门与 meta 锁传播",
       "category": "30-architecture",
-      "sha256": "118f2f7dd1203422a365b8ac3a7d0d5e0ebca3957d1e028b121be233a6c796e0"
+      "sha256": "16ecbce4e91798f32e9544e545466e31781519c1d3f9cabe39a11748ee199a3b"
     },
     {
-      "id": "30-design:decisions:tuning:01-auto-tuning",
-      "path": "30-design/decisions/tuning/01-auto-tuning.md",
+      "id": "30-design:02-decisions:06-tuning:01-auto-tuning",
+      "path": "30-design/02-decisions/06-tuning/01-auto-tuning.md",
       "title": "自动调律需求与执行边界",
       "category": "30-architecture",
-      "sha256": "227c11dc62aec9de18affeab8b24ec0d9ec44d0007882d268020efb122bba46c"
+      "sha256": "588c2147d73a359cc8236006f97d20ac9cbb594d55bc6e9b471f3bd6121d6394"
     },
     {
-      "id": "30-design:decisions:tuning:02-tuning-management",
-      "path": "30-design/decisions/tuning/02-tuning-management.md",
+      "id": "30-design:02-decisions:06-tuning:02-tuning-management",
+      "path": "30-design/02-decisions/06-tuning/02-tuning-management.md",
       "title": "调律管理与历史记录需求",
       "category": "30-architecture",
-      "sha256": "7a1a3280de108a705642618a02eeb54af4aefe259fc7b12c340b30a32f00d567"
+      "sha256": "f5af59ff7eddc0e72803fb040888c08cfc42a401ebd18ac5087f6265671df31a"
     },
     {
-      "id": "30-design:decisions:tuning:03-smart-tuning",
-      "path": "30-design/decisions/tuning/03-smart-tuning.md",
+      "id": "30-design:02-decisions:06-tuning:03-smart-tuning",
+      "path": "30-design/02-decisions/06-tuning/03-smart-tuning.md",
       "title": "智能调律 — 基于备战方案毕业率的二次调律处理",
       "category": "30-architecture",
-      "sha256": "62521554d20b72fa8094195ff266e62eb3dafbdde0e9a6273fc162503b22e727"
+      "sha256": "42ee7766181031e28ee9235a61d8448db287294e28d8dbfa0b6fcfe384f81614"
     },
     {
-      "id": "30-design:decisions:tuning:04-transmute-simulation",
-      "path": "30-design/decisions/tuning/04-transmute-simulation.md",
+      "id": "30-design:02-decisions:06-tuning:04-transmute-simulation",
+      "path": "30-design/02-decisions/06-tuning/04-transmute-simulation.md",
       "title": "模拟转律需求与结果应用边界",
       "category": "30-architecture",
-      "sha256": "4c3aa179b4069418e4361119a8b99c92cbf591fd9b2f118b13f42a73829b1a08"
+      "sha256": "53a511713381f84ba7165a6eb98ad4b9889426f4e05863877bfb17274c23120d"
     },
     {
-      "id": "30-design:decisions:tuning:06-native-attack-affixes",
-      "path": "30-design/decisions/tuning/06-native-attack-affixes.md",
+      "id": "30-design:02-decisions:06-tuning:06-native-attack-affixes",
+      "path": "30-design/02-decisions/06-tuning/06-native-attack-affixes.md",
       "title": "本属攻击统一规则表达",
       "category": "30-architecture",
       "sha256": "8485a8aed7c809cbfbd61b9074fef96f5bae8124e047243a5d24cfbfb3443052"
     },
     {
-      "id": "40-reference:README",
-      "path": "40-reference/README.md",
-      "title": "参考资料（reference）",
+      "id": "30-design:02-decisions:README",
+      "path": "30-design/02-decisions/README.md",
+      "title": "决策与规格记录（已实现需求）",
       "category": "30-architecture",
-      "sha256": "9b32062902fcadea00ec4d149b64a2706a90c77b9d7b6b4f6073a5cda30c2c10"
+      "sha256": "2bbee69a58db113230f314fdaedaeb6b804660f2407d75333c0a8872694fe336"
     },
     {
-      "id": "40-reference:config:contract",
-      "path": "40-reference/config/contract.md",
+      "id": "40-reference:01-config:01-contract",
+      "path": "40-reference/01-config/01-contract.md",
       "title": "契约 B：配置与迁移",
       "category": "30-architecture",
-      "sha256": "282ec144f487445ea005c44e48cf92b46f97a5361ef8ab885f02c2df1cc2c294"
+      "sha256": "0f718e326068d3ca0d398a913d906d776ee446deff2892d27f283c98a85a7672"
     },
     {
-      "id": "40-reference:dsl:01-basics",
-      "path": "40-reference/dsl/01-basics.md",
+      "id": "40-reference:02-dsl:01-basics",
+      "path": "40-reference/02-dsl/01-basics.md",
       "title": "DSL 语言基础",
       "category": "30-architecture",
       "sha256": "b68f132d33fd0632b76ce88dc226427b98a01f119add2b25528918da3e01b759"
     },
     {
-      "id": "40-reference:dsl:02-concepts",
-      "path": "40-reference/dsl/02-concepts.md",
+      "id": "40-reference:02-dsl:02-concepts",
+      "path": "40-reference/02-dsl/02-concepts.md",
       "title": "实体与坐标体系",
       "category": "30-architecture",
-      "sha256": "d73df98c6729b179328a4ecdb76cbfaf69d5c04bb14c4f73a0076c995e649d82"
+      "sha256": "58c49373d2132f7e2707dedca90f148a31172c222d7e4924d81c558436c0617f"
     },
     {
-      "id": "40-reference:dsl:03-interaction",
-      "path": "40-reference/dsl/03-interaction.md",
+      "id": "40-reference:02-dsl:03-interaction",
+      "path": "40-reference/02-dsl/03-interaction.md",
       "title": "DSL 交互指令概览",
       "category": "30-architecture",
-      "sha256": "4089c308e087292472887c44e7776d7dec2075f274e9ce7f62afdaa1af464e03"
+      "sha256": "43a70486237307ccc3030236b4127534ff53c2e1b9438ba6f708a6a489b78bbe"
     },
     {
-      "id": "40-reference:dsl:03.1-basic-commands",
-      "path": "40-reference/dsl/03.1-basic-commands.md",
+      "id": "40-reference:02-dsl:03.1-basic-commands",
+      "path": "40-reference/02-dsl/03.1-basic-commands.md",
       "title": "DSL 基础指令",
       "category": "30-architecture",
       "sha256": "0b9b216f772d1cd85e9a73ba502d931bff109e29f05cf95999a4f2b67df87c63"
     },
     {
-      "id": "40-reference:dsl:03.2-interaction",
-      "path": "40-reference/dsl/03.2-interaction.md",
+      "id": "40-reference:02-dsl:03.2-interaction",
+      "path": "40-reference/02-dsl/03.2-interaction.md",
       "title": "DSL 时间与辅助指令",
       "category": "30-architecture",
-      "sha256": "aab52b887d1c48fced5d485060dc144d8ead890181f604064b20004ed0ee0f27"
+      "sha256": "86d2fe5d780ee9e148b4de1f040640f6f0904e81d3c78632679b971b424d1183"
     },
     {
-      "id": "40-reference:dsl:03.3-mouse",
-      "path": "40-reference/dsl/03.3-mouse.md",
+      "id": "40-reference:02-dsl:03.3-mouse",
+      "path": "40-reference/02-dsl/03.3-mouse.md",
       "title": "DSL 鼠标操作指令",
       "category": "30-architecture",
-      "sha256": "12ff03cfc31dec450becdd1962a562d5fb433ba171ddf1d0482117186888eb79"
+      "sha256": "d8a0bc8bfbd6a57a970ff9cbbd59e73eb95dfcfd0d696f5faca57d2fcbf1f1e4"
     },
     {
-      "id": "40-reference:dsl:03.4-keyboard",
-      "path": "40-reference/dsl/03.4-keyboard.md",
+      "id": "40-reference:02-dsl:03.4-keyboard",
+      "path": "40-reference/02-dsl/03.4-keyboard.md",
       "title": "DSL 按压输入指令",
       "category": "30-architecture",
       "sha256": "954b0e0caf8bfb270cd578ff90090b95a6136e0aa391adef25fa3ee25cbccc15"
     },
     {
-      "id": "40-reference:dsl:03.5-key-reference",
-      "path": "40-reference/dsl/03.5-key-reference.md",
+      "id": "40-reference:02-dsl:03.5-key-reference",
+      "path": "40-reference/02-dsl/03.5-key-reference.md",
       "title": "按键名称与组合键速查",
       "category": "30-architecture",
       "sha256": "af444390ac70f89aace413b4f81a4c2b53e73e059cbe7a1abbe06feb612e9754"
     },
     {
-      "id": "40-reference:dsl:03.6-scene-declarations",
-      "path": "40-reference/dsl/03.6-scene-declarations.md",
+      "id": "40-reference:02-dsl:03.6-scene-declarations",
+      "path": "40-reference/02-dsl/03.6-scene-declarations.md",
       "title": "场景位置声明",
       "category": "30-architecture",
       "sha256": "1240daa5f2e34eda473932452d1efe7126c7dd25d80bcae41b4d67c5adf81220"
     },
     {
-      "id": "40-reference:dsl:03.7-timeline",
-      "path": "40-reference/dsl/03.7-timeline.md",
+      "id": "40-reference:02-dsl:03.7-timeline",
+      "path": "40-reference/02-dsl/03.7-timeline.md",
       "title": "timeline — 并发输入时间线",
       "category": "30-architecture",
-      "sha256": "1474c731e3536cda69ce22ef7add08e1f2fff6ed8f1d4690fdb04d10f20945bd"
+      "sha256": "24056f08f0f1b7af535c871e9493a35be05f8322c18e28f9b21f28f53844ea81"
     },
     {
-      "id": "40-reference:dsl:04-data-flow",
-      "path": "40-reference/dsl/04-data-flow.md",
+      "id": "40-reference:02-dsl:04-data-flow",
+      "path": "40-reference/02-dsl/04-data-flow.md",
       "title": "DSL 感知指令概览",
       "category": "30-architecture",
       "sha256": "2c403d15764425f5cd9d99ab550e7ea59494312af9557555468eb06dd9dc7992"
     },
     {
-      "id": "40-reference:dsl:04.1-scan",
-      "path": "40-reference/dsl/04.1-scan.md",
+      "id": "40-reference:02-dsl:04.1-scan",
+      "path": "40-reference/02-dsl/04.1-scan.md",
       "title": "scan — 区域 OCR / 模板匹配",
       "category": "30-architecture",
       "sha256": "b84ece2bd548e1980faaae7de21791cab6ddf0fc01b2058e18c23360ee25f679"
     },
     {
-      "id": "40-reference:dsl:04.2-recognize",
-      "path": "40-reference/dsl/04.2-recognize.md",
+      "id": "40-reference:02-dsl:04.2-recognize",
+      "path": "40-reference/02-dsl/04.2-recognize.md",
       "title": "recognize — 图像材料识别",
       "category": "30-architecture",
       "sha256": "2279f20ab006cbdf2a878e97838299d3713e1b4d3aec5aee340b4cf70cb0d9ca"
     },
     {
-      "id": "40-reference:dsl:04.3-find",
-      "path": "40-reference/dsl/04.3-find.md",
+      "id": "40-reference:02-dsl:04.3-find",
+      "path": "40-reference/02-dsl/04.3-find.md",
       "title": "find — 文字坐标定位",
       "category": "30-architecture",
       "sha256": "2dbaf2550a5b60aded8615a8fd28cd033004ec042e469ea4f171306322f8dd4a"
     },
     {
-      "id": "40-reference:dsl:04.4-image-template",
-      "path": "40-reference/dsl/04.4-image-template.md",
+      "id": "40-reference:02-dsl:04.4-image-template",
+      "path": "40-reference/02-dsl/04.4-image-template.md",
       "title": "by image — Region 模板匹配",
       "category": "30-architecture",
-      "sha256": "c657abed49e140b3c978a8f78e916da6e244e3626181ff16e3a734d8bf7ecc78"
+      "sha256": "a0c7960ffc8ddd0c0dfbeaabcd8a245519cdec0da0137decf8545116f0a9ca9f"
     },
     {
-      "id": "40-reference:dsl:05-control-flow",
-      "path": "40-reference/dsl/05-control-flow.md",
+      "id": "40-reference:02-dsl:05-control-flow",
+      "path": "40-reference/02-dsl/05-control-flow.md",
       "title": "DSL 控制流概览",
       "category": "30-architecture",
       "sha256": "eb334f26d949e926a83f22ced0996cd6401b03cb6edcf86e600278f3ad8b9fcc"
     },
     {
-      "id": "40-reference:dsl:05.1-loops-branches",
-      "path": "40-reference/dsl/05.1-loops-branches.md",
+      "id": "40-reference:02-dsl:05.1-loops-branches",
+      "path": "40-reference/02-dsl/05.1-loops-branches.md",
       "title": "分支与循环 — if / for / loop / break / continue",
       "category": "30-architecture",
       "sha256": "49508bd2c6d5e44391283797dd4bea4f5751ee195b696eebbeeaf14b4cc82b9c"
     },
     {
-      "id": "40-reference:dsl:05.2-flow-jumps",
-      "path": "40-reference/dsl/05.2-flow-jumps.md",
+      "id": "40-reference:02-dsl:05.2-flow-jumps",
+      "path": "40-reference/02-dsl/05.2-flow-jumps.md",
       "title": "异常与跳转 — try / return / goto",
       "category": "30-architecture",
       "sha256": "b71961de50bb4589081d470235ef62ba51dbc7ca397ac2205ac9437aeb0b695b"
     },
     {
-      "id": "40-reference:dsl:05.3-conditions",
-      "path": "40-reference/dsl/05.3-conditions.md",
+      "id": "40-reference:02-dsl:05.3-conditions",
+      "path": "40-reference/02-dsl/05.3-conditions.md",
       "title": "条件表达式",
       "category": "30-architecture",
       "sha256": "24e37271106d729359f4653a6d9823838dc5c4cb0e6abb04b1841b661c79ef93"
     },
     {
-      "id": "40-reference:dsl:06-functions",
-      "path": "40-reference/dsl/06-functions.md",
+      "id": "40-reference:02-dsl:06-functions",
+      "path": "40-reference/02-dsl/06-functions.md",
       "title": "DSL 内置函数",
       "category": "30-architecture",
       "sha256": "3003fa3211cd9fc42d441999bd7d2ddd720d6d4bf4be56700b3f0f13cd13e6b6"
     },
     {
-      "id": "40-reference:dsl:06.1-basic-functions",
-      "path": "40-reference/dsl/06.1-basic-functions.md",
+      "id": "40-reference:02-dsl:06.1-basic-functions",
+      "path": "40-reference/02-dsl/06.1-basic-functions.md",
       "title": "DSL 基础函数",
       "category": "30-architecture",
       "sha256": "7ec4f595cff6702c08a6ce370826fd64ab89b3cbb7b9479acac4ed5a73ffb8ec"
     },
     {
-      "id": "40-reference:dsl:06.2-system-interaction",
-      "path": "40-reference/dsl/06.2-system-interaction.md",
+      "id": "40-reference:02-dsl:06.2-system-interaction",
+      "path": "40-reference/02-dsl/06.2-system-interaction.md",
       "title": "DSL 系统与交互函数",
       "category": "30-architecture",
       "sha256": "c9ee8bc725ed9bccab563ac2e2034d7ac55222df94938b0c32aeee91a42c97b8"
     },
     {
-      "id": "40-reference:dsl:06.3-game-functions",
-      "path": "40-reference/dsl/06.3-game-functions.md",
+      "id": "40-reference:02-dsl:06.3-game-functions",
+      "path": "40-reference/02-dsl/06.3-game-functions.md",
       "title": "DSL 游戏相关函数",
       "category": "30-architecture",
       "sha256": "965fca12183ba141ddf0f9179493d531908b9e99006d437856909dfa8f89fe6c"
     },
     {
-      "id": "40-reference:dsl:06.4-vision-functions",
-      "path": "40-reference/dsl/06.4-vision-functions.md",
+      "id": "40-reference:02-dsl:06.4-vision-functions",
+      "path": "40-reference/02-dsl/06.4-vision-functions.md",
       "title": "图色函数 — 取色 / 像素规则占比 / 亮段 / 色心方位 / 同色图标 / 多点找色",
       "category": "30-architecture",
-      "sha256": "c1ac27a793a43ee96ae4722e41e06e8639cfbc33d4243236f8c341ba1ced2619"
+      "sha256": "0c7c0cd19870ee7ed442ead91ba2f83a5d88a6ca54427a00fd1e7eedb621bdb9"
     },
     {
-      "id": "40-reference:dsl:07-subworkflows",
-      "path": "40-reference/dsl/07-subworkflows.md",
+      "id": "40-reference:02-dsl:07-subworkflows",
+      "path": "40-reference/02-dsl/07-subworkflows.md",
       "title": "DSL 模块化：import / def / call",
       "category": "30-architecture",
-      "sha256": "25a6f00d3b451e1db1e11b6951e5731b3fd96f7eea058d3ffd6fdb55325696d8"
+      "sha256": "2ccc00662dfcddebec2deaf9de176dfdb69fec511c11efd4d4d112292d419f0c"
     },
     {
-      "id": "40-reference:dsl:07.1-metadata",
-      "path": "40-reference/dsl/07.1-metadata.md",
+      "id": "40-reference:02-dsl:07.1-metadata",
+      "path": "40-reference/02-dsl/07.1-metadata.md",
       "title": "`.wf` 文件头元数据",
       "category": "30-architecture",
       "sha256": "24635848b38ca9a8d0ea2e79e06288c849367f15372170b67853130a6f22b5b2"
     },
     {
-      "id": "40-reference:dsl:08-examples",
-      "path": "40-reference/dsl/08-examples.md",
+      "id": "40-reference:02-dsl:08-examples",
+      "path": "40-reference/02-dsl/08-examples.md",
       "title": "DSL 完整示例",
       "category": "30-architecture",
       "sha256": "2861174a7daafc410f93c562b9ca9962a6e217786bbd2da920be7767bc332ee9"
     },
     {
-      "id": "40-reference:dsl:09-data-channels",
-      "path": "40-reference/dsl/09-data-channels.md",
+      "id": "40-reference:02-dsl:09-data-channels",
+      "path": "40-reference/02-dsl/09-data-channels.md",
       "title": "数据通道",
       "category": "30-architecture",
       "sha256": "7c35558c55194105930a6c41409b1a26b973c5077243ad8e784eab8f3cb8f384"
     },
     {
       "id": "dsl",
-      "path": "40-reference/dsl/README.md",
+      "path": "40-reference/02-dsl/README.md",
       "title": "DSL 语法速查",
       "category": "30-architecture",
-      "sha256": "ccb719345bc18d5cd924405583dfbc41e94785750604fa2fc9909046c3f54daf"
+      "sha256": "092c632b983a1670ebe04dab7e99c014f6e11a737625670c851f4ac529f644d1"
     },
     {
-      "id": "40-reference:profile:data-model",
-      "path": "40-reference/profile/data-model.md",
+      "id": "40-reference:03-profile:01-data-model",
+      "path": "40-reference/03-profile/01-data-model.md",
       "title": "Profile 数据字段模型",
       "category": "30-architecture",
       "sha256": "fd5ac7d06b2ad56d0ba7404bab242773a2e3854f666e1754555a77e652a55045"
     },
     {
-      "id": "40-reference:sync:offline-install",
-      "path": "40-reference/sync/offline-install.md",
+      "id": "40-reference:04-sync:01-offline-install",
+      "path": "40-reference/04-sync/01-offline-install.md",
       "title": "离线安装契约（PC → Android 配置同步）",
       "category": "30-architecture",
       "sha256": "3d2af77c78786ced6c9d65a4e1783d362635f653f56c47a396b866103110a01d"
     },
     {
-      "id": "40-reference:sync:profile-and-account",
-      "path": "40-reference/sync/profile-and-account.md",
+      "id": "40-reference:04-sync:02-profile-and-account",
+      "path": "40-reference/04-sync/02-profile-and-account.md",
       "title": "契约 C：Profile 与账户同步",
       "category": "30-architecture",
-      "sha256": "c94d5a0fae2b0a0b7c983237f09dbc1e83bec5ea0a3cb01a985422dc80dc6a35"
+      "sha256": "1bae9ab0651823d6af9a3741d1cdf168d1af65cf7730cb370308f11d4c2c1781"
+    },
+    {
+      "id": "40-reference:README",
+      "path": "40-reference/README.md",
+      "title": "参考资料（reference）",
+      "category": "30-architecture",
+      "sha256": "ab1ad404c4af946c53134ce5188da0a931e3480ed14e991e9bab62b5ad26c129"
+    },
+    {
+      "id": "60-guide:01-accounts:01-appendix-a-online-config",
+      "path": "60-guide/01-accounts/01-appendix-a-online-config.md",
+      "title": "附录 A. 在线配置、会员内容与功能激活",
+      "category": "60-userguide",
+      "sha256": "eb323b9849ea2ff987e6f1319dfd5504be449b46c726c16ed5dcedc064aaa072"
+    },
+    {
+      "id": "60-guide:02-android:07-mobile-device",
+      "path": "60-guide/02-android/07-mobile-device.md",
+      "title": "7. 移动设备（安卓）",
+      "category": "60-userguide",
+      "sha256": "b47b9d42557ef0b7845497f7a8695b9ba652c2e0600b8e6388ac743c9d93c99b"
+    },
+    {
+      "id": "60-guide:03-automation:01-appendix-c-preset-gallery",
+      "path": "60-guide/03-automation/01-appendix-c-preset-gallery.md",
+      "title": "附录 C · 预置图库内容（端游 / 手游）",
+      "category": "60-userguide",
+      "sha256": "e7277187d8f0a1eb2360dbd8383de7121a257190dcec5f5c503856bc7d11b522"
+    },
+    {
+      "id": "60-guide:03-automation:04.01-tuning-config-overview",
+      "path": "60-guide/03-automation/04.01-tuning-config-overview.md",
+      "title": "4.1 调律配置 — 页面结构",
+      "category": "60-userguide",
+      "sha256": "ce11e931087823c4279ce144b833d039466d99973266d7f0f54b8d200d265403"
+    },
+    {
+      "id": "60-guide:03-automation:04.02-default-config",
+      "path": "60-guide/03-automation/04.02-default-config.md",
+      "title": "4.2 默认配置含义",
+      "category": "60-userguide",
+      "sha256": "9a9ccdfee6d293899581db87284d9bf0202580332e04222a6e93d08fc329c815"
+    },
+    {
+      "id": "60-guide:03-automation:04.03-behavior-config",
+      "path": "60-guide/03-automation/04.03-behavior-config.md",
+      "title": "4.3 三种处理配置项详解",
+      "category": "60-userguide",
+      "sha256": "1cd1213a503fde1a280bd3938e81018a9b41227bc4adbbe50c007f231dab42a6"
+    },
+    {
+      "id": "60-guide:03-automation:04.04-school-rules",
+      "path": "60-guide/03-automation/04.04-school-rules.md",
+      "title": "4.4 流派规则详解",
+      "category": "60-userguide",
+      "sha256": "a2f6395b3a4dbc3fe027dc668577e03a0ca419e2d58c78b8362553bfc895bdd1"
+    },
+    {
+      "id": "60-guide:03-automation:04.05-game-config",
+      "path": "60-guide/03-automation/04.05-game-config.md",
+      "title": "4.5 游戏配置",
+      "category": "60-userguide",
+      "sha256": "932b9640230a5902c56fe0d29c207da7ee27f93eff26891bd0d073070d9d8f34"
+    },
+    {
+      "id": "60-guide:03-automation:04.06-running-tuning",
+      "path": "60-guide/03-automation/04.06-running-tuning.md",
+      "title": "4.6 运行自动调律",
+      "category": "60-userguide",
+      "sha256": "f1464f4734420c82be0f61b65b3546e9ffcce3b6a43a6c7a51be481ea421d583"
+    },
+    {
+      "id": "60-guide:03-automation:04.07-agent-tuning",
+      "path": "60-guide/03-automation/04.07-agent-tuning.md",
+      "title": "4.7 使用外部 Agent 智能调律",
+      "category": "60-userguide",
+      "sha256": "91cee696e1e68d64f07473b3437da7368456588f8257aa4c4cbd4b0ab607dd3e"
+    },
+    {
+      "id": "60-guide:03-automation:05.01-equipment-data-overview",
+      "path": "60-guide/03-automation/05.01-equipment-data-overview.md",
+      "title": "5.1 装备数据总览",
+      "category": "60-userguide",
+      "sha256": "b8e59e0ed3983c08702fd70a46f05e631ddd3a5fecf19fbc152e91133b0030bb"
+    },
+    {
+      "id": "60-guide:03-automation:05.02-equipment-data-acquisition",
+      "path": "60-guide/03-automation/05.02-equipment-data-acquisition.md",
+      "title": "5.2 装备数据如何产生",
+      "category": "60-userguide",
+      "sha256": "a08691dc3fc5ced924f44fa384eef765030716e9de412344373d0dd38fe316c6"
+    },
+    {
+      "id": "60-guide:03-automation:05.03-equipment-management",
+      "path": "60-guide/03-automation/05.03-equipment-management.md",
+      "title": "5.3 装备管理与编辑",
+      "category": "60-userguide",
+      "sha256": "6df4e597c5501c999471b9657336085bea257864f5ecb851e5b1150704b6ccb8"
+    },
+    {
+      "id": "60-guide:03-automation:05.04-base-attributes-and-graduation",
+      "path": "60-guide/03-automation/05.04-base-attributes-and-graduation.md",
+      "title": "5.4 角色基础属性与真实毕业率",
+      "category": "60-userguide",
+      "sha256": "68ba80535b862088a5e7d0327b61817d0951dc8b64ba3d0a77991068649d2d01"
+    },
+    {
+      "id": "60-guide:03-automation:05.05-school-rule-filtering",
+      "path": "60-guide/03-automation/05.05-school-rule-filtering.md",
+      "title": "5.5 使用流派规则过滤装备",
+      "category": "60-userguide",
+      "sha256": "b4f1a2666dac89db964b890941dcd63c174a87af533d01c176e79c2ece7d95da"
+    },
+    {
+      "id": "60-guide:03-automation:05.06-optimal-equipment-combination",
+      "path": "60-guide/03-automation/05.06-optimal-equipment-combination.md",
+      "title": "5.6 计算最优毕业率组合",
+      "category": "60-userguide",
+      "sha256": "1fa490e4099356d4ef725858626954e6e300fdb2acbef595891c993a9759129c"
+    },
+    {
+      "id": "60-guide:03-automation:05.07-build-calculator",
+      "path": "60-guide/03-automation/05.07-build-calculator.md",
+      "title": "5.7 出装搭配与模拟计算器",
+      "category": "60-userguide",
+      "sha256": "a321c43637797dd48d6574b4cd3dc0e58cbc0da83ffdb5dc427c243d05ac743a"
+    },
+    {
+      "id": "60-guide:03-automation:06-workflows",
+      "path": "60-guide/03-automation/06-workflows.md",
+      "title": "6. 工作流与日常任务",
+      "category": "60-userguide",
+      "sha256": "4327e75e84d645b2a23e202e161227a390e9405d8b3b54c64b300de232870c65"
+    },
+    {
+      "id": "60-guide:03-automation:06.07-system-scripts",
+      "path": "60-guide/03-automation/06.07-system-scripts.md",
+      "title": "6.7 系统脚本与工作流清单",
+      "category": "60-userguide",
+      "sha256": "e5efe79ffc58affefc067c5a44c9a113208604d68923228013a1b39aa10f1f68"
+    },
+    {
+      "id": "60-guide:04-desktop:01-quick-start",
+      "path": "60-guide/04-desktop/01-quick-start.md",
+      "title": "1. 快速开始",
+      "category": "60-userguide",
+      "sha256": "e2c8b1ddc7a5b097e65245c54162b7d46ae8c632a19f967b6f59394e1101f210"
+    },
+    {
+      "id": "60-guide:04-desktop:02-main-interface",
+      "path": "60-guide/04-desktop/02-main-interface.md",
+      "title": "2. 主界面与用户管理",
+      "category": "60-userguide",
+      "sha256": "73580c0533d821d1d28770080505edce6e8739565db81c56ab21f5d7496047a5"
+    },
+    {
+      "id": "60-guide:04-desktop:03.01-base-config",
+      "path": "60-guide/04-desktop/03.01-base-config.md",
+      "title": "3.1 通用配置",
+      "category": "60-userguide",
+      "sha256": "3cbaa0bb9da075f29fbc5e15e7c56be2cfb35dbbb493f7e2b4bff6585a25faa1"
+    },
+    {
+      "id": "60-guide:04-desktop:03.02-scene-management",
+      "path": "60-guide/04-desktop/03.02-scene-management.md",
+      "title": "3.2 场景管理（F3）",
+      "category": "60-userguide",
+      "sha256": "b247990b0122cc2f7fb6193584ad01a33b13908ed1898fceab6e78955340dcc8"
+    },
+    {
+      "id": "60-guide:04-desktop:03.03-gallery-management",
+      "path": "60-guide/04-desktop/03.03-gallery-management.md",
+      "title": "3.3 图库管理（F4）",
+      "category": "60-userguide",
+      "sha256": "9247ea573ab6a8393372be80420f2a87dc98fca87ff4c5b4aac9d4077f319f84"
+    },
+    {
+      "id": "60-guide:04-desktop:03.04-batch-tasks",
+      "path": "60-guide/04-desktop/03.04-batch-tasks.md",
+      "title": "3.4 批量任务",
+      "category": "60-userguide",
+      "sha256": "e1a876a5fe8c38d3f8845f22c7f56a0f17b11db02d425547ccfc316aca3c4862"
+    },
+    {
+      "id": "60-guide:04-desktop:03.05-visual-recognition-troubleshooting",
+      "path": "60-guide/04-desktop/03.05-visual-recognition-troubleshooting.md",
+      "title": "3.5 图像识别与模板匹配排查",
+      "category": "60-userguide",
+      "sha256": "930013ed18ddccd978254c2e435398e85c2be92afaff2c71ecc934f5df768d7b"
+    },
+    {
+      "id": "60-guide:04-desktop:03.06-world-map-management",
+      "path": "60-guide/04-desktop/03.06-world-map-management.md",
+      "title": "大世界地图管理",
+      "category": "60-userguide",
+      "sha256": "06cd4add5ddaa7911dae010563d03d5ed6e2f1c2d789306b285d9e65c4ffbca2"
+    },
+    {
+      "id": "60-guide:04-desktop:08-script-authoring",
+      "path": "60-guide/04-desktop/08-script-authoring.md",
+      "title": "8. 脚本工作台与脚本作者须知",
+      "category": "60-userguide",
+      "sha256": "a4c44d45a4395eede81bbbc14d41ba8c0cba44d4b7d0949ae4387af4c196c8e9"
+    },
+    {
+      "id": "60-guide:04-desktop:09-faq-and-feedback",
+      "path": "60-guide/04-desktop/09-faq-and-feedback.md",
+      "title": "9. 常见问题与反馈",
+      "category": "60-userguide",
+      "sha256": "aec9517943eb6a297e2bc7c23626df4615551ab901efdc1e3c52e85fe669ac54"
+    },
+    {
+      "id": "60-guide:04-desktop:10-appendix-b-command-line",
+      "path": "60-guide/04-desktop/10-appendix-b-command-line.md",
+      "title": "附录 B. 命令行执行脚本",
+      "category": "60-userguide",
+      "sha256": "abeafae37dff510e0b6eff2efa7784a8e6a383899b373416d6e6afc85b364bee"
+    },
+    {
+      "id": "60-guide:05-recovery:01-config-migration",
+      "path": "60-guide/05-recovery/01-config-migration.md",
+      "title": "配置迁移恢复指南",
+      "category": "60-userguide",
+      "sha256": "062836f432e247c910876171646fc150c3d32630e3b93ab6c730803017938054"
     },
     {
       "id": "userguide",
       "path": "60-guide/README.md",
       "title": "律匠用户指南",
       "category": "60-userguide",
-      "sha256": "68a6bff0a8647814a1cd73e1dba41b524616bb018f6dd6be35bb3e88ff1bf44d"
-    },
-    {
-      "id": "60-guide:accounts:appendix-a-online-config",
-      "path": "60-guide/accounts/appendix-a-online-config.md",
-      "title": "附录 A. 在线配置、会员内容与功能激活",
-      "category": "60-userguide",
-      "sha256": "32f3795cb9eb7837513ed344c3eaed781ab37f18cf76f93a959df2b7829f78bf"
-    },
-    {
-      "id": "60-guide:android:07-mobile-device",
-      "path": "60-guide/android/07-mobile-device.md",
-      "title": "7. 移动设备（安卓）",
-      "category": "60-userguide",
-      "sha256": "13372c057a47b668b13159c37f3ea91390ea2eda2a02fb60d39694c6d75e06a6"
-    },
-    {
-      "id": "60-guide:automation:04.01-tuning-config-overview",
-      "path": "60-guide/automation/04.01-tuning-config-overview.md",
-      "title": "4.1 调律配置 — 页面结构",
-      "category": "60-userguide",
-      "sha256": "4a1fd2bea0a251fd9e998f97dd7ad11fc0cbb926d4b972098259dee2d1f34d8f"
-    },
-    {
-      "id": "60-guide:automation:04.02-default-config",
-      "path": "60-guide/automation/04.02-default-config.md",
-      "title": "4.2 默认配置含义",
-      "category": "60-userguide",
-      "sha256": "7432406f9410add50a04a2634754874a7e93d64e6dbbab6be3347667f89e4c1d"
-    },
-    {
-      "id": "60-guide:automation:04.03-behavior-config",
-      "path": "60-guide/automation/04.03-behavior-config.md",
-      "title": "4.3 三种处理配置项详解",
-      "category": "60-userguide",
-      "sha256": "1cd1213a503fde1a280bd3938e81018a9b41227bc4adbbe50c007f231dab42a6"
-    },
-    {
-      "id": "60-guide:automation:04.04-school-rules",
-      "path": "60-guide/automation/04.04-school-rules.md",
-      "title": "4.4 流派规则详解",
-      "category": "60-userguide",
-      "sha256": "dd688d1f9f6c9dc995d8a6e9017266ac04d3578f0018293461e954431e31f152"
-    },
-    {
-      "id": "60-guide:automation:04.05-game-config",
-      "path": "60-guide/automation/04.05-game-config.md",
-      "title": "4.5 游戏配置",
-      "category": "60-userguide",
-      "sha256": "5d6e72fe50a8a649939fe8f884e7a8f58acfd5dbdabeb4ea061ddcb6e9803f5f"
-    },
-    {
-      "id": "60-guide:automation:04.06-running-tuning",
-      "path": "60-guide/automation/04.06-running-tuning.md",
-      "title": "4.6 运行自动调律",
-      "category": "60-userguide",
-      "sha256": "59e02f83e042f20b5279453e45d97931a732a72b3a63f45762b0aa02b9307460"
-    },
-    {
-      "id": "60-guide:automation:04.07-agent-tuning",
-      "path": "60-guide/automation/04.07-agent-tuning.md",
-      "title": "4.7 使用外部 Agent 智能调律",
-      "category": "60-userguide",
-      "sha256": "91cee696e1e68d64f07473b3437da7368456588f8257aa4c4cbd4b0ab607dd3e"
-    },
-    {
-      "id": "60-guide:automation:05.01-equipment-data-overview",
-      "path": "60-guide/automation/05.01-equipment-data-overview.md",
-      "title": "5.1 装备数据总览",
-      "category": "60-userguide",
-      "sha256": "b8e59e0ed3983c08702fd70a46f05e631ddd3a5fecf19fbc152e91133b0030bb"
-    },
-    {
-      "id": "60-guide:automation:05.02-equipment-data-acquisition",
-      "path": "60-guide/automation/05.02-equipment-data-acquisition.md",
-      "title": "5.2 装备数据如何产生",
-      "category": "60-userguide",
-      "sha256": "cab73c1bbdf8f44cb0f393814d5bd2647b080b91def8f4ff2d8189086d2380da"
-    },
-    {
-      "id": "60-guide:automation:05.03-equipment-management",
-      "path": "60-guide/automation/05.03-equipment-management.md",
-      "title": "5.3 装备管理与编辑",
-      "category": "60-userguide",
-      "sha256": "6df4e597c5501c999471b9657336085bea257864f5ecb851e5b1150704b6ccb8"
-    },
-    {
-      "id": "60-guide:automation:05.04-base-attributes-and-graduation",
-      "path": "60-guide/automation/05.04-base-attributes-and-graduation.md",
-      "title": "5.4 角色基础属性与真实毕业率",
-      "category": "60-userguide",
-      "sha256": "68ba80535b862088a5e7d0327b61817d0951dc8b64ba3d0a77991068649d2d01"
-    },
-    {
-      "id": "60-guide:automation:05.05-school-rule-filtering",
-      "path": "60-guide/automation/05.05-school-rule-filtering.md",
-      "title": "5.5 使用流派规则过滤装备",
-      "category": "60-userguide",
-      "sha256": "b4f1a2666dac89db964b890941dcd63c174a87af533d01c176e79c2ece7d95da"
-    },
-    {
-      "id": "60-guide:automation:05.06-optimal-equipment-combination",
-      "path": "60-guide/automation/05.06-optimal-equipment-combination.md",
-      "title": "5.6 计算最优毕业率组合",
-      "category": "60-userguide",
-      "sha256": "1fa490e4099356d4ef725858626954e6e300fdb2acbef595891c993a9759129c"
-    },
-    {
-      "id": "60-guide:automation:05.07-build-calculator",
-      "path": "60-guide/automation/05.07-build-calculator.md",
-      "title": "5.7 出装搭配与模拟计算器",
-      "category": "60-userguide",
-      "sha256": "a321c43637797dd48d6574b4cd3dc0e58cbc0da83ffdb5dc427c243d05ac743a"
-    },
-    {
-      "id": "60-guide:automation:06-workflows",
-      "path": "60-guide/automation/06-workflows.md",
-      "title": "6. 工作流与日常任务",
-      "category": "60-userguide",
-      "sha256": "e6da43097a2445b5c2460e808bddbeaab802d3d23b8361ca3b131991fbf2ba4e"
-    },
-    {
-      "id": "60-guide:automation:06.07-system-scripts",
-      "path": "60-guide/automation/06.07-system-scripts.md",
-      "title": "6.7 系统脚本与工作流清单",
-      "category": "60-userguide",
-      "sha256": "cb6abddf2da1968a2be0cb9143dcb4b0dd9cdaf0ff7bfb44de3ede064896565b"
-    },
-    {
-      "id": "60-guide:automation:appendix-c-preset-gallery",
-      "path": "60-guide/automation/appendix-c-preset-gallery.md",
-      "title": "附录 C · 预置图库内容（端游 / 手游）",
-      "category": "60-userguide",
-      "sha256": "ef764be3a93093f5ffc60283cb58ec3f32be61ae22a6adfe6301fe7dbb9e3ad9"
-    },
-    {
-      "id": "60-guide:desktop:01-quick-start",
-      "path": "60-guide/desktop/01-quick-start.md",
-      "title": "1. 快速开始",
-      "category": "60-userguide",
-      "sha256": "e2c8b1ddc7a5b097e65245c54162b7d46ae8c632a19f967b6f59394e1101f210"
-    },
-    {
-      "id": "60-guide:desktop:02-main-interface",
-      "path": "60-guide/desktop/02-main-interface.md",
-      "title": "2. 主界面与用户管理",
-      "category": "60-userguide",
-      "sha256": "0aa194961f44d7126a73295bbdcbff7301f40841fc9a432f6446b75b7d9be2c4"
-    },
-    {
-      "id": "60-guide:desktop:03.01-base-config",
-      "path": "60-guide/desktop/03.01-base-config.md",
-      "title": "3.1 通用配置",
-      "category": "60-userguide",
-      "sha256": "3cbaa0bb9da075f29fbc5e15e7c56be2cfb35dbbb493f7e2b4bff6585a25faa1"
-    },
-    {
-      "id": "60-guide:desktop:03.02-scene-management",
-      "path": "60-guide/desktop/03.02-scene-management.md",
-      "title": "3.2 场景管理（F3）",
-      "category": "60-userguide",
-      "sha256": "c63a1c8f01681df80c00dfc16397007c287c9cea205d496c7986fff8d6c43e88"
-    },
-    {
-      "id": "60-guide:desktop:03.03-gallery-management",
-      "path": "60-guide/desktop/03.03-gallery-management.md",
-      "title": "3.3 图库管理（F4）",
-      "category": "60-userguide",
-      "sha256": "1df00ff44ae5f4e83c77b73867d614681a37c589f1660cb7dc774fddda575072"
-    },
-    {
-      "id": "60-guide:desktop:03.04-batch-tasks",
-      "path": "60-guide/desktop/03.04-batch-tasks.md",
-      "title": "3.4 批量任务",
-      "category": "60-userguide",
-      "sha256": "1761feb0cd5e02e29146aef5da386ff9401745bd09fbec19cbad8bf70b75004f"
-    },
-    {
-      "id": "60-guide:desktop:03.05-visual-recognition-troubleshooting",
-      "path": "60-guide/desktop/03.05-visual-recognition-troubleshooting.md",
-      "title": "3.5 图像识别与模板匹配排查",
-      "category": "60-userguide",
-      "sha256": "930013ed18ddccd978254c2e435398e85c2be92afaff2c71ecc934f5df768d7b"
-    },
-    {
-      "id": "60-guide:desktop:03.06-world-map-management",
-      "path": "60-guide/desktop/03.06-world-map-management.md",
-      "title": "大世界地图管理",
-      "category": "60-userguide",
-      "sha256": "06cd4add5ddaa7911dae010563d03d5ed6e2f1c2d789306b285d9e65c4ffbca2"
-    },
-    {
-      "id": "60-guide:desktop:08-script-authoring",
-      "path": "60-guide/desktop/08-script-authoring.md",
-      "title": "8. 脚本工作台与脚本作者须知",
-      "category": "60-userguide",
-      "sha256": "b37ceb4b8ef71ec48f996e68d05a567807b9be2e2d92eff506c26d673d85e84d"
-    },
-    {
-      "id": "60-guide:desktop:09-faq-and-feedback",
-      "path": "60-guide/desktop/09-faq-and-feedback.md",
-      "title": "9. 常见问题与反馈",
-      "category": "60-userguide",
-      "sha256": "21ae6663f8430301e2bd35ca13bebf59ae9e6c4ab9ea2ae48065ffdd6fbf8504"
-    },
-    {
-      "id": "60-guide:desktop:appendix-b-command-line",
-      "path": "60-guide/desktop/appendix-b-command-line.md",
-      "title": "附录 B. 命令行执行脚本",
-      "category": "60-userguide",
-      "sha256": "abeafae37dff510e0b6eff2efa7784a8e6a383899b373416d6e6afc85b364bee"
-    },
-    {
-      "id": "60-guide:recovery:config-migration",
-      "path": "60-guide/recovery/config-migration.md",
-      "title": "配置迁移恢复指南",
-      "category": "60-userguide",
-      "sha256": "062836f432e247c910876171646fc150c3d32630e3b93ab6c730803017938054"
+      "sha256": "6cac10a2fd739568eed826d47ee3769174703b66eced4c5fd720610de0dece4d"
     },
     {
       "id": "70-agent:05-ai-connection",
@@ -1470,14 +1470,14 @@
       "path": "70-agent/07-agent-mcp.md",
       "title": "外部 Agent 本机 MCP 与智能调律",
       "category": "70-agent",
-      "sha256": "08575f794c0ceca1e9fc2724c9bdebc60889eee08c48219f1d35b66345be597f"
+      "sha256": "5bcab768dd4f4d42482757aea1a66031188d21105c6b4a0771f3d34ce0790eca"
     },
     {
       "id": "70-agent:10-contracts:00-script-task-brief",
       "path": "70-agent/10-contracts/00-script-task-brief.md",
       "title": "脚本开发任务书（交给 AI Agent）",
       "category": "70-agent",
-      "sha256": "386a139f66b48575e21969af9a03ee3fc862cd6daceee8101e1a25a6ab0bec54"
+      "sha256": "fddafa54929cd81e3668602b46276f2c4a7ec60ed8b4994acda2710f0772a1cc"
     },
     {
       "id": "permissions",
@@ -1505,7 +1505,7 @@
       "path": "70-agent/20-operations/03-script-authoring.md",
       "title": "写一个可运行的 `.wf` 脚本",
       "category": "70-agent",
-      "sha256": "716832de5f87fb583f65ed29055fdd146a3244fe7bd8e296f9151bbc8a50eecd"
+      "sha256": "6ddbad2b8d4084b673156d12a5eca47b795bb33cc19303cb9bdbd6bbb22a305f"
     },
     {
       "id": "workbuddy",
@@ -1515,18 +1515,18 @@
       "sha256": "6f86cbb921d15b27f180e99dedb51383b44be501968126751c4855e4e09ee729"
     },
     {
+      "id": "tool-schema",
+      "path": "70-agent/40-schemas/tools.json",
+      "title": "工具 schema",
+      "category": "70-agent",
+      "sha256": "9a6b8c372b528a5324c74f8eb60eebdc698bc67cadc7a20bae2b4dfb49c9620c"
+    },
+    {
       "id": "entry",
       "path": "70-agent/README.md",
       "title": "律匠外部 Agent 使用入口",
       "category": "70-agent",
-      "sha256": "e4fb60b4d0a48b0f310f7de8eb53c2b9159e066747f51e489f9a04f723bd67d6"
-    },
-    {
-      "id": "tool-schema",
-      "path": "70-agent/schemas/tools.json",
-      "title": "工具 schema",
-      "category": "70-agent",
-      "sha256": "9a6b8c372b528a5324c74f8eb60eebdc698bc67cadc7a20bae2b4dfb49c9620c"
+      "sha256": "1a3943a0cc721014767e55a5ff2d68c0bd3f37c2ec77da59fa211009b33c4b3c"
     }
   ]
 }

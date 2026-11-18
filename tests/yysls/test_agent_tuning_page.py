@@ -62,7 +62,7 @@ def test_page_service_connection_survives_user_changes_without_packaging(qtbot, 
         tools = json.loads(resource.content)
         assert "list_users" in {tool["name"] for tool in tools}
         dsl_resource = list(asyncio.run(page.server.mcp.read_resource(
-            "lvjiang://docs/40-reference:dsl:01-basics")))[0]
+            "lvjiang://docs/40-reference:02-dsl:01-basics")))[0]
         assert "语法" in dsl_resource.content
 
         active[0] = "user_b"

@@ -48,7 +48,7 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     spec.loader.exec_module(module)
     output = tmp_path / "installed/docs"
     module.build_bundle(output, archive=tmp_path / "agent.zip")
-    tools = json.loads((output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
+    tools = json.loads((output / "70-agent/40-schemas/tools.json").read_text(encoding="utf-8"))
     # schema 由真实工具声明生成：公开 schema 的名字集合与注册进 MCP 的一致
     from lvjiang.apps.yysls.core.agent.catalog import tool_catalog
     from lvjiang.apps.yysls.core.agent.service import AgentService
@@ -63,7 +63,7 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     assert "skip_tuning" not in payload["properties"]["run_config"]["properties"]
     docs = AgentDocuments(output, AGENT_DOCUMENT_LAYOUT)
     source = AgentDocuments(Path(__file__).parents[2] / "docs", AGENT_DOCUMENT_LAYOUT, source_mode=True,
-                            schema_provider=lambda: (output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
+                            schema_provider=lambda: (output / "70-agent/40-schemas/tools.json").read_text(encoding="utf-8"))
     assert source.list_docs() == docs.list_docs()
     for entry in source.list_docs()["documents"]:
         assert source.read_doc(entry["id"]) == docs.read_doc(entry["id"])
@@ -82,8 +82,8 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     assert docs.list_docs("30-architecture")["documents"]
     assert "语法" in docs.read_doc("dsl")["text"]
     assert {entry["path"] for entry in manifest["documents"]} >= {
-        "10-domain/yysls/01-equipment-system.md", "60-guide/desktop/01-quick-start.md",
-        "40-reference/dsl/01-basics.md", "70-agent/README.md"}
+        "10-domain/01-yysls/01-equipment-system.md", "60-guide/04-desktop/01-quick-start.md",
+        "40-reference/02-dsl/01-basics.md", "70-agent/README.md"}
     # 逻辑分类仍是四个稳定键（guide 的分类键是 60-userguide），不随磁盘目录改名。
     assert {entry["category"] for entry in manifest["documents"]} == {
         "10-game", "30-architecture", "60-userguide", "70-agent"}
@@ -99,7 +99,7 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
         docs.read_doc("../../config/session/session.json")
     manifest = docs.list_docs()
     assert {p.relative_to(output).as_posix() for p in output.rglob("*") if p.is_file()} == {
-        "70-agent/manifest.json", *[d["path"] for d in manifest["documents"]]}
+        "70-agent/00-manifest.json", *[d["path"] for d in manifest["documents"]]}
     entry = output / "70-agent/README.md"
     entry.write_text("tampered", encoding="utf-8")
     with pytest.raises(ValueError, match="清单不符"):

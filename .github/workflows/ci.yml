@@ -33,7 +33,7 @@ jobs:
         run: python -m mypy
 
       # 文档门禁：链接/锚点/孤儿/编号/层索引时效锚，以及归档索引是否与目录
-      # 一一对应。规范见 docs/00-meta/doc-standard.md；两个脚本都是纯静态
+      # 一一对应。规范见 docs/00-meta/01-doc-standard.md；两个脚本都是纯静态
       # 检查，不联网。
       - name: Docs check (links / orphans / index)
         run: |

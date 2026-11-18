@@ -83,7 +83,7 @@ if $hit != "" -> click $hit
 | 需要什么 | 读哪篇 |
 |---|---|
 | 元数据全字段、参数类型、骨架、错误表、惯用法 | [写一个可运行的 .wf 脚本](../20-operations/03-script-authoring.md) |
-| 语法细节索引 | [DSL 语法目录](../../40-reference/dsl/README.md) |
+| 语法细节索引 | [DSL 语法目录](../../40-reference/02-dsl/README.md) |
 | 现网写法（42 个预置脚本） | `config/system/workflows/`：先看 `subcall/page_detection.wf`（判定库），再看 `daily/` 下的完整流程 |
 
 ## 7. 交付说明的固定格式

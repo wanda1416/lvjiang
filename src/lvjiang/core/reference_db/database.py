@@ -608,7 +608,7 @@ class ReferenceDatabase:
 
         开发模式直删所在层。用户模式下只能删自己的 local 条目；系统条目属于
         system 内容，不允许删除——想要一套自己的图请**新建图库空间**，
-        而不是把系统图去掉（详见 docs/30-design/architecture/overview/04-config-layering.md）。
+        而不是把系统图去掉（详见 docs/30-design/01-architecture/overview/04-config-layering.md）。
 
         Args:
             filename: 目标文件路径（相对路径）

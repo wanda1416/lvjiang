@@ -17,7 +17,7 @@ def test_bundle_checks_internal_links_even_when_marked_source_only(tmp_path):
 
     directory = tmp_path / "70-agent"
     directory.mkdir()
-    (directory / "manifest.json").write_text(json.dumps({
+    (directory / "00-manifest.json").write_text(json.dumps({
         "documents": [{"path": "70-agent/README.md"}],
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     page = directory / "README.md"
@@ -37,3 +37,27 @@ def test_document_baseline_can_remain_at_its_last_review(tmp_path, monkeypatch):
     monkeypatch.setattr(docs_check, "DOCS", directory)
     assert docs_check.check_status([document]) == []
     assert document.read_text(encoding="utf-8") == text
+
+
+def test_number_prefixes_gate_with_releases_exemption(tmp_path, monkeypatch):
+    """编号顶层目录的子目录与非 README 文件必须带数字前缀；50-releases 顶层
+    允许版本号（v<数字>）排序——这是目录编号化迁移后的常驻门禁。"""
+    docs = tmp_path / "docs"
+    for rel in (
+        "10-domain/01-yysls",          # 已编号目录：放行
+        "10-domain/legacy",            # 未编号子目录：拦截
+        "20-plans",                    # 未编号文件：拦截
+        "50-releases",                 # 版本号顶层条目：豁免
+    ):
+        (docs / rel).mkdir(parents=True)
+    (docs / "10-domain/01-yysls/README.md").write_text("# x\n", encoding="utf-8")
+    (docs / "20-plans/README.md").write_text("# x\n", encoding="utf-8")
+    (docs / "20-plans/backlog.md").write_text("# x\n", encoding="utf-8")
+    (docs / "50-releases/v0.15.17.md").write_text("# x\n", encoding="utf-8")
+    (docs / "50-releases/v-notes.md").write_text("# x\n", encoding="utf-8")
+    monkeypatch.setattr(docs_check, "DOCS", docs)
+    assert docs_check.check_number_prefixes() == [
+        "缺编号前缀 10-domain/legacy",
+        "缺编号前缀 20-plans/backlog.md",
+        "缺编号前缀 50-releases/v-notes.md",
+    ]

@@ -37,7 +37,7 @@
 - [生成新的调律配置](20-operations/02-generation.md)
 - [编写与校验 `.wf` 脚本](20-operations/03-script-authoring.md)：脚本开发的现状说明与待实现契约
 - [WorkBuddy 接入与对话示例](30-examples/01-workbuddy.md)
-- [共享领域知识](../10-domain/yysls/README.md)（仅源码检出）
+- [共享领域知识](../10-domain/01-yysls/README.md)（仅源码检出）
 - [AI 连接配置](05-ai-connection.md)（原 38-platform/05）：连接方式、凭据与连接测试
 - [Agent MCP 架构](07-agent-mcp.md)（原 38-platform/07）：服务架构、发现与文档访问
 
@@ -45,8 +45,8 @@
 
 文档按逻辑分类发布，开发与发行共用以下层的完整正文和目录：
 
-- [domain/yysls：游戏机制与调律评价](../10-domain/yysls/README.md)（仅源码检出）
-- [design：架构与设计](../30-design/architecture/README.md)，[DSL 语法目录](../40-reference/dsl/README.md)
+- [domain/yysls：游戏机制与调律评价](../10-domain/01-yysls/README.md)（仅源码检出）
+- [design：架构与设计](../30-design/01-architecture/README.md)，[DSL 语法目录](../40-reference/02-dsl/README.md)
 - [guide：软件操作指南](../60-guide/README.md)
 - agent：当前入口、MCP 契约与工作流示例。
 

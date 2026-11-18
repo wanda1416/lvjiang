@@ -1,7 +1,7 @@
 """并发手势探针 — 在真机上验证输入时间线能不能落地
 
 `timeline` 块在设备端编译成一个多 stroke 手势（见
-docs/20-plans/platform/03-input-timeline.md）。框架层支持是明确的，但三件事只有真机
+docs/20-plans/03-platform/03-input-timeline.md）。框架层支持是明确的，但三件事只有真机
 能回答：
 
 1. 本机 ``getMaxStrokeCount()`` 的实际值（AOSP 为 10，厂商 ROM 可能不同）；

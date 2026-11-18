@@ -4,7 +4,7 @@
 
 | 主题 | 入口 |
 |------|------|
-| 插件开发 | [plugins.md](plugins.md)（装配事实看契约 A，开发步骤看 02-plugin-system） |
+| 插件开发 | [plugins.md](01-plugins.md)（装配事实看契约 A，开发步骤看 02-plugin-system） |
 | 打包与发布手册 | [packaging/readme.md](../../packaging/readme.md) |
 | Android 构建与部署 | [android/DEPLOYMENT.md](../../android/DEPLOYMENT.md) |
 | Android 签名说明 | [android/README-signing.md](../../android/README-signing.md) |

@@ -1,7 +1,7 @@
 """装备判定公共基类
 
 定义四档评级、判定结果数据结构和调律规则判定器接口。
-评级采用穷举匹配制（参考 docs/10-domain/yysls/10-tuning-rules/01-huiyi.md）。
+评级采用穷举匹配制（参考 docs/10-domain/01-yysls/10-tuning-rules/01-huiyi.md）。
 """
 
 from abc import ABC, abstractmethod

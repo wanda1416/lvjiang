@@ -181,7 +181,7 @@ def is_in_bag_page($fresh)
 
 ## 9. 细节去哪查
 
-| 要写的东西 | 读哪一篇（都在 [DSL 语法目录](../../40-reference/dsl/README.md)） |
+| 要写的东西 | 读哪一篇（都在 [DSL 语法目录](../../40-reference/02-dsl/README.md)） |
 |---|---|
 | 词法、字面量、变量与表达式、引用模型 | `01-basics.md` |
 | 场景 / 布局 / Area / Action / Panel 是什么 | `02-concepts.md` |

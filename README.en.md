@@ -17,7 +17,7 @@ The built-in plugin targets Where Winds Meet gear tuning, and the plugin mechani
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
-> 📖 **User guide** (Chinese): [Quick start](docs/60-guide/desktop/01-quick-start.md) | [Contents](docs/60-guide/README.md)
+> 📖 **User guide** (Chinese): [Quick start](docs/60-guide/04-desktop/01-quick-start.md) | [Contents](docs/60-guide/README.md)
 
 ---
 
@@ -86,7 +86,7 @@ Action performed on PC or phone
 | Where Winds Meet plugin | `src/lvjiang/apps/yysls/` | Gear management, scoring, tuning, material recognition, graduation rate, loadouts, smart tuning and its UI (config/ + core/ + workflows/ + sync/ + ui/) |
 | On-device | `src/lvjiang/core/ondevice/`, `android/` | Android standalone runtime: accessibility capture/gesture bridge, device-side rapidocr adapter, Kotlin host project |
 
-See the [architecture docs](docs/30-design/architecture/README.md) and the [DSL grammar reference](docs/40-reference/dsl/README.md) for more detail. (Both are in Chinese.)
+See the [architecture docs](docs/30-design/01-architecture/README.md) and the [DSL grammar reference](docs/40-reference/02-dsl/README.md) for more detail. (Both are in Chinese.)
 
 ---
 
@@ -273,7 +273,7 @@ python -m lvjiang --list --id haoyun_lianji
 python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --json
 ```
 
-> Full parameters, exit codes and JSON output: [Appendix D: command line](docs/60-guide/desktop/appendix-b-command-line.md) (Chinese).
+> Full parameters, exit codes and JSON output: [Appendix D: command line](docs/60-guide/04-desktop/01-appendix-b-command-line.md) (Chinese).
 
 Once the PyQt6 main window is up, the basic flow is:
 
@@ -284,7 +284,7 @@ Once the PyQt6 main window is up, the basic flow is:
 5. **Analyze and run**: compute graduation-rate combinations and loadouts, or run batch auto-tuning / smart tuning.
 6. **Phone (optional)**: push configurations to the LvJiang APK and run or collect results on the phone.
 
-> Detailed workflows are in the [user guide](docs/60-guide/README.md) and the [auto-tuning flow](docs/30-design/decisions/tuning/01-auto-tuning.md) (both Chinese).
+> Detailed workflows are in the [user guide](docs/60-guide/README.md) and the [auto-tuning flow](docs/30-design/02-decisions/06-tuning/01-auto-tuning.md) (both Chinese).
 
 ---
 
@@ -358,25 +358,25 @@ Documentation is organized into numbered layers; each directory README is its in
 | [`docs/60-guide/`](docs/60-guide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
 | [`docs/70-agent/`](docs/70-agent/README.md) | External agent access, discovery and the business-operation contract |
 | [`docs/00-meta/`](docs/00-meta/README.md) | Meta: roadmap, backlog, documentation conventions |
-| [`docs/10-domain/yysls/`](docs/10-domain/yysls/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
+| [`docs/10-domain/01-yysls/`](docs/10-domain/01-yysls/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
 | [`docs/20-plans/`](docs/20-plans/README.md) | Plans and boundaries of partially implemented features (split from 20-requirements) |
-| [`docs/30-design/architecture/`](docs/30-design/architecture/README.md) | Architecture: main-window state machine, plugin system |
-| [`docs/30-design/architecture/models/`](docs/30-design/architecture/models/README.md) | Data models: gear model, scene implementation, session and context |
-| [`docs/40-reference/dsl/`](docs/40-reference/dsl/README.md) | Workflow DSL grammar specification |
-| [`docs/30-design/architecture/engine/`](docs/30-design/architecture/engine/README.md) | Engine internals: capture and cropping |
-| [`docs/30-design/architecture/scene/`](docs/30-design/architecture/scene/README.md) | Scene / layout definition and editing |
-| [`docs/30-design/architecture/workflows/`](docs/30-design/architecture/workflows/README.md) | Business flow orchestration |
-| [`docs/30-design/architecture/graduation/`](docs/30-design/architecture/graduation/README.md) | Graduation-rate engine |
-| [`docs/30-design/architecture/vision/`](docs/30-design/architecture/vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
-| [`docs/30-design/architecture/platform/`](docs/30-design/architecture/platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
-| [`docs/30-design/architecture/runtime/`](docs/30-design/architecture/runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
-| [`docs/40-development/`](docs/80-history/dev/README.md) | Development log: monthly refactor and decision records |
+| [`docs/30-design/01-architecture/`](docs/30-design/01-architecture/README.md) | Architecture: main-window state machine, plugin system |
+| [`docs/30-design/01-architecture/models/`](docs/30-design/01-architecture/03-models/README.md) | Data models: gear model, scene implementation, session and context |
+| [`docs/40-reference/02-dsl/`](docs/40-reference/02-dsl/README.md) | Workflow DSL grammar specification |
+| [`docs/30-design/01-architecture/engine/`](docs/30-design/01-architecture/01-engine/README.md) | Engine internals: capture and cropping |
+| [`docs/30-design/01-architecture/scene/`](docs/30-design/01-architecture/07-scene/README.md) | Scene / layout definition and editing |
+| [`docs/30-design/01-architecture/workflows/`](docs/30-design/01-architecture/09-workflows/README.md) | Business flow orchestration |
+| [`docs/30-design/01-architecture/graduation/`](docs/30-design/01-architecture/02-graduation/README.md) | Graduation-rate engine |
+| [`docs/30-design/01-architecture/vision/`](docs/30-design/01-architecture/08-vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
+| [`docs/30-design/01-architecture/platform/`](docs/30-design/01-architecture/05-platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
+| [`docs/30-design/01-architecture/runtime/`](docs/30-design/01-architecture/06-runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
+| [`docs/40-development/`](docs/80-history/02-dev/README.md) | Development log: monthly refactor and decision records |
 
 ---
 
 ## 🗺️ Roadmap
 
-The project evolved in stages: skeleton → coordinate calibration → POI capture and OCR → UI state detection → affix parsers → input wrappers → workflow DSL and engine → config-driven rule engine → UI polish → Android standalone runtime → phone batch runs and account sync. Current work is tracked in the [backlog](docs/20-plans/backlog.md), platform plans in [Android](docs/80-history/meta-archive/android-platform-progress.md) and [macOS](docs/00-meta/platforms/macos.md); [roadmap](docs/80-history/roadmap.md) keeps historical stage snapshots only and does not describe the current scope.
+The project evolved in stages: skeleton → coordinate calibration → POI capture and OCR → UI state detection → affix parsers → input wrappers → workflow DSL and engine → config-driven rule engine → UI polish → Android standalone runtime → phone batch runs and account sync. Current work is tracked in the [backlog](docs/20-plans/01-backlog.md), platform plans in [Android](docs/80-history/01-meta-archive/01-android-platform-progress.md) and [macOS](docs/00-meta/01-platforms/01-macos.md); [roadmap](docs/80-history/01-roadmap.md) keeps historical stage snapshots only and does not describe the current scope.
 
 ---
 
@@ -396,7 +396,7 @@ Ways to report problems:
 
 - **WeChat group**: "Help → Feedback" in the main window, then "join group by QR code"
 - **GitHub Issues**: [github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
-- **Reporting rules**: [FAQ and feedback](docs/60-guide/desktop/09-faq-and-feedback.md) (Chinese)
+- **Reporting rules**: [FAQ and feedback](docs/60-guide/04-desktop/09-faq-and-feedback.md) (Chinese)
 
 **Scope of support:**
 

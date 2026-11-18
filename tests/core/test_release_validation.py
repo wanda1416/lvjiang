@@ -9,7 +9,7 @@ def source(root, version):
     (root / "pyproject.toml").write_text(f'[project]\nversion = "{version}"\n', encoding="utf-8")
     fields = {"src/lvjiang/_version.py": f'__version__ = "{version}"\n',
               "android/app/build.gradle.kts": f'versionName = "{version}"\nversionCode = 10\n',
-              f"docs/releases/v{version}.md": f"# v{version} 测试说明\n"}
+              f"docs/50-releases/v{version}.md": f"# v{version} 测试说明\n"}
     for name, content in fields.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -17,23 +17,23 @@ def source(root, version):
 
 
 def test_release_notes_path_resolution(tmp_path):
-    # 新稳定路径：docs/releases/v<tag>.md
-    flat = tmp_path / "docs/releases/v1.2.3.md"
+    # 新稳定路径：docs/50-releases/v<tag>.md
+    flat = tmp_path / "docs/50-releases/v1.2.3.md"
     flat.parent.mkdir(parents=True)
     flat.write_text("# v1.2.3\n", encoding="utf-8")
-    assert check_release.release_notes_path(tmp_path, "1.2.3") == "docs/releases/v1.2.3.md"
-    # 新系列子目录：docs/releases/<系列>/v<tag>.md
-    (tmp_path / "docs/releases/v1.2").mkdir()
+    assert check_release.release_notes_path(tmp_path, "1.2.3") == "docs/50-releases/v1.2.3.md"
+    # 新系列子目录：docs/50-releases/<系列>/v<tag>.md
+    (tmp_path / "docs/50-releases/v1.2").mkdir()
     (flat).unlink()
-    series = tmp_path / "docs/releases/v1.2/v1.2.3.md"
+    series = tmp_path / "docs/50-releases/v1.2/v1.2.3.md"
     series.write_text("# v1.2.3\n", encoding="utf-8")
-    assert check_release.release_notes_path(tmp_path, "1.2.3") == "docs/releases/v1.2/v1.2.3.md"
-    # 旧位置兼容：docs/50-releases/[<系列>/]v<tag>.md
+    assert check_release.release_notes_path(tmp_path, "1.2.3") == "docs/50-releases/v1.2/v1.2.3.md"
+    # 旧位置兼容：docs/releases/[<系列>/]v<tag>.md
     (series).unlink()
-    legacy = tmp_path / "docs/50-releases/v1.2/v1.2.3.md"
+    legacy = tmp_path / "docs/releases/v1.2/v1.2.3.md"
     legacy.parent.mkdir(parents=True)
     legacy.write_text("# v1.2.3\n", encoding="utf-8")
-    assert check_release.release_notes_path(tmp_path, "1.2.3") == "docs/50-releases/v1.2/v1.2.3.md"
+    assert check_release.release_notes_path(tmp_path, "1.2.3") == "docs/releases/v1.2/v1.2.3.md"
     # 缺失时报错
     legacy.unlink()
     with pytest.raises(ValueError, match="缺少发布说明"):
@@ -41,10 +41,10 @@ def test_release_notes_path_resolution(tmp_path):
 
 
 def test_release_notes_path_rejects_double_body(tmp_path):
-    new = tmp_path / "docs/releases/v1.2.3.md"
+    new = tmp_path / "docs/50-releases/v1.2.3.md"
     new.parent.mkdir(parents=True)
     new.write_text("# v1.2.3\n", encoding="utf-8")
-    legacy = tmp_path / "docs/50-releases/v1.2.3.md"
+    legacy = tmp_path / "docs/releases/v1.2.3.md"
     legacy.parent.mkdir(parents=True)
     legacy.write_text("# v1.2.3\n", encoding="utf-8")
     with pytest.raises(ValueError, match="双正文"):

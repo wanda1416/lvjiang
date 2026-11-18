@@ -1,0 +1,197 @@
+# 截图与输入后端矩阵
+
+> Layer owner：L6 后端选择（`run_control` 按方案连接模式与设备状态挑选）
+> Feeds/Affects：`core/desktop/*`、`core/android/*`、`core/ondevice/*`、`core/input/base.py`；DSL 各指令在不同后端上的实际行为
+> Stability：随后端实现演进；新增/删除后端或改变某条能力时必须同步本表
+
+同一条 DSL 在不同连接方式下落到的物理机制差别很大：`drag ... hold` 在 a11y
+是两段 stroke，在 ADB 是 `motionevent` 序列或匀速 swipe，在 PC 是鼠标按下移动。
+本文把所有路径列在一张表里，回答"这条指令在这个环境到底做了什么、精度如何、
+哪些做不到"。
+
+## 一、路径一览
+
+连接恢复的共同编排位于 `core/android/recovery.py`。每个 AdbDevice 持有一个
+AndroidRecovery，策略也只由该设备持有；AgentClient 使用同一策略，不维护副本。
+ADB 与 Agent 保留单次探测、重建转发、握手及执行占用等各自原语，公共协调器负责
+重试间隔、停止检查、人工确认、输入降级判断及恢复成功通知。
+任务恢复需求见[Android 连接恢复与输入降级](../../decisions/platform/18-android-connection-recovery.md)。
+
+`shell` / `shell_bytes` 的 `retry_safe` 由消费者显式声明。screencap 与设备属性读取
+允许超时重试；未声明的命令按保守策略处理，超时后先确认可能已经执行的动作。
+Agent 继续根据 request_sent 区分已发出但结果未知的输入；它不能自动重放。
+底层 reconnect 只报告探测结果，成功响应才通知宿主；人工重新检查不解除主动暂停。
+AgentCapture 的传输失败进入相同的等待入口，不转成识别未命中，也不暗改截图后端。
+不可重试的截图业务错误仍按原识别契约返回失败，停止或无恢复通道则传播连接异常。
+
+主窗口的**执行目标**决定实际 capture/input 实例，方案决定环境、布局并声明允许的
+连接模式。一个窗口和多台 Android 设备可以同时保持连接，但第一阶段每次任务只冻结
+其中一个目标。后续多目标并发会让每个任务绑定独立目标句柄，并允许断线后重绑定
+capture/input；业务配置在任务起点按磁盘内容解析，不另建副本。见
+[03-concurrent-execution.md](../runtime/03-concurrent-execution.md)。连接模式只有两种，后端在模式
+内部再按设备状态细分。
+
+```
+连接模式 windows（Win32 窗口）
+├─ 截图：DesktopCapture（mss 抓窗口区域）
+└─ 输入：SendInputInput   前台 —— 真实光标/键盘事件，窗口需在前台
+         PostMessageInput  后台 —— 向目标 hwnd 投递消息，不动光标
+
+连接模式 adb（Android 设备）
+├─ 截图：AgentCapture       无障碍 takeScreenshot，RGBA 裸字节（Android 11+）
+│        AndroidStreamCapture scrcpy 服务端 H.264 流，零延迟取最新帧
+│        AdbCapture          adb exec-out screencap，逐帧起子进程
+└─ 输入：AgentInput  ─ via=auto ─┬─ a11y   dispatchGesture / performGlobalAction
+         │                       └─ shell  Shizuku 里跑 input tap/swipe/keyevent
+         AdbInput    adb shell input（Agent 未连接时的兜底）
+
+设备端独立运行（手机上的律匠 app 自己跑 .wf）
+├─ 截图：ondevice/capture  无障碍 takeScreenshot 或 Shizuku screencap
+└─ 输入：A11yInput / ShellInput（与 Agent 的两条通道同源，少一层协议）
+```
+
+- 「手游投屏」方案 = `windows` 模式 + `android` 环境 + `android_cast` 布局：PC 上
+  对 scrcpy 窗口用 SendInput/PostMessage，截图走 DesktopCapture。它是 PC 路径，
+  不是 Android 路径。
+- Agent 的 `via=auto`：无障碍就绪优先无障碍，否则 Shizuku，两者都没有时握手失败
+  回退 AdbInput。按键类请求在 a11y 只能发 BACK/HOME，其余 keycode 自动转 shell
+  （需 Shizuku 已授权）。
+
+## 二、输入能力矩阵
+
+✅ 完整支持 ｜ ⚠️ 降级/有条件 ｜ ❌ 不支持（记 warning 或抛错）
+
+| DSL / 能力 | PC 前台 SendInput | PC 后台 PostMessage | Android Agent a11y | Android Agent shell (Shizuku) | Android ADB `input` |
+|---|---|---|---|---|---|
+| `click` 左键 | ✅ 移动光标后点击 | ✅ 投递消息，不动光标 | ✅ tap | ✅ `input tap` | ✅ `input tap` |
+| `click right/middle/x1/x2` | ✅ | ⚠️ 降级为左键 | ⚠️ 触屏无鼠标键，按普通点击 | ⚠️ 同左 | ⚠️ 同左 |
+| `click ... hold` | ✅ 按下→等待→抬起 | ✅ 左键 | ✅ `long_press` stroke | ✅ 原地 swipe | ✅ 原地 `input swipe` |
+| `click` 命中 `activation_key` | ✅ 转按键（含 hold→`press hold`） | ✅ 同左（后台键盘消息） | 布局不绑键，走触屏 | 同左 | 同左 |
+| `drag A to B` / arrow | ✅ 按下→`smooth_move_to`→抬起 | ✅ WM_MOUSEMOVE 分步投递 | ✅ swipe stroke | ✅ `input swipe` | ✅ `input swipe` |
+| `drag ... hold` | ✅ 到终点后保持 | ✅ | ✅ `hold_move`：两段 stroke 真正停住 | ⚠️ hold 合并进 swipe 总时长，匀速插值，推满只在结尾生效 | ✅ Android 10+：`motionevent DOWN→MOVE→sleep→UP`；⚠️ 更老系统合并 swipe |
+| `drag` 中间过程精度 | 高精度绝对截止时间 | 同左 | 系统按帧调度 | `input` 进程 ~100–300 ms/条 | 同左 + adb 往返 |
+| `drag ... scale/exact` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `move to / move by` | ✅ 相对位移分步 | ⚠️ `move to` 投递 WM_MOUSEMOVE；`move by` 忽略 | ❌ 无鼠标概念 | ❌ | ❌ |
+| `place` | ✅ SetCursorPos | ⚠️ 等价一次 WM_MOUSEMOVE | ❌ | ❌ | ❌ |
+| `scroll ... interval` | ✅ 逐格滚轮事件 + 间隔 | ✅ 逐格 WM_MOUSEWHEEL | ⚠️ 一次 100px×n 的 swipe，`interval` 忽略 | ⚠️ 同左 | ⚠️ 同左 |
+| `press "ESC"` / `"HOME"` | ✅ 真实 ESC 键 | ✅ | ✅ 系统 BACK / HOME 全局动作 | ✅ keyevent 4 / 3 | ✅ keyevent 4 / 3（三条 Android 路径 ESC 一律等于系统返回） |
+| `press "X"`（其它键） | ✅ 扫描码 SendInput | ✅ 后台键盘消息 | ⚠️ `via=auto` 转 shell，无 Shizuku 则报错 | ✅ `input keyevent`（一次即含抬起） | ✅ 同左 |
+| `press "X" hold` / `down` / `up` | ✅ 真实按住 | ✅ | ❌ keyevent 是一次性的，`hold`/`down`/`up` 无法保持 | ❌ 同左 | ❌ 同左 |
+| `press "MOUSE_LEFT"` 等鼠标键原语 | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `paste` | ✅ 剪贴板 + Ctrl+V | ✅ 剪贴板 + 后台 Ctrl+V | ❌ | ❌ | ❌ |
+| `replay input_trace`（高精度回放） | ✅ 唯一支持 | ❌ | ❌ | ❌ | ❌ |
+| 多点触控（同时推杆 + 转视角） | 无此概念 | 无此概念 | ✅ `GestureDescription` 最多 10 stroke（尚未接入 DSL） | ❌ | ❌ 单指针 |
+| 全局热键（开始/停止/暂停/录制） | ⚠️ 前台模式禁止 `press` 当前热键 | ✅ | — | — | — |
+| 抖动（point 半径 / 区域 click_rect） | ✅ | ✅ | ✅ | ✅ | ✅ 各后端一致，由引擎层计算 |
+| 停止响应（hold 期间） | ✅ 引擎注入 `stop_check`，立即抬起 | ✅ | ⚠️ 手势已下发无法中断，等本段 stroke 结束（≤ 60 s） | ⚠️ 等 `input` 返回 | ⚠️ 等 shell 返回 |
+
+关键差异展开：
+
+- **PC 前台 vs 后台**：前台是真实输入，任何窗口都收；代价是窗口必须在前台、
+  光标被占用、不能同时干别的。后台是消息投递，SDL/DirectInput 类游戏可能
+  不认（只读硬件层输入），`move by`、鼠标键原语、高精度回放都做不到；优点是
+  不抢光标、可最小化运行。`activate_before_send` 让后台模式在投递前瞬时激活
+  窗口再还原，专门适配 scrcpy 这类只在有焦点时处理消息的窗口。
+- **a11y vs shell/ADB 的手势**：a11y 是进程内 Binder 调用、系统按帧调度、
+  路径由系统插值；shell/ADB 每条 `input` 都在设备上拉起一次 `app_process`
+  （100–300 ms），再加 adb 往返。木桩测伤这类靠 `hold 1.52 after wait 0.8`
+  堆时序的脚本只有 a11y 通道才有讨论精度的基础。
+- **a11y 的手势时长上限**：单次 `dispatchGesture` 最长 60 秒。`hold_move` 的
+  移动段与停住段各是一次 dispatch，任一段超过 60 秒手势失败。长时间持续推杆
+  不用 `hold` 表达，属于后续 locomotion 会话原语的职责。
+- **a11y 会被真实触摸取消**：用户碰屏幕，正在执行的手势走 `onCancelled`，
+  指针被强制抬起。ADB 注入不受影响。
+- **按键**：Android 侧只有 shell/ADB 能发任意 keycode，且 `keyevent` 是一次性的，
+  `press hold / down / up` 在所有 Android 路径都不可能真正保持。
+- **并发输入（输入时间线）**：只有两条路做得到——PC（按键与鼠标各有独立状态）与
+  a11y（一个 `GestureDescription` 装多条 stroke，各带 `startTime`）。ADB shell input
+  与 Shizuku 都走 `input`，单指且无法交错两个 pointer，**不做静默降级**：脚本用
+  `#% requires: [device_gesture]` 声明，加载期就拒绝。两侧支持的步骤类型还不一样：
+  PC 只接按键（端游的移动是 WASD，不为鼠标拖拽发明并发），a11y 只接触点（安卓的
+  `keyevent` 保持不住）。见 [32-grammar/03.7-timeline.md](../../../40-reference/dsl/03.7-timeline.md)。
+
+## 三、截图能力矩阵
+
+| | DesktopCapture (PC) | WgcCapture (PC 后台) | AgentCapture (a11y) | AndroidStreamCapture (scrcpy) | AdbCapture (screencap) | 设备端 ondevice |
+|---|---|---|---|---|---|---|
+| 机制 | mss 抓窗口区域，专用工作线程 | Windows Graphics Capture 按 hwnd 取帧，推送式 | `takeScreenshot` RGBA 裸字节 | scrcpy 服务端 H.264 流，后台线程持续解码 | `adb exec-out screencap -p`，逐帧子进程 + PNG 编解码 | a11y `takeScreenshot` 或 Shizuku `screencap` |
+| 单帧耗时 | 十几 ms | `capture()` 零等待返回最新帧 | 几十 ms | `capture()` 零等待返回最新帧 | 300–800 ms | 同 a11y/shell |
+| 前置条件 | 目标窗口可见（最小化拿不到） | Win10 1903+、装了 windows-capture；窗口未最小化 | Android 11+、无障碍已开 | 设备端推 scrcpy-server.jar | 只需 adb | app 常驻 |
+| 限制 | 被遮挡部分是遮挡物；DPI 感知换算 | **被遮挡仍可用**；最小化后停帧；部分系统版本会画捕获边框 | 框架限流（距上一次请求 <=333ms 即失败，按服务连接计时，后端自行补齐节拍并通过 `min_capture_interval` 告知采样循环）；`FLAG_SECURE` 窗口不可截 | 有压缩失真；`capture_lossless` 另取 | 慢；无 UI 实时预览 | 同 a11y/shell |
+| 尺寸来源 | 窗口客户区 | 对齐到窗口矩形，与 mss 同构 | 截图实际尺寸 | 设备原始分辨率（不缩放，与 tap 同坐标系） | 实际截图尺寸（横屏游戏 wm size 可能是竖屏，以截图为准） | 同左 |
+| 实时预览 | ✅ | ✅ | ✅ 轮询 | ✅ 帧回调 | ❌ | — |
+
+### 推送式视频流的健康契约（AndroidStreamCapture）
+
+推送式后端的 `capture()` 永远返回"最后一帧"，因此**它不能报告自己的死活**——帧冻结时
+上层会拿旧画面继续识别与点击。健康判定因此独立成一套观测，并按实测值定阈值：
+
+| 观测 | 判定 | 动作 |
+|---|---|---|
+| socket EOF / 读异常 | `FAULT_SOCKET_EOF`，实测 0.1s | 重建会话 |
+| 收字节数 3s 为零且无 EOF | `FAULT_RX_IDLE`（半开连接不给 EOF；编码器停摆同样是零字节，恢复动作相同） | 关 socket → 重建会话 |
+| 帧计数 5s 不推进 | 先查 `mWakefulness`：息屏 → 无故障；亮屏 → `FAULT_STALL` | 重建会话 |
+| 连续 30 包解码失败 | `FAULT_DECODE` | 重建解码器 → 重建会话 |
+| 尺寸/方向切换中无帧 | 豁免，10s 上限 | 超时才判停摆 |
+
+实测依据（V2415A / MTK，2800×1260）：亮屏静止仍有 2–4 帧/秒、最长帧间隔 2.03s；
+**息屏后 0 帧 0 字节，与编码器停摆完全同构**；`kill -STOP` 冻结服务端 18s 无帧，
+`socket` 仍在、进程仍在。所以"帧不变"不参与判定，只有设备显示状态能区分二者。
+
+运行期取帧与输入闸门：
+
+- `capture_for_run(capture)` / `ensure_capture_channel(capture)`（`core/input/capture_base.py`）
+  按**类型**做能力探测，只对声明了 `capture_blocking` / `ensure_channel_healthy` 的后端
+  生效，PC／screencap／代理后端语义不变。
+- 引擎在每条语句前调用闸门：`只点击不截图` 的脚本因此同样被拦住。
+- 恢复由 `AndroidRecovery.recover_stream()` 编排（单飞、阶梯重试、无限等待人工），
+  失败抛 `ChannelFaultError`；批量据此中止整批并记 `channel_fault`。
+
+### PC 后台截图（遮挡可用，最小化不可用）
+
+主窗口「扫描窗口」模式下有一个**后台截图**开关（默认关，仅本次运行期间生效）。
+打开后 PC 端取帧从 mss 换成 Windows Graphics Capture：
+
+- **能解决的**：游戏窗口被别的窗口盖住照样截得到。DWM 合成模型下，被遮挡的窗口
+  仍在各自的缓冲区里正常渲染，盖不盖只影响屏幕合成结果。
+- **不能解决的**：最小化。窗口最小化后没有被合成的客户区表面，WGC 随之停帧——
+  这条路的上限是「被遮挡也能跑」，不是「最小化挂后台」。独占全屏失焦时引擎可能
+  自行降帧，也不在这条路的管辖范围内。
+- **几何对齐**：WGC 交付的帧是窗口可见边界（DWM `DWMWA_EXTENDED_FRAME_BOUNDS`），
+  比 `GetWindowRect` 窄若干像素（Win10 两侧各约 8px 不可见调整边框）。后端按两个
+  矩形的差值把帧贴回窗口矩形尺寸再交出去，输出与 mss 那张图逐像素同构，**既有布局
+  标定不用重做**。多出来的边框区域填黑。
+- 输入侧另有「后台模式」开关（PostMessage）。两个开关互相独立：截图能后台不代表
+  输入能后台，部分游戏不响应消息注入。要真正无人值守，两个都得成立。
+
+坐标系约定：所有 Android 截图后端输出的图像与 `input tap` 使用同一坐标系（不缩放、
+已对齐设备方向），工作流的画布归一化坐标经布局 canvas 换算后直接可用。
+
+## 四、暴露面与运行前提
+
+不同路径被游戏或系统"看见"的方式不同，这不是精度问题，但决定了某条路径能不能用：
+
+| 路径 | 需要用户做的事 | 被检测的信号 |
+|---|---|---|
+| PC 前台 | 游戏窗口保持前台 | 无特殊信号（真实输入） |
+| PC 后台 | 目标 hwnd | 部分游戏不响应消息注入 |
+| a11y | 手机上开启律匠无障碍服务（一次） | 部分手游检测"启用了无障碍服务"并拒绝运行 |
+| Shizuku | 每次开机后重新激活 Shizuku 并授权 | 开发者选项/无线调试已开 |
+| ADB | USB 或无线调试已连接 | 同上 |
+
+## 五、选择建议
+
+- **战斗/移动/木桩**（时序敏感）：Android 用 a11y；PC 用前台 SendInput。后台
+  PostMessage 只在游戏确认接受消息注入且不需要 `move by` 时用。
+- **日常导航/扫描**（时序不敏感）：任一路径均可；Android 上开 a11y 免去每次
+  激活 Shizuku 的麻烦。
+- **需要任意按键**（安卓）：必须有 Shizuku 或 ADB；只开无障碍会在 `press` 处报错。
+- **两个都开**（无障碍 + Shizuku）是安卓最稳的配置：手势走 a11y，按键自动转 shell。
+
+## 六、维护约定
+
+- 新增或删除输入/截图后端、改变某条指令在某后端的行为时，先改本表再改代码注释。
+- 各指令文档（`32-grammar/03.3-mouse.md` 等）只保留该指令特有的说明，跨后端
+  差异以本表为准并链接过来。
+- 后端类的 `kind`（`InputBackendKind`）是引擎判定运行模式的唯一依据，不允许在
+  通用层按具体类名分派。

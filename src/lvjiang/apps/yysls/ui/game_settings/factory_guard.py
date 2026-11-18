@@ -1,7 +1,7 @@
 """系统内容删除守卫 —— 供设置面板判断某条目能否删除
 
 系统配置是开发者提供的初始内容，用户模式下不允许删除（详见
-docs/design/architecture/overview/04-config-layering.md「删除：默认禁止」）。用户自己
+docs/30-design/architecture/overview/04-config-layering.md「删除：默认禁止」）。用户自己
 新增的条目不受限制，照常可删。
 
 面板拿不到 system 编辑权限时，删除按钮应**置灰**并说明替代方案，

@@ -141,7 +141,7 @@
 
 ## 3. 明确不会发出什么
 
-律匠的[问题反馈规范](docs/guide/desktop/09-faq-and-feedback.md)要求你在提交 issue 前遮盖四类信息。反过来，律匠自己上传的数据里也**一条都不包含**：
+律匠的[问题反馈规范](docs/60-guide/desktop/09-faq-and-feedback.md)要求你在提交 issue 前遮盖四类信息。反过来，律匠自己上传的数据里也**一条都不包含**：
 
 - ❌ 游戏账号、角色名、任何可识别身份的信息
 - ❌ ADB 设备序列号
@@ -173,7 +173,7 @@
 - 超过 **180 天**没有再打开过律匠的标识，会被整条删除。
 - 90 天之后只留下不含任何标识的汇总数字（比如"8 月 1 日有多少人打开律匠"这类计数），这些数字已经和任何人对不上了，因此可以无限期保留。
 
-表结构与查询方式（面向想了解技术细节的读者）见 [数据库设计文档](docs/design/architecture/platform/04-telemetry.md)。
+表结构与查询方式（面向想了解技术细节的读者）见 [数据库设计文档](docs/30-design/architecture/platform/04-telemetry.md)。
 
 ## 6. 谁能看到这些数据
 
@@ -206,4 +206,4 @@
 
 ## 9. 有疑问找谁
 
-微信交流群（主窗口「帮助 → 反馈」扫码加群）或 [GitHub Issue](https://github.com/wanda1416/lvjiang/issues)，参见[反馈规范](docs/guide/desktop/09-faq-and-feedback.md)。
+微信交流群（主窗口「帮助 → 反馈」扫码加群）或 [GitHub Issue](https://github.com/wanda1416/lvjiang/issues)，参见[反馈规范](docs/60-guide/desktop/09-faq-and-feedback.md)。

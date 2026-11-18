@@ -4,7 +4,7 @@
 精确不变地整体平移」。战斗、移动这类定义要求组内相对位置严格相等，一个个挪
 必然在小数位上散掉，所以需要一个真正的组概念。
 
-设计要点（完整语义见 docs/design/decisions/editor/04-canvas-group-selection.md）：
+设计要点（完整语义见 docs/30-design/decisions/editor/04-canvas-group-selection.md）：
 
 - 选区按 ``(kind, key)`` 存，不存索引。表格那边已经为此踩过坑——视图过滤后
   row 不再对应场景定义的索引。选区指错实体的后果是把错的东西挪走。

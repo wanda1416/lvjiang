@@ -25,8 +25,8 @@ def git(root: Path, *args: str) -> str:
 def release_notes_path(root: Path, tag: str) -> str:
     """发布说明的**仓库内相对路径**。
 
-    识别顺序：当前发布中的版本留在新稳定路径 ``docs/releases/v<tag>.md``；
-    往期版本归档到系列子目录（``docs/releases/v0.15/v<tag>.md``）；再兼容读取
+    识别顺序：当前发布中的版本留在新稳定路径 ``docs/50-releases/v<tag>.md``；
+    往期版本归档到系列子目录（``docs/50-releases/v0.15/v<tag>.md``）；再兼容读取
     旧位置 ``docs/releases/[<系列>/]v<tag>.md``（仅历史提交）。新旧两处同时
     存在真实正文时直接报错——不允许双正文。返回相对路径是因为 Release 工作流
     会把它当仓库内路径去做产物上传。
@@ -41,8 +41,8 @@ def release_notes_path(root: Path, tag: str) -> str:
                 return candidate
         return None
 
-    new = pick("docs/releases")
-    legacy = pick("docs/50-releases")
+    new = pick("docs/50-releases")
+    legacy = pick("docs/releases")
     if new is not None and legacy is not None:
         raise ValueError(
             "发布说明存在双正文："
@@ -50,7 +50,7 @@ def release_notes_path(root: Path, tag: str) -> str:
             f"{legacy.relative_to(root).as_posix()} 同时存在，只允许保留一处")
     found = new or legacy
     if found is None:
-        raise ValueError(f"缺少发布说明：docs/releases/[<系列>/]v{tag}.md")
+        raise ValueError(f"缺少发布说明：docs/50-releases/[<系列>/]v{tag}.md")
     return found.relative_to(root).as_posix()
 
 

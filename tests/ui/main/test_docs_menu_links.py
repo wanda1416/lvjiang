@@ -21,18 +21,18 @@ def opened_urls(monkeypatch):
 
 
 def test_open_docs_targets_the_public_guide_entry(qtbot, opened_urls):
-    """主窗口「帮助 → 文档」必须打开公开仓的新用户指南入口 docs/guide/README.md。"""
+    """主窗口「帮助 → 文档」必须打开公开仓的新用户指南入口 docs/60-guide/README.md。"""
 
     class _Stub(MenuOpsMixin):
         pass
 
     _Stub()._open_docs()
     assert opened_urls == [
-        f"https://github.com/{GITHUB_REPO}/blob/master/docs/guide/README.md"]
+        f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-guide/README.md"]
 
 
 def test_feedback_dialog_issue_guide_targets_the_faq_page(qtbot, opened_urls):
     """反馈对话框「提交规范」必须指向迁移后的常见问题与反馈页，旧路径不得复现。"""
     FeedbackDialog._open_issue_guide()
     assert opened_urls == [
-        f"https://github.com/{GITHUB_REPO}/blob/master/docs/guide/desktop/09-faq-and-feedback.md"]
+        f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-guide/desktop/09-faq-and-feedback.md"]

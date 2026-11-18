@@ -16,8 +16,8 @@ import pathlib
 import re
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-DEVLOG_ROOT = REPO / "docs" / "history" / "dev"
-RELEASES = REPO / "docs" / "releases"
+DEVLOG_ROOT = REPO / "docs" / "80-history" / "dev"
+RELEASES = REPO / "docs" / "50-releases"
 MONTH_DIR = re.compile(r"\d{4}-\d{2}")
 
 

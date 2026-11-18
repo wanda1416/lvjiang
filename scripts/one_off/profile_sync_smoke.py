@@ -22,6 +22,7 @@ from lvjiang.core.profile import (  # noqa: E402
     engine,
     regen_gate,
     repository,
+    service,
     snapshot_sync,
 )
 from lvjiang.core.profile.models import QuotaKeyDef  # noqa: E402
@@ -136,14 +137,17 @@ def main() -> int:
     ok &= step("pull_and_replay", lambda: snapshot_sync.pull_and_replay("t", allow_overwrite=True).__dict__)
     ok &= step("回放后读值", lambda: repository.db_read_entry("tester", "stock", "jinbi"))
 
-    # 周期重置 + regen 物化（tick）
+    # 跨周期：tick 不写库，只有真实写入才物化 reset + set
     old = (datetime.now() - timedelta(days=3)).isoformat(timespec="seconds")
     repository.db_upsert("tester", "quota", "daily", 42, event_at=old, op_type="set")
     kd = QuotaKeyDef(key="daily", label="日", period="day", reset_time="05:00")
     cfg = SimpleNamespace(get_keys_by_model=lambda m: [kd] if m == "quota" else [])
-    ok &= step("周期重置 tick",
+    ok &= step("tick 不写 reset",
                lambda: engine.ProfileProcessor._tick_user(
-                   SimpleNamespace(_notify_updated=lambda u: None), "tester", cfg))
+                   SimpleNamespace(_quota_display={}, _notify_updated=lambda u: None),
+                   "tester", cfg))
+    ok &= step("跨周期读值（派生 0）",
+               lambda: service.profile_read("tester", "daily"))
 
     ok &= step("历史查询", lambda: len(repository.db_get_history("tester")))
     ok &= step("历史聚合", lambda: len(repository.db_history_page(

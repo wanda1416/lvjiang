@@ -17,7 +17,7 @@
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
-> 📖 **用户手册**：[快速开始](docs/guide/desktop/01-quick-start.md) | [目录](docs/guide/README.md)
+> 📖 **用户手册**：[快速开始](docs/60-guide/desktop/01-quick-start.md) | [目录](docs/60-guide/README.md)
 
 ---
 
@@ -87,7 +87,7 @@ PC 端或手机端执行操作
 | 燕云剧情插件 | `src/lvjiang/apps/yysls_story/` | 剧情选项文案库匹配、`story_*` 内置函数与文案编辑对话框（依赖 yysls，入口在「燕云」菜单） |
 | 设备端 | `src/lvjiang/core/ondevice/`、`android/` | 安卓独立执行端：无障碍截图/手势桥接、rapidocr 设备端适配、Kotlin 宿主工程 |
 
-更多细节见 [架构文档](docs/design/architecture/README.md) 与 [DSL 语法文档](docs/reference/dsl/README.md)。
+更多细节见 [架构文档](docs/30-design/architecture/README.md) 与 [DSL 语法文档](docs/40-reference/dsl/README.md)。
 
 ---
 
@@ -101,7 +101,7 @@ PC 端或手机端执行操作
 
 ![批量任务与用户总览](docs/assets/screenshots/main-batch-overview.png)
 
-> 游戏配置、调律配置与毕业率分析等界面见 [用户指南](docs/guide/README.md)。截图中的用户（角色名）与设备信息均已做打码处理。
+> 游戏配置、调律配置与毕业率分析等界面见 [用户指南](docs/60-guide/README.md)。截图中的用户（角色名）与设备信息均已做打码处理。
 
 ---
 
@@ -245,7 +245,7 @@ pip install -e ".[dev]"
 
 ## ▶️ 使用
 
-> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/guide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
+> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/60-guide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
 
 **Windows 用户** 可直接从 [Releases](https://github.com/wanda1416/lvjiang/releases) 下载最新发行包（免安装 zip 或安装程序 exe），解压/安装后运行 `lvjiang.exe` 即可，无需 Python 环境。**Android 用户** 可下载随版发布的律匠 APK 在手机上独立执行。
 
@@ -286,7 +286,7 @@ python -m lvjiang --list --id haoyun_lianji
 python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --json
 ```
 
-> 完整参数、退出码与 JSON 输出见 [附录 D：命令行执行脚本](docs/guide/desktop/appendix-b-command-line.md)。
+> 完整参数、退出码与 JSON 输出见 [附录 D：命令行执行脚本](docs/60-guide/desktop/appendix-b-command-line.md)。
 
 启动界面后进入 PyQt6 主窗口，基本流程：
 
@@ -297,7 +297,7 @@ python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --j
 5. **分析与执行**：计算毕业率组合、出装搭配，或运行批量自动调律 / 智能调律。
 6. **手机端（可选）**：下发配置到律匠 APK，在手机上独立执行或回传结果。
 
-> 详细业务流程见 [用户指南](docs/guide/README.md) 与 [自动调律流程](docs/design/decisions/tuning/01-auto-tuning.md)。
+> 详细业务流程见 [用户指南](docs/60-guide/README.md) 与 [自动调律流程](docs/30-design/decisions/tuning/01-auto-tuning.md)。
 
 ---
 
@@ -367,29 +367,29 @@ python -m mypy
 |------|------|
 | [`PRIVACY.md`](PRIVACY.md) | 隐私说明：联网行为、账户同步、匿名调律数据收集发出什么/不发出什么 |
 | [`docs/`](docs/README.md) | 完整文档中心与按读者导航 |
-| [`docs/50-releases/`](docs/releases/README.md) | 发布记录与版本说明 |
-| [`docs/guide/`](docs/guide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
-| [`docs/agent/`](docs/agent/README.md) | 外部 Agent 接入、发现与业务操作契约 |
-| [`docs/00-meta/`](docs/meta/README.md) | 元信息：路线图、待办、文档组织约定 |
-| [`docs/domain/yysls/`](docs/domain/yysls/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
-| [`docs/plans/`](docs/plans/README.md) | 部分实现功能的计划与边界（原 20-requirements 分流） |
-| [`docs/design/architecture/`](docs/design/architecture/README.md) | 技术架构：主窗口状态机、插件系统 |
-| [`docs/design/architecture/models/`](docs/design/architecture/models/README.md) | 数据模型：装备模型、场景实现、会话与上下文 |
-| [`docs/reference/dsl/`](docs/reference/dsl/README.md) | 工作流 DSL 语法规范 |
-| [`docs/design/architecture/engine/`](docs/design/architecture/engine/README.md) | 引擎细节：截图与裁剪 |
-| [`docs/design/architecture/scene/`](docs/design/architecture/scene/README.md) | 场景 / 布局定义与编辑 |
-| [`docs/design/architecture/workflows/`](docs/design/architecture/workflows/README.md) | 业务流程编排 |
-| [`docs/design/architecture/graduation/`](docs/design/architecture/graduation/README.md) | 毕业率计算引擎 |
-| [`docs/design/architecture/vision/`](docs/design/architecture/vision/README.md) | 视觉感知子系统：图色 / 模板匹配 / 坐标一致性 |
-| [`docs/design/architecture/platform/`](docs/design/architecture/platform/README.md) | 平台与接入：设备端代理协议、匿名统计 |
-| [`docs/design/architecture/runtime/`](docs/design/architecture/runtime/README.md) | 运行期能力：调律历史、地图管理、多目标并发、出装计算 |
-| [`docs/40-development/`](docs/history/dev/README.md) | 开发日志：按月归档的重构 / 决策记录 |
+| [`docs/50-releases/`](docs/50-releases/README.md) | 发布记录与版本说明 |
+| [`docs/60-guide/`](docs/60-guide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
+| [`docs/70-agent/`](docs/70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 |
+| [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、待办、文档组织约定 |
+| [`docs/10-domain/yysls/`](docs/10-domain/yysls/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
+| [`docs/20-plans/`](docs/20-plans/README.md) | 部分实现功能的计划与边界（原 20-requirements 分流） |
+| [`docs/30-design/architecture/`](docs/30-design/architecture/README.md) | 技术架构：主窗口状态机、插件系统 |
+| [`docs/30-design/architecture/models/`](docs/30-design/architecture/models/README.md) | 数据模型：装备模型、场景实现、会话与上下文 |
+| [`docs/40-reference/dsl/`](docs/40-reference/dsl/README.md) | 工作流 DSL 语法规范 |
+| [`docs/30-design/architecture/engine/`](docs/30-design/architecture/engine/README.md) | 引擎细节：截图与裁剪 |
+| [`docs/30-design/architecture/scene/`](docs/30-design/architecture/scene/README.md) | 场景 / 布局定义与编辑 |
+| [`docs/30-design/architecture/workflows/`](docs/30-design/architecture/workflows/README.md) | 业务流程编排 |
+| [`docs/30-design/architecture/graduation/`](docs/30-design/architecture/graduation/README.md) | 毕业率计算引擎 |
+| [`docs/30-design/architecture/vision/`](docs/30-design/architecture/vision/README.md) | 视觉感知子系统：图色 / 模板匹配 / 坐标一致性 |
+| [`docs/30-design/architecture/platform/`](docs/30-design/architecture/platform/README.md) | 平台与接入：设备端代理协议、匿名统计 |
+| [`docs/30-design/architecture/runtime/`](docs/30-design/architecture/runtime/README.md) | 运行期能力：调律历史、地图管理、多目标并发、出装计算 |
+| [`docs/40-development/`](docs/80-history/dev/README.md) | 开发日志：按月归档的重构 / 决策记录 |
 
 ---
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/plans/backlog.md)，平台计划见 [Android](docs/history/meta-archive/android-platform-progress.md) 与 [macOS](docs/meta/platforms/macos.md)；历史阶段快照见 [roadmap](docs/history/roadmap.md)（仅作存档，不代表当前范围）。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/20-plans/backlog.md)，平台计划见 [Android](docs/80-history/meta-archive/android-platform-progress.md) 与 [macOS](docs/00-meta/platforms/macos.md)；历史阶段快照见 [roadmap](docs/80-history/roadmap.md)（仅作存档，不代表当前范围）。
 
 ---
 
@@ -409,7 +409,7 @@ python -m mypy
 
 - **微信交流群**：主窗口「帮助 → 反馈」中点击「扫码加群」
 - **GitHub Issue**：[github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
-- **提交规范**：[常见问题与反馈](docs/guide/desktop/09-faq-and-feedback.md)
+- **提交规范**：[常见问题与反馈](docs/60-guide/desktop/09-faq-and-feedback.md)
 
 **反馈范围说明：**
 
@@ -419,7 +419,7 @@ python -m mypy
 | 功能建议与需求 | 远程协助配置环境 |
 | 文档内容过时或无法实操 | 逐个步骤指导操作 |
 
-作者精力有限，无法提供一对一使用教学。[用户指南](docs/guide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。正式提交 Bug 时必须提供版本与运行环境、复现步骤、预期与实际结果、连续日志；识别或点击问题还需附截图或录屏。信息不足的问题在补齐前不会进入代码排查。
+作者精力有限，无法提供一对一使用教学。[用户指南](docs/60-guide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。正式提交 Bug 时必须提供版本与运行环境、复现步骤、预期与实际结果、连续日志；识别或点击问题还需附截图或录屏。信息不足的问题在补齐前不会进入代码排查。
 
 ---
 

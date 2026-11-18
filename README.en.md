@@ -17,7 +17,7 @@ The built-in plugin targets Where Winds Meet gear tuning, and the plugin mechani
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
-> 📖 **User guide** (Chinese): [Quick start](docs/guide/desktop/01-quick-start.md) | [Contents](docs/guide/README.md)
+> 📖 **User guide** (Chinese): [Quick start](docs/60-guide/desktop/01-quick-start.md) | [Contents](docs/60-guide/README.md)
 
 ---
 
@@ -86,7 +86,7 @@ Action performed on PC or phone
 | Where Winds Meet plugin | `src/lvjiang/apps/yysls/` | Gear management, scoring, tuning, material recognition, graduation rate, loadouts, smart tuning and its UI (config/ + core/ + workflows/ + sync/ + ui/) |
 | On-device | `src/lvjiang/core/ondevice/`, `android/` | Android standalone runtime: accessibility capture/gesture bridge, device-side rapidocr adapter, Kotlin host project |
 
-See the [architecture docs](docs/design/architecture/README.md) and the [DSL grammar reference](docs/reference/dsl/README.md) for more detail. (Both are in Chinese.)
+See the [architecture docs](docs/30-design/architecture/README.md) and the [DSL grammar reference](docs/40-reference/dsl/README.md) for more detail. (Both are in Chinese.)
 
 ---
 
@@ -232,7 +232,7 @@ Key dependencies: `PyQt6`, `mss`, `pynput`, `rapidocr-onnxruntime`, `onnxruntime
 
 ## ▶️ Usage
 
-> 🧑‍💻 **First time here?** Start with the [user guide](docs/guide/README.md) (Chinese) — it walks through connecting a phone, launching the app and running auto-tuning.
+> 🧑‍💻 **First time here?** Start with the [user guide](docs/60-guide/README.md) (Chinese) — it walks through connecting a phone, launching the app and running auto-tuning.
 
 **Windows users** can download the latest release from [Releases](https://github.com/wanda1416/lvjiang/releases) — a portable zip or an installer exe; run `lvjiang.exe` afterwards, no Python needed. **Android users** can install the LvJiang APK shipped with each release and run tasks standalone on the phone.
 
@@ -273,7 +273,7 @@ python -m lvjiang --list --id haoyun_lianji
 python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --json
 ```
 
-> Full parameters, exit codes and JSON output: [Appendix D: command line](docs/guide/desktop/appendix-b-command-line.md) (Chinese).
+> Full parameters, exit codes and JSON output: [Appendix D: command line](docs/60-guide/desktop/appendix-b-command-line.md) (Chinese).
 
 Once the PyQt6 main window is up, the basic flow is:
 
@@ -284,7 +284,7 @@ Once the PyQt6 main window is up, the basic flow is:
 5. **Analyze and run**: compute graduation-rate combinations and loadouts, or run batch auto-tuning / smart tuning.
 6. **Phone (optional)**: push configurations to the LvJiang APK and run or collect results on the phone.
 
-> Detailed workflows are in the [user guide](docs/guide/README.md) and the [auto-tuning flow](docs/design/decisions/tuning/01-auto-tuning.md) (both Chinese).
+> Detailed workflows are in the [user guide](docs/60-guide/README.md) and the [auto-tuning flow](docs/30-design/decisions/tuning/01-auto-tuning.md) (both Chinese).
 
 ---
 
@@ -354,29 +354,29 @@ Documentation is organized into numbered layers; each directory README is its in
 |-----------|----------|
 | [`PRIVACY.md`](PRIVACY.md) | Privacy statement: network behavior, account sync, and what anonymous tuning data does and does not send |
 | [`docs/`](docs/README.md) | Documentation hub with reader-oriented navigation |
-| [`docs/50-releases/`](docs/releases/README.md) | Release records and version notes |
-| [`docs/guide/`](docs/guide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
-| [`docs/agent/`](docs/agent/README.md) | External agent access, discovery and the business-operation contract |
-| [`docs/00-meta/`](docs/meta/README.md) | Meta: roadmap, backlog, documentation conventions |
-| [`docs/domain/yysls/`](docs/domain/yysls/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
-| [`docs/plans/`](docs/plans/README.md) | Plans and boundaries of partially implemented features (split from 20-requirements) |
-| [`docs/design/architecture/`](docs/design/architecture/README.md) | Architecture: main-window state machine, plugin system |
-| [`docs/design/architecture/models/`](docs/design/architecture/models/README.md) | Data models: gear model, scene implementation, session and context |
-| [`docs/reference/dsl/`](docs/reference/dsl/README.md) | Workflow DSL grammar specification |
-| [`docs/design/architecture/engine/`](docs/design/architecture/engine/README.md) | Engine internals: capture and cropping |
-| [`docs/design/architecture/scene/`](docs/design/architecture/scene/README.md) | Scene / layout definition and editing |
-| [`docs/design/architecture/workflows/`](docs/design/architecture/workflows/README.md) | Business flow orchestration |
-| [`docs/design/architecture/graduation/`](docs/design/architecture/graduation/README.md) | Graduation-rate engine |
-| [`docs/design/architecture/vision/`](docs/design/architecture/vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
-| [`docs/design/architecture/platform/`](docs/design/architecture/platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
-| [`docs/design/architecture/runtime/`](docs/design/architecture/runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
-| [`docs/40-development/`](docs/history/dev/README.md) | Development log: monthly refactor and decision records |
+| [`docs/50-releases/`](docs/50-releases/README.md) | Release records and version notes |
+| [`docs/60-guide/`](docs/60-guide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
+| [`docs/70-agent/`](docs/70-agent/README.md) | External agent access, discovery and the business-operation contract |
+| [`docs/00-meta/`](docs/00-meta/README.md) | Meta: roadmap, backlog, documentation conventions |
+| [`docs/10-domain/yysls/`](docs/10-domain/yysls/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
+| [`docs/20-plans/`](docs/20-plans/README.md) | Plans and boundaries of partially implemented features (split from 20-requirements) |
+| [`docs/30-design/architecture/`](docs/30-design/architecture/README.md) | Architecture: main-window state machine, plugin system |
+| [`docs/30-design/architecture/models/`](docs/30-design/architecture/models/README.md) | Data models: gear model, scene implementation, session and context |
+| [`docs/40-reference/dsl/`](docs/40-reference/dsl/README.md) | Workflow DSL grammar specification |
+| [`docs/30-design/architecture/engine/`](docs/30-design/architecture/engine/README.md) | Engine internals: capture and cropping |
+| [`docs/30-design/architecture/scene/`](docs/30-design/architecture/scene/README.md) | Scene / layout definition and editing |
+| [`docs/30-design/architecture/workflows/`](docs/30-design/architecture/workflows/README.md) | Business flow orchestration |
+| [`docs/30-design/architecture/graduation/`](docs/30-design/architecture/graduation/README.md) | Graduation-rate engine |
+| [`docs/30-design/architecture/vision/`](docs/30-design/architecture/vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
+| [`docs/30-design/architecture/platform/`](docs/30-design/architecture/platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
+| [`docs/30-design/architecture/runtime/`](docs/30-design/architecture/runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
+| [`docs/40-development/`](docs/80-history/dev/README.md) | Development log: monthly refactor and decision records |
 
 ---
 
 ## 🗺️ Roadmap
 
-The project evolved in stages: skeleton → coordinate calibration → POI capture and OCR → UI state detection → affix parsers → input wrappers → workflow DSL and engine → config-driven rule engine → UI polish → Android standalone runtime → phone batch runs and account sync. Current work is tracked in the [backlog](docs/plans/backlog.md), platform plans in [Android](docs/history/meta-archive/android-platform-progress.md) and [macOS](docs/meta/platforms/macos.md); [roadmap](docs/history/roadmap.md) keeps historical stage snapshots only and does not describe the current scope.
+The project evolved in stages: skeleton → coordinate calibration → POI capture and OCR → UI state detection → affix parsers → input wrappers → workflow DSL and engine → config-driven rule engine → UI polish → Android standalone runtime → phone batch runs and account sync. Current work is tracked in the [backlog](docs/20-plans/backlog.md), platform plans in [Android](docs/80-history/meta-archive/android-platform-progress.md) and [macOS](docs/00-meta/platforms/macos.md); [roadmap](docs/80-history/roadmap.md) keeps historical stage snapshots only and does not describe the current scope.
 
 ---
 
@@ -396,7 +396,7 @@ Ways to report problems:
 
 - **WeChat group**: "Help → Feedback" in the main window, then "join group by QR code"
 - **GitHub Issues**: [github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
-- **Reporting rules**: [FAQ and feedback](docs/guide/desktop/09-faq-and-feedback.md) (Chinese)
+- **Reporting rules**: [FAQ and feedback](docs/60-guide/desktop/09-faq-and-feedback.md) (Chinese)
 
 **Scope of support:**
 
@@ -406,7 +406,7 @@ Ways to report problems:
 | Feature requests and requirements | Remotely setting up your environment |
 | Documentation that is outdated or unusable | Step-by-step walkthroughs |
 
-The author cannot provide one-on-one tutoring. The [user guide](docs/guide/README.md) and the group already cover the vast majority of use cases, so please read the docs or ask in the group first. A bug report must include the version and environment, reproduction steps, expected and actual results, and continuous logs; recognition or click issues also need a screenshot or screen recording. Reports without enough information are not investigated until they are completed.
+The author cannot provide one-on-one tutoring. The [user guide](docs/60-guide/README.md) and the group already cover the vast majority of use cases, so please read the docs or ask in the group first. A bug report must include the version and environment, reproduction steps, expected and actual results, and continuous logs; recognition or click issues also need a screenshot or screen recording. Reports without enough information are not investigated until they are completed.
 
 ---
 

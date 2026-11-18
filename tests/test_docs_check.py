@@ -15,17 +15,17 @@ def test_live_index_reports_unlisted_chapter(tmp_path, monkeypatch):
 def test_bundle_checks_internal_links_even_when_marked_source_only(tmp_path):
     import json
 
-    directory = tmp_path / "agent"
+    directory = tmp_path / "70-agent"
     directory.mkdir()
     (directory / "manifest.json").write_text(json.dumps({
-        "documents": [{"path": "agent/README.md"}],
+        "documents": [{"path": "70-agent/README.md"}],
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     page = directory / "README.md"
     page.write_text(
         "# 示例\n[源码](../../src/example.py)（仅源码检出）\n"
         "[缺失章节](missing.md)（仅源码检出）\n", encoding="utf-8")
     assert docs_check.check_bundle_links(tmp_path) == [
-        "发行链接不可达 agent/README.md -> missing.md"]
+        "发行链接不可达 70-agent/README.md -> missing.md"]
 
 
 def test_document_baseline_can_remain_at_its_last_review(tmp_path, monkeypatch):

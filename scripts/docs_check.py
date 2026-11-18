@@ -9,7 +9,7 @@
 检查范围是 `docs/` 下全部 `.md`；链接目标可以是仓库内任意文件（源码、配置、
 打包手册都允许被引用）。纯静态检查，不联网、不依赖 Qt，可以直接进 CI。
 
-约定见 `docs/meta/doc-standard.md`：层索引写明基线，会被实现进度推翻的
+约定见 `docs/00-meta/doc-standard.md`：层索引写明基线，会被实现进度推翻的
 文档（plans、平台进度）写明状态，归档文档写明「状态止于」。
 日期与基线记录实际内容核对的时间和版本，不要求跟随应用发版更新；本脚本只读检查。
 """
@@ -38,18 +38,18 @@ ANCHOR_DROP = re.compile(r"[^\w\u4e00-\u9fff\- ]")
 FRESH = re.compile(r"v?\d+\.\d+\.\d+|20\d\d-\d\d-\d\d|20\d\d\s*年")
 #: 每层索引文件必须覆盖同目录全部 .md；开发日志月份目录由 DEV_MONTH 动态发现，
 #: releases 系列子目录按递归覆盖，均不在这里硬编码。
-INDEX_DIRS = ("releases",)
+INDEX_DIRS = ("50-releases",)
 #: 这些目录的索引必须覆盖**递归**全部 .md：发布说明按系列归档到子目录，
 #: 每个子目录不再各配一份 README，登记责任仍归顶层索引。
-RECURSIVE_INDEX_DIRS = ("releases",)
+RECURSIVE_INDEX_DIRS = ("50-releases",)
 #: 开发日志的月份子目录名（history/dev/YYYY-MM），索引覆盖动态发现
 DEV_MONTH = re.compile(r"\d{4}-\d{2}")
 SKIP_PREFIX = ("http://", "https://", "mailto:", "#")
 
-#: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 meta/doc-standard.md）
-STATUS_SCOPES = ("design/decisions", "plans", "meta/platforms")
-STATUS_INDEXES = ("design/decisions/README.md", "plans/README.md",
-                  "meta/platforms/README.md")
+#: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 00-meta/doc-standard.md）
+STATUS_SCOPES = ("30-design/decisions", "20-plans", "00-meta/platforms")
+STATUS_INDEXES = ("30-design/decisions/README.md", "20-plans/README.md",
+                  "00-meta/platforms/README.md")
 STATUS_LINE = re.compile(
     r"^>\s*状态\s*[：:]\s*(已实现|部分实现|规划)"
     r"\s*（(\d{4}-\d{2}-\d{2})，基线\s*v?(\d+\.\d+(?:\.\d+)?)）", re.M)
@@ -193,7 +193,7 @@ def check_freshness(files: list[pathlib.Path]) -> list[str]:
     """各层 README 必须写明基线版本或最后更新日期。
 
     页面级不强制——单个页面里的版本号会随内容变化，只有层索引承担
-    “当前基线在哪”的责任；约定见 docs/meta/doc-standard.md。
+    “当前基线在哪”的责任；约定见 docs/00-meta/doc-standard.md。
     """
     problems: list[str] = []
     for path in files:
@@ -209,10 +209,10 @@ def check_freshness(files: list[pathlib.Path]) -> list[str]:
 
 def is_archived(rel: str) -> bool:
     """需要「状态止于」行的归档正文：旧 archive/ 目录与迁移后的
-    history/meta-archive/。history/dev/（开发日志）同属归档内容，但迁移前
+    80-history/meta-archive/。80-history/dev/（开发日志）同属归档内容，但迁移前
     不要求状态止期行，语义保持现状不收紧。"""
     return ("/archive/" in rel
-            or rel.startswith("history/meta-archive/"))
+            or rel.startswith("80-history/meta-archive/"))
 
 
 def status_docs(files: list[pathlib.Path]) -> list[pathlib.Path]:
@@ -262,7 +262,7 @@ def check_index_status(files: list[pathlib.Path]) -> list[str]:
     索引给人快速扫的，文档首行是权威；两边不一致就是有一处已经腐烂。
     """
     problems: list[str] = []
-    index = DOCS / "plans/README.md"
+    index = DOCS / "20-plans/README.md"
     if not index.is_file():
         return problems
     for line in read(index).splitlines():
@@ -294,7 +294,7 @@ def check_index_coverage() -> list[str]:
     names.update(path.parent.relative_to(DOCS).as_posix()
                  for path in DOCS.rglob("README.md"))
     # 开发日志月份目录必须各有一份覆盖当月全部日志的 README，目录名动态发现
-    dev_root = DOCS / "history" / "dev"
+    dev_root = DOCS / "80-history" / "dev"
     if dev_root.is_dir():
         names.update(path.relative_to(DOCS).as_posix()
                      for path in dev_root.iterdir()
@@ -338,7 +338,7 @@ def check_bundle_digests(bundle: pathlib.Path, manifest: dict) -> list[str]:
         if digest != entry.get("sha256"):
             problems.append(f"摘要与正文不符 {rel}")
     actual = {p.relative_to(bundle).as_posix() for p in bundle.rglob("*") if p.is_file()}
-    manifest_rel = "agent/manifest.json"
+    manifest_rel = "70-agent/manifest.json"
     for rel in sorted(actual - seen - {manifest_rel}):
         problems.append(f"清单外文件 {rel}")
     return problems
@@ -346,7 +346,7 @@ def check_bundle_digests(bundle: pathlib.Path, manifest: dict) -> list[str]:
 
 def check_bundle(bundle: pathlib.Path) -> list[str]:
     bundle = bundle.resolve()
-    manifest_path = bundle / "agent/manifest.json"
+    manifest_path = bundle / "70-agent/manifest.json"
     if not manifest_path.is_file():
         return [f"清单缺失 {manifest_path.relative_to(bundle).as_posix()}"]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -357,7 +357,7 @@ def check_bundle_links(bundle: pathlib.Path, manifest: dict | None = None) -> li
     """验证发行文档的内部链接；源码参考必须显式标明且不能掩盖包内缺失。"""
     bundle = bundle.resolve()
     if manifest is None:
-        manifest = json.loads((bundle / "agent/manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((bundle / "70-agent/manifest.json").read_text(encoding="utf-8"))
     paths = [bundle / entry["path"] for entry in manifest["documents"]]
     layers = {path.relative_to(bundle).parts[0] for path in paths}
     problems = []

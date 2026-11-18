@@ -14,10 +14,10 @@
 
 | 调用者 | 用途 | 位置 |
 |---|---|---|
-| `find_image_in_region(...)` | `find ... by image` 指令实现 | `recognition.py` L625 |
-| `match_region_templates(...)` | `scan ... by image` 指令实现 | `recognition.py` L692 |
-| `locate_in_region(...)` | 底层：单 Region 定位 | `template_locator.py` L318 |
-| `locate(...)` | 最底层：任意矩形内定位 | `template_locator.py` L237 |
+| `find_image_in_region(...)` | `find ... by image` 指令实现 | `recognition.py` 的 `find_image_in_region` |
+| `match_region_templates(...)` | `scan ... by image` 指令实现 | `recognition.py` 的 `match_region_templates` |
+| `locate_in_region(...)` | 底层：单 Region 定位 | `template_locator.py` 的 `locate_in_region` |
+| `locate(...)` | 最底层：任意矩形内定位 | `template_locator.py` 的 `locate` |
 
 `scan` 与 `find` **共用 `locate()`**，唯一区别是候选处理：
 - `scan` 逐个 Region 循环，**首个命中即返**，返回 Region key
@@ -155,7 +155,7 @@ FoundRegion(
 
 ## 与编辑器"预览匹配"的一致性
 
-`scene_tab.py` L415 编辑器里"预览命中"逻辑：
+`scene_tab.py` 的场景编辑器里"预览命中"逻辑：
 
 ```python
 passed = hit is not None and score >= binding.min_score
@@ -177,7 +177,7 @@ passed = hit is not None and score >= binding.min_score
 
 **症状**：编辑器预览命中，运行时分数极低；把阈值降到 0.6 才能过。
 **根因**：`x2 = int(right) - 1`（旧）与编辑器 `int(round(right))` 存在 2 px 差异。当模板宽度 == Region 宽度时，`tw > rw` 触发 `continue`，scale=1.0 被完全跳过，只能靠次优缩放。
-**修复**：`int(right) + 1`（现），见 commit `1d68a25a`。
+**修复**：`int(right) + 1`（现）。
 **教训**：详见 [04-coordinate-system.md](04-coordinate-system.md) §取整一致性契约。
 
 ### 坑 2 · 同形状不同色按钮互相误命中

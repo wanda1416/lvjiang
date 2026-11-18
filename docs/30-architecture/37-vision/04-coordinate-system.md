@@ -28,7 +28,7 @@
 
 ## 归一化 ↔ 像素的换算（唯一口径）
 
-在 `recognition.py` L657、`template_locator.py` L298-306 各处重复出现：
+在 `recognition.py` 与 `template_locator.py` 的多处边界计算里重复出现：
 
 ```python
 canvas_px_x = canvas.x_ratio * frame_w
@@ -58,7 +58,7 @@ y2 = round(canvas_px_y + (region.y_ratio + region.h_ratio) * canvas_px_h) - 1
 
 ### 曾经踩过的坑
 
-`template_locator.py` L237 早期版本：
+`template_locator.py` 的 `locate` 早期版本：
 
 ```python
 x2 = int(right) - 1      # 旧代码
@@ -72,7 +72,7 @@ x2 = int(right) - 1      # 旧代码
 
 **症状**：明明桌面 1920 录的模板放桌面 1920 用，scale 应该正好 1.0，结果被完全跳过，只能靠 0.99/1.01 次优尺度匹配，分数下降 5-10 点。
 
-**修复**（commit `a41ff356` 与后续）：改用 `int(right) + 1`，与编辑器 `round` 语义对齐，diff 稳定在 +1 或 +2 px。
+**修复**（后续修正）：改用 `int(right) + 1`，与编辑器 `round` 语义对齐，diff 稳定在 +1 或 +2 px。
 
 **权衡**：搜索区最多宽 2 px。放宽会引入误命中风险吗？memory 中 `模板匹配边界计算：+1 修正优于 -1 的保守策略` 判定：negligible。
 
@@ -90,7 +90,7 @@ x2 = int(right) - 1      # 旧代码
 
 ### 归一化坐标浮点误差
 
-`_RECT_EPS = 1e-6`（`layout_models.py` L66）。归一化坐标经过 UI 拖拽 + JSON 往返会有末位浮点误差，`x + w` 落在 `1.0000000000000002` 上不该判成越界。所有边界比较用 `± EPS` 容差。
+`_RECT_EPS = 1e-6`（见 `layout_models.py`）。归一化坐标经过 UI 拖拽 + JSON 往返会有末位浮点误差，`x + w` 落在 `1.0000000000000002` 上不该判成越界。所有边界比较用 `± EPS` 容差。
 
 ---
 

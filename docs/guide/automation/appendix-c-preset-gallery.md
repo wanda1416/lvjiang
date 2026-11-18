@@ -4,8 +4,8 @@
 
 这份附录回答一个问题：**系统随包带了哪些参考图——端游和手游各有什么，哪些是两边共用的。**
 
-改图、加图、调分组请见 [3.3 图库管理](03.03-gallery-management.md)；参考图匹配算法与
-命中失败的含义见 [37-vision/01-perception-channels.md](../30-architecture/37-vision/01-perception-channels.md)。
+改图、加图、调分组请见 [3.3 图库管理](../desktop/03.03-gallery-management.md)；参考图匹配算法与
+命中失败的含义见 [37-vision/01-perception-channels.md](../../30-architecture/37-vision/01-perception-channels.md)。
 
 数据来源：`config/system/references/{desktop,android}.yaml` 与同名图片目录（本文用界面上的中文名「端游 / 手游」称呼对应 key `desktop` / `android`）。图片按分组分目录
 存放（`{空间}/{分组}/{文件名}.png`，目录名即分组名），文件名来自内容哈希，**不代表语义**；

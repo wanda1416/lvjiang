@@ -13,7 +13,8 @@
 | [30-architecture/](30-architecture/README.md) | 数据模型、DSL 语法、引擎、场景、工作流、毕业率 | 开发者 |
 | [40-development/](40-development/README.md) | 按日期归档的开发日志与技术参考 | 开发者 |
 | [50-releases/](50-releases/README.md) | 各版本发布说明 | 所有人 |
-| [60-userguide/](60-userguide/README.md) | 安装、配置、运行的完整操作指引 | 用户 |
+| [guide/](guide/README.md) | 安装、配置、运行的完整操作指引（用户指南） | 用户 |
+| [60-userguide/](60-userguide/README.md) | 旧用户指南路径的兼容页（正文已迁至 guide/） | 用户 |
 | [70-agent/](70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 | 用户 / Agent |
 
 ## 核心契约
@@ -31,11 +32,12 @@
 
 | 我想…… | 去这里 |
 |--------|--------|
-| 装好就开始用 | [快速开始](60-userguide/01-quick-start.md) |
+| 装好就开始用 | [快速开始](guide/desktop/01-quick-start.md) |
 | 搞懂装备怎么被评级 | [调律评价规则](10-game/10-tuning-rules/README.md) |
-| 配置并运行自动调律 | [调律配置总览](60-userguide/04.01-tuning-config-overview.md) |
+| 配置并运行自动调律 | [调律配置总览](guide/automation/04.01-tuning-config-overview.md) |
 | 了解游戏调律/转律/承音机制 | [装备系统](10-game/01-equipment-system.md) |
-| 写工作流脚本 | [脚本工作台与作者须知](60-userguide/08-script-authoring.md)、[DSL 语法](30-architecture/32-grammar/README.md) |
-| 反馈问题 | [问题反馈](60-userguide/09-faq-and-feedback.md) |
+| 写工作流脚本 | [脚本工作台与作者须知](guide/desktop/08-script-authoring.md)、[DSL 语法](30-architecture/32-grammar/README.md) |
+| 反馈问题 | [问题反馈](guide/desktop/09-faq-and-feedback.md) |
 
-- [在线配置、会员内容与功能激活](60-userguide/appendix-a-online-config.md)：更新生效、本地覆盖、本地激活与在线会员授权的区别、关闭撤销与人工恢复。
+- [在线配置、会员内容与功能激活](guide/accounts/appendix-a-online-config.md)：更新生效、本地覆盖、本地激活与在线会员授权的区别、关闭撤销与人工恢复。
+- 旧路径 `docs/60-userguide/` 下的链接已迁移，旧地址由 [60-userguide 兼容页](60-userguide/README.md)承接。

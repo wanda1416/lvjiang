@@ -393,7 +393,7 @@ hooks = AppHooks(
 
 - 实体模型与指纹：[31-models/01-equipment-models.md](../31-models/01-equipment-models.md)
 - 调律规则的启用与顺序：[10-game/10-tuning-rules/](../../10-game/10-tuning-rules/README.md)
-- 用户视角的脚本管理：[60-userguide/06-workflows.md](../../60-userguide/06-workflows.md)
+- 用户视角的脚本管理：[60-userguide/06-workflows.md](../../guide/automation/06-workflows.md)
 
 ## 七、运行与界面状态分文件
 

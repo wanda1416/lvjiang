@@ -141,7 +141,7 @@
 
 ## 3. 明确不会发出什么
 
-律匠的[问题反馈规范](docs/60-userguide/08-feedback-and-issues.md)要求你在提交 issue 前遮盖四类信息。反过来，律匠自己上传的数据里也**一条都不包含**：
+律匠的[问题反馈规范](docs/guide/desktop/09-faq-and-feedback.md)要求你在提交 issue 前遮盖四类信息。反过来，律匠自己上传的数据里也**一条都不包含**：
 
 - ❌ 游戏账号、角色名、任何可识别身份的信息
 - ❌ ADB 设备序列号
@@ -206,4 +206,4 @@
 
 ## 9. 有疑问找谁
 
-微信交流群（主窗口「帮助 → 反馈」扫码加群）或 [GitHub Issue](https://github.com/wanda1416/lvjiang/issues)，参见[反馈规范](docs/60-userguide/08-feedback-and-issues.md)。
+微信交流群（主窗口「帮助 → 反馈」扫码加群）或 [GitHub Issue](https://github.com/wanda1416/lvjiang/issues)，参见[反馈规范](docs/guide/desktop/09-faq-and-feedback.md)。

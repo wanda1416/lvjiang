@@ -26,11 +26,16 @@ def test_published_id_baseline_unchanged():
     catalog = source.layout.catalog(source.root)
     expected = {entry["id"]: entry["path"] for entry in BASELINE["documents"]}
     assert catalog == expected
+    # 逻辑分类与磁盘目录解耦（guide 的分类键仍是 60-userguide）：分类取声明映射结果。
     categories = {entry["id"]: entry["category"] for entry in BASELINE["documents"]}
-    assert {entry["id"]: entry["path"].split("/", 1)[0]
+    assert {entry["id"]: source.layout.logical_category(entry["path"])
             for entry in BASELINE["documents"]} == categories
     for doc_id in ("entry", "permissions", "dsl", "tool-schema"):
         assert source.read_doc(doc_id)["text"]
+    # 迁移前发布的旧 ID 经 compat 继续可读，读到的正文一致。
+    for old_id, new_id in (("60-userguide:01-quick-start", "guide:desktop:01-quick-start"),
+                           ("60-userguide:README", "userguide")):
+        assert source.read_doc(old_id)["text"] == source.read_doc(new_id)["text"]
 
 
 def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
@@ -75,9 +80,12 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     assert docs.list_docs("30-architecture")["documents"]
     assert "语法" in docs.read_doc("dsl")["text"]
     assert {entry["path"] for entry in manifest["documents"]} >= {
-        "10-game/01-equipment-system.md", "60-userguide/01-quick-start.md",
+        "10-game/01-equipment-system.md", "guide/desktop/01-quick-start.md",
         "30-architecture/32-grammar/01-basics.md", "70-agent/README.md"}
-    assert {entry["category"] for entry in manifest["documents"]} == set(DOCUMENT_DIRECTORIES)
+    # 逻辑分类仍是四个稳定键（guide 的分类键是 60-userguide），不随磁盘目录改名。
+    assert {entry["category"] for entry in manifest["documents"]} == {
+        "10-game", "30-architecture", "60-userguide", "70-agent"}
+    assert set(DOCUMENT_DIRECTORIES) == {"10-game", "30-architecture", "guide", "70-agent"}
     with pytest.raises(ValueError):
         source.read_doc("20-requirements:README")
     with pytest.raises(ValueError):

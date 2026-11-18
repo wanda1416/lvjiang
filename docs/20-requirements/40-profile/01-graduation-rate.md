@@ -12,6 +12,6 @@
 
 数据来自备战方案、实际装备与模型，运行期注入战斗属性计算，不向 Excel 工作簿写角色信息。区分真实属性与三满/转律等派生假设，缺模型或基础属性时给出可行动提示。相同输入在主页面与分析入口得出一致结果，分析不改原数据。
 
-现行契约见 [毕业率计算](../../30-architecture/36-graduation/README.md)，操作见 [基础属性与毕业率](../../60-userguide/05.04-base-attributes-and-graduation.md)。
+现行契约见 [毕业率计算](../../30-architecture/36-graduation/README.md)，操作见 [基础属性与毕业率](../../guide/automation/05.04-base-attributes-and-graduation.md)。
 
 早期设计保存于 [过程档案](../../40-development/2026-10/2026-10-09-profile-graduation-early-design.md)。

@@ -25,7 +25,7 @@ from .qrcode_refresher import QrCodeRefresher
 
 ISSUE_GUIDE_URL = (
     f"https://github.com/{GITHUB_REPO}/blob/master/"
-    "docs/60-userguide/08-feedback-and-issues.md"
+    "docs/guide/desktop/09-faq-and-feedback.md"
 )
 NEW_ISSUE_URL = f"https://github.com/{GITHUB_REPO}/issues/new"
 

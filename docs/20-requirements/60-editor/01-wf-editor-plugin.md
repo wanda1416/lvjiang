@@ -72,4 +72,4 @@
 
 相关权威文档：[DSL 语法](../../30-architecture/32-grammar/README.md)、
 [子工作流路径语义](../../30-architecture/32-grammar/07-subworkflows.md)、
-[应用内脚本工作台](../../60-userguide/06-workflows.md)。
+[应用内脚本工作台](../../guide/automation/06-workflows.md)。

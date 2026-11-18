@@ -17,7 +17,7 @@ The built-in plugin targets Where Winds Meet gear tuning, and the plugin mechani
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
-> 📖 **User guide** (Chinese): [Quick start](docs/60-userguide/01-quick-start.md) | [Contents](docs/60-userguide/README.md)
+> 📖 **User guide** (Chinese): [Quick start](docs/guide/desktop/01-quick-start.md) | [Contents](docs/guide/README.md)
 
 ---
 
@@ -232,7 +232,7 @@ Key dependencies: `PyQt6`, `mss`, `pynput`, `rapidocr-onnxruntime`, `onnxruntime
 
 ## ▶️ Usage
 
-> 🧑‍💻 **First time here?** Start with the [user guide](docs/60-userguide/README.md) (Chinese) — it walks through connecting a phone, launching the app and running auto-tuning.
+> 🧑‍💻 **First time here?** Start with the [user guide](docs/guide/README.md) (Chinese) — it walks through connecting a phone, launching the app and running auto-tuning.
 
 **Windows users** can download the latest release from [Releases](https://github.com/wanda1416/lvjiang/releases) — a portable zip or an installer exe; run `lvjiang.exe` afterwards, no Python needed. **Android users** can install the LvJiang APK shipped with each release and run tasks standalone on the phone.
 
@@ -273,7 +273,7 @@ python -m lvjiang --list --id haoyun_lianji
 python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --json
 ```
 
-> Full parameters, exit codes and JSON output: [Appendix D: command line](docs/60-userguide/appendix-d-command-line.md) (Chinese).
+> Full parameters, exit codes and JSON output: [Appendix D: command line](docs/guide/desktop/appendix-b-command-line.md) (Chinese).
 
 Once the PyQt6 main window is up, the basic flow is:
 
@@ -284,7 +284,7 @@ Once the PyQt6 main window is up, the basic flow is:
 5. **Analyze and run**: compute graduation-rate combinations and loadouts, or run batch auto-tuning / smart tuning.
 6. **Phone (optional)**: push configurations to the LvJiang APK and run or collect results on the phone.
 
-> Detailed workflows are in the [user guide](docs/60-userguide/README.md) and the [auto-tuning flow](docs/20-requirements/10-tuning/01-auto-tuning.md) (both Chinese).
+> Detailed workflows are in the [user guide](docs/guide/README.md) and the [auto-tuning flow](docs/20-requirements/10-tuning/01-auto-tuning.md) (both Chinese).
 
 ---
 
@@ -355,7 +355,7 @@ Documentation is organized into numbered layers; each directory README is its in
 | [`PRIVACY.md`](PRIVACY.md) | Privacy statement: network behavior, account sync, and what anonymous tuning data does and does not send |
 | [`docs/`](docs/README.md) | Documentation hub with reader-oriented navigation |
 | [`docs/50-releases/`](docs/50-releases/README.md) | Release records and version notes |
-| [`docs/60-userguide/`](docs/60-userguide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
+| [`docs/guide/`](docs/guide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
 | [`docs/70-agent/`](docs/70-agent/README.md) | External agent access, discovery and the business-operation contract |
 | [`docs/00-meta/`](docs/00-meta/README.md) | Meta: roadmap, backlog, documentation conventions |
 | [`docs/10-game/`](docs/10-game/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
@@ -396,7 +396,7 @@ Ways to report problems:
 
 - **WeChat group**: "Help → Feedback" in the main window, then "join group by QR code"
 - **GitHub Issues**: [github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
-- **Reporting rules**: [FAQ and feedback](docs/60-userguide/09-faq-and-feedback.md) (Chinese)
+- **Reporting rules**: [FAQ and feedback](docs/guide/desktop/09-faq-and-feedback.md) (Chinese)
 
 **Scope of support:**
 
@@ -406,7 +406,7 @@ Ways to report problems:
 | Feature requests and requirements | Remotely setting up your environment |
 | Documentation that is outdated or unusable | Step-by-step walkthroughs |
 
-The author cannot provide one-on-one tutoring. The [user guide](docs/60-userguide/README.md) and the group already cover the vast majority of use cases, so please read the docs or ask in the group first. A bug report must include the version and environment, reproduction steps, expected and actual results, and continuous logs; recognition or click issues also need a screenshot or screen recording. Reports without enough information are not investigated until they are completed.
+The author cannot provide one-on-one tutoring. The [user guide](docs/guide/README.md) and the group already cover the vast majority of use cases, so please read the docs or ask in the group first. A bug report must include the version and environment, reproduction steps, expected and actual results, and continuous logs; recognition or click issues also need a screenshot or screen recording. Reports without enough information are not investigated until they are completed.
 
 ---
 

@@ -28,7 +28,7 @@
       "path": "10-game/04-tuning-mechanics.md",
       "title": "调律与转律：文档边界",
       "category": "10-game",
-      "sha256": "d5573ce586938047e07a4fd66cbd7a2d819093868397977b784894bfa924b12c"
+      "sha256": "d18868a861a69417ba97c636b4f30808d11da669895b9de9566fedc1e589e490"
     },
     {
       "id": "10-game:05-ui-pages-and-relations",
@@ -42,7 +42,7 @@
       "path": "10-game/06-mechanics-conventions.md",
       "title": "游戏机制约定（代码内写死项登记）",
       "category": "10-game",
-      "sha256": "73132759ad6ab00f919d7e7f78b6844e9b6c205f7758922b545b76aad489b5c2"
+      "sha256": "da08e99043bf5518990f47007745fa55346d920b6c22617668ae0ee395f96a97"
     },
     {
       "id": "10-game:07-nanlu-season",
@@ -203,7 +203,7 @@
       "path": "30-architecture/30-overview/04-config-layering.md",
       "title": "配置分层：system / local",
       "category": "30-architecture",
-      "sha256": "f0a972f503912610c92661a91179da8ff285975768e4a6ced827154440c5045a"
+      "sha256": "dd95b1403170b54801f2abfb04eae3cee875ec7ea224adc134cd541ab3664630"
     },
     {
       "id": "30-architecture:30-overview:05-content-cache",
@@ -217,7 +217,7 @@
       "path": "30-architecture/30-overview/06-session-data-map.md",
       "title": "config/session 数据划分与读写方",
       "category": "30-architecture",
-      "sha256": "2bd31177f5a8caea0e14bfee934c4f81548f2c62b6ab295b8ec024ee1505adbd"
+      "sha256": "23aae71e7878f3e0b0f09d156af40d86c2378e2c5f7566daecbb1687d7663f73"
     },
     {
       "id": "30-architecture:30-overview:README",
@@ -252,7 +252,7 @@
       "path": "30-architecture/31-models/04-profile.md",
       "title": "Profile 共享模块",
       "category": "30-architecture",
-      "sha256": "dd07a78902f9106e41fbc3eca0c6b58ddffc9cbce53c28764b3fb5a2ad0cec00"
+      "sha256": "7654da8b5dab5ef354c43e52a4a672da638709f03efdbdaaaf81cb5178ccbd4e"
     },
     {
       "id": "30-architecture:31-models:05-martial-arts-and-playstyles",
@@ -469,7 +469,7 @@
       "path": "30-architecture/32-grammar/09-data-channels.md",
       "title": "数据通道",
       "category": "30-architecture",
-      "sha256": "26760332ca325831024a8f14d0b45cbaa96b2591c99995d8290144f521e0e7b9"
+      "sha256": "7c35558c55194105930a6c41409b1a26b973c5077243ad8e784eab8f3cb8f384"
     },
     {
       "id": "dsl",
@@ -518,7 +518,7 @@
       "path": "30-architecture/34-scene/02-scene-layout-editing.md",
       "title": "场景编辑器的配置、布局与运行边界",
       "category": "30-architecture",
-      "sha256": "4a964624776c68639544e1c580f64cd673f5ead9b8fd0ef6fac2a762afec2bf0"
+      "sha256": "4d43d459e1aa85b8116bf86c632c651975b55c1de756a43255c543927fedec0e"
     },
     {
       "id": "30-architecture:34-scene:03-cross-scene-references",
@@ -539,7 +539,7 @@
       "path": "30-architecture/34-scene/README.md",
       "title": "场景系统",
       "category": "30-architecture",
-      "sha256": "1297113b8c0601fbe57b396b48cc9dc854e6b673f05f8c1b5e4ef7ad11eaeacd"
+      "sha256": "59da686c744fe84c29df0166235e065a16e4d1836c97c4b32e5fb0714fac4da7"
     },
     {
       "id": "30-architecture:35-workflows:01-current-equip-analysis",
@@ -560,14 +560,14 @@
       "path": "30-architecture/35-workflows/03-bag-traversal.md",
       "title": "背包遍历、去重与回收补位",
       "category": "30-architecture",
-      "sha256": "78c0705275c57e4ab1474fe7ea0d530e5e00581897726b123773055396a7bb0c"
+      "sha256": "6218f9afd9c477cb498fea796f437ae0bb686cb38f4a49e7d3fac63c10add1a3"
     },
     {
       "id": "30-architecture:35-workflows:04-tuning-decisions",
       "path": "30-architecture/35-workflows/04-tuning-decisions.md",
       "title": "自动调律决策与执行保护",
       "category": "30-architecture",
-      "sha256": "729aaa8acf73034b924c30fc60c086ed50d1f88f310443f9c247f6bbc71dca66"
+      "sha256": "7682d9efa1c321fb3c2775139e824b7f979116ff5ad452fa42568026c4c28030"
     },
     {
       "id": "30-architecture:35-workflows:05-execution-feedback",
@@ -581,7 +581,7 @@
       "path": "30-architecture/35-workflows/README.md",
       "title": "流程编排（Workflows）",
       "category": "30-architecture",
-      "sha256": "653959f81efafd36cef1d8dfc2068c27cd5003b38fe422cdb67fe765c3b4c197"
+      "sha256": "58d5809e5bfda57940c86d9aeb8e98735097ad76c193a73eaadca0f9312dc0ec"
     },
     {
       "id": "30-architecture:36-graduation:01-data-flow",
@@ -623,7 +623,7 @@
       "path": "30-architecture/36-graduation/06-operations.md",
       "title": "毕业率导入验证与缓存契约",
       "category": "30-architecture",
-      "sha256": "7b468cf4d4e818488c8ac0bcb5b2603322d14ffab0bf1cec066dac428691f3a5"
+      "sha256": "16a8785b25792f009827c39791e9e2055c8c01443ab89905a0e5c1ef8242189d"
     },
     {
       "id": "30-architecture:36-graduation:07-skill-rotation",
@@ -644,7 +644,7 @@
       "path": "30-architecture/36-graduation/09-transmute-simulation.md",
       "title": "模拟转律：候选、搜索、投影与持久化",
       "category": "30-architecture",
-      "sha256": "abed218835a252813ba643be394c7301d37d20f80f79fc29a7fcb9d231043eb1"
+      "sha256": "76f471660a5ebdd49ff2d3988f9231b35f9871d61821e34e2cc938ef041e3af6"
     },
     {
       "id": "30-architecture:36-graduation:README",
@@ -693,28 +693,28 @@
       "path": "30-architecture/37-vision/05-tuning-and-failures.md",
       "title": "视觉感知失败语义与能力边界",
       "category": "30-architecture",
-      "sha256": "3276be5facf884ba12a3b586b2ffdcdedcce61825c4c1b3b482d06cd2e9d6480"
+      "sha256": "5076ebe6fdc7e6ec832260c0dc563598420ae3f9b8d39e21d10c756720be8ca1"
     },
     {
       "id": "30-architecture:37-vision:06-tooling-and-regression",
       "path": "30-architecture/37-vision/06-tooling-and-regression.md",
       "title": "编辑器与运行期的感知一致性契约",
       "category": "30-architecture",
-      "sha256": "a7a7bf90e63e46dc368fff2f454ba89a9b310226ce624e56531130fc76343789"
+      "sha256": "feba560b0993c388cd57b1bc47e0c68667a3eeb025ee2b718b1eb99e180583a4"
     },
     {
       "id": "30-architecture:37-vision:README",
       "path": "30-architecture/37-vision/README.md",
       "title": "37 · 视觉感知子系统（Vision）",
       "category": "30-architecture",
-      "sha256": "80470021afb19a5baaba437511543489895af1d9ba1ee6fa0ae4624d849ce811"
+      "sha256": "cfdb2635753532f0a23a7c4e5d501cba1dd0078499d065aee7cfcb4a7e284a0d"
     },
     {
       "id": "30-architecture:38-platform:01-device-agent-protocol",
       "path": "30-architecture/38-platform/01-device-agent-protocol.md",
       "title": "设备端代理协议（PC ↔ 律匠 app）",
       "category": "30-architecture",
-      "sha256": "62bd6f683c4e0864faf2804d8c32912e4c512c9fe078201c34da4460c08eceb2"
+      "sha256": "438e120de5b65c1c012c8ecac5520544a38ac1216108db6d4f5282e03cd6119b"
     },
     {
       "id": "30-architecture:38-platform:02-instance-access",
@@ -843,223 +843,6 @@
       "sha256": "2f8bf67f51ad0f027ce8ba7dbaf722ddf831578c89cbd952c2afc20da6ab1a1d"
     },
     {
-      "id": "60-userguide:01-quick-start",
-      "path": "60-userguide/01-quick-start.md",
-      "title": "1. 快速开始",
-      "category": "60-userguide",
-      "sha256": "e2c8b1ddc7a5b097e65245c54162b7d46ae8c632a19f967b6f59394e1101f210"
-    },
-    {
-      "id": "60-userguide:02-main-interface",
-      "path": "60-userguide/02-main-interface.md",
-      "title": "2. 主界面与用户管理",
-      "category": "60-userguide",
-      "sha256": "2839a2190004902e56aeb119a5c58d30055df483e4a758168613ae09cbe42e5a"
-    },
-    {
-      "id": "60-userguide:03.01-base-config",
-      "path": "60-userguide/03.01-base-config.md",
-      "title": "3.1 通用配置",
-      "category": "60-userguide",
-      "sha256": "ed90a0de1a15ffe4e39fd8a4a2a65e1f43fb371ed93b6e1da4e3df4d60e545eb"
-    },
-    {
-      "id": "60-userguide:03.02-scene-management",
-      "path": "60-userguide/03.02-scene-management.md",
-      "title": "3.2 场景管理（F3）",
-      "category": "60-userguide",
-      "sha256": "ae22b3f3ef56b4fd27af455e00c49b90201ba6aafe505be4f1e3bbcadc204053"
-    },
-    {
-      "id": "60-userguide:03.03-gallery-management",
-      "path": "60-userguide/03.03-gallery-management.md",
-      "title": "3.3 图库管理（F4）",
-      "category": "60-userguide",
-      "sha256": "98b768f8ea65f8acd9f0eed4c2e4a496c6934c91f6afa3369b49c1776db3b629"
-    },
-    {
-      "id": "60-userguide:03.04-batch-tasks",
-      "path": "60-userguide/03.04-batch-tasks.md",
-      "title": "3.4 批量任务",
-      "category": "60-userguide",
-      "sha256": "e756a0bcaf8b069143e6647d5e3c90cc72b97d7a1c0c7ca22b14f4219d00abbd"
-    },
-    {
-      "id": "60-userguide:03.05-visual-recognition-troubleshooting",
-      "path": "60-userguide/03.05-visual-recognition-troubleshooting.md",
-      "title": "3.5 图像识别与模板匹配排查",
-      "category": "60-userguide",
-      "sha256": "930013ed18ddccd978254c2e435398e85c2be92afaff2c71ecc934f5df768d7b"
-    },
-    {
-      "id": "60-userguide:03.06-world-map-management",
-      "path": "60-userguide/03.06-world-map-management.md",
-      "title": "大世界地图管理",
-      "category": "60-userguide",
-      "sha256": "06cd4add5ddaa7911dae010563d03d5ed6e2f1c2d789306b285d9e65c4ffbca2"
-    },
-    {
-      "id": "60-userguide:04.01-tuning-config-overview",
-      "path": "60-userguide/04.01-tuning-config-overview.md",
-      "title": "4.1 调律配置 — 页面结构",
-      "category": "60-userguide",
-      "sha256": "5d76d7488d13b32b53c01b769df7f2a35311dc15e1da0c92973f6dc04a4b4a99"
-    },
-    {
-      "id": "60-userguide:04.02-default-config",
-      "path": "60-userguide/04.02-default-config.md",
-      "title": "4.2 默认配置含义",
-      "category": "60-userguide",
-      "sha256": "debd547ab5841da2da5d71f9993d9d4302c6734857d67116b4de5b77b3738dc0"
-    },
-    {
-      "id": "60-userguide:04.03-behavior-config",
-      "path": "60-userguide/04.03-behavior-config.md",
-      "title": "4.3 三种处理配置项详解",
-      "category": "60-userguide",
-      "sha256": "1cd1213a503fde1a280bd3938e81018a9b41227bc4adbbe50c007f231dab42a6"
-    },
-    {
-      "id": "60-userguide:04.04-school-rules",
-      "path": "60-userguide/04.04-school-rules.md",
-      "title": "4.4 流派规则详解",
-      "category": "60-userguide",
-      "sha256": "c35a60b2632ffcbeca44352493a579bf51c5bc2952faba89a3ae28e93d2013f1"
-    },
-    {
-      "id": "60-userguide:04.05-game-config",
-      "path": "60-userguide/04.05-game-config.md",
-      "title": "4.5 游戏配置",
-      "category": "60-userguide",
-      "sha256": "910cca6205e00b97eb105c30619c219c4b5b6febdc037f30df6690f153600658"
-    },
-    {
-      "id": "60-userguide:04.06-running-tuning",
-      "path": "60-userguide/04.06-running-tuning.md",
-      "title": "4.6 运行自动调律",
-      "category": "60-userguide",
-      "sha256": "43514bc634d30224be4eddd1356db0515a5720ccca33c17f24274edd012268e0"
-    },
-    {
-      "id": "60-userguide:04.07-agent-tuning",
-      "path": "60-userguide/04.07-agent-tuning.md",
-      "title": "4.7 使用外部 Agent 智能调律",
-      "category": "60-userguide",
-      "sha256": "e4b37a9a050bd8ccc090b6e6c2f4d3760ac5679010a2a1396da9830f111d5074"
-    },
-    {
-      "id": "60-userguide:05.01-equipment-data-overview",
-      "path": "60-userguide/05.01-equipment-data-overview.md",
-      "title": "5.1 装备数据总览",
-      "category": "60-userguide",
-      "sha256": "b8e59e0ed3983c08702fd70a46f05e631ddd3a5fecf19fbc152e91133b0030bb"
-    },
-    {
-      "id": "60-userguide:05.02-equipment-data-acquisition",
-      "path": "60-userguide/05.02-equipment-data-acquisition.md",
-      "title": "5.2 装备数据如何产生",
-      "category": "60-userguide",
-      "sha256": "566aa0ada769eb10373b76c7d0b87cf15314ad8cc87c7984cae77dad63264060"
-    },
-    {
-      "id": "60-userguide:05.03-equipment-management",
-      "path": "60-userguide/05.03-equipment-management.md",
-      "title": "5.3 装备管理与编辑",
-      "category": "60-userguide",
-      "sha256": "6df4e597c5501c999471b9657336085bea257864f5ecb851e5b1150704b6ccb8"
-    },
-    {
-      "id": "60-userguide:05.04-base-attributes-and-graduation",
-      "path": "60-userguide/05.04-base-attributes-and-graduation.md",
-      "title": "5.4 角色基础属性与真实毕业率",
-      "category": "60-userguide",
-      "sha256": "9e2407f1018c1ec8c017ce130d4dc8aee927ab3baa5d559450de5b840a2da71f"
-    },
-    {
-      "id": "60-userguide:05.05-school-rule-filtering",
-      "path": "60-userguide/05.05-school-rule-filtering.md",
-      "title": "5.5 使用流派规则过滤装备",
-      "category": "60-userguide",
-      "sha256": "b4f1a2666dac89db964b890941dcd63c174a87af533d01c176e79c2ece7d95da"
-    },
-    {
-      "id": "60-userguide:05.06-optimal-equipment-combination",
-      "path": "60-userguide/05.06-optimal-equipment-combination.md",
-      "title": "5.6 计算最优毕业率组合",
-      "category": "60-userguide",
-      "sha256": "1fa490e4099356d4ef725858626954e6e300fdb2acbef595891c993a9759129c"
-    },
-    {
-      "id": "60-userguide:05.07-build-calculator",
-      "path": "60-userguide/05.07-build-calculator.md",
-      "title": "5.7 出装搭配与模拟计算器",
-      "category": "60-userguide",
-      "sha256": "a321c43637797dd48d6574b4cd3dc0e58cbc0da83ffdb5dc427c243d05ac743a"
-    },
-    {
-      "id": "60-userguide:06-workflows",
-      "path": "60-userguide/06-workflows.md",
-      "title": "6. 工作流与日常任务",
-      "category": "60-userguide",
-      "sha256": "f1b88dd0df66717b8c1d10d5af6013c8c970d53b0336bec3e01d20a02b2dd3ae"
-    },
-    {
-      "id": "60-userguide:06.07-system-scripts",
-      "path": "60-userguide/06.07-system-scripts.md",
-      "title": "6.7 系统脚本与工作流清单",
-      "category": "60-userguide",
-      "sha256": "7740bbbd6814d0d985960ce8dbca1613da0f0ed455feacab37f1f8fdfdc3bbce"
-    },
-    {
-      "id": "60-userguide:07-mobile-device",
-      "path": "60-userguide/07-mobile-device.md",
-      "title": "7. 移动设备（安卓）",
-      "category": "60-userguide",
-      "sha256": "c0a28d3965df3e15ca86ebfaa059219be0da3fd4f4db5cd1d14eda3739a13e00"
-    },
-    {
-      "id": "60-userguide:08-script-authoring",
-      "path": "60-userguide/08-script-authoring.md",
-      "title": "8. 脚本工作台与脚本作者须知",
-      "category": "60-userguide",
-      "sha256": "b46f9e359842b0ee16103acc1a8e3b3f1a03a2a1b3784d7b0262a9f954c3b519"
-    },
-    {
-      "id": "60-userguide:09-faq-and-feedback",
-      "path": "60-userguide/09-faq-and-feedback.md",
-      "title": "9. 常见问题与反馈",
-      "category": "60-userguide",
-      "sha256": "ba9cfa9e5d897b12234843c84883012bf5a4d0eec7d4acbc9028a1622440a7ec"
-    },
-    {
-      "id": "userguide",
-      "path": "60-userguide/README.md",
-      "title": "律匠用户指南",
-      "category": "60-userguide",
-      "sha256": "63d0f3743da0b4e53b124484707f46aa37101def694541a922b2943a0f23437f"
-    },
-    {
-      "id": "60-userguide:appendix-a-online-config",
-      "path": "60-userguide/appendix-a-online-config.md",
-      "title": "附录 A. 在线配置、会员内容与功能激活",
-      "category": "60-userguide",
-      "sha256": "5c806d17675998d4889781482fea6be9c26741f59cd346272c14434b198e97b0"
-    },
-    {
-      "id": "60-userguide:appendix-b-command-line",
-      "path": "60-userguide/appendix-b-command-line.md",
-      "title": "附录 B. 命令行执行脚本",
-      "category": "60-userguide",
-      "sha256": "abeafae37dff510e0b6eff2efa7784a8e6a383899b373416d6e6afc85b364bee"
-    },
-    {
-      "id": "60-userguide:appendix-c-preset-gallery",
-      "path": "60-userguide/appendix-c-preset-gallery.md",
-      "title": "附录 C · 预置图库内容（端游 / 手游）",
-      "category": "60-userguide",
-      "sha256": "12b282402bc1852eac3e9b53ff7ee4b8fa16777f8cc948b1825b3febcda6bf26"
-    },
-    {
       "id": "70-agent:10-contracts:00-script-task-brief",
       "path": "70-agent/10-contracts/00-script-task-brief.md",
       "title": "脚本开发任务书（交给 AI Agent）",
@@ -1106,14 +889,238 @@
       "path": "70-agent/README.md",
       "title": "律匠外部 Agent 使用入口",
       "category": "70-agent",
-      "sha256": "78a9266422e83c83453ceb290acd784c4c02454b8e0b1b182984e7afa516131c"
+      "sha256": "682e4ce500c91e7e22f93071d95fa1a347637ef792e2303d1d753d7228171595"
     },
     {
       "id": "tool-schema",
       "path": "70-agent/schemas/tools.json",
       "title": "工具 schema",
       "category": "70-agent",
-      "sha256": "3fa74e499aa831b618a6cdbc9adee3e70e887b0f916815b621394f8cc54ecc00"
+      "sha256": "9a6b8c372b528a5324c74f8eb60eebdc698bc67cadc7a20bae2b4dfb49c9620c"
+    },
+    {
+      "id": "userguide",
+      "path": "guide/README.md",
+      "title": "律匠用户指南",
+      "category": "60-userguide",
+      "sha256": "752cc940c0b9a2d8120fe974e3ade8ea715d43a42b3e89a02191c49fbe114918"
+    },
+    {
+      "id": "guide:accounts:appendix-a-online-config",
+      "path": "guide/accounts/appendix-a-online-config.md",
+      "title": "附录 A. 在线配置、会员内容与功能激活",
+      "category": "60-userguide",
+      "sha256": "e241cd30dfd1a7207ed0317b76eedb71b9be7ef17ad8e81dee094006c6367c5c"
+    },
+    {
+      "id": "guide:android:07-mobile-device",
+      "path": "guide/android/07-mobile-device.md",
+      "title": "7. 移动设备（安卓）",
+      "category": "60-userguide",
+      "sha256": "d06922b08955253c07b559b56c9b289ec7087b1f3143f3a67a20b751819f8a08"
+    },
+    {
+      "id": "guide:automation:04.01-tuning-config-overview",
+      "path": "guide/automation/04.01-tuning-config-overview.md",
+      "title": "4.1 调律配置 — 页面结构",
+      "category": "60-userguide",
+      "sha256": "4a1fd2bea0a251fd9e998f97dd7ad11fc0cbb926d4b972098259dee2d1f34d8f"
+    },
+    {
+      "id": "guide:automation:04.02-default-config",
+      "path": "guide/automation/04.02-default-config.md",
+      "title": "4.2 默认配置含义",
+      "category": "60-userguide",
+      "sha256": "02d9c6a35694b88e1c891fc77a30adaf2955a8a79f4c77b1c8db2288bdab3645"
+    },
+    {
+      "id": "guide:automation:04.03-behavior-config",
+      "path": "guide/automation/04.03-behavior-config.md",
+      "title": "4.3 三种处理配置项详解",
+      "category": "60-userguide",
+      "sha256": "1cd1213a503fde1a280bd3938e81018a9b41227bc4adbbe50c007f231dab42a6"
+    },
+    {
+      "id": "guide:automation:04.04-school-rules",
+      "path": "guide/automation/04.04-school-rules.md",
+      "title": "4.4 流派规则详解",
+      "category": "60-userguide",
+      "sha256": "2e2042fb664823ce43ac0c8349301ef14753c5c8a2bfd1eb4236ae4d96e0c27a"
+    },
+    {
+      "id": "guide:automation:04.05-game-config",
+      "path": "guide/automation/04.05-game-config.md",
+      "title": "4.5 游戏配置",
+      "category": "60-userguide",
+      "sha256": "1fc821874fdf28c00125ea470963c61e700099eb6230c909a4c01e7efb896cd9"
+    },
+    {
+      "id": "guide:automation:04.06-running-tuning",
+      "path": "guide/automation/04.06-running-tuning.md",
+      "title": "4.6 运行自动调律",
+      "category": "60-userguide",
+      "sha256": "59e02f83e042f20b5279453e45d97931a732a72b3a63f45762b0aa02b9307460"
+    },
+    {
+      "id": "guide:automation:04.07-agent-tuning",
+      "path": "guide/automation/04.07-agent-tuning.md",
+      "title": "4.7 使用外部 Agent 智能调律",
+      "category": "60-userguide",
+      "sha256": "91cee696e1e68d64f07473b3437da7368456588f8257aa4c4cbd4b0ab607dd3e"
+    },
+    {
+      "id": "guide:automation:05.01-equipment-data-overview",
+      "path": "guide/automation/05.01-equipment-data-overview.md",
+      "title": "5.1 装备数据总览",
+      "category": "60-userguide",
+      "sha256": "b8e59e0ed3983c08702fd70a46f05e631ddd3a5fecf19fbc152e91133b0030bb"
+    },
+    {
+      "id": "guide:automation:05.02-equipment-data-acquisition",
+      "path": "guide/automation/05.02-equipment-data-acquisition.md",
+      "title": "5.2 装备数据如何产生",
+      "category": "60-userguide",
+      "sha256": "cab73c1bbdf8f44cb0f393814d5bd2647b080b91def8f4ff2d8189086d2380da"
+    },
+    {
+      "id": "guide:automation:05.03-equipment-management",
+      "path": "guide/automation/05.03-equipment-management.md",
+      "title": "5.3 装备管理与编辑",
+      "category": "60-userguide",
+      "sha256": "6df4e597c5501c999471b9657336085bea257864f5ecb851e5b1150704b6ccb8"
+    },
+    {
+      "id": "guide:automation:05.04-base-attributes-and-graduation",
+      "path": "guide/automation/05.04-base-attributes-and-graduation.md",
+      "title": "5.4 角色基础属性与真实毕业率",
+      "category": "60-userguide",
+      "sha256": "68ba80535b862088a5e7d0327b61817d0951dc8b64ba3d0a77991068649d2d01"
+    },
+    {
+      "id": "guide:automation:05.05-school-rule-filtering",
+      "path": "guide/automation/05.05-school-rule-filtering.md",
+      "title": "5.5 使用流派规则过滤装备",
+      "category": "60-userguide",
+      "sha256": "b4f1a2666dac89db964b890941dcd63c174a87af533d01c176e79c2ece7d95da"
+    },
+    {
+      "id": "guide:automation:05.06-optimal-equipment-combination",
+      "path": "guide/automation/05.06-optimal-equipment-combination.md",
+      "title": "5.6 计算最优毕业率组合",
+      "category": "60-userguide",
+      "sha256": "1fa490e4099356d4ef725858626954e6e300fdb2acbef595891c993a9759129c"
+    },
+    {
+      "id": "guide:automation:05.07-build-calculator",
+      "path": "guide/automation/05.07-build-calculator.md",
+      "title": "5.7 出装搭配与模拟计算器",
+      "category": "60-userguide",
+      "sha256": "a321c43637797dd48d6574b4cd3dc0e58cbc0da83ffdb5dc427c243d05ac743a"
+    },
+    {
+      "id": "guide:automation:06-workflows",
+      "path": "guide/automation/06-workflows.md",
+      "title": "6. 工作流与日常任务",
+      "category": "60-userguide",
+      "sha256": "e6da43097a2445b5c2460e808bddbeaab802d3d23b8361ca3b131991fbf2ba4e"
+    },
+    {
+      "id": "guide:automation:06.07-system-scripts",
+      "path": "guide/automation/06.07-system-scripts.md",
+      "title": "6.7 系统脚本与工作流清单",
+      "category": "60-userguide",
+      "sha256": "cb6abddf2da1968a2be0cb9143dcb4b0dd9cdaf0ff7bfb44de3ede064896565b"
+    },
+    {
+      "id": "guide:automation:appendix-c-preset-gallery",
+      "path": "guide/automation/appendix-c-preset-gallery.md",
+      "title": "附录 C · 预置图库内容（端游 / 手游）",
+      "category": "60-userguide",
+      "sha256": "5f700953e35a9a89ba8aa9290fcd810b1c467aa9a318fa17d37f986e5284e900"
+    },
+    {
+      "id": "guide:desktop:01-quick-start",
+      "path": "guide/desktop/01-quick-start.md",
+      "title": "1. 快速开始",
+      "category": "60-userguide",
+      "sha256": "e2c8b1ddc7a5b097e65245c54162b7d46ae8c632a19f967b6f59394e1101f210"
+    },
+    {
+      "id": "guide:desktop:02-main-interface",
+      "path": "guide/desktop/02-main-interface.md",
+      "title": "2. 主界面与用户管理",
+      "category": "60-userguide",
+      "sha256": "e0f3720faf51ae7d2716061d702dad916a4ed366bdcf53c54453193c8cb3eefc"
+    },
+    {
+      "id": "guide:desktop:03.01-base-config",
+      "path": "guide/desktop/03.01-base-config.md",
+      "title": "3.1 通用配置",
+      "category": "60-userguide",
+      "sha256": "3cbaa0bb9da075f29fbc5e15e7c56be2cfb35dbbb493f7e2b4bff6585a25faa1"
+    },
+    {
+      "id": "guide:desktop:03.02-scene-management",
+      "path": "guide/desktop/03.02-scene-management.md",
+      "title": "3.2 场景管理（F3）",
+      "category": "60-userguide",
+      "sha256": "c63a1c8f01681df80c00dfc16397007c287c9cea205d496c7986fff8d6c43e88"
+    },
+    {
+      "id": "guide:desktop:03.03-gallery-management",
+      "path": "guide/desktop/03.03-gallery-management.md",
+      "title": "3.3 图库管理（F4）",
+      "category": "60-userguide",
+      "sha256": "1df00ff44ae5f4e83c77b73867d614681a37c589f1660cb7dc774fddda575072"
+    },
+    {
+      "id": "guide:desktop:03.04-batch-tasks",
+      "path": "guide/desktop/03.04-batch-tasks.md",
+      "title": "3.4 批量任务",
+      "category": "60-userguide",
+      "sha256": "e21fb25712f2a390b8951fc6c0a853711046fd9dc4e6ef2eee8e8871ec9ed4dc"
+    },
+    {
+      "id": "guide:desktop:03.05-visual-recognition-troubleshooting",
+      "path": "guide/desktop/03.05-visual-recognition-troubleshooting.md",
+      "title": "3.5 图像识别与模板匹配排查",
+      "category": "60-userguide",
+      "sha256": "930013ed18ddccd978254c2e435398e85c2be92afaff2c71ecc934f5df768d7b"
+    },
+    {
+      "id": "guide:desktop:03.06-world-map-management",
+      "path": "guide/desktop/03.06-world-map-management.md",
+      "title": "大世界地图管理",
+      "category": "60-userguide",
+      "sha256": "06cd4add5ddaa7911dae010563d03d5ed6e2f1c2d789306b285d9e65c4ffbca2"
+    },
+    {
+      "id": "guide:desktop:08-script-authoring",
+      "path": "guide/desktop/08-script-authoring.md",
+      "title": "8. 脚本工作台与脚本作者须知",
+      "category": "60-userguide",
+      "sha256": "ec18792b7b9cdd6b36d5f28956999f358b366f2784f7b1b57326dae8f593ba0c"
+    },
+    {
+      "id": "guide:desktop:09-faq-and-feedback",
+      "path": "guide/desktop/09-faq-and-feedback.md",
+      "title": "9. 常见问题与反馈",
+      "category": "60-userguide",
+      "sha256": "21ae6663f8430301e2bd35ca13bebf59ae9e6c4ab9ea2ae48065ffdd6fbf8504"
+    },
+    {
+      "id": "guide:desktop:appendix-b-command-line",
+      "path": "guide/desktop/appendix-b-command-line.md",
+      "title": "附录 B. 命令行执行脚本",
+      "category": "60-userguide",
+      "sha256": "abeafae37dff510e0b6eff2efa7784a8e6a383899b373416d6e6afc85b364bee"
+    },
+    {
+      "id": "guide:recovery:config-migration",
+      "path": "guide/recovery/config-migration.md",
+      "title": "配置迁移恢复指南",
+      "category": "60-userguide",
+      "sha256": "062836f432e247c910876171646fc150c3d32630e3b93ab6c730803017938054"
     }
   ]
 }

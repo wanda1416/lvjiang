@@ -140,7 +140,7 @@ local 只存 `__added__` / `__removed__` / `__order__` 增量）、哪些列表�
   版本化文件/目录。毕业率模型的身份写在文件自身（schema_version + 流派/方案/等级/版本），
   发现层按 schema 过滤，不另设方案名清单。
 - **Agent 文档布局**：`src/lvjiang/apps/yysls/core/agent/documents.py` 声明
-  `DOCUMENT_DIRECTORIES = ("10-game", "30-architecture", "60-userguide", "70-agent")`、
+  `DOCUMENT_DIRECTORIES = ("10-game", "30-architecture", "guide", "70-agent")`（物理目录 `guide` 经 `categories={"guide": "60-userguide"}` 维持逻辑分类键 `60-userguide`）、
   稳定别名表 `AGENT_DOCUMENTS`（如 `entry`、`tool-schema`）与 `AGENT_DOCUMENT_LAYOUT`。
   该声明同时是发行文档收录范围的唯一来源（见 docs/00-meta/00-doc-standard.md 第七节）。
 - **Agent 工具装配**：`src/lvjiang/apps/yysls/core/agent/catalog.py` 的 `tool_catalog`

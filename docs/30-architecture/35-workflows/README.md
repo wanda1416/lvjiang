@@ -74,7 +74,7 @@
 ### 批量钩子的接入点
 
 `batch/` 下四个文件对应调度器的四个阶段，行为规范写在
-[批量任务](../../60-userguide/03.04-batch-tasks.md)，`batch_check` / `batch_unit_prepare`
+[批量任务](../../guide/desktop/03.04-batch-tasks.md)，`batch_check` / `batch_unit_prepare`
 的元数据语义见 [07.1-metadata.md](../32-grammar/07.1-metadata.md)：
 
 | 文件 | 阶段 | 说明 |

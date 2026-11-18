@@ -38,7 +38,7 @@ src/lvjiang/apps/yysls/workflows/implementations/bag_traversal/
 
 **适用场景**：当 Dedup 策略因特殊场景（如装备排序变化）表现不佳时，可回切此策略。
 
-运行选择来自用户调律配置的 scroll_strategy；操作步骤见[调律设置](../../60-userguide/04.06-running-tuning.md)。
+运行选择来自用户调律配置的 scroll_strategy；操作步骤见[调律设置](../../guide/automation/04.06-running-tuning.md)。
 
 ### 4.4 到底检测
 

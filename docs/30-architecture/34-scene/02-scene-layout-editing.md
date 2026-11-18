@@ -16,7 +16,7 @@
 
 ## 用户操作
 
-操作正文统一位于 [场景管理指南](../../60-userguide/03.02-scene-management.md)。语义模型见 [场景与布局定义](01-scene-layout-definition.md)；旧的手工扩展步骤见 [开发归档](../../40-development/2026-10/2026-10-09-scene-extension-notes.md)（仅源码检出）。
+操作正文统一位于 [场景管理指南](../../guide/desktop/03.02-scene-management.md)。语义模型见 [场景与布局定义](01-scene-layout-definition.md)；旧的手工扩展步骤见 [开发归档](../../40-development/2026-10/2026-10-09-scene-extension-notes.md)（仅源码检出）。
 
 ## 布局实现职责
 

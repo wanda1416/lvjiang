@@ -12,7 +12,7 @@
 
 使用现有 Profile 模型与 SQLite 仓储，观测值与推算值分别说明来源和时间，用户之间的数据隔离。采集失败不把旧值标为刚采集；缺失或未知不当作零。
 
-模型与存储契约见 [Profile 架构](../../30-architecture/31-models/04-profile.md)，读取入口见 [工作流用户指南](../../60-userguide/06-workflows.md)。
+模型与存储契约见 [Profile 架构](../../30-architecture/31-models/04-profile.md)，读取入口见 [工作流用户指南](../../guide/automation/06-workflows.md)。
 
 早期设计保存于 [过程档案](../../40-development/2026-10/2026-10-09-profile-currency-early-design.md)。
 

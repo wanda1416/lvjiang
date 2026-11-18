@@ -45,7 +45,7 @@
 
 - [10-game：游戏机制与调律评价](../10-game/README.md)
 - [30-architecture：架构与 DSL](../30-architecture/README.md)，[DSL 语法目录](../30-architecture/32-grammar/README.md)
-- [60-userguide：软件操作指南](../60-userguide/README.md)
+- [60-userguide：软件操作指南](../guide/README.md)
 - 70-agent：当前入口、MCP 契约与工作流示例。
 
 先调用 list_docs(category)，或用 search_docs(query, category) 查具体章节；

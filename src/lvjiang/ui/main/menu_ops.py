@@ -462,7 +462,7 @@ class MenuOpsMixin:
         from PyQt6.QtGui import QDesktopServices
 
         from ...core.updates.release import GITHUB_REPO
-        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/60-userguide/README.md"))
+        QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/blob/master/docs/guide/README.md"))
 
     def _open_feedback(self):
         """打开反馈规范与反馈渠道对话框。"""

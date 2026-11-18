@@ -17,7 +17,7 @@
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
 </p>
 
-> 📖 **用户手册**：[快速开始](docs/60-userguide/01-quick-start.md) | [目录](docs/60-userguide/README.md)
+> 📖 **用户手册**：[快速开始](docs/guide/desktop/01-quick-start.md) | [目录](docs/guide/README.md)
 
 ---
 
@@ -101,7 +101,7 @@ PC 端或手机端执行操作
 
 ![批量任务与用户总览](docs/assets/screenshots/main-batch-overview.png)
 
-> 游戏配置、调律配置与毕业率分析等界面见 [用户指南](docs/60-userguide/README.md)。截图中的用户（角色名）与设备信息均已做打码处理。
+> 游戏配置、调律配置与毕业率分析等界面见 [用户指南](docs/guide/README.md)。截图中的用户（角色名）与设备信息均已做打码处理。
 
 ---
 
@@ -245,7 +245,7 @@ pip install -e ".[dev]"
 
 ## ▶️ 使用
 
-> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/60-userguide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
+> 🧑‍💻 **首次使用？** 请参考 [用户指南](docs/guide/README.md)——从连接手机、启动程序到运行自动调律的完整步骤。
 
 **Windows 用户** 可直接从 [Releases](https://github.com/wanda1416/lvjiang/releases) 下载最新发行包（免安装 zip 或安装程序 exe），解压/安装后运行 `lvjiang.exe` 即可，无需 Python 环境。**Android 用户** 可下载随版发布的律匠 APK 在手机上独立执行。
 
@@ -286,7 +286,7 @@ python -m lvjiang --list --id haoyun_lianji
 python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --json
 ```
 
-> 完整参数、退出码与 JSON 输出见 [附录 D：命令行执行脚本](docs/60-userguide/appendix-d-command-line.md)。
+> 完整参数、退出码与 JSON 输出见 [附录 D：命令行执行脚本](docs/guide/desktop/appendix-b-command-line.md)。
 
 启动界面后进入 PyQt6 主窗口，基本流程：
 
@@ -297,7 +297,7 @@ python -m lvjiang --exec --id haoyun_lianji --user 张三 --target adb --yes --j
 5. **分析与执行**：计算毕业率组合、出装搭配，或运行批量自动调律 / 智能调律。
 6. **手机端（可选）**：下发配置到律匠 APK，在手机上独立执行或回传结果。
 
-> 详细业务流程见 [用户指南](docs/60-userguide/README.md) 与 [自动调律流程](docs/20-requirements/10-tuning/01-auto-tuning.md)。
+> 详细业务流程见 [用户指南](docs/guide/README.md) 与 [自动调律流程](docs/20-requirements/10-tuning/01-auto-tuning.md)。
 
 ---
 
@@ -368,7 +368,7 @@ python -m mypy
 | [`PRIVACY.md`](PRIVACY.md) | 隐私说明：联网行为、账户同步、匿名调律数据收集发出什么/不发出什么 |
 | [`docs/`](docs/README.md) | 完整文档中心与按读者导航 |
 | [`docs/50-releases/`](docs/50-releases/README.md) | 发布记录与版本说明 |
-| [`docs/60-userguide/`](docs/60-userguide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
+| [`docs/guide/`](docs/guide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
 | [`docs/70-agent/`](docs/70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 |
 | [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、待办、文档组织约定 |
 | [`docs/10-game/`](docs/10-game/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
@@ -409,7 +409,7 @@ python -m mypy
 
 - **微信交流群**：主窗口「帮助 → 反馈」中点击「扫码加群」
 - **GitHub Issue**：[github.com/wanda1416/lvjiang/issues](https://github.com/wanda1416/lvjiang/issues)
-- **提交规范**：[常见问题与反馈](docs/60-userguide/09-faq-and-feedback.md)
+- **提交规范**：[常见问题与反馈](docs/guide/desktop/09-faq-and-feedback.md)
 
 **反馈范围说明：**
 
@@ -419,7 +419,7 @@ python -m mypy
 | 功能建议与需求 | 远程协助配置环境 |
 | 文档内容过时或无法实操 | 逐个步骤指导操作 |
 
-作者精力有限，无法提供一对一使用教学。[用户指南](docs/60-userguide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。正式提交 Bug 时必须提供版本与运行环境、复现步骤、预期与实际结果、连续日志；识别或点击问题还需附截图或录屏。信息不足的问题在补齐前不会进入代码排查。
+作者精力有限，无法提供一对一使用教学。[用户指南](docs/guide/README.md)和交流群已覆盖绝大多数使用场景，遇到问题请先查阅文档或在群内讨论。正式提交 Bug 时必须提供版本与运行环境、复现步骤、预期与实际结果、连续日志；识别或点击问题还需附截图或录屏。信息不足的问题在补齐前不会进入代码排查。
 
 ---
 

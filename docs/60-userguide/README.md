@@ -1,66 +1,42 @@
-# 律匠用户指南
+# 律匠用户指南（旧路径兼容页）
 
-> 最后更新：2026-10-09（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-11-18（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
 
-面向普通用户的操作手册：如何启动程序、连接手机、完成配置、运行自动调律，以及管理装备数据和计算毕业率。
+用户指南已迁入 [`docs/guide/`](../guide/README.md)，新入口按任务组织导航。GitHub 上的旧链接不会自动跳转，请用下表找到对应内容的新位置。
 
-> 工作流 DSL 语法不在本文范围，见 [DSL 语法文档](../30-architecture/32-grammar/README.md)。
+## 旧文件名 → 新路径
 
-## 目录
-
-| 章节 | 内容 |
+| 旧文件（docs/60-userguide/） | 新路径（docs/guide/） |
 |------|------|
-| **基础** | |
-| [1. 快速开始](01-quick-start.md) | 环境要求、安装启动、连接设备、选择连接方案（手游 / 端游 / 手游投屏）、布局适配、第一次运行完整走查、遇到问题怎么自查与反馈 |
-| [2. 主界面与用户管理](02-main-interface.md) | 主窗口布局、顶部菜单与热键、用户管理 (F2)、Profile 类型内分组、布局切换、连接方案 |
-| **功能配置** | |
-| [3.1 通用配置](03.01-base-config.md) | 基础设置、Android 连接设置（恢复次数与画面流故障）、输入参数、等待参数 |
-| [3.2 场景管理](03.02-scene-management.md) | 场景编辑器 (F3)、视图与多截图、子场景裁剪及模板、跨场景引用、**装备词条解析失败的自助排查**、布局继承机制 |
-| [3.3 图库管理](03.03-gallery-management.md) | 图库管理 (F4)、参考图与分组、输入/输出字段、端游/手游空间、图像识别工具 |
-| [3.4 批量任务](03.04-batch-tasks.md) | 批量 Tab、可见用户与调度单元、工作流槽位、执行流程与进度 |
-| [3.5 图像识别与模板匹配排查](03.05-visual-recognition-troubleshooting.md) | 现场、模板、布局与实际任务结果的核对步骤 |
-| [3.6 大世界地图管理](03.06-world-map-management.md) | 大地图与地域目录、探查图片预览、拼接底图与覆盖范围 |
-| [4.1 调律配置 — 页面结构](04.01-tuning-config-overview.md) | F6 对话框布局、规则内部结构、规则管理、装备调律验证 |
-| [4.2 默认配置含义](04.02-default-config.md) | 系统默认规则组的扫描、材料与调律处理，以及预置流派规则 |
-| [4.3 三种处理配置项详解](04.03-behavior-config.md) | 四种判定语义，以及扫描处理、材料处理、调律处理的配置项 |
-| [4.4 流派规则详解](04.04-school-rules.md) | 通用会意、会心小外、会心大外、治疗纯奶、治疗火拳 |
-| [4.5 游戏配置](04.05-game-config.md) | F5 游戏配置：词组配置、装备配置、武学配置、流派配置、玩法配置、等级配置、赛季配置、字体设置 |
-| [4.6 运行自动调律](04.06-running-tuning.md) | 调律 Tab 三页、启动与停止、运行中行为、调律说明文档解读 |
-| [4.7 外部 Agent 智能调律](04.07-agent-tuning.md) | WorkBuddy 接入、扫描与培养分析、新配置及一键启动 |
-| [5.1 装备数据总览](05.01-equipment-data-overview.md) | 备战方案工作区、真实/模拟装备、公共装备池、八个槽位和数据关系 |
-| [5.2 装备数据如何产生](05.02-equipment-data-acquisition.md) | 已穿戴/背包装备扫描、OCR 解析、指纹去重、用户存储和扫描核对 |
-| [5.3 装备管理与编辑](05.03-equipment-management.md) | 筛选、穿戴、卸下、模拟装备、复制校正、删除和导出 |
-| [5.4 角色基础属性与真实毕业率](05.04-base-attributes-and-graduation.md) | 面板属性反推、基础属性编辑、战斗属性聚合、DPS 与真实毕业率、培养建议分析 |
-| [5.5 使用流派规则过滤装备](05.05-school-rule-filtering.md) | 区分流派规则与毕业率方案，按评级预筛无效候选 |
-| [5.6 计算最优毕业率组合](05.06-optimal-equipment-combination.md) | 候选构造、假设选项、智能剪枝、全局 Top 10 搜索结果与应用、技能轴查看 |
-| [5.7 出装搭配与模拟计算器](05.07-build-calculator.md) | 总词条合法分配、角色属性实时推演、玩法出装读写与三级要求 |
-| **专题** | |
-| [6. 工作流与日常任务](06-workflows.md) | 日常 Tab 操作、运行控制、专用脚本入口、脚本配置管理、任务历史（写脚本见 8） |
-| [6.7 系统脚本与工作流清单](06.07-system-scripts.md) | 系统自带脚本的清单与参数、系统脚本与本地副本的覆盖关系 |
-| [7. 移动设备（安卓）](07-mobile-device.md) | 手机端 app 安装、设备扫描、设备体检（版本/协议/权限/手势上限/标定）、并发手势实测与往返延迟 |
-| [8. 脚本工作台与脚本作者须知](08-script-authoring.md) | 脚本工作台操作、指令选择、画布取点取色、单步调试，以及脚本文件与运行性质的约定（面向自己写脚本的用户） |
-| [9. 常见问题与反馈](09-faq-and-feedback.md) | 连接/识别/调律/批量/装备/工作流问题、常见误操作、术语速查；反馈受理范围、必填信息、日志与隐私脱敏要求 |
-| **附录** | |
-| [A. 在线配置、会员内容与功能激活](appendix-a-online-config.md) | 在线配置的获取与生效、功能激活与离线恢复、本地激活与在线会员授权的区别、关闭撤销与人工恢复、升级与版本口径 |
-| [B. 命令行执行脚本](appendix-b-command-line.md) | 不开界面跑任务：list / schema / run、参数、退出码与 JSON 输出 |
-| [C. 预置图库内容](appendix-c-preset-gallery.md) | 随包分发的端游/手游参考图清单：共有规格、逐分组对照、只在一边出现的图、工作流与自动调律实际用到的 label、已知差异 |
-
-## 相关文档
-
-| 文档 | 内容 |
-|------|------|
-| [README](../../README.md)（仅源码检出） | 项目简介、安装、技术架构 |
-| [隐私说明](../../PRIVACY.md)（仅源码检出） | 联网行为、匿名调律数据收集发出什么/不发出什么、如何关闭 |
-| [自动调律需求](../20-requirements/10-tuning/01-auto-tuning.md)（仅源码检出） | 自动调律需求与行为规则细节 |
-| [装备与调律机制](../10-game/01-equipment-system.md) | 游戏客观机制：调律、转律、承音 |
-| [调律评价规则](../10-game/10-tuning-rules/README.md) | 律匠的装备分级与流派判定规格 |
-| [DSL 语法](../30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
-| [主窗口状态流](../30-architecture/30-overview/01-main-window-state-flow.md) | 定位/连接状态机 |
-
----
-
-**遇到问题或有建议？欢迎加群反馈：**
-
-进群前请至少看完 [1. 快速开始](01-quick-start.md)；没看完快速开始就来提问的，一律不回复。
-
-![微信交流群](https://wanda1416.github.io/lvjiang/feedback-qrcode.jpg)
+| README.md | [guide/README.md](../guide/README.md) |
+| 01-quick-start.md | [guide/desktop/01-quick-start.md](01-quick-start.md)（本层兼容 stub） |
+| 02-main-interface.md | [guide/desktop/02-main-interface.md](../guide/desktop/02-main-interface.md) |
+| 03.01-base-config.md | [guide/desktop/03.01-base-config.md](../guide/desktop/03.01-base-config.md) |
+| 03.02-scene-management.md | [guide/desktop/03.02-scene-management.md](../guide/desktop/03.02-scene-management.md) |
+| 03.03-gallery-management.md | [guide/desktop/03.03-gallery-management.md](../guide/desktop/03.03-gallery-management.md) |
+| 03.04-batch-tasks.md | [guide/desktop/03.04-batch-tasks.md](../guide/desktop/03.04-batch-tasks.md) |
+| 03.05-visual-recognition-troubleshooting.md | [guide/desktop/03.05-visual-recognition-troubleshooting.md](../guide/desktop/03.05-visual-recognition-troubleshooting.md) |
+| 03.06-world-map-management.md | [guide/desktop/03.06-world-map-management.md](../guide/desktop/03.06-world-map-management.md) |
+| 04.01-tuning-config-overview.md | [guide/automation/04.01-tuning-config-overview.md](../guide/automation/04.01-tuning-config-overview.md) |
+| 04.02-default-config.md | [guide/automation/04.02-default-config.md](../guide/automation/04.02-default-config.md) |
+| 04.03-behavior-config.md | [guide/automation/04.03-behavior-config.md](../guide/automation/04.03-behavior-config.md) |
+| 04.04-school-rules.md | [guide/automation/04.04-school-rules.md](../guide/automation/04.04-school-rules.md) |
+| 04.05-game-config.md | [guide/automation/04.05-game-config.md](../guide/automation/04.05-game-config.md) |
+| 04.06-running-tuning.md | [guide/automation/04.06-running-tuning.md](../guide/automation/04.06-running-tuning.md) |
+| 04.07-agent-tuning.md | [guide/automation/04.07-agent-tuning.md](../guide/automation/04.07-agent-tuning.md) |
+| 05.01-equipment-data-overview.md | [guide/automation/05.01-equipment-data-overview.md](../guide/automation/05.01-equipment-data-overview.md) |
+| 05.02-equipment-data-acquisition.md | [guide/automation/05.02-equipment-data-acquisition.md](../guide/automation/05.02-equipment-data-acquisition.md) |
+| 05.03-equipment-management.md | [guide/automation/05.03-equipment-management.md](../guide/automation/05.03-equipment-management.md) |
+| 05.04-base-attributes-and-graduation.md | [guide/automation/05.04-base-attributes-and-graduation.md](../guide/automation/05.04-base-attributes-and-graduation.md) |
+| 05.05-school-rule-filtering.md | [guide/automation/05.05-school-rule-filtering.md](../guide/automation/05.05-school-rule-filtering.md) |
+| 05.06-optimal-equipment-combination.md | [guide/automation/05.06-optimal-equipment-combination.md](../guide/automation/05.06-optimal-equipment-combination.md) |
+| 05.07-build-calculator.md | [guide/automation/05.07-build-calculator.md](../guide/automation/05.07-build-calculator.md) |
+| 06-workflows.md | [guide/automation/06-workflows.md](../guide/automation/06-workflows.md) |
+| 06.07-system-scripts.md | [guide/automation/06.07-system-scripts.md](../guide/automation/06.07-system-scripts.md) |
+| 07-mobile-device.md | [guide/android/07-mobile-device.md](../guide/android/07-mobile-device.md) |
+| 08-script-authoring.md | [guide/desktop/08-script-authoring.md](../guide/desktop/08-script-authoring.md) |
+| 09-faq-and-feedback.md | [guide/desktop/09-faq-and-feedback.md](../guide/desktop/09-faq-and-feedback.md) |
+| 08-feedback-and-issues.md | [本层 stub](08-feedback-and-issues.md)，内容已并入 [guide/desktop/09-faq-and-feedback.md](../guide/desktop/09-faq-and-feedback.md) |
+| appendix-a-online-config.md | [guide/accounts/appendix-a-online-config.md](../guide/accounts/appendix-a-online-config.md) |
+| appendix-b-command-line.md | [guide/desktop/appendix-b-command-line.md](../guide/desktop/appendix-b-command-line.md) |
+| appendix-c-preset-gallery.md | [guide/automation/appendix-c-preset-gallery.md](../guide/automation/appendix-c-preset-gallery.md) |

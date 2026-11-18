@@ -153,7 +153,7 @@
 
 `config/session/` 会包含用户名、装备数据、执行结果与截图，因此：
 
-- 用户被明确要求**不要**整目录打包上传（见 [../../60-userguide/09-faq-and-feedback.md](../../60-userguide/09-faq-and-feedback.md)）；
+- 用户被明确要求**不要**整目录打包上传（见 [../../60-userguide/09-faq-and-feedback.md](../../guide/desktop/09-faq-and-feedback.md)）；
   需要排查时由开发者点名具体文件。
 - 匿名安装标识因此不放这里，落在 `config/local/telemetry/`（见 04-config-layering 的例外条目）。
 - `mcp.json` 的 `token`/`agent_key` 是访问凭据，属于「本机私有」而不是「可分享的运行态」；

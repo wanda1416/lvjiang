@@ -8,7 +8,7 @@
 
 ## 需求列表
 
-每份文档只写需求、边界与验收；实现细节在[30-architecture](../30-architecture/README.md)，操作步骤在[60-userguide](../60-userguide/README.md)。
+每份文档只写需求、边界与验收；实现细节在[30-architecture](../30-architecture/README.md)，操作步骤在[60-userguide](../guide/README.md)。
 
 状态取值只有三种：`已实现`、`部分实现`、`规划`；权威写法是各文档首行的状态行，
 本表的取值为便于扫读的摘要，两者不一致时 `scripts/docs_check.py` 会报错。

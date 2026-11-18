@@ -51,6 +51,6 @@
 - 不按方案分别保存目标。
 - 不自动勾选“模拟转律”，不把目标写成真实 `name/value`。
 
-算法、模型与代码职责见 [模拟转律架构](../../30-architecture/36-graduation/09-transmute-simulation.md)，操作见 [毕业率指南](../../60-userguide/05.04-base-attributes-and-graduation.md)。
+算法、模型与代码职责见 [模拟转律架构](../../30-architecture/36-graduation/09-transmute-simulation.md)，操作见 [毕业率指南](../../guide/automation/05.04-base-attributes-and-graduation.md)。
 
 需求来源和旧入口比较见 [历史设计记录](../../40-development/2026-10/2026-10-09-transmute-design-background.md)。

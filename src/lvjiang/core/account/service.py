@@ -116,10 +116,13 @@ def set_sync_paused(paused: bool) -> None:
 def profile_sync_state() -> dict:
     """profile 账本同步状态（落 account.json）：
 
-    - ``remote_history_id``：已应用的**远端**水位（远端自增 id，与本地
-      ``profile_history.id`` 是两套编号，绝不互认）
-    - ``push_local_id``：已上传的**本地** history.id 水位
-    - ``profile_snapshot_id``：``{username: 远端快照 id}``，本设备落地/刷新时绑定
+    - ``remote_history_id``：已应用的**远端**水位（云端 ``remote_id``，与本地
+      ``profile_history.local_id`` 是两套编号，绝不互认）
+    - ``local_history_id``：上行基线——快照上传/落地那一刻推进的本地最大
+      ``local_id``，之下的行由快照整体覆盖，永不上传
+    - ``snapshot_remote_id``：当前快照绑定的云端水位
+    - ``profile_snapshot_id``：本设备跟随的**账户级**快照行 id（单一整数，
+      不是按用户映射）
     """
     data = load_profile().get("profile_sync")
     return dict(data) if isinstance(data, dict) else {}

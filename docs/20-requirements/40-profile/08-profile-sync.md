@@ -68,7 +68,7 @@
 
 ## 6. 接口（legacy 路径，行为即 v1.2）
 
-- `POST /api/sync/state`：`protocol_version: 2`；各通道计数与 sha
+- `POST /api/sync/state`：`protocol_version: 2`；各通道水位与「有没有」（0/1）、快照摘要与定义/布局 `sha256`——全部按表查（见 §4），版本行本身只存 `documents_head` 与 `users_rev`
 - `POST /api/sync/profile/push`：接受 set/reset/regen/meta；按 `(account_id, op_id)` 幂等；含 delta 整批 409
 - `POST /api/sync/profile/pull`：下发四种类型，`since_remote_id` 增量
 - `POST /api/sync/profile/snapshot`：清单/详情/上传（空体=空基线播种）

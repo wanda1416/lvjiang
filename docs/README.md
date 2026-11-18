@@ -16,6 +16,17 @@
 | [60-userguide/](60-userguide/README.md) | 安装、配置、运行的完整操作指引 | 用户 |
 | [70-agent/](70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 | 用户 / Agent |
 
+## 核心契约
+
+实现行为的权威说明，与代码同步维护；与旧架构文档冲突时以这里为准。
+
+| 契约 | 入口 |
+|------|------|
+| 插件装配 | [契约 A：插件装配](design/architecture/plugins.md) |
+| 配置与迁移 | [契约 B：配置与迁移](reference/config/contract.md)；配套[配置迁移恢复指南](guide/recovery/config-migration.md) |
+| Profile 与账户同步 | [契约 C：Profile 与账户同步](reference/sync/profile-and-account.md)；配套[Profile 数据字段模型](reference/profile/data-model.md) |
+| 离线安装（PC → Android） | [契约 D：离线安装](reference/sync/offline-install.md) |
+
 ## 常用入口
 
 | 我想…… | 去这里 |

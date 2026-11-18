@@ -265,7 +265,7 @@ regen 模型区分两种刷新机制，DSL 函数自动处理：
 数据模型定义可设置 `change_script`，值为相对于 `workflows/` 的脚本路径。写入先
 完成并立即返回，关联脚本随后在全局串行队列中异步执行。脚本可直接读取注入的
 `$origin_key`、`$origin_model`、`$key`、`$model`、`$old_value`、`$new_value`、
-`$delta`、`$source`、`$change_type`。关联脚本不持有设备能力，也不占用用户任务锁；
+`$delta`、`$source`、`$op_type`。关联脚本不持有设备能力，也不占用用户任务锁；
 其中调用 `scan`、`find` 等设备指令会在运行时失败。脚本内再次调用 Profile 写入
 函数会自动继承触发链，循环写回会在落库前被拒绝。
 

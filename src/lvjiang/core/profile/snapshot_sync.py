@@ -4,15 +4,16 @@
 分配自己的 ``remote_id``。所以：
 
 - 上行只报本地 id 供幂等（``(instance_id, local_id)``），远端不回传映射
-- 下行按 ``remote_id`` 水位拉，落地时**不写本地 history**（回放只影响 entries），
-  因此不存在"把远端行又推回去"的回声
-- ``tick`` / ``reset`` 是时间派生，永不上云，两端按同一份 profile.yaml 各自算
+- 下行按 ``remote_id`` 水位拉，回放**照常写本地账本**（行身份是来源设备的
+  ``(instance_id, local_id)``）；上行按 ``instance_id = 本机`` 过滤，回放行
+  永不被代传，构不成回声
+- ``reset`` / ``regen`` 照常上行；上行门是作者过滤 + 基线水位（见 :func:`push_local`）
 
 新设备落地 = 远端 entries 快照 + ``remote_id`` 之后的增量回放。
 一轮同步（:func:`sync_all`）的顺序：
 
 1. 确认协议版本（:func:`profile_protocol_block`），不对就一个 op 都不发；
-2. 按需把最新快照并进本地、再回放水位之后的 set（:func:`pull_and_replay`）；
+2. 按需把最新快照并进本地、再回放水位之后的 op（:func:`pull_and_replay`）；
 3. 上传基线之后的本机写入（:func:`push_local`）；
 4. 云端一份快照都没有而本机有数据时，补建首份基线（:func:`refresh_snapshot`）。
 

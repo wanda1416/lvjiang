@@ -108,11 +108,49 @@ def check_links(files: list[pathlib.Path]) -> tuple[list[str], set[pathlib.Path]
     return problems, inbound
 
 
+def reachable_from_entry(files: list[pathlib.Path]) -> set[pathlib.Path]:
+    """从 docs/README.md 沿文档链接可达的集合。
+
+    只看「有没有入链」会让互相引用的孤岛通过；真正的要求是从导航入口
+    沿链接一步步能走到。链接只算 .md 目标（图片与资源不承载导航）。
+    """
+    entry = DOCS / "README.md"
+    if not entry.is_file():
+        return {path.resolve() for path in files}
+    seen: set[pathlib.Path] = set()
+    queue = [entry]
+    while queue:
+        path = queue.pop()
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        text = body_without_code(read(path))
+        for match in LINK.finditer(text):
+            raw = match.group(1)
+            if raw.startswith(SKIP_PREFIX):
+                continue
+            target = raw.partition("#")[0]
+            nxt = (path.parent / target).resolve() if target else path
+            if nxt.suffix == ".md" and nxt.is_file() and nxt.resolve() not in seen:
+                queue.append(nxt)
+    return seen
+
+
 def check_orphans(files: list[pathlib.Path], inbound: set[pathlib.Path]) -> list[str]:
     return [
         f"孤儿文档（无任何入链） {path.relative_to(REPO).as_posix()}"
         for path in files
         if path.name != "README.md" and path.resolve() not in inbound
+    ]
+
+
+def check_unreachable(files: list[pathlib.Path]) -> list[str]:
+    reachable = reachable_from_entry(files)
+    return [
+        f"入口不可达（docs/README.md 链接走不到） {path.relative_to(REPO).as_posix()}"
+        for path in files
+        if path.resolve() not in reachable
     ]
 
 
@@ -357,6 +395,7 @@ def main() -> int:
     groups: dict[str, list[str]] = {
         "死链与锚点": link_problems,
         "孤儿文档": check_orphans(files, inbound),
+        "入口可达": check_unreachable(files),
         "一级标题": check_titles(files),
         "编号冲突": check_duplicate_numbers(files),
         "时效锚": check_freshness(files),

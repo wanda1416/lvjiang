@@ -62,8 +62,9 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
   `detail` 替换为 `delta_value REAL NULL` 与 `sync_from TEXT NULL`。
   同步来源使用 `model:key`，变动量记录 clamp 后实际变化，不能拿入库整数相减
   代替连续再生的语义变动。NULL 表示未知，不等于零。
-- `change_type` 为 `action`、`override`、`tick`、`reset`；`tick` 只表示自动恢复，
-  周期清零使用 `reset`，传给变更脚本的事件类型也一致。
+- `op_type` 为 `set`、`reset`、`regen`、`meta`；`regen` 只表示恢复固化，
+  周期清零使用 `reset`，传给变更脚本的事件 `op_type` 也一致。旧库残留的
+  `delta` 行只读不写（v13 迁移见 `core/profile/migrations.py`）。
 - `profile_key_renames` 保存全用户重命名时间、操作 ID、模型、旧新 key，以及
   entries/history/sync_from 更新数量；独立的 key 重命名记录对话框按链显示曾用名，
   不混入数值历史页。
@@ -186,7 +187,7 @@ Profile 是全局共享的用户数据。不增加 `app_id`，不做 app 分库�
 只有事务提交后才进入应用级 `ProfileScriptRunner` FIFO 队列，提交方不等待执行。
 事件向脚本注入
 `origin_key`、`origin_model`、`key`、`model`、`old_value`、`new_value`、
-`delta`、`source` 和 `change_type`。
+`delta`、`source` 和 `op_type`。
 
 Profile 脚本每次使用新的轻量 `WorkflowEngine`，加载该用户的 Session 读取快照，
 但不装配截图、OCR、输入、布局和 Session 保存回调。它调用无锁执行入口，既不

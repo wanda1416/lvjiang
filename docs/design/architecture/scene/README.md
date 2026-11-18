@@ -1,0 +1,20 @@
+# 场景系统
+
+> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+
+游戏场景的语义模型与编辑/运行状态契约。用户操作统一见 [场景管理](../../../guide/desktop/03.02-scene-management.md)。
+
+## 文档索引
+
+| 文件 | 内容 |
+|------|------|
+| [01-scene-layout-definition.md](01-scene-layout-definition.md) | 场景与布局语义模型：Scene / Area / Layout 三层数据结构定义 |
+| [02-scene-layout-editing.md](02-scene-layout-editing.md) | 场景编辑器的配置、布局、引用与保存边界 |
+| [03-cross-scene-references.md](03-cross-scene-references.md) | 跨场景 area 引用：一块区域只留一处坐标真源，与子场景嵌套的区别 |
+| [04-page-transition-contract.md](04-page-transition-contract.md) | 页面结构与跳转契约：TAB/取景归属、调用方返回、全局入口与校验 |
+
+## 关联文档
+
+- **场景实现**：[31-models/02-scene-implementations.md](../models/02-scene-implementations.md) — 各场景具体字段定义
+- **DSL 交互指令**：[32-grammar/02-concepts.md](../../../reference/dsl/02-concepts.md)（概念）/ [03.3-mouse.md](../../../reference/dsl/03.3-mouse.md)（指令） — click/drag/wait 等指令的场景寻址
+- **架构总览**：[30-architecture/README.md](../../../30-architecture/README.md)（仅源码检出）

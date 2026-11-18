@@ -4,7 +4,7 @@
 开发模式写的就是 system，所以顺序可以随便调；用户模式写的只是 local 覆盖，而
 键序不参与 diff——放开拖动只会让用户改出一份存不下来的顺序，因此不给入口。
 
-另见 `docs/30-architecture/30-overview/04-config-layering.md`。
+另见 `docs/design/architecture/overview/04-config-layering.md`。
 """
 from __future__ import annotations
 

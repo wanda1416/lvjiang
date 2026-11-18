@@ -33,12 +33,12 @@
    缺 `CurrencySnapshot` 历史留存（JSONL）、90 天过期清理与趋势折线图。
 5. **心力 / 体力管理**：**部分实现**（需求文档状态 2026-10-09；律准石库存与记账策略
    已在 `apps/yysls/workflows/implementations/tuning/stone_stock.py`）。剩余项见
-   `docs/20-requirements/40-profile/03-stamina-management.md` 的未完成清单；
+   `docs/plans/profile/03-stamina-management.md` 的未完成清单；
    依赖定时轮询与多账号批量，工程量比看上去大。
 6. **局内地图目标闭环导航与撤离**：为渡尘墟、觉障林及后续同类玩法提供
    可复用的玩家/目标地图定位、目标锁定、短脉冲移动、重新定位、防卡和到达交互能力。
    导航核心不硬编码玩法名称，不直接关闭应用；具体机制、安全边界与分阶段计划见
-   [`07-in-match-navigation.md`](../20-requirements/50-platform/02-in-match-navigation.md)。
+   [`07-in-match-navigation.md`](../plans/platform/02-in-match-navigation.md)。
 
 > 上面 6 条是当前唯一清单；下方 P1/P2 是同一批事项的详情，重复项只留一处指针。
 
@@ -303,7 +303,7 @@ MVP 已可用（总览 / 调律分析 / 数据同步）。明确不在第一阶�
 
 ### 10. 「武学天赋」并进武学配置 {#p2-martial-art-attrs-merge}
 
-**位置**: `docs/30-architecture/31-models/06-base-attr-model.md`§界面·名册从哪来
+**位置**: `docs/design/architecture/models/06-base-attr-model.md`§界面·名册从哪来
 
 武学名册已经以 `game_config.yaml` 的 `martial_arts` 为准（属性配置那页
 只是数值覆盖层，增删按钮已禁用）。名册在武学配置那边，数值理应也在

@@ -246,5 +246,5 @@ return 0
 
 | 文档 | 内容 |
 |------|------|
-| [玩家档案系统总览](../../20-requirements/40-profile/README.md) | 玩家档案系统总览 |
+| [玩家档案系统总览](../../plans/profile/README.md) | 玩家档案系统总览 |
 | [references/desktop.yaml](../../../config/system/references/desktop.yaml) | 端游参考图配置（含货币资产组；当时文件名为 `端游.yaml`） |

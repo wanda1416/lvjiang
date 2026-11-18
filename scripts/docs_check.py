@@ -45,8 +45,9 @@ RECURSIVE_INDEX_DIRS = ("50-releases",)
 SKIP_PREFIX = ("http://", "https://", "mailto:", "#")
 
 #: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 00-doc-standard.md）
-STATUS_SCOPES = ("20-requirements", "00-meta/platforms")
-STATUS_INDEXES = ("20-requirements/README.md", "00-meta/platforms/README.md")
+STATUS_SCOPES = ("design/decisions", "plans", "00-meta/platforms")
+STATUS_INDEXES = ("design/decisions/README.md", "plans/README.md",
+                  "00-meta/platforms/README.md")
 STATUS_LINE = re.compile(
     r"^>\s*状态\s*[：:]\s*(已实现|部分实现|规划)"
     r"\s*（(\d{4}-\d{2}-\d{2})，基线\s*v?(\d+\.\d+(?:\.\d+)?)）", re.M)
@@ -246,12 +247,12 @@ def check_status(files: list[pathlib.Path], *, descriptive: bool = False) -> lis
 
 
 def check_index_status(files: list[pathlib.Path]) -> list[str]:
-    """20-requirements 层索引的状态列必须与目标文档的状态行一致。
+    """plans 层索引的状态列必须与目标文档的状态行一致。
 
     索引给人快速扫的，文档首行是权威；两边不一致就是有一处已经腐烂。
     """
     problems: list[str] = []
-    index = DOCS / "20-requirements/README.md"
+    index = DOCS / "plans/README.md"
     if not index.is_file():
         return problems
     for line in read(index).splitlines():
@@ -321,7 +322,7 @@ def check_bundle_digests(bundle: pathlib.Path, manifest: dict) -> list[str]:
         if digest != entry.get("sha256"):
             problems.append(f"摘要与正文不符 {rel}")
     actual = {p.relative_to(bundle).as_posix() for p in bundle.rglob("*") if p.is_file()}
-    manifest_rel = "70-agent/manifest.json"
+    manifest_rel = "agent/manifest.json"
     for rel in sorted(actual - seen - {manifest_rel}):
         problems.append(f"清单外文件 {rel}")
     return problems
@@ -329,7 +330,7 @@ def check_bundle_digests(bundle: pathlib.Path, manifest: dict) -> list[str]:
 
 def check_bundle(bundle: pathlib.Path) -> list[str]:
     bundle = bundle.resolve()
-    manifest_path = bundle / "70-agent/manifest.json"
+    manifest_path = bundle / "agent/manifest.json"
     if not manifest_path.is_file():
         return [f"清单缺失 {manifest_path.relative_to(bundle).as_posix()}"]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -340,7 +341,7 @@ def check_bundle_links(bundle: pathlib.Path, manifest: dict | None = None) -> li
     """验证发行文档的内部链接；源码参考必须显式标明且不能掩盖包内缺失。"""
     bundle = bundle.resolve()
     if manifest is None:
-        manifest = json.loads((bundle / "70-agent/manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads((bundle / "agent/manifest.json").read_text(encoding="utf-8"))
     paths = [bundle / entry["path"] for entry in manifest["documents"]]
     layers = {path.relative_to(bundle).parts[0] for path in paths}
     problems = []

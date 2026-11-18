@@ -1,0 +1,590 @@
+# DSL 语法速查
+
+> 最后更新：2026-10-09（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+
+工作流 DSL（Domain Specific Language）语法规范，用于描述 `.wf` 工作流文件。
+
+> **要动手写一个脚本**（而不是查语法）请先读
+> [写一个可运行的 .wf 脚本](../../agent/20-operations/03-script-authoring.md)：
+> 那里给的是最短路径、可复制骨架、校验入口与常见错误表；本篇负责“某个子句到底怎么拼”。
+
+> 这是**速查页**：只给格式骨架与最小示例，目标是「一眼看到怎么写」。子句语义、边界条件、
+> 参数细节与失败行为以各子文件为准；两边冲突时按子文件修正本文，而不是反过来。
+
+## 解析入口与契约
+
+共享解析入口使用 Lark LALR 与 contextual lexer，惰性建表；执行引擎、静态检查和编辑器共用该入口。`parse_file` 的内容缓存和独立 AST 副本语义保持不变。
+
+场景引用统一由 `const_or_var` 接受配置引用或变量。按钮、滚动和拖拽方向使用共享字面量，并通过局部规则恢复各指令原有 token 类型与源位置；滚动仍只接受上下，按键按下／释放的别名保持不变。日志级别和等待时机优先于同时可接受的裸标识符。
+
+DSL 写法、AST 节点与运行行为保持原契约。非法语法抛出 Lark `UnexpectedInput` 子类，具体字符／token 异常类型可能随解析器改变；消费者使用行列定位，不绑定单一子类。
+
+验收边界见 [解析性能需求](../../design/decisions/editor/07-dsl-parser-performance.md)。历史对照工具及限制见 [等价验证](../../../scripts/one_off/lalr_parser/README.md)（仅源码检出）（仅源码检出）。
+
+---
+
+## 文档索引
+
+| 文件 | 内容 |
+|------|------|
+| [01-basics.md](01-basics.md) | 词法与值、引用模型、变量系统、表达式 |
+| [02-concepts.md](02-concepts.md) | 场景（Scene）、布局（Layout）、Area/Action、Panel |
+| [03-interaction.md](03-interaction.md) | 交互指令概览：指令分类、隐藏延迟共性、press 状态管理 |
+| [03.1-basic-commands.md](03.1-basic-commands.md) | 基础指令：collect、eval、default、call、log |
+| [03.2-interaction.md](03.2-interaction.md) | 时间与辅助：wait、wait stable、align、screenshot |
+| [03.3-mouse.md](03.3-mouse.md) | 鼠标操作：click、drag、后缀等待子句、隐藏延迟 |
+| [03.4-keyboard.md](03.4-keyboard.md) | 按压输入：press、键盘与鼠标按钮、状态管理和后端机制 |
+| [03.5-key-reference.md](03.5-key-reference.md) | 按键速查：物理键名、字符别名、组合键和平台限制 |
+| [03.6-scene-declarations.md](03.6-scene-declarations.md) | 流程位置声明：scene、view、unknown（仅元数据） |
+| [03.7-timeline.md](03.7-timeline.md) | 并发输入：timeline 块、绝对偏移、各通道支持情况与边界 |
+| [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
+| [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
+| [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |
+| [04.3-find.md](04.3-find.md) | find — 文字与模板坐标定位 |
+| [04.4-image-template.md](04.4-image-template.md) | `by image` — scan / find 模板匹配完整语义 |
+| [05-control-flow.md](05-control-flow.md) | 控制流概览与指令总表 |
+| [05.1-loops-branches.md](05.1-loops-branches.md) | 分支与循环：if、for、loop、break、continue |
+| [05.2-flow-jumps.md](05.2-flow-jumps.md) | 异常与跳转：try/catch、return、label/goto |
+| [05.3-conditions.md](05.3-conditions.md) | 条件表达式：基础条件、组合条件、算术比较 |
+| [06-functions.md](06-functions.md) | 内置函数总览与速查表 |
+| [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术、字典/列表、字符串 |
+| [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数 |
+| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数 |
+| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、像素规则占比、亮段、色心方位、同色图标、多点找色 |
+| [07-subworkflows.md](07-subworkflows.md) | 模块化：import/def/call、变量隔离 |
+| [07.1-metadata.md](07.1-metadata.md) | `.wf` 文件头元数据与外部参数声明 |
+| [08-examples.md](08-examples.md) | 完整示例 |
+| [09-data-channels.md](09-data-channels.md) | 数据通道：session/context/variables/output |
+
+---
+
+## 一、词法与值
+
+```
+# 注释
+# 整行注释以 # 开头
+
+# 字面量
+"字符串"               # 双引号，不支持转义
+42 / -3                # 整数（int）
+1.5 / -3.14            # 浮点数（float）
+true / false            # 布尔值
+null                    # 空值
+{"k": "v", "n": 3}     # 字典（key 限定 str）
+[1, "a", null]          # 列表
+(1, 2)                  # 泛化元组（支持数字/变量混合）
+```
+
+**续行**：行尾 `\` 显式续行；`{}`/`[]`/`()` 内部隐式续行。
+
+## 二、引用模型
+
+```
+[name]                  # 配置引用（场景/Area/Action 名）
+$var                    # 运行时变量引用
+[scene].[area]          # 场景.区域
+[scene].$var            # 场景.动态区域
+$scene.[area]           # 动态场景.区域
+[f1, f2, f3]            # 多 Area 列表（scan/recognize 用）
+"text"                  # 字符串数据（用于 eval/log/by匹配/函数参数）
+```
+
+> `[name]` 表示配置引用，`$var` 表示变量引用。`"text"` 始终表示字符串数据，不用于配置引用。变量只是延迟求值的常量。
+
+**Panel 索引区分**：`[scene].[panel][row][col]` 中，`scene`/`panel` 是配置引用（`[name]` 或 `$var`），而 `row`/`col` 是面板索引（`[INT]` 或 `[$var]`），不是 area 引用。row/col 不支持字符串，`["a"]` 语法不合法。
+
+## 三、变量与表达式
+
+```
+# 赋值
+eval $var = "hello"             # 显式赋值
+$var = "hello"                  # 隐式 eval（等价）
+eval $var = func(args)          # 函数返回值赋值
+eval $var = $a + $b * 2        # 算术表达式
+eval $var = {"k": "v"}          # 字典
+eval $var = ["a", "b"]          # 列表
+eval $var = (1, 2)              # 泛化元组
+default $var = 10               # 仅当未从外部传入时赋值
+
+# 字段访问
+$dict.field                     # 静态字段
+$dict."field"                   # 字符串 key
+$dict.$key                      # 动态 key
+$dict.a.b.c                     # 链式访问
+$list[0] / $list[$i]            # 列表索引
+
+# 算术
+$a + $b                         # 加（str 时自动拼接）
+$a - $b                         # 减
+$a * $b                         # 乘
+$a / $b                         # 浮点除（除零返回 0.0）
+```
+
+## 四、领域概念
+
+```
+Scene   → 游戏页面/界面状态（YAML 定义于 scenes/）
+Layout  → Area/Action 坐标映射（JSON 定义于 layouts/）
+Region  → 有面积的矩形区域（可 click/scan/recognize）
+Point   → 坐标点（可 click）
+Action  → 拖拽行为实体（Arrow，可 drag）
+Panel   → 可寻址网格容器（[r][c] 二维索引，r/c 从 1 开始）
+```
+
+## 五、交互指令
+
+### click — 激活
+
+```
+click [scene].[region]                  # 按布局激活：默认点击中心，也可绑定按键
+click [scene].[region] hold 1.4         # 按住 1.4 秒后释放（触屏长按/鼠标长按）
+click [scene].[region] hold (1.3, 1.5)  # 在区间内随机选择按住时长
+click [scene].$var                      # 动态区域
+click [scene].[panel][r][c]             # Panel 格子中心
+click [scene].[panel]                   # Panel 中心
+click $var                              # CoordRef / find 结果
+click (rx, ry)                          # 画布归一化坐标
+click [scene].[region] after wait stable 5  # 点击后等待稳定
+```
+
+### drag — 拖拽
+
+```
+# Arrow 拖拽
+drag [scene].[arrow]                    # 执行 Arrow 定义的拖拽
+drag [scene].[arrow] duration 0.5                # 指定时长
+drag [scene].[arrow] duration 0.5 hold 0.2       # 拖拽后按住
+drag [scene].[arrow] scale 2 exact               # 向量放大 2 倍，两端不抖动
+
+# Panel/Region 翻页
+drag [scene].[panel][r][c] down <n>     # 下翻 n 行（默认 1）
+drag [scene].[panel][r][c] up $var      # 上翻 $var 行
+drag [scene].[panel][r][c] left/right   # 左/右翻
+
+# 点对拖拽
+drag [s1].[p1] to [s2].[p2]               # 两点间拖拽
+drag (rx1, ry1) to (rx2, ry2)          # 坐标模式
+```
+
+### move / place — 鼠标移动
+
+```
+place (0.52, 0.38)                      # 直接放置光标，不产生移动过程
+move to (0.8, 0.5) duration 0.3         # 移动到目标（目标语法与 click 一致）
+move to [inventory].[slot3]             # 目标也可以是场景引用 / panel / $var
+move by (-0.2, 0) duration 0.4          # 相对位移，分量 ∈ [-1, 1]
+move (0.5, 0.5) by (0.2, 0) duration 0.3  # 显式起点 = place + move by
+```
+
+`place`/`move` 没有默认前后延迟，但同样支持 `before`/`after`/`around` 等待子句。
+详见 [03.3-mouse.md](03.3-mouse.md#二move--鼠标移动)。
+
+### scroll — 鼠标滚轮
+
+```
+scroll up <n>                           # 在画布中心向上滚动 n 格（默认 1）
+scroll down 3                           # 方向后紧跟数量
+scroll [scene].[region] up <n>          # 先移动光标到目标再滚动
+scroll [scene].[panel][r][c] down <n>   # 移动到格子中心后滚动
+scroll [scene].[region] up 5 interval 0.1  # 逐格固定间隔（默认 20~50ms 随机）
+```
+
+### replay — 高精度输入轨迹回放
+
+```
+replay input_trace "lvtrace/7f02c8c43d7a.lvtrace"
+```
+
+轨迹相对当前 `.wf` 文件解析，由专用实时回放器一次执行，不逐事件进入 DSL 调度。
+
+### app — 应用生命周期
+
+```
+app stop "game" timeout 15              # 停止并等待进程消失
+app start "game" timeout 30             # 启动并等待进程出现
+```
+
+`game` 是「配置管理 → 应用注册」中的应用名，控制器按当前实际连接目标选择
+Android/PC 绑定，不依据工作流环境。详见 [06.2-system-interaction.md](06.2-system-interaction.md)。
+
+### wait — 等待
+
+```
+wait @<delay_name>                      # 命名延迟（配置读取）
+wait 1.5                                # 固定秒数
+wait $var                               # 动态等待
+wait (1, 2)                             # 随机范围
+```
+
+### wait stable — 等待画面稳定
+
+```
+wait stable <timeout>                                           # 基本形式
+wait stable <timeout> on [scene].[region]                       # 只比较指定区域
+wait stable <timeout> [on [scene].[region]] threshold <v> interval <v> duration <v> least <v>
+```
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `timeout` | 必填 | 等待预算秒数（耗尽记警告并继续） |
+| `threshold` | 0.02 | 像素差异率阈值 |
+| `interval` | 0.3 | 截图间隔 |
+| `duration` | 0.5 | 需持续稳定的时长 |
+| `least` | 0.5 | 最低等待秒数 |
+| `on` | 全画面 | 当前布局中的普通区域 `[scene].[region]`；只在该区域内计算帧差异 |
+
+时间及阈值参数支持字面量 / `@命名延迟` / `$变量`。`on` 的场景名和区域名也可使用变量，例如 `on $scene.$region`。`on` 必须位于 `timeout` 之后、其他选项之前；省略时比较整张截图。
+
+区域限定会按当前布局的画布与区域坐标换算出像素裁剪框，适合排除角色动画、粒子等无关变化。它只支持普通 Region，不支持坐标点、方向、网格单元或三段子场景引用。静态区域在执行前校验，动态区域在运行时解析；未绑定或禁用会报错。
+
+可作为操作的等待子句：
+
+```wf
+click [scene].[button] after wait stable 5 on [scene].[content]
+```
+
+等待区域不会自动继承操作目标；不写 `on` 的内联 `wait stable` 仍检查全画面。完整说明见 [03.2-interaction.md](03.2-interaction.md#12-稳定等待wait-stable)。
+
+### align / screenshot
+
+```
+align [scene].[panel]                   # 手动触发面板自对齐
+screenshot                              # 新截图保存到 logs/image/
+screenshot from last                    # 保存最近截图原图，info 输出路径和帧序号
+```
+
+### press — 键盘与鼠标按钮输入
+
+```
+press "KEY"                             # 完整按键（down + up）
+press "KEY" hold <秒数>                 # 按住指定时长
+press "KEY" hold (<最小>, <最大>)       # 区间内随机选择时长
+press "KEY" hold $var                   # 数值或二元 tuple 变量
+press "KEY" down                        # 按下保持
+press "KEY" up                          # 释放
+press "CTRL" + "C"                      # 单条组合键（左到右按下、右到左释放）
+press "MOUSE_LEFT"                      # 当前指针位置单击左键
+press "MOUSE_RIGHT" hold 0.5            # 当前指针位置按住右键
+paste "ABC123"                         # PC 剪贴板 + Ctrl+V 文本输入
+paste $redeem_code                      # 粘贴运行时变量
+```
+
+| 模式 | 语义 | 状态变化 |
+|------|------|--------|
+| PRESS | 一次完整按键 | down → up |
+| HOLD | 按住 N 秒 | down → sleep → up |
+| DOWN | 按下保持 | 键留在 registry |
+| UP | 释放 | 键从 registry 移除 |
+
+键名不区分大小写，支持别名（Escape→ESC, Control→CTRL）。单条组合键用 `+` 连接：
+
+```
+press "CTRL" + "C"                      # 左到右按下、右到左释放
+press "CTRL" + "SHIFT" + "S"
+press "CTRL" + "A" hold 0.5             # 组合键同样支持 hold / down / up
+```
+
+需要在组合键之间穿插其他语句时，才改用 down/up 显式时序：
+
+```
+press "CTRL" down
+press "C"
+press "CTRL" up
+```
+
+工作流退出时 `release_all()` 自动释放所有残留按键。详见 [03.4-keyboard.md](03.4-keyboard.md)。
+
+## 六、基础指令
+
+```
+# collect — 存入输出字典
+collect $var                            # 以变量名为 key
+collect $var as "label"                 # 以静态 label 为 key
+collect $var as $alias                  # 以动态 alias 为 key
+collect session.field                   # 以字段名为 key
+
+# eval — 赋值（可省略 eval 关键字）
+eval $var = func(args)
+eval $var.field = value
+
+# call — 调用子过程
+call proc_name()
+call proc_name($arg1, $arg2)
+call $result = proc_name()              # 接收返回值
+call proc_name() as $output             # 接收 output dict
+call $result = proc() as $output        # 同时接收
+
+# log — 日志输出
+log "消息"                              # 默认 info 级别
+log debug / info / warn / error "消息"  # 指定级别
+log concat("a", $var)                   # 函数返回值
+```
+
+## 七、感知指令
+
+> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04.1-scan.md](04.1-scan.md) / [04.2-recognize.md](04.2-recognize.md) / [04.3-find.md](04.3-find.md) / [04.4-image-template.md](04.4-image-template.md)。
+
+### scan — OCR 文字扫描
+
+```
+scan [scene] as $var                                    # 扫描所有 region → dict
+scan [scene].[r1, r2] as $var                           # 指定 region → dict
+scan [scene].[panel] as $var                            # 整面板 → {行: {列: 文本}}
+scan [scene].[panel][r][c] as $var                      # 单格 → str
+
+# 带 by（短路匹配 → str 或 {row, col}）
+scan [scene].[r1, r2] as $var by contains "文本"
+scan [scene].[r1, r2] as $var by equals_any $list
+scan [scene].[r1, r2] as $var by image                    # 用布局中的 Region 模板绑定
+
+# 带 where（置信度过滤）
+scan [scene].[r1, r2] as $var where confidence >= 0.8
+```
+
+### recognize — 图像材料识别
+
+```
+recognize [scene].[s1, s2] as $var                      # 识别 slot → dict
+recognize [scene].[panel] as $var                       # 整面板 → {行: {列: 材料名}}
+recognize [scene].[panel][r][c] as $var                 # 单格 → str
+
+# 带 by（短路匹配）
+recognize [scene].[s1, s2] as $var by equals "材料名" on group "分组"
+
+# 带 as rich（富返回值）
+recognize [scene].[s1, s2] as rich $var                 # → {key: 富dict}
+recognize [scene].[s1, s2] as rich $var with yysls_rich_parse
+
+# 组合
+recognize [scene].[s1, s2] as rich $var with func where confidence >= 0.8 on group "分组"
+```
+
+默认 `recognize` 只做参考图匹配，不执行输出区域 OCR；只有 `as rich`
+会读取图库定义的 `level_text`、`count_text` 等输出字段。
+`as rich` 与 `by` 返回类型冲突，不能同时使用；组合时解析器会直接报错。
+
+### find — 文字坐标定位
+
+```
+find as $var by contains "文字"                         # 全画布搜索 → FoundRegion
+find [scene].[area] as $var by contains "文字"          # 指定区域搜索
+find $scene.$region as $var by contains_any $list       # 动态区域
+
+# 带 where
+find as $var by contains "文字" where confidence >= 0.8
+
+# 显式模板定位：config/system/templates/<name>.png，where 作匹配分门槛
+find as $var by image "extract_icon"
+find [scene].[area] as $var by image "extract_icon" where confidence >= 0.85
+
+# 按当前布局的 Region 模板绑定定位；前面的 area 是搜索范围，后面的 back 是模板来源
+find as $var by image [game_menu_page].[back]
+find [scene].[area] as $var by image [game_menu_page].[back]
+```
+
+### 修饰子句速查
+
+| 子句 | 方向 | 适用 |
+|------|------|------|
+| `by <mode> <target>` | 降级：dict → str/位置 | scan / recognize / find |
+| `as rich` | 升级：str → dict，并执行输出区域 OCR | 仅 recognize |
+| `with <func>` | 配合 rich | 仅 recognize |
+| `with "<清洗组>"` | 在全局默认清洗后叠加业务规则组 | scan / find |
+| `where confidence >= <n>` | 过滤 | scan / recognize / find |
+| `on group "<name>"` | 限定分组 | 仅 recognize |
+| `from last` / `from screen` / `from $var` | 切换取帧来源；`$var` 取 default/last/screen | scan / recognize / find |
+
+by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list`；
+`scan` Region 另支持无 target 的 `by image`；`find` 支持
+`by image [scene].[region]`（推荐）及兼容形式 `by image "模板名"`。
+
+`with "<清洗组>"` 是 `scan` / `find` 的 OCR 结果清洗子句，与 `recognize` 的
+`with <func>` 是两个不同的东西（前者接字符串，后者接函数名）：
+所有 OCR 会先执行全局默认清洗；该子句再按配置中的清洗组做附加处理，
+不能与 `by image` 同时使用。
+详见 [04.1-scan.md](04.1-scan.md#清洗子句) / [04.3-find.md](04.3-find.md#清洗子句)。
+
+### 与 click 的配合
+
+| 产出 | click 用法 |
+|------|-----------|
+| scan/recognize 有 by → str | `click [scene].$var` |
+| find → FoundRegion | `click $var` |
+| CoordRef 变量 | `click $var` |
+| scan/recognize 无 by → dict | 不可直接 click |
+| panel by → {row, col} | `click [scene].[panel][$var.row][$var.col]` |
+
+## 八、控制流
+
+```
+# 条件分支
+if <cond>
+    ...
+else if <cond>
+    ...
+else
+    ...
+end
+
+# 枚举循环（循环变量名不带 $）
+for item in ["a", "b", "c"] ... end   # 静态列表（元素必须是完整表达式，裸标识符非法）
+for item in $list ... end             # 列表变量
+for i in [1...$n] ... end             # 整数范围（闭区间，端点可为表达式）
+
+# 计数循环
+loop <N> ... end                      # N 为数字或 $var
+
+# 条件循环
+loop while <cond> ... end             # 先判断后执行
+loop until <cond> ... end             # 先执行后判断（至少一次）
+
+# 循环控制
+break                                 # 跳出最内层循环
+continue                              # 跳过当前迭代
+
+# 异常处理
+try
+    ...
+catch $err
+    ...
+end
+
+# 返回
+return                                # 结束工作流/子过程
+return -1                             # 异常终止（主工作流）
+return <value>                        # 返回值给调用方
+
+# 标签跳转
+@label_name                           # 定义标签
+goto label_name                       # 跳转到标签
+
+# 单行守卫（-> 后只能跟一条非块语句，等价于 if <条件> / 该语句 / end）
+if not $ready -> return 0
+if $seen -> call finish_scan()
+if env("desktop") -> press "F"
+env:"android" -> click [game_main_page].[menu] after wait @page_refresh   # env:"x" 是 env("x") 的简写
+```
+
+## 九、条件表达式
+
+```
+# 基础条件
+$var contains "文本"                  # 包含子串
+$var == "文本" / $var != "文本"        # 字符串精确比较
+$var in ["a", "b"]                    # 等于列表中任一项
+$var is_empty                         # 不存在、空白串或空集合（0 / false 不算空）
+$var > N / < N / >= N / <= N         # 数值比较
+$var == N / != N                      # 数值容差比较（浮点安全）
+$var                                  # truthy 检查
+not <条件>                            # 取反
+
+# 组合条件
+<cond> and <cond>                     # 逻辑与（优先级高于 or）
+<cond> or <cond>                      # 逻辑或
+(<cond>)                              # 括号分组
+
+# 算术条件
+$a + 1 > $b * 2                       # 两侧支持 + - * /
+($x + $y) / 2 >= 60
+```
+
+falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
+
+## 十、内置函数
+
+> 完整签名与说明见 [06-functions.md](06-functions.md)；实际注册表以 `list_functions()` 为准。
+> 下表只列常用入口，**不保证穷尽**——查不到不等于不存在，请以那两处为准。
+
+| 类别 | 函数 |
+|------|------|
+| **基础运算** | `mod` `min` `max` `abs` `to_flag` |
+| **字典/列表** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
+| **字符串** | `concat` `substr` `split` `split_lines` `replace` `join` `startswith` `endswith` `index_of` `repeat` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
+| **正则** | `match` `regex_find` `regex_find_all` `regex_replace` `regex_split` `regex_escape` |
+| **装备** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` `equipment_lock_status` |
+| **背包遍历** | `check_scroll` `notify_scroll` `scroll_advance` |
+| **背包游标** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |
+| **入库与角色属性** | `scanned_loadout_names` `ensure_scanned_loadout` `bind_scanned_loadout` `loadout_scan_target` `write_bag_item` `mark_equipment_seen` `write_equipped` `set_scanned_loadout_gongjue` `has_scanned_base_attrs` `save_scanned_base_attrs` `to_role_base_attrs` `open_base_attr_form` |
+| **游戏属性** | `game_attr` |
+| **时间** | `clock` `datetime` |
+| **用户交互与系统** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
+| **应用生命周期** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
+| **运行环境与后端** | `env` `check_env` `is_send` `is_post` `is_device` `is_unattended` |
+| **图色** | `pixel` `bright` `color_ratio` `pixel_ratios` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
+| **玩家档案** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `profile_locked` `user_get` `profile_history_aggregate` `profile_reject` |
+| **自动剧情（燕云剧情插件）** | `story_options` `story_pick` `story_learn` |
+
+## 十一、模块化
+
+```
+# import — 引入外部 def
+import "subcall/navigation.wf"
+
+# def — 定义子过程
+def process_slot($row, $col)
+    ...
+end
+
+# call — 调用（变量隔离，子过程不影响调用方）
+call proc_name($arg1, $arg2)
+call $result = proc_name()            # 接收返回值
+
+# 工作流参数由 .wf 文件头的 #% 元数据声明
+# 详见 07.1-metadata.md
+```
+
+> 子过程异常返回约定：`return -1` 表示失败，调用方检查 `$result < 0`。详见 [07-subworkflows.md](07-subworkflows.md)。
+
+## 十二、数据通道
+
+| 通道 | 生命周期 | 隔离性 | 用途 |
+|------|----------|--------|------|
+| **session** | 永久（跨执行） | 共享引用 | 角色级持久状态 |
+| **context** | 单次执行 | 共享引用 | 过程间数据传递 |
+| **global 变量** | 单次执行 | 显式声明后共享 | 跨过程共享简单值 |
+| **variables** | 单次执行 | 按 call 隔离 | 过程局部计算 |
+| **output** | 单次执行 | 按 call 隔离 | 返回给上层调度者 |
+
+```
+# session — 持久化
+eval session.key = value
+eval $val = session.key
+eval save()                           # 强制落盘
+
+# context — 跨过程共享
+eval context.key = value
+eval $val = context.key
+
+# global — 显式声明共享变量名
+global $count
+eval $count = 0
+
+# output — 返回结果
+collect $var as "label"               # 写入 output dict
+call proc() as $output                # 接收子过程 output
+```
+
+> Profile（玩家档案）通过 `profile_get` / `profile_set` / `profile_inc` 函数访问，独立于上述五通道。详见 [09-data-channels.md](09-data-channels.md)。
+
+## 十三、解析期校验与实现对应
+
+权威文法在 `src/lvjiang/workflows/grammar/grammar.lark`，转写器在 `parser/`
+（`statements.py` / `expressions.py` / `modules_control.py`），本文档与它对齐。
+
+**解析期**（不等到执行）就会报错的约束：
+
+| 约束 | 说明 |
+|------|------|
+| 引用位置不允许字符串 | 场景/区域名必须是 `[name]` 或 `$var`；`drag [scene]."arrow"` 直接报错 |
+| 坐标归一化范围 | `click` / `place` / `move` / `drag` 的绝对坐标必须 ∈ [0, 1]，`move by` 的分量 ∈ [-1, 1] |
+| `full by` 仅 recognize | `scan` / `find` 写 `full by` 报错 |
+| `by image` 可用面 | 只有 `scan` Region（无 target）与 `find`（必须带 target）支持；`recognize` 完全不支持 |
+| `by image` 与清洗组互斥 | `by image` 不能与 `with "<清洗组>"` 同时写 |
+| `as rich` 与 `by` 互斥 | recognize 两种返回语义冲突，组合即报错 |
+| `->` 单行守卫 | `->` 后必须恰有一条非块语句（块语句与空动作在解析期拒绝）；`env:"..." ->` 的环境名还必须是非空常量字符串 |
+
+**执行期**才校验的项：`with <func>` 必须与 `as rich` 搭配、panel 行列越界（越界写空串）、
+命名延迟 `@name` 是否存在、press 键名是否在 VK 映射表内。
+
+静态引用（场景 / 区域 / 坐标点 / 方向 / 面板 / 模板）由工作流预检一次性比对当前布局，
+详见 [33-engine/02-static-check.md](../../design/architecture/engine/02-static-check.md)。

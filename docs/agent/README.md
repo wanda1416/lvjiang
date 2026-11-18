@@ -1,0 +1,60 @@
+# 律匠外部 Agent 使用入口
+
+> 最后更新：2026-10-09（基线 v0.13.14）。本机 MCP 已实现；WorkBuddy 界面接入与真实游戏闭环待实机验收。
+
+智能调律属于 Lv1 功能。未开通 Lv1 时，所有 MCP 访问（包括初始化、发现和文档
+读取）均返回激活提示。请让用户在律匠设置的“功能激活”中激活后重新接入。
+
+用户通过“燕云 → 智能调律”启用 MCP，后续主实例启动自动开启并按 AI 设置中的 agents 目录自动同步所选 Agent 配置。
+对话框管理启用、端口、同步和停用；关闭对话框不关闭服务。开启服务即可使用本实例已开放的 MCP 能力，
+不绑定一个用户或设备，不要求逐项授予权限。配置只含本机地址与私人连接令牌；
+端口与令牌持久化，切换用户、设备和重启不需要手动重新导出；只读实例不能开启服务。
+
+先调用 get_capabilities、list_users 和 list_targets，了解当前用户、全部用户和
+已连接设备。当前用户随律匠主界面变化，用户与执行目标在每次调用中明确选择。
+不要把连接建立时的当前用户当作永久固定用户，换用户处理前重新查询上下文。
+接口返回功能未开通、服务关闭、用户不存在、设备离线或任务占用时，向用户解释
+具体原因；不用让用户重新导出配置或逐项勾选授权。
+
+写脚本时按两级来：先照[脚本开发任务书](10-contracts/00-script-task-brief.md)执行（角色、边界、
+`--list`/`--dry-run` 命令循环、交付格式），细节再查[编写与校验 `.wf` 脚本](20-operations/03-script-authoring.md)
+（元数据、骨架、错误表），语法本身仍指向 DSL 目录。当前 MCP 尚未开放脚本读写，两份文档里的
+工具草案都是待实现契约。
+
+阅读契约，查询数据，与用户讨论目标，分析培养和组合，再生成全新的基础组和
+调律规则。生成结果和建议在 Agent 中展示，可调用 start_auto_tuning 或在律匠
+“查看生成方案并启动”中按同一结果启动。先检查 validate_auto_tuning 的 ready
+与逐方案原因。用户明确要求保存默认选择时调用 update_tuning_config，原自动
+调律入口随后使用这些规则设置；生成结果的临时目标覆盖须通过生成结果入口启动。
+内置 AI 模型设置与 MCP 无关。
+
+## 操作契约
+
+- [脚本开发任务书](10-contracts/00-script-task-brief.md)：接到"写一个脚本"这类任务时**先读这份**，
+  它给的是角色、边界、可跑的命令循环与交付格式
+- [对象、状态与执行边界](10-contracts/01-context-and-permissions.md)
+- [装备培养与组合分析](20-operations/01-analysis.md)
+- [生成新的调律配置](20-operations/02-generation.md)
+- [编写与校验 `.wf` 脚本](20-operations/03-script-authoring.md)：脚本开发的现状说明与待实现契约
+- [WorkBuddy 接入与对话示例](30-examples/01-workbuddy.md)
+- [共享领域知识](../domain/yysls/README.md)（仅源码检出）
+- [AI 连接配置](05-ai-connection.md)（原 38-platform/05）：连接方式、凭据与连接测试
+- [Agent MCP 架构](07-agent-mcp.md)（原 38-platform/07）：服务架构、发现与文档访问
+
+## 机制、操作与 DSL 文档
+
+文档按逻辑分类发布，开发与发行共用以下层的完整正文和目录：
+
+- [domain/yysls：游戏机制与调律评价](../domain/yysls/README.md)（仅源码检出）
+- [design：架构与设计](../design/architecture/README.md)，[DSL 语法目录](../reference/dsl/README.md)
+- [guide：软件操作指南](../guide/README.md)
+- agent：当前入口、MCP 契约与工作流示例。
+
+先调用 list_docs(category)，或用 search_docs(query, category) 查具体章节；
+省略 category 跨层查询。AI 解释装备与玩法时查分类 10-game，教用户点击和设置时
+查分类 60-userguide，解释脚本语法和执行语义时查分类 30-architecture；分类键是
+逻辑分类，与磁盘目录解耦。
+
+开发环境直接读本实例 docs，无需先打包；发行包按上述逻辑分类发布。工具 schema
+实时或构建时由实际接口生成。数据与有效规则通过 get_game_config、get_tuning_config
+核对，文档描述的软件能力与 MCP 工具当前可调用范围分别判断。

@@ -2,9 +2,9 @@
 
 > 最后更新：2026-11-18（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
 
-面向普通用户的操作手册：如何启动程序、连接手机、完成配置、运行自动调律，以及管理装备数据和计算毕业率。本层已从 `docs/60-userguide/` 迁入 `docs/guide/`，旧路径由 [60-userguide 兼容页](../60-userguide/README.md)承接。
+面向普通用户的操作手册：如何启动程序、连接手机、完成配置、运行自动调律，以及管理装备数据和计算毕业率。本层已从 `docs/60-userguide/` 迁入 `docs/guide/`，旧路径由 [60-userguide 兼容页](../60-userguide/README.md)（仅源码检出）承接。
 
-> 工作流 DSL 语法不在本文范围，见 [DSL 语法文档](../30-architecture/32-grammar/README.md)。
+> 工作流 DSL 语法不在本文范围，见 [DSL 语法文档](../reference/dsl/README.md)。
 
 ## 按任务导航
 
@@ -22,7 +22,7 @@
 | 管理装备数据、算毕业率、算出装 | [装备数据总览](automation/05.01-equipment-data-overview.md)（详见 [5.2](automation/05.02-equipment-data-acquisition.md)～[5.7](automation/05.07-build-calculator.md)） |
 | 跑日常任务与工作流脚本 | [工作流与日常任务](automation/06-workflows.md)、[系统脚本清单](automation/06.07-system-scripts.md) |
 | 在手机上使用律匠 | [移动设备（安卓）](android/07-mobile-device.md) |
-| 自己写脚本 | [脚本工作台与作者须知](desktop/08-script-authoring.md)、[DSL 语法](../30-architecture/32-grammar/README.md) |
+| 自己写脚本 | [脚本工作台与作者须知](desktop/08-script-authoring.md)、[DSL 语法](../reference/dsl/README.md) |
 | 遇到问题、提交反馈 | [常见问题与反馈](desktop/09-faq-and-feedback.md) |
 | 不开界面用命令行跑任务 | [附录 B：命令行](desktop/appendix-b-command-line.md) |
 | 搞懂在线配置、会员授权与激活 | [附录 A：在线配置](accounts/appendix-a-online-config.md) |
@@ -87,11 +87,11 @@
 |------|------|
 | [README](../../README.md)（仅源码检出） | 项目简介、安装、技术架构 |
 | [隐私说明](../../PRIVACY.md)（仅源码检出） | 联网行为、匿名调律数据收集发出什么/不发出什么、如何关闭 |
-| [自动调律需求](../20-requirements/10-tuning/01-auto-tuning.md)（仅源码检出） | 自动调律需求与行为规则细节 |
-| [装备与调律机制](../10-game/01-equipment-system.md) | 游戏客观机制：调律、转律、承音 |
-| [调律评价规则](../10-game/10-tuning-rules/README.md) | 律匠的装备分级与流派判定规格 |
-| [DSL 语法](../30-architecture/32-grammar/README.md) | 工作流 DSL 语法规范 |
-| [主窗口状态流](../30-architecture/30-overview/01-main-window-state-flow.md) | 定位/连接状态机 |
+| [自动调律需求](../design/decisions/tuning/01-auto-tuning.md) | 自动调律需求与行为规则细节 |
+| [装备与调律机制](../domain/yysls/01-equipment-system.md) | 游戏客观机制：调律、转律、承音 |
+| [调律评价规则](../domain/yysls/10-tuning-rules/README.md) | 律匠的装备分级与流派判定规格 |
+| [DSL 语法](../reference/dsl/README.md) | 工作流 DSL 语法规范 |
+| [主窗口状态流](../design/architecture/overview/01-main-window-state-flow.md) | 定位/连接状态机 |
 
 ---
 

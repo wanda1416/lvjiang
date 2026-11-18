@@ -8,7 +8,7 @@
 
 ## 使用方法
 
-先按下表定位症状行，逐条排查。找不到对应症状就查 [02](../../30-architecture/37-vision/02-color-ops-internals.md) / [03](../../30-architecture/37-vision/03-template-matching.md) / [04](../../30-architecture/37-vision/04-coordinate-system.md) 三篇的算法描述。
+先按下表定位症状行，逐条排查。找不到对应症状就查 [02](../../design/architecture/vision/02-color-ops-internals.md) / [03](../../design/architecture/vision/03-template-matching.md) / [04](../../design/architecture/vision/04-coordinate-system.md) 三篇的算法描述。
 
 ## 症状索引
 
@@ -63,7 +63,7 @@
 
 #### T6 · 编辑器 ✓ 运行时 ✗
 
-按 [03-template-matching.md](../../30-architecture/37-vision/03-template-matching.md) §"与编辑器预览匹配的一致性"排查清单逐条走。最常见的是**帧不同**：编辑器用的是你**录截图时那一帧**，运行时是**实时截屏**，两者相差几秒到几小时。
+按 [03-template-matching.md](../../design/architecture/vision/03-template-matching.md) §"与编辑器预览匹配的一致性"排查清单逐条走。最常见的是**帧不同**：编辑器用的是你**录截图时那一帧**，运行时是**实时截屏**，两者相差几秒到几小时。
 
 **修复**：用截图工具截**当下运行时**的那一帧，喂给 `scripts/diagnostics/scan_tpl_bound.py`（若存在）离线诊断。
 

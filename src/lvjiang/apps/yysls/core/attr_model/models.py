@@ -88,7 +88,7 @@ SCOPE_PANEL = "panel"
 SCOPE_COMBAT = "combat"
 SCOPES: tuple[str, ...] = (SCOPE_PANEL, SCOPE_COMBAT)
 
-#: 整条词条的 min/max 默认拆分比（登记于 docs/10-game/06-mechanics-conventions.md A5）。
+#: 整条词条的 min/max 默认拆分比（登记于 docs/domain/yysls/06-mechanics-conventions.md A5）。
 #: 游戏事实：心法给出的一整条词条
 #: 按 1:2 拆成最小/最大，两者之和等于该等级该词条的满值。
 #: 已在 96 级（25.9 / 51.9，和 77.8）与 110 级（40.5 / 80.9，和 121.4）

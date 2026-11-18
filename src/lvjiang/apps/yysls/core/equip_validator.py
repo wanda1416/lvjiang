@@ -9,7 +9,7 @@ OCR 误读，也可能是手工构造的模拟装备或历史脏数据。
 UI 依据该字段在装备名称后显示「!」提醒用户手工校正。
 
 判定依据只来自游戏级装备/词组配置，以及
-docs/10-game/01-equipment-system.md 中的装备产出硬规则。这里绝不读取调律规则：
+docs/domain/yysls/01-equipment-system.md 中的装备产出硬规则。这里绝不读取调律规则：
 调律规则属于用户玩法策略，不能决定一件装备是否能由游戏产出。
 
 定音不在本模块判定。止戈定音是可预计的合法状态，由定音解析链路使用独立
@@ -80,7 +80,7 @@ def _over_cap(level, affix: Affix) -> tuple[bool, float | None]:
 def _categories() -> tuple[str, tuple[str, ...]]:
     """返回（属攻类归属名, 神力词条归属名元组）
 
-    组合铁律与这两个归属名写死在代码：docs/10-game/06-mechanics-conventions.md A6。
+    组合铁律与这两个归属名写死在代码：docs/domain/yysls/06-mechanics-conventions.md A6。
     """
     return "属攻类", ("增效类", "武器类")
 

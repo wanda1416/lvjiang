@@ -198,7 +198,7 @@ def new_script_text(name: str, env: tuple[str, ...] = ("android", "desktop")) ->
         "#   if $hit\n"
         "#       click $hit\n"
         "#   end\n"
-        "# 语法文档：docs/30-architecture/32-grammar/README.md\n"
+        "# 语法文档：docs/reference/dsl/README.md\n"
         "\n"
         "log \"开始\"\n"
     )

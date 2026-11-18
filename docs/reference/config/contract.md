@@ -12,7 +12,7 @@
 | session | `config/session/` | 纯运行态与用户数据，**不经 resolver** | `core/config/session.py`（session.json）、各独立模块 |
 
 层职责与目录拓扑声明见 `core/paths.py` 与 `core/config/resolver.py` 模块文档字符串；
-分层总览另见 `docs/30-architecture/30-overview/04-config-layering.md`。
+分层总览另见 `docs/design/architecture/overview/04-config-layering.md`。
 
 ### 1.1 读取优先级与覆盖语义
 
@@ -63,7 +63,7 @@
 ### 1.4 「场景归属、排序、存在性、字段覆盖」不是同一维度
 
 以 `config/system` 的场景/布局布局为例（完整规则见
-`docs/30-architecture/34-scene/01-scene-layout-definition.md`，此处不复制）：
+`docs/design/architecture/scene/01-scene-layout-definition.md`，此处不复制）：
 
 - **存在性与归属**：目录是唯一事实源——`scenes/{group}.yaml` 是分组定义，
   `scenes/{group}/{scene}.yaml` 是场景文件；文件落盘即注册
@@ -75,7 +75,7 @@
   「local 同名文件整体顶掉 system」的实体影子、`_meta.json` 的排序补丁是
   三个不同机制。
 - **启停/展示**：`disabled` 是场景文件自身字段，只影响 UI 展示，定义仍注册；
-  用户顺序/启停偏好存 session（`docs/30-architecture/30-overview/04-config-layering.md`
+  用户顺序/启停偏好存 session（`docs/design/architecture/overview/04-config-layering.md`
   第四节），不写回配置层。
 
 结论：给某个维度加能力时不得借用另一维度的机制（例如用字段覆盖实现排序、
@@ -184,6 +184,6 @@
 
 ## 关联文档
 
-- 分层总览：`docs/30-architecture/30-overview/04-config-layering.md`
-- 修订缓存：`docs/30-architecture/30-overview/05-content-cache.md`
+- 分层总览：`docs/design/architecture/overview/04-config-layering.md`
+- 修订缓存：`docs/design/architecture/overview/05-content-cache.md`
 - 用户侧恢复步骤：`docs/guide/recovery/config-migration.md`

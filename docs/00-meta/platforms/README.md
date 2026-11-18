@@ -10,4 +10,4 @@
 |------|------|
 | [macos.md](macos.md) | macOS 支持计划与进度 |
 
-当前平台能力（后端矩阵、协议、限制）见 [30-architecture/38-platform/](../../30-architecture/38-platform/README.md)。
+当前平台能力（后端矩阵、协议、限制）见 [30-architecture/38-platform/](../../design/architecture/platform/README.md)。

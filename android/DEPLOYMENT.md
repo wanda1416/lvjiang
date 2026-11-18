@@ -151,7 +151,7 @@ PY
 - `hold_move`：在专用测试页面或游戏摇杆上验证“推到位后保持”，不要在有破坏性操作的页面测试；
 - 故意让设备端手势失败一次，确认 PC 工作流收到异常，而不是继续假装动作成功。
 
-协议和调用入口见 `docs/30-architecture/38-platform/01-device-agent-protocol.md`。最小调用示例：
+协议和调用入口见 `docs/design/architecture/platform/01-device-agent-protocol.md`。最小调用示例：
 
 ```python
 from lvjiang.core.android import AdbDevice, connect_agent

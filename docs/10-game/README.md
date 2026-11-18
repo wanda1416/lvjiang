@@ -1,34 +1,20 @@
-# 游戏领域知识
+# 游戏领域知识（已迁移）
 
-> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-11-18（基线 v0.15.17）。本页是旧路径兼容页，只做旧→新对照。
 
-记录《燕云十六声》中与律匠相关的客观机制，以及律匠采用的调律评价规格。
+游戏机制层已整体迁至 [docs/domain/yysls/](../domain/yysls/README.md)；文件名未变，只有目录前缀变化。旧地址 `docs/domain/yysls/...` 的对照：
 
-客观机制与评价规格分开维护：机制描述游戏允许什么，评价规格描述律匠如何判断和处置装备。
+| 旧路径 | 新路径 |
+|--------|--------|
+| `docs/domain/yysls/01-equipment-system.md` | `docs/domain/yysls/01-equipment-system.md` |
+| `docs/domain/yysls/02-school-system.md` | `docs/domain/yysls/02-school-system.md` |
+| `docs/domain/yysls/03-damage-mechanics.md` | `docs/domain/yysls/03-damage-mechanics.md` |
+| `docs/domain/yysls/04-tuning-mechanics.md` | `docs/domain/yysls/04-tuning-mechanics.md` |
+| `docs/domain/yysls/05-ui-pages-and-relations.md` | `docs/domain/yysls/05-ui-pages-and-relations.md` |
+| `docs/domain/yysls/06-mechanics-conventions.md` | `docs/domain/yysls/06-mechanics-conventions.md` |
+| `docs/domain/yysls/07-nanlu-season.md` | `docs/domain/yysls/07-nanlu-season.md` |
+| `docs/domain/yysls/affix-compendium.md` | `docs/domain/yysls/affix-compendium.md` |
+| `docs/domain/yysls/10-tuning-rules/` | `docs/domain/yysls/10-tuning-rules/` |
+| `docs/domain/yysls/20-translation/` | `docs/domain/yysls/20-translation/` |
 
-## 文件索引
-
-| 文件 | 内容 |
-|------|------|
-| [01-equipment-system.md](01-equipment-system.md) | 装备系统：部位、品质、等级、调律/转律/承音机制 |
-| [02-school-system.md](02-school-system.md) | 门派系统：流派定位、武学特色 |
-| [03-damage-mechanics.md](03-damage-mechanics.md) | 伤害机制：计算公式、属性转换 |
-| [04-tuning-mechanics.md](04-tuning-mechanics.md) | 调律相关文档的边界与索引 |
-| [05-ui-pages-and-relations.md](05-ui-pages-and-relations.md) | 游戏 UI 页面、叠层、视图状态及自动化流程关联图 |
-| [06-mechanics-conventions.md](06-mechanics-conventions.md) | 游戏机制约定登记表：写死在代码、未进配置的规则事实（五维系数、弓玦、三率上限、调律铁律、部位归并等），含位置与依据 |
-| [07-nanlu-season.md](07-nanlu-season.md) | 南吕相和赛季（115 阶）：赛季等级、承音作废线、词条产出范围、跨等级升级、冷却与抗性口径 |
-| [affix-compendium.md](affix-compendium.md) | 词条大全：普通词条名称、出现部位与单位 |
-| [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
-| [20-translation/](20-translation/README.md) | 游戏独有术语中英对照：基于国际服官方翻译表（武学/心法/流派/战斗属性/装备/定音等） |
-| [../40-development/analysis/](../40-development/analysis/README.md)（仅源码检出） | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（方法与过程，落户开发层） |
-
-## 待补充（尚未创建）
-
-- `affix-compendium.md` 的**数值范围与出现规则**（名称/部位/单位已收录）
-- `rarity-rules.md` — 稀有词条规则
-
-这两篇要填的是**结论**（游戏实际怎么出词条），而结论得先从观测数据里推出来——
-方法与脚本见 [开发层的分析篇](../40-development/analysis/README.md)（仅源码检出）。
-
-各流派毕业标准与调律评级不是同一概念，毕业率模型见
-[毕业率计算](../30-architecture/36-graduation/README.md)。
+入口：[游戏机制与调律评价规格（domain/yysls）](../domain/yysls/README.md)。

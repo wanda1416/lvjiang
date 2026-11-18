@@ -1,7 +1,7 @@
 """全局装备合法性判定器（equip_validator）测试
 
 判定的是「游戏能不能产出这样一件装备」，不是「这件装备好不好」。
-依据见 docs/10-game/01-equipment-system.md「调律核心规则（两大铁律）」
+依据见 docs/domain/yysls/01-equipment-system.md「调律核心规则（两大铁律）」
 与「神力词条」两节。用仓库里真实的 game_config.yaml，不 mock。
 """
 

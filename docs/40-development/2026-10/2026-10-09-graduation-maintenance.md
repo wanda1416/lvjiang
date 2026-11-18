@@ -82,7 +82,7 @@ results = validate_model(model)  # 返回 dict，或抛出 FormulaError
 
 **约束**：不得静默读取旧缓存值替代计算。未实现函数必须抛出 `FormulaError`。
 
-函数语言规范详见 [02-formula-language.md](../../30-architecture/36-graduation/02-formula-language.md#扩展流程)。
+函数语言规范详见 [02-formula-language.md](../../design/architecture/graduation/02-formula-language.md#扩展流程)。
 ## 故障排查
 
 | 症状 | 可能原因 | 排查步骤 |

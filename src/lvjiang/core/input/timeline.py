@@ -3,7 +3,7 @@
 DSL 的 ``timeline`` 块编译成一串 :class:`TimelineStep`，再交给输入后端落地。
 步骤本身与后端无关：只说"第 t 秒，这一路做什么"，怎么并发是后端的事。
 
-设计边界见 docs/20-requirements/15-input-timeline.md，其中两条决定了本模块的形状：
+设计边界见 docs/plans/platform/03-input-timeline.md，其中两条决定了本模块的形状：
 
 - **偏移是相对块起点的绝对值**，不是间隔。并发的正确性只取决于各路何时开始。
 - **整块原子**：a11y 多 stroke 手势任一路失败，系统回调是整组取消。所以校验

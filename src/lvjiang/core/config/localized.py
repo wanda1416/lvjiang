@@ -30,7 +30,7 @@ from typing import Any
 #: 语言标签里能接受的形态：``zh_CN`` / ``zh-CN`` / ``en`` 都按同一套匹配。
 FALLBACK_LANGUAGE = "zh_CN"
 #: 非中文界面的兜底语言。随包 12 种语言里 8 种本身就是英文回退（见
-#: ``docs/20-requirements/50-platform/01-i18n.md``），配置显示名没写该语言时
+#: ``docs/plans/platform/01-i18n.md``），配置显示名没写该语言时
 #: 跟着落到英文，界面才不会一半英文按钮、一半中文名字。
 ENGLISH_FALLBACK_LANGUAGE = "en_US"
 

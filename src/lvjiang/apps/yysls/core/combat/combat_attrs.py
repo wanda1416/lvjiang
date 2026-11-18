@@ -116,7 +116,7 @@ PLAY_STYLE_FIELD_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
 ]
 
 # 以下常量是写死的游戏规则事实（不在 config/），登记与依据见
-# docs/10-game/06-mechanics-conventions.md A1–A4；改动先更新登记表。
+# docs/domain/yysls/06-mechanics-conventions.md A1–A4；改动先更新登记表。
 # 抗性配置（110级默认值）
 # 三率抗性 = 145 → 除数 = 1 + 145/100 = 2.45
 # 增效抗性 = 15 → 除数 = 1 + 15/100 = 1.15
@@ -1075,7 +1075,7 @@ def calculate_judgment_outcomes(
 
     公式中的判定三率就是面板黄字：这里先按等级抗性从当前白字得到黄字，
     直接会心/会意则不受抗性影响。正常范围内
-    对应 ``docs/10-game/03-damage-mechanics.md`` 的四条公式；当会心与
+    对应 ``docs/domain/yysls/03-damage-mechanics.md`` 的四条公式；当会心与
     会意之和溢出时按游戏的会意优先规则压缩会心，保证四种结果仍为
     互斥且总和为 100%。
     """

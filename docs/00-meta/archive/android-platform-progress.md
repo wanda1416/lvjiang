@@ -522,7 +522,7 @@ PC 端 ADB 模式原先只有 `adb shell input` + `screencap`。现在 app 内�
 （`LocalServerSocket("lvjiang-agent")`，随 `App.onCreate` 启动，对端 uid 只收 adbd/本进程），
 PC 经 `adb forward tcp:<port> localabstract:lvjiang-agent` 连入，截图走 `takeScreenshot`（RGBA 裸字节）、
 点击/拖拽/推住走 `dispatchGesture`、BACK/HOME 走 `performGlobalAction`，Shizuku 为可选通道。
-协议契约：`docs/30-architecture/04-device-agent-protocol.md`；PC 侧 `core/android/agent.py`。
+协议契约：`docs/design/architecture/04-device-agent-protocol.md`；PC 侧 `core/android/agent.py`。
 
 - [x] Kotlin `AgentServer` + `App`/`A11yService` 启动挂钩（`kotlinc` + android.jar + 桩编译零错误）
 - [x] PC 侧 `AgentClient / AgentCapture / AgentInput` + 工厂 + 配置 `adb_agent_mode` + 设置页/主窗口开关

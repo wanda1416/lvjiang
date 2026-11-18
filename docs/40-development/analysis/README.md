@@ -3,7 +3,7 @@
 > 最后更新：2026-10-08（基线 v0.13.14）。本文如与代码或配置不符，以代码与配置为准。
 >
 > 本文是**分析过程与方法**，不是游戏机制的结论：推断出的机制回写
-> [10-game](../../10-game/README.md)，10-game 对本文只保留一行入口。
+> [10-game](../../domain/yysls/README.md)，10-game 对本文只保留一行入口。
 
 调律出什么词条、数值落在哪、有没有保底——这些是**游戏的客观机制**，律匠只能
 通过观测去逼近，猜不出来。本文讲怎么把观测数据变成结论，以及**这份数据在哪些
@@ -16,9 +16,9 @@
 | 内容 | 去哪看 |
 |------|--------|
 | 收集了什么字段、隐私边界 | [`PRIVACY.md`](../../../PRIVACY.md)、[`08-feedback-and-issues.md`](../../guide/desktop/09-faq-and-feedback.md) |
-| 服务端表结构、运营指标（DAU/留存/版本分布） | [`30-architecture/38-platform/04-telemetry.md`](../../30-architecture/38-platform/04-telemetry.md) |
-| 律匠**如何判定**装备好坏（评价规格） | [`10-tuning-rules/`](../../10-game/10-tuning-rules/README.md) |
-| 游戏调律/转律的客观机制描述 | [`01-equipment-system.md`](../../10-game/01-equipment-system.md) |
+| 服务端表结构、运营指标（DAU/留存/版本分布） | [`30-architecture/38-platform/04-telemetry.md`](../../design/architecture/platform/04-telemetry.md) |
+| 律匠**如何判定**装备好坏（评价规格） | [`10-tuning-rules/`](../../domain/yysls/10-tuning-rules/README.md) |
+| 游戏调律/转律的客观机制描述 | [`01-equipment-system.md`](../../domain/yysls/01-equipment-system.md) |
 | **从数据里发现机制**（本文） | 本目录 |
 
 本文只管「怎么从数据推断机制」。推断出来的机制结论应当回写到

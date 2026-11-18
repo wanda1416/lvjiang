@@ -442,7 +442,7 @@ class AgentTuningPage(QWidget):
             docs = AgentDocuments(constants.PROJECT_ROOT / "docs", AGENT_DOCUMENT_LAYOUT,
                                   source_mode=not getattr(sys, "frozen", False))
             server = LocalMCPServer(tool_catalog(self.service, docs), instructions=(
-                "先调用 get_capabilities、list_users 和 read_doc('entry')。游戏机制读 10-game，操作指导读 60-userguide，DSL 与架构读 30-architecture，接口契约读 70-agent。"
+                "先调用 get_capabilities、list_users 和 read_doc('entry')。游戏机制读分类 10-game，操作指导读分类 60-userguide，DSL 与架构读分类 30-architecture，接入与契约读分类 70-agent；分类键是逻辑分类，与磁盘目录无关，用 list_docs 的分类筛选即可。"
                 "开启服务即可使用全部已开放能力；用户和目标按每次调用选择。"
                 "切换用户不需改连接配置；调用受限时向用户解释接口返回原因。"
                 "生成前先调用 get_tuning_config，遵守 rule_contract 中 patterns 部位归并与行为 parts 的区别；不要从模板或报错猜测合法部位。"

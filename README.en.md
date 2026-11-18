@@ -86,7 +86,7 @@ Action performed on PC or phone
 | Where Winds Meet plugin | `src/lvjiang/apps/yysls/` | Gear management, scoring, tuning, material recognition, graduation rate, loadouts, smart tuning and its UI (config/ + core/ + workflows/ + sync/ + ui/) |
 | On-device | `src/lvjiang/core/ondevice/`, `android/` | Android standalone runtime: accessibility capture/gesture bridge, device-side rapidocr adapter, Kotlin host project |
 
-See the [architecture docs](docs/30-architecture/README.md) and the [DSL grammar reference](docs/30-architecture/32-grammar/README.md) for more detail. (Both are in Chinese.)
+See the [architecture docs](docs/design/architecture/README.md) and the [DSL grammar reference](docs/reference/dsl/README.md) for more detail. (Both are in Chinese.)
 
 ---
 
@@ -284,7 +284,7 @@ Once the PyQt6 main window is up, the basic flow is:
 5. **Analyze and run**: compute graduation-rate combinations and loadouts, or run batch auto-tuning / smart tuning.
 6. **Phone (optional)**: push configurations to the LvJiang APK and run or collect results on the phone.
 
-> Detailed workflows are in the [user guide](docs/guide/README.md) and the [auto-tuning flow](docs/20-requirements/10-tuning/01-auto-tuning.md) (both Chinese).
+> Detailed workflows are in the [user guide](docs/guide/README.md) and the [auto-tuning flow](docs/design/decisions/tuning/01-auto-tuning.md) (both Chinese).
 
 ---
 
@@ -356,20 +356,20 @@ Documentation is organized into numbered layers; each directory README is its in
 | [`docs/`](docs/README.md) | Documentation hub with reader-oriented navigation |
 | [`docs/50-releases/`](docs/50-releases/README.md) | Release records and version notes |
 | [`docs/guide/`](docs/guide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
-| [`docs/70-agent/`](docs/70-agent/README.md) | External agent access, discovery and the business-operation contract |
+| [`docs/agent/`](docs/agent/README.md) | External agent access, discovery and the business-operation contract |
 | [`docs/00-meta/`](docs/00-meta/README.md) | Meta: roadmap, backlog, documentation conventions |
-| [`docs/10-game/`](docs/10-game/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
-| [`docs/20-requirements/`](docs/20-requirements/README.md) | Requirements: runtime environment, operation flows, config model, profiles, graduation rate, i18n |
-| [`docs/30-architecture/`](docs/30-architecture/README.md) | Architecture: main-window state machine, plugin system |
-| [`docs/30-architecture/31-models/`](docs/30-architecture/31-models/README.md) | Data models: gear model, scene implementation, session and context |
-| [`docs/30-architecture/32-grammar/`](docs/30-architecture/32-grammar/README.md) | Workflow DSL grammar specification |
-| [`docs/30-architecture/33-engine/`](docs/30-architecture/33-engine/README.md) | Engine internals: capture and cropping |
-| [`docs/30-architecture/34-scene/`](docs/30-architecture/34-scene/README.md) | Scene / layout definition and editing |
-| [`docs/30-architecture/35-workflows/`](docs/30-architecture/35-workflows/README.md) | Business flow orchestration |
-| [`docs/30-architecture/36-graduation/`](docs/30-architecture/36-graduation/README.md) | Graduation-rate engine |
-| [`docs/30-architecture/37-vision/`](docs/30-architecture/37-vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
-| [`docs/30-architecture/38-platform/`](docs/30-architecture/38-platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
-| [`docs/30-architecture/39-runtime/`](docs/30-architecture/39-runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
+| [`docs/domain/yysls/`](docs/domain/yysls/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
+| [`docs/plans/`](docs/plans/README.md) | Plans and boundaries of partially implemented features (split from 20-requirements) |
+| [`docs/design/architecture/`](docs/design/architecture/README.md) | Architecture: main-window state machine, plugin system |
+| [`docs/design/architecture/models/`](docs/design/architecture/models/README.md) | Data models: gear model, scene implementation, session and context |
+| [`docs/reference/dsl/`](docs/reference/dsl/README.md) | Workflow DSL grammar specification |
+| [`docs/design/architecture/engine/`](docs/design/architecture/engine/README.md) | Engine internals: capture and cropping |
+| [`docs/design/architecture/scene/`](docs/design/architecture/scene/README.md) | Scene / layout definition and editing |
+| [`docs/design/architecture/workflows/`](docs/design/architecture/workflows/README.md) | Business flow orchestration |
+| [`docs/design/architecture/graduation/`](docs/design/architecture/graduation/README.md) | Graduation-rate engine |
+| [`docs/design/architecture/vision/`](docs/design/architecture/vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
+| [`docs/design/architecture/platform/`](docs/design/architecture/platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
+| [`docs/design/architecture/runtime/`](docs/design/architecture/runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
 | [`docs/40-development/`](docs/40-development/README.md) | Development log: monthly refactor and decision records |
 
 ---

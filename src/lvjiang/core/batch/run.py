@@ -1,6 +1,6 @@
 """批量的运行态：本次执行草稿。
 
-批量有三层状态，边界见 `docs/20-requirements/30-batch/04-batch-state-layers.md`：
+批量有三层状态，边界见 `docs/design/decisions/batch/04-batch-state-layers.md`：
 
 - **配置组定义** `BatchConfigItem`（`batch.json`）——可见范围、初始顺序、默认勾选、
   调度单元、生命周期 wf。只在「批量配置」窗口里改。

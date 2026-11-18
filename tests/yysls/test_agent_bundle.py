@@ -11,6 +11,27 @@ from lvjiang.apps.yysls.core.agent.documents import (
 )
 from lvjiang.core.ai.agent_docs import AgentDocuments
 
+BASELINE = json.loads(
+    (Path(__file__).parent / "data/agent_docs_baseline.json").read_text(encoding="utf-8"))
+
+
+def test_published_id_baseline_unchanged():
+    """已发布 ID 基线是外部 Agent 依赖的稳定契约：不丢 ID、不换路径、不换分类。
+
+    有意搬迁文档时必须同步更新 fixture（tests/yysls/data/agent_docs_baseline.json）
+    并提供兼容映射，让旧 ID 继续可读；直接改断言放行丢失是失败，不是重构。
+    """
+    source = AgentDocuments(Path(__file__).parents[2] / "docs", AGENT_DOCUMENT_LAYOUT,
+                            source_mode=True, schema_provider=lambda: "{}\n")
+    catalog = source.layout.catalog(source.root)
+    expected = {entry["id"]: entry["path"] for entry in BASELINE["documents"]}
+    assert catalog == expected
+    categories = {entry["id"]: entry["category"] for entry in BASELINE["documents"]}
+    assert {entry["id"]: entry["path"].split("/", 1)[0]
+            for entry in BASELINE["documents"]} == categories
+    for doc_id in ("entry", "permissions", "dsl", "tool-schema"):
+        assert source.read_doc(doc_id)["text"]
+
 
 def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     script = Path(__file__).parents[2] / "scripts/build_agent_bundle.py"

@@ -27,4 +27,4 @@
 - [遍历、去重与补位](../../architecture/workflows/03-bag-traversal.md)
 - [决策与执行保护](../../architecture/workflows/04-tuning-decisions.md)
 - [运行操作](../../../guide/automation/04.06-running-tuning.md)
-- [早期方案归档](../../../40-development/2026-10/2026-10-09-auto-tuning-early-design.md)（仅源码检出）
+- [早期方案归档](../../../history/dev/2026-10/2026-10-09-auto-tuning-early-design.md)（仅源码检出）

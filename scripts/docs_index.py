@@ -14,12 +14,17 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
-from collections.abc import Callable
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-DEVLOG_ROOT = REPO / "docs" / "40-development"
-RELEASES = REPO / "docs" / "50-releases"
-MONTHLY_DIRS = ("2026-07", "2026-08", "2026-09", "2026-10")
+DEVLOG_ROOT = REPO / "docs" / "history" / "dev"
+RELEASES = REPO / "docs" / "releases"
+MONTH_DIR = re.compile(r"\d{4}-\d{2}")
+
+
+def monthly_dirs(root: pathlib.Path = DEVLOG_ROOT) -> list[str]:
+    """自动发现开发日志的 YYYY-MM 月份目录；生成与检查共用同一发现逻辑。"""
+    return sorted(p.name for p in root.iterdir()
+                  if p.is_dir() and MONTH_DIR.fullmatch(p.name))
 
 H1 = re.compile(r"^#\s+(.*)$", re.M)
 DATE_IN_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
@@ -109,9 +114,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="只校验不写入")
     args = parser.parse_args()
 
-    targets: list[tuple[pathlib.Path, Callable[[str], str]]] = [
-        (DEVLOG_ROOT / month, devlog_key) for month in MONTHLY_DIRS
-    ]
+    targets = [(DEVLOG_ROOT / month, devlog_key) for month in monthly_dirs()]
     targets.append((RELEASES, release_key))
 
     problems: list[str] = []

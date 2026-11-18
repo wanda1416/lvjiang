@@ -14,7 +14,7 @@
 
 模型与存储契约见 [Profile 架构](../../design/architecture/models/04-profile.md)，读取入口见 [工作流用户指南](../../guide/automation/06-workflows.md)。
 
-早期设计保存于 [过程档案](../../40-development/2026-10/2026-10-09-profile-currency-early-design.md)。
+早期设计保存于 [过程档案](../../history/dev/2026-10/2026-10-09-profile-currency-early-design.md)。
 
 ## 逐战商店的配额与消费
 

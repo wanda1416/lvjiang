@@ -367,10 +367,10 @@ python -m mypy
 |------|------|
 | [`PRIVACY.md`](PRIVACY.md) | 隐私说明：联网行为、账户同步、匿名调律数据收集发出什么/不发出什么 |
 | [`docs/`](docs/README.md) | 完整文档中心与按读者导航 |
-| [`docs/50-releases/`](docs/50-releases/README.md) | 发布记录与版本说明 |
+| [`docs/50-releases/`](docs/releases/README.md) | 发布记录与版本说明 |
 | [`docs/guide/`](docs/guide/README.md) | 用户指南：连接、配置、运行、毕业率与手机端 |
 | [`docs/agent/`](docs/agent/README.md) | 外部 Agent 接入、发现与业务操作契约 |
-| [`docs/00-meta/`](docs/00-meta/README.md) | 元信息：路线图、待办、文档组织约定 |
+| [`docs/00-meta/`](docs/meta/README.md) | 元信息：路线图、待办、文档组织约定 |
 | [`docs/domain/yysls/`](docs/domain/yysls/README.md) | 游戏机制事实层：装备系统、流派、伤害、调律 / 转律规则 |
 | [`docs/plans/`](docs/plans/README.md) | 部分实现功能的计划与边界（原 20-requirements 分流） |
 | [`docs/design/architecture/`](docs/design/architecture/README.md) | 技术架构：主窗口状态机、插件系统 |
@@ -383,13 +383,13 @@ python -m mypy
 | [`docs/design/architecture/vision/`](docs/design/architecture/vision/README.md) | 视觉感知子系统：图色 / 模板匹配 / 坐标一致性 |
 | [`docs/design/architecture/platform/`](docs/design/architecture/platform/README.md) | 平台与接入：设备端代理协议、匿名统计 |
 | [`docs/design/architecture/runtime/`](docs/design/architecture/runtime/README.md) | 运行期能力：调律历史、地图管理、多目标并发、出装计算 |
-| [`docs/40-development/`](docs/40-development/README.md) | 开发日志：按月归档的重构 / 决策记录 |
+| [`docs/40-development/`](docs/history/dev/README.md) | 开发日志：按月归档的重构 / 决策记录 |
 
 ---
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/00-meta/02-backlog.md)，平台计划见 [Android](docs/00-meta/archive/android-platform-progress.md) 与 [macOS](docs/00-meta/platforms/macos.md)；历史阶段快照见 [roadmap](docs/00-meta/01-roadmap.md)（仅作存档，不代表当前范围）。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/plans/backlog.md)，平台计划见 [Android](docs/history/meta-archive/android-platform-progress.md) 与 [macOS](docs/meta/platforms/macos.md)；历史阶段快照见 [roadmap](docs/history/roadmap.md)（仅作存档，不代表当前范围）。
 
 ---
 

@@ -1,56 +1,13 @@
-# 开发日志（过程层）
+# 开发日志（旧路径兼容页）
 
-按时间记录开发过程中的重要决策、问题排查、实验记录。
+> 最后更新：2026-11-18（基线 v0.15.17）。本层描述如与代码或配置不符，以代码与配置为准。
 
-本目录是过程档案，逐日记录在 2026-09-05 后一度停更，2026-10 起按需补充；
-这些记录中的“当前状态”只对记录当天有效。交付与升级说明请按版本阅读
-[发布记录](../50-releases/README.md)，当前操作方式请看
-[用户指南](../guide/README.md)。
+开发日志与过程档案已整体迁至 [`docs/history/dev/`](../history/dev/README.md)，月度子目录、
+`analysis/`、`references/` 与文件名保持不变。GitHub 上的旧链接不会自动跳转，请从新入口进入。
 
-## 目录结构
-
-- `YYYY-MM/` — 按月分组的开发日志
-- `references/` — 拿来参考的开发信息（API 文档、技术调研等）
-
-## 参考信息
-
-| 文件 | 主题 |
-|------|------|
-| [references/game-api.md](references/game-api.md) | 燕云十六声官方 API 接口参考（装备/体力/心力/不肝数据） |
-| [analysis/](analysis/README.md) | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（从 10-game 迁入） |
-
-## 月度归档
-
-| 月份 | 篇数 | 索引 |
-|------|------|------|
-| 2026-11 | 1 | [2026-11/](2026-11/README.md) |
-| 2026-10 | 11 | [2026-10/](2026-10/README.md) |
-| 2026-09 | 4 | [2026-09/](2026-09/README.md) |
-| 2026-08 | 35 | [2026-08/](2026-08/README.md) |
-| 2026-07 | 27 | [2026-07/](2026-07/README.md) |
-
-## 日志格式
-
-新写的日志按下面的模板。2026-08 及更早的历史日志体例不一（多为「一、二、… +
-关键设计决策」），不要求回改——它们只作过程档案阅读。
-
-```markdown
-# Dev Log: <标题>
-
-> 日期：YYYY-MM-DD
-> 涉及模块：<路径>
-> 关键词：<关键词>
-
-## 问题描述
-## 排查过程
-## 根因分析
-## 解决方案
-## 教训
-```
-
-两条落笔纪律：
-
-- 结论里属于**现行规格**的内容（schema、页面跳转契约、状态机）写进
-  [架构文档](../30-architecture/README.md)，日志只留决策、踩坑与证据；
-- 日志里的相对链接与文件名会随目录调整变化，索引由
-  `python scripts/docs_index.py` 生成与校验，不要手工维护行数。
+| 旧位置（docs/40-development/） | 新位置（docs/history/dev/） |
+|--------------------------------|------------------------------|
+| README.md | [history/dev/README.md](../history/dev/README.md) |
+| 2026-07/ … 2026-11/ | [history/dev/](../history/dev/README.md) 各月目录 |
+| analysis/ | [history/dev/analysis/](../history/dev/analysis/README.md) |
+| references/ | [history/dev/references/](../history/dev/references/game-api.md) |

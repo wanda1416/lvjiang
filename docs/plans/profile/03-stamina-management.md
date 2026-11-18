@@ -18,4 +18,4 @@
 
 旧方案提出的跨账号恢复预测报表和即将超限账号提醒仍需单独明确界面与验收，不能因已支持读取和周期推算就宣称这些报表已交付。
 
-早期设计保存于 [过程档案](../../40-development/2026-10/2026-10-09-profile-stamina-early-design.md)。
+早期设计保存于 [过程档案](../../history/dev/2026-10/2026-10-09-profile-stamina-early-design.md)。

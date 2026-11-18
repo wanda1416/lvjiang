@@ -20,7 +20,7 @@
 | [affix-compendium.md](affix-compendium.md) | 词条大全：普通词条名称、出现部位与单位 |
 | [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
 | [20-translation/](20-translation/README.md) | 游戏独有术语中英对照：基于国际服官方翻译表（武学/心法/流派/战斗属性/装备/定音等） |
-| [../40-development/analysis/](../../40-development/analysis/README.md)（仅源码检出） | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（方法与过程，落户开发层） |
+| [../40-development/analysis/](../../history/dev/analysis/README.md)（仅源码检出） | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（方法与过程，落户开发层） |
 
 ## 待补充（尚未创建）
 
@@ -28,7 +28,7 @@
 - `rarity-rules.md` — 稀有词条规则
 
 这两篇要填的是**结论**（游戏实际怎么出词条），而结论得先从观测数据里推出来——
-方法与脚本见 [开发层的分析篇](../../40-development/analysis/README.md)（仅源码检出）。
+方法与脚本见 [开发层的分析篇](../../history/dev/analysis/README.md)（仅源码检出）。
 
 各流派毕业标准与调律评级不是同一概念，毕业率模型见
 [毕业率计算](../../design/architecture/graduation/README.md)。

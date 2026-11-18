@@ -9,8 +9,8 @@
 检查范围是 `docs/` 下全部 `.md`；链接目标可以是仓库内任意文件（源码、配置、
 打包手册都允许被引用）。纯静态检查，不联网、不依赖 Qt，可以直接进 CI。
 
-约定见 `docs/00-meta/00-doc-standard.md`：层索引写明基线，会被实现进度推翻的
-文档（20-requirements、平台进度）写明状态，归档文档写明「状态止于」。
+约定见 `docs/meta/doc-standard.md`：层索引写明基线，会被实现进度推翻的
+文档（plans、平台进度）写明状态，归档文档写明「状态止于」。
 日期与基线记录实际内容核对的时间和版本，不要求跟随应用发版更新；本脚本只读检查。
 """
 
@@ -36,18 +36,20 @@ NUMBER_PREFIX = re.compile(r"^(\d+(?:\.\d+)*)[.-](?=\D)")
 ANCHOR_DROP = re.compile(r"[^\w\u4e00-\u9fff\- ]")
 #: 时效锚：正文前 20 行里出现版本号或日期即可
 FRESH = re.compile(r"v?\d+\.\d+\.\d+|20\d\d-\d\d-\d\d|20\d\d\s*年")
-#: 每层索引文件必须覆盖同目录全部 .md
-INDEX_DIRS = ("40-development/2026-07", "40-development/2026-08",
-              "40-development/2026-09", "50-releases")
+#: 每层索引文件必须覆盖同目录全部 .md；开发日志月份目录由 DEV_MONTH 动态发现，
+#: releases 系列子目录按递归覆盖，均不在这里硬编码。
+INDEX_DIRS = ("releases",)
 #: 这些目录的索引必须覆盖**递归**全部 .md：发布说明按系列归档到子目录，
 #: 每个子目录不再各配一份 README，登记责任仍归顶层索引。
-RECURSIVE_INDEX_DIRS = ("50-releases",)
+RECURSIVE_INDEX_DIRS = ("releases",)
+#: 开发日志的月份子目录名（history/dev/YYYY-MM），索引覆盖动态发现
+DEV_MONTH = re.compile(r"\d{4}-\d{2}")
 SKIP_PREFIX = ("http://", "https://", "mailto:", "#")
 
-#: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 00-doc-standard.md）
-STATUS_SCOPES = ("design/decisions", "plans", "00-meta/platforms")
+#: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 meta/doc-standard.md）
+STATUS_SCOPES = ("design/decisions", "plans", "meta/platforms")
 STATUS_INDEXES = ("design/decisions/README.md", "plans/README.md",
-                  "00-meta/platforms/README.md")
+                  "meta/platforms/README.md")
 STATUS_LINE = re.compile(
     r"^>\s*状态\s*[：:]\s*(已实现|部分实现|规划)"
     r"\s*（(\d{4}-\d{2}-\d{2})，基线\s*v?(\d+\.\d+(?:\.\d+)?)）", re.M)
@@ -191,7 +193,7 @@ def check_freshness(files: list[pathlib.Path]) -> list[str]:
     """各层 README 必须写明基线版本或最后更新日期。
 
     页面级不强制——单个页面里的版本号会随内容变化，只有层索引承担
-    “当前基线在哪”的责任；约定见 docs/00-meta/00-doc-standard.md。
+    “当前基线在哪”的责任；约定见 docs/meta/doc-standard.md。
     """
     problems: list[str] = []
     for path in files:
@@ -205,12 +207,20 @@ def check_freshness(files: list[pathlib.Path]) -> list[str]:
     return problems
 
 
+def is_archived(rel: str) -> bool:
+    """需要「状态止于」行的归档正文：旧 archive/ 目录与迁移后的
+    history/meta-archive/。history/dev/（开发日志）同属归档内容，但迁移前
+    不要求状态止期行，语义保持现状不收紧。"""
+    return ("/archive/" in rel
+            or rel.startswith("history/meta-archive/"))
+
+
 def status_docs(files: list[pathlib.Path]) -> list[pathlib.Path]:
-    """需要状态行的文档：20-requirements 全部与平台进度文档，层索引除外。"""
+    """需要状态行的文档：plans 全部与平台进度文档，层索引除外。"""
     out: list[pathlib.Path] = []
     for path in files:
         rel = path.relative_to(DOCS).as_posix()
-        if rel in STATUS_INDEXES or "/archive/" in rel:
+        if rel in STATUS_INDEXES or is_archived(rel):
             continue
         if any(rel.startswith(scope + "/") for scope in STATUS_SCOPES):
             out.append(path)
@@ -239,7 +249,7 @@ def check_status(files: list[pathlib.Path], *, descriptive: bool = False) -> lis
                 f" {rel}")
     for path in files:
         rel = path.relative_to(DOCS).as_posix()
-        if "/archive/" not in rel or path.name == "README.md":
+        if not is_archived(rel) or path.name == "README.md":
             continue
         if not ARCHIVE_LINE.search(head_of(path)):
             problems.append(f"归档缺「状态止于」行（前 15 行） {rel}")
@@ -283,6 +293,12 @@ def check_index_coverage() -> list[str]:
     names = set(INDEX_DIRS) if DOCS == REPO / "docs" else set()
     names.update(path.parent.relative_to(DOCS).as_posix()
                  for path in DOCS.rglob("README.md"))
+    # 开发日志月份目录必须各有一份覆盖当月全部日志的 README，目录名动态发现
+    dev_root = DOCS / "history" / "dev"
+    if dev_root.is_dir():
+        names.update(path.relative_to(DOCS).as_posix()
+                     for path in dev_root.iterdir()
+                     if path.is_dir() and DEV_MONTH.fullmatch(path.name))
     for name in sorted(names):
         directory = DOCS / name
         index = directory / "README.md"

@@ -1,40 +1,14 @@
-# 文档与项目治理
+# 文档与项目治理（旧路径兼容页）
 
-> 最后更新：2026-11-17（基线 v0.15.15）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-11-18（基线 v0.15.17）。本层描述如与代码或配置不符，以代码与配置为准。
 
-本目录维护文档规范、项目路线图、当前待办和平台推进计划。完整文档导航见 [文档中心](../README.md)。
+原 `docs/00-meta/` 已拆分迁入新位置，本页只为旧链接保留去向：
 
-## 文件索引
-
-| 文档 | 内容 |
-|------|------|
-| [00-doc-standard.md](00-doc-standard.md) | **文档规范**：分层职责、目录与编号、写作纪律、编目自动化 |
-| [01-roadmap.md](01-roadmap.md) | 项目阶段与长期路线（Phase 0~9 快照，不代表当前范围） |
-| [02-backlog.md](02-backlog.md) | 唯一待办来源（功能待办 6 条 + P1/P2 详情；历史段已迁 archive） |
-| [platforms/](platforms/README.md) | 平台推进计划索引（现为 [macos.md](platforms/macos.md)） |
-| [archive/](archive/README.md) | 归档：过期规划与进度快照（如 [backlog-history-2026-10-06.md](archive/backlog-history-2026-10-06.md)、[android-platform-progress.md](archive/android-platform-progress.md)） |
-
-## 文档体系
-
-八层文档各管一段，职责不要互相渗透（导航见[文档中心](../README.md)）：
-
-| 层 | 只写什么 |
-|----|----------|
-| 00-meta | 文档规范、路线图与阶段快照、待办、平台推进计划 |
-| 10-game | 游戏客观机制与律匠的评价规格（人可读）；机器规则在 `config/system/yysls/` |
-| 20-requirements | 需求、边界与验收标准（不写实现细节） |
-| 30-architecture | 数据模型、DSL 语法、引擎、场景、工作流、毕业率、视觉等实现与契约 |
-| 40-development | 按日期归档的开发日志与技术参考（过程档案） |
-| 50-releases | 各版本发布说明 |
-| 60-userguide | 安装、配置、运行的完整操作指引 |
-| 70-agent | 外部 Agent 接入、发现与业务操作契约 |
-
-维护约定：
-
-- **单一来源**：同一事实只在一层写全，其它地方只链接。规则维护链为
-  「规格文档与 YAML 同步修改 → 测试校验 → 规则引擎加载 → 工作流执行」。
-- **面向对象**：用户指南不写源码路径、配置 key 与 DSL API；需求文档不写实现细节；
-  实现细节写进 30-architecture，过程与决策写进 40-development。
-- **时效**：出现“当前 / 目前”的文档要写明依据的版本或日期；历史规划集中在
-  本目录里作为快照保存，不混进现行说明。
-- **索引**：每层 README 的索引必须与目录内容一一对应。
+| 旧位置（docs/00-meta/） | 新位置 |
+|--------------------------|--------|
+| README.md（本页） | [docs/meta/README.md](../meta/README.md) |
+| 00-doc-standard.md | [docs/meta/doc-standard.md](../meta/doc-standard.md) |
+| 01-roadmap.md | [docs/history/roadmap.md](../history/roadmap.md) |
+| 02-backlog.md | [docs/plans/backlog.md](../plans/backlog.md) |
+| platforms/ | [docs/meta/platforms/](../meta/platforms/README.md) |
+| archive/ | [docs/history/meta-archive/](../history/meta-archive/README.md) |

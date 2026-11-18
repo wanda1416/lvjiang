@@ -12,7 +12,7 @@
 | 背包遍历、材料检查、自动处置与执行流程 | [../20-requirements/10-tuning/01-auto-tuning.md](../../design/decisions/tuning/01-auto-tuning.md) | 自动调律的需求与实现结构 |
 | 狗粮规则、大律准石检查等材料配置 | [../60-userguide/04.02-default-config.md](../../guide/automation/04.02-default-config.md)、[04.03-behavior-config.md](../../guide/automation/04.03-behavior-config.md) | 默认值与在 UI 中如何修改 |
 | 用户如何配置并运行自动调律 | [../60-userguide/README.md](../../guide/README.md) | 面向使用者的操作指引 |
-| 如何从观测数据反推出词条分布规律 | [../40-development/analysis/](../../40-development/analysis/README.md)（仅源码检出）（仅源码检出） | 分析方法与脚本，不沉淀结论 |
+| 如何从观测数据反推出词条分布规律 | [../40-development/analysis/](../../history/dev/analysis/README.md)（仅源码检出）（仅源码检出） | 分析方法与脚本，不沉淀结论 |
 | 写死在代码、未进配置的机制事实（组合铁律、可转律槽、部位归并、动态词条保留名） | [06-mechanics-conventions.md](06-mechanics-conventions.md) | 登记位置与依据；改游戏规则先查这里 |
 
 ## 程序侧对应

@@ -2,7 +2,7 @@
 
 > 最后更新：2026-11-18。本文合并原「附录 B 官方在线配置与会员内容」与「附录 C 功能激活与恢复」；
 > 原「附录 A 配置升级调整」属于 0.13.15 → 0.15.0 的一次性升级指引，已过期并归档到
-> [归档目录](../../00-meta/archive/appendix-a-config-upgrade-0.15.0.md)（仅源码检出），现役口径见本文第六节。
+> [归档目录](../../history/meta-archive/appendix-a-config-upgrade-0.15.0.md)（仅源码检出），现役口径见本文第六节。
 
 ## 一、在线配置的获取与生效
 
@@ -71,7 +71,7 @@
   当时的格式调整（`app.yaml` 的 `android_apps`、`scenes.yaml` 聚合索引、布局里集中的
   `disabled`、`levels_and_seasons.yaml`、`batch.json` v2、OCR 规则合并、调律规则字段、
   等级能力布尔值等）是一次性迁移，当前版本不再提供面向 0.13.14 及更早格式的迁移。
-  完整清单见[归档的配置升级调整](../../00-meta/archive/appendix-a-config-upgrade-0.15.0.md)（仅源码检出），仅作追溯。
+  完整清单见[归档的配置升级调整](../../history/meta-archive/appendix-a-config-upgrade-0.15.0.md)（仅源码检出），仅作追溯。
 - **升级前备份**配置，不要删除整个 local 目录或布局目录；读取不会自动改写旧文件。
 - **便携包**升级要解压到新目录；手机升级使用相同官方签名。
 - **版本口径**：测试版以 bN 结尾（如 0.15.0b1），预发布候选以 rcN 结尾（如 0.15.0rc1）。

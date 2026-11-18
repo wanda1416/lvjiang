@@ -14,4 +14,4 @@
 
 现行契约见 [毕业率计算](../../architecture/graduation/README.md)，操作见 [基础属性与毕业率](../../../guide/automation/05.04-base-attributes-and-graduation.md)。
 
-早期设计保存于 [过程档案](../../../40-development/2026-10/2026-10-09-profile-graduation-early-design.md)（仅源码检出）。
+早期设计保存于 [过程档案](../../../history/dev/2026-10/2026-10-09-profile-graduation-early-design.md)（仅源码检出）。

@@ -354,10 +354,10 @@ Documentation is organized into numbered layers; each directory README is its in
 |-----------|----------|
 | [`PRIVACY.md`](PRIVACY.md) | Privacy statement: network behavior, account sync, and what anonymous tuning data does and does not send |
 | [`docs/`](docs/README.md) | Documentation hub with reader-oriented navigation |
-| [`docs/50-releases/`](docs/50-releases/README.md) | Release records and version notes |
+| [`docs/50-releases/`](docs/releases/README.md) | Release records and version notes |
 | [`docs/guide/`](docs/guide/README.md) | User guide: connecting, configuring, running, graduation rate and the phone app |
 | [`docs/agent/`](docs/agent/README.md) | External agent access, discovery and the business-operation contract |
-| [`docs/00-meta/`](docs/00-meta/README.md) | Meta: roadmap, backlog, documentation conventions |
+| [`docs/00-meta/`](docs/meta/README.md) | Meta: roadmap, backlog, documentation conventions |
 | [`docs/domain/yysls/`](docs/domain/yysls/README.md) | Game mechanics as facts: gear system, schools, damage, tuning / transmutation rules |
 | [`docs/plans/`](docs/plans/README.md) | Plans and boundaries of partially implemented features (split from 20-requirements) |
 | [`docs/design/architecture/`](docs/design/architecture/README.md) | Architecture: main-window state machine, plugin system |
@@ -370,13 +370,13 @@ Documentation is organized into numbered layers; each directory README is its in
 | [`docs/design/architecture/vision/`](docs/design/architecture/vision/README.md) | Vision subsystem: color / template matching / coordinate consistency |
 | [`docs/design/architecture/platform/`](docs/design/architecture/platform/README.md) | Platform and integration: on-device proxy protocol, anonymous telemetry |
 | [`docs/design/architecture/runtime/`](docs/design/architecture/runtime/README.md) | Runtime capabilities: tuning history, map management, concurrent targets, loadout math |
-| [`docs/40-development/`](docs/40-development/README.md) | Development log: monthly refactor and decision records |
+| [`docs/40-development/`](docs/history/dev/README.md) | Development log: monthly refactor and decision records |
 
 ---
 
 ## 🗺️ Roadmap
 
-The project evolved in stages: skeleton → coordinate calibration → POI capture and OCR → UI state detection → affix parsers → input wrappers → workflow DSL and engine → config-driven rule engine → UI polish → Android standalone runtime → phone batch runs and account sync. Current work is tracked in the [backlog](docs/00-meta/02-backlog.md), platform plans in [Android](docs/00-meta/archive/android-platform-progress.md) and [macOS](docs/00-meta/platforms/macos.md); [roadmap](docs/00-meta/01-roadmap.md) keeps historical stage snapshots only and does not describe the current scope.
+The project evolved in stages: skeleton → coordinate calibration → POI capture and OCR → UI state detection → affix parsers → input wrappers → workflow DSL and engine → config-driven rule engine → UI polish → Android standalone runtime → phone batch runs and account sync. Current work is tracked in the [backlog](docs/plans/backlog.md), platform plans in [Android](docs/history/meta-archive/android-platform-progress.md) and [macOS](docs/meta/platforms/macos.md); [roadmap](docs/history/roadmap.md) keeps historical stage snapshots only and does not describe the current scope.
 
 ---
 

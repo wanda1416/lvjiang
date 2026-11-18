@@ -122,7 +122,7 @@ wrangler d1 execute lvjiang-stats --remote --file=ops/stats-worker/queries/dau.s
 词条、有没有保底、`cap_pct` 是什么分布——SQL 写起来很难读也很难复核，走
 `roll_export.sql` 导出到本地，用 `scripts/analyze_telemetry_rolls.py` 生成
 报告；方法论与这份数据已知的系统性偏差见
-[`docs/40-development/analysis/`](../../../40-development/analysis/README.md)（仅源码检出）。
+[`docs/40-development/analysis/`](../../../history/dev/analysis/README.md)（仅源码检出）。
 
 ### 读数字时必须记住的两条
 

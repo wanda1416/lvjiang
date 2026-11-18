@@ -3,17 +3,18 @@
 > 最后更新：2026-11-18（基线 v0.15.17）。本层描述如与代码或配置不符，以代码与配置为准。
 
 按用途分层：使用者看 guide，游戏事实看 domain，设计与决策看 design，接口参考看
-reference，接入与契约看 agent，计划与过程记录看 plans/40/50，规范与待办看 00。
+reference，接入与契约看 agent，计划与待办看 plans，规范与平台计划看 meta，历史与
+发布记录看 history/releases。
 
 | 目录 | 内容 | 面向 |
 |------|------|------|
-| [00-meta/](00-meta/README.md) | 文档规范（[00-doc-standard.md](00-meta/00-doc-standard.md)）、路线图、待办、平台推进计划 | 维护者 |
 | [domain/yysls/](domain/yysls/README.md) | 游戏客观机制，以及律匠的调律评价规格 | 用户 / 开发者 |
 | [design/](design/architecture/README.md) | 架构与设计：[architecture/](design/architecture/README.md) 各子区、[decisions/](design/decisions/README.md) 已实现需求的决策与规格 | 开发者 |
 | [reference/](reference/README.md) | 接口参考：DSL 语法、配置契约、同步与 Profile 数据模型 | 开发者 |
-| [plans/](plans/README.md) | 部分实现功能的计划与边界（原 20-requirements 分流） | 开发者 |
-| [40-development/](40-development/README.md) | 按日期归档的开发日志与技术参考 | 开发者 |
-| [50-releases/](50-releases/README.md) | 各版本发布说明 | 所有人 |
+| [plans/](plans/README.md) | 部分实现功能的计划与边界（原 20-requirements 分流）与[全局待办](plans/backlog.md) | 开发者 |
+| [meta/](meta/README.md) | 文档规范（[doc-standard.md](meta/doc-standard.md)）、平台推进计划 | 维护者 |
+| [history/](history/dev/README.md) | 开发日志与过程档案（[dev/](history/dev/README.md) 按月归档）、[路线图快照](history/roadmap.md)、[meta 归档](history/meta-archive/README.md) | 开发者 |
+| [releases/](releases/README.md) | 各版本发布说明 | 所有人 |
 | [guide/](guide/README.md) | 安装、配置、运行的完整操作指引（用户指南） | 用户 |
 | [agent/](agent/README.md) | 外部 Agent 接入、发现与业务操作契约 | 用户 / Agent |
 | [develop/](develop/README.md) | 开发者入口：插件开发、打包、Android 部署 | 开发者 |
@@ -25,6 +26,9 @@ reference，接入与契约看 agent，计划与过程记录看 plans/40/50，�
 | [10-game/](10-game/README.md) | 兼容页，正文已迁至 domain/yysls/ |
 | [20-requirements/](20-requirements/README.md) | 兼容页，已按状态分流至 design/decisions/ 与 plans/ |
 | [30-architecture/](30-architecture/README.md) | 兼容页，已拆分至 design/architecture/、reference/dsl/、agent/ |
+| [40-development/](40-development/README.md) | 兼容页，正文已迁至 history/dev/ |
+| [50-releases/](50-releases/README.md) | 兼容页，正文已迁至 releases/ |
+| [00-meta/](00-meta/README.md) | 兼容页，已拆分至 meta/、plans/backlog、history/roadmap 与 history/meta-archive/ |
 | [60-userguide/](60-userguide/README.md) | 兼容页，正文已迁至 guide/ |
 | [70-agent/](70-agent/README.md) | 兼容页，正文已迁至 agent/ |
 

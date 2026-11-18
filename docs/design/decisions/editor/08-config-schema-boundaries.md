@@ -26,7 +26,7 @@
 不再从 session.json 搬运旧节点。多文档事务恢复、版本校验和数据库建表与版本管理保留。
 
 定向回归保护当前配置可用、旧入口可诊断、读取不写文件和当前存储的事务恢复不退化。
-操作指引见 [配置升级调整](../../../00-meta/archive/appendix-a-config-upgrade-0.15.0.md)（仅源码检出）。
+操作指引见 [配置升级调整](../../../history/meta-archive/appendix-a-config-upgrade-0.15.0.md)（仅源码检出）。
 
 ## 状态元信息
 

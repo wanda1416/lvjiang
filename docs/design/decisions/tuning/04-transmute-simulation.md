@@ -53,4 +53,4 @@
 
 算法、模型与代码职责见 [模拟转律架构](../../architecture/graduation/09-transmute-simulation.md)，操作见 [毕业率指南](../../../guide/automation/05.04-base-attributes-and-graduation.md)。
 
-需求来源和旧入口比较见 [历史设计记录](../../../40-development/2026-10/2026-10-09-transmute-design-background.md)（仅源码检出）。
+需求来源和旧入口比较见 [历史设计记录](../../../history/dev/2026-10/2026-10-09-transmute-design-background.md)（仅源码检出）。

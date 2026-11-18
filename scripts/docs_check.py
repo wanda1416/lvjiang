@@ -263,10 +263,46 @@ def check_index_coverage() -> list[str]:
     return problems
 
 
-def check_bundle_links(bundle: pathlib.Path) -> list[str]:
+def check_bundle_digests(bundle: pathlib.Path, manifest: dict) -> list[str]:
+    """清单闭合与摘要一致：清单是发行包读取的唯一权威。"""
+    import hashlib
+
+    problems: list[str] = []
+    seen: set[str] = set()
+    for entry in manifest["documents"]:
+        rel = entry["path"]
+        if rel in seen:
+            problems.append(f"清单重复条目 {rel}")
+            continue
+        seen.add(rel)
+        path = bundle / rel
+        if not path.is_file():
+            problems.append(f"清单文件缺失 {rel}")
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != entry.get("sha256"):
+            problems.append(f"摘要与正文不符 {rel}")
+    actual = {p.relative_to(bundle).as_posix() for p in bundle.rglob("*") if p.is_file()}
+    manifest_rel = "70-agent/manifest.json"
+    for rel in sorted(actual - seen - {manifest_rel}):
+        problems.append(f"清单外文件 {rel}")
+    return problems
+
+
+def check_bundle(bundle: pathlib.Path) -> list[str]:
+    bundle = bundle.resolve()
+    manifest_path = bundle / "70-agent/manifest.json"
+    if not manifest_path.is_file():
+        return [f"清单缺失 {manifest_path.relative_to(bundle).as_posix()}"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return [*check_bundle_digests(bundle, manifest), *check_bundle_links(bundle, manifest)]
+
+
+def check_bundle_links(bundle: pathlib.Path, manifest: dict | None = None) -> list[str]:
     """验证发行文档的内部链接；源码参考必须显式标明且不能掩盖包内缺失。"""
     bundle = bundle.resolve()
-    manifest = json.loads((bundle / "70-agent/manifest.json").read_text(encoding="utf-8"))
+    if manifest is None:
+        manifest = json.loads((bundle / "70-agent/manifest.json").read_text(encoding="utf-8"))
     paths = [bundle / entry["path"] for entry in manifest["documents"]]
     layers = {path.relative_to(bundle).parts[0] for path in paths}
     problems = []
@@ -306,7 +342,7 @@ def main() -> int:
     mode.add_argument("--bundle", type=pathlib.Path, help="检查已生成的发行文档目录")
     args = parser.parse_args()
     if args.bundle is not None:
-        problems = check_bundle_links(args.bundle)
+        problems = check_bundle(args.bundle)
         for problem in problems:
             print(problem)
         print(f"发行文档链接问题 {len(problems)} 处")

@@ -42,6 +42,12 @@ def test_bundle_is_closed_and_readable_without_source_checkout(tmp_path):
     output = tmp_path / "installed/docs"
     module.build_bundle(output, archive=tmp_path / "agent.zip")
     tools = json.loads((output / "70-agent/schemas/tools.json").read_text(encoding="utf-8"))
+    # schema 由真实工具声明生成：公开 schema 的名字集合与注册进 MCP 的一致
+    from lvjiang.apps.yysls.core.agent.catalog import tool_catalog
+    from lvjiang.apps.yysls.core.agent.service import AgentService
+    service = AgentService(Path(__file__).parents[2], dispatch=lambda *_: {})
+    assert {tool["name"] for tool in tools} == set(
+        tool_catalog(service, AgentDocuments(output, AGENT_DOCUMENT_LAYOUT)))
     generation = next(tool for tool in tools if tool["name"] == "create_generated_tuning")
     payload = generation["inputSchema"]["properties"]["payload"]
     assert payload["required"] == ["base_group", "rules"]

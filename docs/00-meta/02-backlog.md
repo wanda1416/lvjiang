@@ -2,23 +2,9 @@
 
 > 已完成/废弃条目定期清出本文件；2026-10-06 之前的历史段已迁到
 > [archive/backlog-history-2026-10-06.md](archive/backlog-history-2026-10-06.md)。
-> 开启新对话时先读本文件。
-> 当前发布功能与升级边界见
-> [v0.15.9 发布说明](../50-releases/v0.15/v0.15.9.md)。
-
-## 当前基线（2026-11-17）
-
-- 正式版本为 **0.15.9**，`dev` 已到 **0.15.15**（开发期修正）；不能把 `dev` 上的
-  东西写成已发布功能。
-- 批量配置以可见用户限定范围，执行时可按用户名或用户属性聚合调度单元；主页面再
-  勾选本次执行单元，并可在「工具 → 任务参数」声明某用户跳过某任务。见
-  [批量执行单元](../20-requirements/30-batch/02-batch-execution-units.md)。
-- 装备分析已支持 115 阶赛季、按等级与版本选择毕业率模型、模拟转律和装备假设视图；
-  智能调律按用户与基础规则组启用。见
-  [南吕赛季需求](../20-requirements/10-tuning/05-nanlu-season.md)和
-  [智能调律需求](../20-requirements/10-tuning/03-smart-tuning.md)。
-- 本页「功能待办」列出仍未完成的方向；具体实施范围以最新代码及各需求文档的未完成项
-  为准。下方 P1/P2 是同一批事项的详情，重复项只留一处指针。
+> 本文件只留**仍然有效**的待办；当前版本与发布状态以
+> [发布说明索引](../50-releases/README.md) 为准，不在此维护版本快照。
+> 协作授权、执行环境与验证门禁见根目录 `AGENTS.md`，本文件不再重复。
 
 ---
 
@@ -66,31 +52,10 @@
 
 ---
 
-## 特别注意事项（下一对话必读）
-
-1. **严禁自动提交**；提交时中文信息须写入 UTF-8 文件后 `git commit -F`。
-2. 运行环境：用**仓库 `.venv`**（`.venv\Scripts\python.exe`）。历史上这里写"用全局
-    python（.venv 缺 yaml）"，那条已不成立：`.venv` 现在是可编辑安装、dev 依赖齐全，
-   系统解释器反而缺 `pygls`/`lsprotocol` 和 `lvjiang` 包，会让
-   `test_wf_language_server`、`test_*_ondevice_imports`、OCR 推理等用例以环境错误的
-   形式失败（见 AGENTS.md 2.11）。pytest 加 `-p no:cacheprovider`
-   可避开沙箱对 .pytest_cache 的权限报错；PowerShell 写中文用 `python -X utf8`。
-   注意：pytest -q 在本机不打印 "N passed" 汇总行，以进度 100% 且无 F/E 为准。
-3. **SearchReplace 陷阱**：任何含 `───` U+2500 制表线的行做锚点必失败，
-   用纯代码锚点或（文件 <1000 行时）Write 整文件重写。
-4. **Qt 样式级联坑**：容器 QFrame 的 setStyleSheet 必须用 `QFrame#objectName` 选择器，
-   否则级联到 QListWidget/QTableWidget（均继承 QFrame）抹掉其边框背景，看似"布局错乱"。
-   排查布局问题先离屏 `widget.grab().save()` 截图确认实际渲染。
-5. school_panel 信号重入：`_refresh_list` 中 `clear()` 会嵌套触发 `_on_school_changed`，
-   后者用 `prev_loading` 保存/恢复 `_loading` 标志，改动时勿破坏此约定。
-6. 用户约定：开发期配置重构**不写迁移兼容代码**（旧 schema 直接废弃）。
-7. 提交推送遵循 /submit 一次性语义：完成后不自动 commit/push，等用户指令。
-
 ## 待办明细（P1 / P2 详情）
 
 > 逐条详情按优先级组织，状态以「功能待办」为准；勾选框只表示该条内部子步骤，
 > 带「外部依赖」的条目要真机或作者本人操作，AI 不可推进。
-> 最后整理：2026-11-17（基线 `dev` = 0.15.15）。
 
 ---
 

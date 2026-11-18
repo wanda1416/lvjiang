@@ -10,8 +10,7 @@ session 为运行与用户数据，不经过此模块。读取 local > system；
 - 实体文件（一物一文件：scenes/*.yaml、workflows/*.wf、
   layouts/{name}/{scene}.json、yysls/tuning_rules/*.yaml、
   references/**/*.png）→ 整文件影子（local 有就完全顶掉，不做内容合并）
-- 聚合键值文件（scenes.yaml、layouts.yaml、
-  yysls/game_config/*.yaml、yysls/tune_config.yaml）→ 键级 diff 深合并；
+- 聚合键值文件（yysls/game_config/*.yaml、yysls/tune_config.yaml 等）→ 键级 diff 深合并；
   dict 递归、列表与标量整键替换；
   每层 dict 支持 "__deleted__": [key, ...] 删除键
 

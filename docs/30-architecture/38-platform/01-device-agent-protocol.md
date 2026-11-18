@@ -164,7 +164,7 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_diagnostics` | 可选 `screen_repetitions`（0～10，默认 0） | `report`：依赖/插件/引擎、OCR 和内存；同步后可仅采集真实屏幕连续推理，不注入游戏动作；手机执行中拒绝检查 |
 | `offline_sync_begin` | `size`,`sha256`,`preserve_task_params`,`preserve_batch_config` | 建立暂存上传，最大 256 MiB；必须分别显式选择保留任务参数、批量配置与否 |
 | `offline_sync_chunk` | `offset`,`data`（Base64） | 顺序写入，重复块内容相同才允许重试 |
-| `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
+| `offline_sync_commit` | — | staging 内校验完整包和逐文件哈希、版本、DB 后分域逐文件安装；失败可能已部分应用，需重试 |
 
 手机任务状态为 idle/running/pausing/paused/stopping/done/failed/stopped。
 设备端截图后端自行满足无障碍 `takeScreenshot` 的框架限流（AOSP <=333ms 判定间隔
@@ -189,15 +189,17 @@ APK 主页面使用应用栏菜单导航，首页突出悬浮服务启停；权�
 pausing/paused/stopping 同样占用任务槽。暂停确认在引擎实际等待点发生，结束会唤醒暂停。
 PC 断线不停止手机任务；PC 租约在重连后重新申请，防止重连绕过执行互斥。
 
-配置包仅包含 config/system、local、remote、session 的数据文件（排除 Git、锁与诊断
-归档）。DB 由 SQLite backup 生成，不能直接复制仍有 WAL 的数据库。手机校验后整体
-交换 config，留存上一份 offline-backup/config；应用与启动共用锁，并清理配置单例和
-引擎缓存。Python 实现随 APK 打包，不通过配置同步热更新。
+配置包仅包含 config/system、local、session 的数据文件（排除 Git、锁与诊断
+归档）。DB 由 SQLite backup 生成，不能直接复制仍有 WAL 的数据库。手机先在 staging 内
+完成校验，随后分域逐文件安装（system/local 镜像、session 按清单覆盖），不保留备份、
+不提供整包事务回滚；失败可能已部分应用，报错并重试。应用与启动共用锁，并清理配置
+单例和引擎缓存。Python 实现随 APK 打包，不通过配置同步热更新。
 
 APK 从官方 config/system 生成预置 ZIP，以摘要记录已安装代次，仅交换 system。
 首次初始化默认用户、安卓布局与空 DB；配置就绪与同步历史分离，未同步也可装配引擎。
 PC 同步默认保留 wf_configs 和用户 workflow_params，按用户/任务整体择取手机值，
-保留手机独有用户；不合并 DB。保留在暂存区完成，之后沿用目录交换与失败回滚。
+保留手机独有用户；不合并 DB。保留计算在暂存区完成，之后分域逐文件写入，
+不做目录交换，也没有失败整体回滚。
 协议 v1 仍可读取状态和安全控制，但不能执行新版同步，旧客户端缺少保留标志时也拒绝同步。
 配置重载前关闭旧 OCR 后端的 det/cls/rec 会话及其 SessionOptions，再丢弃缓存。
 Android 关闭 CPU arena，与 PC 默认一致；rec/cls 单条批次，输入 direct buffer 在会话内

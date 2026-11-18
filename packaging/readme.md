@@ -107,7 +107,7 @@ Release 标题，确保发布页面与历史版本维持一致。
   | 通道 | 清理行为 |
   |------|---------|
   | Windows 安装器 | `[InstallDelete]` 在拷文件前清空 `{app}\config\system` 与 `{app}\_internal` |
-  | Android APK | 新预置代次整目录更新官方 system，保留 local/updates/session/DB；PC 同步校验后交换配置并保留备份 |
+  | Android APK | 新预置代次整目录更新官方 system，保留 local/updates/session/DB；PC 同步校验后分域逐文件安装（system/local 镜像、session 按清单覆盖），不提供整包备份与事务回滚 |
   | Windows 便携版 ZIP | **不清理**，用户必须解压到新目录，见下方打包产物说明 |
 
   三条通道都保留 `config/local` 和 `config/session` 的个人数据。其中

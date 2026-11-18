@@ -430,13 +430,13 @@ Sponsorship is entirely voluntary: it buys no features, licenses or priority sup
 
 ## 🔒 Data and privacy
 
-LvJiang only goes online in a few situations: announcements, update checks, online config sync (since 0.8.0), feature activation and online membership licensing (since 0.15.0), account and multi-device sync (since 0.15.9, only after you sign in and press sync), and anonymous tuning data collection (since 0.7.0).
+LvJiang only goes online in a few situations: announcements, update checks, online config sync (since 0.8.0), feature activation and online membership licensing (since 0.15.0, only when you enter an activation code), account and multi-device sync (since 0.15.9, only after you sign in), and anonymous tuning data collection (since 0.7.0, only after your explicit first-launch consent).
 
 - Announcements, update checks and online config sync **only download, never upload**: announcements and update checks have worked this way since the first release, and online config exists to fix problems such as drifted coordinates or tuning rules remotely. It is on by default and can be turned off item by item in "Configuration → Network & Privacy".
 - Feature activation and online membership licensing verify your license code and fetch member content; the first activation needs a network connection, after which the app works offline until expiry.
-- Account and multi-device sync happens only after you sign in and press "initial sync / sync". It uploads the character roster, sync documents and the profile overview ledger so that devices can be peers; the phone pulls but does not push by default. Without signing in and syncing, the data stays on the local machine.
+- Account and multi-device sync happens only after you sign in. Once signed in, sync runs automatically in the foreground (about once a minute) and can be paused or stopped by signing out at any time. It uploads the character roster, sync documents and the profile overview ledger so that devices can be peers; the phone pulls but does not push by default. Without signing in, the data stays on the local machine.
 - Anonymous tuning data collection requires your explicit consent on first launch — decline and not a single record is sent. Once accepted you can still turn it off in settings at any time and delete the local, not-yet-uploaded records in one click.
-- LvJiang **never uploads** your screenshots, logs, gear data, game account or character names, and uploads nothing from the `config/` directory.
+- LvJiang **never uploads proactively**: your screenshots, logs, game account or character names are not sent, and nothing from the `config/` directory is uploaded. The only game-related data that ever leaves the machine is the anonymous tuning statistics you consented to, whose field whitelist is described in section 2 of the privacy statement.
 
 See the [privacy statement](PRIVACY.md) for the full text. The server code is public as well: [`ops/stats-worker/`](ops/stats-worker/)
 

@@ -16,6 +16,11 @@
 接口返回功能未开通、服务关闭、用户不存在、设备离线或任务占用时，向用户解释
 具体原因；不用让用户重新导出配置或逐项勾选授权。
 
+写脚本时按两级来：先照[脚本开发任务书](10-contracts/00-script-task-brief.md)执行（角色、边界、
+`--list`/`--dry-run` 命令循环、交付格式），细节再查[编写与校验 `.wf` 脚本](20-operations/03-script-authoring.md)
+（元数据、骨架、错误表），语法本身仍指向 DSL 目录。当前 MCP 尚未开放脚本读写，两份文档里的
+工具草案都是待实现契约。
+
 阅读契约，查询数据，与用户讨论目标，分析培养和组合，再生成全新的基础组和
 调律规则。生成结果和建议在 Agent 中展示，可调用 start_auto_tuning 或在律匠
 “查看生成方案并启动”中按同一结果启动。先检查 validate_auto_tuning 的 ready
@@ -25,9 +30,12 @@
 
 ## 操作契约
 
+- [脚本开发任务书](10-contracts/00-script-task-brief.md)：接到"写一个脚本"这类任务时**先读这份**，
+  它给的是角色、边界、可跑的命令循环与交付格式
 - [对象、状态与执行边界](10-contracts/01-context-and-permissions.md)
 - [装备培养与组合分析](20-operations/01-analysis.md)
 - [生成新的调律配置](20-operations/02-generation.md)
+- [编写与校验 `.wf` 脚本](20-operations/03-script-authoring.md)：脚本开发的现状说明与待实现契约
 - [WorkBuddy 接入与对话示例](30-examples/01-workbuddy.md)
 - [共享领域知识](../10-game/README.md)
 

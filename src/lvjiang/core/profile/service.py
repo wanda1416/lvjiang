@@ -852,6 +852,14 @@ def sync_write_adapter(
     if new_value == current_value:
         return current_value, 0
 
+    # 变更脚本看到的 old/new/delta 是**派生基线**上的值（`_read_current_value` 已经
+    # 把 quota 归零、regen 恢复都算进去了），与下面物化出来的账本行是同一套基线：
+    # 物化只把「这条派生值」正式落成一行，基线本身不变。两条前提要一起看——
+    # 1. 速率型 regen 在两次计算之间仍会长一点点，漂移是毫秒级的点（±1e-6 量级），
+    #    不足以让阈值判断翻转；2. 唯一会放大差异的是「这次写入恰好跨过周期边界的
+    #    毫秒窗口」，那是决定文档主动排除的边界（见 profile 同步文档「设计限制」）。
+    # 若哪天把 `_read_current_value` 改成返回存储值，这里构建的 event 就会与账本分叉，
+    # 必须先把它挪到两次物化之后（`profile_action` 的顺序）。
     event = _prepare_event(
         user_name, model_type, key,
         old_value=current_value, new_value=new_value, delta=actual_delta,

@@ -148,3 +148,29 @@ def test_capped_regen_target_does_not_materialize_on_no_change(run_profile):
     run_profile('eval profile_inc("counter", -10, "返还")')
     assert not _history()
     assert repository.db_read_entry("tester", "regen", "tili").event_at == stamp
+
+
+def test_regen_target_trigger_event_carries_materialized_baseline(run_profile, monkeypatch):
+    """变更脚本拿到的 old_value 必须是物化后的基线，不是上次存储的锚点。
+
+    `sync_write_adapter` 用「派生基线」构建 event（`_read_current_value` 已经把恢复量
+    算进去了），随后物化出来的 regen 行与这个基线同源，所以两者数值必须一致。这条断言
+    锁住这个隐式耦合：若哪天读取口径改成返回存储值（这里是 100 而不是 550），event 会
+    与账本分叉，而 config 里比对 old/new 的阈值脚本会静默误判。
+    """
+    from lvjiang.core.profile import triggers
+
+    captured = []
+    monkeypatch.setattr(triggers, "submit_profile_trigger", captured.append)
+    _declare_regen_target(run_profile)
+    repository.db_upsert("tester", "regen", "tili", 100, event_at=_before_daily_boundary())
+
+    run_profile('eval profile_inc("counter", 30, "消耗")')
+
+    target_events = [e for e in captured if e.key == "tili"]
+    assert len(target_events) == 1
+    event = target_events[0]
+    set_row = _history()[0]
+    assert (event.op_type, event.old_value, event.new_value, event.delta) == (
+        "set", set_row.old_value, set_row.new_value, set_row.delta_value)
+    assert (event.old_value, event.new_value) == (550, 520)

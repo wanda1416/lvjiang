@@ -198,6 +198,30 @@ def test_write_that_changes_nothing_records_nothing(quota_env) -> None:
 # ─── CAS：期望值是库里那一行，不是派生值 ──────────────────────
 
 
+def test_trigger_event_uses_derived_baseline_across_period(quota_env, monkeypatch) -> None:
+    """变更脚本看到的是本周期基线（0），不是库里的旧周期满值。
+
+    与账本一致：归零单独成一条 reset 行（120→0），业务行是 0→30。阈值类脚本比的是
+    old/new，若这里塞进旧周期的 120，跨周期第一次写入会被误判成「下降」。
+    """
+    from lvjiang.core.profile import triggers
+    from lvjiang.core.profile.service import profile_action
+
+    captured = []
+    monkeypatch.setattr(triggers, "submit_profile_trigger", captured.append)
+    _seed("weekly", 120, days_ago=8)
+
+    profile_action("u", "weekly", set_value=30, source="周常")
+
+    assert [event.op_type for event in captured] == ["set"]
+    event = captured[0]
+    set_row = _history("weekly")[0]
+    assert set_row.op_type == "set"
+    assert (event.old_value, event.new_value, event.delta) == (
+        set_row.old_value, set_row.new_value, set_row.delta_value)
+    assert (event.old_value, event.new_value) == (0.0, 30.0)
+
+
 def test_cas_write_uses_stored_value_not_derived_zero(quota_env) -> None:
     from lvjiang.core.profile.repository import db_read_entry
     from lvjiang.core.profile.service import profile_action

@@ -26,6 +26,12 @@ from tests.pytest_resources import install_closed_directory_scan
 # 在这里显式固定，使本地、CI 与所有子进程的编码约定一致，不再依赖外部环境变量。
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
+# UI 测试一律离屏：此处必须在任何 PyQt6 导入之前落定，QApplication 一旦带窗口
+# 创建就改不回来。有桌面会话的机器上如果真开了窗口，模态对话框既会挂在没人点的
+# 位置上，也会干扰正在使用电脑的人；CI 无桌面时则直接起不来。
+# 只设默认值：显式指定的平台（排障时临时改回有头模式）优先。
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 # 在收集测试模块前就封死真实 config；不能只依赖各用例自觉使用 tmp_path。
 install_project_config_write_guard(Path(__file__).parents[1] / "config")
 
@@ -229,6 +235,31 @@ def _no_qt_modal_dialogs(monkeypatch):
     # QMessageBox/QInputDialog 等都继承 QDialog，实例 exec() 一并封死。
     monkeypatch.setattr(
         QtWidgets.QDialog, "exec", _banned("QDialog.exec()"))
+
+
+@pytest.fixture(autouse=True)
+def _qt_runs_offscreen():
+    """UI 测试必须跑在离屏平台上（AGENTS 2.12）。
+
+    默认值由本文件顶部的 ``QT_QPA_PLATFORM`` 提供；这里守的是「环境里有遗留值、
+    或用例自己切回有头模式」的情况——那会让窗口真开到用户桌面上，模态对话框挂在
+    没人点的位置，整套测试表现为卡死而不是失败。用例结束才断言，因为平台上没
+    导入 Qt 的用例不该被这条拦住。
+    """
+    yield
+    import sys
+
+    if "PyQt6.QtGui" not in sys.modules:
+        return
+    from PyQt6.QtGui import QGuiApplication
+
+    app = QGuiApplication.instance()
+    if app is None:
+        return
+    platform = app.platformName()
+    assert platform in {"offscreen", "minimal"}, (
+        f"UI 测试跑在 {platform!r} 平台上：不要在测试里切换到有头模式"
+        "（离屏由 tests/conftest.py 的 QT_QPA_PLATFORM 统一设定，见 AGENTS 2.12）")
 
 
 _PLUGIN_RELOAD_CALLBACKS: list | None = None

@@ -157,6 +157,22 @@
 - 往系统解释器手动 `pip install` 不是修复；测试也不要依赖 `sys.executable` 之外的隐式配置
   （子进程自补 `PYTHONPATH`，或在已安装的 `.venv` 里运行）。依赖变化同步 `uv.lock`。
 
+### 2.12 UI 测试：一律离屏，且必须能限时关闭
+
+- **离屏是硬门禁**：`QT_QPA_PLATFORM=offscreen` 由 `tests/conftest.py` 在任何 PyQt6
+  导入之前设好；不得在用例或脚本里改回有头模式。`_qt_runs_offscreen` 夹具会在用例结束时
+  校验 `QApplication.platformName()`，不是 `offscreen`/`minimal` 直接判失败。
+  理由不是洁癖：有桌面会话的机器上真开窗口时，模态对话框会挂在没人点的位置上（整套件
+  表现为「卡死」，不报错也不超时），还会打断正在用电脑的人；CI 无桌面则直接起不来。
+- **限时关闭**：用例里不允许出现会无限等待的入口。`QDialog.exec()` 与
+  `QMessageBox`/`QFileDialog`/`QInputDialog` 等静态便捷函数已被 conftest 封死
+  （触发即失败），需要驱动对话框的用例自行打桩——不要为了绕开它自造模态循环。
+- **等待必须带超时**：用 `qtbot.waitSignal(sig, timeout=…)` / `qtbot.waitUntil(cond, timeout=…)`；
+  禁止裸 `time.sleep` 轮询、"等用户点一下"或依赖窗口真实可见。窗口与对话框交给
+  `qtbot.addWidget` 收尾，不依赖人工关闭或进程退出清理。
+- **口径**：UI 用例必须在没有桌面会话、没有人值守的机器上跑完；跑不完是设计问题，
+  不能当成环境问题绕过去（`pytest -q` 卡在某个百分比就是这类问题，见 5.1）。
+
 ## 三、提交基本原则
 
 提交以“可独立理解、可独立审阅、可安全回退”为目标；拆分的唯一理由是拆开后各部分真的会被

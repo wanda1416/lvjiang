@@ -132,6 +132,7 @@ hooks = AppHooks(
         "yysls/tuning_rules/*.yaml", "yysls/gear_sets/*.yaml",
         "yysls/base_groups/*.yaml", "yysls/damage_model/*.yaml",
         "yysls/attr_model/**/*.yaml", "yysls/graduation/**/*.json",
+        "yysls/lingering.yaml",
     ),
     offline_session_files=_offline_session_files,
     history_channels=_history_channels,

@@ -1,7 +1,7 @@
 """燕云菜单 —— 通过 AppHooks menu_builders 注入通用 MainWindow 的菜单栏。
 
 「燕云」菜单：游戏配置（F5）、调律配置（F6，内含调律验证入口）、属性配置、
-智能调律。
+智能调律、袅袅之音。
 """
 from __future__ import annotations
 
@@ -39,11 +39,26 @@ def build_menu(host, menubar) -> None:
         dialog = AttrConfigDialog(parent=host)
         dialog.exec()
 
+    def _open_linger():
+        """清单是随手翻看的记录页：首次打开时创建，之后复用同一实例。"""
+        from .linger import LingerDialog
+
+        dialog = getattr(host, "_linger_dialog", None)
+        if dialog is None:
+            dialog = LingerDialog(host)
+            host._linger_dialog = dialog
+        else:
+            dialog.reload()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
     entries = [
         ("game_config", tr("游戏配置"), _open_game_config),
         ("tuning_rules", tr("调律配置"), _open_tuning_rules),
         ("attr_config", tr("属性配置"), _open_attr_config),
         ("agent_tuning", tr("智能调律"), _open_agent_tuning),
+        ("linger", tr("袅袅之音"), _open_linger),
     ]
 
     actions: dict[str, QAction] = {}
@@ -63,6 +78,7 @@ SHORTCUT_ITEMS: tuple[MenuItem, ...] = (
     MenuItem("tuning_rules", ZONE_PLUGIN_MENU, "F6", group="燕云", label="调律配置"),
     MenuItem("attr_config", ZONE_PLUGIN_MENU, "", group="燕云", label="属性配置"),
     MenuItem("agent_tuning", ZONE_PLUGIN_MENU, "", group="燕云", label="智能调律"),
+    MenuItem("linger", ZONE_PLUGIN_MENU, "", group="燕云", label="袅袅之音"),
 )
 
 _ITEMS = {entry.item_id: entry for entry in SHORTCUT_ITEMS}

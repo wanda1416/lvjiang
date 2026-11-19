@@ -15,6 +15,7 @@ from ....core.config.versioning import (
     register_versioned_dir,
     register_versioned_file,
 )
+from ..core.linger.catalog import LINGER_FILE
 from .builds import GEAR_SETS_DIR
 from .game_config_files import GAME_CONFIG_FILES
 
@@ -40,6 +41,10 @@ register_versioned_dir("yysls/tuning_rules", "*.yaml", depth=1)
 # 基础规则组同样目录驱动（存在性由目录决定、order 排序），远程可以直接
 # 下发一套新组。
 register_versioned_dir("yysls/base_groups", "*.yaml", depth=1)
+# 袅袅之音清单：全部地区一份文件，内容随版本整体下发。条目列表的注册表
+# 语义（按 id 原位替换）在 core.linger.overrides 里 import 即注册——那里是
+# 页面与测试的必经之路，且避免了 merge_policy → linger 的循环导入。
+register_versioned_file(LINGER_FILE)
 
 # 毕业率模型的身份写在文件自己里（schema_version + 流派/方案/等级/版本），
 # 发现层只认当前 schema 且四项齐全的实体，所以可随远程下发全新方案文件，

@@ -75,6 +75,29 @@ REGISTRY_LIST_IDENTITY: dict[str, dict[str, str]] = {
 }
 
 
+def register_registry_list_identity(rel_path: str,
+                                    mapping: dict[str, str]) -> None:
+    """声明注册表列表的条目身份字段，支持 ``*`` 通配（如 ``regions.*.items``）。
+
+    声明后该列表按身份原位替换：改一个字段不会变成「删一条 + 加一条」，local
+    也不用写整张 ``__order__``。路径写法与 :data:`REGISTRY_LIST_PATHS` 一致。
+    """
+    REGISTRY_LIST_IDENTITY.setdefault(rel_path, {}).update(mapping)
+
+
+def _identity_for(path: str, identity: dict[str, str] | None) -> str | None:
+    """按具体路径取身份字段；先精确匹配，再按通配模式匹配。"""
+    if not identity:
+        return None
+    direct = identity.get(path)
+    if direct is not None:
+        return direct
+    for pattern, field_name in identity.items():
+        if "*" in pattern and _path_matches(path, (pattern,)):
+            return field_name
+    return None
+
+
 def register_registry_list_paths(rel_path: str, paths: tuple[str, ...]) -> None:
     """供插件声明自己私有配置文件里的「注册表列表」路径（见上）。
 
@@ -200,11 +223,13 @@ def merge_registry_list(base_list: list, overlay: dict,
                 result.append(item)
     order = overlay.get(ORDER_KEY)
     if order:
+        # identity 模式下 __order__ 的条目既可以是完整条目（存量 local），也可以
+        # 直接是身份字符串（新写法，拖动排序只存 id，local 不臃肿）。
         rank = (
             {name: i for i, name in enumerate(order)}
             if identity_field is None
             else {
-                _identity(name, identity_field): i
+                (name if isinstance(name, str) else _identity(name, identity_field)): i
                 for i, name in enumerate(order)
             }
         )
@@ -245,7 +270,12 @@ def diff_registry_list(base_list: list, desired: list,
             diff[ADDED_KEY] = added
         if merge_registry_list(base_list, diff, identity_field) == desired:
             return diff
-        diff[ORDER_KEY] = desired
+        # 顺序增量只存身份（id），不把整张表复制进 local；系统条目内容的更新
+        # 仍走 system 层，不受这份顺序影响。
+        diff[ORDER_KEY] = [
+            ident for item in desired
+            if (ident := _identity(item, identity_field)) is not None
+        ]
         return diff
 
     added = [x for x in desired if x not in base_list]
@@ -293,7 +323,7 @@ def merge_doc(base: dict, overlay: dict,
                 and isinstance(value, dict)
                 and any(k in value for k in _REGISTRY_KEYS)):
             result[key] = merge_registry_list(
-                result.get(key) or [], value, (identity or {}).get(path))
+                result.get(key) or [], value, _identity_for(path, identity))
         elif isinstance(value, dict) and isinstance(result.get(key), dict):
             result[key] = merge_doc(result[key], value, registry, path, identity)
         else:
@@ -343,7 +373,7 @@ def compute_diff(base: dict, desired: dict,
     for key, value in desired.items():
         base_value = base.get(key)
         path = f"{_prefix}.{key}" if _prefix else key
-        identity_field = (identity or {}).get(path)
+        identity_field = _identity_for(path, identity)
         if (protected is not None and path in protected
                 and isinstance(value, list) and isinstance(base_value, list)):
             value, restored = restore_protected_list(

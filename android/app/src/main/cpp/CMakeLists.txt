@@ -5,19 +5,18 @@ add_library(opencv UNKNOWN IMPORTED)
 set_target_properties(opencv PROPERTIES
     IMPORTED_LOCATION "${OPENCV_ROOT}/jni/${ANDROID_ABI}/libopencv_java4.so")
 
-# 对齐 APK 中的 ORT 1.20.0。头文件仅下载到构建目录，校验内容避免漂移。
-set(ORT_INCLUDE "${CMAKE_BINARY_DIR}/ort-include")
-file(MAKE_DIRECTORY "${ORT_INCLUDE}")
+# 对齐 APK 中的 ORT 1.20.0。头文件随仓库内置（third_party/onnxruntime），构建不联网：
+# 以前在配置阶段从 raw.githubusercontent 下载，2026-11-19 起该地址返回非 2xx，
+# Android Release 构建连带失败两次（见该目录 README）。哈希仍逐文件校验，防误改与漂移。
+set(ORT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime")
 function(ort_header NAME HASH)
-    set(DEST "${ORT_INCLUDE}/${NAME}")
-    if(NOT EXISTS "${DEST}")
-        file(DOWNLOAD
-            "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.20.0/include/onnxruntime/core/session/${NAME}"
-            "${DEST}" EXPECTED_HASH "SHA256=${HASH}" TLS_VERIFY ON)
+    set(SRC "${ORT_INCLUDE}/${NAME}")
+    if(NOT EXISTS "${SRC}")
+        message(FATAL_ERROR "缺少内置 ORT 头文件: ${SRC}（见 third_party/onnxruntime/README.md）")
     endif()
-    file(SHA256 "${DEST}" ACTUAL)
+    file(SHA256 "${SRC}" ACTUAL)
     if(NOT ACTUAL STREQUAL HASH)
-        message(FATAL_ERROR "ORT header checksum mismatch: ${NAME}")
+        message(FATAL_ERROR "内置 ORT 头文件校验失败: ${NAME}（期望 ${HASH}，实际 ${ACTUAL}）")
     endif()
 endfunction()
 ort_header(onnxruntime_c_api.h 573a117ae6b83ead7f53da6cedaa0d7b7d9cdb45c0ba4726bac9081e67696a82)

@@ -1527,6 +1527,16 @@
       "title": "律匠外部 Agent 使用入口",
       "category": "70-agent",
       "sha256": "1a3943a0cc721014767e55a5ff2d68c0bd3f37c2ec77da59fa211009b33c4b3c"
+    },
+    {
+      "id": "30-design:02-decisions:04-platform:29-feedback-channel",
+      "path": "30-design/02-decisions/04-platform/29-feedback-channel.md",
+      "category": "30-architecture"
+    },
+    {
+      "id": "70-agent:20-operations:04-profile-operations",
+      "path": "70-agent/20-operations/04-profile-operations.md",
+      "category": "70-agent"
     }
   ]
 }

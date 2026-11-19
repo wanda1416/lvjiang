@@ -17,7 +17,6 @@ notices:
   '{name}二维码获取失败：{error}；可点「打开赞助页面」': 'Failed to fetch the {name} QR code: {error}; you can click "Open sponsor page"'
   下载该版本: Download This Version
   不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: No data is uploaded. You can enable it later in Settings → Network & Privacy.
-  不受理：一对一教学、远程配置、信息不足、明确不支持的功能、第三方修改导致的问题及商业用途。: 'Not accepted: one-on-one teaching, remote configuration, insufficient information, explicitly unsupported features, issues caused by third-party modifications, and commercial use.'
   不同意: Disagree
   不收集: Do not collect
   不收集什么: What not to collect
@@ -36,31 +35,20 @@ notices:
   反馈与建议: Feedback & Suggestions
   发布于 {date}: Released {date}
   发现新版本: New Version Available
-  受理范围: Scope
-  受理：可复现的 Bug、功能建议、过时或无法执行的文档。: 'Accepted: reproducible bugs, feature suggestions, outdated or non-working documentation.'
-  只有信息足以复现或定位的问题才会进入开发者排查；受理不代表承诺修复时间。: Only issues with enough information to reproduce or locate go to the developer; acceptance doesn't promise a fix timeline.
   同意后随时可在「配置管理 → 网络与隐私」关闭。: After agreeing, you can turn it off anytime via "Config Manager → Network & Privacy".
   图片无法显示，请刷新或打开赞助页面: The image cannot be displayed; refresh or open the sponsor page
-  复现步骤、预期结果、实际结果和出现频率: Reproduction steps, expected result, actual result and frequency
   好的: OK
   实际会发送的数据长这样: The data actually sent looks like this
   尚未获取到公告，点击“重新获取”进行同步。: No announcements fetched yet; click "Refresh" to sync.
   开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: Enabling telemetry uploads related, unreported history from the last {days} days; records created while disabled remain stored locally.
-  异常前后的连续日志；识别或点击问题附截图或录屏: Continuous logs around the issue; screenshots or recordings for recognition/tap problems
   当前为离线模式，仅显示本地公告缓存: Offline mode; showing the local announcement cache only
   当前版本: Current Version
   律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: LvJiang is free and open source. If it saves you time, you're welcome to buy the author a coffee.
-  律匠版本；源码版同时提供 commit hash: LvJiang version; source builds also include the commit hash
   忽略该提示: Ignore This Version
   愿意贡献匿名使用数据，帮助改进律匠吗？: Would you like to contribute anonymous usage data to help improve LvJiang?
   截图、日志、配置文件或其他未在上方列明的本地内容: Screenshots, logs, configuration files, or other local content not listed above
-  截图方式、输入方式、工作流名称与全部参数: Capture method, input method, workflow name and all parameters
   打开赞助页面: Open Sponsor Page
   扫码加群: Scan to Join the Group
-  提交 Bug 时至少提供: Minimum information for a bug report
-  提交 GitHub Issue: Submit a GitHub Issue
-  提交日志和截图前，请遮盖账号、角色名、ADB 序列号、Token 等隐私信息。: Before submitting logs and screenshots, mask private info such as accounts, character names, ADB serials and tokens.
-  提交问题前请准备完整的定位信息: Prepare complete diagnostic information before reporting
   支持律匠: Support LvJiang
   收集什么: What's Collected
   暂无二维码，请获取最新二维码: No QR code yet; fetch the latest one
@@ -68,7 +56,6 @@ notices:
   更新于 {date}: Updated {date}
   最新版本: Latest Version
   本次发布暂无详细说明。: No detailed notes for this release.
-  查看详细规范: View detailed guidelines
   检查中...: Checking...
   正在获取…: Fetching…
   正在获取公告...: Fetching announcements...
@@ -85,7 +72,72 @@ notices:
   账号、姓名或其他能认出你是谁的信息: Your account, name, or any other information that could identify you
   赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: Sponsoring is entirely voluntary — it buys no features, licenses or priority support, and affects nothing existing.
   赞助律匠: Sponsor LvJiang
-  运行环境、布局、设备分辨率与横竖屏方向: Runtime environment, layout, device resolution and orientation
   这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: This ID is a random string generated on this machine; it doesn't contain your account or hardware info, but it does let us tell that records came from the same machine. You can reset it anytime in Settings.
   重新获取: Refresh
   公告: Announcements
+
+# ── 反馈与建议（0.15.18 改版）──
+'  （无）': '  (ไม่มี)'
+GitHub 反馈: ส่งความคิดเห็นผ่าน GitHub
+'{n}/{limit} 张': '{n}/{limit} ภาพ'
+一句话说清问题或建议: อธิบายปัญหาหรือข้อเสนอสั้น ๆ
+依次做了什么，点哪个按钮: สิ่งที่ทำทีละขั้นและกดปุ่มใด
+出现频率: ความถี่
+剪贴板里没有图片: ไม่มีรูปภาพในคลิปบอร์ด
+图片 (*.png *.jpg *.jpeg *.webp): รูปภาพ (*.png *.jpg *.jpeg *.webp)
+图片无效，无法作为附件: รูปภาพไม่ถูกต้อง แนบไม่ได้
+复现步骤: ขั้นตอนการทำให้เกิดซ้ำ
+复现细节（可选，填了更容易定位）: รายละเอียด (ไม่บังคับ ช่วยให้ระบุได้ง่ายขึ้น)
+复现细节：: 'รายละเอียด:'
+实际是什么样: สิ่งที่เกิดขึ้นจริง
+实际结果: ผลลัพธ์จริง
+将要提交的内容: เนื้อหาที่จะส่ง
+已恢复上次未提交的草稿（截图需要重新粘贴），提交成功后草稿自动清除。: กู้คืนฉบับร่างที่ยังไม่ได้ส่งแล้ว (ต้องวางภาพหน้าจอใหม่) ฉบับร่างจะถูกลบเมื่อส่งสำเร็จ
+已提交，编号 {id}。回复会发到 {email}。: ส่งแล้วหมายเลข {id} คำตอบจะส่งไปที่ {email}
+已附加 1 张截图（已压缩到 {kb} KB）: แนบภาพหน้าจอ 1 ภาพแล้ว (บีบอัดเหลือ {kb} KB)
+必填：回复会发到这个邮箱: จำเป็น — คำตอบจะส่งไปที่อีเมลนี้
+截图与日志: ภาพหน้าจอและบันทึก
+截图预览: ดูตัวอย่างภาพหน้าจอ
+提交: ส่ง
+提交失败：{error}: 'ส่งไม่สำเร็จ: {error}'
+无法读取图片：{name}: 'อ่านรูปภาพไม่ได้: {name}'
+日志会自动遮盖本机用户目录、令牌、设备序号与匿名标识；截图里的账号、角色名、ADB 序列号需要你自己确认遮挡。提交前可以用「预览」核对全部内容。: บันทึกจะถูกปิดข้อมูลอัตโนมัติ (โฟลเดอร์ผู้ใช้ โทเคน ซีเรียลเครื่อง รหัสไม่ระบุตัวตน) ส่วนภาพหน้าจอต้องปิดบังบัญชี ชื่อตัวละคร และ ADB serial ด้วยตัวเอง ใช้ «ดูตัวอย่าง» ตรวจทั้งหมดก่อนส่ง
+日志片段（前 40 行，已脱敏）：: 'ตัวอย่างบันทึก (40 บรรทัดแรก ปิดข้อมูลแล้ว):'
+日志预览（将随反馈提交）: ดูตัวอย่างบันทึก (จะส่งไปด้วย)
+最多附加 {n} 张截图: แนบภาพหน้าจอได้ไม่เกิน {n} ภาพ
+本来应该是什么样: ที่ควรจะเป็น
+标题: หัวข้อ
+标题：{text}: 'หัวข้อ: {text}'
+正在上传附件 {done}/{total}：{name}: 'กำลังอัปโหลดไฟล์แนบ {done}/{total}: {name}'
+正在提交…: กำลังส่ง…
+正在提交，请稍候…: กำลังส่ง กรุณารอสักครู่…
+正在补传附件…: กำลังส่งไฟล์แนบใหม่…
+正文已提交，编号 {id}；{n} 个附件没传上去（{names}）。可以点「补传附件」重试，正文不会重复提交。: ส่งรายงานแล้วหมายเลข {id} แต่ไฟล์แนบ {n} ไฟล์ล้มเหลว ({names}) กด «ส่งไฟล์แนบใหม่» รายงานจะไม่ถูกส่งซ้ำ
+正文已提交，附件完成 {done}/{total}: ส่งเนื้อหาแล้ว ไฟล์แนบ {done}/{total}
+没有找到日志文件: ไม่พบบันทึก
+环境信息（自动采集，不含用户名/角色名/路径）：: 'ข้อมูลสภาพแวดล้อม (เก็บอัตโนมัติ ไม่มีชื่อผู้ใช้ ชื่อตัวละคร หรือพาธ):'
+移除所选: ลบรายการที่เลือก
+类型：{label}（{key}）: 'ประเภท: {label} ({key})'
+粘贴截图 (Ctrl+V): วางภาพหน้าจอ (Ctrl+V)
+约 {kb} KB（已脱敏{suffix}）: ประมาณ {kb} KB (ปิดข้อมูลแล้ว{suffix})
+缺陷、功能建议、文档问题、账号同步问题都可以在这里提交；回复会发到你填写的邮箱。: แจ้งข้อบกพร่อง ข้อเสนอแนะ ปัญหาเอกสาร และปัญหาบัญชี/การซิงค์ได้ที่นี่ คำตอบจะส่งไปยังอีเมลที่กรอก
+补传失败：{error}: 'ส่งใหม่ไม่สำเร็จ: {error}'
+补传附件: ส่งไฟล์แนบใหม่
+详细描述: รายละเอียด
+详细描述：: 'รายละเอียด:'
+详细规范: แนวทางฉบับเต็ม
+请填写标题: กรอกหัวข้อ
+请填写能收到回复的邮箱: กรอกอีเมลที่รับคำตอบได้
+请填写详细描述: กรุณาอธิบาย
+还有 {n} 个附件没传上去：{names}: 'ยังมีไฟล์แนบ {n} ไฟล์ที่ส่งไม่สำเร็จ: {names}'
+这一天没有可用的日志文件: ไม่มีไฟล์บันทึกของวันนั้น
+这张图太大，压到 {limit} KB 以内仍失败，请裁剪后重试: ภาพใหญ่เกินไป บีบอัดแล้วยังเกิน {limit} KB กรุณาครอปแล้วลองใหม่
+选择图片…: เลือกรูปภาพ…
+邮箱: อีเมล
+邮箱：{text}: 'อีเมล: {text}'
+附件已全部传上去，编号 {id}。: ส่งไฟล์แนบครบแล้ว หมายเลข {id}
+附件：: 'ไฟล์แนบ:'
+附加最近日志: แนบบันทึกล่าสุด
+预期结果: ผลลัพธ์ที่คาดหวัง
+预览日志: ดูบันทึก
+，已截断: ' (ตัดทอนแล้ว)'

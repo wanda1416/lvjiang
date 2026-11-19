@@ -410,8 +410,7 @@ class FeedbackDialog(QDialog):
     def _build_button_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
         self._guide_btn = QPushButton(tr("详细规范"))
-        self._guide_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl(ISSUE_GUIDE_URL)))
+        self._guide_btn.clicked.connect(self._open_issue_guide)
         self._group_btn = QPushButton(tr("扫码加群"))
         self._group_btn.clicked.connect(self._open_group_qr)
         self._github_btn = QPushButton(tr("GitHub 反馈"))
@@ -869,3 +868,8 @@ class FeedbackDialog(QDialog):
     def _open_group_qr(self) -> None:
         """用户主动请求时展示交流群二维码。"""
         GroupQrDialog(self).exec()
+
+    @staticmethod
+    def _open_issue_guide() -> None:
+        """打开用户指南里的反馈规范（本对话框唯一的规范入口）。"""
+        QDesktopServices.openUrl(QUrl(ISSUE_GUIDE_URL))

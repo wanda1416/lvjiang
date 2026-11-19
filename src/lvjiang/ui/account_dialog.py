@@ -16,6 +16,7 @@ from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -34,7 +35,11 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.account import ACCOUNT_SERVICE, AccountError, get_session
-from ..core.account.service import set_sync_paused, sync_paused
+from ..core.account.service import (
+    current_instance_id,
+    set_sync_paused,
+    sync_paused,
+)
 from ..i18n import tr
 from .widgets.button_styles import apply_button_style
 
@@ -577,6 +582,43 @@ class AccountManagerDialog(QDialog):
         self._readonly = readonly_instance()
         layout = QVBoxLayout(self)
 
+        # ════ 顶部第一行：**当前设备ID**（+ 复制），登录前后都在 ════
+        # 忘了密码的人正是来到这一页求助的人：管理员重置前要凭设备 ID 确认
+        # 「来者就是这个账号的人」。已登录的人同样可能要把它交给管理员（本地
+        # 登录态还在、但要用别的设备或网页重置），所以不随登录态收起——复制
+        # 入口只有这一处，藏起来就等于没有。
+        self.instance_id = current_instance_id()
+        self.device_id_row = QWidget()
+        device_row = QVBoxLayout(self.device_id_row)
+        device_row.setContentsMargins(0, 0, 0, 0)
+        device_row.setSpacing(2)
+        device_line = QHBoxLayout()
+        device_line.setSpacing(8)
+        self.device_id_label = QLabel(tr("当前设备ID：{id}").format(id=self.instance_id))
+        self.device_id_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.device_id_label.setStyleSheet("font-size: 13px;")
+        self.copy_device_button = QPushButton(tr("复制"))
+        apply_button_style(self.copy_device_button, variant="neutral")
+        self.copy_device_button.setFixedWidth(72)
+        self.copy_device_button.clicked.connect(self._copy_device_id)
+        device_line.addWidget(self.device_id_label)
+        device_line.addWidget(self.copy_device_button)
+        device_line.addStretch()
+        device_row.addLayout(device_line)
+        device_hint = QLabel(tr("（请勿随意向他人泄露该 id，这是重置密码的唯一凭据）"))
+        device_hint.setWordWrap(True)
+        device_hint.setStyleSheet("color: palette(mid); font-size: 12px;")
+        device_row.addWidget(device_hint)
+        self.device_hint = device_hint
+        #: 复制成功的短暂反馈：按钮文案回退，避免把一次性提示留在界面上
+        self._copied_button: tuple[QPushButton, str] | None = None
+        self._copy_timer = QTimer(self)
+        self._copy_timer.setSingleShot(True)
+        self._copy_timer.setInterval(1500)
+        self._copy_timer.timeout.connect(self._reset_copy_label)
+        layout.addWidget(self.device_id_row)
+
         # ════ 第一行：左侧账户身份 + 右侧「自助服务 / 修改密码 / 退出登录」 ════
         head_row = QHBoxLayout()
         self.account_label = QLabel()
@@ -744,7 +786,7 @@ class AccountManagerDialog(QDialog):
         self.devices = QTableWidget(0, 4)
         self.devices.setHorizontalHeaderLabels(
             [tr("设备"), tr("平台"), tr("最近活跃"), tr("操作")])
-        _tune_table(self.devices, fixed={1: 84, 2: 168, 3: 96},
+        _tune_table(self.devices, fixed={1: 84, 2: 168, 3: 160},
                     row_height=40, stretch_column=0)
         device_layout.addWidget(self.devices, stretch=1)
 
@@ -819,6 +861,33 @@ class AccountManagerDialog(QDialog):
         """一行临时反馈（正在登录…／失败原因）：固定高度常驻，只换文字。"""
         self.status.setText(text)
 
+    def _copy_device_id(self) -> None:
+        """复制本机设备 ID（未登录时的顶部行）。"""
+        self._copy_to_clipboard(self.instance_id, self.copy_device_button, tr("复制"))
+
+    def _copy_to_clipboard(self, value: str, button: QPushButton, default_text: str) -> None:
+        """把设备 ID 写进剪贴板：它是管理员重置密码时唯一的身份凭据。
+
+        反馈放在**按钮自己身上**（短暂显示「已复制」）而不是底部状态行——那一行
+        是红字错误提示，用来报「已复制」既误导又容易被下一条错误顶掉。
+        """
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(value)
+        button.setText(tr("已复制"))
+        self._copied_button = (button, default_text)
+        self._copy_timer.start()
+
+    def _reset_copy_label(self) -> None:
+        if self._copied_button is None:
+            return
+        button, text = self._copied_button
+        self._copied_button = None
+        try:
+            button.setText(text)
+        except RuntimeError:        # 对话框或该行已销毁，定时器的最后一跳可以忽略
+            pass
+
     def _on_operation_failed(self, ok: bool, result) -> None:
         if ok or not self._alive():
             return
@@ -837,6 +906,9 @@ class AccountManagerDialog(QDialog):
         self.self_service_button.setVisible(summary is not None)
         self.change_password_button.setVisible(summary is not None)
         self.logout_button.setVisible(summary is not None)
+        # 设备 ID 顶部行只在未登录时出现：那是「忘了密码来求助」的人唯一能拿到
+        # 它的地方；登录后它在「设备管理」每行的「复制ID」里，不占头条位置。
+        self.device_id_row.setVisible(summary is None)
         self.tabs.setVisible(summary is not None)
         self.form_host.setVisible(summary is None)
         self._render_sync()
@@ -849,7 +921,12 @@ class AccountManagerDialog(QDialog):
         self._render_devices(summary)
 
     def _render_devices(self, summary: dict) -> None:
-        """设备列表；每行末尾一个「登出」按钮，允许单独下线某台设备。"""
+        """设备列表：每行「复制ID」+「登出」。
+
+        「复制ID」是找回密码那条链路的登录后入口：用户把本机（或另一台自己设备）
+        的设备 ID 发给管理员，管理员据此核对身份后才重置密码。放在行内而不是
+        对话框顶部，是为了不让一行技术标识压在账号信息上面。
+        """
         devices = summary.get("devices") or []
         mine = summary.get("instance_id") or ""
         self.devices.setRowCount(len(devices))
@@ -869,13 +946,22 @@ class AccountManagerDialog(QDialog):
             host = QWidget()
             cell = QHBoxLayout(host)
             cell.setContentsMargins(6, 0, 6, 0)
+            cell.setSpacing(6)
+            device_id = device.get("id")
+            copy = QPushButton(tr("复制ID"))
+            apply_button_style(copy, variant="neutral")
+            copy.setFixedWidth(76)          # 固定宽度：不让按钮把列撑变形
+            copy.setToolTip(tr("复制这台设备的 ID；重置密码时管理员凭它核对身份，不要随意泄露"))
+            copy.clicked.connect(
+                lambda _=False, did=device_id, button=copy:
+                self._copy_to_clipboard(did, button, tr("复制ID")))
+            cell.addWidget(copy)
             kick = QPushButton(tr("登出"))
             apply_button_style(kick, variant="neutral")
-            kick.setFixedWidth(64)          # 固定宽度：不让按钮把列撑变形
+            kick.setFixedWidth(64)
             if self._readonly:
                 kick.setEnabled(False)
                 kick.setToolTip(tr(READONLY_SYNC_HINT))
-            device_id = device.get("id")
             kick.clicked.connect(
                 lambda _=False, did=device_id: self._revoke_device(did))
             cell.addWidget(kick)

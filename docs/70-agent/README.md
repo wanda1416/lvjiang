@@ -1,6 +1,6 @@
 # 律匠外部 Agent 使用入口
 
-> 最后更新：2026-10-09（基线 v0.13.14）。本机 MCP 已实现；WorkBuddy 界面接入与真实游戏闭环待实机验收。
+> 最后更新：2026-11-19（基线 v0.15.17）。本机 MCP 已实现；WorkBuddy 界面接入与真实游戏闭环待实机验收。
 
 智能调律属于 Lv1 功能。未开通 Lv1 时，所有 MCP 访问（包括初始化、发现和文档
 读取）均返回激活提示。请让用户在律匠设置的“功能激活”中激活后重新接入。
@@ -36,6 +36,8 @@
 - [装备培养与组合分析](20-operations/01-analysis.md)
 - [生成新的调律配置](20-operations/02-generation.md)
 - [编写与校验 `.wf` 脚本](20-operations/03-script-authoring.md)：脚本开发的现状说明与待实现契约
+- [Profile 读写操作](20-operations/04-profile-operations.md)：四模型共用一条读写入口、按意图选调用、
+  写一次的账本与联动、哪些约束引擎强制哪些靠自觉、并发与重跑（MCP 无 Profile 工具）
 - [WorkBuddy 接入与对话示例](30-examples/01-workbuddy.md)
 - [共享领域知识](../10-domain/01-yysls/README.md)（仅源码检出）
 - [AI 连接配置](05-ai-connection.md)（原 38-platform/05）：连接方式、凭据与连接测试

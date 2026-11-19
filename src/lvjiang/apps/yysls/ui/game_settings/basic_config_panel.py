@@ -84,11 +84,29 @@ class BasicConfigPanel(QWidget):
         self._stone_percent.valueChanged.connect(self._apply)
         form.addRow(tr_label('传律石提升'), self._stone_percent)
         layout.addWidget(box)
+        layout.addWidget(self._build_tuning_box())
         layout.addWidget(self._build_hotkey_box())
 
         self._status_label = QLabel()
         layout.addWidget(self._status_label)
         layout.addStretch()
+
+    def _build_tuning_box(self) -> QGroupBox:
+        """调律动作自身的游戏节奏参数（与具体规则、装备无关）。"""
+        box = QGroupBox(tr("调律设置"))
+        form = QFormLayout(box)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        self._reset_min_wait = QSpinBox()
+        self._reset_min_wait.setRange(0, 60)
+        self._reset_min_wait.setSuffix(tr(" 秒"))
+        self._reset_min_wait.setMinimumWidth(140)
+        self._reset_min_wait.setToolTip(tr(
+            "重置调律两次确认之间的最短等待。游戏新版为 3 秒；"
+            "程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。"
+            "填 0 表示不做这段额外等待。"))
+        self._reset_min_wait.valueChanged.connect(self._apply)
+        form.addRow(tr_label('重置最小等待时间'), self._reset_min_wait)
+        return box
 
     def _build_hotkey_box(self) -> QGroupBox:
         """插件菜单的快捷键：区间 F5~F7 与 Alt+字母，与通用菜单共用查重。"""
@@ -126,6 +144,9 @@ class BasicConfigPanel(QWidget):
         self._stone_percent.setValue(float(basic.get(
             "chuanlv_stone_percent",
             manager.get_chuanlv_stone_percent())))
+        self._reset_min_wait.setValue(int(basic.get(
+            "reset_min_wait_seconds",
+            manager.get_reset_min_wait_seconds())))
         self._load_shortcuts(basic)
 
     def _load_shortcuts(self, basic: dict) -> None:
@@ -154,6 +175,7 @@ class BasicConfigPanel(QWidget):
             self._cooldown_carryover.isChecked())
         basic["chuanlv_stone_percent"] = round(
             self._stone_percent.value(), 2)
+        basic["reset_min_wait_seconds"] = self._reset_min_wait.value()
         shortcuts = self._collect_shortcuts()
         if shortcuts is None:
             return

@@ -12,6 +12,7 @@ from .constants import (
     AFFIX_CATEGORY_NAMES,
     BASE_ATTR_PARTS,
     DEFAULT_CHUANLV_STONE_PERCENT,
+    DEFAULT_RESET_MIN_WAIT_SECONDS,
     EQUIP_PART_NAMES,
     POOL_DINGYIN,
     POOL_NORMAL,
@@ -62,6 +63,17 @@ def parse_basic(self: GameConfigManager, data: dict) -> None:
         and not isinstance(stone_percent, bool)
         and 0 < float(stone_percent) <= 100
         else DEFAULT_CHUANLV_STONE_PERCENT
+    )
+    # 重置调律两次确认之间的最短等待（秒）。缺省取游戏新版的最短冷却；
+    # 0 合法（不做额外等待），非数字或超过 60 秒视为写坏，退回缺省值。
+    reset_wait = raw_basic.get(
+        "reset_min_wait_seconds", DEFAULT_RESET_MIN_WAIT_SECONDS)
+    self._reset_min_wait_seconds = (
+        int(reset_wait)
+        if isinstance(reset_wait, (int, float))
+        and not isinstance(reset_wait, bool)
+        and 0 <= float(reset_wait) <= 60
+        else DEFAULT_RESET_MIN_WAIT_SECONDS
     )
 
 

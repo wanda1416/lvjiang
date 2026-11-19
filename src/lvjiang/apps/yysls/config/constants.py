@@ -10,6 +10,12 @@ _CHENGYIN_RATIO = 0.94
 # 估算逻辑见 core/affix_cultivation.py。
 DEFAULT_CHUANLV_STONE_PERCENT = 4.5
 
+# 重置调律两次确认之间的最短等待（秒）。游戏新版把这段冷却缩短到 3 秒，
+# 可在「游戏配置 → 基础配置 → 调律设置」逐机校正。程序在这个最短等待之后
+# 还会再等一次页面刷新才点二次确认，见
+# workflows/implementations/tuning/resetter.py。
+DEFAULT_RESET_MIN_WAIT_SECONDS = 3
+
 # 词库类型（_pool 字段取值；缺省为普通词条）
 POOL_NORMAL = "normal"
 POOL_DINGYIN = "dingyin"

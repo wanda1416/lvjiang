@@ -321,7 +321,14 @@ def test_desktop_confirms_reset_entry_only_in_tune_scene():
     wf.press.assert_not_called()
 
 
-def test_desktop_reset_confirms_with_layout_actions_around_secondary_delay():
+def test_desktop_reset_waits_minimum_then_refresh_before_second_confirm(
+        monkeypatch):
+    """首次确认后必须先等够重置最短等待，再等一次页面刷新，才点二次确认。
+
+    两段等待职责不同：最短等待是游戏冷却（新版 3 秒，游戏配置可改），
+    页面刷新是等弹窗渲染出来。合并成一个固定值（旧的 secondary_confirm）
+    时，游戏改冷却只能整段跟着改，且页面刷新会被算进冷却里。
+    """
     wf = MagicMock(TUNE_SCENE="equip_tune_detail", CONTROL_SCENE=CONTROL_SCENE)
     wf.engine.call_subcall.return_value = 1
 
@@ -337,6 +344,10 @@ def test_desktop_reset_confirms_with_layout_actions_around_secondary_delay():
         return {key: values[key] for key in fields}
 
     wf.ocr_scene.side_effect = ocr_scene
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.workflows.implementations.tuning.resetter"
+        ".get_game_config",
+        lambda: SimpleNamespace(get_reset_min_wait_seconds=lambda: 3))
     routes = DesktopTuningRouteStrategy(wf)
     resetter = TuningResetter(wf, routes)
 
@@ -351,8 +362,9 @@ def test_desktop_reset_confirms_with_layout_actions_around_secondary_delay():
     calls = wf.method_calls
     first_confirm = calls.index(
         call.click_region("equip_tune_detail", "reset_confirm"))
-    delay = calls.index(call.wait_delay("secondary_confirm"))
-    assert first_confirm < delay
+    min_wait = calls.index(call.wait_seconds(3))
+    refresh = calls.index(call.wait_delay("page_refresh"))
+    assert first_confirm < min_wait < refresh
     wf.engine.call_subcall.assert_called_once_with(
         "scan_and_confirm", ["重置二次确认", 1])
 
@@ -520,8 +532,8 @@ def test_reset_success_closes_the_refund_prompt_with_close_btn():
 
     calls = wf.method_calls
     close = calls.index(call.click_region("equip_tune_detail", "close_btn"))
-    secondary_delay = calls.index(call.wait_delay("secondary_confirm"))
-    assert secondary_delay < close
+    pre_confirm_wait = calls.index(call.wait_delay("page_refresh"))
+    assert pre_confirm_wait < close
     wf.engine.call_subcall.assert_called_once_with(
         "scan_and_confirm", ["重置二次确认", 1])
     assert call.click_region(CONTROL_SCENE, "blank_area") not in calls

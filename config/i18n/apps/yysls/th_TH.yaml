@@ -742,6 +742,8 @@ yysls:
   '{name}穿透：{value}': '{name} Penetration: {value}'
   "菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。": "ปุ่มลัดของเมนูใช้ได้เฉพาะในหน้าต่าง เมนูปลั๊กอินใช้ F5~F7 หรือ Alt+ตัวอักษรได้ และต้องไม่ซ้ำกับเมนูทั่วไป/เครื่องมือ"
   "快捷键不可用：": "ใช้ปุ่มลัดไม่ได้: "
+  "重置最小等待时间": "Minimum Reset Wait"
+  "重置调律两次确认之间的最短等待。游戏新版为 3 秒；程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。填 0 表示不做这段额外等待。": "Minimum wait between the two reset confirmations. The current game version uses 3 s; the app then waits one extra page refresh before clicking the second confirmation, so the dialog is never clicked before it appears. Set 0 to skip this extra wait."
 auto_strings:
   装备词条: Equipment Affixes
   词条约束: Affix Constraints

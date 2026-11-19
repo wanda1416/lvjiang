@@ -55,8 +55,8 @@ delay_params:
     - 4.0
   secondary_confirm:
     label:
-      zh_CN: 二次确认等待（包括装备冷却）
-      en_US: Secondary Confirm Wait (incl. gear cooldown)
+      zh_CN: 二次确认等待
+      en_US: Secondary Confirm Wait
     range:
     - 6.0
     - 7.0

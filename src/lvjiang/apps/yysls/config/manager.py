@@ -17,7 +17,10 @@ from ....i18n import tr
 from . import affix_queries, arts_queries, equipment_queries, progression_queries
 from . import game_config_loader as loader
 from .affix_levels import LevelRange
-from .constants import DEFAULT_CHUANLV_STONE_PERCENT
+from .constants import (
+    DEFAULT_CHUANLV_STONE_PERCENT,
+    DEFAULT_RESET_MIN_WAIT_SECONDS,
+)
 from .game_config_parsers import (
     SEASON_SWITCH_HOUR as SEASON_SWITCH_HOUR,
 )
@@ -129,6 +132,8 @@ class GameConfigManager:
         self._equipment_cooldown_carryover = True
         # 一次传律提升被喂词条普通满值的百分比（顶层 basic_config）
         self._chuanlv_stone_percent = DEFAULT_CHUANLV_STONE_PERCENT
+        # 重置调律两次确认之间的最短等待秒数（顶层 basic_config）
+        self._reset_min_wait_seconds = DEFAULT_RESET_MIN_WAIT_SECONDS
         # 赛季配置：赛季编号 → SeasonConfig（顶层 season_configs）
         self._season_configs: list[SeasonConfig] = []
         # 基础属性名（从 _attr 字段收集：外功攻击/气血最大值/...）
@@ -339,6 +344,8 @@ class GameConfigManager:
     is_equipment_cooldown_carryover_enabled = progression_queries.is_equipment_cooldown_carryover_enabled
 
     get_chuanlv_stone_percent = progression_queries.get_chuanlv_stone_percent
+
+    get_reset_min_wait_seconds = progression_queries.get_reset_min_wait_seconds
 
     level_config_for = progression_queries.level_config_for
 

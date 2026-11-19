@@ -1,5 +1,6 @@
-content_version: 1
+content_version: 2
 basic_config:
   equipment_cooldown_days: 3
   equipment_cooldown_carryover: true
   chuanlv_stone_percent: 4.5
+  reset_min_wait_seconds: 3

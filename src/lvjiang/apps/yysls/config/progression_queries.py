@@ -38,6 +38,15 @@ def get_chuanlv_stone_percent(self: GameConfigManager) -> float:
     return self._chuanlv_stone_percent
 
 
+def get_reset_min_wait_seconds(self: GameConfigManager) -> int:
+    """重置调律两次确认之间的最短等待秒数，缺省 3 秒。
+
+    游戏新版把这段重置冷却缩短到 3 秒；消费者在最短等待之后还要再等一次
+    页面刷新才点二次确认，见 ``tuning/resetter.py``。
+    """
+    return self._reset_min_wait_seconds
+
+
 def level_config_for(self: GameConfigManager, level: int) -> LevelConfig | None:
     """按等级查找配置条目（精确匹配），未找到返回 None"""
     for cfg in self._level_configs:

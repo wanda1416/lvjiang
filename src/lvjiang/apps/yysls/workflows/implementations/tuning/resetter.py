@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.workflows.implementations.tuning.ports import ResetHostPort
 
 from ......i18n import tr
@@ -188,7 +189,16 @@ class TuningResetter:
             self._close_dialog()
             return (RESET_FAILED, tr("重置确认按钮识别失败，跳过该装备"))
         self._routes.confirm_reset_entry()
-        wf.wait_delay("secondary_confirm")
+        # 首次确认点下去后游戏进入重置冷却，等够才点二次确认。等待分两段：
+        # ① 游戏新版要求的最短等待（游戏配置 → 基础配置 → 调律设置，缺省 3 秒）；
+        # ② 再等一次页面刷新，避免二次确认弹窗还没渲染出来就被点空。
+        # 早先这里只有一个 secondary_confirm（6–7 秒），把游戏冷却和页面刷新
+        # 混在同一个固定区间里，游戏缩短冷却后整段都得跟着改。
+        min_wait = get_game_config().get_reset_min_wait_seconds()
+        logger.debug("  重置二次确认前等待 {} 秒 + 页面刷新", min_wait)
+        if min_wait > 0:
+            wf.wait_seconds(min_wait)
+        wf.wait_delay("page_refresh")
         if not self._routes.scan_and_confirm("重置二次确认"):
             # 首次确认点下去之后必然弹二次确认。弹不出来通常不是识别问题，
             # 而是账号开了安全锁需要解锁，机器自己点不出来。此时既不能替用户

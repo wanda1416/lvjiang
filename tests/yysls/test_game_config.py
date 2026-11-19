@@ -191,6 +191,29 @@ class TestResolveAffixCategory:
         assert GameConfigManager(path).get_equipment_cooldown_days() == 5
 
 
+    def test_reset_min_wait_seconds_reads_basic_config(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "basic_config:\n"
+            "  reset_min_wait_seconds: 5\n"
+            "level_configs: []\n",
+            encoding="utf-8",
+        )
+        assert GameConfigManager(path).get_reset_min_wait_seconds() == 5
+
+    def test_invalid_reset_min_wait_falls_back_to_default(self, tmp_path):
+        """写坏的等待只影响重置节奏，退回缺省值而不是拒绝整份配置。"""
+        import yaml
+
+        for value in ("3", 61):
+            path = tmp_path / "game_config.yaml"
+            path.write_text(yaml.safe_dump({
+                "basic_config": {"reset_min_wait_seconds": value},
+                "level_configs": [],
+            }), encoding="utf-8")
+            assert GameConfigManager(
+                path).get_reset_min_wait_seconds() == 3
+
     def test_level_115_material_rules_match_110(self):
         path = (Path(__file__).resolve().parents[2]
                 / "config/system/yysls/game_config/seasons.yaml")

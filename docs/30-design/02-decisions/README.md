@@ -78,6 +78,7 @@
 | [27-hotkeys-and-menu-shortcuts.md](04-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 | 已实现 |
 | [28-account-document-sync.md](04-platform/28-account-document-sync.md) | 全局任务参数与批量配置上云：账户级文档通道、冲突不留副本与迁移 | 已实现 |
 | [29-feedback-channel.md](04-platform/29-feedback-channel.md) | 反馈与建议：客户端内置提交、分类与附件协议、网页管理控制台与管理员名册 | 已实现 |
+| [30-account-device-credential.md](04-platform/30-account-device-credential.md) | 设备 ID 作为重置密码凭据：服务端校验、预检接口与两端展示位置 | 已实现 |
 
 ## editor（编辑器域：WF 编辑器插件、任务历史、运行态与保存边界）
 

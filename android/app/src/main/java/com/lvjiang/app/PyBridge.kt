@@ -150,6 +150,8 @@ object PyBridge {
     // ── 账户（登录/登出/状态/同步）────────────────────────────
     fun accountStatus(context: Context): JSONObject =
         callJson(context, "account_status", moduleName = ACCOUNT_MODULE)
+    fun accountDevices(context: Context): JSONObject =
+        callJson(context, "account_devices", moduleName = ACCOUNT_MODULE)
     fun accountLogin(context: Context, login: String, password: String): JSONObject =
         callJson(context, "account_login", login, password, moduleName = ACCOUNT_MODULE)
     fun accountLogout(context: Context): JSONObject =

@@ -13,6 +13,7 @@ from loguru import logger
 from ..account.service import (
     AccountError,
     AccountSession,
+    current_instance_id,
     current_keyring_user,
     get_session,
     load_profile,
@@ -190,11 +191,65 @@ def account_clear_profile() -> str:
 def account_status() -> str:
     """登录态。**内存快照优先**：进程内第一次才真的问一次（凭据库 + 必要时
     一次网络校验），之后进设置页只是读缓存；登录/登出/令牌失效时才刷新。
-    之前每次调用都新建会话并 refresh+summary，等于进一次设置页打两个网络请求。"""
+    之前每次调用都新建会话并 refresh+summary，等于进一次设置页打两个网络请求。
+
+    ``instance_id`` 是**本机设备 ID**（本地事实，随叫随给）：找回密码时管理员
+    凭它确认身份，所以不跟着登录态一起缓存，也不因网络失败缺失。
+    """
     global _STATUS_CACHE
     if _STATUS_CACHE is None:
         _STATUS_CACHE = _probe_status()
-    return json.dumps(_STATUS_CACHE, ensure_ascii=False)
+    status = dict(_STATUS_CACHE)
+    status["instance_id"] = current_instance_id()
+    return json.dumps(status, ensure_ascii=False)
+
+
+def account_devices() -> str:
+    """本账号的设备列表（含本机标记与在线状态），供「账户 → 设备」行。
+
+    ``online`` 的口径见 :mod:`..account.devices`（与网页端同一窗口）；``since`` 给
+    「首次出现 …」，同型号的两台手机靠它和设备名区分。没登录（或登录态已失效）
+    时返回空表并如实标 ``logged_in=false``——列表只能来自 ``/api/summary``，没会话
+    就没有可看的东西，这不属于错误。
+    """
+    from ..account.devices import device_online, device_status_text, format_relative
+
+    session = _session()
+    if not session.access_token:
+        try:
+            if session.restore(fetch_summary=False) is None:
+                return json.dumps({"ok": True, "logged_in": False, "devices": []},
+                                  ensure_ascii=False)
+        except AccountError as error:
+            _note_network_error(error)
+            return json.dumps({"ok": False, "message": str(error),
+                               "offline": error.code in _OFFLINE_CODES},
+                              ensure_ascii=False)
+    try:
+        summary = session.summary()
+    except AccountError as error:
+        _note_network_error(error)
+        return json.dumps({"ok": False, "message": str(error),
+                           "offline": error.code in _OFFLINE_CODES},
+                          ensure_ascii=False)
+    _set_online(True)
+    mine = str(summary.get("instance_id") or "")
+    devices = []
+    for device in summary.get("devices") or []:
+        last_seen = str(device.get("last_seen") or "")
+        first_seen = str(device.get("first_seen") or "")
+        devices.append({
+            "id": str(device.get("id") or ""),
+            "name": str(device.get("name") or ""),
+            "platform": str(device.get("platform") or ""),
+            "online": device_online(last_seen),
+            "status": device_status_text(last_seen),
+            "since": f"首次出现 {format_relative(first_seen)}" if first_seen else "",
+            "self": bool(mine) and device.get("id") == mine,
+        })
+    return json.dumps({"ok": True, "logged_in": True, "devices": devices,
+                       "online": sum(1 for item in devices if item["online"])},
+                      ensure_ascii=False)
 
 
 def account_login(login: str, password: str) -> str:

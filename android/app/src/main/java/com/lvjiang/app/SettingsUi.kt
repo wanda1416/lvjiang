@@ -2,12 +2,16 @@ package com.lvjiang.app
 
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Typeface
+import android.util.TypedValue
 import android.view.View
-import android.widget.LinearLayout
 import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -62,6 +66,30 @@ object SettingsUi {
         val pad = (4 * resources.displayMetrics.density).toInt()
         setPadding(0, pad, 0, pad)
     }
+
+    /** 卡片 / 分组标题：M3 Title Medium（16sp、字重 500），不是 18sp 粗体。 */
+    fun heading(context: Context, value: String) = label(context, value, 16f).apply {
+        // Typeface 没有 MEDIUM 常量：Medium 是 Roboto 的字体族名，不能当样式传
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    }
+
+    /**
+     * 行尾图标按钮：48dp×48dp 触控目标 + 无边界涟漪（M3 IconButton 的最小要求）。
+     * 纯图标必须带 contentDescription，否则读屏只会念「按钮」。
+     */
+    fun iconButton(context: Context, iconRes: Int, description: String, action: () -> Unit) =
+        AppCompatImageButton(context).apply {
+            setImageResource(iconRes)
+            contentDescription = description
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(0, 0, 0, 0)
+            val attr = TypedValue()
+            context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, attr, true)
+            setBackgroundResource(attr.resourceId)
+            val side = (48 * resources.displayMetrics.density).toInt()
+            layoutParams = LinearLayout.LayoutParams(side, side)
+            setOnClickListener { action() }
+        }
 
     fun row(context: Context, title: String, summary: String, summaryMaxLines: Int? = null, indentSummary: Boolean = false): LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL

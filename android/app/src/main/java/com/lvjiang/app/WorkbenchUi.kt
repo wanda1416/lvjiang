@@ -2,6 +2,7 @@ package com.lvjiang.app
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -114,6 +115,10 @@ class WorkbenchUi(
         SettingsUi.label(activity, value, size).apply {
             if (size >= 18f) setTypeface(null, android.graphics.Typeface.BOLD)
         }.also { parent.addView(it) }
+
+    /** 卡片 / 分组标题：M3 Title Medium（16sp、字重 500），替掉原先的 18sp 粗体。 */
+    private fun sectionTitle(parent: LinearLayout, value: String) =
+        SettingsUi.heading(activity, value).also { parent.addView(it) }
     private fun button(parent: LinearLayout, value: String, primary: Boolean = false, action: () -> Unit) =
         MaterialButton(if (primary) activity else ContextThemeWrapper(activity, R.style.ThemeOverlay_Lvjiang_TextButton)).apply {
             text = value; isAllCaps = false; textSize = 14f
@@ -1245,6 +1250,14 @@ class WorkbenchUi(
      */
     private var lastLoginError = ""
     private var accountSummary: TextView? = null
+    /** 账户卡「设备」行的摘要（在线几台 / 共几台）。 */
+    private var deviceSummary: TextView? = null
+    /** 账户卡顶部的本机设备 ID（文本 + 原值，复制用）。 */
+    private var deviceIdText: TextView? = null
+    private var deviceIdValue = ""
+
+    private fun summaryText(row: LinearLayout): TextView =
+        (row.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
 
     /**
      * 账户卡片。三种情况严格分开，不能混：
@@ -1254,19 +1267,30 @@ class WorkbenchUi(
      */
     private fun accountCard() {
         val accountCardLayout = card()
-        text(accountCardLayout, "账户", 18f)
-        val loginRow = SettingsUi.row(activity, "账户", "正在检查登录状态…")
+        sectionTitle(accountCardLayout, "账户")
+
+        // 设备 ID 是「忘了密码去找管理员」那条链路唯一的凭据，所以放在卡片最上面；
+        // 它是本地事实（instance.id），不依赖登录与网络，登录前后都显示。
+        deviceIdBlock(accountCardLayout)
+
+        val loginRow = SettingsUi.row(activity, "登录状态", "正在检查登录状态…")
         accountCardLayout.addView(loginRow)
         loginRow.isEnabled = false
-        fun summaryText(row: LinearLayout): TextView =
-            (row.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
         accountSummary = summaryText(loginRow)
         loginRow.setOnClickListener { showAccountActions() }
+
+        val deviceRow = SettingsUi.row(activity, "设备", "登录后可查看本账号的在线设备",
+            summaryMaxLines = 2)
+        accountCardLayout.addView(deviceRow)
+        deviceSummary = summaryText(deviceRow)
+        deviceRow.setOnClickListener { showDevices() }
+
         request({ PyBridge.accountStatus(activity) }) { result ->
             if (!result.optBoolean("ok")) {
                 summaryText(loginRow).text = result.optString("message")
                 return@request
             }
+            setDeviceId(result.optString("instance_id"))
             if (result.optBoolean("logged_in")) {
                 val who = result.optString("display_name").ifEmpty { result.optString("login") }
                 summaryText(loginRow).text = if (result.has("online") && !result.optBoolean("online")) {
@@ -1276,6 +1300,7 @@ class WorkbenchUi(
                 }
                 lastLoginError = ""
                 loginRow.isEnabled = true
+                refreshDeviceSummary()
             } else {
                 val orphaned = result.optBoolean("orphaned")
                 summaryText(loginRow).text = when {
@@ -1286,6 +1311,140 @@ class WorkbenchUi(
                 loginRow.isEnabled = true
                 loginRow.setOnClickListener { showLoginDialog() }
             }
+        }
+    }
+
+    /**
+     * 设备 ID 区块：标题行（含 48dp 复制按钮）→ 整行的 32 位值 → 换行提醒。
+     *
+     * 值单独占一整行、用等宽字体：和「设备 ID」挤在同一行时，360dp 屏上这串 32 位
+     * 十六进制会被硬折成两行，凭据被劈成两段，核对时极易看错。
+     */
+    private fun deviceIdBlock(parent: LinearLayout) {
+        val header = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        header.addView(SettingsUi.label(activity, "设备 ID", 14f).apply {
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(SettingsUi.iconButton(
+            activity, R.drawable.ic_content_copy, "复制设备 ID") { copyDeviceId() })
+        parent.addView(header, LinearLayout.LayoutParams(-1, -2))
+
+        val value = SettingsUi.label(activity, "正在读取…", 14f).apply {
+            setTextIsSelectable(true)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, 0)
+        }
+        deviceIdText = value
+        parent.addView(value, LinearLayout.LayoutParams(-1, -2))
+
+        parent.addView(SettingsUi.label(
+            activity, "请勿随意向他人泄露，这是重置密码的唯一凭据", 12f, secondary = true))
+    }
+
+    private fun setDeviceId(value: String) {
+        deviceIdValue = value.trim()
+        deviceIdText?.text = deviceIdValue.ifEmpty { "读取失败，请重新进入本页" }
+    }
+
+    private fun copyDeviceId() = copyToClipboard(deviceIdValue, deviceIdText)
+
+    /**
+     * 复制设备 ID（本机的，或「在线设备」里某一台的）。
+     *
+     * 这串是重置密码的凭据：API 33+ 标成敏感内容（系统复制浮层只提示、不预览），
+     * 且不再自己 toast——系统已经弹过「已复制」，重复提示只会互相盖住。
+     */
+    private fun copyToClipboard(value: String, anchor: View?) {
+        if (value.isEmpty()) { toast("设备 ID 还没读到，请稍后再试"); return }
+        val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+        if (clipboard == null) { toast("系统剪贴板不可用"); return }
+        val clip = android.content.ClipData.newPlainText("律匠设备 ID", value)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            clip.description.extras = android.os.PersistableBundle().apply {
+                putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+        clipboard.setPrimaryClip(clip)
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            toast("设备 ID 已复制")
+        }
+        anchor?.announceForAccessibility("设备 ID 已复制")
+    }
+
+    /** 设备列表只能来自 /api/summary（要登录态），所以进页时按登录状态再拉一次。 */
+    private fun refreshDeviceSummary() {
+        deviceSummary?.text = "正在读取在线设备…"
+        request({ PyBridge.accountDevices(activity) }) { updateDeviceSummary(it) }
+    }
+
+    private fun updateDeviceSummary(result: JSONObject) {
+        val target = deviceSummary ?: return
+        if (!result.optBoolean("ok")) {
+            // 行内只留稳定状态：后端原文在点行重试时用 toast 讲，别把次要色说明行撑成报错
+            target.text = "设备列表暂不可用 · 点此重试"
+            return
+        }
+        if (!result.optBoolean("logged_in")) {
+            target.text = "登录后可查看本账号的在线设备"
+            return
+        }
+        val devices = objects(result.optJSONArray("devices"))
+        target.text = if (devices.isEmpty()) "本账号下还没有登记设备"
+            else "在线 ${devices.count { it.optBoolean("online") }} 台 · 共 ${devices.size} 台设备"
+    }
+
+    /** 在线设备明细：名称（本机）、平台与在线状态。 */
+    private fun showDevices() {
+        request({ PyBridge.accountDevices(activity) }) { result ->
+            if (!result.optBoolean("logged_in")) {
+                // 没登录就直接给登录入口：设置页里「点一下只弹一条 toast」最像坏了
+                showLoginDialog()
+                return@request
+            }
+            if (!result.optBoolean("ok")) {
+                toast(result.optString("message").ifEmpty { "设备列表暂不可用" })
+                updateDeviceSummary(result)
+                return@request
+            }
+            updateDeviceSummary(result)
+            val devices = objects(result.optJSONArray("devices"))
+            val content = SettingsUi.dialogContent(activity)
+            if (devices.isEmpty()) text(content, "本账号下还没有登记设备。", 14f)
+            val gap = (8 * activity.resources.displayMetrics.density).toInt()
+            devices.forEachIndexed { index, device ->
+                if (index > 0) content.addView(View(activity), LinearLayout.LayoutParams(-1, gap))
+                val name = (device.optString("name").ifEmpty { device.optString("id").take(8) }) +
+                    if (device.optBoolean("self")) "（本机）" else ""
+                // 每台设备一行：左边名称 + 平台/在线/首次出现，右边复制该设备的 ID
+                val row = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+                val texts = column()
+                texts.addView(SettingsUi.label(activity, name, 16f))
+                val detail = listOf(
+                    device.optString("platform").ifEmpty { "—" },
+                    device.optString("status").ifEmpty { "—" },
+                    device.optString("since"),
+                ).filter { it.isNotEmpty() }.joinToString(" · ")
+                texts.addView(SettingsUi.label(activity, detail, 12f, secondary = true))
+                row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+                val deviceId = device.optString("id")
+                var copyButton: View? = null
+                copyButton = SettingsUi.iconButton(
+                    activity, R.drawable.ic_content_copy, "复制该设备的 ID") {
+                    copyToClipboard(deviceId, copyButton)
+                }
+                row.addView(copyButton)
+                content.addView(row, LinearLayout.LayoutParams(-1, -2))
+            }
+            MaterialAlertDialogBuilder(activity).setTitle("在线设备")
+                .setView(SettingsUi.dialogScroll(activity, content))
+                .setPositiveButton("关闭", null)
+                .show()
         }
     }
 

@@ -8,10 +8,11 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from lvjiang.core.account.service import AccountError
+from lvjiang.core.account.service import AccountError, current_instance_id
 from lvjiang.core.ondevice import account_api
 
 
@@ -40,7 +41,8 @@ def test_status_probes_only_once_per_process(monkeypatch) -> None:
     second = json.loads(account_api.account_status())
 
     assert first == second == {"ok": True, "logged_in": True,
-                               "login": "wang", "display_name": "王"}
+                               "login": "wang", "display_name": "王",
+                               "instance_id": current_instance_id()}
     assert len(calls) == 1
 
 
@@ -104,7 +106,8 @@ def test_login_warms_cache_without_extra_probe(monkeypatch) -> None:
 
     assert result["ok"] is True
     assert status == {"ok": True, "logged_in": True, "online": True,
-                      "login": "wang", "display_name": "王"}
+                      "login": "wang", "display_name": "王",
+                      "instance_id": current_instance_id()}
 
 
 def test_logout_clears_cached_status(monkeypatch) -> None:
@@ -116,3 +119,57 @@ def test_logout_clears_cached_status(monkeypatch) -> None:
     account_api.account_logout()
 
     assert json.loads(account_api.account_status())["logged_in"] is False
+
+
+def test_status_always_exposes_local_device_id(monkeypatch) -> None:
+    """设备 ID 是本地事实：未登录、断网也必须在。
+
+    它在找回密码流程里是唯一的身份凭据——跟登录态一起缓存或跟着网络失败一起
+    消失，用户就没法把它报给管理员了。
+    """
+    monkeypatch.setattr(account_api, "_STATUS_CACHE", {"ok": True, "logged_in": False})
+
+    status = json.loads(account_api.account_status())
+
+    assert status["logged_in"] is False
+    assert status["instance_id"] == current_instance_id()
+
+
+def test_devices_list_marks_self_and_online(monkeypatch) -> None:
+    """「账户 → 设备」行的数据源：本机标记与在线判定都来自 /api/summary。"""
+    from lvjiang.core.account.devices import ONLINE_WINDOW_MINUTES
+
+    session = account_api._session()
+    session.access_token = "access"
+    now = datetime.now(timezone.utc)
+    fresh = (now - timedelta(minutes=ONLINE_WINDOW_MINUTES - 1)).isoformat()
+    stale = (now - timedelta(minutes=ONLINE_WINDOW_MINUTES + 1)).isoformat()
+    first_seen = (now - timedelta(days=3)).isoformat()
+    monkeypatch.setattr(session, "summary", lambda: {
+        "instance_id": "dev-self",
+        "devices": [
+            {"id": "dev-self", "name": "Pixel 7", "platform": "android",
+             "last_seen": fresh, "first_seen": first_seen},
+            {"id": "dev-pc", "name": "书房PC", "platform": "windows", "last_seen": stale},
+        ]})
+
+    result = json.loads(account_api.account_devices())
+
+    assert [result["ok"], result["logged_in"], result["online"]] == [True, True, 1]
+    assert [item["self"] for item in result["devices"]] == [True, False]
+    assert result["devices"][0]["status"] == "在线"
+    assert result["devices"][1]["status"].startswith("最后在线")
+    # 同型号两台手机只能靠「首次出现」区分；服务端缺这个字段时留空，不编造
+    assert result["devices"][0]["since"] == "首次出现 3 天前"
+    assert result["devices"][1]["since"] == ""
+
+
+def test_devices_list_is_empty_when_not_logged_in(monkeypatch) -> None:
+    """没登录不是错误：设备列表只能来自 summary，如实返回空表让界面说「登录后可见」。"""
+    session = account_api._session()
+    session.access_token = ""
+    monkeypatch.setattr(session, "restore", lambda *, fetch_summary=True: None)
+
+    result = json.loads(account_api.account_devices())
+
+    assert result == {"ok": True, "logged_in": False, "devices": []}

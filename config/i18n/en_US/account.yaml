@@ -11,7 +11,7 @@ account_dialog:
   "创建快照": "Create Snapshot"
   "初始同步": "Initial Sync"
   "在浏览器中打开注册页面": "Open the registration page in a browser"
-  "在浏览器打开自助操作页：导出数据、清除云端数据、注销账号": "Open the self-service page in a browser: export data, clear cloud data, delete account"
+  "在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号": "Open the self-service page in a browser: change password, export data, clear cloud data, delete account"
   "定义": "Definitions"
   "密码": "Password"
   ? "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。"

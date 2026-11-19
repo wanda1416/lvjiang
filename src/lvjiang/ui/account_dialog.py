@@ -627,7 +627,7 @@ class AccountManagerDialog(QDialog):
         self.self_service_button = QPushButton(tr("自助服务…"))
         apply_button_style(self.self_service_button, variant="neutral")
         self.self_service_button.setToolTip(tr(
-            "在浏览器打开自助操作页：导出数据、清除云端数据、注销账号"))
+            "在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号"))
         self.self_service_button.clicked.connect(self._open_self_service)
         head_row.addWidget(self.self_service_button)
         self.change_password_button = QPushButton(tr("修改密码…"))

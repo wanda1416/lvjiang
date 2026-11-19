@@ -106,10 +106,16 @@ object SettingsUi {
                 }
             })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(label(context, "›", 24f).apply { setPadding((16 * resources.displayMetrics.density).toInt(), 0, 0, 0) })
+        // 尾部指示用图标而不是「›」字符：字符会被读屏当成正文念出来
+        addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            val icon = (24 * resources.displayMetrics.density).toInt()
+            layoutParams = LinearLayout.LayoutParams(icon, icon)
+        })
         isClickable = true
         isFocusable = true
-        val attr = android.util.TypedValue()
+        val attr = TypedValue()
         context.theme.resolveAttribute(android.R.attr.selectableItemBackground, attr, true)
         setBackgroundResource(attr.resourceId)
     }

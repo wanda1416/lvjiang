@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 行尾「可进入」指示：用矢量图标而不是「›」字符——字符会被读屏念出来，
+     不同字体下宽度也不稳。M3 列表项尾部的图标是 colorOnSurfaceVariant。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="?attr/colorOnSurfaceVariant"
+    android:autoMirrored="true">
+    <path android:fillColor="@android:color/white"
+        android:pathData="M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z" />
+</vector>

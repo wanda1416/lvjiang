@@ -331,7 +331,7 @@ class WorkbenchUi(
         val run = card()
         val heading = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
         run.addView(heading)
-        text(heading, "当前任务", 18f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        sectionTitle(heading, "当前任务").layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         runtimeStatus = Chip(activity).apply {
             text = "待开始"; textSize = 12f; isClickable = false; isCheckable = false; isFocusable = false
             chipStrokeWidth = 0f
@@ -387,7 +387,7 @@ class WorkbenchUi(
         lastHistoryState = "${status.optLong("log_generation")}/${status.optString("state")}"
         val recentHeading = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
         recent.addView(recentHeading)
-        text(recentHeading, "最新执行", 18f).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        sectionTitle(recentHeading, "最新执行").layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         button(recentHeading, "刷新") { loadHistory(recent) }
         loadHistory(recent)
         updateStatus(status)
@@ -512,7 +512,7 @@ class WorkbenchUi(
                 if (!result.optBoolean("ok")) toast(result.optString("message")) else show("TASKS")
             } }.isEnabled = !readonly
             button(host, "查看当前进度") { batchProgress() }.visibility = if (status.optJSONObject("batch")?.optString("group_id").orEmpty().isNotEmpty()) View.VISIBLE else View.GONE
-            val recent = card(); text(recent, "最近批次", 18f)
+            val recent = card(); sectionTitle(recent, "最近批次")
             request({ PyBridge.batchHistory(activity) }) { history ->
                 if (!history.optBoolean("ok")) text(recent, history.optString("message"))
                 val records = objects(history.optJSONArray("records"))
@@ -914,7 +914,7 @@ class WorkbenchUi(
     private fun renderGroupCard(parent: LinearLayout, entries: List<JSONObject>, username: String) {
         val section = card(parent)
         val first = entries.first()
-        text(section, "${first.optString("model_label")} · ${first.optString("group")}", 18f)
+        sectionTitle(section, "${first.optString("model_label")} · ${first.optString("group")}")
         entries.forEach { entry ->
             val value = when {
                 entry.optBoolean("locked") -> "[锁定]"
@@ -974,7 +974,7 @@ class WorkbenchUi(
             if (groups.isEmpty()) text(host, "暂无可展示的数据项")
             groups.forEach { group ->
                 val section = card()
-                text(section, group.optString("title"), 18f)
+                sectionTitle(section, group.optString("title"))
                 objects(group.optJSONArray("items")).forEach { item ->
                     val body = column()
                     section.addView(body, LinearLayout.LayoutParams(-1, -2))
@@ -1052,7 +1052,7 @@ class WorkbenchUi(
                     if (groups.isEmpty()) text(content, "请先在备战方案页选择有效的流派和基础属性。")
                     groups.forEach { group ->
                         val attributes = card(content)
-                        text(attributes, group.optString("title"), 18f)
+                        sectionTitle(attributes, group.optString("title"))
                         objects(group.optJSONArray("items")).forEach { item ->
                             val row = LinearLayout(activity).apply {
                                 orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL
@@ -1118,7 +1118,7 @@ class WorkbenchUi(
                 selector("基础属性", result.optString("base_attribute"), result.optJSONArray("base_attributes")) { loadoutBase = it }
                 if ((result.optJSONArray("schemes")?.length() ?: 0) == 0) text(summary, "请同步适用计算模型。", 12f)
                 val equipment = card(content)
-                text(equipment, "方案装备", 18f)
+                sectionTitle(equipment, "方案装备")
                 objects(result.optJSONArray("slots")).forEach { slot ->
                     val item = slot.optJSONObject("equipment")
                     val label = slot.optString("label")
@@ -1210,7 +1210,7 @@ class WorkbenchUi(
 
     private fun settings() {
         val tools = card()
-        text(tools, "运行与维护", 18f)
+        sectionTitle(tools, "运行与维护")
         fun entry(parent: LinearLayout, title: String, summary: String, action: () -> Unit) {
             parent.addView(SettingsUi.row(activity, title, summary).apply { setOnClickListener { action() } })
         }
@@ -1224,7 +1224,7 @@ class WorkbenchUi(
         profileSourceSummary = (sourceRow.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
         request({ PyBridge.accountProfileStatus(activity) }) { updateProfileSourceSummary(it) }
         val about = card()
-        text(about, "关于与反馈", 18f)
+        sectionTitle(about, "关于与反馈")
         val versionRow = SettingsUi.row(activity, "版本与发布说明", "正在读取版本…")
         about.addView(versionRow)
         versionRow.isEnabled = false

@@ -66,12 +66,22 @@ class BasicConfigPanel(QWidget):
         self._cooldown_days.setToolTip(tr(
             "扫描装备发生转律后的冷却天数"))
         self._cooldown_days.valueChanged.connect(self._apply)
-        form.addRow(tr_label('冷却时间'), self._cooldown_days)
+        form.addRow(tr_label('装备重置冷却时间'), self._cooldown_days)
+        self._reset_min_wait = QSpinBox()
+        self._reset_min_wait.setRange(0, 60)
+        self._reset_min_wait.setSuffix(tr(" 秒"))
+        self._reset_min_wait.setMinimumWidth(140)
+        self._reset_min_wait.setToolTip(tr(
+            "重置调律两次确认之间的最短等待。游戏新版为 3 秒；"
+            "程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。"
+            "填 0 表示不做这段额外等待。"))
+        self._reset_min_wait.valueChanged.connect(self._apply)
+        form.addRow(tr_label('重置二次确认时间'), self._reset_min_wait)
         self._cooldown_carryover = QCheckBox(tr("冷却到期后累计一次"))
         self._cooldown_carryover.setToolTip(tr(
             "逾期时间会抵扣下一轮冷却，最多保留一次可重置次数"))
         self._cooldown_carryover.toggled.connect(self._apply)
-        form.addRow(tr_label('逾期进度'), self._cooldown_carryover)
+        form.addRow(tr_label('重置冷却逾期进度'), self._cooldown_carryover)
         self._stone_percent = QDoubleSpinBox()
         self._stone_percent.setRange(0.1, 100.0)
         self._stone_percent.setDecimals(1)
@@ -82,31 +92,13 @@ class BasicConfigPanel(QWidget):
             "一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。"
             "装备「养成」里按它估算承音喂满还需要几个传律石。"))
         self._stone_percent.valueChanged.connect(self._apply)
-        form.addRow(tr_label('传律石提升'), self._stone_percent)
+        form.addRow(tr_label('装备培养单次提升'), self._stone_percent)
         layout.addWidget(box)
-        layout.addWidget(self._build_tuning_box())
         layout.addWidget(self._build_hotkey_box())
 
         self._status_label = QLabel()
         layout.addWidget(self._status_label)
         layout.addStretch()
-
-    def _build_tuning_box(self) -> QGroupBox:
-        """调律动作自身的游戏节奏参数（与具体规则、装备无关）。"""
-        box = QGroupBox(tr("调律设置"))
-        form = QFormLayout(box)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        self._reset_min_wait = QSpinBox()
-        self._reset_min_wait.setRange(0, 60)
-        self._reset_min_wait.setSuffix(tr(" 秒"))
-        self._reset_min_wait.setMinimumWidth(140)
-        self._reset_min_wait.setToolTip(tr(
-            "重置调律两次确认之间的最短等待。游戏新版为 3 秒；"
-            "程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。"
-            "填 0 表示不做这段额外等待。"))
-        self._reset_min_wait.valueChanged.connect(self._apply)
-        form.addRow(tr_label('重置最小等待时间'), self._reset_min_wait)
-        return box
 
     def _build_hotkey_box(self) -> QGroupBox:
         """插件菜单的快捷键：区间 F5~F7 与 Alt+字母，与通用菜单共用查重。"""

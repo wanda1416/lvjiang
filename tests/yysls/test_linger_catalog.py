@@ -48,10 +48,12 @@ def test_shipped_catalog_matches_the_published_totals(tmp_path: Path) -> None:
         "青州": 14,
         "江南": 30,
         "未央城": 19,
-        "通用": 30,
+        "通用": 36,
     }
-    assert catalog.total == 218
-    assert catalog.item_count == 102
+    # 总枚 224 含周期型 10（无我三排 3 + 逐战 2 + 百珍 2 + 不肝 1 + 地华 2）；
+    # 固定口径 214（周期型按当期进度动态，不计入常驻分母的推进统计）。
+    assert catalog.total == 224
+    assert catalog.item_count == 107
     assert [region.order for region in catalog.regions] == sorted(
         region.order for region in catalog.regions)
 

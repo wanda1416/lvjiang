@@ -619,11 +619,30 @@ other:
       label: 止戈境界
       count: 2
       source: 止戈段位
-    - id: feabbfa8
+    - id: 4a1d0e2e
       category: 觉障林
-      label: 无我
-      count: 3
+      label: 无我·单排
+      count: 1
       source: 觉障林
+      kind: periodic
+      target: quota:nn_juezhang_of_halfseason
+      detail: 半赛季周期；单排首通各 1 枚（共享同一配额 key，步进 1）。
+    - id: 8bcbd580
+      category: 觉障林
+      label: 无我·双排
+      count: 1
+      source: 觉障林
+      kind: periodic
+      target: quota:nn_juezhang_of_halfseason
+      detail: 半赛季周期；双排首通各 1 枚（共享同一配额 key，步进 2）。
+    - id: 49a6b713
+      category: 觉障林
+      label: 无我·五排
+      count: 1
+      source: 觉障林
+      kind: periodic
+      target: quota:nn_juezhang_of_halfseason
+      detail: 半赛季周期；五排首通各 1 枚（共享同一配额 key，步进 3）。
     - id: 3d1e3fbd
       category: 家业
       label: 繁荣度
@@ -645,6 +664,30 @@ other:
       source: 藏锋志
       category: 图鉴
     - id: c95afeee
-      label: 渡尘墟
+      label: 逐战商店
+      count: 2
+      source: 逐战商店
+      kind: periodic
+      target: quota:nn_of_halfseason
+      detail: 大赛季周期，每周期 2 枚（3000 花蕊织/个）。
+    - id: 7ecba74a
+      label: 百珍商店
+      count: 2
+      source: 百珍商店
+      kind: periodic
+      target: quota:niaoniao_of_week
+      detail: 每周 2 枚（200 长鸣玉/个）。
+    - id: 51e23c00
+      label: 不肝商店
       count: 1
-      source: 渡尘墟
+      source: 不肝商店
+      kind: periodic
+      target: quota:nn_bugan_of_week
+      detail: 每周 1 枚（200 长鸣玉/个）。
+    - id: a519a7bd
+      label: 地华商店
+      count: 2
+      source: 地华商店
+      kind: periodic
+      target: quota:dihua_of_month
+      detail: 每月 2 枚。

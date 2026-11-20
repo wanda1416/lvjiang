@@ -186,7 +186,8 @@ def _fallback_source(raw: dict) -> str:
 
 
 def region_from_doc(doc: Any, *, source_name: str,
-                    region_id: str | None = None) -> LingerRegion:
+                    region_id: str | None = None,
+                    default_target: str = DEFAULT_TARGET) -> LingerRegion:
     """把一份地区清单 YAML 解析成 :class:`LingerRegion`。
 
     任何字段问题都抛 ``ValueError``（带文件名与条目位置），由加载层隔离：
@@ -225,7 +226,7 @@ def region_from_doc(doc: Any, *, source_name: str,
         if count <= 0:
             raise ValueError(f"{where} 的 count 必须大于 0")
         item_label = _require_text(raw.get("label"), f"{where} 的 label")
-        target = str(raw.get("target") or "").strip() or DEFAULT_TARGET
+        target = str(raw.get("target") or "").strip() or default_target
         kind = _item_kind(raw, where)
         # 目标决定读取语义（配额=周期读值），但不再强制反推 kind：同一个
         # 来源既可以按周期记账（quota:*），也可以按库存累计（stock:*）或
@@ -255,7 +256,7 @@ def region_from_doc(doc: Any, *, source_name: str,
 
 
 #: 顶层保留给元信息的键（不属于任何地区）
-RESERVED_DOC_KEYS = frozenset({"content_version", "default_target"})
+RESERVED_DOC_KEYS = frozenset({"content_version", "default_target", "target_candidates"})
 
 
 def catalog_from_doc(doc: Any, source_name: str) -> LingerCatalog:
@@ -269,10 +270,12 @@ def catalog_from_doc(doc: Any, source_name: str) -> LingerCatalog:
     region_ids = [k for k in doc if k not in RESERVED_DOC_KEYS]
     if not region_ids:
         raise ValueError(f"{source_name} 没有任何地区")
+    doc_default_target = str(doc.get("default_target") or "").strip() or DEFAULT_TARGET
     regions = [
         region_from_doc(doc[region_id],
                         source_name=f"{source_name} 的地区 {region_id}",
-                        region_id=str(region_id))
+                        region_id=str(region_id),
+                        default_target=doc_default_target)
         for region_id in region_ids
     ]
     return build_catalog(regions)

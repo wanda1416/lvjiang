@@ -478,9 +478,7 @@ class LingerDialog(QDialog):
         all_item.setData(Qt.ItemDataRole.UserRole, _ALL_REGIONS)
         self.region_list.addItem(all_item)
         for region in self._catalog.regions:
-            done = sum(
-                self._state.resolve_done(item_key(region.id, item.id), item)
-                for item in region.items)
+            done = self._region_fixed_done(region)
             region_entry = QListWidgetItem(f"{region.label}  {done}/{region.fixed_total}")
             region_entry.setData(Qt.ItemDataRole.UserRole, region.id)
             region_entry.setToolTip(region.label)
@@ -897,12 +895,12 @@ class LingerDialog(QDialog):
         else:
             event.ignore()
 
-    def _drag_source_key(self) -> str | None:
+    def _drag_source_ref(self) -> _RowRef | None:
         row = self.table.currentRow()
         ref = self._rows.get(row)
         if ref is None or ref.slot is not None:
             return None
-        return item_key(ref.region.id, ref.item.id)
+        return ref
 
     def _drop(self, event) -> None:
         """松手：把拖动条目挪到落点条目前面（地区末尾则传 None）。
@@ -912,10 +910,11 @@ class LingerDialog(QDialog):
         if event.source() is not self.table:
             event.ignore()
             return
-        source_key = self._drag_source_key()
-        if source_key is None:
+        source_ref = self._drag_source_ref()
+        if source_ref is None:
             event.ignore()
             return
+        source_key = item_key(source_ref.region.id, source_ref.item.id)
         pos = event.position().toPoint()
         target_row = self.table.rowAt(pos.y())
         ref = self._rows.get(target_row)
@@ -923,9 +922,7 @@ class LingerDialog(QDialog):
             event.ignore()
             return
         target_key = item_key(ref.region.id, ref.item.id)
-        region_a, _, _ = source_key.partition("/")
-        region_b, _, _ = target_key.partition("/")
-        if region_a != region_b:
+        if source_ref.region.id != ref.region.id:
             event.ignore()
             return
 
@@ -1191,11 +1188,16 @@ class LingerDialog(QDialog):
         self.status.setStyleSheet(
             "color: #c62828; font-size: 11px;" if error else _MUTED_STYLE)
 
+    def _region_fixed_done(self, region: LingerRegion) -> int:
+        return sum(
+            self._state.resolve_done(item_key(region.id, item.id), item)
+            for item in region.items
+            if not item.periodic
+        )
+
     def _refresh_region_labels(self, region: LingerRegion) -> None:
         """只更新左栏里这一个地区的计数，避免整表重建丢焦点。"""
-        done = sum(
-            self._state.resolve_done(item_key(region.id, item.id), item)
-            for item in region.items)
+        done = self._region_fixed_done(region)
         self._updating = True
         for row in range(self.region_list.count()):
             entry = self.region_list.item(row)

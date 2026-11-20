@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -17,6 +16,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 from .item_dialog import candidate_targets
 
 
@@ -36,7 +36,7 @@ class LingerBatchTargetDialog(QDialog):
         row = QHBoxLayout()
         row.setSpacing(10)
         row.addWidget(QLabel(tr_label("目标")))
-        self.target_combo = QComboBox(self)
+        self.target_combo = AutoWidthComboBox(self, width_mode=ComboWidthMode.POPUP)
         self.target_combo.addItem(tr("跟随同步模型"), "")
         for value, label in candidate_targets():
             self.target_combo.addItem(label, value)

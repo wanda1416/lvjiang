@@ -27,7 +27,7 @@ from .....core.config.resolver import get_resolver
 from .board import LINGER_BOARD
 from .models import (
     DEFAULT_TARGET,
-    ITEM_PERIODIC,
+    ITEM_KINDS,
     ITEM_SINGLE,
     RESERVED_DOC_KEYS,
     LingerCatalog,
@@ -219,7 +219,13 @@ def upsert_item(key: str, fields: dict) -> None:
         return
     items, index = found
     clean = _clean_fields(fields, require_id=False)
-    items[index] = {**items[index], **clean}
+    updated = dict(items[index])
+    if "target" in fields:
+        updated.pop("target", None)
+    if "kind" in fields:
+        updated.pop("kind", None)
+    updated.update(clean)
+    items[index] = updated
     _save_full(doc)
 
 
@@ -362,23 +368,19 @@ def set_batch_target(keys: list[str], target: str) -> int:
 
 
 def _clean_fields(fields: dict, *, require_id: bool = True) -> dict:
-    """只收清单认识的字段；target/kind 的自洽规则与解析层一致。"""
+    """只收清单认识的字段；记法（kind）与入账目标（target）独立保存。"""
     result: dict[str, Any] = {}
     for name in ("category", "label", "count", "source", "detail"):
         if name in fields:
             result[name] = fields[name]
-    kind = str(fields.get("kind") or ITEM_SINGLE)
-    target = str(fields.get("target") or "").strip()
-    if target.startswith("quota:"):
-        kind = ITEM_PERIODIC
-    elif kind == ITEM_PERIODIC:
+    kind = str(fields.get("kind") or ITEM_SINGLE).strip()
+    if kind not in ITEM_KINDS:
         kind = ITEM_SINGLE
-        target = ""
-    if target and target != DEFAULT_TARGET:
+    if kind != ITEM_SINGLE:
+        result["kind"] = kind
+    target = str(fields.get("target") or "").strip()
+    if target:
         result["target"] = target
-        result["kind"] = kind
-    elif kind != ITEM_SINGLE:
-        result["kind"] = kind
     if require_id and "id" in fields:
         result["id"] = fields["id"]
     return result

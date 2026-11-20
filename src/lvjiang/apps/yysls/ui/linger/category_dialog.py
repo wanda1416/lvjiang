@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -19,6 +18,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 from ...core.linger import known_categories, remove_category, rename_category
 
 
@@ -46,14 +46,14 @@ class LingerCategoryDialog(QDialog):
 
         rename_row = QHBoxLayout()
         rename_row.addWidget(QLabel(tr_label("类型")))
-        self.rename_from = QComboBox(self)
+        self.rename_from = AutoWidthComboBox(self, width_mode=ComboWidthMode.POPUP)
         # 首项留空：打开时不默认选中任何分类，避免一键作用到意外目标
         self.rename_from.addItem("")
         self.rename_from.addItems(known_categories())
         self.rename_from.setCurrentIndex(0)
         self.rename_from.currentTextChanged.connect(self._update_actions)
         rename_row.addWidget(self.rename_from, 1)
-        self.rename_to = QComboBox(self)
+        self.rename_to = AutoWidthComboBox(self, width_mode=ComboWidthMode.POPUP)
         self.rename_to.setEditable(True)
         self.rename_to.currentTextChanged.connect(lambda _text: self._update_actions())
         rename_row.addWidget(self.rename_to, 1)

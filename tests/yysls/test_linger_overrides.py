@@ -281,3 +281,31 @@ def test_move_back_to_system_order_clears_local(resolver: ConfigResolver) -> Non
     ov.move_item("a", "b")
 
     assert _local_doc(resolver) == {}
+
+
+def test_target_candidates_and_default_target_apply_to_items(resolver: ConfigResolver) -> None:
+    """顶层 target_candidates 不被当成地区，且 default_target 生效于未指定 target 的条目。"""
+    ov.set_target_candidates(["stock:other", "none"], "stock:other")
+
+    catalog = _effective(resolver)
+    assert catalog.item("a")[1].target == "stock:other"
+
+
+def test_upsert_preserves_decoupled_kind_and_clears_target_on_follow_default(
+    resolver: ConfigResolver,
+) -> None:
+    """记法与入账目标解耦：互不覆盖，切回跟随同步模型时清掉旧 target。"""
+    ov.upsert_item("a", {"label": "甲", "count": 2, "kind": "roster", "target": "quota:wk"})
+    item_a = _effective(resolver).item("a")[1]
+    assert item_a.kind == "roster"
+    assert item_a.target == "quota:wk"
+
+    ov.upsert_item("a", {"label": "甲", "count": 2, "kind": "periodic", "target": "stock:other"})
+    item_a = _effective(resolver).item("a")[1]
+    assert item_a.kind == "periodic"
+    assert item_a.target == "stock:other"
+
+    ov.upsert_item("a", {"label": "甲", "count": 2, "kind": "single", "target": ""})
+    item_a = _effective(resolver).item("a")[1]
+    assert item_a.kind == "single"
+    assert item_a.target == "stock:niaoniao"

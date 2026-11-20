@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -87,7 +86,8 @@ def candidate_targets() -> list[tuple[str, str]]:
                 if candidate_value == value:
                     result.append((value, label))
                     break
-    result.append((NO_SYNC_TARGET, tr("不同步")))
+    if not any(value == NO_SYNC_TARGET for value, _label in result):
+        result.append((NO_SYNC_TARGET, tr("不同步")))
     return result
 
 
@@ -148,7 +148,7 @@ class LingerItemDialog(QDialog):
         self.region_combo.setEnabled(self._item is None)
         form.addRow(tr_label("地区"), self.region_combo)
 
-        self.category_edit = QComboBox(self)
+        self.category_edit = AutoWidthComboBox(self, width_mode=ComboWidthMode.POPUP)
         self.category_edit.setEditable(True)
         self.category_edit.addItems(["", *category_choices()])
         self.category_edit.setCurrentIndex(0)
@@ -161,13 +161,13 @@ class LingerItemDialog(QDialog):
         self.label_edit = QLineEdit(self)
         form.addRow(tr_label("条目"), self.label_edit)
 
-        self.kind_combo = QComboBox(self)
+        self.kind_combo = AutoWidthComboBox(self, width_mode=ComboWidthMode.POPUP)
         for value, label in _KIND_CHOICES:
             if value == ITEM_PERIODIC and not target_choices(booking.MODEL_QUOTA):
                 continue  # 没有配额 key 时不提供「周期」，免得选了个没法落的类型
             self.kind_combo.addItem(tr(label), value)
         self.kind_combo.currentIndexChanged.connect(self._reload_targets)
-        form.addRow(tr_label("类型"), self.kind_combo)
+        form.addRow(tr_label("记法"), self.kind_combo)
 
         self.count_spin = QSpinBox(self)
         self.count_spin.setRange(1, 999)
@@ -177,7 +177,7 @@ class LingerItemDialog(QDialog):
         self.source_edit = QLineEdit(self)
         form.addRow(tr_label("来源"), self.source_edit)
 
-        self.target_combo = QComboBox(self)
+        self.target_combo = AutoWidthComboBox(self, width_mode=ComboWidthMode.POPUP)
         form.addRow(tr_label("目标"), self.target_combo)
         self._reload_targets()
 

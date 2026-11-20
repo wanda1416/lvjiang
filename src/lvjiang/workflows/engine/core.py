@@ -746,7 +746,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 except InputTraceError as exc:
                     raise WorkflowUserError(str(exc)) from exc
                 self._input_trace_cache[path] = trace
-                self._input_trace_cache[path] = trace
+                # 校验期已缓存，执行期不再二次解码
 
     # ─── Python 桥：subcall 加载与调用 ────────────────────────
 

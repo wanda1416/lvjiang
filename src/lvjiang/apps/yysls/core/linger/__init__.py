@@ -72,7 +72,6 @@ __all__ = [
     "set_batch_target",
     "read_target_candidates",
     "set_target_candidates",
-    "set_target_candidates",
     "upsert_item",
     "build_catalog",
     "catalog_from_doc",

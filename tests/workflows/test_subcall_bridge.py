@@ -110,6 +110,82 @@ def test_nav_subcalls_have_explicit_success_return():
         assert final_stmt.value == 0, f"{name} 应以 0 表示成功"
 
 
+class _StubRegion:
+    """只有 key / template / disabled 三个静态检查会用到的字段"""
+
+    def __init__(self, key: str, template=None):
+        self.key = key
+        self.template = template
+        self.disabled = False
+
+
+class _StubLayout:
+    """只摆本端那一侧的主页图标：另一端是「有坐标、没绑模板」的占位。
+
+    真实布局就是这样：安卓的 ``ditu`` 绑了模板、``dongzuo`` 只有坐标，
+    桌面反之。占位区域刻意保留，用来放另一端的标定结果。
+    """
+
+    def __init__(self, regions: dict[str, list]):
+        self._regions = regions
+
+    def get_scene_regions(self, scene):
+        return self._regions.get(scene, [])
+
+    def get_scene_points(self, scene):
+        return []
+
+    def get_scene_arrows(self, scene):
+        return []
+
+    def get_scene_panels(self, scene):
+        return []
+
+
+WF_ENV_BRANCHED_ICON = '''def main_page_icon()
+    eval $icon = ""
+    if env("android")
+        scan [game_main_page].[ditu] as $icon by image
+    else if env("desktop")
+        scan [game_main_page].[dongzuo] as $icon by image
+    end
+    return to_flag($icon)
+end
+
+call $ok = main_page_icon()
+'''
+
+
+def test_load_subcalls_prunes_other_side_env_branch(tmp_path):
+    """load_subcalls 的引用校验按本端裁 ``env()`` 分支。
+
+    真实事故：安卓批量里「购买心法心得」的可执行性检查全灭，理由是
+    ``page_detection.wf:53 [game_main_page].[dongzuo] — 区域未绑定模板``。
+    桌面那颗图标只在本端绑了模板，安卓布局里同 key 的区域是纯坐标占位，
+    而 load_subcalls 校验时没把 run_env 传下去，于是「本端永远不执行」
+    的分支也被算进校验，把整批任务挡在门外。
+    """
+    from lvjiang.core.layout.models import TemplateBinding
+
+    layout = _StubLayout({
+        "game_main_page": [
+            _StubRegion("ditu", TemplateBinding(
+                "android/game_main_page/ditu", 0.8, 2048, 920)),
+            _StubRegion("dongzuo"),
+        ],
+    })
+    wf = tmp_path / "icon_probe.wf"
+    wf.write_text(WF_ENV_BRANCHED_ICON, encoding="utf-8")
+
+    # 本端分支只碰 ditu：校验必须通过（回归点）
+    make_engine(layout=layout, run_env="android").load_subcalls(wf)
+
+    # 反证：环境未知时两路都查，另一端的占位区域确实会让校验失败，
+    # 说明上面那条通过不是靠用例太松，而是靠 run_env 裁掉了无关分支。
+    with pytest.raises(WorkflowUserError, match="dongzuo"):
+        make_engine(layout=layout, run_env="").load_subcalls(wf)
+
+
 def test_tune_navigation_uses_stable_page_label_detector():
     """调律页身份不能依赖会在满词条时变成「定音」的动作按钮。"""
     workflows = get_config_system_dir() / "workflows/subcall"

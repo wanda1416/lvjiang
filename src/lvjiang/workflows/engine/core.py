@@ -1224,12 +1224,18 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """限定范围的布局引用校验：仅检查顶层语句与指定过程
 
         供 load_subcalls 使用，避免重复校验已加载过程。
+
+        ``run_env`` 必须传：本端点不执行的分支不该参与校验。漏传时
+        collect_refs 按「环境未知」保守检查两路 ``env()`` 分支，另一端
+        那颗只摆了坐标、没绑模板的占位区域就会被判成绑定缺失——安卓
+        批量检查因此被桌面分支的 ``game_main_page.dongzuo`` 挡在门外。
         """
         # 构造仅包含指定过程的子集用于 collect_refs
         scoped_procs = {n: self._procs[n] for n in proc_names if n in self._procs}
         scoped_sources = {n: self._proc_sources.get(n, source) for n in proc_names}
         refs = collect_refs(top_body, scoped_procs,
-                           proc_sources=scoped_sources, source=source)
+                           proc_sources=scoped_sources, source=source,
+                           run_env=self.run_env)
         problems = check_refs(refs, self._layout)
         if problems:
             raise WorkflowUserError(format_problems(problems))

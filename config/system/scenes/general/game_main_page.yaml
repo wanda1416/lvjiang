@@ -1,4 +1,4 @@
-content_version: 3
+content_version: 8
 key: game_main_page
 name: 主页
 views:
@@ -53,7 +53,12 @@ regions:
   is_text: true
   is_clickable: true
 - key: ditu
-  name: 地图
+  name: 地图图标
+  type: func
+  is_text: false
+  is_clickable: true
+- key: ditu_mini
+  name: 小地图
   type: func
   is_text: false
   is_clickable: true

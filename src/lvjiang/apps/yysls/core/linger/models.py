@@ -42,8 +42,11 @@ def now_iso() -> str:
 
 
 def item_key(region_id: str, item_id: str) -> str:
-    """记录文件里的条目键：地区 + 条目，两者都是稳定 id。"""
-    return f"{region_id}/{item_id}"
+    """记录文件里的条目键：条目 id 全局唯一，地区前缀冗余。
+
+    保留双参签名（region_id 仅表明条目归属，不参与键值）：调用方不用逐处改。
+    """
+    return item_id
 
 
 # ─── 清单定义 ────────────────────────────────────────────────
@@ -146,13 +149,11 @@ class LingerCatalog:
         return None
 
     def item(self, key: str) -> tuple[LingerRegion, LingerItem] | None:
-        region_id, _, item_id = key.partition("/")
-        region = self.region(region_id)
-        if region is None:
-            return None
-        for item in region.items:
-            if item.id == item_id:
-                return region, item
+        """按条目 id（记录键）全局查找；返回它所在的地区与条目本身。"""
+        for region in self.regions:
+            for item in region.items:
+                if item.id == key:
+                    return region, item
         return None
 
 
@@ -234,28 +235,27 @@ def region_from_doc(doc: Any, *, source_name: str,
                         items=tuple(items))
 
 
+#: 顶层保留给元信息的键（不属于任何地区）
+RESERVED_DOC_KEYS = frozenset({"content_version", "default_target"})
+
+
 def catalog_from_doc(doc: Any, source_name: str) -> LingerCatalog:
-    """解析整份清单文件（``regions:`` 列表）；坏地区抛 ``ValueError`` 交给加载层。"""
+    """解析整份清单文件；坏地区抛 ``ValueError`` 交给加载层。
+
+    顶层每个键（除元信息外）就是一个地区：地区只是条目的属性分组，
+    不再套 ``regions:`` 容器——local 覆盖层写单地区时直接顶层同名即可。
+    """
     if not isinstance(doc, dict):
         raise ValueError(f"{source_name} 顶层必须是 mapping")
-    raw_regions = doc.get("regions")
-    if isinstance(raw_regions, dict):
-        # 现行结构：按地区 id 索引，方便 local 只写自己改动的那个地区
-        if not raw_regions:
-            raise ValueError(f"{source_name} 的 regions 不能为空")
-        regions = [
-            region_from_doc(entry, source_name=f"{source_name} 的地区 {region_id}",
-                            region_id=str(region_id))
-            for region_id, entry in raw_regions.items()
-        ]
-    elif isinstance(raw_regions, list) and raw_regions:
-        # 兼容旧的列表结构（测试与小样）
-        regions = [
-            region_from_doc(entry, source_name=f"{source_name} 第 {index + 1} 个地区")
-            for index, entry in enumerate(raw_regions)
-        ]
-    else:
-        raise ValueError(f"{source_name} 的 regions 必须是非空列表或 mapping")
+    region_ids = [k for k in doc if k not in RESERVED_DOC_KEYS]
+    if not region_ids:
+        raise ValueError(f"{source_name} 没有任何地区")
+    regions = [
+        region_from_doc(doc[region_id],
+                        source_name=f"{source_name} 的地区 {region_id}",
+                        region_id=str(region_id))
+        for region_id in region_ids
+    ]
     return build_catalog(regions)
 
 
@@ -467,7 +467,10 @@ class LingerState:
         items: dict[str, ItemProgress] = {}
         if isinstance(raw_items, dict):
             for key, value in raw_items.items():
-                if not isinstance(key, str) or "/" not in key or not isinstance(value, dict):
+                # 键 = 条目 id（uuid8）。历史文件里的 `地区/条目` 旧键取后半归一。
+                if isinstance(key, str) and "/" in key:
+                    key = key.rpartition("/")[2]
+                if not isinstance(key, str) or not key or not isinstance(value, dict):
                     continue
                 try:
                     done = int(value.get("done", 0))

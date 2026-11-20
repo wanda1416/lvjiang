@@ -28,6 +28,7 @@ from .models import (
     DEFAULT_TARGET,
     ITEM_PERIODIC,
     ITEM_SINGLE,
+    RESERVED_DOC_KEYS,
     LingerCatalog,
     catalog_from_doc,
 )
@@ -37,9 +38,10 @@ LINGER_FILE = "yysls/lingering.yaml"
 
 # 条目列表的合并语义（按 id 原位替换）。import 即注册：页面与测试只要碰到本
 # 模块就生效，不依赖 AppHooks 是否已加载插件；幂等，重复注册无副作用。
+# 顶层每个地区键的 items 都按注册表语义合并（`*.items` 通配全部地区）。
 if LINGER_FILE not in REGISTRY_LIST_PATHS:
-    register_registry_list_paths(LINGER_FILE, ("regions.*.items",))
-    register_registry_list_identity(LINGER_FILE, {"regions.*.items": "id"})
+    register_registry_list_paths(LINGER_FILE, ("*.items",))
+    register_registry_list_identity(LINGER_FILE, {"*.items": "id"})
 def _load_full() -> dict:
     """读取当前合并视图（system + local），作为编辑的完整文档。"""
     return get_resolver().load_merged(LINGER_FILE)
@@ -102,8 +104,8 @@ def rename_category(old: str, new: str) -> int:
         return 0
     doc = _load_full()
     changed = 0
-    for region in doc.get("regions", {}).values():
-        if not isinstance(region, dict):
+    for region_id, region in doc.items():
+        if region_id in RESERVED_DOC_KEYS or not isinstance(region, dict):
             continue
         for entry in region.get("items") or []:
             if isinstance(entry, dict) and str(entry.get("category") or "") == old_clean:
@@ -121,8 +123,8 @@ def remove_category(name: str) -> int:
         return 0
     doc = _load_full()
     changed = 0
-    for region in doc.get("regions", {}).values():
-        if not isinstance(region, dict):
+    for region_id, region in doc.items():
+        if region_id in RESERVED_DOC_KEYS or not isinstance(region, dict):
             continue
         for entry in region.get("items") or []:
             if isinstance(entry, dict) and str(entry.get("category") or "") == clean:
@@ -137,10 +139,10 @@ def remove_category(name: str) -> int:
 
 
 def _find_region(doc: dict, region_id: str) -> dict | None:
-    regions = doc.get("regions")
-    if not isinstance(regions, dict):
+    """顶层键即地区（元信息键除外）；见 :func:`catalog_from_doc` 的结构说明。"""
+    if region_id in RESERVED_DOC_KEYS:
         return None
-    region = regions.get(region_id)
+    region = doc.get(region_id)
     return region if isinstance(region, dict) else None
 
 
@@ -154,11 +156,12 @@ def _find_item(region: dict, item_id: str) -> tuple[list, int] | None:
     return None
 
 
-def _split_key(key: str) -> tuple[str, str]:
-    region_id, _, item_id = str(key).partition("/")
-    if not region_id or not item_id:
-        raise ValueError(f"条目键不合法：{key!r}")
-    return region_id, item_id
+def _region_id_of(key: str) -> str:
+    """条目键（=条目 id）→ 所在地区 id（经 catalog 反查）。"""
+    found = load_effective_catalog().item(key)
+    if found is None:
+        raise KeyError(f"条目不存在：{key!r}")
+    return found[0].id
 
 
 # ─── 页面用的增删改 ──────────────────────────────────────────
@@ -175,13 +178,17 @@ def new_item_id() -> str:
 
 def upsert_item(key: str, fields: dict) -> None:
     """修改一条（含用户新增过的条目）；不存在的条目视为配置错误，忽略并记日志。"""
-    region_id, item_id = _split_key(key)
+    try:
+        region_id = _region_id_of(key)
+    except KeyError:
+        logger.warning(f"袅袅之音编辑落空：条目 {key} 不存在")
+        return
     doc = _load_full()
     region = _find_region(doc, region_id)
     if region is None:
         logger.warning(f"袅袅之音编辑落空：地区 {region_id} 不存在")
         return
-    found = _find_item(region, item_id)
+    found = _find_item(region, key)
     if found is None:
         logger.warning(f"袅袅之音编辑落空：条目 {key} 不存在")
         return
@@ -192,7 +199,7 @@ def upsert_item(key: str, fields: dict) -> None:
 
 
 def add_item(region_id: str, fields: dict) -> str:
-    """新增一条，返回条目键 ``<地区 id>/<条目 id>``。"""
+    """新增一条到指定地区，返回条目键（=条目 id，全局唯一）。"""
     doc = _load_full()
     region = _find_region(doc, region_id)
     if region is None:
@@ -205,17 +212,20 @@ def add_item(region_id: str, fields: dict) -> str:
     entry = {"id": item_id, **_clean_fields(fields, require_id=False)}
     items.append(entry)
     _save_full(doc)
-    return f"{region_id}/{item_id}"
+    return item_id
 
 
 def remove_item(key: str) -> None:
     """隐藏一条：用户层写 ``hidden: true``（系统条目不允许真删）。"""
-    region_id, item_id = _split_key(key)
+    try:
+        region_id = _region_id_of(key)
+    except KeyError:
+        return
     doc = _load_full()
     region = _find_region(doc, region_id)
     if region is None:
         return
-    found = _find_item(region, item_id)
+    found = _find_item(region, key)
     if found is None:
         return
     items, index = found
@@ -229,19 +239,22 @@ def revert_item(key: str) -> None:
     system 里的原条目以 system 层为准恢复（不是拿合并视图回填，避免把用户
     改过的值又写成一份新的覆盖）。
     """
-    region_id, item_id = _split_key(key)
+    try:
+        region_id = _region_id_of(key)
+    except KeyError:
+        return
     resolver = get_resolver()
     merged = _load_full()
     region = _find_region(merged, region_id)
     if region is None:
         return
-    found = _find_item(region, item_id)
+    found = _find_item(region, key)
     if found is None:
         return
     items, index = found
     system_doc = resolver.load_system(LINGER_FILE)
     system_region = _find_region(system_doc, region_id)
-    system_found = (_find_item(system_region, item_id)
+    system_found = (_find_item(system_region, key)
                     if system_region is not None else None)
     if system_found is None:
         # 用户新增的条目：直接从列表里去掉
@@ -260,12 +273,15 @@ def move_item(key: str, before_key: str | None) -> bool:
     就把新内容挡在外面。挪到「正好等于当前系统顺序」的位置时 diff 归零，
     local 里的顺序增量随之消失，行为与其它覆盖一致。
     """
-    region_id, item_id = _split_key(key)
+    try:
+        region_id = _region_id_of(key)
+    except KeyError:
+        return False
     doc = _load_full()
     region = _find_region(doc, region_id)
     if region is None:
         return False
-    found = _find_item(region, item_id)
+    found = _find_item(region, key)
     if found is None:
         return False
     items = found[0]
@@ -274,8 +290,7 @@ def move_item(key: str, before_key: str | None) -> bool:
     if before_key is None:
         target_index = len(items) - 1
     else:
-        anchor_id = _split_key(before_key)[1]
-        anchor = _find_item(region, anchor_id)
+        anchor = _find_item(region, before_key)
         if anchor is None:
             return False
         # 相邻上移会让 anchor 落到移动项之后；以目标位置的最终态为准换算
@@ -293,17 +308,20 @@ def set_batch_target(keys: list[str], target: str) -> int:
     ``target`` 为空表示解绑（退回固定类，走顶部「同步模型」）。
     """
     clean = str(target or "").strip()
+    catalog = load_effective_catalog()
     doc = _load_full()
     changed = 0
     for key in keys:
-        region_id, item_id = _split_key(key)
-        region = _find_region(doc, region_id)
-        if region is None:
-            continue
-        found = _find_item(region, item_id)
+        found = catalog.item(key)
         if found is None:
             continue
-        items, index = found
+        region = _find_region(doc, found[0].id)
+        if region is None:
+            continue
+        entry_found = _find_item(region, key)
+        if entry_found is None:
+            continue
+        items, index = entry_found
         entry = dict(items[index])
         if clean:
             entry["target"] = clean

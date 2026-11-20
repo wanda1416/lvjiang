@@ -135,7 +135,7 @@ def test_display_name_joins_category_with_label() -> None:
         {"id": "b", "label": "以武会友", "count": 8, "kind": "roster"},
     ])
 
-    a, b = (catalog.item(f"r/{k}")[1] for k in ("a", "b"))
+    a, b = (catalog.item(k)[1] for k in ("a", "b"))
     assert a.display_name == "探游：寻刀记"
     assert b.display_name == "以武会友"
 
@@ -147,7 +147,7 @@ def test_source_defaults_to_display_name() -> None:
         {"id": "b", "label": "地图探索", "count": 2, "source": "自定义来源"},
     ])
 
-    a, b = (catalog.item(f"r/{k}")[1] for k in ("a", "b"))
+    a, b = (catalog.item(k)[1] for k in ("a", "b"))
     assert a.source == "残章：夜行刀"
     assert b.source == "自定义来源"
 
@@ -159,7 +159,7 @@ def test_display_name_joins_category_with_label() -> None:
         {"id": "b", "label": "以武会友", "count": 8, "kind": "roster"},
     ])
 
-    a, b = (catalog.item(f"r/{k}")[1] for k in ("a", "b"))
+    a, b = (catalog.item(k)[1] for k in ("a", "b"))
     assert a.display_name == "探游：寻刀记"
     assert b.display_name == "以武会友"
 
@@ -171,7 +171,7 @@ def test_source_defaults_to_display_name() -> None:
         {"id": "b", "label": "地图探索", "count": 2, "source": "自定义来源"},
     ])
 
-    a, b = (catalog.item(f"r/{k}")[1] for k in ("a", "b"))
+    a, b = (catalog.item(k)[1] for k in ("a", "b"))
     assert a.source == "残章：夜行刀"
     assert b.source == "自定义来源"
 
@@ -183,10 +183,10 @@ def test_detail_keeps_inner_newlines() -> None:
         {"id": "a", "label": "A", "detail": "  " + body + "  "},
     ])
 
-    assert catalog.item("r/a")[1].detail == body
+    assert catalog.item("a")[1].detail == body
 
 
-    assert catalog.item("r/a")[1].detail == "第一行\n第二行"
+    assert catalog.item("a")[1].detail == "第一行\n第二行"
 
 
 
@@ -205,7 +205,7 @@ def test_quota_target_makes_item_periodic() -> None:
     catalog = _single_region([
         {"id": "a", "label": "A", "target": "quota:some_weekly"},
     ])
-    item = catalog.item("r/a")[1]
+    item = catalog.item("a")[1]
 
     assert item.kind == "periodic"
     assert item.periodic is True
@@ -216,7 +216,7 @@ def test_periodic_without_quota_target_falls_back_to_single() -> None:
     catalog = _single_region([
         {"id": "a", "label": "A", "kind": "periodic"},
     ])
-    item = catalog.item("r/a")[1]
+    item = catalog.item("a")[1]
 
     assert item.kind == "single"
 
@@ -241,10 +241,10 @@ def _single_region(items: list[dict]):
     ])
 
 
-    assert catalog.item("r/a")[1].detail == "第一行\n第二行"
+    assert catalog.item("a")[1].detail == "第一行\n第二行"
 
 
-    assert catalog.item("r/a")[1].detail == "第一行\n第二行"
+    assert catalog.item("a")[1].detail == "第一行\n第二行"
 
 
 
@@ -263,7 +263,7 @@ def test_quota_target_makes_item_periodic() -> None:
     catalog = _single_region([
         {"id": "a", "label": "A", "target": "quota:some_weekly"},
     ])
-    item = catalog.item("r/a")[1]
+    item = catalog.item("a")[1]
 
     assert item.kind == "periodic"
     assert item.periodic is True
@@ -274,7 +274,7 @@ def test_periodic_without_quota_target_falls_back_to_single() -> None:
     catalog = _single_region([
         {"id": "a", "label": "A", "kind": "periodic"},
     ])
-    item = catalog.item("r/a")[1]
+    item = catalog.item("a")[1]
 
     assert item.kind == "single"
 
@@ -294,14 +294,14 @@ def test_fixed_totals_exclude_periodic_items() -> None:
 
 def test_catalog_item_lookup_uses_region_and_item_ids() -> None:
     catalog = LingerCatalog(())
-    assert catalog.item("hexi/ywh") is None
+    assert catalog.item("ywh") is None
 
     region = region_from_doc(
         {"id": "hexi", "label": "河西",
          "items": [{"id": "ywh", "label": "以武会友", "count": 14}]},
         source_name="hexi.yaml")
     catalog = build_catalog([region])
-    found = catalog.item("hexi/ywh")
+    found = catalog.item("ywh")
     assert found is not None
     assert found[0].id == "hexi"
     assert found[1].count == 14

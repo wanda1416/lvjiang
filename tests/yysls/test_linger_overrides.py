@@ -18,18 +18,16 @@ from lvjiang.core.config.resolver import ConfigResolver
 
 BASE_DOC = {
     "content_version": 1,
-    "regions": {
-        "qinghe": {
-            "label": "清河", "order": 10,
-            "items": [
-                {"id": "a", "label": "甲", "count": 2},
-                {"id": "b", "label": "乙", "count": 1, "source": "来源乙"},
-            ],
-        },
-        "hexi": {
-            "label": "河西", "order": 20,
-            "items": [{"id": "c", "label": "丙", "count": 3}],
-        },
+    "qinghe": {
+        "label": "清河", "order": 10,
+        "items": [
+            {"id": "a", "label": "甲", "count": 2},
+            {"id": "b", "label": "乙", "count": 1, "source": "来源乙"},
+        ],
+    },
+    "hexi": {
+        "label": "河西", "order": 20,
+        "items": [{"id": "c", "label": "丙", "count": 3}],
     },
 }
 
@@ -66,42 +64,41 @@ def _effective(resolver: ConfigResolver):
 
 def test_rename_only_writes_the_changed_item(resolver: ConfigResolver) -> None:
     """local 与 system 同名同结构，只存被改的条目（注册表增量）。"""
-    ov.upsert_item("qinghe/a", {"label": "改名"})
+    ov.upsert_item("a", {"label": "改名"})
 
     local = _local_doc(resolver)
-    items = local["regions"]["qinghe"]["items"]
+    items = local["qinghe"]["items"]
     assert items == {"__added__": [{"id": "a", "label": "改名", "count": 2}]}
     # 只动 qinghe；其它地区不进 local
-    assert "hexi" not in local["regions"]
+    assert "hexi" not in local
 
 
 def test_add_item_creates_new_entry_and_survives_merge(resolver: ConfigResolver) -> None:
     key = ov.add_item("hexi", {"label": "新增来源", "count": 2})
 
-    region_id, item_id = key.split("/")
+    assert re.fullmatch(r"[0-9a-f]{8}", key)
     catalog = _effective(resolver)
-    hexi = catalog.region(region_id)
-    assert [item.id for item in hexi.items] == ["c", item_id]
-    assert re.fullmatch(r"[0-9a-f]{8}", item_id)
+    hexi = catalog.region("hexi")
+    assert [item.id for item in hexi.items] == ["c", key]
 
 
 def test_remove_marks_hidden_not_deleted(resolver: ConfigResolver) -> None:
     """系统条目不允许真删：local 写 hidden，合并后这条不再出现。"""
-    ov.remove_item("qinghe/b")
+    ov.remove_item("b")
 
     catalog = _effective(resolver)
     assert [item.id for item in catalog.region("qinghe").items] == ["a"]
     # hidden 只是标记：local 里保留整条并打标，而不是把条目删掉
-    local_items = _local_doc(resolver)["regions"]["qinghe"]["items"]["__added__"]
+    local_items = _local_doc(resolver)["qinghe"]["items"]["__added__"]
     assert any(entry.get("hidden") for entry in local_items)
 
 
 def test_revert_restores_system_version(resolver: ConfigResolver) -> None:
-    ov.upsert_item("qinghe/a", {"label": "改名"})
-    ov.revert_item("qinghe/a")
+    ov.upsert_item("a", {"label": "改名"})
+    ov.revert_item("a")
 
     catalog = _effective(resolver)
-    assert catalog.item("qinghe/a")[1].label == "甲"
+    assert catalog.item("a")[1].label == "甲"
     assert _local_doc(resolver) == {}
 
 
@@ -115,15 +112,15 @@ def test_revert_user_item_removes_it(resolver: ConfigResolver) -> None:
 
 
 def test_batch_target_binds_and_unbinds(resolver: ConfigResolver) -> None:
-    changed = ov.set_batch_target(["qinghe/a", "qinghe/b"], "quota:niaoniao_of_week")
+    changed = ov.set_batch_target(["a", "b"], "quota:niaoniao_of_week")
     assert changed == 2
     catalog = _effective(resolver)
-    assert [catalog.item(f"qinghe/{k}")[1].kind for k in ("a", "b")] == [
+    assert [catalog.item(k)[1].kind for k in ("a", "b")] == [
         "periodic", "periodic"]
 
-    ov.set_batch_target(["qinghe/a", "qinghe/b"], "")
+    ov.set_batch_target(["a", "b"], "")
     catalog = _effective(resolver)
-    assert [catalog.item(f"qinghe/{k}")[1].kind for k in ("a", "b")] == [
+    assert [catalog.item(k)[1].kind for k in ("a", "b")] == [
         "single", "single"]
     assert _local_doc(resolver) == {}
 
@@ -142,17 +139,17 @@ def test_default_target_roundtrip(resolver: ConfigResolver) -> None:
 
 def test_system_update_still_reaches_user_layer(resolver: ConfigResolver) -> None:
     """local 只存改动：system 后来新增的条目必须照常出现在合并视图里。"""
-    ov.upsert_item("qinghe/a", {"label": "改名"})
+    ov.upsert_item("a", {"label": "改名"})
 
     system_path = resolver.system_dir / "yysls" / "lingering.yaml"
     doc = yaml.safe_load(system_path.read_text(encoding="utf-8"))
-    doc["regions"]["qinghe"]["items"].append({"id": "new", "label": "新条目", "count": 1})
+    doc["qinghe"]["items"].append({"id": "new", "label": "新条目", "count": 1})
     system_path.write_text(yaml.dump(doc, allow_unicode=True), encoding="utf-8")
 
     catalog = _effective(resolver)
     ids = [item.id for item in catalog.region("qinghe").items]
     assert ids == ["a", "b", "new"]
-    assert catalog.item("qinghe/a")[1].label == "改名"
+    assert catalog.item("a")[1].label == "改名"
 
 
 def test_user_created_category_appears_in_choices(resolver: ConfigResolver) -> None:
@@ -231,17 +228,17 @@ def test_remove_category_returns_items_to_plain(resolver: ConfigResolver) -> Non
 
 def test_move_item_writes_order_only(resolver: ConfigResolver) -> None:
     """拖动排序只产生顺序增量：local 里是 __order__，条目内容不重复存。"""
-    ov.move_item("qinghe/b", "qinghe/a")
+    ov.move_item("b", "a")
 
     local = _local_doc(resolver)
-    assert local["regions"]["qinghe"]["items"] == {"__order__": ["b", "a"]}
+    assert local["qinghe"]["items"] == {"__order__": ["b", "a"]}
     catalog = _effective(resolver)
     assert [i.id for i in catalog.region("qinghe").items] == ["b", "a"]
 
 
 def test_move_item_to_end(resolver: ConfigResolver) -> None:
     """拖到地区末尾 = 挪到最后一条后面。"""
-    ov.move_item("qinghe/a", None)
+    ov.move_item("a", None)
 
     catalog = _effective(resolver)
     assert [i.id for i in catalog.region("qinghe").items] == ["b", "a"]
@@ -249,8 +246,8 @@ def test_move_item_to_end(resolver: ConfigResolver) -> None:
 
 def test_move_down_to_after_neighbor(resolver: ConfigResolver) -> None:
     """相邻下移：a 拖到 b 后面 == 顺序对调，不是原地不动。"""
-    ov.move_item("qinghe/a", "qinghe/c")  # hexi 有 c，跨地区必须被拒绝
-    ov.move_item("hexi/c", None)
+    ov.move_item("a", "c")  # hexi 有 c，跨地区必须被拒绝
+    ov.move_item("c", None)
 
     catalog = _effective(resolver)
     assert [i.id for i in catalog.region("qinghe").items] == ["a", "b"]
@@ -258,17 +255,17 @@ def test_move_down_to_after_neighbor(resolver: ConfigResolver) -> None:
 
 
 def test_move_cross_region_is_rejected(resolver: ConfigResolver) -> None:
-    assert ov.move_item("qinghe/a", "hexi/c") is False
+    assert ov.move_item("a", "c") is False
     assert _local_doc(resolver) == {}
 
 
 def test_move_restored_system_new_items_stay_visible(resolver: ConfigResolver) -> None:
     """用户排过序后 system 新增的条目必须仍然出现（排在后面）。"""
-    ov.move_item("qinghe/b", "qinghe/a")
+    ov.move_item("b", "a")
 
     system_path = resolver.system_dir / "yysls" / "lingering.yaml"
     doc = yaml.safe_load(system_path.read_text(encoding="utf-8"))
-    doc["regions"]["qinghe"]["items"].append({"id": "new", "label": "新条目", "count": 1})
+    doc["qinghe"]["items"].append({"id": "new", "label": "新条目", "count": 1})
     system_path.write_text(yaml.dump(doc, allow_unicode=True), encoding="utf-8")
 
     catalog = _effective(resolver)
@@ -278,7 +275,7 @@ def test_move_restored_system_new_items_stay_visible(resolver: ConfigResolver) -
 
 def test_move_back_to_system_order_clears_local(resolver: ConfigResolver) -> None:
     """拖回系统顺序时顺序增量消失，local 回到干净状态。"""
-    ov.move_item("qinghe/b", "qinghe/a")
-    ov.move_item("qinghe/a", "qinghe/b")
+    ov.move_item("b", "a")
+    ov.move_item("a", "b")
 
     assert _local_doc(resolver) == {}

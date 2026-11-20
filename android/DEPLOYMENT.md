@@ -102,7 +102,7 @@ adb -s <serial> install -r -g android/app/build/outputs/apk/debug/app-debug.apk
 adb -s <serial> shell am start -n com.lvjiang.app/.MainActivity
 ```
 
-在手机系统设置中手动开启“无障碍 → 律匠自动操作”。回到 App 首页，应看到：
+在手机系统设置中手动开启“无障碍 → 律匠辅助”。回到 App 首页，应看到：
 
 - `辅助已开启`；
 - PC 尚未连接时显示 `PC 未连接（等待 ADB 连接）`；
@@ -187,7 +187,7 @@ cd android && ./gradlew :app:assembleDebug
 
 | 现象 | 排查 |
 |---|---|
-| App 显示辅助未开启 | 回到系统无障碍设置重新开启“律匠自动操作”，再回 App 确认状态 |
+| App 显示辅助未开启 | 回到系统无障碍设置重新开启“律匠辅助”，再回 App 确认状态 |
 | PC 回退 ADB | 确认 App 已安装、进程可启动、辅助已开启；重连设备以重新握手 |
 | App 显示 PC 未连接 | 确认 PC 仍保持设备连接；检查 `adb forward --list` 和 PC 日志 |
 | 指令返回失败 | 查看 App 最近指令状态、PC 的 `AgentOpError` 文本和 logcat `AgentServer` |

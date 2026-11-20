@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 // 系统不允许应用自己打开无障碍开关，只能把用户送到设置页。
                 // 这也是运行期唯一的恢复手段：服务被系统清掉后没有自动重连的 API。
-                toast("请在列表中找到「律匠自动操作」并开启")
+                toast("请在列表中找到「律匠辅助」并开启")
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }

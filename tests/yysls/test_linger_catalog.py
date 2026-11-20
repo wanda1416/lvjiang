@@ -2,7 +2,7 @@
 
 随包清单是游戏事实（地区 / 条目 / 枚数），改错不会报错、只会让页面显示一个
 错的进度，所以这里直接对仓库里的实际文件做合计断言：每个地区的枚数与攻略口径
-一致，合计 219。
+一致，当前合计 224（常驻 214 + 周期 10）。
 """
 from __future__ import annotations
 
@@ -36,9 +36,7 @@ def _resolver(tmp_path: Path) -> ConfigResolver:
 def test_shipped_catalog_matches_the_published_totals(tmp_path: Path) -> None:
     catalog = load_catalog(_resolver(tmp_path))
 
-    # 口径：攻略 219 − 探游拆条修正 1（原并作 3，我去秘库 2 + 酒香 1）
-    # − 捕猎马猴 1（与琳琅商店重复，删）。我去秘库 2 枚 = 探游 1 + 皇宫秘库 12 柜 1。
-    # 合计 218 为规范化后的正口径（2026-11-20 对照薄荷小鹿袅来运转源表核对）。
+    # 与官方发布内容对拍；周期来源不进入常驻分母。
     assert {region.label: region.total for region in catalog.regions} == {
         "清河": 15,
         "开封": 26,
@@ -54,6 +52,11 @@ def test_shipped_catalog_matches_the_published_totals(tmp_path: Path) -> None:
     # 固定口径 214（周期型按当期进度动态，不计入常驻分母的推进统计）。
     assert catalog.total == 224
     assert catalog.item_count == 107
+    assert catalog.fixed_total == 214
+    assert catalog.fixed_item_count == 100
+    periodic = [item for region in catalog.regions for item in region.items if item.periodic]
+    assert len(periodic) == 7
+    assert sum(item.count for item in periodic) == 10
     assert [region.order for region in catalog.regions] == sorted(
         region.order for region in catalog.regions)
 
@@ -154,30 +157,6 @@ def test_source_defaults_to_display_name() -> None:
     assert b.source == "自定义来源"
 
 
-def test_display_name_joins_category_with_label() -> None:
-    """展示名 = 类型：条目；没有类型就只显示条目（以武会友这类）。"""
-    catalog = _single_region([
-        {"id": "a", "category": "探游", "label": "寻刀记", "count": 1},
-        {"id": "b", "label": "以武会友", "count": 8, "kind": "roster"},
-    ])
-
-    a, b = (catalog.item(k)[1] for k in ("a", "b"))
-    assert a.display_name == "探游：寻刀记"
-    assert b.display_name == "以武会友"
-
-
-def test_source_defaults_to_display_name() -> None:
-    """来源缺省回落到展示名（类型：条目），账本里的来源与页面看到的一致。"""
-    catalog = _single_region([
-        {"id": "a", "category": "残章", "label": "夜行刀", "count": 1},
-        {"id": "b", "label": "地图探索", "count": 2, "source": "自定义来源"},
-    ])
-
-    a, b = (catalog.item(k)[1] for k in ("a", "b"))
-    assert a.source == "残章：夜行刀"
-    assert b.source == "自定义来源"
-
-
 def test_detail_keeps_inner_newlines() -> None:
     """详情是多行文本：首尾空白去掉，中间换行要留（双击后按原样显示）。"""
     body = "第一行" + chr(10) + "第二行"
@@ -189,7 +168,6 @@ def test_detail_keeps_inner_newlines() -> None:
 
 
     assert catalog.item("a")[1].detail == "第一行\n第二行"
-
 
 
 def test_item_kind_parses_roster_and_legacy_named() -> None:
@@ -212,57 +190,6 @@ def test_quota_target_makes_item_periodic() -> None:
 
     assert item.kind == "single"
     assert item.periodic is True
-
-
-def test_kind_and_target_are_independent() -> None:
-    """记法与入账目标互不反推：kind 保持声明值，periodic 形态由 target 推导。"""
-    catalog = _single_region([
-        {"id": "a", "label": "A", "kind": "periodic"},   # kind 原样保留
-        {"id": "b", "label": "B", "target": "quota:x"},  # 未声明 kind 也不被改写
-    ])
-    a, b = (catalog.item(k)[1] for k in ("a", "b"))
-
-    assert a.kind == "periodic" and not a.periodic   # 没绑配额 → 形态非周期
-    assert b.kind == "single" and b.periodic         # 绑配额 → 形态周期
-
-
-def test_fixed_totals_exclude_periodic_items() -> None:
-    """219 那个分母只算常驻来源，周期型自己按周期走，不能混进去。"""
-    catalog = _single_region([
-        {"id": "a", "label": "A", "count": 2},
-        {"id": "b", "label": "B", "count": 3, "target": "quota:some_weekly"},
-    ])
-
-    assert catalog.total == 5
-    assert catalog.fixed_total == 2
-    assert catalog.fixed_item_count == 1
-    assert catalog.region("r").fixed_total == 2
-
-
-def _single_region(items: list[dict]):
-    return build_catalog([
-        region_from_doc({"id": "r", "label": "R", "items": items},
-                        source_name="r.yaml"),
-    ])
-
-
-    assert catalog.item("a")[1].detail == "第一行\n第二行"
-
-
-    assert catalog.item("a")[1].detail == "第一行\n第二行"
-
-
-
-def test_item_kind_parses_roster_and_legacy_named() -> None:
-    catalog = _single_region([
-        {"id": "a", "label": "A", "kind": "roster", "count": 2},
-        {"id": "b", "label": "B", "named": True},
-        {"id": "c", "label": "C"},
-    ])
-
-    kinds = {item.id: item.kind for item in catalog.region("r").items}
-    assert kinds == {"a": "roster", "b": "roster", "c": "single"}
-
 
 
 def test_kind_and_target_are_independent() -> None:

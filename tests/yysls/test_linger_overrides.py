@@ -7,10 +7,10 @@ resolver + 合并层落盘——**local 文件名与结构必须和 system 一�
 from __future__ import annotations
 
 import re
-import yaml
 from pathlib import Path
 
 import pytest
+import yaml
 
 from lvjiang.apps.yysls.core.linger import overrides as ov
 from lvjiang.apps.yysls.core.linger.models import catalog_from_doc
@@ -165,44 +165,6 @@ def test_user_created_category_appears_in_choices(resolver: ConfigResolver) -> N
 
 
 def test_rename_category_touches_every_item(resolver: ConfigResolver) -> None:
-    from lvjiang.apps.yysls.core.linger.models import LingerItem
-    ov.add_item("qinghe", {"label": "甲一", "count": 1, "category": "旧分类"})
-    ov.add_item("qinghe", {"label": "甲二", "count": 1, "category": "旧分类"})
-
-    changed = ov.rename_category("旧分类", "新分类")
-
-    assert changed == 2
-    catalog = _effective(resolver)
-    names = [i.display_name for i in catalog.region("qinghe").items
-             if i.category == "新分类"]
-    assert sorted(names) == ["新分类：甲一", "新分类：甲二"]
-    assert "旧分类" not in ov.known_categories(catalog)
-
-
-def test_remove_category_returns_items_to_plain(resolver: ConfigResolver) -> None:
-    ov.add_item("qinghe", {"label": "乙一", "count": 1, "category": "临时分类"})
-
-    changed = ov.remove_category("临时分类")
-
-    assert changed == 1
-    catalog = _effective(resolver)
-    entry = [i for i in catalog.region("qinghe").items if i.label == "乙一"]
-    assert entry[0].category == ""
-    assert entry[0].display_name == "乙一"
-
-
-def test_user_created_category_appears_in_choices(resolver: ConfigResolver) -> None:
-    """用户输入新分类保存条目后，它就是可选分类之一（无需任何注册步骤）。"""
-    ov.add_item("qinghe", {"label": "自定义来源", "count": 1, "category": "我的分类"})
-
-    catalog = _effective(resolver)
-    assert "我的分类" in ov.known_categories(catalog)
-    entry = [i for i in catalog.region("qinghe").items if i.label == "自定义来源"]
-    assert entry[0].display_name == "我的分类：自定义来源"
-
-
-def test_rename_category_touches_every_item(resolver: ConfigResolver) -> None:
-    from lvjiang.apps.yysls.core.linger.models import LingerItem
     ov.add_item("qinghe", {"label": "甲一", "count": 1, "category": "旧分类"})
     ov.add_item("qinghe", {"label": "甲二", "count": 1, "category": "旧分类"})
 

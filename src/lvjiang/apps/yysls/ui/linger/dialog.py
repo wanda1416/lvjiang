@@ -922,7 +922,7 @@ class LingerDialog(QDialog):
             event.ignore()
             return
         target_key = item_key(ref.region.id, ref.item.id)
-        if source_ref.region.id != ref.region.id:
+        if source_ref.region.id != ref.region.id or target_key == source_key:
             event.ignore()
             return
 
@@ -934,7 +934,7 @@ class LingerDialog(QDialog):
             before_key = (item_key(self._rows[nxt].region.id, self._rows[nxt].item.id)
                           if nxt is not None else None)
         else:
-            before_key = target_key if target_key != source_key else None
+            before_key = target_key
         if before_key == source_key:
             event.ignore()
             return
@@ -951,11 +951,15 @@ class LingerDialog(QDialog):
             event.ignore()
 
     def _next_item_row(self, row: int) -> int | None:
-        """某行之后的下一个条目行（跳过子项行）；没有则 None。"""
+        """本地区的下一个条目行（跳过子项行）；地区末尾为 None。"""
+        region_id = self._rows[row].region.id
         for candidate in range(row + 1, self.table.rowCount()):
             ref = self._rows.get(candidate)
-            if ref is not None and ref.slot is None:
-                return candidate
+            if ref is not None:
+                if ref.region.id != region_id:
+                    return None
+                if ref.slot is None:
+                    return candidate
         return None
 
     def _on_cell_double_clicked(self, row: int, column: int) -> None:

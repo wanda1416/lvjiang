@@ -86,6 +86,8 @@ class LingerItem:
     #: 大段说明（任务怎么完成、在哪接、需要注意什么）。列表里只显示摘要，
     #: 双击行看全文。
     detail: str = ""
+    #: 目标未声明时才跟随默认；不能用有效值是否等于默认来猜测。
+    follows_default: bool = False
 
     @property
     def display_name(self) -> str:
@@ -226,7 +228,8 @@ def region_from_doc(doc: Any, *, source_name: str,
         if count <= 0:
             raise ValueError(f"{where} 的 count 必须大于 0")
         item_label = _require_text(raw.get("label"), f"{where} 的 label")
-        target = str(raw.get("target") or "").strip() or default_target
+        declared_target = str(raw.get("target") or "").strip()
+        target = declared_target or default_target
         kind = _item_kind(raw, where)
         # 目标决定读取语义（配额=周期读值），但不再强制反推 kind：同一个
         # 来源既可以按周期记账（quota:*），也可以按库存累计（stock:*）或
@@ -248,6 +251,7 @@ def region_from_doc(doc: Any, *, source_name: str,
             source=str(raw.get("source") or _fallback_source(raw)).strip(),
             kind=kind,
             target=target,
+            follows_default=not declared_target,
             names=names,
             detail=str(raw.get("detail") or "").strip(),
         ))

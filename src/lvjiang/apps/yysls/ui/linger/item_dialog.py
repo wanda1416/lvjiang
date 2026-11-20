@@ -232,9 +232,11 @@ class LingerItemDialog(QDialog):
             index = self.kind_combo.count() - 1
         self.kind_combo.setCurrentIndex(index)
         self._reload_targets()
-        target_index = self.target_combo.findData(item.target)
+        # 回显声明关系，而不是把解析后的默认值写成条目自己的绑定。
+        target = "" if item.follows_default else item.target
+        target_index = self.target_combo.findData(target)
         if target_index < 0:
-            self.target_combo.addItem(item.target, item.target)
+            self.target_combo.addItem(target, target)
             target_index = self.target_combo.count() - 1
         self.target_combo.setCurrentIndex(target_index)
 

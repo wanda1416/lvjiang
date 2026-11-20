@@ -87,7 +87,7 @@ def set_target_candidates(candidates: list[str], default: str) -> None:
 
 
 def set_default_target(target: str) -> None:
-    """改固定/逐位共用的同步模型；只影响这两类，周期型各用自己的 key。"""
+    """修改未显式声明 target 的条目所使用的默认目标。"""
     doc = _load_full()
     clean = str(target or "").strip()
     if clean and clean != DEFAULT_TARGET:

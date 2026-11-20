@@ -3350,5 +3350,6 @@ linger:
   改名: Đổi tên
   把「{name}」从全部条目上移除？条目本身保留，退回无类型。: Gỡ '{name}' khỏi mọi mục? Các mục vẫn còn, trở
     về không phân loại.
+  "选中两条以上条目后可用": "Chọn từ hai mục trở lên để dùng"
   类型: Loại
   条目: Mục

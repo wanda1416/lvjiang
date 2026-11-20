@@ -3348,5 +3348,6 @@ linger:
   改名: Rename
   把「{name}」从全部条目上移除？条目本身保留，退回无类型。: Remove '{name}' from all items? The items stay,
     without a category.
-  类型: Typ
-  条目: Eintrag
+  "选中两条以上条目后可用": "Verfügbar, wenn mindestens zwei Einträge ausgewählt sind"
+  类型: Type
+  条目: Entry

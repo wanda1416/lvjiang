@@ -913,6 +913,13 @@
       "sha256": "f4b025d3c68101aa6dc5ff3197d5d73449307f8ab2e5080b6eaa4e88df5e66c8"
     },
     {
+      "id": "30-design:02-decisions:04-platform:30-account-device-credential",
+      "path": "30-design/02-decisions/04-platform/30-account-device-credential.md",
+      "title": "设备 ID 作为重置密码的凭据",
+      "category": "30-architecture",
+      "sha256": "8bd90a029a0e22abdfd0f68ded42729b04f62173e70200f0592298ff54523cbf"
+    },
+    {
       "id": "30-design:02-decisions:05-profile:01-graduation-rate",
       "path": "30-design/02-decisions/05-profile/01-graduation-rate.md",
       "title": "毕业率分析需求与现行边界",

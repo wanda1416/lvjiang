@@ -48,6 +48,10 @@ account_dialog:
   自助服务…: Self-service…
   设备登出: Sign out device
   设备管理: Device Management
+  "复制ID": "Copy ID"
+  "复制这台设备的 ID；重置密码时管理员凭它核对身份，不要随意泄露": "Copy this device's ID. An admin uses it to verify identity when resetting the password. Do not share it casually."
+  "当前设备ID：{id}": "Device ID: {id}"
+  "（请勿随意向他人泄露该 id，这是重置密码的唯一凭据）": "(Do not share this ID. It is the only credential for resetting the password.)"
   请先点「初始同步」建立同步状态: Click "Initial Sync" first to establish sync state
   请输入密码: Enter your password
   请输入账户: Enter your account

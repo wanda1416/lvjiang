@@ -19,6 +19,15 @@ qinghe:
       detail: 在清河依次挑战 8 位对手
       kind: roster
       category: 以武会友
+      names:
+        - 元皓
+        - 悯鸿
+        - 照微夜
+        - 楼百尺
+        - 姚凌凌
+        - 罗伯礼
+        - 邱秋仁
+        - 房万间
     - id: 211f77c3
       category: 妙妙庙
       label: 妙妙庙
@@ -55,6 +64,13 @@ kaifeng:
       source: 以武会友：开封
       kind: roster
       category: 以武会友
+      names:
+        - 裘衔
+        - 丁远
+        - 不平生
+        - 胡衍
+        - 花间客
+        - 淮南客
     - id: 590434a6
       category: 妙妙庙
       label: 妙妙庙
@@ -117,6 +133,11 @@ kaifeng:
       source: 四海豪客：开封
       detail: 九流门驻地四人
       kind: roster
+      names:
+        - 夺命
+        - 热血
+        - 有情
+        - 妙手
 huanggong:
   label: 开封皇宫
   order: 30
@@ -128,6 +149,11 @@ huanggong:
       kind: roster
       category: 四海豪客
       detail: ''
+      names:
+        - 陈红娘
+        - 高怀德
+        - 申九
+        - 张恨棠、李卫宋
     - id: 31cdf439
       category: 妙妙庙
       label: 妙妙庙
@@ -185,6 +211,21 @@ hexi:
       source: 以武会友：河西
       kind: roster
       category: 以武会友
+      names:
+        - 苟保仁
+        - 贾龙王
+        - 文修
+        - 颠倒生
+        - 林中
+        - 李醉风
+        - 程放
+        - 孟济川
+        - 赵途
+        - 平五丈
+        - 袁天罡
+        - 卫陵鸦
+        - 周季
+        - 高继思
     - id: 7c77b4b3
       category: 妙妙庙
       label: 漠漠庙
@@ -244,6 +285,17 @@ bujianshan:
       source: 以武会友：不见山
       kind: roster
       category: 以武会友
+      names:
+        - 雁九笙
+        - 甄士贾
+        - 裘武
+        - 风侠客
+        - 酒千岁
+        - 卞从远
+        - 耶律广
+        - 李振
+        - 肖然
+        - 风四海
     - id: 4b5bee77
       category: 妙妙庙
       label: 漠漠庙
@@ -346,6 +398,14 @@ qingzhou:
       kind: roster
       category: 四海豪客
       detail: ''
+      names:
+        - 楚一振
+        - 沈韩杨
+        - 柳晏如
+        - 林行逸
+        - 谢长庚
+        - 季浮真
+        - 卢以诚
     - id: 36ca6e03
       category: 妙妙庙
       label: 妙妙庙
@@ -377,6 +437,16 @@ jiangnan:
       kind: roster
       category: 四海豪客
       detail: ''
+      names:
+        - 凌非羽
+        - 夜行客
+        - 陈慎
+        - 洛逢春
+        - 周远信
+        - 冷三
+        - 叶来归
+        - 吴断刀
+        - 李老三
     - id: 3a1f634d
       category: 妙妙庙
       label: 妙妙庙
@@ -465,6 +535,10 @@ weiyangcheng:
       kind: roster
       category: 四海豪客
       detail: ''
+      names:
+        - 仇亦筹
+        - 顾千龄
+        - 哈德
     - id: a44afd0d
       label: 区域探索度
       count: 2

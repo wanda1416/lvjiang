@@ -71,6 +71,9 @@ class LingerItem:
     category: str = ""
     kind: str = ITEM_SINGLE
     target: str = DEFAULT_TARGET
+    #: 逐位条目的固定位名（项目级事实：每个用户面对的对手/对象固定）。
+    #: 用户记录只存勾选状态；位名缺省时（names 未配或不够长）才落到用户层。
+    names: tuple[str, ...] = ()
     #: 大段说明（任务怎么完成、在哪接、需要注意什么）。列表里只显示摘要，
     #: 双击行看全文。
     detail: str = ""
@@ -223,6 +226,11 @@ def region_from_doc(doc: Any, *, source_name: str,
         hidden = bool(raw.get("hidden", False))
         if hidden:
             continue
+        raw_names = raw.get("names")
+        names = tuple(
+            str(name).strip() for name in raw_names
+            if str(name).strip()
+        ) if isinstance(raw_names, (list, tuple)) else ()
         items.append(LingerItem(
             id=item_id,
             category=str(raw.get("category") or "").strip(),
@@ -231,6 +239,7 @@ def region_from_doc(doc: Any, *, source_name: str,
             source=str(raw.get("source") or _fallback_source(raw)).strip(),
             kind=kind,
             target=target,
+            names=names,
             detail=str(raw.get("detail") or "").strip(),
         ))
     return LingerRegion(id=region_id, label=label, order=order_value,

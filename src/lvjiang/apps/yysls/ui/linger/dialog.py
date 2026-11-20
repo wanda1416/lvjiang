@@ -728,12 +728,14 @@ class LingerDialog(QDialog):
         self._rows[row] = _RowRef(region, item, index)
         slots = self._state.slot_view(item_key(region.id, item.id), item.count)
         slot = slots[index] if index < len(slots) else ItemSlot()
+        # 位名是项目级事实（names 已配就显示它）；用户 slots 里的名字只作覆盖
+        shown_name = item.names[index] if index < len(item.names) else slot.name
 
         index_cell = QTableWidgetItem(tr("第 {index} 位").format(index=index + 1))
         index_cell.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         self.table.setItem(row, COL_REGION, index_cell)
 
-        name_cell = QTableWidgetItem(slot.name)
+        name_cell = QTableWidgetItem(shown_name)
         name_cell.setFlags(
             Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
             | Qt.ItemFlag.ItemIsEditable)
@@ -1024,11 +1026,18 @@ class LingerDialog(QDialog):
             return
         current = slots[ref.slot]
         done_value = current.done if done is None else done
-        name_value = current.name if name is None else name.strip()
+        item = ref.item
+        # 项目级位名：与 names 相同（含未改动的空）不落用户层；只有用户真的
+        # 改出不同名字（NPC 改名这类边缘情况）才存进自己的记录
+        default_name = item.names[ref.slot] if ref.slot < len(item.names) else ""
+        if name is None:
+            name_value = current.name or default_name
+        else:
+            name_value = name.strip()
         # 名字与已得是两件事：填名字只记名字，是否拿到由用户勾选，不代做决定
         slots[ref.slot] = ItemSlot(
             done=done_value,
-            name=name_value,
+            name="" if name_value == default_name else name_value,
             at=current.at or (now_iso() if done_value else ""),
         )
         try:

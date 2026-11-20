@@ -35,12 +35,13 @@ def _resolver(tmp_path: Path) -> ConfigResolver:
 def test_shipped_catalog_matches_the_published_totals(tmp_path: Path) -> None:
     catalog = load_catalog(_resolver(tmp_path))
 
-    # 口径：攻略 219 − 探游拆条修正 1（我去秘库+酒香各 1，原并作 3）
-    # − 捕猎马猴 1（与琳琅商店重复，删）。合计 217 为规范化后的正口径。
+    # 口径：攻略 219 − 探游拆条修正 1（原并作 3，我去秘库 2 + 酒香 1）
+    # − 捕猎马猴 1（与琳琅商店重复，删）。我去秘库 2 枚 = 探游 1 + 皇宫秘库 12 柜 1。
+    # 合计 218 为规范化后的正口径（2026-11-20 对照薄荷小鹿袅来运转源表核对）。
     assert {region.label: region.total for region in catalog.regions} == {
         "清河": 15,
         "开封": 26,
-        "开封皇宫": 17,
+        "开封皇宫": 18,
         "河西": 30,
         "不见山": 36,
         "青州": 14,
@@ -48,7 +49,7 @@ def test_shipped_catalog_matches_the_published_totals(tmp_path: Path) -> None:
         "未央城": 19,
         "通用": 30,
     }
-    assert catalog.total == 217
+    assert catalog.total == 218
     assert catalog.item_count == 102
     assert [region.order for region in catalog.regions] == sorted(
         region.order for region in catalog.regions)

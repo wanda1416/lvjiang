@@ -4,560 +4,564 @@ regions:
     label: 清河
     order: 10
     items:
-    - id: ywh
-      label: 以武会友
-      count: 8
-      source: 以武会友：清河
-      detail: 在清河依次挑战 8 位对手
-      kind: roster
-      category: 以武会友
-    - id: miaomiao_shop
-      category: 妙妙庙
-      label: 妙妙庙
-      count: 2
-      source: 妙妙商店：清河
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：清河
-      category: 探索
-      detail: 清河地图探索度达到9000
-    - id: canzhang_yexingdao
-      category: 残章
-      label: 夜行刀
-      count: 1
-      source: 残章：夜行刀
-    - id: canzhang_qianjinsanjin
-      category: 残章
-      label: 千金散尽
-      count: 1
-      source: 残章：千金散尽
-    - id: qiyu_fohua
-      category: 奇遇
-      label: 佛花与鼠
-      count: 1
-      source: 奇遇：佛花与鼠
+      - id: ywh
+        label: 以武会友
+        count: 8
+        source: 以武会友：清河
+        detail: 在清河依次挑战 8 位对手
+        kind: roster
+        category: 以武会友
+      - id: miaomiao_shop
+        category: 妙妙庙
+        label: 妙妙庙
+        count: 2
+        source: 妙妙商店：清河
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：清河
+        category: 探索
+        detail: 清河地图探索度达到9000
+      - id: canzhang_yexingdao
+        category: 残章
+        label: 夜行刀
+        count: 1
+        source: 残章：夜行刀
+      - id: canzhang_qianjinsanjin
+        category: 残章
+        label: 千金散尽
+        count: 1
+        source: 残章：千金散尽
+      - id: qiyu_fohua
+        category: 奇遇
+        label: 佛花与鼠
+        count: 1
+        source: 奇遇：佛花与鼠
   kaifeng:
     label: 开封
     order: 20
     items:
-    - id: ywh
-      label: 以武会友
-      count: 6
-      source: 以武会友：开封
-      kind: roster
-      category: 以武会友
-    - id: miaomiao_shop
-      category: 妙妙庙
-      label: 妙妙庙
-      count: 3
-      source: 妙妙商店：开封
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：开封
-      category: 探索
-    - id: qiyu_fengkuangdeshitou
-      category: 奇遇
-      label: 疯狂的石头
-      count: 1
-      source: 奇遇：疯狂的石头
-    - id: xiaji_gongzishu
-      category: 侠迹
-      label: 公子书
-      count: 1
-      source: 侠迹：公子书
-    - id: shilian_gongzishu
-      category: 试炼
-      label: 公子书
-      count: 1
-      source: 试炼：公子书
-    - id: shilian_heicaishen
-      category: 试炼
-      label: 黑财神
-      count: 1
-      source: 试炼：黑财神
-    - id: guijianji
-      label: 鬼间集
-      count: 2
-      source: 鬼间集
-      category: 图鉴
-    - id: fengwenjian
-      label: 风闻笺
-      count: 1
-      source: 风闻笺
-      category: 图鉴
-    - id: huajianji
-      label: 花间集
-      count: 2
-      source: 花间集
-      category: 图鉴
-    - id: zhenshou_tianshanglai
-      category: 镇守
-      label: 天上来
-      count: 1
-      source: 镇守：天上来
-    - id: zhaofeiyan_siku
-      label: 赵飞燕私库
-      count: 1
-      source: 宝箱：赵飞燕私库
-      category: 宝箱
-    - id: ue4eedd6b
-      category: 四海豪客
-      label: 四海豪客
-      count: 4
-      source: 四海豪客：开封
-      detail: 九流门驻地四人
-      kind: roster
+      - id: ywh
+        label: 以武会友
+        count: 6
+        source: 以武会友：开封
+        kind: roster
+        category: 以武会友
+      - id: miaomiao_shop
+        category: 妙妙庙
+        label: 妙妙庙
+        count: 3
+        source: 妙妙商店：开封
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：开封
+        category: 探索
+      - id: qiyu_fengkuangdeshitou
+        category: 奇遇
+        label: 疯狂的石头
+        count: 1
+        source: 奇遇：疯狂的石头
+      - id: xiaji_gongzishu
+        category: 侠迹
+        label: 公子书
+        count: 1
+        source: 侠迹：公子书
+      - id: shilian_gongzishu
+        category: 试炼
+        label: 公子书
+        count: 1
+        source: 试炼：公子书
+      - id: shilian_heicaishen
+        category: 试炼
+        label: 黑财神
+        count: 1
+        source: 试炼：黑财神
+      - id: guijianji
+        label: 鬼间集
+        count: 2
+        source: 鬼间集
+        category: 图鉴
+      - id: fengwenjian
+        label: 风闻笺
+        count: 1
+        source: 风闻笺
+        category: 图鉴
+      - id: huajianji
+        label: 花间集
+        count: 2
+        source: 花间集
+        category: 图鉴
+      - id: zhenshou_tianshanglai
+        category: 镇守
+        label: 天上来
+        count: 1
+        source: 镇守：天上来
+      - id: zhaofeiyan_siku
+        label: 赵飞燕私库
+        count: 1
+        source: 宝箱：赵飞燕私库
+        category: 宝箱
+      - id: ue4eedd6b
+        category: 四海豪客
+        label: 四海豪客
+        count: 4
+        source: 四海豪客：开封
+        detail: 九流门驻地四人
+        kind: roster
   huanggong:
     label: 开封皇宫
     order: 30
     items:
-    - id: ywh
-      label: 四海豪客
-      count: 4
-      source: 以武会友：开封皇宫
-      kind: roster
-      category: 四海豪客
-      detail: ''
-    - id: miaomiao_shop
-      category: 妙妙庙
-      label: 妙妙庙
-      count: 2
-      source: 妙妙商店：开封皇宫
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：开封皇宫
-      category: 探索
-    - id: douququ
-      label: 斗蛐蛐
-      count: 2
-      source: 斗蛐蛐
-    - id: miwence
-      label: 皇宫秘闻册
-      count: 2
-      source: 皇宫秘闻册
-      category: 图鉴
-    - id: tanyou_woqumiku
-      category: 探游
-      label: 我去秘库
-      count: 1
-      source: 探游：我去秘库
-    - id: tanyou_jiuxiang
-      category: 探游
-      label: 酒香不怕巷子深
-      count: 1
-      source: 探游：酒香不怕巷子深
-    - id: canzhang_gaotangyeke_shang
-      category: 残章
-      label: 高堂野客·上
-      count: 1
-      source: 残章：高堂野客·上
-    - id: canzhang_gaotangyeke_xia
-      category: 残章
-      label: 高堂野客·下
-      count: 1
-      source: 残章：高堂野客·下
-    - id: xueren
-      category: 成就
-      label: 七个小雪人
-      count: 1
-      source: 成就：七个小雪人
-      detail: 皇宫雪天的时候给七个雪人插鼻子
+      - id: ywh
+        label: 四海豪客
+        count: 4
+        source: 以武会友：开封皇宫
+        kind: roster
+        category: 四海豪客
+        detail: ''
+      - id: miaomiao_shop
+        category: 妙妙庙
+        label: 妙妙庙
+        count: 2
+        source: 妙妙商店：开封皇宫
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：开封皇宫
+        category: 探索
+      - id: douququ
+        label: 斗蛐蛐
+        count: 2
+        source: 斗蛐蛐
+      - id: miwence
+        label: 皇宫秘闻册
+        count: 2
+        source: 皇宫秘闻册
+        category: 图鉴
+      - id: tanyou_woqumiku
+        category: 探游
+        label: 我去秘库
+        count: 2
+        source: 探游：我去秘库
+        detail: 探游任务 1 枚；皇宫秘库打开 12 个柜子再得 1 枚。
+      - id: tanyou_jiuxiang
+        category: 探游
+        label: 酒香不怕巷子深
+        count: 1
+        source: 探游：酒香不怕巷子深
+      - id: canzhang_gaotangyeke_shang
+        category: 残章
+        label: 高堂野客·上
+        count: 1
+        source: 残章：高堂野客·上
+      - id: canzhang_gaotangyeke_xia
+        category: 残章
+        label: 高堂野客·下
+        count: 1
+        source: 残章：高堂野客·下
+      - id: xueren
+        category: 成就
+        label: 七个小雪人
+        count: 1
+        source: 成就：七个小雪人
+        detail: 皇宫雪天的时候给七个雪人插鼻子
   hexi:
     label: 河西
     order: 40
     items:
-    - id: ywh
-      label: 以武会友
-      count: 14
-      source: 以武会友：河西
-      kind: roster
-      category: 以武会友
-    - id: momo_shop
-      category: 妙妙庙
-      label: 漠漠庙
-      count: 3
-      source: 漠漠商店：河西
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：河西
-      category: 探索
-    - id: zhuxian
-      label: 河西
-      count: 4
-      source: 主章：河西
-      category: 主章
-    - id: zhenshou_dasanguan
-      category: 镇守
-      label: 大散关
-      count: 1
-      source: 镇守：大散关
-    - id: zhenshou_xianchenghu
-      category: 镇守
-      label: 陷城湖
-      count: 1
-      source: 镇守：陷城湖
-    - id: zhenshou_yuzaizaoye
-      category: 镇守
-      label: 鱼在藻也
-      count: 1
-      source: 镇守：鱼在藻也
-    - id: xiaji_taipingguichu
-      category: 侠迹
-      label: 太平归处
-      count: 1
-      source: 侠迹：太平归处
-    - id: xiaji_kaifengxulai
-      category: 侠迹
-      label: 凯风徐来
-      count: 1
-      source: 侠迹：凯风徐来
-    - id: chijinji
-      label: 池锦集
-      count: 1
-      source: 池锦集
-      category: 图鉴
-    - id: yiwuyuxin
-      label: 以武愈心
-      count: 1
-      source: 以武愈心
+      - id: ywh
+        label: 以武会友
+        count: 14
+        source: 以武会友：河西
+        kind: roster
+        category: 以武会友
+      - id: momo_shop
+        category: 妙妙庙
+        label: 漠漠庙
+        count: 3
+        source: 漠漠商店：河西
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：河西
+        category: 探索
+      - id: zhuxian
+        label: 河西
+        count: 4
+        source: 主章：河西
+        category: 主章
+      - id: zhenshou_dasanguan
+        category: 镇守
+        label: 大散关
+        count: 1
+        source: 镇守：大散关
+      - id: zhenshou_xianchenghu
+        category: 镇守
+        label: 陷城湖
+        count: 1
+        source: 镇守：陷城湖
+      - id: zhenshou_yuzaizaoye
+        category: 镇守
+        label: 鱼在藻也
+        count: 1
+        source: 镇守：鱼在藻也
+      - id: xiaji_taipingguichu
+        category: 侠迹
+        label: 太平归处
+        count: 1
+        source: 侠迹：太平归处
+      - id: xiaji_kaifengxulai
+        category: 侠迹
+        label: 凯风徐来
+        count: 1
+        source: 侠迹：凯风徐来
+      - id: chijinji
+        label: 池锦集
+        count: 1
+        source: 池锦集
+        category: 图鉴
+      - id: yiwuyuxin
+        label: 以武愈心
+        count: 1
+        source: 以武愈心
   bujianshan:
     label: 不见山
     order: 50
     items:
-    - id: ywh
-      label: 以武会友
-      count: 10
-      source: 以武会友：不见山
-      kind: roster
-      category: 以武会友
-    - id: momo_shop
-      category: 妙妙庙
-      label: 漠漠庙
-      count: 3
-      source: 漠漠商店：不见山
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：不见山
-      category: 探索
-    - id: zhuxian
-      label: 不见山
-      count: 6
-      source: 主章：不见山
-      category: 主章
-    - id: zhenshou_feitiancanyuan
-      category: 镇守
-      label: 飞天残垣
-      count: 1
-      source: 镇守：飞天残垣
-    - id: zhenshou_moshouzhixin
-      category: 镇守
-      label: 墨守之心
-      count: 1
-      source: 镇守：墨守之心
-    - id: zhenshou_hutuohe
-      category: 镇守
-      label: 滹沱河
-      count: 1
-      source: 镇守：滹沱河
-    - id: kebei_hutuozhiming
-      category: 镇守
-      label: 滹沱河·刻碑
-      count: 1
-      source: 镇守：滹沱河·刻碑
-    - id: tanyou_yingdengxihua
-      category: 探游
-      label: 影灯戏话
-      count: 1
-      source: 探游：影灯戏话
-    - id: qiyu_buyizhiyue
-      category: 奇遇
-      label: 不义之约
-      count: 1
-      source: 奇遇：不义之约
-    - id: menshan
-      label: 一扇门册
-      count: 1
-      source: 一扇门册
-      category: 图鉴
-    - id: huolang_houqinpu
-      category: 兑换
-      label: 鲮货郎·后勤铺
-      count: 1
-      source: 鲮货郎：后勤铺
-    - id: huolang_jianhuodian
-      category: 兑换
-      label: 鲮货郎·尖货店
-      count: 1
-      source: 鲮货郎：尖货店
-    - id: linlang_shop
-      label: 琳琅商店
-      count: 1
-      source: 琳琅商店
-      category: 兑换
-    - id: xiaji_juan1_shanzhongjianmo
-      category: 侠迹
-      label: 山中见墨
-      count: 1
-      source: 侠迹：山中见墨
-    - id: xiaji_juan3_qinglucunhui
-      category: 侠迹
-      label: 薤露存辉
-      count: 1
-      source: 侠迹：薤露存辉
-    - id: xiaji_juan4_pixingweiqin
-      category: 侠迹
-      label: 披星为衿
-      count: 1
-      source: 侠迹：披星为衿
-    - id: xiaji_juan6_shebusha
-      category: 侠迹
-      label: 奉敕不杀
-      count: 1
-      source: 侠迹：奉敕不杀
-    - id: xiaji_juan7_luzhongqu
-      category: 侠迹
-      label: 芦中曲
-      count: 1
-      source: 侠迹：芦中曲
+      - id: ywh
+        label: 以武会友
+        count: 10
+        source: 以武会友：不见山
+        kind: roster
+        category: 以武会友
+      - id: momo_shop
+        category: 妙妙庙
+        label: 漠漠庙
+        count: 3
+        source: 漠漠商店：不见山
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：不见山
+        category: 探索
+      - id: zhuxian
+        label: 不见山
+        count: 6
+        source: 主章：不见山
+        category: 主章
+      - id: zhenshou_feitiancanyuan
+        category: 镇守
+        label: 飞天残垣
+        count: 1
+        source: 镇守：飞天残垣
+      - id: zhenshou_moshouzhixin
+        category: 镇守
+        label: 墨守之心
+        count: 1
+        source: 镇守：墨守之心
+      - id: zhenshou_hutuohe
+        category: 镇守
+        label: 滹沱河
+        count: 1
+        source: 镇守：滹沱河
+      - id: kebei_hutuozhiming
+        category: 探游
+        label: 滹沱之名
+        count: 1
+        source: 探游：滹沱之名
+        detail: 刻碑 100 个侠名可得。
+      - id: tanyou_yingdengxihua
+        category: 探游
+        label: 影灯戏话
+        count: 1
+        source: 探游：影灯戏话
+      - id: qiyu_buyizhiyue
+        category: 奇遇
+        label: 不义之约
+        count: 1
+        source: 奇遇：不义之约
+      - id: menshan
+        label: 一扇门册
+        count: 1
+        source: 一扇门册
+        category: 图鉴
+      - id: huolang_houqinpu
+        category: 兑换
+        label: 鲮货郎·后勤铺
+        count: 1
+        source: 鲮货郎：后勤铺
+      - id: huolang_jianhuodian
+        category: 兑换
+        label: 鲮货郎·尖货店
+        count: 1
+        source: 鲮货郎：尖货店
+      - id: linlang_shop
+        label: 琳琅商店
+        count: 1
+        source: 琳琅商店
+        category: 兑换
+      - id: xiaji_juan1_shanzhongjianmo
+        category: 侠迹
+        label: 山中见墨
+        count: 1
+        source: 侠迹：山中见墨
+      - id: xiaji_juan3_qinglucunhui
+        category: 侠迹
+        label: 薤露存辉
+        count: 1
+        source: 侠迹：薤露存辉
+      - id: xiaji_juan4_pixingweiqin
+        category: 侠迹
+        label: 披星为衿
+        count: 1
+        source: 侠迹：披星为衿
+      - id: xiaji_juan6_shebusha
+        category: 侠迹
+        label: 奉敕不杀
+        count: 1
+        source: 侠迹：奉敕不杀
+      - id: xiaji_juan7_luzhongqu
+        category: 侠迹
+        label: 芦中曲
+        count: 1
+        source: 侠迹：芦中曲
   qingzhou:
     label: 青州
     order: 60
     items:
-    - id: ywh
-      label: 四海豪客
-      count: 7
-      source: 以武会友：青州
-      kind: roster
-      category: 四海豪客
-      detail: ''
-    - id: miaomiao_shop
-      category: 妙妙庙
-      label: 妙妙庙
-      count: 2
-      source: 妙妙商店：青州
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：青州
-      category: 探索
-    - id: canzhang_fengxuedaishan
-      category: 残章
-      label: 风雪岱山
-      count: 1
-      source: 残章：风雪岱山
-    - id: wenjinguan
-      category: 图鉴
-      label: 生徙行薄
-      count: 2
-      source: 图鉴：生徙行薄
+      - id: ywh
+        label: 四海豪客
+        count: 7
+        source: 以武会友：青州
+        kind: roster
+        category: 四海豪客
+        detail: ''
+      - id: miaomiao_shop
+        category: 妙妙庙
+        label: 妙妙庙
+        count: 2
+        source: 妙妙商店：青州
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：青州
+        category: 探索
+      - id: canzhang_fengxuedaishan
+        category: 残章
+        label: 风雪岱山
+        count: 1
+        source: 残章：风雪岱山
+      - id: wenjinguan
+        category: 图鉴
+        label: 生徙行薄
+        count: 2
+        source: 图鉴：生徙行薄
   jiangnan:
     label: 江南
     order: 70
     items:
-    - id: ywh
-      label: 四海豪客
-      count: 9
-      source: 以武会友：江南
-      kind: roster
-      category: 四海豪客
-      detail: ''
-    - id: miaomiao_shop
-      category: 妙妙庙
-      label: 妙妙庙
-      count: 3
-      source: 妙妙商店：江南
-    - id: map_explore
-      label: 区域探索度
-      count: 3
-      source: 地图探索：江南
-      category: 探索
-    - id: canzhang_wumingchunshan
-      category: 残章
-      label: 无明春山
-      count: 1
-      source: 残章：无明春山
-    - id: canzhang_dawuyouli
-      category: 残章
-      label: 大雾幽篁
-      count: 1
-      source: 残章：大雾幽篁
-      detail: ''
-    - id: canzhang_hanhaitang
-      category: 残章
-      label: 捍海塘
-      count: 1
-      source: 残章：捍海塘
-    - id: canzhang_fantaisui
-      category: 残章
-      label: 犯太岁
-      count: 2
-      source: 残章：犯太岁
-    - id: chenzhai_hezi
-      label: 陈宅
-      count: 1
-      source: 宝箱：陈宅
-      category: 宝箱
-    - id: zhuxian_zuoyijiangnan
-      category: 主章
-      label: 最忆江南
-      count: 1
-      source: 主章：最忆江南
-    - id: zhuxian_fengyuwuru
-      category: 主章
-      label: 风雨误入
-      count: 1
-      source: 主章：风雨误入
-    - id: xiaji_liaozengyizhichun
-      category: 侠迹
-      label: 聊赠一枝春
-      count: 1
-      source: 侠迹：聊赠一枝春
-    - id: changcaolu_hangzhou
-      category: 图鉴
-      label: 杭州游记
-      count: 2
-      source: 地图探索：尝草录
-    - id: yuxi_rugangjicha
-      category: 探索
-      label: 入港稽查
-      count: 1
-      source: 探索：入港稽查
-    - id: jingxiang_caiyun
-      category: 活动
-      label: 敬香问吉
-      count: 1
-      source: 活动：敬香问吉
-      detail: 选择财运，已结束
-    - id: xiangfeng_shaonian
-      label: 相逢恰是少年时
-      count: 1
-      source: 剧情奖励
-    - id: xuesheng_pingyin
-      category: 兑换
-      label: 平澜门籍
-      count: 1
-      source: 平澜门籍：学生凭引
+      - id: ywh
+        label: 四海豪客
+        count: 9
+        source: 以武会友：江南
+        kind: roster
+        category: 四海豪客
+        detail: ''
+      - id: miaomiao_shop
+        category: 妙妙庙
+        label: 妙妙庙
+        count: 3
+        source: 妙妙商店：江南
+      - id: map_explore
+        label: 区域探索度
+        count: 3
+        source: 地图探索：江南
+        category: 探索
+      - id: canzhang_wumingchunshan
+        category: 残章
+        label: 无明春山
+        count: 1
+        source: 残章：无明春山
+      - id: canzhang_dawuyouli
+        category: 残章
+        label: 大雾幽篁
+        count: 1
+        source: 残章：大雾幽篁
+        detail: ''
+      - id: canzhang_hanhaitang
+        category: 残章
+        label: 捍海塘
+        count: 1
+        source: 残章：捍海塘
+      - id: canzhang_fantaisui
+        category: 残章
+        label: 犯太岁
+        count: 2
+        source: 残章：犯太岁
+      - id: chenzhai_hezi
+        label: 陈宅
+        count: 1
+        source: 宝箱：陈宅
+        category: 宝箱
+        detail: 迟早斋撬锁（零花钱）。
+      - id: zhuxian_zuoyijiangnan
+        category: 主章
+        label: 最忆江南
+        count: 1
+        source: 主章：最忆江南
+      - id: zhuxian_fengyuwuru
+        category: 主章
+        label: 风雨误入
+        count: 1
+        source: 主章：风雨误入
+      - id: xiaji_liaozengyizhichun
+        category: 侠迹
+        label: 聊赠一枝春
+        count: 1
+        source: 侠迹：聊赠一枝春
+      - id: changcaolu_hangzhou
+        category: 图鉴
+        label: 杭州游记
+        count: 2
+        source: 地图探索：尝草录
+      - id: yuxi_rugangjicha
+        category: 探索
+        label: 入港稽查
+        count: 1
+        source: 探索：入港稽查
+      - id: jingxiang_caiyun
+        category: 活动
+        label: 敬香问吉
+        count: 1
+        source: 活动：敬香问吉
+        detail: 选择财运，已结束
+      - id: xiangfeng_shaonian
+        label: 相逢恰是少年时
+        count: 1
+        source: 剧情奖励
+      - id: xuesheng_pingyin
+        category: 兑换
+        label: 平澜门籍
+        count: 1
+        source: 平澜门籍：学生凭引
   weiyangcheng:
     label: 未央城
     order: 80
     items:
-    - id: ywh
-      label: 四海豪客
-      count: 3
-      source: 以武会友：未央城
-      kind: roster
-      category: 四海豪客
-      detail: ''
-    - id: map_explore
-      label: 区域探索度
-      count: 2
-      source: 地图探索：未央城
-      category: 探索
-    - id: miaomiao_shop
-      category: 妙妙庙
-      label: 妙妙庙
-      count: 2
-      source: 妙妙商店：未央城
-    - id: canzhang_canghaiyizhu
-      category: 残章
-      label: 沧海遗珠
-      count: 1
-      source: 残章：沧海遗珠
-    - id: zhenshou_shenlou
-      category: 镇守
-      label: 蜃楼
-      count: 1
-      source: 镇守：蜃楼
-    - id: tanyou_xundaoji
-      category: 探游
-      label: 寻刀记
-      count: 1
-      source: 探游：寻刀记
-    - id: tanyou_wanshiyouzhi
-      category: 探游
-      label: 万事有值
-      count: 1
-      source: 探游：万事有值
-    - id: wanshizhi_dieshiweishan
-      category: 探游
-      label: 叠石为山
-      count: 1
-      source: 探游：叠石为山
-      detail: ''
-    - id: wuheyouji_shubuqing
-      category: 乌何有集
-      label: 鼠不清
-      count: 1
-      source: 乌何有集
-    - id: wangchen_mengshou
-      category: 宝箱
-      label: 金盆盥手
-      count: 1
-      source: 宝箱：金盆盥手
-      detail: 忘尘山庄三楼
-    - id: guike_pingyin
-      label: 贵客凭引
-      count: 4
-      source: 贵客凭引
-      category: 兑换
-    - id: fuquyuan_baoxiang
-      label: 芙蕖苑
-      count: 1
-      source: 宝箱：芙蕖苑
-      category: 宝箱
+      - id: ywh
+        label: 四海豪客
+        count: 3
+        source: 以武会友：未央城
+        kind: roster
+        category: 四海豪客
+        detail: ''
+      - id: map_explore
+        label: 区域探索度
+        count: 2
+        source: 地图探索：未央城
+        category: 探索
+      - id: miaomiao_shop
+        category: 妙妙庙
+        label: 妙妙庙
+        count: 2
+        source: 妙妙商店：未央城
+      - id: canzhang_canghaiyizhu
+        category: 残章
+        label: 沧海遗珠
+        count: 1
+        source: 残章：沧海遗珠
+      - id: zhenshou_shenlou
+        category: 镇守
+        label: 蜃楼
+        count: 1
+        source: 镇守：蜃楼
+      - id: tanyou_xundaoji
+        category: 探游
+        label: 寻刀记
+        count: 1
+        source: 探游：寻刀记
+      - id: tanyou_wanshiyouzhi
+        category: 探游
+        label: 万事有值
+        count: 1
+        source: 探游：万事有值
+      - id: wanshizhi_dieshiweishan
+        category: 探游
+        label: 叠石为山
+        count: 1
+        source: 探游：叠石为山
+        detail: ''
+      - id: wuheyouji_shubuqing
+        category: 乌何有集
+        label: 鼠不清
+        count: 1
+        source: 乌何有集
+        detail: 乌何有集右前方旋转楼梯处与鼠鼠对话开启（鼠鼠抬轿）。
+      - id: wangchen_mengshou
+        category: 宝箱
+        label: 金盆盥手
+        count: 1
+        source: 宝箱：金盆盥手
+        detail: 忘尘山庄三楼
+      - id: guike_pingyin
+        label: 贵客凭引
+        count: 4
+        source: 贵客凭引
+        category: 兑换
+      - id: fuquyuan_baoxiang
+        label: 芙蕖苑
+        count: 1
+        source: 宝箱：芙蕖苑
+        category: 宝箱
   other:
     label: 通用
     order: 90
     items:
-    - id: qiangzhezhilu
-      category: 新手
-      label: 强者之路
-      count: 5
-      source: 强者之路
-    - id: waiguan_danpin
-      category: 外观单品
-      label: 80/160
-      count: 2
-      source: 外观单品
-    - id: wuku_zaoyi
-      label: 武库总造诣
-      count: 12
-      source: 武库奖励
-    - id: zhibo_jingjie
-      label: 止戈境界
-      count: 2
-      source: 止戈段位
-    - id: jiaozhanglin_wuwo
-      category: 觉障林
-      label: 无我
-      count: 3
-      source: 觉障林
-    - id: jiaye_zirongdu
-      category: 家业
-      label: 繁荣度
-      count: 1
-      source: 家业
-      detail: ''
-    - id: zhuangke_yunyou
-      label: 庄客云游
-      count: 1
-      source: 庄客云游
-      category: 家业
-    - id: bufengxunying
-      label: 捕风寻影
-      count: 1
-      source: 捕风寻影
-    - id: cangfengzhi
-      label: 藏锋志
-      count: 2
-      source: 藏锋志
-      category: 图鉴
-    - id: duchengxu
-      label: 渡尘墟
-      count: 1
-      source: 渡尘墟
+      - id: qiangzhezhilu
+        category: 新手
+        label: 强者之路
+        count: 5
+        source: 强者之路
+      - id: waiguan_danpin
+        category: 外观单品
+        label: 80/160
+        count: 2
+        source: 外观单品
+      - id: wuku_zaoyi
+        label: 武库总造诣
+        count: 12
+        source: 武库奖励
+      - id: zhibo_jingjie
+        label: 止戈境界
+        count: 2
+        source: 止戈段位
+      - id: jiaozhanglin_wuwo
+        category: 觉障林
+        label: 无我
+        count: 3
+        source: 觉障林
+      - id: jiaye_zirongdu
+        category: 家业
+        label: 繁荣度
+        count: 1
+        source: 家业
+        detail: ''
+      - id: zhuangke_yunyou
+        label: 庄客云游
+        count: 1
+        source: 庄客云游
+        category: 家业
+      - id: bufengxunying
+        label: 捕风寻影
+        count: 1
+        source: 捕风寻影
+      - id: cangfengzhi
+        label: 藏锋志
+        count: 2
+        source: 藏锋志
+        category: 图鉴
+      - id: duchengxu
+        label: 渡尘墟
+        count: 1
+        source: 渡尘墟

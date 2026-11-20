@@ -147,9 +147,10 @@ regions:
         detail: 探游任务 1 枚；皇宫秘库打开 12 个柜子再得 1 枚。
       - id: tanyou_jiuxiang
         category: 探游
-        label: 酒香不怕巷子深
+        label: 酒香不怕埋得深
         count: 1
-        source: 探游：酒香不怕巷子深
+        source: 探游：酒香不怕埋得深
+        detail: 变成小狗。
       - id: canzhang_gaotangyeke_shang
         category: 残章
         label: 高堂野客·上
@@ -313,9 +314,9 @@ regions:
         source: 侠迹：薤露存辉
       - id: xiaji_juan4_pixingweiqin
         category: 侠迹
-        label: 披星为衿
+        label: 揽星为衿
         count: 1
-        source: 侠迹：披星为衿
+        source: 侠迹：揽星为衿
       - id: xiaji_juan6_shebusha
         category: 侠迹
         label: 奉敕不杀

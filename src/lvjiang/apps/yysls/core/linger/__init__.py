@@ -13,6 +13,7 @@ from .models import (
     ITEM_PERIODIC,
     ITEM_ROSTER,
     ITEM_SINGLE,
+    NO_SYNC_TARGET,
     STATE_VERSION,
     ItemProgress,
     ItemSlot,
@@ -31,17 +32,20 @@ from .overrides import (
     known_categories,
     load_effective_catalog,
     move_item,
+    read_target_candidates,
     remove_category,
     remove_item,
     rename_category,
     revert_item,
     set_batch_target,
+    set_target_candidates,
     upsert_item,
 )
 from .store import DOCUMENT_KIND, DOCUMENT_SUFFIX, LingerStore
 
 __all__ = [
     "LINGER_BOARD",
+    "NO_SYNC_TARGET",
     "DOCUMENT_KIND",
     "DOCUMENT_SUFFIX",
     "LINGER_FILE",
@@ -66,6 +70,9 @@ __all__ = [
     "remove_item",
     "revert_item",
     "set_batch_target",
+    "read_target_candidates",
+    "set_target_candidates",
+    "set_target_candidates",
     "upsert_item",
     "build_catalog",
     "catalog_from_doc",

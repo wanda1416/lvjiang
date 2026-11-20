@@ -33,6 +33,7 @@ from ...core.linger.models import (
     ITEM_PERIODIC,
     ITEM_ROSTER,
     ITEM_SINGLE,
+    NO_SYNC_TARGET,
     LingerItem,
     LingerRegion,
 )
@@ -62,6 +63,43 @@ _KIND_CHOICES = (
     (ITEM_ROSTER, "逐位"),
     (ITEM_PERIODIC, "周期"),
 )
+
+
+def candidate_targets() -> list[tuple[str, str]]:
+    """条目编辑器的入账目标候选：同步模型对话框勾选的 key（含不同步）。
+
+    候选配置存 local（``yysls/lingering.yaml`` 的 ``candidates`` 段），
+    没配置过时回落到全部库存+配额 key——首次使用不需要先设置。
+    """
+    from ...core.linger import overrides as ov
+
+    chosen = ov.read_target_candidates()
+    if not chosen:
+        result = target_choices(booking.MODEL_STOCK) + target_choices(booking.MODEL_QUOTA)
+    else:
+        result = []
+        for value in chosen:
+            if value == NO_SYNC_TARGET:
+                result.append((value, tr("不同步")))
+                continue
+            model, _, key = value.partition(":")
+            for candidate_value, label in target_choices(model):
+                if candidate_value == value:
+                    result.append((value, label))
+                    break
+    result.append((NO_SYNC_TARGET, tr("不同步")))
+    return result
+
+
+def candidate_label(value: str) -> str:
+    """入账目标的显示名：候选表里有就用，否则「不同步」或裸值。"""
+    if value == NO_SYNC_TARGET:
+        return tr("不同步")
+    for candidate_value, label in (target_choices(booking.MODEL_STOCK)
+                                   + target_choices(booking.MODEL_QUOTA)):
+        if candidate_value == value:
+            return label
+    return value
 
 
 def target_choices(model: str) -> list[tuple[str, str]]:
@@ -162,18 +200,21 @@ class LingerItemDialog(QDialog):
         outer.addWidget(buttons)
 
     def _reload_targets(self) -> None:
-        kind = str(self.kind_combo.currentData() or ITEM_SINGLE)
-        model = booking.MODEL_QUOTA if kind == ITEM_PERIODIC else booking.MODEL_STOCK
+        """入账目标：跟随顶部「同步模型」候选（库存+配额+不同步）。
+
+        任何记法都可自选——周期型可以改绑库存（累计制），固定型也可以
+        绑配额（周常商店这类）；「跟随同步模型」= 不写自己的 target。
+        """
         current = self.target_combo.currentData()
         self.target_combo.blockSignals(True)
         self.target_combo.clear()
-        for value, label in target_choices(model):
+        self.target_combo.addItem(tr("跟随同步模型"), "")
+        for value, label in candidate_targets():
             self.target_combo.addItem(label, value)
         index = self.target_combo.findData(current)
         self.target_combo.setCurrentIndex(index if index >= 0 else 0)
         self.target_combo.blockSignals(False)
-        # 只有周期型需要自己的 key；固定/逐位统一走顶部「同步模型」
-        self.target_combo.setEnabled(kind == ITEM_PERIODIC)
+        self.target_combo.setEnabled(True)
 
     def _fill(self, item: LingerItem) -> None:
         index = self.category_edit.findText(item.category)
@@ -203,9 +244,7 @@ class LingerItemDialog(QDialog):
         source = self.source_edit.text().strip() or (
             f"{category}：{label}" if category else label)
         kind = str(self.kind_combo.currentData() or ITEM_SINGLE)
-        # 固定/逐位不单独存目标：统一用顶部「同步模型」，只有周期型各有自己的 key
-        target = (str(self.target_combo.currentData() or DEFAULT_TARGET)
-                  if kind == ITEM_PERIODIC else "")
+        target = str(self.target_combo.currentData() or "").strip()
         return {
             "category": category,
             "label": label,

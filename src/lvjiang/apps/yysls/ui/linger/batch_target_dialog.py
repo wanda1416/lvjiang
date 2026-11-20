@@ -17,8 +17,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style
-from ...core.linger import booking
-from .item_dialog import target_choices
+from .item_dialog import candidate_targets
 
 
 class LingerBatchTargetDialog(QDialog):
@@ -38,8 +37,8 @@ class LingerBatchTargetDialog(QDialog):
         row.setSpacing(10)
         row.addWidget(QLabel(tr_label("目标")))
         self.target_combo = QComboBox(self)
-        self.target_combo.addItem(tr("固定"), "")
-        for value, label in target_choices(booking.MODEL_QUOTA):
+        self.target_combo.addItem(tr("跟随同步模型"), "")
+        for value, label in candidate_targets():
             self.target_combo.addItem(label, value)
         index = self.target_combo.findData(current)
         self.target_combo.setCurrentIndex(index if index >= 0 else 0)

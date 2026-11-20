@@ -3350,6 +3350,18 @@ linger:
   改名: Đổi tên
   把「{name}」从全部条目上移除？条目本身保留，退回无类型。: Gỡ '{name}' khỏi mọi mục? Các mục vẫn còn, trở
     về không phân loại.
-  "选中两条以上条目后可用": "Chọn từ hai mục trở lên để dùng"
+  选中两条以上条目后可用: Chọn từ hai mục trở lên để dùng
   类型: Loại
   条目: Mục
+  默认同步 key: Khóa đồng bộ mặc định
+  不同步: Không đồng bộ
+  跟随同步模型: Theo mô hình đồng bộ
+  设为默认: Đặt làm mặc định
+  搜索 key…: Tìm khóa…
+  勾选的 key 进入条目编辑与顶部切换的候选；「默认同步 key」是固定/逐位条目（未自选目标时）的入账目标。: Khóa đã chọn thành ứng
+    viên khi sửa mục; khóa đồng bộ mặc định là nơi ghi các mục cố định chưa chọn mục
+    tiêu.
+  库存: Stock
+  配额: Hạn mức
+  记录: Ghi lại
+  当前默认；右键勾选后点「设为默认」可切换: Chọn rồi đặt làm mặc định

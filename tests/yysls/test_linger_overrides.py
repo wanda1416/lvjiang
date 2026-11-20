@@ -115,8 +115,10 @@ def test_batch_target_binds_and_unbinds(resolver: ConfigResolver) -> None:
     changed = ov.set_batch_target(["a", "b"], "quota:niaoniao_of_week")
     assert changed == 2
     catalog = _effective(resolver)
-    assert [catalog.item(k)[1].kind for k in ("a", "b")] == [
-        "periodic", "periodic"]
+    # 只改入账目标，不动记法（记法与目标是独立决定）
+    assert [catalog.item(k)[1].target for k in ("a", "b")] == [
+        "quota:niaoniao_of_week", "quota:niaoniao_of_week"]
+    assert [catalog.item(k)[1].kind for k in ("a", "b")] == ["single", "single"]
 
     ov.set_batch_target(["a", "b"], "")
     catalog = _effective(resolver)

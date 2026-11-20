@@ -62,6 +62,30 @@ def read_default_target() -> str:
     return str(doc.get("default_target") or DEFAULT_TARGET).strip()
 
 
+def read_target_candidates() -> list[str]:
+    """入账目标候选（同步模型对话框勾选的 key）；空 = 未配置，回落全量。"""
+    value = get_resolver().load_local(LINGER_FILE).get("target_candidates")
+    if not isinstance(value, list):
+        return []
+    return [str(v).strip() for v in value if str(v).strip()]
+
+
+def set_target_candidates(candidates: list[str], default: str) -> None:
+    """写入候选与默认同步 key；空列表删除配置（回落全量候选）。"""
+    doc = _load_full()
+    clean = [c for c in (str(v).strip() for v in candidates) if c]
+    if clean:
+        doc["target_candidates"] = clean
+    else:
+        doc.pop("target_candidates", None)
+    default_clean = str(default or "").strip()
+    if default_clean and default_clean != DEFAULT_TARGET:
+        doc["default_target"] = default_clean
+    else:
+        doc.pop("default_target", None)
+    _save_full(doc)
+
+
 def set_default_target(target: str) -> None:
     """改固定/逐位共用的同步模型；只影响这两类，周期型各用自己的 key。"""
     doc = _load_full()
@@ -304,9 +328,11 @@ def move_item(key: str, before_key: str | None) -> bool:
 
 
 def set_batch_target(keys: list[str], target: str) -> int:
-    """把一批条目统一绑到同一个目标，返回实际改动的条数。
+    """把一批条目统一绑到同一个入账目标，返回实际改动的条数。
 
-    ``target`` 为空表示解绑（退回固定类，走顶部「同步模型」）。
+    ``target`` 为空表示跟随同步模型（删掉条目自己的目标声明）；
+    ``none`` 表示只记录不同步。绑任何目标都不再强制改记法——
+    记法（single/roster）与入账目标是两个独立决定。
     """
     clean = str(target or "").strip()
     catalog = load_effective_catalog()
@@ -326,10 +352,8 @@ def set_batch_target(keys: list[str], target: str) -> int:
         entry = dict(items[index])
         if clean:
             entry["target"] = clean
-            entry["kind"] = ITEM_PERIODIC
         else:
             entry.pop("target", None)
-            entry.pop("kind", None)
         items[index] = entry
         changed += 1
     if changed:

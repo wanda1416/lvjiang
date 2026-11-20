@@ -3348,6 +3348,18 @@ linger:
   改名: Rename
   把「{name}」从全部条目上移除？条目本身保留，退回无类型。: Remove '{name}' from all items? The items stay,
     without a category.
-  "选中两条以上条目后可用": "Disponible tras seleccionar dos o más entradas"
+  选中两条以上条目后可用: Disponible tras seleccionar dos o más entradas
   类型: Type
   条目: Entry
+  默认同步 key: Default sync key
+  不同步: No sync
+  跟随同步模型: Follow sync model
+  设为默认: Set as default
+  搜索 key…: Search keys…
+  勾选的 key 进入条目编辑与顶部切换的候选；「默认同步 key」是固定/逐位条目（未自选目标时）的入账目标。: Checked keys become candidates
+    in item editing; the default sync key is where fixed/roster items book (when no
+    own target).
+  库存: Stock
+  配额: Quota
+  记录: Record
+  当前默认；右键勾选后点「设为默认」可切换: Check then use Set as default

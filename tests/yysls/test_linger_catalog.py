@@ -202,23 +202,26 @@ def test_item_kind_parses_roster_and_legacy_named() -> None:
 
 
 def test_quota_target_makes_item_periodic() -> None:
+    """绑配额 target → 展示形态周期；kind 不被反推（保持 single）。"""
     catalog = _single_region([
         {"id": "a", "label": "A", "target": "quota:some_weekly"},
     ])
     item = catalog.item("a")[1]
 
-    assert item.kind == "periodic"
+    assert item.kind == "single"
     assert item.periodic is True
 
 
-def test_periodic_without_quota_target_falls_back_to_single() -> None:
-    """声明周期却没绑配额 key 是配置错误：按固定处理，别造出半周期半固定。"""
+def test_kind_and_target_are_independent() -> None:
+    """记法与入账目标互不反推：kind 保持声明值，periodic 形态由 target 推导。"""
     catalog = _single_region([
-        {"id": "a", "label": "A", "kind": "periodic"},
+        {"id": "a", "label": "A", "kind": "periodic"},   # kind 原样保留
+        {"id": "b", "label": "B", "target": "quota:x"},  # 未声明 kind 也不被改写
     ])
-    item = catalog.item("a")[1]
+    a, b = (catalog.item(k)[1] for k in ("a", "b"))
 
-    assert item.kind == "single"
+    assert a.kind == "periodic" and not a.periodic   # 没绑配额 → 形态非周期
+    assert b.kind == "single" and b.periodic         # 绑配额 → 形态周期
 
 
 def test_fixed_totals_exclude_periodic_items() -> None:
@@ -259,24 +262,17 @@ def test_item_kind_parses_roster_and_legacy_named() -> None:
     assert kinds == {"a": "roster", "b": "roster", "c": "single"}
 
 
-def test_quota_target_makes_item_periodic() -> None:
+
+def test_kind_and_target_are_independent() -> None:
+    """记法与入账目标互不反推：kind 保持声明值，periodic 形态由 target 推导。"""
     catalog = _single_region([
-        {"id": "a", "label": "A", "target": "quota:some_weekly"},
+        {"id": "a", "label": "A", "kind": "periodic"},   # kind 原样保留
+        {"id": "b", "label": "B", "target": "quota:x"},  # 未声明 kind 也不被改写
     ])
-    item = catalog.item("a")[1]
+    a, b = (catalog.item(k)[1] for k in ("a", "b"))
 
-    assert item.kind == "periodic"
-    assert item.periodic is True
-
-
-def test_periodic_without_quota_target_falls_back_to_single() -> None:
-    """声明周期却没绑配额 key 是配置错误：按固定处理，别造出半周期半固定。"""
-    catalog = _single_region([
-        {"id": "a", "label": "A", "kind": "periodic"},
-    ])
-    item = catalog.item("a")[1]
-
-    assert item.kind == "single"
+    assert a.kind == "periodic" and not a.periodic   # 没绑配额 → 形态非周期
+    assert b.kind == "single" and b.periodic         # 绑配额 → 形态周期
 
 
 def test_fixed_totals_exclude_periodic_items() -> None:

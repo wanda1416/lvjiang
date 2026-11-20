@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QCheckBox,
-    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -51,6 +50,7 @@ from .....ui.widgets.layout_helpers import (
 from ...core.linger import (
     ITEM_ROSTER,
     ITEM_SINGLE,
+    NO_SYNC_TARGET,
     ItemSlot,
     LingerCatalog,
     LingerItem,
@@ -204,11 +204,13 @@ class LingerDialog(QDialog):
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         header.addWidget(self.user_combo)
         header.addSpacing(12)
-        header.addWidget(QLabel(tr_label("同步模型")))
-        self.target_combo = QComboBox(self)
-        self.target_combo.setMinimumWidth(180)
-        self.target_combo.currentIndexChanged.connect(self._on_default_target_changed)
-        header.addWidget(self.target_combo)
+        # 同步模型：按钮开配置对话框（候选勾选+默认 key）；右侧只读显示当前默认
+        self.sync_model_button = QPushButton(tr("同步模型"))
+        apply_button_style(self.sync_model_button, variant="neutral")
+        self.sync_model_button.clicked.connect(self._open_sync_model)
+        header.addWidget(self.sync_model_button)
+        self.sync_model_label = QLabel("")
+        header.addWidget(self.sync_model_label)
         header.addStretch(1)
         # 默认关闭：点一下只记录，记账必须是显式选择
         self.booking_switch = QCheckBox(tr("同步记账"))
@@ -432,32 +434,22 @@ class LingerDialog(QDialog):
         return bool(username) and booking.booking_enabled(username)
 
     def _reload_targets(self) -> None:
-        """同步模型下拉：固定/逐位条目共用的入账目标。"""
-        from .item_dialog import target_choices
+        """同步模型状态：只读显示当前默认同步 key。"""
+        from .item_dialog import candidate_label
 
         current = overrides.read_default_target()
-        self._updating = True
-        self.target_combo.clear()
-        for value, label in target_choices(booking.MODEL_STOCK):
-            self.target_combo.addItem(label, value)
-        index = self.target_combo.findData(current)
-        if index < 0:
-            self.target_combo.addItem(current, current)
-            index = self.target_combo.count() - 1
-        self.target_combo.setCurrentIndex(index)
-        self._updating = False
+        self.sync_model_label.setText(candidate_label(current))
 
-    def _on_default_target_changed(self, _index: int) -> None:
-        if self._updating:
-            return
-        target = str(self.target_combo.currentData() or "")
-        if not target:
-            return
-        overrides.set_default_target(target)
+    def _open_sync_model(self) -> None:
+        from .sync_model_dialog import LingerSyncModelDialog
+
+        LingerSyncModelDialog(self).exec()
+        # 候选/默认可能都变了：清单里「跟随同步模型」的条目立即反映
         self._catalog = load_effective_catalog()
         self._refresh_region_list()
         self._fill_table()
         self._refresh_summary()
+        self._reload_targets()
 
     def _on_user_changed(self, _index: int) -> None:
         if self._updating:
@@ -1128,6 +1120,8 @@ class LingerDialog(QDialog):
         """
         if self._store is None or not self._booking_enabled:
             return
+        if item.target == NO_SYNC_TARGET:
+            return  # 显式不同步：只记录
         if not booking.target_available(item.target):
             logger.warning(f"入账目标 {item.target} 不在定义里，本次只记录")
             return

@@ -32,6 +32,10 @@ ITEM_KINDS = (ITEM_SINGLE, ITEM_ROSTER, ITEM_PERIODIC)
 #: 写成 ``quota:<key>`` 就是周期型来源，写成 ``stock:<key>`` 是固定来源。
 DEFAULT_TARGET = LINGER_BOARD.default_target
 
+#: 「不同步」哨兵：条目只记录、不写任何 profile key。绑了它的条目按
+#: 固定/逐位的记录语义走（记录文件存 done/slots），永不入账。
+NO_SYNC_TARGET = "none"
+
 #: 记录文件的结构版本；读取时宽容处理更旧/未知字段，不做破坏性迁移。
 #: v2 给条目加了可选的 ``slots``（逐个录入名字的子项），
 #: v3 加了 ``booked``（已写进 Profile 账本的枚数）。
@@ -49,6 +53,11 @@ def item_key(region_id: str, item_id: str) -> str:
     保留双参签名（region_id 仅表明条目归属，不参与键值）：调用方不用逐处改。
     """
     return item_id
+
+
+def booking_target_is_quota(target: str) -> bool:
+    """入账目标是否配额模型（周期重置）；不依赖 booking 模块即可判定。"""
+    return str(target or "").startswith("quota:")
 
 
 # ─── 清单定义 ────────────────────────────────────────────────
@@ -90,8 +99,8 @@ class LingerItem:
 
     @property
     def periodic(self) -> bool:
-        """周期型：已得等于配额 key 的本周期当前值。"""
-        return self.kind == ITEM_PERIODIC
+        """周期型：已得等于配额 key 的本周期当前值（由 target 推导）。"""
+        return booking_target_is_quota(self.target)
 
 
 def _item_kind(raw: dict, where: str) -> str:
@@ -216,13 +225,12 @@ def region_from_doc(doc: Any, *, source_name: str,
         if count <= 0:
             raise ValueError(f"{where} 的 count 必须大于 0")
         item_label = _require_text(raw.get("label"), f"{where} 的 label")
-        target = str(raw.get("target") or DEFAULT_TARGET).strip()
+        target = str(raw.get("target") or "").strip() or DEFAULT_TARGET
         kind = _item_kind(raw, where)
-        # 类型与目标必须自洽：绑了配额 key 就是周期型，声明周期却没绑配额则降级为固定
-        if target.startswith("quota:"):
-            kind = ITEM_PERIODIC
-        elif kind == ITEM_PERIODIC:
-            kind = ITEM_SINGLE
+        # 目标决定读取语义（配额=周期读值），但不再强制反推 kind：同一个
+        # 来源既可以按周期记账（quota:*），也可以按库存累计（stock:*）或
+        # 只记录不同步（none）——记法（kind）与入账目标（target）是两个
+        # 独立决定，periodic 只是"target 为配额"时的展示形态。
         hidden = bool(raw.get("hidden", False))
         if hidden:
             continue

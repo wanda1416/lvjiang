@@ -24,6 +24,9 @@ from .board import LINGER_BOARD
 
 #: 清单条目的默认入账目标：库存里的袅袅之音
 TARGET_KEY = LINGER_BOARD.default_target
+
+#: 「不同步」哨兵（与 models.NO_SYNC_TARGET 同值，独立声明避免循环导入）
+NO_SYNC_TARGET = "none"
 #: 开关存在 ``interface.json`` 的 ``ui_state`` 下，按用户名记（本机界面状态）
 SWITCH_NODE = "ui_state"
 SWITCH_KEY = LINGER_BOARD.switch_key
@@ -41,7 +44,12 @@ def split_target(target: str) -> tuple[str, str]:
 
 
 def target_available(target: str) -> bool:
-    """目标 key 是否还在定义里；用户删掉这个 key 时返回 False。"""
+    """目标 key 是否还在定义里；用户删掉这个 key 时返回 False。
+
+    「不同步」哨兵恒可用：它本来就不指向任何 key。
+    """
+    if target == NO_SYNC_TARGET:
+        return True
     model, key = split_target(target)
     if not key:
         return False

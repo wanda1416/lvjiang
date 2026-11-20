@@ -6,6 +6,7 @@ resolver + 合并层落盘——**local 文件名与结构必须和 system 一�
 """
 from __future__ import annotations
 
+import re
 import yaml
 from pathlib import Path
 
@@ -81,7 +82,7 @@ def test_add_item_creates_new_entry_and_survives_merge(resolver: ConfigResolver)
     catalog = _effective(resolver)
     hexi = catalog.region(region_id)
     assert [item.id for item in hexi.items] == ["c", item_id]
-    assert item_id.startswith("u")
+    assert re.fullmatch(r"[0-9a-f]{8}", item_id)
 
 
 def test_remove_marks_hidden_not_deleted(resolver: ConfigResolver) -> None:

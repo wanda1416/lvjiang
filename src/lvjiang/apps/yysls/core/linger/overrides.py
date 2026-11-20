@@ -40,10 +40,6 @@ LINGER_FILE = "yysls/lingering.yaml"
 if LINGER_FILE not in REGISTRY_LIST_PATHS:
     register_registry_list_paths(LINGER_FILE, ("regions.*.items",))
     register_registry_list_identity(LINGER_FILE, {"regions.*.items": "id"})
-#: 新增条目 id 的前缀（区别于内容层 id，避免撞名）
-USER_ID_PREFIX = "u"
-
-
 def _load_full() -> dict:
     """读取当前合并视图（system + local），作为编辑的完整文档。"""
     return get_resolver().load_merged(LINGER_FILE)
@@ -169,8 +165,12 @@ def _split_key(key: str) -> tuple[str, str]:
 
 
 def new_item_id() -> str:
-    """新增条目的稳定 id：u + 8 位随机 hex（与展示名无关，改名不改它）。"""
-    return f"{USER_ID_PREFIX}{uuid4().hex[:8]}"
+    """新增条目的 id：与系统条目同格式的纯随机 uuid8。
+
+    id 从生成起永不变更——与地区、分类、条目名、类型完全解耦，改任何
+    字段都不断用户记录（见 lingering.yaml 文件头约定）。
+    """
+    return uuid4().hex[:8]
 
 
 def upsert_item(key: str, fields: dict) -> None:

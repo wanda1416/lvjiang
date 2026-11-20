@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -65,7 +66,8 @@ def test_every_shipped_item_has_stable_id_and_source(tmp_path: Path) -> None:
             key = f"{region.id}/{item.id}"
             assert key not in keys, f"条目键重复：{key}"
             keys.add(key)
-            assert item.id.isascii() and item.id.islower(), key
+            # id 是纯随机 uuid8（全数字也算合法——islower 对纯数字为 False）
+            assert item.id.isascii() and re.fullmatch(r"[0-9a-f]{8}", item.id), key
             assert item.count >= 1
             assert item.label and item.source
 

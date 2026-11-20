@@ -13,25 +13,28 @@ from __future__ import annotations
 from loguru import logger
 
 from .....core.config.resolver import ConfigResolver, get_resolver
+from .board import LINGER_BOARD
 from .models import LingerCatalog, catalog_from_doc
 
 #: 清单文件（相对配置根，system/local 同名合并）
-LINGER_FILE = "yysls/lingering.yaml"
+LINGER_FILE = LINGER_BOARD.catalog_file
 
 
-def load_catalog(resolver: ConfigResolver | None = None) -> LingerCatalog:
+def load_catalog(resolver: ConfigResolver | None = None, *,
+                 board=LINGER_BOARD) -> LingerCatalog:
     """读取整份清单；文件缺失或写坏时返回空目录，由页面提示「清单未安装」。"""
     resolver = resolver or get_resolver()
+    path = board.catalog_file
     try:
-        doc = resolver.load_merged(LINGER_FILE)
+        doc = resolver.load_merged(path)
     except FileNotFoundError:
-        logger.warning(f"袅袅之音清单不存在：{LINGER_FILE}")
+        logger.warning(f"{board.title}清单不存在：{path}")
         return LingerCatalog(())
     except Exception as exc:
-        logger.error(f"袅袅之音清单 {LINGER_FILE} 无法读取：{exc}")
+        logger.error(f"{board.title}清单 {path} 无法读取：{exc}")
         return LingerCatalog(())
     try:
-        return catalog_from_doc(doc, source_name=LINGER_FILE)
+        return catalog_from_doc(doc, source_name=path)
     except Exception as exc:  # 内容写坏了：整份丢弃，页面给提示
-        logger.error(f"袅袅之音清单 {LINGER_FILE} 解析失败：{exc}")
+        logger.error(f"{board.title}清单 {path} 解析失败：{exc}")
         return LingerCatalog(())

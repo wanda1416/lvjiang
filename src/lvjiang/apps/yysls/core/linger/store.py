@@ -25,12 +25,13 @@ from lvjiang.core.fs_util import atomic_write_bytes, locked_paths
 from lvjiang.core.json_files import formatted_json_bytes
 from lvjiang.core.sync.dirty import mark_dirty
 
+from .board import LINGER_BOARD
 from .models import ItemSlot, LingerState
 
 #: 用户级文档后缀，与 ``apps/yysls/sync/documents.py`` 登记的 kind 对应
-DOCUMENT_SUFFIX = ".linger.json"
-#: 文档通道使用的 kind
-DOCUMENT_KIND = "linger"
+DOCUMENT_SUFFIX = LINGER_BOARD.document_suffix
+#: 文档通道使用的 kind。云端已按这个 kind 存数据，不可改名。
+DOCUMENT_KIND = LINGER_BOARD.document_kind
 
 _LOCKS_GUARD = threading.Lock()
 _LOCKS: dict[str, threading.RLock] = {}
@@ -43,9 +44,14 @@ def _path_lock(path: Path) -> threading.RLock:
 
 
 class LingerStore:
-    """一个用户的记录文档读写。"""
+    """一个用户的记录文档读写。
 
-    def __init__(self, username: str, users_dir: Path | None = None):
+    默认落在袅袅之音这块板。传入别的 :class:`ChecklistBoard` 时，文件名和
+    ``mark_dirty`` 的 kind 跟着那块板走，记录结构不变。
+    """
+
+    def __init__(self, username: str, users_dir: Path | None = None, *,
+                 board=LINGER_BOARD):
         name = str(username or "").strip()
         if not name or "/" in name or "\\" in name:
             raise ValueError(f"非法用户名：{username!r}")
@@ -53,9 +59,10 @@ class LingerStore:
             from lvjiang.constants import USERS_DIR
 
             users_dir = USERS_DIR
+        self.board = board
         self.username = name
         self.users_dir = Path(users_dir)
-        self.path = self.users_dir / f"{name}{DOCUMENT_SUFFIX}"
+        self.path = self.users_dir / f"{name}{board.document_suffix}"
         self._lock = _path_lock(self.path)
 
     def load(self) -> LingerState:
@@ -66,12 +73,12 @@ class LingerStore:
             except FileNotFoundError:
                 return LingerState()
             except OSError as exc:
-                logger.error(f"读取袅袅之音记录失败 {self.path}：{exc}")
+                logger.error(f"读取{self.board.title}记录失败 {self.path}：{exc}")
                 return LingerState()
         try:
             data = json.loads(raw)
         except ValueError as exc:
-            logger.error(f"袅袅之音记录不是合法 JSON {self.path}：{exc}")
+            logger.error(f"{self.board.title}记录不是合法 JSON {self.path}：{exc}")
             return LingerState()
         return LingerState.from_dict(data)
 
@@ -115,4 +122,4 @@ class LingerStore:
             formatted_json_bytes(state.to_dict()),
             prefix=f".{self.path.stem}_",
         )
-        mark_dirty(self.username, DOCUMENT_KIND)
+        mark_dirty(self.username, self.board.document_kind)

@@ -1,11 +1,12 @@
-"""袅袅之音清单：内容定义（YAML）+ 用户记录（``.linger.json``）。
+"""袅袅之音清单：内容定义（YAML）+ 用户记录（``.linger.json``）+ 可选入账。
 
-对外只暴露三件事：读清单、读写某个用户的记录、以及两者合成的进度统计。
-入账（写 profile）与周期型来源不在本模块——它们属于下一版，见
+这是第一块清单板（``LINGER_BOARD``）。对外仍是：读清单、读写某个用户的记录、
+合成进度。入账在 :mod:`.booking`，默认关闭。板身份见
 ``docs/20-plans/02-profile/04-linger-checklist.md``。
 """
 from __future__ import annotations
 
+from .board import LINGER_BOARD
 from .catalog import LINGER_FILE, load_catalog
 from .models import (
     ITEM_KINDS,
@@ -40,6 +41,7 @@ from .overrides import (
 from .store import DOCUMENT_KIND, DOCUMENT_SUFFIX, LingerStore
 
 __all__ = [
+    "LINGER_BOARD",
     "DOCUMENT_KIND",
     "DOCUMENT_SUFFIX",
     "LINGER_FILE",

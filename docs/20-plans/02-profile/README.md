@@ -26,7 +26,7 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 | 毕业率分析 | [01-graduation-rate.md](../../30-design/02-decisions/05-profile/01-graduation-rate.md) | 角色装备 → 毕业率模型 → 毕业率展示 | P2 | ✅ 已实现（实现方式与子文档早期方案不同） |
 | 货币追踪 | [02-currency-tracking.md](02-currency-tracking.md) | 钱袋 OCR 识别 → Profile stock 模型 | P1 | ✅ 已实现（实现方式与子文档早期方案不同） |
 | 心力体力管理 | [03-stamina-management.md](03-stamina-management.md) | 资源监控 → 恢复预测 → 超标预警 | P0 | ✅ 已完成（基础框架） |
-| 袅袅之音清单 | [04-linger-checklist.md](04-linger-checklist.md) | 常驻来源清单 → 每用户 `.linger.json` 记录 | P2 | 🚧 第一版（只记录，入账未做） |
+| 袅袅之音清单 | [04-linger-checklist.md](04-linger-checklist.md) | 常驻来源清单 → `.linger.json`，可选入账；第一块清单板 | P2 | ✅ 记录与入账已实现（批量补入账、第二块板未做） |
 | 总览多列与历史 | [04-overview-multi-columns.md](../../30-design/02-decisions/05-profile/04-overview-multi-columns.md)、[05-history-dialog.md](../../30-design/02-decisions/05-profile/05-history-dialog.md) | 表头批量加列、变更记录对话框 | P1 | ✅ 已实现 |
 | 页面结构与搬运 | [06-overview-layout-sync.md](../../30-design/02-decisions/05-profile/06-overview-layout-sync.md) | 分组/列/列宽独立成 `profile.json`，手动上传下载 + 网页只读展示 | P1 | ✅ 已实现 |
 | 同步模型 v1.1（set-only） | [07-set-only-v1.1.md](../../30-design/02-decisions/05-profile/07-set-only-v1.1.md) | 账本只同步绝对值 set，周期变化在读取时计算 | P0 | ✅ 已实现（历史方案，已被 v1.2 取代） |

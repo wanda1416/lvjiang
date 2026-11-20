@@ -20,12 +20,13 @@ from loguru import logger
 from .....core.config import get_interface_store
 from .....core.profile.schema import get_profile_config
 from .....core.profile.service import profile_action, profile_read
+from .board import LINGER_BOARD
 
 #: 清单条目的默认入账目标：库存里的袅袅之音
-TARGET_KEY = "stock:niaoniao"
+TARGET_KEY = LINGER_BOARD.default_target
 #: 开关存在 ``interface.json`` 的 ``ui_state`` 下，按用户名记（本机界面状态）
 SWITCH_NODE = "ui_state"
-SWITCH_KEY = "linger_booking"
+SWITCH_KEY = LINGER_BOARD.switch_key
 
 MODEL_STOCK = "stock"
 MODEL_QUOTA = "quota"
@@ -71,51 +72,59 @@ def periodic_state(username: str, target: str) -> tuple[int, int]:
     return current, cap
 
 
-def booking_enabled(username: str) -> bool:
+def _board_or_default(board):
+    return LINGER_BOARD if board is None else board
+
+
+def booking_enabled(username: str, board=None) -> bool:
     """该用户是否打开了「同步记账」（默认关闭）。"""
+    board = _board_or_default(board)
     node = get_interface_store().get_node(SWITCH_NODE, {})
     if not isinstance(node, dict):
         return False
-    block = node.get(SWITCH_KEY)
+    block = node.get(board.switch_key)
     if not isinstance(block, dict):
         return False
     return bool(block.get(username))
 
 
-def set_booking_enabled(username: str, enabled: bool) -> None:
+def set_booking_enabled(username: str, enabled: bool, board=None) -> None:
     """切换「同步记账」；打开不会补写以前的记录，只有之后的改动才入账。"""
+    board = _board_or_default(board)
     store = get_interface_store()
 
     def mutate(node) -> dict:
         data = dict(node) if isinstance(node, dict) else {}
-        block = dict(data.get(SWITCH_KEY) or {})
+        block = dict(data.get(board.switch_key) or {})
         if enabled:
             block[username] = True
         else:
             block.pop(username, None)
         if block:
-            data[SWITCH_KEY] = block
+            data[board.switch_key] = block
         else:
-            data.pop(SWITCH_KEY, None)
+            data.pop(board.switch_key, None)
         return data
 
     store.mutate_node(SWITCH_NODE, mutate)
 
 
-def write_delta(username: str, target: str, delta: int, source: str) -> str | None:
+def write_delta(username: str, target: str, delta: int, source: str,
+                board=None) -> str | None:
     """往账本写一条增量；成功返回 ``None``，失败返回可展示的原因。"""
+    board = _board_or_default(board)
     if delta == 0:
         return None
     model, key = split_target(target)
     if not key:
         return "no target"
     try:
-        # 库存目标不触发同步目标（见模块说明）；配额目标就是周期账，按周期语义走。
+        # 哪些模型触发同步目标由这块板声明。袅袅只放行配额。
         profile_action(
             username, key, delta=delta, source=source,
-            trigger_sync=model == MODEL_QUOTA,
+            trigger_sync=board.triggers_sync(model),
         )
     except Exception as exc:  # 锁定、CAS 冲突、未定义都归于「这次没入账」
-        logger.warning(f"袅袅之音入账失败 {username}.{target} Δ{delta:+d}：{exc}")
+        logger.warning(f"{board.title}入账失败 {username}.{target} Δ{delta:+d}：{exc}")
         return str(exc) or "failed"
     return None

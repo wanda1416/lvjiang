@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from .board import LINGER_BOARD
+
 #: 条目类型：决定「怎么记」以及「记到哪」
 #: - single：单次/累加来源，勾选或填数字
 #: - roster：每一枚对应一个具体对象（以武会友），展开逐位记名字
@@ -28,7 +30,7 @@ ITEM_KINDS = (ITEM_SINGLE, ITEM_ROSTER, ITEM_PERIODIC)
 
 #: 条目的默认入账目标（库存里的袅袅之音）。清单里可用 ``target:`` 覆盖；
 #: 写成 ``quota:<key>`` 就是周期型来源，写成 ``stock:<key>`` 是固定来源。
-DEFAULT_TARGET = "stock:niaoniao"
+DEFAULT_TARGET = LINGER_BOARD.default_target
 
 #: 记录文件的结构版本；读取时宽容处理更旧/未知字段，不做破坏性迁移。
 #: v2 给条目加了可选的 ``slots``（逐个录入名字的子项），

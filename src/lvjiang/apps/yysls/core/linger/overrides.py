@@ -24,6 +24,7 @@ from .....core.config.merge import (
     register_registry_list_paths,
 )
 from .....core.config.resolver import get_resolver
+from .board import LINGER_BOARD
 from .models import (
     DEFAULT_TARGET,
     ITEM_PERIODIC,
@@ -33,8 +34,8 @@ from .models import (
     catalog_from_doc,
 )
 
-#: 清单相对路径（system/local 同名）
-LINGER_FILE = "yysls/lingering.yaml"
+#: 清单相对路径（system/local 同名）。合并注册绑在这块板上，换文件要另行注册。
+LINGER_FILE = LINGER_BOARD.catalog_file
 
 # 条目列表的合并语义（按 id 原位替换）。import 即注册：页面与测试只要碰到本
 # 模块就生效，不依赖 AppHooks 是否已加载插件；幂等，重复注册无副作用。

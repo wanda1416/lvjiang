@@ -381,7 +381,9 @@ def test_unreadable_reset_count_reaches_the_equipment_card(qtbot):
     card = TuningResultCard(result)
     qtbot.addWidget(card)
     assert card.reset_label is not None
+    from lvjiang.ui.widgets.theme import get_theme_manager
+
     # 标成「异常」而不是「重置结果」，并且标红。
     assert card.reset_label.text().startswith("异常：")
     assert card.reset_label.property("anomaly") is True
-    assert "#D32F2F" in card.reset_label.styleSheet()
+    assert get_theme_manager().tokens.danger.lower() in card.reset_label.styleSheet().lower()

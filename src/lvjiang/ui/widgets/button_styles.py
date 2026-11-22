@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialogButtonBox,
     QMessageBox,
     QPushButton,
@@ -10,8 +11,8 @@ from PyQt6.QtWidgets import (
 )
 
 ACTION_BUTTON_STYLE = (
-    "QPushButton { border: 1px solid palette(highlight); "
-    "color: palette(highlight); border-radius: 5px; padding: 5px 11px; "
+    "QPushButton { border: 1px solid palette(link); "
+    "color: palette(link); border-radius: 5px; padding: 5px 11px; "
     "font-weight: 600; }"
     "QPushButton:hover { background-color: palette(midlight); }"
     "QPushButton:pressed, QPushButton:checked { background-color: palette(mid); }"
@@ -28,17 +29,17 @@ NEUTRAL_BUTTON_STYLE = (
 )
 
 DANGER_BUTTON_STYLE = (
-    "QPushButton { background-color: palette(button); color: #c62828; "
-    "border: 1px solid #c62828; border-radius: 5px; padding: 5px 11px; "
+    "QPushButton { background-color: palette(button); color: #be123c; "
+    "border: 1px solid #be123c; border-radius: 5px; padding: 5px 11px; "
     "font-weight: 600; }"
-    "QPushButton:hover { background-color: rgba(198, 40, 40, 0.12); }"
-    "QPushButton:pressed { background-color: rgba(198, 40, 40, 0.22); }"
+    "QPushButton:hover { background-color: rgba(190, 18, 60, 0.12); }"
+    "QPushButton:pressed { background-color: rgba(190, 18, 60, 0.22); }"
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 
 COMPACT_ACTION_BUTTON_STYLE = (
-    "QPushButton { border: 1px solid palette(highlight); "
-    "color: palette(highlight); border-radius: 4px; padding: 2px 7px; "
+    "QPushButton { border: 1px solid palette(link); "
+    "color: palette(link); border-radius: 4px; padding: 2px 7px; "
     "font-weight: 600; }"
     "QPushButton:hover { background-color: palette(midlight); }"
     "QPushButton:pressed, QPushButton:checked { background-color: palette(mid); }"
@@ -55,11 +56,11 @@ COMPACT_NEUTRAL_BUTTON_STYLE = (
 )
 
 COMPACT_DANGER_BUTTON_STYLE = (
-    "QPushButton { background-color: palette(button); color: #c62828; "
-    "border: 1px solid #c62828; border-radius: 4px; padding: 2px 7px; "
+    "QPushButton { background-color: palette(button); color: #be123c; "
+    "border: 1px solid #be123c; border-radius: 4px; padding: 2px 7px; "
     "font-weight: 600; }"
-    "QPushButton:hover { background-color: rgba(198, 40, 40, 0.12); }"
-    "QPushButton:pressed { background-color: rgba(198, 40, 40, 0.22); }"
+    "QPushButton:hover { background-color: rgba(190, 18, 60, 0.12); }"
+    "QPushButton:pressed { background-color: rgba(190, 18, 60, 0.22); }"
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 
@@ -72,6 +73,31 @@ COMPACT_TOOL_BUTTON_STYLE = (
 )
 
 
+def _apply_styled_buttons(
+    buttons: tuple[QPushButton | None, ...],
+    variant: str,
+    density: str,
+    fallback_styles: dict[str, str],
+) -> None:
+    """Apply variant/density dynamic properties, falling back inline without global theme."""
+    fallback = fallback_styles[variant]
+    app = QApplication.instance()
+    has_theme = app is not None and bool(app.property("lvjiangTheme"))
+    for button in buttons:
+        if button is None:
+            continue
+        button.setProperty("btnVariant", variant)
+        button.setProperty("btnDensity", density)
+        if has_theme:
+            button.setStyleSheet("")
+            style = button.style()
+            if style is not None:
+                style.unpolish(button)
+                style.polish(button)
+        else:
+            button.setStyleSheet(fallback)
+
+
 def apply_button_style(
     *buttons: QPushButton | None,
     variant: str = "action",
@@ -82,20 +108,17 @@ def apply_button_style(
         "neutral": NEUTRAL_BUTTON_STYLE,
         "danger": DANGER_BUTTON_STYLE,
     }
-    style = styles[variant]
-    for button in buttons:
-        if button is not None:
-            button.setStyleSheet(style)
+    _apply_styled_buttons(buttons, variant, "regular", styles)
 
 
 _EXECUTION_BUTTON_COLORS = {
-    "run": ("#4CAF50", "white"),
-    "stop": ("#f44336", "white"),
-    "stopping": ("#ef9a9a", "white"),
-    "not_ready": ("#FFC107", "#333"),
-    "disabled": ("#9E9E9E", "white"),
-    "pause": ("#FF9800", "white"),
-    "pausing": ("#FFB74D", "white"),
+    "run": ("#2e7d52", "#ffffff"),
+    "stop": ("#c4334b", "#ffffff"),
+    "stopping": ("#d98b96", "#ffffff"),
+    "not_ready": ("#d4942a", "#1c1b18"),
+    "disabled": ("#78756e", "#f5f3ee"),
+    "pause": ("#c8721a", "#ffffff"),
+    "pausing": ("#dfa05e", "#1c1b18"),
 }
 
 
@@ -131,10 +154,7 @@ def apply_compact_button_style(
         "neutral": COMPACT_NEUTRAL_BUTTON_STYLE,
         "danger": COMPACT_DANGER_BUTTON_STYLE,
     }
-    style = styles[variant]
-    for button in buttons:
-        if button is not None:
-            button.setStyleSheet(style)
+    _apply_styled_buttons(buttons, variant, "compact", styles)
 
 
 def apply_message_box_button_style(box: QMessageBox) -> None:

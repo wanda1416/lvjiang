@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -11,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr, tr_label
+from .....ui.widgets.theme import LIGHT, ThemeTokens, get_theme_manager
 from ...config.tune_slots import SLOT_LABELS
 from ...core.tuning_rules import RATING_LABELS
 from .result_store import (
@@ -30,12 +32,6 @@ from .result_store import (
     TuningEquipmentResult,
 )
 
-_QUALITY_ACCENT = {
-    "gold": "#B58A35",
-    "purple": "#7656A8",
-    "blue": "#3D78C5",
-}
-
 _QUALITY_LABELS = {
     "gold": tr("金色"),
     "purple": tr("紫色"),
@@ -49,14 +45,6 @@ _RESULT_LABELS = {
     RESULT_TUNED: tr("已调律"),
     RESULT_TUNED_RECYCLED: tr("调律后回收"),
     RESULT_RESET: tr("重置未执行"),
-}
-
-_RESULT_COLORS = {
-    RESULT_RECYCLED: "#D32F2F",
-    RESULT_SKIPPED: "#7A7F87",
-    RESULT_TUNED: "#388E3C",
-    RESULT_TUNED_RECYCLED: "#E65100",
-    RESULT_RESET: "#607D8B",
 }
 
 _RESET_LABELS = {
@@ -91,14 +79,49 @@ def _result_label(result: TuningEquipmentResult) -> str:
     return _RESULT_LABELS.get(result.result, result.result)
 
 
-def _cap_color(cap_pct) -> str:
+def _theme_tokens() -> ThemeTokens:
+    app = QApplication.instance()
+    return LIGHT if app is None else get_theme_manager(app).tokens
+
+
+def _quality_accent(quality: str, tokens: ThemeTokens) -> str:
+    colors = (
+        {"gold": "#e5a93b", "purple": "#c084fc", "blue": "#38bdf8"}
+        if tokens.is_dark else
+        {"gold": "#b45309", "purple": "#7e22ce", "blue": "#0369a1"}
+    )
+    return colors.get(quality, tokens.border_strong)
+
+
+def _result_badge_color(result_key: str, tokens: ThemeTokens) -> str:
+    colors = (
+        {
+            RESULT_RECYCLED: "#b91c3c",
+            RESULT_SKIPPED: "#524f49",
+            RESULT_TUNED: "#166534",
+            RESULT_TUNED_RECYCLED: "#b45309",
+            RESULT_RESET: "#0e5a8a",
+        }
+        if tokens.is_dark else
+        {
+            RESULT_RECYCLED: "#be123c",
+            RESULT_SKIPPED: "#635f56",
+            RESULT_TUNED: "#15803d",
+            RESULT_TUNED_RECYCLED: "#c2410c",
+            RESULT_RESET: "#0369a1",
+        }
+    )
+    return colors.get(result_key, tokens.text_muted)
+
+
+def _cap_color(cap_pct, tokens: ThemeTokens) -> str:
     if cap_pct is None:
         return "palette(text)"
     if cap_pct >= 90:
-        return "#B8860B"
+        return "#e5a93b" if tokens.is_dark else "#b45309"
     if cap_pct >= 70:
-        return "#8B5CF6"
-    return "#2563EB"
+        return "#c084fc" if tokens.is_dark else "#7e22ce"
+    return "#38bdf8" if tokens.is_dark else "#0369a1"
 
 
 def _value_text(affix: dict) -> str:
@@ -118,9 +141,10 @@ class TuningResultCard(QFrame):
         self.result = result
         self.setObjectName("tuningResultCard")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        tokens = _theme_tokens()
         self.setMinimumWidth(220)
         self.setMinimumHeight(215)
-        accent = _QUALITY_ACCENT.get(result.quality, "#8A8A8A")
+        accent = _quality_accent(result.quality, tokens)
         self.setStyleSheet(
             "QFrame#tuningResultCard {"
             "background-color: palette(base);"
@@ -149,7 +173,7 @@ class TuningResultCard(QFrame):
         status = _result_label(result)
         self.status_label = QLabel(status)
         self.status_label.setStyleSheet(
-            f"color: white; background: {_RESULT_COLORS.get(result.result, '#607D8B')};"
+            f"color: white; background: {_result_badge_color(result.result, tokens)};"
             "border: none; border-radius: 8px; padding: 2px 7px;"
             "font-size: 11px; font-weight: bold;"
         )
@@ -192,7 +216,7 @@ class TuningResultCard(QFrame):
                 tr_label('装备状态') + "、".join(state_parts))
             equipment_state.setWordWrap(True)
             equipment_state.setStyleSheet(
-                "font-size: 11px; font-weight: bold; color: #8A5A00; border: none;")
+                f"font-size: 11px; font-weight: bold; color: {tokens.warning}; border: none;")
             layout.addWidget(equipment_state)
 
         self.reset_label: QLabel | None = None
@@ -206,7 +230,7 @@ class TuningResultCard(QFrame):
             self.reset_label.setProperty("anomaly", anomaly)
             self.reset_label.setStyleSheet(
                 "font-size: 11px; font-weight: bold; border: none; color: "
-                + ("#D32F2F" if anomaly else "#8A5A00") + ";")
+                + (tokens.danger if anomaly else tokens.warning) + ";")
             layout.addWidget(self.reset_label)
 
         line = QFrame()
@@ -229,7 +253,7 @@ class TuningResultCard(QFrame):
                 cap_label = QLabel(f"{cap:g}%" if isinstance(cap, (int, float)) else f"{cap}%")
                 cap_label.setAlignment(Qt.AlignmentFlag.AlignRight)
                 cap_label.setStyleSheet(
-                    f"font-size: 11px; font-weight: bold; color: {_cap_color(cap)}; border: none;"
+                    f"font-size: 11px; font-weight: bold; color: {_cap_color(cap, tokens)}; border: none;"
                 )
                 cap_label.setMinimumWidth(38)
                 row.addWidget(cap_label)

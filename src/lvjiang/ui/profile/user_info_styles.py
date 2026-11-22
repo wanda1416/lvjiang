@@ -3,7 +3,7 @@
 USER_INFO_GROUP_STYLE = """
     QGroupBox {
         font-weight: bold;
-        border: 1px solid #cccccc;
+        border: 1px solid palette(midlight);
         border-radius: 4px;
         margin-top: 8px;
         padding-top: 12px;

@@ -15,6 +15,7 @@ from html import escape
 from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import (
+    QApplication,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -28,6 +29,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.theme import LIGHT, ThemeTokens, get_theme_manager
 from .progress_hub import TuningProgressHub
 from .result_store import TuningResultStore
 from .styles import HEADER_TITLE_STYLE
@@ -35,22 +37,38 @@ from .styles import HEADER_TITLE_STYLE
 if TYPE_CHECKING:
     from .result_dialog import TuningResultsDialog
 
-# 品阶 key → 颜色
-_QUALITY_COLORS = {
-    "gold": "#FFD700",
-    "purple": "#9C27B0",
-    "blue": "#2196F3",
-}
-
-# 评级 key → 中文 + 颜色
-_RATING_STYLE = {
-    "top": (tr("顶级"), "#FF6F00; font-weight: bold"),
-    "excellent": (tr("优秀"), "#388E3C"),
-    "normal": (tr("能用"), "#757575"),
-    "junk": (tr("垃圾"), "#D32F2F"),
-}
-
 _MAX_AFFIX = 5  # 装备最大词条数（固定占位，避免布局抖动）
+
+
+def _theme_tokens() -> ThemeTokens:
+    app = QApplication.instance()
+    return LIGHT if app is None else get_theme_manager(app).tokens
+
+
+def _quality_color(quality: str, tokens: ThemeTokens) -> str:
+    colors = (
+        {"gold": "#e5a93b", "purple": "#c084fc", "blue": "#38bdf8"}
+        if tokens.is_dark else
+        {"gold": "#b45309", "purple": "#7e22ce", "blue": "#0369a1"}
+    )
+    return colors.get(quality, tokens.text)
+
+
+def _rating_info(
+    rating: str,
+    tokens: ThemeTokens,
+    default_label: str | None = None,
+) -> tuple[str, str]:
+    styles = {
+        "top": (tr("顶级"), f"color:{tokens.accent}; font-weight: bold"),
+        "excellent": (tr("优秀"), f"color:{tokens.success}"),
+        "normal": (tr("能用"), f"color:{tokens.text_muted}"),
+        "junk": (tr("垃圾"), f"color:{tokens.danger}"),
+    }
+    if rating in styles:
+        return styles[rating]
+    fallback = default_label if default_label is not None else rating
+    return fallback, f"color:{tokens.text}"
 
 
 class TuningProgressWidget(QWidget):
@@ -367,7 +385,8 @@ class TuningProgressWidget(QWidget):
         level = started.get("level")
         rounds = finish.get("rounds", 0)
         rating = finish.get("final_rating", "")
-        rating_cn = _RATING_STYLE.get(rating, (rating or tr("未评级"), ""))[0]
+        rating_cn = _rating_info(
+            rating, _theme_tokens(), default_label=rating or tr("未评级"))[0]
         status = finish.get("status", "done")
         status_labels = {
             "recycled": tr("已回收"),
@@ -483,7 +502,7 @@ class TuningProgressWidget(QWidget):
         subtitle = " / ".join(value for value in (rule, playstyle) if value)
         heading = f"<b>备战方案：{name}</b>"
         if subtitle:
-            heading += f" <span style='color:#888'>({subtitle})</span>"
+            heading += f" <span style='color:{_theme_tokens().text_muted}'>({subtitle})</span>"
         status = str(item.get("status") or "")
         raw_reason = str(item.get("reason") or "")
         reason = escape(raw_reason)
@@ -590,9 +609,10 @@ class TuningProgressWidget(QWidget):
         self._round_count = 0
         self._current_equipment_info = dict(info)
         self._current_events = []
+        tokens = _theme_tokens()
         name = info.get("name") or info.get("type") or tr("未知")
         quality = info.get("quality", "")
-        color = _QUALITY_COLORS.get(quality, "#333")
+        color = _quality_color(quality, tokens)
         self._equip_name_label.setText(
             f"<span style='color:{color}'>{name}</span>")
         level = info.get("level", 0)
@@ -636,7 +656,7 @@ class TuningProgressWidget(QWidget):
             self._target_label.setText(tr("目标：-"))
         expect = info.get("expect_rating", "")
         if expect:
-            rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
+            rating_cn, rating_style = _rating_info(expect, tokens)
             self._expect_label.setText(
                 f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         else:
@@ -654,9 +674,10 @@ class TuningProgressWidget(QWidget):
             self._record_event("装备状态：" + "、".join(state_parts))
 
     def _on_equipment_assessed(self, info: dict):
+        tokens = _theme_tokens()
         expect = info.get("expect_rating", "")
         if expect:
-            rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
+            rating_cn, rating_style = _rating_info(expect, tokens)
             self._expect_label.setText(
                 f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         plain_parts = []
@@ -665,12 +686,13 @@ class TuningProgressWidget(QWidget):
             result = result or {}
             name = result.get("name") or key
             if result.get("skipped") or result.get("not_applicable"):
-                html_parts.append(f"<span style='color:#999'>{name}：不适用</span>")
+                html_parts.append(
+                    f"<span style='color:{tokens.text_muted}'>{name}：不适用</span>")
                 plain_parts.append(f"{name}：不适用")
                 continue
             rating = result.get("rating", "")
-            rating_cn, style = _RATING_STYLE.get(
-                rating, (rating or tr("未评级"), "#333"))
+            rating_cn, style = _rating_info(
+                rating, tokens, default_label=rating or tr("未评级"))
             html_parts.append(f"{name}：<span style='{style}'>{tr(rating_cn)}</span>")
             plain_parts.append(f"{name}：{tr(rating_cn)}")
         self._rule_ratings_label.setText(
@@ -681,6 +703,7 @@ class TuningProgressWidget(QWidget):
             ("；".join(plain_parts) or "无可用判定规则"))
 
     def _on_round_prepared(self, info: dict):
+        tokens = _theme_tokens()
         round_no = info.get("round_no", self._round_count + 1)
         food = info.get("food_used") or tr("不添加狗粮")
         reason = info.get("food_reason", "")
@@ -690,7 +713,7 @@ class TuningProgressWidget(QWidget):
                 n=round_no, action=action, food=food))
         self._last_result_label.setText(
             tr("第 {n} 轮方案：{food}").format(n=round_no, food=food) +
-            (f"<br><span style='color:#888'>{reason}</span>" if reason else ""))
+            (f"<br><span style='color:{tokens.text_muted}'>{reason}</span>" if reason else ""))
         stock = info.get("material_stock") or {}
         if stock:
             self._material_label.setText(
@@ -700,6 +723,7 @@ class TuningProgressWidget(QWidget):
             f"第 {round_no} 轮准备：{food}" + (f"｜{reason}" if reason else ""))
 
     def _on_tune_round_completed(self, info: dict):
+        tokens = _theme_tokens()
         self._round_count += 1
         round_no = info.get("round_no", self._round_count)
         self._round_label.setText(tr("轮次：{n}").format(n=round_no))
@@ -725,7 +749,7 @@ class TuningProgressWidget(QWidget):
         if food_reason:
             self._last_result_label.setText(
                 f"{result_text}<br>"
-                f"<span style='color:#888'>{food_reason}</span>")
+                f"<span style='color:{tokens.text_muted}'>{food_reason}</span>")
         stock = info.get("material_stock", {})
         if stock:
             parts = [f"{k}×{v}" for k, v in stock.items()]
@@ -733,12 +757,12 @@ class TuningProgressWidget(QWidget):
             self._material_label.setVisible(True)
         expect = info.get("expect_rating")
         if expect:
-            rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
+            rating_cn, rating_style = _rating_info(expect, tokens)
             self._expect_label.setText(
                 f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         final = info.get("final_rating")
         if final:
-            rating_cn, rating_style = _RATING_STYLE.get(final, (final, "#333"))
+            rating_cn, rating_style = _rating_info(final, tokens)
             self._final_label.setText(
                 f"{tr('最终评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         else:
@@ -759,7 +783,7 @@ class TuningProgressWidget(QWidget):
         rating = info.get("final_rating", "")
         rounds = info.get("rounds", 0)
         status = info.get("status", "done")
-        rating_cn, rating_style = _RATING_STYLE.get(rating, (rating, "#333"))
+        rating_cn, rating_style = _rating_info(rating, _theme_tokens())
         status_text = {
             "recycled": tr("已回收"),
             "interrupted": tr("调律中断，已保存部分报告"),

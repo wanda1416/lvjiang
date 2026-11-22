@@ -153,6 +153,23 @@ class TestLoadUserConfig:
         assert config.font_sizes.user_overview == 13
         assert config.font_sizes.user_info == 15
 
+    def test_theme_accepts_paper_and_falls_back_on_invalid(
+            self, session_env, monkeypatch):
+        """theme 支持 light / paper / dark，非法值回退为 light。"""
+        monkeypatch.setattr(
+            "lvjiang.core.config.load_app_config", lambda: {})
+        session_env.write_text(json.dumps({
+            "settings": {"theme": "paper"}
+        }), encoding="utf-8")
+        reset_session_store()
+        assert load_user_config().theme == "paper"
+
+        session_env.write_text(json.dumps({
+            "settings": {"theme": "unknown"}
+        }), encoding="utf-8")
+        reset_session_store()
+        assert load_user_config().theme == "light"
+
     def test_invalid_font_sizes_fall_back_to_system_default(
             self, session_env, monkeypatch):
         monkeypatch.setattr(

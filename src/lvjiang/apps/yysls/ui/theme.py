@@ -4,11 +4,11 @@ from __future__ import annotations
 
 
 def equipment_quality_stylesheet(tokens) -> str:
-    dark = tokens.window.lower() == "#202327"
+    dark = bool(getattr(tokens, "is_dark", False))
     colors = (
-        {"gold": "#ffd166", "purple": "#c4a0ff", "blue": "#73a7ff", "green": "#62d58a"}
+        {"gold": "#e5a93b", "purple": "#c084fc", "blue": "#38bdf8", "green": "#34d399"}
         if dark else
-        {"gold": "#b8860b", "purple": "#8b5cf6", "blue": "#2563eb", "green": "#16863e"}
+        {"gold": "#b45309", "purple": "#7e22ce", "blue": "#0369a1", "green": "#15803d"}
     )
     return "\n".join([
         f'QLabel[equipmentName="true"] {{ color: {tokens.text}; }}',

@@ -319,7 +319,7 @@ class UserConfig:
     （system 系统默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
     language: str = "zh_CN"                  # 界面语言（zh_CN / en_US / auto）
-    theme: str = "light"                     # 界面主题（light / dark）
+    theme: str = "light"                     # 界面主题（light / paper / dark）
     android_capture_method: str = "scrcpy"  # scrcpy / screencap
     android_input_method: str = "adb"       # adb / device_gesture（Beta，需 App）
     android_recovery: AndroidRecoveryConfig = field(default_factory=AndroidRecoveryConfig)
@@ -340,7 +340,7 @@ class UserConfig:
     font_sizes: FontSizeConfig = field(default_factory=FontSizeConfig)    # 用户页面内容字号
 
     def __post_init__(self):
-        if self.theme not in {"light", "dark"}:
+        if self.theme not in {"light", "paper", "dark"}:
             self.theme = "light"
         if self.android_capture_method not in {"scrcpy", "screencap"}:
             self.android_capture_method = "scrcpy"

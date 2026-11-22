@@ -172,6 +172,21 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             self._tab_widget.setFont(font)
         self._connect_profile_engine()
         self._connect_profile_script_runner()
+        self._connect_theme_changes()
+
+    def _connect_theme_changes(self) -> None:
+        """主题切换后重刷总览表，使单元格语义色即时跟随主题。"""
+        if QApplication.instance() is None:
+            return
+        try:
+            from ..widgets.theme import get_theme_manager
+
+            get_theme_manager().theme_changed.connect(self._on_theme_changed)
+        except Exception as e:
+            logger.debug(f"ProfileTab 连接 ThemeManager 失败: {e}")
+
+    def _on_theme_changed(self, *_args) -> None:
+        self._schedule_refresh()
 
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新总览 UI。"""

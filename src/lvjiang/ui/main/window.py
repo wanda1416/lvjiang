@@ -629,7 +629,7 @@ class MainWindow(
         self._adb_resume_event = threading.Event()
         self._adb_resume_event.set()  # 初始为已恢复，不阻塞
         self._adb_banner = QFrame()
-        self._adb_banner.setStyleSheet("background-color: #d32f2f;")
+        self._adb_banner.setStyleSheet("background-color: #be123c;")
         self._adb_banner.setVisible(False)
         _bl = QHBoxLayout(self._adb_banner)
         _bl.setContentsMargins(8, 2, 8, 2)
@@ -638,7 +638,7 @@ class MainWindow(
         _bl.addWidget(self._adb_banner_label, stretch=1)
         self._adb_banner_btn = QPushButton(tr("重新检查"))
         self._adb_banner_btn.setStyleSheet(
-            "background-color: white; color: #d32f2f; font-weight: bold; "
+            "background-color: white; color: #be123c; font-weight: bold; "
             "padding: 2px 12px; border: none; font-size: 12px;"
         )
         _bl.addWidget(self._adb_banner_btn)
@@ -839,7 +839,7 @@ class MainWindow(
 
         self.preview_label = QLabel(tr("定位窗口后自动截屏"))
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setStyleSheet("background-color: #2b2b2b; color: #888; font-size: 14px;")
+        self.preview_label.setStyleSheet("background-color: #1c1c22; color: #9b968c; font-size: 14px;")
         preview_layout.addWidget(self.preview_label, stretch=1)
 
         preview_layout.addWidget(self._build_capture_panel())

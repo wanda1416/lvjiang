@@ -139,5 +139,5 @@ def test_locked_cell_uses_pause_button_grey_background():
     item = QTableWidgetItem("")
     apply_cell_style(item, "locked")
     assert item.background().color() == QColor(DISABLED_BUTTON_BG)
-    assert DISABLED_BUTTON_BG.upper() == "#9E9E9E"   # 暂停按钮默认态
+    assert DISABLED_BUTTON_BG.upper() == "#78756E"   # 暂停按钮默认态
     assert item.text() == ""

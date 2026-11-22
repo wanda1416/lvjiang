@@ -19,10 +19,11 @@ from typing import cast
 from loguru import logger
 from PyQt6 import sip
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QAction, QDesktopServices
+from PyQt6.QtGui import QAction, QActionGroup, QDesktopServices
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
+    QMenu,
     QMessageBox,
     QPushButton,
     QToolButton,
@@ -34,7 +35,13 @@ from lvjiang.core.plugins import get_registry
 from ...core.config import load_user_config
 from ...i18n import tr
 from ..widgets.button_styles import exec_styled_message_box
-from ..widgets.theme import get_theme_manager
+from ..widgets.theme import THEME_ORDER, get_theme_manager, normalize_theme
+
+_THEME_MENU_ITEMS: dict[str, tuple[str, str]] = {
+    "light": ("纯白", "☀"),
+    "paper": ("宣纸", "❖"),
+    "dark": ("玄墨", "☾"),
+}
 
 
 class MenuOpsMixin:
@@ -285,10 +292,10 @@ class MenuOpsMixin:
         self._admin_feedback_button.setFixedHeight(22)
         self._admin_feedback_button.setStyleSheet(
             "QPushButton#adminFeedbackBadgeButton {"
-            "  background-color: #d9383a; color: #ffffff; border: none;"
+            "  background-color: #be123c; color: #ffffff; border: none;"
             "  border-radius: 11px; padding: 0 10px; font-size: 12px; font-weight: 600;"
             "}"
-            "QPushButton#adminFeedbackBadgeButton:hover { background-color: #c12b2d; }"
+            "QPushButton#adminFeedbackBadgeButton:hover { background-color: #9f1239; }"
         )
         self._admin_feedback_button.clicked.connect(self._open_admin_console)
         self._admin_feedback_button.hide()
@@ -297,8 +304,26 @@ class MenuOpsMixin:
         self._theme_button = QToolButton(corner)
         self._theme_button.setObjectName("themeToggleButton")
         self._theme_button.setAutoRaise(True)
-        self._theme_button.setFixedSize(34, 28)
-        self._theme_button.clicked.connect(self._toggle_theme)
+        self._theme_button.setFixedHeight(28)
+        self._theme_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+
+        theme_menu = QMenu(self._theme_button)
+        theme_group = QActionGroup(theme_menu)
+        theme_group.setExclusive(True)
+        self._theme_actions: dict[str, QAction] = {}
+        for key in THEME_ORDER:
+            label_key, _icon = _THEME_MENU_ITEMS[key]
+            action = QAction(tr(label_key), theme_menu)
+            action.setCheckable(True)
+            action.triggered.connect(
+                lambda _checked=False, theme_key=key: self._select_theme(theme_key)
+            )
+            theme_group.addAction(action)
+            theme_menu.addAction(action)
+            self._theme_actions[key] = action
+        self._theme_button.setMenu(theme_menu)
+        self._theme_menu = theme_menu
+
         manager = get_theme_manager()
         manager.theme_changed.connect(self._update_theme_button)
         self._update_theme_button(manager.current)
@@ -332,20 +357,35 @@ class MenuOpsMixin:
         QDesktopServices.openUrl(QUrl("https://lvjiang.wyxj.net/#/console"))
 
     def _update_theme_button(self, theme: str) -> None:
-        """更新图标和辅助文本，描述按钮点击后的目标主题。"""
-        if theme == "dark":
-            text = tr("切换到浅色主题")
-            self._theme_button.setText("☀")
-        else:
-            text = tr("切换到深色主题")
-            self._theme_button.setText("☾")
-        self._theme_button.setToolTip(text)
-        self._theme_button.setAccessibleName(text)
+        """更新右上角主题按钮文本、下拉勾选态与辅助说明。"""
+        btn = getattr(self, "_theme_button", None)
+        if btn is None or sip.isdeleted(btn):
+            return
+        normalized = normalize_theme(theme)
+        label_key, icon = _THEME_MENU_ITEMS[normalized]
+        label = tr(label_key)
+        btn.setText(f"{icon} {label}")
+        tip = tr("切换界面主题（当前：{name}）").format(name=label)
+        btn.setToolTip(tip)
+        btn.setAccessibleName(tip)
+        action = getattr(self, "_theme_actions", {}).get(normalized)
+        if action is not None and not sip.isdeleted(action):
+            action.setChecked(True)
+        btn.adjustSize()
+        menubar = self.menuBar()
+        if menubar is not None:
+            menubar.adjustSize()
+
+    def _select_theme(self, theme: str) -> None:
+        normalized = get_theme_manager().apply(theme)
+        from ...core.config import save_settings
+
+        save_settings({"theme": normalized})
 
     def _toggle_theme(self) -> None:
-        manager = get_theme_manager()
-        theme = manager.toggle()
+        theme = get_theme_manager().toggle()
         from ...core.config import save_settings
+
         save_settings({"theme": theme})
 
     # ─── 对话框 ──────────────────────────────────────────────

@@ -7,20 +7,25 @@ semantic dynamic properties styled here.
 """
 from __future__ import annotations
 
+import ctypes
+import sys
 from dataclasses import dataclass
 from typing import Literal, cast
 
 from loguru import logger
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6 import sip
+from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
-ThemeName = Literal["light", "dark"]
+ThemeName = Literal["light", "paper", "dark"]
 DEFAULT_THEME: ThemeName = "light"
+THEME_ORDER: tuple[ThemeName, ...] = ("light", "paper", "dark")
 
 
 @dataclass(frozen=True)
 class ThemeTokens:
+    is_dark: bool
     window: str
     surface: str
     surface_alt: str
@@ -34,6 +39,7 @@ class ThemeTokens:
     accent: str
     accent_hover: str
     accent_pressed: str
+    selection_bg: str
     selection_text: str
     danger: str
     danger_surface: str
@@ -46,6 +52,7 @@ class ThemeTokens:
 
 
 LIGHT = ThemeTokens(
+    is_dark=False,
     window="#f5f6f8",
     surface="#ffffff",
     surface_alt="#f0f2f4",
@@ -59,6 +66,7 @@ LIGHT = ThemeTokens(
     accent="#0078d4",
     accent_hover="#106ebe",
     accent_pressed="#005a9e",
+    selection_bg="#0078d4",
     selection_text="#ffffff",
     danger="#c62828",
     danger_surface="#ffebee",
@@ -70,32 +78,65 @@ LIGHT = ThemeTokens(
     success_surface="#e8f5e9",
 )
 
-DARK = ThemeTokens(
-    window="#202327",
-    surface="#292d32",
-    surface_alt="#32373d",
-    surface_hover="#3a4148",
-    surface_pressed="#454d55",
-    border="#47505a",
-    border_strong="#68737f",
-    text="#e8eaed",
-    text_muted="#b0b7bf",
-    text_disabled="#747d87",
-    accent="#4da3e6",
-    accent_hover="#69b2ea",
-    accent_pressed="#3189cf",
+PAPER = ThemeTokens(
+    is_dark=False,
+    window="#f5f3ee",
+    surface="#ffffff",
+    surface_alt="#efece5",
+    surface_hover="#e6e1d6",
+    surface_pressed="#dad3c5",
+    border="#dcd6ca",
+    border_strong="#bdb5a6",
+    text="#1c1b18",
+    text_muted="#635f56",
+    text_disabled="#9e988d",
+    accent="#b45309",
+    accent_hover="#9a4507",
+    accent_pressed="#7c3705",
+    selection_bg="#b45309",
     selection_text="#ffffff",
-    danger="#ff7b7b",
-    danger_surface="#4a272b",
-    warning="#ffb45b",
-    warning_surface="#49351f",
-    info="#83bfff",
-    info_surface="#203b56",
-    success="#73d58a",
-    success_surface="#203f2b",
+    danger="#be123c",
+    danger_surface="#fce7ec",
+    warning="#b45309",
+    warning_surface="#fef3e2",
+    info="#0369a1",
+    info_surface="#e6f4fb",
+    success="#15803d",
+    success_surface="#e7f6ec",
 )
 
-THEMES: dict[ThemeName, ThemeTokens] = {"light": LIGHT, "dark": DARK}
+DARK = ThemeTokens(
+    is_dark=True,
+    window="#141418",
+    surface="#1c1c22",
+    surface_alt="#24242c",
+    surface_hover="#2d2d37",
+    surface_pressed="#363642",
+    border="#32323d",
+    border_strong="#4d4d5c",
+    text="#edeae2",
+    text_muted="#9b968c",
+    text_disabled="#66635c",
+    accent="#e5a93b",
+    accent_hover="#f0be5e",
+    accent_pressed="#c98f24",
+    selection_bg="#7a4c12",
+    selection_text="#f5f2ea",
+    danger="#f87171",
+    danger_surface="#3b1c22",
+    warning="#fb923c",
+    warning_surface="#3a2515",
+    info="#38bdf8",
+    info_surface="#162d3d",
+    success="#34d399",
+    success_surface="#153226",
+)
+
+THEMES: dict[ThemeName, ThemeTokens] = {
+    "light": LIGHT,
+    "paper": PAPER,
+    "dark": DARK,
+}
 
 
 def normalize_theme(value: object) -> ThemeName:
@@ -116,7 +157,7 @@ def _palette(tokens: ThemeTokens) -> QPalette:
         QPalette.ColorRole.Button: tokens.surface_alt,
         QPalette.ColorRole.ButtonText: tokens.text,
         QPalette.ColorRole.BrightText: tokens.selection_text,
-        QPalette.ColorRole.Highlight: tokens.accent,
+        QPalette.ColorRole.Highlight: tokens.selection_bg,
         QPalette.ColorRole.HighlightedText: tokens.selection_text,
         QPalette.ColorRole.Link: tokens.accent,
         QPalette.ColorRole.Mid: tokens.text_muted,
@@ -174,7 +215,7 @@ QComboBox, QListView, QTreeView, QTableView, QListWidget, QTableWidget {{
     color: {t.text};
     border: 1px solid {t.border};
     border-radius: 4px;
-    selection-background-color: {t.accent};
+    selection-background-color: {t.selection_bg};
     selection-color: {t.selection_text};
 }}
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus,
@@ -186,7 +227,7 @@ QComboBox QAbstractItemView {{
     background-color: {t.surface};
     color: {t.text};
     border: 1px solid {t.border_strong};
-    selection-background-color: {t.accent};
+    selection-background-color: {t.selection_bg};
     selection-color: {t.selection_text};
 }}
 QPushButton, QToolButton {{
@@ -208,6 +249,65 @@ QPushButton:disabled, QToolButton:disabled {{
 QDialogButtonBox QPushButton {{
     padding: 6px 18px;
 }}
+QPushButton[btnVariant="action"] {{
+    background-color: transparent;
+    border: 1px solid {t.accent};
+    color: {t.accent};
+    border-radius: 5px;
+    padding: 5px 11px;
+    font-weight: 600;
+}}
+QPushButton[btnVariant="action"]:hover {{
+    background-color: {t.surface_hover};
+}}
+QPushButton[btnVariant="action"]:pressed, QPushButton[btnVariant="action"]:checked {{
+    background-color: {t.surface_pressed};
+}}
+QPushButton[btnVariant="action"]:disabled {{
+    color: {t.text_disabled};
+    border-color: {t.border};
+}}
+QPushButton[btnVariant="neutral"] {{
+    background-color: {t.surface_alt};
+    color: {t.text};
+    border: 1px solid {t.border_strong};
+    border-radius: 5px;
+    padding: 5px 11px;
+    font-weight: 600;
+}}
+QPushButton[btnVariant="neutral"]:hover {{
+    background-color: {t.surface_hover};
+}}
+QPushButton[btnVariant="neutral"]:pressed, QPushButton[btnVariant="neutral"]:checked {{
+    background-color: {t.surface_pressed};
+}}
+QPushButton[btnVariant="neutral"]:disabled {{
+    color: {t.text_disabled};
+    border-color: {t.border};
+}}
+QPushButton[btnVariant="danger"] {{
+    background-color: {t.surface_alt};
+    color: {t.danger};
+    border: 1px solid {t.danger};
+    border-radius: 5px;
+    padding: 5px 11px;
+    font-weight: 600;
+}}
+QPushButton[btnVariant="danger"]:hover {{
+    background-color: {t.danger_surface};
+}}
+QPushButton[btnVariant="danger"]:pressed {{
+    background-color: {t.danger};
+    color: {t.selection_text};
+}}
+QPushButton[btnVariant="danger"]:disabled {{
+    color: {t.text_disabled};
+    border-color: {t.border};
+}}
+QPushButton[btnDensity="compact"] {{
+    border-radius: 4px;
+    padding: 2px 7px;
+}}
 /* 上面的 QWidget 规则给所有控件写死了 color，它会盖掉调色板里的 Disabled 分组，
    于是禁用的勾选框、单选和说明文字仍是常态色——看起来像「点不到」而不是「不可用」。
    按钮早就单独补过 :disabled，这里把其余带文字的控件一并补上。 */
@@ -228,7 +328,7 @@ QListWidget[navigation="true"]::item:hover {{
     background-color: {t.surface_hover};
 }}
 QListWidget[navigation="true"]::item:selected {{
-    background-color: {t.accent};
+    background-color: {t.selection_bg};
     color: {t.selection_text};
 }}
 QTabWidget::pane {{
@@ -267,7 +367,7 @@ QMenu {{
 }}
 QMenu::item {{ padding: 8px 32px; }}
 QMenu::item:selected {{
-    background-color: {t.accent};
+    background-color: {t.selection_bg};
     color: {t.selection_text};
 }}
 QMenu::item:disabled {{
@@ -318,8 +418,12 @@ QToolButton#themeToggleButton {{
     background: transparent;
     border: none;
     border-radius: 4px;
-    padding: 2px 7px;
-    font-size: 16px;
+    padding: 2px 8px;
+    font-size: 13px;
+}}
+QToolButton#themeToggleButton::menu-indicator {{
+    image: none;
+    width: 0px;
 }}
 QToolButton#themeToggleButton:hover {{ background-color: {t.surface_hover}; }}
 """
@@ -341,6 +445,78 @@ def _extension_stylesheet(tokens: ThemeTokens) -> str:
     return "\n".join(chunks)
 
 
+_DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+_DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+_DWMWA_CAPTION_COLOR = 35
+_DWMWA_TEXT_COLOR = 36
+
+
+def _colorref(hex_color: str) -> int:
+    """将 #RRGGBB 转换为 Windows GDI/DWM 使用的 0x00BBGGRR COLORREF。"""
+    color = QColor(hex_color)
+    return (color.blue() << 16) | (color.green() << 8) | color.red()
+
+
+def _apply_win32_titlebar(widget: QWidget, tokens: ThemeTokens) -> None:
+    """同步 Windows 原生顶层窗口标题栏配色（Win11 精确着色，Win10 同步深浅）。"""
+    if sys.platform != "win32":
+        return
+    app = QApplication.instance()
+    if not isinstance(app, QApplication):
+        return
+    if app.platformName() in {"offscreen", "minimal"}:
+        return
+    if not isinstance(widget, QWidget) or not widget.isWindow():
+        return
+    flags = widget.windowFlags()
+    if flags & Qt.WindowType.FramelessWindowHint:
+        return
+    if (flags & Qt.WindowType.WindowType_Mask) in (
+        Qt.WindowType.Popup,
+        Qt.WindowType.ToolTip,
+    ):
+        return
+    if not widget.testAttribute(Qt.WidgetAttribute.WA_WState_Created):
+        return
+
+    try:
+        hwnd = int(widget.winId())
+        if not hwnd:
+            return
+        dwmapi = ctypes.windll.dwmapi
+        hwnd_ptr = ctypes.c_void_p(hwnd)
+        dark = ctypes.c_int(1 if tokens.is_dark else 0)
+        hr = dwmapi.DwmSetWindowAttribute(
+            hwnd_ptr,
+            ctypes.c_uint(_DWMWA_USE_IMMERSIVE_DARK_MODE),
+            ctypes.byref(dark),
+            ctypes.c_uint(ctypes.sizeof(dark)),
+        )
+        if hr != 0:
+            dwmapi.DwmSetWindowAttribute(
+                hwnd_ptr,
+                ctypes.c_uint(_DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1),
+                ctypes.byref(dark),
+                ctypes.c_uint(ctypes.sizeof(dark)),
+            )
+        caption = ctypes.c_uint32(_colorref(tokens.window))
+        dwmapi.DwmSetWindowAttribute(
+            hwnd_ptr,
+            ctypes.c_uint(_DWMWA_CAPTION_COLOR),
+            ctypes.byref(caption),
+            ctypes.c_uint(ctypes.sizeof(caption)),
+        )
+        text_color = ctypes.c_uint32(_colorref(tokens.text))
+        dwmapi.DwmSetWindowAttribute(
+            hwnd_ptr,
+            ctypes.c_uint(_DWMWA_TEXT_COLOR),
+            ctypes.byref(text_color),
+            ctypes.c_uint(ctypes.sizeof(text_color)),
+        )
+    except Exception:  # noqa: BLE001 - 非关键装饰，绝不阻塞窗口显示
+        pass
+
+
 class ThemeManager(QObject):
     """Apply and broadcast application theme changes."""
 
@@ -351,6 +527,17 @@ class ThemeManager(QObject):
         self._theme: ThemeName = DEFAULT_THEME
         # Fusion consistently honours custom palettes on Windows/Linux/macOS.
         app.setStyle("Fusion")
+        app.installEventFilter(self)
+
+    def eventFilter(self, watched, event):  # noqa: N802 - Qt override
+        if (
+            event is not None
+            and event.type() in (QEvent.Type.Show, QEvent.Type.WinIdChange)
+            and isinstance(watched, QWidget)
+            and watched.isWindow()
+        ):
+            _apply_win32_titlebar(watched, self.tokens)
+        return super().eventFilter(watched, event)
 
     @property
     def current(self) -> ThemeName:
@@ -362,7 +549,7 @@ class ThemeManager(QObject):
 
     def apply(self, theme: object) -> ThemeName:
         app = QApplication.instance()
-        if app is None:
+        if not isinstance(app, QApplication):
             raise RuntimeError("Cannot apply a theme without QApplication")
         normalized = normalize_theme(theme)
         changed = normalized != self._theme
@@ -371,12 +558,15 @@ class ThemeManager(QObject):
         app.setPalette(_palette(THEMES[normalized]))
         tokens = THEMES[normalized]
         app.setStyleSheet(_stylesheet(tokens) + _extension_stylesheet(tokens))
+        for widget in app.topLevelWidgets():
+            _apply_win32_titlebar(widget, tokens)
         if changed:
             self.theme_changed.emit(normalized)
         return normalized
 
     def toggle(self) -> ThemeName:
-        return self.apply("dark" if self._theme == "light" else "light")
+        index = THEME_ORDER.index(self._theme)
+        return self.apply(THEME_ORDER[(index + 1) % len(THEME_ORDER)])
 
 
 _manager: ThemeManager | None = None
@@ -395,4 +585,8 @@ def get_theme_manager(app: QApplication | None = None) -> ThemeManager:
 def reset_theme_manager() -> None:
     """Drop the singleton reference (primarily for isolated tests)."""
     global _manager
-    _manager = None
+    if _manager is not None:
+        app = QApplication.instance()
+        if app is not None and not sip.isdeleted(app) and not sip.isdeleted(_manager):
+            app.removeEventFilter(_manager)
+        _manager = None

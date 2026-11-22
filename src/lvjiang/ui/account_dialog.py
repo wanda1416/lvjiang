@@ -213,12 +213,14 @@ class AccountHolder(QObject):
     sync_finished = pyqtSignal(bool, object)        # 数据同步
     sync_progress = pyqtSignal(dict)                # 分步进度
     avatars_finished = pyqtSignal(bool, object)     # 手动「同步全部头像」
+    admin_feedback_changed = pyqtSignal(int)        # 管理员待受理反馈数（非管理员为 0）
 
     def __init__(self):
         super().__init__()
         self.session = get_session()
         self.summary: dict | None = None
         self.done = False
+        self.admin_new_feedback: int = 0
         self.sync_attempted = False
         self.last_sync_report = None
         #: 最近一次同步**成功**的时刻——对话框跨开关期间保留，落「最近同步时间」
@@ -276,6 +278,9 @@ class AccountHolder(QObject):
                     QTimer.singleShot(0, lambda: self.sync_async(auto=True))
             else:
                 timer.stop()
+        if summary is None and self.admin_new_feedback != 0:
+            self.admin_new_feedback = 0
+            self.admin_feedback_changed.emit(0)
         self.changed.emit(summary)
 
     # ─── 心跳 ─────────────────────────────────────────
@@ -331,6 +336,12 @@ class AccountHolder(QObject):
             if ok:
                 self.last_sync_report = result
                 self.last_sync_at = datetime.now().strftime("%H:%M:%S")
+                new_fb = getattr(result, "admin_new_feedback", None)
+                if isinstance(new_fb, int):
+                    fb_count = max(0, new_fb)
+                    if fb_count != self.admin_new_feedback:
+                        self.admin_new_feedback = fb_count
+                        self.admin_feedback_changed.emit(fb_count)
                 describe = getattr(result, "describe", None)
                 text = describe() if describe else str(result)
                 # 分钟节拍下零变更是常态（全 0 无失败）：INFO 一天刷几百行
@@ -460,6 +471,13 @@ class AccountHolder(QObject):
                                       on_progress=progress, stop=stop)
             report = _CombinedReport(document_report, profile_report, users_report)
             report.errors.extend(definition_report.errors)
+            try:
+                from ..core.sync.client import post
+                from ..core.sync.round_state import cloud_state
+                raw_fb = cloud_state(token, post).get("admin_new_feedback")
+                report.admin_new_feedback = int(raw_fb) if isinstance(raw_fb, int) else 0
+            except Exception:
+                report.admin_new_feedback = None
             return report
 
         return self._start(action, "sync")

@@ -18,9 +18,16 @@ from typing import cast
 
 from loguru import logger
 from PyQt6 import sip
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QDialog, QMessageBox, QToolButton, QWidget
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QAction, QDesktopServices
+from PyQt6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QPushButton,
+    QToolButton,
+    QWidget,
+)
 
 from lvjiang.core.plugins import get_registry
 
@@ -266,8 +273,28 @@ class MenuOpsMixin:
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
 
-        # ── 主题切换（不属于任何插件，固定在菜单栏最右侧）──
-        self._theme_button = QToolButton(menubar)
+        # ── 右上角：管理员待受理反馈气泡 + 主题切换（固定在菜单栏最右侧）──
+        corner = QWidget(menubar)
+        corner_layout = QHBoxLayout(corner)
+        corner_layout.setContentsMargins(0, 0, 4, 0)
+        corner_layout.setSpacing(6)
+
+        self._admin_feedback_button = QPushButton(corner)
+        self._admin_feedback_button.setObjectName("adminFeedbackBadgeButton")
+        self._admin_feedback_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._admin_feedback_button.setFixedHeight(22)
+        self._admin_feedback_button.setStyleSheet(
+            "QPushButton#adminFeedbackBadgeButton {"
+            "  background-color: #d9383a; color: #ffffff; border: none;"
+            "  border-radius: 11px; padding: 0 10px; font-size: 12px; font-weight: 600;"
+            "}"
+            "QPushButton#adminFeedbackBadgeButton:hover { background-color: #c12b2d; }"
+        )
+        self._admin_feedback_button.clicked.connect(self._open_admin_console)
+        self._admin_feedback_button.hide()
+        corner_layout.addWidget(self._admin_feedback_button)
+
+        self._theme_button = QToolButton(corner)
         self._theme_button.setObjectName("themeToggleButton")
         self._theme_button.setAutoRaise(True)
         self._theme_button.setFixedSize(34, 28)
@@ -275,9 +302,34 @@ class MenuOpsMixin:
         manager = get_theme_manager()
         manager.theme_changed.connect(self._update_theme_button)
         self._update_theme_button(manager.current)
-        menubar.setCornerWidget(
-            self._theme_button, Qt.Corner.TopRightCorner
-        )
+        corner_layout.addWidget(self._theme_button)
+
+        menubar.setCornerWidget(corner, Qt.Corner.TopRightCorner)
+
+        try:
+            from ..account_dialog import account_holder
+            holder = account_holder()
+            holder.admin_feedback_changed.connect(self._update_admin_feedback_button)
+            self._update_admin_feedback_button(holder.admin_new_feedback)
+        except Exception:  # noqa: BLE001 — 独立单测仅建菜单时允许跳过登录态绑定
+            pass
+
+    def _update_admin_feedback_button(self, count: int) -> None:
+        btn = getattr(self, "_admin_feedback_button", None)
+        if btn is None or sip.isdeleted(btn):
+            return
+        if count > 0:
+            btn.setText(tr("待受理反馈 ({count})").format(count=count))
+            btn.setToolTip(tr("控制台有 {count} 条待受理反馈，点击打开网页管理控制台").format(count=count))
+            btn.show()
+        else:
+            btn.hide()
+        menubar = self.menuBar()
+        if menubar is not None:
+            menubar.adjustSize()
+
+    def _open_admin_console(self) -> None:
+        QDesktopServices.openUrl(QUrl("https://lvjiang.wyxj.net/#/console"))
 
     def _update_theme_button(self, theme: str) -> None:
         """更新图标和辅助文本，描述按钮点击后的目标主题。"""

@@ -170,6 +170,20 @@ class TestLoadUserConfig:
         reset_session_store()
         assert load_user_config().theme == "light"
 
+    def test_user_config_accepts_every_registered_theme(
+            self, session_env, monkeypatch):
+        """配置层合法主题集合与 theme.THEMES 保持一致，防止增删主题后漂移。"""
+        from lvjiang.ui.widgets.theme import THEMES
+
+        monkeypatch.setattr(
+            "lvjiang.core.config.load_app_config", lambda: {})
+        for theme_key in THEMES:
+            session_env.write_text(json.dumps({
+                "settings": {"theme": theme_key}
+            }), encoding="utf-8")
+            reset_session_store()
+            assert load_user_config().theme == theme_key
+
     def test_invalid_font_sizes_fall_back_to_system_default(
             self, session_env, monkeypatch):
         monkeypatch.setattr(

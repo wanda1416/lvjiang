@@ -25,6 +25,7 @@
 | 自己写脚本 | [脚本工作台与作者须知](04-desktop/08-script-authoring.md)、[DSL 语法](../40-reference/02-dsl/README.md) |
 | 遇到问题、提交反馈 | [常见问题与反馈](04-desktop/09-faq-and-feedback.md) |
 | 不开界面用命令行跑任务 | [附录 B：命令行](04-desktop/10-appendix-b-command-line.md) |
+| 了解云端同步加密、改密风险与备战分享 | [云端同步、加密与备战分享](01-accounts/02-cloud-sync-and-privacy.md) |
 | 搞懂在线配置、会员授权与激活 | [附录 A：在线配置](01-accounts/01-appendix-a-online-config.md) |
 | 看随包预置图库清单 | [附录 C：预置图库内容](03-automation/01-appendix-c-preset-gallery.md) |
 | 恢复配置迁移失败的环境 | [配置迁移恢复指南](05-recovery/01-config-migration.md) |
@@ -75,11 +76,12 @@
 |------|------|
 | [7. 移动设备（安卓）](02-android/07-mobile-device.md) | 手机端 app 安装、设备扫描、设备体检（版本/协议/权限/手势上限/标定）、并发手势实测与往返延迟 |
 
-### 在线配置（accounts/）
+### 在线配置与账号同步（accounts/）
 
 | 章节 | 内容 |
 |------|------|
 | [附录 A. 在线配置、会员内容与功能激活](01-accounts/01-appendix-a-online-config.md) | 在线配置的获取与生效、功能激活与离线恢复、本地激活与在线会员授权的区别、关闭撤销与人工恢复、升级与版本口径 |
+| [云端同步、端到端加密与备战分享](01-accounts/02-cloud-sync-and-privacy.md) | 加密与仍明文数据对照、改密与重置密码的不可逆说明、备战方案历史快照分享与 1~90 天有效期 |
 
 ## 相关文档
 

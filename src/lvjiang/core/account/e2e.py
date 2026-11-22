@@ -16,6 +16,7 @@ SIV 构造）：同明文得同密文——文档通道的 sha/CAS 与名册的�
 from __future__ import annotations
 
 import base64
+import gzip
 import hashlib
 import json
 
@@ -43,6 +44,11 @@ def set_key(key: bytes | None) -> None:
 
 def current_key() -> bytes | None:
     return _KEY
+
+
+def key_fingerprint(key: bytes) -> str:
+    """派生密钥的短摘要（用于本地追踪密文化迁移基线，不存明文口令）。"""
+    return hashlib.sha256(key).hexdigest()[:16]
 
 
 # ─── account.json 密钥缓存（restore 时免去 210k 派生） ─────────────────
@@ -79,25 +85,35 @@ def _synthetic_nonce(key: bytes, plaintext: bytes) -> bytes:
     return hashlib.sha256(key + b"iv" + plaintext).digest()[:12]
 
 
-def _encrypt(key: bytes, plaintext: bytes) -> dict:
-    nonce = _synthetic_nonce(key, plaintext)
-    ct = AESGCM(key).encrypt(nonce, plaintext, None)
-    return {"e2e": 1,
-            "n": base64.b64encode(nonce).decode("ascii"),
-            "c": base64.b64encode(ct).decode("ascii")}
+def _encrypt(key: bytes, plaintext: bytes, *, compress: bool = False) -> dict:
+    payload = gzip.compress(plaintext) if compress else plaintext
+    nonce = _synthetic_nonce(key, payload)
+    ct = AESGCM(key).encrypt(nonce, payload, None)
+    wrapper: dict[str, object] = {
+        "e2e": 1,
+        "n": base64.b64encode(nonce).decode("ascii"),
+        "c": base64.b64encode(ct).decode("ascii"),
+    }
+    if compress:
+        wrapper["z"] = 1
+    return wrapper
 
 
 def _decrypt(key: bytes, wrapper: dict) -> bytes | None:
     try:
         nonce = base64.b64decode(wrapper["n"])
         ct = base64.b64decode(wrapper["c"])
-        return AESGCM(key).decrypt(nonce, ct, None)
-    except Exception:   # noqa: BLE001 — 错钥 InvalidTag / 封装损坏都按解不开处理
+        raw = AESGCM(key).decrypt(nonce, ct, None)
+        if wrapper.get("z") == 1:
+            return gzip.decompress(raw)
+        return raw
+    except Exception:   # noqa: BLE001 — 错钥 InvalidTag / 解压损坏都按解不开处理
         return None
 
 
 def is_encrypted(value) -> bool:
     return (isinstance(value, dict) and value.get("e2e") == 1
+            and value.get("z") in (None, 0, 1)
             and isinstance(value.get("n"), str) and isinstance(value.get("c"), str))
 
 
@@ -129,8 +145,8 @@ def is_encrypted_text(text: str) -> bool:
 
 
 def encrypt_text(key: bytes, text: str) -> str:
-    """文本 → 封装 JSON 字符串（便利贴文档：payload 为压缩前文本）。"""
-    return json.dumps(_encrypt(key, text.encode("utf-8")), ensure_ascii=False)
+    """文本 → 先 gzip 压缩再加密的封装 JSON 字符串（z:1 兼容无 z 旧密文）。"""
+    return json.dumps(_encrypt(key, text.encode("utf-8"), compress=True), ensure_ascii=False)
 
 
 def decrypt_text(key: bytes, wrapped: str) -> str | None:

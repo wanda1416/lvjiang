@@ -156,12 +156,10 @@ def _push(document: LocalDocument, token: str, raw: bytes, sha256: str,
 
 
 def _outbound_bytes(document: LocalDocument, raw: bytes) -> bytes:
-    """上云前的边界变换：便利贴端到端加密（本地明文 → 云端密文）。
+    """上云前的边界变换：全部文档端到端加密（本地明文 → 先压缩再加密）。
 
     无密钥时原样上云（读取端按 legacy 明文处理），不让加密层阻断同步。
     """
-    if document.kind != "notes":
-        return raw
     from ..account.e2e import current_key, encrypt_text
     key = current_key()
     if key is None:
@@ -170,9 +168,7 @@ def _outbound_bytes(document: LocalDocument, raw: bytes) -> bytes:
 
 
 def _inbound_bytes(document: LocalDocument, payload: bytes) -> bytes | None:
-    """下拉后的边界变换：便利贴解密。返回 None 表示保持本地文件不变。"""
-    if document.kind != "notes":
-        return payload
+    """下拉后的边界变换：全文档解密。返回 None 表示保持本地文件不变。"""
     from ..account.e2e import current_key, decrypt_text, is_encrypted_text
     text = payload.decode("utf-8", "replace")
     if not is_encrypted_text(text):
@@ -184,22 +180,15 @@ def _inbound_bytes(document: LocalDocument, payload: bytes) -> bytes | None:
     return plain.encode("utf-8")
 
 
-def _is_plain_legacy_note(raw: bytes) -> bool:
-    """远端便利贴字节是否仍是 legacy 明文（未套 E2E 封装）。"""
+def _is_plain_legacy(raw: bytes) -> bool:
+    """远端文档字节是否仍是 legacy 明文（未套 E2E 封装）。"""
     from ..account.e2e import is_encrypted_text
     return not is_encrypted_text(raw.decode("utf-8", "replace"))
 
 
 def _pull(document: LocalDocument, token: str, report: SyncReport,
           *, keep_local: bool = False, raw: bytes | None = None) -> None:
-    """把云端版本落到本地。``keep_local`` 为真时先把本地版另存为冲突副本。
-
-    只有**本地确实有更新的独立改动、却被云端覆盖**时才算冲突。本地只是旧版
-    时直接覆盖即可——给每个旧版都留一份副本只会堆垃圾（实测会导致所有
-    notes.json 每次同步都多出一个 .conflict 文件）。
-
-    ``raw`` 传入时不再逐份请求（批量拉取路径）；为 None 时按单份接口拉。
-    """
+    """把云端版本落到本地。``keep_local`` 为真时先把本地版另存为冲突副本。"""
     key = f"{document.label}/{document.kind}"
     before = document.path.read_bytes() if document.path.exists() else None
     if raw is None:
@@ -207,32 +196,58 @@ def _pull(document: LocalDocument, token: str, report: SyncReport,
         raw = base64.b64decode(remote["payload_base64"])
         if remote.get("zipped"):
             raw = gzip.decompress(raw)
-    # E2E 迁移判定必须看**远端原始字节**：远端是 legacy 明文才需要重推密文；
-    # 远端本来就是密文时，解密后的 payload 恒为明文，不能再按 payload 判定，
-    # 否则每次同步都把 19 份便利贴重新上推一遍。
-    remote_was_plaintext = (document.kind == "notes"
-                            and _is_plain_legacy_note(raw))
+    remote_was_plaintext = _is_plain_legacy(raw)
     payload = _inbound_bytes(document, raw)
     if payload is None:
-        # 密文但本机解不开（改密后旧数据等）：保留本地明文，不制造冲突副本
+        # 密文但本机解不开（改密后旧数据/未输口令）：保留本地明文，登记待解密集合
+        pend = dirty.pending_decrypt()
+        if key not in pend:
+            pend.add(key)
+            dirty.set_pending_decrypt(pend)
         report.pulled.append(key)
         return
+    pend_dec = dirty.pending_decrypt()
+    if key in pend_dec:
+        pend_dec.discard(key)
+        dirty.set_pending_decrypt(pend_dec)
     if keep_local and _conflict_copy(document) and document.path.is_file():
         saved = _save_conflict(document, document.path.read_bytes())
         if saved is not None:
             report.conflicts.append(f"{key} → {saved.name}")
     _write_bytes(document, payload, expected=before)
     report.pulled.append(key)
-    # E2E 迁移钩子：拉到的是**明文**而本机有密钥 → 云端还没换密文。立即把
-    # 密文推上去，否则会卡死在「明文 sha 相同 → 跳过推送」的循环里，明文
-    # 永远留在云端（首次切换 E2E 时每个 notes 文档都会撞上）。
-    if document.kind == "notes":
-        from ..account.e2e import current_key, encrypt_text
-        e2e_key = current_key()
-        if e2e_key is not None and remote_was_plaintext:
-            encrypted = encrypt_text(e2e_key, payload.decode("utf-8")).encode("utf-8")
-            _push(document, token, encrypted,
-                  hashlib.sha256(encrypted).hexdigest(), None, report)
+    # E2E 迁移钩子：拉到的是明文而本机有密钥 → 立即以 CAS 重推密文。
+    # 若遇并发 409 冲突则静默重拉；若遇离线/失败则登记 pending_encrypt 下次补推。
+    from ..account.e2e import current_key, encrypt_text
+    e2e_key = current_key()
+    if e2e_key is not None and remote_was_plaintext:
+        encrypted = encrypt_text(e2e_key, payload.decode("utf-8")).encode("utf-8")
+        plain_sha = hashlib.sha256(raw).hexdigest()
+        enc_sha = hashlib.sha256(encrypted).hexdigest()
+        try:
+            _push(document, token, encrypted, enc_sha, plain_sha, report)
+            pend_enc = dirty.pending_encrypt()
+            if key in pend_enc:
+                pend_enc.discard(key)
+                dirty.set_pending_encrypt(pend_enc)
+        except SyncConflict:
+            # 另一台设备同时完成了静默加密升级，静默重拉确认即可
+            try:
+                latest = client.pull(token, document.label, document.kind)
+                latest_raw = base64.b64decode(latest["payload_base64"])
+                if latest.get("zipped"):
+                    latest_raw = gzip.decompress(latest_raw)
+                if not _is_plain_legacy(latest_raw):
+                    latest_plain = _inbound_bytes(document, latest_raw)
+                    if latest_plain is not None:
+                        _write_bytes(document, latest_plain, expected=payload)
+            except SyncError:
+                pass
+        except SyncError as error:
+            pend_enc = dirty.pending_encrypt()
+            pend_enc.add(key)
+            dirty.set_pending_encrypt(pend_enc)
+            logger.debug("[sync] 文档 {} 密文化重推延后：{}", key, error)
 
 
 def _local_mtime(document: LocalDocument) -> datetime:
@@ -274,6 +289,74 @@ def _detect_local_changes(local_docs: list[LocalDocument]) -> set[str]:
         if known is None or known[0] != stat.st_size or known[1] != stat.st_mtime_ns:
             changed.add(key)
     return changed
+
+
+def _reconcile_e2e_migration(token: str, users_dir: Path, session_dir: Path,
+                             report: SyncReport) -> None:
+    """一次性密文化核对与待迁移补推：仅在密钥指纹变化或有待迁移项时执行。"""
+    from ..account.e2e import current_key, encrypt_text, key_fingerprint
+
+    key = current_key()
+    if key is None:
+        return
+    fp = key_fingerprint(key)
+
+    # 1. 重试此前解密失败的文档（恢复/更换正确密钥后自动重拉）
+    for item_key in sorted(dirty.pending_decrypt()):
+        label, _, kind = item_key.partition("/")
+        doc = _document_for_remote(label, kind, users_dir, session_dir)
+        if doc is None:
+            continue
+        try:
+            _pull(doc, token, report)
+        except SyncError as error:
+            report.errors.append(f"{item_key}: {error}")
+
+    # 2. 比对 manifest：远端仍是明文 sha256 的文档静默加密重推
+    local_docs = iter_local_documents(users_dir, session_dir)
+    by_key = {(d.label, d.kind): d for d in local_docs}
+    pend_enc = dirty.pending_encrypt()
+    try:
+        manifest_rows = client.manifest(token)
+    except SyncError as error:
+        report.errors.append(str(error))
+        return
+
+    unmanaged_count = 0
+    for row in manifest_rows:
+        r_label, r_kind = row.get("label", ""), row.get("kind", "")
+        doc = by_key.get((r_label, r_kind))
+        if doc is None:
+            unmanaged_count += 1
+            continue
+        if not doc.path.is_file():
+            continue
+        raw = _read_bytes(doc)
+        plain_sha = hashlib.sha256(raw).hexdigest()
+        doc_key = f"{doc.label}/{doc.kind}"
+        if row.get("sha256") == plain_sha or doc_key in pend_enc:
+            encrypted = encrypt_text(key, raw.decode("utf-8")).encode("utf-8")
+            enc_sha = hashlib.sha256(encrypted).hexdigest()
+            try:
+                _push(doc, token, encrypted, enc_sha, row.get("sha256"), report)
+                pend_enc.discard(doc_key)
+                dirty.set_pending_encrypt(pend_enc)
+            except SyncConflict:
+                # 并发device刚升完密文，静默重拉确认即可
+                try:
+                    _pull(doc, token, report)
+                except SyncError as error:
+                    report.errors.append(f"{doc_key}: {error}")
+            except SyncError as error:
+                pend_enc.add(doc_key)
+                dirty.set_pending_encrypt(pend_enc)
+                report.errors.append(f"{doc_key}: {error}")
+
+    if unmanaged_count:
+        logger.info("[sync] 云端存在 {} 份本机未管理插件的文档（跳过本机迁移校验）", unmanaged_count)
+
+    if not report.errors and not dirty.pending_decrypt() and not dirty.pending_encrypt():
+        dirty.set_e2e_migrated_key_fp(fp)
 
 
 def sync_documents(token: str, users_dir: Path = USERS_DIR,
@@ -323,7 +406,20 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
     remote_changed = bool(changed)
     local_changed = bool(local_dirty)
 
+    from ..account.e2e import current_key, key_fingerprint
+    e2e_key = current_key()
+    needs_e2e_check = (
+        e2e_key is not None
+        and (
+            dirty.e2e_migrated_key_fp() != key_fingerprint(e2e_key)
+            or bool(dirty.pending_decrypt())
+            or bool(dirty.pending_encrypt())
+        )
+    )
+
     if not remote_changed and not local_changed:
+        if needs_e2e_check:
+            _reconcile_e2e_migration(token, users_dir, session_dir, report)
         return report
 
     if remote_changed and not local_changed:
@@ -347,6 +443,8 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
                 report.errors.append(f"{entry['label']}/{entry['kind']}: {error}")
         if not report.errors:
             dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
+            if needs_e2e_check:
+                _reconcile_e2e_migration(token, users_dir, session_dir, report)
         return report
 
     if local_changed and not remote_changed:
@@ -369,6 +467,8 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
                 report.errors.append(f"{key}: {error}")
         if not report.errors:
             dirty.save_sync_state(next_id - 1, set(), _local_stamps(local_docs))
+            if needs_e2e_check:
+                _reconcile_e2e_migration(token, users_dir, session_dir, report)
         return report
 
     # 双变：全量 manifest + 本地 mtime 对比裁决，之后清脏、抬水位。
@@ -376,6 +476,8 @@ def sync_documents(token: str, users_dir: Path = USERS_DIR,
     if not report.errors:
         dirty.save_sync_state(next_id - 1, set(),
                               _local_stamps(iter_local_documents(users_dir, session_dir)))
+        if needs_e2e_check:
+            _reconcile_e2e_migration(token, users_dir, session_dir, report)
     return report
 
 

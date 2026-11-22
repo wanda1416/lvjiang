@@ -112,3 +112,44 @@ def save_sync_state(remote_id: int, dirty: set[str],
     if stamps is not None:
         state["stamps"] = stamps
     _save(state)
+
+
+def e2e_migrated_key_fp() -> str:
+    value = _state().get("e2e_migrated_key_fp")
+    return value if isinstance(value, str) else ""
+
+
+def set_e2e_migrated_key_fp(fp: str) -> None:
+    state = _state()
+    state["e2e_migrated_key_fp"] = fp
+    _save(state)
+
+
+def _str_set_field(name: str) -> set[str]:
+    raw = _state().get(name)
+    return {x for x in raw if isinstance(x, str)} if isinstance(raw, list) else set()
+
+
+def _set_str_set_field(name: str, values: set[str]) -> None:
+    state = _state()
+    if values:
+        state[name] = sorted(values)
+    else:
+        state.pop(name, None)
+    _save(state)
+
+
+def pending_decrypt() -> set[str]:
+    return _str_set_field("pending_decrypt")
+
+
+def set_pending_decrypt(values: set[str]) -> None:
+    _set_str_set_field("pending_decrypt", values)
+
+
+def pending_encrypt() -> set[str]:
+    return _str_set_field("pending_encrypt")
+
+
+def set_pending_encrypt(values: set[str]) -> None:
+    _set_str_set_field("pending_encrypt", values)

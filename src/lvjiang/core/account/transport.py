@@ -78,9 +78,16 @@ def http_error(
             code = details["error"]
     except (ValueError, UnicodeDecodeError, OSError):
         pass
+    if exc.code == 426 and not code:
+        code = "client_upgrade_required"
     if exc.code >= 500:
         return AccountError(messages["service_unavailable"],
                             code=code or "service_unavailable")
+    if code == "client_upgrade_required":
+        return AccountError(
+            messages.get(code, "云端已启用全文档端到端加密，请升级客户端后再同步"),
+            code=code,
+        )
     if code in rejected:
         return AccountError(messages.get(code, f"账号服务请求失败（HTTP {exc.code}）"),
                             code=code)

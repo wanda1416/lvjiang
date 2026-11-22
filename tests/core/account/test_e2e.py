@@ -53,3 +53,39 @@ def test_wrong_key_fails_closed_not_garbage(tmp_path):
     wrapped_text = e2e.encrypt_text(old_key, "重要便利贴内容")
     assert e2e.decrypt_text(new_key, wrapped_text) is None
     assert e2e.is_encrypted_text(wrapped_text)
+
+
+def test_encrypt_text_uses_z1_and_reads_legacy_uncompressed():
+    import json
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    text = '{"plans": {"p1": {"name": "大量重复结构"}}}' * 10
+    wrapped_z1 = e2e.encrypt_text(key, text)
+    parsed = json.loads(wrapped_z1)
+    assert parsed["e2e"] == 1 and parsed["z"] == 1
+    assert len(wrapped_z1) < len(text)
+    assert e2e.decrypt_text(key, wrapped_z1) == text
+
+    # 兼容无 z 旧密文
+    legacy_wrapped = json.dumps(e2e._encrypt(key, text.encode("utf-8"), compress=False))
+    assert "z" not in json.loads(legacy_wrapped)
+    assert e2e.decrypt_text(key, legacy_wrapped) == text
+
+
+def test_http_426_client_upgrade_required_keeps_session():
+    import io
+    from urllib import error as urlerror
+
+    from lvjiang.core.account import service, transport
+
+    exc = urlerror.HTTPError(
+        "http://test.local/api/sync/manifest",
+        426,
+        "Upgrade Required",
+        hdrs=None,
+        fp=io.BytesIO(b'{"error":"client_upgrade_required"}'),
+    )
+    err = transport.http_error(exc, messages=service.ERROR_MESSAGES, rejected=service.AUTH_REJECTED_CODES)
+    assert err.code == "client_upgrade_required"
+    assert err.code not in service.AUTH_REJECTED_CODES
+    assert "升级" in str(err)

@@ -45,8 +45,13 @@ def _fresh_token(stale: str) -> str:
 
 def _request(method: str, route: str, data: dict | None, token: str, *,
              allow_refresh: bool = True) -> dict:
-    headers = {"Content-Type": "application/json", "Accept": "application/json",
-               "User-Agent": _USER_AGENT, "Authorization": f"Bearer {token}"}
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": _USER_AGENT,
+        "Authorization": f"Bearer {token}",
+        "X-Lvjiang-E2E-Docs": "1",
+    }
     request = urlrequest.Request(
         ACCOUNT_SERVICE + route,
         data=None if data is None else json.dumps(data, ensure_ascii=False).encode("utf-8"),
@@ -129,3 +134,8 @@ def push(token: str, label: str, kind: str, sha256: str,
     if expected_sha256 is not None:
         data["expected_sha256"] = expected_sha256
     return _request("POST", "/api/sync/push", data, token)
+
+
+def enable_e2e_docs(token: str) -> dict:
+    """显式开启当前账号的全文档端到端加密开关（开启后服务端拦截旧版客户端）。"""
+    return _request("POST", "/api/sync/e2e/enable", {}, token)

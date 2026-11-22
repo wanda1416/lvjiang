@@ -88,6 +88,8 @@ def env(tmp_path, monkeypatch):
             doc_state["stamps"] = stamps
 
     monkeypatch.setattr(engine.dirty, "save_sync_state", fake_save_state)
+    monkeypatch.setattr(engine.dirty, "_state", lambda: doc_state)
+    monkeypatch.setattr(engine.dirty, "_save", lambda s: doc_state.update(s))
     # 本文件只验证「标脏 → 状态机」；磁盘戳感知由 test_document_detect.py 覆盖。
     monkeypatch.setattr(engine, "_detect_local_changes", lambda _docs: set())
 
@@ -490,3 +492,87 @@ def test_corrupt_workflow_downlink_keeps_valid_local(env):
         engine._pull(engine.LocalDocument("__global__", "workflow", path), "fixture", report, raw=b'{"workflow_params":null}')
     assert path.read_bytes() == original
     assert not report.pulled
+
+
+def test_e2e_silent_migration_bypasses_fast_path_once_then_idles(env, monkeypatch):
+    """本地与云端均为未改动的 legacy 明文时，持钥同步应绕过快路径静默加密上推一次，之后恢复空轮。"""
+    import hashlib
+
+    from lvjiang.core.account import e2e
+    from lvjiang.core.sync import dirty, engine
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    monkeypatch.setattr(e2e, "current_key", lambda: key)
+
+    path = env["dirs"]["session"] / "workflow.json"
+    plain = b'{"workflow_params":{"wf":{"n":1}}}'
+    path.write_bytes(plain)
+    plain_sha = hashlib.sha256(plain).hexdigest()
+
+    env["fake"].docs[("__global__", "workflow")] = {
+        "sha256": plain_sha, "size": len(plain), "zipped": True,
+        "payload": base64.b64encode(gzip.compress(plain)).decode(),
+        "updated_at": "2026-11-01T00:00:00Z", "revision": 5,
+    }
+    env["doc_state"]["remote_document_id"] = 5
+    env["doc_state"]["stamps"] = {
+        "__global__/workflow": [path.stat().st_size, path.stat().st_mtime_ns],
+    }
+
+    calls: list[str] = []
+    orig_manifest = env["fake"].manifest
+    monkeypatch.setattr(engine.client, "manifest",
+                        lambda tok: (calls.append("manifest"), orig_manifest(tok))[1])
+    monkeypatch.setattr(engine, "cloud_state",
+                        lambda _tok, _post: {"document_head": 5})
+
+    report1 = _sync(env)
+    assert not report1.errors
+    assert "manifest" in calls
+    assert len(env["fake"].pushes) == 1
+    pushed_raw = gzip.decompress(base64.b64decode(env["fake"].pushes[0]["payload_base64"]))
+    assert e2e.is_encrypted_text(pushed_raw.decode("utf-8"))
+    assert dirty.e2e_migrated_key_fp() == e2e.key_fingerprint(key)
+
+    # 第二轮应恢复零成本空转（不拉 manifest、不推送）
+    calls.clear()
+    env["fake"].pushes.clear()
+    env["doc_state"]["remote_document_id"] = 5
+    report2 = _sync(env)
+    assert not report2.errors
+    assert calls == []
+    assert env["fake"].pushes == []
+
+
+def test_e2e_decrypt_failure_records_pending_and_retries_when_key_set(env, monkeypatch):
+    """无钥时下拉密文不覆写本地文件并登记 pending_decrypt；恢复密钥后自动补拉解密。"""
+    from lvjiang.core.account import e2e
+    from lvjiang.core.sync import dirty, engine
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    cur = {"key": None}
+    monkeypatch.setattr(e2e, "current_key", lambda: cur["key"])
+
+    path = env["dirs"]["session"] / "workflow.json"
+    local_old = b'{"workflow_params":{"wf":{"n":1}}}'
+    path.write_bytes(local_old)
+    cloud_new = b'{"workflow_params":{"wf":{"n":9}}}'
+    enc_bytes = e2e.encrypt_text(key, cloud_new.decode("utf-8")).encode("utf-8")
+
+    env["fake"].set_remote_future("__global__", "workflow", enc_bytes, "2099-01-01T00:00:00Z")
+    env["doc_state"]["stamps"] = {
+        "__global__/workflow": [path.stat().st_size, path.stat().st_mtime_ns],
+    }
+
+    report1 = _sync(env)
+    assert not report1.errors
+    assert path.read_bytes() == local_old
+    assert "__global__/workflow" in dirty.pending_decrypt()
+
+    # 恢复密钥并同步：自动补拉解密并清空 pending_decrypt
+    cur["key"] = key
+    monkeypatch.setattr(engine, "cloud_state", lambda _tok, _post: {"document_head": 1})
+    report2 = _sync(env)
+    assert not report2.errors
+    assert path.read_bytes() == cloud_new
+    assert dirty.pending_decrypt() == set()

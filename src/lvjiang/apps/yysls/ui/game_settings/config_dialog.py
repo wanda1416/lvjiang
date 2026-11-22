@@ -50,7 +50,7 @@ class GameConfigDialog(QDialog):
         self._data = manager.get_raw()
         self._dirty = False
         self._tab = GameConfigTab(
-            data=self._data, on_changed=self._mark_dirty)
+            self, data=self._data, on_changed=self._mark_dirty)
         self._layout.addWidget(self._tab)
 
         self._buttons = QDialogButtonBox(
@@ -150,7 +150,7 @@ class GameConfigDialog(QDialog):
         self._data = manager.get_raw()
         old_tab = self._tab
         self._tab = GameConfigTab(
-            data=self._data, on_changed=self._mark_dirty)
+            self, data=self._data, on_changed=self._mark_dirty)
         self._layout.replaceWidget(old_tab, self._tab)
         old_tab.deleteLater()
         self._dirty = False

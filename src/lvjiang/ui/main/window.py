@@ -869,7 +869,7 @@ class MainWindow(
 
         # 告警面板（在 Tab 下方）
         from ..execution.alert_panel import AlertPanel
-        self._alert_panel = AlertPanel()
+        self._alert_panel = AlertPanel(right_panel)
         right_layout.addWidget(self._alert_panel)
 
         splitter.addWidget(right_panel)

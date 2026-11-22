@@ -88,7 +88,8 @@ class EquipmentSetEditor(QFrame):
             self.setVisible(False)
             return
         self._series = series
-        self.setVisible(True)
+        if self.parentWidget() is not None:
+            self.setVisible(True)
         if series == "output":
             self._title.setText(tr("攻具套装定义"))
             headers = [tr("套装名称"), tr("推荐流派"), tr("基础属性")]

@@ -55,7 +55,6 @@ class AlertPanel(QWidget):
         """初始化 UI 组件"""
         self.setProperty("status", "warning")
         self.setStyleSheet(self.ALERT_STYLE)
-        self.setVisible(False)  # 初始隐藏
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
@@ -83,13 +82,16 @@ class AlertPanel(QWidget):
         alerts = get_alerts()
         if alerts:
             self._display_alert(alerts[0])
+        else:
+            self.setVisible(False)
 
     def _display_alert(self, alert: dict) -> None:
         """显示指定告警"""
         self._current_alert_id = alert.get("id")
         message = alert.get("message", "")
         self._message_label.setText(message)
-        self.setVisible(True)
+        if self.parentWidget() is not None:
+            self.setVisible(True)
 
     def push_alert(self, alert_id: str, message: str, timestamp: str) -> None:
         """推送新告警到栈顶并显示

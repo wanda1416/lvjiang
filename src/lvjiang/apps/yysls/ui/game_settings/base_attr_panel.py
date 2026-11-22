@@ -388,7 +388,7 @@ class BaseAttrPanel(QWidget):
         # 攻具/防具套装与各自的等阶名称属于同一配置页，不再
         # 单独占用一个一级 Tab。
         self._equipment_set_editor = EquipmentSetEditor(
-            data=self._data, on_changed=self._save_data)
+            self, data=self._data, on_changed=self._save_data)
         self._equipment_set_editor.setVisible(False)
         right_layout.addWidget(self._equipment_set_editor)
 

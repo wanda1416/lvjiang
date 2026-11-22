@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
-from lvjiang.ui.widgets.theme import current_tokens
 
 from ...core.layout.models import Panel
 from ...i18n import tr, tr_label
@@ -80,7 +79,7 @@ class PanelBindingForm(QWidget):
                 f"{panel.w_ratio:.4f}, {panel.h_ratio:.4f}"))
             form.addRow(QLabel(tr("位置和尺寸可在画布中拖动调整。")))
         self.error = QLabel()
-        self.error.setStyleSheet(f"color: {current_tokens().danger};")
+        self.error.setProperty("tone", "danger")
         form.addRow(self.error)
 
     def value(self) -> PanelBindingConfig:

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from PyQt6.QtWidgets import (
+    QBoxLayout,
+    QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -11,6 +16,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .button_styles import apply_dialog_button_box_style
 from .combo_box import (
     combo_contents_width,
     fit_combo_popup_to_contents,
@@ -18,6 +24,7 @@ from .combo_box import (
 )
 
 __all__ = [
+    "add_dialog_footer",
     "combo_contents_width",
     "fit_combo_popup_to_contents",
     "fit_combo_to_contents",
@@ -25,6 +32,7 @@ __all__ = [
     "configure_navigation_list",
     "config_field_card",
     "navigation_width_for_chars",
+    "set_status_tone",
 ]
 
 
@@ -94,3 +102,41 @@ def navigation_width_for_chars(nav: QListWidget, count: int) -> int:
     否则量到的是默认字体，理由见那边的说明。
     """
     return nav.fontMetrics().horizontalAdvance("汉" * count) + 32
+
+
+def set_status_tone(label: QLabel, text: str, tone: str = "muted") -> None:
+    """统一设置行内状态/校验文案与语义色调，由全局主题 QSS 自动重抛光。"""
+    label.setText(text)
+    label.setProperty("tone", tone)
+    style = label.style()
+    if style is not None:
+        style.unpolish(label)
+        style.polish(label)
+
+
+def add_dialog_footer(
+    container: QBoxLayout | QFormLayout,
+    buttons: QDialogButtonBox,
+    *,
+    leading_widgets: Sequence[QWidget] = (),
+    status_label: QLabel | None = None,
+    status_tone: str = "danger",
+) -> QLabel:
+    """添加统一对话框底部栏：左侧常驻语义状态标签 + 右侧标准样式按钮组。"""
+    apply_dialog_button_box_style(buttons)
+    row = QWidget()
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(0, 0, 0, 0)
+    label = status_label if status_label is not None else QLabel()
+    if status_label is None:
+        label.setProperty("tone", status_tone)
+    layout.addWidget(label)
+    layout.addStretch(1)
+    for widget in leading_widgets:
+        layout.addWidget(widget)
+    layout.addWidget(buttons)
+    if isinstance(container, QFormLayout):
+        container.addRow(row)
+    else:
+        container.addWidget(row)
+    return label

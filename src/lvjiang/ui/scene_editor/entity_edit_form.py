@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import (
 
 from ...core.input.key_names import normalize_pressable
 from ...i18n import tr, tr_label
+from ..widgets.layout_helpers import add_dialog_footer
 from ..widgets.pressable_combo import PressableSelector
-from ..widgets.theme import current_tokens
 
 
 def add_attribute_row(
@@ -67,18 +67,8 @@ def add_dialog_action_row(
     leading_button: QPushButton | None = None,
 ) -> QLabel:
     """添加固定高度的底部校验提示和对话框按钮。"""
-    row = QWidget()
-    layout = QHBoxLayout(row)
-    layout.setContentsMargins(0, 0, 0, 0)
-    error_label = QLabel()
-    error_label.setStyleSheet(f"color: {current_tokens().danger};")
-    layout.addWidget(error_label)
-    layout.addStretch()
-    if leading_button is not None:
-        layout.addWidget(leading_button)
-    layout.addWidget(buttons)
-    form.addRow(row)
-    return error_label
+    leading = (leading_button,) if leading_button is not None else ()
+    return add_dialog_footer(form, buttons, leading_widgets=leading)
 
 
 def validate_activation_key_edit(

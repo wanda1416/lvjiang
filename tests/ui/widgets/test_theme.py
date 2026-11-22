@@ -165,3 +165,38 @@ def test_execution_button_style_adapts_to_dark_theme(qtbot) -> None:
         assert _EXECUTION_BUTTON_COLORS_DARK["run"][0] in btn.styleSheet()
     finally:
         reset_theme_manager()
+
+
+def test_status_tone_and_dialog_footer_helpers(qtbot) -> None:
+    """set_status_tone 与 add_dialog_footer 统一语义属性与按钮样式。"""
+    from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+
+    from lvjiang.ui.widgets.layout_helpers import add_dialog_footer, set_status_tone
+    from lvjiang.ui.widgets.theme import DARK, get_theme_manager, reset_theme_manager
+
+    app = QApplication.instance()
+    assert isinstance(app, QApplication)
+    reset_theme_manager()
+    try:
+        mgr = get_theme_manager(app)
+        mgr.apply("dark")
+
+        dialog = QDialog()
+        qtbot.addWidget(dialog)
+        layout = QVBoxLayout(dialog)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        status = add_dialog_footer(layout, buttons)
+        assert isinstance(status, QLabel)
+        assert status.property("tone") == "danger"
+        assert buttons.button(QDialogButtonBox.StandardButton.Ok).property("btnVariant") == "action"
+        assert buttons.button(QDialogButtonBox.StandardButton.Cancel).property("btnVariant") == "neutral"
+
+        set_status_tone(status, "已保存", tone="success")
+        assert status.text() == "已保存"
+        assert status.property("tone") == "success"
+        assert f'QLabel[tone="danger"] {{ color: {DARK.danger}; }}' in app.styleSheet()
+        assert f'QLabel[tone="success"] {{ color: {DARK.success}; }}' in app.styleSheet()
+    finally:
+        reset_theme_manager()

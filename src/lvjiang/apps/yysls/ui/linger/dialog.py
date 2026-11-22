@@ -46,8 +46,8 @@ from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode
 from .....ui.widgets.layout_helpers import (
     configure_navigation_list,
     mark_navigation_list,
+    set_status_tone,
 )
-from .....ui.widgets.theme import current_tokens
 from ...core.linger import (
     ITEM_ROSTER,
     ITEM_SINGLE,
@@ -322,7 +322,8 @@ class LingerDialog(QDialog):
 
         bottom = QHBoxLayout()
         self.status = QLabel("")
-        self.status.setStyleSheet(_MUTED_STYLE)
+        self.status.setStyleSheet("font-size: 11px;")
+        set_status_tone(self.status, "", tone="muted")
         bottom.addWidget(self.status)
         bottom.addStretch(1)
         close_button = QPushButton(tr("关闭"))
@@ -1189,9 +1190,7 @@ class LingerDialog(QDialog):
         self._updating = False
 
     def _set_status(self, text: str, *, error: bool = False) -> None:
-        self.status.setText(text)
-        self.status.setStyleSheet(
-            f"color: {current_tokens().danger}; font-size: 11px;" if error else _MUTED_STYLE)
+        set_status_tone(self.status, text, tone="danger" if error else "muted")
 
     def _region_fixed_done(self, region: LingerRegion) -> int:
         return sum(

@@ -79,6 +79,7 @@ from ...workflows.file_tree import (
 from ...workflows.metadata import SCRIPT_ID_RE, metadata_error
 from ..widgets.button_styles import apply_button_style
 from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
+from ..widgets.layout_helpers import set_status_tone
 from ..widgets.theme import current_tokens, get_theme_manager
 from .wf_code_edit import WfCodeEdit
 
@@ -445,7 +446,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
         self.lbl_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.lbl_status.setStyleSheet("color: palette(mid); padding: 4px;")
+        self.lbl_status.setStyleSheet("padding: 4px;")
+        set_status_tone(self.lbl_status, "", tone="muted")
         rl.addWidget(self.lbl_status)
         splitter.addWidget(right)
 
@@ -959,10 +961,9 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             record._refresh_buttons()
 
     def _set_status(self, text: str, error: bool = False):
-        self.lbl_status.setText(text)
-        tokens = current_tokens()
-        color = tokens.danger if error else tokens.success
-        self.lbl_status.setStyleSheet(f"color: {color}; padding: 4px;")
+        set_status_tone(
+            self.lbl_status, text, tone="danger" if error else "success"
+        )
 
     def _confirm_discard(
         self, *, include_config: bool = False, include_record: bool = False,

@@ -670,7 +670,8 @@ class AccountManagerDialog(QDialog):
         # 避免登录时从无到有把整个对话框顶跳一下。
         self.status = QLabel()
         self.status.setFixedHeight(20)
-        self.status.setStyleSheet(f"color: {current_tokens().danger}; font-size: 12px;")
+        self.status.setProperty("tone", "danger")
+        self.status.setStyleSheet("font-size: 12px;")
 
         # ════ 未登录：居中的紧凑登录卡（不摊满整个对话框） ════
         # 对话框标题已是「账户管理」，卡内不再重复「账户登录」标题。
@@ -747,7 +748,8 @@ class AccountManagerDialog(QDialog):
         # 错误行：固定高度常驻，只换文字，不随失败出现/消失顶跳布局。
         self.sync_error = QLabel()
         self.sync_error.setFixedHeight(20)
-        self.sync_error.setStyleSheet(f"color: {current_tokens().danger}; font-size: 12px;")
+        self.sync_error.setProperty("tone", "danger")
+        self.sync_error.setStyleSheet("font-size: 12px;")
         sync_layout.addWidget(self.sync_error)
 
         self._step_rows = {tr("定义"): 0, tr("用户"): 1, tr("文档"): 2, tr("总览"): 3}
@@ -1255,7 +1257,7 @@ class AccountManagerDialog(QDialog):
         warning = QLabel(tr(
             "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n"
             "此操作不可恢复；本地数据不会被删除。"))
-        warning.setStyleSheet(f"color: {current_tokens().danger};")
+        warning.setProperty("tone", "danger")
         form.addRow(warning)
         form.addRow(tr("密码"), field.widget())
         buttons = QDialogButtonBox(

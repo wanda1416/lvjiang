@@ -22,8 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
-
-from .theme import current_tokens
+from lvjiang.ui.widgets.layout_helpers import add_dialog_footer
 
 
 @dataclass
@@ -85,7 +84,7 @@ class FormDialog(QDialog):
 
         self.lbl_error = QLabel("")
         self.lbl_error.setWordWrap(True)
-        self.lbl_error.setStyleSheet(f"color: {current_tokens().danger};")
+        self.lbl_error.setProperty("tone", "danger")
         self.lbl_error.hide()
         root.addWidget(self.lbl_error)
 
@@ -93,7 +92,7 @@ class FormDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
-        root.addWidget(buttons)
+        add_dialog_footer(root, buttons, status_label=QLabel())
         self.setMinimumWidth(420)
 
         first = self._widgets[self._fields[0].key] if self._fields else None

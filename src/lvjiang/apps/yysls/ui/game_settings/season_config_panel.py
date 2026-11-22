@@ -35,7 +35,7 @@ from lvjiang.apps.yysls.config import (
     validate_season_configs,
 )
 from lvjiang.ui.widgets.button_styles import apply_button_style
-from lvjiang.ui.widgets.theme import current_tokens
+from lvjiang.ui.widgets.layout_helpers import set_status_tone
 
 from .....i18n import tr
 from .factory_guard import (
@@ -480,10 +480,9 @@ class SeasonConfigPanel(QWidget):
 
     def _set_status(self, text: str, is_error: bool):
         """更新状态标签"""
-        tokens = current_tokens()
-        color = tokens.danger if is_error else tokens.success
-        self._status_label.setStyleSheet(f"color: {color};")
-        self._status_label.setText(text)
+        set_status_tone(
+            self._status_label, text, tone="danger" if is_error else "success"
+        )
 
     def refresh_level_combos(self):
         """刷新所有行的装备等级下拉列表（等级配置变更后调用）"""

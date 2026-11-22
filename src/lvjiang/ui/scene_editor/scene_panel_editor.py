@@ -33,7 +33,6 @@ from ...core.scene.registry import (
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets.misc import centered_cell_widget, strip_focus_rect
-from ..widgets.theme import current_tokens
 from .entity_order_table import EntityOrderTable
 from .panel_binding_form import PanelBindingConfig, PanelBindingForm
 from .scene_select import (
@@ -408,7 +407,7 @@ class PanelEditorMixin:
         if scene_combo is not None:
             connect_scene_views_sync(scene_combo, views)
         error = QLabel()
-        error.setStyleSheet(f"color: {current_tokens().danger};")
+        error.setProperty("tone", "danger")
         form.addRow(error)
 
         def result():

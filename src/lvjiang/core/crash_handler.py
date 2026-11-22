@@ -96,6 +96,77 @@ def _install_excepthook():
 
 # ─── Layer 3: Windows native crash handler ───────────────
 
+_EXCEPTION_NAMES = {
+    0xC0000005: "ACCESS_VIOLATION",
+    0xC0000006: "IN_PAGE_ERROR",
+    0xC000001D: "ILLEGAL_INSTRUCTION",
+    0xC0000025: "NONCONTINUABLE_EXCEPTION",
+    0xC000008C: "ARRAY_BOUNDS_EXCEEDED",
+    0xC0000094: "INT_DIVIDE_BY_ZERO",
+    0xC00000FD: "STACK_OVERFLOW",
+    0xC0000374: "HEAP_CORRUPTION",
+    0xC0000409: "STACK_BUFFER_OVERRUN",
+    0xC000041D: "FATAL_USER_CALLBACK_EXCEPTION",
+}
+_ACCESS_TYPES = {0: "Read", 1: "Write", 8: "Execute(DEP)"}
+
+
+def _format_windows_exception(exception_ptrs_raw: int) -> list[str]:
+    """安全解析 Windows EXCEPTION_POINTERS：输出异常码、访问地址与出错 DLL 偏移。"""
+    import ctypes
+    from ctypes import wintypes
+
+    lines = [f"Raw pointer: 0x{exception_ptrs_raw:X}"]
+    if not exception_ptrs_raw:
+        return lines
+
+    class _EXCEPTION_RECORD(ctypes.Structure):
+        _fields_ = [
+            ("ExceptionCode", wintypes.DWORD),
+            ("ExceptionFlags", wintypes.DWORD),
+            ("ExceptionRecord", ctypes.c_void_p),
+            ("ExceptionAddress", ctypes.c_void_p),
+            ("NumberParameters", wintypes.DWORD),
+            ("ExceptionInformation", ctypes.c_size_t * 15),
+        ]
+
+    class _EXCEPTION_POINTERS(ctypes.Structure):
+        _fields_ = [
+            ("ExceptionRecord", ctypes.POINTER(_EXCEPTION_RECORD)),
+            ("ContextRecord", ctypes.c_void_p),
+        ]
+
+    kernel32 = ctypes.windll.kernel32
+    lines.append(f"ThreadId: 0x{kernel32.GetCurrentThreadId():08x}")
+
+    ptrs = _EXCEPTION_POINTERS.from_address(exception_ptrs_raw)
+    if not ptrs.ExceptionRecord:
+        return lines
+    rec = ptrs.ExceptionRecord.contents
+    code = int(rec.ExceptionCode)
+    name = _EXCEPTION_NAMES.get(code, "UNKNOWN")
+    lines.append(f"Exception: 0x{code:08X} ({name})")
+
+    addr = int(rec.ExceptionAddress or 0)
+    if addr:
+        module_desc = f"0x{addr:X}"
+        hmod = ctypes.c_void_p()
+        # GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT(2) | FROM_ADDRESS(4)
+        if kernel32.GetModuleHandleExW(6, ctypes.c_void_p(addr), ctypes.byref(hmod)) and hmod.value:
+            buf = ctypes.create_unicode_buffer(520)
+            if kernel32.GetModuleFileNameW(hmod, buf, len(buf)):
+                mod_name = Path(buf.value).name
+                module_desc = f"{mod_name}+0x{addr - hmod.value:X} (0x{addr:X})"
+        lines.append(f"Address: {module_desc}")
+
+    if code in (0xC0000005, 0xC0000006) and rec.NumberParameters >= 2:
+        op = _ACCESS_TYPES.get(int(rec.ExceptionInformation[0]), str(rec.ExceptionInformation[0]))
+        target = int(rec.ExceptionInformation[1])
+        lines.append(f"Access: {op} at 0x{target:X}")
+
+    return lines
+
+
 def _install_windows_handler():
     """Windows SetUnhandledExceptionFilter 兜底 native crash"""
     global _windows_handler_keepalive
@@ -111,9 +182,13 @@ def _install_windows_handler():
         def _handler(exception_ptrs_raw):
             crash_path = _crash_log_path()
             try:
+                try:
+                    header_lines = _format_windows_exception(int(exception_ptrs_raw or 0))
+                except Exception:
+                    header_lines = [f"Raw pointer: 0x{exception_ptrs_raw:X}"]
                 with open(crash_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(f"=== Native Crash {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-                    f.write(f"Raw pointer: 0x{exception_ptrs_raw:X}\n")
+                    f.write("\n".join(header_lines) + "\n")
                     # dump 当前 Python 线程栈
                     f.write("\n--- Python traceback ---\n")
                     faulthandler.dump_traceback(file=f, all_threads=True)

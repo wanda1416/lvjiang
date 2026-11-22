@@ -47,6 +47,7 @@ from .....ui.widgets.layout_helpers import (
     configure_navigation_list,
     mark_navigation_list,
 )
+from .....ui.widgets.theme import current_tokens
 from ...core.linger import (
     ITEM_ROSTER,
     ITEM_SINGLE,
@@ -1190,7 +1191,7 @@ class LingerDialog(QDialog):
     def _set_status(self, text: str, *, error: bool = False) -> None:
         self.status.setText(text)
         self.status.setStyleSheet(
-            "color: #c62828; font-size: 11px;" if error else _MUTED_STYLE)
+            f"color: {current_tokens().danger}; font-size: 11px;" if error else _MUTED_STYLE)
 
     def _region_fixed_done(self, region: LingerRegion) -> int:
         return sum(

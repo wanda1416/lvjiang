@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr
 from .....ui.widgets.button_styles import apply_button_style
+from .....ui.widgets.theme import current_tokens
 from ...config.tune_slots import SLOT_LABELS
 from ...core.tuning_history.repository import TuningHistoryRepository
 from .result_dialog import TuningResultsDialog
@@ -164,7 +165,7 @@ class TuningHistoryWidget(QWidget):
                 # 异常列非零时标红：整表扫一眼就能定位到需要复核 OCR 的运行，
                 # 不必逐条打开详情去找那张卡片。
                 if column == _ANOMALY_COLUMN and run.anomaly_count:
-                    item.setForeground(QColor("#D32F2F"))
+                    item.setForeground(QColor(current_tokens().danger))
                     item.setToolTip(tr("本次运行有 {n} 件装备识别异常").format(
                         n=run.anomaly_count))
                 self._table.setItem(row, column, item)

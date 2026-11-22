@@ -30,58 +30,66 @@ from lvjiang.core.users.document import UserConfigManager
 from ..i18n import tr, tr_label
 from .avatar_editor_dialog import AvatarEditorDialog
 from .widgets.avatar_widget import AvatarWidget
+from .widgets.theme import current_tokens
 
-# ─── 样式常量 ────────────────────────────────────────────
+# ─── 样式辅助 ────────────────────────────────────────────
 
-_ACCENT = "#0078d4"
 
-_STYLE_LIST = """
-QListWidget#userList {
+def _style_list() -> str:
+    tokens = current_tokens()
+    return f"""
+QListWidget#userList {{
     border: 1px solid palette(midlight);
     border-radius: 6px;
     background: palette(base);
     outline: none;
     padding: 4px;
-}
-QListWidget#userList::item {
+}}
+QListWidget#userList::item {{
     padding: 5px 10px;
     border-radius: 4px;
     margin: 1px 0;
     color: palette(text);
-}
-QListWidget#userList::item:hover {
+}}
+QListWidget#userList::item:hover {{
     background: palette(alternate-base);
-}
-QListWidget#userList::item:selected {
-    background: #0078d4;
-    color: white;
-}
+}}
+QListWidget#userList::item:selected {{
+    background: {tokens.selection_bg};
+    color: {tokens.selection_text};
+}}
 """
 
-_STYLE_BTN_PRIMARY = f"""
+
+def _style_btn_primary() -> str:
+    tokens = current_tokens()
+    return f"""
 QPushButton {{
-    background: {_ACCENT};
-    color: white;
+    background: {tokens.accent};
+    color: {tokens.selection_text};
     border: none;
     border-radius: 4px;
     padding: 6px 14px;
 }}
-QPushButton:hover {{ background: #106ebe; }}
-QPushButton:pressed {{ background: #005a9e; }}
+QPushButton:hover {{ background: {tokens.accent_hover}; }}
+QPushButton:pressed {{ background: {tokens.accent_pressed}; }}
 QPushButton:disabled {{ background: palette(mid); }}
 """
 
-_STYLE_BTN_DANGER = """
-QPushButton {
+
+def _style_btn_danger() -> str:
+    tokens = current_tokens()
+    return f"""
+QPushButton {{
     background: transparent;
-    color: #d13438;
-    border: 1px solid #d13438;
+    color: {tokens.danger};
+    border: 1px solid {tokens.danger};
     border-radius: 4px;
     padding: 6px 14px;
-}
-QPushButton:hover { background: palette(alternate-base); }
-QPushButton:pressed { background: palette(midlight); }
-QPushButton:disabled { color: palette(mid); border-color: palette(mid); }
+}}
+QPushButton:hover {{ background: {tokens.danger_surface}; }}
+QPushButton:pressed {{ background: palette(midlight); }}
+QPushButton:disabled {{ color: palette(mid); border-color: palette(mid); }}
 """
 
 _STYLE_BTN_GHOST = """
@@ -229,12 +237,12 @@ class UserManagerDialog(QDialog):
         toolbar.setSpacing(8)
 
         self._btn_new = QPushButton(tr("＋ 新建用户"))
-        self._btn_new.setStyleSheet(_STYLE_BTN_PRIMARY)
+        self._btn_new.setStyleSheet(_style_btn_primary())
         self._btn_new.clicked.connect(self._on_create_user)
         toolbar.addWidget(self._btn_new)
 
         self._btn_delete = QPushButton(tr("删除"))
-        self._btn_delete.setStyleSheet(_STYLE_BTN_DANGER)
+        self._btn_delete.setStyleSheet(_style_btn_danger())
         self._btn_delete.setEnabled(False)
         self._btn_delete.clicked.connect(self._on_delete_user)
         toolbar.addWidget(self._btn_delete)
@@ -245,7 +253,7 @@ class UserManagerDialog(QDialog):
         # 用户列表（支持拖拽排序）
         self._user_list = QListWidget()
         self._user_list.setObjectName("userList")
-        self._user_list.setStyleSheet(_STYLE_LIST)
+        self._user_list.setStyleSheet(_style_list())
         self._user_list.setDragDropMode(
             QAbstractItemView.DragDropMode.InternalMove,
         )
@@ -343,12 +351,12 @@ class UserManagerDialog(QDialog):
         self._btn_add_attribute.clicked.connect(self._add_attribute)
         self._btn_delete_attribute.clicked.connect(self._delete_attributes)
         self._btn_add_attribute.setStyleSheet(_STYLE_BTN_GHOST)
-        self._btn_delete_attribute.setStyleSheet(_STYLE_BTN_DANGER)
+        self._btn_delete_attribute.setStyleSheet(_style_btn_danger())
         attr_actions.addWidget(self._btn_add_attribute)
         attr_actions.addWidget(self._btn_delete_attribute)
         attr_actions.addStretch()
         self._btn_save_attributes = QPushButton(tr("保存属性"))
-        self._btn_save_attributes.setStyleSheet(_STYLE_BTN_PRIMARY)
+        self._btn_save_attributes.setStyleSheet(_style_btn_primary())
         self._btn_save_attributes.clicked.connect(self._save_attributes)
         attr_actions.addWidget(self._btn_save_attributes)
         attr_layout.addLayout(attr_actions)
@@ -368,7 +376,7 @@ class UserManagerDialog(QDialog):
         """卡片内的小节标题"""
         label = QLabel(text)
         label.setStyleSheet(
-            f"color: {_ACCENT}; font-weight: bold; font-size: 13px;"
+            f"color: {current_tokens().accent}; font-weight: bold; font-size: 13px;"
         )
         return label
 

@@ -49,9 +49,7 @@ from ...workflows.builtins import (
 )
 from ...workflows.builtins.script_meta import scan_directory, script_problems
 from ..widgets.button_styles import apply_compact_button_style
-
-#: 元数据问题与重名冲突的提示色
-_WARN_COLOR = "#c62828"
+from ..widgets.theme import current_tokens
 
 
 @dataclass
@@ -181,7 +179,7 @@ class BuiltinFunctionPanel(QWidget):
                     item = QTreeWidgetItem([entry.name])
                     item.setData(0, Qt.ItemDataRole.UserRole, entry)
                     if entry.issues:
-                        item.setForeground(0, QBrush(QColor(_WARN_COLOR)))
+                        item.setForeground(0, QBrush(QColor(current_tokens().danger)))
                         item.setToolTip(0, "\n".join(entry.issues))
                     group_item.addChild(item)
             root_item.setExpanded(True)
@@ -349,7 +347,7 @@ class BuiltinFunctionPanel(QWidget):
 
         self.problems_label = QLabel()
         self.problems_label.setWordWrap(True)
-        self.problems_label.setStyleSheet(f"color: {_WARN_COLOR};")
+        self.problems_label.setStyleSheet(f"color: {current_tokens().danger};")
         self.problems_label.setVisible(False)
         layout.addWidget(self.problems_label)
 
@@ -391,7 +389,7 @@ class BuiltinFunctionPanel(QWidget):
             Qt.TextInteractionFlag.TextSelectableByMouse)
         self.issues_label = QLabel()
         self.issues_label.setWordWrap(True)
-        self.issues_label.setStyleSheet(f"color: {_WARN_COLOR};")
+        self.issues_label.setStyleSheet(f"color: {current_tokens().danger};")
 
         layout.addWidget(self.title)
         layout.addWidget(self.signature_label)

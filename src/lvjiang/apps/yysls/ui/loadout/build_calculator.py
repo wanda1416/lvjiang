@@ -40,6 +40,7 @@ from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style, apply_compact_button_style
 from .....ui.widgets.layout_helpers import fit_combo_to_contents
 from .....ui.widgets.misc import strip_focus_rect
+from .....ui.widgets.theme import current_tokens
 from ...config import get_game_config
 from ...config.builds import (
     BuildDefinition,
@@ -878,7 +879,9 @@ class BuildEditor(QWidget):
                 if priority == "recommended":
                     label.setProperty("tone", "muted")
                 else:
-                    label.setStyleSheet("color: #c62828;" if priority == "required" else "color: #D97706;")
+                    tokens = current_tokens()
+                    color = tokens.danger if priority == "required" else tokens.warning
+                    label.setStyleSheet(f"color: {color};")
                 self._unmet_layout.addWidget(label)
                 self._unmet_labels.append(label)
         self._unmet_content.setVisible(bool(self._unmet_labels))

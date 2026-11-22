@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr
 from .....ui.widgets.button_styles import apply_button_style
-from .....ui.widgets.presentation import is_dark_theme
+from .....ui.widgets.theme import current_tokens
 from ...config.equipment_slots import grid_layout
 from ...config.tune_slots import SLOT_LABELS
 from ...core.combat.combat_attrs import map_affix_to_attr
@@ -913,11 +913,8 @@ class AffixAnalysisPages(QWidget):
         assert header is not None
         header.setStretchLastSection(False)
 
-        dark_theme = is_dark_theme(table)
-        if positive:
-            color = QColor("#66BB6A" if dark_theme else "#2E7D32")
-        else:
-            color = QColor("#EF5350" if dark_theme else "#C62828")
+        tokens = current_tokens()
+        color = QColor(tokens.success if positive else tokens.danger)
         for row, impact in enumerate(impacts):
             name = impact.name
             if not positive and impact.occurrence_count > 1:

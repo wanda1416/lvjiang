@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -12,9 +11,10 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr, tr_label
-from .....ui.widgets.theme import LIGHT, ThemeTokens, get_theme_manager
+from .....ui.widgets.theme import current_tokens
 from ...config.tune_slots import SLOT_LABELS
 from ...core.tuning_rules import RATING_LABELS
+from ..theme import affix_cap_color, quality_color, tuning_result_badge_color
 from .result_store import (
     RESET_ANOMALIES,
     RESET_COMPLETED,
@@ -79,51 +79,6 @@ def _result_label(result: TuningEquipmentResult) -> str:
     return _RESULT_LABELS.get(result.result, result.result)
 
 
-def _theme_tokens() -> ThemeTokens:
-    app = QApplication.instance()
-    return LIGHT if app is None else get_theme_manager(app).tokens
-
-
-def _quality_accent(quality: str, tokens: ThemeTokens) -> str:
-    colors = (
-        {"gold": "#e5a93b", "purple": "#c084fc", "blue": "#38bdf8"}
-        if tokens.is_dark else
-        {"gold": "#b45309", "purple": "#7e22ce", "blue": "#0369a1"}
-    )
-    return colors.get(quality, tokens.border_strong)
-
-
-def _result_badge_color(result_key: str, tokens: ThemeTokens) -> str:
-    colors = (
-        {
-            RESULT_RECYCLED: "#b91c3c",
-            RESULT_SKIPPED: "#524f49",
-            RESULT_TUNED: "#166534",
-            RESULT_TUNED_RECYCLED: "#b45309",
-            RESULT_RESET: "#0e5a8a",
-        }
-        if tokens.is_dark else
-        {
-            RESULT_RECYCLED: "#be123c",
-            RESULT_SKIPPED: "#635f56",
-            RESULT_TUNED: "#15803d",
-            RESULT_TUNED_RECYCLED: "#c2410c",
-            RESULT_RESET: "#0369a1",
-        }
-    )
-    return colors.get(result_key, tokens.text_muted)
-
-
-def _cap_color(cap_pct, tokens: ThemeTokens) -> str:
-    if cap_pct is None:
-        return "palette(text)"
-    if cap_pct >= 90:
-        return "#e5a93b" if tokens.is_dark else "#b45309"
-    if cap_pct >= 70:
-        return "#c084fc" if tokens.is_dark else "#7e22ce"
-    return "#38bdf8" if tokens.is_dark else "#0369a1"
-
-
 def _value_text(affix: dict) -> str:
     value = affix.get("value", "")
     if affix.get("unit") == "%" and value != "":
@@ -141,18 +96,8 @@ class TuningResultCard(QFrame):
         self.result = result
         self.setObjectName("tuningResultCard")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        tokens = _theme_tokens()
         self.setMinimumWidth(220)
         self.setMinimumHeight(215)
-        accent = _quality_accent(result.quality, tokens)
-        self.setStyleSheet(
-            "QFrame#tuningResultCard {"
-            "background-color: palette(base);"
-            "border: 1px solid palette(midlight);"
-            f"border-left: 4px solid {accent};"
-            "border-radius: 8px; padding: 2px; }"
-            "QFrame#tuningResultCard:hover { border-color: palette(highlight); }"
-        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(9, 7, 9, 7)
@@ -172,11 +117,6 @@ class TuningResultCard(QFrame):
         header.addWidget(self.name_label, 1)
         status = _result_label(result)
         self.status_label = QLabel(status)
-        self.status_label.setStyleSheet(
-            f"color: white; background: {_result_badge_color(result.result, tokens)};"
-            "border: none; border-radius: 8px; padding: 2px 7px;"
-            "font-size: 11px; font-weight: bold;"
-        )
         header.addWidget(self.status_label)
         layout.addLayout(header)
 
@@ -211,26 +151,24 @@ class TuningResultCard(QFrame):
             state = (tr("冷却完成")
                      if result.cooldown_state == "completed" else tr("冷却中"))
             state_parts.append(f"{kind}{state}")
+        self._equipment_state_label: QLabel | None = None
         if state_parts:
             equipment_state = QLabel(
                 tr_label('装备状态') + "、".join(state_parts))
             equipment_state.setWordWrap(True)
-            equipment_state.setStyleSheet(
-                f"font-size: 11px; font-weight: bold; color: {tokens.warning}; border: none;")
             layout.addWidget(equipment_state)
+            self._equipment_state_label = equipment_state
 
         self.reset_label: QLabel | None = None
+        self._reset_anomaly = False
         if result.reset_outcome:
             reset_text = _RESET_LABELS.get(
                 result.reset_outcome, result.reset_outcome)
-            anomaly = result.reset_outcome in RESET_ANOMALIES
+            self._reset_anomaly = result.reset_outcome in RESET_ANOMALIES
             self.reset_label = QLabel(
-                (tr("异常：{result}") if anomaly else tr("重置结果：{result}"))
+                (tr("异常：{result}") if self._reset_anomaly else tr("重置结果：{result}"))
                 .format(result=reset_text))
-            self.reset_label.setProperty("anomaly", anomaly)
-            self.reset_label.setStyleSheet(
-                "font-size: 11px; font-weight: bold; border: none; color: "
-                + (tokens.danger if anomaly else tokens.warning) + ";")
+            self.reset_label.setProperty("anomaly", self._reset_anomaly)
             layout.addWidget(self.reset_label)
 
         line = QFrame()
@@ -239,6 +177,7 @@ class TuningResultCard(QFrame):
         layout.addWidget(line)
 
         self.affix_labels: list[QLabel] = []
+        self._cap_labels: list[tuple[QLabel, int | float | None]] = []
         for affix in result.final_affixes:
             row = QHBoxLayout()
             name = QLabel(str(affix.get("name") or "?"))
@@ -252,11 +191,9 @@ class TuningResultCard(QFrame):
             if cap is not None:
                 cap_label = QLabel(f"{cap:g}%" if isinstance(cap, (int, float)) else f"{cap}%")
                 cap_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-                cap_label.setStyleSheet(
-                    f"font-size: 11px; font-weight: bold; color: {_cap_color(cap, tokens)}; border: none;"
-                )
                 cap_label.setMinimumWidth(38)
                 row.addWidget(cap_label)
+                self._cap_labels.append((cap_label, cap))
             layout.addLayout(row)
             self.affix_labels.append(name)
         if not result.final_affixes:
@@ -281,6 +218,36 @@ class TuningResultCard(QFrame):
             "background: palette(alternate-base); border-radius: 3px; padding: 4px;"
         )
         layout.addWidget(self.reason_label)
+        self.refresh_theme()
+
+    def refresh_theme(self) -> None:
+        """原地刷新依赖 ThemeTokens 的语义色，保留卡片实例与滚动/悬停状态。"""
+        tokens = current_tokens()
+        accent = quality_color(self.result.quality, tokens, default=tokens.border_strong)
+        self.setStyleSheet(
+            "QFrame#tuningResultCard {"
+            "background-color: palette(base);"
+            "border: 1px solid palette(midlight);"
+            f"border-left: 4px solid {accent};"
+            "border-radius: 8px; padding: 2px; }"
+            "QFrame#tuningResultCard:hover { border-color: palette(highlight); }"
+        )
+        self.status_label.setStyleSheet(
+            f"color: white; background: {tuning_result_badge_color(self.result.result, tokens)};"
+            "border: none; border-radius: 8px; padding: 2px 7px;"
+            "font-size: 11px; font-weight: bold;"
+        )
+        if self._equipment_state_label is not None:
+            self._equipment_state_label.setStyleSheet(
+                f"font-size: 11px; font-weight: bold; color: {tokens.warning}; border: none;")
+        if self.reset_label is not None:
+            color = tokens.danger if self._reset_anomaly else tokens.warning
+            self.reset_label.setStyleSheet(
+                f"font-size: 11px; font-weight: bold; border: none; color: {color};")
+        for cap_label, cap in self._cap_labels:
+            cap_label.setStyleSheet(
+                f"font-size: 11px; font-weight: bold; color: {affix_cap_color(cap, tokens)}; border: none;"
+            )
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802 - Qt API
         super().mouseReleaseEvent(event)

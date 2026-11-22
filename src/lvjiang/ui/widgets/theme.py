@@ -1,4 +1,4 @@
-"""Application-wide light and dark theme support.
+"""Application-wide theme support (light, paper, and dark).
 
 The theme layer owns neutral UI colours.  Business colours (equipment quality,
 success/warning/error states) may still be supplied by individual widgets, but
@@ -20,7 +20,6 @@ from PyQt6.QtWidgets import QApplication, QWidget
 
 ThemeName = Literal["light", "paper", "dark"]
 DEFAULT_THEME: ThemeName = "light"
-THEME_ORDER: tuple[ThemeName, ...] = ("light", "paper", "dark")
 
 
 @dataclass(frozen=True)
@@ -97,7 +96,7 @@ PAPER = ThemeTokens(
     selection_text="#ffffff",
     danger="#be123c",
     danger_surface="#fce7ec",
-    warning="#b45309",
+    warning="#c2410c",
     warning_surface="#fef3e2",
     info="#0369a1",
     info_surface="#e6f4fb",
@@ -132,16 +131,38 @@ DARK = ThemeTokens(
     success_surface="#153226",
 )
 
-THEMES: dict[ThemeName, ThemeTokens] = {
-    "light": LIGHT,
-    "paper": PAPER,
-    "dark": DARK,
-}
+@dataclass(frozen=True)
+class ThemeSpec:
+    key: ThemeName
+    label: str
+    icon: str
+    tokens: ThemeTokens
+
+
+THEME_SPECS: tuple[ThemeSpec, ...] = (
+    ThemeSpec("light", "纯白", "☀", LIGHT),
+    ThemeSpec("paper", "宣纸", "❖", PAPER),
+    ThemeSpec("dark", "玄墨", "☾", DARK),
+)
+THEME_ORDER: tuple[ThemeName, ...] = tuple(spec.key for spec in THEME_SPECS)
+THEMES: dict[ThemeName, ThemeTokens] = {spec.key: spec.tokens for spec in THEME_SPECS}
+_SPECS_BY_KEY: dict[ThemeName, ThemeSpec] = {spec.key: spec for spec in THEME_SPECS}
 
 
 def normalize_theme(value: object) -> ThemeName:
     """Return a supported theme name, falling back safely for old configs."""
     return cast(ThemeName, value) if value in THEMES else DEFAULT_THEME
+
+
+def get_theme_spec(theme: object) -> ThemeSpec:
+    """Return the normalized ThemeSpec for a theme key."""
+    return _SPECS_BY_KEY[normalize_theme(theme)]
+
+
+def current_tokens() -> ThemeTokens:
+    """Safely return active ThemeTokens, falling back to LIGHT outside QApplication."""
+    app = QApplication.instance()
+    return LIGHT if not isinstance(app, QApplication) else get_theme_manager(app).tokens
 
 
 def _palette(tokens: ThemeTokens) -> QPalette:
@@ -402,6 +423,9 @@ QFrame[surface="card"] {{
     border-radius: 6px;
 }}
 QLabel[tone="muted"] {{ color: {t.text_muted}; }}
+QLabel[tone="danger"] {{ color: {t.danger}; }}
+QLabel[tone="warning"] {{ color: {t.warning}; }}
+QLabel[tone="success"] {{ color: {t.success}; }}
 QLabel[status="info"], QFrame[status="info"], QWidget[status="info"] {{
     color: {t.info}; background-color: {t.info_surface};
 }}
@@ -447,8 +471,22 @@ def _extension_stylesheet(tokens: ThemeTokens) -> str:
 
 _DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
 _DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+_DWMWA_BORDER_COLOR = 34
 _DWMWA_CAPTION_COLOR = 35
 _DWMWA_TEXT_COLOR = 36
+
+_dwm_set_attr = None
+
+
+def _dwm_set_window_attribute():
+    """懒初始化 DwmSetWindowAttribute 绑定与 ctypes 签名。"""
+    global _dwm_set_attr
+    if _dwm_set_attr is None:
+        fn = ctypes.windll.dwmapi.DwmSetWindowAttribute
+        fn.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_uint]
+        fn.restype = ctypes.c_long
+        _dwm_set_attr = fn
+    return _dwm_set_attr
 
 
 def _colorref(hex_color: str) -> int:
@@ -483,36 +521,29 @@ def _apply_win32_titlebar(widget: QWidget, tokens: ThemeTokens) -> None:
         hwnd = int(widget.winId())
         if not hwnd:
             return
-        dwmapi = ctypes.windll.dwmapi
+        dwm_set = _dwm_set_window_attribute()
         hwnd_ptr = ctypes.c_void_p(hwnd)
         dark = ctypes.c_int(1 if tokens.is_dark else 0)
-        hr = dwmapi.DwmSetWindowAttribute(
+        hr = dwm_set(
             hwnd_ptr,
-            ctypes.c_uint(_DWMWA_USE_IMMERSIVE_DARK_MODE),
+            _DWMWA_USE_IMMERSIVE_DARK_MODE,
             ctypes.byref(dark),
-            ctypes.c_uint(ctypes.sizeof(dark)),
+            ctypes.sizeof(dark),
         )
         if hr != 0:
-            dwmapi.DwmSetWindowAttribute(
+            dwm_set(
                 hwnd_ptr,
-                ctypes.c_uint(_DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1),
+                _DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
                 ctypes.byref(dark),
-                ctypes.c_uint(ctypes.sizeof(dark)),
+                ctypes.sizeof(dark),
             )
-        caption = ctypes.c_uint32(_colorref(tokens.window))
-        dwmapi.DwmSetWindowAttribute(
-            hwnd_ptr,
-            ctypes.c_uint(_DWMWA_CAPTION_COLOR),
-            ctypes.byref(caption),
-            ctypes.c_uint(ctypes.sizeof(caption)),
-        )
-        text_color = ctypes.c_uint32(_colorref(tokens.text))
-        dwmapi.DwmSetWindowAttribute(
-            hwnd_ptr,
-            ctypes.c_uint(_DWMWA_TEXT_COLOR),
-            ctypes.byref(text_color),
-            ctypes.c_uint(ctypes.sizeof(text_color)),
-        )
+        for attr, hex_color in (
+            (_DWMWA_BORDER_COLOR, tokens.border_strong),
+            (_DWMWA_CAPTION_COLOR, tokens.window),
+            (_DWMWA_TEXT_COLOR, tokens.text),
+        ):
+            val = ctypes.c_uint32(_colorref(hex_color))
+            dwm_set(hwnd_ptr, attr, ctypes.byref(val), ctypes.sizeof(val))
     except Exception:  # noqa: BLE001 - 非关键装饰，绝不阻塞窗口显示
         pass
 
@@ -583,10 +614,16 @@ def get_theme_manager(app: QApplication | None = None) -> ThemeManager:
 
 
 def reset_theme_manager() -> None:
-    """Drop the singleton reference (primarily for isolated tests)."""
+    """Drop the singleton reference and restore default app palette/stylesheet."""
     global _manager
     if _manager is not None:
         app = QApplication.instance()
-        if app is not None and not sip.isdeleted(app) and not sip.isdeleted(_manager):
-            app.removeEventFilter(_manager)
+        if isinstance(app, QApplication) and not sip.isdeleted(app):
+            if not sip.isdeleted(_manager):
+                app.removeEventFilter(_manager)
+            app.setProperty("lvjiangTheme", None)
+            app.setStyleSheet("")
+            style = app.style()
+            if style is not None:
+                app.setPalette(style.standardPalette())
         _manager = None

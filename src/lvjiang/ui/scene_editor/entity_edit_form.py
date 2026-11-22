@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from ...core.input.key_names import normalize_pressable
 from ...i18n import tr, tr_label
 from ..widgets.pressable_combo import PressableSelector
+from ..widgets.theme import current_tokens
 
 
 def add_attribute_row(
@@ -70,7 +71,7 @@ def add_dialog_action_row(
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
     error_label = QLabel()
-    error_label.setStyleSheet("color: #c62828;")
+    error_label.setStyleSheet(f"color: {current_tokens().danger};")
     layout.addWidget(error_label)
     layout.addStretch()
     if leading_button is not None:

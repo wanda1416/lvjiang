@@ -48,6 +48,7 @@ from ...core.config import (
 )
 from ...i18n import tr, tr_in, tr_label
 from ..widgets.button_styles import apply_button_style, apply_compact_tool_button_style
+from ..widgets.theme import current_tokens
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -1140,7 +1141,7 @@ class SettingsDialog(QDialog):
         vbox = QVBoxLayout(tab)
 
         warn = QLabel(tr("以下为系统级全局热键，保存后立即生效。"))
-        warn.setStyleSheet("color: #2E7D32; font-weight: bold;")
+        warn.setStyleSheet(f"color: {current_tokens().success}; font-weight: bold;")
         warn.setWordWrap(True)
         vbox.addWidget(warn)
 
@@ -1194,7 +1195,7 @@ class SettingsDialog(QDialog):
 
         # ── 菜单快捷键 ──
         header = QLabel(tr("菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）"))
-        header.setStyleSheet("color: #1565C0; font-weight: bold;")
+        header.setStyleSheet(f"color: {current_tokens().info}; font-weight: bold;")
         header.setWordWrap(True)
         vbox.addWidget(header)
         menu_form = QFormLayout()
@@ -1498,7 +1499,7 @@ class SettingsDialog(QDialog):
         self._license_status.setText(
             tr("本地激活：已激活") + f"：{issued.code_id} | {bind} | "
             + tr("有效期") + f" {expires}\n" + tr("已开放") + f"：{feats}")
-        self._license_status.setStyleSheet("color: #2e7d32;")
+        self._license_status.setStyleSheet(f"color: {current_tokens().success};")
         self._clear_license_btn.setEnabled(not getattr(self, "_activation_busy", False))
 
     def _refresh_online_license_status(self):
@@ -1508,7 +1509,11 @@ class SettingsDialog(QDialog):
         text = tr("在线会员授权") + "：" + tr(status.reason)
         if self._online_license_status.text() != text:
             self._online_license_status.setText(text)
-            color = {"allowed": "#2e7d32", "denied": "#c62828"}.get(status.state, "palette(mid)")
+            tokens = current_tokens()
+            color = {
+                "allowed": tokens.success,
+                "denied": tokens.danger,
+            }.get(status.state, "palette(mid)")
             self._online_license_status.setStyleSheet(f"color: {color};")
 
     def _on_copy_serial(self):
@@ -1803,7 +1808,7 @@ class SettingsDialog(QDialog):
             self._offline_hint.setText(tr(
                 "已暂停公告检查、版本检查、在线配置更新和匿名数据上报；"
                 "关闭离线模式后，将恢复之前的选择。"))
-            self._offline_hint.setStyleSheet("color: #D97706;")
+            self._offline_hint.setStyleSheet(f"color: {current_tokens().warning};")
         else:
             self._offline_hint.setText(tr(
                 "可在下方分别控制公告、版本更新、在线配置和匿名数据上报。"))

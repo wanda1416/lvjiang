@@ -36,7 +36,7 @@ from ......ui.widgets.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
-from ......ui.widgets.presentation import is_dark_theme, make_tag
+from ......ui.widgets.presentation import make_tag
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.constants import ASSUME_CHENGYIN_KEY
 from ....core.equip_parser.dingyin_parser import (
@@ -55,6 +55,16 @@ from ....core.equip_validator import illegal_reasons_of
 from ....core.equipment_cooldown import next_cooldown_expiry
 from ....core.loadout.models import EQUIPMENT_LAST_SEEN_AT
 from ....core.loadout.transmute import TARGET_NAME_KEY, TARGET_VALUE_KEY
+from ...theme import (
+    affix_cap_color,
+    quality_bg,
+    quality_border,
+    status_tag_color,
+    yellow_stat_color,
+)
+from ...theme import (
+    transmute_target_color as _theme_transmute_target_color,
+)
 
 
 class _ElidedLabel(QLabel):
@@ -102,12 +112,6 @@ class _ElidedLabel(QLabel):
         painter.end()
 
 
-# 品质背景色（半透明，仅金/紫）
-_QUALITY_BG_COLORS = {
-    "gold": "rgba(210, 179, 102, 0.25)",
-    "purple": "rgba(113, 102, 120, 0.25)",
-}
-
 # 槽位卡片样式
 _SLOT_STYLE_EMPTY = (
     "_SlotCard { background-color: palette(alternate-base); "
@@ -139,9 +143,10 @@ def _slot_style_hovered(bg: str = "palette(base)") -> str:
     )
 
 
-def transmute_target_color(widget: QWidget) -> str:
-    """转律目标的黄色：深色主题用亮黄，浅色主题用深琥珀，保证可读。"""
-    return "#FFD54F" if is_dark_theme(widget) else "#B26A00"
+def transmute_target_color(widget: QWidget | None = None) -> str:
+    """转律目标的黄色：委托给 yysls 业务主题模块。"""
+    del widget
+    return _theme_transmute_target_color()
 
 
 def _transmute_target_text(affix: dict) -> str:
@@ -161,17 +166,6 @@ def _transmute_target_tooltip(affix: dict) -> str:
         return ""
     return tr("转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；"
               "仅在勾选「模拟转律」时计入属性）").format(name=name, value=value)
-
-
-def _affix_value_color(cap_pct: int | float | None) -> str:
-    """词条数值颜色：>=90 金，[70,90) 紫，<70 蓝"""
-    if cap_pct is None:
-        return "palette(text)"
-    if cap_pct >= 90:
-        return "#B8860B"
-    if cap_pct >= 70:
-        return "#8B5CF6"
-    return "#2563EB"
 
 
 # ── 标签样式 ──────────────────────────────────────────
@@ -632,7 +626,7 @@ class _EquipmentPropertiesDialog(QDialog):
                 self._remaining_value = QLabel("")
                 self._remaining_value.setObjectName("cooldownRemainingText")
                 self._remaining_value.setStyleSheet(
-                    "color: #D97706; font-weight: 600;")
+                    f"color: {yellow_stat_color()}; font-weight: 600;")
                 form.addRow(self._remaining_name, self._remaining_value)
         layout.addLayout(form)
 
@@ -897,8 +891,8 @@ class _IllegalBadge(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setFixedSize(16, 16)
         self.setStyleSheet(
-            "color: #ffffff; background: #f44336; border-radius: 8px;"
-            "font-weight: bold; font-size: 11px;")
+            f"color: #ffffff; background: {status_tag_color('illegal')}; "
+            "border-radius: 8px; font-weight: bold; font-size: 11px;")
         self.hide()
 
     def set_reasons(self, reasons: list[str]) -> None:
@@ -946,7 +940,7 @@ class _LockBadge(QWidget):
 
         # 图标不依赖字体或 Emoji，在不同 DPI/主题下始终是同一个锁形。
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#B45353"))
+        painter.setBrush(QColor(status_tag_color("lock")))
         painter.drawEllipse(QRectF(0.5, 0.5, 17.0, 17.0))
 
         painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -991,8 +985,8 @@ class _StatusTagBar(QWidget):
         self._layout.setSpacing(4)
         self._tags: dict[str, QLabel] = {}
 
-    def define(self, key: str, text: str, bg: str = "#607D8B") -> None:
-        label = make_tag(text, bg, self)
+    def define(self, key: str, text: str, bg: str | None = None) -> None:
+        label = make_tag(text, status_tag_color(key) if bg is None else bg, self)
         label.setVisible(False)
         self._tags[key] = label
         self._layout.addWidget(label)
@@ -1031,7 +1025,7 @@ class _AffixRowsMixin:
         cap_pcts = equip_affix_cap_pcts(equip_data)
         if cap_pcts:
             avg_pct = sum(cap_pcts) / len(cap_pcts)
-            pct_color = _affix_value_color(avg_pct)
+            pct_color = affix_cap_color(avg_pct)
             pct_html = (
                 f'&nbsp;&nbsp;<span style="font-size:{self._affix_fs}px;'
                 f'color:{pct_color};font-weight:bold;">{avg_pct:.0f}%</span>')
@@ -1056,7 +1050,7 @@ class _AffixRowsMixin:
         else:
             val_str = str(value)
 
-        val_color = _affix_value_color(cap_pct)
+        val_color = affix_cap_color(cap_pct)
         transfer_mark = " ⟳" if affix.get("is_transferred", False) else ""
         if affix.get(_SWITCHABLE_KEY):
             transfer_mark += " ⇄"
@@ -1219,7 +1213,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         self.hypothesis_label = QLabel("")
         self.hypothesis_label.setWordWrap(True)
         self.hypothesis_label.setStyleSheet(
-            "font-size: 10px; color: #B26A00; font-weight: 700;")
+            f"font-size: 10px; color: {yellow_stat_color()}; font-weight: 700;")
         self.hypothesis_label.setContentsMargins(
             0, 0, self.lock_badge.reserved_width, 0)
         self.hypothesis_label.setVisible(False)
@@ -1238,7 +1232,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         header.addWidget(self.lbl_name, stretch=1)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("filtered", tr("筛选"))
-        self.status_tags.define("mock", tr("模拟"), "#7E57C2")
+        self.status_tags.define("mock", tr("模拟"))
         header.addWidget(self.status_tags)
         self.illegal_badge = _IllegalBadge()
         header.addWidget(self.illegal_badge)
@@ -1279,7 +1273,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         self.cooldown_label.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.cooldown_label.setStyleSheet(
-            f"font-size: {self._affix_fs}px; color: #D97706; "
+            f"font-size: {self._affix_fs}px; color: {yellow_stat_color()}; "
             "font-weight: 600;")
         self.cooldown_label.hide()
         self.affix_layout.addWidget(self.cooldown_label)
@@ -1293,7 +1287,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         """常态边框色：需要引起注意的卡片用强调色，其余按品质区分。"""
         if self._attention:
             return "palette(highlight)"
-        return "#b0a080" if self._quality_bg else "palette(midlight)"
+        return quality_border(bool(self._quality_bg))
 
     def set_attention(self, attention: bool) -> None:
         """用强调色边框标出这张卡片（如最优组合里需要更换的部位）。"""
@@ -1483,7 +1477,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         )
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
         quality = equip_data.get("quality") or ""
-        self._quality_bg = _QUALITY_BG_COLORS.get(quality)
+        self._quality_bg = quality_bg(quality)
 
         name = equip_data.get("name", tr("未知"))
         self.lbl_name.setText(f"{self._display_name} · {name}")
@@ -1606,8 +1600,8 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
             f"font-weight: bold; font-size: {self._name_fs}px;")
         name_row.addWidget(self.lbl_name, stretch=1)
         self.status_tags = _StatusTagBar()
-        self.status_tags.define("mock", tr("模拟"), "#7E57C2")
-        self.status_tags.define("loadout", tr("备战"), "#00897B")
+        self.status_tags.define("mock", tr("模拟"))
+        self.status_tags.define("loadout", tr("备战"))
         name_row.addWidget(self.status_tags)
         self.illegal_badge = _IllegalBadge()
         name_row.addWidget(self.illegal_badge)
@@ -1652,7 +1646,7 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         self.cooldown_label.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.cooldown_label.setStyleSheet(
-            f"font-size: {self._affix_fs}px; color: #D97706; "
+            f"font-size: {self._affix_fs}px; color: {yellow_stat_color()}; "
             "font-weight: 600;")
         self.cooldown_label.hide()
         self.affix_layout.addWidget(self.cooldown_label)
@@ -1806,7 +1800,7 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
             equip_data.get("lock_status") == "locked")
 
         quality = equip_data.get("quality") or ""
-        self._quality_bg = _QUALITY_BG_COLORS.get(quality)
+        self._quality_bg = quality_bg(quality)
         self._apply_card_style()
 
         name = equip_data.get("name", tr("未知"))

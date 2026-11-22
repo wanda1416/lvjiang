@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QDialog,
     QFrame,
@@ -19,6 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.widgets.theme import get_theme_manager
 from ...config.tune_slots import SLOT_LABELS
 from ...core.tuning_rules import RATING_LABELS
 from .result_card import TuningResultCard
@@ -95,6 +97,12 @@ class TuningResultsDialog(QDialog):
         store.reset.connect(self._on_store_reset)
         self._refresh_counts()
         self._rebuild_cards()
+        if QApplication.instance() is not None:
+            get_theme_manager().theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self, *_args) -> None:
+        for card in self._cards:
+            card.refresh_theme()
 
     @property
     def selected_slot(self) -> str | None:

@@ -44,6 +44,7 @@ from lvjiang.ui.widgets.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.widgets.theme import current_tokens
 
 from .....i18n import tr
 from .factory_guard import (
@@ -667,6 +668,7 @@ class LevelConfigPanel(QWidget):
 
     def _set_status(self, text: str, is_error: bool):
         """更新状态标签"""
-        color = "#c62828" if is_error else "#2e7d32"
+        tokens = current_tokens()
+        color = tokens.danger if is_error else tokens.success
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(text)

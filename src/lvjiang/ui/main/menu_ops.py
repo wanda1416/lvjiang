@@ -35,13 +35,7 @@ from lvjiang.core.plugins import get_registry
 from ...core.config import load_user_config
 from ...i18n import tr
 from ..widgets.button_styles import exec_styled_message_box
-from ..widgets.theme import THEME_ORDER, get_theme_manager, normalize_theme
-
-_THEME_MENU_ITEMS: dict[str, tuple[str, str]] = {
-    "light": ("纯白", "☀"),
-    "paper": ("宣纸", "❖"),
-    "dark": ("玄墨", "☾"),
-}
+from ..widgets.theme import THEME_SPECS, get_theme_manager, get_theme_spec
 
 
 class MenuOpsMixin:
@@ -311,16 +305,15 @@ class MenuOpsMixin:
         theme_group = QActionGroup(theme_menu)
         theme_group.setExclusive(True)
         self._theme_actions: dict[str, QAction] = {}
-        for key in THEME_ORDER:
-            label_key, _icon = _THEME_MENU_ITEMS[key]
-            action = QAction(tr(label_key), theme_menu)
+        for spec in THEME_SPECS:
+            action = QAction(tr(spec.label), theme_menu)
             action.setCheckable(True)
             action.triggered.connect(
-                lambda _checked=False, theme_key=key: self._select_theme(theme_key)
+                lambda _checked=False, theme_key=spec.key: self._select_theme(theme_key)
             )
             theme_group.addAction(action)
             theme_menu.addAction(action)
-            self._theme_actions[key] = action
+            self._theme_actions[spec.key] = action
         self._theme_button.setMenu(theme_menu)
         self._theme_menu = theme_menu
 
@@ -361,14 +354,13 @@ class MenuOpsMixin:
         btn = getattr(self, "_theme_button", None)
         if btn is None or sip.isdeleted(btn):
             return
-        normalized = normalize_theme(theme)
-        label_key, icon = _THEME_MENU_ITEMS[normalized]
-        label = tr(label_key)
-        btn.setText(f"{icon} {label}")
+        spec = get_theme_spec(theme)
+        label = tr(spec.label)
+        btn.setText(f"{spec.icon} {label}")
         tip = tr("切换界面主题（当前：{name}）").format(name=label)
         btn.setToolTip(tip)
         btn.setAccessibleName(tip)
-        action = getattr(self, "_theme_actions", {}).get(normalized)
+        action = getattr(self, "_theme_actions", {}).get(spec.key)
         if action is not None and not sip.isdeleted(action):
             action.setChecked(True)
         btn.adjustSize()
@@ -381,12 +373,6 @@ class MenuOpsMixin:
         from ...core.config import save_settings
 
         save_settings({"theme": normalized})
-
-    def _toggle_theme(self) -> None:
-        theme = get_theme_manager().toggle()
-        from ...core.config import save_settings
-
-        save_settings({"theme": theme})
 
     # ─── 对话框 ──────────────────────────────────────────────
 

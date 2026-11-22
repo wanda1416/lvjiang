@@ -721,8 +721,6 @@ maps:
 menu_ops:
   公告: Announcements
   关于: About
-  切换到浅色主题: Switch to light theme
-  切换到深色主题: Switch to dark theme
   反馈: Feedback
   图像识别: OCR
   图库已刷新: Gallery Refreshed

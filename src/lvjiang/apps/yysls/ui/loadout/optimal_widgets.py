@@ -30,6 +30,7 @@ from lvjiang.ui.widgets.button_styles import (
     apply_dialog_button_box_style,
 )
 from lvjiang.ui.widgets.misc import FlowLayout
+from lvjiang.ui.widgets.theme import current_tokens
 
 from .....i18n import tr, tr_label
 from .....ui.widgets.presentation import (
@@ -40,6 +41,7 @@ from .....ui.widgets.presentation import (
 from ...config.equipment_slots import SLOT_SPECS
 from ...core.affix_cap import affix_dict_cap_pct
 from ..domain_labels import domain_label
+from ..theme import quality_color
 from .widgets import (
     assumption_pill,
 )
@@ -47,12 +49,6 @@ from .widgets import (
 _SLOT_ORDER: list[tuple[str, str, str]] = [
     (spec.key, spec.label, spec.filter_type) for spec in SLOT_SPECS
 ]
-_QUALITY_COLORS = {
-    "gold": "#B8860B",
-    "purple": "#8B5CF6",
-    "blue": "#2563EB",
-    "green": "#16A34A",
-}
 _STRIP_ROW_HEIGHT = 20
 _CHANGE_SWAP = "swap"    # 备战方案穿着别的装备，要换下来
 _CHANGE_NEW = "new"      # 备战方案这个部位是空的，直接穿上
@@ -180,7 +176,8 @@ def _equip_label(equip: dict) -> str:
     name = equip.get("name", tr("未知"))
     quality = equip.get("quality", "")
     level = equip.get("level", "?")
-    color = _QUALITY_COLORS.get(quality, "#666")
+    tokens = current_tokens()
+    color = quality_color(quality, tokens, default=tokens.text_muted)
     return f'<span style="color:{color}">{name}</span> (Lv{level})'
 
 
@@ -190,7 +187,8 @@ def _equip_tooltip(equip: dict) -> str:
     name = equip.get("name", tr("未知"))
     level = equip.get("level", "?")
     quality = equip.get("quality", "")
-    color = _QUALITY_COLORS.get(quality, "#666")
+    tokens = current_tokens()
+    color = quality_color(quality, tokens, default=tokens.text_muted)
     parts.append(
         f'<b><span style="color:{color}">{name}</span></b>  Lv{level}')
     is_cy = equip.get("is_chengyin", False)

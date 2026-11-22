@@ -38,6 +38,7 @@ from lvjiang.ui.widgets.button_styles import (
     apply_dialog_button_box_style,
 )
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.theme import current_tokens
 
 from ......i18n import tr, tr_label
 from ....config.equipment_slots import SLOT_SPECS
@@ -53,6 +54,7 @@ from ....core.loadout.models import (
     EQUIPMENT_UPDATED_AT,
 )
 from ...events import EQUIPMENT_CHANGED, get_event_hub
+from ...theme import yellow_stat_color
 from .batch_copy import BatchCopyMixin
 from .cards import _CompactEquipCard, _SlotCard
 from .mock_dialog import MockEquipDialog
@@ -60,7 +62,10 @@ from .mock_dialog import MockEquipDialog
 # 状态展示行样式（与角色详情毕业率卡片一致）
 _STATUS_NAME_STYLE = "font-size: 13px; color: palette(mid);"
 _STATUS_VALUE_STYLE = "font-size: 15px; font-weight: 600;"
-_STATUS_YELLOW_VALUE_STYLE = "font-size: 15px; font-weight: 600; color: #D97706;"
+
+
+def _status_yellow_value_style() -> str:
+    return f"font-size: 15px; font-weight: 600; color: {yellow_stat_color()};"
 
 # 右侧装备操作组统一样式
 _ACTION_BTN_STYLE = (
@@ -159,7 +164,7 @@ class _FilteredDeleteDialog(QDialog):
             "只删除当前筛选出的背包装备，此处不支持删除模拟装备"))
         self._source_hint_label.setWordWrap(True)
         self._source_hint_label.setStyleSheet(
-            "color: #D97706; font-weight: 600;")
+            f"color: {yellow_stat_color()}; font-weight: 600;")
         layout.addWidget(self._source_hint_label)
 
         self._preserve_checkbox = QCheckBox(tr("保留备战中的装备"))
@@ -180,14 +185,15 @@ class _FilteredDeleteDialog(QDialog):
         self._stats_label.setWordWrap(True)
         layout.addWidget(self._stats_label)
 
+        danger = current_tokens().danger
         self._reference_warning = QLabel()
         self._reference_warning.setWordWrap(True)
         self._reference_warning.setStyleSheet(
-            "color: #c62828; font-weight: 600;")
+            f"color: {danger}; font-weight: 600;")
         layout.addWidget(self._reference_warning)
 
         irreversible = QLabel(tr("此操作不可撤销。"))
-        irreversible.setStyleSheet("color: #c62828; font-weight: 600;")
+        irreversible.setStyleSheet(f"color: {danger}; font-weight: 600;")
         layout.addWidget(irreversible)
 
         buttons = QDialogButtonBox(
@@ -405,7 +411,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._status_graduation = QLabel("--")
         self._status_graduation.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._status_graduation.setMinimumWidth(80)
-        self._status_graduation.setStyleSheet(_STATUS_YELLOW_VALUE_STYLE)
+        self._status_graduation.setStyleSheet(_status_yellow_value_style())
         metrics_row.addWidget(self._status_graduation)
 
         metrics_row.addStretch()
@@ -670,7 +676,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._slot_separator = QFrame()
         self._slot_separator.setFrameShape(QFrame.Shape.HLine)
         self._slot_separator.setStyleSheet(
-            "background-color: #ccc; max-height: 1px; margin: 4px 8px;")
+            "background-color: palette(midlight); max-height: 1px; margin: 4px 8px;")
         self._slot_separator.setFixedHeight(1)
         wrapper_layout.addWidget(self._slot_separator)
 

@@ -79,7 +79,7 @@ from ...workflows.file_tree import (
 from ...workflows.metadata import SCRIPT_ID_RE, metadata_error
 from ..widgets.button_styles import apply_button_style
 from ..widgets.dialog_guards import EscapeCloseConfirmationMixin
-from ..widgets.theme import get_theme_manager
+from ..widgets.theme import current_tokens, get_theme_manager
 from .wf_code_edit import WfCodeEdit
 
 # ─── 纯逻辑（可离线测试）────────────────────────────────
@@ -506,7 +506,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#d32f2f"))
+        painter.setBrush(QColor(current_tokens().danger))
         painter.drawEllipse(1, 1, 16, 16)
         font = painter.font()
         font.setBold(True)
@@ -960,8 +960,9 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _set_status(self, text: str, error: bool = False):
         self.lbl_status.setText(text)
-        self.lbl_status.setStyleSheet(
-            "color: #c62828; padding: 4px;" if error else "color: #2e7d32; padding: 4px;")
+        tokens = current_tokens()
+        color = tokens.danger if error else tokens.success
+        self.lbl_status.setStyleSheet(f"color: {color}; padding: 4px;")
 
     def _confirm_discard(
         self, *, include_config: bool = False, include_record: bool = False,

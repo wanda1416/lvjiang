@@ -31,6 +31,7 @@ from ...core.scene.registry import (
 )
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_dialog_button_box_style
+from ..widgets.theme import current_tokens
 from .scene_tab import SceneTab
 from .tab_add_bar import InlineAddTabWidget
 
@@ -244,7 +245,7 @@ class SceneOpsMixin:
         key_edit.setPlaceholderText(tr("英文，如 my_scene"))
         form.addRow(tr_label('场景 Key'), key_edit)
         error_label = QLabel()
-        error_label.setStyleSheet("color: #c62828;")
+        error_label.setStyleSheet(f"color: {current_tokens().danger};")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()
@@ -318,7 +319,7 @@ class SceneOpsMixin:
         key_edit.setPlaceholderText(tr("英文，如 my_group"))
         form.addRow(tr_label('分组 Key'), key_edit)
         error_label = QLabel()
-        error_label.setStyleSheet("color: #c62828;")
+        error_label.setStyleSheet(f"color: {current_tokens().danger};")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()

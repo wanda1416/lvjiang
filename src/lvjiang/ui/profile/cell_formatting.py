@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtWidgets import QApplication, QTableWidgetItem
+from PyQt6.QtWidgets import QTableWidgetItem
 
 from ...core.profile.models import (
     DIR_BOTH,
@@ -41,6 +41,7 @@ from ...core.profile.regen import (
 from ...core.profile.rows import Entry
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import DISABLED_BUTTON_BG
+from ..widgets.theme import current_tokens
 
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
 
@@ -325,31 +326,23 @@ def locked_sync_targets(kd, data: dict) -> list:
     ]
 
 
-def _current_theme_tokens():
-    """安全读取当前主题令牌；无 QApplication 时回退浅色预设。"""
-    from ..widgets.theme import LIGHT, get_theme_manager
-
-    app = QApplication.instance()
-    return LIGHT if app is None else get_theme_manager(app).tokens
-
-
 def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
     """应用单元格样式: '' | 'red_bold' | 'orange_bold' | 'green_bold' | 'locked'"""
     if style == "red_bold":
         font = QFont(item.font())
         font.setBold(True)
         item.setFont(font)
-        item.setForeground(QColor(_current_theme_tokens().danger))
+        item.setForeground(QColor(current_tokens().danger))
     elif style == "orange_bold":
         font = QFont(item.font())
         font.setBold(True)
         item.setFont(font)
-        item.setForeground(QColor(_current_theme_tokens().warning))
+        item.setForeground(QColor(current_tokens().warning))
     elif style == "green_bold":
         font = QFont(item.font())
         font.setBold(True)
         item.setFont(font)
-        item.setForeground(QColor(_current_theme_tokens().success))
+        item.setForeground(QColor(current_tokens().success))
     elif style == "locked":
         # 底色用「暂停按钮默认那档灰」：该用户在总览里"没有这个值"，不是 0
         # 也不是上限。单元格没有文本，只改前景色等于什么都没显示，必须填底色。

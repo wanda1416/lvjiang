@@ -61,6 +61,7 @@ from lvjiang.ui.widgets.layout_helpers import (
     mark_navigation_list,
     navigation_width_for_chars,
 )
+from lvjiang.ui.widgets.theme import current_tokens
 
 from .....i18n import tr, tr_label
 from .base_rule_page import BaseRuleGroupPage
@@ -522,10 +523,11 @@ class TuningRulesDialog(QDialog):
 
     def _set_status(self, text: str, is_error: bool | str):
         # is_error: True=红（错误）/ False=绿（正常）/ "warn"=黄（软警告）
+        tokens = current_tokens()
         if is_error == "warn":
-            color = "#f9a825"
+            color = tokens.warning
         else:
-            color = "#c62828" if is_error else "#2e7d32"
+            color = tokens.danger if is_error else tokens.success
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(text)
         if self._initializing:
@@ -560,7 +562,7 @@ class TuningRulesDialog(QDialog):
         self._has_error = False
         self._save_button.setEnabled(False)
         self._discard_button.setEnabled(False)
-        self._status_label.setStyleSheet("color: #2e7d32;")
+        self._status_label.setStyleSheet(f"color: {current_tokens().success};")
         self._status_label.setText(tr("调律配置已保存并生效"))
         self._refresh_config_version_info()
 
@@ -618,7 +620,7 @@ class TuningRulesDialog(QDialog):
         self._has_error = False
         self._save_button.setEnabled(False)
         self._discard_button.setEnabled(False)
-        self._status_label.setStyleSheet("color: #2e7d32;")
+        self._status_label.setStyleSheet(f"color: {current_tokens().success};")
         self._status_label.setText(tr("已撤销未保存的调律配置更改"))
         self._refresh_config_version_info()
 

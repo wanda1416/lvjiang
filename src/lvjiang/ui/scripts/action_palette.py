@@ -32,6 +32,7 @@ from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 from ...i18n import tr
 from ...workflows import action_catalog as cat
 from ..widgets.button_styles import apply_button_style
+from ..widgets.theme import current_tokens
 
 
 @dataclass
@@ -358,9 +359,10 @@ class ActionPalette(QWidget):
             self.btn_insert.setEnabled(True)
         except cat.RenderError as e:
             self.preview.setText(str(e))
+            danger = current_tokens().danger
             self.preview.setStyleSheet(
                 "font-family: Menlo, Consolas, monospace; background: palette(alternate-base); "
-                "padding: 6px; border: 1px solid #c62828; color: #c62828;")
+                f"padding: 6px; border: 1px solid {danger}; color: {danger};")
             self.btn_insert.setEnabled(False)
 
     def _on_insert(self):

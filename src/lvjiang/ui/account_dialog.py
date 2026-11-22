@@ -42,6 +42,7 @@ from ..core.account.service import (
 )
 from ..i18n import tr
 from .widgets.button_styles import apply_button_style
+from .widgets.theme import current_tokens
 
 
 def _eye_icon(visible: bool) -> QIcon:
@@ -669,7 +670,7 @@ class AccountManagerDialog(QDialog):
         # 避免登录时从无到有把整个对话框顶跳一下。
         self.status = QLabel()
         self.status.setFixedHeight(20)
-        self.status.setStyleSheet("color: #c62828; font-size: 12px;")
+        self.status.setStyleSheet(f"color: {current_tokens().danger}; font-size: 12px;")
 
         # ════ 未登录：居中的紧凑登录卡（不摊满整个对话框） ════
         # 对话框标题已是「账户管理」，卡内不再重复「账户登录」标题。
@@ -746,7 +747,7 @@ class AccountManagerDialog(QDialog):
         # 错误行：固定高度常驻，只换文字，不随失败出现/消失顶跳布局。
         self.sync_error = QLabel()
         self.sync_error.setFixedHeight(20)
-        self.sync_error.setStyleSheet("color: #c62828; font-size: 12px;")
+        self.sync_error.setStyleSheet(f"color: {current_tokens().danger}; font-size: 12px;")
         sync_layout.addWidget(self.sync_error)
 
         self._step_rows = {tr("定义"): 0, tr("用户"): 1, tr("文档"): 2, tr("总览"): 3}
@@ -1230,7 +1231,7 @@ class AccountManagerDialog(QDialog):
             ).format(origin=origin, created=created)
         else:
             warning = (
-                "<br><span style=\"color:#c62828\">云端基线是空的。</span>"
+                f"<br><span style=\"color:{current_tokens().danger}\">云端基线是空的。</span>"
                 if empty_baseline else "")
             text = tr(
                 "云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}"
@@ -1254,7 +1255,7 @@ class AccountManagerDialog(QDialog):
         warning = QLabel(tr(
             "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n"
             "此操作不可恢复；本地数据不会被删除。"))
-        warning.setStyleSheet("color: #c62828;")
+        warning.setStyleSheet(f"color: {current_tokens().danger};")
         form.addRow(warning)
         form.addRow(tr("密码"), field.widget())
         buttons = QDialogButtonBox(

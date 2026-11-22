@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr, tr_label
+from .....ui.widgets.theme import current_tokens
 from ...config import get_game_config
 
 #: 插件菜单可用键位：F5~F7（插件段）与 Alt+F5~F7、Alt+字母。
@@ -185,7 +186,7 @@ class BasicConfigPanel(QWidget):
             manager.save(data)
         except Exception as exc:  # noqa: BLE001 - 保存错误直接展示给用户
             logger.exception("基础配置保存失败")
-            self._status_label.setStyleSheet("color: #c62828;")
+            self._status_label.setStyleSheet(f"color: {current_tokens().danger};")
             self._status_label.setText(tr("保存失败：{error}").format(error=exc))
             return
         # 菜单快捷键即时生效：动作就在本窗口的菜单栏上，不需要重启。
@@ -195,7 +196,7 @@ class BasicConfigPanel(QWidget):
             apply_shortcuts(shortcuts)
         except Exception as exc:  # noqa: BLE001 - 应用失败不影响保存结果
             logger.warning(f"插件菜单快捷键应用失败: {exc}")
-        self._status_label.setStyleSheet("color: #2e7d32;")
+        self._status_label.setStyleSheet(f"color: {current_tokens().success};")
         self._status_label.setText(tr("已保存并生效（{time}）").format(
             time=datetime.now().strftime("%H:%M:%S")))
 
@@ -217,7 +218,7 @@ class BasicConfigPanel(QWidget):
                 combo.currentText() or "")
         problems = validate_menu_shortcuts(values, owner=ZONE_PLUGIN_MENU)
         if problems:
-            self._status_label.setStyleSheet("color: #c62828;")
+            self._status_label.setStyleSheet(f"color: {current_tokens().danger};")
             self._status_label.setText(
                 tr("快捷键不可用：") + problems[0])
             return None

@@ -44,6 +44,7 @@ from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.widgets.theme import current_tokens
 
 from .....i18n import tr
 from ..domain_labels import domain_label
@@ -70,7 +71,7 @@ class _RemoveXDelegate(QStyledItemDelegate):
         super().paint(painter, option, index)
         r = option.rect
         painter.save()
-        painter.setPen(QColor("#c62828"))
+        painter.setPen(QColor(current_tokens().danger))
         painter.drawText(
             QRect(r.right() - _X_ZONE, r.top(), _X_ZONE - 10, r.height()),
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,

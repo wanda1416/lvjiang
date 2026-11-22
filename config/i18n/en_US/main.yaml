@@ -104,8 +104,10 @@ main_window:
 menu_ops:
   "公告": "Announcements"
   "关于": "About"
-  "切换到浅色主题": "Switch to light theme"
-  "切换到深色主题": "Switch to dark theme"
+  "纯白": "Pure White"
+  "宣纸": "Xuan Paper"
+  "玄墨": "Ink Dark"
+  "切换界面主题（当前：{name}）": "Switch theme (current: {name})"
   "反馈": "Feedback"
   "图库已刷新": "Gallery Refreshed"
   "地图管理": "Map Manager"

@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
     QToolButton,
 )
 
+from .theme import LIGHT, current_tokens
+
 ACTION_BUTTON_STYLE = (
     "QPushButton { border: 1px solid palette(link); "
     "color: palette(link); border-radius: 5px; padding: 5px 11px; "
@@ -29,11 +31,11 @@ NEUTRAL_BUTTON_STYLE = (
 )
 
 DANGER_BUTTON_STYLE = (
-    "QPushButton { background-color: palette(button); color: #be123c; "
-    "border: 1px solid #be123c; border-radius: 5px; padding: 5px 11px; "
+    f"QPushButton {{ background-color: palette(button); color: {LIGHT.danger}; "
+    f"border: 1px solid {LIGHT.danger}; border-radius: 5px; padding: 5px 11px; "
     "font-weight: 600; }"
-    "QPushButton:hover { background-color: rgba(190, 18, 60, 0.12); }"
-    "QPushButton:pressed { background-color: rgba(190, 18, 60, 0.22); }"
+    "QPushButton:hover { background-color: rgba(198, 40, 40, 0.12); }"
+    "QPushButton:pressed { background-color: rgba(198, 40, 40, 0.22); }"
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 
@@ -56,11 +58,11 @@ COMPACT_NEUTRAL_BUTTON_STYLE = (
 )
 
 COMPACT_DANGER_BUTTON_STYLE = (
-    "QPushButton { background-color: palette(button); color: #be123c; "
-    "border: 1px solid #be123c; border-radius: 4px; padding: 2px 7px; "
+    f"QPushButton {{ background-color: palette(button); color: {LIGHT.danger}; "
+    f"border: 1px solid {LIGHT.danger}; border-radius: 4px; padding: 2px 7px; "
     "font-weight: 600; }"
-    "QPushButton:hover { background-color: rgba(190, 18, 60, 0.12); }"
-    "QPushButton:pressed { background-color: rgba(190, 18, 60, 0.22); }"
+    "QPushButton:hover { background-color: rgba(198, 40, 40, 0.12); }"
+    "QPushButton:pressed { background-color: rgba(198, 40, 40, 0.22); }"
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 
@@ -116,9 +118,20 @@ _EXECUTION_BUTTON_COLORS = {
     "stop": ("#c4334b", "#ffffff"),
     "stopping": ("#d98b96", "#ffffff"),
     "not_ready": ("#d4942a", "#1c1b18"),
-    "disabled": ("#78756e", "#f5f3ee"),
+    "disabled": ("#78756e", "#ffffff"),
     "pause": ("#c8721a", "#ffffff"),
     "pausing": ("#dfa05e", "#1c1b18"),
+}
+
+
+_EXECUTION_BUTTON_COLORS_DARK = {
+    "run": ("#236843", "#f5f2ea"),
+    "stop": ("#a6293d", "#f5f2ea"),
+    "stopping": ("#8f4a55", "#f5f2ea"),
+    "not_ready": ("#c98722", "#141418"),
+    "disabled": ("#46454d", "#edeae2"),
+    "pause": ("#a85d12", "#f5f2ea"),
+    "pausing": ("#c88a4b", "#141418"),
 }
 
 
@@ -129,7 +142,12 @@ DISABLED_BUTTON_BG = _EXECUTION_BUTTON_COLORS["disabled"][0]
 
 def apply_execution_button_style(button: QPushButton, variant: str) -> None:
     """主页面各执行 Tab 的启停和暂停按钮共用同一尺寸与状态颜色。"""
-    background, foreground = _EXECUTION_BUTTON_COLORS[variant]
+    palette = (
+        _EXECUTION_BUTTON_COLORS_DARK
+        if current_tokens().is_dark
+        else _EXECUTION_BUTTON_COLORS
+    )
+    background, foreground = palette[variant]
     button.setStyleSheet(
         f"background-color: {background}; color: {foreground}; "
         "font-weight: bold; font-size: 13px; padding: 6px 8px;"

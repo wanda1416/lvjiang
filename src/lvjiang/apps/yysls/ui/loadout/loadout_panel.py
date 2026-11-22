@@ -21,11 +21,13 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
 from lvjiang.ui.widgets.button_styles import apply_compact_button_style
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
+from lvjiang.ui.widgets.theme import current_tokens, get_theme_manager
 
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr
 from ...core.loadout import LoadoutRepository
 from ..events import get_event_hub
+from ..theme import yellow_stat_color
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
@@ -52,13 +54,15 @@ _VIEW_MODE_BTN_STYLE = (
 
 def _view_mode_icon(mode: str) -> QIcon:
     """绘制左右面板布局图标，避免依赖字体对 Unicode 符号的支持。"""
+    tokens = current_tokens()
     pixmap = QPixmap(32, 32)
     pixmap.fill(QColor(0, 0, 0, 0))
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    border = QColor("#6f7b86")
-    accent = QColor("#0078d4")
-    soft = QColor("#9acbea")
+    border = QColor(tokens.text_muted)
+    accent = QColor(tokens.accent)
+    soft = QColor(tokens.accent)
+    soft.setAlpha(90)
     outer = QRectF(3.5, 5.5, 25, 21)
     painter.setPen(QPen(border, 1.6))
     painter.setBrush(QColor(0, 0, 0, 0))
@@ -99,6 +103,10 @@ class LoadoutPanel(QWidget):
             else None
         )
         self._build_ui()
+        from PyQt6.QtWidgets import QApplication
+
+        if QApplication.instance() is not None:
+            get_theme_manager().theme_changed.connect(self._refresh_theme_styles)
         host.user_changed.connect(self._on_user_changed)
         self._event_hub = get_event_hub(host)
         self._event_hub.graduation_updated.connect(self._sync_metrics)
@@ -271,14 +279,22 @@ class LoadoutPanel(QWidget):
         label = QLabel(name)
         value = QLabel("--")
         value.setStyleSheet(
-            "font-size:16px;font-weight:700;color:#F57C00;"
-            if yellow else "font-size:16px;font-weight:700;color:#263238;"
+            f"font-size:16px;font-weight:700;color:{yellow_stat_color()};"
+            if yellow else "font-size:16px;font-weight:700;color:palette(text);"
         )
         row.addWidget(label)
         row.addStretch()
         row.addWidget(value)
         parent.addWidget(card, stretch)
         return label, value
+
+    def _refresh_theme_styles(self, *_args) -> None:
+        """主题切换后同步刷新布局图标和黄字指标卡颜色。"""
+        for mode, btn in self._view_buttons.items():
+            btn.setIcon(_view_mode_icon(mode))
+        self._metric_rate.setStyleSheet(
+            f"font-size:16px;font-weight:700;color:{yellow_stat_color()};"
+        )
 
     def _attach_assumption_controls(self) -> None:
         """Move combat assumptions into the always-visible summary row."""

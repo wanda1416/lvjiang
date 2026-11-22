@@ -33,6 +33,7 @@ from ..widgets.button_styles import (
     apply_dialog_button_box_style,
     fit_button_width,
 )
+from ..widgets.theme import current_tokens
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -416,7 +417,7 @@ class ViewManagerDialog(QDialog):
         key_edit.setPlaceholderText(tr("小写字母开头，仅含小写字母/数字/下划线"))
         form.addRow(tr_label('视图 Key'), key_edit)
         error_label = QLabel()
-        error_label.setStyleSheet("color: #c62828;")
+        error_label.setStyleSheet(f"color: {current_tokens().danger};")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit()
@@ -497,7 +498,7 @@ class ViewManagerDialog(QDialog):
             key_edit.setToolTip(tr("基底视图的 key 是保留值，不可重命名"))
         form.addRow(tr_label('视图 Key'), key_edit)
         error_label = QLabel()
-        error_label.setStyleSheet("color: #c62828;")
+        error_label.setStyleSheet(f"color: {current_tokens().danger};")
         error_label.hide()
         form.addRow("", error_label)
         name_edit = QLineEdit(old_view.name)

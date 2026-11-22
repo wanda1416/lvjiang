@@ -50,6 +50,7 @@ from lvjiang.ui.widgets.layout_helpers import (
     configure_navigation_list,
     navigation_width_for_chars,
 )
+from lvjiang.ui.widgets.theme import current_tokens
 
 from .models import (
     AUTO_PLOT_DIR,
@@ -418,7 +419,7 @@ class StoryChoicesDialog(QDialog):
     def _set_status(self, text: str, *, error: bool = False) -> None:
         self._status.setText(text)
         self._status.setStyleSheet(
-            "color: #c62828;" if error else "color: palette(mid);"
+            f"color: {current_tokens().danger};" if error else "color: palette(mid);"
         )
 
     # ─── 交互 ────────────────────────────────────────────

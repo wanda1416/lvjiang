@@ -23,6 +23,8 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
+from .theme import current_tokens
+
 
 @dataclass
 class FormField:
@@ -83,7 +85,7 @@ class FormDialog(QDialog):
 
         self.lbl_error = QLabel("")
         self.lbl_error.setWordWrap(True)
-        self.lbl_error.setStyleSheet("color: #c62828;")
+        self.lbl_error.setStyleSheet(f"color: {current_tokens().danger};")
         self.lbl_error.hide()
         root.addWidget(self.lbl_error)
 

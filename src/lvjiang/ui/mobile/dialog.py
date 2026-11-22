@@ -57,11 +57,19 @@ from ...core.android.gesture_probe import (
 from ...core.updates.release import get_version
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style
+from ..widgets.theme import current_tokens
 from .device_scan import DeviceDiscoveryWorker, DeviceScanPanel
 from .diagnostics import build_checks, build_report, capability_notes
 from .qr_widget import QrCodeWidget
 
-_LEVEL_COLOR = {"ok": "#2e7d32", "warn": "#e65100", "bad": "#c62828"}
+
+def _level_color(level: str) -> str:
+    tokens = current_tokens()
+    return {
+        "ok": tokens.success,
+        "warn": tokens.warning,
+        "bad": tokens.danger,
+    }.get(level, tokens.text_muted)
 
 
 class _DownloadWorker(QThread):
@@ -846,7 +854,7 @@ class MobileDeviceDialog(QDialog):
         health = self._render_health(status)
         if error:
             health += (
-                f"<hr><div style='color:{_LEVEL_COLOR['bad']}'>"
+                f"<hr><div style='color:{_level_color('bad')}'>"
                 f"{escape(tr('体检失败：{err}').format(err=error))}</div>")
         self._health_text.setHtml(health)
         if probe:
@@ -868,7 +876,7 @@ class MobileDeviceDialog(QDialog):
     def _render_health(self, status: dict) -> str:
         rows = []
         for item in build_checks(status, self._version, PROTOCOL_VERSION):
-            color = _LEVEL_COLOR.get(item.level, "#444444")
+            color = _level_color(item.level)
             hint = (f"<div style='color:#666;margin-left:1em'>→ {item.hint}</div>"
                     if item.hint else "")
             rows.append(

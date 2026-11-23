@@ -7,12 +7,24 @@
 只声明场景内有哪些可交互元素及其类型属性。
 """
 
+import re
 from dataclasses import dataclass, field
 
 from ...i18n import tr
 
 # 合法的 region type 枚举
 VALID_REGION_TYPES = {"attr", "slot", "func"}
+
+#: 场景/分组/实体的 key 书写规则：小写字母开头，仅小写字母/数字/下划线。
+#: DSL 的 ``NAME`` 更宽（允许中文与大写，见 grammar.lark），两边不一致时用户
+#: 看到的是「布局里没绑」，于是去翻布局而不是改 key——所以规则只留这一处，
+#: 加载校验、编辑期校验与 LSP 提示都读它。
+ENTITY_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def is_valid_key(key: str) -> bool:
+    """key 是否符合场景/区域/坐标点的书写规则。"""
+    return bool(ENTITY_KEY_RE.fullmatch(key or ""))
 
 # 基底视图：开启多视图后永远存在的第一个视图，展示上与普通视图
 # 等同（不叠加到其他视图），仅承接存量定义且不可删除
@@ -43,9 +55,11 @@ class ViewDef:
         d: dict[str, object] = {"key": self.key, "name": self.name}
         if self.kind:
             d["kind"] = self.kind
-            if self.owner:
-                d["owner"] = self.owner
-        elif not self.same_layer:
+        if self.owner:
+            # owner 独立于 kind：兼容旧定义可能只写了 owner，保存时丢掉它等于
+            # 悄悄拆掉结构归属，下次加载页面归属就解析不出来。
+            d["owner"] = self.owner
+        if not self.kind and not self.same_layer:
             d["same_layer"] = False
         return d
 
@@ -247,7 +261,27 @@ class SceneDef:
     hide_all_views: bool = False
     #: 场景管理界面的展示开关；定义仍加载，旧工作流与布局引用不受影响
     disabled: bool = False
+    #: 加载期发现的无效跨场景引用：{(源场景, 实体): 原因}。
+    #: 无效引用**保留在 references 里**，绝不丢弃——丢弃后下一次保存就把它
+    #: 从 YAML 里永久抹掉，而源场景往往只是暂时解析失败（少写一个 type、
+    #: 文件正在被外部编辑）。消费方按 ``valid_references()`` 过滤。
+    invalid_references: dict[tuple[str, str], str] = field(
+        default_factory=dict, repr=False, compare=False)
 
     @property
     def is_subscene(self) -> bool:
         return self.type == "subscene"
+
+
+def valid_references(scene) -> list[SceneRefDef]:
+    """场景里当前可用的跨场景引用。
+
+    加载期校验没过的引用仍留在 ``references`` 里（见
+    ``SceneDef.invalid_references``），展开坐标、解析跳转时不能拿它们当真。
+    测试替身与旧调用方只给 ``references``，此时视为全部有效。
+    """
+    refs = list(getattr(scene, "references", ()) or ())
+    invalid = getattr(scene, "invalid_references", None) or {}
+    if not invalid:
+        return refs
+    return [ref for ref in refs if (ref.scene, ref.entity) not in invalid]

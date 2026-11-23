@@ -15,6 +15,7 @@ from lvjiang.core.layout.manager import (
 from lvjiang.core.layout.models import Layout, Point, Region
 from lvjiang.core.paths import CONFIG_SUBDIRECTORIES
 from lvjiang.core.scene.definition import SceneRegistry
+from lvjiang.core.scene.definition_models import PointDef, RegionDef, valid_references
 
 
 def _write(dir_path, key, doc):
@@ -84,7 +85,9 @@ def test_subscene_cannot_be_referenced(scenes_dir):
         "references": [{"scene": "jianghu_card", "entity": "title"}]})
 
     scene = _registry(scenes_dir).get_scene("activity_jianghu")
-    assert scene.references == []
+    assert scene.invalid_references == {
+        ("jianghu_card", "title"): "只能引用一级场景，不能引用子场景"}
+    assert valid_references(scene) == []
 
 
 def test_reference_to_a_reference_is_rejected(scenes_dir):
@@ -96,11 +99,19 @@ def test_reference_to_a_reference_is_rejected(scenes_dir):
 
     reg = _registry(scenes_dir)
     assert [r.key for r in reg.get_scene("b").references] == ["confirm"]
-    assert reg.get_scene("c").references == []
+    c = reg.get_scene("c")
+    # 引用定义保留（保存时不会被抹掉），但标为无效、不参与展开与跳转解析
+    assert [r.key for r in c.references] == ["confirm"]
+    assert c.invalid_references == {("b", "confirm"): "不能引用引用，源必须是原生定义"}
+    assert valid_references(c) == []
 
 
-def test_missing_source_is_dropped_not_fatal(scenes_dir):
-    """单个场景写错不该让整个注册表加载失败，否则 UI 都起不来。"""
+def test_missing_source_is_reported_not_fatal(scenes_dir):
+    """单个场景写错不该让整个注册表加载失败，否则 UI 都起不来。
+
+    写错的引用**保留声明、只登记问题**：丢弃会让下一次保存把它从 YAML 里
+    永久抹掉，而源场景往往只是暂时解析失败。
+    """
     _write(scenes_dir, "a", {"regions": [{"key": "x", "name": "X", "type": "func"}]})
     _write(scenes_dir, "b", {"references": [
         {"scene": "nope", "entity": "gone"},      # 源场景不存在
@@ -109,8 +120,10 @@ def test_missing_source_is_dropped_not_fatal(scenes_dir):
     ]})
 
     reg = _registry(scenes_dir)
-    # 非法的两条被丢弃，合法的保留；场景本身照常可用。
-    assert [r.key for r in reg.get_scene("b").references] == ["x"]
+    scene = reg.get_scene("b")
+    assert [r.key for r in scene.references] == ["gone", "missing", "x"]
+    assert set(scene.invalid_references) == {("nope", "gone"), ("a", "missing")}
+    assert [r.key for r in valid_references(scene)] == ["x"]
     assert reg.get_scene("a") is not None
 
 
@@ -759,3 +772,84 @@ def test_migration_preflight_rejects_self_reference_and_name_collision(reference
         referenced.validate_reference_retarget("general_control", "destination", "confirm", "occupied")
     for key in ("bag", "equip_tune_detail"):
         assert referenced.get_scene(key).references[0].entity == "confirm"
+
+
+# ─── 引用生命周期的三道门 ────────────────────────────────
+
+def test_an_entity_key_cannot_shadow_a_reference(scenes_dir):
+    """引用名与原生实体共享命名空间，编辑期就要拦。
+
+    漏拦的后果不是「两次定义打架」那么温和：保存得下，下次加载 `_load_scene`
+    判重直接抛错，**整个场景从注册表消失**，用户只看到面板里少了它。
+    """
+    _write(scenes_dir, "src", {
+        "regions": [{"key": "confirm", "name": "确认", "type": "func"}]})
+    _write(scenes_dir, "dst", {
+        "regions": [{"key": "solo", "name": "独立", "type": "func"}],
+        "references": [{"scene": "src", "entity": "confirm"}]})
+    reg = _registry(scenes_dir)
+    path = scenes_dir / "general" / "dst.yaml"
+    before = path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="跨场景引用占用"):
+        reg.add_region_to_scene(
+            "dst", RegionDef("confirm", "本地确认", type="func"))
+    with pytest.raises(ValueError, match="跨场景引用占用"):
+        reg.rename_region_key("dst", "solo", "confirm")
+    with pytest.raises(ValueError, match="跨场景引用占用"):
+        reg.add_point_to_scene(
+            "dst", PointDef("confirm", "本地点", type="func"))
+
+    assert path.read_text(encoding="utf-8") == before
+    # 磁盘没被写坏，重载后场景照常在
+    assert _registry(scenes_dir).get_scene("dst") is not None
+
+
+def test_a_broken_source_never_deletes_the_reference_from_disk(scenes_dir):
+    """源场景暂时坏掉时，引用方保存一次不得把引用永久抹掉。
+
+    这是旧实现的数据丢失路径：加载期把无效引用从内存删掉，之后任何一次保存
+    都按内存写回 YAML，用户手写的 `references:` 就此消失，等源场景修好也回
+    不来了。
+    """
+    _write(scenes_dir, "src", {
+        "regions": [{"key": "confirm", "name": "确认", "type": "func"}]})
+    _write(scenes_dir, "dst", {
+        "regions": [{"key": "solo", "name": "独立", "type": "func"}],
+        "references": [{"scene": "src", "entity": "confirm"}]})
+    # 源场景被外部编辑写坏（半截 YAML）→ 该场景整份加载失败
+    path = scenes_dir / "general" / "src.yaml"
+    path.write_text(
+        "key: src\nname: src\nregions: [\n  {key: confirm, name: 确认\n",
+        encoding="utf-8")
+
+    reg = _registry(scenes_dir)
+    assert reg.get_scene("src") is None
+    dst = reg.get_scene("dst")
+    assert [r.key for r in dst.references] == ["confirm"]
+    assert ("src", "confirm") in dst.invalid_references
+
+    # 用户在引用方随手改点东西并保存
+    reg.add_region_to_scene("dst", RegionDef("extra", "新增", type="func"))
+    saved = yaml.safe_load(
+        (scenes_dir / "general" / "dst.yaml").read_text(encoding="utf-8"))
+    assert [r["entity"] for r in saved["references"]] == ["confirm"]
+
+    # 源场景修好后引用自动回到有效状态，不需要重新配置
+    _write(scenes_dir, "src", {
+        "regions": [{"key": "confirm", "name": "确认", "type": "func"}]})
+    healed = _registry(scenes_dir).get_scene("dst")
+    assert [r.key for r in valid_references(healed)] == ["confirm"]
+
+
+def test_deleting_a_scene_whose_areas_are_referenced_is_refused(referenced):
+    """删源场景等于删掉引用方的一个实体：必须先解引用。
+
+    和 `_reject_if_referenced`（删实体）对称——那条早就有了，删整场景却没有
+    对应的检查，引用方在下次加载时静静少一个实体。
+    """
+    with pytest.raises(ValueError, match="元素正被以下场景引用"):
+        referenced.delete_scene("general_control")
+
+    assert referenced.get_scene("general_control") is not None
+

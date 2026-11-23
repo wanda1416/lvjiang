@@ -11,7 +11,7 @@ DSL 中三种坐标描述法的统一运行时表示：
 - CoordRef - CoordRef → Offset（隐式降级为中心点）
 - Offset + Offset → Offset
 - Offset - Offset → Offset
-- Offset * n / Offset / n → Offset
+- Offset * n / Offset / n → Offset（除 0 抛 ZeroDivisionError）
 - tuple → Offset（隐式转换）
 
 禁止：CoordRef * n / CoordRef / n（破坏向量运算法则）
@@ -144,10 +144,14 @@ class Offset:
         return self.__mul__(n)
 
     def __truediv__(self, n: Union[int, float]) -> Offset:
-        """Offset / n → Offset（向量缩放）"""
+        """Offset / n → Offset（向量缩放）
+
+        除数为 0 直接抛 ZeroDivisionError：返回零向量会把调用方算错的步数或
+        比例伪装成一个合法结果，几何错误越早暴露代价越小。
+        """
         if isinstance(n, (int, float)):
             if n == 0:
-                return Offset(dx=0.0, dy=0.0)
+                raise ZeroDivisionError("Offset 不能除以 0：检查步数或比例的计算")
             return Offset(dx=self.dx / n, dy=self.dy / n)
         return NotImplemented
 

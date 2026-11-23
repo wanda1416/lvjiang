@@ -5,6 +5,8 @@
 - LayoutConfigManager.migrate_item_across_layouts：全部布局文件迁移写盘
 """
 
+import json
+
 import pytest
 
 from lvjiang.core.layout.manager import LayoutConfigManager, migrate_layout_item
@@ -66,6 +68,38 @@ class TestMigrateLayoutItem:
         assert remain[0].to_key is None
         assert remain[0].to_cx_ratio == 0.4
         assert remain[0].to_cy_ratio == 0.6
+
+    def test_moved_arrow_bakes_a_target_that_stays_behind(self):
+        """随迁方向的终点若留在源场景，必须烘成绝对坐标。
+
+        否则目标场景里凭空多出一条 `to_key` 指向不存在点的方向，静态检查
+        在开跑前硬拦，用户还得回头手工修布局。
+        """
+        layout = _make_layout()
+        layout.set_scene_arrows("src", [
+            Arrow("linked", from_key="origin", to_key="stay"),
+        ])
+
+        assert migrate_layout_item(layout, "src", "dst", "point", "origin") is True
+
+        moved = layout.get_scene_arrows("dst")
+        assert [a.key for a in moved] == ["linked"]
+        assert moved[0].to_key is None
+        assert (moved[0].to_cx_ratio, moved[0].to_cy_ratio) == (0.7, 0.8)
+        assert [p.key for p in layout.get_scene_points("src")] == ["stay"]
+
+    def test_moved_self_loop_keeps_its_endpoint(self):
+        """自环两端一起搬走，to_key 仍然有效，不该被烘死。"""
+        layout = _make_layout()
+        layout.set_scene_arrows("src", [
+            Arrow("loop", from_key="origin", to_key="origin"),
+        ])
+
+        migrate_layout_item(layout, "src", "dst", "point", "origin")
+
+        moved = layout.get_scene_arrows("dst")
+        assert [a.key for a in moved] == ["loop"]
+        assert moved[0].to_key == "origin"
 
     def test_panel_migrated(self):
         layout = _make_layout()
@@ -214,3 +248,91 @@ class TestDeleteAcrossLayouts:
 
         assert delete_item_key_across_all_layouts("src", "arrow", "fwd") == []
         assert len(self._scene_json("layout_a")["arrows"]) == 2
+
+
+class TestRenameCascade:
+    """源实体/场景改名时，布局侧的坐标文件与引用位置都要跟过去。
+
+    这两件事分别坏在不同的地方：坐标文件按「布局 + 分组 + 场景 key」定位，
+    改完名之后按旧 key 推出来的路径根本不存在；``reference_positions`` 按
+    (目标场景, 源场景, 源实体) 匹配，源地址一变就再也对不上。两种失配都静默：
+    前者让改名后的场景在每套布局里都没有坐标，后者让用户摆好的位置回到源坐标。
+    """
+
+    @pytest.fixture
+    def env(self, tmp_path, monkeypatch):
+        import json
+
+        import yaml
+
+        import lvjiang.constants as constants
+        import lvjiang.core.config.resolver as cr
+        import lvjiang.core.scene.registry as sr
+        from lvjiang.core.scene.config import load_scene_manifest
+        from lvjiang.core.scene.definition import SceneRegistry
+
+        monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "system", tmp_path / "system")
+        monkeypatch.setitem(CONFIG_SUBDIRECTORIES, "local", tmp_path / "local")
+        monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
+        monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
+        monkeypatch.setattr(cr, "_resolver", None)
+
+        scenes = tmp_path / "system" / "scenes"
+        (scenes / "general").mkdir(parents=True)
+        (scenes / "general" / "src.yaml").write_text(yaml.safe_dump({
+            "key": "src", "name": "源",
+            "regions": [{"key": "close_btn", "name": "关闭", "type": "func"}],
+        }, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        (scenes / "general" / "dst.yaml").write_text(yaml.safe_dump({
+            "key": "dst", "name": "目标",
+            "references": [{"scene": "src", "entity": "close_btn"}],
+        }, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        (scenes / "general.yaml").write_text(
+            yaml.safe_dump({"name": "通用"}, allow_unicode=True), encoding="utf-8")
+        (scenes / "_meta.json").write_text(json.dumps(
+            {"groups": [{"key": "general", "scenes": ["src", "dst"]}]},
+            ensure_ascii=False), encoding="utf-8")
+
+        resolver = cr.get_resolver()
+        manifest = load_scene_manifest(resolver)
+        registry = SceneRegistry(
+            resolver=resolver, scene_order=manifest.order,
+            group_config=manifest.groups, group_names=manifest.group_names)
+        # 布局路径解析（_scene_group_of）读的是模块单例，替身到本用例的场景表
+        monkeypatch.setattr(sr, "_registry", registry)
+
+        layout = Layout(key="test_layout", name="测试布局")
+        layout.set_scene_regions("src", [Region("close_btn", 0.1, 0.1, 0.2, 0.2)])
+        layout.set_scene_regions("dst", [
+            Region("close_btn", 0.9, 0.9, 0.2, 0.2, source_scene="src",
+                   position_overridden=True,
+                   source_x_ratio=0.1, source_y_ratio=0.1)])
+        assert LayoutConfigManager().save_layout(layout)
+        return registry, tmp_path / "system" / "layouts" / "test_layout" / "general"
+
+    def test_renaming_the_source_entity_carries_the_custom_position(self, env):
+        registry, scene_dir = env
+        dst_json = scene_dir / "dst.json"
+        rows = json.loads(dst_json.read_text(encoding="utf-8"))["reference_positions"]
+        assert [(r["scene"], r["entity"]) for r in rows] == [("src", "close_btn")]
+
+        registry.rename_region_key("src", "close_btn", "ok_btn")
+
+        rows = json.loads(dst_json.read_text(encoding="utf-8"))["reference_positions"]
+        assert [(r["scene"], r["entity"]) for r in rows] == [("src", "ok_btn")]
+        assert (rows[0]["x_ratio"], rows[0]["y_ratio"]) == (0.9, 0.9)
+
+    def test_renaming_the_scene_moves_its_coords_and_retargets_positions(self, env):
+        registry, scene_dir = env
+        assert (scene_dir / "src.json").exists()
+
+        registry.rename_scene("src", "src2", "源二")
+
+        assert not (scene_dir / "src.json").exists()
+        moved = json.loads(
+            (scene_dir / "src2.json").read_text(encoding="utf-8"))
+        assert [r["key"] for r in moved["regions"]] == ["close_btn"]
+        rows = json.loads(
+            (scene_dir / "dst.json").read_text(encoding="utf-8"))["reference_positions"]
+        assert [(r["scene"], r["entity"]) for r in rows] == [("src2", "close_btn")]
+

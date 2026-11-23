@@ -19,6 +19,7 @@ from .definition_models import (
     RegionDef,
     SubsceneRefDef,
     ViewDef,
+    valid_references,
 )
 
 
@@ -66,29 +67,42 @@ def _rebuild_scene_globals():
     global SCENE_REGIONS, SCENE_POINTS, SCENE_PANELS
     global SCENE_GROUPS_META, GROUP_SCENES, GROUP_ORDER
     assert _registry is not None  # 仅在 initialize_scene_registry / reload 内调用
-    SCENE_REGIONS.clear()
-    SCENE_REGIONS.update({
+    scenes = _registry.all_scenes()
+    # 先把新内容算完再替换：clear() 与 update() 之间是空窗，后台线程此刻读到的
+    # 是空 dict，会当成「这个场景没有区域」继续跑下去。
+    regions: dict[str, tuple[str, list[tuple[str, str]]]] = {
         key: (scene.name, [(r.key, r.name) for r in scene.regions])
-        for key, scene in _registry.all_scenes().items()
-    })
-    SCENE_POINTS.clear()
-    SCENE_POINTS.update({
+        for key, scene in scenes.items()
+    }
+    points: dict[str, list[tuple[str, str]]] = {
         key: [(p.key, p.name) for p in scene.points]
-        for key, scene in _registry.all_scenes().items()
-    })
-    SCENE_PANELS.clear()
-    SCENE_PANELS.update({
+        for key, scene in scenes.items()
+    }
+    panels: dict[str, list[tuple[str, str]]] = {
         key: [(p.key, p.name) for p in scene.panels]
-        for key, scene in _registry.all_scenes().items()
-    })
+        for key, scene in scenes.items()
+    }
+    groups_meta: dict[str, str] = {}
+    group_scenes: dict[str, list[str]] = {}
+    group_order: list[str] = []
+    for gk, gname in _registry.get_groups():
+        groups_meta[gk] = gname
+        group_scenes[gk] = _registry.get_group_scenes(gk)
+        group_order.append(gk)
+
+    SCENE_REGIONS.clear()
+    SCENE_REGIONS.update(regions)
+    SCENE_POINTS.clear()
+    SCENE_POINTS.update(points)
+    SCENE_PANELS.clear()
+    SCENE_PANELS.update(panels)
     # 重建分组缓存
     SCENE_GROUPS_META.clear()
+    SCENE_GROUPS_META.update(groups_meta)
     GROUP_SCENES.clear()
+    GROUP_SCENES.update(group_scenes)
     GROUP_ORDER.clear()
-    for gk, gname in _registry.get_groups():
-        SCENE_GROUPS_META[gk] = gname
-        GROUP_SCENES[gk] = _registry.get_group_scenes(gk)
-        GROUP_ORDER.append(gk)
+    GROUP_ORDER.extend(group_order)
 
 
 def initialize_scene_registry() -> None:
@@ -147,8 +161,12 @@ def reload_scene_registry():
     # 配置写入会同步触发本函数。若直接替换模块单例，已打开的区域编辑器、
     # 视图管理器仍会继续修改旧 SceneRegistry，下一次写入就可能把刚保存的
     # to/views 等字段覆盖回去。保留对象身份，只替换其最新磁盘状态。
-    _registry.__dict__.clear()
-    _registry.__dict__.update(refreshed.__dict__)
+    #
+    # 替换方式是**逐属性赋值**：旧实现先 __dict__.clear() 再 update()，两步
+    # 之间是一张空表，工作流线程此刻读注册表会拿到 AttributeError 或空集合。
+    # CPython 里属性赋值是原子的，读者只会看到旧态或新态，不会看到「什么都没有」。
+    for name, value in refreshed.__dict__.items():
+        setattr(_registry, name, value)
     _rebuild_scene_globals()
 
 
@@ -212,7 +230,7 @@ def _referenced_entity_name(scene, entity_key: str) -> str | None:
     引用项在本场景的 regions/points 里查不到，名称查询若就此退回 key，画布
     标签和列表里的引用行就会和本场景原生实体长得不一样。统一回源取名。
     """
-    for ref in getattr(scene, "references", ()):
+    for ref in valid_references(scene):
         if ref.entity != entity_key:
             continue
         source = get_registry().get_scene(ref.scene)
@@ -286,7 +304,7 @@ def get_effective_region_defs(
         region for region in scene.regions
         if is_view_visible(region.views, current_view)
     ]
-    for ref in scene.references:
+    for ref in valid_references(scene):
         if not is_view_visible(ref.views, current_view):
             continue
         source = get_registry().get_scene(ref.scene)

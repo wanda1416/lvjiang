@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
 from ...core.config.resolver import get_resolver
 from ...core.layout.manager import (
     delete_scene_across_all_layouts,
-    rename_scene_across_all_layouts,
 )
 from ...core.scene.registry import (
     get_group_name,
@@ -686,10 +685,9 @@ class SceneOpsMixin:
             QMessageBox.warning(self, tr("重命名失败"), str(e))  # type: ignore[arg-type]
             return
         registry.save_group_config()
-        # 同步布局和截图文件
+        # 布局坐标文件与截图已在 registry.rename_scene 里级联改名（那里才
+        # 知道场景改名前所在的分组）；这里只负责刷新已打开布局的 scene 映射。
         if key_changed:
-            rename_scene_across_all_layouts(scene_key, new_key)
-            # 重新加载当前布局以刷新 scene key 映射
             if self._current_layout:
                 reloaded = self._manager.load_layout(self._current_layout.key)
                 if reloaded:

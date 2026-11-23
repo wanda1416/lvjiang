@@ -4,7 +4,6 @@
 已拆分至 definition_models.py。
 """
 
-import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -31,13 +30,12 @@ from .definition_models import (
     SceneRefDef,
     SubsceneRefDef,
     ViewDef,
+    is_valid_key,
 )
-
-_VALID_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def _validate_key_and_name(key: str, name: str, kind: str) -> None:
-    if not _VALID_KEY_RE.fullmatch(key):
+    if not is_valid_key(key):
         raise ValueError(f"{kind} key 必须以小写字母开头，仅含小写字母/数字/下划线")
     if not name.strip():
         raise ValueError(f"{kind}名称不能为空")
@@ -133,7 +131,7 @@ class SceneRegistry:
         self._disabled_scenes = {
             key for key, scene in self._scenes.items() if scene.disabled}
 
-        self._drop_invalid_references()
+        self._validate_references()
 
         # 按 scene_order 排序
         if scene_order:
@@ -148,37 +146,47 @@ class SceneRegistry:
         # 初始化分组
         self._init_groups(group_config, group_names)
 
-    def _drop_invalid_references(self) -> None:
+    def _validate_references(self) -> None:
         """跨场景引用的合法性校验；只能在全部场景加载完之后做。
 
-        非法引用**丢弃并记 error**，不抛异常：单个场景写错不该让整个注册表
-        加载失败——那会连带 UI 起不来。丢弃后该 key 就是未定义，运行到它时
-        走现有的"实体不存在"报错路径，同样不会静默点错地方。
+        非法引用**保留定义、只登记问题**（``SceneDef.invalid_references``）：
+        单个场景写错不该让整个注册表加载失败（那会连带 UI 起不来），但也
+        绝不能把它从内存里删掉——删掉之后任何一次保存都会把用户写的引用从
+        YAML 里**永久**抹掉，而源场景往往只是暂时解析失败。消费方用
+        ``valid_references()`` 过滤，删除与唯一性守卫仍看得见它。
         """
         for scene in self._scenes.values():
-            kept: list[SceneRefDef] = []
+            problems: dict[tuple[str, str], str] = {}
             for ref in scene.references:
-                source = self._scenes.get(ref.scene)
-                where = f"场景 {scene.key} 引用 {ref.scene}.{ref.entity}"
-                if source is None:
-                    logger.error(f"{where} 失败：源场景不存在")
+                reason = self._reference_problem(ref)
+                if reason is None:
                     continue
-                if source.is_subscene:
-                    # 子场景实体坐标相对外框，搬过来需要变换；一级场景才是
-                    # 同一套画布归一化坐标，可以零变换直取。
-                    logger.error(f"{where} 失败：只能引用一级场景，不能引用子场景")
-                    continue
-                if any(r.entity == ref.entity for r in source.references):
-                    logger.error(f"{where} 失败：不能引用引用，源必须是原生定义")
-                    continue
-                native = ([r.key for r in source.regions]
-                          + [p.key for p in source.points]
-                          + [p.key for p in source.panels])
-                if ref.entity not in native:
-                    logger.error(f"{where} 失败：源场景没有该实体")
-                    continue
-                kept.append(ref)
-            scene.references = kept
+                problems[(ref.scene, ref.entity)] = reason
+                logger.error(
+                    f"场景 {scene.key} 引用 {ref.scene}.{ref.entity} 无效：{reason}")
+            scene.invalid_references = problems
+
+    def _reference_problem(self, ref: SceneRefDef) -> str | None:
+        """一条跨场景引用的加载期校验，返回原因或 None。
+
+        规则同 docs/30-design/01-architecture/07-scene/03-cross-scene-references.md：
+        源场景必须存在且是一级场景，源实体必须是原生定义（不能引用引用）。
+        """
+        source = self._scenes.get(ref.scene)
+        if source is None:
+            return "源场景不存在"
+        if source.is_subscene:
+            # 子场景实体坐标相对外框，搬过来需要变换；一级场景才是
+            # 同一套画布归一化坐标，可以零变换直取。
+            return "只能引用一级场景，不能引用子场景"
+        if any(r.entity == ref.entity for r in source.references):
+            return "不能引用引用，源必须是原生定义"
+        native = ([r.key for r in source.regions]
+                  + [p.key for p in source.points]
+                  + [p.key for p in source.panels])
+        if ref.entity not in native:
+            return "源场景没有该实体"
+        return None
 
     def _load_scene(self, yaml_file: Path) -> SceneDef:
         """从单个 YAML 文件加载场景定义"""
@@ -236,7 +244,9 @@ class SceneRegistry:
 
         regions = []
         for rd in data.get("regions", []):
-            rtype = rd.get("type", "info")
+            # 缺省值必须与 RegionDef.type 的默认值同源：历史遗留的 "info" 不在
+            # 合法集合里，省略 type 的 YAML 会让整个场景加载失败并静默消失。
+            rtype = rd.get("type", RegionDef.type)
             if rtype not in VALID_REGION_TYPES:
                 raise ValueError(f"区域 {rd.get('key')} 的 type '{rtype}' 不合法，合法值: {VALID_REGION_TYPES}")
             regions.append(RegionDef(
@@ -253,7 +263,7 @@ class SceneRegistry:
 
         points = []
         for pd in data.get("points", []):
-            ptype = pd.get("type", "func")
+            ptype = pd.get("type", PointDef.type)
             if ptype not in VALID_REGION_TYPES:
                 raise ValueError(f"坐标点 {pd.get('key')} 的 type '{ptype}' 不合法，合法值: {VALID_REGION_TYPES}")
             points.append(PointDef(
@@ -309,7 +319,7 @@ class SceneRegistry:
                     + [r.key for r in references])
         dup = {k for k in all_keys if all_keys.count(k) > 1}
         if dup:
-            raise ValueError(f"场景 {key} 的 region/point/panel key 重复: {dup}")
+            raise ValueError(f"场景 {key} 的 region/point/panel/引用 key 重复: {dup}")
 
         return SceneDef(key=key, name=name, regions=regions, points=points,
                         panels=panels, views=views, type=scene_type,
@@ -566,6 +576,15 @@ class SceneRegistry:
                   if any(r.scene == key for r in s.subscene_refs)]
         if owners:
             raise ValueError(f"场景 {key} 正被以下场景引用，不能删除: {', '.join(owners)}")
+        # 跨场景 area 引用同样要拦：删了源场景，引用方会少掉那个实体，而
+        # 用户根本不知道谁引用过它。级联删别人的定义更糟——他在 A 点删除，
+        # B 的定义跟着没了。
+        area_owners = [s.key for s in self._scenes.values()
+                       if any(r.scene == key for r in s.references)]
+        if area_owners:
+            raise ValueError(
+                f"场景 {key} 的元素正被以下场景引用，不能删除：{', '.join(area_owners)}。"
+                f"请先在这些场景里移除引用，再删除本场景")
         old_group = self.get_scene_group(key)
         rel_path = self._scene_rel_path(key, old_group)
         self._resolver.delete_entity(
@@ -637,6 +656,16 @@ class SceneRegistry:
                         changed = True
                 if changed:
                     self._save_scene_yaml(owner)
+
+            # 布局侧同样按场景 key 定位：坐标文件要跟着改名，下游场景里
+            # reference_positions 的 "scene" 字段也要改指，否则旧文件成孤儿、
+            # 用户在目标场景摆的引用位置静默回到源坐标。
+            self._retarget_layout_positions(key, new_key, "")
+            from ..layout.references import rename_scene_across_all_layouts
+            try:
+                rename_scene_across_all_layouts(key, new_key, old_group or "")
+            except Exception as exc:  # noqa: BLE001 — 定义已落盘，坐标级联失败不回滚
+                logger.error(f"布局坐标文件级联改名失败 {key}: {exc}")
 
             self._resolver.delete_entity(old_rel_path, layer=old_layer)
 
@@ -938,19 +967,12 @@ class SceneRegistry:
             raise ValueError(f"场景不存在: {scene_key}")
         if scene.is_subscene:
             raise ValueError(f"子场景 {scene_key} 不能引用其他场景的 area")
-        source = self._scenes.get(ref.scene)
-        if source is None:
-            raise ValueError(f"源场景不存在: {ref.scene}")
-        if source.is_subscene:
-            raise ValueError("只能引用一级场景，不能引用子场景")
         if ref.scene == scene_key:
             raise ValueError("不能引用自身")
-        if any(r.entity == ref.entity for r in source.references):
-            raise ValueError("不能引用引用，源必须是原生定义")
-        native = ([r.key for r in source.regions] + [p.key for p in source.points]
-                  + [p.key for p in source.panels])
-        if ref.entity not in native:
-            raise ValueError(f"源场景 {ref.scene} 没有实体 {ref.entity}")
+        # 与加载期同一套规则，校验逻辑只留一份（见 _reference_problem）
+        reason = self._reference_problem(ref)
+        if reason is not None:
+            raise ValueError(f"引用 {ref.scene}.{ref.entity} 不合法：{reason}")
         self._check_key_unique(scene, ref.key)
         scene.references.append(ref)
         self._save_scene_yaml(scene)
@@ -1031,7 +1053,23 @@ class SceneRegistry:
         for scene in updates:
             self._scenes[scene.key] = scene
             self._save_scene_yaml(scene)
+        self._retarget_layout_positions(old_scene, new_scene, entity, target_entity)
         return [scene.key for scene in updates]
+
+    def _retarget_layout_positions(self, old_scene: str, new_scene: str,
+                                   old_entity: str, new_entity: str = "") -> None:
+        """布局里针对这些引用的自定义摆放位置跟着换地址。
+
+        YAML 侧的定义这时已经改完了，坐标覆盖只是附加信息：失败记 error 但不
+        回滚，与 :meth:`move_scene_to_group` 的级联口径一致。
+        """
+        from ..layout.references import retarget_reference_positions
+        try:
+            retarget_reference_positions(
+                old_scene, new_scene, old_entity, new_entity)
+        except Exception as exc:  # noqa: BLE001 — 坐标覆盖失败不能回滚定义
+            logger.error(
+                f"布局引用位置级联更新失败 {old_scene}.{old_entity}: {exc}")
 
     def validate_reference_retarget(self, old_scene: str, new_scene: str,
                                     entity: str, new_entity: str = "") -> None:
@@ -1194,6 +1232,7 @@ class SceneRegistry:
         for owner in updates:
             self._scenes[owner.key] = owner
             self._save_scene_yaml(owner)
+        self._retarget_layout_positions(scene_key, scene_key, old_key, new_key)
         logger.info(f"场景 {scene_key} region key 重命名: {old_key} -> {new_key}")
 
     def rename_point_key(self, scene_key: str, old_key: str, new_key: str):
@@ -1213,6 +1252,7 @@ class SceneRegistry:
         for owner in updates:
             self._scenes[owner.key] = owner
             self._save_scene_yaml(owner)
+        self._retarget_layout_positions(scene_key, scene_key, old_key, new_key)
         logger.info(f"场景 {scene_key} point key 重命名: {old_key} -> {new_key}")
 
     def rename_panel_key(self, scene_key: str, old_key: str, new_key: str):
@@ -1232,30 +1272,36 @@ class SceneRegistry:
         for owner in updates:
             self._scenes[owner.key] = owner
             self._save_scene_yaml(owner)
+        self._retarget_layout_positions(scene_key, scene_key, old_key, new_key)
         logger.info(f"场景 {scene_key} panel key 重命名: {old_key} -> {new_key}")
 
     # ─── 内部方法 ─────────────────────────────────────────────
 
     def _check_key_unique(self, scene: SceneDef, new_key: str):
-        """检查 key 在场景内是否重复（region/point/panel 共享命名空间）"""
-        all_keys = (
-            [r.key for r in scene.regions]
-            + [p.key for p in scene.points]
-            + [p.key for p in scene.panels]
-            + [r.key for r in scene.subscene_refs]
-        )
-        if new_key in all_keys:
-            raise ValueError(f"key 已存在: {new_key}")
+        """检查 key 在场景内是否重复（原生定义与引用名共享命名空间）"""
+        self._check_key_unique_excluding(scene, new_key, "")
 
     def _check_key_unique_excluding(self, scene: SceneDef, new_key: str, exclude_key: str):
-        """检查 key 在场景内是否重复，但排除指定的旧 key（用于重命名场景）"""
-        all_keys = (
-            [r.key for r in scene.regions if r.key != exclude_key]
-            + [p.key for p in scene.points if p.key != exclude_key]
-            + [p.key for p in scene.panels if p.key != exclude_key]
-            + [r.key for r in scene.subscene_refs if r.key != exclude_key]
-        )
-        if new_key in all_keys:
+        """检查 key 在场景内是否重复，但排除指定的旧 key（用于重命名）
+
+        引用必须算进来：``_load_scene`` 判重时包含 ``references``，这里漏掉就
+        会让 UI 造出一个保存得下、下次加载却整场景报错消失的状态。撞到引用时
+        特意点名，否则用户会在「哪里还有这个 key」上白找半天。
+        """
+        tables = {
+            "跨场景引用": [r.key for r in scene.references],
+            "子场景引用": [r.key for r in scene.subscene_refs],
+            "region": [r.key for r in scene.regions],
+            "point": [p.key for p in scene.points],
+            "panel": [p.key for p in scene.panels],
+        }
+        for label, keys in tables.items():
+            if new_key not in keys or new_key == exclude_key:
+                continue
+            if label == "跨场景引用":
+                raise ValueError(
+                    f"key 已存在: {new_key}（该名字被一条跨场景引用占用，"
+                    f"请先移除那条引用）")
             raise ValueError(f"key 已存在: {new_key}")
 
     def _scene_rel_path(self, scene_key: str, group_key: str | None = None) -> str:

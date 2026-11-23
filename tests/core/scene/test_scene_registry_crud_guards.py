@@ -193,6 +193,63 @@ def test_scene_revision_increments_on_actual_edit(tmp_path):
         "content_version"] == 3
 
 
+def test_region_without_type_falls_back_to_the_model_default(tmp_path):
+    """省略 type 是合法写法，缺省值必须与 RegionDef 同源。
+
+    旧实现缺省成历史遗留的 "info"，而它不在合法集合里：整份场景 YAML 加载
+    失败、记一条 error 后静默消失，用户只看到场景列表里少了一项。
+    """
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    path = system / "scenes" / "general" / "factory.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump({
+            "key": "factory", "name": "系统场景",
+            "regions": [{"key": "label", "name": "标签"}],
+            "points": [{"key": "marker", "name": "标记"}],
+        }, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    registry = SceneRegistry(resolver=ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True))
+
+    scene = registry.get_scene("factory")
+    assert scene is not None
+    assert [region.type for region in scene.regions] == ["attr"]
+    assert [point.type for point in scene.points] == ["func"]
+
+
+def test_legacy_view_owner_survives_a_save(tmp_path):
+    """只写了 owner、没写 kind 的旧视图，保存一次不能把 owner 丢掉。
+
+    丢的是结构归属：下次加载 page_owner() 解析不出来，页面归属就断在那里，
+    而且没有任何提示。
+    """
+    system = tmp_path / "system"
+    path = system / "scenes" / "general" / "factory.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump({
+            "key": "factory", "name": "系统场景",
+            "views": [
+                {"key": "base", "name": "基底"},
+                {"key": "detail", "name": "详情", "owner": "/base"},
+            ],
+        }, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    registry = SceneRegistry(resolver=ConfigResolver(
+        system_dir=system, local_dir=tmp_path / "local", dev_mode=True))
+
+    registry.save_scene_views("factory")
+
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))
+    detail = next(v for v in saved["views"] if v["key"] == "detail")
+    assert detail["owner"] == "/base"
+    assert "kind" not in detail
+
+
 def test_region_transition_survives_registry_reload(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"

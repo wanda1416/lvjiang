@@ -7,21 +7,32 @@ from loguru import logger
 from ..config.resolver import get_resolver
 from . import screenshots
 from .config import (
+    load_layout_doc,
     load_layout_entries,
+    validate_layout_key,
 )
 from .models import Layout
 from .storage import (
+    _enumerate_scene_files,
+    _resolve_layout_entry,
     _scene_rel,
 )
 
 
-def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str):
-    """重命名单个布局下某场景的 JSON 文件（内容不变，仅改文件名）"""
+def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str,
+                           group: str = ""):
+    """重命名单个布局下某场景的 JSON 文件（内容不变，仅改文件名）
+
+    ``group`` 是场景改名前所在分组，必须由调用方给出：场景 key 改完之后注册表
+    里已经没有旧 key，``_scene_rel`` 按名字推出来的是平铺根目录，分组化之后的
+    坐标文件会永远留在原处（新 key 没有坐标、旧文件成了谁也认领不了的孤儿）。
+    """
     if old_key == new_key:
         return
     resolver = get_resolver()
-    old_rel = _scene_rel(layout_name, old_key)
-    new_rel = _scene_rel(layout_name, new_key)
+    base = f"layouts/{validate_layout_key(layout_name)}"
+    old_rel = f"{base}/{group}/{old_key}.json" if group else f"{base}/{old_key}.json"
+    new_rel = f"{base}/{group}/{new_key}.json" if group else f"{base}/{new_key}.json"
     old_path = resolver.resolve_read(old_rel)
     if old_path and old_path.exists():
         content = old_path.read_text(encoding="utf-8")
@@ -30,12 +41,16 @@ def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str):
         logger.info(f"布局场景文件已重命名: {old_key}.json -> {new_key}.json ({layout_name})")
 
 
-def rename_scene_across_all_layouts(old_key: str, new_key: str):
-    """遍历所有布局，重命名场景 JSON 文件 + 截图文件"""
+def rename_scene_across_all_layouts(old_key: str, new_key: str,
+                                    group: str = "") -> None:
+    """遍历所有布局，重命名场景 JSON 文件 + 截图文件
+
+    ``group`` 见 :func:`rename_layout_scene_key`，由场景注册表在改名时给出。
+    """
     if old_key == new_key:
         return
     for layout_name in load_layout_entries():
-        rename_layout_scene_key(layout_name, old_key, new_key)
+        rename_layout_scene_key(layout_name, old_key, new_key, group)
     screenshots.rename_scene_screenshots(old_key, new_key)
 
 
@@ -92,6 +107,77 @@ def delete_scene_across_all_layouts(scene_key: str):
                     changed = True
             if changed:
                 screenshots._save_screenshot_meta(layout_dir.name, meta)
+
+
+def retarget_reference_positions(
+    old_scene: str, new_scene: str,
+    old_entity: str = "", new_entity: str = "",
+) -> list[str]:
+    """把各布局里针对某条引用的「自定义摆放位置」改指到新地址。
+
+    ``reference_positions`` 按 (目标场景, 源场景, 源实体) 三元组匹配（见
+    :func:`storage._expand_scene_references`）。源实体改名/搬家、或源场景 key
+    改名之后，下游那份 x/y 覆盖再也匹配不上：源坐标一动，引用项就静默跳回源
+    位置，用户在目标场景里摆好的位置白摆。
+
+    ``old_entity`` 为空表示只换场景（场景 key 改名），实体名保持不变。
+    返回实际改动过的场景目录名。
+    """
+    target_entity = new_entity or old_entity
+    if (old_scene, old_entity) == (new_scene, target_entity):
+        return []
+    changed: list[str] = []
+    visited: set[str] = set()
+    doc = load_layout_doc().get("layouts", {})
+    for layout_name in load_layout_entries():
+        resolved = _resolve_layout_entry(doc, layout_name)
+        # 别名布局与根布局共用同一批场景文件，只处理一次
+        scene_dir = resolved[1] if resolved else layout_name
+        if scene_dir in visited:
+            continue
+        visited.add(scene_dir)
+        if _retarget_positions_in_dir(
+                scene_dir, old_scene, new_scene, old_entity, target_entity):
+            changed.append(scene_dir)
+    return changed
+
+
+def _retarget_positions_in_dir(scene_dir: str, old_scene: str, new_scene: str,
+                               old_entity: str, new_entity: str) -> bool:
+    """在一个布局目录下逐场景文件改写引用位置；返回是否有改动。"""
+    resolver = get_resolver()
+    changed = False
+    for scene_key in _enumerate_scene_files(scene_dir):
+        rel = _scene_rel(scene_dir, scene_key)
+        path = resolver.resolve_read(rel)
+        if path is None:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001 — 单个文件坏了不阻断其余场景
+            logger.error(f"读取布局场景文件失败 {rel}: {exc}")
+            continue
+        rows = data.get("reference_positions")
+        if not isinstance(rows, list):
+            continue
+        touched = False
+        for row in rows:
+            if not isinstance(row, dict) or row.get("scene") != old_scene:
+                continue
+            if old_entity and row.get("entity") != old_entity:
+                continue
+            row["scene"] = new_scene
+            if old_entity:
+                row["entity"] = new_entity
+            touched = True
+        if not touched:
+            continue
+        resolver.write_entity(rel, json.dumps(data, ensure_ascii=False, indent=2))
+        logger.info(
+            f"布局 {scene_dir} 场景 {scene_key} 的引用位置已改指: "
+            f"{old_scene}.{old_entity or '*'} -> {new_scene}.{new_entity or '*'}")
+        changed = True
+    return changed
 
 
 def rename_item_key_across_all_layouts(scene_key: str, kind: str, old_key: str, new_key: str):
@@ -235,6 +321,8 @@ def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key
     kind="point" 时联动处理箭头：
     - source 中 from_key == key 的箭头随点迁移到 target
     - source 中 to_key == key 的箭头烘焙为绝对坐标，避免悬空引用
+    - 随迁箭头的终点若指向**留守在 source 的另一个点**，同样先烘焙成绝对
+      坐标：目标场景里没有那个点，带着 to_key 走就是一条悬空引用
 
     Returns:
         是否发生了改动
@@ -273,6 +361,24 @@ def migrate_layout_item(layout: Layout, source: str, target: str, kind: str, key
                 a.to_key = None
                 a.to_cx_ratio = point.cx_ratio
                 a.to_cy_ratio = point.cy_ratio
+        # 随迁箭头：终点指向留守源场景的另一个点时，先把那个点的坐标烘进箭头。
+        # 不烘就走 = 目标场景里凭空多出一条指向不存在点的方向，静态检查在
+        # 执行前就会把它拦下来，用户还得回头手工修一遍。
+        for a in moved:
+            if a.to_key is None or a.to_key == key:
+                # 绝对态端点无需处理；自环两端一起搬走，to_key 仍然有效
+                continue
+            stay_point = next(
+                (p for p in source_points if p.key == a.to_key), None)
+            if stay_point is None:
+                # 迁移前就已经是悬空引用，不在这里编造坐标
+                logger.warning(
+                    f"迁移方向「{a.key}」的终点 {a.to_key} 在源场景不存在，"
+                    f"保持原样（源场景本身已悬空）")
+                continue
+            a.to_key = None
+            a.to_cx_ratio = stay_point.cx_ratio
+            a.to_cy_ratio = stay_point.cy_ratio
         layout.set_scene_arrows(source, remain)
         if moved:
             moved_keys = {a.key for a in moved}

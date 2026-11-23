@@ -6,12 +6,16 @@
 
 契约只做声明和校验，**不驱动执行**：现有 wf 与 Python 编排一行都不用改，
 契约先行、逐步补全，后续读代码的人（和 AI）能直接看懂转移逻辑。
+
+**当前状态：未启用的契约。** :func:`validate_transitions` 与
+:func:`find_unreachable_views` 目前只被 tests/ 与离线分析调用，没有接入运行时
+预检、LSP 诊断或任何 CI 门禁——接入之前，别把这里的校验当成会生效的拦截。
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from .definition_models import BASE_VIEW_KEY
+from .definition_models import BASE_VIEW_KEY, valid_references
 
 
 @dataclass(frozen=True)
@@ -64,7 +68,7 @@ def parse_target(raw: str, current_scene: str) -> tuple[str, str] | None:
 def effective_entities(scenes: dict, scene):
     """引用的动态返回在使用方上下文解析，固定相对目标仍属于定义方。"""
     yield from (*scene.regions, *scene.points)
-    for ref in scene.references:
+    for ref in valid_references(scene):
         source = scenes.get(ref.scene)
         if source is None:
             continue

@@ -6,6 +6,7 @@ from typing import Iterable
 from loguru import logger
 
 from ..config.resolver import get_resolver
+from ..scene.definition_models import valid_references
 from .config import (
     DEFAULT_ASPECT_TOLERANCE,
     load_layout_doc,
@@ -291,7 +292,7 @@ def _expand_scene_references(
         return
 
     for scene_key, scene in scenes.items():
-        for ref in getattr(scene, "references", ()):
+        for ref in valid_references(scene):
             expand_one_reference(
                 regions, points, scene_key, ref.scene, ref.entity,
                 position=(reference_positions or {}).get(
@@ -319,7 +320,7 @@ def refresh_scene_references(
     affected: set[str] = set()
     for scene_key, scene in scenes.items():
         refs = [
-            ref for ref in getattr(scene, "references", ())
+            ref for ref in valid_references(scene)
             if source_scenes is None or ref.scene in source_scenes
         ]
         if not refs:

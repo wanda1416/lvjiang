@@ -25,6 +25,7 @@ class _ActionMixin:
         completed = precise_wait(
             seconds,
             stop_check=self._stop_check,
+            clock=getattr(self, "runtime_clock", None),
             pause_check=getattr(self, "_wait_if_paused", None),
         )
         if not completed:
@@ -344,6 +345,7 @@ class _ActionMixin:
         completed = precise_wait(
             seconds,
             stop_check=self._stop_check,
+            clock=getattr(self, "runtime_clock", None),
             # _ActionMixin is also used by a few lightweight adapters that do
             # not inherit BaseWorkflow.  They still get precise, stoppable
             # waits without being forced to implement pause support.
@@ -355,7 +357,7 @@ class _ActionMixin:
     def wait_stable(self, timeout: float | str, threshold: float = 0.02,
                     interval: float = 0.3, stable_duration: float = 0.5,
                     least: float = 0.5, crop_box: dict | None = None,
-                    *, _clock=time.monotonic, _sleep=time.sleep):
+                    *, _clock=None, _sleep=None):
         """等待画面稳定（连续截图对比）
 
         每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
@@ -380,6 +382,10 @@ class _ActionMixin:
         与 wait_seconds 相同，期间持续检查停止标志。
         """
         import cv2
+
+        clock = getattr(self, "runtime_clock", None)
+        _clock = _clock or (clock.monotonic if clock is not None else time.monotonic)
+        _sleep = _sleep or (clock.sleep if clock is not None else time.sleep)
 
         # 命名延迟参数：取范围中值
         if isinstance(timeout, str):

@@ -12,6 +12,7 @@ from ...core.input.base import InputBackend
 from ...core.input.capture_base import CaptureBackend
 from ...core.layout.models import Layout
 from ...core.ocr.engine import OCREngine
+from ...core.timing import RuntimeClock
 from .. import builtins  # noqa: F401  触发内置函数注册
 from .actions import _ActionMixin
 from .coords import _CoordMixin
@@ -58,7 +59,9 @@ class BaseWorkflow(
         stop_check: Optional[Callable[[], bool]] = None,
         pause_event: threading.Event | None = None,
         reference_recognizer: "ReferenceRecognizer | None" = None,
+        runtime_clock: RuntimeClock | None = None,
     ):
+        self.runtime_clock = runtime_clock
         self._capture = capture
         self._ocr = ocr
         self._input = input_ctrl

@@ -8,6 +8,14 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from typing import Protocol
+
+
+class RuntimeClock(Protocol):
+    """Explicit runtime clock, e.g. a bounded offline device; never global patching."""
+    def monotonic(self) -> float: ...
+    def sleep(self, seconds: float) -> None: ...
+
 
 NS_PER_SECOND = 1_000_000_000
 _COARSE_THRESHOLD_NS = 10_000_000
@@ -60,8 +68,16 @@ def precise_wait(
     spin_tail_ns: int = _DEFAULT_SPIN_TAIL_NS,
     _clock_ns: Callable[[], int] = time.perf_counter_ns,
     _sleep: Callable[[float], None] = time.sleep,
+    clock: RuntimeClock | None = None,
 ) -> bool:
     """Wait at least ``seconds`` using a monotonic absolute deadline."""
+    if clock is not None:
+        if pause_check is not None:
+            pause_check()
+        if stop_check is not None and stop_check():
+            return False
+        clock.sleep(max(0.0, float(seconds)))
+        return stop_check is None or not stop_check()
     duration_ns = max(0, int(float(seconds) * NS_PER_SECOND))
     deadline_ns = _clock_ns() + duration_ns
     return precise_wait_until(

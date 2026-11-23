@@ -30,6 +30,7 @@ from ...core.layout.key_validation import validate_key_name
 from ...core.layout.models import Layout
 from ...core.ocr.engine import OCREngine
 from ...core.recognizers import ReferenceRecognizer
+from ...core.timing import RuntimeClock
 from ..align import GridAlignment
 from ..base import BaseWorkflow
 from ..capture_snapshot import CaptureSnapshotMixin
@@ -166,8 +167,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         stop_check: Callable[[], bool] | None = None,
         pause_event: threading.Event | None = None,
         unattended: bool = False,
+        capture_observer: Callable | None = None,
+        runtime_clock: RuntimeClock | None = None,
     ):
         # 硬件后端（直接持有）
+        self.runtime_clock = runtime_clock
         self._capture = capture
         self._ocr = ocr
         self._input = input_ctrl
@@ -209,6 +213,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             ReferenceRecognizer(self._ocr) if self._ocr is not None else None
         )
         self._init_capture_snapshot()
+        # Explicit host-owned observer; off by default, no recorder/device discovery.
+        self.capture_observer = capture_observer
         # 执行状态
         self.variables: dict = {}
         # 本次加载 import 的外置脚本：相对 workflows 根的路径 → 文件绝对路径。
@@ -324,6 +330,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 stop_check=self._stop_check,
                 pause_event=self._pause_event,
                 reference_recognizer=self._reference_recognizer,
+                runtime_clock=self.runtime_clock,
             )
             # BaseWorkflow 是 WorkflowEngine 公共原语的 Python 门面；
             # 回指当前引擎后，Panel/press 等公共能力不再在
@@ -404,9 +411,19 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """本次 import 的外置脚本注册的全部函数名"""
         return list(self._script_funcs)
 
+    execution_scope: Callable | None = None  # Host-owned lifecycle hook.
+
     @user_execution
     def execute(self, source, *, initial_variables: dict | None = None,
                 _reset_context: bool = True) -> dict:
+        from contextlib import nullcontext
+        factory = self.execution_scope if _reset_context else None
+        with (factory(self, source) if factory is not None else nullcontext()):
+            return self._execute_scoped(source, initial_variables=initial_variables,
+                                        _reset_context=_reset_context)
+
+    def _execute_scoped(self, source, *, initial_variables: dict | None = None,
+                        _reset_context: bool = True) -> dict:
         """使用用户执行锁运行设备工作流。"""
         begin = getattr(self._input, "begin_execution", None) if _reset_context else None
         end = getattr(self._input, "end_execution", None) if _reset_context else None
@@ -1244,6 +1261,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """执行 Python 工作流实例"""
         # reset_state() 会刷新 reference 服务，必须先完成生命周期注入。
         workflow._reference_recognizer = self._reference_recognizer
+        workflow.runtime_clock = self.runtime_clock
         workflow.reset_state()
         workflow.variables.update(self.variables)
         # 注入引擎引用，使工作流内调用的 UI 交互内置函数

@@ -319,7 +319,10 @@ class StageExecutionMixin:
         用户信息由批量层显式传递（username）：引擎绑定 run_username 与
         save_fn，全程不读全局 active user。
         """
-        engine = self._create_engine()
+        try:
+            engine = self._create_engine()
+        finally:
+            self._recording_task_id = ""
         self._task_stop_clear()
         engine.session = session
         engine.run_username = username or ""

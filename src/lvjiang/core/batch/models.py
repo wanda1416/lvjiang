@@ -172,6 +172,7 @@ class BatchContext:
     target_kind: str = ""
     target_label: str = ""
     task_run_id: str = ""
+    full_task_capture: bool = False
     input_kind: str = ""
     layout_name: str = ""
     run_env: str = ""

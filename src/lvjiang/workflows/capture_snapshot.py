@@ -9,8 +9,9 @@ cache would leak frames between concurrent tasks and users.
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 
 import numpy as np
 from loguru import logger
@@ -29,6 +30,7 @@ _SCREEN_SIZE_TOLERANCE = 0.05
 class CaptureSnapshotMixin:
     """Record and expose the latest frame captured by a workflow run."""
 
+    capture_observer: Callable[[dict[str, Any], np.ndarray], None] | None = None
     _last_capture_frame: np.ndarray | None
     _last_capture_time_ns: int
     _last_capture_source: str
@@ -70,6 +72,8 @@ class CaptureSnapshotMixin:
             scope = "from screen" if getattr(self, "_screen_capture_scope", False) else "from last"
             logger.debug(
                 f"capture: frame_seq={self.last_capture_seq} source={source} {scope}")
+            assert self._reused_capture_frame is not None
+            self._notify_capture_observer(self._reused_capture_frame, source, reused=True)
             return self._reused_capture_frame
 
         from_screen = bool(getattr(self, "_screen_capture_scope", False))
@@ -102,7 +106,24 @@ class CaptureSnapshotMixin:
         logger.debug(
             f"capture: frame_seq={self.last_capture_seq} "
             f"source={self._last_capture_source}")
+        self._notify_capture_observer(frame, self._last_capture_source, reused=False)
         return frame
+
+    def _notify_capture_observer(self, frame: np.ndarray, source: str, *, reused: bool) -> None:
+        """Optional host observer; borrowed pixels are valid only during this call.
+
+        The observer must obtain its own stable copy for asynchronous work.
+        Recording failures never replace recognition results or hardware errors.
+        """
+        observer = getattr(self, "capture_observer", None)
+        if observer is None:
+            return
+        try:
+            observer({"frame_seq": self.last_capture_seq, "source": str(source),
+                      "captured_ns": self._last_capture_time_ns, "reused": reused}, frame)
+        except Exception as exc:
+            self.capture_observer = None
+            logger.warning("截图观察器失败，已停用记录（不影响识别）：{}", type(exc).__name__)
 
     def _capture_screen_frame(self) -> tuple[np.ndarray, bool] | None:
         """``from screen``：跳过视频流直取当下画面。

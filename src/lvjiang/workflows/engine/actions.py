@@ -979,6 +979,7 @@ class _ActionsMixin:
                     completed = precise_wait(
                         random.uniform(0.025, 0.035),
                         stop_check=self._stop_check,
+                        clock=getattr(self, "runtime_clock", None),
                         pause_check=self._wait_if_paused,
                     )
                     if not completed:
@@ -996,6 +997,7 @@ class _ActionsMixin:
                     completed = precise_wait(
                         duration,
                         stop_check=self._stop_check,
+                        clock=getattr(self, "runtime_clock", None),
                         pause_check=self._wait_if_paused,
                     )
                     if not completed:

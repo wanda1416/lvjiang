@@ -816,6 +816,9 @@ class MainWindow(
         option_slot_3.hide()
         selection_row.addWidget(settings_container)
         controls_layout.addLayout(selection_row)
+        self.chk_full_task_capture = QCheckBox(tr("本次任务全帧采集"))
+        self.chk_full_task_capture.setToolTip(tr("仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。"))
+        controls_layout.addWidget(self.chk_full_task_capture)
         controls_layout.addStretch()
 
         # 默认紧凑展示约三行目标；多出的目标滚动查看，也可拖动下边界扩展。
@@ -1348,6 +1351,7 @@ class MainWindow(
             ocr=run_context.ocr,
             input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
+            full_task_capture=getattr(self._batch_tab, "consume_full_task_capture", lambda: False)(),
             target_id=target_snapshot.id,
             target_kind=target_snapshot.kind,
             target_label=target_snapshot.display_name,

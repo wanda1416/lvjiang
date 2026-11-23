@@ -66,4 +66,4 @@
 | [27-hotkeys-and-menu-shortcuts.md](../30-design/02-decisions/04-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 | 已实现 |
 | [28-account-document-sync.md](../30-design/02-decisions/04-platform/28-account-document-sync.md) | 全局任务参数与批量配置上云：账户级文档通道、冲突不留副本与迁移 | 已实现 |
 | [29-ai-exception-recovery.md](03-platform/29-ai-exception-recovery.md) | AI 异常导航恢复提案：有限动作、检查点续跑与独立验收；未实施 | 规划 |
-| [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 识别帧历史调试与主动反馈提案：显式开启、有界帧/动作时间线、离线查看、任务关联与主动反馈；未实施 | 规划 |
+| [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 全任务采集/离线WF模拟已接桌面/批量、WF库与覆盖CLI；诊断FIFO与反馈仍规划 | 部分实现 |

@@ -94,3 +94,18 @@ def test_non_auth_errors_are_not_retried(monkeypatch):
         client.post("/api/sync/users/pull", {}, "stale")
     assert info.value.code == "service_unavailable"
     assert fresh_calls == []
+
+
+def test_426_without_error_body_asks_for_client_upgrade(monkeypatch):
+    """426 但响应体没有 error（边缘代理/网关转发）：仍要说「请升级客户端」。
+
+    服务端自己一定带 ``{"error": "client_upgrade_required"}``，但本通道是独立
+    解析 HTTPError 的，缺了这段兜底就会把裸 ``HTTP 426`` 抛给用户。
+    """
+    _install(monkeypatch, [_http_error(426, {})])
+
+    with pytest.raises(client.SyncError) as info:
+        client.post("/api/sync/push", {}, "token")
+
+    assert info.value.code == "client_upgrade_required"
+    assert "升级客户端" in str(info.value)

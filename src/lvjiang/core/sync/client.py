@@ -67,6 +67,11 @@ def _request(method: str, route: str, data: dict | None, token: str, *,
         if exc.code == 409 and isinstance(details, dict) and details.get("error") == "conflict":
             raise SyncConflict(details) from None
         code = details.get("error") if isinstance(details, dict) and isinstance(details.get("error"), str) else ""
+        if exc.code == 426 and not code:
+            # 与 account/transport.py 的 http_error 保持同一口径：426 = 服务端要求
+            # 升级客户端。本仓库的服务端一定带 error 字段，但边缘代理/网关转发
+            # 的状态码可能没有 body——此时也要给出「请升级客户端」而不是裸 HTTP 码。
+            code = "client_upgrade_required"
         # 令牌被判失效：同一进程里可能刚被别处刷新轮换过，换一枚再试一次。只重试
         # 一次，再失败就是真的需要重新登录，交给上层报表。
         if allow_refresh and code in _AUTH_RETRY_CODES:

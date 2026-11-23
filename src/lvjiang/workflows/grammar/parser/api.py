@@ -23,15 +23,18 @@ _file_parse_lock = RLock()
 
 
 def _get_parser() -> Lark:
+    """懒加载 Lark 实例；双检锁避免并发首解析各构造一份"""
     global _parser
     if _parser is None:
-        grammar_path = Path(__file__).parent.parent / "grammar.lark"
-        _parser = Lark(
-            grammar_path.read_text(encoding="utf-8"),
-            parser="lalr",
-            lexer="contextual",
-            propagate_positions=True,
-        )
+        with _file_parse_lock:
+            if _parser is None:
+                grammar_path = Path(__file__).parent.parent / "grammar.lark"
+                _parser = Lark(
+                    grammar_path.read_text(encoding="utf-8"),
+                    parser="lalr",
+                    lexer="contextual",
+                    propagate_positions=True,
+                )
     return _parser
 
 
@@ -47,11 +50,23 @@ def _preprocess_line_continuation(text: str) -> tuple[str, list[int]]:
     的行号与源文件一致 —— 静态校验的报错要报真实行号。
     补出来的换行没有原文下标，记为 -1。调用方用这张表把解析器看到的
     token 位置还原到续行之前的源文本。
+
+    注释必须在这里一并识别：词法层的 COMMENT 会吃掉整行，但本函数看到的是
+    原始字符流。若把注释里的引号、半个括号也计入 in_string / depth，
+    `# (待补充` 这类注释就会让 depth 失衡，后续所有行被折叠进同一个逻辑行、
+    整份脚本静默解析成 0 条语句。所以注释一旦开始，就整段丢弃（词法层本来
+    也 %ignore 掉它），既不参与计数，也不会把注释文字带进续行之后的逻辑行——
+    括号内的 `[1, # 注释` 换行时才不会连下一行的内容一起被注释吃掉。
+
+    字符串转义口径以文法为准：``STRING`` 是 ``"[^"\\n]*"``，不支持 ``\\"``
+    转义，因此这里遇到 ``"`` 一律翻转字符串状态——曾经按 ``\\"`` 判转义，
+    与词法层分叉，含反斜杠的字符串会在预处理和解析两端得到不同结论。
     """
     result: list[str] = []
     origin: list[int] = []
     depth = 0
     in_string = False
+    in_comment = False
     pending_nl = 0  # 当前逻辑行内吐掉的换行数
     i = 0
 
@@ -61,9 +76,16 @@ def _preprocess_line_continuation(text: str) -> tuple[str, list[int]]:
 
     while i < len(text):
         ch = text[i]
-        if ch == '"' and (i == 0 or text[i - 1] != '\\'):
+        if in_comment:
+            if ch != '\n':
+                i += 1
+                continue  # 注释内容整段丢弃
+            in_comment = False  # 换行结束注释，下面按普通换行处理
+        if ch == '"':
             in_string = not in_string
             emit(ch, i)
+        elif not in_string and ch == '#':
+            in_comment = True
         elif not in_string and ch == '\\' and text[i + 1:i + 2] in ('\n', '\r'):
             # 显式续行：\\\n 或 \\\r\n。空格占住反斜杠的位置，换行稍后补回。
             emit(' ', i)

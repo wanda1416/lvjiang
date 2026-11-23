@@ -702,3 +702,47 @@ def test_crlf_document_parses_like_lf():
     from_crlf = parse_text(crlf)
     assert len(from_crlf.body) == len(from_lf.body)
     assert type(from_crlf.body[0]) is type(from_lf.body[0])
+
+
+# ─── 注释与续行的相互作用 ───────────────────────────────────
+
+def test_trailing_inline_comment_keeps_statement_boundary():
+    """行尾注释不能吞掉语句终结的换行。
+
+    COMMENT 曾写成 ``/#[^\\n]*\\n?/``：`log "a"  # 说明` 会把换行一并吃掉，
+    下一行被拼进当前语句、直接报语法错误；末行带注释时连补 `\\n` 也救不回来。
+    """
+    program = parse_text('log "a"  # 点击确认\nlog "b"\n')
+    assert len(program.body) == 2
+
+
+def test_last_line_inline_comment_without_newline():
+    program = parse_text('log "a"\nlog "b"  # 说明')
+    assert len(program.body) == 2
+
+
+def test_comment_brackets_do_not_swallow_following_lines():
+    """注释里的半个括号不能影响续行状态机的括号深度。
+
+    预处理与词法层是两套状态机：注释内的 `(` 曾被计入 depth，后续换行全被
+    折叠成空格，整份脚本静默解析成 0 条语句——不报错，只是什么都不做。
+    """
+    program = parse_text('# (待补充说明\nlog "a"\nlog "b"\n')
+    assert len(program.body) == 2
+
+
+def test_comment_quote_does_not_open_string_state():
+    program = parse_text('# 他说 "你好\nlog "a"\nlog "b"\n')
+    assert len(program.body) == 2
+
+
+def test_comment_inside_bracket_continuation_keeps_content():
+    """括号续行里的行尾注释不能把续行内容一起吃掉。
+
+    括号内的换行会被替换成空格，注释若留在文本里就会一路吃到逻辑行末尾，
+    `[\\n 1, # 说明\\n 2\\n]` 会丢掉 `2 ]`。注释必须在预处理阶段整段丢弃。
+    """
+    program = parse_text(
+        'eval $x = [\n    1,  # 第一项 (\n    2\n]\nlog "z"\n')
+    assert len(program.body) == 2
+    assert [a.value for a in program.body[0].func_args] == [1, 2]

@@ -72,6 +72,25 @@ def test_encrypt_text_uses_z1_and_reads_legacy_uncompressed():
     assert e2e.decrypt_text(key, legacy_wrapped) == text
 
 
+def test_encrypt_text_deterministic_across_time_and_os_header(monkeypatch):
+    import gzip
+    import time
+
+    clock = iter([1_700_000_000.0, 1_700_000_100.0, 1_700_000_200.0])
+    monkeypatch.setattr(time, "time", lambda: next(clock))
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    text = '{"notes": [{"text": "跨秒确定性验证", "updated_at": "t"}]}'
+    wrapped1 = e2e.encrypt_text(key, text)
+    wrapped2 = e2e.encrypt_text(key, text)
+    assert wrapped1 == wrapped2
+    assert e2e.decrypt_text(key, wrapped1) == text
+
+    gz = e2e._deterministic_gzip(b"hello world")
+    assert gz[:10] == b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x02\xff"
+    assert gzip.decompress(gz) == b"hello world"
+
+
 def test_http_426_client_upgrade_required_keeps_session():
     import io
     from urllib import error as urlerror

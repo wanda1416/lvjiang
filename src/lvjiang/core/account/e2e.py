@@ -5,10 +5,14 @@
 派生出同一把钥；口令与密钥都不上云（本地 account.json 缓存密钥仅用于
 restore 免重派生——本地磁盘上本就是明文数据，缓存不降低安全性）。
 
-算法：AES-256-GCM，nonce 为**合成 IV**（SHA-256(key‖"iv"‖明文)[:12]，
-SIV 构造）：同明文得同密文——文档通道的 sha/CAS 与名册的内容签名机制
-完全照常工作；不同明文的 nonce 碰撞可忽略。改口令即换钥：旧密文由
-下一次同步自动整体重推（密文签名必变，触发上传）。
+算法：AES-256-GCM，nonce 为**合成 IV**（SHA-256(key‖"iv"‖载荷)[:12]，SIV 构造，
+载荷 = 压缩后的明文）：同一份实现里同明文得同密文（压缩头固定、不含时间戳），
+文档通道的 sha/CAS 与名册的内容签名机制照常工作；不同明文的 nonce 碰撞可忽略。
+改口令即换钥：旧密文由下一次同步自动整体重推（密文签名必变，触发上传）。
+
+「同明文同密文」只承诺到**同一份压缩实现**：裸 deflate 的输出随 zlib 构建变化，
+网页端（WebCrypto + CompressionStream）连封装字段顺序都不同，因此跨客户端的密文
+sha 不是同一份内容的可比摘要——同步层对这种情况按 mtime 裁决，不依赖 sha 相等。
 
 封装格式：{"e2e": 1, "n": <b64 nonce>, "c": <b64 ct+tag>}。读取端见到
 非封装内容按 legacy 明文处理（过渡期读旧数据，写入时即加密上推）。
@@ -109,7 +113,9 @@ def _synthetic_nonce(key: bytes, plaintext: bytes) -> bytes:
 def _deterministic_gzip(data: bytes) -> bytes:
     # 固定 RFC 1952 头（mtime=0, XFL=2, OS=255 unknown）：不能直接用
     # gzip.compress(..., mtime=0)，Python 3.12+ 该分支走 zlib.compress(wbits=31)，
-    # 会按平台写 OS 字节（Windows 0x0a / Linux 0x03），破坏跨端密文一致。
+    # 会按平台写 OS 字节（Windows 0x0a / Linux 0x03）。
+    # 裸 deflate 的字节仍随 zlib 构建变化，所以这里保证的是「同机同版本跨时间稳定」，
+    # 足以让本机跨轮的 sha 比较成立；不要据此断言跨客户端密文相同。
     header = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x02\xff"
     compressed = zlib.compress(data, level=9, wbits=-15)
     trailer = struct.pack("<LL", zlib.crc32(data) & 0xFFFFFFFF, len(data) & 0xFFFFFFFF)

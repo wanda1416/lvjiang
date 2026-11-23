@@ -136,7 +136,21 @@ def _format_windows_exception(exception_ptrs_raw: int) -> list[str]:
             ("ContextRecord", ctypes.c_void_p),
         ]
 
-    kernel32 = ctypes.windll.kernel32
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=False)
+    kernel32.GetCurrentThreadId.argtypes = []
+    kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+    kernel32.GetModuleHandleExW.argtypes = [
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    kernel32.GetModuleHandleExW.restype = wintypes.BOOL
+    kernel32.GetModuleFileNameW.argtypes = [
+        ctypes.c_void_p,
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+    ]
+    kernel32.GetModuleFileNameW.restype = wintypes.DWORD
     lines.append(f"ThreadId: 0x{kernel32.GetCurrentThreadId():08x}")
 
     ptrs = _EXCEPTION_POINTERS.from_address(exception_ptrs_raw)

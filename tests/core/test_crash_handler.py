@@ -1,5 +1,6 @@
 """Windows native crash 异常详情解析测试。"""
 import ctypes
+import re
 import sys
 from ctypes import wintypes
 
@@ -40,4 +41,4 @@ def test_format_windows_exception_parses_code_access_and_module():
     assert "0xC0000005 (ACCESS_VIOLATION)" in text
     assert "Access: Read at 0x18" in text
     assert "kernel32.dll+0x" in text.lower()
-    assert "ThreadId: 0x" in text
+    assert re.search(r"^ThreadId: 0x[0-9a-f]{8}$", text, re.MULTILINE)

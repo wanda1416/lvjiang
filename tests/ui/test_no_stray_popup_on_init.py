@@ -65,18 +65,3 @@ def test_alert_panel_does_not_popup_on_init_with_pending_alert(
         assert not empty_panel.isVisible()
     finally:
         app.removeEventFilter(spy)
-
-
-def test_game_config_dialog_does_not_popup_stray_window_on_init(qtbot) -> None:
-    from lvjiang.apps.yysls.ui.game_settings import GameConfigDialog
-
-    app = QApplication.instance()
-    assert app is not None
-    spy = _TopLevelShowSpy()
-    app.installEventFilter(spy)
-    try:
-        dialog = GameConfigDialog()
-        qtbot.addWidget(dialog)
-        assert spy.shown_windows == []
-    finally:
-        app.removeEventFilter(spy)

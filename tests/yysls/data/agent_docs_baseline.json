@@ -920,6 +920,13 @@
       "sha256": "8bd90a029a0e22abdfd0f68ded42729b04f62173e70200f0592298ff54523cbf"
     },
     {
+      "id": "30-design:02-decisions:04-platform:31-ui-theme-system",
+      "path": "30-design/02-decisions/04-platform/31-ui-theme-system.md",
+      "title": "桌面端三主题系统与单一来源收敛",
+      "category": "30-architecture",
+      "sha256": "3da343d2268a6611148caca38d593a4a83ea1dbeecf311a4229cabd2f4bb9ee6"
+    },
+    {
       "id": "30-design:02-decisions:05-profile:01-graduation-rate",
       "path": "30-design/02-decisions/05-profile/01-graduation-rate.md",
       "title": "毕业率分析需求与现行边界",
@@ -1247,6 +1254,13 @@
       "title": "附录 A. 在线配置、会员内容与功能激活",
       "category": "60-userguide",
       "sha256": "eb323b9849ea2ff987e6f1319dfd5504be449b46c726c16ed5dcedc064aaa072"
+    },
+    {
+      "id": "60-guide:01-accounts:02-cloud-sync-and-privacy",
+      "path": "60-guide/01-accounts/02-cloud-sync-and-privacy.md",
+      "title": "云端同步、端到端加密与备战分享",
+      "category": "60-userguide",
+      "sha256": "f77735f967ef76235e461c51fd6d3cf7aec61dba58a7f1fd1e85e600d3274b73"
     },
     {
       "id": "60-guide:02-android:07-mobile-device",

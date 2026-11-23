@@ -213,3 +213,34 @@ class TestDatetime:
         assert isinstance(time_str, str)
         parts = time_str.split(":")
         assert len(parts) == 3
+
+
+# ─── 标量转换 ──────────────────────────────────────────────
+
+
+class TestToNumber:
+    """``to_number`` 必须把非有限值挡住。
+
+    ``float("inf")`` / ``float("nan")`` 都能转换成功，放行后参与比较会静默给出
+    恒真或恒假的结果（nan 与任何值比较都是 False），脚本作者只会看到「条件怎么
+    都不成立」。回归点：参数里写成 ``"inf"`` 或被 1e400 这类字面量撑爆的数值。
+    """
+
+    def test_inf_and_nan_are_rejected(self):
+        from lvjiang.workflows.builtins._coerce import to_number
+
+        assert to_number("inf") is None
+        assert to_number("-inf") is None
+        assert to_number("nan") is None
+        assert to_number("1e400") is None
+        assert to_number(float("inf")) is None
+        assert to_number(float("nan")) is None
+
+    def test_ordinary_numbers_still_convert(self):
+        from lvjiang.workflows.builtins._coerce import to_number
+
+        assert to_number("12") == 12
+        assert to_number("1.5") == 1.5
+        assert to_number(7) == 7
+        assert to_number("abc") is None
+        assert to_number(True) is None

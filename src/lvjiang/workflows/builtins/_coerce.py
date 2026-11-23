@@ -6,24 +6,33 @@ int/float 双类型语义：
 - bool 返回 None（不参与数值运算）
 
 布尔字面文本只认 ``true`` / ``false`` / ``1`` / ``0``，见 :data:`BOOL_TEXT`。
+非有限值（``inf`` / ``nan``）不算数字：让它们流进比较会得到恒真或恒假的结果。
 """
+
+import math
 
 
 def to_number(val) -> int | float | None:
     """将值转为数值，失败时返回 None
 
     - bool → None（Python 中 bool ⊂ int，需先拦截）
-    - int/float → 直接返回
+    - int/float → 直接返回（非有限值同样返回 None）
     - 字符串：含小数点 → float，否则 → int
-    - 其他类型或转换失败 → None
+    - 其他类型、转换失败或超出有限范围 → None
+
+    ``inf`` / ``nan`` 必须在这里就挡掉：``float("inf")``、``float("1e400")``、
+    ``float("nan")`` 都能转换成功，放行后参与比较会静默给出恒真/恒假结果
+    （nan 与任何值比较都是 False），脚本作者只会看到"条件怎么都不成立"。
     """
     if isinstance(val, bool):
         return None
     if isinstance(val, (int, float)):
-        return val
+        return val if math.isfinite(val) else None
     try:
         s = str(val)
         f = float(s)
+        if not math.isfinite(f):
+            return None
         if "." not in s and f.is_integer():
             return int(f)
         return f

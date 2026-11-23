@@ -4,10 +4,14 @@ action_catalog:
   OCR 扫描区域: OCR Scan Region
   PC 端通过剪贴板和 Ctrl+V 输入文本，支持后台模式: On PC, types text via clipboard and Ctrl+V; supports background mode
   find 结果、矩形或坐标变量: find result, rectangle or point variable
+  '「{label}」不能包含英文双引号或换行（DSL 字符串不支持转义）': '"{label}" cannot contain double quotes or line breaks (DSL strings do not support escapes)'
   '「{label}」应为 #rrggbb': '"{label}" should be #rrggbb'
   「{label}」应为 {n} 个数: '"{label}" should be {n} numbers'
+  '「{label}」应为命名延迟（字母或中文开头的名字）': '"{label}" should be a named delay (a name starting with a letter or Chinese character)'
   「{label}」未填写: '"{label}" is not filled in'
+  '「{label}」的 {n} 个值都必须是数字': 'all {n} values of "{label}" must be numbers'
   不带 by 得到文字；带 by 得到命中与否: Without by, returns the text; with by, returns whether it hit
+  '「{label}」请填单个 key（例如 ok），不要带方括号或场景前缀': 'enter a single key for "{label}" (for example ok), without brackets or a scene prefix'
   不抖动: No jitter
   主导通道: Primary Channel
   交互: Interaction

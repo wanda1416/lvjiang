@@ -179,6 +179,8 @@ class AndroidStreamCapture(CaptureBackend):
         self._socket_name: str = ""
         self._video_port: int | None = None
         self._server_proc: subprocess.Popen | None = None
+        self._stderr_thread: threading.Thread | None = None
+        self._server_stderr_tail: list[str] = []
         self._sock: socket.socket | None = None
         self._decoder: "av.CodecContext | None" = None
         self._latest_frame: np.ndarray | None = None
@@ -628,11 +630,14 @@ class AndroidStreamCapture(CaptureBackend):
         # 那会连带杀掉同设备上其他目标、其他客户端（包括用户正在跑的批量任务）
         # 的会话——它们的 socket 只会收到一次静默 EOF。
         if self._scid:
-            subprocess.run(
-                [*self._device._base(), "shell",
-                 "pkill", "-f", f"scid={self._scid:08x}"],
-                capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
-            )
+            try:
+                subprocess.run(
+                    [*self._device._base(), "shell",
+                     "pkill", "-f", f"scid={self._scid:08x}"],
+                    capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
+                )
+            except Exception as exc:  # noqa: BLE001 - 断连停流时 pkill 失败不得阻断清理与重建
+                logger.debug(f"[AndroidStream] 清理远端 scrcpy 进程失败（已忽略）: {exc}")
 
         if not decode_thread_stuck:
             with self._decoder_lock:
@@ -759,12 +764,21 @@ class AndroidStreamCapture(CaptureBackend):
             f"max_size={self._max_size} max_fps={self._max_fps} "
             f"control=false tunnel_forward=true cleanup=false"
         )
+        self._server_stderr_tail.clear()
         try:
             self._server_proc = subprocess.Popen(
                 [*self._device._base(), "shell", shell_cmd],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                 **SUBPROCESS_NO_WINDOW,
             )
+            proc = self._server_proc
+            self._stderr_thread = threading.Thread(
+                target=self._drain_server_stderr,
+                args=(proc,),
+                daemon=True,
+                name="android-stream-stderr",
+            )
+            self._stderr_thread.start()
             logger.debug(f"[AndroidStream] server 进程已启动 pid={self._server_proc.pid}")
         except Exception as e:
             self._fail(tr("启动 scrcpy server 失败：{error}").format(error=e))
@@ -774,15 +788,37 @@ class AndroidStreamCapture(CaptureBackend):
         # 等待 server 就绪（监听 socket）
         time.sleep(1.5)
         if self._server_proc.poll() is not None:
-            _, stderr = self._server_proc.communicate()
+            if self._stderr_thread is not None:
+                self._stderr_thread.join(timeout=1.0)
+            detail = "\n".join(self._server_stderr_tail)[:300]
             self._fail(tr("scrcpy server 启动失败（返回码 {rc}）：{detail}").format(
                 rc=self._server_proc.returncode,
-                detail=stderr.decode(errors="replace")[:300]))
+                detail=detail))
             self._server_proc = None
             return False
 
         logger.debug("[AndroidStream] server 进程运行中")
         return True
+
+    def _drain_server_stderr(self, proc: subprocess.Popen) -> None:
+        """持续排空 scrcpy server stderr，防止 OS 管道缓冲写满导致视频流死锁。"""
+        stream = proc.stderr
+        if stream is None:
+            return
+        try:
+            for raw in iter(stream.readline, b""):
+                line = raw.decode(errors="replace").strip()
+                if line:
+                    self._server_stderr_tail.append(line)
+                    if len(self._server_stderr_tail) > 20:
+                        del self._server_stderr_tail[:-20]
+        except Exception:
+            pass
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                pass
 
     # ─── 内部：socket 连接 ────────────────────────────────
 

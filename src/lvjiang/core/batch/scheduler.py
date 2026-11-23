@@ -582,8 +582,9 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
 
             # 3. 顺序执行脚本
             for script_idx, script in enumerate(self._scripts):
-                if self._stop_check():
-                    self._stopped = True
+                if self._stop_check() or self._aborted:
+                    if self._stop_check():
+                        self._stopped = True
                     break
 
                 if self._is_skipped(username, script.id):
@@ -598,12 +599,29 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         f"[批量] {label} → {script.name} 跳过: {_SKIP_REASON}")
                     continue
 
+                planned = self._task_plan[(run_idx, script.id)]
+                params = copy.deepcopy(planned.params)
+                if script.batch_check:
+                    checked = self._check_script(
+                        script, username, params=params)
+                    if checked.status != RESULT_SUCCESS:
+                        status = self._result_to_ui_status(checked.status)
+                        entry_result["scripts"][script.id] = status
+                        self.progress.emit(
+                            round_number, run_idx, label, script.id, status)
+                        report.start_script(script.id, script.name)
+                        report.end_script(status)
+                        reason = checked.message or checked.status
+                        self._log(
+                            f"[批量] {label} → {script.name} "
+                            f"{'跳过' if status == ST_SKIPPED else '检查失败'}: "
+                            f"{reason}")
+                        continue
+
                 self.progress.emit(
                     round_number, run_idx, label, script.id, ST_RUNNING)
                 self._log(f"[批量] {label} → {script.name} ...")
                 report.start_script(script.id, script.name)
-                planned = self._task_plan[(run_idx, script.id)]
-                params = copy.deepcopy(planned.params)
                 from ..history.daily import try_create_task_run
                 task_started_at = datetime.now().astimezone()
                 task_run = try_create_task_run(
@@ -627,7 +645,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         try:
                             result = self._run_script(
                                 script, session, username, params=params)
-                            if username:
+                            if username and not self._stop_check():
                                 self._session_manager.save(username, session)
                         except Exception as error:
                             log_failure(
@@ -636,14 +654,21 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         if task_run is not None:
                             logger.info(
                                 f"任务线程结束: task_run_id={task_run.task_run_id}")
+                    batch_stopped = self._stop_check()
                     task_stopped = self._task_was_stopped()
-                    script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
+                    if task_stopped:
+                        self._task_stop_clear()
+                    if batch_stopped:
+                        self._stopped = True
+                    script_ui_status = (
+                        ST_STOPPED if (batch_stopped or task_stopped) else ST_SUCCESS)
                     entry_result["scripts"][script.id] = script_ui_status
                     self.progress.emit(
                         round_number, run_idx, label, script.id, script_ui_status)
                     self._log(
                         f"[批量] {label} → {script.name} "
-                        + ("已停止，继续下一项" if task_stopped else "完成"))
+                        + ("已停止" if batch_stopped
+                           else "已停止，继续下一项" if task_stopped else "完成"))
                     report.end_script(script_ui_status, result)
                     try:
                         result_path = self._save_result(
@@ -658,13 +683,26 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         try:
                             task_run.finish(
                                 status=("stopped" if task_stopped
-                                        else "interrupted" if self._stop_check()
+                                        else "interrupted" if batch_stopped
                                         else "completed"),
                                 result_path=result_path,
                             )
                         except Exception as history_exc:  # noqa: BLE001
                             logger.warning(
                                 f"任务历史收尾失败，继续批量任务: {history_exc}")
+                    if batch_stopped:
+                        break
+                except ChannelFaultError as fault:
+                    # 通道级故障：后续每一项都只会拿旧帧空转，必须中止整批。
+                    # 它跟「任务内异常」和「无人值守中断」都不是一类事，不能
+                    # 记一条失败继续下一项，也不该跑无人值守恢复 wf（那时设备
+                    # 本身不可用，恢复流程只会连环失败）。
+                    self._abort_channel_fault(
+                        fault, report=report, label=label, script=script,
+                        run_idx=run_idx, round_number=round_number,
+                        attempt=script_idx + 1, task_run=task_run,
+                        username=username, started_at=task_started_at)
+                    break
                 except Exception as e:
                     result_path = None
                     try:
@@ -688,25 +726,20 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                         round_number, run_idx, label, script.id, ST_FAILED)
                     self._log(f"[批量] {label} → {script.name} 失败: {e}", "error")
                     report.end_script(ST_FAILED)
-                    self._recover_unattended(
+                    rec = self._recover_unattended(
                         run_idx, username, batch_state,
                         pending=script_idx + 1 < len(self._scripts))
-                except ChannelFaultError as fault:
-                    # 通道级故障：后续每一项都只会拿旧帧空转，必须中止整批。
-                    # 它跟「任务内异常」和「无人值守中断」都不是一类事，不能
-                    # 记一条失败继续下一项，也不该跑无人值守恢复 wf（那时设备
-                    # 本身不可用，恢复流程只会连环失败）。
-                    self._abort_channel_fault(
-                        fault, report=report, label=label, script=script,
-                        run_idx=run_idx, round_number=round_number,
-                        attempt=script_idx + 1, task_run=task_run,
-                        username=username, started_at=task_started_at)
+                    if rec is not None:
+                        if rec.state is not None:
+                            batch_state = rec.state
+                        if rec.status != RESULT_SUCCESS:
+                            break
 
             # 用户中断或通道故障时，关闭尚未结束的脚本记录
             if self._stopped or self._aborted:
                 report.finish_pending()
 
-            if use_lifecycle:
+            if use_lifecycle and not self._aborted:
                 # 条目收尾收到通用执行摘要，wf 可据此维护私有状态。
                 item_summary = {
                     "prepare": prepared.status,
@@ -736,6 +769,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
             if self._stopped or self._aborted:
                 break
 
+        self._stopped = self._stopped or self._stop_check()
         summary["stopped"] = self._stopped
         summary["aborted"] = self._aborted
         summary["channel_fault"] = self._channel_fault
@@ -743,9 +777,9 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                else tr("（用户中断）") if self._stopped else "")
         self._log(f"[批量] 全部结束{tag}", "error" if self._aborted else "info")
 
-        # setup 成功才说明批次现场已经建立，此时才允许执行 teardown。
+        # setup 成功且执行通道未故障中断时才允许执行 teardown。
         # setup 非 success 时直接终止，不启动任何后续生命周期阶段。
-        if use_lifecycle and can_run:
+        if use_lifecycle and can_run and not self._aborted:
             teardown = self._run_stage(
                 "batch_teardown", self._spec.workflows.batch_teardown,
                 -1, "", batch_state,
@@ -997,8 +1031,9 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                     })
                     session = self._session_manager.load(username)
                     for script_idx, script in enumerate(self._scripts):
-                        if self._stop_check():
-                            self._stopped = True
+                        if self._stop_check() or self._aborted:
+                            if self._stop_check():
+                                self._stopped = True
                             break
                         if self._is_skipped(username, script.id):
                             # 声明跳过：连可执行性检查都不做，直接记跳过；与用户
@@ -1069,16 +1104,24 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                                 result = self._run_script(
                                     script, session, username,
                                     params=copy.deepcopy(planned.params))
-                                self._session_manager.save(username, session)
+                                if not self._stop_check():
+                                    self._session_manager.save(username, session)
+                            batch_stopped = self._stop_check()
                             task_stopped = self._task_was_stopped()
-                            script_ui_status = ST_STOPPED if task_stopped else ST_SUCCESS
+                            if task_stopped:
+                                self._task_stop_clear()
+                            if batch_stopped:
+                                self._stopped = True
+                            script_ui_status = (
+                                ST_STOPPED if (batch_stopped or task_stopped) else ST_SUCCESS)
                             entry["scripts"][script.id] = script_ui_status
                             report.end_script(script_ui_status, result)
                             self.progress.emit(
                         round_number, run_idx, label, script.id, script_ui_status)
                             self._log(
                                 f"[批量] {label} → {script.name} "
-                                + ("已停止，继续下一项" if task_stopped else "完成"))
+                                + ("已停止" if batch_stopped
+                                   else "已停止，继续下一项" if task_stopped else "完成"))
                             try:
                                 result_path = self._save_result(
                                     username, script, result, task_started_at)
@@ -1093,18 +1136,21 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                                 try:
                                     task_run.finish(
                                         status=("stopped" if task_stopped
-                                                else "interrupted" if self._stop_check()
+                                                else "interrupted" if batch_stopped
                                                 else "completed"),
                                         result_path=result_path)
                                 except Exception as history_exc:  # noqa: BLE001
                                     logger.warning(
                                         f"任务历史收尾失败，继续批量任务: {history_exc}")
+                            if batch_stopped:
+                                break
                         except ChannelFaultError as fault:
                             self._abort_channel_fault(
                                 fault, report=report, label=label, script=script,
                                 run_idx=run_idx, round_number=round_number,
                                 attempt=script_idx + 1, task_run=task_run,
                                 username=username, started_at=task_started_at)
+                            break
                         except Exception as exc:  # noqa: BLE001
                             if isinstance(exc, WorkflowAbort):
                                 logger.info(
@@ -1135,11 +1181,18 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                                 except Exception as history_exc:  # noqa: BLE001
                                     logger.warning(
                                         f"任务历史收尾失败，继续批量任务: {history_exc}")
-                            self._recover_unattended(
+                            rec = self._recover_unattended(
                                 run_idx, username, batch_state,
                                 pending=script_idx + 1 < len(self._scripts))
+                            if rec is not None:
+                                if rec.state is not None:
+                                    batch_state = rec.state
+                                if rec.status != RESULT_SUCCESS:
+                                    break
                     if self._stopped or self._aborted:
                         report.finish_pending()
+                    if self._aborted:
+                        break
                     finished = self._run_stage(
                         "finish_item", self._spec.workflows.finish_item,
                         run_idx, username, batch_state,
@@ -1187,7 +1240,9 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
 
         self._stopped = self._stopped or self._stop_check()
         summary["stopped"] = self._stopped
-        if setup.status == RESULT_SUCCESS:
+        summary["aborted"] = self._aborted
+        summary["channel_fault"] = self._channel_fault
+        if setup.status == RESULT_SUCCESS and not self._aborted:
             teardown = self._run_stage(
                 "batch_teardown", self._spec.workflows.batch_teardown,
                 -1, "", batch_state,

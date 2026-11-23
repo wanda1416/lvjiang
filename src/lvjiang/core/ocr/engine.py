@@ -4,6 +4,7 @@
 那层全局规范化，再去除首尾空白——没有「完全不清洗」这条路径。
 """
 
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -16,6 +17,17 @@ from ..layout.models import CanvasConfig, Region
 from ..scene.registry import get_effective_region_defs
 from .cleaner import OCRCleaner
 from .config import load_region_batch_config
+
+
+def clip_roi(x1: int, y1: int, x2: int, y2: int, width: int, height: int) -> tuple[int, int, int, int]:
+    """将像素 ROI 钳位到 [0, width] x [0, height]，避免负坐标触发 NumPy 反向回绕。"""
+    if width <= 0 or height <= 0:
+        return 0, 0, 0, 0
+    cx1 = max(0, min(int(x1), width))
+    cy1 = max(0, min(int(y1), height))
+    cx2 = max(cx1, min(int(x2), width))
+    cy2 = max(cy1, min(int(y2), height))
+    return cx1, cy1, cx2, cy2
 
 
 @dataclass
@@ -34,6 +46,7 @@ class OCREngine:
     def __init__(self, *, rapidocr_options: dict[str, Any] | None = None,
                  backend_factory: Callable[[], Any] | None = None,
                  region_pixel_budget: int | None = None):
+        self._lock = threading.RLock()
         self._ocr: Any = None
         self._available = False
         self._rapidocr_options = dict(rapidocr_options or {})
@@ -63,24 +76,25 @@ class OCREngine:
 
     def close(self) -> None:
         """释放后端会话；设备端不能仅丢弃 Python 引用来回收 JNI 原生资源。"""
-        backend, self._ocr = self._ocr, None
-        self._available = False
-        self._loaded_options = ()
-        failure = None
-        close_backend = getattr(backend, "close", None)
-        if callable(close_backend):
-            close_backend()
-            return
-        for name in ("text_det", "text_cls", "text_rec"):
-            session = getattr(getattr(backend, name, None), "session", None)
-            close = getattr(session, "close", None)
-            if callable(close):
-                try:
-                    close()
-                except Exception as exc:
-                    failure = failure or exc
-        if failure is not None:
-            raise failure
+        with self._lock:
+            backend, self._ocr = self._ocr, None
+            self._available = False
+            self._loaded_options = ()
+            failure = None
+            close_backend = getattr(backend, "close", None)
+            if callable(close_backend):
+                close_backend()
+                return
+            for name in ("text_det", "text_cls", "text_rec"):
+                session = getattr(getattr(backend, name, None), "session", None)
+                close = getattr(session, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception as exc:
+                        failure = failure or exc
+            if failure is not None:
+                raise failure
 
     def _ensure_loaded(self) -> bool:
         """懒加载 RapidOCR；配置变了就重建会话。
@@ -88,40 +102,41 @@ class OCREngine:
         「图像识别 → 识别配置」保存后不需要重启：下次识别比对参数指纹，
         不同则先 ``close()`` 再按新参数重建。
         """
-        options = self._resolve_options()
-        fingerprint = tuple(sorted(options.items()))
-        if self._ocr is not None:
-            # 空指纹说明会话不是本方法建的（外部注入的后端），来源不明就不要
-            # 擅自重连；只要是我们自己按配置加载的，参数一变就重建。
-            if not self._loaded_options or fingerprint == self._loaded_options:
-                return self._available
-            logger.info("OCR 参数已变更，重建识别会话：{}", options or "出厂默认")
-            self.close()
-        try:
-            if self._backend_factory is not None:
-                self._ocr = self._backend_factory()
-            else:
-                from rapidocr_onnxruntime import RapidOCR
-                self._ocr = RapidOCR(**options)
-            self._loaded_options = fingerprint
-            self._available = True
-            logger.info("OCR 引擎加载成功（{}）", "native" if self._backend_factory else "RapidOCR")
-        except MemoryError:
-            raise
-        except ImportError as e:
-            if self._backend_factory is not None:
-                raise RuntimeError(f"手机 OCR 原生后端依赖加载失败：{e}") from e
-            logger.error(
-                f"RapidOCR 未安装: {e}\n"
-                "请执行: pip install rapidocr-onnxruntime"
-            )
-            self._available = False
-        except Exception as e:
-            if self._backend_factory is not None:
+        with self._lock:
+            options = self._resolve_options()
+            fingerprint = tuple(sorted(options.items()))
+            if self._ocr is not None:
+                # 空指纹说明会话不是本方法建的（外部注入的后端），来源不明就不要
+                # 擅自重连；只要是我们自己按配置加载的，参数一变就重建。
+                if not self._loaded_options or fingerprint == self._loaded_options:
+                    return self._available
+                logger.info("OCR 参数已变更，重建识别会话：{}", options or "出厂默认")
+                self.close()
+            try:
+                if self._backend_factory is not None:
+                    self._ocr = self._backend_factory()
+                else:
+                    from rapidocr_onnxruntime import RapidOCR
+                    self._ocr = RapidOCR(**options)
+                self._loaded_options = fingerprint
+                self._available = True
+                logger.info("OCR 引擎加载成功（{}）", "native" if self._backend_factory else "RapidOCR")
+            except MemoryError:
                 raise
-            logger.error(f"RapidOCR 初始化失败: {e}")
-            self._available = False
-        return self._available
+            except ImportError as e:
+                if self._backend_factory is not None:
+                    raise RuntimeError(f"手机 OCR 原生后端依赖加载失败：{e}") from e
+                logger.error(
+                    f"RapidOCR 未安装: {e}\n"
+                    "请执行: pip install rapidocr-onnxruntime"
+                )
+                self._available = False
+            except Exception as e:
+                if self._backend_factory is not None:
+                    raise
+                logger.error(f"RapidOCR 初始化失败: {e}")
+                self._available = False
+            return self._available
 
     def recognize(self, image: np.ndarray,
                   cleaning_group: str | None = None) -> list[OCRResult]:
@@ -131,21 +146,25 @@ class OCREngine:
         返回: list[OCRResult]
         """
         OCRCleaner().validate_group(cleaning_group)
-        if not self._ensure_loaded():
-            return []
-        try:
-            # 图像预处理：提升 OCR 准确率
-            processed = self._preprocess_for_ocr(image)
-            result, _ = self._ocr(processed)
-            return self._parse_result(result, cleaning_group)
-        except MemoryError:
-            raise
-        except Exception as e:
-            if self._backend_factory is not None:
-                # 原生后端的结构/模型错误不是正常未识别，不允许静默继续点击。
+        with self._lock:
+            if not self._ensure_loaded():
+                return []
+            backend = self._ocr
+            if backend is None:
+                return []
+            try:
+                # 图像预处理：提升 OCR 准确率
+                processed = self._preprocess_for_ocr(image)
+                result, _ = backend(processed)
+                return self._parse_result(result, cleaning_group)
+            except MemoryError:
                 raise
-            logger.error(f"OCR 识别失败: {e}")
-            return []
+            except Exception as e:
+                if self._backend_factory is not None:
+                    # 原生后端的结构/模型错误不是正常未识别，不允许静默继续点击。
+                    raise
+                logger.error(f"OCR 识别失败: {e}")
+                return []
 
     @staticmethod
     def _preprocess_for_ocr(image: np.ndarray) -> np.ndarray:
@@ -219,12 +238,14 @@ class OCREngine:
                 logger.debug(f"跳过非文字区域: {region.key}")
                 continue
 
-            # 区域归一化坐标 -> 截图像素
-            x1 = int(canvas_x + region.x_ratio * canvas_w)
-            y1 = int(canvas_y + region.y_ratio * canvas_h)
-            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
-            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
-
+            # 区域归一化坐标 -> 截图像素（钳位防止负坐标回绕）
+            x1, y1, x2, y2 = clip_roi(
+                int(canvas_x + region.x_ratio * canvas_w),
+                int(canvas_y + region.y_ratio * canvas_h),
+                int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w),
+                int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h),
+                w, h,
+            )
             crops.append((region.key, image[y1:y2, x1:x2]))
 
         if not crops:
@@ -428,11 +449,16 @@ class OCREngine:
 
         h, w = image.shape[:2]
         # panel 区域像素坐标
-        px1 = int(canvas.x_ratio * w + panel.x_ratio * canvas.w_ratio * w)
-        py1 = int(canvas.y_ratio * h + panel.y_ratio * canvas.h_ratio * h)
-        px2 = int(canvas.x_ratio * w + (panel.x_ratio + panel.w_ratio) * canvas.w_ratio * w)
-        py2 = int(canvas.y_ratio * h + (panel.y_ratio + panel.h_ratio) * canvas.h_ratio * h)
+        px1, py1, px2, py2 = clip_roi(
+            int(canvas.x_ratio * w + panel.x_ratio * canvas.w_ratio * w),
+            int(canvas.y_ratio * h + panel.y_ratio * canvas.h_ratio * h),
+            int(canvas.x_ratio * w + (panel.x_ratio + panel.w_ratio) * canvas.w_ratio * w),
+            int(canvas.y_ratio * h + (panel.y_ratio + panel.h_ratio) * canvas.h_ratio * h),
+            w, h,
+        )
         panel_img = image[py1:py2, px1:px2]
+        if panel_img.size == 0:
+            return []
 
         # 校准模式
         calibration = getattr(panel, "calibration", "auto")

@@ -119,8 +119,24 @@ def discover(workflows: Path, fixtures: Path) -> dict:
                         }
                     )
             row.update(fixtures=accepted, rejected_fixtures=rejected)
-            _preflight(path, list(libraries.values()))
-            row["capability_status"] = "supported"
+            if accepted:
+                supported_fixtures = []
+                last_unsupported_reason = ""
+                for fixture_name in accepted:
+                    env_name = str(fixture_specs[fixture_name].get("run_env", "") or "")
+                    try:
+                        _preflight(path, list(libraries.values()), run_env=env_name)
+                        supported_fixtures.append(fixture_name)
+                    except Exception as exc:
+                        last_unsupported_reason = str(exc)[:1024]
+                if supported_fixtures:
+                    row["fixtures"] = supported_fixtures
+                    row["capability_status"] = "supported"
+                else:
+                    row.update(capability_status="unsupported", reason=last_unsupported_reason)
+            else:
+                _preflight(path, list(libraries.values()))
+                row["capability_status"] = "supported"
         except Exception as exc:
             row.update(capability_status="unsupported", reason=str(exc)[:1024])
         row["coverage_status"] = (

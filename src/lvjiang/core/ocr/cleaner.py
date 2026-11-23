@@ -13,12 +13,13 @@
 
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any
 
 from loguru import logger
 
-from .config import OCR_CONFIG_PATH, load_ocr_config
+from .config import _OCR_CONFIG_LOCK, OCR_CONFIG_PATH, load_ocr_config
 
 
 class OCRCleaner:
@@ -233,17 +234,23 @@ class OCRCleaner:
         normalization["groups"] = groups
 
     def _save_config(self):
-        """通过 ConfigResolver 保存完整配置（开发→system，用户→local diff）
-
-        必须保存 self._config 全量内容，而非仅已知键；
-        否则开发模式下 save_merged 全量写 system 会丢失未来新增的键。
-        """
+        """加锁重读最新 ocr.yaml 并仅合并 normalization 节点，避免覆写 recognition 设置。"""
         from ..config import get_resolver
-        doc: dict[str, Any] = {k: v for k, v in self._config.items() if v is not None}
-        try:
-            get_resolver().save_merged(OCR_CONFIG_PATH, doc)
-        except Exception as e:
-            logger.error(f"保存 OCR 清洗配置失败: {e}")
+
+        new_norm = copy.deepcopy(self._config.get("normalization"))
+        with _OCR_CONFIG_LOCK:
+            latest = load_ocr_config()
+            doc: dict[str, Any] = {k: v for k, v in latest.items() if v is not None}
+            if new_norm is not None:
+                doc["normalization"] = new_norm
+            try:
+                get_resolver().save_merged(OCR_CONFIG_PATH, doc)
+                self._config = doc
+            except Exception as e:
+                # 写盘失败时回滚内存缓存为磁盘最新态，避免脏状态残留
+                self._config = latest
+                logger.error(f"保存 OCR 清洗配置失败: {e}")
+                raise
 
     @classmethod
     def reset_instance(cls):

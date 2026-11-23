@@ -23,6 +23,7 @@ from ...workflows.result_protocol import (
     RESULT_STOPPED,
     RESULT_SUCCESS,
 )
+from ..android.recovery import ChannelFaultError
 from ..config.resolver import get_resolver
 from .models import (
     _RESULT_STATUSES,
@@ -240,12 +241,15 @@ class StageExecutionMixin:
                         result, status=RESULT_SKIPPED,
                         message=tr("用户结束当前任务，继续下一项"))
             return replace(result, source=str(wf_path))
+        except ChannelFaultError:
+            raise
         except WorkflowAbort as e:
             # 无人值守改道，不是阶段 wf 出错。按失败记账（这条目不重试，直接
             # 跳到下一个），但日志级别和文案都不该把预期分支说成异常。
             logger.info(
                 f"批量阶段被无人值守中止 ({phase}, "
                 f"{username or 'batch'}): {e}")
+            self._unattended_hit = ""
             return BatchStageResult(
                 status=RESULT_FAILED,
                 message=f"无人值守中止: {e}",
@@ -298,10 +302,13 @@ class StageExecutionMixin:
         engine.workflow_config_snapshot = copy.deepcopy(
             self._dedicated_configs.get((username or "", script.id), self._workflow_configs.get(script.id, {})))
         try:
+            self._task_stop_clear()
             engine.load_subcalls(wf_path)
             value = engine.call_subcall(
                 script.batch_check, [copy.deepcopy(params)])
             return self._normalize_check_result(value)
+        except ChannelFaultError:
+            raise
         except Exception as exc:  # noqa: BLE001 — 单个任务的检查不得拖垮整批
             logger.error(
                 f"批量可执行性检查失败 ({username}/{script.id}): {exc}")

@@ -180,10 +180,30 @@ class ConfigResolver:
         """
         return self._dev_mode
 
+
+    @staticmethod
+    def _safe_path(root: Path, rel_path: str, *, allow_empty: bool = False) -> Path:
+        """解析相对配置路径并强制约束在 root 目录内，防止路径穿越绕过层隔离。"""
+        if not rel_path:
+            if allow_empty:
+                return root
+            raise ValueError("配置路径不能为空")
+        if "\\" in rel_path or rel_path.startswith("/") or ":" in rel_path:
+            raise ValueError(f"非法配置路径: {rel_path}")
+        rel = Path(rel_path)
+        if rel.is_absolute() or ".." in rel.parts:
+            raise ValueError(f"配置路径禁止越界访问: {rel_path}")
+        target = root / rel
+        root_resolved = root.resolve()
+        target_resolved = target.resolve()
+        if not target_resolved.is_relative_to(root_resolved):
+            raise ValueError(f"配置路径逃逸根目录: {rel_path}")
+        return target
+
     def write_dir(self, rel_dir: str = "") -> Path:
         """当前模式的可写目录（确保存在），编辑器默认目录等场景用"""
         root = self.system_dir if self.is_dev_mode() else self.local_dir
-        target = root / rel_dir if rel_dir else root
+        target = self._safe_path(root, rel_dir, allow_empty=True)
         target.mkdir(parents=True, exist_ok=True)
         return target
 
@@ -301,10 +321,10 @@ class ConfigResolver:
         local 恒为最高优先级——用户自己改过的东西，任何在线下发都不该盖掉。
         """
         self._remember_baseline(rel_path)
-        local = self.local_dir / rel_path
+        local = self._safe_path(self.local_dir, rel_path)
         if local.exists():
             return local
-        system = self.system_dir / rel_path
+        system = self._safe_path(self.system_dir, rel_path)
         return system if system.exists() else None
 
     def _remember_baseline(self, rel_path: str) -> None:
@@ -323,7 +343,7 @@ class ConfigResolver:
         path = self.resolve_read(rel_path)
         if path is None:
             return EntityOrigin(layer="", version=None)
-        if path == self.local_dir / rel_path:
+        if path == self._safe_path(self.local_dir, rel_path):
             layer = LAYER_LOCAL
         else:
             layer = LAYER_SYSTEM
@@ -442,7 +462,7 @@ class ConfigResolver:
         """
         root = self._layer_root(
             layer, self.system_dir if self.is_dev_mode() else self.local_dir)
-        target = root / rel_path
+        target = self._safe_path(root, rel_path)
         spec = versioning.spec_for(rel_path)
         if isinstance(data, str) and spec is not None and spec.has_content_version:
             # 先对齐当前修订号检测空操作，再在真正修改时递增。
@@ -529,7 +549,7 @@ class ConfigResolver:
         默认禁止」相关文档）。否则远程新增的调律规则会变成用户可删，
         删掉之后下次同步又回来，行为莫名其妙。
         """
-        return (self.system_dir / rel_path).exists()
+        return self._safe_path(self.system_dir, rel_path).exists()
 
     def ensure_entity_deletable(self, rel_path: str) -> None:
         """在删除或重命名实体前校验当前身份是否有权限。
@@ -553,18 +573,18 @@ class ConfigResolver:
         ``layer`` 显式指定要删哪一层的文件（规则同 :meth:`write_entity`）。
         """
         if layer is not None:
-            target = self._layer_root(layer, self.system_dir) / rel_path
+            target = self._safe_path(self._layer_root(layer, self.system_dir), rel_path)
             if not self.is_dev_mode():
                 self.ensure_entity_deletable(rel_path)
             if target.exists():
                 target.unlink()
         elif self.is_dev_mode():
-            target = self.system_dir / rel_path
+            target = self._safe_path(self.system_dir, rel_path)
             if target.exists():
                 target.unlink()
         else:
             self.ensure_entity_deletable(rel_path)
-            local = self.local_dir / rel_path
+            local = self._safe_path(self.local_dir, rel_path)
             if local.exists():
                 local.unlink()
         self._notify(rel_path)
@@ -584,7 +604,7 @@ class ConfigResolver:
         if not self.is_system_entity(rel_path):
             raise SystemContentProtected(
                 f"{rel_path} 没有系统版本，无法还原")
-        local = self.local_dir / rel_path
+        local = self._safe_path(self.local_dir, rel_path)
         if not local.is_file():
             return False
         local.unlink()
@@ -622,16 +642,16 @@ class ConfigResolver:
         UI 判断某个条目是不是系统内容时用：系统内容用户不允许删除，
         对应的删除按钮应置灰并给出停用替代方案。
         """
-        return self._load_yaml(self.system_dir / rel_path)
+        return self._load_yaml(self._safe_path(self.system_dir, rel_path))
 
     def load_local(self, rel_path: str) -> dict:
         """只读 local 层原始文档，供需要分层 schema 迁移的聚合配置使用。"""
-        return self._load_yaml(self.local_dir / rel_path)
+        return self._load_yaml(self._safe_path(self.local_dir, rel_path))
 
     def load_merged(self, rel_path: str) -> dict:
         """聚合读：system 有效基底 ← local diff 深合并。"""
-        base = self._load_yaml(self.system_dir / rel_path)
-        overlay_path = self.local_dir / rel_path
+        base = self._load_yaml(self._safe_path(self.system_dir, rel_path))
+        overlay_path = self._safe_path(self.local_dir, rel_path)
         if not overlay_path.exists():
             return base
         registry = REGISTRY_LIST_PATHS.get(rel_path, ())
@@ -666,7 +686,7 @@ class ConfigResolver:
         else:
             base = (deepcopy(base_doc) if base_doc is not None
                     else self._load_yaml(
-                        self.system_dir / rel_path))
+                        self._safe_path(self.system_dir, rel_path)))
             diff = compute_diff(
                 base, full_doc, (registry if registry is not None
                                  else REGISTRY_LIST_PATHS.get(rel_path, ())),

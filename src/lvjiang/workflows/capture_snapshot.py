@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from ..core.input.capture_base import capture_for_run
+from ..core.input.capture_base import capture_for_run, unwrap_capture
 from .errors import WorkflowUserError
 
 #: from screen 直取超时：页面校验不该被设备卡顿拖到 capture_lossless 的 10s 默认值。
@@ -38,6 +38,7 @@ class CaptureSnapshotMixin:
     _last_capture_fallback: bool
     _reused_capture_frame: np.ndarray | None
     _screen_capture_scope: bool
+    _snapshot_generation: int
 
     def _init_capture_snapshot(self) -> None:
         self._last_capture_frame = None
@@ -47,6 +48,7 @@ class CaptureSnapshotMixin:
         self._last_capture_fallback = False
         self._reused_capture_frame = None
         self._screen_capture_scope = False
+        self._snapshot_generation = 0
 
     def clear_capture_snapshot(self) -> None:
         """Invalidate the cached frame at a workflow lifecycle boundary."""
@@ -55,6 +57,7 @@ class CaptureSnapshotMixin:
         self._last_capture_source = ""
         self._last_capture_fallback = False
         self._reused_capture_frame = None
+        self._snapshot_generation = getattr(self, "_snapshot_generation", 0) + 1
 
     def capture_frame(self, *, source: str = "") -> np.ndarray | None:
         """Capture a frame and make it the engine's latest snapshot.
@@ -132,7 +135,7 @@ class CaptureSnapshotMixin:
         第二个元素标记这次回退，供日志与上层区分。直取通道由后端能力决定
         （Android scrcpy 走 screencap，PC 后端基类等价于普通截图）。
         """
-        capture = self._capture
+        capture = unwrap_capture(self._capture)
         lossless = getattr(type(capture), "capture_lossless", None)
         reason = ""
         if callable(lossless):
@@ -195,7 +198,7 @@ class CaptureSnapshotMixin:
             sw, sh = int(stream[0]), int(stream[1])
         except Exception:  # noqa: BLE001 - 尺寸只用于诊断
             return None
-        if (sw, sh) == (0, 0):
+        if sw <= 0 or sh <= 0:
             return None
         return sw, sh
 
@@ -224,6 +227,7 @@ class CaptureSnapshotMixin:
             return
         previous = getattr(self, "_reused_capture_frame", None)
         previous_screen = getattr(self, "_screen_capture_scope", False)
+        start_gen = getattr(self, "_snapshot_generation", 0)
         frame = None
         if from_last:
             frame = self.get_last_capture_frame()
@@ -234,7 +238,10 @@ class CaptureSnapshotMixin:
         try:
             yield
         finally:
-            self._reused_capture_frame = previous
+            if getattr(self, "_snapshot_generation", 0) == start_gen:
+                self._reused_capture_frame = previous
+            else:
+                self._reused_capture_frame = None
             self._screen_capture_scope = previous_screen
 
     def get_last_capture_frame(self) -> np.ndarray | None:

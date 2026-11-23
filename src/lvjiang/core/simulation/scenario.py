@@ -380,22 +380,22 @@ class SimulatedDevice:
                 return False
         return True
 
-    def act(self, action: str, **args: Any) -> None:
-        self.event("input", action=action, args=args)
+    def _match_edge(self, action: str, **args: Any) -> dict:
         duration_keys = {
             "click": ("hold",),
             "drag": ("duration", "hold"),
             "move": ("duration",),
             "scroll": ("interval",),
         }.get(action, ())
+        elapsed = self.time - self.entered
         edges = [
             e
             for e in self.scenario.spec["edges"]
             if e["source"] == self.state
             and e["action"] == action
-            and e.get("min_elapsed", 0)
-            <= self.time - self.entered
-            <= e.get("max_elapsed", 1e12)
+            and e.get("min_elapsed", 0) - 1e-12
+            <= elapsed
+            <= e.get("max_elapsed", 1e12) + 1e-12
             and self._matches(
                 {**dict.fromkeys(duration_keys), **e.get("match", {})}, args
             )
@@ -404,7 +404,24 @@ class SimulatedDevice:
             self.fail(
                 "ambiguous_transition" if edges else "unsupported_transition", action
             )
-        self._enter(edges[0])
+        return edges[0]
+
+    def act(self, action: str, **args: Any) -> None:
+        self.event("input", action=action, args=args)
+        edge = self._match_edge(action, **args)
+        self._enter(edge)
+
+    def _act_with_durations(
+        self, action: str, durations: tuple[float | None, ...], **args: Any
+    ) -> None:
+        self.event("input", action=action, args=args)
+        edge = self._match_edge(action, **args)
+        source_state = self.state
+        for span in durations:
+            if span:
+                self.sleep(span)
+        if self.state == source_state:
+            self._enter(edge)
 
     def click_screen(
         self,
@@ -419,9 +436,9 @@ class SimulatedDevice:
         if set(kwargs) - {"pre_delay", "post_delay", "random_offset"}:
             self.fail("unsupported_input_options")
         self._input_delay(kwargs.get("pre_delay"))
-        self.act("click", xy=(x, y), button=button, hold=hold)
-        if hold:
-            self.sleep(hold)
+        self._act_with_durations(
+            "click", (hold,), xy=(x, y), button=button, hold=hold
+        )
         self._input_delay(kwargs.get("post_delay"))
 
     def drag_screen(
@@ -439,19 +456,22 @@ class SimulatedDevice:
         if set(kwargs) - {"pre_delay", "post_delay"}:
             self.fail("unsupported_input_options")
         self._input_delay(kwargs.get("pre_delay"))
-        self.act("drag", from_xy=(x, y), to_xy=(tx, ty), duration=duration, hold=hold)
-        if hold:
-            self.sleep(hold)
-        if duration:
-            self.sleep(duration)
+        self._act_with_durations(
+            "drag",
+            (hold, duration),
+            from_xy=(x, y),
+            to_xy=(tx, ty),
+            duration=duration,
+            hold=hold,
+        )
         self._input_delay(kwargs.get("post_delay"))
 
     def move_screen(
         self, x: int, y: int, poi_name: str = "", duration: float | None = None
     ) -> None:
-        self.act("move", xy=(x, y), duration=duration)
-        if duration:
-            self.sleep(duration)
+        self._act_with_durations(
+            "move", (duration,), xy=(x, y), duration=duration
+        )
 
     def scroll_screen(
         self,
@@ -463,11 +483,15 @@ class SimulatedDevice:
         *,
         interval: float | None = None,
     ) -> None:
-        self.act(
-            "scroll", xy=(x, y), direction=direction, amount=amount, interval=interval
+        span = max(0, amount - 1) * interval if interval is not None else None
+        self._act_with_durations(
+            "scroll",
+            (span,),
+            xy=(x, y),
+            direction=direction,
+            amount=amount,
+            interval=interval,
         )
-        if interval is not None:
-            self.sleep(max(0, amount - 1) * interval)
 
     def _input_delay(self, value: Any) -> None:
         if value is None:

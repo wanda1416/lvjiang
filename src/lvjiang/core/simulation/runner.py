@@ -106,7 +106,10 @@ def _preflight(
     require_environment: bool = False,
 ) -> None:
     from ...workflows.grammar.parser import parse_file
-    from ...workflows.workflow_references import reachable_procs
+    from ...workflows.workflow_references import (
+        _static_env_condition,
+        reachable_procs,
+    )
     from .policy import PURE_FUNCTIONS, UNSUPPORTED_NODES
     from .scenario import SimulationError
 
@@ -149,6 +152,17 @@ def _preflight(
                 raise SimulationError("unsupported_capability", value.name)
             if kind == "Recognize" and value.with_func is not None:
                 raise SimulationError("unsupported_capability", "recognize transform")
+            if kind == "If":
+                walk(value.condition)
+                env_result = _static_env_condition(value.condition, run_env)
+                if env_result is True:
+                    walk(value.then_body)
+                elif env_result is False:
+                    walk(value.else_body)
+                else:
+                    walk(value.then_body)
+                    walk(value.else_body)
+                return
             for field in dataclasses.fields(value):
                 walk(getattr(value, field.name))
         elif isinstance(value, dict):

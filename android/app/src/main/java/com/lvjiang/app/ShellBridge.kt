@@ -2,7 +2,9 @@ package com.lvjiang.app
 
 import android.content.ComponentName
 import android.content.ServiceConnection
+import android.os.DeadObjectException
 import android.os.IBinder
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import rikka.shizuku.Shizuku
 
@@ -12,7 +14,8 @@ import rikka.shizuku.Shizuku
  * 职责：
  * - Shizuku 可用性检测与权限申请；
  * - 绑定 ShellService（UserService，运行在 shell uid 进程）；
- * - 对外提供同步 exec()：input tap / input swipe / screencap 等。
+ * - 对外提供同步 exec() / screencapPng()：支持 DeadObjectException 自动重绑与
+ *   ParcelFileDescriptor 管道传图（规避 Binder 1MB 上限）。
  *
  * 与 PC 端 src/lvjiang/core/android/input.py、adb_capture.py 的命令语义完全同源。
  */
@@ -20,6 +23,7 @@ object ShellBridge {
 
     private const val TAG = "ShellBridge"
     private const val PERMISSION_REQUEST_CODE = 9001
+    private const val SCREENCAP_TIMEOUT_MS = 15_000L
 
     @Volatile
     private var service: IShellService? = null
@@ -84,7 +88,9 @@ object ShellBridge {
 
     /** 绑定 ShellService（已授权前提下），幂等 */
     fun ensureService() {
-        if (service != null) return
+        val current = service
+        if (current != null && current.asBinder().pingBinder()) return
+        service = null
         if (!hasPermission()) {
             Log.w(TAG, "ensureService: no permission")
             return
@@ -98,7 +104,9 @@ object ShellBridge {
 
     /** 等待服务就绪（绑定是异步的） */
     fun awaitReady(timeoutMs: Long = 5000): Boolean {
-        if (service != null) return true
+        val current = service
+        if (current != null && current.asBinder().pingBinder()) return true
+        service = null
         ensureService()
         val deadline = System.currentTimeMillis() + timeoutMs
         while (service == null && System.currentTimeMillis() < deadline) {
@@ -107,17 +115,30 @@ object ShellBridge {
         return service != null
     }
 
+    private fun <T> withServiceRetry(action: (IShellService) -> T, fallback: () -> T): T {
+        repeat(2) { attempt ->
+            val svc = service ?: run {
+                if (!awaitReady()) return fallback()
+                service ?: return fallback()
+            }
+            try {
+                return action(svc)
+            } catch (e: DeadObjectException) {
+                Log.w(TAG, "ShellService DeadObjectException (attempt=${attempt + 1}), rebinding", e)
+                service = null
+            }
+        }
+        return fallback()
+    }
+
     /**
      * 同步执行 shell 命令，返回原始 stdout 字节流。
      * 调用方保证不在主线程调用（Binder 大数据 + 命令耗时）。
      */
-    fun exec(vararg cmd: String): ByteArray {
-        val svc = service ?: run {
-            if (!awaitReady()) return "[stderr]ShellService not ready".toByteArray()
-            service!!
-        }
-        return svc.exec(arrayOf(*cmd))
-    }
+    fun exec(vararg cmd: String): ByteArray = withServiceRetry(
+        action = { svc -> svc.exec(arrayOf(*cmd)) },
+        fallback = { "[stderr]ShellService not ready".toByteArray() },
+    )
 
     /** 文本命令便捷封装 */
     fun execText(vararg cmd: String): String = exec(*cmd).toString(Charsets.UTF_8).trim()
@@ -135,8 +156,14 @@ object ShellBridge {
         return execText("input", "swipe", "${a[0]}", "${a[1]}", "${b[0]}", "${b[1]}", "$durationMs")
     }
 
-    /** 截屏 PNG 字节流（语义对齐 PC 端 AdbCapture 的 adb exec-out screencap -p） */
-    fun screencapPng(): ByteArray = exec("screencap", "-p")
+    /** 截屏 PNG 字节流（经 ParcelFileDescriptor 管道流式读取，规避 Binder 1MB 限制） */
+    fun screencapPng(): ByteArray = withServiceRetry(
+        action = { svc ->
+            val pfd = svc.execToFd(arrayOf("screencap", "-p"), SCREENCAP_TIMEOUT_MS)
+            ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+        },
+        fallback = { "[stderr]ShellService not ready".toByteArray() },
+    )
 
     fun unbind() {
         try {

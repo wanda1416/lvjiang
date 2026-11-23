@@ -253,6 +253,12 @@ object AgentServer {
             return fail("请求不是合法 JSON: ${e.message}")
         }
         val op = req.optString("op", "")
+        if (op == "offline_start") {
+            val context = appContext ?: return fail("应用尚未初始化")
+            if (pcControlsDevice()) return fail("PC 正在控制设备，请先停止 PC 任务")
+            val startErr = FloatService.ensureStarted(context)
+            if (startErr != null) return fail(startErr)
+        }
         val result = try {
             synchronized(executionLock) {
                 if (op in controlOps && localTaskDriving()) {
@@ -322,8 +328,7 @@ object AgentServer {
         "offline_stop" -> Pair(PyBridge.stopTask(requireNotNull(appContext)), null)
         "offline_start" -> {
             val context = requireNotNull(appContext)
-            val error = if (pcControlsDevice()) "PC 正在控制设备，请先停止 PC 任务" else FloatService.ensureStarted(context)
-            if (error != null) fail(error)
+            if (pcControlsDevice()) fail("PC 正在控制设备，请先停止 PC 任务")
             else Pair(PyBridge.startTask(context, req.getString("task_id"), req.optString("username", "")), null)
         }
         "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(

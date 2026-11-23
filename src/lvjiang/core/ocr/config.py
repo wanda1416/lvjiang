@@ -5,10 +5,12 @@
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import Any
 
 OCR_CONFIG_PATH = "ocr.yaml"
+_OCR_CONFIG_LOCK = threading.RLock()
 
 
 @dataclass(frozen=True)
@@ -167,20 +169,21 @@ def save_recognition_settings(
     """
     from ..config import get_resolver
 
-    doc = load_ocr_config()
-    recognition = dict(doc.get("recognition") or {})
-    if region_batch is not None:
-        recognition["region_batch"] = {
-            "min_canvas_side": region_batch.min_canvas_side,
-            "max_content_height": region_batch.max_content_height,
-            "gap": region_batch.gap,
-        }
-    if pc_ocr is not None:
-        recognition["pc_ocr"] = {
-            "threads": pc_ocr.threads,
-            "inter_threads": pc_ocr.inter_threads,
-        }
-    if detect is not None:
-        recognition["detect"] = {"limit_side_len": detect.limit_side_len}
-    doc["recognition"] = recognition
-    get_resolver().save_merged(OCR_CONFIG_PATH, doc)
+    with _OCR_CONFIG_LOCK:
+        doc = load_ocr_config()
+        recognition = dict(doc.get("recognition") or {})
+        if region_batch is not None:
+            recognition["region_batch"] = {
+                "min_canvas_side": region_batch.min_canvas_side,
+                "max_content_height": region_batch.max_content_height,
+                "gap": region_batch.gap,
+            }
+        if pc_ocr is not None:
+            recognition["pc_ocr"] = {
+                "threads": pc_ocr.threads,
+                "inter_threads": pc_ocr.inter_threads,
+            }
+        if detect is not None:
+            recognition["detect"] = {"limit_side_len": detect.limit_side_len}
+        doc["recognition"] = recognition
+        get_resolver().save_merged(OCR_CONFIG_PATH, doc)

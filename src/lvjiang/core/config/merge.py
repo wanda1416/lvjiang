@@ -202,7 +202,11 @@ def merge_registry_list(base_list: list, overlay: dict,
     """
     overlay = overlay or {}
     if identity_field is None:
-        removed = set(overlay.get(REMOVED_KEY) or [])
+        removed_items = overlay.get(REMOVED_KEY) or []
+        try:
+            removed: set | list = set(removed_items)
+        except TypeError:
+            removed = list(removed_items)
         result = [x for x in (base_list or []) if x not in removed]
         for item in overlay.get(ADDED_KEY) or []:
             if item not in result:

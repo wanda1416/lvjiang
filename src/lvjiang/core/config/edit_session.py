@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from .conflicts import checked_write, file_baseline
-from .merge import REGISTRY_LIST_PATHS, compute_diff, merge_doc
+from .merge import REGISTRY_LIST_IDENTITY, REGISTRY_LIST_PATHS, compute_diff, merge_doc
 from .resolver import ConfigResolver
 
 
@@ -110,11 +110,14 @@ class ConfigEditSession:
         for rel_path in self._merged_paths:
             data = self.resolver.load_merged(rel_path)
             registry = REGISTRY_LIST_PATHS.get(rel_path, ())
-            changes = compute_diff(self._baseline_merged[rel_path], data, registry)
+            identity = REGISTRY_LIST_IDENTITY.get(rel_path, {})
+            changes = compute_diff(
+                self._baseline_merged[rel_path], data, registry, identity=identity)
             if changes:
                 # 编辑期间官方配置或别的窗口可能更新；只提交草稿实际改过的字段。
                 self._source.save_merged(rel_path, merge_doc(
-                    self._source.load_merged(rel_path), changes, registry))
+                    self._source.load_merged(rel_path), changes, registry,
+                    identity=identity))
             self._baseline_merged[rel_path] = data
 
         current = self._entity_snapshot()

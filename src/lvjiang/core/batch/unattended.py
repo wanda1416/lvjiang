@@ -16,10 +16,10 @@ from typing import Any, cast
 
 from loguru import logger
 
-from ...workflows.result_protocol import RESULT_SUCCESS
+from ...workflows.result_protocol import RESULT_STOPPED, RESULT_SUCCESS
 from ..layout.config import canvas_aspect_matches
 from ..layout.models import Layout
-from .models import UnattendedInterrupt
+from .models import BatchStageResult, UnattendedInterrupt
 
 
 class UnattendedMixin:
@@ -37,7 +37,7 @@ class UnattendedMixin:
 
 
     def _unattended_ui_callback(self, kind: str, **kwargs) -> object:
-        """Only pause declares an abnormal interruption; forward other UI requests."""
+        """用户决策交互按既有契约透传宿主，仅 pause 触发无人值守异常恢复。"""
         if kind != "pause":
             callback = self._ctx.ui_callback
             return callback(kind, **kwargs) if callback is not None else None
@@ -104,6 +104,9 @@ class UnattendedMixin:
                 "batch_recover_pending": False,
                 "batch_recover_username": username,
             })
+        if result.status == RESULT_STOPPED:
+            self._stopped = True
+            return batch_state
         if result.status != RESULT_SUCCESS:
             self._log(f"[批量] 启动时异常恢复未成功：{result.message}", "warning")
             return batch_state
@@ -111,7 +114,7 @@ class UnattendedMixin:
 
 
     def _recover_unattended(self, run_idx: int, username: str,
-                            batch_state: dict, *, pending: bool) -> None:
+                            batch_state: dict, *, pending: bool) -> BatchStageResult | None:
         """无人值守中止后把游戏收回公共初始页（登录页 - 登录主页视图）。
 
         所有批量任务都从这个视图起步，所以恢复目标只有这一个。具体怎么收——
@@ -125,13 +128,13 @@ class UnattendedMixin:
         继续登录回游戏主页。
         """
         if not self._unattended_hit:
-            return
+            return None
         text, self._unattended_hit = self._unattended_hit, ""
         wf_name = self._spec.workflows.recover_unattended
         if not wf_name:
             self._log(
                 f"[批量] 无人值守中止（{text}）；未配置恢复 wf，直接继续下一个任务")
-            return
+            return None
         self._log(f"[批量] 无人值守中止（{text}）；执行恢复 wf 收回登录主页")
         result = self._run_stage(
             "recover_unattended", wf_name, run_idx, username, batch_state,
@@ -143,5 +146,8 @@ class UnattendedMixin:
                 "batch_recover_username": username,
             })
         self._unattended_hit = ""
-        if result.status != RESULT_SUCCESS:
+        if result.status == RESULT_STOPPED:
+            self._stopped = True
+        elif result.status != RESULT_SUCCESS:
             self._log(f"[批量] 无人值守恢复未成功：{result.message}", "warning")
+        return result

@@ -4,6 +4,7 @@ import numpy as np
 from loguru import logger
 
 from ...core.layout.models import CanvasConfig, FoundRegion, Region
+from ...core.ocr.engine import clip_roi
 from ...core.recognizers import ReferenceInfo
 from ...i18n import tr
 from ..capture_snapshot import CaptureSnapshotMixin
@@ -151,10 +152,13 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         canvas_h = canvas.h_ratio * h
 
         for region in regions:
-            x1 = int(canvas_x + region.x_ratio * canvas_w)
-            y1 = int(canvas_y + region.y_ratio * canvas_h)
-            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
-            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
+            x1, y1, x2, y2 = clip_roi(
+                int(canvas_x + region.x_ratio * canvas_w),
+                int(canvas_y + region.y_ratio * canvas_h),
+                int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w),
+                int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h),
+                w, h,
+            )
             slot_img = img[y1:y2, x1:x2]
 
             if slot_img.size == 0:
@@ -235,10 +239,13 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         canvas_h = canvas.h_ratio * h
 
         for region in regions:
-            x1 = int(canvas_x + region.x_ratio * canvas_w)
-            y1 = int(canvas_y + region.y_ratio * canvas_h)
-            x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
-            y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
+            x1, y1, x2, y2 = clip_roi(
+                int(canvas_x + region.x_ratio * canvas_w),
+                int(canvas_y + region.y_ratio * canvas_h),
+                int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w),
+                int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h),
+                w, h,
+            )
             slot_img = img[y1:y2, x1:x2]
 
             if slot_img.size == 0:
@@ -306,9 +313,11 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         # row-major list → (row, col) dict，转为 1-based
         infos: dict[tuple[int, int], ReferenceInfo] = {}
         cols = panel_obj.cols
+        img_h, img_w = img.shape[:2]
         for idx, (x1, y1, x2, y2) in enumerate(cells_list):
             row, col = idx // cols + 1, idx % cols + 1
-            crop = img[y1:y2, x1:x2]
+            cx1, cy1, cx2, cy2 = clip_roi(x1, y1, x2, y2, img_w, img_h)
+            crop = img[cy1:cy2, cx1:cx2]
             if crop.size == 0:
                 logger.warning(f"cell ({row},{col}) 裁切为空，跳过")
                 continue
@@ -330,10 +339,13 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         cy = canvas.y_ratio * h
         cw = canvas.w_ratio * w
         ch = canvas.h_ratio * h
-        x1 = int(cx + region.x_ratio * cw)
-        y1 = int(cy + region.y_ratio * ch)
-        x2 = int(cx + (region.x_ratio + region.w_ratio) * cw)
-        y2 = int(cy + (region.y_ratio + region.h_ratio) * ch)
+        x1, y1, x2, y2 = clip_roi(
+            int(cx + region.x_ratio * cw),
+            int(cy + region.y_ratio * ch),
+            int(cx + (region.x_ratio + region.w_ratio) * cw),
+            int(cy + (region.y_ratio + region.h_ratio) * ch),
+            w, h,
+        )
         crop = img[y1:y2, x1:x2]
         if crop.size == 0:
             return None
@@ -552,22 +564,32 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         canvas_px_y = canvas.y_ratio * h
         canvas_px_w = canvas.w_ratio * w
         canvas_px_h = canvas.h_ratio * h
+        if canvas_px_w <= 0 or canvas_px_h <= 0:
+            logger.warning("find: 画布尺寸为空")
+            return ""
 
         if search_region is not None:
-            # 指定区域：裁剪后 OCR
-            crop_x1 = int(canvas_px_x + search_region.x_ratio * canvas_px_w)
-            crop_y1 = int(canvas_px_y + search_region.y_ratio * canvas_px_h)
-            crop_x2 = int(canvas_px_x + (search_region.x_ratio + search_region.w_ratio) * canvas_px_w)
-            crop_y2 = int(canvas_px_y + (search_region.y_ratio + search_region.h_ratio) * canvas_px_h)
-            crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
-            if crop.size == 0:
-                logger.warning("find: 搜索区域裁剪为空")
-                return ""
+            # 指定区域：裁剪后 OCR（钳位防止负坐标回绕）
+            crop_x1, crop_y1, crop_x2, crop_y2 = clip_roi(
+                int(canvas_px_x + search_region.x_ratio * canvas_px_w),
+                int(canvas_px_y + search_region.y_ratio * canvas_px_h),
+                int(canvas_px_x + (search_region.x_ratio + search_region.w_ratio) * canvas_px_w),
+                int(canvas_px_y + (search_region.y_ratio + search_region.h_ratio) * canvas_px_h),
+                w, h,
+            )
         else:
             # 全画布搜索
-            crop_x1, crop_y1 = int(canvas_px_x), int(canvas_px_y)
-            crop_x2, crop_y2 = int(canvas_px_x + canvas_px_w), int(canvas_px_y + canvas_px_h)
-            crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
+            crop_x1, crop_y1, crop_x2, crop_y2 = clip_roi(
+                int(canvas_px_x),
+                int(canvas_px_y),
+                int(canvas_px_x + canvas_px_w),
+                int(canvas_px_y + canvas_px_h),
+                w, h,
+            )
+        crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
+        if crop.size == 0:
+            logger.warning("find: 搜索区域裁剪为空")
+            return ""
 
         ocr_results = (self._ocr.recognize(
             crop, cleaning_group=cleaning_group)
@@ -591,6 +613,8 @@ class _RecognitionMixin(CaptureSnapshotMixin):
                 # bbox 是四角坐标 [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
                 xs = [p[0] for p in ocr_result.bbox]
                 ys = [p[1] for p in ocr_result.bbox]
+                if not xs or not ys:
+                    continue
                 min_x, max_x = min(xs), max(xs)
                 min_y, max_y = min(ys), max(ys)
 
@@ -653,10 +677,15 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         canvas_px_y = canvas.y_ratio * height
         canvas_px_w = canvas.w_ratio * width
         canvas_px_h = canvas.h_ratio * height
-        crop_x1 = int(canvas_px_x + region.x_ratio * canvas_px_w)
-        crop_y1 = int(canvas_px_y + region.y_ratio * canvas_px_h)
-        crop_x2 = int(canvas_px_x + (region.x_ratio + region.w_ratio) * canvas_px_w)
-        crop_y2 = int(canvas_px_y + (region.y_ratio + region.h_ratio) * canvas_px_h)
+        if canvas_px_w <= 0 or canvas_px_h <= 0:
+            return []
+        crop_x1, crop_y1, crop_x2, crop_y2 = clip_roi(
+            int(canvas_px_x + region.x_ratio * canvas_px_w),
+            int(canvas_px_y + region.y_ratio * canvas_px_h),
+            int(canvas_px_x + (region.x_ratio + region.w_ratio) * canvas_px_w),
+            int(canvas_px_y + (region.y_ratio + region.h_ratio) * canvas_px_h),
+            width, height,
+        )
         crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
         if crop.size == 0:
             logger.warning(f"ocr_region_blocks: 区域 [{scene_key}].[{region_key}] 裁剪为空")

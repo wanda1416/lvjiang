@@ -52,7 +52,10 @@ class UpdateStore:
     @contextmanager
     def locked(self, *, blocking: bool = True) -> Iterator[bool]:
         with configuration_lock(self.config, blocking=blocking) as acquired:
-            yield acquired
+            if not acquired:
+                yield False
+                return
+            yield True
 
     def _write(self, path: Path, data: bytes, *, fsync: bool = False) -> None:
         atomic_write_bytes(path, data, prefix=".update-", fsync=fsync)
@@ -373,6 +376,8 @@ class UpdateStore:
                          "member": {**(member_metadata or {}), "files": file_hashes(members),
                                     "registries": {name: value.decode("utf-8") for name, value in members.items()
                                                    if name in REGISTRIES}}}
+            if previous_state.get("pending"):
+                new_state["pending"] = previous_state["pending"]
             if not changed:
                 if any(new_state[key] != previous_state.get(key)
                        for key in ("revision", "public_sha256", "member", "member_index_revision")):

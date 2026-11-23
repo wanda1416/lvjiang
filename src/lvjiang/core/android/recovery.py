@@ -141,7 +141,13 @@ class AndroidRecovery:
                     self.check_stop()
                     logger.info("[流式] 重建视频流 {}/{}", attempt, attempts)
                     restart = getattr(stream, "restart", None)
-                    if callable(restart) and restart():
+                    restarted = False
+                    if callable(restart):
+                        try:
+                            restarted = bool(restart())
+                        except Exception as exc:  # noqa: BLE001 - 重建异常不得打穿恢复状态机
+                            logger.warning("[流式] 重建异常 {}/{}：{}", attempt, attempts, exc)
+                    if restarted:
                         clear = getattr(stream, "clear_fault", None)
                         if callable(clear):
                             clear()

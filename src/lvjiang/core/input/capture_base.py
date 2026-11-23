@@ -142,6 +142,23 @@ class CaptureBackend(ABC):
         pass
 
 
+def unwrap_capture(capture: object) -> object:
+    """解包运行期 _ResourceProxy，使能力探测能落到真实截图后端。
+
+    仅当 ``type(capture)`` 自身显式定义了 ``_resource`` 方法时才解包，
+    不会误伤带通用 ``__getattr__`` 的 Mock/测试替身。
+    """
+    seen: set[int] = set()
+    current = capture
+    while id(current) not in seen:
+        seen.add(id(current))
+        resolver = getattr(type(current), "_resource", None)
+        if not callable(resolver):
+            break
+        current = resolver(current)
+    return current
+
+
 def capture_for_run(capture: object, *, timeout: float = 5.0) -> np.ndarray | None:
     """工作流运行期取帧入口。
 
@@ -153,10 +170,11 @@ def capture_for_run(capture: object, *, timeout: float = 5.0) -> np.ndarray | No
     探测按**类型**查而不是实例 `getattr`——替身/桩对象常带 ``__getattr__``，
     实例探测会凭空返回一个 Mock 并把整条取帧路径带偏。
     """
-    blocking = getattr(type(capture), "capture_blocking", None)
+    target = unwrap_capture(capture)
+    blocking = getattr(type(target), "capture_blocking", None)
     if callable(blocking):
-        return capture.capture_blocking(timeout=timeout)  # type: ignore[attr-defined]
-    return capture.capture()  # type: ignore[attr-defined]
+        return target.capture_blocking(timeout=timeout)  # type: ignore[attr-defined]
+    return target.capture()  # type: ignore[attr-defined]
 
 
 def ensure_capture_channel(capture: object) -> None:
@@ -165,6 +183,7 @@ def ensure_capture_channel(capture: object) -> None:
     纯输入脚本（只 click/drag、从不截图）不会经过任何取帧路径，光在 capture()
     上设闸门拦不住它们；这条闸门在每一条语句前执行，健康时只是一次布尔判断。
     """
-    check = getattr(type(capture), "ensure_channel_healthy", None)
+    target = unwrap_capture(capture)
+    check = getattr(type(target), "ensure_channel_healthy", None)
     if callable(check):
-        capture.ensure_channel_healthy()  # type: ignore[attr-defined]
+        target.ensure_channel_healthy()  # type: ignore[attr-defined]

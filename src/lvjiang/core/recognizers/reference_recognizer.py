@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from ..ocr.engine import OCREngine
+from ..ocr.engine import OCREngine, clip_roi
 from ..reference_db import REFERENCE_OUTPUT_RESERVED_KEYS, ReferenceDatabase
 from .reference_matcher import MatchResult, ReferenceMatcher
 
@@ -139,10 +139,13 @@ class ReferenceRecognizer:
 
     def _ocr_region(self, image: np.ndarray, region: tuple[float, ...]) -> str:
         height, width = image.shape[:2]
-        x1 = int(region[0] * width)
-        y1 = int(region[1] * height)
-        x2 = int((region[0] + region[2]) * width)
-        y2 = int((region[1] + region[3]) * height)
+        x1, y1, x2, y2 = clip_roi(
+            int(region[0] * width),
+            int(region[1] * height),
+            int((region[0] + region[2]) * width),
+            int((region[1] + region[3]) * height),
+            width, height,
+        )
         crop = image[y1:y2, x1:x2]
         if crop.size == 0:
             return ""

@@ -227,8 +227,20 @@ def _store_refresh_token(token: str) -> None:
     credentials.write_token(_credentials, _keyring_user(), token)
 
 
-def _clear_stored_session() -> None:
+def _clear_stored_session(session: AccountSession | None = None) -> None:
+    """清空本地登录态：refresh 令牌 + 派生 E2E 密钥。
+
+    密钥跟着登录态一起走：登出或被服务端**明确拒绝**之后，进程里若还挂着一把
+    旧密钥，后续任何拿到 ``e2e.current_key()`` 的路径（文档通道、名册通道）都
+    还能解云端密文；account.json 里的 hex 缓存也会留在磁盘上。这里按「内存
+    （会话对象 + 模块全局）+ 磁盘缓存」三处一起清干净。
+    """
     _store_refresh_token("")
+    from . import e2e
+
+    e2e.forget_key()
+    if session is not None:
+        session.e2e_key = None
 
 
 def stored_token_owner() -> str:
@@ -415,7 +427,7 @@ class AccountSession:
             except AccountError as error:
                 if error.code in AUTH_REJECTED_CODES:
                     logger.warning("登录态已被服务端拒绝（{}），清除本地令牌", error.code)
-                    _clear_stored_session()
+                    _clear_stored_session(self)
                     return None
                 raise
             _store_refresh_token(result["refresh_token"])
@@ -452,12 +464,12 @@ class AccountSession:
                 _request("POST", "/api/logout", {"refresh_token": _stored_refresh_token()})
             except AccountError as error:
                 logger.info("登出请求未完成（{}）；本地登录态照常清除", error)
-        _clear_stored_session()
+        _clear_stored_session(self)
         self.access_token = ""
 
     def logout_all(self) -> dict:
         result = self._authorized("POST", "/api/logout_all", {})
-        _clear_stored_session()
+        _clear_stored_session(self)
         self.access_token = ""
         return result
 
@@ -549,7 +561,14 @@ def get_session() -> AccountSession:
 
 
 def reset_session() -> None:
-    """丢弃进程内会话（测试用：换账号或需要干净令牌时）。"""
+    """丢弃进程内会话（测试用：换账号或需要干净令牌时）。
+
+    模块级 ``e2e._KEY`` 也一并清掉：换号/重置后若把上一把派生钥留在全局里，
+    新会话还没登录前任何取 ``current_key()`` 的路径都会拿到别人的钥。
+    """
     global _session
     with _session_lock:
         _session = None
+    from . import e2e
+
+    e2e.set_key(None)

@@ -65,6 +65,8 @@ def fake_env(tmp_path, monkeypatch):
             if data["new_password"] == "short":
                 raise AccountError("请求无效", code="invalid_request")
             return {"changed": True}
+        if route == "/api/logout":
+            return {"ok": True}
         raise AssertionError(route)
 
     monkeypatch.setattr(account_service, "_request", fake_request)
@@ -138,6 +140,56 @@ def test_logout_clears_keyring_even_if_service_unreachable(fake_env, monkeypatch
     session.logout()
     assert _stored_refresh(fake_env["keyring"]) in (None, "")
     assert session.access_token == ""
+
+
+def test_logout_forgets_derived_e2e_key(fake_env) -> None:
+    """登出必须把派生密钥一起带走：内存三处 + account.json 的 hex 缓存。
+
+    密钥是口令的 PBKDF2 派生（等价于口令的可验证副本）。登出后它若还挂在
+    ``e2e._KEY`` 或留在沙箱 account.json 里，后续任何拿 ``current_key()`` 的
+    路径（文档通道、名册通道）都能用它解云端密文。
+    """
+    from lvjiang.core.account import e2e
+
+    session = AccountSession()
+    session.login("wang", "pw")
+    path = account_service.account_config_path()
+    assert e2e.current_key() is not None
+    assert "e2e_key" in json.loads(path.read_text(encoding="utf-8"))
+    account_service.save_profile_sync_state({"remote_history_id": 42})
+
+    session.logout()
+
+    assert session.e2e_key is None
+    assert e2e.current_key() is None
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    assert "e2e_key" not in profile
+    # 同步水位属于运行态，登出后保留（同账号重登继续用，不退回 bootstrap）
+    assert profile["profile_sync"]["remote_history_id"] == 42
+
+
+def test_auth_rejection_forgets_derived_e2e_key(fake_env, monkeypatch) -> None:
+    """会话被服务端明确拒绝时，密钥与令牌一样必须清掉。
+
+    被踢（设备吊销 / 令牌过期）后进程若还挂着旧钥，而用户迟迟没有重登，
+    这把钥就一直有效——它不属于任何现存会话。
+    """
+    from lvjiang.core.account import e2e
+
+    session = AccountSession()
+    session.login("wang", "pw")
+    assert e2e.current_key() is not None
+
+    def rejected(method, route, data=None, token="", timeout=None):
+        raise AccountError("登录已过期，请重新登录", code="token_expired")
+
+    monkeypatch.setattr(account_service, "_request", rejected)
+
+    assert session.restore(fetch_summary=False) is None
+    assert session.e2e_key is None
+    assert e2e.current_key() is None
+    assert "e2e_key" not in json.loads(
+        account_service.account_config_path().read_text(encoding="utf-8"))
 
 
 def test_change_password_rejects_short_new_password(fake_env) -> None:
@@ -283,7 +335,7 @@ def test_network_error_never_clears_stored_token(monkeypatch) -> None:
     cleared: list[int] = []
     monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "refresh-token")
     monkeypatch.setattr(account_service, "_clear_stored_session",
-                        lambda: cleared.append(1))
+                        lambda session=None: cleared.append(1))
 
     def offline(method, route, data=None, token="", timeout=None):
         raise AccountError("和账号服务握手超时，请检查网络后重试", code="network")
@@ -301,7 +353,7 @@ def test_auth_rejection_clears_stored_token(monkeypatch) -> None:
     cleared: list[int] = []
     monkeypatch.setattr(account_service, "_stored_refresh_token", lambda: "refresh-token")
     monkeypatch.setattr(account_service, "_clear_stored_session",
-                        lambda: cleared.append(1))
+                        lambda session=None: cleared.append(1))
 
     def rejected(method, route, data=None, token="", timeout=None):
         raise AccountError("登录已过期，请重新登录", code="token_expired")
@@ -342,7 +394,7 @@ def test_http_401_with_explicit_code_is_auth() -> None:
     assert error.code == "token_expired"
     assert error.code in account_service.AUTH_REJECTED_CODES
 
-def test_login_fast_path_costs_one_request(monkeypatch) -> None:
+def test_login_fast_path_costs_one_request(monkeypatch, tmp_path) -> None:
     """手机端登录只发一次 POST /api/login：每少一跳就少一次 TLS 握手。"""
     calls: list[str] = []
 

@@ -19,6 +19,8 @@ import base64
 import gzip
 import hashlib
 import json
+import struct
+import zlib
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -60,11 +62,30 @@ def persist_key_into(key: bytes, profile: dict) -> None:
 
 def persist_key(key: bytes) -> None:
     """独立写回 account.json（改密换钥等不由 login 主导的路径）。"""
-    from ..account.service import _save_profile, load_profile
+    from ..account.service import mutate_profile
 
-    profile = load_profile()
-    persist_key_into(key, profile)
-    _save_profile(profile)
+    def _set(profile: dict) -> None:
+        persist_key_into(key, profile)
+
+    mutate_profile(_set)
+
+
+def forget_key() -> None:
+    """丢弃进程内密钥并抹掉 account.json 里的 hex 缓存。
+
+    登出 / 会话被服务端拒绝 / 换号时调用：密钥是口令的 PBKDF2 派生（等价于口令
+    的离线可验证副本），不该在「已经没有登录态」之后继续留在内存与磁盘上。
+    """
+    from ..account.service import load_profile, mutate_profile
+
+    set_key(None)
+    if "e2e_key" not in load_profile():
+        return
+
+    def _drop(profile: dict) -> None:
+        profile.pop("e2e_key", None)
+
+    mutate_profile(_drop)
 
 
 def load_stored_key() -> bytes | None:
@@ -85,8 +106,18 @@ def _synthetic_nonce(key: bytes, plaintext: bytes) -> bytes:
     return hashlib.sha256(key + b"iv" + plaintext).digest()[:12]
 
 
+def _deterministic_gzip(data: bytes) -> bytes:
+    # 固定 RFC 1952 头（mtime=0, XFL=2, OS=255 unknown）：不能直接用
+    # gzip.compress(..., mtime=0)，Python 3.12+ 该分支走 zlib.compress(wbits=31)，
+    # 会按平台写 OS 字节（Windows 0x0a / Linux 0x03），破坏跨端密文一致。
+    header = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x02\xff"
+    compressed = zlib.compress(data, level=9, wbits=-15)
+    trailer = struct.pack("<LL", zlib.crc32(data) & 0xFFFFFFFF, len(data) & 0xFFFFFFFF)
+    return header + compressed + trailer
+
+
 def _encrypt(key: bytes, plaintext: bytes, *, compress: bool = False) -> dict:
-    payload = gzip.compress(plaintext) if compress else plaintext
+    payload = _deterministic_gzip(plaintext) if compress else plaintext
     nonce = _synthetic_nonce(key, payload)
     ct = AESGCM(key).encrypt(nonce, payload, None)
     wrapper: dict[str, object] = {

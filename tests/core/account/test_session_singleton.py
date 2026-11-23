@@ -79,7 +79,8 @@ def test_refresh_token_for_returns_empty_when_server_rejects(monkeypatch):
 
     monkeypatch.setattr(service, "_request", reject)
     monkeypatch.setattr(service, "_stored_refresh_token", lambda: "r1")
-    monkeypatch.setattr(service, "_clear_stored_session", lambda: cleared.append(True))
+    monkeypatch.setattr(service, "_clear_stored_session",
+                        lambda session=None: cleared.append(True))
 
     assert session.refresh_token_for("stale") == ""
     assert cleared == [True]

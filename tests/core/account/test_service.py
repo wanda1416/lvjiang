@@ -356,7 +356,8 @@ def test_login_fast_path_costs_one_request(monkeypatch) -> None:
 
     monkeypatch.setattr(account_service, "_request", fake_request)
     monkeypatch.setattr(account_service, "_store_refresh_token", lambda token: None)
-    monkeypatch.setattr(account_service, "_save_profile", lambda profile: None)
+    monkeypatch.setattr(account_service, "account_config_path",
+                        lambda: tmp_path / "account.json")
     monkeypatch.setattr(account_identity, "stable_instance_id", lambda: "inst")
 
     summary = AccountSession().login("wang", "pw", fetch_summary=False)

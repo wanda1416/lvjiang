@@ -36,30 +36,20 @@ def _users_dir() -> Path:
 
 def _sync_state() -> dict:
     """上次成功同步时的名册签名，落 account.json 的 users_sync 小节。"""
-    from ..account.service import account_config_path
+    from ..account.service import load_profile
 
-    try:
-        data = json.loads(account_config_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    state = data.get("users_sync") if isinstance(data, dict) else None
+    state = load_profile().get("users_sync")
     return dict(state) if isinstance(state, dict) else {}
 
 
 def _save_sync_state(state: dict) -> None:
-    from ..account.service import account_config_path
+    from ..account.service import mutate_profile
 
-    path = account_config_path()
+    def _set(profile: dict) -> None:
+        profile["users_sync"] = state
+
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return
-    except (OSError, ValueError):
-        return
-    data["users_sync"] = state
-    try:
-        path.write_text(formatted_json(data),
-                        encoding="utf-8", newline="\n")
+        mutate_profile(_set, require_existing=True)
     except OSError as error:
         logger.warning("[users sync] 同步状态写回失败：{}", error)
 

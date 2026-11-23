@@ -32,7 +32,6 @@ class _Step:
 def _isolate(monkeypatch, tmp_path):
     """把初始同步会写到的路径全部换到临时目录。"""
     from lvjiang import constants
-    from lvjiang.core.account import service
     from lvjiang.core.config.session import reset_session_store
 
     session = tmp_path / "session"
@@ -40,7 +39,7 @@ def _isolate(monkeypatch, tmp_path):
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", session)
     monkeypatch.setattr(constants, "SESSION_PATH", session / "session.json")
     monkeypatch.setattr(constants, "USERS_DIR", session / "users")
-    monkeypatch.setattr(service, "SESSION_CONFIG_DIR", session)
+    # account.json 的路径由 account.service 每次动态从 constants 取，不必再单独打桩
     monkeypatch.setattr(initial, "SESSION_CONFIG_DIR", session)
     monkeypatch.setattr(initial, "USERS_DIR", session / "users")
     reset_session_store()

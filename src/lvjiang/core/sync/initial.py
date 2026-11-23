@@ -18,8 +18,7 @@ from pathlib import Path
 from loguru import logger
 
 from ...constants import SESSION_CONFIG_DIR, USERS_DIR
-from ..account.service import account_config_path, load_profile
-from ..json_files import formatted_json
+from ..account.service import load_profile, mutate_profile
 from .client import SyncError, post
 
 
@@ -51,25 +50,21 @@ def sync_established() -> bool:
     return bool(load_profile().get("sync_established"))
 
 
-def _save_profile(profile: dict) -> None:
-    path = account_config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(formatted_json(profile), encoding="utf-8", newline="\n")
-
-
 def set_sync_established(value: bool) -> None:
-    profile = load_profile()
-    profile["sync_established"] = value
-    _save_profile(profile)
+    def _set(profile: dict) -> None:
+        profile["sync_established"] = value
+
+    mutate_profile(_set)
 
 
 def clear_local_sync_state() -> None:
     """清空本机全部同步水位与签名（不动登录态、E2E 密钥、本地数据）。"""
-    profile = load_profile()
-    profile.pop("users_sync", None)
-    profile.pop("profile_sync", None)
-    profile.pop("document_sync", None)
-    _save_profile(profile)
+    def _clear(profile: dict) -> None:
+        profile.pop("users_sync", None)
+        profile.pop("profile_sync", None)
+        profile.pop("document_sync", None)
+
+    mutate_profile(_clear)
     logger.info("[initial sync] 本地同步水位已清除")
 
 

@@ -11,13 +11,14 @@ import socket
 import sys
 import threading
 import time  # noqa: F401 — 测试按 account_service.time 替换 sleep
+from collections.abc import Callable
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
 from loguru import logger
 
-from ...constants import SESSION_CONFIG_DIR
+from ..fs_util import InterprocessLockTimeout, atomic_write_text, interprocess_lock
 from ..json_files import formatted_json
 from . import credentials, identity, transport
 from .errors import AccountError
@@ -32,10 +33,23 @@ def _on_android() -> bool:
     return hasattr(sys, "getandroidapilevel")
 
 
+def _session_dir() -> Path:
+    """会话目录：**每次动态取** ``constants``。
+
+    account.json 的所有读写者（登录态、profile 水位、document_sync、users_sync）
+    必须解析出同一个路径。模块顶层绑定的那份常量会绕过测试对
+    ``constants.SESSION_CONFIG_DIR`` 的 monkeypatch，导致「写一个文件、读另一个
+    文件」——``sync/dirty.py`` 早就按动态口径取，这里对齐。
+    """
+    from ... import constants
+
+    return constants.SESSION_CONFIG_DIR
+
+
 def _android_token_path() -> Path:
     """Android 的 refresh 令牌落点：应用私有 session 目录（沙箱隔离，
     其他应用不可读——这是 Android 的安全边界，等价于桌面系统凭据库）。"""
-    return SESSION_CONFIG_DIR / "account_token"
+    return _session_dir() / "account_token"
 
 
 ACCOUNT_SERVICE = "https://lvjiang.wyxj.net"
@@ -78,7 +92,7 @@ AUTH_REJECTED_CODES = frozenset({
 
 def account_config_path() -> Path:
     """账号运行态落 config/session（运行数据语义）。"""
-    return SESSION_CONFIG_DIR / "account.json"
+    return _session_dir() / "account.json"
 
 
 def load_profile() -> dict:
@@ -90,13 +104,51 @@ def load_profile() -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _save_profile(profile: dict) -> None:
+# account.json 是**多写入者**的共享运行态：登录/登出、profile 水位、document_sync、
+# users_sync、sync_established 各写各的键。此前每个写入者各自「读整份 → 改一个键 →
+# 整份写回」，三条写路径里还有两条是非原子的 ``write_text``：并发时就地覆盖别人的
+# 键，甚至另一个线程读到半截 JSON → 解析失败返回 ``{}`` → 下一次写回把 login /
+# account_id / e2e_key 整份抹掉。这里收敛成唯一写入点：进程内线程锁 + 跨进程文件锁
+# （与 session.json 同一套约定，见 core/config/session.py 的 _mutate_disk）+ 原子写。
+_PROFILE_LOCK = threading.RLock()
+#: 等锁上限（秒）。account.json 的写入都是毫秒级，等这么久只能说明有实例卡住了；
+#: 宁可放弃这次状态写（水位可从账本恢复），也不能把登录/心跳线程永久挂住。
+_PROFILE_LOCK_TIMEOUT_S = 10.0
+
+
+def _write_profile(profile: dict) -> None:
+    """原子写回（调用方已持锁）：临时文件 + ``os.replace``，读端永不见半截文件。"""
     path = account_config_path()
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(formatted_json(profile), encoding="utf-8", newline="\n")
+        atomic_write_text(path, formatted_json(profile), prefix=".account-")
     except OSError as error:
         logger.warning("账号信息保存失败：{}（登录态仍保留在凭据库）", error)
+
+
+def mutate_profile(mutate: Callable[[dict], None], *,
+                   require_existing: bool = False) -> bool:
+    """合并最新磁盘状态后原子写回；返回是否真的写成功。
+
+    **唯一**的 account.json 写入口：``mutate`` 只拿得到最新读出的字典，改完由本函数
+    写回，因此它只能动自己的键，不会覆盖别人的。``mutate`` 里**不得做任何 I/O**
+    （不得写 session.json / profile.db）——否则会与那些文件的锁形成反向嵌套。
+
+    ``require_existing=True``：文件不存在或读不出来时整体放弃（脏标记这类「丢了
+    也无所谓、但绝不能凭空造一份空账号态出来」的写入用）。
+    """
+    path = account_config_path()
+    try:
+        with _PROFILE_LOCK, interprocess_lock(
+                path, suffix="state", timeout=_PROFILE_LOCK_TIMEOUT_S):
+            profile = load_profile()
+            if require_existing and not profile:
+                return False
+            mutate(profile)
+            _write_profile(profile)
+            return True
+    except InterprocessLockTimeout as error:
+        logger.warning("账号信息暂未写入（等锁超时，下次同步会重试）：{}", error)
+        return False
 
 
 def current_instance_id() -> str:
@@ -110,9 +162,10 @@ def sync_paused() -> bool:
 
 
 def set_sync_paused(paused: bool) -> None:
-    profile = load_profile()
-    profile["sync_paused"] = bool(paused)
-    _save_profile(profile)
+    def _set(profile: dict) -> None:
+        profile["sync_paused"] = bool(paused)
+
+    mutate_profile(_set)
 
 
 def profile_sync_state() -> dict:
@@ -131,9 +184,10 @@ def profile_sync_state() -> dict:
 
 
 def save_profile_sync_state(state: dict) -> None:
-    profile = load_profile()
-    profile["profile_sync"] = state
-    _save_profile(profile)
+    def _set(profile: dict) -> None:
+        profile["profile_sync"] = state
+
+    mutate_profile(_set)
 
 
 def _credentials():
@@ -302,21 +356,27 @@ class AccountSession:
         # E2E 密钥在「握有明文口令的瞬间」派生并常驻内存；hex 缓存进
         # account.json 供 restore 免重派生（本地盘本就是明文，不降安全性）
         from . import e2e
-        self.e2e_key = e2e.derive_key(password, result["account_id"])
-        e2e.set_key(self.e2e_key)
+        # 局部别名给闭包用：闭包里读 ``self.e2e_key`` 的类型是 ``bytes | None``
+        # （赋值处的收窄不跨闭包），派生结果本身一定是 bytes。
+        key = e2e.derive_key(password, result["account_id"])
+        self.e2e_key = key
+        e2e.set_key(key)
         # 同账号重新登录（掉线/登出后再登）必须**保留**同步水位等运行态——
         # 整写 account.json 会抹掉 profile_sync/users_sync，下一轮同步退回
         # bootstrap，把云端旧快照静默盖到本地新数据上（2026-11-04 事故根源）。
         # 只有切换到不同账号时才换一份干净的运行态。
-        same_account = load_profile().get("account_id") == result["account_id"]
-        profile = load_profile() if same_account else {}
-        profile.update({
-            "login": result["login"], "account_id": result["account_id"],
-            "display_name": result["display_name"], "instance_id": result["instance_id"],
-            "device_name": device_name, "instance_uuid": instance_uuid,
-        })
-        e2e.persist_key_into(self.e2e_key, profile)
-        _save_profile(profile)
+        def _merge_login(profile: dict) -> None:
+            if profile.get("account_id") != result["account_id"]:
+                profile.clear()
+            profile.update({
+                "login": result["login"], "account_id": result["account_id"],
+                "display_name": result["display_name"],
+                "instance_id": result["instance_id"],
+                "device_name": device_name, "instance_uuid": instance_uuid,
+            })
+            e2e.persist_key_into(key, profile)
+
+        mutate_profile(_merge_login)
         self.access_token = result["access_token"]
         self.access_expires_at = result["access_expires_at"]
         if not fetch_summary:

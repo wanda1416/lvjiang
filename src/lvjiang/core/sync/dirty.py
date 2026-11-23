@@ -12,13 +12,7 @@
 """
 from __future__ import annotations
 
-import json
-import os
-from pathlib import Path
-
 from loguru import logger
-
-from ..json_files import formatted_json
 
 
 def writable() -> bool:
@@ -28,19 +22,16 @@ def writable() -> bool:
     return not is_readonly()
 
 
-def _account_path() -> Path:
-    # 每次动态取 constants，便于测试 monkeypatch（account.service 在模块顶层
-    # 绑定了常量，测试改不到）。
-    from ...constants import SESSION_CONFIG_DIR
-    return SESSION_CONFIG_DIR / "account.json"
-
-
 def _read() -> dict:
-    try:
-        data = json.loads(_account_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    """整份 account.json（``document_sync`` 与登录态、profile 水位同住一个文件）。
+
+    读写都经 ``core.account.service``：那边是 account.json 的唯一落点与唯一写
+    入口（动态解析路径、进程内 + 跨进程锁、原子写）。此处另开一份读法会与
+    写入端解析出不同路径，出现「写一个文件、读另一个文件」。
+    """
+    from ..account.service import load_profile
+
+    return load_profile()
 
 
 def _state() -> dict:
@@ -53,19 +44,19 @@ def _save(state: dict) -> None:
 
     标记是尽力而为：写失败（未登录、只读实例、测试门禁）只降级为「下次多做
     一次全量对比」，绝不能让用户的一次便利贴保存因为标记写不进去而失败。
+    写回经 ``service.mutate_profile``（进程内 + 跨进程锁 + 原子写），因此不会
+    覆盖同一份 account.json 里 profile_sync / users_sync 的并发写入。
     """
     if not writable():
         return
-    path = _account_path()
-    data = _read()
-    if not data:
-        return
-    data["document_sync"] = state
+
+    def _set(profile: dict) -> None:
+        profile["document_sync"] = state
+
     try:
-        tmp = path.with_name(f".{path.name}.dirty")
-        tmp.write_text(formatted_json(data),
-                       encoding="utf-8", newline="\n")
-        os.replace(tmp, path)
+        from ..account.service import mutate_profile
+
+        mutate_profile(_set, require_existing=True)
     except Exception as error:      # noqa: BLE001 — 标记失败不能顶掉业务写入
         logger.debug("[sync] 脏标记写回失败（不影响本地数据）：{}", error)
 

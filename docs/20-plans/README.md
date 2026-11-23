@@ -1,9 +1,9 @@
-# 部分实现功能的计划与边界（plans）
+# 功能规划与部分实现边界（plans）
 
-> 最后更新：2026-11-18（基线 v0.15.17）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-11-23（基线 v0.15.19）。本层描述如与代码或配置不符，以代码与配置为准。
 
 状态取值只有 `已实现`、`部分实现`、`规划`；权威写法是各文档首行的状态行，
-本表为原 `docs/20-requirements/` 的分流索引：本目录（plans/）只收「部分实现」的文档；已实现的决策与规格记录见 [design/decisions](../30-design/02-decisions/README.md)。状态列与目标文档状态行的一致性由 `scripts/docs_check.py` 强制。
+本目录收录进行中的规划与部分实现功能；已实现的决策与规格记录见 [design/decisions](../30-design/02-decisions/README.md)。收录边界见[文档规范](../00-meta/01-doc-standard.md)，状态列与目标文档状态行的一致性由 `scripts/docs_check.py` 强制。
 
 ## 全局待办（原 00-meta/02-backlog.md 迁入）
 
@@ -65,3 +65,5 @@
 | [26-online-config-background-download.md](03-platform/26-online-config-background-download.md) | 在线配置后台下载、暂存与下次启动安装 | 部分实现 |
 | [27-hotkeys-and-menu-shortcuts.md](../30-design/02-decisions/04-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 | 已实现 |
 | [28-account-document-sync.md](../30-design/02-decisions/04-platform/28-account-document-sync.md) | 全局任务参数与批量配置上云：账户级文档通道、冲突不留副本与迁移 | 已实现 |
+| [29-ai-exception-recovery.md](03-platform/29-ai-exception-recovery.md) | AI 异常导航恢复提案：有限动作、检查点续跑与独立验收；未实施 | 规划 |
+| [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 识别帧历史调试与主动反馈提案：显式开启、有界帧/动作时间线、离线查看、任务关联与主动反馈；未实施 | 规划 |

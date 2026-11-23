@@ -12,6 +12,7 @@ warning）。
 """
 from __future__ import annotations
 
+from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import (
     CallProc,
     EntityRef,
@@ -125,3 +126,36 @@ class TestRealWorkflowScope:
         assert "activity_jianghu" not in scenes
         # 而它真正要用的场景仍在
         assert "bag_equip_detail" in scenes
+
+
+class TestExpressionContextRefs:
+    """引用出现在表达式里也要被静态门禁看到。
+
+    ``_collect_from_expr`` 过去只下钻 ArithOp 两侧，注释里假设「FuncCall /
+    FieldAccess 不含 EntityRef」，于是比较表达式、内置函数参数、call 实参里的
+    ``[scene].[key]`` 全部漏检——布局漏绑时预检通过、运行时才炸。
+    """
+
+    def test_condition_expression_is_collected(self):
+        program = parse_text('if [main].[hp] == "x"\n    log "y"\nend\n')
+        assert _scenes(program.body, {}) == {"main"}
+
+    def test_function_argument_is_collected(self):
+        program = parse_text('log [main].[hp]\n')
+        assert _scenes(program.body, {}) == {"main"}
+
+    def test_func_call_inside_arithmetic_is_collected(self):
+        program = parse_text('$d = 1 + distance([main].[hp])\n')
+        assert _scenes(program.body, {}) == {"main"}
+
+    def test_call_argument_is_collected(self):
+        program = parse_text(
+            'def f($p)\n    log $p\nend\ncall f([main].[hp])\n')
+        refs = collect_refs(program.body, program.procs, reachable_only=False)
+        assert {(r.scene, r.key) for r in refs} == {("main", "hp")}
+
+    def test_condition_with_nested_call_is_collected(self):
+        """函数调用包在比较里（语法树更深一层）同样要收集到。"""
+        program = parse_text('if contains([main].[hp], "x")\n    log "y"\nend\n')
+        refs = collect_refs(program.body, {}, reachable_only=False)
+        assert {(r.scene, r.key) for r in refs} == {("main", "hp")}

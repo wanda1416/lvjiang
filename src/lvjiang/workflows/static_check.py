@@ -142,6 +142,11 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
             ok = ref.key in bound["region"]
         elif ref.kind == "point":
             ok = ref.key in bound["point"]
+        elif ref.kind == "expr_ref":
+            # 表达式上下文里的引用没有语句层面的语义，与 KIND_LABELS 的
+            # 「区域/坐标点/面板」一致：三类绑定任一即可（函数拿到的是坐标）。
+            ok = (ref.key in bound["region"] or ref.key in bound["point"]
+                  or ref.key in bound["panel"])
         else:
             ok = ref.key in bound["region"]
         if not ok:

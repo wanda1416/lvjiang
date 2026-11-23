@@ -9,12 +9,11 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, is_dataclass, replace
 
 from ..i18n import tr
 from .grammar.ast_nodes import (
     Align,
-    ArithOp,
     CallProc,
     Click,
     Drag,
@@ -27,6 +26,7 @@ from .grammar.ast_nodes import (
     FuncCall,
     If,
     Literal,
+    Log,
     Loop,
     Move,
     Not,
@@ -34,6 +34,7 @@ from .grammar.ast_nodes import (
     PanelRef,
     ProcDef,
     Recognize,
+    Return,
     Scan,
     Scroll,
     SubsceneEntityRef,
@@ -106,15 +107,33 @@ def _add_subscene(acc: list[RefUse], node: SubsceneEntityRef,
 
 
 def _collect_from_expr(node, acc: list[RefUse], line: int) -> None:
-    """递归遍历表达式节点，收集其中的 EntityRef（用于赋值与算术上下文）"""
+    """递归遍历表达式节点，收集其中的静态引用
+
+    按 dataclass 字段通用下钻，而不是逐类型枚举：过去只写了 ArithOp 的两侧，
+    注释里假设「FuncCall / FieldAccess 不含 EntityRef」，于是
+    ``if [main].[a] == "x"`` 与 ``call f([main].[a])`` 里的引用被静默漏检，
+    执行前的布局门禁等于没查，直到运行到那一行才因坐标未绑定失败。
+    """
+    if node is None or isinstance(node, (str, bytes, bool, int, float)):
+        return
     if isinstance(node, EntityRef):
         _add(acc, node.scene, node.entity, "expr_ref", line)
-    elif isinstance(node, SubsceneEntityRef):
+        return
+    if isinstance(node, SubsceneEntityRef):
         _add_subscene(acc, node, "expr_ref", line)
-    elif isinstance(node, ArithOp):
-        _collect_from_expr(node.left, acc, line)
-        _collect_from_expr(node.right, acc, line)
-    # 其他节点类型（VarRef/Literal/FieldAccess/FuncCall）不含 EntityRef，无需递归
+        return
+    if isinstance(node, dict):
+        for value in node.values():
+            _collect_from_expr(value, acc, line)
+        return
+    if isinstance(node, (list, tuple)):
+        for item in node:
+            _collect_from_expr(item, acc, line)
+        return
+    if not is_dataclass(node):
+        return
+    for field in fields(node):
+        _collect_from_expr(getattr(node, field.name), acc, line)
 
 
 def _static_env_condition(condition, run_env: str) -> bool | None:
@@ -217,13 +236,31 @@ def _collect_from_stmt(stmt, acc: list[RefUse], run_env: str = "") -> None:
         if stmt.area is not None and isinstance(stmt.area, EntityRef):
             _add(acc, stmt.area.scene, stmt.area.entity, "stable_area", line)
 
-    # 表达式内 EntityRef 收集（$a = [scene].[region] 或 $diff = $b - $a 等）
-    if isinstance(stmt, Eval):
-        _collect_from_expr(getattr(stmt, 'value', None), acc, line)
-        for arg in getattr(stmt, 'func_args', []):
+    # 表达式内 EntityRef 收集（$a = [scene].[region]、条件、调用实参等）。
+    # 这些位置过去全都漏检：静态门禁只查到赋值右值里的算术，一旦引用出现在
+    # 比较/逻辑表达式、内置函数参数或 call 实参里，就等到运行时才因坐标未绑定失败。
+    if isinstance(stmt, (Eval, EvalFieldChainAssign)):
+        for arg in getattr(stmt, "func_args", []) or []:
             _collect_from_expr(arg, acc, line)
-    elif isinstance(stmt, EvalFieldChainAssign):
-        _collect_from_expr(getattr(stmt, 'value', None), acc, line)
+        _collect_from_expr(getattr(stmt, "value", None), acc, line)
+    elif isinstance(stmt, CallProc):
+        for arg in stmt.args or []:
+            _collect_from_expr(arg, acc, line)
+    elif isinstance(stmt, If):
+        _collect_from_expr(stmt.condition, acc, line)
+    elif isinstance(stmt, (WhileLoop, UntilLoop)):
+        _collect_from_expr(stmt.condition, acc, line)
+    elif isinstance(stmt, For):
+        _collect_from_expr(stmt.iterable, acc, line)
+    elif isinstance(stmt, ForRange):
+        _collect_from_expr(stmt.start, acc, line)
+        _collect_from_expr(stmt.end, acc, line)
+    elif isinstance(stmt, Loop):
+        _collect_from_expr(stmt.count, acc, line)
+    elif isinstance(stmt, Log):
+        _collect_from_expr(stmt.message, acc, line)
+    elif isinstance(stmt, Return):
+        _collect_from_expr(stmt.value, acc, line)
 
     # 嵌套体递归
     if isinstance(stmt, If):

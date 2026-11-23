@@ -215,3 +215,27 @@ def test_none_candidate_is_listed_once_in_editor(dialog, qtbot):
     editor = LingerItemDialog(list(dialog._catalog.regions))
     qtbot.addWidget(editor)
     assert [editor.target_combo.itemData(i) for i in range(editor.target_combo.count())].count("none") == 1
+
+
+def test_sync_model_dialog_rejects_unchecked_default_and_realigns_on_uncheck(dialog, qtbot):
+    from lvjiang.apps.yysls.ui.linger.sync_model_dialog import LingerSyncModelDialog
+
+    overrides.set_target_candidates(["stock:niaoniao"], "stock:niaoniao")
+    sync_dlg = LingerSyncModelDialog(dialog)
+    qtbot.addWidget(sync_dlg)
+    sync_dlg.show()
+
+    # 1) 勾 A 后取消 A：设为默认必须禁用且默认值保持不变
+    other_box = sync_dlg._checkboxes["stock:other"]
+    other_box.setChecked(True)
+    assert sync_dlg.use_default_button.isEnabled()
+    other_box.setChecked(False)
+    assert not sync_dlg.use_default_button.isEnabled()
+    sync_dlg._set_default_from_selection()
+    assert overrides.read_default_target() == "stock:niaoniao"
+
+    # 2) 勾 A 并存为候选后取消当前默认项：默认自动切到剩余已勾选项且文本框同步刷新
+    other_box.setChecked(True)
+    sync_dlg._checkboxes["stock:niaoniao"].setChecked(False)
+    assert overrides.read_default_target() == "stock:other"
+    assert sync_dlg.default_edit.text() == "stock:other"

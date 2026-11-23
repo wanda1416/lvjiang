@@ -271,3 +271,22 @@ def test_upsert_preserves_decoupled_kind_and_clears_target_on_follow_default(
     item_a = _effective(resolver).item("a")[1]
     assert item_a.kind == "single"
     assert item_a.target == "stock:niaoniao"
+
+
+def test_set_target_candidates_keeps_default_within_non_empty_candidates(
+    resolver: ConfigResolver,
+) -> None:
+    """非空候选下默认必须落在候选内；取消默认切到剩余首项；清空候选保留设置或回落。"""
+    ov.set_target_candidates(["stock:other", "none", "stock:other"], "stock:niaoniao")
+    assert ov.read_target_candidates() == ["stock:other", "none"]
+    assert ov.read_default_target() == "stock:other"
+
+    ov.set_target_candidates(["none"], ov.read_default_target())
+    assert ov.read_default_target() == "none"
+
+    ov.set_target_candidates([], "stock:other")
+    assert ov.read_target_candidates() == []
+    assert ov.read_default_target() == "stock:other"
+
+    ov.set_target_candidates([], "")
+    assert ov.read_default_target() == "stock:niaoniao"

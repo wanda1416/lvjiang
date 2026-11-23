@@ -73,12 +73,15 @@ def read_target_candidates() -> list[str]:
 def set_target_candidates(candidates: list[str], default: str) -> None:
     """写入候选与默认同步 key；空列表删除配置（回落全量候选）。"""
     doc = _load_full()
-    clean = [c for c in (str(v).strip() for v in candidates) if c]
+    clean = list(dict.fromkeys(c for c in (str(v).strip() for v in candidates) if c))
+    default_clean = str(default or "").strip()
     if clean:
         doc["target_candidates"] = clean
+        effective = default_clean or DEFAULT_TARGET
+        if effective not in clean:
+            default_clean = clean[0]
     else:
         doc.pop("target_candidates", None)
-    default_clean = str(default or "").strip()
     if default_clean and default_clean != DEFAULT_TARGET:
         doc["default_target"] = default_clean
     else:

@@ -131,15 +131,20 @@ class LingerSyncModelDialog(QDialog):
         return [value for value, box in self._checkboxes.items() if box.isChecked()]
 
     def _on_toggle(self, value: str) -> None:
-        # 候选即时保存（勾选即生效，关闭不丢）；记住最后操作行供「设为默认」
-        self._last_toggled = value
+        # 候选即时保存（勾选即生效，关闭不丢）；仅勾选操作可成为「设为默认」焦点
+        box = self._checkboxes.get(value)
+        if box is not None and box.isChecked():
+            self._last_toggled = value
+        elif getattr(self, "_last_toggled", "") == value:
+            self._last_toggled = ""
         ov.set_target_candidates(self._current_candidates(),
                                  ov.read_default_target())
         self._refresh_default()
 
     def _set_default_from_selection(self) -> None:
         value = getattr(self, "_last_toggled", "")
-        if not value:
+        box = self._checkboxes.get(value) if value else None
+        if not value or box is None or not box.isChecked():
             return
         ov.set_target_candidates(self._current_candidates(), value)
         self._refresh_default()
@@ -148,9 +153,10 @@ class LingerSyncModelDialog(QDialog):
         current = ov.read_default_target()
         self.default_edit.setText(
             tr("不同步") if current == NO_SYNC_TARGET else current)
+        last = getattr(self, "_last_toggled", "")
+        box = self._checkboxes.get(last) if last else None
         self.use_default_button.setEnabled(
-            bool(getattr(self, "_last_toggled", ""))
-            and self._last_toggled != current)
+            bool(last) and box is not None and box.isChecked() and last != current)
 
     def _apply_filter(self, text: str) -> None:
         needle = text.strip().lower()

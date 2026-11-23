@@ -566,6 +566,7 @@ def test_e2e_decrypt_failure_records_pending_and_retries_when_key_set(env, monke
 
     report1 = _sync(env)
     assert not report1.errors
+    assert report1.pulled == []
     assert path.read_bytes() == local_old
     assert "__global__/workflow" in dirty.pending_decrypt()
 
@@ -576,3 +577,188 @@ def test_e2e_decrypt_failure_records_pending_and_retries_when_key_set(env, monke
     assert not report2.errors
     assert path.read_bytes() == cloud_new
     assert dirty.pending_decrypt() == set()
+
+
+def test_pending_encrypt_does_not_overwrite_newer_remote_and_clears_stale(env, monkeypatch):
+    """pending_encrypt 重试不得用本机旧内容覆盖远端新版，且失效待加密项应清理。"""
+    from lvjiang.core.account import e2e
+    from lvjiang.core.sync import dirty, engine
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    monkeypatch.setattr(e2e, "current_key", lambda: key)
+
+    path = env["dirs"]["session"] / "workflow.json"
+    local_old = b'{"workflow_params":{"wf":{"n":1}}}'
+    path.write_bytes(local_old)
+
+    # 远端已是另一设备更新后的密文（sha 与本地明文不同）
+    cloud_new = e2e.encrypt_text(key, '{"workflow_params":{"wf":{"n":99}}}').encode("utf-8")
+    env["fake"].docs[("__global__", "workflow")] = {
+        "sha256": engine.hashlib.sha256(cloud_new).hexdigest(),
+        "size": len(cloud_new),
+        "zipped": True,
+        "payload": base64.b64encode(gzip.compress(cloud_new, mtime=0)).decode(),
+        "updated_at": "2026-11-01T00:00:00Z",
+    }
+    env["doc_state"]["remote_document_id"] = 5
+    env["doc_state"]["stamps"] = {
+        "__global__/workflow": [path.stat().st_size, path.stat().st_mtime_ns],
+    }
+    dirty.set_pending_encrypt({"__global__/workflow", "ghost/notes"})
+    monkeypatch.setattr(engine, "cloud_state", lambda _tok, _post: {"document_head": 5})
+
+    report = _sync(env)
+    assert not report.errors
+    assert env["fake"].pushes == []
+    assert dirty.pending_encrypt() == set()
+    assert dirty.e2e_migrated_key_fp() == e2e.key_fingerprint(key)
+
+
+def test_push_advances_watermark_when_revision_contiguous_only(env, monkeypatch):
+    """连续 revision 才推进本地水位（含迁移补推），跳号时不跳过；相同字节不重写入磁盘。"""
+    import hashlib
+    import os
+
+    from lvjiang.core.account import e2e
+    from lvjiang.core.sync import engine
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    monkeypatch.setattr(e2e, "current_key", lambda: key)
+
+    path = env["dirs"]["session"] / "workflow.json"
+    plain = b'{"workflow_params":{"wf":{"n":1}}}'
+    path.write_bytes(plain)
+    plain_sha = hashlib.sha256(plain).hexdigest()
+
+    env["fake"].docs[("__global__", "workflow")] = {
+        "sha256": plain_sha, "size": len(plain), "zipped": True,
+        "payload": base64.b64encode(gzip.compress(plain, mtime=0)).decode(),
+        "updated_at": "2026-11-01T00:00:00Z",
+    }
+    env["doc_state"]["remote_document_id"] = 5
+    env["doc_state"]["stamps"] = {
+        "__global__/workflow": [path.stat().st_size, path.stat().st_mtime_ns],
+    }
+
+    cloud_head = {"v": 5}
+    pull_calls: list[dict] = []
+
+    def fake_post(route, data, token):
+        if route == "/api/sync/state":
+            return {"document_head": cloud_head["v"]}
+        pull_calls.append(data)
+        return {"documents": [], "next_id": cloud_head["v"] + 1}
+
+    next_rev = {"v": 6}
+    orig_push = env["fake"].push
+
+    def push_with_rev(token, label, kind, sha256, payload_base64, expected_sha256=None):
+        orig_push(token, label, kind, sha256, payload_base64, expected_sha256)
+        rev = next_rev["v"]
+        cloud_head["v"] = rev
+        return {"stored": True, "revision": rev}
+
+    monkeypatch.setattr(engine, "post", fake_post)
+    monkeypatch.setattr(engine.client, "push", push_with_rev)
+
+    # 1) 空轮迁移推密文返回连续 revision=6：水位抬到 6，下一轮不发 documents/pull
+    report1 = _sync(env)
+    assert not report1.errors
+    assert env["doc_state"]["remote_document_id"] == 6
+    pull_calls.clear()
+    report2 = _sync(env)
+    assert not report2.errors
+    assert pull_calls == []
+
+    # 2) 本地标脏推送连续 revision=7：水位抬到 7
+    note = env["dirs"]["users"] / "甲.notes.json"
+    note.write_bytes(b'{"notes": []}\n')
+    env["doc_state"]["dirty"] = {"甲/notes": True}
+    next_rev["v"] = 7
+    report3 = _sync(env)
+    assert not report3.errors
+    assert env["doc_state"]["remote_document_id"] == 7
+
+    # 3) 跳号 revision=9（他机穿插写入 8）：水位保持 7，防止漏拉 8
+    env["doc_state"]["dirty"] = {"甲/notes": True}
+    next_rev["v"] = 9
+    report4 = _sync(env)
+    assert not report4.errors
+    assert env["doc_state"]["remote_document_id"] == 7
+
+    # 4) _pull 收到与本地相同字节时跳过写盘（保留原 mtime）且不计入 pulled
+    fixed_ts = 1_700_000_000
+    os.utime(note, (fixed_ts, fixed_ts))
+    enc = e2e.encrypt_text(key, '{"notes": []}\n').encode("utf-8")
+    pull_report = engine.SyncReport()
+    engine._pull(engine.LocalDocument("甲", "notes", note), "t", pull_report, raw=enc)
+    assert pull_report.pulled == []
+    assert int(note.stat().st_mtime) == fixed_ts
+
+
+def test_pending_decrypt_clears_unmanaged_and_not_found_zombies(env, monkeypatch):
+    """无法定位本地路径或远端已不存在的 pending_decrypt 僵尸项应自动清理，不阻断迁移完成。"""
+    from lvjiang.core.account import e2e
+    from lvjiang.core.sync import dirty, engine
+    from lvjiang.core.sync.client import SyncError
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    monkeypatch.setattr(e2e, "current_key", lambda: key)
+    monkeypatch.setattr(engine, "cloud_state", lambda _tok, _post: {"document_head": 5})
+    env["doc_state"]["remote_document_id"] = 5
+
+    dirty.set_pending_decrypt({"张三/unknown_plugin_kind", "李四/notes"})
+
+    def fake_pull(_tok, label, kind):
+        raise SyncError("服务接口不存在", code="not_found")
+
+    monkeypatch.setattr(engine.client, "pull", fake_pull)
+
+    report = _sync(env)
+    assert report.errors == []
+    assert dirty.pending_decrypt() == set()
+    assert dirty.e2e_migrated_key_fp() == e2e.key_fingerprint(key)
+
+
+def test_pull_migration_409_handles_plaintext_and_undecryptable_ciphertext(env, monkeypatch):
+    """_pull 触发 409 重拉后：明文版本应落地并入 pending_encrypt；解不开的新密文保留本地并入 pending_decrypt。"""
+    from lvjiang.core.account import e2e
+    from lvjiang.core.sync import dirty, engine
+
+    key = e2e.derive_key("pw-123456", "a" * 32)
+    other_key = e2e.derive_key("pw-other", "a" * 32)
+    monkeypatch.setattr(e2e, "current_key", lambda: key)
+
+    path = env["dirs"]["users"] / "甲.notes.json"
+    doc = engine.LocalDocument("甲", "notes", path)
+
+    def conflict_push(*_args, **_kwargs):
+        raise SyncConflict({"error": "conflict"})
+
+    monkeypatch.setattr(engine.client, "push", conflict_push)
+
+    # 1) 409 重拉到另一份明文：落盘并登记 pending_encrypt
+    plain_v2 = b'{"notes": [{"text": "v2"}]}\n'
+    monkeypatch.setattr(engine.client, "pull", lambda _tok, label, kind: {
+        "label": label, "kind": kind, "sha256": "s2", "size": len(plain_v2),
+        "zipped": True, "updated_at": "2026-11-02T00:00:00Z",
+        "payload_base64": base64.b64encode(gzip.compress(plain_v2, mtime=0)).decode(),
+    })
+    report1 = engine.SyncReport()
+    engine._pull(doc, "t", report1, raw=b'{"notes": []}\n')
+    assert path.read_bytes() == plain_v2
+    assert "甲/notes" in dirty.pending_encrypt()
+
+    # 2) 409 重拉到本机解不开的新密文：保留当前本地明文并登记 pending_decrypt
+    dirty.set_pending_encrypt(set())
+    enc_other = e2e.encrypt_text(other_key, '{"notes": [{"text": "secret"}]}').encode("utf-8")
+    monkeypatch.setattr(engine.client, "pull", lambda _tok, label, kind: {
+        "label": label, "kind": kind, "sha256": "s3", "size": len(enc_other),
+        "zipped": True, "updated_at": "2026-11-03T00:00:00Z",
+        "payload_base64": base64.b64encode(gzip.compress(enc_other, mtime=0)).decode(),
+    })
+    report2 = engine.SyncReport()
+    plain_v3 = b'{"notes": [{"text": "v3"}]}\n'
+    engine._pull(doc, "t", report2, raw=plain_v3)
+    assert path.read_bytes() == plain_v3
+    assert "甲/notes" in dirty.pending_decrypt()

@@ -29,6 +29,13 @@ def validate_scene_declarations(program, scenes):
         scene = scenes.get(declaration.scene)
         if scene is None:
             problems.append((declaration.line_no, f"声明的场景不存在: {declaration.scene}"))
+        elif scene.is_subscene:
+            # 子场景是父场景画布里的一块局部，不是可跳转的页面：脚本按 `scene`
+            # 声明它会得到一个永远匹配不上的流程位置。
+            problems.append((
+                declaration.line_no,
+                f"声明的场景是子场景，不能作为流程位置: {declaration.scene}"
+                f"（请声明引用它的父场景）"))
         elif declaration.view is not None and not (
             any(v.key == declaration.view for v in scene.views)
             or declaration.view == "base" and not scene.views

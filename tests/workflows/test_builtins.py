@@ -7,6 +7,7 @@ system 模块（confirm/pause/save/panel_rows）依赖 engine 与 GUI，不纳�
 import pytest
 
 from lvjiang.workflows.builtins import builtin_func, get_function, list_functions
+from lvjiang.workflows.errors import WorkflowUserError
 from tests.case_matrix import case_matrix
 
 
@@ -58,8 +59,14 @@ class TestArithmetic:
         assert _fn("mod")("7", "3") == 1
         assert _fn("min")("2.5", "0.5") == 0.5
 
-    def test_divide_by_zero_returns_zero(self):
-        assert _fn("mod")(7, 0) == 0
+    def test_modulo_by_zero_is_an_error(self):
+        """模数为 0 必须报错，不能返回 0。
+
+        返回 0 会把算错的模数伪装成合法余数（任何数 mod 0 = 0 的假象），
+        分支判定就此静默走错。
+        """
+        with pytest.raises(WorkflowUserError, match="请检查模数变量"):
+            _fn("mod")(7, 0)
 
     def test_invalid_input_returns_zero(self):
         assert _fn("mod")("abc", 1) == 0

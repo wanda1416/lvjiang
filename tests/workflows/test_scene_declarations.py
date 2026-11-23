@@ -35,3 +35,20 @@ scene [settings]
     assert len(collect_scene_declarations(program)) == 4
     errors = validate_scene_declarations(program, scenes)
     assert {line for line, _ in errors} == {2, 5}
+
+
+def test_subscene_cannot_be_declared_as_a_page():
+    """子场景是父画布里的局部，不是可跳转的页面。
+
+    声明它只会得到一个永远匹配不上的流程位置，白白给人「这段流程有锚点」的错觉。
+    """
+    program = parse_text('scene [jianghu_card]\n')
+    scenes = {
+        'jianghu_card': SceneDef('jianghu_card', '江湖卡片', type='subscene'),
+        'activity_jianghu': SceneDef('activity_jianghu', '江湖活动'),
+    }
+
+    errors = validate_scene_declarations(program, scenes)
+
+    assert [line for line, _ in errors] == [1]
+    assert '子场景' in errors[0][1]

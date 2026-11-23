@@ -109,7 +109,7 @@ Offset(dx, dy)                — 位移向量（独立类型，不属于 CoordR
 | Offset + Offset | Offset | 向量叠加 |
 | Offset - Offset | Offset | 向量差 |
 | Offset * n | Offset | 向量缩放 |
-| Offset / n | Offset | 向量缩放 |
+| Offset / n | Offset | 向量缩放；**n 为 0 直接报错**，不会给出零向量 |
 | tuple → Offset | 隐式转换 | 原始可当位移 |
 
 **禁止的运算**：

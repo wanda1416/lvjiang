@@ -397,7 +397,8 @@ class _EvalMixin:
         """求值算术表达式节点
 
         保持 int/float 类型：int+int→int，int+float→float，除法始终为 float。
-        null 操作数视为 0（int），除 0 返回 0.0。
+        null 操作数视为 0（int）。**除数为 0 直接报错**：给一个 0.0 会把算错的
+        除数伪装成合法结果，后续判断、计数与坐标全部静默偏掉。
         `+` 运算符：任一侧为 str 则走字符串拼接。
         CoordRef/Offset 运算：委托 _eval_coord_arith。
         """
@@ -445,7 +446,10 @@ class _EvalMixin:
             case "*":
                 return left * right
             case "/":
-                return left / right if right != 0 else 0.0
+                if right == 0:
+                    raise WorkflowUserError(
+                        f"数值运算不合法: {left} / 0。请检查除数变量是否可能为 0")
+                return left / right
             case _:
                 logger.warning(f"未知算术运算符: {node.op}")
                 return 0.0
@@ -483,6 +487,12 @@ class _EvalMixin:
                     return right * left
             case "/":
                 if isinstance(left, Offset) and isinstance(right, (int, float)):
+                    if right == 0:
+                        # 除 0 在类型层已经会抛 ZeroDivisionError，这里换成用户
+                        # 能看懂的报错：偏移量除以 0 只会得到一个错误的方向，
+                        # 静默当成零偏移就是「看着跑完了、其实点错地方」。
+                        raise WorkflowUserError(
+                            "坐标运算不合法: Offset / 0。请检查步数或比例变量")
                     return left / right
         left_desc = type(left).__name__ if left is not None else "null"
         right_desc = type(right).__name__ if right is not None else "null"

@@ -182,7 +182,7 @@ click $target
 - `CoordRef - Offset` → `CoordRef`（保持子类）
 - `CoordRef - CoordRef` → `Offset`（隐式降级为中心点）
 - `Offset ± Offset` → `Offset`
-- `Offset * n` / `Offset / n` → `Offset`
+- `Offset * n` / `Offset / n` → `Offset`（`n` 为 0 直接报错，不返回零向量）
 - `tuple → Offset` — 隐式转换（`(dx, dy)` 可直接当位移用）
 
 **禁止运算**：`CoordRef * n` / `CoordRef / n`（位置乘以数字无意义，破坏向量运算法则）

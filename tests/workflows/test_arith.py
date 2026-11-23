@@ -5,6 +5,9 @@
 """
 
 
+import pytest
+
+from lvjiang.workflows.errors import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine
@@ -22,7 +25,6 @@ class TestArithEval:
         ("eval $x = 10 - 3", {}, 7),
         ("eval $x = 4 * 5", {}, 20),
         ("eval $x = 10 / 3", {}, 10 / 3),   # 浮点除
-        ("eval $x = 10 / 0", {}, 0.0),      # 除 0 返回 0.0
         # 变量参与
         ("eval $x = $a + $b", {"a": 10, "b": 20}, 30),
         ("eval $x = $a * 2 + 1", {"a": 5}, 11),
@@ -42,6 +44,18 @@ class TestArithEval:
             engine._exec_stmt(stmt)
         assert engine.variables.get("x") == expected
 
+    def test_division_by_zero_is_an_error(self):
+        """除 0 必须报错，不能再给 0.0。
+
+        0.0 会被当成一次成功的除法：计数、比例、坐标全部按错的值继续算，
+        运行看起来"跑完了"，只是结果和点位都不对。
+        """
+        engine = make_engine()
+        with pytest.raises(WorkflowUserError, match="请检查除数变量"):
+            for stmt in parse_text("eval $x = 10 / 0").body:
+                engine._exec_stmt(stmt)
+        assert "x" not in engine.variables
+
 
     @case_matrix("variables,expected", [
         ({"a": 9, "b": 5}, True),
@@ -53,8 +67,7 @@ class TestArithEval:
         prog = parse_text('if $a + 1 == $b * 2\n    log "eq"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is expected
 
-    def test_float_equality_and_inequality_share_tolerance(self):
-        # float_equality_tolerance
+    def test_float_equality_and_inequality_share_tolerance(self):        # float_equality_tolerance
         engine = make_engine()
         engine.variables = {}
         prog = parse_text('if 0.1 + 0.2 == 0.3\n    log "eq"\nend\n')

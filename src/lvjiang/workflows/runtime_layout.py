@@ -84,13 +84,20 @@ def resolve_subscene_entity(layout, parent_scene: str, reference_key: str,
 
 def resolve_subscene_instance(layout, parent_scene: str, reference_key: str):
     """取得父场景中的子画布实例，供坐标投影和模板缩放共用。"""
-    resolve_subscene_target_scene(parent_scene, reference_key)
+    target_scene = resolve_subscene_target_scene(parent_scene, reference_key)
     instance = next((r for r in layout.get_scene_subscene_refs(parent_scene)
                      if r.key == reference_key), None)
     if instance is None:
         raise WorkflowUserError(
             f"场景 {parent_scene} 的子场景引用未绑定坐标: {reference_key}")
     require_enabled(instance, parent_scene, "subscene_ref")
+    if instance.w_ratio <= 0 or instance.h_ratio <= 0:
+        # 外框为零（或负）时所有子实体都会投影到同一个点，点下去是错的，
+        # 而且错得很安静：坐标算得出来，只是全塌在一起。
+        raise WorkflowUserError(
+            f"场景 {parent_scene} 的子场景引用 [{reference_key}] 外框尺寸为 "
+            f"{instance.w_ratio}×{instance.h_ratio}，无法投影子场景 "
+            f"{target_scene} 内的元素；请在布局里重新框选该子场景")
     return instance
 
 

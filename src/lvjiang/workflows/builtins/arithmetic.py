@@ -19,22 +19,28 @@ GROUP = "基础运算"
     "mod",
     params={
         "a": "被取模数",
-        "b": "模数，为 0 时返回 0",
+        "b": "模数，为 0 时报错",
         "*args": "其余参数忽略",
     },
     returns="int | float",
 )
 def _mod(a, b, *args):
-    """取模运算，除数为 0 返回 0
+    """取模运算，模数为 0 直接报错
+
+    与 ``/`` 同一口径：返回 0 会把算错的模数伪装成合法余数，分支判定
+    会静默走错。null/非数字参数仍按 0 参与运算（模 0 同样报错）。
 
     .wf 用法:
         eval $remainder = mod($val, 3)
     """
+    from ..engine.signals import WorkflowUserError
+
     a_num, b_num = to_number(a), to_number(b)
     if a_num is None or b_num is None:
         return 0
     if b_num == 0:
-        return 0
+        raise WorkflowUserError(
+            f"取模不合法: mod({a}, 0)。请检查模数变量是否可能为 0")
     return a_num % b_num
 
 

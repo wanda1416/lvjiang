@@ -300,6 +300,7 @@ def _check_scene_exists(program) -> list[Diagnostic]:
     if registry is None:
         return []
     diagnostics = []
+    from lvjiang.core.scene.definition_models import is_valid_key
     from lvjiang.workflows.scene_declarations import validate_scene_declarations
     for line, message in validate_scene_declarations(program, registry.all_scenes()):
         diagnostics.append(Diagnostic(range=_line_range(line), message=message,
@@ -313,11 +314,52 @@ def _check_scene_exists(program) -> list[Diagnostic]:
             continue
         if ref.scene not in valid_scenes:
             seen_scenes.add(ref.scene)
+            hint = "" if is_valid_key(ref.scene) else (
+                "（key 只能小写字母开头、仅含小写字母/数字/下划线；"
+                "中文或大写不会出现在场景定义里）")
             diagnostics.append(Diagnostic(
                 range=_line_range(ref.line_no),
-                message=f"场景 '{ref.scene}' 不存在于 scenes/ 目录中",
+                message=f"场景 '{ref.scene}' 不存在于 scenes/ 目录中{hint}",
                 severity=DiagnosticSeverity.Error,
             ))
+    diagnostics.extend(_check_entity_key_charset(program, registry))
+    return diagnostics
+
+
+def _check_entity_key_charset(program, registry) -> list[Diagnostic]:
+    """实体 key 里的中文/大写值得点名。
+
+    DSL 的 ``NAME`` 允许中文与大写，但场景/区域/坐标点的 key 只允许小写字母
+    数字下划线。两边规则不一致时，人看到的是布局「没绑」，于是去翻布局而不是
+    改 key。只在**确实用了这种 key、且定义里找不到它**时提示：手写的合法中文
+    key 仍照常生效，不受噪声干扰。
+    """
+    from lvjiang.core.scene.definition_models import is_valid_key
+
+    refs = collect_refs(program.body, program.procs,
+                        source=program.source, reachable_only=False)
+    diagnostics: list[Diagnostic] = []
+    reported: set[str] = set()
+    for ref in refs:
+        if ref.is_subscene or not ref.key or is_valid_key(ref.key):
+            continue
+        if ref.key in reported:
+            continue
+        scene = registry.get_scene(ref.scene)
+        if scene is None:
+            continue
+        defined = ([r.key for r in scene.regions]
+                   + [p.key for p in scene.points]
+                   + [p.key for p in scene.panels])
+        if ref.key in defined:
+            continue
+        reported.add(ref.key)
+        diagnostics.append(Diagnostic(
+            range=_line_range(ref.line_no),
+            message=(f"key '{ref.key}' 不符合书写规则：只能小写字母开头，"
+                     f"仅含小写字母/数字/下划线；中文与大写写不进场景定义"),
+            severity=DiagnosticSeverity.Warning,
+        ))
     return diagnostics
 
 

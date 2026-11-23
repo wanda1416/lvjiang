@@ -245,6 +245,41 @@ def test_valid_identifier_similar_to_keyword_has_no_warning(
     assert published == []
 
 
+def _registry_stub(scenes: dict) -> SimpleNamespace:
+    """最小场景注册表替身：只需场景清单与按 key 取场景。"""
+    return SimpleNamespace(
+        all_scene_keys=lambda: list(scenes),
+        all_scenes=lambda: dict(scenes),
+        get_scene=lambda key: scenes.get(key),
+    )
+
+
+def test_non_ascii_entity_key_gets_an_actionable_hint(parse_cache_server) -> None:
+    """DSL 的 NAME 允许中文，但场景定义的 key 只收小写字母数字下划线。
+
+    不提示的话，人看到的是「布局里没绑」，于是去翻布局而不是改 key。
+    """
+    wf_server = parse_cache_server
+    registry = _registry_stub({
+        "settings": SimpleNamespace(regions=[], points=[], panels=[])})
+
+    diagnostics = wf_server._check_entity_key_charset(
+        parse_text('click [settings].[确认]\n'), registry)
+
+    assert len(diagnostics) == 1
+    assert "小写字母" in diagnostics[0].message
+
+
+def test_defined_entity_keys_never_get_the_charset_hint(parse_cache_server) -> None:
+    """手写的合法中文 key 照常生效，不制造噪声。"""
+    wf_server = parse_cache_server
+    registry = _registry_stub({"settings": SimpleNamespace(
+        regions=[SimpleNamespace(key="确认")], points=[], panels=[])})
+
+    assert wf_server._check_entity_key_charset(
+        parse_text('click [settings].[确认]\n'), registry) == []
+
+
 def test_procedure_rename_checks_collisions_and_edits_only_symbols(
     wf_server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

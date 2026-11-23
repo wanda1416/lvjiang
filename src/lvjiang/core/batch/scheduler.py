@@ -341,7 +341,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
             },
         )
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
-        self._recording_batch_id = batch_run_id
+        self._diagnostic_batch_id = batch_run_id
         self._batch_run = batch_run
         summary: dict = {
             "batch_run_id": batch_run_id,
@@ -619,7 +619,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                     capture = (task_run.capture_logs()
                                if task_run is not None else nullcontext())
                     with capture:
-                        self._recording_task_id = task_run.task_run_id if task_run is not None else ""
+                        self._diagnostic_task_id = task_run.task_run_id if task_run is not None else ""
                         if task_run is not None:
                             logger.info(
                                 f"任务开始: task_run_id={task_run.task_run_id}, "
@@ -820,7 +820,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
         )
         self._batch_run = batch_run
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
-        self._recording_batch_id = batch_run_id
+        self._diagnostic_batch_id = batch_run_id
         summary: dict = {"batch_run_id": batch_run_id, "entries": {},
                          "stopped": False, "lifecycle": {}}
         report = BatchReport(
@@ -1065,7 +1065,7 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
                             capture = (task_run.capture_logs()
                                        if task_run is not None else nullcontext())
                             with capture:
-                                self._recording_task_id = task_run.task_run_id if task_run is not None else ""
+                                self._diagnostic_task_id = task_run.task_run_id if task_run is not None else ""
                                 result = self._run_script(
                                     script, session, username,
                                     params=copy.deepcopy(planned.params))
@@ -1266,14 +1266,11 @@ class BatchScheduler(StageExecutionMixin, UnattendedMixin):
         engine.execution_target_snapshot = SimpleNamespace(
             id=ctx.target_id, kind=ctx.target_kind, display_name=ctx.target_label)
         engine.window_rebind_hook = ctx.window_rebind_hook
-        if ctx.full_task_capture:
-            from ...constants import PROJECT_ROOT
-            from ..simulation.host import recording_scope
-            engine.execution_scope = recording_scope(
-                PROJECT_ROOT / "logs" / "recordings",
-                task_run_id=getattr(self, "_recording_task_id", "") or ctx.task_run_id,
-                batch_run_id=getattr(self, "_recording_batch_id", ""),
-                target_scope=ctx.target_id)
+        if ctx.diagnostics is not None:
+            engine.execution_scope = ctx.diagnostics.scope(
+                task_run_id=getattr(self, "_diagnostic_task_id", "") or ctx.task_run_id,
+                batch_run_id=getattr(self, "_diagnostic_batch_id", ""),
+                target_scope=ctx.target_id, previous=engine.execution_scope)
         return engine
 
 

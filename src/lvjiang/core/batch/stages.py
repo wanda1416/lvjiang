@@ -322,7 +322,7 @@ class StageExecutionMixin:
         try:
             engine = self._create_engine()
         finally:
-            self._recording_task_id = ""
+            self._diagnostic_task_id = ""
         self._task_stop_clear()
         engine.session = session
         engine.run_username = username or ""

@@ -10,7 +10,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from ...i18n import tr
 from ...workflows.errors import WorkflowAbort
@@ -22,6 +22,9 @@ from ...workflows.result_protocol import (
 )
 from .config import BatchConfigItem, BatchWorkflows
 from .run import BatchRunDraft
+
+if TYPE_CHECKING:
+    from ..task_diagnostics import DiagnosticRequest
 
 # 进度状态常量
 ST_PENDING = tr("待执行")
@@ -172,7 +175,7 @@ class BatchContext:
     target_kind: str = ""
     target_label: str = ""
     task_run_id: str = ""
-    full_task_capture: bool = False
+    diagnostics: DiagnosticRequest | None = None
     input_kind: str = ""
     layout_name: str = ""
     run_env: str = ""

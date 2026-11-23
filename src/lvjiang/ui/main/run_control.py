@@ -2320,17 +2320,14 @@ class RunControlMixin:
                 return workflow_fn()
             with lease.authorized():
                 return workflow_fn()
-        capture_option = getattr(self, "chk_full_task_capture", None)
-        if capture_option is not None and capture_option.isChecked():
-            from ...constants import PROJECT_ROOT
-            from ...core.simulation.host import recording_scope
+        diagnostics = getattr(self, "_task_diagnostics", None)
+        request = diagnostics.freeze() if diagnostics is not None else None
+        if request is not None:
             engine = getattr(self, "_current_engine", None)
             if engine is not None:
-                engine.execution_scope = recording_scope(
-                    PROJECT_ROOT / "logs" / "recordings",
-                    task_run_id=run_context.task_run_id, target_scope=run_context.target_id)
-                run_context.metadata["full_task_capture"] = True
-                capture_option.setChecked(False)
+                engine.execution_scope = request.scope(
+                    task_run_id=run_context.task_run_id, target_scope=run_context.target_id,
+                    previous=engine.execution_scope)
         worker = WorkflowWorker(flow_id, execute_authorized, task_run=task_run)
         run_context.worker = worker
         run_context.engine = getattr(self, "_current_engine", None)

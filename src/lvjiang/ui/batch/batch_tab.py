@@ -397,9 +397,6 @@ class BatchTab(QWidget):
         self._unattended_check = QCheckBox()
         self._unattended_check.toggled.connect(self._on_unattended_toggled)
         summary_form.addRow(tr_label('无人值守'), self._unattended_check)
-        self._full_task_capture_check = QCheckBox()
-        self._full_task_capture_check.setToolTip(tr("仅本次批量；每个任务独立保存全部取图，可能占用较多磁盘，不自动上传。"))
-        summary_form.addRow(tr_label("本次批量全帧采集"), self._full_task_capture_check)
         self._allow_portrait_check = QCheckBox()
         self._allow_portrait_check.toggled.connect(
             self._on_allow_portrait_toggled)
@@ -1546,11 +1543,6 @@ class BatchTab(QWidget):
             self._host.request_stop()
             return
         self._start_batch()
-
-    def consume_full_task_capture(self) -> bool:
-        enabled = self._full_task_capture_check.isChecked()
-        self._full_task_capture_check.setChecked(False)
-        return enabled
 
     def _start_batch(self):
         self._start_feedback.clear_failure()

@@ -126,6 +126,15 @@ class MenuOpsMixin:
         dialog.show()
         return dialog
 
+    def _open_task_diagnostics(self):
+        from ...core.task_diagnostics import TaskDiagnostics
+        from ..task_diagnostics_dialog import TaskDiagnosticsDialog
+
+        if getattr(self, "_task_diagnostics", None) is None:
+            self._task_diagnostics = TaskDiagnostics()
+        return self._show_modeless_tool(
+            "task_diagnostics", lambda: TaskDiagnosticsDialog(self._task_diagnostics, self))
+
     def _close_modeless_tools(self) -> bool:
         """关闭全部非模态工具；任一窗口拒绝关闭时返回 False。"""
         windows = getattr(self, "_modeless_tool_windows", {})
@@ -204,6 +213,10 @@ class MenuOpsMixin:
         daily_history.triggered.connect(
             lambda: MenuOpsMixin._open_task_history(self))
         tools_menu.addAction(daily_history)
+
+        diagnostics = QAction(tr("任务诊断"), self)
+        diagnostics.triggered.connect(self._open_task_diagnostics)
+        tools_menu.addAction(diagnostics)
 
         mobile_device = QAction(tr("移动设备"), self)
         mobile_device.triggered.connect(

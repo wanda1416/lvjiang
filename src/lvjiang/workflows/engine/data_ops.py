@@ -34,6 +34,12 @@ from ..runtime_layout import (
 )
 from .signals import WorkflowUserError, _ReturnSignal
 
+#: 过程调用嵌套上限。DSL 的过程调用没有递归保护时，互递归（a 调 b、b 调 a）
+#: 会一路打到 Python 的 RecursionError —— 那时报错是引擎内部栈帧，既看不出
+#: 是哪个 .wf 打转，也可能在解释器边缘留下半执行的按键状态。这里显式限深，
+#: 超限按脚本错误上报。
+_MAX_CALL_DEPTH = 64
+
 
 class _DataOpsMixin:
     """数据指令执行：OCR/识别取数、collect 输出、eval 赋值、过程调用"""
@@ -621,6 +627,13 @@ class _DataOpsMixin:
         if proc_def is None:
             logger.error(f"call: 未定义的过程 {node.name}")
             return
+        if len(node.args) > len(proc_def.params):
+            # 多写的实参过去被静默丢弃：脚本看着能跑，实际调用的是另一个语义。
+            # 少写实参则保持原样——库里大量 `call is_in_main_page()` 调用
+            # 就是靠形参缺失时读作 null 的约定在跑，收紧它会打断既有脚本。
+            raise WorkflowUserError(
+                f"call {node.name}: 最多接受 {len(proc_def.params)} 个实参，"
+                f"实际写了 {len(node.args)} 个（第 {node.line_no} 行）")
         logger.debug(f"--- call {node.name}({len(node.args)} args) ---")
         # 1. 先在调用方作用域中解析参数值
         resolved_args = []
@@ -660,6 +673,11 @@ class _DataOpsMixin:
         """
         # 调用前先提交调用方对全局变量的最新写入；子过程从共享全局值
         # 加形参开始，普通变量仍保持完全隔离。
+        if self._call_depth >= _MAX_CALL_DEPTH:
+            raise WorkflowUserError(
+                f"过程调用嵌套超过 {_MAX_CALL_DEPTH} 层（当前进入 {proc_def.name}）："
+                "疑似递归未收敛，请检查过程的互相调用")
+        self._call_depth += 1
         self._sync_global_variables()
         saved_vars = self.variables
         saved_output = dict(self.output)
@@ -681,6 +699,7 @@ class _DataOpsMixin:
             except _ReturnSignal as e:
                 return_value = e.value  # 捕获返回值
         finally:
+            self._call_depth -= 1
             # 先提交子过程对全局变量的写入，再恢复调用方局部变量并注入
             # 全局最新值。即便过程通过 return 或异常退出，全局写入也不丢失。
             callee_output = dict(self.output)

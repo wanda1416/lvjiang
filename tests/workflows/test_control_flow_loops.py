@@ -9,6 +9,7 @@
 """
 
 from lvjiang.workflows.engine import control_flow
+from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine, run
 
 
@@ -174,3 +175,39 @@ call $b = probe(0)
         inline = run('if $ready -> eval $hit = 1\n', {"ready": 1})
         block = run('if $ready\n    eval $hit = 1\nend\n', {"ready": 1})
         assert inline["hit"] == block["hit"]
+
+
+class TestGotoSafetyGuard:
+    """goto 回跳必须有次数上限，否则 `@a ... goto a` 只能靠用户点停止收场。
+
+    上限约束的是**回跳次数**（与循环迭代上限共用 ``_loop_limit``），所以块体
+    实际执行 ``limit + 1`` 次：首次进入 + limit 次回跳；第 limit+1 次回跳被拦下。
+    """
+
+    CODE = '''@loop
+    eval $n = $n + 1
+    goto loop
+'''
+
+    def test_goto_loop_stops_at_limit(self, monkeypatch):
+        monkeypatch.setattr(control_flow, "_MAX_LOOP_ITERATIONS", 5)
+        assert run(self.CODE, {"n": 0})["n"] == 6
+
+    def test_goto_loop_keeps_default_cap(self):
+        """上限未解除时同样生效。"""
+        engine = make_engine()
+        engine.variables = {"n": 0}
+        engine._loop_limit = 7
+        engine._exec_body(parse_text(self.CODE).body)
+        assert engine.variables["n"] == 8
+
+    def test_bounded_goto_still_works(self):
+        """有限次回跳的既有写法不受影响。"""
+        code = '''eval $n = 0
+@again
+eval $n = $n + 1
+if $n < 3
+    goto again
+end
+'''
+        assert run(code, {"n": 0})["n"] == 3

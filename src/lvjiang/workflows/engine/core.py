@@ -225,6 +225,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._script_funcs: dict[str, Callable] = {}
         # try/catch 内的预期业务异常由 DSL 自行处理，不先记成整项任务失败。
         self._try_depth = 0
+        # 过程调用嵌套深度，_run_proc 进出时维护，超限按脚本错误上报。
+        self._call_depth = 0
         # global 声明按变量名跨 call 共享；普通变量仍由 _run_proc 隔离。
         self._global_variable_names: set[str] = set()
         self._global_variables: dict = {}
@@ -1320,8 +1322,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         collect 的输出记录到 self._collect_output，不中断执行流。
         仅 break/goto/停止请求 才会提前终止。
         goto 信号会向上传播，直到找到包含目标标签的层级。
+        goto 跳转次数与循环迭代共用 ``_loop_limit``：没有计数时
+        ``@a ... goto a`` 会一直转到用户点停止，无人值守下白烧 CPU。
         """
         pc = 0
+        jumps = 0
         while pc < len(stmts):
             if self._stop_check():
                 logger.info("工作流被用户停止")
@@ -1337,6 +1342,12 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 # 检查当前层级的标签索引
                 local_index = self._build_label_index(stmts)
                 if target in local_index:
+                    jumps += 1
+                    if self._loop_limit and jumps > self._loop_limit:
+                        logger.error(
+                            f"goto 超过 {self._loop_limit} 次跳转，强制退出本层语句防死循环；"
+                            "确需更多轮次请在文件头声明 #% requires: [unbounded_loops]")
+                        return
                     pc = local_index[target]
                     continue  # 从标签位置继续，不 pc+1
                 else:

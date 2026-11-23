@@ -89,6 +89,8 @@ batch:
   "用户：{name}": "User: {name}"
   "勾选的脚本没有可配置的任务参数": "Selected scripts have no configurable task parameters"
   "改动立即生效，与日常任务共用同一份参数": "Changes take effect immediately and share the same parameters as daily tasks"
+  "本次批量全帧采集": "Capture pleine image pour ce lot"
+  "仅本次批量；每个任务独立保存全部取图，可能占用较多磁盘，不自动上传。": "Ce lot uniquement ; chaque tâche enregistre toutes ses captures séparément, ce qui peut occuper beaucoup d'espace disque. Aucun envoi automatique."
 batch_report:
   （执行通道中断，整批中止）: ' (execution channel lost, batch aborted)'
   （用户中断）: (User Interrupted)

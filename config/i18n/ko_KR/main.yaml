@@ -33,6 +33,8 @@ capture_ops:
   重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
   预览已刷新: Preview refreshed
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
+  "本次任务全帧采集": "이번 작업 전체 프레임 캡처"
+  "仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。": "다음 실행 시 로컬 작업에만 적용됩니다. 모든 작업의 캡처를 저장하므로 디스크를 많이 사용할 수 있습니다. 끄면 기록도 자동 업로드도 하지 않습니다."
 common:
   '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
   btn_save: Save
@@ -126,6 +128,8 @@ menu_ops:
   隐藏预览: Hide Preview
   任务历史: Task History
   "任务参数": "작업 매개변수"
+  "待受理反馈 ({count})": "미처리 피드백 ({count})"
+  "控制台有 {count} 条待受理反馈，点击打开网页管理控制台": "콘솔에 미처리 피드백이 {count}건 있습니다. 클릭하면 웹 관리 콘솔이 열립니다"
 mobile:
   设备端代理: On-device Agent
 platforms:

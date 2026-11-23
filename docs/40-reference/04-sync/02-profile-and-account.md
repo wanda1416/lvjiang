@@ -105,6 +105,15 @@ Android 镜像端同序（`src/lvjiang/core/ondevice/account_api.py` `_sync_roun
   （`src/lvjiang/core/account/service.py`）；丢了由 `_recover_state` 从云端摘要与
   本地账本重新推导，不需要重放或按快照重建
   （`src/lvjiang/core/profile/snapshot_sync.py`）。
+- **`account.json` 只有一个写入口**：`service.mutate_profile()`（进程内线程锁 +
+  跨进程 `interprocess_lock(path, suffix="state")` + 临时文件 `os.replace` 原子写）。
+  这个文件同时装着登录态（`login` / `account_id` / `e2e_key` 缓存）、`profile_sync`、
+  `document_sync`、`users_sync`、`sync_paused`、`sync_established`，由不同模块分别维护；
+  任何新写入者都必须以「锁内重读 → 只改自己那个键 → 原子写回」的方式接入，
+  不得整份写回（会把别人的键一起覆盖，甚至把另一个线程读到的半截 JSON 写空）。
+  读端 `service.load_profile()` 不加锁：原子替换保证它只会读到完整的新旧两个版本之一。
+  `require_existing=True` 用于「丢了也无所谓、但绝不能凭空造一份空账号态」的写入
+  （`core/sync/dirty.py` 的脏标记）。
 - 只在 `remote_history_id > 云端 head` 时报「进度比云端新」（云端可能被重建或换库），
   提示清除同步后重新登录同步；`local_history_id` 是本地编号，不参与该比较
   （`src/lvjiang/core/profile/snapshot_sync.py` `state_problem`）。

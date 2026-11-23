@@ -64,3 +64,35 @@
 - 含旧节点的 session.json 首次读写参数后，参数出现在 workflow.json、旧节点消失、
   其余 session.json 内容不变，原字节留档，新文件（含空）优先且损坏停止。
 - 离线包保留/覆盖开关分别满足第 2 节的合并语义。
+
+## 6. 预埋约束：接入 Android 云端文档同步前必须先落基线
+
+本节记录**当前未实现**的一步及其前置条件，避免将来「给手机也开文档同步」时
+直接把离线包产物送进 mtime 裁决。
+
+**现状（事实）**：手机上的 `workflow.json` / `batch.json` / `users/*.json` 由 PC
+离线包直接覆盖落盘（`core/offline_bundle.py`），文件 mtime 是**打包/落盘时刻**；
+手机侧不写 `account.json` 的 `document_sync`（离线包明确排除 `session/account.json`，
+见 `LOCAL_ONLY_CONFIG_FILES`），也没有 `sync_documents` 入口——`_sync_round`
+（`core/ondevice/account_api.py`）只走 `/api/sync/state` 与 `/api/sync/profile/*`，
+这四个受 `X-Lvjiang-E2E-Docs` 门禁的文档端点手机根本不碰。
+
+**接入时会踩的坑**：`sync_documents` 首次运行 `first_run` 强制走
+`_sync_documents_full`（`core/sync/engine.py`），裁决规则是「本地 mtime ≥ 云端
+`updated_at` 则本地胜」。刚被离线包覆盖的文件 mtime 必然很新，于是手机会用
+**包里那份旧配置**重新加密并反推云端，把 PC 的新版本盖掉；而且手机此时没有
+`document_sync` 基线（`remote_document_id` / `stamps` / `e2e_migrated_key_fp` 全空），
+这套裁决没有任何参照点。
+
+**前置约束**（接入该功能前必须先做，缺一不可）：
+
+1. 手机首次拿到文档时**先写基线而不是先裁决**：以云端当前 `documents_head` 作为
+   `remote_document_id`、把落盘时刻记进 `stamps`，明确表达「本机这份是刚跟随云端
+   拿到的副本」，而不是「本机刚改过」。
+2. 首轮同步走「跟随云端」语义（等价于 `sync_definition(allow_push=False)` 的镜像端
+   只拉不推），由用户显式选择后才切换为可上行。
+3. 离线包落盘后若确实要把手机备份当作新数据，走既有的覆盖确认路径
+   （`overwrite_warnings` + 备份），不得让 mtime 静默胜出。
+
+在此之前，Android 侧**不得**接入 `sync_documents`；本文第 4 节「手机端不直接消费
+这两种云端文档」仍是当前有效边界。

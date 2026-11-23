@@ -85,7 +85,7 @@
     },
     "variables": {
       "name": "variable.other.wf",
-      "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+      "match": "\\$[a-zA-Z_\\u4e00-\\u9fff][a-zA-Z0-9_\\u4e00-\\u9fff]*"
     },
     "ranges": {
       "name": "constant.other.range.wf",
@@ -97,11 +97,11 @@
     },
     "keywords-control": {
       "name": "keyword.control.wf",
-      "match": "\\b(env|if|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch|timeline)\\b"
+      "match": "\\b(env|if|elif|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch|timeline)\\b"
     },
     "keywords-instruction": {
       "name": "keyword.operator.wf",
-      "match": "\\b(scene|click|drag|move|scroll|press|paste|replay|wait|scan|recognize|collect|log|screenshot|eval|default|global|align|find|import|def|call)\\b"
+      "match": "\\b(app|scene|click|drag|move|scroll|press|paste|replay|wait|scan|recognize|collect|log|screenshot|eval|default|global|align|find|import|def|call)\\b"
     },
     "keywords-clause": {
       "name": "keyword.operator.wf",
@@ -137,7 +137,7 @@
     },
     "labels": {
       "name": "entity.name.label.wf",
-      "match": "@[a-zA-Z_][a-zA-Z0-9_]*"
+      "match": "@[a-zA-Z_\\u4e00-\\u9fff][a-zA-Z0-9_\\u4e00-\\u9fff]*"
     }
   }
 }

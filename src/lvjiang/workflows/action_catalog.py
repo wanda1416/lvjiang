@@ -23,6 +23,7 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from ..i18n import tr
@@ -63,6 +64,14 @@ class RenderError(ValueError):
 
 # ─── 渲染 ───────────────────────────────────────────────
 
+#: 槽位值最终会拼成 DSL 文本，校验口径必须与文法一致，否则面板能生成
+#: 一段插进去就解析失败的脚本。文法里 STRING 是 ``"[^"\n]*"``（不支持转义），
+#: 颜色是 ``"#rrggbb"``，坐标是 ``(x, y)`` 的数字。
+_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+_NUMBER_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?$")
+_DELAY_NAME_RE = re.compile(r"^[A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*$")
+
+
 def _strip_quotes(s: str) -> str:
     s = s.strip()
     if len(s) >= 2 and s[0] == s[-1] == '"':
@@ -71,7 +80,12 @@ def _strip_quotes(s: str) -> str:
 
 
 def render_slot(slot: Slot, value: str) -> str:
-    """单个槽位值 → DSL 片段（不含可选包装）"""
+    """单个槽位值 → DSL 片段（不含可选包装）
+
+    非法值一律抛 RenderError 而不是原样拼进去：文本槽位里的英文双引号或
+    换行会直接终结/切断 STRING，颜色、坐标写错则拼出解析不了的语句——这些
+    过去都会生成一段「插进去就报语法错误」的脚本。
+    """
     v = (value or "").strip()
     if v == "":
         if slot.optional:
@@ -82,20 +96,35 @@ def render_slot(slot: Slot, value: str) -> str:
         v = v.strip("[]").strip()
         if not v:
             raise RenderError(tr("「{label}」未填写").format(label=slot.label))
+        if "[" in v or "]" in v or "." in v:
+            # 这类槽位一律是单个 key，模板自己负责拼 `[scene].[key]`；
+            # 填成 `[main].[ok]` 会拼出三段引用，面板看着成功、脚本解析失败。
+            raise RenderError(
+                tr("「{label}」请填单个 key（例如 ok），不要带方括号或场景前缀")
+                .format(label=slot.label))
         return f"[{v}]"
     if kind == "delay":
-        return v if v.startswith("@") else f"@{v}"
+        name = v[1:] if v.startswith("@") else v
+        if _DELAY_NAME_RE.match(name) is None:
+            raise RenderError(
+                tr("「{label}」应为命名延迟（字母或中文开头的名字）").format(label=slot.label))
+        return f"@{name}"
     if kind == "var":
         v = v.lstrip("$")
         if not v:
             raise RenderError(tr("「{label}」未填写").format(label=slot.label))
         return f"${v}"
     if kind in ("text", "template"):
-        return f'"{_strip_quotes(v)}"'
+        inner = _strip_quotes(v)
+        if '"' in inner or "\n" in inner or "\r" in inner:
+            raise RenderError(
+                tr("「{label}」不能包含英文双引号或换行（DSL 字符串不支持转义）")
+                .format(label=slot.label))
+        return f'"{inner}"'
     if kind == "color":
         v = _strip_quotes(v)
         v = v if v.startswith("#") else f"#{v}"
-        if len(v) != 7:
+        if _COLOR_RE.match(v) is None:
             raise RenderError(tr("「{label}」应为 #rrggbb").format(label=slot.label))
         return f'"{v}"'
     if kind in ("coord", "rect"):
@@ -104,6 +133,9 @@ def render_slot(slot: Slot, value: str) -> str:
         want = 2 if kind == "coord" else 4
         if len(parts) != want:
             raise RenderError(tr("「{label}」应为 {n} 个数").format(label=slot.label, n=want))
+        if any(_NUMBER_RE.match(p) is None for p in parts):
+            raise RenderError(
+                tr("「{label}」的 {n} 个值都必须是数字").format(label=slot.label, n=want))
         return "(" + ", ".join(parts) + ")"
     # raw / choice
     return v
@@ -343,6 +375,12 @@ ACTIONS: tuple[Action, ...] = (
 )
 
 _BY_KEY = {a.key: a for a in ACTIONS}
+
+# 重复 key 会静默覆盖：面板按 key 取指令，两个同名 key 意味着列表里少一条、
+# 取到的是后一条。目录是手写常量，这里在导入期直接拦住。
+if len(_BY_KEY) != len(ACTIONS):
+    _dups = sorted({a.key for a in ACTIONS if sum(b.key == a.key for b in ACTIONS) > 1})
+    raise ValueError(f"action_catalog: 指令 key 重复: {', '.join(_dups)}")
 
 
 def get_action(key: str) -> Action:

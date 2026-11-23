@@ -693,8 +693,20 @@ _BLOCK_KEYWORD_RE = re.compile(r"^(def|if|for|loop|try|timeline)\b", re.I)
 
 
 def _code_part(line: str) -> str:
-    """去掉行首尾空白，只留下用于结构判断的代码部分。"""
-    return line.strip()
+    """去掉行首尾空白与行尾注释，只留下用于结构判断的代码部分。
+
+    `end  # 收尾` 是合法脚本，但只 strip() 的话它不等于 "end"，折叠范围与
+    def 区间会一直找到文件末尾。注释按「引号外的 #」识别，避免把
+    `log "#"` 这类字符串误当注释。
+    """
+    code = line.strip()
+    in_string = False
+    for index, ch in enumerate(code):
+        if ch == '"':
+            in_string = not in_string
+        elif ch == '#' and not in_string:
+            return code[:index].strip()
+    return code
 
 
 def _opens_block(code: str) -> bool:

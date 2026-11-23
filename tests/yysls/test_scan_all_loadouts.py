@@ -536,24 +536,28 @@ def test_select_game_plan_history_tuning_never_uses_paid_confirmation(
 
 
 @pytest.mark.parametrize(
-    ("main_checks", "retry_answers", "expected", "prompt_count"),
+    ("main_checks", "expected", "prompt_count"),
     [
-        ([1], [], 0, 0),
-        ([0, 1], [True], 0, 1),
-        ([0, 0, 1], [True, True], 0, 2),
-        ([0], [False], -1, 1),
+        ([1], 0, 0),
+        ([0, 1], 0, 1),
+        ([0, 0, 1], 0, 2),
+        # 三次确认后仍未回到主页：保留失败返回，不无限提示
+        ([0, 0, 0, 0], -1, 3),
     ],
 )
 def test_return_from_game_plans_checks_only_home_and_prompts_on_mismatch(
-        monkeypatch, main_checks, retry_answers, expected, prompt_count):
-    """返回路径不依赖中间页 OCR；终点失配由用户决定重试或停止。"""
+        monkeypatch, main_checks, expected, prompt_count):
+    """返回路径不依赖中间页 OCR；终点失配用 pause 声明异常，复查最多三轮。
+
+    终点失配是异常阻断：无人值守由引擎在 pause 处中断并恢复，不能改用 confirm
+    原地等人点一个不会来的「是」。
+    """
     proc = parse_file(Path(
         "config/system/workflows/subcall/loadout/game_plans.wf"
     )).procs["nav_game_plans_to_main"]
     engine = make_engine()
     clicked = []
     checks = iter(main_checks)
-    answers = iter(retry_answers)
     prompts = []
 
     monkeypatch.setattr(engine, "_exec_click", lambda node: clicked.append(node))
@@ -566,9 +570,8 @@ def test_return_from_game_plans_checks_only_home_and_prompts_on_mismatch(
     original_eval = engine._exec_eval
 
     def fake_eval(node):
-        if node.func_name == "confirm":
+        if node.func_name == "pause":
             prompts.append(node)
-            engine.variables[node.target] = next(answers)
         else:
             original_eval(node)
 

@@ -5,7 +5,7 @@
 #
 # 包含过程：
 #   nav_main_to_game_plans()  — 主页 → 备战方案页（0=成功 / -1=失败）
-#   nav_game_plans_to_main()  — 备战方案页 → 主页（0=成功 / -1=用户放弃）
+#   nav_game_plans_to_main()  — 备战方案页 → 主页（0=成功 / -1=仍未确认主页）
 #   collect_game_plan_names() — 读当前网格里可见的方案名列表
 #   select_game_plan($name)   — 选中指定方案并读出方案名与两门武学
 
@@ -41,23 +41,27 @@ end
 #
 # 参数：无
 # 前置：在备战方案页（或已退到菜单页）。
-# 后置：0=已确认在主页；-1=用户选择结束本次扫描，现场未确认。
-# 返回：0=成功；-1=用户在确认框选择停止。
+# 后置：0=已确认在主页；-1=连续三次确认后仍未回到主页，现场未确认。
+# 返回：0=成功；-1=人工处理后仍无法确认主页。
 #
 # 按既定返回路径操作，只在终点确认主页；中途 OCR 偶发漏判不应终止整批扫描。
+# 终点失配是异常阻断，用 pause 声明：无人值守由引擎中断本次扫描并执行异常恢复，
+# 不再原地等人点一个不会来的「是」；有人值守暂停等人工，点确定后重新识别。
 def nav_game_plans_to_main()
     click [training_plan].[back] after wait @page_refresh
     click [training_main].[back] after wait @page_refresh
     click [game_menu_page].[back] after wait @page_refresh
     call $in_main = is_in_main_page()
+    eval $attempts = 0
     loop while not $in_main
         screenshot from last
-        eval $retry = confirm("未确认已返回主页。请手动回到主页后点击是重试检查；点击否结束本次扫描")
-        if not $retry
-            log warn "用户选择停止：未能确认已返回主页"
+        eval pause("未确认已返回主页。请手动回到主页后点击确定重新检查；无人值守会中断本次扫描并恢复页面")
+        call $in_main = is_in_main_page(1)
+        eval $attempts = $attempts + 1
+        if not $in_main and $attempts >= 3
+            log error "连续三次确认后仍未回到主页，保持现场"
             return -1
         end
-        call $in_main = is_in_main_page(1)
     end
     return 0
 end

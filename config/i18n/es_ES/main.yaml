@@ -33,8 +33,6 @@ capture_ops:
   重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
   预览已刷新: Preview refreshed
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
-  "本次任务全帧采集": "Captura de fotograma completo en esta tarea"
-  "仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。": "Solo para tareas locales del próximo inicio; guarda todas las capturas de todas las tareas y puede ocupar mucho disco. Si está desactivado, no se registra nada ni se sube automáticamente."
 common:
   '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
   btn_save: Save
@@ -358,3 +356,14 @@ hotkey_settings:
   "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Atajos de menú (solo en la ventana; no capturan teclas cuando la ventana no tiene el foco)"
   "（不绑定）": "(sin asignar)"
   "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Pulsa una vez para minimizar a la bandeja y otra para volver. La configuración del área de notificación puede ocultar el icono; este atajo es la única forma fiable de recuperar la ventana oculta."
+
+task_diagnostics_dialog:
+  "任务诊断": "Diagnóstico de tarea"
+  "启用开发诊断模式": "Activar diagnóstico de desarrollo"
+  "帧": "fotogramas"
+  "最近帧上限": "Límite de fotogramas recientes"
+  "压缩缓存上限": "Límite de caché comprimida"
+  "诊断调试": "Diagnóstico"
+  "模拟运行": "Ejecución simulada"
+  "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Vista previa para desarrolladores: desactivado por defecto y se desactiva al reiniciar. Los cambios solo se aplican a la próxima tarea o lote que inicies; las tareas en curso no cambian."
+  "按任务保留实际识别用帧（WebP），超出任一上限时淘汰最早帧，直到同时不超限；恰好等于上限时不淘汰。1 MB = 1,000,000 字节。限额包含压缩图与帧元数据，不是进程总内存；原图与编码队列另有界。并行任务各自占用缓存，结束后只保留最近启动任务的记录。仅内存保存，退出即清空，不自动上传。": "Conserva por tarea los fotogramas realmente usados para el reconocimiento (WebP); si se supera cualquiera de los límites se descartan los más antiguos hasta cumplir ambos, y justo en el límite no se descarta nada. 1 MB = 1.000.000 bytes. Los límites incluyen imágenes comprimidas y metadatos de fotogramas, no la memoria total del proceso; los fotogramas originales y la cola de codificación tienen su propio límite. Cada tarea en paralelo mantiene su propia caché y al terminar solo se conserva la de la tarea iniciada más recientemente. Solo en memoria, se borra al salir, nunca se sube."

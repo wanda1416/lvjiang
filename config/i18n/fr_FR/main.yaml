@@ -33,8 +33,6 @@ capture_ops:
   重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
   预览已刷新: Preview refreshed
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
-  "本次任务全帧采集": "Capture pleine image pour cette tâche"
-  "仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。": "Concerne uniquement les tâches locales du prochain démarrage ; enregistre toutes les captures de toutes les tâches et peut occuper beaucoup d'espace disque. Désactivé : rien n'est enregistré ni envoyé automatiquement."
 common:
   '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
   btn_save: Save
@@ -358,3 +356,14 @@ hotkey_settings:
   "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Raccourcis de menu (fenêtre uniquement ; ils ne capturent pas les touches quand la fenêtre est inactive)"
   "（不绑定）": "(non défini)"
   "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Appuyez une fois pour réduire dans la zone de notification, encore une fois pour revenir. Selon les réglages de la zone de notification, l'icône peut ne pas s'afficher ; ce raccourci est le seul moyen fiable de retrouver la fenêtre."
+
+task_diagnostics_dialog:
+  "任务诊断": "Diagnostic de tâche"
+  "启用开发诊断模式": "Activer le diagnostic développeur"
+  "帧": "trames"
+  "最近帧上限": "Limite de trames récentes"
+  "压缩缓存上限": "Limite du cache compressé"
+  "诊断调试": "Diagnostic"
+  "模拟运行": "Exécution simulée"
+  "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Aperçu développeur : désactivé par défaut, désactivé à nouveau après un redémarrage. Les modifications ne s'appliquent qu'à la prochaine tâche ou au prochain lot lancé ; les tâches en cours ne changent pas."
+  "按任务保留实际识别用帧（WebP），超出任一上限时淘汰最早帧，直到同时不超限；恰好等于上限时不淘汰。1 MB = 1,000,000 字节。限额包含压缩图与帧元数据，不是进程总内存；原图与编码队列另有界。并行任务各自占用缓存，结束后只保留最近启动任务的记录。仅内存保存，退出即清空，不自动上传。": "Conserve par tâche les trames réellement utilisées pour la reconnaissance (WebP) ; si l'une des limites est dépassée, les plus anciennes sont évincées jusqu'à ce que les deux soient respectées, et à la limite exacte rien n'est évincé. 1 Mo = 1 000 000 octets. Les limites couvrent les images compressées et les métadonnées de trame, pas la mémoire totale du processus ; les trames brutes et la file d'encodage sont bornées séparément. Les tâches parallèles ont chacune leur cache et, à la fin, seul celui de la tâche lancée le plus récemment est conservé. En mémoire uniquement, effacé à la fermeture, jamais envoyé."

@@ -66,7 +66,8 @@
 
 运行上下文依据（仅源码检出）：[execution_runs.py](../../../src/lvjiang/ui/main/execution_runs.py)：`ExecutionRunContext`；
 [batch/models.py](../../../src/lvjiang/core/batch/models.py)：`BatchContext`。
-诊断FIFO拟议依赖仍未加入；现有`BatchContext.full_task_capture`只服务全任务采集（见第20节链接），不把UI类型引入core。
+诊断FIFO拟议依赖仍未加入；全量采集只服务 CLI 与显式宿主（见第20节链接），不把UI类型引入core。
+GUI 侧另有独立的「任务诊断」开发预览（`BatchContext.diagnostics`，只做内存最近帧、无导出），与本文诊断FIFO不是同一实现。
 
 **与已实现采集的复用边界**：全任务采集已经把 `capture_observer`、`wrap_capture`、`wrap_input` 三个接缝做出来了，
 诊断只在这三个接缝上挂自己的观察者，另建内存环与冻结/导出逻辑；**不复用**录制器的流式落盘、无损PNG 与“不完整即拒绝”语义，
@@ -132,6 +133,10 @@
 | `finalize_timeout_ms` | `1000`，候选待测 | 截止帧收尾等待上限；不含强制中断原生codec，不承诺文件1秒内写完 |
 | 日志/包大小 | 摘录最多 `256_000 B`；ZIP最多 `12_000_000 B` | 输出也有硬限；优先省略可选日志/缩短索引，不破坏manifest闭合 |
 | 磁盘保留 | 最多10个完成包且合计不超 `100_000_000 B` | 按更早到达的上限淘汰本功能旧包；值待使用场景确认 |
+
+现状差异（2026-11-23，GUI 开发预览首版）：工具 →「任务诊断（开发预览）」只实现「100 帧 / 50,000,000 B
+内存环 + 封口日志」，没有单帧体积目标、ZIP 导出、离线查看器与磁盘保留，也不写盘、不上传；
+上表其余候选值仍属拟议，未落地。
 
 每条元数据中的 ROI 数组、嵌套值、事件理由列表也必须有限，不能只限字符串和图像。
 原始像素与 `nbytes` 在复制前检查；超过 raw 限额不做昂贵的同步缩放，标 `raw_budget_exceeded`。

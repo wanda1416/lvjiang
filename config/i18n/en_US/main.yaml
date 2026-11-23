@@ -34,8 +34,6 @@ capture_ops:
   "重新取一帧并更新预览，不保存文件": "Grab a fresh frame and update the preview; nothing is saved"
   "预览已刷新": "Preview refreshed"
   "，请选择 保存 或 放弃": ", please choose Save or Discard"
-  "本次任务全帧采集": "Full-frame capture for this task"
-  "仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。": "Applies only to local tasks started next time; saves every frame of all tasks and may use a lot of disk space. When off, nothing is recorded and nothing is uploaded automatically."
 common:
   "[加载] 已加载工作流: ": "[Loaded] Workflow loaded: "
   "btn_save": "Save"
@@ -359,3 +357,14 @@ hotkey_settings:
   "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Menu shortcuts (window-only; they do not capture keys while the window is unfocused)"
   "（不绑定）": "(unbound)"
   "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Press once to minimize to the system tray and again to bring the window back. The tray icon may not appear depending on notification-area settings; this shortcut is the only reliable way back once the window is hidden."
+
+task_diagnostics_dialog:
+  "任务诊断": "Task diagnostics"
+  "启用开发诊断模式": "Enable developer diagnostics"
+  "帧": "frames"
+  "最近帧上限": "Recent frame limit"
+  "压缩缓存上限": "Compressed cache limit"
+  "诊断调试": "Diagnostics"
+  "模拟运行": "Simulation run"
+  "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Developer preview: off by default, off again after a restart. Changes apply only to the next task or batch you start; running tasks are unaffected."
+  "按任务保留实际识别用帧（WebP），超出任一上限时淘汰最早帧，直到同时不超限；恰好等于上限时不淘汰。1 MB = 1,000,000 字节。限额包含压缩图与帧元数据，不是进程总内存；原图与编码队列另有界。并行任务各自占用缓存，结束后只保留最近启动任务的记录。仅内存保存，退出即清空，不自动上传。": "Keeps the frames actually used for recognition (WebP) per task; exceeding either limit evicts the oldest frames until both fit, and exactly at the limit nothing is evicted. 1 MB = 1,000,000 bytes. The limits cover compressed images and frame metadata, not total process memory; raw frames and the encoding queue are bounded separately. Parallel tasks each hold their own cache, and only the most recently started task's record is kept afterwards. Memory only, cleared on exit, never uploaded."

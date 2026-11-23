@@ -2328,6 +2328,8 @@ class RunControlMixin:
                 engine.execution_scope = request.scope(
                     task_run_id=run_context.task_run_id, target_scope=run_context.target_id,
                     previous=engine.execution_scope)
+            else:
+                logger.warning("任务诊断已开启，但当前没有可用的执行引擎；本次不记录最近帧")
         worker = WorkflowWorker(flow_id, execute_authorized, task_run=task_run)
         run_context.worker = worker
         run_context.engine = getattr(self, "_current_engine", None)

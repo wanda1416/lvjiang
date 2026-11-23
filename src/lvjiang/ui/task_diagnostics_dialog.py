@@ -40,11 +40,11 @@ class TaskDiagnosticsDialog(QDialog):
         self.frames_spin = QSpinBox()
         self.frames_spin.setRange(1, 10_000)
         self.frames_spin.setValue(diagnostics.options.max_frames)
-        self.frames_spin.setSuffix(tr(" 帧"))
+        self.frames_spin.setSuffix(" " + tr("帧"))
         form.addRow(tr("最近帧上限"), self.frames_spin)
         self.capacity_spin = QSpinBox()
         self.capacity_spin.setRange(1, 1_000)
-        self.capacity_spin.setValue(diagnostics.options.max_bytes // 1_000_000)
+        self.capacity_spin.setValue(max(1, diagnostics.options.max_bytes // 1_000_000))
         self.capacity_spin.setSuffix(" MB")
         form.addRow(tr("压缩缓存上限"), self.capacity_spin)
         hint = QLabel(
@@ -61,15 +61,21 @@ class TaskDiagnosticsDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.close)
         layout.addWidget(buttons)
+        self._sync_limits_enabled()
         self.enabled_check.toggled.connect(self._changed)
         self.frames_spin.valueChanged.connect(self._changed)
         self.capacity_spin.valueChanged.connect(self._changed)
-        self._changed()
 
-    def _changed(self, *_args) -> None:
+    def _sync_limits_enabled(self) -> None:
         enabled = self.enabled_check.isChecked()
         self.frames_spin.setEnabled(enabled)
         self.capacity_spin.setEnabled(enabled)
+
+    def _changed(self, *_args) -> None:
+        # 只在用户真的改动时回写：打开对话框不应把取整后的上限覆盖回去。
+        self._sync_limits_enabled()
         self._diagnostics.options = DiagnosticOptions(
-            enabled, self.frames_spin.value(), self.capacity_spin.value() * 1_000_000
+            self.enabled_check.isChecked(),
+            self.frames_spin.value(),
+            self.capacity_spin.value() * 1_000_000,
         )

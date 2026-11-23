@@ -1,7 +1,7 @@
 """Tools-only opt-in preview controls; no simulation GUI pretence or persisted enable."""
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QCheckBox, QMainWindow, QWidget
+from PyQt6.QtWidgets import QCheckBox, QLabel, QMainWindow, QWidget
 
 from lvjiang.core.task_diagnostics import TaskDiagnostics
 from lvjiang.ui.main.menu_ops import MenuOpsMixin
@@ -22,6 +22,8 @@ def test_tools_menu_opens_one_modeless_diagnostic_dialog(qtbot):
     assert getattr(host, "_task_diagnostics", None) is None
     tools = next(a.menu() for a in host.menuBar().actions() if a.text() == "工具")
     action = next(a for a in tools.actions() if a.text() == "任务诊断")
+    # 菜单保持四字短标签；「开发预览」的说明放在对话框正文，不塞进菜单标题。
+    assert action.text() == "任务诊断"
     action.trigger()
     dialog = host._modeless_tool_windows["task_diagnostics"]
     # pytest-qt also closes registered widgets at teardown; avoid double-close
@@ -46,6 +48,8 @@ def test_diagnostic_tabs_defaults_ephemeral_settings_and_launch_freeze(qtbot):
     assert dialog.tabs.widget(1).findChildren(QWidget) == []
     assert len(dialog.findChildren(QCheckBox)) == 1
     assert dialog.enabled_check.text() == "启用开发诊断模式"
+    # 开发预览的口径写在对话框里，菜单标题只保留四字。
+    assert any("开发预览" in label.text() for label in dialog.findChildren(QLabel))
     assert not dialog.enabled_check.isChecked() and service.freeze() is None
     assert dialog.frames_spin.value() == 100 and dialog.capacity_spin.value() == 50
     assert not dialog.frames_spin.isEnabled() and not dialog.capacity_spin.isEnabled()

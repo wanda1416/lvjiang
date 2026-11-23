@@ -33,8 +33,6 @@ capture_ops:
   重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
   预览已刷新: Preview refreshed
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
-  "本次任务全帧采集": "Captura de quadro completo nesta tarefa"
-  "仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。": "Só para tarefas locais do próximo início; salva todas as capturas de todas as tarefas e pode ocupar muito disco. Desativado: nada é registrado nem enviado automaticamente."
 common:
   '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
   btn_save: Save
@@ -358,3 +356,14 @@ hotkey_settings:
   "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Atalhos de menu (somente na janela; não capturam teclas quando ela está sem foco)"
   "（不绑定）": "(não definido)"
   "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Pressione uma vez para minimizar para a bandeja e outra para voltar. A configuração da área de notificação pode ocultar o ícone; este atalho é a única forma confiável de recuperar a janela oculta."
+
+task_diagnostics_dialog:
+  "任务诊断": "Diagnóstico de tarefa"
+  "启用开发诊断模式": "Ativar diagnóstico de desenvolvedor"
+  "帧": "quadros"
+  "最近帧上限": "Limite de quadros recentes"
+  "压缩缓存上限": "Limite de cache comprimido"
+  "诊断调试": "Diagnóstico"
+  "模拟运行": "Execução simulada"
+  "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Prévia para desenvolvedores: desativado por padrão e volta a ficar desativado ao reiniciar. As alterações valem apenas para a próxima tarefa ou lote iniciado; tarefas em execução não mudam."
+  "按任务保留实际识别用帧（WebP），超出任一上限时淘汰最早帧，直到同时不超限；恰好等于上限时不淘汰。1 MB = 1,000,000 字节。限额包含压缩图与帧元数据，不是进程总内存；原图与编码队列另有界。并行任务各自占用缓存，结束后只保留最近启动任务的记录。仅内存保存，退出即清空，不自动上传。": "Guarda por tarefa os quadros realmente usados no reconhecimento (WebP); se qualquer um dos limites for excedido, os mais antigos são descartados até que ambos caibam, e exatamente no limite nada é descartado. 1 MB = 1.000.000 bytes. Os limites incluem imagens comprimidas e metadados de quadro, não a memória total do processo; quadros originais e a fila de codificação têm limites próprios. Tarefas paralelas mantêm cada uma seu cache e, ao terminar, só o da tarefa iniciada mais recentemente é mantido. Apenas em memória, apagado ao sair, nunca enviado."

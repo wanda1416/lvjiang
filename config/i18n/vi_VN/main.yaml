@@ -33,8 +33,6 @@ capture_ops:
   重新取一帧并更新预览，不保存文件: Grab a fresh frame and update the preview; nothing is saved
   预览已刷新: Preview refreshed
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
-  "本次任务全帧采集": "Chụp toàn bộ khung hình cho tác vụ này"
-  "仅下次启动的本机任务；保存所有任务取图，可能占用较多磁盘。不开启则不记录；不自动上传。": "Chỉ áp dụng cho tác vụ cục bộ ở lần khởi động sau; lưu toàn bộ ảnh chụp của mọi tác vụ và có thể chiếm nhiều dung lượng đĩa. Khi tắt, không ghi lại và không tự động tải lên."
 common:
   '[加载] 已加载工作流: ': '[Loaded] Workflow loaded: '
   btn_save: Save
@@ -358,3 +356,14 @@ hotkey_settings:
   "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Phím tắt menu (chỉ trong cửa sổ; không bắt phím khi cửa sổ không được chọn)"
   "（不绑定）": "(chưa gán)"
   "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Nhấn một lần để thu nhỏ xuống khay hệ thống, nhấn lần nữa để mở lại. Biểu tượng khay có thể không hiện tùy cấu hình vùng thông báo; phím tắt này là cách duy nhất đáng tin để lấy lại cửa sổ đã ẩn."
+
+task_diagnostics_dialog:
+  "任务诊断": "Chẩn đoán tác vụ"
+  "启用开发诊断模式": "Bật chẩn đoán nhà phát triển"
+  "帧": "khung"
+  "最近帧上限": "Giới hạn khung gần nhất"
+  "压缩缓存上限": "Giới hạn bộ nhớ đệm nén"
+  "诊断调试": "Chẩn đoán"
+  "模拟运行": "Chạy mô phỏng"
+  "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Bản xem trước cho nhà phát triển: mặc định tắt và tắt lại sau khi khởi động lại. Thay đổi chỉ áp dụng cho tác vụ hoặc lô kế tiếp bạn khởi chạy; tác vụ đang chạy không bị ảnh hưởng."
+  "按任务保留实际识别用帧（WebP），超出任一上限时淘汰最早帧，直到同时不超限；恰好等于上限时不淘汰。1 MB = 1,000,000 字节。限额包含压缩图与帧元数据，不是进程总内存；原图与编码队列另有界。并行任务各自占用缓存，结束后只保留最近启动任务的记录。仅内存保存，退出即清空，不自动上传。": "Giữ theo từng tác vụ những khung thực sự dùng để nhận dạng (WebP); vượt một trong hai giới hạn thì loại bỏ khung cũ nhất cho đến khi thỏa cả hai, và đúng bằng giới hạn thì không loại bỏ. 1 MB = 1.000.000 byte. Giới hạn gồm ảnh nén và siêu dữ liệu khung, không phải tổng bộ nhớ tiến trình; khung gốc và hàng đợi mã hóa có giới hạn riêng. Các tác vụ song song mỗi tác vụ giữ bộ nhớ đệm riêng, và sau khi kết thúc chỉ giữ bản ghi của tác vụ khởi chạy gần nhất. Chỉ lưu trong bộ nhớ, xóa khi thoát, không tự động tải lên."

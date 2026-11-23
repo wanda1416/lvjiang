@@ -497,7 +497,7 @@
       "path": "30-design/01-architecture/06-runtime/README.md",
       "title": "运行期能力",
       "category": "30-architecture",
-      "sha256": "51cf6143d97ac46aecde0b29da6e59fdab81fa8db3b8916a8b69411a674c907d"
+      "sha256": "fe7203211b318bc5db4672537998816c8d217f8058f9c94ea79ad332c606c122"
     },
     {
       "id": "30-design:01-architecture:07-scene:01-scene-layout-definition",
@@ -623,7 +623,7 @@
       "path": "30-design/01-architecture/09-workflows/06-workflow-simulation.md",
       "title": "全任务采集与离线工作流模拟（设计）",
       "category": "30-architecture",
-      "sha256": "d74b75992b6bc959baa6fa6a4b0ca75ddb9bd432eec56421f492faef094b6b15"
+      "sha256": "a8edda561b3afae9bb3378f3de0a439d12f65efbb0529258e5f579d2df861db8"
     },
     {
       "id": "30-design:01-architecture:09-workflows:README",
@@ -644,14 +644,14 @@
       "path": "30-design/02-decisions/01-batch/01-batch-task-eligibility.md",
       "title": "批量任务可执行性检查",
       "category": "30-architecture",
-      "sha256": "6041fbf683e80383469ae5c6d33548bfc1699de5189f79f4711de8b4606fe702"
+      "sha256": "1a9bc94147461e801df00018d08df7b00f15a7b0abe613d4675e96a738c7c92a"
     },
     {
       "id": "30-design:02-decisions:01-batch:02-batch-execution-units",
       "path": "30-design/02-decisions/01-batch/02-batch-execution-units.md",
       "title": "批量执行单元",
       "category": "30-architecture",
-      "sha256": "d4fd7f0dc6b07d49fea10aae5eb3f63cf50c4789d7dd58599a768a95c285dda9"
+      "sha256": "7299306979ecb84cd879e4c69e5013b166b058c39f53a51a003d7f1592af342c"
     },
     {
       "id": "30-design:02-decisions:01-batch:03-unattended-batch",
@@ -693,14 +693,14 @@
       "path": "30-design/02-decisions/02-editor/03-workflow-metadata-editor.md",
       "title": "工作流元数据表单与保存位置",
       "category": "30-architecture",
-      "sha256": "bb3d09559b43fe9de263db838ef779b02e29192ca3466611257da386906b8eea"
+      "sha256": "97e549f89d2a90e3c5a3e294f2ae98a38801670da1a4bbb2ecde2efc18b6845e"
     },
     {
       "id": "30-design:02-decisions:02-editor:04-canvas-group-selection",
       "path": "30-design/02-decisions/02-editor/04-canvas-group-selection.md",
       "title": "画布组选区与整组平移",
       "category": "30-architecture",
-      "sha256": "c7d2ccf47e5ea0e5c2168774dc33f02edd5508fcb5d396fe3ea0601756021fcd"
+      "sha256": "1b360da767446a98fd9d1bbfa1961122f03872baebc3111a5650125f2b077235"
     },
     {
       "id": "30-design:02-decisions:02-editor:05-runtime-find-area",
@@ -763,7 +763,7 @@
       "path": "30-design/02-decisions/03-equipment/01-loadout-management.md",
       "title": "备战方案管理",
       "category": "30-architecture",
-      "sha256": "bc8562829d802b23a57c4899c2a38bb86d6b1b595f4626560ef789fbf163f01c"
+      "sha256": "729642315958d12928efa25b424a2c831e06de3e32d8bf94895c47b6e46cade4"
     },
     {
       "id": "30-design:02-decisions:03-equipment:02-build-calculator",
@@ -1015,14 +1015,14 @@
       "path": "30-design/02-decisions/06-tuning/06-native-attack-affixes.md",
       "title": "本属攻击统一规则表达",
       "category": "30-architecture",
-      "sha256": "f1b3435c8ac284e23abacb540cd6ff88e387db089b7284f46d2456f28a35be3d"
+      "sha256": "883e4132c07c3dafb82269480637c23eacffc88bf92ecb9f01b6c4975a1d3901"
     },
     {
       "id": "30-design:02-decisions:README",
       "path": "30-design/02-decisions/README.md",
       "title": "决策与规格记录（已实现需求）",
       "category": "30-architecture",
-      "sha256": "3590d1405acb51bbf1b649a49214a5e1fe4cc50b31034861469dbbd48802792d"
+      "sha256": "591c59ecb1911ee1e729310a6a7be691e6d3c62814de2208a5b67e1aac321e02"
     },
     {
       "id": "40-reference:01-config:01-contract",

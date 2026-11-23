@@ -1,4 +1,4 @@
-"""应用升级不能要求未修改的文档随之刷新日期和版本。"""
+"""文档门禁只保链接与索引：生命周期看目录，修改时间看 Git。"""
 from scripts import docs_check
 
 
@@ -28,15 +28,16 @@ def test_bundle_checks_internal_links_even_when_marked_source_only(tmp_path):
         "发行链接不可达 70-agent/README.md -> missing.md"]
 
 
-def test_document_baseline_can_remain_at_its_last_review(tmp_path, monkeypatch):
-    directory = tmp_path / "docs"
-    document = directory / "20-requirements" / "example.md"
-    document.parent.mkdir(parents=True)
-    text = "# 示例需求\n\n> 状态：已实现（2025-01-01，基线 v0.1.0）。\n"
-    document.write_text(text, encoding="utf-8")
-    monkeypatch.setattr(docs_check, "DOCS", directory)
-    assert docs_check.check_status([document]) == []
-    assert document.read_text(encoding="utf-8") == text
+def test_titles_gate_requires_blank_line_after_heading(tmp_path, monkeypatch):
+    """标题紧贴正文是最容易复发的排版退化：新文档一律要在标题后留空行。"""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    good = docs / "01-good.md"
+    good.write_text("# 标题\n\n> 状态：已实现。\n", encoding="utf-8")
+    tight = docs / "02-tight.md"
+    tight.write_text("# 标题\n> 状态：已实现。\n", encoding="utf-8")
+    monkeypatch.setattr(docs_check, "DOCS", docs)
+    assert docs_check.check_titles([good, tight]) == ["一级标题后缺空行 02-tight.md"]
 
 
 def test_number_prefixes_gate_with_releases_exemption(tmp_path, monkeypatch):

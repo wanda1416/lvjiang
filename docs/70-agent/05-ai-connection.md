@@ -1,7 +1,5 @@
 # AI 连接与请求边界
 
-> 2026-10-08，基线 v0.13.13。
-
 `core/ai` 不依赖 Qt 或游戏插件。AISettings 是冻结的请求参数；AIService 使用
 HTTPX AsyncClient 调用 `/chat/completions`，返回文本、模型、耗时与服务实际提供的
 token 用量。未提供用量时不估算。asyncio 总超时和任务取消关闭客户端，不自动重试。

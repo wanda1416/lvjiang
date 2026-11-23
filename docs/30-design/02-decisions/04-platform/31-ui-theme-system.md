@@ -1,6 +1,6 @@
 # 桌面端三主题系统与单一来源收敛
 
-> 状态：已实现（2026-11-22，基线 v0.15.19）。
+> 状态：已实现。
 
 ## 1. 背景与目标
 
@@ -27,6 +27,6 @@
 
 ### 2.4 两层单一来源与 Windows 原生标题栏边界
 
-- **通用主题层**：[theme.py](../../../../src/lvjiang/ui/widgets/theme.py) 独占 `ThemeSpec`、`THEME_SPECS`、基础色板、全局 QSS 与 `current_tokens()`；右上角菜单直接遍历 `THEME_SPECS` 生成，不再各自维护标签与顺序。
-- **插件业务主题层**：[apps/yysls/ui/theme.py](../../../../src/lvjiang/apps/yysls/ui/theme.py) 基于通用 `ThemeTokens` 派生燕云专属语义色（装备品阶、词条上限档位、调律评级与结果胶囊、转律目标、黄字属性等），通用层不感知具体游戏业务概念，插件 UI 不再在控件内各自抄写色表。
+- **通用主题层**：[theme.py](../../../../src/lvjiang/ui/widgets/theme.py)（仅源码检出） 独占 `ThemeSpec`、`THEME_SPECS`、基础色板、全局 QSS 与 `current_tokens()`；右上角菜单直接遍历 `THEME_SPECS` 生成，不再各自维护标签与顺序。
+- **插件业务主题层**：[apps/yysls/ui/theme.py](../../../../src/lvjiang/apps/yysls/ui/theme.py)（仅源码检出） 基于通用 `ThemeTokens` 派生燕云专属语义色（装备品阶、词条上限档位、调律评级与结果胶囊、转律目标、黄字属性等），通用层不感知具体游戏业务概念，插件 UI 不再在控件内各自抄写色表。
 - **Windows DWM 标题栏同步**：Qt 调色板与 QSS 不控制操作系统非客户区标题栏，因此在真实 Windows 桌面环境下（通过 `sys.platform == "win32"` 与非 `offscreen`/`minimal` 门控）使用 `dwmapi.DwmSetWindowAttribute` 同步沉浸式深浅模式（属性 `20` / 兼容旧版 Win10 `19`）、标题栏边框（`34`）、底色（`35`）与文字色（`36`）；Linux / macOS 及离屏测试在入口直接跳过，不触发原生句柄创建。

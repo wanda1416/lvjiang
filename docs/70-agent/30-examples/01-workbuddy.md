@@ -1,6 +1,6 @@
 # WorkBuddy 本机接入与对话示例
 
-> 最后更新：2026-10-09（基线 v0.13.14）。按官方格式导出 Streamable HTTP 配置，实际 WorkBuddy 界面接入待本机验收。
+> 按官方格式导出 Streamable HTTP 配置，实际 WorkBuddy 界面接入待本机验收。
 
 1. 启动律匠，在设置中激活 Lv1，打开“燕云 → 智能调律”。
 2. 在 AI 设置中确认 WorkBuddy 的默认路径，在智能调律中选择 WorkBuddy，再点击“启用智能调律”，自动合并导出，保留其他服务。

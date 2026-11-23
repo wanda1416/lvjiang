@@ -1,4 +1,4 @@
-"""文档健康检查：死链、锚点、孤儿、编号冲突、一级标题、时效锚与状态行。
+"""文档健康检查：死链、锚点、孤儿、入口可达、编号冲突与索引登记。
 
 用法：
 
@@ -9,9 +9,9 @@
 检查范围是 `docs/` 下全部 `.md`；链接目标可以是仓库内任意文件（源码、配置、
 打包手册都允许被引用）。纯静态检查，不联网、不依赖 Qt，可以直接进 CI。
 
-约定见 `docs/00-meta/01-doc-standard.md`：层索引写明基线，会被实现进度推翻的
-文档（plans、平台进度）写明状态，归档文档写明「状态止于」。
-日期与基线记录实际内容核对的时间和版本，不要求跟随应用发版更新；本脚本只读检查。
+只保「链接和索引不烂」：目录自己表达文档生命周期（20-plans → 30-design → 40-reference），
+修改时间由 Git 表达。本脚本不检查日期、基线或状态行，也不再要求任何文档写
+`> 最后更新：…`。约定见 `docs/00-meta/01-doc-standard.md`。
 """
 
 from __future__ import annotations
@@ -34,8 +34,6 @@ FENCE_MARK = ("```", "~~~")
 NUMBER_PREFIX = re.compile(r"^(\d+(?:\.\d+)*)[.-](?=\D)")
 #: GitHub 生成锚点时删除标点但保留下划线，空格转连字符
 ANCHOR_DROP = re.compile(r"[^\w\u4e00-\u9fff\- ]")
-#: 时效锚：正文前 20 行里出现版本号或日期即可
-FRESH = re.compile(r"v?\d+\.\d+\.\d+|20\d\d-\d\d-\d\d|20\d\d\s*年")
 #: 每层索引文件必须覆盖同目录全部 .md；开发日志月份目录由 DEV_MONTH 动态发现，
 #: releases 系列子目录按递归覆盖，均不在这里硬编码。
 INDEX_DIRS = ("50-releases",)
@@ -49,19 +47,8 @@ SKIP_PREFIX = ("http://", "https://", "mailto:", "#")
 #: 编号顶层目录：其直接子目录与非 README 文件名必须以数字开头（NN- 或日期前缀），
 #: 50-releases 顶层例外允许版本号（v<数字>）排序。
 NUMBERED_TOP_DIRS = ("00-meta", "10-domain", "20-plans", "30-design", "40-reference",
-                     "50-releases", "60-guide", "70-agent", "80-history", "90-develop")
+                     "50-releases", "60-guide", "70-agent", "80-history")
 VERSION_PREFIX = re.compile(r"^v\d")
-
-#: 状态行：会被实现进度推翻的文档必须写明状态与基线（约定见 00-meta/01-doc-standard.md）
-STATUS_SCOPES = ("30-design/02-decisions", "20-plans", "00-meta/01-platforms")
-STATUS_INDEXES = ("30-design/02-decisions/README.md", "20-plans/README.md",
-                  "00-meta/01-platforms/README.md")
-STATUS_LINE = re.compile(
-    r"^>\s*状态\s*[：:]\s*(已实现|部分实现|规划)"
-    r"\s*（(\d{4}-\d{2}-\d{2})，基线\s*v?(\d+\.\d+(?:\.\d+)?)）", re.M)
-ARCHIVE_LINE = re.compile(r"^>\s*状态止于\s*\d{4}-\d{2}-\d{2}", re.M)
-#: 状态行与时效锚都只看正文最前面这一段
-HEAD_LINES = 15
 
 
 def slug(title: str) -> str:
@@ -168,13 +155,25 @@ CODE_CAPTION = re.compile(r"^[^\s]*[./\\][^\s]*$")
 
 
 def check_titles(files: list[pathlib.Path]) -> list[str]:
+    """一篇一个一级标题，且标题下一行必须是空行。
+
+    标题紧贴正文（`# 标题` 直接接 `> 状态：…`）在渲染与纯文本阅读里都挤在一起，
+    是零成本的排版门禁；只做结构检查，不检查日期、基线或状态内容。
+    """
     problems: list[str] = []
     for path in files:
-        titles = [title for title in H1.findall(body_without_code(read(path)))
+        rel = path.relative_to(DOCS).as_posix()
+        lines = body_without_code(read(path)).splitlines()
+        titles = [title for title in H1.findall("\n".join(lines))
                   if not CODE_CAPTION.match(title.strip())]
         if len(titles) != 1:
-            rel = path.relative_to(REPO).as_posix()
             problems.append(f"一级标题数量 {len(titles)} 处 {rel}")
+        for index, line in enumerate(lines):
+            if not line.startswith("# ") or CODE_CAPTION.match(line[2:].strip()):
+                continue
+            if index + 1 < len(lines) and lines[index + 1].strip():
+                problems.append(f"一级标题后缺空行 {rel}")
+            break
     return problems
 
 
@@ -195,103 +194,6 @@ def check_duplicate_numbers(files: list[pathlib.Path]) -> list[str]:
     return problems
 
 
-def check_freshness(files: list[pathlib.Path]) -> list[str]:
-    """各层 README 必须写明基线版本或最后更新日期。
-
-    页面级不强制——单个页面里的版本号会随内容变化，只有层索引承担
-    “当前基线在哪”的责任；约定见 docs/00-meta/01-doc-standard.md。
-    """
-    problems: list[str] = []
-    for path in files:
-        if path.name != "README.md":
-            continue
-        head = "\n".join(read(path).splitlines()[:20])
-        if not FRESH.search(head):
-            problems.append(
-                f"层索引缺时效锚（前 20 行无版本号或日期）"
-                f" {path.relative_to(DOCS).as_posix()}")
-    return problems
-
-
-def is_archived(rel: str) -> bool:
-    """需要「状态止于」行的归档正文：旧 archive/ 目录与迁移后的
-    80-history/01-meta-archive/。80-history/02-dev/（开发日志）同属归档内容，但迁移前
-    不要求状态止期行，语义保持现状不收紧。"""
-    return ("/archive/" in rel
-            or rel.startswith("80-history/01-meta-archive/"))
-
-
-def status_docs(files: list[pathlib.Path]) -> list[pathlib.Path]:
-    """需要状态行的文档：plans 全部与平台进度文档，层索引除外。"""
-    out: list[pathlib.Path] = []
-    for path in files:
-        rel = path.relative_to(DOCS).as_posix()
-        if rel in STATUS_INDEXES or is_archived(rel):
-            continue
-        if any(rel.startswith(scope + "/") for scope in STATUS_SCOPES):
-            out.append(path)
-    return out
-
-
-def head_of(path: pathlib.Path) -> str:
-    return "\n".join(read(path).splitlines()[:HEAD_LINES])
-
-
-def check_status(files: list[pathlib.Path], *, descriptive: bool = False) -> list[str]:
-    """活文档写状态行（含基线版本），归档文档写「状态止于」。
-
-    状态行把「已实现 / 部分实现 / 规划」与基线版本钉在文档开头，避免再出现
-    “文档写着待实现、代码早已上线”这类腐烂。基线是文档实际核对版本，
-    允许早于应用版本，不以应用发版要求重写未修改文档。
-    """
-    problems: list[str] = []
-    for path in status_docs(files):
-        rel = path.relative_to(DOCS).as_posix()
-        match = (re.search(r"^>\s*状态[：:]\s*\S+", head_of(path), re.M)
-                 if descriptive else STATUS_LINE.search(head_of(path)))
-        if not match:
-            problems.append(
-                "缺状态行（前 15 行需 `> 状态：已实现|部分实现|规划（YYYY-MM-DD，基线 vX.Y.Z）`）"
-                f" {rel}")
-    for path in files:
-        rel = path.relative_to(DOCS).as_posix()
-        if not is_archived(rel) or path.name == "README.md":
-            continue
-        if not ARCHIVE_LINE.search(head_of(path)):
-            problems.append(f"归档缺「状态止于」行（前 15 行） {rel}")
-    return problems
-
-
-def check_index_status(files: list[pathlib.Path]) -> list[str]:
-    """plans 层索引的状态列必须与目标文档的状态行一致。
-
-    索引给人快速扫的，文档首行是权威；两边不一致就是有一处已经腐烂。
-    """
-    problems: list[str] = []
-    index = DOCS / "20-plans/README.md"
-    if not index.is_file():
-        return problems
-    for line in read(index).splitlines():
-        if not line.startswith("|"):
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if len(cells) < 3:
-            continue
-        link = re.search(r"\]\(([^)#]+\.md)\)", cells[0])
-        if not link:
-            continue
-        target = (index.parent / link.group(1)).resolve()
-        if not target.is_file():
-            continue
-        rel = target.relative_to(DOCS).as_posix()
-        doc = STATUS_LINE.search(head_of(target))
-        cell = cells[-1].lstrip("✅").strip()
-        if not doc:
-            problems.append(f"索引状态无法比对（目标缺状态行） {rel}")
-        elif not cell.startswith(doc.group(1)):
-            problems.append(
-                f"索引状态与文档不一致 {rel}: 索引「{cells[-1]}」/ 文档「{doc.group(1)}」")
-    return problems
 
 
 def check_number_prefixes() -> list[str]:
@@ -438,9 +340,6 @@ def main() -> int:
         "一级标题": check_titles(files),
         "编号冲突": check_duplicate_numbers(files),
         "编号前缀": check_number_prefixes(),
-        "时效锚": check_freshness(files),
-        "状态行": check_status(files, descriptive=args.admin),
-        "索引状态": check_index_status(files),
         "索引覆盖": check_index_coverage(),
     }
     total = 0

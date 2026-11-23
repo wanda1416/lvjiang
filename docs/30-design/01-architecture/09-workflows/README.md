@@ -1,6 +1,6 @@
 # 流程编排（Workflows）
 
-> 最后更新：2026-11-23（基线 v0.15.19）。本层描述如与代码或配置不符，以代码与配置为准。
+> 本层描述如与代码或配置不符，以代码与配置为准。
 
 流程编排描述如何组合多个场景来完成一个完整的业务目标。
 
@@ -126,7 +126,6 @@
   需求见[任务入口状态与启动反馈](../../02-decisions/02-editor/11-execution-feedback.md)和
   [日常参数保存边界](../../02-decisions/02-editor/12-parameter-save-boundaries.md)。
 
-
 ## 离线验证接缝
 
 引擎现可由宿主显式注入`capture_observer`与`runtime_clock`：前者旁路接收新帧/复用事件，
@@ -134,4 +133,5 @@
 同一模拟设备提供capture/input/clock，不创建真实目标，不按截图次数推进画面。
 工具只通过声明状态图验证动作因果，未知能力不当成功；不在通用层硬编码领域插件。
 桌面/批量默认关闭的全任务采集经宿主生命周期hook装配，不引入UI到core；受控WF库沿用原resolver，未建模领域能力仍拒绝。
-当前范围、工具入口与未支持能力见[离线WF模拟工具](../../../90-develop/02-workflow-simulation.md)。
+当前范围、工具入口与未支持能力见
+[06-workflow-simulation.md](06-workflow-simulation.md)：全任务采集、夹具标注转换与并行模拟 CLI。

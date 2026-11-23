@@ -1,9 +1,11 @@
 # 功能规划与部分实现边界（plans）
 
-> 最后更新：2026-11-23（基线 v0.15.19）。本层描述如与代码或配置不符，以代码与配置为准。
+> 本层描述如与代码或配置不符，以代码与配置为准。
 
-状态取值只有 `已实现`、`部分实现`、`规划`；权威写法是各文档首行的状态行，
-本目录收录进行中的规划与部分实现功能；已实现的决策与规格记录见 [design/decisions](../30-design/02-decisions/README.md)。收录边界见[文档规范](../00-meta/01-doc-standard.md)，状态列与目标文档状态行的一致性由 `scripts/docs_check.py` 强制。
+本目录只收**还没开始写代码**的纯计划：调研、提案、方案对比与全局待办。开始落地后把文档
+`git mv` 进 [design/](../30-design/01-architecture/README.md) 继续演进，定型后再沉淀契约到
+[reference/](../40-reference/README.md)。收录边界见[文档规范](../00-meta/01-doc-standard.md)；
+下表的状态列只是给人扫的摘要，以各篇正文为准，不由脚本强制比对。
 
 ## 全局待办（原 00-meta/02-backlog.md 迁入）
 
@@ -66,4 +68,5 @@
 | [27-hotkeys-and-menu-shortcuts.md](../30-design/02-decisions/04-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 | 已实现 |
 | [28-account-document-sync.md](../30-design/02-decisions/04-platform/28-account-document-sync.md) | 全局任务参数与批量配置上云：账户级文档通道、冲突不留副本与迁移 | 已实现 |
 | [29-ai-exception-recovery.md](03-platform/29-ai-exception-recovery.md) | AI 异常导航恢复提案：有限动作、检查点续跑与独立验收；未实施 | 规划 |
-| [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 全任务采集/离线WF模拟已接桌面/批量、WF库与覆盖CLI；诊断FIFO与反馈仍规划 | 部分实现 |
+| [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 识别帧历史诊断 FIFO、异常冻结包与反馈附件上传 | 规划 |
+| [31-wf-simulation-hardening.md](03-platform/31-wf-simulation-hardening.md) | 离线WF模拟的回归门禁增强：无人值守弹窗门禁、状态覆盖断言、失败Diff、OCR缓存与宽容匹配档 | 规划 |

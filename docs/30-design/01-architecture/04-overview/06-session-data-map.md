@@ -1,6 +1,6 @@
 # config/session 数据划分与读写方
 
-> 最后更新：2026-11-02（基线 v0.15.9）。本层描述如与代码不符，以代码为准。
+> 本层描述如与代码不符，以代码为准。
 
 `config/session/` 是客户端唯一的纯运行态目录：不进 git、不参与 system/local 配置分层、
 不经 `ConfigResolver`。目录本身由 `constants.SESSION_CONFIG_DIR` 声明，其余路径统一经

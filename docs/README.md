@@ -1,10 +1,12 @@
 # 律匠文档中心
 
-> 最后更新：2026-11-18（基线 v0.15.17）。本层描述如与代码或配置不符，以代码与配置为准。
+> 本层描述如与代码或配置不符，以代码与配置为准。
 
 按用途分层：使用者看 60-guide，游戏事实看 10-domain，设计与决策看 30-design，接口参考看
 40-reference，接入与契约看 70-agent，计划与待办看 20-plans，规范与平台计划看 00-meta，
 历史与发布记录看 80-history/50-releases。
+目录本身就是生命周期：只有纯计划进 20-plans（未写代码），有概念与实现进 30-design，
+定型后把精确契约沉淀到 40-reference；时间与版本以 Git 历史为准，正文不写日期基线。
 
 | 目录 | 内容 | 面向 |
 |------|------|------|
@@ -17,7 +19,6 @@
 | [50-releases/](50-releases/README.md) | 各版本发布说明 | 所有人 |
 | [60-guide/](60-guide/README.md) | 安装、配置、运行的完整操作指引（用户指南） | 用户 |
 | [70-agent/](70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 | 用户 / Agent |
-| [90-develop/](90-develop/README.md) | 开发者入口：插件开发、打包、Android 部署 | 开发者 |
 
 ## 核心契约
 
@@ -43,6 +44,7 @@
 | 反馈问题 | [问题反馈](60-guide/04-desktop/09-faq-and-feedback.md) |
 
 - [在线配置、会员内容与功能激活](60-guide/01-accounts/01-appendix-a-online-config.md)：更新生效、本地覆盖、本地激活与在线会员授权的区别、关闭撤销与人工恢复。
+- 构建与打包：[打包与发布手册](../packaging/readme.md)、[Android 构建与部署](../android/DEPLOYMENT.md)、[Android 签名说明](../android/README-signing.md)。
 - 旧编号目录（`docs/10-game/`、`docs/20-requirements/`、`docs/30-architecture/`、
   `docs/40-development/`、`docs/50-releases/`、`docs/60-userguide/`、`docs/70-agent/`）与
   中间态无编号目录已一次性切换到上表现行结构，不做旧路径兼容；Agent 文档 ID 同步退役，

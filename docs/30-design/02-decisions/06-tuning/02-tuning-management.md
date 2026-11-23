@@ -1,5 +1,6 @@
 # 调律管理与历史记录需求
-> 状态：已实现（2026-10-08，基线 v0.13.14）。
+
+> 状态：已实现。
 
 > 当前管理页已经采用“历史固定首页 + 每次调律独立任务页”。多目标边界见
 > [05-concurrent-target-execution.md](../04-platform/05-concurrent-target-execution.md#8-调律管理)。

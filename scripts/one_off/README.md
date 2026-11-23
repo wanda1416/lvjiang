@@ -141,3 +141,19 @@ python scripts/one_off/migrate_output_to_logs.py --root D:\lvjiang   # 指定客
 python scripts/one_off/normalize_history_paths.py            # 干跑
 python scripts/one_off/normalize_history_paths.py --apply    # 执行
 ```
+
+## 文档生命周期改造（v0.15.19 之后）
+
+废除 `docs/90-develop/`，核心研发文档只走 20-plans → 30-design → 40-reference 单向线；
+修改时间改由 Git 表达，`scripts/docs_check.py` 收缩为「只保链接和索引不烂」。三个脚本
+按此顺序执行一次，可重复执行且默认可干跑：
+
+- [strip_doc_timestamps.py](strip_doc_timestamps.py) 剥离活跃层文档的
+  `> 最后更新：…`、`（基线 vX.Y.Z）`；`50-releases/`、`80-history/` 冻结存档不动。
+- [normalize_doc_line_endings.py](normalize_doc_line_endings.py) 把被误写成 CRLF 的正文
+  还原为 LF（只处理 HEAD 里没有 CRLF 的文件），避免「改一行、整份重排」的假 diff。
+- [regen_agent_docs_baseline.py](regen_agent_docs_baseline.py) 按当前 `docs/` 重生成
+  `tests/yysls/data/agent_docs_baseline.json`：文档集合或正文的 sha256 变了，Agent
+  发行文档门禁会直接红灯；版本字段沿用 fixture 现值。
+- [fix_heading_spacing.py](fix_heading_spacing.py) 给「一级标题下一行不是空行」的文档补一个空行
+  （换行风格沿用原文件）；该规则已并入 `docs_check.py` 的 `check_titles` 常驻门禁。

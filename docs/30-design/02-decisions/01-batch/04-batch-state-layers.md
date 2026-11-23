@@ -1,6 +1,6 @@
 # 批量的状态分层
 
-> 状态：已实现（2026-10-08，基线 v0.13.14）。
+> 状态：已实现。
 >
 > 数据归属、协调算法、`batch.json` v2 迁移与落点见
 > [39-runtime/06-batch-state-layers.md](../../01-architecture/06-runtime/06-batch-state-layers.md)。
@@ -60,7 +60,6 @@
 文件里，而是按配置组记在本机会话状态里；首次打开按配置组的"默认执行"列勾选。**
 旧格式一次性转换，不保留常驻兼容层；读取规则见
 [实现契约](../../01-architecture/06-runtime/06-batch-state-layers.md#batchjson-v2-迁移)。
-
 
 ## 5. 配置窗口与参数页
 

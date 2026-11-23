@@ -1511,8 +1511,12 @@ class WorkbenchUi(
     private fun updateProfileSourceSummary(result: JSONObject) {
         val snapshot = result.optInt("snapshot_id", 0)
         val watermark = result.optInt("snapshot_remote_id", 0)
-        profileSourceSummary?.text = if (snapshot > 0)
+        val base = if (snapshot > 0)
             "数据来源：云端 · 快照#$snapshot · 历史水位 $watermark" else "数据来源：云端"
+        // 后台心跳每分钟跑一轮同步，失败只落在 account_profile_status 的
+        // last_sync_error 里：摘要行不带出来，用户就只能靠手动点同步才发现。
+        val failure = result.optString("last_sync_error")
+        profileSourceSummary?.text = if (failure.isEmpty()) base else "$base · 上次同步失败：$failure"
     }
 
     /**
@@ -1530,6 +1534,12 @@ class WorkbenchUi(
             val lines = mutableListOf("当前来源：云端")
             if (snapshot > 0) lines.add("云端快照 #$snapshot · 历史水位 $watermark")
             lines.add(if (pending > 0) "未同步变更 $pending 条" else "变更已全部同步")
+            // 后台每分钟一轮的同步失败只存在 last_sync_error 里，不在这里显示，
+            // 「同步完成」这句话就会一直挂着而实际早就没同步成功过。
+            val failure = result.optString("last_sync_error")
+            val lastAt = result.optString("last_sync_at")
+            if (failure.isNotEmpty()) lines.add("上次同步失败：$failure")
+            if (lastAt.isNotEmpty()) lines.add("最近一次同步 $lastAt")
 
             val content = SettingsUi.dialogContent(activity)
 

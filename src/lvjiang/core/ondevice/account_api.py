@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import threading
+from datetime import datetime
 
 from loguru import logger
 
@@ -26,6 +27,16 @@ from ..account.service import (
 _STATUS_CACHE: dict | None = None
 # 只是"现在连不上服务"，与登录态无关，别混进 logged_in。
 _OFFLINE_CODES = frozenset({"network", "service_unavailable", "rejected"})
+
+#: 同步单飞：前台心跳线程（每 60 秒）与「立即同步」/登录后同步可以同时进来，
+#: 两轮并发会同时读改写 account.json 的 profile_sync 水位（后写覆盖前写），
+#: 也会各自开一轮 sync_round 重复拉取。PC 端 AccountHolder 有同类单飞标志
+#: （ui/account_dialog.py 的 _start），手机侧此前没有。
+_SYNC_LOCK = threading.Lock()
+
+#: 最近一轮同步的结果（`{at, ok, message}`）。手机端「数据同步」摘要行与对话框
+#: 都读它：失败只进 _sync_round 返回的 dict，界面原本完全看不到。
+_LAST_SYNC: dict | None = None
 
 
 def _session() -> AccountSession:
@@ -87,12 +98,46 @@ def _probe_status() -> dict:
     return {"ok": True, "logged_in": False}
 
 
-def _sync(token: str) -> dict:
-    """一轮镜像端同步；一轮只取一次云端版本行，没变化的通道不发请求。"""
-    from ..sync.round_state import sync_round
+def _sync(token: str, *, wait: float | None = None) -> dict | None:
+    """一轮镜像端同步；同一时刻进程内只允许一轮。
 
-    with sync_round():
-        return _sync_round(token)
+    ``wait`` 是等锁上限（秒）：``None`` 无限等（手动同步用），``0`` 表示拿不到
+    就放弃并返回 ``None``（前台心跳用——这一分钟跳过，不排队堆积）。失败细节由
+    :func:`_sync_round` 收进返回的 dict，不抛异常。
+    """
+    if not _SYNC_LOCK.acquire(blocking=True, timeout=-1 if wait is None else wait):
+        return None
+    try:
+        from ..sync.round_state import sync_round
+
+        with sync_round():
+            return _sync_round(token)
+    finally:
+        _SYNC_LOCK.release()
+
+
+def _forget_last_sync() -> None:
+    """换登录态时丢掉上一轮的同步结论（否则新账号的摘要行会显示旧失败）。"""
+    global _LAST_SYNC
+    _LAST_SYNC = None
+
+
+def _remember_sync_result(result, *, trigger: str) -> None:
+    """记下最近一轮同步的结果，供 ``account_profile_status`` 透出。
+
+    只在这一轮**有失败**且失败原因与上一轮不同时进 WARNING：分钟节拍下弱网
+    连续失败是常态，逐分钟刷日志只会把真正的报告淹掉。
+    """
+    global _LAST_SYNC
+    if not isinstance(result, dict):
+        return
+    failed = not result.get("synced")
+    message = str(result.get("message") or "") if failed else ""
+    previous = _LAST_SYNC or {}
+    _LAST_SYNC = {"at": datetime.now().strftime("%H:%M:%S"),
+                  "ok": not failed, "message": message}
+    if failed and message and message != previous.get("message"):
+        logger.warning("[account] {}同步未完成：{}", trigger, message)
 
 
 def _sync_round(token: str) -> dict:
@@ -148,22 +193,30 @@ def _reset_sync_state() -> None:
 
 
 def account_profile_status() -> str:
-    """profile 同步状态：`{ok, snapshot_id, snapshot_remote_id, pending_push}`。
+    """profile 同步状态：`{ok, snapshot_id, snapshot_remote_id, pending_push, ...}`。
 
     snapshot_id/remote_id 是手机当前跟随的云端位置（哪份快照、回放到账本
     哪个水位）；pending_push 是水位之上本机产生、尚未上云的变更行数。
+
+    ``last_sync_error`` / ``last_sync_at`` / ``syncing`` 是**失败可见性**：前台
+    心跳每分钟在后台跑一轮，失败此前只进 ``_sync_round`` 的返回 dict 然后被丢弃，
+    设置页的「数据同步」摘要行看不出任何异常。摘要行与同步对话框都读这几个字段。
     """
     from ..account.service import profile_sync_state
     from ..profile.repository import db_count_pending_push
 
     state = profile_sync_state()
     watermark = int(state.get("remote_history_id") or 0)
+    last = _LAST_SYNC or {}
     return json.dumps({
         "ok": True,
         "snapshot_id": int(state.get("profile_snapshot_id") or 0),
         "snapshot_remote_id": watermark,
         "pending_push": db_count_pending_push(
             int(state.get("local_history_id") or 0), _author_stamp()),
+        "syncing": _SYNC_LOCK.locked(),
+        "last_sync_at": str(last.get("at") or ""),
+        "last_sync_error": str(last.get("message") or ""),
     }, ensure_ascii=False)
 
 
@@ -273,6 +326,7 @@ def account_login(login: str, password: str) -> str:
               "pending_sync": True}
     _remember_status({"ok": True, "logged_in": True, "online": True,
                       "login": result["login"], "display_name": result["display_name"]})
+    _forget_last_sync()
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -283,6 +337,7 @@ def account_logout() -> str:
     except AccountError as error:
         return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
     _remember_status({"ok": True, "logged_in": False})
+    _forget_last_sync()
     return json.dumps({"ok": True}, ensure_ascii=False)
 
 
@@ -301,11 +356,16 @@ def account_sync() -> str:
                                "offline": error.code in _OFFLINE_CODES},
                               ensure_ascii=False)
     try:
-        result = _sync(session.access_token)
+        result = _sync(session.access_token, wait=_MANUAL_SYNC_WAIT_S)
     except AccountError as error:
         _note_network_error(error)
         return json.dumps({"ok": False, "message": str(error),
                            "offline": error.code in _OFFLINE_CODES}, ensure_ascii=False)
+    if result is None:
+        # 前台心跳正在跑同一轮：不排队硬等，直接让用户再点一次
+        return json.dumps({"ok": False, "message": "另一轮同步正在进行，请稍候再试"},
+                          ensure_ascii=False)
+    _remember_sync_result(result, trigger="手动")
     _set_online(True)
     return json.dumps({"ok": True, **result}, ensure_ascii=False)
 
@@ -317,6 +377,9 @@ def account_sync() -> str:
 
 SYNC_INTERVAL_S = 60
 HEARTBEAT_EVERY_N_SYNC = 10            # 60s × 10 = 10 分钟一跳
+#: 手动「立即同步」等前台心跳让路的时长（秒）：一轮 idle 同步通常 1~3 秒，
+#: 等这么久还拿不到锁说明心跳正卡在网络上，让用户重试比无声干等更好。
+_MANUAL_SYNC_WAIT_S = 5.0
 _heartbeat_stop = threading.Event()
 _heartbeat_thread: threading.Thread | None = None
 
@@ -349,16 +412,25 @@ def _heartbeat_tick(ticks: int) -> int:
         except AccountError:
             pass                          # 弱网抖动静默，下轮再试
     try:
-        _sync(token)
+        # 拿不到锁（用户正在手动同步）= 这一分钟跳过，不排队
+        result = _sync(token, wait=0)
     except AccountError:
         pass
+    else:
+        _remember_sync_result(result, trigger="后台")
     return ticks
 
 
 def _heartbeat_loop() -> None:
     ticks = 0
     while not _heartbeat_stop.wait(SYNC_INTERVAL_S):
-        ticks = _heartbeat_tick(ticks)
+        try:
+            ticks = _heartbeat_tick(ticks)
+        except Exception:                 # noqa: BLE001
+            # 节拍线程死掉就再也没有后台同步，且日志里只有一次 traceback。
+            # 任何异常都只作废这一分钟：`_sync` 链内的 SyncError 已被就地收进
+            # report.errors，能逃到这里的是 sqlite/IO 这类意外故障。
+            logger.exception("[account] 前台同步轮次异常，下一分钟重试")
 
 
 def account_heartbeat_start() -> str:

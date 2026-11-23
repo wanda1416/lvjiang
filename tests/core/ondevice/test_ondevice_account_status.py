@@ -173,3 +173,35 @@ def test_devices_list_is_empty_when_not_logged_in(monkeypatch) -> None:
     result = json.loads(account_api.account_devices())
 
     assert result == {"ok": True, "logged_in": False, "devices": []}
+
+
+def test_profile_status_surfaces_last_sync_failure(monkeypatch) -> None:
+    """后台每分钟一轮同步失败，必须能从 profile 状态里读到。
+
+    此前失败只进 ``_sync_round`` 返回的 dict 然后被丢弃，设置页「数据同步」摘要
+    行永远显示「数据来源：云端」，只有手动点「立即同步」才看得到 toast。
+    """
+    monkeypatch.setattr(account_api, "_LAST_SYNC",
+                        {"at": "10:20:30", "ok": False,
+                         "message": "连不上账号服务，同步未完成"})
+    monkeypatch.setattr("lvjiang.core.account.service.profile_sync_state", lambda: {})
+    monkeypatch.setattr(account_api, "_author_stamp", lambda: "inst")
+
+    result = json.loads(account_api.account_profile_status())
+
+    assert result["ok"] is True
+    assert result["last_sync_error"] == "连不上账号服务，同步未完成"
+    assert result["last_sync_at"] == "10:20:30"
+    assert result["syncing"] is False
+
+
+def test_profile_status_has_no_error_after_a_clean_round(monkeypatch) -> None:
+    monkeypatch.setattr(account_api, "_LAST_SYNC",
+                        {"at": "10:21:00", "ok": True, "message": ""})
+    monkeypatch.setattr("lvjiang.core.account.service.profile_sync_state", lambda: {})
+    monkeypatch.setattr(account_api, "_author_stamp", lambda: "inst")
+
+    result = json.loads(account_api.account_profile_status())
+
+    assert result["last_sync_error"] == ""
+    assert result["last_sync_at"] == "10:21:00"

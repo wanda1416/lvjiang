@@ -746,3 +746,29 @@ def test_comment_inside_bracket_continuation_keeps_content():
         'eval $x = [\n    1,  # 第一项 (\n    2\n]\nlog "z"\n')
     assert len(program.body) == 2
     assert [a.value for a in program.body[0].func_args] == [1, 2]
+
+
+def test_drag_distance_accepts_variable():
+    """drag 距离复用 var_ref：ASCII 与中文变量名都必须能解析。
+
+    过去 DRAG_DIST 自带一份 ASCII 变量正则并优先匹配，`up $次数` 在 drag
+    里报语法错误、而 `wait $次数` 正常——同一份「变量名长什么样」有两份定义。
+    """
+    for name in ("$n", "$次数"):
+        node = parse_text(f"drag [main].[panel][1][1] up {name}\n").body[0]
+        assert isinstance(node, Drag)
+        assert node.direction == "up"
+        assert node.distance.name == name[1:]
+
+
+def test_drag_distance_still_accepts_numbers():
+    node = parse_text("drag [main].[panel][1][1] down 0.5\n").body[0]
+    assert node.distance == 0.5
+    node = parse_text("drag [main].[panel][1][1] up\n").body[0]
+    assert node.distance == 1.0
+
+
+def test_drag_distance_rejects_negative():
+    """负距离在旧词法里是语法错误，放开会悄悄改变既有写法的含义。"""
+    with pytest.raises(VisitError):
+        parse_text("drag [main].[panel][1][1] up -1\n")

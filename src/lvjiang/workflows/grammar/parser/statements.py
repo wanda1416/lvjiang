@@ -537,16 +537,25 @@ class _StmtMixin:
     def drag_direction(self, items):
         """up|down [n | $var] → (direction_str, distance_float_or_VarRef)
 
-        距离支持整数、浮点数（如 0.5 表示半行）、变量引用
+        距离支持整数、浮点数（如 0.5 表示半行）、变量引用。距离由
+        ``number | var_ref`` 给出，因此这里的值已经是转换后的 int/float
+        或 VarRef 节点，不再需要拆文本。
+
+        负值仍然拒绝：``number`` 规则本身接受负数，而旧的 DRAG_DIST 终端
+        只认 ``[0-9]+(\\.[0-9]+)?``，`up -1` 是语法错误。放开它会悄悄改变
+        一套既有写法的含义，所以这里显式回绝并给出可读的原因。
         """
         dir_token = str(items[0]).lower()
         distance = 1.0
         if len(items) > 1:
-            rows_str = str(items[1])
-            if rows_str.startswith('$'):
-                distance = VarRef(name=rows_str[1:])  # 动态行数
+            raw = items[1]
+            if isinstance(raw, VarRef):
+                distance = raw  # 动态行数
             else:
-                distance = float(rows_str)  # 静态行数（支持浮点数，如 0.5）
+                distance = float(raw)  # 静态行数（支持浮点数，如 0.5）
+                if distance < 0:
+                    raise WorkflowUserError(
+                        f"drag: 距离必须是非负数，实际写了 {raw}（第 {self._line(items)} 行）")
         return (dir_token, distance)
 
     def drag_scene_target(self, items):

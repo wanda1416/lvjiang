@@ -80,9 +80,6 @@ from .optimal_widgets import (
     _MIN_RATING_CHOICES as _MIN_RATING_CHOICES,
 )
 from .optimal_widgets import (
-    _QUALITY_COLORS as _QUALITY_COLORS,
-)
-from .optimal_widgets import (
     _SLOT_ORDER as _SLOT_ORDER,
 )
 from .optimal_widgets import (

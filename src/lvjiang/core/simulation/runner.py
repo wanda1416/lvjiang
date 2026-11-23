@@ -226,7 +226,7 @@ def _worker(fixture: Path, directory: Path, *, record: bool = False) -> int:
         ocr = OCREngine(
             rapidocr_options={"intra_op_num_threads": 1, "inter_op_num_threads": 1}
         )
-        with (directory / "events.jsonl").open("w", encoding="utf-8") as trace:
+        with (directory / "events.jsonl").open("w", encoding="utf-8", newline="\n") as trace:
             device = SimulatedDevice(scenario, trace)
             capture: Any = device
             input_ctrl: Any = device
@@ -360,7 +360,7 @@ def _worker(fixture: Path, directory: Path, *, record: bool = False) -> int:
             ocr.close()
     temporary = directory / "result.json.part"
     temporary.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
     )
     os.replace(temporary, directory / "result.json")
     return 0 if report["status"] == "passed" else 1
@@ -440,7 +440,7 @@ def run_cases(
             except subprocess.TimeoutExpired:
                 report = {"status": "timeout", "code": "wall_timeout"}
                 (directory / "result.json").write_text(
-                    json.dumps(report) + "\n", encoding="utf-8"
+                    json.dumps(report) + "\n", encoding="utf-8", newline="\n"
                 )
         return {**report, "case_directory": str(directory)}
 
@@ -448,7 +448,7 @@ def run_cases(
         results = list(pool.map(run, enumerate(fixtures)))
     report_path = output / f"run-{uuid.uuid4().hex[:8]}.json"
     report_path.write_text(
-        json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
     )
     return results
 
@@ -551,7 +551,7 @@ def main(argv: list[str] | None = None) -> int:
 
         data = discover(args.workflows_root, args.fixtures_root)
         args.output.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
         )
         return 0
     if args.command == "run-discovered":

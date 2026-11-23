@@ -41,7 +41,7 @@ if $done
 end
 return -1
 """,
-        encoding="utf-8",
+        encoding="utf-8", newline="\n",
     )
     spec = {
         "format_version": 1,
@@ -65,5 +65,5 @@ return -1
         ],
     }
     (directory / "scenario.json").write_text(
-        json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
     )

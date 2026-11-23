@@ -82,7 +82,7 @@ def bundle_workflow(entry: Path, destination: Path, *, roots: list[Path]) -> dic
             target.write_bytes(data)
             manifest["files"][name] = hashlib.sha256(data).hexdigest()
         (destination / "manifest.json").write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
         )
         return manifest
     except BaseException:

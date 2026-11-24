@@ -1,90 +1,102 @@
 common:
-  title: Image Recognition
-  匹配分组: Match group
-  区域间隔: Region gap
-  单批内容最大高度: Max height per batch
-  清洗组: Cleaning group
-  画布最小边长: Min canvas side
-  识别结果（已应用清洗规则）: Recognition result (cleaning rules applied)
+  title: Reconocimiento de imágenes
+  匹配分组: Grupo de coincidencia
+  区域间隔: Espacio entre regiones
+  单批内容最大高度: Altura máxima por lote
+  清洗组: Grupo de limpieza
+  画布最小边长: Lado mínimo del lienzo
+  识别结果（已应用清洗规则）: Resultado del reconocimiento (reglas de limpieza aplicadas)
 main_window:
-  就绪: Ready
+  就绪: Listo
 menu_ops:
   图像识别: OCR
 ocr_dialog:
-  (无匹配): (No Match)
-  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Ctrl+V to paste a screenshot, or click "Upload Image" to load a file
-  key 不能为空: key cannot be empty
-  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: The maximum total height allowed per batch of regions; anything beyond splits into the next batch.
-  上传图片: Upload Image
-  从设备获取最新截图: Grab the latest screenshot from the device
-  创建规则组: Create Rule Group
-  删除规则组: Delete Rule Group
-  刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
-  刷新截图失败: Failed to refresh the screenshot
-  匹配参考图: Match Reference Image
-  区域批量识别: Batch Region Recognition
-  ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
-  : "Batch region recognition stitches multiple text regions into one canvas and calls OCR once.\nThese parameters control the stitched size; they take effect from the next recognition after saving."
-  原始文本: Raw Text
-  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: OCR settings have unsaved changes; quit and discard them?
-  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Image files (*.png *.jpg *.jpeg *.bmp *.webp);;All files (*)
-  已撤销未保存的清洗规则修改: Reverted unsaved cleaning-rule changes
-  已撤销未保存的识别配置修改: Reverted unsaved recognition-config changes
-  已清除选框: Selection cleared
-  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: Minimum width and height of the stitched canvas. Too small and narrow regions get hugely upscaled by the OCR detector.
-  撤销清洗规则: Undo Cleaning Rules
-  撤销识别配置: Undo Recognition Config
-  文本替换（精确匹配）: Text replacement (exact match)
-  无图片: No image
-  无法读取剪贴板图片: Cannot read the clipboard image
-  替换为: Replace with
-  未匹配到参考图: No reference image matched
-  未识别到文字: No text recognized
-  正则替换: Regex replacement
-  正则表达式: Regular expression
-  正在刷新截图...: Refreshing screenshot...
-  正在匹配参考图...: Matching reference images...
-  正在识别文字...: Recognizing text...
-  测试: Test
-  测试清洗效果: Test Cleaning
-  添加替换规则: Add replacement rule
-  添加正则规则: Add regex rule
-  清洗结果...: Cleaning result...
-  清洗规则: Cleaning Rules
-  清洗规则已保存: Cleaning rules saved
-  清空画布: Clear Canvas
-  清除红色选框: Clear red selection
-  清除选择: Clear Selection
-  相邻文字区域在拼图中的间隔。: Gap between adjacent text regions in the stitched canvas.
-  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: Delete rule group "{name}"? Workflows referencing it will fail to run.
-  确定撤销本次所有未保存的清洗规则更改吗？: Undo all unsaved cleaning-rule changes made this session?
-  确定撤销本次所有未保存的识别配置更改吗？: Undo all unsaved recognition-config changes made this session?
-  '行 {n}: 无效的正则表达式': 'Row {n}: invalid regular expression'
-  规则组 key（用于 with 声明）: Rule group key (used in with clauses)
-  规则组名称: Rule group name
-  规则组已创建: Rule group created
-  规则组已删除: Rule group deleted
-  规则组已重命名: Rule group renamed
-  识别失败: Recognition failed
-  识别文字: Recognize Text
-  识别配置: Recognition Config
-  识别配置已保存: Recognition config saved
-  请先保存或取消当前清洗组的修改: Save or discard the current cleaning group's changes first
-  输入测试文本...: Enter test text...
-  选择图片: Select Image
-  选框区域为空: The selection region is empty
-  重命名规则组: Rename Rule Group
-  ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
-  : "Default rules apply globally to all OCR; scan/find with clauses stack the selected business group on top of the defaults.\nClick \"Save\" to apply — no restart needed; use \"Undo\" to revert unsaved changes."
-  默认规则（全局）: Default Rules (Global)
-  ? "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。"
-  : "Recognition performance applies to every recognition call: higher parallelism is faster but uses proportionally more CPU.\nSaved changes take effect from the next recognition — no restart needed."
-  "识别性能": "Performance"
-  "单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。": "Threads used inside one recognition. Default 2: going higher is no faster in practice and only raises whole-machine CPU usage; use 1 for the lowest CPU cost on long background runs."
-  "识别线程数": "Recognition threads"
-  "同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。": "How many operator lanes run concurrently. Detection, classification and recognition each already own a thread pool, so raising this mostly adds scheduling contention; default 1."
-  "并行算子线程数": "Operator threads"
-  "检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。": "Before detection the frame is rescaled so its short side equals this value (large frames shrink, small crops grow). Smaller is faster and cheaper but more likely to miss small text; 736 is the factory value — leave it unless you have a reason."
-  "检测输入短边": "Detection input short side"
+  (无匹配): (Sin coincidencias)
+  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Pulsa Ctrl+V para pegar una captura o haz clic en «Subir imagen» para cargar un archivo
+  key 不能为空: La clave no puede estar vacía
+  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: Altura total máxima permitida por lote de regiones; lo que exceda este valor se divide en el siguiente lote.
+  上传图片: Subir imagen
+  从设备获取最新截图: Obtener la última captura del dispositivo
+  创建规则组: Crear grupo de reglas
+  删除规则组: Eliminar grupo de reglas
+  刷新截图不可用：未连接设备或未传入回调: 'No se puede actualizar la captura: no hay dispositivo conectado o no se proporcionó la función de retorno'
+  刷新截图失败: Error al actualizar la captura
+  匹配参考图: Coincidir imagen de referencia
+  区域批量识别: Reconocimiento por lotes de regiones
+  ? '区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。
+
+    这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。'
+  : 'El reconocimiento por lotes combina varias regiones de texto en un solo lienzo y ejecuta OCR una sola vez.
+
+    Estos parámetros controlan el tamaño del lienzo combinado; tras guardar, se aplican a partir del siguiente reconocimiento.'
+  原始文本: Texto original
+  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: Hay cambios sin guardar en la configuración de OCR. ¿Seguro que quieres salir y descartarlos?
+  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Archivos de imagen (*.png *.jpg *.jpeg *.bmp *.webp);;Todos los archivos (*)
+  已撤销未保存的清洗规则修改: Se han deshecho los cambios sin guardar en las reglas de limpieza
+  已撤销未保存的识别配置修改: Se han deshecho los cambios sin guardar en la configuración de reconocimiento
+  已清除选框: Selección borrada
+  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: Ancho y alto mínimos del lienzo combinado. Si es demasiado pequeño, el detector OCR ampliará en exceso las regiones estrechas.
+  撤销清洗规则: Deshacer reglas de limpieza
+  撤销识别配置: Deshacer configuración de reconocimiento
+  文本替换（精确匹配）: Reemplazo de texto (coincidencia exacta)
+  无图片: Sin imagen
+  无法读取剪贴板图片: No se puede leer la imagen del portapapeles
+  替换为: Reemplazar por
+  未匹配到参考图: No se encontró ninguna imagen de referencia coincidente
+  未识别到文字: No se reconoció ningún texto
+  正则替换: Reemplazo con regex
+  正则表达式: Expresión regular
+  正在刷新截图...: Actualizando captura...
+  正在匹配参考图...: Buscando coincidencias de referencia...
+  正在识别文字...: Reconociendo texto...
+  测试: Probar
+  测试清洗效果: Probar limpieza
+  添加替换规则: Añadir regla de reemplazo
+  添加正则规则: Añadir regla regex
+  清洗结果...: Resultado de la limpieza...
+  清洗规则: Reglas de limpieza
+  清洗规则已保存: Reglas de limpieza guardadas
+  清空画布: Limpiar lienzo
+  清除红色选框: Borrar selección roja
+  清除选择: Borrar selección
+  相邻文字区域在拼图中的间隔。: Espaciado entre regiones de texto adyacentes en el lienzo combinado.
+  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: ¿Seguro que quieres eliminar el grupo de reglas «{name}»? Los flujos de trabajo que lo referencien dejarán de funcionar.
+  确定撤销本次所有未保存的清洗规则更改吗？: ¿Seguro que quieres deshacer todos los cambios sin guardar en las reglas de limpieza de esta sesión?
+  确定撤销本次所有未保存的识别配置更改吗？: ¿Seguro que quieres deshacer todos los cambios sin guardar en la configuración de reconocimiento de esta sesión?
+  '行 {n}: 无效的正则表达式': 'Fila {n}: expresión regular no válida'
+  规则组 key（用于 with 声明）: Clave del grupo de reglas (usada en cláusulas with)
+  规则组名称: Nombre del grupo de reglas
+  规则组已创建: Grupo de reglas creado
+  规则组已删除: Grupo de reglas eliminado
+  规则组已重命名: Grupo de reglas renombrado
+  识别失败: Error de reconocimiento
+  识别文字: Reconocer texto
+  识别配置: Configuración de reconocimiento
+  识别配置已保存: Configuración de reconocimiento guardada
+  请先保存或取消当前清洗组的修改: Guarda o descarta primero los cambios del grupo de limpieza actual
+  输入测试文本...: Introduce el texto de prueba...
+  选择图片: Seleccionar imagen
+  选框区域为空: La región seleccionada está vacía
+  重命名规则组: Renombrar grupo de reglas
+  ? '默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。
+
+    改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。'
+  : 'Las reglas predeterminadas se aplican globalmente a todo el OCR; las cláusulas with de scan/find aplican el grupo de reglas seleccionado sobre las predeterminadas.
+
+    Haz clic en «Guardar» para aplicar sin reiniciar; usa «Deshacer» para revertir los cambios sin guardar.'
+  默认规则（全局）: Reglas predeterminadas (global)
+  ? '识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。
+
+    保存后从下一次识别开始生效，不需要重启。'
+  : 'El rendimiento de reconocimiento se aplica a todas las llamadas de OCR: a mayor paralelismo, más rapidez, pero también mayor uso proporcional de CPU.
+
+    Tras guardar, se aplica a partir del siguiente reconocimiento sin reiniciar.'
+  识别性能: Rendimiento
+  单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 'Número de hilos usados internamente en cada reconocimiento. Por defecto 2: en la práctica aumentarlo no acelera y solo eleva el uso total de CPU; usar 1 ahorra más CPU en ejecuciones largas en segundo plano.'
+  识别线程数: Hilos de reconocimiento
+  同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。: Número de hilos de operadores en paralelo. Los modelos de detección, clasificación y reconocimiento ya cuentan con su propio grupo de hilos, por lo que aumentarlo suele añadir contención de planificación; por defecto 1.
+  并行算子线程数: Hilos de operadores
+  检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。: Antes de la detección, la imagen se escala para que su lado corto coincida con este valor (las grandes se reducen y las pequeñas se amplían). Un valor menor es más rápido y consume menos CPU, pero puede omitir texto pequeño; 736 es el valor de fábrica, no lo cambies sin motivo.
+  检测输入短边: Lado corto de entrada para detección
 user_avatar:
-  刷新截图: Refresh Screenshot
+  刷新截图: Actualizar captura

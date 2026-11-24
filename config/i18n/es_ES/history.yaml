@@ -1,62 +1,62 @@
 all_user_params:
-  任务: Task
+  任务: Tarea
 batch:
-  全局任务参数: Global task parameters
-  恢复默认顺序: Restore Default Order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to change the actual execution order; right-click to restore the default order or shuffle it; the order in Batch Configuration is only the initial order
-  重命名配置: Rename Configuration
-  随机打乱顺序: Shuffle Order
+  全局任务参数: Parámetros globales de tareas
+  恢复默认顺序: Restaurar orden predeterminado
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Arrastra para cambiar el orden real de ejecución; haz clic derecho para restaurar el orden predeterminado o mezclarlo; el orden en la configuración de lotes solo sirve como orden inicial
+  重命名配置: Renombrar configuración
+  随机打乱顺序: Mezclar orden
 common:
-  batch_run_id: Batch Run ID
-  duration: Duration
-  finished_at: End Time
-  scope: Scope
-  source: Source
-  task: Task
-  task_count: Tasks
-  task_run_id: Task Run ID
-  title: Task History
-  unavailable: Task history is temporarily unavailable
-  参数: Parameters
-  当前批次: Current batch
-  执行目标: Execution Target
-  重命名: Rename
+  batch_run_id: ID de ejecución de lote
+  duration: Duración
+  finished_at: Hora de finalización
+  scope: Ámbito
+  source: Origen
+  task: Tarea
+  task_count: Tareas
+  task_run_id: ID de ejecución de tarea
+  title: Historial de tareas
+  unavailable: El historial de tareas no está disponible temporalmente
+  参数: Parámetros
+  当前批次: Lote actual
+  执行目标: Destino de ejecución
+  重命名: Renombrar
 daily_history:
-  任务历史: Task History
-  任务历史暂不可用: Task history is temporarily unavailable
-  任务数: Tasks
-  单独运行: Single Run
-  已选: selected
-  开始日期不能晚于结束日期: Start date cannot be after the end date
-  批量历史: Batch History
-  批量运行: Batch Run
-  日期范围无效: Invalid date range
-  未记录用户: Unrecorded user
-  查看全部单任务: View all single tasks
-  查询: Query
-  清除勾选，改为全部: Clear the check to include all
-  窗口: Window
-  结束时间: End Time
-  耗时: Duration
-  返回全部任务: Back to all tasks
-  配置: Config
-  任务: Task
+  任务历史: Historial de tareas
+  任务历史暂不可用: El historial de tareas no está disponible temporalmente
+  任务数: Tareas
+  单独运行: Ejecución individual
+  已选: seleccionados
+  开始日期不能晚于结束日期: La fecha de inicio no puede ser posterior a la fecha de fin
+  批量历史: Historial de lotes
+  批量运行: Ejecución por lotes
+  日期范围无效: Rango de fechas no válido
+  未记录用户: Usuario no registrado
+  查看全部单任务: Ver todas las tareas individuales
+  查询: Consultar
+  清除勾选，改为全部: Desmarcar para incluir todo
+  窗口: Ventana
+  结束时间: Hora de finalización
+  耗时: Duración
+  返回全部任务: Volver a todas las tareas
+  配置: Configuración
+  任务: Tarea
 history_viewer:
-  刷新日志: Refresh Log
-  当前级别没有日志: No logs at this level
-  执行日志: Execution Log
-  执行结果: Execution Result
-  批量报告: Batch Report
-  文件较大，仅预览开头 2 MiB: File is large; only the first 2 MiB is previewed
-  文件较大，仅预览末尾 2 MiB: File is large; only the last 2 MiB is previewed
-  无法读取文件: Cannot read the file
-  日志文件为空: The log file is empty
-  日志级别: Log Level
-  显示所选级别及更高级别的日志: Show logs at the selected level and above
-  没有对应文件: No matching file
-  结果不是有效 JSON，显示原文: The result isn't valid JSON; showing raw text
-  记录详情: Record Details
-  选择一条记录查看内容: Select a record to view its content
-  选择一条记录查看日志: Select a record to view its log
+  刷新日志: Actualizar registro
+  当前级别没有日志: No hay registros en este nivel
+  执行日志: Registro de ejecución
+  执行结果: Resultado de ejecución
+  批量报告: Informe de lote
+  文件较大，仅预览开头 2 MiB: El archivo es grande; solo se muestran los primeros 2 MiB
+  文件较大，仅预览末尾 2 MiB: El archivo es grande; solo se muestran los últimos 2 MiB
+  无法读取文件: No se puede leer el archivo
+  日志文件为空: El archivo de registro está vacío
+  日志级别: Nivel de registro
+  显示所选级别及更高级别的日志: Mostrar registros del nivel seleccionado y superiores
+  没有对应文件: No hay archivo correspondiente
+  结果不是有效 JSON，显示原文: El resultado no es un JSON válido; se muestra el texto sin formato
+  记录详情: Detalles del registro
+  选择一条记录查看内容: Selecciona un registro para ver su contenido
+  选择一条记录查看日志: Selecciona un registro para ver su registro
 settings_dialog:
-  输入参数: Input Parameters
+  输入参数: Parámetros de entrada

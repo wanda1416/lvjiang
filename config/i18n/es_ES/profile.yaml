@@ -1,315 +1,464 @@
 all_user_params:
-  参数来源：全局参数: 'Parameter source: global parameters'
-  参数来源：独立参数: 'Parameter source: per-user parameters'
-  激活码已被云端停用: License code has been disabled in the cloud
+  参数来源：全局参数: 'Origen de parámetros: parámetros globales'
+  参数来源：独立参数: 'Origen de parámetros: parámetros por usuario'
+  激活码已被云端停用: El código de activación ha sido desactivado en la nube
 common:
-  allowed: Latest check passed
-  checking: Checking cloud member authorization
-  contains: contains
-  denied: 'Cloud authorization denied: unregistered, disabled, expired, or insufficient level'
-  disabled: License code has been disabled in the cloud
-  done: Done
-  expired: Cloud authorization for the license code has expired
-  invalid: Invalid member authorization request
-  label: Online member authorization
-  level: License level is insufficient for this member package
-  package: Member package is missing or disabled
-  unavailable: Online check incomplete; review configuration sync logs and retry
-  unchecked: Not checked; cloud authorization is not confirmed
-  unregistered: License code has not been registered in the cloud
-  version: Application version does not meet member package requirements
-  便利贴内容: Sticky note content
-  准点周期: Reset cycle
-  减少量: Decrease amount
-  变动规则: Change rules
-  变更脚本: Change script
-  同步目标: Sync targets
-  增加量: Increase amount
-  增量（正增负减）: Delta (positive adds, negative subtracts)
-  恢复类型: Restore type
-  新名称: New name
-  未记录: Not recorded
-  来源: Source
-  橙色阈值: Orange threshold
-  每次恢复: Each restore
-  红色阈值: Red threshold
-  速率单位: Rate unit
-  速率数值: Rate value
-  重命名分组: Rename Group
-  重置日(几号): Reset day (day of month)
-  重置日(周几): Reset day (weekday)
-  重置时刻: Reset time
-  默认: Default
+  allowed: Última comprobación superada
+  checking: Comprobando autorización de miembro en la nube
+  contains: contiene
+  denied: 'Autorización en la nube denegada: no registrado, desactivado, caducado o nivel insuficiente'
+  disabled: El código de activación ha sido desactivado en la nube
+  done: Listo
+  expired: La autorización en la nube del código de activación ha caducado
+  invalid: Solicitud de autorización de miembro no válida
+  label: Autorización de miembro en línea
+  level: El nivel de licencia es insuficiente para este paquete de miembro
+  package: Falta el paquete de miembro o está desactivado
+  unavailable: Comprobación en línea incompleta; revisa los registros de sincronización de configuración e inténtalo de nuevo
+  unchecked: Sin comprobar; la autorización en la nube no está confirmada
+  unregistered: El código de activación no está registrado en la nube
+  version: La versión de la aplicación no cumple los requisitos del paquete de miembro
+  便利贴内容: Contenido de la nota adhesiva
+  准点周期: Ciclo de reinicio
+  减少量: Cantidad a reducir
+  变动规则: Reglas de cambio
+  变更脚本: Script de cambio
+  同步目标: Destinos de sincronización
+  增加量: Cantidad a aumentar
+  增量（正增负减）: Variación (positivo suma, negativo resta)
+  恢复类型: Tipo de recuperación
+  新名称: Nuevo nombre
+  未记录: Sin registrar
+  来源: Origen
+  橙色阈值: Umbral naranja
+  每次恢复: Cada recuperación
+  红色阈值: Umbral rojo
+  速率单位: Unidad de tasa
+  速率数值: Valor de tasa
+  重命名分组: Renombrar grupo
+  重置日(几号): Día de reinicio (día del mes)
+  重置日(周几): Día de reinicio (día de la semana)
+  重置时刻: Hora de reinicio
+  默认: Predeterminado
 daily_history:
-  清除: Clear
+  清除: Limpiar
 profile:
-  Key '{key}' 已在该分组中显示: Key '{key}' is already shown in this group
-  Key '{key}' 已存在: Key '{key}' already exists
-  Key 只能包含字母、数字和下划线: Keys may contain only letters, digits and underscores
-  Profile 关联脚本处理中（待处理 {count}）: Profile-related scripts processing ({count} pending)
-  '{field}不能大于 999999': '{field} cannot exceed 999999'
-  '{field}不能小于 {min}': '{field} cannot be less than {min}'
-  '{field}必须是有效数字': '{field} must be a valid number'
+  Key '{key}' 已在该分组中显示: La clave '{key}' ya se muestra en este grupo
+  Key '{key}' 已存在: La clave '{key}' ya existe
+  Key 只能包含字母、数字和下划线: La clave solo puede contener letras, números y guiones bajos
+  Profile 关联脚本处理中（待处理 {count}）: Procesando scripts asociados al perfil ({count} pendientes)
+  '{field}不能大于 999999': '{field} no puede superar 999999'
+  '{field}不能小于 {min}': '{field} no puede ser menor que {min}'
+  '{field}必须是有效数字': '{field} debe ser un número válido'
   '{first} +{rest}': '{first} +{rest}'
-  '{label} 必须是整数': '{label} must be an integer'
-  '{noun} · {count} 项': '{noun} · {count} items'
-  '{title} Key ({model})': '{title} Key ({model})'
-  一次只能复制一条定义: Only one definition can be copied at a time
-  上一页: Previous Page
-  下一页: Next Page
-  不提醒: Don't remind
-  为零: Zero
-  仅删除历史，不修改当前值；会影响按历史统计的额度: Deletes history only, leaving current values unchanged; affects quotas that accumulate from history
-  今天: Today
-  便利贴: Sticky Note
-  便利贴内容不能超过 {limit} 个字符: Sticky note content cannot exceed {limit} characters
-  保存便利贴失败：{error}: 'Failed to save the sticky note: {error}'
-  倍率: Multiplier
-  全选当前结果: Select All Results
-  共 {total} 条: '{total} records total'
-  其他设备: Other Devices
-  写入冲突: Write Conflict
-  准点/{unit}: At reset/{unit}
-  准点:{val}/{period}: 'At reset: {val}/{period}'
-  准点恢复: Restore at reset
-  减少: Decrease
-  减少 {value}: Decrease {value}
-  减少...: Decrease...
-  '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）': 'The value after decreasing cannot go below 0 (current: {cur}, entered: {inp})'
-  分组名不能为空: Group name cannot be empty
-  分钟: minutes
-  删除便利贴失败：{error}: 'Failed to delete the sticky note: {error}'
-  勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: When checked the script runs before the write lands; a rejection or failure rolls back the whole sync write chain. Unchecked, it queues after commit. Sync scripts should be short — not for long waits.
-  ? "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
-  : "Checked: handled as an action, triggering sync of the config's sync_targets.\nUnchecked: handled as a pure overwrite, writing only this key without triggering any sync."
-  ? "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"
-  : "Checked: once the target caps out this item locks (the overview shows — and becomes read-only).\nUnchecked: the item displays and edits normally even when the target is full; increments just stop writing to the capped target."
-  包含: Contains
-  单向增加: Increase-only
-  原 key 已不存在，请重新打开编辑对话框: The original key no longer exists. Reopen the editor
-  原分组已被移除，请重新选择: The original group was removed; pick again
-  双击修改来源: Double-click to edit the source
-  取消本项「满值锁定」后可继续记录，增量不再写入已满目标: Uncheck this item's "full-value lock" to keep recording; increments stop writing to the capped target
-  取消这个条件: Remove this condition
-  变动规则第 {row} 行至少添加一个快捷数量: Change rule row {row} needs at least one quick amount
-  变动规则第 {row} 行设置了快捷数量，请填写来源或用途: Change rule row {row} has quick amounts; fill in the source or use
-  变动量: Delta
-  变动量：{value}: 'Delta: {value}'
-  变更类型：{label}: 'Change type: {label}'
-  '变更脚本不存在: workflows/{path}': "Change script doesn't exist: workflows/{path}"
-  另有 {count} 项未列出，输入可搜索: '{count} more items not listed; type to search'
-  同步:{sync}: 'Sync: {sync}'
-  同步修改: Sync changes
-  同步变更依赖方: Sync dependent parties of the change
-  同步目标 {targets} 已达上限: Sync target {targets} has reached its cap
-  同步目标不能指向自身: Sync targets cannot point at themselves
-  周: weeks
-  周一: Mon
-  周三: Wed
-  周二: Tue
-  周五: Fri
-  周六: Sat
-  周四: Thu
-  周期: Cycle
-  回到打开这个对话框时的默认范围: Back to the default range from when this dialog opened
-  增加: Increase
-  增加 {value}: Increase {value}
-  增加...: Increase...
-  增量: Delta
-  复制定义: Duplicate Definition
-  定义数据模型 key: Define Data-Model Keys
-  定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Defines the data model's keys. Double-click non-group columns to edit; right-click to change groups in bulk.
-  实时/{unit}: Realtime/{unit}
-  实时:{val}/{unit}: 'Realtime: {val}/{unit}'
-  实时恢复: Realtime restore
-  小时: hours
-  展示上限: Display cap
-  展示总和行: Show total row
-  工作流语法正确: Workflow syntax OK
-  '当前值: {val}': 'Current value: {val}'
-  当前分组没有可添加的字段: The current group has no fields to add
-  当前显示全部记录: Showing all records
-  当前用户已锁定: Locked for the current user
-  快捷数量: Quick amounts
-  快捷规则:{count}项: 'Quick rules: {count}'
+  '{label} 必须是整数': '{label} debe ser un número entero'
+  '{noun} · {count} 项': '{noun} · {count} elementos'
+  '{title} Key ({model})': Clave de {title} ({model})
+  一次只能复制一条定义: Solo se puede duplicar una definición a la vez
+  上一页: Página anterior
+  下一页: Página siguiente
+  不提醒: No recordar
+  为零: Cero
+  仅删除历史，不修改当前值；会影响按历史统计的额度: Elimina solo el historial sin modificar el valor actual; afecta a los cupos calculados a partir del historial
+  今天: Hoy
+  便利贴: Nota adhesiva
+  便利贴内容不能超过 {limit} 个字符: El contenido de la nota adhesiva no puede superar los {limit} caracteres
+  保存便利贴失败：{error}: 'Error al guardar la nota adhesiva: {error}'
+  倍率: Multiplicador
+  全选当前结果: Seleccionar todos los resultados
+  共 {total} 条: '{total} registros en total'
+  其他设备: Otros dispositivos
+  写入冲突: Conflicto de escritura
+  准点/{unit}: Al reinicio/{unit}
+  准点:{val}/{period}: 'Al reinicio: {val}/{period}'
+  准点恢复: Recuperación al reinicio
+  减少: Reducir
+  减少 {value}: Reducir {value}
+  减少...: Reducir...
+  '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）': 'El valor tras reducir no puede ser menor que 0 (actual: {cur}, introducido: {inp})'
+  分组名不能为空: El nombre del grupo no puede estar vacío
+  分钟: minutos
+  删除便利贴失败：{error}: 'Error al eliminar la nota adhesiva: {error}'
+  勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: Si está marcado, el script se ejecuta antes de guardar en disco y un rechazo o fallo revierte toda la cadena de escritura sincronizada; si no, pasa a la cola en segundo plano tras confirmar. Los scripts síncronos deben ser breves y no incluir esperas largas.
+  ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
+
+    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
+  : 'Marcado: se procesa como acción y activa la sincronización de los sync_targets configurados.
+
+    Desmarcado: se procesa como sobrescritura pura; solo escribe esta clave sin activar sincronizaciones.'
+  ? '勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。
+
+    取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。'
+  : 'Marcado: bloquea este elemento cuando el destino alcanza su límite (el resumen muestra — y pasa a solo lectura).
+
+    Desmarcado: se sigue mostrando y editando normalmente aunque el destino esté lleno; los incrementos simplemente dejan de escribirse en el destino lleno.'
+  包含: Contiene
+  单向增加: Solo aumento
+  原 key 已不存在，请重新打开编辑对话框: La clave original ya no existe; vuelve a abrir el editor
+  原分组已被移除，请重新选择: El grupo original fue eliminado; selecciona otro
+  双击修改来源: Doble clic para editar el origen
+  取消本项「满值锁定」后可继续记录，增量不再写入已满目标: Desmarca el «bloqueo al máximo» de este elemento para seguir registrando; los incrementos no se escribirán en el destino lleno
+  取消这个条件: Quitar esta condición
+  变动规则第 {row} 行至少添加一个快捷数量: La fila {row} de reglas de cambio necesita al menos una cantidad rápida
+  变动规则第 {row} 行设置了快捷数量，请填写来源或用途: La fila {row} de reglas de cambio tiene cantidades rápidas; rellena el origen o el uso
+  变动量: Variación
+  变动量：{value}: 'Variación: {value}'
+  变更类型：{label}: 'Tipo de cambio: {label}'
+  '变更脚本不存在: workflows/{path}': 'No existe el script de cambio: workflows/{path}'
+  另有 {count} 项未列出，输入可搜索: Hay {count} elementos más sin listar; escribe para buscar
+  同步:{sync}: 'Sincronizar: {sync}'
+  同步修改: Sincronizar cambios
+  同步变更依赖方: Sincronizar elementos dependientes
+  同步目标 {targets} 已达上限: El destino de sincronización {targets} ha alcanzado su límite
+  同步目标不能指向自身: Un destino de sincronización no puede apuntar a sí mismo
+  周: semanas
+  周一: Lun
+  周三: Mié
+  周二: Mar
+  周五: Vie
+  周六: Sáb
+  周四: Jue
+  周期: Ciclo
+  回到打开这个对话框时的默认范围: Volver al rango predeterminado al abrir este cuadro de diálogo
+  增加: Aumentar
+  增加 {value}: Aumentar {value}
+  增加...: Aumentar...
+  增量: Incremento
+  复制定义: Duplicar definición
+  定义数据模型 key: Definir claves del modelo de datos
+  定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Define las claves del modelo de datos. Haz doble clic en columnas no de grupo para editar; clic derecho para cambiar grupos por lotes.
+  实时/{unit}: Tiempo real/{unit}
+  实时:{val}/{unit}: 'Tiempo real: {val}/{unit}'
+  实时恢复: Recuperación en tiempo real
+  小时: horas
+  展示上限: Límite visible
+  展示总和行: Mostrar fila de total
+  工作流语法正确: Sintaxis del flujo de trabajo correcta
+  '当前值: {val}': 'Valor actual: {val}'
+  当前分组没有可添加的字段: El grupo actual no tiene campos disponibles para añadir
+  当前显示全部记录: Mostrando todos los registros
+  当前用户已锁定: Bloqueado para el usuario actual
+  快捷数量: Cantidades rápidas
+  快捷规则:{count}项: 'Reglas rápidas: {count}'
   总和: Total
-  恢复入口范围: Restore Entry Scope
-  按{title}筛选: Filter by {title}
-  搜索 值 / 来源 / 用户 / 键: Search value / source / user / key
-  搜索{title}（可输入未列出的值）: Search {title} (values not listed can be typed)
-  搜索字段名称或 key: Search field names or keys
-  搜索：{value}: 'Search: {value}'
-  撤销失败: Undo failed
-  支持小数: Decimals supported
-  数值无效: Invalid number
-  数据变化后执行；路径相对于 workflows 目录: Runs after data changes; path relative to the workflows directory
-  数据模型: Data Model
-  新值: New Value
-  新值包含：{value}: 'New value contains: {value}'
-  新增: Add
-  新增便利贴: New Sticky Note
-  新增列: Add Column
-  新建分组: New Group
-  无上限: No cap
-  旧值: Old Value
-  旧值包含：{value}: 'Old value contains: {value}'
-  时间: Time
-  时间：{value}: 'Time: {value}'
-  暂无便利贴: No sticky notes
-  更改分组: Change Group
-  未完成: Incomplete
-  未记录设备: Unrecorded device
-  末页: Last Page
-  本机: This PC
-  条: records
-  来源/用途: Source/Use
-  来源（增加）: Source (increase)
-  来源：{value}: 'Source: {value}'
-  查看全部用户、全部 key 的变更记录: View change history for all users and all keys
-  查看历史记录: View History
-  标签: Label
-  校验: Validate
-  校验失败: Validation Failed
-  橙警:>={val}: 'Orange alert: >={val}'
-  每页: Per page
-  没有可用的数据模型 key，请先在数据模型定义中添加: No data-model keys available; add some in the data-model definition first
-  没有符合筛选条件的记录: No records match the filters
-  添加同步目标: Add Sync Target
-  添加来源: Add Source
-  添加用途: Add Use
-  添加（{count}）: Add ({count})
-  清空选择: Clear Selection
-  清除全部筛选: Clear All Filters
-  满值锁定: Full-value lock
-  点击更改分组: Click to change the group
-  用户 {name}: User {name}
-  用户头像: User Avatar
-  用户数据模型定义: User Data Model Definition
-  用途: Use
-  用途（减少）: Use (decrease)
-  ? "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。"
-  : "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndoing writes a new reversed record."
-  ? "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。"
-  : "Permanently delete this history record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nDelta: {delta}\n\nDeletes history only — current values stay and no deletion record is added. This cannot be undone; deleting acquisition records may free source quotas accumulated from history."
-  确定要删除 key '{key}' 吗？: Delete key '{key}'?
-  确定要删除分组 '{name}' 吗？: Delete group '{name}'?
-  确定要删除这条便利贴吗？: Delete this sticky note?
-  确认撤销: Confirm Undo
-  确认重命名: Confirm Rename
-  第 {page} / {pages} 页 · {start}–{end} 条: Page {page} / {pages} · records {start}–{end}
-  类型：{value}: 'Type: {value}'
-  红警:>={val}: 'Red alert: >={val}'
-  编辑便利贴: Edit Sticky Note
-  编辑当前列: Edit Current Column
-  自定义增量 - {label}: Custom delta - {label}
-  至少保留一个分组: Keep at least one group
-  覆写 - {label}: Overwrite - {label}
-  覆写...: Overwrite...
-  ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
-  : "Remove {user}'s lock on \"{label}\"?\nAfter unlocking, automated tasks will read and update this key again."
-  设备：{value}: 'Device: {value}'
-  该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: The value was updated by another process; this delta was not written. Refresh and try again.
-  该条历史记录已发生变化，请刷新后重试: That history record has changed; refresh and try again
-  详情摘要: Detail Summary
-  请停止所有任务后再重命名 Profile key: Stop all tasks before renaming a Profile key
-  请先选择变更脚本: Select a change script first
-  请先选择用户: Select a user first
-  请输入 Key: Enter a key
-  请输入{field}: Enter {field}
-  请输入标签: Enter a label
-  请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件: Pick a .wf file under config/system/workflows or config/local/workflows
-  读取便利贴失败：{error}: 'Failed to read sticky notes: {error}'
-  跳至: Go to
-  软上限: Soft cap
-  输入错误: Input Error
-  近 30 天: Last 30 days
-  近 7 天: Last 7 days
-  近 90 天: Last 90 days
-  选择...: Select...
-  选择变更脚本: Select Change Script
-  选择字段: Select Field
-  ? "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？"
-  : "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
-  重新读取用户数据: Reload User Data
-  重置:{time}: 'Reset: {time}'
-  重置日:{day}: 'Reset day: {day}'
-  重置日:{day}号: 'Reset day: the {day}th'
-  ? "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。"
-  : "Lock \"{label}\" for {user}?\nOnce locked the engine ignores this value: automated tasks stop reading or writing it, periodic resets stop, and the value stays at its current state.\nRight-click to unlock any time."
-  键: Key
-  键：{label}: 'Key: {label}'
-  键：{value}: 'Key: {value}'
-  首页: First Page
-  （清空）: (empty)
-  （请选择）: (select one)
-  ＋ 添加便利贴: ＋ Add Sticky Note
-  Profile 变更脚本仍在执行，请等待队列完成后重命名: A Profile change script is still running; wait for the queue to finish before renaming
-  '下一点恢复: 已达上限': 'Next-point restore: cap reached'
-  便利贴内容不能为空: Sticky note content cannot be empty
-  ? "保存 profile.yaml 失败:\n{e}"
-  : "Failed to save profile.yaml:\n{e}"
-  删除当前列: Delete Current Column
-  升序: Ascending
-  右侧新增列: Add column on the right
-  ? "回写用户数据失败:\n{e}"
-  : "Failed to write user data:\n{e}"
-  库存: Inventory
-  开启后允许输入小数，UI 使用 DoubleValidator: When checked, decimals are allowed (UI uses DoubleValidator)
-  当前配置: Current Config
-  '恢复类型: 准点恢复': 'Restore type: at reset'
-  '恢复类型: 实时恢复': 'Restore type: realtime'
-  无法编辑: Cannot edit
-  橙色: Orange
-  正向: Positive
-  用户总览: User Overview
-  用户：{value}: 'User: {value}'
-  红色: Red
-  编辑备注 - {label}: Edit note - {label}
-  编辑文本...: Edit text...
-  负向: Negative
-  配额: Quota
-  降序: Descending
-  "同步到": "Synced To"
-  "备注内容": "Note Content"
-  "总览历史记录": "Overview history"
-  "更新": "Updated"
-  "未同步": "Not synced"
-  "来自": "From"
-  "来自：{value}": "From: {value}"
+  恢复入口范围: Restaurar rango inicial
+  按{title}筛选: Filtrar por {title}
+  搜索 值 / 来源 / 用户 / 键: Buscar valor / origen / usuario / clave
+  搜索{title}（可输入未列出的值）: Buscar {title} (puedes escribir valores no listados)
+  搜索字段名称或 key: Buscar nombre de campo o clave
+  搜索：{value}: 'Buscar: {value}'
+  撤销失败: Error al deshacer
+  支持小数: Admite decimales
+  数值无效: Número no válido
+  数据变化后执行；路径相对于 workflows 目录: Se ejecuta cuando cambian los datos; ruta relativa al directorio workflows
+  数据模型: Modelo de datos
+  新值: Nuevo valor
+  新值包含：{value}: 'El nuevo valor contiene: {value}'
+  新增: Añadir
+  新增便利贴: Nueva nota adhesiva
+  新增列: Añadir columna
+  新建分组: Nuevo grupo
+  无上限: Sin límite
+  旧值: Valor anterior
+  旧值包含：{value}: 'El valor anterior contiene: {value}'
+  时间: Hora
+  时间：{value}: 'Hora: {value}'
+  暂无便利贴: No hay notas adhesivas
+  更改分组: Cambiar grupo
+  未完成: Incompleto
+  未记录设备: Dispositivo no registrado
+  末页: Última página
+  本机: Este PC
+  条: registros
+  来源/用途: Origen/Uso
+  来源（增加）: Origen (aumento)
+  来源：{value}: 'Origen: {value}'
+  查看全部用户、全部 key 的变更记录: Ver historial de cambios de todos los usuarios y todas las claves
+  查看历史记录: Ver historial
+  标签: Etiqueta
+  校验: Validar
+  校验失败: Error de validación
+  橙警:>={val}: 'Alerta naranja: >={val}'
+  每页: Por página
+  没有可用的数据模型 key，请先在数据模型定义中添加: No hay claves del modelo de datos disponibles; añádelas primero en la definición del modelo
+  没有符合筛选条件的记录: No hay registros que coincidan con los filtros
+  添加同步目标: Añadir destino de sincronización
+  添加来源: Añadir origen
+  添加用途: Añadir uso
+  添加（{count}）: Añadir ({count})
+  清空选择: Limpiar selección
+  清除全部筛选: Borrar todos los filtros
+  满值锁定: Bloqueo al máximo
+  点击更改分组: Haz clic para cambiar de grupo
+  用户 {name}: Usuario {name}
+  用户头像: Avatar de usuario
+  用户数据模型定义: Definición del modelo de datos de usuario
+  用途: Uso
+  用途（减少）: Uso (reducción)
+  ? '确定撤销这条记录吗？
+
+
+    用户：{username}
+
+    数据项：{label}
+
+    时间：{time}
+
+    来源：{source}
+
+
+    撤销会按反向写入一条新记录。'
+  : '¿Seguro que quieres deshacer este registro?
+
+
+    Usuario: {username}
+
+    Elemento: {label}
+
+    Hora: {time}
+
+    Origen: {source}
+
+
+    Deshacer escribirá un nuevo registro inverso.'
+  ? '确定永久删除这条历史记录吗？
+
+
+    用户：{username}
+
+    数据项：{label}
+
+    时间：{time}
+
+    来源：{source}
+
+    变动量：{delta}
+
+
+    仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。'
+  : '¿Seguro que quieres eliminar permanentemente este registro del historial?
+
+
+    Usuario: {username}
+
+    Elemento: {label}
+
+    Hora: {time}
+
+    Origen: {source}
+
+    Variación: {delta}
+
+
+    Solo elimina el historial sin cambiar el valor actual ni crear un registro de borrado. Esta acción no se puede deshacer; eliminar registros de obtención puede liberar cupos acumulados por historial.'
+  确定要删除 key '{key}' 吗？: ¿Seguro que quieres eliminar la clave '{key}'?
+  确定要删除分组 '{name}' 吗？: ¿Seguro que quieres eliminar el grupo '{name}'?
+  确定要删除这条便利贴吗？: ¿Seguro que quieres eliminar esta nota adhesiva?
+  确认撤销: Confirmar deshacer
+  确认重命名: Confirmar cambio de nombre
+  第 {page} / {pages} 页 · {start}–{end} 条: Página {page} / {pages} · registros {start}–{end}
+  类型：{value}: 'Tipo: {value}'
+  红警:>={val}: 'Alerta roja: >={val}'
+  编辑便利贴: Editar nota adhesiva
+  编辑当前列: Editar columna actual
+  自定义增量 - {label}: Variación personalizada - {label}
+  至少保留一个分组: Debes conservar al menos un grupo
+  覆写 - {label}: Sobrescribir - {label}
+  覆写...: Sobrescribir...
+  ? '解除 {user} 的「{label}」锁定？
+
+    解锁后自动任务会重新读取并更新该 key。'
+  : '¿Desbloquear «{label}» para {user}?
+
+    Tras desbloquearlo, las tareas automáticas volverán a leer y actualizar esta clave.'
+  设备：{value}: 'Dispositivo: {value}'
+  该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: Otro proceso ha actualizado este valor; no se ha escrito esta variación. Actualiza e inténtalo de nuevo.
+  该条历史记录已发生变化，请刷新后重试: Este registro del historial ha cambiado; actualiza e inténtalo de nuevo
+  详情摘要: Resumen de detalles
+  请停止所有任务后再重命名 Profile key: Detén todas las tareas antes de renombrar una clave de Profile
+  请先选择变更脚本: Selecciona primero un script de cambio
+  请先选择用户: Selecciona primero un usuario
+  请输入 Key: Introduce una clave
+  请输入{field}: Introduce {field}
+  请输入标签: Introduce una etiqueta
+  请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件: Selecciona un archivo .wf dentro de config/system/workflows o config/local/workflows
+  读取便利贴失败：{error}: 'Error al leer las notas adhesivas: {error}'
+  跳至: Ir a
+  软上限: Límite flexible
+  输入错误: Error de entrada
+  近 30 天: Últimos 30 días
+  近 7 天: Últimos 7 días
+  近 90 天: Últimos 90 días
+  选择...: Seleccionar...
+  选择变更脚本: Seleccionar script de cambio
+  选择字段: Seleccionar campo
+  ? '重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。
+
+
+    是否继续？'
+  : 'Renombrar actualizará los registros actuales, el historial, los orígenes de sincronización y las referencias de configuración de todos los usuarios. Las claves en flujos de trabajo y scripts de cambio no se sustituyen automáticamente y deberás actualizarlas manualmente.
+
+
+    ¿Continuar?'
+  重新读取用户数据: Recargar datos de usuario
+  重置:{time}: 'Reinicio: {time}'
+  重置日:{day}: 'Día de reinicio: {day}'
+  重置日:{day}号: 'Día de reinicio: día {day}'
+  ? '锁定 {user} 的「{label}」？
+
+    锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。
+
+    随时可以右键解锁。'
+  : '¿Bloquear «{label}» para {user}?
+
+    Al bloquearlo, el motor ignora este valor: las tareas automáticas dejan de leerlo o escribirlo, se detienen los reinicios periódicos y el valor permanece en su estado actual.
+
+    Puedes desbloquearlo en cualquier momento con clic derecho.'
+  键: Clave
+  键：{label}: 'Clave: {label}'
+  键：{value}: 'Clave: {value}'
+  首页: Primera página
+  （清空）: (vacío)
+  （请选择）: (seleccionar)
+  ＋ 添加便利贴: ＋ Añadir nota adhesiva
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: Hay un script de cambio de Profile en ejecución; espera a que finalice la cola antes de renombrar
+  '下一点恢复: 已达上限': 'Próximo punto: límite alcanzado'
+  便利贴内容不能为空: El contenido de la nota adhesiva no puede estar vacío
+  ? '保存 profile.yaml 失败:
+
+    {e}'
+  : 'Error al guardar profile.yaml:
+
+    {e}'
+  删除当前列: Eliminar columna actual
+  升序: Ascendente
+  右侧新增列: Añadir columna a la derecha
+  ? '回写用户数据失败:
+
+    {e}'
+  : 'Error al guardar los datos de usuario:
+
+    {e}'
+  库存: Inventario
+  开启后允许输入小数，UI 使用 DoubleValidator: Si está activado, permite introducir decimales (la interfaz usa DoubleValidator)
+  当前配置: Configuración actual
+  '恢复类型: 准点恢复': 'Tipo de recuperación: al reinicio'
+  '恢复类型: 实时恢复': 'Tipo de recuperación: en tiempo real'
+  无法编辑: No editable
+  橙色: Naranja
+  正向: Positivo
+  用户总览: Resumen de usuarios
+  用户：{value}: 'Usuario: {value}'
+  红色: Rojo
+  编辑备注 - {label}: Editar nota - {label}
+  编辑文本...: Editar texto...
+  负向: Negativo
+  配额: Cupo
+  降序: Descendente
+  同步到: Sincronizado con
+  备注内容: Contenido de la nota
+  总览历史记录: Historial del resumen
+  更新: Actualizado
+  未同步: Sin sincronizar
+  来自: Desde
+  来自：{value}: 'Desde: {value}'
 run_control:
   错误: Error
 profile_service:
-  profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: profile.yaml uses the old format (with fields/groups); update it manually to the new format
-  仅可撤销写入记录: Only write records can be undone
-  全向: Omni
-  再生: Regenerate
+  profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: profile.yaml utiliza el formato antiguo (con fields/groups); actualízalo manualmente al nuevo formato
+  仅可撤销写入记录: Solo se pueden deshacer registros de escritura
+  全向: Bidireccional
+  再生: Regenerar
 loadout:
-  删除方案: Delete Plan
-
+  删除方案: Eliminar plan
 layout_transfer:
-  "覆盖远端页面结构？": "Overwrite the remote page structure?"
-  "下载排版": "Download layout"
-  "确认替换本机结构": "Confirm replacing this machine's structure"
-  "本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？": "La estructura de páginas de este equipo se reemplazará por la de la nube; la estructura actual no se conserva automáticamente.\n\n¿Reemplazar ahora?"
-  "{} 个分组 / {} 列": "{} groups / {} columns"
-  "无法解析": "Unparsable"
-  "远端已有页面结构，且不是本机写入的：\n\n{remote}\n远端结构：{remote_size}\n本机结构：{local_size}\n\n覆盖后，其它设备下载将得到本机结构。": "The remote already has a page structure that this machine did not write:\n\n{remote}\nRemote structure: {remote_size}\nThis machine: {local_size}\n\nAfter overwriting, other devices will download this machine's structure."
-  "上传排版": "Upload layout"
-  "页面结构以 PC 为准，手机端只支持下载。": "Page structure is owned by the PC; the mobile app can only download it."
-  "请先在「账号」里登录后再上传页面结构。": "Sign in under Account before uploading the page structure."
-  "云端与本机一致，无需上传。": "The cloud matches this machine; nothing to upload."
-  "请先在「账号」里登录后再下载页面结构。": "Sign in under Account before downloading the page structure."
-  "云端还没有页面结构，先在编辑端点一次「上传排版」。": "The cloud has no page structure yet; click \"Upload layout\" once on the editing machine."
-  "将使用云端的页面结构：\n\n{remote}\n云端结构：{size}\n本机结构：{local}\n\n继续后还需再确认一次才会替换本机结构。": "The cloud page structure will be used:\n\n{remote}\nCloud structure: {size}\nThis machine: {local}\n\nYou will be asked once more before this machine's structure is replaced."
-  "已下载页面结构。\n{detail}": "Estructura de páginas descargada.\n{detail}"
-  "已上传页面结构。\n{detail}": "Page structure uploaded.\n{detail}"
-  "云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。": "The cloud page structure was changed by another device while you were confirming; download first or retry later."
-  "读取本机页面结构失败：{error}": "Failed to read this machine's page structure: {error}"
-  "下载失败，本机结构未改变：{error}": "Download failed; this machine's structure is unchanged: {error}"
-  "写入本机页面结构失败：{error}": "Failed to write this machine's page structure: {error}"
-  "把本机的分组、列与列宽上传到云端；远端已有其它设备写入的结构时会先询问是否覆盖": "Upload this machine's groups, columns and column widths to the cloud; if the remote already holds a structure written by another device, you are asked before overwriting"
-  "用云端的页面结构替换本机结构，需要两次确认": "Replace this machine's structure with the cloud page structure; two confirmations are required"
-  "快照只支持在 PC 端创建。": "Snapshots can only be created on the PC."
-  "请先在「账号」里登录后再创建快照。": "Sign in under Account before creating a snapshot."
-  "创建快照失败：{error}": "Failed to create a snapshot: {error}"
-  "已创建快照。\n{detail}": "Snapshot created.\n{detail}"
+  覆盖远端页面结构？: ¿Sobrescribir la estructura de página remota?
+  下载排版: Descargar diseño
+  确认替换本机结构: Confirmar sustitución de la estructura local
+  ? '本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。
+
+
+    确认替换？'
+  : 'La estructura de página actual de este equipo se sustituirá por la de la nube y no se guardará una copia automáticamente.
+
+
+    ¿Confirmar sustitución?'
+  '{} 个分组 / {} 列': '{} grupos / {} columnas'
+  无法解析: No se puede analizar
+  ? '远端已有页面结构，且不是本机写入的：
+
+
+    {remote}
+
+    远端结构：{remote_size}
+
+    本机结构：{local_size}
+
+
+    覆盖后，其它设备下载将得到本机结构。'
+  : 'Ya existe una estructura de página remota y no fue subida desde este equipo:
+
+
+    {remote}
+
+    Estructura remota: {remote_size}
+
+    Estructura local: {local_size}
+
+
+    Si sobrescribes, los demás dispositivos descargarán la estructura de este equipo.'
+  上传排版: Subir diseño
+  页面结构以 PC 为准，手机端只支持下载。: La estructura de página se gestiona desde el PC; el móvil solo admite descarga.
+  请先在「账号」里登录后再上传页面结构。: Inicia sesión en «Cuenta» antes de subir la estructura de página.
+  云端与本机一致，无需上传。: La nube coincide con este equipo; no es necesario subir nada.
+  请先在「账号」里登录后再下载页面结构。: Inicia sesión en «Cuenta» antes de descargar la estructura de página.
+  云端还没有页面结构，先在编辑端点一次「上传排版」。: Aún no hay estructura de página en la nube; pulsa primero «Subir diseño» en el equipo de edición.
+  ? '将使用云端的页面结构：
+
+
+    {remote}
+
+    云端结构：{size}
+
+    本机结构：{local}
+
+
+    继续后还需再确认一次才会替换本机结构。'
+  : 'Se utilizará la estructura de página de la nube:
+
+
+    {remote}
+
+    Estructura en la nube: {size}
+
+    Estructura local: {local}
+
+
+    Tras continuar deberás confirmar una vez más antes de sustituir la estructura local.'
+  ? '已下载页面结构。
+
+    {detail}'
+  : 'Estructura de página descargada.
+
+    {detail}'
+  ? '已上传页面结构。
+
+    {detail}'
+  : 'Estructura de página subida.
+
+    {detail}'
+  云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。: Otro dispositivo modificó la estructura de página en la nube mientras confirmabas; descárgala primero o inténtalo más tarde.
+  读取本机页面结构失败：{error}: 'Error al leer la estructura de página local: {error}'
+  下载失败，本机结构未改变：{error}: 'Error al descargar; la estructura local no ha cambiado: {error}'
+  写入本机页面结构失败：{error}: 'Error al escribir la estructura de página local: {error}'
+  把本机的分组、列与列宽上传到云端；远端已有其它设备写入的结构时会先询问是否覆盖: Sube a la nube los grupos, columnas y anchos de columna de este equipo; si ya existe una estructura subida por otro dispositivo, preguntará antes de sobrescribir
+  用云端的页面结构替换本机结构，需要两次确认: Sustituye la estructura local por la estructura de página de la nube; requiere dos confirmaciones
+  快照只支持在 PC 端创建。: Las instantáneas solo se pueden crear en el PC.
+  请先在「账号」里登录后再创建快照。: Inicia sesión en «Cuenta» antes de crear una instantánea.
+  创建快照失败：{error}: 'Error al crear la instantánea: {error}'
+  ? '已创建快照。
+
+    {detail}'
+  : 'Instantánea creada.
+
+    {detail}'

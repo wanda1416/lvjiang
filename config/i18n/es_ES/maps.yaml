@@ -1,35 +1,35 @@
 maps:
-  'HUD 场景不存在: {scene}': 'HUD scene does not exist: {scene}'
-  HUD 绑定 minimap_center 必须属于基础视图: HUD binding minimap_center must belong to the base view
-  'HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}': 'HUD binding minimap_center must reference a point; not found: {key}'
-  HUD 绑定 {attr} 必须属于 full 视图: HUD binding {attr} must belong to the full view
-  HUD 绑定 {attr} 必须属于基础视图: HUD binding {attr} must belong to the base view
-  'HUD 绑定 {attr} 必须引用区域，未找到: {key}': 'HUD binding {attr} must reference a region; not found: {key}'
-  POI key 必须以小写字母开头，仅含小写字母/数字/下划线: POI key must start with a lowercase letter and contain only lowercase letters, digits and underscores
-  POI {key} 坐标超出底图范围: POI {key} coordinates are outside the base map
-  POI 必须是键值映射: POI must be a mapping
-  base_image_sha256 必须是 64 位十六进制摘要: base_image_sha256 must be a 64-character hex digest
-  min_area 必须大于 0: min_area must be greater than 0
-  pois 必须是列表: pois must be a list
-  ui 必须是键值映射: ui must be a mapping
-  window_ratio 必须在 0.05–1 之间: window_ratio must be between 0.05 and 1
-  '{name} 必须是三元整数列表': '{name} must be a list of three integers'
-  '{name} 必须满足 H=0–180、S/V=0–255': '{name} must satisfy H=0–180, S/V=0–255'
-  '{name}地图': '{name} map'
-  地图 key 必须以小写字母开头，仅含小写字母/数字/下划线: Map key must start with a lowercase letter and contain only lowercase letters, digits and underscores
-  '地图不存在: {key}': 'Map does not exist: {key}'
-  地图名称不能为空: Map name cannot be empty
-  '地图名称已存在: {name}': 'Map name already exists: {name}'
-  地图图片与定义摘要不一致: Map image does not match the definition digest
-  地图定义必须是键值映射: Map definition must be a mapping
-  地图文件 {rel} 内的 key 为 {inner}，与文件名不一致: Map file {rel} declares key {inner}, which differs from the file name
-  地域名称不能为空，且 key 不得重复: Region name cannot be empty and keys must be unique
-  大地图: World Map
-  底图数据为空: Base map data is empty
-  底图文件名固定为 base.png: The base map file must be named base.png
-  探查图片名称不能为空，且 key 不得重复: Survey image names cannot be empty and keys must be unique
-  '探查图片引用了不存在的地域: {region}': 'Survey image references a nonexistent region: {region}'
-  探查图片必须有有效的 SHA256 摘要: Survey images must have a valid SHA256 digest
-  '探查图片缺失或摘要不匹配: {name}': 'Survey image missing or digest mismatch: {name}'
-  '未知导航模式: {mode}': 'Unknown navigation mode: {mode}'
-  '未知朝向识别方法: {method}': 'Unknown heading detection method: {method}'
+  'HUD 场景不存在: {scene}': 'La escena HUD no existe: {scene}'
+  HUD 绑定 minimap_center 必须属于基础视图: El enlace HUD minimap_center debe pertenecer a la vista base
+  'HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}': 'El enlace HUD minimap_center debe hacer referencia a un punto de coordenadas; no encontrado: {key}'
+  HUD 绑定 {attr} 必须属于 full 视图: El enlace HUD {attr} debe pertenecer a la vista full
+  HUD 绑定 {attr} 必须属于基础视图: El enlace HUD {attr} debe pertenecer a la vista base
+  'HUD 绑定 {attr} 必须引用区域，未找到: {key}': 'El enlace HUD {attr} debe hacer referencia a una región; no encontrada: {key}'
+  POI key 必须以小写字母开头，仅含小写字母/数字/下划线: La clave de POI debe empezar por letra minúscula y contener solo minúsculas, dígitos y guiones bajos
+  POI {key} 坐标超出底图范围: Las coordenadas del POI {key} están fuera del mapa base
+  POI 必须是键值映射: POI debe ser un mapa clave-valor
+  base_image_sha256 必须是 64 位十六进制摘要: base_image_sha256 debe ser un resumen hexadecimal de 64 caracteres
+  min_area 必须大于 0: min_area debe ser mayor que 0
+  pois 必须是列表: pois debe ser una lista
+  ui 必须是键值映射: ui debe ser un mapa clave-valor
+  window_ratio 必须在 0.05–1 之间: window_ratio debe estar entre 0.05 y 1
+  '{name} 必须是三元整数列表': '{name} debe ser una lista de tres enteros'
+  '{name} 必须满足 H=0–180、S/V=0–255': '{name} debe cumplir H=0–180 y S/V=0–255'
+  '{name}地图': Mapa de {name}
+  地图 key 必须以小写字母开头，仅含小写字母/数字/下划线: La clave del mapa debe empezar por letra minúscula y contener solo minúsculas, dígitos y guiones bajos
+  '地图不存在: {key}': 'El mapa no existe: {key}'
+  地图名称不能为空: El nombre del mapa no puede estar vacío
+  '地图名称已存在: {name}': 'El nombre del mapa ya existe: {name}'
+  地图图片与定义摘要不一致: La imagen del mapa no coincide con el resumen de la definición
+  地图定义必须是键值映射: La definición del mapa debe ser un mapa clave-valor
+  地图文件 {rel} 内的 key 为 {inner}，与文件名不一致: El archivo de mapa {rel} declara la clave {inner}, que no coincide con el nombre del archivo
+  地域名称不能为空，且 key 不得重复: El nombre de la región no puede estar vacío y las claves no pueden repetirse
+  大地图: Mapa del mundo
+  底图数据为空: Los datos del mapa base están vacíos
+  底图文件名固定为 base.png: El nombre del archivo del mapa base debe ser base.png
+  探查图片名称不能为空，且 key 不得重复: El nombre de la imagen de exploración no puede estar vacío y las claves no pueden repetirse
+  '探查图片引用了不存在的地域: {region}': 'La imagen de exploración hace referencia a una región inexistente: {region}'
+  探查图片必须有有效的 SHA256 摘要: La imagen de exploración debe tener un resumen SHA256 válido
+  '探查图片缺失或摘要不匹配: {name}': 'Falta la imagen de exploración o el resumen no coincide: {name}'
+  '未知导航模式: {mode}': 'Modo de navegación desconocido: {mode}'
+  '未知朝向识别方法: {method}': 'Método de detección de orientación desconocido: {method}'

@@ -1,233 +1,249 @@
 common:
-  btn_save: Save
-  placeholder: "Recorded output appears here (canvas-normalized coordinates, savable as .wf)\nLow precision creates editable commands; high precision saves a raw input trace; F9/F10/F11/F12 are ignored"
-  title: Script Config
+  btn_save: Guardar
+  placeholder: El resultado grabado aparecerá aquí (coordenadas normalizadas del lienzo, guardable como .wf). La baja precisión genera comandos editables; la alta precisión guarda una traza de entrada sin procesar; F9/F10/F11/F12 se ignoran
+  title: Configuración de scripts
   上移: Subir
   下移: Bajar
-  '内置类: ': 'Built-in class: '
-  参数: Parameters
-  录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: Recorded output appears here (canvas-normalized coordinates, savable as .wf)
-  系统: System
-  脚本文件不存在: Script file not found
+  '内置类: ': 'Clase integrada: '
+  参数: Parámetros
+  录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: El resultado grabado aparecerá aquí (coordenadas normalizadas del lienzo, guardable como .wf)
+  系统: Sistema
+  脚本文件不存在: El archivo de script no existe
 daily_history:
-  专用: Dedicated
-  日常: Daily
+  专用: Dedicado
+  日常: Diario
 menu_ops:
-  脚本编辑: Script Editing
+  脚本编辑: Edición de scripts
 reference:
-  显示名: Display Name
+  显示名: Nombre visible
 run_control:
-  未分组: Ungrouped
+  未分组: Sin grupo
 scripts:
-  ADB 模式暂不支持录制: ADB mode does not support recording yet
-  Unicode 字母/数字/下划线: Unicode letters/digits/underscores
-  '{path} 已存在。覆盖该位置的脚本？': '{path} already exists. Overwrite the script there?'
-  '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. Right-click it in the tree and "Copy to local" to modify.'
-  ■ 停止录制: ■ Stop Recording
-  ● 录制脚本: ● Record Script
-  ? "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n"
-  : "⚠ Script metadata unrecognizable; this script won't appear in the run list:\n"
-  上移选项: Move Option Up
-  下移选项: Move Option Down
-  不会被录制: Will not be recorded
-  不勾选: Unchecked
-  不支持：{kind}（请选择有效类型）: 'Unsupported: {kind} (pick a valid type)'
-  与内置函数重名，脚本运行时会被拒绝: Conflicts with a builtin name; the script will be rejected at runtime
-  丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。: Discard local changes to {name} and restore the {target} version? This cannot be undone.
-  主窗口有工作流在运行，先停止它: The main window has a running workflow; stop it first
-  仅用于脚本展示分组，不改变脚本性质或执行顺序: Only for script display grouping; doesn't change script nature or execution order
-  从代码重新加载: Reload from Code
-  代码: Code
-  代码中的元数据已变化，重新加载会丢弃元数据页尚未应用的修改。重新加载？: Metadata in the code has changed; reloading discards metadata-page changes not yet applied. Reload?
-  低精度: Low Precision
-  低精度录制中…连续移动将合并: Low-precision recording… continuous moves will be merged
-  保存为工作流文件: Save as Workflow File
-  保存到 workflows/{dir}: Save to workflows/{dir}
-  保存到 workflows/{dir}；显示名留空则用 id: Saves to workflows/{dir}; empty display name falls back to the id
-  修改会写回代码缓冲区，仍需点击“保存”才会落盘。: Changes write back to the code buffer; still click "Save" to persist.
-  值: Value
-  停在第 {n} 行（单步 = 执行这一行）: Stopped at line {n} (step = execute this line)
-  停止中…: Stopping…
-  元数据: Metadata
-  元数据与代码均已修改: Both metadata and code changed
-  元数据尚未应用: Metadata not yet applied
-  元数据无效: Invalid Metadata
-  元数据根节点必须是键值映射: The metadata root must be a mapping
-  元数据表单不可编辑：{error}: "The metadata form isn't editable: {error}"
-  内置: Built-in
-  内置函数: Built-in Functions
-  写入编辑区域: Write to Editor
-  切换类型会移除旧类型专属的设置。继续？: Switching the type removes the old type's settings. Continue?
-  删除脚本: Delete Script
-  删除脚本 {rel}？此操作不可恢复。: Delete script {rel}? This cannot be undone.
-  删除选项: Delete Option
-  勾选: Checked
-  单步: Step
-  单步…: Step…
-  单步模式：在第一条语句前停住: 'Step Mode: pause before the first statement'
-  占位提示: Placeholder
-  参数名: Parameter name
-  参数定义: Parameter Definitions
-  参数数: Params
-  参数解析失败: Failed to parse parameters
-  取画布: Take Canvas
-  变量名（不用写 $）: Variable name (no need to write $)
-  可批量运行: Batch-runnable
-  可独立运行: Standalone-runnable
-  同路径脚本已存在于 local。新建 system 文件后仍由 local 版本生效，继续？: A same-path script already exists in local. After creating the system file the local version still takes effect; continue?
-  同路径脚本已存在于另一保存位置。新建 local 文件会覆盖其运行效果，继续？: A same-path script already exists in another save location. Creating a local file overrides its runtime effect; continue?
-  含义: Meaning
-  '启动失败: {e}': 'Start failed: {e}'
-  声明默认值: Declared default value
-  复制到本地以修改: Copy to Local for Editing
-  复制录制结果: Copy Recording
-  多个条件（每行一个，全部满足）: Multiple conditions (one per line; all must hold)
-  存在尚未支持的声明：{keys}；请先在代码页处理: 'Unsupported declarations present: {keys}; handle them on the Code page first'
-  '完成，返回值: {rv}': 'Done, return value: {rv}'
-  定位到脚本: Locate in Script
-  将在下一条语句前暂停: Will pause before the next statement
-  展开: Expand
-  属性单元准备工作流: Attribute-unit prepare workflow
-  工作流运行中，无法录制: A workflow is running; cannot record
-  左侧选择脚本，或点「新建」: Select a script on the left, or click "New"
-  ? "已保存 {path}，但校验未通过：\n"
-  : "Saved {path}, but validation failed:\n"
-  已保存 {path}，语法与布局引用校验通过: Saved {path}; syntax and layout-reference checks passed
-  已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: "Written to the target, but the original file couldn't be removed: {error}. Check both scripts."
-  已写入编辑区域；请在编辑器中保存脚本: Written to the editor; save the script in the editor
-  已创建 {path}: Created {path}
-  已删除 {rel}: Deleted {rel}
-  已复制到剪贴板: Copied to the clipboard
-  已复制到本地，现在可以编辑: Copied to local; you can edit it now
-  已存在: Already Exists
-  已截图 {w}×{h}（画布裁剪后）: Captured {w}x{h} (after canvas crop)
-  已改名；原名：{name}: 'Renamed; was: {name}'
-  已有未清除的录制内容，请清除后再次点击「录制脚本」，避免覆盖丢失。: Uncleared recording content exists; clear it before clicking "Record Script" again to avoid overwriting.
-  已清除: Cleared
-  已用外部编辑器打开: Opened in the external editor
-  已还原为{target}版本: Restored to the {target} version
-  应用到代码: Apply to Code
-  开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: When enabled, pointer movement is recorded. When disabled, only standalone movement is ignored; clicks, holds, drags, and wheel events are still captured. It is usually unnecessary for ordinary UI actions, but should be enabled for game-camera rotation or other continuous movement.
-  异常退出: Exit on Exception
-  当前脚本不可编辑（系统脚本请先复制到本地），或已带有高精度轨迹: The current script isn't editable (copy system scripts to local first), or it already carries a high-precision track
-  录制: Record
-  录制内容尚未保存或复制到剪贴板，确定要关闭吗？: The recording hasn't been saved or copied; close anyway?
-  录制结束，可修改结果后「写入编辑区域」或「复制录制结果」: Recording finished; edit the result then "Write to Editor" or "Copy Recording"
-  录制结束，可编辑后保存为 .wf: Recording finished; edit then save as .wf
-  录制结束，未捕获到有效操作: Recording finished; no valid actions captured
-  录制结果: Recording
-  ? "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？"
-  : "The recording hasn't been written into the script that started it.\nSwitching scripts clears this recording; continue?"
-  录制轨迹引用超出工作流目录：{ref}: 'The recording track reference escapes the workflows directory: {ref}'
-  录制鼠标移动: Record Mouse Movement
-  待机 | 点击「录制脚本」: Standby | click "Record Script"
-  待机 | 点击「录制脚本」或按: Idle | Click "Record Script" or press
-  或点击停止: or click Stop
-  所需能力: Required Capability
-  执行: Run
-  执行结果显示在这里: Results appear here
-  批量检查: Batch Check
-  找不到录制轨迹：{path}: 'Recording track not found: {path}'
-  找不到该函数: Function not found
-  找不到过程 {name} 的定义: Definition of proc {name} not found
-  把录制结果按语句插入代码编辑器的光标处: Inserts the recording into the code editor at the cursor, as statements
-  ? "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？"
-  : "System script {name} must be copied to local before it can be modified.\nAfter copying, this file no longer follows system updates. Continue?"
-  指令: Command
-  插件: Plugins
-  插入到脚本: Insert into Script
-  插入区域: Insert Region
-  插入坐标: Insert Coordinate
-  插入颜色: Insert Color
-  搜索函数名或说明: Search function names or descriptions
-  搜索指令：点击 / 等待 / 找图 / 颜色…: 'Search commands: Click / Wait / Find Image / Color…'
-  收起: Collapse
-  放弃修改？: Discard changes?
-  放弃录制结果？: Discard the recording?
-  新增选项: Add Option
-  新建脚本: New Script
-  无主窗口，无法截图: No main window; cannot take a screenshot
-  无主窗口，无法获取运行环境: No main window; cannot get the runtime environment
-  无效的保存位置: Invalid save location
-  '无法加载布局: {layout_name}': 'Cannot load layout: {layout_name}'
-  无法加载当前布局: Failed to load the current layout
-  无法加载当前布局做引用校验: Failed to load the current layout to validate references
-  '无法加载当前布局做引用校验: {e}': 'Failed to load the current layout to validate references: {e}'
-  无法开始录制: Cannot start recording
-  显示条件: Show Condition
-  显示环境: Show Environment
-  暴露: Expose
-  更改参数类型: Change Parameter Type
-  未声明（勾选）: Undeclared (checked)
-  未能写入：当前脚本不可编辑或已带有高精度轨迹: "Write failed: the current script isn't editable or already carries a high-precision track"
+  ADB 模式暂不支持录制: El modo ADB aún no admite grabación
+  Unicode 字母/数字/下划线: Letras Unicode, números y guiones bajos
+  '{path} 已存在。覆盖该位置的脚本？': '{path} ya existe. ¿Sobrescribir el script en esa ubicación?'
+  '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} es un script del sistema. Para modificarlo, haz clic derecho en el árbol y elige «Copiar a local para editar».'
+  ■ 停止录制: ■ Detener grabación
+  ● 录制脚本: ● Grabar script
+  ? '⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：
+
+    '
+  : '⚠ No se reconocen los metadatos del script; este script no aparecerá en la lista de ejecución:
+
+    '
+  上移选项: Subir opción
+  下移选项: Bajar opción
+  不会被录制: No se grabará
+  不勾选: Sin marcar
+  不支持：{kind}（请选择有效类型）: 'No compatible: {kind} (elige un tipo válido)'
+  与内置函数重名，脚本运行时会被拒绝: Coincide con el nombre de una función integrada; el script se rechazará al ejecutarse
+  丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。: ¿Descartar los cambios locales de {name} y restaurar la versión {target}? Esta acción no se puede deshacer.
+  主窗口有工作流在运行，先停止它: Hay un flujo de trabajo ejecutándose en la ventana principal; detenlo primero
+  仅用于脚本展示分组，不改变脚本性质或执行顺序: Solo sirve para agrupar scripts visualmente; no cambia su naturaleza ni el orden de ejecución
+  从代码重新加载: Recargar desde el código
+  代码: Código
+  代码中的元数据已变化，重新加载会丢弃元数据页尚未应用的修改。重新加载？: Los metadatos del código han cambiado; recargar descartará los cambios aún no aplicados en la pestaña de metadatos. ¿Recargar?
+  低精度: Baja precisión
+  低精度录制中…连续移动将合并: Grabación de baja precisión… los movimientos continuos se combinarán
+  保存为工作流文件: Guardar como archivo de flujo de trabajo
+  保存到 workflows/{dir}: Guardar en workflows/{dir}
+  保存到 workflows/{dir}；显示名留空则用 id: Se guarda en workflows/{dir}; si el nombre visible queda vacío se usa el id
+  修改会写回代码缓冲区，仍需点击“保存”才会落盘。: Los cambios se escriben en el búfer de código; aún debes pulsar «Guardar» para guardarlos en disco.
+  值: Valor
+  停在第 {n} 行（单步 = 执行这一行）: Detenido en la línea {n} (paso = ejecutar esta línea)
+  停止中…: Deteniendo…
+  元数据: Metadatos
+  元数据与代码均已修改: Se han modificado tanto los metadatos como el código
+  元数据尚未应用: Metadatos aún sin aplicar
+  元数据无效: Metadatos no válidos
+  元数据根节点必须是键值映射: El nodo raíz de los metadatos debe ser un mapa clave-valor
+  元数据表单不可编辑：{error}: 'El formulario de metadatos no se puede editar: {error}'
+  内置: Integrado
+  内置函数: Funciones integradas
+  写入编辑区域: Escribir en el editor
+  切换类型会移除旧类型专属的设置。继续？: Cambiar de tipo eliminará los ajustes específicos del tipo anterior. ¿Continuar?
+  删除脚本: Eliminar script
+  删除脚本 {rel}？此操作不可恢复。: ¿Eliminar el script {rel}? Esta acción no se puede deshacer.
+  删除选项: Eliminar opción
+  勾选: Marcado
+  单步: Paso
+  单步…: Paso…
+  单步模式：在第一条语句前停住: 'Modo paso a paso: pausar antes de la primera instrucción'
+  占位提示: Texto de marcador
+  参数名: Nombre del parámetro
+  参数定义: Definiciones de parámetros
+  参数数: Parámetros
+  参数解析失败: Error al analizar los parámetros
+  取画布: Capturar lienzo
+  变量名（不用写 $）: Nombre de variable (sin escribir $)
+  可批量运行: Ejecutable por lotes
+  可独立运行: Ejecutable de forma independiente
+  同路径脚本已存在于 local。新建 system 文件后仍由 local 版本生效，继续？: Ya existe un script con la misma ruta en local. Al crear el archivo en system seguirá prevaleciendo la versión local. ¿Continuar?
+  同路径脚本已存在于另一保存位置。新建 local 文件会覆盖其运行效果，继续？: Ya existe un script con la misma ruta en otra ubicación. Crear un archivo en local anulará su efecto en ejecución. ¿Continuar?
+  含义: Significado
+  '启动失败: {e}': 'Error al iniciar: {e}'
+  声明默认值: Valor predeterminado declarado
+  复制到本地以修改: Copiar a local para editar
+  复制录制结果: Copiar grabación
+  多个条件（每行一个，全部满足）: Varias condiciones (una por línea; todas deben cumplirse)
+  存在尚未支持的声明：{keys}；请先在代码页处理: 'Hay declaraciones aún no compatibles: {keys}; gestiónalas primero en la pestaña de código'
+  '完成，返回值: {rv}': 'Completado, valor de retorno: {rv}'
+  定位到脚本: Localizar en el script
+  将在下一条语句前暂停: Se pausará antes de la siguiente instrucción
+  展开: Expandir
+  属性单元准备工作流: Flujo de preparación de unidad de atributo
+  工作流运行中，无法录制: Hay un flujo de trabajo en ejecución; no se puede grabar
+  左侧选择脚本，或点「新建」: Selecciona un script a la izquierda o haz clic en «Nuevo»
+  ? '已保存 {path}，但校验未通过：
+
+    '
+  : 'Se guardó {path}, pero falló la validación:
+
+    '
+  已保存 {path}，语法与布局引用校验通过: Se guardó {path}; la validación de sintaxis y referencias de diseño ha sido correcta
+  已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: 'Se escribió en el destino, pero no se pudo eliminar el archivo original: {error}. Revisa ambos scripts.'
+  已写入编辑区域；请在编辑器中保存脚本: Escrito en el editor; guarda el script en el editor
+  已创建 {path}: Creado {path}
+  已删除 {rel}: Eliminado {rel}
+  已复制到剪贴板: Copiado al portapapeles
+  已复制到本地，现在可以编辑: Copiado a local; ya puedes editarlo
+  已存在: Ya existe
+  已截图 {w}×{h}（画布裁剪后）: Captura realizada {w}×{h} (tras recortar el lienzo)
+  已改名；原名：{name}: 'Renombrado; nombre anterior: {name}'
+  已有未清除的录制内容，请清除后再次点击「录制脚本」，避免覆盖丢失。: Ya existe contenido grabado sin borrar; bórralo antes de volver a pulsar «Grabar script» para evitar sobrescribirlo.
+  已清除: Borrado
+  已用外部编辑器打开: Abierto en el editor externo
+  已还原为{target}版本: Restaurado a la versión {target}
+  应用到代码: Aplicar al código
+  开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: Si está activado, graba la trayectoria del ratón; si está desactivado, solo omite el movimiento simple mientras sigue grabando clics, pulsaciones mantenidas, arrastres y rueda. No suele ser necesario para interfaces normales; actívalo solo para giros de cámara u otros movimientos continuos.
+  异常退出: Salida por excepción
+  当前脚本不可编辑（系统脚本请先复制到本地），或已带有高精度轨迹: El script actual no se puede editar (copia primero los scripts del sistema a local) o ya incluye una traza de alta precisión
+  录制: Grabar
+  录制内容尚未保存或复制到剪贴板，确定要关闭吗？: La grabación aún no se ha guardado ni copiado al portapapeles. ¿Seguro que quieres cerrar?
+  录制结束，可修改结果后「写入编辑区域」或「复制录制结果」: Grabación finalizada; puedes editar el resultado y luego pulsar «Escribir en el editor» o «Copiar grabación»
+  录制结束，可编辑后保存为 .wf: Grabación finalizada; puedes editarla y guardarla como .wf
+  录制结束，未捕获到有效操作: Grabación finalizada; no se capturaron acciones válidas
+  录制结果: Resultado de grabación
+  ? '录制结果尚未写入开始录制时的脚本。
+
+    切换脚本将清除这份录制结果，是否继续？'
+  : 'El resultado de la grabación aún no se ha escrito en el script desde el que se inició.
+
+    Cambiar de script borrará esta grabación. ¿Continuar?'
+  录制轨迹引用超出工作流目录：{ref}: 'La referencia de la traza grabada sale del directorio de flujos de trabajo: {ref}'
+  录制鼠标移动: Grabar movimiento del ratón
+  待机 | 点击「录制脚本」: En espera | Haz clic en «Grabar script»
+  待机 | 点击「录制脚本」或按: En espera | Haz clic en «Grabar script» o pulsa
+  或点击停止: o haz clic en Detener
+  所需能力: Capacidad requerida
+  执行: Ejecutar
+  执行结果显示在这里: Los resultados de ejecución aparecen aquí
+  批量检查: Comprobación por lotes
+  找不到录制轨迹：{path}: 'No se encuentra la traza de grabación: {path}'
+  找不到该函数: No se encuentra esa función
+  找不到过程 {name} 的定义: No se encuentra la definición del procedimiento {name}
+  把录制结果按语句插入代码编辑器的光标处: Inserta el resultado grabado como instrucciones en la posición del cursor del editor de código
+  ? '把系统脚本 {name} 复制到本地后才能修改。
+
+    复制之后这个文件不再跟随系统更新，确定？'
+  : 'Debes copiar el script del sistema {name} a local antes de poder modificarlo.
+
+    Después de copiarlo, este archivo dejará de recibir actualizaciones del sistema. ¿Continuar?'
+  指令: Comando
+  插件: Complementos
+  插入到脚本: Insertar en el script
+  插入区域: Insertar región
+  插入坐标: Insertar coordenada
+  插入颜色: Insertar color
+  搜索函数名或说明: Buscar nombre de función o descripción
+  搜索指令：点击 / 等待 / 找图 / 颜色…: 'Buscar comandos: Clic / Esperar / Buscar imagen / Color…'
+  收起: Contraer
+  放弃修改？: ¿Descartar cambios?
+  放弃录制结果？: ¿Descartar el resultado de grabación?
+  新增选项: Añadir opción
+  新建脚本: Nuevo script
+  无主窗口，无法截图: No hay ventana principal; no se puede capturar pantalla
+  无主窗口，无法获取运行环境: No hay ventana principal; no se puede obtener el entorno de ejecución
+  无效的保存位置: Ubicación de guardado no válida
+  '无法加载布局: {layout_name}': 'No se puede cargar el diseño: {layout_name}'
+  无法加载当前布局: No se pudo cargar el diseño actual
+  无法加载当前布局做引用校验: No se pudo cargar el diseño actual para validar referencias
+  '无法加载当前布局做引用校验: {e}': 'No se pudo cargar el diseño actual para validar referencias: {e}'
+  无法开始录制: No se puede iniciar la grabación
+  显示条件: Condición de visualización
+  显示环境: Entorno de visualización
+  暴露: Exponer
+  更改参数类型: Cambiar tipo de parámetro
+  未声明（勾选）: Sin declarar (marcado)
+  未能写入：当前脚本不可编辑或已带有高精度轨迹: 'No se pudo escribir: el script actual no es editable o ya incluye una traza de alta precisión'
   本地 (local): Local (local)
-  本地脚本: Local Scripts
-  本地覆盖系统: Local override of system
-  清除录制结果: Clear Recording
-  点: Point
-  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: Generates readable, directly editable WF DSL. On stop, key press/hold/release and following waits are merged where safe; continuous mouse moves and short waits are merged at ~100ms granularity. Good for regular UI flows and later hand-tuning; not for game camera moves that need exact raw-input replay.
-  留空 = id: Empty = id
-  留空使用默认值: Leave empty for defaults
-  目标位置已有 {path}。继续会覆盖目标，并在成功保存后移除原文件。: The target already has {path}. Continuing overwrites it and removes the original after a successful save.
-  目标位置已有不同的录制轨迹：{path}: 'The target already has a different recording track: {path}'
-  确定清除已录制的 DSL 内容吗？: Clear the recorded DSL content?
-  确认保存位置: Confirm Save Location
-  稳定脚本标识；修改后已有引用不会自动更新: Stable script identifier; existing references don't update automatically after a change
-  第 {index} 个参数不是字段映射: Parameter {index} is not a field mapping
-  第 {index} 个参数有未支持的字段：{keys}: 'Parameter {index} has unsupported fields: {keys}'
-  第 {index} 个参数的选项包含未支持的字段: Parameter {index}'s options contain unsupported fields
-  第 {line} 行第 {col} 列：语法错误: 'Line {line}, column {col}: syntax error'
-  系统 (system): System (system)
-  系统脚本不可删除；不想展示请在「脚本配置」取消勾选: System scripts cannot be deleted; uncheck them in "Script Config" instead
-  系统脚本只读——右键「复制到本地以修改」后才能保存: System scripts are read-only — right-click and choose "Copy to Local for Editing" before saving
-  系统脚本只读——右键「复制到本地以修改」后才能编辑: System scripts are read-only — right-click and choose "Copy to Local for Editing" to edit
-  系统（只读）: System (read-only)
-  脚本 id 不能为空: Script id cannot be empty
-  脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: Script id cannot start with _ (the discovery layer treats it as a temp file and skips it)
-  脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: Script id may only use Unicode letters, digits, and underscores, and must start with a letter
-  脚本 id（文件名）: Script id (file name)
-  脚本 {rel} 已存在，覆盖？: Script {rel} already exists. Overwrite?
-  脚本、录制结果或脚本配置有未保存的修改，放弃？: Scripts, recordings or script config have unsaved changes; discard?
-  脚本为空: Script Is Empty
-  脚本声明: Script Declarations
-  脚本录制: Script Recording
-  脚本性质: Script Nature
-  脚本配置: Script Config
-  脚本问题：{reason}: 'Script problem: {reason}'
-  覆盖目标脚本？: Overwrite the target script?
-  记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: Records the raw timeline of keyboard input, mouse buttons, wheel events, and optional pointer movement. Saving also creates a companion trace under workflows/lvtrace for timing closer to the original recording. This is suitable for timing-sensitive game-camera actions; the WF text cannot be moved without its companion trace file.
-  试算: Try Run
-  试算会真的执行脚本再调这个函数：别拿它跑耗时或来源不明的脚本，界面会一直卡到它返回。: "Try Run actually executes the script before calling this function: don't use it on slow or untrusted scripts — the UI blocks until it returns."
-  该函数需要引擎注入（_engine/_wf），只能在脚本执行时调用: This function needs engine injection (_engine/_wf) and can only be called while a script runs
-  语法检查通过（保存后会再做布局引用校验）: Syntax check passed (a layout-reference check runs again on save)
-  请先在“元数据”页点击“应用到代码”，再保存脚本。: Click "Apply to Code" on the Metadata page before saving the script.
-  请先在主窗口定位游戏窗口: Please locate the game window in the main window first
-  请先在主窗口扫描并定位窗口: Scan and locate a window in the main window first
-  请先选择或新建一个可编辑脚本，并保存已有高精度录制: Select or create an editable script first, and save any existing high-precision recording
-  '读取失败: {e}': 'Failed to read: {e}'
-  调试: Debug
-  迁移未完成: Migration incomplete
-  运行: Run
-  运行中…: Running…
-  运行时使用多行输入: Use multi-line input at runtime
-  运行环境: Runtime Environment
-  返回: Returns
-  还原为{target}: Restore to {target}
-  还原失败: Restore Failed
-  这份录制结果已写入编辑区域；清除后可开始新录制: This recording is already written to the editor; clear it to start a new recording
-  这份录制结果已写入，请清除后重新录制: This recording is written; clear it before recording again
-  这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改: This is a local copy of a {target} script and can't be deleted; right-click → Restore to drop local changes
-  选项: Options
-  高精度: High precision
-  高精度 WF 依赖配套轨迹文件，不能单独复制: The high-precision WF depends on its companion track file and can't be copied alone
-  高精度录制中…原始输入写入统一时间线: High-precision recording… raw inputs are written to a unified timeline
-  默认值: Default
-  默认勾选: Checked by default
-  默认状态: Default State
-  默认选项: Default Option
-  默认隐藏: Hidden by default
-  （无说明）: (no description)
-  （未声明）: (undeclared)
-  （未截图）: (No Screenshot)
-  专用: Dedicated
-  "录制精度": "Recording Precision"
+  本地脚本: Scripts locales
+  本地覆盖系统: Local anula sistema
+  清除录制结果: Borrar grabación
+  点: Punto
+  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: Genera código WF DSL legible y editable directamente. Al detener la grabación, fusiona pulsaciones, retenciones, liberaciones y esperas posteriores cuando es seguro; los movimientos continuos del ratón y esperas cortas se agrupan en intervalos de unos 100 ms. Ideal para flujos de interfaz normales y ajustes manuales, pero no para cámaras de juego que requieran reproducción exacta de cada evento sin procesar.
+  留空 = id: Vacío = id
+  留空使用默认值: Dejar vacío para usar el valor predeterminado
+  目标位置已有 {path}。继续会覆盖目标，并在成功保存后移除原文件。: Ya existe {path} en el destino. Continuar sobrescribirá el destino y eliminará el archivo original tras guardar correctamente.
+  目标位置已有不同的录制轨迹：{path}: 'El destino ya tiene una traza de grabación diferente: {path}'
+  确定清除已录制的 DSL 内容吗？: ¿Seguro que quieres borrar el contenido DSL grabado?
+  确认保存位置: Confirmar ubicación de guardado
+  稳定脚本标识；修改后已有引用不会自动更新: Identificador estable del script; las referencias existentes no se actualizarán automáticamente si lo cambias
+  第 {index} 个参数不是字段映射: El parámetro {index} no es un mapa de campos
+  第 {index} 个参数有未支持的字段：{keys}: 'El parámetro {index} tiene campos no compatibles: {keys}'
+  第 {index} 个参数的选项包含未支持的字段: Las opciones del parámetro {index} contienen campos no compatibles
+  第 {line} 行第 {col} 列：语法错误: 'Línea {line}, columna {col}: error de sintaxis'
+  系统 (system): Sistema (system)
+  系统脚本不可删除；不想展示请在「脚本配置」取消勾选: Los scripts del sistema no se pueden eliminar; si no quieres mostrarlos, desmárcalos en «Configuración de scripts»
+  系统脚本只读——右键「复制到本地以修改」后才能保存: 'Los scripts del sistema son de solo lectura: haz clic derecho y elige «Copiar a local para editar» para poder guardar'
+  系统脚本只读——右键「复制到本地以修改」后才能编辑: 'Los scripts del sistema son de solo lectura: haz clic derecho y elige «Copiar a local para editar» para poder editar'
+  系统（只读）: Sistema (solo lectura)
+  脚本 id 不能为空: El id del script no puede estar vacío
+  脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: El id del script no puede empezar por _ (la capa de detección lo omite como archivo temporal)
+  脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: El id del script solo puede contener letras Unicode, números y guiones bajos, y debe empezar por una letra
+  脚本 id（文件名）: Id del script (nombre de archivo)
+  脚本 {rel} 已存在，覆盖？: El script {rel} ya existe. ¿Sobrescribir?
+  脚本、录制结果或脚本配置有未保存的修改，放弃？: Hay cambios sin guardar en los scripts, la grabación o la configuración de scripts. ¿Descartarlos?
+  脚本为空: El script está vacío
+  脚本声明: Declaraciones del script
+  脚本录制: Grabación de scripts
+  脚本性质: Tipo de script
+  脚本配置: Configuración de scripts
+  脚本问题：{reason}: 'Problema en el script: {reason}'
+  覆盖目标脚本？: ¿Sobrescribir el script de destino?
+  记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: Registra la línea temporal sin procesar del teclado, botones del ratón, rueda y movimiento opcional del ratón. Al guardar el script también se genera el archivo de traza asociado en workflows/lvtrace, con una cadencia más fiel a la grabación original, ideal para giros de cámara y escenas sensibles al tiempo. El script depende de esa traza y no puede migrarse copiando solo el texto WF.
+  试算: Ejecución de prueba
+  试算会真的执行脚本再调这个函数：别拿它跑耗时或来源不明的脚本，界面会一直卡到它返回。: 'La ejecución de prueba ejecuta realmente el script antes de llamar a esta función: no la uses con scripts lentos o de origen desconocido, ya que la interfaz quedará bloqueada hasta que termine.'
+  该函数需要引擎注入（_engine/_wf），只能在脚本执行时调用: Esta función requiere inyección del motor (_engine/_wf) y solo puede llamarse durante la ejecución de un script
+  语法检查通过（保存后会再做布局引用校验）: Comprobación de sintaxis superada (al guardar se volverán a comprobar las referencias del diseño)
+  请先在“元数据”页点击“应用到代码”，再保存脚本。: Haz clic primero en «Aplicar al código» en la pestaña «Metadatos» antes de guardar el script.
+  请先在主窗口定位游戏窗口: Localiza primero la ventana del juego en la ventana principal
+  请先在主窗口扫描并定位窗口: Escanea y localiza primero una ventana en la ventana principal
+  请先选择或新建一个可编辑脚本，并保存已有高精度录制: Selecciona o crea primero un script editable y guarda cualquier grabación de alta precisión existente
+  '读取失败: {e}': 'Error de lectura: {e}'
+  调试: Depurar
+  迁移未完成: Migración incompleta
+  运行: Ejecutar
+  运行中…: Ejecutando…
+  运行时使用多行输入: Usar entrada multilínea en ejecución
+  运行环境: Entorno de ejecución
+  返回: Devuelve
+  还原为{target}: Restaurar a {target}
+  还原失败: Error al restaurar
+  这份录制结果已写入编辑区域；清除后可开始新录制: Esta grabación ya se escribió en el editor; bórrala para iniciar una nueva
+  这份录制结果已写入，请清除后重新录制: Esta grabación ya se escribió; bórrala antes de volver a grabar
+  这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改: Esta es una copia local de un script de {target} y no se puede eliminar; haz clic derecho y elige Restaurar para descartar los cambios locales
+  选项: Opciones
+  高精度: Alta precisión
+  高精度 WF 依赖配套轨迹文件，不能单独复制: Un WF de alta precisión depende de su archivo de traza asociado y no se puede copiar por separado
+  高精度录制中…原始输入写入统一时间线: Grabación de alta precisión… las entradas sin procesar se escriben en una línea temporal unificada
+  默认值: Valor predeterminado
+  默认勾选: Marcado por defecto
+  默认状态: Estado predeterminado
+  默认选项: Opción predeterminada
+  默认隐藏: Oculto por defecto
+  （无说明）: (sin descripción)
+  （未声明）: (sin declarar)
+  （未截图）: (Sin captura)
+  专用: Dedicado
+  录制精度: Precisión de grabación

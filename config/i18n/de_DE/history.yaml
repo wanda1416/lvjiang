@@ -1,62 +1,64 @@
 all_user_params:
-  任务: Task
+  任务: Aufgabe
 batch:
-  全局任务参数: Global task parameters
-  恢复默认顺序: Restore Default Order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to change the actual execution order; right-click to restore the default order or shuffle it; the order in Batch Configuration is only the initial order
-  重命名配置: Rename Configuration
-  随机打乱顺序: Shuffle Order
+  全局任务参数: Globale Aufgabenparameter
+  恢复默认顺序: Standardreihenfolge wiederherstellen
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Ziehen, um die tatsächliche Ausführungsreihenfolge
+    anzupassen; Rechtsklick zum Wiederherstellen der Standardreihenfolge oder zum
+    zufälligen Mischen; die Reihenfolge in der Stapelkonfiguration dient nur als Startreihenfolge
+  重命名配置: Konfiguration umbenennen
+  随机打乱顺序: Reihenfolge mischen
 common:
-  batch_run_id: Batch Run ID
-  duration: Duration
-  finished_at: End Time
-  scope: Scope
-  source: Source
-  task: Task
-  task_count: Tasks
-  task_run_id: Task Run ID
-  title: Task History
-  unavailable: Task history is temporarily unavailable
-  参数: Parameters
-  当前批次: Current batch
-  执行目标: Execution Target
-  重命名: Rename
+  batch_run_id: Stapellauf-ID
+  duration: Dauer
+  finished_at: Endzeit
+  scope: Bereich
+  source: Quelle
+  task: Aufgabe
+  task_count: Aufgaben
+  task_run_id: Aufgabenlauf-ID
+  title: Aufgabenverlauf
+  unavailable: Aufgabenverlauf ist vorübergehend nicht verfügbar
+  参数: Parameter
+  当前批次: Aktueller Stapel
+  执行目标: Ausführungsziel
+  重命名: Umbenennen
 daily_history:
-  任务历史: Task History
-  任务历史暂不可用: Task history is temporarily unavailable
-  任务数: Tasks
-  单独运行: Single Run
-  已选: selected
-  开始日期不能晚于结束日期: Start date cannot be after the end date
-  批量历史: Batch History
-  批量运行: Batch Run
-  日期范围无效: Invalid date range
-  未记录用户: Unrecorded user
-  查看全部单任务: View all single tasks
-  查询: Query
-  清除勾选，改为全部: Clear the check to include all
-  窗口: Window
-  结束时间: End Time
-  耗时: Duration
-  返回全部任务: Back to all tasks
-  配置: Config
-  任务: Task
+  任务历史: Aufgabenverlauf
+  任务历史暂不可用: Aufgabenverlauf ist vorübergehend nicht verfügbar
+  任务数: Aufgaben
+  单独运行: Einzellauf
+  已选: ausgewählt
+  开始日期不能晚于结束日期: Das Startdatum darf nicht nach dem Enddatum liegen
+  批量历史: Stapelverlauf
+  批量运行: Stapellauf
+  日期范围无效: Ungültiger Datumsbereich
+  未记录用户: Nicht erfasster Benutzer
+  查看全部单任务: Alle Einzelaufgaben anzeigen
+  查询: Abfragen
+  清除勾选，改为全部: Auswahl aufheben, um alle einzubeziehen
+  窗口: Fenster
+  结束时间: Endzeit
+  耗时: Dauer
+  返回全部任务: Zurück zu allen Aufgaben
+  配置: Konfiguration
+  任务: Aufgabe
 history_viewer:
-  刷新日志: Refresh Log
-  当前级别没有日志: No logs at this level
-  执行日志: Execution Log
-  执行结果: Execution Result
-  批量报告: Batch Report
-  文件较大，仅预览开头 2 MiB: File is large; only the first 2 MiB is previewed
-  文件较大，仅预览末尾 2 MiB: File is large; only the last 2 MiB is previewed
-  无法读取文件: Cannot read the file
-  日志文件为空: The log file is empty
-  日志级别: Log Level
-  显示所选级别及更高级别的日志: Show logs at the selected level and above
-  没有对应文件: No matching file
-  结果不是有效 JSON，显示原文: The result isn't valid JSON; showing raw text
-  记录详情: Record Details
-  选择一条记录查看内容: Select a record to view its content
-  选择一条记录查看日志: Select a record to view its log
+  刷新日志: Protokoll aktualisieren
+  当前级别没有日志: Keine Protokolle auf dieser Stufe
+  执行日志: Ausführungsprotokoll
+  执行结果: Ausführungsergebnis
+  批量报告: Stapelbericht
+  文件较大，仅预览开头 2 MiB: Datei ist groß; nur die ersten 2 MiB werden als Vorschau angezeigt
+  文件较大，仅预览末尾 2 MiB: Datei ist groß; nur die letzten 2 MiB werden als Vorschau angezeigt
+  无法读取文件: Datei kann nicht gelesen werden
+  日志文件为空: Die Protokolldatei ist leer
+  日志级别: Protokollstufe
+  显示所选级别及更高级别的日志: Protokolle der ausgewählten Stufe und höher anzeigen
+  没有对应文件: Keine passende Datei
+  结果不是有效 JSON，显示原文: Ergebnis ist kein gültiges JSON; Rohtext wird angezeigt
+  记录详情: Eintragsdetails
+  选择一条记录查看内容: Einen Eintrag auswählen, um den Inhalt anzuzeigen
+  选择一条记录查看日志: Einen Eintrag auswählen, um das Protokoll anzuzeigen
 settings_dialog:
-  输入参数: Input Parameters
+  输入参数: Eingabeparameter

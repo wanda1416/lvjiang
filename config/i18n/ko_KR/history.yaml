@@ -1,62 +1,62 @@
 all_user_params:
-  任务: Task
+  任务: 작업
 batch:
-  全局任务参数: Global task parameters
-  恢复默认顺序: Restore Default Order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to change the actual execution order; right-click to restore the default order or shuffle it; the order in Batch Configuration is only the initial order
-  重命名配置: Rename Configuration
-  随机打乱顺序: Shuffle Order
+  全局任务参数: 전역 작업 매개변수
+  恢复默认顺序: 기본 순서 복원
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: 드래그하여 실제 실행 순서를 조정할 수 있습니다. 우클릭하면 기본 순서 복원 또는 무작위 섞기가 가능하며, 일괄 설정의 순서는 초기 순서로만 사용됩니다
+  重命名配置: 설정 이름 변경
+  随机打乱顺序: 순서 무작위 섞기
 common:
-  batch_run_id: Batch Run ID
-  duration: Duration
-  finished_at: End Time
-  scope: Scope
-  source: Source
-  task: Task
-  task_count: Tasks
-  task_run_id: Task Run ID
-  title: Task History
-  unavailable: Task history is temporarily unavailable
-  参数: Parameters
-  当前批次: Current batch
-  执行目标: Execution Target
-  重命名: Rename
+  batch_run_id: 일괄 실행 ID
+  duration: 소요 시간
+  finished_at: 종료 시간
+  scope: 범위
+  source: 출처
+  task: 작업
+  task_count: 작업 수
+  task_run_id: 작업 실행 ID
+  title: 작업 기록
+  unavailable: 작업 기록을 일시적으로 사용할 수 없습니다
+  参数: 매개변수
+  当前批次: 현재 일괄 작업
+  执行目标: 실행 대상
+  重命名: 이름 변경
 daily_history:
-  任务历史: Task History
-  任务历史暂不可用: Task history is temporarily unavailable
-  任务数: Tasks
-  单独运行: Single Run
-  已选: selected
-  开始日期不能晚于结束日期: Start date cannot be after the end date
-  批量历史: Batch History
-  批量运行: Batch Run
-  日期范围无效: Invalid date range
-  未记录用户: Unrecorded user
-  查看全部单任务: View all single tasks
-  查询: Query
-  清除勾选，改为全部: Clear the check to include all
-  窗口: Window
-  结束时间: End Time
-  耗时: Duration
-  返回全部任务: Back to all tasks
-  配置: Config
-  任务: Task
+  任务历史: 작업 기록
+  任务历史暂不可用: 작업 기록을 일시적으로 사용할 수 없습니다
+  任务数: 작업 수
+  单独运行: 단독 실행
+  已选: 선택됨
+  开始日期不能晚于结束日期: 시작 날짜는 종료 날짜보다 늦을 수 없습니다
+  批量历史: 일괄 실행 기록
+  批量运行: 일괄 실행
+  日期范围无效: 유효하지 않은 날짜 범위
+  未记录用户: 미기록 사용자
+  查看全部单任务: 모든 단일 작업 보기
+  查询: 조회
+  清除勾选，改为全部: 선택 해제하여 전체 표시
+  窗口: 창
+  结束时间: 종료 시간
+  耗时: 소요 시간
+  返回全部任务: 전체 작업으로 돌아가기
+  配置: 설정
+  任务: 작업
 history_viewer:
-  刷新日志: Refresh Log
-  当前级别没有日志: No logs at this level
-  执行日志: Execution Log
-  执行结果: Execution Result
-  批量报告: Batch Report
-  文件较大，仅预览开头 2 MiB: File is large; only the first 2 MiB is previewed
-  文件较大，仅预览末尾 2 MiB: File is large; only the last 2 MiB is previewed
-  无法读取文件: Cannot read the file
-  日志文件为空: The log file is empty
-  日志级别: Log Level
-  显示所选级别及更高级别的日志: Show logs at the selected level and above
-  没有对应文件: No matching file
-  结果不是有效 JSON，显示原文: The result isn't valid JSON; showing raw text
-  记录详情: Record Details
-  选择一条记录查看内容: Select a record to view its content
-  选择一条记录查看日志: Select a record to view its log
+  刷新日志: 로그 새로고침
+  当前级别没有日志: 현재 레벨에 로그가 없습니다
+  执行日志: 실행 로그
+  执行结果: 실행 결과
+  批量报告: 일괄 실행 보고서
+  文件较大，仅预览开头 2 MiB: 파일이 커서 앞부분 2 MiB만 미리 봅니다
+  文件较大，仅预览末尾 2 MiB: 파일이 커서 뒷부분 2 MiB만 미리 봅니다
+  无法读取文件: 파일을 읽을 수 없습니다
+  日志文件为空: 로그 파일이 비어 있습니다
+  日志级别: 로그 레벨
+  显示所选级别及更高级别的日志: 선택한 레벨 이상의 로그 표시
+  没有对应文件: 해당 파일이 없습니다
+  结果不是有效 JSON，显示原文: 결과가 유효한 JSON이 아니므로 원문을 표시합니다
+  记录详情: 기록 상세 정보
+  选择一条记录查看内容: 내용을 볼 기록을 선택하세요
+  选择一条记录查看日志: 로그를 볼 기록을 선택하세요
 settings_dialog:
-  输入参数: Input Parameters
+  输入参数: 입력 매개변수

@@ -1,52 +1,51 @@
 plugin:
-  "燕云剧情": "WWM Story"
-
+  燕云剧情: 연운 스토리
 story:
-  "保存到": "Saved to"
-  "匹配阈值": "Match threshold"
-  "场景/任务": "Scene/quest"
-  "已删除配置文件": "Deleted config file"
-  "已新建配置文件": "Created config file"
-  "文案库来源": "Story library source"
-  "正在编辑": "Editing"
-  "正确答案": "Correct answer"
-  "配置文件": "Config file"
-  "问题/旁白": "Question/narration"
-  "阈值保存失败": "Failed to save the threshold"
-  "为什么选这个（可选）": "Why this choice (optional)"
-  "删除文件": "Delete File"
-  "删除文案": "Delete Entry"
-  "删除这条文案？": "Delete this entry?"
-  "删除配置文件「{name}」及其全部文案？": "Delete config file \"{name}\" and all its entries?"
-  "匹配阈值已保存到": "Match threshold saved to"
-  "如 主线-第三章-问剑": "e.g. Main-Chapter 3-Sword"
-  "已保存到": "Saved to"
-  "已删除": "Deleted"
-  "搜索场景 / 选项 / 答案": "Search scenes / choices / answers"
-  "文件名（如 主线-第三章 / 活动-夏日）：": "File name (e.g. Main-Chapter 3 / Event-Summer):"
-  "新建文案：填写选项与正确答案后保存": "New entry: fill in the choices and the correct answer, then save"
-  "新建配置文件": "New Config File"
-  "无配置文件": "No config files"
-  "普通用户只能保存到本地；系统为随发布内容": "Regular users save locally only; system ships with releases"
-  "未创建": "Not created"
-  "本地覆盖生效": "Local override active"
-  "来自随发布的系统配置": "From the bundled system config"
-  "正确答案必须是选项之一": "The correct answer must be one of the choices"
-  "每行一个选项": "One choice per line"
-  "没有可删除的配置文件": "No config files to delete"
-  "激活时全部配置文件一起生效；这里只切换要编辑的那一个": "All config files apply together when active; this only switches which one you edit"
-  "系统（仅开发者）": "System (developers only)"
-  "系统（随发布）": "System (bundled)"
-  "该文件还没有落盘，保存后创建": "This file isn't on disk yet; it's created on save"
-  "该配置文件已存在": "That config file already exists"
-  "请先在左侧选择要删除的文案": "Select an entry on the left to delete first"
-  "请先新建一个配置文件": "Create a config file first"
-  "选项和正确答案不能为空": "Choices and the correct answer cannot be empty"
-  "选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择": "If the choice-set similarity falls below this, it counts as unknown and the workflow pauses for manual selection"
-  "问题或旁白关键文本（可选）": "Key text of the question or narration (optional)"
-  "＋ 新增文案": "＋ New Entry"
-  "＋ 新建": "＋ New"
-  "，配置文件「": ", config file \""
-  "；系统也有副本": "; the system also has a copy"
-  "自动剧情": "Auto Story"
-  "修改暂存于当前对话框，点击保存后生效": "Edits are staged in this dialog; they take effect on Save"
+  保存到: 저장 위치
+  匹配阈值: 일치 임계값
+  场景/任务: 장면/퀘스트
+  已删除配置文件: 설정 파일이 삭제되었습니다
+  已新建配置文件: 설정 파일이 생성되었습니다
+  文案库来源: 스크립트 라이브러리 출처
+  正在编辑: 편집 중
+  正确答案: 정답
+  配置文件: 설정 파일
+  问题/旁白: 질문/내레이션
+  阈值保存失败: 임계값 저장에 실패했습니다
+  为什么选这个（可选）: 이 선택지를 고른 이유(선택 사항)
+  删除文件: 파일 삭제
+  删除文案: 항목 삭제
+  删除这条文案？: 이 항목을 삭제할까요?
+  删除配置文件「{name}」及其全部文案？: 설정 파일 '{name}'과(와) 포함된 모든 항목을 삭제할까요?
+  匹配阈值已保存到: 일치 임계값이 저장된 위치
+  如 主线-第三章-问剑: '예: 메인-제3장-문검'
+  已保存到: 저장 위치
+  已删除: 삭제됨
+  搜索场景 / 选项 / 答案: 장면 / 선택지 / 정답 검색
+  文件名（如 主线-第三章 / 活动-夏日）：: '파일명(예: 메인-제3장 / 이벤트-여름):'
+  新建文案：填写选项与正确答案后保存: '새 항목: 선택지와 정답을 입력한 뒤 저장하세요'
+  新建配置文件: 새 설정 파일
+  无配置文件: 설정 파일 없음
+  普通用户只能保存到本地；系统为随发布内容: 일반 사용자는 로컬에만 저장할 수 있으며, 시스템 설정은 배포에 포함된 기본 항목입니다
+  未创建: 미생성
+  本地覆盖生效: 로컬 덮어쓰기 적용 중
+  来自随发布的系统配置: 배포에 포함된 시스템 설정
+  正确答案必须是选项之一: 정답은 선택지 중 하나여야 합니다
+  每行一个选项: 한 줄에 선택지 하나씩 입력
+  没有可删除的配置文件: 삭제할 설정 파일이 없습니다
+  激活时全部配置文件一起生效；这里只切换要编辑的那一个: 활성화 시 모든 설정 파일이 함께 적용되며, 여기서는 편집할 파일만 전환합니다
+  系统（仅开发者）: 시스템(개발자 전용)
+  系统（随发布）: 시스템(배포 포함)
+  该文件还没有落盘，保存后创建: 이 파일은 아직 디스크에 생성되지 않았으며 저장 시 생성됩니다
+  该配置文件已存在: 해당 설정 파일이 이미 존재합니다
+  请先在左侧选择要删除的文案: 먼저 왼쪽에서 삭제할 항목을 선택하세요
+  请先新建一个配置文件: 먼저 설정 파일을 새로 만드세요
+  选项和正确答案不能为空: 선택지와 정답은 비워 둘 수 없습니다
+  选项集合相似度低于该值时视为未收录，工作流会暂停等你手动选择: 선택지 집합 유사도가 이 값보다 낮으면 미등록 항목으로 간주되어 수동 선택을 위해 워크플로가 일시 정지됩니다
+  问题或旁白关键文本（可选）: 질문 또는 내레이션 핵심 텍스트(선택 사항)
+  ＋ 新增文案: ＋ 항목 추가
+  ＋ 新建: ＋ 새로 만들기
+  ，配置文件「: ', 설정 파일 '''
+  ；系统也有副本: ; 시스템에도 사본이 있습니다
+  自动剧情: 자동 스토리
+  修改暂存于当前对话框，点击保存后生效: 변경 사항은 이 대화 상자에 임시 저장되며 저장을 눌러야 적용됩니다

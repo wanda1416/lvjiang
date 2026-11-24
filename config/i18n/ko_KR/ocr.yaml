@@ -1,90 +1,102 @@
 common:
-  title: Image Recognition
-  匹配分组: Match group
-  区域间隔: Region gap
-  单批内容最大高度: Max height per batch
-  清洗组: Cleaning group
-  画布最小边长: Min canvas side
-  识别结果（已应用清洗规则）: Recognition result (cleaning rules applied)
+  title: 이미지 인식
+  匹配分组: 매칭 그룹
+  区域间隔: 영역 간격
+  单批内容最大高度: 배치당 최대 높이
+  清洗组: 정제 그룹
+  画布最小边长: 최소 캔버스 변 길이
+  识别结果（已应用清洗规则）: 인식 결과(정제 규칙 적용됨)
 main_window:
-  就绪: Ready
+  就绪: 준비됨
 menu_ops:
-  图像识别: OCR
+  图像识别: 이미지 인식(OCR)
 ocr_dialog:
-  (无匹配): (No Match)
-  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Ctrl+V to paste a screenshot, or click "Upload Image" to load a file
-  key 不能为空: key cannot be empty
-  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: The maximum total height allowed per batch of regions; anything beyond splits into the next batch.
-  上传图片: Upload Image
-  从设备获取最新截图: Grab the latest screenshot from the device
-  创建规则组: Create Rule Group
-  删除规则组: Delete Rule Group
-  刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
-  刷新截图失败: Failed to refresh the screenshot
-  匹配参考图: Match Reference Image
-  区域批量识别: Batch Region Recognition
-  ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
-  : "Batch region recognition stitches multiple text regions into one canvas and calls OCR once.\nThese parameters control the stitched size; they take effect from the next recognition after saving."
-  原始文本: Raw Text
-  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: OCR settings have unsaved changes; quit and discard them?
-  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Image files (*.png *.jpg *.jpeg *.bmp *.webp);;All files (*)
-  已撤销未保存的清洗规则修改: Reverted unsaved cleaning-rule changes
-  已撤销未保存的识别配置修改: Reverted unsaved recognition-config changes
-  已清除选框: Selection cleared
-  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: Minimum width and height of the stitched canvas. Too small and narrow regions get hugely upscaled by the OCR detector.
-  撤销清洗规则: Undo Cleaning Rules
-  撤销识别配置: Undo Recognition Config
-  文本替换（精确匹配）: Text replacement (exact match)
-  无图片: No image
-  无法读取剪贴板图片: Cannot read the clipboard image
+  (无匹配): (일치 항목 없음)
+  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Ctrl+V로 스크린샷을 붙여넣거나 「이미지 업로드」를 클릭해 파일을 불러오세요
+  key 不能为空: key는 비워 둘 수 없습니다
+  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: 한 배치의 영역에 허용되는 최대 총 높이입니다. 초과하면 다음 배치로 분할해 인식합니다.
+  上传图片: 이미지 업로드
+  从设备获取最新截图: 기기에서 최신 스크린샷 가져오기
+  创建规则组: 규칙 그룹 생성
+  删除规则组: 규칙 그룹 삭제
+  刷新截图不可用：未连接设备或未传入回调: '스크린샷 새로고침 불가: 기기가 연결되지 않았거나 콜백이 전달되지 않았습니다'
+  刷新截图失败: 스크린샷 새로고침 실패
+  匹配参考图: 참조 이미지 매칭
+  区域批量识别: 영역 일괄 인식
+  ? '区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。
+
+    这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。'
+  : '영역 일괄 인식은 여러 텍스트 영역을 하나의 캔버스로 합쳐 OCR을 한 번만 호출합니다.
+
+    이 매개변수는 병합 크기를 제어하며, 저장 후 다음 인식부터 적용됩니다.'
+  原始文本: 원본 텍스트
+  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: 이미지 인식 설정에 저장되지 않은 변경 사항이 있습니다. 종료하고 변경 사항을 취소할까요?
+  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): 이미지 파일 (*.png *.jpg *.jpeg *.bmp *.webp);;모든 파일 (*)
+  已撤销未保存的清洗规则修改: 저장되지 않은 정제 규칙 변경 사항을 되돌렸습니다
+  已撤销未保存的识别配置修改: 저장되지 않은 인식 설정 변경 사항을 되돌렸습니다
+  已清除选框: 선택 영역을 지웠습니다
+  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: 병합 캔버스의 최소 너비와 높이입니다. 너무 작으면 좁은 영역이 OCR 감지기에 의해 과도하게 확대됩니다.
+  撤销清洗规则: 정제 규칙 되돌리기
+  撤销识别配置: 인식 설정 되돌리기
+  文本替换（精确匹配）: 텍스트 치환(정확히 일치)
+  无图片: 이미지 없음
+  无法读取剪贴板图片: 클립보드 이미지를 읽을 수 없습니다
   替换为: 바꿀 내용
-  未匹配到参考图: No reference image matched
-  未识别到文字: No text recognized
-  正则替换: Regex replacement
+  未匹配到参考图: 일치하는 참조 이미지가 없습니다
+  未识别到文字: 인식된 텍스트가 없습니다
+  正则替换: 정규식 치환
   正则表达式: 정규 표현식
-  正在刷新截图...: Refreshing screenshot...
-  正在匹配参考图...: Matching reference images...
-  正在识别文字...: Recognizing text...
-  测试: Test
-  测试清洗效果: Test Cleaning
-  添加替换规则: Add replacement rule
-  添加正则规则: Add regex rule
-  清洗结果...: Cleaning result...
-  清洗规则: Cleaning Rules
-  清洗规则已保存: Cleaning rules saved
-  清空画布: Clear Canvas
-  清除红色选框: Clear red selection
-  清除选择: Clear Selection
-  相邻文字区域在拼图中的间隔。: Gap between adjacent text regions in the stitched canvas.
-  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: Delete rule group "{name}"? Workflows referencing it will fail to run.
-  确定撤销本次所有未保存的清洗规则更改吗？: Undo all unsaved cleaning-rule changes made this session?
-  确定撤销本次所有未保存的识别配置更改吗？: Undo all unsaved recognition-config changes made this session?
-  '行 {n}: 无效的正则表达式': 'Row {n}: invalid regular expression'
-  规则组 key（用于 with 声明）: Rule group key (used in with clauses)
-  规则组名称: Rule group name
-  规则组已创建: Rule group created
-  规则组已删除: Rule group deleted
-  规则组已重命名: Rule group renamed
-  识别失败: Recognition failed
-  识别文字: Recognize Text
-  识别配置: Recognition Config
-  识别配置已保存: Recognition config saved
-  请先保存或取消当前清洗组的修改: Save or discard the current cleaning group's changes first
-  输入测试文本...: Enter test text...
-  选择图片: Select Image
-  选框区域为空: The selection region is empty
-  重命名规则组: Rename Rule Group
-  ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
-  : "Default rules apply globally to all OCR; scan/find with clauses stack the selected business group on top of the defaults.\nClick \"Save\" to apply — no restart needed; use \"Undo\" to revert unsaved changes."
-  默认规则（全局）: Default Rules (Global)
-  ? "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。"
-  : "Recognition performance applies to every recognition call: higher parallelism is faster but uses proportionally more CPU.\nSaved changes take effect from the next recognition — no restart needed."
-  "识别性能": "Performance"
-  "单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。": "Threads used inside one recognition. Default 2: going higher is no faster in practice and only raises whole-machine CPU usage; use 1 for the lowest CPU cost on long background runs."
-  "识别线程数": "Recognition threads"
-  "同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。": "How many operator lanes run concurrently. Detection, classification and recognition each already own a thread pool, so raising this mostly adds scheduling contention; default 1."
-  "并行算子线程数": "Operator threads"
-  "检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。": "Before detection the frame is rescaled so its short side equals this value (large frames shrink, small crops grow). Smaller is faster and cheaper but more likely to miss small text; 736 is the factory value — leave it unless you have a reason."
-  "检测输入短边": "Detection input short side"
+  正在刷新截图...: 스크린샷 새로고침 중...
+  正在匹配参考图...: 참조 이미지 매칭 중...
+  正在识别文字...: 텍스트 인식 중...
+  测试: 테스트
+  测试清洗效果: 정제 결과 테스트
+  添加替换规则: 치환 규칙 추가
+  添加正则规则: 정규식 규칙 추가
+  清洗结果...: 정제 결과...
+  清洗规则: 정제 규칙
+  清洗规则已保存: 정제 규칙이 저장되었습니다
+  清空画布: 캔버스 비우기
+  清除红色选框: 빨간색 선택 영역 지우기
+  清除选择: 선택 해제
+  相邻文字区域在拼图中的间隔。: 병합 캔버스에서 인접한 텍스트 영역 간의 간격입니다.
+  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: 규칙 그룹 「{name}」을(를) 삭제할까요? 이를 참조하는 워크플로를 실행할 수 없게 됩니다.
+  确定撤销本次所有未保存的清洗规则更改吗？: 저장되지 않은 정제 규칙 변경 사항을 모두 되돌릴까요?
+  确定撤销本次所有未保存的识别配置更改吗？: 저장되지 않은 인식 설정 변경 사항을 모두 되돌릴까요?
+  '行 {n}: 无效的正则表达式': '{n}행: 잘못된 정규 표현식'
+  规则组 key（用于 with 声明）: 규칙 그룹 key(with 구문에서 사용)
+  规则组名称: 규칙 그룹 이름
+  规则组已创建: 규칙 그룹이 생성되었습니다
+  规则组已删除: 규칙 그룹이 삭제되었습니다
+  规则组已重命名: 규칙 그룹 이름이 변경되었습니다
+  识别失败: 인식 실패
+  识别文字: 텍스트 인식
+  识别配置: 인식 설정
+  识别配置已保存: 인식 설정이 저장되었습니다
+  请先保存或取消当前清洗组的修改: 먼저 현재 정제 그룹의 변경 사항을 저장하거나 취소하세요
+  输入测试文本...: 테스트 텍스트 입력...
+  选择图片: 이미지 선택
+  选框区域为空: 선택 영역이 비어 있습니다
+  重命名规则组: 규칙 그룹 이름 변경
+  ? '默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。
+
+    改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。'
+  : '기본 규칙은 모든 OCR에 전역 적용되며, scan/find의 with 구문은 기본 규칙 뒤에 선택한 업무 규칙 그룹을 추가로 적용합니다.
+
+    수정 후 「저장」을 클릭하면 재시작 없이 적용되며, 저장하지 않은 변경 사항은 「되돌리기」로 복원할 수 있습니다.'
+  默认规则（全局）: 기본 규칙(전역)
+  ? '识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。
+
+    保存后从下一次识别开始生效，不需要重启。'
+  : '인식 성능은 모든 인식 호출에 적용됩니다. 병렬도가 높을수록 빨라지지만 CPU 사용량도 비례해 증가합니다.
+
+    저장 후 다음 인식부터 재시작 없이 적용됩니다.'
+  识别性能: 인식 성능
+  单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 단일 인식 내부에서 사용하는 스레드 수입니다. 기본값은 2이며, 더 높여도 빨라지지 않고 전체 CPU 사용량만 높아집니다. 1로 설정하면 CPU를 가장 적게 사용해 장시간 백그라운드 실행에 적합합니다.
+  识别线程数: 인식 스레드 수
+  同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。: 동시에 병렬 실행되는 연산자 수입니다. 감지·분류·인식 세 모델이 각자 스레드 풀을 보유하므로 값을 키우면 스케줄링 경합만 증가하는 경우가 많습니다. 기본값은 1입니다.
+  并行算子线程数: 병렬 연산자 스레드 수
+  检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。: 감지 전에 화면을 짧은 변 기준으로 이 값에 맞춰 스케일링합니다(큰 이미지는 축소, 작은 이미지는 확대). 낮추면 더 빠르고 CPU를 아끼지만 작은 글자가 누락되기 쉽습니다. 기본값 736은 특별한 이유가 없다면 유지하세요.
+  检测输入短边: 감지 입력 짧은 변
 user_avatar:
-  刷新截图: Refresh Screenshot
+  刷新截图: 스크린샷 새로고침

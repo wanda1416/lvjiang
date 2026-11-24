@@ -1,82 +1,80 @@
 action_catalog:
-  通知: Notify
+  通知: 알림
 common:
-  checking: Checking...
-  close: Close
-  empty: No announcements
-  notice_version: Announcement version {version}
-  published_at: Published on {date}
-  refresh: Refresh
-  summary: Only reports with enough information to reproduce or diagnose the problem enter developer triage; acceptance does not promise a fix date.
-  title: Announcements
-  updated_at: Updated {date}
+  checking: 확인 중...
+  close: 닫기
+  empty: 공지사항이 없습니다
+  notice_version: 공지 버전 {version}
+  published_at: '{date} 게시'
+  refresh: 새로고침
+  summary: 재현하거나 원인을 진단할 수 있을 만큼 충분한 정보가 포함된 제보만 개발자 분류 대상에 포함됩니다. 접수되었다고 해서 수정 일정이 보장되지는 않습니다.
+  title: 공지사항
+  updated_at: '{date} 업데이트'
 menu_ops:
-  检查更新: Check for Updates
-  检查更新失败: Update check failed
+  检查更新: 업데이트 확인
+  检查更新失败: 업데이트 확인 실패
 notices:
-  '{name}二维码获取失败：{error}；可点「打开赞助页面」': 'Failed to fetch the {name} QR code: {error}; you can click "Open sponsor page"'
-  下载该版本: Download This Version
-  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: No data is uploaded. You can enable it later in Settings → Network & Privacy.
-  不同意: Disagree
-  不收集: Do not collect
-  不收集什么: What not to collect
-  二维码已更新: QR code updated
-  仅用于所列功能改进，不公开发布原始数据: Only for improving the listed features; raw data is not published
-  使用交流和一般咨询请优先在群内讨论: For usage questions and general discussion, please ask in the group first
-  免责声明: Disclaimer
-  公告版本 {version}: Announcement version {version}
-  关于律匠: About LvJiang
-  刷新{name}二维码失败，已保留当前二维码：{error}: 'Failed to refresh the {name} QR code; keeping the current one: {error}'
-  刷新中...: Refreshing...
-  刷新二维码: Refresh QR Code
-  刷新失败，已保留当前二维码：{error}: 'Refresh failed; keeping the current QR code: {error}'
-  前往发布声明: Open Release Notes
-  匿名使用数据收集: Anonymous Usage Data Collection
-  反馈与建议: Feedback & Suggestions
-  发布于 {date}: Released {date}
-  发现新版本: New Version Available
-  同意后随时可在「配置管理 → 网络与隐私」关闭。: After agreeing, you can turn it off anytime via "Config Manager → Network & Privacy".
-  图片无法显示，请刷新或打开赞助页面: The image cannot be displayed; refresh or open the sponsor page
-  好的: OK
-  实际会发送的数据长这样: The data actually sent looks like this
-  尚未获取到公告，点击“重新获取”进行同步。: No announcements fetched yet; click "Refresh" to sync.
-  开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: Enabling telemetry uploads related, unreported history from the last {days} days; records created while disabled remain stored locally.
-  当前为离线模式，仅显示本地公告缓存: Offline mode; showing the local announcement cache only
-  当前版本: Current Version
-  律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: LvJiang is free and open source. If it saves you time, you're welcome to buy the author a coffee.
-  忽略该提示: Ignore This Version
-  愿意贡献匿名使用数据，帮助改进律匠吗？: Would you like to contribute anonymous usage data to help improve LvJiang?
-  截图、日志、配置文件或其他未在上方列明的本地内容: Screenshots, logs, configuration files, or other local content not listed above
-  打开赞助页面: Open Sponsor Page
-  扫码加群: Scan to Join the Group
-  支持律匠: Support LvJiang
-  收集什么: What's Collected
-  暂无二维码，请获取最新二维码: No QR code yet; fetch the latest one
-  暂无公告: No announcements
-  更新于 {date}: Updated {date}
-  最新版本: Latest Version
-  本次发布暂无详细说明。: No detailed notes for this release.
-  检查中...: Checking...
-  正在获取…: Fetching…
-  正在获取公告...: Fetching announcements...
-  正在获取最新二维码...: Fetching the latest QR code...
-  正在获取最新二维码…: Fetching the latest QR code…
-  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: 'Once-daily launch record: LvJiang version, OS type, runtime environment, and a random identifier'
-  用来做什么: What It's Used For
-  离线模式下可查看缓存，暂不联网刷新: Cache viewable in offline mode; no online refresh for now
-  获取中...: Fetching...
-  '获取公告失败: {error}': 'Failed to fetch announcements: {error}'
-  获取失败，当前显示上次缓存：{error}: 'Fetch failed; showing the last cache: {error}'
-  许可证: License
-  该版本不再提醒: Don't remind me about this version
-  账号、姓名或其他能认出你是谁的信息: Your account, name, or any other information that could identify you
-  赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: Sponsoring is entirely voluntary — it buys no features, licenses or priority support, and affects nothing existing.
-  赞助律匠: Sponsor LvJiang
-  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: This ID is a random string generated on this machine; it doesn't contain your account or hardware info, but it does let us tell that records came from the same machine. You can reset it anytime in Settings.
-  重新获取: Refresh
-  公告: Announcements
-
-# ── 反馈与建议（0.15.18 改版）──
+  '{name}二维码获取失败：{error}；可点「打开赞助页面」': '{name} QR 코드를 가져오지 못했습니다: {error}. 「후원 페이지 열기」를 클릭할 수 있습니다'
+  下载该版本: 이 버전 다운로드
+  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: 어떠한 데이터도 업로드되지 않습니다. 나중에 참여하고 싶다면 「설정 관리 → 네트워크 및 개인정보」에서 언제든지 켤 수 있습니다.
+  不同意: 동의 안 함
+  不收集: 수집 안 함
+  不收集什么: 수집하지 않는 항목
+  二维码已更新: QR 코드가 업데이트되었습니다
+  仅用于所列功能改进，不公开发布原始数据: 명시된 기능 개선에만 사용되며 원본 데이터는 공개하지 않습니다
+  使用交流和一般咨询请优先在群内讨论: 사용법 교류 및 일반 문의는 먼저 커뮤니티 그룹에서 논의해 주세요
+  免责声明: 면책 조항
+  公告版本 {version}: 공지 버전 {version}
+  关于律匠: LvJiang 정보
+  刷新{name}二维码失败，已保留当前二维码：{error}: '{name} QR 코드 새로고침 실패, 현재 QR 코드를 유지합니다: {error}'
+  刷新中...: 새로고침 중...
+  刷新二维码: QR 코드 새로고침
+  刷新失败，已保留当前二维码：{error}: '새로고침 실패, 현재 QR 코드를 유지합니다: {error}'
+  前往发布声明: 릴리스 노트 보기
+  匿名使用数据收集: 익명 사용 데이터 수집
+  反馈与建议: 피드백 및 제안
+  发布于 {date}: '{date} 출시'
+  发现新版本: 새 버전 발견
+  同意后随时可在「配置管理 → 网络与隐私」关闭。: 동의한 후에도 「설정 관리 → 네트워크 및 개인정보」에서 언제든지 끌 수 있습니다.
+  图片无法显示，请刷新或打开赞助页面: 이미지를 표시할 수 없습니다. 새로고침하거나 후원 페이지를 열어 주세요
+  好的: 확인
+  实际会发送的数据长这样: 실제로 전송되는 데이터 형식
+  尚未获取到公告，点击“重新获取”进行同步。: 아직 공지사항을 가져오지 못했습니다. 「새로고침」을 클릭하여 동기화하세요.
+  开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: 활성화하면 최근 {days}일 이내에 보고되지 않은 관련 기록 데이터를 추가로 전송합니다. 비활성화 기간의 기록은 로컬에 유지됩니다.
+  当前为离线模式，仅显示本地公告缓存: 현재 오프라인 모드이며 로컬 공지 캐시만 표시합니다
+  当前版本: 현재 버전
+  律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: LvJiang은 무료 오픈소스 소프트웨어입니다. 시간을 절약하는 데 도움이 되었다면 개발자에게 커피 한 잔을 후원해 주세요.
+  忽略该提示: 이 버전 무시
+  愿意贡献匿名使用数据，帮助改进律匠吗？: LvJiang 개선을 위해 익명 사용 데이터를 공유해 주시겠습니까?
+  截图、日志、配置文件或其他未在上方列明的本地内容: 스크린샷, 로그, 설정 파일 또는 위에 명시되지 않은 기타 로컬 콘텐츠
+  打开赞助页面: 후원 페이지 열기
+  扫码加群: QR 스캔으로 그룹 참여
+  支持律匠: LvJiang 후원
+  收集什么: 수집 항목
+  暂无二维码，请获取最新二维码: QR 코드가 없습니다. 최신 QR 코드를 가져와 주세요
+  暂无公告: 공지사항이 없습니다
+  更新于 {date}: '{date} 업데이트'
+  最新版本: 최신 버전
+  本次发布暂无详细说明。: 이번 릴리스에는 상세 설명이 없습니다.
+  检查中...: 확인 중...
+  正在获取…: 가져오는 중…
+  正在获取公告...: 공지사항을 가져오는 중...
+  正在获取最新二维码...: 최신 QR 코드를 가져오는 중...
+  正在获取最新二维码…: 최신 QR 코드를 가져오는 중…
+  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: '하루 1회 실행 기록: LvJiang 버전, OS 유형, 실행 환경, 무작위 식별자'
+  用来做什么: 사용 목적
+  离线模式下可查看缓存，暂不联网刷新: 오프라인 모드에서는 캐시만 볼 수 있으며 온라인 새로고침은 지원되지 않습니다
+  获取中...: 가져오는 중...
+  '获取公告失败: {error}': '공지사항 가져오기 실패: {error}'
+  获取失败，当前显示上次缓存：{error}: '가져오기 실패, 마지막 캐시를 표시합니다: {error}'
+  许可证: 라이선스
+  该版本不再提醒: 이 버전 다시 알리지 않기
+  账号、姓名或其他能认出你是谁的信息: 계정, 이름 또는 본인을 식별할 수 있는 기타 정보
+  赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: 후원은 전적으로 자발적이며 기능, 라이선스 또는 우선 지원과 교환되지 않고 기존 기능에도 영향을 주지 않습니다.
+  赞助律匠: LvJiang 후원
+  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: 이 식별자는 이 기기에서 무작위로 생성된 문자열로 계정이나 하드웨어 정보를 포함하지 않지만, 동일한 PC의 반복 기록을 구분하는 데 사용됩니다. 설정에서 언제든지 초기화할 수 있습니다.
+  重新获取: 다시 가져오기
+  公告: 공지사항
 '  （无）': '  (없음)'
 GitHub 反馈: GitHub 피드백
 '{n}/{limit} 张': '{n}/{limit} 장'

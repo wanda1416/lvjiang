@@ -10,6 +10,7 @@ import json
 import threading
 import uuid
 from collections import deque
+from collections.abc import Callable
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from typing import Any
@@ -61,12 +62,19 @@ class RecentFrameHistory:
     RAW_LIMIT = 32_000_000
     PENDING_LIMIT = 4
 
-    def __init__(self, options: DiagnosticOptions, identity: dict[str, str]):
+    def __init__(
+        self,
+        options: DiagnosticOptions,
+        identity: dict[str, str],
+        *,
+        on_frame: Callable[[DiagnosticFrame], Any] | None = None,
+    ):
         if not options.enabled:
             raise ValueError("Frame history requires explicit opt-in")
         self.options = options
         self.identity = {key: str(value)[:256] for key, value in identity.items()}
         self.identity["capture_scope"] = uuid.uuid4().hex
+        self._on_frame = on_frame
         self._condition = threading.Condition()
         self._frames: deque[DiagnosticFrame] = deque()
         self._pending: deque[tuple[bytes, Any]] = deque()
@@ -143,6 +151,7 @@ class RecentFrameHistory:
                     return
                 metadata, image = self._pending.popleft()
             frame = None
+            published = None
             try:
                 frame = DiagnosticFrame(_encode_webp(image), metadata)
             except Exception:
@@ -166,9 +175,17 @@ class RecentFrameHistory:
                             ):
                                 self._bytes -= self._frames.popleft().nbytes
                                 self._evicted += 1
-                    self._condition.notify_all()
+                            published = frame
+                        self._condition.notify_all()
+                    else:
+                        self._condition.notify_all()
+                if published is not None and self._on_frame is not None:
+                    try:
+                        self._on_frame(published)
+                    except Exception:
+                        pass
                 # Do not keep a raw reference alive while waiting for the next frame.
-                del frame
+                del frame, published
 
     def close(self, task_status: str, *, timeout: float = 2.0) -> None:
         with self._condition:
@@ -244,7 +261,9 @@ class DiagnosticRequest:
             status = "failed"
             try:
                 try:
-                    history = RecentFrameHistory(self.options, identity)
+                    history = RecentFrameHistory(
+                        self.options, identity, on_frame=self.service._emit_frame
+                    )
                     self.service._remember(history)
 
                     def observe(meta, pixels):
@@ -314,7 +333,21 @@ class TaskDiagnostics:
     def __init__(self) -> None:
         self.options = DiagnosticOptions()
         self._last: RecentFrameHistory | None = None
+        self._frame_listener: Callable[[DiagnosticFrame], Any] | None = None
         self._lock = threading.Lock()
+
+    def set_frame_listener(
+        self, listener: Callable[[DiagnosticFrame], Any] | None,
+    ) -> None:
+        """注册/清除已编码帧的实时监听回调（用于可选的外部落盘，默认 None）。"""
+        with self._lock:
+            self._frame_listener = listener
+
+    def _emit_frame(self, frame: DiagnosticFrame) -> None:
+        with self._lock:
+            listener = self._frame_listener
+        if listener is not None:
+            listener(frame)
 
     def freeze(self) -> DiagnosticRequest | None:
         return DiagnosticRequest(self, self.options) if self.options.enabled else None

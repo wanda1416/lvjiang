@@ -46,7 +46,13 @@ def test_diagnostic_tabs_defaults_ephemeral_settings_and_launch_freeze(qtbot):
         "模拟运行",
     ]
     assert dialog.tabs.widget(1).findChildren(QWidget) == []
-    assert len(dialog.findChildren(QCheckBox)) == 1
+    assert {c.text() for c in dialog.findChildren(QCheckBox)} == {
+        "启用开发诊断模式",
+        "同步落盘到 logs",
+        "跟踪最新",
+    }
+    assert not dialog.dump_check.isChecked()
+    assert dialog.follow_check.isChecked()
     assert dialog.enabled_check.text() == "启用开发诊断模式"
     # 开发预览的口径写在对话框里，菜单标题只保留四字。
     assert any("开发预览" in label.text() for label in dialog.findChildren(QLabel))
@@ -120,3 +126,175 @@ def test_real_main_controls_no_longer_expose_capture_checkbox(qtbot, monkeypatch
     assert not hasattr(host, "chk_full_task_capture")
     assert not hasattr(host, "_task_diagnostics")
     assert all("全帧采集" not in c.text() for c in host.findChildren(QCheckBox))
+
+
+def _observe_color(history, seq: int, bgr: tuple[int, int, int], source: str = "ocr") -> None:
+    import numpy as np
+
+    img = np.zeros((24, 32, 3), dtype=np.uint8)
+    img[:, :] = bgr
+    history.observe({"frame_seq": seq, "source": source, "captured_ns": seq * 1_000_000}, img)
+
+
+def test_carousel_follow_latest_and_pinned_frame_survives_fifo_eviction(qtbot):
+    """轮播支持跟踪最新与跳转旧帧；正在查看的旧帧留在临时区，即使 FIFO 淘汰也不被清除。"""
+    import time
+
+    from lvjiang.core.task_diagnostics import DiagnosticOptions, RecentFrameHistory
+
+    service = TaskDiagnostics()
+    service.options = DiagnosticOptions(enabled=True, max_frames=2, max_bytes=10_000_000)
+    history = RecentFrameHistory(service.options, {"task_run_id": "t1"})
+    service._remember(history)
+
+    dialog = TaskDiagnosticsDialog(service)
+    qtbot.addWidget(dialog)
+
+    _observe_color(history, 1, (20, 30, 220), "ocr")
+    _observe_color(history, 2, (20, 220, 30), "template")
+    deadline = time.monotonic() + 3.0
+    while len(history.frames()) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+    dialog.refresh_frames()
+    assert "#2" in dialog.meta_label.text()
+    assert dialog.index_label.text() == "2 / 2"
+    assert dialog._pinned_pixmap is not None and not dialog._pinned_pixmap.isNull()
+
+    # 切到最早一帧 (#1) 并脱离跟踪模式
+    dialog._jump_first()
+    assert not dialog.follow_check.isChecked()
+    assert "#1" in dialog.meta_label.text()
+    assert dialog.index_label.text() == "1 / 2"
+
+    # 继续写入 #3、#4，使 #1 被底层 FIFO (max_frames=2) 淘汰
+    _observe_color(history, 3, (220, 30, 20), "ocr")
+    _observe_color(history, 4, (200, 200, 30), "color")
+    deadline = time.monotonic() + 3.0
+    while history.snapshot()["evicted"] < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+    dialog.refresh_frames()
+    # 正在查看的 #1 仍保留在临时区，不被清除也不被跳走
+    assert "#1" in dialog.meta_label.text()
+    assert "临时区保留" in dialog.meta_label.text()
+    assert "原缓存已淘汰" in dialog.meta_label.text()
+    assert dialog._pinned_pixmap is not None and not dialog._pinned_pixmap.isNull()
+
+    # 一键切回跟踪最新，立即跳到 #4
+    dialog._jump_last()
+    assert dialog.follow_check.isChecked()
+    assert "#4" in dialog.meta_label.text()
+    assert dialog.index_label.text() == "2 / 2"
+
+    history.close("completed")
+    dialog.close()
+
+
+def test_dump_toggle_writes_existing_and_new_frames_into_unique_session_folders(qtbot, tmp_path):
+    """开启落盘开关会创建独立新目录，导出当前帧+临时区帧+后续新帧；再次开启新建目录。"""
+    import json
+    import time
+
+    from lvjiang.core.task_diagnostics import DiagnosticOptions, RecentFrameHistory
+
+    service = TaskDiagnostics()
+    service.options = DiagnosticOptions(enabled=True, max_frames=2, max_bytes=10_000_000)
+    history = RecentFrameHistory(service.options, {"task_run_id": "dump-run"})
+    service._remember(history)
+
+    dump_root = tmp_path / "logs" / "diagnostics"
+    dialog = TaskDiagnosticsDialog(service, dump_base_dir=dump_root)
+    qtbot.addWidget(dialog)
+
+    _observe_color(history, 1, (10, 20, 240), "ocr")
+    _observe_color(history, 2, (10, 240, 20), "template")
+    deadline = time.monotonic() + 3.0
+    while len(history.frames()) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+
+    # 钉住 #1 并让 #3 淘汰 #1，确保落盘会把临时区帧 #1 + 当前缓存 #2/#3 一起落盘
+    dialog._jump_first()
+    _observe_color(history, 3, (240, 20, 10), "color")
+    deadline = time.monotonic() + 3.0
+    while history.snapshot()["evicted"] < 1 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+
+    # 第一次开启落盘
+    dialog.dump_check.setChecked(True)
+    dir1 = dialog._dumper.session_dir
+    assert dir1 is not None and dir1.parent == dump_root and dir1.is_dir()
+
+    # 落盘期间又产生新帧 #4
+    _observe_color(history, 4, (120, 120, 120), "ocr")
+    deadline = time.monotonic() + 3.0
+    while history.snapshot()["evicted"] < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+
+    # 关闭落盘并刷盘完成
+    dialog.dump_check.setChecked(False)
+    assert not dialog._dumper.active
+    assert dialog._dumper.written_count == 4
+
+    webp_files = sorted(dir1.glob("*.webp"))
+    assert len(webp_files) == 4
+    lines = (dir1 / "frames.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 4
+    seqs = [json.loads(line)["frame_seq"] for line in lines]
+    assert seqs == [1, 2, 3, 4]
+
+    # 第二次开启落盘必须生成全新的目录
+    dialog.dump_check.setChecked(True)
+    dir2 = dialog._dumper.session_dir
+    assert dir2 is not None and dir2 != dir1 and dir2.parent == dump_root
+    dialog.dump_check.setChecked(False)
+
+    history.close("completed")
+    dialog.close()
+
+
+def test_push_dumper_captures_all_frames_without_polling_even_when_hidden(qtbot, tmp_path):
+    """即使 max_frames=1 且对话框处于隐藏/不轮询状态，推送式落盘也不丢任何中间帧。"""
+    import json
+    import time
+
+    from PyQt6.QtWidgets import QSizePolicy
+
+    from lvjiang.core.task_diagnostics import DiagnosticOptions, RecentFrameHistory
+
+    service = TaskDiagnostics()
+    dialog = TaskDiagnosticsDialog(service, dump_base_dir=tmp_path / "logs" / "diagnostics")
+    qtbot.addWidget(dialog)
+
+    # 未开启诊断且无缓存帧时，落盘开关应禁用，且预览区使用 Ignored 策略不锁死缩窗
+    assert not dialog.dump_check.isEnabled()
+    assert dialog.preview_label.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored
+    assert dialog.preview_label.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Ignored
+
+    dialog.enabled_check.setChecked(True)
+    assert dialog.dump_check.isEnabled()
+    dialog.dump_check.setChecked(True)
+    session_dir = dialog._dumper.session_dir
+    assert session_dir is not None
+
+    # 隐藏对话框（停止 UI 轮询定时器），通过 service._emit_frame 连续高速写入 5 帧（FIFO 上限=1）
+    dialog.hide()
+    assert not dialog._poll_timer.isActive()
+    opts = DiagnosticOptions(enabled=True, max_frames=1, max_bytes=10_000_000)
+    history = RecentFrameHistory(opts, {"task_run_id": "burst"}, on_frame=service._emit_frame)
+    service._remember(history)
+    for seq in range(1, 5):
+        _observe_color(history, seq, (seq * 40, 100, 200), "ocr")
+    history.close("completed")
+
+    deadline = time.monotonic() + 3.0
+    while dialog._dumper.written_count < 4 and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+    dialog.dump_check.setChecked(False)
+    lines = (session_dir / "frames.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["frame_seq"] for line in lines] == [1, 2, 3, 4]
+    dialog.close()

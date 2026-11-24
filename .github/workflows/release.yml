@@ -41,7 +41,7 @@ jobs:
       - name: Validate release tag, source and Android upgrade order
         id: release
         run: >-
-          python scripts/check_release.py --tag "$RELEASE_TAG"
+          python scripts/ci/check_release.py --tag "$RELEASE_TAG"
           --github-output "$GITHUB_OUTPUT"
           ${{ github.event_name == 'workflow_dispatch' && '--test-only' || '' }}
   # 门禁通过后，两边各自构建并上传 artifact，最后一个作业统一创建 Release。
@@ -76,7 +76,7 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Check versioned configuration
-        run: python scripts/add_content_version.py --check
+        run: python scripts/ci/add_content_version.py --check
 
       - name: Lint
         run: python -m ruff check src tests scripts

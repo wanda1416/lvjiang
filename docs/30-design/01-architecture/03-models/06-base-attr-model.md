@@ -267,7 +267,7 @@ buffs:
 环境参数（怪物防御/抗性、食物、固伤加成、团队增益）**不在这里**：
 方案 JSON 的 `environment` 已经存了一份，存两份必然漏同步。
 
-`scripts/extract_damage_model.py <流派>` 从 Excel 抽取，写成公式的格子
+`scripts/yysls/extract_damage_model.py <流派>` 从 Excel 抽取，写成公式的格子
 取缓存值，缓存缺失即报错退出——猜一个数字进配置比缺一条更糟。
 未识别的有表头列若含有效数据，也会报出工作表、单元格和字段名，
 禁止静默丢弃机制。`settlement_bonus` 独立表示结算增伤；技能的

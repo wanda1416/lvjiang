@@ -127,7 +127,7 @@ python scripts/analyze_telemetry_rolls.py rolls.json \
 ### 路径 C：分析自己的历史调律记录
 
 ```bash
-python scripts/analyze_tuning_affixes.py config/session/tuning_history.db
+python scripts/yysls/analyze_tuning_affixes.py config/session/tuning_history.db
 ```
 
 这个脚本回答的是 C 类问题：部位词条分布、第 N 个词条的分布、**给定首词条
@@ -300,7 +300,7 @@ n 小 p 小，正态近似会给出负下界或过窄的区间，恰好是它最
 | 脚本 | 数据源 | 产出 |
 |------|--------|------|
 | [`scripts/analyze_telemetry_rolls.py`](../../../../scripts/analyze_telemetry_rolls.py) | A 本地缓冲 / B D1 导出 | Markdown 报告（0~7 节，`--target-slots` 时加第 8 节） |
-| [`scripts/analyze_tuning_affixes.py`](../../../../scripts/analyze_tuning_affixes.py) | C `logs/tuning` | 终端报告：部位分布、第 N 词条分布、条件概率 |
+| [`scripts/yysls/analyze_tuning_affixes.py`](../../../../scripts/yysls/analyze_tuning_affixes.py) | C `logs/tuning` | 终端报告：部位分布、第 N 词条分布、条件概率 |
 | [`ops/stats-worker/queries/roll_export.sql`](../../../../ops/stats-worker/queries/roll_export.sql) | D1 | 原始批次导出，供上面第一个脚本消费 |
 | [`ops/stats-client/`](../../../../ops/stats-client/README.md) | B（增量缓存到本地） | 网页：总览指标 + 调律分析（含槽位条件查询交互表单） |
 

@@ -176,7 +176,7 @@ Release 工作流先统一校验，再由 Windows 与 Android 各自构建并上
 
 `build-windows`：
 
-1. `validate` 作业使用 `scripts/check_release.py` 校验正式/测试标签与三份源码版本字段完全一致；
+1. `validate` 作业使用 `scripts/ci/check_release.py` 校验正式/测试标签与三份源码版本字段完全一致；
 2. 确认 `docs/50-releases/[<系列>/]v<版本>.md` 存在、一级标题以 `v<版本>` 开头；
    正式标签提交必须属于远端 `master`；
 3. 检查配置 `content_version` 完整性，运行 Ruff、mypy 与全量 pytest；
@@ -293,7 +293,7 @@ Windows/Android 构建、签名核验及四项产物检查，不允许绕过失�
 - [ ] `docs/50-releases/<系列>/vX.Y.Z.md` 发布文档已编写
 - [ ] **不兼容变动已逐项排查**（对照上表八类），每条都写了「现象 / 原因 / 如何调整」；确认无不兼容时也已明确写出
 - [ ] 文件修订号由实际保存自动递增，不为发布批量提升；在线配置发布按应用系列及 rN 管理，与 content_version 无关。会被 `config/local` 遮蔽的内容已在发布说明里提示用户
-- [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全；命令在仓库 `.venv` 内执行，见 `AGENTS.md` 2.11）
+- [ ] `python scripts/ci/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全；命令在仓库 `.venv` 内执行，见 `AGENTS.md` 2.11）
 - [ ] `uv.lock` 变更已纳入提交（如有）
 - [ ] 所有变更已提交并推送
 - [ ] 发布提交已进入 `origin/master` 和 `public/master`，且两者指向同一提交

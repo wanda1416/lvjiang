@@ -1,0 +1,304 @@
+"""伤害建模：系数表的解析、同源校验与写回。
+
+这份配置是毕业率编译程序的可读参考层——程序能算，但读不出「第一道
+剑气的外功倍率是 1.3066」。所以这里验的是「读得对、写得回、过期看得
+出来」，不验伤害数值：求值不在这个模块里。
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+
+from lvjiang.apps.yysls.core.damage import (
+    DamageModelError,
+    DamageModelManager,
+    parse_model,
+)
+
+_MINIMAL = {
+    "school": "鸣金·虹",
+    "scheme": "基础方案",
+    "source": {"file": "x.xlsx", "version": "2.0", "sha256": "abc"},
+    "skills": {
+        "第一道剑气": {
+            "kind": "剑", "charge": True, "qi_ratio": 1.1,
+            "outer_ratio": 1.3066, "outer_fixed": 361,
+            "attr_ratio": 1.9598, "attr_fixed": 197,
+            "modifiers": {"generic": 0.2},
+        },
+        "尚未测量": {"kind": "剑"},
+    },
+    "buffs": {"远程笛": {"generic": 0.2}, "N/a占位": {}},
+}
+
+
+def test_parse_reads_the_four_coefficients() -> None:
+    model = parse_model(_MINIMAL, filename="鸣金·虹.yaml")
+
+    skill = model.skill("第一道剑气")
+    assert skill is not None
+    assert (skill.outer_ratio, skill.outer_fixed) == (1.3066, 361.0)
+    assert (skill.attr_ratio, skill.attr_fixed) == (1.9598, 197.0)
+    assert skill.charge is True and skill.kind == "剑"
+
+
+def test_a_skill_with_no_coefficients_counts_as_unfilled() -> None:
+    """四个系数全 0 就是没填。建模进度得能走到 100%，否则没人知道还差什么。"""
+    model = parse_model(_MINIMAL, filename="鸣金·虹.yaml")
+
+    assert model.progress() == (1, 2)
+
+
+@pytest.mark.parametrize("payload", [
+    {"skills": {}},                                          # 缺 school
+    {"school": "x", "顶层拼错": 1},
+    {"school": "x", "skills": {"甲": {"打错的字段": 1}}},
+    {"school": "x", "skills": {"甲": {"modifiers": {"没这个字段": 1}}}},
+    {"school": "x", "skills": {"甲": {"force": {"强制什么": True}}}},
+    {"school": "x", "skills": {"甲": {"outer_ratio": "不是数值"}}},
+    {"school": "x", "skills": {"甲": {"charge": 1}}},         # 必须是布尔
+    {"school": "x", "buffs": {"甲": {"没这个字段": 1}}},
+])
+def test_parse_rejects_malformed_config(payload: dict) -> None:
+    """写错了要当场知道：静默跳过一个拼错的字段，只会让人对着一个
+    不动的数字找半天。"""
+    with pytest.raises(DamageModelError):
+        parse_model(payload, filename="x.yaml")
+
+
+@pytest.fixture
+def models_dir(tmp_path):
+    (tmp_path / "鸣金·虹.yaml").write_text(
+        yaml.dump(_MINIMAL, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return DamageModelManager(tmp_path), tmp_path
+
+
+def test_saving_a_skill_persists_and_reloads(models_dir) -> None:
+    manager, _ = models_dir
+
+    manager.save_skill("鸣金·虹", "尚未测量", {"kind": "剑", "outer_ratio": 2.0})
+
+    skill = manager.model("鸣金·虹").skill("尚未测量")
+    assert skill.outer_ratio == 2.0
+    assert manager.model("鸣金·虹").progress() == (2, 2)
+
+
+def test_saving_an_invalid_skill_leaves_the_file_alone(models_dir) -> None:
+    """整份文件先过一遍解析再落盘：单条看着合法、放进文件却打不开的话，
+    界面会提示保存成功，然后整个流派的系数表全废。"""
+    manager, path = models_dir
+    before = (path / "鸣金·虹.yaml").read_text(encoding="utf-8")
+
+    with pytest.raises(DamageModelError):
+        manager.save_skill("鸣金·虹", "尚未测量", {"modifiers": {"没这个字段": 1}})
+
+    assert (path / "鸣金·虹.yaml").read_text(encoding="utf-8") == before
+
+
+def test_a_scheme_from_another_workbook_is_reported_as_out_of_sync(
+    models_dir,
+) -> None:
+    """比 sha256 而不是文件名：改过表内容却没改文件名，正是两边悄悄分家
+    的时刻。"""
+    manager, path = models_dir
+    # 孤立目录是单层的，方案就摆在模型旁边（见 _scheme_rel）；
+    # 生产布局的等级子目录由 test_graduation_model_registry 覆盖。
+    (path / "鸣金·虹_基础方案_v1.json").write_text(
+        json.dumps({
+            "schema_version": 3,
+            "school": "鸣金·虹",
+            "scheme": "基础方案",
+            "model_level": 110,
+            "model_version": 1,
+            "source": {"sha256": "另一份表"},
+        }),
+        encoding="utf-8",
+    )
+    manager.reload()
+
+    assert "不同源" in manager.mismatched("鸣金·虹")
+
+
+def _write_scheme(path, level: int, sha: str, version: int = 1) -> None:
+    (path / f"鸣金·虹_基础方案_v{version}.json").write_text(
+        json.dumps({
+            "schema_version": 3,
+            "school": "鸣金·虹",
+            "scheme": "基础方案",
+            "model_level": level,
+            "model_version": version,
+            "source": {"sha256": sha},
+        }),
+        encoding="utf-8",
+    )
+
+
+def test_a_higher_level_scheme_does_not_age_out_the_coefficient_table(
+    models_dir,
+) -> None:
+    """只要有一份配套方案同源就算一致，不必是最高等级那份。
+
+    方案按等级分文件，系数表却是一个流派一份。某流派新增 115 级方案时，仍在用
+    110 阶表的它并没有过期——若按「必须与最高等级方案同源」判定，页面会永远挂着
+    「已过期，重新导入 Excel 可修复」，而导入 115 的 Excel 并不是想要的结果。
+    """
+    manager, path = models_dir
+    _write_scheme(path, 110, "abc")          # 与系数表同源
+    _write_scheme(path, 115, "另一份表", version=2)  # 更高等级，另一份 Excel
+    manager.reload()
+
+    assert manager.mismatched("鸣金·虹") == ""
+
+
+def test_a_missing_scheme_is_reported_too(models_dir) -> None:
+    manager, _ = models_dir
+
+    assert "找不到配套方案" in manager.mismatched("鸣金·虹")
+
+
+# ── 与仓库里那份真实配置 ──────────────────────────────────
+
+def test_the_shipped_model_matches_its_graduation_scheme() -> None:
+    """仓库里的伤害模型必须与配套方案同源，否则页面上的系数会静静过期。"""
+    from lvjiang.apps.yysls.core.damage import get_damage_model_manager
+
+    manager = get_damage_model_manager()
+    for school in manager.schools():
+        assert manager.mismatched(school) == "", school
+
+
+def test_schools_without_a_damage_model_are_explicitly_unmodelled() -> None:
+    """有毕业方案却没有系数表的流派，必须在 attr_model 里登记为未建模。
+
+    伤害建模页对缺失系数只会空白，不会报错；「模型还没出」本身是合法状态，
+    但必须是登记过的状态（两门武学都 ``modeled: false``），不能静默漏掉一个
+    流派——那样加流派时既没人报错、页面也是空的。
+    """
+    from lvjiang.apps.yysls.core.damage import get_damage_model_manager
+
+    root = Path(__file__).resolve().parents[4]
+    schemes = {
+        json.loads(path.read_text(encoding="utf-8"))["school"]
+        # 方案按等级分子目录，所以要递归找
+        for path in (root / "config/system/yysls/graduation").glob("*/*.json")
+    }
+    assert schemes
+
+    entries = yaml.safe_load(
+        (root / "config/system/yysls/attr_model/martial_art.yaml")
+        .read_text(encoding="utf-8"),
+    )["entries"]
+    unmodelled_arts = {
+        str(config.get("group") or key.split("·")[0])
+        for key, config in entries.items()
+        if config.get("modeled") is False
+    }
+    schools = yaml.safe_load(
+        (root / "config/system/yysls/game_config/schools.yaml")
+        .read_text(encoding="utf-8"),
+    )["schools"]
+
+    silent = {
+        school for school in schemes - set(get_damage_model_manager().schools())
+        if not {
+            schools[school]["main"]["martial_art"],
+            schools[school]["sub"]["martial_art"],
+        } <= unmodelled_arts
+    }
+    assert not silent, (
+        f"这些流派有毕业方案、没有伤害模型，也未在 martial_art.yaml 标记 "
+        f"modeled: false: {sorted(silent)}")
+
+
+def test_the_three_sword_qi_coefficients_come_straight_from_the_workbook() -> None:
+    """三道剑气是同一招的 1 : 1.2 : 1.4，`三剑气` 恰好是三者之和——
+    整条管线对倍率是线性的，这条关系错了说明抽取抽歪了。"""
+    root = Path(__file__).resolve().parents[4]
+    data = yaml.safe_load(
+        (root / "config/system/yysls/damage_model/鸣金·虹.yaml")
+        .read_text(encoding="utf-8"))
+    skills = data["skills"]
+
+    first = skills["第一道剑气"]["outer_ratio"]
+    assert skills["第二道剑气"]["outer_ratio"] == pytest.approx(first * 1.2, abs=5e-4)
+    assert skills["第三道剑气"]["outer_ratio"] == pytest.approx(first * 1.4, abs=5e-4)
+    assert skills["三剑气"]["outer_ratio"] == pytest.approx(
+        sum(skills[f"第{n}道剑气"]["outer_ratio"] for n in "一二三"))
+
+
+@pytest.fixture
+def extractor():
+    import runpy
+    return runpy.run_path(str(Path(__file__).resolve().parents[4] / "scripts/yysls/extract_damage_model.py"))
+
+
+def test_extractor_rejects_unknown_active_mechanics(extractor):
+    import openpyxl
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "增益"
+    sheet.append([None, "通用增伤", "新机制"])
+    sheet.append(["测试增益", 0.1, 0.2])
+    with pytest.raises(extractor["ExtractError"], match="新机制"):
+        extractor["_buffs"](book, book)
+    sheet.cell(2, 3).value = 0
+    assert extractor["_buffs"](book, book) == {"测试增益": {"generic": 0.1}}
+
+
+@pytest.mark.slow
+def test_all_shipped_models_match_excel_extraction(extractor):
+    import openpyxl
+    root = Path(__file__).resolve().parents[4]
+    for path in sorted((root / "config/system/yysls/damage_model").glob("*.yaml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        sources = sorted((root / "data/excel").rglob(doc["source"]["file"]))
+        assert sources, (path.name, doc["source"]["file"])
+        # 源表可能已归档到「过期版本」；优先用仍在等级目录下的那一份。
+        excel = next(
+            (item for item in sources if "过期版本" not in item.parts),
+            sources[0],
+        )
+        book = openpyxl.load_workbook(excel, data_only=False)
+        cached = openpyxl.load_workbook(excel, data_only=True)
+        try:
+            assert doc["skills"] == extractor["_skills"](book, cached), path.name
+            assert doc["buffs"] == extractor["_buffs"](book, cached), path.name
+            model = parse_model(doc, filename=path.name)
+            if model.school == "破竹·樽":
+                assert next(b for b in model.buffs if b.name == "步乱").modifiers["settlement_bonus"] == 0.2
+            if model.school == "破竹·鸢":
+                for name in ("拳甲R蓄2直伤", "拳甲R蓄4直伤"):
+                    assert model.skill(name).intent_conversion == 1.0
+        finally:
+            book.close()
+            cached.close()
+
+
+def test_extractor_finds_current_scheme_in_level_directory(extractor):
+    scheme, data = extractor["_scheme"]("鸣金·虹")
+    assert scheme == data["scheme"] == "基础方案"
+    # 方案按等级分目录存放，_scheme 必须取最新一级。期望值从目录名推出，
+    # 新赛季模型入库后仍然成立，不跟着季度写死数字。
+    levels = {
+        int(path.parent.name.removesuffix("级"))
+        for path in extractor["SCHEME_DIR"].glob("*/鸣金·虹_*.json")
+    }
+    assert levels, "鸣金·虹 没有任何方案 JSON"
+    assert data["model_level"] == max(levels)
+    assert data["source"]["file"]
+
+
+def test_conversion_survives_skill_edit_and_reload(models_dir):
+    from lvjiang.apps.yysls.ui.game_settings.damage_model_panel import DamageModelPanel
+    manager, _ = models_dir
+    manager.save_skill("鸣金·虹", "尚未测量", {
+        "outer_ratio": 2, "intent_conversion": 1,
+        "modifiers": {"settlement_bonus": 0.2}})
+    payload = DamageModelPanel._raw_skill(None, manager.model("鸣金·虹"), "尚未测量")
+    manager.save_skill("鸣金·虹", "尚未测量", payload)
+    skill = manager.model("鸣金·虹").skill("尚未测量")
+    assert skill.intent_conversion == 1
+    assert skill.modifiers["settlement_bonus"] == 0.2

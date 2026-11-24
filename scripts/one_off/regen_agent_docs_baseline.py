@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-FIXTURE = REPO / "tests/yysls/data/agent_docs_baseline.json"
+FIXTURE = REPO / "tests/apps/yysls/data/agent_docs_baseline.json"
 
 
 def main() -> int:

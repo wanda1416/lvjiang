@@ -155,14 +155,14 @@
 | 应用版本 app_version | `X.Y.Z`、`X.Y.Z.N`、`X.Y.ZbN/rcN` | `core/versioning.py` `application_version` | 客户端发布版本 | 配置只比较三段系列，软件升级另按完整版本比较（`config_version`） |
 | 在线系列 app_series | 三段 `X.Y.Z` | `core/versioning.py` `application_series`；包清单 `core/updates/bundle.py` `make_manifest` | 在线配置包归属系列；预发布基底各自隔离（`update_namespace`） | 配置包与客户端系列不匹配拒绝安装（`update_store.py` `_install`） |
 | 在线修订号 revision (rN) | 正整数，r0 为基线 | `core/updates/bundle.py` 清单 `revision`；归档目录 `update_store.py` `_archive_directory` | 在线公开配置包递增修订；安装只比较修订号，不同就从 r0 重建整棵树（`update_store.py` `_install`） | 只作用于 system 层在线内容，不触碰 local |
-| content_version | 文件内顶层字段（JSON key / YAML 顶层行），正整数 | `core/config/versioning.py` `CONTENT_VERSION_KEY`；`scripts/add_content_version.py` 补齐存量 | 实体文件内部修订号：实际保存自动递增，供修订索引（`core/config/content.py` `rebuild_content`）与读取缓存失效使用 | **不参与来源仲裁**（local 影子恒优先）；不在 UI 展示；`.wf` 与模板 PNG 等不带此字段、随整包修订下发（`versioning.py` 注册表 `has_content_version=False`） |
+| content_version | 文件内顶层字段（JSON key / YAML 顶层行），正整数 | `core/config/versioning.py` `CONTENT_VERSION_KEY`；`scripts/ci/add_content_version.py` 补齐存量 | 实体文件内部修订号：实际保存自动递增，供修订索引（`core/config/content.py` `rebuild_content`）与读取缓存失效使用 | **不参与来源仲裁**（local 影子恒优先）；不在 UI 展示；`.wf` 与模板 PNG 等不带此字段、随整包修订下发（`versioning.py` 注册表 `has_content_version=False`） |
 | schema_version | 各文件/协议自定义整数 | 各格式模块（如 `core/db/schema.py`、`core/updates/bundle.py` 清单协议） | 声明**结构格式**版本，格式不兼容时由消费方校验拒绝 | 与 content_version 互不影响（`core/config/versioning.py` 模块文档：结构 schema_version 不受 content_version 影响） |
 
 要点区分：
 
 - content_version 是**文件内容修订**（谁改了这个文件几次），revision 是**在线包
   修订**（这批 system 树是第几版），二者互不推导。
-- `scripts/add_content_version.py` 只给 `config/system` 下参与版本管理的实体补
+- `scripts/ci/add_content_version.py` 只给 `config/system` 下参与版本管理的实体补
   content_version（清单来自 `versioning.py` 注册表 + 插件注册，脚本不自己维护
   一份），幂等、`--check` 供 CI；改 `config/system` 的提交须跑
   `--check` 并把受影响文件 content_version 加 1（AGENTS.md 第五节）。

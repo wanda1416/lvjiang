@@ -235,7 +235,7 @@
 2. 测试范围与风险相称：单个工作流、配置、局部 UI 文案或局部逻辑只跑直接相关的用例与必要静态
    检查，**禁止默认全量 pytest**；只有发布验证、核心/跨域改动、公共契约高风险变更或定向测试
    暴露广泛回归风险时才跑全量，非发布场景先说明原因。代码提交至少跑 Ruff，类型相关跑 mypy；
-   改 `config/system` 还要跑 `python scripts/add_content_version.py --check`，并在同一次改动里把
+   改 `config/system` 还要跑 `python scripts/ci/add_content_version.py --check`，并在同一次改动里把
    受影响文件的 `content_version` 加 1（新增文件由脚本补 1）。
 3. 新增测试必须能回答“它防止哪个真实回归”：会再次触发的场景、受保护的可观察契约、失败时的
    用户影响；答不出就不要写。

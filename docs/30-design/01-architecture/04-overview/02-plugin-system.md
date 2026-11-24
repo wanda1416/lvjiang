@@ -135,7 +135,7 @@ builder 约定：
 （插件模块本身 import 失败、未导出 `hooks`）则整体失败——这不是"可降级"的错误。
 
 `load_config_policies(app_ids)` 只装配第 2 步，不注入 UI 与工作流：离线工具
-（`scripts/add_content_version.py`、配置层单测）需要完整登记表但不需要副作用。
+（`scripts/ci/add_content_version.py`、配置层单测）需要完整登记表但不需要副作用。
 ```
 
 ## 插件目录结构
@@ -308,7 +308,7 @@ class AutoFarmWorkflow(BaseWorkflow):
 - 外置插件在主仓库根执行：
   `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest plugins/<name>/tests`。
 - 改完插件目录或插件发现逻辑，至少跑 `tests/core/test_plugin_discovery.py`；
-  改配置声明跑 `python scripts/add_content_version.py --check`。
+  改配置声明跑 `python scripts/ci/add_content_version.py --check`。
 - 打包侧另行校验插件清单与对应 `local` 资源是否随包（见 `plugins/README.md`）。
 
 ## 注册机制

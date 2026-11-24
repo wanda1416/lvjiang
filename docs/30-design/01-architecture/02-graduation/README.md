@@ -21,7 +21,7 @@
 | 模型转换 | `src/lvjiang/apps/yysls/core/graduation/graduation_converter.py` |
 | 程序编译器 | `src/lvjiang/apps/yysls/core/graduation/graduation_program.py` |
 | 运行时 | `src/lvjiang/apps/yysls/core/graduation/__init__.py` |
-| 源表更新检查 | `scripts/check_graduation_updates.py` |
+| 源表更新检查 | `scripts/yysls/check_graduation_updates.py` |
 | JSON 数据目录 | `config/system/yysls/graduation/` |
 
 ## 子文档导航

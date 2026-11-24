@@ -2,7 +2,7 @@
 import subprocess
 
 import pytest
-from scripts import check_release
+from scripts.ci import check_release
 
 
 def source(root, version):

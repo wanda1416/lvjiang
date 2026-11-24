@@ -33,7 +33,7 @@ if errorlevel 1 (
 rem Copy factory config and adb next to exe
 rem PyInstaller creates dist/lvjiang/ with lvjiang.exe at the root
 rem Use the same canonical system tree and r0 identity as Android.
-uv run python scripts\build_system_baseline.py dist\lvjiang\config
+uv run python scripts\ci\build_system_baseline.py dist\lvjiang\config
 if errorlevel 1 exit /b 1
 rem UI translations ship next to config/system: available_languages() scans
 rem config\i18n\*.yaml for meta.display_name, so a missing directory silently
@@ -51,7 +51,7 @@ xcopy /e /i /y data\adb dist\lvjiang\data\adb >nul
 if errorlevel 1 exit /b 1
 
 rem Publish game, architecture/DSL, user guide and Agent documentation with their original paths.
-uv run python scripts\build_agent_bundle.py --output dist\lvjiang\docs --zip dist\lvjiang-agent-v%APP_VERSION%.zip
+uv run python scripts\ci\build_agent_bundle.py --output dist\lvjiang\docs --zip dist\lvjiang-agent-v%APP_VERSION%.zip
 if errorlevel 1 exit /b 1
 
 rem License text ships with the binary: the disclaimer and liability limit only

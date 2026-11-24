@@ -1,5 +1,5 @@
 """文档门禁只保链接与索引：生命周期看目录，修改时间看 Git。"""
-from scripts import docs_check
+from scripts.ci import docs_check
 
 
 def test_live_index_reports_unlisted_chapter(tmp_path, monkeypatch):

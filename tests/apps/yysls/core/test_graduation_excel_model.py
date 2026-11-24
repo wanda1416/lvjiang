@@ -1,0 +1,575 @@
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+import pytest
+
+from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.apps.yysls.core.combat.combat_attrs import (
+    CombatAttributes,
+    aggregate_equipment_attrs,
+    apply_hypothetical_caps,
+    build_graduation_attrs,
+)
+from lvjiang.apps.yysls.core.graduation import (
+    get_graduation_calculator,
+    get_graduation_scheme_combat_attrs,
+    get_graduation_scheme_inputs,
+    invalidate_graduation_cache,
+    set_graduation_baseline_dps,
+)
+from lvjiang.apps.yysls.core.graduation.excel_formula import parse_formula
+from lvjiang.apps.yysls.core.graduation.graduation_converter import convert_workbook
+from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
+from tests.case_matrix import case_matrix
+
+DATA_DIR = (
+    Path(__file__).parents[4] / "config" / "system" / "yysls" / "graduation"
+)
+EXCEL_DIR = Path(__file__).parents[4] / "data" / "excel"
+SCHOOLS = [
+    "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
+    "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",
+]
+#: 表格作者取整/浮点误差允许 0.1% 的满值偏差，与批量导入脚本保持一致。
+GRADUATION_RATE_TOLERANCE = 0.001
+
+
+def _load(school: str) -> dict:
+    return json.loads(
+        (DATA_DIR / "110级" / f"{school}_基础方案_v1.json").read_text(encoding="utf-8")
+    )
+
+
+def test_formula_parser_supports_workbook_subset() -> None:
+    ast = parse_formula('=IF(A1>0,SUM(B1:B3),VLOOKUP("x",表!A:C,2,FALSE))')
+    assert ast["op"] == "call"
+    assert ast["name"] == "IF"
+
+
+@pytest.mark.slow
+def test_converter_resolves_skill_alias_in_school_group() -> None:
+    path = next(
+        (p for p in EXCEL_DIR.glob("110级/*鸣金虹*.xlsx")
+         if "副本" not in p.stem),
+        None,
+    )
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/110级/*鸣金虹*.xlsx")
+    model = convert_workbook(path, "鸣金·虹")
+    assert model["baseline_attrs"]["extra_attrs"]["无名剑法蓄力技增伤"] == 0.32
+
+
+@pytest.mark.slow
+def test_converter_ignores_blank_skill_affix_label() -> None:
+    path = next(EXCEL_DIR.glob("110级/*牵丝霖*.xlsx"), None)
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/110级/*牵丝霖*.xlsx")
+    model = convert_workbook(path, "牵丝·霖")
+    skill_group = set(
+        get_game_config().get_alias_groups("指定技能增效")["牵丝·霖"]
+    )
+    assert not skill_group.intersection(model["baseline_attrs"].get("extra_attrs", {}))
+
+
+def _expectation_workbook(labels: tuple[str, ...]):
+    import openpyxl
+
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "期望"
+    for row, label in enumerate(labels, start=15):
+        sheet.cell(row, 1, label)
+    sheet.cell(15 + len(labels), 1, "固伤加成")
+    return book
+
+
+def _two_spear_config():
+    """真实词组别名 + 一个主副都是枪的流派，隔离于随包流派配置。"""
+    from copy import deepcopy
+
+    from lvjiang.apps.yysls.core.graduation import graduation_converter as converter
+
+    config = deepcopy(converter._game_config())
+    config["schools"]["测试·双枪"] = {
+        "attr": "鸣金",
+        "main": {"martial_art": "测试枪法", "weapon": "枪"},
+        "sub": {"martial_art": "测试枪法二", "weapon": "枪"},
+    }
+    config["affix_caps"]["指定技能增效"]["_aliases"]["测试·双枪"] = ["测试定音"]
+    return config
+
+
+def test_workbook_inputs_ignores_weapon_rows_the_school_cannot_use() -> None:
+    """双枪流派的表格带着模板遗留的「剑增」行时，导入不能被这行卡住。
+
+    表格由同一套模板派生，本流派用不到的武器增伤行不参与任何计算；
+    把它当错误会让整份表无法导入，而改表又会被作者的下一版覆盖。
+    """
+    from lvjiang.apps.yysls.core.graduation import graduation_converter as converter
+
+    book = _expectation_workbook(("全武增", "首领增", "剑增", "枪增", "奇术增"))
+    inputs = converter._workbook_inputs(book, "测试·双枪", _two_spear_config())
+
+    assert inputs["weapon_bonus_primary"] == "期望!B18"
+    assert "期望!B17" not in inputs.values()
+    assert inputs["all_skill_bonus"] == "期望!B15"
+
+
+def test_workbook_inputs_still_rejects_labels_outside_the_alias_config() -> None:
+    """忽略无关武器行不等于放宽校验：真正不认识的简称仍要报错。"""
+    from lvjiang.apps.yysls.core.graduation import graduation_converter as converter
+
+    book = _expectation_workbook(("不存在的简称",))
+    with pytest.raises(RuntimeError, match="不在词组别名配置中"):
+        converter._workbook_inputs(book, "测试·双枪", _two_spear_config())
+
+
+@pytest.mark.slow
+def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> None:
+    """破竹·风比通用表多一行老鼠定音，后续环境行也随之下移。"""
+    path = next(EXCEL_DIR.glob("110级/破竹风*.xlsx"), None)
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/110级/破竹风*.xlsx")
+
+    model = convert_workbook(path, "破竹·风")
+    extra = model["baseline_attrs"]["extra_attrs"]
+    assert extra["泥犁三垢强效轻击增伤"] == 0
+    assert extra["粟子游尘鼠鼠增伤"] == pytest.approx(0.32)
+    assert model["environment"]["fixed_damage_bonus"] == pytest.approx(0.4)
+    assert model["environment"]["food_bonus"] == {
+        "min_outer": 200,
+        "max_outer": 400,
+    }
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("level", (110, 115))
+@pytest.mark.parametrize("school", SCHOOLS)
+def test_converter_accepts_both_qishu_input_layouts(school: str, level: int) -> None:
+    """110/115 的奇术输入布局不同，转换器必须两种都认。
+
+    115 起游戏把单体/群体类奇术增伤合并成全奇术增伤，一部分流派的表格因此少
+    一行，定音从 B21 上移到 B20，另一部分流派仍保留两行。行号写死时新布局的
+    定音行会被当成群体奇术，导入直接报「简称无法解析」，用户拿不到 115 方案。
+
+    每个 (流派, 等级) 单独一条用例：单次 convert_workbook 要数秒，22 次塞进一条
+    会成为整轮 pytest 的长尾（xdist 无法分摊）；且 case_matrix 里一个 skip 会把
+    其余行一起跳过，拆开后缺哪张表只跳哪一条。
+    """
+    slug = school.replace("·", "")
+    path = next(
+        (p for p in EXCEL_DIR.glob(f"{level}级/*{slug}*.xlsx")
+         if "副本" not in p.stem and not p.name.startswith("~$")),
+        None,
+    )
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/{level}级/*{slug}*.xlsx")
+    try:
+        attrs = convert_workbook(path, school, model_level=level)["baseline_attrs"]
+    except PermissionError:
+        # 工作簿正被 Excel 打开时 Windows 不给读，属于环境状态而非模型缺陷
+        pytest.skip(f"Excel 正被占用: {path}")
+    merged = "all_qs_bonus" in attrs
+    split = {"single_qs_bonus", "group_qs_bonus"} & attrs.keys()
+    assert merged != bool(split), (
+        f"{school} {level} 级的奇术输入同时出现了合并词条与单/群两路："
+        f"{sorted(attrs)}"
+    )
+
+
+@case_matrix("school", SCHOOLS)
+def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
+    model = _load(school)
+    assert next(iter(model)) == "content_version"
+    assert model["content_version"] == 1
+    assert model["schema_version"] == 3
+    assert model["scheme"] == "基础方案"
+    assert model["model_level"] == 110
+    assert model["model_version"] == 1
+    assert model["source"]["sha256"]
+    assert "sheets" not in model
+    baseline = model["baseline_attrs"]
+    extra = baseline.get("extra_attrs", {})
+    values = [
+        baseline.get(spec["name"], 0) if spec["kind"] == "field"
+        else extra.get(spec["name"], 0)
+        for spec in model["program"]["inputs"]
+    ]
+    actual = ProgramRuntime(model["program"], values).outputs()
+    # 从 reference 自行计算 Excel 原始基准，不依赖可能被用户覆盖的 graduation_baseline_dps
+    expected_baseline = (
+        model["reference"]["dps"] / model["reference"]["graduation_rate"]
+    )
+    actual["graduation_rate"] = actual["dps"] / expected_baseline
+    for name, expected in model["reference"].items():
+        assert actual[name] == pytest.approx(expected, rel=1e-10, abs=1e-6)
+    assert actual["graduation_rate"] == pytest.approx(
+        1.0, abs=GRADUATION_RATE_TOLERANCE)
+
+
+def test_runtime_uses_non_mingjin_element_inputs() -> None:
+    calculator = get_graduation_calculator("破竹·鸢")
+    assert calculator is not None
+    low = CombatAttributes(min_outer=3000, max_outer=3000,
+                           min_pozhu=100, max_pozhu=100)
+    high = CombatAttributes(min_outer=3000, max_outer=3000,
+                            min_pozhu=1000, max_pozhu=1000)
+    assert calculator.calculate(high).dps > calculator.calculate(low).dps
+
+
+def test_new_school_needs_only_a_model_not_a_code_list() -> None:
+    """新流派只要导入模型就能算毕业率，不需要同时改代码里的流派清单。"""
+    invalidate_graduation_cache()
+    assert get_graduation_calculator("鸣金·霆", "基础方案", 115) is not None
+    # 没有对应等级的模型属于正常情况：返回 None，不抛异常也不刷错误日志。
+    assert get_graduation_calculator("鸣金·霆", "基础方案", 110) is None
+    assert get_graduation_calculator("不存在的流派", "基础方案", 115) is None
+
+
+def test_runtime_reports_workbook_baseline() -> None:
+    # 锚定 110 级工作簿：期望值来自该模型，不随当前赛季等级漂移
+    calculator = get_graduation_calculator("裂石·威", world_level=110)
+    assert calculator is not None
+    assert calculator.baseline_dps() == pytest.approx(141520.37)
+    assert calculator.combat_time() == pytest.approx(101.4)
+
+
+def test_editable_baseline_dps_recalibrates_graduation_rate(
+    tmp_path, monkeypatch,
+) -> None:
+    import lvjiang.apps.yysls.core.graduation.model_registry as registry
+    import lvjiang.constants as constants
+    import lvjiang.core.config.session as session_mod
+
+    source = DATA_DIR / "110级" / "鸣金·虹_基础方案_v1.json"
+    shutil.copy(source, tmp_path / source.name)
+    monkeypatch.setattr(
+        registry, "get_resolver",
+        # 发现层走递归枚举（方案按等级分子目录），替身得提供同一个方法，
+        # 否则它测的就不是生产实际调用的那条路。
+        lambda: type("Resolver", (), {
+            "resolve_read": lambda self, rel_path: tmp_path / Path(rel_path).name,
+            "enumerate_entity_tree":
+                lambda self, _rel_dir, _pattern: [f"110级/{source.name}"],
+        })(),
+    )
+    # 基准 DPS 覆盖值现存于 config/session/yysls/graduations.json；
+    # 把 session 目录整体指到 tmp_path 并重置单例，避免污染真实 session。
+    monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(session_mod, "_store", None)
+    invalidate_graduation_cache()
+    try:
+        attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")
+        original = get_graduation_calculator("鸣金·虹", "基础方案")
+        assert original is not None
+        dps = original.calculate(attrs).dps
+        set_graduation_baseline_dps("鸣金·虹", "基础方案", dps * 2)
+        calibrated = get_graduation_calculator("鸣金·虹", "基础方案")
+        assert calibrated is not None
+        result = calibrated.calculate(attrs)
+        assert result.dps == pytest.approx(dps)
+        assert result.graduation_rate == pytest.approx(0.5)
+    finally:
+        invalidate_graduation_cache()
+
+
+
+
+@case_matrix("school", SCHOOLS)
+def test_dynamic_inputs_use_canonical_game_affix_names(school: str) -> None:
+    model = _load(school)
+    game_config = get_game_config()
+    canonical = set(game_config.get_wuxue_affix_names())
+    canonical.update(game_config.get_aliases_for_category("指定技能增效"))
+    affix_inputs = {
+        spec["name"] for spec in model["program"]["inputs"]
+        if spec["kind"] == "affix"
+    }
+    assert affix_inputs <= canonical
+    assert affix_inputs <= set(model["baseline_attrs"].get("extra_attrs", {}))
+
+
+def test_runtime_matches_mingjin_hong_excel_example(monkeypatch) -> None:
+    # 隔离 session 覆盖层，确保使用 JSON 源数据 baseline
+    import lvjiang.apps.yysls.core.graduation as grad_mod
+    monkeypatch.setattr(grad_mod, "_get_session_baseline", lambda *a, **kw: None)
+    invalidate_graduation_cache()
+    # 输入与期望值均来自 110 级工作簿示例，显式钉住等级
+    calculator = get_graduation_calculator("鸣金·虹", world_level=110)
+    assert calculator is not None
+    attrs = CombatAttributes(
+        min_outer=1696, max_outer=5624, outer_pen=63.5,
+        min_mingjin=513, max_mingjin=1350, mingjin_pen=36,
+        mingjin_bonus=0.15, min_wuxiang=79, max_wuxiang=157,
+        precision=0.8271, crit_rate=0.1789, intent_rate=0.3929,
+        direct_crit=0, direct_intent=0.023,
+        crit_dmg=0.5, intent_dmg=0.402,
+        all_skill_bonus=0.08, boss_bonus=0.083,
+        extra_attrs={
+            "剑武学增伤": 0.08,
+            "无名剑法蓄力技增伤": 0.32,
+        },
+    )
+    result = calculator.calculate(attrs)
+    assert result.dps == pytest.approx(146401.02681145616)
+    assert result.graduation_rate == pytest.approx(0.9506393512026488)
+
+
+def test_scheme_value_inputs_exclude_food_bonus() -> None:
+    values = get_graduation_scheme_inputs("鸣金·虹", "基础方案")
+    names = {entry["name"] for entry in values}
+    assert "min_outer" in names
+    assert "无名剑法蓄力技增伤" in names
+    assert all("food" not in name.lower() for name in names)
+
+
+def test_v2_records_environment_without_exposing_it_as_inputs() -> None:
+    model = _load("鸣金·虹")
+    assert model["environment"]["food_bonus"] == {
+        "min_outer": 200,
+        "max_outer": 400,
+    }
+    assert model["environment"]["team_buffs"]
+    input_names = {spec["name"] for spec in model["program"]["inputs"]}
+    assert "food_bonus" not in input_names
+    assert "team_buffs" not in input_names
+
+
+@case_matrix("school", SCHOOLS)
+def test_v2_contains_no_excel_affix_aliases(school: str) -> None:
+    raw = (DATA_DIR / "110级" / f"{school}_基础方案_v1.json").read_text(
+        encoding="utf-8")
+    game_config = get_game_config()
+    for exact_name in game_config.get_wuxue_affix_names():
+        for alias in game_config.get_affix_aliases(exact_name):
+            assert f'"{alias}"' not in raw
+
+
+def test_scheme_combat_attrs_only_expose_canonical_affix_names() -> None:
+    attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")
+    assert "剑武学增伤" in attrs.extra_attrs
+    assert "无名剑法蓄力技增伤" in attrs.extra_attrs
+    assert "剑增" not in attrs.extra_attrs
+    assert "蓄力技定音" not in attrs.extra_attrs
+
+
+def test_pozhu_scheme_uses_canonical_field_spelling() -> None:
+    values = {
+        entry["name"]: entry["value"]
+        for entry in get_graduation_scheme_inputs("破竹·风", "基础方案")
+    }
+    attrs = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
+    assert attrs.pozhu_pen == values["pozhu_pen"]
+    assert attrs.pozhu_bonus == values["pozhu_bonus"]
+    assert "pozhu_pen" in attrs.to_dict()
+
+
+def test_runtime_only_consumes_canonical_affix_names() -> None:
+    calculator = get_graduation_calculator("鸣金·虹")
+    assert calculator is not None
+    common = dict(
+        min_outer=1696, max_outer=5624, outer_pen=63.5,
+        min_mingjin=513, max_mingjin=1350, mingjin_pen=36,
+        mingjin_bonus=0.15, min_wuxiang=79, max_wuxiang=157,
+        precision=0.8271, crit_rate=0.1789, intent_rate=0.3929,
+        direct_crit=0, direct_intent=0.023,
+        crit_dmg=0.5, intent_dmg=0.402,
+        all_skill_bonus=0.08, boss_bonus=0.083,
+    )
+    configured = CombatAttributes(
+        **common,
+        extra_attrs={
+            "剑武学增伤": 0.08,
+            "无名剑法蓄力技增伤": 0.32,
+        },
+    )
+    scanned = CombatAttributes(
+        **common,
+        extra_attrs={
+            "剑武学增伤": 0.08,
+            "无名剑法蓄力技增伤": 0.32,
+            "文动霓裳特殊技增伤": 0.99,
+        },
+    )
+    assert calculator.calculate(scanned) == calculator.calculate(configured)
+
+
+def test_pozhu_feng_runtime_consumes_mouse_dingyin() -> None:
+    calculator = get_graduation_calculator("破竹·风")
+    assert calculator is not None
+    attrs = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
+
+    attrs.extra_attrs["粟子游尘鼠鼠增伤"] = 0
+    without_mouse = calculator.calculate(attrs)
+    attrs.extra_attrs["粟子游尘鼠鼠增伤"] = 0.32
+    with_mouse = calculator.calculate(attrs)
+
+    assert with_mouse.dps > without_mouse.dps
+    assert with_mouse.graduation_rate > without_mouse.graduation_rate
+
+
+def _buff_divisor() -> float:
+    """当前赛季装备等级的增益抗性除数。"""
+    gc = get_game_config()
+    config = gc.level_config_for(gc.current_equip_level())
+    return 1 + float((config and config.buff_resistance) or 0) / 100
+
+
+def test_pozhu_feng_mouse_dingyin_reaches_formula_from_equipment() -> None:
+    """双刀四件防具满定音应经现有装备链路变成公式的 0.32 输入。"""
+    equipped = {
+        slot: {
+            "name": f"模拟{part}",
+            "type": part,
+            "level": 110,
+            "quality": "gold",
+            "dingyin": {
+                "name": "泥犁三垢强效轻击增伤",
+                "value": 1.0,
+            },
+        }
+        for slot, part in (
+            ("head", "冠胄"),
+            ("chest", "胸甲"),
+            ("leg", "胫甲"),
+            ("wrist", "腕甲"),
+        )
+    }
+    replaced = apply_hypothetical_caps(
+        equipped, full_dingyin=True, playstyle="双刀",
+    )
+    assert {
+        equip["dingyin"]["name"] for equip in replaced.values()
+    } == {"粟子游尘鼠鼠增伤"}
+
+    equipment_attrs = aggregate_equipment_attrs(replaced)
+    assert equipment_attrs.extra_attrs["粟子游尘鼠鼠增伤"] == pytest.approx(
+        0.368,
+    )
+    effective = build_graduation_attrs(
+        CombatAttributes(), equipment_attrs, "破竹·风",
+    )
+    # 定音满值过一遍当前赛季的增益抗性；抗性是每个等阶都会变的游戏数值，
+    # 写死只会让补数据的提交无端变红。
+    assert effective.extra_attrs["粟子游尘鼠鼠增伤"] == pytest.approx(
+        0.368 / _buff_divisor(),
+    )
+
+    calculator = get_graduation_calculator("破竹·风")
+    assert calculator is not None
+    baseline = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
+    # 标定自洽：把方案自己的满值原样喂回去就是毕业率 1.0。
+    #
+    # 容差跟的是**源表自己的舍入**，不是我们的算术：随包 115 级各表的自洽度在
+    # 6e-9 ~ 2.6e-8 之间（破竹·风这份表 Excel 自己算出来的 期望!I16 就是
+    # 1.00000002228733），原来的 1e-8 是按 110 表标的，比源表本身还紧。模型与
+    # Excel 是否逐位一致由专门的对账用例守，这里只验标定方向没搞反。
+    assert calculator.calculate(baseline).graduation_rate == pytest.approx(
+        1.0, rel=1e-7)
+
+    # 装备口径不再等于方案满值：这套方案是按 110 的抗性标定的，当前赛季抗性
+    # 更高，同一条定音过完抗性后就到不了表里那个数。所以这里只验「装备上的
+    # 定音确实一路走进了公式」，不验它正好把毕业率顶到 1.0——那要等毕业率表
+    # 按新等阶重新标定。
+    baseline.extra_attrs.pop("粟子游尘鼠鼠增伤", None)
+    without_mouse = calculator.calculate(baseline)
+    with_mouse = calculator.calculate(baseline + effective)
+    assert with_mouse.dps > without_mouse.dps
+
+
+# ─── Excel 错误值 ────────────────────────────────────────
+
+
+def test_formula_parser_accepts_excel_error_literals() -> None:
+    """`#REF!` 这类是 Excel 写回的**值**，不是语法错误，解析阶段必须放过。
+
+    转换器会把整个工作簿的每个公式都过一遍解析做校验。解析阶段就拒绝的话，
+    任何一张表里的坏格都能挡住整份表的导入，而报错还会说成「不支持这种写法」。
+    """
+    ast = parse_formula('=IF(期望!#REF!="逆反",0,25)')
+    assert ast["args"][0]["left"] == {"op": "error", "code": "期望!#REF!"}
+    # 删表删行后 Excel 写回的是带表名的整体，裸写法也要认
+    assert parse_formula("=#DIV/0!") == {"op": "error", "code": "#DIV/0!"}
+    assert parse_formula("=IF('有 空格'!#N/A=1,2,3)")["args"][0]["left"]["code"] == (
+        "'有 空格'!#N/A")
+
+
+def test_excel_errors_propagate_like_excel_and_fail_at_the_boundary() -> None:
+    """错误值按 Excel 的方式**传播**，在取输出那一步才失败。
+
+    求值时一碰到就抛，一张表里任何一个没人取用的坏格都能挡住整份表的导入；
+    而把它当成 0 或静默跳过，又会算出一个数——那个数会被固化进毕业率模型，
+    之后没有任何地方会发现。所以：沿途按值传，边界上拒绝。
+    """
+    from lvjiang.apps.yysls.core.graduation.excel_formula import (
+        ExcelError,
+        FormulaError,
+        FormulaModel,
+    )
+
+    model = FormulaModel({"sheets": {"表": {
+        "dimensions": {"max_row": 3, "max_column": 2},
+        "cells": {
+            "A1": {"formula": "=#REF!"},
+            "A2": {"formula": '=IF(#REF!="x",1,2)'},
+            "A3": {"value": 5},
+            "B1": {"formula": "=A1+1"},
+            "B2": {"formula": "=SUM(A1:A3)"},
+            "B3": {"formula": "=IFERROR(#REF!,7)"},
+        },
+    }}})
+
+    # 坏格自身的值就是那个错误，并记住出处
+    assert model.value("A1", "表") == ExcelError("#REF!", "表!A1")
+    # 比较同样传播：当成 False 会让 IF 静默选错一边
+    assert isinstance(model.value("A2", "表"), ExcelError)
+    # 算术与 SUM 都传播，出处一路保留——SUM 尤其要盯：它按 isinstance 只收
+    # 数字，哨兵若被当文本跳过就会少加一项却照样返回一个数
+    for coord in ("B1", "B2"):
+        assert model.value(coord, "表") == ExcelError("#REF!", "表!A1")
+    # IFERROR 照 Excel 语义兜住
+    assert model.value("B3", "表") == 7
+
+    # 边界：真要当数用的时候必须失败，并指出坏在哪一格
+    with pytest.raises(FormulaError, match="表!A1"):
+        float(model.value("B2", "表"))
+
+
+@pytest.mark.slow
+def test_unused_broken_cell_does_not_block_import() -> None:
+    """破竹·风 115 表的 增益!F18 引用已失效（作者删行留下的 `#REF!`）。
+
+    但它不影响结果：`期望!AV2` 用 `XLOOKUP(S2:AL2, 增益!$A:$A, 增益!$F:$F, 0)`
+    查表，而这一行选中的增益里没有「蹭断」——Excel 自己算出来的 AV2 是 0.444
+    而不是 #REF!。所以判据只有一个：输出能不能和 Excel 的缓存值对上。
+
+    顺带钉住坏格不会在产物里留痕：它编译成死常量，剪枝时连同别的死分支一起丢掉。
+    """
+    import openpyxl
+
+    from lvjiang.apps.yysls.core.graduation.graduation_converter import OUTPUTS
+
+    path = next(EXCEL_DIR.glob("115级/破竹风*.xlsx"), None)
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/115级/破竹风*.xlsx")
+
+    model = convert_workbook(path, "破竹·风", model_level=115)
+    cached = openpyxl.load_workbook(path, data_only=True)
+    try:
+        reference = model.get("reference") or {}
+        assert reference, "没有产出 reference，无从对账"
+        for name, value in reference.items():
+            sheet, coord = OUTPUTS[name].rsplit("!", 1)
+            assert value == pytest.approx(
+                float(cached[sheet][coord].value)), name
+    finally:
+        cached.close()
+
+    assert not any(
+        entry[0] == "const" and type(entry[1]).__name__ == "ExcelError"
+        for entry in model["program"]["nodes"]
+    ), "没人取用的坏格不该留在产物里"

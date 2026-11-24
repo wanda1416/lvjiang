@@ -59,8 +59,8 @@ AI 或用户精确查字段/语法/命令 → 提炼契约进 40-reference；只
 
 | 脚本 | 职责 |
 |------|------|
-| `python scripts/docs_check.py` | 死链与页内锚点、孤儿文档、入口可达、一级标题、目录内编号冲突与前缀、层索引是否登记了同目录全部文档 |
-| `python scripts/docs_index.py --check` | 按月归档的开发日志、发布说明索引是否与目录一一对应 |
+| `python scripts/ci/docs_check.py` | 死链与页内锚点、孤儿文档、入口可达、一级标题、目录内编号冲突与前缀、层索引是否登记了同目录全部文档 |
+| `python scripts/ci/docs_index.py --check` | 按月归档的开发日志、发布说明索引是否与目录一一对应 |
 
 两个脚本都接在 `.github/workflows/ci.yml` 的 `Docs check` 步骤上；改动文档后本地先跑
 一遍。门禁只保「链接和索引不烂」，不检查日期、基线或状态行。索引行的人工列（主题 /
@@ -93,9 +93,9 @@ admin 可以保留导航页，但操作正文不复制维护两份。
 除原检查外，维护者从主工程根目录执行：
 
 ```bash
-python scripts/docs_check.py --admin
-python scripts/build_agent_bundle.py --output <新的临时目录>
-python scripts/docs_check.py --bundle <上述临时目录>
+python scripts/ci/docs_check.py --admin
+python scripts/ci/build_agent_bundle.py --output <新的临时目录>
+python scripts/ci/docs_check.py --bundle <上述临时目录>
 ```
 
 admin 模式复用链接、标题、编号和索引检查。没有 admin 检出时明确报错，不把缺失目录当作

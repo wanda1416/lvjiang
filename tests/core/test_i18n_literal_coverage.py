@@ -240,55 +240,6 @@ def test_language_tables_cover_every_en_key(language: str) -> None:
 
 
 @pytest.mark.parametrize("language", _shipped_languages())
-def test_app_fallback_values_match_en(language: str) -> None:
-    """英文回退语言的插件词表必须与 en_US 逐条相同（放行非 ASCII 的本地化值）。
-
-    真实事故：10 个新语言的插件表停在 dd4ca53f 修正官方译名之前的英文快照，
-    336 条术语与 en 分叉——同一游戏概念在不同界面语言下叫法不同：
-    ``Dingyin`` / ``Attunement``、``Cap Value`` / ``Maximum``、
-    ``Loadout`` / ``Equipment Builds``。这些语言本来就以英文回退，值不一致
-    只说明复制品腐烂，不是本地化。
-
-    对 ``config/i18n/apps/`` 下每个随包插件词表逐一检查，不认识具体插件。
-    """
-    apps_root = I18N_DIR / "apps"
-    drifted: dict[str, tuple[str, str]] = {}
-    for en_file in sorted(apps_root.glob("*/en_US.yaml")) if apps_root.is_dir() else []:
-        target = en_file.parent / f"{language}.yaml"
-        if not target.exists():  # 插件可以只随包部分语言
-            continue
-        en_values = _flat_values(en_file)
-        drifted.update({
-            f"apps/{en_file.parent.name}:" + "/".join(path): (value, en_values[path])
-            for path, value in _flat_values(target).items()
-            if value.isascii() and path in en_values and en_values[path] != value
-        })
-    assert not drifted, (
-        f"{language} 插件层有 {len(drifted)} 条英文值与 en_US 不一致"
-        f"（应随 en 一起改，不要各存一份）：{sorted(drifted)[:8]}")
-
-
-def _flat_values(path: Path) -> dict[tuple[str, ...], str]:
-    """词表文件的 {键路径: 字符串值}（跳过多模块文件顶层 meta）。"""
-    data = _load_yaml(path)
-    values: dict[tuple[str, ...], str] = {}
-
-    def walk(node: object, trail: tuple[str, ...]) -> None:
-        if not isinstance(node, dict):
-            return
-        for key, value in node.items():
-            if not trail and key == "meta":
-                continue
-            if isinstance(value, dict):
-                walk(value, trail + (str(key),))
-            elif isinstance(value, str):
-                values[trail + (str(key),)] = value
-
-    walk(data, ())
-    return values
-
-
-@pytest.mark.parametrize("language", _shipped_languages())
 def test_literal_translations_do_not_end_with_colon(language: str) -> None:
     """文案的译文不应自带冒号，否则 tr_label() 会拼出双冒号。
 

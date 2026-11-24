@@ -1,75 +1,87 @@
 account_dialog:
-  上行: Upload
-  下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Data for the following users will follow the cloud snapshot; local data will be overwritten:'
-  下行: Download
-  云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: "The cloud baseline is empty.<br>Source: {origin}<br>Time: {created}<br>Entries: 0<br><br>Continuing will fill the baseline from this machine's current overview; local users are not backed up or replaced."
+  上行: Отправка
+  下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Данные следующих пользователей будут взяты из облачного снимка; локальные данные будут перезаписаны:'
+  下行: Загрузка
+  云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: 'Облачная база пуста.<br>Источник: {origin}<br>Время: {created}<br>Записей: 0<br><br>При продолжении база будет заполнена текущим обзором с этого устройства; локальные пользователи не резервируются и не заменяются.'
   ? 云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。
-  : 'A cloud snapshot already exists.<br>Source: {origin}<br>Time: {created}<br>Entries: {count}{warning}<br><br>Continuing will first back up local users, overview definitions and overview data to config/session/_backup-*, then pull cloud data.'
-  修改密码: Change Password
-  修改密码…: Changing password…
-  创建快照: Create Snapshot
-  初始同步: Initial Sync
-  在浏览器中打开注册页面: Open the registration page in a browser
-  在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号: 'Open the self-service page in a browser: change password, export data, clear cloud data, delete account'
-  定义: Definitions
-  密码: Password
-  ? "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。"
-  : "This clears cloud definitions, users, documents and overview data (account and login state are kept).\nThis cannot be undone; local data is not deleted."
-  已取消覆盖：本机数据未改动，profile 同步未启用。: 'Overwrite cancelled: local data unchanged, profile sync not enabled.'
-  平台: Platform
-  当前密码: Current password
-  当前设备不是初始同步设备: This device is not the initial-sync device
-  总览: Overview
-  ? "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。"
-  : "Upload all local character data as the cloud overview baseline.\nInitial sync creates one automatically; click manually later when needed."
-  操作未完成: Operation not completed
-  数据同步: Data Sync
-  文档: Documentation
-  新密码至少 8 位: The new password must be at least 8 characters
-  新密码（至少 8 位）: New password (at least 8 characters)
-  显示密码: Show password
-  最近同步时间：{}: 'Last sync: {}'
-  最近活跃: Last active
-  未知设备: Unknown device
-  检测到云端覆盖待确认；点「立即同步」处理。: A pending cloud overwrite awaits confirmation; click "Sync now" to handle it.
-  正在修改密码…: Changing password…
-  正在同步…: Syncing…
-  正在备份并应用云端快照…: Backing up and applying the cloud snapshot…
-  正在清除同步…: Clearing sync…
-  正在登录…: Signing in…
-  注册: Register
-  清除同步: Clear Sync
-  登出: Sign out
-  登录: Sign in
-  登录后可同步角色名册、文档与总览数据: Sign in to sync rosters, documents and overview data
-  确定让该设备下线？该设备上的全部会话会立即失效。: Take this device offline? All sessions on it will be invalidated immediately.
-  确认后会先把本机 profile 数据备份到 config/session/_sync-backup-<时间戳>/，再应用云端快照；可在该目录恢复。: After confirmation, local profile data is backed up to config/session/_sync-backup-<timestamp>/ before applying the cloud snapshot; you can restore from that directory.
-  立即同步: Sync Now
-  自助服务…: Self-service…
-  设备登出: Sign out device
-  设备管理: Device Management
-  "复制ID": "Copy ID"
-  "复制这台设备的 ID；重置密码时管理员凭它核对身份，不要随意泄露": "Copy this device's ID. An admin uses it to verify identity when resetting the password. Do not share it casually."
-  "当前设备ID：{id}": "Device ID: {id}"
-  "（请勿随意向他人泄露该 id，这是重置密码的唯一凭据）": "(Do not share this ID. It is the only credential for resetting the password.)"
-  请先点「初始同步」建立同步状态: Click "Initial Sync" first to establish sync state
-  请输入密码: Enter your password
-  请输入账户: Enter your account
-  读取本机总览失败：{error}: 'Failed to read the local overview: {error}'
-  账户: Account
-  这是本机：下线后需要重新登录。: "This is the local machine: you'll need to sign in again after signing it out."
-  进度: Progress
-  退出所有设备: Sign out all devices
-  退出登录: Sign out
-  通道: Channel
-  隐藏密码: Hide password
-  ? "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"
-  : "First time: establish sync state between this machine and the cloud. If the cloud already has data, local\nusers, overview definitions and overview data are backed up to config/session/_backup-* before pulling."
-  ；等 {} 项: ; {} more items
-  "已恢复每分钟自动同步": "Automatic sync every minute resumed"
-  "已暂停自动同步；手动「立即同步」仍可用": "Automatic sync paused; manual \"Sync now\" still works"
-  "恢复同步": "Resume sync"
-  "暂停同步": "Pause sync"
-  "暂停后不再每分钟自动同步（心跳与在线状态不受影响）。手动「立即同步」仍可用；重启后保持暂停状态。": "After pausing, automatic sync every minute stops (heartbeat and online status are unaffected). Manual \"Sync now\" still works; the paused state persists after restart."
+  : 'В облаке уже есть снимок.<br>Источник: {origin}<br>Время: {created}<br>Записей: {count}{warning}<br><br>При продолжении локальные пользователи, определения обзора и данные обзора сначала будут сохранены в config/session/_backup-*, а затем загрузятся данные из облака.'
+  修改密码: Сменить пароль
+  修改密码…: Смена пароля…
+  创建快照: Создать снимок
+  初始同步: Начальная синхронизация
+  在浏览器中打开注册页面: Открыть страницу регистрации в браузере
+  在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号: 'Открыть страницу самообслуживания в браузере: смена пароля, экспорт данных, очистка облака, удаление аккаунта'
+  定义: Определения
+  密码: Пароль
+  ? '将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。
+
+    此操作不可恢复；本地数据不会被删除。'
+  : 'Будут очищены облачные определения, пользователи, документы и данные обзора (аккаунт и сеанс входа сохранятся).
+
+    Это действие необратимо; локальные данные удалены не будут.'
+  已取消覆盖：本机数据未改动，profile 同步未启用。: 'Перезапись отменена: локальные данные не изменены, синхронизация профиля не включена.'
+  平台: Платформа
+  当前密码: Текущий пароль
+  当前设备不是初始同步设备: Это устройство не является устройством начальной синхронизации
+  总览: Обзор
+  ? '把本机当前全部角色数据上传为云端总览基线。
+
+    初始同步会自动创建一次；之后需要时手动点。'
+  : 'Отправить все локальные данные персонажей как облачную базу обзора.
+
+    При начальной синхронизации создаётся автоматически; позже можно нажимать вручную.'
+  操作未完成: Операция не завершена
+  数据同步: Синхронизация данных
+  文档: Документация
+  新密码至少 8 位: Новый пароль должен содержать не менее 8 символов
+  新密码（至少 8 位）: Новый пароль (не менее 8 символов)
+  显示密码: Показать пароль
+  最近同步时间：{}: 'Последняя синхронизация: {}'
+  最近活跃: Последняя активность
+  未知设备: Неизвестное устройство
+  检测到云端覆盖待确认；点「立即同步」处理。: Обнаружена ожидающая подтверждения перезапись из облака; нажмите «Синхронизировать» для обработки.
+  正在修改密码…: Смена пароля…
+  正在同步…: Синхронизация…
+  正在备份并应用云端快照…: Резервное копирование и применение облачного снимка…
+  正在清除同步…: Очистка синхронизации…
+  正在登录…: Вход…
+  注册: Регистрация
+  清除同步: Очистить синхронизацию
+  登出: Выйти
+  登录: Войти
+  登录后可同步角色名册、文档与总览数据: Войдите, чтобы синхронизировать списки персонажей, документы и данные обзора
+  确定让该设备下线？该设备上的全部会话会立即失效。: Отключить это устройство? Все сеансы на нём немедленно станут недействительными.
+  确认后会先把本机 profile 数据备份到 config/session/_sync-backup-<时间戳>/，再应用云端快照；可在该目录恢复。: После подтверждения локальные данные профиля сначала будут сохранены в config/session/_sync-backup-<timestamp>/, а затем применится облачный снимок; восстановить можно из этой папки.
+  立即同步: Синхронизировать
+  自助服务…: Самообслуживание…
+  设备登出: Выйти на устройстве
+  设备管理: Управление устройствами
+  复制ID: Копировать ID
+  复制这台设备的 ID；重置密码时管理员凭它核对身份，不要随意泄露: Скопировать ID этого устройства. Администратор использует его для проверки личности при сбросе пароля — не передавайте его посторонним
+  当前设备ID：{id}: 'ID устройства: {id}'
+  （请勿随意向他人泄露该 id，这是重置密码的唯一凭据）: (Не передавайте этот ID посторонним — это единственное подтверждение для сброса пароля)
+  请先点「初始同步」建立同步状态: Сначала нажмите «Начальная синхронизация», чтобы настроить синхронизацию
+  请输入密码: Введите пароль
+  请输入账户: Введите аккаунт
+  读取本机总览失败：{error}: 'Не удалось прочитать локальный обзор: {error}'
+  账户: Аккаунт
+  这是本机：下线后需要重新登录。: 'Это текущее устройство: после отключения потребуется войти снова.'
+  进度: Прогресс
+  退出所有设备: Выйти на всех устройствах
+  退出登录: Выйти из аккаунта
+  通道: Канал
+  隐藏密码: Скрыть пароль
+  ? '首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地
+
+    用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。'
+  : 'Первый запуск: настройка синхронизации между этим устройством и облаком. Если в облаке уже есть данные, локальные
+
+    пользователи, определения и данные обзора сначала сохранятся в config/session/_backup-*, а затем загрузятся из облака.'
+  ；等 {} 项: ; и ещё {}
+  已恢复每分钟自动同步: Ежеминутная автосинхронизация возобновлена
+  已暂停自动同步；手动「立即同步」仍可用: Автосинхронизация приостановлена; ручная кнопка «Синхронизировать» по-прежнему доступна
+  恢复同步: Возобновить синхронизацию
+  暂停同步: Приостановить синхронизацию
+  暂停后不再每分钟自动同步（心跳与在线状态不受影响）。手动「立即同步」仍可用；重启后保持暂停状态。: После приостановки ежеминутная автосинхронизация отключается (проверка связи и статус в сети не затрагиваются). Ручная кнопка «Синхронизировать» по-прежнему работает; пауза сохраняется после перезапуска.
 common:
-  用户: User
+  用户: Пользователь

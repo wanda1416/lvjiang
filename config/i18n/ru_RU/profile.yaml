@@ -1,315 +1,464 @@
 all_user_params:
-  参数来源：全局参数: 'Parameter source: global parameters'
-  参数来源：独立参数: 'Parameter source: per-user parameters'
-  激活码已被云端停用: License code has been disabled in the cloud
+  参数来源：全局参数: 'Источник параметров: глобальные параметры'
+  参数来源：独立参数: 'Источник параметров: индивидуальные параметры'
+  激活码已被云端停用: Код активации отключён в облаке
 common:
-  allowed: Latest check passed
-  checking: Checking cloud member authorization
-  contains: contains
-  denied: 'Cloud authorization denied: unregistered, disabled, expired, or insufficient level'
-  disabled: License code has been disabled in the cloud
-  done: Done
-  expired: Cloud authorization for the license code has expired
-  invalid: Invalid member authorization request
-  label: Online member authorization
-  level: License level is insufficient for this member package
-  package: Member package is missing or disabled
-  unavailable: Online check incomplete; review configuration sync logs and retry
-  unchecked: Not checked; cloud authorization is not confirmed
-  unregistered: License code has not been registered in the cloud
-  version: Application version does not meet member package requirements
-  便利贴内容: Sticky note content
-  准点周期: Reset cycle
-  减少量: Decrease amount
-  变动规则: Change rules
-  变更脚本: Change script
-  同步目标: Sync targets
-  增加量: Increase amount
-  增量（正增负减）: Delta (positive adds, negative subtracts)
-  恢复类型: Restore type
-  新名称: New name
-  未记录: Not recorded
-  来源: Source
-  橙色阈值: Orange threshold
-  每次恢复: Each restore
-  红色阈值: Red threshold
-  速率单位: Rate unit
-  速率数值: Rate value
-  重命名分组: Rename Group
-  重置日(几号): Reset day (day of month)
-  重置日(周几): Reset day (weekday)
-  重置时刻: Reset time
-  默认: Default
+  allowed: Последняя проверка пройдена
+  checking: Проверка облачной авторизации участника
+  contains: содержит
+  denied: 'Облачная авторизация отклонена: код не зарегистрирован, отключён, истёк или имеет недостаточный уровень'
+  disabled: Код активации отключён в облаке
+  done: Готово
+  expired: Срок действия облачной авторизации кода истёк
+  invalid: Некорректный запрос авторизации участника
+  label: Онлайн-авторизация участника
+  level: Уровень лицензии недостаточен для этого пакета участника
+  package: Пакет участника отсутствует или отключён
+  unavailable: Онлайн-проверка не завершена; проверьте журнал синхронизации конфигурации и повторите попытку
+  unchecked: Не проверено; облачная авторизация не подтверждена
+  unregistered: Код активации не зарегистрирован в облаке
+  version: Версия приложения не соответствует требованиям пакета участника
+  便利贴内容: Содержимое стикера
+  准点周期: Цикл сброса
+  减少量: Уменьшение
+  变动规则: Правила изменения
+  变更脚本: Скрипт изменения
+  同步目标: Цели синхронизации
+  增加量: Увеличение
+  增量（正增负减）: Дельта (положительная увеличивает, отрицательная уменьшает)
+  恢复类型: Тип восстановления
+  新名称: Новое имя
+  未记录: Не записано
+  来源: Источник
+  橙色阈值: Оранжевый порог
+  每次恢复: За восстановление
+  红色阈值: Красный порог
+  速率单位: Единица скорости
+  速率数值: Значение скорости
+  重命名分组: Переименовать группу
+  重置日(几号): День сброса (число месяца)
+  重置日(周几): День сброса (день недели)
+  重置时刻: Время сброса
+  默认: По умолчанию
 daily_history:
-  清除: Clear
+  清除: Очистить
 profile:
-  Key '{key}' 已在该分组中显示: Key '{key}' is already shown in this group
-  Key '{key}' 已存在: Key '{key}' already exists
-  Key 只能包含字母、数字和下划线: Keys may contain only letters, digits and underscores
-  Profile 关联脚本处理中（待处理 {count}）: Profile-related scripts processing ({count} pending)
-  '{field}不能大于 999999': '{field} cannot exceed 999999'
-  '{field}不能小于 {min}': '{field} cannot be less than {min}'
-  '{field}必须是有效数字': '{field} must be a valid number'
+  Key '{key}' 已在该分组中显示: Ключ '{key}' уже отображается в этой группе
+  Key '{key}' 已存在: Ключ '{key}' уже существует
+  Key 只能包含字母、数字和下划线: Ключ может содержать только буквы, цифры и подчёркивания
+  Profile 关联脚本处理中（待处理 {count}）: 'Выполняются связанные скрипты профиля (ожидает: {count})'
+  '{field}不能大于 999999': Поле «{field}» не может превышать 999999
+  '{field}不能小于 {min}': Поле «{field}» не может быть меньше {min}
+  '{field}必须是有效数字': Поле «{field}» должно быть корректным числом
   '{first} +{rest}': '{first} +{rest}'
-  '{label} 必须是整数': '{label} must be an integer'
-  '{noun} · {count} 项': '{noun} · {count} items'
-  '{title} Key ({model})': '{title} Key ({model})'
-  一次只能复制一条定义: Only one definition can be copied at a time
-  上一页: Previous Page
-  下一页: Next Page
-  不提醒: Don't remind
-  为零: Zero
-  仅删除历史，不修改当前值；会影响按历史统计的额度: Deletes history only, leaving current values unchanged; affects quotas that accumulate from history
-  今天: Today
-  便利贴: Sticky Note
-  便利贴内容不能超过 {limit} 个字符: Sticky note content cannot exceed {limit} characters
-  保存便利贴失败：{error}: 'Failed to save the sticky note: {error}'
-  倍率: Multiplier
-  全选当前结果: Select All Results
-  共 {total} 条: '{total} records total'
-  其他设备: Other Devices
-  写入冲突: Write Conflict
-  准点/{unit}: At reset/{unit}
-  准点:{val}/{period}: 'At reset: {val}/{period}'
-  准点恢复: Restore at reset
-  减少: Decrease
-  减少 {value}: Decrease {value}
-  减少...: Decrease...
-  '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）': 'The value after decreasing cannot go below 0 (current: {cur}, entered: {inp})'
-  分组名不能为空: Group name cannot be empty
-  分钟: minutes
-  删除便利贴失败：{error}: 'Failed to delete the sticky note: {error}'
-  勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: When checked the script runs before the write lands; a rejection or failure rolls back the whole sync write chain. Unchecked, it queues after commit. Sync scripts should be short — not for long waits.
-  ? "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
-  : "Checked: handled as an action, triggering sync of the config's sync_targets.\nUnchecked: handled as a pure overwrite, writing only this key without triggering any sync."
-  ? "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"
-  : "Checked: once the target caps out this item locks (the overview shows — and becomes read-only).\nUnchecked: the item displays and edits normally even when the target is full; increments just stop writing to the capped target."
-  包含: Contains
-  单向增加: Increase-only
-  原 key 已不存在，请重新打开编辑对话框: The original key no longer exists. Reopen the editor
-  原分组已被移除，请重新选择: The original group was removed; pick again
-  双击修改来源: Double-click to edit the source
-  取消本项「满值锁定」后可继续记录，增量不再写入已满目标: Uncheck this item's "full-value lock" to keep recording; increments stop writing to the capped target
-  取消这个条件: Remove this condition
-  变动规则第 {row} 行至少添加一个快捷数量: Change rule row {row} needs at least one quick amount
-  变动规则第 {row} 行设置了快捷数量，请填写来源或用途: Change rule row {row} has quick amounts; fill in the source or use
-  变动量: Delta
-  变动量：{value}: 'Delta: {value}'
-  变更类型：{label}: 'Change type: {label}'
-  '变更脚本不存在: workflows/{path}': "Change script doesn't exist: workflows/{path}"
-  另有 {count} 项未列出，输入可搜索: '{count} more items not listed; type to search'
-  同步:{sync}: 'Sync: {sync}'
-  同步修改: Sync changes
-  同步变更依赖方: Sync dependent parties of the change
-  同步目标 {targets} 已达上限: Sync target {targets} has reached its cap
-  同步目标不能指向自身: Sync targets cannot point at themselves
-  周: weeks
-  周一: Mon
-  周三: Wed
-  周二: Tue
-  周五: Fri
-  周六: Sat
-  周四: Thu
-  周期: Cycle
-  回到打开这个对话框时的默认范围: Back to the default range from when this dialog opened
-  增加: Increase
-  增加 {value}: Increase {value}
-  增加...: Increase...
-  增量: Delta
-  复制定义: Duplicate Definition
-  定义数据模型 key: Define Data-Model Keys
-  定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Defines the data model's keys. Double-click non-group columns to edit; right-click to change groups in bulk.
-  实时/{unit}: Realtime/{unit}
-  实时:{val}/{unit}: 'Realtime: {val}/{unit}'
-  实时恢复: Realtime restore
-  小时: hours
-  展示上限: Display cap
-  展示总和行: Show total row
-  工作流语法正确: Workflow syntax OK
-  '当前值: {val}': 'Current value: {val}'
-  当前分组没有可添加的字段: The current group has no fields to add
-  当前显示全部记录: Showing all records
-  当前用户已锁定: Locked for the current user
-  快捷数量: Quick amounts
-  快捷规则:{count}项: 'Quick rules: {count}'
-  总和: Total
-  恢复入口范围: Restore Entry Scope
-  按{title}筛选: Filter by {title}
-  搜索 值 / 来源 / 用户 / 键: Search value / source / user / key
-  搜索{title}（可输入未列出的值）: Search {title} (values not listed can be typed)
-  搜索字段名称或 key: Search field names or keys
-  搜索：{value}: 'Search: {value}'
-  撤销失败: Undo failed
-  支持小数: Decimals supported
-  数值无效: Invalid number
-  数据变化后执行；路径相对于 workflows 目录: Runs after data changes; path relative to the workflows directory
-  数据模型: Data Model
-  新值: New Value
-  新值包含：{value}: 'New value contains: {value}'
-  新增: Add
-  新增便利贴: New Sticky Note
-  新增列: Add Column
-  新建分组: New Group
-  无上限: No cap
-  旧值: Old Value
-  旧值包含：{value}: 'Old value contains: {value}'
-  时间: Time
-  时间：{value}: 'Time: {value}'
-  暂无便利贴: No sticky notes
-  更改分组: Change Group
-  未完成: Incomplete
-  未记录设备: Unrecorded device
-  末页: Last Page
-  本机: This PC
-  条: records
-  来源/用途: Source/Use
-  来源（增加）: Source (increase)
-  来源：{value}: 'Source: {value}'
-  查看全部用户、全部 key 的变更记录: View change history for all users and all keys
-  查看历史记录: View History
-  标签: Label
-  校验: Validate
-  校验失败: Validation Failed
-  橙警:>={val}: 'Orange alert: >={val}'
-  每页: Per page
-  没有可用的数据模型 key，请先在数据模型定义中添加: No data-model keys available; add some in the data-model definition first
-  没有符合筛选条件的记录: No records match the filters
-  添加同步目标: Add Sync Target
-  添加来源: Add Source
-  添加用途: Add Use
-  添加（{count}）: Add ({count})
-  清空选择: Clear Selection
-  清除全部筛选: Clear All Filters
-  满值锁定: Full-value lock
-  点击更改分组: Click to change the group
-  用户 {name}: User {name}
-  用户头像: User Avatar
-  用户数据模型定义: User Data Model Definition
-  用途: Use
-  用途（减少）: Use (decrease)
-  ? "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。"
-  : "Undo this record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\n\nUndoing writes a new reversed record."
-  ? "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。"
-  : "Permanently delete this history record?\n\nUser: {username}\nItem: {label}\nTime: {time}\nSource: {source}\nDelta: {delta}\n\nDeletes history only — current values stay and no deletion record is added. This cannot be undone; deleting acquisition records may free source quotas accumulated from history."
-  确定要删除 key '{key}' 吗？: Delete key '{key}'?
-  确定要删除分组 '{name}' 吗？: Delete group '{name}'?
-  确定要删除这条便利贴吗？: Delete this sticky note?
-  确认撤销: Confirm Undo
-  确认重命名: Confirm Rename
-  第 {page} / {pages} 页 · {start}–{end} 条: Page {page} / {pages} · records {start}–{end}
-  类型：{value}: 'Type: {value}'
-  红警:>={val}: 'Red alert: >={val}'
-  编辑便利贴: Edit Sticky Note
-  编辑当前列: Edit Current Column
-  自定义增量 - {label}: Custom delta - {label}
-  至少保留一个分组: Keep at least one group
-  覆写 - {label}: Overwrite - {label}
-  覆写...: Overwrite...
-  ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
-  : "Remove {user}'s lock on \"{label}\"?\nAfter unlocking, automated tasks will read and update this key again."
-  设备：{value}: 'Device: {value}'
-  该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: The value was updated by another process; this delta was not written. Refresh and try again.
-  该条历史记录已发生变化，请刷新后重试: That history record has changed; refresh and try again
-  详情摘要: Detail Summary
-  请停止所有任务后再重命名 Profile key: Stop all tasks before renaming a Profile key
-  请先选择变更脚本: Select a change script first
-  请先选择用户: Select a user first
-  请输入 Key: Enter a key
-  请输入{field}: Enter {field}
-  请输入标签: Enter a label
-  请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件: Pick a .wf file under config/system/workflows or config/local/workflows
-  读取便利贴失败：{error}: 'Failed to read sticky notes: {error}'
-  跳至: Go to
-  软上限: Soft cap
-  输入错误: Input Error
-  近 30 天: Last 30 days
-  近 7 天: Last 7 days
-  近 90 天: Last 90 days
-  选择...: Select...
-  选择变更脚本: Select Change Script
-  选择字段: Select Field
-  ? "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？"
-  : "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
-  重新读取用户数据: Reload User Data
-  重置:{time}: 'Reset: {time}'
-  重置日:{day}: 'Reset day: {day}'
-  重置日:{day}号: 'Reset day: the {day}th'
-  ? "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。"
-  : "Lock \"{label}\" for {user}?\nOnce locked the engine ignores this value: automated tasks stop reading or writing it, periodic resets stop, and the value stays at its current state.\nRight-click to unlock any time."
-  键: Key
-  键：{label}: 'Key: {label}'
-  键：{value}: 'Key: {value}'
-  首页: First Page
-  （清空）: (empty)
-  （请选择）: (select one)
-  ＋ 添加便利贴: ＋ Add Sticky Note
-  Profile 变更脚本仍在执行，请等待队列完成后重命名: A Profile change script is still running; wait for the queue to finish before renaming
-  '下一点恢复: 已达上限': 'Next-point restore: cap reached'
-  便利贴内容不能为空: Sticky note content cannot be empty
-  ? "保存 profile.yaml 失败:\n{e}"
-  : "Failed to save profile.yaml:\n{e}"
-  删除当前列: Delete Current Column
-  升序: Ascending
-  右侧新增列: Add column on the right
-  ? "回写用户数据失败:\n{e}"
-  : "Failed to write user data:\n{e}"
-  库存: Inventory
-  开启后允许输入小数，UI 使用 DoubleValidator: When checked, decimals are allowed (UI uses DoubleValidator)
-  当前配置: Current Config
-  '恢复类型: 准点恢复': 'Restore type: at reset'
-  '恢复类型: 实时恢复': 'Restore type: realtime'
-  无法编辑: Cannot edit
-  橙色: Orange
-  正向: Positive
-  用户总览: User Overview
-  用户：{value}: 'User: {value}'
-  红色: Red
-  编辑备注 - {label}: Edit note - {label}
-  编辑文本...: Edit text...
-  负向: Negative
-  配额: Quota
-  降序: Descending
-  "同步到": "Synced To"
-  "备注内容": "Note Content"
-  "总览历史记录": "Overview history"
-  "更新": "Updated"
-  "未同步": "Not synced"
-  "来自": "From"
-  "来自：{value}": "From: {value}"
+  '{label} 必须是整数': «{label}» должно быть целым числом
+  '{noun} · {count} 项': '{noun} · {count} шт.'
+  '{title} Key ({model})': '{title} — ключ ({model})'
+  一次只能复制一条定义: За один раз можно продублировать только одно определение
+  上一页: Назад
+  下一页: Вперёд
+  不提醒: Не напоминать
+  为零: Ноль
+  仅删除历史，不修改当前值；会影响按历史统计的额度: Удаляет только историю, не меняя текущие значения; влияет на квоты, рассчитываемые по истории
+  今天: Сегодня
+  便利贴: Стикер
+  便利贴内容不能超过 {limit} 个字符: Длина стикера не может превышать {limit} символов
+  保存便利贴失败：{error}: 'Не удалось сохранить стикер: {error}'
+  倍率: Множитель
+  全选当前结果: Выбрать все результаты
+  共 {total} 条: 'Всего записей: {total}'
+  其他设备: Другие устройства
+  写入冲突: Конфликт записи
+  准点/{unit}: По сбросу/{unit}
+  准点:{val}/{period}: 'По сбросу: {val}/{period}'
+  准点恢复: Восстановление по сбросу
+  减少: Уменьшить
+  减少 {value}: Уменьшить на {value}
+  减少...: Уменьшить...
+  '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）': 'Значение после уменьшения не может быть меньше 0 (текущее: {cur}, введено: {inp})'
+  分组名不能为空: Имя группы не может быть пустым
+  分钟: мин
+  删除便利贴失败：{error}: 'Не удалось удалить стикер: {error}'
+  勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: При включении скрипт выполняется до записи на диск; при отклонении или ошибке откатывается вся цепочка синхронной записи. При отключении ставится в фоновую очередь после сохранения. Синхронные скрипты должны быть короткими, без длительных ожиданий.
+  ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
+
+    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
+  : 'Отмечено: обрабатывается как действие, запуская синхронизацию настроенных sync_targets.
+
+    Снято: простая перезапись только этого ключа без запуска синхронизации.'
+  ? '勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。
+
+    取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。'
+  : 'Отмечено: когда цель достигает предела, этот пункт блокируется (в обзоре показывается «—» и запрещается редактирование).
+
+    Снято: пункт остаётся видимым и редактируемым даже при заполнении цели; приращения просто перестают записываться в заполненную цель.'
+  包含: Содержит
+  单向增加: Только увеличение
+  原 key 已不存在，请重新打开编辑对话框: Исходный ключ больше не существует. Откройте окно редактирования заново
+  原分组已被移除，请重新选择: Исходная группа была удалена; выберите другую
+  双击修改来源: Двойной клик для изменения источника
+  取消本项「满值锁定」后可继续记录，增量不再写入已满目标: Снимите «Блокировку при максимуме» для этого пункта, чтобы продолжить запись; приращения не будут записываться в заполненную цель
+  取消这个条件: Удалить это условие
+  变动规则第 {row} 行至少添加一个快捷数量: В строке {row} правил изменения добавьте хотя бы одно быстрое значение
+  变动规则第 {row} 行设置了快捷数量，请填写来源或用途: В строке {row} заданы быстрые значения — укажите источник или назначение
+  变动量: Дельта
+  变动量：{value}: 'Дельта: {value}'
+  变更类型：{label}: 'Тип изменения: {label}'
+  '变更脚本不存在: workflows/{path}': 'Скрипт изменения не найден: workflows/{path}'
+  另有 {count} 项未列出，输入可搜索: Ещё {count} элементов скрыто; введите текст для поиска
+  同步:{sync}: 'Синхр.: {sync}'
+  同步修改: Синхронизировать изменения
+  同步变更依赖方: Синхронизировать зависимые цели
+  同步目标 {targets} 已达上限: Цель синхронизации {targets} достигла предела
+  同步目标不能指向自身: Цель синхронизации не может указывать на саму себя
+  周: нед
+  周一: Пн
+  周三: Ср
+  周二: Вт
+  周五: Пт
+  周六: Сб
+  周四: Чт
+  周期: Цикл
+  回到打开这个对话框时的默认范围: Вернуться к диапазону по умолчанию на момент открытия окна
+  增加: Увеличить
+  增加 {value}: Увеличить на {value}
+  增加...: Увеличить...
+  增量: Дельта
+  复制定义: Дублировать определение
+  定义数据模型 key: Определить ключи модели данных
+  定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。: Задаёт ключи модели данных. Дважды щёлкните по столбцу (кроме группы) для редактирования; ПКМ — массовая смена группы.
+  实时/{unit}: В реальном времени/{unit}
+  实时:{val}/{unit}: 'В реальном времени: {val}/{unit}'
+  实时恢复: Восстановление в реальном времени
+  小时: ч
+  展示上限: Отображаемый предел
+  展示总和行: Показывать строку итогов
+  工作流语法正确: Синтаксис рабочего процесса корректен
+  '当前值: {val}': 'Текущее значение: {val}'
+  当前分组没有可添加的字段: В текущей группе нет полей для добавления
+  当前显示全部记录: Показаны все записи
+  当前用户已锁定: Заблокировано для текущего пользователя
+  快捷数量: Быстрые значения
+  快捷规则:{count}项: 'Быстрые правила: {count}'
+  总和: Итого
+  恢复入口范围: Сбросить исходный диапазон
+  按{title}筛选: 'Фильтр: {title}'
+  搜索 值 / 来源 / 用户 / 键: 'Поиск: значение / источник / пользователь / ключ'
+  搜索{title}（可输入未列出的值）: Поиск ({title}, можно ввести своё значение)
+  搜索字段名称或 key: Поиск по названию поля или ключу
+  搜索：{value}: 'Поиск: {value}'
+  撤销失败: Не удалось отменить
+  支持小数: Поддержка дробей
+  数值无效: Некорректное число
+  数据变化后执行；路径相对于 workflows 目录: Выполняется после изменения данных; путь относительно каталога workflows
+  数据模型: Модель данных
+  新值: Новое значение
+  新值包含：{value}: 'Новое значение содержит: {value}'
+  新增: Добавить
+  新增便利贴: Новый стикер
+  新增列: Добавить столбец
+  新建分组: Новая группа
+  无上限: Без предела
+  旧值: Старое значение
+  旧值包含：{value}: 'Старое значение содержит: {value}'
+  时间: Время
+  时间：{value}: 'Время: {value}'
+  暂无便利贴: Стикеров нет
+  更改分组: Изменить группу
+  未完成: Не завершено
+  未记录设备: Устройство не записано
+  末页: В конец
+  本机: Этот ПК
+  条: зап.
+  来源/用途: Источник/Назначение
+  来源（增加）: Источник (увеличение)
+  来源：{value}: 'Источник: {value}'
+  查看全部用户、全部 key 的变更记录: Просмотр истории изменений по всем пользователям и всем ключам
+  查看历史记录: История изменений
+  标签: Метка
+  校验: Проверить
+  校验失败: Проверка не пройдена
+  橙警:>={val}: 'Оранж. порог: >={val}'
+  每页: На странице
+  没有可用的数据模型 key，请先在数据模型定义中添加: Нет доступных ключей модели данных; сначала добавьте их в определении модели данных
+  没有符合筛选条件的记录: Нет записей, соответствующих фильтрам
+  添加同步目标: Добавить цель синхронизации
+  添加来源: Добавить источник
+  添加用途: Добавить назначение
+  添加（{count}）: Добавить ({count})
+  清空选择: Снять выделение
+  清除全部筛选: Сбросить все фильтры
+  满值锁定: Блокировка при максимуме
+  点击更改分组: Нажмите, чтобы изменить группу
+  用户 {name}: Пользователь {name}
+  用户头像: Аватар пользователя
+  用户数据模型定义: Определение модели данных пользователя
+  用途: Назначение
+  用途（减少）: Назначение (уменьшение)
+  ? '确定撤销这条记录吗？
+
+
+    用户：{username}
+
+    数据项：{label}
+
+    时间：{time}
+
+    来源：{source}
+
+
+    撤销会按反向写入一条新记录。'
+  : 'Отменить эту запись?
+
+
+    Пользователь: {username}
+
+    Поле: {label}
+
+    Время: {time}
+
+    Источник: {source}
+
+
+    Отмена создаст новую обратную запись.'
+  ? '确定永久删除这条历史记录吗？
+
+
+    用户：{username}
+
+    数据项：{label}
+
+    时间：{time}
+
+    来源：{source}
+
+    变动量：{delta}
+
+
+    仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。'
+  : 'Удалить эту запись истории навсегда?
+
+
+    Пользователь: {username}
+
+    Поле: {label}
+
+    Время: {time}
+
+    Источник: {source}
+
+    Дельта: {delta}
+
+
+    Удаляется только запись истории; текущие значения не меняются и запись об удалении не создаётся. Действие необратимо; удаление записей получения может освободить квоты источников, считающиеся по истории.'
+  确定要删除 key '{key}' 吗？: Удалить ключ '{key}'?
+  确定要删除分组 '{name}' 吗？: Удалить группу '{name}'?
+  确定要删除这条便利贴吗？: Удалить этот стикер?
+  确认撤销: Подтвердите отмену
+  确认重命名: Подтвердите переименование
+  第 {page} / {pages} 页 · {start}–{end} 条: Стр. {page} / {pages} · записи {start}–{end}
+  类型：{value}: 'Тип: {value}'
+  红警:>={val}: 'Красн. порог: >={val}'
+  编辑便利贴: Редактировать стикер
+  编辑当前列: Редактировать текущий столбец
+  自定义增量 - {label}: Своя дельта — {label}
+  至少保留一个分组: Необходимо оставить хотя бы одну группу
+  覆写 - {label}: Перезаписать — {label}
+  覆写...: Перезаписать...
+  ? '解除 {user} 的「{label}」锁定？
+
+    解锁后自动任务会重新读取并更新该 key。'
+  : 'Снять блокировку «{label}» для {user}?
+
+    После разблокировки автоматические задачи снова будут читать и обновлять этот ключ.'
+  设备：{value}: 'Устройство: {value}'
+  该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: Значение было изменено другим процессом; эта дельта не записана. Обновите данные и повторите попытку.
+  该条历史记录已发生变化，请刷新后重试: Эта запись истории изменилась; обновите и повторите попытку
+  详情摘要: Сводка
+  请停止所有任务后再重命名 Profile key: Остановите все задачи перед переименованием ключа профиля
+  请先选择变更脚本: Сначала выберите скрипт изменения
+  请先选择用户: Сначала выберите пользователя
+  请输入 Key: Введите ключ
+  请输入{field}: Введите поле «{field}»
+  请输入标签: Введите метку
+  请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件: Выберите файл .wf из каталога config/system/workflows или config/local/workflows
+  读取便利贴失败：{error}: 'Не удалось прочитать стикеры: {error}'
+  跳至: Перейти к
+  软上限: Мягкий предел
+  输入错误: Ошибка ввода
+  近 30 天: За 30 дней
+  近 7 天: За 7 дней
+  近 90 天: За 90 дней
+  选择...: Выбрать...
+  选择变更脚本: Выбрать скрипт изменения
+  选择字段: Выбрать поле
+  ? '重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。
+
+
+    是否继续？'
+  : 'Переименование обновит текущие записи, историю, источники синхронизации и ссылки в конфигурации для всех пользователей. Ключи в рабочих процессах и скриптах изменений не заменяются автоматически — обновите их вручную.
+
+
+    Продолжить?'
+  重新读取用户数据: Перезагрузить данные пользователя
+  重置:{time}: 'Сброс: {time}'
+  重置日:{day}: 'День сброса: {day}'
+  重置日:{day}号: 'День сброса: {day}-е число'
+  ? '锁定 {user} 的「{label}」？
+
+    锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。
+
+    随时可以右键解锁。'
+  : 'Заблокировать «{label}» для {user}?
+
+    После блокировки движок игнорирует это значение: автоматические задачи перестают его читать и записывать, периодический сброс останавливается, и значение остаётся неизменным.
+
+    Разблокировать можно в любой момент через контекстное меню.'
+  键: Ключ
+  键：{label}: 'Ключ: {label}'
+  键：{value}: 'Ключ: {value}'
+  首页: В начало
+  （清空）: (пусто)
+  （请选择）: (выберите)
+  ＋ 添加便利贴: ＋ Добавить стикер
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: Скрипт изменения профиля ещё выполняется; дождитесь завершения очереди перед переименованием
+  '下一点恢复: 已达上限': 'Следующее восстановление: достигнут предел'
+  便利贴内容不能为空: Содержимое стикера не может быть пустым
+  ? '保存 profile.yaml 失败:
+
+    {e}'
+  : 'Не удалось сохранить profile.yaml:
+
+    {e}'
+  删除当前列: Удалить текущий столбец
+  升序: По возрастанию
+  右侧新增列: Добавить столбец справа
+  ? '回写用户数据失败:
+
+    {e}'
+  : 'Не удалось сохранить данные пользователя:
+
+    {e}'
+  库存: Запас
+  开启后允许输入小数，UI 使用 DoubleValidator: При включении разрешается ввод дробей (в интерфейсе используется DoubleValidator)
+  当前配置: Текущая конфигурация
+  '恢复类型: 准点恢复': 'Тип восстановления: по сбросу'
+  '恢复类型: 实时恢复': 'Тип восстановления: в реальном времени'
+  无法编辑: Недоступно для редактирования
+  橙色: Оранжевый
+  正向: Положительное
+  用户总览: Обзор пользователей
+  用户：{value}: 'Пользователь: {value}'
+  红色: Красный
+  编辑备注 - {label}: Редактировать заметку — {label}
+  编辑文本...: Редактировать текст...
+  负向: Отрицательное
+  配额: Квота
+  降序: По убыванию
+  同步到: Синхронизировано с
+  备注内容: Текст заметки
+  总览历史记录: История обзора
+  更新: Обновлено
+  未同步: Не синхронизировано
+  来自: Откуда
+  来自：{value}: 'Откуда: {value}'
 run_control:
   错误: Ошибка
 profile_service:
-  profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: profile.yaml uses the old format (with fields/groups); update it manually to the new format
-  仅可撤销写入记录: Only write records can be undone
-  全向: Omni
-  再生: Regenerate
+  profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式: Файл profile.yaml использует старый формат (с fields/groups); обновите его вручную до нового формата
+  仅可撤销写入记录: Отменить можно только записи о внесении данных
+  全向: Двунаправленное
+  再生: Восстановление
 loadout:
-  删除方案: Delete Plan
-
+  删除方案: Удалить план
 layout_transfer:
-  "覆盖远端页面结构？": "Overwrite the remote page structure?"
-  "下载排版": "Download layout"
-  "确认替换本机结构": "Confirm replacing this machine's structure"
-  "本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？": "Структура страниц на этом устройстве будет заменена структурой из облака; текущая структура не сохраняется автоматически.\n\nЗаменить сейчас?"
-  "{} 个分组 / {} 列": "{} groups / {} columns"
-  "无法解析": "Unparsable"
-  "远端已有页面结构，且不是本机写入的：\n\n{remote}\n远端结构：{remote_size}\n本机结构：{local_size}\n\n覆盖后，其它设备下载将得到本机结构。": "The remote already has a page structure that this machine did not write:\n\n{remote}\nRemote structure: {remote_size}\nThis machine: {local_size}\n\nAfter overwriting, other devices will download this machine's structure."
-  "上传排版": "Upload layout"
-  "页面结构以 PC 为准，手机端只支持下载。": "Page structure is owned by the PC; the mobile app can only download it."
-  "请先在「账号」里登录后再上传页面结构。": "Sign in under Account before uploading the page structure."
-  "云端与本机一致，无需上传。": "The cloud matches this machine; nothing to upload."
-  "请先在「账号」里登录后再下载页面结构。": "Sign in under Account before downloading the page structure."
-  "云端还没有页面结构，先在编辑端点一次「上传排版」。": "The cloud has no page structure yet; click \"Upload layout\" once on the editing machine."
-  "将使用云端的页面结构：\n\n{remote}\n云端结构：{size}\n本机结构：{local}\n\n继续后还需再确认一次才会替换本机结构。": "The cloud page structure will be used:\n\n{remote}\nCloud structure: {size}\nThis machine: {local}\n\nYou will be asked once more before this machine's structure is replaced."
-  "已下载页面结构。\n{detail}": "Структура страниц загружена.\n{detail}"
-  "已上传页面结构。\n{detail}": "Page structure uploaded.\n{detail}"
-  "云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。": "The cloud page structure was changed by another device while you were confirming; download first or retry later."
-  "读取本机页面结构失败：{error}": "Failed to read this machine's page structure: {error}"
-  "下载失败，本机结构未改变：{error}": "Download failed; this machine's structure is unchanged: {error}"
-  "写入本机页面结构失败：{error}": "Failed to write this machine's page structure: {error}"
-  "把本机的分组、列与列宽上传到云端；远端已有其它设备写入的结构时会先询问是否覆盖": "Upload this machine's groups, columns and column widths to the cloud; if the remote already holds a structure written by another device, you are asked before overwriting"
-  "用云端的页面结构替换本机结构，需要两次确认": "Replace this machine's structure with the cloud page structure; two confirmations are required"
-  "快照只支持在 PC 端创建。": "Snapshots can only be created on the PC."
-  "请先在「账号」里登录后再创建快照。": "Sign in under Account before creating a snapshot."
-  "创建快照失败：{error}": "Failed to create a snapshot: {error}"
-  "已创建快照。\n{detail}": "Snapshot created.\n{detail}"
+  覆盖远端页面结构？: Перезаписать облачную структуру страниц?
+  下载排版: Загрузить структуру
+  确认替换本机结构: Подтвердите замену локальной структуры
+  ? '本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。
+
+
+    确认替换？'
+  : 'Структура страниц на этом устройстве будет заменена структурой из облака; текущая структура не сохраняется автоматически.
+
+
+    Заменить сейчас?'
+  '{} 个分组 / {} 列': '{} групп / {} столбцов'
+  无法解析: Не удалось разобрать
+  ? '远端已有页面结构，且不是本机写入的：
+
+
+    {remote}
+
+    远端结构：{remote_size}
+
+    本机结构：{local_size}
+
+
+    覆盖后，其它设备下载将得到本机结构。'
+  : 'В облаке уже есть структура страниц, записанная не с этого устройства:
+
+
+    {remote}
+
+    Облачная структура: {remote_size}
+
+    Локальная структура: {local_size}
+
+
+    После перезаписи другие устройства загрузят структуру с этого ПК.'
+  上传排版: Выгрузить структуру
+  页面结构以 PC 为准，手机端只支持下载。: Структура страниц задаётся на ПК; мобильное приложение поддерживает только загрузку.
+  请先在「账号」里登录后再上传页面结构。: Сначала войдите в разделе «Аккаунт», затем выгрузите структуру страниц.
+  云端与本机一致，无需上传。: Облачная структура совпадает с локальной; выгрузка не требуется.
+  请先在「账号」里登录后再下载页面结构。: Сначала войдите в разделе «Аккаунт», затем загрузите структуру страниц.
+  云端还没有页面结构，先在编辑端点一次「上传排版」。: В облаке ещё нет структуры страниц; сначала нажмите «Выгрузить структуру» на ПК.
+  ? '将使用云端的页面结构：
+
+
+    {remote}
+
+    云端结构：{size}
+
+    本机结构：{local}
+
+
+    继续后还需再确认一次才会替换本机结构。'
+  : 'Будет применена облачная структура страниц:
+
+
+    {remote}
+
+    Облачная структура: {size}
+
+    Локальная структура: {local}
+
+
+    После продолжения потребуется ещё одно подтверждение перед заменой локальной структуры.'
+  ? '已下载页面结构。
+
+    {detail}'
+  : 'Структура страниц загружена.
+
+    {detail}'
+  ? '已上传页面结构。
+
+    {detail}'
+  : 'Структура страниц выгружена.
+
+    {detail}'
+  云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。: Пока вы подтверждали действие, облачная структура страниц была изменена другим устройством; сначала загрузите её или повторите позже.
+  读取本机页面结构失败：{error}: 'Не удалось прочитать локальную структуру страниц: {error}'
+  下载失败，本机结构未改变：{error}: 'Ошибка загрузки; локальная структура не изменена: {error}'
+  写入本机页面结构失败：{error}: 'Не удалось записать локальную структуру страниц: {error}'
+  把本机的分组、列与列宽上传到云端；远端已有其它设备写入的结构时会先询问是否覆盖: Выгружает локальные группы, столбцы и их ширину в облако; если в облаке уже есть структура с другого устройства, сначала запросит подтверждение перезаписи
+  用云端的页面结构替换本机结构，需要两次确认: Заменяет локальную структуру страниц облачной; требуется двойное подтверждение
+  快照只支持在 PC 端创建。: Снимки можно создавать только на ПК.
+  请先在「账号」里登录后再创建快照。: Сначала войдите в разделе «Аккаунт», затем создайте снимок.
+  创建快照失败：{error}: 'Не удалось создать снимок: {error}'
+  ? '已创建快照。
+
+    {detail}'
+  : 'Снимок создан.
+
+    {detail}'

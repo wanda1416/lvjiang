@@ -1,64 +1,78 @@
 common:
-  cancel: Cancel
-  current: Current
-  empty: No sticky notes yet
-  paste: Paste from Clipboard
-  remove: Remove Current Avatar
-  reset: Reset
-  title: Sticky Notes
-  请输入用户名: Enter a username
+  cancel: Отмена
+  current: Текущий
+  empty: Стикеров пока нет
+  paste: Вставить из буфера обмена
+  remove: Удалить текущий аватар
+  reset: Сбросить
+  title: Стикеры
+  请输入用户名: Введите имя пользователя
 user_avatar:
-  从剪贴板粘贴: Paste from clipboard
-  从当前设备或窗口获取最新截图: Grab the latest screenshot from the current device or window
-  使用此头像: Use This Avatar
-  保存头像失败：{error}: 'Failed to save avatar: {error}'
-  保存并使用: Save and Use
-  删除历史头像: Delete History Avatar
-  删除历史头像失败：{error}: 'Failed to delete history avatar: {error}'
-  剪贴板中没有图片: No image in the clipboard
-  双击编辑头像: Double-click to edit avatar
-  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Drag the image to position; zoom with wheel or slider · Ctrl+V to paste
-  图片尺寸过大，请选择不超过 4000 万像素的图片: Image too large; pick one no larger than 40 megapixels
-  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Image files (*.png *.jpg *.jpeg *.webp *.bmp)
-  头像库: Avatar Library
-  头像文件不存在或文件名无效: Avatar file missing or invalid file name
-  头像正在使用: Avatar in use
-  导入图片或从剪贴板粘贴: Import an image or paste from the clipboard
-  导入头像图片: Import Avatar Image
-  当前使用: Current
-  截图失败: Screenshot Failed
-  无法更新用户头像引用: Cannot update the user's avatar reference
-  无法粘贴: Cannot paste
-  无法读取图片：{error}: 'Cannot read the image: {error}'
-  没有可保存的裁剪图片: No cropped image to save
-  没有读取到有效图片: No valid image was read
-  确定永久删除这张历史头像吗？此操作无法撤销。: Permanently delete this history avatar? This cannot be undone.
-  移除头像失败：{error}: 'Failed to remove avatar: {error}'
-  移除当前头像: Remove Current Avatar
-  编辑“{name}”的头像: Edit avatar for "{name}"
-  编辑头像: Edit Avatar
-  缩放: Zoom
-  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
-  选择之前保存的头像，或导入一张新图片: Pick a previously saved avatar or import a new image
+  从剪贴板粘贴: Вставить из буфера обмена
+  从当前设备或窗口获取最新截图: Получить последний скриншот с текущего устройства или окна
+  使用此头像: Использовать этот аватар
+  保存头像失败：{error}: 'Не удалось сохранить аватар: {error}'
+  保存并使用: Сохранить и использовать
+  删除历史头像: Удалить аватар из истории
+  删除历史头像失败：{error}: 'Не удалось удалить аватар из истории: {error}'
+  剪贴板中没有图片: В буфере обмена нет изображения
+  双击编辑头像: Двойной клик для редактирования аватара
+  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Перетаскивайте изображение для позиционирования, масштабируйте колесом или ползунком · Ctrl+V — вставить
+  图片尺寸过大，请选择不超过 4000 万像素的图片: Изображение слишком велико; выберите файл не более 40 мегапикселей
+  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Изображения (*.png *.jpg *.jpeg *.webp *.bmp)
+  头像库: Библиотека аватаров
+  头像文件不存在或文件名无效: Файл аватара не найден или имеет недопустимое имя
+  头像正在使用: Аватар используется
+  导入图片或从剪贴板粘贴: Импортируйте изображение или вставьте из буфера обмена
+  导入头像图片: Импорт изображения аватара
+  当前使用: Текущий
+  截图失败: Ошибка создания скриншота
+  无法更新用户头像引用: Не удалось обновить ссылку на аватар пользователя
+  无法粘贴: Не удалось вставить
+  无法读取图片：{error}: 'Не удалось прочитать изображение: {error}'
+  没有可保存的裁剪图片: Нет обрезанного изображения для сохранения
+  没有读取到有效图片: Не удалось прочитать корректное изображение
+  确定永久删除这张历史头像吗？此操作无法撤销。: Удалить этот аватар из истории навсегда? Это действие нельзя отменить.
+  移除头像失败：{error}: 'Не удалось удалить аватар: {error}'
+  移除当前头像: Удалить текущий аватар
+  编辑“{name}”的头像: Редактировать аватар «{name}»
+  编辑头像: Редактировать аватар
+  缩放: Масштаб
+  ? '该头像正被以下用户使用，不能删除：
+
+    {users}
+
+
+    请先为这些用户更换或移除头像。'
+  : 'Этот аватар используется следующими пользователями и не может быть удалён:
+
+    {users}
+
+
+    Сначала замените или удалите их аватары.'
+  选择之前保存的头像，或导入一张新图片: Выберите ранее сохранённый аватар или импортируйте новое изображение
 user_manager:
-  保存属性: Save Attributes
-  删除属性: Delete Attributes
-  同步全部头像: Sync All Avatars
-  属性 Key 不能为空: Attribute key cannot be empty
-  属性 Key 不能重复：{key}: 'Duplicate attribute key: {key}'
-  悬浮点击编辑，或双击头像: Hover and click to edit, or double-click the avatar
-  把本机与云端的头像做一次双向合并；不参与日常自动同步: One-time two-way merge of local and cloud avatars; not part of daily auto sync
-  新增属性: Add Attribute
-  新建用户: New User
-  无法删除该用户: This user cannot be deleted
-  正在同步头像…: Syncing avatars…
-  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters.
-  用户名已存在: Username already exists
-  用户属性: User Attributes
-  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
-  ＋ 新建用户: ＋ New User
+  保存属性: Сохранить атрибуты
+  删除属性: Удалить атрибуты
+  同步全部头像: Синхронизировать все аватары
+  属性 Key 不能为空: Ключ атрибута не может быть пустым
+  属性 Key 不能重复：{key}: 'Повторяющийся ключ атрибута: {key}'
+  悬浮点击编辑，或双击头像: Наведите и нажмите для редактирования или дважды щёлкните по аватару
+  把本机与云端的头像做一次双向合并；不参与日常自动同步: Выполнить разовое двустороннее слияние локальных и облачных аватаров; не входит в обычную автосинхронизацию
+  新增属性: Добавить атрибут
+  新建用户: Новый пользователь
+  无法删除该用户: Невозможно удалить этого пользователя
+  正在同步头像…: Синхронизация аватаров…
+  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Имя пользователя может содержать иероглифы, буквы, цифры, подчёркивания и дефисы (до 32 символов).
+  用户名已存在: Имя пользователя уже существует
+  用户属性: Атрибуты пользователя
+  ? '确定要删除用户「{name}」吗？
+
+    用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。'
+  : 'Удалить пользователя «{name}»?
+
+    Пользователь будет удалён из текущего списка и пакетных настроек, но связанные файлы данных сохранятся — повторное добавление с тем же именем восстановит их.'
+  ＋ 新建用户: ＋ Новый пользователь
 user_toolbar:
-  上一个用户: Previous User
-  下一个用户: Next User
+  上一个用户: Предыдущий пользователь
+  下一个用户: Следующий пользователь

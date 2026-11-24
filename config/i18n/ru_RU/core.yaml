@@ -1,148 +1,156 @@
 about:
-  仅限非商业使用: Non-commercial use only
+  仅限非商业使用: Только для некоммерческого использования
   律匠: LvJiang
-  本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。: This project is for learning and technical research only. Using automation tools to operate games may violate the relevant game's user agreement; users bear the consequences themselves.
-  本项目源码公开、免费使用: Open source and free to use
-  窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行: Window capture → region annotation → OCR → workflow execution
-  软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。: The software is provided as is, without warranty of any kind; the author is not liable for any loss caused by using it.
-  通用视觉 RPA 引擎: General-purpose Visual RPA Engine
+  本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。: Проект предназначен только для обучения и технических исследований. Использование инструментов автоматизации в играх может нарушать пользовательское соглашение соответствующей игры; пользователь несёт полную ответственность за последствия.
+  本项目源码公开、免费使用: Открытый исходный код, бесплатное использование
+  窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行: Захват окна → разметка областей → OCR → выполнение процессов
+  软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。: ПО предоставляется «как есть», без каких-либо гарантий; автор не несёт ответственности за любые убытки, вызванные его использованием.
+  通用视觉 RPA 引擎: Универсальный визуальный движок RPA
 action_catalog:
-  秒: sec
+  秒: сек
 apk_release:
-  下载 {url} 失败：{err}: 'Failed to download {url}: {err}'
-  下载已取消: Download cancelled
-  ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
-  : "Checksum mismatch; the file may be corrupted or tampered with\nExpected {want}\nActual {got}"
+  下载 {url} 失败：{err}: 'Не удалось скачать {url}: {err}'
+  下载已取消: Загрузка отменена
+  ? '校验和不匹配，文件可能损坏或被篡改
+
+    期望 {want}
+
+    实际 {got}'
+  : 'Контрольная сумма не совпадает, файл может быть повреждён или подменён
+
+    Ожидалось {want}
+
+    Получено {got}'
 batch_report:
-  '## 汇总': '## Summary'
-  成功: Succeeded
-  执行通道中断，整批已中止: Execution channel lost; the batch was aborted
-  通道中断（整批中止）: Channel interrupted (batch aborted)
-  （未执行任何脚本）: ' (no script was executed)'
-  （正常完成）: (Completed Normally)
+  '## 汇总': '## Сводка'
+  成功: Успешно
+  执行通道中断，整批已中止: Канал выполнения прерван; весь пакет остановлен
+  通道中断（整批中止）: Канал прерван (пакет остановлен)
+  （未执行任何脚本）: ' (ни один скрипт не выполнен)'
+  （正常完成）: (Завершено штатно)
 batch_scheduler:
-  已停止: Stopped
+  已停止: Остановлено
 cli:
-  不注册全局热键（留给另一实例）；不启动 MCP 服务: Do not register global hotkeys (leave them to another instance); do not start the MCP service
-  注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用: 'Register and load a plugin: NAME (built-in or plugins/) or NAME@PATH (any directory); repeatable'
-  通用视觉 RPA 引擎（支持插件扩展）: General-purpose vision RPA engine (plugin-extensible)
-  额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg: Load all built-in plugins and everything in the default plugins/ directory without individual -reg flags
+  不注册全局热键（留给另一实例）；不启动 MCP 服务: Не регистрировать глобальные горячие клавиши (оставить другому экземпляру); не запускать службу MCP
+  注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用: 'Зарегистрировать и загрузить плагин: NAME (встроенный или из plugins/) либо NAME@PATH (любой каталог); можно указывать несколько раз'
+  通用视觉 RPA 引擎（支持插件扩展）: Универсальный визуальный движок RPA (с поддержкой плагинов)
+  额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg: Загрузить все встроенные плагины и все плагины из каталога plugins/ по умолчанию без отдельных флагов -reg
 common:
-  基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
-  画面异常: Screen error
-  画面无法解码: Cannot decode the screen
-  画面采集停摆: Capture stalled
-  连接断开: Disconnected
-  连接无响应: No response
-  采集进程退出: Capture process exited
+  基于 PyQt6 · RapidOCR · OpenCV: На базе PyQt6 · RapidOCR · OpenCV
+  画面异常: Ошибка экрана
+  画面无法解码: Не удалось декодировать экран
+  画面采集停摆: Захват экрана завис
+  连接断开: Соединение разорвано
+  连接无响应: Нет ответа
+  采集进程退出: Процесс захвата завершился
 core_common:
-  DesktopCapture 已停止: DesktopCapture stopped
-  YAML 顶层必须是字典: YAML top level must be a dict
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off, or disabled by the system); please re-enable it'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap returned empty data (Shizuku not authorized?)'
-  config 中缺少 model_path: config is missing model_path
-  initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
-  pynput 未安装，无法录制: pynput is not installed; cannot record
-  全量: Full
-  分组名称不能为空: Group name cannot be empty
-  可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.
-  可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.
-  场景必须包含 key 和 name: Scene must contain key and name
-  基底视图不可删除，如需取消分层请取消多视图: The base view cannot be deleted; to remove layering, disable multi-view
-  截图失败：无障碍服务未连接或截图被节流: 'Screenshot failed: Accessibility Service not connected, or screenshots are being throttled'
-  截图编码失败: Screenshot encoding failed
-  '未知图色操作: {op}，可用: {ops}': 'Unknown pixel-color operation: {op}, available: {ops}'
-  画布尺寸非法: Invalid canvas size
-  空间不存在: Space does not exist
-  系统空间不可删除，可新建自己的空间: The system space cannot be deleted; create your own space instead
-  缺参照图或实时截图: Missing reference image or live screenshot
-  至少保留一个图库空间: At least one gallery space must be kept
-  至少需要保留一个场景分组: At least one scene group must be retained
-  还没有实时截图: No live screenshot yet
+  DesktopCapture 已停止: DesktopCapture остановлен
+  YAML 顶层必须是字典: Верхний уровень YAML должен быть словарём
+  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Служба специальных возможностей не подключена (выключена или отключена системой); включите её снова'
+  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap вернул пустые данные (Shizuku не авторизован?)'
+  config 中缺少 model_path: В config отсутствует model_path
+  initial_variables 必须是 JSON 对象: initial_variables должен быть объектом JSON
+  pynput 未安装，无法录制: pynput не установлен; запись невозможна
+  全量: Полный
+  分组名称不能为空: Название группы не может быть пустым
+  可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: Возможно, из-за сетевой проблемы не удаётся открыть {url} для получения объявлений; проверьте настройки сети и повторите
+  可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: Возможно, из-за сетевой проблемы не удаётся открыть {url} для проверки обновлений; проверьте настройки сети и повторите
+  场景必须包含 key 和 name: Сцена должна содержать поля key и name
+  基底视图不可删除，如需取消分层请取消多视图: Базовое представление нельзя удалить; чтобы убрать слои, отключите мультивид
+  截图失败：无障碍服务未连接或截图被节流: 'Не удалось сделать снимок: служба специальных возможностей не подключена или съёмка ограничена системой'
+  截图编码失败: Ошибка кодирования скриншота
+  '未知图色操作: {op}，可用: {ops}': 'Неизвестная операция по цвету пикселей: {op}, доступно: {ops}'
+  画布尺寸非法: Недопустимый размер холста
+  空间不存在: Пространство не существует
+  系统空间不可删除，可新建自己的空间: Системное пространство нельзя удалить; создайте собственное пространство
+  缺参照图或实时截图: Отсутствует эталонное изображение или живой скриншот
+  至少保留一个图库空间: Должно остаться хотя бы одно пространство галереи
+  至少需要保留一个场景分组: Должна остаться хотя бы одна группа сцен
+  还没有实时截图: Живого скриншота пока нет
 daily_history:
-  手机独立执行: On-device Execution
-  项: items
+  手机独立执行: Автономный запуск на телефоне
+  项: элементов
 map_manager:
-  key: key
+  key: Ключ
 mobile:
-  向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活: Pushing configs to the phone requires Lv1 activation; activate under Settings → "Activation"
-  已标定: Calibrated
+  向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活: Для отправки конфигурации на телефон требуется активация Lv1; активируйте её в «Настройки → Активация функций»
+  已标定: Откалибровано
 notices:
-  同意: Agree
-  当前为离线模式，请关闭离线模式后刷新公告: Offline mode is on; turn it off to refresh announcements
+  同意: Согласен
+  当前为离线模式，请关闭离线模式后刷新公告: Включён автономный режим; отключите его, чтобы обновить объявления
 ocr_dialog:
-  名称不能为空: Name cannot be empty
+  名称不能为空: Название не может быть пустым
 ondevice_runner:
-  当前 active_layout 不存在：{name}: 'The current active_layout does not exist: {name}'
-  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 'No layout available: session has no active_layout set, and the layouts.yaml roster is empty'
+  当前 active_layout 不存在：{name}: 'Текущий active_layout не существует: {name}'
+  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 'Нет доступного макета: в session не задан active_layout, а список layouts.yaml пуст'
 platforms:
-  工作流暂停: Workflow Paused
-  工作流通知: Workflow Notification
+  工作流暂停: Процесс приостановлен
+  工作流通知: Уведомление процесса
 profile:
-  Profile 变更脚本仍在执行，请等待队列完成后重命名: Profile change scripts are still running. Wait for the queue to finish before renaming
-  便利贴内容不能为空: Sticky note content cannot be empty
-  原列已被移除，请重新选择插入位置: The original column was removed; pick an insert position again
-  每周: Weekly
-  每天: Daily
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: Скрипты изменения Profile ещё выполняются; дождитесь завершения очереди перед переименованием
+  便利贴内容不能为空: Текст заметки не может быть пустым
+  原列已被移除，请重新选择插入位置: Исходный столбец удалён; выберите позицию вставки заново
+  每周: Еженедельно
+  每天: Ежедневно
 profile_models:
-  备注: Notes
+  备注: Примечания
 profile_service:
-  仅可撤销写入记录: Only write records can be undone
-  历史记录不存在: The history record does not exist
-  只能撤销该用户此数据项的最新记录: Only the latest record of this data item for that user can be undone
-  当前数据项已不存在: The data item no longer exists
-  数据已发生变化，请刷新后重试: The data has changed; refresh and try again
-  该条历史已不存在或归属不匹配，请刷新后重试: That history entry no longer exists or belongs to someone else; refresh and try again
+  仅可撤销写入记录: Отменить можно только записи о сохранении
+  历史记录不存在: Запись истории не существует
+  只能撤销该用户此数据项的最新记录: Можно отменить только последнюю запись этого поля для данного пользователя
+  当前数据项已不存在: Этот элемент данных больше не существует
+  数据已发生变化，请刷新后重试: Данные изменились; обновите и повторите
+  该条历史已不存在或归属不匹配，请刷新后重试: Эта запись истории больше не существует или принадлежит другому пользователю; обновите и повторите
 run_control:
-  已恢复: Resumed
-  拒绝: Rejected
+  已恢复: Возобновлено
+  拒绝: Отклонено
 scene_editor:
-  基底视图的 key 是保留值，不可重命名: The base view's key is reserved and cannot be renamed
-  多视图场景不能转为子场景，请先取消多视图: Multi-view scenes can't become sub-scenes; cancel multi-view first
-  布局名称不能为空: Layout name cannot be empty
-  通过: Passed
+  基底视图的 key 是保留值，不可重命名: Ключ базового представления зарезервирован и не может быть переименован
+  多视图场景不能转为子场景，请先取消多视图: Сцену с мультивидом нельзя сделать подсценой; сначала отключите мультивид
+  布局名称不能为空: Название макета не может быть пустым
+  通过: Пройдено
 scrcpy_capture:
-  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry
-  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy server failed to start (exit code {rc}): {detail}'
-  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'scrcpy protocol version changed unexpectedly: client implements {version}; {detail}'
-  启动 scrcpy server 失败：{error}: 'Failed to start the scrcpy server: {error}'
-  启动视频流失败：{error}: 'Failed to start the video stream: {error}'
-  找不到 scrcpy-server.jar：{path}: 'scrcpy-server.jar not found: {path}'
-  推送 scrcpy-server.jar 失败：{detail}: 'Failed to push scrcpy-server.jar: {detail}'
-  无法建立 scrcpy 视频端口转发: Could not set up the scrcpy video port forward
-  未安装 PyAV，无法解码视频流（请安装 av 依赖）: PyAV is not installed; the video stream cannot be decoded (install the av dependency)
-  画面流不可用: The screen stream is unavailable
-  等待新画面超时: Timed out waiting for a new frame
-  视频包长度异常，画面流已失步（需要重建会话）: Abnormal video packet length; the screen stream is out of sync (the session needs to be rebuilt)
-  视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: The video stream connection was closed by the peer (scrcpy session ended or cleaned up by another program)
-  视频流连接被中断：{error}: 'The video stream connection was interrupted: {error}'
-  读取视频流异常：{error}: 'Error while reading the video stream: {error}'
-  连接 scrcpy 视频端口超时（端口 {port}）: Timed out connecting to the scrcpy video port ({port})
-  "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "Still no video stream header after {seconds} s (scrcpy server failed to start or version mismatch)"
-  "解码线程异常退出：{error}": "Decode thread exited unexpectedly: {error}"
+  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: Первый кадр не получен за 5 сек (бывает при выключенном/заблокированном экране или невозможности кодирования); включите экран и повторите
+  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'Не удалось запустить scrcpy server (код возврата {rc}): {detail}'
+  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'Неожиданная версия протокола scrcpy: клиент реализует {version}; {detail}'
+  启动 scrcpy server 失败：{error}: 'Не удалось запустить scrcpy server: {error}'
+  启动视频流失败：{error}: 'Не удалось запустить видеопоток: {error}'
+  找不到 scrcpy-server.jar：{path}: 'Файл scrcpy-server.jar не найден: {path}'
+  推送 scrcpy-server.jar 失败：{detail}: 'Не удалось отправить scrcpy-server.jar: {detail}'
+  无法建立 scrcpy 视频端口转发: Не удалось настроить проброс видеопорта scrcpy
+  未安装 PyAV，无法解码视频流（请安装 av 依赖）: PyAV не установлен; декодирование видеопотока невозможно (установите зависимость av)
+  画面流不可用: Поток экрана недоступен
+  等待新画面超时: Истекло время ожидания нового кадра
+  视频包长度异常，画面流已失步（需要重建会话）: Некорректная длина видеопакета; поток экрана рассинхронизирован (требуется пересоздать сеанс)
+  视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: Соединение видеопотока закрыто удалённой стороной (сеанс scrcpy завершён или очищен другой программой)
+  视频流连接被中断：{error}: 'Соединение видеопотока прервано: {error}'
+  读取视频流异常：{error}: 'Ошибка чтения видеопотока: {error}'
+  连接 scrcpy 视频端口超时（端口 {port}）: Истекло время подключения к видеопорту scrcpy (порт {port})
+  等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）: За {seconds} сек не удалось прочитать заголовок видеопотока (ошибка запуска scrcpy server или несовпадение версий)
+  解码线程异常退出：{error}: 'Поток декодирования аварийно завершился: {error}'
 scripts:
-  '区域 ': 'Region '
-  检查: Check
+  '区域 ': 'Область '
+  检查: Проверка
 update:
-  当前为离线模式，请关闭离线模式后检查更新: Offline mode is on; turn it off to check for updates
-  无法获取版本信息: Failed to get version info
-  无法访问 {url} 获取更新：HTTP {code}: 'Unable to access {url} for updates: HTTP {code}'
+  当前为离线模式，请关闭离线模式后检查更新: Включён автономный режим; отключите его для проверки обновлений
+  无法获取版本信息: Не удалось получить сведения о версии
+  无法访问 {url} 获取更新：HTTP {code}: 'Не удаётся открыть {url} для проверки обновлений: HTTP {code}'
 wgc_capture:
-  后台截图仅支持 Windows: Background capture is Windows-only
-  '后台截图组件加载失败: ': 'Failed to load the background capture component: '
-  缺少 windows-capture 依赖，请重新安装或更新程序: The windows-capture dependency is missing; reinstall or update the program
+  后台截图仅支持 Windows: Фоновый захват экрана поддерживается только в Windows
+  '后台截图组件加载失败: ': 'Не удалось загрузить компонент фонового захвата: '
+  缺少 windows-capture 依赖，请重新安装或更新程序: Отсутствует зависимость windows-capture; переустановите или обновите программу
 workflows_common:
-  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules must be a non-empty mapping'
+  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules должен быть непустым словарём'
 android:
-  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry
-  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy server failed to start (exit code {rc}): {detail}'
-  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'scrcpy protocol version changed unexpectedly: client implements {version}; {detail}'
-  下载 {url} 失败：{err}: 'Failed to download {url}: {err}'
-  下载已取消: Download cancelled
+  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: Первый кадр не получен за 5 сек (бывает при выключенном/заблокированном экране или невозможности кодирования); включите экран и повторите
+  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'Не удалось запустить scrcpy server (код возврата {rc}): {detail}'
+  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'Неожиданная версия протокола scrcpy: клиент реализует {version}; {detail}'
+  下载 {url} 失败：{err}: 'Не удалось скачать {url}: {err}'
+  下载已取消: Загрузка отменена
 desktop:
-  DesktopCapture 已停止: DesktopCapture stopped
+  DesktopCapture 已停止: DesktopCapture остановлен
 ondevice:
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off or disabled by system); re-enable it'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap returned empty data (Shizuku not authorized?)'
-  config 中缺少 model_path: model_path missing from config
-  initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
+  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Служба специальных возможностей не подключена (выключена или отключена системой); включите её снова'
+  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap вернул пустые данные (Shizuku не авторизован?)'
+  config 中缺少 model_path: В config отсутствует model_path
+  initial_variables 必须是 JSON 对象: initial_variables должен быть объектом JSON

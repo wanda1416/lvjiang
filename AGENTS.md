@@ -162,6 +162,11 @@
 - 典型症状 `UnicodeDecodeError: 'gbk' codec can't decode byte ...`（CI 上是 `'charmap'`），发生
   在导入或收集阶段会让**整个文件**无法运行而非只挂一条用例。门禁：改动必须能在默认编码为
   GBK 的 Windows 上通过，不依赖开发机或 CI 的隐式行为。
+- `config/session` 下的 YAML 是运行期生成的文件，排版以 `core/config.dump_yaml()` 为唯一口径
+  （`save_yaml()` 与它同源）。不得用编辑器格式化、`ruamel`、js-yaml 等换一种序列化风格改写：
+  block sequence 一旦被缩进，下一次应用保存就会把整篇重排成两千行 diff，而内容一个字都没变。
+  提交 `config/session` 子仓库前先跑 `python scripts/ci/check_yaml_style.py config/session`；
+  需要修复时加 `--write`（纯 YAML round-trip，不经 profile schema，不会删改任何定义）。
 
 ### 2.11 执行环境
 

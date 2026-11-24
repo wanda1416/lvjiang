@@ -145,11 +145,23 @@ def load_yaml(path: Path) -> dict[str, Any]:
     return data if data else {}
 
 
+def dump_yaml(data: dict[str, Any]) -> str:
+    """YAML 序列化的唯一入口（保序不排序键、不缩进 block sequence）。
+
+    全仓库写 YAML 的排版都由这里决定：任何外部工具用别的序列化器（js-yaml、
+    ruamel、编辑器格式化都会把 block sequence 缩进）写出的文件，在本地保存
+    一次就会整篇重排。需要判断「磁盘上的字节是否本仓库写的」时用它比对，
+    而不是在每个调用点各写一份参数。
+    """
+    return yaml.dump(data, allow_unicode=True, default_flow_style=False,
+                     sort_keys=False)
+
+
 def save_yaml(path: Path, data: dict[str, Any]) -> None:
     """保存 YAML 文件（自动建父目录，保序不排序键）"""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        f.write(dump_yaml(data))
 
 
 def load_user_config() -> UserConfig:

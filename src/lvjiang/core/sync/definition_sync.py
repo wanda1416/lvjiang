@@ -14,9 +14,11 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
 from loguru import logger
 
 from ..account.service import profile_sync_state, save_profile_sync_state
+from ..config import dump_yaml
 from .client import SyncError, post
 from .round_state import cloud_state, invalidate
 
@@ -98,6 +100,17 @@ def sync_definition(token: str, yaml_path: Path | None = None,
     return report
 
 
+def _is_canonical(raw: bytes) -> bool:
+    """这份字节是否由本仓库的 `dump_yaml()` 写出（纯 YAML round-trip，不经 schema）。"""
+    try:
+        data = yaml.safe_load(raw.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError):
+        return False
+    if not data:
+        return False
+    return dump_yaml(data).encode("utf-8") == raw
+
+
 def _pull_to_local(token: str, yaml_path: Path, report: DefinitionSyncReport) -> None:
     try:
         remote = post("/api/sync/profile/definition", {}, token).get("definition")
@@ -107,7 +120,15 @@ def _pull_to_local(token: str, yaml_path: Path, report: DefinitionSyncReport) ->
         if remote.get("zipped"):
             raw = gzip.decompress(raw)
         yaml_path.parent.mkdir(parents=True, exist_ok=True)
+        was_canonical = yaml_path.is_file() and _is_canonical(yaml_path.read_bytes())
         yaml_path.write_bytes(raw)
+        # 排版口径不同会在下次本地保存时整篇重排（内容不变、diff 两千行）。
+        # 这里只把事实报出来，不重写云端那份：定义的解释权归推送方。
+        if was_canonical and not _is_canonical(raw):
+            logger.warning(
+                "[definition] 云端定义的 YAML 排版与本机序列化器不同"
+                "（可能由网页端或其它工具写入），已原样落盘；"
+                "下次本地保存会按本机口径整篇重排")
         state = profile_sync_state()
         state["definition_sha"] = remote.get("sha256") or _local_sha256(yaml_path)
         save_profile_sync_state(state)

@@ -12,6 +12,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.os.Handler
@@ -79,6 +80,7 @@ class FloatService : Service() {
     /** 吸附态：贴边收起为边缘细把手（仅内存运行态，不持久化） */
     private var collapsed = false
     private var collapseEdge = ""
+    private val touchThroughDepth = java.util.concurrent.atomic.AtomicInteger(0)
     private var panelView: View? = null
     private var panelParams: WindowManager.LayoutParams? = null
     /** 当前骨架：未启动（含结束后的结果态）/ 运行（含暂停与待决策）。 */
@@ -1363,7 +1365,77 @@ class FloatService : Service() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
+    private fun runOnMainSync(timeoutMs: Long = 150L, action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action()
+            return
+        }
+        val latch = java.util.concurrent.CountDownLatch(1)
+        ui.post {
+            try {
+                action()
+            } finally {
+                latch.countDown()
+            }
+        }
+        runCatching { latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }
+    }
+
+    /** 若手势包围盒命中悬浮球区域，则临时为悬浮球加上 FLAG_NOT_TOUCHABLE 让点击穿透到底层应用。 */
+    private fun acquireTouchThroughIfHit(bounds: RectF): Boolean {
+        var acquired = false
+        runOnMainSync {
+            val icon = floatView ?: return@runOnMainSync
+            val p = floatParams ?: return@runOnMainSync
+            if (icon.visibility != View.VISIBLE || !icon.isAttachedToWindow) return@runOnMainSync
+            val loc = IntArray(2)
+            icon.getLocationOnScreen(loc)
+            val pad = dp(4).toFloat()
+            val left = loc[0] - pad
+            val top = loc[1] - pad
+            val right = loc[0] + icon.width + pad
+            val bottom = loc[1] + icon.height + pad
+            val overlaps =
+                bounds.left <= right && left <= bounds.right &&
+                    bounds.top <= bottom && top <= bounds.bottom
+            if (!overlaps) return@runOnMainSync
+            if (touchThroughDepth.getAndIncrement() == 0) {
+                p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager.updateViewLayout(icon, p) }
+            }
+            acquired = true
+        }
+        return acquired
+    }
+
+    private fun releaseTouchThrough() {
+        runOnMainSync {
+            if (touchThroughDepth.decrementAndGet() > 0) return@runOnMainSync
+            touchThroughDepth.set(0)
+            val icon = floatView ?: return@runOnMainSync
+            val p = floatParams ?: return@runOnMainSync
+            if (!icon.isAttachedToWindow) return@runOnMainSync
+            p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            runCatching { windowManager.updateViewLayout(icon, p) }
+        }
+    }
+
     companion object {
+        /**
+         * 自动化手势命中悬浮球时默认临时穿透悬浮窗（不可关闭）：
+         * 既避免脚本点击误触悬浮球暂停任务，又保证点击真实落到底层游戏界面。
+         */
+        fun <T> withOverlayTouchThrough(bounds: RectF?, block: () -> T): T {
+            val service = instance ?: return block()
+            if (bounds == null) return block()
+            val acquired = service.acquireTouchThroughIfHit(bounds)
+            return try {
+                block()
+            } finally {
+                if (acquired) service.releaseTouchThrough()
+            }
+        }
+
         fun selectedTaskLabel(context: Context): String = instance?.selectedTaskName
             ?: context.getSharedPreferences("float_tasks", Context.MODE_PRIVATE).getString("selected_name", "").orEmpty()
 

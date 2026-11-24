@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityService.ScreenshotResult
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Path
+import android.graphics.RectF
 import android.util.Log
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
@@ -266,38 +267,41 @@ object A11yBridge {
             .addStroke(stroke)
             .build()
 
-        val latch = CountDownLatch(1)
-        var completed = false
+        val bounds = RectF().also { path.computeBounds(it, true) }
+        return FloatService.withOverlayTouchThrough(bounds) {
+            val latch = CountDownLatch(1)
+            var completed = false
 
-        val ok = service.dispatchGesture(
-            gesture,
-            object : AccessibilityService.GestureResultCallback() {
-                override fun onCompleted(description: android.accessibilityservice.GestureDescription?) {
-                    completed = true
-                    latch.countDown()
-                }
+            val ok = service.dispatchGesture(
+                gesture,
+                object : AccessibilityService.GestureResultCallback() {
+                    override fun onCompleted(description: android.accessibilityservice.GestureDescription?) {
+                        completed = true
+                        latch.countDown()
+                    }
 
-                override fun onCancelled(description: android.accessibilityservice.GestureDescription?) {
-                    Log.w(TAG, "手势被取消")
-                    latch.countDown()
-                }
-            },
-            null,
-        )
-        if (!ok) {
-            Log.w(TAG, "dispatchGesture 返回 false（服务未就绪或手势非法）")
-            return "dispatchGesture 返回 false（服务未就绪或手势非法）"
+                    override fun onCancelled(description: android.accessibilityservice.GestureDescription?) {
+                        Log.w(TAG, "手势被取消")
+                        latch.countDown()
+                    }
+                },
+                null,
+            )
+            if (!ok) {
+                Log.w(TAG, "dispatchGesture 返回 false（服务未就绪或手势非法）")
+                return@withOverlayTouchThrough "dispatchGesture 返回 false（服务未就绪或手势非法）"
+            }
+
+            // 等回调而不是立即返回：上层脚本紧接着就要截图看结果，手势没落地就截等于白截。
+            // 超时给足 stroke 时长 + 3s 余量。
+            if (!latch.await(durationMs + 3000, TimeUnit.MILLISECONDS)) {
+                Log.w(TAG, "等待手势回调超时")
+                return@withOverlayTouchThrough "等待手势回调超时（${durationMs + 3000}ms 内系统没有回调）"
+            }
+            // 回调来了但不是 onCompleted，只剩 onCancelled 这一种可能
+            if (completed) null
+            else "手势被系统取消（真实触摸、系统弹窗或其他无障碍服务打断）"
         }
-
-        // 等回调而不是立即返回：上层脚本紧接着就要截图看结果，手势没落地就截等于白截。
-        // 超时给足 stroke 时长 + 3s 余量。
-        if (!latch.await(durationMs + 3000, TimeUnit.MILLISECONDS)) {
-            Log.w(TAG, "等待手势回调超时")
-            return "等待手势回调超时（${durationMs + 3000}ms 内系统没有回调）"
-        }
-        // 回调来了但不是 onCompleted，只剩 onCancelled 这一种可能
-        return if (completed) null
-        else "手势被系统取消（真实触摸、系统弹窗或其他无障碍服务打断）"
     }
 
     /**
@@ -321,17 +325,22 @@ object A11yBridge {
             moveTo(a[0].toFloat(), a[1].toFloat())
             lineTo(b[0].toFloat(), b[1].toFloat())
         }
-        val moveStroke = android.accessibilityservice.GestureDescription.StrokeDescription(
-            movePath, 0, moveMs.coerceAtLeast(1), holdMs > 0,
-        )
-        dispatchAndWait(service, moveStroke, moveMs)?.let { return "推到位阶段：$it" }
-        if (holdMs <= 0) return null
-        val dwellPath = Path().apply {
-            moveTo(b[0].toFloat(), b[1].toFloat())
-            lineTo(b[0] + 1f, b[1].toFloat())
+        val bounds = RectF().also { movePath.computeBounds(it, true) }
+        return FloatService.withOverlayTouchThrough(bounds) {
+            val moveStroke = android.accessibilityservice.GestureDescription.StrokeDescription(
+                movePath, 0, moveMs.coerceAtLeast(1), holdMs > 0,
+            )
+            dispatchAndWait(service, moveStroke, moveMs)?.let {
+                return@withOverlayTouchThrough "推到位阶段：$it"
+            }
+            if (holdMs <= 0) return@withOverlayTouchThrough null
+            val dwellPath = Path().apply {
+                moveTo(b[0].toFloat(), b[1].toFloat())
+                lineTo(b[0] + 1f, b[1].toFloat())
+            }
+            val dwellStroke = moveStroke.continueStroke(dwellPath, 0, holdMs, false)
+            dispatchAndWait(service, dwellStroke, holdMs)?.let { "按住阶段：$it" }
         }
-        val dwellStroke = moveStroke.continueStroke(dwellPath, 0, holdMs, false)
-        return dispatchAndWait(service, dwellStroke, holdMs)?.let { "按住阶段：$it" }
     }
 
     /**
@@ -364,13 +373,18 @@ object A11yBridge {
         }
 
         val builder = android.accessibilityservice.GestureDescription.Builder()
-        for (s in strokes) {
+        val bounds = RectF()
+        val strokeBounds = RectF()
+        for ((index, s) in strokes.withIndex()) {
             val a = ScreenMap.mapPoint(s.x1, s.y1)
             val b = ScreenMap.mapPoint(s.x2, s.y2)
             val duration = (s.moveMs + s.holdMs).coerceAtLeast(1)
+            val p = strokePath(a, b, s)
+            p.computeBounds(strokeBounds, true)
+            if (index == 0) bounds.set(strokeBounds) else bounds.union(strokeBounds)
             builder.addStroke(
                 android.accessibilityservice.GestureDescription
-                    .StrokeDescription(strokePath(a, b, s), s.startMs, duration),
+                    .StrokeDescription(p, s.startMs, duration),
             )
         }
 
@@ -379,26 +393,28 @@ object A11yBridge {
         } catch (e: IllegalStateException) {
             return "时间线手势非法: ${e.message}"
         }
-        val latch = CountDownLatch(1)
-        var completed = false
-        val ok = service.dispatchGesture(
-            gesture,
-            object : AccessibilityService.GestureResultCallback() {
-                override fun onCompleted(description: android.accessibilityservice.GestureDescription?) {
-                    completed = true
-                    latch.countDown()
-                }
+        return FloatService.withOverlayTouchThrough(bounds) {
+            val latch = CountDownLatch(1)
+            var completed = false
+            val ok = service.dispatchGesture(
+                gesture,
+                object : AccessibilityService.GestureResultCallback() {
+                    override fun onCompleted(description: android.accessibilityservice.GestureDescription?) {
+                        completed = true
+                        latch.countDown()
+                    }
 
-                override fun onCancelled(description: android.accessibilityservice.GestureDescription?) {
-                    Log.w(TAG, "时间线手势被取消")
-                    latch.countDown()
-                }
-            },
-            null,
-        )
-        if (!ok) return "dispatchGesture 返回 false（服务未就绪或手势非法）"
-        latch.await(span + 2000, TimeUnit.MILLISECONDS)
-        return if (completed) null else "时间线手势未完成（可能被真实触摸取消）"
+                    override fun onCancelled(description: android.accessibilityservice.GestureDescription?) {
+                        Log.w(TAG, "时间线手势被取消")
+                        latch.countDown()
+                    }
+                },
+                null,
+            )
+            if (!ok) return@withOverlayTouchThrough "dispatchGesture 返回 false（服务未就绪或手势非法）"
+            latch.await(span + 2000, TimeUnit.MILLISECONDS)
+            if (completed) null else "时间线手势未完成（可能被真实触摸取消）"
+        }
     }
 
     /**

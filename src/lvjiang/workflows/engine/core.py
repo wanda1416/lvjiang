@@ -428,7 +428,6 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                         _reset_context: bool = True) -> dict:
         """使用用户执行锁运行设备工作流。"""
         begin = getattr(self._input, "begin_execution", None) if _reset_context else None
-        end = getattr(self._input, "end_execution", None) if _reset_context else None
         if self._input is not None:
             self._input.stop_check = self._stop_check
         if begin is not None:
@@ -440,8 +439,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 _reset_context=_reset_context,
             )
         finally:
-            if end is not None:
-                end()
+            if _reset_context:
+                end = getattr(self._input, "end_execution", None)
+                if end is not None:
+                    end()
 
     def _execute_unlocked(self, source, *, initial_variables: dict | None = None,
                           _reset_context: bool = True) -> dict:

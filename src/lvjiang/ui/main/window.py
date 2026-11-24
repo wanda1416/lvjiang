@@ -1256,7 +1256,7 @@ class MainWindow(
 
     # ─── 批处理执行 ───────────────────────────────────────
 
-    def run_batch(self, spec) -> bool:
+    def run_batch(self, spec, *, prechecked_device_busy: bool = False) -> bool:
         """启动批量执行，返回是否成功
 
         spec: 批量页已经冻结好的 `BatchRunSpec`——配置组定义与本次运行草稿在
@@ -1297,6 +1297,7 @@ class MainWindow(
         if not self._begin_automation(
             tr("批量执行"), username="", execution_scope="batch",
             allow_portrait=spec.allow_portrait,
+            check_device_busy=not prechecked_device_busy,
         ):
             return False
 

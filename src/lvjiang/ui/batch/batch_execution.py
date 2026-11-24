@@ -175,7 +175,7 @@ class _BatchExecutionMixin:
                 for task_id in tasks)
             self._host.append_log(
                 f"[批量] 已按用户声明跳过 {total} 格：{names}")
-        ok = self._host.run_batch(spec)
+        ok = self._host.run_batch(spec, prechecked_device_busy=True)
         if not ok:
             self._set_config_enabled(True)
 

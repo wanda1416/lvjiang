@@ -213,6 +213,7 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
     def _begin_automation(
         self, name: str, *, username: str | None = None,
         execution_scope: str = "daily", allow_portrait: bool = False,
+        check_device_busy: bool = True,
     ) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         hk = self._user_config.hotkeys
@@ -266,7 +267,7 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
         # 要到 engine.execute → control_begin 才失败。这里在占用本地目标之前
         # 先试取一次（拿到即释放，判据与真正执行同为 control_begin），被占用
         # 就弹窗说明，不留下"一闪就结束 + 一行 ERROR"的体验。
-        device_busy = self.device_execution_busy()
+        device_busy = self.device_execution_busy() if check_device_busy else ""
         if device_busy:
             self._notify_device_busy(device_busy)
             report_start_failure(self, device_busy, execution_scope)
@@ -286,6 +287,8 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
             report_start_failure(self, decision.reason, execution_scope)
             return False
         self._current_run_context = run_context
+        if recovery is not None:
+            run_context.metadata["android_recovery"] = recovery
         if recovery is not None and target.device is not None:
             target.device.recovery = recovery
             configure = getattr(target.input_ctrl, "configure_recovery", None)
@@ -835,6 +838,13 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
         if target is None or getattr(target, "kind", "") != "adb":
             return ""
         input_ctrl = getattr(target, "input_ctrl", None)
+        probe = getattr(input_ctrl, "probe_execution_busy", None)
+        if callable(probe):
+            try:
+                return str(probe() or "")
+            except Exception as exc:  # 传输类故障交给真正的执行路径报，预检不额外拦截
+                logger.warning(f"设备执行占用预检失败，按原流程继续: {exc}")
+                return ""
         begin = getattr(input_ctrl, "begin_execution", None)
         end = getattr(input_ctrl, "end_execution", None)
         if not callable(begin) or not callable(end):

@@ -840,12 +840,63 @@ class _AdbDeviceOpsMixin:
         # _on_adb_connection_restored 在一次请求真正成功后才更新）。等通道本身
         # 的等待不受影响，仍在重连后立即唤醒并复位运行状态。
         # 确认权以存在运行实例为前提：没有运行实例就没有等待者，放行无副作用。
+        active_run = self._run_manager.run_for_target(target_id)
+        if active_run is not None:
+            frozen_recovery = (
+                (getattr(active_run, "metadata", None) or {}).get("android_recovery")
+                or getattr(old_device, "recovery", None))
+            if frozen_recovery is not None:
+                device.recovery = frozen_recovery
+                configure = getattr(input_ctrl, "configure_recovery", None)
+                if callable(configure):
+                    configure(frozen_recovery)
+            input_ctrl.stop_check = active_run.stop_event.is_set
         holds_confirmation = (
             any(_pending_uncertain(dev) for dev in tracked_devices)
-            and self._run_manager.run_for_target(target_id) is not None)
+            and active_run is not None)
         old = self._execution_targets.put(target)
+        old_agent = getattr(old, "agent", None) if old is not None else None
+        handoff_lease = bool(
+            old_agent is not None
+            and getattr(old_agent, "_owns_execution", False)
+            and active_run is not None
+            and not active_run.stop_event.is_set()
+            and callable(getattr(input_ctrl, "mark_execution_pending", None))
+            and callable(getattr(input_ctrl, "ensure_execution_owned", None))
+        )
         if old is not None:
-            self._dispose_execution_target(old)
+            self._dispose_execution_target(old, dispose_agent=not handoff_lease)
+        if handoff_lease:
+            def _run_active(rc=active_run, tid=target_id) -> bool:
+                return (
+                    self._run_manager.run_for_target(tid) is rc
+                    and not rc.stop_event.is_set()
+                )
+
+            input_ctrl.mark_execution_pending(_run_active)
+
+            def _handoff_agent_lease(
+                prev_agent=old_agent, new_ctrl=input_ctrl, active_fn=_run_active,
+            ) -> None:
+                try:
+                    release = getattr(prev_agent, "release_execution", None)
+                    if callable(release):
+                        release(timeout=1.5)
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug(f"[设备端执行] 旧代理释放租约失败: {exc}")
+                try:
+                    prev_agent.close()
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug(f"[设备端执行] 关闭旧代理失败: {exc}")
+                if active_fn():
+                    try:
+                        new_ctrl.ensure_execution_owned()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug(f"[设备端执行] 新代理补取租约失败: {exc}")
+
+            threading.Thread(
+                target=_handoff_agent_lease, name="agent-lease-handoff", daemon=True,
+            ).start()
         if not holds_confirmation:
             # 注册表和 TargetHandle 已切到新资源后才唤醒失败命令。
             resume_event.set()
@@ -912,7 +963,9 @@ class _AdbDeviceOpsMixin:
             self.btn_locate.setText(tr("连接"))
             self._set_locate_enabled(True)
 
-    def _dispose_execution_target(self, target) -> None:
+    def _dispose_execution_target(
+        self, target, *, dispose_agent: bool = True,
+    ) -> None:
         """释放一个目标独占的资源，不影响其他已连接目标。"""
         capture = target.capture
         if capture is not None:
@@ -920,7 +973,7 @@ class _AdbDeviceOpsMixin:
                 capture.stop()
             except Exception as exc:  # noqa: BLE001
                 logger.debug(f"截图后端停止失败: {exc}")
-        if target.agent is not None:
+        if dispose_agent and target.agent is not None:
             try:
                 target.agent.close()
             except Exception as exc:  # noqa: BLE001

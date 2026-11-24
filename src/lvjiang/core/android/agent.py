@@ -24,6 +24,7 @@ import struct
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -33,7 +34,7 @@ from ...core.config import InputSimConfig
 from ..config.models import AndroidRecoveryConfig
 from ..input.base import InputBackend, InputBackendKind
 from ..input.capture_base import A11yScreenshotThrottle, CaptureBackend
-from .device import AdbDevice
+from .device import AdbConnectionError, AdbDevice
 from .input import _KEY_TO_ANDROID_KEYCODE, AdbInput
 from .recovery import RecoveryAction
 
@@ -302,6 +303,42 @@ class AgentClient:
                 self._sock = None
             self._cleanup_forward()
             self._status = {}
+            self._owns_execution = False
+
+    def release_execution(self, timeout: float = 2.0) -> None:
+        """单次不重试释放执行占用；失败时直接关连接以释放手机租约，绝不触发重连。"""
+        with self._lock:
+            if not self._owns_execution:
+                return
+            try:
+                if self._sock is not None:
+                    header, _ = self._roundtrip("control_end", timeout=timeout)
+                    if not header.get("ok"):
+                        raise AgentOpError(str(
+                            header.get("error") or header.get("message") or "设备端未说明原因"))
+            except (AgentError, AdbConnectionError, OSError) as exc:
+                logger.warning(f"PC 控制释放失败，关闭代理连接: {exc}")
+                self.close()
+            finally:
+                self._owns_execution = False
+
+    def probe_execution_busy(self, timeout: float = 1.5) -> str:
+        """单次短超时探测设备是否拒绝交出执行占用；不重试、不改状态、不触发恢复。"""
+        with self._lock:
+            if self._sock is None or self._status.get("offline_protocol") not in (1, 2, 3, 4):
+                return ""
+            try:
+                header, _ = self._roundtrip("control_begin", timeout=timeout)
+            except (AgentTransportError, OSError, struct.error) as exc:
+                logger.warning(f"设备执行占用探测通信异常，交执行路径处理: {exc}")
+                return ""
+            if not header.get("ok"):
+                return str(header.get("error") or header.get("message") or "设备端未说明原因")
+            try:
+                self._roundtrip("control_end", timeout=timeout)
+            except (AgentTransportError, OSError, struct.error) as exc:
+                logger.warning(f"设备执行占用探测释放失败: {exc}")
+            return ""
 
     def _setup_forward(self) -> int | None:
         ports = list(range(_PORT_RANGE[0], _PORT_RANGE[1] + 1))
@@ -510,12 +547,58 @@ class AgentInput(InputBackend):
         self.target_hwnd = None
         self._adb: AdbInput | None = None
         self._using_adb = False
+        self._execution_pending = False
+        self._execution_run_active: Callable[[], bool] | None = None
 
     def configure_recovery(self, policy: AndroidRecoveryConfig) -> None:
         """宿主启动一次执行链时调用；批量内的脚本不重新读取设置。"""
         self._client.recovery = policy
         self._using_adb = False
         self.kind = InputBackendKind.AGENT
+
+    def probe_execution_busy(self, timeout: float = 1.5) -> str:
+        if self._using_adb:
+            return ""
+        return self._client.probe_execution_busy(timeout=timeout)
+
+    def mark_execution_pending(
+        self, run_active: Callable[[], bool] | None = None,
+    ) -> None:
+        """标记运行中重连后的新通道待补取执行占用，绝不阻塞主线程。"""
+        with self._client._lock:
+            self._execution_pending = True
+            self._execution_run_active = run_active
+
+    def ensure_execution_owned(self) -> None:
+        """在确认运行仍活动时，为重连后的新代理通道幂等补取 control_begin。"""
+        if not self._execution_pending or self._using_adb:
+            return
+        with self._client._lock:
+            if not self._execution_pending or self._using_adb:
+                return
+            run_active = self._execution_run_active
+            if run_active is not None and not run_active():
+                self._execution_pending = False
+                self._execution_run_active = None
+                return
+            if self._client._owns_execution:
+                self._execution_pending = False
+                return
+            if (self._client._sock is None
+                    or self._client.status.get("offline_protocol") not in (1, 2, 3, 4)):
+                self._execution_pending = False
+                return
+            try:
+                header, _ = self._client._roundtrip("control_begin", timeout=2.0)
+                if header.get("ok"):
+                    self._client._owns_execution = True
+                else:
+                    reason = str(header.get("error") or header.get("message") or "设备端未说明原因")
+                    logger.warning(f"[Agent] 运行中重连补取执行占用被拒: {reason}")
+            except (AgentError, AdbConnectionError, OSError) as exc:
+                logger.warning(f"[Agent] 运行中重连补取执行占用失败: {exc}")
+            finally:
+                self._execution_pending = False
 
     def begin_execution(self) -> None:
         if self._using_adb:
@@ -525,15 +608,14 @@ class AgentInput(InputBackend):
             self._client._owns_execution = not self._using_adb
 
     def end_execution(self) -> None:
-        if self._client._owns_execution:
-            try:
-                self._client.call("control_end")
-            except AgentError as exc:
-                # 关闭连接也会释放手机的控制租约；不能遮蔽工作流原始异常。
-                logger.warning(f"PC 控制释放失败，关闭代理连接: {exc}")
-                self._client.close()
-            finally:
-                self._client._owns_execution = False
+        self._execution_pending = False
+        self._execution_run_active = None
+        try:
+            self._client.release_execution()
+        except (AgentError, AdbConnectionError) as exc:
+            # 关闭连接也会释放手机的控制租约；不能遮蔽工作流原始异常。
+            logger.warning(f"PC 控制释放失败，关闭代理连接: {exc}")
+            self._client.close()
 
     @property
     def client(self) -> AgentClient:
@@ -557,6 +639,8 @@ class AgentInput(InputBackend):
                 self._client.timeout,
                 gesture_ms / 1000 + self._GESTURE_TIMEOUT_MARGIN,
             )
+        if op != "control_begin":
+            self.ensure_execution_owned()
         while True:
             if self.stop_check and self.stop_check():
                 raise AgentTransportError("输入恢复已停止")

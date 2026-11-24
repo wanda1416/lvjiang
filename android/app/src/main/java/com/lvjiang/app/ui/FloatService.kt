@@ -80,7 +80,8 @@ class FloatService : Service() {
     /** 吸附态：贴边收起为边缘细把手（仅内存运行态，不持久化） */
     private var collapsed = false
     private var collapseEdge = ""
-    private val touchThroughDepth = java.util.concurrent.atomic.AtomicInteger(0)
+    private var iconTouchThroughDepth = 0
+    private var panelTouchThroughDepth = 0
     private var panelView: View? = null
     private var panelParams: WindowManager.LayoutParams? = null
     /** 当前骨架：未启动（含结束后的结果态）/ 运行（含暂停与待决策）。 */
@@ -549,6 +550,7 @@ class FloatService : Service() {
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelView = null
         panelParams = null
+        panelTouchThroughDepth = 0
         panelMode = null
         contentHost = null
         selectionArea = null
@@ -1365,74 +1367,135 @@ class FloatService : Service() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
-    private fun runOnMainSync(timeoutMs: Long = 150L, action: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            action()
-            return
+    private data class TouchThroughLease(
+        val hitIcon: Boolean,
+        val hitPanel: Boolean,
+        val panelRef: View?,
+    )
+
+    private fun windowOverlaps(view: View?, bounds: RectF): Boolean {
+        if (view == null || view.visibility != View.VISIBLE || !view.isAttachedToWindow) {
+            return false
         }
+        val loc = IntArray(2)
+        view.getLocationOnScreen(loc)
+        val pad = dp(4).toFloat()
+        val left = loc[0] - pad
+        val top = loc[1] - pad
+        val right = loc[0] + view.width + pad
+        val bottom = loc[1] + view.height + pad
+        return bounds.left <= right && left <= bounds.right &&
+            bounds.top <= bottom && top <= bounds.bottom
+    }
+
+    private fun applyTouchThroughOnMain(bounds: RectF): TouchThroughLease? {
+        val icon = floatView
+        val iconParams = floatParams
+        val hitIcon = icon != null && iconParams != null && windowOverlaps(icon, bounds)
+        if (hitIcon) {
+            if (iconTouchThroughDepth == 0) {
+                iconParams!!.flags = iconParams.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager.updateViewLayout(icon!!, iconParams) }
+            }
+            iconTouchThroughDepth += 1
+        }
+        val panel = panelView
+        val pParams = panelParams
+        val hitPanel = panel != null && pParams != null && windowOverlaps(panel, bounds)
+        if (hitPanel) {
+            if (panelTouchThroughDepth == 0) {
+                pParams!!.flags = pParams.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager.updateViewLayout(panel!!, pParams) }
+            }
+            panelTouchThroughDepth += 1
+        }
+        return if (hitIcon || hitPanel) TouchThroughLease(hitIcon, hitPanel, if (hitPanel) panel else null) else null
+    }
+
+    /**
+     * 若手势包围盒命中悬浮球或已展开的悬浮面板，则临时为其加上 FLAG_NOT_TOUCHABLE。
+     *
+     * 用 3 态 AtomicInteger（0=待执行 / 1=已提交 / 2=已取消）杜绝超时泄漏：
+     * 超时且主线程尚未开始时直接 CAS 取消，runnable 稍后跑起立即空返；
+     * 若主线程恰好已进入提交态，则等其 <1ms 完成并拿到租约，由 finally 成对释放。
+     */
+    private fun acquireTouchThroughIfHit(bounds: RectF): TouchThroughLease? {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return applyTouchThroughOnMain(bounds)
+        }
+        val state = java.util.concurrent.atomic.AtomicInteger(0)
+        val leaseRef = java.util.concurrent.atomic.AtomicReference<TouchThroughLease?>(null)
         val latch = java.util.concurrent.CountDownLatch(1)
         ui.post {
+            if (!state.compareAndSet(0, 1)) return@post
             try {
-                action()
+                leaseRef.set(applyTouchThroughOnMain(bounds))
             } finally {
                 latch.countDown()
             }
         }
-        runCatching { latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }
-    }
-
-    /** 若手势包围盒命中悬浮球区域，则临时为悬浮球加上 FLAG_NOT_TOUCHABLE 让点击穿透到底层应用。 */
-    private fun acquireTouchThroughIfHit(bounds: RectF): Boolean {
-        var acquired = false
-        runOnMainSync {
-            val icon = floatView ?: return@runOnMainSync
-            val p = floatParams ?: return@runOnMainSync
-            if (icon.visibility != View.VISIBLE || !icon.isAttachedToWindow) return@runOnMainSync
-            val loc = IntArray(2)
-            icon.getLocationOnScreen(loc)
-            val pad = dp(4).toFloat()
-            val left = loc[0] - pad
-            val top = loc[1] - pad
-            val right = loc[0] + icon.width + pad
-            val bottom = loc[1] + icon.height + pad
-            val overlaps =
-                bounds.left <= right && left <= bounds.right &&
-                    bounds.top <= bottom && top <= bounds.bottom
-            if (!overlaps) return@runOnMainSync
-            if (touchThroughDepth.getAndIncrement() == 0) {
-                p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                runCatching { windowManager.updateViewLayout(icon, p) }
+        val completed = runCatching {
+            latch.await(150L, java.util.concurrent.TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+        if (!completed) {
+            if (state.compareAndSet(0, 2)) {
+                return null
             }
-            acquired = true
+            // 主线程已进入提交态，等它写完 leaseRef，保证与 finally 成对释放
+            runCatching { latch.await() }
         }
-        return acquired
+        return leaseRef.get()
     }
 
-    private fun releaseTouchThrough() {
-        runOnMainSync {
-            if (touchThroughDepth.decrementAndGet() > 0) return@runOnMainSync
-            touchThroughDepth.set(0)
-            val icon = floatView ?: return@runOnMainSync
-            val p = floatParams ?: return@runOnMainSync
-            if (!icon.isAttachedToWindow) return@runOnMainSync
-            p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-            runCatching { windowManager.updateViewLayout(icon, p) }
+    private fun releaseTouchThrough(lease: TouchThroughLease) {
+        val releaseAction = {
+            if (lease.hitIcon) {
+                iconTouchThroughDepth = (iconTouchThroughDepth - 1).coerceAtLeast(0)
+                if (iconTouchThroughDepth == 0) {
+                    val icon = floatView
+                    val iconParams = floatParams
+                    if (icon != null && iconParams != null && icon.isAttachedToWindow) {
+                        iconParams.flags =
+                            iconParams.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                        runCatching { windowManager.updateViewLayout(icon, iconParams) }
+                    }
+                }
+            }
+            if (lease.hitPanel) {
+                val panel = panelView
+                val pParams = panelParams
+                // 若期间面板已关闭重建（实例不同），closePanel 已清零 depth，不碰新面板
+                if (panel != null && panel === lease.panelRef && pParams != null) {
+                    panelTouchThroughDepth = (panelTouchThroughDepth - 1).coerceAtLeast(0)
+                    if (panelTouchThroughDepth == 0 && panel.isAttachedToWindow) {
+                        pParams.flags =
+                            pParams.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                        runCatching { windowManager.updateViewLayout(panel, pParams) }
+                    }
+                }
+            }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            releaseAction()
+        } else {
+            ui.post(releaseAction)
         }
     }
 
     companion object {
         /**
-         * 自动化手势命中悬浮球时默认临时穿透悬浮窗（不可关闭）：
-         * 既避免脚本点击误触悬浮球暂停任务，又保证点击真实落到底层游戏界面。
+         * 自动化手势命中悬浮球或悬浮面板时默认临时穿透悬浮窗（不可关闭）：
+         * 既避免脚本点击误触悬浮球暂停或点中面板按钮，又保证点击真实落到底层游戏界面。
+         * 注：仅覆盖无障碍（A11yBridge）主注入路径；PC 远程 via=shell 路径下悬浮球默认隐藏。
          */
         fun <T> withOverlayTouchThrough(bounds: RectF?, block: () -> T): T {
             val service = instance ?: return block()
             if (bounds == null) return block()
-            val acquired = service.acquireTouchThroughIfHit(bounds)
+            val lease = service.acquireTouchThroughIfHit(bounds)
             return try {
                 block()
             } finally {
-                if (acquired) service.releaseTouchThrough()
+                if (lease != null) service.releaseTouchThrough(lease)
             }
         }
 

@@ -41,6 +41,7 @@ from .....ui.execution.user_selector import ExecutionUserSelector
 from .....ui.main.run_control import (
     STATE_PAUSING,
     STATE_STOPPING,
+    STATE_WAITING_TARGET,
     other_task_running_label,
 )
 from .....ui.widgets.button_styles import (
@@ -440,7 +441,7 @@ class TuningTab(QWidget):
             self.btn_run_tuning.setText(tr("停止中"))
             self.btn_run_tuning.setEnabled(False)
             apply_execution_button_style(self.btn_run_tuning, "stopping")
-        elif state in ("running", STATE_PAUSING, "paused"):
+        elif state in ("running", STATE_PAUSING, "paused", STATE_WAITING_TARGET):
             self.btn_run_tuning.setText(hotkey_label(tr("停止"), hk.stop))
             apply_execution_button_style(self.btn_run_tuning, "stop")
         else:
@@ -448,7 +449,7 @@ class TuningTab(QWidget):
             reason = tr("请选择有效的执行用户") if selector is not None and not selector.resolve_username() else ""
             apply_idle_start(self.btn_run_tuning, getattr(self, "_status_label", None),
                              self._host, state, hotkey_label(tr("开始调律"), hk.start), reason)
-        if other_label or state in ("running", STATE_PAUSING, "paused", STATE_STOPPING):
+        if other_label or state in ("running", STATE_PAUSING, "paused", STATE_STOPPING, STATE_WAITING_TARGET):
             self.btn_run_tuning.setToolTip("")
             show_running_feedback(getattr(self, "_status_label", None), other_label)
         # 刷新暂停/恢复按钮

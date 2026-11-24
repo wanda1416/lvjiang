@@ -55,6 +55,7 @@ STATE_PLAN_UNSUPPORTED = "plan_unsupported"
 STATE_START_DENIED = "start_denied"
 STATE_PAUSING = "pausing"
 STATE_STOPPING = "stopping"
+STATE_WAITING_TARGET = "waiting_target"
 
 
 class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
@@ -120,6 +121,18 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
         self._run_state = run_context.state.value
         self._running_target_id = run_context.target_id
         self._running_target_snapshot = run_context.target_snapshot
+
+    def _sync_projected_run_state(self, run_context, state_value: str) -> None:
+        """仅当目标仍是当前查看目标时同步 _run_state 与运行按钮，避免后台目标污染投影。"""
+        if run_context is None or run_context is not getattr(self, "_current_run_context", None):
+            return
+        self._run_state = state_value
+        refresh = getattr(self, "_refresh_run_button", None)
+        if callable(refresh) and (
+            getattr(self, "_user_config", None) is not None
+            or getattr(refresh, "__func__", None) is not RunControlMixin._refresh_run_button
+        ):
+            refresh()
 
     def _capture_launch_draft(self, target_id: str | None) -> None:
         target = self._execution_targets.get(target_id)
@@ -455,6 +468,10 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
                 context.task_run_id, final_state,
             )
             self._emit_concurrency_changed()
+        if context is not None:
+            hide_banner = getattr(self, "_hide_channel_banner", None)
+            if callable(hide_banner):
+                hide_banner(context.target_id)
         if not is_current:
             refresh_targets = getattr(self, "_refresh_execution_targets_ui", None)
             if callable(refresh_targets):
@@ -475,9 +492,14 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
         self._set_context_controls_locked(LOCK_REASON_BATCH, False)
         self._refresh_run_button()
         self._refresh_pause_button()
-        banner = getattr(self, '_adb_banner', None)
-        if banner is not None:
-            banner.setVisible(False)
+        if context is None:
+            drop_banner = getattr(self, "_drop_channel_banner", None)
+            if callable(drop_banner):
+                drop_banner()
+            else:
+                banner = getattr(self, '_adb_banner', None)
+                if banner is not None:
+                    banner.setVisible(False)
         self.statusBar().showMessage(f"{name} 已结束")
         logger.info(f"自动化结束: {name}")
 
@@ -648,9 +670,18 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
         resume_event = self._run_resume_event(run_context)
         if resume_event is not None:
             resume_event.set()
-        banner = getattr(self, '_adb_banner', None)
-        if banner is not None:
-            banner.setVisible(False)
+        if run_context is not None:
+            hide_banner = getattr(self, "_hide_channel_banner", None)
+            if callable(hide_banner):
+                hide_banner(run_context.target_id)
+        else:
+            drop_banner = getattr(self, "_drop_channel_banner", None)
+            if callable(drop_banner):
+                drop_banner()
+            else:
+                banner = getattr(self, '_adb_banner', None)
+                if banner is not None:
+                    banner.setVisible(False)
         self.statusBar().showMessage(tr("停止中... | 等待当前步骤结束"))
         # 占位主流程（_on_start）没有工作流线程，直接复位
         if self._current_worker is None:

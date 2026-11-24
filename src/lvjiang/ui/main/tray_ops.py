@@ -157,9 +157,10 @@ class TrayOpsMixin:
             STATE_PLAN_UNSUPPORTED,
             STATE_START_DENIED,
             STATE_STOPPING,
+            STATE_WAITING_TARGET,
         )
         state = self._tray_state
-        active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING)
+        active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING, STATE_WAITING_TARGET)
         self._tray_icon.setIcon(_make_tray_icon(self._tray_icon_state(state)))
         status_text = {
             "running": tr("运行中"),
@@ -192,4 +193,4 @@ class TrayOpsMixin:
         self._tray_action_stop.setText(
             tr("结束中") if state == STATE_STOPPING else tr("结束当前目标"))
         self._tray_action_stop.setEnabled(
-            state in ("running", STATE_PAUSING, "paused"))
+            state in ("running", STATE_PAUSING, "paused", STATE_WAITING_TARGET))

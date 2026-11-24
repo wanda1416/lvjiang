@@ -25,6 +25,7 @@ STATE_PLAN_UNSUPPORTED = "plan_unsupported"
 STATE_START_DENIED = "start_denied"
 STATE_PAUSING = "pausing"
 STATE_STOPPING = "stopping"
+STATE_WAITING_TARGET = "waiting_target"
 
 
 class _AndroidRecoveryMixin:
@@ -64,31 +65,23 @@ class _AndroidRecoveryMixin:
             run_context.task_run_id, RunState.WAITING_TARGET)
         self._emit_run_instance_state(
             run_context, RunState.WAITING_TARGET.value)
+        sync_state = getattr(self, "_sync_projected_run_state", None)
+        if callable(sync_state):
+            sync_state(run_context, RunState.WAITING_TARGET.value)
         message = tr(
             "[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；"
             "若无法恢复，请按 F10 停止任务后重新连接: {error}").format(
                 name=target.display_name, error=error_msg)
         self.append_log(message)
         self._show_connection_recovery_question(target, run_context, error_msg)
+        self._show_channel_banner(
+            target_id,
+            tr("⚠ 执行通道等待确认：处理问题后点击「重新检查」；"
+               "无法恢复时请按 F10 停止任务"))
         if target_id != self._execution_targets.active_target_id:
             return
         self.statusBar().showMessage(tr(
             "设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务"))
-        banner = getattr(self, '_adb_banner', None)
-        if banner is not None:
-            label = getattr(self, '_adb_banner_label', None)
-            if label is not None:
-                label.setText(tr(
-                    "⚠ 执行通道等待确认：处理问题后点击「重新检查」；"
-                    "无法恢复时请按 F10 停止任务"))
-            btn = getattr(self, '_adb_banner_btn', None)
-            if btn is not None:
-                try:
-                    btn.clicked.disconnect()
-                except TypeError:
-                    pass
-                btn.clicked.connect(self._resume_adb)
-            banner.setVisible(True)
 
     def _on_stream_lost(self, target_id: str, kind: str, detail: str, device=None):
         """画面流故障（ADB 通道还在）：运行中的任务停下等恢复，空闲时只提示。
@@ -118,14 +111,17 @@ class _AndroidRecoveryMixin:
             run_context.task_run_id, RunState.WAITING_TARGET)
         self._emit_run_instance_state(
             run_context, RunState.WAITING_TARGET.value)
+        sync_state = getattr(self, "_sync_projected_run_state", None)
+        if callable(sync_state):
+            sync_state(run_context, RunState.WAITING_TARGET.value)
         self._show_connection_recovery_question(
             target, run_context, detail, kind="stream")
-        if target_id != self._execution_targets.active_target_id:
-            return
-        self.statusBar().showMessage(tr("画面流中断，任务正在等待恢复"))
         self._show_channel_banner(
             target_id,
             tr("⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务"))
+        if target_id != self._execution_targets.active_target_id:
+            return
+        self.statusBar().showMessage(tr("画面流中断，任务正在等待恢复"))
 
     def _channel_banner_texts(self) -> dict[str, str]:
         """每条横幅的文案按目标保存。
@@ -228,10 +224,31 @@ class _AndroidRecoveryMixin:
         timer = QTimer(box)
         timer.setInterval(200)
 
+        dismissed = False
+
         def current():
             return self._run_manager.run_for_target(target.id) is run_context
 
+        def dismiss_silently() -> None:
+            nonlocal dismissed
+            if dismissed:
+                return
+            dismissed = True
+            timer.stop()
+            dialogs.pop(target.id, None)
+            try:
+                box.finished.disconnect(finish)
+            except (TypeError, RuntimeError):
+                pass
+            try:
+                box.close()
+                box.deleteLater()
+            except RuntimeError:
+                pass
+
         def finish(answer):
+            if dismissed:
+                return
             timer.stop()
             dialogs.pop(target.id, None)
             if current() and not run_context.stop_event.is_set():
@@ -261,10 +278,30 @@ class _AndroidRecoveryMixin:
             if not current() or run_context.stop_event.is_set():
                 box.done(QMessageBox.StandardButton.No)
 
+        box._dismiss_silently = dismiss_silently  # type: ignore[attr-defined]
         box.finished.connect(finish)
         timer.timeout.connect(poll)
         timer.start()
         box.show()
+
+    def _dismiss_connection_recovery_question(self, target_id: str) -> None:
+        """恢复成功后静默关闭该目标的恢复弹窗，不触发 Yes/No/Esc 业务分支。"""
+        dialogs = getattr(self, "_connection_recovery_dialogs", None)
+        if not dialogs:
+            return
+        box = dialogs.get(target_id)
+        if box is None:
+            return
+        dismiss = getattr(box, "_dismiss_silently", None)
+        if callable(dismiss):
+            dismiss()
+            return
+        dialogs.pop(target_id, None)
+        try:
+            box.close()
+            box.deleteLater()
+        except RuntimeError:
+            pass
 
     def _on_adb_connection_restored(self, target_id: str):
         from .execution_runs import RunState
@@ -280,6 +317,10 @@ class _AndroidRecoveryMixin:
                          and not run_context.pause_event.is_set() else RunState.RUNNING)
                 self._run_manager.set_state(run_context.task_run_id, state)
                 self._emit_run_instance_state(run_context, state.value)
+                sync_state = getattr(self, "_sync_projected_run_state", None)
+                if callable(sync_state):
+                    sync_state(run_context, state.value)
+        self._dismiss_connection_recovery_question(target_id)
         self._refresh_execution_targets_ui()
         self._hide_channel_banner(target_id)
 

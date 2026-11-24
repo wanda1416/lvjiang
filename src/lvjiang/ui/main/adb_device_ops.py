@@ -910,6 +910,12 @@ class _AdbDeviceOpsMixin:
                     else RunState.RUNNING)
                 self._run_manager.set_state(run_context.task_run_id, next_state)
                 self._emit_run_instance_state(run_context, next_state.value)
+                sync_state = getattr(self, "_sync_projected_run_state", None)
+                if callable(sync_state):
+                    sync_state(run_context, next_state.value)
+            dismiss = getattr(self, "_dismiss_connection_recovery_question", None)
+            if callable(dismiss):
+                dismiss(target_id)
         self._activate_connected_target(target, old)
         # 连接成功就该收起上一个会话留下的通道横幅。原先只有「运行实例正处于
         # waiting_target」才收，空闲重连时横幅会一直挂着「画面流已中断」——用户
@@ -1131,6 +1137,10 @@ class _AdbDeviceOpsMixin:
         target.input_kind = str(
             getattr(target.input_ctrl, "kind", "") or "")
         self._rebind_target_resources(target)
+        if not enabled:
+            hide_banner = getattr(self, "_hide_channel_banner", None)
+            if callable(hide_banner):
+                hide_banner(target_id)
         if self._execution_targets.active_target_id == target_id:
             self._sync_active_target_compat()
         self._refresh_execution_targets_ui()

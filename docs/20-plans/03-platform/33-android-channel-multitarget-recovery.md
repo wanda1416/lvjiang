@@ -1,6 +1,6 @@
 # Android ADB 与无障碍通道多目标切换及状态恢复修复方案
 
-> 状态：未开始（方案已复核，待确认后分批实施）。
+> 状态：已完成（三批次修复、定向回归测试与全量 CI 门禁均已通过）。
 
 相关既有设计决策：
 - [18-android-connection-recovery.md](../../30-design/02-decisions/04-platform/18-android-connection-recovery.md)（代理与 ADB 重连、输入降级、画面流故障及人工恢复边界）

@@ -31,6 +31,7 @@ from ...i18n import tr
 from ..main.run_control import (
     STATE_PAUSING,
     STATE_STOPPING,
+    STATE_WAITING_TARGET,
 )
 from ..widgets.button_styles import (
     apply_execution_button_style,
@@ -587,7 +588,7 @@ class _BatchExecutionMixin:
 
     def _on_automation_state(self, state: str):
         """宿主自动化状态变化 → 刷新按钮"""
-        active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING)
+        active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING, STATE_WAITING_TARGET)
         self._running = state in active_states
         self._refresh_run_button(state)
         if state in active_states:
@@ -640,14 +641,14 @@ class _BatchExecutionMixin:
             self._btn_run.setText(tr("停止中"))
             self._btn_run.setEnabled(False)
             apply_execution_button_style(self._btn_run, "stopping")
-        elif state in ("running", STATE_PAUSING, "paused"):
+        elif state in ("running", STATE_PAUSING, "paused", STATE_WAITING_TARGET):
             self._btn_run.setText(hotkey_label(tr("停止"), hk.stop))
             self._btn_run.setEnabled(True)
             apply_execution_button_style(self._btn_run, "stop")
         else:
             apply_idle_start(self._btn_run, getattr(self, "_start_feedback", None), self._host,
                              state, hotkey_label(tr("开始执行"), hk.start), _BatchExecutionMixin._start_reason(self))
-        if state in ("running", STATE_PAUSING, "paused", STATE_STOPPING):
+        if state in ("running", STATE_PAUSING, "paused", STATE_STOPPING, STATE_WAITING_TARGET):
             self._btn_run.setToolTip("")
             show_running_feedback(getattr(self, "_start_feedback", None))
         # 刷新暂停/恢复按钮

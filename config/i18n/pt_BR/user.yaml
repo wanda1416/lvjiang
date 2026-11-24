@@ -1,64 +1,78 @@
 common:
-  cancel: Cancel
-  current: Current
-  empty: No sticky notes yet
-  paste: Paste from Clipboard
-  remove: Remove Current Avatar
-  reset: Reset
-  title: Sticky Notes
-  请输入用户名: Enter a username
+  cancel: Cancelar
+  current: Atual
+  empty: Nenhuma nota adesiva ainda
+  paste: Colar da área de transferência
+  remove: Remover avatar atual
+  reset: Redefinir
+  title: Notas adesivas
+  请输入用户名: Digite um nome de usuário
 user_avatar:
-  从剪贴板粘贴: Paste from clipboard
-  从当前设备或窗口获取最新截图: Grab the latest screenshot from the current device or window
-  使用此头像: Use This Avatar
-  保存头像失败：{error}: 'Failed to save avatar: {error}'
-  保存并使用: Save and Use
-  删除历史头像: Delete History Avatar
-  删除历史头像失败：{error}: 'Failed to delete history avatar: {error}'
-  剪贴板中没有图片: No image in the clipboard
-  双击编辑头像: Double-click to edit avatar
-  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Drag the image to position; zoom with wheel or slider · Ctrl+V to paste
-  图片尺寸过大，请选择不超过 4000 万像素的图片: Image too large; pick one no larger than 40 megapixels
-  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Image files (*.png *.jpg *.jpeg *.webp *.bmp)
-  头像库: Avatar Library
-  头像文件不存在或文件名无效: Avatar file missing or invalid file name
-  头像正在使用: Avatar in use
-  导入图片或从剪贴板粘贴: Import an image or paste from the clipboard
-  导入头像图片: Import Avatar Image
-  当前使用: Current
-  截图失败: Screenshot Failed
-  无法更新用户头像引用: Cannot update the user's avatar reference
-  无法粘贴: Cannot paste
-  无法读取图片：{error}: 'Cannot read the image: {error}'
-  没有可保存的裁剪图片: No cropped image to save
-  没有读取到有效图片: No valid image was read
-  确定永久删除这张历史头像吗？此操作无法撤销。: Permanently delete this history avatar? This cannot be undone.
-  移除头像失败：{error}: 'Failed to remove avatar: {error}'
-  移除当前头像: Remove Current Avatar
-  编辑“{name}”的头像: Edit avatar for "{name}"
-  编辑头像: Edit Avatar
+  从剪贴板粘贴: Colar da área de transferência
+  从当前设备或窗口获取最新截图: Obter a captura de tela mais recente do dispositivo ou janela atual
+  使用此头像: Usar este avatar
+  保存头像失败：{error}: 'Falha ao salvar o avatar: {error}'
+  保存并使用: Salvar e usar
+  删除历史头像: Excluir avatar do histórico
+  删除历史头像失败：{error}: 'Falha ao excluir avatar do histórico: {error}'
+  剪贴板中没有图片: Nenhuma imagem na área de transferência
+  双击编辑头像: Clique duas vezes para editar o avatar
+  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Arraste a imagem para posicionar; use a roda do mouse ou o controle deslizante para zoom · Ctrl+V para colar
+  图片尺寸过大，请选择不超过 4000 万像素的图片: Imagem grande demais; escolha uma imagem com no máximo 40 megapixels
+  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Arquivos de imagem (*.png *.jpg *.jpeg *.webp *.bmp)
+  头像库: Biblioteca de avatares
+  头像文件不存在或文件名无效: Arquivo de avatar ausente ou nome de arquivo inválido
+  头像正在使用: Avatar em uso
+  导入图片或从剪贴板粘贴: Importe uma imagem ou cole da área de transferência
+  导入头像图片: Importar imagem de avatar
+  当前使用: Em uso
+  截图失败: Falha na captura de tela
+  无法更新用户头像引用: Não foi possível atualizar a referência de avatar do usuário
+  无法粘贴: Não foi possível colar
+  无法读取图片：{error}: 'Não foi possível ler a imagem: {error}'
+  没有可保存的裁剪图片: Nenhuma imagem recortada para salvar
+  没有读取到有效图片: Nenhuma imagem válida foi lida
+  确定永久删除这张历史头像吗？此操作无法撤销。: Excluir permanentemente este avatar do histórico? Esta ação não pode ser desfeita.
+  移除头像失败：{error}: 'Falha ao remover o avatar: {error}'
+  移除当前头像: Remover avatar atual
+  编辑“{name}”的头像: Editar avatar de "{name}"
+  编辑头像: Editar avatar
   缩放: Zoom
-  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
-  选择之前保存的头像，或导入一张新图片: Pick a previously saved avatar or import a new image
+  ? '该头像正被以下用户使用，不能删除：
+
+    {users}
+
+
+    请先为这些用户更换或移除头像。'
+  : 'Este avatar está em uso pelos seguintes usuários e não pode ser excluído:
+
+    {users}
+
+
+    Troque ou remova o avatar desses usuários primeiro.'
+  选择之前保存的头像，或导入一张新图片: Escolha um avatar salvo anteriormente ou importe uma nova imagem
 user_manager:
-  保存属性: Save Attributes
-  删除属性: Delete Attributes
-  同步全部头像: Sync All Avatars
-  属性 Key 不能为空: Attribute key cannot be empty
-  属性 Key 不能重复：{key}: 'Duplicate attribute key: {key}'
-  悬浮点击编辑，或双击头像: Hover and click to edit, or double-click the avatar
-  把本机与云端的头像做一次双向合并；不参与日常自动同步: One-time two-way merge of local and cloud avatars; not part of daily auto sync
-  新增属性: Add Attribute
-  新建用户: New User
-  无法删除该用户: This user cannot be deleted
-  正在同步头像…: Syncing avatars…
-  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters.
-  用户名已存在: Username already exists
-  用户属性: User Attributes
-  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
-  ＋ 新建用户: ＋ New User
+  保存属性: Salvar atributos
+  删除属性: Excluir atributos
+  同步全部头像: Sincronizar todos os avatares
+  属性 Key 不能为空: A chave do atributo não pode ficar vazia
+  属性 Key 不能重复：{key}: 'Chave de atributo duplicada: {key}'
+  悬浮点击编辑，或双击头像: Passe o mouse e clique para editar, ou clique duas vezes no avatar
+  把本机与云端的头像做一次双向合并；不参与日常自动同步: Faz uma mesclagem bidirecional única entre avatares locais e na nuvem; não participa da sincronização automática diária
+  新增属性: Adicionar atributo
+  新建用户: Novo usuário
+  无法删除该用户: Não é possível excluir este usuário
+  正在同步头像…: Sincronizando avatares…
+  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: O nome de usuário pode conter caracteres chineses, letras, números, sublinhados e hífens, com até 32 caracteres.
+  用户名已存在: Nome de usuário já existe
+  用户属性: Atributos do usuário
+  ? '确定要删除用户「{name}」吗？
+
+    用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。'
+  : 'Excluir o usuário "{name}"?
+
+    O usuário será removido da lista atual e das configurações em lote, mas os arquivos de dados associados serão mantidos; basta adicionar novamente com o mesmo nome para restaurar.'
+  ＋ 新建用户: ＋ Novo usuário
 user_toolbar:
-  上一个用户: Previous User
-  下一个用户: Next User
+  上一个用户: Usuário anterior
+  下一个用户: Próximo usuário

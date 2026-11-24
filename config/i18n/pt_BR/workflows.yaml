@@ -1,169 +1,169 @@
 action_catalog:
-  0=红 1=绿 2=蓝: 0=Red 1=Green 2=Blue
-  ESC / 字母键 / MOUSE_LEFT；设备端 ESC=返回: ESC / letter keys / MOUSE_LEFT; on-device ESC = Back
-  OCR 扫描区域: OCR Scan Region
-  PC 端通过剪贴板和 Ctrl+V 输入文本，支持后台模式: On PC, types text via clipboard and Ctrl+V; supports background mode
-  find 结果、矩形或坐标变量: find result, rectangle or point variable
-  '「{label}」不能包含英文双引号或换行（DSL 字符串不支持转义）': '"{label}" cannot contain double quotes or line breaks (DSL strings do not support escapes)'
-  '「{label}」应为 #rrggbb': '"{label}" should be #rrggbb'
-  「{label}」应为 {n} 个数: '"{label}" should be {n} numbers'
-  '「{label}」应为命名延迟（字母或中文开头的名字）': '"{label}" should be a named delay (a name starting with a letter or Chinese character)'
-  「{label}」未填写: '"{label}" is not filled in'
-  '「{label}」的 {n} 个值都必须是数字': 'all {n} values of "{label}" must be numbers'
-  不带 by 得到文字；带 by 得到命中与否: Without by, returns the text; with by, returns whether it hit
-  '「{label}」请填单个 key（例如 ok），不要带方括号或场景前缀': 'enter a single key for "{label}" (for example ok), without brackets or a scene prefix'
-  不抖动: No jitter
-  主导通道: Primary Channel
-  交互: Interaction
-  亮段计数: Bright segment count
-  值/表达式: Value / expression
-  停止应用: Stop App
-  内容: Content
-  出错也继续: Continue on error
-  列表: List
-  到达后按住(秒): Hold After Arriving (sec)
-  匹配: Match
-  区域/点: Region/Point
-  区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Fraction (0-1) of pixels in the region close to the target color; used to tell whether a button is lit / which screen is showing
-  取点亮度: Sample Point Brightness
-  取点颜色: Sample Point Color
-  只判断是否含: Only Check Contains
-  只看某区域: Only Look at a Region
-  向量倍数: Vector multiplier
-  启动应用: Start App
-  命名延迟，留空则不等待: Named delay; leave empty to skip waiting
-  图库识别（分类）: Gallery Recognition (Classification)
-  图色: Pixel Color
-  声明全局变量: Declare Global Variable
-  声明后可在主流程与所有子过程中共享读写: Shared for reading and writing by the main flow and all subprocedures after declaration
-  失败退出: Exit on Failure
-  如 $x > 0.5 / $v contains "ok" / not $hit: e.g. $x > 0.5 / $v contains "ok" / not $hit
-  如果…: If…
-  如果…否则…: If… Else…
-  字符串写双引号，或使用 $变量: Strings in double quotes, or use $variables
-  存入变量: Store in Variable
-  定义区域变量: Define Region Variable
-  定义子过程: Define Subprocedure
-  容差: Tolerance
-  应用名: App name
-  延迟: Delay
-  当…时重复: Repeat While…
-  形如 [scene].[region]: 'Format: [scene].[region]'
-  形如 [scene].[region]，留空全画布: 'Format: [scene].[region]; leave empty for the full canvas'
-  形如 [scene].[region]；留空则搜索整个画布: Like [scene].[region]; empty searches the whole canvas
-  循环变量: Loop Variable
-  感知: Perception
-  截图存档: Screenshot Archive
-  打日志: Write Log
-  找同色图标: Find Same-Color Icon
-  找图（模板定位）: Find Image (Template Match)
-  找文字（可点击）: Find Text (Clickable)
-  拖拽区域翻页: Drag Region to Page
-  拖拽（两点）: Drag (Two Points)
-  按住(秒/区间): Hold (seconds/range)
-  按区域绑定找图: Find image by region binding
-  按压按键/鼠标键: Press a key or mouse button
-  按布局中 Region 绑定的模板匹配，返回首个命中的区域 key: Match templates bound to Region in the layout; returns the first hit's region key
-  按应用注册类型停止 Android 或 PC 应用，并确认进程消失: Stop an Android or PC app per its registration type and confirm the process is gone
-  按应用注册类型启动 Android 或 PC 应用，并确认进程出现: Start an Android or PC app per its registration type and confirm the process appears
-  控制流: Control Flow
-  搜索范围: Search Range
-  操作后等待: Wait After Action
-  收集到输出: Collect into Output
-  数据与输出: Data & Output
-  文字: Text
-  文本/变量: Text/variable
-  暂停等人工: Pause for Manual Action
-  最低分(0-1): Min Score (0-1)
-  最长等待(秒): Max Wait (sec)
-  模板匹配区域: Template Match Region
-  模板区域: Template Region
-  模板场景: Template Scene
-  滑动时长(秒/区间): Swipe duration (seconds/range)
-  激活区域: Activate Region
-  激活布局实体；默认点击中心，布局可改为按键: Activate a layout entity; click its center by default or use a layout-bound key
-  点击变量: Click Variable
-  点击坐标: Click Coordinate
-  点击画布归一化坐标: Click Canvas-Normalized Coordinate
-  画布上点一下取值: Click on the Canvas to Pick a Value
-  画布框选取值: Box-Select on Canvas to Pick a Value
-  画布框选的区域存成变量，之后 click / 图色函数都能用: The region boxed on the canvas is stored as a variable, usable later by click / pixel-color functions
-  目标色: Target Color
-  等待画面稳定: Wait for Screen to Settle
-  等待（命名延迟）: Wait (Named Delay)
-  等待（秒）: Wait (sec)
-  粘贴文本: Paste Text
-  级别: Level
-  终点: End Point
-  行/列数: Rows/Columns
-  读取当前布局的 Region 模板绑定，并在指定范围或全画布定位: Reads the current layout's Region template bindings and locates within the range or the whole canvas
-  调用子过程: Call Subprocedure
-  赋值: Assign
-  起点: Start Point
-  起点→终点向量放大/缩小，如 2 或 0.5: Scale of the start→end vector, e.g. 2 or 0.5
-  超时(秒): Timeout (seconds)
-  输出键名: Output Key Name
-  过程名: Procedure Name
-  返回列表，按面积降序；$first = $icons[0] 后可 click: Returns a list, sorted by area descending; $first = $icons[0] can then be clicked
-  进入亮段阈值: Enter-Bright-Segment Threshold
-  退出阈值: Exit Threshold
-  通道下限: Channel Lower Bound
-  遍历列表: Iterate List
-  重复 N 次: Repeat N Times
-  重复直到…: Repeat Until…
-  错误变量: Error Variable
-  键名: Key Name
-  限定区域: Restrict to Region
-  面板/区域: Panel/Region
-  颜色占比: Color Ratio
-  高出其他通道: Exceeds Other Channels By
+  0=红 1=绿 2=蓝: 0=Vermelho 1=Verde 2=Azul
+  ESC / 字母键 / MOUSE_LEFT；设备端 ESC=返回: ESC / teclas de letra / MOUSE_LEFT; no dispositivo, ESC = Voltar
+  OCR 扫描区域: Região de varredura OCR
+  PC 端通过剪贴板和 Ctrl+V 输入文本，支持后台模式: No PC, insere texto via área de transferência e Ctrl+V; suporta modo em segundo plano
+  find 结果、矩形或坐标变量: Resultado de find, retângulo ou variável de coordenada
+  「{label}」不能包含英文双引号或换行（DSL 字符串不支持转义）: '"{label}" não pode conter aspas duplas nem quebras de linha (strings DSL não suportam escape)'
+  '「{label}」应为 #rrggbb': '"{label}" deve estar no formato #rrggbb'
+  「{label}」应为 {n} 个数: '"{label}" deve conter {n} números'
+  「{label}」应为命名延迟（字母或中文开头的名字）: '"{label}" deve ser um atraso nomeado (nome iniciado por letra ou caractere chinês)'
+  「{label}」未填写: '"{label}" não foi preenchido'
+  「{label}」的 {n} 个值都必须是数字: Todos os {n} valores de "{label}" devem ser números
+  不带 by 得到文字；带 by 得到命中与否: Sem by, retorna o texto; com by, retorna se houve correspondência
+  「{label}」请填单个 key（例如 ok），不要带方括号或场景前缀: 'Informe uma única chave para "{label}" (ex.: ok), sem colchetes nem prefixo de cena'
+  不抖动: Sem jitter
+  主导通道: Canal dominante
+  交互: Interação
+  亮段计数: Contagem de segmentos brilhantes
+  值/表达式: Valor/expressão
+  停止应用: Parar aplicativo
+  内容: Conteúdo
+  出错也继续: Continuar em caso de erro
+  列表: Lista
+  到达后按住(秒): Manter pressionado ao chegar (s)
+  匹配: Correspondência
+  区域/点: Região/Ponto
+  区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Proporção (0–1) de pixels na região próximos à cor-alvo; útil para verificar se um botão está aceso ou qual tela está ativa
+  取点亮度: Amostrar brilho do ponto
+  取点颜色: Amostrar cor do ponto
+  只判断是否含: Verificar apenas se contém
+  只看某区域: Restringir a uma região
+  向量倍数: Multiplicador do vetor
+  启动应用: Iniciar aplicativo
+  命名延迟，留空则不等待: Atraso nomeado; deixe em branco para não aguardar
+  图库识别（分类）: Reconhecimento por galeria (classificação)
+  图色: Cor de pixel
+  声明全局变量: Declarar variável global
+  声明后可在主流程与所有子过程中共享读写: Compartilhada para leitura e escrita entre o fluxo principal e todos os subprocedimentos após a declaração
+  失败退出: Sair em caso de falha
+  如 $x > 0.5 / $v contains "ok" / not $hit: 'Ex.: $x > 0.5 / $v contains "ok" / not $hit'
+  如果…: Se…
+  如果…否则…: Se… Senão…
+  字符串写双引号，或使用 $变量: Escreva strings entre aspas duplas ou use $variáveis
+  存入变量: Armazenar na variável
+  定义区域变量: Definir variável de região
+  定义子过程: Definir subprocedimento
+  容差: Tolerância
+  应用名: Nome do aplicativo
+  延迟: Atraso
+  当…时重复: Repetir enquanto…
+  形如 [scene].[region]: 'Formato: [scene].[region]'
+  形如 [scene].[region]，留空全画布: 'Formato: [scene].[region]; deixe em branco para toda a tela'
+  形如 [scene].[region]；留空则搜索整个画布: 'Formato: [scene].[region]; vazio pesquisa toda a tela'
+  循环变量: Variável de loop
+  感知: Percepção
+  截图存档: Arquivar captura de tela
+  打日志: Registrar log
+  找同色图标: Encontrar ícone da mesma cor
+  找图（模板定位）: Encontrar imagem (correspondência de modelo)
+  找文字（可点击）: Encontrar texto (clicável)
+  拖拽区域翻页: Arrastar região para paginar
+  拖拽（两点）: Arrastar (dois pontos)
+  按住(秒/区间): Manter pressionado (s/intervalo)
+  按区域绑定找图: Encontrar imagem por vínculo de região
+  按压按键/鼠标键: Pressionar tecla ou botão do mouse
+  按布局中 Region 绑定的模板匹配，返回首个命中的区域 key: Faz correspondência com os modelos vinculados à Region no layout e retorna a chave da primeira região encontrada
+  按应用注册类型停止 Android 或 PC 应用，并确认进程消失: Encerra um aplicativo Android ou PC conforme o registro e confirma o encerramento do processo
+  按应用注册类型启动 Android 或 PC 应用，并确认进程出现: Inicia um aplicativo Android ou PC conforme o registro e confirma o início do processo
+  控制流: Fluxo de controle
+  搜索范围: Área de busca
+  操作后等待: Aguardar após a ação
+  收集到输出: Coletar na saída
+  数据与输出: Dados e saída
+  文字: Texto
+  文本/变量: Texto/variável
+  暂停等人工: Pausar para ação manual
+  最低分(0-1): Pontuação mín. (0-1)
+  最长等待(秒): Espera máx. (s)
+  模板匹配区域: Região de correspondência de modelo
+  模板区域: Região do modelo
+  模板场景: Cena do modelo
+  滑动时长(秒/区间): Duração do deslize (s/intervalo)
+  激活区域: Ativar região
+  激活布局实体；默认点击中心，布局可改为按键: Ativa uma entidade de layout; por padrão clica no centro, podendo usar tecla vinculada no layout
+  点击变量: Clicar na variável
+  点击坐标: Clicar na coordenada
+  点击画布归一化坐标: Clicar em coordenada normalizada da tela
+  画布上点一下取值: Clique na tela para obter o valor
+  画布框选取值: Selecione um retângulo na tela para obter o valor
+  画布框选的区域存成变量，之后 click / 图色函数都能用: A região selecionada na tela é salva como variável e pode ser usada depois por click ou funções de cor de pixel
+  目标色: Cor-alvo
+  等待画面稳定: Aguardar estabilização da tela
+  等待（命名延迟）: Aguardar (atraso nomeado)
+  等待（秒）: Aguardar (s)
+  粘贴文本: Colar texto
+  级别: Nível
+  终点: Ponto final
+  行/列数: Linhas/Colunas
+  读取当前布局的 Region 模板绑定，并在指定范围或全画布定位: Lê os vínculos de modelo da Region no layout atual e localiza dentro do intervalo ou em toda a tela
+  调用子过程: Chamar subprocedimento
+  赋值: Atribuir
+  起点: Ponto inicial
+  起点→终点向量放大/缩小，如 2 或 0.5: 'Escala do vetor ponto inicial→final, ex.: 2 ou 0.5'
+  超时(秒): Tempo limite (s)
+  输出键名: Chave de saída
+  过程名: Nome do procedimento
+  返回列表，按面积降序；$first = $icons[0] 后可 click: Retorna uma lista ordenada por área decrescente; $first = $icons[0] pode ser clicado depois
+  进入亮段阈值: Limite de entrada em segmento brilhante
+  退出阈值: Limite de saída
+  通道下限: Limite inferior do canal
+  遍历列表: Percorrer lista
+  重复 N 次: Repetir N vezes
+  重复直到…: Repetir até…
+  错误变量: Variável de erro
+  键名: Nome da chave
+  限定区域: Restringir à região
+  面板/区域: Painel/Região
+  颜色占比: Proporção de cor
+  高出其他通道: Excede outros canais em
 builtin_profile:
-  DSL OCR 观测: DSL OCR Observation
-  DSL 写入: DSL Write
-  'color_ratio: 缺少颜色参数': 'color_ratio: missing color parameters'
-  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: offset point should be [dx, dy, "#rrggbb"], got: {v!r}'
-  'find_multi_color: 缺少锚点颜色': 'find_multi_color: missing anchor color'
-  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules must be a non-empty dict'
-  '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
-  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], find result, or (x, y[, w, h]) literal), got: {t}'
-  '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'
+  DSL OCR 观测: Observação OCR da DSL
+  DSL 写入: Gravação DSL
+  'color_ratio: 缺少颜色参数': 'color_ratio: parâmetros de cor ausentes'
+  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: o ponto de deslocamento deve ser [dx, dy, "#rrggbb"], obtido: {v!r}'
+  'find_multi_color: 缺少锚点颜色': 'find_multi_color: cor de âncora ausente'
+  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules deve ser um dicionário não vazio'
+  '{name}: 需要数值，实际: {v!r}': '{name}: esperado um valor numérico, obtido: {v!r}'
+  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: esperada uma referência de coordenada ($var = [scene].[region], resultado de find ou literal (x, y[, w, h])), obtido: {t}'
+  '{what}: 需要坐标引用，实际: {t}': '{what}: esperada uma referência de coordenada, obtido: {t}'
 core_common:
-  场景: Scene
+  场景: Cena
 profile:
-  方向: Direction
+  方向: Direção
 result_protocol:
-  "脚本返回失败": "O script retornou falha"
-  "脚本返回失败（返回值 {value}）": "O script retornou falha (valor de retorno {value})"
+  脚本返回失败: O script retornou falha
+  脚本返回失败（返回值 {value}）: O script retornou falha (valor de retorno {value})
 scene_editor:
-  区域: Region
+  区域: Região
 scripts:
-  变量: Variable
-  面板: Panel
+  变量: Variável
+  面板: Painel
 static_check:
-  区域未绑定模板: Region has no bound template
-  场景未绑定任何坐标: The scene has no coordinates bound
-  场景未绑定任何子场景引用: The scene has no sub-scene references bound
-  子场景引用未定义: Sub-scene reference undefined
-  子场景引用未绑定坐标: Sub-scene reference has no bound coordinates
-  引用目标不是子场景: The reference target is not a sub-scene
-  请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: Check the key spelling in the script (the DSL only recognizes keys, not Chinese names), or bind it in the Scene Editor
+  区域未绑定模板: Região sem modelo vinculado
+  场景未绑定任何坐标: A cena não possui coordenadas vinculadas
+  场景未绑定任何子场景引用: A cena não possui referências de subcena vinculadas
+  子场景引用未定义: Referência de subcena indefinida
+  子场景引用未绑定坐标: Referência de subcena sem coordenadas vinculadas
+  引用目标不是子场景: O destino referenciado não é uma subcena
+  请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定: Verifique a grafia da chave no script (a DSL reconhece apenas chaves, não nomes em chinês) ou vincule-a no Editor de Cenas
 workflow_references:
-  区域/坐标点/面板: Region/Point/Panel
-  区域/面板: Region/Panel
-  坐标点: Coordinate Point
-  方向/区域: Direction/Region
-  模板来源区域: Template Source Region
+  区域/坐标点/面板: Região/Ponto/Painel
+  区域/面板: Região/Painel
+  坐标点: Ponto de coordenada
+  方向/区域: Direção/Região
+  模板来源区域: Região de origem do modelo
 workflows_common:
-  'color_ratio: 缺少颜色参数': 'color_ratio: missing color parameter'
-  'find: 模板 {name} 不存在（config/system/templates/）': 'find: template {name} not found (config/system/templates/)'
-  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: offset point should be [dx, dy, "#rrggbb"], got: {v!r}'
-  'find_multi_color: 缺少锚点颜色': 'find_multi_color: missing anchor color'
-  '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
-  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], a find result, or an (x, y[, w, h]) literal), got: {t}'
-  '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'
-  图色函数需要在工作流引擎中调用: Pixel-color functions must be called inside the workflow engine
-  图色函数：截图失败: 'Pixel-color function: screenshot failed'
-  图色函数：画布裁剪为空（检查布局 canvas 配置）: "Pixel-color function: canvas crop is empty (check the layout's canvas config)"
-  工作流已暂停，点击确定继续: Workflow paused; click OK to continue
-  无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: Failed to get screenshot size; cannot convert to screen coordinates (check the screenshot backend)
-  等分降级: Equal-Split Fallback
+  'color_ratio: 缺少颜色参数': 'color_ratio: parâmetro de cor ausente'
+  'find: 模板 {name} 不存在（config/system/templates/）': 'find: modelo {name} não encontrado (config/system/templates/)'
+  'find_multi_color: 偏移点应为 [dx, dy, "#rrggbb"]，实际: {v!r}': 'find_multi_color: o ponto de deslocamento deve ser [dx, dy, "#rrggbb"], obtido: {v!r}'
+  'find_multi_color: 缺少锚点颜色': 'find_multi_color: cor de âncora ausente'
+  '{name}: 需要数值，实际: {v!r}': '{name}: esperado um valor numérico, obtido: {v!r}'
+  '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: esperada uma referência de coordenada ($var = [scene].[region], resultado de find ou literal (x, y[, w, h])), obtido: {t}'
+  '{what}: 需要坐标引用，实际: {t}': '{what}: esperada uma referência de coordenada, obtido: {t}'
+  图色函数需要在工作流引擎中调用: Funções de cor de pixel precisam ser chamadas dentro do motor de fluxo de trabalho
+  图色函数：截图失败: 'Função de cor de pixel: falha na captura de tela'
+  图色函数：画布裁剪为空（检查布局 canvas 配置）: 'Função de cor de pixel: recorte da tela vazio (verifique a configuração canvas do layout)'
+  工作流已暂停，点击确定继续: Fluxo de trabalho pausado; clique em OK para continuar
+  无法获取截屏尺寸，无法换算屏幕坐标（检查截屏后端）: Não foi possível obter o tamanho da captura de tela; não é possível converter para coordenadas de tela (verifique o backend de captura)
+  等分降级: Fallback de divisão igual

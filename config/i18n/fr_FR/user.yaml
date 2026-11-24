@@ -1,64 +1,78 @@
 common:
-  cancel: Cancel
-  current: Current
-  empty: No sticky notes yet
-  paste: Paste from Clipboard
-  remove: Remove Current Avatar
-  reset: Reset
-  title: Sticky Notes
-  请输入用户名: Enter a username
+  cancel: Annuler
+  current: Actuel
+  empty: Aucune note adhésive pour le moment
+  paste: Coller depuis le presse-papiers
+  remove: Supprimer l'avatar actuel
+  reset: Réinitialiser
+  title: Notes adhésives
+  请输入用户名: Saisissez un nom d'utilisateur
 user_avatar:
-  从剪贴板粘贴: Paste from clipboard
-  从当前设备或窗口获取最新截图: Grab the latest screenshot from the current device or window
-  使用此头像: Use This Avatar
-  保存头像失败：{error}: 'Failed to save avatar: {error}'
-  保存并使用: Save and Use
-  删除历史头像: Delete History Avatar
-  删除历史头像失败：{error}: 'Failed to delete history avatar: {error}'
-  剪贴板中没有图片: No image in the clipboard
-  双击编辑头像: Double-click to edit avatar
-  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Drag the image to position; zoom with wheel or slider · Ctrl+V to paste
-  图片尺寸过大，请选择不超过 4000 万像素的图片: Image too large; pick one no larger than 40 megapixels
-  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Image files (*.png *.jpg *.jpeg *.webp *.bmp)
-  头像库: Avatar Library
-  头像文件不存在或文件名无效: Avatar file missing or invalid file name
-  头像正在使用: Avatar in use
-  导入图片或从剪贴板粘贴: Import an image or paste from the clipboard
-  导入头像图片: Import Avatar Image
-  当前使用: Current
-  截图失败: Screenshot Failed
-  无法更新用户头像引用: Cannot update the user's avatar reference
-  无法粘贴: Cannot paste
-  无法读取图片：{error}: 'Cannot read the image: {error}'
-  没有可保存的裁剪图片: No cropped image to save
-  没有读取到有效图片: No valid image was read
-  确定永久删除这张历史头像吗？此操作无法撤销。: Permanently delete this history avatar? This cannot be undone.
-  移除头像失败：{error}: 'Failed to remove avatar: {error}'
-  移除当前头像: Remove Current Avatar
-  编辑“{name}”的头像: Edit avatar for "{name}"
-  编辑头像: Edit Avatar
+  从剪贴板粘贴: Coller depuis le presse-papiers
+  从当前设备或窗口获取最新截图: Récupérer la dernière capture de l'appareil ou de la fenêtre actuelle
+  使用此头像: Utiliser cet avatar
+  保存头像失败：{error}: 'Échec de l''enregistrement de l''avatar : {error}'
+  保存并使用: Enregistrer et utiliser
+  删除历史头像: Supprimer l'avatar de l'historique
+  删除历史头像失败：{error}: 'Échec de la suppression de l''avatar de l''historique : {error}'
+  剪贴板中没有图片: Aucune image dans le presse-papiers
+  双击编辑头像: Double-cliquez pour modifier l'avatar
+  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Faites glisser l'image pour la positionner, zoomez avec la molette ou le curseur · Ctrl+V pour coller
+  图片尺寸过大，请选择不超过 4000 万像素的图片: Image trop grande ; choisissez une image ne dépassant pas 40 mégapixels
+  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Fichiers image (*.png *.jpg *.jpeg *.webp *.bmp)
+  头像库: Bibliothèque d'avatars
+  头像文件不存在或文件名无效: Fichier d'avatar introuvable ou nom de fichier invalide
+  头像正在使用: Avatar en cours d'utilisation
+  导入图片或从剪贴板粘贴: Importez une image ou collez depuis le presse-papiers
+  导入头像图片: Importer une image d'avatar
+  当前使用: Actuel
+  截图失败: Échec de la capture
+  无法更新用户头像引用: Impossible de mettre à jour la référence d'avatar de l'utilisateur
+  无法粘贴: Impossible de coller
+  无法读取图片：{error}: 'Impossible de lire l''image : {error}'
+  没有可保存的裁剪图片: Aucune image recadrée à enregistrer
+  没有读取到有效图片: Aucune image valide n'a été lue
+  确定永久删除这张历史头像吗？此操作无法撤销。: Supprimer définitivement cet avatar de l'historique ? Cette action est irréversible.
+  移除头像失败：{error}: 'Échec de la suppression de l''avatar : {error}'
+  移除当前头像: Supprimer l'avatar actuel
+  编辑“{name}”的头像: Modifier l'avatar de « {name} »
+  编辑头像: Modifier l'avatar
   缩放: Zoom
-  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
-  选择之前保存的头像，或导入一张新图片: Pick a previously saved avatar or import a new image
+  ? '该头像正被以下用户使用，不能删除：
+
+    {users}
+
+
+    请先为这些用户更换或移除头像。'
+  : 'Cet avatar est utilisé par les utilisateurs suivants et ne peut pas être supprimé :
+
+    {users}
+
+
+    Veuillez d''abord changer ou retirer leur avatar.'
+  选择之前保存的头像，或导入一张新图片: Choisissez un avatar enregistré ou importez une nouvelle image
 user_manager:
-  保存属性: Save Attributes
-  删除属性: Delete Attributes
-  同步全部头像: Sync All Avatars
-  属性 Key 不能为空: Attribute key cannot be empty
-  属性 Key 不能重复：{key}: 'Duplicate attribute key: {key}'
-  悬浮点击编辑，或双击头像: Hover and click to edit, or double-click the avatar
-  把本机与云端的头像做一次双向合并；不参与日常自动同步: One-time two-way merge of local and cloud avatars; not part of daily auto sync
-  新增属性: Add Attribute
-  新建用户: New User
-  无法删除该用户: This user cannot be deleted
-  正在同步头像…: Syncing avatars…
-  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters.
-  用户名已存在: Username already exists
-  用户属性: User Attributes
-  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
-  ＋ 新建用户: ＋ New User
+  保存属性: Enregistrer les attributs
+  删除属性: Supprimer les attributs
+  同步全部头像: Synchroniser tous les avatars
+  属性 Key 不能为空: La clé d'attribut ne peut pas être vide
+  属性 Key 不能重复：{key}: 'Clé d''attribut en double : {key}'
+  悬浮点击编辑，或双击头像: Survolez et cliquez pour modifier, ou double-cliquez sur l'avatar
+  把本机与云端的头像做一次双向合并；不参与日常自动同步: Effectue une fusion bidirectionnelle ponctuelle entre les avatars locaux et le cloud ; ne participe pas à la synchronisation automatique quotidienne
+  新增属性: Ajouter un attribut
+  新建用户: Nouvel utilisateur
+  无法删除该用户: Impossible de supprimer cet utilisateur
+  正在同步头像…: Synchronisation des avatars…
+  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Le nom d'utilisateur ne peut contenir que des caractères chinois, lettres, chiffres, tirets bas et tirets, jusqu'à 32 caractères.
+  用户名已存在: Ce nom d'utilisateur existe déjà
+  用户属性: Attributs utilisateur
+  ? '确定要删除用户「{name}」吗？
+
+    用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。'
+  : 'Supprimer l''utilisateur « {name} » ?
+
+    L''utilisateur sera retiré de la liste actuelle et des configurations par lot ; les fichiers de données associés sont conservés et peuvent être restaurés en recréant le même nom.'
+  ＋ 新建用户: ＋ Nouvel utilisateur
 user_toolbar:
-  上一个用户: Previous User
-  下一个用户: Next User
+  上一个用户: Utilisateur précédent
+  下一个用户: Utilisateur suivant

@@ -1,117 +1,116 @@
 common:
-  分组: Group
-  数字: Number
-  文本: Text
+  分组: Groupe
+  数字: Nombre
+  文本: Texte
 menu_ops:
-  图库管理: Reference Manager
+  图库管理: Gestionnaire de références
 reference:
-  '  未导入图片': '  No image imported'
-  元数据字段定义已保存: Metadata field definitions saved
-  全部删除: Delete All
-  内置字段不可删除: Built-in fields cannot be deleted
-  内置字段，不可编辑或删除: Built-in field; cannot be edited or deleted
-  切割: Crop
-  切割结果: Crop Result
-  删除空间: Delete Space
-  删除选中的图库空间（含其全部参考图）: Delete the selected gallery space (including all its reference images)
-  匹配度阈值: Match Threshold
-  单cell尺寸: Cell Size
-  参数超出图片大小: Parameter exceeds image size
-  参考图信息: Reference Image Info
-  可筛选: Filterable
-  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
-  图片文件 (*.png *.jpg *.bmp *.webp): Image Files (*.png *.jpg *.bmp *.webp)
-  字段标识 (key): Field Identifier (key)
-  尚未切割: Not yet split
-  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
-  应用到全部: Apply to All
-  应用设置: Apply Settings
-  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
-  执行切割: Execute Split
-  批量管理: Batch Management
-  提交到图库: Submit to Gallery
-  新增字段: Add Field
-  新建图库空间: New Gallery Space
-  新建空间: New Space
-  未填写: Not Filled
-  未框选区域: No Area Selected
-  清除网格: Clear Grid
-  生成网格: Generate Grid
-  留空则不修改: Leave empty to keep unchanged
-  粘贴 (Ctrl+V): Paste (Ctrl+V)
-  系统空间：可编辑其中内容，但不能删除该空间: 'System Space: its contents can be edited, but the space itself cannot be deleted'
-  网格参数: Grid Parameters
-  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
-  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
-  请先导入图片: Please import an image first
-  请先框选区域: Please select an area first
-  请至少选择一个参考图: Please select at least one reference image
-  输入元数据（用于筛选管理）: Enter metadata (for filter management)
-  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
-  退出批量: Exit Batch
-  选择参考图片: Select Reference Image
-  "图库空间": "Gallery Space"
-  "宽": "Width"
-  "高": "Height"
-  "间隔": "Spacing"
-  "批量分组": "Batch Group"
-  "行": "Rows"
-  "列": "Columns"
-  "分组名非法": "Invalid group name"
-  "编辑图库空间": "Edit Gallery Space"
-  "保存空间展示名失败，详见日志": "Failed to save the space display name; see the log"
-  "空间 key": "Space key"
-  "key 是目录名与方案里的引用，不可修改；要换 key 请新建空间。展示名留空则直接显示 key。": "The key is the directory name and how plans refer to this space, so it cannot be changed; create a new space if you need a different one. Leave the display name empty to show the key itself."
-  "无法创建空间，详见日志": "Failed to create the space; see the log"
-  "空间 key 不能为空": "Space key cannot be empty"
-  "空间 key 不能包含路径分隔符或特殊字符": "Space key must not contain path separators or special characters"
-  "同名空间已存在": "A space with this name already exists"
-  "小写字母、数字与下划线，如 android": "Lowercase letters, digits and underscores, e.g. android"
-  "key 是目录名与方案里的引用，编辑时不可修改": "The key is the directory name and how plans refer to this space; it cannot be changed while editing"
-  "key 是目录名与方案里的引用，创建后不可修改。简体中文与英文必须填写。": "The key is the directory name and how plans refer to this space, so it cannot be changed after creation. Simplified Chinese and English are both required."
-  "简体中文与英文都必须填写": "Both Simplified Chinese and English are required"
+  '  未导入图片': '  Aucune image importée'
+  元数据字段定义已保存: Définitions des champs de métadonnées enregistrées
+  全部删除: Tout supprimer
+  内置字段不可删除: Les champs intégrés ne peuvent pas être supprimés
+  内置字段，不可编辑或删除: Champ intégré ; impossible de le modifier ou de le supprimer
+  切割: Découper
+  切割结果: Résultat du découpage
+  删除空间: Supprimer l'espace
+  删除选中的图库空间（含其全部参考图）: Supprimer l'espace de galerie sélectionné (y compris toutes ses images de référence)
+  匹配度阈值: Seuil de correspondance
+  单cell尺寸: Taille de cellule
+  参数超出图片大小: Les paramètres dépassent la taille de l'image
+  参考图信息: Infos de l'image de référence
+  可筛选: Filtrable
+  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Confiance minimale pour la reconnaissance d'image (0~1) ; en dessous, l'image est considérée comme non correspondante ; plus la valeur est élevée, plus c'est strict
+  图片文件 (*.png *.jpg *.bmp *.webp): Fichiers image (*.png *.jpg *.bmp *.webp)
+  字段标识 (key): Identifiant du champ (clé)
+  尚未切割: Pas encore découpé
+  已填写的字段将应用到所有选中项: Les champs renseignés seront appliqués à tous les éléments sélectionnés
+  应用到全部: Appliquer à tout
+  应用设置: Appliquer les paramètres
+  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Coordonnées normalisées x, y, w, h (0~1), ex. 0, 0, 1, 0.5
+  执行切割: Lancer le découpage
+  批量管理: Gestion par lot
+  提交到图库: Envoyer vers la galerie
+  新增字段: Ajouter un champ
+  新建图库空间: Nouvel espace de galerie
+  新建空间: Nouvel espace
+  未填写: Non renseigné
+  未框选区域: Aucune zone sélectionnée
+  清除网格: Effacer la grille
+  生成网格: Générer la grille
+  留空则不修改: Laisser vide pour ne pas modifier
+  粘贴 (Ctrl+V): Coller (Ctrl+V)
+  系统空间：可编辑其中内容，但不能删除该空间: 'Espace système : son contenu peut être modifié, mais l''espace lui-même ne peut pas être supprimé'
+  网格参数: Paramètres de la grille
+  网格线间隔像素，用于过滤黑边: Espacement des lignes de grille en pixels, pour filtrer les bordures noires
+  裁剪区域 (x, y, w, h): Zone de recadrage (x, y, w, h)
+  请先导入图片: Veuillez d'abord importer une image
+  请先框选区域: Veuillez d'abord sélectionner une zone
+  请至少选择一个参考图: Veuillez sélectionner au moins une image de référence
+  输入元数据（用于筛选管理）: Métadonnées d'entrée (pour le filtrage et la gestion)
+  输出元数据（识别时按区域 OCR）: Métadonnées de sortie (OCR par zone lors de la reconnaissance)
+  退出批量: Quitter le mode lot
+  选择参考图片: Sélectionner une image de référence
+  图库空间: Espace de galerie
+  宽: Largeur
+  高: Hauteur
+  间隔: Espacement
+  批量分组: Groupement par lot
+  行: Lignes
+  列: Colonnes
+  分组名非法: Nom de groupe invalide
+  编辑图库空间: Modifier l'espace de galerie
+  保存空间展示名失败，详见日志: Échec de l'enregistrement du nom d'affichage de l'espace ; voir le journal
+  空间 key: Clé d'espace
+  key 是目录名与方案里的引用，不可修改；要换 key 请新建空间。展示名留空则直接显示 key。: La clé correspond au nom du dossier et à la référence dans les plans ; elle ne peut pas être modifiée. Créez un nouvel espace pour changer de clé. Laissez le nom d'affichage vide pour afficher directement la clé.
+  无法创建空间，详见日志: Impossible de créer l'espace ; voir le journal
+  空间 key 不能为空: La clé d'espace ne peut pas être vide
+  空间 key 不能包含路径分隔符或特殊字符: La clé d'espace ne doit pas contenir de séparateurs de chemin ni de caractères spéciaux
+  同名空间已存在: Un espace portant ce nom existe déjà
+  小写字母、数字与下划线，如 android: Lettres minuscules, chiffres et tirets bas, ex. android
+  key 是目录名与方案里的引用，编辑时不可修改: La clé correspond au nom du dossier et à la référence dans les plans ; elle n'est pas modifiable lors de l'édition
+  key 是目录名与方案里的引用，创建后不可修改。简体中文与英文必须填写。: La clé correspond au nom du dossier et à la référence dans les plans ; elle ne peut pas être modifiée après création. Le chinois simplifié et l'anglais sont obligatoires.
+  简体中文与英文都必须填写: Le chinois simplifié et l'anglais sont tous deux obligatoires
 user_avatar:
-  导入图片: Import Image
-
+  导入图片: Importer une image
 template:
-  模板按分组存放，与图库空间无关: Templates are stored by group and are unrelated to the gallery space
-  新增图像: Add Image
-  参考图管理: Reference Images
-  参考图元数据: Reference Metadata
-  模板图管理: Template Images
-  参考图: Reference image
-  模板图: Template image
-  写入目标: Write to
-  在画布上框选一个矩形即为模板图。分组留空写入 common；布局分组的模板由场景管理截取，这里不能写。: Draw one rectangle on the canvas to crop a template. Leave the group empty to write into "common"; layout groups are captured by the scene editor and cannot be written here.
-  模板名（不含分组）: Template name (without group)
-  测试匹配: Test match
-  保存到模板库: Save to template library
-  未导入图片: No image imported
-  裁剪模板: Crop template
-  模板至少需要 4×4 像素，请调整框选: A template needs at least 4×4 pixels; adjust the selection
-  请先填写模板名: Enter a template name first
-  模板名不能包含路径分隔符: The template name must not contain path separators
-  用法: Usage
-  像素 {w}×{h} ｜ 录制画布 {rw}×{rh}: Pixels {w}×{h} ｜ Recorded canvas {rw}×{rh}
-  分数 {score:.3f}（阈值 {threshold:.2f}）: Score {score:.3f} (threshold {threshold:.2f})
-  「{group}」是布局分组，模板由场景管理截取: '"{group}" is a layout group; its templates are captured by the scene editor'
-  模板「{name}」已存在，覆盖？: Template "{name}" already exists. Overwrite?
-  搜索模板名: Search template name
-  复制名字: Copy name
-  未被引用: Not referenced
-  标定样本：运行时按颜色比例判定，不参与模板匹配，永久保留: 'Calibration sample: judged by colour ratio at runtime, not used for template matching, kept permanently'
-  布局分组的模板由场景管理截取/删除，这里只读: Layout-group templates are captured/deleted by the scene editor; read-only here
-  重命名模板: Rename template
-  像素尺寸: Pixel size
-  录制画布: Recorded canvas
-  来源层: Layer
-  共享: Shared
-  标定样本，不参与匹配: Calibration sample, not used for matching
-  标定样本，不需要尺寸: Calibration sample, no size needed
-  删除模板: Delete template
-  删除失败，详见日志: Delete failed; see the log
-  未登记（同分辨率专用）: Not registered (same resolution only)
-  绑定 {n} 处: '{n} binding(s)'
-  脚本引用 {n} 处: '{n} script reference(s)'
-  确定删除模板「{name}」？{detail}: Delete template "{name}"?{detail}
-  模板详情: Template details
+  模板按分组存放，与图库空间无关: Les modèles sont stockés par groupe et indépendants de l'espace de galerie
+  新增图像: Ajouter une image
+  参考图管理: Images de référence
+  参考图元数据: Métadonnées de référence
+  模板图管理: Images de modèle
+  参考图: Image de référence
+  模板图: Image de modèle
+  写入目标: Destination d'écriture
+  在画布上框选一个矩形即为模板图。分组留空写入 common；布局分组的模板由场景管理截取，这里不能写。: Tracez un rectangle sur le canevas pour découper un modèle. Laissez le groupe vide pour écrire dans « common » ; les groupes de mise en page sont capturés par l'éditeur de scènes et ne peuvent pas être écrits ici.
+  模板名（不含分组）: Nom du modèle (sans groupe)
+  测试匹配: Tester la correspondance
+  保存到模板库: Enregistrer dans la bibliothèque de modèles
+  未导入图片: Aucune image importée
+  裁剪模板: Recadrer le modèle
+  模板至少需要 4×4 像素，请调整框选: Un modèle doit faire au moins 4×4 pixels ; ajustez la sélection
+  请先填写模板名: Veuillez d'abord saisir un nom de modèle
+  模板名不能包含路径分隔符: Le nom du modèle ne doit pas contenir de séparateurs de chemin
+  用法: Utilisation
+  像素 {w}×{h} ｜ 录制画布 {rw}×{rh}: Pixels {w}×{h} ｜ Canevas enregistré {rw}×{rh}
+  分数 {score:.3f}（阈值 {threshold:.2f}）: Score {score:.3f} (seuil {threshold:.2f})
+  「{group}」是布局分组，模板由场景管理截取: « {group} » est un groupe de mise en page ; ses modèles sont capturés par l'éditeur de scènes
+  模板「{name}」已存在，覆盖？: Le modèle « {name} » existe déjà. L'écraser ?
+  搜索模板名: Rechercher un nom de modèle
+  复制名字: Copier le nom
+  未被引用: Non référencé
+  标定样本：运行时按颜色比例判定，不参与模板匹配，永久保留: 'Échantillon de calibrage : évalué par ratio de couleur à l''exécution, non utilisé pour la correspondance de modèles, conservé définitivement'
+  布局分组的模板由场景管理截取/删除，这里只读: Les modèles des groupes de mise en page sont capturés/supprimés par l'éditeur de scènes ; lecture seule ici
+  重命名模板: Renommer le modèle
+  像素尺寸: Dimensions en pixels
+  录制画布: Canevas d'enregistrement
+  来源层: Couche source
+  共享: Partagé
+  标定样本，不参与匹配: Échantillon de calibrage, non utilisé pour la correspondance
+  标定样本，不需要尺寸: Échantillon de calibrage, aucune taille requise
+  删除模板: Supprimer le modèle
+  删除失败，详见日志: Échec de la suppression ; voir le journal
+  未登记（同分辨率专用）: Non enregistré (même résolution uniquement)
+  绑定 {n} 处: '{n} liaison(s)'
+  脚本引用 {n} 处: '{n} référence(s) de script'
+  确定删除模板「{name}」？{detail}: Supprimer le modèle « {name} » ?{detail}
+  模板详情: Détails du modèle

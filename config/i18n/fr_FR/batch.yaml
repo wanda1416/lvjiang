@@ -1,123 +1,141 @@
 batch:
-  ? "* 表示当前用户使用独立参数\n"
-  : "* means this user uses per-user parameters\n"
-  <b>选择执行单元</b>: <b>Select execution units</b>
-  <b>选择执行脚本</b>: <b>Select scripts</b>
-  Profile 定义不可用: Profile definitions unavailable
-  Profile 定义已不存在: Profile definitions no longer exist
-  '[批量] 以下已勾选脚本当前不可用，本次不会执行：': '[Batch] These checked scripts are unavailable and will not run:'
-  '{name}（已失效）': '{name} (stale)'
-  不指定: Unspecified
-  人: users
-  人无数值，置于末尾: users without a value go last
-  全局任务参数: Global Task Parameters
-  单个执行单元时跳过上述生命周期工作流: Skip the lifecycle workflows above when there is a single execution unit
-  单元: Units
-  单元候选: Unit Candidates
-  单元候选（{key}）: Unit candidates ({key})
-  单元候选（用户名）: Unit candidates (username)
-  可见任务: Visible Tasks
-  可见用户: Visible Users
-  定义主页面右键「按 Profile 排序」用哪个键、什么方向。排完的顺序只属于本次运行，不写回这里: Choose which Profile key and direction the main window's right-click "Sort by Profile" uses. The sorted order belongs to that run only and is not written back here
-  实际只选择一个用户单元时，直接执行任务，不调用生命周期工作流: When only one user unit is actually selected, run tasks directly without lifecycle workflows
-  实际只选择一个用户单元时，直接执行任务；属性单元始终运行准备工作流: When only one user unit is actually selected, run tasks directly; attribute units always run the prepare workflow
-  对应的任务脚本已不存在；取消勾选并保存即可从列表移除: The task script no longer exists; uncheck it and save to remove it from the list
-  工作流文件 (*.wf): Workflow Files (*.wf)
-  已按 Profile 排序用户: Users sorted by Profile
-  异常恢复: Unattended Recovery
+  ? '* 表示当前用户使用独立参数
+
+    '
+  : '* indique que cet utilisateur utilise des paramètres dédiés
+
+    '
+  <b>选择执行单元</b>: <b>Sélectionner les unités d'exécution</b>
+  <b>选择执行脚本</b>: <b>Sélectionner les scripts</b>
+  Profile 定义不可用: Définitions de profil indisponibles
+  Profile 定义已不存在: Les définitions de profil n'existent plus
+  '[批量] 以下已勾选脚本当前不可用，本次不会执行：': '[Lot] Les scripts cochés suivants sont indisponibles et ne seront pas exécutés :'
+  '{name}（已失效）': '{name} (obsolète)'
+  不指定: Non spécifié
+  人: utilisateurs
+  人无数值，置于末尾: utilisateurs sans valeur placés en dernier
+  全局任务参数: Paramètres globaux des tâches
+  单个执行单元时跳过上述生命周期工作流: Ignorer les workflows de cycle de vie ci-dessus lorsqu'il n'y a qu'une seule unité d'exécution
+  单元: Unités
+  单元候选: Unités candidates
+  单元候选（{key}）: Unités candidates ({key})
+  单元候选（用户名）: Unités candidates (nom d'utilisateur)
+  可见任务: Tâches visibles
+  可见用户: Utilisateurs visibles
+  定义主页面右键「按 Profile 排序」用哪个键、什么方向。排完的顺序只属于本次运行，不写回这里: Définit la clé de profil et le sens utilisés par « Trier par profil » dans le menu contextuel de la fenêtre principale. L'ordre trié ne s'applique qu'à cette exécution et n'est pas enregistré ici
+  实际只选择一个用户单元时，直接执行任务，不调用生命周期工作流: Lorsqu'une seule unité utilisateur est sélectionnée, exécuter directement les tâches sans appeler les workflows de cycle de vie
+  实际只选择一个用户单元时，直接执行任务；属性单元始终运行准备工作流: Lorsqu'une seule unité utilisateur est sélectionnée, exécuter directement les tâches ; les unités par attribut exécutent toujours le workflow de préparation
+  对应的任务脚本已不存在；取消勾选并保存即可从列表移除: Le script de tâche correspondant n'existe plus ; décochez-le et enregistrez pour le retirer de la liste
+  工作流文件 (*.wf): Fichiers de workflow (*.wf)
+  已按 Profile 排序用户: Utilisateurs triés par profil
+  异常恢复: Récupération autonome
   ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
-  : "Scheduling by \"{key}\", but the prepare workflow \"{wf}\" does not pick and return the unit's username. Use batch/prepare_item_by_attr.wf, or declare #% batch_unit_prepare: true in your own workflow and return username."
-  当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: Scheduling by attribute; configure the item prepare workflow in "Tools → Batch Configuration" first.
-  恢复默认顺序: Restore Default Order
-  手机端正在执行任务，请暂停或者结束任务: The phone is running a task; pause or stop it first
-  ? "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}"
-  : "The phone is running a task; pause or stop it first.\n\nDevice replied: {detail}"
-  ? "执行用户：{username}\n参数来源：{source}"
-  : "Executing user: {username}\nParameter source: {source}"
-  ? "执行用户：{username}\n点击查看本轮任务参数"
-  : "Executing user: {username}\nClick to view this round's task parameters"
-  执行顺序: Execution Order
-  批量设置: Batch settings
-  批量配置: Batch Configuration
-  拖动可临时调整实际执行顺序: Drag to temporarily adjust the actual execution order
-  拖动可调整实际执行顺序；右键可恢复默认、随机打乱或按 Profile 排序；批量配置中的顺序仅作为初始顺序: Drag to adjust the actual execution order; right-click to restore defaults, shuffle, or sort by Profile; the order in Batch Configuration is only the initial order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to adjust the actual execution order; right-click to restore defaults or shuffle; the order in Batch Configuration is only the initial order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱；批量配置中的顺序仅作为初始顺序: Drag to adjust the actual execution order; right-click to restore defaults or shuffle; the order in Batch Configuration is only the initial order
-  指定顺序排序: Sort by Specified Order
-  按属性调度时不适用：一个属性值可能对应多名用户，必须由条目准备工作流选定并回传用户名，所以生命周期始终执行。切回「用户名」会恢复你原来的选择: 'Not applicable when scheduling by attribute: one attribute value may map to multiple users, so the prepare workflow must pick and return the username and lifecycle always runs. Switching back to "Username" restores your original choice'
-  按用户名调度，还是按用户资料的某个属性调度。它决定主页面候选列表的内容、生命周期契约和条目准备工作流的合法性，所以属于配置组定义: Schedule by username or by a profile attribute. It determines the main window candidate list, the lifecycle contract and which prepare workflow is valid — a configuration-group definition
-  排序键属于配置组定义；在用户列表右键「按 Profile 排序」执行一次，排完的顺序只属于本次运行: The sort key is a configuration-group definition; right-click the user list and "Sort by Profile" to sort once — the order belongs to that run only
-  新建配置: New Config
-  无人值守撞上异常暂停后，用它把游戏收回登录主页。主页面的「无人值守」要等这里配好才能勾选: Used to return the game to the login page after an unattended abnormal pause. The main window's "Unattended" checkbox needs this configured first
-  无法开始批量任务: Cannot start the batch
-  暂无启用的单元，请到「单元」页勾选: No enabled units; check some on the "Units" page
-  暂无配置组，请先通过「工具 → 批量配置」添加: No configuration groups; add one via "Tools → Batch Configuration" first
-  本次长时间无人看守时勾选：任务遇到异常暂停时不再等人，该任务按失败记录并跳过，随后由配置组的「异常恢复 wf」把游戏收回登录主页，再继续下一个任务。确认、输入和选择仍等待用户交互: "Check when leaving the machine unattended for a long time: on an abnormal pause the task no longer waits — it's recorded as failed and skipped, then the group's recovery workflow returns the game to the login page and the next task runs. Confirmations, inputs and choices still wait for interaction"
-  条目准备: Item preparation
-  条目准备工作流不支持当前属性调度，请到批量配置中修改: The item prepare workflow doesn't support the current attribute scheduling; change it in Batch Configuration
-  条目收尾: Item cleanup
-  浏览...: Browse...
-  点击查看本轮任务参数: Click to view this round's task parameters
-  用户独立参数: Per-user Parameters
-  确定删除当前批量配置吗？: Delete the current batch configuration?
-  第一列决定是否出现在主页面，第二列决定主页面首次加载或点「恢复默认」时是否勾选；拖动可调整初始顺序: The first column controls visibility in the main window; the second controls whether it's checked on first load or "Restore defaults". Drag to adjust the initial order
+  : 'Planification par « {key} », mais le workflow de préparation d''élément « {wf} » ne sélectionne ni ne renvoie le nom d''utilisateur de cette unité. Utilisez batch/prepare_item_by_attr.wf ou déclarez #% batch_unit_prepare: true dans votre workflow et renvoyez username.'
+  当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: 'Planification par attribut : configurez d''abord le workflow de préparation d''élément dans « Outils → Configuration par lots ».'
+  恢复默认顺序: Rétablir l'ordre par défaut
+  手机端正在执行任务，请暂停或者结束任务: Le téléphone exécute actuellement une tâche ; mettez-la en pause ou arrêtez-la d'abord
+  ? '手机端正在执行任务，请暂停或者结束任务。
+
+
+    设备返回：{detail}'
+  : 'Le téléphone exécute actuellement une tâche ; mettez-la en pause ou arrêtez-la d''abord.
+
+
+    Réponse de l''appareil : {detail}'
+  ? '执行用户：{username}
+
+    参数来源：{source}'
+  : 'Utilisateur exécuté : {username}
+
+    Source des paramètres : {source}'
+  ? '执行用户：{username}
+
+    点击查看本轮任务参数'
+  : 'Utilisateur exécuté : {username}
+
+    Cliquez pour afficher les paramètres de ce tour'
+  执行顺序: Ordre d'exécution
+  批量设置: Paramètres par lots
+  批量配置: Configuration par lots
+  拖动可临时调整实际执行顺序: Faites glisser pour ajuster temporairement l'ordre d'exécution réel
+  拖动可调整实际执行顺序；右键可恢复默认、随机打乱或按 Profile 排序；批量配置中的顺序仅作为初始顺序: Faites glisser pour ajuster l'ordre d'exécution réel ; cliquez avec le bouton droit pour rétablir par défaut, mélanger ou trier par profil ; l'ordre dans la configuration par lots sert uniquement d'ordre initial
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Faites glisser pour ajuster l'ordre d'exécution réel ; cliquez avec le bouton droit pour rétablir par défaut ou mélanger ; l'ordre dans la configuration par lots sert uniquement d'ordre initial
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱；批量配置中的顺序仅作为初始顺序: Faites glisser pour ajuster l'ordre d'exécution réel ; cliquez avec le bouton droit pour rétablir par défaut ou mélanger ; l'ordre dans la configuration par lots sert uniquement d'ordre initial
+  指定顺序排序: Trier selon l'ordre défini
+  按属性调度时不适用：一个属性值可能对应多名用户，必须由条目准备工作流选定并回传用户名，所以生命周期始终执行。切回「用户名」会恢复你原来的选择: 'Non applicable lors de la planification par attribut : une valeur d''attribut peut correspondre à plusieurs utilisateurs, le workflow de préparation doit donc sélectionner et renvoyer le nom d''utilisateur et le cycle de vie s''exécute toujours. Revenir à « Nom d''utilisateur » rétablit votre choix initial'
+  按用户名调度，还是按用户资料的某个属性调度。它决定主页面候选列表的内容、生命周期契约和条目准备工作流的合法性，所以属于配置组定义: 'Planifier par nom d''utilisateur ou par un attribut du profil. Ce réglage détermine la liste des candidats de la fenêtre principale, le contrat du cycle de vie et la validité du workflow de préparation : il fait donc partie du groupe de configuration'
+  排序键属于配置组定义；在用户列表右键「按 Profile 排序」执行一次，排完的顺序只属于本次运行: La clé de tri appartient au groupe de configuration ; cliquez avec le bouton droit sur la liste des utilisateurs et choisissez « Trier par profil » pour trier une fois — l'ordre ne s'applique qu'à cette exécution
+  新建配置: Nouvelle configuration
+  无人值守撞上异常暂停后，用它把游戏收回登录主页。主页面的「无人值守」要等这里配好才能勾选: Utilisé pour ramener le jeu à l'écran de connexion après une pause anormale en mode autonome. La case « Autonome » de la fenêtre principale nécessite d'abord ce réglage
+  无法开始批量任务: Impossible de démarrer le lot
+  暂无启用的单元，请到「单元」页勾选: Aucune unité activée ; cochez-en dans l'onglet « Unités »
+  暂无配置组，请先通过「工具 → 批量配置」添加: Aucun groupe de configuration ; ajoutez-en un via « Outils → Configuration par lots »
+  本次长时间无人看守时勾选：任务遇到异常暂停时不再等人，该任务按失败记录并跳过，随后由配置组的「异常恢复 wf」把游戏收回登录主页，再继续下一个任务。确认、输入和选择仍等待用户交互: 'Cochez cette option pour une exécution autonome prolongée : en cas de pause anormale, la tâche n''attend plus — elle est marquée en échec et ignorée, puis le workflow de récupération du groupe ramène le jeu à l''écran de connexion avant la tâche suivante. Les confirmations, saisies et choix attendent toujours une interaction'
+  条目准备: Préparation d'élément
+  条目准备工作流不支持当前属性调度，请到批量配置中修改: Le workflow de préparation d'élément ne prend pas en charge la planification par attribut actuelle ; modifiez-le dans Configuration par lots
+  条目收尾: Finalisation d'élément
+  浏览...: Parcourir...
+  点击查看本轮任务参数: Cliquez pour afficher les paramètres de ce tour
+  用户独立参数: Paramètres dédiés par utilisateur
+  确定删除当前批量配置吗？: Supprimer la configuration par lots actuelle ?
+  第一列决定是否出现在主页面，第二列决定主页面首次加载或点「恢复默认」时是否勾选；拖动可调整初始顺序: La première colonne contrôle l'affichage dans la fenêtre principale ; la seconde indique si l'élément est coché au premier chargement ou lors de « Rétablir par défaut ». Faites glisser pour ajuster l'ordre initial
   脚本: Script
-  脚本候选: Script Candidates
-  请到「单元」页至少勾选一个执行单元: Check at least one execution unit on the "Units" page
-  请到「脚本」页至少勾选一个脚本: Check at least one script on the "Scripts" page
-  请在「工具 → 批量配置」中配置条目准备工作流: Configure the item prepare workflow in "Tools → Batch Configuration"
-  请至少勾选一个脚本: Check at least one script
-  请选择 workflows 目录下的 .wf 文件: Pick a .wf file under the workflows directory
-  调度单元属于配置组定义，在「工具 → 批量配置」中修改: The scheduling unit is a configuration-group definition; change it in "Tools → Batch Configuration"
-  选择工作流文件: Select Workflow File
-  配置名称已存在: Configuration name already exists
-  重命名配置: Rename Configuration
-  随机打乱顺序: Shuffle Order
-  需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守撞上异常暂停后要靠它把游戏收回登录主页: "First configure this group's \"recovery workflow\" in \"Tools → Batch Configuration\": unattended mode relies on it to return the game to the login page after an abnormal pause"
-  默认执行: Run by default
-  "配置名称": "Configuration Name"
-  "安卓目标批量开始时若处于竖屏，只要交换宽高后与布局画布比例一致就允许启动；启动后先由配置组的「异常恢复 wf」回到登录主页，再由「条目准备工作流」把人送回游戏。两者的工作流都要在「工具 → 批量配置」里配置": "For Android targets a batch may start in portrait as long as swapping width and height matches the layout canvas ratio. After starting, the group's \"recovery workflow\" returns the game to the login screen, and then the \"item prep workflow\" sends the player back into the game. Both workflows are configured under Tools → Batch Configuration."
-  "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」与「条目准备工作流」：允许竖屏启动会先把游戏收回登录主页，没有条目准备就无法再把人送回游戏": "Configure both the \"recovery workflow\" and the \"item prep workflow\" for this group under Tools → Batch Configuration first: a portrait start first returns the game to the login screen, and without item prep nobody can send the player back into the game."
-  "允许竖屏需要先配置条目准备工作流": "Portrait start requires an item prep workflow"
-  "「允许竖屏」启动时会先由异常恢复 wf 把客户端收回登录主页，需要条目准备工作流再把人送回游戏。请先在「工具 → 批量配置」为该配置组配置条目准备 wf。": "\"Allow portrait\" first has the recovery workflow return the client to the login screen, then the item prep workflow sends the player back into the game. Configure an item prep workflow for this group under Tools → Batch Configuration first."
-  "上一轮": "Previous round"
-  "下一轮": "Next round"
-  "第 {round}/{rounds} 轮": "Round {round}/{rounds}"
-  "跳到最新一轮并持续跟随；按下表示正在跟随": "Jump to the latest round and keep following; pressed means following"
-  "全局参数": "Global parameters"
-  "编辑范围": "Edit scope"
-  "用户：{name}": "User: {name}"
-  "勾选的脚本没有可配置的任务参数": "Selected scripts have no configurable task parameters"
-  "改动立即生效，与日常任务共用同一份参数": "Changes take effect immediately and share the same parameters as daily tasks"
+  脚本候选: Scripts candidats
+  请到「单元」页至少勾选一个执行单元: Cochez au moins une unité d'exécution dans l'onglet « Unités »
+  请到「脚本」页至少勾选一个脚本: Cochez au moins un script dans l'onglet « Scripts »
+  请在「工具 → 批量配置」中配置条目准备工作流: Configurez le workflow de préparation d'élément dans « Outils → Configuration par lots »
+  请至少勾选一个脚本: Cochez au moins un script
+  请选择 workflows 目录下的 .wf 文件: Sélectionnez un fichier .wf dans le dossier workflows
+  调度单元属于配置组定义，在「工具 → 批量配置」中修改: L'unité de planification appartient au groupe de configuration ; modifiez-la dans « Outils → Configuration par lots »
+  选择工作流文件: Sélectionner un fichier de workflow
+  配置名称已存在: Ce nom de configuration existe déjà
+  重命名配置: Renommer la configuration
+  随机打乱顺序: Mélanger l'ordre
+  需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守撞上异常暂停后要靠它把游戏收回登录主页: 'Configurez d''abord le « workflow de récupération » de ce groupe dans « Outils → Configuration par lots » : le mode autonome en a besoin pour ramener le jeu à l''écran de connexion après une pause anormale'
+  默认执行: Exécuter par défaut
+  配置名称: Nom de la configuration
+  安卓目标批量开始时若处于竖屏，只要交换宽高后与布局画布比例一致就允许启动；启动后先由配置组的「异常恢复 wf」回到登录主页，再由「条目准备工作流」把人送回游戏。两者的工作流都要在「工具 → 批量配置」里配置: Pour les cibles Android, un lot peut démarrer en mode portrait tant que l'inversion largeur/hauteur correspond au ratio du canevas. Après le démarrage, le « workflow de récupération » du groupe ramène le jeu à l'écran de connexion, puis le « workflow de préparation d'élément » remet le joueur en jeu. Les deux workflows se configurent dans Outils → Configuration par lots.
+  需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」与「条目准备工作流」：允许竖屏启动会先把游戏收回登录主页，没有条目准备就无法再把人送回游戏: 'Configurez d''abord le « workflow de récupération » et le « workflow de préparation d''élément » pour ce groupe dans Outils → Configuration par lots : le démarrage en portrait ramène d''abord le jeu à l''écran de connexion, et sans préparation d''élément il est impossible de revenir en jeu.'
+  允许竖屏需要先配置条目准备工作流: Le démarrage en portrait nécessite un workflow de préparation d'élément
+  「允许竖屏」启动时会先由异常恢复 wf 把客户端收回登录主页，需要条目准备工作流再把人送回游戏。请先在「工具 → 批量配置」为该配置组配置条目准备 wf。: « Autoriser le portrait » utilise d'abord le workflow de récupération pour ramener le client à l'écran de connexion, puis le workflow de préparation d'élément pour remettre le joueur en jeu. Configurez d'abord un workflow de préparation d'élément pour ce groupe dans Outils → Configuration par lots.
+  上一轮: Tour précédent
+  下一轮: Tour suivant
+  第 {round}/{rounds} 轮: Tour {round}/{rounds}
+  跳到最新一轮并持续跟随；按下表示正在跟随: Aller au dernier tour et continuer à suivre ; enfoncé signifie suivi actif
+  全局参数: Paramètres globaux
+  编辑范围: Portée de modification
+  用户：{name}: 'Utilisateur : {name}'
+  勾选的脚本没有可配置的任务参数: Les scripts sélectionnés n'ont aucun paramètre de tâche configurable
+  改动立即生效，与日常任务共用同一份参数: Les modifications prennent effet immédiatement et partagent les mêmes paramètres que les tâches quotidiennes
 batch_report:
-  （执行通道中断，整批中止）: ' (execution channel lost, batch aborted)'
-  （用户中断）: (User Interrupted)
-  '## 汇总': '## Summary'
+  （执行通道中断，整批中止）: ' (canal d''exécution interrompu, lot annulé)'
+  （用户中断）: (Interrompu par l'utilisateur)
+  '## 汇总': '## Résumé'
 batch_scheduler:
-  待执行: Pending
-  执行被停止: Execution was stopped
-  批次准备: Batch Init
-  批次收尾: Batch Wrap-up
-  批量可执行性子过程必须返回 dict: The batch executability subroutine must return a dict
-  批量可执行性检查只支持 DSL 工作流: Batch executability checks support DSL workflows only
-  生命周期 wf 必须返回 dict 或 null: Lifecycle wf must return a dict or null
-  生命周期 wf 的 state 必须是 dict: The lifecycle wf's state must be a dict
-  生命周期 wf 返回了无效角色: The lifecycle workflow returned an invalid role
-  用户结束当前任务，继续下一项: User ended the current task; continue with the next one
-  通道中断: Channel interrupted
-  "未执行": "Not run"
+  待执行: En attente
+  执行被停止: L'exécution a été arrêtée
+  批次准备: Préparation du lot
+  批次收尾: Clôture du lot
+  批量可执行性子过程必须返回 dict: La sous-routine d'exécutabilité du lot doit renvoyer un dict
+  批量可执行性检查只支持 DSL 工作流: La vérification d'exécutabilité par lots ne prend en charge que les workflows DSL
+  生命周期 wf 必须返回 dict 或 null: Le workflow de cycle de vie doit renvoyer un dict ou null
+  生命周期 wf 的 state 必须是 dict: Le champ state du workflow de cycle de vie doit être un dict
+  生命周期 wf 返回了无效角色: Le workflow de cycle de vie a renvoyé un rôle invalide
+  用户结束当前任务，继续下一项: L'utilisateur a terminé la tâche actuelle ; passage à la suivante
+  通道中断: Canal interrompu
+  未执行: Non exécuté
 common:
-  停止中: Stopping
-  全不选: Deselect All
-  异常恢复工作流: Recovery workflow
-  执行轮数: Rounds
-  批次准备工作流: Batch setup workflow
-  批次收尾工作流: Batch teardown workflow
-  指定排序: Sort by
-  无人值守: Unattended
-  允许竖屏: Allow Portrait
-  未配置: not configured
-  条目准备工作流: Item prepare workflow
-  条目收尾工作流: Item finish workflow
-  用户名: Username
-  调度单元: Scheduling unit
+  停止中: Arrêt en cours
+  全不选: Tout désélectionner
+  异常恢复工作流: Workflow de récupération
+  执行轮数: Tours
+  批次准备工作流: Workflow de préparation du lot
+  批次收尾工作流: Workflow de clôture du lot
+  指定排序: Trier par
+  无人值守: Autonome
+  允许竖屏: Autoriser le portrait
+  未配置: non configuré
+  条目准备工作流: Workflow de préparation d'élément
+  条目收尾工作流: Workflow de clôture d'élément
+  用户名: Nom d'utilisateur
+  调度单元: Unité de planification

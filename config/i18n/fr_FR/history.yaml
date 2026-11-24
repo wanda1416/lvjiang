@@ -1,62 +1,62 @@
 all_user_params:
-  任务: Task
+  任务: Tâche
 batch:
-  全局任务参数: Global task parameters
-  恢复默认顺序: Restore Default Order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to change the actual execution order; right-click to restore the default order or shuffle it; the order in Batch Configuration is only the initial order
-  重命名配置: Rename Configuration
-  随机打乱顺序: Shuffle Order
+  全局任务参数: Paramètres globaux des tâches
+  恢复默认顺序: Rétablir l'ordre par défaut
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Faites glisser pour modifier l'ordre d'exécution réel ; cliquez avec le bouton droit pour rétablir l'ordre par défaut ou le mélanger ; l'ordre dans la configuration par lots ne sert que d'ordre initial
+  重命名配置: Renommer la configuration
+  随机打乱顺序: Mélanger l'ordre
 common:
-  batch_run_id: Batch Run ID
-  duration: Duration
-  finished_at: End Time
-  scope: Scope
+  batch_run_id: ID d'exécution par lots
+  duration: Durée
+  finished_at: Heure de fin
+  scope: Portée
   source: Source
-  task: Task
-  task_count: Tasks
-  task_run_id: Task Run ID
-  title: Task History
-  unavailable: Task history is temporarily unavailable
-  参数: Parameters
-  当前批次: Current batch
-  执行目标: Execution Target
-  重命名: Rename
+  task: Tâche
+  task_count: Tâches
+  task_run_id: ID d'exécution de tâche
+  title: Historique des tâches
+  unavailable: L'historique des tâches est temporairement indisponible
+  参数: Paramètres
+  当前批次: Lot actuel
+  执行目标: Cible d'exécution
+  重命名: Renommer
 daily_history:
-  任务历史: Task History
-  任务历史暂不可用: Task history is temporarily unavailable
-  任务数: Tasks
-  单独运行: Single Run
-  已选: selected
-  开始日期不能晚于结束日期: Start date cannot be after the end date
-  批量历史: Batch History
-  批量运行: Batch Run
-  日期范围无效: Invalid date range
-  未记录用户: Unrecorded user
-  查看全部单任务: View all single tasks
-  查询: Query
-  清除勾选，改为全部: Clear the check to include all
-  窗口: Window
-  结束时间: End Time
-  耗时: Duration
-  返回全部任务: Back to all tasks
-  配置: Config
-  任务: Task
+  任务历史: Historique des tâches
+  任务历史暂不可用: L'historique des tâches est temporairement indisponible
+  任务数: Tâches
+  单独运行: Exécution unique
+  已选: sélectionné(s)
+  开始日期不能晚于结束日期: La date de début ne peut pas être postérieure à la date de fin
+  批量历史: Historique des lots
+  批量运行: Exécution par lots
+  日期范围无效: Plage de dates invalide
+  未记录用户: Utilisateur non enregistré
+  查看全部单任务: Afficher toutes les tâches uniques
+  查询: Rechercher
+  清除勾选，改为全部: Décocher pour tout inclure
+  窗口: Fenêtre
+  结束时间: Heure de fin
+  耗时: Durée
+  返回全部任务: Retour à toutes les tâches
+  配置: Configuration
+  任务: Tâche
 history_viewer:
-  刷新日志: Refresh Log
-  当前级别没有日志: No logs at this level
-  执行日志: Execution Log
-  执行结果: Execution Result
-  批量报告: Batch Report
-  文件较大，仅预览开头 2 MiB: File is large; only the first 2 MiB is previewed
-  文件较大，仅预览末尾 2 MiB: File is large; only the last 2 MiB is previewed
-  无法读取文件: Cannot read the file
-  日志文件为空: The log file is empty
-  日志级别: Log Level
-  显示所选级别及更高级别的日志: Show logs at the selected level and above
-  没有对应文件: No matching file
-  结果不是有效 JSON，显示原文: The result isn't valid JSON; showing raw text
-  记录详情: Record Details
-  选择一条记录查看内容: Select a record to view its content
-  选择一条记录查看日志: Select a record to view its log
+  刷新日志: Actualiser le journal
+  当前级别没有日志: Aucun journal à ce niveau
+  执行日志: Journal d'exécution
+  执行结果: Résultat d'exécution
+  批量报告: Rapport de lot
+  文件较大，仅预览开头 2 MiB: 'Fichier volumineux : aperçu des 2 premiers Mio uniquement'
+  文件较大，仅预览末尾 2 MiB: 'Fichier volumineux : aperçu des 2 derniers Mio uniquement'
+  无法读取文件: Impossible de lire le fichier
+  日志文件为空: Le fichier journal est vide
+  日志级别: Niveau de journalisation
+  显示所选级别及更高级别的日志: Afficher les journaux du niveau sélectionné et supérieur
+  没有对应文件: Aucun fichier correspondant
+  结果不是有效 JSON，显示原文: Le résultat n'est pas un JSON valide ; affichage du texte brut
+  记录详情: Détails de l'enregistrement
+  选择一条记录查看内容: Sélectionnez un enregistrement pour afficher son contenu
+  选择一条记录查看日志: Sélectionnez un enregistrement pour afficher son journal
 settings_dialog:
-  输入参数: Input Parameters
+  输入参数: Paramètres d'entrée

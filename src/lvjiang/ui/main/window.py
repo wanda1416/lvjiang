@@ -1627,16 +1627,22 @@ class MainWindow(
         from PyQt6.QtCore import QThread
 
         # 设备扫描/连接循环靠取消标记退出，先置位再等线程结束。
-        worker = getattr(self, "_device_worker", None)
-        cancel = getattr(worker, "cancel", None)
-        if callable(cancel):
-            cancel()
+        for worker in (
+            getattr(self, "_device_worker", None),
+            *tuple(getattr(self, "_retired_device_worker_set", ())),
+        ):
+            cancel = getattr(worker, "cancel", None)
+            if callable(cancel):
+                cancel()
 
         threads = list(self.findChildren(QThread))
-        # 设备线程创建时没有 parent，findChildren 看不到，单独补上。
-        device_thread = getattr(self, "_device_thread", None)
-        if device_thread is not None and device_thread not in threads:
-            threads.append(device_thread)
+        # 设备线程（含已退居后台的 retired 线程）创建时没有 parent，findChildren 看不到，单独补上。
+        for device_thread in (
+            getattr(self, "_device_thread", None),
+            *tuple(getattr(self, "_retired_device_thread_set", ())),
+        ):
+            if device_thread is not None and device_thread not in threads:
+                threads.append(device_thread)
 
         for thread in threads:
             if not thread.isRunning():

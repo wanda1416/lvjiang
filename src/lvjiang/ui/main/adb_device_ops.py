@@ -324,18 +324,25 @@ class _AdbDeviceOpsMixin:
         self.statusBar().showMessage(tr("正在扫描设备..."))
 
         # 异步扫描
+        self._next_device_scan_seq()
         self._wait_device_thread()
-        self._device_thread = QThread()
-        self._device_worker = _DeviceWorker(task="scan")
-        self._device_worker.moveToThread(self._device_thread)
-        self._device_thread.started.connect(self._device_worker.run)
-        self._device_worker.scan_finished.connect(self._on_scan_devices_done)
-        self._device_worker.error.connect(self._on_scan_devices_error)
-        self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
-        self._device_thread.start()
+        thread = QThread()
+        worker = _DeviceWorker(task="scan")
+        self._device_thread = thread
+        self._device_worker = worker
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.scan_finished.connect(
+            lambda devices, w=worker: self._on_scan_devices_done(devices, worker=w))
+        worker.error.connect(
+            lambda message, w=worker: self._on_scan_devices_error(message, worker=w))
+        self._bind_device_worker_lifecycle(worker, thread)
+        thread.start()
 
-    def _on_scan_devices_done(self, devices: list):
+    def _on_scan_devices_done(self, devices: list, *, worker=None):
         """扫描完成回调（主线程）"""
+        if worker is not None and worker is not getattr(self, "_device_worker", None):
+            return
         self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
@@ -417,11 +424,74 @@ class _AdbDeviceOpsMixin:
             self.btn_scan_device.setText(tr("扫描设备"))
             self.statusBar().showMessage(tr("已取消扫描"))
 
+    def _retired_device_threads(self) -> set[QThread]:
+        threads = getattr(self, "_retired_device_thread_set", None)
+        if threads is None:
+            threads = set()
+            self._retired_device_thread_set = threads
+        return threads
+
+    def _retired_device_workers(self) -> set[QObject]:
+        workers = getattr(self, "_retired_device_worker_set", None)
+        if workers is None:
+            workers = set()
+            self._retired_device_worker_set = workers
+        return workers
+
+    def _latest_connect_seqs(self) -> dict[str, int]:
+        seqs = getattr(self, "_latest_connect_seq_by_target", None)
+        if seqs is None:
+            seqs = {}
+            self._latest_connect_seq_by_target = seqs
+        return seqs
+
+    def _next_device_scan_seq(self) -> int:
+        seq = int(getattr(self, "_device_scan_seq", 0)) + 1
+        self._device_scan_seq = seq
+        return seq
+
+    def _next_device_connect_seq(self) -> int:
+        seq = int(getattr(self, "_device_connect_seq", 0)) + 1
+        self._device_connect_seq = seq
+        return seq
+
+    def _retire_device_thread(self, thread: QThread, worker: QObject | None) -> None:
+        """保活仍在运行中的旧设备线程，避免覆盖引用触发 Qt qFatal。"""
+        threads = self._retired_device_threads()
+        workers = self._retired_device_workers()
+        threads.add(thread)
+        if worker is not None:
+            workers.add(worker)
+
+        def _cleanup() -> None:
+            threads.discard(thread)
+            if worker is not None:
+                workers.discard(worker)
+                try:
+                    worker.deleteLater()
+                except RuntimeError:
+                    pass
+            try:
+                thread.deleteLater()
+            except RuntimeError:
+                pass
+
+        thread.finished.connect(_cleanup)
+        if not thread.isRunning():
+            _cleanup()
+
     def _wait_device_thread(self):
-        """等待可能存在的旧设备线程退出"""
-        if hasattr(self, '_device_thread') and self._device_thread.isRunning():
-            self._device_thread.quit()
-            self._device_thread.wait(3000)
+        """短等旧设备线程退出；仍阻塞则移入 retired 集合保活，避免主线程卡死或 qFatal。"""
+        old_thread = getattr(self, "_device_thread", None)
+        old_worker = getattr(self, "_device_worker", None)
+        if old_thread is None or not old_thread.isRunning():
+            return
+        cancel = getattr(old_worker, "cancel", None)
+        if callable(cancel):
+            cancel()
+        old_thread.quit()
+        if not old_thread.wait(200):
+            self._retire_device_thread(old_thread, old_worker)
 
     def _start_wireless_scan(self, mode: str = "lan", subnets: list | None = None):
         """启动 ADB 扫描（异步）
@@ -442,22 +512,30 @@ class _AdbDeviceOpsMixin:
             scope = "全部网卡" if not subnets else "、".join(f"{s}0/24" for s in subnets)
             self.append_log(f"[扫描] 正在扫描局域网 ADB 设备（{scope}）...")
 
+        self._next_device_scan_seq()
         self._wait_device_thread()
-        self._device_thread = QThread()
-        self._device_worker = _DeviceWorker(
+        thread = QThread()
+        worker = _DeviceWorker(
             task="local_scan" if mode == "local" else "wireless_scan",
             subnets=subnets,
         )
-        self._device_worker.moveToThread(self._device_thread)
-        self._device_thread.started.connect(self._device_worker.run)
-        self._device_worker.wireless_finished.connect(self._on_wireless_scan_done)
-        self._device_worker.wireless_progress.connect(self._on_wireless_scan_progress)
-        self._device_worker.error.connect(self._on_wireless_scan_error)
-        self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
-        self._device_thread.start()
+        self._device_thread = thread
+        self._device_worker = worker
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.wireless_finished.connect(
+            lambda devices, w=worker: self._on_wireless_scan_done(devices, worker=w))
+        worker.wireless_progress.connect(
+            lambda msg, cur, tot, w=worker: self._on_wireless_scan_progress(msg, cur, tot, worker=w))
+        worker.error.connect(
+            lambda message, w=worker: self._on_wireless_scan_error(message, worker=w))
+        self._bind_device_worker_lifecycle(worker, thread)
+        thread.start()
 
-    def _on_wireless_scan_progress(self, message: str, current: int, total: int):
+    def _on_wireless_scan_progress(self, message: str, current: int, total: int, *, worker=None):
         """局域网扫描进度回调（主线程）"""
+        if worker is not None and worker is not getattr(self, "_device_worker", None):
+            return
         # 对话框可能已关闭，检查有效性
         if not hasattr(self, "_wireless_dialog") or not self._wireless_dialog:
             return
@@ -466,8 +544,10 @@ class _AdbDeviceOpsMixin:
         except RuntimeError:
             pass  # 对话框已被销毁
 
-    def _on_wireless_scan_done(self, devices: list):
+    def _on_wireless_scan_done(self, devices: list, *, worker=None):
         """局域网扫描完成回调（主线程）"""
+        if worker is not None and worker is not getattr(self, "_device_worker", None):
+            return
         # 如果任务被取消，不处理结果
         if (hasattr(self, '_device_worker') and self._device_worker
                 and self._device_worker.is_cancelled()):
@@ -521,8 +601,10 @@ class _AdbDeviceOpsMixin:
         self.append_log(f"[扫描] 发现 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(f"已发现 {len(devices)} 台设备 | 请选择并点击连接")
 
-    def _on_wireless_scan_error(self, error_msg: str):
+    def _on_wireless_scan_error(self, error_msg: str, *, worker=None):
         """局域网扫描失败回调（主线程）"""
+        if worker is not None and worker is not getattr(self, "_device_worker", None):
+            return
         self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
@@ -536,8 +618,10 @@ class _AdbDeviceOpsMixin:
         self.append_log(f"[错误] 局域网扫描失败: {error_msg}")
         self.statusBar().showMessage(tr("扫描失败 | 详见日志"))
 
-    def _on_scan_devices_error(self, error_msg: str):
+    def _on_scan_devices_error(self, error_msg: str, *, worker=None):
         """扫描失败回调（主线程）"""
+        if worker is not None and worker is not getattr(self, "_device_worker", None):
+            return
         self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
@@ -583,32 +667,38 @@ class _AdbDeviceOpsMixin:
             device_execution = self._android_connection_draft.device_execution
 
         # 异步连接
+        connect_seq = self._next_device_connect_seq()
         self._wait_device_thread()
-        self._device_thread = QThread()
-        self._device_worker = _DeviceWorker(
+        thread = QThread()
+        worker = _DeviceWorker(
             task="connect", serial=combo_data["serial"],
             capture_method=capture_method,
             agent_mode=device_execution,
             allow_adb_fallback=load_user_config().android_recovery.allow_adb_fallback,
             auto_start_shizuku=load_user_config().android_recovery.auto_start_shizuku,
         )
-        self._device_worker.moveToThread(self._device_thread)
-        self._device_thread.started.connect(self._device_worker.run)
-        self._device_worker.notice.connect(self.log_text.append)
-        self._device_worker.connect_finished.connect(
-            lambda device, capture, method, w, h, agent: self._on_connect_done(
+        self._device_thread = thread
+        self._device_worker = worker
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.notice.connect(self.log_text.append)
+        worker.connect_finished.connect(
+            lambda device, capture, method, w, h, agent, seq=connect_seq, wrk=worker:
+            self._on_connect_done(
                 combo_data, device, capture, method, w, h, agent,
-                update_candidate_ui=update_candidate_ui)
+                update_candidate_ui=update_candidate_ui,
+                connect_seq=seq, worker=wrk)
         )
-        self._device_worker.error.connect(
-            lambda message: self._on_connect_error(
-                message, update_candidate_ui=update_candidate_ui))
-        self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
-        self._device_thread.start()
+        worker.error.connect(
+            lambda message, wrk=worker: self._on_connect_error(
+                message, update_candidate_ui=update_candidate_ui, worker=wrk))
+        self._bind_device_worker_lifecycle(worker, thread)
+        thread.start()
 
     def _on_connect_done(
             self, combo_data, device, capture, capture_method, w, h,
-            agent=None, *, update_candidate_ui: bool = True):
+            agent=None, *, update_candidate_ui: bool = True,
+            connect_seq: int | None = None, worker=None):
         """连接成功回调（主线程）"""
         import threading
 
@@ -623,6 +713,14 @@ class _AdbDeviceOpsMixin:
         # 真机仍只按身份归并（USB 与无线是一个目标）。
         target_id = android_target_id(
             identity.value, str(getattr(device, "serial", "") or ""))
+        is_current_worker = (
+            worker is None or worker is getattr(self, "_device_worker", None))
+        if connect_seq is not None:
+            latest_seqs = self._latest_connect_seqs()
+            if connect_seq < latest_seqs.get(target_id, 0):
+                self._release_rejected_connection(capture, agent)
+                return
+            latest_seqs[target_id] = connect_seq
         conflict = self._unconfirmed_identity_conflict(target_id, identity.stable)
         if conflict is not None:
             # 读不到任何稳定标识时，无法判断这条 transport 是不是已连目标的
@@ -635,7 +733,7 @@ class _AdbDeviceOpsMixin:
                 "「{name}」是同一台设备。请先断开该目标再连接。"
             ).format(serial=combo_data["serial"], name=conflict.display_name))
             self.statusBar().showMessage(tr("设备标识未确认，已拒绝连接"))
-            if update_candidate_ui:
+            if update_candidate_ui and is_current_worker:
                 self.btn_locate.setText(tr("连接"))
                 self._set_locate_enabled(True)
             return
@@ -789,7 +887,7 @@ class _AdbDeviceOpsMixin:
         self.statusBar().showMessage(self._hotkey_status(
             f"已连接设备 {combo_data['serial']}",
             (hk.start, tr("开始")), (hk.stop, tr("停止"))))
-        if update_candidate_ui:
+        if update_candidate_ui and is_current_worker:
             self.btn_locate.setText(tr("连接"))
             self._set_locate_enabled(True)
         self._refresh_execution_targets_ui()
@@ -802,12 +900,15 @@ class _AdbDeviceOpsMixin:
             self._capture_preview()
 
     def _on_connect_error(
-            self, error_msg: str, *, update_candidate_ui: bool = True):
+            self, error_msg: str, *, update_candidate_ui: bool = True, worker=None):
         """连接失败回调（主线程）"""
+        is_current_worker = (
+            worker is None or worker is getattr(self, "_device_worker", None))
         logger.error(f"连接设备失败: {error_msg}")
         self.append_log(f"[错误] 连接设备失败: {error_msg}")
-        self.statusBar().showMessage(tr("连接失败 | 详见日志"))
-        if update_candidate_ui:
+        if is_current_worker:
+            self.statusBar().showMessage(tr("连接失败 | 详见日志"))
+        if update_candidate_ui and is_current_worker:
             self.btn_locate.setText(tr("连接"))
             self._set_locate_enabled(True)
 

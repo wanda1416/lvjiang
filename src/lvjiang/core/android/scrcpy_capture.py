@@ -220,6 +220,7 @@ class AndroidStreamCapture(CaptureBackend):
         self._stream_recovery = None
         self._recover_lock = threading.Lock()
         self._lifecycle_lock = threading.RLock()
+        self._stop_epoch = 0
         #: 按策略暂停（如空闲停流）期间不该有帧，看门狗必须豁免
         self.paused_by_policy = threading.Event()
 
@@ -419,14 +420,20 @@ class AndroidStreamCapture(CaptureBackend):
                 raise ChannelFaultError(self._fault_detail or tr("画面流不可用"))
             hook(self)
 
+    def _stop_interrupted(self, expected_epoch: int) -> bool:
+        return bool(self._user_stop or self._stop_epoch != expected_epoch)
+
     def restart(self) -> bool:
-        """重建整个会话（停 → 起）。生命周期锁与手动断开/切换截图方式互斥。"""
+        """重建整个会话（停 → 起）。_lifecycle_lock 仅串行化并发 restart()，不阻断外部 stop()。"""
         with self._lifecycle_lock:
             logger.info("[AndroidStream] 重建视频流会话")
             self.stop()
+            expected_epoch = self._stop_epoch
             self._user_stop = False
             time.sleep(0.2)
-            if not self.start():
+            if self._stop_interrupted(expected_epoch):
+                return False
+            if not self.start(_expected_epoch=expected_epoch):
                 return False
             self.clear_fault()
             return True
@@ -442,7 +449,7 @@ class AndroidStreamCapture(CaptureBackend):
 
     # ─── 生命周期 ─────────────────────────────────────────
 
-    def start(self) -> bool:
+    def start(self, *, _expected_epoch: int | None = None) -> bool:
         """推送 jar → 启动 server → 建立连接 → 读协议头 → 启动解码线程 → 等待首帧"""
         try:
             import av  # noqa: F401
@@ -450,9 +457,13 @@ class AndroidStreamCapture(CaptureBackend):
             self._fail(tr("未安装 PyAV，无法解码视频流（请安装 av 依赖）"))
             return False
 
+        expected_epoch = self._stop_epoch if _expected_epoch is None else _expected_epoch
+        if _expected_epoch is not None and self._stop_interrupted(expected_epoch):
+            return False
         try:
             self._running = True
-            self._user_stop = False
+            if _expected_epoch is None:
+                self._user_stop = False
             self._last_error = ""
             self._fault = ""
             self._fault_detail = ""
@@ -474,7 +485,10 @@ class AndroidStreamCapture(CaptureBackend):
                 logger.debug(f"[AndroidStream] max_size=0，使用设备分辨率较长边: {self._max_size}")
 
             # 1. 推送 jar
-            if not self._push_jar():
+            if self._stop_interrupted(expected_epoch):
+                self._running = False
+                return False
+            if not self._push_jar() or self._stop_interrupted(expected_epoch):
                 self._running = False
                 return False
 
@@ -483,8 +497,10 @@ class AndroidStreamCapture(CaptureBackend):
             self._cleanup_forward()
             self._video_port = self._device.forward_dynamic(
                 f"localabstract:{self._socket_name}")
-            if self._video_port is None:
-                self._fail(tr("无法建立 scrcpy 视频端口转发"))
+            if self._video_port is None or self._stop_interrupted(expected_epoch):
+                if not self._stop_interrupted(expected_epoch):
+                    self._fail(tr("无法建立 scrcpy 视频端口转发"))
+                self._cleanup_forward()
                 self._running = False
                 return False
             logger.debug(
@@ -492,12 +508,12 @@ class AndroidStreamCapture(CaptureBackend):
                 f"-> localabstract:{self._socket_name}")
 
             # 3. 启动 server
-            if not self._start_server():
+            if not self._start_server() or self._stop_interrupted(expected_epoch):
                 self.stop()
                 return False
 
             # 4. 连接 socket
-            if not self._connect_socket():
+            if not self._connect_socket() or self._stop_interrupted(expected_epoch):
                 self.stop()
                 return False
 
@@ -509,6 +525,9 @@ class AndroidStreamCapture(CaptureBackend):
             header_deadline = time.monotonic() + 10.0
             attempt = 0
             while True:
+                if self._stop_interrupted(expected_epoch):
+                    self.stop()
+                    return False
                 attempt += 1
                 try:
                     header_ok = self._read_protocol_header()
@@ -540,11 +559,14 @@ class AndroidStreamCapture(CaptureBackend):
                         pass
                     self._sock = None
                 time.sleep(0.5)
-                if not self._connect_socket():
+                if self._stop_interrupted(expected_epoch) or not self._connect_socket():
                     self.stop()
                     return False
 
             # 6. 启动解码线程
+            if self._stop_interrupted(expected_epoch):
+                self.stop()
+                return False
             with self._decoder_lock:
                 self._decoder = av.CodecContext.create("h264", "r")
             self._decode_thread = threading.Thread(
@@ -557,7 +579,7 @@ class AndroidStreamCapture(CaptureBackend):
             # 7. 等待首帧（解码线程若已崩溃则立即失败，报真实原因）
             deadline = time.monotonic() + 5.0
             while not self._ready_event.is_set() and time.monotonic() < deadline:
-                if not self._running:
+                if not self._running or self._stop_interrupted(expected_epoch):
                     break
                 if self._decode_thread is not None and not self._decode_thread.is_alive():
                     break
@@ -593,6 +615,7 @@ class AndroidStreamCapture(CaptureBackend):
         # 主动停止不算故障：置位后解码线程与看门狗都不会再报错
         self._user_stop = True
         self._running = False
+        self._stop_epoch += 1
         self._ready_event.clear()
         self._transitioning = True
 

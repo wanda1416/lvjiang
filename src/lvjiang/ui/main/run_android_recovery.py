@@ -358,12 +358,17 @@ class _AndroidRecoveryMixin:
             self._hide_channel_banner(target_id)
             self.append_log(tr("[操作] 当前目标是单帧截图，没有可重建的画面流，已收起提示"))
             return True
-        if getattr(self, "_stream_recheck_bridge", None) is not None:
+        bridges = self._stream_recheck_bridges()
+        if target_id in bridges:
             self.append_log(tr("[画面流] 正在重建中，请稍候"))
             return True
 
         bridge = _StreamRecheckBridge(target_id)
-        bridge.finished.connect(self._on_stream_recheck_finished)
+        bridge.finished.connect(
+            lambda tid, ok, detail, cap=capture, br=bridge:
+            self._on_stream_recheck_finished(
+                tid, ok, detail, capture=cap, bridge=br))
+        bridges[target_id] = bridge
         self._stream_recheck_bridge = bridge
         self.statusBar().showMessage(tr("正在重建画面流..."))
         self.append_log(tr("[操作] 重新检查画面流"))
@@ -384,10 +389,28 @@ class _AndroidRecoveryMixin:
         threading.Thread(target=work, name="stream-recheck", daemon=True).start()
         return True
 
-    def _on_stream_recheck_finished(self, target_id: str, ok: bool, detail: str) -> None:
-        """空闲重建结果回到主线程：成功收横幅，失败把原因留在横幅上允许再试。"""
-        self._stream_recheck_bridge = None
-        if self._execution_targets.get(target_id) is None:
+    def _stream_recheck_bridges(self) -> dict[str, _StreamRecheckBridge]:
+        bridges = getattr(self, "_stream_recheck_bridges_by_target", None)
+        if bridges is None:
+            bridges = {}
+            self._stream_recheck_bridges_by_target = bridges
+        return bridges
+
+    def _on_stream_recheck_finished(
+        self, target_id: str, ok: bool, detail: str, *,
+        capture=None, bridge=None,
+    ) -> None:
+        """空闲重建结果回到主线程：校验当前绑定实例后更新横幅。"""
+        bridges = self._stream_recheck_bridges()
+        if bridge is None or bridges.get(target_id) is bridge:
+            bridges.pop(target_id, None)
+        self._stream_recheck_bridge = next(iter(bridges.values()), None)
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        if capture is not None and (
+            target.handle is None or target.handle.binding().capture is not capture
+        ):
             return
         if ok:
             self.append_log(tr("[画面流] 已恢复"))

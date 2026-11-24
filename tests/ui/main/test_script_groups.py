@@ -187,7 +187,7 @@ def test_external_load_replaces_temporary_item_even_when_group_filtered(qtbot, m
     path = tmp_path / "new.wf"
     path.write_text('#% name: 新临时\n#% group: 材料\nlog "正文"\n', encoding="utf-8")
     monkeypatch.setattr("PyQt6.QtWidgets.QFileDialog.getOpenFileName", lambda *_args: (str(path), ""))
-    monkeypatch.setattr("lvjiang.ui.main.run_control.get_resolver",
+    monkeypatch.setattr("lvjiang.ui.main.run_selectors.get_resolver",
                         lambda: SimpleNamespace(write_dir=lambda _name: tmp_path))
     host._on_load_workflow()
     assert host._get_selected_flow_config()["id"] == "__loaded__:new"

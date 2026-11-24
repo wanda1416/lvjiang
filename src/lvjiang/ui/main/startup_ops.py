@@ -80,7 +80,7 @@ class StartupOpsMixin:
             self._continue_after_update_check()
             return
         from ...core.updates.release import should_prompt_update
-        from ..background.update import UpdateChecker
+        from ..background import UpdateChecker
 
         checker = UpdateChecker(self)
 
@@ -130,7 +130,7 @@ class StartupOpsMixin:
             apply_outcome,
             build_job,
         )
-        from ..background.telemetry import TelemetryReporter
+        from ..background import TelemetryReporter
 
         job = build_job()
         if job.is_empty:

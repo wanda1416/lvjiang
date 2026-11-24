@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...core.about.links import SUPPORT_PAGE_URL
+from ...core.about import SUPPORT_PAGE_URL
 from ...core.qrcode import support as support_qrcode
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style

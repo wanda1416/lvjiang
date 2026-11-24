@@ -23,8 +23,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
-from lvjiang.ui.user_toolbar import add_user_nav_buttons
+from lvjiang.ui.users.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
+from lvjiang.ui.users.user_toolbar import add_user_nav_buttons
 from lvjiang.ui.widgets.button_styles import apply_button_style
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 from lvjiang.ui.widgets.layout_helpers import fit_combo_to_contents

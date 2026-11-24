@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 
 from lvjiang.core.layout.models import Region
+from lvjiang.workflows.analysis.workflow_references import collect_refs
 from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.workflow_references import collect_refs
 from tests.workflows.test_capture_reuse import _engine, _run
 
 

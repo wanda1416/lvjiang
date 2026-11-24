@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..i18n import tr
+from ...i18n import tr
 from .workflow_references import KIND_LABELS, RefUse
 
 
@@ -79,7 +79,7 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
     cache: dict[str, dict[str, set[str]]] = {}
     for ref in refs:
         if ref.is_subscene:
-            from ..core.scene.registry import get_subscene_ref_def, is_subscene
+            from ...core.scene.registry import get_subscene_ref_def, is_subscene
             instances = layout.get_scene_subscene_refs(ref.scene)
             # 引用 key 为变量时无法知道具体实例，但仍可像普通动态区域一样
             # 校验到父场景层级，不能把整条三段引用从预检中丢掉。
@@ -175,7 +175,7 @@ def _template_problem(region) -> str | None:
     binding = getattr(region, "template", None) if region is not None else None
     if binding is None:
         return tr("区域未绑定模板")
-    from ..core.recognizers.template_locator import get_template_store
+    from ...core.recognizers.template_locator import get_template_store
     try:
         template = get_template_store().get(binding.name)
     except ValueError as exc:

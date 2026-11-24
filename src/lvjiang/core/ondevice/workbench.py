@@ -220,7 +220,7 @@ def public_content(kind: str, refresh: bool = False) -> str:
     """公开内容按需展示；二维码默认读缓存，用户可显式刷新。"""
     try:
         if kind == "about":
-            from ..about.content import about_content
+            from ..about import about_content
             return _json({"ok": True, **about_content()})
         if kind == "notices":
             from ..updates.announcement import (
@@ -267,7 +267,7 @@ def public_content(kind: str, refresh: bool = False) -> str:
             return _json({"ok": True, "message": message, "image": base64.b64encode(payload).decode("ascii")})
         if kind == "version":
             # 版本入口的站点与桌面共同维护。
-            from ..about.links import RELEASES_URL
+            from ..about import RELEASES_URL
             from ..version_info import get_version
             return _json({"ok": True, "version": get_version(), "url": RELEASES_URL})
         raise ValueError("内容类型不可用")

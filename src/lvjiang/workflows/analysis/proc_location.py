@@ -9,11 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..core.config.resolver import get_resolver
-from .engine.core import WorkflowUserError, _normalize_import_path
-from .file_tree import WORKFLOWS_DIR
-from .grammar import parse_text
-from .grammar.ast_nodes import (
+from ...core.config.resolver import get_resolver
+from ..engine.core import WorkflowUserError, _normalize_import_path
+from ..file_tree import WORKFLOWS_DIR
+from ..grammar import parse_text
+from ..grammar.ast_nodes import (
     CallProc,
     For,
     ForRange,

@@ -10,9 +10,9 @@ from lvjiang.core.recognizers.template_locator import (
     normalize_template_name,
     validate_template_image,
 )
+from lvjiang.workflows.analysis.static_check import check_refs
+from lvjiang.workflows.analysis.workflow_references import collect_refs
 from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.static_check import check_refs
-from lvjiang.workflows.workflow_references import collect_refs
 
 
 def test_template_binding_roundtrip_and_optional_omission():

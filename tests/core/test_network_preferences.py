@@ -42,7 +42,7 @@ def test_startup_skips_disabled_checks_and_continues_chain(
         return Checker
 
     monkeypatch.setattr("lvjiang.ui.notices.announcement_checker.AnnouncementChecker", checker("announcement"))
-    monkeypatch.setattr("lvjiang.ui.background.update.UpdateChecker", checker("update"))
+    monkeypatch.setattr("lvjiang.ui.background.UpdateChecker", checker("update"))
 
     class Host(StartupOpsMixin):
         def _continue_after_update_check(self):

@@ -12,6 +12,7 @@ warning）。
 """
 from __future__ import annotations
 
+from lvjiang.workflows.analysis.workflow_references import collect_refs, reachable_procs
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import (
     CallProc,
@@ -23,7 +24,6 @@ from lvjiang.workflows.grammar.ast_nodes import (
     Scan,
     Try,
 )
-from lvjiang.workflows.workflow_references import collect_refs, reachable_procs
 
 
 def _scan(scene: str, key: str, line: int = 1) -> Scan:

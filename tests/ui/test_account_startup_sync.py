@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QApplication
 
 
 def _holder(monkeypatch, *, paused: bool):
-    from lvjiang.ui import account_dialog
+    from lvjiang.ui.users import account_dialog
 
     monkeypatch.setattr(account_dialog, "readonly_instance", lambda: False)
     monkeypatch.setattr(account_dialog, "sync_paused", lambda: paused)

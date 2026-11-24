@@ -5,7 +5,7 @@ from copy import deepcopy
 from typing import Any, Literal
 
 from ...core.config.models import HotkeyConfig
-from ...core.plugin_runtime import RuntimeRun, RuntimeTarget
+from ...core.plugins.runtime import RuntimeRun, RuntimeTarget
 
 
 class PluginRuntime:

@@ -32,6 +32,13 @@ from ...core.ocr.engine import OCREngine
 from ...core.recognizers import ReferenceRecognizer
 from ...core.timing import RuntimeClock
 from ..align import GridAlignment
+from ..analysis.program_check import (
+    check_metadata_defaults,
+    check_proc_scope_reads,
+    collect_global_names,
+)
+from ..analysis.static_check import check_refs, format_problems
+from ..analysis.workflow_references import collect_refs
 from ..base import BaseWorkflow
 from ..capture_snapshot import CaptureSnapshotMixin
 from ..errors import WorkflowExecutionError
@@ -78,13 +85,6 @@ from ..grammar.ast_nodes import (
     WhileLoop,
 )
 from ..grammar.parser import parse_file
-from ..program_check import (
-    check_metadata_defaults,
-    check_proc_scope_reads,
-    collect_global_names,
-)
-from ..static_check import check_refs, format_problems
-from ..workflow_references import collect_refs
 from . import control_flow
 from .actions import _ActionsMixin
 from .control_flow import _ControlFlowMixin

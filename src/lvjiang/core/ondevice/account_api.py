@@ -31,7 +31,7 @@ _OFFLINE_CODES = frozenset({"network", "service_unavailable", "rejected"})
 #: 同步单飞：前台心跳线程（每 60 秒）与「立即同步」/登录后同步可以同时进来，
 #: 两轮并发会同时读改写 account.json 的 profile_sync 水位（后写覆盖前写），
 #: 也会各自开一轮 sync_round 重复拉取。PC 端 AccountHolder 有同类单飞标志
-#: （ui/account_dialog.py 的 _start），手机侧此前没有。
+#: （ui/users/account_dialog.py 的 _start），手机侧此前没有。
 _SYNC_LOCK = threading.Lock()
 
 #: 最近一轮同步的结果（`{at, ok, message}`）。手机端「数据同步」摘要行与对话框

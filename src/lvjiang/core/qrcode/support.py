@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
-from ..about.links import SUPPORT_QRCODE_BASE_URL
+from ..about import SUPPORT_QRCODE_BASE_URL
 from .cache import cache_path, cached_bytes, write_cache
 from .image import fetch_image_bytes
 

@@ -52,7 +52,7 @@ def test_account_manager_enabled_on_main_instance(qtbot, monkeypatch):
 
 def test_readonly_instance_never_auto_restores_login(qtbot, monkeypatch):
     """只读实例不自动登录：不碰凭据库、不起后台线程、不开节拍。"""
-    from lvjiang.ui.account_dialog import AccountHolder
+    from lvjiang.ui.users.account_dialog import AccountHolder
 
     monkeypatch.setattr(access, "_readonly", True)
     holder = AccountHolder()
@@ -68,7 +68,7 @@ def test_readonly_instance_never_auto_restores_login(qtbot, monkeypatch):
 
 def test_readonly_instance_allows_manual_restore(qtbot, monkeypatch):
     """手动打开账户页时允许一次只读恢复，否则「立即同步」拿不到会话。"""
-    from lvjiang.ui.account_dialog import AccountHolder
+    from lvjiang.ui.users.account_dialog import AccountHolder
 
     monkeypatch.setattr(access, "_readonly", True)
     holder = AccountHolder()
@@ -83,7 +83,7 @@ def test_readonly_instance_allows_manual_restore(qtbot, monkeypatch):
 
 def test_readonly_instance_refuses_account_actions(qtbot, monkeypatch):
     """登录/改密/登出/清除同步照旧禁止；同步本身不被实例类型拦。"""
-    from lvjiang.ui.account_dialog import AccountHolder
+    from lvjiang.ui.users.account_dialog import AccountHolder
 
     monkeypatch.setattr(access, "_readonly", True)
     holder = AccountHolder()
@@ -100,7 +100,7 @@ def test_readonly_instance_refuses_account_actions(qtbot, monkeypatch):
 
 def test_readonly_instance_can_run_manual_sync(qtbot, monkeypatch):
     """只读实例拿到会话后，手动同步这一轮允许启动（分钟节拍仍然不起）。"""
-    from lvjiang.ui.account_dialog import AccountHolder
+    from lvjiang.ui.users.account_dialog import AccountHolder
 
     monkeypatch.setattr(access, "_readonly", True)
     monkeypatch.setattr("lvjiang.core.sync.initial.sync_established", lambda: True)

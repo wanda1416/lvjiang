@@ -35,7 +35,7 @@ from .....core.ai.agent_mcp import (
     has_agent_access,
 )
 from .....core.ai.agent_settings import AgentSettings, load_agent_settings
-from .....core.plugin_runtime import PluginRuntimePort, RuntimeTarget
+from .....core.plugins.runtime import PluginRuntimePort, RuntimeTarget
 from .....i18n import tr, tr_label
 from .....ui.widgets.button_styles import apply_button_style
 from .....ui.widgets.combo_box import AutoWidthComboBox, ComboWidthMode

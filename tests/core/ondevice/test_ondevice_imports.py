@@ -56,7 +56,7 @@ def test_ondevice_entrypoints_import_without_pyqt6(tmp_path) -> None:
         assert __import__("json").loads(batch.editor())["ok"]
         assert not __import__("json").loads(batch.view())["ok"]
         from lvjiang.core import version_info
-        from lvjiang.core.about import content as about
+        from lvjiang.core import about
         from lvjiang.core.qrcode import group as group_qrcode
         from lvjiang.core.updates import announcement
         assert about.about_content()["version"] == version_info.get_version()

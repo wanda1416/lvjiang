@@ -1,6 +1,6 @@
 """指令面板 —— 快捷指令式的「选操作 → 填槽位 → 预览 → 插入」
 
-数据来自 ``workflows.action_catalog``（纯数据），本模块只做 Qt 呈现：
+数据来自 ``workflows.analysis.action_catalog``（纯数据），本模块只做 Qt 呈现：
 搜索框 + 分类列表 + 按槽位类型生成的表单 + 实时预览 + 插入按钮。
 
 槽位取值来源（由调用方注入 providers，便于测试时全 mock）：
@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
-from ...workflows import action_catalog as cat
+from ...workflows.analysis import action_catalog as cat
 from ..widgets.button_styles import apply_button_style
 from ..widgets.theme import current_tokens
 

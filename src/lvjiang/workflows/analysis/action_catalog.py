@@ -26,7 +26,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ..i18n import tr
+from ...i18n import tr
 
 SLOT_KINDS = ("scene", "region", "coord", "rect", "color", "delay", "template", "text", "raw", "var", "choice")
 

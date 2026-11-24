@@ -57,7 +57,7 @@ builder 约定：
 - `host.active_user_name() -> str`：当前活跃用户名
 - `host.plugin_runtime: PluginRuntimePort`：查询目标、预检启动、切换目标、启动工作流、
   查询运行记录与人工提示、暂停/恢复/停止任务，以及读取热键快照和插件页。
-  契约位于 `core/plugin_runtime.py`，桌面适配位于 `ui/main/plugin_runtime.py`。
+  契约位于 `core/plugins/runtime.py`，桌面适配位于 `ui/main/plugin_runtime.py`。
   插件通过适配器访问目标登记、运行管理与界面恢复，不直接读取这些宿主私有入口。
   `run/current_run` 仍返回原运行对象，`engine/worker` 是供进度及结果读取的原对象引用；
   `pages()` 返回全部左栏控件，由插件筛选自己的页面。目前统一的是访问入口，并未隔离对象。

@@ -27,10 +27,10 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.users.document import UserConfigManager
 
-from ..i18n import tr, tr_label
+from ...i18n import tr, tr_label
+from ..widgets.avatar_widget import AvatarWidget
+from ..widgets.theme import current_tokens
 from .avatar_editor_dialog import AvatarEditorDialog
-from .widgets.avatar_widget import AvatarWidget
-from .widgets.theme import current_tokens
 
 # ─── 样式辅助 ────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ class UserManagerDialog(QDialog):
     @staticmethod
     def _account_holder():
         """账户持有者；只读实例不参与账号操作，直接返回 None。"""
-        from ..core.access import is_readonly
+        from ...core.access import is_readonly
 
         if is_readonly():
             return None
@@ -522,7 +522,7 @@ class UserManagerDialog(QDialog):
         values = self._read_attributes()
         if values is None:
             return
-        from ..core.users.document import UserMetadataConflictError
+        from ...core.users.document import UserMetadataConflictError
         try:
             saved = self._user_manager.replace_user_attributes(
                 name, values, self._attribute_baseline
@@ -573,7 +573,7 @@ class UserManagerDialog(QDialog):
 
         # 分开报错：名字非法与重名是两回事，合成一句话用户不知道该改什么。
         # 真正的校验在 UserManager.create_user 里（唯一入口），这里只为提示。
-        from ..core.users.document import is_valid_username
+        from ...core.users.document import is_valid_username
         if not is_valid_username(name):
             QMessageBox.warning(
                 self, tr("失败"),

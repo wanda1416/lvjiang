@@ -6,9 +6,9 @@ import pytest
 
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.resolver import ConfigResolver
+from lvjiang.workflows.analysis.proc_location import index_proc_calls
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import CallProc
-from lvjiang.workflows.proc_location import index_proc_calls
 
 
 @pytest.fixture

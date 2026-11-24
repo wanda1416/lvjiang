@@ -1,8 +1,8 @@
 # 公共服务与桌面适配
 
-- `core.updates.release.fetch_latest_release` 提供更新结果与错误，Qt 检查线程位于 `ui/background/update.py`。
+- `core.updates.release.fetch_latest_release` 提供更新结果与错误，Qt 检查线程位于 `ui/background.py`。
 - `core.config.remote.run_sync` 在进程读取配置之前下载公开包和会员包，由启动引导安装，没有 Qt 线程。
-- `core.telemetry.reporter.run_report` 返回上报结果，Qt 包装位于 `ui/background/telemetry.py`，
+- `core.telemetry.reporter.run_report` 返回上报结果，Qt 包装位于 `ui/background.py`，
   桌面仍在主线程构造 job 并应用记账结果。
 - `core.profile.engine.ProfileProcessor.tick` 保留周期处理、同步脚本与提醒持久化；
   `ui/profile/engine.py` 管理桌面线程、信号和生命周期。key 重命名通过无 GUI 更新通知
@@ -39,7 +39,7 @@
 
 ### 按需临时线程（用完即毁）
 
-- `_AccountWorker`（`ui/account_dialog.py`）：登录/恢复/改密/同步/心跳各起一个，
+- `_AccountWorker`（`ui/users/account_dialog.py`）：登录/恢复/改密/同步/心跳各起一个，
   同类互斥（operation 与 sync 各一把锁，心跳独立），由应用级 `AccountHolder` 持有——
   **绝不做对话框子对象**，关窗不杀线程。
 - `WorkflowWorker`（运行工作流）、`BatchWorker`（批量执行）、

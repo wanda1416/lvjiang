@@ -6,14 +6,14 @@
 
 import pytest
 
-from lvjiang.workflows.engine.signals import WorkflowUserError
-from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.metadata import WorkflowMetadataError, parse_metadata
-from lvjiang.workflows.program_check import (
+from lvjiang.workflows.analysis.program_check import (
     check_metadata_defaults,
     check_proc_scope_reads,
     collect_global_names,
 )
+from lvjiang.workflows.engine.signals import WorkflowUserError
+from lvjiang.workflows.grammar import parse_text
+from lvjiang.workflows.metadata import WorkflowMetadataError, parse_metadata
 from tests.workflows.conftest import make_engine
 
 

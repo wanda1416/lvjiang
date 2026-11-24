@@ -121,7 +121,7 @@ local 只存 `__added__` / `__removed__` / `__order__` 增量）、哪些列表�
   `core.workflows.implementations`、内置函数经 `@builtin_func` 进入 DSL 内置函数表；
   脚本/任务运行期与通用引擎消费这些注册表，不感知插件来源。
 - **外部 Agent 运行接口**：主窗口暴露 `PluginRuntimePort` 适配器
-  （`src/lvjiang/core/plugin_runtime.py` 协议、`src/lvjiang/ui/main/plugin_runtime.py` 实现），
+  （`src/lvjiang/core/plugins/runtime.py` 协议、`src/lvjiang/ui/main/plugin_runtime.py` 实现），
   向插件页面提供目标选择、任务状态、运行控制与工作流启动的受限通道。
 
 ## 六、yysls 插件专属事实

@@ -31,8 +31,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
-from lvjiang.ui.user_toolbar import add_user_nav_buttons
+from lvjiang.ui.users.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
+from lvjiang.ui.users.user_toolbar import add_user_nav_buttons
 from lvjiang.ui.widgets.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,

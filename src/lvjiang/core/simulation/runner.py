@@ -105,11 +105,11 @@ def _preflight(
     run_env: str = "",
     require_environment: bool = False,
 ) -> None:
-    from ...workflows.grammar.parser import parse_file
-    from ...workflows.workflow_references import (
+    from ...workflows.analysis.workflow_references import (
         _static_env_condition,
         reachable_procs,
     )
+    from ...workflows.grammar.parser import parse_file
     from .policy import PURE_FUNCTIONS, UNSUPPORTED_NODES
     from .scenario import SimulationError
 

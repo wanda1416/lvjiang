@@ -1,7 +1,7 @@
 """流程位置元数据；独立于运行时坐标依赖和页面状态。"""
 from dataclasses import fields, is_dataclass
 
-from .grammar.ast_nodes import SceneDeclaration
+from ..grammar.ast_nodes import SceneDeclaration
 
 
 def collect_scene_declarations(program):

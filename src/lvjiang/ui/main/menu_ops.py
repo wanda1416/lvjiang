@@ -169,7 +169,7 @@ class MenuOpsMixin:
         if is_readonly():
             # 只读实例不自动同步（节拍与 account.json 水位只归主实例），但账户页
             # 里仍可手动「立即同步」——它是用户显式点出来的单次动作。
-            from ..account_dialog import READONLY_SYNC_HINT
+            from ..users.account_dialog import READONLY_SYNC_HINT
             account_mgmt.setToolTip(tr(READONLY_SYNC_HINT))
         settings_menu.addAction(account_mgmt)
 
@@ -338,7 +338,7 @@ class MenuOpsMixin:
         menubar.setCornerWidget(corner, Qt.Corner.TopRightCorner)
 
         try:
-            from ..account_dialog import account_holder
+            from ..users.account_dialog import account_holder
             holder = account_holder()
             holder.admin_feedback_changed.connect(self._update_admin_feedback_button)
             self._update_admin_feedback_button(holder.admin_new_feedback)
@@ -510,7 +510,7 @@ class MenuOpsMixin:
 
         from ...core.telemetry.consent import is_offline_mode
         from ...core.updates.release import get_version, is_newer_version
-        from ..background.update import UpdateChecker
+        from ..background import UpdateChecker
         from ..notices.update_dialog import UpdateDialog
         if is_offline_mode():
             QMessageBox.information(self, tr("检查更新"), tr("当前为离线模式，请关闭离线模式后检查更新"))
@@ -573,11 +573,11 @@ class MenuOpsMixin:
         只读实例也开这个页：能看账户、能手动「立即同步」，只把账户操作禁掉
         （禁用原因由对话框自己写明，不再弹一句「请在主实例操作」把人挡在门外）。
         """
-        from ..account_dialog import AccountManagerDialog
+        from ..users.account_dialog import AccountManagerDialog
         AccountManagerDialog(self).exec()
 
     def _open_user_manager(self):
-        from ..user_manager_dialog import UserManagerDialog
+        from ..users.user_manager_dialog import UserManagerDialog
         dialog = UserManagerDialog(
             self._user_manager,
             self,

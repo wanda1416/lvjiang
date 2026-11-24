@@ -12,10 +12,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from lvjiang.core.paths import get_config_system_dir
+from lvjiang.workflows.analysis.static_check import check_refs
+from lvjiang.workflows.analysis.workflow_references import (
+    collect_refs,
+    collect_scene_keys,
+)
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
-from lvjiang.workflows.static_check import check_refs
-from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
 from tests.case_matrix import case_matrix
 
 from .conftest import make_engine

@@ -47,7 +47,7 @@ from ...core.profile.store import (
     set_active_group,
 )
 from ...i18n import tr, tr_label
-from ..user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_refresh_button
+from ..users.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_refresh_button
 from .cell_editing import ProfileCellEditingMixin
 from .cell_formatting import (
     ENTRY_SNAPSHOT_ROLE,

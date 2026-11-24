@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lvjiang.core.about.links import GITHUB_REPO
+from lvjiang.core.about import GITHUB_REPO
 from lvjiang.ui.main.menu_ops import MenuOpsMixin
 from lvjiang.ui.notices.feedback_dialog import FeedbackDialog
 

@@ -16,7 +16,7 @@ class _FakeClipboard:
 
 
 def _open_dialog(qtbot, monkeypatch):
-    from lvjiang.ui import account_dialog
+    from lvjiang.ui.users import account_dialog
 
     monkeypatch.setattr(account_dialog, "readonly_instance", lambda: False)
     # 不联网、不起后台线程：只验顶部那一行，不关心登录恢复

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
-from .config.models import HotkeyConfig
+from ..config.models import HotkeyConfig
 
 
 @dataclass(frozen=True)

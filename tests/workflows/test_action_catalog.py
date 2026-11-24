@@ -11,7 +11,7 @@
 
 import pytest
 
-from lvjiang.workflows.action_catalog import (
+from lvjiang.workflows.analysis.action_catalog import (
     ACTIONS,
     RenderError,
     Slot,

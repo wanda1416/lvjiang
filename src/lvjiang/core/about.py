@@ -1,7 +1,19 @@
-"""桌面和手机共用的关于内容，界面仅负责排版。"""
-from ...i18n import tr
-from ..version_info import get_version
-from .links import GITHUB_REPO, RELEASES_URL
+"""对外展示内容：公开链接与「关于」文本。
+
+桌面与手机共用同一份内容，界面只负责排版；链接集中在这里，避免同一地址散落在
+多个界面模块里。
+"""
+from ..i18n import tr
+from .version_info import get_version
+
+GITHUB_REPO = "wanda1416/lvjiang"
+RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+
+#: 官方站点（lvjiang/server 的账户服务 Worker 网页端）。赞助页与收款码都挂在这里：
+#: 与网页同域直出静态资源，国内可达性优于 GitHub Pages。
+SITE_URL = "https://lvjiang.wyxj.net"
+SUPPORT_PAGE_URL = f"{SITE_URL}/#/support"
+SUPPORT_QRCODE_BASE_URL = f"{SITE_URL}/support"
 
 
 def about_content() -> dict[str, str]:

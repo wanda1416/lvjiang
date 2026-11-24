@@ -12,7 +12,7 @@ def test_public_plugin_contracts_import_without_qt(tmp_path):
         [sys.executable, "-c",
          "import sys; sys.modules['PyQt6'] = None; "
          "from lvjiang.core.app_events import AppEvent; "
-         "from lvjiang.core.plugin_runtime import PluginRuntimePort; "
+         "from lvjiang.core.plugins.runtime import PluginRuntimePort; "
          "from lvjiang.core.profile.engine import ProfileProcessor; "
          "from lvjiang.core.updates.release import fetch_latest_release; "
          "from lvjiang.core.telemetry.reporter import run_report; "

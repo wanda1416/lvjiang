@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass, replace
 
-from ..i18n import tr
-from .grammar.ast_nodes import (
+from ...i18n import tr
+from ..grammar.ast_nodes import (
     Align,
     CallProc,
     Click,

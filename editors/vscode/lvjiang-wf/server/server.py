@@ -96,6 +96,9 @@ try:
     )
 
     from lvjiang.core.config.resolver import get_resolver  # noqa: E402
+    from lvjiang.workflows.analysis.workflow_references import (
+        collect_refs,  # noqa: E402
+    )
     from lvjiang.workflows.engine.core import _normalize_import_path  # noqa: E402
     from lvjiang.workflows.grammar import parse_text  # noqa: E402
     from lvjiang.workflows.grammar.ast_nodes import (  # noqa: E402
@@ -111,7 +114,6 @@ try:
         WhileLoop,
     )
     from lvjiang.workflows.metadata import metadata_error  # noqa: E402
-    from lvjiang.workflows.workflow_references import collect_refs  # noqa: E402
 except ImportError as e:
     _die(
         f"cannot import 'lvjiang' ({e}). Expected the project source at {_src_dir} "
@@ -301,7 +303,9 @@ def _check_scene_exists(program) -> list[Diagnostic]:
         return []
     diagnostics = []
     from lvjiang.core.scene.definition_models import is_valid_key
-    from lvjiang.workflows.scene_declarations import validate_scene_declarations
+    from lvjiang.workflows.analysis.scene_declarations import (
+        validate_scene_declarations,
+    )
     for line, message in validate_scene_declarations(program, registry.all_scenes()):
         diagnostics.append(Diagnostic(range=_line_range(line), message=message,
                                       severity=DiagnosticSeverity.Warning))
@@ -369,7 +373,7 @@ def _check_layout_refs(program) -> list[Diagnostic]:
     if not layout_key:
         return []
     from lvjiang.core.layout.manager import load_layout_by_key
-    from lvjiang.workflows.static_check import check_refs
+    from lvjiang.workflows.analysis.static_check import check_refs
 
     layout = load_layout_by_key(layout_key)
     if layout is None:

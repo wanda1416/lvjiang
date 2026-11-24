@@ -34,15 +34,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.account import ACCOUNT_SERVICE, AccountError, get_session
-from ..core.account.service import (
+from ...core.account import ACCOUNT_SERVICE, AccountError, get_session
+from ...core.account.service import (
     current_instance_id,
     set_sync_paused,
     sync_paused,
 )
-from ..i18n import tr
-from .widgets.button_styles import apply_button_style
-from .widgets.theme import current_tokens
+from ...i18n import tr
+from ..widgets.button_styles import apply_button_style
+from ..widgets.theme import current_tokens
 
 
 def _eye_icon(visible: bool) -> QIcon:
@@ -127,7 +127,7 @@ class _AccountWorker(QThread):
 
 def readonly_instance() -> bool:
     """只读实例不做任何账号操作（登录态与同步数据只归主实例）。"""
-    from ..core.access import is_readonly
+    from ...core.access import is_readonly
 
     return is_readonly()
 
@@ -426,10 +426,10 @@ class AccountHolder(QObject):
         只读实例也允许跑这一轮：它不起分钟节拍（见 ``apply``），只有用户手动
         「立即同步」能走到这里。会话由打开账户管理时的只读恢复提供。
         """
-        from ..core.sync.initial import sync_established
+        from ...core.sync.initial import sync_established
         if not sync_established():
             return False
-        from ..core.sync.engine import sync_documents
+        from ...core.sync.engine import sync_documents
         token = self.session.access_token
         if not token:
             return False
@@ -439,7 +439,7 @@ class AccountHolder(QObject):
         self._sync_cancel.clear()
 
         def action():
-            from ..core.sync.round_state import sync_round
+            from ...core.sync.round_state import sync_round
 
             # 一轮只取一次云端版本行（/api/sync/state）：各通道据此跳过没变化的拉取，
             # 空闲轮只有这一个请求。
@@ -447,14 +447,14 @@ class AccountHolder(QObject):
                 return _round()
 
         def _round():
-            from ..core.profile.snapshot_sync import sync_all
-            from ..core.sync.definition_sync import sync_definition
-            from ..core.sync.initial import (
+            from ...core.profile.snapshot_sync import sync_all
+            from ...core.sync.definition_sync import sync_definition
+            from ...core.sync.initial import (
                 CloudClearedNotice,
                 cloud_not_inited,
                 reset_local_after_cloud_clear,
             )
-            from ..core.sync.users_sync import sync_users
+            from ...core.sync.users_sync import sync_users
             def progress(data):
                 self.sync_progress.emit(dict(data))
 
@@ -473,8 +473,8 @@ class AccountHolder(QObject):
             report = _CombinedReport(document_report, profile_report, users_report)
             report.errors.extend(definition_report.errors)
             try:
-                from ..core.sync.client import post
-                from ..core.sync.round_state import cloud_state
+                from ...core.sync.client import post
+                from ...core.sync.round_state import cloud_state
                 raw_fb = cloud_state(token, post).get("admin_new_feedback")
                 report.admin_new_feedback = int(raw_fb) if isinstance(raw_fb, int) else 0
             except Exception:
@@ -485,7 +485,7 @@ class AccountHolder(QObject):
 
     def initial_sync_async(self, confirmed: str = "seed") -> bool:
         """初始同步。``confirmed`` 是用户刚刚确认的动作，跟随必须带 follow。"""
-        from ..core.sync.initial import initial_sync
+        from ...core.sync.initial import initial_sync
         token = self.session.access_token
         if readonly_instance() or not token:
             return False
@@ -507,7 +507,7 @@ class AccountHolder(QObject):
 
         头像体积大、变化少，放进每分钟节拍只会白耗流量，所以单独做成按钮。
         """
-        from ..core.sync.users_sync import sync_all_avatars
+        from ...core.sync.users_sync import sync_all_avatars
         token = self.session.access_token
         if readonly_instance() or not token or self.summary is None:
             return False
@@ -519,7 +519,7 @@ class AccountHolder(QObject):
 
     def clear_sync_async(self, password: str) -> bool:
         """清除同步：清空云端同步数据 + 本机水位与状态，回到未建立。"""
-        from ..core.sync.initial import clear_local_sync_state, set_sync_established
+        from ...core.sync.initial import clear_local_sync_state, set_sync_established
         if readonly_instance():
             return False
 
@@ -1016,7 +1016,7 @@ class AccountManagerDialog(QDialog):
                     item.setText(str(data[key] or 0))
 
     def _render_sync(self) -> None:
-        from ..core.sync.initial import sync_established
+        from ...core.sync.initial import sync_established
         established = sync_established()
         report = self.holder.last_sync_report
         if self.holder.syncing:
@@ -1168,7 +1168,7 @@ class AccountManagerDialog(QDialog):
         self.holder.change_password_async(old_password, new_password)
 
     def _sync_now(self) -> None:
-        from ..core.sync.initial import sync_established
+        from ...core.sync.initial import sync_established
         if not sync_established():
             self._set_sync_note(tr("请先点「初始同步」建立同步状态"))
             return
@@ -1191,7 +1191,7 @@ class AccountManagerDialog(QDialog):
             self._set_sync_note(tr("已恢复每分钟自动同步"))
 
     def _initial_or_clear(self) -> None:
-        from ..core.sync.initial import sync_established
+        from ...core.sync.initial import sync_established
         if sync_established():
             self._clear_sync()
             return
@@ -1202,7 +1202,7 @@ class AccountManagerDialog(QDialog):
         except AccountError as error:
             self._set_sync_note(str(error), error=True)
             return
-        from ..core.sync.initial import (
+        from ...core.sync.initial import (
             classify_initial_action,
             local_profile_has_entries,
         )

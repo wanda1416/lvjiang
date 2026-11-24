@@ -49,7 +49,7 @@ from lvjiang.ui.widgets.combo_box import AutoWidthComboBox
 from ...core.config import load_available_envs, load_env, load_user_config
 from ...core.config.users import SessionManager
 from ...core.layout.manager import LayoutConfigManager
-from ...core.plugin_runtime import PluginRuntimePort
+from ...core.plugins.runtime import PluginRuntimePort
 from ...core.reference_db import ReferenceDatabase
 from ...core.users.document import UserConfigManager
 from ...i18n import tr
@@ -370,7 +370,7 @@ class MainWindow(
         self._build_tray_icon()
         # 启动即后台恢复账号登录态并预取数据；账户管理对话框因此开箱即已登录。
         # 只读实例由 restore_async 内部直接跳过（不碰凭据库、不联网）。
-        from ..account_dialog import ensure_account_restored
+        from ..users.account_dialog import ensure_account_restored
         ensure_account_restored()
         if not self._user_manager.list_users():
             bar = self.statusBar()

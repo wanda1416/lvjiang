@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...core.about.content import about_content
+from ...core.about import about_content
 from ...core.updates.release import (
     GITHUB_REPO,
     ReleaseInfo,
@@ -27,7 +27,7 @@ from ...core.updates.release import (
     is_newer_version,
 )
 from ...i18n import tr
-from ..background.update import UpdateChecker
+from ..background import UpdateChecker
 from ..widgets.button_styles import apply_button_style, exec_styled_message_box
 
 # 导出供外部使用

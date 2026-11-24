@@ -5,8 +5,8 @@ from __future__ import annotations
 from PyQt6.QtCore import QObject, QTimer, pyqtSlot
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
-from ..i18n import tr
-from .widgets.button_styles import ACTION_BUTTON_STYLE
+from ...i18n import tr
+from ..widgets.button_styles import ACTION_BUTTON_STYLE
 
 REFRESH_BTN_STYLE = (
     "QPushButton { background-color: #607D8B; color: white; font-size: 12px; "

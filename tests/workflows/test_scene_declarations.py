@@ -1,12 +1,12 @@
 """位置声明有源码位置和静态诊断，执行时完全无操作。"""
 from lvjiang.core.scene.definition_models import SceneDef, ViewDef
-from lvjiang.workflows.engine.core import WorkflowEngine
-from lvjiang.workflows.grammar import SceneDeclaration, parse_text
-from lvjiang.workflows.scene_declarations import (
+from lvjiang.workflows.analysis.scene_declarations import (
     collect_scene_declarations,
     validate_scene_declarations,
 )
-from lvjiang.workflows.workflow_references import collect_refs
+from lvjiang.workflows.analysis.workflow_references import collect_refs
+from lvjiang.workflows.engine.core import WorkflowEngine
+from lvjiang.workflows.grammar import SceneDeclaration, parse_text
 
 
 def test_scene_unknown_unspecified_and_explicit_view():

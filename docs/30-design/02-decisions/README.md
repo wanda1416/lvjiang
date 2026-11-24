@@ -16,7 +16,7 @@
 | [04-transmute-simulation.md](06-tuning/04-transmute-simulation.md) | 模拟转律：八件装备联合转律建议、公共装备目标保存、备战方案第四假设 |
 | [05-nanlu-season.md](06-tuning/05-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 |
 | [06-native-attack-affixes.md](06-tuning/06-native-attack-affixes.md) | 本属攻击统一规则表达：用最大/最小本属攻击替代无相与本流派属攻 |
-| [07-base-attribute-baseline.md](../../20-plans/01-tuning/07-base-attribute-baseline.md)（仅源码检出） | 115 阶满养成基础属性：按流派与来源选择推导无 40 词条基线 |
+| [02-base-attribute-baseline.md](../../20-plans/02-base-attribute-baseline.md)（仅源码检出） | 115 阶满养成基础属性：按流派与来源选择推导无 40 词条基线 |
 
 ## equipment（装备与数据域：备战方案、出装计算、会话数据）
 
@@ -40,10 +40,10 @@
 
 | 文档 | 内容 |
 |------|------|
-| [README.md](../../20-plans/02-profile/README.md)（仅源码检出） | 玩家档案子系统总览：四模型数据层、范围与实施路线 |
+| [03-profile-overview.md](../../20-plans/03-profile-overview.md)（仅源码检出） | 玩家档案子系统总览：四模型数据层、范围与实施路线 |
 | [01-graduation-rate.md](05-profile/01-graduation-rate.md) | 毕业率分析：角色装备 → 毕业率模型 → 展示 |
-| [02-currency-tracking.md](../../20-plans/02-profile/02-currency-tracking.md)（仅源码检出） | 货币追踪：钱袋 OCR → Profile stock 模型 |
-| [03-stamina-management.md](../../20-plans/02-profile/03-stamina-management.md)（仅源码检出） | 心力体力管理：资源监控 → 恢复预测 → 超标预警 |
+| [04-currency-tracking.md](../../20-plans/04-currency-tracking.md)（仅源码检出） | 货币追踪：钱袋 OCR → Profile stock 模型 |
+| [05-stamina-management.md](../../20-plans/05-stamina-management.md)（仅源码检出） | 心力体力管理：资源监控 → 恢复预测 → 超标预警 |
 | [04-overview-multi-columns.md](05-profile/04-overview-multi-columns.md) | 数据总览字段多选、批量新增列与列宽保持 |
 | [05-history-dialog.md](05-profile/05-history-dialog.md) | 变更记录对话框：三入口统一、筛选与聚合 |
 | [06-overview-layout-sync.md](05-profile/06-overview-layout-sync.md) | 页面结构（`profile.json`）独立成文件、手动上传下载与网页只读展示 |
@@ -52,8 +52,8 @@
 
 | 文档 | 内容 |
 |------|------|
-| [01-i18n.md](../../20-plans/03-platform/01-i18n.md)（仅源码检出） | 国际化支持框架：tr() 函数、翻译文件、UI 改造 |
-| [02-in-match-navigation.md](../../20-plans/03-platform/02-in-match-navigation.md)（仅源码检出） | 局内地图目标闭环导航与撤离：渡尘墟、觉障林等玩法通用 |
+| [07-i18n.md](../../20-plans/07-i18n.md)（仅源码检出） | 国际化支持框架：tr() 函数、翻译文件、UI 改造 |
+| [08-in-match-navigation.md](../../20-plans/08-in-match-navigation.md)（仅源码检出） | 局内地图目标闭环导航与撤离：渡尘墟、觉障林等玩法通用 |
 | [03-input-timeline.md](04-platform/03-input-timeline.md) | 输入时间线：描述严格并发的操作序列，多路手势与跨端落地 |
 | [04-execution-targets.md](04-platform/04-execution-targets.md) | 单窗口、多设备连接与显式执行目标 |
 | [05-concurrent-target-execution.md](04-platform/05-concurrent-target-execution.md) | 多执行目标并发任务、断线恢复与 Lv1 授权边界 |
@@ -62,25 +62,26 @@
 | [08-android-task-settings.md](04-platform/08-android-task-settings.md) | 手机按用户编辑任务参数与自动调律设置 |
 | [10-ai-connection.md](04-platform/10-ai-connection.md) | AI 连接配置、系统凭据存储与后台连接测试 |
 | [09-android-preset.md](04-platform/09-android-preset.md) | 官方预置、手机用户管理与同步参数保留 |
-| [12-agent-mcp.md](../../20-plans/03-platform/12-agent-mcp.md)（仅源码检出） | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 |
-| [13-agent-docs-access.md](../../20-plans/03-platform/13-agent-docs-access.md)（仅源码检出） | Agent 文档逐篇收录、目录拆分与配置文件访问清单 |
+| [09-agent-mcp.md](../../20-plans/09-agent-mcp.md)（仅源码检出） | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 |
+| [10-agent-docs-access.md](../../20-plans/10-agent-docs-access.md)（仅源码检出） | Agent 文档逐篇收录、目录拆分与配置文件访问清单 |
 | [15-android-workbench.md](04-platform/15-android-workbench.md) | Android 四页工作台、确认交互、执行历史和只读用户数据 |
 | [16-android-batch.md](04-platform/16-android-batch.md) | 手机批量配置、运行草稿、悬浮启动与方向过渡 |
 | [17-prerelease.md](04-platform/17-prerelease.md) | PEP 440 测试/候选版本与正式升级比较 |
 | [18-android-connection-recovery.md](04-platform/18-android-connection-recovery.md) | 代理与 ADB 重连、输入降级及人工恢复边界 |
 | [19-write-ownership.md](04-platform/19-write-ownership.md) | 用户执行占用、热键与 MCP 的主实例专属门禁 |
-| [20-world-map-catalog.md](../../20-plans/03-platform/20-world-map-catalog.md)（仅源码检出） | 大世界地图与地域目录、探查底图保存与预览、重叠截图拼接 |
+| [11-world-map-catalog.md](../../20-plans/11-world-map-catalog.md)（仅源码检出） | 大世界地图与地域目录、探查底图保存与预览、重叠截图拼接 |
 | [21-plugin-data.md](04-platform/21-plugin-data.md) | 插件领域数据与同步数据库声明 |
 | [22-plugin-runtime.md](04-platform/22-plugin-runtime.md) | 插件宿主运行接口与公共事件契约 |
 | [23-service-boundaries.md](04-platform/23-service-boundaries.md) | 公共服务与桌面适配边界 |
 | [24-config-policy-bootstrap.md](04-platform/24-config-policy-bootstrap.md) | 插件配置策略显式装配 |
 | [25-configuration-modules.md](04-platform/25-configuration-modules.md) | 配置、布局与组合展示职责拆分 |
-| [26-online-config-background-download.md](../../20-plans/03-platform/26-online-config-background-download.md)（仅源码检出） | 在线配置后台下载、暂存与下次启动安装 |
+| [26-online-config-background-download.md](04-platform/26-online-config-background-download.md) | 在线配置后台下载、暂存、启动校验与下次启动安装 |
 | [27-hotkeys-and-menu-shortcuts.md](04-platform/27-hotkeys-and-menu-shortcuts.md) | 键位分区：菜单快捷键、全局热键与插件键位归属 |
 | [28-account-document-sync.md](04-platform/28-account-document-sync.md) | 全局任务参数与批量配置上云：账户级文档通道、冲突不留副本与迁移 |
 | [29-feedback-channel.md](04-platform/29-feedback-channel.md) | 反馈与建议：客户端内置提交、分类与附件协议、网页管理控制台与管理员名册 |
 | [30-account-device-credential.md](04-platform/30-account-device-credential.md) | 设备 ID 作为重置密码凭据：服务端校验、预检接口与两端展示位置 |
 | [31-ui-theme-system.md](04-platform/31-ui-theme-system.md) | 桌面端三主题系统（纯白/宣纸/玄墨）、两层单一来源收口与原生标题栏同步 |
+| [32-android-channel-multitarget-recovery.md](04-platform/32-android-channel-multitarget-recovery.md) | Android 多目标通道切换、重连换绑与状态恢复：修复原则、边界与分批方案 |
 
 ## editor（编辑器域：WF 编辑器插件、任务历史、运行态与保存边界）
 

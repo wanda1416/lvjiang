@@ -1,7 +1,7 @@
 # 识别帧历史调试与异常诊断包方案
 
 > 状态：规划。下文标“拟议”的诊断FIFO、异常冻结包与反馈附件上传均未实施；另一条链路
-> （全任务采集与离线WF模拟）已落地，见[工作流模拟](../../30-design/01-architecture/09-workflows/06-workflow-simulation.md)。
+> （全任务采集与离线WF模拟）已落地，见[工作流模拟((../30-design/01-architecture/09-workflows/06-workflow-simulation.md)。
 > 合并依据：吸收外部《工作流帧调试记录（黑匣子 / Flight Recorder）详细执行方案》v1.1的动作时间线、离线查看和校准方法；诊断部分未实施。
 
 ## 1. 背景、目标与交付范围
@@ -21,14 +21,14 @@
 - 支持中途开启但不能追溯过去画面；支持手动导出、失败/人工介入前留证，以及用户主动反馈时自动准备对应证据。
 - 一个进程同时只记录一个选定执行目标的一次任务；后续任务重新建作用域，不自动混入其他角色。
 - Android App 端侧常驻历史、并行多目标同时记录不在首版交付；核心保持无 Qt 依赖，后续须另测内存再接入口。
-- 与 [AI 异常恢复方案](29-ai-exception-recovery.md) 独立，无模型调用、无自动上传；未来 AI 按用户授权选取少量帧消费，不默认发送整个包。
+- 与 [AI 异常恢复方案((29-ai-exception-recovery.md) 独立，无模型调用、无自动上传；未来 AI 按用户授权选取少量帧消费，不默认发送整个包。
 
 非目标：连续录像、复刻录屏器、云端图库、数据库索引平台、自动修游戏状态、改变无人值守策略、重写任务结果/账本。
 诊断不能代替确定性 bug 修复，也不自动点击确认、重试购买或领奖。
 
 ## 2. 当前事实与复用边界
 
-现行契约见 [工作流截图复用与诊断记录](../../30-design/02-decisions/04-platform/06-workflow-capture-reuse.md)。
+现行契约见 [工作流截图复用与诊断记录((../30-design/02-decisions/04-platform/06-workflow-capture-reuse.md)。
 该文规定最近帧及显式 PNG 留图，不含滚动队列或自动 pause 留图。本方案只规划默认关闭的增量，
 不把旧文直接改成“已支持”；实施时再同步已实现设计、接口参考与用户指南。
 
@@ -36,19 +36,19 @@
 
 | 当前事实 | 源码与符号 | 实施约束 |
 |---|---|---|
-| 每引擎仅保留最近完整帧；新 capture 增 seq，from-last 不增；clear 不重置 seq | [capture_snapshot.py](../../../src/lvjiang/workflows/capture_snapshot.py)：`CaptureSnapshotMixin.capture_frame`、`clear_capture_snapshot` | seq 不是全局视频帧号；不改变复用语义 |
-| 最近帧返回引用，非统一不可变副本 | 同文件 `get_last_capture_frame`；[WGC](../../../src/lvjiang/core/desktop/wgc_capture.py)：`capture` / `_align_to_region`；[scrcpy](../../../src/lvjiang/core/android/scrcpy_capture.py) | 后端所有权不同，异步保存必须取得稳定副本 |
-| OCR/面板/图像等在捕获图上裁 ROI 并识别 | [recognition.py](../../../src/lvjiang/workflows/base/recognition.py)：`ocr_scene`、`ocr_scene_by` 等；[vision.py](../../../src/lvjiang/workflows/builtins/vision.py)：图色识别 | 要覆盖多类识别和 from-last，不只 OCR by |
-| 面板校准也有独立捕获入口 | [engine/panel.py](../../../src/lvjiang/workflows/engine/panel.py)：`_capture_panel_image` | 核对实际图像分析消费者，不能遗漏或把所有校准预览当OCR |
-| DSL与Python工作流都能直接发输入，后端还可能追加随机偏移 | [engine/actions.py](../../../src/lvjiang/workflows/engine/actions.py)：`_send_click`、`_send_drag`、`press_keys`；[base/actions.py](../../../src/lvjiang/workflows/base/actions.py)：`click_at`、`click_region`、`drag_between`；[input/base.py](../../../src/lvjiang/core/input/base.py)：`InputBackend.click_screen` | 不能只记录DSL解析，也不能把请求坐标冒称实际落点 |
-| 显式 screenshot 可保存同帧 PNG，缺图/写失败不掩盖业务错误 | [engine/core.py](../../../src/lvjiang/workflows/engine/core.py)：`_exec_screenshot` | 原功能保留；历史包失败不影响 PNG |
-| UI 截图来自当前预览，与工作流失败帧不是同一概念 | [capture_ops.py](../../../src/lvjiang/ui/main/capture_ops.py)：手动截图路径 | 不把 UI 预览图替代异常原帧 |
-| 已有 WebP 编码能力探测与文件写法 | [layout/screenshots.py](../../../src/lvjiang/core/layout/screenshots.py)：`save_scene_screenshot` | 仅借鉴编码/路径处理，不能调用它写 debug：它会写布局资源、替换资源并返回有损解码图 |
-| 已有 scrcpy H264/PyAV 连续录像与有界队列 | [screen_recorder.py](../../../src/lvjiang/core/input/screen_recorder.py)：`ScreenRecorder` | 借鉴非阻塞准入/丢弃计数，不接视频帧率采样、不另建录像器 |
-| pause 声明异常，confirm 是普通业务是/否 | [system.py](../../../src/lvjiang/workflows/builtins/system.py)：`pause_user`、`_pause`、`_confirm` | 留证不改变回调返回值或对话框行为 |
-| 无人值守将 pause 转为退栈异常，随后运行恢复阶段；confirm 仍转发 | [unattended.py](../../../src/lvjiang/core/batch/unattended.py)：`_unattended_ui_callback`、`_recover_unattended` | 必须在抛出/导航恢复之前冻结 |
-| 批量每脚本创建引擎，任务日志有独立 run 标识 | [stages.py](../../../src/lvjiang/core/batch/stages.py)：`_run_script`；[daily.py](../../../src/lvjiang/core/history/daily.py)：`TaskRunSession` | 注入显式上下文，不读全局 active user |
-| 顶层负数/失败 dict 有统一判定函数，但批量仍有“无异常即成功”路径 | [result_protocol.py](../../../src/lvjiang/workflows/result_protocol.py)：`return_failure_message`；[scheduler.py](../../../src/lvjiang/core/batch/scheduler.py)：脚本完成收尾 | 不仅监听 Python 异常或现有 completed 标志 |
+| 每引擎仅保留最近完整帧；新 capture 增 seq，from-last 不增；clear 不重置 seq | [capture_snapshot.py((../../src/lvjiang/workflows/capture_snapshot.py)：`CaptureSnapshotMixin.capture_frame`、`clear_capture_snapshot` | seq 不是全局视频帧号；不改变复用语义 |
+| 最近帧返回引用，非统一不可变副本 | 同文件 `get_last_capture_frame`；[WGC((../../src/lvjiang/core/desktop/wgc_capture.py)：`capture` / `_align_to_region`；[scrcpy((../../src/lvjiang/core/android/scrcpy_capture.py) | 后端所有权不同，异步保存必须取得稳定副本 |
+| OCR/面板/图像等在捕获图上裁 ROI 并识别 | [recognition.py((../../src/lvjiang/workflows/base/recognition.py)：`ocr_scene`、`ocr_scene_by` 等；[vision.py((../../src/lvjiang/workflows/builtins/vision.py)：图色识别 | 要覆盖多类识别和 from-last，不只 OCR by |
+| 面板校准也有独立捕获入口 | [engine/panel.py((../../src/lvjiang/workflows/engine/panel.py)：`_capture_panel_image` | 核对实际图像分析消费者，不能遗漏或把所有校准预览当OCR |
+| DSL与Python工作流都能直接发输入，后端还可能追加随机偏移 | [engine/actions.py((../../src/lvjiang/workflows/engine/actions.py)：`_send_click`、`_send_drag`、`press_keys`；[base/actions.py((../../src/lvjiang/workflows/base/actions.py)：`click_at`、`click_region`、`drag_between`；[input/base.py((../../src/lvjiang/core/input/base.py)：`InputBackend.click_screen` | 不能只记录DSL解析，也不能把请求坐标冒称实际落点 |
+| 显式 screenshot 可保存同帧 PNG，缺图/写失败不掩盖业务错误 | [engine/core.py((../../src/lvjiang/workflows/engine/core.py)：`_exec_screenshot` | 原功能保留；历史包失败不影响 PNG |
+| UI 截图来自当前预览，与工作流失败帧不是同一概念 | [capture_ops.py((../../src/lvjiang/ui/main/capture_ops.py)：手动截图路径 | 不把 UI 预览图替代异常原帧 |
+| 已有 WebP 编码能力探测与文件写法 | [layout/screenshots.py((../../src/lvjiang/core/layout/screenshots.py)：`save_scene_screenshot` | 仅借鉴编码/路径处理，不能调用它写 debug：它会写布局资源、替换资源并返回有损解码图 |
+| 已有 scrcpy H264/PyAV 连续录像与有界队列 | [screen_recorder.py((../../src/lvjiang/core/input/screen_recorder.py)：`ScreenRecorder` | 借鉴非阻塞准入/丢弃计数，不接视频帧率采样、不另建录像器 |
+| pause 声明异常，confirm 是普通业务是/否 | [system.py((../../src/lvjiang/workflows/builtins/system.py)：`pause_user`、`_pause`、`_confirm` | 留证不改变回调返回值或对话框行为 |
+| 无人值守将 pause 转为退栈异常，随后运行恢复阶段；confirm 仍转发 | [unattended.py((../../src/lvjiang/core/batch/unattended.py)：`_unattended_ui_callback`、`_recover_unattended` | 必须在抛出/导航恢复之前冻结 |
+| 批量每脚本创建引擎，任务日志有独立 run 标识 | [stages.py((../../src/lvjiang/core/batch/stages.py)：`_run_script`；[daily.py((../../src/lvjiang/core/history/daily.py)：`TaskRunSession` | 注入显式上下文，不读全局 active user |
+| 顶层负数/失败 dict 有统一判定函数，但批量仍有“无异常即成功”路径 | [result_protocol.py((../../src/lvjiang/workflows/result_protocol.py)：`return_failure_message`；[scheduler.py((../../src/lvjiang/core/batch/scheduler.py)：脚本完成收尾 | 不仅监听 Python 异常或现有 completed 标志 |
 
 ## 3. 模块责任与装配方式（拟议）
 
@@ -64,8 +64,8 @@
 | 诊断触发与状态展示 | builtins/system、引擎错误/退出适配、run_control 与批量退出适配 | 用弹窗阻塞导出、吞异常、自动回答 confirm |
 | 偏好入口 | 现有配置模型/读取/保存及设置页 | 新账号系统、独立配置仓库、云端同步 debug 图 |
 
-运行上下文依据（仅源码检出）：[execution_runs.py](../../../src/lvjiang/ui/main/execution_runs.py)：`ExecutionRunContext`；
-[batch/models.py](../../../src/lvjiang/core/batch/models.py)：`BatchContext`。
+运行上下文依据（仅源码检出）：[execution_runs.py((../../src/lvjiang/ui/main/execution_runs.py)：`ExecutionRunContext`；
+[batch/models.py((../../src/lvjiang/core/batch/models.py)：`BatchContext`。
 诊断FIFO拟议依赖仍未加入；全量采集只服务 CLI 与显式宿主（见第20节链接），不把UI类型引入core。
 GUI 侧另有独立的「任务诊断」开发预览（`BatchContext.diagnostics`，只做内存最近帧、无导出），与本文诊断FIFO不是同一实现。
 
@@ -108,10 +108,10 @@ GUI 侧另有独立的「任务诊断」开发预览（`BatchContext.diagnostics
 如实现时复用enabled字段，它也只能是本次运行字段，不能保存为跨重启自动采集开关。
 复用UserConfig/load_user_config/save_settings作偏好装配、字段级更新，明确排除云端同步；不读写游戏业务参数。
 
-现有入口（仅源码检出）：[models.py](../../../src/lvjiang/core/config/models.py)：`UserConfig`；
-[config/__init__.py](../../../src/lvjiang/core/config/__init__.py)：`load_user_config`；
-[session.py](../../../src/lvjiang/core/config/session.py)：`save_settings`；
-[settings/dialog.py](../../../src/lvjiang/ui/settings/dialog.py)：`SettingsDialog`。
+现有入口（仅源码检出）：[models.py((../../src/lvjiang/core/config/models.py)：`UserConfig`；
+[config/__init__.py((../../src/lvjiang/core/config/__init__.py)：`load_user_config`；
+[session.py((../../src/lvjiang/core/config/session.py)：`save_settings`；
+[settings/dialog.py((../../src/lvjiang/ui/settings/dialog.py)：`SettingsDialog`。
 这些入口尚无本文调试选项；运行区动作也须新增，不能把现有“反馈与建议”误认为已有任务证据入口。
 
 ### 4.2 工程候选值，不是性能承诺
@@ -417,7 +417,7 @@ UTF-8、中文不转义、两空格JSON、末尾换行，实际写出后再按�
   原任务照常失败/恢复，已有显式PNG照常保留。可用同帧PNG能力降级，但不得重新capture冒充异常图。
 - 无图也能输出说明原因的metadata-only partial包；若包写不出来只输出诊断失败日志，不再抛业务异常。
 
-实现借鉴（仅源码检出）：[history/transfer.py](../../../src/lvjiang/core/history/transfer.py)：`export_history` 的manifest/路径校验，
+实现借鉴（仅源码检出）：[history/transfer.py((../../src/lvjiang/core/history/transfer.py)：`export_history` 的manifest/路径校验，
 但不要导出其数据库记录或把诊断环加入history同步通道。
 
 ## 11. 隐私与非上传边界
@@ -432,10 +432,10 @@ UTF-8、中文不转义、两空格JSON、末尾换行，实际写出后再按�
 - 不为“脱敏”删掉页面名、ROI、预期/实际OCR、游戏内角色/物品等必要诊断信息；用户主动上报时允许保留这些画面/上下文。
   仅继续排除程序已知的密码/token等秘密字段；不自动模糊原图。业务可通过通用hook标记不宜记录的输入阶段，但不强制用户逐图审核通过。
 - 图像不是自动脱敏的。文本regex不能保证屏幕秘密被遮住，不能宣称开启debug后分享天然安全。
-- [feedback/redact.py](../../../src/lvjiang/core/feedback/redact.py)：`redact_text` 与
-  [feedback/logtail.py](../../../src/lvjiang/core/feedback/logtail.py)：`read_excerpt` 可复用脱敏/限量思路（仅源码检出），
+- [feedback/redact.py((../../src/lvjiang/core/feedback/redact.py)：`redact_text` 与
+  [feedback/logtail.py((../../src/lvjiang/core/feedback/logtail.py)：`read_excerpt` 可复用脱敏/限量思路（仅源码检出），
   不为了脱敏额外读取账户凭据；测试必须传合成身份或隔离来源。
-- 现有[反馈限制](../../../src/lvjiang/core/feedback/limits.py)（仅源码检出）是最多10张截图、12附件，单件gzip后900,000B；
+- 现有[反馈限制((../../src/lvjiang/core/feedback/limits.py)（仅源码检出）是最多10张截图、12附件，单件gzip后900,000B；
   本地100帧ZIP不是已支持的反馈附件。仅缓存阶段不动通道；本轮新增主动反馈阶段须按第18节联动改造，不能默默丢包或自动发送。
 
 ## 12. 代码改动清单与分阶段任务
@@ -444,49 +444,49 @@ UTF-8、中文不转义、两空格JSON、末尾换行，实际写出后再按�
 
 ### 阶段0：离线参数校准（不读取真实用户数据作为默认测试）
 
-- [ ] 按第14.3节，用明确授权、可保存为隔离fixture的样本做一次性矩阵，产物保留原始测量，不改产品识别输入。
-- [ ] 明确目标分辨率、小字质量与候选性能门槛，选出一个首版档位；无证据时沿用不缩放基线，不把附件数字写成实测。
+- [ ( 按第14.3节，用明确授权、可保存为隔离fixture的样本做一次性矩阵，产物保留原始测量，不改产品识别输入。
+- [ ( 明确目标分辨率、小字质量与候选性能门槛，选出一个首版档位；无证据时沿用不缩放基线，不把附件数字写成实测。
 
 ### 阶段A：手动诊断闭环
 
-- [ ] 新增两个诊断模块及最小数据模型，关闭状态不启动worker；实现raw/编码/元数据预算与单worker背压。
-- [ ] 在CaptureSnapshotMixin补捕获元数据，保持source/seq/from-last/清空语义；识别入口统一begin/end，补齐颜色/last消费者。
-- [ ] 公共输入派发补有界ActionEvent，核对DSL与Python路径不双计、请求坐标/后端偏移/实际派发语义准确。
-- [ ] 在ExecutionRunContext及BatchContext显式装配可选recorder，按run/target/engine隔离；每次脚本创建/销毁有确定归属。
-- [ ] 配置模型/load_user_config/save_settings仅保存本机容量画质偏好；运行区增加显式本次任务/批量开启、中途启停、记录状态和手动导出。
-- [ ] 新增UI词条按项目既有i18n规范与实际语言清单处理；不把附件中未经复核的固定语言数量写成验收事实。
-- [ ] 实现单导出、冻结截止、统一离线index查看器、manifest、包quota/原子落盘；按always/on_issue策略收尾，未开启不补图。
-- [ ] 按第14.3节复核原始/压后OCR与人工真值、延迟/CPU/峰值内存及小字可读性，确定候选是否可用；不读取真实用户配置。
+- [ ( 新增两个诊断模块及最小数据模型，关闭状态不启动worker；实现raw/编码/元数据预算与单worker背压。
+- [ ( 在CaptureSnapshotMixin补捕获元数据，保持source/seq/from-last/清空语义；识别入口统一begin/end，补齐颜色/last消费者。
+- [ ( 公共输入派发补有界ActionEvent，核对DSL与Python路径不双计、请求坐标/后端偏移/实际派发语义准确。
+- [ ( 在ExecutionRunContext及BatchContext显式装配可选recorder，按run/target/engine隔离；每次脚本创建/销毁有确定归属。
+- [ ( 配置模型/load_user_config/save_settings仅保存本机容量画质偏好；运行区增加显式本次任务/批量开启、中途启停、记录状态和手动导出。
+- [ ( 新增UI词条按项目既有i18n规范与实际语言清单处理；不把附件中未经复核的固定语言数量写成验收事实。
+- [ ( 实现单导出、冻结截止、统一离线index查看器、manifest、包quota/原子落盘；按always/on_issue策略收尾，未开启不补图。
+- [ ( 按第14.3节复核原始/压后OCR与人工真值、延迟/CPU/峰值内存及小字可读性，确定候选是否可用；不读取真实用户配置。
 
 阶段A出口：不需异常触发也能手动取得正确、有界、可读的本地包；禁用时原产品路径不变。
 
 ### 阶段B：异常与人工交互触发
 
-- [ ] 复核/单独修复已知批量业务失败误判成功问题；记录明确验收，不把诊断上线等同其修复。
-- [ ] builtins/system在confirm/pause回调前发通用诊断事件，保持native/Qt两条原路径及返回值。
-- [ ] 引擎`_report_statement_failure`、退出结果适配覆盖错误；留意WorkflowAbort与UnattendedInterrupt并非都经过语句报错。
-- [ ] 单次run_control与批量scheduler使用一致顶层结果判定观察，重复原因合并，不扩展成扫描所有collect值。
-- [ ] 实现关键帧pending/in-flight收尾、deadline后的partial与迟到结果隔离，恢复导航不得改写冻结现场。
-- [ ] 定向回归货运商店返回失败、人工继续和无人值守恢复：图像留证不改变购买、领奖、完成记账或任务重试次数。
+- [ ( 复核/单独修复已知批量业务失败误判成功问题；记录明确验收，不把诊断上线等同其修复。
+- [ ( builtins/system在confirm/pause回调前发通用诊断事件，保持native/Qt两条原路径及返回值。
+- [ ( 引擎`_report_statement_failure`、退出结果适配覆盖错误；留意WorkflowAbort与UnattendedInterrupt并非都经过语句报错。
+- [ ( 单次run_control与批量scheduler使用一致顶层结果判定观察，重复原因合并，不扩展成扫描所有collect值。
+- [ ( 实现关键帧pending/in-flight收尾、deadline后的partial与迟到结果隔离，恢复导航不得改写冻结现场。
+- [ ( 定向回归货运商店返回失败、人工继续和无人值守恢复：图像留证不改变购买、领奖、完成记账或任务重试次数。
 
 阶段B出口：失败/人工介入前即可冻结，能说明缺失而非伪造完整；没有新阻塞、自动确认或账本写入。
 
 ### 阶段C：任务关联与用户主动反馈（本轮新增必要交付）
 
-- [ ] 按第15—19节复用task_run_id/batch_run_id，补轻量诊断摘要与本地原子索引，不新建数据库。
-- [ ] 支持本次任务/本次批量及中途启停，跨重启不自动恢复采集；任务历史显示正交诊断状态。
-- [ ] 从失败行/任务历史打开FeedbackDialog，自动准备对应任务日志与选定incident包，显示清单、查看/移除与截图提示。
-- [ ] 客户端、Worker与控制台联动实现有界分块，不能把12MB ZIP直接塞进当前900KB附件；保留日志/关键帧显式降级。
-- [ ] 本地回执、固定seq补传、取消/重试、pinning与跨重启恢复验收；只随用户提交发送，不后台重试。
+- [ ( 按第15—19节复用task_run_id/batch_run_id，补轻量诊断摘要与本地原子索引，不新建数据库。
+- [ ( 支持本次任务/本次批量及中途启停，跨重启不自动恢复采集；任务历史显示正交诊断状态。
+- [ ( 从失败行/任务历史打开FeedbackDialog，自动准备对应任务日志与选定incident包，显示清单、查看/移除与截图提示。
+- [ ( 客户端、Worker与控制台联动实现有界分块，不能把12MB ZIP直接塞进当前900KB附件；保留日志/关键帧显式降级。
+- [ ( 本地回执、固定seq补传、取消/重试、pinning与跨重启恢复验收；只随用户提交发送，不后台重试。
 
 阶段C出口：本地包ready与服务端附件received分别可见；用户一次提交即可携带证据，失败仍能在本机重试。
 
 ### 阶段D：按证据完善，不作为首版前置
 
-- [ ] 若真实样本小字普遍不可读，再评估限额内附异常原图/关键ROI，不为每帧默认复制多份；MAD只先验证分组，不默认丢图。
-- [ ] 若确有并行目标需求，再设计共享进程总预算与公平准入；Android端侧复用前先测内存/退出边界。
-- [ ] AI消费、并行目标等额外能力另行授权；主动反馈按阶段C交付，不把debug开启当上传授权。
-- [ ] 实施后同步现行设计/参考/用户指南，将本规划的阶段状态如实更新，backlog仍是唯一待办来源。
+- [ ( 若真实样本小字普遍不可读，再评估限额内附异常原图/关键ROI，不为每帧默认复制多份；MAD只先验证分组，不默认丢图。
+- [ ( 若确有并行目标需求，再设计共享进程总预算与公平准入；Android端侧复用前先测内存/退出边界。
+- [ ( AI消费、并行目标等额外能力另行授权；主动反馈按阶段C交付，不把debug开启当上传授权。
+- [ ( 实施后同步现行设计/参考/用户指南，将本规划的阶段状态如实更新，backlog仍是唯一待办来源。
 
 建议新增定向测试位置（尚不存在，不应建空用例凑数）：
 `tests/core/diagnostics/` 下覆盖缓存与导出；`tests/workflows/`补观察来源/交互冻结；
@@ -598,7 +598,7 @@ WebP q75/q65及JPEG q75。参数组合是候选，不是同时提供多套运行
 UI文案区分两种操作，不把它们写回批量配置组。无图/中途开始/丢帧/导出暂停区间都是覆盖信息，
 不是自动化业务失败。批次勾选跳过的任务目前不会创建TaskRunSession，不为debug伪造执行历史。
 开启时可选落盘策略也只作用于本次范围，不写入批量配置组或跨重启恢复；未来CLI仅可把同一运行选项传入，
-不能单独建第三套逻辑。现有[task_cli.py](../../../src/lvjiang/core/task_cli.py)尚无本文开关（仅源码检出），CLI适配非首版前置。
+不能单独建第三套逻辑。现有[task_cli.py((../../src/lvjiang/core/task_cli.py)尚无本文开关（仅源码检出），CLI适配非首版前置。
 
 ### 15.2 身份只保留必要层级
 
@@ -618,10 +618,10 @@ UI文案区分两种操作，不把它们写回批量配置组。无图/中途�
 如果任务历史写入失败，先分配/保留本次运行ID供UI与诊断共用，再尝试持久化；标history_unavailable，
 不因记录失败阻止业务，也不能宣称不存在的历史行/日志已保存。
 
-依据（仅源码检出）：[daily.py](../../../src/lvjiang/core/history/daily.py)：`TaskRunRecord`、`BatchRunRecord`、
-`TaskRunSession`、`try_create_task_run`；[run_control.py](../../../src/lvjiang/ui/main/run_control.py)：单次历史创建；
-[scheduler.py](../../../src/lvjiang/core/batch/scheduler.py)：按脚本创建子任务；
-[daily_history_dialog.py](../../../src/lvjiang/ui/daily_history_dialog.py)：按record.log_path显示日志、按batch_run_id下钻。
+依据（仅源码检出）：[daily.py((../../src/lvjiang/core/history/daily.py)：`TaskRunRecord`、`BatchRunRecord`、
+`TaskRunSession`、`try_create_task_run`；[run_control.py((../../src/lvjiang/ui/main/run_control.py)：单次历史创建；
+[scheduler.py((../../src/lvjiang/core/batch/scheduler.py)：按脚本创建子任务；
+[daily_history_dialog.py((../../src/lvjiang/ui/daily_history_dialog.py)：按record.log_path显示日志、按batch_run_id下钻。
 
 ### 15.3 复用现有历史库，只加最小本地摘要
 
@@ -691,9 +691,9 @@ manual confirm标人工交互并可有包，不能因此把任务判失败；有
 这些都需要补齐，不能把现有“补传附件”按钮当跨重启可靠恢复。
 
 依据（均仅源码检出）：
-[FeedbackDialog](../../../src/lvjiang/ui/notices/feedback_dialog.py)：`__init__`、`_refresh_log_state`、`_attachments`、`_submit`、`_retry_attachments`、`_save_draft`、`reject`；
-[反馈客户端](../../../src/lvjiang/core/feedback/client.py)：`submit_feedback`、`upload_attachments`；
-[日志摘录](../../../src/lvjiang/core/feedback/logtail.py)：`read_excerpt`。
+[FeedbackDialog((../../src/lvjiang/ui/notices/feedback_dialog.py)：`__init__`、`_refresh_log_state`、`_attachments`、`_submit`、`_retry_attachments`、`_save_draft`、`reject`；
+[反馈客户端((../../src/lvjiang/core/feedback/client.py)：`submit_feedback`、`upload_attachments`；
+[日志摘录((../../src/lvjiang/core/feedback/logtail.py)：`read_excerpt`。
 
 ### 17.2 推荐交互链路
 
@@ -740,11 +740,11 @@ manual confirm标人工交互并可有包，不能因此把任务判失败；有
 
 ### 18.1 不能直接上传的代码事实
 
-独立server的[src/feedback.mjs](../../../server/src/feedback.mjs)现限定：总12附件、截图10、日志1、diagnostics体检文本1；
+独立server的[src/feedback.mjs((../../server/src/feedback.mjs)现限定：总12附件、截图10、日志1、diagnostics体检文本1；
 单件存储payload最多900,000B，MIME仅PNG/JPEG/WebP/text/plain，**不接受ZIP**。
-[src/worker.mjs](../../../server/src/worker.mjs)对attach请求上限1,800,000B，对submit清单262,144B；
-[src/console.mjs](../../../server/src/console.mjs)按件取payload；
-[ConsoleView](../../../server/web/src/views/ConsoleView.tsx)对非image按文本展示，不能直接显示二进制包。
+[src/worker.mjs((../../server/src/worker.mjs)对attach请求上限1,800,000B，对submit清单262,144B；
+[src/console.mjs((../../server/src/console.mjs)按件取payload；
+[ConsoleView((../../server/web/src/views/ConsoleView.tsx)对非image按文本展示，不能直接显示二进制包。
 均仅源码检出，server是独立仓；本轮未改server。这些是项目当前限制，不代表本轮已核实的平台最大额度。
 
 12MB ZIP不能一次塞进900KB单件，WebP再gzip也不能保证足够变小；把100帧当100个screenshot也会超过数量限制。
@@ -838,8 +838,8 @@ UI可以关闭/保留job但不能销毁仍运行的QThread，晚到回执只更�
 
 全任务采集与动作驱动的离线WF模拟是另一个用途：它从启用起不轮转开头，任何丢记录/限额/编码失败
 都标不完整，不与本文诊断FIFO共用丢弃策略。实现现状、工具入口、夹具标注流程与未支持能力见
-[全任务采集与离线工作流模拟工具](../../30-design/01-architecture/09-workflows/06-workflow-simulation.md)，
+[全任务采集与离线工作流模拟工具((../30-design/01-architecture/09-workflows/06-workflow-simulation.md)，
 不在本层重复展开。
 
-本文其余各节只规划诊断FIFO、异常冻结包与反馈附件上传；AI接管仍按[AI异常恢复方案](29-ai-exception-recovery.md)规划，
+本文其余各节只规划诊断FIFO、异常冻结包与反馈附件上传；AI接管仍按[AI异常恢复方案((29-ai-exception-recovery.md)规划，
 均不因模拟基础存在而勾完成。

@@ -2,7 +2,7 @@
 
 这是第一块清单板（``LINGER_BOARD``）。对外仍是：读清单、读写某个用户的记录、
 合成进度。入账在 :mod:`.booking`，默认关闭。板身份见
-``docs/20-plans/02-profile/04-linger-checklist.md``。
+``docs/20-plans/06-linger-checklist.md``。
 """
 from __future__ import annotations
 

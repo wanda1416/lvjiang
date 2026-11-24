@@ -220,5 +220,5 @@ return 0
 
 | 文档 | 内容 |
 |------|------|
-| [玩家档案系统总览](../../../20-plans/02-profile/README.md) | 玩家档案系统总览 |
+| [玩家档案系统总览](../../../20-plans/03-profile-overview.md) | 玩家档案系统总览 |
 | [01-auto-tuning.md](../../../30-design/02-decisions/06-tuning/01-auto-tuning.md) | 自动调律（装备数据模型参考） |

@@ -64,7 +64,7 @@ quota / regen / stock / note 四类定义、SQLite 持久化、周期派生值�
 | 同步协议与账户（契约 C） | [02-profile-and-account.md](../../../40-reference/04-sync/02-profile-and-account.md) |
 | 总览页面结构与布局同步、历史对话框交互 | [06-overview-layout-sync.md](../../02-decisions/05-profile/06-overview-layout-sync.md)、[05-history-dialog.md](../../02-decisions/05-profile/05-history-dialog.md) |
 | v1.1 旧协议（已被 08 取代，仅作历史） | [07-set-only-v1.1.md](../../02-decisions/05-profile/07-set-only-v1.1.md) |
-| 业务需求与目标（规划层，尚未全部实现，状态可能滞后） | `docs/20-plans/02-profile/`（仅源码检出，不随包发布） |
+| 业务需求与目标（规划层，尚未全部实现，状态可能滞后） | `docs/20-plans/03-profile-overview.md`（仅源码检出，不随包发布） |
 
 ## 模块边界
 

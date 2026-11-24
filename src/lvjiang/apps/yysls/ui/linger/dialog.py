@@ -1,7 +1,7 @@
 """袅袅之音清单窗口：按地区勾选常驻来源，记录每个角色已拿多少枚。
 
 记录写 ``users/<用户名>.linger.json``；勾选同时按差额入账到 Profile（开关可关），
-细节见 ``docs/20-plans/02-profile/04-linger-checklist.md``。
+细节见 ``docs/20-plans/06-linger-checklist.md``。
 
 「每一枚对应一个具体对手」的条目（``named``）点行即可原地展开子项，逐位勾选并填
 名字——不另开窗口，展开后仍能对照上下条目。

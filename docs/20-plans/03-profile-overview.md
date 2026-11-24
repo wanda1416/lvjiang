@@ -24,14 +24,14 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 | 子需求 | 文档 | 核心能力 | 优先级 | 状态 |
 |--------|------|----------|--------|------|
 | 玩家数据模型 | 本文档 §3-§7 | quota/regen/stock/note 四模型 + SQLite + UI | P0 | ✅ 已完成 |
-| 毕业率分析 | [01-graduation-rate.md](../../30-design/02-decisions/05-profile/01-graduation-rate.md) | 角色装备 → 毕业率模型 → 毕业率展示 | P2 | ✅ 已实现（实现方式与子文档早期方案不同） |
-| 货币追踪 | [02-currency-tracking.md](02-currency-tracking.md) | 钱袋 OCR 识别 → Profile stock 模型 | P1 | ✅ 已实现（实现方式与子文档早期方案不同） |
-| 心力体力管理 | [03-stamina-management.md](03-stamina-management.md) | 资源监控 → 恢复预测 → 超标预警 | P0 | ✅ 已完成（基础框架） |
-| 袅袅之音清单 | [04-linger-checklist.md](04-linger-checklist.md) | 常驻来源清单 → `.linger.json`，可选入账；第一块清单板 | P2 | ✅ 记录与入账已实现（批量补入账、第二块板未做） |
-| 总览多列与历史 | [04-overview-multi-columns.md](../../30-design/02-decisions/05-profile/04-overview-multi-columns.md)、[05-history-dialog.md](../../30-design/02-decisions/05-profile/05-history-dialog.md) | 表头批量加列、变更记录对话框 | P1 | ✅ 已实现 |
-| 页面结构与搬运 | [06-overview-layout-sync.md](../../30-design/02-decisions/05-profile/06-overview-layout-sync.md) | 分组/列/列宽独立成 `profile.json`，手动上传下载 + 网页只读展示 | P1 | ✅ 已实现 |
-| 同步模型 v1.1（set-only） | [07-set-only-v1.1.md](../../30-design/02-decisions/05-profile/07-set-only-v1.1.md) | 账本只同步绝对值 set，周期变化在读取时计算 | P0 | ✅ 已实现（历史方案，已被 v1.2 取代） |
-| 同步模型 v1.2（当前） | [08-profile-sync.md](../../30-design/02-decisions/05-profile/08-profile-sync.md) | 类型三分类（set/reset/regen/meta）、水位门、meta 锁传播、delta 拒绝 | P0 | ✅ 已实现并上线 |
+| 毕业率分析 | [01-graduation-rate.md](../30-design/02-decisions/05-profile/01-graduation-rate.md) | 角色装备 → 毕业率模型 → 毕业率展示 | P2 | ✅ 已实现（实现方式与子文档早期方案不同） |
+| 货币追踪 | [02-currency-tracking.md](04-currency-tracking.md) | 钱袋 OCR 识别 → Profile stock 模型 | P1 | ✅ 已实现（实现方式与子文档早期方案不同） |
+| 心力体力管理 | [03-stamina-management.md](05-stamina-management.md) | 资源监控 → 恢复预测 → 超标预警 | P0 | ✅ 已完成（基础框架） |
+| 袅袅之音清单 | [04-linger-checklist.md](06-linger-checklist.md) | 常驻来源清单 → `.linger.json`，可选入账；第一块清单板 | P2 | ✅ 记录与入账已实现（批量补入账、第二块板未做） |
+| 总览多列与历史 | [04-overview-multi-columns.md](../30-design/02-decisions/05-profile/04-overview-multi-columns.md)、[05-history-dialog.md](../30-design/02-decisions/05-profile/05-history-dialog.md) | 表头批量加列、变更记录对话框 | P1 | ✅ 已实现 |
+| 页面结构与搬运 | [06-overview-layout-sync.md](../30-design/02-decisions/05-profile/06-overview-layout-sync.md) | 分组/列/列宽独立成 `profile.json`，手动上传下载 + 网页只读展示 | P1 | ✅ 已实现 |
+| 同步模型 v1.1（set-only） | [07-set-only-v1.1.md](../30-design/02-decisions/05-profile/07-set-only-v1.1.md) | 账本只同步绝对值 set，周期变化在读取时计算 | P0 | ✅ 已实现（历史方案，已被 v1.2 取代） |
+| 同步模型 v1.2（当前） | [08-profile-sync.md](../30-design/02-decisions/05-profile/08-profile-sync.md) | 类型三分类（set/reset/regen/meta）、水位门、meta 锁传播、delta 拒绝 | P0 | ✅ 已实现并上线 |
 
 ### 2.1 已完成功能（v0.2.0+）
 
@@ -130,7 +130,7 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 ## 3. 架构与存储（见实现文档）
 
 模块划分、数据流、`profile.yaml` / `profile.db` / `profile.json` 的存储契约与 schema
-版本演进全部登记在 [Profile 共享模块](../../30-design/01-architecture/03-models/04-profile.md)，
+版本演进全部登记在 [Profile 共享模块](../30-design/01-architecture/03-models/04-profile.md)，
 本节不复制。需求层只保留三条约束：
 
 - **定义是用户的资产**：`profile.yaml` 只增改不删除；读取到无法解释的条目必须原样保留
@@ -163,7 +163,7 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 - 双击 cell 编辑（计算 delta，走 action 路径）
 - 单元格右键可覆写、查看该用户对当前 key 的历史；列头右键可查看所有用户对
   当前 key 的历史；工具栏「历史记录」查看整个账本。三个入口共用同一个对话框，
-  入口只决定预先填好的筛选条件（见 [05-history-dialog.md](../../30-design/02-decisions/05-profile/05-history-dialog.md)）
+  入口只决定预先填好的筛选条件（见 [05-history-dialog.md](../30-design/02-decisions/05-profile/05-history-dialog.md)）
 - 历史对话框提供关键词与时间范围、每列一个聚合筛选行（默认前 20 项，其余输入
   模糊查找）、任意页跳转；筛选不锁定，入口范围可一键恢复
 - 列头拖拽调整顺序和宽度
@@ -225,7 +225,7 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 运行中的任务或未完成的 Profile 脚本队列必须先结束，再执行重命名。
 工作流与变更脚本中的字符串引用不扫描、不自动替换，用户需自行核对和调整。
 此能力从 v0.13.12 起正式提供；存储与恢复细节见
-[Profile 共享模块](../../30-design/01-architecture/03-models/04-profile.md)。
+[Profile 共享模块](../30-design/01-architecture/03-models/04-profile.md)。
 
 ### 4.5 待实现 UI
 
@@ -330,10 +330,10 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 | 文档 | 内容 |
 |------|------|
 | 本文档 | 玩家档案系统需求总览 |
-| [01-graduation-rate.md](../../30-design/02-decisions/05-profile/01-graduation-rate.md) | 毕业率分析子需求 |
-| [02-currency-tracking.md](02-currency-tracking.md) | 货币追踪子需求 |
-| [03-stamina-management.md](03-stamina-management.md) | 心力体力管理子需求 |
-| [05-history-dialog.md](../../30-design/02-decisions/05-profile/05-history-dialog.md) | 变更记录对话框：三入口统一、筛选与聚合 |
-| [README.md](../README.md) | 计划层索引（原需求文档已按状态分流） |
+| [01-graduation-rate.md](../30-design/02-decisions/05-profile/01-graduation-rate.md) | 毕业率分析子需求 |
+| [02-currency-tracking.md](04-currency-tracking.md) | 货币追踪子需求 |
+| [03-stamina-management.md](05-stamina-management.md) | 心力体力管理子需求 |
+| [05-history-dialog.md](../30-design/02-decisions/05-profile/05-history-dialog.md) | 变更记录对话框：三入口统一、筛选与聚合 |
+| [README.md](README.md) | 计划层索引（原需求文档已按状态分流） |
 
-- [04-overview-multi-columns.md](../../30-design/02-decisions/05-profile/04-overview-multi-columns.md)：总览多列配置与状态边界。
+- [04-overview-multi-columns.md](../30-design/02-decisions/05-profile/04-overview-multi-columns.md)：总览多列配置与状态边界。

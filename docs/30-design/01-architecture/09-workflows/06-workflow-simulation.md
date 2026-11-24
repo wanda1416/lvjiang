@@ -26,7 +26,7 @@
 | 图像 | 有损 WebP 诊断副本（候选参数，未校准） | 无损 PNG，保留识别像素 |
 | 产物 | 当前仅内存帧与元数据；incident ZIP/查看器尚未实现 | 原始 tape + 人工侧车 → 状态图 fixture → 覆盖报表 |
 | 资源 | 内存环，受编码与元数据预算约束 | 流式落盘，磁盘 512MB / 原图 32MB / 单编码 worker |
-| 文档归属 | [诊断方案](../../../20-plans/03-platform/30-debug-frame-history.md)（仅源码检出） | 本页（30-design，已实现） |
+| 文档归属 | [诊断方案](../../../20-plans/13-debug-frame-history.md)（仅源码检出） | 本页（30-design，已实现） |
 
 ## 3. 实现结构
 
@@ -112,7 +112,7 @@ WF哈希、帧/事件计数、事件流SHA256及Python/OpenCV/numpy环境版本�
 - 计数器、队列、元数据均有界；源码对象/编码器临时内存、Python对象开销另计，50 MB不是总RSS。并行任务各有预算；宿主只保留最近启动任务的缓存，其他任务退出后释放，不能把每任务配额当全程序内存上限。
 - worker在任务线程退出前最多等待2秒收尾，超时丢弃排队帧及迟到结果并标记incomplete，不能强杀原生编码调用。业务completed/failed/cancelled单独记录；采集错误不改变返回值、不自动确认弹窗。
 - 当前通过宿主`_task_diagnostics.latest.snapshot()`查看有界元数据/丢帧统计，`frames()`取得只读WebP和关联元数据；调用方若额外保留这些对象，其内存自负。封口日志记录任务ID、scope、帧数、字节和丢帧原因。
-- 不落盘、不生成ZIP、不上传；退出即清空。异常包、反馈收集仍是[后续诊断方案](../../../20-plans/03-platform/30-debug-frame-history.md)（仅源码检出），本次不扩展。此有损缓存不适合作为全任务模拟fixture。
+- 不落盘、不生成ZIP、不上传；退出即清空。异常包、反馈收集仍是[后续诊断方案](../../../20-plans/13-debug-frame-history.md)（仅源码检出），本次不扩展。此有损缓存不适合作为全任务模拟fixture。
 - 离屏Qt真实WorkflowWorker/BatchScheduler、真实引擎与合成OCR场景已验证装配；未连接真机，未测量Windows录制负载/游戏小字质量。
 
 ## 6. 录完后标注和转换
@@ -240,7 +240,7 @@ Windows将解释器路径换为 `.venv\Scripts\python.exe`。以下数字均为�
 
 外部曾提出 v1.0「一次录制 → 状态机建模 → 多进程并行回放」方案。本表只落定**采纳/不采纳**；
 标「未实装」的条目已按优先级移到
-[离线 WF 模拟的回归门禁增强（计划）](../../../20-plans/03-platform/31-wf-simulation-hardening.md)（仅源码检出），
+[离线 WF 模拟的回归门禁增强（计划）](../../../20-plans/14-wf-simulation-hardening.md)（仅源码检出），
 本层不重复写计划、也不把它们当已有能力：
 
 | 外部建议 | 处置 | 理由与现状 |
@@ -274,5 +274,5 @@ Windows将解释器路径换为 `.venv\Scripts\python.exe`。以下数字均为�
 5. 用真实中文游戏画面和Windows测量OCR、小字保真、采集吞吐/队列、峰值RSS/磁盘/并行上限。尚未做此测量，不承诺性能或成功率。
 
 没有真机fixture时，第3步真实采集、第4步全部领域能力及第5步不可勾完成；本次实现不代表100帧诊断FIFO、
-自动反馈上传或AI恢复已完成。[计划](../../../20-plans/03-platform/31-wf-simulation-hardening.md)（仅源码检出）
+自动反馈上传或AI恢复已完成。[计划](../../../20-plans/14-wf-simulation-hardening.md)（仅源码检出）
 里的门禁增强、OCR 缓存档、宽容匹配档与差异图也都还没实装，不能当现状。

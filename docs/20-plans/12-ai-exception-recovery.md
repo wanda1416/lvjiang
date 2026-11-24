@@ -19,8 +19,8 @@
 - 遇到任意异常自动接管，包括鉴权/配置错误、设备断连、用户停止、账本冲突及交易状态不明。
 - 保存和恢复任意 DSL 指令快照，或任务退出后盲目重跑整项任务。
 
-已有无人值守规则见[无人值守批量](../../30-design/02-decisions/01-batch/03-unattended-batch.md)，
-已有 AI 请求边界见[AI 连接与请求边界](../../70-agent/05-ai-connection.md)。
+已有无人值守规则见[无人值守批量](../30-design/02-decisions/01-batch/03-unattended-batch.md)，
+已有 AI 请求边界见[AI 连接与请求边界](../70-agent/05-ai-connection.md)。
 本文只定义待实施的增量，不改变这些功能的现行契约。
 
 ## 2. 现有能力与待补能力
@@ -44,11 +44,11 @@
 
 依据（均仅源码检出）：
 
-- [AIService / AISettings](../../../src/lvjiang/core/ai/service.py)、[AIStore](../../../src/lvjiang/core/ai/store.py)。
-- [AI 设置页与请求取消](../../../src/lvjiang/ui/settings/ai.py)。
-- [截图后端](../../../src/lvjiang/core/input/capture_base.py)、[输入后端](../../../src/lvjiang/core/input/base.py)。
-- [运行上下文与目标占用](../../../src/lvjiang/ui/main/execution_runs.py)。
-- [AppHooks](../../../src/lvjiang/core/plugins/hooks.py)、[现有领域工具目录](../../../src/lvjiang/apps/yysls/core/agent/catalog.py)。
+- [AIService / AISettings](../../src/lvjiang/core/ai/service.py)、[AIStore](../../src/lvjiang/core/ai/store.py)。
+- [AI 设置页与请求取消](../../src/lvjiang/ui/settings/ai.py)。
+- [截图后端](../../src/lvjiang/core/input/capture_base.py)、[输入后端](../../src/lvjiang/core/input/base.py)。
+- [运行上下文与目标占用](../../src/lvjiang/ui/main/execution_runs.py)。
+- [AppHooks](../../src/lvjiang/core/plugins/hooks.py)、[现有领域工具目录](../../src/lvjiang/apps/yysls/core/agent/catalog.py)。
 
 ## 3. 恢复语义：不是一句“处理完毕”就续跑
 
@@ -66,10 +66,10 @@
 所以无人值守不会再在该处等待 `confirm`；这仍是现有异常恢复，不是 AI 接管。
 
 依据（均仅源码检出）：
-[无人值守回调](../../../src/lvjiang/core/batch/unattended.py)的 `_unattended_ui_callback()`、
-[DSL 执行器](../../../src/lvjiang/workflows/engine/core.py)的 `_exec_body()`、
-[子过程执行](../../../src/lvjiang/workflows/engine/data_ops.py)的 `_run_proc()`、
-[备战返回流程](../../../config/system/workflows/subcall/loadout/game_plans.wf)的 `nav_game_plans_to_main()`。
+[无人值守回调](../../src/lvjiang/core/batch/unattended.py)的 `_unattended_ui_callback()`、
+[DSL 执行器](../../src/lvjiang/workflows/engine/core.py)的 `_exec_body()`、
+[子过程执行](../../src/lvjiang/workflows/engine/data_ops.py)的 `_run_proc()`、
+[备战返回流程](../../config/system/workflows/subcall/loadout/game_plans.wf)的 `nav_game_plans_to_main()`。
 
 ### 3.2 两种回交契约
 
@@ -157,9 +157,9 @@ MVP 不开放任意坐标、按键序列或代码。以后如确需坐标点击�
 - 不要求逐像素锁帧，动画不必触发新事务系统；由具体目标声明足以判定动作是否仍适用的条件。
 
 复用依据（均仅源码检出）：
-[截图快照](../../../src/lvjiang/workflows/capture_snapshot.py)的 `capture_frame()`、
-[坐标换算](../../../src/lvjiang/workflows/base/coords.py)的 `_ratio_to_screen()`、
-[任务停止](../../../src/lvjiang/ui/main/run_control.py)的 `_request_stop()`。
+[截图快照](../../src/lvjiang/workflows/capture_snapshot.py)的 `capture_frame()`、
+[坐标换算](../../src/lvjiang/workflows/base/coords.py)的 `_ratio_to_screen()`、
+[任务停止](../../src/lvjiang/ui/main/run_control.py)的 `_request_stop()`。
 
 ### 5.3 预算、取消与退路
 
@@ -208,9 +208,9 @@ MVP 不开放任意坐标、按键序列或代码。以后如确需坐标点击�
 接入 AI 不能掩盖这些错误，更不能把模型恢复失败包装成任务完成。
 
 批量修正应复用 `return_failure_message()` 的通用协议，不解析某个任务的嵌套字段。
-依据（均仅源码检出）：[业务执行出口](../../../src/lvjiang/core/batch/stages.py)的 `_run_script()`、
-[调度器](../../../src/lvjiang/core/batch/scheduler.py)、
-[顶层返回协议](../../../src/lvjiang/workflows/result_protocol.py)。
+依据（均仅源码检出）：[业务执行出口](../../src/lvjiang/core/batch/stages.py)的 `_run_script()`、
+[调度器](../../src/lvjiang/core/batch/scheduler.py)、
+[顶层返回协议](../../src/lvjiang/workflows/result_protocol.py)。
 
 ## 8. 分阶段实施与验收
 

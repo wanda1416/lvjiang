@@ -8,8 +8,8 @@
 
 ### 1.1 `design/` 与 `guide/` 已落档内容
 
-- **设计决策（`30-design`）**：[31-ui-theme-system.md](../../30-design/02-decisions/04-platform/31-ui-theme-system.md) 已记录桌面端三主题（`light` 纯白 / `paper` 宣纸 / `dark` 玄墨）取舍、固定 `Fusion` 风格、与 Web v2 令牌同源微调、通用/插件两层单一来源边界，以及 Windows DWM 原生标题栏/边框同步策略。
-- **用户指南（`60-guide`）**：[02-main-interface.md](../../60-guide/04-desktop/02-main-interface.md) 已更新右上角三主题下拉切换与 Windows 原生标题栏同步说明。
+- **设计决策（`30-design`）**：[31-ui-theme-system.md](../30-design/02-decisions/04-platform/31-ui-theme-system.md) 已记录桌面端三主题（`light` 纯白 / `paper` 宣纸 / `dark` 玄墨）取舍、固定 `Fusion` 风格、与 Web v2 令牌同源微调、通用/插件两层单一来源边界，以及 Windows DWM 原生标题栏/边框同步策略。
+- **用户指南（`60-guide`）**：[02-main-interface.md](../60-guide/04-desktop/02-main-interface.md) 已更新右上角三主题下拉切换与 Windows 原生标题栏同步说明。
 
 ### 1.2 `reference/` 状态与代码已落地能力
 

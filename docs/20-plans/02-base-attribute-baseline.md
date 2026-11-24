@@ -40,7 +40,7 @@
 ## 3. 数值所有权
 
 每类来源以哪份文件为准、以及聚合与置空规则，见
-[基础属性来源模型](../../30-design/01-architecture/03-models/06-base-attr-model.md#数值所有权)；
+[基础属性来源模型](../30-design/01-architecture/03-models/06-base-attr-model.md#数值所有权)；
 本节不再重复。
 
 ## 4. 验收基线

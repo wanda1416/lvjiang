@@ -280,7 +280,7 @@
       "path": "30-design/01-architecture/02-graduation/README.md",
       "title": "毕业率计算引擎",
       "category": "30-architecture",
-      "sha256": "c9ad8c2f5f7e3738c783d86dd8aaf8cff1c0f004c0b4b86f806177cd61696157"
+      "sha256": "ce7ade572d83e9c94c16be1188f96dfaed6f91ab234d94c7a1720e9b09ea071c"
     },
     {
       "id": "30-design:01-architecture:03-models:01-equipment-models",
@@ -301,14 +301,14 @@
       "path": "30-design/01-architecture/03-models/03-session-and-context.md",
       "title": "Session 与 Context 数据模型",
       "category": "30-architecture",
-      "sha256": "80916f9bdbe651de6ab21bff34e344c93d4368889fbb226e96cf866a0580c677"
+      "sha256": "99eb641ef74c81486674e9b2c9fa197b2d21359f8944a2ebbf75fbcb32fad1ab"
     },
     {
       "id": "30-design:01-architecture:03-models:04-profile",
       "path": "30-design/01-architecture/03-models/04-profile.md",
       "title": "Profile 共享模块",
       "category": "30-architecture",
-      "sha256": "7649cd1ad9fa7644c7f80abcec0e5dff002dec7c7b5d2fa16b9fc4cab1700ed1"
+      "sha256": "e2cb5564a535dc011a41999da342143f5699eacb304ac7306276386f54b71a8e"
     },
     {
       "id": "30-design:01-architecture:03-models:05-martial-arts-and-playstyles",
@@ -322,7 +322,7 @@
       "path": "30-design/01-architecture/03-models/06-base-attr-model.md",
       "title": "基础属性来源模型",
       "category": "30-architecture",
-      "sha256": "bdab7a5aed26bf28d0fadc773e4df0f64d010eb4958bcd721d8b7d5c9e7ec87e"
+      "sha256": "3caa1b5d4c4ccd113e5bec9ca25188a865b04d83e48d783b1abb0f66afda61b5"
     },
     {
       "id": "30-design:01-architecture:03-models:README",
@@ -343,7 +343,7 @@
       "path": "30-design/01-architecture/04-overview/02-plugin-system.md",
       "title": "插件系统架构与开发指南",
       "category": "30-architecture",
-      "sha256": "9a6246231cff01ad74099c24699dd289c50459a6e2425f177a2e98906c440c4c"
+      "sha256": "ca8b7b17f46e7e400438471bb5f4c86a3f3cdadad32c44cb45adb47510958033"
     },
     {
       "id": "30-design:01-architecture:04-overview:03-graduation-formula-model",
@@ -392,14 +392,14 @@
       "path": "30-design/01-architecture/05-platform/08-i18n.md",
       "title": "国际化模块与翻译查找契约",
       "category": "30-architecture",
-      "sha256": "1291f6b958cf7fc8780ebdb592e00b08d71aecbf3a400ff3d98c1b9a5140d12b"
+      "sha256": "b91a2a3adddea703975928d5819fd4b42cfde3332a957e0dd11bbb8dedf0e5f6"
     },
     {
       "id": "30-design:01-architecture:05-platform:09-android-workbench",
       "path": "30-design/01-architecture/05-platform/09-android-workbench.md",
       "title": "Android 工作台架构",
       "category": "30-architecture",
-      "sha256": "f8d9188021fd0257344b20de2cce3bdb8b52a785aeecc45ef2e21e46487ea5ef"
+      "sha256": "7e8e380c5a45e64596e035ca8ca8f7f4f1ea619161e6cd5fb186da35ae26889a"
     },
     {
       "id": "30-design:01-architecture:05-platform:10-android-batch",
@@ -413,7 +413,7 @@
       "path": "30-design/01-architecture/05-platform/11-background-services.md",
       "title": "公共服务与桌面适配",
       "category": "30-architecture",
-      "sha256": "eb89310a05b7072218ef21937fad7cb2da6cd1bcbcf8027c71d91f75cf5c6e8a"
+      "sha256": "73e29d053b38434b1d41b9eb9d8ec3617d8685fb5ec563d36d5710263a0f3c71"
     },
     {
       "id": "30-design:01-architecture:05-platform:README",
@@ -595,7 +595,7 @@
       "path": "30-design/01-architecture/09-workflows/06-workflow-simulation.md",
       "title": "全任务采集与离线工作流模拟（设计）",
       "category": "30-architecture",
-      "sha256": "a8edda561b3afae9bb3378f3de0a439d12f65efbb0529258e5f579d2df861db8"
+      "sha256": "aae41e11c7595926b06289daa09ba36b8386faf13f1407a0dd2d4c13e7802edf"
     },
     {
       "id": "30-design:01-architecture:09-workflows:README",
@@ -878,6 +878,13 @@
       "sha256": "0714819d38e20f3fa7d793c4adb773e998f1f0b5bd9336351f7bb929bb069eed"
     },
     {
+      "id": "30-design:02-decisions:04-platform:26-online-config-background-download",
+      "path": "30-design/02-decisions/04-platform/26-online-config-background-download.md",
+      "title": "在线配置后台下载与下次启动安装",
+      "category": "30-architecture",
+      "sha256": "a237e144b26b3c4ba825ef9f065b04105a9434ea348a2fb683d75abc769e60b6"
+    },
+    {
       "id": "30-design:02-decisions:04-platform:27-hotkeys-and-menu-shortcuts",
       "path": "30-design/02-decisions/04-platform/27-hotkeys-and-menu-shortcuts.md",
       "title": "键位分区：菜单快捷键与全局热键",
@@ -952,7 +959,7 @@
       "path": "30-design/02-decisions/05-profile/07-set-only-v1.1.md",
       "title": "Profile 同步 v1.1：set-only 数据模型与周期裁决（历史方案）",
       "category": "30-architecture",
-      "sha256": "aced0d7a693c8b1ae4c55c0a0849c99c18282c908ddfa22c6cc262012489b10e"
+      "sha256": "1e51f05348b42238a1aa32f5af0511d6b315b5c2664bd570dd1931efe8c73767"
     },
     {
       "id": "30-design:02-decisions:05-profile:08-profile-sync",
@@ -1008,14 +1015,14 @@
       "path": "30-design/02-decisions/README.md",
       "title": "决策与规格记录（已实现需求）",
       "category": "30-architecture",
-      "sha256": "0a47c6560a16da1ed4f3ff27e4340c0f2f34aae17d5f8435bf335ae5dbe951d4"
+      "sha256": "b46cff52b758ddfb5148ede0d3c035fac44e19142650061122c02762c3059d3e"
     },
     {
       "id": "40-reference:01-config:01-contract",
       "path": "40-reference/01-config/01-contract.md",
       "title": "契约 B：配置与迁移",
       "category": "30-architecture",
-      "sha256": "41eb00d1709cd1eea56b8a9e3f52b9051a3b27a31be64742646b301db594d69f"
+      "sha256": "22a9526065500e89a52794ed4db6ccd58c8ada989722f72b93deed8dcedb1961"
     },
     {
       "id": "40-reference:01-config:02-config-layering",
@@ -1267,7 +1274,7 @@
       "path": "40-reference/05-plugins/01-contract.md",
       "title": "契约 A：插件装配",
       "category": "30-architecture",
-      "sha256": "5136c70256ac4a5b861c2780280eba599a3810e3be25c3e970359c14575ea57c"
+      "sha256": "b8fa4aad6a2901d6728141f0ee44c1cafec254bbf0201787347c441b692f4931"
     },
     {
       "id": "40-reference:README",
@@ -1519,7 +1526,7 @@
       "path": "70-agent/07-agent-mcp.md",
       "title": "外部 Agent 本机 MCP 与智能调律",
       "category": "70-agent",
-      "sha256": "38964365365e16d9cb8f9b87019706f595fa5856e60a08787a5bbf284b37817f"
+      "sha256": "7eaa16d9ff73e4e41b1f31a8a5355fa85d3a821121b372d7067d2271e7b071d1"
     },
     {
       "id": "70-agent:10-contracts:00-script-task-brief",

@@ -1,7 +1,7 @@
 # 离线 WF 模拟的回归门禁增强（计划）
 
 > 状态：规划。本文只收**尚未实装**的增强项；已实现的范围、契约与拒绝清单见
-> [全任务采集与离线工作流模拟（设计）](../../30-design/01-architecture/09-workflows/06-workflow-simulation.md)。
+> [全任务采集与离线工作流模拟（设计）](../30-design/01-architecture/09-workflows/06-workflow-simulation.md)。
 > 设计层 §10 已把外部方案逐条落定，其中「不采纳」的条目不再在本文重开。
 
 ## 1. 现状与缺口

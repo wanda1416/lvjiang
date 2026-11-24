@@ -661,7 +661,7 @@ LWW 结果 = 9，而不是 8
 
 ## 11. 相关文档
 
-- [用户 Profile 系统需求总览](../../../20-plans/02-profile/README.md)（仅源码检出）
+- [用户 Profile 系统需求总览](../../../20-plans/03-profile-overview.md)（仅源码检出）
 - [页面结构与搬运](06-overview-layout-sync.md)
 - 账户与同步架构（历史背景）：独立 admin 仓库 `docs/30-design/01-architecture/07-account-and-sync.md`（不随主工程发布）
 - [公共服务与桌面适配](../../01-architecture/05-platform/11-background-services.md)

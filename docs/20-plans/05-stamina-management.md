@@ -12,10 +12,10 @@
 
 使用现有 Profile 模型与 SQLite 仓储，观测值与推算值分别说明来源和时间，用户之间的数据隔离。采集失败不把旧值标为刚采集；缺失或未知不当作零。
 
-模型与存储契约见 [Profile 架构](../../30-design/01-architecture/03-models/04-profile.md)，读取入口见 [工作流用户指南](../../60-guide/03-automation/06-workflows.md)。
+模型与存储契约见 [Profile 架构](../30-design/01-architecture/03-models/04-profile.md)，读取入口见 [工作流用户指南](../60-guide/03-automation/06-workflows.md)。
 
 ## 后续需求
 
 旧方案提出的跨账号恢复预测报表和即将超限账号提醒仍需单独明确界面与验收，不能因已支持读取和周期推算就宣称这些报表已交付。
 
-早期设计保存于 [过程档案](../../80-history/02-dev/2026-10/2026-10-09-profile-stamina-early-design.md)。
+早期设计保存于 [过程档案](../80-history/02-dev/2026-10/2026-10-09-profile-stamina-early-design.md)。

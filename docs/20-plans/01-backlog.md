@@ -35,24 +35,24 @@
    缺 `CurrencySnapshot` 历史留存（JSONL）、90 天过期清理与趋势折线图。
 5. **心力 / 体力管理**：**部分实现**（需求文档状态 2026-10-09；律准石库存与记账策略
    已在 `apps/yysls/workflows/implementations/tuning/stone_stock.py`）。剩余项见
-   `docs/20-plans/02-profile/03-stamina-management.md` 的未完成清单；
+   `docs/20-plans/05-stamina-management.md` 的未完成清单；
    依赖定时轮询与多账号批量，工程量比看上去大。
 6. **局内地图目标闭环导航与撤离**：为渡尘墟、觉障林及后续同类玩法提供
    可复用的玩家/目标地图定位、目标锁定、短脉冲移动、重新定位、防卡和到达交互能力。
    导航核心不硬编码玩法名称，不直接关闭应用；具体机制、安全边界与分阶段计划见
-   [`07-in-match-navigation.md`](03-platform/02-in-match-navigation.md)。
+   [`07-in-match-navigation.md`](08-in-match-navigation.md)。
 
 7. **AI 异常导航恢复**：规划，尚未实施；仅在已声明的安全检查点按需调用识图模型，
    程序验收后再继续，不授权购买、领奖或账本写入。范围、前置修正与分阶段验收见
-   [AI 异常导航恢复与安全续跑方案](03-platform/29-ai-exception-recovery.md)；实施另行授权。
+   [AI 异常导航恢复与安全续跑方案](12-ai-exception-recovery.md)；实施另行授权。
 
 8. **识别帧历史调试与异常诊断包**：规划——可选本地保存最近最多 100 张识别帧，
    以编码总字节与有界背压控制开销，显式开启并关联任务状态，补充动作时间线与离线查看；
    主动反馈自动准备对应日志/包，提交才发送。实施与验收见
-   [识别帧历史调试与异常诊断包方案](03-platform/30-debug-frame-history.md)；与AI恢复独立，诊断/反馈后续实施另行授权。
+   [识别帧历史调试与异常诊断包方案](13-debug-frame-history.md)；与AI恢复独立，诊断/反馈后续实施另行授权。
    另一条已分流的链路不在此条内：全任务采集与离线WF模拟的首版实现见
    [设计](../30-design/01-architecture/09-workflows/06-workflow-simulation.md)，
-   其未实装的门禁增强见[计划](03-platform/31-wf-simulation-hardening.md)。
+   其未实装的门禁增强见[计划](14-wf-simulation-hardening.md)。
 
 > 上面 8 条是当前唯一清单；下方 P1/P2 是同一批事项的详情，重复项只留一处指针。
 

@@ -322,6 +322,17 @@ class AgentClient:
             finally:
                 self._owns_execution = False
 
+    def _drop_socket(self) -> None:
+        """在已持锁时仅关闭并置空 TCP 连接，保留握手状态且不触发恢复。"""
+        if self._sock is not None:
+            close = getattr(self._sock, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except OSError:
+                    pass
+            self._sock = None
+
     def probe_execution_busy(self, timeout: float = 1.5) -> str:
         """单次短超时探测设备是否拒绝交出执行占用；不重试、不改状态、不触发恢复。"""
         with self._lock:
@@ -331,6 +342,7 @@ class AgentClient:
                 header, _ = self._roundtrip("control_begin", timeout=timeout)
             except (AgentTransportError, OSError, struct.error) as exc:
                 logger.warning(f"设备执行占用探测通信异常，交执行路径处理: {exc}")
+                self._drop_socket()
                 return ""
             if not header.get("ok"):
                 return str(header.get("error") or header.get("message") or "设备端未说明原因")
@@ -338,6 +350,7 @@ class AgentClient:
                 self._roundtrip("control_end", timeout=timeout)
             except (AgentTransportError, OSError, struct.error) as exc:
                 logger.warning(f"设备执行占用探测释放失败: {exc}")
+                self._drop_socket()
             return ""
 
     def _setup_forward(self) -> int | None:
@@ -549,6 +562,7 @@ class AgentInput(InputBackend):
         self._using_adb = False
         self._execution_pending = False
         self._execution_run_active: Callable[[], bool] | None = None
+        self._execution_handoff_ready: threading.Event | None = None
 
     def configure_recovery(self, policy: AndroidRecoveryConfig) -> None:
         """宿主启动一次执行链时调用；批量内的脚本不重新读取设置。"""
@@ -562,31 +576,49 @@ class AgentInput(InputBackend):
         return self._client.probe_execution_busy(timeout=timeout)
 
     def mark_execution_pending(
-        self, run_active: Callable[[], bool] | None = None,
+        self,
+        run_active: Callable[[], bool] | None = None,
+        *,
+        ready_event: threading.Event | None = None,
     ) -> None:
         """标记运行中重连后的新通道待补取执行占用，绝不阻塞主线程。"""
         with self._client._lock:
             self._execution_pending = True
             self._execution_run_active = run_active
+            self._execution_handoff_ready = ready_event
 
     def ensure_execution_owned(self) -> None:
-        """在确认运行仍活动时，为重连后的新代理通道幂等补取 control_begin。"""
+        """在确认旧连接已释放且运行仍活动时，为重连后的新代理通道幂等补取 control_begin。"""
         if not self._execution_pending or self._using_adb:
             return
+        ready = self._execution_handoff_ready
+        if ready is not None and not ready.is_set():
+            deadline = time.monotonic() + 2.0
+            while not ready.is_set():
+                if self.stop_check and self.stop_check():
+                    return
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                ready.wait(timeout=min(0.05, remaining))
         with self._client._lock:
             if not self._execution_pending or self._using_adb:
+                self._execution_handoff_ready = None
                 return
             run_active = self._execution_run_active
             if run_active is not None and not run_active():
                 self._execution_pending = False
                 self._execution_run_active = None
+                self._execution_handoff_ready = None
                 return
             if self._client._owns_execution:
                 self._execution_pending = False
+                self._execution_handoff_ready = None
                 return
             if (self._client._sock is None
                     or self._client.status.get("offline_protocol") not in (1, 2, 3, 4)):
                 self._execution_pending = False
+                self._execution_handoff_ready = None
                 return
             try:
                 header, _ = self._client._roundtrip("control_begin", timeout=2.0)
@@ -599,6 +631,7 @@ class AgentInput(InputBackend):
                 logger.warning(f"[Agent] 运行中重连补取执行占用失败: {exc}")
             finally:
                 self._execution_pending = False
+                self._execution_handoff_ready = None
 
     def begin_execution(self) -> None:
         if self._using_adb:
@@ -610,6 +643,7 @@ class AgentInput(InputBackend):
     def end_execution(self) -> None:
         self._execution_pending = False
         self._execution_run_active = None
+        self._execution_handoff_ready = None
         try:
             self._client.release_execution()
         except (AgentError, AdbConnectionError) as exc:

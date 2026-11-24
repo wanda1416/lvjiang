@@ -71,4 +71,4 @@
 | [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 识别帧历史诊断 FIFO、异常冻结包与反馈附件上传 |
 | [31-wf-simulation-hardening.md](03-platform/31-wf-simulation-hardening.md) | 离线WF模拟的回归门禁增强：无人值守弹窗门禁、状态覆盖断言、失败Diff、OCR缓存与宽容匹配档 |
 | [32-desktop-ui-polish.md](03-platform/32-desktop-ui-polish.md) | 桌面端高密度 UI 微规范收口与可读性改进：真机巡检、文字减压、高 DPI 弹性与横幅/弹窗收敛 |
-| [33-android-channel-multitarget-recovery.md](03-platform/33-android-channel-multitarget-recovery.md) | Android ADB 与无障碍通道多目标切换、重连换绑与状态恢复：总修复原则、边界与分批修复方案 |
+| [32-android-channel-multitarget-recovery.md](../30-design/02-decisions/04-platform/32-android-channel-multitarget-recovery.md) | Android ADB 与无障碍通道多目标切换、重连换绑与状态恢复：总修复原则、边界与分批修复方案 |

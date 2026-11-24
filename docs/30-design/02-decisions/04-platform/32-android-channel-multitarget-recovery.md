@@ -1,11 +1,11 @@
 # Android ADB 与无障碍通道多目标切换及状态恢复修复方案
 
-> 状态：已完成（三批次修复、定向回归测试与全量 CI 门禁均已通过）。
+> 状态：已实现，含定向回归测试。
 
 相关既有设计决策：
-- [18-android-connection-recovery.md](../../30-design/02-decisions/04-platform/18-android-connection-recovery.md)（代理与 ADB 重连、输入降级、画面流故障及人工恢复边界）
-- [04-execution-targets.md](../../30-design/02-decisions/04-platform/04-execution-targets.md)（单窗口、多设备连接与显式执行目标）
-- [05-concurrent-target-execution.md](../../30-design/02-decisions/04-platform/05-concurrent-target-execution.md)（多执行目标并发任务与断线恢复）
+- [18-android-connection-recovery.md](./18-android-connection-recovery.md)（代理与 ADB 重连、输入降级、画面流故障及人工恢复边界）
+- [04-execution-targets.md](./04-execution-targets.md)（单窗口、多设备连接与显式执行目标）
+- [05-concurrent-target-execution.md](./05-concurrent-target-execution.md)（多执行目标并发任务与断线恢复）
 
 ---
 
@@ -64,9 +64,9 @@
   - 禁止仅保活旧线程而不做请求代次校验（连续重连同一设备时慢返回的旧回调会覆盖新连接并泄漏 `capture`/`agent`）。
 - **精确改动清单**：
   1. `src/lvjiang/ui/main/adb_device_ops.py`：
-     - 引入 `_retired_device_threads()`（`set[QThread]`）与 `_retired_device_workers()`（保活仍在跑的 worker）；引入递增 `_device_scan_seq`、`_device_connect_seq` 与 `_latest_connect_seq_by_target: dict[str, int]`。
-     - 改写 `_wait_device_thread()`：对仍在运行的旧线程先 `old_worker.cancel()` + `old_thread.quit()`，短等（如 `wait(200)` 避免长卡 UI）；若仍存活则移入 retired 集合并绑定 `finished` 自动移除与 `deleteLater()`。
-     - 扫描回调校验 `worker is getattr(self, "_device_worker", None)`（或匹配最新扫描序号），过期回调直接丢弃。
+     - 引入 `_retired_device_threads()`（`set[QThread]`）与 `_retired_device_workers()`（保活仍在跑的 worker）；引入递增 `_device_connect_seq` 与 `_latest_connect_seq_by_target: dict[str, int]`，并用 `_candidate_connect_worker` 单独追踪前台候选连接，避免右键重连顶替后 `btn_locate` 卡死。
+     - 改写 `_wait_device_thread(*, replacing_with_scan: bool = False)`：仅对非 `"connect"` 任务调 `cancel()`；当扫描被连接/重连顶替时立即恢复扫描按钮，否则短等（`wait(200)`）后把仍存活的旧线程与 worker 移入 retired 集合并绑定 `finished` 自动清理。
+     - 扫描回调校验 `worker is getattr(self, "_device_worker", None)`，过期回调直接丢弃。
      - `_start_device_connection` 分配 `connect_seq`；`_on_connect_done` 解析出 `target_id` 后比对 `_latest_connect_seq_by_target.get(target_id, 0)`：过期则调用 `_release_rejected_connection(capture, agent)` 并直接返回，不触碰注册表或 UI；候选区 `btn_locate` 仅由当前最新 `_device_worker` 恢复。
   2. `src/lvjiang/ui/main/window.py`：
      - `_stop_running_qthreads()` 同步纳入 `_retired_device_threads` 集合，确保关闭程序时无残留活跃 `QThread`。
@@ -203,7 +203,7 @@
   - `device_execution_busy()` 在 `AgentClient` 断线/超时时单次短超时放行且不清空 `_status`、不改 `_using_adb`，设备明确拒绝仍拦截；批量启动不重复探测。
 - **验证**：
   - `.venv\Scripts\python.exe -m ruff check` + `mypy` 改动文件
-  - `.venv\Scripts\python.exe -m pytest tests/core/android/test_agent.py tests/ui/main/test_device_busy_precheck.py tests/ui/main/test_batch_device_precheck.py tests/ui/main/test_android_reconnect_recovery.py tests/ui/main/test_target_resource_rebinding.py -q`
+  - `.venv\Scripts\python.exe -m pytest tests/core/android/ tests/ui/main/test_device_busy_precheck.py tests/ui/main/test_batch_device_precheck.py tests/ui/main/test_android_reconnect_recovery.py tests/ui/main/test_target_resource_rebinding.py -q`
 
 ### 批次 C：多目标 `WAITING_TARGET` 投影、通道横幅与恢复弹窗收口（缺陷 3 + 缺陷 4 + 缺陷 6）
 - **文件**：`run_control.py`、`run_android_recovery.py`、`adb_device_ops.py`、`batch_execution.py`、`tuning_tab.py`、`tray_ops.py`

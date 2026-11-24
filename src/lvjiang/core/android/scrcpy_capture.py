@@ -189,6 +189,7 @@ class AndroidStreamCapture(CaptureBackend):
         self._on_frame_callback = None
         self._running = False
         self._decode_thread: threading.Thread | None = None
+        self._stuck_decode_thread: threading.Thread | None = None
         self._size: tuple[int, int] | None = None
         self._session_size: tuple[int, int] | None = None
         self._ready_event = threading.Event()
@@ -552,12 +553,13 @@ class AndroidStreamCapture(CaptureBackend):
                     f"[AndroidStream] 协议头读取失败，server 未就绪，"
                     f"继续等待（第 {attempt} 次）")
                 # 关闭当前 socket，等待后重连
-                if self._sock:
+                sock = self._sock
+                self._sock = None
+                if sock is not None:
                     try:
-                        self._sock.close()
+                        sock.close()
                     except Exception:
                         pass
-                    self._sock = None
                 time.sleep(0.5)
                 if self._stop_interrupted(expected_epoch) or not self._connect_socket():
                     self.stop()
@@ -581,9 +583,23 @@ class AndroidStreamCapture(CaptureBackend):
             while not self._ready_event.is_set() and time.monotonic() < deadline:
                 if not self._running or self._stop_interrupted(expected_epoch):
                     break
-                if self._decode_thread is not None and not self._decode_thread.is_alive():
+                decode_thread = self._decode_thread
+                if decode_thread is not None and not decode_thread.is_alive():
                     break
                 time.sleep(0.05)
+
+            if self._stop_interrupted(expected_epoch):
+                decode_thread = self._decode_thread
+                if (
+                    self._sock is not None
+                    or self._server_proc is not None
+                    or (decode_thread is not None and decode_thread.is_alive())
+                    or self._video_port is not None
+                ):
+                    self.stop()
+                else:
+                    self._running = False
+                return False
 
             if self._latest_frame is None:
                 if self._decode_thread_error:
@@ -619,50 +635,61 @@ class AndroidStreamCapture(CaptureBackend):
         self._ready_event.clear()
         self._transitioning = True
 
-        if self._sock:
+        sock = self._sock
+        self._sock = None
+        if sock is not None:
             try:
-                self._sock.close()
+                sock.close()
             except Exception:
                 pass
-            self._sock = None
 
-        if self._server_proc:
+        proc = self._server_proc
+        self._server_proc = None
+        if proc is not None:
             try:
-                self._server_proc.terminate()
-                self._server_proc.wait(timeout=3.0)
+                proc.terminate()
+                proc.wait(timeout=3.0)
             except Exception:
                 try:
-                    self._server_proc.kill()
+                    proc.kill()
                 except Exception:
                     pass
-            self._server_proc = None
 
         decode_thread_stuck = False
-        if self._decode_thread and self._decode_thread.is_alive():
-            self._decode_thread.join(timeout=2.0)
-            if self._decode_thread.is_alive():
+        decode_thread = self._decode_thread
+        if decode_thread is not None and decode_thread.is_alive():
+            decode_thread.join(timeout=2.0)
+            if decode_thread.is_alive():
                 # 解码线程未按时退出（可能阻塞在 decoder.parse/decode），
                 # 此时不能清 _decoder，否则线程访问已释放对象触发 native crash
                 decode_thread_stuck = True
+                self._stuck_decode_thread = decode_thread
                 logger.warning("[AndroidStream] 解码线程 2s 内未退出，保留 decoder 引用避免竞态")
-        self._decode_thread = None
+        if self._decode_thread is decode_thread:
+            self._decode_thread = None
 
         self._cleanup_forward()
         # 只杀本会话的服务端。scid 是随机 31 位，按它精确匹配即可命中
         # 本实例的 sh 包装进程与 app_process；绝不能用 pkill -f scrcpy-server，
         # 那会连带杀掉同设备上其他目标、其他客户端（包括用户正在跑的批量任务）
         # 的会话——它们的 socket 只会收到一次静默 EOF。
-        if self._scid:
+        scid = self._scid
+        if scid:
             try:
                 subprocess.run(
                     [*self._device._base(), "shell",
-                     "pkill", "-f", f"scid={self._scid:08x}"],
+                     "pkill", "-f", f"scid={scid:08x}"],
                     capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
                 )
             except Exception as exc:  # noqa: BLE001 - 断连停流时 pkill 失败不得阻断清理与重建
                 logger.debug(f"[AndroidStream] 清理远端 scrcpy 进程失败（已忽略）: {exc}")
 
-        if not decode_thread_stuck:
+        stuck = self._stuck_decode_thread
+        if stuck is not None and not stuck.is_alive():
+            if self._stuck_decode_thread is stuck:
+                self._stuck_decode_thread = None
+            stuck = None
+        if not decode_thread_stuck and stuck is None:
             with self._decoder_lock:
                 self._decoder = None
         logger.debug("[AndroidStream] 已停止")
@@ -1010,10 +1037,11 @@ class AndroidStreamCapture(CaptureBackend):
     def _decode_loop_inner(self, frame_interval: float, last_frame_time: float, buf: bytes) -> None:
         while self._running:
             self._maybe_log_metrics(time.monotonic())
-            if self._sock is None:
+            sock = self._sock
+            if sock is None:
                 break
             try:
-                data = self._sock.recv(65536)
+                data = sock.recv(65536)
             except socket.timeout:
                 continue
             except OSError as exc:
@@ -1409,7 +1437,8 @@ class AndroidStreamCapture(CaptureBackend):
 
     def _cleanup_forward(self):
         """只清理本实例创建的 adb forward 规则。"""
-        if self._video_port is None:
-            return
-        self._device.remove_forward(f"tcp:{self._video_port}")
+        port = self._video_port
         self._video_port = None
+        if port is None:
+            return
+        self._device.remove_forward(f"tcp:{port}")

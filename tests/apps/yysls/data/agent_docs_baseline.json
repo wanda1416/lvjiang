@@ -913,6 +913,13 @@
       "sha256": "defa2e345203272a1df755a32926869ce182e36d851311df40a5692b0f72529f"
     },
     {
+      "id": "30-design:02-decisions:04-platform:32-android-channel-multitarget-recovery",
+      "path": "30-design/02-decisions/04-platform/32-android-channel-multitarget-recovery.md",
+      "title": "Android ADB 与无障碍通道多目标切换及状态恢复修复方案",
+      "category": "30-architecture",
+      "sha256": "ce371f24e8aa8a217266bbc697710ae135e7c4e67d4221206fe298ac63e4220e"
+    },
+    {
       "id": "30-design:02-decisions:05-profile:01-graduation-rate",
       "path": "30-design/02-decisions/05-profile/01-graduation-rate.md",
       "title": "毕业率分析需求与现行边界",

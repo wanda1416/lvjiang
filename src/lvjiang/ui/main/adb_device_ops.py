@@ -11,6 +11,8 @@ from ...core.config import load_user_config
 from ...i18n import tr
 from ..mobile.device_scan import DeviceScanPanel
 
+_SCAN_TASKS = frozenset({"scan", "wireless_scan", "local_scan"})
+
 
 def _pending_uncertain(device) -> bool:
     """该设备上此刻是否有人阻塞在「已发出、结果不确定」的确认上。
@@ -249,6 +251,8 @@ class _WirelessScanDialog(QObject):
 class _AdbDeviceOpsMixin:
     # ─── ADB 设备扫描/连接 ─────────────────────────────────
 
+    _candidate_connect_worker: _DeviceWorker | None = None
+
     def _target_device_refs(self, target_id: str) -> list[weakref.ref]:
         """返回指定目标仍在存活的 AdbDevice 弱引用列表，并顺手清理已回收项。"""
         by_target = getattr(self, "_adb_target_device_refs", None)
@@ -324,8 +328,7 @@ class _AdbDeviceOpsMixin:
         self.statusBar().showMessage(tr("正在扫描设备..."))
 
         # 异步扫描
-        self._next_device_scan_seq()
-        self._wait_device_thread()
+        self._wait_device_thread(replacing_with_scan=True)
         thread = QThread()
         worker = _DeviceWorker(task="scan")
         self._device_thread = thread
@@ -390,9 +393,7 @@ class _AdbDeviceOpsMixin:
         thread = getattr(self, "_device_thread", None)
         return bool(
             worker is not None
-            and getattr(worker, "_task", "") in {
-                "scan", "wireless_scan", "local_scan",
-            }
+            and getattr(worker, "_task", "") in _SCAN_TASKS
             and thread is not None
             and thread.isRunning()
         )
@@ -445,11 +446,6 @@ class _AdbDeviceOpsMixin:
             self._latest_connect_seq_by_target = seqs
         return seqs
 
-    def _next_device_scan_seq(self) -> int:
-        seq = int(getattr(self, "_device_scan_seq", 0)) + 1
-        self._device_scan_seq = seq
-        return seq
-
     def _next_device_connect_seq(self) -> int:
         seq = int(getattr(self, "_device_connect_seq", 0)) + 1
         self._device_connect_seq = seq
@@ -480,15 +476,25 @@ class _AdbDeviceOpsMixin:
         if not thread.isRunning():
             _cleanup()
 
-    def _wait_device_thread(self):
+    def _wait_device_thread(self, *, replacing_with_scan: bool = False):
         """短等旧设备线程退出；仍阻塞则移入 retired 集合保活，避免主线程卡死或 qFatal。"""
         old_thread = getattr(self, "_device_thread", None)
         old_worker = getattr(self, "_device_worker", None)
         if old_thread is None or not old_thread.isRunning():
             return
-        cancel = getattr(old_worker, "cancel", None)
-        if callable(cancel):
-            cancel()
+        old_task = getattr(old_worker, "_task", "")
+        if old_task != "connect":
+            cancel = getattr(old_worker, "cancel", None)
+            if callable(cancel):
+                cancel()
+        if old_task in _SCAN_TASKS and not replacing_with_scan:
+            btn_win = getattr(self, "btn_scan_window", None)
+            if btn_win is not None:
+                btn_win.setEnabled(True)
+            btn_dev = getattr(self, "btn_scan_device", None)
+            if btn_dev is not None:
+                btn_dev.setEnabled(True)
+                btn_dev.setText(tr("扫描设备"))
         old_thread.quit()
         if not old_thread.wait(200):
             self._retire_device_thread(old_thread, old_worker)
@@ -512,8 +518,7 @@ class _AdbDeviceOpsMixin:
             scope = "全部网卡" if not subnets else "、".join(f"{s}0/24" for s in subnets)
             self.append_log(f"[扫描] 正在扫描局域网 ADB 设备（{scope}）...")
 
-        self._next_device_scan_seq()
-        self._wait_device_thread()
+        self._wait_device_thread(replacing_with_scan=True)
         thread = QThread()
         worker = _DeviceWorker(
             task="local_scan" if mode == "local" else "wireless_scan",
@@ -679,6 +684,8 @@ class _AdbDeviceOpsMixin:
         )
         self._device_thread = thread
         self._device_worker = worker
+        if update_candidate_ui:
+            self._candidate_connect_worker = worker
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.notice.connect(self.log_text.append)
@@ -694,6 +701,22 @@ class _AdbDeviceOpsMixin:
                 message, update_candidate_ui=update_candidate_ui, worker=wrk))
         self._bind_device_worker_lifecycle(worker, thread)
         thread.start()
+
+    def _restore_candidate_connect_ui(
+        self, worker, update_candidate_ui: bool,
+    ) -> None:
+        """恢复候选区连接按钮；仅限对应的前台连接本身，不被右键重连顶掉。"""
+        if not update_candidate_ui:
+            return
+        if worker is not None and worker is not getattr(self, "_candidate_connect_worker", None):
+            return
+        self._candidate_connect_worker = None
+        btn_locate = getattr(self, "btn_locate", None)
+        if btn_locate is not None:
+            btn_locate.setText(tr("连接"))
+        set_locate = getattr(self, "_set_locate_enabled", None)
+        if callable(set_locate):
+            set_locate(True)
 
     def _on_connect_done(
             self, combo_data, device, capture, capture_method, w, h,
@@ -719,6 +742,7 @@ class _AdbDeviceOpsMixin:
             latest_seqs = self._latest_connect_seqs()
             if connect_seq < latest_seqs.get(target_id, 0):
                 self._release_rejected_connection(capture, agent)
+                self._restore_candidate_connect_ui(worker, update_candidate_ui)
                 return
             latest_seqs[target_id] = connect_seq
         conflict = self._unconfirmed_identity_conflict(target_id, identity.stable)
@@ -733,9 +757,7 @@ class _AdbDeviceOpsMixin:
                 "「{name}」是同一台设备。请先断开该目标再连接。"
             ).format(serial=combo_data["serial"], name=conflict.display_name))
             self.statusBar().showMessage(tr("设备标识未确认，已拒绝连接"))
-            if update_candidate_ui and is_current_worker:
-                self.btn_locate.setText(tr("连接"))
-                self._set_locate_enabled(True)
+            self._restore_candidate_connect_ui(worker, update_candidate_ui)
             return
         existing_target = self._execution_targets.get(target_id)
         generation = (
@@ -867,27 +889,33 @@ class _AdbDeviceOpsMixin:
         if old is not None:
             self._dispose_execution_target(old, dispose_agent=not handoff_lease)
         if handoff_lease:
+            old_released = threading.Event()
+
             def _run_active(rc=active_run, tid=target_id) -> bool:
                 return (
                     self._run_manager.run_for_target(tid) is rc
                     and not rc.stop_event.is_set()
                 )
 
-            input_ctrl.mark_execution_pending(_run_active)
+            input_ctrl.mark_execution_pending(_run_active, ready_event=old_released)
 
             def _handoff_agent_lease(
                 prev_agent=old_agent, new_ctrl=input_ctrl, active_fn=_run_active,
+                released_ev=old_released,
             ) -> None:
                 try:
-                    release = getattr(prev_agent, "release_execution", None)
-                    if callable(release):
-                        release(timeout=1.5)
-                except Exception as exc:  # noqa: BLE001
-                    logger.debug(f"[设备端执行] 旧代理释放租约失败: {exc}")
-                try:
-                    prev_agent.close()
-                except Exception as exc:  # noqa: BLE001
-                    logger.debug(f"[设备端执行] 关闭旧代理失败: {exc}")
+                    try:
+                        release = getattr(prev_agent, "release_execution", None)
+                        if callable(release):
+                            release(timeout=1.5)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug(f"[设备端执行] 旧代理释放租约失败: {exc}")
+                    try:
+                        prev_agent.close()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug(f"[设备端执行] 关闭旧代理失败: {exc}")
+                finally:
+                    released_ev.set()
                 if active_fn():
                     try:
                         new_ctrl.ensure_execution_owned()
@@ -940,13 +968,12 @@ class _AdbDeviceOpsMixin:
                 f"目标身份退化为连接地址")
             self.append_log(tr(
                 "[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标"))
-        hk = self._user_config.hotkeys
-        self.statusBar().showMessage(self._hotkey_status(
-            f"已连接设备 {combo_data['serial']}",
-            (hk.start, tr("开始")), (hk.stop, tr("停止"))))
-        if update_candidate_ui and is_current_worker:
-            self.btn_locate.setText(tr("连接"))
-            self._set_locate_enabled(True)
+        if is_current_worker:
+            hk = self._user_config.hotkeys
+            self.statusBar().showMessage(self._hotkey_status(
+                f"已连接设备 {combo_data['serial']}",
+                (hk.start, tr("开始")), (hk.stop, tr("停止"))))
+        self._restore_candidate_connect_ui(worker, update_candidate_ui)
         self._refresh_execution_targets_ui()
         self._refresh_active_target_ui()
         self._refresh_run_button()
@@ -965,9 +992,7 @@ class _AdbDeviceOpsMixin:
         self.append_log(f"[错误] 连接设备失败: {error_msg}")
         if is_current_worker:
             self.statusBar().showMessage(tr("连接失败 | 详见日志"))
-        if update_candidate_ui and is_current_worker:
-            self.btn_locate.setText(tr("连接"))
-            self._set_locate_enabled(True)
+        self._restore_candidate_connect_ui(worker, update_candidate_ui)
 
     def _dispose_execution_target(
         self, target, *, dispose_agent: bool = True,
@@ -1137,10 +1162,6 @@ class _AdbDeviceOpsMixin:
         target.input_kind = str(
             getattr(target.input_ctrl, "kind", "") or "")
         self._rebind_target_resources(target)
-        if not enabled:
-            hide_banner = getattr(self, "_hide_channel_banner", None)
-            if callable(hide_banner):
-                hide_banner(target_id)
         if self._execution_targets.active_target_id == target_id:
             self._sync_active_target_compat()
         self._refresh_execution_targets_ui()
@@ -1249,6 +1270,10 @@ class _AdbDeviceOpsMixin:
             self._install_stream_hooks(
                 capture, target_id, generation, target.connection_bridge, target.device)
         self._rebind_target_resources(target)
+        if not enabled:
+            hide_banner = getattr(self, "_hide_channel_banner", None)
+            if callable(hide_banner):
+                hide_banner(target_id)
         if old_capture is not None:
             try:
                 old_capture.stop()

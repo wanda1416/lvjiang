@@ -236,3 +236,53 @@ def test_recovery_dialog_dismissed_silently_on_restore(qapp):
     assert not run_a.stop_event.is_set()
     assert not any("仍在等待通道恢复" in line for line in host.logs)
     host.close()
+
+
+def test_switching_android_to_screencap_hides_channel_banner(qapp, monkeypatch):
+    """Android 目标空闲断流后通过右键切回单帧 screencap，必须收起残留的断流横幅。"""
+    from lvjiang.ui.main.adb_device_ops import _AdbDeviceOpsMixin
+
+    banner_visible = [False]
+    banner_text = [""]
+    monkeypatch.setattr(
+        "lvjiang.core.android.create_capture_backend",
+        lambda **_kw: SimpleNamespace(start=lambda: True, stop=lambda: None),
+    )
+
+    class _Host(_AdbDeviceOpsMixin, _AndroidRecoveryMixin):
+        def __init__(self):
+            self._execution_targets = ExecutionTargetRegistry()
+            self._run_manager = SimpleNamespace(run_for_target=lambda _tid: None)
+            self._adb_banner_target_id = None
+            self._adb_banner = SimpleNamespace(setVisible=lambda v: banner_visible.__setitem__(0, v))
+            self._adb_banner_label = SimpleNamespace(setText=lambda s: banner_text.__setitem__(0, s))
+            self._adb_banner_btn = None
+            self._preview_enabled = False
+            self.logs: list[str] = []
+
+        def append_log(self, msg: str): self.logs.append(msg)
+        def _target_has_active_run(self, _tid: str) -> bool: return False
+        def _abort_recording_for_target(self, *_a): pass
+        def _rebind_target_resources(self, _target): pass
+        def _sync_active_target_compat(self): pass
+        def _apply_rec_state(self): pass
+        def _refresh_execution_targets_ui(self): pass
+
+    host = _Host()
+    target = ExecutionTarget(
+        id="adb:A", kind="adb", display_name="A",
+        capture=SimpleNamespace(stop=lambda: None),
+        input_ctrl=object(), device=object(),
+        capture_method="scrcpy", streaming=True,
+    )
+    host._execution_targets.put(target)
+    host._execution_targets.select(target.id)
+    host._show_channel_banner(target.id, "⚠ 画面流已中断")
+    assert banner_visible[0] is True
+    assert target.id in host._channel_banner_texts()
+
+    host._set_android_target_streaming(target.id, False)
+
+    assert banner_visible[0] is False
+    assert host._adb_banner_target_id is None
+    assert target.id not in host._channel_banner_texts()

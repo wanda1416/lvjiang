@@ -262,3 +262,310 @@ def test_scrcpy_stop_interrupts_restart_without_blocking():
     assert not t.is_alive()
     assert result == [False]
     assert cap._decode_thread is None
+
+
+def test_wait_device_thread_restores_scan_buttons_and_skips_cancelling_connect(qapp):
+    """扫描被非扫描操作顶替时恢复扫描按钮；等待连接线程时不得静默 cancel() 他目标连接。"""
+    from PyQt6.QtWidgets import QPushButton
+
+    host = _FakeHost()
+    host.btn_scan_window = QPushButton()
+    host.btn_scan_device = QPushButton("取消扫描")
+    host.btn_scan_window.setEnabled(False)
+    host.btn_scan_device.setEnabled(False)
+
+    # 1. 扫描 worker 被非扫描操作顶替：立即恢复扫描按钮并取消旧扫描
+    scan_release = threading.Event()
+    scan_cancelled = threading.Event()
+
+    class _ScanWorker(QObject):
+        _task = "scan"
+
+        def cancel(self):
+            scan_cancelled.set()
+
+        def run(self):
+            scan_release.wait(5.0)
+
+    scan_thread = QThread()
+    scan_worker = _ScanWorker()
+    scan_worker.moveToThread(scan_thread)
+    scan_thread.started.connect(scan_worker.run)
+    host._device_thread = scan_thread
+    host._device_worker = scan_worker
+    scan_thread.start()
+    time.sleep(0.05)
+
+    host._wait_device_thread(replacing_with_scan=False)
+    assert scan_cancelled.is_set()
+    assert host.btn_scan_window.isEnabled() is True
+    assert host.btn_scan_device.isEnabled() is True
+    assert host.btn_scan_device.text() == "扫描设备"
+
+    # 2. 连接 worker（_task == "connect"）不得被 cancel() 吞掉错误
+    conn_release = threading.Event()
+    conn_cancelled = threading.Event()
+
+    class _ConnWorker(QObject):
+        _task = "connect"
+
+        def cancel(self):
+            conn_cancelled.set()
+
+        def run(self):
+            conn_release.wait(5.0)
+
+    conn_thread = QThread()
+    conn_worker = _ConnWorker()
+    conn_worker.moveToThread(conn_thread)
+    conn_thread.started.connect(conn_worker.run)
+    host._device_thread = conn_thread
+    host._device_worker = conn_worker
+    conn_thread.start()
+    time.sleep(0.05)
+
+    host._wait_device_thread(replacing_with_scan=False)
+    assert not conn_cancelled.is_set()
+
+    scan_release.set()
+    conn_release.set()
+    host._device_thread = None
+    host._device_worker = None
+    MainWindow._stop_running_qthreads(host, timeout_ms=2000)
+    qapp.processEvents()
+
+
+def test_candidate_connect_restores_locate_button_after_background_reconnect(qapp, monkeypatch):
+    """候选区连接被右键重连顶替后，原候选连接收尾（含过期分支）仍必须恢复 btn_locate。"""
+    from PyQt6.QtCore import pyqtSignal
+    from PyQt6.QtWidgets import QPushButton
+
+    monkeypatch.setattr(
+        "lvjiang.ui.main.adb_device_ops.load_user_config",
+        lambda: SimpleNamespace(
+            android_recovery=SimpleNamespace(allow_adb_fallback=True, auto_start_shizuku=False),
+        ),
+    )
+    monkeypatch.setattr(
+        "lvjiang.core.android.create_input_backend",
+        lambda **_kw: SimpleNamespace(kind="adb"),
+    )
+    monkeypatch.setattr(
+        "lvjiang.core.app_controller.record_connected_android",
+        lambda *_a, **_kw: {},
+    )
+
+    gate_fg = threading.Event()
+    gate_bg = threading.Event()
+    workers: list[QObject] = []
+
+    class _StubDeviceWorker(QObject):
+        scan_finished = pyqtSignal(list)
+        wireless_finished = pyqtSignal(list)
+        wireless_progress = pyqtSignal(str, int, int)
+        connect_finished = pyqtSignal(object, object, str, int, int, object)
+        notice = pyqtSignal(str)
+        error = pyqtSignal(str)
+        finished = pyqtSignal()
+
+        def __init__(self, task: str, serial: str = "", **_kw):
+            super().__init__()
+            self._task = task
+            self._serial = serial
+            self._cancelled = False
+            workers.append(self)
+
+        def cancel(self):
+            self._cancelled = True
+
+        def is_cancelled(self):
+            return self._cancelled
+
+        def run(self):
+            if len(workers) == 1:
+                gate_fg.wait(5.0)
+                dev = _FakeDevice("10.0.0.1:5555", "id-same")
+                cap = _FakeCapture("fg-stale")
+            else:
+                gate_bg.wait(5.0)
+                dev = _FakeDevice("10.0.0.2:5555", "id-same")
+                cap = _FakeCapture("bg-fresh")
+            self.connect_finished.emit(dev, cap, "screencap", 1280, 720, None)
+            self.finished.emit()
+
+    monkeypatch.setattr("lvjiang.ui.main.adb_device_ops._DeviceWorker", _StubDeviceWorker)
+
+    host = _FakeHost()
+    locate_states: list[bool] = []
+    host.btn_locate = QPushButton("连接")
+    host._set_locate_enabled = lambda en: locate_states.append(bool(en))
+    host._apply_backend_ui = lambda _mode: None
+    host._android_connection_draft = SimpleNamespace(capture_method="screencap", device_execution=False)
+    host.log_text = SimpleNamespace(append=lambda _m: None)
+
+    host._start_device_connection({"serial": "10.0.0.1:5555"}, update_candidate_ui=True)
+    worker_fg = host._device_worker
+    assert host._candidate_connect_worker is worker_fg
+    assert host.btn_locate.text() == "连接中..."
+    assert locate_states[-1] is False
+
+    host._start_device_connection({"serial": "10.0.0.2:5555"}, update_candidate_ui=False)
+    worker_bg = host._device_worker
+    assert worker_bg is not worker_fg
+    assert host._candidate_connect_worker is worker_fg
+
+    gate_bg.set()
+    deadline = time.monotonic() + 2.0
+    while not host._execution_targets.all() and time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(0.01)
+    assert host._execution_targets.all()[0].serial == "10.0.0.2:5555"
+    assert host.btn_locate.text() == "连接中..."  # 右键重连不得提前复位前台候选按钮
+
+    gate_fg.set()
+    deadline = time.monotonic() + 2.0
+    while host._candidate_connect_worker is not None and time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(0.01)
+    qapp.processEvents()
+
+    assert host._candidate_connect_worker is None
+    assert host.btn_locate.text() == "连接"
+    assert locate_states[-1] is True
+    MainWindow._stop_running_qthreads(host, timeout_ms=2000)
+
+
+def test_scrcpy_step7_interrupted_by_stop_fails_cleanly_even_with_frame(monkeypatch):
+    """步骤 7 等待首帧时被 stop() 打断：绝不误报息屏错，即使已写入首帧也不得返回 True。"""
+    import numpy as np
+
+    monkeypatch.setattr("lvjiang.core.android.scrcpy_capture.time.sleep", lambda _s: None)
+    monkeypatch.setattr(
+        "lvjiang.core.android.scrcpy_capture.subprocess.run",
+        lambda *_a, **_kw: SimpleNamespace(returncode=0, stdout=b"", stderr=b""),
+    )
+
+    class _FakeAv:
+        class CodecContext:
+            @staticmethod
+            def create(*_a):
+                return object()
+
+    monkeypatch.setitem(__import__("sys").modules, "av", _FakeAv)
+
+    for write_frame_before_stop in (False, True):
+        entered_wait = threading.Event()
+        release_decode = threading.Event()
+
+        device = SimpleNamespace(
+            serial="dev-1",
+            _base=lambda: ["adb", "-s", "dev-1"],
+            get_resolution=lambda: (1280, 720),
+            forward_dynamic=lambda _spec: 27183,
+            remove_forward=lambda _spec: None,
+        )
+        cap = AndroidStreamCapture(device=device, max_size=1280)
+        cap._push_jar = lambda: True  # type: ignore[method-assign]
+        cap._start_server = lambda: True  # type: ignore[method-assign]
+        cap._connect_socket = lambda: True  # type: ignore[method-assign]
+        cap._read_protocol_header = lambda: True  # type: ignore[method-assign]
+
+        def _fake_decode(c=cap, ev_in=entered_wait, ev_out=release_decode, wf=write_frame_before_stop):
+            if wf:
+                c._latest_frame = np.zeros((4, 4, 3), dtype=np.uint8)
+            ev_in.set()
+            ev_out.wait(5.0)
+
+        cap._decode_loop = _fake_decode  # type: ignore[method-assign]
+
+        result: list[bool] = []
+        t = threading.Thread(target=lambda r=result, c=cap: r.append(c.restart()), daemon=True)
+        t.start()
+        assert entered_wait.wait(2.0)
+
+        try:
+            cap.stop()
+        finally:
+            release_decode.set()
+            t.join(timeout=3.0)
+        assert not t.is_alive()
+        assert result == [False]
+        assert cap.last_error == ""
+
+
+def test_scrcpy_concurrent_stop_safe_and_preserves_stuck_decoder(monkeypatch):
+    """并发 stop() 无 TOCTOU 崩溃、不删 tcp:None，卡住的 decoder 在线程退出前保持保留。"""
+    monkeypatch.setattr(
+        "lvjiang.core.android.scrcpy_capture.subprocess.run",
+        lambda *_a, **_kw: SimpleNamespace(returncode=0, stdout=b"", stderr=b""),
+    )
+
+    removed_forwards: list[str] = []
+    device = SimpleNamespace(
+        serial="dev-1",
+        _base=lambda: ["adb", "-s", "dev-1"],
+        remove_forward=lambda spec: removed_forwards.append(spec),
+    )
+    cap = AndroidStreamCapture(device=device, max_size=1280)
+    cap._video_port = 27183
+    sentinel_decoder = object()
+    cap._decoder = sentinel_decoder  # type: ignore[assignment]
+
+    join_calls = 0
+    join_lock = threading.Lock()
+    blocked_in_join = threading.Event()
+    first_stop_done = threading.Event()
+
+    class _FakeDecodeThread:
+        def __init__(self):
+            self.alive = True
+
+        def is_alive(self) -> bool:
+            return self.alive
+
+        def join(self, timeout: float | None = None) -> None:
+            nonlocal join_calls
+            with join_lock:
+                join_calls += 1
+                call_index = join_calls
+            if call_index == 1:
+                # 线程 A 进入 join() 后等待线程 B 先完成 stop() 并把 _decode_thread 置 None，
+                # 线程 A 再返回 join() 复检存活状态，确定性复现原 TOCTOU 空指针路径。
+                blocked_in_join.set()
+                assert first_stop_done.wait(2.0)
+
+    fake_thread = _FakeDecodeThread()
+    cap._decode_thread = fake_thread  # type: ignore[assignment]
+
+    errors: list[BaseException] = []
+
+    def _run_stop(mark_done: bool) -> None:
+        try:
+            cap.stop()
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            if mark_done:
+                first_stop_done.set()
+
+    t_other = threading.Thread(target=_run_stop, args=(False,), daemon=True)
+    t_other.start()
+    assert blocked_in_join.wait(2.0)
+
+    _run_stop(mark_done=True)
+    t_other.join(timeout=2.0)
+    assert not t_other.is_alive()
+
+    assert errors == []
+    assert removed_forwards == ["tcp:27183"]
+    assert cap._decode_thread is None
+    assert cap._decoder is sentinel_decoder
+
+    # 卡住线程仍存活期间再次调用 stop()，不得误清 _decoder
+    cap.stop()
+    assert cap._decoder is sentinel_decoder
+
+    # 线程真正退出后再调用 stop()，应正常清空 _decoder
+    fake_thread.alive = False
+    cap.stop()
+    assert cap._decoder is None

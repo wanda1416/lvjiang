@@ -156,6 +156,7 @@ settings_dialog:
   用于重启后重新发现窗口: Dùng để tìm lại cửa sổ sau khi khởi động lại
   用户信息字号: Cỡ chữ Thông tin người dùng
   用户总览字号: Cỡ chữ Tổng quan người dùng
+  "总览设置": "Cài đặt tổng quan"
   界面语言: Ngôn ngữ giao diện
   留空自动解析 Launcher: Để trống để tự động phân giải Launcher
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: "Môi trường đích quyết định giá trị trả về của env() trong DSL, dùng để phân biệt chiến lược điều hướng giữa game PC và game di động. Đây là môi trường nơi trò chơi chạy, không phải hệ điều hành của máy này."

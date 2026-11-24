@@ -40,7 +40,6 @@ from ...core.profile.regen import (
 )
 from ...core.profile.rows import Entry
 from ...i18n import tr, tr_label
-from ..widgets.button_styles import DISABLED_BUTTON_BG
 from ..widgets.theme import current_tokens
 
 # ─── 配额周期辅助函数 ────────────────────────────────────────────
@@ -344,9 +343,9 @@ def apply_cell_style(item: QTableWidgetItem, style: str) -> None:
         item.setFont(font)
         item.setForeground(QColor(current_tokens().success))
     elif style == "locked":
-        # 底色用「暂停按钮默认那档灰」：该用户在总览里"没有这个值"，不是 0
-        # 也不是上限。单元格没有文本，只改前景色等于什么都没显示，必须填底色。
-        item.setBackground(QColor(DISABLED_BUTTON_BG))
+        # 用主题的极淡灰底色（surface_hover）：该用户在总览里"没有这个值"，不是 0
+        # 也不是上限。保留柔和浅灰提示锁定，避免深灰像挖空一块一样突兀。
+        item.setBackground(QColor(current_tokens().surface_hover))
 
 
 def format_cell_tooltip(kd: KeyDef, model_type: str,

@@ -168,6 +168,7 @@ settings_dialog:
   用于重启后重新发现窗口: Utilisé pour retrouver la fenêtre après un redémarrage
   用户信息字号: Taille de police d'Infos utilisateur
   用户总览字号: Taille de police d'Aperçu utilisateur
+  "总览设置": "Paramètres de l'aperçu"
   界面语言: Langue de l'interface
   留空自动解析 Launcher: Laisser vide pour résoudre automatiquement le Launcher
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: L'environnement cible détermine la valeur renvoyée par env() dans le DSL afin de distinguer la navigation PC et mobile. Il s'agit de l'environnement d'exécution du jeu, pas de l'OS local.

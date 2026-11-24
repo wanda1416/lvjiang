@@ -178,7 +178,7 @@ class SettingsDialog(QDialog):
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_grouped_tab([
             (tr("常规设置"), self._build_basic_tab()),
-            (tr("字体设置"), self._build_font_tab()),
+            (tr("总览设置"), self._build_font_tab()),
             (tr("热键设置"), self._build_hotkey_tab()),
         ]), tr("基础设置"))
         self._tabs.addTab(self._build_grouped_tab([
@@ -1104,7 +1104,8 @@ class SettingsDialog(QDialog):
         caption.setWordWrap(True)
         vbox.addWidget(caption)
 
-        form = QFormLayout()
+        row = QHBoxLayout()
+        row.setSpacing(8)
         default_size = self._default_font_point_size(tab)
         fonts = self._config.font_sizes
 
@@ -1113,16 +1114,21 @@ class SettingsDialog(QDialog):
         self._overview_font_spin.setSuffix(" pt")
         self._overview_font_spin.setValue(fonts.user_overview or default_size)
         self._overview_font_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow(tr("用户总览字号") + ":", self._overview_font_spin)
+        row.addWidget(QLabel(tr("用户总览字号") + ":"))
+        row.addWidget(self._overview_font_spin)
+
+        row.addSpacing(24)
 
         self._user_info_font_spin = QSpinBox()
         self._user_info_font_spin.setRange(8, 24)
         self._user_info_font_spin.setSuffix(" pt")
         self._user_info_font_spin.setValue(fonts.user_info or default_size)
         self._user_info_font_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow(tr("用户信息字号") + ":", self._user_info_font_spin)
+        row.addWidget(QLabel(tr("用户信息字号") + ":"))
+        row.addWidget(self._user_info_font_spin)
+        row.addStretch(1)
 
-        vbox.addLayout(form)
+        vbox.addLayout(row)
         vbox.addStretch()
         return tab
 
@@ -1140,15 +1146,26 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
+        # 系统级全局热键与菜单快捷键共用同一 QGridLayout（两栏各占 标签+控件 2 列，
+        # 中间以 col=2 留白），确保上下两段的第二列严格垂直对齐。
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
+        grid.setColumnMinimumWidth(2, 24)
+        grid.setColumnStretch(5, 1)
+        self._hotkey_grid = grid
+
         warn = QLabel(tr("以下为系统级全局热键，保存后立即生效。"))
         warn.setStyleSheet(f"color: {current_tokens().success}; font-weight: bold;")
         warn.setWordWrap(True)
-        vbox.addWidget(warn)
+        grid.addWidget(warn, 0, 0, 1, 6)
 
-        form = QFormLayout()
         hk = self._config.hotkeys
         self._hotkey_combos: dict[str, tuple[Any, Any]] = {}
-        for name, label in _HOTKEY_FIELDS:
+        for idx, (name, label) in enumerate(_HOTKEY_FIELDS):
+            grid_row = 1 + idx // 2
+            label_col, field_col = (0, 1) if idx % 2 == 0 else (3, 4)
+
             modifier_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
             for value, modifier_label in _MODIFIER_CHOICES:
                 modifier_combo.addItem(
@@ -1166,12 +1183,15 @@ class SettingsDialog(QDialog):
             key_index = key_combo.findText(key_part.upper())
             key_combo.setCurrentIndex(key_index if key_index >= 0 else 0)
             self._hotkey_combos[name] = (modifier_combo, key_combo)
-            row = QHBoxLayout()
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(6)
-            row.addWidget(modifier_combo)
-            row.addWidget(key_combo)
-            row.addStretch(1)
+
+            field_box = QWidget()
+            field_row = QHBoxLayout(field_box)
+            field_row.setContentsMargins(0, 0, 0, 0)
+            field_row.setSpacing(6)
+            field_row.addWidget(modifier_combo)
+            field_row.addWidget(key_combo)
+            field_row.addStretch(1)
+
             tip = ""
             if name == "record":
                 tip = tr("该热键只在「脚本编辑」工作台打开期间临时全局注册，"
@@ -1181,27 +1201,32 @@ class SettingsDialog(QDialog):
                          "系统托盘图标可能因通知区域设置而不显示，这个热键是窗口"
                          "隐藏后唯一可靠的恢复方式。")
             if tip:
-                # 提示按钮放在标题一侧：塞进字段列会让这一行比其它行宽一个按钮。
                 label_box = QWidget()
                 label_row = QHBoxLayout(label_box)
                 label_row.setContentsMargins(0, 0, 0, 0)
+                label_row.setSpacing(4)
                 label_row.addWidget(QLabel(f"{label}:"))
                 label_row.addWidget(self._tip_button(tip))
-                label_row.addStretch()
-                form.addRow(label_box, row)
+                label_row.addStretch(1)
+                grid.addWidget(label_box, grid_row, label_col)
             else:
-                form.addRow(f"{label}:", row)
-        vbox.addLayout(form)
+                grid.addWidget(QLabel(f"{label}:"), grid_row, label_col)
+            grid.addWidget(field_box, grid_row, field_col)
 
         # ── 菜单快捷键 ──
+        menu_header_row = 1 + (len(_HOTKEY_FIELDS) + 1) // 2
         header = QLabel(tr("菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）"))
         header.setStyleSheet(f"color: {current_tokens().info}; font-weight: bold;")
+        header.setContentsMargins(0, 12, 0, 0)
         header.setWordWrap(True)
-        vbox.addWidget(header)
-        menu_form = QFormLayout()
+        grid.addWidget(header, menu_header_row, 0, 1, 6)
+
         self._menu_shortcut_combos: dict[str, Any] = {}
         overrides = getattr(self._config, "menu_shortcuts", {}) or {}
-        for entry in CORE_MENU_ITEMS:
+        for idx, entry in enumerate(CORE_MENU_ITEMS):
+            grid_row = menu_header_row + 1 + idx // 2
+            label_col, field_col = (0, 1) if idx % 2 == 0 else (3, 4)
+
             combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
             combo.addItem(tr("（不绑定）"), "")
             combo.addItems(_MENU_SHORTCUT_CHOICES)
@@ -1210,8 +1235,11 @@ class SettingsDialog(QDialog):
             index = combo.findText(current_shortcut) if current_shortcut else 0
             combo.setCurrentIndex(index if index >= 0 else 0)
             self._menu_shortcut_combos[entry.item_id] = combo
-            menu_form.addRow(f"{tr(entry.group)} · {tr(entry.label)}:", combo)
-        vbox.addLayout(menu_form)
+
+            grid.addWidget(QLabel(f"{tr(entry.group)} · {tr(entry.label)}:"), grid_row, label_col)
+            grid.addWidget(combo, grid_row, field_col, Qt.AlignmentFlag.AlignLeft)
+
+        vbox.addLayout(grid)
 
         vbox.addStretch()
         return tab

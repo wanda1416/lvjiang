@@ -124,20 +124,17 @@ def test_detail_page_tolerates_missing_key():
     assert _format_detail_label(kd, "quota", data) == ("", False)
 
 
-def test_locked_cell_uses_pause_button_grey_background():
-    """锁定单元格必须填**底色**，且用的是「暂停按钮默认那档灰」。
-
-    只有前景色的话，空文本等于什么都没显示；色值单独抄一个还会和按钮不一致。
-    """
+def test_locked_cell_uses_subtle_grey_background():
+    """锁定单元格必须填**极淡灰底色**（主题 surface_hover），不发黑突兀。"""
     from PyQt6.QtGui import QColor
     from PyQt6.QtWidgets import QApplication, QTableWidgetItem
 
     from lvjiang.ui.profile.cell_formatting import apply_cell_style
-    from lvjiang.ui.widgets.button_styles import DISABLED_BUTTON_BG
+    from lvjiang.ui.widgets.theme import current_tokens
 
     app = QApplication.instance() or QApplication([])  # noqa: F841 - 供控件使用
     item = QTableWidgetItem("")
     apply_cell_style(item, "locked")
-    assert item.background().color() == QColor(DISABLED_BUTTON_BG)
-    assert DISABLED_BUTTON_BG.upper() == "#78756E"   # 暂停按钮默认态
+    expected = QColor(current_tokens().surface_hover)
+    assert item.background().color() == expected
     assert item.text() == ""

@@ -165,6 +165,11 @@ settings_dialog:
   环境 key: Chave do ambiente
   用于重启后重新发现窗口: Usado para redescobrir a janela após reiniciar
   "总览设置": "Configurações de visão geral"
+  "当前有尚未保存的配置修改，关闭前是否保存？": "Há alterações de configuração não salvas. Salvar antes de fechar?"
+  "重启以应用新语言": "Reiniciar para aplicar o idioma"
+  "界面语言修改已保存，需重启律匠后生效。\n\n是否立即重启？选择「稍后重启」不会撤销已保存的修改，下次启动程序时自动生效。": "A alteração de idioma foi salva e entrará em vigor após reiniciar.\n\nReiniciar agora? Escolher \"Reiniciar depois\" não desfaz a alteração salva; ela será aplicada automaticamente na próxima inicialização."
+  "立即重启": "Reiniciar agora"
+  "稍后重启": "Reiniciar depois"
   "用户总览内容字号": "Tamanho do texto da visão geral"
   "用户信息内容字号": "Tamanho do texto de dados do usuário"
   "全局热键": "Atalhos globais"

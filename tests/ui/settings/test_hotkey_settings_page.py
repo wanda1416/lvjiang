@@ -9,7 +9,7 @@ def dialog(qtbot):
     from lvjiang.ui.settings.dialog import SettingsDialog
 
     widget = SettingsDialog(None)
-    qtbot.addWidget(widget)
+    qtbot.addWidget(widget, before_close_func=lambda w: setattr(w, "_bypass_close_guard", True))
     # 热键页在 __init__ 里已作为 Tab 构建，控件连同父级一起存活；不要重复构建，
     # 第二次构建出来的控件没有父级，会被 GC 掉。
     return widget

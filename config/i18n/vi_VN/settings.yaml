@@ -153,6 +153,11 @@ settings_dialog:
   环境 key: Khóa môi trường
   用于重启后重新发现窗口: Dùng để tìm lại cửa sổ sau khi khởi động lại
   "总览设置": "Cài đặt tổng quan"
+  "当前有尚未保存的配置修改，关闭前是否保存？": "Có thay đổi cấu hình chưa được lưu. Bạn có muốn lưu trước khi đóng không?"
+  "重启以应用新语言": "Khởi động lại để áp dụng ngôn ngữ mới"
+  "界面语言修改已保存，需重启律匠后生效。\n\n是否立即重启？选择「稍后重启」不会撤销已保存的修改，下次启动程序时自动生效。": "Thay đổi ngôn ngữ đã được lưu và sẽ có hiệu lực sau khi khởi động lại.\n\nKhởi động lại ngay? Chọn \"Khởi động lại sau\" sẽ không hủy thay đổi đã lưu; ngôn ngữ mới sẽ tự động áp dụng ở lần mở tiếp theo."
+  "立即重启": "Khởi động lại ngay"
+  "稍后重启": "Khởi động lại sau"
   "用户总览内容字号": "Cỡ chữ nội dung tổng quan"
   "用户信息内容字号": "Cỡ chữ nội dung thông tin người dùng"
   "全局热键": "Phím tắt toàn cục"

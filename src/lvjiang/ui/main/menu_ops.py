@@ -599,6 +599,7 @@ class MenuOpsMixin:
         dialog.android_apps_saved.connect(self._apply_android_app_settings)
         # 方案增删改后立刻重建顶部下拉，不用等下次启动
         dialog.plans_saved.connect(self._refresh_plan_combo)
+        dialog.restart_requested.connect(self._on_settings_restart_requested)
         if dialog.exec():
             # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
             active_hotkeys = self._user_config.hotkeys
@@ -607,6 +608,20 @@ class MenuOpsMixin:
             # 覆盖切换失败时仍可用的运行期键位。
             self._user_config.hotkeys = active_hotkeys
             self.statusBar().showMessage(tr("配置已保存"), 3000)
+
+    def _on_settings_restart_requested(self) -> None:
+        from PyQt6.QtCore import QTimer
+
+        QTimer.singleShot(0, self._restart_application)
+
+    def _restart_application(self) -> None:
+        """经由主窗口正常关闭清理后原地重启；若被运行中任务阻止则取消重启标记。"""
+        from ...app import cancel_application_restart, request_application_restart
+
+        request_application_restart()
+        self.close()
+        if self.isVisible():
+            cancel_application_restart()
 
     def _apply_android_app_settings(self, values: dict) -> None:
         """安卓应用注册表保存后立即替换运行期快照，无需重启程序。"""

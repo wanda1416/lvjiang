@@ -47,7 +47,11 @@ from ...core.config import (
     save_settings,
 )
 from ...i18n import tr, tr_in, tr_label
-from ..widgets.button_styles import apply_button_style, apply_compact_tool_button_style
+from ..widgets.button_styles import (
+    apply_button_style,
+    apply_compact_tool_button_style,
+    exec_styled_message_box,
+)
 from ..widgets.theme import current_tokens
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
@@ -157,6 +161,7 @@ class SettingsDialog(QDialog):
     font_sizes_saved = pyqtSignal(dict)
     android_apps_saved = pyqtSignal(dict)
     plans_saved = pyqtSignal()
+    restart_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -167,6 +172,7 @@ class SettingsDialog(QDialog):
         # 构建方案页时可能会把旧版空值/失效值归一化为表单实际显示值，
         # 此时底部保存按钮尚未创建；先独立记录脏状态，等按钮创建后同步。
         self._dirty = False
+        self._bypass_close_guard = False
         self._range_spins: dict[str, tuple[QDoubleSpinBox, QDoubleSpinBox]] = {}
         self._custom_rows: list[dict] = []
         self._setup_ui()
@@ -217,7 +223,7 @@ class SettingsDialog(QDialog):
         btn_row.addWidget(self._restart_hint)
         btn_row.addStretch()
         self._close_btn = QPushButton(tr("关闭"))
-        self._close_btn.clicked.connect(self.accept)
+        self._close_btn.clicked.connect(self._on_close_clicked)
         btn_row.addWidget(self._close_btn)
         apply_button_style(self._save_btn)
         apply_button_style(self._close_btn, variant="neutral")
@@ -255,6 +261,57 @@ class SettingsDialog(QDialog):
         self._dirty = True
         if hasattr(self, "_save_btn"):
             self._save_btn.setEnabled(True)
+
+    def _has_unsaved_changes(self) -> bool:
+        ai_page = getattr(self, "_ai_page", None)
+        ai_dirty = bool(ai_page is not None and ai_page.is_dirty())
+        return bool(getattr(self, "_dirty", False)) or ai_dirty
+
+    def _confirm_close_with_unsaved(self) -> bool:
+        """存在未保存修改时提示用户选择保存、放弃或取消关闭。"""
+        if not self._has_unsaved_changes():
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle(tr("未保存的修改"))
+        box.setText(tr("当前有尚未保存的配置修改，关闭前是否保存？"))
+        box.setStandardButtons(
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel
+        )
+        box.setDefaultButton(QMessageBox.StandardButton.Save)
+        choice = exec_styled_message_box(box)
+        if choice == QMessageBox.StandardButton.Cancel:
+            return False
+        if choice == QMessageBox.StandardButton.Save:
+            if self._dirty and not self._on_save():
+                return False
+            ai_page = getattr(self, "_ai_page", None)
+            if ai_page is not None and ai_page.is_dirty() and not ai_page.save():
+                return False
+            return True
+        self._dirty = False
+        return True
+
+    def _on_close_clicked(self) -> None:
+        if not self._confirm_close_with_unsaved():
+            return
+        self._bypass_close_guard = True
+        self.accept()
+
+    def reject(self) -> None:
+        if not getattr(self, "_bypass_close_guard", False) and not self._confirm_close_with_unsaved():
+            return
+        self._bypass_close_guard = True
+        super().reject()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt
+        if not getattr(self, "_bypass_close_guard", False) and not self._confirm_close_with_unsaved():
+            event.ignore()
+            return
+        self._bypass_close_guard = True
+        super().closeEvent(event)
 
     def _refresh_save_button_visibility(self, index: int) -> None:
         """独立保存的 AI 页和即时保存的隐私页隐藏全局保存按钮。"""
@@ -1971,20 +2028,20 @@ class SettingsDialog(QDialog):
             }
         return apps
 
-    def _on_save(self):
+    def _on_save(self) -> bool:
         delay_params = self._collect_custom()
         if delay_params is None:
-            return
+            return False
         hotkeys = self._collect_hotkeys()
         if hotkeys is None:
-            return
+            return False
         plan_error = self._validate_plans()
         if plan_error:
             QMessageBox.warning(self, tr("方案设置"), plan_error)
-            return
+            return False
         android_apps = self._collect_android_apps()
         if android_apps is None:
-            return
+            return False
         settings = {
             "android_recovery": {
                 "allow_adb_fallback": self._adb_fallback_cb.isChecked(),
@@ -2036,6 +2093,37 @@ class SettingsDialog(QDialog):
             entry["saved"] = bool(entry["key"].text().strip())
         for entry in self._android_app_rows:
             entry["saved"] = bool(entry["name"].text().strip())
+        previous_saved_lang = self._config.language
+        target_lang = settings["language"]
+        self._config.language = target_lang
         self._dirty = False
         self._save_btn.setEnabled(False)
         self._update_restart_hint()
+
+        from ...i18n import current_language
+
+        if target_lang and target_lang != previous_saved_lang and target_lang != current_language():
+            self._prompt_language_restart()
+        return True
+
+    def _prompt_language_restart(self) -> None:
+        """语言保存成功后立即询问是否原地重启；明确说明选择不重启也不会撤销已保存修改。"""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle(tr("重启以应用新语言"))
+        box.setText(
+            tr(
+                "界面语言修改已保存，需重启律匠后生效。\n\n"
+                "是否立即重启？选择「稍后重启」不会撤销已保存的修改，下次启动程序时自动生效。"
+            )
+        )
+        restart_btn = box.addButton(tr("立即重启"), QMessageBox.ButtonRole.AcceptRole)
+        later_btn = box.addButton(tr("稍后重启"), QMessageBox.ButtonRole.RejectRole)
+        apply_button_style(restart_btn, variant="action")
+        apply_button_style(later_btn, variant="neutral")
+        box.setDefaultButton(restart_btn)
+        box.exec()
+        if box.clickedButton() is restart_btn:
+            self.restart_requested.emit()
+            self._bypass_close_guard = True
+            self.accept()

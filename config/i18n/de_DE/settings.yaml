@@ -153,6 +153,11 @@ settings_dialog:
   环境 key: Umgebungs-Key
   用于重启后重新发现窗口: Dient zum erneuten Auffinden des Fensters nach einem Neustart
   "总览设置": "Übersichtseinstellungen"
+  "当前有尚未保存的配置修改，关闭前是否保存？": "Es gibt ungespeicherte Konfigurationsänderungen. Vor dem Schließen speichern?"
+  "重启以应用新语言": "Neu starten, um neue Sprache anzuwenden"
+  "界面语言修改已保存，需重启律匠后生效。\n\n是否立即重启？选择「稍后重启」不会撤销已保存的修改，下次启动程序时自动生效。": "Die Sprachänderung wurde gespeichert und wird nach einem Neustart wirksam.\n\nJetzt neu starten? Wenn Sie „Später neu starten“ wählen, bleibt die gespeicherte Änderung erhalten und wird beim nächsten Start automatisch angewendet."
+  "立即重启": "Jetzt neu starten"
+  "稍后重启": "Später neu starten"
   "用户总览内容字号": "Inhaltsschriftgröße Übersicht"
   "用户信息内容字号": "Inhaltsschriftgröße Benutzerinfo"
   "全局热键": "Globale Hotkeys"

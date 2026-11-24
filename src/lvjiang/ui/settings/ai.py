@@ -146,6 +146,7 @@ class AISettingsPage(QWidget):
             except AIError as error:
                 self._auto_allowed = False
                 self.status.setText(tr(str(error)))
+        self._saved_snapshot = self._snapshot()
         # 地址变化必须显式重填 Key，避免把旧服务凭据发送到新服务。
         self.url.textChanged.connect(self._url_changed)
         self.model.editTextChanged.connect(self._edited)
@@ -198,15 +199,30 @@ class AISettingsPage(QWidget):
         return AISettings(self.url.text(), self.model.currentText(), self.timeout.value()).validated(
             require_model=require_model)
 
-    def save(self):
+    def _snapshot(self) -> tuple[str, str, int, str]:
+        return (
+            self.url.text().strip(),
+            self.model.currentText().strip(),
+            self.timeout.value(),
+            self.key.text(),
+        )
+
+    def is_dirty(self) -> bool:
+        return self._snapshot() != self._saved_snapshot
+
+    def save(self) -> bool:
         try:
             self.store.save(self.settings(), self.key.text())
         except AIError as error:
             self.status.setText(tr(str(error)))
+            return False
         except Exception:
             self.status.setText(tr("保存失败，请检查配置目录权限"))
+            return False
         else:
+            self._saved_snapshot = self._snapshot()
             self.status.setText(tr("AI 配置已保存"))
+            return True
 
     def test(self):
         self._start_request(models=False)

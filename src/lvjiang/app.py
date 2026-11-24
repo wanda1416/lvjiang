@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import time
@@ -88,6 +89,59 @@ def _dispose_qt_objects() -> None:
         if not sip.isdeleted(_app):
             sip.delete(_app)
         _app = None
+
+
+_restart_requested = False
+
+
+def request_application_restart() -> None:
+    """标记当前事件循环退出后自动原地重启应用。"""
+    global _restart_requested
+    _restart_requested = True
+
+
+def cancel_application_restart() -> None:
+    """取消已登记的原地重启（例如主窗口因任务运行中拒绝关闭）。"""
+    global _restart_requested
+    _restart_requested = False
+
+
+def build_restart_command() -> list[str]:
+    """构造原地重启命令，兼容 PyInstaller 发行版与源码运行。"""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, *sys.argv[1:]]
+    return [sys.executable, "-m", "lvjiang", *sys.argv[1:]]
+
+
+def build_restart_env() -> dict[str, str]:
+    """清理 PyInstaller 注入的环境变量，防止子进程继承旧 bootloader 状态。"""
+    env = dict(os.environ)
+    env.pop("_MEIPASS2", None)
+    orig_ld = env.pop("LD_LIBRARY_PATH_ORIG", None)
+    if orig_ld is not None:
+        env["LD_LIBRARY_PATH"] = orig_ld
+    elif getattr(sys, "frozen", False):
+        env.pop("LD_LIBRARY_PATH", None)
+    return env
+
+
+def spawn_restarted_process():
+    """在单实例锁释放后以分离进程模式拉起新实例。"""
+    import subprocess
+
+    cmd = build_restart_command()
+    env = build_restart_env()
+    kwargs: dict = {
+        "env": env,
+        "close_fds": True,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = (
+            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+        )
+    else:
+        kwargs["start_new_session"] = True
+    return subprocess.Popen(cmd, **kwargs)
 
 
 def run_app(hooks_list: list[Any] | None = None) -> int:
@@ -185,4 +239,14 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     exit_code = _app.exec()
     _dispose_qt_objects()
+    global _restart_requested
+    if _restart_requested:
+        _restart_requested = False
+        from .core.access import close_instance
+
+        close_instance()
+        try:
+            spawn_restarted_process()
+        except Exception as exc:  # noqa: BLE001
+            logger.opt(exception=exc).error(f"原地重启拉起新进程失败: {exc}")
     return exit_code

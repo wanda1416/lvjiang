@@ -92,8 +92,8 @@ _MENU_SHORTCUT_CHOICES = (
 # 数值输入框统一定宽，避免被布局拉满整行
 _SPIN_WIDTH = 90
 # 热键行的两个下拉定宽：闭合框不随最长候选撑开，候选只在展开列表里体现。
-_HOTKEY_MODIFIER_WIDTH = 84
-_HOTKEY_KEY_WIDTH = 90
+_HOTKEY_MODIFIER_WIDTH = 76
+_HOTKEY_KEY_WIDTH = 76
 _MENU_SHORTCUT_WIDTH = 110
 
 
@@ -1097,13 +1097,6 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
-        caption = QLabel(tr(
-            "只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，"
-            "包括列表表头；顶部工具栏按钮保持不变。"
-        ))
-        caption.setWordWrap(True)
-        vbox.addWidget(caption)
-
         row = QHBoxLayout()
         row.setSpacing(8)
         default_size = self._default_font_point_size(tab)
@@ -1114,7 +1107,7 @@ class SettingsDialog(QDialog):
         self._overview_font_spin.setSuffix(" pt")
         self._overview_font_spin.setValue(fonts.user_overview or default_size)
         self._overview_font_spin.setFixedWidth(_SPIN_WIDTH)
-        row.addWidget(QLabel(tr("用户总览字号") + ":"))
+        row.addWidget(QLabel(tr("用户总览内容字号") + ":"))
         row.addWidget(self._overview_font_spin)
 
         row.addSpacing(24)
@@ -1124,7 +1117,7 @@ class SettingsDialog(QDialog):
         self._user_info_font_spin.setSuffix(" pt")
         self._user_info_font_spin.setValue(fonts.user_info or default_size)
         self._user_info_font_spin.setFixedWidth(_SPIN_WIDTH)
-        row.addWidget(QLabel(tr("用户信息字号") + ":"))
+        row.addWidget(QLabel(tr("用户信息内容字号") + ":"))
         row.addWidget(self._user_info_font_spin)
         row.addStretch(1)
 
@@ -1146,25 +1139,43 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
-        # 系统级全局热键与菜单快捷键共用同一 QGridLayout（两栏各占 标签+控件 2 列，
-        # 中间以 col=2 留白），确保上下两段的第二列严格垂直对齐。
+        # 系统级全局热键与菜单快捷键共用同一 3 列 QGridLayout（三组栏位分别占
+        # col 0/1、col 3/4、col 6/7，栏间以 col=2/5 留白），确保上下三列严格对齐。
+        cols = 3
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(8)
-        grid.setColumnMinimumWidth(2, 24)
-        grid.setColumnStretch(5, 1)
+        grid.setColumnMinimumWidth(2, 16)
+        grid.setColumnMinimumWidth(5, 16)
+        grid.setColumnStretch(8, 1)
         self._hotkey_grid = grid
 
-        warn = QLabel(tr("以下为系统级全局热键，保存后立即生效。"))
-        warn.setStyleSheet(f"color: {current_tokens().success}; font-weight: bold;")
-        warn.setWordWrap(True)
-        grid.addWidget(warn, 0, 0, 1, 6)
+        def _section_title(title: str, tip: str, *, top_margin: int = 0) -> QWidget:
+            box = QWidget()
+            row = QHBoxLayout(box)
+            row.setContentsMargins(0, top_margin, 0, 0)
+            row.setSpacing(6)
+            lbl = QLabel(title)
+            lbl.setStyleSheet("font-weight: bold;")
+            row.addWidget(lbl)
+            row.addWidget(self._tip_button(tip))
+            row.addStretch(1)
+            return box
+
+        grid.addWidget(
+            _section_title(
+                tr("全局热键"),
+                tr("系统级全局热键，保存后立即生效。"),
+            ),
+            0, 0, 1, 9,
+        )
 
         hk = self._config.hotkeys
         self._hotkey_combos: dict[str, tuple[Any, Any]] = {}
         for idx, (name, label) in enumerate(_HOTKEY_FIELDS):
-            grid_row = 1 + idx // 2
-            label_col, field_col = (0, 1) if idx % 2 == 0 else (3, 4)
+            grid_row = 1 + idx // cols
+            col_group = idx % cols
+            label_col, field_col = col_group * 3, col_group * 3 + 1
 
             modifier_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
             for value, modifier_label in _MODIFIER_CHOICES:
@@ -1187,7 +1198,7 @@ class SettingsDialog(QDialog):
             field_box = QWidget()
             field_row = QHBoxLayout(field_box)
             field_row.setContentsMargins(0, 0, 0, 0)
-            field_row.setSpacing(6)
+            field_row.setSpacing(4)
             field_row.addWidget(modifier_combo)
             field_row.addWidget(key_combo)
             field_row.addStretch(1)
@@ -1214,18 +1225,28 @@ class SettingsDialog(QDialog):
             grid.addWidget(field_box, grid_row, field_col)
 
         # ── 菜单快捷键 ──
-        menu_header_row = 1 + (len(_HOTKEY_FIELDS) + 1) // 2
-        header = QLabel(tr("菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）"))
-        header.setStyleSheet(f"color: {current_tokens().info}; font-weight: bold;")
-        header.setContentsMargins(0, 12, 0, 0)
-        header.setWordWrap(True)
-        grid.addWidget(header, menu_header_row, 0, 1, 6)
+        divider_row = 1 + (len(_HOTKEY_FIELDS) + cols - 1) // cols
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setFrameShadow(QFrame.Shadow.Sunken)
+        grid.addWidget(divider, divider_row, 0, 1, 9)
+
+        menu_header_row = divider_row + 1
+        grid.addWidget(
+            _section_title(
+                tr("菜单快捷键"),
+                tr("仅在窗口内生效，窗口失焦时不抢游戏按键。"),
+                top_margin=4,
+            ),
+            menu_header_row, 0, 1, 9,
+        )
 
         self._menu_shortcut_combos: dict[str, Any] = {}
         overrides = getattr(self._config, "menu_shortcuts", {}) or {}
         for idx, entry in enumerate(CORE_MENU_ITEMS):
-            grid_row = menu_header_row + 1 + idx // 2
-            label_col, field_col = (0, 1) if idx % 2 == 0 else (3, 4)
+            grid_row = menu_header_row + 1 + idx // cols
+            col_group = idx % cols
+            label_col, field_col = col_group * 3, col_group * 3 + 1
 
             combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
             combo.addItem(tr("（不绑定）"), "")

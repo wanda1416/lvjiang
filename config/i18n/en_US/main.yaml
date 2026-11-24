@@ -354,7 +354,6 @@ task_params_dialog:
 
 hotkey_settings:
   "菜单快捷键有冲突，请检查后重试：": "Menu shortcuts conflict; please check and try again: "
-  "菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）": "Menu shortcuts (window-only; they do not capture keys while the window is unfocused)"
   "（不绑定）": "(unbound)"
   "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Press once to minimize to the system tray and again to bring the window back. The tray icon may not appear depending on notification-area settings; this shortcut is the only reliable way back once the window is hidden."
 

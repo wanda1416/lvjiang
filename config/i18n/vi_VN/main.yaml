@@ -351,7 +351,6 @@ task_params_dialog:
   方向键 ← / → 切换上一个 / 下一个: Phím mũi tên ← / → chuyển sang mục trước / sau
 hotkey_settings:
   菜单快捷键有冲突，请检查后重试：: "Phím tắt menu bị trùng; hãy kiểm tra và thử lại: "
-  菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）: Phím tắt menu (chỉ trong cửa sổ; không bắt phím khi cửa sổ không được chọn)
   （不绑定）: (chưa gán)
   按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。: "Nhấn một lần để thu nhỏ xuống khay hệ thống, nhấn lần nữa để mở lại. Biểu tượng khay có thể không hiện tùy cấu hình vùng thông báo; phím tắt này là cách duy nhất đáng tin để lấy lại cửa sổ đã ẩn."
 task_diagnostics_dialog:

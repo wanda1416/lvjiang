@@ -62,7 +62,6 @@ settings_dialog:
   从当前组合新建: Aus aktueller Kombination erstellen
   代理不可用时允许降级为 ADB 输入: Fallback auf ADB-Eingabe zulassen, wenn der Agent nicht verfügbar ist
   代理重连次数: Agent-Wiederverbindungsversuche
-  以下为系统级全局热键，保存后立即生效。: Die folgenden systemweiten Hotkeys werden nach dem Speichern sofort wirksam.
   会员包 v{version}: Mitgliedspaket v{version}
   停止 / 结束: Stopp / Beenden
   免绑定: Ohne Gerätebindung
@@ -76,7 +75,6 @@ settings_dialog:
   功能激活: Funktionsaktivierung
   参与匿名数据收集，帮助改进内置规则: An anonymer Datenerfassung teilnehmen, um integrierte Regeln zu verbessern
   参数 key: Parameter-Key
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Passt nur die Schriftgröße des Inhalts unterhalb der Aktualisieren-Symbolleiste in „Benutzerübersicht“ und „Benutzerinfo“ an (einschließlich Listenköpfen); die oberen Symbolleisten-Schaltflächen bleiben unverändert.
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Unten können Sie Ankündigungen, Versionsupdates, Online-Konfiguration und anonyme Datenberichte einzeln steuern.
   后台截图 (WGC，Beta): Hintergrundaufnahme (WGC, Beta)
   后台输入 (PostMessage): Hintergrundeingabe (PostMessage)
@@ -154,9 +152,13 @@ settings_dialog:
   热键不能重复绑定同一个按键，请检查后重试: Dieselbe Taste kann nicht mehreren Hotkeys zugewiesen werden; bitte prüfen und erneut versuchen
   环境 key: Umgebungs-Key
   用于重启后重新发现窗口: Dient zum erneuten Auffinden des Fensters nach einem Neustart
-  用户信息字号: Schriftgröße Benutzerinfo
-  用户总览字号: Schriftgröße Benutzerübersicht
   "总览设置": "Übersichtseinstellungen"
+  "用户总览内容字号": "Inhaltsschriftgröße Übersicht"
+  "用户信息内容字号": "Inhaltsschriftgröße Benutzerinfo"
+  "全局热键": "Globale Hotkeys"
+  "系统级全局热键，保存后立即生效。": "Systemweite globale Hotkeys werden nach dem Speichern sofort wirksam."
+  "菜单快捷键": "Menü-Tastenkürzel"
+  "仅在窗口内生效，窗口失焦时不抢游戏按键。": "Nur bei fokussiertem Fenster aktiv; blockiert im Hintergrund keine Spieltasten."
   界面语言: Oberflächensprache
   留空自动解析 Launcher: Leer lassen, um den Launcher automatisch aufzulösen
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: Die Zielumgebung bestimmt den Rückgabewert von env() in der DSL, um die Navigationsstrategie zwischen PC- und Mobilspielen zu unterscheiden. Gemeint ist die Laufzeitumgebung des Spiels, nicht das Betriebssystem dieses Computers.

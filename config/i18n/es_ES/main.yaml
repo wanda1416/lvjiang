@@ -351,7 +351,6 @@ task_params_dialog:
   方向键 ← / → 切换上一个 / 下一个: Las flechas ← / → cambian al elemento anterior / siguiente
 hotkey_settings:
   菜单快捷键有冲突，请检查后重试：: 'Hay conflictos entre atajos de menú; revísalos e inténtalo de nuevo: '
-  菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）: Atajos de menú (solo en la ventana; no capturan teclas cuando la ventana no tiene el foco)
   （不绑定）: (sin asignar)
   按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。: Pulsa una vez para minimizar a la bandeja y otra para volver. La configuración del área de notificación puede ocultar el icono; este atajo es la única forma fiable de recuperar la ventana oculta.
 task_diagnostics_dialog:

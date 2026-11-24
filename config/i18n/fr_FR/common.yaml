@@ -2203,7 +2203,6 @@ settings_dialog:
   从当前组合新建: Nouveau depuis la combinaison actuelle
   代理不可用时允许降级为 ADB 输入: Autoriser le basculement sur la saisie ADB si l'agent est indisponible
   代理重连次数: Tentatives de reconnexion de l'agent
-  以下为系统级全局热键，保存后立即生效。: Les raccourcis ci-dessous sont globaux au système et prennent effet immédiatement après enregistrement.
   会员包 v{version}: Pack membre v{version}
   停止 / 结束: Arrêter / Terminer
   免绑定: Sans liaison machine
@@ -2217,7 +2216,6 @@ settings_dialog:
   功能激活: Activation des fonctionnalités
   参与匿名数据收集，帮助改进内置规则: Participer à la collecte anonyme pour améliorer les règles intégrées
   参数 key: Clé de paramètre
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Ajuste uniquement la taille de police du contenu sous la barre d'actualisation dans « Vue d'ensemble » et « Infos utilisateur », en-têtes inclus ; les boutons de la barre supérieure ne changent pas.
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Vous pouvez contrôler séparément ci-dessous les annonces, les mises à jour, la configuration en ligne et les statistiques anonymes.
   后台截图 (WGC，Beta): Capture en arrière-plan (WGC, Bêta)
   后台输入 (PostMessage): Saisie en arrière-plan (PostMessage)
@@ -2307,8 +2305,6 @@ settings_dialog:
   热键不能重复绑定同一个按键，请检查后重试: Impossible d'assigner la même touche à plusieurs raccourcis ; vérifiez et réessayez
   环境 key: Clé d'environnement
   用于重启后重新发现窗口: Utilisé pour retrouver la fenêtre après redémarrage
-  用户信息字号: Taille de police Infos utilisateur
-  用户总览字号: Taille de police Vue d'ensemble
   界面语言: Langue de l'interface
   重启应用后生效: Prend effet après redémarrage de l'application
   留空自动解析 Launcher: Laisser vide pour résoudre le lanceur automatiquement

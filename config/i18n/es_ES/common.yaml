@@ -2203,7 +2203,6 @@ settings_dialog:
   从当前组合新建: Crear a partir de la combinación actual
   代理不可用时允许降级为 ADB 输入: Permitir retroceso a entrada ADB si el agente no está disponible
   代理重连次数: Intentos de reconexión del agente
-  以下为系统级全局热键，保存后立即生效。: Los atajos globales del sistema indicados abajo entran en vigor inmediatamente al guardar.
   会员包 v{version}: Paquete de miembro v{version}
   停止 / 结束: Detener / Finalizar
   免绑定: Sin vinculación de equipo
@@ -2217,7 +2216,6 @@ settings_dialog:
   功能激活: Activación de funciones
   参与匿名数据收集，帮助改进内置规则: Participar en la recopilación anónima de datos para ayudar a mejorar las reglas integradas
   参数 key: Clave del parámetro
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Ajusta solo el tamaño de fuente del contenido bajo la barra de actualización en «Resumen de usuarios» e «Información de usuario», incluidos los encabezados de lista; los botones de la barra superior no cambian.
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Debajo puedes controlar por separado los avisos, las actualizaciones de versión, la configuración en línea y el envío anónimo de datos.
   后台截图 (WGC，Beta): Captura en segundo plano (WGC, Beta)
   后台输入 (PostMessage): Entrada en segundo plano (PostMessage)
@@ -2307,8 +2305,6 @@ settings_dialog:
   热键不能重复绑定同一个按键，请检查后重试: No se puede asignar la misma tecla a varios atajos; revísalo e inténtalo de nuevo
   环境 key: Clave del entorno
   用于重启后重新发现窗口: Se usa para volver a localizar la ventana tras un reinicio
-  用户信息字号: Tamaño de fuente de Información de usuario
-  用户总览字号: Tamaño de fuente de Resumen de usuarios
   界面语言: Idioma de la interfaz
   重启应用后生效: Surte efecto al reiniciar la aplicación
   留空自动解析 Launcher: Dejar vacío para detectar el Launcher automáticamente

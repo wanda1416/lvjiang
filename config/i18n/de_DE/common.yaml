@@ -1975,7 +1975,6 @@ settings_dialog:
   从当前组合新建: Aus aktueller Kombination erstellen
   代理不可用时允许降级为 ADB 输入: Bei Nichtverfügbarkeit des Agents Rückfall auf ADB-Eingabe erlauben
   代理重连次数: Agent-Wiederverbindungsversuche
-  以下为系统级全局热键，保存后立即生效。: Nachfolgend sind systemweite globale Tastenkombinationen aufgeführt; Änderungen gelten sofort nach dem Speichern.
   会员包 v{version}: Mitgliederpaket v{version}
   停止 / 结束: Stopp / Beenden
   免绑定: Ohne Gerätebindung
@@ -1989,7 +1988,6 @@ settings_dialog:
   功能激活: Funktionsaktivierung
   参与匿名数据收集，帮助改进内置规则: An anonymer Datenerfassung teilnehmen, um integrierte Regeln zu verbessern
   参数 key: Parameterschlüssel
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Passt nur die Schriftgröße der Inhalte unterhalb der Aktualisieren-Symbolleiste in „Benutzerübersicht“ und „Benutzerinformationen“ (inkl. Tabellenköpfen) an; die oberen Symbolleisten-Schaltflächen bleiben unverändert.
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Unten lassen sich Ankündigungen, Versionsupdates, Online-Konfiguration und anonyme Datenübermittlung getrennt steuern.
   后台截图 (WGC，Beta): Hintergrunderfassung (WGC, Beta)
   后台输入 (PostMessage): Hintergrundeingabe (PostMessage)
@@ -2067,8 +2065,6 @@ settings_dialog:
   热键不能重复绑定同一个按键，请检查后重试: Dieselbe Taste darf nicht mehrfach für Tastenkombinationen belegt werden; bitte prüfen und erneut versuchen
   环境 key: Umgebungsschlüssel
   用于重启后重新发现窗口: Wird zum Wiederauffinden des Fensters nach einem Neustart verwendet
-  用户信息字号: Schriftgröße Benutzerinformationen
-  用户总览字号: Schriftgröße Benutzerübersicht
   界面语言: Oberflächensprache
   重启应用后生效: Wird nach Neustart der Anwendung wirksam
   留空自动解析 Launcher: Leer lassen, um den Launcher automatisch zu ermitteln

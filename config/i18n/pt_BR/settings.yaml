@@ -62,7 +62,6 @@ settings_dialog:
   从当前组合新建: Novo a partir da combinação atual
   代理不可用时允许降级为 ADB 输入: Permitir fallback para entrada ADB quando o agente estiver indisponível
   代理重连次数: Tentativas de reconexão do agente
-  以下为系统级全局热键，保存后立即生效。: Os atalhos globais do sistema abaixo entram em vigor imediatamente após salvar.
   会员包 v{version}: Pacote de membro v{version}
   停止 / 结束: Parar / Encerrar
   免绑定: Sem vínculo à máquina
@@ -76,7 +75,6 @@ settings_dialog:
   功能激活: Ativação
   参与匿名数据收集，帮助改进内置规则: Participar da coleta anônima de dados para ajudar a melhorar as regras integradas
   参数 key: Chave do parâmetro
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Ajusta apenas o tamanho da fonte do conteúdo abaixo da barra de atualização em "Visão geral de usuários" e "Informações do usuário", incluindo os cabeçalhos das listas; os botões da barra superior não mudam.
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Abaixo você pode controlar separadamente avisos, atualizações de versão, configuração online e envio anônimo de dados.
   后台截图 (WGC，Beta): Captura em segundo plano (WGC, Beta)
   后台输入 (PostMessage): Entrada em segundo plano (PostMessage)
@@ -166,9 +164,13 @@ settings_dialog:
   热键不能重复绑定同一个按键，请检查后重试: Os atalhos não podem usar a mesma tecla repetida; verifique e tente novamente
   环境 key: Chave do ambiente
   用于重启后重新发现窗口: Usado para redescobrir a janela após reiniciar
-  用户信息字号: Tamanho da fonte de Informações do usuário
-  用户总览字号: Tamanho da fonte de Visão geral de usuários
   "总览设置": "Configurações de visão geral"
+  "用户总览内容字号": "Tamanho do texto da visão geral"
+  "用户信息内容字号": "Tamanho do texto de dados do usuário"
+  "全局热键": "Atalhos globais"
+  "系统级全局热键，保存后立即生效。": "Atalhos globais do sistema, aplicados imediatamente após salvar."
+  "菜单快捷键": "Atalhos de menu"
+  "仅在窗口内生效，窗口失焦时不抢游戏按键。": "Ativos apenas com a janela em foco, sem interferir nas teclas do jogo."
   界面语言: Idioma da interface
   留空自动解析 Launcher: Deixe em branco para resolver o Launcher automaticamente
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: O ambiente de destino define o valor retornado por env() na DSL, diferenciando a estratégia de navegação entre jogos de PC e mobile. Refere-se ao ambiente em que o jogo roda, não ao sistema operacional desta máquina.

@@ -54,28 +54,31 @@ def test_menu_shortcut_colliding_with_global_hotkey_is_reported(dialog):
     problems = dialog._menu_shortcut_problems({"start": "Alt+H"})
 
     assert problems
-def test_hotkey_tab_uses_aligned_two_column_grid_and_overview_settings_tab(dialog):
-    """全局热键 3×2、菜单快捷键每行 2 列且与全局热键第二列对齐；字体设置改为总览设置 1×2。"""
+def test_hotkey_tab_uses_aligned_three_column_grid_and_clean_overview_settings(dialog):
+    """全局热键 2×3、菜单快捷键 4×3 且三列对齐；总览设置 1×2 且无冗长顶部说明。"""
     grid = dialog._hotkey_grid
     hk_positions = []
     for modifier_combo, _key_combo in dialog._hotkey_combos.values():
         idx = grid.indexOf(modifier_combo.parentWidget())
         row, col, _rs, _cs = grid.getItemPosition(idx)
         hk_positions.append((row, col))
-    assert len({r for r, _ in hk_positions}) == 3
-    assert {c for _, c in hk_positions} == {1, 4}
+    assert len({r for r, _ in hk_positions}) == 2
+    assert {c for _, c in hk_positions} == {1, 4, 7}
 
     menu_positions = []
     for combo in dialog._menu_shortcut_combos.values():
         idx = grid.indexOf(combo)
         row, col, _rs, _cs = grid.getItemPosition(idx)
         menu_positions.append((row, col))
-    assert len({r for r, _ in menu_positions}) == 6
-    assert {c for _, c in menu_positions} == {1, 4}
+    assert len({r for r, _ in menu_positions}) == 4
+    assert {c for _, c in menu_positions} == {1, 4, 7}
 
-    from PyQt6.QtWidgets import QGroupBox
+    from PyQt6.QtWidgets import QGroupBox, QLabel
 
     group_titles = [gb.title() for gb in dialog.findChildren(QGroupBox)]
     assert "总览设置" in group_titles
     assert "字体设置" not in group_titles
-    assert dialog._overview_font_spin.parentWidget() is dialog._user_info_font_spin.parentWidget()
+    font_container = dialog._overview_font_spin.parentWidget()
+    assert font_container is dialog._user_info_font_spin.parentWidget()
+    font_labels = {lbl.text() for lbl in font_container.findChildren(QLabel)}
+    assert font_labels == {"用户总览内容字号:", "用户信息内容字号:"}

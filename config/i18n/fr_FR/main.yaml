@@ -433,7 +433,6 @@ task_params_dialog:
   方向键 ← / → 切换上一个 / 下一个: Les flèches ← / → passent à l'élément précédent / suivant
 hotkey_settings:
   菜单快捷键有冲突，请检查后重试：: 'Conflit de raccourcis de menu ; vérifiez puis réessayez : '
-  菜单快捷键（只在窗口内生效，保留窗口失焦时不抢游戏按键）: Raccourcis de menu (fenêtre uniquement ; ils ne capturent pas les touches quand la fenêtre est inactive)
   （不绑定）: (non défini)
   按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。: Appuyez une fois pour réduire dans la zone de notification, encore une fois pour revenir. Selon les réglages de la zone de notification, l'icône peut ne pas s'afficher ; ce raccourci est le seul moyen fiable de retrouver la fenêtre.
 task_diagnostics_dialog:

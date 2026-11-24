@@ -62,7 +62,6 @@ settings_dialog:
   从当前组合新建: Tạo mới từ tổ hợp hiện tại
   代理不可用时允许降级为 ADB 输入: Cho phép hạ cấp về đầu vào ADB khi tác nhân không khả dụng
   代理重连次数: Số lần kết nối lại tác nhân
-  以下为系统级全局热键，保存后立即生效。: "Dưới đây là các phím tắt toàn cục cấp hệ thống, có hiệu lực ngay sau khi lưu."
   "会员包 v{version}": "Gói hội viên v{version}"
   停止 / 结束: Dừng / Kết thúc
   免绑定: Không ràng buộc máy
@@ -76,7 +75,6 @@ settings_dialog:
   功能激活: Kích hoạt tính năng
   参与匿名数据收集，帮助改进内置规则: Tham gia thu thập dữ liệu ẩn danh để giúp cải thiện quy tắc tích hợp sẵn
   参数 key: Khóa tham số
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: "Chỉ điều chỉnh cỡ chữ nội dung bên dưới thanh công cụ làm mới trong \"Tổng quan người dùng\" và \"Thông tin người dùng\", bao gồm tiêu đề danh sách; các nút trên thanh công cụ phía trên giữ nguyên."
   可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: "Bạn có thể điều khiển riêng thông báo, cập nhật phiên bản, cấu hình trực tuyến và báo cáo dữ liệu ẩn danh bên dưới."
   后台截图 (WGC，Beta): "Chụp nền sau (WGC, Beta)"
   后台输入 (PostMessage): Đầu vào nền sau (PostMessage)
@@ -154,9 +152,13 @@ settings_dialog:
   热键不能重复绑定同一个按键，请检查后重试: "Không thể gán trùng một phím cho nhiều phím tắt, vui lòng kiểm tra và thử lại"
   环境 key: Khóa môi trường
   用于重启后重新发现窗口: Dùng để tìm lại cửa sổ sau khi khởi động lại
-  用户信息字号: Cỡ chữ Thông tin người dùng
-  用户总览字号: Cỡ chữ Tổng quan người dùng
   "总览设置": "Cài đặt tổng quan"
+  "用户总览内容字号": "Cỡ chữ nội dung tổng quan"
+  "用户信息内容字号": "Cỡ chữ nội dung thông tin người dùng"
+  "全局热键": "Phím tắt toàn cục"
+  "系统级全局热键，保存后立即生效。": "Phím tắt toàn cục cấp hệ thống, có hiệu lực ngay sau khi lưu."
+  "菜单快捷键": "Phím tắt menu"
+  "仅在窗口内生效，窗口失焦时不抢游戏按键。": "Chỉ hoạt động khi cửa sổ đang được chọn, không chiếm phím game khi mất tiêu điểm."
   界面语言: Ngôn ngữ giao diện
   留空自动解析 Launcher: Để trống để tự động phân giải Launcher
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: "Môi trường đích quyết định giá trị trả về của env() trong DSL, dùng để phân biệt chiến lược điều hướng giữa game PC và game di động. Đây là môi trường nơi trò chơi chạy, không phải hệ điều hành của máy này."

@@ -1,90 +1,90 @@
 common:
-  title: Image Recognition
-  匹配分组: Match group
-  区域间隔: Region gap
-  单批内容最大高度: Max height per batch
-  清洗组: Cleaning group
-  画布最小边长: Min canvas side
-  识别结果（已应用清洗规则）: Recognition result (cleaning rules applied)
+  title: 画像認識
+  匹配分组: マッチグループ
+  区域间隔: 領域間隔
+  单批内容最大高度: 1バッチあたりの最大高さ
+  清洗组: クレンジンググループ
+  画布最小边长: キャンバス最小辺長
+  识别结果（已应用清洗规则）: 認識結果（クレンジングルール適用済み）
 main_window:
-  就绪: Ready
+  就绪: 準備完了
 menu_ops:
-  图像识别: OCR
+  图像识别: 画像認識
 ocr_dialog:
-  (无匹配): (No Match)
-  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Ctrl+V to paste a screenshot, or click "Upload Image" to load a file
-  key 不能为空: key cannot be empty
-  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: The maximum total height allowed per batch of regions; anything beyond splits into the next batch.
-  上传图片: Upload Image
-  从设备获取最新截图: Grab the latest screenshot from the device
-  创建规则组: Create Rule Group
-  删除规则组: Delete Rule Group
-  刷新截图不可用：未连接设备或未传入回调: 'Refresh screenshot unavailable: device not connected or callback not provided'
-  刷新截图失败: Failed to refresh the screenshot
-  匹配参考图: Match Reference Image
-  区域批量识别: Batch Region Recognition
+  (无匹配): (一致なし)
+  Ctrl+V 粘贴截图，或点击「上传图片」加载文件: Ctrl+V でスクリーンショットを貼り付けるか、「画像をアップロード」をクリックしてファイルを読み込みます
+  key 不能为空: key は空にできません
+  一批区域内容允许的最大总高度，超过后拆分为下一批识别。: 1バッチの領域に許可される最大合計高さです。超過すると次のバッチに分割されます。
+  上传图片: 画像をアップロード
+  从设备获取最新截图: デバイスから最新のスクリーンショットを取得
+  创建规则组: ルールグループを作成
+  删除规则组: ルールグループを削除
+  刷新截图不可用：未连接设备或未传入回调: スクリーンショットを更新できません：デバイス未接続またはコールバック未設定
+  刷新截图失败: スクリーンショットの更新に失敗しました
+  匹配参考图: 参照画像と照合
+  区域批量识别: 領域一括認識
   ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
-  : "Batch region recognition stitches multiple text regions into one canvas and calls OCR once.\nThese parameters control the stitched size; they take effect from the next recognition after saving."
-  原始文本: Raw Text
-  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: OCR settings have unsaved changes; quit and discard them?
-  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Image files (*.png *.jpg *.jpeg *.bmp *.webp);;All files (*)
-  已撤销未保存的清洗规则修改: Reverted unsaved cleaning-rule changes
-  已撤销未保存的识别配置修改: Reverted unsaved recognition-config changes
-  已清除选框: Selection cleared
-  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: Minimum width and height of the stitched canvas. Too small and narrow regions get hugely upscaled by the OCR detector.
-  撤销清洗规则: Undo Cleaning Rules
-  撤销识别配置: Undo Recognition Config
-  文本替换（精确匹配）: Text replacement (exact match)
-  无图片: No image
-  无法读取剪贴板图片: Cannot read the clipboard image
+  : "領域一括認識では複数のテキスト領域を1枚のキャンバスに結合し、OCR を1回だけ呼び出します。\nこれらのパラメータは結合サイズを制御し、保存後の次回認識から有効になります。"
+  原始文本: 生テキスト
+  图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: 画像認識設定に未保存の変更があります。変更を破棄して終了しますか？
+  图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): 画像ファイル (*.png *.jpg *.jpeg *.bmp *.webp);;すべてのファイル (*)
+  已撤销未保存的清洗规则修改: 未保存のクレンジングルールの変更を取り消しました
+  已撤销未保存的识别配置修改: 未保存の認識設定の変更を取り消しました
+  已清除选框: 選択枠をクリアしました
+  拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。: 結合キャンバスの幅・高さの最小値です。小さすぎると細い領域が OCR 検出器によって大幅に拡大されます。
+  撤销清洗规则: クレンジングルールの変更を元に戻す
+  撤销识别配置: 認識設定の変更を元に戻す
+  文本替换（精确匹配）: テキスト置換（完全一致）
+  无图片: 画像なし
+  无法读取剪贴板图片: クリップボードの画像を読み込めません
   替换为: 置換後
-  未匹配到参考图: No reference image matched
-  未识别到文字: No text recognized
-  正则替换: Regex replacement
+  未匹配到参考图: 一致する参照画像がありません
+  未识别到文字: テキストが認識されませんでした
+  正则替换: 正規表現置換
   正则表达式: 正規表現
-  正在刷新截图...: Refreshing screenshot...
-  正在匹配参考图...: Matching reference images...
-  正在识别文字...: Recognizing text...
-  测试: Test
-  测试清洗效果: Test Cleaning
-  添加替换规则: Add replacement rule
-  添加正则规则: Add regex rule
-  清洗结果...: Cleaning result...
-  清洗规则: Cleaning Rules
-  清洗规则已保存: Cleaning rules saved
-  清空画布: Clear Canvas
-  清除红色选框: Clear red selection
-  清除选择: Clear Selection
-  相邻文字区域在拼图中的间隔。: Gap between adjacent text regions in the stitched canvas.
-  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: Delete rule group "{name}"? Workflows referencing it will fail to run.
-  确定撤销本次所有未保存的清洗规则更改吗？: Undo all unsaved cleaning-rule changes made this session?
-  确定撤销本次所有未保存的识别配置更改吗？: Undo all unsaved recognition-config changes made this session?
-  '行 {n}: 无效的正则表达式': 'Row {n}: invalid regular expression'
-  规则组 key（用于 with 声明）: Rule group key (used in with clauses)
-  规则组名称: Rule group name
-  规则组已创建: Rule group created
-  规则组已删除: Rule group deleted
-  规则组已重命名: Rule group renamed
-  识别失败: Recognition failed
-  识别文字: Recognize Text
-  识别配置: Recognition Config
-  识别配置已保存: Recognition config saved
-  请先保存或取消当前清洗组的修改: Save or discard the current cleaning group's changes first
-  输入测试文本...: Enter test text...
-  选择图片: Select Image
-  选框区域为空: The selection region is empty
-  重命名规则组: Rename Rule Group
+  正在刷新截图...: スクリーンショットを更新中...
+  正在匹配参考图...: 参照画像を照合中...
+  正在识别文字...: テキストを認識中...
+  测试: テスト
+  测试清洗效果: クレンジング結果をテスト
+  添加替换规则: 置換ルールを追加
+  添加正则规则: 正規表現ルールを追加
+  清洗结果...: クレンジング結果...
+  清洗规则: クレンジングルール
+  清洗规则已保存: クレンジングルールを保存しました
+  清空画布: キャンバスをクリア
+  清除红色选框: 赤色の選択枠をクリア
+  清除选择: 選択をクリア
+  相邻文字区域在拼图中的间隔。: 結合キャンバス内の隣接するテキスト領域間の間隔です。
+  确定删除规则组「{name}」吗？引用它的工作流将无法执行。: ルールグループ「{name}」を削除しますか？これを参照しているワークフローは実行できなくなります。
+  确定撤销本次所有未保存的清洗规则更改吗？: 今回未保存のクレンジングルールの変更をすべて取り消しますか？
+  确定撤销本次所有未保存的识别配置更改吗？: 今回未保存の認識設定の変更をすべて取り消しますか？
+  '行 {n}: 无效的正则表达式': '行 {n}: 無効な正規表現です'
+  规则组 key（用于 with 声明）: ルールグループ key（with 句で使用）
+  规则组名称: ルールグループ名
+  规则组已创建: ルールグループを作成しました
+  规则组已删除: ルールグループを削除しました
+  规则组已重命名: ルールグループ名を変更しました
+  识别失败: 認識に失敗しました
+  识别文字: テキストを認識
+  识别配置: 認識設定
+  识别配置已保存: 認識設定を保存しました
+  请先保存或取消当前清洗组的修改: 先に現在のクレンジンググループの変更を保存または破棄してください
+  输入测试文本...: テストテキストを入力...
+  选择图片: 画像を選択
+  选框区域为空: 選択領域が空です
+  重命名规则组: ルールグループ名を変更
   ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
-  : "Default rules apply globally to all OCR; scan/find with clauses stack the selected business group on top of the defaults.\nClick \"Save\" to apply — no restart needed; use \"Undo\" to revert unsaved changes."
-  默认规则（全局）: Default Rules (Global)
+  : "デフォルトルールはすべての OCR にグローバル適用され、scan/find の with 句で選択した業務ルールグループがその上に重ねて適用されます。\n変更後は「保存」をクリックすると再起動不要で即座に反映され、未保存の変更は「元に戻す」で復元できます。"
+  默认规则（全局）: デフォルトルール（グローバル）
   ? "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。"
-  : "Recognition performance applies to every recognition call: higher parallelism is faster but uses proportionally more CPU.\nSaved changes take effect from the next recognition — no restart needed."
-  "识别性能": "Performance"
-  "单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。": "Threads used inside one recognition. Default 2: going higher is no faster in practice and only raises whole-machine CPU usage; use 1 for the lowest CPU cost on long background runs."
-  "识别线程数": "Recognition threads"
-  "同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。": "How many operator lanes run concurrently. Detection, classification and recognition each already own a thread pool, so raising this mostly adds scheduling contention; default 1."
-  "并行算子线程数": "Operator threads"
-  "检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。": "Before detection the frame is rescaled so its short side equals this value (large frames shrink, small crops grow). Smaller is faster and cheaper but more likely to miss small text; 736 is the factory value — leave it unless you have a reason."
-  "检测输入短边": "Detection input short side"
+  : "認識パフォーマンスはすべての認識呼び出しに適用されます。並列度が高いほど高速ですが、CPU 使用率も比例して上がります。\n保存後の次回認識から有効になり、再起動は不要です。"
+  识别性能: 認識パフォーマンス
+  单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 1回の認識内部で使用するスレッド数です。デフォルトは 2 で、実測上これ以上増やしても高速化せずシステム全体の CPU 負荷だけが上がります。1 にすると最も省 CPU で、バックグラウンド長時間稼働に適しています。
+  识别线程数: 認識スレッド数
+  同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。: 同時並列実行するオペレーター数です。検出・分類・認識の3モデルそれぞれに専用スレッドプールがあるため、増やすと通常はスケジューリング競合が増えるだけです。デフォルトは 1 です。
+  并行算子线程数: 並列オペレータースレッド数
+  检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。: 検出前に画面の短辺をこの値に合わせてリサイズします（大きい画像は縮小、小さい画像は拡大）。小さくすると高速・省 CPU になりますが小さい文字を見落としやすくなります。736 が初期値のため、特別な理由がなければ変更しないでください。
+  检测输入短边: 検出入力の短辺
 user_avatar:
-  刷新截图: Refresh Screenshot
+  刷新截图: スクリーンショットを更新

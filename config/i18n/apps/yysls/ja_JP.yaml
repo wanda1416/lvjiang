@@ -18,7 +18,7 @@ yysls:
   推荐要求: 推薦要求
   承音数值: 承音数値
   装备等级: 装備等級
-  总词条分布（包含首词条）: Total affixes (including first affixes)
+  总词条分布（包含首词条）: 総詞条分布（首詞条を含む）
   可获取位置: 可取得位置
   添加可用词条: 追加可用詞条
   其余词条: 其余詞条
@@ -40,22 +40,18 @@ yysls:
   完整且满足强制要求: 完整且満足強制要求
   草稿／要求未满足: 草稿／要求未満足
   当前等级无可用位置: 当前等級無可用位置
-  无法分配，请调整词条数量: Cannot allocate; adjust affix counts
-  从备战方案进入可加载角色基础属性并计算毕业率: Open from a loadout to use character attributes and calculate
-    graduation rate
-  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: Uncheck to use full ordinary caps; equipment base
-    stats and tuning use the selected level
-  装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: Distribution prioritizes legality
-    and existing positions, not globally optimal graduation rate. Saving does not
-    change the current character's equipment or base attributes.
+  无法分配，请调整词条数量: 割り当てできません。詞条数を調整してください
+  从备战方案进入可加载角色基础属性并计算毕业率: 編成プランから開くとキャラクター基礎属性を読み込み、卒業率を計算できます
+  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: チェックを外すと通常詞条の最大値で計算します。装備の基礎属性と定音は選択した等級が適用されます
+  装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: 装備分布は整合性と元の配置の維持を優先しており、卒業率の全体最適とは限りません。保存しても現在のユーザー装備や基礎属性は変更されません。
   未保存的修改: 未保存的修改
-  放弃当前出装搭配的未保存修改？: Discard unsaved changes to this build?
+  放弃当前出装搭配的未保存修改？: 現在のビルドの未保存の変更を破棄しますか？
   当前用户: 当前ユーザー
   角色基础属性: 角色基礎属性
-  系统预设不能删除，请复制后编辑: System presets cannot be deleted; make a copy to edit
-  请先选择当前用户和备战方案: Select a user and loadout first
+  系统预设不能删除，请复制后编辑: システムプリセットは削除できません。複製してから編集してください
+  请先选择当前用户和备战方案: 先にユーザーと編成プランを選択してください
   无法打开模拟计算器: 無法打開模擬計算器
-  请先删除该玩法下的出装搭配：{builds}: 'Remove this playstyle''s builds first: {builds}'
+  请先删除该玩法下的出装搭配：{builds}: 先にこのプレイスタイルのビルドを削除してください：{builds}
   词条数: 詞条数
   基础定义: 基礎定義
   主武学增伤: 主武学増傷
@@ -65,8 +61,7 @@ yysls:
   对单位增伤: 対単位増傷
   不需要增伤: 不需要増傷
   无特定定音: 無特定定音
-  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: All-art, mystic skill and target bonuses are descriptive only
-    ⓘ
+  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: 全武学・奇術・対象別ダメージ増加はプレイスタイル説明用です ⓘ
   调律管理: 調律管理
   当前任务: 当前任務
   历史记录: 歴史記録
@@ -77,9 +72,7 @@ yysls:
   删除记录: 削除記録
   删除调律记录: 削除調律記録
   删除调律记录失败: 削除調律記録失敗
-  确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。: Delete the tuning run at {time}
-    and all its equipment details? Unreported telemetry records will also be deleted.
-    This cannot be undone.
+  确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。: '{time} の調律タスクとその全装備詳細を削除しますか？未送信の統計記録も削除されます。この操作は取り消せません。'
   开始时间: 開始時間
   状态: 状態
   已锁定: 已鎖定
@@ -100,27 +93,23 @@ yysls:
   默认规则: 默認規則
   调律记录详情: 調律記録詳情
   当前正在运行任务: 当前正在運行任務
-  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: Runs
-    {runs} · Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped}
-    · Reset {reset}
-  处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: Processed {total}
-    · Tuned {tuned} · Recycled {recycled} · Skipped {skipped} · Reset {reset}
+  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: 履歴 {runs} 回 · 処理 {total} 件 · 調律 {tuned} · 回収 {recycled} · スキップ {skipped} · リセット {reset}
+  处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: 処理 {total} · 調律 {tuned} · 回収 {recycled} · スキップ {skipped} · リセット {reset}
   已跳过: 已跳過
-  跳过 {count}: Skipped {count}
+  跳过 {count}: スキップ {count}
   首饰: 首飾
-  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type}
-    · Lv{level} · {quality} · {rounds} rounds · {rating}'
+  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type} · Lv{level} · {quality} · {rounds} ラウンド · {rating}'
   全部结果: 全部結果
-  共 {count} 件: '{count} Total'
+  共 {count} 件: 合計 {count} 件
   卡片始终按处理顺序展示: 卡片始終按処理順序展示
-  回收 {count}: Recycled {count}
-  搜索装备、类型或词条: Search equipment, type, or affix
-  调律 {count}: Tuned {count}
-  重置 {count}: Reset {count}
+  回收 {count}: 回収 {count}
+  搜索装备、类型或词条: 装備・種類・詞条を検索
+  调律 {count}: 調律 {count}
+  重置 {count}: リセット {count}
   重置相关: 重置相関
   装备详情: 装備詳情
   装备部位: 装備部位
-  本轮还没有可展示的装备处理结果: No equipment processing results to display for this run yet
+  本轮还没有可展示的装备处理结果: このラウンドで表示できる装備処理結果はまだありません
   传律石不够: 伝律石不夠
   冷却期中: 冷却期中
   冷却期等待: 冷却期等待
@@ -129,74 +118,59 @@ yysls:
   重置检查失败: 重置検查失敗
   重置未执行: 重置未執行
   重置次数耗尽: 重置次数耗尽
-  重置结果：{result}: 'Reset result: {result}'
+  重置结果：{result}: リセット結果：{result}
   标准名称: 標準名称
   部位名称: 部位名称
   等阶名称: 等階名称
   添加名称: 追加名称
   格式错误: 格式錯誤
-  请一次添加一个名称，无需使用逗号分隔。: Add one name at a time; comma separators are not needed.
-  名称不能重复。: Names must be unique.
-  名称不能为空。: Name cannot be empty.
-  双击名称或按 F2 可编辑: Double-click a name or press F2 to edit it
-  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: Configure tier names to validate
-    equipment names and identify original levels. Chengyin does not change the tier
-    name; unmatched original levels are 0.
+  请一次添加一个名称，无需使用逗号分隔。: 名称は1つずつ追加してください。カンマ区切りは不要です。
+  名称不能重复。: 名称は重複できません。
+  名称不能为空。: 名称は空にできません。
+  双击名称或按 F2 可编辑: 名称をダブルクリック、または F2 で編集できます
+  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: 各装備等級の等階名を設定します。装備名の検証と元の等級の識別に使われます。承音では等階名は変わらず、一致しない場合は元の等級が 0 になります。
   承音后转律: 承音後転律
   原始等级: 原始等級
   冷却时间: 冷却時間
   养成: 養成
   养成扫描装备: 養成掃描装備
-  记录扫描装备的转律、承音或培养: Record transmutation, Chengyin, or cultivation
-  扫描装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Fixed properties of scanned equipment are read-only
-    · Only transmutation, Chengyin, and value cultivation are supported
-  此装备没有可培养的定音词条: This equipment has no Attunement affix to cultivate
-  当前装备不支持继续承音，或没有更高的已配置等级: This equipment cannot be upgraded through Chengyin, or
-    no higher configured level exists
-  培养只能提高词条数值，不能降低: Cultivation can only increase affix values
+  记录扫描装备的转律、承音或培养: スキャン装備の転律・承音・育成を記録します
+  扫描装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: スキャン装備の確定属性は変更不可 · 転律・承音・詞条数値の育成のみ対応
+  此装备没有可培养的定音词条: この装備には育成可能な定音詞条がありません
+  当前装备不支持继续承音，或没有更高的已配置等级: この装備はこれ以上承音できないか、より高い設定済み等級がありません
+  培养只能提高词条数值，不能降低: 育成では詞条数値を上げるのみ可能で、下げることはできません
   一次转律只能修改一个词条: 一次転律只能修改一個詞条
-  宫为首词条，不能转律: The first affix cannot be transmuted
-  已有转律词条时，只能继续转律原固定槽位: Further transmutation is limited to the existing fixed slot
-  承音只能提升到下一个已配置等级: Chengyin can only upgrade to the next configured level
+  宫为首词条，不能转律: 宮は首詞条のため転律できません
+  已有转律词条时，只能继续转律原固定槽位: すでに転律詞条がある場合、元の固定スロットのみ継続して転律できます
+  承音只能提升到下一个已配置等级: 承音は次の設定済み等級へのみ引き上げられます
   承音状态不能撤销: 承音状態不能取消
   未对装备进行任何养成修改: 未対装備進行任何養成修改
   装备养成: 装備養成
-  配置跨等级、跨装备类型共用的游戏规则。: Configure game rules shared across levels and equipment types.
-  '冷却时间:': 'Cooldown:'
-  扫描装备发生转律后的冷却天数: Number of cooldown days applied after transmuting scanned equipment
+  配置跨等级、跨装备类型共用的游戏规则。: 等級や装備種類をまたいで共通するゲームルールを設定します。
+  '冷却时间:': クールダウン：
+  扫描装备发生转律后的冷却天数: スキャン装備で転律を行った後のクールダウン日数
   冷却到期后累计一次: 冷却到期後累計一次
-  '逾期进度:': 'Expired Progress:'
-  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: Overdue time reduces the next cooldown, with at most one
-    reset carried over
-  '传律石提升:': 'Chuanlv Stone Gain:'
-  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: One transmute raises
-    a single affix by this percentage of that affix's normal cap at the current level.
-    Equipment "Development" uses it to estimate how many Chuanlv Stones are still
-    needed to max out Chengyin values.
-  当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）: This equipment needs {count} Chuanlv Stones
-    to max out Chengyin values (Chengyin cap at level {level})
-  当前装备承音词条已满，无需传律石（{level} 阶承音上限）: Chengyin affixes are already maxed; no Chuanlv
-    Stones needed (Chengyin cap at level {level})
-  按 {level} 阶承音上限估算：: 'Estimated against the level {level} Chengyin cap:'
-  勾选表示该装备已承音；承音后词条数值上限变为承音上限: Ticked means this equipment is Chengyin; affix values
-    are then capped at the Chengyin cap
-  该装备已经承音，承音状态不能撤销: This equipment is already Chengyin; the state cannot be reverted
-  已承音，可继续承音到 {level} 阶（用等级下拉）: Already Chengyin; can Chengyin further to level {level}
-    (use the level dropdown)
-  勾选后按 {level} 阶承音上限记录: When ticked, values are recorded against the level {level}
-    Chengyin cap
-  可切换到该装备的承音目标等级，查看对应等级的词条上限与传律石: Switch to this equipment's Chengyin target level
-    to see that level's affix caps and Chuanlv Stones
-  该装备没有其它可承音到的等级: This equipment has no other level to Chengyin into
+  '逾期进度:': 超過進捗：
+  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: 超過時間は次回のクールダウンから差し引かれ、最大1回分のリセット回数を保持します
+  '传律石提升:': 伝律石の上昇量：
+  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: 1回の伝律で詞条1つのみが上昇し、増分はその詞条の現在等級における通常最大値に対するこの割合になります。装備「育成」ではこれをもとに承音の上限到達に必要な伝律石数を試算します。
+  当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）: この装備の承音を上限まで育成するには伝律石が {count} 個必要です（{level} 階承音上限）
+  当前装备承音词条已满，无需传律石（{level} 阶承音上限）: この装備の承音詞条はすでに上限です。伝律石は不要です（{level} 階承音上限）
+  按 {level} 阶承音上限估算：: '{level} 階承音上限での試算：'
+  勾选表示该装备已承音；承音后词条数值上限变为承音上限: チェックすると承音済みとして扱われ、詞条数値の上限が承音上限になります
+  该装备已经承音，承音状态不能撤销: この装備はすでに承音済みのため、承音状態は取り消せません
+  已承音，可继续承音到 {level} 阶（用等级下拉）: 承音済みです。さらに {level} 階へ承音できます（等級プルダウンを使用）
+  勾选后按 {level} 阶承音上限记录: チェックすると {level} 階承音上限で記録されます
+  可切换到该装备的承音目标等级，查看对应等级的词条上限与传律石: この装備の承音先等級に切り替えて、該当等級の詞条上限と必要伝律石を確認できます
+  该装备没有其它可承音到的等级: この装備に他の承音先等級はありません
   没有可估算的承音词条: 没有可估算的承音詞条
-  '{name}：已满（{value} / {target}）': '{name}: maxed ({value} / {target})'
-  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}: {stones} stones ({value}
-    → {target}, +{step} each)'
-  无法估算（缺少该等级上限配置）：{names}: 'Cannot estimate (missing cap config for this level): {names}'
+  '{name}：已满（{value} / {target}）': '{name}：上限到達（{value} / {target}）'
+  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}：{stones} 個（{value} → {target}、1個あたり +{step}）'
+  无法估算（缺少该等级上限配置）：{names}: 試算不可（該当等級の上限設定が不足）：{names}
   冷却装备: 冷却装備
   用户名: ユーザー名
   冷却倒计时: 冷却倒計時
-  当前没有设置冷却时间的装备: No equipment currently has a cooldown
+  当前没有设置冷却时间的装备: 現在クールダウンが設定されている装備はありません
   不限: 不限
   白装: 白装
   未满调律: 未満調律
@@ -204,36 +178,30 @@ yysls:
   删除筛选装备: 削除篩選装備
   删除背包装备确认: 削除揹包装備確認
   假设视图: 假設視図
-  在原始装备与应用当前计算假设后的内存副本之间切换: Switch between original equipment and an in-memory copy
-    with the current assumptions applied
-  卡片显示应用假设后的内存副本: Cards show in-memory copies with assumptions applied
-  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}: 'Bow set: {gongjue} · {n} items · {change}
-    · {view}'
+  在原始装备与应用当前计算假设后的内存副本之间切换: 元の装備と、現在の計算仮定を適用したメモリ上のコピーを切り替えます
+  卡片显示应用假设后的内存副本: カードには計算仮定を適用したメモリ上のコピーが表示されます
+  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}: 弓玦セット：{gongjue}　計 {n} 件　·　{change}　·　{view}
   主武: 主武
   副武: 副武
-  删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备: Delete filtered equipment except currently equipped
-    items; mock equipment is excluded when Type is All
+  删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备: 現在の絞り込み結果を削除します（装着中の装備は除外。種類が「すべて」の場合は模擬装備も除外）
   不含模拟装备: 不含模擬装備
-  当前筛选条件下没有可删除的未穿戴装备: No deletable unequipped items match the current filters
-  当前筛选条件下没有可删除的背包装备: No deletable inventory equipment matches the current filters
+  当前筛选条件下没有可删除的未穿戴装备: 現在の絞り込み条件に削除可能な未装着装備がありません
+  当前筛选条件下没有可删除的背包装备: 現在の絞り込み条件に削除可能なバッグ内装備がありません
   模拟装备: 模擬装備
   删除全部模拟装备: 削除全部模擬装備
-  确定删除当前用户的全部模拟装备吗？: Delete all mock equipment for the current user?
+  确定删除当前用户的全部模拟装备吗？: 現在のユーザーの模擬装備をすべて削除しますか？
   删除完成: 削除完成
-  已删除 {count} 件模拟装备。: Deleted {count} mock equipment items.
-  确定删除当前筛选出的 {count} 件未穿戴装备吗？: Delete the {count} unequipped items matching the current
-    filters?
+  已删除 {count} 件模拟装备。: 模擬装備を {count} 件削除しました。
+  确定删除当前筛选出的 {count} 件未穿戴装备吗？: 現在の絞り込み条件に一致する未装着装備 {count} 件を削除しますか？
   当前筛选条件: 当前篩選条件
-  此操作不可撤销。: This action cannot be undone.
+  此操作不可撤销。: この操作は取り消せません。
   剩余时间: 剩余時間
   清除冷却时间: 清除冷却時間
   重置冷却时间: 重置冷却時間
   装备冷却时间已到: 装備冷却時間已到
-  '{days} 天 {hours} 小时 {minutes} 分钟': '{days}d {hours}h {minutes}m'
-  该原始等级装备承音后是否仍允许在已转律词条上无限转律: Whether equipment of this original level may infinitely
-    retransfer its transferred affix after Chengyin
-  装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name format: Tier Name + Standard Name | Equipment
-    Part Name'
+  '{days} 天 {hours} 小时 {minutes} 分钟': '{days} 日 {hours} 時間 {minutes} 分'
+  该原始等级装备承音后是否仍允许在已转律词条上无限转律: この元の等級の装備が承音後も、転律済み詞条で無制限に再転律できるかどうか
+  装备名称结构：等阶名称 + 标准名称 | 部位名称: 装備名の構造：等階名 + 標準名 | 部位名
   输出: 輸出
   攻具: 攻具
   防具: 防具
@@ -243,9 +211,8 @@ yysls:
   开关: スイッチ
   当前装备: 当前装備
   调律装备总览: 調律装備総覧
-  查看当前详情_count: 查看当前詳情_count
-  在独立窗口中查看本轮全部装备处理结果: View all equipment processing results from this run in a separate
-    window
+  查看当前详情_count: 現在の詳細を表示（{count}）
+  在独立窗口中查看本轮全部装备处理结果: このラウンドの全装備処理結果を別ウィンドウで表示します
   处理意见: 処理意見
   已调律: 已調律
   调律后回收: 調律後回收
@@ -255,31 +222,27 @@ yysls:
   无词条: 無詞条
   未装备: 未装備
   武库装备: 武庫装備
-  武库装备，到达部位边界: Vault gear, slot boundary reached
-  武库装备，同武器组，跳过: Vault gear, same weapon group, skipped
-  武库装备，跳过: Vault gear, skipped
+  武库装备，到达部位边界: 武庫装備、部位の境界に到達
+  武库装备，同武器组，跳过: 武庫装備、同一武器グループのためスキップ
+  武库装备，跳过: 武庫装備、スキップ
   跳过实际调律: 跳過実際調律
   运行时校验缓存: 実行時検証キャッシュ
-  检查大律准石>=: Check major tuning stones >=
-  启用后_首次识别数量低于设定值时要求人工确认: When enabled, require confirmation if the initial detected
-    count is below this value.
-  首次识别时使用的额外大律准石数量门槛: Extra major tuning stone threshold used for the initial scan.
-  启用后_每实际进入_5_件装备调律时重新读取律准石_有效读数与缓存相差超过_1_个大律准石时记录错误日志: When enabled, re-read tuning
-    stones after every 5 equipment entries and log an error if a valid reading differs
-    from the cache by more than 1 major stone.
+  检查大律准石>=: 大律準石チェック >=
+  启用后_首次识别数量低于设定值时要求人工确认: 有効にすると、初回認識数が設定値を下回った場合に手動確認を求めます。
+  首次识别时使用的额外大律准石数量门槛: 初回認識時に使用する大律準石の追加しきい値。
+  启用后_每实际进入_5_件装备调律时重新读取律准石_有效读数与缓存相差超过_1_个大律准石时记录错误日志: 有効にすると、5件の装備を調律するごとに律準石を再読み取りし、有効な読取値とキャッシュの差が大律準石1個を超えた場合にエラーログを記録します。
   全局: 全局
   未实现: 未実現
-  F6_调律配置可新增_编辑规则组: 'F6: Tuning Config to add/edit rule groups'
+  F6_调律配置可新增_编辑规则组: F6 の調律設定からルールグループを追加・編集できます
   停止_F10: 停止_F10
   全局开关与测试选项: 全局スイッチ与測試選項
-  列: Columns
+  列: 列
   初始跳过: 初始跳過
   取消全选: 取消全選
-  基础规则组_{key}_不存在_拒绝启动: Base rule group '{key}' does not exist, refusing to start
+  基础规则组_{key}_不存在_拒绝启动: 基本ルールグループ '{key}' が存在しないため、開始を中止しました
   基础规则_单选: 基礎規則_単選
   开始调律_F9: 開始調律_F9
-  当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: Current gallery space missing levels/counts
-    output field, cannot start auto tuning
+  当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: 現在の画像ライブラリ空間に levels/counts 出力フィールドがないため、自動調律を開始できません
   打开进度: 打開進捗
   指定调律: 指定調律
   参数: 参数
@@ -289,20 +252,18 @@ yysls:
   调试参数: 調試参数
   PC_端兼容后台模式: PC_端兼容後台模式
   启用位置校验遍历策略: 啓用位置検証遍歴策略
-  默认使用去重遍历_dedup_启用后改用位置校验遍历_positional: Uses dedup traversal by default; when enabled,
-    switches to positional validation traversal.
-  仅在_PC_端生效_关闭时继续使用更精准的拖拽滚动: Only applies on PC; when off, more precise drag scrolling
-    remains in use.
+  默认使用去重遍历_dedup_启用后改用位置校验遍历_positional: 既定では重複排除走査（dedup）を使用します。有効にすると位置検証走査（positional）に切り替わります。
+  仅在_PC_端生效_关闭时继续使用更精准的拖拽滚动: PC版でのみ有効です。オフの場合はより正確なドラッグスクロールを使用します。
   更多: 更多
   未就绪: 未就緒
   流派规则_可多选: 流派規則_可多選
   自动打开调律进度: 自動打開調律進捗
   自动调律: 自動調律
-  行: Rows
+  行: 行
   规则: 規則
   请至少选择一个调律规则: 請至少選択一個調律規則
   请至少选择一个调律部位: 請至少選択一個調律部位
-  选中的规则均未实现判定逻辑: Selected rules have no judgment logic implemented
+  选中的规则均未实现判定逻辑: 選択したルールはいずれも判定ロジックが実装されていません
   选择调律部位: 選択調律部位
   隐藏进度: 隠藏進捗
   保留: 保留
@@ -314,8 +275,8 @@ yysls:
   已回收: 已回收
   强制调律: 強制調律
   当前词条: 当前詞条
-  '{prefix}（{n}/{total}）：': '{prefix} ({n}/{total}):'
-  正在处理：{name}（{idx}/{total}）: 'Processing: {name} ({idx}/{total})'
+  '{prefix}（{n}/{total}）：': '{prefix}（{n}/{total}）：'
+  正在处理：{name}（{idx}/{total}）: 処理中：{name}（{idx}/{total}）
   周一: 週一
   周二: 週二
   周三: 週三
@@ -328,25 +289,24 @@ yysls:
   能用: 能用
   垃圾: ゴミ
   当前词条_1: 当前詞条_1
-  扫描处理_{name}: 'Scan Result: {name} → '
+  扫描处理_{name}: 'スキャン処理：{name} → '
   批次进度: 批次進捗
   最终词条: 最終詞条
   材料: 材料
-  正在处理_{name}: 'Processing: {name}'
+  正在处理_{name}: 処理中：{name}
   目标词条: 目標詞条
   目标: 目標
   目标_1: 目標_1
   等待中: 等待中
-  等级_{level}_{quality}_词条_{count}_5: Lv {level} | {quality} | Affix {count}/5
+  等级_{level}_{quality}_词条_{count}_5: 等級 {level} | {quality} | 詞条 {count}/5
   蓝色: 藍色
   词条进度: 詞条進捗
   调律状态: 調律状態
-  调律结束{suffix}_{total}_件装备_{rounds}_轮调律: 'Tuning Ended{suffix}: {total} equipment,
-    {rounds} rounds'
+  调律结束{suffix}_{total}_件装备_{rounds}_轮调律: 調律終了{suffix}：{total} 件の装備、{rounds} ラウンド調律
   调律进度: 調律進捗
   调满后回收: 調満後回收
   轮次_0: 輪次_0
-  轮次_{n}: 'Round: {n}'
+  轮次_{n}: ラウンド：{n}
   预期评级: 預期評級
   已中断: 已中断
   完整定级: 完整定級
@@ -354,22 +314,21 @@ yysls:
   不值得调律: 不値得調律
   值得调律: 値得調律
   判定: 判定
-  勾选表示该词条是调律过程中调出的_非扫描时已有: Check to indicate this affix was tuned out, not already
-    present at scan
-  可转律_取消后不做转律模拟: Can Transform (cancel to skip transform simulation)
+  勾选表示该词条是调律过程中调出的_非扫描时已有: チェックすると、スキャン時に元からあった詞条ではなく調律で出た詞条として扱います
+  可转律_取消后不做转律模拟: 転律可能（チェックを外すと転律シミュレーションを行いません）
   品阶: 品階
-  基础规则组_{key}_不存在: Base rule group {key} does not exist
+  基础规则组_{key}_不存在: 基本ルールグループ {key} が存在しません
   待调出: 待調出
   构造装备: 構造装備
   模拟调律: 模擬調律
   武器: 武器
-  流派配置_仅本次测试_不保存: 'Playstyle Config (this test only, not saved):'
+  流派配置_仅本次测试_不保存: 流派設定（今回のテストのみ、保存されません）：
   等级: 等級
   紫色: 紫色
   装备调律验证: 装備調律験証
-  词条{i}: 'Affix {i}:'
-  请先在左侧启用至少一个调律规则: Please enable at least one tuning rule on the left
-  请勾选至少一个_待调出_词条进行模拟: Please check at least one 'to tune out' affix to simulate
+  词条{i}: 詞条{i}：
+  请先在左侧启用至少一个调律规则: 先に左側で調律ルールを少なくとも1つ有効にしてください
+  请勾选至少一个_待调出_词条进行模拟: シミュレーションする「調律予定」詞条を少なくとも1つチェックしてください
   请至少选择首词条: 請至少選択首詞条
   部位: 部位
   金色: 金色
@@ -386,14 +345,13 @@ yysls:
   主武学: 主武学
   全选: 全選
   分组: 分組
-  分组_{name}_已存在: Group '{name}' already exists
+  分组_{name}_已存在: グループ '{name}' はすでに存在します
   分组名称: 分組名称
   删除: 削除
   删除选中: 削除選中
   副武器: 副武器
   副武学: 副武学
-  勾选该词条可出现的装备部位_全选_全部: Check equipment slots where this affix can appear (Select All
-    = All)
+  勾选该词条可出现的装备部位_全选_全部: この詞条が出現し得る装備部位をチェックしてください（全選択 = すべて）
   反选: 反選
   定音词组: 定音詞組
   将选中赛季上移一行: 将選中賽季上移一行
@@ -402,24 +360,21 @@ yysls:
   将选中配置下移一行: 将選中配置下移一行
   属性: 属性
   提示: 提示
-  新增武器重启后方可参与识别_被流派配置引用的武器不可删除: New weapons participate in recognition only after
-    restart; weapons referenced by playstyle config cannot be deleted
+  新增武器重启后方可参与识别_被流派配置引用的武器不可删除: 新しく追加した武器は再起動後に認識対象になります。流派設定から参照されている武器は削除できません
   无法删除: 無法削除
   无法添加: 無法追加
   无法重命名: 無法重命名
   普通词组: 普通詞組
   最大值: 最大値
   最小值: 最小値
-  武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: Weapon candidates come from weapon types in Equipment
-    Config. Martial Enhancement moved to weapon types in Equipment Config.
+  武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: 武器候補は装備設定の武器種類から取得されます。武学増効は装備設定の武器種類へ移動しました。
   武器名称: 武器名称
   武器类型: 武器類型
-  武器类型_{name}_已存在: Weapon type '{name}' already exists.
-  武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Weapon type '{name}' is referenced by
-    playstyle {users}, please unbind in playstyle config first.
+  武器类型_{name}_已存在: 武器種類「{name}」はすでに存在します。
+  武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: 武器種類「{name}」は流派 {users} から参照されています。先に流派設定で紐付けを解除してください。
   武学增效: 武学増效
-  流派_{name}_已存在: Playstyle '{name}' already exists.
-  流派名不能为空或与已有流派重名: Playstyle name cannot be empty or duplicate.
+  流派_{name}_已存在: 流派「{name}」はすでに存在します。
+  流派名不能为空或与已有流派重名: 流派名は空にできず、既存の流派と重複できません。
   流派名称: 流派名称
   流派类型: 流派類型
   流派配置: 流派配置
@@ -432,16 +387,16 @@ yysls:
   添加赛季: 追加賽季
   添加配置: 追加配置
   游戏配置: 遊戯配置
-  确定删除武器类型_{name}: Delete weapon type '{name}'?
-  确定删除流派_{name}: Delete playstyle '{name}'?
-  确定要删除等级_{level}_吗: Delete level {level}?
-  确定要删除词组_{name}_吗: Delete phrase '{name}'?
+  确定删除武器类型_{name}: 武器種類「{name}」を削除しますか？
+  确定删除流派_{name}: 流派「{name}」を削除しますか？
+  确定要删除等级_{level}_吗: 等級 {level} を削除しますか？
+  确定要删除词组_{name}_吗: 詞組 '{name}' を削除しますか？
   确认删除: 確認削除
   等级配置: 等級配置
   装备类型: 装備類型
   装备配置: 装備配置
   词条分组: 詞条分組
-  词组_{name}_已存在: Phrase '{name}' already exists
+  词组_{name}_已存在: 詞組 '{name}' はすでに存在します
   词组分类: 詞組分類
   词组单位: 詞組単位
   词组名称: 詞組名称
@@ -455,41 +410,33 @@ yysls:
   重复: 重複
   无等级配置: 無等級配置
   全部: 全部
-  key_须为小写英文标识_字母开头_可含数字_下划线: Key must be lowercase (starts with letter, may contain
-    digits/underscore)
+  key_须为小写英文标识_字母开头_可含数字_下划线: key は英小文字で始まる識別子にしてください（数字・アンダースコア可）
   不足时: 不足時
   主增伤词条: 主増傷詞条
-  低于该等级的装备直接跳过_不进入任何判定: Equipment below this level is skipped, no judgment entered
-  保存失败_{e}: 'Save failed: {e}'
-  停用后不进调律的装备一律保留_调律门槛仍生效: When disabled, equipment not entering tuning is kept (tuning
-    threshold still applies)
-  停用后按无命中默认行为执行: When disabled, execute with no-hit default behavior
+  低于该等级的装备直接跳过_不进入任何判定: この等級未満の装備は判定を行わず直接スキップします
+  保存失败_{e}: 保存に失敗しました：{e}
+  停用后不进调律的装备一律保留_调律门槛仍生效: 無効にすると、調律に入らない装備はすべて保持されます（調律しきい値は引き続き有効）
+  停用后按无命中默认行为执行: 無効にすると、未一致時の既定動作で実行されます
   全部_1: 全部_1
-  全部未命中时取_默认判定_部位页可按部位设置: 'When all miss, use ''Default Judgment'': slot page can
-    set per slot,'
+  全部未命中时取_默认判定_部位页可按部位设置: すべて未一致の場合は「既定判定」を使用：部位タブで部位ごとに設定可能、
   关闭时生效: オフ時生效
-  切换后扫描处理_材料处理_结束处理页同步对准该组: After switching, Scan/Material/End Processing pages sync
-    to this group,
+  切换后扫描处理_材料处理_结束处理页同步对准该组: 切り替えるとスキャン処理・素材処理・終了処理タブもこのグループに同期します、
   删除基础规则组: 削除基礎規則組
   删除本组: 削除本組
   删除本规则: 削除本規則
   删除规则: 削除規則
   删除选中行: 削除選中行
   删除选中规则: 削除選中規則
-  删除选中规则组_至少保留一个: Delete selected rule group (keep at least one)
+  删除选中规则组_至少保留一个: 選択したルールグループを削除（最低1つは保持）
   判定条件: 判定条件
-  判定顺序_垃圾_一般_优秀_顶级_命中即定档: 'Judgment order: Junk → Normal → Excellent → Top, first
-    hit sets tier'
+  判定顺序_垃圾_一般_优秀_顶级_命中即定档: 判定順：ゴミ → 一般 → 優秀 → 最高級（最初に一致したランクで確定）
   勾选装备词条名_至少一项: 勾選装備詞条名_至少一項
   单件重置次数上限: 単件重置次数上限
-  双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: Double-click 'Rule Description' column to edit; select
-    a row to copy/delete the rule group
-  发现同时配置_动态属攻和真实属攻_建议修正: Dynamic attr and real attr configured simultaneously, recommend
-    correction
+  双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: 「ルール説明」列をダブルクリックして編集。行を選択するとそのルールグループを複製・削除できます
+  发现同时配置_动态属攻和真实属攻_建议修正: 動的属性攻撃と実属性攻撃が同時に設定されています。修正をおすすめします
   可用词条库: 可用詞条庫
-  可用词条库为全局价值序_越靠前越优先保留与填充: Available Affix Pool is global value order (earlier = higher
-    priority);
-  可用词条库_全局_各部位词条混放: Available Affix Pool (global, mixed slots)
+  可用词条库为全局价值序_越靠前越优先保留与填充: 利用可能詞条プールは全体の価値順です（上位ほど優先的に保持・補充されます）；
+  可用词条库_全局_各部位词条混放: 利用可能詞条プール（全体、各部位の詞条を混在管理）
   右键禁用: 右鍵禁用
   名字: 名字
   名称: 名称
@@ -500,42 +447,39 @@ yysls:
   启用检查: 啓用検查
   启用行为表: 啓用行為表
   启用该规则: 啓用該規則
-  命中条件_预期评级属于勾选档位_全选_不限: 'Hit condition: expected rating in checked tiers (Select
-    All = no limit,'
-  命中条件_首词条初始数值按方向比较该值: 'Hit condition: first affix initial value compared by direction;'
+  命中条件_预期评级属于勾选档位_全选_不限: 一致条件：予想評価がチェック済みランクに含まれる（全選択 = 制限なし、
+  命中条件_首词条初始数值按方向比较该值: 一致条件：首詞条の初期数値を指定方向でこの値と比較；
   品阶门槛: 品階門檻
   品阶门槛_覆盖: 品階門檻_覆蓋
-  四档_垃圾_一般_优秀_顶级: 'Four tiers: Junk / Normal / Excellent / Top'
-  回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0: 'Recycle retry cap: max re-read count after recycle,
-    must be > 0'
-  固定标准部位_勾选有调律价值的品阶: Fixed standard slots; check quality tiers with tuning value;
+  四档_垃圾_一般_优秀_顶级: 4段階：ゴミ / 一般 / 優秀 / 最高級
+  回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0: 回収後の再読込ループ上限：回収後に同一スロットを再読み取りして続行する最大回数（0より大きい値）
+  固定标准部位_勾选有调律价值的品阶: 標準部位は固定。調律価値のある品階をチェックしてください；
   基础规则: 基礎規則
   复制基础规则组: 複製基礎規則組
   复制选中: 複製選中
   复制选中规则组为独立副本: 複製選中規則組為独立副本
   大律准石数量检查: 大律準石数量検查
-  如_aggressive_小写字母_数字_下划线: e.g. aggressive (lowercase/digits/underscore)
-  如_my_rule_小写字母_数字_下划线: e.g. my_rule (lowercase/digits/underscore)
+  如_aggressive_小写字母_数字_下划线: 例：aggressive（英小文字・数字・アンダースコア）
+  如_my_rule_小写字母_数字_下划线: 例：my_rule（英小文字・数字・アンダースコア）
   如_治疗_纯奶: 如_治療_純奶
   如_激进回收: 如_激進回收
-  对装备进行第一次调律前执行一次结束处理: Execute end processing once before first tuning of equipment,
+  对装备进行第一次调律前执行一次结束处理: 装備の初回調律前に終了処理を1回実行します、
   将选中规则上移一行: 将選中規則上移一行
   将选中规则下移一行: 将選中規則下移一行
-  已保存并生效_{now}: Saved and active ({now})
-  已切换到基础规则组_{name}: Switched to base rule group '{name}'
-  已删除基础规则组_{name}: Deleted base rule group '{name}'
-  已删除规则_{key}: Deleted rule {key}
+  已保存并生效_{now}: 保存して適用しました（{now}）
+  已切换到基础规则组_{name}: 基本ルールグループ「{name}」に切り替えました
+  已删除基础规则组_{name}: 基本ルールグループ「{name}」を削除しました
+  已删除规则_{key}: ルール {key} を削除しました
   已启用: 已啓用
-  已复制为基础规则组_{name}: Copied as base rule group '{name}'
-  已新增基础规则组_{name}: Added new base rule group '{name}'
-  已新增规则_{name}: Added new rule '{name}'
-  已是最后一条规则_无法下移: Already the last rule, cannot move down
+  已复制为基础规则组_{name}: 基本ルールグループ「{name}」として複製しました
+  已新增基础规则组_{name}: 基本ルールグループ「{name}」を新規追加しました
+  已新增规则_{name}: ルール「{name}」を新規追加しました
+  已是最后一条规则_无法下移: すでに最後のルールのため下へ移動できません
   已是第一条规则_无法上移: 已是第一条規則_無法上移
   已禁用: 已禁用
   已选词条_可拖拽调整顺序: 已選詞条_可拖拽調整順序
   开关_key: スイッチ_key
-  开关_key_显示名_规则条件组_when_引用的: Switch key → display name; referenced by rule condition
-    group when
+  开关_key_显示名_规则条件组_when_引用的: スイッチ key → 表示名；ルール条件グループ when で参照されます
   开关前提: スイッチ前提
   开关设定: スイッチ設定
   开启时生效: 開啓時生效
@@ -547,23 +491,19 @@ yysls:
   新增规则组: 新増規則組
   新增调律规则: 新増調律規則
   最大连续回收次数: 最大連続回收次数
-  本条规则的判定方式_传入规则_运行期勾选的规则_全部规则: 'This rule''s judgment method: passed rules = runtime
-    checked rules; all rules;'
+  本条规则的判定方式_传入规则_运行期勾选的规则_全部规则: このルールの判定方式：指定ルール＝実行時にチェックしたルール；全ルール；
   机制说明_不可配置: 機制説明_不可配置
   材料处理: 材料処理
   条件: 条件
-  条件组_组内全部满足方命中: Condition group (all in group must be met)
-  标识_key_须为小写字母开头的英文_数字_下划线: Identifier key must start with lowercase letter, then
-    letters/digits/underscores
+  条件组_组内全部满足方命中: 条件グループ（グループ内すべてを満たすと一致）
+  标识_key_须为小写字母开头的英文_数字_下划线: 識別子 key は英小文字で始まり、英字・数字・アンダースコアのみ使用できます
   标识_key: 標識_key
-  校验失败_未保存_{err}: 'Validation failed (not saved): {err}'
+  校验失败_未保存_{err}: 検証に失敗しました（未保存）：{err}
   次数用尽后: 次数用尽後
-  每档由若干条件组定义_组间_OR_组内_AND: 'Each tier defined by condition groups: OR between groups,
-    AND within group,'
+  每档由若干条件组定义_组间_OR_组内_AND: 各ランクは複数の条件グループで定義：グループ間は OR、グループ内は AND、
   每轮调律开始前的行为点: 每輪調律開始前的行為点
-  每轮调律结束后的行为点_按预期评级决策: 'Behavior point after each tuning round): decide by expected
-    rating'
-  每轮调律自上而下匹配_首条命中即生效: Each tuning round matches top-down, first hit takes effect;
+  每轮调律结束后的行为点_按预期评级决策: 各調律ラウンド終了後の処理ポイント）：予想評価に応じて判断
+  每轮调律自上而下匹配_首条命中即生效: 各調律ラウンドは上から順に照合し、最初に一致したルールが適用されます；
   流派规则: 流派規則
   添加条件: 追加条件
   添加条件组: 追加条件組
@@ -571,72 +511,67 @@ yysls:
   添加规则: 追加規則
   狗粮添加规则: 狗糧追加規則
   玩法设定: 玩法設定
-  确定删除规则组_{name}_该操作不可恢复: Delete rule group '{name}'? This cannot be undone.
-  确定删除调律规则_{name}_规则文件将被删除_不可恢复: Delete tuning rule '{name}'? The file will be deleted
-    permanently.
+  确定删除规则组_{name}_该操作不可恢复: ルールグループ「{name}」を削除しますか？この操作は元に戻せません。
+  确定删除调律规则_{name}_规则文件将被删除_不可恢复: 調律ルール「{name}」を削除しますか？ルールファイルは完全に削除され、元に戻せません。
   禁用: 禁用
   移除选中: 移除選中
   等级门槛: 等級門檻
-  等级门槛_调律门槛_扫描_材料_结束处理: Level threshold + tuning threshold + scan/material/end processing,
+  等级门槛_调律门槛_扫描_材料_结束处理: 等級しきい値 + 調律しきい値 + スキャン／素材／終了処理、
   结束处理: 結束処理
   自选判定规则: 自選判定規則
   自选词条: 自選詞条
   至少保留一个规则组: 至少保留一個規則組
   装备评级: 装備評級
-  规则变更即校验_校验通过自动保存并生效: Rule changes validated; auto-saved on pass
+  规则变更即校验_校验通过自动保存并生效: ルール変更時に自動検証され、通過すると自動保存・適用されます
   规则名称不能为空: 規則名称不能為空
   规则名称: 規則名称
-  规则命中重置但次数已用尽_按钮文本读不到数字: Rule hit reset but count exhausted (button text cannot read
-    number)
+  规则命中重置但次数已用尽_按钮文本读不到数字: リセットルールに一致しましたが残り回数がありません（ボタン文字から数字を読み取れません）
   规则已禁用_右键启用: 規則已禁用_右鍵啓用
   规则组名: 規則組名
   规则组名称不能为空: 規則組名称不能為空
   规则组名称: 規則組名称
   规则说明: 規則説明
-  规则说明已保存_{key}: Rule description saved ({key})
-  设置启用状态失败_{e}: 'Failed to set enable state: {e}'
-  询问是否继续_弹窗确认_继续则本次运行不再检查: 'Ask to continue: popup confirm, continue skips further
-    checks this run'
-  请先在列表中选中要删除的规则组: Please select a rule group to delete in the list first
-  请先在列表中选中要复制的规则组: Please select a rule group to copy in the list first
+  规则说明已保存_{key}: ルール説明を保存しました（{key}）
+  设置启用状态失败_{e}: 有効状態の設定に失敗しました：{e}
+  询问是否继续_弹窗确认_继续则本次运行不再检查: 続行するか確認：ポップアップで確認し、続行すると今回の実行中は再チェックしません
+  请先在列表中选中要删除的规则组: 先に一覧から削除するルールグループを選択してください
+  请先在列表中选中要复制的规则组: 先に一覧から複製するルールグループを選択してください
   请先选中要删除的规则行: 請先選中要削除的規則行
   调律前识别材料区数量: 調律前識別材料区数量
   调律门槛: 調律門檻
   转律词条库: 転律詞条庫
-  转律词条库_全局_优先级从高到低: Transform Affix Pool (global, priority high to low)
-  进调律前的行为点_未达调律门槛的装备: 'Before tuning behavior): Equipment below tuning threshold'
-  选择{title}词条: Select {title} affix
+  转律词条库_全局_优先级从高到低: 転律詞条プール（全体、優先度が高い順）
+  进调律前的行为点_未达调律门槛的装备: 調律に入る前の処理ポイント）：調律しきい値未満の装備
+  选择{title}词条: '{title}詞条を選択'
   选择条件词条: 選択条件詞条
   选择词条: 選択詞条
   选择首词条候选: 選択首詞条候選
-  通用判定_这里的条件对所有部位都生效: 'Common judgment: conditions here apply to all slots'
+  通用判定_这里的条件对所有部位都生效: 共通判定：ここの条件はすべての部位に適用されます
   重命名: 重命名
-  重命名失败_{e}: 'Rename failed: {e}'
+  重命名失败_{e}: 名前の変更に失敗しました：{e}
   重命名规则: 重命名規則
   重命名规则_key: 重命名規則_key
-  预期评级_该档即进入调律_固定用传入规则判定: Enter tuning when expected rating >= this tier (uses passed
-    rules)
-  预期评级识别使用勾选的流派规则: 'Expected rating uses checked playstyle rules:'
+  预期评级_该档即进入调律_固定用传入规则判定: 予想評価がこのランク以上で調律に入ります（常に指定ルールで判定）
+  预期评级识别使用勾选的流派规则: 予想評価の認識にはチェックした流派ルールを使用：
   首词条: 首詞条
   首词条初始数值比较方向: 首詞条初始数値比較方向
   默认判定: 默認判定
   默认判定_1: 默認判定_1
-  仅列出的部位覆盖全局默认_未列部位沿用基础配置: (Only listed slots override global defaults)
-  双击左侧导航中的规则名可修改: (Double-click rule name in left nav to rename)
+  仅列出的部位覆盖全局默认_未列部位沿用基础配置: （記載された部位のみ全体設定を上書きし、未記載の部位は基本設定を引き継ぎます）
+  双击左侧导航中的规则名可修改: （左ナビのルール名をダブルクリックすると名前を変更できます）
   无_恒生效: 無_恒生效
   点击选择词条: 点撃選択詞条
   点击选择首词条: 点撃選択首詞条
   跟随规则设置: 跟随規則設置
   须大于_0: 須大於_0
   新增规则: 新増規則
-  Key_{key}_已在该分组中显示: Key '{key}' already shown in group
-  '{label}_必须是数字': '{label} must be a number'
-  '{label}_必须是整数': '{label} must be an integer'
+  Key_{key}_已在该分组中显示: Key '{key}' はすでにこのグループに表示されています
+  '{label}_必须是数字': '{label} は数値である必要があります'
+  '{label}_必须是整数': '{label} は整数である必要があります'
   保存失败: 保存失敗
   写入冲突: 写入衝突
   减少: 減少
-  减少后数值不能小于_0_当前值_{cur}_输入_{inp}: 'Value after decrease cannot be less than 0 (current:
-    {cur}, input: {inp})'
+  减少后数值不能小于_0_当前值_{cur}_输入_{inp}: '減算後の数値は 0 未満にできません（現在値: {cur}、入力値: {inp}）'
   减少量: 減少量
   分组名不能为空: 分組名不能為空
   删除分组: 削除分組
@@ -646,7 +581,7 @@ yysls:
   增加: 増加
   增加量: 増加量
   定义数据模型_key: 定義数拠模型_key
-  当前值_{val}: 'Current Value: {val}'
+  当前值_{val}: '現在値: {val}'
   数值无效: 数値無效
   数据模型: 数拠模型
   新值: 新値
@@ -654,66 +589,64 @@ yysls:
   新建分组: 新建分組
   来源_用途: 来源_用途
   查看历史记录: 查看歴史記録
-  没有可用的数据模型_key_请先在数据模型定义中添加: No data model keys available, please add in model definition
-    first
+  没有可用的数据模型_key_请先在数据模型定义中添加: 利用可能なデータモデル key がありません。先にデータモデル定義で追加してください
   确定: 確定
-  确定要删除分组_{name}_吗: Delete group '{name}'?
-  自定义增减_{label}: Custom change - {label}
+  确定要删除分组_{name}_吗: グループ '{name}' を削除しますか？
+  自定义增减_{label}: カスタム増減 - {label}
   ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
 
     取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
-  : 'Checked: apply action semantics and trigger configured sync_targets.
+  : 'チェック：action として処理し、設定済みの sync_targets への同期を発火します。
 
-    Unchecked: overwrite only this key without triggering synchronization.'
+    チェック解除：純粋な上書きとして処理し、この key のみ書き込み、同期は発火しません。'
   至少保留一个分组: 至少保留一個分組
-  覆写_{label}: Override - {label}
-  该数值已被其他进程更新_本次增减未写入_请刷新后重试: Value was updated by another process, change not written.
-    Please refresh and retry.
+  覆写_{label}: 上書き - {label}
+  该数值已被其他进程更新_本次增减未写入_请刷新后重试: この数値は別プロセスによって更新されたため、今回の増減は書き込まれませんでした。更新してから再試行してください。
   选择字段: 選択フィールド
   错误: 錯誤
   请选择: 請選択
-  '{field}不能大于_999999': '{field} cannot exceed 999999'
-  '{field}不能小于_{min}': '{field} cannot be less than {min}'
-  '{field}必须是有效数字': '{field} must be a valid number'
+  '{field}不能大于_999999': '{field}は 999999 以下にしてください'
+  '{field}不能小于_{min}': '{field}は {min} 以上にしてください'
+  '{field}必须是有效数字': '{field}は有効な数値である必要があります'
   同步变更依赖方: 同步変更依頼方
   旧值: 旧値
   时间: 時間
   来源: 来源
   类型: 類型
   详情: 詳情
-  请输入{field}: Please enter {field}
+  请输入{field}: '{field}を入力してください'
   请输入数值: 請輸入数値
   输入错误: 輸入錯誤
-  选择或输入新{label}: Select or enter new {label}
+  选择或输入新{label}: 新しい{label}を選択または入力
   上一个用户: 上一個ユーザー
   下一个用户: 下一個ユーザー
   已完成: 已完成
   已重置: 已重置
   未完成: 未完成
   请先选择用户: 請先選択ユーザー
-  Key_{key}_已存在: Key '{key}' already exists
-  Key_只能包含字母_数字和下划线: Key can only contain letters, digits and underscores
+  Key_{key}_已存在: Key '{key}' はすでに存在します
+  Key_只能包含字母_数字和下划线: Key には英字・数字・アンダースコアのみ使用できます
   上限: 上限
   上限_1: 上限_1
   不提醒: 不提醒
   倍率: 倍率
-  准点_{unit}: Boundary/{unit}
-  准点_{val}_{period}: Boundary:{val}/{period}
+  准点_{unit}: 定時/{unit}
+  准点_{val}_{period}: 定時:{val}/{period}
   准点周期: 準点週期
   准点恢复: 準点恢復
   分钟: 分鐘
   半赛季: 半賽季
   单向增加: 単向増加
   可选: 可選
-  同步_{sync}: Sync:{sync}
+  同步_{sync}: 同期:{sync}
   同步目标: 同步目標
   同步目标不能指向自身: 同步目標不能指向自身
-  周: Week
+  周: 週
   周期: 週期
   周期_1: 週期_1
-  天: Day
-  实时_{unit}: Realtime/{unit}
-  实时_{val}_{unit}: Realtime:{val}/{unit}
+  天: 日
+  实时_{unit}: リアルタイム/{unit}
+  实时_{val}_{unit}: リアルタイム:{val}/{unit}
   实时恢复: 実時恢復
   小时: 小時
   展示上限: 展示上限
@@ -725,15 +658,15 @@ yysls:
   标签: 標籤
   标签_1: 標籤_1
   橙色阈值: 橙色閾値
-  橙警_{val}: Orange:>={val}
+  橙警_{val}: 橙警告:>={val}
   每周: 每週
   每天: 每天
   每月: 每月
   每次恢复: 每次恢復
   添加同步目标: 追加同步目標
-  确定要删除_key_{key}_吗: Delete key '{key}'?
+  确定要删除_key_{key}_吗: key '{key}' を削除しますか？
   红色阈值: 紅色閾値
-  红警_{val}: Red:>={val}
+  红警_{val}: 赤警告:>={val}
   编辑: 編集
   英文_如: 英文_如
   详情摘要: 詳情摘要
@@ -743,47 +676,41 @@ yysls:
   软上限: 軟上限
   速率单位: 速率単位
   速率数值: 速率数値
-  重置_{time}: Reset:{time}
+  重置_{time}: リセット:{time}
   重置日_几号: 重置日_幾号
   重置日_周几: 重置日_周幾
-  重置日_{day}: Reset day:{day}
-  重置日_{day}号: Reset day:{day}
+  重置日_{day}: リセット日:{day}
+  重置日_{day}号: リセット日:{day}日
   重置时刻: 重置時刻
   默认: 默認
-  传律石不够（持有 {held} < 要求 {need}），跳过该装备: Not enough Chuanlv Stones (held {held} < required
-    {need}); skipping this equipment
-  异常：{result}: 'Anomaly: {result}'
+  传律石不够（持有 {held} < 要求 {need}），跳过该装备: 伝律石が不足しています（所持 {held} < 必要 {need}）。この装備をスキップします
+  异常：{result}: 異常：{result}
   无法识别重置次数: 無法識別重置次数
-  无法识别重置次数，跳过该装备: Cannot read the remaining reset count; skipping this equipment
+  无法识别重置次数，跳过该装备: リセット回数を認識できないため、この装備をスキップします
   异常: 異常
-  本次运行有 {n} 件装备识别异常: '{n} equipment item(s) in this run had recognition anomalies'
-  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: Runs
-    {runs} · Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped}
-    · Reset {reset} · Anomalies {anomaly}
+  本次运行有 {n} 件装备识别异常: 今回の実行で {n} 件の装備に認識異常がありました
+  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: 履歴 {runs} 回 · 処理 {total} 件 · 調律 {tuned} · 回収 {recycled} · スキップ {skipped} · リセット {reset} · 異常 {anomaly}
   全部评级: 全部評級
   绑定开关: 紐付けスイッチ
   需更换: 需更換
   新穿戴: 新穿戴
   已穿戴: 已穿戴
-  当前：{name}: 'Now: {name}'
-  备战方案此部位现在穿的装备，应用组合后会被换下: What this slot currently wears in the loadout; applying
-    the combination replaces it
-  计算假设：: 'Assumptions: '
-  计算假设：{text}: 'Assumption: {text}'
-  需更换 {count} 件: Swap {count}
-  需要更换：{names}: 'Needs swapping: {names}'
+  当前：{name}: 現在：{name}
+  备战方案此部位现在穿的装备，应用组合后会被换下: 編成プランのこの部位に現在装着している装備。組み合わせを適用すると入れ替わります
+  计算假设：: 計算仮定：
+  计算假设：{text}: 計算仮定：{text}
+  需更换 {count} 件: 交換必要 {count} 件
+  需要更换：{names}: 交換が必要：{names}
   与备战方案一致: 与ロードアウト一致
-  换下：{name}: 'Replaces: {name}'
+  换下：{name}: 外す：{name}
   备战方案此部位当前为空: ロードアウト此部位当前為空
-  需更换 {count} 件：{names}: 'Swap {count}: {names}'
-  与当前备战方案一致，无需更换: Matches the current loadout; nothing to swap
-  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　卡片显示原始装备数值，计算假设标注在卡片上方: 'Gongjue set: {gongjue}　{n}
-    pieces　·　{change}　·　Cards show original equipment values; assumptions are noted
-    above each card'
+  需更换 {count} 件：{names}: 交換必要 {count} 件：{names}
+  与当前备战方案一致，无需更换: 現在の編成プランと一致しており、交換不要です
+  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　卡片显示原始装备数值，计算假设标注在卡片上方: 弓玦セット：{gongjue}　計 {n} 件　·　{change}　·　カードには元の装備数値を表示し、計算仮定はカード上部に記載しています
   全部用户: 全部ユーザー
   未选择用户: 未選択ユーザー
   所选用户没有冷却装备: 所選ユーザー没有冷却装備
-  '{shown} / {total} 件': '{shown} / {total} items'
+  '{shown} / {total} 件': '{shown} / {total} 件'
   外功: 外功
   属攻攻击: 属攻攻撃
   无相攻击: 無相攻撃
@@ -817,15 +744,13 @@ yysls:
   '{name}攻击：{value}': '{name}攻击：{value}'
   '{name}伤害加成：{value}': '{name}伤害加成：{value}'
   '{name}穿透：{value}': '{name}穿透：{value}'
-  菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。: メニューのショートカットはウィンドウ内でのみ有効です。プラグインメニューは
-    F5~F7 または Alt+英字を使用でき、共通/ツールメニューと重複できません。
+  菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。: メニューのショートカットはウィンドウ内でのみ有効です。プラグインメニューは F5~F7 または Alt+英字を使用でき、共通/ツールメニューと重複できません。
   快捷键不可用：: ショートカットを使用できません：
   装备重置冷却时间: 装備リセットクールダウン時間
   重置二次确认时间: リセット再確認待機時間
   重置冷却逾期进度: リセットクールダウン超過進捗
   装备培养单次提升: 装備育成1回あたりの上昇量
-  重置调律两次确认之间的最短等待。游戏新版为 3 秒；程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。填 0 表示不做这段额外等待。: 調律リセットの2回の確認のあいだの最小待機。現行バージョンは3秒で、その後にページ更新をもう一度待ってから2回目の確認を押します（ダイアログが出る前に押して空振りしないため）。0
-    ならこの追加待機を行いません。
+  重置调律两次确认之间的最短等待。游戏新版为 3 秒；程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。填 0 表示不做这段额外等待。: 調律リセットの2回の確認のあいだの最小待機。現行バージョンは3秒で、その後にページ更新をもう一度待ってから2回目の確認を押します（ダイアログが出る前に押して空振りしないため）。0 ならこの追加待機を行いません。
 auto_strings:
   装备词条: 装備詞条
   词条约束: 詞条約束
@@ -851,21 +776,17 @@ auto_strings:
   正在重新计算…: 正在重新計算…
   完整且满足强制要求: 完整且満足強制要求
   草稿／要求未满足: 草稿／要求未満足
-  无法分配，请调整词条数量: Cannot allocate; adjust the affix count
-  从备战方案进入可加载角色基础属性并计算毕业率: Entering from a loadout plan allows loading character base
-    attributes and computing graduation rate
-  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: After cancelling, normal affix cap values are used;
-    base attributes and Attunement still follow the selected level
-  装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: Equipment distribution prioritizes
-    validity and keeping original positions, not global graduation-rate optimality.
-    Saving doesn't modify the current user's gear or base attributes.
+  无法分配，请调整词条数量: 割り当てできません。詞条数を調整してください
+  从备战方案进入可加载角色基础属性并计算毕业率: 編成プランから開くとキャラクター基礎属性を読み込み、卒業率を計算できます
+  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: チェックを外すと通常詞条の最大値で計算します。装備の基礎属性と定音は選択した等級が適用されます
+  装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: 装備分布は整合性と元の配置の維持を優先しており、卒業率の全体最適とは限りません。保存しても現在のユーザー装備や基礎属性は変更されません。
   未保存的修改: 未保存的修改
-  放弃当前出装搭配的未保存修改？: Discard unsaved changes to the current loadout?
+  放弃当前出装搭配的未保存修改？: 現在のビルドの未保存の変更を破棄しますか？
   角色基础属性: 角色基礎属性
-  系统预设不能删除，请复制后编辑: System presets cannot be deleted; copy before editing
-  请先选择当前用户和备战方案: Select the current user and loadout plan first
+  系统预设不能删除，请复制后编辑: システムプリセットは削除できません。複製してから編集してください
+  请先选择当前用户和备战方案: 先にユーザーと編成プランを選択してください
   无法打开模拟计算器: 無法打開模擬計算器
-  请先删除该玩法下的出装搭配：{builds}: 'Delete the loadouts under this playstyle first: {builds}'
+  请先删除该玩法下的出装搭配：{builds}: 先にこのプレイスタイルのビルドを削除してください：{builds}
   基础定义: 基礎定義
   主武学增伤: 主武学増傷
   副武学增伤: 副武学増傷
@@ -874,8 +795,7 @@ auto_strings:
   对单位增伤: 対単位増傷
   不需要增伤: 不需要増傷
   无特定定音: 無特定定音
-  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: All martial arts / mystic / single-target damage boosts are
-    playstyle notes only ⓘ
+  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: 全武学・奇術・対象別ダメージ増加はプレイスタイル説明用です ⓘ
   调律管理: 調律管理
   当前任务: 当前任務
   历史记录: 歴史記録
@@ -886,9 +806,7 @@ auto_strings:
   删除记录: 削除記録
   删除调律记录: 削除調律記録
   删除调律记录失败: 削除調律記録失敗
-  确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。: Delete the tuning task at {time}
-    and all its equipment details? Unreported stats will also be deleted; this cannot
-    be undone.
+  确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。: '{time} の調律タスクとその全装備詳細を削除しますか？未送信の統計記録も削除されます。この操作は取り消せません。'
   开始时间: 開始時間
   状态: 状態
   已锁定: 已鎖定
@@ -908,24 +826,22 @@ auto_strings:
   默认规则: 默認規則
   调律记录详情: 調律記録詳情
   当前正在运行任务: 当前正在運行任務
-  处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: Processed {total}
-    · tuned {tuned} · recycled {recycled} · skipped {skipped} · reset {reset}
+  处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: 処理 {total} · 調律 {tuned} · 回収 {recycled} · スキップ {skipped} · リセット {reset}
   已跳过: 已跳過
-  跳过 {count}: Skipped {count}
+  跳过 {count}: スキップ {count}
   首饰: 首飾
-  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type}
-    · Lv{level} · {quality} · {rounds} rounds · {rating}'
+  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type} · Lv{level} · {quality} · {rounds} ラウンド · {rating}'
   全部结果: 全部結果
-  共 {count} 件: '{count} pieces total'
+  共 {count} 件: 合計 {count} 件
   卡片始终按处理顺序展示: 卡片始終按処理順序展示
-  回收 {count}: Recycled {count}
-  搜索装备、类型或词条: Search equipment, type or affixes
-  调律 {count}: Tuned {count}
-  重置 {count}: Reset {count}
+  回收 {count}: 回収 {count}
+  搜索装备、类型或词条: 装備・種類・詞条を検索
+  调律 {count}: 調律 {count}
+  重置 {count}: リセット {count}
   重置相关: 重置相関
   装备详情: 装備詳情
   装备部位: 装備部位
-  本轮还没有可展示的装备处理结果: No equipment processing results to display this round
+  本轮还没有可展示的装备处理结果: このラウンドで表示できる装備処理結果はまだありません
   传律石不够: 伝律石不夠
   冷却期中: 冷却期中
   冷却期等待: 冷却期等待
@@ -934,58 +850,47 @@ auto_strings:
   重置检查失败: 重置検查失敗
   重置未执行: 重置未執行
   重置次数耗尽: 重置次数耗尽
-  重置结果：{result}: 'Reset result: {result}'
+  重置结果：{result}: リセット結果：{result}
   标准名称: 標準名称
   部位名称: 部位名称
   等阶名称: 等階名称
   添加名称: 追加名称
   格式错误: 格式錯誤
-  请一次添加一个名称，无需使用逗号分隔。: Add one name at a time; no commas needed.
-  名称不能重复。: Name must be unique.
-  名称不能为空。: Name cannot be empty.
-  双击名称或按 F2 可编辑: Double-click the name or press F2 to edit
-  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: Configures tier names per
-    gear level, used to validate equipment names and identify the original level;
-    Chimera doesn't change the tier name — unmatched means original level 0.
+  请一次添加一个名称，无需使用逗号分隔。: 名称は1つずつ追加してください。カンマ区切りは不要です。
+  名称不能重复。: 名称は重複できません。
+  名称不能为空。: 名称は空にできません。
+  双击名称或按 F2 可编辑: 名称をダブルクリック、または F2 で編集できます
+  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: 各装備等級の等階名を設定します。装備名の検証と元の等級の識別に使われます。承音では等階名は変わらず、一致しない場合は元の等級が 0 になります。
   承音后转律: 承音後転律
   原始等级: 原始等級
   冷却时间: 冷却時間
   养成: 養成
-  记录扫描装备的转律、承音或培养: Records transfers, Chimera or growth of scanned equipment
-  此装备没有可培养的定音词条: This gear has no growable Attunement affixes
-  承音只能提升到下一个已配置等级: Chimera can only advance to the next configured level
+  记录扫描装备的转律、承音或培养: スキャン装備の転律・承音・育成を記録します
+  此装备没有可培养的定音词条: この装備には育成可能な定音詞条がありません
+  承音只能提升到下一个已配置等级: 承音は次の設定済み等級へのみ引き上げられます
   承音状态不能撤销: 承音状態不能取消
   未对装备进行任何养成修改: 未対装備進行任何養成修改
   装备养成: 装備養成
-  配置跨等级、跨装备类型共用的游戏规则。: Configures game rules shared across levels and equipment types.
-  扫描装备发生转律后的冷却天数: Cooldown days after a transfer is detected on scanned gear
+  配置跨等级、跨装备类型共用的游戏规则。: 等級や装備種類をまたいで共通するゲームルールを設定します。
+  扫描装备发生转律后的冷却天数: スキャン装備で転律を行った後のクールダウン日数
   冷却到期后累计一次: 冷却到期後累計一次
-  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: Overtime deducts from the next cooldown, keeping at most
-    one available reset
-  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: Each Chimera transfer
-    boosts one affix by this percentage of its normal cap at the current level. The
-    equipment "Grow" tab uses it to estimate how many Chimera Stones are needed to
-    fill it.
-  当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）: Filling this gear's Chimera requires {count}
-    Stones (Lv {level} Chimera cap)
-  当前装备承音词条已满，无需传律石（{level} 阶承音上限）: This gear's Chimera affixes are already full; no
-    Stones needed (Lv {level} cap)
-  按 {level} 阶承音上限估算：: 'Estimated at Lv {level} Chimera cap:'
-  勾选表示该装备已承音；承音后词条数值上限变为承音上限: Check if this gear has been Chimera-enhanced; the affix
-    cap changes to the Chimera cap
-  该装备已经承音，承音状态不能撤销: Already Chimera-enhanced; state cannot be undone
-  已承音，可继续承音到 {level} 阶（用等级下拉）: Already Chimera-enhanced; can further enhance to Lv
-    {level} (use the level dropdown)
-  勾选后按 {level} 阶承音上限记录: When checked, records at the Lv {level} Chimera cap
+  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: 超過時間は次回のクールダウンから差し引かれ、最大1回分のリセット回数を保持します
+  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: 1回の伝律で詞条1つのみが上昇し、増分はその詞条の現在等級における通常最大値に対するこの割合になります。装備「育成」ではこれをもとに承音の上限到達に必要な伝律石数を試算します。
+  当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）: この装備の承音を上限まで育成するには伝律石が {count} 個必要です（{level} 階承音上限）
+  当前装备承音词条已满，无需传律石（{level} 阶承音上限）: この装備の承音詞条はすでに上限です。伝律石は不要です（{level} 階承音上限）
+  按 {level} 阶承音上限估算：: '{level} 階承音上限での試算：'
+  勾选表示该装备已承音；承音后词条数值上限变为承音上限: チェックすると承音済みとして扱われ、詞条数値の上限が承音上限になります
+  该装备已经承音，承音状态不能撤销: この装備はすでに承音済みのため、承音状態は取り消せません
+  已承音，可继续承音到 {level} 阶（用等级下拉）: 承音済みです。さらに {level} 階へ承音できます（等級プルダウンを使用）
+  勾选后按 {level} 阶承音上限记录: チェックすると {level} 階承音上限で記録されます
   没有可估算的承音词条: 没有可估算的承音詞条
-  '{name}：已满（{value} / {target}）': '{name}: full ({value} / {target})'
-  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}: {stones} (value {value}
-    → {target}, +{step} each)'
-  无法估算（缺少该等级上限配置）：{names}: 'Cannot estimate (missing level cap config): {names}'
+  '{name}：已满（{value} / {target}）': '{name}：上限到達（{value} / {target}）'
+  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}：{stones} 個（{value} → {target}、1個あたり +{step}）'
+  无法估算（缺少该等级上限配置）：{names}: 試算不可（該当等級の上限設定が不足）：{names}
   冷却装备: 冷却装備
   用户名: ユーザー名
   冷却倒计时: 冷却倒計時
-  当前没有设置冷却时间的装备: No gear with a cooldown configured
+  当前没有设置冷却时间的装备: 現在クールダウンが設定されている装備はありません
   不限: 不限
   白装: 白装
   未满调律: 未満調律
@@ -993,35 +898,31 @@ auto_strings:
   删除筛选装备: 削除篩選装備
   删除背包装备确认: 削除揹包装備確認
   假设视图: 假設視図
-  在原始装备与应用当前计算假设后的内存副本之间切换: Toggle between the original equipment and the in-memory
-    copy after applying current assumptions
-  卡片显示应用假设后的内存副本: Cards show the in-memory copy after applying assumptions
-  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}: 'Gongjue set: {gongjue}　{n} pieces　·　{change}　·　{view}'
+  在原始装备与应用当前计算假设后的内存副本之间切换: 元の装備と、現在の計算仮定を適用したメモリ上のコピーを切り替えます
+  卡片显示应用假设后的内存副本: カードには計算仮定を適用したメモリ上のコピーが表示されます
+  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}: 弓玦セット：{gongjue}　計 {n} 件　·　{change}　·　{view}
   主武: 主武
   副武: 副武
-  当前筛选条件下没有可删除的背包装备: No bag equipment matches the current filters for deletion
+  当前筛选条件下没有可删除的背包装备: 現在の絞り込み条件に削除可能なバッグ内装備がありません
   模拟装备: 模擬装備
   删除全部模拟装备: 削除全部模擬装備
-  确定删除当前用户的全部模拟装备吗？: Delete all mock equipment for the current user?
+  确定删除当前用户的全部模拟装备吗？: 現在のユーザーの模擬装備をすべて削除しますか？
   删除完成: 削除完成
-  已删除 {count} 件模拟装备。: Deleted {count} mock equipment.
+  已删除 {count} 件模拟装备。: 模擬装備を {count} 件削除しました。
   当前筛选条件: 当前篩選条件
-  此操作不可撤销。: This cannot be undone.
+  此操作不可撤销。: この操作は取り消せません。
   剩余时间: 剩余時間
   清除冷却时间: 清除冷却時間
   重置冷却时间: 重置冷却時間
-  '{days} 天 {hours} 小时 {minutes} 分钟': '{days}d {hours}h {minutes}m'
-  该原始等级装备承音后是否仍允许在已转律词条上无限转律: Whether gear at this original level, after Chimera,
-    still allows unlimited transfers on already-transferred affixes
-  装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name structure: tier name + standard name
-    | slot name'
+  '{days} 天 {hours} 小时 {minutes} 分钟': '{days} 日 {hours} 時間 {minutes} 分'
+  该原始等级装备承音后是否仍允许在已转律词条上无限转律: この元の等級の装備が承音後も、転律済み詞条で無制限に再転律できるかどうか
+  装备名称结构：等阶名称 + 标准名称 | 部位名称: 装備名の構造：等階名 + 標準名 | 部位名
   攻具: 攻具
   防具: 防具
   刷新装备数据: 刷新装備数拠
   当前装备: 当前装備
   调律装备总览: 調律装備総覧
-  在独立窗口中查看本轮全部装备处理结果: View all equipment processing results for this round in a separate
-    window
+  在独立窗口中查看本轮全部装备处理结果: このラウンドの全装備処理結果を別ウィンドウで表示します
   处理意见: 処理意見
   已调律: 已調律
   调律后回收: 調律後回收
@@ -1030,12 +931,12 @@ auto_strings:
   承音: 承音
   未装备: 未装備
   武库装备: 武庫装備
-  武库装备，到达部位边界: Armory gear; reached slot boundary
-  武库装备，同武器组，跳过: Armory gear; same weapon group, skipping
-  武库装备，跳过: Armory gear; skipping
+  武库装备，到达部位边界: 武庫装備、部位の境界に到達
+  武库装备，同武器组，跳过: 武庫装備、同一武器グループのためスキップ
+  武库装备，跳过: 武庫装備、スキップ
   跳过实际调律: 跳過実際調律
   运行时校验缓存: 実行時検証キャッシュ
-  检查大律准石>=: Check Lv Stones >=
+  检查大律准石>=: 大律準石チェック >=
   初始跳过: 初始跳過
   取消全选: 取消全選
   指定调律: 指定調律
@@ -1055,8 +956,8 @@ auto_strings:
   已回收: 已回收
   强制调律: 強制調律
   当前词条: 当前詞条
-  '{prefix}（{n}/{total}）：': '{prefix} ({n}/{total}):'
-  正在处理：{name}（{idx}/{total}）: 'Processing: {name} ({idx}/{total})'
+  '{prefix}（{n}/{total}）：': '{prefix}（{n}/{total}）：'
+  正在处理：{name}（{idx}/{total}）: 処理中：{name}（{idx}/{total}）
   顶级: 頂級
   优秀: 優秀
   能用: 能用
@@ -1083,7 +984,7 @@ auto_strings:
   等级: 等級
   紫色: 紫色
   装备调律验证: 装備調律験証
-  请先在左侧启用至少一个调律规则: Enable at least one tuning rule on the left first
+  请先在左侧启用至少一个调律规则: 先に左側で調律ルールを少なくとも1つ有効にしてください
   请至少选择首词条: 請至少選択首詞条
   部位: 部位
   金色: 金色
@@ -1207,18 +1108,18 @@ auto_strings:
   规则组名称不能为空: 規則組名称不能為空
   规则组名称: 規則組名称
   规则说明: 規則説明
-  请先在列表中选中要删除的规则组: Select the rule groups to delete in the list first
-  请先在列表中选中要复制的规则组: Select the rule groups to copy in the list first
+  请先在列表中选中要删除的规则组: 先に一覧から削除するルールグループを選択してください
+  请先在列表中选中要复制的规则组: 先に一覧から複製するルールグループを選択してください
   请先选中要删除的规则行: 請先選中要削除的規則行
   调律门槛: 調律門檻
   转律词条库: 転律詞条庫
-  选择{title}词条: Select {title} affix
+  选择{title}词条: '{title}詞条を選択'
   选择条件词条: 選択条件詞条
   选择词条: 選択詞条
   选择首词条候选: 選択首詞条候選
   重命名: 重命名
   重命名规则: 重命名規則
-  预期评级识别使用勾选的流派规则: Expected-rating detection uses the checked playstyle rules
+  预期评级识别使用勾选的流派规则: 予想評価の認識にはチェックした流派ルールを使用
   首词条: 首詞条
   首词条初始数值比较方向: 首詞条初始数値比較方向
   默认判定: 默認判定
@@ -1229,169 +1130,153 @@ auto_strings:
   已完成: 已完成
   已重置: 已重置
   上限: 上限
-  天: day(s)
+  天: 日
   编辑: 編集
   默认: 默認
-  传律石不够（持有 {held} < 要求 {need}），跳过该装备: Not enough Chimera Stones (have {held} < need
-    {need}); skipping this piece
-  异常：{result}: 'Anomaly: {result}'
+  传律石不够（持有 {held} < 要求 {need}），跳过该装备: 伝律石が不足しています（所持 {held} < 必要 {need}）。この装備をスキップします
+  异常：{result}: 異常：{result}
   无法识别重置次数: 無法識別重置次数
-  无法识别重置次数，跳过该装备: Cannot read reset count; skipping this piece
+  无法识别重置次数，跳过该装备: リセット回数を認識できないため、この装備をスキップします
   异常: 異常
-  本次运行有 {n} 件装备识别异常: '{n} pieces had recognition anomalies this run'
-  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: History
-    {runs} runs · processed {total} · tuned {tuned} · recycled {recycled} · skipped
-    {skipped} · reset {reset} · anomalies {anomaly}
+  本次运行有 {n} 件装备识别异常: 今回の実行で {n} 件の装備に認識異常がありました
+  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: 履歴 {runs} 回 · 処理 {total} 件 · 調律 {tuned} · 回収 {recycled} · スキップ {skipped} · リセット {reset} · 異常 {anomaly}
   全部评级: 全部評級
   绑定开关: 紐付けスイッチ
   需更换: 需更換
   新穿戴: 新穿戴
   已穿戴: 已穿戴
-  当前：{name}: 'Current: {name}'
-  备战方案此部位现在穿的装备，应用组合后会被换下: The gear currently worn in this slot of the loadout plan
-    will be swapped out when the build is applied
-  计算假设：{text}: 'Calculation assumptions: {text}'
-  需更换 {count} 件: '{count} pieces need swapping'
-  需要更换：{names}: 'Need swapping: {names}'
+  当前：{name}: 現在：{name}
+  备战方案此部位现在穿的装备，应用组合后会被换下: 編成プランのこの部位に現在装着している装備。組み合わせを適用すると入れ替わります
+  计算假设：{text}: 計算仮定：{text}
+  需更换 {count} 件: 交換必要 {count} 件
+  需要更换：{names}: 交換が必要：{names}
   与备战方案一致: 与ロードアウト一致
-  换下：{name}: 'Swap out: {name}'
+  换下：{name}: 外す：{name}
   备战方案此部位当前为空: ロードアウト此部位当前為空
-  需更换 {count} 件：{names}: '{count} pieces need swapping: {names}'
-  与当前备战方案一致，无需更换: Matches the current loadout plan; no change needed
+  需更换 {count} 件：{names}: 交換必要 {count} 件：{names}
+  与当前备战方案一致，无需更换: 現在の編成プランと一致しており、交換不要です
   全部用户: 全部ユーザー
   未选择用户: 未選択ユーザー
   所选用户没有冷却装备: 所選ユーザー没有冷却装備
-  '{shown} / {total} 件': '{shown} / {total} pieces'
-  '   - 词条未记录': '   - Affix Not Recorded'
-  ' 等+': ' ...+'
+  '{shown} / {total} 件': '{shown} / {total} 件'
+  '   - 词条未记录': '   - 詞条未記録'
+  ' 等+': ' など+'
   '#': '#'
-  '## 运行结束': '## Run Finished'
-  '### 成品清单（一般及以上）': '### Finished Items (Common and above)'
-  100%毕业率基准 DPS: 100% Graduation Rate Baseline DPS
+  '## 运行结束': '## 実行終了'
+  '### 成品清单（一般及以上）': '### 完成品一覧（一般以上）'
+  100%毕业率基准 DPS: 100%卒業率基準 DPS
   <止戈定音>: <止戈定音>
   DPS: DPS
-  Excel 工作簿 (*.xlsx): Excel Workbook (*.xlsx)
-  Excel 文件 (*.xlsx): Excel File (*.xlsx)
-  '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律': '[Notice] "Skip Actual Tuning" is on: only simulates
-    entering/exiting the tuning page, no tuning is performed'
-  common_conditions 必须是 dict: common_conditions must be a dict
-  'playstyles: 名字不能为空': 'playstyles: name cannot be empty'
-  pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when: The pvp section is deprecated; use the
-    switches registry + rule condition group `when` instead
-  switches 必须是 dict: switches must be a dict
-  tune_config 顶层必须是 dict: The top level of tune_config must be a dict
-  '{count} 个可提升词条': '{count} improvable affixes'
-  '{count} 件': '{count} pieces'
-  '{count} 条': '{count} entries'
-  '{label}（{unit}）': '{label} ({unit})'
-  '{label}（基础值）': '{label} (Base Value)'
-  '{name} 里没有「{sheet}」工作表，可能不是毕业率计算器': '{name} has no "{sheet}" worksheet; it may
-    not be a graduation-rate calculator'
-  '{name}（共{count}条，按损失最小一条）': '{name} ({count} total, showing the smallest loss)'
-  '{slot}  {name} {value}  毕业率下降 {loss}': '{slot}  {name} {value}  graduation rate
-    drop {loss}'
+  Excel 工作簿 (*.xlsx): Excel ブック (*.xlsx)
+  Excel 文件 (*.xlsx): Excel ファイル (*.xlsx)
+  '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律': '[通知] 「実際の調律をスキップ」が有効です：調律画面の出入りのみシミュレートし、調律は実行しません'
+  common_conditions 必须是 dict: common_conditions は dict である必要があります
+  'playstyles: 名字不能为空': 'playstyles: 名前は空にできません'
+  pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when: pvp セクションは廃止されました。switches スイッチ登録表とルール条件グループ when を使用してください
+  switches 必须是 dict: switches は dict である必要があります
+  tune_config 顶层必须是 dict: tune_config のトップレベルは dict である必要があります
+  '{count} 个可提升词条': 強化可能な詞条 {count} 個
+  '{count} 件': '{count} 件'
+  '{count} 条': '{count} 条'
+  '{label}（{unit}）': '{label}（{unit}）'
+  '{label}（基础值）': '{label}（基礎値）'
+  '{name} 里没有「{sheet}」工作表，可能不是毕业率计算器': '{name} に「{sheet}」シートがありません。卒業率計算機ではない可能性があります'
+  '{name}（共{count}条，按损失最小一条）': '{name}（全{count}条、損失が最小の1条を表示）'
+  '{slot}  {name} {value}  毕业率下降 {loss}': '{slot}  {name} {value}  卒業率低下 {loss}'
   '{slot} · {name}': '{slot} · {name}'
-  '{slot} · {name}：{reasons}': '{slot} · {name}: {reasons}'
-  '{slot}·{position}：{source} → {target}': '{slot}·{position}: {source} -> {target}'
+  '{slot} · {name}：{reasons}': '{slot} · {name}：{reasons}'
+  '{slot}·{position}：{source} → {target}': '{slot}·{position}：{source} → {target}'
   ≥{level}: ≥{level}
-  ── 调律开始 ──: -- Tuning Started --
-  ▲ 上移: ▲ Move Up
-  ▼ 下移: ▼ Move Down
-  「{sheet}」表是空的: '"{sheet}" sheet is empty'
-  「{sheet}」表缺少必需列：{cols}: '"{sheet}" sheet is missing required columns: {cols}'
-  「{sheet}」表里没有找到任何技能行: No skill rows found in the "{sheet}" sheet
-  【复制】: '[Copy]'
+  ── 调律开始 ──: ── 調律開始 ──
+  ▲ 上移: ▲ 上へ移動
+  ▼ 下移: ▼ 下へ移動
+  「{sheet}」表是空的: 「{sheet}」シートは空です
+  「{sheet}」表缺少必需列：{cols}: 「{sheet}」シートに必須列が不足しています：{cols}
+  「{sheet}」表里没有找到任何技能行: 「{sheet}」シートにスキル行が見つかりませんでした
+  【复制】: 【複製】
   一般: 一般
   一键添加律准石: 一鍵追加律準石
-  万: 10k
+  万: 万
   三率填写白字: 三率填写白字
   三率类: 三率類
   上一件装备: 上一件装備
-  上一件装备 · 重置前: Previous Equipment · Before Reset
+  上一件装备 · 重置前: 前の装備 · リセット前
   上半赛季结束日期: 上半賽季結束日期
   不添加狗粮: 不追加狗糧
   全奇术增伤: 全奇術増傷
   群体类奇术增伤: 群体類奇術増傷
   逐轮狗粮决策: 逐輪狗糧決策
   本轮未执行调律: 本輪未執行調律
-  第 {n} 轮：{food}{outcome}: 'Round {n}: {food}{outcome}'
+  第 {n} 轮：{food}{outcome}: 第 {n} ラウンド：{food}{outcome}
   不适用: 不適用
   不限品阶: 不限品階
   不限评级: 不限評級
   不限部位: 不限部位
-  仅用于辅助筛选候选装备，不参与装备合法性判断: Only used to help filter candidate equipment; not part of
-    equipment validity checks
+  仅用于辅助筛选候选装备，不参与装备合法性判断: 候補装備の絞り込み補助にのみ使用され、装備の整合性判定には関与しません
   仅紫色: 僅紫色
   仅金色: 僅金色
   仅金装: 僅金装
   仅首词条: 僅首詞条
   仅展示黄字三率和增效: 僅展示黄字三率和増效
-  以下装备存在词条组合异常，已排除培养计算；请先校正：: 'The following equipment has an invalid affix combination
-    and has been excluded from the graduation calculation; please correct it first:'
+  以下装备存在词条组合异常，已排除培养计算；请先校正：: 以下の装備には詞条の組み合わせ異常があるため、育成計算から除外しました。先に修正してください：
   会心率: 会心率
   会意率: 会意率
-  伞: Umbrella
+  伞: 傘
   伞武学增伤: 傘武学増傷
   传入规则: 伝入規則
   伤害: 傷害
   伤害加成: 傷害加成
   伤害来源: 傷害来源
   位置: 位置
-  体: Vitality
-  佩: Pendant
+  体: 体
+  佩: 佩
   保存修改: 保存修改
   保存成功: 保存成功
   保留版本: 保留版本
-  修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算: After editing, the graduation rate is recalculated
-    as Current ADPS / this baseline DPS
+  修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算: 変更後、卒業率は 現在ADPS ÷ この基準DPS で再計算されます
   候选装备: 候選装備
-  候选装备  {count}: Candidate Equipment  {count}
+  候选装备  {count}: 候補装備  {count}
   候选评级: 候選評級
-  值得调律，但测试开关已启用，跳过实际调律: Worth tuning, but the test switch is enabled, so actual tuning
-    is skipped
+  值得调律，但测试开关已启用，跳过实际调律: 調律価値がありますが、テストスイッチが有効なため実際の調律をスキップします
   全武学增效: 全武学増效
   全部同时出现: 全部同時出現
-  全部未命中时取「默认判定」：部位页可按部位设置，未设置则跟随规则设置页: 'When nothing matches, falls back to the "Default
-    Judgment": settable per slot on the Slot page, otherwise follows the Rule Settings
-    page'
+  全部未命中时取「默认判定」：部位页可按部位设置，未设置则跟随规则设置页: すべて未一致の場合は「既定判定」を使用：部位タブで部位ごとに設定でき、未設定の場合はルール設定タブに従います
   全部规则: 全部規則
-  全部规则（默认配置）: All Rules (Default Config)
+  全部规则（默认配置）: 全ルール（既定設定）
   ? '其他增益：
 
     '
-  : 'Other Bonuses:
+  : 'その他のバフ：
 
     '
   冠胄: 冠冑
-  冠胄 · 胸甲: Head Guard · Chest Armor
+  冠胄 · 胸甲: 兜 · 胸甲
   冲突: 衝突
   准备执行: 準備執行
   分析失败: 分析失敗
-  分析当前配装的合法培养建议和词条敏感度: Analyze valid growth suggestions and affix sensitivity for
-    the current build
-  '列 ': 'Column '
+  分析当前配装的合法培养建议和词条敏感度: 現在のビルドに対する正規の育成提案と詞条感度を分析します
+  '列 ': '列 '
   创建基础属性: 創建基礎属性
   创建模拟装备: 創建模擬装備
   创建装备: 創建装備
   删除此装备: 削除此装備
   删除等级: 削除等級
   判定属性: 判定属性
-  判定抗性(%): Judgment Resistance (%)
-  判定抗性百分比（可选，>= 0）: Judgment resistance percentage (optional, >= 0)
+  判定抗性(%): 判定耐性(%)
+  判定抗性百分比（可选，>= 0）: 判定耐性の割合（任意、>= 0）
   判定结果: 判定結果
   判定语义: 判定語義
   别名: 別名
   刷新战斗属性: 刷新戦闘属性
   刷新装备: 刷新装備
-  剑: Sword
+  剑: 剣
   剑武学增伤: 剣武学増傷
   动作: 動作
   动态类: 動態類
-  劲: Vigor
-  势: Momentum
-  勾选装备后计算；最多选择 3 件。: Check equipment to include in the calculation; select up to 3
-    pieces.
-  区间值（最小~最大）: Range value (min~max)
+  劲: 勁
+  势: 勢
+  勾选装备后计算；最多选择 3 件。: 計算に含める装備をチェックしてください（最大 3 件）。
+  区间值（最小~最大）: 範囲値（最小~最大）
   单体类奇术增伤: 単体類奇術増傷
   单值: 単値
   单次均值: 単次均値
@@ -1405,60 +1290,48 @@ auto_strings:
   双刀武学增伤: 双刀武学増傷
   取消合并: 取消合併
   可培养词条: 可培養詞条
-  可用词条库为全局价值序（越靠前越优先保留与填充）；武学增伤不在此填写——玩法指定武器的武学增伤自动视为最高优先级，未指定时按垃圾词条处理。: The available-affix
-    pool is a global priority order (earlier = kept/filled first); Martial Damage
-    bonuses aren't entered here -- the Martial Damage bonus of the weapon specified
-    by the playstyle is automatically treated as top priority, and treated as a junk
-    affix otherwise.
+  可用词条库为全局价值序（越靠前越优先保留与填充）；武学增伤不在此填写——玩法指定武器的武学增伤自动视为最高优先级，未指定时按垃圾词条处理。: 利用可能詞条プールは全体の価値順です（上位ほど優先的に保持・補充されます）。武学ダメージ増加はここには記入しません——プレイスタイルで指定された武器の武学ダメージ増加は自動的に最優先扱いとなり、未指定の場合はゴミ詞条として扱われます。
   右键菜单: 右鍵菜単
   合并失败: 合併失敗
   合并选中项: 合併選中項
   名称为空: 名称為空
-  否: 'No'
+  否: いいえ
   命中: 命中
   ? '命中条件：装备任一条题名属于勾选词条
 
     （勾选仅首词条时只判定装备首词条）；
 
     自选词条语义不跑潜力判定'
-  : 'Hit condition: any of the equipment''s affixes belongs to the checked affixes
+  : '一致条件：装備のいずれかの詞条がチェック済み詞条に含まれる
 
-    (when "first affix only" is checked, only the first affix is judged);
+    （「首詞条のみ」をチェック時は首詞条のみ判定）；
 
-    "Custom Affix" semantics skip potential judgment'
-  命中条件：预期评级属于勾选档位（全选 = 不限，不取评级）: 'Hit condition: expected rating falls in a checked
-    tier (Select All = no limit, rating not taken)'
-  命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）: 'Hit condition: compares the first
-    affix''s initial value against this value by direction; <= 100 / >= 0 = no limit
-    (recognition failure counts as not meeting it)'
+    カスタム詞条方式ではポテンシャル判定を行いません'
+  命中条件：预期评级属于勾选档位（全选 = 不限，不取评级）: 一致条件：予想評価がチェック済みランクに含まれる（全選択 = 制限なし、評価を参照しない）
+  命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）: 一致条件：首詞条の初期数値を指定方向でこの値と比較；≤ 100 / ≥ 0 = 制限なし（認識失敗時は未達扱い）
   品阶未知: 品階未知
-  品阶未识别，跳过品阶筛选: Quality not recognized; skipping quality filter
+  品阶未识别，跳过品阶筛选: 品階を認識できなかったため、品階フィルターをスキップします
   品阶识别异常: 品階識別異常
-  商: Shang
+  商: 商
   回收装备: 回收装備
-  回收装备：分解为材料: 'Recycle Equipment: Break Down into Materials'
-  固定标准部位；勾选有调律价值的品阶；规则设置页可按部位覆盖本全局默认: Fixed standard slots; check the quality tiers
-    worth tuning; the Rule Settings page can override this global default per slot
+  回收装备：分解为材料: 装備を回収：素材に分解
+  固定标准部位；勾选有调律价值的品阶；规则设置页可按部位覆盖本全局默认: 標準部位は固定。調律価値のある品階をチェックしてください。ルール設定タブで部位ごとにこの全体既定値を上書きできます
   培养建议: 培養建議
   基准DPS: 基準DPS
   基础属性: 基礎属性
   等级属性: 等級属性
-  基础属性「{name}」已保存到流派「{school}」: Base attributes "{name}" saved to playstyle "{school}"
-  基础属性「{name}」已存在，是否覆盖？: Base attributes "{name}" already exist. Overwrite?
+  基础属性「{name}」已保存到流派「{school}」: 基礎属性「{name}」を流派「{school}」に保存しました
+  基础属性「{name}」已存在，是否覆盖？: 基礎属性「{name}」はすでに存在します。上書きしますか？
   基础属性名称: 基礎属性名称
   基础属性名称不能为空: 基礎属性名称不能為空
   基础属性已存在: 基礎属性已存在
-  基础属性：{name}: 'Base Attributes: {name}'
-  基础属性：未声明（YAML 中通过 _attr 配置）: 'Base attributes: Not declared (configured via _attr
-    in YAML)'
+  基础属性：{name}: 基礎属性：{name}
+  基础属性：未声明（YAML 中通过 _attr 配置）: 基礎属性：未宣言（YAML で _attr により設定）
   基础方案: 基礎方案
-  基础规则组顶层必须是 dict: The top level of a base rule group must be a dict
-  填写这套基础配置对应的面板属性。装备专属属性无需填写；外功穿透和属攻穿透仅填写基础值，不包含装备定音。: Fill in the panel attributes
-    for this base config. Equipment-exclusive attributes don't need to be filled in;
-    Physical Penetration and Attribute Penetration should only include the base value,
-    not equipment attunement.
+  基础规则组顶层必须是 dict: 基本ルールグループのトップレベルは dict である必要があります
+  填写这套基础配置对应的面板属性。装备专属属性无需填写；外功穿透和属攻穿透仅填写基础值，不包含装备定音。: この基礎設定に対応するステータス値を入力してください。装備専用属性は入力不要です。外功貫通と属性攻撃貫通は基礎値のみ入力し、装備の定音は含めないでください。
   增效类: 増效類
-  增益抗性百分比（可选，>= 0）: Bonus resistance percentage (optional, >= 0)
+  增益抗性百分比（可选，>= 0）: バフ耐性の割合（任意、>= 0）
   增益效果: 増益效果
   处理中: 処理中
   备战: ロードアウト
@@ -1469,119 +1342,95 @@ auto_strings:
   外功攻击: 外功攻撃
   外功类: 外功類
   外功防御: 外功防禦
-  如：踏雪云珑: e.g. Taxue Yunlong
-  如：黄钟长鸣: e.g. Huangzhong Changming
+  如：踏雪云珑: 例：踏雪雲瓏
+  如：黄钟长鸣: 例：黄鐘長鳴
   字体设置: 字体設置
-  完成：{rounds} 轮，{status}: 'Done: {rounds} rounds, {status}'
+  完成：{rounds} 轮，{status}: 完了：{rounds} ラウンド、{status}
   定音: 定音
-  最终评级：: 'Final Rating:'
-  最终评级：-: 'Final Rating: -'
-  实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源: 'Experimental: import a graduation-rate calculator
-    Excel file to view the race axis and damage sources'
-  宫: Gong
-  宫为首词条 · 商角徵羽不可重复: Gong must be the first affix · Shang/Jue/Zhi/Yu cannot repeat
+  最终评级：: 最終評価：
+  最终评级：-: 最終評価：-
+  实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源: 実験的機能：卒業率計算機 Excel をインポートし、タイムラインとダメージ内訳を表示します
+  宫: 宮
+  宫为首词条 · 商角徵羽不可重复: 宮は首詞条 · 商・角・徴・羽は重複不可
   对玩家单位增效: 対玩家単位増效
   对首领单位增伤: 対首領単位増傷
-  对齐失败：alignment 为 None: 'Alignment failed: alignment is None'
-  导入 Excel: Import Excel
-  导入 Excel…: Import Excel…
+  对齐失败：alignment 为 None: 整列に失敗しました：alignment が None です
+  导入 Excel: Excel をインポート
+  导入 Excel…: Excel をインポート…
   导入失败: 導入失敗
   导入成功: 導入成功
-  导入毕业率 Excel: Import Graduation Rate Excel
-  导出为 leoq7 格式: Export as leoq7 Format
+  导入毕业率 Excel: 卒業率 Excel をインポート
+  导出为 leoq7 格式: leoq7 形式でエクスポート
   导出失败: 導出失敗
   导出成功: 導出成功
   导出数据: 導出数拠
   导出装备数据: 導装備備数拠
-  将低于最高等级的装备视为最高等级参与计算: Treat equipment below the max level as max level for the calculation
-  将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定: Treat equipment below the max level
-    as max level (raises base attributes); affix/Attunement values are determined
-    by full Chengyin/full Attunement
-  将已装备的定音词条数值视为上限（100%）参与计算: Treat the equipped Attunement affix values as the cap
-    (100%) in the calculation
-  将已装备的承音装备词条数值视为承音上限参与计算: Treat the equipped Chengyin equipment's affix values as
-    the Chengyin cap in the calculation
-  尚未导入。选择毕业率计算器 Excel 查看其竞速轴。: Not imported yet. Select a graduation-rate calculator
-    Excel file to view its race axis.
+  将低于最高等级的装备视为最高等级参与计算: 最高等級未満の装備を最高等級とみなして計算に含めます
+  将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定: 最高等級未満の装備を最高等級とみなします（基礎属性を引き上げ）。詞条・定音数値は最大承音／最大定音の設定に従います
+  将已装备的定音词条数值视为上限（100%）参与计算: 装着済みの定音詞条数値を上限（100%）とみなして計算します
+  将已装备的承音装备词条数值视为承音上限参与计算: 装着済みの承音装備の詞条数値を承音上限とみなして計算します
+  尚未导入。选择毕业率计算器 Excel 查看其竞速轴。: 未インポートです。卒業率計算機 Excel を選択してタイムラインを表示してください。
   属性攻击: 属性攻撃
   属性跟随: 属性跟随
   属攻: 属攻
   属攻伤害加成: 属攻傷害加成
-  属攻伤害加成（{name}）: Attribute ATK Damage Bonus ({name})
+  属攻伤害加成（{name}）: 属性攻撃ダメージ増加（{name}）
   属攻穿透: 属攻穿透
-  属攻穿透（{name}）: Attribute Penetration ({name})
+  属攻穿透（{name}）: 属性攻撃貫通（{name}）
   属攻类: 属攻類
-  属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Attribute ATK affixes (including Formless) allowed
-    at most 2; affixes 2-5 currently have {n}
+  属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: 属性攻撃系詞条（無相を含む）は最大 2 条までですが、現在詞条 2-5 に {n} 条あります
   已定音: 已定音
   ? '已导出到
 
     {path}'
-  : 'Exported to
+  : 'エクスポート先：
 
     {path}'
   已应用: 已応用
-  已是最后一条赛季，无法下移: This is the last season; cannot move down
-  已是最后一条配置，无法下移: This is the last config; cannot move down
-  已是第一条赛季，无法上移: This is the first season; cannot move up
-  已是第一条配置，无法上移: This is the first config; cannot move up
-  已校验 {count} 种合法组合: Validated {count} legal combinations
-  已符合规则但未找到调律入口，跳过本件: Matches the rule, but no tuning entry point was found; skipping
-    this piece
-  已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。勾选参与搜索的装备后，系统会重新计算整套毕业率。: Loaded {count} candidate
-    equipment pieces, covering {slots}/8 slots. Once you check the equipment to search
-    with, the system recalculates the full graduation rate.
-  已选择 {count} 件装备，正在计算联合提升…: '{count} equipment selected, calculating combined uplift…'
-  已锁定，跳过: Locked, Skipped
+  已是最后一条赛季，无法下移: すでに最後のシーズンのため下へ移動できません
+  已是最后一条配置，无法下移: すでに最後の設定のため下へ移動できません
+  已是第一条赛季，无法上移: すでに最初のシーズンのため上へ移動できません
+  已是第一条配置，无法上移: すでに最初の設定のため上へ移動できません
+  已校验 {count} 种合法组合: 有効な組み合わせ {count} 通りを検証しました
+  已符合规则但未找到调律入口，跳过本件: ルールに一致しましたが調律入口が見つからないため、この装備をスキップします
+  已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。勾选参与搜索的装备后，系统会重新计算整套毕业率。: 候補装備を {count} 件読み込みました（{slots}/8 部位をカバー）。探索対象の装備をチェックすると、セット全体の卒業率を再計算します。
+  已选择 {count} 件装备，正在计算联合提升…: '{count} 件の装備を選択しました。複合上昇量を計算中…'
+  已锁定，跳过: ロック済みのためスキップ
   应用失败: 応用失敗
   应用此组合: 応用此組合
-  建议按装备部位分组。可同时勾选 1-3 件装备进行联合计算；系统会为每个词条位置比较多个候选目标，并重新计算整套毕业率，不会把单项提升直接相加。: Grouping
-    by equipment slot is recommended. Check 1-3 pieces of equipment at once for a
-    joint calculation; the system compares multiple candidate targets for each affix
-    slot and recalculates the full graduation rate, rather than simply summing individual
-    uplifts.
+  建议按装备部位分组。可同时勾选 1-3 件装备进行联合计算；系统会为每个词条位置比较多个候选目标，并重新计算整套毕业率，不会把单项提升直接相加。: 装備部位ごとにグループ化することをおすすめします。1～3 件の装備を同時チェックして複合計算でき、各詞条枠で複数の候補目標を比較してセット全体の卒業率を再計算します（単体上昇量の単純合算ではありません）。
   建议转为: 建議転為
-  开关 key → 显示名；规则条件组 when 引用的开关禁止删除: Switch key -> display name; switches referenced
-    by a rule condition group's `when` cannot be deleted
+  开关 key → 显示名；规则条件组 when 引用的开关禁止删除: スイッチ key → 表示名；ルール条件グループ when から参照されているスイッチは削除できません
   开始搜索: 開始搜索
   开始日期: 開始日期
   开始调律: 開始調律
   弓玦: 弓玦
   弓玦套装: 弓玦套装
   当前毕业率: 当前畢業率
-  当前装备完成后将在这里归档: Once the current equipment is finished, it'll be archived here
-  当前赛季装备等级（从等级配置中选择）: Current season equipment level (select from level config)
-  当前配装存在词条组合异常，请先校正：{names}: 'The current build has an invalid affix combination;
-    please correct it first: {names}'
-  当前配装没有符合规则且能提高毕业率的词条替换建议: The current build has no rule-compliant affix-swap suggestions
-    that would raise the graduation rate
-  当前阶段：{phase}: 'Current Stage: {phase}'
-  当前阶段：扫描判定 — 已读取装备，计算调律潜力: 'Current Stage: Scan Judgment -- equipment read, calculating
-    tuning potential'
-  当前阶段：收尾处理 — 当前装备处理完成: 'Current Stage: Wrap-up -- current equipment finished processing'
-  当前阶段：材料准备 — 第 {n} 轮{action}，{food}: 'Current Stage: Material Prep -- round {n} {action},
-    {food}'
-  当前阶段：等待下一件装备: 'Current Stage: Waiting for Next Equipment'
-  当前阶段：等待开始: 'Current Stage: Waiting to Start'
-  当前阶段：重置调律 — 重置完成，按新装备继续调律: 'Current Stage: Reset Tuning -- reset complete, continuing
-    tuning as a new equipment'
-  律匠 - 燕云十六声装备调律工具: LvJiang - Where Winds Meet Equipment Tuning Tool
-  御: Defense
-  徵: Zhi
-  必须同时绑定主武学和副武学: Both Main Martial and Off Martial must be bound
+  当前装备完成后将在这里归档: 現在の装備が完了するとここにアーカイブされます
+  当前赛季装备等级（从等级配置中选择）: 今シーズンの装備等級（等級設定から選択）
+  当前配装存在词条组合异常，请先校正：{names}: 現在のビルドに詞条の組み合わせ異常があります。先に修正してください：{names}
+  当前配装没有符合规则且能提高毕业率的词条替换建议: 現在のビルドには、ルールに適合し卒業率を上げられる詞条交換提案がありません
+  当前阶段：{phase}: 現在のフェーズ：{phase}
+  当前阶段：扫描判定 — 已读取装备，计算调律潜力: 現在のフェーズ：スキャン判定 — 装備を読み取り、調律ポテンシャルを計算中
+  当前阶段：收尾处理 — 当前装备处理完成: 現在のフェーズ：終了処理 — 現在の装備の処理が完了
+  当前阶段：材料准备 — 第 {n} 轮{action}，{food}: 現在のフェーズ：素材準備 — 第 {n} ラウンド{action}、{food}
+  当前阶段：等待下一件装备: 現在のフェーズ：次の装備を待機中
+  当前阶段：等待开始: 現在のフェーズ：開始待機中
+  当前阶段：重置调律 — 重置完成，按新装备继续调律: 現在のフェーズ：調律リセット — リセット完了、新装備として調律を続行
+  律匠 - 燕云十六声装备调律工具: 律匠 - 風燕伝：Where Winds Meet 装備調律ツール
+  御: 御
+  徵: 徴
+  必须同时绑定主武学和副武学: 主武学と副武学の両方を紐付ける必要があります
   总伤害: 総傷害
-  战斗 {time:.1f} 秒 · {rows} 行 / {hits} 次命中 · {skills} 个技能 · 总伤 {damage:,.0f} · DPS {dps:,.0f}: Combat
-    {time:.1f}s · {rows} rows / {hits} hits · {skills} skills · Total Damage {damage:,.0f}
-    · DPS {dps:,.0f}
+  战斗 {time:.1f} 秒 · {rows} 行 / {hits} 次命中 · {skills} 个技能 · 总伤 {damage:,.0f} · DPS {dps:,.0f}: 戦闘 {time:.1f} 秒 · {rows} 行 / {hits} ヒット · {skills} スキル · 総ダメージ {damage:,.0f} · DPS {dps:,.0f}
   战斗属性全屏: 戦闘属性全屏
   战斗属性半屏: 戦闘属性半屏
   战斗时间: 戦闘時間
-  所选装备存在词条组合异常，请先校正：{names}: 'The selected equipment has an invalid affix combination;
-    please correct it first: {names}'
-  所选装备没有能进一步提高毕业率的合法联合方案。: The selected equipment has no legal joint combination that
-    further raises the graduation rate.
+  所选装备存在词条组合异常，请先校正：{names}: 選択した装備に詞条の組み合わせ異常があります。先に修正してください：{names}
+  所选装备没有能进一步提高毕业率的合法联合方案。: 選択した装備には卒業率をさらに高められる正規の複合プランがありません。
   所选调律规则的实际评级: 所選調律規則的実際評級
-  扇: Fan
+  扇: 扇
   扇武学增伤: 扇武学増傷
   扇武学增效: 扇武学増效
   手甲: 手甲
@@ -1589,68 +1438,67 @@ auto_strings:
   执行调律: 執行調律
   扫描判定: 掃描判定
   承音装备: 承音装備
-  全部用户中没有找到符合条件的疑似重复装备: No possible duplicate equipment was found across all users
+  全部用户中没有找到符合条件的疑似重复装备: 全ユーザーの中で条件に一致する重複候補装備は見つかりませんでした
   面向全部用户: 面向全部ユーザー
   技能: 技能
   技能轴: 技能軸
   指定武学增效: 指定武学増效
   搜索失败: 搜索失敗
-  搜索失败，请检查候选装备后重试。: Search failed; check the candidate equipment and try again.
-  搜索完成，共得到 {count} 个可用结果。: Search complete, {count} usable results found.
-  搜索时排除模拟装备，仅使用真实背包和已穿戴装备: Exclude mock equipment during search; only use real inventory
-    and equipped items
+  搜索失败，请检查候选装备后重试。: 探索に失敗しました。候補装備を確認して再試行してください。
+  搜索完成，共得到 {count} 个可用结果。: 探索完了。利用可能な結果が {count} 件見つかりました。
+  搜索时排除模拟装备，仅使用真实背包和已穿戴装备: 探索時に模擬装備を除外し、実際のバッグ内装備と装着中装備のみを使用します
   搜索最优毕业率装备组合: 搜索最優畢業率装備組合
   支持承音: 支持承音
   支持重置: 支持重置
   收尾处理: 收尾処理
   攻击属性: 攻撃属性
-  敏: Agility
+  敏: 敏
   数值填充: 数値填充
-  数值复用目标部位，表格只读: Values reuse target slot, table is read-only
+  数值复用目标部位，表格只读: 数値は対象部位の値を再利用するため、表は読み取り専用です
   数值展示: 数値展示
-  数据必须是 dict: Data must be a dict
-  文本文件 (*.txt): Text File (*.txt)
+  数据必须是 dict: データは dict である必要があります
+  文本文件 (*.txt): テキストファイル (*.txt)
   新建属性: 新建属性
   新建方案: 新建方案
   方案: 方案
-  方案 ADPS: Plan ADPS
+  方案 ADPS: プラン ADPS
   ? '方案「{name}」已生成。
 
     DPS：{dps:.2f}
 
     文件：{path}'
-  : 'Plan "{name}" generated.
+  : 'プラン「{name}」を生成しました。
 
-    DPS: {dps:.2f}
+    DPS：{dps:.2f}
 
-    File: {path}'
+    ファイル：{path}'
   方案名称: 方案名称
-  方案数值读取失败：{error}: 'Failed to read plan values: {error}'
+  方案数值读取失败：{error}: プラン数値の読み取りに失敗しました：{error}
   方案管理: 方案管理
-  无: None
+  无: なし
   无可用判定规则: 無可用判定規則
-  无处置规则命中 → 跳过该装备: No disposal rule matched -> skip this equipment
-  无已实现规则可判定该装备，结束调律: No implemented rule can judge this equipment; ending tuning
+  无处置规则命中 → 跳过该装备: 処分ルール未一致 → この装備をスキップ
+  无已实现规则可判定该装备，结束调律: この装備を判定できる実装済みルールがないため、調律を終了します
   无方案: 無方案
   无有效结论: 無有效結論
   无法保存: 無法保存
   无法创建: 無法創建
-  '无法删除方案文件: {exc}': 'Cannot delete plan file: {exc}'
-  无法打开 {name}：{err}: 'Cannot open {name}: {err}'
+  '无法删除方案文件: {exc}': 'プランファイルを削除できません: {exc}'
+  无法打开 {name}：{err}: '{name} を開けません：{err}'
   无法搜索: 無法搜索
   无法继续调律: 無法継続調律
   无法装备: 無法装備
   无法解析: 無法解析
-  无法识别装备类型：「{type_name}」: 'Cannot recognize equipment type: "{type_name}"'
+  无法识别装备类型：「{type_name}」: 装備種類を認識できません：「{type_name}」
   无法跟随: 無法跟随
-  无狗粮规则命中 → 不添加: No fodder rule matched -> not added
+  无狗粮规则命中 → 不添加: 餌ルール未一致 → 追加しない
   无相: 無相
-  无行为规则命中 → 继续调律: No behavior rule matched -> continue tuning
+  无行为规则命中 → 继续调律: 動作ルール未一致 → 調律を続行
   无词条数据: 無詞条数拠
   无限转律: 無限転律
   旧版本: 旧版本
   展示白字和黄字三率和增效: 展示白字和黄字三率和増效
-  右键切换白字和黄字三率及增效的显示方式: Right-click to switch rate and bonus display
+  右键切换白字和黄字三率及增效的显示方式: 右クリックで白字・黄字の三率および増効の表示方式を切り替えます
   暂无已完成装备: 暫無已完成装備
   暂无数据: 暫無数拠
   暂无符合条件的词条: 暫無符合条件的詞条
@@ -1658,15 +1506,15 @@ auto_strings:
   最优组合已应用到装备栏: 最優組合已応用到装備欄
   最优结果: 最優結果
   最低材料数量: 最低材料数量
-  最多同时选择 3 件装备。: Select up to 3 pieces of equipment at once.
+  最多同时选择 3 件装备。: 同時に選択できる装備は最大 3 件です。
   最大: 最大
   最大外功攻击: 最大外功攻撃
   最大外属攻击: 最大外属攻撃
   最大无相攻击: 最大無相攻撃
   最大本属攻击: 最大本属攻撃
-  最大预期：: 'Max Expected:'
-  最大预期：-: 'Max Expected: -'
-  最大预期：判定中...: 'Max Expected: judging...'
+  最大预期：: 最大予想：
+  最大预期：-: 最大予想：-
+  最大预期：判定中...: 最大予想：判定中...
   最小: 最小
   最小外功攻击: 最小外功攻撃
   最小外属攻击: 最小外属攻撃
@@ -1674,8 +1522,8 @@ auto_strings:
   最小本属攻击: 最小本属攻撃
   最高单项提升: 最高単項提升
   未归类: 未帰類
-  未找到「添加」入口: '"Add" entry point not found'
-  未找到对应流派的毕业率方案: No graduation-rate plan found for the matching playstyle
+  未找到「添加」入口: 「追加」入口が見つかりません
+  未找到对应流派的毕业率方案: 該当する流派の卒業率プランが見つかりませんでした
   未找到有效组合: 未找到有效組合
   未找到角色详情面板: 未找到角色詳情面板
   未找到调律入口: 未找到調律入口
@@ -1685,139 +1533,116 @@ auto_strings:
   未知装备: 未知装備
   未知词条: 未知詞条
   未评级: 未評級
-  未达门槛 → 扫描处理: Below threshold -> Scan Processing
+  未达门槛 → 扫描处理: しきい値未満 → スキャン処理
   未选词条: 未選詞条
-  未配置基础规则组，请在调律页选择基础规则组: No base rule group configured; select one on the Tuning page
-  未配置狗粮规则 → 不添加: No fodder rule configured -> not added
-  未配置调律规则，请在调律页选择至少一个规则: No tuning rule configured; select at least one on the Tuning
-    page
-  未配置调律部位，请在调律页选择至少一个部位: No tuning slot configured; select at least one on the Tuning
-    page
-  本件已重置过一次，冷却期内不再重置: This piece has already been reset once; no more resets during
-    the cooldown
+  未配置基础规则组，请在调律页选择基础规则组: 基本ルールグループが未設定です。調律タブで基本ルールグループを選択してください
+  未配置狗粮规则 → 不添加: 餌ルール未設定 → 追加しない
+  未配置调律规则，请在调律页选择至少一个规则: 調律ルールが未設定です。調律タブで少なくとも1つのルールを選択してください
+  未配置调律部位，请在调律页选择至少一个部位: 調律部位が未設定です。調律タブで少なくとも1つの部位を選択してください
+  本件已重置过一次，冷却期内不再重置: この装備はすでに1回リセット済みのため、クールダウン中は再リセットしません
   ? '本条规则取评级时只注入首词条，忽略已有的其他词条
 
     （其余槽视作空槽由潜力判定自由填充）；避免回收掉
 
     非首词条已成垃圾但可重置调律的装备'
-  : 'When computing rating, this rule only injects the first affix and ignores the
-    other existing affixes
+  : 'このルールは評価計算時に首詞条のみ注入し、他の既存詞条を無視します
 
-    (remaining slots are treated as empty and freely filled by the potential judgment);
-    avoids scrapping
+    （残りの枠は空枠としてポテンシャル判定で自由に補完）。
 
-    equipment whose non-first affixes are junk but could still be reset and re-tuned'
-  本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；自选规则=弹窗勾选；自选词条=判定结果列改勾词条，按装备词条名匹配，不跑潜力判定: 'How this
-    rule judges: Passed-in Rules = rules checked at runtime; All Rules; Custom Rules
-    = checked in a popup; Custom Affixes = affixes checked in the judgment-result
-    column, matched by equipment affix name, skipping potential judgment'
-  本次无一般及以上成品。: No Common-or-above finished items this run.
+    非首詞条がゴミでもリセット再調律できる装備を誤って回収するのを防ぎます'
+  本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；自选规则=弹窗勾选；自选词条=判定结果列改勾词条，按装备词条名匹配，不跑潜力判定: このルールの判定方式：指定ルール＝実行時にチェックしたルール；全ルール；カスタムルール＝ポップアップで選択；カスタム詞条＝判定結果列で詞条をチェックし装備の詞条名で照合（ポテンシャル判定なし）
+  本次无一般及以上成品。: 今回は一般以上の完成品がありませんでした。
   本轮停止: 本輪停止
   材料准备: 材料準備
-  枪: Spear
+  枪: 槍
   枪武学增伤: 槍武学増傷
-  查找承音或再次转律产生的同件装备历史版本: Find historical versions of the same equipment produced by
-    Chengyin or repeated Transform
+  查找承音或再次转律产生的同件装备历史版本: 承音や再転律によって生じた同一装備の履歴バージョンを検索します
   模拟: 模擬
   横刀: 横刀
   横刀武学增伤: 横刀武学増傷
-  正在比较 {count} 种装备组合，搜索期间仍可取消。: Comparing {count} equipment combinations; you can
-    still cancel during the search.
+  正在比较 {count} 种装备组合，搜索期间仍可取消。: '{count} 通りの装備組み合わせを比較中です。探索中もキャンセルできます。'
   正在读取候选装备…: 正在読取候選装備…
   正常完成: 正常完成
   ? '武器【{type}】与当前方案的武学不匹配（主武学武器：{main}，副武学武器：{sub}）。
 
     如需使用该武器，请新建对应流派的方案。'
-  : 'Weapon [{type}] doesn''t match this plan''s Martial (Main Martial weapon: {main},
-    Off Martial weapon: {sub}).
+  : '武器【{type}】は現在のプランの武学と一致しません（主武学武器：{main}、副武学武器：{sub}）。
 
-    To use this weapon, create a plan for the matching playstyle.'
+    この武器を使用するには、対応する流派のプランを新規作成してください。'
   武器类: 武器類
   攻具套装: 攻具套装
   攻具套装定义: 攻具套装定義
-  攻具套装：{name}: 'Attack Gear Set: {name}'
+  攻具套装：{name}: 攻撃具セット：{name}
   请选择攻具套装: 請選択攻具套装
   武学属性: 武学属性
-  每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when: 'Each tier is defined by several condition
-    groups: OR between groups, AND within a group; a group can bind a `when` switch
-    precondition'
+  每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when: 各ランクは複数の条件グループで定義：グループ間は OR、グループ内は AND。条件グループにはスイッチ前提条件 when を紐付けられます
   每轮添加: 每輪追加
-  每轮调律开始前的行为点）：律准石数量检查、狗粮检查与添加: 'Behavior point before each tuning round): tuning-stone
-    count check, fodder check and add'
+  每轮调律开始前的行为点）：律准石数量检查、狗粮检查与添加: 各調律ラウンド開始前の処理ポイント）：律準石数のチェック、餌のチェックと追加
   毕业率: 畢業率
   毕业率变化: 畢業率変化
   气血最大值: 気血最大値
   没有全部出现: 没有全部出現
-  没有可跟随的目标部位。: No target slot to follow.
-  没有启用任何调律规则，请在调律页勾选至少一个规则: No tuning rule is enabled; check at least one on the Tuning
-    page
+  没有可跟随的目标部位。: 追従できる対象部位がありません。
+  没有启用任何调律规则，请在调律页勾选至少一个规则: 有効な調律ルールがありません。調律タブで少なくとも1つのルールをチェックしてください
   没有激活的用户: 没有激活的ユーザー
   流派: 流派
   测试模式跳过调律: 測試模式跳過調律
   测试装备: 測試装備
   测高: 測高
   添加词条名: 追加詞条名
-  游戏账号、角色名、装备名称、装备指纹、截图和日志: Game account, character name, equipment name, equipment
-    fingerprint, screenshots, and logs
+  游戏账号、角色名、装备名称、装备指纹、截图和日志: ゲームアカウント、キャラクター名、装備名、装備フィンガープリント、スクリーンショットおよびログ
   满定音: 満定音
   满承音: 満承音
   满数值: 満数値
   满等级: 満等級
-  满词条，已完成扫描处理: Affixes full; Scan Processing completed
-  满词条，扫描完成: Affixes full; scan complete
+  满词条，已完成扫描处理: 詞条が満枠のため、スキャン処理を完了しました
+  满词条，扫描完成: 詞条が満枠のため、スキャン完了
   满调律: 満調律
   漂移补滚后对齐失败: 漂移補滾後対斉失敗
   燕云十六声: 燕雲十六声
   牵丝: 牽糸
-  环: Ring
-  环 · 佩: Ring · Pendant
+  环: 環
+  环 · 佩: 環 · 佩
   生存类: 生存類
-  用于备战方案比较  ·  不会修改真实背包装备: For comparing loadout plans  ·  does not modify your real
-    inventory equipment
-  用于改进律匠内置的调律规则: Used to improve LvJiang's built-in tuning rules
+  用于备战方案比较  ·  不会修改真实背包装备: 編成プランの比較用 · 実際のバッグ内装備は変更されません
+  用于改进律匠内置的调律规则: 律匠内蔵の調律ルール改善に使用されます
   用户中断: ユーザー中断
   破竹: 破竹
-  确定删除基础属性「{name}」？: Delete base attributes "{name}"?
+  确定删除基础属性「{name}」？: 基礎属性「{name}」を削除しますか？
   ? '确定要从背包中删除【{name}】吗？
 
     此操作不可撤销。'
-  : 'Delete [{name}] from your inventory?
+  : 'バッグから【{name}】を削除しますか？
 
-    This cannot be undone.'
+    この操作は取り消せません。'
   ? '确定要删除模拟装备【{name}】吗？
 
     此操作不可撤销。'
-  : 'Delete mock equipment [{name}]?
+  : '模擬装備【{name}】を削除しますか？
 
-    This cannot be undone.'
+    この操作は取り消せません。'
   确认跟随: 確認跟随
-  神力词条「{name}」不能是转律产出：转律不会产出神力词条: 'Godly affix "{name}" cannot come from a Transform:
-    Transform never produces Godly affixes'
-  神力词条最多 1 条，当前词条 2-5 里有 {n} 条: At most 1 Godly affix allowed; affixes 2-5 currently
-    have {n}
+  神力词条「{name}」不能是转律产出：转律不会产出神力词条: 神力詞条「{name}」は転律産出にできません：転律では神力詞条が出ません
+  神力词条最多 1 条，当前词条 2-5 里有 {n} 条: 神力詞条は最大 1 条までですが、現在詞条 2-5 に {n} 条あります
   空数据: 空数拠
   穿戴到对应槽位: 穿戴到対応槽位
-  符合以下规则，开始调律：: 'Matches the following rules; starting tuning:'
-  第 {n} 轮方案：{food}: 'Round {n} Plan: {food}'
-  等待下一件装备...: Waiting for next equipment...
-  等待评级...: Waiting for rating...
-  等级 {level} | {quality} | {rounds} 轮 | {rating} | {status}: Level {level} | {quality}
-    | {rounds} rounds | {rating} | {status}
-  等级不足，当前部位结束: Level too low; this slot ends
-  等级不足，部位结束: Level too low; slot ends
+  符合以下规则，开始调律：: 以下のルールに一致したため、調律を開始します：
+  第 {n} 轮方案：{food}: 第 {n} ラウンド案：{food}
+  等待下一件装备...: 次の装備を待機中...
+  等待评级...: 評価待機中...
+  等级 {level} | {quality} | {rounds} 轮 | {rating} | {status}: 等級 {level} | {quality} | {rounds} ラウンド | {rating} | {status}
+  等级不足，当前部位结束: 等級不足のため、この部位の処理を終了します
+  等级不足，部位结束: 等級不足、部位終了
   等级倒序: 等級倒序
   等级字号: 等級字号
   等级正序: 等級正序
   筛选: 篩選
   精准率: 精準率
-  系统规则不可删除或修改 key；不使用时请取消启用: System rules cannot be deleted or have their key changed;
-    disable them instead of deleting
+  系统规则不可删除或修改 key；不使用时请取消启用: システムルールは削除や key 変更ができません。使わない場合は無効化してください
   系统规则组不可删除: 系統規則組不可削除
-  系统配置不可删除。如不需要，请改用停用/取消勾选。: System config cannot be deleted. If you don't need it,
-    disable/uncheck it instead.
-  系统配置不可删除，只能修改其取值；新增的条目可以删除。: System config cannot be deleted, only its value edited;
-    entries you add can be deleted.
-  紫: Purple
+  系统配置不可删除。如不需要，请改用停用/取消勾选。: システム設定は削除できません。不要な場合は無効化／チェック解除してください。
+  系统配置不可删除，只能修改其取值；新增的条目可以删除。: システム設定は削除できず、値の変更のみ可能です。追加した項目は削除できます。
+  紫: 紫
   紫装: 紫装
   紫装及以下: 紫装及以下
   结束全部调律: 結束全部調律
@@ -1831,28 +1656,26 @@ auto_strings:
   编辑属性: 編集属性
   编辑模拟装备: 編集模擬装備
   编辑模拟装备数据: 編集模擬装備数拠
-  缺少必填字段 key/name: Missing required field key/name
+  缺少必填字段 key/name: 必須フィールド key/name が不足しています
   网格列数: グリッド列数
-  羽: Yu
+  羽: 羽
   联合培养结果: 連合培養結果
-  联合培养需要选择 1-3 件装备: Joint growth requires selecting 1-3 pieces of equipment
-  联合计算器未初始化，请关闭窗口后重新打开词条培养分析。: The joint calculator isn't initialized; close this
-    window and reopen Affix Growth Analysis.
-  联合计算失败：{error}: 'Joint calculation failed: {error}'
+  联合培养需要选择 1-3 件装备: 複合育成には 1～3 件の装備を選択する必要があります
+  联合计算器未初始化，请关闭窗口后重新打开词条培养分析。: 複合計算機が初期化されていません。ウィンドウを閉じて詞条育成分析を開き直してください。
+  联合计算失败：{error}: 複合計算に失敗しました：{error}
   背包: 揹包
   胫甲: 脛甲
-  胫甲 · 腕甲: Shin Guard · Wrist Guard
+  胫甲 · 腕甲: 脛甲 · 腕甲
   胸甲: 胸甲
   腕甲: 腕甲
-  自动淘汰被其他候选完全压制的装备，缩减搜索空间: Automatically eliminate equipment fully dominated by another
-    candidate, shrinking the search space
+  自动淘汰被其他候选完全压制的装备，缩减搜索空间: 他の候補に完全に劣る装備を自動で除外し、探索空間を縮小します
   自定义: 自定義
   自选规则: 自選規則
   舞绫鼓: 舞綾鼓
   舞绫鼓武学增伤: 舞綾鼓武学増傷
   蓝装: 藍装
   蓝装及以下: 藍装及以下
-  '行 ': 'Row '
+  '行 ': '行 '
   补滚后对齐失败: 補滾後対斉失敗
   裂石: 裂石
   装备: 装備
@@ -1860,93 +1683,76 @@ auto_strings:
   装备名字号: 装備名字号
   装备失败: 装備失敗
   装备展示设置: 装備展示設置
-  装备数据缺少 _fp 字段: Equipment data missing the _fp field
-  装备未加载，请刷新: Equipment not loaded; please refresh
+  装备数据缺少 _fp 字段: 装備データに _fp フィールドが不足しています
+  装备未加载，请刷新: 装備が読み込まれていません。更新してください
   装备状态异常: 装備状態異常
-  装备状态异常，点击查看原因: Equipment state error; click to see why
-  装备等级（1-999，不可重复，必填）: Equipment level (1-999, no duplicates, required)
+  装备状态异常，点击查看原因: 装備状態に異常があります。クリックして原因を表示
+  装备等级（1-999，不可重复，必填）: 装備等級（1-999、重複不可、必須）
   装备调律过程: 装備調律過程
-  装备部位、等级品阶、启用规则、初始词条、逐轮材料与产出、停止原因和最终评级: Equipment slot, level/quality, enabled rules,
-    initial affixes, per-round materials and output, stop reason, and final rating
-  装备重置冷却期，跳过该装备: Equipment is in the reset cooldown; skipping this equipment
+  装备部位、等级品阶、启用规则、初始词条、逐轮材料与产出、停止原因和最终评级: 装備部位、等級・品階、有効ルール、初期詞条、各ラウンドの素材と産出、停止理由および最終評価
+  装备重置冷却期，跳过该装备: 装備がリセットクールダウン中のため、この装備をスキップします
   装备面板全屏: 装備面板全屏
-  规则 key 须为小写字母开头的英文/数字/下划线: The rule key must start with a lowercase letter, using
-    letters/digits/underscore
-  规则可引用词表为空（attributes.yaml 异常）: The rule's referenceable word list is empty (attributes.yaml
-    error)
-  规则命中重置但次数已用尽（按钮文本读不到数字）时的转处置动作: The fallback disposal action when a rule matches
-    Reset but the count is already used up (the button text has no readable number)
-  规则文件顶层必须是 dict: The top level of a rule file must be a dict
-  规则组 key 须为小写字母开头的英文/数字/下划线: The rule group key must start with a lowercase letter,
-    using letters/digits/underscore
-  规则组 name 不能为空: The rule group name cannot be empty
+  规则 key 须为小写字母开头的英文/数字/下划线: ルール key は英小文字で始まり、英字・数字・アンダースコアのみ使用できます
+  规则可引用词表为空（attributes.yaml 异常）: ルールが参照できる詞条リストが空です（attributes.yaml 異常）
+  规则命中重置但次数已用尽（按钮文本读不到数字）时的转处置动作: リセットルールに一致したものの残り回数が尽きている場合（ボタン文字から数字を読み取れない場合）の代替処分動作
+  规则文件顶层必须是 dict: ルールファイルのトップレベルは dict である必要があります
+  规则组 key 须为小写字母开头的英文/数字/下划线: ルールグループ key は英小文字で始まり、英字・数字・アンダースコアのみ使用できます
+  规则组 name 不能为空: ルールグループ name は空にできません
   规则设置: 規則設置
   规则评级: 規則評級
-  角: Jue
-  解析 {name} 时出错：{err}: 'Error parsing {name}: {err}'
+  角: 角
+  解析 {name} 时出错：{err}: '{name} の解析中にエラーが発生しました：{err}'
   计数大于等于: 計数大於等於
   计数小于等于: 計数小於等於
   计算中…: 計算中…
   计算联合提升: 計算連合提升
   词条: 詞条
-  词条 2-5 不能重复：「{name}」出现了 {n} 次: 'Affixes 2-5 cannot repeat: "{name}" appears {n}
-    times'
-  词条 {i} 数据格式异常: Affix {i} has an invalid data format
-  词条 {i} 缺少有效名称或数值: Affix {i} is missing a valid name or value
-  词条 {i}「{name}」数值 {value} 达上限的 {pct}%，超出该等级上限: Affix {i} "{name}" value {value} reaches
-    {pct}% of the cap, exceeding the limit for this level
-  词条 {slot}「{name}」不在普通词条配置中: Affix {slot} "{name}" is not in the normal affix config
-  词条 {slot}「{name}」不能出现在{part}: Affix {slot} "{name}" cannot appear on {part}
-  词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}: Affix {slot} "{name}" doesn't match
-    equipment type "{type_name}"{detail}
+  词条 2-5 不能重复：「{name}」出现了 {n} 次: 詞条 2-5 は重複できません：「{name}」が {n} 回出現しています
+  词条 {i} 数据格式异常: 詞条 {i} のデータ形式が不正です
+  词条 {i} 缺少有效名称或数值: 詞条 {i} に有効な名称または数値が不足しています
+  词条 {i}「{name}」数值 {value} 达上限的 {pct}%，超出该等级上限: 詞条 {i}「{name}」の数値 {value} が上限の {pct}% に達しており、この等級の上限を超えています
+  词条 {slot}「{name}」不在普通词条配置中: 詞条 {slot}「{name}」は通常詞条設定に存在しません
+  词条 {slot}「{name}」不能出现在{part}: 詞条 {slot}「{name}」は{part}には出現できません
+  词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}: 詞条 {slot}「{name}」は装備種類「{type_name}」と一致しません{detail}
   词条值: 詞条値
-  词条名称（原始词条名 → 当前类别）: Affix name (original affix → current category)
+  词条名称（原始词条名 → 当前类别）: 詞条名（元の詞条名 → 現在のカテゴリ）
   词条字号: 詞条字号
   词条库设置: 詞条庫設置
   词条部位: 詞条部位
   词条配置: 詞条配置
   询问是否继续: 詢問是否継続
-  该等级已转律词条是否允许无限再次转律: Whether an already-Transformed affix at this level can be Transformed
-    again unlimited times
-  该等级是否允许重置调律（可选）: Whether this level allows tuning reset (optional)
-  该等级装备是否允许进入承音装备合并候选: Whether equipment at this level is allowed into Chengyin equipment-merge
-    candidates
-  该等级要求的最低材料数量（可选）: Minimum material count required for this level (optional)
-  该行不产出伤害，通常是心法切换或起手动作: This row produces no damage; usually a stance switch or opener
-    action
-  该装备存在以下异常，游戏中不会出现这样的装备，通常是识别误读，请手工校正：: 'This equipment has the following anomalies;
-    equipment like this doesn''t occur in-game, usually a recognition misread -- please
-    correct it manually:'
-  请先点击 '+ 分组' 创建分组: Please click '+ Group' to create a group first
+  该等级已转律词条是否允许无限再次转律: この等級の転律済み詞条で無制限に再転律できるかどうか
+  该等级是否允许重置调律（可选）: この等級で調律リセットを許可するかどうか（任意）
+  该等级装备是否允许进入承音装备合并候选: この等級の装備を承音装備の統合候補に含めるかどうか
+  该等级要求的最低材料数量（可选）: この等級に必要な最低素材数（任意）
+  该行不产出伤害，通常是心法切换或起手动作: この行はダメージを発生させません（通常は心法切替や初動モーションです）
+  该装备存在以下异常，游戏中不会出现这样的装备，通常是识别误读，请手工校正：: この装備には以下の異常があります。ゲーム内では発生しない構成であり、通常は認識誤読のため手動で修正してください：
+  请先点击 '+ 分组' 创建分组: 先に「+ グループ」をクリックしてグループを作成してください
   请先选中要删除的赛季行: 請先選中要削除的賽季行
   请先选中要删除的配置行: 請先選中要削除的配置行
-  请先选择一个流派后再确认基础属性识别结果: Select a playstyle first before confirming the base-attribute
-    recognition result
+  请先选择一个流派后再确认基础属性识别结果: 基礎属性の認識結果を確定する前に、先に流派を選択してください
   请先选择词条类别: 請先選択詞条類別
   请输入装备名称: 請輸入装備名称
   请选择方案或基础属性: 請選択方案或基礎属性
   调律: 調律
   调律中断: 調律中断
-  调律中断，已保存部分报告: Tuning interrupted; a partial report was saved
+  调律中断，已保存部分报告: 調律が中断されました。途中までのレポートを保存しました
   调律材料: 調律材料
   调律结束: 調律結束
-  调律部位配置无效，请在调律页重新选择部位: Invalid tuning slot config; reselect the slots on the Tuning
-    page
-  调整「其他装备」Tab 中卡片的外观参数，保存后刷新即生效。: Adjust the appearance parameters for cards in the
-    "Other Equipment" tab; refresh after saving to apply.
-  调满后回收模式，跳过狗粮添加: Recycle-When-Full mode; skipping fodder add
-  调满后回收模式：词条已满，执行回收: 'Recycle-When-Full mode: affixes are full, recycling'
-  调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收: 'Recycle When Full: once matched, no further rule
-    judgment; skips fodder, recycles once 5 affixes are full'
+  调律部位配置无效，请在调律页重新选择部位: 調律部位の設定が無効です。調律タブで部位を再選択してください
+  调整「其他装备」Tab 中卡片的外观参数，保存后刷新即生效。: 「その他の装備」タブのカード外観パラメータを調整します。保存後に更新すると反映されます。
+  调满后回收模式，跳过狗粮添加: 満枠後回収モードのため、餌の追加をスキップします
+  调满后回收模式：词条已满，执行回收: 満枠後回収モード：詞条が満枠になったため回収を実行します
+  调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收: 満枠後回収：一致後はルール判定を行わず餌をスキップし、詞条が5枠埋まったら回収します
   赛季名称: 賽季名称
-  赛季名称（如：黄钟长鸣、夹钟并作）: Season name (e.g. Huangzhong Changming, Jiazhong Bingzuo)
+  赛季名称（如：黄钟长鸣、夹钟并作）: シーズン名（例：黄鐘長鳴、夾鐘並作）
   赛季开始日期: 賽季開始日期
   赛季结束日期: 賽季結束日期
   赛季编号: 賽季編号
   赛季编号不可重复: 賽季編号不可重複
-  赛季编号（1, 2, 3...，用于排序，不可重复）: Season number (1, 2, 3..., for sorting, no duplicates)
+  赛季编号（1, 2, 3...，用于排序，不可重复）: シーズン番号（1, 2, 3...、並び替え用、重複不可）
   跳过该装备: 跳過該装備
-  跳过该装备：结束保留在背包: 'Skip This Equipment: ends and keeps it in the inventory'
+  跳过该装备：结束保留在背包: この装備をスキップ：処理を終了しバッグに保持
   轴序: 軸序
   轴行: 軸行
   输入基础属性名称: 輸入基礎属性名称
@@ -1955,18 +1761,15 @@ auto_strings:
     「默认」使用基础规则定义的 min_level，
 
     选择具体等级后以该值为准。'
-  : 'Overrides the level threshold from the base rule at runtime;
+  : '実行時に基本ルールの等級しきい値を上書きします。
 
-    "Default" uses the base rule''s min_level,
+    「既定」は基本ルール定義の min_level を使用し、
 
-    selecting a specific level uses that value instead.'
-  进调律前的行为点）：未达调律门槛的装备按下表处置，自上而下首条命中即生效并阻断后续规则；无命中 = 保留: 'Behavior point before entering
-    tuning): equipment below the tuning threshold is disposed of per the table below,
-    top-down, first match wins and blocks later rules; no match = keep'
-  选中项包含冲突关系，请确保同一旧装备只合并到一个新版本。: The selection has conflicting relations; make sure
-    each old equipment merges into only one new version.
+    具体的な等級を選ぶとその値が適用されます。'
+  进调律前的行为点）：未达调律门槛的装备按下表处置，自上而下首条命中即生效并阻断后续规则；无命中 = 保留: 調律に入る前の処理ポイント）：調律しきい値未満の装備は以下の表に従い上から順に処分され、最初に一致したルールが適用されて後続を遮断します（未一致 = 保持）
+  选中项包含冲突关系，请确保同一旧装备只合并到一个新版本。: 選択項目に競合する関係が含まれています。同じ旧装備は1つの新バージョンにのみ統合するようにしてください。
   选择槽位: 選択槽位
-  选择毕业率计算器 Excel: Select Graduation-Rate Calculator Excel
+  选择毕业率计算器 Excel: 卒業率計算機 Excel を選択
   选择首词条: 選択首詞条
   通用: 通用
   通用判定: 通用判定
@@ -1976,81 +1779,69 @@ auto_strings:
 
 
     新 key（小写字母开头的英文/数字/下划线）：'
-  : 'Renaming changes the rule id (the YAML filename),
+  : '名前を変更するとルール id（YAML ファイル名）が変わり、
 
-    which may affect code/workflow configs that directly reference this key -- please
-    confirm.
+    この key を直接参照するコードやワークフロー設定に影響する可能性があります。ご確認ください。
 
 
-    New key (starts with a lowercase letter, letters/digits/underscore):'
+    新しい key（英小文字で始まる英字・数字・アンダースコア）：'
   重命名词条名: 重命名詞条名
   重新计算: 重新計算
-  重置二次确认识别失败，跳过该装备: Failed to recognize the reset secondary confirmation; skipping
-    this equipment
-  重置前快照（已执行重置）: Snapshot Before Reset (reset already performed)
-  重置完成：以首词条状态重新开始调律: 'Reset complete: tuning restarts from the first-affix state'
-  重置材料信息识别失败，跳过该装备: Failed to recognize reset material info; skipping this equipment
-  重置确认按钮识别失败，跳过该装备: Failed to recognize the reset confirmation button; skipping this
-    equipment
+  重置二次确认识别失败，跳过该装备: リセット二次確認の認識に失敗したため、この装備をスキップします
+  重置前快照（已执行重置）: リセット前スナップショット（リセット実行済み）
+  重置完成：以首词条状态重新开始调律: リセット完了：首詞条の状態から調律を再開します
+  重置材料信息识别失败，跳过该装备: リセット素材情報の認識に失敗したため、この装備をスキップします
+  重置确认按钮识别失败，跳过该装备: リセット確認ボタンの認識に失敗したため、この装備をスキップします
   重置装备: 重置装備
-  重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）: 'Reset Equipment: clears all affixes except the
-    first and continues (limited by cooldown, once per piece)'
+  重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）: 装備をリセット：首詞条以外の全詞条を消去して続行（クールダウン制限あり、1装備につき1回まで）
   重置调律: 重置調律
-  重置边界：以下数据为执行重置前的装备状态: 'Reset Boundary: the following data is the equipment state
-    before the reset'
-  金: Gold
+  重置边界：以下数据为执行重置前的装备状态: リセット境界：以下のデータはリセット実行前の装備状態です
+  金: 金
   金装: 金装
   防具类: 防具類
   陌刀: 陌刀
   陌刀武学增伤: 陌刀武学増傷
   需先校正: 需先校正
-  '非 ': 'Not '
+  '非 ': '非 '
   页面导航: ページナビ
-  首词条 %: First Affix %
-  首词条「{name}」不能出现在{part}: First affix "{name}" cannot appear on {part}
+  首词条 %: 首詞条 %
+  首词条「{name}」不能出现在{part}: 首詞条「{name}」は{part}には出現できません
   首词条不限: 首詞条不限
   鸣金: 鳴金
-  默认（跟随基础规则）: Default (follow base rule)
-  （本方案）: (Current Plan)
-  （本流派）: (Current School)
-  （本属性）: (Current Attribute)
-  （无候选装备）: (No Candidate Equipment)
-  （无词条名，点击 '+ 词条名' 添加）: (No affix name, click '+ Add Affix Name' to add)
-  （未选）: (Not Selected)
-  （须为 ['recycle', 'skip']）: (Must be ['recycle', 'skip'])
-  （须为小写字母开头的英文/数字/下划线）: (Must be alphanumeric starting with lowercase letter, underscores
-    allowed)
-  ，仅首词条: ', first affix only'
-  ，该武器对应「{expected}」: ', this weapon corresponds to "{expected}"'
+  默认（跟随基础规则）: 既定（基本ルールに従う）
+  （本方案）: （本プラン）
+  （本流派）: （本流派）
+  （本属性）: （本属性）
+  （无候选装备）: （候補装備なし）
+  （无词条名，点击 '+ 词条名' 添加）: （詞条名なし、「+ 詞条名」をクリックして追加）
+  （未选）: （未選択）
+  （须为 ['recycle', 'skip']）: （['recycle', 'skip'] のいずれかである必要があります）
+  （须为小写字母开头的英文/数字/下划线）: （英小文字で始まる英字・数字・アンダースコアである必要があります）
+  ，仅首词条: 、首詞条のみ
+  ，该武器对应「{expected}」: 、この武器は「{expected}」に対応しています
   指纹: 指紋
   更新时间: 更新時間
-  查看装备来源、指纹、原始等级和时间: View equipment source, fingerprint, original level, and timestamps
+  查看装备来源、指纹、原始等级和时间: 装備の入手元、フィンガープリント、元の等級および日時を確認します
   装备属性: 装備属性
   选择要复制的模拟装备: 選択要複製的模擬装備
   点击选择要复制的装备: 点撃選択要複製的装備
-  只删除当前筛选出的背包装备，此处不支持删除模拟装备: Delete only filtered inventory equipment; mock equipment
-    is not supported here
-  确定删除当前筛选出的背包装备吗？: Delete the filtered inventory equipment?
+  只删除当前筛选出的背包装备，此处不支持删除模拟装备: 現在絞り込まれているバッグ内装備のみ削除します。ここでは模擬装備は削除できません
+  确定删除当前筛选出的背包装备吗？: 現在絞り込まれているバッグ内装備を削除しますか？
   保留备战中的装备: 保留ロードアウト中的装備
-  保留当前用户任意现存备战方案正在引用的装备: Keep equipment referenced by any existing loadout for the
-    current user
+  保留当前用户任意现存备战方案正在引用的装备: 現在のユーザーのいずれかの既存編成プランで参照されている装備を保持します
   保留已锁定的装备: 保留已鎖定的装備
   保留已标记为锁定的装备: 保留已標記為鎖定的装備
-  筛选命中 {matched} 件；备战保护 {referenced} 件；锁定保护 {locked} 件；实际将删除 {deleted} 件: 'Matched:
-    {matched}; protected by loadouts: {referenced}; locked: {locked}; to delete: {deleted}'
-  警告：{count} 件装备将从相关备战方案中移除。: 'Warning: {count} equipment item(s) will be removed
-    from related loadouts.'
+  筛选命中 {matched} 件；备战保护 {referenced} 件；锁定保护 {locked} 件；实际将删除 {deleted} 件: 一致 {matched} 件；編成保護 {referenced} 件；ロック保護 {locked} 件；実際に削除 {deleted} 件
+  警告：{count} 件装备将从相关备战方案中移除。: 警告：{count} 件の装備が関連する編成プランから削除されます。
   批量复制装备: 批量複製装備
-  批量复制模拟装备到其他用户: Copy mock equipment to other users in batches
-  已选择 {count} 件: '{count} selected'
+  批量复制模拟装备到其他用户: 模擬装備を他のユーザーへ一括複製します
+  已选择 {count} 件: '{count} 件選択中'
   复制到…: 複製到…
   退出批量模式: 退出批量模式
   复制到: 複製到
-  确定将 {items} 件模拟装备复制给 {users} 个用户吗？: Copy {items} mock equipment items to {users}
-    users?
-  '{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}': '{user}: {copied} added, {existing}
-    existing, {conflicts} conflicts'
-  '{user}：复制失败：{error}': '{user}: copy failed: {error}'
+  确定将 {items} 件模拟装备复制给 {users} 个用户吗？: '{items} 件の模擬装備を {users} 名のユーザーに複製しますか？'
+  '{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}': '{user}：新規 {copied}、既存 {existing}、競合 {conflicts}'
+  '{user}：复制失败：{error}': '{user}：複製失敗：{error}'
   确认复制: 確認複製
   复制完成: 複製完成
   转律建议: 転律建議
@@ -2059,85 +1850,60 @@ auto_strings:
   已保存目标毕业率: 已保存目標畢業率
   推荐毕业率: 推薦畢業率
   实际数值: 実際数値
-  八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限（彩狗粮 100%），承音按承音上限。基于：{basis}。: 'At most one transmute
-    per piece across all eight; targets come from the union of transmute affix pools.
-    Non-Chengyin uses the normal cap (100%), Chengyin uses the Chengyin cap. Basis:
-    {basis}.'
-  点击「计算」开始搜索；不会自动运行。: Click "Calculate" to search; it never runs automatically.
-  缺装备，补齐后计算: Missing equipment; fill the slot before calculating
+  八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限（彩狗粮 100%），承音按承音上限。基于：{basis}。: 8部位の装備につき各最大1回まで転律でき、目標は転律詞条プールの和集合から選択します。未承音は通常上限（虹餌 100%）、承音は承音上限を使用。基準：{basis}。
+  点击「计算」开始搜索；不会自动运行。: 「計算」をクリックして探索を開始します（自動実行はされません）。
+  缺装备，补齐后计算: 装備が不足しています。補完してから計算してください
   计算: 計算
   取消计算: 取消計算
   应用: 応用
-  把推荐目标写入备战方案的装备卡片；目标属于公共装备，会影响所有引用这些装备的方案: Write the recommended targets onto the
-    loadout cards; targets belong to shared equipment and affect every plan referencing
-    them
+  把推荐目标写入备战方案的装备卡片；目标属于公共装备，会影响所有引用这些装备的方案: 推奨目標を編成プランの装備カードに書き込みます。目標は共通装備に紐付くため、これらの装備を参照する全プランに影響します
   正在搜索转律组合…: 正在搜索転律組合…
-  已取消；保留上一次完成的结果。: Cancelled; the last completed result is kept.
-  计算失败：{error}: 'Calculation failed: {error}'
-  不参与：{reason}: 'Excluded: {reason}'
+  已取消；保留上一次完成的结果。: キャンセルしました。前回完了時の結果を保持します。
+  计算失败：{error}: 計算に失敗しました：{error}
+  不参与：{reason}: 対象外：{reason}
   无需转律: 無需転律
-  推荐 {gain:+.2f}%（换词条净收益 {swap:+.2f}%）: Recommended {gain:+.2f}% (net swap gain {swap:+.2f}%)
-  缺 {count} 件装备，请补齐后重新计算: '{count} piece(s) missing; fill them and recalculate'
-  存在词条组合异常的装备，结果不可信，禁止应用: Some equipment has illegal affix combinations; the result
-    is untrusted and cannot be applied
-  搜索未穷尽（预算耗尽），以下是当前搜索最好结果: Search not exhausted (budget spent); showing the best result
-    found so far
-  建议顺序：{order}: 'Suggested order: {order}'
-  共求值 {count} 次: '{count} evaluations'
-  没有找到超过阈值的转律提升（不代表不存在）: No transmute gain above the threshold was found (this does
-    not prove none exists)
-  已写入 {count} 件装备的转律目标；勾选备战方案的「模拟转律」查看效果。: Transmute targets written to {count} piece(s);
-    tick "Simulate Transmute" on the loadout to see the effect.
+  推荐 {gain:+.2f}%（换词条净收益 {swap:+.2f}%）: 推奨 {gain:+.2f}%（詞条交換純増 {swap:+.2f}%）
+  缺 {count} 件装备，请补齐后重新计算: 装備が {count} 件不足しています。補完して再計算してください
+  存在词条组合异常的装备，结果不可信，禁止应用: 詞条の組み合わせ異常がある装備が含まれるため、結果は信頼できず適用できません
+  搜索未穷尽（预算耗尽），以下是当前搜索最好结果: 探索は全件網羅していません（計算予算上限に到達）。現時点での最良結果を表示しています
+  建议顺序：{order}: 推奨順：{order}
+  共求值 {count} 次: 合計 {count} 回評価
+  没有找到超过阈值的转律提升（不代表不存在）: しきい値を超える転律の上昇は見つかりませんでした（存在しないことを保証するものではありません）
+  已写入 {count} 件装备的转律目标；勾选备战方案的「模拟转律」查看效果。: '{count} 件の装備に転律目標を書き込みました。編成プランの「模擬転律」をチェックすると効果を確認できます。'
   原始等级未知: 原始等級未知
   不支持无限转律: 不支持無限転律
   承音后不可转律: 承音後不可転律
   词条组合异常: 詞条組合異常
-  多个转律标记，请校正: Multiple transmute marks; please correct
-  首词条带转律标记，请校正: First affix marked as transmuted; please correct
+  多个转律标记，请校正: 複数の転律マークがあります。修正してください
+  首词条带转律标记，请校正: 首詞条に転律マークが付いています。修正してください
   没有可转词条: 没有可転詞条
   缺少该等级配置: 缺少該等級配置
-  转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；仅在勾选「模拟转律」时计入属性）: 'Transmute target: {name}
-    {value} (normal cap 100% if not Chengyin, Chengyin cap otherwise; counted only
-    when "Simulate Transmute" is ticked)'
+  转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；仅在勾选「模拟转律」时计入属性）: 転律目標：{name} {value}（未承音は通常上限 100%、承音は承音上限；「模擬転律」チェック時のみ属性に計上）
   清除转律目标: 清除転律目標
-  删除该装备保存的模拟转律目标；影响所有引用此装备的方案: Remove the saved transmute target on this equipment;
-    affects every plan referencing it
+  删除该装备保存的模拟转律目标；影响所有引用此装备的方案: この装備に保存された模擬転律目標を削除します。この装備を参照する全プランに影響します
   清除失败: 清除失敗
-  将删除「{name}」的转律目标，所有引用该装备的备战方案都会受影响。继续？: This removes the transmute target of "{name}";
-    every loadout referencing it is affected. Continue?
+  将删除「{name}」的转律目标，所有引用该装备的备战方案都会受影响。继续？: 「{name}」の転律目標を削除します。この装備を参照するすべての編成プランに影響します。続行しますか？
   应用转律目标: 応用転律目標
-  将写入 {count} 件装备的转律目标。目标属于公共装备，会影响所有引用这些装备的备战方案；此次结果只针对当前方案优化。继续？: This writes transmute
-    targets to {count} piece(s). Targets belong to shared equipment and affect every
-    loadout referencing them; this result was optimized for the current plan only.
-    Continue?
-  用户已切换，请重新打开分析: The user changed; reopen the analysis
-  备战方案已切换，请重新计算: The loadout changed; recalculate first
+  将写入 {count} 件装备的转律目标。目标属于公共装备，会影响所有引用这些装备的备战方案；此次结果只针对当前方案优化。继续？: '{count} 件の装備に転律目標を書き込みます。目標は共通装備に紐付くため、これらの装備を参照するすべての編成プランに影響します（今回の結果は現在のプラン専用に最適化されています）。続行しますか？'
+  用户已切换，请重新打开分析: ユーザーが切り替わりました。分析を開き直してください
+  备战方案已切换，请重新计算: 編成プランが切り替わりました。再計算してください
   毕业率分析: 畢業率分析
   计算假设: 計算假設
-  对话框内的改动不会写回备战方案: Changes here are not written back to the loadout
-  按装备上已保存的转律目标计算；转律建议页本身不受此项影响: Compute with the transmute targets saved on equipment;
-    the Transmute Advice page itself ignores this option
-  显示上次搜索的 {count} 个结果；重新搜索会覆盖。: Showing the {count} result(s) of the last search;
-    a new search overwrites them.
-  计算假设已变化，当前结果按旧假设得出；请重新搜索。: Assumptions changed; the current results use the old
-    ones. Search again.
-  计算假设已变化，当前结果按旧假设得出；请重新计算。: Assumptions changed; the current result uses the old
-    ones. Recalculate.
+  对话框内的改动不会写回备战方案: ダイアログ内の変更は編成プランに書き戻されません
+  按装备上已保存的转律目标计算；转律建议页本身不受此项影响: 装備に保存済みの転律目標を使って計算します（転律提案タブ自体はこの設定の影響を受けません）
+  显示上次搜索的 {count} 个结果；重新搜索会覆盖。: 前回の探索結果 {count} 件を表示しています。再探索すると上書きされます。
+  计算假设已变化，当前结果按旧假设得出；请重新搜索。: 計算仮定が変更されました。現在の結果は旧仮定によるものです。再探索してください。
+  计算假设已变化，当前结果按旧假设得出；请重新计算。: 計算仮定が変更されました。現在の結果は旧仮定によるものです。再計算してください。
   查看该组合: 查看該組合
-  在「最优结果」里点某一条的「查看该组合」: Click "View This Combo" on a row in "Best Results"
-  '方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值': 'Plan
-    #{rank}　Gongjue set: {gongjue}　Graduation {rate:.2f}%　·　Attributes are computed
-    under the search-time assumptions and this Gongjue set, not measured after equipping'
+  在「最优结果」里点某一条的「查看该组合」: 「最適結果」で任意の行の「この組み合わせを見る」をクリックしてください
+  '方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值': 'プラン #{rank}　弓玦セット：{gongjue}　卒業率 {rate:.2f}%　·　属性は探索時の計算仮定とこの弓玦セットに基づく算出値であり、実装着時の実測値ではありません'
   组合详情: 組合詳情
   战斗属性: 戦闘属性
-  以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按顶部计算假设投影后的装备数值计算。: These
-    are affix yields (theoretical); they do not mean a single affix can be gained
-    or lost in-game. Additions use the Lv{level} normal-affix cap; deductions are
-    computed on equipment projected by the calculation assumptions above.
+  以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按顶部计算假设投影后的装备数值计算。: 以下は詞条収益率（理論値）であり、ゲーム内で詞条を単独で増減できるわけではありません。追加は Lv{level} 通常詞条最大値、控除は上部の計算仮定を反映した装備数値で算出しています。
   新增一条词条的收益率: 新増一条詞条的收益率
   扣除一条当前词条的损失率: 扣除一条当前詞条的損失率
-  已取消本次搜索。: This search was cancelled.
-  已取消本次搜索；上一次的结果保留。: This search was cancelled; the previous results are kept.
+  已取消本次搜索。: 今回の探索をキャンセルしました。
+  已取消本次搜索；上一次的结果保留。: 今回の探索をキャンセルしました。前回の結果を保持します。
   保存: 保存
   保存位置: 保存位置
   保存并关闭: 保存並オフ
@@ -2145,7 +1911,7 @@ auto_strings:
   全部玩法: 全部玩法
   其他来源: 其他来源
   冷却中: 冷却中
-  准备中...: Preparing...
+  准备中...: 準備中...
   切换: 切換
   切换套装: 切換套装
   创建时间: 創建時間
@@ -2166,7 +1932,7 @@ auto_strings:
   效果: 效果
   新增玩法: 新増玩法
   新建: 新建
-  是: 'Yes'
+  是: はい
   普通定音: 普通定音
   暂停: 暫停
   暂停中: 暫停中
@@ -2179,92 +1945,78 @@ auto_strings:
   武学配置: 武学配置
   玩法: 玩法
   玩法类型: 玩法類型
-  空: Empty
+  空: 空
   管理: 管理
   装备套装: 装備套装
   跳过: 跳過
-  轮: Round
+  轮: ラウンド
   音律: 音律
   预览: 預覧
-  ' 秒': ' s'
+  ' 秒': ' 秒'
   key: key
-  payload 必须是 JSON 对象: payload must be a JSON object
-  '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} has an invalid kind: {kind};
-    allowed: {allowed}'
-  '{filename} 顶层含未知字段: {keys}': '{filename} has unknown top-level fields: {keys}'
-  '{kind} 不是单选来源，不能用 selections 指定': '{kind} is not a single-choice source and cannot
-    be set via selections'
-  '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: dimension affixes must
-    name the dimension in stats; full_affix is not supported'
-  '{label}: 未知属性字段 {field}': '{label}: unknown stat field {field}'
-  '{label}: 等级 {level} 没有词条 {category} 的上限配置': '{label}: no cap configured for affix
-    {category} at level {level}'
-  '{label}: 词条 {category} 未登记字段映射': '{label}: affix {category} has no field mapping'
-  '{n} 个属性靠补足': '{n} stat(s) rely on the gap'
-  '{school} 推导': '{school} derived'
-  '{source} 含未知字段: {keys}': '{source} has unknown fields: {keys}'
-  '{source} 声明了 split 却没有 full_affix': '{source} declares split without full_affix'
-  '{source} 既声明无静态属性又填了数值，取哪个无从判断': '{source} declares no static stats yet also carries
-    values; which one applies is undecidable'
-  '{source} 的 full_affix 不受支持: {name}；可用 {allowed}': '{source}: full_affix {name}
-    is not supported; available: {allowed}'
-  '{source} 的 full_affix 必须是词条类别名': '{source}: full_affix must be an affix category
-    name'
-  '{source} 的 group 必须是字符串': '{source}: group must be a string'
-  '{source} 的 label 必须是字符串': '{source}: label must be a string'
-  '{source} 的 modeled 必须是布尔值': '{source}: modeled must be a boolean'
-  '{source} 的 no_effect 必须是布尔值': '{source}: no_effect must be a boolean'
-  '{source} 的 scope 只能是 {allowed}': '{source}: scope must be one of {allowed}'
-  '{source} 的 tier 必须是非负整数': '{source}: tier must be a non-negative integer'
-  '{what} 不是已知属性字段': '{what} is not a known stat field'
-  '{what} 含未知公式字段: {keys}': '{what} has unknown formula fields: {keys}'
-  '{what} 必须是数值，实际是 {kind}': '{what} must be a number, got {kind}'
-  '{what} 必须是映射，实际是 {kind}': '{what} must be a mapping, got {kind}'
-  '{what} 是映射时必须含 formula': '{what} must contain formula when it is a mapping'
-  '{what} 的 formula 之外还有多余的键: {keys}': '{what} has keys besides formula: {keys}'
-  '{what} 的 round 必须是整数': '{what}: round must be an integer'
-  '{what} 的 source 不是已知属性字段: {source}': '{what}: source is not a known stat field:
-    {source}'
-  '{what} 的 split 必须是两个整数，如 [1, 2]': '{what}: split must be two integers, e.g. [1,
-    2]'
-  '{what} 缺少 source': '{what} is missing source'
+  payload 必须是 JSON 对象: payload は JSON オブジェクトである必要があります
+  '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} の kind が無効です: {kind}；指定可能 {allowed}'
+  '{filename} 顶层含未知字段: {keys}': '{filename} のトップレベルに未知のフィールドがあります: {keys}'
+  '{kind} 不是单选来源，不能用 selections 指定': '{kind} は単一選択ソースではないため selections で指定できません'
+  '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: 五維詞条は stats で次元を明示する必要があり、full_affix は使用できません'
+  '{label}: 未知属性字段 {field}': '{label}: 未知の属性フィールド {field}'
+  '{label}: 等级 {level} 没有词条 {category} 的上限配置': '{label}: 等級 {level} に詞条 {category} の上限設定がありません'
+  '{label}: 词条 {category} 未登记字段映射': '{label}: 詞条 {category} にフィールドマッピングが未登録です'
+  '{n} 个属性靠补足': '{n} 個の属性が補完に依存しています'
+  '{school} 推导': '{school} 導出'
+  '{source} 含未知字段: {keys}': '{source} に未知のフィールドがあります: {keys}'
+  '{source} 声明了 split 却没有 full_affix': '{source} は full_affix なしで split を宣言しています'
+  '{source} 既声明无静态属性又填了数值，取哪个无从判断': '{source} は静的属性なしと宣言しつつ数値も設定しているため、どちらを採用するか判定できません'
+  '{source} 的 full_affix 不受支持: {name}；可用 {allowed}': '{source} の full_affix は未対応です: {name}；利用可能 {allowed}'
+  '{source} 的 full_affix 必须是词条类别名': '{source} の full_affix は詞条カテゴリ名である必要があります'
+  '{source} 的 group 必须是字符串': '{source} の group は文字列である必要があります'
+  '{source} 的 label 必须是字符串': '{source} の label は文字列である必要があります'
+  '{source} 的 modeled 必须是布尔值': '{source} の modeled は真偽値である必要があります'
+  '{source} 的 no_effect 必须是布尔值': '{source} の no_effect は真偽値である必要があります'
+  '{source} 的 scope 只能是 {allowed}': '{source} の scope は {allowed} のいずれかである必要があります'
+  '{source} 的 tier 必须是非负整数': '{source} の tier は 0 以上の整数である必要があります'
+  '{what} 不是已知属性字段': '{what} は既知の属性フィールドではありません'
+  '{what} 含未知公式字段: {keys}': '{what} に未知の数式フィールドがあります: {keys}'
+  '{what} 必须是数值，实际是 {kind}': '{what} は数値である必要があります（実際：{kind}）'
+  '{what} 必须是映射，实际是 {kind}': '{what} はマッピングである必要があります（実際：{kind}）'
+  '{what} 是映射时必须含 formula': '{what} がマッピングの場合は formula を含む必要があります'
+  '{what} 的 formula 之外还有多余的键: {keys}': '{what} に formula 以外の余分なキーがあります: {keys}'
+  '{what} 的 round 必须是整数': '{what} の round は整数である必要があります'
+  '{what} 的 source 不是已知属性字段: {source}': '{what} の source は既知の属性フィールドではありません: {source}'
+  '{what} 的 split 必须是两个整数，如 [1, 2]': '{what} の split は [1, 2] のような2つの整数である必要があります'
+  '{what} 缺少 source': '{what} に source が不足しています'
   —: —
-  「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑: Values for "one full
-    affix" come from the affix cap of the current level, so a new season only needs
-    the affix config updated; use Advanced for entries with several stats or a formula
-  」: ”
+  「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑: 「詞条1本分」の数値は詞組設定の現在等級上限から生成されるため、シーズン変更時は詞組設定を1か所更新するだけで済みます。1項目で複数属性を与える場合や数式が必要な場合は「詳細編集」を使用してください
+  」: 」
   与对照完全一致: 与対照完全一致
-  与对照有 {n} 项不一致，看「按来源拆分」定位: '{n} field(s) differ from the reference; use the per-source
-    breakdown to locate them'
+  与对照有 {n} 项不一致，看「按来源拆分」定位: 対照と {n} 項目が一致しません。「ソース別内訳」で原因を特定してください
   仅战斗内: 僅戦闘内
-  以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: The three above describe the build only; they do not
-    affect rating, auto-tuning or graduation rate
-  以下文件解析失败，已跳过：{files}: 'These files failed to parse and were skipped: {files}'
-  以下流派或玩法仍在使用该武学：{schools}: 'Still used by these schools or playstyles: {schools}'
-  顺序由系统配置决定；你新增的条目会排在最后。: The order comes from the system configuration; entries you
-    add go last.
-  以下调律规则仍在引用该玩法：{rules}: 'Still referenced by these tuning rules: {rules}'
+  以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: 上記3項目はプレイスタイル説明用であり、評価・自動調律・卒業率計算には影響しません
+  以下文件解析失败，已跳过：{files}: 以下のファイルは解析に失敗したためスキップしました：{files}
+  以下流派或玩法仍在使用该武学：{schools}: 以下の流派またはプレイスタイルがこの武学を使用中です：{schools}
+  顺序由系统配置决定；你新增的条目会排在最后。: 並び順はシステム設定で決まります。追加した項目は末尾に配置されます。
+  以下调律规则仍在引用该玩法：{rules}: 以下の調律ルールがこのプレイスタイルを参照中です：{rules}
   作用域: 作用域
   保存时包含未建模补足: 保存時包含未建模補足
   修改失败: 修改失敗
-  修改暂存于当前对话框，点击保存后生效: Edits are staged in this dialog; they take effect on Save
+  修改暂存于当前对话框，点击保存后生效: 変更はこのダイアログ内に一時保存され、「保存」をクリックすると反映されます
   停止中: 停止中
   全不选: 全不選
-  其中 {n} 项尚未填数值: '{n} of them have no values yet'
-  分组 '{name}' 已存在: Group '{name}' already exists
+  其中 {n} 项尚未填数值: うち {n} 項目は数値未入力です
+  分组 '{name}' 已存在: グループ '{name}' はすでに存在します
   创建失败: 創建失敗
-  删除「{name}」的 {n} 个条目？: Delete the {n} entries of "{name}"?
+  删除「{name}」的 {n} 个条目？: 「{name}」の {n} 件の項目を削除しますか？
   删除失败: 削除失敗
   删除条目: 削除条目
   删除玩法: 削除玩法
   加载失败: 加載失敗
   包含: 包含
-  参与推导 {n} 项: '{n} contributions included'
-  '反解目标含未知字段: {field}': 'Back-solve target has an unknown field: {field}'
+  参与推导 {n} 项: 導出対象 {n} 項目
+  '反解目标含未知字段: {field}': '逆算目標に未知のフィールドがあります: {field}'
   取值: 取値
   取值方式: 取値方式
-  另有 {n} 项仅战斗内生效，不进本表: '{n} more apply in combat only and are not listed here'
-  同一门心法不能装在多个槽位: The same inner way cannot occupy two slots
+  另有 {n} 项仅战斗内生效，不进本表: ほか {n} 項目は戦闘中のみ有効のため本表には含まれません
+  同一门心法不能装在多个槽位: 同じ心法を複数のスロットに装着することはできません
   ? '名字 = 调律 Tab 勾选项；
 
     增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；
@@ -2274,90 +2026,74 @@ auto_strings:
     绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；
 
     武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。'
-  : 'Name = Tuning Tab checkbox item;
+  : '名前 = 調律タブのチェック項目；
 
-    Leave damage affix empty / select ''- No Damage -'' = no damage boost needed on
-    that side;
+    ダメージ増加詞条を空欄／「- 増傷不要 -」選択 = そちら側の増傷不要；
 
-    Attribute = gameplay element school (non-weapon slots use element→no-equal equivalence);
+    属性 = プレイスタイルの属性攻撃流派（非武器部位はこれに基づき属性攻撃→無相等価を適用）；
 
-    Bind switch = this gameplay judgment equals activating that switch (overrides
-    global state);
+    紐付けスイッチ = このプレイスタイル判定時にそのスイッチを有効化したのと同等（全体状態を上書き）；
 
-    Weapon/affix candidates from game config, damage boost candidates narrowed by
-    same-side weapon.'
+    武器・詞条候補はゲーム設定から取得し、増傷候補は同側の武器紐付けに応じて絞り込まれます。'
   基础属性推导: 基礎属性推導
   存为基础属性: 存為基礎属性
   对照值: 対照値
   对照基础属性: 対照基礎属性
-  尚未配装，先在左侧选心法与其他来源: Nothing equipped yet — pick inner ways and other sources on the
-    left
-  属性与主副武学由绑定流派提供，已锁定: Attribute and martial arts come from the bound school and are
-    locked
+  尚未配装，先在左侧选心法与其他来源: まだ未設定です。先に左側で心法とその他のソースを選択してください
+  属性与主副武学由绑定流派提供，已锁定: 属性と主副武学は紐付けられた流派から提供されるためロックされています
   属性来源: 属性来源
   属性来源条目名不能为空: 属性来源条目名不能為空
-  '属性来源条目已存在: {ids}': 'Entry already exists: {ids}'
+  '属性来源条目已存在: {ids}': '属性ソース項目はすでに存在します: {ids}'
   属性配置: 属性配置
-  已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）: Saved to the system layer, but the local
-    copy is still effective; restore the local override to apply the system change
-    ({now})
+  已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）: システム層に保存しましたが、ローカル設定が依然として有効です。システム変更を反映するには先にローカル上書きを復元してください（{now}）
   已填: 已填
-  已存为基础属性「{name}」，毕业率可直接选用: Saved as base attributes "{name}"; graduation rate can
-    use it directly
+  已存为基础属性「{name}」，毕业率可直接选用: 基礎属性「{name}」として保存しました。卒業率計算でそのまま選択できます
   待填: 待填
-  待填 {n} 条: '{n} still to fill'
-  心法重数只能是 1-{max}：{name} 填了 {tier}: 'Inner way tier must be 1-{max}: {name} got {tier}'
-  心法（{n} 个槽）: Inner Ways ({n} slots)
-  所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」: All playstyles are referenced; create new ones in
-    Game Config → Playstyles
+  待填 {n} 条: 未入力 {n} 件
+  心法重数只能是 1-{max}：{name} 填了 {tier}: 心法重数は 1-{max} の範囲である必要があります：{name} に {tier} が指定されています
+  心法（{n} 个槽）: 心法（{n} スロット）
+  所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」: すべてのプレイスタイルが参照済みです。新規作成は「ゲーム設定 → プレイスタイル設定」で行ってください
   手填补足: 手填補足
   执行用户: 執行ユーザー
   执行目标: 執行目標
   按来源拆分: 按来源拆分
   推导值: 推導値
   推导失败: 推導失敗
-  推导失败：{msg}: 'Derivation failed: {msg}'
+  推导失败：{msg}: 導出に失敗しました：{msg}
   攻具定音: 攻具定音
   新增失败: 新増失敗
   新增条目: 新増条目
   新增武学: 新増武学
   新建失败: 新建失敗
   无静态属性: 無静態属性
-  暂停中...: Pausing...
-  最多同时装备 {n} 门心法，给了 {got} 门: At most {n} inner ways can be equipped, got {got}
+  暂停中...: 一時停止中...
+  最多同时装备 {n} 门心法，给了 {got} 门: 同時に装着できる心法は最大 {n} 種類ですが、{got} 種類指定されています
   未保存的更改: 未保存的更改
   未建模补足: 未建模補足
-  '未知作用域: {scope}': 'Unknown scope: {scope}'
-  '未知来源类别: {kind}': 'Unknown source kind: {kind}'
-  '未知流派属性: {attr}': 'Unknown school attribute: {attr}'
-  '未知的属性来源条目: {ids}': 'Unknown stat source entries: {ids}'
+  '未知作用域: {scope}': '未知のスコープ: {scope}'
+  '未知来源类别: {kind}': '未知のソース種別: {kind}'
+  '未知流派属性: {attr}': '未知の流派属性: {attr}'
+  '未知的属性来源条目: {ids}': '未知の属性ソース項目: {ids}'
   未记录: 未記録
-  未选对照，只显示推导值: No reference selected; showing derived values only
-  本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}: This page {done}/{total} confirmed　All
-    sources {all_done}/{all_total}
+  未选对照，只显示推导值: 対照未選択のため、導出値のみ表示しています
+  本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}: このページで確認済み {done}/{total}　全ソース {all_done}/{all_total}
   条目: 条目
   条目内容必须是映射: 条目内容必須是映射
-  条目名（分组用「·」分隔，如 易水歌·二重）：: 'Entry name (group and item separated by "·", e.g. 易水歌·二重):'
-  来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值: While sources are incomplete the gap is solved from
-    the reference panel; uncheck to save the model value alone
-  槽 {n}: Slot {n}
+  条目名（分组用「·」分隔，如 易水歌·二重）：: 項目名（グループは「·」で区切る。例：易水歌·二重）：
+  来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值: ソースが未入力の場合、差分は対照パネルから逆算して補完されます。チェックを外すと純粋なモデル値のみ保存します
+  槽 {n}: スロット {n}
   武学类型: 武学類型
-  武学：{arts}（由流派决定，不需选择）: 'Martial arts: {arts} (set by the path, not selectable)'
-  流派与玩法只引用武学，武器由此派生，不在别处录入: Schools and playstyles reference arts only; the weapon
-    is derived here
-  玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用: Playstyles are defined in Game Config → Playstyles;
-    referenced here only
+  武学：{arts}（由流派决定，不需选择）: 武学：{arts}（流派により決定、選択不要）
+  流派与玩法只引用武学，武器由此派生，不在别处录入: 流派とプレイスタイルは武学のみを参照し、武器はここから派生するため他所では登録しません
+  玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用: プレイスタイル定義は「ゲーム設定 → プレイスタイル設定」で管理され、ここでは参照のみ行います
   玩法配置: 玩法配置
-  直接编辑该条目的 YAML。可用键：stats、extra、full_affix、split、scope、no_effect、label: 'Edit this
-    entry''s YAML directly. Keys: stats, extra, full_affix, split, scope, no_effect,
-    label'
+  直接编辑该条目的 YAML。可用键：stats、extra、full_affix、split、scope、no_effect、label: この項目の YAML を直接編集します。利用可能なキー：stats、extra、full_affix、split、scope、no_effect、label
   系统: 系統
   结束任务: 結束任務
   编辑…: 編集…
-  自定义玩法可自由选择属性与武学，并显示全部防具定音: Custom playstyles can freely select attributes and martial
-    arts and show all armor dingyin options
+  自定义玩法可自由选择属性与武学，并显示全部防具定音: カスタムプレイスタイルは属性と武学を自由に選択でき、すべての防具定音を表示します
   识别失败: 識別失敗
-  '词条拆分比无效: {split}': 'Invalid affix split ratio: {split}'
+  '词条拆分比无效: {split}': '詞条分割比が無効です: {split}'
   该武学已存在: 該武学已存在
   该玩法已存在: 該玩法已存在
   请选择有效的执行用户: 請選択有效的執行ユーザー
@@ -2365,289 +2101,208 @@ auto_strings:
   重置: 重置
   防具定音: 防具定音
   随武学: 随武学
-  高级编辑 - {name}: Advanced edit - {name}
-  （不对照）: (no reference)
-  （不选）: (none)
-  （无）: (None)
-  （空）: (Empty)
+  高级编辑 - {name}: 詳細編集 - {name}
+  （不对照）: （対照なし）
+  （不选）: （未選択）
+  （无）: （なし）
+  （空）: （空）
   玩法名称: 玩法名称
   武学名称: 武学名称
   ? '同一份配置里有引用，删除后会显示为未知套装：
 
     {items}'
-  : 'Referenced in the same config; after deletion they will show as unknown sets:
+  : '同じ設定内で参照されているため、削除後は未知セットとして表示されます：
 
     {items}'
-  ' 级': ' Lv'
-  F6 调律配置可新增/编辑规则组: 'F6: tuning config can add/edit rule groups'
-  MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。: MCP service started; {agent} connection config
-    synced. No re-export needed after restart.
-  MCP 服务未启动。导出的配置包含私人连接令牌，请勿公开分享。: MCP service not running. The exported config contains
-    private connection tokens; do not share publicly.
-  MCP 端口: MCP Port
-  PC 端兼容后台模式: PC background mode compatible
+  ' 级': ' 級'
+  F6 调律配置可新增/编辑规则组: F6 の調律設定からルールグループを追加・編集できます
+  MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。: MCP サービスを起動し、{agent} 接続設定を同期しました。再起動後の再エクスポートは不要です。
+  MCP 服务未启动。导出的配置包含私人连接令牌，请勿公开分享。: MCP サービスは起動していません。エクスポートされる設定には個人接続トークンが含まれるため、公開・共有しないでください。
+  MCP 端口: MCP ポート
+  PC 端兼容后台模式: PC版バックグラウンド互換モード
   PVE: PVE
   PVP: PVP
-  PVP 方案不参与智能调律：目前没有 PVP 调律方案，一起加载会让够不到 PVE 标准的装备被判成有提升: 'PVP plans are excluded from
-    smart tuning: there are no PVP tuning plans, and loading them would mark gear
-    below PVE standards as an upgrade'
-  disabled 必须是布尔值: disabled must be a boolean
-  key 须为小写英文标识（字母开头，可含数字/下划线）: key must be a lowercase identifier (letter first; digits/underscores
-    allowed)
-  order 必须是整数: order must be an integer
+  PVP 方案不参与智能调律：目前没有 PVP 调律方案，一起加载会让够不到 PVE 标准的装备被判成有提升: PVP プランはスマート調律の対象外です：現在 PVP 調律プランが存在せず、一緒に読み込むと PVE 基準未満の装備が強化候補と判定されてしまいます
+  disabled 必须是布尔值: disabled は真偽値である必要があります
+  key 须为小写英文标识（字母开头，可含数字/下划线）: key は英小文字で始まる識別子にしてください（数字・アンダースコア可）
+  order 必须是整数: order は整数である必要があります
   v{version}: v{version}
-  '{count} 个用户的备战方案还有未保存的修改，要保存后再关闭吗？': '{count} users'' loadout plans have unsaved
-    changes. Save before closing?'
-  '{filename} 的 scheme 必须是字符串': '{filename}: scheme must be a string'
-  '{filename} 缺少 school': '{filename}: missing school'
-  '{file}  技能 {done}/{total}': '{file}  skills {done}/{total}'
-  '{label}是 {actual}，该玩法需要 {expected}': '{label} is {actual}; this playstyle requires
-    {expected}'
-  '{level} 级': Lv {level}
-  '{level} 级弓玦没有可用的加成数据，请选择已配置的等级。': No bonus data for Gongjue Lv {level}; pick a
-    configured level.
-  '{level}级': Lv {level}
-  '{level}级·DPS': Lv {level} · DPS
-  '{level}级·毕业率': Lv {level} · Graduation Rate
-  '{name}　{type} · {level}级　{dingyin}　[{source}]': '{name}　{type} · Lv {level}　{dingyin}　[{source}]'
-  '{name}（{style}）': '{name} ({style})'
-  '{name}（当前不匹配）': '{name} (currently unmatched)'
-  '{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条': '{priority} · {affix}:
-    currently {actual}, required {minimum}–{maximum}'
-  '{school}  ·  {scheme}  ·  {level}级  ·  v{version}  ·  {plan}': '{school}  ·  {scheme}  ·  Lv
-    {level}  ·  v{version}  ·  {plan}'
-  '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值': '{school}
-    · {sources} sources · {pending} pending/partial · {declared} declared, not evaluated'
-  '{source} 的 kind 必须是字符串': '{source}: kind must be a string'
-  '{what} 必须是布尔值': '{what} must be a boolean'
-  '{what}.{name} 不是已知修正字段': '{what}.{name} is not a known modifier field'
-  '{what}.{name} 不是已知强制结算开关': '{what}.{name} is not a known force-settlement toggle'
-  '{where} 含未知修正字段: {keys}': '{where} contains unknown modifier fields: {keys}'
-  '{where} 含未知强制结算开关: {keys}': '{where} contains unknown force-settlement toggles:
-    {keys}'
-  　假设：{labels}: '　Assumptions: {labels}'
-  「{name}」套装已存在。: Set "{name}" already exists.
-  「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。: '"{target}" has no graduation plan at
-    Lv {level}; optimal comparison unavailable for now.'
-  【完整定级】: '[Full Grading]'
-  【调律潜力】: '[Tuning Potential]'
+  '{count} 个用户的备战方案还有未保存的修改，要保存后再关闭吗？': '{count} 名のユーザーの編成プランに未保存の変更があります。保存してから閉じますか？'
+  '{filename} 的 scheme 必须是字符串': '{filename} の scheme は文字列である必要があります'
+  '{filename} 缺少 school': '{filename} に school が不足しています'
+  '{file}  技能 {done}/{total}': '{file}  スキル {done}/{total}'
+  '{label}是 {actual}，该玩法需要 {expected}': '{label}は {actual} ですが、このプレイスタイルには {expected} が必要です'
+  '{level} 级': '{level} 級'
+  '{level} 级弓玦没有可用的加成数据，请选择已配置的等级。': Lv {level} の弓玦には利用可能なボーナスデータがありません。設定済みの等級を選択してください。
+  '{level}级': レベル{level}
+  '{level}级·DPS': Lv{level}·DPS
+  '{level}级·毕业率': Lv{level}·卒業率
+  '{name}　{type} · {level}级　{dingyin}　[{source}]': '{name}　{type} · Lv{level}　{dingyin}　[{source}]'
+  '{name}（{style}）': '{name}（{style}）'
+  '{name}（当前不匹配）': '{name}（現在不一致）'
+  '{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条': '{priority} · {affix}：現在 {actual} 条、条件 {minimum}～{maximum} 条'
+  '{school}  ·  {scheme}  ·  {level}级  ·  v{version}  ·  {plan}': '{school}  ·  {scheme}  ·  Lv{level}  ·  v{version}  ·  {plan}'
+  '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值': '{school} · {sources} ソース · {pending} 未入力/一部入力 · {declared} 効果宣言済み・未評価'
+  '{source} 的 kind 必须是字符串': '{source} の kind は文字列である必要があります'
+  '{what} 必须是布尔值': '{what} は真偽値である必要があります'
+  '{what}.{name} 不是已知修正字段': '{what}.{name} は既知の補正フィールドではありません'
+  '{what}.{name} 不是已知强制结算开关': '{what}.{name} は既知の強制決済スイッチではありません'
+  '{where} 含未知修正字段: {keys}': '{where} に未知の補正フィールドがあります: {keys}'
+  '{where} 含未知强制结算开关: {keys}': '{where} に未知の強制決済スイッチがあります: {keys}'
+  　假设：{labels}: 　仮定：{labels}
+  「{name}」套装已存在。: 「{name}」セットはすでに存在します。
+  「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。: 「{target}」は Lv {level} の卒業率プランがまだないため、最適組み合わせを比較できません。
+  【完整定级】: 【完全評価】
+  【调律潜力】: 【調律ポテンシャル】
   一键勾选: 一鍵勾選
-  下载 Agent: Download Agent
+  下载 Agent: Agent をダウンロード
   不添加: 不追加
   不选择流派: 不選択流派
   不选择玩法: 不選択玩法
-  与另一件同类型装备互换普通定音属性: Swap normal Attunement affixes with another piece of the same
-    type
-  与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）: Different source from the paired plan; the coefficient
-    table may be outdated (re-import the Excel to fix)
-  个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。留空时自动跟随当前赛季等级。: Personal level determines the resistance
-    used in graduation rate calculations and caps the plan level you can load. Leave
-    empty to follow the current season level.
-  为当前用户创建一件模拟装备，不修改角色基础属性: Create a mock equipment for the current user without modifying
-    base attributes
-  为当前用户和当前基础规则组启用智能调律。运行前请为相关备战方案扫描完整的八件穿戴装备。: Enable smart tuning for the current
-    user and base rule group. Scan all eight equipped pieces for the relevant loadout
-    plan before running.
-  为本赛季等级的原生装备额外创建同等级承音分支；只将普通词条拉到承音上限，定音保持原值: Additionally create a same-level Chimera
-    branch for native gear at this season's level; only normal affixes are raised
-    to the Chimera cap, Attunement stays as-is
+  与另一件同类型装备互换普通定音属性: 同じ種類の別装備と通常定音属性を入れ替えます
+  与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）: 対応プランとソースが異なるため、係数表が古い可能性があります（Excel を再インポートすると修復できます）
+  个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。留空时自动跟随当前赛季等级。: 個人等級は卒業率計算で使う耐性を決定し、読み込める最高プラン等級を制限します。空欄の場合は今シーズンの等級に自動追従します。
+  为当前用户创建一件模拟装备，不修改角色基础属性: 現在のユーザー用に模擬装備を1件作成します（キャラクター基礎属性は変更しません）
+  为当前用户和当前基础规则组启用智能调律。运行前请为相关备战方案扫描完整的八件穿戴装备。: 現在のユーザーと基本ルールグループでスマート調律を有効にします。実行前に関連編成プランの8部位の装着装備をすべてスキャンしておいてください。
+  为本赛季等级的原生装备额外创建同等级承音分支；只将普通词条拉到承音上限，定音保持原值: 今シーズン等級のネイティブ装備に対して同等級の承音分岐を追加作成します。通常詞条のみ承音上限まで引き上げ、定音は元の値を維持します
   主武学和副武学不能相同: 主武学和副武学不能相同
   互换失败: 互換失敗
   互换定音: 互換定音
   互换普通定音: 互換普通定音
-  仅勾选无歧义候选；有多个可能版本的组请人工核对: Only unambiguous candidates are checked; manually review
-    groups with multiple possible versions
-  仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。: PC only; when off, the more precise drag-scroll is used.
-  仅在现有调律处理决定继续调律后执行。系统会基于备战方案和承音上限推演当前装备的最大可能毕业率；计算失败或结果不可靠时始终放行。: Runs only after
-    the tuning handler decides to continue. The system projects the gear's maximum
-    possible graduation rate from the loadout plan and Chimera cap; always passes
-    through if the calculation fails or is unreliable.
+  仅勾选无歧义候选；有多个可能版本的组请人工核对: 曖昧さのない候補のみ自動チェックされます。複数バージョン候補があるグループは手動で確認してください
+  仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。: PC版でのみ有効です。オフの場合はより正確なドラッグスクロールを使用します。
+  仅在现有调律处理决定继续调律后执行。系统会基于备战方案和承音上限推演当前装备的最大可能毕业率；计算失败或结果不可靠时始终放行。: 既存の調律処理が調律続行と判断した後にのみ実行されます。編成プランと承音上限からこの装備の最大可能卒業率を推算し、計算失敗や信頼性不足時は常に通過させます。
   仅识别首词条: 僅識別首詞条
-  以下词条未计入（按部位规则或同名只取最高处理）：: 'These affixes were not counted (slot rules or same-name
-    highest-only):'
+  以下词条未计入（按部位规则或同名只取最高处理）：: 以下の詞条は計上されませんでした（部位ルールまたは同名最高値のみ採用）：
   会意转化: 会意転化
   传入玩法: 伝入玩法
   伤害建模: 傷害建模
-  低于该等级的装备直接跳过，不进入任何判定: Gear below this level is skipped entirely; no judgment is
-    applied
-  使用 Agent: Use Agent
+  低于该等级的装备直接跳过，不进入任何判定: この等級未満の装備は判定を行わず直接スキップします
+  使用 Agent: Agent を使用
   使用律准石缓存: 使用律準石キャッシュ
-  保存到其他位置会另存一份，原搭配保留: Saving elsewhere creates a copy; the original loadout is preserved
-  保存失败：{error}: 'Save failed: {error}'
-  保存失败：{e}: 'Save failed: {e}'
+  保存到其他位置会另存一份，原搭配保留: 別名で保存すると新しいビルドとして保存され、元のビルドは残ります
+  保存失败：{error}: 保存に失敗しました：{error}
+  保存失败：{e}: 保存に失敗しました：{e}
   保存成长状态: 保存成長状態
   保护跳过: 保護跳過
   候选装备最大可能毕业率: 候選装備最大可能畢業率
   停用智能调律: 停用智能調律
-  先在表格里选中要删除的套装。: Select the set to delete in the table first.
-  全套最多 {count} 条词条，请先减少其他词条: A full set allows at most {count} affixes; reduce others
-    first
+  先在表格里选中要删除的套装。: 先に表から削除するセットを選択してください。
+  全套最多 {count} 条词条，请先减少其他词条: セット全体で最大 {count} 条までです。先に他の詞条を減らしてください
   关联套装: 関連套装
   关闭已结束的任务页: オフ已結束的任務頁
-  关闭时只记录智能判定结果，不改变原有调律流程。: When off, only smart-judgment results are recorded; the
-    original tuning flow is unchanged.
+  关闭时只记录智能判定结果，不改变原有调律流程。: オフ時はスマート判定結果の記録のみ行い、従来の調律フローは変更しません。
   养成真实装备: 養成真実装備
-  再次转律只能修改原固定槽位: Re-transfer can only modify the original fixed slots
+  再次转律只能修改原固定槽位: 再転律では元の固定スロットのみ変更できます
   冷却完成: 冷却完成
   冷却状态: 冷却状態
   冷却类型: 冷却類型
-  冷却类型不明，跳过: Unknown cooldown type; skipping
+  冷却类型不明，跳过: クールダウン種別が不明なためスキップします
   切换到: 切換到
   切换卡片当前展示的定音: 切換卡片当前展示的定音
-  切换后扫描处理/材料处理/调律处理页同步对准该组，不会修改用户在自动调律页选择的规则组: After switching, the Scan/Material/Tuning
-    handler pages align to this group; rule groups selected on the Auto Tuning page
-    are not modified
+  切换后扫描处理/材料处理/调律处理页同步对准该组，不会修改用户在自动调律页选择的规则组: 切り替えるとスキャン処理・素材処理・調律処理タブもこのグループに同期します（自動調律タブで選択中のルールグループは変更しません）
   切换失败: 切換失敗
   切换定音: 切換定音
-  切换等级可查看该等级的词条上限与传律石估算；选到本装备的承音目标等级时会同时勾选承音: Switch levels to view affix caps and
-    Chimera Stone estimates for that level; selecting this gear's Chimera target level
-    also checks Chimera
+  切换等级可查看该等级的词条上限与传律石估算；选到本装备的承音目标等级时会同时勾选承音: 等級を切り替えると該当等級の詞条上限と必要伝律石の試算を確認できます。この装備の承音先等級を選ぶと承音も自動でチェックされます
   删除备战方案: 削除ロードアウト
   删除套装: 削除套装
   ? '删除套装「{name}」？
 
 
     备战方案和装备记录里引用它的部位，删除后会按未知套装处理，不会自动清空。{detail}'
-  : 'Delete set "{name}"?
+  : 'セット「{name}」を削除しますか？
 
 
-    Slots in loadout plans and equipment records that reference it will show as unknown
-    sets after deletion; nothing is auto-cleared. {detail}'
-  删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择: Delete all old versions on the left and migrate
-    loadout plan references to the right; conflicting groups are mutually exclusive
-  删除选中规则组（至少保留一个）: Delete selected rule groups (keep at least one)
+    編成プランや装備記録で参照している部位は削除後に未知セット扱いとなり、自動消去はされません。{detail}'
+  删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择: 左側の旧バージョンをすべて削除し、編成プランの参照を右側バージョンへ移行します。競合グループは排他選択になります
+  删除选中规则组（至少保留一个）: 選択したルールグループを削除（最低1つは保持）
   判定会心: 判定会心
   判定会意: 判定会意
-  判定抗性 {judge:.1f}%，增益抗性 {buff:.1f}%；黄字按公共规则折算与封顶。: Judge resistance {judge:.1f}%,
-    buff resistance {buff:.1f}%; yellow text is converted and capped by shared rules.
+  判定抗性 {judge:.1f}%，增益抗性 {buff:.1f}%；黄字按公共规则折算与封顶。: 判定耐性 {judge:.1f}%、バフ耐性 {buff:.1f}%；黄字は共通ルールに従って換算・上限適用されます。
   判定精准: 判定精準
-  判定精准、判定会心、判定会意取面板黄字；直接会心、直接会意不受抗性。: Judged Precision/Critical/Affinity use panel
-    yellow text; Direct Critical and Direct Affinity are unaffected by resistance.
-  判定顺序：垃圾 → 一般 → 优秀 → 顶级，命中即定档: 'Judgment order: Junk → Common → Excellent → Top;
-    first match sets the grade'
+  判定精准、判定会心、判定会意取面板黄字；直接会心、直接会意不受抗性。: 判定精準・判定会心・判定会意はパネル黄字を使用します。直接会心・直接会意は耐性の影響を受けません。
+  判定顺序：垃圾 → 一般 → 优秀 → 顶级，命中即定档: 判定順：ゴミ → 一般 → 優秀 → 最高級（最初に一致したランクで確定）
   刷新生成方案: 刷新生成方案
   副增伤词条: 副増傷詞条
-  勾选参与候选筛选的玩法；装备只要有一条玩法达标就保留: Check the playstyles used for candidate filtering; gear
-    meeting any one playstyle is kept
-  勾选后，满承音假设会把本件当作承音装备计算；只影响计算，不改变装备的承音状态: When checked, the full-Chimera assumption
-    treats this piece as Chimera-enhanced for calculation only; the gear's actual
-    Chimera state is unchanged
-  勾选表示该词条是调律过程中调出的，非扫描时已有: Check if this affix was rolled during tuning, not present
-    at scan time
-  勾选该词条可出现的装备部位（全选 = 全部）: Check the slots this affix can appear on (all = everywhere)
+  勾选参与候选筛选的玩法；装备只要有一条玩法达标就保留: 候補絞り込みに使うプレイスタイルをチェックしてください。いずれか1つのプレイスタイルで基準を満たせば保持されます
+  勾选后，满承音假设会把本件当作承音装备计算；只影响计算，不改变装备的承音状态: チェックすると、最大承音仮定でこの装備を承音済みとして計算します（計算のみに影響し、装備の承音状態は変わりません）
+  勾选表示该词条是调律过程中调出的，非扫描时已有: チェックすると、スキャン時に元からあった詞条ではなく調律で出た詞条として扱います
+  勾选该词条可出现的装备部位（全选 = 全部）: この詞条が出現し得る装備部位をチェックしてください（全選択 = すべて）
   匹配关键字: 匹配関鍵字
   升级规则: 升級規則
   单击查看词条详情: 単撃查看詞条詳情
-  卡片显示原始装备数值，计算假设标注在卡片上方: Cards show original equipment values; calculation assumptions
-    are noted above the card
-  原地承音：等级不变，词条数值落到承音上限: 'In-place Chimera: level unchanged, affix values raised to
-    the Chimera cap'
+  卡片显示原始装备数值，计算假设标注在卡片上方: カードには元の装備数値を表示し、計算仮定はカード上部に記載しています
+  原地承音：等级不变，词条数值落到承音上限: 同階承音：等級は変わらず、詞条数値が承音上限まで引き上げられます
   原词条: 原詞条
   及以上装备: 及以上装備
-  双击「规则说明」列可编辑，选中一行后可复制/删除该规则组: Double-click the "Description" column to edit; select
-    a row to copy/delete that rule group
-  双击单元格即可逐项编辑；灰色单元格由流派决定: Double-click cells to edit individually; grey cells are
-    determined by the school
-  发现 {count} 处部位/品阶无启用规则覆盖：: 'Found {count} slot/quality combinations with no active
-    rule coverage:'
-  发现同时配置 动态属攻和真实属攻，建议修正: Both dynamic and true element attack are configured; consider
-    fixing
+  双击「规则说明」列可编辑，选中一行后可复制/删除该规则组: 「ルール説明」列をダブルクリックして編集。行を選択するとそのルールグループを複製・削除できます
+  双击单元格即可逐项编辑；灰色单元格由流派决定: セルをダブルクリックして個別に編集できます。灰色のセルは流派により決まります
+  发现 {count} 处部位/品阶无启用规则覆盖：: 有効なルールでカバーされていない部位／品階が {count} 件見つかりました：
+  发现同时配置 动态属攻和真实属攻，建议修正: 動的属性攻撃と実属性攻撃が同時に設定されています。修正をおすすめします
   取最大值: 取最大値
-  只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。: Only ignores other existing affixes for
-    the tuning threshold check; the first affix's maximum potential decides whether
-    tuning starts.
-  不会改写装备；进入后的调律处理仍使用完整实际词条。: Does not modify equipment; the tuning handler still uses
-    the full actual affixes after entry.
-  只影响本次计算，不会写进搭配: Affects this calculation only; nothing is written to the loadout
-  只有主实例可以启动 MCP 服务: Only the primary instance can start the MCP service
-  只有开发模式可以指定保存位置: Only developer mode can specify a save location
-  只检查部位和金/紫品阶是否有启用规则；判定结果和首词条条件需在实际运行时确定。: Only checks whether slots and gold/purple
-    quality have active rules; judgment results and first-affix conditions are determined
-    at runtime.
-  只能从可用词条库里、且各流派转律词条库允许转出的词条中选择；动态类四个词条只要在可用词条库中即可选。: Can only pick from the available
-    affix pool, restricted to what each school's transfer pool allows; the four dynamic
-    affixes are selectable as long as they're in the pool.
-  只评估本次自动调律实际勾选的规则与玩法，避免为本次不打算培养的方案消耗材料。: Only evaluates rules and playstyles actually
-    checked for this auto-tuning run, avoiding material waste on plans not being grown
-    this time.
-  只读实例不能停用 MCP 服务，请在主实例操作: Read-only instances cannot stop the MCP service; do it
-    on the primary instance
+  只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。: 調律しきい値判定のときのみ既存の他詞条を無視し、首詞条素材の最大ポテンシャルで調律フローに入るか判断します。
+  不会改写装备；进入后的调律处理仍使用完整实际词条。: 装備データは書き換えません。調律開始後の調律処理では実際の全詞条を使用します。
+  只影响本次计算，不会写进搭配: 今回の計算のみに影響し、ビルドには書き込まれません
+  只有主实例可以启动 MCP 服务: MCP サービスを起動できるのはメインインスタンスのみです
+  只有开发模式可以指定保存位置: 保存先を指定できるのは開発モードのみです
+  只检查部位和金/紫品阶是否有启用规则；判定结果和首词条条件需在实际运行时确定。: 部位および金／紫品階に有効なルールがあるかのみを確認します。判定結果や首詞条条件は実行時に確定します。
+  只能从可用词条库里、且各流派转律词条库允许转出的词条中选择；动态类四个词条只要在可用词条库中即可选。: 利用可能詞条プールに含まれ、かつ各流派の転律詞条プールで許可された詞条のみ選択できます。動的系の4詞条は利用可能詞条プールにあれば選択可能です。
+  只评估本次自动调律实际勾选的规则与玩法，避免为本次不打算培养的方案消耗材料。: 今回の自動調律で実際にチェックしたルールとプレイスタイルのみを評価し、育成予定のないプランへの素材消費を防ぎます。
+  只读实例不能停用 MCP 服务，请在主实例操作: 読み取り専用インスタンスからは MCP サービスを停止できません。メインインスタンスで操作してください
   可交换: 可交換
-  可用词条库（全局，各部位词条混放）: Available Affix Pool (global, all slots mixed)
-  可转律（取消后不做转律模拟）: Transferable (uncheck to skip transfer simulation)
-  可输入装备提供的直接属性和原始五维，以验证天赋阈值。不要填角色最终面板，也不要重复填写五维转换后的攻击。此处输入仅用于本次预览，不写入内置来源。: Enter
-    direct attributes and raw five stats provided by equipment to verify talent thresholds.
-    Do not enter the character's final panel or duplicate attack from stat conversion.
-    This input is for this preview only and is not written to built-in sources.
+  可用词条库（全局，各部位词条混放）: 利用可能詞条プール（全体、各部位の詞条を混在管理）
+  可转律（取消后不做转律模拟）: 転律可能（チェックを外すと転律シミュレーションを行いません）
+  可输入装备提供的直接属性和原始五维，以验证天赋阈值。不要填角色最终面板，也不要重复填写五维转换后的攻击。此处输入仅用于本次预览，不写入内置来源。: 天賦しきい値を検証するため、装備から得られる直接属性と元の五維を入力できます。キャラクターの最終パネルや五維変換後の攻撃力は重複入力しないでください。ここでの入力は今回のプレビュー専用で、内蔵ソースには書き込まれません。
   合并本组: 合併本組
-  合计（白字）: Total (white text)
+  合计（白字）: 合計（白字）
   同名叠加: 同名畳加
   同步接入配置: 同步接入配置
   名称已存在: 名称已存在
-  启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。启用后每次主实例启动时自动开启服务并同步接入配置。: After
-    starting MCP, discuss schools and growth goals in external agents like WorkBuddy.
-    AI can inspect the current user and all users, query equipment, scan loadout plans,
-    generate new configs and start tuning. When enabled, the service auto-starts and
-    syncs connection config on every primary-instance launch.
+  启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。启用后每次主实例启动时自动开启服务并同步接入配置。: MCP を起動すると、WorkBuddy などの外部 Agent で流派や育成目標を相談できます。AI は現在ユーザーや全ユーザーの把握、装備検索、編成プランスキャン、新規設定生成や調律開始を行えます。有効にするとメインインスタンス起動時に自動でサービスを開始し接続設定を同期します。
   启动大律准石数量检查: 啓動大律準石数量検查
-  启动时会再次核对判定范围，并执行当前选中的设备；不会改变默认选择。: The judgment scope is re-verified at start, and
-    the currently selected device runs; the default selection is unchanged.
+  启动时会再次核对判定范围，并执行当前选中的设备；不会改变默认选择。: 起動時に判定範囲を再確認し、現在選択中のデバイスで実行します（既定選択は変更しません）。
   启动选中方案: 啓動選中方案
   启用判定: 啓用判定
-  启用后，扫描到已锁定装备时直接保留，不进入调律、重置或回收流程。: When enabled, locked gear found during scanning
-    is kept as-is; it skips tuning, reset and recycling.
-  启用后，每实际开始调律 5 件装备时重新读取律准石；有效读数与缓存相差超过 1 个大律准石时记录错误日志。: When enabled, re-reads Lv
-    Stones every 5 pieces actually tuned; logs an error if the reading differs from
-    cache by more than 1 Lv Stone.
-  启用后，首次识别数量低于设定值时要求人工确认。: When enabled, requires manual confirmation if the first-scan
-    count falls below the threshold.
+  启用后，扫描到已锁定装备时直接保留，不进入调律、重置或回收流程。: 有効にすると、スキャンでロック済み装備を検出した際に調律・リセット・回収を行わずそのまま保持します。
+  启用后，每实际开始调律 5 件装备时重新读取律准石；有效读数与缓存相差超过 1 个大律准石时记录错误日志。: 有効にすると、実際に5件の装備を調律開始するごとに律準石を再読み取りし、有効な読取値とキャッシュの差が大律準石1個を超えた場合にエラーログを記録します。
+  启用后，首次识别数量低于设定值时要求人工确认。: 有効にすると、初回認識数が設定値を下回った場合に手動確認を求めます。
   启用处理动作: 啓用処理動作
   启用智能调律: 啓用智能調律
   启用紫装: 啓用紫装
   启用金装: 啓用金装
-  命中条件：装备任一条题名属于勾选词条；自选词条语义不跑潜力判定: 'Hit condition: any of the gear''s affix names
-    belongs to the checked set; custom affixes skip potential judgment'
-  命中条件：预期评级属于勾选档位（全选 = 不限）: 'Hit condition: expected grade is in the checked tiers
-    (all = no limit)'
-  品阶门槛（覆盖）: Quality Threshold (override)
-  四个系数都是 0，还没填: All four coefficients are 0; nothing filled in yet
-  四档：垃圾 / 一般 / 优秀 / 顶级: 'Four tiers: Junk / Common / Excellent / Top'
-  回收补位循环上限：回收后重读同格续处理的最大次数，必须大于 0: 'Recycle refill loop cap: max times to re-read
-    the same slot after recycling and continue; must be > 0'
+  命中条件：装备任一条题名属于勾选词条；自选词条语义不跑潜力判定: 一致条件：装備のいずれかの詞条がチェック済み詞条に含まれる；カスタム詞条方式ではポテンシャル判定を行いません
+  命中条件：预期评级属于勾选档位（全选 = 不限）: 一致条件：予想評価がチェック済みランクに含まれる（全選択 = 制限なし）
+  品阶门槛（覆盖）: 品階しきい値（上書き）
+  四个系数都是 0，还没填: 4つの係数がすべて 0 で未入力です
+  四档：垃圾 / 一般 / 优秀 / 顶级: 4段階：ゴミ / 一般 / 優秀 / 最高級
+  回收补位循环上限：回收后重读同格续处理的最大次数，必须大于 0: 回収後の再読込ループ上限：回収後に同一スロットを再読み取りして続行する最大回数（0より大きい値）
   培养只能提高定音数值: 培養只能提高定音数値
   培养只能提高词条数值: 培養只能提高詞条数値
-  基于当前用户基础属性调整出装搭配: Adjust the loadout based on the current user's base attributes
-  基础属性「{name}」已存在，请使用其他名称。: Base attribute "{name}" already exists; use a different
-    name.
-  基础属性使用当前所选的已存数值，尚未拆分的内容仍归这一列。五维转换已计入对应词条，不重复相加。: Base attributes use the currently
-    selected saved values; unsplit content stays in this column. Five-stat conversion
-    is already counted in the corresponding affix and not double-added.
-  基础规则组 {key} 不存在: Base rule group {key} does not exist
+  基于当前用户基础属性调整出装搭配: 現在のユーザー基礎属性に基づいてビルドを調整します
+  基础属性「{name}」已存在，请使用其他名称。: 基礎属性「{name}」はすでに存在します。別の名前を使用してください。
+  基础属性使用当前所选的已存数值，尚未拆分的内容仍归这一列。五维转换已计入对应词条，不重复相加。: 基礎属性は現在選択中の保存済み数値を使用し、未分割の内容はこの列に含まれます。五維変換は対応詞条に計上済みのため重複加算されません。
+  基础规则组 {key} 不存在: 基本ルールグループ {key} が存在しません
   基础配置: 基礎配置
-  填写当前面板属性，并自动扣除穿戴装备、套装与弓玦属性: Fill in current panel attributes; equipped gear, set
-    bonuses and Gongjue attributes are auto-deducted
+  填写当前面板属性，并自动扣除穿戴装备、套装与弓玦属性: 現在のパネル属性を入力すると、装着中の装備・セット・弓玦の属性が自動で差し引かれます
   增益名不能为空: 増益名不能為空
   增益表: 増益表
   处理动作: 処理動作
   备战方案管理: ロードアウト管理
   备战方案范围: ロードアウト範囲
-  多件装备出现同名词条时只生效数值最高的一条，例如两把剑各带一条剑武学增伤只算最高者: When multiple pieces have the same-name
-    affix, only the highest value applies — e.g. two swords each with a sword martial
-    arts damage boost count only the higher one
+  多件装备出现同名词条时只生效数值最高的一条，例如两把剑各带一条剑武学增伤只算最高者: 複数の装備に同じ名前の詞条がある場合、数値が最も高い1条のみ有効になります（例：剣2本にそれぞれ剣武学増傷がある場合、高い方のみ計上）
   大于等于: 大於等於
   套装名称: 套装名称
-  如 aggressive（小写字母/数字/下划线）: e.g. aggressive (lowercase letters/digits/underscores)
-  如 my_rule（小写字母/数字/下划线）: e.g. my_rule (lowercase letters/digits/underscores)
-  如 治疗-纯奶: e.g. Heal-Pure Support
-  如 激进回收: e.g. Aggressive Recycle
+  如 aggressive（小写字母/数字/下划线）: 例：aggressive（英小文字・数字・アンダースコア）
+  如 my_rule（小写字母/数字/下划线）: 例：my_rule（英小文字・数字・アンダースコア）
+  如 治疗-纯奶: 例：回復-純ヒーラー
+  如 激进回收: 例：積極回収
   字段: フィールド
-  存在多个可能版本或兼容性分歧，请人工核对；一键勾选不选择本组。: Multiple possible versions or compatibility conflicts;
-    review manually. Check-all skips this group.
+  存在多个可能版本或兼容性分歧，请人工核对；一键勾选不选择本组。: 複数の候補バージョンまたは互換性の相違があるため手動で確認してください。一括チェックではこのグループを選択しません。
   对战类型: 対戦類型
   导入出装搭配: 導入ビルド
   导入毕业率方案: 導入畢業率方案
   导出文件: 導出文件
-  导出路径需为绝对路径或以 ~/ 开头: Export path must be absolute or start with ~/
+  导出路径需为绝对路径或以 ~/ 开头: エクスポート先パスは絶対パス、または ~/ で始まる必要があります
   ? '将出装搭配「{build}」导入备战方案「{plan}」，替换八个槽位的装备。
 
     原装备保留在当前用户装备库中，不会删除，也不会影响其他备战方案。
@@ -2657,113 +2312,91 @@ auto_strings:
     {details}
 
     是否继续？'
-  : 'Import loadout "{build}" into plan "{plan}", replacing all eight slots.
+  : 'ビルド「{build}」を編成プラン「{plan}」にインポートし、8つのスロットの装備を置き換えます。
 
-    Original gear stays in the user''s equipment library; nothing is deleted and other
-    plans are unaffected.
+    元の装備は現在のユーザー装備庫に残り、削除されず他の編成プランにも影響しません。
 
-    Also applies the build''s Gongjue and sets battle type to PVE:
+    あわせてこのビルドの弓玦を適用し、戦闘タイプを PVE に設定します：
 
     {details}
 
-    Continue?'
-  将承音装备的普通词条数值视为承音上限参与计算: Treat Chimera-enhanced gear's normal affix values as the
-    Chimera cap for calculation
+    続行しますか？'
+  将承音装备的普通词条数值视为承音上限参与计算: 承音装備の通常詞条数値を承音上限とみなして計算します
   尚无内置角色属性表: 尚無内置角色属性表
-  尚无最终评级 → 结束并保留装备: No final grade yet → stop and keep the gear
+  尚无最终评级 → 结束并保留装备: 最終評価がまだないため → 終了して装備を保持
   展开筛选条件: 展開篩選条件
-  属性 / 来源: Attribute / Source
-  已保存并生效（{now}）: Saved and active ({now})
-  已保存并生效（{time}）: Saved and active ({time})
-  已删除基础规则组「{name}」: Deleted base rule group "{name}"
-  已删除规则 {key}: Deleted rule {key}
-  已合并 {count} 份旧装备快照，方案引用已迁移。可继续选择其他候选；取消合并仅关闭窗口，不撤销已完成操作。: Merged {count} old equipment
-    snapshots; plan references migrated. You can continue selecting other candidates;
-    cancelling only closes the window and doesn't undo completed merges.
-  已复制为基础规则组「{name}」: Copied as base rule group "{name}"
-  已撤销未保存的调律配置更改: Reverted unsaved tuning config changes
-  已新增基础规则组「{name}」: Created base rule group "{name}"
-  已新增规则「{name}」: Created rule "{name}"
-  已是最后一条规则，无法下移: Already the last rule; cannot move down
-  已是第一条规则，无法上移: Already the first rule; cannot move up
-  已清除上次搜索结果。: Previous search results cleared.
-  已选词条（可拖拽调整顺序）: Selected affixes (drag to reorder)
+  属性 / 来源: 属性 / ソース
+  已保存并生效（{now}）: 保存して適用しました（{now}）
+  已保存并生效（{time}）: 保存して適用しました（{time}）
+  已删除基础规则组「{name}」: 基本ルールグループ「{name}」を削除しました
+  已删除规则 {key}: ルール {key} を削除しました
+  已合并 {count} 份旧装备快照，方案引用已迁移。可继续选择其他候选；取消合并仅关闭窗口，不撤销已完成操作。: 旧装備スナップショットを {count} 件統合し、プラン参照を移行しました。他の候補も続けて選択できます。キャンセルするとウィンドウを閉じるだけで、完了済みの統合は取り消されません。
+  已复制为基础规则组「{name}」: 基本ルールグループ「{name}」として複製しました
+  已撤销未保存的调律配置更改: 未保存の調律設定の変更を取り消しました
+  已新增基础规则组「{name}」: 基本ルールグループ「{name}」を新規追加しました
+  已新增规则「{name}」: ルール「{name}」を新規追加しました
+  已是最后一条规则，无法下移: すでに最後のルールのため下へ移動できません
+  已是第一条规则，无法上移: すでに最初のルールのため上へ移動できません
+  已清除上次搜索结果。: 前回の探索結果をクリアしました。
+  已选词条（可拖拽调整顺序）: 選択済み詞条（ドラッグで順序を変更可能）
   应用调律规则: 応用調律規則
-  开关 key: Toggle key
-  '开关: ': 'Toggle: '
-  开发模式：本地 = 只在这台机器生效，不随安装包发布: 'Developer mode: local = only affects this machine,
-    not distributed with the installer'
-  弓玦 {name}（{index}/{total}）: Gongjue {name} ({index}/{total})
-  弓玦套装：{name}: 'Gongjue set: {name}'
-  弓玦实际生效等级，可输入 113 等中间等级；随赛季表示使用赛季默认等级。: The Gongjue's effective level; enter intermediate
-    values like 113. "Follow season" uses the season default.
-  弓玦实际生效等级，默认取当前赛季档位: The Gongjue's effective level, defaults to the current season
-    tier
+  开关 key: スイッチ key
+  '开关: ': 'スイッチ: '
+  开发模式：本地 = 只在这台机器生效，不随安装包发布: 開発モード：ローカル = この端末でのみ有効で、インストーラーには同梱されません
+  弓玦 {name}（{index}/{total}）: 弓玦 {name}（{index}/{total}）
+  弓玦套装：{name}: 弓玦セット：{name}
+  弓玦实际生效等级，可输入 113 等中间等级；随赛季表示使用赛季默认等级。: 弓玦の実際に有効な等級です。113 などの中間等級も入力できます。「シーズンに追従」はシーズン既定等級を使用します。
+  弓玦实际生效等级，默认取当前赛季档位: 弓玦の実際に有効な等級。既定では今シーズンの段階を使用します
   弓玦等级: 弓玦等級
-  弓玦（类型 / 等级）: Gongjue (type / level)
-  弓玦：{name}（{level}级）　装备等级：{equip_level}　战斗类型：{type}: 'Gongjue: {name} (Lv {level})　Gear
-    level: {equip_level}　Battle type: {type}'
+  弓玦（类型 / 等级）: 弓玦（種類 / 等級）
+  弓玦：{name}（{level}级）　装备等级：{equip_level}　战斗类型：{type}: 弓玦：{name}（Lv{level}）　装備等級：{equip_level}　戦闘タイプ：{type}
   引用方案: 引用方案
   强制保留: 強制保留
   强制结算: 強制結算
-  强制调律：无视进入门槛，强制进入调律流程: 'Force Tune: bypass the entry threshold and force into the
-    tuning flow'
-  当前入口不支持互换定音，请在装备页操作: This entry doesn't support Attunement swap; do it on the Equipment
-    page
+  强制调律：无视进入门槛，强制进入调律流程: 強制調律：開始しきい値を無視して強制的に調律フローに入ります
+  当前入口不支持互换定音，请在装备页操作: この入口では定音交換に対応していません。装備タブから操作してください
   当前入口不支持修改套装: 当前入口不支持修改套装
-  当前入口不支持修改计算设置: This entry doesn't support calculation settings
-  当前入口不支持切换定音，请在装备页操作: This entry doesn't support Attunement toggle; do it on the
-    Equipment page
-  当前图库空间缺少 levels/counts 输出字段，无法启动自动调律: The current gallery space lacks levels/counts
-    output fields; cannot start auto tuning
+  当前入口不支持修改计算设置: この入口では計算設定を変更できません
+  当前入口不支持切换定音，请在装备页操作: この入口では定音切替に対応していません。装備タブから操作してください
+  当前图库空间缺少 levels/counts 输出字段，无法启动自动调律: 現在の画像ライブラリ空間に levels/counts 出力フィールドがないため、自動調律を開始できません
   当前方案: 当前方案
   当前方案三满极限: 当前方案三満極限
-  当前玩法没有可导入的出装搭配: No importable loadouts for this playstyle
-  当前真实装备不支持该转律变化: The real equipment doesn't support this transfer change
-  当前装备：{name}: 'Current gear: {name}'
-  当前词条：-: 'Current affix: —'
-  当前阶段：调律处理 — 第 {n} 轮完成，正在匹配处理规则: 'Current stage: tuning handler — round {n} done,
-    matching handler rules'
+  当前玩法没有可导入的出装搭配: 現在のプレイスタイルにインポート可能なビルドがありません
+  当前真实装备不支持该转律变化: 現在の実装備はこの転律変更に対応していません
+  当前装备：{name}: 現在の装備：{name}
+  当前词条：-: 現在の詞条：-
+  当前阶段：调律处理 — 第 {n} 轮完成，正在匹配处理规则: 現在のフェーズ：調律処理 — 第 {n} ラウンド完了、処理ルールを照合中
   律准石规则: 律準石規則
   心法: 心法
-  心法名不能含「{sep}」，它是重数的分隔符: Inner Way names cannot contain "{sep}" — it's the multiplicity
-    separator
+  心法名不能含「{sep}」，它是重数的分隔符: 心法名に「{sep}」は含められません（重数の区切り文字として使用されます）
   成长状态: 成長状態
   手动输入: 手動輸入
-  打开游戏配置中的流派配置与基础属性: Open school config and base attributes in Game Config
-  扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法胜出，多个命中取最长关键字。: When scanning all loadout plans,
-    plan names containing the playstyle name take priority; otherwise the playstyle
-    matching a keyword wins, longest keyword first.
+  打开游戏配置中的流派配置与基础属性: ゲーム設定の流派設定と基礎属性を開きます
+  扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法胜出，多个命中取最长关键字。: 全編成プランをスキャンする際、プラン名にプレイスタイル名を直接含むものが優先され、それ以外はキーワード一致のプレイスタイルが選ばれます（複数一致時は最長キーワード優先）。
   扫描处理规则: 掃描処理規則
-  '扫描处理：{name} → ': 'Scan handler: {name} → '
+  '扫描处理：{name} → ': 'スキャン処理：{name} → '
   扫描时间: 掃描時間
-  找不到配套方案 {name}: Paired plan {name} not found
+  找不到配套方案 {name}: 対応するプラン {name} が見つかりません
   承音后的装备等级不能降低: 承音後的装備等級不能降低
   承音必须同时提升装备等级: 承音必須同時提升装備等級
   技能名不能为空: 技能名不能為空
-  按当前备战方案玩法将定音视为目标满值参与计算: Per the current plan's playstyle, Attunement is treated
-    as target cap for calculation
+  按当前备战方案玩法将定音视为目标满值参与计算: 現在の編成プランのプレイスタイルに従い、定音を目標最大値とみなして計算します
   按照满承音装备计算: 按照満承音装備計算
-  按装备上已保存的转律目标计算（目标由「毕业率分析 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: Calculates from the transfer
-    target saved on the gear (set via Graduation Analysis → Transfer Suggestions);
-    uses saved targets only, no search triggered
+  按装备上已保存的转律目标计算（目标由「毕业率分析 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: 装備に保存済みの転律目標で計算します（目標は「卒業率分析 → 転律提案」で計算・適用）。保存済み目標のみ使用し、探索は実行しません
   排序失败: 排序失敗
   排除模拟装备: 排除模擬装備
   提升装备等级必须同时承音: 提升装備等級必須同時承音
   搜索技能: 搜索技能
-  搬移失败：{e}: 'Move failed: {e}'
+  搬移失败：{e}: 移動に失敗しました：{e}
   撤销游戏配置: 取消遊戯配置
   撤销调律配置: 取消調律配置
   擦伤率: 擦傷率
   收起筛选条件: 收起篩選条件
-  攻具套装「{name}」把它登记为关联防具: Attack set "{name}" registered it as a linked defense piece
-  数值以大律准石计，小律准石按 0.1；重置/回收填当前词条数对应的累计返还。: Values in Lv Stones; minor stones count
-    as 0.1. For reset/recycle, fill in the cumulative return matching the current
-    affix count.
-  数值（比例使用小数）: Value (decimals for ratios)
+  攻具套装「{name}」把它登记为关联防具: 攻撃具セット「{name}」がこれを関連防具として登録しています
+  数值以大律准石计，小律准石按 0.1；重置/回收填当前词条数对应的累计返还。: 数値は大律準石換算（小律準石は 0.1）。リセット／回収は現在の詞条数に対応する累計返還量を入力してください。
+  数值（比例使用小数）: 数値（割合は小数で入力）
   新增心法: 新増心法
-  新增武器重启后方可参与识别；被流派配置引用的武器不可删除: New weapons participate in recognition after restart;
-    weapons referenced by school config cannot be deleted
+  新增武器重启后方可参与识别；被流派配置引用的武器不可删除: 新しく追加した武器は再起動後に認識対象になります。流派設定から参照されている武器は削除できません
   新建属性…: 新建属性…
   ? '方案极限：原穿戴方案按满等级、满承音、满定音计算；
 
@@ -2772,30 +2405,26 @@ auto_strings:
     七件极限：排除当前部位后，其余装备按三项全满计算；
 
     候选极限：替换当前装备后，整套方案按三项全满计算。'
-  : 'Plan limit: the original plan at full level, full Chimera, full Attunement;
+  : 'プラン限界：元の装着プランを最大等級・最大承音・最大定音で計算；
 
-    Current actual: the plan''s eight pieces'' actual graduation rate, for reference;
+    現在実値：編成プランの現在8部位の実際の卒業率（参考用）；
 
-    Seven-piece limit: excluding this slot, the rest at all-three-max;
+    7部位限界：現在の部位を除き、残りの装備を3項目すべて最大で計算；
 
-    Candidate limit: after swapping this piece, the whole plan at all-three-max.'
+    候補限界：現在の装備を入れ替えた後、セット全体を3項目すべて最大で計算。'
   方案等级: 方案等級
-  方案：{name} · {level}级 v{version}（满值属性，不含食物加成）: 'Plan: {name} · Lv {level} v{version}
-    (max-value attributes, no food buffs)'
-  无法打开毕业率分析：{reason}。请检查当前备战方案的战斗属性设置。: 'Cannot open graduation analysis: {reason}.
-    Check the current plan''s battle attribute settings.'
+  方案：{name} · {level}级 v{version}（满值属性，不含食物加成）: プラン：{name} · Lv{level} v{version}（最大値属性、料理バフなし）
+  无法打开毕业率分析：{reason}。请检查当前备战方案的战斗属性设置。: 卒業率分析を開けません：{reason}。現在の編成プランの戦闘属性設定を確認してください。
   无法提升时的处理: 無法提升時的処理
   无需增伤: 無需増傷
   无静态加成: 無静態加成
-  旧版本 {index}: Old version {index}
+  旧版本 {index}: 旧バージョン {index}
   普伤率: 普傷率
   普通用户不能写入系统预置: 普通ユーザー不能写入系統預置
-  普通规则调律：此基础组未启用毕业率判定。: 'Normal rule tuning: graduation judgment is not enabled for
-    this base group.'
+  普通规则调律：此基础组未启用毕业率判定。: 通常ルール調律：この基本グループでは卒業率判定が有効になっていません。
   智能分析: 智能分析
   智能调律: 智能調律
-  智能调律已停用，下次启动不会开启 MCP；已启动的游戏任务继续运行。: Smart tuning disabled; MCP won't start on next
-    launch. Running game tasks continue.
+  智能调律已停用，下次启动不会开启 MCP；已启动的游戏任务继续运行。: スマート調律を無効化しました。次回起動時に MCP は起動しません（実行中のゲームタスクは継続されます）。
   智能调律生成方案: 智能調律生成方案
   智能调律配置已暂存: 智能調律配置已暫存
   暂无毕业率方案: 暫無畢業率方案
@@ -2805,182 +2434,138 @@ auto_strings:
   最终会心: 最終会心
   最终会意: 最終会意
   最终伤害判定率: 最終傷害判定率
-  最终评级未达优秀 → 结束并保留装备: Final grade below Excellent → stop and keep the gear
+  最终评级未达优秀 → 结束并保留装备: 最終評価が優秀未満のため → 終了して装備を保持
   有未保存的更改: 有未保存的更改
   未匹配本次规则玩法: 未匹配本次規則玩法
   未命名装备: 未命名装備
-  '未知技能: {name}': 'Unknown skill: {name}'
-  未知档位保留为待补；心法和武学填 0 表示未装备。等级累计表只选对应档，不叠加其他等级。: Unknown tiers are kept as pending;
-    enter 0 for Inner Way and Martial Arts if unequipped. The level accumulation table
-    picks only the matching tier, not stacking others.
-  '未知的流派伤害模型: {name}': 'Unknown school damage model: {name}'
+  '未知技能: {name}': '未知のスキル: {name}'
+  未知档位保留为待补；心法和武学填 0 表示未装备。等级累计表只选对应档，不叠加其他等级。: 未知の段階は未入力として保持されます。心法と武学は 0 で未装着を表します。等級累計表は該当段階のみ選択し、他等級とは合算しません。
+  '未知的流派伤害模型: {name}': '未知の流派ダメージモデル: {name}'
   未知目标: 未知目標
   未知调律: 未知調律
   未能启动调律: 未能啓動調律
-  未评级（词条未满）: Ungraded (affixes not full)
-  未达调律门槛时自上而下匹配，首条命中即生效；全部不命中则保留: Below the tuning threshold, match top-down; first
-    hit takes effect; no hit → keep
-  未选择玩法，不应用规则: No playstyle selected; rules not applied
-  本次成功合并 {count} 份旧装备快照，其余操作未完成。请核对错误后重新选择；已完成的合并不会撤销。: Successfully merged {count}
-    old equipment snapshots; remaining operations incomplete. Review errors and re-select;
-    completed merges are not undone.
-  本赛季 {floor} 阶以下的装备已不能承音: Gear below season floor Lv {floor} can no longer be Chimera-enhanced
-  本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。: The lowest gear level
-    that can still be Chimera-enhanced this season. Below it, gear is abandoned this
-    season — no in-place or next-tier enhancement — and excluded from full-level/full-Chimera
-    assumptions.
-  这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。: This is not the same as "Chimera supported"
-    in level config, which describes whether gear at that level was allowed Chimera
-    at release.
-  本赛季弓玦套装采用的词条等级；不填时跟随装备等级: The affix level used by this season's Gongjue set; empty
-    = follow gear level
-  本赛季该等级的装备已不能承音: Gear at this level can no longer be Chimera-enhanced this season
-  本页是毕业率编译程序的可读参考层，改这里的系数不会改变毕业率结果；表换了版本要重跑 scripts/extract_damage_model.py: This
-    page is the human-readable reference layer for the graduation compiler; changing
-    coefficients here doesn't alter results. After a table version change, re-run
-    scripts/extract_damage_model.py
-  机制说明，不可配置: Mechanism description; not configurable
+  未评级（词条未满）: 未評価（詞条未満枠）
+  未达调律门槛时自上而下匹配，首条命中即生效；全部不命中则保留: 調律しきい値未満の場合は上から順に照合し、最初に一致したルールが適用されます（すべて未一致なら保持）
+  未选择玩法，不应用规则: プレイスタイル未選択のためルールを適用しません
+  本次成功合并 {count} 份旧装备快照，其余操作未完成。请核对错误后重新选择；已完成的合并不会撤销。: 今回 {count} 件の旧装備スナップショットを統合しましたが、残りの処理は完了していません。エラーを確認して再選択してください（完了済みの統合は取り消されません）。
+  本赛季 {floor} 阶以下的装备已不能承音: 今シーズン {floor} 階未満の装備は承音できなくなっています
+  本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。: 今シーズンでまだ承音できる最低装備等級です。これ未満の装備は今シーズン対象外となり、同階承音も次階承音もできないため、最大等級／最大承音の仮定に含まれません。
+  这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。: これは等級設定の「承音対応」とは別物です（後者はその等級の装備が当時承音できたかどうかを表します）。
+  本赛季弓玦套装采用的词条等级；不填时跟随装备等级: 今シーズンの弓玦セットが採用する詞条等級（空欄時は装備等級に追従）
+  本赛季该等级的装备已不能承音: 今シーズンはこの等級の装備を承音できません
+  本页是毕业率编译程序的可读参考层，改这里的系数不会改变毕业率结果；表换了版本要重跑 scripts/extract_damage_model.py: このページは卒業率コンパイラの可読参照レイヤーです。ここで係数を変更しても卒業率結果は変わりません。表のバージョン変更時は scripts/extract_damage_model.py を再実行してください
+  机制说明，不可配置: 仕様説明（設定不可）
   材料不足时: 材料不足時
   材料处理规则: 材料処理規則
   条件与技能效果: 条件与技能效果
-  条件组（组内全部满足方命中）: Condition group (all conditions in the group must hold)
-  查看当前战斗属性的各项来源: View each source of the current battle attributes
-  查看当前详情（{count}）: View current details ({count})
+  条件组（组内全部满足方命中）: 条件グループ（グループ内すべてを満たすと一致）
+  查看当前战斗属性的各项来源: 現在の戦闘属性の各ソース内訳を表示します
+  查看当前详情（{count}）: 現在の詳細を表示（{count}）
   查看最终伤害判定率: 查看最終傷害判定率
   查看生成方案并启动: 查看生成方案並啓動
-  标识 key 须为小写字母开头的英文/数字/下划线: Identifier key must start with a lowercase letter; English
-    letters, digits, underscores only
-  校验失败（未保存）：{err}: 'Validation failed (not saved): {err}'
+  标识 key 须为小写字母开头的英文/数字/下划线: 識別子 key は英小文字で始まり、英字・数字・アンダースコアのみ使用できます
+  校验失败（未保存）：{err}: 検証に失敗しました（未保存）：{err}
   校验规则: 検証規則
   模型版本: 模型版本
   模型等级: 模型等級
-  止戈定音具体类型尚未配置，暂不支持互换: Zhige Attunement sub-type not configured; swap not supported
-    yet
-  正在处理：{name}: 'Processing: {name}'
+  止戈定音具体类型尚未配置，暂不支持互换: 止戈定音の具体タイプが未設定のため、まだ交換に対応していません
+  正在处理：{name}: 処理中：{name}
   正在拖动: 正在拖動
-  此装备没有可切换的普通定音词条: This gear has no swappable normal Attunement affixes
-  武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。: Weapon candidates come from equipment-config
-    weapon types. Martial arts boosts have moved to equipment-config weapon types.
-  武器类型「{name}」已存在。: Weapon type "{name}" already exists.
-  武器类型「{name}」正被流派 {users} 引用，请先在流派配置中解除绑定。: Weapon type "{name}" is referenced by
-    school {users}; unbind it in school config first.
+  此装备没有可切换的普通定音词条: この装備には切替可能な通常定音詞条がありません
+  武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。: 武器候補は装備設定の武器種類から取得されます。武学増効は装備設定の武器種類へ移動しました。
+  武器类型「{name}」已存在。: 武器種類「{name}」はすでに存在します。
+  武器类型「{name}」正被流派 {users} 引用，请先在流派配置中解除绑定。: 武器種類「{name}」は流派 {users} から参照されています。先に流派設定で紐付けを解除してください。
   武学: 武学
-  武学名册以「武学配置」为准，在那里增删: The martial arts roster follows "Martial Arts Config"; add/remove
-    there
+  武学名册以「武学配置」为准，在那里增删: 武学一覧は「武学設定」を基準とし、追加・削除はそちらで行います
   每行一个关键字: 每行一個関鍵字
-  每轮调律自上而下匹配；命中后按材料不足动作结束或顺延；全部不命中则不添加: Each tuning round matches top-down; on hit,
-    ends per the material-insufficient action or defers; no hit → not added
-  比较前，候选装备与当前穿戴装备的毕业率都会按所选精度向下取整。例如 94.59% 在 0.1% 精度下按 94.5% 判断。: Before comparison,
-    both candidate and worn gear graduation rates are floored to the selected precision.
-    E.g. 94.59% at 0.1% precision is judged as 94.5%.
+  每轮调律自上而下匹配；命中后按材料不足动作结束或顺延；全部不命中则不添加: 各調律ラウンドは上から順に照合し、一致後は素材不足時の動作に従って終了または次へ進みます（すべて未一致なら追加しない）
+  比较前，候选装备与当前穿戴装备的毕业率都会按所选精度向下取整。例如 94.59% 在 0.1% 精度下按 94.5% 判断。: 比較前に、候補装備と現在装着装備の卒業率は選択した精度で切り捨てられます。例：94.59% は 0.1% 精度で 94.5% として判定されます。
   毕业率方案: 畢業率方案
   毕业率精度: 畢業率精度
-  没有其他具有普通定音的同类型装备: No other same-type gear with normal Attunement
+  没有其他具有普通定音的同类型装备: 通常定音を持つ他の同種装備がありません
   没有更高的已配置等级: 没有更高的已配置等級
-  流派「{name}」已存在。: School "{name}" already exists.
-  流派名不能为空或与已有流派重名。: School name cannot be empty or duplicate an existing school.
-  流派配置（仅本次测试，不保存）：: 'School config (test only, not saved):'
-  添加{side}套装: Add {side} set
+  流派「{name}」已存在。: 流派「{name}」はすでに存在します。
+  流派名不能为空或与已有流派重名。: 流派名は空にできず、既存の流派と重複できません。
+  流派配置（仅本次测试，不保存）：: 流派設定（今回のテストのみ、保存されません）：
+  添加{side}套装: '{side}セットを追加'
   添加套装: 追加套装
   清理结果: 清理結果
   清除结果: 清除結果
-  游戏内该等级的承音上限，按游戏显示填写；新建等级时先按上限×94% 给出默认值: The in-game Chimera cap for this level,
-    as shown in-game; new levels default to cap × 94%
-  游戏配置有未保存的更改，确定退出并放弃这些更改吗？: Game config has unsaved changes; quit and discard them?
+  游戏内该等级的承音上限，按游戏显示填写；新建等级时先按上限×94% 给出默认值: ゲーム内における該当等級の承音上限（ゲーム表示通りに入力）。新規等級作成時は上限×94%を既定値にします
+  游戏配置有未保存的更改，确定退出并放弃这些更改吗？: ゲーム設定に未保存の変更があります。変更を破棄して終了しますか？
   点击查看逐条明细: 点撃查看逐条明細
-  点击选择玩法（不选则不应用规则）: Click to pick a playstyle (rules not applied without one)
+  点击选择玩法（不选则不应用规则）: クリックしてプレイスタイルを選択（未選択時はルール不適用）
   版本号: 版本号
   玩法不存在: 玩法不存在
-  玩法评级只辅助勾选候选，不作为装备合法性规则；多选时按各条规则给出的最高评级判定: Playstyle grading only aids candidate
-    checking, not gear validity rules; with multiple selected, the highest grade from
-    any rule wins
-  生成八件模拟装备并替换当前出装，原装备保留: Generate eight mock equipment pieces and replace the current
-    loadout; originals kept
-  生成八件模拟装备并替换目标方案的出装，原装备保留；同时应用搭配的弓玦，战斗类型设为 PVE。: Generate eight mock pieces and replace
-    the target plan's loadout; originals kept. Also applies the build's Gongjue, battle
-    type set to PVE.
+  玩法评级只辅助勾选候选，不作为装备合法性规则；多选时按各条规则给出的最高评级判定: プレイスタイル評価は候補チェックの補助のみに使用され、装備の整合性ルールではありません。複数選択時は各ルールの最高評価を採用します
+  生成八件模拟装备并替换当前出装，原装备保留: 模擬装備を8件生成して現在の出装を置き換えます（元の装備は保持されます）
+  生成八件模拟装备并替换目标方案的出装，原装备保留；同时应用搭配的弓玦，战斗类型设为 PVE。: 模擬装備を8件生成して対象プランの出装を置き換えます（元の装備は保持）。あわせてビルドの弓玦を適用し、戦闘タイプを PVE に設定します。
   生效截止等级: 生效截止等級
-  生效等级不填即不限；新等阶移除的词条填截止等级，低等阶装备上它仍然合法: Empty = no level limit; for affixes removed
-    in newer tiers, fill the cutoff level — it remains valid on lower-tier gear
+  生效等级不填即不限；新等阶移除的词条填截止等级，低等阶装备上它仍然合法: 有効等級が空欄なら無制限。新等階で廃止された詞条は終了等級を設定すると、低等階装備上では引き続き有効として扱われます
   生效起始等级: 生效起始等級
-  生效（黄字）: Effective (yellow text)
+  生效（黄字）: 有効（黄字）
   用户停止调律: ユーザー停止調律
-  用户选择结束本次调律：重置二次确认未出现: 'User chose to stop tuning: reset confirmation didn''t appear'
-  用户：{user}　方案：{plan}　流派：{school}　基础属性：{base}　世界等级：{level}　弓玦：{gongjue}（{gongjue_level}级）: 'User:
-    {user}　Plan: {plan}　School: {school}　Base: {base}　World level: {level}　Gongjue:
-    {gongjue} (Lv {gongjue_level})'
-  由流派决定；改流派，或把流派切到「自定义」后再单独编辑: Determined by school; change the school, or switch
-    to "Custom" to edit individually
+  用户选择结束本次调律：重置二次确认未出现: ユーザーが今回の調律を終了しました：リセット二次確認が表示されませんでした
+  用户：{user}　方案：{plan}　流派：{school}　基础属性：{base}　世界等级：{level}　弓玦：{gongjue}（{gongjue_level}级）: ユーザー：{user}　プラン：{plan}　流派：{school}　基礎属性：{base}　世界等級：{level}　弓玦：{gongjue}（Lv{gongjue_level}）
+  由流派决定；改流派，或把流派切到「自定义」后再单独编辑: 流派により決まります。流派を変更するか、「カスタム」に切り替えてから個別に編集してください
   白字会心率: 白字会心率
   白字会意率: 白字会意率
   白字精准率: 白字精準率
-  目标用户：{user}　备战方案：{plan}　玩法：{style}: 'Target user: {user}　Plan: {plan}　Playstyle:
-    {style}'
+  目标用户：{user}　备战方案：{plan}　玩法：{style}: 対象ユーザー：{user}　編成プラン：{plan}　プレイスタイル：{style}
   目标等级: 目標等級
-  目标词条：-: 'Target affix: —'
-  目标：-: 'Target: —'
-  相邻赛季日期必须衔接：赛季 {previous} 的结束日期必须等于赛季 {following} 的开始日期（05:00 切换）: 'Adjacent season
-    dates must align: season {previous}''s end date must equal season {following}''s
-    start date (05:00 switchover)'
+  目标词条：-: 目標詞条：-
+  目标：-: 目標：-
+  相邻赛季日期必须衔接：赛季 {previous} 的结束日期必须等于赛季 {following} 的开始日期（05:00 切换）: 隣接するシーズンの日付は連続している必要があります：シーズン {previous} の終了日はシーズン {following} の開始日と一致させてください（05:00 切替）
   真实装备不能删除定音词条: 真実装備不能削除定音詞条
   真实装备不能新增定音词条: 真実装備不能新増定音詞条
-  真实装备不能新增或删除词条: Real equipment cannot have affixes added or removed
-  真实装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Real equipment's inherent attributes are immutable  ·  only
-    transfer, Chimera and affix-value growing are supported
-  '真实装备的既定属性不可修改: ': 'Real equipment''s inherent attributes are immutable: '
+  真实装备不能新增或删除词条: 実装備では詞条を追加・削除できません
+  真实装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: 実装備の確定属性は変更不可 · 転律・承音・詞条数値の育成のみ対応
+  '真实装备的既定属性不可修改: ': '実装備の確定属性は変更できません: '
   真气比例: 真気比例
   确定删除: 確定削除
-  确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，公共装备池中的装备不会删除，保存后才会生效。: Delete "{name}"? {count}
-    equipment references in this plan will be released; gear in the shared pool is
-    not deleted. Takes effect on save.
+  确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，公共装备池中的装备不会删除，保存后才会生效。: 「{name}」を削除しますか？このプランの {count} 件の装備参照は解除されますが、共通装備プールの装備は削除されません（保存後に反映）。
   ? '确定删除方案「{name}」的 {level}级 v{version}？
 
     对应的 JSON 文件也会被删除。'
-  : 'Delete plan "{name}" Lv {level} v{version}?
+  : 'プラン「{name}」の Lv{level} v{version} を削除しますか？
 
-    The corresponding JSON file will also be deleted.'
-  确定删除武器类型「{name}」？: Delete weapon type "{name}"?
-  确定删除流派「{name}」？: Delete school "{name}"?
-  确定删除规则组「{name}」？该操作不可恢复。: Delete rule group "{name}"? This cannot be undone.
-  确定删除调律规则「{name}」？规则文件将被删除，不可恢复。: Delete tuning rule "{name}"? The rule file will
-    be deleted and cannot be recovered.
-  确定撤销本次所有未保存的游戏配置更改吗？: Undo all unsaved game config changes made this session?
-  确定撤销本次所有未保存的调律配置更改吗？: Undo all unsaved tuning config changes made this session?
-  确定要删除等级 {level} 吗？: Delete level {level}?
-  确定要删除词组 '{name}' 吗？: Delete group '{name}'?
+    対応する JSON ファイルも削除されます。'
+  确定删除武器类型「{name}」？: 武器種類「{name}」を削除しますか？
+  确定删除流派「{name}」？: 流派「{name}」を削除しますか？
+  确定删除规则组「{name}」？该操作不可恢复。: ルールグループ「{name}」を削除しますか？この操作は元に戻せません。
+  确定删除调律规则「{name}」？规则文件将被删除，不可恢复。: 調律ルール「{name}」を削除しますか？ルールファイルは完全に削除され、元に戻せません。
+  确定撤销本次所有未保存的游戏配置更改吗？: 今回行った未保存のゲーム設定変更をすべて取り消しますか？
+  确定撤销本次所有未保存的调律配置更改吗？: 今回行った未保存の調律設定変更をすべて取り消しますか？
+  确定要删除等级 {level} 吗？: 等級 {level} を削除しますか？
+  确定要删除词组 '{name}' 吗？: 詞組 '{name}' を削除しますか？
   确认替换当前出装: 確認替換当前装備
-  第 {row} 条赛季编号不合法: 'Row {row}: invalid season number'
-  第 {row} 条赛季配置格式不正确: 'Row {row}: invalid season config format'
-  等待中...: Waiting...
+  第 {row} 条赛季编号不合法: '{row} 行目のシーズン番号が不正です'
+  第 {row} 条赛季配置格式不正确: '{row} 行目のシーズン設定形式が正しくありません'
+  等待中...: 待機中...
   等待冷却: 等待冷却
-  等待分析...: Analyzing...
-  等级 {level} | {quality} | 词条 {count}/5: Lv {level} | {quality} | affixes {count}/5
-  等级不足，跳过（同类型）: Level too low; skipping (same type)
+  等待分析...: 分析待機中...
+  等级 {level} | {quality} | 词条 {count}/5: 等級 {level} | {quality} | 詞条 {count}/5
+  等级不足，跳过（同类型）: 等級不足のためスキップ（同種類）
   等级尚无数据: 等級尚無数拠
-  等级门槛 + 调律门槛 + 扫描/材料/调律处理，一组一套可切换；流派规则全局不受影响: Level threshold + tuning threshold
-    + scan/material/tuning handlers — one set per group, switchable; school rules
-    are global and unaffected
+  等级门槛 + 调律门槛 + 扫描/材料/调律处理，一组一套可切换；流派规则全局不受影响: 等級しきい値 + 調律しきい値 + スキャン／素材／調律処理を1グループ単位で切替可能（流派ルールは全体共通で影響を受けません）
   ? '筛选已生效，但保存到用户资料失败：{error}
 
 
     本次浏览不受影响，下次操作会再尝试保存。
 
     筛选条件未保存'
-  : 'Filter applied, but saving to the user profile failed: {error}
+  : 'フィルターは適用されましたが、ユーザープロファイルへの保存に失敗しました：{error}
 
 
-    This session is unaffected; the next operation will retry.
+    今回の閲覧には影響せず、次回操作時に再保存を試みます。
 
-    Filter not saved'
+    フィルター条件未保存'
   筛选条件未保存: 篩選条件未保存
   筛选设置: 篩選設置
-  系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force: 'Coefficients:
-    {ratios}; also accepts kind / charge / qi_ratio / intent_conversion / modifiers
-    / force'
+  系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force: 係数：{ratios}；その他 kind / charge / qi_ratio / intent_conversion / modifiers / force も記述可能
   系统预置: 系統預置
-  系统预置只读，请复制或另存为本地搭配: System presets are read-only; copy or save as a local loadout
-  系统预置只读，请选择本地保存位置或另存为新搭配: System presets are read-only; pick a local save location
-    or save as a new loadout
+  系统预置只读，请复制或另存为本地搭配: システムプリセットは読み取り専用です。複製するかローカルビルドとして別名保存してください
+  系统预置只读，请选择本地保存位置或另存为新搭配: システムプリセットは読み取り専用です。ローカル保存先を選ぶか新ビルドとして保存してください
   紫装区: 紫装区
   回收累计返还: 回收累計返還
   调律消耗: 調律消耗
@@ -2992,16 +2577,13 @@ auto_strings:
   继续调律或锁定: 継続調律或鎖定
   编辑匹配关键字: 編集匹配関鍵字
   编辑所选来源: 編集所選来源
-  编辑技能：{name}: 'Edit Skill: {name}'
+  编辑技能：{name}: スキルを編集：{name}
   编辑方案: 編集方案
   编辑该技能: 編集該技能
   蓄力技定音: 蓄力技定音
-  蓝色装备，忽略: Blue gear; ignoring
-  装备从起始等级（或更低）升到目标等级（或更高）时，原词条自动变成目标词条；只影响升级投影，不改真实扫描结果: When gear goes from the start
-    level (or lower) to the target level (or higher), the original affix automatically
-    becomes the target affix; only affects upgrade projection, not real scan results
-  装备无相穿透已折算至当前流派属攻穿透。: Equipment element penetration has been folded into the current
-    school's element penetration.
+  蓝色装备，忽略: 青装備のため無視
+  装备从起始等级（或更低）升到目标等级（或更高）时，原词条自动变成目标词条；只影响升级投影，不改真实扫描结果: 装備が開始等級（以下）から目標等級（以上）へ昇格した際、元の詞条が自動的に目標詞条へ変化します（昇格投影のみに影響し、実スキャン結果は変わりません）
+  装备无相穿透已折算至当前流派属攻穿透。: 装備の無相貫通は現在の流派の属性攻撃貫通に換算済みです。
   ? '装备至少完成一轮调律后，若词条已满且明确命中
 
     "继续调律或锁定"规则，并且传入规则的最终评级达到
@@ -3011,134 +2593,110 @@ auto_strings:
     无规则命中只结束并保留，不会自动锁定。
 
     已锁定装备不会再点击，避免误解锁。'
-  : 'After at least one tuning round, if affixes are full and the
+  : '装備が少なくとも1ラウンド調律を終え、詞条が満枠かつ
 
-    "Continue Tuning or Lock" rule clearly hits, and the passed rule''s
+    "調律続行またはロック"ルールに明確に一致し、指定ルールの
 
-    final grade reaches Excellent or Top, auto-lock when returning to
+    最終評価が優秀または最高級に達した場合、装備詳細画面へ戻った際に自動ロックします。
 
-    gear details.
+    ルール未一致時は終了して保持するのみで自動ロックしません。
 
-    No rule hit only stops and keeps the gear — no auto-lock.
-
-    Locked gear won''t be tapped again to avoid accidental unlock.'
+    ロック済み装備は誤解除を防ぐため再クリックしません。'
   装备贡献字段: 装備貢献フィールド
   装备输入预览: 装備輸入預覧
-  装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效: Gear needs at least one selected playstyle grading
-    it at this tier or above; no effect without a playstyle
-  规则已禁用；右键启用: Rule disabled; right-click to enable
-  规则组「{key}」已移到{layer}: Rule group "{key}" moved to {layer}
-  规则说明已保存（{key}）: Rule description saved ({key})
+  装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效: 装備は選択済みプレイスタイルのうち少なくとも1つからこのランク以上の評価を得る必要があります（プレイスタイル未選択時は無効）
+  规则已禁用；右键启用: ルールは無効です。右クリックで有効化できます
+  规则组「{key}」已移到{layer}: ルールグループ「{key}」を{layer}へ移動しました
+  规则说明已保存（{key}）: ルール説明を保存しました（{key}）
   角色属性表: 角色属性表
-  计算当前配装的联合转律方案: Compute the joint transfer plan for the current build
+  计算当前配装的联合转律方案: 現在のビルドに対する複合転律プランを計算します
   计算设置: 計算設置
   计算设置未保存: 計算設置未保存
-  设置启用状态失败：{e}: 'Failed to set enabled state: {e}'
-  评估所有已启用调律规则所覆盖的玩法。: Evaluates playstyles covered by all enabled tuning rules.
-  评级 ≥: Grade ≥
-  识别出 {count} 组合并候选，其中 {review_count} 组需要人工核对。左侧全部旧版本合并到右侧保留版本；有分歧的组不自动勾选。: Found
-    {count} merge candidates; {review_count} need manual review. All old versions
-    on the left merge into the kept version on the right; conflicting groups aren't
-    auto-checked.
-  词条{i}：: 'Affix {i}:'
+  设置启用状态失败：{e}: 有効状態の設定に失敗しました：{e}
+  评估所有已启用调律规则所覆盖的玩法。: 有効なすべての調律ルールが対象とするプレイスタイルを評価します。
+  评级 ≥: 評価 ≥
+  识别出 {count} 组合并候选，其中 {review_count} 组需要人工核对。左侧全部旧版本合并到右侧保留版本；有分歧的组不自动勾选。: 統合候補が {count} グループ見つかり、そのうち {review_count} グループは手動確認が必要です。左側の旧バージョンをすべて右側の保持バージョンへ統合します（競合グループは自動チェックされません）。
+  词条{i}：: 詞条{i}：
   词条名: 詞条名
-  词条已满，无行为规则命中 → 结束并保留装备: Affixes full, no handler rule hit → stop and keep gear
-  词条数：{count}/40: 'Affixes: {count}/40'
+  词条已满，无行为规则命中 → 结束并保留装备: 詞条が満枠で動作ルール未一致 → 終了して装備を保持
+  词条数：{count}/40: 詞条数：{count}/40
   词条转律: 詞条転律
-  词条转律保护，跳过: Affix transfer protected; skipping
-  词组 '{name}' 已存在: Group '{name}' already exists
-  询问是否继续：弹窗确认，继续则本次运行不再检查: 'Ask to continue: popup confirmation; if continued, no
-    more checks this run'
+  词条转律保护，跳过: 詞条転律保護のためスキップ
+  词组 '{name}' 已存在: 詞組 '{name}' はすでに存在します
+  询问是否继续：弹窗确认，继续则本次运行不再检查: 続行するか確認：ポップアップで確認し、続行すると今回の実行中は再チェックしません
   该用户当前使用的方案: 該ユーザー当前使用的方案
   该等级的装备不支持承音: 該等級的装備不支持承音
-  该等级重置调律不返还律准石，重置返还固定按 0 计。: Reset tuning at this level returns no Lv Stones; reset
-    return is fixed at 0.
-  该装备两种定音都有，可在装备属性中切换: This gear has both Attunement types; switch in gear attributes
-  该装备只扫描到一种定音，无法切换: Only one Attunement type scanned; cannot toggle
+  该等级重置调律不返还律准石，重置返还固定按 0 计。: この等級の調律リセットでは律準石が返還されないため、リセット返還は 0 固定です。
+  该装备两种定音都有，可在装备属性中切换: この装備は両方の定音を持っているため、装備属性で切り替えられます
+  该装备只扫描到一种定音，无法切换: この装備は1種類の定音のみスキャンされているため切り替えられません
   该装备没有普通定音: 該装備没有普通定音
-  该项固定为 0，无需配置: This is fixed at 0; no config needed
-  请先为当前备战方案选择玩法: Pick a playstyle for the current loadout plan first
-  请先启动 MCP 服务: Start the MCP service first
-  请先在 AI 设置的外部 Agent 中添加接入配置: Add a connection config in Settings → AI Settings →
-    External Agent first
-  请先选择包含流派信息的备战方案: Select a loadout plan containing school info first
-  请先选择用户、备战方案及玩法: Select user, loadout plan and playstyle first
+  该项固定为 0，无需配置: この項目は 0 固定のため設定不要です
+  请先为当前备战方案选择玩法: 先に現在の編成プランのプレイスタイルを選択してください
+  请先启动 MCP 服务: 先に MCP サービスを起動してください
+  请先在 AI 设置的外部 Agent 中添加接入配置: 先に AI 設定の外部 Agent で接続設定を追加してください
+  请先选择包含流派信息的备战方案: 先に流派情報を含む編成プランを選択してください
+  请先选择用户、备战方案及玩法: 先にユーザー・編成プラン・プレイスタイルを選択してください
   请先选择用户和备战方案: 請先選択ユーザー和ロードアウト
-  请勾选至少一个「待调出」词条进行模拟: Check at least one "To Transfer Out" affix for the simulation
-  请填写方案名称并选择方案等级: Fill in the plan name and pick a plan level
-  请输入当前律准石数量（小律准石按 0.1 计）: Enter the current Lv Stone count (minor stones count as
-    0.1)
+  请勾选至少一个「待调出」词条进行模拟: シミュレーションする「調律予定」詞条を少なくとも1つチェックしてください
+  请填写方案名称并选择方案等级: プラン名を入力し、プラン等級を選択してください
+  请输入当前律准石数量（小律准石按 0.1 计）: 現在の律準石数を入力してください（小律準石は 0.1 換算）
   请选择生成方案: 請選択生成方案
   调律处理: 調律処理
   调律处理规则: 調律処理規則
-  调律已启动，请在调律管理中查看进度。: Tuning started; check progress in Tuning Manager.
-  调律结束{suffix}：{total} 件装备，{rounds} 轮调律: 'Tuning finished{suffix}: {total} pieces,
-    {rounds} rounds'
+  调律已启动，请在调律管理中查看进度。: 調律を開始しました。進捗は調律管理で確認してください。
+  调律结束{suffix}：{total} 件装备，{rounds} 轮调律: 調律終了{suffix}：{total} 件の装備、{rounds} ラウンド調律
   调律配置已保存并生效: 調律配置已保存並生效
-  调律配置有未保存的更改，确定退出并放弃这些更改吗？: Tuning config has unsaved changes; quit and discard them?
-  调满后按本次传入的当前规则重新判定；达到所选评级的装备强制保留，不执行回收。: After a full tune, re-judges using the passed-in
-    current rule; gear reaching the selected grade is force-kept, not recycled.
-  赛季 {number} 必须填写开始和结束日期: Season {number} needs start and end dates
-  赛季 {number} 的结束日期必须晚于开始日期: Season {number}'s end date must be after its start date
-  赛季编号不可重复：{number}: 'Duplicate season number: {number}'
+  调律配置有未保存的更改，确定退出并放弃这些更改吗？: 調律設定に未保存の変更があります。変更を破棄して終了しますか？
+  调满后按本次传入的当前规则重新判定；达到所选评级的装备强制保留，不执行回收。: 満枠後に今回指定された現在ルールで再判定し、選択した評価に達した装備は回収せず強制保持します。
+  赛季 {number} 必须填写开始和结束日期: シーズン {number} の開始日と終了日を入力してください
+  赛季 {number} 的结束日期必须晚于开始日期: シーズン {number} の終了日は開始日より後である必要があります
+  赛季编号不可重复：{number}: シーズン番号が重複しています：{number}
   赛季装备假设承音: 賽季装備假設承音
   赛季配置必须是列表: 賽季配置必須是列表
   起始等级: 起始等級
-  超过 1 天: '> 1 day'
-  超过 1 小时: '> 1 hour'
-  超过 14 天: '> 14 days'
-  超过 3 天: '> 3 days'
-  超过 30 天: '> 30 days'
-  超过 7 天: '> 7 days'
+  超过 1 天: 1日超
+  超过 1 小时: 1時間超
+  超过 14 天: 14日超
+  超过 3 天: 3日超
+  超过 30 天: 30日超
+  超过 7 天: 7日超
   跳过初始检查: 跳過初始検查
   跳过当前装备: 跳過当前装備
   跳过锁定装备调律: 跳過鎖定装備調律
-  转律只能修改商角徵羽中的一个词条: Transfer can only modify one of the Shang-Jue-Zhi-Yu affixes
-  转律后的词条必须标记 is_transferred: Transferred affixes must be flagged is_transferred
+  转律只能修改商角徵羽中的一个词条: 転律では商・角・徴・羽のうち1つの詞条のみ変更できます
+  转律后的词条必须标记 is_transferred: 転律後の詞条には is_transferred フラグが必要です
   转律槽位标记不能单独修改: 転律槽位標記不能単独修改
-  转律词条库（全局，优先级从高到低）: Transfer Affix Pool (global, priority high→low)
-  轮次：0: 'Rounds: 0'
-  轮次：{n}: 'Rounds: {n}'
+  转律词条库（全局，优先级从高到低）: 転律詞条プール（全体、優先度が高い順）
+  轮次：0: ラウンド：0
+  轮次：{n}: ラウンド：{n}
   还没有任何流派的伤害模型: 還没有任何流派的傷害模型
-  还没有生成方案，请先在 Agent 中生成。: No generated plan yet; generate one in the Agent first.
-  这里只汇总已录入的静态贡献，含估计值，尚不是完整角色面板。观测值仅供核对，不作为来源相加。条件效果不计入总量。: This summarizes only entered
-    static contributions, including estimates — not a full character panel. Observed
-    values are for verification only and aren't summed as sources. Conditional effects
-    aren't counted in the total.
-  进入调律前与每轮调律后的行为点）：按完整装备预期评级决策（首条命中）。无命中默认：未满 = 继续调律、词条满 = 结束并按设置锁定；材料不足/用户中断属阻断，不触发: 'Behavior
-    points before tuning and after each round): decides by full-equipment expected
-    grade (first match). Default no-hit: not full = continue tuning; full = stop and
-    lock per settings. Material shortage / user interrupt are blocking, not triggered'
-  进入调律前及每轮结束后自上而下匹配；全部不命中时未满继续、已满保留: Before tuning starts and after each round, match
-    top-down; no hit → continue if not full, keep if full
-  选择 Agent 接入配置文件: Select Agent connection config file
-  选择一件同类型装备，互换两者的普通定音属性。装备展示的定音类别和备战方案引用不会改变。: Pick a same-type piece to swap both
-    gears' normal Attunement affixes. The displayed Attunement category and loadout
-    plan references are unchanged.
+  还没有生成方案，请先在 Agent 中生成。: まだプランが生成されていません。先に Agent で生成してください。
+  这里只汇总已录入的静态贡献，含估计值，尚不是完整角色面板。观测值仅供核对，不作为来源相加。条件效果不计入总量。: ここには入力済みの静的寄与（推定値を含む）のみを集計しており、完全なキャラクターパネルではありません。観測値は照合用でありソースとして加算されません。条件付き効果も合計には含まれません。
+  进入调律前与每轮调律后的行为点）：按完整装备预期评级决策（首条命中）。无命中默认：未满 = 继续调律、词条满 = 结束并按设置锁定；材料不足/用户中断属阻断，不触发: 調律開始前と各ラウンド後の処理ポイント）：装備全体の予想評価で判断（最初に一致したルールを適用）。未一致時の既定：未満枠 = 調律続行、満枠 = 終了して設定に従いロック；素材不足／ユーザー中断は遮断扱いで発火しません
+  进入调律前及每轮结束后自上而下匹配；全部不命中时未满继续、已满保留: 調律開始前と各ラウンド終了後に上から順に照合し、すべて未一致なら未満枠は続行、満枠は保持します
+  选择 Agent 接入配置文件: Agent 接続設定ファイルを選択
+  选择一件同类型装备，互换两者的普通定音属性。装备展示的定音类别和备战方案引用不会改变。: 同じ種類の装備を1件選び、双方の通常定音属性を入れ替えます。装備の表示定音カテゴリと編成プラン参照は変わりません。
   选择原词条: 選択原詞条
   选择文件: 選択文件
-  选择流派会自动填入对应的两门武学并锁定；要自由搭配就选「不选择流派」: Picking a school auto-fills and locks both martial
-    arts; choose "No school" for free combination
+  选择流派会自动填入对应的两门武学并锁定；要自由搭配就选「不选择流派」: 流派を選ぶと対応する2つの武学が自動入力・ロックされます。自由に組み合わせる場合は「流派を選択しない」を選んでください
   选择调律玩法: 選択調律玩法
-  选择转律词条库（{school}）: Select transfer affix pool ({school})
+  选择转律词条库（{school}）: 転律詞条プールを選択（{school}）
   ? '选项已生效，但保存到用户资料失败：{error}
 
 
     本次操作不受影响，下次操作会再尝试保存。'
-  : 'Option applied, but saving to the user profile failed: {error}
+  : '設定は適用されましたが、ユーザープロファイルへの保存に失敗しました：{error}
 
 
-    This operation is unaffected; the next one will retry.'
-  通用判定：这里的条件对所有部位都生效: 'General judgment: conditions here apply to all slots'
-  部位与金/紫品阶均有候选规则。判定结果和首词条条件仍可能使规则不命中。: Both slots and gold/purple quality have candidate
-    rules. Judgment results and first-affix conditions may still prevent a rule from
-    hitting.
-  '配套方案读取失败: {msg}': 'Failed to read the paired plan: {msg}'
+    今回の操作には影響せず、次回操作時に再保存を試みます。'
+  通用判定：这里的条件对所有部位都生效: 共通判定：ここの条件はすべての部位に適用されます
+  部位与金/紫品阶均有候选规则。判定结果和首词条条件仍可能使规则不命中。: 部位と金／紫品階のいずれにも候補ルールがあります。判定結果や首詞条条件によってはルールに一致しない場合があります。
+  '配套方案读取失败: {msg}': '対応プランの読み取りに失敗しました: {msg}'
   配置不完整: 配置不完整
-  重命名失败：{e}: 'Rename failed: {e}'
-  重命名规则 key: Rename Rule Key
+  重命名失败：{e}: 名前の変更に失敗しました：{e}
+  重命名规则 key: ルール key の名前を変更
   重新推导: 重新推導
-  重置冷却中，等待冷却完成: Reset cooling; waiting for cooldown to finish
+  重置冷却中，等待冷却完成: リセットクールダウン中のため、完了を待機しています
   重置无返还: 重置無返還
   金装区: 金装区
   锁定优秀及以上装备: 鎖定優秀及以上装備
@@ -3146,64 +2704,53 @@ auto_strings:
   防具套装定义: 防具套装定義
   随赛季: 随賽季
   随赛季更新: 随賽季更新
-  随赛季更新（{level}）: Updates with season ({level})
+  随赛季更新（{level}）: シーズンに追従（{level}）
   静态推导: 静態推導
-  非承音装备不能培养词条数值: Non-Chimera gear cannot grow affix values
+  非承音装备不能培养词条数值: 非承音装備では詞条数値を育成できません
   顺延判定规则: 順延判定規則
-  预期评级 ≥ 该档即进入调律（固定用传入规则判定）: Expected grade ≥ this tier starts tuning (always judged
-    by the passed-in rule)
+  预期评级 ≥ 该档即进入调律（固定用传入规则判定）: 予想評価がこのランク以上で調律に入ります（常に指定ルールで判定）
   预览基础属性: 預覧基礎属性
-  首次识别后按调律、重置和回收结果记账；关闭后每个检查点重新识别。: After first recognition, records by tuning/reset/recycle
-    result; when off, re-recognizes at each checkpoint.
-  首次识别时使用的额外大律准石数量门槛。: Extra Lv Stone count threshold used during first recognition.
-  默认使用去重遍历（dedup）；启用后改用位置校验遍历（positional）。: Defaults to dedup traversal; enabling
-    switches to positional traversal.
-  默认使用当前赛季等级，也可以手动选择旧等级。: Defaults to the current season level; you can also pick
-    an older level.
-  （仅列出的部位覆盖全局默认，未列部位沿用基础配置）: (only listed slots override the global default; unlisted
-    slots use base config)
-  （全局）: (global)
-  （双击左侧导航中的规则名可修改）: (double-click a rule name in the left nav to rename)
-  （已中断）: (interrupted)
-  （无等级配置）: (no level config)
-  （无，恒生效）: (none, always active)
-  （未实现）: (not implemented)
-  （未选择）: (none selected)
-  （未配置）: (not configured)
-  （溢出{source} {overflow}）: (overflow {source} {overflow})
-  （点击选择词条）: (click to pick an affix)
-  （点击选择首词条）: (click to pick a first affix)
-  （跟随规则设置）: (follow rule settings)
-  （须大于 0）: (must be > 0)
-  ＋ 新增规则: ＋ New Rule
-  ；强制要求未满足：: '; forced requirements not met: '
+  首次识别后按调律、重置和回收结果记账；关闭后每个检查点重新识别。: 初回認識後は調律・リセット・回収の結果に応じて増減を記録します。オフの場合は各チェックポイントで再認識します。
+  首次识别时使用的额外大律准石数量门槛。: 初回認識時に使用する大律準石の追加しきい値。
+  默认使用去重遍历（dedup）；启用后改用位置校验遍历（positional）。: 既定では重複排除走査（dedup）を使用します。有効にすると位置検証走査（positional）に切り替わります。
+  默认使用当前赛季等级，也可以手动选择旧等级。: 既定では今シーズンの等級を使用しますが、過去の等級を手動選択することもできます。
+  （仅列出的部位覆盖全局默认，未列部位沿用基础配置）: （記載された部位のみ全体設定を上書きし、未記載の部位は基本設定を引き継ぎます）
+  （全局）: （全体）
+  （双击左侧导航中的规则名可修改）: （左ナビのルール名をダブルクリックすると名前を変更できます）
+  （已中断）: （中断済み）
+  （无等级配置）: （等級設定なし）
+  （无，恒生效）: （なし、常時有効）
+  （未实现）: （未実装）
+  （未选择）: （未選択）
+  （未配置）: （未設定）
+  （溢出{source} {overflow}）: （超過{source} {overflow}）
+  （点击选择词条）: （クリックして詞条を選択）
+  （点击选择首词条）: （クリックして首詞条を選択）
+  （跟随规则设置）: （ルール設定に従う）
+  （须大于 0）: （0 より大きい値）
+  ＋ 新增规则: ＋ ルールを追加
+  ；强制要求未满足：: ；必須条件を満たしていません：
   ? '「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。
 
 
     现有可用等级：{levels}。'
-  : '"{target}" has no graduation plan at Lv {level}; optimal comparison unavailable.
+  : '「{target}」は Lv {level} の卒業率プランがまだないため、最適組み合わせを比較できません。
 
 
-    Available levels: {levels}.'
-  「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。: '"{target}" has no graduation plan yet; import
-    one to enable optimal comparison.'
+    利用可能な等級：{levels}。'
+  「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。: 「{target}」に利用可能な卒業率プランがまだありません。インポートすると最適組み合わせを比較できます。
   ? '只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。
 
     不会改写装备；进入后的调律处理仍使用完整实际词条。'
-  : 'Only ignores other existing affixes for the tuning threshold check; the first
-    affix''s maximum potential decides whether tuning starts.
+  : '調律しきい値判定のときのみ既存の他詞条を無視し、首詞条素材の最大ポテンシャルで調律フローに入るか判断します。
 
-    Does not modify equipment; the tuning handler still uses the full actual affixes
-    after entry.'
+    装備データは書き換えません。調律開始後の調律処理では実際の全詞条を使用します。'
   ? '本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。
 
     这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。'
-  : 'The lowest gear level that can still be Chimera-enhanced this season. Below it,
-    gear is abandoned this season — no in-place or next-tier enhancement — and excluded
-    from full-level/full-Chimera assumptions.
+  : '今シーズンでまだ承音できる最低装備等級です。これ未満の装備は今シーズン対象外となり、同階承音も次階承音もできないため、最大等級／最大承音の仮定に含まれません。
 
-    This is not the same as "Chimera supported" in level config, which describes whether
-    gear at that level was allowed Chimera at release.'
+    これは等級設定の「承音対応」とは別物です（後者はその等級の装備が当時承音できたかどうかを表します）。'
   ? '
 
 
@@ -3213,48 +2760,47 @@ auto_strings:
   : '
 
 
-    Referenced in the same config; after deletion they will show as unknown sets:
+    同じ設定内で参照されているため、削除後は未知セットとして表示されます：
 
     {items}'
   ? '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值
 
     {notes}'
-  : '{school} · {sources} sources · {pending} pending/partial · {declared} declared,
-    not evaluated
+  : '{school} · {sources} ソース · {pending} 未入力/一部入力 · {declared} 効果宣言済み・未評価
 
     {notes}'
   ? '发现 {count} 处部位/品阶无启用规则覆盖：
 
     '
-  : 'Found {count} slot/quality combos with no active rule coverage:
+  : '有効なルールでカバーされていない部位／品階が {count} 件見つかりました：
 
     '
   ? '筛选已生效，但保存到用户资料失败：{error}
 
 
     本次浏览不受影响，下次操作会再尝试保存。'
-  : 'Filter applied, but saving to the user profile failed: {error}
+  : 'フィルターは適用されましたが、ユーザープロファイルへの保存に失敗しました：{error}
 
 
-    This session is unaffected; the next operation will retry.'
+    今回の閲覧には影響せず、次回操作時に再保存を試みます。'
   ? '紫装区
 
     回收累计返还'
-  : 'Purple Zone
+  : '紫装備枠
 
-    Recycle Cumulative Return'
+    回収累計返還'
   ? '紫装区
 
     调律消耗'
-  : 'Purple Zone
+  : '紫装備枠
 
-    Tuning Cost'
+    調律消費'
   ? '紫装区
 
     重置累计返还'
-  : 'Purple Zone
+  : '紫装備枠
 
-    Reset Cumulative Return'
+    リセット累計返還'
   ? '装备至少完成一轮调律后，若词条已满且明确命中
 
     “继续调律或锁定”规则，并且传入规则的最终评级达到
@@ -3264,34 +2810,36 @@ auto_strings:
     无规则命中只结束并保留，不会自动锁定。
 
     已锁定装备不会再点击，避免误解锁。'
-  : 'After at least one tuning round, if affixes are full and the “Continue Tuning
-    or Lock” rule clearly hits, and the passed rule''s final grade reaches Excellent
-    or Top, auto-lock when returning to gear details.
+  : '装備が少なくとも1ラウンド調律を終え、詞条が満枠かつ
 
-    No rule hit only stops and keeps the gear — no auto-lock.
+    “調律続行またはロック”ルールに明確に一致し、指定ルールの
 
-    Locked gear won''t be tapped again to avoid accidental unlock.'
+    最終評価が優秀または最高級に達した場合、装備詳細画面へ戻った際に自動ロックします。
+
+    ルール未一致時は終了して保持するのみで自動ロックしません。
+
+    ロック済み装備は誤解除を防ぐため再クリックしません。'
   ? '金装区
 
     回收累计返还'
-  : 'Gold Zone
+  : '金装備枠
 
-    Recycle Cumulative Return'
+    回収累計返還'
   ? '金装区
 
     调律消耗'
-  : 'Gold Zone
+  : '金装備枠
 
-    Tuning Cost'
+    調律消費'
   ? '金装区
 
     重置累计返还'
-  : 'Gold Zone
+  : '金装備枠
 
-    Reset Cumulative Return'
-  别名（每行一个）: Aliases (one per line)
+    リセット累計返還'
+  别名（每行一个）: 別名（1行に1つ）
   原始词条名称: 原始詞条名称
-  心法名（六重自动建好）: Inner Way Name (tiers 1-6 are created automatically)
+  心法名（六重自动建好）: 心法名（六重まで自動作成）
   编辑来源: 編集来源
   游戏配置版本: 遊戯配置版本
   计算失败: 計算失敗
@@ -3299,32 +2847,30 @@ auto_strings:
   请选择要穿戴到的槽位: 請選択要穿戴到的槽位
   以下部位没有候选装备: 以下部位没有候選装備
   个人世界等级: 個人世界等級
-  标识 key: Identifier Key
-  勾选装备词条名（至少一项）: Check affix names (at least one)
+  标识 key: 識別子 key
+  勾选装备词条名（至少一项）: 装備詞条名をチェック（1つ以上）
   规则来源: 規則来源
   选择要引用的玩法: 選択要引用的玩法
   调律配置来源: 調律配置来源
-  Agent 任务状态保存失败: Failed to save Agent task state
-  Agent 设置无法读取: Could not read Agent settings
+  Agent 任务状态保存失败: Agent タスク状態の保存に失敗しました
+  Agent 设置无法读取: Agent 設定を読み取れません
   停用状态未保存: 停用状態未保存
-  无法读取 MCP 接入配置: Could not read the MCP connection config
+  无法读取 MCP 接入配置: MCP 接続設定を読み取れません
   实际参与智能判定的方案: 実際参与智能判定的方案
   未参与的方案或规则及原因: 未参与的方案或規則及原因
   装备状态: 装備状態
-  基础规则（单选）: Base Rule (single select)
-  流派规则（可多选）: Playstyle Rules (multi-select)
+  基础规则（单选）: 基本ルール（単一選択）
+  流派规则（可多选）: 流派ルール（複数選択可）
   最低等级: 最低等級
-  调律任务运行中: Tuning tasks running
+  调律任务运行中: 調律タスク実行中
 linger:
   袅袅之音: 嫋々の音
   地区: 地域
   枚数: 枚数
   已得: 取得済み
   清单未安装: チェックリスト未インストール
-  已记录 {done}/{total} 枚 · 完成 {items}/{item_total} 条: 記録 {done}/{total} 枚 · 完了 {items}/{item_total}
-    件
-  已入账 {booked}/{total} 枚 · 待入账 {pending} 枚: 入帳済み {booked}/{total} 枚 · 未入帳 {pending}
-    枚
+  已记录 {done}/{total} 枚 · 完成 {items}/{item_total} 条: 記録 {done}/{total} 枚 · 完了 {items}/{item_total} 件
+  已入账 {booked}/{total} 枚 · 待入账 {pending} 枚: 入帳済み {booked}/{total} 枚 · 未入帳 {pending} 枚
   第 {index} 位: '{index} 番目'
   同步记账: プロフィールに記帳
   固定: 固定

@@ -23,20 +23,25 @@
    - 层3 无法解析：完全空/无内容 → 视为空槽位，正常终止扫描
    涉及 `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/loadout/equipment_scan.wf` /
    `apps/yysls/workflows/implementations/auto_tuning.py` 门控逻辑。
+
 2. **统计报表面板**：跨任务的数据汇总视图（处理装备数、评级分布、材料消耗、
    狗粮投入），与叙事型调律说明文档互补。数据源已在 v0.10.0 齐备
    （`config/session/tuning_history.db` 结构化历史 + 实时总览 + 历史详情），
    缺的是**跨任务聚合**这一层，`apps/yysls/ui/` 下目前没有任何相关模块。
+
 3. **转律 / 装上执行**：目前已有转律建议、模拟转律和评级潜力计算，
    但建议结果不会自动进入游戏完成转律；毕业装备替换穿戴也仍需人工操作。
    若要实现执行链路，须先核对最新的转律资格和装备保护规则。
+
 4. **货币追踪补完**：`scan_wallet.wf` 已完成识别侧（整页 OCR、数字清洗、
    货币名匹配、桌面 4×6 / 安卓 3×6 自适应与补扫、容差防误识、写入 Profile）；
    缺 `CurrencySnapshot` 历史留存（JSONL）、90 天过期清理与趋势折线图。
+
 5. **心力 / 体力管理**：**部分实现**（需求文档状态 2026-10-09；律准石库存与记账策略
    已在 `apps/yysls/workflows/implementations/tuning/stone_stock.py`）。剩余项见
    `docs/20-plans/05-stamina-management.md` 的未完成清单；
    依赖定时轮询与多账号批量，工程量比看上去大。
+
 6. **局内地图目标闭环导航与撤离**：为渡尘墟、觉障林及后续同类玩法提供
    可复用的玩家/目标地图定位、目标锁定、短脉冲移动、重新定位、防卡和到达交互能力。
    导航核心不硬编码玩法名称，不直接关闭应用；具体机制、安全边界与分阶段计划见

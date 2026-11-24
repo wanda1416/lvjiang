@@ -1,64 +1,64 @@
 common:
-  cancel: Cancel
-  current: Current
-  empty: No sticky notes yet
-  paste: Paste from Clipboard
-  remove: Remove Current Avatar
-  reset: Reset
-  title: Sticky Notes
-  请输入用户名: Enter a username
+  cancel: キャンセル
+  current: 現在
+  empty: 付箋はまだありません
+  paste: クリップボードから貼り付け
+  remove: 現在のアバターを削除
+  reset: リセット
+  title: 付箋
+  请输入用户名: ユーザー名を入力してください
 user_avatar:
-  从剪贴板粘贴: Paste from clipboard
-  从当前设备或窗口获取最新截图: Grab the latest screenshot from the current device or window
-  使用此头像: Use This Avatar
-  保存头像失败：{error}: 'Failed to save avatar: {error}'
-  保存并使用: Save and Use
-  删除历史头像: Delete History Avatar
-  删除历史头像失败：{error}: 'Failed to delete history avatar: {error}'
-  剪贴板中没有图片: No image in the clipboard
-  双击编辑头像: Double-click to edit avatar
-  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: Drag the image to position; zoom with wheel or slider · Ctrl+V to paste
-  图片尺寸过大，请选择不超过 4000 万像素的图片: Image too large; pick one no larger than 40 megapixels
-  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): Image files (*.png *.jpg *.jpeg *.webp *.bmp)
-  头像库: Avatar Library
-  头像文件不存在或文件名无效: Avatar file missing or invalid file name
-  头像正在使用: Avatar in use
-  导入图片或从剪贴板粘贴: Import an image or paste from the clipboard
-  导入头像图片: Import Avatar Image
-  当前使用: Current
-  截图失败: Screenshot Failed
-  无法更新用户头像引用: Cannot update the user's avatar reference
-  无法粘贴: Cannot paste
-  无法读取图片：{error}: 'Cannot read the image: {error}'
-  没有可保存的裁剪图片: No cropped image to save
-  没有读取到有效图片: No valid image was read
-  确定永久删除这张历史头像吗？此操作无法撤销。: Permanently delete this history avatar? This cannot be undone.
-  移除头像失败：{error}: 'Failed to remove avatar: {error}'
-  移除当前头像: Remove Current Avatar
-  编辑“{name}”的头像: Edit avatar for "{name}"
-  编辑头像: Edit Avatar
-  缩放: Zoom
+  从剪贴板粘贴: クリップボードから貼り付け
+  从当前设备或窗口获取最新截图: 現在のデバイスまたはウィンドウから最新のスクリーンショットを取得
+  使用此头像: このアバターを使用
+  保存头像失败：{error}: アバターの保存に失敗しました：{error}
+  保存并使用: 保存して使用
+  删除历史头像: 履歴アバターを削除
+  删除历史头像失败：{error}: 履歴アバターの削除に失敗しました：{error}
+  剪贴板中没有图片: クリップボードに画像がありません
+  双击编辑头像: ダブルクリックでアバターを編集
+  可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴: ドラッグで位置調整、ホイールまたはスライダーで拡大縮小 · Ctrl+V で貼り付け
+  图片尺寸过大，请选择不超过 4000 万像素的图片: 画像サイズが大きすぎます。4,000万ピクセル以下の画像を選択してください
+  图片文件 (*.png *.jpg *.jpeg *.webp *.bmp): 画像ファイル (*.png *.jpg *.jpeg *.webp *.bmp)
+  头像库: アバターライブラリ
+  头像文件不存在或文件名无效: アバターファイルが存在しないか、ファイル名が無効です
+  头像正在使用: 使用中のアバター
+  导入图片或从剪贴板粘贴: 画像をインポートするか、クリップボードから貼り付け
+  导入头像图片: アバター画像をインポート
+  当前使用: 使用中
+  截图失败: スクリーンショット取得失敗
+  无法更新用户头像引用: ユーザーのアバター参照を更新できません
+  无法粘贴: 貼り付けできません
+  无法读取图片：{error}: 画像を読み込めません：{error}
+  没有可保存的裁剪图片: 保存できる切り抜き画像がありません
+  没有读取到有效图片: 有効な画像を読み込めませんでした
+  确定永久删除这张历史头像吗？此操作无法撤销。: この履歴アバターを完全に削除しますか？この操作は元に戻せません。
+  移除头像失败：{error}: アバターの削除に失敗しました：{error}
+  移除当前头像: 現在のアバターを削除
+  编辑“{name}”的头像: 「{name}」のアバターを編集
+  编辑头像: アバターを編集
+  缩放: ズーム
   ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "This avatar is used by the following users and cannot be deleted:\n{users}\n\nChange or remove their avatars first."
-  选择之前保存的头像，或导入一张新图片: Pick a previously saved avatar or import a new image
+  : "このアバターは以下のユーザーが使用中のため削除できません：\n{users}\n\n先にこれらのユーザーのアバターを変更または削除してください。"
+  选择之前保存的头像，或导入一张新图片: 以前保存したアバターを選択するか、新しい画像をインポートしてください
 user_manager:
-  保存属性: Save Attributes
-  删除属性: Delete Attributes
-  同步全部头像: Sync All Avatars
-  属性 Key 不能为空: Attribute key cannot be empty
-  属性 Key 不能重复：{key}: 'Duplicate attribute key: {key}'
-  悬浮点击编辑，或双击头像: Hover and click to edit, or double-click the avatar
-  把本机与云端的头像做一次双向合并；不参与日常自动同步: One-time two-way merge of local and cloud avatars; not part of daily auto sync
-  新增属性: Add Attribute
-  新建用户: New User
-  无法删除该用户: This user cannot be deleted
-  正在同步头像…: Syncing avatars…
-  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Usernames may use Chinese, letters, digits, underscores and hyphens, up to 32 characters.
-  用户名已存在: Username already exists
-  用户属性: User Attributes
+  保存属性: 属性を保存
+  删除属性: 属性を削除
+  同步全部头像: 全アバターを同期
+  属性 Key 不能为空: 属性キーを入力してください
+  属性 Key 不能重复：{key}: 属性キーが重複しています：{key}
+  悬浮点击编辑，或双击头像: ホバーしてクリックで編集、またはアバターをダブルクリック
+  把本机与云端的头像做一次双向合并；不参与日常自动同步: ローカルとクラウドのアバターを1回だけ双方向マージします（通常の自動同期には含まれません）
+  新增属性: 属性を追加
+  新建用户: 新規ユーザー
+  无法删除该用户: このユーザーは削除できません
+  正在同步头像…: アバターを同期中…
+  用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: ユーザー名には漢字・英数字・アンダースコア・ハイフンのみ使用でき、最大32文字までです。
+  用户名已存在: ユーザー名は既に存在します
+  用户属性: ユーザー属性
   ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Delete user \"{name}\"?\nThe user is removed from the current list and batch configs; associated data files are kept — re-adding the same name restores them."
-  ＋ 新建用户: ＋ New User
+  : "ユーザー「{name}」を削除しますか？\n現在のリストとバッチ設定から除外されますが、関連データファイルは保持されます。同じ名前で再追加すると復元できます。"
+  ＋ 新建用户: ＋ 新規ユーザー
 user_toolbar:
-  上一个用户: Previous User
-  下一个用户: Next User
+  上一个用户: 前のユーザー
+  下一个用户: 次のユーザー

@@ -1,117 +1,116 @@
 common:
-  分组: Group
-  数字: Number
-  文本: Text
+  分组: グループ
+  数字: 数値
+  文本: テキスト
 menu_ops:
-  图库管理: Reference Manager
+  图库管理: 画像ライブラリ管理
 reference:
-  '  未导入图片': '  No image imported'
-  元数据字段定义已保存: Metadata field definitions saved
-  全部删除: Delete All
-  内置字段不可删除: Built-in fields cannot be deleted
-  内置字段，不可编辑或删除: Built-in field; cannot be edited or deleted
-  切割: Crop
-  切割结果: Crop Result
-  删除空间: Delete Space
-  删除选中的图库空间（含其全部参考图）: Delete the selected gallery space (including all its reference images)
-  匹配度阈值: Match Threshold
-  单cell尺寸: Cell Size
-  参数超出图片大小: Parameter exceeds image size
-  参考图信息: Reference Image Info
-  可筛选: Filterable
-  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
-  图片文件 (*.png *.jpg *.bmp *.webp): Image Files (*.png *.jpg *.bmp *.webp)
-  字段标识 (key): Field Identifier (key)
-  尚未切割: Not yet split
-  已填写的字段将应用到所有选中项: Filled fields will be applied to all selected items
-  应用到全部: Apply to All
-  应用设置: Apply Settings
-  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: Normalized coordinates x, y, w, h (0~1), e.g. 0, 0, 1, 0.5
-  执行切割: Execute Split
-  批量管理: Batch Management
-  提交到图库: Submit to Gallery
-  新增字段: Add Field
-  新建图库空间: New Gallery Space
-  新建空间: New Space
-  未填写: Not Filled
-  未框选区域: No Area Selected
-  清除网格: Clear Grid
-  生成网格: Generate Grid
-  留空则不修改: Leave empty to keep unchanged
-  粘贴 (Ctrl+V): Paste (Ctrl+V)
-  系统空间：可编辑其中内容，但不能删除该空间: 'System Space: its contents can be edited, but the space itself cannot be deleted'
-  网格参数: Grid Parameters
-  网格线间隔像素，用于过滤黑边: Grid line interval in pixels, for filtering black borders
-  裁剪区域 (x, y, w, h): Crop Area (x, y, w, h)
-  请先导入图片: Please import an image first
-  请先框选区域: Please select an area first
-  请至少选择一个参考图: Please select at least one reference image
-  输入元数据（用于筛选管理）: Enter metadata (for filter management)
-  输出元数据（识别时按区域 OCR）: Output metadata (OCR by region during recognition)
-  退出批量: Exit Batch
-  选择参考图片: Select Reference Image
-  "图库空间": "Gallery Space"
-  "宽": "Width"
-  "高": "Height"
-  "间隔": "Spacing"
-  "批量分组": "Batch Group"
-  "行": "Rows"
-  "列": "Columns"
-  "分组名非法": "Invalid group name"
-  "编辑图库空间": "Edit Gallery Space"
-  "保存空间展示名失败，详见日志": "Failed to save the space display name; see the log"
-  "空间 key": "Space key"
-  "key 是目录名与方案里的引用，不可修改；要换 key 请新建空间。展示名留空则直接显示 key。": "The key is the directory name and how plans refer to this space, so it cannot be changed; create a new space if you need a different one. Leave the display name empty to show the key itself."
-  "无法创建空间，详见日志": "Failed to create the space; see the log"
-  "空间 key 不能为空": "Space key cannot be empty"
-  "空间 key 不能包含路径分隔符或特殊字符": "Space key must not contain path separators or special characters"
-  "同名空间已存在": "A space with this name already exists"
-  "小写字母、数字与下划线，如 android": "Lowercase letters, digits and underscores, e.g. android"
-  "key 是目录名与方案里的引用，编辑时不可修改": "The key is the directory name and how plans refer to this space; it cannot be changed while editing"
-  "key 是目录名与方案里的引用，创建后不可修改。简体中文与英文必须填写。": "The key is the directory name and how plans refer to this space, so it cannot be changed after creation. Simplified Chinese and English are both required."
-  "简体中文与英文都必须填写": "Both Simplified Chinese and English are required"
+  '  未导入图片': '  画像がインポートされていません'
+  元数据字段定义已保存: メタデータフィールド定義を保存しました
+  全部删除: すべて削除
+  内置字段不可删除: 組み込みフィールドは削除できません
+  内置字段，不可编辑或删除: 組み込みフィールド（編集・削除不可）
+  切割: 切り抜き
+  切割结果: 切り抜き結果
+  删除空间: スペースを削除
+  删除选中的图库空间（含其全部参考图）: 選択した画像ライブラリスペースを削除します（配下の参照画像をすべて含む）
+  匹配度阈值: 一致度しきい値
+  单cell尺寸: 単一セルサイズ
+  参数超出图片大小: パラメータが画像サイズを超えています
+  参考图信息: 参照画像情報
+  可筛选: 絞り込み可能
+  图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: 画像認識の最低信頼度（0〜1）。この値未満は不一致とみなされます。高いほど厳密になります
+  图片文件 (*.png *.jpg *.bmp *.webp): 画像ファイル (*.png *.jpg *.bmp *.webp)
+  字段标识 (key): フィールド識別子 (key)
+  尚未切割: 未分割
+  已填写的字段将应用到所有选中项: 入力済みのフィールドは選択したすべての項目に適用されます
+  应用到全部: すべてに適用
+  应用设置: 設定を適用
+  归一化坐标 x, y, w, h（0~1），如 0, 0, 1, 0.5: 正規化座標 x, y, w, h（0〜1）、例：0, 0, 1, 0.5
+  执行切割: 分割を実行
+  批量管理: 一括管理
+  提交到图库: ライブラリに登録
+  新增字段: フィールドを追加
+  新建图库空间: 新規画像ライブラリスペース
+  新建空间: 新規スペース
+  未填写: 未入力
+  未框选区域: 領域未選択
+  清除网格: グリッドをクリア
+  生成网格: グリッドを生成
+  留空则不修改: 空欄のままにすると変更しません
+  粘贴 (Ctrl+V): 貼り付け (Ctrl+V)
+  系统空间：可编辑其中内容，但不能删除该空间: システムスペース：内容は編集できますが、スペース自体は削除できません
+  网格参数: グリッドパラメータ
+  网格线间隔像素，用于过滤黑边: グリッド線の間隔（ピクセル）。黒帯の除外に使用します
+  裁剪区域 (x, y, w, h): 切り抜き領域 (x, y, w, h)
+  请先导入图片: 先に画像をインポートしてください
+  请先框选区域: 先に領域を選択してください
+  请至少选择一个参考图: 参照画像を1つ以上選択してください
+  输入元数据（用于筛选管理）: 入力メタデータ（絞り込み管理用）
+  输出元数据（识别时按区域 OCR）: 出力メタデータ（認識時の領域別 OCR 用）
+  退出批量: 一括管理を終了
+  选择参考图片: 参照画像を選択
+  图库空间: 画像ライブラリスペース
+  宽: 幅
+  高: 高さ
+  间隔: 間隔
+  批量分组: 一括グループ
+  行: 行
+  列: 列
+  分组名非法: 無効なグループ名です
+  编辑图库空间: 画像ライブラリスペースを編集
+  保存空间展示名失败，详见日志: スペース表示名の保存に失敗しました。詳細はログを確認してください
+  空间 key: スペース key
+  key 是目录名与方案里的引用，不可修改；要换 key 请新建空间。展示名留空则直接显示 key。: key はディレクトリ名およびプラン内での参照名となるため変更できません。別の key が必要な場合は新規スペースを作成してください。表示名を空にすると key がそのまま表示されます。
+  无法创建空间，详见日志: スペースを作成できませんでした。詳細はログを確認してください
+  空间 key 不能为空: スペース key は空にできません
+  空间 key 不能包含路径分隔符或特殊字符: スペース key にパス区切り文字や特殊文字は使用できません
+  同名空间已存在: 同じ名前のスペースが既に存在します
+  小写字母、数字与下划线，如 android: 小文字英字・数字・アンダースコア（例：android）
+  key 是目录名与方案里的引用，编辑时不可修改: key はディレクトリ名およびプラン内での参照名となるため、編集時は変更できません
+  key 是目录名与方案里的引用，创建后不可修改。简体中文与英文必须填写。: key はディレクトリ名およびプラン内での参照名となるため、作成後は変更できません。簡体字中国語と英語は必須です。
+  简体中文与英文都必须填写: 簡体字中国語と英語の両方を入力してください
 user_avatar:
-  导入图片: Import Image
-
+  导入图片: 画像をインポート
 template:
-  模板按分组存放，与图库空间无关: Templates are stored by group and are unrelated to the gallery space
-  新增图像: Add Image
-  参考图管理: Reference Images
-  参考图元数据: Reference Metadata
-  模板图管理: Template Images
-  参考图: Reference image
-  模板图: Template image
-  写入目标: Write to
-  在画布上框选一个矩形即为模板图。分组留空写入 common；布局分组的模板由场景管理截取，这里不能写。: Draw one rectangle on the canvas to crop a template. Leave the group empty to write into "common"; layout groups are captured by the scene editor and cannot be written here.
-  模板名（不含分组）: Template name (without group)
-  测试匹配: Test match
-  保存到模板库: Save to template library
-  未导入图片: No image imported
-  裁剪模板: Crop template
-  模板至少需要 4×4 像素，请调整框选: A template needs at least 4×4 pixels; adjust the selection
-  请先填写模板名: Enter a template name first
-  模板名不能包含路径分隔符: The template name must not contain path separators
-  用法: Usage
-  像素 {w}×{h} ｜ 录制画布 {rw}×{rh}: Pixels {w}×{h} ｜ Recorded canvas {rw}×{rh}
-  分数 {score:.3f}（阈值 {threshold:.2f}）: Score {score:.3f} (threshold {threshold:.2f})
-  「{group}」是布局分组，模板由场景管理截取: '"{group}" is a layout group; its templates are captured by the scene editor'
-  模板「{name}」已存在，覆盖？: Template "{name}" already exists. Overwrite?
-  搜索模板名: Search template name
-  复制名字: Copy name
-  未被引用: Not referenced
-  标定样本：运行时按颜色比例判定，不参与模板匹配，永久保留: 'Calibration sample: judged by colour ratio at runtime, not used for template matching, kept permanently'
-  布局分组的模板由场景管理截取/删除，这里只读: Layout-group templates are captured/deleted by the scene editor; read-only here
-  重命名模板: Rename template
-  像素尺寸: Pixel size
-  录制画布: Recorded canvas
-  来源层: Layer
-  共享: Shared
-  标定样本，不参与匹配: Calibration sample, not used for matching
-  标定样本，不需要尺寸: Calibration sample, no size needed
-  删除模板: Delete template
-  删除失败，详见日志: Delete failed; see the log
-  未登记（同分辨率专用）: Not registered (same resolution only)
-  绑定 {n} 处: '{n} binding(s)'
-  脚本引用 {n} 处: '{n} script reference(s)'
-  确定删除模板「{name}」？{detail}: Delete template "{name}"?{detail}
-  模板详情: Template details
+  模板按分组存放，与图库空间无关: テンプレートはグループ単位で保存され、画像ライブラリスペースとは無関係です
+  新增图像: 画像を追加
+  参考图管理: 参照画像管理
+  参考图元数据: 参照画像メタデータ
+  模板图管理: テンプレート画像管理
+  参考图: 参照画像
+  模板图: テンプレート画像
+  写入目标: 書き込み先
+  在画布上框选一个矩形即为模板图。分组留空写入 common；布局分组的模板由场景管理截取，这里不能写。: キャンバス上に矩形を描画するとテンプレート画像になります。グループを空にすると common に保存されます。レイアウトグループのテンプレートはシーンエディタで取得するため、ここからは書き込めません。
+  模板名（不含分组）: テンプレート名（グループ名除く）
+  测试匹配: 照合テスト
+  保存到模板库: テンプレートライブラリに保存
+  未导入图片: 画像がインポートされていません
+  裁剪模板: テンプレートを切り抜き
+  模板至少需要 4×4 像素，请调整框选: テンプレートは最低 4×4 ピクセル必要です。選択範囲を調整してください
+  请先填写模板名: 先にテンプレート名を入力してください
+  模板名不能包含路径分隔符: テンプレート名にパス区切り文字は使用できません
+  用法: 用途
+  像素 {w}×{h} ｜ 录制画布 {rw}×{rh}: ピクセル {w}×{h} ｜ 記録キャンバス {rw}×{rh}
+  分数 {score:.3f}（阈值 {threshold:.2f}）: スコア {score:.3f}（しきい値 {threshold:.2f}）
+  「{group}」是布局分组，模板由场景管理截取: 「{group}」はレイアウトグループです。テンプレートはシーンエディタで取得します
+  模板「{name}」已存在，覆盖？: テンプレート「{name}」は既に存在します。上書きしますか？
+  搜索模板名: テンプレート名を検索
+  复制名字: 名前をコピー
+  未被引用: 未参照
+  标定样本：运行时按颜色比例判定，不参与模板匹配，永久保留: キャリブレーションサンプル：実行時に色比率で判定され、テンプレート照合には使用されません（永久保持）
+  布局分组的模板由场景管理截取/删除，这里只读: レイアウトグループのテンプレートはシーンエディタで取得・削除されます（ここでは読み取り専用）
+  重命名模板: テンプレート名を変更
+  像素尺寸: ピクセルサイズ
+  录制画布: 記録キャンバス
+  来源层: ソースレイヤー
+  共享: 共有
+  标定样本，不参与匹配: キャリブレーションサンプル（照合対象外）
+  标定样本，不需要尺寸: キャリブレーションサンプル（サイズ不要）
+  删除模板: テンプレートを削除
+  删除失败，详见日志: 削除に失敗しました。詳細はログを確認してください
+  未登记（同分辨率专用）: 未登録（同解像度専用）
+  绑定 {n} 处: バインド {n} 箇所
+  脚本引用 {n} 处: スクリプト参照 {n} 箇所
+  确定删除模板「{name}」？{detail}: テンプレート「{name}」を削除しますか？{detail}
+  模板详情: テンプレート詳細

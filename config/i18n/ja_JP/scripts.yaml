@@ -1,233 +1,251 @@
 common:
-  btn_save: Save
-  placeholder: "Recorded output appears here (canvas-normalized coordinates, savable as .wf)\nLow precision creates editable commands; high precision saves a raw input trace; F9/F10/F11/F12 are ignored"
-  title: Script Config
+  btn_save: 保存
+  placeholder: '録画結果がここに表示されます（キャンバス正規化座標、.wf として保存可能）
+
+    低精度は編集可能なコマンドを生成、高精度は生の入力トレースを保存（F9/F10/F11/F12 は無視）'
+  title: スクリプト設定
   上移: 上へ
   下移: 下へ
-  '内置类: ': 'Built-in class: '
-  参数: Parameters
-  录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: Recorded output appears here (canvas-normalized coordinates, savable as .wf)
-  系统: System
-  脚本文件不存在: Script file not found
+  '内置类: ': '組み込みクラス: '
+  参数: パラメータ
+  录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: 録画結果がここに表示されます（キャンバス正規化座標、.wf として保存可能）
+  系统: システム
+  脚本文件不存在: スクリプトファイルが存在しません
 daily_history:
-  专用: Dedicated
+  专用: 専用
   日常: デイリー
 menu_ops:
-  脚本编辑: Script Editing
+  脚本编辑: スクリプト編集
 reference:
-  显示名: Display Name
+  显示名: 表示名
 run_control:
-  未分组: Ungrouped
+  未分组: 未分類
 scripts:
-  ADB 模式暂不支持录制: ADB mode does not support recording yet
-  Unicode 字母/数字/下划线: Unicode letters/digits/underscores
-  '{path} 已存在。覆盖该位置的脚本？': '{path} already exists. Overwrite the script there?'
-  '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. Right-click it in the tree and "Copy to local" to modify.'
-  ■ 停止录制: ■ Stop Recording
-  ● 录制脚本: ● Record Script
-  ? "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n"
-  : "⚠ Script metadata unrecognizable; this script won't appear in the run list:\n"
-  上移选项: Move Option Up
-  下移选项: Move Option Down
-  不会被录制: Will not be recorded
-  不勾选: Unchecked
-  不支持：{kind}（请选择有效类型）: 'Unsupported: {kind} (pick a valid type)'
-  与内置函数重名，脚本运行时会被拒绝: Conflicts with a builtin name; the script will be rejected at runtime
-  丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。: Discard local changes to {name} and restore the {target} version? This cannot be undone.
-  主窗口有工作流在运行，先停止它: The main window has a running workflow; stop it first
-  仅用于脚本展示分组，不改变脚本性质或执行顺序: Only for script display grouping; doesn't change script nature or execution order
-  从代码重新加载: Reload from Code
-  代码: Code
-  代码中的元数据已变化，重新加载会丢弃元数据页尚未应用的修改。重新加载？: Metadata in the code has changed; reloading discards metadata-page changes not yet applied. Reload?
-  低精度: Low Precision
-  低精度录制中…连续移动将合并: Low-precision recording… continuous moves will be merged
-  保存为工作流文件: Save as Workflow File
-  保存到 workflows/{dir}: Save to workflows/{dir}
-  保存到 workflows/{dir}；显示名留空则用 id: Saves to workflows/{dir}; empty display name falls back to the id
-  修改会写回代码缓冲区，仍需点击“保存”才会落盘。: Changes write back to the code buffer; still click "Save" to persist.
-  值: Value
-  停在第 {n} 行（单步 = 执行这一行）: Stopped at line {n} (step = execute this line)
-  停止中…: Stopping…
-  元数据: Metadata
-  元数据与代码均已修改: Both metadata and code changed
-  元数据尚未应用: Metadata not yet applied
-  元数据无效: Invalid Metadata
-  元数据根节点必须是键值映射: The metadata root must be a mapping
-  元数据表单不可编辑：{error}: "The metadata form isn't editable: {error}"
-  内置: Built-in
-  内置函数: Built-in Functions
-  写入编辑区域: Write to Editor
-  切换类型会移除旧类型专属的设置。继续？: Switching the type removes the old type's settings. Continue?
-  删除脚本: Delete Script
-  删除脚本 {rel}？此操作不可恢复。: Delete script {rel}? This cannot be undone.
-  删除选项: Delete Option
-  勾选: Checked
-  单步: Step
-  单步…: Step…
-  单步模式：在第一条语句前停住: 'Step Mode: pause before the first statement'
-  占位提示: Placeholder
-  参数名: Parameter name
-  参数定义: Parameter Definitions
-  参数数: Params
-  参数解析失败: Failed to parse parameters
-  取画布: Take Canvas
-  变量名（不用写 $）: Variable name (no need to write $)
-  可批量运行: Batch-runnable
-  可独立运行: Standalone-runnable
-  同路径脚本已存在于 local。新建 system 文件后仍由 local 版本生效，继续？: A same-path script already exists in local. After creating the system file the local version still takes effect; continue?
-  同路径脚本已存在于另一保存位置。新建 local 文件会覆盖其运行效果，继续？: A same-path script already exists in another save location. Creating a local file overrides its runtime effect; continue?
-  含义: Meaning
-  '启动失败: {e}': 'Start failed: {e}'
-  声明默认值: Declared default value
-  复制到本地以修改: Copy to Local for Editing
-  复制录制结果: Copy Recording
-  多个条件（每行一个，全部满足）: Multiple conditions (one per line; all must hold)
-  存在尚未支持的声明：{keys}；请先在代码页处理: 'Unsupported declarations present: {keys}; handle them on the Code page first'
-  '完成，返回值: {rv}': 'Done, return value: {rv}'
-  定位到脚本: Locate in Script
-  将在下一条语句前暂停: Will pause before the next statement
-  展开: Expand
-  属性单元准备工作流: Attribute-unit prepare workflow
-  工作流运行中，无法录制: A workflow is running; cannot record
-  左侧选择脚本，或点「新建」: Select a script on the left, or click "New"
-  ? "已保存 {path}，但校验未通过：\n"
-  : "Saved {path}, but validation failed:\n"
-  已保存 {path}，语法与布局引用校验通过: Saved {path}; syntax and layout-reference checks passed
-  已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: "Written to the target, but the original file couldn't be removed: {error}. Check both scripts."
-  已写入编辑区域；请在编辑器中保存脚本: Written to the editor; save the script in the editor
-  已创建 {path}: Created {path}
-  已删除 {rel}: Deleted {rel}
-  已复制到剪贴板: Copied to the clipboard
-  已复制到本地，现在可以编辑: Copied to local; you can edit it now
-  已存在: Already Exists
-  已截图 {w}×{h}（画布裁剪后）: Captured {w}x{h} (after canvas crop)
-  已改名；原名：{name}: 'Renamed; was: {name}'
-  已有未清除的录制内容，请清除后再次点击「录制脚本」，避免覆盖丢失。: Uncleared recording content exists; clear it before clicking "Record Script" again to avoid overwriting.
-  已清除: Cleared
-  已用外部编辑器打开: Opened in the external editor
-  已还原为{target}版本: Restored to the {target} version
-  应用到代码: Apply to Code
-  开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: When enabled, pointer movement is recorded. When disabled, only standalone movement is ignored; clicks, holds, drags, and wheel events are still captured. It is usually unnecessary for ordinary UI actions, but should be enabled for game-camera rotation or other continuous movement.
-  异常退出: Exit on Exception
-  当前脚本不可编辑（系统脚本请先复制到本地），或已带有高精度轨迹: The current script isn't editable (copy system scripts to local first), or it already carries a high-precision track
-  录制: Record
-  录制内容尚未保存或复制到剪贴板，确定要关闭吗？: The recording hasn't been saved or copied; close anyway?
-  录制结束，可修改结果后「写入编辑区域」或「复制录制结果」: Recording finished; edit the result then "Write to Editor" or "Copy Recording"
-  录制结束，可编辑后保存为 .wf: Recording finished; edit then save as .wf
-  录制结束，未捕获到有效操作: Recording finished; no valid actions captured
-  录制结果: Recording
-  ? "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？"
-  : "The recording hasn't been written into the script that started it.\nSwitching scripts clears this recording; continue?"
-  录制轨迹引用超出工作流目录：{ref}: 'The recording track reference escapes the workflows directory: {ref}'
-  录制鼠标移动: Record Mouse Movement
-  待机 | 点击「录制脚本」: Standby | click "Record Script"
-  待机 | 点击「录制脚本」或按: Idle | Click "Record Script" or press
-  或点击停止: or click Stop
-  所需能力: Required Capability
-  执行: Run
-  执行结果显示在这里: Results appear here
-  批量检查: Batch Check
-  找不到录制轨迹：{path}: 'Recording track not found: {path}'
-  找不到该函数: Function not found
-  找不到过程 {name} 的定义: Definition of proc {name} not found
-  把录制结果按语句插入代码编辑器的光标处: Inserts the recording into the code editor at the cursor, as statements
-  ? "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？"
-  : "System script {name} must be copied to local before it can be modified.\nAfter copying, this file no longer follows system updates. Continue?"
-  指令: Command
-  插件: Plugins
-  插入到脚本: Insert into Script
-  插入区域: Insert Region
-  插入坐标: Insert Coordinate
-  插入颜色: Insert Color
-  搜索函数名或说明: Search function names or descriptions
-  搜索指令：点击 / 等待 / 找图 / 颜色…: 'Search commands: Click / Wait / Find Image / Color…'
-  收起: Collapse
-  放弃修改？: Discard changes?
-  放弃录制结果？: Discard the recording?
-  新增选项: Add Option
-  新建脚本: New Script
-  无主窗口，无法截图: No main window; cannot take a screenshot
-  无主窗口，无法获取运行环境: No main window; cannot get the runtime environment
-  无效的保存位置: Invalid save location
-  '无法加载布局: {layout_name}': 'Cannot load layout: {layout_name}'
-  无法加载当前布局: Failed to load the current layout
-  无法加载当前布局做引用校验: Failed to load the current layout to validate references
-  '无法加载当前布局做引用校验: {e}': 'Failed to load the current layout to validate references: {e}'
-  无法开始录制: Cannot start recording
-  显示条件: Show Condition
-  显示环境: Show Environment
-  暴露: Expose
-  更改参数类型: Change Parameter Type
-  未声明（勾选）: Undeclared (checked)
-  未能写入：当前脚本不可编辑或已带有高精度轨迹: "Write failed: the current script isn't editable or already carries a high-precision track"
-  本地 (local): Local (local)
-  本地脚本: Local Scripts
-  本地覆盖系统: Local override of system
-  清除录制结果: Clear Recording
-  点: Point
-  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: Generates readable, directly editable WF DSL. On stop, key press/hold/release and following waits are merged where safe; continuous mouse moves and short waits are merged at ~100ms granularity. Good for regular UI flows and later hand-tuning; not for game camera moves that need exact raw-input replay.
-  留空 = id: Empty = id
-  留空使用默认值: Leave empty for defaults
-  目标位置已有 {path}。继续会覆盖目标，并在成功保存后移除原文件。: The target already has {path}. Continuing overwrites it and removes the original after a successful save.
-  目标位置已有不同的录制轨迹：{path}: 'The target already has a different recording track: {path}'
-  确定清除已录制的 DSL 内容吗？: Clear the recorded DSL content?
-  确认保存位置: Confirm Save Location
-  稳定脚本标识；修改后已有引用不会自动更新: Stable script identifier; existing references don't update automatically after a change
-  第 {index} 个参数不是字段映射: Parameter {index} is not a field mapping
-  第 {index} 个参数有未支持的字段：{keys}: 'Parameter {index} has unsupported fields: {keys}'
-  第 {index} 个参数的选项包含未支持的字段: Parameter {index}'s options contain unsupported fields
-  第 {line} 行第 {col} 列：语法错误: 'Line {line}, column {col}: syntax error'
-  系统 (system): System (system)
-  系统脚本不可删除；不想展示请在「脚本配置」取消勾选: System scripts cannot be deleted; uncheck them in "Script Config" instead
-  系统脚本只读——右键「复制到本地以修改」后才能保存: System scripts are read-only — right-click and choose "Copy to Local for Editing" before saving
-  系统脚本只读——右键「复制到本地以修改」后才能编辑: System scripts are read-only — right-click and choose "Copy to Local for Editing" to edit
-  系统（只读）: System (read-only)
-  脚本 id 不能为空: Script id cannot be empty
-  脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: Script id cannot start with _ (the discovery layer treats it as a temp file and skips it)
-  脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: Script id may only use Unicode letters, digits, and underscores, and must start with a letter
-  脚本 id（文件名）: Script id (file name)
-  脚本 {rel} 已存在，覆盖？: Script {rel} already exists. Overwrite?
-  脚本、录制结果或脚本配置有未保存的修改，放弃？: Scripts, recordings or script config have unsaved changes; discard?
-  脚本为空: Script Is Empty
-  脚本声明: Script Declarations
-  脚本录制: Script Recording
-  脚本性质: Script Nature
-  脚本配置: Script Config
-  脚本问题：{reason}: 'Script problem: {reason}'
-  覆盖目标脚本？: Overwrite the target script?
-  记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: Records the raw timeline of keyboard input, mouse buttons, wheel events, and optional pointer movement. Saving also creates a companion trace under workflows/lvtrace for timing closer to the original recording. This is suitable for timing-sensitive game-camera actions; the WF text cannot be moved without its companion trace file.
-  试算: Try Run
-  试算会真的执行脚本再调这个函数：别拿它跑耗时或来源不明的脚本，界面会一直卡到它返回。: "Try Run actually executes the script before calling this function: don't use it on slow or untrusted scripts — the UI blocks until it returns."
-  该函数需要引擎注入（_engine/_wf），只能在脚本执行时调用: This function needs engine injection (_engine/_wf) and can only be called while a script runs
-  语法检查通过（保存后会再做布局引用校验）: Syntax check passed (a layout-reference check runs again on save)
-  请先在“元数据”页点击“应用到代码”，再保存脚本。: Click "Apply to Code" on the Metadata page before saving the script.
-  请先在主窗口定位游戏窗口: Please locate the game window in the main window first
-  请先在主窗口扫描并定位窗口: Scan and locate a window in the main window first
-  请先选择或新建一个可编辑脚本，并保存已有高精度录制: Select or create an editable script first, and save any existing high-precision recording
-  '读取失败: {e}': 'Failed to read: {e}'
-  调试: Debug
-  迁移未完成: Migration incomplete
-  运行: Run
-  运行中…: Running…
-  运行时使用多行输入: Use multi-line input at runtime
-  运行环境: Runtime Environment
-  返回: Returns
-  还原为{target}: Restore to {target}
-  还原失败: Restore Failed
-  这份录制结果已写入编辑区域；清除后可开始新录制: This recording is already written to the editor; clear it to start a new recording
-  这份录制结果已写入，请清除后重新录制: This recording is written; clear it before recording again
-  这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改: This is a local copy of a {target} script and can't be deleted; right-click → Restore to drop local changes
-  选项: Options
-  高精度: High precision
-  高精度 WF 依赖配套轨迹文件，不能单独复制: The high-precision WF depends on its companion track file and can't be copied alone
-  高精度录制中…原始输入写入统一时间线: High-precision recording… raw inputs are written to a unified timeline
-  默认值: Default
-  默认勾选: Checked by default
-  默认状态: Default State
-  默认选项: Default Option
-  默认隐藏: Hidden by default
-  （无说明）: (no description)
-  （未声明）: (undeclared)
-  （未截图）: (No Screenshot)
-  专用: Dedicated
-  "录制精度": "Recording Precision"
+  ADB 模式暂不支持录制: ADB モードではまだ録画に対応していません
+  Unicode 字母/数字/下划线: Unicode 文字・数字・アンダースコア
+  '{path} 已存在。覆盖该位置的脚本？': '{path} は既に存在します。この場所のスクリプトを上書きしますか？'
+  '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} はシステムスクリプトです。編集するにはツリーで右クリックし「ローカルにコピーして編集」を選択してください。'
+  ■ 停止录制: ■ 録画停止
+  ● 录制脚本: ● スクリプト録画
+  ? '⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：
+
+    '
+  : '⚠ スクリプトのメタデータを認識できないため、このスクリプトは実行リストに表示されません：
+
+    '
+  上移选项: 選択肢を上へ移動
+  下移选项: 選択肢を下へ移動
+  不会被录制: 録画されません
+  不勾选: チェックなし
+  不支持：{kind}（请选择有效类型）: 未対応：{kind}（有効な型を選択してください）
+  与内置函数重名，脚本运行时会被拒绝: 組み込み関数と名前が重複しているため、実行時に拒否されます
+  丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。: '{name} のローカル変更を破棄し、{target} バージョンに戻しますか？この操作は元に戻せません。'
+  主窗口有工作流在运行，先停止它: メインウィンドウでワークフローが実行中です。先に停止してください
+  仅用于脚本展示分组，不改变脚本性质或执行顺序: スクリプトの表示グループ分けのみに使用され、性質や実行順序には影響しません
+  从代码重新加载: コードから再読み込み
+  代码: コード
+  代码中的元数据已变化，重新加载会丢弃元数据页尚未应用的修改。重新加载？: コード内のメタデータが変更されています。再読み込みするとメタデータページで未適用の変更が破棄されます。再読み込みしますか？
+  低精度: 低精度
+  低精度录制中…连续移动将合并: 低精度で録画中…連続移動は統合されます
+  保存为工作流文件: ワークフローファイルとして保存
+  保存到 workflows/{dir}: workflows/{dir} に保存
+  保存到 workflows/{dir}；显示名留空则用 id: workflows/{dir} に保存（表示名が空の場合は id を使用）
+  修改会写回代码缓冲区，仍需点击“保存”才会落盘。: 変更はコードバッファに書き戻されます。ディスクへ保存するには「保存」をクリックしてください。
+  值: 値
+  停在第 {n} 行（单步 = 执行这一行）: '{n} 行目で停止中（ステップ = この行を実行）'
+  停止中…: 停止中…
+  元数据: メタデータ
+  元数据与代码均已修改: メタデータとコードの両方が変更されています
+  元数据尚未应用: メタデータが未適用です
+  元数据无效: 無効なメタデータ
+  元数据根节点必须是键值映射: メタデータのルートはキー値マッピングである必要があります
+  元数据表单不可编辑：{error}: メタデータフォームは編集できません：{error}
+  内置: 組み込み
+  内置函数: 組み込み関数
+  写入编辑区域: 編集領域に書き込む
+  切换类型会移除旧类型专属的设置。继续？: 型を切り替えると旧型固有の設定が削除されます。続行しますか？
+  删除脚本: スクリプトを削除
+  删除脚本 {rel}？此操作不可恢复。: スクリプト {rel} を削除しますか？この操作は元に戻せません。
+  删除选项: 選択肢を削除
+  勾选: チェックあり
+  单步: ステップ
+  单步…: ステップ実行中…
+  单步模式：在第一条语句前停住: ステップモード：最初の文の前で一時停止
+  占位提示: プレースホルダー
+  参数名: パラメータ名
+  参数定义: パラメータ定義
+  参数数: パラメータ数
+  参数解析失败: パラメータの解析に失敗しました
+  取画布: キャンバス取得
+  变量名（不用写 $）: 変数名（$ は不要）
+  可批量运行: バッチ実行可能
+  可独立运行: 単独実行可能
+  同路径脚本已存在于 local。新建 system 文件后仍由 local 版本生效，继续？: 同じパスのスクリプトが local に既に存在します。system ファイルを作成しても local 版が優先されます。続行しますか？
+  同路径脚本已存在于另一保存位置。新建 local 文件会覆盖其运行效果，继续？: 同じパスのスクリプトが別の保存先に既に存在します。local ファイルを作成すると実行時に上書きされます。続行しますか？
+  含义: 説明
+  '启动失败: {e}': '起動に失敗しました: {e}'
+  声明默认值: 宣言されたデフォルト値
+  复制到本地以修改: ローカルにコピーして編集
+  复制录制结果: 録画結果をコピー
+  多个条件（每行一个，全部满足）: 複数条件（1行につき1つ、すべてを満たす必要あり）
+  存在尚未支持的声明：{keys}；请先在代码页处理: 未対応の宣言が含まれています：{keys}。先にコードページで処理してください
+  '完成，返回值: {rv}': '完了、戻り値: {rv}'
+  定位到脚本: スクリプトへ移動
+  将在下一条语句前暂停: 次の文の前で一時停止します
+  展开: 展開
+  属性单元准备工作流: 属性ユニット準備ワークフロー
+  工作流运行中，无法录制: ワークフロー実行中のため録画できません
+  左侧选择脚本，或点「新建」: 左側からスクリプトを選択するか、「新規作成」をクリックしてください
+  ? '已保存 {path}，但校验未通过：
+
+    '
+  : '{path} を保存しましたが、検証に失敗しました：
+
+    '
+  已保存 {path}，语法与布局引用校验通过: '{path} を保存しました。構文およびレイアウト参照の検証に合格しました'
+  已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: 保存先へ書き込みましたが、元のファイルを削除できませんでした：{error}。両方のスクリプトを確認してください。
+  已写入编辑区域；请在编辑器中保存脚本: 編集領域に書き込みました。エディタでスクリプトを保存してください
+  已创建 {path}: '{path} を作成しました'
+  已删除 {rel}: '{rel} を削除しました'
+  已复制到剪贴板: クリップボードにコピーしました
+  已复制到本地，现在可以编辑: ローカルにコピーしました。編集できます
+  已存在: 既に存在します
+  已截图 {w}×{h}（画布裁剪后）: '{w}×{h} をキャプチャしました（キャンバス切り抜き後）'
+  已改名；原名：{name}: 名前を変更しました（旧名：{name}）
+  已有未清除的录制内容，请清除后再次点击「录制脚本」，避免覆盖丢失。: 未クリアの録画内容があります。上書きによる消失を防ぐため、クリアしてから再度「スクリプト録画」をクリックしてください。
+  已清除: クリアしました
+  已用外部编辑器打开: 外部エディタで開きました
+  已还原为{target}版本: '{target} バージョンに復元しました'
+  应用到代码: コードに適用
+  开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: オンにするとマウス移動の軌跡を記録します。オフの場合は単純な移動のみを無視し、クリック・長押し・ドラッグ・ホイールは通常どおり録画されます。通常の UI 操作では不要ですが、ゲーム視点の回転など連続的な移動を再現したい場合にオンにしてください。
+  异常退出: 例外で終了
+  当前脚本不可编辑（系统脚本请先复制到本地），或已带有高精度轨迹: 現在のスクリプトは編集不可（システムスクリプトは先にローカルへコピーしてください）、または高精度トレースを含んでいます
+  录制: 録画
+  录制内容尚未保存或复制到剪贴板，确定要关闭吗？: 録画内容が保存またはコピーされていません。閉じてもよろしいですか？
+  录制结束，可修改结果后「写入编辑区域」或「复制录制结果」: 録画が終了しました。結果を編集後、「編集領域に書き込む」または「録画結果をコピー」を実行できます
+  录制结束，可编辑后保存为 .wf: 録画が終了しました。編集後 .wf として保存できます
+  录制结束，未捕获到有效操作: 録画が終了しましたが、有効な操作が記録されませんでした
+  录制结果: 録画結果
+  ? '录制结果尚未写入开始录制时的脚本。
+
+    切换脚本将清除这份录制结果，是否继续？'
+  : '録画結果が録画開始時のスクリプトにまだ書き込まれていません。
+
+    スクリプトを切り替えるとこの録画結果は消去されます。続行しますか？'
+  录制轨迹引用超出工作流目录：{ref}: 録画トレース参照が workflows ディレクトリの範囲外です：{ref}
+  录制鼠标移动: マウス移動を録画
+  待机 | 点击「录制脚本」: 待機中 | 「スクリプト録画」をクリック
+  待机 | 点击「录制脚本」或按: 待機中 | 「スクリプト録画」をクリックまたは押下
+  或点击停止: または停止をクリック
+  所需能力: 必要な機能
+  执行: 実行
+  执行结果显示在这里: 実行結果がここに表示されます
+  批量检查: 一括チェック
+  找不到录制轨迹：{path}: 録画トレースが見つかりません：{path}
+  找不到该函数: 関数が見つかりません
+  找不到过程 {name} 的定义: プロシージャ {name} の定義が見つかりません
+  把录制结果按语句插入代码编辑器的光标处: 録画結果をコードエディタのカーソル位置に文として挿入します
+  ? '把系统脚本 {name} 复制到本地后才能修改。
+
+    复制之后这个文件不再跟随系统更新，确定？'
+  : 'システムスクリプト {name} を変更するにはローカルにコピーする必要があります。
+
+    コピー後、このファイルはシステム更新に追従しなくなります。続行しますか？'
+  指令: コマンド
+  插件: プラグイン
+  插入到脚本: スクリプトに挿入
+  插入区域: 領域を挿入
+  插入坐标: 座標を挿入
+  插入颜色: 色を挿入
+  搜索函数名或说明: 関数名または説明を検索
+  搜索指令：点击 / 等待 / 找图 / 颜色…: コマンド検索：クリック / 待機 / 画像検索 / 色…
+  收起: 折りたたむ
+  放弃修改？: 変更を破棄しますか？
+  放弃录制结果？: 録画結果を破棄しますか？
+  新增选项: 選択肢を追加
+  新建脚本: 新規スクリプト
+  无主窗口，无法截图: メインウィンドウがないためスクリーンショットを取得できません
+  无主窗口，无法获取运行环境: メインウィンドウがないため実行環境を取得できません
+  无效的保存位置: 無効な保存先です
+  '无法加载布局: {layout_name}': 'レイアウトを読み込めません: {layout_name}'
+  无法加载当前布局: 現在のレイアウトを読み込めません
+  无法加载当前布局做引用校验: 参照検証用の現在のレイアウトを読み込めません
+  '无法加载当前布局做引用校验: {e}': '参照検証用の現在のレイアウトを読み込めません: {e}'
+  无法开始录制: 録画を開始できません
+  显示条件: 表示条件
+  显示环境: 表示環境
+  暴露: 公開
+  更改参数类型: パラメータ型を変更
+  未声明（勾选）: 未宣言（チェックあり）
+  未能写入：当前脚本不可编辑或已带有高精度轨迹: 書き込み失敗：現在のスクリプトは編集不可、または高精度トレースを含んでいます
+  本地 (local): ローカル (local)
+  本地脚本: ローカルスクリプト
+  本地覆盖系统: ローカルがシステムを上書き
+  清除录制结果: 録画結果をクリア
+  点: 点
+  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: 読みやすく直接編集可能な WF DSL を生成します。録画停止時に安全に統合できるキー押下・長押し・解放および後続待機をまとめ、連続マウス移動と短い待機は約 100ms 粒度で集約します。通常の UI 操作や後からの手動調整に適していますが、生の入力イベント単位で厳密な再現が必要なゲーム視点操作には向きません。
+  留空 = id: 空欄 = id
+  留空使用默认值: 空欄でデフォルト値を使用
+  目标位置已有 {path}。继续会覆盖目标，并在成功保存后移除原文件。: 保存先に既に {path} が存在します。続行すると上書きされ、保存成功後に元のファイルが削除されます。
+  目标位置已有不同的录制轨迹：{path}: 保存先に別の録画トレースが既に存在します：{path}
+  确定清除已录制的 DSL 内容吗？: 録画済みの DSL 内容をクリアしますか？
+  确认保存位置: 保存先の確認
+  稳定脚本标识；修改后已有引用不会自动更新: 安定したスクリプト識別子です。変更しても既存の参照は自動更新されません
+  第 {index} 个参数不是字段映射: '{index} 番目のパラメータがフィールドマッピングではありません'
+  第 {index} 个参数有未支持的字段：{keys}: '{index} 番目のパラメータに未対応のフィールドがあります：{keys}'
+  第 {index} 个参数的选项包含未支持的字段: '{index} 番目のパラメータの選択肢に未対応のフィールドが含まれています'
+  第 {line} 行第 {col} 列：语法错误: '{line} 行 {col} 列：構文エラー'
+  系统 (system): システム (system)
+  系统脚本不可删除；不想展示请在「脚本配置」取消勾选: システムスクリプトは削除できません。非表示にする場合は「スクリプト設定」でチェックを外してください
+  系统脚本只读——右键「复制到本地以修改」后才能保存: システムスクリプトは読み取り専用です。保存するには右クリックして「ローカルにコピーして編集」を選択してください
+  系统脚本只读——右键「复制到本地以修改」后才能编辑: システムスクリプトは読み取り専用です。編集するには右クリックして「ローカルにコピーして編集」を選択してください
+  系统（只读）: システム（読み取り専用）
+  脚本 id 不能为空: スクリプト id は空にできません
+  脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: スクリプト id は _ で始められません（検出層が一時ファイルとしてスキップします）
+  脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: スクリプト id には Unicode 文字・数字・アンダースコアのみ使用でき、文字で始める必要があります
+  脚本 id（文件名）: スクリプト id（ファイル名）
+  脚本 {rel} 已存在，覆盖？: スクリプト {rel} は既に存在します。上書きしますか？
+  脚本、录制结果或脚本配置有未保存的修改，放弃？: スクリプト、録画結果、またはスクリプト設定に未保存の変更があります。破棄しますか？
+  脚本为空: スクリプトが空です
+  脚本声明: スクリプト宣言
+  脚本录制: スクリプト録画
+  脚本性质: スクリプト種別
+  脚本配置: スクリプト設定
+  脚本问题：{reason}: スクリプトの問題：{reason}
+  覆盖目标脚本？: 保存先スクリプトを上書きしますか？
+  记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: キーボード・マウスボタン・ホイールおよび任意のマウス移動の生タイムラインを記録します。保存時に workflows/lvtrace 配下へ対応するトレースファイルも生成され、録画時に近いタイミングで再生できるためゲーム視点など高精度な時系列操作に適しています。WF テキストのみをコピーして移行することはできません。
+  试算: 試算
+  试算会真的执行脚本再调这个函数：别拿它跑耗时或来源不明的脚本，界面会一直卡到它返回。: 試算はスクリプトを実際に実行してからこの関数を呼び出します。時間のかかるスクリプトや出所不明のスクリプトでは実行しないでください（戻るまで UI がブロックされます）。
+  该函数需要引擎注入（_engine/_wf），只能在脚本执行时调用: この関数はエンジン注入（_engine/_wf）が必要なため、スクリプト実行中のみ呼び出せます
+  语法检查通过（保存后会再做布局引用校验）: 構文チェックに合格しました（保存時にレイアウト参照チェックを再実行します）
+  请先在“元数据”页点击“应用到代码”，再保存脚本。: スクリプトを保存する前に、「メタデータ」ページで「コードに適用」をクリックしてください。
+  请先在主窗口定位游戏窗口: 先にメインウィンドウでゲームウィンドウを特定してください
+  请先在主窗口扫描并定位窗口: 先にメインウィンドウでスキャンしてウィンドウを特定してください
+  请先选择或新建一个可编辑脚本，并保存已有高精度录制: 先に編集可能なスクリプトを選択または新規作成し、既存の高精度録画を保存してください
+  '读取失败: {e}': '読み込みに失敗しました: {e}'
+  调试: デバッグ
+  迁移未完成: 移行未完了
+  运行: 実行
+  运行中…: 実行中…
+  运行时使用多行输入: 実行時に複数行入力を使用
+  运行环境: 実行環境
+  返回: 戻り値
+  还原为{target}: '{target} に復元'
+  还原失败: 復元に失敗しました
+  这份录制结果已写入编辑区域；清除后可开始新录制: この録画結果は既に編集領域に書き込まれています。新しく録画するにはクリアしてください
+  这份录制结果已写入，请清除后重新录制: この録画結果は書き込み済みです。再録画するにはクリアしてください
+  这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改: これは {target} スクリプトのローカルコピーのため削除できません。右クリックから復元するとローカル変更を破棄できます
+  选项: 選択肢
+  高精度: 高精度
+  高精度 WF 依赖配套轨迹文件，不能单独复制: 高精度 WF は対応するトレースファイルに依存するため単独ではコピーできません
+  高精度录制中…原始输入写入统一时间线: 高精度で録画中…生入力を統一タイムラインに記録中
+  默认值: デフォルト値
+  默认勾选: デフォルトでチェック
+  默认状态: デフォルト状態
+  默认选项: デフォルト選択肢
+  默认隐藏: デフォルトで非表示
+  （无说明）: （説明なし）
+  （未声明）: （未宣言）
+  （未截图）: （スクリーンショットなし）
+  专用: 専用
+  录制精度: 録画精度

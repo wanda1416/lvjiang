@@ -1,35 +1,35 @@
 maps:
-  'HUD 场景不存在: {scene}': 'HUD scene does not exist: {scene}'
-  HUD 绑定 minimap_center 必须属于基础视图: HUD binding minimap_center must belong to the base view
-  'HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}': 'HUD binding minimap_center must reference a point; not found: {key}'
-  HUD 绑定 {attr} 必须属于 full 视图: HUD binding {attr} must belong to the full view
-  HUD 绑定 {attr} 必须属于基础视图: HUD binding {attr} must belong to the base view
-  'HUD 绑定 {attr} 必须引用区域，未找到: {key}': 'HUD binding {attr} must reference a region; not found: {key}'
-  POI key 必须以小写字母开头，仅含小写字母/数字/下划线: POI key must start with a lowercase letter and contain only lowercase letters, digits and underscores
-  POI {key} 坐标超出底图范围: POI {key} coordinates are outside the base map
-  POI 必须是键值映射: POI must be a mapping
-  base_image_sha256 必须是 64 位十六进制摘要: base_image_sha256 must be a 64-character hex digest
-  min_area 必须大于 0: min_area must be greater than 0
-  pois 必须是列表: pois must be a list
-  ui 必须是键值映射: ui must be a mapping
-  window_ratio 必须在 0.05–1 之间: window_ratio must be between 0.05 and 1
-  '{name} 必须是三元整数列表': '{name} must be a list of three integers'
-  '{name} 必须满足 H=0–180、S/V=0–255': '{name} must satisfy H=0–180, S/V=0–255'
-  '{name}地图': '{name} map'
-  地图 key 必须以小写字母开头，仅含小写字母/数字/下划线: Map key must start with a lowercase letter and contain only lowercase letters, digits and underscores
-  '地图不存在: {key}': 'Map does not exist: {key}'
-  地图名称不能为空: Map name cannot be empty
-  '地图名称已存在: {name}': 'Map name already exists: {name}'
-  地图图片与定义摘要不一致: Map image does not match the definition digest
-  地图定义必须是键值映射: Map definition must be a mapping
-  地图文件 {rel} 内的 key 为 {inner}，与文件名不一致: Map file {rel} declares key {inner}, which differs from the file name
-  地域名称不能为空，且 key 不得重复: Region name cannot be empty and keys must be unique
-  大地图: World Map
-  底图数据为空: Base map data is empty
-  底图文件名固定为 base.png: The base map file must be named base.png
-  探查图片名称不能为空，且 key 不得重复: Survey image names cannot be empty and keys must be unique
-  '探查图片引用了不存在的地域: {region}': 'Survey image references a nonexistent region: {region}'
-  探查图片必须有有效的 SHA256 摘要: Survey images must have a valid SHA256 digest
-  '探查图片缺失或摘要不匹配: {name}': 'Survey image missing or digest mismatch: {name}'
-  '未知导航模式: {mode}': 'Unknown navigation mode: {mode}'
-  '未知朝向识别方法: {method}': 'Unknown heading detection method: {method}'
+  "HUD 场景不存在: {scene}": "Cảnh HUD không tồn tại: {scene}"
+  HUD 绑定 minimap_center 必须属于基础视图: Liên kết HUD minimap_center phải thuộc chế độ xem cơ bản
+  "HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}": "Liên kết HUD minimap_center phải tham chiếu một tọa độ điểm; không tìm thấy: {key}"
+  "HUD 绑定 {attr} 必须属于 full 视图": "Liên kết HUD {attr} phải thuộc chế độ xem đầy đủ (full)"
+  "HUD 绑定 {attr} 必须属于基础视图": "Liên kết HUD {attr} phải thuộc chế độ xem cơ bản"
+  "HUD 绑定 {attr} 必须引用区域，未找到: {key}": "Liên kết HUD {attr} phải tham chiếu một vùng; không tìm thấy: {key}"
+  POI key 必须以小写字母开头，仅含小写字母/数字/下划线: "Khóa POI phải bắt đầu bằng chữ thường và chỉ chứa chữ thường, chữ số và dấu gạch dưới"
+  "POI {key} 坐标超出底图范围": "Tọa độ POI {key} vượt quá phạm vi bản đồ nền"
+  POI 必须是键值映射: "POI phải là một bảng ánh xạ khóa-giá trị"
+  base_image_sha256 必须是 64 位十六进制摘要: base_image_sha256 phải là chuỗi băm thập lục phân 64 ký tự
+  min_area 必须大于 0: min_area phải lớn hơn 0
+  pois 必须是列表: pois phải là một danh sách
+  ui 必须是键值映射: "ui phải là một bảng ánh xạ khóa-giá trị"
+  window_ratio 必须在 0.05–1 之间: window_ratio phải nằm trong khoảng 0.05–1
+  "{name} 必须是三元整数列表": "{name} phải là danh sách gồm ba số nguyên"
+  "{name} 必须满足 H=0–180、S/V=0–255": "{name} phải thỏa mãn H=0–180, S/V=0–255"
+  "{name}地图": "Bản đồ {name}"
+  地图 key 必须以小写字母开头，仅含小写字母/数字/下划线: "Khóa bản đồ phải bắt đầu bằng chữ thường và chỉ chứa chữ thường, chữ số và dấu gạch dưới"
+  "地图不存在: {key}": "Bản đồ không tồn tại: {key}"
+  地图名称不能为空: Tên bản đồ không được để trống
+  "地图名称已存在: {name}": "Tên bản đồ đã tồn tại: {name}"
+  地图图片与定义摘要不一致: Ảnh bản đồ không khớp với chuỗi băm trong định nghĩa
+  地图定义必须是键值映射: "Định nghĩa bản đồ phải là một bảng ánh xạ khóa-giá trị"
+  "地图文件 {rel} 内的 key 为 {inner}，与文件名不一致": "Tệp bản đồ {rel} khai báo khóa {inner}, không khớp với tên tệp"
+  地域名称不能为空，且 key 不得重复: Tên khu vực không được để trống và khóa không được trùng lặp
+  大地图: Bản đồ lớn
+  底图数据为空: Dữ liệu bản đồ nền trống
+  底图文件名固定为 base.png: Tên tệp bản đồ nền cố định là base.png
+  探查图片名称不能为空，且 key 不得重复: Tên ảnh khảo sát không được để trống và khóa không được trùng lặp
+  "探查图片引用了不存在的地域: {region}": "Ảnh khảo sát tham chiếu khu vực không tồn tại: {region}"
+  探查图片必须有有效的 SHA256 摘要: Ảnh khảo sát phải có chuỗi băm SHA256 hợp lệ
+  "探查图片缺失或摘要不匹配: {name}": "Thiếu ảnh khảo sát hoặc chuỗi băm không khớp: {name}"
+  "未知导航模式: {mode}": "Chế độ điều hướng không xác định: {mode}"
+  "未知朝向识别方法: {method}": "Phương pháp nhận diện hướng không xác định: {method}"

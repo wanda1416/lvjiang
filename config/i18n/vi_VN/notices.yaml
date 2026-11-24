@@ -1,143 +1,141 @@
 action_catalog:
-  通知: Notify
+  通知: Thông báo
 common:
-  checking: Checking...
-  close: Close
-  empty: No announcements
-  notice_version: Announcement version {version}
-  published_at: Published on {date}
-  refresh: Refresh
-  summary: Only reports with enough information to reproduce or diagnose the problem enter developer triage; acceptance does not promise a fix date.
-  title: Announcements
-  updated_at: Updated {date}
+  checking: Đang kiểm tra...
+  close: Đóng
+  empty: Không có thông báo
+  notice_version: "Phiên bản thông báo {version}"
+  published_at: "Đăng ngày {date}"
+  refresh: Làm mới
+  summary: Chỉ các báo cáo có đủ thông tin để tái hiện hoặc chẩn đoán sự cố mới được đưa vào phân loại của nhà phát triển; việc tiếp nhận không cam kết ngày sửa lỗi.
+  title: Thông báo
+  updated_at: "Cập nhật ngày {date}"
 menu_ops:
-  检查更新: Check for Updates
-  检查更新失败: Update check failed
+  检查更新: Kiểm tra cập nhật
+  检查更新失败: Kiểm tra cập nhật thất bại
 notices:
-  '{name}二维码获取失败：{error}；可点「打开赞助页面」': 'Failed to fetch the {name} QR code: {error}; you can click "Open sponsor page"'
-  下载该版本: Download This Version
-  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: No data is uploaded. You can enable it later in Settings → Network & Privacy.
-  不同意: Disagree
-  不收集: Do not collect
-  不收集什么: What not to collect
-  二维码已更新: QR code updated
-  仅用于所列功能改进，不公开发布原始数据: Only for improving the listed features; raw data is not published
-  使用交流和一般咨询请优先在群内讨论: For usage questions and general discussion, please ask in the group first
-  免责声明: Disclaimer
-  公告版本 {version}: Announcement version {version}
-  关于律匠: About LvJiang
-  刷新{name}二维码失败，已保留当前二维码：{error}: 'Failed to refresh the {name} QR code; keeping the current one: {error}'
-  刷新中...: Refreshing...
-  刷新二维码: Refresh QR Code
-  刷新失败，已保留当前二维码：{error}: 'Refresh failed; keeping the current QR code: {error}'
-  前往发布声明: Open Release Notes
-  匿名使用数据收集: Anonymous Usage Data Collection
-  反馈与建议: Feedback & Suggestions
-  发布于 {date}: Released {date}
-  发现新版本: New Version Available
-  同意后随时可在「配置管理 → 网络与隐私」关闭。: After agreeing, you can turn it off anytime via "Config Manager → Network & Privacy".
-  图片无法显示，请刷新或打开赞助页面: The image cannot be displayed; refresh or open the sponsor page
+  "{name}二维码获取失败：{error}；可点「打开赞助页面」": "Lấy mã QR {name} thất bại: {error}; bạn có thể bấm \"Mở trang tài trợ\""
+  下载该版本: Tải phiên bản này
+  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: "Không tải lên bất kỳ dữ liệu nào. Nếu sau này muốn tham gia, bạn có thể bật lại bất cứ lúc nào trong \"Quản lý cấu hình → Mạng và quyền riêng tư\"."
+  不同意: Không đồng ý
+  不收集: Không thu thập
+  不收集什么: Những gì không thu thập
+  二维码已更新: Đã cập nhật mã QR
+  仅用于所列功能改进，不公开发布原始数据: "Chỉ dùng để cải thiện các tính năng đã liệt kê, không công bố dữ liệu gốc"
+  使用交流和一般咨询请优先在群内讨论: "Đối với câu hỏi sử dụng và trao đổi chung, vui lòng thảo luận trong nhóm trước"
+  免责声明: Tuyên bố miễn trừ trách nhiệm
+  "公告版本 {version}": "Phiên bản thông báo {version}"
+  关于律匠: Giới thiệu LvJiang
+  "刷新{name}二维码失败，已保留当前二维码：{error}": "Làm mới mã QR {name} thất bại, đã giữ lại mã QR hiện tại: {error}"
+  刷新中...: Đang làm mới...
+  刷新二维码: Làm mới mã QR
+  "刷新失败，已保留当前二维码：{error}": "Làm mới thất bại, đã giữ lại mã QR hiện tại: {error}"
+  前往发布声明: Mở ghi chú phát hành
+  匿名使用数据收集: Thu thập dữ liệu sử dụng ẩn danh
+  反馈与建议: "Phản hồi & Đề xuất"
+  "发布于 {date}": "Phát hành ngày {date}"
+  发现新版本: Có phiên bản mới
+  同意后随时可在「配置管理 → 网络与隐私」关闭。: "Sau khi đồng ý, bạn có thể tắt bất cứ lúc nào trong \"Quản lý cấu hình → Mạng và quyền riêng tư\"."
+  图片无法显示，请刷新或打开赞助页面: "Không thể hiển thị hình ảnh, vui lòng làm mới hoặc mở trang tài trợ"
   好的: OK
-  实际会发送的数据长这样: The data actually sent looks like this
-  尚未获取到公告，点击“重新获取”进行同步。: No announcements fetched yet; click "Refresh" to sync.
-  开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: Enabling telemetry uploads related, unreported history from the last {days} days; records created while disabled remain stored locally.
-  当前为离线模式，仅显示本地公告缓存: Offline mode; showing the local announcement cache only
-  当前版本: Current Version
-  律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: LvJiang is free and open source. If it saves you time, you're welcome to buy the author a coffee.
-  忽略该提示: Ignore This Version
-  愿意贡献匿名使用数据，帮助改进律匠吗？: Would you like to contribute anonymous usage data to help improve LvJiang?
-  截图、日志、配置文件或其他未在上方列明的本地内容: Screenshots, logs, configuration files, or other local content not listed above
-  打开赞助页面: Open Sponsor Page
-  扫码加群: Scan to Join the Group
-  支持律匠: Support LvJiang
-  收集什么: What's Collected
-  暂无二维码，请获取最新二维码: No QR code yet; fetch the latest one
-  暂无公告: No announcements
-  更新于 {date}: Updated {date}
-  最新版本: Latest Version
-  本次发布暂无详细说明。: No detailed notes for this release.
-  检查中...: Checking...
-  正在获取…: Fetching…
-  正在获取公告...: Fetching announcements...
-  正在获取最新二维码...: Fetching the latest QR code...
-  正在获取最新二维码…: Fetching the latest QR code…
-  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: 'Once-daily launch record: LvJiang version, OS type, runtime environment, and a random identifier'
-  用来做什么: What It's Used For
-  离线模式下可查看缓存，暂不联网刷新: Cache viewable in offline mode; no online refresh for now
-  获取中...: Fetching...
-  '获取公告失败: {error}': 'Failed to fetch announcements: {error}'
-  获取失败，当前显示上次缓存：{error}: 'Fetch failed; showing the last cache: {error}'
-  许可证: License
-  该版本不再提醒: Don't remind me about this version
-  账号、姓名或其他能认出你是谁的信息: Your account, name, or any other information that could identify you
-  赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: Sponsoring is entirely voluntary — it buys no features, licenses or priority support, and affects nothing existing.
-  赞助律匠: Sponsor LvJiang
-  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: This ID is a random string generated on this machine; it doesn't contain your account or hardware info, but it does let us tell that records came from the same machine. You can reset it anytime in Settings.
-  重新获取: Refresh
-  公告: Announcements
-
-# ── 反馈与建议（0.15.18 改版）──
-'  （无）': '  (không có)'
+  实际会发送的数据长这样: Dữ liệu thực tế sẽ gửi có dạng như sau
+  尚未获取到公告，点击“重新获取”进行同步。: "Chưa lấy được thông báo, bấm \"Lấy lại\" để đồng bộ."
+  "开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。": "Sau khi bật sẽ gửi bổ sung dữ liệu lịch sử liên quan chưa báo cáo trong {days} ngày gần đây; các bản ghi khi tắt vẫn được lưu cục bộ."
+  当前为离线模式，仅显示本地公告缓存: "Đang ở chế độ ngoại tuyến, chỉ hiển thị bộ nhớ đệm thông báo cục bộ"
+  当前版本: Phiên bản hiện tại
+  律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: "LvJiang miễn phí và mã nguồn mở. Nếu công cụ giúp bạn tiết kiệm thời gian, bạn có thể tự nguyện mời tác giả một tách cà phê."
+  忽略该提示: Bỏ qua phiên bản này
+  愿意贡献匿名使用数据，帮助改进律匠吗？: "Bạn có muốn đóng góp dữ liệu sử dụng ẩn danh để giúp cải thiện LvJiang không?"
+  截图、日志、配置文件或其他未在上方列明的本地内容: "Ảnh chụp màn hình, nhật ký, tệp cấu hình hoặc nội dung cục bộ khác không liệt kê ở trên"
+  打开赞助页面: Mở trang tài trợ
+  扫码加群: Quét mã tham gia nhóm
+  支持律匠: Ủng hộ LvJiang
+  收集什么: Những gì được thu thập
+  暂无二维码，请获取最新二维码: "Chưa có mã QR, vui lòng lấy mã QR mới nhất"
+  暂无公告: Chưa có thông báo
+  "更新于 {date}": "Cập nhật ngày {date}"
+  最新版本: Phiên bản mới nhất
+  本次发布暂无详细说明。: Phiên bản phát hành này chưa có mô tả chi tiết.
+  检查中...: Đang kiểm tra...
+  正在获取…: Đang lấy…
+  正在获取公告...: Đang lấy thông báo...
+  正在获取最新二维码...: Đang lấy mã QR mới nhất...
+  正在获取最新二维码…: Đang lấy mã QR mới nhất…
+  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: "Bản ghi khởi động mỗi ngày một lần: phiên bản LvJiang, loại hệ điều hành, môi trường chạy và một mã định danh ngẫu nhiên"
+  用来做什么: Dùng để làm gì
+  离线模式下可查看缓存，暂不联网刷新: "Ở chế độ ngoại tuyến có thể xem bộ nhớ đệm, tạm không làm mới trực tuyến"
+  获取中...: Đang lấy...
+  "获取公告失败: {error}": "Lấy thông báo thất bại: {error}"
+  "获取失败，当前显示上次缓存：{error}": "Lấy dữ liệu thất bại, đang hiển thị bộ nhớ đệm lần trước: {error}"
+  许可证: Giấy phép
+  该版本不再提醒: Không nhắc lại phiên bản này
+  账号、姓名或其他能认出你是谁的信息: "Tài khoản, họ tên hoặc thông tin khác có thể nhận diện bạn"
+  赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: "Việc tài trợ hoàn toàn tự nguyện, không đổi lấy tính năng, giấy phép hay hỗ trợ ưu tiên, và không ảnh hưởng đến bất kỳ tính năng hiện có nào."
+  赞助律匠: Tài trợ LvJiang
+  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: "Mã định danh này là chuỗi ký tự ngẫu nhiên tạo trên máy bạn, không chứa thông tin tài khoản hay phần cứng, nhưng giúp chúng tôi biết nhiều bản ghi đến từ cùng một máy tính; bạn có thể đặt lại bất cứ lúc nào trong phần Cài đặt."
+  重新获取: Lấy lại
+  公告: Thông báo
+"  （无）": "  (không có)"
 GitHub 反馈: Phản hồi qua GitHub
-'{n}/{limit} 张': '{n}/{limit} ảnh'
+"{n}/{limit} 张": "{n}/{limit} ảnh"
 一句话说清问题或建议: Mô tả vấn đề hoặc đề xuất trong một dòng
-依次做了什么，点哪个按钮: Bạn đã làm gì theo từng bước, bấm nút nào
+依次做了什么，点哪个按钮: "Bạn đã làm gì theo từng bước, bấm nút nào"
 出现频率: Tần suất
 剪贴板里没有图片: Không có ảnh trong clipboard
-图片 (*.png *.jpg *.jpeg *.webp): Hình ảnh (*.png *.jpg *.jpeg *.webp)
-图片无效，无法作为附件: Ảnh không hợp lệ, không thể đính kèm
+"图片 (*.png *.jpg *.jpeg *.webp)": "Hình ảnh (*.png *.jpg *.jpeg *.webp)"
+图片无效，无法作为附件: "Ảnh không hợp lệ, không thể đính kèm"
 复现步骤: Các bước tái hiện
-复现细节（可选，填了更容易定位）: Chi tiết (không bắt buộc, giúp xác định nhanh hơn)
-复现细节：: 'Chi tiết:'
+复现细节（可选，填了更容易定位）: "Chi tiết (không bắt buộc, giúp xác định nhanh hơn)"
+复现细节：: "Chi tiết:"
 实际是什么样: Thực tế đã xảy ra gì
 实际结果: Kết quả thực tế
 将要提交的内容: Nội dung sẽ gửi
 已恢复上次未提交的草稿（截图需要重新粘贴），提交成功后草稿自动清除。: Đã khôi phục bản nháp chưa gửi (cần dán lại ảnh chụp); bản nháp sẽ bị xóa sau khi gửi thành công.
-已提交，编号 {id}。回复会发到 {email}。: Đã gửi với mã {id}. Phản hồi sẽ gửi tới {email}.
-已附加 1 张截图（已压缩到 {kb} KB）: Đã đính kèm 1 ảnh chụp (nén còn {kb} KB)
+"已提交，编号 {id}。回复会发到 {email}。": "Đã gửi với mã {id}. Phản hồi sẽ gửi tới {email}."
+"已附加 1 张截图（已压缩到 {kb} KB）": "Đã đính kèm 1 ảnh chụp (nén còn {kb} KB)"
 必填：回复会发到这个邮箱: Bắt buộc — phản hồi sẽ gửi tới địa chỉ này
 截图与日志: Ảnh chụp và nhật ký
 截图预览: Xem trước ảnh chụp
 提交: Gửi
-提交失败：{error}: 'Gửi thất bại: {error}'
-无法读取图片：{name}: 'Không đọc được ảnh: {name}'
-日志会自动遮盖本机用户目录、令牌、设备序号与匿名标识；截图里的账号、角色名、ADB 序列号需要你自己确认遮挡。提交前可以用「预览」核对全部内容。: Nhật ký được che tự động (thư mục người dùng, token, số sê-ri thiết bị, ID ẩn danh); trong ảnh chụp, bạn tự che tài khoản, tên nhân vật và ADB serial. Dùng «Xem trước» để kiểm tra toàn bộ trước khi gửi.
-日志片段（前 40 行，已脱敏）：: 'Đoạn nhật ký (40 dòng đầu, đã che):'
+"提交失败：{error}": "Gửi thất bại: {error}"
+"无法读取图片：{name}": "Không đọc được ảnh: {name}"
+日志会自动遮盖本机用户目录、令牌、设备序号与匿名标识；截图里的账号、角色名、ADB 序列号需要你自己确认遮挡。提交前可以用「预览」核对全部内容。: "Nhật ký được che tự động (thư mục người dùng, token, số sê-ri thiết bị, ID ẩn danh); trong ảnh chụp, bạn tự che tài khoản, tên nhân vật và ADB serial. Dùng «Xem trước» để kiểm tra toàn bộ trước khi gửi."
+日志片段（前 40 行，已脱敏）：: "Đoạn nhật ký (40 dòng đầu, đã che):"
 日志预览（将随反馈提交）: Xem trước nhật ký (sẽ gửi kèm)
-最多附加 {n} 张截图: Tối đa {n} ảnh chụp
+"最多附加 {n} 张截图": "Tối đa {n} ảnh chụp"
 本来应该是什么样: Đáng lẽ phải thế nào
 标题: Tiêu đề
-标题：{text}: 'Tiêu đề: {text}'
-正在上传附件 {done}/{total}：{name}: 'Đang tải tệp đính kèm {done}/{total}: {name}'
+"标题：{text}": "Tiêu đề: {text}"
+"正在上传附件 {done}/{total}：{name}": "Đang tải tệp đính kèm {done}/{total}: {name}"
 正在提交…: Đang gửi…
-正在提交，请稍候…: Đang gửi, vui lòng chờ…
+正在提交，请稍候…: "Đang gửi, vui lòng chờ…"
 正在补传附件…: Đang gửi lại tệp đính kèm…
-正文已提交，编号 {id}；{n} 个附件没传上去（{names}）。可以点「补传附件」重试，正文不会重复提交。: Đã gửi với mã {id}; {n} tệp đính kèm không gửi được ({names}). Bấm «Gửi lại tệp đính kèm» — nội dung sẽ không gửi lại.
-正文已提交，附件完成 {done}/{total}: Đã gửi nội dung, tệp đính kèm {done}/{total}
+"正文已提交，编号 {id}；{n} 个附件没传上去（{names}）。可以点「补传附件」重试，正文不会重复提交。": "Đã gửi với mã {id}; {n} tệp đính kèm không gửi được ({names}). Bấm «Gửi lại tệp đính kèm» — nội dung sẽ không gửi lại."
+"正文已提交，附件完成 {done}/{total}": "Đã gửi nội dung, tệp đính kèm {done}/{total}"
 没有找到日志文件: Không tìm thấy tệp nhật ký
-环境信息（自动采集，不含用户名/角色名/路径）：: 'Môi trường (thu thập tự động; không có tên người dùng, tên nhân vật hay đường dẫn):'
+环境信息（自动采集，不含用户名/角色名/路径）：: "Môi trường (thu thập tự động; không có tên người dùng, tên nhân vật hay đường dẫn):"
 移除所选: Xóa mục đã chọn
-类型：{label}（{key}）: 'Loại: {label} ({key})'
+"类型：{label}（{key}）": "Loại: {label} ({key})"
 粘贴截图 (Ctrl+V): Dán ảnh chụp (Ctrl+V)
-约 {kb} KB（已脱敏{suffix}）: khoảng {kb} KB (đã che{suffix})
-缺陷、功能建议、文档问题、账号同步问题都可以在这里提交；回复会发到你填写的邮箱。: Có thể gửi lỗi, đề xuất, vấn đề tài liệu và tài khoản/đồng bộ tại đây; phản hồi sẽ gửi tới email bạn điền.
-补传失败：{error}: 'Gửi lại thất bại: {error}'
+"约 {kb} KB（已脱敏{suffix}）": "khoảng {kb} KB (đã che{suffix})"
+缺陷、功能建议、文档问题、账号同步问题都可以在这里提交；回复会发到你填写的邮箱。: "Có thể gửi lỗi, đề xuất, vấn đề tài liệu và tài khoản/đồng bộ tại đây; phản hồi sẽ gửi tới email bạn điền."
+"补传失败：{error}": "Gửi lại thất bại: {error}"
 补传附件: Gửi lại tệp đính kèm
 详细描述: Mô tả chi tiết
-详细描述：: 'Mô tả:'
+详细描述：: "Mô tả:"
 详细规范: Quy định đầy đủ
 请填写标题: Vui lòng nhập tiêu đề
 请填写能收到回复的邮箱: Nhập email có thể nhận phản hồi
 请填写详细描述: Vui lòng mô tả
-还有 {n} 个附件没传上去：{names}: 'Vẫn còn {n} tệp đính kèm chưa gửi được: {names}'
+"还有 {n} 个附件没传上去：{names}": "Vẫn còn {n} tệp đính kèm chưa gửi được: {names}"
 这一天没有可用的日志文件: Không có tệp nhật ký cho ngày đó
-这张图太大，压到 {limit} KB 以内仍失败，请裁剪后重试: Ảnh quá lớn, sau khi nén vẫn vượt {limit} KB; hãy cắt bớt rồi thử lại
+"这张图太大，压到 {limit} KB 以内仍失败，请裁剪后重试": "Ảnh quá lớn, sau khi nén vẫn vượt {limit} KB; hãy cắt bớt rồi thử lại"
 选择图片…: Chọn ảnh…
-邮箱: Email
-邮箱：{text}: 'Email: {text}'
-附件已全部传上去，编号 {id}。: Đã gửi hết tệp đính kèm — {id}.
-附件：: 'Tệp đính kèm:'
+邮箱: Địa chỉ email
+"邮箱：{text}": "Địa chỉ email: {text}"
+"附件已全部传上去，编号 {id}。": "Đã gửi hết tệp đính kèm — {id}."
+附件：: "Tệp đính kèm:"
 附加最近日志: Đính kèm nhật ký gần đây
 预期结果: Kết quả mong đợi
 预览日志: Xem nhật ký
-，已截断: ', đã cắt bớt'
+，已截断: ", đã cắt bớt"

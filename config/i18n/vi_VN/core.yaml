@@ -1,148 +1,148 @@
 about:
-  仅限非商业使用: Non-commercial use only
+  仅限非商业使用: Chỉ dành cho mục đích phi thương mại
   律匠: LvJiang
-  本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。: This project is for learning and technical research only. Using automation tools to operate games may violate the relevant game's user agreement; users bear the consequences themselves.
-  本项目源码公开、免费使用: Open source and free to use
-  窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行: Window capture → region annotation → OCR → workflow execution
-  软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。: The software is provided as is, without warranty of any kind; the author is not liable for any loss caused by using it.
-  通用视觉 RPA 引擎: General-purpose Visual RPA Engine
+  本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。: Dự án này chỉ dành cho mục đích học tập và nghiên cứu kỹ thuật. Việc sử dụng công cụ tự động hóa để thao tác trò chơi có thể vi phạm điều khoản người dùng của trò chơi liên quan; người sử dụng tự chịu mọi hậu quả phát sinh.
+  本项目源码公开、免费使用: "Dự án mã nguồn mở, sử dụng miễn phí"
+  窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行: "Định vị & chụp cửa sổ → Đánh dấu vùng → Nhận diện OCR → Thực thi quy trình"
+  软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。: "Phần mềm được cung cấp theo nguyên trạng, không kèm theo bất kỳ bảo đảm nào; tác giả không chịu trách nhiệm đối với mọi tổn thất phát sinh từ việc sử dụng phần mềm này."
+  通用视觉 RPA 引擎: Công cụ RPA thị giác đa năng
 action_catalog:
-  秒: sec
+  秒: giây
 apk_release:
-  下载 {url} 失败：{err}: 'Failed to download {url}: {err}'
-  下载已取消: Download cancelled
+  "下载 {url} 失败：{err}": "Tải {url} thất bại: {err}"
+  下载已取消: Đã hủy tải xuống
   ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
-  : "Checksum mismatch; the file may be corrupted or tampered with\nExpected {want}\nActual {got}"
+  : "Mã kiểm tra không khớp, tệp có thể bị hỏng hoặc bị chỉnh sửa\nKỳ vọng {want}\nThực tế {got}"
 batch_report:
-  '## 汇总': '## Summary'
-  成功: Succeeded
-  执行通道中断，整批已中止: Execution channel lost; the batch was aborted
-  通道中断（整批中止）: Channel interrupted (batch aborted)
-  （未执行任何脚本）: ' (no script was executed)'
-  （正常完成）: (Completed Normally)
+  "## 汇总": "## Tổng hợp"
+  成功: Thành công
+  执行通道中断，整批已中止: "Kênh thực thi bị gián đoạn, toàn bộ lô đã hủy"
+  通道中断（整批中止）: Gián đoạn kênh (toàn bộ lô đã hủy)
+  （未执行任何脚本）: " (chưa thực thi kịch bản nào)"
+  （正常完成）: (Hoàn thành bình thường)
 batch_scheduler:
-  已停止: Stopped
+  已停止: Đã dừng
 cli:
-  不注册全局热键（留给另一实例）；不启动 MCP 服务: Do not register global hotkeys (leave them to another instance); do not start the MCP service
-  注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用: 'Register and load a plugin: NAME (built-in or plugins/) or NAME@PATH (any directory); repeatable'
-  通用视觉 RPA 引擎（支持插件扩展）: General-purpose vision RPA engine (plugin-extensible)
-  额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg: Load all built-in plugins and everything in the default plugins/ directory without individual -reg flags
+  不注册全局热键（留给另一实例）；不启动 MCP 服务: Không đăng ký phím tắt toàn cục (nhường cho phiên bản khác); không khởi động dịch vụ MCP
+  "注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用": "Đăng ký và tải tiện ích bổ sung: NAME (tích hợp sẵn hoặc trong plugins/) hoặc NAME@PATH (thư mục bất kỳ); có thể dùng nhiều lần"
+  通用视觉 RPA 引擎（支持插件扩展）: Công cụ RPA thị giác đa năng (hỗ trợ mở rộng bằng tiện ích)
+  "额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg": "Tải thêm tất cả tiện ích tích hợp sẵn và mọi tiện ích trong thư mục mặc định plugins/ mà không cần truyền từng cờ -reg"
 common:
-  基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
-  画面异常: Screen error
-  画面无法解码: Cannot decode the screen
-  画面采集停摆: Capture stalled
-  连接断开: Disconnected
-  连接无响应: No response
-  采集进程退出: Capture process exited
+  基于 PyQt6 · RapidOCR · OpenCV: Xây dựng trên PyQt6 · RapidOCR · OpenCV
+  画面异常: Màn hình bất thường
+  画面无法解码: Không thể giải mã khung hình
+  画面采集停摆: Thu nhận khung hình bị đứng
+  连接断开: Mất kết nối
+  连接无响应: Kết nối không phản hồi
+  采集进程退出: Tiến trình thu hình đã thoát
 core_common:
-  DesktopCapture 已停止: DesktopCapture stopped
-  YAML 顶层必须是字典: YAML top level must be a dict
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off, or disabled by the system); please re-enable it'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap returned empty data (Shizuku not authorized?)'
-  config 中缺少 model_path: config is missing model_path
-  initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
-  pynput 未安装，无法录制: pynput is not installed; cannot record
-  全量: Full
-  分组名称不能为空: Group name cannot be empty
-  可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.
-  可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.
-  场景必须包含 key 和 name: Scene must contain key and name
-  基底视图不可删除，如需取消分层请取消多视图: The base view cannot be deleted; to remove layering, disable multi-view
-  截图失败：无障碍服务未连接或截图被节流: 'Screenshot failed: Accessibility Service not connected, or screenshots are being throttled'
-  截图编码失败: Screenshot encoding failed
-  '未知图色操作: {op}，可用: {ops}': 'Unknown pixel-color operation: {op}, available: {ops}'
-  画布尺寸非法: Invalid canvas size
-  空间不存在: Space does not exist
-  系统空间不可删除，可新建自己的空间: The system space cannot be deleted; create your own space instead
-  缺参照图或实时截图: Missing reference image or live screenshot
-  至少保留一个图库空间: At least one gallery space must be kept
-  至少需要保留一个场景分组: At least one scene group must be retained
-  还没有实时截图: No live screenshot yet
+  DesktopCapture 已停止: DesktopCapture đã dừng
+  YAML 顶层必须是字典: Cấp cao nhất của YAML phải là một từ điển
+  "[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启": "[A11yCapture] Dịch vụ Trợ năng chưa kết nối (chưa bật hoặc bị hệ thống tắt), vui lòng bật lại"
+  "[ShellCapture] screencap 返回空数据（Shizuku 未授权？）": "[ShellCapture] screencap trả về dữ liệu trống (Shizuku chưa được cấp quyền?)"
+  config 中缺少 model_path: Thiếu model_path trong config
+  initial_variables 必须是 JSON 对象: initial_variables phải là một đối tượng JSON
+  pynput 未安装，无法录制: "Chưa cài đặt pynput, không thể ghi lại thao tác"
+  全量: Toàn bộ
+  分组名称不能为空: Tên nhóm không được để trống
+  "可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试": "Có thể do sự cố mạng nên không thể truy cập {url} để lấy thông báo, vui lòng kiểm tra cài đặt mạng và thử lại"
+  "可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试": "Có thể do sự cố mạng nên không thể truy cập {url} để kiểm tra cập nhật, vui lòng kiểm tra cài đặt mạng và thử lại"
+  场景必须包含 key 和 name: Cảnh phải chứa cả key và name
+  基底视图不可删除，如需取消分层请取消多视图: Không thể xóa chế độ xem nền; nếu muốn bỏ phân lớp hãy tắt đa chế độ xem
+  截图失败：无障碍服务未连接或截图被节流: "Chụp màn hình thất bại: Dịch vụ Trợ năng chưa kết nối hoặc việc chụp màn hình đang bị giới hạn tần suất"
+  截图编码失败: Mã hóa ảnh chụp màn hình thất bại
+  "未知图色操作: {op}，可用: {ops}": "Thao tác màu ảnh không xác định: {op}, khả dụng: {ops}"
+  画布尺寸非法: Kích thước khung vẽ không hợp lệ
+  空间不存在: Không gian không tồn tại
+  系统空间不可删除，可新建自己的空间: "Không thể xóa không gian hệ thống, bạn có thể tạo không gian riêng"
+  缺参照图或实时截图: Thiếu ảnh tham chiếu hoặc ảnh chụp trực tiếp
+  至少保留一个图库空间: Phải giữ lại ít nhất một không gian thư viện ảnh
+  至少需要保留一个场景分组: Cần giữ lại ít nhất một nhóm cảnh
+  还没有实时截图: Chưa có ảnh chụp trực tiếp
 daily_history:
-  手机独立执行: On-device Execution
-  项: items
+  手机独立执行: Thực thi độc lập trên điện thoại
+  项: mục
 map_manager:
   key: key
 mobile:
-  向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活: Pushing configs to the phone requires Lv1 activation; activate under Settings → "Activation"
-  已标定: Calibrated
+  向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活: "Gửi cấu hình xuống điện thoại yêu cầu kích hoạt Lv1, vui lòng kích hoạt trong Cài đặt → \"Kích hoạt tính năng\""
+  已标定: Đã hiệu chỉnh
 notices:
-  同意: Agree
-  当前为离线模式，请关闭离线模式后刷新公告: Offline mode is on; turn it off to refresh announcements
+  同意: Đồng ý
+  当前为离线模式，请关闭离线模式后刷新公告: "Đang ở chế độ ngoại tuyến, vui lòng tắt chế độ ngoại tuyến trước khi làm mới thông báo"
 ocr_dialog:
-  名称不能为空: Name cannot be empty
+  名称不能为空: Tên không được để trống
 ondevice_runner:
-  当前 active_layout 不存在：{name}: 'The current active_layout does not exist: {name}'
-  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 'No layout available: session has no active_layout set, and the layouts.yaml roster is empty'
+  "当前 active_layout 不存在：{name}": "active_layout hiện tại không tồn tại: {name}"
+  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: "Không có bố cục khả dụng: session chưa chỉ định active_layout và danh sách layouts.yaml đang trống"
 platforms:
-  工作流暂停: Workflow Paused
-  工作流通知: Workflow Notification
+  工作流暂停: Quy trình đã tạm dừng
+  工作流通知: Thông báo quy trình
 profile:
-  Profile 变更脚本仍在执行，请等待队列完成后重命名: Profile change scripts are still running. Wait for the queue to finish before renaming
-  便利贴内容不能为空: Sticky note content cannot be empty
-  原列已被移除，请重新选择插入位置: The original column was removed; pick an insert position again
-  每周: Weekly
-  每天: Daily
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: "Kịch bản cập nhật Profile vẫn đang chạy, vui lòng đợi hàng đợi hoàn tất rồi mới đổi tên"
+  便利贴内容不能为空: Nội dung ghi chú dán không được để trống
+  原列已被移除，请重新选择插入位置: "Cột gốc đã bị xóa, vui lòng chọn lại vị trí chèn"
+  每周: Hằng tuần
+  每天: Hằng ngày
 profile_models:
-  备注: Notes
+  备注: Ghi chú
 profile_service:
-  仅可撤销写入记录: Only write records can be undone
-  历史记录不存在: The history record does not exist
-  只能撤销该用户此数据项的最新记录: Only the latest record of this data item for that user can be undone
-  当前数据项已不存在: The data item no longer exists
-  数据已发生变化，请刷新后重试: The data has changed; refresh and try again
-  该条历史已不存在或归属不匹配，请刷新后重试: That history entry no longer exists or belongs to someone else; refresh and try again
+  仅可撤销写入记录: Chỉ có thể hoàn tác bản ghi ghi dữ liệu
+  历史记录不存在: Bản ghi lịch sử không tồn tại
+  只能撤销该用户此数据项的最新记录: Chỉ có thể hoàn tác bản ghi mới nhất của mục dữ liệu này cho người dùng đó
+  当前数据项已不存在: Mục dữ liệu hiện tại không còn tồn tại
+  数据已发生变化，请刷新后重试: "Dữ liệu đã thay đổi, vui lòng làm mới và thử lại"
+  该条历史已不存在或归属不匹配，请刷新后重试: "Bản ghi lịch sử này không còn tồn tại hoặc không khớp chủ sở hữu, vui lòng làm mới và thử lại"
 run_control:
-  已恢复: Resumed
-  拒绝: Rejected
+  已恢复: Đã tiếp tục
+  拒绝: Từ chối
 scene_editor:
-  基底视图的 key 是保留值，不可重命名: The base view's key is reserved and cannot be renamed
-  多视图场景不能转为子场景，请先取消多视图: Multi-view scenes can't become sub-scenes; cancel multi-view first
-  布局名称不能为空: Layout name cannot be empty
-  通过: Passed
+  基底视图的 key 是保留值，不可重命名: "Khóa của chế độ xem nền là giá trị dành riêng, không thể đổi tên"
+  多视图场景不能转为子场景，请先取消多视图: "Cảnh đa chế độ xem không thể chuyển thành cảnh con, vui lòng tắt đa chế độ xem trước"
+  布局名称不能为空: Tên bố cục không được để trống
+  通过: Đạt
 scrcpy_capture:
-  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry
-  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy server failed to start (exit code {rc}): {detail}'
-  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'scrcpy protocol version changed unexpectedly: client implements {version}; {detail}'
-  启动 scrcpy server 失败：{error}: 'Failed to start the scrcpy server: {error}'
-  启动视频流失败：{error}: 'Failed to start the video stream: {error}'
-  找不到 scrcpy-server.jar：{path}: 'scrcpy-server.jar not found: {path}'
-  推送 scrcpy-server.jar 失败：{detail}: 'Failed to push scrcpy-server.jar: {detail}'
-  无法建立 scrcpy 视频端口转发: Could not set up the scrcpy video port forward
-  未安装 PyAV，无法解码视频流（请安装 av 依赖）: PyAV is not installed; the video stream cannot be decoded (install the av dependency)
-  画面流不可用: The screen stream is unavailable
-  等待新画面超时: Timed out waiting for a new frame
-  视频包长度异常，画面流已失步（需要重建会话）: Abnormal video packet length; the screen stream is out of sync (the session needs to be rebuilt)
-  视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: The video stream connection was closed by the peer (scrcpy session ended or cleaned up by another program)
-  视频流连接被中断：{error}: 'The video stream connection was interrupted: {error}'
-  读取视频流异常：{error}: 'Error while reading the video stream: {error}'
-  连接 scrcpy 视频端口超时（端口 {port}）: Timed out connecting to the scrcpy video port ({port})
-  "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "Still no video stream header after {seconds} s (scrcpy server failed to start or version mismatch)"
-  "解码线程异常退出：{error}": "Decode thread exited unexpectedly: {error}"
+  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: "Không nhận được khung hình đầu tiên trong 5 giây (thường xảy ra khi điện thoại tắt màn hình, khóa màn hình hoặc màn hình hiện tại không thể mã hóa); vui lòng bật sáng màn hình và thử lại"
+  "scrcpy server 启动失败（返回码 {rc}）：{detail}": "Khởi động scrcpy server thất bại (mã thoát {rc}): {detail}"
+  "scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}": "Phiên bản giao thức scrcpy thay đổi ngoài dự kiến: máy khách triển khai theo {version}, {detail}"
+  "启动 scrcpy server 失败：{error}": "Khởi động scrcpy server thất bại: {error}"
+  "启动视频流失败：{error}": "Khởi động luồng video thất bại: {error}"
+  "找不到 scrcpy-server.jar：{path}": "Không tìm thấy scrcpy-server.jar: {path}"
+  "推送 scrcpy-server.jar 失败：{detail}": "Đẩy tệp scrcpy-server.jar thất bại: {detail}"
+  无法建立 scrcpy 视频端口转发: Không thể thiết lập chuyển tiếp cổng video scrcpy
+  未安装 PyAV，无法解码视频流（请安装 av 依赖）: "Chưa cài đặt PyAV, không thể giải mã luồng video (vui lòng cài gói phụ thuộc av)"
+  画面流不可用: Luồng màn hình không khả dụng
+  等待新画面超时: Hết thời gian chờ khung hình mới
+  视频包长度异常，画面流已失步（需要重建会话）: "Độ dài gói video bất thường, luồng màn hình đã mất đồng bộ (cần tạo lại phiên)"
+  视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: Kết nối luồng video đã bị phía bên kia đóng (phiên scrcpy kết thúc hoặc bị chương trình khác dọn dẹp)
+  "视频流连接被中断：{error}": "Kết nối luồng video bị gián đoạn: {error}"
+  "读取视频流异常：{error}": "Lỗi khi đọc luồng video: {error}"
+  "连接 scrcpy 视频端口超时（端口 {port}）": "Hết thời gian kết nối tới cổng video scrcpy (cổng {port})"
+  "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "Sau {seconds} giây vẫn không đọc được phần đầu giao thức luồng video (scrcpy server khởi động thất bại hoặc sai phiên bản)"
+  "解码线程异常退出：{error}": "Luồng giải mã thoát bất thường: {error}"
 scripts:
-  '区域 ': 'Region '
-  检查: Check
+  "区域 ": "Vùng "
+  检查: Kiểm tra
 update:
-  当前为离线模式，请关闭离线模式后检查更新: Offline mode is on; turn it off to check for updates
-  无法获取版本信息: Failed to get version info
-  无法访问 {url} 获取更新：HTTP {code}: 'Unable to access {url} for updates: HTTP {code}'
+  当前为离线模式，请关闭离线模式后检查更新: "Đang ở chế độ ngoại tuyến, vui lòng tắt chế độ ngoại tuyến trước khi kiểm tra cập nhật"
+  无法获取版本信息: Không thể lấy thông tin phiên bản
+  "无法访问 {url} 获取更新：HTTP {code}": "Không thể truy cập {url} để kiểm tra cập nhật: HTTP {code}"
 wgc_capture:
-  后台截图仅支持 Windows: Background capture is Windows-only
-  '后台截图组件加载失败: ': 'Failed to load the background capture component: '
-  缺少 windows-capture 依赖，请重新安装或更新程序: The windows-capture dependency is missing; reinstall or update the program
+  后台截图仅支持 Windows: Chụp màn hình nền chỉ hỗ trợ Windows
+  "后台截图组件加载失败: ": "Tải thành phần chụp màn hình nền thất bại: "
+  "缺少 windows-capture 依赖，请重新安装或更新程序": "Thiếu gói phụ thuộc windows-capture, vui lòng cài lại hoặc cập nhật chương trình"
 workflows_common:
-  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules must be a non-empty mapping'
+  "pixel_ratios: rules 必须是非空字典": "pixel_ratios: rules phải là một từ điển không rỗng"
 android:
-  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: No first frame within 5 s (happens when the phone screen is off, locked, or the current screen cannot be encoded); turn the screen on and retry
-  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy server failed to start (exit code {rc}): {detail}'
-  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'scrcpy protocol version changed unexpectedly: client implements {version}; {detail}'
-  下载 {url} 失败：{err}: 'Failed to download {url}: {err}'
-  下载已取消: Download cancelled
+  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: "Không nhận được khung hình đầu tiên trong 5 giây (thường xảy ra khi điện thoại tắt màn hình, khóa màn hình hoặc màn hình hiện tại không thể mã hóa); vui lòng bật sáng màn hình và thử lại"
+  "scrcpy server 启动失败（返回码 {rc}）：{detail}": "Khởi động scrcpy server thất bại (mã thoát {rc}): {detail}"
+  "scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}": "Phiên bản giao thức scrcpy thay đổi ngoài dự kiến: máy khách triển khai theo {version}, {detail}"
+  "下载 {url} 失败：{err}": "Tải {url} thất bại: {err}"
+  下载已取消: Đã hủy tải xuống
 desktop:
-  DesktopCapture 已停止: DesktopCapture stopped
+  DesktopCapture 已停止: DesktopCapture đã dừng
 ondevice:
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Accessibility Service not connected (switch off or disabled by system); re-enable it'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap returned empty data (Shizuku not authorized?)'
-  config 中缺少 model_path: model_path missing from config
-  initial_variables 必须是 JSON 对象: initial_variables must be a JSON object
+  "[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启": "[A11yCapture] Dịch vụ Trợ năng chưa kết nối (chưa bật hoặc bị hệ thống tắt), vui lòng bật lại"
+  "[ShellCapture] screencap 返回空数据（Shizuku 未授权？）": "[ShellCapture] screencap trả về dữ liệu trống (Shizuku chưa được cấp quyền?)"
+  config 中缺少 model_path: Thiếu model_path trong config
+  initial_variables 必须是 JSON 对象: initial_variables phải là một đối tượng JSON

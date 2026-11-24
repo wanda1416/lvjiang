@@ -1,193 +1,193 @@
 agent_settings:
-  Agent 名称: Agent name
-  Agent 设置已保存: Agent settings saved
-  MCP 连接名称: MCP connection name
-  下载 Agent 链接: Agent download link
-  保存 Agent 设置: Save Agent Settings
-  删除所选: Delete Selected
-  添加 Agent: Add Agent
-  "配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。具体使用哪个 Agent 在调用它的功能页中选择；接入令牌不会保存在这里。": "Configure external Agent names and default export files, all via Streamable HTTP. Choose which Agent to use on the feature page that calls it; access tokens are not stored here."
-  默认导出文件: Default export file
+  Agent 名称: Tên Agent
+  Agent 设置已保存: Đã lưu cài đặt Agent
+  MCP 连接名称: Tên kết nối MCP
+  下载 Agent 链接: Liên kết tải Agent
+  保存 Agent 设置: Lưu cài đặt Agent
+  删除所选: Xóa mục đã chọn
+  添加 Agent: Thêm Agent
+  配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。具体使用哪个 Agent 在调用它的功能页中选择；接入令牌不会保存在这里。: "Cấu hình tên và tệp xuất mặc định của Agent bên ngoài, kết nối thống nhất qua Streamable HTTP. Chọn Agent cụ thể tại trang tính năng gọi nó; mã truy cập không được lưu ở đây."
+  默认导出文件: Tệp xuất mặc định
 ai_settings:
-  AI 配置已保存: AI settings saved
-  保存 AI 配置: Save AI Settings
-  保存失败，请检查配置目录权限: Save failed; check the config directory permissions
-  取消请求: Cancel Request
-  外部 Agent: External Agent
-  已获取 {count} 个模型；请选择模型后测试连接: Fetched {count} models; pick one and test the connection
-  接口根地址: API base URL
-  接口根地址通常以 /v1 结尾，不包含 /chat/completions。API Key 保存到系统凭据库，不进入配置文件或手机同步数据。: The API base URL usually ends with /v1 and excludes /chat/completions. The API key is stored in the system credential store, not in config files or phone sync data.
-  无需鉴权的本地服务可留空: Leave empty for local services that need no auth
-  服务返回的模型列表为空，可手动填写模型名称后测试连接: The service returned an empty model list; fill in a model name manually and test the connection
-  模型名称: Model name
-  模型接口: Model API
-  正在测试连接…: Testing connection…
-  正在获取模型列表…: Fetching model list…
-  测试连接: Test Connection
-  获取模型: Fetch Models
-  请求超时: Request timed out
-  连接可用，模型已返回文本回复（耗时 {seconds} 秒）: Connection works; the model replied with text (took {seconds} s)
-  配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。: Configure an OpenAI-compatible API for upcoming AI features. The connection test sends a short request to the selected model and may cost a little.
+  AI 配置已保存: Đã lưu cấu hình AI
+  保存 AI 配置: Lưu cấu hình AI
+  保存失败，请检查配置目录权限: "Lưu thất bại, vui lòng kiểm tra quyền thư mục cấu hình"
+  取消请求: Hủy yêu cầu
+  外部 Agent: Agent bên ngoài
+  "已获取 {count} 个模型；请选择模型后测试连接": "Đã lấy {count} mô hình; vui lòng chọn mô hình rồi kiểm thử kết nối"
+  接口根地址: URL gốc của API
+  接口根地址通常以 /v1 结尾，不包含 /chat/completions。API Key 保存到系统凭据库，不进入配置文件或手机同步数据。: "URL gốc của API thường kết thúc bằng /v1, không gồm /chat/completions. API Key được lưu trong kho thông tin xác thực hệ thống, không lưu vào tệp cấu hình hay dữ liệu đồng bộ điện thoại."
+  无需鉴权的本地服务可留空: Để trống với dịch vụ cục bộ không cần xác thực
+  服务返回的模型列表为空，可手动填写模型名称后测试连接: "Dịch vụ trả về danh sách mô hình trống, có thể nhập tên mô hình thủ công rồi kiểm thử kết nối"
+  模型名称: Tên mô hình
+  模型接口: API mô hình
+  正在测试连接…: Đang kiểm thử kết nối…
+  正在获取模型列表…: Đang lấy danh sách mô hình…
+  测试连接: Kiểm thử kết nối
+  获取模型: Lấy danh sách mô hình
+  请求超时: Yêu cầu hết thời gian chờ
+  "连接可用，模型已返回文本回复（耗时 {seconds} 秒）": "Kết nối hoạt động, mô hình đã phản hồi văn bản (mất {seconds} giây)"
+  配置 OpenAI 兼容接口，供后续 AI 功能使用。连接测试会向所选模型发送一条简短请求，可能产生少量费用。: Cấu hình API tương thích OpenAI cho các tính năng AI. Kiểm thử kết nối sẽ gửi một yêu cầu ngắn đến mô hình đã chọn và có thể phát sinh một khoản phí nhỏ.
 common:
   Activity: Activity
-  ai: AI Settings
-  btn_save: Save
-  execution: Execution Parameters
-  general: General Settings
-  title: Settings
-  包名: Package name
-  可执行文件: Executable
-  安卓截图: Android capture
-  安卓输入: Android input
-  期望方向: Expected orientation
-  窗口截图: Window capture
-  窗口标题: Window title
-  窗口输入: Window input
-  默认点击范围半径: Default tap range radius
+  ai: Cài đặt AI
+  btn_save: Lưu
+  execution: Tham số thực thi
+  general: Cài đặt chung
+  title: Cài đặt
+  包名: Tên gói
+  可执行文件: Tệp thực thi
+  安卓截图: Chụp màn hình Android
+  安卓输入: Đầu vào Android
+  期望方向: Hướng mong muốn
+  窗口截图: Chụp cửa sổ
+  窗口标题: Tiêu đề cửa sổ
+  窗口输入: Đầu vào cửa sổ
+  默认点击范围半径: Bán kính vùng nhấp mặc định
 menu_ops:
-  配置管理: Settings
+  配置管理: Cài đặt
 settings_dialog:
-  (未命名): (Unnamed)
-  ADB screencap 单帧截图: ADB screencap (single frame)
-  ADB shell input 指令执行: ADB shell input (command channel)
-  ADB 重连次数: ADB reconnect attempts
-  AI 设置: AI Settings
-  Android 连接设置: Android Connection Settings
-  Scrcpy 流式截图: Scrcpy Streaming Capture
-  一次性码首次激活需要联网，请先关闭完全离线模式。: One-time codes need internet on first activation; turn off full offline mode first.
-  不公开发布原始数据。: Raw data is not published.
-  了解详情: Learn More
-  仅 Windows 生效：开始执行前要求律匠以管理员身份运行: 'Windows only: requires LvJiang to run as administrator before starting'
-  仅上报匿名的运行环境信息，不含任何游戏内数据。: Only anonymous runtime environment info is reported; no in-game data.
-  从当前组合新建: New from Current Build
-  代理不可用时允许降级为 ADB 输入: Allow fallback to ADB input when the agent is unavailable
-  代理重连次数: Agent reconnect attempts
-  以下为系统级全局热键，保存后立即生效。: System-level global hotkeys below take effect immediately after saving.
-  会员包 v{version}: Member package v{version}
-  停止 / 结束: Stop / End
-  免绑定: No machine binding
-  公开配置修订 r{version}（{date} 同步）: Public config revision r{version} (synced {date})
-  公开配置：预置 r0: 'Public config: bundled r0'
-  写入 app.yaml，随安装包分发: Written to app.yaml, distributed with the installer
-  分发: Distribution
-  删除应用: Delete App
-  前台截图 (mss): Foreground capture (mss)
-  前台输入 (SendInput): Foreground Input (SendInput)
-  功能激活: Activation
-  参与匿名数据收集，帮助改进内置规则: Opt in to anonymous data collection to help improve built-in rules
-  参数 key: Parameter key
-  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: Adjusts only the content font size below the refresh toolbar in "User Overview" and "User Info", including list headers; the top toolbar buttons are unchanged.
-  可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: Below you can control announcements, version updates, remote config, and anonymous data reporting independently.
-  后台截图 (WGC，Beta): Background capture (WGC, Beta)
-  后台输入 (PostMessage): Background input (PostMessage)
-  启动时检查公告: Check Announcements on Startup
-  启动时检查新版本: Check for New Version on Startup
-  在线会员授权: Online Member Authorization
-  基础设置: Basic Settings
-  如 com.example.game: e.g. com.example.game
-  如 game: e.g. game
-  如 ios: e.g. ios
-  如 my_wait: e.g. my_wait
-  完全离线模式（暂停全部联网功能）: Fully Offline Mode (pause all network features)
+  (未命名): (Chưa đặt tên)
+  ADB screencap 单帧截图: ADB screencap (chụp từng khung)
+  ADB shell input 指令执行: ADB shell input (kênh lệnh)
+  ADB 重连次数: Số lần kết nối lại ADB
+  AI 设置: Cài đặt AI
+  Android 连接设置: Cài đặt kết nối Android
+  Scrcpy 流式截图: Chụp luồng Scrcpy
+  一次性码首次激活需要联网，请先关闭完全离线模式。: "Mã dùng một lần cần kết nối mạng khi kích hoạt lần đầu, vui lòng tắt chế độ hoàn toàn ngoại tuyến trước."
+  不公开发布原始数据。: Không công bố công khai dữ liệu gốc.
+  了解详情: Tìm hiểu thêm
+  仅 Windows 生效：开始执行前要求律匠以管理员身份运行: "Chỉ áp dụng trên Windows: yêu cầu LvJiang chạy với quyền quản trị viên trước khi bắt đầu"
+  仅上报匿名的运行环境信息，不含任何游戏内数据。: "Chỉ gửi thông tin môi trường chạy ẩn danh, không bao gồm bất kỳ dữ liệu trong trò chơi nào."
+  从当前组合新建: Tạo mới từ tổ hợp hiện tại
+  代理不可用时允许降级为 ADB 输入: Cho phép hạ cấp về đầu vào ADB khi tác nhân không khả dụng
+  代理重连次数: Số lần kết nối lại tác nhân
+  以下为系统级全局热键，保存后立即生效。: "Dưới đây là các phím tắt toàn cục cấp hệ thống, có hiệu lực ngay sau khi lưu."
+  "会员包 v{version}": "Gói hội viên v{version}"
+  停止 / 结束: Dừng / Kết thúc
+  免绑定: Không ràng buộc máy
+  "公开配置修订 r{version}（{date} 同步）": "Bản sửa đổi cấu hình công khai r{version} (đồng bộ {date})"
+  公开配置：预置 r0: "Cấu hình công khai: tích hợp sẵn r0"
+  写入 app.yaml，随安装包分发: "Ghi vào app.yaml, phân phối kèm bộ cài đặt"
+  分发: Phân phối
+  删除应用: Xóa ứng dụng
+  前台截图 (mss): Chụp nền trước (mss)
+  前台输入 (SendInput): Đầu vào nền trước (SendInput)
+  功能激活: Kích hoạt tính năng
+  参与匿名数据收集，帮助改进内置规则: Tham gia thu thập dữ liệu ẩn danh để giúp cải thiện quy tắc tích hợp sẵn
+  参数 key: Khóa tham số
+  只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏按钮保持不变。: "Chỉ điều chỉnh cỡ chữ nội dung bên dưới thanh công cụ làm mới trong \"Tổng quan người dùng\" và \"Thông tin người dùng\", bao gồm tiêu đề danh sách; các nút trên thanh công cụ phía trên giữ nguyên."
+  可在下方分别控制公告、版本更新、在线配置和匿名数据上报。: "Bạn có thể điều khiển riêng thông báo, cập nhật phiên bản, cấu hình trực tuyến và báo cáo dữ liệu ẩn danh bên dưới."
+  后台截图 (WGC，Beta): "Chụp nền sau (WGC, Beta)"
+  后台输入 (PostMessage): Đầu vào nền sau (PostMessage)
+  启动时检查公告: Kiểm tra thông báo khi khởi động
+  启动时检查新版本: Kiểm tra phiên bản mới khi khởi động
+  在线会员授权: Cấp phép hội viên trực tuyến
+  基础设置: Cài đặt cơ bản
+  如 com.example.game: "Ví dụ: com.example.game"
+  如 game: "Ví dụ: game"
+  如 ios: "Ví dụ: ios"
+  如 my_wait: "Ví dụ: my_wait"
+  完全离线模式（暂停全部联网功能）: Chế độ hoàn toàn ngoại tuyến (tạm dừng mọi tính năng mạng)
   ? 实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。
-  : "Experimental: many scripts don't work in this mode yet; unavailability reports are not accepted. Background capture screenshots the game even when covered by other windows, at slightly slower speed; it requires background window input too, and neither works when the window is minimized. This sets the default: the main window only auto-checks \"Background capture\" after you check \"Background mode\", and you can still change it any time during a run."
-  实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Experimental: the phone must have the LvJiang App installed with Accessibility Service enabled; this only changes the channel used for taps and swipes, not the screenshot method. Falls back to ADB shell input if the connection fails.'
-  尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: No connection info of this type yet; connect a device or locate a window in the main window first.
-  已下载待安装：{parts}（下次启动生效）: 'Downloaded pending install: {parts} (effective next launch)'
-  已复制: Copied
-  已开放: Open
-  已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: Announcement checks, version checks, remote config updates, and anonymous reporting are all paused; turning off offline mode restores your previous choices.
-  已绑定本机: Bound to this machine
-  常规设置: General Settings
-  '应用「{name}」的 Activity 格式无效: {activity}': 'App "{name}" has an invalid Activity format: {activity}'
-  '应用「{name}」的包名格式无效: {package}': 'App "{name}" has an invalid package name format: {package}'
-  应用「{name}」至少需要一个 Android 或 Windows 绑定: App "{name}" needs at least an Android or Windows binding
-  应用名不能为空: App name cannot be empty
-  '应用名重复: {name}': 'Duplicate app name: {name}'
-  应用注册: App Registration
-  建立流式传输尝试次数: Video Stream Attempts
+  : "Tính năng thử nghiệm: nhiều script tạm thời chưa chạy được ở chế độ này và không tiếp nhận phản hồi lỗi. Chụp nền sau cho phép chụp cửa sổ trò chơi ngay cả khi bị cửa sổ khác che khuất nhưng chậm hơn một chút; yêu cầu đầu vào cửa sổ cũng ở chế độ nền sau và không lấy được hình khi cửa sổ bị thu nhỏ. Đây là giá trị mặc định: giao diện chính chỉ tự động chọn \"Chụp nền sau\" sau khi bạn bật \"Chế độ nền sau\", và vẫn có thể đổi bất cứ lúc nào trong phiên chạy."
+  实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: "Tính năng thử nghiệm: điện thoại cần cài ứng dụng LvJiang và bật dịch vụ Trợ năng; chỉ thay đổi kênh thực thi chạm và vuốt, không thay đổi cách chụp màn hình. Tự động quay về ADB shell input khi kết nối thất bại."
+  尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: "Chưa có thông tin kết nối thuộc loại này, vui lòng kết nối thiết bị hoặc định vị cửa sổ trong cửa sổ chính trước."
+  "已下载待安装：{parts}（下次启动生效）": "Đã tải xuống chờ cài đặt: {parts} (có hiệu lực lần khởi động sau)"
+  已复制: Đã sao chép
+  已开放: Đã mở
+  已暂停公告检查、版本检查、在线配置更新和匿名数据上报；关闭离线模式后，将恢复之前的选择。: "Đã tạm dừng kiểm tra thông báo, kiểm tra phiên bản, cập nhật cấu hình trực tuyến và báo cáo dữ liệu ẩn danh; tắt chế độ ngoại tuyến sẽ khôi phục các lựa chọn trước đó."
+  已绑定本机: Đã liên kết với máy này
+  常规设置: Cài đặt chung
+  "应用「{name}」的 Activity 格式无效: {activity}": "Định dạng Activity của ứng dụng \"{name}\" không hợp lệ: {activity}"
+  "应用「{name}」的包名格式无效: {package}": "Định dạng tên gói của ứng dụng \"{name}\" không hợp lệ: {package}"
+  "应用「{name}」至少需要一个 Android 或 Windows 绑定": "Ứng dụng \"{name}\" cần ít nhất một liên kết Android hoặc Windows"
+  应用名不能为空: Tên ứng dụng không được để trống
+  "应用名重复: {name}": "Tên ứng dụng bị trùng: {name}"
+  应用注册: Đăng ký ứng dụng
+  建立流式传输尝试次数: Số lần thử tạo luồng video
   ? "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。"
-  : "What to do when a click/drag coordinate computed by the engine falls outside the captured frame.\nUnchecked (default): raise an error and end the run — out of bounds means the script's drag distance does not match the current panel geometry, and silently truncating turns \"scroll two rows\" into \"scroll one row\" with nothing in the script or the log to show it.\nChecked: the engine truncates to the frame edge, logs a warning and keeps running.\nThe check lives in the engine: on-device gestures reject such coordinates outright while desktop input and adb shell input accept them silently, so the backends cannot be relied on."
-  当前标识：未生成（未开启）: 'Current ID: not generated (disabled)'
-  手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: The Shizuku service process dies after a phone reboot, and tasks that restart the game depend on it. When enabled, connecting in on-device mode detects and starts it once (only if not already running).
-  执行参数: Execution Parameters
-  把激活码粘贴到这里，换行和空格会被自动忽略: Paste the activation code here; newlines and spaces are ignored
-  接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。: Receives official config and task updates matching the current app version, applied at next launch after verification. Your local configs always take priority; running tasks keep using what this process already loaded. Turning this off or going offline restores bundled content and removes member content at next launch, without touching local data.
-  接收在线配置更新: Receive Remote Config Updates
-  新方案: New plan
-  方案「{name}」至少要勾选一种连接模式: Plan "{name}" needs at least one connection mode
-  方案名称不能为空: Plan name cannot be empty
-  方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。: A plan binds gallery, environment and layout together and declares its connection modes and launch privilege requirements.
-  方案设置: Plan Settings
-  无法读取所连接窗口的可执行文件。: Cannot read the executable of the connected window.
-  显示名称: Display Name
-  暂停 / 恢复: Pause / Resume
-  最小化 / 恢复窗口: Minimize / Restore window
-  有效期: Validity
-  未单独标定点击区域时，落点框从区域中心向四边延伸的比例。0.25 = 落点覆盖区域中间的一半；必须小于 0.5: When no tap region is calibrated separately, the ratio the tap box extends from the region center to each edge. 0.25 = the tap covers the middle half; must be below 0.5
-  未知日期: Unknown Date
-  未识别到设备当前前台应用。: Could not identify the device's current foreground app.
-  本地激活：已激活: 'Local activation: active'
-  本地激活：未激活，高级功能不可用。: 'Local activation: inactive; advanced features unavailable.'
-  本机序列号: Machine serial
-  查看待上报数据: View Data to Be Reported
-  模式: Mode
-  横屏: Landscape
-  正在激活，请等待联网操作完成后关闭。: Activating; wait for the online operation to finish before closing.
-  正在验证激活码；一次性码将联网绑定本机…: Verifying the activation code; one-time codes will bind to this machine online…
-  每个应用可同时绑定 Android 与 Windows。运行时按当前实际连接目标选择绑定，与工作流环境无关；连接后可用对应的「获取连接信息」自动回填。: Each app can bind Android and Windows at once. At runtime the binding follows the actual connected target, independent of workflow environment; after connecting, the matching "Get connection info" fills it in automatically.
-  每次点击前的随机等待，模拟人类反应时间: Random wait before each click, simulating human reaction time
-  每次点击后的随机等待: Random wait after each click
-  永久: Permanent
-  添加参数: Add Parameter
-  添加应用: Add App
-  添加环境: "Add Environment\nSave first?'"
-  清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。: Clearing disables local advanced features. You can paste an activation code again to re-check local and online authorization.
-  清除激活: Clear Activation
-  激活: Activate
-  激活失败: Activation failed
-  激活成功。部分功能需要重新定位窗口后生效。: Activated. Some features take effect after re-locating the window.
-  激活码: Activation Code
-  点击前延迟(秒): Delay Before Click (sec)
-  点击后延迟(秒): Delay After Click (sec)
-  点击坐标附加 ±N 像素的随机偏移: Add a +/-N pixel random offset to the click coordinate
-  热键不能重复绑定同一个按键，请检查后重试: Hotkeys cannot be bound to the same key twice; please check and retry
-  环境 key: Environment key
-  用于重启后重新发现窗口: Used to rediscover the window after a restart
-  用户信息字号: User Info font size
-  用户总览字号: User Overview font size
-  界面语言: Interface Language
-  留空自动解析 Launcher: Leave empty to resolve the Launcher automatically
-  目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: Target Environment determines what env() returns in the DSL, used to distinguish navigation strategy between PC and mobile games. This is the environment the game runs in, not this machine's OS.
-  确定删除方案「{name}」吗？: Delete plan "{name}"?
-  空串不自动定位窗口: Empty string disables automatic window location
-  竖屏: Portrait
-  等待参数: Wait Parameters
-  等待范围(秒): Wait Range (sec)
-  管理员权限: Administrator privileges
-  系统参数: System Parameters
-  网络与隐私: Network & Privacy
-  获取信息: Get Info
-  获取连接信息: Get Connection Info
-  该热键只在「脚本编辑」工作台打开期间临时全局注册，对话框关闭后立即注销；其余热键在软件运行期间始终生效。: This hotkey is only temporarily registered globally while the "Script Editor" workbench is open, and unregistered the moment the dialog closes; all other hotkeys stay active while the app runs.
-  请先粘贴激活码: Paste an activation code first
-  读不到硬件标识（非 Windows 平台）: Hardware identity unavailable (non-Windows platform)
-  越界坐标自动截断: Auto-truncate out-of-bounds coordinates
-  连接方案: Connection Plans
-  连接端侧执行时自动启动 Shizuku 服务: Auto-start the Shizuku service when connecting in on-device mode
-  部分激活码不绑定机器，直接粘贴即可，不需要提供序列号。: Some activation codes aren't machine-bound — just paste them; no serial needed.
-  重置匿名标识: Reset Anonymous ID
-  重置后服务端会把你当成一个新用户，之前的记录无法再与新标识关联。确定重置吗？: After resetting, the server will treat you as a new user; previous records can no longer be linked to the new ID. Reset anyway?
-  重置标识: Reset ID
-  重试间隔（秒）: Retry interval (seconds)
-  需要绑定本机的激活码时，把这串序列号发给作者。它由主板标识算出，每次启动现算、不会存盘，也不包含任何可还原的硬件信息。: If your activation code is machine-bound, send this serial to the author. It's derived from the motherboard identity, computed at each launch, never stored, and contains no reversible hardware information.
-  首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: Used for both the initial stream setup and automatic recovery after a disconnect. Once exhausted the task waits for manual handling and never gives up by itself.
-  首次窗口定位后可自动获取: Can be filled automatically after the first window location
-  高级设置: Advanced Settings
+  : "Cách xử lý khi tọa độ nhấp/kéo do công cụ tính toán nằm ngoài khung hình.\nKhông chọn (mặc định): báo lỗi và kết thúc phiên chạy — vượt biên nghĩa là tham số dịch chuyển của script không khớp hình học bảng hiện tại, tự cắt biên sẽ âm thầm biến \"cuộn hai dòng\" thành \"cuộn một dòng\" mà script lẫn nhật ký đều không thấy.\nChọn: công cụ cắt về biên khung hình, ghi một cảnh báo và tiếp tục chạy.\nViệc kiểm tra diễn ra ở tầng công cụ: cùng tọa độ vượt biên, cử chỉ trợ năng trên thiết bị sẽ từ chối cứng, còn máy tính và adb shell input lại âm thầm chấp nhận nên không thể trông cậy vào phần phụ trợ."
+  当前标识：未生成（未开启）: "Định danh hiện tại: chưa tạo (chưa bật)"
+  手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: "Sau khi khởi động lại điện thoại, tiến trình dịch vụ Shizuku sẽ dừng, trong khi các tác vụ cần khởi động lại trò chơi phụ thuộc vào nó. Khi bật, kết nối ở chế độ trên thiết bị sẽ tự động kiểm tra và khởi chạy một lần (chỉ khi chưa chạy)."
+  执行参数: Tham số thực thi
+  把激活码粘贴到这里，换行和空格会被自动忽略: "Dán mã kích hoạt vào đây, ký tự xuống dòng và khoảng trắng sẽ tự động bị bỏ qua"
+  接收与当前应用版本匹配的官方配置和任务更新，校验通过后下次启动生效。你的本地配置始终优先；正在执行的任务继续使用本进程已经加载的配置。关闭此选项或进入离线模式后，下次启动会恢复预置并撤下会员内容，不影响本地数据。: "Nhận bản cập nhật cấu hình và tác vụ chính thức khớp với phiên bản ứng dụng hiện tại, có hiệu lực ở lần khởi động tiếp theo sau khi xác minh. Cấu hình cục bộ luôn được ưu tiên; tác vụ đang chạy tiếp tục dùng cấu hình đã nạp. Tắt tùy chọn này hoặc bật chế độ ngoại tuyến sẽ khôi phục bản tích hợp sẵn và gỡ nội dung hội viên ở lần khởi động sau mà không ảnh hưởng dữ liệu cục bộ."
+  接收在线配置更新: Nhận cập nhật cấu hình trực tuyến
+  新方案: Phương án mới
+  "方案「{name}」至少要勾选一种连接模式": "Phương án \"{name}\" cần chọn ít nhất một chế độ kết nối"
+  方案名称不能为空: Tên phương án không được để trống
+  方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。: "Phương án gắn kết thư viện ảnh, môi trường và bố cục thành một thể thống nhất, đồng thời khai báo chế độ kết nối và yêu cầu quyền khởi chạy."
+  方案设置: Cài đặt phương án
+  无法读取所连接窗口的可执行文件。: Không thể đọc tệp thực thi của cửa sổ đang kết nối.
+  显示名称: Tên hiển thị
+  暂停 / 恢复: Tạm dừng / Tiếp tục
+  最小化 / 恢复窗口: Thu nhỏ / Khôi phục cửa sổ
+  有效期: Thời hạn hiệu lực
+  "未单独标定点击区域时，落点框从区域中心向四边延伸的比例。0.25 = 落点覆盖区域中间的一半；必须小于 0.5": "Khi chưa hiệu chuẩn riêng vùng nhấp, đây là tỷ lệ khung điểm rơi mở rộng từ tâm vùng ra bốn cạnh. 0.25 = điểm rơi phủ một nửa ở giữa vùng; phải nhỏ hơn 0.5"
+  未知日期: Ngày không xác định
+  未识别到设备当前前台应用。: Không nhận diện được ứng dụng nền trước hiện tại của thiết bị.
+  本地激活：已激活: "Kích hoạt cục bộ: đã kích hoạt"
+  本地激活：未激活，高级功能不可用。: "Kích hoạt cục bộ: chưa kích hoạt, tính năng nâng cao không khả dụng."
+  本机序列号: "Số sê-ri máy này"
+  查看待上报数据: Xem dữ liệu chờ gửi
+  模式: Chế độ
+  横屏: Ngang
+  正在激活，请等待联网操作完成后关闭。: "Đang kích hoạt, vui lòng chờ thao tác mạng hoàn tất trước khi đóng."
+  正在验证激活码；一次性码将联网绑定本机…: Đang xác minh mã kích hoạt; mã dùng một lần sẽ kết nối mạng để liên kết máy này…
+  每个应用可同时绑定 Android 与 Windows。运行时按当前实际连接目标选择绑定，与工作流环境无关；连接后可用对应的「获取连接信息」自动回填。: "Mỗi ứng dụng có thể liên kết đồng thời Android và Windows. Khi chạy sẽ chọn liên kết theo đích kết nối thực tế, không phụ thuộc môi trường quy trình; sau khi kết nối có thể dùng \"Lấy thông tin kết nối\" tương ứng để tự điền."
+  每次点击前的随机等待，模拟人类反应时间: Chờ ngẫu nhiên trước mỗi lần nhấp để mô phỏng thời gian phản xạ của người
+  每次点击后的随机等待: Chờ ngẫu nhiên sau mỗi lần nhấp
+  永久: Vĩnh viễn
+  添加参数: Thêm tham số
+  添加应用: Thêm ứng dụng
+  添加环境: Thêm môi trường
+  清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。: "Sau khi xóa, các tính năng nâng cao cục bộ sẽ không khả dụng. Bạn có thể dán lại mã kích hoạt để kiểm tra lại trạng thái cấp phép cục bộ và trực tuyến."
+  清除激活: Xóa kích hoạt
+  激活: Kích hoạt
+  激活失败: Kích hoạt thất bại
+  激活成功。部分功能需要重新定位窗口后生效。: Kích hoạt thành công. Một số tính năng cần định vị lại cửa sổ để có hiệu lực.
+  激活码: Mã kích hoạt
+  点击前延迟(秒): Độ trễ trước khi nhấp (giây)
+  点击后延迟(秒): Độ trễ sau khi nhấp (giây)
+  点击坐标附加 ±N 像素的随机偏移: Thêm độ lệch ngẫu nhiên ±N pixel vào tọa độ nhấp
+  热键不能重复绑定同一个按键，请检查后重试: "Không thể gán trùng một phím cho nhiều phím tắt, vui lòng kiểm tra và thử lại"
+  环境 key: Khóa môi trường
+  用于重启后重新发现窗口: Dùng để tìm lại cửa sổ sau khi khởi động lại
+  用户信息字号: Cỡ chữ Thông tin người dùng
+  用户总览字号: Cỡ chữ Tổng quan người dùng
+  界面语言: Ngôn ngữ giao diện
+  留空自动解析 Launcher: Để trống để tự động phân giải Launcher
+  目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: "Môi trường đích quyết định giá trị trả về của env() trong DSL, dùng để phân biệt chiến lược điều hướng giữa game PC và game di động. Đây là môi trường nơi trò chơi chạy, không phải hệ điều hành của máy này."
+  "确定删除方案「{name}」吗？": "Bạn có chắc muốn xóa phương án \"{name}\" không?"
+  空串不自动定位窗口: Để trống để tắt tự động định vị cửa sổ
+  竖屏: Dọc
+  等待参数: Tham số chờ
+  等待范围(秒): Khoảng chờ (giây)
+  管理员权限: Quyền quản trị viên
+  系统参数: Tham số hệ thống
+  网络与隐私: "Mạng & Quyền riêng tư"
+  获取信息: Lấy thông tin
+  获取连接信息: Lấy thông tin kết nối
+  该热键只在「脚本编辑」工作台打开期间临时全局注册，对话框关闭后立即注销；其余热键在软件运行期间始终生效。: "Phím tắt này chỉ được đăng ký toàn cục tạm thời khi bàn làm việc \"Chỉnh sửa script\" đang mở và hủy ngay khi đóng hộp thoại; các phím tắt khác luôn có hiệu lực khi phần mềm đang chạy."
+  请先粘贴激活码: Vui lòng dán mã kích hoạt trước
+  读不到硬件标识（非 Windows 平台）: Không đọc được định danh phần cứng (không phải nền tảng Windows)
+  越界坐标自动截断: Tự động cắt tọa độ vượt biên
+  连接方案: Phương án kết nối
+  连接端侧执行时自动启动 Shizuku 服务: Tự động khởi chạy dịch vụ Shizuku khi kết nối ở chế độ trên thiết bị
+  部分激活码不绑定机器，直接粘贴即可，不需要提供序列号。: "Một số mã kích hoạt không ràng buộc máy, chỉ cần dán trực tiếp mà không cần cung cấp số sê-ri."
+  重置匿名标识: Đặt lại định danh ẩn danh
+  重置后服务端会把你当成一个新用户，之前的记录无法再与新标识关联。确定重置吗？: "Sau khi đặt lại, máy chủ sẽ coi bạn như người dùng mới và các bản ghi trước đó không thể liên kết với định danh mới nữa. Bạn có chắc muốn đặt lại không?"
+  重置标识: Đặt lại định danh
+  重试间隔（秒）: Khoảng cách thử lại (giây)
+  需要绑定本机的激活码时，把这串序列号发给作者。它由主板标识算出，每次启动现算、不会存盘，也不包含任何可还原的硬件信息。: "Khi cần mã kích hoạt ràng buộc máy này, hãy gửi chuỗi số sê-ri này cho tác giả. Mã được tính từ định danh bo mạch chủ mỗi lần khởi động, không lưu vào đĩa và không chứa thông tin phần cứng nào có thể đảo ngược."
+  首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: "Số lần này dùng chung cho lần thiết lập luồng video đầu tiên và tự động khôi phục sau khi ngắt kết nối; khi dùng hết sẽ chờ xử lý thủ công, không tự hủy tác vụ."
+  首次窗口定位后可自动获取: Có thể tự động lấy sau lần định vị cửa sổ đầu tiên
+  高级设置: Cài đặt nâng cao
   ? "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。"
-  : "By default the video stream is set up 5 times, then the agent is reconnected 5 times and ADB 5 times, 2 s apart. If it still fails, the task waits for manual handling with no timeout: Yes re-checks, No stops the task; closing the prompt does not stop it and the banner stays.\nMulti-touch and concurrent gestures are not downgraded. Inputs that may already have been sent are never replayed automatically. Applies to tasks started afterwards."
-  鼠标/触控移动到目标位置的耗时: Time for the mouse/touch to move to the target position
-  鼠标移动时长(秒): Mouse Move Duration (sec)
-  "坐标越界处理": "Out-of-Bounds Handling"
-  "坐标随机偏移(px)": "Random Coordinate Offset (px)"
-  "当前标识": "Current ID"
+  : "Mặc định thử tạo luồng video 5 lần, nếu thất bại sẽ kết nối lại tác nhân 5 lần và ADB 5 lần, cách nhau 2 giây. Nếu vẫn không khả dụng sẽ chờ xử lý thủ công không giới hạn: chọn Có để kiểm tra lại, chọn Không để dừng tác vụ tương ứng; đóng hộp thoại sẽ không dừng tác vụ và biểu ngữ phía trên vẫn giữ nguyên.\nKhông hạ cấp cử chỉ đa điểm và cử chỉ đồng thời. Không tự động gửi lại thao tác khi không chắc đã thực thi hay chưa. Cài đặt áp dụng cho các tác vụ khởi chạy sau."
+  鼠标/触控移动到目标位置的耗时: Thời gian di chuyển chuột/chạm tới vị trí mục tiêu
+  鼠标移动时长(秒): Thời lượng di chuyển chuột (giây)
+  坐标越界处理: Xử lý tọa độ vượt biên
+  坐标随机偏移(px): Độ lệch tọa độ ngẫu nhiên (px)
+  当前标识: Định danh hiện tại

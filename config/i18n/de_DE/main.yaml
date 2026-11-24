@@ -567,7 +567,9 @@ task_diagnostics_dialog:
   不完整: Unvollständig
   临时 / {total}: Gepinnt / {total}
   创建落盘目录失败：{error}: 'Dump-Ordner konnte nicht erstellt werden: {error}'
-  同步落盘到 logs: Frames in logs speichern
+  "开始落盘": "Speichern starten"
+  "停止落盘": "Speichern stoppen"
+  "回到最新": "Zum Neuesten"
   启用开发诊断模式并运行任务后，此处将实时展示识别用帧。: Aktiviere den Entwickler-Diagnosemodus und starte eine
     Aufgabe, um Erkennungsframes hier live anzuzeigen.
   已停止落盘（共写入 {count} 帧）→ {path}: Speichern gestoppt ({count} Frames) → {path}

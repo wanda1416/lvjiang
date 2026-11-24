@@ -6,15 +6,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QImage, QKeyEvent, QPixmap
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices, QFontDatabase, QImage, QKeyEvent, QPixmap
 from PyQt6.QtWidgets import (
+    QAbstractSpinBox,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSizePolicy,
     QSlider,
@@ -32,6 +34,10 @@ from ..core.task_diagnostics_dump import (
     parse_frame_metadata,
 )
 from ..i18n import tr
+from .widgets.button_styles import (
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
 
 
 def _decode_webp_pixmap(webp: bytes) -> QPixmap | None:
@@ -104,13 +110,14 @@ class TaskDiagnosticsDialog(QDialog):
         preview.setWordWrap(True)
         debug_layout.addWidget(preview)
 
-        # ── 紧凑设置行 ──
+        # ── 配置参数行（独立一行，避免窄窗与长译文挤压状态摘要）──
         controls_row = QHBoxLayout()
+        controls_row.setSpacing(8)
         self.enabled_check = QCheckBox(tr("启用开发诊断模式"))
         self.enabled_check.setChecked(diagnostics.options.enabled)
         controls_row.addWidget(self.enabled_check)
 
-        controls_row.addSpacing(12)
+        controls_row.addSpacing(8)
         controls_row.addWidget(QLabel(tr("最近帧上限")))
         self.frames_spin = QSpinBox()
         self.frames_spin.setRange(1, 10_000)
@@ -125,36 +132,62 @@ class TaskDiagnosticsDialog(QDialog):
         self.capacity_spin.setValue(max(1, diagnostics.options.max_bytes // 1_000_000))
         self.capacity_spin.setSuffix(" MB")
         controls_row.addWidget(self.capacity_spin)
-
         controls_row.addStretch(1)
-        self.summary_label = QLabel(tr("暂无诊断帧记录"))
-        controls_row.addWidget(self.summary_label)
         debug_layout.addLayout(controls_row)
 
-        # ── 落盘控制行 ──
+        # ── 落盘控制与运行摘要行 ──
         dump_row = QHBoxLayout()
-        self.dump_check = QCheckBox(tr("同步落盘到 logs"))
-        self.dump_check.setToolTip(
+        dump_row.setSpacing(8)
+        self.dump_dot_label = QLabel("●")
+        self.dump_dot_label.setStyleSheet("color: #888; font-size: 12px;")
+        dump_row.addWidget(self.dump_dot_label)
+
+        self.btn_dump_toggle = QPushButton(tr("开始落盘"))
+        self.btn_dump_toggle.setCheckable(True)
+        self.btn_dump_toggle.setToolTip(
             tr("开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录")
         )
-        dump_row.addWidget(self.dump_check)
+        apply_compact_button_style(self.btn_dump_toggle, variant="action")
+        dump_row.addWidget(self.btn_dump_toggle)
 
         self.dump_status_label = QLabel(tr("未开启落盘（仅内存缓存，退出清空）"))
+        self.dump_status_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
         dump_row.addWidget(self.dump_status_label, 1)
 
         self.btn_open_dump_dir = QPushButton(tr("打开目录"))
         self.btn_open_dump_dir.setEnabled(False)
+        apply_compact_button_style(self.btn_open_dump_dir, variant="neutral")
         dump_row.addWidget(self.btn_open_dump_dir)
         debug_layout.addLayout(dump_row)
 
-        # ── 中间帧元信息 + 大图预览区 ──
+        # ── 运行摘要与当前帧元信息 ──
+        self.summary_label = QLabel(tr("暂无诊断帧记录"))
+        debug_layout.addWidget(self.summary_label)
+
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(8)
         self.meta_label = QLabel(tr("启用开发诊断模式并运行任务后，此处将实时展示识别用帧。"))
         self.meta_label.setWordWrap(True)
-        debug_layout.addWidget(self.meta_label)
+        self.meta_label.setFont(
+            QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        )
+        meta_row.addWidget(self.meta_label, 1)
 
+        self.btn_return_latest = QPushButton(tr("回到最新"))
+        apply_compact_button_style(self.btn_return_latest, variant="action")
+        self.btn_return_latest.setVisible(False)
+        meta_row.addWidget(self.btn_return_latest)
+        debug_layout.addLayout(meta_row)
+
+        # ── 大图预览区 ──
         self.preview_label = QLabel(tr("暂无画面"))
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setFrameShape(QFrame.Shape.StyledPanel)
+        self.preview_label.setStyleSheet(
+            "QLabel { background-color: #1e1e1e; color: #bdbdbd; border-radius: 4px; }"
+        )
         self.preview_label.setSizePolicy(
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored
         )
@@ -163,21 +196,28 @@ class TaskDiagnosticsDialog(QDialog):
 
         # ── 底部轮播控制条 ──
         nav_row = QHBoxLayout()
+        nav_row.setSpacing(6)
         self.btn_first = QPushButton("|<")
         self.btn_first.setToolTip(tr("最早一帧 (Home)"))
-        self.btn_first.setFixedWidth(40)
         self.btn_prev = QPushButton("<")
         self.btn_prev.setToolTip(tr("上一帧 (←)"))
-        self.btn_prev.setFixedWidth(36)
         self.frame_slider = QSlider(Qt.Orientation.Horizontal)
         self.frame_slider.setRange(0, 0)
         self.frame_slider.setEnabled(False)
         self.btn_next = QPushButton(">")
         self.btn_next.setToolTip(tr("下一帧 (→)"))
-        self.btn_next.setFixedWidth(36)
         self.btn_last = QPushButton(">|")
         self.btn_last.setToolTip(tr("最新一帧 (End)"))
-        self.btn_last.setFixedWidth(40)
+        apply_compact_button_style(
+            self.btn_first,
+            self.btn_prev,
+            self.btn_next,
+            self.btn_last,
+            variant="neutral",
+        )
+        for btn in (self.btn_first, self.btn_prev, self.btn_next, self.btn_last):
+            btn.setMinimumWidth(34)
+
         self.follow_check = QCheckBox(tr("跟踪最新"))
         self.follow_check.setChecked(True)
         self.index_label = QLabel("0 / 0")
@@ -204,16 +244,18 @@ class TaskDiagnosticsDialog(QDialog):
         )  # Deliberately blank until a real GUI exists.
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        apply_dialog_button_box_style(buttons)
         buttons.rejected.connect(self.close)
         layout.addWidget(buttons)
 
-        # ── 信号绑定与定时刷新 ──
+        # ── 信号绑定、键盘导航拦截与定时刷新 ──
         self._sync_limits_enabled()
         self.enabled_check.toggled.connect(self._changed)
         self.frames_spin.valueChanged.connect(self._changed)
         self.capacity_spin.valueChanged.connect(self._changed)
-        self.dump_check.toggled.connect(self._on_dump_toggled)
+        self.btn_dump_toggle.toggled.connect(self._on_dump_toggled)
         self.btn_open_dump_dir.clicked.connect(self._open_dump_dir)
+        self.btn_return_latest.clicked.connect(self._jump_last)
         self.btn_first.clicked.connect(self._jump_first)
         self.btn_prev.clicked.connect(self._step_prev)
         self.btn_next.clicked.connect(self._step_next)
@@ -221,10 +263,19 @@ class TaskDiagnosticsDialog(QDialog):
         self.frame_slider.valueChanged.connect(self._on_slider_changed)
         self.follow_check.toggled.connect(self._on_follow_toggled)
 
+        self._install_keyboard_nav_filter()
+
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(250)
         self._poll_timer.timeout.connect(self.refresh_frames)
         self.refresh_frames()
+
+    def _install_keyboard_nav_filter(self) -> None:
+        """在非输入子控件上安装事件过滤器，防止 TabBar/按钮/滑块吞掉方向键切帧。"""
+        for child in self.findChildren(QWidget):
+            if isinstance(child, (QAbstractSpinBox, QLineEdit)):
+                continue
+            child.installEventFilter(self)
 
     # ─── 配置同步 ─────────────────────────────────────────
 
@@ -233,7 +284,17 @@ class TaskDiagnosticsDialog(QDialog):
         self.frames_spin.setEnabled(enabled)
         self.capacity_spin.setEnabled(enabled)
         has_frames = bool(self._current_frames) or self._pinned_frame is not None
-        self.dump_check.setEnabled(enabled or has_frames or self._dumper.active)
+        self.btn_dump_toggle.setEnabled(enabled or has_frames or self._dumper.active)
+
+    def _sync_dump_button_style(self, active: bool) -> None:
+        if active:
+            self.btn_dump_toggle.setText(tr("停止落盘"))
+            apply_compact_button_style(self.btn_dump_toggle, variant="danger")
+            self.dump_dot_label.setStyleSheet("color: #d93025; font-size: 12px;")
+        else:
+            self.btn_dump_toggle.setText(tr("开始落盘"))
+            apply_compact_button_style(self.btn_dump_toggle, variant="action")
+            self.dump_dot_label.setStyleSheet("color: #888; font-size: 12px;")
 
     def _changed(self, *_args) -> None:
         # 只在用户真的改动时回写：打开对话框不应把取整后的上限覆盖回去。
@@ -257,15 +318,18 @@ class TaskDiagnosticsDialog(QDialog):
             try:
                 session_dir = self._dumper.start()
             except OSError as exc:
-                self.dump_check.blockSignals(True)
-                self.dump_check.setChecked(False)
-                self.dump_check.blockSignals(False)
+                self.btn_dump_toggle.blockSignals(True)
+                self.btn_dump_toggle.setChecked(False)
+                self.btn_dump_toggle.blockSignals(False)
+                self._sync_dump_button_style(False)
                 self.dump_status_label.setText(
                     tr("创建落盘目录失败：{error}").format(error=exc)
                 )
+                self.dump_status_label.setToolTip(self.dump_status_label.text())
                 return
             self._last_dump_dir = session_dir
             self.btn_open_dump_dir.setEnabled(True)
+            self._sync_dump_button_style(True)
             # 先把临时区正在查看的图（可能已被 FIFO 淘汰）和当前缓存全部入队落盘
             initial_frames: list[DiagnosticFrame] = []
             if self._pinned_frame is not None:
@@ -280,6 +344,7 @@ class TaskDiagnosticsDialog(QDialog):
             return
         self._diagnostics.set_frame_listener(None)
         self._dumper.stop()
+        self._sync_dump_button_style(False)
         self._sync_limits_enabled()
         self._refresh_dump_status()
 
@@ -293,6 +358,7 @@ class TaskDiagnosticsDialog(QDialog):
             if self._dumper.error_count:
                 text += tr(" | 失败 {err}").format(err=self._dumper.error_count)
             self.dump_status_label.setText(text)
+            self.dump_status_label.setToolTip(str(session_dir))
         elif session_dir is not None:
             rel = self._format_dump_dir(session_dir)
             self.dump_status_label.setText(
@@ -300,8 +366,10 @@ class TaskDiagnosticsDialog(QDialog):
                     count=self._dumper.written_count, path=rel
                 )
             )
+            self.dump_status_label.setToolTip(str(session_dir))
         else:
             self.dump_status_label.setText(tr("未开启落盘（仅内存缓存，退出清空）"))
+            self.dump_status_label.setToolTip("")
 
     def _open_dump_dir(self) -> None:
         target = self._dumper.session_dir or self._last_dump_dir
@@ -434,22 +502,23 @@ class TaskDiagnosticsDialog(QDialog):
         if total > 0:
             self.frame_slider.setRange(0, total - 1)
             self.frame_slider.setEnabled(True)
-            if idx is not None:
-                self.frame_slider.setValue(idx)
+            self.frame_slider.setValue(idx if idx is not None else 0)
         else:
             self.frame_slider.setRange(0, 0)
             self.frame_slider.setValue(0)
             self.frame_slider.setEnabled(False)
         self.frame_slider.blockSignals(False)
 
+        in_temp_slot = idx is None and self._pinned_frame is not None
         self.btn_first.setEnabled(total > 0 and idx != 0)
-        self.btn_prev.setEnabled(total > 0 and (idx is None or idx > 0))
+        self.btn_prev.setEnabled(total > 0 and idx is not None and idx > 0)
         self.btn_next.setEnabled(total > 0 and (idx is None or idx < total - 1))
         self.btn_last.setEnabled(total > 0 and idx != total - 1)
+        self.btn_return_latest.setVisible(in_temp_slot and total > 0)
 
         if idx is not None:
             self.index_label.setText(f"{idx + 1} / {total}")
-        elif self._pinned_frame is not None:
+        elif in_temp_slot:
             self.index_label.setText(tr("临时 / {total}").format(total=total))
         else:
             self.index_label.setText(f"0 / {total}")
@@ -492,8 +561,9 @@ class TaskDiagnosticsDialog(QDialog):
         if not self._current_frames:
             return
         idx = self._find_pinned_index()
-        target = 0 if idx is None else max(0, idx - 1)
-        self._select_index(target, follow=False)
+        if idx is None or idx <= 0:
+            return
+        self._select_index(idx - 1, follow=False)
 
     def _step_next(self) -> None:
         if not self._current_frames:
@@ -504,21 +574,40 @@ class TaskDiagnosticsDialog(QDialog):
 
     # ─── 窗口事件与清理 ───────────────────────────────────
 
+    def _handle_nav_key(self, key: int) -> bool:
+        """在诊断调试页且焦点不在数字输入框时响应方向键/Home/End 切帧。"""
+        if self.tabs.currentIndex() != 0:
+            return False
+        if isinstance(self.focusWidget(), (QAbstractSpinBox, QLineEdit)):
+            return False
+        if key == Qt.Key.Key_Left:
+            self._step_prev()
+            return True
+        if key == Qt.Key.Key_Right:
+            self._step_next()
+            return True
+        if key == Qt.Key.Key_Home:
+            self._jump_first()
+            return True
+        if key == Qt.Key.Key_End:
+            self._jump_last()
+            return True
+        return False
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:  # noqa: N802 - Qt
+        if (
+            event is not None
+            and event.type() == QEvent.Type.KeyPress
+            and isinstance(event, QKeyEvent)
+            and self._handle_nav_key(event.key())
+        ):
+            return True
+        return super().eventFilter(obj, event)
+
     def keyPressEvent(self, event: QKeyEvent | None) -> None:  # noqa: N802 - Qt
         if event is None:
             return
-        key = event.key()
-        if key == Qt.Key.Key_Left:
-            self._step_prev()
-            return
-        if key == Qt.Key.Key_Right:
-            self._step_next()
-            return
-        if key == Qt.Key.Key_Home:
-            self._jump_first()
-            return
-        if key == Qt.Key.Key_End:
-            self._jump_last()
+        if self._handle_nav_key(event.key()):
             return
         super().keyPressEvent(event)
 
@@ -533,7 +622,7 @@ class TaskDiagnosticsDialog(QDialog):
         if not self._poll_timer.isActive():
             self._poll_timer.start()
 
-    def hideEvent(self, event) -> None:  # noqa: N802 - Qt
+    def hideEvent(self, event) -> None:
         self._poll_timer.stop()
         super().hideEvent(event)
 
@@ -542,9 +631,10 @@ class TaskDiagnosticsDialog(QDialog):
         self._diagnostics.set_frame_listener(None)
         if self._dumper.active:
             self._dumper.stop()
-            self.dump_check.blockSignals(True)
-            self.dump_check.setChecked(False)
-            self.dump_check.blockSignals(False)
+            self.btn_dump_toggle.blockSignals(True)
+            self.btn_dump_toggle.setChecked(False)
+            self.btn_dump_toggle.blockSignals(False)
+            self._sync_dump_button_style(False)
         self._pinned_frame = None
         self._pinned_pixmap = None
         self._pinned_key = None

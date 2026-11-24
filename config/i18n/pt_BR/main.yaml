@@ -453,7 +453,9 @@ task_diagnostics_dialog:
   不完整: Incompleto
   临时 / {total}: Fixado / {total}
   创建落盘目录失败：{error}: 'Falha ao criar pasta de gravação: {error}'
-  同步落盘到 logs: Gravar quadros em logs
+  "开始落盘": "Iniciar gravação"
+  "停止落盘": "Parar gravação"
+  "回到最新": "Voltar ao mais recente"
   启用开发诊断模式并运行任务后，此处将实时展示识别用帧。: Ative o diagnóstico e execute uma tarefa para visualizar os quadros de reconhecimento ao vivo.
   已停止落盘（共写入 {count} 帧）→ {path}: Gravação parada ({count} quadros) → {path}
   已封口: Encerrado

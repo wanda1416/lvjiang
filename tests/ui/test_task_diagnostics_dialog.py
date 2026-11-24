@@ -1,7 +1,7 @@
 """Tools-only opt-in preview controls; no simulation GUI pretence or persisted enable."""
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QCheckBox, QLabel, QMainWindow, QWidget
+from PyQt6.QtWidgets import QCheckBox, QDialogButtonBox, QLabel, QMainWindow, QWidget
 
 from lvjiang.core.task_diagnostics import TaskDiagnostics
 from lvjiang.ui.main.menu_ops import MenuOpsMixin
@@ -48,10 +48,21 @@ def test_diagnostic_tabs_defaults_ephemeral_settings_and_launch_freeze(qtbot):
     assert dialog.tabs.widget(1).findChildren(QWidget) == []
     assert {c.text() for c in dialog.findChildren(QCheckBox)} == {
         "启用开发诊断模式",
-        "同步落盘到 logs",
         "跟踪最新",
     }
-    assert not dialog.dump_check.isChecked()
+    assert dialog.btn_dump_toggle.isCheckable()
+    assert not dialog.btn_dump_toggle.isChecked()
+    assert dialog.btn_dump_toggle.text() == "开始落盘"
+    assert dialog.btn_dump_toggle.property("btnVariant") == "action"
+    assert dialog.btn_open_dump_dir.property("btnVariant") == "neutral"
+    for nav_btn in (dialog.btn_first, dialog.btn_prev, dialog.btn_next, dialog.btn_last):
+        assert nav_btn.property("btnVariant") == "neutral"
+        assert nav_btn.property("btnDensity") == "compact"
+    close_box = dialog.findChild(QDialogButtonBox)
+    assert close_box is not None
+    close_btn = close_box.button(QDialogButtonBox.StandardButton.Close)
+    assert close_btn is not None and close_btn.property("btnVariant") == "neutral"
+
     assert dialog.follow_check.isChecked()
     assert dialog.enabled_check.text() == "启用开发诊断模式"
     # 开发预览的口径写在对话框里，菜单标题只保留四字。
@@ -175,17 +186,70 @@ def test_carousel_follow_latest_and_pinned_frame_survives_fifo_eviction(qtbot):
         time.sleep(0.02)
 
     dialog.refresh_frames()
-    # 正在查看的 #1 仍保留在临时区，不被清除也不被跳走
+    # 正在查看的 #1 仍保留在临时区，不被清除也不被跳走；上一帧按钮禁用且显示「回到最新」
     assert "#1" in dialog.meta_label.text()
     assert "临时区保留" in dialog.meta_label.text()
     assert "原缓存已淘汰" in dialog.meta_label.text()
+    assert not dialog.btn_prev.isEnabled()
+    assert dialog.btn_next.isEnabled()
+    assert not dialog.btn_return_latest.isHidden()
     assert dialog._pinned_pixmap is not None and not dialog._pinned_pixmap.isNull()
 
-    # 一键切回跟踪最新，立即跳到 #4
-    dialog._jump_last()
+    # 点击「回到最新」一键切回跟踪最新，立即跳到 #4
+    dialog.btn_return_latest.click()
     assert dialog.follow_check.isChecked()
+    assert dialog.btn_return_latest.isHidden()
     assert "#4" in dialog.meta_label.text()
     assert dialog.index_label.text() == "2 / 2"
+
+    history.close("completed")
+    dialog.close()
+
+
+def test_keyboard_arrow_navigation_works_when_child_widgets_focused_and_respects_spinbox(qtbot):
+    """焦点在 TabBar/按钮/滑块上时方向键能切帧且不误切 Tab；焦点在 SpinBox 时不劫持方向键。"""
+    import time
+
+    from lvjiang.core.task_diagnostics import DiagnosticOptions, RecentFrameHistory
+
+    service = TaskDiagnostics()
+    service.options = DiagnosticOptions(enabled=True, max_frames=5, max_bytes=10_000_000)
+    history = RecentFrameHistory(service.options, {"task_run_id": "kbd"})
+    service._remember(history)
+
+    dialog = TaskDiagnosticsDialog(service)
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    for seq in (1, 2, 3):
+        _observe_color(history, seq, (seq * 50, 120, 200), "ocr")
+    deadline = time.monotonic() + 3.0
+    while len(history.frames()) < 3 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+    assert "#3" in dialog.meta_label.text()
+
+    # 焦点在 TabBar 上按 ←：应切到 #2，且不切换到「模拟运行」Tab
+    tab_bar = dialog.tabs.tabBar()
+    tab_bar.setFocus()
+    qtbot.keyClick(tab_bar, Qt.Key.Key_Left)
+    assert dialog.tabs.currentIndex() == 0
+    assert "#2" in dialog.meta_label.text()
+
+    # 焦点在普通按钮上按 Home / → / End
+    dialog.btn_next.setFocus()
+    qtbot.keyClick(dialog.btn_next, Qt.Key.Key_Home)
+    assert "#1" in dialog.meta_label.text()
+    qtbot.keyClick(dialog.btn_next, Qt.Key.Key_Right)
+    assert "#2" in dialog.meta_label.text()
+    qtbot.keyClick(dialog.btn_next, Qt.Key.Key_End)
+    assert "#3" in dialog.meta_label.text()
+    assert dialog.follow_check.isChecked()
+
+    # 焦点在帧数 SpinBox 时按 ← 不应劫持切帧
+    dialog.frames_spin.setFocus()
+    qtbot.keyClick(dialog.frames_spin, Qt.Key.Key_Left)
+    assert "#3" in dialog.meta_label.text()
 
     history.close("completed")
     dialog.close()
@@ -223,7 +287,9 @@ def test_dump_toggle_writes_existing_and_new_frames_into_unique_session_folders(
     dialog.refresh_frames()
 
     # 第一次开启落盘
-    dialog.dump_check.setChecked(True)
+    dialog.btn_dump_toggle.setChecked(True)
+    assert dialog.btn_dump_toggle.text() == "停止落盘"
+    assert dialog.btn_dump_toggle.property("btnVariant") == "danger"
     dir1 = dialog._dumper.session_dir
     assert dir1 is not None and dir1.parent == dump_root and dir1.is_dir()
 
@@ -235,7 +301,9 @@ def test_dump_toggle_writes_existing_and_new_frames_into_unique_session_folders(
     dialog.refresh_frames()
 
     # 关闭落盘并刷盘完成
-    dialog.dump_check.setChecked(False)
+    dialog.btn_dump_toggle.setChecked(False)
+    assert dialog.btn_dump_toggle.text() == "开始落盘"
+    assert dialog.btn_dump_toggle.property("btnVariant") == "action"
     assert not dialog._dumper.active
     assert dialog._dumper.written_count == 4
 
@@ -247,10 +315,10 @@ def test_dump_toggle_writes_existing_and_new_frames_into_unique_session_folders(
     assert seqs == [1, 2, 3, 4]
 
     # 第二次开启落盘必须生成全新的目录
-    dialog.dump_check.setChecked(True)
+    dialog.btn_dump_toggle.setChecked(True)
     dir2 = dialog._dumper.session_dir
     assert dir2 is not None and dir2 != dir1 and dir2.parent == dump_root
-    dialog.dump_check.setChecked(False)
+    dialog.btn_dump_toggle.setChecked(False)
 
     history.close("completed")
     dialog.close()
@@ -270,13 +338,13 @@ def test_push_dumper_captures_all_frames_without_polling_even_when_hidden(qtbot,
     qtbot.addWidget(dialog)
 
     # 未开启诊断且无缓存帧时，落盘开关应禁用，且预览区使用 Ignored 策略不锁死缩窗
-    assert not dialog.dump_check.isEnabled()
+    assert not dialog.btn_dump_toggle.isEnabled()
     assert dialog.preview_label.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored
     assert dialog.preview_label.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Ignored
 
     dialog.enabled_check.setChecked(True)
-    assert dialog.dump_check.isEnabled()
-    dialog.dump_check.setChecked(True)
+    assert dialog.btn_dump_toggle.isEnabled()
+    dialog.btn_dump_toggle.setChecked(True)
     session_dir = dialog._dumper.session_dir
     assert session_dir is not None
 
@@ -294,7 +362,7 @@ def test_push_dumper_captures_all_frames_without_polling_even_when_hidden(qtbot,
     while dialog._dumper.written_count < 4 and time.monotonic() < deadline:
         time.sleep(0.02)
 
-    dialog.dump_check.setChecked(False)
+    dialog.btn_dump_toggle.setChecked(False)
     lines = (session_dir / "frames.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(line)["frame_seq"] for line in lines] == [1, 2, 3, 4]
     dialog.close()

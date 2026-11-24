@@ -453,7 +453,9 @@ task_diagnostics_dialog:
   不完整: Incomplet
   临时 / {total}: Épinglée / {total}
   创建落盘目录失败：{error}: 'Échec de création du dossier : {error}'
-  同步落盘到 logs: Enregistrer dans logs
+  "开始落盘": "Démarrer l'enregistrement"
+  "停止落盘": "Arrêter l'enregistrement"
+  "回到最新": "Retour au dernier"
   启用开发诊断模式并运行任务后，此处将实时展示识别用帧。: Activez le mode diagnostic et lancez une tâche pour afficher les images de reconnaissance en direct.
   已停止落盘（共写入 {count} 帧）→ {path}: Enregistrement arrêté ({count} images) → {path}
   已封口: Fermé

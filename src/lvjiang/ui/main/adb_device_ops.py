@@ -1,7 +1,10 @@
 """主窗口的 ADB / 无线调试设备扫描、连接与后台工作线程。"""
 
 
+import weakref
+
 from loguru import logger
+from PyQt6 import sip
 from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 
 from ...core.config import load_user_config
@@ -245,6 +248,67 @@ class _WirelessScanDialog(QObject):
 
 class _AdbDeviceOpsMixin:
     # ─── ADB 设备扫描/连接 ─────────────────────────────────
+
+    def _target_device_refs(self, target_id: str) -> list[weakref.ref]:
+        """返回指定目标仍在存活的 AdbDevice 弱引用列表，并顺手清理已回收项。"""
+        by_target = getattr(self, "_adb_target_device_refs", None)
+        if by_target is None:
+            by_target = {}
+            self._adb_target_device_refs = by_target
+        refs = [ref for ref in by_target.get(target_id, ()) if ref() is not None]
+        if refs:
+            by_target[target_id] = refs
+        else:
+            by_target.pop(target_id, None)
+        return refs
+
+    def _remember_target_device(self, target_id: str, device) -> None:
+        """登记归属该目标的 AdbDevice，供跨多次重连统一改指新传输与恢复回调。"""
+        if device is None:
+            return
+        refs = self._target_device_refs(target_id)
+        if any(ref() is device for ref in refs):
+            return
+        try:
+            ref = weakref.ref(device)
+        except TypeError:
+            return
+        by_target = getattr(self, "_adb_target_device_refs", None)
+        if by_target is None:
+            by_target = {}
+            self._adb_target_device_refs = by_target
+        refs.append(ref)
+        by_target[target_id] = refs
+
+    def _live_target_devices(self, target_id: str, extra=None) -> list:
+        """收集该目标下所有仍存活的 AdbDevice（含 extra 且去重保序）。"""
+        devices = [dev for ref in self._target_device_refs(target_id) if (dev := ref()) is not None]
+        if extra is not None and not any(dev is extra for dev in devices):
+            devices.append(extra)
+        return devices
+
+    def _dispatch_connection_signal(
+        self, target_id: str, method: str, *args,
+    ) -> None:
+        """把恢复通知动态转发到当前活跃目标的信号桥，忽略已释放目标的竞态通知。"""
+        target = self._execution_targets.get(target_id)
+        bridge = getattr(target, "connection_bridge", None)
+        if bridge is None:
+            return
+        if isinstance(bridge, QObject) and sip.isdeleted(bridge):
+            return
+        try:
+            getattr(bridge, method)(*args)
+        except RuntimeError:
+            pass
+
+    def _notify_adb_connection_lost(
+        self, target_id: str, message: str, device=None,
+    ) -> None:
+        self._dispatch_connection_signal(target_id, "notify_lost", message, device)
+
+    def _notify_adb_connection_restored(self, target_id: str) -> None:
+        self._dispatch_connection_signal(target_id, "notify_restored")
 
     def _on_scan_devices(self):
         """扫描 ADB 设备；只刷新候选，不断开已连接目标。"""
@@ -597,14 +661,14 @@ class _AdbDeviceOpsMixin:
             existing_target.resume_event
             if existing_target is not None and existing_target.resume_event is not None
             else threading.Event())
-        # 先把旧 AdbDevice 的 transport 更新到新连接，再唤醒正在
-        # _handle_connection_error 中等待的失败命令，这样重试不会继续打旧 IP。
-        # 断线时那条在飞命令一直持有这个旧 device（输入对象在一次调用里只解析
-        # 一次），所以它必须跟新连接一样可用。
+        # 先把所有仍存活的旧 AdbDevice 更新到新连接，再唤醒正在
+        # _handle_connection_error 中等待的失败命令，这样多次重连后的在飞旧设备
+        # 也不会继续打旧 IP，且回调始终动态路由到当前最新 target.connection_bridge。
         old_device = existing_target.device if existing_target is not None else None
-        if old_device is not None:
-            old_device.serial = device.serial
-            old_device.adb_path = device.adb_path
+        tracked_devices = self._live_target_devices(target_id, extra=old_device)
+        for dev in tracked_devices:
+            dev.serial = device.serial
+            dev.adb_path = device.adb_path
         device.resume_event = resume_event
         try:
             from ...core.app_controller import record_connected_android
@@ -622,27 +686,28 @@ class _AdbDeviceOpsMixin:
         bridge.stream_lost.connect(self._on_stream_lost)
 
         def wire(dev) -> None:
-            """同一个目标的所有 AdbDevice 共用一套恢复回调。
+            """同一个目标的所有 AdbDevice 共用一套动态路由恢复回调。
 
-            `on_connection_lost` 把发起通知的 device 一并带上：重连换过设备后
-            宿主必须知道断的是哪一条连接，不能拿新连接的协调器去判断旧连接
-            此刻在等什么（否则目标会被误标成离线，ready 门禁跟着失效）。
+            不直接闭包绑定短命 ``bridge``，而是按 ``target_id`` 动态读取当下活跃
+            target 的 ``connection_bridge``，避免连续多次重连释放旧 bridge 后
+            更早在飞命令打到已销毁的 Qt 对象；同时带上发起通知的 ``dev``，
+            让宿主区分断线归属。
             """
             dev.on_connection_lost = (
-                lambda message, dev=dev: bridge.notify_lost(message, dev))
-            dev.on_connection_restored = bridge.notify_restored
+                lambda message, tid=target_id, dev=dev:
+                self._notify_adb_connection_lost(tid, message, dev))
+            dev.on_connection_restored = (
+                lambda tid=target_id: self._notify_adb_connection_restored(tid))
             dev.can_wait_for_recovery = lambda tid=target_id: self._run_manager.run_for_target(tid) is not None
             dev.stop_check = lambda tid=target_id: bool(
                 (run := self._run_manager.run_for_target(tid))
                 and run.stop_event.is_set())
 
-        # 旧 device 的回调也必须改指新 bridge：它随旧目标一起被释放时，
-        # 新目标会 dispose 掉旧 bridge，而旧 device 还在被在飞命令持有，
-        # 命令重试成功时的恢复通知就会打到已销毁的 Qt 对象上，把一次正常
-        # 恢复变成任务级异常。
         wire(device)
-        if old_device is not None:
-            wire(old_device)
+        self._remember_target_device(target_id, device)
+        for dev in tracked_devices:
+            wire(dev)
+            self._remember_target_device(target_id, dev)
 
         # 画面流健康：故障经信号桥回主线程，恢复走统一的 recover_stream 阶梯
         self._install_stream_hooks(
@@ -678,7 +743,7 @@ class _AdbDeviceOpsMixin:
         # 的等待不受影响，仍在重连后立即唤醒并复位运行状态。
         # 确认权以存在运行实例为前提：没有运行实例就没有等待者，放行无副作用。
         holds_confirmation = (
-            _pending_uncertain(old_device)
+            any(_pending_uncertain(dev) for dev in tracked_devices)
             and self._run_manager.run_for_target(target_id) is not None)
         old = self._execution_targets.put(target)
         if old is not None:

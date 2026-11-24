@@ -292,10 +292,21 @@ class _AndroidRecoveryMixin:
         分辨「有人在等」和「只是提示」，否则那个按钮点了等于没点。
         """
         target = self._execution_targets.get(self._execution_targets.active_target_id)
-        coordinator = getattr(
-            getattr(target, "device", None), "recovery_coordinator", None)
-        if coordinator is not None:
-            return bool(getattr(coordinator, "waiting", False))
+        target_dev = getattr(target, "device", None)
+        live_fn = getattr(self, "_live_target_devices", None)
+        target_id = getattr(target, "id", None)
+        devices = (
+            live_fn(target_id, extra=target_dev)
+            if target_id and callable(live_fn)
+            else ([target_dev] if target_dev is not None else [])
+        )
+        coordinators = [
+            coord
+            for dev in devices
+            if (coord := getattr(dev, "recovery_coordinator", None)) is not None
+        ]
+        if coordinators:
+            return any(bool(getattr(coord, "waiting", False)) for coord in coordinators)
         # 没有恢复协调器（窗口目标、测试替身）：退回按运行实例状态判断。
         from .execution_runs import RunState
         context = getattr(self, "_current_run_context", None)

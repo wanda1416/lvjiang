@@ -138,7 +138,9 @@ def create_engine(
 class _LocalShellDevice:
     """复用公共应用生命周期控制器，命令由本机 Shizuku 通道执行。"""
 
-    def shell(self, *args: str, timeout: float = 15.0) -> str:
+    def shell(
+        self, *args: str, timeout: float = 15.0, retry_safe: bool = False,
+    ) -> str:
         from . import shell
         if not shell.is_shizuku_alive() or not shell.has_permission():
             raise RuntimeError("此任务需要重启应用，请先启动并授权 Shizuku")

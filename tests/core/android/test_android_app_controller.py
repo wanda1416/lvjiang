@@ -12,7 +12,7 @@ class FakeDevice:
         self.running = True
         self.calls = []
 
-    def shell(self, *args, timeout=15):
+    def shell(self, *args, timeout=15, retry_safe=False):
         self.calls.append(args)
         if args[:2] == ("am", "force-stop"):
             self.running = False

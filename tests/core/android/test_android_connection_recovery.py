@@ -295,3 +295,78 @@ def test_execution_ownership_denial_does_not_bypass_agent_via_adb(monkeypatch):
     adb.assert_not_called()
     shell.assert_not_called()
     assert not backend._using_adb
+
+
+def test_shell_bytes_without_recovery_raises_timeout_immediately(monkeypatch):
+    """recover=False 时超时直接抛异常，不进入重连/人工确认，也不清除外层恢复标志。"""
+    device = AdbDevice(serial='test-device', adb_path='test-adb')
+    device.recovery_coordinator.recovering = True
+    reconnect_once = Mock(return_value=True)
+    monkeypatch.setattr(device, '_reconnect_once', reconnect_once)
+    lost = Mock()
+    restored = Mock()
+    device.on_connection_lost = lost
+    device.on_connection_restored = restored
+
+    monkeypatch.setattr(
+        'lvjiang.core.android.device.subprocess.run',
+        Mock(side_effect=subprocess.TimeoutExpired('adb', 3.0)),
+    )
+    with pytest.raises(subprocess.TimeoutExpired):
+        device.shell_bytes('exec-out', 'screencap', '-p', timeout=3.0, retry_safe=True, recover=False)
+    reconnect_once.assert_not_called()
+    lost.assert_not_called()
+
+    monkeypatch.setattr(
+        'lvjiang.core.android.device.subprocess.run',
+        Mock(return_value=SimpleNamespace(returncode=0, stdout=b'ok', stderr=b'')),
+    )
+    assert device.shell_bytes('exec-out', 'screencap', '-p', timeout=3.0, retry_safe=True, recover=False) == b'ok'
+    assert device.recovery_coordinator.recovering
+    restored.assert_not_called()
+
+
+def test_stream_capture_lossless_timeout_returns_none_without_entering_recovery(monkeypatch):
+    """视频流模式直取无损帧超时返回 None 交由上层回退，不能弹不确定确认死循环。"""
+    from lvjiang.core.android.scrcpy_capture import AndroidStreamCapture
+
+    device = AdbDevice(serial='192.168.0.100:5555', adb_path='test-adb')
+    reconnect_once = Mock(return_value=True)
+    lost = Mock()
+    monkeypatch.setattr(device, '_reconnect_once', reconnect_once)
+    device.on_connection_lost = lost
+    monkeypatch.setattr(
+        'lvjiang.core.android.device.subprocess.run',
+        Mock(side_effect=subprocess.TimeoutExpired('adb', 3.0)),
+    )
+
+    frame = AndroidStreamCapture(device).capture_lossless(timeout=3.0)
+
+    assert frame is None
+    reconnect_once.assert_not_called()
+    lost.assert_not_called()
+    assert not device.recovery_coordinator.waiting
+
+
+def test_app_controller_is_running_timeout_retries_without_uncertain_confirmation(monkeypatch):
+    """pidof 为只读探测，超时后只安全重试，不能按不明写操作要求人工确认。"""
+    from lvjiang.core.android.app_controller import AndroidAppController
+    from lvjiang.core.config import AndroidAppConfig
+
+    device = AdbDevice(serial='test-device', adb_path='test-adb')
+    device.recovery.retry_interval = 0
+    run = Mock(side_effect=[
+        subprocess.TimeoutExpired('pidof', 5.0),
+        SimpleNamespace(returncode=0, stdout='1234\n', stderr=''),
+    ])
+    monkeypatch.setattr('lvjiang.core.android.device.subprocess.run', run)
+    monkeypatch.setattr(device, '_reconnect_once', lambda: True)
+    lost = Mock()
+    device.on_connection_lost = lost
+
+    controller = AndroidAppController(
+        device, {'game': AndroidAppConfig(package='com.example.game', orientation='landscape')},
+    )
+    assert controller.is_running('game') is True
+    assert run.call_count == 2
+    lost.assert_not_called()

@@ -252,8 +252,18 @@ class AdbDevice:
                     failures = 0
                 retried = True
 
-    def shell_bytes(self, *args: str, timeout: float = 15.0, retry_safe: bool = False) -> bytes:
-        """执行 adb 命令返回字节流；仅明确只读的调用方可声明 retry_safe。"""
+    def shell_bytes(
+        self,
+        *args: str,
+        timeout: float = 15.0,
+        retry_safe: bool = False,
+        recover: bool = True,
+    ) -> bytes:
+        """执行 adb 命令返回字节流；仅明确只读的调用方可声明 retry_safe。
+
+        ``recover=False`` 时不进入重连与人工恢复循环，直接将超时或断连异常抛给
+        调用方（供直取截屏等允许快速失败并回退主通道的可选读取使用）。
+        """
         retried = False
         failures = 0
         while True:
@@ -272,10 +282,12 @@ class AdbDevice:
                         stderr_msg = stderr_msg.decode(errors="replace")
                     if self._is_disconnect_error(stderr_msg):
                         raise OSError(stderr_msg)
-                if r.returncode == 0:
+                if recover and r.returncode == 0:
                     self.recovery_coordinator.succeeded()
                 return r.stdout
             except (subprocess.TimeoutExpired, OSError) as e:
+                if not recover:
+                    raise
                 failures += 1
                 if self._handle_connection_error(e, f"adb {args}", retry_safe=retry_safe, failed_attempts=failures):
                     failures = 0

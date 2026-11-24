@@ -666,14 +666,20 @@ class AndroidStreamCapture(CaptureBackend):
             BGR numpy 数组，失败返回 None
         """
         try:
-            png_bytes = self._device.shell_bytes("exec-out", "screencap", "-p", timeout=timeout)
+            # 无损直取仅用于比对/降级回退，超时或异常由调用方决定回退视频流，
+            # 不得进入 ADB 恢复循环误判「动作可能已经执行」阻塞健康视频流。
+            png_bytes = self._device.shell_bytes(
+                "exec-out", "screencap", "-p",
+                timeout=timeout, retry_safe=True, recover=False,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"[AndroidStream] screencap 超时（{timeout:.1f}s）")
+            return None
         except Exception as e:
-            from loguru import logger
-            logger.error(f"[AndroidStream] screencap 执行异常: {e}")
+            logger.warning(f"[AndroidStream] screencap 执行异常: {e}")
             return None
 
         if not png_bytes:
-            from loguru import logger
             logger.error("[AndroidStream] screencap 返回空数据")
             return None
 
@@ -682,12 +688,10 @@ class AndroidStreamCapture(CaptureBackend):
             arr = np.frombuffer(png_bytes, dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if img is None:
-                from loguru import logger
                 logger.error("[AndroidStream] PNG 解码失败")
                 return None
             return img
         except Exception as e:
-            from loguru import logger
             logger.error(f"[AndroidStream] screencap 解码失败: {e}")
             return None
 

@@ -309,3 +309,50 @@ def test_connect_keeps_banner_while_uncertain_action_awaits(reconnect_case) -> N
 
     assert banner.visible
     assert '等待确认' in banner.text
+
+
+def test_multiple_reconnects_keep_earlier_device_routing_and_uncertain_wait(
+    qtbot, reconnect_case, monkeypatch,
+) -> None:
+    """连续两次重连后，更早仍在飞的 device1 仍更新传输、保留等待并动态路由到最新 bridge。"""
+    from PyQt6 import sip
+    from PyQt6.QtCore import QCoreApplication, QEvent
+    from PyQt6.QtWidgets import QApplication
+
+    case = reconnect_case
+    case.mark_waiting('uncertain_action')
+
+    # 第一次重连：target.device 切到 device2，bridge1 被 deleteLater() 销毁。
+    case.connect()
+    target_after_first = case.registry.get(TARGET_ID)
+    assert target_after_first is not None
+    bridge2 = target_after_first.connection_bridge
+    assert bridge2 is not case.old_bridge
+
+    # 第二次重连：target.device 切到 device3，bridge2 也被 deleteLater() 销毁。
+    third_serial = '192.168.1.200:5555'
+    third_device = AdbDevice(serial=third_serial, adb_path='test-adb')
+    monkeypatch.setattr(third_device, 'shell', Mock(return_value=STABLE_ID))
+    case.host._on_connect_done(
+        {'serial': third_serial}, third_device, _Backend('scrcpy'),
+        'scrcpy', 2800, 1260, None, update_candidate_ui=False)
+
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QApplication.processEvents()
+    qtbot.waitUntil(
+        lambda: sip.isdeleted(case.old_bridge) and sip.isdeleted(bridge2),
+        timeout=1000,
+    )
+
+    # 第 2 次重连不得因为只看 device2 而误放行 device1 的不确定动作等待，
+    # 且 device1 必须跟着更新为最新地址。
+    assert not case.resume_event.is_set()
+    assert case.old_device.serial == third_serial
+    assert case.host._has_run_waiter() is True
+
+    # device1 回调不再命中已销毁的 bridge1/bridge2，而是安全路由到最新 bridge3。
+    case.run_manager.run_for_target = lambda _tid: None
+    case.old_device.on_connection_lost('旧设备超时')
+    assert case.host.lost_calls[-1] == (TARGET_ID, '旧设备超时', case.old_device)
+    case.old_device.on_connection_restored()
+    assert case.host.restored_calls[-1] == TARGET_ID

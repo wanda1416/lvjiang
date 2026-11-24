@@ -62,7 +62,7 @@ class AndroidAppController:
 
     def is_running(self, name: str) -> bool:
         app = self.get(name)
-        output = self.device.shell("pidof", app.package, timeout=5.0)
+        output = self.device.shell("pidof", app.package, timeout=5.0, retry_safe=True)
         return bool(output.strip())
 
     def stop(self, name: str, timeout: float = 15.0) -> bool:

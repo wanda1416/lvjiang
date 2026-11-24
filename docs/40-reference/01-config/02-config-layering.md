@@ -32,7 +32,7 @@
 与仓库 `.gitattributes` 的 `eol=lf` 一致，不随 Windows 文本模式变成 CRLF。
 
 实体修订缓存与保存冲突检查见
-[配置修订缓存与任务读取](05-content-cache.md)。content_version 仅用于内部缓存失效，
+[配置修订缓存与任务读取](03-content-cache.md)。content_version 仅用于内部缓存失效，
 实际保存自动递增；界面只展示系统或本地来源。基底身份保存在 session/baseline.json，
 仅用于生成和确认 r0、恢复官方预置，不参与在线更新的远端比对，也不参与任务启动判定。
 
@@ -71,11 +71,11 @@ local 文件可直接删除；system 官方文件不允许用户删除，也不�
 > 场景与布局注册表不再是聚合文件：`scenes.yaml` / `layouts.yaml` 已退役，
 > 改为目录化结构（分组/布局定义文件 + 同名内容子目录 + `_meta.json` 顺序），
 > 由 namespace 优先级链 `system > local`（> 插件）合并，见
-> [34-scene/01-scene-layout-definition.md](../07-scene/01-scene-layout-definition.md)
+> [34-scene/01-scene-layout-definition.md](../../30-design/01-architecture/07-scene/01-scene-layout-definition.md)
 > 的「存储结构」一节。
 
 游戏配置目录现有七个文件；出装搭配独立放在 `yysls/gear_sets/`，不并入统一视图，
-见 [04-build-calculator.md](../06-runtime/04-build-calculator.md)：
+见 [04-build-calculator.md](../../30-design/01-architecture/06-runtime/04-build-calculator.md)：
 
 | 文件 | 内容 |
 |------|------|
@@ -98,7 +98,7 @@ Python 都保留插入序），不另设 `order`。顺序属于配置内容而�
 
 场景与布局的目录化结构与合并语义（namespace 区间恒序、local `_meta.json`
 排序补丁、字段级补丁只保留给 `local/layouts/{key}.yaml`）见
-[34-scene/01-scene-layout-definition.md](../07-scene/01-scene-layout-definition.md)。
+[34-scene/01-scene-layout-definition.md](../../30-design/01-architecture/07-scene/01-scene-layout-definition.md)。
 要点：目录是归属与存在的唯一事实源；`scenes/*.yaml`（顶层）只有分组定义；
 `disabled` 场景是场景文件自身的字段，只从场景管理 UI 隐藏，定义仍注册并可被
 旧布局、工作流引用；`layouts/{key}` 是不可变的存储标识，同时用于
@@ -391,9 +391,9 @@ hooks = AppHooks(
 
 ## 关联文档
 
-- 实体模型与指纹：[31-models/01-equipment-models.md](../03-models/01-equipment-models.md)
-- 调律规则的启用与顺序：[10-game/10-tuning-rules/](../../../10-domain/01-yysls/10-tuning-rules/README.md)
-- 用户视角的脚本管理：[60-userguide/06-workflows.md](../../../60-guide/03-automation/06-workflows.md)
+- 实体模型与指纹：[31-models/01-equipment-models.md](../../30-design/01-architecture/03-models/01-equipment-models.md)
+- 调律规则的启用与顺序：[10-game/10-tuning-rules/](../../10-domain/01-yysls/10-tuning-rules/README.md)
+- 用户视角的脚本管理：[60-userguide/06-workflows.md](../../60-guide/03-automation/06-workflows.md)
 
 ## 七、运行与界面状态分文件
 
@@ -427,7 +427,7 @@ UI 页面继续统一通过 `load_ui_page_state` / `update_ui_page_state`
 新文件和 `migration: {source: session, version: 1}` 标记，再删除旧文件四个节点，最后
 移除标记。新文件已存在但标记尚在时只重试清理；不存在标记时不回读旧数据。
 旧文件损坏不会被空数据覆盖。更完整的边界见
-[任务历史与界面状态需求](../../02-decisions/02-editor/02-task-history.md#5-界面与辅助状态独立存储)。
+[任务历史与界面状态需求](../../30-design/02-decisions/02-editor/02-task-history.md#5-界面与辅助状态独立存储)。
 
 手机同步包含新文件，配置应用后重置并加载两个存储。Profile key 重命名维护新文件，
 失败恢复日志也覆盖新路径。用户元数据内按用户保存的界面状态仍属于 `users/*.json`。

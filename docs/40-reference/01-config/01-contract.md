@@ -12,7 +12,7 @@
 | session | `config/session/` | 纯运行态与用户数据，**不经 resolver** | `core/config/session.py`（session.json）、各独立模块 |
 
 层职责与目录拓扑声明见 `core/paths.py` 与 `core/config/resolver.py` 模块文档字符串；
-分层总览另见 `docs/30-design/01-architecture/overview/04-config-layering.md`。
+分层总览另见 [配置分层](02-config-layering.md)。
 
 ### 1.1 读取优先级与覆盖语义
 
@@ -75,7 +75,7 @@
   「local 同名文件整体顶掉 system」的实体影子、`_meta.json` 的排序补丁是
   三个不同机制。
 - **启停/展示**：`disabled` 是场景文件自身字段，只影响 UI 展示，定义仍注册；
-  用户顺序/启停偏好存 session（`docs/30-design/01-architecture/overview/04-config-layering.md`
+  用户顺序/启停偏好存 session（[配置分层](02-config-layering.md)
   第四节），不写回配置层。
 
 结论：给某个维度加能力时不得借用另一维度的机制（例如用字段覆盖实现排序、
@@ -184,6 +184,7 @@
 
 ## 关联文档
 
-- 分层总览：`docs/30-design/01-architecture/overview/04-config-layering.md`
-- 修订缓存：`docs/30-design/01-architecture/overview/05-content-cache.md`
+- 分层总览：[02-config-layering.md](02-config-layering.md)
+- 修订缓存：[03-content-cache.md](03-content-cache.md)
+- 数据地图：[04-session-data-map.md](04-session-data-map.md)
 - 用户侧恢复步骤：`docs/60-guide/05-recovery/01-config-migration.md`

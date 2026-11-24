@@ -26,7 +26,7 @@
 
 | 契约 | 入口 |
 |------|------|
-| 插件装配 | [契约 A：插件装配](30-design/01-architecture/01-plugins.md) |
+| 插件装配 | [契约 A：插件装配](40-reference/05-plugins/01-contract.md) |
 | 配置与迁移 | [契约 B：配置与迁移](40-reference/01-config/01-contract.md)；配套[配置迁移恢复指南](60-guide/05-recovery/01-config-migration.md) |
 | Profile 与账户同步 | [契约 C：Profile 与账户同步](40-reference/04-sync/02-profile-and-account.md)；配套[Profile 数据字段模型](40-reference/03-profile/01-data-model.md) |
 | 离线安装（PC → Android） | [契约 D：离线安装](40-reference/04-sync/01-offline-install.md) |
@@ -43,7 +43,7 @@
 | 接入外部 Agent | [Agent 入口](70-agent/README.md) |
 | 反馈问题 | [问题反馈](60-guide/04-desktop/09-faq-and-feedback.md) |
 
-- [在线配置、会员内容与功能激活](60-guide/01-accounts/01-appendix-a-online-config.md)：更新生效、本地覆盖、本地激活与在线会员授权的区别、关闭撤销与人工恢复。
+- [在线配置、会员内容与功能激活](60-guide/01-accounts/01-online-config-and-activation.md)：更新生效、本地覆盖、本地激活与在线会员授权的区别、关闭撤销与人工恢复。
 - 构建与打包：[打包与发布手册](../packaging/readme.md)、[Android 构建与部署](../android/DEPLOYMENT.md)、[Android 签名说明](../android/README-signing.md)。
 - 旧编号目录（`docs/10-game/`、`docs/20-requirements/`、`docs/30-architecture/`、
   `docs/40-development/`、`docs/50-releases/`、`docs/60-userguide/`、`docs/70-agent/`）与

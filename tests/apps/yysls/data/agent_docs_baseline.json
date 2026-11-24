@@ -49,7 +49,7 @@
       "path": "10-domain/01-yysls/07-nanlu-season.md",
       "title": "南吕相和赛季（115 阶）",
       "category": "10-game",
-      "sha256": "ee4db67ee5d656dd8fe3200f00083a18a0ac862e8bbc33bbba7846a1f93821d6"
+      "sha256": "43970bcc055d95be601e96fdc713b0abcb7d3e085429662cf4673f993c02a3c7"
     },
     {
       "id": "10-domain:01-yysls:08-affix-compendium",
@@ -206,13 +206,6 @@
       "sha256": "5c499dd2e61c8bbe36b7e02f6bd5bbdf076559dcdd4c5d06a09c0b45e0e3d9fd"
     },
     {
-      "id": "30-design:01-architecture:01-plugins",
-      "path": "30-design/01-architecture/01-plugins.md",
-      "title": "契约 A：插件装配",
-      "category": "30-architecture",
-      "sha256": "5136c70256ac4a5b861c2780280eba599a3810e3be25c3e970359c14575ea57c"
-    },
-    {
       "id": "30-design:01-architecture:02-graduation:01-data-flow",
       "path": "30-design/01-architecture/02-graduation/01-data-flow.md",
       "title": "端到端数据流",
@@ -308,7 +301,7 @@
       "path": "30-design/01-architecture/03-models/03-session-and-context.md",
       "title": "Session 与 Context 数据模型",
       "category": "30-architecture",
-      "sha256": "bae81521cec28cfad063a54bf48672f561de8e54682fff12fc17169b8837efcd"
+      "sha256": "80916f9bdbe651de6ab21bff34e344c93d4368889fbb226e96cf866a0580c677"
     },
     {
       "id": "30-design:01-architecture:03-models:04-profile",
@@ -322,7 +315,7 @@
       "path": "30-design/01-architecture/03-models/05-martial-arts-and-playstyles.md",
       "title": "武学 / 流派 / 玩法",
       "category": "30-architecture",
-      "sha256": "2aed479d46ff13182c2b1aedf325a8ea38919fbe09443132c6ec820e5f064638"
+      "sha256": "0fb55530c314f238f61ee970d2191a408c5f6886a3c167eb8348faa63757d927"
     },
     {
       "id": "30-design:01-architecture:03-models:06-base-attr-model",
@@ -350,7 +343,7 @@
       "path": "30-design/01-architecture/04-overview/02-plugin-system.md",
       "title": "插件系统架构与开发指南",
       "category": "30-architecture",
-      "sha256": "a34c8876013756d45319c9d51581d0899a409d329f5bc13c282d03769c1e9e2f"
+      "sha256": "9a6246231cff01ad74099c24699dd289c50459a6e2425f177a2e98906c440c4c"
     },
     {
       "id": "30-design:01-architecture:04-overview:03-graduation-formula-model",
@@ -360,32 +353,11 @@
       "sha256": "ed048b8fd3223f3830635a8e7840f973bc2224f62cf9c6318ceecc7ad1043555"
     },
     {
-      "id": "30-design:01-architecture:04-overview:04-config-layering",
-      "path": "30-design/01-architecture/04-overview/04-config-layering.md",
-      "title": "配置分层：system / local",
-      "category": "30-architecture",
-      "sha256": "afbc655afceb67921f2a69a86b5d5df49b17e417444573514146e12efdf24f37"
-    },
-    {
-      "id": "30-design:01-architecture:04-overview:05-content-cache",
-      "path": "30-design/01-architecture/04-overview/05-content-cache.md",
-      "title": "配置修订缓存与任务读取",
-      "category": "30-architecture",
-      "sha256": "4cad782f1227cdd68c58ff37a16f0a39e857b595514d6420a747471ae6e381ae"
-    },
-    {
-      "id": "30-design:01-architecture:04-overview:06-session-data-map",
-      "path": "30-design/01-architecture/04-overview/06-session-data-map.md",
-      "title": "config/session 数据划分与读写方",
-      "category": "30-architecture",
-      "sha256": "d36a723a586884a412662b16721c4b3561b8e41f94abdf5d415bd64621237ddf"
-    },
-    {
       "id": "30-design:01-architecture:04-overview:README",
       "path": "30-design/01-architecture/04-overview/README.md",
       "title": "架构总览",
       "category": "30-architecture",
-      "sha256": "2bc4a0bff9247924f5dcb5460cfc49a710c9a6085f1c04e5ff3c85fc939c95be"
+      "sha256": "50e5b770736476ed429bdbf6e8e3ac21cce1982c9cf03fe49967621269320ed1"
     },
     {
       "id": "30-design:01-architecture:05-platform:01-device-agent-protocol",
@@ -420,7 +392,7 @@
       "path": "30-design/01-architecture/05-platform/08-i18n.md",
       "title": "国际化模块与翻译查找契约",
       "category": "30-architecture",
-      "sha256": "79f746871e98c0abe1a3fe1d1ad721c428e852d87989b93a1e55421ee755728a"
+      "sha256": "1291f6b958cf7fc8780ebdb592e00b08d71aecbf3a400ff3d98c1b9a5140d12b"
     },
     {
       "id": "30-design:01-architecture:05-platform:09-android-workbench",
@@ -504,7 +476,7 @@
       "path": "30-design/01-architecture/07-scene/01-scene-layout-definition.md",
       "title": "场景与布局 — 语义模型定义",
       "category": "30-architecture",
-      "sha256": "37dc349f2b47d75d500c2d4770582f61bb3986141c4d135c4f6750fd2b1d437e"
+      "sha256": "3803872b86eb07e8a1267739c895ef19c741092550b39caac6420f97febafd38"
     },
     {
       "id": "30-design:01-architecture:07-scene:02-scene-layout-editing",
@@ -518,14 +490,14 @@
       "path": "30-design/01-architecture/07-scene/03-cross-scene-references.md",
       "title": "跨场景 area 引用",
       "category": "30-architecture",
-      "sha256": "a23b816a602dbbd27bf192ab0d230dcd9112bbfb6a96df8ea55d5b2f41ae52d4"
+      "sha256": "66803426ef767158001d77e87d76c21cac794705b2aeebbb8e976d4c5b21993c"
     },
     {
       "id": "30-design:01-architecture:07-scene:04-page-transition-contract",
       "path": "30-design/01-architecture/07-scene/04-page-transition-contract.md",
       "title": "页面结构与跳转契约",
       "category": "30-architecture",
-      "sha256": "9261ce1039fb4fab52ccbfb65408f0b621654ed4b8e6d5859e96d095d3b2c5bd"
+      "sha256": "ed6390b98c52b5a9a520b9bd68e7e795d9282e60c2223b21ab5838f751ef253f"
     },
     {
       "id": "30-design:01-architecture:07-scene:README",
@@ -637,7 +609,7 @@
       "path": "30-design/01-architecture/README.md",
       "title": "架构与设计区",
       "category": "30-architecture",
-      "sha256": "0b3a4c55c302b83b95e79170cf1e0d1419a98dc30a13c80b15dd435e41895611"
+      "sha256": "f71be1089b6657ccf8fd80d5fbccf7348e5eaa3994eaaf2e68eab2817d6c69a3"
     },
     {
       "id": "30-design:02-decisions:01-batch:01-batch-task-eligibility",
@@ -966,7 +938,7 @@
       "path": "30-design/02-decisions/05-profile/06-overview-layout-sync.md",
       "title": "用户总览页面结构与上传下载",
       "category": "30-architecture",
-      "sha256": "38aab183820be55b4d6a270bee336015ab817c47362b585caf48718375c10aab"
+      "sha256": "ab7af1cfa9fcbb6f0317386d712556e8eb2ba9a7a0cae2aa67de5c7b2cce173b"
     },
     {
       "id": "30-design:02-decisions:05-profile:07-set-only-v1.1",
@@ -1011,6 +983,13 @@
       "sha256": "aff1b4f265b8ac8d01cdc5aeb4ceef02c5f9a738088a0940d83c17cfed8e7044"
     },
     {
+      "id": "30-design:02-decisions:06-tuning:05-nanlu-season",
+      "path": "30-design/02-decisions/06-tuning/05-nanlu-season.md",
+      "title": "南吕相和赛季适配",
+      "category": "30-architecture",
+      "sha256": "b7115fc1aecc8f55305c3535fa1f9aaafc2af0f077b775a6748881185c9fec32"
+    },
+    {
       "id": "30-design:02-decisions:06-tuning:06-native-attack-affixes",
       "path": "30-design/02-decisions/06-tuning/06-native-attack-affixes.md",
       "title": "本属攻击统一规则表达",
@@ -1022,28 +1001,49 @@
       "path": "30-design/02-decisions/README.md",
       "title": "决策与规格记录（已实现需求）",
       "category": "30-architecture",
-      "sha256": "591c59ecb1911ee1e729310a6a7be691e6d3c62814de2208a5b67e1aac321e02"
+      "sha256": "0a47c6560a16da1ed4f3ff27e4340c0f2f34aae17d5f8435bf335ae5dbe951d4"
     },
     {
       "id": "40-reference:01-config:01-contract",
       "path": "40-reference/01-config/01-contract.md",
       "title": "契约 B：配置与迁移",
       "category": "30-architecture",
-      "sha256": "0f718e326068d3ca0d398a913d906d776ee446deff2892d27f283c98a85a7672"
+      "sha256": "41eb00d1709cd1eea56b8a9e3f52b9051a3b27a31be64742646b301db594d69f"
+    },
+    {
+      "id": "40-reference:01-config:02-config-layering",
+      "path": "40-reference/01-config/02-config-layering.md",
+      "title": "配置分层：system / local",
+      "category": "30-architecture",
+      "sha256": "3015a5115231ba3fc0f9425e1bfbe07c31b926a590a5857d5ed27aecb8524041"
+    },
+    {
+      "id": "40-reference:01-config:03-content-cache",
+      "path": "40-reference/01-config/03-content-cache.md",
+      "title": "配置修订缓存与任务读取",
+      "category": "30-architecture",
+      "sha256": "4cad782f1227cdd68c58ff37a16f0a39e857b595514d6420a747471ae6e381ae"
+    },
+    {
+      "id": "40-reference:01-config:04-session-data-map",
+      "path": "40-reference/01-config/04-session-data-map.md",
+      "title": "config/session 数据划分与读写方",
+      "category": "30-architecture",
+      "sha256": "0df7028b3a7b72b8032755421697a6eefdcc0da6cfe048a795d137812271b5b5"
     },
     {
       "id": "40-reference:02-dsl:01-basics",
       "path": "40-reference/02-dsl/01-basics.md",
       "title": "DSL 语言基础",
       "category": "30-architecture",
-      "sha256": "b68f132d33fd0632b76ce88dc226427b98a01f119add2b25528918da3e01b759"
+      "sha256": "de4cb5f748c8f290e02975a98ddbe89924b7d7c99b5b81c19906ac7dc8902ad3"
     },
     {
       "id": "40-reference:02-dsl:02-concepts",
       "path": "40-reference/02-dsl/02-concepts.md",
       "title": "实体与坐标体系",
       "category": "30-architecture",
-      "sha256": "58c49373d2132f7e2707dedca90f148a31172c222d7e4924d81c558436c0617f"
+      "sha256": "9b6bd7b790cd8efeb16dd879b225ee7cc7707c7c13e40e02d13665cfcadd7560"
     },
     {
       "id": "40-reference:02-dsl:03-interaction",
@@ -1106,7 +1106,7 @@
       "path": "40-reference/02-dsl/04-data-flow.md",
       "title": "DSL 感知指令概览",
       "category": "30-architecture",
-      "sha256": "2c403d15764425f5cd9d99ab550e7ea59494312af9557555468eb06dd9dc7992"
+      "sha256": "23a22c3f11d0dfcb6d53e1476225194ead80d6cd6802a43e2f04ebc2d953c02e"
     },
     {
       "id": "40-reference:02-dsl:04.1-scan",
@@ -1162,7 +1162,7 @@
       "path": "40-reference/02-dsl/05.3-conditions.md",
       "title": "条件表达式",
       "category": "30-architecture",
-      "sha256": "24e37271106d729359f4653a6d9823838dc5c4cb0e6abb04b1841b661c79ef93"
+      "sha256": "ad08b323018c1ac0d6cb14f0042e28f57c9300464227fcfc0327a62f989d04ec"
     },
     {
       "id": "40-reference:02-dsl:06-functions",
@@ -1176,7 +1176,7 @@
       "path": "40-reference/02-dsl/06.1-basic-functions.md",
       "title": "DSL 基础函数",
       "category": "30-architecture",
-      "sha256": "7ec4f595cff6702c08a6ce370826fd64ab89b3cbb7b9479acac4ed5a73ffb8ec"
+      "sha256": "11ddaec034b460103f8c4daf77ebb20e0bfe7b1928a1a8a837b7b47f2e111792"
     },
     {
       "id": "40-reference:02-dsl:06.2-system-interaction",
@@ -1232,7 +1232,7 @@
       "path": "40-reference/02-dsl/README.md",
       "title": "DSL 语法速查",
       "category": "30-architecture",
-      "sha256": "f3c9e916d502435e39c1c3b83fee40181c60bd4d4cec86120cb18221aee7b026"
+      "sha256": "2c18c09c3c5b78543aa1b61345aae76820835556a111db5b31ecaaa69f85916a"
     },
     {
       "id": "40-reference:03-profile:01-data-model",
@@ -1256,18 +1256,25 @@
       "sha256": "aa491eeba819c4333f453e40dca0acccc4a282c21f0d17b369d0124ef5ed7552"
     },
     {
+      "id": "40-reference:05-plugins:01-contract",
+      "path": "40-reference/05-plugins/01-contract.md",
+      "title": "契约 A：插件装配",
+      "category": "30-architecture",
+      "sha256": "5136c70256ac4a5b861c2780280eba599a3810e3be25c3e970359c14575ea57c"
+    },
+    {
       "id": "40-reference:README",
       "path": "40-reference/README.md",
       "title": "参考资料（reference）",
       "category": "30-architecture",
-      "sha256": "414c0a9762236df6389e605c5c45f05fd03951bb7b5f9f70f4b30cd1a532f6d9"
+      "sha256": "8d04f78fc188122cbc84399670c5fa6719e29271d276c6756c433cb5f3ddd5da"
     },
     {
-      "id": "60-guide:01-accounts:01-appendix-a-online-config",
-      "path": "60-guide/01-accounts/01-appendix-a-online-config.md",
-      "title": "附录 A. 在线配置、会员内容与功能激活",
+      "id": "60-guide:01-accounts:01-online-config-and-activation",
+      "path": "60-guide/01-accounts/01-online-config-and-activation.md",
+      "title": "在线配置、会员内容与功能激活",
       "category": "60-userguide",
-      "sha256": "0ebebf7465835752b2509295f672d39f716f76a05ca820aefae7a304c7e31eeb"
+      "sha256": "ebc7735bf5e75f93406df73a6744aceb522b6a6d34b6ec4840b8f24e3842ca59"
     },
     {
       "id": "60-guide:01-accounts:02-cloud-sync-and-privacy",
@@ -1284,11 +1291,11 @@
       "sha256": "2b604ed8258c31816bbb9146ca657dd5c67dcf0cb7e1ebd81eee6004e037eac5"
     },
     {
-      "id": "60-guide:03-automation:01-appendix-c-preset-gallery",
-      "path": "60-guide/03-automation/01-appendix-c-preset-gallery.md",
-      "title": "附录 C · 预置图库内容（端游 / 手游）",
+      "id": "60-guide:03-automation:01-preset-gallery",
+      "path": "60-guide/03-automation/01-preset-gallery.md",
+      "title": "预置图库内容（端游 / 手游）",
       "category": "60-userguide",
-      "sha256": "65d979f0907eedee059905c0bd10c0801ba61872970713319d40b0679bb35e16"
+      "sha256": "e776a52842b4a8e2b5665383acbb5f7a9512903c3a3ac241f527573122c032be"
     },
     {
       "id": "60-guide:03-automation:04.01-tuning-config-overview",
@@ -1400,7 +1407,7 @@
       "path": "60-guide/03-automation/06.07-system-scripts.md",
       "title": "6.7 系统脚本与工作流清单",
       "category": "60-userguide",
-      "sha256": "e5efe79ffc58affefc067c5a44c9a113208604d68923228013a1b39aa10f1f68"
+      "sha256": "d0be5eb8b359bc3ce00756cceecbdeb47dde8e5a9d3dab34679baab90c7e7128"
     },
     {
       "id": "60-guide:04-desktop:01-quick-start",
@@ -1435,7 +1442,7 @@
       "path": "60-guide/04-desktop/03.03-gallery-management.md",
       "title": "3.3 图库管理（F4）",
       "category": "60-userguide",
-      "sha256": "9247ea573ab6a8393372be80420f2a87dc98fca87ff4c5b4aac9d4077f319f84"
+      "sha256": "5034bd67b028cbe94973b90e5bb565ef968284e44f39072f2974a52632a31a5b"
     },
     {
       "id": "60-guide:04-desktop:03.04-batch-tasks",
@@ -1473,11 +1480,11 @@
       "sha256": "903c932f90a7b3811456dfc0c2de75a9a007c2adec427eaae81be15739e0f409"
     },
     {
-      "id": "60-guide:04-desktop:10-appendix-b-command-line",
-      "path": "60-guide/04-desktop/10-appendix-b-command-line.md",
-      "title": "附录 B. 命令行执行脚本",
+      "id": "60-guide:04-desktop:10-command-line",
+      "path": "60-guide/04-desktop/10-command-line.md",
+      "title": "命令行执行脚本",
       "category": "60-userguide",
-      "sha256": "abeafae37dff510e0b6eff2efa7784a8e6a383899b373416d6e6afc85b364bee"
+      "sha256": "dd73959083c79fc332ffd1bfe69153dcd8086e8a9cf3d0c3a403eacef7afcdab"
     },
     {
       "id": "60-guide:05-recovery:01-config-migration",
@@ -1491,7 +1498,7 @@
       "path": "60-guide/README.md",
       "title": "律匠用户指南",
       "category": "60-userguide",
-      "sha256": "754b397abe7e083fcf02d1d5e0a9fb51d0228d6efc5857215961ec968c5cf292"
+      "sha256": "0e4a3a9be445ac958abd54ea9e34d08361f21f06efe058e68680a54150114782"
     },
     {
       "id": "70-agent:05-ai-connection",

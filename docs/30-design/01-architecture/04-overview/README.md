@@ -11,6 +11,6 @@
 | [01-main-window-state-flow.md](01-main-window-state-flow.md) | 主窗口状态机：扫描、定位、执行流程 |
 | [02-plugin-system.md](02-plugin-system.md) | 插件系统架构与开发指南：`AppHooks` 扩展点全表、加载顺序与失败边界、离线/同步声明面、测试门禁 |
 | [03-graduation-formula-model.md](03-graduation-formula-model.md) | 毕业率公式模型（导航至 36-graduation） |
-| [04-config-layering.md](04-config-layering.md) | 配置分层：system/local 读取、session 运行数据、合并与写权限 |
-| [05-content-cache.md](05-content-cache.md) | 配置修订缓存、运行快照、保存冲突与基底状态路径 |
-| [06-session-data-map.md](06-session-data-map.md) | `config/session` 全量数据划分、读写咽喉模块、锁与存续判断 |
+| [04-config-layering.md](../../../40-reference/01-config/02-config-layering.md) | 配置分层：system/local 读取、session 运行数据、合并与写权限 |
+| [05-content-cache.md](../../../40-reference/01-config/03-content-cache.md) | 配置修订缓存、运行快照、保存冲突与基底状态路径 |
+| [06-session-data-map.md](../../../40-reference/01-config/04-session-data-map.md) | `config/session` 全量数据划分、读写咽喉模块、锁与存续判断 |

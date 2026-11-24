@@ -7,8 +7,9 @@
 | 子区 | 内容 |
 |------|------|
 | [dsl/](02-dsl/README.md) | 工作流 DSL 语法、命令、函数与数据通道的接口参考（原 `30-architecture/32-grammar/`） |
-| [config/](01-config/01-contract.md) | 契约 B：配置与迁移 |
+| [config/](01-config/01-contract.md) | 契约 B：配置与迁移、配置分层、修订缓存与 `config/session` 数据地图 |
 | [sync/](04-sync/01-offline-install.md) | 契约 C/D：Profile 与账户同步、离线安装 |
 | [profile/](03-profile/01-data-model.md) | Profile 数据字段模型 |
+| [plugins/](05-plugins/01-contract.md) | 契约 A：插件装配边界与注册契约 |
 
 相关契约总览见 [docs/README.md](../README.md)（仅源码检出） 的「核心契约」表。

@@ -24,10 +24,10 @@
 | 在手机上使用律匠 | [移动设备（安卓）](02-android/07-mobile-device.md) |
 | 自己写脚本 | [脚本工作台与作者须知](04-desktop/08-script-authoring.md)、[DSL 语法](../40-reference/02-dsl/README.md) |
 | 遇到问题、提交反馈 | [常见问题与反馈](04-desktop/09-faq-and-feedback.md) |
-| 不开界面用命令行跑任务 | [附录 B：命令行](04-desktop/10-appendix-b-command-line.md) |
+| 不开界面用命令行跑任务 | [命令行执行脚本](04-desktop/10-command-line.md) |
 | 了解云端同步加密、改密风险与备战分享 | [云端同步、加密与备战分享](01-accounts/02-cloud-sync-and-privacy.md) |
-| 搞懂在线配置、会员授权与激活 | [附录 A：在线配置](01-accounts/01-appendix-a-online-config.md) |
-| 看随包预置图库清单 | [附录 C：预置图库内容](03-automation/01-appendix-c-preset-gallery.md) |
+| 搞懂在线配置、会员授权与激活 | [在线配置、会员内容与功能激活](01-accounts/01-online-config-and-activation.md) |
+| 看随包预置图库清单 | [预置图库内容](03-automation/01-preset-gallery.md) |
 | 恢复配置迁移失败的环境 | [配置迁移恢复指南](05-recovery/01-config-migration.md) |
 
 ## 全部章节
@@ -46,7 +46,7 @@
 | [3.6 大世界地图管理](04-desktop/03.06-world-map-management.md) | 大地图与地域目录、探查图片预览、拼接底图与覆盖范围 |
 | [8. 脚本工作台与脚本作者须知](04-desktop/08-script-authoring.md) | 脚本工作台操作、指令选择、画布取点取色、单步调试，以及脚本文件与运行性质的约定（面向自己写脚本的用户） |
 | [9. 常见问题与反馈](04-desktop/09-faq-and-feedback.md) | 连接/识别/调律/批量/装备/工作流问题、常见误操作、术语速查；反馈受理范围、必填信息、日志与隐私脱敏要求 |
-| [附录 B. 命令行执行脚本](04-desktop/10-appendix-b-command-line.md) | 不开界面跑任务：list / schema / run、参数、退出码与 JSON 输出 |
+| [命令行执行脚本](04-desktop/10-command-line.md) | 不开界面跑任务：list / schema / run、参数、退出码与 JSON 输出 |
 
 ### 调律配置与运行（automation/）
 
@@ -68,7 +68,7 @@
 | [5.7 出装搭配与模拟计算器](03-automation/05.07-build-calculator.md) | 总词条合法分配、角色属性实时推演、玩法出装读写与三级要求 |
 | [6. 工作流与日常任务](03-automation/06-workflows.md) | 日常 Tab 操作、运行控制、专用脚本入口、脚本配置管理、任务历史（写脚本见 [8](04-desktop/08-script-authoring.md)） |
 | [6.7 系统脚本与工作流清单](03-automation/06.07-system-scripts.md) | 系统自带脚本的清单与参数、系统脚本与本地副本的覆盖关系 |
-| [附录 C. 预置图库内容](03-automation/01-appendix-c-preset-gallery.md) | 随包分发的端游/手游参考图清单：共有规格、逐分组对照、只在一边出现的图、工作流与自动调律实际用到的 label、已知差异 |
+| [预置图库内容](03-automation/01-preset-gallery.md) | 随包分发的端游/手游参考图清单：共有规格、逐分组对照、只在一边出现的图、工作流与自动调律实际用到的 label、已知差异 |
 
 ### 移动设备（android/）
 
@@ -80,7 +80,7 @@
 
 | 章节 | 内容 |
 |------|------|
-| [附录 A. 在线配置、会员内容与功能激活](01-accounts/01-appendix-a-online-config.md) | 在线配置的获取与生效、功能激活与离线恢复、本地激活与在线会员授权的区别、关闭撤销与人工恢复、升级与版本口径 |
+| [在线配置、会员内容与功能激活](01-accounts/01-online-config-and-activation.md) | 在线配置的获取与生效、功能激活与离线恢复、本地激活与在线会员授权的区别、关闭撤销与人工恢复、升级与版本口径 |
 | [云端同步、端到端加密与备战分享](01-accounts/02-cloud-sync-and-privacy.md) | 加密与仍明文数据对照、改密与重置密码的不可逆说明、备战方案历史快照分享与 1~90 天有效期 |
 
 ## 相关文档

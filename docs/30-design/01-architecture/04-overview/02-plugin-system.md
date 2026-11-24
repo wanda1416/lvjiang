@@ -394,7 +394,7 @@ class AutoFarmWorkflow(BaseWorkflow):
   Profile / 同步的边界（需求侧）
 - [配置策略装配](../../02-decisions/04-platform/24-config-policy-bootstrap.md)：
   `config_policy_modules` 的 bootstrap 顺序与门禁
-- [配置分层：system / local](04-config-layering.md)：插件声明自己的合并策略与受保护列表
+- [配置分层：system / local](../../../40-reference/01-config/02-config-layering.md)：插件声明自己的合并策略与受保护列表
 - [DSL 模块化与内置函数](../../../40-reference/02-dsl/07-subworkflows.md)：`@builtin_func` 注册、
   重名拒绝与 `_engine` / `_wf` 注入
 - [插件国际化](../05-platform/08-i18n.md)：`config/i18n/apps/<app>/<lang>.yaml` 与

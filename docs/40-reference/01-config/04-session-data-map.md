@@ -11,9 +11,9 @@
 不属于本目录，见第三节；其余各节都只讲 `config/session/` 里面的东西。
 
 本文只回答「这个目录里有什么、谁写、谁读、丢了会怎样」。节点语义、领域模型和锁协议分别
-在 [04-config-layering.md](04-config-layering.md)、[31-models/04-profile.md](../03-models/04-profile.md)、
-[31-models/03-session-and-context.md](../03-models/03-session-and-context.md) 与
-[38-platform/02-instance-access.md](../05-platform/02-instance-access.md) 里写全，这里只做归属与
+在 [02-config-layering.md](02-config-layering.md)、[31-models/04-profile.md](../../30-design/01-architecture/03-models/04-profile.md)、
+[31-models/03-session-and-context.md](../../30-design/01-architecture/03-models/03-session-and-context.md) 与
+[38-platform/02-instance-access.md](../../30-design/01-architecture/05-platform/02-instance-access.md) 里写全，这里只做归属与
 存续判断，不重复它们的结论。
 
 ## 一、五个分区
@@ -51,7 +51,7 @@
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
 | `daily_history.db` | `batch_runs` / `task_runs` | `core/history/daily.py`（`TaskHistoryRepository`） | schema v2；同时被 `core/history/transfer.py` 作为回传通道登记 |
-| `tuning_history.db` | `tuning_runs` / `tuning_equipment` / `telemetry_deliveries` | `apps/yysls/core/tuning_history/repository.py` | schema v3；投递状态供遥测使用，见 [39-runtime/01-tuning-history.md](../06-runtime/01-tuning-history.md) |
+| `tuning_history.db` | `tuning_runs` / `tuning_equipment` / `telemetry_deliveries` | `apps/yysls/core/tuning_history/repository.py` | schema v3；投递状态供遥测使用，见 [39-runtime/01-tuning-history.md](../../30-design/01-architecture/06-runtime/01-tuning-history.md) |
 | `history-transfer/` | 手机历史回传的收发 zip 与 `preferences.json` | `core/android/history_transfer.py`、`core/ondevice/history_transfer.py`、`ui/mobile/offline.py` | zip 是传输中产物，`preferences.json` 按设备序列号记上次选择，复用 `SessionStore` 原语 |
 
 产出与日志在同级 `logs/` 下，与配置、会话互不干扰；同一次运行的结果与日志落在同一棵目录树：
@@ -153,7 +153,7 @@
 
 `config/session/` 会包含用户名、装备数据、执行结果与截图，因此：
 
-- 用户被明确要求**不要**整目录打包上传（见 [../../60-userguide/09-faq-and-feedback.md](../../../60-guide/04-desktop/09-faq-and-feedback.md)）；
+- 用户被明确要求**不要**整目录打包上传（见 [09-faq-and-feedback.md](../../60-guide/04-desktop/09-faq-and-feedback.md)）；
   需要排查时由开发者点名具体文件。
 - 匿名安装标识因此不放这里，落在 `config/local/telemetry/`（见 04-config-layering 的例外条目）。
 - `mcp.json` 的 `token`/`agent_key` 是访问凭据，属于「本机私有」而不是「可分享的运行态」；
@@ -179,9 +179,9 @@
 
 | 文档 | 内容 |
 |------|------|
-| [04-config-layering.md](04-config-layering.md) | system/local 分层、`session.json` 节点划分与用户偏好归属 |
-| [05-content-cache.md](05-content-cache.md) | 修订缓存、运行快照与基底状态 |
-| [../31-models/03-session-and-context.md](../03-models/03-session-and-context.md) | DSL `session`/`context` 与用户目录文件职责 |
-| [../31-models/04-profile.md](../03-models/04-profile.md) | Profile 四模型与数值语义 |
-| [../38-platform/02-instance-access.md](../05-platform/02-instance-access.md) | 主实例/只读实例边界与用户执行锁 |
-| [../39-runtime/01-tuning-history.md](../06-runtime/01-tuning-history.md) | 调律历史模型与投递状态 |
+| [02-config-layering.md](02-config-layering.md) | system/local 分层、`session.json` 节点划分与用户偏好归属 |
+| [03-content-cache.md](03-content-cache.md) | 修订缓存、运行快照与基底状态 |
+| [31-models/03-session-and-context.md](../../30-design/01-architecture/03-models/03-session-and-context.md) | DSL `session`/`context` 与用户目录文件职责 |
+| [31-models/04-profile.md](../../30-design/01-architecture/03-models/04-profile.md) | Profile 四模型与数值语义 |
+| [38-platform/02-instance-access.md](../../30-design/01-architecture/05-platform/02-instance-access.md) | 主实例/只读实例边界与用户执行锁 |
+| [39-runtime/01-tuning-history.md](../../30-design/01-architecture/06-runtime/01-tuning-history.md) | 调律历史模型与投递状态 |

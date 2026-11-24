@@ -21,7 +21,7 @@
 | [02-tuning-management.md](../30-design/02-decisions/06-tuning/02-tuning-management.md) | 调律管理：实时总览、版本化历史、七天匿名补传 |
 | [03-smart-tuning.md](../30-design/02-decisions/06-tuning/03-smart-tuning.md) | 智能调律：结合备战方案毕业率的二次调律处理与剩余词条推演 |
 | [04-transmute-simulation.md](../30-design/02-decisions/06-tuning/04-transmute-simulation.md) | 模拟转律：八件装备联合转律建议、公共装备目标保存、备战方案第四假设 |
-| [05-nanlu-season.md](01-tuning/05-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 |
+| [05-nanlu-season.md](../30-design/02-decisions/06-tuning/05-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 |
 | [06-native-attack-affixes.md](../30-design/02-decisions/06-tuning/06-native-attack-affixes.md) | 本属攻击统一规则表达：用最大/最小本属攻击替代无相与本流派属攻 |
 | [07-base-attribute-baseline.md](01-tuning/07-base-attribute-baseline.md) | 115 阶满养成基础属性：按流派与来源选择推导无 40 词条基线 |
 
@@ -70,3 +70,4 @@
 | [29-ai-exception-recovery.md](03-platform/29-ai-exception-recovery.md) | AI 异常导航恢复提案：有限动作、检查点续跑与独立验收；未实施 |
 | [30-debug-frame-history.md](03-platform/30-debug-frame-history.md) | 识别帧历史诊断 FIFO、异常冻结包与反馈附件上传 |
 | [31-wf-simulation-hardening.md](03-platform/31-wf-simulation-hardening.md) | 离线WF模拟的回归门禁增强：无人值守弹窗门禁、状态覆盖断言、失败Diff、OCR缓存与宽容匹配档 |
+| [32-desktop-ui-polish.md](03-platform/32-desktop-ui-polish.md) | 桌面端高密度 UI 微规范收口与可读性改进：真机巡检、文字减压、高 DPI 弹性与横幅/弹窗收敛 |

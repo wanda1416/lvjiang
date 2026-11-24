@@ -26,7 +26,7 @@
 - 用户改一个条目 → local 只存那一个键，加载时按 key 覆盖 system 那份；
 - 用户新增条目 → local 只多一个键，排在末尾；
 - 系统后续新增或改值照常进合并视图；系统条目在用户层不可删除
-  （见 [配置分层](../04-overview/04-config-layering.md)）。
+  （见 [配置分层](../../../40-reference/01-config/02-config-layering.md)）。
 
 ## 2. 武学：武器和属性的唯一真源
 

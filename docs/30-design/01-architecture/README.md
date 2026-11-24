@@ -9,7 +9,7 @@
 
 | 契约 | 入口 |
 |------|------|
-| 契约 A：插件装配 | [plugins.md](01-plugins.md) |
+| 契约 A：插件装配 | [plugins.md](../../40-reference/05-plugins/01-contract.md) |
 
 ## 子区索引
 

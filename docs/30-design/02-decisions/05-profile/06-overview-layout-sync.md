@@ -198,5 +198,5 @@ hi = 480                                  # 挡住别机带来的离谱宽列
 ## 10. 相关文档
 
 - 存储契约：[Profile 共享模块](../../01-architecture/03-models/04-profile.md)
-- 定义通道：[在线配置、会员内容与功能激活](../../../60-guide/01-accounts/01-appendix-a-online-config.md)
+- 定义通道：[在线配置、会员内容与功能激活](../../../60-guide/01-accounts/01-online-config-and-activation.md)
 - 用户操作：[2. 主界面与用户管理](../../../60-guide/04-desktop/02-main-interface.md)

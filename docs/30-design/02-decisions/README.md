@@ -14,7 +14,7 @@
 | [02-tuning-management.md](06-tuning/02-tuning-management.md) | 调律管理：实时总览、版本化历史、七天匿名补传 |
 | [03-smart-tuning.md](06-tuning/03-smart-tuning.md) | 智能调律：结合备战方案毕业率的二次调律处理与剩余词条推演 |
 | [04-transmute-simulation.md](06-tuning/04-transmute-simulation.md) | 模拟转律：八件装备联合转律建议、公共装备目标保存、备战方案第四假设 |
-| [05-nanlu-season.md](../../20-plans/01-tuning/05-nanlu-season.md)（仅源码检出） | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 |
+| [05-nanlu-season.md](06-tuning/05-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 |
 | [06-native-attack-affixes.md](06-tuning/06-native-attack-affixes.md) | 本属攻击统一规则表达：用最大/最小本属攻击替代无相与本流派属攻 |
 | [07-base-attribute-baseline.md](../../20-plans/01-tuning/07-base-attribute-baseline.md)（仅源码检出） | 115 阶满养成基础属性：按流派与来源选择推导无 40 词条基线 |
 

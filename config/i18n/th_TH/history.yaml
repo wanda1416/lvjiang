@@ -1,62 +1,62 @@
 all_user_params:
-  任务: Task
+  任务: งาน
 batch:
-  全局任务参数: Global task parameters
-  恢复默认顺序: Restore Default Order
-  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to change the actual execution order; right-click to restore the default order or shuffle it; the order in Batch Configuration is only the initial order
-  重命名配置: Rename Configuration
-  随机打乱顺序: Shuffle Order
+  全局任务参数: พารามิเตอร์งานส่วนกลาง
+  恢复默认顺序: คืนค่าลำดับเริ่มต้น
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: ลากเพื่อปรับลำดับการทำงานจริง คลิกขวาเพื่อคืนค่าลำดับเริ่มต้นหรือสุ่มสลับลำดับ ลำดับในการตั้งค่าแบบชุดใช้เป็นลำดับเริ่มต้นเท่านั้น
+  重命名配置: เปลี่ยนชื่อการตั้งค่า
+  随机打乱顺序: สุ่มสลับลำดับ
 common:
-  batch_run_id: Batch Run ID
-  duration: Duration
-  finished_at: End Time
-  scope: Scope
-  source: Source
-  task: Task
-  task_count: Tasks
-  task_run_id: Task Run ID
-  title: Task History
-  unavailable: Task history is temporarily unavailable
-  参数: Parameters
-  当前批次: Current batch
-  执行目标: Execution Target
-  重命名: Rename
+  batch_run_id: รหัสการรันแบบชุด
+  duration: ระยะเวลา
+  finished_at: เวลาสิ้นสุด
+  scope: ขอบเขต
+  source: แหล่งที่มา
+  task: งาน
+  task_count: จำนวนงาน
+  task_run_id: รหัสการรันงาน
+  title: ประวัติงาน
+  unavailable: ประวัติงานไม่พร้อมใช้งานชั่วคราว
+  参数: พารามิเตอร์
+  当前批次: ชุดงานปัจจุบัน
+  执行目标: เป้าหมายการทำงาน
+  重命名: เปลี่ยนชื่อ
 daily_history:
-  任务历史: Task History
-  任务历史暂不可用: Task history is temporarily unavailable
-  任务数: Tasks
-  单独运行: Single Run
-  已选: selected
-  开始日期不能晚于结束日期: Start date cannot be after the end date
-  批量历史: Batch History
-  批量运行: Batch Run
-  日期范围无效: Invalid date range
-  未记录用户: Unrecorded user
-  查看全部单任务: View all single tasks
-  查询: Query
-  清除勾选，改为全部: Clear the check to include all
-  窗口: Window
-  结束时间: End Time
-  耗时: Duration
-  返回全部任务: Back to all tasks
-  配置: Config
-  任务: Task
+  任务历史: ประวัติงาน
+  任务历史暂不可用: ประวัติงานไม่พร้อมใช้งานชั่วคราว
+  任务数: จำนวนงาน
+  单独运行: รันเดี่ยว
+  已选: เลือกแล้ว
+  开始日期不能晚于结束日期: วันที่เริ่มต้นต้องไม่ช้ากว่าวันที่สิ้นสุด
+  批量历史: ประวัติแบบชุด
+  批量运行: รันแบบชุด
+  日期范围无效: ช่วงวันที่ไม่ถูกต้อง
+  未记录用户: ไม่ได้บันทึกผู้ใช้
+  查看全部单任务: ดูงานเดี่ยวทั้งหมด
+  查询: ค้นหา
+  清除勾选，改为全部: ล้างการเลือกเพื่อแสดงทั้งหมด
+  窗口: หน้าต่าง
+  结束时间: เวลาสิ้นสุด
+  耗时: เวลาที่ใช้
+  返回全部任务: กลับไปยังงานทั้งหมด
+  配置: การตั้งค่า
+  任务: งาน
 history_viewer:
-  刷新日志: Refresh Log
-  当前级别没有日志: No logs at this level
-  执行日志: Execution Log
-  执行结果: Execution Result
-  批量报告: Batch Report
-  文件较大，仅预览开头 2 MiB: File is large; only the first 2 MiB is previewed
-  文件较大，仅预览末尾 2 MiB: File is large; only the last 2 MiB is previewed
-  无法读取文件: Cannot read the file
-  日志文件为空: The log file is empty
-  日志级别: Log Level
-  显示所选级别及更高级别的日志: Show logs at the selected level and above
-  没有对应文件: No matching file
-  结果不是有效 JSON，显示原文: The result isn't valid JSON; showing raw text
-  记录详情: Record Details
-  选择一条记录查看内容: Select a record to view its content
-  选择一条记录查看日志: Select a record to view its log
+  刷新日志: รีเฟรชบันทึก
+  当前级别没有日志: ไม่มีบันทึกในระดับนี้
+  执行日志: บันทึกการทำงาน
+  执行结果: ผลลัพธ์การทำงาน
+  批量报告: รายงานแบบชุด
+  文件较大，仅预览开头 2 MiB: ไฟล์มีขนาดใหญ่ แสดงตัวอย่างเฉพาะ 2 MiB แรก
+  文件较大，仅预览末尾 2 MiB: ไฟล์มีขนาดใหญ่ แสดงตัวอย่างเฉพาะ 2 MiB สุดท้าย
+  无法读取文件: ไม่สามารถอ่านไฟล์ได้
+  日志文件为空: ไฟล์บันทึกว่างเปล่า
+  日志级别: ระดับบันทึก
+  显示所选级别及更高级别的日志: แสดงบันทึกในระดับที่เลือกและระดับที่สูงกว่า
+  没有对应文件: ไม่มีไฟล์ที่ตรงกัน
+  结果不是有效 JSON，显示原文: ผลลัพธ์ไม่ใช่ JSON ที่ถูกต้อง กำลังแสดงข้อความต้นฉบับ
+  记录详情: รายละเอียดรายการ
+  选择一条记录查看内容: เลือกรายการเพื่อดูเนื้อหา
+  选择一条记录查看日志: เลือกรายการเพื่อดูบันทึก
 settings_dialog:
-  输入参数: Input Parameters
+  输入参数: พารามิเตอร์อินพุต

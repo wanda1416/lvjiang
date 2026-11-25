@@ -181,7 +181,11 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     get_resolver().reset_edit_baselines()
     from .core.scene.registry import initialize_scene_registry
     initialize_scene_registry()
+    # 任务栏归类必须在第一个窗口出现之前设置，否则 Windows 会沿用 python.exe 的图标。
+    from .ui.widgets.app_icon import apply_app_icon, set_windows_app_user_model_id
+    set_windows_app_user_model_id()
     _app = QApplication(sys.argv)
+    apply_app_icon(_app)
     from .core.config.conflicts import set_conflict_handler
     from .ui.config_conflicts import confirm_config_overwrite
     set_conflict_handler(confirm_config_overwrite)

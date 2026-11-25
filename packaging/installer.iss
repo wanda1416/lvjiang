@@ -29,6 +29,8 @@ OutputDir=..\dist
 OutputBaseFilename=lvjiang-v{#AppVersion}-win64-setup
 Compression=lzma2/ultra64
 SolidCompression=yes
+; 安装包自身的图标，与 exe 同源（src/lvjiang/assets/icon.ico）
+SetupIconFile=..\src\lvjiang\assets\icon.ico
 
 ; UI
 WizardStyle=modern

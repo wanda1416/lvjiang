@@ -53,7 +53,7 @@ where = ["src"]
 
 # grammar.lark 是 DSL 解析器运行时要读的文件，不声明的话非 editable 安装会缺它
 [tool.setuptools.package-data]
-lvjiang = ["workflows/grammar/*.lark"]
+lvjiang = ["workflows/grammar/*.lark", "assets/*.png", "assets/*.ico"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

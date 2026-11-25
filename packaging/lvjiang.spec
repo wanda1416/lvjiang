@@ -14,8 +14,16 @@
 """
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
+# 图标资产与 exe 图标同源（src/lvjiang/assets，由 scripts/one_off/make_app_icon.py 生成）。
+# 运行时按包目录加载，所以 datas 的落点是 lvjiang/assets。
+from pathlib import Path
+
+_ASSETS = Path(SPECPATH) / ".." / "src" / "lvjiang" / "assets"
+_APP_ICON = str(_ASSETS / "icon.ico")
+
 datas, binaries, hiddenimports = collect_all("rapidocr_onnxruntime")
 datas += [("../src/lvjiang/workflows/grammar", "lvjiang/workflows/grammar")]
+datas += [(str(_ASSETS / "icon.png"), "lvjiang/assets")]
 hiddenimports += collect_submodules("lvjiang")
 # keyring 通过运行时发现加载 Windows 凭据后端。
 hiddenimports += ["keyring.backends.Windows"]
@@ -59,6 +67,7 @@ exe = EXE(
     upx=False,  # UPX 压缩会显著抬高杀软误报率，不启用
     console=False,  # GUI 应用；崩溃日志由 crash_handler 落盘 logs/crashes/
     disable_windowed_traceback=False,
+    icon=_APP_ICON,
 )
 
 # 同一份 Analysis 再包一个控制台 exe：两者共用 launcher.py，由 argv 分流。
@@ -76,6 +85,7 @@ cli = EXE(
     upx=False,
     console=True,
     disable_windowed_traceback=False,
+    icon=_APP_ICON,
 )
 
 coll = COLLECT(

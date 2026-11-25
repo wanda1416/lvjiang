@@ -24,6 +24,7 @@ import struct
 import subprocess
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -65,12 +66,29 @@ class AgentTransportError(AgentError):
         self.request_sent = request_sent
 
 
+_PROCESS_CLIENT_ID = uuid.uuid4().hex
+LEASE_BUSY_ERROR_CODE = "lease_busy"
+
+
+def _default_client_id() -> str:
+    """复用实例出生标识（config/session/instance.id）；不可用时退回进程级 UUID。"""
+    try:
+        from ..account.identity import stable_instance_id
+        value = stable_instance_id().strip()
+        if value:
+            return value
+    except Exception:  # noqa: BLE001
+        pass
+    return _PROCESS_CLIENT_ID
+
+
 class AgentOpError(AgentError):
     """设备端执行失败（ok=false），error 为设备端给的原因"""
 
-    def __init__(self, message: str, retryable: bool = False):
+    def __init__(self, message: str, retryable: bool = False, error_code: str = ""):
         super().__init__(message)
         self.retryable = retryable
+        self.error_code = error_code
 
 
 # ─── 线协议（纯函数，便于单测）────────────────────────────
@@ -123,10 +141,11 @@ class AgentClient:
     """
 
     def __init__(self, device: AdbDevice, socket_name: str = AGENT_SOCKET_NAME,
-                 timeout: float = 15.0):
+                 timeout: float = 15.0, *, client_id: str | None = None):
         self._device = device
         self._socket_name = socket_name
         self._timeout = timeout
+        self._client_id = client_id or _default_client_id()
         self._sock: socket.socket | None = None
         self._port: int | None = None
         self._lock = threading.RLock()
@@ -339,7 +358,8 @@ class AgentClient:
             if self._sock is None or self._status.get("offline_protocol") not in (1, 2, 3, 4):
                 return ""
             try:
-                header, _ = self._roundtrip("control_begin", timeout=timeout)
+                header, _ = self._roundtrip(
+                    "control_begin", timeout=timeout, client_id=self._client_id)
             except (AgentTransportError, OSError, struct.error) as exc:
                 logger.warning(f"设备执行占用探测通信异常，交执行路径处理: {exc}")
                 self._drop_socket()
@@ -385,9 +405,13 @@ class AgentClient:
         if not self.connect(3.0):
             return False
         if self._owns_execution:
-            header, _ = self._roundtrip("control_begin")
+            header, _ = self._roundtrip("control_begin", client_id=self._client_id)
             if not header.get("ok"):
-                raise AgentOpError(str(header.get("error") or "无法恢复设备执行占用"))
+                raise AgentOpError(
+                    str(header.get("error") or "无法恢复设备执行占用"),
+                    retryable=bool(header.get("retryable")),
+                    error_code=str(header.get("error_code") or ""),
+                )
         return True
 
     def _retry_connection(self) -> bool:
@@ -422,8 +446,11 @@ class AgentClient:
                     raise
                 header, payload = self._roundtrip(op, timeout, **params)
             if not header.get("ok"):
-                raise AgentOpError(str(header.get("error") or header.get("message") or "设备端未说明原因"),
-                                   retryable=bool(header.get("retryable")))
+                raise AgentOpError(
+                    str(header.get("error") or header.get("message") or "设备端未说明原因"),
+                    retryable=bool(header.get("retryable")),
+                    error_code=str(header.get("error_code") or ""),
+                )
             self._device.recovery_coordinator.succeeded()
             return header, payload
 
@@ -563,6 +590,7 @@ class AgentInput(InputBackend):
         self._execution_pending = False
         self._execution_run_active: Callable[[], bool] | None = None
         self._execution_handoff_ready: threading.Event | None = None
+        self._target_handle: Any = None
 
     def configure_recovery(self, policy: AndroidRecoveryConfig) -> None:
         """宿主启动一次执行链时调用；批量内的脚本不重新读取设置。"""
@@ -587,8 +615,52 @@ class AgentInput(InputBackend):
             self._execution_run_active = run_active
             self._execution_handoff_ready = ready_event
 
+    def bind_target_handle(self, handle: Any) -> None:
+        """绑定所属 TargetHandle，热替换后在重试循环内解析到当前最新输入后端。"""
+        self._target_handle = handle
+
+    def _resolve_active_input(self) -> Any:
+        """若所属 TargetHandle 已切到新输入后端，直接返回最新一代；否则返回 self。"""
+        handle = self._target_handle
+        if handle is None:
+            return self
+        try:
+            current = handle.binding().input_ctrl
+        except Exception:  # noqa: BLE001
+            return self
+        if current is None or current is self:
+            return self
+        return current
+
+    def _delegate_to_adb_backend(self, backend: Any, op: str, **params: Any) -> None:
+        """热替换从 Agent 切到非 Agent 输入后端（如 AdbInput）时的动作委派。"""
+        if op == "control_begin":
+            return
+        if op in {"tap", "long_press"}:
+            backend.click_screen(
+                params["x"], params["y"], pre_delay=(0, 0),
+                post_delay=(0, 0), random_offset=False,
+                hold=params.get("duration_ms", 50) / 1000 if op == "long_press" else None)
+        elif op in {"swipe", "hold_move"}:
+            move = params.get("move_ms", params.get("duration_ms", 100)) / 1000
+            hold = params.get("hold_ms", 0) / 1000
+            backend.drag_screen(
+                params["x1"], params["y1"], params["x2"], params["y2"],
+                duration=move, hold=hold, pre_delay=(0, 0), post_delay=(0, 0))
+        elif op == "key":
+            code = params.get("keycode")
+            if code is None:
+                code = {"BACK": 4, "HOME": 3}[params["name"]]
+            backend.device.shell("input", "keyevent", str(code))
+        else:
+            raise AgentTransportError("已切换为 ADB 输入，不支持代理专有手势")
+
     def ensure_execution_owned(self) -> None:
-        """在确认旧连接已释放且运行仍活动时，为重连后的新代理通道幂等补取 control_begin。"""
+        """在确认旧连接已释放且运行仍活动时，为重连后的新代理通道幂等补取 control_begin。
+
+        补取失败时不静默清掉 ``_execution_pending``，由调用方（``_call`` 重试循环）
+        走可恢复通道重试，避免无租约直接下发 ``tap`` 触发致命错误。
+        """
         if not self._execution_pending or self._using_adb:
             return
         ready = self._execution_handoff_ready
@@ -615,29 +687,34 @@ class AgentInput(InputBackend):
                 self._execution_pending = False
                 self._execution_handoff_ready = None
                 return
-            if (self._client._sock is None
-                    or self._client.status.get("offline_protocol") not in (1, 2, 3, 4)):
+            if self._client.status.get("offline_protocol") not in (1, 2, 3, 4):
                 self._execution_pending = False
                 self._execution_handoff_ready = None
                 return
+            if self._client._sock is None:
+                raise AgentTransportError("运行中重连补取执行占用失败: 代理未连接")
             try:
-                header, _ = self._client._roundtrip("control_begin", timeout=2.0)
-                if header.get("ok"):
-                    self._client._owns_execution = True
-                else:
-                    reason = str(header.get("error") or header.get("message") or "设备端未说明原因")
-                    logger.warning(f"[Agent] 运行中重连补取执行占用被拒: {reason}")
-            except (AgentError, AdbConnectionError, OSError) as exc:
+                header, _ = self._client._roundtrip(
+                    "control_begin", timeout=2.0, client_id=self._client._client_id)
+            except (AgentTransportError, AdbConnectionError, OSError) as exc:
                 logger.warning(f"[Agent] 运行中重连补取执行占用失败: {exc}")
-            finally:
+                raise AgentTransportError(f"运行中重连补取执行占用失败: {exc}") from exc
+            if header.get("ok"):
+                self._client._owns_execution = True
                 self._execution_pending = False
                 self._execution_handoff_ready = None
+                return
+            reason = str(header.get("error") or header.get("message") or "设备端未说明原因")
+            error_code = str(header.get("error_code") or "")
+            retryable = bool(header.get("retryable")) or error_code == LEASE_BUSY_ERROR_CODE
+            logger.warning(f"[Agent] 运行中重连补取执行占用被拒: {reason}")
+            raise AgentOpError(reason, retryable=retryable, error_code=error_code)
 
     def begin_execution(self) -> None:
         if self._using_adb:
             return
         if self._client.status.get("offline_protocol") in (1, 2, 3, 4):
-            self._call("control_begin", "取得执行占用")
+            self._call("control_begin", "取得执行占用", client_id=self._client._client_id)
             self._client._owns_execution = not self._using_adb
 
     def end_execution(self) -> None:
@@ -673,16 +750,24 @@ class AgentInput(InputBackend):
                 self._client.timeout,
                 gesture_ms / 1000 + self._GESTURE_TIMEOUT_MARGIN,
             )
-        if op != "control_begin":
-            self.ensure_execution_owned()
+        lease_busy_retries = 0
         while True:
             if self.stop_check and self.stop_check():
                 raise AgentTransportError("输入恢复已停止")
+            active = self._resolve_active_input()
+            if active is not self:
+                if isinstance(active, AgentInput):
+                    active._call(op, what, gesture_ms=gesture_ms, **params)
+                    return
+                self._delegate_to_adb_backend(active, op, **params)
+                return
             if self._using_adb:
                 self._call_adb(op, **params)
                 self._client.device.recovery_coordinator.succeeded()
                 return
             try:
+                if op != "control_begin":
+                    self.ensure_execution_owned()
                 self._client.call(op, timeout=timeout, **params)
                 return
             except AgentTransportError as error:
@@ -698,6 +783,33 @@ class AgentInput(InputBackend):
                     self._client._owns_execution = False
                     logger.warning("[输入] 代理恢复失败，已降级为 ADB；本次运行使用 ADB 输入")
             except AgentOpError as error:
+                if error.error_code == LEASE_BUSY_ERROR_CODE:
+                    # 租约占用属瞬时可恢复通道事件：先检查是否已切新后端，再短退避重试，
+                    # 仍被占用则转入恢复状态机，避免误判为致命业务失败。
+                    if self._resolve_active_input() is not self:
+                        continue
+                    if lease_busy_retries < 3:
+                        lease_busy_retries += 1
+                        logger.warning(
+                            "[Agent] {}遇租约占用，第 {}/3 次短暂重试：{}",
+                            what, lease_busy_retries, error,
+                        )
+                        time.sleep(0.35)
+                        continue
+                    lease_busy_retries = 0
+                    device = self._client.device
+                    action = device.recovery_coordinator.after_agent_failure(
+                        AgentTransportError(str(error), request_sent=False),
+                        what, uncertain=False,
+                        fallback_supported=op in self._ADB_OPERATIONS,
+                    )
+                    if action is RecoveryAction.FALLBACK:
+                        self._using_adb = True
+                        self.kind = InputBackendKind.ADB
+                        self._client.close()
+                        self._client._owns_execution = False
+                        logger.warning("[输入] 租约持续被占，已降级为 ADB；本次运行使用 ADB 输入")
+                    continue
                 logger.warning("[Agent] {}未成功：{}", what, error)
                 raise
 

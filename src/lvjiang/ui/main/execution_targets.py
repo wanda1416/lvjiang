@@ -108,6 +108,12 @@ class TargetHandle:
             dict(target.window) if target.window is not None else None,
             target.resume_event,
         )
+        self._bind_input_handle(target.input_ctrl)
+
+    def _bind_input_handle(self, input_ctrl: Any) -> None:
+        bind = getattr(input_ctrl, "bind_target_handle", None)
+        if callable(bind):
+            bind(self)
 
     def binding(self) -> ResourceBinding:
         with self._lock:
@@ -121,6 +127,7 @@ class TargetHandle:
                 dict(target.window) if target.window is not None else None,
                 target.resume_event,
             )
+            self._bind_input_handle(target.input_ctrl)
             return self._binding
 
     def update_window(self, window: dict[str, Any]) -> ResourceBinding:

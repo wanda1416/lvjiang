@@ -84,6 +84,8 @@ object AgentServer {
     /** 所有 op 串行：手势与截图本来就不该并发，省掉各桥接对象的并发考虑 */
     val executionLock = Any()
     @Volatile private var pcOwner: Long? = null
+    @Volatile private var pcOwnerClientId: String? = null
+    @Volatile private var pcOwnerSocket: LocalSocket? = null
     private var uploadFile: File? = null
     private var uploadPreserveTaskParams = true
     private var uploadPreserveBatchConfig = true
@@ -205,7 +207,7 @@ object AgentServer {
                 }
                 val buf = ByteArray(len)
                 input.readFully(buf)
-                val (header, payload) = handle(String(buf, Charsets.UTF_8))
+                val (header, payload) = handle(String(buf, Charsets.UTF_8), client)
                 writeResponse(output, header, payload)
             }
         } catch (e: IOException) {
@@ -215,6 +217,8 @@ object AgentServer {
                 synchronized(executionLock) {
                     if (pcOwner == Thread.currentThread().id) {
                         pcOwner = null
+                        pcOwnerClientId = null
+                        pcOwnerSocket = null
                         FloatService.setPcConnected(false)
                     }
                 }
@@ -246,7 +250,7 @@ object AgentServer {
      * 处理一条请求，返回 (JSON 头, 二进制负载或 null)。
      * 与 socket 无关，便于自检里直接调用。任何异常都折叠成 ok=false，连接不会因此断掉。
      */
-    fun handle(requestJson: String): Pair<JSONObject, ByteArray?> {
+    fun handle(requestJson: String, client: LocalSocket? = null): Pair<JSONObject, ByteArray?> {
         val req = try {
             JSONObject(requestJson)
         } catch (e: Exception) {
@@ -264,9 +268,9 @@ object AgentServer {
                 if (op in controlOps && localTaskDriving()) {
                     fail("手机离线任务正在执行，请先结束任务")
                 } else if (op in controlOps && pcOwner != null && pcOwner != Thread.currentThread().id) {
-                    fail("设备已被另一条 PC 执行连接占用")
+                    fail("设备已被另一条 PC 执行连接占用", retryable = true, errorCode = "lease_busy")
                 } else {
-                    dispatch(op, req)
+                    dispatch(op, req, client)
                 }
             }
         } catch (e: Throwable) {
@@ -281,7 +285,7 @@ object AgentServer {
         return result
     }
 
-    private fun dispatch(op: String, req: JSONObject): Pair<JSONObject, ByteArray?> = when (op) {
+    private fun dispatch(op: String, req: JSONObject, client: LocalSocket? = null): Pair<JSONObject, ByteArray?> = when (op) {
         "ping", "status" -> ok(status())
         "screenshot" -> screenshot(req)
         "tap" -> tap(req)
@@ -298,16 +302,39 @@ object AgentServer {
         "calib_hide" -> calibHide()
         "float_icon" -> floatIcon(req)
         "control_begin" -> {
-            if (localTaskDriving() || pcOwner != null && pcOwner != Thread.currentThread().id) fail("设备正在执行其他任务")
-            else {
-                pcOwner = Thread.currentThread().id
-                FloatService.setPcConnected(true)
-                ok()
+            val reqClientId = req.optString("client_id", "").trim()
+            val sameClientTakeover = (
+                pcOwner != null
+                && pcOwner != Thread.currentThread().id
+                && reqClientId.isNotEmpty()
+                && reqClientId == pcOwnerClientId
+            )
+            when {
+                localTaskDriving() -> fail("手机离线任务正在执行，请先结束任务")
+                pcOwner != null && pcOwner != Thread.currentThread().id && !sameClientTakeover ->
+                    fail("设备已被另一条 PC 执行连接占用", retryable = true, errorCode = "lease_busy")
+                else -> {
+                    val staleSocket = if (sameClientTakeover) pcOwnerSocket else null
+                    pcOwner = Thread.currentThread().id
+                    pcOwnerClientId = reqClientId.ifEmpty { null }
+                    pcOwnerSocket = client
+                    FloatService.setPcConnected(true)
+                    if (staleSocket != null && staleSocket !== client) {
+                        Log.i(TAG, "同 client_id 重连接管执行租约，关闭旧连接")
+                        try {
+                            staleSocket.close()
+                        } catch (_: IOException) {
+                        }
+                    }
+                    ok()
+                }
             }
         }
         "control_end" -> {
             if (pcOwner == Thread.currentThread().id) {
                 pcOwner = null
+                pcOwnerClientId = null
+                pcOwnerSocket = null
                 FloatService.setPcConnected(false)
             }
             ok()
@@ -761,10 +788,15 @@ object AgentServer {
     private fun okBin(header: JSONObject, payload: ByteArray): Pair<JSONObject, ByteArray?> =
         header.put("ok", true) to payload
 
-    private fun fail(error: String, retryable: Boolean = false): Pair<JSONObject, ByteArray?> {
+    private fun fail(
+        error: String,
+        retryable: Boolean = false,
+        errorCode: String? = null,
+    ): Pair<JSONObject, ByteArray?> {
         Log.w(TAG, error)
         val header = JSONObject().put("ok", false).put("error", error)
         if (retryable) header.put("retryable", true)
+        if (!errorCode.isNullOrEmpty()) header.put("error_code", errorCode)
         return header to null
     }
 }

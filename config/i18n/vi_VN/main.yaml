@@ -50,6 +50,13 @@ main_window:
   : "Các tác vụ sau chưa kết thúc an toàn, tạm chưa đóng chương trình:\n{tasks}\n\nVui lòng thử đóng lại sau; nếu tác vụ không thể dừng, bạn có thể buộc đóng LvJiang từ hệ thống."
   任务仍在收尾: Tác vụ vẫn đang hoàn tất
   使用独立参数: Dùng tham số riêng
+  "恢复默认参数": "Khôi phục mặc định"
+  "参数已与脚本预置值一致，无需恢复": "Tham số đã khớp với giá trị mặc định của kịch bản, không cần khôi phục"
+  "清除本次加载的临时参数草稿，回到脚本预置值": "Xóa bản nháp tham số tạm của kịch bản này và quay về giá trị mặc định"
+  "把 {name} 的独立参数恢复为脚本预置值；其他用户与全局参数不受影响": "Khôi phục tham số riêng của {name} về mặc định; người dùng khác và tham số chung không bị ảnh hưởng"
+  "清除该脚本保存的全局参数，所有未使用独立参数的用户一起回到脚本预置值": "Xóa tham số chung đã lưu của kịch bản này; mọi người dùng không dùng tham số riêng sẽ quay về mặc định"
+  "临时脚本参数草稿": "bản nháp tham số kịch bản tạm thời"
+  "{name} 的独立参数": "tham số riêng của {name}"
   全部任务: Tất cả tác vụ
   关闭程序: Đóng chương trình
   切换日志显示级别：低于选中级别的日志将被隐藏: "Chuyển mức hiển thị nhật ký: nhật ký thấp hơn mức đã chọn sẽ bị ẩn"

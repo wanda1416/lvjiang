@@ -27,12 +27,19 @@ _TOKEN = ""
 _STAGE: Path | None = None
 
 
-def _discard_stage() -> None:
-    """删掉本次导出的暂存目录（幂等）；手机历史与附件原件不在其中。"""
+def _discard_stage(*, sweep_orphans: bool = False) -> None:
+    """删掉本次导出的暂存目录（幂等）；手机历史与附件原件不在其中。
+
+    ``sweep_orphans=True`` 时一并清理上次进程异常退出残留的 ``.history-stage-*``。
+    """
     global _STAGE
     if _STAGE is not None:
         shutil.rmtree(_STAGE, ignore_errors=True)
         _STAGE = None
+    if sweep_orphans:
+        for stale in constants.PROJECT_ROOT.glob(".history-stage-*"):
+            if stale.is_dir():
+                shutil.rmtree(stale, ignore_errors=True)
 
 
 def request(operation: str, payload: str) -> str:
@@ -45,7 +52,7 @@ def request(operation: str, payload: str) -> str:
                 from .plugins import ensure_loaded
                 ensure_loaded()
                 _TOKEN = ""  # 新导出失败也不能继续读取旧包。
-                _discard_stage()
+                _discard_stage(sweep_orphans=True)
                 # 暂存放在项目根下的隐藏目录，与 .offline-stage- 同口径：安卓端没有
                 # 可靠的系统 temp，而项目根一定可写；导出结束即整目录删除。
                 _STAGE = Path(tempfile.mkdtemp(prefix=".history-stage-", dir=constants.PROJECT_ROOT))

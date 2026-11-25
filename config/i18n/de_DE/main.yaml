@@ -71,6 +71,13 @@ main_window:
     über das System.'
   任务仍在收尾: Aufgaben werden noch abgeschlossen
   使用独立参数: Eigene Parameter verwenden
+  "恢复默认参数": "Standardwerte wiederherstellen"
+  "参数已与脚本预置值一致，无需恢复": "Parameter entsprechen bereits den Skript-Standardwerten"
+  "清除本次加载的临时参数草稿，回到脚本预置值": "Temporäre Parameterentwürfe dieses Skripts löschen und Standardwerte wiederherstellen"
+  "把 {name} 的独立参数恢复为脚本预置值；其他用户与全局参数不受影响": "Eigene Parameter von {name} auf Skript-Standardwerte zurücksetzen; andere Benutzer und globale Parameter bleiben unverändert"
+  "清除该脚本保存的全局参数，所有未使用独立参数的用户一起回到脚本预置值": "Gespeicherte globale Parameter dieses Skripts löschen; alle Benutzer ohne eigene Parameter kehren zu den Standardwerten zurück"
+  "临时脚本参数草稿": "temporärer Skript-Parameterentwurf"
+  "{name} 的独立参数": "eigene Parameter von {name}"
   全部任务: Alle Aufgaben
   关闭程序: Programm schließen
   切换日志显示级别：低于选中级别的日志将被隐藏: 'Protokollstufe umschalten: Einträge unterhalb der gewählten

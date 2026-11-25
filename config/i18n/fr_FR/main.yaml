@@ -60,6 +60,13 @@ main_window:
     Réessayez de fermer plus tard ; si une tâche reste bloquée, forcez l''arrêt de LvJiang depuis le système.'
   任务仍在收尾: Tâches encore en cours de finalisation
   使用独立参数: Utiliser des paramètres dédiés
+  "恢复默认参数": "Rétablir par défaut"
+  "参数已与脚本预置值一致，无需恢复": "Les paramètres correspondent déjà aux valeurs par défaut du script"
+  "清除本次加载的临时参数草稿，回到脚本预置值": "Effacer le brouillon temporaire de paramètres et revenir aux valeurs par défaut du script"
+  "把 {name} 的独立参数恢复为脚本预置值；其他用户与全局参数不受影响": "Rétablir les paramètres indépendants de {name} par défaut ; les autres utilisateurs et paramètres globaux ne sont pas affectés"
+  "清除该脚本保存的全局参数，所有未使用独立参数的用户一起回到脚本预置值": "Effacer les paramètres globaux enregistrés de ce script ; tous les utilisateurs sans paramètres indépendants reviendront aux valeurs par défaut"
+  "临时脚本参数草稿": "brouillon temporaire de paramètres"
+  "{name} 的独立参数": "paramètres indépendants de {name}"
   全部任务: Toutes les tâches
   关闭程序: Fermer le programme
   切换日志显示级别：低于选中级别的日志将被隐藏: 'Changer le niveau d''affichage des journaux : les entrées inférieures au niveau choisi sont masquées'

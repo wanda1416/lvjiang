@@ -228,7 +228,12 @@ def test_rpc_retry_and_cancel_do_not_import_partial_history(histories, monkeypat
     assert not (pc / "config/session/daily_history.db").exists()
     assert pull_history(agent, pc, ["tasks"])["imported"]["tasks"] == 2
     assert pull_history(agent, pc, ["tasks"])["imported"]["tasks"] == 0
-    # 收发包不进 config/session，两端暂存目录用完即删
+    # 模拟上次进程崩溃遗留的暂存目录：下一次 begin 应一并清掉
+    orphan = phone / ".history-stage-crashed"
+    orphan.mkdir()
+    (orphan / "outgoing.zip").write_bytes(b"stale")
+    assert pull_history(agent, pc, ["tasks"])["imported"]["tasks"] == 0
+    # 收发包不进 config/session，两端暂存目录用完即删（含历史崩溃残留）
     assert not (pc / "config/session/history-transfer").exists()
     assert not list(phone.glob(".history-stage-*"))
 

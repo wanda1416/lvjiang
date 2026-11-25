@@ -541,16 +541,81 @@ class SceneRegistry:
 
         - 顺序（分组间 + 组内）→ ``scenes/_meta.json``；
         - 分组名 → ``scenes/{group}.yaml``（仅在新建或名称变化时写）。
+
+        **两层各写自己归属的成员**：注册表内存里是 system ∪ local 的合并视图，
+        整份写进一层会把另一层的分组固化过去——local 的「地图」分组就这样被
+        写进过 system，把本机私有分层变成随包内容。归属按磁盘判定（目录或分组
+        定义文件在哪一层），与加载侧「目录即归属」同一口径。
         """
-        save_scene_meta(self._resolver, self._group_order, self._group_scenes)
-        initial = getattr(self, "_initial_group_names", {})
-        for group_key in self._group_order:
-            name = self._groups.get(group_key, group_key)
-            if initial.get(group_key) != name \
-                    or not self._resolver.resolve_read(f"scenes/{group_key}.yaml"):
-                save_group_name(self._resolver, group_key, name)
+        with self._resolver.batch_changes():
+            if self._resolver.is_dev_mode():
+                # 开发模式：两层各写自己归属的分组与场景。整份合并视图写进
+                # system 会把 local 私有分层固化进随包内容（「地图」分组曾这
+                # 样从 local 漏进 system）。
+                self._save_layer_meta("system")
+                self._save_layer_meta("local")
+            else:
+                # 用户模式：local 是**排序补丁**，覆盖用户在合并视图里看到的
+                # 组内顺序（含 system 场景），故整份写入 local。
+                save_scene_meta(
+                    self._resolver, self._group_order, self._group_scenes)
+            initial = getattr(self, "_initial_group_names", {})
+            for group_key in self._group_order:
+                name = self._groups.get(group_key, group_key)
+                if initial.get(group_key) != name \
+                        or not self._resolver.resolve_read(f"scenes/{group_key}.yaml"):
+                    save_group_name(
+                        self._resolver, group_key, name,
+                        layer=self._explicit_write_layer(group_key))
         self._initial_group_names = dict(self._groups)
         logger.info(f"已保存分组配置: {self._group_order}")
+
+    def _layer_root(self, layer: str) -> Path:
+        return self._resolver.system_dir if layer == "system" \
+            else self._resolver.local_dir
+
+    def _owner_layer(self, group_key: str) -> str:
+        """分组归属层：local 有分组定义或目录就算 local，否则算 system。"""
+        local_scenes = self._resolver.local_dir / "scenes"
+        if (local_scenes / group_key).is_dir() \
+                or (local_scenes / f"{group_key}.yaml").is_file():
+            return "local"
+        return "system"
+
+    def _explicit_write_layer(self, group_key: str) -> str | None:
+        """写分组的显式层参数：开发模式下 local 归属必须显式写回 local。"""
+        if self._resolver.is_dev_mode() and self._owner_layer(group_key) == "local":
+            return "local"
+        return None
+
+    def _layer_meta_view(self, layer: str) -> tuple[list[str], dict[str, list[str]]]:
+        """按层从磁盘归属推导这一层 ``_meta.json`` 的内容（目录即归属）。
+
+        归属本层的分组无条件收录；被另一层拥有、但本层有同名场景影子（用户
+        覆盖场景）的分组也要收录，否则本层这些场景在组内的顺序无处可写。
+        """
+        base = self._layer_root(layer) / "scenes"
+        order: list[str] = []
+        groups: dict[str, list[str]] = {}
+        for group_key in self._group_order:
+            owned = (base / group_key).is_dir() \
+                or (base / f"{group_key}.yaml").is_file()
+            scenes = [key for key in self._group_scenes.get(group_key, [])
+                      if (base / group_key / f"{key}.yaml").is_file()]
+            if owned or scenes:
+                order.append(group_key)
+                groups[group_key] = scenes
+        return order, groups
+
+    def _save_layer_meta(self, layer: str) -> None:
+        order, groups = self._layer_meta_view(layer)
+        has_meta = (self._layer_root(layer) / "scenes" / "_meta.json").is_file()
+        if not order and not has_meta:
+            # 该层没有分组也没有历史 meta：不凭空造一个空文件
+            return
+        save_scene_meta(
+            self._resolver, order, groups,
+            layer="local" if self._resolver.is_dev_mode() and layer == "local" else None)
 
     # ─── 场景 CRUD ──────────────────────────────────────────
 

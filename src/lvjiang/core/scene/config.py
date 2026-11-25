@@ -273,20 +273,28 @@ def save_scene_meta(
     resolver: ConfigResolver,
     group_order: list[str],
     groups: dict[str, list[str]],
+    *,
+    layer: str | None = None,
 ) -> None:
-    """写 ``scenes/_meta.json``：开发模式写 system；用户模式写 local 排序补丁。"""
+    """写 ``scenes/_meta.json``：开发模式写 system；用户模式写 local 排序补丁。
+
+    ``layer`` 显式指定写哪一层。一层的 meta 只能放这一层归属的分组与场景：
+    注册表内部是 system ∪ local 的合并视图，整份写进一层会把另一层的分组
+    固化过去（local 的「地图」分组曾这样被写进 system）。
+    """
     doc = build_scene_meta(group_order, groups)
     text = json.dumps(doc, ensure_ascii=False, indent=2) + "\n"
-    resolver.write_entity(SCENE_META_REL, text)
+    resolver.write_entity(SCENE_META_REL, text, layer=layer)
 
 
-def save_group_name(resolver: ConfigResolver, group_key: str, name: str) -> None:
+def save_group_name(resolver: ConfigResolver, group_key: str, name: str,
+                    *, layer: str | None = None) -> None:
     """写分组定义 ``scenes/{group}.yaml``（开发 → system；用户 → local 覆盖名）。"""
     import yaml
     rel = f"scenes/{group_key}.yaml"
     resolver.write_entity(rel, yaml.safe_dump(
         {"name": name}, allow_unicode=True, default_flow_style=False,
-        sort_keys=False))
+        sort_keys=False), layer=layer)
 
 
 def ensure_group_dir(resolver: ConfigResolver, group_key: str) -> None:

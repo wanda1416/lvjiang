@@ -1,5 +1,5 @@
 {
-  "content_version": 2,
+  "content_version": 5,
   "groups": [
     {
       "key": "general",
@@ -39,7 +39,9 @@
         "bag_wallet_detail",
         "bugan_detail",
         "zhanling_detail",
-        "shop_detail"
+        "shop_detail",
+        "build_main",
+        "build_alchemy"
       ]
     },
     {

@@ -1,5 +1,6 @@
 #% id: scan_wallet
 #% name: 扫描钱袋货币
+#% group: 数据
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

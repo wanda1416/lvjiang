@@ -1,5 +1,6 @@
 #% id: purchase_xinfa
 #% name: 购买心法心得
+#% group: 日常
 #% runnable: true
 #% batchable: true
 #% batch_check: check_xinfa_batch

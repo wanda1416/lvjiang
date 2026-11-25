@@ -1,5 +1,6 @@
 #% id: gather_zhayu
 #% name: 太极炸鱼
+#% group: 材料
 #% runnable: true
 #% env: [android, desktop]
 #% note: |-

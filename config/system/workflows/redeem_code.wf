@@ -1,5 +1,6 @@
 #% id: redeem_code
 #% name: 输入兑换码
+#% group: 日常
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

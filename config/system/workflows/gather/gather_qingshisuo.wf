@@ -1,5 +1,6 @@
 #% id: gather_qingshisuo
 #% name: 刷青石锁
+#% group: 材料
 #% runnable: true
 #% env: [android, desktop]
 #% requires: [device_gesture]

@@ -1,5 +1,6 @@
 #% id: scan_all_loadouts
 #% name: 扫描全部备战方案
+#% group: 数据
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

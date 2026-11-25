@@ -1,5 +1,6 @@
 #% id: gather_hugujiu
 #% name: 刷虎骨酒
+#% group: 材料
 #% runnable: true
 #% env: [android, desktop]
 #% requires: [device_gesture]

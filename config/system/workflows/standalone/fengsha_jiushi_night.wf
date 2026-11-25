@@ -1,6 +1,6 @@
 #% id: fengsha_jiushi_night
 #% name: 风沙酒肆·夜宿谜影
-#% group: 活动
+#% group: 玩法
 #% runnable: true
 #% batchable: false
 #% env: [desktop, android]

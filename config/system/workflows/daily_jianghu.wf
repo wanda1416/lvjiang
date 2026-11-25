@@ -1,5 +1,6 @@
 #% id: daily_jianghu
 #% name: 每日江湖号令
+#% group: 日常
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

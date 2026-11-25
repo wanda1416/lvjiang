@@ -1,5 +1,6 @@
 #% id: gather_du_gao
 #% name: 刷毒和膏
+#% group: 材料
 #% runnable: true
 #% env: [android, desktop]
 #% requires: [device_gesture]

@@ -1,5 +1,6 @@
 #% id: stake_mingjinhong
 #% name: 鸣金虹木桩测伤
+#% group: 测伤
 #% runnable: true
 #% env: [desktop, android]
 #% note: |-

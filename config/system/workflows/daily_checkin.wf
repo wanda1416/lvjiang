@@ -1,5 +1,6 @@
 #% id: daily_checkin
 #% name: 每日自动签到
+#% group: 日常
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

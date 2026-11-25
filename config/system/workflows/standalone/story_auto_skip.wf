@@ -1,5 +1,6 @@
 #% id: story_auto_skip
 #% name: 自动剧情跳过
+#% group: 玩法
 #% runnable: true
 #% batchable: false
 #% env: [android]

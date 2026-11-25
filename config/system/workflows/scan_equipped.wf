@@ -1,5 +1,6 @@
 #% id: scan_equipped
 #% name: 扫描备战装备
+#% group: 数据
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

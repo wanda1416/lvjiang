@@ -1,5 +1,6 @@
 #% id: purchase_bugan
 #% name: 购买不肝商店
+#% group: 日常
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

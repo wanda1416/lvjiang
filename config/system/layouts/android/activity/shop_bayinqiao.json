@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "regions": [
     {
       "key": "price",
@@ -38,15 +38,15 @@
     },
     {
       "key": "refresh",
-      "x_ratio": 0.0607,
+      "x_ratio": 0.04825,
       "y_ratio": 0.873,
-      "w_ratio": 0.1071,
-      "h_ratio": 0.0873
+      "w_ratio": 0.11245000000000001,
+      "h_ratio": 0.10320000000000007
     },
     {
       "key": "buy",
-      "x_ratio": 0.8464,
-      "y_ratio": 0.873,
+      "x_ratio": 0.8393,
+      "y_ratio": 0.8809500000000001,
       "w_ratio": 0.1286,
       "h_ratio": 0.0873
     },

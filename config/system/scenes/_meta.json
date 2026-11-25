@@ -1,5 +1,5 @@
 {
-  "content_version": 1,
+  "content_version": 2,
   "groups": [
     {
       "key": "general",
@@ -39,8 +39,7 @@
         "bag_wallet_detail",
         "bugan_detail",
         "zhanling_detail",
-        "shop_detail",
-        "shop_bayinqiao"
+        "shop_detail"
       ]
     },
     {
@@ -61,7 +60,8 @@
         "activity_huoyun",
         "activity_fujingxingzhou",
         "activity_mengzhu",
-        "activity_jianghuyi"
+        "activity_jianghuyi",
+        "shop_bayinqiao"
       ]
     },
     {

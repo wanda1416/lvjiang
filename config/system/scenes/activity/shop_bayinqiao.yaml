@@ -1,4 +1,4 @@
-content_version: 3
+content_version: 2
 key: shop_bayinqiao
 name: 八音窍
 views:
@@ -8,6 +8,7 @@ views:
 - key: public
   name: 公示页
   kind: page
+hide_all_views: true
 regions:
 - key: price
   name: 当前最低单价

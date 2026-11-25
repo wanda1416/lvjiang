@@ -72,9 +72,10 @@ def move_scene_group_across_all_layouts(
         if source is None:
             continue
         try:
+            layer = resolver.local_only_layer(old_rel)
             content = source.read_text(encoding="utf-8")
-            resolver.write_entity(new_rel, content)
-            resolver.delete_entity(old_rel)
+            resolver.write_entity(new_rel, content, layer=layer)
+            resolver.delete_entity(old_rel, layer=layer)
             logger.info(
                 f"布局坐标已随场景换组移动: {old_rel} -> {new_rel}")
         except Exception as exc:  # noqa: BLE001

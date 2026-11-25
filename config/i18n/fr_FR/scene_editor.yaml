@@ -292,6 +292,7 @@ scene_editor:
   移除当前场景的引用，保留源场景定义和布局坐标: Retire la référence de la scène actuelle tout en conservant la définition et les coordonnées de la scène source
   等分网格: Grille à découpage égal
   系统场景不可删除: Les scènes système ne peuvent pas être supprimées
+  系统场景不可更改分组: Les scènes système ne peuvent pas changer de groupe
   系统场景不能修改 key: La clé d'une scène système ne peut pas être modifiée
   系统场景只能修改显示名称，不能修改 key: Pour les scènes système, seul le nom d'affichage est modifiable, pas la clé
   系统布局不可删除；不使用时切换到其他布局即可: Les mises en page système ne peuvent pas être supprimées ; basculez simplement vers une autre si besoin

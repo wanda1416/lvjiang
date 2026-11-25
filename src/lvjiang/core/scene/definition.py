@@ -575,7 +575,12 @@ class SceneRegistry:
             else self._resolver.local_dir
 
     def _owner_layer(self, group_key: str) -> str:
-        """分组归属层：local 有分组定义或目录就算 local，否则算 system。"""
+        """分组归属层：与加载侧 system > local 一致，system 有定义或目录即属 system，
+        仅存在于 local 时才归属 local。"""
+        system_scenes = self._resolver.system_dir / "scenes"
+        if (system_scenes / group_key).is_dir() \
+                or (system_scenes / f"{group_key}.yaml").is_file():
+            return "system"
         local_scenes = self._resolver.local_dir / "scenes"
         if (local_scenes / group_key).is_dir() \
                 or (local_scenes / f"{group_key}.yaml").is_file():

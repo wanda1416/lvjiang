@@ -292,6 +292,7 @@ scene_editor:
   移除当前场景的引用，保留源场景定义和布局坐标: Remove a referência da cena atual, mantendo a definição e as coordenadas da cena de origem
   等分网格: Grade dividida igualmente
   系统场景不可删除: Cenas do sistema não podem ser excluídas
+  系统场景不可更改分组: Cenas do sistema não podem mudar de grupo
   系统场景不能修改 key: Não é possível alterar a chave de uma cena do sistema
   系统场景只能修改显示名称，不能修改 key: Em cenas do sistema só é possível alterar o nome de exibição, não a chave
   系统布局不可删除；不使用时切换到其他布局即可: Layouts do sistema não podem ser excluídos; basta alternar para outro layout se não for usá-lo

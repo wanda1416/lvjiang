@@ -86,3 +86,26 @@ def test_local_scene_inside_system_group_is_ordered_in_local_meta(tmp_path):
     assert "map" not in system_meta
     assert local_meta["general"] == ["a"], "local 影子的组内顺序要落在 local meta"
     assert local_meta["map"] == ["m"]
+
+
+def test_rename_system_group_with_local_shadow_writes_system_yaml(tmp_path):
+    """开发模式下 system 分组在 local 有同名子目录时，重命名仍写回 system。"""
+    resolver, registry = _build_registry(tmp_path)
+    _write(resolver.local_dir / "scenes" / "general" / "a.yaml",
+           "key: a\nname: A（本地覆盖）\n")
+    manifest = load_scene_manifest(resolver)
+    registry = SceneRegistry(
+        resolver=resolver,
+        scene_order=manifest.order,
+        group_config=manifest.groups,
+        group_names=manifest.group_names,
+        disabled_scenes=manifest.disabled,
+        group_layers=manifest.group_layers,
+        scene_layers=manifest.scene_layers,
+    )
+
+    registry.rename_group("general", "通用改名")
+    registry.save_group_config()
+
+    assert "通用改名" in (resolver.system_dir / "scenes" / "general.yaml").read_text(encoding="utf-8")
+    assert not (resolver.local_dir / "scenes" / "general.yaml").exists()

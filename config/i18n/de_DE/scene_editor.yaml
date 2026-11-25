@@ -262,6 +262,7 @@ scene_editor:
   移除当前场景的引用，保留源场景定义和布局坐标: Referenz aus der aktuellen Szene entfernen; Definition und Layout-Koordinaten der Quellszene bleiben erhalten
   等分网格: Gleichmäßiges Raster
   系统场景不可删除: Systemszenen können nicht gelöscht werden
+  系统场景不可更改分组: Systemszenen können die Gruppe nicht wechseln
   系统场景不能修改 key: Der Key einer Systemszene kann nicht geändert werden
   系统场景只能修改显示名称，不能修改 key: Bei Systemszenen kann nur der Anzeigename geändert werden, nicht der Key
   系统布局不可删除；不使用时切换到其他布局即可: Systemlayouts können nicht gelöscht werden; wechseln Sie einfach zu einem anderen Layout

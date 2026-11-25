@@ -575,12 +575,16 @@ class SceneOpsMixin:
                     tr("系统场景只能修改显示名称，不能修改 key"))
             # 更改分组子菜单
             move_menu = menu.addMenu(tr("更改分组"))
-            registry = get_registry()
-            current_group = registry.get_scene_group(scene_key)
-            for gk, gn in registry.get_groups():
-                if gk != current_group:
-                    move_action = move_menu.addAction(gn)
-                    move_action.setData(gk)
+            if protected:
+                move_menu.setEnabled(False)
+                move_menu.menuAction().setToolTip(tr("系统场景不可更改分组"))
+            else:
+                registry = get_registry()
+                current_group = registry.get_scene_group(scene_key)
+                for gk, gn in registry.get_groups():
+                    if gk != current_group:
+                        move_action = move_menu.addAction(gn)
+                        move_action.setData(gk)
             menu.addSeparator()
         new_action = menu.addAction(tr("新建场景"))
         action = menu.exec(scene_tab_widget.mapToGlobal(pos))
@@ -607,7 +611,7 @@ class SceneOpsMixin:
             # 这里不再补写 save_group_config：重复写同一份 _meta 只会多触发
             # 一次内容索引重建与注册表重载。
             registry.move_scene_to_group(scene_key, target_group)
-        except ValueError as e:
+        except (ValueError, PermissionError) as e:
             QMessageBox.warning(self, tr("移动失败"), str(e))  # type: ignore[arg-type]
             return
         reload_scene_registry()

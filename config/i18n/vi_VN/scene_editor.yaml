@@ -262,6 +262,7 @@ scene_editor:
   移除当前场景的引用，保留源场景定义和布局坐标: "Gỡ tham chiếu khỏi cảnh hiện tại, giữ nguyên định nghĩa và tọa độ bố cục của cảnh nguồn"
   等分网格: Lưới chia đều
   系统场景不可删除: Không thể xóa cảnh hệ thống
+  系统场景不可更改分组: Không thể đổi nhóm cảnh hệ thống
   系统场景不能修改 key: Không thể sửa key của cảnh hệ thống
   系统场景只能修改显示名称，不能修改 key: "Cảnh hệ thống chỉ có thể sửa tên hiển thị, không thể sửa key"
   系统布局不可删除；不使用时切换到其他布局即可: Không thể xóa bố cục hệ thống; nếu không dùng hãy chuyển sang bố cục khác

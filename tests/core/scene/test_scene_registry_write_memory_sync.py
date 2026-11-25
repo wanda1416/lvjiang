@@ -161,3 +161,36 @@ def test_delete_scene_after_hot_reload(hot_reload):
             f"scenes/{group}/{DELETE_KEY}.yaml") is None
     finally:
         _purge(DELETE_KEY)
+
+
+def test_move_local_only_scene_keeps_layout_coords_in_local(hot_reload):
+    """开发模式下移动仅存于 local 的场景时，布局坐标必须留在 local，不得漏写进 system。"""
+    registry = get_registry()
+    resolver = hot_reload.resolver
+    groups = [group_key for group_key, _name in registry.get_groups()]
+    assert len(groups) >= 2
+    source_group, target_group = groups[0], groups[1]
+    key = "hot_reload_local_only_probe"
+
+    try:
+        scene_yaml = f"key: {key}\nname: 本地探针\n"
+        resolver.write_entity(f"scenes/{source_group}/{key}.yaml", scene_yaml, layer="local")
+        coords = {"content_version": 1, "regions": []}
+        resolver.write_entity(
+            f"layouts/android/{source_group}/{key}.json",
+            json.dumps(coords, ensure_ascii=False, indent=2) + "\n",
+            layer="local",
+        )
+        reload_scene_registry()
+        hot_reload.notifications.clear()
+
+        registry.move_scene_to_group(key, target_group)
+
+        assert not any(hot_reload.blocked_snapshots)
+        assert (resolver.local_dir / f"scenes/{target_group}/{key}.yaml").is_file()
+        assert not (resolver.system_dir / f"scenes/{target_group}/{key}.yaml").exists()
+        assert (resolver.local_dir / f"layouts/android/{target_group}/{key}.json").is_file()
+        assert not (resolver.local_dir / f"layouts/android/{source_group}/{key}.json").exists()
+        assert not (resolver.system_dir / f"layouts/android/{target_group}/{key}.json").exists()
+    finally:
+        _purge(key)

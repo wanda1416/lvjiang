@@ -1010,11 +1010,19 @@ class MainWindow(
         self._independent_params_checkbox.setVisible(False)
         self._independent_params_checkbox.toggled.connect(
             self._on_independent_params_toggled)
+        # 恢复默认参数：清掉保存过的参数，让面板回到 .wf 里的预置值。
+        # 只在参数确实偏离预置值时可点，避免按了没有反应。
+        self._reset_params_button = QPushButton(tr("恢复默认参数"))
+        self._reset_params_button.setObjectName("reset_task_params")
+        self._reset_params_button.setVisible(False)
+        self._reset_params_button.clicked.connect(self._on_reset_task_params)
+        apply_button_style(self._reset_params_button, variant="neutral")
         params_scope_row = QHBoxLayout()
         params_scope_row.setContentsMargins(0, 0, 0, 0)
         params_scope_row.setSpacing(8)
         params_scope_row.addWidget(self._independent_params_checkbox)
         params_scope_row.addStretch(1)
+        params_scope_row.addWidget(self._reset_params_button)
         daily_layout.addLayout(params_scope_row)
 
         self._workflow_note_label = _create_workflow_note_label()

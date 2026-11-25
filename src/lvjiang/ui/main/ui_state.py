@@ -9,7 +9,7 @@
 
 依赖主类提供：
     _main_splitter / _left_tabs / tabs / workflow_combo / _param_panel /
-    _workflow_note_label / _workflow_configs /
+    _workflow_note_label / _workflow_configs / _reset_params_button /
     _displayed_script_id / _get_selected_flow_config
 """
 
@@ -330,6 +330,7 @@ class UiStateMixin:
     def _on_param_value_changed(self, *_args):
         """非文本控件（勾选、下拉、数字）改动立即落盘。"""
         self._save_displayed_params()
+        self._refresh_reset_params_state()
 
     def _on_param_text_edited(self, *_args):
         """文本输入合并保存，避免每敲一个字都写文件。"""
@@ -339,6 +340,7 @@ class UiStateMixin:
             self._param_save_timer.setInterval(_PARAM_SAVE_DELAY_MS)
             self._param_save_timer.timeout.connect(self._save_pending_params)
         self._param_save_timer.start()
+        self._refresh_reset_params_state()
 
     def _persist_param_change(self, *_args):
         """兼容入口：按触发源决定立即保存还是合并保存。"""
@@ -489,6 +491,12 @@ class UiStateMixin:
                 context["definitions"], context["global_values"], editable=True)
             self._global_param_baseline = deepcopy(global_form.collect())
         global_panel.setVisible(is_user)
+        # 「恢复默认参数」跟着生效面板走：可点状态与提示都由这份上下文决定，
+        # 参数一改就重算，不必等面板重建。
+        self._displayed_param_context = context
+        self._displayed_param_preset = self._preset_param_values(
+            context["definitions"])
+        self._sync_reset_params_button(context)
 
     def _rebuild_effective_panel(self) -> None:
         """只重建生效面板（切执行用户用；全局值与用户无关）。"""
@@ -516,6 +524,8 @@ class UiStateMixin:
         self._displayed_param_cfg = None
         self._displayed_param_baseline = {}
         self._global_param_baseline = {}
+        self._displayed_param_context = None
+        self._displayed_param_preset = None
         refresh_feedback = getattr(self, "_refresh_daily_start_feedback", None)
         if callable(refresh_feedback):
             refresh_feedback()
@@ -530,6 +540,7 @@ class UiStateMixin:
         independent = getattr(self, "_independent_params_checkbox", None)
         if independent is not None:
             independent.setVisible(False)
+        self._sync_reset_params_button(None)
 
         flow_cfg = self._get_selected_flow_config()
         # ⚠️ 专用脚本不画参数面板
@@ -580,4 +591,143 @@ class UiStateMixin:
         else:
             from ...core.users.document import delete_user_workflow_params
             delete_user_workflow_params(username, workflow_id, users_dir)
+        self._rebuild_param_panel()
+
+    # ─── 恢复默认参数 ──────────────────────────────────────
+    #
+    # 「恢复默认参数」清的是**保存过的**参数，让生效面板回到 .wf 里的预置值
+    # （参数定义里的 ``default``，与启动兜底同源）。清哪一份由当前生效来源
+    # 决定，与上面那行「使用独立参数」指向的归属一致：
+    #
+    # - 共享：删该脚本的全局参数，所有未使用独立参数的用户一起回到预置值；
+    # - 独立：把预置值写进该用户的独立参数。不能只删独立参数——全局若被改过，
+    #   删掉后会回落到那份改过的全局值，用户点了「恢复默认」却看不到默认值。
+    #
+    # 可点条件只认「生效值是否偏离预置值」，不看有没有保存过：值与预置一致时
+    # 按了也没有反应，禁用并给出原因才符合实际。
+
+    def _preset_param_values(self, definitions: list[dict]) -> dict:
+        """脚本预置值：参数定义里的 default。"""
+        from ...core.task_params import parameter_defaults
+        return parameter_defaults(definitions)
+
+    @staticmethod
+    def _param_value_key(definition: dict, value):
+        """按参数类型收敛取值，供「是否偏离预置值」比较。
+
+        同一份值在三条路径上类型不同：元数据里 number 是 int，配置里存的是
+        字符串，表单 ``collect`` 又把 number 读成字符串。不按声明类型归一化，
+        就会把「3 / "3"」这种表示差异当成用户改过，按钮永远亮着。
+        """
+        kind = str(definition.get("type") or "select")
+        if kind == "number":
+            try:
+                return ("number", int(str(value).strip()))
+            except (TypeError, ValueError):
+                return ("number", str(value))
+        if kind in ("bool", "checkgroup"):
+            from ...workflows.builtins._coerce import to_bool
+            if kind == "bool":
+                return ("bool", to_bool(value))
+            items = value if isinstance(value, dict) else {}
+            return ("checkgroup", tuple(sorted(
+                (str(option), to_bool(checked))
+                for option, checked in items.items())))
+        return ("text", "" if value is None else str(value))
+
+    def _params_differ_from_preset(self, context: dict) -> bool:
+        """生效值是否偏离脚本预置值。
+
+        优先读生效面板的当前值，这样刚改完还没落盘的编辑也算「已修改」；
+        面板没有字段时退回上下文里的生效值。
+        """
+        preset = getattr(self, "_displayed_param_preset", None)
+        if preset is None:
+            preset = self._preset_param_values(context["definitions"])
+        form = getattr(self, "_effective_param_form", None)
+        if form is not None and form.has_fields():
+            values = form.collect()
+        else:
+            values = context.get("values") or {}
+        for definition in context["definitions"]:
+            name = str(definition.get("name") or "")
+            if not name or name not in preset:
+                continue
+            if (self._param_value_key(definition, preset[name])
+                    != self._param_value_key(definition, values.get(name))):
+                return True
+        return False
+
+    def _reset_params_tooltip(self, context: dict, modified: bool) -> str:
+        """按当前归属说明会清掉哪一份参数，或说明为什么不能点。"""
+        if not modified:
+            return tr("参数已与脚本预置值一致，无需恢复")
+        if context["temporary"]:
+            return tr("清除本次加载的临时参数草稿，回到脚本预置值")
+        if context["source"] == "user":
+            return tr(
+                "把 {name} 的独立参数恢复为脚本预置值；"
+                "其他用户与全局参数不受影响"
+            ).format(name=context["username"])
+        return tr(
+            "清除该脚本保存的全局参数，所有未使用独立参数的用户"
+            "一起回到脚本预置值")
+
+    def _sync_reset_params_button(self, context: dict | None) -> None:
+        """刷新「恢复默认参数」的可见、可点与提示。"""
+        button = getattr(self, "_reset_params_button", None)
+        if button is None:
+            return
+        if context is None:
+            button.setVisible(False)
+            button.setEnabled(False)
+            return
+        modified = self._params_differ_from_preset(context)
+        button.setVisible(True)
+        button.setEnabled(modified)
+        button.setToolTip(self._reset_params_tooltip(context, modified))
+
+    def _refresh_reset_params_state(self) -> None:
+        """参数改动后重算按钮状态；复用最近一次上下文，不重读配置。"""
+        context = getattr(self, "_displayed_param_context", None)
+        if context is None:
+            return
+        self._sync_reset_params_button(context)
+
+    def _on_reset_task_params(self) -> None:
+        """恢复默认参数：清掉已保存的参数，生效面板回到脚本预置值。"""
+        # 本次要丢弃的修改不能再算作「待保存」：防抖计时器停掉，生效面板的
+        # baseline 直接对齐当前值，否则随后重建面板时的 _save_displayed_params
+        # 会把手改的值又写回刚清掉的归属。全局对照面板不动——那边改的是全局，
+        # 不在这次重置范围内，照常在重建时落盘。
+        timer = getattr(self, "_param_save_timer", None)
+        if timer is not None:
+            timer.stop()
+        form = getattr(self, "_effective_param_form", None)
+        if form is not None and form.has_fields():
+            self._displayed_param_baseline = deepcopy(form.collect())
+        context = self._current_param_context()
+        if context is None:
+            return
+        if not self._params_differ_from_preset(context):
+            self._sync_reset_params_button(context)
+            return
+        workflow_id = str(context["flow_cfg"]["id"])
+        preset = self._preset_param_values(context["definitions"])
+        if context["temporary"]:
+            # 临时脚本的参数草稿只在内存里，清掉即回到预置值。
+            context["flow_cfg"]["_saved_params"] = {}
+            scope = tr("临时脚本参数草稿")
+        elif context["source"] == "user":
+            from ...core.users.document import set_user_workflow_params
+            user_manager = getattr(self, "_user_manager", None)
+            set_user_workflow_params(
+                context["username"], workflow_id, preset,
+                getattr(user_manager, "_users_dir", None))
+            scope = tr("{name} 的独立参数").format(name=context["username"])
+        else:
+            from ...core.config.wf_configs import delete_wf_config
+            delete_wf_config(workflow_id)
+            scope = tr("全局参数")
+        logger.info(f"已恢复默认参数: {workflow_id}（{scope}）")
         self._rebuild_param_panel()

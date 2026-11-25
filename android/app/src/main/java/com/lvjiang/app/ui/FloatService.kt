@@ -1388,7 +1388,10 @@ class FloatService : Service() {
             bounds.top <= bottom && top <= bounds.bottom
     }
 
-    private fun applyTouchThroughOnMain(bounds: RectF): TouchThroughLease? {
+    private fun applyTouchThroughOnMain(
+        bounds: RectF,
+    ): Pair<TouchThroughLease?, java.util.concurrent.CountDownLatch?> {
+        val updatedViews = mutableListOf<View>()
         val icon = floatView
         val iconParams = floatParams
         val hitIcon = icon != null && iconParams != null && windowOverlaps(icon, bounds)
@@ -1396,6 +1399,7 @@ class FloatService : Service() {
             if (iconTouchThroughDepth == 0) {
                 iconParams!!.flags = iconParams.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 runCatching { windowManager.updateViewLayout(icon!!, iconParams) }
+                updatedViews.add(icon!!)
             }
             iconTouchThroughDepth += 1
         }
@@ -1406,14 +1410,38 @@ class FloatService : Service() {
             if (panelTouchThroughDepth == 0) {
                 pParams!!.flags = pParams.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 runCatching { windowManager.updateViewLayout(panel!!, pParams) }
+                updatedViews.add(panel!!)
             }
             panelTouchThroughDepth += 1
         }
-        return if (hitIcon || hitPanel) TouchThroughLease(hitIcon, hitPanel, if (hitPanel) panel else null) else null
+        if (!hitIcon && !hitPanel) return Pair(null, null)
+        val lease = TouchThroughLease(hitIcon, hitPanel, if (hitPanel) panel else null)
+        if (updatedViews.isEmpty()) return Pair(lease, null)
+        // relayoutWindow 在 onPreDraw 之前完成：等这一帧 onPreDraw 即保证 WMS 已收到新 flag。
+        val settled = java.util.concurrent.CountDownLatch(updatedViews.size)
+        for (target in updatedViews) {
+            val vto = target.viewTreeObserver
+            if (vto.isAlive) {
+                val listener = object : android.view.ViewTreeObserver.OnPreDrawListener {
+                    override fun onPreDraw(): Boolean {
+                        val currentVto = target.viewTreeObserver
+                        if (currentVto.isAlive) currentVto.removeOnPreDrawListener(this)
+                        settled.countDown()
+                        return true
+                    }
+                }
+                vto.addOnPreDrawListener(listener)
+                target.invalidate()
+            } else {
+                settled.countDown()
+            }
+        }
+        return Pair(lease, settled)
     }
 
     /**
-     * 若手势包围盒命中悬浮球或已展开的悬浮面板，则临时为其加上 FLAG_NOT_TOUCHABLE。
+     * 若手势包围盒命中悬浮球或已展开的悬浮面板，则临时为其加上 FLAG_NOT_TOUCHABLE，
+     * 并等待首帧 onPreDraw 落地以确保 WMS/InputDispatcher 已生效。
      *
      * 用 3 态 AtomicInteger（0=待执行 / 1=已提交 / 2=已取消）杜绝超时泄漏：
      * 超时且主线程尚未开始时直接 CAS 取消，runnable 稍后跑起立即空返；
@@ -1421,15 +1449,19 @@ class FloatService : Service() {
      */
     private fun acquireTouchThroughIfHit(bounds: RectF): TouchThroughLease? {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return applyTouchThroughOnMain(bounds)
+            return applyTouchThroughOnMain(bounds).first
         }
         val state = java.util.concurrent.atomic.AtomicInteger(0)
         val leaseRef = java.util.concurrent.atomic.AtomicReference<TouchThroughLease?>(null)
+        val settledRef =
+            java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CountDownLatch?>(null)
         val latch = java.util.concurrent.CountDownLatch(1)
         ui.post {
             if (!state.compareAndSet(0, 1)) return@post
             try {
-                leaseRef.set(applyTouchThroughOnMain(bounds))
+                val (lease, settled) = applyTouchThroughOnMain(bounds)
+                leaseRef.set(lease)
+                settledRef.set(settled)
             } finally {
                 latch.countDown()
             }
@@ -1443,6 +1475,9 @@ class FloatService : Service() {
             }
             // 主线程已进入提交态，等它写完 leaseRef，保证与 finally 成对释放
             runCatching { latch.await() }
+        }
+        settledRef.get()?.let { settled ->
+            runCatching { settled.await(60L, java.util.concurrent.TimeUnit.MILLISECONDS) }
         }
         return leaseRef.get()
     }
@@ -1486,6 +1521,7 @@ class FloatService : Service() {
         /**
          * 自动化手势命中悬浮球或悬浮面板时默认临时穿透悬浮窗（不可关闭）：
          * 既避免脚本点击误触悬浮球暂停或点中面板按钮，又保证点击真实落到底层游戏界面。
+         * 面板在启动成功后自动收起；运行期展开面板属于用户自担，这里不对面板做豁免。
          * 注：仅覆盖无障碍（A11yBridge）主注入路径；PC 远程 via=shell 路径下悬浮球默认隐藏。
          */
         fun <T> withOverlayTouchThrough(bounds: RectF?, block: () -> T): T {

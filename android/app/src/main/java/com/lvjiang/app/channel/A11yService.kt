@@ -226,11 +226,19 @@ object A11yBridge {
     // 绝大多数设备是恒等）。映射放在这个注入口而不是各调用方：PC 代理通道与设备端 Python
     // 通道都经过这里，标定一次两边同时生效。
 
+    private fun pointsBounds(x1: Int, y1: Int, x2: Int = x1, y2: Int = y1): RectF =
+        RectF(
+            minOf(x1, x2).toFloat(),
+            minOf(y1, y2).toFloat(),
+            maxOf(x1, x2).toFloat(),
+            maxOf(y1, y2).toFloat(),
+        )
+
     /** 单点点击；durationMs 是按住时长。成功返回 null，失败返回原因 */
     fun tap(x: Int, y: Int, durationMs: Long = 50): String? {
         val p = ScreenMap.mapPoint(x, y)
         val path = Path().apply { moveTo(p[0].toFloat(), p[1].toFloat()) }
-        return dispatch(path, 0, durationMs)
+        return dispatch(path, 0, durationMs, pointsBounds(p[0], p[1]))
     }
 
     /** 直线滑动。成功返回 null，失败返回原因 */
@@ -241,7 +249,7 @@ object A11yBridge {
             moveTo(a[0].toFloat(), a[1].toFloat())
             lineTo(b[0].toFloat(), b[1].toFloat())
         }
-        return dispatch(path, 0, durationMs)
+        return dispatch(path, 0, durationMs, pointsBounds(a[0], a[1], b[0], b[1]))
     }
 
     /**
@@ -251,10 +259,10 @@ object A11yBridge {
     fun longPress(x: Int, y: Int, durationMs: Long): String? {
         val p = ScreenMap.mapPoint(x, y)
         val path = Path().apply { moveTo(p[0].toFloat(), p[1].toFloat()) }
-        return dispatch(path, 0, durationMs)
+        return dispatch(path, 0, durationMs, pointsBounds(p[0], p[1]))
     }
 
-    private fun dispatch(path: Path, startTime: Long, durationMs: Long): String? {
+    private fun dispatch(path: Path, startTime: Long, durationMs: Long, bounds: RectF): String? {
         val service = A11yService.instance ?: run {
             Log.w(TAG, "手势失败：无障碍服务未连接")
             return "无障碍服务未连接（辅助开关被系统或省电策略关掉？）"
@@ -267,7 +275,6 @@ object A11yBridge {
             .addStroke(stroke)
             .build()
 
-        val bounds = RectF().also { path.computeBounds(it, true) }
         return FloatService.withOverlayTouchThrough(bounds) {
             val latch = CountDownLatch(1)
             var completed = false
@@ -325,7 +332,7 @@ object A11yBridge {
             moveTo(a[0].toFloat(), a[1].toFloat())
             lineTo(b[0].toFloat(), b[1].toFloat())
         }
-        val bounds = RectF().also { movePath.computeBounds(it, true) }
+        val bounds = pointsBounds(a[0], a[1], b[0], b[1])
         return FloatService.withOverlayTouchThrough(bounds) {
             val moveStroke = android.accessibilityservice.GestureDescription.StrokeDescription(
                 movePath, 0, moveMs.coerceAtLeast(1), holdMs > 0,
@@ -374,13 +381,12 @@ object A11yBridge {
 
         val builder = android.accessibilityservice.GestureDescription.Builder()
         val bounds = RectF()
-        val strokeBounds = RectF()
         for ((index, s) in strokes.withIndex()) {
             val a = ScreenMap.mapPoint(s.x1, s.y1)
             val b = ScreenMap.mapPoint(s.x2, s.y2)
             val duration = (s.moveMs + s.holdMs).coerceAtLeast(1)
             val p = strokePath(a, b, s)
-            p.computeBounds(strokeBounds, true)
+            val strokeBounds = pointsBounds(a[0], a[1], b[0], b[1])
             if (index == 0) bounds.set(strokeBounds) else bounds.union(strokeBounds)
             builder.addStroke(
                 android.accessibilityservice.GestureDescription

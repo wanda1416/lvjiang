@@ -1,0 +1,107 @@
+#% id: craft_tiangong_daoju
+#% name: 制作天工道具
+#% group: 材料
+#% runnable: true
+#% env: [android, desktop]
+#% note: |-
+#%   适用于 制造 → 炼药 页的「天工道具」视图，单次运行任务
+#%   运行前请手动进入「天工道具」视图，并选中要制作的道具
+#%   每轮：数量上限 → 炼药 → 先等 5 秒，再最多轮询 20 次等「确定」→ 确定，按设定次数重复
+#%   桌面端「炼药」和「确定」都是 Space 键（布局已绑定），需要游戏窗口在前台
+#%   材料不足时游戏会弹「缺少以下材料，是否前往获取？」，脚本只记 warn 并结束任务，
+#%   不替用户点确认或取消（单次运行，不回收现场）
+#%   全程不做页面判定，起点不在该视图时会点到别处
+#% parameters:
+#%   - name: times
+#%     label: 制作次数
+#%     type: number
+#%     default: 10
+#%     min: 1
+#%     max: 999
+
+# 制作天工道具（物资-炼药 → 天工道具视图）
+#
+# 一轮只有三步：点「数量上限」把数量拉满（100）→ 点「炼药」→ 结果画面点「确定」。
+# 不做页面判定、不读库存与材料余量：脚本假设运行前已经停在「天工道具」视图并选好道具。
+#
+# 结果画面的等待分两段：
+#   先固定等 5 秒       — 画面最快也要 6 秒左右才出，先等掉大头
+#   再轮询最多 20 次    — 每拍只截一次图：先判「材料不足」弹窗，再复用同一帧判「确定」，
+#                         间隔用 @step_interval（默认 1-1.2 秒，最多再等约 20 秒），
+#                         次数写死，不会无限循环
+#
+# 两种要防的误判：
+#   1. 「确定」和「炼药」是同一个操作位置：安卓端两个按钮的坐标重叠，桌面端两者都是
+#      Space 键。等不够时盲发就会落回炼药，白白多炼一炉——所以确认画面出现再发。
+#   2. 材料不足时按「确定」/Space，游戏会直接弹「缺少以下材料，是否前往获取？」。这是
+#      标准确认/取消弹窗（general_control 的 [confirm]/[cancel]，判据与 scan_and_cancel
+#      同源；桌面端分别是 Space / Esc）。脚本只记 warn 并结束任务，不替用户点确认或
+#      取消：单次运行任务不做「前往获取」的决定，也不需要回收现场。
+#
+# 平台差异只在「数量上限」：安卓点 >| 按钮，桌面同样点那个按钮（没有键位绑定）。
+# 「炼药」「确定」两端的点击都由布局决定——安卓点坐标，桌面按 Space。
+#
+# 参数：
+#   times — 制作次数，默认 10
+# 前置：停在 制造 → 炼药 页的「天工道具」视图，且已选中要制作的道具。
+# 后置：按次数炼完就停在原页面，不返回主页、不切视图。
+# 返回：次数不合法或等不到结果画面时记错误日志并返回 -1；材料不足记 warn 并正常结束；
+#       按次数跑完不写返回值。
+
+default $times = 10
+
+if $times < 1
+    log error "制作天工道具：制作次数必须大于 0"
+    return -1
+end
+
+eval $done = 0
+loop $times
+    eval $round = $done + 1
+    log info "制作天工道具：第 " + $round + "/" + $times + " 次"
+
+    # 数量拉满：数量选择右侧的「>|」按钮，一次到上限 100
+    click [build_alchemy].[add_max] after wait @step_interval
+    # 炼药；先固定等 5 秒，剩下的交给轮询
+    click [build_alchemy].[lianyao] after wait 5
+
+    call $panel = wait_craft_result()
+    if $panel == 2
+        log warn "制作天工道具：材料不足，已停止制作（本次完成 " + $done + " 次）"
+        return 0
+    else if $panel < 0
+        log error "制作天工道具：等不到炼药结果画面（没出现「确定」），已中止"
+        return -1
+    end
+
+    click [build_alchemy].[confirm] after wait @step_interval
+    eval $done = $done + 1
+end
+
+log info "制作天工道具：已完成 " + $done + " 次制作"
+
+# ─── wait_craft_result ────────────────────────────────────
+# 轮询等炼药结果，同时认「材料不足」弹窗（内部过程）。
+#
+# 前置：已点过「炼药」并等过前面那 5 秒。
+# 后置：无副作用，只识别不点击。
+# 返回：1=结果画面已出现；2=材料不足；-1=轮询 20 次仍然没有。
+#
+# 每拍只截一次图：先用标准「确认/取消」弹窗判材料不足，命中即返回；没命中就
+# from last 复用同一帧看结果画面的「确定」，不重复截图。
+#
+# 判据与 subcall/page_action.wf 的 scan_and_cancel 同源：确认/取消任一按钮命中
+# 即证明弹窗存在（单个按钮可能因高亮、动画暂时读不出来）。这里只判不点。
+#
+# 次数写死 20 次：每拍间隔 @step_interval，最多再等约 20 秒就放弃，不会无限循环。
+def wait_craft_result()
+    eval $dialog_labels = ["确认", "确定", "取消"]
+    loop 20
+        scan [general_control].[confirm, cancel] as $dialog by contains_any $dialog_labels
+        if $dialog -> return 2
+        scan [build_alchemy].[confirm] as $hit from last by contains "确定"
+        if $hit -> return 1
+        wait @step_interval
+    end
+    return -1
+end

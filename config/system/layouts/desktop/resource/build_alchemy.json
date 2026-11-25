@@ -1,0 +1,28 @@
+{
+  "content_version": 1,
+  "regions": [
+    {
+      "key": "add_max",
+      "x_ratio": 0.9088541666666666,
+      "y_ratio": 0.7166666666666667,
+      "w_ratio": 0.019270833333333334,
+      "h_ratio": 0.03518518518518519
+    },
+    {
+      "key": "lianyao",
+      "x_ratio": 0.8625,
+      "y_ratio": 0.9064814814814814,
+      "w_ratio": 0.13697916666666668,
+      "h_ratio": 0.053703703703703705,
+      "activation_key": "SPACE"
+    },
+    {
+      "key": "confirm",
+      "x_ratio": 0.9416666666666667,
+      "y_ratio": 0.9166666666666666,
+      "w_ratio": 0.025,
+      "h_ratio": 0.028703703703703703,
+      "activation_key": "SPACE"
+    }
+  ]
+}

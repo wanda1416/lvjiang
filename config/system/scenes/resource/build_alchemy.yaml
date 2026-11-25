@@ -1,0 +1,28 @@
+content_version: 6
+key: build_alchemy
+name: 炼药
+views:
+- key: base
+  name: 药剂
+- key: tiangong_daoju
+  name: 天工道具
+hide_all_views: true
+regions:
+- key: add_max
+  name: 添加最大
+  type: func
+  is_text: false
+  is_clickable: true
+  view: tiangong_daoju
+- key: lianyao
+  name: 炼药
+  type: func
+  is_text: true
+  is_clickable: true
+  view: tiangong_daoju
+- key: confirm
+  name: 确定
+  type: func
+  is_text: true
+  is_clickable: true
+  view: tiangong_daoju

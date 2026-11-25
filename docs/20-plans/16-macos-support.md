@@ -98,7 +98,7 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
   `window_ops` 的 `sys.platform` 分支全部改读适配层；Windows 行为语义零变化
 - [ ] **P1-g** mac 真机验证（依赖 Phase 0）：本节状态停留在 2026-07；
   后续 macOS 出包与代理通道实机验证见
-  [2026-08-23-screen-calibration.md](../../80-history/02-dev/2026-08/2026-08-23-screen-calibration.md)：
+  [2026-08-23-screen-calibration.md](../80-history/02-dev/2026-08/2026-08-23-screen-calibration.md)：
   连设备 → scrcpy 流截图 → OCR → 跑一条完整调律工作流
 
 ## Phase 2 待办：窗口模式（8~10 天，可无限期后置）

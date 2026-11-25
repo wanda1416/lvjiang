@@ -27,3 +27,4 @@
 | [13-debug-frame-history.md](13-debug-frame-history.md) | 平台 | 识别帧历史诊断 FIFO、异常冻结包与反馈附件上传 |
 | [14-wf-simulation-hardening.md](14-wf-simulation-hardening.md) | 平台 | 离线 WF 模拟的回归门禁增强：无人值守弹窗门禁、状态覆盖断言、失败 Diff、OCR 缓存 |
 | [15-desktop-ui-polish.md](15-desktop-ui-polish.md) | 平台 | 桌面端高密度 UI 收口：真机巡检、文字减压、高 DPI 弹性与横幅/弹窗收敛 |
+| [16-macos-support.md](16-macos-support.md) | 平台 | macOS 平台支持计划与进度：Phase 1 真机验证、Phase 2 窗口模式、Phase 3 打包分发 |

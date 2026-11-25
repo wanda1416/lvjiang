@@ -45,7 +45,7 @@
 6. **局内地图目标闭环导航与撤离**：为渡尘墟、觉障林及后续同类玩法提供
    可复用的玩家/目标地图定位、目标锁定、短脉冲移动、重新定位、防卡和到达交互能力。
    导航核心不硬编码玩法名称，不直接关闭应用；具体机制、安全边界与分阶段计划见
-   [`07-in-match-navigation.md`](08-in-match-navigation.md)。
+   [`08-in-match-navigation.md`](08-in-match-navigation.md)。
 
 7. **AI 异常导航恢复**：规划，尚未实施；仅在已声明的安全检查点按需调用识图模型，
    程序验收后再继续，不授权购买、领奖或账本写入。范围、前置修正与分阶段验收见
@@ -59,7 +59,32 @@
    [设计](../30-design/01-architecture/09-workflows/06-workflow-simulation.md)，
    其未实装的门禁增强见[计划](14-wf-simulation-hardening.md)。
 
-> 上面 8 条是当前唯一清单；下方 P1/P2 是同一批事项的详情，重复项只留一处指针。
+9. **桌面端高密度 UI 收口**：未开始——真机视觉巡检、文字减压、高 DPI / 窄屏弹性、
+   剩余横幅与存量模态弹窗收敛，见 [桌面端高密度 UI 微规范收口计划](15-desktop-ui-polish.md)。
+
+10. **macOS 平台支持**：部分实现——Phase 1（ADB 模式）代码完成待 mac 真机验证，
+    Phase 2（窗口模式）与 Phase 3（打包分发）未开始，见 [macOS 平台支持计划](16-macos-support.md)。
+
+11. **大世界地图运行时与未实现能力**：部分实现——地图/地域目录、探查底图与同缩放拼接已落地；
+    地域选择与界碑传送运行时函数见 [大世界地图目录与探查底图](11-world-map-catalog.md)，
+    整图自动采集、跨缩放视口匹配、POI/玩家位置检测器等见 [地图架构未实现清单](../30-design/01-architecture/06-runtime/02-maps.md#尚未实现)。
+
+12. **Agent MCP 验收与脚本读写工具面**：部分实现——调律 MCP 与文档访问主链路已实现，
+    待 Windows 安装及 WorkBuddy / 真实游戏实机验收（见 [09-agent-mcp.md](09-agent-mcp.md)、
+    [10-agent-docs-access.md](10-agent-docs-access.md)）；**脚本读写 MCP 工具面**尚未实现
+    （待实现契约散见 [00-script-task-brief.md](../70-agent/10-contracts/00-script-task-brief.md) §8 与
+    [03-script-authoring.md](../70-agent/20-operations/03-script-authoring.md) §9–10）。
+
+13. **场景 Panel `regions` 型语法**：规划中——将多个已定义 Region 合并到同一 Panel 并按 `[name]` 寻址，
+    详见 [场景布局定义](../30-design/01-architecture/07-scene/01-scene-layout-definition.md) 与
+    [DSL 概念](../40-reference/02-dsl/02-concepts.md)。
+
+14. **其余部分实现方案的收尾缺口**：
+    - 115 阶满养成基础属性细分来源：[02-base-attribute-baseline.md](02-base-attribute-baseline.md)
+    - 用户 Profile 角色基础数据/玩法进度/地区解锁/材料库存与对应 UI：[03-profile-overview.md](03-profile-overview.md)
+    - 袅袅之音清单完整云同步语义：[06-linger-checklist.md](06-linger-checklist.md)
+
+> 上面 14 条是当前唯一清单（覆盖 `20-plans/` 全部未完成方案及散落在其他文档层的规划项）；下方 P1/P2 是重点事项的详情，重复项只留一处指针。
 
 ---
 
@@ -139,7 +164,7 @@
 
 ### 3. macOS ADB 模式真机验证 {#p1-mac-adb}
 
-**位置**: `docs/00-meta/01-platforms/01-macos.md` Phase 1 · P1-g
+**位置**: `docs/20-plans/16-macos-support.md` Phase 1 · P1-g
 
 **状态**:
 - ✅ P0-a ~ P0-d：依赖矩阵 + pytest 全绿（macOS 12.7.6 验证）
@@ -256,7 +281,7 @@
 
 ### 6. macOS 窗口模式支持 {#p2-mac-window}
 
-**位置**: `docs/00-meta/01-platforms/01-macos.md` Phase 2
+**位置**: `docs/20-plans/16-macos-support.md` Phase 2
 
 **范围**: 8~10 天工作量，可无限期后置
 
@@ -335,6 +360,64 @@ MVP 已可用（总览 / 调律分析 / 数据同步）。明确不在第一阶�
 
 ---
 
-> P2 #11（profile 记账判定三份重复）与 #12（meta 锁 SQL 三处维护）已于
+### 11. Agent 脚本读写 MCP 工具面 {#p2-agent-script-mcp}
+
+**位置**: `docs/70-agent/10-contracts/00-script-task-brief.md`§8、`docs/70-agent/20-operations/03-script-authoring.md`§9–10
+
+当前 MCP 仅开放调律分析与配置生成链路，脚本读写仍由外部 Agent 直接操作本地文件；
+契约中预留的脚本读写 MCP 工具面尚未实现。
+
+**待办**:
+- [ ] 在 MCP 服务中按既有安全边界开放 `.wf` 校验与 `config/local/workflows/` 受限写入
+- [ ] 同步更新 `09-agent-mcp.md` 与 `70-agent/` 对应状态
+
+**优先级**: 🟢 **低**（当前 CLI + 本地文件契约已可用）
+
+---
+
+### 12. 场景 Panel `regions` 型语法 {#p2-panel-regions}
+
+**位置**: `docs/30-design/01-architecture/07-scene/01-scene-layout-definition.md`、`docs/40-reference/02-dsl/02-concepts.md`
+
+当前所有 Panel 均为 `type: grid`；文档中规划的 `type: regions`（多个已定义 Region
+聚合成 Panel 并通过 `[name]` 寻址）尚未实现。
+
+**待办**:
+- [ ] 布局 schema 与场景加载器支持 `type: regions`
+- [ ] DSL 寻址与场景编辑器支持 `[name]` 访问
+
+**优先级**: 🟢 **低**（暂无强需求阻塞）
+
+---
+
+### 13. 大世界地图与局内导航运行时 {#p2-world-map-runtime}
+
+**位置**: `docs/20-plans/11-world-map-catalog.md`、`docs/20-plans/08-in-match-navigation.md`、`docs/30-design/01-architecture/06-runtime/02-maps.md`§尚未实现
+
+地图/地域目录、探查截图预览与同缩放拼接已落地，运行时消费与自动探图尚未实现。
+
+**待办**:
+- [ ] 地域选择与界碑传送运行时函数
+- [ ] POI / 玩家位置大地图检测器、跨缩放视口匹配与整图自动采集
+- [ ] 局内导航状态机与闭环移动原语（见 `08-in-match-navigation.md`）
+
+**优先级**: 🟢 **中**（依赖具体玩法脚本推进节奏）
+
+---
+
+### 14. 桌面端高密度 UI 微规范收口 {#p2-desktop-ui-polish}
+
+**位置**: `docs/20-plans/15-desktop-ui-polish.md`
+
+**待办**:
+- [ ] 真机三主题视觉巡检（人工验收）
+- [ ] 高密度界面“文字减压”与高 DPI / 窄屏弹性适配
+- [ ] 剩余横幅与存量模态弹窗收敛
+
+**优先级**: 🟢 **低**（待排期）
+
+---
+
+> 原 P2 #11（profile 记账判定三份重复）与 #12（meta 锁 SQL 三处维护）已于
 > 2026-11-15 收口（`e4f7de37`、`a271849d`、`3c9ea1fc`），按本文件约定清出；
 > 细节见 git 历史与 `docs/80-history/02-dev/`。

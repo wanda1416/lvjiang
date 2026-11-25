@@ -389,7 +389,7 @@ python -m mypy
 
 ## 🗺️ 路线图
 
-项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/20-plans/01-backlog.md)，平台计划见 [Android](docs/80-history/01-meta-archive/01-android-platform-progress.md) 与 [macOS](docs/00-meta/01-platforms/01-macos.md)；历史阶段快照见 [roadmap](docs/80-history/01-roadmap.md)（仅作存档，不代表当前范围）。
+项目按阶段演进：项目骨架 → 坐标校准 → POI 截取与 OCR → UI 状态检测 → 词条解析器 → 输入封装 → 工作流 DSL 与引擎 → 规则引擎配置化 → GUI 完善 → 安卓独立执行端 → 手机端批量与账户同步。当前待办见 [backlog](docs/20-plans/01-backlog.md)，平台计划见 [Android](docs/80-history/01-meta-archive/01-android-platform-progress.md) 与 [macOS](docs/20-plans/16-macos-support.md)；历史阶段快照见 [roadmap](docs/80-history/01-roadmap.md)（仅作存档，不代表当前范围）。
 
 ---
 

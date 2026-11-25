@@ -4,7 +4,9 @@
 > 涉及模块：`src/lvjiang/core/`（36 个根模块，6236 行）
 > 关键词：目录分层、模块归属、import 迁移、评审稿
 
-> 本文是**方案**，不是已完成的事实。落地前需要确认包名与批次；落地后应把结论
+> 状态：已实现归档（B1–B4 对应 `core/{history,users,updates,qrcode,about}/` 均已落地，仅作历史设计记录留存）。
+>
+> （原稿说明）本文是**方案**，不是已完成的事实。落地前需要确认包名与批次；落地后应把结论
 > 合并进 `docs/30-architecture/30-overview/06-session-data-map.md` 的相关表格。
 
 ---

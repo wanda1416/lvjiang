@@ -82,6 +82,16 @@ def _default_client_id() -> str:
     return _PROCESS_CLIENT_ID
 
 
+def _control_begin_params(client: Any) -> dict[str, Any]:
+    """``control_begin`` 的身份参数。
+
+    设备端只在这条指令上按 ``client_id`` 判断「同机重连接管」，所以身份只能是可选
+    字段：没有该属性的实现（测试替身、第三方客户端）不带它，行为与旧版一致。
+    """
+    value = getattr(client, "client_id", "")
+    return {"client_id": value} if isinstance(value, str) and value else {}
+
+
 class AgentOpError(AgentError):
     """设备端执行失败（ok=false），error 为设备端给的原因"""
 
@@ -172,6 +182,11 @@ class AgentClient:
     @property
     def connected(self) -> bool:
         return self._sock is not None
+
+    @property
+    def client_id(self) -> str:
+        """本客户端身份；同机重连时设备端据此把执行租约接管给新连接。"""
+        return self._client_id
 
     @property
     def status(self) -> dict:
@@ -359,7 +374,8 @@ class AgentClient:
                 return ""
             try:
                 header, _ = self._roundtrip(
-                    "control_begin", timeout=timeout, client_id=self._client_id)
+                    "control_begin", timeout=timeout,
+                    **_control_begin_params(self))
             except (AgentTransportError, OSError, struct.error) as exc:
                 logger.warning(f"设备执行占用探测通信异常，交执行路径处理: {exc}")
                 self._drop_socket()
@@ -402,16 +418,26 @@ class AgentClient:
 
     def _reconnect(self) -> bool:
         # 完整重建转发与握手，已 close 或代理进程退出也能恢复。
+        #
+        # connect() 会先 close()，把 _owns_execution 清零；因此必须先记下重连前
+        # 是否持租约——持过就必须重新 control_begin。漏掉这一步，重连后的 controlOps
+        # 会被设备端以「设备已被另一条 PC 执行连接占用」拒绝，而 _call 的补租约只在
+        # _execution_pending 时生效（只有换目标才置位），纯传输重连就永远救不回来。
+        owns_execution = self._owns_execution
         if not self.connect(3.0):
             return False
-        if self._owns_execution:
-            header, _ = self._roundtrip("control_begin", client_id=self._client_id)
+        if owns_execution:
+            header, _ = self._roundtrip(
+                "control_begin", **_control_begin_params(self))
             if not header.get("ok"):
                 raise AgentOpError(
                     str(header.get("error") or "无法恢复设备执行占用"),
                     retryable=bool(header.get("retryable")),
                     error_code=str(header.get("error_code") or ""),
                 )
+            # 重新持租约：漏掉这一句，结束运行时的 control_end 不会发出，
+            # 设备端租约要留到连接断开才释放。
+            self._owns_execution = True
         return True
 
     def _retry_connection(self) -> bool:
@@ -695,7 +721,8 @@ class AgentInput(InputBackend):
                 raise AgentTransportError("运行中重连补取执行占用失败: 代理未连接")
             try:
                 header, _ = self._client._roundtrip(
-                    "control_begin", timeout=2.0, client_id=self._client._client_id)
+                    "control_begin", timeout=2.0,
+                    **_control_begin_params(self._client))
             except (AgentTransportError, AdbConnectionError, OSError) as exc:
                 logger.warning(f"[Agent] 运行中重连补取执行占用失败: {exc}")
                 raise AgentTransportError(f"运行中重连补取执行占用失败: {exc}") from exc
@@ -710,11 +737,38 @@ class AgentInput(InputBackend):
             logger.warning(f"[Agent] 运行中重连补取执行占用被拒: {reason}")
             raise AgentOpError(reason, retryable=retryable, error_code=error_code)
 
+    def _takeover_execution_lease(self, timeout: float = 2.0) -> bool:
+        """租约被占时按 ``client_id`` 尝试接管；成功即重新持有租约。
+
+        设备端只对 ``control_begin`` 做「同机重连接管」，``controlOps`` 一律拒绝，
+        所以被拒后必须先补一次 ``control_begin``：否则重发原 op 只会再被拒一次，
+        纯传输重连（没有换目标、``_execution_pending`` 未置位）就永远走不出这个循环。
+        """
+        with self._client._lock:
+            if self._using_adb or self._client._sock is None:
+                return False
+            try:
+                header, _ = self._client._roundtrip(
+                    "control_begin", timeout=timeout,
+                    **_control_begin_params(self._client))
+            except (AgentError, AdbConnectionError, OSError) as exc:
+                logger.warning(f"[Agent] 接管执行租约失败: {exc}")
+                return False
+            if not header.get("ok"):
+                reason = str(
+                    header.get("error") or header.get("message") or "设备端未说明原因")
+                logger.warning(f"[Agent] 接管执行租约被拒: {reason}")
+                return False
+            self._client._owns_execution = True
+            return True
+
     def begin_execution(self) -> None:
         if self._using_adb:
             return
         if self._client.status.get("offline_protocol") in (1, 2, 3, 4):
-            self._call("control_begin", "取得执行占用", client_id=self._client._client_id)
+            self._call(
+                "control_begin", "取得执行占用",
+                **_control_begin_params(self._client))
             self._client._owns_execution = not self._using_adb
 
     def end_execution(self) -> None:
@@ -784,9 +838,13 @@ class AgentInput(InputBackend):
                     logger.warning("[输入] 代理恢复失败，已降级为 ADB；本次运行使用 ADB 输入")
             except AgentOpError as error:
                 if error.error_code == LEASE_BUSY_ERROR_CODE:
-                    # 租约占用属瞬时可恢复通道事件：先检查是否已切新后端，再短退避重试，
-                    # 仍被占用则转入恢复状态机，避免误判为致命业务失败。
+                    # 租约占用属瞬时可恢复通道事件：先看是否已切到新后端，再按
+                    # client_id 接管（设备端只对 control_begin 接管，重发原 op
+                    # 只会再被拒），仍占不到才退避重试、最后交恢复状态机。
                     if self._resolve_active_input() is not self:
+                        continue
+                    if self._takeover_execution_lease():
+                        lease_busy_retries = 0
                         continue
                     if lease_busy_retries < 3:
                         lease_busy_retries += 1

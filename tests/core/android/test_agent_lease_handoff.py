@@ -263,3 +263,64 @@ def test_default_client_id_reuses_stable_instance_id(monkeypatch):
     device = _FakeDevice(coord)
     client = AgentClient(device)  # type: ignore[arg-type]
     assert client._client_id == "inst-from-session-file"
+
+
+def test_transport_reconnect_reacquires_lease_and_releases_it_again():
+    """纯传输重连（未换目标）：connect() 清掉的租约必须重新取回，结束时能正常释放。
+
+    回归场景：旧实现在 ``connect()`` 之后才判断 ``_owns_execution``，而 connect 内部
+    已经 close 把它清零，于是重连后从不补 ``control_begin``：后续 controlOps 会被
+    设备端按「另一条 PC 连接占用」拒绝，``end_execution`` 也不会发 ``control_end``。
+    """
+    sock_counter = {"active": 0, "max_active": 0}
+    client, _ctrl, _calls = _make_agent_pair("only", sock_counter)
+    client._owns_execution = True
+    ops: list[str] = []
+
+    def _connect(_timeout: float = 3.0) -> bool:
+        client._owns_execution = False  # 真实 connect() → close() 的效果
+        return True
+
+    def _roundtrip(op: str, timeout=None, **params):
+        ops.append(op)
+        return {"ok": True}, b""
+
+    client.connect = _connect  # type: ignore[method-assign]
+    client._roundtrip = _roundtrip  # type: ignore[method-assign]
+
+    assert client._reconnect() is True
+    assert client._owns_execution is True
+    client.release_execution()
+    assert ops == ["control_begin", "control_end"]
+
+
+def test_lease_busy_takes_over_lease_before_resending_the_op(monkeypatch):
+    """controlOps 遇 lease_busy：先按 client_id 补 control_begin 接管，再重发原 op。
+
+    设备端只对 ``control_begin`` 做同机接管，重发原 op 只会再被拒——这是纯传输重连
+    （没有换目标、``_execution_pending`` 未置位）唯一的自救路径。
+    """
+    monkeypatch.setattr("lvjiang.core.android.agent.time.sleep", lambda _s: None)
+    sock_counter = {"active": 0, "max_active": 0}
+    busy = {"left": 1}
+
+    def _roundtrip_fn(op: str, _params: dict):
+        if op == "tap" and busy["left"] > 0:
+            busy["left"] -= 1
+            return {
+                "ok": False,
+                "error": "设备已被另一条 PC 执行连接占用",
+                "retryable": True,
+                "error_code": LEASE_BUSY_ERROR_CODE,
+            }, b""
+        return {"ok": True}, b""
+
+    client, ctrl, calls = _make_agent_pair(
+        "solo", sock_counter, roundtrip_fn=_roundtrip_fn)
+
+    ctrl._call("tap", "点击", x=11, y=22)
+
+    assert [op for _who, op, _params in calls] == ["tap", "control_begin", "tap"]
+    assert calls[1][2].get("client_id") == "pc-instance-1"
+    assert client._owns_execution is True
+    assert ctrl._using_adb is False

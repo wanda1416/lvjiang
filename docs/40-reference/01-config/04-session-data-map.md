@@ -46,13 +46,16 @@
 
 ## 三、B 历史与产出
 
-本目录里只有两个历史库和手机回传的收发目录：
+本目录里只有两个历史库：
 
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
 | `daily_history.db` | `batch_runs` / `task_runs` | `core/history/daily.py`（`TaskHistoryRepository`） | schema v2；同时被 `core/history/transfer.py` 作为回传通道登记 |
 | `tuning_history.db` | `tuning_runs` / `tuning_equipment` / `telemetry_deliveries` | `apps/yysls/core/tuning_history/repository.py` | schema v3；投递状态供遥测使用，见 [39-runtime/01-tuning-history.md](../../30-design/01-architecture/06-runtime/01-tuning-history.md) |
-| `history-transfer/` | 手机历史回传的收发 zip 与 `preferences.json` | `core/android/history_transfer.py`、`core/ondevice/history_transfer.py`、`ui/mobile/offline.py` | zip 是传输中产物，`preferences.json` 按设备序列号记上次选择，复用 `SessionStore` 原语 |
+
+手机历史回传的收发包不落在 session：手机端写项目根下的 `.history-stage-*`（`history_end` 即删），
+PC 端写系统临时目录（写完立刻由 `import_history` 读掉）。按设备记住的回传范围属于界面状态，
+存 `interface.json` 的 `ui_state.mobile_offline`，不另开配置文件与目录。
 
 产出与日志在同级 `logs/` 下，与配置、会话互不干扰；同一次运行的结果与日志落在同一棵目录树：
 
@@ -71,7 +74,7 @@
 | 路径 | 内容 | 咽喉模块 | 备注 |
 |------|------|----------|------|
 | `session.json` | `users`（用户名册与顺序）、`settings`、`daily.scripts`（脚本顺序/启停/显示名）、`plans`（不分发的机器级方案） | `SessionStore`（`core/config/session.py`） | 节点语义见 04-config-layering；写入口是 `get_node`/`set_node`/`update_node`/`mutate_node`，禁止外部直接读写文件 |
-| `interface.json` | `actives`（当前用户/布局/空间/环境/方案）、`daily`（当前脚本与分组）、`ui_state`（窗口、分栏、页签、列宽）、`batch`（活动组 ID 与草稿）、`profile`（总览分组与顺序）、`alert_info`、`alert_history`、`server_config`（公告、遥测、在线配置状态） | `InterfaceStore`（`core/config/interface.py`） | 页面级状态唯一写入口是 `update_ui_page_state`，不得整节点替换 |
+| `interface.json` | `actives`（当前用户/布局/空间/环境/方案）、`daily`（当前脚本与分组）、`ui_state`（窗口、分栏、页签、列宽、手机页回传勾选）、`batch`（活动组 ID 与草稿）、`profile`（总览分组与顺序）、`alert_info`、`alert_history`、`server_config`（公告、遥测、在线配置状态） | `InterfaceStore`（`core/config/interface.py`） | 页面级状态唯一写入口是 `update_ui_page_state`，不得整节点替换 |
 | `workflow.json` | 全局任务参数：`workflow_params`（按 wf_id，日常/批量/调律共享） | `core/config/wf_configs.py` | 账户级同步文档（kind=workflow），冲突按云端最新覆盖、不留副本；旧 session.json 的 wf_configs 节点已一次性迁出 |
 | `batch.json` | 批量活动组的**定义**（groups） | `core/batch/run.py` | 账户级同步文档（kind=batch），冲突同样不留副本；与 interface.json.batch 分工：定义在 batch.json，当前选中与草稿在 interface.json |
 | `content.json` | 内容修订索引：按实体记 revision | `core/config/content.py` | 可重建；任务读取不依赖它，缺失或损坏只影响这份记录本身 |

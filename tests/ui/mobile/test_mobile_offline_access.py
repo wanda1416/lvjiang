@@ -91,11 +91,10 @@ def test_sync_scope_is_independent_of_remote_user_and_task_choices(qapp, monkeyp
 
 
 def test_history_choices_are_device_specific_and_independent_of_downstream(qapp, monkeypatch, tmp_path):
-    from lvjiang.core.config.session import SessionStore
+    from lvjiang.core.config import interface
+    interface.reset_interface_store()
     monkeypatch.setattr(offline, "has_feature", lambda _: False)
     monkeypatch.setattr(offline, "load_layout_entries", dict)
-    monkeypatch.setattr(offline.OfflineControlPage, "_history_preferences",
-                        lambda self: SessionStore(tmp_path / "preferences.json"))
     serial = ["device-a"]
     page = offline.OfflineControlPage(None, lambda: serial[0], lambda _: None)
     try:
@@ -103,6 +102,10 @@ def test_history_choices_are_device_specific_and_independent_of_downstream(qapp,
         assert not page.buttons["sync"].isEnabled()
         page.history_choices["tasks"].setChecked(False)
         assert page.history_choices["logs"].isChecked()
+        # 勾选记忆是界面状态，落在 interface.json 的 ui_state，不再单开配置文件与目录
+        stored = interface.load_ui_page_state("mobile_offline")["history_choices"]
+        assert stored["device-a"]["tasks"] is False
+        assert not list((tmp_path / "session").glob("history-transfer*"))
         serial[0] = "device-b"
         page.device_changed()
         assert page.history_choices["tasks"].isChecked()
@@ -117,3 +120,4 @@ def test_history_choices_are_device_specific_and_independent_of_downstream(qapp,
     finally:
         page.close()
         page.deleteLater()
+        interface.reset_interface_store()

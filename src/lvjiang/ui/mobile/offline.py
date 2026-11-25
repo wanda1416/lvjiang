@@ -26,6 +26,7 @@ from ...core.android.agent import connect_agent_diagnostic
 from ...core.android.device import AdbDevice
 from ...core.android.history_transfer import pull_history
 from ...core.android.offline import require_offline_sync_access, sync_offline_bundle
+from ...core.config.interface import load_ui_page_state, update_ui_page_state
 from ...core.history.transfer import history_channels
 from ...core.layout.config import layouts_for_env, load_layout_entries
 from ...core.license import has_feature
@@ -33,6 +34,9 @@ from ...core.offline_bundle import build_offline_bundle
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style
 from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode
+
+#: 本页可持久化的界面状态：按设备序列号记住上次的回传范围，存 interface.json。
+_UI_PAGE_KEY = "mobile_offline"
 
 
 class _OfflineWorker(QThread):
@@ -224,23 +228,25 @@ class OfflineControlPage(QWidget):
         self.preserve_task_params.setEnabled(not busy and not active)
         self.preserve_batch_config.setEnabled(not busy and not active)
 
-    def _history_preferences(self):
-        from ...core.config.session import SessionStore
-        from ...core.paths import session_directory
-        return SessionStore(session_directory() / "history-transfer" / "preferences.json")
+    def _stored_history_choices(self) -> dict:
+        """``ui_state.mobile_offline.history_choices``：按设备记上次勾选的回传范围。"""
+        stored = load_ui_page_state(_UI_PAGE_KEY).get("history_choices")
+        return stored if isinstance(stored, dict) else {}
 
     def _load_history_choices(self) -> None:
-        choices = self._history_preferences().get_node(str(self._serial() or ""), {})
+        stored = self._stored_history_choices().get(str(self._serial() or ""))
+        choices = stored if isinstance(stored, dict) else {}
         for key, check in self.history_choices.items():
             check.blockSignals(True)
             check.setChecked(bool(choices.get(key, True)))
             check.blockSignals(False)
 
     def _save_history_choices(self) -> None:
-        serial = self._serial()
+        serial = str(self._serial() or "")
         if serial:
-            self._history_preferences().update_node(str(serial), {
-                key: check.isChecked() for key, check in self.history_choices.items()})
+            stored = self._stored_history_choices()
+            stored[serial] = {key: check.isChecked() for key, check in self.history_choices.items()}
+            update_ui_page_state(_UI_PAGE_KEY, {"history_choices": stored})
         self._update_buttons()
 
     def _sync_username(self) -> str:

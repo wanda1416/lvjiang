@@ -24,9 +24,9 @@ def pull_history(
         total = summary["size"]
         if not isinstance(total, int) or not 0 < total <= MAX_BYTES:
             raise ValueError("历史包大小非法")
-        directory = root / "config/session/history-transfer"
-        directory.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="incoming-", dir=directory) as temp:
+        # 接收包只活在一次回传里：分块写完立刻由 import_history 读掉，临时目录随之删除。
+        # 它没有任何后续读取方，也不该在 config/session 里留下一个永不清理的空目录。
+        with tempfile.TemporaryDirectory(prefix="lvjiang-history-incoming-") as temp:
             archive = Path(temp) / "history.zip"
             offset = 0
             digest = hashlib.sha256()

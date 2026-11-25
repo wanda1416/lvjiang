@@ -245,5 +245,7 @@ Android 关闭 CPU arena，与 PC 默认一致；rec/cls 单条批次，输入 d
 历史表按类别事务合并，附件保持相对路径；相同身份不同内容报错，不静默覆盖。
 运行记录 UUID 及插件的运行 ID/明细序号用于去重，不照搬本地自增主键。
 中断可重新导出并回传，当前不保存分块续传游标；成功类别不因其他类别失败而回滚。
-传输暂存与按设备选项均位于 `config/session/history-transfer`。
+传输暂存与按设备选项都不落在 `config/session`：手机端冻结包写项目根下的 `.history-stage-*`
+（`history_end` 或下一次 `begin` 即删），PC 端接收包写系统临时目录并在导入后删除；按设备
+记住的回传范围属于界面状态，存 `interface.json` 的 `ui_state.mobile_offline`。
 配置下发不携带历史库，安装时用 SQLite backup 保留手机库及 `session/output`，Profile 仍按原规则下发。

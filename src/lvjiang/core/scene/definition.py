@@ -464,8 +464,14 @@ class SceneRegistry:
         """移动场景到其他分组：目录即归属，因此是物理移动场景文件。
 
         连锁：所有布局下的坐标文件 ``layouts/{layout}/{旧组}/{scene}.json``
-        同步移到 ``{新组}/``。用户模式下系统场景的分组归属不可移动——移动
-        意味着删除 system 原文件；本组内 local 影子可正常移动。
+        同步移到 ``{新组}/``，最后由本方法把 ``_meta.json`` 一并落盘。用户
+        模式下系统场景的分组归属不可移动——移动意味着删除 system 原文件；本
+        组内 local 影子可正常移动。
+
+        整段迁移包在同一个变更批次里，注册表重载与 ``prepare_content_split``
+        只在批次结束时跑一次；否则写新删旧后那段「场景 YAML 已到新组、坐标
+        还在旧组」的撕裂态会被判成迁错坐标（``content_split_blocked_scenes``），
+        场景在运行期整份消失。
         """
         if scene_key not in self._scenes:
             raise ValueError(f"场景不存在: {scene_key}")
@@ -487,19 +493,27 @@ class SceneRegistry:
         def _move():
             self._resolver.write_entity(new_rel, content, layer=layer)
             self._resolver.delete_entity(old_rel, layer=layer)
-        checked_write(self._resolver, baselines, _move)
-        # 内存归属同步
-        if old_group:
-            self._group_scenes[old_group].remove(scene_key)
-        if scene_key not in self._group_scenes[new_group_key]:
-            self._group_scenes[new_group_key].append(scene_key)
-        # 布局坐标文件级联移动（先于 save_group_config 的热重载亦可，彼此独立）
-        try:
-            from ..layout.references import move_scene_group_across_all_layouts
-            move_scene_group_across_all_layouts(
-                scene_key, old_group or "", new_group_key)
-        except Exception as exc:  # noqa: BLE001
-            logger.error(f"布局坐标分组目录级联移动失败: {scene_key}: {exc}")
+        with self._resolver.batch_changes():
+            checked_write(self._resolver, baselines, _move)
+            # 内存归属同步。批次内的写入不通知重载，但调用方可能是嵌套在别的
+            # 批次里，或直接持有未重载的注册表，所以这里按当前状态做幂等收敛：
+            # 重载过（场景已在目标组）与没重载（还在旧组）都收敛到同一结果。
+            for group_key, scenes in self._group_scenes.items():
+                if group_key != new_group_key:
+                    scenes[:] = [k for k in scenes if k != scene_key]
+            target_scenes = self._group_scenes[new_group_key]
+            if scene_key not in target_scenes:
+                target_scenes.append(scene_key)
+            # 坐标目录级联必须在批次内：放到批次外，重载会先看到「场景已换组、
+            # 坐标还在旧组」的撕裂态，把场景判成迁错坐标拉黑。
+            try:
+                from ..layout.references import move_scene_group_across_all_layouts
+                move_scene_group_across_all_layouts(
+                    scene_key, old_group or "", new_group_key)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"布局坐标分组目录级联移动失败: {scene_key}: {exc}")
+            # 分组顺序与成员落在 _meta.json；同一批次内写完，重载只看到终态。
+            self.save_group_config()
         logger.info(f"已移动场景 {scene_key} 到分组 {new_group_key}")
 
     def _clamp_namespace_order(self, keys: list[str],
@@ -589,12 +603,14 @@ class SceneRegistry:
         rel_path = self._scene_rel_path(key, old_group)
         self._resolver.delete_entity(
             rel_path, layer=self._resolver.local_only_layer(rel_path))
-        del self._scenes[key]
-        self._order.remove(key)
-        # 从分组中移除
-        group = self.get_scene_group(key)
-        if group:
-            self._group_scenes[group].remove(key)
+        # 与换组同理：删文件同样同步触发热重载，注册表里可能已经没有这个
+        # 场景、顺序项和分组归属。这里按当前状态收敛，不能假设进入方法时的
+        # 内存还在（旧实现在热重载后抛 KeyError，界面弹「删除失败」）。
+        self._scenes.pop(key, None)
+        self._order = [k for k in self._order if k != key]
+        for scenes in self._group_scenes.values():
+            if key in scenes:
+                scenes[:] = [k for k in scenes if k != key]
         self._disabled_scenes.discard(key)
         logger.info(f"已删除场景: {key}")
 

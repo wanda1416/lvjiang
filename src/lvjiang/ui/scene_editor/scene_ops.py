@@ -603,11 +603,13 @@ class SceneOpsMixin:
             return
         registry = get_registry()
         try:
+            # 迁移（场景文件 + 坐标目录 + _meta.json）在同一个变更批次内完成，
+            # 这里不再补写 save_group_config：重复写同一份 _meta 只会多触发
+            # 一次内容索引重建与注册表重载。
             registry.move_scene_to_group(scene_key, target_group)
         except ValueError as e:
             QMessageBox.warning(self, tr("移动失败"), str(e))  # type: ignore[arg-type]
             return
-        registry.save_group_config()
         reload_scene_registry()
         self._rebuild_group_tabs()
         self._apply_layout_to_tabs()

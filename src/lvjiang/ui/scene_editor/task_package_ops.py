@@ -42,7 +42,6 @@ from ...workflows.package import (
     build_package_registry,
     create_package_resolver,
     discover_task_packages,
-    package_screenshots_dir,
 )
 from ..widgets.button_styles import apply_button_style
 
@@ -110,6 +109,7 @@ class TaskPackageOpsMixin:
         self._active_task_package = None
         self._task_scope_tokens = None
         self._saved_main_state = None
+        self._disabled_parent_for_task_pkg = None
 
     @property
     def active_task_package(self: SceneEditorDialog) -> TaskPackage | None:
@@ -145,9 +145,16 @@ class TaskPackageOpsMixin:
         if not self._confirm_discard_changes(tr("加载任务场景")):
             return False
 
-        # 若已在另一任务包中，先安静卸载旧作用域
-        if self._active_task_package is not None:
-            self._release_task_scope_tokens()
+        # 先完整构造新包对象，失败时完全不影响当前所处模式与作用域
+        try:
+            pkg_resolver = create_package_resolver(pkg)
+            pkg_registry = build_package_registry(pkg, pkg_resolver)
+            from ...core.layout.screenshots import SCREENSHOTS_DIR
+            pkg_screenshots = SCREENSHOTS_DIR / "_packages" / pkg.id
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("加载任务场景失败")
+            QMessageBox.warning(self, tr("加载任务场景失败"), str(exc))
+            return False
 
         if self._saved_main_state is None:
             self._saved_main_state = {
@@ -156,20 +163,22 @@ class TaskPackageOpsMixin:
                 "scene_key": self._get_current_scene_key(),
             }
 
-        try:
-            pkg_resolver = create_package_resolver(pkg)
-            pkg_registry = build_package_registry(pkg, pkg_resolver)
-            pkg_screenshots = package_screenshots_dir(pkg)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("加载任务场景失败")
-            QMessageBox.warning(self, tr("加载任务场景失败"), str(exc))
-            return False
+        # 新包就绪后再释放旧作用域并切入新作用域
+        if self._active_task_package is not None:
+            self._release_task_scope_tokens()
 
         res_tok = set_scoped_resolver(pkg_resolver)
         reg_tok = set_scoped_registry(pkg_registry)
         shot_tok = set_scoped_screenshots_dir(pkg_screenshots)
         self._task_scope_tokens = (res_tok, reg_tok, shot_tok)
         self._active_task_package = pkg
+
+        # 冻结父窗口交互：避免任务场景模式占用主线程 ContextVar 期间在主窗口并发操作全局配置
+        parent_widget = self.parentWidget()
+        if (parent_widget is not None and parent_widget.isEnabled()
+                and self._disabled_parent_for_task_pkg is None):
+            parent_widget.setEnabled(False)
+            self._disabled_parent_for_task_pkg = parent_widget
         self._manager = LayoutConfigManager()
 
         self._mark_all_scenes_clean()
@@ -195,13 +204,19 @@ class TaskPackageOpsMixin:
 
     def _release_task_scope_tokens(self: SceneEditorDialog) -> None:
         tokens = self._task_scope_tokens
-        if tokens is None:
-            return
-        res_tok, reg_tok, shot_tok = tokens
-        self._task_scope_tokens = None
-        reset_scoped_screenshots_dir(shot_tok)
-        reset_scoped_registry(reg_tok)
-        reset_scoped_resolver(res_tok)
+        if tokens is not None:
+            res_tok, reg_tok, shot_tok = tokens
+            self._task_scope_tokens = None
+            reset_scoped_screenshots_dir(shot_tok)
+            reset_scoped_registry(reg_tok)
+            reset_scoped_resolver(res_tok)
+        disabled_parent = getattr(self, "_disabled_parent_for_task_pkg", None)
+        if disabled_parent is not None:
+            self._disabled_parent_for_task_pkg = None
+            try:
+                disabled_parent.setEnabled(True)
+            except RuntimeError:
+                pass  # 父窗口已销毁
 
     def _exit_task_package_mode(
         self: SceneEditorDialog, *, restore_ui: bool = True,

@@ -88,8 +88,9 @@ def delete_scene_across_all_layouts(scene_key: str):
     resolver = get_resolver()
     for layout_name in load_layout_entries():
         resolver.delete_entity(_scene_rel(layout_name, scene_key))
-    if screenshots.SCREENSHOTS_DIR.exists():
-        for layout_dir in screenshots.SCREENSHOTS_DIR.iterdir():
+    screenshots_base = screenshots.get_screenshots_root()
+    if screenshots_base.exists():
+        for layout_dir in screenshots_base.iterdir():
             if not layout_dir.is_dir():
                 continue
             for extension in screenshots._SCREENSHOT_EXTENSIONS:

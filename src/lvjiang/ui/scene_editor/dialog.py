@@ -193,6 +193,9 @@ class SceneEditorDialog(
             logger.warning(f"保存场景编辑器窗口大小失败: {e}")
 
     def closeEvent(self, event):
+        super().closeEvent(event)
+        if not event.isAccepted():
+            return
         self._exit_task_package_mode(restore_ui=False)
         self._save_window_size()
         # 显式断开应用级信号：它活得比本对话框久，留着就是在已销毁的控件上回调
@@ -203,7 +206,6 @@ class SceneEditorDialog(
             except TypeError:
                 pass  # 已经断开（重复 close 等）
             self._focus_watch_app = None
-        super().closeEvent(event)
 
     def _refresh_insert_entity_button(self, *_args) -> None:
         """焦点变化后重算「插入当前实体」的可用性"""
@@ -1088,11 +1090,13 @@ class SceneEditorDialog(
 
         QDialog.closeEvent 会调用 reject()，且当 reject 后对话框仍可见时
         会 ignore 关闭事件，因此只需覆盖 reject 即可同时拦截 X 与 Esc。
+        通过确认后再释放任务场景作用域，避免取消关闭时提前切回全局或按 Esc 泄漏作用域。
         """
         if not self._confirm_script_stopped_before_close():
             return
         if not self._confirm_discard_changes(tr("关闭场景编辑器")):
             return
+        self._exit_task_package_mode(restore_ui=False)
         super().reject()
 
     # ─── 尺寸信息栏 ─────────────────────────────

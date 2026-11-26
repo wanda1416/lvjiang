@@ -524,3 +524,81 @@ def test_validate_only_ordinary_task_keeps_global_scope(isolated_env):
     assert engine._layout is layout
     assert get_resolver() is root_resolver
     assert get_registry() is base_registry
+def test_find_task_package_supports_nested_subdir_entry(isolated_env):
+    """入口 .wf 放在任务包子目录（如 sub/main.wf）时仍能向上识别到 manifest.yaml。"""
+    _, _, loc_dir, _, _ = isolated_env
+    wf = _seed_task_package(
+        loc_dir / "workflows" / "standalone" / "nested_pkg",
+        pkg_id="nested_pkg",
+        group_key="np",
+        scene_key="np_home",
+        entry="sub/main.wf",
+    )
+    pkg = find_task_package_for_wf(wf)
+    assert pkg is not None
+    assert pkg.id == "nested_pkg"
+    assert pkg.entry == "sub/main.wf"
+
+
+def test_task_package_runtime_scope_allows_same_package_reentry(isolated_env):
+    """同一任务包内嵌套进入 task_package_runtime_scope 时复用作用域，不报自身冲突。"""
+    _, _, loc_dir, _, base_registry = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    layout = _global_only_layout()
+    with task_package_runtime_scope(wf, layout) as outer_layout:
+        assert outer_layout is not None and "fsjs_lobby" in outer_layout.regions
+        with task_package_runtime_scope(wf, outer_layout) as inner_layout:
+            assert inner_layout is outer_layout
+            assert get_registry().get_scene("fsjs_lobby") is not None
+    assert get_registry() is base_registry
+    assert get_registry().get_scene("fsjs_lobby") is None
+
+
+def test_delete_scene_across_all_layouts_respects_scoped_screenshots_dir(isolated_env, tmp_path: Path):
+    """任务场景作用域内删场景时，只删除任务包截图目录中的截图，不触碰全局截图目录。"""
+    from lvjiang.core.layout.references import delete_scene_across_all_layouts
+
+    global_shots = tmp_path / "global_shots"
+    pkg_shots = tmp_path / "pkg_shots"
+    (global_shots / "desktop").mkdir(parents=True)
+    (pkg_shots / "desktop").mkdir(parents=True)
+    global_img = global_shots / "desktop" / "fsjs_lobby.png"
+    pkg_img = pkg_shots / "desktop" / "fsjs_lobby.png"
+    global_img.write_bytes(b"GLOBAL")
+    pkg_img.write_bytes(b"PKG")
+
+    with use_screenshots_dir(pkg_shots):
+        delete_scene_across_all_layouts("fsjs_lobby")
+
+    assert not pkg_img.exists()
+    assert global_img.exists()
+
+
+def test_scene_editor_cancel_close_keeps_scope_and_reject_releases_scope(isolated_env, qtbot, monkeypatch):
+    """点 X 取消关闭不提前释放任务包作用域；按 Esc（reject）通过确认后彻底释放。"""
+    from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
+
+    _, _, loc_dir, root_resolver, base_registry = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    pkg = find_task_package_for_wf(wf)
+    assert pkg is not None
+
+    dlg = SceneEditorDialog()
+    qtbot.addWidget(dlg)
+    try:
+        assert dlg._enter_task_package_mode(pkg) is True
+        # 1. 模拟用户点 X 后在未保存确认框点「取消」
+        monkeypatch.setattr(dlg, "_confirm_discard_changes", lambda _action: False)
+        dlg.close()
+        assert dlg.active_task_package == pkg
+        assert get_registry().get_scene("fsjs_lobby") is not None
+        assert get_resolver() is not root_resolver
+
+        # 2. 模拟用户按 Esc（直接走 reject）并确认放弃
+        monkeypatch.setattr(dlg, "_confirm_discard_changes", lambda _action: True)
+        dlg.reject()
+        assert dlg.active_task_package is None
+        assert get_resolver() is root_resolver
+        assert get_registry() is base_registry
+    finally:
+        dlg.close()

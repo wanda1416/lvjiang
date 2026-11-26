@@ -486,6 +486,17 @@ def handle_guest($index, $round)
         return 0
     end
 
+    # PC 端没有「听风辨位」按钮（listen_btn 在桌面布局标为 disabled），直接按兜底策略处理
+    if env("desktop")
+        eval $reason = "桌面端无「听风辨位」按钮，按兜底策略处理"
+        call $should_open = decide($slot, $verdict)
+        if $rehearsal -> eval $should_open = 0
+        call $final_open = act_on_decision($slot, $should_open, $reason)
+        eval $record = {"round": $round, "index": $slot, "verdict": $verdict, "reason": $reason, "opened": $final_open}
+        eval append($records, $record)
+        return 0
+    end
+
     find [fsjs_night].[listen_btn] as $listen by contains_any $words_listen
     if $listen
         click $listen after wait (0.6, 0.9)

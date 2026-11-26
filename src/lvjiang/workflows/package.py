@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,6 +45,9 @@ from .file_tree import WORKFLOWS_DIR
 
 MANIFEST_FILENAME = "manifest.yaml"
 _PACKAGE_ID_RE = re.compile(r"^[A-Za-z0-9_\u4e00-\u9fff-]+$")
+_active_runtime_package_id: ContextVar[str | None] = ContextVar(
+    "active_task_package_id", default=None,
+)
 
 
 @dataclass(frozen=True)
@@ -201,30 +205,39 @@ def _workflows_rel_package_dir(dir_path: Path, root: ConfigResolver) -> str | No
 
 
 def find_task_package_for_wf(wf_path: Path) -> TaskPackage | None:
-    """快速探测 .wf 是否属于独立任务包；普通任务无 manifest.yaml 时 O(1) 返回 None。"""
+    """探测 .wf 是否属于独立任务包（支持包根及子目录脚本，无 manifest.yaml 时快速返回 None）。"""
     resolved = Path(wf_path).resolve()
     parent = resolved.parent
     root = get_root_resolver()
 
     rel_dir = _workflows_rel_package_dir(parent, root)
     if rel_dir is not None:
-        sys_dir = root.system_dir / WORKFLOWS_DIR / rel_dir
-        loc_dir = root.local_dir / WORKFLOWS_DIR / rel_dir
-        has_sys = (sys_dir / MANIFEST_FILENAME).is_file()
-        has_loc = (loc_dir / MANIFEST_FILENAME).is_file()
-        if not has_sys and not has_loc:
-            return None
-        return load_task_package_dir(
-            loc_dir if has_loc else sys_dir,
-            rel_dir=rel_dir,
-            system_dir=sys_dir if sys_dir.is_dir() else None,
-            local_dir=loc_dir if loc_dir.is_dir() else None,
-        )
-
-    # 非标准 workflows 目录（例如测试临时目录或外部绝对路径）：只看同级 manifest.yaml
-    if not (parent / MANIFEST_FILENAME).is_file():
+        # 从当前目录向上逐层查到 workflows/ 根之下，兼容 entry 位于子目录的场景
+        parts = Path(rel_dir).parts
+        for depth in range(len(parts), 0, -1):
+            cand_rel = Path(*parts[:depth]).as_posix()
+            sys_dir = root.system_dir / WORKFLOWS_DIR / cand_rel
+            loc_dir = root.local_dir / WORKFLOWS_DIR / cand_rel
+            has_sys = (sys_dir / MANIFEST_FILENAME).is_file()
+            has_loc = (loc_dir / MANIFEST_FILENAME).is_file()
+            if has_sys or has_loc:
+                return load_task_package_dir(
+                    loc_dir if has_loc else sys_dir,
+                    rel_dir=cand_rel,
+                    system_dir=sys_dir if sys_dir.is_dir() else None,
+                    local_dir=loc_dir if loc_dir.is_dir() else None,
+                )
         return None
-    return load_task_package_dir(parent, rel_dir="", system_dir=None, local_dir=parent)
+
+    # 非标准 workflows 目录（例如测试临时目录或外部绝对路径）：向上最多查 4 层
+    cur = parent
+    for _ in range(4):
+        if (cur / MANIFEST_FILENAME).is_file():
+            return load_task_package_dir(cur, rel_dir="", system_dir=None, local_dir=cur)
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return None
 
 
 def discover_task_packages(root: ConfigResolver | None = None) -> list[TaskPackage]:
@@ -447,6 +460,10 @@ def task_package_runtime_scope(
     if pkg is None:
         yield base_layout
         return
+    # 同一任务包内部嵌套执行子脚本时直接复用已合并作用域，避免与自身冲突
+    if _active_runtime_package_id.get() == pkg.id:
+        yield base_layout
+        return
 
     base_root = get_root_resolver()
     base_registry = get_registry()
@@ -468,8 +485,10 @@ def task_package_runtime_scope(
         f"已合并加载独立任务包「{pkg.name}」({pkg.id}): "
         f"+{len(pkg_registry.all_scene_keys())} 场景"
     )
+    pkg_token = _active_runtime_package_id.set(pkg.id)
     with use_resolver(overlay_resolver), use_scene_registry(merged_registry):
         try:
             yield merged_layout
         finally:
+            _active_runtime_package_id.reset(pkg_token)
             logger.info(f"已释放独立任务包「{pkg.name}」({pkg.id}) 运行作用域")

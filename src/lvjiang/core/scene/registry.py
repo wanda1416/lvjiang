@@ -167,31 +167,8 @@ def get_registry() -> SceneRegistry:
     return _registry
 
 
-def reload_scene_registry():
-    """场景配置变化后原位重载，保留对象身份，避免已打开编辑器持有失效对象。
-
-    未初始化时先初始化（兜底）：正常启动由 run_app 显式调用
-    initialize_scene_registry，本函数只在场景文件变化后使用。
-    若当前处于任务场景作用域，仅原位重载该作用域注册表，不触碰全局单例。
-    """
-    scoped = _scoped_registry.get()
-    if scoped is not None:
-        from ..config.resolver import get_resolver
-        resolver = get_resolver()
-        resolver.clear_read_cache()
-        manifest = load_scene_manifest(resolver)
-        refreshed = SceneRegistry(
-            resolver=resolver,
-            scene_order=manifest.order if manifest else None,
-            group_config=manifest.groups if manifest else None,
-            group_names=manifest.group_names if manifest else None,
-            disabled_scenes=manifest.disabled if manifest else None,
-            group_layers=manifest.group_layers if manifest else None,
-            scene_layers=manifest.scene_layers if manifest else None,
-        )
-        for name, value in refreshed.__dict__.items():
-            setattr(scoped, name, value)
-        return
+def _reload_global_scene_registry() -> None:
+    """原位重载进程级全局场景注册表，不受当前线程任务包作用域影响。"""
     if _registry is None:
         initialize_scene_registry()
         return
@@ -219,10 +196,38 @@ def reload_scene_registry():
     _rebuild_scene_globals()
 
 
+def reload_scene_registry():
+    """场景配置变化后原位重载，保留对象身份，避免已打开编辑器持有失效对象。
+
+    未初始化时先初始化（兜底）：正常启动由 run_app 显式调用
+    initialize_scene_registry，本函数只在场景文件变化后使用。
+    若当前处于任务场景作用域，仅原位重载该作用域注册表，不触碰全局单例。
+    """
+    scoped = _scoped_registry.get()
+    if scoped is not None:
+        from ..config.resolver import get_resolver
+        resolver = get_resolver()
+        resolver.clear_read_cache()
+        manifest = load_scene_manifest(resolver)
+        refreshed = SceneRegistry(
+            resolver=resolver,
+            scene_order=manifest.order if manifest else None,
+            group_config=manifest.groups if manifest else None,
+            group_names=manifest.group_names if manifest else None,
+            disabled_scenes=manifest.disabled if manifest else None,
+            group_layers=manifest.group_layers if manifest else None,
+            scene_layers=manifest.scene_layers if manifest else None,
+        )
+        for name, value in refreshed.__dict__.items():
+            setattr(scoped, name, value)
+        return
+    _reload_global_scene_registry()
+
+
 def _on_config_change(paths: tuple[str, ...]):
-    """配置写入后的失效通知：场景相关文件变更时重载注册表"""
+    """配置写入后的失效通知：根解析器场景变更时只重载全局注册表。"""
     if any(path.startswith("scenes/") for path in paths):
-        reload_scene_registry()
+        _reload_global_scene_registry()
 
 
 get_root_resolver().add_batch_change_listener(_on_config_change)

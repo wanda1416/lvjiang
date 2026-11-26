@@ -377,6 +377,8 @@ task_diagnostics_dialog:
   已停止落盘（共写入 {count} 帧）→ {path}: Dump stopped ({count} frames written) → {path}
   已封口: Closed
   "开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录": "Asynchronously dumps buffered and incoming frames into a new folder under logs/diagnostics/"
+  "清空缓存": "Clear Cache"
+  "清空当前内存缓存帧与临时区预览；后续开始落盘仅写入新采集的帧": "Clear buffered in-memory frames and the pinned preview so future dumps only write newly captured frames"
   打开目录: Open folder
   收尾中: Draining
   暂无画面: No frame

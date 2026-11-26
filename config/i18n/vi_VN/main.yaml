@@ -378,6 +378,8 @@ task_diagnostics_dialog:
   已停止落盘（共写入 {count} 帧）→ {path}: Đã dừng lưu (ghi {count} khung) → {path}
   已封口: Đã đóng
   "开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录": "Ghi bất đồng bộ các khung trong bộ đệm và khung mới vào thư mục mới dưới logs/diagnostics/"
+  "清空缓存": "Xóa bộ nhớ đệm"
+  "清空当前内存缓存帧与临时区预览；后续开始落盘仅写入新采集的帧": "Xóa các khung hình đang lưu trong bộ nhớ và bản xem trước đã ghim để lần ghi đĩa sau chỉ lưu khung hình mới"
   打开目录: Mở thư mục
   收尾中: Đang hoàn tất
   暂无画面: Chưa có hình

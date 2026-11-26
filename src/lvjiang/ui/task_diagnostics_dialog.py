@@ -156,6 +156,14 @@ class TaskDiagnosticsDialog(QDialog):
         )
         dump_row.addWidget(self.dump_status_label, 1)
 
+        self.btn_clear_cache = QPushButton(tr("清空缓存"))
+        self.btn_clear_cache.setEnabled(False)
+        self.btn_clear_cache.setToolTip(
+            tr("清空当前内存缓存帧与临时区预览；后续开始落盘仅写入新采集的帧")
+        )
+        apply_compact_button_style(self.btn_clear_cache, variant="neutral")
+        dump_row.addWidget(self.btn_clear_cache)
+
         self.btn_open_dump_dir = QPushButton(tr("打开目录"))
         self.btn_open_dump_dir.setEnabled(False)
         apply_compact_button_style(self.btn_open_dump_dir, variant="neutral")
@@ -254,6 +262,7 @@ class TaskDiagnosticsDialog(QDialog):
         self.frames_spin.valueChanged.connect(self._changed)
         self.capacity_spin.valueChanged.connect(self._changed)
         self.btn_dump_toggle.toggled.connect(self._on_dump_toggled)
+        self.btn_clear_cache.clicked.connect(self._clear_cache)
         self.btn_open_dump_dir.clicked.connect(self._open_dump_dir)
         self.btn_return_latest.clicked.connect(self._jump_last)
         self.btn_first.clicked.connect(self._jump_first)
@@ -285,6 +294,7 @@ class TaskDiagnosticsDialog(QDialog):
         self.capacity_spin.setEnabled(enabled)
         has_frames = bool(self._current_frames) or self._pinned_frame is not None
         self.btn_dump_toggle.setEnabled(enabled or has_frames or self._dumper.active)
+        self.btn_clear_cache.setEnabled(has_frames)
 
     def _sync_dump_button_style(self, active: bool) -> None:
         if active:
@@ -371,6 +381,19 @@ class TaskDiagnosticsDialog(QDialog):
             self.dump_status_label.setText(tr("未开启落盘（仅内存缓存，退出清空）"))
             self.dump_status_label.setToolTip("")
 
+    def _clear_cache(self) -> None:
+        """清空内存缓存帧与临时区预览，避免后续开始落盘带入历史帧。"""
+        self._diagnostics.clear_cache()
+        self._current_frames = ()
+        self._pinned_frame = None
+        self._pinned_meta = {}
+        self._pinned_key = None
+        self._pinned_pixmap = None
+        self._set_follow_latest(True)
+        self._render_pixmap()
+        self._render_pinned_metadata()
+        self.refresh_frames()
+
     def _open_dump_dir(self) -> None:
         target = self._dumper.session_dir or self._last_dump_dir
         if target is not None and target.exists():
@@ -385,6 +408,7 @@ class TaskDiagnosticsDialog(QDialog):
             self._current_frames = ()
             self._current_scope = ""
             self.summary_label.setText(tr("暂无诊断帧记录"))
+            self._sync_limits_enabled()
             self._sync_nav_controls()
             self._refresh_dump_status()
             return

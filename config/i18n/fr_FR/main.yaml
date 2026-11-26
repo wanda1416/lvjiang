@@ -378,6 +378,8 @@ task_diagnostics_dialog:
   已停止落盘（共写入 {count} 帧）→ {path}: Enregistrement arrêté ({count} images) → {path}
   已封口: Fermé
   "开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录": "Enregistre de façon asynchrone les images en mémoire et entrantes dans un nouveau dossier sous logs/diagnostics/"
+  "清空缓存": "Vider le cache"
+  "清空当前内存缓存帧与临时区预览；后续开始落盘仅写入新采集的帧": "Vide les images en mémoire et l'aperçu épinglé afin que le prochain enregistrement n'écrive que les nouvelles images"
   打开目录: Ouvrir le dossier
   收尾中: Finalisation
   暂无画面: Aucune image

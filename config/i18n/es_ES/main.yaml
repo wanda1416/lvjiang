@@ -378,6 +378,8 @@ task_diagnostics_dialog:
   已停止落盘（共写入 {count} 帧）→ {path}: Volcado detenido ({count} fotogramas) → {path}
   已封口: Cerrado
   "开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录": "Vuelca de forma asíncrona los fotogramas en caché y nuevos en una carpeta nueva bajo logs/diagnostics/"
+  "清空缓存": "Limpiar caché"
+  "清空当前内存缓存帧与临时区预览；后续开始落盘仅写入新采集的帧": "Limpia los fotogramas en memoria y la vista previa fijada para que el próximo guardado solo escriba nuevos fotogramas"
   打开目录: Abrir carpeta
   收尾中: Finalizando
   暂无画面: Sin imagen

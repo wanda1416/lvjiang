@@ -206,6 +206,14 @@ class RecentFrameHistory:
                 self._pending.clear()
                 self._state = "incomplete"
 
+    def clear(self) -> int:
+        """清空当前内存缓存帧（不影响正在录制的任务继续采集后续新帧）。"""
+        with self._condition:
+            cleared = len(self._frames)
+            self._frames.clear()
+            self._bytes = 0
+            return cleared
+
     def frames(self) -> tuple[DiagnosticFrame, ...]:
         """Explicit internal access; callers retaining this tuple own its memory."""
         with self._condition:
@@ -355,6 +363,19 @@ class TaskDiagnostics:
     def _remember(self, history: RecentFrameHistory) -> None:
         with self._lock:
             self._last = history
+
+    def clear_cache(self) -> int:
+        """清空最近任务的内存帧缓存；若任务已封口则同时释放历史句柄。"""
+        with self._lock:
+            history = self._last
+        if history is None:
+            return 0
+        cleared = history.clear()
+        if history.snapshot()["state"] in ("closed", "incomplete"):
+            with self._lock:
+                if self._last is history:
+                    self._last = None
+        return cleared
 
     @property
     def latest(self) -> RecentFrameHistory | None:

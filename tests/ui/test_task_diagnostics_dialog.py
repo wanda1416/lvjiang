@@ -366,3 +366,128 @@ def test_push_dumper_captures_all_frames_without_polling_even_when_hidden(qtbot,
     lines = (session_dir / "frames.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(line)["frame_seq"] for line in lines] == [1, 2, 3, 4]
     dialog.close()
+
+
+def test_clear_cache_button_clears_history_and_pinned_frame_before_next_dump(qtbot, tmp_path):
+    """落盘行提供清空缓存按钮；清空后历史帧与临时区帧均被清除，后续开始落盘不再带入旧帧。"""
+    import json
+    import time
+
+    from lvjiang.core.task_diagnostics import DiagnosticOptions, RecentFrameHistory
+
+    service = TaskDiagnostics()
+    service.options = DiagnosticOptions(enabled=True, max_frames=2, max_bytes=10_000_000)
+    history = RecentFrameHistory(
+        service.options, {"task_run_id": "run-1"}, on_frame=service._emit_frame
+    )
+    service._remember(history)
+
+    dump_root = tmp_path / "logs" / "diagnostics"
+    dialog = TaskDiagnosticsDialog(service, dump_base_dir=dump_root)
+    qtbot.addWidget(dialog)
+
+    assert dialog.btn_clear_cache.text() == "清空缓存"
+    assert dialog.btn_clear_cache.property("btnVariant") == "neutral"
+    assert dialog.btn_clear_cache.property("btnDensity") == "compact"
+    assert not dialog.btn_clear_cache.isEnabled()
+
+    # 采集 3 帧并钉住被淘汰的 #1，再封口任务
+    _observe_color(history, 1, (10, 20, 240), "ocr")
+    _observe_color(history, 2, (10, 240, 20), "template")
+    deadline = time.monotonic() + 3.0
+    while len(history.frames()) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+    dialog._jump_first()
+    _observe_color(history, 3, (240, 20, 10), "color")
+    history.close("completed")
+    dialog.refresh_frames()
+
+    assert dialog.btn_clear_cache.isEnabled()
+    assert dialog._pinned_frame is not None
+
+    # 点击清空缓存：释放历史句柄、清空临时区预览并恢复跟踪最新
+    dialog.btn_clear_cache.click()
+    assert service.latest is None
+    assert dialog._pinned_frame is None
+    assert dialog._current_frames == ()
+    assert dialog.follow_check.isChecked()
+    assert dialog.index_label.text() == "0 / 0"
+    assert dialog.summary_label.text() == "暂无诊断帧记录"
+    assert dialog.preview_label.text() == "暂无画面"
+    assert not dialog.btn_clear_cache.isEnabled()
+
+    # 清空后开始落盘：不应写入任何旧帧，仅写入后续新采集的帧
+    dialog.btn_dump_toggle.setChecked(True)
+    session_dir = dialog._dumper.session_dir
+    assert session_dir is not None
+
+    history2 = RecentFrameHistory(
+        service.options, {"task_run_id": "run-2"}, on_frame=service._emit_frame
+    )
+    service._remember(history2)
+    _observe_color(history2, 10, (50, 150, 250), "ocr")
+    history2.close("completed")
+
+    deadline = time.monotonic() + 3.0
+    while dialog._dumper.written_count < 1 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.btn_dump_toggle.setChecked(False)
+
+    lines = (session_dir / "frames.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["frame_seq"] for line in lines] == [10]
+    dialog.close()
+
+
+def test_clear_cache_while_recording_keeps_receiving_new_frames(qtbot, tmp_path):
+    """任务录制中清空缓存，仅清掉已缓冲帧，不影响当前任务继续写入和落盘新帧。"""
+    import json
+    import time
+
+    from lvjiang.core.task_diagnostics import DiagnosticOptions, RecentFrameHistory
+
+    service = TaskDiagnostics()
+    service.options = DiagnosticOptions(enabled=True, max_frames=5, max_bytes=10_000_000)
+    history = RecentFrameHistory(
+        service.options, {"task_run_id": "live-run"}, on_frame=service._emit_frame
+    )
+    service._remember(history)
+
+    dialog = TaskDiagnosticsDialog(service, dump_base_dir=tmp_path / "logs" / "diagnostics")
+    qtbot.addWidget(dialog)
+
+    _observe_color(history, 1, (10, 20, 240), "ocr")
+    _observe_color(history, 2, (10, 240, 20), "template")
+    deadline = time.monotonic() + 3.0
+    while len(history.frames()) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+    assert dialog.index_label.text() == "2 / 2"
+
+    # 录制中清空缓存
+    dialog.btn_clear_cache.click()
+    assert service.latest is history
+    assert history.frames() == ()
+    assert history.snapshot()["retained_bytes"] == 0
+    assert dialog.index_label.text() == "0 / 0"
+    assert not dialog.btn_clear_cache.isEnabled()
+
+    # 开启落盘并继续采集新帧 #3
+    dialog.btn_dump_toggle.setChecked(True)
+    session_dir = dialog._dumper.session_dir
+    assert session_dir is not None
+
+    _observe_color(history, 3, (200, 100, 50), "ocr")
+    deadline = time.monotonic() + 3.0
+    while len(history.frames()) < 1 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    dialog.refresh_frames()
+    assert dialog.index_label.text() == "1 / 1"
+    assert "#3" in dialog.meta_label.text()
+    assert dialog.btn_clear_cache.isEnabled()
+
+    history.close("completed")
+    dialog.btn_dump_toggle.setChecked(False)
+    lines = (session_dir / "frames.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["frame_seq"] for line in lines] == [3]
+    dialog.close()

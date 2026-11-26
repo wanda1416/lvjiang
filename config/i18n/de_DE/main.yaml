@@ -378,6 +378,8 @@ task_diagnostics_dialog:
   已停止落盘（共写入 {count} 帧）→ {path}: Speichern gestoppt ({count} Frames) → {path}
   已封口: Geschlossen
   "开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录": "Speichert gepufferte und neue Frames asynchron in einem neuen Ordner unter logs/diagnostics/"
+  "清空缓存": "Cache leeren"
+  "清空当前内存缓存帧与临时区预览；后续开始落盘仅写入新采集的帧": "Leert die zwischengespeicherten Frames im Speicher und die fixierte Vorschau, sodass beim nächsten Speichern nur neue Frames geschrieben werden"
   打开目录: Ordner öffnen
   收尾中: Abschließen
   暂无画面: Kein Bild

@@ -1221,7 +1221,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         for widget, name_label, value_label in (
                 self._weapon_bonus_slots + self._skill_bonus_slots):
             name_label.clear()
-            value_label.clear()
+            value_label.setText(" ")
             widget.setToolTip("")
 
         def fill_slots(items: list[tuple[str, float]], slots) -> None:

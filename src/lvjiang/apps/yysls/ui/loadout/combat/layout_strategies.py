@@ -133,7 +133,7 @@ class HalfCardLayout(CardLayoutStrategy):
         self.update_dynamic_slots(tab)
         self.drain_layout(tab._main_layout)
         for card in cards:
-            card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         flow = QVBoxLayout()
         flow.setContentsMargins(0, 0, 0, 0)
         flow.setSpacing(12)

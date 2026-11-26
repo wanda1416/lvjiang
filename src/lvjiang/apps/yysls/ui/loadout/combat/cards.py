@@ -257,13 +257,13 @@ class CombatCardsMixin:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
         name_label = QLabel()
+        name_label.setObjectName("attrName")
         name_label.setStyleSheet(_NAME_STYLE)
         value_label = self._create_value_label()
-        # 空的动态槽仍须保留一行高度：全屏模式下增益卡片必须与左侧
-        # 六行攻击卡片等高，不能因定音数量少而让下方卡片上移。
-        widget.setMinimumHeight(max(
-            name_label.fontMetrics().height(), value_label.fontMetrics().height(),
-        ))
+        # 空槽用单空格占位而非 widget.setMinimumHeight(unpolished fontMetrics)：
+        # 1) 避免构造期未应用 QSS 的旧字体高度覆盖 layout minimumSizeHint，导致半屏单列被压矮裁字；
+        # 2) 全屏模式下空槽仍按 15px 样式自然撑出与固定行完全一致的高度。
+        value_label.setText(" ")
         layout.addWidget(name_label)
         layout.addStretch()
         layout.addWidget(value_label)

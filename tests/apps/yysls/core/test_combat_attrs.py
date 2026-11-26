@@ -498,3 +498,37 @@ def test_play_style_reverse_derivation_subtracts_equipment_set_bonus(monkeypatch
 
     assert saved["base"].max_outer == pytest.approx(true_base.max_outer)
     assert saved["base"].intent_rate == pytest.approx(true_base.intent_rate)
+
+
+def test_dynamic_slot_matches_fixed_row_height_under_vertical_pressure(qtbot):
+    """动态槽不得因 setMinimumHeight 覆盖 minimumSizeHint 而被压矮，且参与 attrName 对齐。"""
+    from PyQt6.QtWidgets import QGridLayout, QLabel, QWidget
+
+    from lvjiang.apps.yysls.ui.loadout.combat.cards import CombatCardsMixin
+
+    class _Host(CombatCardsMixin, QWidget):
+        def __init__(self):
+            super().__init__()
+            self._attr_labels = {}
+            grid = QGridLayout(self)
+            grid.setVerticalSpacing(8)
+            self.w_fixed = self._create_attr_widget("全武学增效", "all_skill_bonus")
+            self._attr_labels["all_skill_bonus"].setText(
+                "11.20%(<span style='color:#d4a017;'>8.48%</span>)"
+            )
+            grid.addWidget(self.w_fixed, 0, 0)
+            self.w_dyn, self.d_name, self.d_val = self._create_dynamic_slot(grid, 1, 0)
+            self.d_name.setText("剑武学增伤")
+            self.d_val.setText(
+                "11.30%(<span style='color:#d4a017;'>8.56%</span>)"
+            )
+
+    host = _Host()
+    qtbot.addWidget(host)
+    host.resize(240, 40)
+    host.show()
+    qtbot.wait(10)
+
+    assert host.w_dyn.minimumHeight() == 0
+    assert host.w_dyn.height() == host.w_fixed.height()
+    assert host.w_dyn.findChild(QLabel, "attrName") is host.d_name

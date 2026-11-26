@@ -119,7 +119,9 @@ class AgentService:
         plan = state.plans.get(plan_id)
         if plan is None:
             raise ValueError("备战方案不存在")
-        from ...config.play_styles import get_play_styles
+        from ...config.base_attributes import (
+            resolve_base_attribute_data,
+        )
         from ..loadout.models import resolve_school
         school = resolve_school(plan.main_martial_art, plan.sub_martial_art, self.game_config.get_schools())
         from ...config.equipment_slots import EQUIPMENT_SLOTS
@@ -137,7 +139,7 @@ class AgentService:
             problems.append(exc.reason)
             model = None
         return {"plan": {"plan_id": plan.id, **plan.to_dict()}, "equipment": state.resolved_equipment(plan_id),
-                "base_attributes": get_play_styles(school).get(plan.base_attribute, {}) if school else {},
+                "base_attributes": (resolve_base_attribute_data(school, plan.base_attribute) or {}) if school else {},
                 "revision": revision(state.to_dict()),
                 "completeness": {"ready": not problems, "missing_slots": missing_slots, "reasons": problems},
                 "model": model, "data_source": "saved_loadout_repository",
@@ -146,7 +148,9 @@ class AgentService:
 
     def list_base_attributes(self, user: str, plan_id: str) -> dict:
         """列出方案所属流派的共享基础属性候选；不限定为该用户已引用的名称。"""
-        from ...config.play_styles import get_play_styles
+        from ...config.base_attributes import (
+            list_all_base_attributes,
+        )
         from ..loadout.models import resolve_school
         self._check(user)
         state = LoadoutRepository(user, self.users_dir).load()
@@ -154,7 +158,7 @@ class AgentService:
         if plan is None:
             raise ValueError("备战方案不存在")
         school = resolve_school(plan.main_martial_art, plan.sub_martial_art, self.game_config.get_schools())
-        values = get_play_styles(school) if school else {}
+        values = list_all_base_attributes(school) if school else {}
         return {"school": school, "current": plan.base_attribute, "items": values,
                 "revision": revision(values), "scope": "shared_by_school"}
 

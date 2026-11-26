@@ -1855,6 +1855,8 @@ auto_strings:
   导入: Importar
   已保存: Guardado
   当前属性: Atributos actuales
+  "预置": "Preajuste"
+  "本地预置": "Preajuste local"
   当前玩法: Modo actual
   恢复: Rehacer
   扫描: Escanear

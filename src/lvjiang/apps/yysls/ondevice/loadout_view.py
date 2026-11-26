@@ -97,8 +97,8 @@ def equipment_pool(username: str, offset: int = 0) -> str:
 
 def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str = "", assumptions: str = "{}") -> str:
     from ..config import get_game_config
+    from ..config.base_attributes import list_all_base_attributes
     from ..config.equipment_slots import SLOT_SPECS
-    from ..config.play_styles import get_play_styles
     from ..core.combat.combat_attrs import (
         CombatAttributes,
         GraduationAttrContext,
@@ -128,7 +128,7 @@ def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str
         level = state.effective_world_level(gc.current_equip_level())
         models = available_models(school) if school else ()
         schemes = sorted({ref.scheme for ref in models if ref.level <= level})
-        bases = get_play_styles(school) if school else {}
+        bases = list_all_base_attributes(school) if school else {}
         if scheme:
             if scheme not in schemes:
                 raise ValueError("计算方案不适用于当前流派和等级")

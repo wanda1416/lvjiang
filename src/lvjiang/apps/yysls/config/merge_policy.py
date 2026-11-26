@@ -52,3 +52,4 @@ register_versioned_file(LINGER_FILE)
 # 模型按等级分子目录（graduation/<等级>级/<流派>_<方案>_v<版本>.json），
 # 所以深度是 2：等级膨胀时不至于把一个目录堆到几十个文件。
 register_versioned_dir("yysls/graduation", "*.json", depth=2)
+register_versioned_dir("yysls/base_attributes", "*.yaml", depth=1)

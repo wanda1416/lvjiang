@@ -1888,6 +1888,8 @@ auto_strings:
   导入: "Importar"
   已保存: "Salvo"
   当前属性: "Atributos atuais"
+  "预置": "Predefinição"
+  "本地预置": "Predefinição local"
   当前玩法: "Modo atual"
   恢复: "Refazer"
   扫描: "Escanear"

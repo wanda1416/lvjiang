@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...config.play_styles import get_play_styles
+from ...config.base_attributes import resolve_base_attribute_data
 from ..combat.combat_attrs import (
     CombatAttributes,
     GraduationAttrContext,
@@ -66,6 +66,7 @@ class PlanScoringContext:
     gongjue_level: int
     playstyle: str
     attribute: str                    # 流派属性（鸣金/裂石/…），动态词条归类用
+    model_stage: int = 1
 
     @classmethod
     def from_plan(
@@ -106,7 +107,7 @@ class PlanScoringContext:
         if not plan.base_attribute:
             problems.append("当前备战方案未选择角色基础属性")
         else:
-            base_data = get_play_styles(school).get(plan.base_attribute)
+            base_data = resolve_base_attribute_data(school, plan.base_attribute)
             if not isinstance(base_data, dict):
                 problems.append(f"角色基础属性「{plan.base_attribute}」在流派「{school}」下不存在")
         if problems:
@@ -136,6 +137,7 @@ class PlanScoringContext:
                 effective_level),
             playstyle=plan.playstyle,
             attribute=str((schools.get(school) or {}).get("attr") or ""),
+            model_stage=getattr(model, "stage", 1),
         )
 
     def scorer(self, *, game_config=None, **budget) -> LoadoutScorer:

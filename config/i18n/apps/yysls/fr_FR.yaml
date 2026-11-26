@@ -1855,6 +1855,8 @@ auto_strings:
   导入: Importer
   已保存: Enregistré
   当前属性: Attributs actuels
+  "预置": "Préréglage"
+  "本地预置": "Préréglage local"
   当前玩法: Mode actuel
   恢复: Rétablir
   扫描: Scanner

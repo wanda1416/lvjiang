@@ -1769,6 +1769,8 @@ auto_strings:
   开始时间: Start Time
   异常: Debuff
   当前属性: Current Attributes
+  "预置": "Preset"
+  "本地预置": "Local Preset"
   当前玩法: Current Mode
   当前装备: Current Gear
   恢复: Redo

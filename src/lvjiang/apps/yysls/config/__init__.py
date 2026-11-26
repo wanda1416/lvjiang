@@ -13,6 +13,20 @@ from .attr_loadout import (
     save_derivation,
     save_loadout,
 )
+from .base_attributes import (
+    BASE_ATTRIBUTES_DIR,
+    PRESET_REF_PREFIX,
+    BaseAttributePreset,
+    delete_base_attribute_preset,
+    get_base_attribute_preset,
+    get_base_attribute_presets,
+    list_all_base_attributes,
+    make_preset_ref,
+    parse_preset_ref,
+    resolve_base_attribute_data,
+    resolve_default_preset,
+    save_base_attribute_preset,
+)
 from .constants import (
     AFFIX_CATEGORY_NAMES,
     BASE_ATTR_PARTS,
@@ -71,6 +85,18 @@ __all__ = [
     # 基础属性配置存储（保留 play_style API 名称以兼容已有数据）
     "get_play_styles",
     "save_play_style",
+    "BASE_ATTRIBUTES_DIR",
+    "PRESET_REF_PREFIX",
+    "BaseAttributePreset",
+    "delete_base_attribute_preset",
+    "get_base_attribute_preset",
+    "get_base_attribute_presets",
+    "list_all_base_attributes",
+    "make_preset_ref",
+    "parse_preset_ref",
+    "resolve_base_attribute_data",
+    "resolve_default_preset",
+    "save_base_attribute_preset",
     "delete_play_style",
     "rename_play_style",
 ]

@@ -412,18 +412,45 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if refresh_display:
             self._refresh_display()
 
+    def _current_base_attr_ref(self) -> str:
+        """返回当前选中基础属性的规范引用键（预置为 preset:<id>，个人为裸名）。"""
+        if self._combo_play_style.currentIndex() < 0:
+            return ""
+        data = self._combo_play_style.currentData()
+        if isinstance(data, str) and data:
+            return data
+        return self._combo_play_style.currentText()
+
+    def _find_base_attr_index(self, ref: str) -> int:
+        if not ref:
+            return -1
+        idx = self._combo_play_style.findData(ref)
+        if idx >= 0:
+            return idx
+        return self._combo_play_style.findText(ref)
+
     def _refresh_play_styles(self):
-        """刷新基础属性下拉（根据当前方案派生的流派）。"""
-        from ....config import get_play_styles
+        """刷新基础属性下拉：同时展示 system/local 预置属性与 session 个人属性集。"""
+        from ....config import (
+            get_base_attribute_presets,
+            get_play_styles,
+            make_preset_ref,
+        )
 
         school = self._get_current_school()
         self._combo_play_style.blockSignals(True)
         self._combo_play_style.clear()
 
         if school:
+            for preset in get_base_attribute_presets(school):
+                tag = tr("本地预置") if preset.source == "local" else tr("预置")
+                self._combo_play_style.addItem(
+                    f"[{tag}] {preset.label}",
+                    make_preset_ref(preset.id),
+                )
             play_styles = get_play_styles(school)
             for name in play_styles:
-                self._combo_play_style.addItem(name)
+                self._combo_play_style.addItem(name, name)
 
         fit_combo_to_contents(self._combo_play_style, minimum=104)
         self._combo_play_style.blockSignals(False)
@@ -458,9 +485,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._save_selection()
 
     def _on_edit_play_style(self) -> None:
-        """打开流派配置；存在已选属性时才定位到该属性。"""
+        """打开流派配置；存在已选个人属性时定位到该属性。"""
+        from ....config import parse_preset_ref
+
         school = self._get_current_school()
-        play_style = self._combo_play_style.currentText()
+        selected_ref = self._current_base_attr_ref()
+        play_style = "" if parse_preset_ref(selected_ref) else selected_ref
         from ...game_settings import GameConfigDialog
 
         dialog = GameConfigDialog(parent=self._host)
@@ -469,7 +499,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if not school:
             return
         self._refresh_play_styles()
-        index = self._combo_play_style.findText(play_style)
+        index = self._find_base_attr_index(selected_ref)
         if index >= 0:
             self._combo_play_style.setCurrentIndex(index)
         self._refresh_display()
@@ -646,7 +676,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             repo = LoadoutRepository(user_name)
             plan = repo.load().active_plan
             values = (
-                self._combo_play_style.currentText()
+                self._current_base_attr_ref()
                 if self._combo_play_style.currentIndex() >= 0
                 else plan.base_attribute,
                 self._get_current_gongjue(),
@@ -743,12 +773,29 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             self._refresh_play_styles()
             self._refresh_schemes()
 
-            # 恢复基础属性
+            # 恢复基础属性：未指定时优先按玩法/流派自动绑定最新 (level, stage) 预置
             if play_style:
-                idx = self._combo_play_style.findText(play_style)
+                idx = self._find_base_attr_index(play_style)
                 self._combo_play_style.setCurrentIndex(idx)
-            elif self._combo_play_style.currentText():
-                defaults["base_attribute"] = self._combo_play_style.currentText()
+            else:
+                from ....config import make_preset_ref, resolve_default_preset
+
+                default_preset = (
+                    resolve_default_preset(
+                        school,
+                        playstyle=getattr(plan, "playstyle", "") or "",
+                        level=self._effective_world_level(),
+                    )
+                    if school else None
+                )
+                if default_preset is not None:
+                    preset_ref = make_preset_ref(default_preset.id)
+                    idx = self._find_base_attr_index(preset_ref)
+                    if idx >= 0:
+                        self._combo_play_style.setCurrentIndex(idx)
+                        defaults["base_attribute"] = preset_ref
+                elif self._current_base_attr_ref():
+                    defaults["base_attribute"] = self._current_base_attr_ref()
 
             # 恢复弓玦
             idx = self._combo_gongjue.findData(gongjue)
@@ -1169,24 +1216,23 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         fill_slots(skill_items, self._skill_bonus_slots)
 
     def _get_base_attrs(self) -> CombatAttributes:
-        """获取当前选择的基础属性。"""
+        """获取当前选择的基础属性（支持预置 preset:<id> 与个人 play_styles.json）。"""
         if self._preview and self._preview_base_attrs is not None:
             return self._preview_base_attrs
-        play_style = self._combo_play_style.currentText()
-        if not play_style:
+        selected_ref = self._current_base_attr_ref()
+        if not selected_ref:
             return CombatAttributes()
 
         school = self._get_current_school()
         if not school:
             return CombatAttributes()
 
-        from ....config import get_play_styles
-        play_styles = get_play_styles(school)
-
-        if play_style not in play_styles:
+        from ....config import resolve_base_attribute_data
+        data = resolve_base_attribute_data(school, selected_ref)
+        if not isinstance(data, dict):
             return CombatAttributes()
 
-        return CombatAttributes.from_dict(play_styles[play_style])
+        return CombatAttributes.from_dict(data)
 
     def assumptions(self):
         """当前假设复选框对应的 ``Assumptions``（备战方案面板口径）。"""

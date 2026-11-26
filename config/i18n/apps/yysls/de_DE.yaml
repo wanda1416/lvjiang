@@ -1921,6 +1921,8 @@ auto_strings:
   导入: Importieren
   已保存: Gespeichert
   当前属性: Aktuelle Attribute
+  "预置": "Vorlage"
+  "本地预置": "Lokale Vorlage"
   当前玩法: Aktuelle Spielweise
   恢复: Wiederherstellen
   扫描: Scannen

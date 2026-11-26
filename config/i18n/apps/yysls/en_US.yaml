@@ -2683,3 +2683,4 @@ linger:
   配额: Quota
   记录: Record
   当前默认；右键勾选后点「设为默认」可切换: Check then use Set as default
+  "基础属性名称不能以 {prefix} 开头": "Base attribute name cannot start with {prefix}"

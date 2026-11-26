@@ -2687,3 +2687,4 @@ linger:
   配额: Cuota
   记录: Registro
   当前默认；右键勾选后点「设为默认」可切换: Marca primero para usar «Establecer como predeterminada»
+  "基础属性名称不能以 {prefix} 开头": "El nombre de los atributos base no puede empezar con {prefix}"

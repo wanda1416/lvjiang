@@ -114,9 +114,10 @@ RESISTANCE_RATE = 2.8
 ACCURACY_BASE = 0.65
 
 #: 五维：公共底子（DIY 表 23–25 行 = 劲/敏/势）原样写进快照，
-#: 体/御 计算表没有列，但同一底子下也是 328，一并补上，避免下游缺项。
+#: 体/御 计算表没有列，默认跟随同一底子（dim_jin，兜底 328.0），避免升阶时硬编码漂移。
 DIM_CELLS = {"dim_jin": "B23", "dim_min": "B24", "dim_shi": "B25"}
-DIM_FALLBACK = {"dim_ti": 328.0, "dim_yu": 328.0}
+DIM_EXTRA_FIELDS = ("dim_ti", "dim_yu")
+DIM_DEFAULT = 328.0
 
 _ROUNDUP_RE = re.compile(r"^ROUNDUP\((.*),(\d+)\)$", re.S)
 
@@ -365,7 +366,9 @@ def compute_stats(
     for name, coord in DIM_CELLS.items():
         raw = (diy_cells.get(coord) or {}).get("value", 0)
         stats[name] = float(raw) if isinstance(raw, (int, float)) else 0.0
-    stats.update(DIM_FALLBACK)
+    base_dim_val = stats.get("dim_jin") or DIM_DEFAULT
+    for name in DIM_EXTRA_FIELDS:
+        stats[name] = base_dim_val
     return {name: round(value, 4) for name, value in stats.items() if abs(value) > 1e-9}
 
 
@@ -401,7 +404,7 @@ def render_document(
 ) -> str:
     """落盘结构：只写口径快照，不写来源站点/版本/哈希等信息。"""
     ordered = {name: stats[name] for name, _ in CELL_FIELDS if name in stats}
-    for name in (*DIM_CELLS, *DIM_FALLBACK):
+    for name in (*DIM_CELLS, *DIM_EXTRA_FIELDS):
         if name in stats:
             ordered[name] = stats[name]
     document = {

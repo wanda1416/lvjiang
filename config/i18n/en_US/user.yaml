@@ -61,3 +61,8 @@ user_manager:
 user_toolbar:
   "上一个用户": "Previous User"
   "下一个用户": "Next User"
+  "用户配置": "User Settings"
+  "新增配置": "Add Setting"
+  "删除配置": "Delete Setting"
+  "保存配置": "Save Settings"
+  "高隐私配置（如账号、角色、尾号等）：云同步端到端加密，绝不随备战方案对外分享": "High-privacy settings (account, character, suffix, etc.): end-to-end encrypted in cloud sync and never shared with loadout links"

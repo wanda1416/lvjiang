@@ -2685,3 +2685,4 @@ linger:
   配额: Cota
   记录: Registro
   当前默认；右键勾选后点「设为默认」可切换: Marque primeiro para usar Definir como padrão
+  "基础属性名称不能以 {prefix} 开头": "O nome dos atributos base não pode começar com {prefix}"

@@ -60,3 +60,8 @@ user_manager:
 user_toolbar:
   上一个用户: Vorheriger Benutzer
   下一个用户: Nächster Benutzer
+  "用户配置": "Benutzereinstellungen"
+  "新增配置": "Einstellung hinzufügen"
+  "删除配置": "Einstellung löschen"
+  "保存配置": "Einstellungen speichern"
+  "高隐私配置（如账号、角色、尾号等）：云同步端到端加密，绝不随备战方案对外分享": "Hochsensible Einstellungen (Konto, Charakter, Endziffern usw.): Ende-zu-Ende-verschlüsselt in der Cloud und niemals in Build-Links geteilt"

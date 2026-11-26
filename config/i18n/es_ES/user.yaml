@@ -60,3 +60,8 @@ user_manager:
 user_toolbar:
   上一个用户: Usuario anterior
   下一个用户: Siguiente usuario
+  "用户配置": "Configuración de usuario"
+  "新增配置": "Añadir configuración"
+  "删除配置": "Eliminar configuración"
+  "保存配置": "Guardar configuración"
+  "高隐私配置（如账号、角色、尾号等）：云同步端到端加密，绝不随备战方案对外分享": "Configuración de alta privacidad (cuenta, personaje, sufijo, etc.): cifrada de extremo a extremo en la nube y nunca compartida en enlaces"

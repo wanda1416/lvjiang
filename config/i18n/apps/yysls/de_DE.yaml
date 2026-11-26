@@ -2684,3 +2684,4 @@ linger:
   配额: Kontingent
   记录: Eintrag
   当前默认；右键勾选后点「设为默认」可切换: Erst markieren, dann „Als Standard festlegen“ nutzen
+  "基础属性名称不能以 {prefix} 开头": "Der Name der Basiswerte darf nicht mit {prefix} beginnen"

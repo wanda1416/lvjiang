@@ -2686,3 +2686,4 @@ linger:
   配额: Quota
   记录: Enregistrement
   当前默认；右键勾选后点「设为默认」可切换: Cochez puis utilisez « Définir par défaut »
+  "基础属性名称不能以 {prefix} 开头": "Le nom des attributs de base ne peut pas commencer par {prefix}"

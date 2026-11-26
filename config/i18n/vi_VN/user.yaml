@@ -60,3 +60,8 @@ user_manager:
 user_toolbar:
   上一个用户: Người dùng trước
   下一个用户: Người dùng tiếp theo
+  "用户配置": "Cấu hình người dùng"
+  "新增配置": "Thêm cấu hình"
+  "删除配置": "Xóa cấu hình"
+  "保存配置": "Lưu cấu hình"
+  "高隐私配置（如账号、角色、尾号等）：云同步端到端加密，绝不随备战方案对外分享": "Cấu hình riêng tư cao (tài khoản, nhân vật, số đuôi...): mã hóa đầu cuối khi đồng bộ đám mây và không bao giờ chia sẻ theo phương án"

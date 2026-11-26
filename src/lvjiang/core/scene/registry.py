@@ -5,6 +5,8 @@
 已拆分至 layout_models.py。
 """
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import replace
 
 from loguru import logger
@@ -130,8 +132,36 @@ def initialize_scene_registry() -> None:
         logger.warning("未加载场景分组，场景相关功能暂不可用；请检查 scenes/ 目录，不影响程序启动")
 
 
+_scoped_registry: ContextVar[SceneRegistry | None] = ContextVar(
+    "scoped_scene_registry", default=None,
+)
+
+
+def set_scoped_registry(registry: SceneRegistry | None):
+    """设置当前上下文的场景注册表并返回恢复 token。"""
+    return _scoped_registry.set(registry)
+
+
+def reset_scoped_registry(token) -> None:
+    """按 token 恢复上下文场景注册表。"""
+    _scoped_registry.reset(token)
+
+
+@contextmanager
+def use_scene_registry(registry: SceneRegistry | None):
+    """在上下文内临时切换 get_registry() 返回值，退出时必定还原。"""
+    token = _scoped_registry.set(registry)
+    try:
+        yield
+    finally:
+        _scoped_registry.reset(token)
+
+
 def get_registry() -> SceneRegistry:
-    """获取场景注册表实例（供 UI 层调用 CRUD 方法）"""
+    """获取场景注册表实例（未进入作用域时返回进程级单例）。"""
+    scoped = _scoped_registry.get()
+    if scoped is not None:
+        return scoped
     initialize_scene_registry()
     assert _registry is not None  # initialize_scene_registry 保证已构造
     return _registry
@@ -142,7 +172,26 @@ def reload_scene_registry():
 
     未初始化时先初始化（兜底）：正常启动由 run_app 显式调用
     initialize_scene_registry，本函数只在场景文件变化后使用。
+    若当前处于任务场景作用域，仅原位重载该作用域注册表，不触碰全局单例。
     """
+    scoped = _scoped_registry.get()
+    if scoped is not None:
+        from ..config.resolver import get_resolver
+        resolver = get_resolver()
+        resolver.clear_read_cache()
+        manifest = load_scene_manifest(resolver)
+        refreshed = SceneRegistry(
+            resolver=resolver,
+            scene_order=manifest.order if manifest else None,
+            group_config=manifest.groups if manifest else None,
+            group_names=manifest.group_names if manifest else None,
+            disabled_scenes=manifest.disabled if manifest else None,
+            group_layers=manifest.group_layers if manifest else None,
+            scene_layers=manifest.scene_layers if manifest else None,
+        )
+        for name, value in refreshed.__dict__.items():
+            setattr(scoped, name, value)
+        return
     if _registry is None:
         initialize_scene_registry()
         return
@@ -196,6 +245,8 @@ def get_scene_group(scene_key: str) -> str | None:
 
 def sync_scene_cache(scene_key: str):
     """仅刷新单个场景的全局缓存（区域/坐标/面板编辑后调用，避免全量重载）"""
+    if _scoped_registry.get() is not None:
+        return  # 任务场景作用域内不污染全局字典
     global SCENE_REGIONS, SCENE_POINTS, SCENE_PANELS
     scene = get_registry().get_scene(scene_key)
     if scene:

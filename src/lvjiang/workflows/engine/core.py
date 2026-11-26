@@ -864,9 +864,20 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         return return_value
 
     def _execute_dsl(self, wf_path: Path) -> dict:
-        """加载并执行 .wf 文件"""
+        """加载并执行 .wf 文件（独立任务包在执行期自动合并场景/布局并于退出时释放）"""
+        from ..package import task_package_runtime_scope
+
         self._ensure_workflow()
         resolved = Path(wf_path).resolve()
+        prev_layout = self._layout
+        with task_package_runtime_scope(resolved, prev_layout) as active_layout:
+            self._layout = active_layout
+            try:
+                return self._execute_dsl_in_scope(resolved)
+            finally:
+                self._layout = prev_layout
+
+    def _execute_dsl_in_scope(self, resolved: Path) -> dict:
         program = self._load_and_validate(resolved)
         # 静态校验全部通过后才执行外置脚本的模块顶层代码：脚本写错不会
         # 在校验失败的路径上留下"跑了一半"的副作用

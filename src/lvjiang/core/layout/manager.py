@@ -245,9 +245,9 @@ class LayoutConfigManager:
         key = validate_layout_key(key)
         name = name.strip()
         self.validate_new_identity(key, name)
-        from ..scene.registry import SCENE_REGIONS
+        from ..scene.registry import get_registry
         layout = Layout(key=key, name=name)
-        for scene_key in SCENE_REGIONS:
+        for scene_key in get_registry().all_scene_keys():
             layout.regions[scene_key] = []
         if not self.save_layout(layout):
             raise ValueError(self.last_save_error or "布局未保存，请检查日志")

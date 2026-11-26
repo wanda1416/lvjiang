@@ -1,0 +1,429 @@
+"""独立任务包（Standalone Task Package）与场景管理双模式回归测试。"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+
+from lvjiang.core.config.resolver import (
+    ConfigResolver,
+    get_resolver,
+)
+from lvjiang.core.layout.models import CanvasConfig, Layout, Region
+from lvjiang.core.layout.screenshots import (
+    layout_screenshots_dir,
+    use_screenshots_dir,
+)
+from lvjiang.core.scene.config import load_scene_manifest
+from lvjiang.core.scene.definition import SceneRegistry
+from lvjiang.core.scene.registry import get_registry
+from lvjiang.workflows.errors import WorkflowUserError
+from lvjiang.workflows.package import (
+    create_package_resolver,
+    discover_task_packages,
+    find_task_package_for_wf,
+    package_screenshots_dir,
+    task_package_runtime_scope,
+)
+
+
+def _write_yaml(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _write_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _seed_base_config(root_sys: Path) -> None:
+    """构造最小化的全局主配置（scenes + layouts: desktop / android / android_cast + templates）。"""
+    _write_json(root_sys / "scenes" / "_meta.json", {"groups": [{"key": "general", "scenes": ["game_main_page"]}]})
+    _write_yaml(
+        root_sys / "scenes" / "general.yaml",
+        {"name": "通用", "scenes": ["game_main_page"]},
+    )
+    _write_yaml(
+        root_sys / "scenes" / "general" / "game_main_page.yaml",
+        {
+            "key": "game_main_page",
+            "name": "主界面",
+            "regions": [{"key": "enter_btn", "name": "进入按钮"}],
+            "points": [],
+            "panels": [],
+        },
+    )
+
+    _write_json(
+        root_sys / "layouts" / "_meta.json",
+        {"layouts": ["desktop", "android", "android_cast"]},
+    )
+    _write_yaml(
+        root_sys / "layouts" / "desktop.yaml",
+        {"name": "桌面端", "canvas": {"x": 0, "y": 0, "w": 1920, "h": 1080}},
+    )
+    _write_yaml(
+        root_sys / "layouts" / "android.yaml",
+        {"name": "安卓端", "canvas": {"x": 0, "y": 0, "w": 2400, "h": 1080}},
+    )
+    _write_yaml(
+        root_sys / "layouts" / "android_cast.yaml",
+        {
+            "name": "安卓投屏",
+            "extends": "android",
+            "canvas": {"x": 0, "y": 0, "w": 1920, "h": 864},
+        },
+    )
+    _write_json(
+        root_sys / "layouts" / "desktop" / "general" / "game_main_page.json",
+        {
+            "regions": [
+                {"key": "enter_btn", "x_ratio": 0.1, "y_ratio": 0.1, "w_ratio": 0.2, "h_ratio": 0.1}
+            ]
+        },
+    )
+    _write_json(
+        root_sys / "layouts" / "android" / "general" / "game_main_page.json",
+        {
+            "regions": [
+                {"key": "enter_btn", "x_ratio": 0.2, "y_ratio": 0.2, "w_ratio": 0.2, "h_ratio": 0.1}
+            ]
+        },
+    )
+    (root_sys / "templates").mkdir(parents=True, exist_ok=True)
+    (root_sys / "templates" / "global_ok.png").write_bytes(b"GLOBAL_PNG")
+
+
+def _seed_task_package(
+    pkg_dir: Path,
+    *,
+    pkg_id: str = "fengshajiusi",
+    group_key: str = "fsjs",
+    scene_key: str = "fsjs_lobby",
+    entry: str = "fengshajiusi.wf",
+    include_template: bool = True,
+) -> Path:
+    """在指定目录构造标准独立任务包（manifest.yaml + .wf + scenes/ + layouts/）。"""
+    _write_yaml(
+        pkg_dir / "manifest.yaml",
+        {
+            "schema_version": 1,
+            "id": pkg_id,
+            "name": "风沙酒肆",
+            "entry": entry,
+            "version": "1.0.0",
+        },
+    )
+    wf_file = pkg_dir / entry
+    wf_file.parent.mkdir(parents=True, exist_ok=True)
+    wf_file.write_text(
+        "#% name: 风沙酒肆\n#% runnable: true\nset $ok = 1\nreturn $ok\n",
+        encoding="utf-8",
+    )
+
+    _write_json(pkg_dir / "scenes" / "_meta.json", {"groups": [{"key": group_key, "scenes": [scene_key]}]})
+    _write_yaml(
+        pkg_dir / "scenes" / f"{group_key}.yaml",
+        {"name": "风沙酒肆", "scenes": [scene_key]},
+    )
+    _write_yaml(
+        pkg_dir / "scenes" / group_key / f"{scene_key}.yaml",
+        {
+            "key": scene_key,
+            "name": "酒肆大厅",
+            "regions": [{"key": "drink_btn", "name": "喝酒按钮"}],
+            "points": [],
+            "panels": [],
+        },
+    )
+
+    _write_json(
+        pkg_dir / "layouts" / "_meta.json",
+        {"layouts": ["desktop", "android"]},
+    )
+    _write_yaml(
+        pkg_dir / "layouts" / "desktop.yaml",
+        {"name": "桌面端", "canvas": {"x": 0, "y": 0, "w": 1920, "h": 1080}},
+    )
+    _write_yaml(
+        pkg_dir / "layouts" / "android.yaml",
+        {"name": "安卓端", "canvas": {"x": 0, "y": 0, "w": 2400, "h": 1080}},
+    )
+    _write_json(
+        pkg_dir / "layouts" / "desktop" / group_key / f"{scene_key}.json",
+        {
+            "regions": [
+                {"key": "drink_btn", "x_ratio": 0.5, "y_ratio": 0.5, "w_ratio": 0.1, "h_ratio": 0.1}
+            ]
+        },
+    )
+    _write_json(
+        pkg_dir / "layouts" / "android" / group_key / f"{scene_key}.json",
+        {
+            "regions": [
+                {"key": "drink_btn", "x_ratio": 0.7, "y_ratio": 0.6, "w_ratio": 0.12, "h_ratio": 0.08}
+            ]
+        },
+    )
+    if include_template:
+        (pkg_dir / "templates").mkdir(parents=True, exist_ok=True)
+        (pkg_dir / "templates" / "fsjs_icon.png").write_bytes(b"PKG_PNG")
+    return wf_file
+
+
+@pytest.fixture
+def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """隔离的 root ConfigResolver + 基础 SceneRegistry，不触碰真实仓库目录。"""
+    sys_dir = tmp_path / "system"
+    loc_dir = tmp_path / "local"
+    sys_dir.mkdir()
+    loc_dir.mkdir()
+    _seed_base_config(sys_dir)
+
+    root_resolver = ConfigResolver(
+        system_dir=sys_dir,
+        local_dir=loc_dir,
+        dev_mode=False,
+        track_content=False,
+    )
+    manifest = load_scene_manifest(root_resolver)
+    base_registry = SceneRegistry(
+        resolver=root_resolver,
+        scene_order=manifest.order if manifest else None,
+        group_config=manifest.groups if manifest else None,
+        group_names=manifest.group_names if manifest else None,
+        disabled_scenes=manifest.disabled if manifest else None,
+        group_layers=manifest.group_layers if manifest else None,
+        scene_layers=manifest.scene_layers if manifest else None,
+    )
+
+    monkeypatch.setattr("lvjiang.core.config.resolver._resolver", root_resolver)
+    monkeypatch.setattr("lvjiang.core.scene.registry._registry", base_registry)
+    return tmp_path, sys_dir, loc_dir, root_resolver, base_registry
+
+
+def test_ordinary_task_untouched(isolated_env):
+    """普通任务（无 manifest.yaml）完全走原路径，不修改布局、解析器或注册表。"""
+    _, sys_dir, _, root_resolver, base_registry = isolated_env
+    ordinary_wf = sys_dir / "workflows" / "daily" / "ordinary.wf"
+    ordinary_wf.parent.mkdir(parents=True, exist_ok=True)
+    ordinary_wf.write_text("#% runnable: true\nreturn 1\n", encoding="utf-8")
+
+    assert find_task_package_for_wf(ordinary_wf) is None
+
+    base_layout = Layout(
+        key="desktop",
+        name="桌面端",
+        canvas=CanvasConfig(),
+        regions={"game_main_page": [Region(key="enter_btn", x_ratio=0.1, y_ratio=0.1, w_ratio=0.2, h_ratio=0.1)]},
+    )
+    with task_package_runtime_scope(ordinary_wf, base_layout) as active_layout:
+        assert active_layout is base_layout
+        assert get_resolver() is root_resolver
+        assert get_registry() is base_registry
+
+
+def test_manifest_entry_path_traversal_rejected(isolated_env):
+    """manifest.yaml 中的 entry 禁止路径穿越、绝对路径或非 .wf 后缀。"""
+    _, _, loc_dir, _, _ = isolated_env
+    pkg_dir = loc_dir / "workflows" / "standalone" / "badpkg"
+    pkg_dir.mkdir(parents=True)
+    wf = pkg_dir / "badpkg.wf"
+    wf.write_text("#% runnable: true\n", encoding="utf-8")
+
+    for bad_entry in ("../outside.wf", "/abs/path.wf", "script.py"):
+        _write_yaml(pkg_dir / "manifest.yaml", {"id": "badpkg", "entry": bad_entry})
+        with pytest.raises(WorkflowUserError):
+            find_task_package_for_wf(wf)
+
+
+def test_discover_task_packages_and_shadow_layer(isolated_env):
+    """发现层识别 system 与 local 独立包，local 影子优先。"""
+    _, sys_dir, loc_dir, root_resolver, _ = isolated_env
+    _seed_task_package(sys_dir / "workflows" / "standalone" / "fengshajiusi")
+    _seed_task_package(loc_dir / "workflows" / "thirdparty" / "my_pkg", pkg_id="my_pkg", group_key="mp", scene_key="mp_home", entry="my_pkg.wf")
+
+    pkgs = discover_task_packages(root_resolver)
+    ids = [p.id for p in pkgs]
+    assert ids == ["fengshajiusi", "my_pkg"]
+    assert pkgs[0].layer == "system"
+    assert pkgs[1].layer == "local"
+
+    # system 包在用户模式下写 local 影子
+    res_sys = create_package_resolver(pkgs[0], root_resolver)
+    assert res_sys.system_dir == sys_dir / "workflows" / "standalone" / "fengshajiusi"
+    assert res_sys.local_dir == loc_dir / "workflows" / "standalone" / "fengshajiusi"
+
+
+def test_duplicate_group_or_scene_raises_on_start(isolated_env):
+    """任务包分组或场景与全局重名时，启动即报错中止。"""
+    _, _, loc_dir, _, _ = isolated_env
+    # 1. 分组重名（general）
+    wf_dup_group = _seed_task_package(
+        loc_dir / "workflows" / "standalone" / "dup_group",
+        pkg_id="dup_group",
+        group_key="general",
+        scene_key="fsjs_unique",
+        entry="dup_group.wf",
+    )
+    with pytest.raises(WorkflowUserError, match="重复分组: general"):
+        with task_package_runtime_scope(wf_dup_group, None):
+            pass
+
+    # 2. 场景重名（game_main_page）
+    wf_dup_scene = _seed_task_package(
+        loc_dir / "workflows" / "standalone" / "dup_scene",
+        pkg_id="dup_scene",
+        group_key="fsjs_unique_group",
+        scene_key="game_main_page",
+        entry="dup_scene.wf",
+    )
+    with pytest.raises(WorkflowUserError, match="重复场景: game_main_page"):
+        with task_package_runtime_scope(wf_dup_scene, None):
+            pass
+
+
+def test_runtime_scope_merges_same_named_layouts_and_releases_on_exit(isolated_env):
+    """运行期按同名根布局（desktop / android / android_cast 别名）合并，退出后彻底释放。"""
+    _, _, loc_dir, root_resolver, base_registry = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+
+    desktop_layout = Layout(
+        key="desktop",
+        name="桌面端",
+        canvas=CanvasConfig(),
+        regions={"game_main_page": [Region(key="enter_btn", x_ratio=0.1, y_ratio=0.1, w_ratio=0.2, h_ratio=0.1)]},
+    )
+    android_cast_layout = Layout(
+        key="android_cast",
+        name="安卓投屏",
+        canvas=CanvasConfig(),
+        regions={"game_main_page": [Region(key="enter_btn", x_ratio=0.2, y_ratio=0.2, w_ratio=0.2, h_ratio=0.1)]},
+    )
+
+    # 1. 桌面端同名布局合并 + 模板优先与回退
+    with task_package_runtime_scope(wf, desktop_layout) as merged:
+        assert merged is not None and merged is not desktop_layout
+        assert "game_main_page" in merged.regions
+        assert "fsjs_lobby" in merged.regions
+        assert merged.get_scene_regions("fsjs_lobby")[0].x_ratio == pytest.approx(0.5)
+        assert get_registry().get_scene("fsjs_lobby") is not None
+        assert get_registry().get_scene("game_main_page") is not None
+        # 模板叠加：包内优先 + 全局回退
+        assert get_resolver().resolve_read("templates/fsjs_icon.png") is not None
+        assert get_resolver().resolve_read("templates/global_ok.png") is not None
+
+    # 退出后彻底释放，不污染全局注册表和原始 Layout
+    assert get_registry() is base_registry
+    assert get_registry().get_scene("fsjs_lobby") is None
+    assert "fsjs_lobby" not in desktop_layout.regions
+    assert get_resolver() is root_resolver
+    assert get_resolver().resolve_read("templates/fsjs_icon.png") is None
+
+    # 2. 安卓投屏别名布局（extends: android）自动回退合并任务包的 android 布局，且异常也必定释放
+    with pytest.raises(RuntimeError, match="boom"):
+        with task_package_runtime_scope(wf, android_cast_layout) as merged_android:
+            assert merged_android is not None
+            assert merged_android.get_scene_regions("fsjs_lobby")[0].x_ratio == pytest.approx(0.7)
+            raise RuntimeError("boom")
+
+    assert get_registry() is base_registry
+    assert get_registry().get_scene("fsjs_lobby") is None
+    assert "fsjs_lobby" not in android_cast_layout.regions
+
+
+def test_screenshots_isolated_per_task_package(isolated_env, tmp_path: Path):
+    """任务包截图目录隔离在 _packages/<id>/ 下，不与全局 desktop 截图目录冲突。"""
+    _, _, loc_dir, _, _ = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    pkg = find_task_package_for_wf(wf)
+    assert pkg is not None
+
+    fake_shots = tmp_path / "screenshots"
+    with use_screenshots_dir(fake_shots):
+        main_desktop_dir = layout_screenshots_dir("desktop")
+        pkg_root = package_screenshots_dir(pkg)
+        with use_screenshots_dir(pkg_root):
+            pkg_desktop_dir = layout_screenshots_dir("desktop")
+        assert pkg_desktop_dir == fake_shots / "_packages" / "fengshajiusi" / "desktop"
+        assert pkg_desktop_dir != main_desktop_dir
+        assert layout_screenshots_dir("desktop") == main_desktop_dir
+
+
+def test_workflow_engine_executes_task_package_with_static_check(isolated_env):
+    """WorkflowEngine._execute_dsl 运行独立任务包时通过静态校验并在退出后释放。"""
+    from lvjiang.workflows.engine import WorkflowEngine
+
+    _, _, loc_dir, _, base_registry = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    # 写入同时静态引用主场景与任务私有场景的脚本（放在分支中避免真触发点击，但会走 check_refs）
+    wf.write_text(
+        "#% name: 风沙酒肆\n"
+        "#% runnable: true\n"
+        "if false\n"
+        "    click [game_main_page].[enter_btn]\n"
+        "    click [fsjs_lobby].[drink_btn]\n"
+        "end\n"
+        "return 42\n",
+        encoding="utf-8",
+    )
+
+    desktop_layout = Layout(
+        key="desktop",
+        name="桌面端",
+        canvas=CanvasConfig(),
+        regions={"game_main_page": [Region(key="enter_btn", x_ratio=0.1, y_ratio=0.1, w_ratio=0.2, h_ratio=0.1)]},
+    )
+    engine = WorkflowEngine(capture=None, input_ctrl=None, layout=desktop_layout, ocr=None)
+    engine.execute(wf)
+    assert engine.return_value == 42
+    # 退出后引擎持有的布局还原，且全局注册表未受污染
+    assert engine._layout is desktop_layout
+    assert "fsjs_lobby" not in desktop_layout.regions
+    assert get_registry() is base_registry
+    assert get_registry().get_scene("fsjs_lobby") is None
+
+
+def test_scene_editor_dual_mode_switch_and_restore(isolated_env, qtbot):
+    """场景管理顶栏双模式切换：加载任务场景仅看包内场景，退出还原主场景且不污染全局。"""
+    from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
+    _, _, loc_dir, root_resolver, base_registry = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    pkg = find_task_package_for_wf(wf)
+    assert pkg is not None
+
+    dlg = SceneEditorDialog()
+    qtbot.addWidget(dlg)
+    try:
+        assert dlg.active_task_package is None
+        assert dlg._btn_task_package.text() == "加载任务场景"
+        assert "game_main_page" in dlg._tabs
+        assert "fsjs_lobby" not in dlg._tabs
+
+        # 切入任务场景模式
+        assert dlg._enter_task_package_mode(pkg) is True
+        assert dlg.active_task_package == pkg
+        assert dlg._btn_task_package.text() == "退出任务场景"
+        assert "风沙酒肆" in dlg.windowTitle()
+        assert "fsjs_lobby" in dlg._tabs
+        assert "game_main_page" not in dlg._tabs
+        # 全局主注册表完全未被污染
+        assert base_registry.get_scene("fsjs_lobby") is None
+
+        # 退出任务场景模式
+        assert dlg._exit_task_package_mode(restore_ui=True) is True
+        assert dlg.active_task_package is None
+        assert dlg._btn_task_package.text() == "加载任务场景"
+        assert "game_main_page" in dlg._tabs
+        assert "fsjs_lobby" not in dlg._tabs
+        assert get_resolver() is root_resolver
+        assert get_registry() is base_registry
+    finally:
+        dlg.close()
+

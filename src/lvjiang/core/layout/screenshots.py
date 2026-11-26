@@ -4,6 +4,8 @@ import json
 import re
 import shutil
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +20,31 @@ from .config import (
 
 # 布局截图属于运行态产出，落 session 层
 SCREENSHOTS_DIR = SESSION_CONFIG_DIR / "screenshots"
+_scoped_screenshots_dir: ContextVar[Path | None] = ContextVar(
+    "scoped_screenshots_dir", default=None,
+)
+
+
+def get_screenshots_root() -> Path:
+    """当前上下文的截图根目录（未进入任务包作用域时返回全局 SCREENSHOTS_DIR）。"""
+    return _scoped_screenshots_dir.get() or SCREENSHOTS_DIR
+
+
+def set_scoped_screenshots_dir(path: Path | None):
+    return _scoped_screenshots_dir.set(path)
+
+
+def reset_scoped_screenshots_dir(token) -> None:
+    _scoped_screenshots_dir.reset(token)
+
+
+@contextmanager
+def use_screenshots_dir(path: Path | None):
+    token = _scoped_screenshots_dir.set(path)
+    try:
+        yield
+    finally:
+        _scoped_screenshots_dir.reset(token)
 _SCREENSHOT_EXTENSIONS = ("webp", "png")
 _WEBP_QUALITY = 90
 
@@ -31,7 +58,7 @@ def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str
     """
     if old_view_key == new_view_key:
         return
-    screenshots_base = SCREENSHOTS_DIR
+    screenshots_base = get_screenshots_root()
     if not screenshots_base.exists():
         return
     old_stem = _screenshot_base_stem(scene_key, old_view_key)
@@ -66,7 +93,7 @@ def _safe_name(name: str) -> str:
 
 def layout_screenshots_dir(layout_name: str) -> Path:
     """获取布局的截图目录"""
-    return SCREENSHOTS_DIR / _safe_name(layout_name)
+    return get_screenshots_root() / _safe_name(layout_name)
 
 
 def scene_screenshot_name(
@@ -200,7 +227,7 @@ def rename_scene_screenshots(old_key: str, new_key: str):
     """
     if old_key == new_key:
         return
-    screenshots_base = SCREENSHOTS_DIR
+    screenshots_base = get_screenshots_root()
     if not screenshots_base.exists():
         return
     for layout_dir in screenshots_base.iterdir():

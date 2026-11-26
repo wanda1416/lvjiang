@@ -81,9 +81,11 @@ class SceneOpsMixin:
             self._current_layout.key if self._current_layout is not None
             else self._layout_combo.currentData() or "")
         try:
-            from ...core.config.content import rebuild_content
-            rebuild_content(get_resolver())
-            get_resolver().reset_edit_baselines()
+            resolver = get_resolver()
+            if resolver.track_content:
+                from ...core.config.content import rebuild_content
+                rebuild_content(resolver)
+            resolver.reset_edit_baselines()
             reload_scene_registry()
             # 必须先读定义再读坐标，否则新增区域会被旧定义当作孤儿过滤。
             layout = self._manager.load_layout(layout_key) if layout_key else None

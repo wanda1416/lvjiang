@@ -51,6 +51,7 @@ from .scene_ops import SceneOpsMixin
 from .scene_tab import SceneTab
 from .script_ops import ScriptOpsMixin, _InsertEntityButton
 from .tab_add_bar import InlineAddTabWidget
+from .task_package_ops import TaskPackageOpsMixin
 
 _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY = 8
 
@@ -80,6 +81,7 @@ class SceneEditorDialog(
     SceneOpsMixin,
     RecognitionOpsMixin,
     ScriptOpsMixin,
+    TaskPackageOpsMixin,
     QDialog,
 ):
     """场景编辑器对话框 - 布局→场景 层级结构"""
@@ -121,6 +123,7 @@ class SceneEditorDialog(
         self._scene_layout_paths: dict[str, str] = {}
         self._applying_layout = False
         self._click_rect_mode = False
+        self._init_task_package_state()
 
         self._setup_ui()
         get_theme_manager().theme_changed.connect(self._update_info_label)
@@ -190,6 +193,7 @@ class SceneEditorDialog(
             logger.warning(f"保存场景编辑器窗口大小失败: {e}")
 
     def closeEvent(self, event):
+        self._exit_task_package_mode(restore_ui=False)
         self._save_window_size()
         # 显式断开应用级信号：它活得比本对话框久，留着就是在已销毁的控件上回调
         app = getattr(self, "_focus_watch_app", None)
@@ -316,6 +320,12 @@ class SceneEditorDialog(
         self._dirty_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
         self._dirty_label.setVisible(False)
         top_bar.addWidget(self._dirty_label)
+
+        self._btn_task_package = QPushButton(tr("加载任务场景"))
+        self._btn_task_package.setToolTip(tr("加载独立任务包的场景与布局进行查看和调试"))
+        self._btn_task_package.clicked.connect(self._on_toggle_task_package)
+        apply_button_style(self._btn_task_package, variant="neutral")
+        top_bar.addWidget(self._btn_task_package)
 
         layout.addLayout(top_bar)
 

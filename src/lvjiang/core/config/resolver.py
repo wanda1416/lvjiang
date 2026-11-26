@@ -711,13 +711,70 @@ class ConfigResolver:
         self._notify(rel_path)
 
 
-# ─── 模块级单例 ──────────────────────────────────────────
+class OverlayConfigResolver:
+    """运行期叠加解析器：仅对 ``templates/`` 优先查任务包，其余全部透传基础解析器。
+
+    用于独立任务包运行态：避免污染全局 ConfigResolver，同时让 TemplateStore
+    自然按「任务包 templates/ → 全局 templates/」顺序查找模板图。
+    """
+
+    def __init__(self, base: ConfigResolver, package_resolver: ConfigResolver):
+        self._base = base
+        self._package = package_resolver
+
+    def resolve_read(self, rel_path: str) -> Path | None:
+        if rel_path.startswith("templates/"):
+            hit = self._package.resolve_read(rel_path)
+            if hit is not None:
+                return hit
+        return self._base.resolve_read(rel_path)
+
+    def exists(self, rel_path: str) -> bool:
+        if rel_path.startswith("templates/") and self._package.exists(rel_path):
+            return True
+        return self._base.exists(rel_path)
+
+    def clear_read_cache(self) -> None:
+        self._package.clear_read_cache()
+        self._base.clear_read_cache()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._base, name)
+
+
+# ─── 模块级单例与线程级作用域 ─────────────────────────────
 
 _resolver: ConfigResolver | None = None
+_scoped_resolver: ContextVar[ConfigResolver | OverlayConfigResolver | None] = ContextVar(
+    "scoped_config_resolver", default=None,
+)
+
+
+def set_scoped_resolver(resolver: ConfigResolver | OverlayConfigResolver | None):
+    """设置当前上下文的配置解析器并返回恢复 token。"""
+    return _scoped_resolver.set(resolver)
+
+
+def reset_scoped_resolver(token) -> None:
+    """按 token 恢复上下文配置解析器。"""
+    _scoped_resolver.reset(token)
+
+
+@contextmanager
+def use_resolver(resolver: ConfigResolver | OverlayConfigResolver | None):
+    """在上下文内临时切换 get_resolver() 返回值，退出时必定还原。"""
+    token = _scoped_resolver.set(resolver)
+    try:
+        yield
+    finally:
+        _scoped_resolver.reset(token)
 
 
 def get_resolver() -> ConfigResolver:
-    """配置读取入口：始终是进程级单例，任务运行期不再切换副本。"""
+    """配置读取入口：未进入作用域时直接返回进程级单例。"""
+    scoped = _scoped_resolver.get()
+    if scoped is not None:
+        return scoped  # type: ignore[return-value]
     return get_root_resolver()
 
 

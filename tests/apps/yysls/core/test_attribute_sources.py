@@ -63,3 +63,28 @@ def test_sources_match_scoring_with_stacking_dimensions_sets_and_penetration():
     assert equipped == original
     base.min_outer = 999
     assert report.category_attrs("base").min_outer == 100
+
+
+def test_sources_raw_includes_talent_dim_delta_when_base_has_dims():
+    config = get_game_config()
+    base = CombatAttributes(
+        min_outer=1000, max_outer=2000,
+        dim_jin=328.0, dim_min=328.0, dim_shi=328.0,
+    )
+    gongjue = CombatAttributes()
+    equipped = {
+        "main_weapon": {
+            "level": 115, "quality": "gold",
+            "affix_1": {"name": "势", "value": 60.0},
+        },
+    }
+    context = GraduationAttrContext.from_school("鸣金·虹", world_level=115, game_config=config)
+    report = build_attribute_source_report(
+        base, gongjue, equipped, context=context, school="鸣金·虹", game_config=config)
+    summed = CombatAttributes()
+    for contribution in report.contributions:
+        summed = summed + contribution.attrs
+    assert summed.max_outer == pytest.approx(report.raw.max_outer)
+    assert summed.intent_rate == pytest.approx(report.raw.intent_rate)
+    assert report.raw.max_outer == pytest.approx(report.effective.max_outer)
+    assert any("武学天赋" in c.label for c in report.contributions)

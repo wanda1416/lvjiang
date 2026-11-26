@@ -18,8 +18,8 @@ entries:
       intent_rate: 0.14
       crit_dmg: 0.5
       intent_dmg: 0.35
-      min_wuxiang: 79.2
-      max_wuxiang: 92.4
+      min_wuxiang: 92.4
+      max_wuxiang: 118.8
   角色等级·100级攻击累计:
     stats:
       min_outer: 263

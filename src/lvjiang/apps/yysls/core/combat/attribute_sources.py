@@ -15,6 +15,7 @@ from .combat_attrs import (
     compute_equip_base_attrs,
     effective_equipped,
     fold_wuxiang_pen,
+    talent_dim_delta,
 )
 from .equipment_sets import LEFT_SET_SLOTS, equipment_set_bonus
 
@@ -96,9 +97,16 @@ def build_attribute_source_report(
             add("dingyin" if key == "dingyin" else "affix", label, attrs)
 
     # 总值仍以评分内核为准，来源明细只是对它的解释。
+    base_with_gongjue = base + gongjue
     folded = fold_wuxiang_pen(equipment_attrs(equipped, game_config), context.target_pen_field)
+    talent_delta = talent_dim_delta(base_with_gongjue, folded, school)
+    if any(
+        value for key, value in talent_delta.to_dict().items()
+        if key != "extra_attrs"
+    ) or any(talent_delta.extra_attrs.values()):
+        add("base", "武学天赋（五维补正）", talent_delta)
     return AttributeSourceReport(
-        tuple(contributions), base + gongjue + folded,
-        build_graduation_attrs(base + gongjue, folded, school, context=context),
+        tuple(contributions), base_with_gongjue + folded + talent_delta,
+        build_graduation_attrs(base_with_gongjue, folded, school, context=context),
         context, tuple(excluded),
     )

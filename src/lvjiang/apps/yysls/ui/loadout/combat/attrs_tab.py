@@ -36,6 +36,7 @@ from ....core.combat.combat_attrs import (
     JudgmentOutcomeRates,
     calculate_judgment_outcomes,
     format_value,
+    talent_dim_delta,
 )
 from ...events import get_event_hub
 from .cards import CombatCardsMixin
@@ -1000,9 +1001,14 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             scored_equipment(equipped or {}, get_game_config()),
             context.target_pen_field,
         )
-        combat_attrs = base_attrs + gongjue_attrs + equip_attrs
+        base_with_gongjue = base_attrs + gongjue_attrs
+        combat_attrs = (
+            base_with_gongjue
+            + equip_attrs
+            + talent_dim_delta(base_with_gongjue, equip_attrs, school)
+        )
         graduation_attrs = build_graduation_attrs(
-            base_attrs + gongjue_attrs, equip_attrs, school, context=context)
+            base_with_gongjue, equip_attrs, school, context=context)
         buff_resistance = context.buff_resistance
 
         self._current_combat_attrs = combat_attrs

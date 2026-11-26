@@ -845,3 +845,34 @@ class TestPerformanceBenchmark:
 
         assert results, "Should return at least one result"
         assert elapsed < 5.0, f"Search took {elapsed:.2f}s, expected < 5s"
+
+
+def test_search_optimal_combo_matches_scorer_with_talent_dim_delta() -> None:
+    """使用含五维预置的 base_attrs 时，向量化评分应与 LoadoutScorer 一致计入 talent_dim_delta。"""
+    calc = _get_calculator()
+    base_attrs = CombatAttributes(
+        min_outer=1500, max_outer=3200,
+        min_mingjin=500, max_mingjin=1200,
+        precision=0.80, crit_rate=0.20, intent_rate=0.25,
+        crit_dmg=0.5, intent_dmg=0.4,
+        dim_jin=328.0, dim_min=328.0, dim_shi=328.0, dim_ti=328.0, dim_yu=328.0,
+    )
+    high_shi = {
+        "name": "高势戒指", "type": "环", "level": 115, "quality": "gold",
+        "affix_1": {"name": "势", "value": 80.0},
+    }
+    plain_ring = {
+        "name": "普通戒指", "type": "环", "level": 115, "quality": "gold",
+        "affix_1": {"name": "外功穿透", "value": 1.0},
+    }
+    candidates = {"ring": [plain_ring, high_shi]}
+
+    results = search_optimal_combo(
+        candidates, calc, base_attrs, use_dominance_pruning=False,
+    )
+    assert len(results) == 2
+    assert results[0]["equipped"]["ring"]["name"] == "高势戒指"
+
+    scorer = LoadoutScorer(calc, base_attrs, "鸣金·虹")
+    expected_rate = scorer.rate({"ring": high_shi})
+    assert results[0]["rate"] == pytest.approx(expected_rate, rel=1e-9)

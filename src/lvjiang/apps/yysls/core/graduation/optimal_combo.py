@@ -23,6 +23,7 @@ from ..affix_cap import affix_cap_value
 from ..combat.combat_attrs import (
     BONUS_PERCENT_FIELDS,
     CRIT_RATE_CAP,
+    DIM_FIELDS,
     INTENT_RATE_CAP,
     PENETRATION_FIELDS,
     PRECISION_BASE,
@@ -756,6 +757,31 @@ def search_optimal_combo(
     game_config = get_game_config()
     set_bonus_cache: dict[tuple[tuple[str, float], ...], list[float]] = {}
 
+    # 武学天赋五维增量（与 combat_attrs.talent_dim_delta 同口径）：
+    # 基础快照含正目标五维且尚未触顶时，累加组合装备五维并在抗性折算前叠加差额。
+    talent_scaling = game_config.get_talent_scaling(calculator._school)
+    talent_dim_field = (
+        DIM_FIELDS.get(str(talent_scaling.get("dim") or "").strip())
+        if talent_scaling
+        else None
+    )
+    talent_base_val = float(getattr(base_attrs, talent_dim_field, 0.0)) if talent_dim_field else 0.0
+    talent_base_dim = (float(talent_scaling.get("base_dim") or 0) or 528.0) if talent_scaling else 528.0
+    talent_terms: list[tuple[int, float]] = []
+    if talent_scaling and talent_dim_field and 0.0 < talent_base_val < talent_base_dim:
+        for key, value in talent_scaling.items():
+            if key in ("dim", "base_dim"):
+                continue
+            idx = field_index.get(key)
+            if idx is not None and value:
+                talent_terms.append((idx, float(value) / talent_base_dim))
+    slot_dim_arrays: list[list[float]] = []
+    if talent_terms and talent_dim_field is not None:
+        slot_dim_arrays = [
+            [float(getattr(e[1], talent_dim_field, 0.0)) for e in slot_deltas[k]]
+            for k in active_slots
+        ]
+
     # -- Phase 2: enumerate + evaluate --
     board = TopRLeaderboard(top_r)
     evaluated = 0
@@ -811,6 +837,14 @@ def search_optimal_combo(
             set_bonus_cache[set_key] = set_vec
         for d in range(n_dims):
             acc[d] += set_vec[d]
+        if talent_terms:
+            equip_dim = 0.0
+            for si, idx in enumerate(combo_indices):
+                equip_dim += slot_dim_arrays[si][idx]
+            span = min(talent_base_val + equip_dim, talent_base_dim) - talent_base_val
+            if span > 0.0:
+                for d, coeff in talent_terms:
+                    acc[d] += coeff * span
         # 3. 应用抗性规则（向量化等效 build_graduation_attrs）
         _apply_resistance_to_vec(acc, base_vec, field_index, graduation_context)
 

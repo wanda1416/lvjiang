@@ -465,8 +465,6 @@ def talent_dim_delta(
     那一段是乘好的，无法事后还原）；所以这里只补「总五维比基础五维多出来的部分」
     对应的差额。基础快照没给五维（旧数据 / 个人实测条目）时直接返回空，行为不变。
     """
-    if not any((base_attrs.dim_jin, base_attrs.dim_min, base_attrs.dim_shi)):
-        return CombatAttributes()
     from ...config import get_game_config
 
     scaling = get_game_config().get_talent_scaling(school)
@@ -475,8 +473,10 @@ def talent_dim_delta(
     field_name = DIM_FIELDS.get(str(scaling.get("dim") or "").strip())
     if field_name is None:
         return CombatAttributes()
-    base_dim = float(scaling.get("base_dim") or 0) or 528.0
     base_value = getattr(base_attrs, field_name, 0.0)
+    if base_value <= 0:
+        return CombatAttributes()
+    base_dim = float(scaling.get("base_dim") or 0) or 528.0
     total_value = base_value + getattr(equipment_attrs, field_name, 0.0)
     span = min(total_value, base_dim) - min(base_value, base_dim)
     if span <= 0:

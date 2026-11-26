@@ -104,6 +104,7 @@ def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str
         GraduationAttrContext,
         fold_wuxiang_pen,
         format_value,
+        talent_dim_delta,
     )
     from ..core.graduation.assumptions import Assumptions
     from ..core.graduation.context import (
@@ -174,7 +175,8 @@ def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str
             attr_context = GraduationAttrContext.from_school(school, world_level=level, game_config=gc)
             base = CombatAttributes.from_dict(bases[plan.base_attribute]) + gongjue_attrs(
                 plan.gongjue, gc, world_level=level, gongjue_level=plan.gongjue_level)
-            raw = base + fold_wuxiang_pen(equipment_attrs(projected, gc), attr_context.target_pen_field)
+            equip = fold_wuxiang_pen(equipment_attrs(projected, gc), attr_context.target_pen_field)
+            raw = base + equip + talent_dim_delta(base, equip, school)
             effective = graduation_input(base, projected, school, gc, attr_context=attr_context)
             effective_items = {label: value for label, value, _ in effective.display_items()}
             combat = [{"label": label, "raw": format_value(value, unit),
@@ -190,7 +192,7 @@ def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str
             problems.append(exc.reason)
         except Exception as exc:
             problems.append(f"毕业率计算失败：{exc}")
-        sorted_bases = sorted(bases)
+        sorted_bases = list(bases)
         base_label = (
             format_base_attribute_label(school, plan.base_attribute)
             if school else plan.base_attribute

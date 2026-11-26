@@ -1,4 +1,4 @@
-"""阶段 1 回归测试：预置基础属性分层（base_attributes）与毕业率模型多阶段（stage）。"""
+"""阶段 1 回归测试：预置基础属性分层与 stage、毕业率模型按 (level, version) 选型。"""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from lvjiang.apps.yysls.config import (
     save_base_attribute_preset,
 )
 from lvjiang.apps.yysls.core.graduation.model_registry import (
-    available_stages,
     invalidate_model_registry,
     model_filename,
     select_graduation_model,
@@ -126,31 +125,27 @@ def test_dual_source_resolution_and_user_mode_delete_protection(tmp_path, monkey
     assert resolve_base_attribute_data("鸣金·虹", ref) == {"max_outer": 5200.0}
 
 
-def test_graduation_model_registry_supports_multi_stage_selection(tmp_path, monkeypatch):
-    """验证毕业率模型按 (level, stage, version) 选型且兼容未标 stage 的存量文件。"""
+def test_graduation_model_registry_selects_by_level_and_version_without_stage(tmp_path, monkeypatch):
+    """验证毕业率模型仅按 (level, version) 选型，不引入 stage 维度（残留 stage 字段忽略）。"""
     res = _isolate_resolver(tmp_path, monkeypatch, dev_mode=True)
     grad_dir = res.system_dir / "yysls" / "graduation" / "115级"
     grad_dir.mkdir(parents=True, exist_ok=True)
 
-    # 存量文件不带 stage（兼容为 stage=1），v4
+    # 即使历史文件带残留 stage 字段也会被忽略，仍按 (level, version) 排序并选出最新版本
+    assert model_filename("鸣金·虹", "基础方案", 4) == "鸣金·虹_基础方案_v4.json"
     (grad_dir / model_filename("鸣金·虹", "基础方案", 4)).write_text(json.dumps({
         "schema_version": 3, "school": "鸣金·虹", "scheme": "基础方案",
         "model_level": 115, "model_version": 4,
     }, ensure_ascii=False), encoding="utf-8")
-    # 阶段 2 新表 v1
-    (grad_dir / model_filename("鸣金·虹", "基础方案", 1, stage=2)).write_text(json.dumps({
+    (grad_dir / model_filename("鸣金·虹", "基础方案", 5)).write_text(json.dumps({
         "schema_version": 3, "school": "鸣金·虹", "scheme": "基础方案",
-        "model_level": 115, "stage": 2, "model_version": 1,
+        "model_level": 115, "stage": 2, "model_version": 5,
     }, ensure_ascii=False), encoding="utf-8")
     invalidate_model_registry()
 
-    assert available_stages("鸣金·虹", "基础方案", level=115) == (1, 2)
-    # 默认选最高阶段（stage=2 v1），而非 stage=1 v4
     latest = select_graduation_model("鸣金·虹", "基础方案", 115)
-    assert latest is not None and (latest.level, latest.stage, latest.version) == (115, 2, 1)
-    # 指定 stage=1 时选到 stage=1 v4
-    s1 = select_graduation_model("鸣金·虹", "基础方案", 115, stage=1)
-    assert s1 is not None and (s1.level, s1.stage, s1.version) == (115, 1, 4)
+    assert latest is not None and (latest.level, latest.version) == (115, 5)
+    assert not hasattr(latest, "stage")
 
 
 def test_graduation_model_default_base_attribute_roundtrip(tmp_path, monkeypatch):
@@ -173,7 +168,6 @@ def test_graduation_model_default_base_attribute_roundtrip(tmp_path, monkeypatch
                 "scheme": "基础方案",
                 "model_level": 115,
                 "model_version": 1,
-                "stage": 1,
                 "reference": {"dps": 10000.0},
                 "graduation_baseline_dps": 10000.0,
             },

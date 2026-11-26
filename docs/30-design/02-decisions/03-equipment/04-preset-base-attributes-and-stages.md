@@ -11,14 +11,16 @@
 
 本设计在**不改名 `session/yysls/play_styles.json`、不改动云同步 `kind="play_styles"` 与 `loadouts` Schema** 的前提下，引入 `system/local` 分层预置基础属性与通用阶段维度 `stage`，打通 PC 与 Web 两条路径。
 
-## 2. 统一四维模型（与赛季日历解耦）
+## 2. 预置基础属性与模型维度约定
 
-| 维度 | 字段 | 类型 / 示例 | 默认解析规则 |
+**只有预置基础属性（`yysls/base_attributes/*.yaml`）存在阶段维度 `stage`；毕业率计算模型（`yysls/graduation/`）不引入 `stage`，由 `(school, scheme, level, version)` 唯一标识并随赛季更新自然迭代版本号。**
+
+| 维度 | 适用对象 | 字段 / 示例 | 默认解析规则 |
 | --- | --- | --- | --- |
-| 等级 | `level` | `int`（`100` / `110` / `115`） | 未指定时自动取已配置数据的最高 `level`；指定个人世界等级时取不超过该等级的最高 `level` |
-| 阶段 | `stage` | `int`（`1` / `2` / `3`…） | 同一等级内的养成/版本阶段（不限两段）；同等级默认取最高 `stage`，存量缺省视为 `1` |
-| 归属 | `school` + `playstyle` | 流派 + 可选玩法 | 选玩法后优先匹配 `playstyle` 专属条目，缺省回落同 `school` 默认条目（`playstyle: null`） |
-| 表格修订版 | `version`（仅 `graduation`） | `int`（`v1` / `v2` / `v4`…） | 同一 `(level, stage)` 内自动取最高 `version` |
+| 等级 | 预置基础属性 & 毕业率模型 | `level`（`100` / `110` / `115`） | 未指定时自动取已配置数据的最高 `level`；指定个人世界等级时取不超过该等级的最高 `level` |
+| 阶段 | **仅预置基础属性** | `stage`（`1` / `2` / `3`…） | 同一等级内的养成/版本阶段；同等级默认取最高 `stage` |
+| 归属 | 预置基础属性 | `school` + `playstyle` | 选玩法后优先匹配 `playstyle` 专属条目，缺省回落同 `school` 默认条目（`playstyle: null`） |
+| 表格修订版 | **仅毕业率模型** | `version`（`v1` / `v2` / `v4`…） | 同一 `(school, scheme, level)` 内自动取最高 `version` |
 
 ## 3. 存储分层与 Schema 契约
 
@@ -55,11 +57,11 @@
 - **五维随快照一起存**：预置写 `dim_jin/dim_min/dim_shi/dim_ti/dim_yu`（115 阶公共底子五个都是 `328`，快照里的攻击/三率已经按这组五维算好）。评分链把「基础五维 + 装备五维词条」相加后重算**依赖总五维的项**：武学天赋按 `MIN(总五维 / 属性需求, 1)` 缩放，系数登记在 `game_config/schools.yaml` 的 `talent_scaling`（属性需求分母 528）。这样玩家身上叠 劲/敏/势 词条时武学天赋能跟着补满，而不再被基础快照里的比例锁死。
 - **兼容边界**：基础属性**没写五维**（历史条目、个人实测、旧版本配置）时不参与上述补算，行为与旧版逐字段一致；装备自身的五维词条一直走 `convert_five_dims` 的线性换算，不受影响。
 
-### 3.2 毕业率模型多阶段扩展（`yysls/graduation/`）
+### 3.2 毕业率模型默认预置绑定（`yysls/graduation/`）
 
-- 模型 JSON 顶层支持可选整数 `"stage"`（缺省兼容为 `1`，110/115 级随版本更新自然推进的方案无需额外写 `stage`）与可选 `"default_base_attribute"`（绑定该方案的默认预置引用，如 `preset:115_s2`）。
-- `model_filename(school, scheme, version, stage=...)` 在 `stage == 1` 时保持 `{流派}_{方案名}_v{version}.json`，`stage > 1` 时生成 `{流派}_{方案名}_s{stage}_v{version}.json`。
-- `list_graduation_models` 与 `select_graduation_model` 按 `(school, scheme, level, stage, version)` 去重与排序，默认自动选出不超过世界等级的最高 `(level, stage, version)`，并支持按 `stage` 显式筛选。
+- 毕业率计算模型不引入 `stage`（若历史文件带残留 `stage` 字段也会在解析时忽略）；模型 JSON 顶层仅支持可选 `"default_base_attribute"`（绑定该方案的默认预置引用，如 `preset:115_s2`）。
+- `model_filename(school, scheme, version)` 固定生成 `{流派}_{方案名}_v{version}.json`。
+- `list_graduation_models` 与 `select_graduation_model` 按 `(school, scheme, level, version)` 去重与排序，默认自动选出不超过世界等级的最高 `(level, version)`。
 
 ## 4. 双源引用与 PC / Web 闭环
 
@@ -76,8 +78,8 @@
 
 ### 4.3 Web 端同源导出与无扫描试算
 
-- `scripts/yysls/export_yysls_web_assets.py` 直接读取 `system` 层 `base_attributes`（不受本机 `local` 同 ID 覆盖影响）导出至 `server/web/public/assets/yysls/config.json`，并在 `manifest.json` 的 `ModelEntry` 输出 `stage` 与可选 `default_base_attribute`。
-- `server/web` 端实现与 PC 同口径的 `RuleBook.resolveBaseAttributeData` / `resolveDefaultPreset`、`selectModel(..., stage)` 与 `deriveBaseAttributes(panelAttrs, equipped, gongjueContrib, rules)`（面板减装备与弓玦，穿透保留面板值），并在备战页与模拟计算器提供预置/个人双源选择及「新建/反推」弹窗；当前前提是角色已在 PC 同步过 `loadouts` 备战方案，Web 端无需 PC 面板扫描或同步 `play_styles` 即可选择预置或反推试算。
+- `scripts/yysls/export_yysls_web_assets.py` 直接读取 `system` 层 `base_attributes`（不受本机 `local` 同 ID 覆盖影响）导出至 `server/web/public/assets/yysls/config.json`，并在 `manifest.json` 的 `ModelEntry` 输出可选 `default_base_attribute`（模型索引不输出 `stage`）。
+- `server/web` 端实现与 PC 同口径的 `RuleBook.resolveBaseAttributeData` / `resolveDefaultPreset`、`selectModel` 与 `deriveBaseAttributes(panelAttrs, equipped, gongjueContrib, rules)`（面板减装备与弓玦，穿透保留面板值），并在备战页与模拟计算器提供预置/个人双源选择及「新建/反推」弹窗；当前前提是角色已在 PC 同步过 `loadouts` 备战方案，Web 端无需 PC 面板扫描或同步 `play_styles` 即可选择预置或反推试算。
 
 ## 5. 已知基线与后续边界
 
@@ -86,4 +88,4 @@
 - 快照口径：**排除** 8 件装备固有主属性、词条与定音、装备套装（两件套）、弓玦；**保留** 等级/天赋/地图收集/突破、四条叠音、默认心法、武学天赋、武库（本系）。仓库当前没有心法选择概念，各流派先用一组默认心法，后续迭代再改为可选。
 - 网页端（`server/web` 的 `RuleBook.talentScaling` 与 `buildGraduationAttrs`）实现同一份五维补差口径：`config.json` 随资产下发 `talent_scaling` 与预置里的 `dim_*`，两端对同一份数据算出的面板逐字段一致（`.tmp` 里的对拍结果：势 +83.1 → 会意 +0.015775、大外 +96.7297）。
 - 115 级上半赛季（`s1`）已结束，不再补录 `s1`。毕业率方案本身随下半赛季更新自然推进，不再按 `s1`/`s2` 拆分或写死阶段字段。
-- 后续可在 Web 端继续扩展纯浏览器本地角色/装备池与显式 `stage` 切换控件，本决策已为两者预留数据结构与解析接口。
+- 后续可在 Web 端继续扩展纯浏览器本地角色/装备池，本决策已为预置基础属性多阶段筛选预留数据结构与解析接口。

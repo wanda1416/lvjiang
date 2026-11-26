@@ -2613,7 +2613,6 @@ auto_strings:
   'ID: {id} · {level}级 {stage}阶段 · 来源：{source}': 'ID: {id} · St.{level} Phase {stage}
     · Quelle: {source}'
   '{id}（缺失）': '{id} (Fehlt)'
-  '{level}级 S{stage}': St.{level} S{stage}
   '{scheme} · {level}级 v{version}': '{scheme} · St.{level} v{version}'
   '{tag}：{label}（{id}）': '{tag}: {label} ({id})'
   个人基础属性: Persönliche Basiswerte

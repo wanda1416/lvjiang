@@ -16,14 +16,13 @@ MODEL_SCHEMA_VERSION = 3
 
 @dataclass(frozen=True, order=True)
 class GraduationModelRef:
-    """一份可执行毕业率模型的稳定身份（支持同等级多阶段 stage）。"""
+    """一份可执行毕业率模型的稳定身份（由流派、方案、等级与版本唯一确定）。"""
 
     school: str
     scheme: str
     level: int
     version: int
     rel_path: str
-    stage: int = 1
     default_base_attribute: str = ""
 
 
@@ -38,25 +37,21 @@ def level_dirname(level: int) -> str:
     return f"{level}级"
 
 
-def model_filename(school: str, scheme: str, version: int, *, stage: int = 1) -> str:
+def model_filename(school: str, scheme: str, version: int) -> str:
     """返回模型实体文件名；身份仍以 JSON 元数据为准。"""
     cleaned = scheme.strip()
     if not cleaned or any(char in cleaned for char in '<>:"/\\|?*'):
         raise ValueError("方案名称为空或包含文件名非法字符")
-    if stage <= 0:
-        raise ValueError("方案阶段必须大于 0")
     if version <= 0:
         raise ValueError("方案版本号必须大于 0")
-    if stage == 1:
-        return f"{school}_{cleaned}_v{version}.json"
-    return f"{school}_{cleaned}_s{stage}_v{version}.json"
+    return f"{school}_{cleaned}_v{version}.json"
 
 
 def model_rel_path(
-    school: str, scheme: str, level: int, version: int, *, stage: int = 1,
+    school: str, scheme: str, level: int, version: int,
 ) -> str:
     return (f"{DATA_REL_DIR}/{level_dirname(level)}/"
-            f"{model_filename(school, scheme, version, stage=stage)}")
+            f"{model_filename(school, scheme, version)}")
 
 
 def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
@@ -76,11 +71,8 @@ def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
     scheme = str(data.get("scheme") or "").strip()
     level = data.get("model_level")
     version = data.get("model_version")
-    raw_stage = data.get("stage", 1)
-    stage = 1 if raw_stage is None else raw_stage
     if (not school or not scheme
             or not isinstance(level, int) or isinstance(level, bool) or level <= 0
-            or not isinstance(stage, int) or isinstance(stage, bool) or stage <= 0
             or not isinstance(version, int) or isinstance(version, bool)
             or version <= 0):
         logger.warning(f"毕业率模型身份不完整，已忽略: {rel_path}")
@@ -92,7 +84,6 @@ def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
         level,
         version,
         rel_path,
-        stage=stage,
         default_base_attribute=default_base_attribute,
     )
 
@@ -101,7 +92,7 @@ def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
 def list_graduation_models() -> tuple[GraduationModelRef, ...]:
     """枚举当前配置分层中所有新格式模型。"""
     resolver = get_resolver()
-    refs: dict[tuple[str, str, int, int, int], GraduationModelRef] = {}
+    refs: dict[tuple[str, str, int, int], GraduationModelRef] = {}
     # 递归枚举：模型按等级分在子目录里，单层枚举扫不到。
     for entry in resolver.enumerate_entity_tree(DATA_REL_DIR, "*.json"):
         rel_path = f"{DATA_REL_DIR}/{entry}"
@@ -116,7 +107,7 @@ def list_graduation_models() -> tuple[GraduationModelRef, ...]:
         ref = _parse_model(rel_path, data)
         if ref is None:
             continue
-        key = (ref.school, ref.scheme, ref.level, ref.stage, ref.version)
+        key = (ref.school, ref.scheme, ref.level, ref.version)
         previous = refs.get(key)
         if previous is not None and previous.rel_path != ref.rel_path:
             logger.warning(
@@ -125,7 +116,7 @@ def list_graduation_models() -> tuple[GraduationModelRef, ...]:
         refs[key] = ref
     return tuple(sorted(
         refs.values(),
-        key=lambda item: (item.school, item.scheme, item.level, item.stage, item.version),
+        key=lambda item: (item.school, item.scheme, item.level, item.version),
     ))
 
 
@@ -139,26 +130,15 @@ def available_models(
     )
 
 
-def available_stages(
-    school: str, scheme: str = "", level: int | None = None,
-) -> tuple[int, ...]:
-    """返回流派/方案下已存在的阶段列表（升序）。"""
-    return tuple(sorted({
-        ref.stage for ref in available_models(school, scheme)
-        if level is None or ref.level == level
-    }))
-
-
 def select_graduation_model(
-    school: str, scheme: str, world_level: int, *, stage: int | None = None,
+    school: str, scheme: str, world_level: int,
 ) -> GraduationModelRef | None:
-    """选不超过个人世界等级的最高模型等级，再取最高阶段与最新版本。"""
+    """选不超过个人世界等级的最高模型等级，再取该等级最新版本。"""
     candidates = [
         ref for ref in available_models(school, scheme)
-        if (world_level <= 0 or ref.level <= world_level)
-        and (stage is None or stage <= 0 or ref.stage == stage)
+        if world_level <= 0 or ref.level <= world_level
     ]
-    return max(candidates, key=lambda item: (item.level, item.stage, item.version),
+    return max(candidates, key=lambda item: (item.level, item.version),
                default=None)
 
 

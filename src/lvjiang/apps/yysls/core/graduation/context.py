@@ -67,7 +67,6 @@ class PlanScoringContext:
     gongjue_level: int
     playstyle: str
     attribute: str                    # 流派属性（鸣金/裂石/…），动态词条归类用
-    model_stage: int = 1
 
     @classmethod
     def from_plan(
@@ -141,7 +140,6 @@ class PlanScoringContext:
                 effective_level),
             playstyle=plan.playstyle,
             attribute=str((schools.get(school) or {}).get("attr") or ""),
-            model_stage=getattr(model, "stage", 1),
         )
 
     def scorer(self, *, game_config=None, **budget) -> LoadoutScorer:

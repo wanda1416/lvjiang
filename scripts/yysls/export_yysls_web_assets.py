@@ -361,7 +361,7 @@ def build_assets() -> dict[str, bytes]:
     per_level: dict[int, int] = {}
     for ref in sorted(
         list_graduation_models(),
-        key=lambda item: (item.level, item.school, item.scheme, item.stage, item.version),
+        key=lambda item: (item.level, item.school, item.scheme, item.version),
     ):
         sequence = per_level.get(ref.level, 0) + 1
         per_level[ref.level] = sequence
@@ -370,7 +370,7 @@ def build_assets() -> dict[str, bytes]:
         models[shard] = payload
         entry_meta: dict[str, object] = {
             "school": ref.school, "scheme": ref.scheme,
-            "level": ref.level, "stage": ref.stage, "version": ref.version,
+            "level": ref.level, "version": ref.version,
             "path": shard, "bytes": len(payload),
             "sha256": hashlib.sha256(payload).hexdigest()[:16],
         }

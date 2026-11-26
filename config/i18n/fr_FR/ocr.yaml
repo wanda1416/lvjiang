@@ -23,12 +23,7 @@ ocr_dialog:
   刷新截图失败: Échec de l'actualisation de la capture
   匹配参考图: Faire correspondre l'image de référence
   区域批量识别: Reconnaissance de zones par lot
-  ? '区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。
-
-    这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。'
-  : 'La reconnaissance par lot assemble plusieurs zones de texte sur un seul canevas et n''appelle l''OCR qu''une seule fois.
-
-    Ces paramètres contrôlent la taille de l''assemblage ; ils prennent effet dès la prochaine reconnaissance après enregistrement.'
+  "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。": "La reconnaissance par lot assemble plusieurs zones de texte sur un seul canevas et n'appelle l'OCR qu'une seule fois.\nCes paramètres contrôlent la taille de l'assemblage ; ils prennent effet dès la prochaine reconnaissance après enregistrement."
   原始文本: Texte brut
   图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: La configuration OCR contient des modifications non enregistrées. Quitter et les abandonner ?
   图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Fichiers image (*.png *.jpg *.jpeg *.bmp *.webp);;Tous les fichiers (*)
@@ -78,19 +73,9 @@ ocr_dialog:
   选择图片: Sélectionner une image
   选框区域为空: La zone sélectionnée est vide
   重命名规则组: Renommer le groupe de règles
-  ? '默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。
-
-    改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。'
-  : 'Les règles par défaut s''appliquent globalement à tout l''OCR ; les clauses with de scan/find superposent le groupe métier sélectionné aux règles par défaut.
-
-    Cliquez sur « Enregistrer » pour appliquer sans redémarrer ; utilisez « Annuler » pour restaurer les modifications non enregistrées.'
+  "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。": "Les règles par défaut s'appliquent globalement à tout l'OCR ; les clauses with de scan/find superposent le groupe métier sélectionné aux règles par défaut.\nCliquez sur « Enregistrer » pour appliquer sans redémarrer ; utilisez « Annuler » pour restaurer les modifications non enregistrées."
   默认规则（全局）: Règles par défaut (global)
-  ? '识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。
-
-    保存后从下一次识别开始生效，不需要重启。'
-  : 'Les performances de reconnaissance s''appliquent à chaque appel : plus le parallélisme est élevé, plus c''est rapide, mais la charge CPU augmente en proportion.
-
-    Les modifications enregistrées prennent effet dès la prochaine reconnaissance, sans redémarrage.'
+  "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。": "Les performances de reconnaissance s'appliquent à chaque appel : plus le parallélisme est élevé, plus c'est rapide, mais la charge CPU augmente en proportion.\nLes modifications enregistrées prennent effet dès la prochaine reconnaissance, sans redémarrage."
   识别性能: Performances
   单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 'Nombre de threads utilisés par une reconnaissance. Valeur par défaut : 2. Aller plus haut n''accélère pas en pratique et augmente seulement la charge CPU globale ; 1 consomme le moins de CPU pour les exécutions longues en arrière-plan.'
   识别线程数: Threads de reconnaissance

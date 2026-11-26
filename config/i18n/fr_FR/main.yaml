@@ -6,8 +6,7 @@ batch_scheduler:
   运行中: En cours
   用户声明不执行该任务: L'utilisateur a déclaré cette tâche inutile
 capture_ops:
-  '[录屏] 仅流式截图模式支持录屏': '[Enregistrement] L''enregistrement d''écran n''est pris en
-    charge qu''en mode capture en continu'
+  "[录屏] 仅流式截图模式支持录屏": "[Enregistrement] L'enregistrement d'écran n'est pris en charge qu'en mode capture en continu"
   '[录屏] 保存失败（详见日志）': '[Enregistrement] Échec de l''enregistrement (voir le journal)'
   '[录屏] 启动失败（详见日志）': '[Enregistrement] Échec du démarrage (voir le journal)'
   '[录屏] 已放弃本次录制，文件已删除': '[Enregistrement] Enregistrement abandonné, fichier supprimé'
@@ -19,25 +18,19 @@ capture_ops:
   ■ 停止: ■ Arrêter
   ▶ 继续: ▶ Reprendre
   ● 录屏: ● Enregistrer
-  仅流式截图模式支持录屏: L'enregistrement d'écran n'est pris en charge qu'en mode capture en
-    continu
-  取一帧、更新预览并保存到 data/capture/picture: Capture une image, met à jour l'aperçu et l'enregistre
-    dans data/capture/picture
+  "仅流式截图模式支持录屏": "L'enregistrement d'écran n'est pris en charge qu'en mode capture en continu"
+  "取一帧、更新预览并保存到 data/capture/picture": "Capture une image, met à jour l'aperçu et l'enregistre dans data/capture/picture"
   图像已复制到剪贴板，可用 Ctrl+V 粘贴: Image copiée dans le presse-papiers ; collez avec Ctrl+V
-  复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件: Copie l'image d'origine de l'aperçu dans le
-    presse-papiers (collez avec Ctrl+V) sans enregistrer de fichier
+  "复制当前预览的原始图像到剪贴板，可用 Ctrl+V 粘贴，不保存文件": "Copie l'image d'origine de l'aperçu dans le presse-papiers (collez avec Ctrl+V) sans enregistrer de fichier"
   已暂停: En pause
   录制中: Enregistrement
   待保存: À enregistrer
   待机: En veille
   截屏: Capture d'écran
   放弃: Ignorer
-  暂无可复制的画面，请先刷新或截屏: Rien à copier pour le moment ; actualisez ou faites d'abord une
-    capture
-  暂无可复制的画面，请先连接目标并刷新或截屏: Rien à copier pour le moment ; connectez une cible puis actualisez
-    ou faites une capture
-  重新取一帧并更新预览，不保存文件: Capture une nouvelle image et met à jour l'aperçu sans enregistrer
-    de fichier
+  "暂无可复制的画面，请先刷新或截屏": "Rien à copier pour le moment ; actualisez ou faites d'abord une capture"
+  "暂无可复制的画面，请先连接目标并刷新或截屏": "Rien à copier pour le moment ; connectez une cible puis actualisez ou faites une capture"
+  "重新取一帧并更新预览，不保存文件": "Capture une nouvelle image et met à jour l'aperçu sans enregistrer de fichier"
   预览已刷新: Aperçu actualisé
   ，请选择 保存 或 放弃: ', veuillez choisir Enregistrer ou Ignorer'
 common:
@@ -50,95 +43,55 @@ common:
 execution_targets:
   游戏窗口: Fenêtre de jeu
 main_window:
-  '[错误] 当前环境不支持以下脚本：': '[Erreur] L''environnement actuel ne prend pas en charge les
-    scripts suivants :'
-  【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，: '[Format d''écran de l''émulateur] Si l''émulateur
-    cible n''a pas de préréglage 20:9,'
-  【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，: '[Important] Sur PC avec un émulateur (ex. MuMu,
-    LDPlayer), vous devez sélectionner « Android »,'
-  ? '以下任务尚未安全结束，暂不关闭程序：
-
-    {tasks}
-
-
-    请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。'
-  : 'Les tâches suivantes ne sont pas encore terminées en toute sécurité ; le programme
-    ne se fermera pas encore :
-
-    {tasks}
-
-
-    Réessayez de fermer plus tard ; si une tâche reste bloquée, forcez l''arrêt de
-    LvJiang depuis le système.'
+  "[错误] 当前环境不支持以下脚本：": "[Erreur] L'environnement actuel ne prend pas en charge les scripts suivants :"
+  "【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，": "[Format d'écran de l'émulateur] Si l'émulateur cible n'a pas de préréglage 20:9,"
+  "【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，": "[Important] Sur PC avec un émulateur (ex. MuMu, LDPlayer), vous devez sélectionner « Android »,"
+  "以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。": "Les tâches suivantes ne sont pas encore terminées en toute sécurité ; le programme ne se fermera pas encore :\n{tasks}\n\nRéessayez de fermer plus tard ; si une tâche reste bloquée, forcez l'arrêt de LvJiang depuis le système."
   任务仍在收尾: Tâches encore en cours de finalisation
   使用独立参数: Utiliser des paramètres dédiés
   恢复默认参数: Rétablir par défaut
   参数已与脚本预置值一致，无需恢复: Les paramètres correspondent déjà aux valeurs par défaut du script
-  清除本次加载的临时参数草稿，回到脚本预置值: Effacer le brouillon temporaire de paramètres et revenir
-    aux valeurs par défaut du script
-  把 {name} 的独立参数恢复为脚本预置值；其他用户与全局参数不受影响: Rétablir les paramètres indépendants de {name}
-    par défaut ; les autres utilisateurs et paramètres globaux ne sont pas affectés
-  清除该脚本保存的全局参数，所有未使用独立参数的用户一起回到脚本预置值: Effacer les paramètres globaux enregistrés de
-    ce script ; tous les utilisateurs sans paramètres indépendants reviendront aux
-    valeurs par défaut
+  "清除本次加载的临时参数草稿，回到脚本预置值": "Effacer le brouillon temporaire de paramètres et revenir aux valeurs par défaut du script"
+  "把 {name} 的独立参数恢复为脚本预置值；其他用户与全局参数不受影响": "Rétablir les paramètres indépendants de {name} par défaut ; les autres utilisateurs et paramètres globaux ne sont pas affectés"
+  "清除该脚本保存的全局参数，所有未使用独立参数的用户一起回到脚本预置值": "Effacer les paramètres globaux enregistrés de ce script ; tous les utilisateurs sans paramètres indépendants reviendront aux valeurs par défaut"
   临时脚本参数草稿: brouillon temporaire de paramètres
   '{name} 的独立参数': paramètres indépendants de {name}
   全部任务: Toutes les tâches
   关闭程序: Fermer le programme
-  切换日志显示级别：低于选中级别的日志将被隐藏: 'Changer le niveau d''affichage des journaux : les entrées
-    inférieures au niveau choisi sont masquées'
+  "切换日志显示级别：低于选中级别的日志将被隐藏": "Changer le niveau d'affichage des journaux : les entrées inférieures au niveau choisi sont masquées"
   加载: Charger
-  参数保存失败，本次批量未启动：{error}: 'Échec de l''enregistrement des paramètres ; le lot n''a
-    pas démarré : {error}'
+  "参数保存失败，本次批量未启动：{error}": "Échec de l'enregistrement des paramètres ; le lot n'a pas démarré : {error}"
   参数设置: Paramètres
-  可采用自定义设置 2000:900（等效 20:9）。: Vous pouvez utiliser un réglage personnalisé 2000:900
-    (équivalent à 20:9).
+  "可采用自定义设置 2000:900（等效 20:9）。": "Vous pouvez utiliser un réglage personnalisé 2000:900 (équivalent à 20:9)."
   后台截图: Capture en arrière-plan
   后台输入: Saisie en arrière-plan
-  否则导航流程会因输入方式不匹配而失败。: sinon la navigation échouera en raison d'une méthode d'entrée
-    incompatible.
-  安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入: 'Android (android) : téléphone ou émulateur,
-    utilise la capture ADB + saisie tactile'
+  "否则导航流程会因输入方式不匹配而失败。": "sinon la navigation échouera en raison d'une méthode d'entrée incompatible."
+  "安卓（android）：手机或模拟器，使用 ADB 截图 + 触摸输入": "Android (android) : téléphone ou émulateur, utilise la capture ADB + saisie tactile"
   定位: Localiser
-  定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效: Après localisation, le cadre rouge s'affiche
-    1 seconde ; cochez pour le laisser visible jusqu'à la déconnexion (session actuelle
-    uniquement)
+  "定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效": "Après localisation, le cadre rouge s'affiche 1 seconde ; cochez pour le laisser visible jusqu'à la déconnexion (session actuelle uniquement)"
   定位窗口后自动截屏: Capture automatique après localisation de la fenêtre
   展示分组，仅筛选脚本列表: Groupe d'affichage ; filtre uniquement la liste des scripts
   工作流运行中: Workflow en cours d'exécution
-  ? '当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。
-
-    确定要退出吗？'
-  : '{count} workflows sont en cours d''exécution ; fermer le programme les arrêtera
-    d''abord et attendra leur finalisation.
-
-    Voulez-vous vraiment quitter ?'
-  当前正在使用方案，如需手动调整请先切换为「自定义」: Un profil de connexion est actif ; passez d'abord sur
-    « Personnalisé » pour modifier manuellement
+  "当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n确定要退出吗？": "{count} workflows sont en cours d'exécution ; fermer le programme les arrêtera d'abord et attendra leur finalisation.\nVoulez-vous vraiment quitter ?"
+  "当前正在使用方案，如需手动调整请先切换为「自定义」": "Un profil de connexion est actif ; passez d'abord sur « Personnalisé » pour modifier manuellement"
   当前目标: Cible actuelle
   律匠 - 通用视觉 RPA 引擎: LvJiang - Moteur RPA visuel polyvalent
   扫描窗口: Analyser les fenêtres
   扫描设备: Analyser les appareils
   批量: Lots
-  批量任务运行过程中不可修改环境和布局: Impossible de modifier l'environnement ou la disposition pendant
-    l'exécution d'un lot
+  "批量任务运行过程中不可修改环境和布局": "Impossible de modifier l'environnement ou la disposition pendant l'exécution d'un lot"
   批量执行: Exécution par lots
-  持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）: Récupère les images en continu depuis le flux de recopie
-    ; décoché, capture une image à la demande (capture image par image)
+  "持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）": "Récupère les images en continu depuis le flux de recopie ; décoché, capture une image à la demande (capture image par image)"
   显示标题: Afficher l'en-tête
   显示连接控制台: Afficher la console de connexion
   最小化到状态栏: Réduire dans la zone de notification
-  桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击: 'Bureau (desktop) : fenêtre de jeu PC, utilise
-    la recopie de fenêtre + clic souris'
+  "桌面（desktop）：PC 游戏窗口，使用窗口投屏 + 鼠标点击": "Bureau (desktop) : fenêtre de jeu PC, utilise la recopie de fenêtre + clic souris"
   流式截图: Capture en continu
   清理日志: Effacer les journaux
-  清空当前窗口的全部日志，包括被级别筛选隐藏的日志: Efface tous les journaux de la fenêtre actuelle, y compris
-    ceux masqués par le filtre de niveau
+  "清空当前窗口的全部日志，包括被级别筛选隐藏的日志": "Efface tous les journaux de la fenêtre actuelle, y compris ceux masqués par le filtre de niveau"
   用户信息: Infos utilisateur
   目标大小: Taille cible
-  目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：: 'L''environnement cible détermine la stratégie
-    de navigation et la méthode d''entrée (l''environnement dans lequel tourne le
-    jeu, pas l''OS de cette machine) :'
+  "目标环境决定导航策略和输入方式（指游戏运行的环境，非本机系统）：": "L'environnement cible détermine la stratégie de navigation et la méthode d'entrée (l'environnement dans lequel tourne le jeu, pas l'OS de cette machine) :"
   目标环境说明: À propos de l'environnement cible
   端侧执行: Exécution sur l'appareil
   红框标定: Marquage cadre rouge
@@ -147,9 +100,7 @@ main_window:
   重新检查: Revérifier
   隐藏标题: Masquer l'en-tête
   隐藏连接控制台: Masquer la console de connexion
-  需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input: Nécessite l'application
-    LvJiang avec le service d'accessibilité activé ; modifie uniquement le canal d'exécution,
-    pas la capture ; bascule vers ADB shell input si injoignable
+  "需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input": "Nécessite l'application LvJiang avec le service d'accessibilité activé ; modifie uniquement le canal d'exécution, pas la capture ; bascule vers ADB shell input si injoignable"
   '[错误] 请先定位窗口': '[Erreur] Veuillez d''abord localiser une fenêtre'
   '[错误] 请先连接并选择执行目标': '[Erreur] Connectez et sélectionnez d''abord une cible d''exécution'
   '[错误] 请先连接设备': '[Erreur] Veuillez d''abord connecter un appareil'
@@ -168,9 +119,7 @@ menu_ops:
   已是最新版本: Déjà à jour
   帮助: Aide
   当前版本 v{current} 已是最新版本: La version actuelle v{current} est déjà à jour
-  新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。: Les nouveaux raccourcis ont été enregistrés,
-    mais la reconstruction de l'écoute globale a échoué ; cette session conserve les
-    anciens raccourcis et les nouveaux seront réessayés au redémarrage.
+  "新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。": "Les nouveaux raccourcis ont été enregistrés, mais la reconstruction de l'écoute globale a échoué ; cette session conserve les anciens raccourcis et les nouveaux seront réessayés au redémarrage."
   显示预览: Afficher l'aperçu
   热键已更新并立即生效: Raccourcis mis à jour et appliqués immédiatement
   热键设置: Raccourcis clavier
@@ -183,8 +132,7 @@ menu_ops:
   任务历史: Historique des tâches
   任务参数: Paramètres des tâches
   待受理反馈 ({count}): Retours en attente ({count})
-  控制台有 {count} 条待受理反馈，点击打开网页管理控制台: '{count} retours en attente dans la console ; cliquez
-    pour ouvrir la console d''administration web'
+  "控制台有 {count} 条待受理反馈，点击打开网页管理控制台": "{count} retours en attente dans la console ; cliquez pour ouvrir la console d'administration web"
 mobile:
   设备端代理: Agent sur l'appareil
 platforms:
@@ -192,22 +140,14 @@ platforms:
 run_control:
   ADB 模式: Mode ADB
   '[启动失败] {name}：{message}': '[Échec du démarrage] {name} : {message}'
-  '[执行目标] 当前方案不适用，已自动切换到「{name}」': '[Cible] Le profil actuel ne s''applique pas ;
-    basculement vers « {name} »'
-  '[拒绝] 已有自动化在运行中，请等待结束': '[Refusé] Une automatisation est déjà en cours ; attendez
-    qu''elle se termine'
-  '[提示] 上次选中的方案已不存在，已回到自定义': '[Avis] Le profil sélectionné précédemment n''existe
-    plus ; retour à Personnalisé'
-  '[提示] 已收起恢复提示，任务仍在等待通道恢复；可点顶部横幅「重新检查」或按 F10 停止': '[Avis] Alerte masquée ; la tâche
-    attend toujours le retour du canal. Cliquez sur « Revérifier » dans la bannière
-    ou appuyez sur F10 pour arrêter'
+  "[执行目标] 当前方案不适用，已自动切换到「{name}」": "[Cible] Le profil actuel ne s'applique pas ; basculement vers « {name} »"
+  "[拒绝] 已有自动化在运行中，请等待结束": "[Refusé] Une automatisation est déjà en cours ; attendez qu'elle se termine"
+  "[提示] 上次选中的方案已不存在，已回到自定义": "[Avis] Le profil sélectionné précédemment n'existe plus ; retour à Personnalisé"
+  "[提示] 已收起恢复提示，任务仍在等待通道恢复；可点顶部横幅「重新检查」或按 F10 停止": "[Avis] Alerte masquée ; la tâche attend toujours le retour du canal. Cliquez sur « Revérifier » dans la bannière ou appuyez sur F10 pour arrêter"
   '[提示] 当前没有正在运行的自动化': '[Avis] Aucune automatisation en cours'
-  '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用': '[Avis] Profil « {name} » : {missing}
-    n''existe plus, application partielle'
-  '[提示] 没有适用于当前执行目标的方案，请配置连接方案': '[Avis] Aucun profil ne correspond à la cible d''exécution
-    actuelle ; configurez un profil de connexion'
-  '[提示] 选中的方案已不存在，已回到自定义': '[Avis] Le profil sélectionné n''existe plus ; retour à
-    Personnalisé'
+  "[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用": "[Avis] Profil « {name} » : {missing} n'existe plus, application partielle"
+  "[提示] 没有适用于当前执行目标的方案，请配置连接方案": "[Avis] Aucun profil ne correspond à la cible d'exécution actuelle ; configurez un profil de connexion"
+  "[提示] 选中的方案已不存在，已回到自定义": "[Avis] Le profil sélectionné n'existe plus ; retour à Personnalisé"
   '[操作] ': '[Action] '
   '[操作] 停止等待恢复的任务': '[Action] Arrêt de la tâche en attente de récupération'
   '[操作] 已停止': '[Action] Arrêté'
@@ -215,10 +155,8 @@ run_control:
   '[操作] 收到停止请求': '[Action] Demande d''arrêt reçue'
   '[操作] 重新检查执行通道': '[Action] Revérification du canal d''exécution'
   '[操作] 重新检查设备执行通道': '[Action] Revérification du canal d''exécution de l''appareil'
-  '[警告] {name} 画面流中断：{reason}': '[Avertissement] Flux d''écran de {name} interrompu
-    : {reason}'
-  '[警告] 以下 {n} 个脚本文件存在问题，请在脚本编辑器中修正：': '[Avertissement] Les {n} fichiers de script
-    suivants présentent des problèmes ; corrigez-les dans l''éditeur de scripts :'
+  "[警告] {name} 画面流中断：{reason}": "[Avertissement] Flux d'écran de {name} interrompu : {reason}"
+  "[警告] 以下 {n} 个脚本文件存在问题，请在脚本编辑器中修正：": "[Avertissement] Les {n} fichiers de script suivants présentent des problèmes ; corrigez-les dans l'éditeur de scripts :"
   '[警告] 执行通道等待确认，请处理 {name} 的问题后点击重新检查；若无法恢复，请按 F10 停止任务后重新连接: {error}': '[Avertissement]
     Le canal d''exécution attend confirmation ; résolvez le problème de {name} puis
     cliquez sur Revérifier. S''il est impossible de récupérer, appuyez sur F10 pour
@@ -228,42 +166,11 @@ run_control:
   '[错误] 请先连接设备': '[Erreur] Veuillez d''abord connecter un appareil'
   '[错误] 请选择一个工作流': '[Erreur] Sélectionnez un workflow'
   '[错误] 请选择有效的执行用户': '[Erreur] Sélectionnez un utilisateur d''exécution valide'
-  ? '{name} 的画面流中断，自动恢复没有成功。
-
-    {error}
-
-
-    请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。'
-  : 'Le flux d''écran de {name} a été interrompu et la récupération automatique a
-    échoué.
-
-    {error}
-
-
-    Vérifiez le téléphone (écran éteint, jeu en arrière-plan, liaison USB/Wi-Fi) puis
-    choisissez Oui pour revérifier ou Non pour arrêter cette tâche. Fermer cette boîte
-    n''arrête pas la tâche ; la bannière reste affichée.'
-  ? '{name} 的连接恢复未完成。
-
-    {error}
-
-
-    请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。'
-  : 'La récupération de connexion de {name} est incomplète.
-
-    {error}
-
-
-    Rétablissez la connexion ADB / agent mobile puis choisissez Oui pour revérifier
-    ou Non pour arrêter la tâche de cette cible.'
-  ⚠ 执行通道等待确认：处理问题后点击「重新检查」；无法恢复时请按 F10 停止任务: '⚠ Le canal d''exécution attend confirmation
-    : résolvez le problème puis cliquez sur « Revérifier » ; appuyez sur F10 pour
-    arrêter si la récupération est impossible'
-  ⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务: '⚠ Flux d''écran interrompu : résolvez le
-    problème puis cliquez sur « Revérifier » ; appuyez sur F10 pour arrêter si la
-    récupération est impossible'
-  ⚠ 画面流已中断：点「重新检查」重试，或断开重连设备: '⚠ Flux d''écran interrompu : cliquez sur « Revérifier
-    » pour réessayer, ou déconnectez et reconnectez l''appareil'
+  "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。": "Le flux d'écran de {name} a été interrompu et la récupération automatique a échoué.\n{error}\n\nVérifiez le téléphone (écran éteint, jeu en arrière-plan, liaison USB/Wi-Fi) puis choisissez Oui pour revérifier ou Non pour arrêter cette tâche. Fermer cette boîte n'arrête pas la tâche ; la bannière reste affichée."
+  "{name} 的连接恢复未完成。\n{error}\n\n请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。": "La récupération de connexion de {name} est incomplète.\n{error}\n\nRétablissez la connexion ADB / agent mobile puis choisissez Oui pour revérifier ou Non pour arrêter la tâche de cette cible."
+  "⚠ 执行通道等待确认：处理问题后点击「重新检查」；无法恢复时请按 F10 停止任务": "⚠ Le canal d'exécution attend confirmation : résolvez le problème puis cliquez sur « Revérifier » ; appuyez sur F10 pour arrêter si la récupération est impossible"
+  "⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务": "⚠ Flux d'écran interrompu : résolvez le problème puis cliquez sur « Revérifier » ; appuyez sur F10 pour arrêter si la récupération est impossible"
+  "⚠ 画面流已中断：点「重新检查」重试，或断开重连设备": "⚠ Flux d'écran interrompu : cliquez sur « Revérifier » pour réessayer, ou déconnectez et reconnectez l'appareil"
   任务暂停中，是否直接停止？: La tâche est en pause. L'arrêter directement ?
   任务运行中: Tâche en cours
   停止中... | 等待当前步骤结束: Arrêt en cours... | En attente de la fin de l'étape actuelle
@@ -277,36 +184,18 @@ run_control:
   工作流输入: Saisie du workflow
   已有任务运行: Une tâche est déjà en cours
   布局: Disposition
-  当前工作环境 {env} 不在该脚本支持的环境 {envs} 中: L'environnement actuel {env} ne figure pas parmi
-    les environnements pris en charge par ce script ({envs})
-  ? '当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。
-
-
-    布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的
-    {tolerance}。'
-  : 'La taille du canevas de la disposition actuelle ne respecte pas les exigences
-    déclarées ; corrigez la disposition et réessayez.
-
-
-    La disposition « {layout} » exige un ratio {expected} ; le canevas actuel est
-    {width}×{height} (ratio {actual}), écart {deviation} supérieur à la tolérance
-    {tolerance}.'
+  "当前工作环境 {env} 不在该脚本支持的环境 {envs} 中": "L'environnement actuel {env} ne figure pas parmi les environnements pris en charge par ce script ({envs})"
+  "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的 {tolerance}。": "La taille du canevas de la disposition actuelle ne respecte pas les exigences déclarées ; corrigez la disposition et réessayez.\n\nLa disposition « {layout} » exige un ratio {expected} ; le canevas actuel est {width}×{height} (ratio {actual}), écart {deviation} supérieur à la tolérance {tolerance}."
   当前方案「{name}」不支持{mode}: Le profil « {name} » ne prend pas en charge {mode}
   当前没有可执行目标: Aucune cible exécutable
   批量任务运行中: Lot en cours d'exécution
   无法加载布局：{name}: 'Impossible de charger la disposition : {name}'
   无法启动工作流: Impossible de démarrer le workflow
   无法开始执行: Impossible de démarrer
-  无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。: Impossible
-    de vérifier si LvJiang dispose des droits administrateur. Le profil de connexion
-    « {name} » exige les droits administrateur ; l'exécution a été refusée pour éviter
-    l'échec des clics et saisies clavier. Fermez LvJiang, relancez-le en tant qu'administrateur
-    et réessayez.
+  "无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。": "Impossible de vérifier si LvJiang dispose des droits administrateur. Le profil de connexion « {name} » exige les droits administrateur ; l'exécution a été refusée pour éviter l'échec des clics et saisies clavier. Fermez LvJiang, relancez-le en tant qu'administrateur et réessayez."
   日常任务运行中: Tâches quotidiennes en cours
-  未定位窗口 | 请先扫描窗口并点击定位: Fenêtre non localisée | Analysez d'abord les fenêtres et cliquez
-    sur Localiser
-  未连接 | 请先定位窗口或连接设备: Non connecté | Localisez d'abord une fenêtre ou connectez un
-    appareil
+  "未定位窗口 | 请先扫描窗口并点击定位": "Fenêtre non localisée | Analysez d'abord les fenêtres et cliquez sur Localiser"
+  "未连接 | 请先定位窗口或连接设备": "Non connecté | Localisez d'abord une fenêtre ou connectez un appareil"
   未连接设备 | 请先扫描并连接设备: Appareil non connecté | Analysez et connectez d'abord un appareil
   正在重新检查设备执行通道...: Revérification du canal d'exécution de l'appareil...
   环境: Environnement
@@ -314,55 +203,35 @@ run_control:
   画面已中断，正在恢复…: Écran interrompu ; récupération en cours…
   画面流中断: Flux d'écran interrompu
   画面流中断，任务正在等待恢复: Flux d'écran interrompu ; la tâche attend la récupération
-  '[操作] 当前目标是单帧截图，没有可重建的画面流，已收起提示': '[Action] La cible actuelle utilise la capture
-    image par image ; aucun flux à reconstruire. Alerte masquée'
+  "[操作] 当前目标是单帧截图，没有可重建的画面流，已收起提示": "[Action] La cible actuelle utilise la capture image par image ; aucun flux à reconstruire. Alerte masquée"
   '[操作] 重新检查画面流': '[Action] Revérification du flux d''écran'
   '[画面流] 已恢复': '[Flux] Récupéré'
   '[画面流] 正在重建中，请稍候': '[Flux] Reconstruction en cours, veuillez patienter'
-  '[警告] 画面流重建失败：{reason}': '[Avertissement] Échec de la reconstruction du flux d''écran
-    : {reason}'
-  ⚠ 画面流仍不可用：{reason}；可再次点「重新检查」或断开重连设备: '⚠ Flux d''écran toujours indisponible : {reason}
-    ; cliquez à nouveau sur « Revérifier » ou déconnectez et reconnectez l''appareil'
+  "[警告] 画面流重建失败：{reason}": "[Avertissement] Échec de la reconstruction du flux d'écran : {reason}"
+  "⚠ 画面流仍不可用：{reason}；可再次点「重新检查」或断开重连设备": "⚠ Flux d'écran toujours indisponible : {reason} ; cliquez à nouveau sur « Revérifier » ou déconnectez et reconnectez l'appareil"
   未知原因: Raison inconnue
   正在重建画面流...: Reconstruction du flux d'écran...
   画面流仍未恢复: Le flux d'écran n'est toujours pas rétabli
   画面流已恢复: Flux d'écran rétabli
   确认停止: Confirmer l'arrêt
-  窗口已消失或句柄失效，请重新定位: La fenêtre a disparu ou son descripteur est obsolète ; localisez-la
-    à nouveau
+  "窗口已消失或句柄失效，请重新定位": "La fenêtre a disparu ou son descripteur est obsolète ; localisez-la à nouveau"
   窗口模式: Mode fenêtre
   等待画面恢复: En attente de récupération de l'écran
   等待设备恢复: En attente de récupération de l'appareil
   继续: Continuer
   自动化运行中: Automatisation en cours
-  设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务: Le canal d'exécution de l'appareil attend confirmation
-    ; résolvez le problème puis revérifiez, ou arrêtez la tâche si la récupération
-    est impossible
+  "设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务": "Le canal d'exécution de l'appareil attend confirmation ; résolvez le problème puis revérifiez, ou arrêtez la tâche si la récupération est impossible"
   设备正在执行其他任务: L'appareil exécute une autre tâche
-  ? '设备正在执行其他任务，本次未启动。
-
-
-    {reason}'
-  : 'L''appareil exécute une autre tâche ; ce lancement a été ignoré.
-
-
-    {reason}'
+  "设备正在执行其他任务，本次未启动。\n\n{reason}": "L'appareil exécute une autre tâche ; ce lancement a été ignoré.\n\n{reason}"
   请选择一个脚本: Sélectionnez un script
-  请选择一个脚本；列表为空时可刷新脚本或调整展示分组: Sélectionnez un script ; si la liste est vide, actualisez
-    les scripts ou ajustez les groupes d'affichage
-  连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。: Le
-    profil de connexion « {name} » exige les droits administrateur, mais LvJiang ne
-    s'exécute pas en tant qu'administrateur. Windows bloque l'envoi de clics et de
-    saisies clavier d'un processus standard vers une fenêtre de jeu élevée. Fermez
-    LvJiang, choisissez « Exécuter en tant qu'administrateur » et réessayez.
+  "请选择一个脚本；列表为空时可刷新脚本或调整展示分组": "Sélectionnez un script ; si la liste est vide, actualisez les scripts ou ajustez les groupes d'affichage"
+  "连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。": "Le profil de connexion « {name} » exige les droits administrateur, mais LvJiang ne s'exécute pas en tant qu'administrateur. Windows bloque l'envoi de clics et de saisies clavier d'un processus standard vers une fenêtre de jeu élevée. Fermez LvJiang, choisissez « Exécuter en tant qu'administrateur » et réessayez."
   需激活 Lv1: Activation Lv1 requise
 scripts:
   启动失败: Échec du démarrage
 tray_ops:
   另有 {count} 个任务运行: '{count} autres tâches en cours'
-  已最小化到状态栏，双击图标或右键「打开主界面」可恢复。: Réduit dans la zone de notification ; double-cliquez
-    sur l'icône ou cliquez avec le bouton droit → « Ouvrir la fenêtre principale »
-    pour restaurer.
+  "已最小化到状态栏，双击图标或右键「打开主界面」可恢复。": "Réduit dans la zone de notification ; double-cliquez sur l'icône ou cliquez avec le bouton droit → « Ouvrir la fenêtre principale » pour restaurer."
   开始: Démarrer
   打开主界面: Ouvrir la fenêtre principale
   未就绪: Non prêt
@@ -372,51 +241,33 @@ tray_ops:
   结束当前目标: Arrêter la cible actuelle
   不能启动: Impossible de démarrer
 ui_state:
-  参数保存失败，请检查配置文件权限或占用后重试：{error}: 'Échec de l''enregistrement des paramètres ; vérifiez
-    les permissions ou le verrouillage du fichier de configuration et réessayez :
-    {error}'
+  "参数保存失败，请检查配置文件权限或占用后重试：{error}": "Échec de l'enregistrement des paramètres ; vérifiez les permissions ou le verrouillage du fichier de configuration et réessayez : {error}"
   参数设置（{name}独立）: Paramètres ({name}, dédié)
   参数设置（共享）: Paramètres (partagé)
   说明: Description
   参数设置（全局参数）: Paramètres (global)
 window_ops:
-  '[定位刷新] {name} · {old} → {new} · {details}': '[Relocalisé] {name} · {old} → {new}
-    · {details}'
+  "[定位刷新] {name} · {old} → {new} · {details}": "[Relocalisé] {name} · {old} → {new} · {details}"
   '[定位失效] {name}：{message}': '[Localisation perdue] {name} : {message}'
   '[定位失败] {message}': '[Échec de localisation] {message}'
   '[截图] 后台截图不可用：': '[Capture] Capture en arrière-plan indisponible : '
-  '[截图] 后台截图启动失败，保留原截图方式': '[Capture] Échec du démarrage de la capture en arrière-plan
-    ; méthode d''origine conservée'
-  '[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）': '[Capture] Échec de la capture en arrière-plan
-    ; retour à la capture au premier plan (indisponible si minimisée)'
+  "[截图] 后台截图启动失败，保留原截图方式": "[Capture] Échec du démarrage de la capture en arrière-plan ; méthode d'origine conservée"
+  "[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）": "[Capture] Échec de la capture en arrière-plan ; retour à la capture au premier plan (indisponible si minimisée)"
   '[执行目标] 已切换到 {name}': '[Cible] Basculé sur {name}'
-  '[扫描] 局域网内未发现可连接的 ADB 设备': '[Analyse] Aucun appareil ADB connectable détecté sur
-    le réseau local'
-  '[扫描] 本机未发现开放的模拟器 ADB 端口': '[Analyse] Aucun port ADB d''émulateur ouvert détecté
-    sur cette machine'
+  "[扫描] 局域网内未发现可连接的 ADB 设备": "[Analyse] Aucun appareil ADB connectable détecté sur le réseau local"
+  "[扫描] 本机未发现开放的模拟器 ADB 端口": "[Analyse] Aucun port ADB d'émulateur ouvert détecté sur cette machine"
   '[扫描] 正在探测本机模拟器 ADB 端口...': '[Analyse] Détection des ports ADB d''émulateurs locaux...'
-  '[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的「{name}」是同一台设备。请先断开该目标再连接。': '[Refusé] Impossible
-    de lire un identifiant stable pour {serial} ; il s''agit peut-être du même appareil
-    que « {name} » déjà connecté. Déconnectez d''abord cette cible.'
-  '[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」': '[Avis] Cette plateforme ne prend pas en charge
-    la recopie de fenêtre ; utilisez « Analyser les appareils »'
+  "[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的「{name}」是同一台设备。请先断开该目标再连接。": "[Refusé] Impossible de lire un identifiant stable pour {serial} ; il s'agit peut-être du même appareil que « {name} » déjà connecté. Déconnectez d'abord cette cible."
+  "[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」": "[Avis] Cette plateforme ne prend pas en charge la recopie de fenêtre ; utilisez « Analyser les appareils »"
   '[提示] 未发现 USB 连接的 ADB 设备': '[Avis] Aucun appareil ADB connecté en USB'
-  '[提示] 窗口目标正在执行任务，不能重新定位': '[Avis] La fenêtre cible exécute une tâche ; impossible
-    de la relocaliser'
-  '[提示] 该目标正在执行任务，不能切换截图方式': '[Avis] Cette cible exécute une tâche ; impossible de
-    changer de méthode de capture'
-  '[提示] 该目标正在执行任务，不能切换输入方式': '[Avis] Cette cible exécute une tâche ; impossible de
-    changer de méthode d''entrée'
-  '[提示] 该目标正在执行任务，不能断开': '[Avis] Cette cible exécute une tâche ; impossible de la
-    déconnecter'
+  "[提示] 窗口目标正在执行任务，不能重新定位": "[Avis] La fenêtre cible exécute une tâche ; impossible de la relocaliser"
+  "[提示] 该目标正在执行任务，不能切换截图方式": "[Avis] Cette cible exécute une tâche ; impossible de changer de méthode de capture"
+  "[提示] 该目标正在执行任务，不能切换输入方式": "[Avis] Cette cible exécute une tâche ; impossible de changer de méthode d'entrée"
+  "[提示] 该目标正在执行任务，不能断开": "[Avis] Cette cible exécute une tâche ; impossible de la déconnecter"
   '[模式] {name} 已切换到{mode}': '[Mode] {name} basculé en {mode}'
-  '[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标': '[Avertissement] Cet appareil ne fournit pas
-    d''identifiant stable ; les connexions USB et sans fil seront traitées comme deux
-    cibles distinctes'
-  '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input': '[Sur appareil] Application injoignable
-    ou canal d''exécution non prêt ; basculement vers adb shell input'
-  '[错误] {method} 截图后端不可用，保留原截图方式': '[Erreur] Le moteur de capture {method} est indisponible
-    ; méthode d''origine conservée'
+  "[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标": "[Avertissement] Cet appareil ne fournit pas d'identifiant stable ; les connexions USB et sans fil seront traitées comme deux cibles distinctes"
+  "[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input": "[Sur appareil] Application injoignable ou canal d'exécution non prêt ; basculement vers adb shell input"
+  "[错误] {method} 截图后端不可用，保留原截图方式": "[Erreur] Le moteur de capture {method} est indisponible ; méthode d'origine conservée"
   '[错误] 未找到可见窗口': '[Erreur] Aucune fenêtre visible trouvée'
   '{input_mode} · {capture_mode}': '{input_mode} · {capture_mode}'
   '{method} 截图后端不可用': Le moteur de capture {method} est indisponible
@@ -428,41 +279,12 @@ window_ops:
   取消中...: Annulation...
   取消扫描: Annuler l'analyse
   启动中: Démarrage
-  ? '实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。
-
-    用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效'
-  : 'Expérimental : de nombreux scripts ne fonctionnent pas encore dans ce mode ;
-    les signalements d''indisponibilité ne sont pas acceptés.
-
-    Capture via Windows Graphics Capture afin que la fenêtre de jeu puisse être recouverte
-    par d''autres ; reste indisponible si minimisée. Session actuelle uniquement'
-  ? '局域网内未发现可连接的 ADB 设备。
-
-
-    请确认：
-
-    1. 设备与电脑在同一局域网
-
-    2. 设备已开启无线调试（开发者选项）
-
-    3. 多网卡时可在下拉框改选目标网段，或改用本地扫描'
-  : 'Aucun appareil ADB connectable trouvé sur le réseau local.
-
-
-    Vérifiez que :
-
-    1. L''appareil est sur le même réseau local que ce PC
-
-    2. Le débogage sans fil est activé sur l''appareil (options pour les développeurs)
-
-    3. Avec plusieurs interfaces réseau, sélectionnez le bon sous-réseau dans la liste
-    ou utilisez l''analyse locale'
+  "实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。\n用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效": "Expérimental : de nombreux scripts ne fonctionnent pas encore dans ce mode ; les signalements d'indisponibilité ne sont pas acceptés.\nCapture via Windows Graphics Capture afin que la fenêtre de jeu puisse être recouverte par d'autres ; reste indisponible si minimisée. Session actuelle uniquement"
+  "局域网内未发现可连接的 ADB 设备。\n\n请确认：\n1. 设备与电脑在同一局域网\n2. 设备已开启无线调试（开发者选项）\n3. 多网卡时可在下拉框改选目标网段，或改用本地扫描": "Aucun appareil ADB connectable trouvé sur le réseau local.\n\nVérifiez que :\n1. L'appareil est sur le même réseau local que ce PC\n2. Le débogage sans fil est activé sur l'appareil (options pour les développeurs)\n3. Avec plusieurs interfaces réseau, sélectionnez le bon sous-réseau dans la liste ou utilisez l'analyse locale"
   已刷新窗口位置: Position de fenêtre actualisée
   已取消扫描: Analyse annulée
-  已扫描窗口 | 请下拉选择目标窗口并点击定位: Fenêtres analysées | Sélectionnez une fenêtre cible et cliquez
-    sur Localiser
-  已扫描设备 | 请选择设备并点击连接: Appareils analysés | Sélectionnez un appareil et cliquez sur
-    Connecter
+  "已扫描窗口 | 请下拉选择目标窗口并点击定位": "Fenêtres analysées | Sélectionnez une fenêtre cible et cliquez sur Localiser"
+  "已扫描设备 | 请选择设备并点击连接": "Appareils analysés | Sélectionnez un appareil et cliquez sur Connecter"
   已断开目标：{name}: 'Cible déconnectée : {name}'
   已离线: Hors ligne
   已连接: Connecté
@@ -482,56 +304,31 @@ window_ops:
   未发现设备: Aucun appareil détecté
   未发现设备 | 可尝试局域网扫描: Aucun appareil détecté | Essayez une analyse LAN
   未发现设备 | 请确认模拟器已启动: Aucun appareil détecté | Vérifiez que l'émulateur est lancé
-  未发现设备 | 请确认设备已开启无线调试: Aucun appareil détecté | Vérifiez que le débogage sans fil
-    est activé
+  "未发现设备 | 请确认设备已开启无线调试": "Aucun appareil détecté | Vérifiez que le débogage sans fil est activé"
   未定位窗口 | 未找到可见窗口: Fenêtre non localisée | Aucune fenêtre visible trouvée
-  ? '本机未发现开放的模拟器 ADB 端口。
-
-
-    请确认：
-
-    1. 模拟器已启动
-
-    2. 模拟器已开启 ADB 调试'
-  : 'Aucun port ADB d''émulateur ouvert détecté sur cette machine.
-
-
-    Vérifiez que :
-
-    1. L''émulateur est lancé
-
-    2. Le débogage ADB est activé dans l''émulateur'
+  "本机未发现开放的模拟器 ADB 端口。\n\n请确认：\n1. 模拟器已启动\n2. 模拟器已开启 ADB 调试": "Aucun port ADB d'émulateur ouvert détecté sur cette machine.\n\nVérifiez que :\n1. L'émulateur est lancé\n2. Le débogage ADB est activé dans l'émulateur"
   正在取消扫描...: Annulation de l'analyse...
   正在扫描局域网...: Analyse du réseau local...
   正在扫描本机模拟器...: Analyse des émulateurs locaux...
   正在扫描窗口...: Analyse des fenêtres...
   正在扫描设备...: Analyse des appareils...
   正在连接设备...: Connexion à l'appareil...
-  窗口位置已刷新，但红框移动失败: Position de fenêtre actualisée, mais le déplacement du cadre rouge
-    a échoué
+  "窗口位置已刷新，但红框移动失败": "Position de fenêtre actualisée, mais le déplacement du cadre rouge a échoué"
   端侧执行（需安装律匠 App）: Exécution sur l'appareil (nécessite l'application LvJiang)
   设备已经连接，已切换为执行目标: L'appareil était déjà connecté ; défini comme cible d'exécution
   设备标识未确认，已拒绝连接: Identifiant d'appareil non confirmé ; connexion refusée
-  设备标识未确认：只能按当前连接地址区分，重启或换用另一种连接方式后会被视为新目标: 'Identifiant d''appareil non confirmé
-    : distingué uniquement par son adresse actuelle ; après redémarrage ou changement
-    de connexion, il sera considéré comme une nouvelle cible'
-  设备端代理不可用，且高级设置已禁用 ADB 输入降级；请恢复手机代理后重新连接: L'agent sur l'appareil est indisponible
-    et le repli sur l'entrée ADB est désactivé dans les paramètres avancés ; rétablissez
-    l'agent mobile et reconnectez
-  该目标正在执行任务，不能重新定位或连接: Cette cible exécute une tâche ; impossible de la relocaliser
-    ou de la reconnecter
+  "设备标识未确认：只能按当前连接地址区分，重启或换用另一种连接方式后会被视为新目标": "Identifiant d'appareil non confirmé : distingué uniquement par son adresse actuelle ; après redémarrage ou changement de connexion, il sera considéré comme une nouvelle cible"
+  "设备端代理不可用，且高级设置已禁用 ADB 输入降级；请恢复手机代理后重新连接": "L'agent sur l'appareil est indisponible et le repli sur l'entrée ADB est désactivé dans les paramètres avancés ; rétablissez l'agent mobile et reconnectez"
+  "该目标正在执行任务，不能重新定位或连接": "Cette cible exécute une tâche ; impossible de la relocaliser ou de la reconnecter"
   请先在主窗口定位窗口: Veuillez d'abord localiser une fenêtre dans la fenêtre principale
   请先在主窗口连接设备: Veuillez d'abord connecter un appareil dans la fenêtre principale
-  运行中不能修改下一次连接参数: Impossible de modifier les paramètres de la prochaine connexion
-    pendant l'exécution
+  "运行中不能修改下一次连接参数": "Impossible de modifier les paramètres de la prochaine connexion pendant l'exécution"
   连接: Connecter
   连接中...: Connexion...
   连接失败 | 详见日志: Échec de la connexion | Voir le journal
   连接目标后可预览: Aperçu disponible après connexion d'une cible
   重新连接: Reconnecter
-  需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义: 'Cochez d''abord « Mode arrière-plan » : la saisie
-    au premier plan exige la fenêtre active, la capture en arrière-plan seule n''a
-    donc pas de sens'
+  "需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义": "Cochez d'abord « Mode arrière-plan » : la saisie au premier plan exige la fenêtre active, la capture en arrière-plan seule n'a donc pas de sens"
 alert_panel:
   关闭此告警: Fermer cette alerte
 pressable_combo:
@@ -543,16 +340,11 @@ task_params_dialog:
   当前用户使用独立参数: Utiliser des paramètres dédiés
   没有可编辑的任务: Aucune tâche à modifier
   任务已不可用: Tâche indisponible
-  任务的全局参数，作用于所有未使用独立参数的用户: Paramètres globaux de la tâche ; s'appliquent aux utilisateurs
-    sans paramètres dédiés
-  全局参数：作用于所有未使用独立参数的用户: 'Paramètres globaux : s''appliquent aux utilisateurs sans
-    paramètres dédiés'
-  勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过: Coché, cet utilisateur ignore la tâche lors des
-    lots ; la ligne reste et l'état devient ignoré
-  该用户声明跳过此任务，批量执行时状态记为跳过: Cet utilisateur a déclaré ignorer cette tâche ; les lots
-    l'enregistrent comme ignorée
-  该用户已声明跳过此任务；取消勾选后可继续编辑参数: Cet utilisateur a déclaré ignorer cette tâche ; décochez
-    pour modifier les paramètres
+  "任务的全局参数，作用于所有未使用独立参数的用户": "Paramètres globaux de la tâche ; s'appliquent aux utilisateurs sans paramètres dédiés"
+  "全局参数：作用于所有未使用独立参数的用户": "Paramètres globaux : s'appliquent aux utilisateurs sans paramètres dédiés"
+  "勾选后该用户在批量执行中跳过此任务，任务列仍然保留、状态记为跳过": "Coché, cet utilisateur ignore la tâche lors des lots ; la ligne reste et l'état devient ignoré"
+  "该用户声明跳过此任务，批量执行时状态记为跳过": "Cet utilisateur a déclaré ignorer cette tâche ; les lots l'enregistrent comme ignorée"
+  "该用户已声明跳过此任务；取消勾选后可继续编辑参数": "Cet utilisateur a déclaré ignorer cette tâche ; décochez pour modifier les paramètres"
   该用户使用独立参数: Cet utilisateur utilise des paramètres dédiés
   改动立即生效: Les modifications s'appliquent aussitôt
   上一个: Précédent
@@ -561,10 +353,7 @@ task_params_dialog:
 hotkey_settings:
   菜单快捷键有冲突，请检查后重试：: 'Conflit de raccourcis de menu ; vérifiez puis réessayez : '
   （不绑定）: (non défini)
-  按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。: Appuyez une fois
-    pour réduire dans la zone de notification, encore une fois pour revenir. Selon
-    les réglages de la zone de notification, l'icône peut ne pas s'afficher ; ce raccourci
-    est le seul moyen fiable de retrouver la fenêtre.
+  "按一次最小化到系统状态栏，再按一次唤回主界面。系统托盘图标可能因通知区域设置而不显示，这个热键是窗口隐藏后唯一可靠的恢复方式。": "Appuyez une fois pour réduire dans la zone de notification, encore une fois pour revenir. Selon les réglages de la zone de notification, l'icône peut ne pas s'afficher ; ce raccourci est le seul moyen fiable de retrouver la fenêtre."
 task_diagnostics_dialog:
   任务诊断: Diagnostic de tâche
   启用开发诊断模式: Activer le diagnostic développeur
@@ -574,8 +363,7 @@ task_diagnostics_dialog:
   诊断调试: Diagnostic
   模拟运行: Exécution simulée
   ' | 失败 {err}': ' | Échecs {err}'
-  '{state} | {count}/{limit} 帧 ({mb:.1f} MB) | 淘汰 {evicted} | 丢帧 {dropped}': '{state}
-    | {count}/{limit} images ({mb:.1f} Mo) | Évincées {evicted} | Perdues {dropped}'
+  "{state} | {count}/{limit} 帧 ({mb:.1f} MB) | 淘汰 {evicted} | 丢帧 {dropped}": "{state} | {count}/{limit} images ({mb:.1f} Mo) | Évincées {evicted} | Perdues {dropped}"
   【临时区保留 · 原缓存已淘汰】: '[Épinglée · Évincée du cache]'
   【临时区保留 · 来自上一任务】: '[Épinglée · Tâche précédente]'
   上一帧 (←): Image précédente (←)
@@ -586,12 +374,10 @@ task_diagnostics_dialog:
   开始落盘: Démarrer l'enregistrement
   停止落盘: Arrêter l'enregistrement
   回到最新: Retour au dernier
-  启用开发诊断模式并运行任务后，此处将实时展示识别用帧。: Activez le mode diagnostic et lancez une tâche pour
-    afficher les images de reconnaissance en direct.
+  "启用开发诊断模式并运行任务后，此处将实时展示识别用帧。": "Activez le mode diagnostic et lancez une tâche pour afficher les images de reconnaissance en direct."
   已停止落盘（共写入 {count} 帧）→ {path}: Enregistrement arrêté ({count} images) → {path}
   已封口: Fermé
-  开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录: Enregistre de façon asynchrone les
-    images en mémoire et entrantes dans un nouveau dossier sous logs/diagnostics/
+  "开启后将当前缓存帧与后续新帧异步写入 logs/diagnostics/ 下的独立新目录": "Enregistre de façon asynchrone les images en mémoire et entrantes dans un nouveau dossier sous logs/diagnostics/"
   打开目录: Ouvrir le dossier
   收尾中: Finalisation
   暂无画面: Aucune image
@@ -602,11 +388,6 @@ task_diagnostics_dialog:
   画面解码失败: Échec du décodage de l'image
   落盘中（已写入 {count} 帧）→ {path}: Enregistrement ({count} images) → {path}
   跟踪最新: Suivre la dernière
-  开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。: 'Aperçu développeur : désactivé
-    par défaut, désactivé à nouveau après un redémarrage. Les modifications ne s''appliquent
-    qu''à la prochaine tâche ou au prochain lot lancé ; les tâches en cours ne changent
-    pas.'
-无界面启动本地控制面服务（供薄壳 lvjiang-cli 提交任务）: Démarrer le serveur de contrôle local sans interface
-  (pour lvjiang-cli)
-无头服务空闲退出秒数（0 表示常驻，默认 30）: Délai d'inactivité avant arrêt en mode sans interface en
-  secondes (0 = permanent, défaut 30)
+  "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Aperçu développeur : désactivé par défaut, désactivé à nouveau après un redémarrage. Les modifications ne s'appliquent qu'à la prochaine tâche ou au prochain lot lancé ; les tâches en cours ne changent pas."
+"无界面启动本地控制面服务（供薄壳 lvjiang-cli 提交任务）": "Démarrer le serveur de contrôle local sans interface (pour lvjiang-cli)"
+"无头服务空闲退出秒数（0 表示常驻，默认 30）": "Délai d'inactivité avant arrêt en mode sans interface en secondes (0 = permanent, défaut 30)"

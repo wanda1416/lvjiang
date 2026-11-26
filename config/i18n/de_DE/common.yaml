@@ -11,8 +11,7 @@ account_dialog:
   下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Die Daten der folgenden Benutzer werden durch den Cloud-Schnappschuss ersetzt; lokale Daten werden überschrieben:'
   下行: Herunterladen
   云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: 'Die Cloud-Basislinie ist leer.<br>Quelle: {origin}<br>Zeit: {created}<br>Einträge: 0<br><br>Beim Fortfahren wird die Basislinie aus der aktuellen lokalen Übersicht ergänzt; lokale Benutzer werden weder gesichert noch ersetzt.'
-  ? 云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。
-  : 'Ein Cloud-Schnappschuss ist bereits vorhanden.<br>Quelle: {origin}<br>Zeit: {created}<br>Einträge: {count}{warning}<br><br>Beim Fortfahren werden zunächst lokale Benutzer, Übersichtsdefinitionen und Übersichtsdaten unter config/session/_backup-* gesichert, bevor die Cloud-Daten abgerufen werden.'
+  "云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。": "Ein Cloud-Schnappschuss ist bereits vorhanden.<br>Quelle: {origin}<br>Zeit: {created}<br>Einträge: {count}{warning}<br><br>Beim Fortfahren werden zunächst lokale Benutzer, Übersichtsdefinitionen und Übersichtsdaten unter config/session/_backup-* gesichert, bevor die Cloud-Daten abgerufen werden."
   修改密码: Passwort ändern
   修改密码…: Passwort wird geändert…
   创建快照: Schnappschuss erstellen
@@ -21,15 +20,13 @@ account_dialog:
   在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号: 'Self-Service-Seite im Browser öffnen: Passwort ändern, Daten exportieren, Cloud-Daten löschen, Konto löschen'
   定义: Definitionen
   密码: Passwort
-  ? "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。"
-  : "Löscht Definitionen, Benutzer, Dokumente und Übersichtsdaten in der Cloud (Konto und Anmeldestatus bleiben erhalten).\nDieser Vorgang kann nicht rückgängig gemacht werden; lokale Daten werden nicht gelöscht."
+  "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。": "Löscht Definitionen, Benutzer, Dokumente und Übersichtsdaten in der Cloud (Konto und Anmeldestatus bleiben erhalten).\nDieser Vorgang kann nicht rückgängig gemacht werden; lokale Daten werden nicht gelöscht."
   已取消覆盖：本机数据未改动，profile 同步未启用。: 'Überschreiben abgebrochen: Lokale Daten unverändert, Profilsynchronisierung nicht aktiviert.'
   平台: Plattform
   当前密码: Aktuelles Passwort
   当前设备不是初始同步设备: Dieses Gerät ist nicht das Gerät der Erstsynchronisierung
   总览: Übersicht
-  ? "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。"
-  : "Alle lokalen Charakterdaten als Cloud-Übersichtsbasislinie hochladen.\nBei der Erstsynchronisierung wird sie automatisch erstellt; danach bei Bedarf manuell auslösen."
+  "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。": "Alle lokalen Charakterdaten als Cloud-Übersichtsbasislinie hochladen.\nBei der Erstsynchronisierung wird sie automatisch erstellt; danach bei Bedarf manuell auslösen."
   操作未完成: Vorgang nicht abgeschlossen
   数据同步: Datensynchronisierung
   文档: Dokumentation
@@ -69,8 +66,7 @@ account_dialog:
   退出登录: Abmelden
   通道: Kanal
   隐藏密码: Passwort ausblenden
-  ? "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"
-  : "Erstnutzung: Synchronisierungsstatus zwischen diesem Gerät und der Cloud einrichten. Sind bereits Cloud-Daten vorhanden, werden lokale\nBenutzer, Übersichtsdefinitionen und Übersichtsdaten vor dem Abruf unter config/session/_backup-* gesichert."
+  "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。": "Erstnutzung: Synchronisierungsstatus zwischen diesem Gerät und der Cloud einrichten. Sind bereits Cloud-Daten vorhanden, werden lokale\nBenutzer, Übersichtsdefinitionen und Übersichtsdaten vor dem Abruf unter config/session/_backup-* gesichert."
   ；等 {} 项: ; {} weitere Einträge
 action_catalog:
   0=红 1=绿 2=蓝: 0=Rot 1=Grün 2=Blau
@@ -230,11 +226,9 @@ all_user_params:
 apk_release:
   下载 {url} 失败：{err}: 'Download von {url} fehlgeschlagen: {err}'
   下载已取消: Download abgebrochen
-  ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
-  : "Prüfsumme stimmt nicht überein; die Datei ist möglicherweise beschädigt oder manipuliert\nErwartet {want}\nTatsächlich {got}"
+  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "Prüfsumme stimmt nicht überein; die Datei ist möglicherweise beschädigt oder manipuliert\nErwartet {want}\nTatsächlich {got}"
 batch:
-  ? "* 表示当前用户使用独立参数\n"
-  : "* bedeutet, dass der aktuelle Benutzer eigene Parameter verwendet\n"
+  "* 表示当前用户使用独立参数\n": "* bedeutet, dass der aktuelle Benutzer eigene Parameter verwendet\n"
   <b>选择执行单元</b>: <b>Ausführungseinheiten auswählen</b>
   <b>选择执行脚本</b>: <b>Skripte auswählen</b>
   Profile 定义不可用: Profildefinitionen nicht verfügbar
@@ -260,17 +254,13 @@ batch:
   已按 Profile 排序用户: Benutzer nach Profil sortiert
   开始执行: Ausführung starten
   异常恢复: Fehlerwiederherstellung
-  ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
-  : 'Es wird nach „{key}“ geplant, aber der Eintrags-Vorbereitungs-Workflow „{wf}“ wählt keinen Benutzernamen für diese Einheit aus und gibt ihn nicht zurück. Verwenden Sie batch/prepare_item_by_attr.wf oder deklarieren Sie #% batch_unit_prepare: true in einem eigenen Vorbereitungs-Workflow und geben Sie username zurück.'
+  "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。": "Es wird nach „{key}“ geplant, aber der Eintrags-Vorbereitungs-Workflow „{wf}“ wählt keinen Benutzernamen für diese Einheit aus und gibt ihn nicht zurück. Verwenden Sie batch/prepare_item_by_attr.wf oder deklarieren Sie #% batch_unit_prepare: true in einem eigenen Vorbereitungs-Workflow und geben Sie username zurück."
   当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: Derzeit wird nach Attribut geplant; bitte konfigurieren Sie zuerst den Eintrags-Vorbereitungs-wf unter „Werkzeuge → Stapelkonfiguration“.
   恢复默认顺序: Standardreihenfolge wiederherstellen
   手机端正在执行任务，请暂停或者结束任务: Auf dem Smartphone läuft eine Aufgabe; bitte zuerst pausieren oder beenden
-  ? "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}"
-  : "Auf dem Smartphone läuft eine Aufgabe; bitte zuerst pausieren oder beenden.\n\nGeräteantwort: {detail}"
-  ? "执行用户：{username}\n参数来源：{source}"
-  : "Ausführender Benutzer: {username}\nParameterquelle: {source}"
-  ? "执行用户：{username}\n点击查看本轮任务参数"
-  : "Ausführender Benutzer: {username}\nKlicken, um die Aufgabenparameter dieser Runde anzuzeigen"
+  "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}": "Auf dem Smartphone läuft eine Aufgabe; bitte zuerst pausieren oder beenden.\n\nGeräteantwort: {detail}"
+  "执行用户：{username}\n参数来源：{source}": "Ausführender Benutzer: {username}\nParameterquelle: {source}"
+  "执行用户：{username}\n点击查看本轮任务参数": "Ausführender Benutzer: {username}\nKlicken, um die Aufgabenparameter dieser Runde anzuzeigen"
   执行顺序: Ausführungsreihenfolge
   批量设置: Stapeleinstellungen
   批量配置: Stapelkonfiguration
@@ -535,8 +525,7 @@ main_window:
   '[错误] 当前环境不支持以下脚本：': '[Fehler] Die aktuelle Umgebung unterstützt folgende Skripte nicht:'
   【模拟器画面比例】如果目标模拟器没有 20:9 的画面比例预设，: '[Emulator-Seitenverhältnis] Falls der Zielemulator keine 20:9-Voreinstellung bietet,'
   【重要】PC 端使用模拟器（如 MuMu、雷电）必须选择「安卓」，: '[Wichtig] Bei Verwendung eines PC-Emulators (z. B. MuMu, LDPlayer) muss „Android“ gewählt werden,'
-  ? "以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。"
-  : "Folgende Aufgaben wurden noch nicht sicher beendet, das Programm bleibt vorerst geöffnet:\n{tasks}\n\nBitte später erneut schließen; falls eine Aufgabe hängt, LvJiang über das System beenden."
+  "以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。": "Folgende Aufgaben wurden noch nicht sicher beendet, das Programm bleibt vorerst geöffnet:\n{tasks}\n\nBitte später erneut schließen; falls eine Aufgabe hängt, LvJiang über das System beenden."
   任务仍在收尾: Aufgaben werden noch abgeschlossen
   使用独立参数: Benutzerparameter verwenden
   全部任务: Alle Aufgaben
@@ -556,8 +545,7 @@ main_window:
   就绪: Bereit
   展示分组，仅筛选脚本列表: Anzeigegruppe; filtert nur die Skriptliste
   工作流运行中: Workflow läuft
-  ? "当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n确定要退出吗？"
-  : "Derzeit laufen {count} Workflows; beim Schließen werden sie gestoppt und sauber beendet.\nWirklich beenden?"
+  "当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n确定要退出吗？": "Derzeit laufen {count} Workflows; beim Schließen werden sie gestoppt und sauber beendet.\nWirklich beenden?"
   当前正在使用方案，如需手动调整请先切换为「自定义」: Derzeit ist ein Schema aktiv; zum manuellen Anpassen zuerst auf „Benutzerdefiniert“ umschalten
   当前目标: Aktuelles Ziel
   律匠 - 通用视觉 RPA 引擎: LvJiang – Allgemeine visuelle RPA-Engine
@@ -798,8 +786,7 @@ mobile:
   安装失败：{err}: 'Installation fehlgeschlagen: {err}'
   安装完成：{out}: 'Installation abgeschlossen: {out}'
   尚未扫描: Noch nicht gesucht
-  ? "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。"
-  : "Die LAN-Suche findet Geräte mit drahtlosem ADB; die lokale Portsuche findet Emulatoren, die nur auf 127.0.0.1 lauschen.\nDie Suche stellt nur ADB-Verbindungen her und ändert nicht das Ausführungsziel im Hauptfenster."
+  "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。": "Die LAN-Suche findet Geräte mit drahtlosem ADB; die lokale Portsuche findet Emulatoren, die nur auf 127.0.0.1 lauschen.\nDie Suche stellt nur ADB-Verbindungen her und ändert nicht das Ausführungsziel im Hauptfenster."
   屏幕: Bildschirm
   屏幕标定: Bildschirmkalibrierung
   已下载 {mb:.1f} MB: '{mb:.1f} MB heruntergeladen'
@@ -877,15 +864,13 @@ mobile:
   没有可用的局域网地址: Keine verfügbare LAN-Adresse
   没有可用的局域网地址：确认本机已连接网络: 'Keine verfügbare LAN-Adresse: sicherstellen, dass dieser PC mit dem Netzwerk verbunden ist'
   没有已连接的 ADB 设备: Kein verbundenes ADB-Gerät vorhanden
-  ? "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。"
-  : "Der Test hält unten links gedrückt und tippt dabei zweimal unten rechts – also „Joystick halten und gleichzeitig tippen“.\nBitte das Smartphone zuerst auf einen Spielbildschirm stellen, auf dem Bewegung und Springen sichtbar sind, und dann auf Start klicken."
+  "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。": "Der Test hält unten links gedrückt und tippt dabei zweimal unten rechts – also „Joystick halten und gleichzeitig tippen“.\nBitte das Smartphone zuerst auf einen Spielbildschirm stellen, auf dem Bewegung und Springen sichtbar sind, und dann auf Start klicken."
   版本: Version
   版本不一致时协议和随包配置都可能对不上。建议把低的那一边升到高的: Bei unterschiedlichen Versionen passen Protokoll und mitgelieferte Konfigurationen eventuell nicht zusammen. Bitte die ältere Seite aktualisieren
   用 PC 配置覆盖手机任务参数和用户名册。: Überschreibt Aufgabenparameter und Benutzerliste des Smartphones mit den PC-Konfigurationen.
   用 PC 配置覆盖手机批量配置。: Überschreibt die Stapelkonfigurationen des Smartphones mit den PC-Konfigurationen.
   用手机扫码，从本机下载安装。手机需要和电脑在同一局域网，但不需要能上网。: Mit dem Smartphone scannen, um von diesem PC herunterzuladen und zu installieren. Das Smartphone muss im selben LAN sein, benötigt aber keinen Internetzugang.
-  ? "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。"
-  : "Mit dem Smartphone scannen, um direkt von GitHub herunterzuladen und zu installieren.\nOhne Internet auf dem Smartphone stattdessen rechts „Lokale Freigabe“ nutzen."
+  "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。": "Mit dem Smartphone scannen, um direkt von GitHub herunterzuladen und zu installieren.\nOhne Internet auf dem Smartphone stattdessen rechts „Lokale Freigabe“ nutzen."
   由本机提供下载，手机不需要能上网: Download wird von diesem PC bereitgestellt; das Smartphone benötigt keinen Internetzugang
   电脑: PC
   确认手机已安装律匠 app、与本机同一局域网或已用 USB 连接，并在 app 内开启无障碍服务: Sicherstellen, dass die LvJiang-App installiert ist, sich im selben LAN oder per USB am PC befindet und die Bedienungshilfen in der App aktiviert sind
@@ -983,8 +968,7 @@ ocr_dialog:
   刷新截图失败: Aktualisieren des Bildschirmfotos fehlgeschlagen
   匹配参考图: Referenzbild abgleichen
   区域批量识别: Stapel-Bereichserkennung
-  ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
-  : "Die Stapel-Bereichserkennung fügt mehrere Textbereiche auf einer Leinwand zusammen und ruft OCR nur einmal auf.\nDiese Parameter steuern die Größe der zusammengesetzten Leinwand; nach dem Speichern ab der nächsten Erkennung wirksam."
+  "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。": "Die Stapel-Bereichserkennung fügt mehrere Textbereiche auf einer Leinwand zusammen und ruft OCR nur einmal auf.\nDiese Parameter steuern die Größe der zusammengesetzten Leinwand; nach dem Speichern ab der nächsten Erkennung wirksam."
   原始文本: Rohtext
   名称不能为空: Name darf nicht leer sein
   图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: Die OCR-Einstellungen enthalten ungespeicherte Änderungen; wirklich schließen und verwerfen?
@@ -1034,8 +1018,7 @@ ocr_dialog:
   选择图片: Bild auswählen
   选框区域为空: Der ausgewählte Bereich ist leer
   重命名规则组: Regelgruppe umbenennen
-  ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
-  : "Standardregeln gelten global für alle OCR-Vorgänge; with-Anweisungen in scan/find wenden die gewählte Fachregelgruppe zusätzlich nach den Standardregeln an.\nÄnderungen werden nach Klick auf „Speichern“ ohne Neustart wirksam; ungespeicherte Änderungen lassen sich mit „Rückgängig“ verwerfen."
+  "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。": "Standardregeln gelten global für alle OCR-Vorgänge; with-Anweisungen in scan/find wenden die gewählte Fachregelgruppe zusätzlich nach den Standardregeln an.\nÄnderungen werden nach Klick auf „Speichern“ ohne Neustart wirksam; ungespeicherte Änderungen lassen sich mit „Rückgängig“ verwerfen."
   默认规则（全局）: Standardregeln (Global)
 ondevice_runner:
   当前 active_layout 不存在：{name}: 'Das aktuelle active_layout existiert nicht: {name}'
@@ -1087,10 +1070,8 @@ profile:
   删除便利贴失败：{error}: 'Löschen der Haftnotiz fehlgeschlagen: {error}'
   删除分组: Gruppe löschen
   勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: Aktiviert wird das Skript vor dem Speichern ausgeführt; bei Ablehnung oder Fehler wird die gesamte synchrone Schreibkette zurückgerollt. Deaktiviert wird es nach dem Speichern in die Hintergrund-Warteschlange eingereiht. Synchrone Skripte sollten kurz sein und keine langen Wartezeiten enthalten.
-  ? "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
-  : "Aktiviert: Verarbeitung nach Action-Semantik, löst Synchronisierung der konfigurierten sync_targets aus.\nDeaktiviert: Reines Überschreiben, schreibt nur diesen Schlüssel ohne Synchronisierung."
-  ? "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"
-  : "Aktiviert: Sobald das Ziel die Obergrenze erreicht, wird dieser Eintrag gesperrt (in der Übersicht als — angezeigt und nicht bearbeitbar).\nDeaktiviert: Der Eintrag bleibt normal sichtbar und bearbeitbar; Zuwächse werden lediglich nicht mehr auf das volle Ziel geschrieben."
+  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Aktiviert: Verarbeitung nach Action-Semantik, löst Synchronisierung der konfigurierten sync_targets aus.\nDeaktiviert: Reines Überschreiben, schreibt nur diesen Schlüssel ohne Synchronisierung."
+  "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。": "Aktiviert: Sobald das Ziel die Obergrenze erreicht, wird dieser Eintrag gesperrt (in der Übersicht als — angezeigt und nicht bearbeitbar).\nDeaktiviert: Der Eintrag bleibt normal sichtbar und bearbeitbar; Zuwächse werden lediglich nicht mehr auf das volle Ziel geschrieben."
   包含: Enthält
   单向增加: Nur erhöhen
   原 key 已不存在，请重新打开编辑对话框: Der ursprüngliche Schlüssel existiert nicht mehr; bitte den Bearbeitungsdialog erneut öffnen
@@ -1199,10 +1180,8 @@ profile:
   用户数据模型定义: Definition des Benutzerdatenmodells
   用途（减少）: Zweck (Verringern)
   确定: OK
-  ? "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。"
-  : "Diesen Eintrag wirklich rückgängig machen?\n\nBenutzer: {username}\nDatenelement: {label}\nZeit: {time}\nQuelle: {source}\n\nDurch Rückgängigmachen wird ein neuer gegenläufiger Eintrag geschrieben."
-  ? "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。"
-  : "Diesen Verlaufseintrag dauerhaft löschen?\n\nBenutzer: {username}\nDatenelement: {label}\nZeit: {time}\nQuelle: {source}\nÄnderung: {delta}\n\nLöscht nur den Verlauf; der aktuelle Wert bleibt unverändert und es wird kein Löscheintrag erstellt. Nicht rückgängig machbar; das Löschen von Bezugseinträgen kann verlaufbasierte Quellenkontingente freigeben."
+  "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。": "Diesen Eintrag wirklich rückgängig machen?\n\nBenutzer: {username}\nDatenelement: {label}\nZeit: {time}\nQuelle: {source}\n\nDurch Rückgängigmachen wird ein neuer gegenläufiger Eintrag geschrieben."
+  "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。": "Diesen Verlaufseintrag dauerhaft löschen?\n\nBenutzer: {username}\nDatenelement: {label}\nZeit: {time}\nQuelle: {source}\nÄnderung: {delta}\n\nLöscht nur den Verlauf; der aktuelle Wert bleibt unverändert und es wird kein Löscheintrag erstellt. Nicht rückgängig machbar; das Löschen von Bezugseinträgen kann verlaufbasierte Quellenkontingente freigeben."
   确定要删除 key '{key}' 吗？: Schlüssel '{key}' wirklich löschen?
   确定要删除分组 '{name}' 吗？: Gruppe '{name}' wirklich löschen?
   确定要删除这条便利贴吗？: Diese Haftnotiz wirklich löschen?
@@ -1217,8 +1196,7 @@ profile:
   至少保留一个分组: Mindestens eine Gruppe muss erhalten bleiben
   覆写 - {label}: Überschreiben – {label}
   覆写...: Überschreiben...
-  ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
-  : "Sperre von „{label}“ für {user} aufheben?\nNach dem Entsperren lesen und aktualisieren automatische Aufgaben diesen Schlüssel wieder."
+  "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。": "Sperre von „{label}“ für {user} aufheben?\nNach dem Entsperren lesen und aktualisieren automatische Aufgaben diesen Schlüssel wieder."
   设备：{value}: 'Gerät: {value}'
   该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: Dieser Wert wurde von einem anderen Prozess aktualisiert; die Änderung wurde nicht geschrieben. Bitte aktualisieren und erneut versuchen.
   该条历史记录已发生变化，请刷新后重试: Dieser Verlaufseintrag hat sich geändert; bitte aktualisieren und erneut versuchen
@@ -1240,14 +1218,12 @@ profile:
   选择...: Auswählen...
   选择变更脚本: Änderungsskript auswählen
   选择字段: Feld auswählen
-  ? "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？"
-  : "Durch das Umbenennen werden aktuelle Einträge, Verlauf, Synchronisierungsquellen und Konfigurationsverweise aller Benutzer geändert. Schlüssel in Workflows und Änderungsskripten werden nicht automatisch ersetzt und müssen manuell angepasst werden.\n\nFortfahren?"
+  "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Durch das Umbenennen werden aktuelle Einträge, Verlauf, Synchronisierungsquellen und Konfigurationsverweise aller Benutzer geändert. Schlüssel in Workflows und Änderungsskripten werden nicht automatisch ersetzt und müssen manuell angepasst werden.\n\nFortfahren?"
   重新读取用户数据: Benutzerdaten neu laden
   重置:{time}: 'Reset: {time}'
   重置日:{day}: 'Reset-Tag: {day}'
   重置日:{day}号: 'Reset-Tag: {day}.'
-  ? "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。"
-  : "„{label}“ für {user} sperren?\nNach dem Sperren ignoriert die Engine diesen Wert: Automatische Aufgaben lesen und schreiben ihn nicht mehr, periodische Resets pausieren und der Wert bleibt dauerhaft im aktuellen Zustand.\nJederzeit per Rechtsklick entsperrbar."
+  "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。": "„{label}“ für {user} sperren?\nNach dem Sperren ignoriert die Engine diesen Wert: Automatische Aufgaben lesen und schreiben ihn nicht mehr, periodische Resets pausieren und der Wert bleibt dauerhaft im aktuellen Zustand.\nJederzeit per Rechtsklick entsperrbar."
   键: Schlüssel
   键：{label}: 'Schlüssel: {label}'
   键：{value}: 'Schlüssel: {value}'
@@ -1336,10 +1312,8 @@ run_control:
   '[错误] 请先连接设备': '[Fehler] Bitte zuerst ein Gerät verbinden'
   '[错误] 请选择一个工作流': '[Fehler] Bitte einen Workflow auswählen'
   '[错误] 请选择有效的执行用户': '[Fehler] Bitte einen gültigen Ausführungsbenutzer auswählen'
-  ? "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。"
-  : "Der Bildstream von {name} wurde unterbrochen und die automatische Wiederherstellung ist fehlgeschlagen.\n{error}\n\nBitte Smartphone prüfen (Bildschirm aus, Spiel im Hintergrund, USB-/WLAN-Verbindung) und „Ja“ zum erneuten Prüfen oder „Nein“ zum Stoppen wählen. Das Schließen dieses Hinweises stoppt die Aufgabe nicht; das Banner bleibt sichtbar."
-  ? "{name} 的连接恢复未完成。\n{error}\n\n请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。"
-  : "Die Verbindungswiederherstellung für {name} ist nicht abgeschlossen.\n{error}\n\nBitte ADB-/Smartphone-Agent-Verbindung wiederherstellen und „Ja“ zum erneuten Prüfen oder „Nein“ zum Stoppen wählen."
+  "{name} 的画面流中断，自动恢复没有成功。\n{error}\n\n请检查手机（是否息屏、游戏是否被切走、USB／无线是否正常）后选择是重新检查；选择否停止该目标任务。关掉本提示不会停止任务，顶部横幅会一直保留。": "Der Bildstream von {name} wurde unterbrochen und die automatische Wiederherstellung ist fehlgeschlagen.\n{error}\n\nBitte Smartphone prüfen (Bildschirm aus, Spiel im Hintergrund, USB-/WLAN-Verbindung) und „Ja“ zum erneuten Prüfen oder „Nein“ zum Stoppen wählen. Das Schließen dieses Hinweises stoppt die Aufgabe nicht; das Banner bleibt sichtbar."
+  "{name} 的连接恢复未完成。\n{error}\n\n请恢复 ADB／手机代理连接后选择是重新检查；选择否停止该目标任务。": "Die Verbindungswiederherstellung für {name} ist nicht abgeschlossen.\n{error}\n\nBitte ADB-/Smartphone-Agent-Verbindung wiederherstellen und „Ja“ zum erneuten Prüfen oder „Nein“ zum Stoppen wählen."
   ⚠ 执行通道等待确认：处理问题后点击「重新检查」；无法恢复时请按 F10 停止任务: '⚠ Ausführungskanal wartet auf Bestätigung: Problem beheben und auf „Erneut prüfen“ klicken; falls nicht wiederherstellbar, mit F10 stoppen'
   ⚠ 画面流中断：处理后点「重新检查」继续；无法恢复请按 F10 停止任务: '⚠ Bildstream unterbrochen: nach Behebung auf „Erneut prüfen“ klicken; falls nicht wiederherstellbar, mit F10 stoppen'
   ⚠ 画面流已中断：点「重新检查」重试，或断开重连设备: '⚠ Bildstream unterbrochen: auf „Erneut prüfen“ klicken oder Gerät trennen und neu verbinden'
@@ -1358,8 +1332,7 @@ run_control:
   已有任务运行: Eine Aufgabe läuft bereits
   布局: Layout
   当前工作环境 {env} 不在该脚本支持的环境 {envs} 中: Die aktuelle Arbeitsumgebung {env} gehört nicht zu den von diesem Skript unterstützten Umgebungen ({envs})
-  ? "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的 {tolerance}。"
-  : "Die Leinwandgröße des aktuellen Layouts entspricht nicht der Vorgabe; bitte Layout anpassen und erneut versuchen.\n\nLayout „{layout}“ erfordert ein Seitenverhältnis von {expected}; aktuell ist die Leinwand {width}×{height} (Verhältnis {actual}), Abweichung {deviation} überschreitet das zulässige Limit {tolerance}."
+  "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n布局「{layout}」要求画布宽高比 {expected}，当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，超出允许的 {tolerance}。": "Die Leinwandgröße des aktuellen Layouts entspricht nicht der Vorgabe; bitte Layout anpassen und erneut versuchen.\n\nLayout „{layout}“ erfordert ein Seitenverhältnis von {expected}; aktuell ist die Leinwand {width}×{height} (Verhältnis {actual}), Abweichung {deviation} überschreitet das zulässige Limit {tolerance}."
   当前方案「{name}」不支持{mode}: Das aktuelle Schema „{name}“ unterstützt {mode} nicht
   当前没有可执行目标: Kein ausführbares Ziel vorhanden
   批量任务运行中: Stapelaufgabe läuft
@@ -1388,8 +1361,7 @@ run_control:
   自动化运行中: Automatisierung läuft
   设备执行通道等待确认，请处理问题后重新检查；无法恢复时请停止任务: Der Geräte-Ausführungskanal wartet auf Bestätigung; Problem beheben und erneut prüfen oder Aufgabe stoppen, falls nicht wiederherstellbar
   设备正在执行其他任务: Auf dem Gerät läuft bereits eine andere Aufgabe
-  ? "设备正在执行其他任务，本次未启动。\n\n{reason}"
-  : "Auf dem Gerät läuft bereits eine andere Aufgabe; Start diesmal abgebrochen.\n\n{reason}"
+  "设备正在执行其他任务，本次未启动。\n\n{reason}": "Auf dem Gerät läuft bereits eine andere Aufgabe; Start diesmal abgebrochen.\n\n{reason}"
   请选择一个脚本: Bitte ein Skript auswählen
   请选择一个脚本；列表为空时可刷新脚本或调整展示分组: Bitte ein Skript auswählen; ist die Liste leer, Skripte aktualisieren oder Anzeigegruppe anpassen
   连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。: Verbindungsschema „{name}“ erfordert Administratorrechte, aber LvJiang läuft derzeit nicht als Administrator. Windows blockiert Klicks und Tastatureingaben von Prozessen mit geringeren Rechten an erhöhte Spielfenster. Bitte LvJiang schließen, per Rechtsklick „Als Administrator ausführen“ wählen und erneut starten.
@@ -1426,8 +1398,7 @@ scene_editor:
   仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: Betrifft nur künftig aktualisierte oder hinzugefügte Bildschirmfotos des aktuellen Layouts, der Szene und Ansicht; vorhandene behalten ihr Format.
   从场景 YAML 中删除 Panel 定义: Panel-Definition aus dem Szenen-YAML löschen
   从场景 YAML 中删除坐标点定义（meta 数据）: Koordinatenpunkt-Definition aus dem Szenen-YAML löschen (Meta-Daten)
-  ? "以下 {n} 条没有加上：\n{detail}"
-  : "Folgende {n} Einträge wurden nicht hinzugefügt:\n{detail}"
+  "以下 {n} 条没有加上：\n{detail}": "Folgende {n} Einträge wurden nicht hinzugefügt:\n{detail}"
   以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: Folgende Szenen enthalten ungespeicherte Änderungen; bitte zuerst manuell speichern oder verwerfen und dann aktualisieren.
   以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: Beginnt mit einem Kleinbuchstaben, erlaubt nur Kleinbuchstaben, Ziffern und Unterstriche; nach der Erstellung unveränderlich
   位置和尺寸可在画布中拖动调整。: Position und Größe können auf der Leinwand per Ziehen angepasst werden.
@@ -1528,8 +1499,7 @@ scene_editor:
   布局写入失败，请检查日志。: Schreiben des Layouts fehlgeschlagen; bitte Protokoll prüfen.
   布局名称: Layout-Name
   布局名称不能为空: Layout-Name darf nicht leer sein
-  ? "布局已保存，但以下模板截图未能删除：\n{errors}"
-  : "Layout gespeichert, aber folgende Vorlagen-Bildschirmfotos konnten nicht gelöscht werden:\n{errors}"
+  "布局已保存，但以下模板截图未能删除：\n{errors}": "Layout gespeichert, aber folgende Vorlagen-Bildschirmfotos konnten nicht gelöscht werden:\n{errors}"
   布局清单里找不到当前布局，请先保存布局: Das aktuelle Layout fehlt in der Layoutliste; bitte zuerst speichern
   布局绑定: Layoutbindung
   应用到当前布局: Auf aktuelles Layout anwenden
@@ -1552,8 +1522,7 @@ scene_editor:
   当前布局尚未绑定此网格。: Dieses Raster ist im aktuellen Layout noch nicht gebunden.
   当前布局没有未保存的改动: Das aktuelle Layout enthält keine ungespeicherten Änderungen
   当前布局绑定: Bindung des aktuellen Layouts
-  ? "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}"
-  : "Die Größe des neuen Bildschirmfotos weicht ab. Trotzdem übernehmen?\n\nAktuell: {old_width} × {old_height}\nNeu: {new_width} × {new_height}"
+  "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}": "Die Größe des neuen Bildschirmfotos weicht ab. Trotzdem übernehmen?\n\nAktuell: {old_width} × {old_height}\nNeu: {new_width} × {new_height}"
   当前激活布局不可删除: Das derzeit aktive Layout kann nicht gelöscht werden
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: In dieser Ansicht sind keine bindbaren Bereichsfelder verfügbar (alle zugewiesen oder nicht Teil dieser Ansicht)
   快速选择当前场景内的目标视图: Schnellauswahl einer Zielansicht innerhalb der aktuellen Szene
@@ -1583,8 +1552,7 @@ scene_editor:
   无可用引用: Keine verfügbaren Referenzen
   无场景改动: Keine Szenenänderungen
   无布局: Kein Layout
-  ? "无截图\n请连接投屏后点击「刷新截图」"
-  : "Kein Bildschirmfoto\nBitte Spiegelung verbinden und auf „Bildschirmfoto aktualisieren“ klicken"
+  "无截图\n请连接投屏后点击「刷新截图」": "Kein Bildschirmfoto\nBitte Spiegelung verbinden und auf „Bildschirmfoto aktualisieren“ klicken"
   无截图源，请先在主窗口定位窗口: Keine Bildquelle; bitte zuerst ein Fenster im Hauptfenster lokalisieren
   无法加载截图: Bildschirmfoto kann nicht geladen werden
   无法取消: Aufheben nicht möglich
@@ -1628,10 +1596,8 @@ scene_editor:
   留空则点击坐标；可输入或下拉选择: Leer klickt auf die Koordinate; Eingabe oder Auswahl aus der Liste möglich
   目标场景不存在: Zielszene existiert nicht
   确定删除引用 {key} 吗？: Referenz {key} wirklich löschen?
-  ? "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。"
-  : "Bildschirmfoto {idx} wirklich löschen?\nDie übrigen Bildschirmfotos werden danach automatisch neu nummeriert."
-  ? "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。"
-  : "Letzten gespeicherten Zustand von Layout „{name}“ wirklich wiederherstellen?\nAlle ungespeicherten Layoutkalibrierungen, Vorlagenaufnahmen und Versionsanpassungen gehen verloren."
+  "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。": "Bildschirmfoto {idx} wirklich löschen?\nDie übrigen Bildschirmfotos werden danach automatisch neu nummeriert."
+  "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。": "Letzten gespeicherten Zustand von Layout „{name}“ wirklich wiederherstellen?\nAlle ungespeicherten Layoutkalibrierungen, Vorlagenaufnahmen und Versionsanpassungen gehen verloren."
   确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。: Referenz dieser Szene auf {scene}.{entity} wirklich aufheben? Definition und Layoutkoordinaten der Quellszene bleiben unverändert.
   移动场景: Szene verschieben
   移动失败: Verschieben fehlgeschlagen
@@ -1750,8 +1716,7 @@ scripts:
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} ist ein Systemskript. Zum Ändern im Baum per Rechtsklick „Zum Bearbeiten lokal kopieren“ wählen.'
   ■ 停止录制: ■ Aufnahme stoppen
   ● 录制脚本: ● Skript aufnehmen
-  ? "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n"
-  : "⚠ Skript-Metadaten nicht erkennbar; dieses Skript erscheint nicht in der Ausführungsliste:\n"
+  "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n": "⚠ Skript-Metadaten nicht erkennbar; dieses Skript erscheint nicht in der Ausführungsliste:\n"
   上移选项: Option nach oben
   下移选项: Option nach unten
   不会被录制: Wird nicht aufgenommen
@@ -1818,8 +1783,7 @@ scripts:
   属性单元准备工作流: Vorbereitungs-Workflow für Attributeinheiten
   工作流运行中，无法录制: Ein Workflow läuft; Aufnahme nicht möglich
   左侧选择脚本，或点「新建」: Links ein Skript auswählen oder auf „Neu“ klicken
-  ? "已保存 {path}，但校验未通过：\n"
-  : "{path} gespeichert, aber Prüfung fehlgeschlagen:\n"
+  "已保存 {path}，但校验未通过：\n": "{path} gespeichert, aber Prüfung fehlgeschlagen:\n"
   已保存 {path}，语法与布局引用校验通过: '{path} gespeichert; Syntax- und Layoutreferenzprüfung bestanden'
   已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: 'Am Zielort gespeichert, aber die Originaldatei konnte nicht entfernt werden: {error}. Bitte beide Skripte prüfen.'
   已写入编辑区域；请在编辑器中保存脚本: In den Editor übernommen; bitte das Skript im Editor speichern
@@ -1844,8 +1808,7 @@ scripts:
   录制结束，可编辑后保存为 .wf: Aufnahme beendet; nach Bedarf bearbeiten und als .wf speichern
   录制结束，未捕获到有效操作: Aufnahme beendet; keine gültigen Aktionen erfasst
   录制结果: Aufnahmeergebnis
-  ? "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？"
-  : "Das Aufnahmeergebnis wurde noch nicht in das Ausgangsskript übernommen.\nEin Skriptwechsel löscht diese Aufnahme. Fortfahren?"
+  "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？": "Das Aufnahmeergebnis wurde noch nicht in das Ausgangsskript übernommen.\nEin Skriptwechsel löscht diese Aufnahme. Fortfahren?"
   录制轨迹引用超出工作流目录：{ref}: 'Verweis auf Aufnahmespur liegt außerhalb des Workflow-Verzeichnisses: {ref}'
   录制鼠标移动: Mausbewegung aufnehmen
   待机 | 点击「录制脚本」: Bereitschaft | Auf „Skript aufnehmen“ klicken
@@ -1859,8 +1822,7 @@ scripts:
   找不到该函数: Funktion nicht gefunden
   找不到过程 {name} 的定义: Definition der Prozedur {name} nicht gefunden
   把录制结果按语句插入代码编辑器的光标处: Fügt das Aufnahmeergebnis als Anweisungen an der Cursorposition im Code-Editor ein
-  ? "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？"
-  : "Das Systemskript {name} muss zum Ändern lokal kopiert werden.\nDanach folgt diese Datei keinen Systemupdates mehr. Fortfahren?"
+  "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？": "Das Systemskript {name} muss zum Ändern lokal kopiert werden.\nDanach folgt diese Datei keinen Systemupdates mehr. Fortfahren?"
   指令: Befehl
   插件: Plugins
   插入到脚本: In Skript einfügen
@@ -2000,8 +1962,7 @@ settings_dialog:
   如 ios: z. B. ios
   如 my_wait: z. B. my_wait
   完全离线模式（暂停全部联网功能）: Vollständiger Offlinemodus (alle Onlinefunktionen pausieren)
-  ? 实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。
-  : 'Experimentelle Funktion: Viele Skripte laufen in diesem Modus noch nicht durch; Störungsmeldungen hierzu werden nicht bearbeitet. Hintergrunderfassung ermöglicht Bilderfassung auch bei verdecktem Spielfenster, ist jedoch etwas langsamer und setzt Hintergrundeingabe voraus; bei minimiertem Fenster liefert keines von beiden ein Bild. Dies legt den Standard fest: Im Hauptfenster wird „Hintergrunderfassung“ erst nach Aktivieren von „Hintergrundmodus“ automatisch gesetzt und bleibt jederzeit änderbar.'
+  "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。": "Experimentelle Funktion: Viele Skripte laufen in diesem Modus noch nicht durch; Störungsmeldungen hierzu werden nicht bearbeitet. Hintergrunderfassung ermöglicht Bilderfassung auch bei verdecktem Spielfenster, ist jedoch etwas langsamer und setzt Hintergrundeingabe voraus; bei minimiertem Fenster liefert keines von beiden ein Bild. Dies legt den Standard fest: Im Hauptfenster wird „Hintergrunderfassung“ erst nach Aktivieren von „Hintergrundmodus“ automatisch gesetzt und bleibt jederzeit änderbar."
   实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Experimentelle Funktion: Auf dem Smartphone muss die LvJiang-App mit aktivierten Bedienungshilfen installiert sein; ändert nur den Ausführungskanal für Tipps und Wischgesten, nicht die Bilderfassung. Bei Verbindungsfehler erfolgt Rückfall auf ADB shell input.'
   尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: Noch keine Verbindungsinformationen dieses Typs vorhanden; bitte zuerst im Hauptfenster ein Gerät verbinden oder ein Fenster lokalisieren.
   已下载待安装：{parts}（下次启动生效）: 'Heruntergeladen, Installation ausstehend: {parts} (ab nächstem Start wirksam)'
@@ -2017,8 +1978,7 @@ settings_dialog:
   '应用名重复: {name}': 'Doppelter App-Name: {name}'
   应用注册: App-Registrierung
   建立流式传输尝试次数: Versuche zum Aufbau des Videostreams
-  ? "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。"
-  : "Verhalten, wenn von der Engine berechnete Klick-/Ziehkoordinaten außerhalb des Bildes liegen.\nDeaktiviert (Standard): Fehler auslösen und Lauf beenden – eine Bereichsüberschreitung zeigt, dass die Verschiebung nicht zur Panel-Geometrie passt; stilles Abschneiden würde „zwei Zeilen scrollen“ unbemerkt zu „eine Zeile“ verkürzen.\nAktiviert: Engine begrenzt auf den Bildrand, protokolliert eine Warnung und läuft weiter.\nDie Prüfung erfolgt in der Engine, da Geräte-Bedienungshilfen solche Koordinaten hart ablehnen, Desktop und adb shell input sie jedoch still akzeptieren."
+  "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。": "Verhalten, wenn von der Engine berechnete Klick-/Ziehkoordinaten außerhalb des Bildes liegen.\nDeaktiviert (Standard): Fehler auslösen und Lauf beenden – eine Bereichsüberschreitung zeigt, dass die Verschiebung nicht zur Panel-Geometrie passt; stilles Abschneiden würde „zwei Zeilen scrollen“ unbemerkt zu „eine Zeile“ verkürzen.\nAktiviert: Engine begrenzt auf den Bildrand, protokolliert eine Warnung und läuft weiter.\nDie Prüfung erfolgt in der Engine, da Geräte-Bedienungshilfen solche Koordinaten hart ablehnen, Desktop und adb shell input sie jedoch still akzeptieren."
   当前标识：未生成（未开启）: 'Aktuelle Kennung: nicht erzeugt (deaktiviert)'
   手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: Nach einem Smartphone-Neustart endet der Shizuku-Dienst, den Aufgaben zum Spielneustart benötigen. Aktiviert wird er beim Verbinden der Geräteausführung automatisch geprüft und einmalig gestartet (nur falls nicht aktiv).
   执行参数: Ausführungsparameter
@@ -2095,8 +2055,7 @@ settings_dialog:
   首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: Gilt sowohl für den erstmaligen Verbindungsaufbau als auch für die automatische Wiederherstellung nach einem Abbruch; sind die Versuche erschöpft, wartet die Aufgabe auf manuelles Eingreifen und bricht nicht automatisch ab.
   首次窗口定位后可自动获取: Kann nach der ersten Fensterlokalisierung automatisch ermittelt werden
   高级设置: Erweiterte Einstellungen
-  ? "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。"
-  : "Standardmäßig 5 Versuche für den Videostream, danach 5 Wiederverbindungen für den Agent und 5 für ADB im Abstand von 2 Sek. Bleibt die Verbindung aus, wartet die Aufgabe unbegrenzt auf manuelles Eingreifen: „Ja“ prüft erneut, „Nein“ stoppt die Aufgabe; das Schließen des Hinweises stoppt nicht und das Banner bleibt sichtbar.\nMehrfinger- und parallele Gesten werden nicht herabgestuft. Unklare Aktionen werden nicht automatisch wiederholt. Gilt für künftig gestartete Aufgaben."
+  "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。": "Standardmäßig 5 Versuche für den Videostream, danach 5 Wiederverbindungen für den Agent und 5 für ADB im Abstand von 2 Sek. Bleibt die Verbindung aus, wartet die Aufgabe unbegrenzt auf manuelles Eingreifen: „Ja“ prüft erneut, „Nein“ stoppt die Aufgabe; das Schließen des Hinweises stoppt nicht und das Banner bleibt sichtbar.\nMehrfinger- und parallele Gesten werden nicht herabgestuft. Unklare Aktionen werden nicht automatisch wiederholt. Gilt für künftig gestartete Aufgaben."
   鼠标/触控移动到目标位置的耗时: Dauer für die Maus-/Touchbewegung zur Zielposition
   鼠标移动时长(秒): Mausbewegungsdauer (Sek.)
 static_check:
@@ -2160,8 +2119,7 @@ user_avatar:
   编辑“{name}”的头像: Avatar von „{name}“ bearbeiten
   编辑头像: Avatar bearbeiten
   缩放: Zoomen
-  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "Dieser Avatar wird derzeit von folgenden Benutzern verwendet und kann nicht gelöscht werden:\n{users}\n\nBitte zuerst deren Avatare ändern oder entfernen."
+  "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。": "Dieser Avatar wird derzeit von folgenden Benutzern verwendet und kann nicht gelöscht werden:\n{users}\n\nBitte zuerst deren Avatare ändern oder entfernen."
   选择之前保存的头像，或导入一张新图片: Einen zuvor gespeicherten Avatar wählen oder ein neues Bild importieren
   重置: Zurücksetzen
 user_manager:
@@ -2180,8 +2138,7 @@ user_manager:
   用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Benutzernamen dürfen chinesische Zeichen, Buchstaben, Ziffern, Unterstriche und Bindestriche enthalten, maximal 32 Zeichen.
   用户名已存在: Benutzername existiert bereits
   用户属性: Benutzerattribute
-  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Benutzer „{name}“ wirklich löschen?\nDer Benutzer wird aus der aktuellen Liste und den Stapelkonfigurationen entfernt; zugehörige Datendateien bleiben erhalten und lassen sich durch erneutes Anlegen desselben Namens wiederherstellen."
+  "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Benutzer „{name}“ wirklich löschen?\nDer Benutzer wird aus der aktuellen Liste und den Stapelkonfigurationen entfernt; zugehörige Datendateien bleiben erhalten und lassen sich durch erneutes Anlegen desselben Namens wiederherstellen."
   ＋ 新建用户: ＋ Neuer Benutzer
 user_toolbar:
   上一个用户: Vorheriger Benutzer
@@ -2223,10 +2180,8 @@ window_ops:
   取消中...: Wird abgebrochen...
   取消扫描: Suche abbrechen
   启动中: Wird gestartet
-  ? "实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。\n用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效"
-  : "Experimentelle Funktion: Viele Skripte laufen in diesem Modus noch nicht durch; Störungsmeldungen hierzu werden nicht bearbeitet.\nErfasst Bilder über Windows Graphics Capture, sodass das Spielfenster auch verdeckt erfasst werden kann; bei minimiertem Fenster jedoch kein Bild. Gilt nur für diese Sitzung"
-  ? "局域网内未发现可连接的 ADB 设备。\n\n请确认：\n1. 设备与电脑在同一局域网\n2. 设备已开启无线调试（开发者选项）\n3. 多网卡时可在下拉框改选目标网段，或改用本地扫描"
-  : "Kein verbindbares ADB-Gerät im LAN gefunden.\n\nBitte prüfen:\n1. Das Gerät befindet sich im selben LAN wie dieser PC\n2. Kabelloses Debugging ist auf dem Gerät aktiviert (Entwickleroptionen)\n3. Bei mehreren Netzwerkkarten im Auswahlfeld das Zielsubnetz wählen oder lokale Suche nutzen"
+  "实验性功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。\n用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；窗口最小化时仍然拿不到画面。仅本次运行期间生效": "Experimentelle Funktion: Viele Skripte laufen in diesem Modus noch nicht durch; Störungsmeldungen hierzu werden nicht bearbeitet.\nErfasst Bilder über Windows Graphics Capture, sodass das Spielfenster auch verdeckt erfasst werden kann; bei minimiertem Fenster jedoch kein Bild. Gilt nur für diese Sitzung"
+  "局域网内未发现可连接的 ADB 设备。\n\n请确认：\n1. 设备与电脑在同一局域网\n2. 设备已开启无线调试（开发者选项）\n3. 多网卡时可在下拉框改选目标网段，或改用本地扫描": "Kein verbindbares ADB-Gerät im LAN gefunden.\n\nBitte prüfen:\n1. Das Gerät befindet sich im selben LAN wie dieser PC\n2. Kabelloses Debugging ist auf dem Gerät aktiviert (Entwickleroptionen)\n3. Bei mehreren Netzwerkkarten im Auswahlfeld das Zielsubnetz wählen oder lokale Suche nutzen"
   已刷新窗口位置: Fensterposition aktualisiert
   已取消扫描: Suche abgebrochen
   已扫描窗口 | 请下拉选择目标窗口并点击定位: Fenster durchsucht | Bitte Zielfenster auswählen und auf Lokalisieren klicken
@@ -2252,8 +2207,7 @@ window_ops:
   未发现设备 | 请确认模拟器已启动: Keine Geräte gefunden | Bitte prüfen, ob der Emulator läuft
   未发现设备 | 请确认设备已开启无线调试: Keine Geräte gefunden | Bitte prüfen, ob kabelloses Debugging aktiviert ist
   未定位窗口 | 未找到可见窗口: Fenster nicht lokalisiert | Kein sichtbares Fenster gefunden
-  ? "本机未发现开放的模拟器 ADB 端口。\n\n请确认：\n1. 模拟器已启动\n2. 模拟器已开启 ADB 调试"
-  : "Keine offenen Emulator-ADB-Ports auf diesem PC gefunden.\n\nBitte prüfen:\n1. Der Emulator läuft\n2. ADB-Debugging ist im Emulator aktiviert"
+  "本机未发现开放的模拟器 ADB 端口。\n\n请确认：\n1. 模拟器已启动\n2. 模拟器已开启 ADB 调试": "Keine offenen Emulator-ADB-Ports auf diesem PC gefunden.\n\nBitte prüfen:\n1. Der Emulator läuft\n2. ADB-Debugging ist im Emulator aktiviert"
   正在取消扫描...: Suche wird abgebrochen...
   正在扫描局域网...: LAN wird durchsucht...
   正在扫描本机模拟器...: Lokale Emulatoren werden gesucht...

@@ -1,8 +1,6 @@
 common:
   btn_save: Enregistrer
-  placeholder: 'Le résultat enregistré s''affichera ici (coordonnées normalisées du canevas, enregistrable en .wf)
-
-    La basse précision crée des commandes modifiables ; la haute précision enregistre la trace brute ; F9/F10/F11/F12 sont ignorées'
+  "placeholder": "Le résultat enregistré s'affichera ici (coordonnées normalisées du canevas, enregistrable en .wf)\nLa basse précision crée des commandes modifiables ; la haute précision enregistre la trace brute ; F9/F10/F11/F12 sont ignorées"
   title: Configuration des scripts
   上移: Monter
   下移: Descendre
@@ -27,12 +25,7 @@ scripts:
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} est un script système. Pour le modifier, faites un clic droit dans l''arborescence et choisissez « Copier en local pour modifier ».'
   ■ 停止录制: ■ Arrêter l'enregistrement
   ● 录制脚本: ● Enregistrer un script
-  ? '⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：
-
-    '
-  : '⚠ Métadonnées du script non reconnues ; ce script n''apparaîtra pas dans la liste d''exécution :
-
-    '
+  "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n": "⚠ Métadonnées du script non reconnues ; ce script n'apparaîtra pas dans la liste d'exécution :\n"
   上移选项: Monter l'option
   下移选项: Descendre l'option
   不会被录制: Ne sera pas enregistré
@@ -96,12 +89,7 @@ scripts:
   属性单元准备工作流: Workflow de préparation d'unité d'attribut
   工作流运行中，无法录制: Un workflow est en cours d'exécution ; impossible d'enregistrer
   左侧选择脚本，或点「新建」: Sélectionnez un script à gauche ou cliquez sur « Nouveau »
-  ? '已保存 {path}，但校验未通过：
-
-    '
-  : '{path} enregistré, mais la validation a échoué :
-
-    '
+  "已保存 {path}，但校验未通过：\n": "{path} enregistré, mais la validation a échoué :\n"
   已保存 {path}，语法与布局引用校验通过: '{path} enregistré ; validation syntaxique et des références de mise en page réussie'
   已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: 'Écrit à l''emplacement cible, mais impossible de supprimer le fichier d''origine : {error}. Vérifiez les deux scripts.'
   已写入编辑区域；请在编辑器中保存脚本: Écrit dans l'éditeur ; enregistrez le script dans l'éditeur
@@ -126,12 +114,7 @@ scripts:
   录制结束，可编辑后保存为 .wf: Enregistrement terminé ; modifiez puis enregistrez en .wf
   录制结束，未捕获到有效操作: Enregistrement terminé ; aucune action valide capturée
   录制结果: Résultat de l'enregistrement
-  ? '录制结果尚未写入开始录制时的脚本。
-
-    切换脚本将清除这份录制结果，是否继续？'
-  : 'L''enregistrement n''a pas encore été écrit dans le script d''origine.
-
-    Changer de script effacera cet enregistrement. Continuer ?'
+  "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？": "L'enregistrement n'a pas encore été écrit dans le script d'origine.\nChanger de script effacera cet enregistrement. Continuer ?"
   录制轨迹引用超出工作流目录：{ref}: 'La référence de trace d''enregistrement sort du dossier workflows : {ref}'
   录制鼠标移动: Enregistrer les mouvements de souris
   待机 | 点击「录制脚本」: En veille | Cliquez sur « Enregistrer un script »
@@ -145,12 +128,7 @@ scripts:
   找不到该函数: Fonction introuvable
   找不到过程 {name} 的定义: Définition du processus {name} introuvable
   把录制结果按语句插入代码编辑器的光标处: Insère le résultat de l'enregistrement sous forme d'instructions à la position du curseur dans l'éditeur
-  ? '把系统脚本 {name} 复制到本地后才能修改。
-
-    复制之后这个文件不再跟随系统更新，确定？'
-  : 'Le script système {name} doit être copié en local avant modification.
-
-    Après copie, ce fichier ne suivra plus les mises à jour système. Continuer ?'
+  "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？": "Le script système {name} doit être copié en local avant modification.\nAprès copie, ce fichier ne suivra plus les mises à jour système. Continuer ?"
   指令: Commande
   插件: Extensions
   插入到脚本: Insérer dans le script

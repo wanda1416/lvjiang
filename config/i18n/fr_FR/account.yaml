@@ -3,8 +3,7 @@ account_dialog:
   下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Les données des utilisateurs suivants suivront l''instantané cloud ; les données locales seront écrasées :'
   下行: Téléchargement
   云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: 'La base de référence cloud est vide.<br>Source : {origin}<br>Heure : {created}<br>Entrées : 0<br><br>Continuer remplira la base à partir de la vue d''ensemble actuelle de cette machine ; les utilisateurs locaux ne seront ni sauvegardés ni remplacés.'
-  ? 云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。
-  : 'Un instantané cloud existe déjà.<br>Source : {origin}<br>Heure : {created}<br>Entrées : {count}{warning}<br><br>Continuer sauvegardera d''abord les utilisateurs locaux, les définitions et les données de vue d''ensemble dans config/session/_backup-*, puis récupérera les données du cloud.'
+  "云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。": "Un instantané cloud existe déjà.<br>Source : {origin}<br>Heure : {created}<br>Entrées : {count}{warning}<br><br>Continuer sauvegardera d'abord les utilisateurs locaux, les définitions et les données de vue d'ensemble dans config/session/_backup-*, puis récupérera les données du cloud."
   修改密码: Modifier le mot de passe
   修改密码…: Modification du mot de passe…
   创建快照: Créer un instantané
@@ -13,23 +12,13 @@ account_dialog:
   在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号: 'Ouvrir la page libre-service dans un navigateur : modifier le mot de passe, exporter les données, effacer les données cloud, supprimer le compte'
   定义: Définitions
   密码: Mot de passe
-  ? '将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。
-
-    此操作不可恢复；本地数据不会被删除。'
-  : 'Cette opération efface les définitions, utilisateurs, documents et données de vue d''ensemble sur le cloud (le compte et la session restent conservés).
-
-    Cette action est irréversible ; les données locales ne sont pas supprimées.'
+  "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。": "Cette opération efface les définitions, utilisateurs, documents et données de vue d'ensemble sur le cloud (le compte et la session restent conservés).\nCette action est irréversible ; les données locales ne sont pas supprimées."
   已取消覆盖：本机数据未改动，profile 同步未启用。: 'Écrasement annulé : les données locales sont inchangées et la synchronisation du profil n''est pas activée.'
   平台: Plateforme
   当前密码: Mot de passe actuel
   当前设备不是初始同步设备: Cet appareil n'est pas l'appareil de synchronisation initiale
   总览: Vue d'ensemble
-  ? '把本机当前全部角色数据上传为云端总览基线。
-
-    初始同步会自动创建一次；之后需要时手动点。'
-  : 'Envoyer toutes les données locales des personnages comme base de référence cloud.
-
-    La synchronisation initiale en crée une automatiquement ; cliquez manuellement plus tard si besoin.'
+  "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。": "Envoyer toutes les données locales des personnages comme base de référence cloud.\nLa synchronisation initiale en crée une automatiquement ; cliquez manuellement plus tard si besoin."
   操作未完成: Opération incomplète
   数据同步: Synchronisation des données
   文档: Documentation
@@ -71,12 +60,7 @@ account_dialog:
   退出登录: Se déconnecter
   通道: Canal
   隐藏密码: Masquer le mot de passe
-  ? '首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地
-
-    用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。'
-  : 'Première utilisation : établit la synchronisation entre cet appareil et le cloud. Si le cloud contient déjà des données, les
-
-    utilisateurs, définitions et données de vue d''ensemble locaux sont sauvegardés dans config/session/_backup-* avant la récupération.'
+  "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。": "Première utilisation : établit la synchronisation entre cet appareil et le cloud. Si le cloud contient déjà des données, les\nutilisateurs, définitions et données de vue d'ensemble locaux sont sauvegardés dans config/session/_backup-* avant la récupération."
   ；等 {} 项: ' ; et {} autres éléments'
   已恢复每分钟自动同步: Synchronisation automatique toutes les minutes reprise
   已暂停自动同步；手动「立即同步」仍可用: Synchronisation automatique en pause ; « Synchroniser maintenant » reste disponible

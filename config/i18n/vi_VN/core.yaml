@@ -11,8 +11,7 @@ action_catalog:
 apk_release:
   "下载 {url} 失败：{err}": "Tải {url} thất bại: {err}"
   下载已取消: Đã hủy tải xuống
-  ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
-  : "Mã kiểm tra không khớp, tệp có thể bị hỏng hoặc bị chỉnh sửa\nKỳ vọng {want}\nThực tế {got}"
+  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "Mã kiểm tra không khớp, tệp có thể bị hỏng hoặc bị chỉnh sửa\nKỳ vọng {want}\nThực tế {got}"
 batch_report:
   "## 汇总": "## Tổng hợp"
   成功: Thành công

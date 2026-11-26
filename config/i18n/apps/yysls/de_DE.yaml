@@ -41,19 +41,14 @@ yysls:
   草稿／要求未满足: Entwurf / Anforderungen nicht erfüllt
   当前等级无可用位置: Keine Position auf dieser Stufe
   无法分配，请调整词条数量: Zuweisung nicht möglich; bitte Affix-Anzahl anpassen
-  从备战方案进入可加载角色基础属性并计算毕业率: Über ein Ausrüstungsset öffnen, um Charakter-Grundwerte
-    zu laden und die Abschlussrate zu berechnen
-  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: Deaktivieren, um normale Maximalwerte zu nutzen; Grundwerte
-    und Einstimmung richten sich nach der gewählten Stufe
-  装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: Die Verteilung priorisiert Gültigkeit
-    und bestehende Positionen, nicht die global optimale Abschlussrate. Beim Speichern
-    werden aktuelle Ausrüstung und Grundwerte nicht geändert.
+  "从备战方案进入可加载角色基础属性并计算毕业率": "Über ein Ausrüstungsset öffnen, um Charakter-Grundwerte zu laden und die Abschlussrate zu berechnen"
+  "取消后按普通词条满值计算；装备基础属性和定音仍按所选等级": "Deaktivieren, um normale Maximalwerte zu nutzen; Grundwerte und Einstimmung richten sich nach der gewählten Stufe"
+  "装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。": "Die Verteilung priorisiert Gültigkeit und bestehende Positionen, nicht die global optimale Abschlussrate. Beim Speichern werden aktuelle Ausrüstung und Grundwerte nicht geändert."
   未保存的修改: Ungespeicherte Änderungen
   放弃当前出装搭配的未保存修改？: Ungespeicherte Änderungen an diesem Build verwerfen?
   当前用户: Aktueller Nutzer
   角色基础属性: Charakter-Grundwerte
-  系统预设不能删除，请复制后编辑: Systemvorlagen können nicht gelöscht werden; zum Bearbeiten bitte
-    kopieren
+  "系统预设不能删除，请复制后编辑": "Systemvorlagen können nicht gelöscht werden; zum Bearbeiten bitte kopieren"
   请先选择当前用户和备战方案: Bitte zuerst Nutzer und Ausrüstungsset auswählen
   无法打开模拟计算器: Build-Rechner kann nicht geöffnet werden
   请先删除该玩法下的出装搭配：{builds}: 'Bitte zuerst die Builds dieses Spielstils löschen: {builds}'
@@ -66,8 +61,7 @@ yysls:
   对单位增伤: Ziel-Schadensbonus
   不需要增伤: Kein Schadensbonus erforderlich
   无特定定音: Keine bestimmte Einstimmung
-  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: Boni für alle Kampfkünste, mystische Künste und Ziele dienen
-    nur zur Spielstilbeschreibung ⓘ
+  "全武学、奇术、对单位增伤仅作玩法说明 ⓘ": "Boni für alle Kampfkünste, mystische Künste und Ziele dienen nur zur Spielstilbeschreibung ⓘ"
   调律管理: Abstimmungsverwaltung
   当前任务: Aktuelle Aufgabe
   历史记录: Verlauf
@@ -78,9 +72,7 @@ yysls:
   删除记录: Eintrag löschen
   删除调律记录: Abstimmungseintrag löschen
   删除调律记录失败: Abstimmungseintrag konnte nicht gelöscht werden
-  确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。: Abstimmungslauf vom {time} samt
-    aller Ausrüstungsdetails wirklich löschen? Nicht gemeldete Statistikeinträge werden
-    ebenfalls gelöscht; dies kann nicht rückgängig gemacht werden.
+  "确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。": "Abstimmungslauf vom {time} samt aller Ausrüstungsdetails wirklich löschen? Nicht gemeldete Statistikeinträge werden ebenfalls gelöscht; dies kann nicht rückgängig gemacht werden."
   开始时间: Startzeit
   状态: Status
   已锁定: Gesperrt
@@ -101,17 +93,12 @@ yysls:
   默认规则: Standardregeln
   调律记录详情: Details zum Abstimmungslauf
   当前正在运行任务: Aktuell laufende Aufgabe
-  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: Verlauf
-    {runs}× · Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen
-    {skipped} · Zurückgesetzt {reset}
-  处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: Verarbeitet
-    {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} ·
-    Zurückgesetzt {reset}
+  "历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}": "Verlauf {runs}× · Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} · Zurückgesetzt {reset}"
+  "处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}": "Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} · Zurückgesetzt {reset}"
   已跳过: Übersprungen
   跳过 {count}: Übersprungen {count}
   首饰: Schmuck
-  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type}
-    · Lv{level} · {quality} · {rounds} Runden · {rating}'
+  "{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}": "{slot} · {type} · Lv{level} · {quality} · {rounds} Runden · {rating}"
   全部结果: Alle Ergebnisse
   共 {count} 件: Gesamt {count}
   卡片始终按处理顺序展示: Karten werden stets in Verarbeitungsreihenfolge angezeigt
@@ -137,69 +124,49 @@ yysls:
   等阶名称: Rangname
   添加名称: Name hinzufügen
   格式错误: Ungültiges Format
-  请一次添加一个名称，无需使用逗号分隔。: Bitte jeweils nur einen Namen hinzufügen; Kommas sind nicht
-    nötig.
+  "请一次添加一个名称，无需使用逗号分隔。": "Bitte jeweils nur einen Namen hinzufügen; Kommas sind nicht nötig."
   名称不能重复。: Namen dürfen nicht doppelt vorkommen.
   名称不能为空。: Name darf nicht leer sein.
   双击名称或按 F2 可编辑: Zum Bearbeiten doppelklicken oder F2 drücken
-  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: Rangnamen je Ausrüstungsstufe
-    konfigurieren, um Namen zu prüfen und die Ursprungsstufe zu erkennen; Chengyin
-    ändert den Rangnamen nicht, bei fehlender Zuordnung ist die Ursprungsstufe 0.
+  "配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。": "Rangnamen je Ausrüstungsstufe konfigurieren, um Namen zu prüfen und die Ursprungsstufe zu erkennen; Chengyin ändert den Rangnamen nicht, bei fehlender Zuordnung ist die Ursprungsstufe 0."
   承音后转律: Umwandlung nach Chengyin
   原始等级: Ursprungsstufe
   冷却时间: Abklingzeit
   养成: Entwicklung
   养成扫描装备: Gescannte Ausrüstung entwickeln
   记录扫描装备的转律、承音或培养: Umwandlung, Chengyin oder Aufwertung gescannter Ausrüstung erfassen
-  扫描装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Feste Eigenschaften gescannter Ausrüstung sind
-    schreibgeschützt · Nur Umwandlung, Chengyin und Affix-Aufwertung werden unterstützt
+  "扫描装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养": "Feste Eigenschaften gescannter Ausrüstung sind schreibgeschützt · Nur Umwandlung, Chengyin und Affix-Aufwertung werden unterstützt"
   此装备没有可培养的定音词条: Diese Ausrüstung hat kein aufwertbares Einstimmungsaffix
-  当前装备不支持继续承音，或没有更高的已配置等级: Diese Ausrüstung kann nicht weiter per Chengyin aufgewertet
-    werden oder es existiert keine höhere konfigurierte Stufe
+  "当前装备不支持继续承音，或没有更高的已配置等级": "Diese Ausrüstung kann nicht weiter per Chengyin aufgewertet werden oder es existiert keine höhere konfigurierte Stufe"
   培养只能提高词条数值，不能降低: Aufwertung kann Affix-Werte nur erhöhen, nicht senken
   一次转律只能修改一个词条: Pro Umwandlung kann nur ein Affix geändert werden
   宫为首词条，不能转律: Das erste Affix kann nicht umgewandelt werden
-  已有转律词条时，只能继续转律原固定槽位: Bei vorhandenem Umwandlungsaffix darf nur derselbe feste Platz
-    weiter umgewandelt werden
+  "已有转律词条时，只能继续转律原固定槽位": "Bei vorhandenem Umwandlungsaffix darf nur derselbe feste Platz weiter umgewandelt werden"
   承音只能提升到下一个已配置等级: Chengyin kann nur auf die nächste konfigurierte Stufe aufwerten
   承音状态不能撤销: Der Chengyin-Status kann nicht rückgängig gemacht werden
   未对装备进行任何养成修改: Keine Entwicklungsänderungen an der Ausrüstung vorgenommen
   装备养成: Ausrüstungsentwicklung
-  配置跨等级、跨装备类型共用的游戏规则。: Spielregeln konfigurieren, die stufen- und typübergreifend
-    gelten.
+  "配置跨等级、跨装备类型共用的游戏规则。": "Spielregeln konfigurieren, die stufen- und typübergreifend gelten."
   '冷却时间:': 'Abklingzeit:'
   扫描装备发生转律后的冷却天数: Abklingtage nach Umwandlung gescannter Ausrüstung
   冷却到期后累计一次: Eine abgelaufene Zurücksetzung ansammeln
   '逾期进度:': 'Überfälliger Fortschritt:'
-  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: Überfällige Zeit verkürzt die nächste Abklingzeit; höchstens
-    eine Zurücksetzung wird angesammelt
+  "逾期时间会抵扣下一轮冷却，最多保留一次可重置次数": "Überfällige Zeit verkürzt die nächste Abklingzeit; höchstens eine Zurücksetzung wird angesammelt"
   '传律石提升:': 'Chuanlv-Stein-Zuwachs:'
-  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: Eine Umwandlung erhöht
-    ein einzelnes Affix um diesen Prozentsatz seines normalen Maximalwerts auf aktueller
-    Stufe. Unter „Entwicklung“ wird damit geschätzt, wie viele Chuanlv-Steine bis
-    zum Chengyin-Maximum fehlen.
-  当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）: Für das Chengyin-Maximum dieser Ausrüstung
-    werden {count} Chuanlv-Steine benötigt (Chengyin-Obergrenze Stufe {level})
-  当前装备承音词条已满，无需传律石（{level} 阶承音上限）: Die Chengyin-Affixe dieser Ausrüstung sind bereits
-    voll, keine Chuanlv-Steine nötig (Chengyin-Obergrenze Stufe {level})
+  "一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。": "Eine Umwandlung erhöht ein einzelnes Affix um diesen Prozentsatz seines normalen Maximalwerts auf aktueller Stufe. Unter „Entwicklung“ wird damit geschätzt, wie viele Chuanlv-Steine bis zum Chengyin-Maximum fehlen."
+  "当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）": "Für das Chengyin-Maximum dieser Ausrüstung werden {count} Chuanlv-Steine benötigt (Chengyin-Obergrenze Stufe {level})"
+  "当前装备承音词条已满，无需传律石（{level} 阶承音上限）": "Die Chengyin-Affixe dieser Ausrüstung sind bereits voll, keine Chuanlv-Steine nötig (Chengyin-Obergrenze Stufe {level})"
   按 {level} 阶承音上限估算：: 'Schätzung nach Chengyin-Obergrenze Stufe {level}:'
-  勾选表示该装备已承音；承音后词条数值上限变为承音上限: Aktiviert bedeutet, dass diese Ausrüstung Chengyin hat;
-    Affix-Obergrenzen richten sich dann nach der Chengyin-Obergrenze
-  该装备已经承音，承音状态不能撤销: Diese Ausrüstung hat bereits Chengyin; der Status kann nicht rückgängig
-    gemacht werden
-  已承音，可继续承音到 {level} 阶（用等级下拉）: Bereits Chengyin; weitere Chengyin-Aufwertung bis Stufe
-    {level} möglich (über Stufenauswahl)
-  勾选后按 {level} 阶承音上限记录: Bei Aktivierung wird nach der Chengyin-Obergrenze Stufe {level}
-    erfasst
-  可切换到该装备的承音目标等级，查看对应等级的词条上限与传律石: Auf die Chengyin-Zielstufe wechseln, um dortige
-    Affix-Obergrenzen und Chuanlv-Steine anzuzeigen
+  "勾选表示该装备已承音；承音后词条数值上限变为承音上限": "Aktiviert bedeutet, dass diese Ausrüstung Chengyin hat; Affix-Obergrenzen richten sich dann nach der Chengyin-Obergrenze"
+  "该装备已经承音，承音状态不能撤销": "Diese Ausrüstung hat bereits Chengyin; der Status kann nicht rückgängig gemacht werden"
+  "已承音，可继续承音到 {level} 阶（用等级下拉）": "Bereits Chengyin; weitere Chengyin-Aufwertung bis Stufe {level} möglich (über Stufenauswahl)"
+  "勾选后按 {level} 阶承音上限记录": "Bei Aktivierung wird nach der Chengyin-Obergrenze Stufe {level} erfasst"
+  "可切换到该装备的承音目标等级，查看对应等级的词条上限与传律石": "Auf die Chengyin-Zielstufe wechseln, um dortige Affix-Obergrenzen und Chuanlv-Steine anzuzeigen"
   该装备没有其它可承音到的等级: Diese Ausrüstung hat keine weitere Chengyin-Zielstufe
   没有可估算的承音词条: Keine schätzbaren Chengyin-Affixe vorhanden
   '{name}：已满（{value} / {target}）': '{name}: voll ({value} / {target})'
-  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}: {stones} Stk. ({value}
-    → {target}, +{step} pro Stein)'
-  无法估算（缺少该等级上限配置）：{names}: 'Schätzung nicht möglich (Obergrenze für diese Stufe fehlt):
-    {names}'
+  "{name}：{stones} 个（{value} → {target}，每石 +{step}）": "{name}: {stones} Stk. ({value} → {target}, +{step} pro Stein)"
+  "无法估算（缺少该等级上限配置）：{names}": "Schätzung nicht möglich (Obergrenze für diese Stufe fehlt): {names}"
   冷却装备: Ausrüstung in Abklingzeit
   用户名: Nutzername
   冷却倒计时: Abklingzeit-Countdown
@@ -211,26 +178,21 @@ yysls:
   删除筛选装备: Gefilterte löschen
   删除背包装备确认: Löschen von Rucksackausrüstung bestätigen
   假设视图: Annahmeansicht
-  在原始装备与应用当前计算假设后的内存副本之间切换: Zwischen Originalausrüstung und Speicherkopie mit angewendeten
-    Berechnungsannahmen umschalten
+  "在原始装备与应用当前计算假设后的内存副本之间切换": "Zwischen Originalausrüstung und Speicherkopie mit angewendeten Berechnungsannahmen umschalten"
   卡片显示应用假设后的内存副本: Karten zeigen Speicherkopien mit angewendeten Annahmen
-  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}: 'Bogen-Set: {gongjue} · {n} Stk. · {change}
-    · {view}'
+  "弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}": "Bogen-Set: {gongjue} · {n} Stk. · {change} · {view}"
   主武: Hauptwaffe
   副武: Nebenwaffe
-  删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备: Aktuelle Filterergebnisse löschen, ohne angelegte
-    Ausrüstung; bei Typ „Alle“ ohne simulierte Ausrüstung
+  "删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备": "Aktuelle Filterergebnisse löschen, ohne angelegte Ausrüstung; bei Typ „Alle“ ohne simulierte Ausrüstung"
   不含模拟装备: ohne simulierte Ausrüstung
-  当前筛选条件下没有可删除的未穿戴装备: Unter den aktuellen Filtern gibt es keine löschbare, nicht angelegte
-    Ausrüstung
+  "当前筛选条件下没有可删除的未穿戴装备": "Unter den aktuellen Filtern gibt es keine löschbare, nicht angelegte Ausrüstung"
   当前筛选条件下没有可删除的背包装备: Unter den aktuellen Filtern gibt es keine löschbare Rucksackausrüstung
   模拟装备: Simulierte Ausrüstung
   删除全部模拟装备: Alle simulierte Ausrüstung löschen
   确定删除当前用户的全部模拟装备吗？: Wirklich alle simulierte Ausrüstung des aktuellen Nutzers löschen?
   删除完成: Löschung abgeschlossen
   已删除 {count} 件模拟装备。: '{count} simulierte Ausrüstungsteile gelöscht.'
-  确定删除当前筛选出的 {count} 件未穿戴装备吗？: Wirklich die {count} gefilterten, nicht angelegten
-    Ausrüstungsteile löschen?
+  "确定删除当前筛选出的 {count} 件未穿戴装备吗？": "Wirklich die {count} gefilterten, nicht angelegten Ausrüstungsteile löschen?"
   当前筛选条件: Aktuelle Filter
   此操作不可撤销。: Diese Aktion kann nicht rückgängig gemacht werden.
   剩余时间: Verbleibende Zeit
@@ -238,8 +200,7 @@ yysls:
   重置冷却时间: Abklingzeit zurücksetzen
   装备冷却时间已到: Abklingzeit der Ausrüstung abgelaufen
   '{days} 天 {hours} 小时 {minutes} 分钟': '{days} T {hours} Std. {minutes} Min.'
-  该原始等级装备承音后是否仍允许在已转律词条上无限转律: Ob Ausrüstung dieser Ursprungsstufe nach Chengyin weiterhin
-    unbegrenzt auf dem umgewandelten Affix umgewandelt werden darf
+  "该原始等级装备承音后是否仍允许在已转律词条上无限转律": "Ob Ausrüstung dieser Ursprungsstufe nach Chengyin weiterhin unbegrenzt auf dem umgewandelten Affix umgewandelt werden darf"
   装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Namensaufbau: Rangname + Standardname | Ausrüstungsteil-Name'
   输出: Ausgabe
   攻具: Angriffsausrüstung
@@ -251,8 +212,7 @@ yysls:
   当前装备: Aktuelle Ausrüstung
   调律装备总览: Abstimmungs-Ausrüstungsübersicht
   查看当前详情_count: Aktuelle Details anzeigen ({count})
-  在独立窗口中查看本轮全部装备处理结果: Alle Ausrüstungsergebnisse dieses Laufs in einem separaten Fenster
-    anzeigen
+  "在独立窗口中查看本轮全部装备处理结果": "Alle Ausrüstungsergebnisse dieses Laufs in einem separaten Fenster anzeigen"
   处理意见: Entscheidung
   已调律: Abgestimmt
   调律后回收: Nach Abstimmung verwertet
@@ -268,13 +228,9 @@ yysls:
   跳过实际调律: Tatsächliche Abstimmung überspringen
   运行时校验缓存: Cache zur Laufzeit prüfen
   检查大律准石>=: Große Abstimmungssteine prüfen >=
-  启用后_首次识别数量低于设定值时要求人工确认: Wenn aktiviert, ist bei einer Erstanzahl unter diesem Wert
-    eine manuelle Bestätigung erforderlich.
-  首次识别时使用的额外大律准石数量门槛: Zusätzlicher Schwellenwert großer Abstimmungssteine für die
-    Ersterkennung.
-  启用后_每实际进入_5_件装备调律时重新读取律准石_有效读数与缓存相差超过_1_个大律准石时记录错误日志: Wenn aktiviert, werden die
-    Abstimmungssteine alle 5 tatsächlich abgestimmten Teile neu ausgelesen; weicht
-    ein gültiger Wert um mehr als 1 großen Stein vom Cache ab, wird ein Fehler protokolliert.
+  "启用后_首次识别数量低于设定值时要求人工确认": "Wenn aktiviert, ist bei einer Erstanzahl unter diesem Wert eine manuelle Bestätigung erforderlich."
+  "首次识别时使用的额外大律准石数量门槛": "Zusätzlicher Schwellenwert großer Abstimmungssteine für die Ersterkennung."
+  "启用后_每实际进入_5_件装备调律时重新读取律准石_有效读数与缓存相差超过_1_个大律准石时记录错误日志": "Wenn aktiviert, werden die Abstimmungssteine alle 5 tatsächlich abgestimmten Teile neu ausgelesen; weicht ein gültiger Wert um mehr als 1 großen Stein vom Cache ab, wird ein Fehler protokolliert."
   全局: (Global)
   未实现: (Nicht implementiert)
   F6_调律配置可新增_编辑规则组: 'F6: Abstimmungskonfig zum Hinzufügen/Bearbeiten von Regelgruppen'
@@ -286,8 +242,7 @@ yysls:
   基础规则组_{key}_不存在_拒绝启动: Basis-Regelgruppe '{key}' existiert nicht, Start abgelehnt
   基础规则_单选: 'Basisregel (Einzelauswahl):'
   开始调律_F9: Abstimmung starten (F9)
-  当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: Im aktuellen Bildraum fehlt das Ausgabefeld
-    levels/counts; Auto-Abstimmung kann nicht gestartet werden
+  "当前图库空间缺少_levels_counts_输出字段_无法启动自动调律": "Im aktuellen Bildraum fehlt das Ausgabefeld levels/counts; Auto-Abstimmung kann nicht gestartet werden"
   打开进度: Fortschritt öffnen
   指定调律: Abstimmung festlegen
   参数: Parameter
@@ -297,11 +252,8 @@ yysls:
   调试参数: 'Debug-Parameter:'
   PC_端兼容后台模式: PC-Hintergrund-Kompatibilitätsmodus
   启用位置校验遍历策略: Positionsgeprüften Durchlauf aktivieren
-  默认使用去重遍历_dedup_启用后改用位置校验遍历_positional: Standardmäßig wird Deduplizierungsdurchlauf
-    (dedup) verwendet; bei Aktivierung wird auf positionsgeprüften Durchlauf (positional)
-    umgestellt.
-  仅在_PC_端生效_关闭时继续使用更精准的拖拽滚动: Gilt nur am PC; deaktiviert bleibt das präzisere Ziehen-Scrollen
-    aktiv.
+  "默认使用去重遍历_dedup_启用后改用位置校验遍历_positional": "Standardmäßig wird Deduplizierungsdurchlauf (dedup) verwendet; bei Aktivierung wird auf positionsgeprüften Durchlauf (positional) umgestellt."
+  "仅在_PC_端生效_关闭时继续使用更精准的拖拽滚动": "Gilt nur am PC; deaktiviert bleibt das präzisere Ziehen-Scrollen aktiv."
   更多: Mehr
   未就绪: Nicht bereit
   流派规则_可多选: 'Spielstil-Regeln (Mehrfachauswahl):'
@@ -350,8 +302,7 @@ yysls:
   蓝色: Blau
   词条进度: Affix-Fortschritt
   调律状态: Abstimmungsstatus
-  调律结束{suffix}_{total}_件装备_{rounds}_轮调律: 'Abstimmung beendet{suffix}: {total} Ausrüstungsteile,
-    {rounds} Runden'
+  "调律结束{suffix}_{total}_件装备_{rounds}_轮调律": "Abstimmung beendet{suffix}: {total} Ausrüstungsteile, {rounds} Runden"
   调律进度: Abstimmungsfortschritt
   调满后回收: Nach voller Abstimmung verwerten
   轮次_0: 'Runde: 0'
@@ -363,8 +314,7 @@ yysls:
   不值得调律: Nicht lohnend abzustimmen
   值得调律: Lohnend abzustimmen
   判定: Bewerten
-  勾选表示该词条是调律过程中调出的_非扫描时已有: Aktivieren, wenn dieses Affix beim Abstimmen entstand und
-    beim Scannen noch nicht vorhanden war
+  "勾选表示该词条是调律过程中调出的_非扫描时已有": "Aktivieren, wenn dieses Affix beim Abstimmen entstand und beim Scannen noch nicht vorhanden war"
   可转律_取消后不做转律模拟: Umwandelbar (deaktivieren, um Umwandlungssimulation zu überspringen)
   品阶: 'Qualität:'
   基础规则组_{key}_不存在: Basis-Regelgruppe {key} existiert nicht
@@ -378,8 +328,7 @@ yysls:
   装备调律验证: Ausrüstungs-Abstimmungsprüfung
   词条{i}: 'Affix {i}:'
   请先在左侧启用至少一个调律规则: Bitte zuerst links mindestens eine Abstimmungsregel aktivieren
-  请勾选至少一个_待调出_词条进行模拟: Bitte mindestens ein „Noch abzustimmen“-Affix für die Simulation
-    auswählen
+  "请勾选至少一个_待调出_词条进行模拟": "Bitte mindestens ein „Noch abzustimmen“-Affix für die Simulation auswählen"
   请至少选择首词条: Bitte mindestens das erste Affix auswählen
   部位: Platz
   金色: Gold
@@ -402,8 +351,7 @@ yysls:
   删除选中: Auswahl löschen
   副武器: Nebenwaffe
   副武学: Neben-Kampfkunst
-  勾选该词条可出现的装备部位_全选_全部: Ausrüstungsplätze markieren, auf denen dieses Affix erscheinen
-    kann (Alle auswählen = Alle)
+  "勾选该词条可出现的装备部位_全选_全部": "Ausrüstungsplätze markieren, auf denen dieses Affix erscheinen kann (Alle auswählen = Alle)"
   反选: Auswahl umkehren
   定音词组: Einstimmungsbegriff
   将选中赛季上移一行: Ausgewählte Saison eine Zeile nach oben verschieben
@@ -412,22 +360,18 @@ yysls:
   将选中配置下移一行: Ausgewählte Konfiguration eine Zeile nach unten verschieben
   属性: Attribut
   提示: Hinweis
-  新增武器重启后方可参与识别_被流派配置引用的武器不可删除: Neue Waffen werden erst nach einem Neustart erkannt;
-    Waffen, die von Spielstilen referenziert werden, können nicht gelöscht werden
+  "新增武器重启后方可参与识别_被流派配置引用的武器不可删除": "Neue Waffen werden erst nach einem Neustart erkannt; Waffen, die von Spielstilen referenziert werden, können nicht gelöscht werden"
   无法删除: Löschen nicht möglich
   无法添加: Hinzufügen nicht möglich
   无法重命名: Umbenennen nicht möglich
   普通词组: Normaler Begriff
   最大值: Maximalwert
   最小值: Minimalwert
-  武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中: Waffenoptionen stammen aus den Waffentypen der
-    Ausrüstungskonfiguration. Kampfkunst-Verstärkungen wurden in die Waffentypen der
-    Ausrüstungskonfiguration verschoben.
+  "武器候选来自装备配置的武器类型_武学增效已移至装备配置的武器类型中": "Waffenoptionen stammen aus den Waffentypen der Ausrüstungskonfiguration. Kampfkunst-Verstärkungen wurden in die Waffentypen der Ausrüstungskonfiguration verschoben."
   武器名称: 'Waffenname:'
   武器类型: Waffentyp
   武器类型_{name}_已存在: Waffentyp „{name}“ existiert bereits.
-  武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Waffentyp „{name}“ wird vom Spielstil
-    {users} verwendet; bitte zuerst in der Spielstil-Konfiguration lösen.
+  "武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定": "Waffentyp „{name}“ wird vom Spielstil {users} verwendet; bitte zuerst in der Spielstil-Konfiguration lösen."
   武学增效: Kampfkunst-Verstärkung
   流派_{name}_已存在: Spielstil „{name}“ existiert bereits.
   流派名不能为空或与已有流派重名: Spielstilname darf nicht leer oder doppelt sein.
@@ -466,22 +410,17 @@ yysls:
   重复: Duplikat
   无等级配置: (Keine Stufenkonfiguration)
   全部: '- Alle -'
-  key_须为小写英文标识_字母开头_可含数字_下划线: Key muss eine kleingeschriebene Kennung sein (beginnt
-    mit Buchstabe, Ziffern/Unterstriche erlaubt)
+  "key_须为小写英文标识_字母开头_可含数字_下划线": "Key muss eine kleingeschriebene Kennung sein (beginnt mit Buchstabe, Ziffern/Unterstriche erlaubt)"
   不足时: Bei Mangel
   主增伤词条: Haupt-Schadensaffix
-  低于该等级的装备直接跳过_不进入任何判定: Ausrüstung unterhalb dieser Stufe wird direkt übersprungen
-    und nicht bewertet
+  "低于该等级的装备直接跳过_不进入任何判定": "Ausrüstung unterhalb dieser Stufe wird direkt übersprungen und nicht bewertet"
   保存失败_{e}: 'Speichern fehlgeschlagen: {e}'
-  停用后不进调律的装备一律保留_调律门槛仍生效: Deaktiviert wird Ausrüstung ohne Abstimmung stets behalten
-    (Abstimmungsschwelle gilt weiterhin)
+  "停用后不进调律的装备一律保留_调律门槛仍生效": "Deaktiviert wird Ausrüstung ohne Abstimmung stets behalten (Abstimmungsschwelle gilt weiterhin)"
   停用后按无命中默认行为执行: Deaktiviert wird das Standardverhalten ohne Treffer ausgeführt
   全部_1: Alle
-  全部未命中时取_默认判定_部位页可按部位设置: 'Bei keinem Treffer gilt die „Standardbewertung“: auf der
-    Platz-Seite je Platz einstellbar,'
+  "全部未命中时取_默认判定_部位页可按部位设置": "Bei keinem Treffer gilt die „Standardbewertung“: auf der Platz-Seite je Platz einstellbar,"
   关闭时生效: Wirksam, wenn deaktiviert
-  切换后扫描处理_材料处理_结束处理页同步对准该组: Nach dem Wechsel synchronisieren sich Scan-/Material-/Endverarbeitung
-    auf diese Gruppe,
+  "切换后扫描处理_材料处理_结束处理页同步对准该组": "Nach dem Wechsel synchronisieren sich Scan-/Material-/Endverarbeitung auf diese Gruppe,"
   删除基础规则组: Basis-Regelgruppe löschen
   删除本组: Diese Gruppe löschen
   删除本规则: Diese Regel löschen
@@ -490,17 +429,13 @@ yysls:
   删除选中规则: Ausgewählte Regel löschen
   删除选中规则组_至少保留一个: Ausgewählte Regelgruppe löschen (mindestens eine behalten)
   判定条件: Bewertungsbedingungen
-  判定顺序_垃圾_一般_优秀_顶级_命中即定档: 'Bewertungsreihenfolge: Müll → Normal → Ausgezeichnet →
-    Top, erster Treffer legt Rang fest'
+  "判定顺序_垃圾_一般_优秀_顶级_命中即定档": "Bewertungsreihenfolge: Müll → Normal → Ausgezeichnet → Top, erster Treffer legt Rang fest"
   勾选装备词条名_至少一项: 'Ausrüstungsaffix-Namen markieren (mindestens einen):'
   单件重置次数上限: Max. Zurücksetzungen pro Teil
-  双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: Spalte „Regelbeschreibung“ zum Bearbeiten doppelklicken;
-    Zeile auswählen zum Kopieren/Löschen der Regelgruppe
-  发现同时配置_动态属攻和真实属攻_建议修正: Dynamischer und echter Elementarangriff gleichzeitig konfiguriert,
-    Korrektur empfohlen
+  "双击_规则说明_列可编辑_选中一行后可复制_删除该规则组": "Spalte „Regelbeschreibung“ zum Bearbeiten doppelklicken; Zeile auswählen zum Kopieren/Löschen der Regelgruppe"
+  "发现同时配置_动态属攻和真实属攻_建议修正": "Dynamischer und echter Elementarangriff gleichzeitig konfiguriert, Korrektur empfohlen"
   可用词条库: Verfügbarer Affix-Pool
-  可用词条库为全局价值序_越靠前越优先保留与填充: Der verfügbare Affix-Pool definiert die globale Wertreihenfolge
-    (weiter vorn = höhere Priorität beim Behalten und Auffüllen);
+  "可用词条库为全局价值序_越靠前越优先保留与填充": "Der verfügbare Affix-Pool definiert die globale Wertreihenfolge (weiter vorn = höhere Priorität beim Behalten und Auffüllen);"
   可用词条库_全局_各部位词条混放: Verfügbarer Affix-Pool (global, alle Plätze gemischt)
   右键禁用: Rechtsklick zum Deaktivieren
   名字: Name
@@ -512,15 +447,12 @@ yysls:
   启用检查: Prüfung aktivieren
   启用行为表: Verhaltenstabelle aktivieren
   启用该规则: Diese Regel aktivieren
-  命中条件_预期评级属于勾选档位_全选_不限: 'Trefferbedingung: Erwartete Bewertung liegt in den markierten
-    Stufen (Alle auswählen = unbegrenzt,'
-  命中条件_首词条初始数值按方向比较该值: 'Trefferbedingung: Startwert des ersten Affixes wird nach Richtung
-    mit diesem Wert verglichen;'
+  "命中条件_预期评级属于勾选档位_全选_不限": "Trefferbedingung: Erwartete Bewertung liegt in den markierten Stufen (Alle auswählen = unbegrenzt,"
+  "命中条件_首词条初始数值按方向比较该值": "Trefferbedingung: Startwert des ersten Affixes wird nach Richtung mit diesem Wert verglichen;"
   品阶门槛: Qualitätsschwelle
   品阶门槛_覆盖: Qualitätsschwelle (Überschreibung)
   四档_垃圾_一般_优秀_顶级: 'Vier Stufen: Müll / Normal / Ausgezeichnet / Top'
-  回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0: 'Wiederholungslimit nach Verwertung: max. Anzahl
-    erneuter Feldlesungen nach Verwertung, muss > 0 sein'
+  "回收补位循环上限_回收后重读同格续处理的最大次数_必须大于_0": "Wiederholungslimit nach Verwertung: max. Anzahl erneuter Feldlesungen nach Verwertung, muss > 0 sein"
   固定标准部位_勾选有调律价值的品阶: Feste Standardplätze; lohnende Qualitätsstufen markieren;
   基础规则: Basisregel
   复制基础规则组: Basis-Regelgruppe kopieren
@@ -531,8 +463,7 @@ yysls:
   如_my_rule_小写字母_数字_下划线: z. B. my_rule (Kleinbuchstaben/Ziffern/Unterstrich)
   如_治疗_纯奶: z. B. Heilung-Vollheiler
   如_激进回收: z. B. Aggressives Verwerten
-  对装备进行第一次调律前执行一次结束处理: Endverarbeitung einmal vor der ersten Abstimmung der Ausrüstung
-    ausführen,
+  "对装备进行第一次调律前执行一次结束处理": "Endverarbeitung einmal vor der ersten Abstimmung der Ausrüstung ausführen,"
   将选中规则上移一行: Ausgewählte Regel eine Zeile nach oben verschieben
   将选中规则下移一行: Ausgewählte Regel eine Zeile nach unten verschieben
   已保存并生效_{now}: Gespeichert und aktiv ({now})
@@ -548,8 +479,7 @@ yysls:
   已禁用: Deaktiviert
   已选词条_可拖拽调整顺序: Ausgewählte Affixe (zum Sortieren ziehen)
   开关_key: Schalter-Key
-  开关_key_显示名_规则条件组_when_引用的: Schalter-Key → Anzeigename; referenziert von der when-Bedingungsgruppe
-    der Regel
+  "开关_key_显示名_规则条件组_when_引用的": "Schalter-Key → Anzeigename; referenziert von der when-Bedingungsgruppe der Regel"
   开关前提: 'Schalter-Vorbedingung:'
   开关设定: Schaltereinstellungen
   开启时生效: Wirksam, wenn aktiviert
@@ -561,24 +491,19 @@ yysls:
   新增规则组: Neue Regelgruppe
   新增调律规则: Neue Abstimmungsregel
   最大连续回收次数: Max. aufeinanderfolgende Verwertungen
-  本条规则的判定方式_传入规则_运行期勾选的规则_全部规则: 'Bewertungsmodus dieser Regel: Übergebene Regeln =
-    zur Laufzeit gewählte Regeln; Alle Regeln;'
+  "本条规则的判定方式_传入规则_运行期勾选的规则_全部规则": "Bewertungsmodus dieser Regel: Übergebene Regeln = zur Laufzeit gewählte Regeln; Alle Regeln;"
   机制说明_不可配置: Mechanikbeschreibung, nicht konfigurierbar
   材料处理: Materialverarbeitung
   条件: Bedingung
   条件组_组内全部满足方命中: Bedingungsgruppe (alle Bedingungen müssen erfüllt sein)
-  标识_key_须为小写字母开头的英文_数字_下划线: Kennungs-Key muss mit Kleinbuchstabe beginnen, danach
-    Buchstaben/Ziffern/Unterstriche
+  "标识_key_须为小写字母开头的英文_数字_下划线": "Kennungs-Key muss mit Kleinbuchstabe beginnen, danach Buchstaben/Ziffern/Unterstriche"
   标识_key: 'Kennungs-Key:'
   校验失败_未保存_{err}: 'Prüfung fehlgeschlagen (nicht gespeichert): {err}'
   次数用尽后: Wenn Versuche aufgebraucht
-  每档由若干条件组定义_组间_OR_组内_AND: 'Jede Stufe wird durch Bedingungsgruppen definiert: ODER
-    zwischen Gruppen, UND innerhalb einer Gruppe,'
+  "每档由若干条件组定义_组间_OR_组内_AND": "Jede Stufe wird durch Bedingungsgruppen definiert: ODER zwischen Gruppen, UND innerhalb einer Gruppe,"
   每轮调律开始前的行为点: 'Verhaltenspunkt vor jeder Abstimmungsrunde):'
-  每轮调律结束后的行为点_按预期评级决策: 'Verhaltenspunkt nach jeder Abstimmungsrunde): Entscheidung
-    nach erwarteter Bewertung'
-  每轮调律自上而下匹配_首条命中即生效: Jede Abstimmungsrunde prüft von oben nach unten, erster Treffer
-    greift;
+  "每轮调律结束后的行为点_按预期评级决策": "Verhaltenspunkt nach jeder Abstimmungsrunde): Entscheidung nach erwarteter Bewertung"
+  "每轮调律自上而下匹配_首条命中即生效": "Jede Abstimmungsrunde prüft von oben nach unten, erster Treffer greift;"
   流派规则: Spielstil-Regeln
   添加条件: Bedingung hinzufügen
   添加条件组: Bedingungsgruppe hinzufügen
@@ -586,10 +511,8 @@ yysls:
   添加规则: Regel hinzufügen
   狗粮添加规则: Regeln zum Futter-Hinzufügen
   玩法设定: Spielstil-Einstellungen
-  确定删除规则组_{name}_该操作不可恢复: Regelgruppe „{name}“ wirklich löschen? Diese Aktion kann
-    nicht rückgängig gemacht werden.
-  确定删除调律规则_{name}_规则文件将被删除_不可恢复: Abstimmungsregel „{name}“ wirklich löschen? Die Regeldatei
-    wird unwiderruflich gelöscht.
+  "确定删除规则组_{name}_该操作不可恢复": "Regelgruppe „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  "确定删除调律规则_{name}_规则文件将被删除_不可恢复": "Abstimmungsregel „{name}“ wirklich löschen? Die Regeldatei wird unwiderruflich gelöscht."
   禁用: Deaktivieren
   移除选中: Auswahl entfernen
   等级门槛: Stufenschwelle
@@ -599,12 +522,10 @@ yysls:
   自选词条: Eigene Affixe
   至少保留一个规则组: Mindestens eine Regelgruppe behalten
   装备评级: Ausrüstungsbewertung
-  规则变更即校验_校验通过自动保存并生效: Regeländerungen werden sofort geprüft und bei Erfolg automatisch
-    gespeichert
+  "规则变更即校验_校验通过自动保存并生效": "Regeländerungen werden sofort geprüft und bei Erfolg automatisch gespeichert"
   规则名称不能为空: Regelname darf nicht leer sein
   规则名称: 'Regelname:'
-  规则命中重置但次数已用尽_按钮文本读不到数字: Regel traf Zurücksetzung, aber Versuche aufgebraucht (Schaltflächentext
-    ohne lesbare Zahl)
+  "规则命中重置但次数已用尽_按钮文本读不到数字": "Regel traf Zurücksetzung, aber Versuche aufgebraucht (Schaltflächentext ohne lesbare Zahl)"
   规则已禁用_右键启用: Regel deaktiviert; Rechtsklick zum Aktivieren
   规则组名: Regelgruppenname
   规则组名称不能为空: Regelgruppenname darf nicht leer sein
@@ -612,8 +533,7 @@ yysls:
   规则说明: Regelbeschreibung
   规则说明已保存_{key}: Regelbeschreibung gespeichert ({key})
   设置启用状态失败_{e}: 'Aktivierungsstatus konnte nicht gesetzt werden: {e}'
-  询问是否继续_弹窗确认_继续则本次运行不再检查: 'Nachfragen: Bestätigungsdialog; bei Fortsetzen keine weitere
-    Prüfung in diesem Lauf'
+  "询问是否继续_弹窗确认_继续则本次运行不再检查": "Nachfragen: Bestätigungsdialog; bei Fortsetzen keine weitere Prüfung in diesem Lauf"
   请先在列表中选中要删除的规则组: Bitte zuerst die zu löschende Regelgruppe in der Liste auswählen
   请先在列表中选中要复制的规则组: Bitte zuerst die zu kopierende Regelgruppe in der Liste auswählen
   请先选中要删除的规则行: Bitte zuerst die zu löschende Regelzeile auswählen
@@ -621,8 +541,7 @@ yysls:
   调律门槛: Abstimmungsschwelle
   转律词条库: Umwandlungs-Affix-Pool
   转律词条库_全局_优先级从高到低: Umwandlungs-Affix-Pool (global, Priorität von hoch nach niedrig)
-  进调律前的行为点_未达调律门槛的装备: 'Verhaltenspunkt vor dem Abstimmen): Ausrüstung unterhalb der
-    Abstimmungsschwelle'
+  "进调律前的行为点_未达调律门槛的装备": "Verhaltenspunkt vor dem Abstimmen): Ausrüstung unterhalb der Abstimmungsschwelle"
   选择{title}词条: '{title}-Affix auswählen'
   选择条件词条: Bedingungsaffix auswählen
   选择词条: Affix auswählen
@@ -632,15 +551,13 @@ yysls:
   重命名失败_{e}: 'Umbenennen fehlgeschlagen: {e}'
   重命名规则: Regel umbenennen
   重命名规则_key: Regel-Key umbenennen
-  预期评级_该档即进入调律_固定用传入规则判定: Bei erwarteter Bewertung ≥ dieser Stufe abstimmen (nutzt
-    fest die übergebenen Regeln)
+  "预期评级_该档即进入调律_固定用传入规则判定": "Bei erwarteter Bewertung ≥ dieser Stufe abstimmen (nutzt fest die übergebenen Regeln)"
   预期评级识别使用勾选的流派规则: 'Erwartete Bewertung nutzt markierte Spielstil-Regeln:'
   首词条: Erstes Affix
   首词条初始数值比较方向: Vergleichsrichtung des Startwerts des ersten Affixes
   默认判定: Standardbewertung
   默认判定_1: 'Standardbewertung:'
-  仅列出的部位覆盖全局默认_未列部位沿用基础配置: (Nur gelistete Plätze überschreiben globale Standards;
-    übrige folgen der Basiskonfiguration)
+  "仅列出的部位覆盖全局默认_未列部位沿用基础配置": "(Nur gelistete Plätze überschreiben globale Standards; übrige folgen der Basiskonfiguration)"
   双击左侧导航中的规则名可修改: (Regelname in der linken Navigation zum Umbenennen doppelklicken)
   无_恒生效: (Keine, immer aktiv)
   点击选择词条: (Klicken, um Affix auszuwählen)
@@ -654,8 +571,7 @@ yysls:
   保存失败: Speichern fehlgeschlagen
   写入冲突: Schreibkonflikt
   减少: Verringern...
-  减少后数值不能小于_0_当前值_{cur}_输入_{inp}: 'Wert nach Verringerung darf nicht unter 0 liegen
-    (aktuell: {cur}, Eingabe: {inp})'
+  "减少后数值不能小于_0_当前值_{cur}_输入_{inp}": "Wert nach Verringerung darf nicht unter 0 liegen (aktuell: {cur}, Eingabe: {inp})"
   减少量: 'Verringerung:'
   分组名不能为空: Gruppenname darf nicht leer sein
   删除分组: Gruppe löschen
@@ -673,16 +589,14 @@ yysls:
   新建分组: Neue Gruppe
   来源_用途: Quelle/Zweck
   查看历史记录: Verlauf anzeigen
-  没有可用的数据模型_key_请先在数据模型定义中添加: Keine Datenmodell-Keys verfügbar; bitte zuerst in der
-    Datenmodelldefinition anlegen
+  "没有可用的数据模型_key_请先在数据模型定义中添加": "Keine Datenmodell-Keys verfügbar; bitte zuerst in der Datenmodelldefinition anlegen"
   确定: OK
   确定要删除分组_{name}_吗: Gruppe '{name}' wirklich löschen?
   自定义增减_{label}: Eigene Änderung - {label}
   "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Aktiviert: Nach Action-Semantik verarbeiten und konfigurierte sync_targets synchronisieren.\nDeaktiviert: Nur diesen Key überschreiben, ohne Synchronisierung auszulösen."
   至少保留一个分组: Mindestens eine Gruppe behalten
   覆写_{label}: Überschreiben - {label}
-  该数值已被其他进程更新_本次增减未写入_请刷新后重试: Dieser Wert wurde von einem anderen Prozess aktualisiert;
-    Änderung nicht geschrieben. Bitte aktualisieren und erneut versuchen.
+  "该数值已被其他进程更新_本次增减未写入_请刷新后重试": "Dieser Wert wurde von einem anderen Prozess aktualisiert; Änderung nicht geschrieben. Bitte aktualisieren und erneut versuchen."
   选择字段: Feld auswählen
   错误: Fehler
   请选择: (Bitte auswählen)
@@ -764,25 +678,20 @@ yysls:
   重置日_{day}号: Reset-Tag:{day}.
   重置时刻: 'Reset-Zeit:'
   默认: Standard
-  传律石不够（持有 {held} < 要求 {need}），跳过该装备: Nicht genügend Chuanlv-Steine (Besitz {held}
-    < Bedarf {need}), diese Ausrüstung wird übersprungen
+  "传律石不够（持有 {held} < 要求 {need}），跳过该装备": "Nicht genügend Chuanlv-Steine (Besitz {held} < Bedarf {need}), diese Ausrüstung wird übersprungen"
   异常：{result}: 'Anomalie: {result}'
   无法识别重置次数: Zurücksetzungsanzahl nicht lesbar
-  无法识别重置次数，跳过该装备: Verbleibende Zurücksetzungen nicht erkennbar, diese Ausrüstung wird
-    übersprungen
+  "无法识别重置次数，跳过该装备": "Verbleibende Zurücksetzungen nicht erkennbar, diese Ausrüstung wird übersprungen"
   异常: Anomalie
   本次运行有 {n} 件装备识别异常: In diesem Lauf gab es Erkennungsanomalien bei {n} Ausrüstungsteil(en)
-  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: Verlauf
-    {runs}× · Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen
-    {skipped} · Zurückgesetzt {reset} · Anomalien {anomaly}
+  "历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}": "Verlauf {runs}× · Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} · Zurückgesetzt {reset} · Anomalien {anomaly}"
   全部评级: Alle Bewertungen
   绑定开关: Bindungsschalter
   需更换: Wechseln
   新穿戴: Neu angelegt
   已穿戴: Angelegt
   当前：{name}: 'Aktuell: {name}'
-  备战方案此部位现在穿的装备，应用组合后会被换下: Derzeit auf diesem Platz im Ausrüstungsset getragen; wird
-    beim Anwenden der Kombination ersetzt
+  "备战方案此部位现在穿的装备，应用组合后会被换下": "Derzeit auf diesem Platz im Ausrüstungsset getragen; wird beim Anwenden der Kombination ersetzt"
   计算假设：: 'Berechnungsannahmen: '
   计算假设：{text}: 'Berechnungsannahme: {text}'
   需更换 {count} 件: '{count} Teil(e) wechseln'
@@ -792,9 +701,7 @@ yysls:
   备战方案此部位当前为空: Dieser Platz ist im Ausrüstungsset derzeit leer
   需更换 {count} 件：{names}: '{count} Teil(e) wechseln: {names}'
   与当前备战方案一致，无需更换: Entspricht dem aktuellen Ausrüstungsset, kein Wechsel nötig
-  弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　卡片显示原始装备数值，计算假设标注在卡片上方: 'Bogen-Set: {gongjue}　{n}
-    Stk.　·　{change}　·　Karten zeigen Originalwerte; Berechnungsannahmen stehen über
-    jeder Karte'
+  "弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　卡片显示原始装备数值，计算假设标注在卡片上方": "Bogen-Set: {gongjue}　{n} Stk.　·　{change}　·　Karten zeigen Originalwerte; Berechnungsannahmen stehen über jeder Karte"
   全部用户: Alle Nutzer
   未选择用户: Kein Nutzer ausgewählt
   所选用户没有冷却装备: Die ausgewählten Nutzer haben keine Ausrüstung in Abklingzeit
@@ -832,18 +739,13 @@ yysls:
   '{name}攻击：{value}': '{name}-Angriff: {value}'
   '{name}伤害加成：{value}': '{name}-Schadensbonus: {value}'
   '{name}穿透：{value}': '{name}-Durchdringung: {value}'
-  菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。: Menü-Tastenkürzel gelten nur im
-    Fenster; Plugin-Menüs dürfen F5~F7 oder Alt+Buchstaben nutzen und müssen sich
-    von Allgemein/Werkzeuge unterscheiden.
+  "菜单快捷键只在窗口内生效；插件菜单可用 F5~F7 或 Alt+字母，不能与通用/工具菜单重复。": "Menü-Tastenkürzel gelten nur im Fenster; Plugin-Menüs dürfen F5~F7 oder Alt+Buchstaben nutzen und müssen sich von Allgemein/Werkzeuge unterscheiden."
   快捷键不可用：: 'Tastenkürzel nicht verfügbar: '
   装备重置冷却时间: Ausrüstungs-Zurücksetzungs-Abklingzeit
   重置二次确认时间: Zweite Bestätigungszeit beim Zurücksetzen
   重置冷却逾期进度: Überfälliger Zurücksetzungs-Abklingfortschritt
   装备培养单次提升: Einzelner Aufwertungszuwachs
-  重置调律两次确认之间的最短等待。游戏新版为 3 秒；程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。填 0 表示不做这段额外等待。: Mindestwartezeit
-    zwischen beiden Zurücksetzungsbestätigungen. Die aktuelle Spielversion nutzt 3
-    Sek.; danach wartet die App noch eine Seitenaktualisierung ab, bevor sie die zweite
-    Bestätigung klickt, damit kein leerer Klick entsteht. 0 deaktiviert diese Zusatzwartezeit.
+  "重置调律两次确认之间的最短等待。游戏新版为 3 秒；程序在此之后还会再等一次页面刷新再点二次确认，避免弹窗没出现就被点空。填 0 表示不做这段额外等待。": "Mindestwartezeit zwischen beiden Zurücksetzungsbestätigungen. Die aktuelle Spielversion nutzt 3 Sek.; danach wartet die App noch eine Seitenaktualisierung ab, bevor sie die zweite Bestätigung klickt, damit kein leerer Klick entsteht. 0 deaktiviert diese Zusatzwartezeit."
 auto_strings:
   装备词条: Ausrüstungsaffixe
   词条约束: Affix-Einschränkungen
@@ -870,18 +772,13 @@ auto_strings:
   完整且满足强制要求: Vollständig; alle Pflichtziele erfüllt
   草稿／要求未满足: Entwurf / Anforderungen nicht erfüllt
   无法分配，请调整词条数量: Zuweisung nicht möglich; bitte Affix-Anzahl anpassen
-  从备战方案进入可加载角色基础属性并计算毕业率: Über ein Ausrüstungsset öffnen, um Charakter-Grundwerte
-    zu laden und die Abschlussrate zu berechnen
-  取消后按普通词条满值计算；装备基础属性和定音仍按所选等级: Deaktivieren, um normale Maximalwerte zu nutzen; Grundwerte
-    und Einstimmung richten sich nach der gewählten Stufe
-  装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。: Die Verteilung priorisiert Gültigkeit
-    und bestehende Positionen, nicht die global optimale Abschlussrate. Beim Speichern
-    werden aktuelle Ausrüstung und Grundwerte nicht geändert.
+  "从备战方案进入可加载角色基础属性并计算毕业率": "Über ein Ausrüstungsset öffnen, um Charakter-Grundwerte zu laden und die Abschlussrate zu berechnen"
+  "取消后按普通词条满值计算；装备基础属性和定音仍按所选等级": "Deaktivieren, um normale Maximalwerte zu nutzen; Grundwerte und Einstimmung richten sich nach der gewählten Stufe"
+  "装备分布优先保证合法并保留原位置，不代表毕业率全局最优；保存不会修改当前用户装备或基础属性。": "Die Verteilung priorisiert Gültigkeit und bestehende Positionen, nicht die global optimale Abschlussrate. Beim Speichern werden aktuelle Ausrüstung und Grundwerte nicht geändert."
   未保存的修改: Ungespeicherte Änderungen
   放弃当前出装搭配的未保存修改？: Ungespeicherte Änderungen an diesem Build verwerfen?
   角色基础属性: Charakter-Grundwerte
-  系统预设不能删除，请复制后编辑: Systemvorlagen können nicht gelöscht werden; zum Bearbeiten bitte
-    kopieren
+  "系统预设不能删除，请复制后编辑": "Systemvorlagen können nicht gelöscht werden; zum Bearbeiten bitte kopieren"
   请先选择当前用户和备战方案: Bitte zuerst Nutzer und Ausrüstungsset auswählen
   无法打开模拟计算器: Build-Rechner kann nicht geöffnet werden
   请先删除该玩法下的出装搭配：{builds}: 'Bitte zuerst die Builds dieses Spielstils löschen: {builds}'
@@ -893,8 +790,7 @@ auto_strings:
   对单位增伤: Ziel-Schadensbonus
   不需要增伤: Kein Schadensbonus erforderlich
   无特定定音: Keine bestimmte Einstimmung
-  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: Boni für alle Kampfkünste, mystische Künste und Ziele dienen
-    nur zur Spielstilbeschreibung ⓘ
+  "全武学、奇术、对单位增伤仅作玩法说明 ⓘ": "Boni für alle Kampfkünste, mystische Künste und Ziele dienen nur zur Spielstilbeschreibung ⓘ"
   调律管理: Abstimmungsverwaltung
   当前任务: Aktuelle Aufgabe
   历史记录: Verlauf
@@ -905,9 +801,7 @@ auto_strings:
   删除记录: Eintrag löschen
   删除调律记录: Abstimmungseintrag löschen
   删除调律记录失败: Abstimmungseintrag konnte nicht gelöscht werden
-  确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。: Abstimmungslauf vom {time} samt
-    aller Ausrüstungsdetails wirklich löschen? Nicht gemeldete Statistikeinträge werden
-    ebenfalls gelöscht; dies kann nicht rückgängig gemacht werden.
+  "确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。": "Abstimmungslauf vom {time} samt aller Ausrüstungsdetails wirklich löschen? Nicht gemeldete Statistikeinträge werden ebenfalls gelöscht; dies kann nicht rückgängig gemacht werden."
   开始时间: Startzeit
   状态: Status
   已锁定: Gesperrt
@@ -927,14 +821,11 @@ auto_strings:
   默认规则: Standardregeln
   调律记录详情: Details zum Abstimmungslauf
   当前正在运行任务: Aktuell laufende Aufgabe
-  处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}: Verarbeitet
-    {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} ·
-    Zurückgesetzt {reset}
+  "处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}": "Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} · Zurückgesetzt {reset}"
   已跳过: Übersprungen
   跳过 {count}: Übersprungen {count}
   首饰: Schmuck
-  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type}
-    · Lv{level} · {quality} · {rounds} Runden · {rating}'
+  "{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}": "{slot} · {type} · Lv{level} · {quality} · {rounds} Runden · {rating}"
   全部结果: Alle Ergebnisse
   共 {count} 件: Gesamt {count}
   卡片始终按处理顺序展示: Karten werden stets in Verarbeitungsreihenfolge angezeigt
@@ -960,14 +851,11 @@ auto_strings:
   等阶名称: Rangname
   添加名称: Name hinzufügen
   格式错误: Ungültiges Format
-  请一次添加一个名称，无需使用逗号分隔。: Bitte jeweils nur einen Namen hinzufügen; Kommas sind nicht
-    nötig.
+  "请一次添加一个名称，无需使用逗号分隔。": "Bitte jeweils nur einen Namen hinzufügen; Kommas sind nicht nötig."
   名称不能重复。: Namen dürfen nicht doppelt vorkommen.
   名称不能为空。: Name darf nicht leer sein.
   双击名称或按 F2 可编辑: Zum Bearbeiten doppelklicken oder F2 drücken
-  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: Rangnamen je Ausrüstungsstufe
-    konfigurieren, um Namen zu prüfen und die Ursprungsstufe zu erkennen; Chengyin
-    ändert den Rangnamen nicht, bei fehlender Zuordnung ist die Ursprungsstufe 0.
+  "配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。": "Rangnamen je Ausrüstungsstufe konfigurieren, um Namen zu prüfen und die Ursprungsstufe zu erkennen; Chengyin ändert den Rangnamen nicht, bei fehlender Zuordnung ist die Ursprungsstufe 0."
   承音后转律: Umwandlung nach Chengyin
   原始等级: Ursprungsstufe
   冷却时间: Abklingzeit
@@ -978,35 +866,22 @@ auto_strings:
   承音状态不能撤销: Der Chengyin-Status kann nicht rückgängig gemacht werden
   未对装备进行任何养成修改: Keine Entwicklungsänderungen an der Ausrüstung vorgenommen
   装备养成: Ausrüstungsentwicklung
-  配置跨等级、跨装备类型共用的游戏规则。: Spielregeln konfigurieren, die stufen- und typübergreifend
-    gelten.
+  "配置跨等级、跨装备类型共用的游戏规则。": "Spielregeln konfigurieren, die stufen- und typübergreifend gelten."
   扫描装备发生转律后的冷却天数: Abklingtage nach Umwandlung gescannter Ausrüstung
   冷却到期后累计一次: Eine abgelaufene Zurücksetzung ansammeln
-  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: Überfällige Zeit verkürzt die nächste Abklingzeit; höchstens
-    eine Zurücksetzung wird angesammelt
-  一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。: Eine Umwandlung erhöht
-    ein einzelnes Affix um diesen Prozentsatz seines normalen Maximalwerts auf aktueller
-    Stufe. Unter „Entwicklung“ wird damit geschätzt, wie viele Chuanlv-Steine bis
-    zum Chengyin-Maximum fehlen.
-  当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）: Für das Chengyin-Maximum dieser Ausrüstung
-    werden {count} Chuanlv-Steine benötigt (Chengyin-Obergrenze Stufe {level})
-  当前装备承音词条已满，无需传律石（{level} 阶承音上限）: Die Chengyin-Affixe dieser Ausrüstung sind bereits
-    voll, keine Chuanlv-Steine nötig (Chengyin-Obergrenze Stufe {level})
+  "逾期时间会抵扣下一轮冷却，最多保留一次可重置次数": "Überfällige Zeit verkürzt die nächste Abklingzeit; höchstens eine Zurücksetzung wird angesammelt"
+  "一次传律只提升一条词条，增量是该词条在当前等级普通满值的这个百分比。装备「养成」里按它估算承音喂满还需要几个传律石。": "Eine Umwandlung erhöht ein einzelnes Affix um diesen Prozentsatz seines normalen Maximalwerts auf aktueller Stufe. Unter „Entwicklung“ wird damit geschätzt, wie viele Chuanlv-Steine bis zum Chengyin-Maximum fehlen."
+  "当前装备承音喂满需要 {count} 个传律石（{level} 阶承音上限）": "Für das Chengyin-Maximum dieser Ausrüstung werden {count} Chuanlv-Steine benötigt (Chengyin-Obergrenze Stufe {level})"
+  "当前装备承音词条已满，无需传律石（{level} 阶承音上限）": "Die Chengyin-Affixe dieser Ausrüstung sind bereits voll, keine Chuanlv-Steine nötig (Chengyin-Obergrenze Stufe {level})"
   按 {level} 阶承音上限估算：: 'Schätzung nach Chengyin-Obergrenze Stufe {level}:'
-  勾选表示该装备已承音；承音后词条数值上限变为承音上限: Aktiviert bedeutet, dass diese Ausrüstung Chengyin hat;
-    Affix-Obergrenzen richten sich dann nach der Chengyin-Obergrenze
-  该装备已经承音，承音状态不能撤销: Diese Ausrüstung hat bereits Chengyin; der Status kann nicht rückgängig
-    gemacht werden
-  已承音，可继续承音到 {level} 阶（用等级下拉）: Bereits Chengyin; weitere Chengyin-Aufwertung bis Stufe
-    {level} möglich (über Stufenauswahl)
-  勾选后按 {level} 阶承音上限记录: Bei Aktivierung wird nach der Chengyin-Obergrenze Stufe {level}
-    erfasst
+  "勾选表示该装备已承音；承音后词条数值上限变为承音上限": "Aktiviert bedeutet, dass diese Ausrüstung Chengyin hat; Affix-Obergrenzen richten sich dann nach der Chengyin-Obergrenze"
+  "该装备已经承音，承音状态不能撤销": "Diese Ausrüstung hat bereits Chengyin; der Status kann nicht rückgängig gemacht werden"
+  "已承音，可继续承音到 {level} 阶（用等级下拉）": "Bereits Chengyin; weitere Chengyin-Aufwertung bis Stufe {level} möglich (über Stufenauswahl)"
+  "勾选后按 {level} 阶承音上限记录": "Bei Aktivierung wird nach der Chengyin-Obergrenze Stufe {level} erfasst"
   没有可估算的承音词条: Keine schätzbaren Chengyin-Affixe vorhanden
   '{name}：已满（{value} / {target}）': '{name}: voll ({value} / {target})'
-  '{name}：{stones} 个（{value} → {target}，每石 +{step}）': '{name}: {stones} Stk. ({value}
-    → {target}, +{step} pro Stein)'
-  无法估算（缺少该等级上限配置）：{names}: 'Schätzung nicht möglich (Obergrenze für diese Stufe fehlt):
-    {names}'
+  "{name}：{stones} 个（{value} → {target}，每石 +{step}）": "{name}: {stones} Stk. ({value} → {target}, +{step} pro Stein)"
+  "无法估算（缺少该等级上限配置）：{names}": "Schätzung nicht möglich (Obergrenze für diese Stufe fehlt): {names}"
   冷却装备: Ausrüstung in Abklingzeit
   用户名: Nutzername
   冷却倒计时: Abklingzeit-Countdown
@@ -1018,8 +893,7 @@ auto_strings:
   删除筛选装备: Gefilterte löschen
   删除背包装备确认: Löschen von Rucksackausrüstung bestätigen
   假设视图: Annahmeansicht
-  在原始装备与应用当前计算假设后的内存副本之间切换: Zwischen Originalausrüstung und Speicherkopie mit angewendeten
-    Berechnungsannahmen umschalten
+  "在原始装备与应用当前计算假设后的内存副本之间切换": "Zwischen Originalausrüstung und Speicherkopie mit angewendeten Berechnungsannahmen umschalten"
   卡片显示应用假设后的内存副本: Karten zeigen Speicherkopien mit angewendeten Annahmen
   弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}: 'Bogen-Set: {gongjue}　{n} Stk.　·　{change}　·　{view}'
   主武: Hauptwaffe
@@ -1036,16 +910,14 @@ auto_strings:
   清除冷却时间: Abklingzeit löschen
   重置冷却时间: Abklingzeit zurücksetzen
   '{days} 天 {hours} 小时 {minutes} 分钟': '{days} T {hours} Std. {minutes} Min.'
-  该原始等级装备承音后是否仍允许在已转律词条上无限转律: Ob Ausrüstung dieser Ursprungsstufe nach Chengyin weiterhin
-    unbegrenzt auf dem umgewandelten Affix umgewandelt werden darf
+  "该原始等级装备承音后是否仍允许在已转律词条上无限转律": "Ob Ausrüstung dieser Ursprungsstufe nach Chengyin weiterhin unbegrenzt auf dem umgewandelten Affix umgewandelt werden darf"
   装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Namensaufbau: Rangname + Standardname | Ausrüstungsteil-Name'
   攻具: Angriffsausrüstung
   防具: Rüstung
   刷新装备数据: Ausrüstungsdaten aktualisieren
   当前装备: Aktuelle Ausrüstung
   调律装备总览: Abstimmungs-Ausrüstungsübersicht
-  在独立窗口中查看本轮全部装备处理结果: Alle Ausrüstungsergebnisse dieses Laufs in einem separaten Fenster
-    anzeigen
+  "在独立窗口中查看本轮全部装备处理结果": "Alle Ausrüstungsergebnisse dieses Laufs in einem separaten Fenster anzeigen"
   处理意见: Entscheidung
   已调律: Abgestimmt
   调律后回收: Nach Abstimmung verwertet
@@ -1256,25 +1128,20 @@ auto_strings:
   天: Tag(e)
   编辑: Bearbeiten
   默认: Standard
-  传律石不够（持有 {held} < 要求 {need}），跳过该装备: Nicht genügend Chuanlv-Steine (Besitz {held}
-    < Bedarf {need}), diese Ausrüstung wird übersprungen
+  "传律石不够（持有 {held} < 要求 {need}），跳过该装备": "Nicht genügend Chuanlv-Steine (Besitz {held} < Bedarf {need}), diese Ausrüstung wird übersprungen"
   异常：{result}: 'Anomalie: {result}'
   无法识别重置次数: Zurücksetzungsanzahl nicht lesbar
-  无法识别重置次数，跳过该装备: Verbleibende Zurücksetzungen nicht erkennbar, diese Ausrüstung wird
-    übersprungen
+  "无法识别重置次数，跳过该装备": "Verbleibende Zurücksetzungen nicht erkennbar, diese Ausrüstung wird übersprungen"
   异常: Anomalie
   本次运行有 {n} 件装备识别异常: In diesem Lauf gab es Erkennungsanomalien bei {n} Ausrüstungsteil(en)
-  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: Verlauf
-    {runs}× · Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen
-    {skipped} · Zurückgesetzt {reset} · Anomalien {anomaly}
+  "历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}": "Verlauf {runs}× · Verarbeitet {total} · Abgestimmt {tuned} · Verwertet {recycled} · Übersprungen {skipped} · Zurückgesetzt {reset} · Anomalien {anomaly}"
   全部评级: Alle Bewertungen
   绑定开关: Bindungsschalter
   需更换: Wechseln
   新穿戴: Neu angelegt
   已穿戴: Angelegt
   当前：{name}: 'Aktuell: {name}'
-  备战方案此部位现在穿的装备，应用组合后会被换下: Derzeit auf diesem Platz im Ausrüstungsset getragen; wird
-    beim Anwenden der Kombination ersetzt
+  "备战方案此部位现在穿的装备，应用组合后会被换下": "Derzeit auf diesem Platz im Ausrüstungsset getragen; wird beim Anwenden der Kombination ersetzt"
   计算假设：{text}: 'Berechnungsannahmen: {text}'
   需更换 {count} 件: '{count} Teil(e) wechseln'
   需要更换：{names}: 'Muss gewechselt werden: {names}'
@@ -1297,13 +1164,10 @@ auto_strings:
   DPS: DPS
   Excel 工作簿 (*.xlsx): Excel-Arbeitsmappe (*.xlsx)
   Excel 文件 (*.xlsx): Excel-Datei (*.xlsx)
-  '[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律': '[Hinweis] „Tatsächliche Abstimmung überspringen“
-    ist aktiv: Es wird nur das Öffnen/Verlassen der Abstimmungsseite simuliert, ohne
-    abzustimmen'
+  "[提示] 已开启「跳过实际调律」：仅模拟进出调律页，不执行调律": "[Hinweis] „Tatsächliche Abstimmung überspringen“ ist aktiv: Es wird nur das Öffnen/Verlassen der Abstimmungsseite simuliert, ohne abzustimmen"
   common_conditions 必须是 dict: common_conditions muss ein dict sein
   'playstyles: 名字不能为空': 'playstyles: Name darf nicht leer sein'
-  pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when: Der Abschnitt pvp ist veraltet; bitte
-    stattdessen das switches-Register + die Regelbedingungsgruppe when verwenden
+  "pvp 段已废弃，请改用 switches 开关注册表 + 规则条件组 when": "Der Abschnitt pvp ist veraltet; bitte stattdessen das switches-Register + die Regelbedingungsgruppe when verwenden"
   switches 必须是 dict: switches muss ein dict sein
   tune_config 顶层必须是 dict: Die oberste Ebene von tune_config muss ein dict sein
   '{count} 个可提升词条': '{count} verbesserbare Affixe'
@@ -1311,11 +1175,9 @@ auto_strings:
   '{count} 条': '{count} Einträge'
   '{label}（{unit}）': '{label} ({unit})'
   '{label}（基础值）': '{label} (Basiswert)'
-  '{name} 里没有「{sheet}」工作表，可能不是毕业率计算器': '{name} enthält kein Arbeitsblatt „{sheet}“;
-    möglicherweise kein Abschlussraten-Rechner'
+  "{name} 里没有「{sheet}」工作表，可能不是毕业率计算器": "{name} enthält kein Arbeitsblatt „{sheet}“; möglicherweise kein Abschlussraten-Rechner"
   '{name}（共{count}条，按损失最小一条）': '{name} (gesamt {count}, kleinster Verlust)'
-  '{slot}  {name} {value}  毕业率下降 {loss}': '{slot}  {name} {value}  Abschlussrate sinkt
-    um {loss}'
+  "{slot}  {name} {value}  毕业率下降 {loss}": "{slot}  {name} {value}  Abschlussrate sinkt um {loss}"
   '{slot} · {name}': '{slot} · {name}'
   '{slot} · {name}：{reasons}': '{slot} · {name}: {reasons}'
   '{slot}·{position}：{source} → {target}': '{slot}·{position}: {source} → {target}'
@@ -1324,8 +1186,7 @@ auto_strings:
   ▲ 上移: ▲ Nach oben
   ▼ 下移: ▼ Nach unten
   「{sheet}」表是空的: Das Arbeitsblatt „{sheet}“ ist leer
-  「{sheet}」表缺少必需列：{cols}: 'Dem Arbeitsblatt „{sheet}“ fehlen erforderliche Spalten:
-    {cols}'
+  "「{sheet}」表缺少必需列：{cols}": "Dem Arbeitsblatt „{sheet}“ fehlen erforderliche Spalten: {cols}"
   「{sheet}」表里没有找到任何技能行: Im Arbeitsblatt „{sheet}“ wurden keine Fertigkeitszeilen gefunden
   【复制】: '[Kopie]'
   一般: Normal
@@ -1346,15 +1207,13 @@ auto_strings:
   不限品阶: Alle Qualitäten
   不限评级: Alle Bewertungen
   不限部位: Alle Plätze
-  仅用于辅助筛选候选装备，不参与装备合法性判断: Dient nur zum Filtern von Ausrüstungskandidaten, nicht zur
-    Gültigkeitsprüfung
+  "仅用于辅助筛选候选装备，不参与装备合法性判断": "Dient nur zum Filtern von Ausrüstungskandidaten, nicht zur Gültigkeitsprüfung"
   仅紫色: Nur Violett
   仅金色: Nur Gold
   仅金装: Nur Goldausrüstung
   仅首词条: Nur erstes Affix
   仅展示黄字三率和增效: Nur effektive Raten (gelb) und Verstärkungen anzeigen
-  以下装备存在词条组合异常，已排除培养计算；请先校正：: 'Folgende Ausrüstung hat eine fehlerhafte Affix-Kombination
-    und wurde von der Aufwertungsberechnung ausgeschlossen; bitte zuerst korrigieren:'
+  "以下装备存在词条组合异常，已排除培养计算；请先校正：": "Folgende Ausrüstung hat eine fehlerhafte Affix-Kombination und wurde von der Aufwertungsberechnung ausgeschlossen; bitte zuerst korrigieren:"
   会心率: Krit.-Rate
   会意率: Affinitätsrate
   伞: Schirm
@@ -1369,17 +1228,14 @@ auto_strings:
   保存修改: Änderungen speichern
   保存成功: Erfolgreich gespeichert
   保留版本: Version behalten
-  修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算: Nach dem Bearbeiten wird die Abschlussrate als Aktuelle
-    ADPS ÷ diese Basis-DPS neu berechnet
+  "修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算": "Nach dem Bearbeiten wird die Abschlussrate als Aktuelle ADPS ÷ diese Basis-DPS neu berechnet"
   候选装备: Kandidaten-Ausrüstung
   候选装备  {count}: Kandidaten-Ausrüstung  {count}
   候选评级: Kandidaten-Bewertung
-  值得调律，但测试开关已启用，跳过实际调律: Lohnend abzustimmen, aber der Testschalter ist aktiv; tatsächliche
-    Abstimmung übersprungen
+  "值得调律，但测试开关已启用，跳过实际调律": "Lohnend abzustimmen, aber der Testschalter ist aktiv; tatsächliche Abstimmung übersprungen"
   全武学增效: Verstärkung aller Kampfkünste
   全部同时出现: Alle gleichzeitig vorhanden
-  全部未命中时取「默认判定」：部位页可按部位设置，未设置则跟随规则设置页: 'Bei keinem Treffer gilt die „Standardbewertung“:
-    auf der Platz-Seite je Platz einstellbar, sonst gemäß Regel-Einstellungsseite'
+  "全部未命中时取「默认判定」：部位页可按部位设置，未设置则跟随规则设置页": "Bei keinem Treffer gilt die „Standardbewertung“: auf der Platz-Seite je Platz einstellbar, sonst gemäß Regel-Einstellungsseite"
   全部规则: Alle Regeln
   全部规则（默认配置）: Alle Regeln (Standardkonfiguration)
   "其他增益：\n": "Weitere Boni:\n"
@@ -1388,8 +1244,7 @@ auto_strings:
   冲突: Konflikt
   准备执行: Ausführung wird vorbereitet
   分析失败: Analyse fehlgeschlagen
-  分析当前配装的合法培养建议和词条敏感度: Gültige Aufwertungsvorschläge und Affix-Sensitivität für den
-    aktuellen Build analysieren
+  "分析当前配装的合法培养建议和词条敏感度": "Gültige Aufwertungsvorschläge und Affix-Sensitivität für den aktuellen Build analysieren"
   '列 ': 'Spalte '
   创建基础属性: Basisattribute erstellen
   创建模拟装备: Simulierte Ausrüstung erstellen
@@ -1425,11 +1280,7 @@ auto_strings:
   双刀武学增伤: Doppelklingen-Kampfkunst-Schaden
   取消合并: Zusammenführen abbrechen
   可培养词条: Aufwertbare Affixe
-  可用词条库为全局价值序（越靠前越优先保留与填充）；武学增伤不在此填写——玩法指定武器的武学增伤自动视为最高优先级，未指定时按垃圾词条处理。: Der verfügbare
-    Affix-Pool ist eine globale Prioritätsliste (weiter vorn = zuerst behalten/auffüllen);
-    Kampfkunst-Schadensboni werden hier nicht eingetragen — der Schadensbonus der
-    im Spielstil festgelegten Waffe hat automatisch höchste Priorität, sonst gilt
-    er als Müll-Affix.
+  "可用词条库为全局价值序（越靠前越优先保留与填充）；武学增伤不在此填写——玩法指定武器的武学增伤自动视为最高优先级，未指定时按垃圾词条处理。": "Der verfügbare Affix-Pool ist eine globale Prioritätsliste (weiter vorn = zuerst behalten/auffüllen); Kampfkunst-Schadensboni werden hier nicht eingetragen — der Schadensbonus der im Spielstil festgelegten Waffe hat automatisch höchste Priorität, sonst gilt er als Müll-Affix."
   右键菜单: Kontextmenü
   合并失败: Zusammenführen fehlgeschlagen
   合并选中项: Auswahl zusammenführen
@@ -1437,37 +1288,28 @@ auto_strings:
   否: Nein
   命中: Treffer
   "命中条件：装备任一条题名属于勾选词条\n（勾选仅首词条时只判定装备首词条）；\n自选词条语义不跑潜力判定": "Trefferbedingung: Ein beliebiges Affix der Ausrüstung gehört zu den markierten Affixen\n(bei „Nur erstes Affix“ wird nur das erste Affix geprüft);\nbei „Eigene Affixe“ entfällt die Potenzialbewertung"
-  命中条件：预期评级属于勾选档位（全选 = 不限，不取评级）: 'Trefferbedingung: Erwartete Bewertung liegt in den
-    markierten Stufen (Alle auswählen = unbegrenzt, Bewertung wird nicht abgefragt)'
-  命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）: 'Trefferbedingung: Startwert des
-    ersten Affixes wird nach Richtung mit diesem Wert verglichen; ≤ 100 / ≥ 0 = unbegrenzt
-    (Erkennungsfehler gilt als nicht erfüllt)'
+  "命中条件：预期评级属于勾选档位（全选 = 不限，不取评级）": "Trefferbedingung: Erwartete Bewertung liegt in den markierten Stufen (Alle auswählen = unbegrenzt, Bewertung wird nicht abgefragt)"
+  "命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）": "Trefferbedingung: Startwert des ersten Affixes wird nach Richtung mit diesem Wert verglichen; ≤ 100 / ≥ 0 = unbegrenzt (Erkennungsfehler gilt als nicht erfüllt)"
   品阶未知: Qualität unbekannt
   品阶未识别，跳过品阶筛选: Qualität nicht erkannt, Qualitätsfilter wird übersprungen
   品阶识别异常: Qualitätserkennungsfehler
   商: Shang
   回收装备: Ausrüstung verwerten
   回收装备：分解为材料: 'Ausrüstung verwerten: In Materialien zerlegen'
-  固定标准部位；勾选有调律价值的品阶；规则设置页可按部位覆盖本全局默认: Feste Standardplätze; lohnende Qualitätsstufen
-    markieren; auf der Regel-Einstellungsseite je Platz überschreibbar
+  "固定标准部位；勾选有调律价值的品阶；规则设置页可按部位覆盖本全局默认": "Feste Standardplätze; lohnende Qualitätsstufen markieren; auf der Regel-Einstellungsseite je Platz überschreibbar"
   培养建议: Aufwertungsvorschläge
   基准DPS: Basis-DPS
   基础属性: Basisattribute
   等级属性: Stufenattribute
-  基础属性「{name}」已保存到流派「{school}」: Basisattribute „{name}“ wurden im Spielstil „{school}“
-    gespeichert
+  "基础属性「{name}」已保存到流派「{school}」": "Basisattribute „{name}“ wurden im Spielstil „{school}“ gespeichert"
   基础属性「{name}」已存在，是否覆盖？: Basisattribute „{name}“ existieren bereits. Überschreiben?
   基础属性名称: Name der Basisattribute
   基础属性名称不能为空: Name der Basisattribute darf nicht leer sein
   基础属性已存在: Basisattribute existieren bereits
-  基础属性：未声明（YAML 中通过 _attr 配置）: 'Basisattribute: Nicht deklariert (über _attr in YAML
-    konfiguriert)'
+  "基础属性：未声明（YAML 中通过 _attr 配置）": "Basisattribute: Nicht deklariert (über _attr in YAML konfiguriert)"
   基础方案: Basisplan
   基础规则组顶层必须是 dict: Die oberste Ebene einer Basis-Regelgruppe muss ein dict sein
-  填写这套基础配置对应的面板属性。装备专属属性无需填写；外功穿透和属攻穿透仅填写基础值，不包含装备定音。: Gib die Werte dieser Basiskonfiguration
-    ein. Ausrüstungsexklusive Attribute müssen nicht ausgefüllt werden; physische
-    Durchdringung und Elementardurchdringung nur als Grundwert ohne Ausrüstungs-Einstimmung
-    eintragen.
+  "填写这套基础配置对应的面板属性。装备专属属性无需填写；外功穿透和属攻穿透仅填写基础值，不包含装备定音。": "Gib die Werte dieser Basiskonfiguration ein. Ausrüstungsexklusive Attribute müssen nicht ausgefüllt werden; physische Durchdringung und Elementardurchdringung nur als Grundwert ohne Ausrüstungs-Einstimmung eintragen."
   增效类: Verstärkung
   增益抗性百分比（可选，>= 0）: Bonusresistenz in Prozent (optional, >= 0)
   增益效果: Bonuseffekte
@@ -1487,11 +1329,9 @@ auto_strings:
   定音: Einstimmung
   最终评级：: 'Endbewertung:'
   最终评级：-: 'Endbewertung: -'
-  实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源: 'Experimentell: Abschlussraten-Rechner-Excel importieren,
-    um Zeitachse und Schadensquellen anzuzeigen'
+  "实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源": "Experimentell: Abschlussraten-Rechner-Excel importieren, um Zeitachse und Schadensquellen anzuzeigen"
   宫: Gong
-  宫为首词条 · 商角徵羽不可重复: Gong ist das erste Affix · Shang/Jue/Zhi/Yu dürfen sich nicht
-    wiederholen
+  "宫为首词条 · 商角徵羽不可重复": "Gong ist das erste Affix · Shang/Jue/Zhi/Yu dürfen sich nicht wiederholen"
   对玩家单位增效: Verstärkung gegen Spieler
   对首领单位增伤: Schadensbonus gegen Bosse
   对齐失败：alignment 为 None: 'Ausrichtung fehlgeschlagen: alignment ist None'
@@ -1514,15 +1354,10 @@ auto_strings:
   导出数据: Daten exportieren
   导出装备数据: Ausrüstungsdaten exportieren
   将低于最高等级的装备视为最高等级参与计算: Ausrüstung unterhalb der Maximalstufe als Maximalstufe berechnen
-  将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定: Ausrüstung unterhalb der Maximalstufe
-    als Maximalstufe behandeln (erhöht Basiswerte); Affix-/Einstimmungswerte richten
-    sich nach Volles Chengyin / Volle Einstimmung
-  将已装备的定音词条数值视为上限（100%）参与计算: Angelegte Einstimmungsaffix-Werte als Obergrenze (100
-    %) berechnen
-  将已装备的承音装备词条数值视为承音上限参与计算: Affix-Werte angelegter Chengyin-Ausrüstung als Chengyin-Obergrenze
-    berechnen
-  尚未导入。选择毕业率计算器 Excel 查看其竞速轴。: Noch nicht importiert. Wähle eine Abschlussraten-Rechner-Excel-Datei,
-    um die Zeitachse anzuzeigen.
+  "将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定": "Ausrüstung unterhalb der Maximalstufe als Maximalstufe behandeln (erhöht Basiswerte); Affix-/Einstimmungswerte richten sich nach Volles Chengyin / Volle Einstimmung"
+  "将已装备的定音词条数值视为上限（100%）参与计算": "Angelegte Einstimmungsaffix-Werte als Obergrenze (100 %) berechnen"
+  "将已装备的承音装备词条数值视为承音上限参与计算": "Affix-Werte angelegter Chengyin-Ausrüstung als Chengyin-Obergrenze berechnen"
+  "尚未导入。选择毕业率计算器 Excel 查看其竞速轴。": "Noch nicht importiert. Wähle eine Abschlussraten-Rechner-Excel-Datei, um die Zeitachse anzuzeigen."
   属性攻击: Elementarangriff
   属性跟随: Attribut folgen
   属攻: Elementarangriff
@@ -1531,35 +1366,24 @@ auto_strings:
   属攻穿透: Elementardurchdringung
   属攻穿透（{name}）: Elementardurchdringung ({name})
   属攻类: Elementar
-  属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Maximal 2 Elementarangriff-Affixe (inkl. Formlos)
-    erlaubt; Affixe 2–5 enthalten derzeit {n}
+  "属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条": "Maximal 2 Elementarangriff-Affixe (inkl. Formlos) erlaubt; Affixe 2–5 enthalten derzeit {n}"
   已定音: Eingestimmt
   已导出到：{path}: 'Exportiert nach: {path}'
   已应用: Angewendet
   已是最后一条赛季，无法下移: Bereits die letzte Saison, kann nicht nach unten verschoben werden
-  已是最后一条配置，无法下移: Bereits die letzte Konfiguration, kann nicht nach unten verschoben
-    werden
+  "已是最后一条配置，无法下移": "Bereits die letzte Konfiguration, kann nicht nach unten verschoben werden"
   已是第一条赛季，无法上移: Bereits die erste Saison, kann nicht nach oben verschoben werden
   已是第一条配置，无法上移: Bereits die erste Konfiguration, kann nicht nach oben verschoben werden
   已校验 {count} 种合法组合: '{count} gültige Kombinationen geprüft'
-  已符合规则但未找到调律入口，跳过本件: Entspricht der Regel, aber kein Abstimmungseingang gefunden;
-    dieses Teil wird übersprungen
-  已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。勾选参与搜索的装备后，系统会重新计算整套毕业率。: '{count} Kandidaten-Ausrüstungsteile
-    geladen, decken {slots}/8 Plätze ab. Markiere die gewünschten Teile für die Suche,
-    um die gesamte Abschlussrate neu zu berechnen.'
-  已选择 {count} 件装备，正在计算联合提升…: '{count} Ausrüstungsteile ausgewählt, gemeinsamer Zuwachs
-    wird berechnet…'
+  "已符合规则但未找到调律入口，跳过本件": "Entspricht der Regel, aber kein Abstimmungseingang gefunden; dieses Teil wird übersprungen"
+  "已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。勾选参与搜索的装备后，系统会重新计算整套毕业率。": "{count} Kandidaten-Ausrüstungsteile geladen, decken {slots}/8 Plätze ab. Markiere die gewünschten Teile für die Suche, um die gesamte Abschlussrate neu zu berechnen."
+  "已选择 {count} 件装备，正在计算联合提升…": "{count} Ausrüstungsteile ausgewählt, gemeinsamer Zuwachs wird berechnet…"
   已锁定，跳过: Gesperrt, übersprungen
   应用失败: Anwenden fehlgeschlagen
   应用此组合: Diese Kombination anwenden
-  建议按装备部位分组。可同时勾选 1-3 件装备进行联合计算；系统会为每个词条位置比较多个候选目标，并重新计算整套毕业率，不会把单项提升直接相加。: Gruppierung
-    nach Ausrüstungsplatz empfohlen. Wähle 1–3 Teile für eine gemeinsame Berechnung;
-    das System vergleicht mehrere Zielkandidaten je Affix-Position und berechnet die
-    gesamte Abschlussrate neu, statt Einzelzuwächse einfach zu addieren.
+  "建议按装备部位分组。可同时勾选 1-3 件装备进行联合计算；系统会为每个词条位置比较多个候选目标，并重新计算整套毕业率，不会把单项提升直接相加。": "Gruppierung nach Ausrüstungsplatz empfohlen. Wähle 1–3 Teile für eine gemeinsame Berechnung; das System vergleicht mehrere Zielkandidaten je Affix-Position und berechnet die gesamte Abschlussrate neu, statt Einzelzuwächse einfach zu addieren."
   建议转为: Empfohlene Umwandlung zu
-  开关 key → 显示名；规则条件组 when 引用的开关禁止删除: Schalter-Key → Anzeigename; Schalter, die von
-    der when-Bedingungsgruppe einer Regel referenziert werden, können nicht gelöscht
-    werden
+  "开关 key → 显示名；规则条件组 when 引用的开关禁止删除": "Schalter-Key → Anzeigename; Schalter, die von der when-Bedingungsgruppe einer Regel referenziert werden, können nicht gelöscht werden"
   开始搜索: Suche starten
   开始日期: Startdatum
   开始调律: Abstimmung starten
@@ -1567,38 +1391,27 @@ auto_strings:
   弓玦套装: Gongjue-Set
   当前毕业率: Aktuelle Abschlussrate
   当前装备完成后将在这里归档: Nach Abschluss der aktuellen Ausrüstung wird sie hier archiviert
-  当前赛季装备等级（从等级配置中选择）: Ausrüstungsstufe der aktuellen Saison (aus Stufenkonfiguration
-    wählen)
-  当前配装存在词条组合异常，请先校正：{names}: 'Der aktuelle Build hat eine fehlerhafte Affix-Kombination;
-    bitte zuerst korrigieren: {names}'
-  当前配装没有符合规则且能提高毕业率的词条替换建议: Für den aktuellen Build gibt es keine regelkonformen Affix-Tauschvorschläge
-    zur Erhöhung der Abschlussrate
+  "当前赛季装备等级（从等级配置中选择）": "Ausrüstungsstufe der aktuellen Saison (aus Stufenkonfiguration wählen)"
+  "当前配装存在词条组合异常，请先校正：{names}": "Der aktuelle Build hat eine fehlerhafte Affix-Kombination; bitte zuerst korrigieren: {names}"
+  "当前配装没有符合规则且能提高毕业率的词条替换建议": "Für den aktuellen Build gibt es keine regelkonformen Affix-Tauschvorschläge zur Erhöhung der Abschlussrate"
   当前阶段：{phase}: 'Aktuelle Phase: {phase}'
-  当前阶段：扫描判定 — 已读取装备，计算调律潜力: 'Aktuelle Phase: Scan-Bewertung — Ausrüstung gelesen,
-    Abstimmungspotenzial wird berechnet'
-  当前阶段：收尾处理 — 当前装备处理完成: 'Aktuelle Phase: Abschlussverarbeitung — aktuelle Ausrüstung
-    abgeschlossen'
-  当前阶段：材料准备 — 第 {n} 轮{action}，{food}: 'Aktuelle Phase: Materialvorbereitung — Runde
-    {n} {action}, {food}'
+  "当前阶段：扫描判定 — 已读取装备，计算调律潜力": "Aktuelle Phase: Scan-Bewertung — Ausrüstung gelesen, Abstimmungspotenzial wird berechnet"
+  "当前阶段：收尾处理 — 当前装备处理完成": "Aktuelle Phase: Abschlussverarbeitung — aktuelle Ausrüstung abgeschlossen"
+  "当前阶段：材料准备 — 第 {n} 轮{action}，{food}": "Aktuelle Phase: Materialvorbereitung — Runde {n} {action}, {food}"
   当前阶段：等待下一件装备: 'Aktuelle Phase: Wartet auf nächste Ausrüstung'
   当前阶段：等待开始: 'Aktuelle Phase: Wartet auf Start'
-  当前阶段：重置调律 — 重置完成，按新装备继续调律: 'Aktuelle Phase: Zurücksetzen — Zurücksetzung fertig,
-    Abstimmung wird als neue Ausrüstung fortgesetzt'
+  "当前阶段：重置调律 — 重置完成，按新装备继续调律": "Aktuelle Phase: Zurücksetzen — Zurücksetzung fertig, Abstimmung wird als neue Ausrüstung fortgesetzt"
   律匠 - 燕云十六声装备调律工具: LvJiang - Where Winds Meet Ausrüstungs-Abstimmungstool
   御: Abwehr
   徵: Zhi
   必须同时绑定主武学和副武学: Sowohl Haupt- als auch Neben-Kampfkunst müssen gebunden sein
   总伤害: Gesamtschaden
-  战斗 {time:.1f} 秒 · {rows} 行 / {hits} 次命中 · {skills} 个技能 · 总伤 {damage:,.0f} · DPS {dps:,.0f}: Kampf
-    {time:.1f} Sek. · {rows} Zeilen / {hits} Treffer · {skills} Fertigkeiten · Gesamtschaden
-    {damage:,.0f} · DPS {dps:,.0f}
+  "战斗 {time:.1f} 秒 · {rows} 行 / {hits} 次命中 · {skills} 个技能 · 总伤 {damage:,.0f} · DPS {dps:,.0f}": "Kampf {time:.1f} Sek. · {rows} Zeilen / {hits} Treffer · {skills} Fertigkeiten · Gesamtschaden {damage:,.0f} · DPS {dps:,.0f}"
   战斗属性全屏: Kampfattribute Vollbild
   战斗属性半屏: Kampfattribute Halbbild
   战斗时间: Kampfzeit
-  所选装备存在词条组合异常，请先校正：{names}: 'Die ausgewählte Ausrüstung hat eine fehlerhafte Affix-Kombination;
-    bitte zuerst korrigieren: {names}'
-  所选装备没有能进一步提高毕业率的合法联合方案。: Für die ausgewählte Ausrüstung gibt es keine gültige gemeinsame
-    Kombination zur weiteren Erhöhung der Abschlussrate.
+  "所选装备存在词条组合异常，请先校正：{names}": "Die ausgewählte Ausrüstung hat eine fehlerhafte Affix-Kombination; bitte zuerst korrigieren: {names}"
+  "所选装备没有能进一步提高毕业率的合法联合方案。": "Für die ausgewählte Ausrüstung gibt es keine gültige gemeinsame Kombination zur weiteren Erhöhung der Abschlussrate."
   所选调律规则的实际评级: Tatsächliche Bewertung der gewählten Abstimmungsregel
   扇: Fächer
   扇武学增伤: Fächer-Kampfkunst-Schaden
@@ -1608,18 +1421,15 @@ auto_strings:
   执行调律: Abstimmung ausführen
   扫描判定: Scan-Bewertung
   承音装备: Chengyin-Ausrüstung
-  全部用户中没有找到符合条件的疑似重复装备: Bei keinem Nutzer wurden passende mögliche Ausrüstungsduplikate
-    gefunden
+  "全部用户中没有找到符合条件的疑似重复装备": "Bei keinem Nutzer wurden passende mögliche Ausrüstungsduplikate gefunden"
   面向全部用户: Für alle Nutzer
   技能: Fertigkeit
   技能轴: Fertigkeitsachse
   指定武学增效: Festgelegte Kampfkunst-Verstärkung
   搜索失败: Suche fehlgeschlagen
-  搜索失败，请检查候选装备后重试。: Suche fehlgeschlagen; bitte Kandidaten-Ausrüstung prüfen und erneut
-    versuchen.
+  "搜索失败，请检查候选装备后重试。": "Suche fehlgeschlagen; bitte Kandidaten-Ausrüstung prüfen und erneut versuchen."
   搜索完成，共得到 {count} 个可用结果。: Suche abgeschlossen, {count} nutzbare Ergebnisse gefunden.
-  搜索时排除模拟装备，仅使用真实背包和已穿戴装备: Simulierte Ausrüstung bei der Suche ausschließen; nur echte
-    Rucksack- und angelegte Ausrüstung verwenden
+  "搜索时排除模拟装备，仅使用真实背包和已穿戴装备": "Simulierte Ausrüstung bei der Suche ausschließen; nur echte Rucksack- und angelegte Ausrüstung verwenden"
   搜索最优毕业率装备组合: Optimale Ausrüstungskombination für die Abschlussrate suchen
   支持承音: Unterstützt Chengyin
   支持重置: Unterstützt Zurücksetzen
@@ -1642,8 +1452,7 @@ auto_strings:
   无: Keine
   无可用判定规则: Keine nutzbare Bewertungsregel
   无处置规则命中 → 跳过该装备: Keine Verwertungsregel getroffen → diese Ausrüstung überspringen
-  无已实现规则可判定该装备，结束调律: Keine implementierte Regel kann diese Ausrüstung bewerten; Abstimmung
-    wird beendet
+  "无已实现规则可判定该装备，结束调律": "Keine implementierte Regel kann diese Ausrüstung bewerten; Abstimmung wird beendet"
   无方案: Kein Plan
   无有效结论: Kein gültiges Ergebnis
   无法保存: Speichern nicht möglich
@@ -1663,8 +1472,7 @@ auto_strings:
   无限转律: Unbegrenzte Umwandlung
   旧版本: Alte Version
   展示白字和黄字三率和增效: Grund- (weiß) und effektive (gelb) Raten und Verstärkungen anzeigen
-  右键切换白字和黄字三率及增效的显示方式: Rechtsklick zum Umschalten der Anzeige weißer/gelber Raten
-    und Verstärkungen
+  "右键切换白字和黄字三率及增效的显示方式": "Rechtsklick zum Umschalten der Anzeige weißer/gelber Raten und Verstärkungen"
   暂无已完成装备: Noch keine abgeschlossene Ausrüstung
   暂无数据: Keine Daten
   暂无符合条件的词条: Keine passenden Affixe
@@ -1701,32 +1509,23 @@ auto_strings:
   未评级: Unbewertet
   未达门槛 → 扫描处理: Unter Schwelle → Scan-Verarbeitung
   未选词条: Kein Affix ausgewählt
-  未配置基础规则组，请在调律页选择基础规则组: Keine Basis-Regelgruppe konfiguriert; bitte auf der Abstimmungsseite
-    auswählen
+  "未配置基础规则组，请在调律页选择基础规则组": "Keine Basis-Regelgruppe konfiguriert; bitte auf der Abstimmungsseite auswählen"
   未配置狗粮规则 → 不添加: Keine Futterregel konfiguriert → nicht hinzufügen
-  未配置调律规则，请在调律页选择至少一个规则: Keine Abstimmungsregel konfiguriert; bitte auf der Abstimmungsseite
-    mindestens eine wählen
-  未配置调律部位，请在调律页选择至少一个部位: Kein Abstimmungsplatz konfiguriert; bitte auf der Abstimmungsseite
-    mindestens einen wählen
-  本件已重置过一次，冷却期内不再重置: Dieses Teil wurde bereits einmal zurückgesetzt; keine weitere
-    Zurücksetzung während der Abklingzeit
+  "未配置调律规则，请在调律页选择至少一个规则": "Keine Abstimmungsregel konfiguriert; bitte auf der Abstimmungsseite mindestens eine wählen"
+  "未配置调律部位，请在调律页选择至少一个部位": "Kein Abstimmungsplatz konfiguriert; bitte auf der Abstimmungsseite mindestens einen wählen"
+  "本件已重置过一次，冷却期内不再重置": "Dieses Teil wurde bereits einmal zurückgesetzt; keine weitere Zurücksetzung während der Abklingzeit"
   "本条规则取评级时只注入首词条，忽略已有的其他词条\n（其余槽视作空槽由潜力判定自由填充）；避免回收掉\n非首词条已成垃圾但可重置调律的装备": "Bei der Bewertung injiziert diese Regel nur das erste Affix und ignoriert die übrigen vorhandenen Affixe\n(die restlichen Plätze gelten als leer und werden bei der Potenzialbewertung frei gefüllt); verhindert das Verwerten\nvon Ausrüstung, deren Folgeaffixe schlecht sind, die aber noch zurückgesetzt werden kann"
-  本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；自选规则=弹窗勾选；自选词条=判定结果列改勾词条，按装备词条名匹配，不跑潜力判定: 'Bewertungsmodus
-    dieser Regel: Übergebene Regeln = zur Laufzeit markierte Regeln; Alle Regeln;
-    Eigene Regeln = im Dialog markiert; Eigene Affixe = in der Ergebnisspalte markierte
-    Affixe, Abgleich nach Affix-Name ohne Potenzialbewertung'
+  "本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；自选规则=弹窗勾选；自选词条=判定结果列改勾词条，按装备词条名匹配，不跑潜力判定": "Bewertungsmodus dieser Regel: Übergebene Regeln = zur Laufzeit markierte Regeln; Alle Regeln; Eigene Regeln = im Dialog markiert; Eigene Affixe = in der Ergebnisspalte markierte Affixe, Abgleich nach Affix-Name ohne Potenzialbewertung"
   本次无一般及以上成品。: In diesem Lauf keine fertigen Teile (Normal oder höher).
   本轮停止: Diese Runde stoppen
   材料准备: Materialvorbereitung
   枪: Speer
   枪武学增伤: Speer-Kampfkunst-Schaden
-  查找承音或再次转律产生的同件装备历史版本: Ältere Versionen derselben Ausrüstung aus Chengyin oder erneuter
-    Umwandlung suchen
+  "查找承音或再次转律产生的同件装备历史版本": "Ältere Versionen derselben Ausrüstung aus Chengyin oder erneuter Umwandlung suchen"
   模拟: Simuliert
   横刀: Säbel
   横刀武学增伤: Säbel-Kampfkunst-Schaden
-  正在比较 {count} 种装备组合，搜索期间仍可取消。: Vergleiche {count} Ausrüstungskombinationen; Abbrechen
-    während der Suche ist jederzeit möglich.
+  "正在比较 {count} 种装备组合，搜索期间仍可取消。": "Vergleiche {count} Ausrüstungskombinationen; Abbrechen während der Suche ist jederzeit möglich."
   正在读取候选装备…: Kandidaten-Ausrüstung wird gelesen…
   正常完成: Normal abgeschlossen
   "武器【{type}】与当前方案的武学不匹配（主武学武器：{main}，副武学武器：{sub}）。\n如需使用该武器，请新建对应流派的方案。": "Waffe [{type}] passt nicht zur Kampfkunst dieses Plans (Haupt-Kampfkunst-Waffe: {main}, Neben-Kampfkunst-Waffe: {sub}).\nUm diese Waffe zu nutzen, erstelle bitte einen Plan für den passenden Spielstil."
@@ -1736,27 +1535,22 @@ auto_strings:
   攻具套装：{name}: 'Angriffsausrüstungs-Set: {name}'
   请选择攻具套装: Bitte ein Angriffsausrüstungs-Set auswählen
   武学属性: Kampfkunst-Attribute
-  每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when: 'Jede Stufe wird durch Bedingungsgruppen
-    definiert: ODER zwischen Gruppen, UND innerhalb einer Gruppe; eine Gruppe kann
-    eine when-Schalter-Vorbedingung binden'
+  "每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when": "Jede Stufe wird durch Bedingungsgruppen definiert: ODER zwischen Gruppen, UND innerhalb einer Gruppe; eine Gruppe kann eine when-Schalter-Vorbedingung binden"
   每轮添加: Jede Runde hinzufügen
-  每轮调律开始前的行为点）：律准石数量检查、狗粮检查与添加: 'Verhaltenspunkt vor jeder Abstimmungsrunde): Abstimmungsstein-Prüfung,
-    Futterprüfung und -hinzufügung'
+  "每轮调律开始前的行为点）：律准石数量检查、狗粮检查与添加": "Verhaltenspunkt vor jeder Abstimmungsrunde): Abstimmungsstein-Prüfung, Futterprüfung und -hinzufügung"
   毕业率: Abschlussrate
   毕业率变化: Änderung der Abschlussrate
   气血最大值: Max. LP
   没有全部出现: Nicht alle vorhanden
   没有可跟随的目标部位。: Kein Zielplatz zum Folgen vorhanden.
-  没有启用任何调律规则，请在调律页勾选至少一个规则: Keine Abstimmungsregel aktiviert; bitte auf der Abstimmungsseite
-    mindestens eine markieren
+  "没有启用任何调律规则，请在调律页勾选至少一个规则": "Keine Abstimmungsregel aktiviert; bitte auf der Abstimmungsseite mindestens eine markieren"
   没有激活的用户: Kein aktiver Nutzer
   流派: Spielstil
   测试模式跳过调律: Testmodus überspringt Abstimmung
   测试装备: Testausrüstung
   测高: Höhe messen
   添加词条名: Affix-Name hinzufügen
-  游戏账号、角色名、装备名称、装备指纹、截图和日志: Spielkonto, Charaktername, Ausrüstungsname, Ausrüstungs-Fingerabdruck,
-    Screenshots und Protokolle
+  "游戏账号、角色名、装备名称、装备指纹、截图和日志": "Spielkonto, Charaktername, Ausrüstungsname, Ausrüstungs-Fingerabdruck, Screenshots und Protokolle"
   满定音: Volle Einstimmung
   满承音: Volles Chengyin
   满数值: Maximalwert
@@ -1770,8 +1564,7 @@ auto_strings:
   环: Ring
   环 · 佩: Ring · Anhänger
   生存类: Überleben
-  用于备战方案比较  ·  不会修改真实背包装备: Zum Vergleichen von Ausrüstungssets · verändert keine echte
-    Rucksackausrüstung
+  "用于备战方案比较  ·  不会修改真实背包装备": "Zum Vergleichen von Ausrüstungssets · verändert keine echte Rucksackausrüstung"
   用于改进律匠内置的调律规则: Zur Verbesserung der integrierten Abstimmungsregeln von LvJiang
   用户中断: Vom Nutzer unterbrochen
   破竹: Bambusschnitt
@@ -1779,18 +1572,15 @@ auto_strings:
   "确定要从背包中删除【{name}】吗？\n此操作不可撤销。": "[{name}] wirklich aus dem Rucksack löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
   "确定要删除模拟装备【{name}】吗？\n此操作不可撤销。": "Simulierte Ausrüstung [{name}] wirklich löschen?\nDiese Aktion kann nicht rückgängig gemacht werden."
   确认跟随: Folgen bestätigen
-  神力词条「{name}」不能是转律产出：转律不会产出神力词条: 'Göttliches Affix „{name}“ kann nicht aus einer
-    Umwandlung stammen: Umwandlungen erzeugen keine göttlichen Affixe'
-  神力词条最多 1 条，当前词条 2-5 里有 {n} 条: Maximal 1 göttliches Affix erlaubt; Affixe 2–5 enthalten
-    derzeit {n}
+  "神力词条「{name}」不能是转律产出：转律不会产出神力词条": "Göttliches Affix „{name}“ kann nicht aus einer Umwandlung stammen: Umwandlungen erzeugen keine göttlichen Affixe"
+  "神力词条最多 1 条，当前词条 2-5 里有 {n} 条": "Maximal 1 göttliches Affix erlaubt; Affixe 2–5 enthalten derzeit {n}"
   空数据: Leere Daten
   穿戴到对应槽位: Auf den passenden Platz anlegen
   符合以下规则，开始调律：: 'Entspricht folgenden Regeln, Abstimmung wird gestartet:'
   第 {n} 轮方案：{food}: 'Plan für Runde {n}: {food}'
   等待下一件装备...: Wartet auf nächste Ausrüstung...
   等待评级...: Wartet auf Bewertung...
-  等级 {level} | {quality} | {rounds} 轮 | {rating} | {status}: Stufe {level} | {quality}
-    | {rounds} Runden | {rating} | {status}
+  "等级 {level} | {quality} | {rounds} 轮 | {rating} | {status}": "Stufe {level} | {quality} | {rounds} Runden | {rating} | {status}"
   等级不足，当前部位结束: Stufe zu niedrig, aktueller Platz beendet
   等级不足，部位结束: Stufe zu niedrig, Platz beendet
   等级倒序: Stufe absteigend
@@ -1798,13 +1588,10 @@ auto_strings:
   等级正序: Stufe aufsteigend
   筛选: Filter
   精准率: Präzisionsrate
-  系统规则不可删除或修改 key；不使用时请取消启用: Systemregeln können nicht gelöscht oder umbenannt werden;
-    bei Nichtgebrauch bitte deaktivieren
+  "系统规则不可删除或修改 key；不使用时请取消启用": "Systemregeln können nicht gelöscht oder umbenannt werden; bei Nichtgebrauch bitte deaktivieren"
   系统规则组不可删除: System-Regelgruppen können nicht gelöscht werden
-  系统配置不可删除。如不需要，请改用停用/取消勾选。: Systemkonfigurationen können nicht gelöscht werden. Bei
-    Nichtgebrauch bitte deaktivieren/abwählen.
-  系统配置不可删除，只能修改其取值；新增的条目可以删除。: Systemkonfigurationen können nicht gelöscht, sondern
-    nur im Wert geändert werden; selbst hinzugefügte Einträge können gelöscht werden.
+  "系统配置不可删除。如不需要，请改用停用/取消勾选。": "Systemkonfigurationen können nicht gelöscht werden. Bei Nichtgebrauch bitte deaktivieren/abwählen."
+  "系统配置不可删除，只能修改其取值；新增的条目可以删除。": "Systemkonfigurationen können nicht gelöscht, sondern nur im Wert geändert werden; selbst hinzugefügte Einträge können gelöscht werden."
   紫: Violett
   紫装: Violette Ausrüstung
   紫装及以下: Violette Ausrüstung und darunter
@@ -1823,18 +1610,15 @@ auto_strings:
   网格列数: Rasterspalten
   羽: Yu
   联合培养结果: Gemeinsames Aufwertungsergebnis
-  联合培养需要选择 1-3 件装备: Für die gemeinsame Aufwertung müssen 1–3 Ausrüstungsteile ausgewählt
-    werden
-  联合计算器未初始化，请关闭窗口后重新打开词条培养分析。: Der gemeinsame Rechner ist nicht initialisiert; bitte
-    Fenster schließen und die Affix-Aufwertungsanalyse neu öffnen.
+  "联合培养需要选择 1-3 件装备": "Für die gemeinsame Aufwertung müssen 1–3 Ausrüstungsteile ausgewählt werden"
+  "联合计算器未初始化，请关闭窗口后重新打开词条培养分析。": "Der gemeinsame Rechner ist nicht initialisiert; bitte Fenster schließen und die Affix-Aufwertungsanalyse neu öffnen."
   联合计算失败：{error}: 'Gemeinsame Berechnung fehlgeschlagen: {error}'
   背包: Rucksack
   胫甲: Beinschiene
   胫甲 · 腕甲: Beinschiene · Armschiene
   胸甲: Brustpanzer
   腕甲: Armschiene
-  自动淘汰被其他候选完全压制的装备，缩减搜索空间: Ausrüstung, die von anderen Kandidaten vollständig dominiert
-    wird, automatisch aussortieren, um den Suchraum zu verkleinern
+  "自动淘汰被其他候选完全压制的装备，缩减搜索空间": "Ausrüstung, die von anderen Kandidaten vollständig dominiert wird, automatisch aussortieren, um den Suchraum zu verkleinern"
   自定义: Benutzerdefiniert
   自选规则: Eigene Regeln
   舞绫鼓: Tanzseidentrommel
@@ -1855,19 +1639,14 @@ auto_strings:
   装备状态异常，点击查看原因: Ausrüstungsstatus fehlerhaft; klicken für Details
   装备等级（1-999，不可重复，必填）: Ausrüstungsstufe (1–999, keine Duplikate, Pflichtfeld)
   装备调律过程: Ausrüstungs-Abstimmungsprozess
-  装备部位、等级品阶、启用规则、初始词条、逐轮材料与产出、停止原因和最终评级: Ausrüstungsplatz, Stufe/Qualität, aktive
-    Regeln, Startaffixe, Materialien & Ergebnisse je Runde, Abbruchgrund und Endbewertung
+  "装备部位、等级品阶、启用规则、初始词条、逐轮材料与产出、停止原因和最终评级": "Ausrüstungsplatz, Stufe/Qualität, aktive Regeln, Startaffixe, Materialien & Ergebnisse je Runde, Abbruchgrund und Endbewertung"
   装备重置冷却期，跳过该装备: Ausrüstung in Zurücksetzungs-Abklingzeit, wird übersprungen
   装备面板全屏: Ausrüstungsfenster Vollbild
-  规则 key 须为小写字母开头的英文/数字/下划线: Der Regel-Key muss mit einem Kleinbuchstaben beginnen
-    und darf nur Buchstaben/Ziffern/Unterstriche enthalten
-  规则可引用词表为空（attributes.yaml 异常）: Die referenzierbare Wortliste der Regel ist leer
-    (attributes.yaml fehlerhaft)
-  规则命中重置但次数已用尽（按钮文本读不到数字）时的转处置动作: Ersatzaktion, wenn eine Regel Zurücksetzen trifft,
-    aber die Versuche aufgebraucht sind (Schaltflächentext ohne lesbare Zahl)
+  "规则 key 须为小写字母开头的英文/数字/下划线": "Der Regel-Key muss mit einem Kleinbuchstaben beginnen und darf nur Buchstaben/Ziffern/Unterstriche enthalten"
+  "规则可引用词表为空（attributes.yaml 异常）": "Die referenzierbare Wortliste der Regel ist leer (attributes.yaml fehlerhaft)"
+  "规则命中重置但次数已用尽（按钮文本读不到数字）时的转处置动作": "Ersatzaktion, wenn eine Regel Zurücksetzen trifft, aber die Versuche aufgebraucht sind (Schaltflächentext ohne lesbare Zahl)"
   规则文件顶层必须是 dict: Die oberste Ebene einer Regeldatei muss ein dict sein
-  规则组 key 须为小写字母开头的英文/数字/下划线: Der Regelgruppen-Key muss mit einem Kleinbuchstaben
-    beginnen und darf nur Buchstaben/Ziffern/Unterstriche enthalten
+  "规则组 key 须为小写字母开头的英文/数字/下划线": "Der Regelgruppen-Key muss mit einem Kleinbuchstaben beginnen und darf nur Buchstaben/Ziffern/Unterstriche enthalten"
   规则组 name 不能为空: Der Regelgruppenname darf nicht leer sein
   规则设置: Regeleinstellungen
   规则评级: Regelbewertung
@@ -1878,17 +1657,13 @@ auto_strings:
   计算中…: Wird berechnet…
   计算联合提升: Gemeinsamen Zuwachs berechnen
   词条: Affix
-  词条 2-5 不能重复：「{name}」出现了 {n} 次: 'Affixe 2–5 dürfen sich nicht wiederholen: „{name}“
-    kommt {n}-mal vor'
+  "词条 2-5 不能重复：「{name}」出现了 {n} 次": "Affixe 2–5 dürfen sich nicht wiederholen: „{name}“ kommt {n}-mal vor"
   词条 {i} 数据格式异常: Affix {i} hat ein ungültiges Datenformat
   词条 {i} 缺少有效名称或数值: Affix {i} fehlt ein gültiger Name oder Wert
-  词条 {i}「{name}」数值 {value} 达上限的 {pct}%，超出该等级上限: Affix {i} „{name}“ mit Wert {value}
-    erreicht {pct}% der Obergrenze und überschreitet das Limit dieser Stufe
-  词条 {slot}「{name}」不在普通词条配置中: Affix {slot} „{name}“ ist nicht in der normalen Affix-Konfiguration
-    enthalten
+  "词条 {i}「{name}」数值 {value} 达上限的 {pct}%，超出该等级上限": "Affix {i} „{name}“ mit Wert {value} erreicht {pct}% der Obergrenze und überschreitet das Limit dieser Stufe"
+  "词条 {slot}「{name}」不在普通词条配置中": "Affix {slot} „{name}“ ist nicht in der normalen Affix-Konfiguration enthalten"
   词条 {slot}「{name}」不能出现在{part}: Affix {slot} „{name}“ kann nicht auf {part} erscheinen
-  词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}: Affix {slot} „{name}“ passt nicht
-    zum Ausrüstungstyp „{type_name}“{detail}
+  "词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}": "Affix {slot} „{name}“ passt nicht zum Ausrüstungstyp „{type_name}“{detail}"
   词条值: Affix-Wert
   词条名称（原始词条名 → 当前类别）: Affix-Name (Originalname → aktuelle Kategorie)
   词条字号: Affix-Schriftgröße
@@ -1896,22 +1671,16 @@ auto_strings:
   词条部位: Affix-Platz
   词条配置: Affix-Konfiguration
   询问是否继续: Nachfragen, ob fortfahren
-  该等级已转律词条是否允许无限再次转律: Ob ein bereits umgewandeltes Affix auf dieser Stufe unbegrenzt
-    erneut umgewandelt werden darf
+  "该等级已转律词条是否允许无限再次转律": "Ob ein bereits umgewandeltes Affix auf dieser Stufe unbegrenzt erneut umgewandelt werden darf"
   该等级是否允许重置调律（可选）: Ob diese Stufe das Zurücksetzen der Abstimmung erlaubt (optional)
-  该等级装备是否允许进入承音装备合并候选: Ob Ausrüstung dieser Stufe als Kandidat für Chengyin-Zusammenführung
-    infrage kommt
+  "该等级装备是否允许进入承音装备合并候选": "Ob Ausrüstung dieser Stufe als Kandidat für Chengyin-Zusammenführung infrage kommt"
   该等级要求的最低材料数量（可选）: Erforderliche Mindestmaterialmenge für diese Stufe (optional)
-  该行不产出伤害，通常是心法切换或起手动作: Diese Zeile verursacht keinen Schaden; meist ein Haltungswechsel
-    oder eine Eröffnungsaktion
-  该装备存在以下异常，游戏中不会出现这样的装备，通常是识别误读，请手工校正：: 'Diese Ausrüstung weist folgende Anomalien
-    auf, die im Spiel so nicht vorkommen (meist ein Erkennungsfehler); bitte manuell
-    korrigieren:'
+  "该行不产出伤害，通常是心法切换或起手动作": "Diese Zeile verursacht keinen Schaden; meist ein Haltungswechsel oder eine Eröffnungsaktion"
+  "该装备存在以下异常，游戏中不会出现这样的装备，通常是识别误读，请手工校正：": "Diese Ausrüstung weist folgende Anomalien auf, die im Spiel so nicht vorkommen (meist ein Erkennungsfehler); bitte manuell korrigieren:"
   请先点击 '+ 分组' 创建分组: Bitte zuerst auf '+ Gruppe' klicken, um eine Gruppe zu erstellen
   请先选中要删除的赛季行: Bitte zuerst die zu löschende Saisonzeile auswählen
   请先选中要删除的配置行: Bitte zuerst die zu löschende Konfigurationszeile auswählen
-  请先选择一个流派后再确认基础属性识别结果: Bitte zuerst einen Spielstil auswählen, bevor das Erkennungsergebnis
-    der Basisattribute bestätigt wird
+  "请先选择一个流派后再确认基础属性识别结果": "Bitte zuerst einen Spielstil auswählen, bevor das Erkennungsergebnis der Basisattribute bestätigt wird"
   请先选择词条类别: Bitte zuerst eine Affix-Kategorie auswählen
   请输入装备名称: Bitte einen Ausrüstungsnamen eingeben
   请选择方案或基础属性: Bitte einen Plan oder Basisattribute auswählen
@@ -1920,16 +1689,11 @@ auto_strings:
   调律中断，已保存部分报告: Abstimmung unterbrochen; Teilbericht wurde gespeichert
   调律材料: Abstimmungsmaterialien
   调律结束: Abstimmung beendet
-  调律部位配置无效，请在调律页重新选择部位: Ungültige Abstimmungsplatz-Konfiguration; bitte Plätze auf
-    der Abstimmungsseite neu wählen
-  调整「其他装备」Tab 中卡片的外观参数，保存后刷新即生效。: Optikparameter der Karten im Tab „Sonstige Ausrüstung“
-    anpassen; nach dem Speichern aktualisieren.
+  "调律部位配置无效，请在调律页重新选择部位": "Ungültige Abstimmungsplatz-Konfiguration; bitte Plätze auf der Abstimmungsseite neu wählen"
+  "调整「其他装备」Tab 中卡片的外观参数，保存后刷新即生效。": "Optikparameter der Karten im Tab „Sonstige Ausrüstung“ anpassen; nach dem Speichern aktualisieren."
   调满后回收模式，跳过狗粮添加: Modus „Nach voller Abstimmung verwerten“, Futter-Hinzufügen übersprungen
-  调满后回收模式：词条已满，执行回收: 'Modus „Nach voller Abstimmung verwerten“: Affixe voll, Verwertung
-    wird ausgeführt'
-  调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收: 'Nach voller Abstimmung verwerten: Nach Treffer
-    keine weitere Regelprüfung, Futter wird übersprungen, Verwertung bei 5 vollen
-    Affixen'
+  "调满后回收模式：词条已满，执行回收": "Modus „Nach voller Abstimmung verwerten“: Affixe voll, Verwertung wird ausgeführt"
+  "调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收": "Nach voller Abstimmung verwerten: Nach Treffer keine weitere Regelprüfung, Futter wird übersprungen, Verwertung bei 5 vollen Affixen"
   赛季名称: Saisonname
   赛季名称（如：黄钟长鸣、夹钟并作）: Saisonname (z. B. Huangzhong Changming, Jiazhong Bingzuo)
   赛季开始日期: Saison-Startdatum
@@ -1943,12 +1707,8 @@ auto_strings:
   轴行: Achsenzeile
   输入基础属性名称: Name der Basisattribute eingeben
   "运行时覆盖基础规则中的等级门槛；\n「默认」使用基础规则定义的 min_level，\n选择具体等级后以该值为准。": "Überschreibt zur Laufzeit die Stufenschwelle der Basisregel;\n„Standard“ nutzt min_level der Basisregel,\nbei Auswahl einer konkreten Stufe gilt dieser Wert."
-  进调律前的行为点）：未达调律门槛的装备按下表处置，自上而下首条命中即生效并阻断后续规则；无命中 = 保留: 'Verhaltenspunkt vor der Abstimmung):
-    Ausrüstung unterhalb der Abstimmungsschwelle wird gemäß folgender Tabelle behandelt,
-    von oben nach unten, erster Treffer greift und blockiert weitere Regeln; kein
-    Treffer = behalten'
-  选中项包含冲突关系，请确保同一旧装备只合并到一个新版本。: Die Auswahl enthält Konflikte; bitte sicherstellen,
-    dass jede alte Ausrüstung nur in genau eine neue Version zusammengeführt wird.
+  "进调律前的行为点）：未达调律门槛的装备按下表处置，自上而下首条命中即生效并阻断后续规则；无命中 = 保留": "Verhaltenspunkt vor der Abstimmung): Ausrüstung unterhalb der Abstimmungsschwelle wird gemäß folgender Tabelle behandelt, von oben nach unten, erster Treffer greift und blockiert weitere Regeln; kein Treffer = behalten"
+  "选中项包含冲突关系，请确保同一旧装备只合并到一个新版本。": "Die Auswahl enthält Konflikte; bitte sicherstellen, dass jede alte Ausrüstung nur in genau eine neue Version zusammengeführt wird."
   选择槽位: Platz wählen
   选择毕业率计算器 Excel: Abschlussraten-Rechner-Excel auswählen
   选择首词条: Erstes Affix wählen
@@ -1957,21 +1717,15 @@ auto_strings:
   "重命名会修改规则 id（YAML 文件名），\n可能影响直接引用该 key 的代码/工作流配置，请确认。\n\n新 key（小写字母开头的英文/数字/下划线）：": "Umbenennen ändert die Regel-ID (YAML-Dateiname)\nund kann Code-/Workflow-Konfigurationen betreffen, die diesen Key direkt referenzieren. Bitte bestätigen.\n\nNeuer Key (beginnt mit Kleinbuchstabe, Buchstaben/Ziffern/Unterstriche):"
   重命名词条名: Affix-Name umbenennen
   重新计算: Neu berechnen
-  重置二次确认识别失败，跳过该装备: Zweite Zurücksetzungsbestätigung nicht erkannt, diese Ausrüstung
-    wird übersprungen
+  "重置二次确认识别失败，跳过该装备": "Zweite Zurücksetzungsbestätigung nicht erkannt, diese Ausrüstung wird übersprungen"
   重置前快照（已执行重置）: Schnappschuss vor Zurücksetzung (Zurücksetzung bereits ausgeführt)
-  重置完成：以首词条状态重新开始调律: 'Zurücksetzung abgeschlossen: Abstimmung beginnt ab erstem Affix
-    neu'
-  重置材料信息识别失败，跳过该装备: Zurücksetzungs-Materialinfo nicht erkannt, diese Ausrüstung wird
-    übersprungen
-  重置确认按钮识别失败，跳过该装备: Zurücksetzungs-Bestätigungsschaltfläche nicht erkannt, diese Ausrüstung
-    wird übersprungen
+  "重置完成：以首词条状态重新开始调律": "Zurücksetzung abgeschlossen: Abstimmung beginnt ab erstem Affix neu"
+  "重置材料信息识别失败，跳过该装备": "Zurücksetzungs-Materialinfo nicht erkannt, diese Ausrüstung wird übersprungen"
+  "重置确认按钮识别失败，跳过该装备": "Zurücksetzungs-Bestätigungsschaltfläche nicht erkannt, diese Ausrüstung wird übersprungen"
   重置装备: Ausrüstung zurücksetzen
-  重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）: 'Ausrüstung zurücksetzen: Alle Affixe außer dem
-    ersten löschen und fortfahren (durch Abklingzeit begrenzt, einmal pro Teil)'
+  "重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）": "Ausrüstung zurücksetzen: Alle Affixe außer dem ersten löschen und fortfahren (durch Abklingzeit begrenzt, einmal pro Teil)"
   重置调律: Abstimmung zurücksetzen
-  重置边界：以下数据为执行重置前的装备状态: 'Zurücksetzungsgrenze: Folgende Daten zeigen den Zustand vor
-    dem Zurücksetzen'
+  "重置边界：以下数据为执行重置前的装备状态": "Zurücksetzungsgrenze: Folgende Daten zeigen den Zustand vor dem Zurücksetzen"
   金: Gold
   金装: Goldausrüstung
   防具类: Rüstung
@@ -1992,40 +1746,31 @@ auto_strings:
   （无词条名，点击 '+ 词条名' 添加）: (Kein Affix-Name, '+ Affix-Name' klicken zum Hinzufügen)
   （未选）: (Nicht ausgewählt)
   （须为 ['recycle', 'skip']）: (Muss ['recycle', 'skip'] sein)
-  （须为小写字母开头的英文/数字/下划线）: (Muss mit Kleinbuchstabe beginnen, Buchstaben/Ziffern/Unterstriche
-    erlaubt)
+  "（须为小写字母开头的英文/数字/下划线）": "(Muss mit Kleinbuchstabe beginnen, Buchstaben/Ziffern/Unterstriche erlaubt)"
   ，仅首词条: ', nur erstes Affix'
   ，该武器对应「{expected}」: ', diese Waffe entspricht „{expected}“'
   指纹: Fingerabdruck
   更新时间: Aktualisiert am
-  查看装备来源、指纹、原始等级和时间: Ausrüstungsquelle, Fingerabdruck, Ursprungsstufe und Zeitstempel
-    anzeigen
+  "查看装备来源、指纹、原始等级和时间": "Ausrüstungsquelle, Fingerabdruck, Ursprungsstufe und Zeitstempel anzeigen"
   装备属性: Ausrüstungseigenschaften
   选择要复制的模拟装备: Zu kopierende simulierte Ausrüstung auswählen
   点击选择要复制的装备: Klicken, um zu kopierende Ausrüstung auszuwählen
-  只删除当前筛选出的背包装备，此处不支持删除模拟装备: Löscht nur aktuell gefilterte Rucksackausrüstung; simulierte
-    Ausrüstung wird hier nicht gelöscht
+  "只删除当前筛选出的背包装备，此处不支持删除模拟装备": "Löscht nur aktuell gefilterte Rucksackausrüstung; simulierte Ausrüstung wird hier nicht gelöscht"
   确定删除当前筛选出的背包装备吗？: Aktuell gefilterte Rucksackausrüstung wirklich löschen?
   保留备战中的装备: Ausrüstung aus Ausrüstungssets behalten
-  保留当前用户任意现存备战方案正在引用的装备: Ausrüstung behalten, die in einem bestehenden Ausrüstungsset
-    des aktuellen Nutzers verwendet wird
+  "保留当前用户任意现存备战方案正在引用的装备": "Ausrüstung behalten, die in einem bestehenden Ausrüstungsset des aktuellen Nutzers verwendet wird"
   保留已锁定的装备: Gesperrte Ausrüstung behalten
   保留已标记为锁定的装备: Als gesperrt markierte Ausrüstung behalten
-  筛选命中 {matched} 件；备战保护 {referenced} 件；锁定保护 {locked} 件；实际将删除 {deleted} 件: 'Filtertreffer:
-    {matched}; durch Sets geschützt: {referenced}; gesperrt: {locked}; tatsächlich
-    gelöscht: {deleted}'
-  警告：{count} 件装备将从相关备战方案中移除。: 'Warnung: {count} Ausrüstungsteil(e) werden aus betroffenen
-    Ausrüstungssets entfernt.'
+  "筛选命中 {matched} 件；备战保护 {referenced} 件；锁定保护 {locked} 件；实际将删除 {deleted} 件": "Filtertreffer: {matched}; durch Sets geschützt: {referenced}; gesperrt: {locked}; tatsächlich gelöscht: {deleted}"
+  "警告：{count} 件装备将从相关备战方案中移除。": "Warnung: {count} Ausrüstungsteil(e) werden aus betroffenen Ausrüstungssets entfernt."
   批量复制装备: Ausrüstung stapelweise kopieren
   批量复制模拟装备到其他用户: Simulierte Ausrüstung stapelweise zu anderen Nutzern kopieren
   已选择 {count} 件: '{count} Stk. ausgewählt'
   复制到…: Kopieren nach…
   退出批量模式: Stapelmodus beenden
   复制到: Kopieren nach
-  确定将 {items} 件模拟装备复制给 {users} 个用户吗？: '{items} simulierte Ausrüstungsteile wirklich
-    zu {users} Nutzern kopieren?'
-  '{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}': '{user}: {copied} neu, {existing}
-    vorhanden, {conflicts} Konflikte'
+  "确定将 {items} 件模拟装备复制给 {users} 个用户吗？": "{items} simulierte Ausrüstungsteile wirklich zu {users} Nutzern kopieren?"
+  "{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}": "{user}: {copied} neu, {existing} vorhanden, {conflicts} Konflikte"
   '{user}：复制失败：{error}': '{user}: Kopieren fehlgeschlagen: {error}'
   确认复制: Kopieren bestätigen
   复制完成: Kopieren abgeschlossen
@@ -2035,39 +1780,26 @@ auto_strings:
   已保存目标毕业率: Gespeicherte Ziel-Abschlussrate
   推荐毕业率: Empfohlene Abschlussrate
   实际数值: Tatsächliche Werte
-  八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限（彩狗粮 100%），承音按承音上限。基于：{basis}。: 'Höchstens eine
-    Umwandlung pro Teil über alle acht Ausrüstungsteile; Ziele stammen aus der Vereinigung
-    der Umwandlungs-Affix-Pools. Ohne Chengyin gilt die normale Obergrenze (100 %),
-    mit Chengyin die Chengyin-Obergrenze. Basis: {basis}.'
-  点击「计算」开始搜索；不会自动运行。: Auf „Berechnen“ klicken, um die Suche zu starten; läuft nicht
-    automatisch.
+  "八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限（彩狗粮 100%），承音按承音上限。基于：{basis}。": "Höchstens eine Umwandlung pro Teil über alle acht Ausrüstungsteile; Ziele stammen aus der Vereinigung der Umwandlungs-Affix-Pools. Ohne Chengyin gilt die normale Obergrenze (100 %), mit Chengyin die Chengyin-Obergrenze. Basis: {basis}."
+  "点击「计算」开始搜索；不会自动运行。": "Auf „Berechnen“ klicken, um die Suche zu starten; läuft nicht automatisch."
   缺装备，补齐后计算: Ausrüstung fehlt; bitte Platz zuerst füllen
   计算: Berechnen
   取消计算: Berechnung abbrechen
   应用: Anwenden
-  把推荐目标写入备战方案的装备卡片；目标属于公共装备，会影响所有引用这些装备的方案: Schreibt die empfohlenen Ziele auf die
-    Ausrüstungskarten des Sets; Ziele gehören zur gemeinsamen Ausrüstung und wirken
-    auf alle Pläne, die sie nutzen
+  "把推荐目标写入备战方案的装备卡片；目标属于公共装备，会影响所有引用这些装备的方案": "Schreibt die empfohlenen Ziele auf die Ausrüstungskarten des Sets; Ziele gehören zur gemeinsamen Ausrüstung und wirken auf alle Pläne, die sie nutzen"
   正在搜索转律组合…: Umwandlungskombinationen werden gesucht…
   已取消；保留上一次完成的结果。: Abgebrochen; das letzte abgeschlossene Ergebnis bleibt erhalten.
   计算失败：{error}: 'Berechnung fehlgeschlagen: {error}'
   不参与：{reason}: 'Ausgeschlossen: {reason}'
   无需转律: Keine Umwandlung nötig
-  推荐 {gain:+.2f}%（换词条净收益 {swap:+.2f}%）: Empfohlen {gain:+.2f}% (Netto-Tauschgewinn
-    {swap:+.2f}%)
-  缺 {count} 件装备，请补齐后重新计算: '{count} Ausrüstungsteil(e) fehlen; bitte ergänzen und neu
-    berechnen'
-  存在词条组合异常的装备，结果不可信，禁止应用: Ausrüstung mit fehlerhafter Affix-Kombination vorhanden;
-    Ergebnis nicht vertrauenswürdig und kann nicht angewendet werden
-  搜索未穷尽（预算耗尽），以下是当前搜索最好结果: Suche nicht vollständig ausgeschöpft (Budget erschöpft);
-    bisher bestes Ergebnis wird angezeigt
+  "推荐 {gain:+.2f}%（换词条净收益 {swap:+.2f}%）": "Empfohlen {gain:+.2f}% (Netto-Tauschgewinn {swap:+.2f}%)"
+  "缺 {count} 件装备，请补齐后重新计算": "{count} Ausrüstungsteil(e) fehlen; bitte ergänzen und neu berechnen"
+  "存在词条组合异常的装备，结果不可信，禁止应用": "Ausrüstung mit fehlerhafter Affix-Kombination vorhanden; Ergebnis nicht vertrauenswürdig und kann nicht angewendet werden"
+  "搜索未穷尽（预算耗尽），以下是当前搜索最好结果": "Suche nicht vollständig ausgeschöpft (Budget erschöpft); bisher bestes Ergebnis wird angezeigt"
   建议顺序：{order}: 'Empfohlene Reihenfolge: {order}'
   共求值 {count} 次: '{count} Auswertungen'
-  没有找到超过阈值的转律提升（不代表不存在）: Kein Umwandlungsgewinn über dem Schwellenwert gefunden (schließt
-    Existenz nicht aus)
-  已写入 {count} 件装备的转律目标；勾选备战方案的「模拟转律」查看效果。: Umwandlungsziele in {count} Ausrüstungsteil(e)
-    geschrieben; im Ausrüstungsset „Umwandlung simulieren“ aktivieren, um den Effekt
-    zu sehen.
+  "没有找到超过阈值的转律提升（不代表不存在）": "Kein Umwandlungsgewinn über dem Schwellenwert gefunden (schließt Existenz nicht aus)"
+  "已写入 {count} 件装备的转律目标；勾选备战方案的「模拟转律」查看效果。": "Umwandlungsziele in {count} Ausrüstungsteil(e) geschrieben; im Ausrüstungsset „Umwandlung simulieren“ aktivieren, um den Effekt zu sehen."
   原始等级未知: Ursprungsstufe unbekannt
   不支持无限转律: Keine unbegrenzte Umwandlung
   承音后不可转律: Nach Chengyin nicht umwandelbar
@@ -2076,50 +1808,32 @@ auto_strings:
   首词条带转律标记，请校正: Erstes Affix als umgewandelt markiert; bitte korrigieren
   没有可转词条: Kein umwandelbares Affix
   缺少该等级配置: Konfiguration für diese Stufe fehlt
-  转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；仅在勾选「模拟转律」时计入属性）: 'Umwandlungsziel: {name}
-    {value} (ohne Chengyin normale Obergrenze 100 %, mit Chengyin Chengyin-Obergrenze;
-    zählt nur bei aktiviertem „Umwandlung simulieren“)'
+  "转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；仅在勾选「模拟转律」时计入属性）": "Umwandlungsziel: {name} {value} (ohne Chengyin normale Obergrenze 100 %, mit Chengyin Chengyin-Obergrenze; zählt nur bei aktiviertem „Umwandlung simulieren“)"
   清除转律目标: Umwandlungsziel löschen
-  删除该装备保存的模拟转律目标；影响所有引用此装备的方案: Löscht das gespeicherte Umwandlungsziel dieser Ausrüstung;
-    betrifft alle Pläne, die sie nutzen
+  "删除该装备保存的模拟转律目标；影响所有引用此装备的方案": "Löscht das gespeicherte Umwandlungsziel dieser Ausrüstung; betrifft alle Pläne, die sie nutzen"
   清除失败: Löschen fehlgeschlagen
-  将删除「{name}」的转律目标，所有引用该装备的备战方案都会受影响。继续？: Das Umwandlungsziel von „{name}“ wird gelöscht;
-    alle Ausrüstungssets, die dieses Teil nutzen, sind betroffen. Fortfahren?
+  "将删除「{name}」的转律目标，所有引用该装备的备战方案都会受影响。继续？": "Das Umwandlungsziel von „{name}“ wird gelöscht; alle Ausrüstungssets, die dieses Teil nutzen, sind betroffen. Fortfahren?"
   应用转律目标: Umwandlungsziele anwenden
-  将写入 {count} 件装备的转律目标。目标属于公共装备，会影响所有引用这些装备的备战方案；此次结果只针对当前方案优化。继续？: Schreibt Umwandlungsziele
-    in {count} Ausrüstungsteil(e). Ziele gehören zur gemeinsamen Ausrüstung und wirken
-    auf alle betroffenen Sets; dieses Ergebnis ist nur für den aktuellen Plan optimiert.
-    Fortfahren?
+  "将写入 {count} 件装备的转律目标。目标属于公共装备，会影响所有引用这些装备的备战方案；此次结果只针对当前方案优化。继续？": "Schreibt Umwandlungsziele in {count} Ausrüstungsteil(e). Ziele gehören zur gemeinsamen Ausrüstung und wirken auf alle betroffenen Sets; dieses Ergebnis ist nur für den aktuellen Plan optimiert. Fortfahren?"
   用户已切换，请重新打开分析: Nutzer wurde gewechselt; Analyse bitte neu öffnen
   备战方案已切换，请重新计算: Ausrüstungsset wurde gewechselt; bitte neu berechnen
   毕业率分析: Abschlussraten-Analyse
   计算假设: Berechnungsannahmen
   对话框内的改动不会写回备战方案: Änderungen in diesem Dialog werden nicht ins Ausrüstungsset zurückgeschrieben
-  按装备上已保存的转律目标计算；转律建议页本身不受此项影响: Mit gespeicherten Umwandlungszielen der Ausrüstung
-    berechnen; die Seite „Umwandlungsvorschläge“ ignoriert diese Option
-  显示上次搜索的 {count} 个结果；重新搜索会覆盖。: Zeigt die {count} Ergebnisse der letzten Suche; eine
-    neue Suche überschreibt sie.
-  计算假设已变化，当前结果按旧假设得出；请重新搜索。: Berechnungsannahmen wurden geändert; aktuelle Ergebnisse
-    beruhen auf alten Annahmen. Bitte neu suchen.
-  计算假设已变化，当前结果按旧假设得出；请重新计算。: Berechnungsannahmen wurden geändert; aktuelles Ergebnis
-    beruht auf alten Annahmen. Bitte neu berechnen.
+  "按装备上已保存的转律目标计算；转律建议页本身不受此项影响": "Mit gespeicherten Umwandlungszielen der Ausrüstung berechnen; die Seite „Umwandlungsvorschläge“ ignoriert diese Option"
+  "显示上次搜索的 {count} 个结果；重新搜索会覆盖。": "Zeigt die {count} Ergebnisse der letzten Suche; eine neue Suche überschreibt sie."
+  "计算假设已变化，当前结果按旧假设得出；请重新搜索。": "Berechnungsannahmen wurden geändert; aktuelle Ergebnisse beruhen auf alten Annahmen. Bitte neu suchen."
+  "计算假设已变化，当前结果按旧假设得出；请重新计算。": "Berechnungsannahmen wurden geändert; aktuelles Ergebnis beruht auf alten Annahmen. Bitte neu berechnen."
   查看该组合: Kombination ansehen
-  在「最优结果」里点某一条的「查看该组合」: Unter „Optimales Ergebnis“ bei einer Zeile auf „Kombination
-    ansehen“ klicken
-  '方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值': 'Plan
-    #{rank}　Gongjue-Set: {gongjue}　Abschlussrate {rate:.2f}%　·　Attribute nach Suchannahmen
-    und diesem Gongjue-Set berechnet, keine echten Anlegewerte'
+  "在「最优结果」里点某一条的「查看该组合」": "Unter „Optimales Ergebnis“ bei einer Zeile auf „Kombination ansehen“ klicken"
+  "方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值": "Plan #{rank}　Gongjue-Set: {gongjue}　Abschlussrate {rate:.2f}%　·　Attribute nach Suchannahmen und diesem Gongjue-Set berechnet, keine echten Anlegewerte"
   组合详情: Kombinationsdetails
   战斗属性: Kampfattribute
-  以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按顶部计算假设投影后的装备数值计算。: Dies
-    sind theoretische Affix-Ertragsraten; sie bedeuten nicht, dass man im Spiel ein
-    einzelnes Affix isoliert gewinnen oder verlieren kann. Hinzufügen nutzt das Lv{level}-Normalmaximum,
-    Abziehen die oben projizierten Werte.
+  "以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按顶部计算假设投影后的装备数值计算。": "Dies sind theoretische Affix-Ertragsraten; sie bedeuten nicht, dass man im Spiel ein einzelnes Affix isoliert gewinnen oder verlieren kann. Hinzufügen nutzt das Lv{level}-Normalmaximum, Abziehen die oben projizierten Werte."
   新增一条词条的收益率: Ertragsrate beim Hinzufügen eines Affixes
   扣除一条当前词条的损失率: Verlustrate beim Entfernen eines aktuellen Affixes
   已取消本次搜索。: Diese Suche wurde abgebrochen.
-  已取消本次搜索；上一次的结果保留。: Diese Suche wurde abgebrochen; die vorherigen Ergebnisse bleiben
-    erhalten.
+  "已取消本次搜索；上一次的结果保留。": "Diese Suche wurde abgebrochen; die vorherigen Ergebnisse bleiben erhalten."
   保存: Speichern
   保存位置: Speicherort
   保存并关闭: Speichern und schließen
@@ -2176,71 +1890,52 @@ auto_strings:
   '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} hat ein ungültiges kind:
     {kind}; erlaubt: {allowed}'
   '{filename} 顶层含未知字段: {keys}': '{filename} enthält unbekannte Top-Level-Felder: {keys}'
-  '{kind} 不是单选来源，不能用 selections 指定': '{kind} ist keine Einzelauswahl-Quelle und kann
-    nicht über selections angegeben werden'
-  '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: Fünf-Dimensionen-Affixe
-    müssen die Dimension explizit in stats angeben; full_affix wird nicht unterstützt'
+  "{kind} 不是单选来源，不能用 selections 指定": "{kind} ist keine Einzelauswahl-Quelle und kann nicht über selections angegeben werden"
+  "{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix": "{label}: Fünf-Dimensionen-Affixe müssen die Dimension explizit in stats angeben; full_affix wird nicht unterstützt"
   '{label}: 未知属性字段 {field}': '{label}: Unbekanntes Attributfeld {field}'
-  '{label}: 等级 {level} 没有词条 {category} 的上限配置': '{label}: Für Stufe {level} ist keine
-    Obergrenze für Affix {category} konfiguriert'
-  '{label}: 词条 {category} 未登记字段映射': '{label}: Für Affix {category} ist keine Feldzuordnung
-    registriert'
+  "{label}: 等级 {level} 没有词条 {category} 的上限配置": "{label}: Für Stufe {level} ist keine Obergrenze für Affix {category} konfiguriert"
+  "{label}: 词条 {category} 未登记字段映射": "{label}: Für Affix {category} ist keine Feldzuordnung registriert"
   '{n} 个属性靠补足': '{n} Attribut(e) über Lückenausgleich'
   '{school} 推导': '{school} abgeleitet'
   '{source} 含未知字段: {keys}': '{source} enthält unbekannte Felder: {keys}'
   '{source} 声明了 split 却没有 full_affix': '{source} deklariert split ohne full_affix'
-  '{source} 既声明无静态属性又填了数值，取哪个无从判断': '{source} deklariert sowohl keine statischen Werte
-    als auch Zahlenwerte; unklar, was gilt'
+  "{source} 既声明无静态属性又填了数值，取哪个无从判断": "{source} deklariert sowohl keine statischen Werte als auch Zahlenwerte; unklar, was gilt"
   '{source} 的 full_affix 不受支持: {name}；可用 {allowed}': '{source}: full_affix {name}
     wird nicht unterstützt; verfügbar: {allowed}'
-  '{source} 的 full_affix 必须是词条类别名': '{source}: full_affix muss ein Affix-Kategoriename
-    sein'
+  "{source} 的 full_affix 必须是词条类别名": "{source}: full_affix muss ein Affix-Kategoriename sein"
   '{source} 的 group 必须是字符串': '{source}: group muss eine Zeichenkette sein'
   '{source} 的 label 必须是字符串': '{source}: label muss eine Zeichenkette sein'
   '{source} 的 modeled 必须是布尔值': '{source}: modeled muss ein Wahrheitswert (bool) sein'
-  '{source} 的 no_effect 必须是布尔值': '{source}: no_effect muss ein Wahrheitswert (bool)
-    sein'
+  "{source} 的 no_effect 必须是布尔值": "{source}: no_effect muss ein Wahrheitswert (bool) sein"
   '{source} 的 scope 只能是 {allowed}': '{source}: scope darf nur {allowed} sein'
   '{source} 的 tier 必须是非负整数': '{source}: tier muss eine nicht-negative Ganzzahl sein'
   '{what} 不是已知属性字段': '{what} ist kein bekanntes Attributfeld'
   '{what} 含未知公式字段: {keys}': '{what} enthält unbekannte Formelfelder: {keys}'
   '{what} 必须是数值，实际是 {kind}': '{what} muss eine Zahl sein, erhalten: {kind}'
   '{what} 必须是映射，实际是 {kind}': '{what} muss eine Zuordnung (dict) sein, erhalten: {kind}'
-  '{what} 是映射时必须含 formula': '{what} muss formula enthalten, wenn es eine Zuordnung
-    ist'
+  "{what} 是映射时必须含 formula": "{what} muss formula enthalten, wenn es eine Zuordnung ist"
   '{what} 的 formula 之外还有多余的键: {keys}': '{what} hat neben formula weitere überflüssige
     Keys: {keys}'
   '{what} 的 round 必须是整数': '{what}: round muss eine Ganzzahl sein'
   '{what} 的 source 不是已知属性字段: {source}': '{what}: source ist kein bekanntes Attributfeld:
     {source}'
-  '{what} 的 split 必须是两个整数，如 [1, 2]': '{what}: split muss aus zwei Ganzzahlen bestehen,
-    z. B. [1, 2]'
+  "{what} 的 split 必须是两个整数，如 [1, 2]": "{what}: split muss aus zwei Ganzzahlen bestehen, z. B. [1, 2]"
   '{what} 缺少 source': '{what} fehlt source'
   —: —
-  「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑: Die Werte von „ein ganzes
-    Affix“ stammen aus der Stufenobergrenze der Begriffskonfiguration, sodass bei
-    Saisonwechsel nur dort geändert werden muss; für Einträge mit mehreren Attributen
-    oder Formeln „Erweitert“ nutzen
+  "「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑": "Die Werte von „ein ganzes Affix“ stammen aus der Stufenobergrenze der Begriffskonfiguration, sodass bei Saisonwechsel nur dort geändert werden muss; für Einträge mit mehreren Attributen oder Formeln „Erweitert“ nutzen"
   」: “
   与对照完全一致: Stimmt exakt mit Referenz überein
-  与对照有 {n} 项不一致，看「按来源拆分」定位: '{n} Feld(er) weichen von der Referenz ab; siehe „Nach
-    Quelle aufschlüsseln“'
+  "与对照有 {n} 项不一致，看「按来源拆分」定位": "{n} Feld(er) weichen von der Referenz ab; siehe „Nach Quelle aufschlüsseln“"
   仅战斗内: Nur im Kampf
-  以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: Die drei oberen Einträge dienen nur der Spielstilbeschreibung
-    und beeinflussen weder Bewertung, Auto-Abstimmung noch Abschlussrate
-  以下文件解析失败，已跳过：{files}: 'Folgende Dateien konnten nicht ausgewertet werden und wurden
-    übersprungen: {files}'
-  以下流派或玩法仍在使用该武学：{schools}: 'Folgende Spielstile oder Spielweisen nutzen diese Kampfkunst
-    noch: {schools}'
-  顺序由系统配置决定；你新增的条目会排在最后。: Die Reihenfolge wird durch die Systemkonfiguration bestimmt;
-    selbst hinzugefügte Einträge stehen am Ende.
-  以下调律规则仍在引用该玩法：{rules}: 'Folgende Abstimmungsregeln referenzieren diese Spielweise
-    noch: {rules}'
+  "以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算": "Die drei oberen Einträge dienen nur der Spielstilbeschreibung und beeinflussen weder Bewertung, Auto-Abstimmung noch Abschlussrate"
+  "以下文件解析失败，已跳过：{files}": "Folgende Dateien konnten nicht ausgewertet werden und wurden übersprungen: {files}"
+  "以下流派或玩法仍在使用该武学：{schools}": "Folgende Spielstile oder Spielweisen nutzen diese Kampfkunst noch: {schools}"
+  "顺序由系统配置决定；你新增的条目会排在最后。": "Die Reihenfolge wird durch die Systemkonfiguration bestimmt; selbst hinzugefügte Einträge stehen am Ende."
+  "以下调律规则仍在引用该玩法：{rules}": "Folgende Abstimmungsregeln referenzieren diese Spielweise noch: {rules}"
   作用域: Geltungsbereich
   保存时包含未建模补足: Unmodellierten Ausgleich beim Speichern einschließen
   修改失败: Änderung fehlgeschlagen
-  修改暂存于当前对话框，点击保存后生效: Änderungen werden in diesem Dialog zwischengespeichert und erst
-    beim Speichern wirksam
+  "修改暂存于当前对话框，点击保存后生效": "Änderungen werden in diesem Dialog zwischengespeichert und erst beim Speichern wirksam"
   停止中: Wird gestoppt
   全不选: Alle abwählen
   其中 {n} 项尚未填数值: Davon haben {n} noch keinen Wert
@@ -2256,35 +1951,27 @@ auto_strings:
   '反解目标含未知字段: {field}': 'Rückrechnungsziel enthält unbekanntes Feld: {field}'
   取值: Wert
   取值方式: Wertart
-  另有 {n} 项仅战斗内生效，不进本表: Weitere {n} Einträge gelten nur im Kampf und stehen nicht in
-    dieser Tabelle
+  "另有 {n} 项仅战斗内生效，不进本表": "Weitere {n} Einträge gelten nur im Kampf und stehen nicht in dieser Tabelle"
   同一门心法不能装在多个槽位: Dieselbe Innere Kunst darf nicht in mehreren Plätzen angelegt sein
   "名字 = 调律 Tab 勾选项；\n增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。": "Name = Auswahlpunkt im Abstimmungs-Tab;\nSchadensaffix leer / „- Kein Schaden -“ = auf dieser Seite kein Schadensbonus nötig;\nAttribut = Elementar-Spielstil (Nicht-Waffen-Plätze nutzen Elementar→Formlos-Äquivalenz);\nBindungsschalter = Bewertung dieser Spielweise aktiviert diesen Schalter (überschreibt globalen Status);\nWaffen-/Affix-Kandidaten stammen aus der Spielkonfiguration, Schadensboni richten sich nach der Waffe derselben Seite."
   基础属性推导: Basisattribute ableiten
   存为基础属性: Als Basisattribute speichern
   对照值: Referenzwert
   对照基础属性: Referenz-Basisattribute
-  尚未配装，先在左侧选心法与其他来源: Noch nichts angelegt — wähle links Innere Künste und weitere
-    Quellen
-  属性与主副武学由绑定流派提供，已锁定: Attribut sowie Haupt- und Neben-Kampfkunst stammen vom gebundenen
-    Spielstil und sind gesperrt
+  "尚未配装，先在左侧选心法与其他来源": "Noch nichts angelegt — wähle links Innere Künste und weitere Quellen"
+  "属性与主副武学由绑定流派提供，已锁定": "Attribut sowie Haupt- und Neben-Kampfkunst stammen vom gebundenen Spielstil und sind gesperrt"
   属性来源: Attributquellen
   属性来源条目名不能为空: Name des Attributquellen-Eintrags darf nicht leer sein
   '属性来源条目已存在: {ids}': 'Attributquellen-Eintrag existiert bereits: {ids}'
   属性配置: Attributkonfiguration
-  已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）: In Systemebene gespeichert, aber lokale
-    Konfiguration ist noch aktiv; bitte zuerst lokale Überschreibung zurücksetzen
-    ({now})
+  "已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）": "In Systemebene gespeichert, aber lokale Konfiguration ist noch aktiv; bitte zuerst lokale Überschreibung zurücksetzen ({now})"
   已填: Ausgefüllt
-  已存为基础属性「{name}」，毕业率可直接选用: Als Basisattribute „{name}“ gespeichert; direkt für die
-    Abschlussrate nutzbar
+  "已存为基础属性「{name}」，毕业率可直接选用": "Als Basisattribute „{name}“ gespeichert; direkt für die Abschlussrate nutzbar"
   待填: Offen
   待填 {n} 条: '{n} noch auszufüllen'
-  心法重数只能是 1-{max}：{name} 填了 {tier}: 'Stufe der Inneren Kunst muss 1–{max} sein: {name}
-    hat {tier}'
+  "心法重数只能是 1-{max}：{name} 填了 {tier}": "Stufe der Inneren Kunst muss 1–{max} sein: {name} hat {tier}"
   心法（{n} 个槽）: Innere Künste ({n} Plätze)
-  所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」: Alle Spielweisen sind bereits referenziert; neue
-    Spielweisen unter „Spielkonfiguration → Spielweisen“ anlegen
+  "所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」": "Alle Spielweisen sind bereits referenziert; neue Spielweisen unter „Spielkonfiguration → Spielweisen“ anlegen"
   手填补足: Manueller Restausgleich
   执行用户: Ausführender Nutzer
   执行目标: Ausführungsziel
@@ -2299,8 +1986,7 @@ auto_strings:
   新建失败: Erstellen fehlgeschlagen
   无静态属性: Keine statischen Attribute
   暂停中...: Wird pausiert...
-  最多同时装备 {n} 门心法，给了 {got} 门: 'Maximal {n} Innere Künste gleichzeitig anlegbar, erhalten:
-    {got}'
+  "最多同时装备 {n} 门心法，给了 {got} 门": "Maximal {n} Innere Künste gleichzeitig anlegbar, erhalten: {got}"
   未保存的更改: Ungespeicherte Änderungen
   未建模补足: Unmodellierter Ausgleich
   '未知作用域: {scope}': 'Unbekannter Geltungsbereich: {scope}'
@@ -2309,29 +1995,22 @@ auto_strings:
   '未知的属性来源条目: {ids}': 'Unbekannte Attributquellen-Einträge: {ids}'
   未记录: Nicht erfasst
   未选对照，只显示推导值: Keine Referenz gewählt; es werden nur abgeleitete Werte angezeigt
-  本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}: Diese Seite bestätigt {done}/{total}　Alle
-    Quellen {all_done}/{all_total}
+  "本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}": "Diese Seite bestätigt {done}/{total}　Alle Quellen {all_done}/{all_total}"
   条目: Eintrag
   条目内容必须是映射: Eintragsinhalt muss eine Zuordnung (dict) sein
   条目名（分组用「·」分隔，如 易水歌·二重）：: 'Eintragsname (Gruppe mit „·“ trennen, z. B. 易水歌·二重):'
-  来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值: Bei unvollständigen Quellen wird die Lücke aus dem
-    Referenzfenster rückgerechnet; deaktiviert wird nur der reine Modellwert gespeichert
+  "来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值": "Bei unvollständigen Quellen wird die Lücke aus dem Referenzfenster rückgerechnet; deaktiviert wird nur der reine Modellwert gespeichert"
   槽 {n}: Platz {n}
   武学类型: Kampfkunst-Typ
   武学：{arts}（由流派决定，不需选择）: 'Kampfkünste: {arts} (durch Spielstil vorgegeben, nicht wählbar)'
-  流派与玩法只引用武学，武器由此派生，不在别处录入: Spielstile und Spielweisen referenzieren nur Kampfkünste;
-    die Waffe wird hier abgeleitet
-  玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用: Spielweisen werden unter „Spielkonfiguration → Spielweisen“
-    gepflegt und hier nur referenziert
+  "流派与玩法只引用武学，武器由此派生，不在别处录入": "Spielstile und Spielweisen referenzieren nur Kampfkünste; die Waffe wird hier abgeleitet"
+  "玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用": "Spielweisen werden unter „Spielkonfiguration → Spielweisen“ gepflegt und hier nur referenziert"
   玩法配置: Spielweisen
-  直接编辑该条目的 YAML。可用键：stats、extra、full_affix、split、scope、no_effect、label: 'YAML dieses
-    Eintrags direkt bearbeiten. Verfügbare Keys: stats, extra, full_affix, split,
-    scope, no_effect, label'
+  "直接编辑该条目的 YAML。可用键：stats、extra、full_affix、split、scope、no_effect、label": "YAML dieses Eintrags direkt bearbeiten. Verfügbare Keys: stats, extra, full_affix, split, scope, no_effect, label"
   系统: System
   结束任务: Aufgabe beenden
   编辑…: Bearbeiten…
-  自定义玩法可自由选择属性与武学，并显示全部防具定音: Eigene Spielweisen können Attribute und Kampfkünste frei
-    wählen und zeigen alle Rüstungs-Einstimmungen
+  "自定义玩法可自由选择属性与武学，并显示全部防具定音": "Eigene Spielweisen können Attribute und Kampfkünste frei wählen und zeigen alle Rüstungs-Einstimmungen"
   识别失败: Erkennung fehlgeschlagen
   '词条拆分比无效: {split}': 'Ungültiges Affix-Teilungsverhältnis: {split}'
   该武学已存在: Diese Kampfkunst existiert bereits
@@ -2351,44 +2030,33 @@ auto_strings:
   "同一份配置里有引用，删除后会显示为未知套装：\n{items}": "In derselben Konfiguration referenziert; nach dem Löschen als unbekanntes Set angezeigt:\n{items}"
   ' 级': ' St.'
   F6 调律配置可新增/编辑规则组: 'F6: Abstimmungskonfig zum Hinzufügen/Bearbeiten von Regelgruppen'
-  MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。: MCP-Dienst gestartet, {agent}-Verbindungskonfiguration
-    synchronisiert; nach Neustart kein erneuter Export nötig.
-  MCP 服务未启动。导出的配置包含私人连接令牌，请勿公开分享。: MCP-Dienst läuft nicht. Die exportierte Konfiguration
-    enthält private Verbindungstoken; nicht öffentlich teilen.
+  "MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。": "MCP-Dienst gestartet, {agent}-Verbindungskonfiguration synchronisiert; nach Neustart kein erneuter Export nötig."
+  "MCP 服务未启动。导出的配置包含私人连接令牌，请勿公开分享。": "MCP-Dienst läuft nicht. Die exportierte Konfiguration enthält private Verbindungstoken; nicht öffentlich teilen."
   MCP 端口: MCP-Port
   PC 端兼容后台模式: PC-Hintergrund-Kompatibilitätsmodus
   PVE: PVE
   PVP: PVP
-  PVP 方案不参与智能调律：目前没有 PVP 调律方案，一起加载会让够不到 PVE 标准的装备被判成有提升: 'PVP-Pläne sind von der intelligenten
-    Abstimmung ausgeschlossen: Es gibt keine PVP-Abstimmungspläne, und ihr Laden würde
-    Ausrüstung unterhalb des PVE-Standards als Verbesserung werten'
+  "PVP 方案不参与智能调律：目前没有 PVP 调律方案，一起加载会让够不到 PVE 标准的装备被判成有提升": "PVP-Pläne sind von der intelligenten Abstimmung ausgeschlossen: Es gibt keine PVP-Abstimmungspläne, und ihr Laden würde Ausrüstung unterhalb des PVE-Standards als Verbesserung werten"
   disabled 必须是布尔值: disabled muss ein Wahrheitswert (bool) sein
-  key 须为小写英文标识（字母开头，可含数字/下划线）: Key muss eine kleingeschriebene Kennung sein (beginnt
-    mit Buchstabe, Ziffern/Unterstriche erlaubt)
+  "key 须为小写英文标识（字母开头，可含数字/下划线）": "Key muss eine kleingeschriebene Kennung sein (beginnt mit Buchstabe, Ziffern/Unterstriche erlaubt)"
   order 必须是整数: order muss eine Ganzzahl sein
   v{version}: v{version}
-  '{count} 个用户的备战方案还有未保存的修改，要保存后再关闭吗？': Bei {count} Nutzern gibt es ungespeicherte
-    Änderungen an Ausrüstungssets. Vor dem Schließen speichern?
+  "{count} 个用户的备战方案还有未保存的修改，要保存后再关闭吗？": "Bei {count} Nutzern gibt es ungespeicherte Änderungen an Ausrüstungssets. Vor dem Schließen speichern?"
   '{filename} 的 scheme 必须是字符串': '{filename}: scheme muss eine Zeichenkette sein'
   '{filename} 缺少 school': '{filename}: school fehlt'
   '{file}  技能 {done}/{total}': '{file}  Fertigkeiten {done}/{total}'
-  '{label}是 {actual}，该玩法需要 {expected}': '{label} ist {actual}; diese Spielweise erfordert
-    {expected}'
+  "{label}是 {actual}，该玩法需要 {expected}": "{label} ist {actual}; diese Spielweise erfordert {expected}"
   '{level} 级': Stufe {level}
-  '{level} 级弓玦没有可用的加成数据，请选择已配置的等级。': Für Gongjue Stufe {level} liegen keine Bonusdaten
-    vor; bitte eine konfigurierte Stufe wählen.
+  "{level} 级弓玦没有可用的加成数据，请选择已配置的等级。": "Für Gongjue Stufe {level} liegen keine Bonusdaten vor; bitte eine konfigurierte Stufe wählen."
   '{level}级': Lv{level}
   '{level}级·DPS': Lv{level} · DPS
   '{level}级·毕业率': Lv{level} · Abschlussrate
   '{name}　{type} · {level}级　{dingyin}　[{source}]': '{name}　{type} · Lv{level}　{dingyin}　[{source}]'
   '{name}（{style}）': '{name} ({style})'
   '{name}（当前不匹配）': '{name} (aktuell unpassend)'
-  '{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条': '{priority} · {affix}:
-    aktuell {actual}, erforderlich {minimum}–{maximum}'
+  "{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条": "{priority} · {affix}: aktuell {actual}, erforderlich {minimum}–{maximum}"
   '{school}  ·  {scheme}  ·  {level}级  ·  v{version}  ·  {plan}': '{school}  ·  {scheme}  ·  Lv{level}  ·  v{version}  ·  {plan}'
-  '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值': '{school}
-    · {sources} Quellen · {pending} offen/teilweise · {declared} deklariert, nicht
-    ausgewertet'
+  "{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值": "{school} · {sources} Quellen · {pending} offen/teilweise · {declared} deklariert, nicht ausgewertet"
   '{source} 的 kind 必须是字符串': '{source}: kind muss eine Zeichenkette sein'
   '{what} 必须是布尔值': '{what} muss ein Wahrheitswert (bool) sein'
   '{what}.{name} 不是已知修正字段': '{what}.{name} ist kein bekanntes Modifikatorfeld'
@@ -2398,8 +2066,7 @@ auto_strings:
     {keys}'
   　假设：{labels}: '　Annahmen: {labels}'
   「{name}」套装已存在。: Set „{name}“ existiert bereits.
-  「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。: Für „{target}“ existiert auf Stufe {level}
-    noch kein Abschlussraten-Plan; optimaler Vergleich derzeit nicht möglich.
+  "「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。": "Für „{target}“ existiert auf Stufe {level} noch kein Abschlussraten-Plan; optimaler Vergleich derzeit nicht möglich."
   【完整定级】: '[Vollbewertung]'
   【调律潜力】: '[Abstimmungspotenzial]'
   一键勾选: Alle markieren
@@ -2407,45 +2074,28 @@ auto_strings:
   不添加: Nicht hinzufügen
   不选择流派: Kein Spielstil
   不选择玩法: Keine Spielweise
-  与另一件同类型装备互换普通定音属性: Normale Einstimmungsattribute mit einer anderen Ausrüstung gleichen
-    Typs tauschen
-  与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）: Andere Quelle als der zugehörige Plan; Koeffiziententabelle
-    ist evtl. veraltet (Excel neu importieren behebt dies)
-  个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。留空时自动跟随当前赛季等级。: Die persönliche Stufe bestimmt die
-    Resistenz bei der Abschlussraten-Berechnung und begrenzt die maximal ladbare Planstufe.
-    Leer lassen, um automatisch der aktuellen Saisonstufe zu folgen.
-  为当前用户创建一件模拟装备，不修改角色基础属性: Simulierte Ausrüstung für den aktuellen Nutzer erstellen,
-    ohne Charakter-Basisattribute zu ändern
-  为当前用户和当前基础规则组启用智能调律。运行前请为相关备战方案扫描完整的八件穿戴装备。: Intelligente Abstimmung für den aktuellen
-    Nutzer und die aktuelle Basis-Regelgruppe aktivieren. Vor dem Start alle acht
-    angelegten Teile der relevanten Ausrüstungssets scannen.
-  为本赛季等级的原生装备额外创建同等级承音分支；只将普通词条拉到承音上限，定音保持原值: Erstellt für native Ausrüstung der aktuellen
-    Saisonstufe zusätzlich einen Chengyin-Zweig gleicher Stufe; nur normale Affixe
-    werden auf die Chengyin-Obergrenze gezogen, Einstimmung bleibt unverändert
+  "与另一件同类型装备互换普通定音属性": "Normale Einstimmungsattribute mit einer anderen Ausrüstung gleichen Typs tauschen"
+  "与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）": "Andere Quelle als der zugehörige Plan; Koeffiziententabelle ist evtl. veraltet (Excel neu importieren behebt dies)"
+  "个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。留空时自动跟随当前赛季等级。": "Die persönliche Stufe bestimmt die Resistenz bei der Abschlussraten-Berechnung und begrenzt die maximal ladbare Planstufe. Leer lassen, um automatisch der aktuellen Saisonstufe zu folgen."
+  "为当前用户创建一件模拟装备，不修改角色基础属性": "Simulierte Ausrüstung für den aktuellen Nutzer erstellen, ohne Charakter-Basisattribute zu ändern"
+  "为当前用户和当前基础规则组启用智能调律。运行前请为相关备战方案扫描完整的八件穿戴装备。": "Intelligente Abstimmung für den aktuellen Nutzer und die aktuelle Basis-Regelgruppe aktivieren. Vor dem Start alle acht angelegten Teile der relevanten Ausrüstungssets scannen."
+  "为本赛季等级的原生装备额外创建同等级承音分支；只将普通词条拉到承音上限，定音保持原值": "Erstellt für native Ausrüstung der aktuellen Saisonstufe zusätzlich einen Chengyin-Zweig gleicher Stufe; nur normale Affixe werden auf die Chengyin-Obergrenze gezogen, Einstimmung bleibt unverändert"
   主武学和副武学不能相同: Haupt- und Neben-Kampfkunst dürfen nicht identisch sein
   互换失败: Tausch fehlgeschlagen
   互换定音: Einstimmung tauschen
   互换普通定音: Normale Einstimmung tauschen
-  仅勾选无歧义候选；有多个可能版本的组请人工核对: Nur eindeutige Kandidaten markieren; Gruppen mit mehreren
-    möglichen Versionen bitte manuell prüfen
-  仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。: Gilt nur am PC; deaktiviert bleibt das präzisere Ziehen-Scrollen
-    aktiv.
-  仅在现有调律处理决定继续调律后执行。系统会基于备战方案和承音上限推演当前装备的最大可能毕业率；计算失败或结果不可靠时始终放行。: Wird erst ausgeführt,
-    nachdem die bestehende Abstimmungslogik auf Weiterstimmen entschied. Projiziert
-    anhand von Ausrüstungsset und Chengyin-Obergrenze die maximal mögliche Abschlussrate;
-    bei Fehlern oder unsicheren Ergebnissen wird stets durchgelassen.
+  "仅勾选无歧义候选；有多个可能版本的组请人工核对": "Nur eindeutige Kandidaten markieren; Gruppen mit mehreren möglichen Versionen bitte manuell prüfen"
+  "仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。": "Gilt nur am PC; deaktiviert bleibt das präzisere Ziehen-Scrollen aktiv."
+  "仅在现有调律处理决定继续调律后执行。系统会基于备战方案和承音上限推演当前装备的最大可能毕业率；计算失败或结果不可靠时始终放行。": "Wird erst ausgeführt, nachdem die bestehende Abstimmungslogik auf Weiterstimmen entschied. Projiziert anhand von Ausrüstungsset und Chengyin-Obergrenze die maximal mögliche Abschlussrate; bei Fehlern oder unsicheren Ergebnissen wird stets durchgelassen."
   仅识别首词条: Nur erstes Affix erkennen
-  以下词条未计入（按部位规则或同名只取最高处理）：: 'Folgende Affixe wurden nicht gezählt (nach Platzregeln
-    oder nur höchster Wert bei gleichem Namen):'
+  "以下词条未计入（按部位规则或同名只取最高处理）：": "Folgende Affixe wurden nicht gezählt (nach Platzregeln oder nur höchster Wert bei gleichem Namen):"
   会意转化: Affinitätsumwandlung
   传入玩法: Übergebene Spielweise
   伤害建模: Schadensmodell
-  低于该等级的装备直接跳过，不进入任何判定: Ausrüstung unterhalb dieser Stufe wird direkt übersprungen
-    und nicht bewertet
+  "低于该等级的装备直接跳过，不进入任何判定": "Ausrüstung unterhalb dieser Stufe wird direkt übersprungen und nicht bewertet"
   使用 Agent: Agent verwenden
   使用律准石缓存: Abstimmungsstein-Cache verwenden
-  保存到其他位置会另存一份，原搭配保留: Speichern an einem anderen Ort legt eine Kopie an; der ursprüngliche
-    Build bleibt erhalten
+  "保存到其他位置会另存一份，原搭配保留": "Speichern an einem anderen Ort legt eine Kopie an; der ursprüngliche Build bleibt erhalten"
   保存失败：{error}: 'Speichern fehlgeschlagen: {error}'
   保存失败：{e}: 'Speichern fehlgeschlagen: {e}'
   保存成长状态: Entwicklungsstatus speichern
@@ -2453,12 +2103,10 @@ auto_strings:
   候选装备最大可能毕业率: Maximal mögliche Abschlussrate der Kandidaten-Ausrüstung
   停用智能调律: Intelligente Abstimmung deaktivieren
   先在表格里选中要删除的套装。: Bitte zuerst das zu löschende Set in der Tabelle auswählen.
-  全套最多 {count} 条词条，请先减少其他词条: Ein vollständiges Set erlaubt höchstens {count} Affixe;
-    bitte zuerst andere reduzieren
+  "全套最多 {count} 条词条，请先减少其他词条": "Ein vollständiges Set erlaubt höchstens {count} Affixe; bitte zuerst andere reduzieren"
   关联套装: Verknüpftes Set
   关闭已结束的任务页: Beendete Aufgabenseiten schließen
-  关闭时只记录智能判定结果，不改变原有调律流程。: Deaktiviert werden nur intelligente Bewertungsergebnisse
-    protokolliert, ohne den Ablauf zu verändern.
+  "关闭时只记录智能判定结果，不改变原有调律流程。": "Deaktiviert werden nur intelligente Bewertungsergebnisse protokolliert, ohne den Ablauf zu verändern."
   养成真实装备: Echte Ausrüstung entwickeln
   再次转律只能修改原固定槽位: Erneute Umwandlung darf nur den ursprünglichen festen Platz ändern
   冷却完成: Abklingzeit beendet
@@ -2467,143 +2115,89 @@ auto_strings:
   冷却类型不明，跳过: Abklingtyp unbekannt, übersprungen
   切换到: Wechseln zu
   切换卡片当前展示的定音: Die auf dieser Karte angezeigte Einstimmung umschalten
-  切换后扫描处理/材料处理/调律处理页同步对准该组，不会修改用户在自动调律页选择的规则组: Nach dem Wechsel richten sich Scan-/Material-/Abstimmungsseiten
-    nach dieser Gruppe; die Auswahl auf der Auto-Abstimmungsseite bleibt unverändert
+  "切换后扫描处理/材料处理/调律处理页同步对准该组，不会修改用户在自动调律页选择的规则组": "Nach dem Wechsel richten sich Scan-/Material-/Abstimmungsseiten nach dieser Gruppe; die Auswahl auf der Auto-Abstimmungsseite bleibt unverändert"
   切换失败: Wechsel fehlgeschlagen
   切换定音: Einstimmung umschalten
-  切换等级可查看该等级的词条上限与传律石估算；选到本装备的承音目标等级时会同时勾选承音: Stufe wechseln, um Affix-Obergrenzen
-    und Chuanlv-Stein-Schätzung anzuzeigen; Wahl der Chengyin-Zielstufe aktiviert
-    zugleich Chengyin
+  "切换等级可查看该等级的词条上限与传律石估算；选到本装备的承音目标等级时会同时勾选承音": "Stufe wechseln, um Affix-Obergrenzen und Chuanlv-Stein-Schätzung anzuzeigen; Wahl der Chengyin-Zielstufe aktiviert zugleich Chengyin"
   删除备战方案: Ausrüstungsset löschen
   删除套装: Set löschen
   "删除套装「{name}」？\n\n备战方案和装备记录里引用它的部位，删除后会按未知套装处理，不会自动清空。{detail}": "Set „{name}“ wirklich löschen?\n\nPlätze in Ausrüstungssets und Ausrüstungsdaten, die es referenzieren, erscheinen danach als unbekanntes Set und werden nicht automatisch geleert. {detail}"
-  删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择: Löscht alle alten Versionen links und überträgt
-    Set-Referenzen auf die rechte Version; Konfliktgruppen schließen sich gegenseitig
-    aus
+  "删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择": "Löscht alle alten Versionen links und überträgt Set-Referenzen auf die rechte Version; Konfliktgruppen schließen sich gegenseitig aus"
   删除选中规则组（至少保留一个）: Ausgewählte Regelgruppe löschen (mindestens eine behalten)
   判定会心: Bewertete Krit.-Rate
   判定会意: Bewertete Affinität
-  判定抗性 {judge:.1f}%，增益抗性 {buff:.1f}%；黄字按公共规则折算与封顶。: Bewertungsresistenz {judge:.1f}%,
-    Bonusresistenz {buff:.1f}%; gelbe Werte werden nach gemeinsamen Regeln umgerechnet
-    und gedeckelt.
+  "判定抗性 {judge:.1f}%，增益抗性 {buff:.1f}%；黄字按公共规则折算与封顶。": "Bewertungsresistenz {judge:.1f}%, Bonusresistenz {buff:.1f}%; gelbe Werte werden nach gemeinsamen Regeln umgerechnet und gedeckelt."
   判定精准: Bewertete Präzision
-  判定精准、判定会心、判定会意取面板黄字；直接会心、直接会意不受抗性。: Bewertete Präzision, Krit.-Rate und Affinität
-    nutzen gelbe Fensterwerte; direkte Krit.-Rate und direkte Affinität unterliegen
-    keiner Resistenz.
-  判定顺序：垃圾 → 一般 → 优秀 → 顶级，命中即定档: 'Bewertungsreihenfolge: Müll → Normal → Ausgezeichnet
-    → Top, erster Treffer legt Rang fest'
+  "判定精准、判定会心、判定会意取面板黄字；直接会心、直接会意不受抗性。": "Bewertete Präzision, Krit.-Rate und Affinität nutzen gelbe Fensterwerte; direkte Krit.-Rate und direkte Affinität unterliegen keiner Resistenz."
+  "判定顺序：垃圾 → 一般 → 优秀 → 顶级，命中即定档": "Bewertungsreihenfolge: Müll → Normal → Ausgezeichnet → Top, erster Treffer legt Rang fest"
   刷新生成方案: Generierten Plan aktualisieren
   副增伤词条: Neben-Schadensaffix
-  勾选参与候选筛选的玩法；装备只要有一条玩法达标就保留: Spielweisen für die Kandidatenfilterung markieren; erfüllt
-    Ausrüstung mindestens eine Spielweise, wird sie behalten
-  勾选后，满承音假设会把本件当作承音装备计算；只影响计算，不改变装备的承音状态: Aktiviert behandelt die Voll-Chengyin-Annahme
-    dieses Teil rechnerisch als Chengyin-Ausrüstung; der echte Chengyin-Status bleibt
-    unverändert
-  勾选表示该词条是调律过程中调出的，非扫描时已有: Aktivieren, wenn dieses Affix beim Abstimmen entstand und
-    beim Scannen noch nicht vorhanden war
-  勾选该词条可出现的装备部位（全选 = 全部）: Ausrüstungsplätze markieren, auf denen dieses Affix erscheinen
-    kann (Alle auswählen = Alle)
+  "勾选参与候选筛选的玩法；装备只要有一条玩法达标就保留": "Spielweisen für die Kandidatenfilterung markieren; erfüllt Ausrüstung mindestens eine Spielweise, wird sie behalten"
+  "勾选后，满承音假设会把本件当作承音装备计算；只影响计算，不改变装备的承音状态": "Aktiviert behandelt die Voll-Chengyin-Annahme dieses Teil rechnerisch als Chengyin-Ausrüstung; der echte Chengyin-Status bleibt unverändert"
+  "勾选表示该词条是调律过程中调出的，非扫描时已有": "Aktivieren, wenn dieses Affix beim Abstimmen entstand und beim Scannen noch nicht vorhanden war"
+  "勾选该词条可出现的装备部位（全选 = 全部）": "Ausrüstungsplätze markieren, auf denen dieses Affix erscheinen kann (Alle auswählen = Alle)"
   匹配关键字: Suchbegriffe
   升级规则: Aufwertungsregeln
   单击查看词条详情: Klicken, um Affix-Details anzuzeigen
-  卡片显示原始装备数值，计算假设标注在卡片上方: Karten zeigen Originalwerte; Berechnungsannahmen stehen
-    über der Karte
-  原地承音：等级不变，词条数值落到承音上限: 'Chengyin auf gleicher Stufe: Stufe unverändert, Affix-Werte
-    auf Chengyin-Obergrenze'
+  "卡片显示原始装备数值，计算假设标注在卡片上方": "Karten zeigen Originalwerte; Berechnungsannahmen stehen über der Karte"
+  "原地承音：等级不变，词条数值落到承音上限": "Chengyin auf gleicher Stufe: Stufe unverändert, Affix-Werte auf Chengyin-Obergrenze"
   原词条: Originalaffix
   及以上装备: und höher
-  双击「规则说明」列可编辑，选中一行后可复制/删除该规则组: Spalte „Regelbeschreibung“ zum Bearbeiten doppelklicken;
-    Zeile auswählen zum Kopieren/Löschen der Regelgruppe
-  双击单元格即可逐项编辑；灰色单元格由流派决定: Zellen zum Bearbeiten doppelklicken; graue Zellen sind durch
-    den Spielstil vorgegeben
-  发现 {count} 处部位/品阶无启用规则覆盖：: '{count} Platz-/Qualitätskombinationen ohne aktive Regelabdeckung
-    gefunden:'
-  发现同时配置 动态属攻和真实属攻，建议修正: Dynamischer und echter Elementarangriff gleichzeitig konfiguriert,
-    Korrektur empfohlen
+  "双击「规则说明」列可编辑，选中一行后可复制/删除该规则组": "Spalte „Regelbeschreibung“ zum Bearbeiten doppelklicken; Zeile auswählen zum Kopieren/Löschen der Regelgruppe"
+  "双击单元格即可逐项编辑；灰色单元格由流派决定": "Zellen zum Bearbeiten doppelklicken; graue Zellen sind durch den Spielstil vorgegeben"
+  "发现 {count} 处部位/品阶无启用规则覆盖：": "{count} Platz-/Qualitätskombinationen ohne aktive Regelabdeckung gefunden:"
+  "发现同时配置 动态属攻和真实属攻，建议修正": "Dynamischer und echter Elementarangriff gleichzeitig konfiguriert, Korrektur empfohlen"
   取最大值: Maximalwert nehmen
-  只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。: Ignoriert übrige Affixe nur bei der Abstimmungsschwellen-Prüfung
-    und entscheidet anhand des Maximalpotenzials des ersten Affixes über den Abstimmungsstart.
-  不会改写装备；进入后的调律处理仍使用完整实际词条。: Verändert die Ausrüstung nicht; die anschließende Abstimmung
-    nutzt weiterhin alle tatsächlichen Affixe.
-  只影响本次计算，不会写进搭配: Wirkt sich nur auf diese Berechnung aus und wird nicht im Build
-    gespeichert
+  "只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。": "Ignoriert übrige Affixe nur bei der Abstimmungsschwellen-Prüfung und entscheidet anhand des Maximalpotenzials des ersten Affixes über den Abstimmungsstart."
+  "不会改写装备；进入后的调律处理仍使用完整实际词条。": "Verändert die Ausrüstung nicht; die anschließende Abstimmung nutzt weiterhin alle tatsächlichen Affixe."
+  "只影响本次计算，不会写进搭配": "Wirkt sich nur auf diese Berechnung aus und wird nicht im Build gespeichert"
   只有主实例可以启动 MCP 服务: Nur die Hauptinstanz kann den MCP-Dienst starten
   只有开发模式可以指定保存位置: Nur im Entwicklermodus kann der Speicherort festgelegt werden
-  只检查部位和金/紫品阶是否有启用规则；判定结果和首词条条件需在实际运行时确定。: Prüft nur, ob Plätze und Gold-/Violett-Qualität
-    aktive Regeln haben; Bewertungsergebnisse und Erst-Affix-Bedingungen ergeben sich
-    zur Laufzeit.
-  只能从可用词条库里、且各流派转律词条库允许转出的词条中选择；动态类四个词条只要在可用词条库中即可选。: Auswahl nur aus dem verfügbaren
-    Affix-Pool, soweit der Umwandlungspool des jeweiligen Spielstils dies erlaubt;
-    die vier dynamischen Affixe sind wählbar, sofern sie im Pool liegen.
-  只评估本次自动调律实际勾选的规则与玩法，避免为本次不打算培养的方案消耗材料。: Bewertet nur die für diesen Auto-Abstimmungslauf
-    markierten Regeln und Spielweisen, um kein Material für ungeplante Builds zu verschwenden.
-  只读实例不能停用 MCP 服务，请在主实例操作: Schreibgeschützte Instanzen können den MCP-Dienst nicht
-    stoppen; bitte in der Hauptinstanz ausführen
+  "只检查部位和金/紫品阶是否有启用规则；判定结果和首词条条件需在实际运行时确定。": "Prüft nur, ob Plätze und Gold-/Violett-Qualität aktive Regeln haben; Bewertungsergebnisse und Erst-Affix-Bedingungen ergeben sich zur Laufzeit."
+  "只能从可用词条库里、且各流派转律词条库允许转出的词条中选择；动态类四个词条只要在可用词条库中即可选。": "Auswahl nur aus dem verfügbaren Affix-Pool, soweit der Umwandlungspool des jeweiligen Spielstils dies erlaubt; die vier dynamischen Affixe sind wählbar, sofern sie im Pool liegen."
+  "只评估本次自动调律实际勾选的规则与玩法，避免为本次不打算培养的方案消耗材料。": "Bewertet nur die für diesen Auto-Abstimmungslauf markierten Regeln und Spielweisen, um kein Material für ungeplante Builds zu verschwenden."
+  "只读实例不能停用 MCP 服务，请在主实例操作": "Schreibgeschützte Instanzen können den MCP-Dienst nicht stoppen; bitte in der Hauptinstanz ausführen"
   可交换: Tauschbar
   可用词条库（全局，各部位词条混放）: Verfügbarer Affix-Pool (global, alle Plätze gemischt)
   可转律（取消后不做转律模拟）: Umwandelbar (deaktivieren, um Umwandlungssimulation zu überspringen)
-  可输入装备提供的直接属性和原始五维，以验证天赋阈值。不要填角色最终面板，也不要重复填写五维转换后的攻击。此处输入仅用于本次预览，不写入内置来源。: Direkte
-    Ausrüstungsattribute und rohe fünf Grundwerte eingeben, um Talentschwellen zu
-    prüfen. Keine fertigen Charakter-Endwerte eintragen und umgerechneten Angriff
-    nicht doppelt angeben. Gilt nur für diese Vorschau.
+  "可输入装备提供的直接属性和原始五维，以验证天赋阈值。不要填角色最终面板，也不要重复填写五维转换后的攻击。此处输入仅用于本次预览，不写入内置来源。": "Direkte Ausrüstungsattribute und rohe fünf Grundwerte eingeben, um Talentschwellen zu prüfen. Keine fertigen Charakter-Endwerte eintragen und umgerechneten Angriff nicht doppelt angeben. Gilt nur für diese Vorschau."
   合并本组: Diese Gruppe zusammenführen
   合计（白字）: Summe (weiß)
   同名叠加: Gleichnamige stapeln
   同步接入配置: Verbindungskonfiguration synchronisieren
   名称已存在: Name existiert bereits
-  启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。启用后每次主实例启动时自动开启服务并同步接入配置。: Nach
-    Start von MCP kannst du in externen Agents wie WorkBuddy über Spielstile und Entwicklungsziele
-    sprechen. Die KI kann Nutzer und Ausrüstung abfragen, Sets scannen, neue Konfigurationen
-    erstellen und Abstimmungen starten. Bei Aktivierung startet der Dienst mit jeder
-    Hauptinstanz automatisch.
+  "启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。启用后每次主实例启动时自动开启服务并同步接入配置。": "Nach Start von MCP kannst du in externen Agents wie WorkBuddy über Spielstile und Entwicklungsziele sprechen. Die KI kann Nutzer und Ausrüstung abfragen, Sets scannen, neue Konfigurationen erstellen und Abstimmungen starten. Bei Aktivierung startet der Dienst mit jeder Hauptinstanz automatisch."
   启动大律准石数量检查: Prüfung großer Abstimmungssteine starten
-  启动时会再次核对判定范围，并执行当前选中的设备；不会改变默认选择。: Beim Start wird der Bewertungsbereich erneut
-    geprüft und das aktuell gewählte Gerät ausgeführt; die Standardauswahl bleibt
-    unverändert.
+  "启动时会再次核对判定范围，并执行当前选中的设备；不会改变默认选择。": "Beim Start wird der Bewertungsbereich erneut geprüft und das aktuell gewählte Gerät ausgeführt; die Standardauswahl bleibt unverändert."
   启动选中方案: Ausgewählten Plan starten
   启用判定: Bewertung aktivieren
-  启用后，扫描到已锁定装备时直接保留，不进入调律、重置或回收流程。: Aktiviert wird beim Scannen gefundene gesperrte
-    Ausrüstung direkt behalten und überspringt Abstimmung, Zurücksetzen und Verwerten.
-  启用后，每实际开始调律 5 件装备时重新读取律准石；有效读数与缓存相差超过 1 个大律准石时记录错误日志。: Aktiviert werden die Abstimmungssteine
-    alle 5 tatsächlich begonnenen Abstimmungen neu ausgelesen; weicht ein gültiger
-    Wert um mehr als 1 großen Stein vom Cache ab, wird ein Fehler protokolliert.
-  启用后，首次识别数量低于设定值时要求人工确认。: Aktiviert ist bei einer Erstanzahl unter dem Schwellenwert
-    eine manuelle Bestätigung erforderlich.
+  "启用后，扫描到已锁定装备时直接保留，不进入调律、重置或回收流程。": "Aktiviert wird beim Scannen gefundene gesperrte Ausrüstung direkt behalten und überspringt Abstimmung, Zurücksetzen und Verwerten."
+  "启用后，每实际开始调律 5 件装备时重新读取律准石；有效读数与缓存相差超过 1 个大律准石时记录错误日志。": "Aktiviert werden die Abstimmungssteine alle 5 tatsächlich begonnenen Abstimmungen neu ausgelesen; weicht ein gültiger Wert um mehr als 1 großen Stein vom Cache ab, wird ein Fehler protokolliert."
+  "启用后，首次识别数量低于设定值时要求人工确认。": "Aktiviert ist bei einer Erstanzahl unter dem Schwellenwert eine manuelle Bestätigung erforderlich."
   启用处理动作: Verarbeitungsaktionen aktivieren
   启用智能调律: Intelligente Abstimmung aktivieren
   启用紫装: Violett einschließen
   启用金装: Gold einschließen
-  命中条件：装备任一条题名属于勾选词条；自选词条语义不跑潜力判定: 'Trefferbedingung: Ein beliebiges Affix der Ausrüstung
-    gehört zu den markierten Affixen; bei „Eigene Affixe“ entfällt die Potenzialbewertung'
-  命中条件：预期评级属于勾选档位（全选 = 不限）: 'Trefferbedingung: Erwartete Bewertung liegt in den markierten
-    Stufen (Alle auswählen = unbegrenzt)'
+  "命中条件：装备任一条题名属于勾选词条；自选词条语义不跑潜力判定": "Trefferbedingung: Ein beliebiges Affix der Ausrüstung gehört zu den markierten Affixen; bei „Eigene Affixe“ entfällt die Potenzialbewertung"
+  "命中条件：预期评级属于勾选档位（全选 = 不限）": "Trefferbedingung: Erwartete Bewertung liegt in den markierten Stufen (Alle auswählen = unbegrenzt)"
   品阶门槛（覆盖）: Qualitätsschwelle (Überschreibung)
   四个系数都是 0，还没填: Alle vier Koeffizienten sind 0; noch nichts eingetragen
   四档：垃圾 / 一般 / 优秀 / 顶级: 'Vier Stufen: Müll / Normal / Ausgezeichnet / Top'
-  回收补位循环上限：回收后重读同格续处理的最大次数，必须大于 0: 'Wiederholungslimit nach Verwertung: max. Anzahl
-    erneuter Feldlesungen nach Verwertung, muss > 0 sein'
+  "回收补位循环上限：回收后重读同格续处理的最大次数，必须大于 0": "Wiederholungslimit nach Verwertung: max. Anzahl erneuter Feldlesungen nach Verwertung, muss > 0 sein"
   培养只能提高定音数值: Aufwertung kann Einstimmungswerte nur erhöhen
   培养只能提高词条数值: Aufwertung kann Affix-Werte nur erhöhen
-  基于当前用户基础属性调整出装搭配: Ausrüstungs-Build anhand der Basisattribute des aktuellen Nutzers
-    anpassen
-  基础属性「{name}」已存在，请使用其他名称。: Basisattribut „{name}“ existiert bereits; bitte einen
-    anderen Namen verwenden.
-  基础属性使用当前所选的已存数值，尚未拆分的内容仍归这一列。五维转换已计入对应词条，不重复相加。: Basisattribute nutzen die aktuell
-    gewählten gespeicherten Werte; nicht aufgeschlüsselte Anteile bleiben in dieser
-    Spalte. Fünf-Werte-Umrechnung ist bereits im jeweiligen Affix enthalten und wird
-    nicht doppelt addiert.
+  "基于当前用户基础属性调整出装搭配": "Ausrüstungs-Build anhand der Basisattribute des aktuellen Nutzers anpassen"
+  "基础属性「{name}」已存在，请使用其他名称。": "Basisattribut „{name}“ existiert bereits; bitte einen anderen Namen verwenden."
+  "基础属性使用当前所选的已存数值，尚未拆分的内容仍归这一列。五维转换已计入对应词条，不重复相加。": "Basisattribute nutzen die aktuell gewählten gespeicherten Werte; nicht aufgeschlüsselte Anteile bleiben in dieser Spalte. Fünf-Werte-Umrechnung ist bereits im jeweiligen Affix enthalten und wird nicht doppelt addiert."
   基础规则组 {key} 不存在: Basis-Regelgruppe {key} existiert nicht
   基础配置: Basiskonfiguration
-  填写当前面板属性，并自动扣除穿戴装备、套装与弓玦属性: Aktuelle Fensterattribute eintragen; angelegte Ausrüstung,
-    Set-Boni und Gongjue-Werte werden automatisch abgezogen
+  "填写当前面板属性，并自动扣除穿戴装备、套装与弓玦属性": "Aktuelle Fensterattribute eintragen; angelegte Ausrüstung, Set-Boni und Gongjue-Werte werden automatisch abgezogen"
   增益名不能为空: Bonusname darf nicht leer sein
   增益表: Bonustabelle
   处理动作: Verarbeitungsaktionen
   备战方案管理: Ausrüstungsset-Verwaltung
   备战方案范围: Ausrüstungsset-Bereich
-  多件装备出现同名词条时只生效数值最高的一条，例如两把剑各带一条剑武学增伤只算最高者: Kommt dasselbe Affix auf mehreren Teilen
-    vor, gilt nur der höchste Wert — z. B. zählt bei zwei Schwertern mit Schwert-Kampfkunst-Schaden
-    nur der höhere
+  "多件装备出现同名词条时只生效数值最高的一条，例如两把剑各带一条剑武学增伤只算最高者": "Kommt dasselbe Affix auf mehreren Teilen vor, gilt nur der höchste Wert — z. B. zählt bei zwei Schwertern mit Schwert-Kampfkunst-Schaden nur der höhere"
   大于等于: Größer oder gleich
   套装名称: Set-Name
   如 aggressive（小写字母/数字/下划线）: z. B. aggressive (Kleinbuchstaben/Ziffern/Unterstrich)
@@ -2611,16 +2205,14 @@ auto_strings:
   如 治疗-纯奶: z. B. Heilung-Vollheiler
   如 激进回收: z. B. Aggressives Verwerten
   字段: Feld
-  存在多个可能版本或兼容性分歧，请人工核对；一键勾选不选择本组。: Mehrere mögliche Versionen oder Kompatibilitätskonflikte;
-    bitte manuell prüfen. „Alle markieren“ überspringt diese Gruppe.
+  "存在多个可能版本或兼容性分歧，请人工核对；一键勾选不选择本组。": "Mehrere mögliche Versionen oder Kompatibilitätskonflikte; bitte manuell prüfen. „Alle markieren“ überspringt diese Gruppe."
   对战类型: Kampftyp
   导入出装搭配: Ausrüstungs-Build importieren
   导入毕业率方案: Abschlussraten-Plan importieren
   导出文件: Datei exportieren
   导出路径需为绝对路径或以 ~/ 开头: Exportpfad muss absolut sein oder mit ~/ beginnen
   "将出装搭配「{build}」导入备战方案「{plan}」，替换八个槽位的装备。\n原装备保留在当前用户装备库中，不会删除，也不会影响其他备战方案。\n同时应用该搭配的弓玦，战斗类型设为 PVE：\n{details}\n是否继续？": "Ausrüstungs-Build „{build}“ in Ausrüstungsset „{plan}“ importieren und alle acht Plätze ersetzen?\nDie Originalausrüstung bleibt in der Bibliothek erhalten, nichts wird gelöscht und andere Sets bleiben unberührt.\nZugleich wird das Gongjue des Builds angewendet und der Kampftyp auf PVE gesetzt:\n{details}\nFortfahren?"
-  将承音装备的普通词条数值视为承音上限参与计算: Normale Affix-Werte von Chengyin-Ausrüstung als Chengyin-Obergrenze
-    berechnen
+  "将承音装备的普通词条数值视为承音上限参与计算": "Normale Affix-Werte von Chengyin-Ausrüstung als Chengyin-Obergrenze berechnen"
   尚无内置角色属性表: Noch keine integrierte Charakter-Attributtabelle vorhanden
   尚无最终评级 → 结束并保留装备: Noch keine Endbewertung → beenden und Ausrüstung behalten
   展开筛选条件: Filter aufklappen
@@ -2629,13 +2221,9 @@ auto_strings:
   已保存并生效（{time}）: Gespeichert und aktiv ({time})
   已删除基础规则组「{name}」: Basis-Regelgruppe „{name}“ gelöscht
   已删除规则 {key}: Regel {key} gelöscht
-  已合并 {count} 份旧装备快照，方案引用已迁移。可继续选择其他候选；取消合并仅关闭窗口，不撤销已完成操作。: '{count} alte Ausrüstungsschnappschüsse
-    zusammengeführt, Planreferenzen migriert. Du kannst weitere Kandidaten wählen;
-    Abbrechen schließt nur das Fenster und macht abgeschlossene Zusammenführungen
-    nicht rückgängig.'
+  "已合并 {count} 份旧装备快照，方案引用已迁移。可继续选择其他候选；取消合并仅关闭窗口，不撤销已完成操作。": "{count} alte Ausrüstungsschnappschüsse zusammengeführt, Planreferenzen migriert. Du kannst weitere Kandidaten wählen; Abbrechen schließt nur das Fenster und macht abgeschlossene Zusammenführungen nicht rückgängig."
   已复制为基础规则组「{name}」: Als Basis-Regelgruppe „{name}“ kopiert
-  已撤销未保存的调律配置更改: Ungespeicherte Änderungen an der Abstimmungskonfiguration rückgängig
-    gemacht
+  "已撤销未保存的调律配置更改": "Ungespeicherte Änderungen an der Abstimmungskonfiguration rückgängig gemacht"
   已新增基础规则组「{name}」: Neue Basis-Regelgruppe „{name}“ hinzugefügt
   已新增规则「{name}」: Neue Regel „{name}“ hinzugefügt
   已是最后一条规则，无法下移: Bereits die letzte Regel, kann nicht nach unten verschoben werden
@@ -2645,50 +2233,37 @@ auto_strings:
   应用调律规则: Abstimmungsregeln anwenden
   开关 key: Schalter-Key
   '开关: ': 'Schalter: '
-  开发模式：本地 = 只在这台机器生效，不随安装包发布: 'Entwicklermodus: Lokal = wirkt nur auf diesem Rechner,
-    nicht im Installationspaket enthalten'
+  "开发模式：本地 = 只在这台机器生效，不随安装包发布": "Entwicklermodus: Lokal = wirkt nur auf diesem Rechner, nicht im Installationspaket enthalten"
   弓玦 {name}（{index}/{total}）: Gongjue {name} ({index}/{total})
   弓玦套装：{name}: 'Gongjue-Set: {name}'
-  弓玦实际生效等级，可输入 113 等中间等级；随赛季表示使用赛季默认等级。: Effektive Stufe des Gongjue; Zwischenwerte
-    wie 113 möglich. „Gemäß Saison“ nutzt die Saison-Standardstufe.
+  "弓玦实际生效等级，可输入 113 等中间等级；随赛季表示使用赛季默认等级。": "Effektive Stufe des Gongjue; Zwischenwerte wie 113 möglich. „Gemäß Saison“ nutzt die Saison-Standardstufe."
   弓玦实际生效等级，默认取当前赛季档位: Effektive Stufe des Gongjue, standardmäßig aktuelle Saisonstufe
   弓玦等级: Gongjue-Stufe
   弓玦（类型 / 等级）: Gongjue (Typ / Stufe)
-  弓玦：{name}（{level}级）　装备等级：{equip_level}　战斗类型：{type}: 'Gongjue: {name} (Lv{level})　Ausrüstungsstufe:
-    {equip_level}　Kampftyp: {type}'
+  "弓玦：{name}（{level}级）　装备等级：{equip_level}　战斗类型：{type}": "Gongjue: {name} (Lv{level})　Ausrüstungsstufe: {equip_level}　Kampftyp: {type}"
   引用方案: Referenzierter Plan
   强制保留: Behalten erzwingen
   强制结算: Zwangsabrechnung
-  强制调律：无视进入门槛，强制进入调律流程: 'Abstimmung erzwingen: Einstiegsschwelle ignorieren und Abstimmung
-    erzwingen'
-  当前入口不支持互换定音，请在装备页操作: Dieser Einstieg unterstützt keinen Einstimmungstausch; bitte
-    auf der Ausrüstungsseite ausführen
+  "强制调律：无视进入门槛，强制进入调律流程": "Abstimmung erzwingen: Einstiegsschwelle ignorieren und Abstimmung erzwingen"
+  "当前入口不支持互换定音，请在装备页操作": "Dieser Einstieg unterstützt keinen Einstimmungstausch; bitte auf der Ausrüstungsseite ausführen"
   当前入口不支持修改套装: Dieser Einstieg unterstützt keine Set-Bearbeitung
   当前入口不支持修改计算设置: Dieser Einstieg unterstützt keine Berechnungseinstellungen
-  当前入口不支持切换定音，请在装备页操作: Dieser Einstieg unterstützt kein Umschalten der Einstimmung;
-    bitte auf der Ausrüstungsseite ausführen
-  当前图库空间缺少 levels/counts 输出字段，无法启动自动调律: Im aktuellen Bildraum fehlt das Ausgabefeld
-    levels/counts; Auto-Abstimmung kann nicht gestartet werden
+  "当前入口不支持切换定音，请在装备页操作": "Dieser Einstieg unterstützt kein Umschalten der Einstimmung; bitte auf der Ausrüstungsseite ausführen"
+  "当前图库空间缺少 levels/counts 输出字段，无法启动自动调律": "Im aktuellen Bildraum fehlt das Ausgabefeld levels/counts; Auto-Abstimmung kann nicht gestartet werden"
   当前方案: Aktueller Plan
   当前方案三满极限: Vollmaximum des aktuellen Plans
   当前玩法没有可导入的出装搭配: Für die aktuelle Spielweise gibt es keinen importierbaren Build
-  当前真实装备不支持该转律变化: Die aktuelle echte Ausrüstung unterstützt diese Umwandlungsänderung
-    nicht
+  "当前真实装备不支持该转律变化": "Die aktuelle echte Ausrüstung unterstützt diese Umwandlungsänderung nicht"
   当前装备：{name}: 'Aktuelle Ausrüstung: {name}'
   当前词条：-: 'Aktuelle Affixe: -'
-  当前阶段：调律处理 — 第 {n} 轮完成，正在匹配处理规则: 'Aktuelle Phase: Abstimmungsverarbeitung — Runde
-    {n} fertig, Verarbeitungsregeln werden geprüft'
+  "当前阶段：调律处理 — 第 {n} 轮完成，正在匹配处理规则": "Aktuelle Phase: Abstimmungsverarbeitung — Runde {n} fertig, Verarbeitungsregeln werden geprüft"
   律准石规则: Abstimmungsstein-Regeln
   心法: Innere Kunst
-  心法名不能含「{sep}」，它是重数的分隔符: Name der Inneren Kunst darf „{sep}“ nicht enthalten — dies
-    ist das Stufentrennzeichen
+  "心法名不能含「{sep}」，它是重数的分隔符": "Name der Inneren Kunst darf „{sep}“ nicht enthalten — dies ist das Stufentrennzeichen"
   成长状态: Entwicklungsstatus
   手动输入: Manuelle Eingabe
-  打开游戏配置中的流派配置与基础属性: Spielstil-Konfiguration und Basisattribute in der Spielkonfiguration
-    öffnen
-  扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法胜出，多个命中取最长关键字。: Beim Scannen aller Ausrüstungssets
-    haben Namen mit direktem Spielweisen-Namen Vorrang; sonst gewinnt die Spielweise
-    mit dem längsten Treffer-Suchbegriff.
+  "打开游戏配置中的流派配置与基础属性": "Spielstil-Konfiguration und Basisattribute in der Spielkonfiguration öffnen"
+  "扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法胜出，多个命中取最长关键字。": "Beim Scannen aller Ausrüstungssets haben Namen mit direktem Spielweisen-Namen Vorrang; sonst gewinnt die Spielweise mit dem längsten Treffer-Suchbegriff."
   扫描处理规则: Scan-Verarbeitungsregeln
   '扫描处理：{name} → ': 'Scan-Verarbeitung: {name} → '
   扫描时间: Scan-Zeit
@@ -2696,12 +2271,9 @@ auto_strings:
   承音后的装备等级不能降低: Die Ausrüstungsstufe darf nach Chengyin nicht sinken
   承音必须同时提升装备等级: Chengyin muss gleichzeitig die Ausrüstungsstufe erhöhen
   技能名不能为空: Fertigkeitsname darf nicht leer sein
-  按当前备战方案玩法将定音视为目标满值参与计算: Einstimmung gemäß Spielweise des aktuellen Ausrüstungssets
-    als Ziel-Maximalwert berechnen
+  "按当前备战方案玩法将定音视为目标满值参与计算": "Einstimmung gemäß Spielweise des aktuellen Ausrüstungssets als Ziel-Maximalwert berechnen"
   按照满承音装备计算: Als Voll-Chengyin-Ausrüstung berechnen
-  按装备上已保存的转律目标计算（目标由「毕业率分析 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: Mit dem auf der Ausrüstung
-    gespeicherten Umwandlungsziel berechnen (ermittelt unter „Abschlussraten-Analyse
-    → Umwandlungsvorschläge“); nutzt nur gespeicherte Ziele, löst keine Suche aus
+  "按装备上已保存的转律目标计算（目标由「毕业率分析 → 转律建议」计算并应用）；只用已保存目标，不触发搜索": "Mit dem auf der Ausrüstung gespeicherten Umwandlungsziel berechnen (ermittelt unter „Abschlussraten-Analyse → Umwandlungsvorschläge“); nutzt nur gespeicherte Ziele, löst keine Suche aus"
   排序失败: Sortieren fehlgeschlagen
   排除模拟装备: Simulierte Ausrüstung ausschließen
   提升装备等级必须同时承音: Erhöhen der Ausrüstungsstufe erfordert gleichzeitig Chengyin
@@ -2711,34 +2283,26 @@ auto_strings:
   撤销调律配置: Abstimmungskonfiguration rückgängig machen
   擦伤率: Streifschussrate
   收起筛选条件: Filter einklappen
-  攻具套装「{name}」把它登记为关联防具: Angriffsausrüstungs-Set „{name}“ hat es als verknüpfte Rüstung
-    registriert
-  数值以大律准石计，小律准石按 0.1；重置/回收填当前词条数对应的累计返还。: Werte in großen Abstimmungssteinen, kleine
-    zählen 0,1; für Zurücksetzen/Verwerten die kumulative Rückerstattung der aktuellen
-    Affix-Anzahl eintragen.
+  "攻具套装「{name}」把它登记为关联防具": "Angriffsausrüstungs-Set „{name}“ hat es als verknüpfte Rüstung registriert"
+  "数值以大律准石计，小律准石按 0.1；重置/回收填当前词条数对应的累计返还。": "Werte in großen Abstimmungssteinen, kleine zählen 0,1; für Zurücksetzen/Verwerten die kumulative Rückerstattung der aktuellen Affix-Anzahl eintragen."
   数值（比例使用小数）: Wert (Dezimalzahlen für Anteile)
   新增心法: Innere Kunst hinzufügen
-  新增武器重启后方可参与识别；被流派配置引用的武器不可删除: Neue Waffen werden erst nach einem Neustart erkannt;
-    Waffen, die von Spielstilen referenziert werden, können nicht gelöscht werden
+  "新增武器重启后方可参与识别；被流派配置引用的武器不可删除": "Neue Waffen werden erst nach einem Neustart erkannt; Waffen, die von Spielstilen referenziert werden, können nicht gelöscht werden"
   新建属性…: Neues Attribut…
   "方案极限：原穿戴方案按满等级、满承音、满定音计算；\n当前实值：备战方案当前八件的实际毕业率，仅供参考；\n七件极限：排除当前部位后，其余装备按三项全满计算；\n候选极限：替换当前装备后，整套方案按三项全满计算。": "Plan-Limit: Originalset bei voller Stufe, vollem Chengyin und voller Einstimmung;\nAktueller Istwert: Tatsächliche Abschlussrate der acht Teile im Set (nur zur Orientierung);\nSieben-Teile-Limit: Ohne diesen Platz, übrige Teile auf Dreifach-Maximum;\nKandidaten-Limit: Nach Austausch dieses Teils das gesamte Set auf Dreifach-Maximum."
   方案等级: Planstufe
-  方案：{name} · {level}级 v{version}（满值属性，不含食物加成）: 'Plan: {name} · Lv{level} v{version}
-    (Maximalwerte ohne Nahrungsboni)'
-  无法打开毕业率分析：{reason}。请检查当前备战方案的战斗属性设置。: 'Abschlussraten-Analyse kann nicht geöffnet
-    werden: {reason}. Bitte die Kampfattribut-Einstellungen des aktuellen Sets prüfen.'
+  "方案：{name} · {level}级 v{version}（满值属性，不含食物加成）": "Plan: {name} · Lv{level} v{version} (Maximalwerte ohne Nahrungsboni)"
+  "无法打开毕业率分析：{reason}。请检查当前备战方案的战斗属性设置。": "Abschlussraten-Analyse kann nicht geöffnet werden: {reason}. Bitte die Kampfattribut-Einstellungen des aktuellen Sets prüfen."
   无法提升时的处理: Wenn keine Verbesserung möglich
   无需增伤: Kein Schadensbonus
   无静态加成: Kein statischer Bonus
   旧版本 {index}: Alte Version {index}
   普伤率: Normalschadensrate
   普通用户不能写入系统预置: Normale Nutzer können keine Systemvorlagen schreiben
-  普通规则调律：此基础组未启用毕业率判定。: 'Normale Regelabstimmung: Für diese Basisgruppe ist die Abschlussraten-Bewertung
-    nicht aktiviert.'
+  "普通规则调律：此基础组未启用毕业率判定。": "Normale Regelabstimmung: Für diese Basisgruppe ist die Abschlussraten-Bewertung nicht aktiviert."
   智能分析: Intelligente Analyse
   智能调律: Intelligente Abstimmung
-  智能调律已停用，下次启动不会开启 MCP；已启动的游戏任务继续运行。: Intelligente Abstimmung deaktiviert; MCP startet
-    beim nächsten Start nicht. Laufende Spielaufgaben laufen weiter.
+  "智能调律已停用，下次启动不会开启 MCP；已启动的游戏任务继续运行。": "Intelligente Abstimmung deaktiviert; MCP startet beim nächsten Start nicht. Laufende Spielaufgaben laufen weiter."
   智能调律生成方案: Generierter Plan der intelligenten Abstimmung
   智能调律配置已暂存: Konfiguration der intelligenten Abstimmung zwischengespeichert
   暂无毕业率方案: Noch keine Abschlussraten-Pläne
@@ -2753,37 +2317,21 @@ auto_strings:
   未匹配本次规则玩法: Passt nicht zur Spielweise dieser Regel
   未命名装备: Unbenannte Ausrüstung
   '未知技能: {name}': 'Unbekannte Fertigkeit: {name}'
-  未知档位保留为待补；心法和武学填 0 表示未装备。等级累计表只选对应档，不叠加其他等级。: Unbekannte Stufen bleiben offen; für
-    nicht angelegte Innere Künste und Kampfkünste 0 eintragen. Die Stufen-Summentabelle
-    wählt nur die passende Stufe ohne andere zu addieren.
+  "未知档位保留为待补；心法和武学填 0 表示未装备。等级累计表只选对应档，不叠加其他等级。": "Unbekannte Stufen bleiben offen; für nicht angelegte Innere Künste und Kampfkünste 0 eintragen. Die Stufen-Summentabelle wählt nur die passende Stufe ohne andere zu addieren."
   '未知的流派伤害模型: {name}': 'Unbekanntes Spielstil-Schadensmodell: {name}'
   未知目标: Unbekanntes Ziel
   未知调律: Unbekannte Abstimmung
   未能启动调律: Abstimmung konnte nicht gestartet werden
   未评级（词条未满）: Unbewertet (Affixe nicht voll)
-  未达调律门槛时自上而下匹配，首条命中即生效；全部不命中则保留: Unterhalb der Abstimmungsschwelle von oben nach
-    unten prüfen, erster Treffer greift; kein Treffer → behalten
+  "未达调律门槛时自上而下匹配，首条命中即生效；全部不命中则保留": "Unterhalb der Abstimmungsschwelle von oben nach unten prüfen, erster Treffer greift; kein Treffer → behalten"
   未选择玩法，不应用规则: Keine Spielweise gewählt, Regeln nicht angewendet
-  本次成功合并 {count} 份旧装备快照，其余操作未完成。请核对错误后重新选择；已完成的合并不会撤销。: '{count} alte Ausrüstungsschnappschüsse
-    erfolgreich zusammengeführt; übrige Vorgänge unvollständig. Fehler prüfen und
-    neu wählen; abgeschlossene Zusammenführungen bleiben bestehen.'
-  本赛季 {floor} 阶以下的装备已不能承音: Ausrüstung unter Saison-Mindeststufe {floor} kann nicht
-    mehr per Chengyin aufgewertet werden
-  本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。: Niedrigste Ausrüstungsstufe,
-    die diese Saison noch Chengyin-fähig ist. Niedrigere Stufen sind diese Saison
-    veraltet (weder gleiches noch nächstes Chengyin möglich) und von Vollstufen-/Voll-Chengyin-Annahmen
-    ausgeschlossen.
-  这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。: 'Dies ist nicht identisch mit „Unterstützt
-    Chengyin“ in der Stufenkonfiguration: Letzteres beschreibt nur, ob diese Stufe
-    damals Chengyin erlaubte.'
-  本赛季弓玦套装采用的词条等级；不填时跟随装备等级: Affix-Stufe des Gongjue-Sets in dieser Saison; leer =
-    Ausrüstungsstufe folgen
-  本赛季该等级的装备已不能承音: Ausrüstung dieser Stufe kann in dieser Saison kein Chengyin mehr
-    erhalten
-  本页是毕业率编译程序的可读参考层，改这里的系数不会改变毕业率结果；表换了版本要重跑 scripts/extract_damage_model.py: Diese
-    Seite ist die lesbare Referenzschicht des Abschlussraten-Compilers; Änderungen
-    hier beeinflussen keine Ergebnisse. Bei neuer Tabellenversion scripts/extract_damage_model.py
-    neu ausführen
+  "本次成功合并 {count} 份旧装备快照，其余操作未完成。请核对错误后重新选择；已完成的合并不会撤销。": "{count} alte Ausrüstungsschnappschüsse erfolgreich zusammengeführt; übrige Vorgänge unvollständig. Fehler prüfen und neu wählen; abgeschlossene Zusammenführungen bleiben bestehen."
+  "本赛季 {floor} 阶以下的装备已不能承音": "Ausrüstung unter Saison-Mindeststufe {floor} kann nicht mehr per Chengyin aufgewertet werden"
+  "本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。": "Niedrigste Ausrüstungsstufe, die diese Saison noch Chengyin-fähig ist. Niedrigere Stufen sind diese Saison veraltet (weder gleiches noch nächstes Chengyin möglich) und von Vollstufen-/Voll-Chengyin-Annahmen ausgeschlossen."
+  "这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。": "Dies ist nicht identisch mit „Unterstützt Chengyin“ in der Stufenkonfiguration: Letzteres beschreibt nur, ob diese Stufe damals Chengyin erlaubte."
+  "本赛季弓玦套装采用的词条等级；不填时跟随装备等级": "Affix-Stufe des Gongjue-Sets in dieser Saison; leer = Ausrüstungsstufe folgen"
+  "本赛季该等级的装备已不能承音": "Ausrüstung dieser Stufe kann in dieser Saison kein Chengyin mehr erhalten"
+  "本页是毕业率编译程序的可读参考层，改这里的系数不会改变毕业率结果；表换了版本要重跑 scripts/extract_damage_model.py": "Diese Seite ist die lesbare Referenzschicht des Abschlussraten-Compilers; Änderungen hier beeinflussen keine Ergebnisse. Bei neuer Tabellenversion scripts/extract_damage_model.py neu ausführen"
   机制说明，不可配置: Mechanikbeschreibung, nicht konfigurierbar
   材料不足时: Bei Materialmangel
   材料处理规则: Materialverarbeitungsregeln
@@ -2793,37 +2341,26 @@ auto_strings:
   查看当前详情（{count}）: Aktuelle Details anzeigen ({count})
   查看最终伤害判定率: Endgültige Schadensbewertungsrate anzeigen
   查看生成方案并启动: Generierten Plan ansehen und starten
-  标识 key 须为小写字母开头的英文/数字/下划线: Kennungs-Key muss mit Kleinbuchstabe beginnen, danach
-    Buchstaben/Ziffern/Unterstriche
+  "标识 key 须为小写字母开头的英文/数字/下划线": "Kennungs-Key muss mit Kleinbuchstabe beginnen, danach Buchstaben/Ziffern/Unterstriche"
   校验失败（未保存）：{err}: 'Prüfung fehlgeschlagen (nicht gespeichert): {err}'
   校验规则: Prüfregeln
   模型版本: Modellversion
   模型等级: Modellstufe
-  止戈定音具体类型尚未配置，暂不支持互换: Konkreter Typ der Zhige-Einstimmung noch nicht konfiguriert;
-    Tausch derzeit nicht unterstützt
+  "止戈定音具体类型尚未配置，暂不支持互换": "Konkreter Typ der Zhige-Einstimmung noch nicht konfiguriert; Tausch derzeit nicht unterstützt"
   正在处理：{name}: 'Wird verarbeitet: {name}'
   正在拖动: Wird gezogen
   此装备没有可切换的普通定音词条: Diese Ausrüstung hat kein umschaltbares normales Einstimmungsaffix
-  武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。: Waffenoptionen stammen aus den Waffentypen der
-    Ausrüstungskonfiguration. Kampfkunst-Verstärkungen wurden in die Waffentypen der
-    Ausrüstungskonfiguration verschoben.
+  "武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。": "Waffenoptionen stammen aus den Waffentypen der Ausrüstungskonfiguration. Kampfkunst-Verstärkungen wurden in die Waffentypen der Ausrüstungskonfiguration verschoben."
   武器类型「{name}」已存在。: Waffentyp „{name}“ existiert bereits.
-  武器类型「{name}」正被流派 {users} 引用，请先在流派配置中解除绑定。: Waffentyp „{name}“ wird vom Spielstil
-    {users} verwendet; bitte zuerst in der Spielstil-Konfiguration lösen.
+  "武器类型「{name}」正被流派 {users} 引用，请先在流派配置中解除绑定。": "Waffentyp „{name}“ wird vom Spielstil {users} verwendet; bitte zuerst in der Spielstil-Konfiguration lösen."
   武学: Kampfkunst
-  武学名册以「武学配置」为准，在那里增删: Die Kampfkunstliste richtet sich nach der „Kampfkunst-Konfiguration“;
-    dort hinzufügen oder entfernen
+  "武学名册以「武学配置」为准，在那里增删": "Die Kampfkunstliste richtet sich nach der „Kampfkunst-Konfiguration“; dort hinzufügen oder entfernen"
   每行一个关键字: Ein Suchbegriff pro Zeile
-  每轮调律自上而下匹配；命中后按材料不足动作结束或顺延；全部不命中则不添加: Jede Abstimmungsrunde prüft von oben nach
-    unten; bei Treffer gemäß Materialmangel-Aktion beenden oder aufschieben; kein
-    Treffer → nicht hinzufügen
-  比较前，候选装备与当前穿戴装备的毕业率都会按所选精度向下取整。例如 94.59% 在 0.1% 精度下按 94.5% 判断。: Vor dem Vergleich
-    werden Abschlussraten von Kandidat und getragener Ausrüstung auf die gewählte
-    Genauigkeit abgerundet (z. B. 94,59 % bei 0,1 % → 94,5 %).
+  "每轮调律自上而下匹配；命中后按材料不足动作结束或顺延；全部不命中则不添加": "Jede Abstimmungsrunde prüft von oben nach unten; bei Treffer gemäß Materialmangel-Aktion beenden oder aufschieben; kein Treffer → nicht hinzufügen"
+  "比较前，候选装备与当前穿戴装备的毕业率都会按所选精度向下取整。例如 94.59% 在 0.1% 精度下按 94.5% 判断。": "Vor dem Vergleich werden Abschlussraten von Kandidat und getragener Ausrüstung auf die gewählte Genauigkeit abgerundet (z. B. 94,59 % bei 0,1 % → 94,5 %)."
   毕业率方案: Abschlussraten-Plan
   毕业率精度: Abschlussraten-Genauigkeit
-  没有其他具有普通定音的同类型装备: Keine andere Ausrüstung gleichen Typs mit normaler Einstimmung
-    vorhanden
+  "没有其他具有普通定音的同类型装备": "Keine andere Ausrüstung gleichen Typs mit normaler Einstimmung vorhanden"
   没有更高的已配置等级: Keine höhere konfigurierte Stufe vorhanden
   流派「{name}」已存在。: Spielstil „{name}“ existiert bereits.
   流派名不能为空或与已有流派重名。: Spielstilname darf nicht leer oder doppelt sein.
@@ -2832,71 +2369,46 @@ auto_strings:
   添加套装: Set hinzufügen
   清理结果: Bereinigtes Ergebnis
   清除结果: Ergebnisse löschen
-  游戏内该等级的承音上限，按游戏显示填写；新建等级时先按上限×94% 给出默认值: Chengyin-Obergrenze dieser Stufe im Spiel
-    (wie im Spiel angezeigt eintragen); neue Stufen erhalten standardmäßig Obergrenze
-    × 94 %
-  游戏配置有未保存的更改，确定退出并放弃这些更改吗？: Die Spielkonfiguration hat ungespeicherte Änderungen.
-    Wirklich beenden und verwerfen?
+  "游戏内该等级的承音上限，按游戏显示填写；新建等级时先按上限×94% 给出默认值": "Chengyin-Obergrenze dieser Stufe im Spiel (wie im Spiel angezeigt eintragen); neue Stufen erhalten standardmäßig Obergrenze × 94 %"
+  "游戏配置有未保存的更改，确定退出并放弃这些更改吗？": "Die Spielkonfiguration hat ungespeicherte Änderungen. Wirklich beenden und verwerfen?"
   点击查看逐条明细: Klicken für Einzelheiten
-  点击选择玩法（不选则不应用规则）: Klicken, um eine Spielweise zu wählen (ohne Auswahl greifen keine
-    Regeln)
+  "点击选择玩法（不选则不应用规则）": "Klicken, um eine Spielweise zu wählen (ohne Auswahl greifen keine Regeln)"
   版本号: Versionsnummer
   玩法不存在: Spielweise existiert nicht
-  玩法评级只辅助勾选候选，不作为装备合法性规则；多选时按各条规则给出的最高评级判定: Spielweisen-Bewertungen helfen nur beim
-    Markieren von Kandidaten, nicht bei der Gültigkeitsprüfung; bei Mehrfachauswahl
-    zählt die höchste Bewertung
-  生成八件模拟装备并替换当前出装，原装备保留: Acht simulierte Ausrüstungsteile erzeugen und aktuelle Ausrüstung
-    ersetzen; Originale bleiben erhalten
-  生成八件模拟装备并替换目标方案的出装，原装备保留；同时应用搭配的弓玦，战斗类型设为 PVE。: Acht simulierte Ausrüstungsteile
-    erzeugen und das Zielset ersetzen, Originale bleiben erhalten; zugleich wird das
-    Gongjue des Builds angewendet und der Kampftyp auf PVE gesetzt.
+  "玩法评级只辅助勾选候选，不作为装备合法性规则；多选时按各条规则给出的最高评级判定": "Spielweisen-Bewertungen helfen nur beim Markieren von Kandidaten, nicht bei der Gültigkeitsprüfung; bei Mehrfachauswahl zählt die höchste Bewertung"
+  "生成八件模拟装备并替换当前出装，原装备保留": "Acht simulierte Ausrüstungsteile erzeugen und aktuelle Ausrüstung ersetzen; Originale bleiben erhalten"
+  "生成八件模拟装备并替换目标方案的出装，原装备保留；同时应用搭配的弓玦，战斗类型设为 PVE。": "Acht simulierte Ausrüstungsteile erzeugen und das Zielset ersetzen, Originale bleiben erhalten; zugleich wird das Gongjue des Builds angewendet und der Kampftyp auf PVE gesetzt."
   生效截止等级: Gültig bis Stufe
-  生效等级不填即不限；新等阶移除的词条填截止等级，低等阶装备上它仍然合法: Leer = unbegrenzt; bei Affixen, die in neueren
-    Rängen entfernt wurden, die Endstufe eintragen — auf niedrigeren Stufen bleiben
-    sie gültig
+  "生效等级不填即不限；新等阶移除的词条填截止等级，低等阶装备上它仍然合法": "Leer = unbegrenzt; bei Affixen, die in neueren Rängen entfernt wurden, die Endstufe eintragen — auf niedrigeren Stufen bleiben sie gültig"
   生效起始等级: Gültig ab Stufe
   生效（黄字）: Effektiv (gelb)
   用户停止调律: Nutzer hat Abstimmung gestoppt
-  用户选择结束本次调律：重置二次确认未出现: 'Nutzer hat diese Abstimmung beendet: Zweite Zurücksetzungsbestätigung
-    erschien nicht'
-  用户：{user}　方案：{plan}　流派：{school}　基础属性：{base}　世界等级：{level}　弓玦：{gongjue}（{gongjue_level}级）: 'Nutzer:
-    {user}　Plan: {plan}　Spielstil: {school}　Basisattribute: {base}　Weltstufe: {level}　Gongjue:
-    {gongjue} (Lv{gongjue_level})'
-  由流派决定；改流派，或把流派切到「自定义」后再单独编辑: Durch den Spielstil festgelegt; Spielstil ändern oder
-    auf „Benutzerdefiniert“ wechseln, um einzeln zu bearbeiten
+  "用户选择结束本次调律：重置二次确认未出现": "Nutzer hat diese Abstimmung beendet: Zweite Zurücksetzungsbestätigung erschien nicht"
+  "用户：{user}　方案：{plan}　流派：{school}　基础属性：{base}　世界等级：{level}　弓玦：{gongjue}（{gongjue_level}级）": "Nutzer: {user}　Plan: {plan}　Spielstil: {school}　Basisattribute: {base}　Weltstufe: {level}　Gongjue: {gongjue} (Lv{gongjue_level})"
+  "由流派决定；改流派，或把流派切到「自定义」后再单独编辑": "Durch den Spielstil festgelegt; Spielstil ändern oder auf „Benutzerdefiniert“ wechseln, um einzeln zu bearbeiten"
   白字会心率: Grund-Krit.-Rate (weiß)
   白字会意率: Grund-Affinitätsrate (weiß)
   白字精准率: Grund-Präzisionsrate (weiß)
-  目标用户：{user}　备战方案：{plan}　玩法：{style}: 'Zielnutzer: {user}　Ausrüstungsset: {plan}　Spielweise:
-    {style}'
+  "目标用户：{user}　备战方案：{plan}　玩法：{style}": "Zielnutzer: {user}　Ausrüstungsset: {plan}　Spielweise: {style}"
   目标等级: Zielstufe
   目标词条：-: 'Ziel-Affixe: -'
   目标：-: 'Ziel: -'
-  相邻赛季日期必须衔接：赛季 {previous} 的结束日期必须等于赛季 {following} 的开始日期（05:00 切换）: 'Angrenzende Saisondaten
-    müssen nahtlos anschließen: Enddatum von Saison {previous} muss gleich dem Startdatum
-    von Saison {following} sein (Wechsel um 05:00)'
+  "相邻赛季日期必须衔接：赛季 {previous} 的结束日期必须等于赛季 {following} 的开始日期（05:00 切换）": "Angrenzende Saisondaten müssen nahtlos anschließen: Enddatum von Saison {previous} muss gleich dem Startdatum von Saison {following} sein (Wechsel um 05:00)"
   真实装备不能删除定音词条: Echte Ausrüstung kann keine Einstimmungsaffixe löschen
   真实装备不能新增定音词条: Echte Ausrüstung kann keine Einstimmungsaffixe hinzufügen
   真实装备不能新增或删除词条: Echte Ausrüstung kann keine Affixe hinzufügen oder löschen
-  真实装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Feste Eigenschaften echter Ausrüstung sind schreibgeschützt  ·  Nur
-    Umwandlung, Chengyin und Affix-Aufwertung werden unterstützt
+  "真实装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养": "Feste Eigenschaften echter Ausrüstung sind schreibgeschützt  ·  Nur Umwandlung, Chengyin und Affix-Aufwertung werden unterstützt"
   '真实装备的既定属性不可修改: ': 'Feste Eigenschaften echter Ausrüstung sind schreibgeschützt: '
   真气比例: Qi-Anteil
   确定删除: Löschen bestätigen
-  确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，公共装备池中的装备不会删除，保存后才会生效。: „{name}“ wirklich löschen?
-    Die {count} Ausrüstungsreferenzen dieses Plans werden gelöst, Teile im gemeinsamen
-    Pool bleiben erhalten. Wirksam nach dem Speichern.
+  "确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，公共装备池中的装备不会删除，保存后才会生效。": "„{name}“ wirklich löschen? Die {count} Ausrüstungsreferenzen dieses Plans werden gelöst, Teile im gemeinsamen Pool bleiben erhalten. Wirksam nach dem Speichern."
   "确定删除方案「{name}」的 {level}级 v{version}？\n对应的 JSON 文件也会被删除。": "Plan „{name}“ Lv{level} v{version} wirklich löschen?\nDie zugehörige JSON-Datei wird ebenfalls gelöscht."
   确定删除武器类型「{name}」？: Waffentyp „{name}“ wirklich löschen?
   确定删除流派「{name}」？: Spielstil „{name}“ wirklich löschen?
-  确定删除规则组「{name}」？该操作不可恢复。: Regelgruppe „{name}“ wirklich löschen? Diese Aktion kann
-    nicht rückgängig gemacht werden.
-  确定删除调律规则「{name}」？规则文件将被删除，不可恢复。: Abstimmungsregel „{name}“ wirklich löschen? Die
-    Regeldatei wird unwiderruflich gelöscht.
-  确定撤销本次所有未保存的游戏配置更改吗？: Alle ungespeicherten Änderungen an der Spielkonfiguration
-    wirklich rückgängig machen?
-  确定撤销本次所有未保存的调律配置更改吗？: Alle ungespeicherten Änderungen an der Abstimmungskonfiguration
-    wirklich rückgängig machen?
+  "确定删除规则组「{name}」？该操作不可恢复。": "Regelgruppe „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  "确定删除调律规则「{name}」？规则文件将被删除，不可恢复。": "Abstimmungsregel „{name}“ wirklich löschen? Die Regeldatei wird unwiderruflich gelöscht."
+  "确定撤销本次所有未保存的游戏配置更改吗？": "Alle ungespeicherten Änderungen an der Spielkonfiguration wirklich rückgängig machen?"
+  "确定撤销本次所有未保存的调律配置更改吗？": "Alle ungespeicherten Änderungen an der Abstimmungskonfiguration wirklich rückgängig machen?"
   确定要删除等级 {level} 吗？: Stufe {level} wirklich löschen?
   确定要删除词组 '{name}' 吗？: Begriff '{name}' wirklich löschen?
   确认替换当前出装: Ersetzen der aktuellen Ausrüstung bestätigen
@@ -2908,20 +2420,14 @@ auto_strings:
   等级 {level} | {quality} | 词条 {count}/5: Lv {level} | {quality} | Affixe {count}/5
   等级不足，跳过（同类型）: Stufe zu niedrig, übersprungen (gleicher Typ)
   等级尚无数据: Für diese Stufe liegen noch keine Daten vor
-  等级门槛 + 调律门槛 + 扫描/材料/调律处理，一组一套可切换；流派规则全局不受影响: Stufenschwelle + Abstimmungsschwelle
-    + Scan-/Material-/Abstimmungsverarbeitung als umschaltbares Set je Gruppe; Spielstil-Regeln
-    gelten global und bleiben unberührt
+  "等级门槛 + 调律门槛 + 扫描/材料/调律处理，一组一套可切换；流派规则全局不受影响": "Stufenschwelle + Abstimmungsschwelle + Scan-/Material-/Abstimmungsverarbeitung als umschaltbares Set je Gruppe; Spielstil-Regeln gelten global und bleiben unberührt"
   "筛选已生效，但保存到用户资料失败：{error}\n\n本次浏览不受影响，下次操作会再尝试保存。\n筛选条件未保存": "Filter aktiv, aber Speichern im Nutzerprofil fehlgeschlagen: {error}\n\nDiese Ansicht bleibt unberührt; beim nächsten Vorgang wird erneut gespeichert.\nFilter nicht gespeichert"
   筛选条件未保存: Filter nicht gespeichert
   筛选设置: Filtereinstellungen
-  系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force: 'Koeffizienten:
-    {ratios}; zusätzlich erlaubt: kind / charge / qi_ratio / intent_conversion / modifiers
-    / force'
+  "系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force": "Koeffizienten: {ratios}; zusätzlich erlaubt: kind / charge / qi_ratio / intent_conversion / modifiers / force"
   系统预置: Systemvorlage
-  系统预置只读，请复制或另存为本地搭配: Systemvorlagen sind schreibgeschützt; bitte kopieren oder als
-    lokalen Build speichern
-  系统预置只读，请选择本地保存位置或另存为新搭配: Systemvorlagen sind schreibgeschützt; bitte lokalen Speicherort
-    wählen oder als neuen Build speichern
+  "系统预置只读，请复制或另存为本地搭配": "Systemvorlagen sind schreibgeschützt; bitte kopieren oder als lokalen Build speichern"
+  "系统预置只读，请选择本地保存位置或另存为新搭配": "Systemvorlagen sind schreibgeschützt; bitte lokalen Speicherort wählen oder als neuen Build speichern"
   紫装区: Violett-Bereich
   回收累计返还: Kumulative Verwertungs-Rückerstattung
   调律消耗: Abstimmungskosten
@@ -2938,17 +2444,12 @@ auto_strings:
   编辑该技能: Diese Fertigkeit bearbeiten
   蓄力技定音: Aufladefertigkeits-Einstimmung
   蓝色装备，忽略: Blaue Ausrüstung, ignoriert
-  装备从起始等级（或更低）升到目标等级（或更高）时，原词条自动变成目标词条；只影响升级投影，不改真实扫描结果: Steigt Ausrüstung von der
-    Startstufe (oder tiefer) auf die Zielstufe (oder höher), wird das Originalaffix
-    automatisch zum Zielaffix; betrifft nur die Aufwertungsprojektion, keine echten
-    Scans
-  装备无相穿透已折算至当前流派属攻穿透。: Formlose Durchdringung der Ausrüstung wurde in die Elementardurchdringung
-    des aktuellen Spielstils umgerechnet.
+  "装备从起始等级（或更低）升到目标等级（或更高）时，原词条自动变成目标词条；只影响升级投影，不改真实扫描结果": "Steigt Ausrüstung von der Startstufe (oder tiefer) auf die Zielstufe (oder höher), wird das Originalaffix automatisch zum Zielaffix; betrifft nur die Aufwertungsprojektion, keine echten Scans"
+  "装备无相穿透已折算至当前流派属攻穿透。": "Formlose Durchdringung der Ausrüstung wurde in die Elementardurchdringung des aktuellen Spielstils umgerechnet."
   "装备至少完成一轮调律后，若词条已满且明确命中\n\"继续调律或锁定\"规则，并且传入规则的最终评级达到\n优秀或顶级，返回装备详情页后自动锁定。\n无规则命中只结束并保留，不会自动锁定。\n已锁定装备不会再点击，避免误解锁。": "Hat die Ausrüstung mindestens eine Abstimmungsrunde durchlaufen, sind alle Affixe voll, trifft die\nRegel „Weiter abstimmen oder sperren“ eindeutig und erreicht die Endbewertung der übergebenen Regel\nAusgezeichnet oder Top, wird nach Rückkehr zur Detailseite automatisch gesperrt.\nOhne Regeltreffer wird nur beendet und behalten, nicht automatisch gesperrt.\nBereits gesperrte Ausrüstung wird nicht erneut angeklickt, um versehentliches Entsperren zu vermeiden."
   装备贡献字段: Ausrüstungs-Beitragsfelder
   装备输入预览: Ausrüstungseingabe-Vorschau
-  装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效: Ausrüstung muss von mindestens einer gewählten
-    Spielweise diese Stufe oder höher erhalten; ohne gewählte Spielweise inaktiv
+  "装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效": "Ausrüstung muss von mindestens einer gewählten Spielweise diese Stufe oder höher erhalten; ohne gewählte Spielweise inaktiv"
   规则已禁用；右键启用: Regel deaktiviert; Rechtsklick zum Aktivieren
   规则组「{key}」已移到{layer}: Regelgruppe „{key}“ wurde nach {layer} verschoben
   规则说明已保存（{key}）: Regelbeschreibung gespeichert ({key})
@@ -2957,62 +2458,43 @@ auto_strings:
   计算设置: Berechnungseinstellungen
   计算设置未保存: Berechnungseinstellungen nicht gespeichert
   设置启用状态失败：{e}: 'Aktivierungsstatus konnte nicht gesetzt werden: {e}'
-  评估所有已启用调律规则所覆盖的玩法。: Bewertet Spielweisen, die von allen aktivierten Abstimmungsregeln
-    abgedeckt werden.
+  "评估所有已启用调律规则所覆盖的玩法。": "Bewertet Spielweisen, die von allen aktivierten Abstimmungsregeln abgedeckt werden."
   评级 ≥: Bewertung ≥
-  识别出 {count} 组合并候选，其中 {review_count} 组需要人工核对。左侧全部旧版本合并到右侧保留版本；有分歧的组不自动勾选。: '{count}
-    Zusammenführungskandidaten erkannt, davon {review_count} manuell zu prüfen. Alle
-    alten Versionen links werden in die behaltene Version rechts zusammengeführt;
-    konfliktbehaftete Gruppen werden nicht automatisch markiert.'
+  "识别出 {count} 组合并候选，其中 {review_count} 组需要人工核对。左侧全部旧版本合并到右侧保留版本；有分歧的组不自动勾选。": "{count} Zusammenführungskandidaten erkannt, davon {review_count} manuell zu prüfen. Alle alten Versionen links werden in die behaltene Version rechts zusammengeführt; konfliktbehaftete Gruppen werden nicht automatisch markiert."
   词条{i}：: 'Affix {i}:'
   词条名: Affix-Name
-  词条已满，无行为规则命中 → 结束并保留装备: Affixe voll, keine Verhaltensregel getroffen → beenden und
-    Ausrüstung behalten
+  "词条已满，无行为规则命中 → 结束并保留装备": "Affixe voll, keine Verhaltensregel getroffen → beenden und Ausrüstung behalten"
   词条数：{count}/40: 'Affixe: {count}/40'
   词条转律: Affix-Umwandlung
   词条转律保护，跳过: Affix-Umwandlungsschutz, übersprungen
   词组 '{name}' 已存在: Begriff '{name}' existiert bereits
-  询问是否继续：弹窗确认，继续则本次运行不再检查: 'Nachfragen: Bestätigungsdialog; bei Fortsetzen keine weitere
-    Prüfung in diesem Lauf'
+  "询问是否继续：弹窗确认，继续则本次运行不再检查": "Nachfragen: Bestätigungsdialog; bei Fortsetzen keine weitere Prüfung in diesem Lauf"
   该用户当前使用的方案: Der derzeit von diesem Nutzer verwendete Plan
   该等级的装备不支持承音: Ausrüstung dieser Stufe unterstützt kein Chengyin
-  该等级重置调律不返还律准石，重置返还固定按 0 计。: Zurücksetzen auf dieser Stufe erstattet keine Abstimmungssteine;
-    Rückerstattung ist fest auf 0 gesetzt.
-  该装备两种定音都有，可在装备属性中切换: Diese Ausrüstung besitzt beide Einstimmungstypen; in den Ausrüstungseigenschaften
-    umschaltbar
-  该装备只扫描到一种定音，无法切换: Für diese Ausrüstung wurde nur ein Einstimmungstyp gescannt; Umschalten
-    nicht möglich
+  "该等级重置调律不返还律准石，重置返还固定按 0 计。": "Zurücksetzen auf dieser Stufe erstattet keine Abstimmungssteine; Rückerstattung ist fest auf 0 gesetzt."
+  "该装备两种定音都有，可在装备属性中切换": "Diese Ausrüstung besitzt beide Einstimmungstypen; in den Ausrüstungseigenschaften umschaltbar"
+  "该装备只扫描到一种定音，无法切换": "Für diese Ausrüstung wurde nur ein Einstimmungstyp gescannt; Umschalten nicht möglich"
   该装备没有普通定音: Diese Ausrüstung hat keine normale Einstimmung
   该项固定为 0，无需配置: Dieser Wert ist fest auf 0, keine Konfiguration erforderlich
   请先为当前备战方案选择玩法: Bitte zuerst eine Spielweise für das aktuelle Ausrüstungsset wählen
   请先启动 MCP 服务: Bitte zuerst den MCP-Dienst starten
-  请先在 AI 设置的外部 Agent 中添加接入配置: Bitte zuerst in den KI-Einstellungen unter Externer
-    Agent eine Verbindungskonfiguration anlegen
+  "请先在 AI 设置的外部 Agent 中添加接入配置": "Bitte zuerst in den KI-Einstellungen unter Externer Agent eine Verbindungskonfiguration anlegen"
   请先选择包含流派信息的备战方案: Bitte zuerst ein Ausrüstungsset mit Spielstil-Informationen wählen
   请先选择用户、备战方案及玩法: Bitte zuerst Nutzer, Ausrüstungsset und Spielweise wählen
   请先选择用户和备战方案: Bitte zuerst Nutzer und Ausrüstungsset wählen
-  请勾选至少一个「待调出」词条进行模拟: Bitte mindestens ein „Noch abzustimmen“-Affix für die Simulation
-    auswählen
+  "请勾选至少一个「待调出」词条进行模拟": "Bitte mindestens ein „Noch abzustimmen“-Affix für die Simulation auswählen"
   请填写方案名称并选择方案等级: Bitte Planname eingeben und Planstufe wählen
-  请输入当前律准石数量（小律准石按 0.1 计）: Bitte aktuelle Anzahl der Abstimmungssteine eingeben (kleine
-    zählen 0,1)
+  "请输入当前律准石数量（小律准石按 0.1 计）": "Bitte aktuelle Anzahl der Abstimmungssteine eingeben (kleine zählen 0,1)"
   请选择生成方案: Bitte einen generierten Plan wählen
   调律处理: Abstimmungsverarbeitung
   调律处理规则: Abstimmungsverarbeitungs-Regeln
-  调律已启动，请在调律管理中查看进度。: Abstimmung gestartet; Fortschritt in der Abstimmungsverwaltung
-    einsehen.
-  调律结束{suffix}：{total} 件装备，{rounds} 轮调律: 'Abstimmung beendet{suffix}: {total} Ausrüstungsteile,
-    {rounds} Runden'
+  "调律已启动，请在调律管理中查看进度。": "Abstimmung gestartet; Fortschritt in der Abstimmungsverwaltung einsehen."
+  "调律结束{suffix}：{total} 件装备，{rounds} 轮调律": "Abstimmung beendet{suffix}: {total} Ausrüstungsteile, {rounds} Runden"
   调律配置已保存并生效: Abstimmungskonfiguration gespeichert und aktiv
-  调律配置有未保存的更改，确定退出并放弃这些更改吗？: Die Abstimmungskonfiguration hat ungespeicherte Änderungen.
-    Wirklich beenden und verwerfen?
-  调满后按本次传入的当前规则重新判定；达到所选评级的装备强制保留，不执行回收。: Nach voller Abstimmung wird anhand der aktuell
-    übergebenen Regel neu bewertet; Ausrüstung ab der gewählten Bewertung wird zwingend
-    behalten und nicht verwertet.
-  赛季 {number} 必须填写开始和结束日期: Für Saison {number} müssen Start- und Enddatum ausgefüllt
-    sein
-  赛季 {number} 的结束日期必须晚于开始日期: Das Enddatum von Saison {number} muss nach dem Startdatum
-    liegen
+  "调律配置有未保存的更改，确定退出并放弃这些更改吗？": "Die Abstimmungskonfiguration hat ungespeicherte Änderungen. Wirklich beenden und verwerfen?"
+  "调满后按本次传入的当前规则重新判定；达到所选评级的装备强制保留，不执行回收。": "Nach voller Abstimmung wird anhand der aktuell übergebenen Regel neu bewertet; Ausrüstung ab der gewählten Bewertung wird zwingend behalten und nicht verwertet."
+  "赛季 {number} 必须填写开始和结束日期": "Für Saison {number} müssen Start- und Enddatum ausgefüllt sein"
+  "赛季 {number} 的结束日期必须晚于开始日期": "Das Enddatum von Saison {number} muss nach dem Startdatum liegen"
   赛季编号不可重复：{number}: 'Saisonnummer darf sich nicht wiederholen: {number}'
   赛季装备假设承音: Saisonausrüstung als Chengyin annehmen
   赛季配置必须是列表: Die Saisonkonfiguration muss eine Liste sein
@@ -3027,40 +2509,26 @@ auto_strings:
   跳过当前装备: Aktuelle Ausrüstung überspringen
   跳过锁定装备调律: Abstimmung gesperrter Ausrüstung überspringen
   转律只能修改商角徵羽中的一个词条: Umwandlung kann nur eines der Affixe Shang/Jue/Zhi/Yu ändern
-  转律后的词条必须标记 is_transferred: Umgewandelte Affixe müssen mit is_transferred markiert
-    sein
+  "转律后的词条必须标记 is_transferred": "Umgewandelte Affixe müssen mit is_transferred markiert sein"
   转律槽位标记不能单独修改: Umwandlungsplatz-Markierungen können nicht einzeln geändert werden
   转律词条库（全局，优先级从高到低）: Umwandlungs-Affix-Pool (global, Priorität von hoch nach niedrig)
   轮次：0: 'Runde: 0'
   轮次：{n}: 'Runde: {n}'
   还没有任何流派的伤害模型: Noch kein Schadensmodell für irgendeinen Spielstil vorhanden
   还没有生成方案，请先在 Agent 中生成。: Noch kein Plan generiert; bitte zuerst im Agent generieren.
-  这里只汇总已录入的静态贡献，含估计值，尚不是完整角色面板。观测值仅供核对，不作为来源相加。条件效果不计入总量。: Hier werden nur erfasste
-    statische Beiträge inkl. Schätzungen summiert — noch kein vollständiges Charakterfenster.
-    Beobachtete Werte dienen nur dem Abgleich, nicht als Quelle. Bedingte Effekte
-    zählen nicht mit.
-  进入调律前与每轮调律后的行为点）：按完整装备预期评级决策（首条命中）。无命中默认：未满 = 继续调律、词条满 = 结束并按设置锁定；材料不足/用户中断属阻断，不触发: 'Verhaltenspunkte
-    vor dem Abstimmen und nach jeder Runde): Entscheidung nach erwarteter Gesamtbewertung
-    (erster Treffer). Ohne Treffer: nicht voll = weiter abstimmen, voll = beenden
-    und nach Einstellung sperren; Materialmangel/Nutzerabbruch blockieren und lösen
-    nicht aus'
-  进入调律前及每轮结束后自上而下匹配；全部不命中时未满继续、已满保留: 'Prüft vor Abstimmungsbeginn und nach jeder Runde
-    von oben nach unten; ohne Treffer: unvollständig weiter, voll behalten'
+  "这里只汇总已录入的静态贡献，含估计值，尚不是完整角色面板。观测值仅供核对，不作为来源相加。条件效果不计入总量。": "Hier werden nur erfasste statische Beiträge inkl. Schätzungen summiert — noch kein vollständiges Charakterfenster. Beobachtete Werte dienen nur dem Abgleich, nicht als Quelle. Bedingte Effekte zählen nicht mit."
+  "进入调律前与每轮调律后的行为点）：按完整装备预期评级决策（首条命中）。无命中默认：未满 = 继续调律、词条满 = 结束并按设置锁定；材料不足/用户中断属阻断，不触发": "Verhaltenspunkte vor dem Abstimmen und nach jeder Runde): Entscheidung nach erwarteter Gesamtbewertung (erster Treffer). Ohne Treffer: nicht voll = weiter abstimmen, voll = beenden und nach Einstellung sperren; Materialmangel/Nutzerabbruch blockieren und lösen nicht aus"
+  "进入调律前及每轮结束后自上而下匹配；全部不命中时未满继续、已满保留": "Prüft vor Abstimmungsbeginn und nach jeder Runde von oben nach unten; ohne Treffer: unvollständig weiter, voll behalten"
   选择 Agent 接入配置文件: Agent-Verbindungskonfigurationsdatei wählen
-  选择一件同类型装备，互换两者的普通定音属性。装备展示的定音类别和备战方案引用不会改变。: Wähle ein Ausrüstungsteil gleichen
-    Typs, um die normalen Einstimmungsattribute beider Teile zu tauschen. Angezeigte
-    Einstimmungskategorie und Set-Referenzen bleiben unverändert.
+  "选择一件同类型装备，互换两者的普通定音属性。装备展示的定音类别和备战方案引用不会改变。": "Wähle ein Ausrüstungsteil gleichen Typs, um die normalen Einstimmungsattribute beider Teile zu tauschen. Angezeigte Einstimmungskategorie und Set-Referenzen bleiben unverändert."
   选择原词条: Originalaffix wählen
   选择文件: Datei wählen
-  选择流派会自动填入对应的两门武学并锁定；要自由搭配就选「不选择流派」: Die Wahl eines Spielstils füllt beide zugehörigen
-    Kampfkünste automatisch aus und sperrt sie; für freie Kombination „Kein Spielstil“
-    wählen
+  "选择流派会自动填入对应的两门武学并锁定；要自由搭配就选「不选择流派」": "Die Wahl eines Spielstils füllt beide zugehörigen Kampfkünste automatisch aus und sperrt sie; für freie Kombination „Kein Spielstil“ wählen"
   选择调律玩法: Abstimmungs-Spielweise wählen
   选择转律词条库（{school}）: Umwandlungs-Affix-Pool wählen ({school})
   "选项已生效，但保存到用户资料失败：{error}\n\n本次操作不受影响，下次操作会再尝试保存。": "Option aktiv, aber Speichern im Nutzerprofil fehlgeschlagen: {error}\n\nDieser Vorgang bleibt unberührt; beim nächsten Mal wird erneut gespeichert."
   通用判定：这里的条件对所有部位都生效: 'Allgemeine Bewertung: Diese Bedingungen gelten für alle Plätze'
-  部位与金/紫品阶均有候选规则。判定结果和首词条条件仍可能使规则不命中。: Plätze sowie Gold-/Violett-Qualität haben Kandidatenregeln.
-    Bewertungsergebnisse und Erst-Affix-Bedingungen können dennoch Treffer verhindern.
+  "部位与金/紫品阶均有候选规则。判定结果和首词条条件仍可能使规则不命中。": "Plätze sowie Gold-/Violett-Qualität haben Kandidatenregeln. Bewertungsergebnisse und Erst-Affix-Bedingungen können dennoch Treffer verhindern."
   '配套方案读取失败: {msg}': 'Zugehöriger Plan konnte nicht gelesen werden: {msg}'
   配置不完整: Konfiguration unvollständig
   重命名失败：{e}: 'Umbenennen fehlgeschlagen: {e}'
@@ -3078,21 +2546,13 @@ auto_strings:
   静态推导: Statische Ableitung
   非承音装备不能培养词条数值: Nicht-Chengyin-Ausrüstung kann Affix-Werte nicht aufwerten
   顺延判定规则: Aufgeschobene Bewertungsregeln
-  预期评级 ≥ 该档即进入调律（固定用传入规则判定）: Bei erwarteter Bewertung ≥ dieser Stufe abstimmen (nutzt
-    fest die übergebenen Regeln)
+  "预期评级 ≥ 该档即进入调律（固定用传入规则判定）": "Bei erwarteter Bewertung ≥ dieser Stufe abstimmen (nutzt fest die übergebenen Regeln)"
   预览基础属性: Basisattribute vorschauen
-  首次识别后按调律、重置和回收结果记账；关闭后每个检查点重新识别。: Nach der Ersterkennung wird anhand von Abstimmung,
-    Zurücksetzen und Verwerten mitgezählt; deaktiviert wird an jedem Prüfpunkt neu
-    erkannt.
-  首次识别时使用的额外大律准石数量门槛。: Zusätzlicher Schwellenwert großer Abstimmungssteine für die
-    Ersterkennung.
-  默认使用去重遍历（dedup）；启用后改用位置校验遍历（positional）。: Standardmäßig wird Deduplizierungsdurchlauf
-    (dedup) verwendet; bei Aktivierung wird auf positionsgeprüften Durchlauf (positional)
-    umgestellt.
-  默认使用当前赛季等级，也可以手动选择旧等级。: Standardmäßig gilt die aktuelle Saisonstufe; ältere Stufen
-    können auch manuell gewählt werden.
-  （仅列出的部位覆盖全局默认，未列部位沿用基础配置）: (Nur gelistete Plätze überschreiben globale Standards;
-    übrige folgen der Basiskonfiguration)
+  "首次识别后按调律、重置和回收结果记账；关闭后每个检查点重新识别。": "Nach der Ersterkennung wird anhand von Abstimmung, Zurücksetzen und Verwerten mitgezählt; deaktiviert wird an jedem Prüfpunkt neu erkannt."
+  "首次识别时使用的额外大律准石数量门槛。": "Zusätzlicher Schwellenwert großer Abstimmungssteine für die Ersterkennung."
+  "默认使用去重遍历（dedup）；启用后改用位置校验遍历（positional）。": "Standardmäßig wird Deduplizierungsdurchlauf (dedup) verwendet; bei Aktivierung wird auf positionsgeprüften Durchlauf (positional) umgestellt."
+  "默认使用当前赛季等级，也可以手动选择旧等级。": "Standardmäßig gilt die aktuelle Saisonstufe; ältere Stufen können auch manuell gewählt werden."
+  "（仅列出的部位覆盖全局默认，未列部位沿用基础配置）": "(Nur gelistete Plätze überschreiben globale Standards; übrige folgen der Basiskonfiguration)"
   （全局）: (Global)
   （双击左侧导航中的规则名可修改）: (Regelname in der linken Navigation zum Umbenennen doppelklicken)
   （已中断）: (Unterbrochen)
@@ -3109,8 +2569,7 @@ auto_strings:
   ＋ 新增规则: ＋ Neue Regel
   ；强制要求未满足：: '; Pflichtanforderungen nicht erfüllt: '
   "「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。\n\n现有可用等级：{levels}。": "Für „{target}“ existiert auf Stufe {level} noch kein Abschlussraten-Plan; optimaler Vergleich derzeit nicht möglich.\n\nVerfügbare Stufen: {levels}."
-  「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。: Für „{target}“ existiert noch kein nutzbarer
-    Abschlussraten-Plan; bitte zuerst importieren, um optimale Kombinationen zu vergleichen.
+  "「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。": "Für „{target}“ existiert noch kein nutzbarer Abschlussraten-Plan; bitte zuerst importieren, um optimale Kombinationen zu vergleichen."
   "只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。\n不会改写装备；进入后的调律处理仍使用完整实际词条。": "Ignoriert übrige Affixe nur bei der Abstimmungsschwellen-Prüfung und entscheidet anhand des Maximalpotenzials des ersten Affixes über den Abstimmungsstart.\nVerändert die Ausrüstung nicht; die anschließende Abstimmung nutzt weiterhin alle tatsächlichen Affixe."
   "本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。\n这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。": "Niedrigste Ausrüstungsstufe, die diese Saison noch Chengyin-fähig ist. Niedrigere Stufen sind diese Saison veraltet (weder gleiches noch nächstes Chengyin möglich) und von Vollstufen-/Voll-Chengyin-Annahmen ausgeschlossen.\nDies ist nicht identisch mit „Unterstützt Chengyin“ in der Stufenkonfiguration: Letzteres beschreibt nur, ob diese Stufe damals Chengyin erlaubte."
   "\n\n同一份配置里有引用，删除后会显示为未知套装：\n{items}": "\n\nIn derselben Konfiguration referenziert; nach dem Löschen als unbekanntes Set angezeigt:\n{items}"
@@ -3163,15 +2622,12 @@ auto_strings:
   删除 / 还原默认: Löschen / Standard wiederherstellen
   双击设置方案绑定的预置基础属性: Doppelklicken, um die voreingestellten Basiswerte festzulegen
   另存为预置…: Als Voreinstellung speichern…
-  当前流派暂无预置基础属性，可先在右侧「预置基础属性」中新建。: Keine voreingestellten Basiswerte für diese Schule
-    vorhanden. Erstellen Sie rechts eine Voreinstellung.
+  "当前流派暂无预置基础属性，可先在右侧「预置基础属性」中新建。": "Keine voreingestellten Basiswerte für diese Schule vorhanden. Erstellen Sie rechts eine Voreinstellung."
   新建预置…: Neue Voreinstellung…
   玩法（可选）: Spielstil (Optional)
-  留空自动生成，如：115级 1阶段（默认）: Leer lassen für automatische Generierung, z. B. St.115 Phase
-    1
+  "留空自动生成，如：115级 1阶段（默认）": "Leer lassen für automatische Generierung, z. B. St.115 Phase 1"
   留空表示流派默认（如 PVE / PVP）: Leer lassen für Schulstandard (z. B. PVE / PVP)
-  确定删除预置基础属性「{id}」？（普通模式下本地覆盖将还原为系统默认）: Voreingestellte Basiswerte „{id}“ löschen?
-    (Lokale Überschreibungen werden im Normalmodus zurückgesetzt.)
+  "确定删除预置基础属性「{id}」？（普通模式下本地覆盖将还原为系统默认）": "Voreingestellte Basiswerte „{id}“ löschen? (Lokale Überschreibungen werden im Normalmodus zurückgesetzt.)"
   编辑元信息…: Metadaten bearbeiten…
   编辑预置基础属性: Voreingestellte Basiswerte bearbeiten
   自动: Auto
@@ -3184,8 +2640,7 @@ auto_strings:
   预置 ID 不能为空: Voreinstellungs-ID darf nicht leer sein
   预置基础属性: Voreingestellte Basiswerte
   预置基础属性「{id}」已存在，是否覆盖？: Voreingestellte Basiswerte „{id}“ existieren bereits. Überschreiben?
-  预置基础属性「{id}」已存在，请使用其他 ID。: Voreingestellte Basiswerte „{id}“ existieren bereits.
-    Bitte eine andere ID verwenden.
+  "预置基础属性「{id}」已存在，请使用其他 ID。": "Voreingestellte Basiswerte „{id}“ existieren bereits. Bitte eine andere ID verwenden."
   预置已存在: Voreinstellung existiert
   默认属性: Standardwerte
   默认预置属性: Standard-Voreinstellung
@@ -3197,33 +2652,25 @@ linger:
   枚数: Anzahl
   已得: Erhalten
   清单未安装: Checkliste nicht installiert
-  已记录 {done}/{total} 枚 · 完成 {items}/{item_total} 条: Erfasst {done}/{total} · Abgeschlossen
-    {items}/{item_total}
-  已入账 {booked}/{total} 枚 · 待入账 {pending} 枚: Verbucht {booked}/{total} · Ausstehend
-    {pending}
+  "已记录 {done}/{total} 枚 · 完成 {items}/{item_total} 条": "Erfasst {done}/{total} · Abgeschlossen {items}/{item_total}"
+  "已入账 {booked}/{total} 枚 · 待入账 {pending} 枚": "Verbucht {booked}/{total} · Ausstehend {pending}"
   第 {index} 位: Nr. {index}
   同步记账: Ins Profil buchen
   固定: Fest
-  删除后列表里不再显示这一条，已记录的历史保留。: Nach dem Löschen wird dieser Eintrag nicht mehr angezeigt;
-    die erfasste Historie bleibt erhalten.
+  "删除后列表里不再显示这一条，已记录的历史保留。": "Nach dem Löschen wird dieser Eintrag nicht mehr angezeigt; die erfasste Historie bleibt erhalten."
   逐位: Einzeln
   同步模型: Sync-Modell
   详情: Details
   暂无详情: Noch keine Details.
   批量绑定: Stapelweise binden
   双击查看完整详情: Doppelklicken für vollständige Details
-  勾选即保存；双击「详情」列看全文，多枚条目双击「已得」填数，行首带三角的条目点一下就地展开逐位记录。: Klick speichert sofort; Spalte
-    „Details“ für Volltext doppelklicken, bei Mehrfach-Einträgen „Erhalten“ für Anzahl
-    doppelklicken, Dreieck-Zeilen zum Aufklappen anklicken.
+  "勾选即保存；双击「详情」列看全文，多枚条目双击「已得」填数，行首带三角的条目点一下就地展开逐位记录。": "Klick speichert sofort; Spalte „Details“ für Volltext doppelklicken, bei Mehrfach-Einträgen „Erhalten“ für Anzahl doppelklicken, Dreieck-Zeilen zum Aufklappen anklicken."
   记法: Erfassung
   管理分类: Kategorien verwalten
   清除分类: Kategorie löschen
-  分类在编辑条目时直接输入新名字即可添加；这里改名作用于全部条目，清除则把这些条目退回无类型。: Neue Kategorien einfach beim Bearbeiten
-    eintippen; Umbenennen wirkt auf alle Einträge, Löschen setzt sie auf kategorielos
-    zurück.
+  "分类在编辑条目时直接输入新名字即可添加；这里改名作用于全部条目，清除则把这些条目退回无类型。": "Neue Kategorien einfach beim Bearbeiten eintippen; Umbenennen wirkt auf alle Einträge, Löschen setzt sie auf kategorielos zurück."
   改名: Umbenennen
-  把「{name}」从全部条目上移除？条目本身保留，退回无类型。: „{name}“ von allen Einträgen entfernen? Die Einträge
-    bleiben ohne Kategorie erhalten.
+  "把「{name}」从全部条目上移除？条目本身保留，退回无类型。": "„{name}“ von allen Einträgen entfernen? Die Einträge bleiben ohne Kategorie erhalten."
   选中两条以上条目后可用: Verfügbar, wenn mindestens zwei Einträge ausgewählt sind
   类型: Typ
   条目: Eintrag
@@ -3232,9 +2679,7 @@ linger:
   跟随同步模型: Sync-Modell folgen
   设为默认: Als Standard festlegen
   搜索 key…: Keys suchen…
-  勾选的 key 进入条目编辑与顶部切换的候选；「默认同步 key」是固定/逐位条目（未自选目标时）的入账目标。: Markierte Keys stehen in
-    der Bearbeitung und oben als Auswahl bereit; „Standard-Sync-Key“ ist das Buchungsziel
-    für feste/einzelne Einträge (ohne eigenes Ziel).
+  "勾选的 key 进入条目编辑与顶部切换的候选；「默认同步 key」是固定/逐位条目（未自选目标时）的入账目标。": "Markierte Keys stehen in der Bearbeitung und oben als Auswahl bereit; „Standard-Sync-Key“ ist das Buchungsziel für feste/einzelne Einträge (ohne eigenes Ziel)."
   库存: Bestand
   配额: Kontingent
   记录: Eintrag

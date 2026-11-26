@@ -1,10 +1,5 @@
 batch:
-  ? '* 表示当前用户使用独立参数
-
-    '
-  : '* indique que cet utilisateur utilise des paramètres dédiés
-
-    '
+  "* 表示当前用户使用独立参数\n": "* indique que cet utilisateur utilise des paramètres dédiés\n"
   <b>选择执行单元</b>: <b>Sélectionner les unités d'exécution</b>
   <b>选择执行脚本</b>: <b>Sélectionner les scripts</b>
   Profile 定义不可用: Définitions de profil indisponibles
@@ -29,31 +24,13 @@ batch:
   工作流文件 (*.wf): Fichiers de workflow (*.wf)
   已按 Profile 排序用户: Utilisateurs triés par profil
   异常恢复: Récupération autonome
-  ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
-  : 'Planification par « {key} », mais le workflow de préparation d''élément « {wf} » ne sélectionne ni ne renvoie le nom d''utilisateur de cette unité. Utilisez batch/prepare_item_by_attr.wf ou déclarez #% batch_unit_prepare: true dans votre workflow et renvoyez username.'
+  "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。": "Planification par « {key} », mais le workflow de préparation d'élément « {wf} » ne sélectionne ni ne renvoie le nom d'utilisateur de cette unité. Utilisez batch/prepare_item_by_attr.wf ou déclarez #% batch_unit_prepare: true dans votre workflow et renvoyez username."
   当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: 'Planification par attribut : configurez d''abord le workflow de préparation d''élément dans « Outils → Configuration par lots ».'
   恢复默认顺序: Rétablir l'ordre par défaut
   手机端正在执行任务，请暂停或者结束任务: Le téléphone exécute actuellement une tâche ; mettez-la en pause ou arrêtez-la d'abord
-  ? '手机端正在执行任务，请暂停或者结束任务。
-
-
-    设备返回：{detail}'
-  : 'Le téléphone exécute actuellement une tâche ; mettez-la en pause ou arrêtez-la d''abord.
-
-
-    Réponse de l''appareil : {detail}'
-  ? '执行用户：{username}
-
-    参数来源：{source}'
-  : 'Utilisateur exécuté : {username}
-
-    Source des paramètres : {source}'
-  ? '执行用户：{username}
-
-    点击查看本轮任务参数'
-  : 'Utilisateur exécuté : {username}
-
-    Cliquez pour afficher les paramètres de ce tour'
+  "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}": "Le téléphone exécute actuellement une tâche ; mettez-la en pause ou arrêtez-la d'abord.\n\nRéponse de l'appareil : {detail}"
+  "执行用户：{username}\n参数来源：{source}": "Utilisateur exécuté : {username}\nSource des paramètres : {source}"
+  "执行用户：{username}\n点击查看本轮任务参数": "Utilisateur exécuté : {username}\nCliquez pour afficher les paramètres de ce tour"
   执行顺序: Ordre d'exécution
   批量设置: Paramètres par lots
   批量配置: Configuration par lots

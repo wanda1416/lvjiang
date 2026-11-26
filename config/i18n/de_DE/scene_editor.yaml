@@ -51,8 +51,7 @@ scene_editor:
   仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: Betrifft nur künftig aktualisierte oder hinzugefügte Screenshots des aktuellen Layouts, der Szene und Ansicht; vorhandene Screenshots behalten ihr Format.
   从场景 YAML 中删除 Panel 定义: Panel-Definition aus dem Szenen-YAML löschen
   从场景 YAML 中删除坐标点定义（meta 数据）: Punktdefinition aus dem Szenen-YAML löschen (Metadaten)
-  ? "以下 {n} 条没有加上：\n{detail}"
-  : "Folgende {n} Einträge wurden nicht hinzugefügt:\n{detail}"
+  "以下 {n} 条没有加上：\n{detail}": "Folgende {n} Einträge wurden nicht hinzugefügt:\n{detail}"
   以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: Folgende Szenen haben ungespeicherte Änderungen; bitte zuerst manuell speichern oder verwerfen und dann aktualisieren.
   以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: Beginnt mit einem Kleinbuchstaben; nur Kleinbuchstaben, Ziffern und Unterstriche; nach Erstellung unveränderlich
   位置和尺寸可在画布中拖动调整。: Position und Größe lassen sich direkt auf der Leinwand per Ziehen anpassen.
@@ -152,8 +151,7 @@ scene_editor:
   别名布局的「适配环境」留空时跟随根布局「{parent}」。: Bleibt die „Zielumgebung“ des Alias-Layouts leer, übernimmt es den Wert des Basislayouts „{parent}“.
   布局写入失败，请检查日志。: Layout konnte nicht geschrieben werden; bitte Protokoll prüfen.
   布局名称: Layout-Name
-  ? "布局已保存，但以下模板截图未能删除：\n{errors}"
-  : "Das Layout wurde gespeichert, aber folgende Vorlagen-Screenshots konnten nicht gelöscht werden:\n{errors}"
+  "布局已保存，但以下模板截图未能删除：\n{errors}": "Das Layout wurde gespeichert, aber folgende Vorlagen-Screenshots konnten nicht gelöscht werden:\n{errors}"
   布局清单里找不到当前布局，请先保存布局: Das aktuelle Layout befindet sich nicht in der Layout-Liste; bitte zuerst speichern
   布局绑定: Layout-Bindung
   应用到当前布局: Auf aktuelles Layout anwenden
@@ -176,8 +174,7 @@ scene_editor:
   当前布局尚未绑定此网格。: Dieses Raster ist im aktuellen Layout noch nicht gebunden.
   当前布局没有未保存的改动: Das aktuelle Layout hat keine ungespeicherten Änderungen
   当前布局绑定: Aktuelle Layout-Bindung
-  ? "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}"
-  : "Die Größe des aktuellen Screenshots stimmt nicht überein. Neue Aufnahme bestätigen?\n\nAktuell: {old_width} × {old_height}\nNeu: {new_width} × {new_height}"
+  "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}": "Die Größe des aktuellen Screenshots stimmt nicht überein. Neue Aufnahme bestätigen?\n\nAktuell: {old_width} × {old_height}\nNeu: {new_width} × {new_height}"
   当前激活布局不可删除: Das aktuell aktive Layout kann nicht gelöscht werden
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: In dieser Ansicht gibt es keine bindbaren Bereichsfelder (alle bereits zugewiesen oder gehören nicht zu dieser Ansicht)
   快速选择当前场景内的目标视图: Zielansicht innerhalb der aktuellen Szene schnell auswählen
@@ -207,8 +204,7 @@ scene_editor:
   无可用引用: Keine verfügbaren Referenzen
   无场景改动: Keine Szenenänderungen
   无布局: Kein Layout
-  ? "无截图\n请连接投屏后点击「刷新截图」"
-  : "Kein Screenshot\nBitte Bildschirmspiegelung verbinden und auf „Screenshot aktualisieren“ klicken"
+  "无截图\n请连接投屏后点击「刷新截图」": "Kein Screenshot\nBitte Bildschirmspiegelung verbinden und auf „Screenshot aktualisieren“ klicken"
   无截图源，请先在主窗口定位窗口: Keine Screenshot-Quelle; bitte erfassen Sie zuerst ein Fenster im Hauptfenster
   无法加载截图: Screenshot konnte nicht geladen werden
   无法取消: Aufheben nicht möglich
@@ -252,10 +248,8 @@ scene_editor:
   留空则点击坐标；可输入或下拉选择: Leer klickt auf die Koordinaten; eingeben oder aus der Liste wählen
   目标场景不存在: Zielszene existiert nicht
   确定删除引用 {key} 吗？: Referenz {key} wirklich löschen?
-  ? "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。"
-  : "Screenshot {idx} wirklich löschen?\nDie übrigen Screenshots werden automatisch neu nummeriert."
-  ? "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。"
-  : "Layout „{name}“ auf den zuletzt gespeicherten Zustand zurücksetzen?\nAlle ungespeicherten Kalibrierungen, Vorlagenaufnahmen und Versionsanpassungen gehen verloren."
+  "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。": "Screenshot {idx} wirklich löschen?\nDie übrigen Screenshots werden automatisch neu nummeriert."
+  "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。": "Layout „{name}“ auf den zuletzt gespeicherten Zustand zurücksetzen?\nAlle ungespeicherten Kalibrierungen, Vorlagenaufnahmen und Versionsanpassungen gehen verloren."
   确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。: Referenz auf {scene}.{entity} in der aktuellen Szene aufheben? Definition und Layout-Koordinaten der Quellszene bleiben unberührt.
   移动场景: Szene verschieben
   移动失败: Verschieben fehlgeschlagen
@@ -351,8 +345,7 @@ scene_editor:
   限定参考图识别的分组范围: Gruppenbereich für die Referenzbilderkennung eingrenzen
   隐藏「全部」选项，打开场景时直接展示基底视图: Option „Alle“ ausblenden und beim Öffnen der Szene direkt die Basisansicht anzeigen
   隐藏全部视图: Alle Ansichten ausblenden
-  ? "\n\n当前有如下场景发生变更：{names}"
-  : "\n\nFolgende Szenen wurden geändert: {names}"
+  "\n\n当前有如下场景发生变更：{names}": "\n\nFolgende Szenen wurden geändert: {names}"
   (无): (Keine)
   创建区域: Bereich erstellen
   创建方向: Richtung erstellen

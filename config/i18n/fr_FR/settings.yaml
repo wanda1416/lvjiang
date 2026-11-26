@@ -87,8 +87,7 @@ settings_dialog:
   如 ios: Ex. ios
   如 my_wait: Ex. my_wait
   完全离线模式（暂停全部联网功能）: Mode hors ligne complet (suspend toutes les fonctions réseau)
-  ? 实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。
-  : 'Fonction expérimentale : de nombreux scripts ne fonctionnent pas encore dans ce mode et les signalements d''indisponibilité ne sont pas traités. La capture en arrière-plan permet de capturer le jeu même recouvert par d''autres fenêtres, légèrement plus lentement ; elle exige aussi l''entrée en arrière-plan, et aucune des deux ne fonctionne si la fenêtre est réduite. Ceci définit la valeur par défaut : l''interface principale ne coche automatiquement « Capture en arrière-plan » qu''une fois « Mode arrière-plan » activé, modifiable à tout moment pendant l''exécution.'
+  "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。": "Fonction expérimentale : de nombreux scripts ne fonctionnent pas encore dans ce mode et les signalements d'indisponibilité ne sont pas traités. La capture en arrière-plan permet de capturer le jeu même recouvert par d'autres fenêtres, légèrement plus lentement ; elle exige aussi l'entrée en arrière-plan, et aucune des deux ne fonctionne si la fenêtre est réduite. Ceci définit la valeur par défaut : l'interface principale ne coche automatiquement « Capture en arrière-plan » qu'une fois « Mode arrière-plan » activé, modifiable à tout moment pendant l'exécution."
   实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: 'Fonction expérimentale : le téléphone doit avoir l''app LvJiang installée avec le service d''accessibilité activé ; cela ne change que le canal des clics et glissements, pas la méthode de capture. Repli sur ADB shell input en cas d''échec de connexion.'
   尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: Aucune information de connexion de ce type pour le moment ; connectez d'abord un appareil ou localisez une fenêtre depuis la fenêtre principale.
   已下载待安装：{parts}（下次启动生效）: 'Téléchargé en attente d''installation : {parts} (effectif au prochain démarrage)'
@@ -104,20 +103,7 @@ settings_dialog:
   '应用名重复: {name}': 'Nom d''application en double : {name}'
   应用注册: Enregistrement des applications
   建立流式传输尝试次数: Tentatives d'établissement du flux vidéo
-  ? '引擎算出的点击/拖拽坐标跑到画面外时怎么办。
-
-    不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。
-
-    勾选：引擎截断到画面边界并记一条 warning，本次运行继续。
-
-    判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。'
-  : 'Comportement lorsqu''une coordonnée de clic/glissement calculée par le moteur sort du cadre capturé.
-
-    Décoché (par défaut) : génère une erreur et arrête l''exécution — un dépassement indique que le déplacement du script ne correspond pas à la géométrie actuelle du panneau, et une troncature silencieuse transformerait « défiler deux lignes » en « une ligne » sans trace.
-
-    Coché : le moteur tronque au bord du cadre, journalise un avertissement et poursuit l''exécution.
-
-    La vérification se fait au niveau du moteur : sur appareil, les gestes d''accessibilité rejettent strictement ces coordonnées alors que le bureau et adb shell input les acceptent silencieusement.'
+  "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。": "Comportement lorsqu'une coordonnée de clic/glissement calculée par le moteur sort du cadre capturé.\nDécoché (par défaut) : génère une erreur et arrête l'exécution — un dépassement indique que le déplacement du script ne correspond pas à la géométrie actuelle du panneau, et une troncature silencieuse transformerait « défiler deux lignes » en « une ligne » sans trace.\nCoché : le moteur tronque au bord du cadre, journalise un avertissement et poursuit l'exécution.\nLa vérification se fait au niveau du moteur : sur appareil, les gestes d'accessibilité rejettent strictement ces coordonnées alors que le bureau et adb shell input les acceptent silencieusement."
   当前标识：未生成（未开启）: 'Identifiant actuel : non généré (désactivé)'
   手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: Après redémarrage du téléphone, le processus du service Shizuku s'arrête, alors que les tâches redémarrant le jeu en dépendent. Une fois activé, il est détecté et démarré automatiquement lors de la connexion en mode appareil (uniquement s'il ne tourne pas déjà).
   执行参数: Paramètres d'exécution
@@ -204,12 +190,7 @@ settings_dialog:
   首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: Partagé entre l'établissement initial du flux vidéo et sa récupération automatique après déconnexion. Une fois épuisé, la tâche attend une intervention manuelle sans jamais abandonner d'elle-même.
   首次窗口定位后可自动获取: Peut être rempli automatiquement après la première localisation de fenêtre
   高级设置: Paramètres avancés
-  ? '默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。
-
-    多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。'
-  : 'Par défaut, le flux vidéo est tenté 5 fois, puis l''agent 5 fois et ADB 5 fois, à 2 s d''intervalle. En cas d''échec persistant, la tâche attend indéfiniment une intervention manuelle : Oui revérifie, Non arrête la tâche ; fermer l''invite ne l''arrête pas et la bannière reste affichée.
-
-    Les gestes multipoints et concurrents ne sont pas dégradés. Une action déjà potentiellement exécutée n''est jamais rejouée automatiquement. S''applique aux tâches lancées ensuite.'
+  "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。": "Par défaut, le flux vidéo est tenté 5 fois, puis l'agent 5 fois et ADB 5 fois, à 2 s d'intervalle. En cas d'échec persistant, la tâche attend indéfiniment une intervention manuelle : Oui revérifie, Non arrête la tâche ; fermer l'invite ne l'arrête pas et la bannière reste affichée.\nLes gestes multipoints et concurrents ne sont pas dégradés. Une action déjà potentiellement exécutée n'est jamais rejouée automatiquement. S'applique aux tâches lancées ensuite."
   鼠标/触控移动到目标位置的耗时: Temps de déplacement de la souris ou du toucher jusqu'à la cible
   鼠标移动时长(秒): Durée de déplacement de la souris (s)
   坐标越界处理: Gestion des coordonnées hors limites

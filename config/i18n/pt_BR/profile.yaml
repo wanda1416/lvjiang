@@ -80,18 +80,8 @@ profile:
   分钟: minutos
   删除便利贴失败：{error}: 'Falha ao excluir a nota adesiva: {error}'
   勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: Quando marcado, o script executa antes da gravação em disco; se recusar ou falhar, toda a cadeia de gravação síncrona é revertida. Desmarcado, entra na fila em segundo plano após o envio. Scripts síncronos devem ser curtos, sem esperas longas.
-  ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
-
-    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
-  : 'Marcado: tratado como ação (action), acionando a sincronização de sync_targets.
-
-    Desmarcado: tratado como sobrescrita pura, gravando apenas esta chave sem acionar sincronizações.'
-  ? '勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。
-
-    取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。'
-  : 'Marcado: quando o alvo atingir o limite, bloqueia este item (exibe — na visão geral e fica somente leitura).
-
-    Desmarcado: o item continua exibido e editável normalmente mesmo com o alvo cheio; os incrementos apenas deixam de ser gravados no alvo cheio.'
+  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Marcado: tratado como ação (action), acionando a sincronização de sync_targets.\nDesmarcado: tratado como sobrescrita pura, gravando apenas esta chave sem acionar sincronizações."
+  "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。": "Marcado: quando o alvo atingir o limite, bloqueia este item (exibe — na visão geral e fica somente leitura).\nDesmarcado: o item continua exibido e editável normalmente mesmo com o alvo cheio; os incrementos apenas deixam de ser gravados no alvo cheio."
   包含: Contém
   单向增加: Somente aumento
   原 key 已不存在，请重新打开编辑对话框: A chave original não existe mais; reabra a janela de edição
@@ -195,62 +185,8 @@ profile:
   用户数据模型定义: Definição do modelo de dados do usuário
   用途: Uso
   用途（减少）: Uso (diminuição)
-  ? '确定撤销这条记录吗？
-
-
-    用户：{username}
-
-    数据项：{label}
-
-    时间：{time}
-
-    来源：{source}
-
-
-    撤销会按反向写入一条新记录。'
-  : 'Desfazer este registro?
-
-
-    Usuário: {username}
-
-    Item: {label}
-
-    Horário: {time}
-
-    Origem: {source}
-
-
-    Desfazer gravará um novo registro inverso.'
-  ? '确定永久删除这条历史记录吗？
-
-
-    用户：{username}
-
-    数据项：{label}
-
-    时间：{time}
-
-    来源：{source}
-
-    变动量：{delta}
-
-
-    仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。'
-  : 'Excluir permanentemente este registro do histórico?
-
-
-    Usuário: {username}
-
-    Item: {label}
-
-    Horário: {time}
-
-    Origem: {source}
-
-    Variação: {delta}
-
-
-    Exclui apenas o histórico, sem alterar o valor atual nem criar registro de exclusão. Esta ação não pode ser desfeita; excluir registros de obtenção pode liberar cotas de origem acumuladas pelo histórico.'
+  "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。": "Desfazer este registro?\n\nUsuário: {username}\nItem: {label}\nHorário: {time}\nOrigem: {source}\n\nDesfazer gravará um novo registro inverso."
+  "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。": "Excluir permanentemente este registro do histórico?\n\nUsuário: {username}\nItem: {label}\nHorário: {time}\nOrigem: {source}\nVariação: {delta}\n\nExclui apenas o histórico, sem alterar o valor atual nem criar registro de exclusão. Esta ação não pode ser desfeita; excluir registros de obtenção pode liberar cotas de origem acumuladas pelo histórico."
   确定要删除 key '{key}' 吗？: Excluir a chave '{key}'?
   确定要删除分组 '{name}' 吗？: Excluir o grupo '{name}'?
   确定要删除这条便利贴吗？: Excluir esta nota adesiva?
@@ -265,12 +201,7 @@ profile:
   至少保留一个分组: Mantenha pelo menos um grupo
   覆写 - {label}: Sobrescrever - {label}
   覆写...: Sobrescrever...
-  ? '解除 {user} 的「{label}」锁定？
-
-    解锁后自动任务会重新读取并更新该 key。'
-  : 'Remover o bloqueio de "{label}" para {user}?
-
-    Após desbloquear, as tarefas automáticas voltarão a ler e atualizar esta chave.'
+  "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。": "Remover o bloqueio de \"{label}\" para {user}?\nApós desbloquear, as tarefas automáticas voltarão a ler e atualizar esta chave."
   设备：{value}: 'Dispositivo: {value}'
   该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: Este valor foi atualizado por outro processo; a variação não foi gravada. Atualize e tente novamente.
   该条历史记录已发生变化，请刷新后重试: Este registro do histórico foi alterado; atualize e tente novamente
@@ -292,28 +223,12 @@ profile:
   选择...: Selecionar...
   选择变更脚本: Selecionar script de alteração
   选择字段: Selecionar campo
-  ? '重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。
-
-
-    是否继续？'
-  : 'Renomear atualizará os registros atuais, o histórico, as origens de sincronização e as referências de configuração de todos os usuários. As chaves em fluxos de trabalho e scripts de alteração não são substituídas automaticamente; atualize-as manualmente.
-
-
-    Deseja continuar?'
+  "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Renomear atualizará os registros atuais, o histórico, as origens de sincronização e as referências de configuração de todos os usuários. As chaves em fluxos de trabalho e scripts de alteração não são substituídas automaticamente; atualize-as manualmente.\n\nDeseja continuar?"
   重新读取用户数据: Recarregar dados do usuário
   重置:{time}: 'Redefinição: {time}'
   重置日:{day}: 'Dia de redefinição: {day}'
   重置日:{day}号: 'Dia de redefinição: dia {day}'
-  ? '锁定 {user} 的「{label}」？
-
-    锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。
-
-    随时可以右键解锁。'
-  : 'Bloquear "{label}" para {user}?
-
-    Enquanto bloqueado, o motor ignora este valor: tarefas automáticas deixam de ler ou gravar, redefinições periódicas são pausadas e o valor permanece no estado atual.
-
-    Você pode desbloquear com o botão direito a qualquer momento.'
+  "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。": "Bloquear \"{label}\" para {user}?\nEnquanto bloqueado, o motor ignora este valor: tarefas automáticas deixam de ler ou gravar, redefinições periódicas são pausadas e o valor permanece no estado atual.\nVocê pode desbloquear com o botão direito a qualquer momento."
   键: Chave
   键：{label}: 'Chave: {label}'
   键：{value}: 'Chave: {value}'
@@ -324,21 +239,11 @@ profile:
   Profile 变更脚本仍在执行，请等待队列完成后重命名: Um script de alteração do Profile ainda está em execução; aguarde a fila concluir antes de renomear
   '下一点恢复: 已达上限': 'Próxima recuperação: limite atingido'
   便利贴内容不能为空: O conteúdo da nota adesiva não pode ficar vazio
-  ? '保存 profile.yaml 失败:
-
-    {e}'
-  : 'Falha ao salvar profile.yaml:
-
-    {e}'
+  "保存 profile.yaml 失败:\n{e}": "Falha ao salvar profile.yaml:\n{e}"
   删除当前列: Excluir coluna atual
   升序: Crescente
   右侧新增列: Adicionar coluna à direita
-  ? '回写用户数据失败:
-
-    {e}'
-  : 'Falha ao gravar dados do usuário:
-
-    {e}'
+  "回写用户数据失败:\n{e}": "Falha ao gravar dados do usuário:\n{e}"
   库存: Estoque
   开启后允许输入小数，UI 使用 DoubleValidator: Quando ativado, permite números decimais (a interface usa DoubleValidator)
   当前配置: Configuração atual
@@ -375,78 +280,19 @@ layout_transfer:
   覆盖远端页面结构？: Sobrescrever a estrutura de página remota?
   下载排版: Baixar layout
   确认替换本机结构: Confirmar substituição da estrutura local
-  ? '本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。
-
-
-    确认替换？'
-  : 'A estrutura de página atual desta máquina será substituída pela da nuvem; nenhuma cópia local será mantida automaticamente.
-
-
-    Confirmar substituição?'
+  "本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？": "A estrutura de página atual desta máquina será substituída pela da nuvem; nenhuma cópia local será mantida automaticamente.\n\nConfirmar substituição?"
   '{} 个分组 / {} 列': '{} grupos / {} colunas'
   无法解析: Não analisável
-  ? '远端已有页面结构，且不是本机写入的：
-
-
-    {remote}
-
-    远端结构：{remote_size}
-
-    本机结构：{local_size}
-
-
-    覆盖后，其它设备下载将得到本机结构。'
-  : 'A nuvem já possui uma estrutura de página que não foi gravada por esta máquina:
-
-
-    {remote}
-
-    Estrutura remota: {remote_size}
-
-    Estrutura local: {local_size}
-
-
-    Após sobrescrever, outros dispositivos baixarão a estrutura desta máquina.'
+  "远端已有页面结构，且不是本机写入的：\n\n{remote}\n远端结构：{remote_size}\n本机结构：{local_size}\n\n覆盖后，其它设备下载将得到本机结构。": "A nuvem já possui uma estrutura de página que não foi gravada por esta máquina:\n\n{remote}\nEstrutura remota: {remote_size}\nEstrutura local: {local_size}\n\nApós sobrescrever, outros dispositivos baixarão a estrutura desta máquina."
   上传排版: Enviar layout
   页面结构以 PC 为准，手机端只支持下载。: A estrutura de página é gerenciada no PC; o celular suporta apenas download.
   请先在「账号」里登录后再上传页面结构。: Faça login em "Conta" antes de enviar a estrutura de página.
   云端与本机一致，无需上传。: A nuvem já corresponde a esta máquina; não é necessário enviar.
   请先在「账号」里登录后再下载页面结构。: Faça login em "Conta" antes de baixar a estrutura de página.
   云端还没有页面结构，先在编辑端点一次「上传排版」。: A nuvem ainda não possui estrutura de página; clique em "Enviar layout" uma vez na máquina de edição.
-  ? '将使用云端的页面结构：
-
-
-    {remote}
-
-    云端结构：{size}
-
-    本机结构：{local}
-
-
-    继续后还需再确认一次才会替换本机结构。'
-  : 'A estrutura de página da nuvem será usada:
-
-
-    {remote}
-
-    Estrutura na nuvem: {size}
-
-    Estrutura local: {local}
-
-
-    Será pedida mais uma confirmação antes de substituir a estrutura local.'
-  ? '已下载页面结构。
-
-    {detail}'
-  : 'Estrutura de página baixada.
-
-    {detail}'
-  ? '已上传页面结构。
-
-    {detail}'
-  : 'Estrutura de página enviada.
-
-    {detail}'
+  "将使用云端的页面结构：\n\n{remote}\n云端结构：{size}\n本机结构：{local}\n\n继续后还需再确认一次才会替换本机结构。": "A estrutura de página da nuvem será usada:\n\n{remote}\nEstrutura na nuvem: {size}\nEstrutura local: {local}\n\nSerá pedida mais uma confirmação antes de substituir a estrutura local."
+  "已下载页面结构。\n{detail}": "Estrutura de página baixada.\n{detail}"
+  "已上传页面结构。\n{detail}": "Estrutura de página enviada.\n{detail}"
   云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。: A estrutura de página na nuvem foi alterada por outro dispositivo enquanto você confirmava; baixe primeiro ou tente novamente mais tarde.
   读取本机页面结构失败：{error}: 'Falha ao ler a estrutura de página local: {error}'
   下载失败，本机结构未改变：{error}: 'Falha no download; a estrutura local não foi alterada: {error}'
@@ -456,9 +302,4 @@ layout_transfer:
   快照只支持在 PC 端创建。: Instantâneos só podem ser criados no PC.
   请先在「账号」里登录后再创建快照。: Faça login em "Conta" antes de criar um instantâneo.
   创建快照失败：{error}: 'Falha ao criar instantâneo: {error}'
-  ? '已创建快照。
-
-    {detail}'
-  : 'Instantâneo criado.
-
-    {detail}'
+  "已创建快照。\n{detail}": "Instantâneo criado.\n{detail}"

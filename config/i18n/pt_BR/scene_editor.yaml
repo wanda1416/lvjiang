@@ -51,12 +51,7 @@ scene_editor:
   仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: Afeta apenas futuras capturas atualizadas ou adicionadas para o layout, cena e visualização atuais; capturas existentes mantêm o formato original.
   从场景 YAML 中删除 Panel 定义: Excluir a definição de Panel do YAML da cena
   从场景 YAML 中删除坐标点定义（meta 数据）: Excluir a definição do ponto de coordenada do YAML da cena (metadados)
-  ? '以下 {n} 条没有加上：
-
-    {detail}'
-  : 'Os {n} itens a seguir não foram adicionados:
-
-    {detail}'
+  "以下 {n} 条没有加上：\n{detail}": "Os {n} itens a seguir não foram adicionados:\n{detail}"
   以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: As cenas a seguir têm alterações não salvas; salve ou descarte-as manualmente antes de atualizar.
   以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: Começa com letra minúscula; apenas letras minúsculas, números e sublinhados; não pode ser alterada após a criação
   位置和尺寸可在画布中拖动调整。: A posição e o tamanho podem ser ajustados arrastando na tela.
@@ -156,12 +151,7 @@ scene_editor:
   别名布局的「适配环境」留空时跟随根布局「{parent}」。: Quando "Ambiente compatível" do layout de alias ficar vazio, seguirá o layout raiz "{parent}".
   布局写入失败，请检查日志。: Falha ao gravar o layout; consulte o log.
   布局名称: Nome do layout
-  ? '布局已保存，但以下模板截图未能删除：
-
-    {errors}'
-  : 'O layout foi salvo, mas não foi possível excluir as seguintes capturas de modelo:
-
-    {errors}'
+  "布局已保存，但以下模板截图未能删除：\n{errors}": "O layout foi salvo, mas não foi possível excluir as seguintes capturas de modelo:\n{errors}"
   布局清单里找不到当前布局，请先保存布局: O layout atual não está na lista de layouts; salve-o primeiro
   布局绑定: Vínculo de layout
   应用到当前布局: Aplicar ao layout atual
@@ -184,18 +174,7 @@ scene_editor:
   当前布局尚未绑定此网格。: O layout atual ainda não vinculou esta grade.
   当前布局没有未保存的改动: O layout atual não tem alterações não salvas
   当前布局绑定: Vínculo do layout atual
-  ? '当前截图大小不匹配，是否确认截图？
-
-
-    当前截图：{old_width} × {old_height}
-
-    新截图：{new_width} × {new_height}'
-  : 'O tamanho da captura atual não corresponde. Confirmar a nova captura?
-
-
-    Atual: {old_width} × {old_height}
-
-    Nova: {new_width} × {new_height}'
+  "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}": "O tamanho da captura atual não corresponde. Confirmar a nova captura?\n\nAtual: {old_width} × {old_height}\nNova: {new_width} × {new_height}"
   当前激活布局不可删除: O layout ativo no momento não pode ser excluído
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: Nenhum campo de região disponível para vincular nesta visualização (todos já atribuídos ou não pertencem a esta visualização)
   快速选择当前场景内的目标视图: Selecionar rapidamente uma visualização de destino na cena atual
@@ -225,12 +204,7 @@ scene_editor:
   无可用引用: Nenhuma referência disponível
   无场景改动: Sem alterações na cena
   无布局: Sem layout
-  ? '无截图
-
-    请连接投屏后点击「刷新截图」'
-  : 'Sem captura de tela
-
-    Conecte o espelhamento e clique em "Atualizar captura"'
+  "无截图\n请连接投屏后点击「刷新截图」": "Sem captura de tela\nConecte o espelhamento e clique em \"Atualizar captura\""
   无截图源，请先在主窗口定位窗口: Sem fonte de captura; localize uma janela na janela principal primeiro
   无法加载截图: Não foi possível carregar a captura de tela
   无法取消: Não é possível cancelar
@@ -274,18 +248,8 @@ scene_editor:
   留空则点击坐标；可输入或下拉选择: Vazio clica nas coordenadas; digite ou escolha na lista
   目标场景不存在: A cena de destino não existe
   确定删除引用 {key} 吗？: Excluir a referência {key}?
-  ? '确定删除截图 {idx} 吗？
-
-    删除后其余截图将自动重编号。'
-  : 'Excluir a captura {idx}?
-
-    As demais capturas serão renumeradas automaticamente.'
-  ? '确定恢复布局「{name}」最近一次保存的状态吗？
-
-    所有未保存的布局标定、模板截取和版本调整都会丢失。'
-  : 'Restaurar o layout "{name}" para o último estado salvo?
-
-    Todas as calibrações, capturas de modelo e ajustes não salvos serão perdidos.'
+  "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。": "Excluir a captura {idx}?\nAs demais capturas serão renumeradas automaticamente."
+  "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。": "Restaurar o layout \"{name}\" para o último estado salvo?\nTodas as calibrações, capturas de modelo e ajustes não salvos serão perdidos."
   确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。: Remover a referência desta cena para {scene}.{entity}? A definição e as coordenadas na cena de origem não serão afetadas.
   移动场景: Mover cena
   移动失败: Falha ao mover
@@ -381,14 +345,7 @@ scene_editor:
   限定参考图识别的分组范围: Restringe o escopo de grupo do reconhecimento de imagens de referência
   隐藏「全部」选项，打开场景时直接展示基底视图: Oculta a opção "Todas" e exibe diretamente a visualização base ao abrir a cena
   隐藏全部视图: Ocultar todas as visualizações
-  ? '
-
-
-    当前有如下场景发生变更：{names}'
-  : '
-
-
-    As seguintes cenas foram alteradas: {names}'
+  "\n\n当前有如下场景发生变更：{names}": "\n\nAs seguintes cenas foram alteradas: {names}"
   (无): (Nenhum)
   创建区域: Criar região
   创建方向: Criar direção

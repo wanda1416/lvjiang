@@ -23,12 +23,7 @@ ocr_dialog:
   刷新截图失败: Falha ao atualizar a captura de tela
   匹配参考图: Corresponder imagem de referência
   区域批量识别: Reconhecimento em lote de regiões
-  ? '区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。
-
-    这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。'
-  : 'O reconhecimento em lote une várias regiões de texto em uma única tela e chama o OCR uma só vez.
-
-    Estes parâmetros controlam o tamanho da tela combinada; passam a valer no próximo reconhecimento após salvar.'
+  "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。": "O reconhecimento em lote une várias regiões de texto em uma única tela e chama o OCR uma só vez.\nEstes parâmetros controlam o tamanho da tela combinada; passam a valer no próximo reconhecimento após salvar."
   原始文本: Texto original
   图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: As configurações de OCR têm alterações não salvas. Deseja sair e descartá-las?
   图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Arquivos de imagem (*.png *.jpg *.jpeg *.bmp *.webp);;Todos os arquivos (*)
@@ -78,19 +73,9 @@ ocr_dialog:
   选择图片: Selecionar imagem
   选框区域为空: A região selecionada está vazia
   重命名规则组: Renomear grupo de regras
-  ? '默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。
-
-    改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。'
-  : 'As regras padrão valem globalmente para todo OCR; as cláusulas with de scan/find aplicam o grupo de regras selecionado após as regras padrão.
-
-    Clique em "Salvar" para aplicar sem reiniciar; use "Desfazer" para reverter alterações não salvas.'
+  "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。": "As regras padrão valem globalmente para todo OCR; as cláusulas with de scan/find aplicam o grupo de regras selecionado após as regras padrão.\nClique em \"Salvar\" para aplicar sem reiniciar; use \"Desfazer\" para reverter alterações não salvas."
   默认规则（全局）: Regras padrão (Global)
-  ? '识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。
-
-    保存后从下一次识别开始生效，不需要重启。'
-  : 'O desempenho de reconhecimento se aplica a todas as chamadas: maior paralelismo acelera, mas consome CPU proporcionalmente.
-
-    As alterações salvas valem a partir do próximo reconhecimento, sem reiniciar.'
+  "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。": "O desempenho de reconhecimento se aplica a todas as chamadas: maior paralelismo acelera, mas consome CPU proporcionalmente.\nAs alterações salvas valem a partir do próximo reconhecimento, sem reiniciar."
   识别性能: Desempenho
   单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 'Número de threads usadas em cada reconhecimento. Padrão 2: aumentar não acelera na prática e só eleva o uso de CPU; use 1 para economizar CPU em execuções longas em segundo plano.'
   识别线程数: Threads de reconhecimento

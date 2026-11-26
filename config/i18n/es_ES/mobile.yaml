@@ -56,8 +56,7 @@ mobile:
   安装失败：{err}: 'Error de instalación: {err}'
   安装完成：{out}: 'Instalación completada: {out}'
   尚未扫描: Aún no escaneado
-  ? "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。"
-  : "El escaneo LAN detecta dispositivos con ADB inalámbrico activado; el escaneo de puertos locales detecta emuladores que solo escuchan en 127.0.0.1.\nEl escaneo solo establece conexiones ADB y no cambia el destino de ejecución de la ventana principal."
+  "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。": "El escaneo LAN detecta dispositivos con ADB inalámbrico activado; el escaneo de puertos locales detecta emuladores que solo escuchan en 127.0.0.1.\nEl escaneo solo establece conexiones ADB y no cambia el destino de ejecución de la ventana principal."
   屏幕: Pantalla
   屏幕标定: Calibración de pantalla
   已下载 {mb:.1f} MB: Descargados {mb:.1f} MB
@@ -134,15 +133,13 @@ mobile:
   没有可用的局域网地址: No hay dirección LAN disponible
   没有可用的局域网地址：确认本机已连接网络: 'No hay dirección LAN disponible: comprueba que el equipo esté conectado a la red'
   没有已连接的 ADB 设备: No hay ningún dispositivo ADB conectado
-  ? "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。"
-  : "La prueba mantendrá pulsada la esquina inferior izquierda durante un momento mientras toca dos veces la esquina inferior derecha (es decir, «mantener el joystick mientras se toca»).\nColoca primero el teléfono en una pantalla del juego donde se aprecien el movimiento y el salto, y luego haz clic en Iniciar."
+  "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。": "La prueba mantendrá pulsada la esquina inferior izquierda durante un momento mientras toca dos veces la esquina inferior derecha (es decir, «mantener el joystick mientras se toca»).\nColoca primero el teléfono en una pantalla del juego donde se aprecien el movimiento y el salto, y luego haz clic en Iniciar."
   版本: Versión
   版本不一致时协议和随包配置都可能对不上。建议把低的那一边升到高的: Cuando las versiones no coinciden, el protocolo y las configuraciones incluidas pueden ser incompatibles. Se recomienda actualizar el lado más antiguo
   用 PC 配置覆盖手机任务参数和用户名册。: Sobrescribe los parámetros de tareas y la lista de usuarios del teléfono con la configuración del PC.
   用 PC 配置覆盖手机批量配置。: Sobrescribe la configuración de lotes del teléfono con la del PC.
   用手机扫码，从本机下载安装。手机需要和电脑在同一局域网，但不需要能上网。: Escanea con el teléfono para descargar e instalar desde este PC. El teléfono debe estar en la misma LAN, pero no necesita acceso a Internet.
-  ? "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。"
-  : "Escanea con el teléfono para descargar e instalar directamente desde GitHub.\nSi el teléfono no tiene acceso a Internet, usa «Compartición local» a la derecha."
+  "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。": "Escanea con el teléfono para descargar e instalar directamente desde GitHub.\nSi el teléfono no tiene acceso a Internet, usa «Compartición local» a la derecha."
   由本机提供下载，手机不需要能上网: La descarga se sirve desde este PC; el teléfono no necesita conexión a Internet
   电脑: PC
   确认手机已安装律匠 app、与本机同一局域网或已用 USB 连接，并在 app 内开启无障碍服务: Comprueba que la app de LvJiang esté instalada en el teléfono, en la misma LAN o conectada por USB, y que el servicio de accesibilidad esté activado en la app

@@ -1,11 +1,6 @@
 # batch.yaml — 按模块段落组织
 batch:
-  ? '* 表示当前用户使用独立参数
-
-    '
-  : '* 表示當前使用者使用獨立引數
-
-    '
+  "* 表示当前用户使用独立参数\n": "* 表示當前使用者使用獨立引數\n"
   <b>选择执行单元</b>: <b>選擇執行單元</b>
   <b>选择执行脚本</b>: <b>選擇執行指令碼</b>
   Profile 定义不可用: Profile 定義不可用
@@ -30,31 +25,13 @@ batch:
   工作流文件 (*.wf): 工作流檔案 (*.wf)
   已按 Profile 排序用户: 已按 Profile 排序使用者
   异常恢复: 異常恢復
-  ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
-  : '當前按「{key}」排程，但條目準備工作流「{wf}」不會選定並返回本單元的使用者名稱。請改用 batch/prepare_item_by_attr.wf，或在自寫的準備工作流裡宣告 #% batch_unit_prepare: true 並返回 username。'
+  "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。": "當前按「{key}」排程，但條目準備工作流「{wf}」不會選定並返回本單元的使用者名稱。請改用 batch/prepare_item_by_attr.wf，或在自寫的準備工作流裡宣告 #% batch_unit_prepare: true 並返回 username。"
   当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: 當前按屬性排程，請先在「工具 → 批次配置」中配置條目準備 wf。
   恢复默认顺序: 恢復預設順序
   手机端正在执行任务，请暂停或者结束任务: 手機端正在執行任務，請暫停或者結束任務
-  ? '手机端正在执行任务，请暂停或者结束任务。
-
-
-    设备返回：{detail}'
-  : '手機端正在執行任務，請暫停或者結束任務。
-
-
-    裝置返回：{detail}'
-  ? '执行用户：{username}
-
-    参数来源：{source}'
-  : '執行使用者：{username}
-
-    引數來源：{source}'
-  ? '执行用户：{username}
-
-    点击查看本轮任务参数'
-  : '執行使用者：{username}
-
-    點選檢視本輪任務引數'
+  "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}": "手機端正在執行任務，請暫停或者結束任務。\n\n裝置返回：{detail}"
+  "执行用户：{username}\n参数来源：{source}": "執行使用者：{username}\n引數來源：{source}"
+  "执行用户：{username}\n点击查看本轮任务参数": "執行使用者：{username}\n點選檢視本輪任務引數"
   执行顺序: 執行順序
   批量设置: 批次設定
   批量配置: 批次配置

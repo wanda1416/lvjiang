@@ -51,12 +51,7 @@ scene_editor:
   仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: Affecte uniquement les captures actualisées ou ajoutées par la suite pour cette mise en page, scène et vue ; les captures existantes conservent leur format.
   从场景 YAML 中删除 Panel 定义: Supprimer la définition Panel du fichier YAML de la scène
   从场景 YAML 中删除坐标点定义（meta 数据）: Supprimer la définition du point du fichier YAML de la scène (métadonnées)
-  ? '以下 {n} 条没有加上：
-
-    {detail}'
-  : 'Les {n} éléments suivants n''ont pas été ajoutés :
-
-    {detail}'
+  "以下 {n} 条没有加上：\n{detail}": "Les {n} éléments suivants n'ont pas été ajoutés :\n{detail}"
   以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: Ces scènes contiennent des modifications non enregistrées ; enregistrez-les ou abandonnez-les avant d'actualiser.
   以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: Commence par une minuscule ; minuscules, chiffres et tirets bas uniquement ; non modifiable après création
   位置和尺寸可在画布中拖动调整。: La position et la taille peuvent être ajustées par glisser-déposer sur le canevas.
@@ -156,12 +151,7 @@ scene_editor:
   别名布局的「适配环境」留空时跟随根布局「{parent}」。: Si l'environnement cible de la mise en page alias est vide, il suit la mise en page racine « {parent} ».
   布局写入失败，请检查日志。: Échec d'écriture de la mise en page ; veuillez consulter le journal.
   布局名称: Nom de la mise en page
-  ? '布局已保存，但以下模板截图未能删除：
-
-    {errors}'
-  : 'La mise en page a été enregistrée, mais ces captures de modèle n''ont pas pu être supprimées :
-
-    {errors}'
+  "布局已保存，但以下模板截图未能删除：\n{errors}": "La mise en page a été enregistrée, mais ces captures de modèle n'ont pas pu être supprimées :\n{errors}"
   布局清单里找不到当前布局，请先保存布局: La mise en page actuelle est introuvable dans la liste ; enregistrez-la d'abord
   布局绑定: Liaison de mise en page
   应用到当前布局: Appliquer à la mise en page actuelle
@@ -184,18 +174,7 @@ scene_editor:
   当前布局尚未绑定此网格。: La mise en page actuelle n'a pas encore lié cette grille.
   当前布局没有未保存的改动: La mise en page actuelle n'a aucune modification non enregistrée
   当前布局绑定: Liaison de la mise en page actuelle
-  ? '当前截图大小不匹配，是否确认截图？
-
-
-    当前截图：{old_width} × {old_height}
-
-    新截图：{new_width} × {new_height}'
-  : 'La taille de la nouvelle capture ne correspond pas. Confirmer quand même ?
-
-
-    Capture actuelle : {old_width} × {old_height}
-
-    Nouvelle capture : {new_width} × {new_height}'
+  "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}": "La taille de la nouvelle capture ne correspond pas. Confirmer quand même ?\n\nCapture actuelle : {old_width} × {old_height}\nNouvelle capture : {new_width} × {new_height}"
   当前激活布局不可删除: La mise en page actuellement active ne peut pas être supprimée
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: Aucun champ de zone ne peut être lié dans cette vue (tous sont déjà attribués ou n'appartiennent pas à cette vue)
   快速选择当前场景内的目标视图: Sélectionner rapidement une vue cible dans la scène actuelle
@@ -225,12 +204,7 @@ scene_editor:
   无可用引用: Aucune référence disponible
   无场景改动: Aucune modification de scène
   无布局: Aucune mise en page
-  ? '无截图
-
-    请连接投屏后点击「刷新截图」'
-  : 'Aucune capture
-
-    Connectez le miroir d''écran puis cliquez sur « Actualiser la capture »'
+  "无截图\n请连接投屏后点击「刷新截图」": "Aucune capture\nConnectez le miroir d'écran puis cliquez sur « Actualiser la capture »"
   无截图源，请先在主窗口定位窗口: Aucune source de capture ; localisez d'abord une fenêtre dans la fenêtre principale
   无法加载截图: Impossible de charger la capture
   无法取消: Impossible d'annuler
@@ -274,18 +248,8 @@ scene_editor:
   留空则点击坐标；可输入或下拉选择: 'Vide : clique sur les coordonnées ; saisissez ou choisissez dans la liste'
   目标场景不存在: La scène cible n'existe pas
   确定删除引用 {key} 吗？: Supprimer la référence {key} ?
-  ? '确定删除截图 {idx} 吗？
-
-    删除后其余截图将自动重编号。'
-  : 'Supprimer la capture {idx} ?
-
-    Les captures restantes seront renumérotées automatiquement.'
-  ? '确定恢复布局「{name}」最近一次保存的状态吗？
-
-    所有未保存的布局标定、模板截取和版本调整都会丢失。'
-  : 'Restaurer le dernier état enregistré de la mise en page « {name} » ?
-
-    Tous les calibrages, captures de modèles et ajustements non enregistrés seront perdus.'
+  "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。": "Supprimer la capture {idx} ?\nLes captures restantes seront renumérotées automatiquement."
+  "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。": "Restaurer le dernier état enregistré de la mise en page « {name} » ?\nTous les calibrages, captures de modèles et ajustements non enregistrés seront perdus."
   确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。: Supprimer la référence de cette scène vers {scene}.{entity} ? La définition et les coordonnées de la scène source restent inchangées.
   移动场景: Déplacer la scène
   移动失败: Échec du déplacement
@@ -381,14 +345,7 @@ scene_editor:
   限定参考图识别的分组范围: Restreindre la portée de groupe de la reconnaissance d'images de référence
   隐藏「全部」选项，打开场景时直接展示基底视图: Masque l'option « Toutes » et affiche directement la vue de base à l'ouverture de la scène
   隐藏全部视图: Masquer toutes les vues
-  ? '
-
-
-    当前有如下场景发生变更：{names}'
-  : '
-
-
-    Les scènes suivantes ont été modifiées : {names}'
+  "\n\n当前有如下场景发生变更：{names}": "\n\nLes scènes suivantes ont été modifiées : {names}"
   (无): (Aucun)
   创建区域: Créer une zone
   创建方向: Créer une direction

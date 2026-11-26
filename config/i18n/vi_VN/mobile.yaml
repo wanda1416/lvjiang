@@ -56,8 +56,7 @@ mobile:
   "安装失败：{err}": "Cài đặt thất bại: {err}"
   "安装完成：{out}": "Cài đặt hoàn tất: {out}"
   尚未扫描: Chưa quét
-  ? "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。"
-  : "Quét mạng LAN dùng để tìm thiết bị đã bật ADB không dây; quét cổng cục bộ dùng để tìm trình giả lập chỉ lắng nghe 127.0.0.1.\nQuét chỉ thiết lập kết nối ADB, không chuyển mục tiêu thực thi ở cửa sổ chính."
+  "局域网扫描用于发现已开启无线 ADB 的设备；本机端口扫描用于发现只监听 127.0.0.1 的模拟器。\n扫描只建立 ADB 连接，不会切换主界面的执行目标。": "Quét mạng LAN dùng để tìm thiết bị đã bật ADB không dây; quét cổng cục bộ dùng để tìm trình giả lập chỉ lắng nghe 127.0.0.1.\nQuét chỉ thiết lập kết nối ADB, không chuyển mục tiêu thực thi ở cửa sổ chính."
   屏幕: Màn hình
   屏幕标定: Hiệu chỉnh màn hình
   "已下载 {mb:.1f} MB": "Đã tải {mb:.1f} MB"
@@ -134,15 +133,13 @@ mobile:
   没有可用的局域网地址: Không có địa chỉ mạng LAN khả dụng
   没有可用的局域网地址：确认本机已连接网络: "Không có địa chỉ mạng LAN khả dụng: hãy đảm bảo máy tính đã kết nối mạng"
   没有已连接的 ADB 设备: Không có thiết bị ADB nào được kết nối
-  ? "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。"
-  : "Bài kiểm tra sẽ nhấn giữ góc dưới bên trái màn hình một lúc, đồng thời chạm hai lần ở góc dưới bên phải — tức là \"vừa đẩy cần điều khiển vừa chạm liên tiếp\".\nVui lòng để điện thoại ở màn hình trò chơi có thể thấy rõ di chuyển và nhảy rồi bấm bắt đầu."
+  "测试会在屏幕左下角按住一段时间，期间在右下角点两次——也就是「推着摇杆同时连点」。\n请先把手机停在游戏里能看出移动和跳跃的画面，再点开始。": "Bài kiểm tra sẽ nhấn giữ góc dưới bên trái màn hình một lúc, đồng thời chạm hai lần ở góc dưới bên phải — tức là \"vừa đẩy cần điều khiển vừa chạm liên tiếp\".\nVui lòng để điện thoại ở màn hình trò chơi có thể thấy rõ di chuyển và nhảy rồi bấm bắt đầu."
   版本: Phiên bản
   版本不一致时协议和随包配置都可能对不上。建议把低的那一边升到高的: "Khi phiên bản không khớp, cả giao thức lẫn cấu hình đi kèm đều có thể sai lệch. Nên nâng cấp phía thấp hơn cho khớp"
   用 PC 配置覆盖手机任务参数和用户名册。: Ghi đè tham số tác vụ và danh sách người dùng trên điện thoại bằng cấu hình từ PC.
   用 PC 配置覆盖手机批量配置。: Ghi đè cấu hình hàng loạt trên điện thoại bằng cấu hình từ PC.
   用手机扫码，从本机下载安装。手机需要和电脑在同一局域网，但不需要能上网。: Quét mã bằng điện thoại để tải và cài đặt từ máy tính này. Điện thoại cần cùng mạng LAN với máy tính nhưng không cần có internet.
-  ? "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。"
-  : "Quét mã bằng điện thoại để tải và cài đặt trực tiếp từ GitHub.\nNếu điện thoại không vào được mạng, hãy dùng mục \"Chia sẻ cục bộ\" ở bên phải."
+  "用手机扫码，直接从 GitHub 下载安装。\n手机上不了网时，改用右侧「本机共享」。": "Quét mã bằng điện thoại để tải và cài đặt trực tiếp từ GitHub.\nNếu điện thoại không vào được mạng, hãy dùng mục \"Chia sẻ cục bộ\" ở bên phải."
   由本机提供下载，手机不需要能上网: "Tải xuống do máy tính này cung cấp, điện thoại không cần kết nối internet"
   电脑: Máy tính
   确认手机已安装律匠 app、与本机同一局域网或已用 USB 连接，并在 app 内开启无障碍服务: "Đảm bảo điện thoại đã cài ứng dụng LvJiang, cùng mạng LAN hoặc đã kết nối USB với máy tính này, và đã bật Dịch vụ Trợ năng trong ứng dụng"

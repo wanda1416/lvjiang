@@ -23,8 +23,7 @@ ocr_dialog:
   刷新截图失败: Làm mới ảnh chụp thất bại
   匹配参考图: Khớp ảnh tham chiếu
   区域批量识别: Nhận diện vùng hàng loạt
-  ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
-  : "Nhận diện vùng hàng loạt sẽ ghép nhiều vùng văn bản thành một khung vẽ và chỉ gọi OCR một lần.\nCác tham số này điều chỉnh kích thước ảnh ghép; có hiệu lực từ lần nhận diện tiếp theo sau khi lưu."
+  "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。": "Nhận diện vùng hàng loạt sẽ ghép nhiều vùng văn bản thành một khung vẽ và chỉ gọi OCR một lần.\nCác tham số này điều chỉnh kích thước ảnh ghép; có hiệu lực từ lần nhận diện tiếp theo sau khi lưu."
   原始文本: Văn bản gốc
   图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: "Cấu hình OCR có thay đổi chưa lưu, bạn có chắc muốn thoát và hủy bỏ không?"
   "图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*)": "Tệp hình ảnh (*.png *.jpg *.jpeg *.bmp *.webp);;Tất cả tệp (*)"
@@ -74,11 +73,9 @@ ocr_dialog:
   选择图片: Chọn ảnh
   选框区域为空: Vùng khung chọn trống
   重命名规则组: Đổi tên nhóm quy tắc
-  ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
-  : "Quy tắc mặc định áp dụng toàn cục cho mọi OCR; mệnh đề with của scan/find sẽ xếp chồng nhóm quy tắc nghiệp vụ đã chọn sau quy tắc mặc định.\nNhấn \"Lưu\" để áp dụng ngay không cần khởi động lại; thay đổi chưa lưu có thể khôi phục bằng \"Hoàn tác\"."
+  "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。": "Quy tắc mặc định áp dụng toàn cục cho mọi OCR; mệnh đề with của scan/find sẽ xếp chồng nhóm quy tắc nghiệp vụ đã chọn sau quy tắc mặc định.\nNhấn \"Lưu\" để áp dụng ngay không cần khởi động lại; thay đổi chưa lưu có thể khôi phục bằng \"Hoàn tác\"."
   默认规则（全局）: Quy tắc mặc định (toàn cục)
-  ? "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。"
-  : "Hiệu năng nhận diện áp dụng cho mọi lần gọi nhận diện: mức song song càng cao càng nhanh, nhưng cũng tiêu tốn CPU tương ứng.\nSau khi lưu sẽ có hiệu lực từ lần nhận diện tiếp theo, không cần khởi động lại."
+  "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。": "Hiệu năng nhận diện áp dụng cho mọi lần gọi nhận diện: mức song song càng cao càng nhanh, nhưng cũng tiêu tốn CPU tương ứng.\nSau khi lưu sẽ có hiệu lực từ lần nhận diện tiếp theo, không cần khởi động lại."
   识别性能: Hiệu năng nhận diện
   单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: "Số luồng dùng bên trong mỗi lần nhận diện. Mặc định là 2: thực tế tăng cao hơn không nhanh hơn mà chỉ làm tăng tải CPU toàn máy; đặt 1 để tiết kiệm CPU nhất, phù hợp chạy nền dài hạn."
   识别线程数: Số luồng nhận diện

@@ -25,8 +25,7 @@ scripts:
   "{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。": "{rel} là script hệ thống. Để chỉnh sửa, nhấp chuột phải trong cây thư mục và chọn \"Sao chép về cục bộ để chỉnh sửa\"."
   ■ 停止录制: ■ Dừng ghi
   ● 录制脚本: ● Ghi script
-  ? "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n"
-  : "⚠ Không nhận diện được siêu dữ liệu script, script này sẽ không xuất hiện trong danh sách chạy:\n"
+  "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n": "⚠ Không nhận diện được siêu dữ liệu script, script này sẽ không xuất hiện trong danh sách chạy:\n"
   上移选项: Di chuyển tùy chọn lên
   下移选项: Di chuyển tùy chọn xuống
   不会被录制: Sẽ không được ghi
@@ -90,8 +89,7 @@ scripts:
   属性单元准备工作流: Quy trình chuẩn bị đơn vị thuộc tính
   工作流运行中，无法录制: "Đang có quy trình chạy, không thể ghi"
   左侧选择脚本，或点「新建」: "Chọn script bên trái hoặc nhấp \"Tạo mới\""
-  ? "已保存 {path}，但校验未通过：\n"
-  : "Đã lưu {path}, nhưng kiểm tra không đạt:\n"
+  "已保存 {path}，但校验未通过：\n": "Đã lưu {path}, nhưng kiểm tra không đạt:\n"
   "已保存 {path}，语法与布局引用校验通过": "Đã lưu {path}, kiểm tra cú pháp và tham chiếu bố cục đều đạt"
   "已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。": "Đã ghi vào vị trí đích nhưng không thể xóa tệp gốc: {error}. Vui lòng kiểm tra cả hai script."
   已写入编辑区域；请在编辑器中保存脚本: Đã ghi vào vùng chỉnh sửa; vui lòng lưu script trong trình soạn thảo
@@ -116,8 +114,7 @@ scripts:
   录制结束，可编辑后保存为 .wf: "Ghi hoàn tất, có thể chỉnh sửa rồi lưu thành .wf"
   录制结束，未捕获到有效操作: "Ghi hoàn tất, không ghi nhận được thao tác hợp lệ nào"
   录制结果: Kết quả ghi
-  ? "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？"
-  : "Kết quả ghi chưa được ghi vào script lúc bắt đầu ghi.\nChuyển script sẽ xóa kết quả ghi này, tiếp tục?"
+  "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？": "Kết quả ghi chưa được ghi vào script lúc bắt đầu ghi.\nChuyển script sẽ xóa kết quả ghi này, tiếp tục?"
   "录制轨迹引用超出工作流目录：{ref}": "Tham chiếu quỹ đạo ghi vượt ngoài thư mục quy trình: {ref}"
   录制鼠标移动: Ghi di chuyển chuột
   "待机 | 点击「录制脚本」": "Chờ | Nhấp \"Ghi script\""
@@ -131,8 +128,7 @@ scripts:
   找不到该函数: Không tìm thấy hàm này
   "找不到过程 {name} 的定义": "Không tìm thấy định nghĩa của thủ tục {name}"
   把录制结果按语句插入代码编辑器的光标处: Chèn kết quả ghi theo từng câu lệnh vào vị trí con trỏ trong trình soạn thảo mã
-  ? "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？"
-  : "Phải sao chép script hệ thống {name} về cục bộ trước khi sửa.\nSau khi sao chép, tệp này sẽ không còn theo cập nhật hệ thống nữa, tiếp tục?"
+  "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？": "Phải sao chép script hệ thống {name} về cục bộ trước khi sửa.\nSau khi sao chép, tệp này sẽ không còn theo cập nhật hệ thống nữa, tiếp tục?"
   指令: Lệnh
   插件: Tiện ích mở rộng
   插入到脚本: Chèn vào script

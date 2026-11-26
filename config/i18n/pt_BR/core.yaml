@@ -11,16 +11,7 @@ action_catalog:
 apk_release:
   下载 {url} 失败：{err}: 'Falha ao baixar {url}: {err}'
   下载已取消: Download cancelado
-  ? '校验和不匹配，文件可能损坏或被篡改
-
-    期望 {want}
-
-    实际 {got}'
-  : 'Soma de verificação incompatível; o arquivo pode estar corrompido ou adulterado
-
-    Esperado {want}
-
-    Obtido {got}'
+  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "Soma de verificação incompatível; o arquivo pode estar corrompido ou adulterado\nEsperado {want}\nObtido {got}"
 batch_report:
   '## 汇总': '## Resumo'
   成功: Sucesso

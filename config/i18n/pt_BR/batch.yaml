@@ -1,10 +1,5 @@
 batch:
-  ? '* 表示当前用户使用独立参数
-
-    '
-  : '* indica que este usuário usa parâmetros próprios
-
-    '
+  "* 表示当前用户使用独立参数\n": "* indica que este usuário usa parâmetros próprios\n"
   <b>选择执行单元</b>: <b>Selecionar unidades de execução</b>
   <b>选择执行脚本</b>: <b>Selecionar scripts</b>
   Profile 定义不可用: Definições de Profile indisponíveis
@@ -29,31 +24,13 @@ batch:
   工作流文件 (*.wf): Arquivos de fluxo de trabalho (*.wf)
   已按 Profile 排序用户: Usuários ordenados por Profile
   异常恢复: Recuperação de falhas
-  ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
-  : 'Agendando por "{key}", mas o fluxo de preparação de item "{wf}" não seleciona nem retorna o nome de usuário desta unidade. Use batch/prepare_item_by_attr.wf ou declare #% batch_unit_prepare: true no seu fluxo e retorne username.'
+  "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。": "Agendando por \"{key}\", mas o fluxo de preparação de item \"{wf}\" não seleciona nem retorna o nome de usuário desta unidade. Use batch/prepare_item_by_attr.wf ou declare #% batch_unit_prepare: true no seu fluxo e retorne username."
   当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: Agendando por atributo; configure primeiro o fluxo de preparação de item em "Ferramentas → Configuração em lote".
   恢复默认顺序: Restaurar ordem padrão
   手机端正在执行任务，请暂停或者结束任务: O celular está executando uma tarefa; pause ou encerre a tarefa primeiro
-  ? '手机端正在执行任务，请暂停或者结束任务。
-
-
-    设备返回：{detail}'
-  : 'O celular está executando uma tarefa; pause ou encerre a tarefa primeiro.
-
-
-    Resposta do dispositivo: {detail}'
-  ? '执行用户：{username}
-
-    参数来源：{source}'
-  : 'Usuário em execução: {username}
-
-    Origem dos parâmetros: {source}'
-  ? '执行用户：{username}
-
-    点击查看本轮任务参数'
-  : 'Usuário em execução: {username}
-
-    Clique para ver os parâmetros das tarefas desta rodada'
+  "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}": "O celular está executando uma tarefa; pause ou encerre a tarefa primeiro.\n\nResposta do dispositivo: {detail}"
+  "执行用户：{username}\n参数来源：{source}": "Usuário em execução: {username}\nOrigem dos parâmetros: {source}"
+  "执行用户：{username}\n点击查看本轮任务参数": "Usuário em execução: {username}\nClique para ver os parâmetros das tarefas desta rodada"
   执行顺序: Ordem de execução
   批量设置: Configurações em lote
   批量配置: Configuração em lote

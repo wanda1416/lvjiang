@@ -23,8 +23,7 @@ ocr_dialog:
   刷新截图失败: Screenshot konnte nicht aktualisiert werden
   匹配参考图: Referenzbild abgleichen
   区域批量识别: Stapel-Bereichserkennung
-  ? "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
-  : "Die Stapel-Bereichserkennung fügt mehrere Textbereiche auf einer Leinwand zusammen und ruft OCR nur einmal auf.\nDiese Parameter steuern die Gesamtgröße; Änderungen greifen nach dem Speichern ab der nächsten Erkennung."
+  "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。": "Die Stapel-Bereichserkennung fügt mehrere Textbereiche auf einer Leinwand zusammen und ruft OCR nur einmal auf.\nDiese Parameter steuern die Gesamtgröße; Änderungen greifen nach dem Speichern ab der nächsten Erkennung."
   原始文本: Rohtext
   图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: Die OCR-Einstellungen enthalten ungespeicherte Änderungen. Beenden und verwerfen?
   图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Bilddateien (*.png *.jpg *.jpeg *.bmp *.webp);;Alle Dateien (*)
@@ -74,15 +73,13 @@ ocr_dialog:
   选择图片: Bild auswählen
   选框区域为空: Der ausgewählte Bereich ist leer
   重命名规则组: Regelgruppe umbenennen
-  ? "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。"
-  : "Standardregeln gelten global für alle OCR-Vorgänge; with-Klauseln von scan/find wenden die gewählte Geschäftsregelgruppe nach den Standardregeln an.\nKlicken Sie zum Übernehmen auf „Speichern“ (kein Neustart nötig); ungespeicherte Änderungen lassen sich mit „Rückgängig“ verwerfen."
+  "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。": "Standardregeln gelten global für alle OCR-Vorgänge; with-Klauseln von scan/find wenden die gewählte Geschäftsregelgruppe nach den Standardregeln an.\nKlicken Sie zum Übernehmen auf „Speichern“ (kein Neustart nötig); ungespeicherte Änderungen lassen sich mit „Rückgängig“ verwerfen."
   默认规则（全局）: Standardregeln (Global)
   识别性能: Erkennungsleistung
   识别线程数: Erkennungs-Threads
   并行算子线程数: Parallele Operator-Threads
   检测输入短边: Kurze Eingangsseite der Erkennung
-  ? "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。"
-  : "Die Erkennungsleistung gilt für alle OCR-Aufrufe: Höhere Parallelität ist schneller, beansprucht aber proportional mehr CPU.\nGespeicherte Änderungen greifen ab der nächsten Erkennung ohne Neustart."
+  "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。": "Die Erkennungsleistung gilt für alle OCR-Aufrufe: Höhere Parallelität ist schneller, beansprucht aber proportional mehr CPU.\nGespeicherte Änderungen greifen ab der nächsten Erkennung ohne Neustart."
   单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 'Anzahl der Threads innerhalb einer einzelnen Erkennung. Standard 2: Höhere Werte bringen in der Praxis keinen Geschwindigkeitsvorteil, sondern erhöhen nur die Gesamt-CPU-Last; 1 spart am meisten CPU für lange Hintergrundläufe.'
   同时并行的算子路数。检测、分类、识别三个模型各自已有线程池，调大通常只增加调度争抢，默认 1。: 'Anzahl gleichzeitig laufender Operator-Spuren. Erkennungs-, Klassifikations- und Lesemodell besitzen jeweils eigene Thread-Pools; höhere Werte erhöhen meist nur den Scheduling-Aufwand (Standard: 1).'
   检测前把画面按短边缩放到该值：大图缩小、小图放大。调小更快更省 CPU，但小字号更容易漏检；736 是出厂值，没有特别需求不要动。: Skaliert das Bild vor der Erkennung auf diese kurze Seitenlänge (große Bilder werden verkleinert, kleine vergrößert). Kleinere Werte sind schneller und CPU-schonender, übersehen aber eher kleine Schrift; 736 ist der Werkswert und sollte ohne besonderen Grund beibehalten werden.

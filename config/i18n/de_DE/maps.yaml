@@ -1,19 +1,16 @@
 maps:
   'HUD 场景不存在: {scene}': 'HUD-Szene existiert nicht: {scene}'
-  HUD 绑定 minimap_center 必须属于基础视图: HUD-Bindung minimap_center muss zur Basisansicht
-    gehören
+  "HUD 绑定 minimap_center 必须属于基础视图": "HUD-Bindung minimap_center muss zur Basisansicht gehören"
   'HUD 绑定 minimap_center 必须引用坐标点，未找到: {key}': 'HUD-Bindung minimap_center muss auf
     einen Koordinatenpunkt verweisen; nicht gefunden: {key}'
   HUD 绑定 {attr} 必须属于 full 视图: HUD-Bindung {attr} muss zur Vollansicht (full) gehören
   HUD 绑定 {attr} 必须属于基础视图: HUD-Bindung {attr} muss zur Basisansicht gehören
   'HUD 绑定 {attr} 必须引用区域，未找到: {key}': 'HUD-Bindung {attr} muss auf einen Bereich verweisen;
     nicht gefunden: {key}'
-  POI key 必须以小写字母开头，仅含小写字母/数字/下划线: POI-Schlüssel muss mit einem Kleinbuchstaben beginnen
-    und darf nur Kleinbuchstaben, Ziffern und Unterstriche enthalten
+  "POI key 必须以小写字母开头，仅含小写字母/数字/下划线": "POI-Schlüssel muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Unterstriche enthalten"
   POI {key} 坐标超出底图范围: Koordinaten von POI {key} liegen außerhalb der Basiskarte
   POI 必须是键值映射: POI muss eine Schlüssel-Wert-Zuordnung sein
-  base_image_sha256 必须是 64 位十六进制摘要: base_image_sha256 muss ein 64-stelliger Hexadezimal-Digest
-    sein
+  "base_image_sha256 必须是 64 位十六进制摘要": "base_image_sha256 muss ein 64-stelliger Hexadezimal-Digest sein"
   min_area 必须大于 0: min_area muss größer als 0 sein
   pois 必须是列表: pois muss eine Liste sein
   ui 必须是键值映射: ui muss eine Schlüssel-Wert-Zuordnung sein
@@ -21,22 +18,18 @@ maps:
   '{name} 必须是三元整数列表': '{name} muss eine Liste aus drei Ganzzahlen sein'
   '{name} 必须满足 H=0–180、S/V=0–255': '{name} muss H=0–180 und S/V=0–255 erfüllen'
   '{name}地图': '{name}-Karte'
-  地图 key 必须以小写字母开头，仅含小写字母/数字/下划线: Kartenschlüssel muss mit einem Kleinbuchstaben beginnen
-    und darf nur Kleinbuchstaben, Ziffern und Unterstriche enthalten
+  "地图 key 必须以小写字母开头，仅含小写字母/数字/下划线": "Kartenschlüssel muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Unterstriche enthalten"
   '地图不存在: {key}': 'Karte existiert nicht: {key}'
   地图名称不能为空: Kartenname darf nicht leer sein
   '地图名称已存在: {name}': 'Kartenname existiert bereits: {name}'
   地图图片与定义摘要不一致: Kartenbild stimmt nicht mit dem Digest der Definition überein
   地图定义必须是键值映射: Kartendefinition muss eine Schlüssel-Wert-Zuordnung sein
-  地图文件 {rel} 内的 key 为 {inner}，与文件名不一致: Kartendatei {rel} enthält den Schlüssel {inner},
-    der nicht mit dem Dateinamen übereinstimmt
-  地域名称不能为空，且 key 不得重复: Regionsname darf nicht leer sein und Schlüssel dürfen nicht
-    doppelt vorkommen
+  "地图文件 {rel} 内的 key 为 {inner}，与文件名不一致": "Kartendatei {rel} enthält den Schlüssel {inner}, der nicht mit dem Dateinamen übereinstimmt"
+  "地域名称不能为空，且 key 不得重复": "Regionsname darf nicht leer sein und Schlüssel dürfen nicht doppelt vorkommen"
   大地图: Weltkarte
   底图数据为空: Basiskartendaten sind leer
   底图文件名固定为 base.png: Die Basiskartendatei muss base.png heißen
-  探查图片名称不能为空，且 key 不得重复: Erkundungsbildnamen dürfen nicht leer sein und Schlüssel
-    dürfen nicht doppelt vorkommen
+  "探查图片名称不能为空，且 key 不得重复": "Erkundungsbildnamen dürfen nicht leer sein und Schlüssel dürfen nicht doppelt vorkommen"
   '探查图片引用了不存在的地域: {region}': 'Erkundungsbild verweist auf eine nicht vorhandene Region:
     {region}'
   探查图片必须有有效的 SHA256 摘要: Erkundungsbilder müssen einen gültigen SHA256-Digest haben

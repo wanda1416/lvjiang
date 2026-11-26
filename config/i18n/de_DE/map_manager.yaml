@@ -1,28 +1,21 @@
 map_manager:
   HUD 场景: HUD-Szene
   HUD 场景绑定（坐标在场景编辑器里标定）: HUD-Szenenbindungen (Koordinaten im Szeneneditor kalibrieren)
-  '{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。': '{scene}.{point} liegt außerhalb des Minikartenbereichs;
-    die Richtungserkennung nutzt vorerst die Bereichsmitte.'
+  "{scene}.{point} 不在小地图区域内，朝向识别暂用区域中心。": "{scene}.{point} liegt außerhalb des Minikartenbereichs; die Richtungserkennung nutzt vorerst die Bereichsmitte."
   ⚠ 缺失：{key}: '⚠ Fehlt: {key}'
   不能删除: Kann nicht gelöscht werden
   从当前画面截取: Aus aktuellem Bild aufnehmen
-  会同时生成 HUD 场景 map_<key>，之后在场景编辑器里标定小地图与大地图区域。: Erzeugt gleichzeitig die HUD-Szene
-    map_<key>; kalibrieren Sie danach Minikarten- und Weltkartenbereich im Szeneneditor.
+  "会同时生成 HUD 场景 map_<key>，之后在场景编辑器里标定小地图与大地图区域。": "Erzeugt gleichzeitig die HUD-Szene map_<key>; kalibrieren Sie danach Minikarten- und Weltkartenbereich im Szeneneditor."
   保存当前画面为探查图片: Aktuelles Bild als Erkundungsbild speichern
   先登记地域: Zuerst Region eintragen
   删除地图: Karte löschen
-  删除地图「{name}」及其底图？自动生成的 HUD 场景 map_{key} 也会一并删除。: Karte „{name}“ und ihre Basiskarte
-    löschen? Die automatisch erstellte HUD-Szene map_{key} wird ebenfalls gelöscht.
+  "删除地图「{name}」及其底图？自动生成的 HUD 场景 map_{key} 也会一并删除。": "Karte „{name}“ und ihre Basiskarte löschen? Die automatisch erstellte HUD-Szene map_{key} wird ebenfalls gelöscht."
   删除选中 POI: Ausgewählten POI löschen
   删除选中地域: Ausgewählte Regionen löschen
-  只有实际补齐整张地图后才勾选；拼接成功不代表已采集整图。: Nur aktivieren, wenn tatsächlich die gesamte Karte
-    vervollständigt wurde; erfolgreiches Zusammensetzen bedeutet nicht, dass die ganze
-    Karte erkundet ist.
+  "只有实际补齐整张地图后才勾选；拼接成功不代表已采集整图。": "Nur aktivieren, wenn tatsächlich die gesamte Karte vervollständigt wurde; erfolgreiches Zusammensetzen bedeutet nicht, dass die ganze Karte erkundet ist."
   只读，请先“复制到本地”再修改: Schreibgeschützt; zum Bearbeiten zuerst „Lokal kopieren“ wählen
   图片文件 (*.png *.jpg *.jpeg *.bmp *.webp): Bilddateien (*.png *.jpg *.jpeg *.bmp *.webp)
-  在底图上点击新增 POI；点击已有标记选中它。坐标为底图归一化坐标。: Auf die Basiskarte klicken, um einen POI hinzuzufügen;
-    auf eine bestehende Markierung klicken, um sie auszuwählen. Koordinaten sind auf
-    die Basiskarte normiert.
+  "在底图上点击新增 POI；点击已有标记选中它。坐标为底图归一化坐标。": "Auf die Basiskarte klicken, um einen POI hinzuzufügen; auf eine bestehende Markierung klicken, um sie auszuwählen. Koordinaten sind auf die Basiskarte normiert."
   地图 key: Kartenschlüssel
   地域与探查: Regionen & Erkundungen
   地域仍被使用: Region wird noch verwendet
@@ -38,39 +31,28 @@ map_manager:
   小写字母开头，字母/数字/下划线: Beginnt mit Kleinbuchstaben; Buchstaben, Ziffern, Unterstriche
   小地图朝向: Minikarten-Ausrichtung
   尖端（退化）: Spitze (degeneriert)
-  尚未导入底图：先「标定 HUD…」标出大地图区域，再在“底图与 POI”页导入: 'Noch keine Basiskarte importiert: Zuerst
-    mit „HUD kalibrieren…“ den Weltkartenbereich festlegen, dann auf der Seite „Basiskarte
-    & POI“ importieren'
+  "尚未导入底图：先「标定 HUD…」标出大地图区域，再在“底图与 POI”页导入": "Noch keine Basiskarte importiert: Zuerst mit „HUD kalibrieren…“ den Weltkartenbereich festlegen, dann auf der Seite „Basiskarte & POI“ importieren"
   展示: Anzeige
   底图与 POI: Basiskarte & POI
   底图区域未标定: Basiskartenbereich nicht kalibriert
-  底图可标注 POI；空白部分尚未探查。: Auf der Basiskarte können POIs markiert werden; leere Bereiche
-    sind noch nicht erkundet.
+  "底图可标注 POI；空白部分尚未探查。": "Auf der Basiskarte können POIs markiert werden; leere Bereiche sind noch nicht erkundet."
   底图已完成整图探查: Basiskarte vollständig erkundet
   底图编码失败: Kodierung der Basiskarte fehlgeschlagen
   底图：局部探查，待补齐: 'Basiskarte: teilweise erkundet, noch zu vervollständigen'
   底图：整图探查已完成: 'Basiskarte: vollständige Erkundung abgeschlossen'
   当前地图有未保存的修改，放弃吗？: Die aktuelle Karte hat ungespeicherte Änderungen. Verwerfen?
-  当前布局不存在，未能定位地图区域。: Das aktuelle Layout existiert nicht; der Kartenbereich konnte
-    nicht lokalisiert werden.
-  当前布局尚未标定 {scene}.{point}，朝向识别暂用小地图区域中心。: Im aktuellen Layout wurde {scene}.{point}
-    noch nicht kalibriert; die Richtungserkennung nutzt vorerst die Minikartenmitte.
-  当前布局尚未标定 {scene}.{region}，无法裁剪地图区域。: Im aktuellen Layout wurde {scene}.{region}
-    noch nicht kalibriert; der Kartenbereich kann nicht zugeschnitten werden.
-  当前无法读取布局，未能定位地图区域。: Das Layout kann derzeit nicht gelesen werden; der Kartenbereich
-    konnte nicht lokalisiert werden.
-  当前未选择地图，无法解析地图区域。: Derzeit ist keine Karte ausgewählt; der Kartenbereich kann nicht
-    aufgelöst werden.
+  "当前布局不存在，未能定位地图区域。": "Das aktuelle Layout existiert nicht; der Kartenbereich konnte nicht lokalisiert werden."
+  "当前布局尚未标定 {scene}.{point}，朝向识别暂用小地图区域中心。": "Im aktuellen Layout wurde {scene}.{point} noch nicht kalibriert; die Richtungserkennung nutzt vorerst die Minikartenmitte."
+  "当前布局尚未标定 {scene}.{region}，无法裁剪地图区域。": "Im aktuellen Layout wurde {scene}.{region} noch nicht kalibriert; der Kartenbereich kann nicht zugeschnitten werden."
+  "当前无法读取布局，未能定位地图区域。": "Das Layout kann derzeit nicht gelesen werden; der Kartenbereich konnte nicht lokalisiert werden."
+  "当前未选择地图，无法解析地图区域。": "Derzeit ist keine Karte ausgewählt; der Kartenbereich kann nicht aufgelöst werden."
   截取当前画面: Aktuelles Bild aufnehmen
   截图所属地域: Region dieses Screenshots
-  按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。: Regionen gemäß der Gebietsauswahl im Spiel
-    eintragen. Erkundungsbilder und Basiskarte werden getrennt gespeichert und lassen
-    sich auf der Basiskartenseite umschalten.
+  "按游戏区域选择器登记地域。探查图片与底图分别保存，可在底图页切换查看。": "Regionen gemäß der Gebietsauswahl im Spiel eintragen. Erkundungsbilder und Basiskarte werden getrennt gespeichert und lassen sich auf der Basiskartenseite umschalten."
   探查: Erkundungen
   探查图片仅供查看: Erkundungsbilder sind schreibgeschützt
   探查图片缺失或无法解码: Erkundungsbild fehlt oder kann nicht dekodiert werden
-  探查截图用于查看；POI 只在底图上编辑。: Erkundungs-Screenshots dienen nur zur Ansicht; POIs werden
-    ausschließlich auf der Basiskarte bearbeitet.
+  "探查截图用于查看；POI 只在底图上编辑。": "Erkundungs-Screenshots dienen nur zur Ansicht; POIs werden ausschließlich auf der Basiskarte bearbeitet."
   搜索窗口（相对短边）: Suchfenster (relativ zur kurzen Kante)
   新地域: Neue Region
   新建地图: Neue Karte
@@ -80,12 +62,10 @@ map_manager:
   无法读取图片: Bild kann nicht gelesen werden
   是否仍然使用整帧作为底图？: Trotzdem das gesamte Bild als Basiskarte verwenden?
   最小面积（像素）: Mindestfläche (Pixel)
-  朝向 {deg:.1f}°　置信度 {conf:.2f}　方法：{method}　面积 {area}px: 'Ausrichtung {deg:.1f}°　Konfidenz
-    {conf:.2f}　Methode: {method}　Fläche {area}px'
+  "朝向 {deg:.1f}°　置信度 {conf:.2f}　方法：{method}　面积 {area}px": "Ausrichtung {deg:.1f}°　Konfidenz {conf:.2f}　Methode: {method}　Fläche {area}px"
   未保存: Ungespeichert
   未取得当前画面: Kein aktuelles Bild erfasst
-  未找到箭头：检查颜色阈值或小地图区域标定: 'Pfeil nicht gefunden: Farbschwellenwert oder Minikartenkalibrierung
-    prüfen'
+  "未找到箭头：检查颜色阈值或小地图区域标定": "Pfeil nicht gefunden: Farbschwellenwert oder Minikartenkalibrierung prüfen"
   来源：{layer}: 'Quelle: {layer}'
   标定 HUD…（打开场景编辑器）: HUD kalibrieren… (öffnet den Szeneneditor)
   标识: Kennung
@@ -99,17 +79,12 @@ map_manager:
   种类: Typ
   箭头颜色与搜索参数（保存到地图）: Pfeilfarbe und Suchparameter (in Karte gespeichert)
   识别结果: Erkennungsergebnis
-  该地域已有探查图片，不能直接删除。: Diese Region enthält bereits Erkundungsbilder und kann nicht
-    direkt gelöscht werden.
+  "该地域已有探查图片，不能直接删除。": "Diese Region enthält bereits Erkundungsbilder und kann nicht direkt gelöscht werden."
   请选择截图所属地域。: Bitte wählen Sie die Region dieses Screenshots aus.
   读取失败: Lesen fehlgeschlagen
-  读取当前布局失败，未能定位地图区域。: Aktuelles Layout konnte nicht gelesen werden; der Kartenbereich
-    konnte nicht lokalisiert werden.
+  "读取当前布局失败，未能定位地图区域。": "Aktuelles Layout konnte nicht gelesen werden; der Kartenbereich konnte nicht lokalisiert werden."
   载入截图文件…: Screenshot-Datei laden…
-  载入整张局内截图后，按当前布局标定的小地图区域裁剪，解析居中的黄色内凹箭头。0° = 正北（屏幕上方），顺时针为正。: Nach dem Laden eines
-    vollständigen Spiel-Screenshots wird gemäß dem im aktuellen Layout kalibrierten
-    Minikartenbereich zugeschnitten und der zentrierte gelbe konkave Pfeil ausgewertet.
-    0° = Norden (oben), im Uhrzeigersinn positiv.
+  "载入整张局内截图后，按当前布局标定的小地图区域裁剪，解析居中的黄色内凹箭头。0° = 正北（屏幕上方），顺时针为正。": "Nach dem Laden eines vollständigen Spiel-Screenshots wird gemäß dem im aktuellen Layout kalibrierten Minikartenbereich zugeschnitten und der zentrierte gelbe konkave Pfeil ausgewertet. 0° = Norden (oben), im Uhrzeigersinn positiv."
   适应窗口: An Fenster anpassen
   选择局内截图: Spiel-Screenshot auswählen
   选择底图: Basiskarte auswählen
@@ -120,5 +95,4 @@ maps:
   'POI key 重复: {key}': 'Doppelter POI-Schlüssel: {key}'
   '地图 key 已存在: {key}': 'Kartenschlüssel existiert bereits: {key}'
 user_avatar:
-  截图功能不可用，请先在主窗口定位窗口或连接设备: Screenshot-Funktion nicht verfügbar; bitte zuerst im Hauptfenster
-    ein Fenster zuweisen oder ein Gerät verbinden
+  "截图功能不可用，请先在主窗口定位窗口或连接设备": "Screenshot-Funktion nicht verfügbar; bitte zuerst im Hauptfenster ein Fenster zuweisen oder ein Gerät verbinden"

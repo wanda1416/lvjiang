@@ -38,8 +38,7 @@ user_avatar:
   编辑“{name}”的头像: Avatar für „{name}“ bearbeiten
   编辑头像: Avatar bearbeiten
   缩放: Zoom
-  ? "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
-  : "Dieser Avatar wird von folgenden Benutzern verwendet und kann nicht gelöscht werden:\n{users}\n\nBitte ändern oder entfernen Sie zuerst deren Avatare."
+  "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。": "Dieser Avatar wird von folgenden Benutzern verwendet und kann nicht gelöscht werden:\n{users}\n\nBitte ändern oder entfernen Sie zuerst deren Avatare."
   选择之前保存的头像，或导入一张新图片: Wählen Sie einen zuvor gespeicherten Avatar oder importieren Sie ein neues Bild
 user_manager:
   保存属性: Attribute speichern
@@ -56,8 +55,7 @@ user_manager:
   用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Benutzernamen dürfen chinesische Zeichen, Buchstaben, Ziffern, Unterstriche und Bindestriche enthalten (max. 32 Zeichen).
   用户名已存在: Benutzername existiert bereits
   用户属性: Benutzerattribute
-  ? "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。"
-  : "Benutzer „{name}“ wirklich löschen?\nDer Benutzer wird aus der aktuellen Liste und den Batch-Konfigurationen entfernt; zugehörige Datendateien bleiben erhalten und werden bei erneutem Anlegen mit demselben Namen wiederhergestellt."
+  "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Benutzer „{name}“ wirklich löschen?\nDer Benutzer wird aus der aktuellen Liste und den Batch-Konfigurationen entfernt; zugehörige Datendateien bleiben erhalten und werden bei erneutem Anlegen mit demselben Namen wiederhergestellt."
   ＋ 新建用户: ＋ Neuer Benutzer
 user_toolbar:
   上一个用户: Vorheriger Benutzer

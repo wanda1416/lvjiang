@@ -80,10 +80,8 @@ profile:
   分钟: Minuten
   删除便利贴失败：{error}: 'Haftnotiz konnte nicht gelöscht werden: {error}'
   勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: Bei Aktivierung läuft das Skript vor dem Speichern; bei Ablehnung oder Fehler wird die gesamte synchrone Schreibkette zurückgerollt. Bei Deaktivierung wird es nach dem Commit in die Hintergrundwarteschlange eingereiht. Synchrone Skripte sollten kurz sein und keine langen Wartezeiten enthalten.
-  ? "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
-  : "Aktiviert: Verarbeitung als Aktion mit Auslösen der konfigurierten sync_targets.\nDeaktiviert: Reine Überschreibung nur dieses Keys ohne Synchronisierung."
-  ? "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。"
-  : "Aktiviert: Sobald das Ziel sein Limit erreicht, wird dieser Eintrag gesperrt (Übersicht zeigt — und ist schreibgeschützt).\nDeaktiviert: Der Eintrag bleibt auch bei vollem Ziel normal anzeig- und bearbeitbar; Erhöhungen werden nur nicht mehr in das volle Ziel geschrieben."
+  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Aktiviert: Verarbeitung als Aktion mit Auslösen der konfigurierten sync_targets.\nDeaktiviert: Reine Überschreibung nur dieses Keys ohne Synchronisierung."
+  "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。": "Aktiviert: Sobald das Ziel sein Limit erreicht, wird dieser Eintrag gesperrt (Übersicht zeigt — und ist schreibgeschützt).\nDeaktiviert: Der Eintrag bleibt auch bei vollem Ziel normal anzeig- und bearbeitbar; Erhöhungen werden nur nicht mehr in das volle Ziel geschrieben."
   包含: Enthält
   单向增加: Nur erhöhen
   原 key 已不存在，请重新打开编辑对话框: Der ursprüngliche Key existiert nicht mehr; bitte öffnen Sie den Bearbeitungsdialog erneut
@@ -187,10 +185,8 @@ profile:
   用户数据模型定义: Definition des Benutzerdatenmodells
   用途: Verwendung
   用途（减少）: Verwendung (Verringerung)
-  ? "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。"
-  : "Diesen Eintrag wirklich rückgängig machen?\n\nBenutzer: {username}\nEintrag: {label}\nZeit: {time}\nQuelle: {source}\n\nBeim Rückgängigmachen wird ein neuer gegenläufiger Eintrag geschrieben."
-  ? "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。"
-  : "Diesen Verlaufseintrag dauerhaft löschen?\n\nBenutzer: {username}\nEintrag: {label}\nZeit: {time}\nQuelle: {source}\nÄnderung: {delta}\n\nEs wird nur der Verlauf gelöscht – aktuelle Werte bleiben unverändert und es wird kein Löscheintrag erzeugt. Dies kann nicht rückgängig gemacht werden; das Löschen von Zugangseinträgen kann aus dem Verlauf berechnete Quellenkontingente wieder freigeben."
+  "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。": "Diesen Eintrag wirklich rückgängig machen?\n\nBenutzer: {username}\nEintrag: {label}\nZeit: {time}\nQuelle: {source}\n\nBeim Rückgängigmachen wird ein neuer gegenläufiger Eintrag geschrieben."
+  "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。": "Diesen Verlaufseintrag dauerhaft löschen?\n\nBenutzer: {username}\nEintrag: {label}\nZeit: {time}\nQuelle: {source}\nÄnderung: {delta}\n\nEs wird nur der Verlauf gelöscht – aktuelle Werte bleiben unverändert und es wird kein Löscheintrag erzeugt. Dies kann nicht rückgängig gemacht werden; das Löschen von Zugangseinträgen kann aus dem Verlauf berechnete Quellenkontingente wieder freigeben."
   确定要删除 key '{key}' 吗？: Key '{key}' wirklich löschen?
   确定要删除分组 '{name}' 吗？: Gruppe '{name}' wirklich löschen?
   确定要删除这条便利贴吗？: Diese Haftnotiz wirklich löschen?
@@ -205,8 +201,7 @@ profile:
   至少保留一个分组: Mindestens eine Gruppe muss erhalten bleiben
   覆写 - {label}: Überschreiben - {label}
   覆写...: Überschreiben...
-  ? "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。"
-  : "Sperre von „{label}“ für {user} aufheben?\nNach dem Entsperren lesen und aktualisieren automatisierte Aufgaben diesen Key wieder."
+  "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。": "Sperre von „{label}“ für {user} aufheben?\nNach dem Entsperren lesen und aktualisieren automatisierte Aufgaben diesen Key wieder."
   设备：{value}: 'Gerät: {value}'
   该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: Dieser Wert wurde von einem anderen Prozess aktualisiert; diese Änderung wurde nicht geschrieben. Bitte aktualisieren und erneut versuchen.
   该条历史记录已发生变化，请刷新后重试: Dieser Verlaufseintrag hat sich geändert; bitte aktualisieren und erneut versuchen
@@ -228,14 +223,12 @@ profile:
   选择...: Auswählen...
   选择变更脚本: Änderungsskript auswählen
   选择字段: Feld auswählen
-  ? "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？"
-  : "Durch das Umbenennen werden aktuelle Einträge, Verlauf, Synchronisierungsquellen und Konfigurationsverweise aller Benutzer angepasst. Keys in Workflows und Änderungsskripten werden nicht automatisch ersetzt und müssen manuell aktualisiert werden.\n\nFortfahren?"
+  "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Durch das Umbenennen werden aktuelle Einträge, Verlauf, Synchronisierungsquellen und Konfigurationsverweise aller Benutzer angepasst. Keys in Workflows und Änderungsskripten werden nicht automatisch ersetzt und müssen manuell aktualisiert werden.\n\nFortfahren?"
   重新读取用户数据: Benutzerdaten neu laden
   重置:{time}: 'Reset: {time}'
   重置日:{day}: 'Reset-Tag: {day}'
   重置日:{day}号: 'Reset-Tag: {day}.'
-  ? "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。"
-  : "„{label}“ für {user} sperren?\nNach dem Sperren ignoriert die Engine diesen Wert: Automatisierte Aufgaben lesen oder schreiben ihn nicht mehr, periodische Resets stoppen und der Wert bleibt im aktuellen Zustand.\nPer Rechtsklick jederzeit wieder entsperrbar."
+  "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。": "„{label}“ für {user} sperren?\nNach dem Sperren ignoriert die Engine diesen Wert: Automatisierte Aufgaben lesen oder schreiben ihn nicht mehr, periodische Resets stoppen und der Wert bleibt im aktuellen Zustand.\nPer Rechtsklick jederzeit wieder entsperrbar."
   键: Key
   键：{label}: 'Key: {label}'
   键：{value}: 'Key: {value}'
@@ -246,13 +239,11 @@ profile:
   Profile 变更脚本仍在执行，请等待队列完成后重命名: Ein Profil-Änderungsskript läuft noch; bitte warten Sie auf den Abschluss der Warteschlange, bevor Sie umbenennen
   '下一点恢复: 已达上限': 'Nächste Wiederherstellung: Limit erreicht'
   便利贴内容不能为空: Der Inhalt der Haftnotiz darf nicht leer sein
-  ? "保存 profile.yaml 失败:\n{e}"
-  : "Speichern von profile.yaml fehlgeschlagen:\n{e}"
+  "保存 profile.yaml 失败:\n{e}": "Speichern von profile.yaml fehlgeschlagen:\n{e}"
   删除当前列: Aktuelle Spalte löschen
   升序: Aufsteigend
   右侧新增列: Spalte rechts hinzufügen
-  ? "回写用户数据失败:\n{e}"
-  : "Zurückschreiben der Benutzerdaten fehlgeschlagen:\n{e}"
+  "回写用户数据失败:\n{e}": "Zurückschreiben der Benutzerdaten fehlgeschlagen:\n{e}"
   库存: Bestand
   开启后允许输入小数，UI 使用 DoubleValidator: Bei Aktivierung sind Dezimalzahlen zulässig (UI nutzt DoubleValidator)
   当前配置: Aktuelle Konfiguration
@@ -289,24 +280,19 @@ layout_transfer:
   覆盖远端页面结构？: Entfernte Seitenstruktur überschreiben?
   下载排版: Layout herunterladen
   确认替换本机结构: Ersetzen der lokalen Struktur bestätigen
-  ? "本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？"
-  : "Die aktuelle Seitenstruktur dieses Geräts wird durch die Cloud-Struktur ersetzt; es wird keine automatische Sicherungskopie erstellt.\n\nJetzt ersetzen?"
+  "本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？": "Die aktuelle Seitenstruktur dieses Geräts wird durch die Cloud-Struktur ersetzt; es wird keine automatische Sicherungskopie erstellt.\n\nJetzt ersetzen?"
   '{} 个分组 / {} 列': '{} Gruppen / {} Spalten'
   无法解析: Nicht parsbar
-  ? "远端已有页面结构，且不是本机写入的：\n\n{remote}\n远端结构：{remote_size}\n本机结构：{local_size}\n\n覆盖后，其它设备下载将得到本机结构。"
-  : "In der Cloud existiert bereits eine Seitenstruktur, die nicht von diesem Gerät geschrieben wurde:\n\n{remote}\nCloud-Struktur: {remote_size}\nLokale Struktur: {local_size}\n\nNach dem Überschreiben erhalten andere Geräte beim Herunterladen die Struktur dieses Geräts."
+  "远端已有页面结构，且不是本机写入的：\n\n{remote}\n远端结构：{remote_size}\n本机结构：{local_size}\n\n覆盖后，其它设备下载将得到本机结构。": "In der Cloud existiert bereits eine Seitenstruktur, die nicht von diesem Gerät geschrieben wurde:\n\n{remote}\nCloud-Struktur: {remote_size}\nLokale Struktur: {local_size}\n\nNach dem Überschreiben erhalten andere Geräte beim Herunterladen die Struktur dieses Geräts."
   上传排版: Layout hochladen
   页面结构以 PC 为准，手机端只支持下载。: Die Seitenstruktur wird am PC verwaltet; die Mobil-App unterstützt nur das Herunterladen.
   请先在「账号」里登录后再上传页面结构。: Bitte melden Sie sich zuerst unter „Konto“ an, bevor Sie die Seitenstruktur hochladen.
   云端与本机一致，无需上传。: Cloud und lokales Gerät stimmen überein; kein Hochladen erforderlich.
   请先在「账号」里登录后再下载页面结构。: Bitte melden Sie sich zuerst unter „Konto“ an, bevor Sie die Seitenstruktur herunterladen.
   云端还没有页面结构，先在编辑端点一次「上传排版」。: In der Cloud existiert noch keine Seitenstruktur; klicken Sie am Bearbeitungsgerät zuerst einmal auf „Layout hochladen“.
-  ? "将使用云端的页面结构：\n\n{remote}\n云端结构：{size}\n本机结构：{local}\n\n继续后还需再确认一次才会替换本机结构。"
-  : "Die Seitenstruktur aus der Cloud wird verwendet:\n\n{remote}\nCloud-Struktur: {size}\nLokale Struktur: {local}\n\nNach dem Fortfahren ist eine weitere Bestätigung erforderlich, bevor die lokale Struktur ersetzt wird."
-  ? "已下载页面结构。\n{detail}"
-  : "Seitenstruktur heruntergeladen.\n{detail}"
-  ? "已上传页面结构。\n{detail}"
-  : "Seitenstruktur hochgeladen.\n{detail}"
+  "将使用云端的页面结构：\n\n{remote}\n云端结构：{size}\n本机结构：{local}\n\n继续后还需再确认一次才会替换本机结构。": "Die Seitenstruktur aus der Cloud wird verwendet:\n\n{remote}\nCloud-Struktur: {size}\nLokale Struktur: {local}\n\nNach dem Fortfahren ist eine weitere Bestätigung erforderlich, bevor die lokale Struktur ersetzt wird."
+  "已下载页面结构。\n{detail}": "Seitenstruktur heruntergeladen.\n{detail}"
+  "已上传页面结构。\n{detail}": "Seitenstruktur hochgeladen.\n{detail}"
   云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。: Die Cloud-Seitenstruktur wurde während Ihrer Bestätigung von einem anderen Gerät geändert; bitte zuerst herunterladen oder später erneut versuchen.
   读取本机页面结构失败：{error}: 'Lokale Seitenstruktur konnte nicht gelesen werden: {error}'
   下载失败，本机结构未改变：{error}: 'Download fehlgeschlagen; lokale Struktur blieb unverändert: {error}'
@@ -316,5 +302,4 @@ layout_transfer:
   快照只支持在 PC 端创建。: Snapshots können nur am PC erstellt werden.
   请先在「账号」里登录后再创建快照。: Bitte melden Sie sich zuerst unter „Konto“ an, bevor Sie einen Snapshot erstellen.
   创建快照失败：{error}: 'Snapshot konnte nicht erstellt werden: {error}'
-  ? "已创建快照。\n{detail}"
-  : "Snapshot erstellt.\n{detail}"
+  "已创建快照。\n{detail}": "Snapshot erstellt.\n{detail}"

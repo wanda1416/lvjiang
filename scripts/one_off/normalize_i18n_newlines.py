@@ -1,15 +1,34 @@
-"""把 i18n 表里的多行显式键改写成「双引号 + \\n 转义」的单行条目。
+"""把翻译表里的跨行条目改写成「双引号 + 转义」的单行条目。
 
-   ? '已导出到            →    "已导出到\\n{path}": "已导出到\\n{path}"
-   (空行)
-       {path}'
-   : '已导出到
-   (空行)
-       {path}'
+抽词表的生成器遇到长文案或含换行的字面量时，会写出三种跨行条目：
 
-YAML 双引号标量会把 `\\n` 解释成换行，因此 key 解析结果与源码里含换行的字面量
-仍然相等；只是不再需要把一句话摊成多行。改写前后用 safe_load 对比，确保映射完全
-一致。
+1. 显式键 + 换行（最丑的三段式）::
+
+       ? '第一行
+       (空行)
+           第二行'
+       : '第一行
+       (空行)
+           第二行'
+
+2. 显式键但每段只有一行（key 与 value 各占一行）::
+
+       ? "长 key"
+       : "长 value"
+
+3. 普通标量被折行（YAML 把折行变成空格）::
+
+         确定删除「{name}」吗？…: Supprimer « {name} »
+           Les {count} références … seront détachées
+
+三种都改写成一行 ``"key": "value"``，换行按 YAML 双引号语义写成 ``\\n``。改写前后
+用 ``yaml.safe_load`` 对比整份文档，映射有任何差别就保留原文件并报错退出。
+
+用法::
+
+    python scripts/one_off/normalize_i18n_newlines.py            # 干跑，只报数量
+    python scripts/one_off/normalize_i18n_newlines.py --apply    # 写回
+    python scripts/one_off/normalize_i18n_newlines.py --root config/i18n/apps
 """
 from __future__ import annotations
 
@@ -19,78 +38,130 @@ import pathlib
 
 import yaml
 
-ROOT = pathlib.Path("config/i18n/apps/yysls")
+DEFAULT_ROOT = pathlib.Path("config/i18n")
+#: 以这些字符开头的标量是容器或块标量，不参与「标量折行」判定
+CONTAINER_STARTS = ("[", "{", "|", ">", "&", "*", "!")
 
 
-def _continuation(line: str) -> bool:
-    return line.strip() == "" or line.startswith("    ")
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
 
 
-def _blocks(lines: list[str]) -> list[tuple[int, int]]:
-    """返回 (start, end) 半开区间，覆盖 `? …` key 段 + `: …` value 段。"""
-    spans: list[tuple[int, int]] = []
-    i = 0
-    while i < len(lines):
-        if not lines[i].startswith("  ? "):
-            i += 1
-            continue
-        j = i + 1
-        while j < len(lines) and _continuation(lines[j]):
-            j += 1
-        if j >= len(lines) or not lines[j].startswith("  : "):
-            raise SystemExit(f"unexpected block at line {i + 1}: {lines[i]!r}")
-        j += 1
-        while j < len(lines) and _continuation(lines[j]):
-            j += 1
-        spans.append((i, j))
-        i = j
-    return spans
+def _is_blank(line: str) -> bool:
+    return line.strip() == ""
+
+
+def _indented_block(block: list[str]) -> str:
+    """把块整体右移两格，套进 ``x:`` 下做成合法的单条映射。"""
+    return "\n".join(("  " + line) if line.strip() else "" for line in block)
 
 
 def _parse_block(block: list[str]) -> tuple[str, str]:
-    indented = [("  " + line) if line.strip() else "" for line in block]
-    doc = yaml.safe_load("x:\n" + "\n".join(indented))
+    doc = yaml.safe_load("x:\n" + _indented_block(block))
     key, value = next(iter(doc["x"].items()))
     if not isinstance(key, str) or not isinstance(value, str):
-        raise SystemExit(f"non-string entry: {key!r} -> {value!r}")
+        raise ValueError(f"词条不是字符串: {key!r} -> {value!r}")
     return key, value
 
 
 def _dq(text: str) -> str:
     """YAML 双引号标量：转义反斜杠、双引号与控制字符。"""
-    escaped = json.dumps(text, ensure_ascii=False)[1:-1]
-    return f'"{escaped}"'
+    return '"' + json.dumps(text, ensure_ascii=False)[1:-1] + '"'
+
+
+def _scalar_may_continue(rest: str) -> bool:
+    """``key: value`` 的 value 已开始，且不是容器或块标量。"""
+    _, sep, value = rest.partition(":")
+    if not sep:
+        return False
+    value = value.strip()
+    return bool(value) and not value.startswith(CONTAINER_STARTS)
+
+
+def _block_span(lines: list[str], start: int) -> int:
+    """从 ``start`` 起的跨行条目结束位置（不含）；只看缩进结构，不解析内容。"""
+    indent = _indent(lines[start])
+    rest = lines[start][indent:]
+    cursor = start + 1
+
+    def more() -> bool:
+        return cursor < len(lines) and (
+            _is_blank(lines[cursor]) or _indent(lines[cursor]) > indent
+        )
+
+    if rest.startswith("? "):
+        while more():
+            cursor += 1
+        if cursor < len(lines) and lines[cursor][indent:].startswith(": "):
+            cursor += 1
+            while more():
+                cursor += 1
+        return cursor
+    if _scalar_may_continue(rest):
+        while more():
+            cursor += 1
+    return cursor
+
+
+def rewrite(lines: list[str]) -> tuple[list[str], int]:
+    """把跨行条目压成单行；返回新行与改写数量。"""
+    out: list[str] = []
+    count = 0
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if _is_blank(line) or line.lstrip().startswith("#"):
+            out.append(line)
+            index += 1
+            continue
+        end = _block_span(lines, index)
+        if end <= index + 1:
+            out.append(line)
+            index += 1
+            continue
+        key, value = _parse_block(lines[index:end])
+        out.append(f"{' ' * _indent(line)}{_dq(key)}: {_dq(value)}")
+        count += 1
+        index = end
+    return out, count
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="把 i18n 多行条目改写为 \\n 转义单行")
+    parser = argparse.ArgumentParser(description="把翻译表跨行条目改写为单行转义条目")
     parser.add_argument("--apply", action="store_true", help="真正写回；默认只报告")
+    parser.add_argument("--root", default=str(DEFAULT_ROOT), help="词表根目录")
     args = parser.parse_args()
 
-    report = []
-    for path in sorted(ROOT.glob("*.yaml")):
+    root = pathlib.Path(args.root)
+    report: list[str] = []
+    total_files = total_entries = 0
+    failures: list[str] = []
+    for path in sorted(root.rglob("*.yaml")):
         text = path.read_text(encoding="utf-8")
-        lines = text.splitlines()
-        spans = _blocks(lines)
-        if not spans:
-            report.append(f"{path.name}: blocks=0 (already normalized)")
+        new_lines, count = rewrite(text.splitlines())
+        if not count:
             continue
-        out = list(lines)
-        for start, end in reversed(spans):
-            key, value = _parse_block(lines[start:end])
-            out[start:end] = [f"  {_dq(key)}: {_dq(value)}"]
-        new_text = "\n".join(out) + "\n"
+        total_files += 1
+        total_entries += count
+        new_text = "\n".join(new_lines) + "\n"
         if yaml.safe_load(text) != yaml.safe_load(new_text):
-            raise SystemExit(f"{path.name}: mapping would change, skipped")
+            failures.append(f"{path}: mapping would change, left untouched")
+            continue
         if args.apply:
             path.write_text(new_text, encoding="utf-8", newline="\n")
-            report.append(f"{path.name}: blocks={len(spans)} rewritten, mapping_ok")
-        else:
-            report.append(f"{path.name}: blocks={len(spans)} (dry-run, use --apply)")
-    summary = "\n".join(report)
+        report.append(f"{path.relative_to(root)}: {count} entries")
+
+    summary = [
+        *report,
+        *failures,
+        f"{'rewritten' if args.apply else 'dry-run'}: files={total_files} entries={total_entries}",
+    ]
+    text_out = "\n".join(summary)
     pathlib.Path(".tmp").mkdir(exist_ok=True)
-    pathlib.Path(".tmp/normalize_i18n_report.txt").write_text(summary + "\n", encoding="utf-8")
-    print(summary)
+    pathlib.Path(".tmp/normalize_i18n_report.txt").write_text(text_out + "\n", encoding="utf-8")
+    print(summary[-1])
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

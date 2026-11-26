@@ -23,12 +23,7 @@ ocr_dialog:
   刷新截图失败: Error al actualizar la captura
   匹配参考图: Coincidir imagen de referencia
   区域批量识别: Reconocimiento por lotes de regiones
-  ? '区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。
-
-    这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。'
-  : 'El reconocimiento por lotes combina varias regiones de texto en un solo lienzo y ejecuta OCR una sola vez.
-
-    Estos parámetros controlan el tamaño del lienzo combinado; tras guardar, se aplican a partir del siguiente reconocimiento.'
+  "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。": "El reconocimiento por lotes combina varias regiones de texto en un solo lienzo y ejecuta OCR una sola vez.\nEstos parámetros controlan el tamaño del lienzo combinado; tras guardar, se aplican a partir del siguiente reconocimiento."
   原始文本: Texto original
   图像识别配置有未保存的更改，确定退出并放弃这些更改吗？: Hay cambios sin guardar en la configuración de OCR. ¿Seguro que quieres salir y descartarlos?
   图片文件 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*): Archivos de imagen (*.png *.jpg *.jpeg *.bmp *.webp);;Todos los archivos (*)
@@ -78,19 +73,9 @@ ocr_dialog:
   选择图片: Seleccionar imagen
   选框区域为空: La región seleccionada está vacía
   重命名规则组: Renombrar grupo de reglas
-  ? '默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。
-
-    改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。'
-  : 'Las reglas predeterminadas se aplican globalmente a todo el OCR; las cláusulas with de scan/find aplican el grupo de reglas seleccionado sobre las predeterminadas.
-
-    Haz clic en «Guardar» para aplicar sin reiniciar; usa «Deshacer» para revertir los cambios sin guardar.'
+  "默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。": "Las reglas predeterminadas se aplican globalmente a todo el OCR; las cláusulas with de scan/find aplican el grupo de reglas seleccionado sobre las predeterminadas.\nHaz clic en «Guardar» para aplicar sin reiniciar; usa «Deshacer» para revertir los cambios sin guardar."
   默认规则（全局）: Reglas predeterminadas (global)
-  ? '识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。
-
-    保存后从下一次识别开始生效，不需要重启。'
-  : 'El rendimiento de reconocimiento se aplica a todas las llamadas de OCR: a mayor paralelismo, más rapidez, pero también mayor uso proporcional de CPU.
-
-    Tras guardar, se aplica a partir del siguiente reconocimiento sin reiniciar.'
+  "识别性能作用于所有识别调用：并行度越高越快，但也会按比例占用 CPU。\n保存后从下一次识别开始生效，不需要重启。": "El rendimiento de reconocimiento se aplica a todas las llamadas de OCR: a mayor paralelismo, más rapidez, pero también mayor uso proporcional de CPU.\nTras guardar, se aplica a partir del siguiente reconocimiento sin reiniciar."
   识别性能: Rendimiento
   单次识别内部使用的线程数。默认 2：实测再往上不会更快，只会推高整机 CPU 占用；填 1 最省 CPU，适合后台长跑。: 'Número de hilos usados internamente en cada reconocimiento. Por defecto 2: en la práctica aumentarlo no acelera y solo eleva el uso total de CPU; usar 1 ahorra más CPU en ejecuciones largas en segundo plano.'
   识别线程数: Hilos de reconocimiento

@@ -11,8 +11,7 @@ action_catalog:
 apk_release:
   下载 {url} 失败：{err}: 'Error al descargar {url}: {err}'
   下载已取消: Descarga cancelada
-  ? "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}"
-  : "La suma de comprobación no coincide; el archivo podría estar dañado o alterado\nEsperado {want}\nObtenido {got}"
+  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "La suma de comprobación no coincide; el archivo podría estar dañado o alterado\nEsperado {want}\nObtenido {got}"
 batch_report:
   '## 汇总': '## Resumen'
   成功: Completado

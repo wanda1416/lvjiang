@@ -38,18 +38,7 @@ user_avatar:
   编辑“{name}”的头像: Modifier l'avatar de « {name} »
   编辑头像: Modifier l'avatar
   缩放: Zoom
-  ? '该头像正被以下用户使用，不能删除：
-
-    {users}
-
-
-    请先为这些用户更换或移除头像。'
-  : 'Cet avatar est utilisé par les utilisateurs suivants et ne peut pas être supprimé :
-
-    {users}
-
-
-    Veuillez d''abord changer ou retirer leur avatar.'
+  "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。": "Cet avatar est utilisé par les utilisateurs suivants et ne peut pas être supprimé :\n{users}\n\nVeuillez d'abord changer ou retirer leur avatar."
   选择之前保存的头像，或导入一张新图片: Choisissez un avatar enregistré ou importez une nouvelle image
 user_manager:
   保存属性: Enregistrer les attributs
@@ -66,12 +55,7 @@ user_manager:
   用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Le nom d'utilisateur ne peut contenir que des caractères chinois, lettres, chiffres, tirets bas et tirets, jusqu'à 32 caractères.
   用户名已存在: Ce nom d'utilisateur existe déjà
   用户属性: Attributs utilisateur
-  ? '确定要删除用户「{name}」吗？
-
-    用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。'
-  : 'Supprimer l''utilisateur « {name} » ?
-
-    L''utilisateur sera retiré de la liste actuelle et des configurations par lot ; les fichiers de données associés sont conservés et peuvent être restaurés en recréant le même nom.'
+  "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Supprimer l'utilisateur « {name} » ?\nL'utilisateur sera retiré de la liste actuelle et des configurations par lot ; les fichiers de données associés sont conservés et peuvent être restaurés en recréant le même nom."
   ＋ 新建用户: ＋ Nouvel utilisateur
 user_toolbar:
   上一个用户: Utilisateur précédent

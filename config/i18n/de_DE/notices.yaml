@@ -7,61 +7,46 @@ common:
   notice_version: Ankündigungsversion {version}
   published_at: Veröffentlicht am {date}
   refresh: Aktualisieren
-  summary: Nur Meldungen mit ausreichenden Informationen zum Nachstellen oder Eingrenzen
-    gelangen in die Entwicklerprüfung; eine Annahme garantiert keinen festen Behebungstermin.
+  "summary": "Nur Meldungen mit ausreichenden Informationen zum Nachstellen oder Eingrenzen gelangen in die Entwicklerprüfung; eine Annahme garantiert keinen festen Behebungstermin."
   title: Ankündigungen
   updated_at: Aktualisiert am {date}
 menu_ops:
   检查更新: Nach Updates suchen
   检查更新失败: Update-Prüfung fehlgeschlagen
 notices:
-  '{name}二维码获取失败：{error}；可点「打开赞助页面」': '{name}-QR-Code konnte nicht abgerufen werden:
-    {error}; klicke auf „Sponsorenseite öffnen“'
+  "{name}二维码获取失败：{error}；可点「打开赞助页面」": "{name}-QR-Code konnte nicht abgerufen werden: {error}; klicke auf „Sponsorenseite öffnen“"
   下载该版本: Diese Version herunterladen
-  不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。: Es werden keine Daten hochgeladen. Wenn
-    du später teilnehmen möchtest, kannst du dies jederzeit unter „Konfiguration →
-    Netzwerk & Datenschutz“ aktivieren.
+  "不会上传任何数据。如果之后想参与，可以在「配置管理 → 网络与隐私」里随时打开。": "Es werden keine Daten hochgeladen. Wenn du später teilnehmen möchtest, kannst du dies jederzeit unter „Konfiguration → Netzwerk & Datenschutz“ aktivieren."
   不同意: Ablehnen
   不收集: Nicht erfassen
   不收集什么: Was nicht erfasst wird
   二维码已更新: QR-Code aktualisiert
-  仅用于所列功能改进，不公开发布原始数据: Nur zur Verbesserung der aufgeführten Funktionen; Rohdaten
-    werden nicht veröffentlicht
-  使用交流和一般咨询请优先在群内讨论: Für Fragen zur Nutzung und allgemeine Diskussionen bitte zuerst
-    in der Gruppe nachfragen
+  "仅用于所列功能改进，不公开发布原始数据": "Nur zur Verbesserung der aufgeführten Funktionen; Rohdaten werden nicht veröffentlicht"
+  "使用交流和一般咨询请优先在群内讨论": "Für Fragen zur Nutzung und allgemeine Diskussionen bitte zuerst in der Gruppe nachfragen"
   免责声明: Haftungsausschluss
   公告版本 {version}: Ankündigungsversion {version}
   关于律匠: Über LvJiang
-  刷新{name}二维码失败，已保留当前二维码：{error}: 'Aktualisieren des {name}-QR-Codes fehlgeschlagen;
-    aktueller QR-Code bleibt erhalten: {error}'
+  "刷新{name}二维码失败，已保留当前二维码：{error}": "Aktualisieren des {name}-QR-Codes fehlgeschlagen; aktueller QR-Code bleibt erhalten: {error}"
   刷新中...: Wird aktualisiert...
   刷新二维码: QR-Code aktualisieren
-  刷新失败，已保留当前二维码：{error}: 'Aktualisieren fehlgeschlagen; aktueller QR-Code bleibt erhalten:
-    {error}'
+  "刷新失败，已保留当前二维码：{error}": "Aktualisieren fehlgeschlagen; aktueller QR-Code bleibt erhalten: {error}"
   前往发布声明: Versionshinweise öffnen
   匿名使用数据收集: Anonyme Nutzungsdatenerfassung
   反馈与建议: Feedback & Vorschläge
   发布于 {date}: Veröffentlicht am {date}
   发现新版本: Neue Version verfügbar
-  同意后随时可在「配置管理 → 网络与隐私」关闭。: Nach deiner Zustimmung kannst du dies jederzeit unter
-    „Konfiguration → Netzwerk & Datenschutz“ wieder deaktivieren.
-  图片无法显示，请刷新或打开赞助页面: Das Bild kann nicht angezeigt werden; aktualisiere es oder öffne
-    die Sponsorenseite
+  "同意后随时可在「配置管理 → 网络与隐私」关闭。": "Nach deiner Zustimmung kannst du dies jederzeit unter „Konfiguration → Netzwerk & Datenschutz“ wieder deaktivieren."
+  "图片无法显示，请刷新或打开赞助页面": "Das Bild kann nicht angezeigt werden; aktualisiere es oder öffne die Sponsorenseite"
   好的: OK
   实际会发送的数据长这样: So sehen die tatsächlich gesendeten Daten aus
-  尚未获取到公告，点击“重新获取”进行同步。: Noch keine Ankündigungen abgerufen; klicke auf „Aktualisieren“,
-    um zu synchronisieren.
-  开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: Nach dem Aktivieren werden noch nicht
-    übermittelte Verlaufsdaten der letzten {days} Tage nachgesendet; Aufzeichnungen
-    aus der deaktivierten Zeit bleiben lokal gespeichert.
+  "尚未获取到公告，点击“重新获取”进行同步。": "Noch keine Ankündigungen abgerufen; klicke auf „Aktualisieren“, um zu synchronisieren."
+  "开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。": "Nach dem Aktivieren werden noch nicht übermittelte Verlaufsdaten der letzten {days} Tage nachgesendet; Aufzeichnungen aus der deaktivierten Zeit bleiben lokal gespeichert."
   当前为离线模式，仅显示本地公告缓存: Offlinemodus; es wird nur der lokale Ankündigungs-Cache angezeigt
   当前版本: Aktuelle Version
-  律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。: LvJiang ist kostenlos und Open Source. Wenn
-    es dir Zeit spart, kannst du dem Autor freiwillig einen Kaffee spendieren.
+  "律匠免费使用、源码公开。如果它帮你省下了时间，可以自愿请作者喝杯咖啡。": "LvJiang ist kostenlos und Open Source. Wenn es dir Zeit spart, kannst du dem Autor freiwillig einen Kaffee spendieren."
   忽略该提示: Diese Version ignorieren
   愿意贡献匿名使用数据，帮助改进律匠吗？: Möchtest du anonyme Nutzungsdaten teilen, um LvJiang zu verbessern?
-  截图、日志、配置文件或其他未在上方列明的本地内容: Screenshots, Protokolle, Konfigurationsdateien oder andere
-    oben nicht aufgeführte lokale Inhalte
+  "截图、日志、配置文件或其他未在上方列明的本地内容": "Screenshots, Protokolle, Konfigurationsdateien oder andere oben nicht aufgeführte lokale Inhalte"
   打开赞助页面: Sponsorenseite öffnen
   扫码加群: Scannen, um der Gruppe beizutreten
   支持律匠: LvJiang unterstützen
@@ -76,8 +61,7 @@ notices:
   正在获取公告...: Ankündigungen werden abgerufen...
   正在获取最新二维码...: Neuester QR-Code wird abgerufen...
   正在获取最新二维码…: Neuester QR-Code wird abgerufen…
-  每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识: 'Ein täglicher Starteintrag: LvJiang-Version, Betriebssystemtyp,
-    Laufzeitumgebung und eine zufällige Kennung'
+  "每天一次的启动记录：律匠版本、系统类型、运行环境、一个随机标识": "Ein täglicher Starteintrag: LvJiang-Version, Betriebssystemtyp, Laufzeitumgebung und eine zufällige Kennung"
   用来做什么: Wofür es verwendet wird
   离线模式下可查看缓存，暂不联网刷新: Im Offlinemodus ist der Cache einsehbar; vorerst keine Online-Aktualisierung
   获取中...: Wird abgerufen...
@@ -85,16 +69,10 @@ notices:
   获取失败，当前显示上次缓存：{error}: 'Abruf fehlgeschlagen; letzter Cache wird angezeigt: {error}'
   许可证: Lizenz
   该版本不再提醒: Für diese Version nicht mehr erinnern
-  账号、姓名或其他能认出你是谁的信息: Dein Konto, Name oder andere Angaben, die dich identifizieren
-    könnten
-  赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。: Unterstützung ist völlig freiwillig – sie bringt
-    keine Funktionen, Lizenzen oder bevorzugten Support und beeinflusst keine bestehenden
-    Funktionen.
+  "账号、姓名或其他能认出你是谁的信息": "Dein Konto, Name oder andere Angaben, die dich identifizieren könnten"
+  "赞助完全自愿，不换取功能、授权或优先支持，也不影响任何既有功能。": "Unterstützung ist völlig freiwillig – sie bringt keine Funktionen, Lizenzen oder bevorzugten Support und beeinflusst keine bestehenden Funktionen."
   赞助律匠: LvJiang unterstützen
-  这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。: Diese Kennung ist
-    eine lokal zufällig erzeugte Zeichenfolge ohne Konto- oder Hardware-Daten; sie
-    zeigt jedoch an, dass Einträge vom selben Computer stammen. Du kannst sie jederzeit
-    in den Einstellungen zurücksetzen.
+  "这个标识是本机随机生成的一串字符，不含你的账号或硬件信息，但确实能让我们知道同一台电脑的多次记录，你可以随时在设置里重置它。": "Diese Kennung ist eine lokal zufällig erzeugte Zeichenfolge ohne Konto- oder Hardware-Daten; sie zeigt jedoch an, dass Einträge vom selben Computer stammen. Du kannst sie jederzeit in den Einstellungen zurücksetzen."
   重新获取: Erneut abrufen
   公告: Ankündigungen
 '  （无）': '  (keine)'
@@ -112,8 +90,7 @@ GitHub 反馈: GitHub-Feedback
 实际是什么样: Was tatsächlich passiert
 实际结果: Tatsächliches Ergebnis
 将要提交的内容: Was gesendet wird
-已恢复上次未提交的草稿（截图需要重新粘贴），提交成功后草稿自动清除。: Nicht gesendeter Entwurf wiederhergestellt (Screenshots
-  erneut einfügen); nach erfolgreichem Senden wird er gelöscht.
+"已恢复上次未提交的草稿（截图需要重新粘贴），提交成功后草稿自动清除。": "Nicht gesendeter Entwurf wiederhergestellt (Screenshots erneut einfügen); nach erfolgreichem Senden wird er gelöscht."
 已提交，编号 {id}。回复会发到 {email}。: Gesendet als {id}. Antworten gehen an {email}.
 已附加 1 张截图（已压缩到 {kb} KB）: 1 Screenshot angehängt (auf {kb} KB komprimiert)
 必填：回复会发到这个邮箱: Pflichtfeld – Antworten gehen an diese Adresse
@@ -122,10 +99,7 @@ GitHub 反馈: GitHub-Feedback
 提交: Senden
 提交失败：{error}: 'Senden fehlgeschlagen: {error}'
 无法读取图片：{name}: 'Bild kann nicht gelesen werden: {name}'
-日志会自动遮盖本机用户目录、令牌、设备序号与匿名标识；截图里的账号、角色名、ADB 序列号需要你自己确认遮挡。提交前可以用「预览」核对全部内容。: Protokolle
-  werden automatisch bereinigt (Benutzerordner, Tokens, Geräteseriennummern, anonyme
-  ID); Inhalte in Screenshots – Konto, Charakternamen, ADB-Seriennummern – musst du
-  selbst abdecken. Mit „Vorschau“ kannst du vor dem Senden alles prüfen.
+"日志会自动遮盖本机用户目录、令牌、设备序号与匿名标识；截图里的账号、角色名、ADB 序列号需要你自己确认遮挡。提交前可以用「预览」核对全部内容。": "Protokolle werden automatisch bereinigt (Benutzerordner, Tokens, Geräteseriennummern, anonyme ID); Inhalte in Screenshots – Konto, Charakternamen, ADB-Seriennummern – musst du selbst abdecken. Mit „Vorschau“ kannst du vor dem Senden alles prüfen."
 日志片段（前 40 行，已脱敏）：: 'Protokollauszug (erste 40 Zeilen, bereinigt):'
 日志预览（将随反馈提交）: Protokollvorschau (wird mitgesendet)
 最多附加 {n} 张截图: Höchstens {n} Screenshots
@@ -136,20 +110,15 @@ GitHub 反馈: GitHub-Feedback
 正在提交…: Wird gesendet…
 正在提交，请稍候…: Wird gesendet, bitte warten…
 正在补传附件…: Anhänge werden erneut gesendet…
-正文已提交，编号 {id}；{n} 个附件没传上去（{names}）。可以点「补传附件」重试，正文不会重复提交。: Bericht gesendet als {id};
-  {n} Anhänge fehlgeschlagen ({names}). Mit „Anhänge erneut senden“ wiederholen –
-  der Bericht wird nicht erneut gesendet.
+"正文已提交，编号 {id}；{n} 个附件没传上去（{names}）。可以点「补传附件」重试，正文不会重复提交。": "Bericht gesendet als {id}; {n} Anhänge fehlgeschlagen ({names}). Mit „Anhänge erneut senden“ wiederholen – der Bericht wird nicht erneut gesendet."
 正文已提交，附件完成 {done}/{total}: Bericht gesendet; Anhänge {done}/{total}
 没有找到日志文件: Keine Protokolldateien gefunden
-环境信息（自动采集，不含用户名/角色名/路径）：: 'Umgebung (automatisch erfasst; ohne Benutzernamen, Charakternamen
-  oder Pfade):'
+"环境信息（自动采集，不含用户名/角色名/路径）：": "Umgebung (automatisch erfasst; ohne Benutzernamen, Charakternamen oder Pfade):"
 移除所选: Auswahl entfernen
 类型：{label}（{key}）: 'Typ: {label} ({key})'
 粘贴截图 (Ctrl+V): Screenshot einfügen (Strg+V)
 约 {kb} KB（已脱敏{suffix}）: ca. {kb} KB (bereinigt{suffix})
-缺陷、功能建议、文档问题、账号同步问题都可以在这里提交；回复会发到你填写的邮箱。: Fehler, Funktionswünsche, Dokumentations-
-  sowie Konto-/Synchronisationsprobleme kannst du hier melden; Antworten gehen an
-  die angegebene E-Mail.
+"缺陷、功能建议、文档问题、账号同步问题都可以在这里提交；回复会发到你填写的邮箱。": "Fehler, Funktionswünsche, Dokumentations- sowie Konto-/Synchronisationsprobleme kannst du hier melden; Antworten gehen an die angegebene E-Mail."
 补传失败：{error}: 'Erneutes Senden fehlgeschlagen: {error}'
 补传附件: Anhänge erneut senden
 详细描述: Beschreibung
@@ -160,8 +129,7 @@ GitHub 反馈: GitHub-Feedback
 请填写详细描述: Bitte beschreibe das Problem
 还有 {n} 个附件没传上去：{names}: '{n} Anhänge weiterhin nicht übertragen: {names}'
 这一天没有可用的日志文件: Für diesen Tag gibt es keine Protokolldatei
-这张图太大，压到 {limit} KB 以内仍失败，请裁剪后重试: Das Bild ist zu groß – auch nach Komprimierung über
-  {limit} KB; bitte zuschneiden und erneut versuchen
+"这张图太大，压到 {limit} KB 以内仍失败，请裁剪后重试": "Das Bild ist zu groß – auch nach Komprimierung über {limit} KB; bitte zuschneiden und erneut versuchen"
 选择图片…: Bilder auswählen…
 邮箱: E-Mail
 邮箱：{text}: 'E-Mail: {text}'

@@ -11,16 +11,7 @@ action_catalog:
 apk_release:
   下载 {url} 失败：{err}: 'Échec du téléchargement de {url} : {err}'
   下载已取消: Téléchargement annulé
-  ? '校验和不匹配，文件可能损坏或被篡改
-
-    期望 {want}
-
-    实际 {got}'
-  : 'Somme de contrôle non concordante ; le fichier est peut-être corrompu ou altéré
-
-    Attendu : {want}
-
-    Obtenu : {got}'
+  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "Somme de contrôle non concordante ; le fichier est peut-être corrompu ou altéré\nAttendu : {want}\nObtenu : {got}"
 batch_report:
   '## 汇总': '## Résumé'
   成功: Réussi

@@ -25,8 +25,7 @@ scripts:
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} ist ein Systemskript. Klicken Sie im Baum mit der rechten Maustaste darauf und wählen Sie „Zum Bearbeiten lokal kopieren“.'
   ■ 停止录制: ■ Aufnahme stoppen
   ● 录制脚本: ● Skript aufnehmen
-  ? "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n"
-  : "⚠ Skript-Metadaten nicht erkennbar; dieses Skript erscheint nicht in der Ausführungsliste:\n"
+  "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n": "⚠ Skript-Metadaten nicht erkennbar; dieses Skript erscheint nicht in der Ausführungsliste:\n"
   上移选项: Option nach oben
   下移选项: Option nach unten
   不会被录制: Wird nicht aufgenommen
@@ -90,8 +89,7 @@ scripts:
   属性单元准备工作流: Vorbereitungs-Workflow für Attributeinheit
   工作流运行中，无法录制: Ein Workflow läuft gerade; Aufnahme nicht möglich
   左侧选择脚本，或点「新建」: Wählen Sie links ein Skript aus oder klicken Sie auf „Neu“
-  ? "已保存 {path}，但校验未通过：\n"
-  : "{path} gespeichert, aber Validierung fehlgeschlagen:\n"
+  "已保存 {path}，但校验未通过：\n": "{path} gespeichert, aber Validierung fehlgeschlagen:\n"
   已保存 {path}，语法与布局引用校验通过: '{path} gespeichert; Syntax- und Layout-Referenzprüfung bestanden'
   已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: 'Am Zielort gespeichert, aber die Originaldatei konnte nicht entfernt werden: {error}. Bitte beide Skripte prüfen.'
   已写入编辑区域；请在编辑器中保存脚本: In den Editor übernommen; bitte speichern Sie das Skript im Editor
@@ -116,8 +114,7 @@ scripts:
   录制结束，可编辑后保存为 .wf: Aufnahme beendet; nach Bedarf bearbeiten und als .wf speichern
   录制结束，未捕获到有效操作: Aufnahme beendet; keine gültigen Aktionen erfasst
   录制结果: Aufnahmeergebnis
-  ? "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？"
-  : "Das Aufnahmeergebnis wurde noch nicht in das Skript übernommen, aus dem die Aufnahme gestartet wurde.\nBeim Wechseln des Skripts geht diese Aufnahme verloren. Fortfahren?"
+  "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？": "Das Aufnahmeergebnis wurde noch nicht in das Skript übernommen, aus dem die Aufnahme gestartet wurde.\nBeim Wechseln des Skripts geht diese Aufnahme verloren. Fortfahren?"
   录制轨迹引用超出工作流目录：{ref}: 'Der Verweis auf die Aufnahmespur liegt außerhalb des Workflow-Verzeichnisses: {ref}'
   录制鼠标移动: Mausbewegungen aufnehmen
   待机 | 点击「录制脚本」: Bereit | Auf „Skript aufnehmen“ klicken
@@ -131,8 +128,7 @@ scripts:
   找不到该函数: Funktion nicht gefunden
   找不到过程 {name} 的定义: Definition der Prozedur {name} nicht gefunden
   把录制结果按语句插入代码编辑器的光标处: Fügt die Aufnahme als Anweisungen an der Cursorposition im Code-Editor ein
-  ? "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？"
-  : "Das Systemskript {name} muss zuerst lokal kopiert werden, bevor es geändert werden kann.\nDanach erhält diese Datei keine Systemupdates mehr. Fortfahren?"
+  "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？": "Das Systemskript {name} muss zuerst lokal kopiert werden, bevor es geändert werden kann.\nDanach erhält diese Datei keine Systemupdates mehr. Fortfahren?"
   指令: Befehl
   插件: Plugins
   插入到脚本: In Skript einfügen

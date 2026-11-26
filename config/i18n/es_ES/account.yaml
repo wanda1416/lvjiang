@@ -3,8 +3,7 @@ account_dialog:
   下列用户的数据将以云端快照为准，本机数据会被覆盖：: 'Los datos de los siguientes usuarios seguirán la instantánea en la nube; se sobrescribirán los datos locales:'
   下行: Descarga
   云端基线是空的。<br>来源：{origin}<br>时间：{created}<br>条目：0<br><br>继续将用本机当前总览补上基线，不会备份或替换本地用户。: 'La línea base en la nube está vacía.<br>Origen: {origin}<br>Fecha: {created}<br>Entradas: 0<br><br>Si continúas, se completará la línea base con el resumen actual de este equipo; no se hará copia de seguridad ni se reemplazarán los usuarios locales.'
-  ? 云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。
-  : 'Ya existe una instantánea en la nube.<br>Origen: {origin}<br>Fecha: {created}<br>Entradas: {count}{warning}<br><br>Si continúas, primero se hará copia de seguridad de los usuarios locales, las definiciones y los datos de resumen en config/session/_backup-*, y después se descargarán los datos de la nube.'
+  "云端已有快照。<br>来源：{origin}<br>时间：{created}<br>条目：{count}{warning}<br><br>继续将先把本地用户、总览定义与总览数据备份到 config/session/_backup-*，再拉取云端数据。": "Ya existe una instantánea en la nube.<br>Origen: {origin}<br>Fecha: {created}<br>Entradas: {count}{warning}<br><br>Si continúas, primero se hará copia de seguridad de los usuarios locales, las definiciones y los datos de resumen en config/session/_backup-*, y después se descargarán los datos de la nube."
   修改密码: Cambiar contraseña
   修改密码…: Cambiando contraseña…
   创建快照: Crear instantánea
@@ -13,15 +12,13 @@ account_dialog:
   在浏览器打开自助操作页：修改密码、导出数据、清除云端数据、注销账号: 'Abrir la página de autoservicio en el navegador: cambiar contraseña, exportar datos, borrar datos en la nube, eliminar cuenta'
   定义: Definiciones
   密码: Contraseña
-  ? "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。"
-  : "Se borrarán las definiciones, usuarios, documentos y datos de resumen en la nube (se conservan la cuenta y la sesión).\nEsta acción no se puede deshacer; los datos locales no se eliminarán."
+  "将清空云端的定义、用户、文档与总览数据（账号与登录态保留）。\n此操作不可恢复；本地数据不会被删除。": "Se borrarán las definiciones, usuarios, documentos y datos de resumen en la nube (se conservan la cuenta y la sesión).\nEsta acción no se puede deshacer; los datos locales no se eliminarán."
   已取消覆盖：本机数据未改动，profile 同步未启用。: 'Sobrescritura cancelada: los datos locales no han cambiado y la sincronización de perfiles no se ha activado.'
   平台: Plataforma
   当前密码: Contraseña actual
   当前设备不是初始同步设备: Este dispositivo no es el dispositivo de sincronización inicial
   总览: Resumen
-  ? "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。"
-  : "Sube todos los datos locales de personajes como línea base de resumen en la nube.\nLa sincronización inicial crea una automáticamente; haz clic aquí manualmente cuando la necesites más adelante."
+  "把本机当前全部角色数据上传为云端总览基线。\n初始同步会自动创建一次；之后需要时手动点。": "Sube todos los datos locales de personajes como línea base de resumen en la nube.\nLa sincronización inicial crea una automáticamente; haz clic aquí manualmente cuando la necesites más adelante."
   操作未完成: Operación no completada
   数据同步: Sincronización de datos
   文档: Documentos
@@ -63,8 +60,7 @@ account_dialog:
   退出登录: Cerrar sesión
   通道: Canal
   隐藏密码: Ocultar contraseña
-  ? "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。"
-  : "Primer uso: establece el estado de sincronización entre este equipo y la nube. Si ya hay datos en la nube, primero se respaldarán\nlos usuarios locales, las definiciones y los datos de resumen en config/session/_backup-* antes de descargarlos."
+  "首次使用：建立本机与云端的同步状态。云端已有数据时，会先把本地\n用户、总览定义与总览数据备份到 config/session/_backup-* 再拉取云端。": "Primer uso: establece el estado de sincronización entre este equipo y la nube. Si ya hay datos en la nube, primero se respaldarán\nlos usuarios locales, las definiciones y los datos de resumen en config/session/_backup-* antes de descargarlos."
   ；等 {} 项: ; y {} elementos más
   已恢复每分钟自动同步: Sincronización automática cada minuto reanudada
   已暂停自动同步；手动「立即同步」仍可用: Sincronización automática en pausa; la opción manual «Sincronizar ahora» sigue disponible

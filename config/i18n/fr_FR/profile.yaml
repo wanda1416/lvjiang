@@ -80,18 +80,8 @@ profile:
   分钟: minutes
   删除便利贴失败：{error}: 'Échec de la suppression de la note adhésive : {error}'
   勾选后脚本在落盘前执行，拒绝或失败时整条同步写入链回滚；不勾选则提交后进入后台队列。同步脚本应短小，不用于长等待。: 'Coché : le script s''exécute avant l''écriture sur disque ; tout refus ou échec annule toute la chaîne de synchronisation. Décoché : mis en file d''arrière-plan après validation. Les scripts synchrones doivent rester courts et sans longues attentes.'
-  ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
-
-    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
-  : 'Coché : traité comme une action déclenchant la synchronisation des sync_targets configurés.
-
-    Décoché : écrasement pur, écrit uniquement cette clé sans déclencher aucune synchronisation.'
-  ? '勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。
-
-    取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。'
-  : 'Coché : une fois la cible au plafond, cet élément est verrouillé (l''aperçu affiche — et devient en lecture seule).
-
-    Décoché : l''élément reste affiché et modifiable même si la cible est pleine ; les incréments cessent simplement d''écrire vers la cible pleine.'
+  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Coché : traité comme une action déclenchant la synchronisation des sync_targets configurés.\nDécoché : écrasement pur, écrit uniquement cette clé sans déclencher aucune synchronisation."
+  "勾选：该目标达到上限后锁定本项（总览显示 — 且不可编辑）。\n取消勾选：目标满了仍正常展示和修改本项，增量只是不再写入已满的目标。": "Coché : une fois la cible au plafond, cet élément est verrouillé (l'aperçu affiche — et devient en lecture seule).\nDécoché : l'élément reste affiché et modifiable même si la cible est pleine ; les incréments cessent simplement d'écrire vers la cible pleine."
   包含: Contient
   单向增加: Augmentation uniquement
   原 key 已不存在，请重新打开编辑对话框: La clé d'origine n'existe plus. Veuillez rouvrir l'éditeur
@@ -195,62 +185,8 @@ profile:
   用户数据模型定义: Définition du modèle de données utilisateur
   用途: Usage
   用途（减少）: Usage (retrait)
-  ? '确定撤销这条记录吗？
-
-
-    用户：{username}
-
-    数据项：{label}
-
-    时间：{time}
-
-    来源：{source}
-
-
-    撤销会按反向写入一条新记录。'
-  : 'Annuler cet enregistrement ?
-
-
-    Utilisateur : {username}
-
-    Élément : {label}
-
-    Heure : {time}
-
-    Source : {source}
-
-
-    L''annulation écrira un nouvel enregistrement inversé.'
-  ? '确定永久删除这条历史记录吗？
-
-
-    用户：{username}
-
-    数据项：{label}
-
-    时间：{time}
-
-    来源：{source}
-
-    变动量：{delta}
-
-
-    仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。'
-  : 'Supprimer définitivement cet enregistrement d''historique ?
-
-
-    Utilisateur : {username}
-
-    Élément : {label}
-
-    Heure : {time}
-
-    Source : {source}
-
-    Variation : {delta}
-
-
-    Seul l''historique est supprimé — les valeurs actuelles restent inchangées et aucun enregistrement de suppression n''est ajouté. Cette action est irréversible et peut libérer des quotas cumulés sur l''historique.'
+  "确定撤销这条记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n\n撤销会按反向写入一条新记录。": "Annuler cet enregistrement ?\n\nUtilisateur : {username}\nÉlément : {label}\nHeure : {time}\nSource : {source}\n\nL'annulation écrira un nouvel enregistrement inversé."
+  "确定永久删除这条历史记录吗？\n\n用户：{username}\n数据项：{label}\n时间：{time}\n来源：{source}\n变动量：{delta}\n\n仅删除历史，不修改当前值，不新增删除记录。此操作不可撤销；删除获取记录可能释放按历史累计的来源额度。": "Supprimer définitivement cet enregistrement d'historique ?\n\nUtilisateur : {username}\nÉlément : {label}\nHeure : {time}\nSource : {source}\nVariation : {delta}\n\nSeul l'historique est supprimé — les valeurs actuelles restent inchangées et aucun enregistrement de suppression n'est ajouté. Cette action est irréversible et peut libérer des quotas cumulés sur l'historique."
   确定要删除 key '{key}' 吗？: Supprimer la clé '{key}' ?
   确定要删除分组 '{name}' 吗？: Supprimer le groupe '{name}' ?
   确定要删除这条便利贴吗？: Supprimer cette note adhésive ?
@@ -265,12 +201,7 @@ profile:
   至少保留一个分组: Conservez au moins un groupe
   覆写 - {label}: Écraser - {label}
   覆写...: Écraser...
-  ? '解除 {user} 的「{label}」锁定？
-
-    解锁后自动任务会重新读取并更新该 key。'
-  : 'Déverrouiller « {label} » pour {user} ?
-
-    Après déverrouillage, les tâches automatiques reliront et mettront à jour cette clé.'
+  "解除 {user} 的「{label}」锁定？\n解锁后自动任务会重新读取并更新该 key。": "Déverrouiller « {label} » pour {user} ?\nAprès déverrouillage, les tâches automatiques reliront et mettront à jour cette clé."
   设备：{value}: 'Appareil : {value}'
   该数值已被其他进程更新，本次增量操作未写入。请刷新后重试。: Cette valeur a été mise à jour par un autre processus ; cette variation n'a pas été écrite. Actualisez et réessayez.
   该条历史记录已发生变化，请刷新后重试: Cet enregistrement d'historique a changé ; actualisez et réessayez
@@ -292,28 +223,12 @@ profile:
   选择...: Sélectionner...
   选择变更脚本: Sélectionner un script de modification
   选择字段: Sélectionner un champ
-  ? '重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。
-
-
-    是否继续？'
-  : 'Le renommage met à jour les valeurs actuelles, l''historique, les sources de synchronisation et les références de configuration de tous les utilisateurs. Les clés dans les workflows et scripts de modification ne sont pas remplacées automatiquement et doivent être mises à jour manuellement.
-
-
-    Continuer ?'
+  "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Le renommage met à jour les valeurs actuelles, l'historique, les sources de synchronisation et les références de configuration de tous les utilisateurs. Les clés dans les workflows et scripts de modification ne sont pas remplacées automatiquement et doivent être mises à jour manuellement.\n\nContinuer ?"
   重新读取用户数据: Recharger les données utilisateur
   重置:{time}: 'Réinit. : {time}'
   重置日:{day}: 'Jour de réinit. : {day}'
   重置日:{day}号: 'Jour de réinit. : le {day}'
-  ? '锁定 {user} 的「{label}」？
-
-    锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。
-
-    随时可以右键解锁。'
-  : 'Verrouiller « {label} » pour {user} ?
-
-    Une fois verrouillé, le moteur ignore cette valeur : les tâches automatiques ne la lisent ni ne l''écrivent, les réinitialisations périodiques s''arrêtent et la valeur reste figée.
-
-    Faites un clic droit pour déverrouiller à tout moment.'
+  "锁定 {user} 的「{label}」？\n锁定后引擎忽略该值：自动任务不再读取或写入，周期重置也会停止，值永久停在当前状态。\n随时可以右键解锁。": "Verrouiller « {label} » pour {user} ?\nUne fois verrouillé, le moteur ignore cette valeur : les tâches automatiques ne la lisent ni ne l'écrivent, les réinitialisations périodiques s'arrêtent et la valeur reste figée.\nFaites un clic droit pour déverrouiller à tout moment."
   键: Clé
   键：{label}: 'Clé : {label}'
   键：{value}: 'Clé : {value}'
@@ -324,21 +239,11 @@ profile:
   Profile 变更脚本仍在执行，请等待队列完成后重命名: Un script de modification de profil est encore en cours ; attendez la fin de la file avant de renommer
   '下一点恢复: 已达上限': 'Prochaine restauration : plafond atteint'
   便利贴内容不能为空: Le contenu de la note adhésive ne peut pas être vide
-  ? '保存 profile.yaml 失败:
-
-    {e}'
-  : 'Échec de l''enregistrement de profile.yaml :
-
-    {e}'
+  "保存 profile.yaml 失败:\n{e}": "Échec de l'enregistrement de profile.yaml :\n{e}"
   删除当前列: Supprimer la colonne actuelle
   升序: Croissant
   右侧新增列: Ajouter une colonne à droite
-  ? '回写用户数据失败:
-
-    {e}'
-  : 'Échec d''écriture des données utilisateur :
-
-    {e}'
+  "回写用户数据失败:\n{e}": "Échec d'écriture des données utilisateur :\n{e}"
   库存: Inventaire
   开启后允许输入小数，UI 使用 DoubleValidator: Une fois activé, autorise la saisie de décimales (l'interface utilise DoubleValidator)
   当前配置: Configuration actuelle
@@ -375,78 +280,19 @@ layout_transfer:
   覆盖远端页面结构？: Écraser la structure de page distante ?
   下载排版: Télécharger la mise en page
   确认替换本机结构: Confirmer le remplacement de la structure locale
-  ? '本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。
-
-
-    确认替换？'
-  : 'La structure de page actuelle de cette machine sera remplacée par celle du cloud ; aucune copie locale ne sera conservée automatiquement.
-
-
-    Confirmer le remplacement ?'
+  "本机当前的页面结构将被云端结构替换，本机结构不会自动保留副本。\n\n确认替换？": "La structure de page actuelle de cette machine sera remplacée par celle du cloud ; aucune copie locale ne sera conservée automatiquement.\n\nConfirmer le remplacement ?"
   '{} 个分组 / {} 列': '{} groupes / {} colonnes'
   无法解析: Impossible à analyser
-  ? '远端已有页面结构，且不是本机写入的：
-
-
-    {remote}
-
-    远端结构：{remote_size}
-
-    本机结构：{local_size}
-
-
-    覆盖后，其它设备下载将得到本机结构。'
-  : 'Le cloud contient déjà une structure de page qui n''a pas été écrite par cette machine :
-
-
-    {remote}
-
-    Structure distante : {remote_size}
-
-    Structure locale : {local_size}
-
-
-    Après écrasement, les autres appareils téléchargeront la structure de cette machine.'
+  "远端已有页面结构，且不是本机写入的：\n\n{remote}\n远端结构：{remote_size}\n本机结构：{local_size}\n\n覆盖后，其它设备下载将得到本机结构。": "Le cloud contient déjà une structure de page qui n'a pas été écrite par cette machine :\n\n{remote}\nStructure distante : {remote_size}\nStructure locale : {local_size}\n\nAprès écrasement, les autres appareils téléchargeront la structure de cette machine."
   上传排版: Envoyer la mise en page
   页面结构以 PC 为准，手机端只支持下载。: La structure de page est gérée sur PC ; l'application mobile ne permet que le téléchargement.
   请先在「账号」里登录后再上传页面结构。: Connectez-vous d'abord dans « Compte » avant d'envoyer la structure de page.
   云端与本机一致，无需上传。: Le cloud et cette machine sont identiques ; rien à envoyer.
   请先在「账号」里登录后再下载页面结构。: Connectez-vous d'abord dans « Compte » avant de télécharger la structure de page.
   云端还没有页面结构，先在编辑端点一次「上传排版」。: Le cloud ne contient pas encore de structure de page ; cliquez d'abord sur « Envoyer la mise en page » sur la machine d'édition.
-  ? '将使用云端的页面结构：
-
-
-    {remote}
-
-    云端结构：{size}
-
-    本机结构：{local}
-
-
-    继续后还需再确认一次才会替换本机结构。'
-  : 'La structure de page du cloud sera utilisée :
-
-
-    {remote}
-
-    Structure cloud : {size}
-
-    Structure locale : {local}
-
-
-    Une seconde confirmation sera demandée avant de remplacer la structure locale.'
-  ? '已下载页面结构。
-
-    {detail}'
-  : 'Structure de page téléchargée.
-
-    {detail}'
-  ? '已上传页面结构。
-
-    {detail}'
-  : 'Structure de page envoyée.
-
-    {detail}'
+  "将使用云端的页面结构：\n\n{remote}\n云端结构：{size}\n本机结构：{local}\n\n继续后还需再确认一次才会替换本机结构。": "La structure de page du cloud sera utilisée :\n\n{remote}\nStructure cloud : {size}\nStructure locale : {local}\n\nUne seconde confirmation sera demandée avant de remplacer la structure locale."
+  "已下载页面结构。\n{detail}": "Structure de page téléchargée.\n{detail}"
+  "已上传页面结构。\n{detail}": "Structure de page envoyée.\n{detail}"
   云端页面结构在你确认期间被其它设备改写，请先下载或稍后重试。: La structure de page dans le cloud a été modifiée par un autre appareil pendant votre confirmation ; téléchargez-la d'abord ou réessayez plus tard.
   读取本机页面结构失败：{error}: 'Échec de lecture de la structure de page locale : {error}'
   下载失败，本机结构未改变：{error}: 'Échec du téléchargement, la structure locale reste inchangée : {error}'
@@ -456,9 +302,4 @@ layout_transfer:
   快照只支持在 PC 端创建。: Les instantanés ne peuvent être créés que sur PC.
   请先在「账号」里登录后再创建快照。: Connectez-vous d'abord dans « Compte » avant de créer un instantané.
   创建快照失败：{error}: 'Échec de création de l''instantané : {error}'
-  ? '已创建快照。
-
-    {detail}'
-  : 'Instantané créé.
-
-    {detail}'
+  "已创建快照。\n{detail}": "Instantané créé.\n{detail}"

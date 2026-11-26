@@ -1,6 +1,5 @@
 batch:
-  ? "* 表示当前用户使用独立参数\n"
-  : "* biểu thị người dùng hiện tại đang dùng tham số riêng\n"
+  "* 表示当前用户使用独立参数\n": "* biểu thị người dùng hiện tại đang dùng tham số riêng\n"
   "<b>选择执行单元</b>": "<b>Chọn đơn vị thực thi</b>"
   "<b>选择执行脚本</b>": "<b>Chọn kịch bản thực thi</b>"
   Profile 定义不可用: Định nghĩa Profile không khả dụng
@@ -25,17 +24,13 @@ batch:
   "工作流文件 (*.wf)": "Tệp quy trình (*.wf)"
   已按 Profile 排序用户: Đã sắp xếp người dùng theo Profile
   异常恢复: Khôi phục sự cố
-  ? "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。"
-  : "Hiện đang điều phối theo \"{key}\", nhưng quy trình chuẩn bị mục \"{wf}\" không chọn và trả về tên người dùng của đơn vị này. Vui lòng đổi sang batch/prepare_item_by_attr.wf, hoặc khai báo #% batch_unit_prepare: true và trả về username trong quy trình tự viết."
+  "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。": "Hiện đang điều phối theo \"{key}\", nhưng quy trình chuẩn bị mục \"{wf}\" không chọn và trả về tên người dùng của đơn vị này. Vui lòng đổi sang batch/prepare_item_by_attr.wf, hoặc khai báo #% batch_unit_prepare: true và trả về username trong quy trình tự viết."
   当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: "Hiện đang điều phối theo thuộc tính, vui lòng cấu hình quy trình chuẩn bị mục trong \"Công cụ → Cấu hình hàng loạt\" trước."
   恢复默认顺序: Khôi phục thứ tự mặc định
   手机端正在执行任务，请暂停或者结束任务: "Điện thoại đang chạy tác vụ, vui lòng tạm dừng hoặc kết thúc tác vụ trước"
-  ? "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}"
-  : "Điện thoại đang chạy tác vụ, vui lòng tạm dừng hoặc kết thúc tác vụ trước.\n\nThiết bị phản hồi: {detail}"
-  ? "执行用户：{username}\n参数来源：{source}"
-  : "Người dùng thực thi: {username}\nNguồn tham số: {source}"
-  ? "执行用户：{username}\n点击查看本轮任务参数"
-  : "Người dùng thực thi: {username}\nNhấp để xem tham số tác vụ lượt này"
+  "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}": "Điện thoại đang chạy tác vụ, vui lòng tạm dừng hoặc kết thúc tác vụ trước.\n\nThiết bị phản hồi: {detail}"
+  "执行用户：{username}\n参数来源：{source}": "Người dùng thực thi: {username}\nNguồn tham số: {source}"
+  "执行用户：{username}\n点击查看本轮任务参数": "Người dùng thực thi: {username}\nNhấp để xem tham số tác vụ lượt này"
   执行顺序: Thứ tự thực thi
   批量设置: Cài đặt hàng loạt
   批量配置: Cấu hình hàng loạt

@@ -1,6 +1,5 @@
 batch:
-  ? "* 表示当前用户使用独立参数\n"
-  : "* indica que este usuario utiliza parámetros propios\n"
+  "* 表示当前用户使用独立参数\n": "* indica que este usuario utiliza parámetros propios\n"
   <b>选择执行单元</b>: <b>Seleccionar unidades de ejecución</b>
   <b>选择执行脚本</b>: <b>Seleccionar scripts</b>
   Profile 定义不可用: Las definiciones de perfil no están disponibles
@@ -25,17 +24,13 @@ batch:
   工作流文件 (*.wf): Archivos de flujo de trabajo (*.wf)
   已按 Profile 排序用户: Usuarios ordenados por perfil
   异常恢复: Recuperación ante anomalías
-  ? '当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。'
-  : 'Programando por «{key}», pero el flujo de preparación de elemento «{wf}» no selecciona ni devuelve el nombre de usuario de la unidad. Usa batch/prepare_item_by_attr.wf o declara #% batch_unit_prepare: true en tu propio flujo y devuelve username.'
+  "当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回本单元的用户名。请改用 batch/prepare_item_by_attr.wf，或在自写的准备工作流里声明 #% batch_unit_prepare: true 并返回 username。": "Programando por «{key}», pero el flujo de preparación de elemento «{wf}» no selecciona ni devuelve el nombre de usuario de la unidad. Usa batch/prepare_item_by_attr.wf o declara #% batch_unit_prepare: true en tu propio flujo y devuelve username."
   当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。: Programación por atributo activa; configura primero el flujo de preparación de elemento en «Herramientas → Configuración de lotes».
   恢复默认顺序: Restaurar orden predeterminado
   手机端正在执行任务，请暂停或者结束任务: El teléfono está ejecutando una tarea; páusala o detenla primero
-  ? "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}"
-  : "El teléfono está ejecutando una tarea; páusala o detenla primero.\n\nRespuesta del dispositivo: {detail}"
-  ? "执行用户：{username}\n参数来源：{source}"
-  : "Usuario en ejecución: {username}\nOrigen de parámetros: {source}"
-  ? "执行用户：{username}\n点击查看本轮任务参数"
-  : "Usuario en ejecución: {username}\nHaz clic para ver los parámetros de esta ronda"
+  "手机端正在执行任务，请暂停或者结束任务。\n\n设备返回：{detail}": "El teléfono está ejecutando una tarea; páusala o detenla primero.\n\nRespuesta del dispositivo: {detail}"
+  "执行用户：{username}\n参数来源：{source}": "Usuario en ejecución: {username}\nOrigen de parámetros: {source}"
+  "执行用户：{username}\n点击查看本轮任务参数": "Usuario en ejecución: {username}\nHaz clic para ver los parámetros de esta ronda"
   执行顺序: Orden de ejecución
   批量设置: Ajustes de lote
   批量配置: Configuración de lotes

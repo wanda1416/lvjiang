@@ -1,32 +1,17 @@
 about:
   仅限非商业使用: Nur für nicht-kommerzielle Nutzung
   律匠: LvJiang
-  本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。: Dieses Projekt dient ausschließlich
-    Lern- und Forschungszwecken. Die Verwendung von Automatisierungswerkzeugen in
-    Spielen kann gegen die Nutzungsbedingungen des jeweiligen Spiels verstoßen; die
-    Folgen tragen die Nutzer selbst.
+  "本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的用户协议，由此产生的后果由使用者自行承担。": "Dieses Projekt dient ausschließlich Lern- und Forschungszwecken. Die Verwendung von Automatisierungswerkzeugen in Spielen kann gegen die Nutzungsbedingungen des jeweiligen Spiels verstoßen; die Folgen tragen die Nutzer selbst."
   本项目源码公开、免费使用: Quelloffen und kostenlos nutzbar
-  窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行: Fensteraufnahme → Bereichsmarkierung → OCR-Erkennung
-    → Workflow-Ausführung
-  软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。: Die Software wird wie besehen ohne jegliche
-    Gewährleistung bereitgestellt; der Autor haftet nicht für Schäden aus deren Nutzung.
+  "窗口定位截屏 → 区域标注 → OCR识别 → 工作流执行": "Fensteraufnahme → Bereichsmarkierung → OCR-Erkennung → Workflow-Ausführung"
+  "软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。": "Die Software wird wie besehen ohne jegliche Gewährleistung bereitgestellt; der Autor haftet nicht für Schäden aus deren Nutzung."
   通用视觉 RPA 引擎: Universelle visuelle RPA-Engine
 action_catalog:
   秒: Sek.
 apk_release:
   下载 {url} 失败：{err}: 'Download von {url} fehlgeschlagen: {err}'
   下载已取消: Download abgebrochen
-  ? '校验和不匹配，文件可能损坏或被篡改
-
-    期望 {want}
-
-    实际 {got}'
-  : 'Prüfsumme stimmt nicht überein; die Datei ist möglicherweise beschädigt oder
-    manipuliert
-
-    Erwartet {want}
-
-    Tatsächlich {got}'
+  "校验和不匹配，文件可能损坏或被篡改\n期望 {want}\n实际 {got}": "Prüfsumme stimmt nicht überein; die Datei ist möglicherweise beschädigt oder manipuliert\nErwartet {want}\nTatsächlich {got}"
 batch_report:
   '## 汇总': '## Zusammenfassung'
   成功: Erfolgreich
@@ -37,14 +22,10 @@ batch_report:
 batch_scheduler:
   已停止: Gestoppt
 cli:
-  不注册全局热键（留给另一实例）；不启动 MCP 服务: Keine globalen Tastenkürzel registrieren (für eine andere
-    Instanz freilassen); MCP-Dienst nicht starten
-  注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用: 'Plugin registrieren und laden:
-    NAME (integriert oder plugins/) oder NAME@PATH (beliebiges Verzeichnis); mehrfach
-    verwendbar'
+  "不注册全局热键（留给另一实例）；不启动 MCP 服务": "Keine globalen Tastenkürzel registrieren (für eine andere Instanz freilassen); MCP-Dienst nicht starten"
+  "注册并加载插件：NAME（内置或 plugins/）或 NAME@PATH（任意目录）；可多次使用": "Plugin registrieren und laden: NAME (integriert oder plugins/) oder NAME@PATH (beliebiges Verzeichnis); mehrfach verwendbar"
   通用视觉 RPA 引擎（支持插件扩展）: Universelle visuelle RPA-Engine (erweiterbar durch Plugins)
-  额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg: Alle integrierten Plugins und alle Plugins
-    im Standardverzeichnis plugins/ laden, ohne einzelne -reg-Angaben
+  "额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg": "Alle integrierten Plugins und alle Plugins im Standardverzeichnis plugins/ laden, ohne einzelne -reg-Angaben"
 common:
   基于 PyQt6 · RapidOCR · OpenCV: Basierend auf PyQt6 · RapidOCR · OpenCV
   画面异常: Bildfehler
@@ -56,32 +37,23 @@ common:
 core_common:
   DesktopCapture 已停止: DesktopCapture gestoppt
   YAML 顶层必须是字典: Die oberste YAML-Ebene muss eine Zuordnung (dict) sein
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Bedienungshilfen-Dienst
-    nicht verbunden (ausgeschaltet oder vom System beendet); bitte erneut aktivieren'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap lieferte
-    leere Daten zurück (Shizuku nicht autorisiert?)'
+  "[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启": "[A11yCapture] Bedienungshilfen-Dienst nicht verbunden (ausgeschaltet oder vom System beendet); bitte erneut aktivieren"
+  "[ShellCapture] screencap 返回空数据（Shizuku 未授权？）": "[ShellCapture] screencap lieferte leere Daten zurück (Shizuku nicht autorisiert?)"
   config 中缺少 model_path: In config fehlt model_path
   initial_variables 必须是 JSON 对象: initial_variables muss ein JSON-Objekt sein
   pynput 未安装，无法录制: pynput ist nicht installiert; Aufnahme nicht möglich
   全量: Vollständig
   分组名称不能为空: Gruppenname darf nicht leer sein
-  可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: Möglicherweise liegt ein Netzwerkproblem vor.
-    Zugriff auf {url} für Ankündigungen fehlgeschlagen; Netzwerkeinstellungen prüfen
-    und erneut versuchen
-  可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: Möglicherweise liegt ein Netzwerkproblem vor.
-    Zugriff auf {url} für Updates fehlgeschlagen; Netzwerkeinstellungen prüfen und
-    erneut versuchen
+  "可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试": "Möglicherweise liegt ein Netzwerkproblem vor. Zugriff auf {url} für Ankündigungen fehlgeschlagen; Netzwerkeinstellungen prüfen und erneut versuchen"
+  "可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试": "Möglicherweise liegt ein Netzwerkproblem vor. Zugriff auf {url} für Updates fehlgeschlagen; Netzwerkeinstellungen prüfen und erneut versuchen"
   场景必须包含 key 和 name: Szene muss key und name enthalten
-  基底视图不可删除，如需取消分层请取消多视图: Die Basisansicht kann nicht gelöscht werden; zum Aufheben
-    der Ebenen Mehrfachansicht deaktivieren
-  截图失败：无障碍服务未连接或截图被节流: 'Screenshot fehlgeschlagen: Bedienungshilfen-Dienst nicht verbunden
-    oder Screenshots werden gedrosselt'
+  "基底视图不可删除，如需取消分层请取消多视图": "Die Basisansicht kann nicht gelöscht werden; zum Aufheben der Ebenen Mehrfachansicht deaktivieren"
+  "截图失败：无障碍服务未连接或截图被节流": "Screenshot fehlgeschlagen: Bedienungshilfen-Dienst nicht verbunden oder Screenshots werden gedrosselt"
   截图编码失败: Screenshot-Kodierung fehlgeschlagen
   '未知图色操作: {op}，可用: {ops}': 'Unbekannte Bild-/Farboperation: {op}, verfügbar: {ops}'
   画布尺寸非法: Ungültige Leinwandgröße
   空间不存在: Bereich existiert nicht
-  系统空间不可删除，可新建自己的空间: Der Systembereich kann nicht gelöscht werden; erstellen Sie stattdessen
-    einen eigenen Bereich
+  "系统空间不可删除，可新建自己的空间": "Der Systembereich kann nicht gelöscht werden; erstellen Sie stattdessen einen eigenen Bereich"
   缺参照图或实时截图: Referenzbild oder Live-Screenshot fehlt
   至少保留一个图库空间: Mindestens ein Galeriebereich muss erhalten bleiben
   至少需要保留一个场景分组: Mindestens eine Szenengruppe muss erhalten bleiben
@@ -92,29 +64,23 @@ daily_history:
 map_manager:
   key: key
 mobile:
-  向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活: Das Übertragen von Konfigurationen an das Telefon
-    erfordert Lv1-Aktivierung; bitte unter Einstellungen → „Funktionsaktivierung“
-    aktivieren
+  "向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活": "Das Übertragen von Konfigurationen an das Telefon erfordert Lv1-Aktivierung; bitte unter Einstellungen → „Funktionsaktivierung“ aktivieren"
   已标定: Kalibriert
 notices:
   同意: Zustimmen
-  当前为离线模式，请关闭离线模式后刷新公告: Offlinemodus ist aktiv; bitte deaktivieren Sie den Offlinemodus,
-    um Ankündigungen zu aktualisieren
+  "当前为离线模式，请关闭离线模式后刷新公告": "Offlinemodus ist aktiv; bitte deaktivieren Sie den Offlinemodus, um Ankündigungen zu aktualisieren"
 ocr_dialog:
   名称不能为空: Name darf nicht leer sein
 ondevice_runner:
   当前 active_layout 不存在：{name}: 'Das aktuelle active_layout existiert nicht: {name}'
-  没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空: 'Kein Layout verfügbar: In
-    session ist kein active_layout festgelegt und layouts.yaml ist leer'
+  "没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空": "Kein Layout verfügbar: In session ist kein active_layout festgelegt und layouts.yaml ist leer"
 platforms:
   工作流暂停: Workflow pausiert
   工作流通知: Workflow-Benachrichtigung
 profile:
-  Profile 变更脚本仍在执行，请等待队列完成后重命名: Profil-Änderungsskripte werden noch ausgeführt; warten
-    Sie, bis die Warteschlange abgeschlossen ist, bevor Sie umbenennen
+  "Profile 变更脚本仍在执行，请等待队列完成后重命名": "Profil-Änderungsskripte werden noch ausgeführt; warten Sie, bis die Warteschlange abgeschlossen ist, bevor Sie umbenennen"
   便利贴内容不能为空: Inhalt der Haftnotiz darf nicht leer sein
-  原列已被移除，请重新选择插入位置: Die ursprüngliche Spalte wurde entfernt; wählen Sie erneut eine
-    Einfügeposition
+  "原列已被移除，请重新选择插入位置": "Die ursprüngliche Spalte wurde entfernt; wählen Sie erneut eine Einfügeposition"
   每周: Wöchentlich
   每天: Täglich
 profile_models:
@@ -122,84 +88,60 @@ profile_models:
 profile_service:
   仅可撤销写入记录: Nur Schreibeinträge können rückgängig gemacht werden
   历史记录不存在: Der Verlaufseintrag existiert nicht
-  只能撤销该用户此数据项的最新记录: Nur der neueste Eintrag dieses Datenelements für diesen Benutzer
-    kann rückgängig gemacht werden
+  "只能撤销该用户此数据项的最新记录": "Nur der neueste Eintrag dieses Datenelements für diesen Benutzer kann rückgängig gemacht werden"
   当前数据项已不存在: Das Datenelement existiert nicht mehr
   数据已发生变化，请刷新后重试: Die Daten wurden geändert; aktualisieren und erneut versuchen
-  该条历史已不存在或归属不匹配，请刷新后重试: Dieser Verlaufseintrag existiert nicht mehr oder gehört nicht
-    zu diesem Benutzer; aktualisieren und erneut versuchen
+  "该条历史已不存在或归属不匹配，请刷新后重试": "Dieser Verlaufseintrag existiert nicht mehr oder gehört nicht zu diesem Benutzer; aktualisieren und erneut versuchen"
 run_control:
   已恢复: Fortgesetzt
   拒绝: Abgelehnt
 scene_editor:
-  基底视图的 key 是保留值，不可重命名: Der Schlüssel der Basisansicht ist reserviert und kann nicht
-    umbenannt werden
-  多视图场景不能转为子场景，请先取消多视图: Szenen mit Mehrfachansicht können nicht in Unterszenen umgewandelt
-    werden; deaktivieren Sie zuerst die Mehrfachansicht
+  "基底视图的 key 是保留值，不可重命名": "Der Schlüssel der Basisansicht ist reserviert und kann nicht umbenannt werden"
+  "多视图场景不能转为子场景，请先取消多视图": "Szenen mit Mehrfachansicht können nicht in Unterszenen umgewandelt werden; deaktivieren Sie zuerst die Mehrfachansicht"
   布局名称不能为空: Layoutname darf nicht leer sein
   通过: Bestanden
 scrcpy_capture:
-  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: Innerhalb von 5 Sek. kein erstes Bild
-    empfangen (tritt auf, wenn der Bildschirm aus oder gesperrt ist oder nicht kodiert
-    werden kann); Bildschirm einschalten und erneut versuchen
-  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy-Server konnte nicht gestartet werden
-    (Exit-Code {rc}): {detail}'
-  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'Unerwartete Änderung der scrcpy-Protokollversion:
-    Client implementiert {version}; {detail}'
+  "5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试": "Innerhalb von 5 Sek. kein erstes Bild empfangen (tritt auf, wenn der Bildschirm aus oder gesperrt ist oder nicht kodiert werden kann); Bildschirm einschalten und erneut versuchen"
+  "scrcpy server 启动失败（返回码 {rc}）：{detail}": "scrcpy-Server konnte nicht gestartet werden (Exit-Code {rc}): {detail}"
+  "scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}": "Unerwartete Änderung der scrcpy-Protokollversion: Client implementiert {version}; {detail}"
   启动 scrcpy server 失败：{error}: 'Start des scrcpy-Servers fehlgeschlagen: {error}'
   启动视频流失败：{error}: 'Videostream konnte nicht gestartet werden: {error}'
   找不到 scrcpy-server.jar：{path}: 'scrcpy-server.jar nicht gefunden: {path}'
-  推送 scrcpy-server.jar 失败：{detail}: 'Übertragen von scrcpy-server.jar fehlgeschlagen:
-    {detail}'
+  "推送 scrcpy-server.jar 失败：{detail}": "Übertragen von scrcpy-server.jar fehlgeschlagen: {detail}"
   无法建立 scrcpy 视频端口转发: scrcpy-Videoportweiterleitung konnte nicht eingerichtet werden
-  未安装 PyAV，无法解码视频流（请安装 av 依赖）: PyAV ist nicht installiert; Videostream kann nicht
-    dekodiert werden (bitte die Abhängigkeit av installieren)
+  "未安装 PyAV，无法解码视频流（请安装 av 依赖）": "PyAV ist nicht installiert; Videostream kann nicht dekodiert werden (bitte die Abhängigkeit av installieren)"
   画面流不可用: Bildstream ist nicht verfügbar
   等待新画面超时: Zeitüberschreitung beim Warten auf ein neues Bild
-  视频包长度异常，画面流已失步（需要重建会话）: Ungewöhnliche Videopaketlänge; Bildstream ist nicht mehr
-    synchron (Sitzung muss neu aufgebaut werden)
-  视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）: Videostream-Verbindung wurde von der Gegenseite
-    geschlossen (scrcpy-Sitzung beendet oder von einem anderen Programm bereinigt)
+  "视频包长度异常，画面流已失步（需要重建会话）": "Ungewöhnliche Videopaketlänge; Bildstream ist nicht mehr synchron (Sitzung muss neu aufgebaut werden)"
+  "视频流连接已被对端关闭（scrcpy 会话结束或被其他程序清理）": "Videostream-Verbindung wurde von der Gegenseite geschlossen (scrcpy-Sitzung beendet oder von einem anderen Programm bereinigt)"
   视频流连接被中断：{error}: 'Videostream-Verbindung unterbrochen: {error}'
   读取视频流异常：{error}: 'Fehler beim Lesen des Videostreams: {error}'
-  连接 scrcpy 视频端口超时（端口 {port}）: Zeitüberschreitung beim Verbinden mit dem scrcpy-Videoport
-    (Port {port})
-  等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）: Nach {seconds} Sek. noch kein
-    Videostream-Protokollheader empfangen (scrcpy-Server nicht gestartet oder Versionskonflikt)
+  "连接 scrcpy 视频端口超时（端口 {port}）": "Zeitüberschreitung beim Verbinden mit dem scrcpy-Videoport (Port {port})"
+  "等待 {seconds} 秒仍无法读取视频流协议头（scrcpy server 启动失败或版本不符）": "Nach {seconds} Sek. noch kein Videostream-Protokollheader empfangen (scrcpy-Server nicht gestartet oder Versionskonflikt)"
   解码线程异常退出：{error}: 'Dekodierungs-Thread unerwartet beendet: {error}'
 scripts:
   '区域 ': 'Bereich '
   检查: Prüfen
 update:
-  当前为离线模式，请关闭离线模式后检查更新: Offlinemodus ist aktiv; bitte deaktivieren Sie den Offlinemodus,
-    um nach Updates zu suchen
+  "当前为离线模式，请关闭离线模式后检查更新": "Offlinemodus ist aktiv; bitte deaktivieren Sie den Offlinemodus, um nach Updates zu suchen"
   无法获取版本信息: Versionsinformationen konnten nicht abgerufen werden
-  无法访问 {url} 获取更新：HTTP {code}: 'Zugriff auf {url} für Updates fehlgeschlagen: HTTP
-    {code}'
+  "无法访问 {url} 获取更新：HTTP {code}": "Zugriff auf {url} für Updates fehlgeschlagen: HTTP {code}"
 wgc_capture:
   后台截图仅支持 Windows: Hintergrundaufnahme wird nur unter Windows unterstützt
   '后台截图组件加载失败: ': 'Hintergrundaufnahme-Komponente konnte nicht geladen werden: '
-  缺少 windows-capture 依赖，请重新安装或更新程序: Abhängigkeit windows-capture fehlt; bitte Programm
-    neu installieren oder aktualisieren
+  "缺少 windows-capture 依赖，请重新安装或更新程序": "Abhängigkeit windows-capture fehlt; bitte Programm neu installieren oder aktualisieren"
 workflows_common:
-  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules muss eine nicht-leere Zuordnung
-    sein'
+  "pixel_ratios: rules 必须是非空字典": "pixel_ratios: rules muss eine nicht-leere Zuordnung sein"
 android:
-  5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试: Innerhalb von 5 Sek. kein erstes Bild
-    empfangen (tritt auf, wenn der Bildschirm aus oder gesperrt ist oder nicht kodiert
-    werden kann); Bildschirm einschalten und erneut versuchen
-  scrcpy server 启动失败（返回码 {rc}）：{detail}: 'scrcpy-Server konnte nicht gestartet werden
-    (Exit-Code {rc}): {detail}'
-  scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}: 'Unerwartete Änderung der scrcpy-Protokollversion:
-    Client implementiert {version}; {detail}'
+  "5 秒内未收到首帧（手机息屏、锁屏或当前画面无法编码时会出现）；请点亮屏幕后重试": "Innerhalb von 5 Sek. kein erstes Bild empfangen (tritt auf, wenn der Bildschirm aus oder gesperrt ist oder nicht kodiert werden kann); Bildschirm einschalten und erneut versuchen"
+  "scrcpy server 启动失败（返回码 {rc}）：{detail}": "scrcpy-Server konnte nicht gestartet werden (Exit-Code {rc}): {detail}"
+  "scrcpy 协议版本变化，不符合预期：客户端按 {version} 实现，{detail}": "Unerwartete Änderung der scrcpy-Protokollversion: Client implementiert {version}; {detail}"
   下载 {url} 失败：{err}: 'Download von {url} fehlgeschlagen: {err}'
   下载已取消: Download abgebrochen
 desktop:
   DesktopCapture 已停止: DesktopCapture gestoppt
 ondevice:
-  '[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启': '[A11yCapture] Bedienungshilfen-Dienst
-    nicht verbunden (ausgeschaltet oder vom System beendet); bitte erneut aktivieren'
-  '[ShellCapture] screencap 返回空数据（Shizuku 未授权？）': '[ShellCapture] screencap lieferte
-    leere Daten zurück (Shizuku nicht autorisiert?)'
+  "[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启": "[A11yCapture] Bedienungshilfen-Dienst nicht verbunden (ausgeschaltet oder vom System beendet); bitte erneut aktivieren"
+  "[ShellCapture] screencap 返回空数据（Shizuku 未授权？）": "[ShellCapture] screencap lieferte leere Daten zurück (Shizuku nicht autorisiert?)"
   config 中缺少 model_path: In config fehlt model_path
   initial_variables 必须是 JSON 对象: initial_variables muss ein JSON-Objekt sein

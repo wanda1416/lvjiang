@@ -87,8 +87,7 @@ settings_dialog:
   如 ios: "Ví dụ: ios"
   如 my_wait: "Ví dụ: my_wait"
   完全离线模式（暂停全部联网功能）: Chế độ hoàn toàn ngoại tuyến (tạm dừng mọi tính năng mạng)
-  ? 实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。
-  : "Tính năng thử nghiệm: nhiều script tạm thời chưa chạy được ở chế độ này và không tiếp nhận phản hồi lỗi. Chụp nền sau cho phép chụp cửa sổ trò chơi ngay cả khi bị cửa sổ khác che khuất nhưng chậm hơn một chút; yêu cầu đầu vào cửa sổ cũng ở chế độ nền sau và không lấy được hình khi cửa sổ bị thu nhỏ. Đây là giá trị mặc định: giao diện chính chỉ tự động chọn \"Chụp nền sau\" sau khi bạn bật \"Chế độ nền sau\", và vẫn có thể đổi bất cứ lúc nào trong phiên chạy."
+  "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上「后台截图」，本次运行内仍可随时改。": "Tính năng thử nghiệm: nhiều script tạm thời chưa chạy được ở chế độ này và không tiếp nhận phản hồi lỗi. Chụp nền sau cho phép chụp cửa sổ trò chơi ngay cả khi bị cửa sổ khác che khuất nhưng chậm hơn một chút; yêu cầu đầu vào cửa sổ cũng ở chế độ nền sau và không lấy được hình khi cửa sổ bị thu nhỏ. Đây là giá trị mặc định: giao diện chính chỉ tự động chọn \"Chụp nền sau\" sau khi bạn bật \"Chế độ nền sau\", và vẫn có thể đổi bất cứ lúc nào trong phiên chạy."
   实验功能：手机需安装律匠 App 并开启无障碍服务；仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。: "Tính năng thử nghiệm: điện thoại cần cài ứng dụng LvJiang và bật dịch vụ Trợ năng; chỉ thay đổi kênh thực thi chạm và vuốt, không thay đổi cách chụp màn hình. Tự động quay về ADB shell input khi kết nối thất bại."
   尚无对应类型的连接信息，请先在主窗口连接设备或定位窗口。: "Chưa có thông tin kết nối thuộc loại này, vui lòng kết nối thiết bị hoặc định vị cửa sổ trong cửa sổ chính trước."
   "已下载待安装：{parts}（下次启动生效）": "Đã tải xuống chờ cài đặt: {parts} (có hiệu lực lần khởi động sau)"
@@ -104,8 +103,7 @@ settings_dialog:
   "应用名重复: {name}": "Tên ứng dụng bị trùng: {name}"
   应用注册: Đăng ký ứng dụng
   建立流式传输尝试次数: Số lần thử tạo luồng video
-  ? "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。"
-  : "Cách xử lý khi tọa độ nhấp/kéo do công cụ tính toán nằm ngoài khung hình.\nKhông chọn (mặc định): báo lỗi và kết thúc phiên chạy — vượt biên nghĩa là tham số dịch chuyển của script không khớp hình học bảng hiện tại, tự cắt biên sẽ âm thầm biến \"cuộn hai dòng\" thành \"cuộn một dòng\" mà script lẫn nhật ký đều không thấy.\nChọn: công cụ cắt về biên khung hình, ghi một cảnh báo và tiếp tục chạy.\nViệc kiểm tra diễn ra ở tầng công cụ: cùng tọa độ vượt biên, cử chỉ trợ năng trên thiết bị sẽ từ chối cứng, còn máy tính và adb shell input lại âm thầm chấp nhận nên không thể trông cậy vào phần phụ trợ."
+  "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。\n勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，而桌面与 adb shell input 会静默接受，指望后端拦不住。": "Cách xử lý khi tọa độ nhấp/kéo do công cụ tính toán nằm ngoài khung hình.\nKhông chọn (mặc định): báo lỗi và kết thúc phiên chạy — vượt biên nghĩa là tham số dịch chuyển của script không khớp hình học bảng hiện tại, tự cắt biên sẽ âm thầm biến \"cuộn hai dòng\" thành \"cuộn một dòng\" mà script lẫn nhật ký đều không thấy.\nChọn: công cụ cắt về biên khung hình, ghi một cảnh báo và tiếp tục chạy.\nViệc kiểm tra diễn ra ở tầng công cụ: cùng tọa độ vượt biên, cử chỉ trợ năng trên thiết bị sẽ từ chối cứng, còn máy tính và adb shell input lại âm thầm chấp nhận nên không thể trông cậy vào phần phụ trợ."
   当前标识：未生成（未开启）: "Định danh hiện tại: chưa tạo (chưa bật)"
   手机重启后 Shizuku 服务进程会死亡，需要重启游戏的任务依赖它。开启后在连接端侧执行时自动检测并启动一次（仅在未运行时启动）。: "Sau khi khởi động lại điện thoại, tiến trình dịch vụ Shizuku sẽ dừng, trong khi các tác vụ cần khởi động lại trò chơi phụ thuộc vào nó. Khi bật, kết nối ở chế độ trên thiết bị sẽ tự động kiểm tra và khởi chạy một lần (chỉ khi chưa chạy)."
   执行参数: Tham số thực thi
@@ -192,8 +190,7 @@ settings_dialog:
   首次建立视频流和断连后自动恢复视频流共用这个次数；耗尽后等待人工处理，不会自动放弃任务。: "Số lần này dùng chung cho lần thiết lập luồng video đầu tiên và tự động khôi phục sau khi ngắt kết nối; khi dùng hết sẽ chờ xử lý thủ công, không tự hủy tác vụ."
   首次窗口定位后可自动获取: Có thể tự động lấy sau lần định vị cửa sổ đầu tiên
   高级设置: Cài đặt nâng cao
-  ? "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。"
-  : "Mặc định thử tạo luồng video 5 lần, nếu thất bại sẽ kết nối lại tác nhân 5 lần và ADB 5 lần, cách nhau 2 giây. Nếu vẫn không khả dụng sẽ chờ xử lý thủ công không giới hạn: chọn Có để kiểm tra lại, chọn Không để dừng tác vụ tương ứng; đóng hộp thoại sẽ không dừng tác vụ và biểu ngữ phía trên vẫn giữ nguyên.\nKhông hạ cấp cử chỉ đa điểm và cử chỉ đồng thời. Không tự động gửi lại thao tác khi không chắc đã thực thi hay chưa. Cài đặt áp dụng cho các tác vụ khởi chạy sau."
+  "默认建立视频流 5 次，失败后重连代理 5 次、ADB 5 次，间隔 2 秒。仍不可用时无限等待人工处理：选择是重新检查、选择否停止对应任务；关掉提示不会停止任务，顶部横幅会一直保留。\n多指和并发手势不降级。动作是否已执行不确定时，不自动重复输入。设置对后续启动的任务生效。": "Mặc định thử tạo luồng video 5 lần, nếu thất bại sẽ kết nối lại tác nhân 5 lần và ADB 5 lần, cách nhau 2 giây. Nếu vẫn không khả dụng sẽ chờ xử lý thủ công không giới hạn: chọn Có để kiểm tra lại, chọn Không để dừng tác vụ tương ứng; đóng hộp thoại sẽ không dừng tác vụ và biểu ngữ phía trên vẫn giữ nguyên.\nKhông hạ cấp cử chỉ đa điểm và cử chỉ đồng thời. Không tự động gửi lại thao tác khi không chắc đã thực thi hay chưa. Cài đặt áp dụng cho các tác vụ khởi chạy sau."
   鼠标/触控移动到目标位置的耗时: Thời gian di chuyển chuột/chạm tới vị trí mục tiêu
   鼠标移动时长(秒): Thời lượng di chuyển chuột (giây)
   坐标越界处理: Xử lý tọa độ vượt biên

@@ -51,8 +51,7 @@ scene_editor:
   仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。: "Chỉ ảnh hưởng ảnh chụp được làm mới hoặc thêm sau này của bố cục, cảnh và chế độ xem hiện tại; ảnh chụp cũ giữ nguyên định dạng."
   从场景 YAML 中删除 Panel 定义: Xóa định nghĩa Panel khỏi YAML cảnh
   从场景 YAML 中删除坐标点定义（meta 数据）: Xóa định nghĩa điểm tọa độ khỏi YAML cảnh (dữ liệu meta)
-  ? "以下 {n} 条没有加上：\n{detail}"
-  : "{n} mục sau chưa được thêm:\n{detail}"
+  "以下 {n} 条没有加上：\n{detail}": "{n} mục sau chưa được thêm:\n{detail}"
   以下场景有未保存的改动，请先手动保存或放弃改动，再点击刷新。: "Các cảnh sau có thay đổi chưa lưu, vui lòng lưu hoặc hủy thủ công rồi mới nhấp làm mới."
   以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改: "Bắt đầu bằng chữ thường, chỉ hỗ trợ chữ thường, chữ số và dấu gạch dưới, không thể sửa sau khi tạo"
   位置和尺寸可在画布中拖动调整。: Vị trí và kích thước có thể kéo thả trên khung vẽ để điều chỉnh.
@@ -152,8 +151,7 @@ scene_editor:
   "别名布局的「适配环境」留空时跟随根布局「{parent}」。": "Khi \"Môi trường tương thích\" của bố cục bí danh để trống sẽ theo bố cục gốc \"{parent}\"."
   布局写入失败，请检查日志。: "Ghi bố cục thất bại, vui lòng kiểm tra nhật ký."
   布局名称: Tên bố cục
-  ? "布局已保存，但以下模板截图未能删除：\n{errors}"
-  : "Đã lưu bố cục, nhưng các ảnh chụp mẫu sau không thể xóa:\n{errors}"
+  "布局已保存，但以下模板截图未能删除：\n{errors}": "Đã lưu bố cục, nhưng các ảnh chụp mẫu sau không thể xóa:\n{errors}"
   布局清单里找不到当前布局，请先保存布局: "Không tìm thấy bố cục hiện tại trong danh sách bố cục, vui lòng lưu bố cục trước"
   布局绑定: Liên kết bố cục
   应用到当前布局: Áp dụng cho bố cục hiện tại
@@ -176,8 +174,7 @@ scene_editor:
   当前布局尚未绑定此网格。: Bố cục hiện tại chưa liên kết lưới này.
   当前布局没有未保存的改动: Bố cục hiện tại không có thay đổi chưa lưu
   当前布局绑定: Liên kết bố cục hiện tại
-  ? "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}"
-  : "Kích thước ảnh chụp hiện tại không khớp, xác nhận chụp mới?\n\nẢnh chụp hiện tại: {old_width} × {old_height}\nẢnh chụp mới: {new_width} × {new_height}"
+  "当前截图大小不匹配，是否确认截图？\n\n当前截图：{old_width} × {old_height}\n新截图：{new_width} × {new_height}": "Kích thước ảnh chụp hiện tại không khớp, xác nhận chụp mới?\n\nẢnh chụp hiện tại: {old_width} × {old_height}\nẢnh chụp mới: {new_width} × {new_height}"
   当前激活布局不可删除: Không thể xóa bố cục đang kích hoạt
   当前视图下没有可绑定的区域字段（已全部分配或不属于本视图）: Không có trường vùng nào có thể liên kết trong chế độ xem này (đều đã được gán hoặc không thuộc chế độ xem này)
   快速选择当前场景内的目标视图: Chọn nhanh chế độ xem đích trong cảnh hiện tại
@@ -207,8 +204,7 @@ scene_editor:
   无可用引用: Không có tham chiếu khả dụng
   无场景改动: Không có thay đổi cảnh
   无布局: Không có bố cục
-  ? "无截图\n请连接投屏后点击「刷新截图」"
-  : "Chưa có ảnh chụp\nVui lòng kết nối phản chiếu màn hình rồi nhấp \"Làm mới ảnh chụp\""
+  "无截图\n请连接投屏后点击「刷新截图」": "Chưa có ảnh chụp\nVui lòng kết nối phản chiếu màn hình rồi nhấp \"Làm mới ảnh chụp\""
   无截图源，请先在主窗口定位窗口: "Không có nguồn ảnh chụp, vui lòng định vị cửa sổ ở cửa sổ chính trước"
   无法加载截图: Không thể tải ảnh chụp
   无法取消: Không thể hủy
@@ -252,10 +248,8 @@ scene_editor:
   留空则点击坐标；可输入或下拉选择: Để trống để nhấp tọa độ; có thể nhập hoặc chọn từ danh sách
   目标场景不存在: Cảnh đích không tồn tại
   "确定删除引用 {key} 吗？": "Bạn có chắc muốn xóa tham chiếu {key} không?"
-  ? "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。"
-  : "Bạn có chắc muốn xóa ảnh chụp {idx} không?\nCác ảnh chụp còn lại sẽ tự động đánh số lại sau khi xóa."
-  ? "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。"
-  : "Bạn có chắc muốn khôi phục bố cục \"{name}\" về trạng thái lưu gần nhất không?\nTất cả hiệu chuẩn bố cục, mẫu đã chụp và điều chỉnh phiên bản chưa lưu sẽ bị mất."
+  "确定删除截图 {idx} 吗？\n删除后其余截图将自动重编号。": "Bạn có chắc muốn xóa ảnh chụp {idx} không?\nCác ảnh chụp còn lại sẽ tự động đánh số lại sau khi xóa."
+  "确定恢复布局「{name}」最近一次保存的状态吗？\n所有未保存的布局标定、模板截取和版本调整都会丢失。": "Bạn có chắc muốn khôi phục bố cục \"{name}\" về trạng thái lưu gần nhất không?\nTất cả hiệu chuẩn bố cục, mẫu đã chụp và điều chỉnh phiên bản chưa lưu sẽ bị mất."
   "确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。": "Bạn có chắc muốn gỡ tham chiếu của cảnh hiện tại tới {scene}.{entity} không? Định nghĩa và tọa độ bố cục của cảnh nguồn không bị ảnh hưởng."
   移动场景: Di chuyển cảnh
   移动失败: Di chuyển thất bại
@@ -351,8 +345,7 @@ scene_editor:
   限定参考图识别的分组范围: Giới hạn phạm vi nhóm khi nhận diện ảnh tham chiếu
   隐藏「全部」选项，打开场景时直接展示基底视图: "Ẩn tùy chọn \"Tất cả\", mở cảnh sẽ hiển thị thẳng chế độ xem cơ sở"
   隐藏全部视图: Ẩn tất cả chế độ xem
-  ? "\n\n当前有如下场景发生变更：{names}"
-  : "\n\nCác cảnh sau đã thay đổi: {names}"
+  "\n\n当前有如下场景发生变更：{names}": "\n\nCác cảnh sau đã thay đổi: {names}"
   (无): (Không có)
   创建区域: Tạo vùng
   创建方向: Tạo hướng

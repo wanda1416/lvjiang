@@ -157,12 +157,16 @@ python scripts/one_off/normalize_history_paths.py --apply    # 执行
   `tests/yysls/data/agent_docs_baseline.json`：文档集合或正文的 sha256 变了，Agent
   发行文档门禁会直接红灯；版本字段沿用 fixture 现值。
 
-## i18n 词表多行条目归一
+## i18n 词表跨行条目归一
 
 [normalize_i18n_newlines.py](normalize_i18n_newlines.py) 把
-`config/i18n/apps/yysls/*.yaml` 里的多行显式键（`? '…'` + 空行 + 续行）改写成
-双引号单行条目 `"第一行\n第二行": "…"`。抽词表的生成器遇到含换行的字面量就会摊成
-多行：key 含换行时 YAML 只能用显式键写法，而单引号流标量里"一行 + 空行"才表示换行，
-于是一句话变成六行。改写成 `\n` 转义后 key 解析结果不变（脚本用 `safe_load` 逐份对比
-映射，不一致就回滚），只是不再占版面。默认干跑，`--apply` 才写回；常驻门禁是
-`tests/apps/yysls/test_i18n_tables.py::test_no_multiline_yaml_entries`。
+`config/i18n/**/*.yaml`（核心词表 `{lang}/*.yaml` 与插件词表 `apps/*`）里的跨行条目
+改写成双引号单行条目。抽词表的生成器会写出三种跨行形态：显式键 + 真换行
+（`? '…'` + 空行 + 续行，一句话六行）、显式键但 key/value 各占一行、以及普通标量被
+折行（YAML 把折行折成空格）。
+
+统一改写成 `"key": "value"`：换行按 YAML 双引号语义写成 `\n`，折行拼接后的空格与原
+解析结果一致。脚本按缩进结构切块，改写前后用 `yaml.safe_load` 对比**整份文档**，映射
+有任何差别就保留原文件并报错退出；默认干跑，`--apply` 才写回，可重复执行。
+常驻门禁是 `tests/core/test_i18n_table_format.py`（全部词表可解析 + 跨行条目为 0），
+它直接复用本脚本的 `rewrite()`，不另写一套判定。

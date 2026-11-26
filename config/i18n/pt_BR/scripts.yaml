@@ -25,12 +25,7 @@ scripts:
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} é um script do sistema. Para alterá-lo, clique com o botão direito na árvore e escolha "Copiar para local para editar".'
   ■ 停止录制: ■ Parar gravação
   ● 录制脚本: ● Gravar script
-  ? '⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：
-
-    '
-  : '⚠ Metadados do script não reconhecidos; este script não aparecerá na lista de execução:
-
-    '
+  "⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n": "⚠ Metadados do script não reconhecidos; este script não aparecerá na lista de execução:\n"
   上移选项: Mover opção para cima
   下移选项: Mover opção para baixo
   不会被录制: Não será gravado
@@ -94,12 +89,7 @@ scripts:
   属性单元准备工作流: Fluxo de preparação de unidade de atributo
   工作流运行中，无法录制: Há um fluxo de trabalho em execução; não é possível gravar
   左侧选择脚本，或点「新建」: Selecione um script à esquerda ou clique em "Novo"
-  ? '已保存 {path}，但校验未通过：
-
-    '
-  : 'Salvo em {path}, mas a validação falhou:
-
-    '
+  "已保存 {path}，但校验未通过：\n": "Salvo em {path}, mas a validação falhou:\n"
   已保存 {path}，语法与布局引用校验通过: Salvo em {path}; validação de sintaxe e referências de layout aprovada
   已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。: 'Gravado no destino, mas não foi possível remover o arquivo original: {error}. Verifique os dois scripts.'
   已写入编辑区域；请在编辑器中保存脚本: Inserido na área de edição; salve o script no editor
@@ -124,12 +114,7 @@ scripts:
   录制结束，可编辑后保存为 .wf: Gravação concluída; edite e salve como .wf
   录制结束，未捕获到有效操作: Gravação concluída; nenhuma ação válida foi capturada
   录制结果: Resultado da gravação
-  ? '录制结果尚未写入开始录制时的脚本。
-
-    切换脚本将清除这份录制结果，是否继续？'
-  : 'O resultado da gravação ainda não foi inserido no script que iniciou a gravação.
-
-    Trocar de script apagará esta gravação. Continuar?'
+  "录制结果尚未写入开始录制时的脚本。\n切换脚本将清除这份录制结果，是否继续？": "O resultado da gravação ainda não foi inserido no script que iniciou a gravação.\nTrocar de script apagará esta gravação. Continuar?"
   录制轨迹引用超出工作流目录：{ref}: 'A referência do rastro de gravação sai do diretório de fluxos de trabalho: {ref}'
   录制鼠标移动: Gravar movimento do mouse
   待机 | 点击「录制脚本」: Em espera | Clique em "Gravar script"
@@ -143,12 +128,7 @@ scripts:
   找不到该函数: Função não encontrada
   找不到过程 {name} 的定义: Definição do procedimento {name} não encontrada
   把录制结果按语句插入代码编辑器的光标处: Insere o resultado gravado como instruções na posição do cursor no editor de código
-  ? '把系统脚本 {name} 复制到本地后才能修改。
-
-    复制之后这个文件不再跟随系统更新，确定？'
-  : 'É necessário copiar o script do sistema {name} para local antes de modificá-lo.
-
-    Após a cópia, este arquivo não acompanhará mais as atualizações do sistema. Continuar?'
+  "把系统脚本 {name} 复制到本地后才能修改。\n复制之后这个文件不再跟随系统更新，确定？": "É necessário copiar o script do sistema {name} para local antes de modificá-lo.\nApós a cópia, este arquivo não acompanhará mais as atualizações do sistema. Continuar?"
   指令: Comando
   插件: Plugins
   插入到脚本: Inserir no script

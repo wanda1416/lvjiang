@@ -1529,7 +1529,15 @@ auto_strings:
   导入失败: Échec de l'importation
   导入成功: Importation réussie
   导入毕业率 Excel: Importer l'Excel d'optimisation
-  导出为 leoq7 格式: Exporter au format leoq7
+  导出后用浏览器打开对应网站: Ouvrir le site dans le navigateur après export
+  导出: Exporter
+  打开网站: Ouvrir le site
+  无法打开浏览器，请手动访问：{url}: Impossible douvrir un navigateur - merci de visiter {url} manuellement
+  JSON 文件 (*.json): Fichier JSON (*.json)
+  导出为 {site} 格式: Exporter au format {site}
+  文本文件，粘贴到 {url} 的导入框: Fichier texte - à coller dans le champ dimport de {url}
+  JSON 文件，在 {url} 的「导入装备库」里选择: Fichier JSON - à sélectionner dans « Importer la bibliothèque » sur {url}
+  导出装备数据到外部网站: Exporter les données déquipement vers un site externe
   导出失败: Échec de l'exportation
   导出成功: Exportation réussie
   导出数据: Exporter les données
@@ -1556,12 +1564,7 @@ auto_strings:
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: 2 affixes d'attaque d'attribut max (Sans forme
     inclus) ; les affixes 2-5 en comptent actuellement {n}
   已定音: Harmonisé
-  ? '已导出到
-
-    {path}'
-  : 'Exporté vers
-
-    {path}'
+  已导出到：{path}: 'Exporté vers : {path}'
   已应用: Appliqué
   已是最后一条赛季，无法下移: Déjà la dernière saison, impossible de descendre
   已是最后一条配置，无法下移: Déjà la dernière config, impossible de descendre

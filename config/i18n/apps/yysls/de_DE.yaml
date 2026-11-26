@@ -1520,7 +1520,15 @@ auto_strings:
   导入失败: Import fehlgeschlagen
   导入成功: Erfolgreich importiert
   导入毕业率 Excel: Abschlussraten-Excel importieren
-  导出为 leoq7 格式: Im leoq7-Format exportieren
+  导出后用浏览器打开对应网站: Nach dem Export die Website im Browser öffnen
+  导出: Exportieren
+  打开网站: Website öffnen
+  无法打开浏览器，请手动访问：{url}: Browser konnte nicht geöffnet werden - bitte {url} manuell aufrufen
+  JSON 文件 (*.json): JSON-Datei (*.json)
+  导出为 {site} 格式: Als {site}-Format exportieren
+  文本文件，粘贴到 {url} 的导入框: Textdatei - in das Importfeld auf {url} einfügen
+  JSON 文件，在 {url} 的「导入装备库」里选择: JSON-Datei - auf {url} unter „Ausrüstungsbibliothek importieren“ auswählen
+  导出装备数据到外部网站: Ausrüstungsdaten an eine externe Website exportieren
   导出失败: Export fehlgeschlagen
   导出成功: Erfolgreich exportiert
   导出数据: Daten exportieren
@@ -1546,12 +1554,7 @@ auto_strings:
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Maximal 2 Elementarangriff-Affixe (inkl. Formlos)
     erlaubt; Affixe 2–5 enthalten derzeit {n}
   已定音: Eingestimmt
-  ? '已导出到
-
-    {path}'
-  : 'Exportiert nach
-
-    {path}'
+  已导出到：{path}: 'Exportiert nach: {path}'
   已应用: Angewendet
   已是最后一条赛季，无法下移: Bereits die letzte Saison, kann nicht nach unten verschoben werden
   已是最后一条配置，无法下移: Bereits die letzte Konfiguration, kann nicht nach unten verschoben

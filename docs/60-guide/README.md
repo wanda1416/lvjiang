@@ -19,7 +19,7 @@
 | 排查图像识别与模板匹配问题 | [图像识别排查](04-desktop/03.05-visual-recognition-troubleshooting.md) |
 | 管理大世界地图 | [大世界地图管理](04-desktop/03.06-world-map-management.md) |
 | 配置并运行自动调律 | [调律配置总览](03-automation/04.01-tuning-config-overview.md)（配置详见 [4.2](03-automation/04.02-default-config.md)～[4.5](03-automation/04.05-game-config.md)，运行见 [4.6](03-automation/04.06-running-tuning.md)、[4.7](03-automation/04.07-agent-tuning.md)） |
-| 管理装备数据、算毕业率、算出装 | [装备数据总览](03-automation/05.01-equipment-data-overview.md)（详见 [5.2](03-automation/05.02-equipment-data-acquisition.md)～[5.7](03-automation/05.07-build-calculator.md)） |
+| 管理装备数据、算毕业率、算出装 | [装备数据总览](03-automation/05.01-equipment-data-overview.md)（详见 [5.2](03-automation/05.02-equipment-data-acquisition.md)～[5.8](03-automation/05.08-equipment-external-sites.md)） |
 | 跑日常任务与工作流脚本 | [工作流与日常任务](03-automation/06-workflows.md)、[系统脚本清单](03-automation/06.07-system-scripts.md) |
 | 在手机上使用律匠 | [移动设备（安卓）](02-android/07-mobile-device.md) |
 | 自己写脚本 | [脚本工作台与作者须知](04-desktop/08-script-authoring.md)、[DSL 语法](../40-reference/02-dsl/README.md) |
@@ -66,6 +66,7 @@
 | [5.5 使用流派规则过滤装备](03-automation/05.05-school-rule-filtering.md) | 区分流派规则与毕业率方案，按评级预筛无效候选 |
 | [5.6 计算最优毕业率组合](03-automation/05.06-optimal-equipment-combination.md) | 候选构造、假设选项、智能剪枝、全局 Top 10 搜索结果与应用、技能轴查看 |
 | [5.7 出装搭配与模拟计算器](03-automation/05.07-build-calculator.md) | 总词条合法分配、角色属性实时推演、玩法出装读写与三级要求 |
+| [5.8 外部装备网站（leoq7 / 兵鉴）](03-automation/05.08-equipment-external-sites.md) | 两个网站的分工、导出格式选择、导入步骤、主属性表版本与词条识别注意事项 |
 | [6. 工作流与日常任务](03-automation/06-workflows.md) | 日常 Tab 操作、运行控制、专用脚本入口、脚本配置管理、任务历史（写脚本见 [8](04-desktop/08-script-authoring.md)） |
 | [6.7 系统脚本与工作流清单](03-automation/06.07-system-scripts.md) | 系统自带脚本的清单与参数、系统脚本与本地副本的覆盖关系 |
 | [预置图库内容](03-automation/01-preset-gallery.md) | 随包分发的端游/手游参考图清单：共有规格、逐分组对照、只在一边出现的图、工作流与自动调律实际用到的 label、已知差异 |

@@ -217,7 +217,14 @@
       "path": "30-design/01-architecture/02-graduation/01-references/01-leoq7-data-format.md",
       "title": "装备数据外部交换格式（V2）",
       "category": "30-architecture",
-      "sha256": "369e5f62302b6277e00a8f6834cc1ea692ce7d65dc39413c248e9d16747b892f"
+      "sha256": "76e7a7e2cbc4bbf0b4e3916f0e4cbdd0a722fe89bf7b7193aa92bea7493062b7"
+    },
+    {
+      "id": "30-design:01-architecture:02-graduation:01-references:02-bingjian-data-format",
+      "path": "30-design/01-architecture/02-graduation/01-references/02-bingjian-data-format.md",
+      "title": "装备数据外部交换格式（兵鉴 `bingjian-gear` v1）",
+      "category": "30-architecture",
+      "sha256": "a931caf97ed1190331b758e0bc9f3295dda407568314f88462f40f75ce985f3a"
     },
     {
       "id": "30-design:01-architecture:02-graduation:02-formula-language",
@@ -280,7 +287,7 @@
       "path": "30-design/01-architecture/02-graduation/README.md",
       "title": "毕业率计算引擎",
       "category": "30-architecture",
-      "sha256": "ce7ade572d83e9c94c16be1188f96dfaed6f91ab234d94c7a1720e9b09ea071c"
+      "sha256": "c3e6b2e359db19b1658c95ce929a4fe3d5a7522246429591a27fdfac65777738"
     },
     {
       "id": "30-design:01-architecture:03-models:01-equipment-models",
@@ -1386,7 +1393,7 @@
       "path": "60-guide/03-automation/05.03-equipment-management.md",
       "title": "5.3 装备管理与编辑",
       "category": "60-userguide",
-      "sha256": "6df4e597c5501c999471b9657336085bea257864f5ecb851e5b1150704b6ccb8"
+      "sha256": "5778e6bcd55a8a1683fc7d34b60606f7233d65b6d3dfd41c31f840b2f62dff1e"
     },
     {
       "id": "60-guide:03-automation:05.04-base-attributes-and-graduation",
@@ -1414,7 +1421,14 @@
       "path": "60-guide/03-automation/05.07-build-calculator.md",
       "title": "5.7 出装搭配与模拟计算器",
       "category": "60-userguide",
-      "sha256": "a321c43637797dd48d6574b4cd3dc0e58cbc0da83ffdb5dc427c243d05ac743a"
+      "sha256": "283622b1dbcb3f76478fa31b0d153e2a2dd8444e8c3eb81f74581b873fe2fa52"
+    },
+    {
+      "id": "60-guide:03-automation:05.08-equipment-external-sites",
+      "path": "60-guide/03-automation/05.08-equipment-external-sites.md",
+      "title": "5.8 外部装备网站（leoq7 / 兵鉴）",
+      "category": "60-userguide",
+      "sha256": "0d3c8799b0ef8cea474d5b2c449a66c2f36bb560fb3637f08ea6d8cc5c779a80"
     },
     {
       "id": "60-guide:03-automation:06-workflows",
@@ -1519,7 +1533,7 @@
       "path": "60-guide/README.md",
       "title": "律匠用户指南",
       "category": "60-userguide",
-      "sha256": "0e4a3a9be445ac958abd54ea9e34d08361f21f06efe058e68680a54150114782"
+      "sha256": "8d5ae19c4fa6ac4d971e4b0cf2c40ab69d5237425c28ab9f6b49edb9cbf97c29"
     },
     {
       "id": "70-agent:05-ai-connection",

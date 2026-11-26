@@ -6,6 +6,13 @@
 该格式只用于外部数据交换，不是律匠本地仓储的备份格式，也不定义毕业率计算语义。
 律匠自身的毕业率计算见 [毕业率计算引擎](../README.md)。
 
+## 与兵鉴通道的关系
+
+同一份 V2 文本 `yysls-bingjian.com` 也能识别（它按 `YYSLS_EQUIPMENT_EXPORT_V2`
+前缀解包），但兵鉴另有能带装备名、紫装与"转"标记的原生 JSON，见
+[兵鉴数据格式](02-bingjian-data-format.md)。两者只共用"哪些装备参与导出"，属性
+标识、编码与文件类型各自独立：导出时由用户选择目标站点，见装备页「导出数据」。
+
 ## 传输文本
 
 导出结果是两行文本：
@@ -20,6 +27,10 @@ YYSLS_EQUIPMENT_EXPORT_V2
 ```text
 JSON → UTF-8 字节 → XOR → Base64
 ```
+
+站点同时接受历史标识 `YYSLS_EQUIPMENT_EXPORT_V1`（其后直接是明文 JSON），律匠只
+产出 V2；读到不认识的标识时，站点会当作"不是本格式"继续尝试下一种读取器。
+XOR 密钥与步进公式见 `leoq7_export.py` 的 `_encode_transfer()`。
 
 ## 顶层负载
 
@@ -85,4 +96,9 @@ JSON → UTF-8 字节 → XOR → Base64
 
 - 已穿戴装备始终参与导出；
 - 背包装备可按等级筛选，并可选择全部 / 仅定音 / 仅满调律；
+- 模拟装备不导出；
 - OCR 无法确定装备类型或词条数值时，相应装备或词条会被跳过。
+
+"哪些装备参与导出"由 `apps/yysls/ui/loadout/equipment_exchange.py` 的
+`iter_export_entries()` 统一收集，本格式与兵鉴格式共用这一份范围定义，避免两个
+站点看到的装备集合不一致。

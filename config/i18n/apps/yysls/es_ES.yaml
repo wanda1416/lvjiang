@@ -1531,7 +1531,15 @@ auto_strings:
   导入失败: Error al importar
   导入成功: Importado correctamente
   导入毕业率 Excel: Importar Excel de tasa de graduación
-  导出为 leoq7 格式: Exportar en formato leoq7
+  导出后用浏览器打开对应网站: Abrir el sitio en el navegador después de exportar
+  导出: Exportar
+  打开网站: Abrir sitio
+  无法打开浏览器，请手动访问：{url}: No se pudo abrir un navegador - visita {url} manualmente
+  JSON 文件 (*.json): Archivo JSON (*.json)
+  导出为 {site} 格式: Exportar en formato {site}
+  文本文件，粘贴到 {url} 的导入框: Archivo de texto - pégalo en el cuadro de importación de {url}
+  JSON 文件，在 {url} 的「导入装备库」里选择: Archivo JSON - selecciónalo en «Importar biblioteca» de {url}
+  导出装备数据到外部网站: Exportar datos de equipo a un sitio externo
   导出失败: Error al exportar
   导出成功: Exportado correctamente
   导出数据: Exportar datos
@@ -1558,12 +1566,7 @@ auto_strings:
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Se permiten como máximo 2 afijos de ataque elemental
     (incluido Sin forma); los afijos 2-5 tienen actualmente {n}
   已定音: Entonado
-  ? '已导出到
-
-    {path}'
-  : 'Exportado a
-
-    {path}'
+  已导出到：{path}: 'Exportado a: {path}'
   已应用: Aplicado
   已是最后一条赛季，无法下移: Ya es la última temporada; no se puede bajar
   已是最后一条配置，无法下移: Ya es la última configuración; no se puede bajar

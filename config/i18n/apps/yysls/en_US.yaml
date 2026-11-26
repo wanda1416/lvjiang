@@ -1056,7 +1056,15 @@ auto_strings:
   导入失败: Import Failed
   导入成功: Imported Successfully
   导入毕业率 Excel: Import Graduation Rate Excel
-  导出为 leoq7 格式: Export as leoq7 Format
+  导出后用浏览器打开对应网站: Open the site in your browser after export
+  导出: Export
+  打开网站: Open Site
+  无法打开浏览器，请手动访问：{url}: Could not open a browser - please visit {url} manually
+  JSON 文件 (*.json): JSON file (*.json)
+  导出为 {site} 格式: Export as {site} format
+  文本文件，粘贴到 {url} 的导入框: Text file - paste it into the import box on {url}
+  JSON 文件，在 {url} 的「导入装备库」里选择: JSON file - pick it in “Import library” on {url}
+  导出装备数据到外部网站: Export equipment data to an external site
   导出失败: Export Failed
   导出成功: Exported Successfully
   导出数据: Export Data
@@ -1082,12 +1090,7 @@ auto_strings:
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Attribute ATK affixes (including Formless) allowed
     at most 2; affixes 2-5 currently have {n}
   已定音: Attunement Applied
-  ? '已导出到
-
-    {path}'
-  : 'Exported to
-
-    {path}'
+  已导出到：{path}: 'Exported to: {path}'
   已应用: Applied
   已是最后一条赛季，无法下移: This is the last season; cannot move down
   已是最后一条配置，无法下移: This is the last config; cannot move down

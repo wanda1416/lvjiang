@@ -1512,7 +1512,15 @@ auto_strings:
   导入失败: Nhập thất bại
   导入成功: Nhập thành công
   导入毕业率 Excel: Nhập Excel tỷ lệ tốt nghiệp
-  导出为 leoq7 格式: Xuất sang định dạng leoq7
+  导出后用浏览器打开对应网站: Mở trang web trong trình duyệt sau khi xuất
+  导出: Xuất
+  打开网站: Mở trang web
+  无法打开浏览器，请手动访问：{url}: Không mở được trình duyệt - vui lòng truy cập {url} thủ công
+  JSON 文件 (*.json): Tệp JSON (*.json)
+  导出为 {site} 格式: Xuất ở định dạng {site}
+  文本文件，粘贴到 {url} 的导入框: Tệp văn bản - dán vào ô nhập trên {url}
+  JSON 文件，在 {url} 的「导入装备库」里选择: Tệp JSON - chọn trong «Nhập thư viện» trên {url}
+  导出装备数据到外部网站: Xuất dữ liệu trang bị sang trang web bên ngoài
   导出失败: Xuất thất bại
   导出成功: Xuất thành công
   导出数据: Xuất dữ liệu
@@ -1539,12 +1547,7 @@ auto_strings:
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Dòng thuộc tính công (gồm Vô Tướng) tối đa 2
     dòng, các dòng 2-5 hiện có {n} dòng
   已定音: Đã Định Âm
-  ? '已导出到
-
-    {path}'
-  : 'Đã xuất ra
-
-    {path}'
+  已导出到：{path}: 'Đã xuất ra: {path}'
   已应用: Đã áp dụng
   已是最后一条赛季，无法下移: Đã là mùa giải cuối cùng, không thể di chuyển xuống
   已是最后一条配置，无法下移: Đã là cấu hình cuối cùng, không thể di chuyển xuống

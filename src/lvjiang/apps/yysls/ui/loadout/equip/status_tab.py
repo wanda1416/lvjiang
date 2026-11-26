@@ -5,7 +5,8 @@ from __future__ import annotations
 import copy
 
 from loguru import logger
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -37,6 +38,7 @@ from ....core.equip_parser.dingyin_parser import (
     DINGYIN_TYPES,
 )
 from ...events import EQUIPMENT_CHANGED, get_event_hub
+from ..equipment_exchange import export_text, site_spec
 from .batch_copy import BatchCopyMixin
 from .cards import _CompactEquipCard, _SlotCard
 from .mock_dialog import MockEquipDialog
@@ -168,7 +170,7 @@ class EquipStatusTab(_EquipFilterMixin, BatchCopyMixin, QWidget):
 
         # 导出数据
         btn_export = QPushButton(tr("导出数据"))
-        btn_export.setToolTip(tr("导出为 leoq7 格式"))
+        btn_export.setToolTip(tr("导出装备数据到外部网站"))
         btn_export.setMinimumWidth(96)
         btn_export.setStyleSheet(_ACTION_BTN_STYLE)
         btn_export.clicked.connect(self._on_export)
@@ -1374,8 +1376,13 @@ class EquipStatusTab(_EquipFilterMixin, BatchCopyMixin, QWidget):
         if not user_name:
             QMessageBox.warning(self, tr("导出失败"), tr("没有激活的用户"))
             return
+        from ..export_dialog import ExportDialog
+
+        dialog = ExportDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        choice = dialog.choice()
         try:
-            from ..leoq7_export import export_leoq7
             inv = self._require_inventory()
             if inv is None:
                 return
@@ -1385,28 +1392,49 @@ class EquipStatusTab(_EquipFilterMixin, BatchCopyMixin, QWidget):
                 "bag_items": inv.bag_items,
                 "mock_items": inv.mock_items,
             }
-            text = export_leoq7(
-                data,
-                user_name,
-                level_threshold=self._get_level_threshold(),
-                affix_filter=self._get_affix_filter(),
+            text, default_name, file_filter = self._build_export(
+                choice.site, data, user_name,
             )
         except Exception as e:
-            logger.error(f"导出 leoq7 数据失败: {e}")
+            logger.error(f"导出 {choice.site} 数据失败: {e}")
             QMessageBox.critical(self, tr("导出失败"), str(e))
             return
         path, _ = QFileDialog.getSaveFileName(
-            self, tr("导出装备数据"),
-            f"{user_name}_leoq7.txt",
-            tr("文本文件 (*.txt)"),
+            self, tr("导出装备数据"), default_name, file_filter,
         )
-        if path:
+        if not path:
+            return
+        try:
             with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
-            QMessageBox.information(
-                self, tr("导出成功"),
-                tr("已导出到\n{path}").format(path=path),
-            )
+        except OSError as e:
+            logger.error(f"写入导出文件失败: {e}")
+            QMessageBox.critical(self, tr("导出失败"), str(e))
+            return
+        QMessageBox.information(
+            self, tr("导出成功"),
+            tr("已导出到：{path}").format(path=path),
+        )
+        if choice.open_site:
+            url = dialog.site_url(choice.site)
+            if not QDesktopServices.openUrl(QUrl(url)):
+                logger.warning(f"未能打开浏览器: {url}")
+                QMessageBox.warning(
+                    self, tr("打开网站"),
+                    tr("无法打开浏览器，请手动访问：{url}").format(url=url),
+                )
+
+    def _build_export(
+        self, site: str, data: dict, user_name: str,
+    ) -> tuple[str, str, str]:
+        """按所选站点生成导出内容、默认文件名与保存过滤器。"""
+        spec = site_spec(site)
+        text = export_text(
+            site, data, user_name,
+            level_threshold=self._get_level_threshold(),
+            affix_filter=self._get_affix_filter(),
+        )
+        return text, f"{user_name}{spec.file_suffix}", tr(spec.file_filter_key)
 
     def _on_optimal_combo(self):
         """打开毕业率分析对话框的「最优组合」页。"""

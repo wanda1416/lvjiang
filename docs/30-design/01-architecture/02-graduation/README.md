@@ -37,5 +37,6 @@
 | [07-skill-rotation.md](07-skill-rotation.md) | 技能轴查看：从原始 Excel 读竞速轴，把 DPS 拆回每个技能 |
 | [08-scoring-layer.md](08-scoring-layer.md) | 评分层：`PlanScoringContext` → `Assumptions` → `LoadoutScorer`，五个入口的公共骨架与转律三套口径 |
 | [references/leoq7-data-format.md](01-references/01-leoq7-data-format.md) | 装备数据外部交换格式（V2）：导出到 `yysls.leoq7.com` 的传输格式（`export_leoq7()`，实现于 `apps/yysls/ui/loadout/leoq7_export.py`） |
+| [references/bingjian-data-format.md](01-references/02-bingjian-data-format.md) | 装备数据外部交换格式（`bingjian-gear` v1）：导出到 `yysls-bingjian.com` 装备库的 JSON、部位与武器词表（`export_bingjian()`，实现于 `apps/yysls/ui/loadout/bingjian_export.py`） |
 
 - [09-transmute-simulation.md](09-transmute-simulation.md)：转律候选、贪心搜索、三满投影与目标保存。

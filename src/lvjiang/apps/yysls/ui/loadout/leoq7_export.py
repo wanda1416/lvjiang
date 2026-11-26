@@ -34,6 +34,17 @@ from __future__ import annotations
 import base64
 import json
 
+from .equipment_exchange import (
+    SLOT_CHEST,
+    SLOT_HANDS,
+    SLOT_HEAD,
+    SLOT_LEGS,
+    SLOT_PENDANT,
+    SLOT_RING,
+    SLOT_WEAPON,
+    iter_export_entries,
+)
+
 # ── 常量 ──────────────────────────────────────────────
 
 _HEADER = "YYSLS_EQUIPMENT_EXPORT_V2"
@@ -265,26 +276,16 @@ def _encode_transfer(json_bytes: bytes) -> str:
 
 # ── 公开 API ──────────────────────────────────────────
 
-# 已装备槽位 → slot_type（与网站 EXTERNAL_SLOT_TYPE_MAP 对齐）
-_EQUIPPED_SLOT_TYPE: dict[str, str] = {
-    "main_weapon": "weapon",
-    "sub_weapon": "weapon",
-    "head": "head",
-    "chest": "cloth",   # 网站用 cloth 表示胸甲
-    "ring": "ring",
-    "pendant": "pendant",
-    "leg": "legs",      # 网站用 legs 表示胫甲
-    "wrist": "wrist",
-}
-
-# 背包武器类型集合（排除防具）
-_WEAPON_TYPES: frozenset[str] = frozenset(_EQUIPMENT_KEY_MAP.keys()) - frozenset({
-    "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲",
-})
-# 背包防具 → slot_type（与网站 EXTERNAL_SLOT_TYPE_MAP 对齐）
-_SLOT_TYPE_MAP: dict[str, str] = {
-    "环": "ring", "佩": "pendant", "冠胄": "head",
-    "胸甲": "cloth", "胫甲": "legs", "腕甲": "wrist",
+# 规范部位 → 网站 slot_type（与 EXTERNAL_SLOT_TYPE_MAP 对齐：
+# 胸甲叫 cloth、腕甲叫 wrist，主副武器统一叫 weapon）
+_SLOT_TYPE: dict[str, str] = {
+    SLOT_WEAPON: "weapon",
+    SLOT_HEAD: "head",
+    SLOT_CHEST: "cloth",   # 网站用 cloth 表示胸甲
+    SLOT_RING: "ring",
+    SLOT_PENDANT: "pendant",
+    SLOT_LEGS: "legs",     # 网站用 legs 表示胫甲
+    SLOT_HANDS: "wrist",
 }
 
 # slot_type → 默认装备类型（当 equip.type 为空时的 fallback）
@@ -326,50 +327,13 @@ def export_leoq7(
     """
     items: list[dict] = []
 
-    # 已装备（不受筛选影响）
-    for slot_key, equip in session_data.get("equipped", {}).items():
-        slot_type = _EQUIPPED_SLOT_TYPE.get(slot_key)
-        if not slot_type:
-            continue
-        item = _convert_item(equip, slot_type)
+    for entry in iter_export_entries(
+        session_data, level_threshold=level_threshold, affix_filter=affix_filter
+    ):
+        slot_type = _SLOT_TYPE[entry.slot]
+        item = _convert_item(entry.equip, slot_type)
         if item:
             items.append(item)
-
-    # 背包（应用筛选）
-    for _group_key, group_items in session_data.get("bag_items", {}).items():
-        if not isinstance(group_items, dict):
-            continue
-        for _fp, equip in group_items.items():
-            equip_type = equip.get("type")
-            if not equip_type:
-                continue  # OCR 完全失败的装备跳过
-            if equip_type in _WEAPON_TYPES:
-                slot_type = "weapon"
-            elif equip_type in _SLOT_TYPE_MAP:
-                slot_type = _SLOT_TYPE_MAP[equip_type]
-            else:
-                continue
-            # 等级筛选
-            if level_threshold > 0:
-                equip_level = equip.get("level", 0)
-                if isinstance(equip_level, str):
-                    try:
-                        equip_level = int(equip_level)
-                    except (ValueError, TypeError):
-                        equip_level = 0
-                if equip_level < level_threshold:
-                    continue
-            # 词条筛选
-            if affix_filter == "dingyin":
-                dingyin = equip.get("dingyin")
-                if not (dingyin and dingyin.get("name")):
-                    continue
-            elif affix_filter == "full_tuning":
-                if not all(equip.get(f"affix_{i}", {}).get("name") for i in range(1, 6)):
-                    continue
-            item = _convert_item(equip, slot_type)
-            if item:
-                items.append(item)
 
     payload = {
         "kind": "yysls-equipment-export",

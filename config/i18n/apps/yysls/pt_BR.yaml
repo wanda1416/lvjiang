@@ -1525,7 +1525,15 @@ auto_strings:
   导入失败: Falha na importação
   导入成功: Importado com sucesso
   导入毕业率 Excel: Importar Excel de taxa de graduação
-  导出为 leoq7 格式: Exportar no formato leoq7
+  导出后用浏览器打开对应网站: Abrir o site no navegador após exportar
+  导出: Exportar
+  打开网站: Abrir site
+  无法打开浏览器，请手动访问：{url}: Não foi possível abrir um navegador - acesse {url} manualmente
+  JSON 文件 (*.json): Arquivo JSON (*.json)
+  导出为 {site} 格式: Exportar no formato {site}
+  文本文件，粘贴到 {url} 的导入框: Arquivo de texto - cole na caixa de importação de {url}
+  JSON 文件，在 {url} 的「导入装备库」里选择: Arquivo JSON - selecione em «Importar biblioteca» em {url}
+  导出装备数据到外部网站: Exportar dados de equipamento para um site externo
   导出失败: Falha na exportação
   导出成功: Exportado com sucesso
   导出数据: Exportar dados
@@ -1552,12 +1560,7 @@ auto_strings:
   属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条: Afixos de ATQ de atributo (incluindo Sem Forma)
     permitem no máximo 2; os afixos 2-5 atualmente possuem {n}
   已定音: Sintonizado
-  ? '已导出到
-
-    {path}'
-  : 'Exportado para
-
-    {path}'
+  已导出到：{path}: 'Exportado para: {path}'
   已应用: Aplicado
   已是最后一条赛季，无法下移: Esta já é a última temporada; não é possível mover para baixo
   已是最后一条配置，无法下移: Esta já é a última configuração; não é possível mover para baixo

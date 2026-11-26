@@ -19,6 +19,11 @@ def other_task_running_label(host: Any, scope: str) -> str:
     """只读当前查看目标的运行快照，非所属页面仅展示占用状态。"""
     context = getattr(host, "_current_run_context", None)
     if context is None:
+        from ...core.control import get_active_control_server
+
+        srv = get_active_control_server()
+        if srv is not None and srv.has_active_job():
+            return tr("任务运行中")
         return ""
     execution_scope = context.metadata.get("execution_scope", "daily")
     if execution_scope == scope:

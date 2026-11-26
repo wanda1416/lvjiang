@@ -154,6 +154,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         dest="all_plugins",
         help=tr("额外加载内置插件与 plugins/ 默认目录中的全部插件，无需逐个 -reg"),
     )
+    parser.add_argument(
+        "--headless-server",
+        action="store_true",
+        dest="headless_server",
+        help=tr("无界面启动本地控制面服务（供薄壳 lvjiang-cli 提交任务）"),
+    )
+    parser.add_argument(
+        "--idle-exit",
+        type=float,
+        default=30.0,
+        dest="idle_exit",
+        help=tr("无头服务空闲退出秒数（0 表示常驻，默认 30）"),
+    )
     return parser.parse_args(argv)
 
 
@@ -246,6 +259,9 @@ def main(argv: list[str] | None = None) -> int:
         return cli_main(argv, bootstrap=bootstrap)
 
     args = _parse_args(argv)
+    if args.headless_server:
+        return _run_headless_server(args)
+
     hooks_list = _bootstrap(args)
 
     # run_app 的导入必须排在插件加载之后：`import lvjiang.app` 会连带导入
@@ -255,6 +271,56 @@ def main(argv: list[str] | None = None) -> int:
     # PyQt6」的约定。
     from .app import run_app
     return run_app(hooks_list)
+
+
+def _run_headless_server(args: argparse.Namespace) -> int:
+    """无 Qt 启动主实例本地控制面（供薄壳 lvjiang-cli 按需拉起）。"""
+    import signal
+
+    hooks_list = _bootstrap(args)
+    from .core.access import is_readonly
+    from .core.config.content import rebuild_content
+    from .core.config.content_split import prepare_content_split
+    from .core.config.resolver import get_resolver
+    from .core.control import (
+        get_active_control_server,
+        start_control_server,
+        stop_control_server,
+    )
+    from .core.plugins import register_config_policies
+    from .core.scene.registry import initialize_scene_registry
+
+    if is_readonly():
+        logger.info("[headless] 已有主实例持有实例锁，无头服务直接退出")
+        return 0
+
+    for hooks in hooks_list:
+        register_config_policies(hooks)
+    resolver = get_resolver()
+    prepare_content_split(resolver)
+    rebuild_content(resolver)
+    initialize_scene_registry()
+
+    start_control_server(mode="headless", idle_exit=float(args.idle_exit))
+    srv = get_active_control_server()
+    assert srv is not None
+
+    def _handle_sig(_signum, _frame):
+        srv.shutdown_event.set()
+
+    for sig in (signal.SIGINT, getattr(signal, "SIGTERM", None)):
+        if sig is not None:
+            try:
+                signal.signal(sig, _handle_sig)
+            except (OSError, ValueError):
+                pass
+
+    try:
+        while not srv.shutdown_event.wait(0.5):
+            pass
+    finally:
+        stop_control_server()
+    return 0
 
 
 if __name__ == "__main__":

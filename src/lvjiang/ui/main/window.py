@@ -1179,8 +1179,13 @@ class MainWindow(
 
     @property
     def is_any_running(self) -> bool:
-        """进程内是否仍有任意执行目标在运行。"""
-        return self._run_manager.is_any_running()
+        """进程内是否仍有任意执行目标或本地控制面作业在运行。"""
+        if self._run_manager.is_any_running():
+            return True
+        from ...core.control import get_active_control_server
+
+        srv = get_active_control_server()
+        return srv is not None and srv.has_active_job()
 
     def run_for_target(self, target_id: str):
         """返回执行目标当前占用的运行实例。"""

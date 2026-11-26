@@ -70,12 +70,46 @@ exe = EXE(
     icon=_APP_ICON,
 )
 
-# 同一份 Analysis 再包一个控制台 exe：两者共用 launcher.py，由 argv 分流。
-# GUI 子系统进程从 cmd 启动会立即返回、stdout 也被重定向到 devnull，
-# 所以命令行入口必须是独立的 console=True 可执行文件。
+# 独立薄壳 Analysis：lvjiang-cli 只打包纯标准库客户端 cli_client.py，
+# 不再复用主程序 PYZ（彻底剔除 lvjiang 业务字节码、PyQt6、OCR、OpenCV 等重依赖），
+# 仅通过 127.0.0.1 本地控制面与运行中的 lvjiang 主实例（或自动拉起的无头实例）通信。
+cli_a = Analysis(
+    ["cli_launcher.py"],
+    pathex=["../src/lvjiang"],
+    binaries=[],
+    datas=[],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        "lvjiang",
+        "PyQt6",
+        "cv2",
+        "numpy",
+        "onnxruntime",
+        "rapidocr_onnxruntime",
+        "PIL",
+        "scipy",
+        "uvicorn",
+        "mcp",
+        "lark",
+        "yaml",
+        "loguru",
+        "fasteners",
+        "keyring",
+        "pytest",
+        "pytest_qt",
+        "ruff",
+        "mypy",
+    ],
+    noarchive=False,
+)
+cli_pyz = PYZ(cli_a.pure)
+
 cli = EXE(
-    pyz,
-    a.scripts,
+    cli_pyz,
+    cli_a.scripts,
     [],
     exclude_binaries=True,
     name="lvjiang-cli",
@@ -92,6 +126,7 @@ coll = COLLECT(
     exe,
     cli,
     a.binaries,
+    cli_a.binaries,
     a.datas,
     strip=False,
     upx=False,

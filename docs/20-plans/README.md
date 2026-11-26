@@ -28,3 +28,4 @@
 | [14-wf-simulation-hardening.md](14-wf-simulation-hardening.md) | 平台 | 离线 WF 模拟的回归门禁增强：无人值守弹窗门禁、状态覆盖断言、失败 Diff、OCR 缓存 |
 | [15-desktop-ui-polish.md](15-desktop-ui-polish.md) | 平台 | 桌面端高密度 UI 收口：真机巡检、文字减压、高 DPI 弹性与横幅/弹窗收敛 |
 | [16-macos-support.md](16-macos-support.md) | 平台 | macOS 平台支持计划与进度：Phase 1 真机验证、Phase 2 窗口模式、Phase 3 打包分发 |
+| [17-local-control-plane-and-thin-cli.md](17-local-control-plane-and-thin-cli.md) | 平台 | 本地控制面与纯 Python 薄壳 lvjiang-cli：三端 127.0.0.1 控制面、单槽位 409、无头自动拉起与独立瘦身打包 |

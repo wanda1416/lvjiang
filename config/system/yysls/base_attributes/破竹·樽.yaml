@@ -1,0 +1,24 @@
+content_version: 1
+school: 破竹·樽
+presets:
+- id: 115_s1
+  level: 115
+  stage: 1
+  playstyle: null
+  label: 115级 1阶段（默认）
+  stats:
+    min_outer: 1832.29
+    max_outer: 2660.0
+    min_pozhu: 539.4
+    max_pozhu: 1078.9
+    min_wuxiang: 79.0
+    max_wuxiang: 92.2
+    precision: 1.134
+    crit_rate: 0.7959
+    direct_crit: 0.092
+    intent_rate: 0.256
+    pozhu_pen: 30.0
+    crit_dmg: 0.54
+    intent_dmg: 0.35
+    outer_bonus: 0.025
+    pozhu_bonus: 0.15

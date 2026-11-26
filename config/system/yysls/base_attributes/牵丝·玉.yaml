@@ -1,0 +1,19 @@
+content_version: 1
+school: 牵丝·玉
+presets:
+- id: 115_s1
+  level: 115
+  stage: 1
+  playstyle: null
+  label: 115级 1阶段（默认）
+  stats:
+    min_outer: 1516.76
+    max_outer: 2378.802
+    min_wuxiang: 79.0
+    max_wuxiang: 66.0
+    precision: 1.1
+    crit_rate: 0.3839
+    direct_crit: 0.046
+    intent_rate: 0.2278
+    crit_dmg: 0.5
+    intent_dmg: 0.35

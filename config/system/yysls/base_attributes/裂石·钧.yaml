@@ -1,0 +1,23 @@
+content_version: 1
+school: 裂石·钧
+presets:
+- id: 115_s1
+  level: 115
+  stage: 1
+  playstyle: null
+  label: 115级 1阶段（默认）
+  stats:
+    min_outer: 1981.05
+    max_outer: 2728.524
+    min_lieshi: 586.8
+    max_lieshi: 1174.2
+    min_wuxiang: 92.0
+    max_wuxiang: 118.6
+    precision: 1.153
+    crit_rate: 0.8343
+    direct_crit: 0.092
+    intent_rate: 0.2651
+    lieshi_pen: 36.0
+    crit_dmg: 0.54
+    intent_dmg: 0.35
+    lieshi_bonus: 0.15

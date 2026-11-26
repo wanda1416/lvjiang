@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -241,14 +242,37 @@ def resolve_base_attribute_data(school: str, base_attr_ref: str) -> dict[str, fl
     return dict(stored) if isinstance(stored, dict) else None
 
 
-def list_all_base_attributes(school: str) -> dict[str, dict[str, float]]:
-    """返回流派下全部可用基础属性（预置 ``preset:<id>`` + 个人 ``play_styles.json``）。"""
+def order_play_style_names(
+    names: Iterable[str], user_name: str | None = None,
+) -> list[str]:
+    """个人基础属性名称的展示顺序：当前用户名前缀匹配的在前，其余按名称排。
+
+    用户与方案一多开，「当前属性」下拉框就会长到翻不动，但用户真正关心的是预置和
+    自己名下的条目。这里只排序不过滤——其他用户的条目仍然在列表里可选。
+    """
+    prefix = (user_name or "").strip()
+    return sorted(
+        (str(name) for name in names),
+        key=lambda name: (0 if prefix and name.startswith(prefix) else 1, name),
+    )
+
+
+def list_all_base_attributes(
+    school: str, *, user_name: str | None = None,
+) -> dict[str, dict[str, float]]:
+    """返回流派下全部可用基础属性（预置 ``preset:<id>`` + 个人 ``play_styles.json``）。
+
+    顺序固定为「预置 → 当前用户名前缀匹配 → 其他」，供下拉框直接使用；
+    ``user_name`` 只影响排序，不会过滤掉别人的条目。
+    """
     result: dict[str, dict[str, float]] = {}
     if not school:
         return result
     for preset in get_base_attribute_presets(school):
         result[make_preset_ref(preset.id)] = dict(preset.stats)
-    for name, attrs in _play_styles_mod.get_play_styles(school).items():
+    play_styles = _play_styles_mod.get_play_styles(school)
+    for name in order_play_style_names(play_styles, user_name):
+        attrs = play_styles[name]
         if isinstance(attrs, dict):
             result[name] = dict(attrs)
     return result

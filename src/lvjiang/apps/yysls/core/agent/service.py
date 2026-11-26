@@ -158,7 +158,7 @@ class AgentService:
         if plan is None:
             raise ValueError("备战方案不存在")
         school = resolve_school(plan.main_martial_art, plan.sub_martial_art, self.game_config.get_schools())
-        values = list_all_base_attributes(school) if school else {}
+        values = list_all_base_attributes(school, user_name=user) if school else {}
         return {"school": school, "current": plan.base_attribute, "items": values,
                 "revision": revision(values), "scope": "shared_by_school"}
 

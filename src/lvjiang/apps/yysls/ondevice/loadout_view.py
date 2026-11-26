@@ -128,7 +128,7 @@ def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str
         level = state.effective_world_level(gc.current_equip_level())
         models = available_models(school) if school else ()
         schemes = sorted({ref.scheme for ref in models if ref.level <= level})
-        bases = list_all_base_attributes(school) if school else {}
+        bases = list_all_base_attributes(school, user_name=username) if school else {}
         if scheme:
             if scheme not in schemes:
                 raise ValueError("计算方案不适用于当前流派和等级")

@@ -763,7 +763,7 @@
       "path": "30-design/02-decisions/03-equipment/04-preset-base-attributes-and-stages.md",
       "title": "预置基础属性分层与毕业率多阶段模型",
       "category": "30-architecture",
-      "sha256": "1faa044345daabfc8883666e243ec4e0d51c4ba9ce8c41f7bd6582b65e9f11f4"
+      "sha256": "19a5b2e107ef86b74b4a29d7a7f135b12d4be05b67d33049fc8cc2feb1c829dc"
     },
     {
       "id": "30-design:02-decisions:04-platform:03-input-timeline",
@@ -1309,7 +1309,7 @@
       "path": "60-guide/01-accounts/02-cloud-sync-and-privacy.md",
       "title": "云端同步、端到端加密与备战分享",
       "category": "60-userguide",
-      "sha256": "9ba1ad923dde43a38a86ecfab4d52fc20392bdae4f23f8447c47effc67b5d02c"
+      "sha256": "3f697f9d9fe1b90dcf93adc24c870f631b3158db4ae0383da3ef0ee5bbb1a4ae"
     },
     {
       "id": "60-guide:02-android:07-mobile-device",
@@ -1400,7 +1400,7 @@
       "path": "60-guide/03-automation/05.04-base-attributes-and-graduation.md",
       "title": "5.4 角色基础属性与真实毕业率",
       "category": "60-userguide",
-      "sha256": "68ba80535b862088a5e7d0327b61817d0951dc8b64ba3d0a77991068649d2d01"
+      "sha256": "8ed6f1163135928d4aad496110b259609781275163b87119b49172ed89558989"
     },
     {
       "id": "60-guide:03-automation:05.05-school-rule-filtering",
@@ -1456,7 +1456,7 @@
       "path": "60-guide/04-desktop/02-main-interface.md",
       "title": "2. 主界面与用户管理",
       "category": "60-userguide",
-      "sha256": "de40cbb15200c9b0b92a7cbb47ef2607f10f88c42b2645738924f2ab41d64ef5"
+      "sha256": "3ecaaa44879ad3e5897a75b1889e3435ec580adaef6eefa8d2a01f3c5c3795e4"
     },
     {
       "id": "60-guide:04-desktop:03.01-base-config",
@@ -1484,7 +1484,7 @@
       "path": "60-guide/04-desktop/03.04-batch-tasks.md",
       "title": "3.4 批量任务",
       "category": "60-userguide",
-      "sha256": "e1a876a5fe8c38d3f8845f22c7f56a0f17b11db02d425547ccfc316aca3c4862"
+      "sha256": "cefa3746da0946a82f468b50764d75ea626033fc9453a6bd8972b40015e25998"
     },
     {
       "id": "60-guide:04-desktop:03.05-visual-recognition-troubleshooting",

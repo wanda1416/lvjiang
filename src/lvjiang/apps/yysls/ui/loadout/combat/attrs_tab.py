@@ -430,27 +430,26 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         return self._combo_play_style.findText(ref)
 
     def _refresh_play_styles(self):
-        """刷新基础属性下拉：同时展示 system/local 预置属性与 session 个人属性集。"""
-        from ....config import (
-            get_base_attribute_presets,
-            get_play_styles,
-            make_preset_ref,
-        )
+        """刷新基础属性下拉：预置在前，其后是当前用户前缀匹配的个人属性集，
+        最后才是其他用户的（只排序不过滤，别人的条目仍然可选）。
+
+        顺序与文案都取自配置层的统一入口，界面不再自己拼预置前缀。
+        """
+        from ....config import format_base_attribute_label, list_all_base_attributes
 
         school = self._get_current_school()
         self._combo_play_style.blockSignals(True)
         self._combo_play_style.clear()
 
         if school:
-            for preset in get_base_attribute_presets(school):
-                tag = tr("本地预置") if preset.source == "local" else tr("预置")
+            user_name = self._host.active_user_name() or ""
+            for ref in list_all_base_attributes(school, user_name=user_name):
                 self._combo_play_style.addItem(
-                    f"[{tag}] {preset.label}",
-                    make_preset_ref(preset.id),
+                    format_base_attribute_label(
+                        school, ref, preset_tag=tr("预置"), local_tag=tr("本地预置"),
+                    ),
+                    ref,
                 )
-            play_styles = get_play_styles(school)
-            for name in play_styles:
-                self._combo_play_style.addItem(name, name)
 
         fit_combo_to_contents(self._combo_play_style, minimum=104)
         self._combo_play_style.blockSignals(False)

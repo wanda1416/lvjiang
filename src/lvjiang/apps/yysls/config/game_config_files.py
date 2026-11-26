@@ -38,7 +38,7 @@ GAME_CONFIG_FILES: dict[str, tuple[str, ...]] = {
         "weapon_types",
     ),
     f"{GAME_CONFIG_DIR}/martial_arts.yaml": ("martial_arts",),
-    f"{GAME_CONFIG_DIR}/schools.yaml": ("schools",),
+    f"{GAME_CONFIG_DIR}/schools.yaml": ("schools", "talent_scaling"),
     f"{GAME_CONFIG_DIR}/playstyles.yaml": ("playstyles",),
 }
 

@@ -220,6 +220,11 @@ def _playstyle_affix_table(gc) -> dict[str, list[str]]:
     return table
 
 
+def _talent_scaling_table(gc) -> dict:
+    """武学天赋的缩放口径：base_dim 与每流派的系数（与 PC schools.yaml 同源）。"""
+    return dict(gc.get_talent_scaling_raw())
+
+
 def _base_attributes_table(gc) -> dict[str, list[dict]]:
     """导出 system 层预置基础属性（直接读取 system 层，避免被本机 local 覆盖遮蔽）。"""
     table: dict[str, list[dict]] = {}
@@ -316,6 +321,8 @@ def build_config() -> dict:
         "base_attributes": _base_attributes_table(gc),
         **_season_table(gc),
         "equipment_sets": gc.get_equipment_sets(),
+        # 武学天赋按五维缩放的系数：网页端要和 PC 一样按「基础五维 + 装备五维」补差。
+        "talent_scaling": _talent_scaling_table(gc),
         "gongjue_bonuses": gc.get_gongjue_bonuses(),
         "schools": gc.get_schools(),
         "playstyles": playstyles,

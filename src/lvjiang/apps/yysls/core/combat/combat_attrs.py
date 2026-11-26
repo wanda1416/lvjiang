@@ -257,6 +257,14 @@ class CombatAttributes:
     all_qs_bonus: float = 0.0
 
     # 动态字段（流派/玩法特有）
+    # 五维（劲/敏/势/体/御）。只有「基础属性快照」会提供：装备侧的五维词条
+    # 已经在聚合时换算成属性，这里只用于和基础五维相加后重算依赖总五维的项
+    # （武学天赋按 MIN(总五维/需求, 1) 缩放）。缺省 0 表示该来源不参与。
+    dim_jin: float = 0.0
+    dim_min: float = 0.0
+    dim_shi: float = 0.0
+    dim_ti: float = 0.0
+    dim_yu: float = 0.0
     extra_attrs: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -439,6 +447,46 @@ def convert_five_dims(jin: float = 0, shi: float = 0, min_val: float = 0,
     result.max_outer = jin * JIN_TO_MAX_OUTER + shi * SHI_TO_MAX_OUTER
     result.crit_rate = min_val * MIN_TO_CRIT_RATE
     result.intent_rate = shi * SHI_TO_INTENT_RATE
+    return result
+
+
+#: 五维名字 → CombatAttributes 字段。
+DIM_FIELDS = {"劲": "dim_jin", "敏": "dim_min", "势": "dim_shi", "体": "dim_ti", "御": "dim_yu"}
+
+
+def talent_dim_delta(
+    base_attrs: CombatAttributes,
+    equipment_attrs: CombatAttributes,
+    school: str,
+) -> CombatAttributes:
+    """装备带来的五维对「武学天赋」的增量。
+
+    基础属性快照里已经把武学天赋按它自己的五维固化进去了（``MIN(五维/需求, 1)``
+    那一段是乘好的，无法事后还原）；所以这里只补「总五维比基础五维多出来的部分」
+    对应的差额。基础快照没给五维（旧数据 / 个人实测条目）时直接返回空，行为不变。
+    """
+    if not any((base_attrs.dim_jin, base_attrs.dim_min, base_attrs.dim_shi)):
+        return CombatAttributes()
+    from ...config import get_game_config
+
+    scaling = get_game_config().get_talent_scaling(school)
+    if not scaling:
+        return CombatAttributes()
+    field_name = DIM_FIELDS.get(str(scaling.get("dim") or "").strip())
+    if field_name is None:
+        return CombatAttributes()
+    base_dim = float(scaling.get("base_dim") or 0) or 528.0
+    base_value = getattr(base_attrs, field_name, 0.0)
+    total_value = base_value + getattr(equipment_attrs, field_name, 0.0)
+    span = min(total_value, base_dim) - min(base_value, base_dim)
+    if span <= 0:
+        return CombatAttributes()
+
+    result = CombatAttributes()
+    for key, value in scaling.items():
+        if key in ("dim", "base_dim") or not hasattr(result, key):
+            continue
+        setattr(result, key, getattr(result, key) + float(value) * span / base_dim)
     return result
 
 
@@ -811,6 +859,12 @@ def aggregate_equipment_attrs(
             yu=five_dims["御"],
         )
         result = result + five_dim_attrs
+        # 五维本身也带出去：上层要和基础属性的五维相加后重算武学天赋。
+        result.dim_jin = five_dims["劲"]
+        result.dim_min = five_dims["敏"]
+        result.dim_shi = five_dims["势"]
+        result.dim_ti = five_dims["体"]
+        result.dim_yu = five_dims["御"]
 
     # 115 起角色面板只保留「全奇术增伤」。旧装备仍可能携带单体/群体
     # 奇术词条；在装备属性聚合边界折入统一字段，不改写原始装备数据。
@@ -951,6 +1005,8 @@ def build_graduation_attrs(
     buff_resistance = context.buff_resistance
     equipment_attrs = fold_wuxiang_pen(equipment_attrs, context.target_pen_field)
     result = base_attrs + equipment_attrs
+    # 武学天赋依赖总五维：基础快照只固化了它自己那部分，装备再带来的五维补差额。
+    result = result + talent_dim_delta(base_attrs, equipment_attrs, school)
 
     for field_name in THREE_RATE_FIELDS:
         setattr(result, field_name, apply_three_rate_resistance(

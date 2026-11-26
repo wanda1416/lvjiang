@@ -132,10 +132,14 @@ def test_formula_clamp_applies() -> None:
 
 
 def test_dimension_fields_do_not_leak_into_combat_attributes() -> None:
-    """五维只是求值中间量，投影回 CombatAttributes 时丢弃。"""
+    """来源模型里五维只是求值中间量，投影回 CombatAttributes 时保持为 0。
+
+    （``CombatAttributes`` 现在带 ``dim_*`` 字段，供预置基础属性携带五维、
+    评分链补算武学天赋；来源推导页仍然只输出换算后的战斗属性。）
+    """
     result = _resolve([_effect("五维·敏", kind="dimension", stats={"dim_min": 100.0})])
 
-    assert not hasattr(result.combat_attrs, "dim_min")
+    assert result.combat_attrs.dim_min == 0.0
 
 
 # ── 双出口 ────────────────────────────────────────────────

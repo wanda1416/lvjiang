@@ -170,6 +170,10 @@ def parse_schools(self: GameConfigManager, data: dict) -> None:
             continue
         self._schools[key] = dict(entry)
 
+    raw_scaling = data.get("talent_scaling")
+    if isinstance(raw_scaling, dict):
+        self._talent_scaling = dict(raw_scaling)
+
 
 def parse_sets(self: GameConfigManager, data: dict) -> None:
     for group, levels in (data.get("equipment_name_series") or {}).items():

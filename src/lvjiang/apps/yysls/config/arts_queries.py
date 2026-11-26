@@ -156,3 +156,42 @@ def get_all_transmute_pools(self: GameConfigManager) -> dict[str, list[str]]:
     """全部流派的转律词条库（流派名 → 词条列表，保持配置声明顺序）"""
     return {school: self.get_transmute_pool(school)
             for school in self._schools}
+
+def get_talent_scaling(self: GameConfigManager, school: str) -> dict | None:
+    """武学天赋按五维缩放的系数：{"dim": "势", "max_outer": 139.4, ...}。
+
+    ``base_dim`` 是计算表的「属性需求」分母（528）。没有配置该流派时返回 None，
+    调用方应保持「不调整」的行为。
+    """
+    entry = (self._talent_scaling.get("schools") or {}).get(str(school or "").strip())
+    if not isinstance(entry, dict) or not entry.get("dim"):
+        return None
+    try:
+        base_dim = float(self._talent_scaling.get("base_dim") or 528)
+    except (TypeError, ValueError):
+        base_dim = 528.0
+    result: dict = {"dim": str(entry["dim"]).strip(), "base_dim": base_dim}
+    for key, value in entry.items():
+        if key == "dim":
+            continue
+        try:
+            result[str(key)] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return result
+
+def get_talent_scaling_raw(self: GameConfigManager) -> dict:
+    """武学天赋缩放配置原文：``{"base_dim": 528, "schools": {流派: {...}}}``。
+
+    网页端导出资产用；业务计算走 ``get_talent_scaling``。
+    """
+    try:
+        base_dim = float(self._talent_scaling.get("base_dim") or 528)
+    except (TypeError, ValueError):
+        base_dim = 528.0
+    schools = {
+        str(name): dict(entry)
+        for name, entry in (self._talent_scaling.get("schools") or {}).items()
+        if isinstance(entry, dict)
+    }
+    return {"base_dim": base_dim, "schools": schools}

@@ -1,4 +1,4 @@
-content_version: 8
+content_version: 9
 schools:
   鸣金·虹:
     attr: 鸣金
@@ -180,3 +180,22 @@ schools:
     - 会心率
     - 敏
     - 劲
+
+# 武学天赋按五维线性缩放：天赋值 × MIN(总五维 / base_dim, 1)。
+# 基础属性快照里已按「公共底子五维」固化了天赋值；装备再带来五维时，
+# 评分链按这里的系数补差额（见 combat_attrs.talent_dim_delta）。
+talent_scaling:
+  base_dim: 528
+  schools:
+    鸣金·虹: {dim: 势, max_outer: 139.4, intent_rate: 0.08}
+    鸣金·影: {dim: 劲, max_outer: 139.4, intent_rate: 0.08}
+    鸣金·霆: {dim: 势, max_outer: 139.4, intent_rate: 0.08}
+    裂石·威: {dim: 劲, min_outer: 139.4, max_outer: 139.4}
+    裂石·钧: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    牵丝·霖: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    牵丝·翊: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    牵丝·玉: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    破竹·尘: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    破竹·风: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    破竹·鸢: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}
+    破竹·樽: {dim: 敏, min_outer: 139.4, crit_rate: 0.16}

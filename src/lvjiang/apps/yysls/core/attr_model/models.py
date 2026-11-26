@@ -182,7 +182,8 @@ SELECTION_POLICIES: dict[str, str] = {
 
 #: CombatAttributes 的数值字段（不含 extra_attrs）
 COMBAT_NUMERIC_FIELDS: tuple[str, ...] = tuple(
-    f.name for f in dataclass_fields(CombatAttributes) if f.name != "extra_attrs"
+    f.name for f in dataclass_fields(CombatAttributes)
+    if f.name != "extra_attrs" and f.name not in DIMENSION_FIELDS
 )
 
 #: 求值的工作字段空间：战斗属性 + 五维。五维不是战斗属性，但武学天赋的

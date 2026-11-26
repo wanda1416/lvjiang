@@ -124,6 +124,8 @@ class GameConfigManager:
         self._playstyles: dict[str, dict] = {}
         # 流派配置：流派名 → {main: {武器: 词条}, sub: [武器]}（顶层 schools）
         self._schools: dict[str, dict] = {}
+        # 武学天赋按五维缩放的系数（schools.yaml 的 talent_scaling 段）
+        self._talent_scaling: dict = {}
         # 等级配置：等级 → LevelConfig（顶层 level_configs）
         self._level_configs: list[LevelConfig] = []
         # 扫描装备转律后的默认冷却天数（顶层 basic_config）
@@ -304,6 +306,10 @@ class GameConfigManager:
     get_martial_arts = arts_queries.get_martial_arts
 
     get_martial_art = arts_queries.get_martial_art
+
+    get_talent_scaling = arts_queries.get_talent_scaling
+
+    get_talent_scaling_raw = arts_queries.get_talent_scaling_raw
 
     get_martial_art_weapon = arts_queries.get_martial_art_weapon
 

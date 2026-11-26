@@ -1,0 +1,8 @@
+name: 安卓布局
+env: android
+canvas:
+  x_ratio: 0.0
+  y_ratio: 0.0
+  w_ratio: 1.0
+  h_ratio: 1.0
+aspect: '20:9'

@@ -6,8 +6,14 @@
 # 后台输入（PostMessage）发不了相对鼠标位移，游戏视角转不动，
 # 所以找床完全不依赖视角：先试原地「躺下」，再用 W/A/S/D 扫一圈房间。
 #
-# 词表、序号表与 $records 由入口 standalone/fengsha_jiushi_night.wf 初始化：
+# 词表、序号表与 $records 由入口 fengsha_jiushi_night.wf 初始化：
 # import 只合并 def，本文件顶层的语句不会执行，所以这里只放过程。
+#
+# 识别同样限定在 [fsjs_night] 的区域里（坐标见包内
+# layouts/desktop/fsjs/fsjs_night.json，按 PC 实机帧标定）。
+# PC 端没有「听风辨位」金色耳朵按钮、线索弹窗的「确认」也只是 Space 键提示，
+# 所以 listen_btn / clue_confirm 在桌面布局里标为 disabled：本文件不引用它们，
+# 但如果被引用会在运行期显式报「区域未绑定布局坐标」而不是偷偷整屏扫。
 
 # ─── lie_down_desktop ─────────────────────────────────────────────────
 # 找一次「躺下」提示并按 F。只按一次——重复按会让人物起身，
@@ -15,7 +21,7 @@
 #
 # 返回：1=已按过 F；0=画面上没有「躺下」提示。
 def lie_down_desktop()
-    find as $lie by contains "躺下"
+    find [fsjs_night].[lie_down] as $lie by contains "躺下"
     if not $lie -> return 0
     log info "看到「躺下」提示，按 F 躺下（只按一次，重复按会起身）。"
     press "f" after wait (1.0, 1.0)
@@ -121,13 +127,13 @@ end
 #
 # 返回：1=处理过弹窗；0=画面上没有这个弹窗。
 def dismiss_clue_dialog_desktop()
-    find as $dlg by contains "未查看的线索"
+    find [fsjs_night].[clue_tip] as $dlg by contains "未查看的线索"
     if not $dlg
-        find as $dlg2 by contains "未查看线索"
+        find [fsjs_night].[clue_tip] as $dlg2 by contains "未查看线索"
         if not $dlg2 -> return 0
     end
     log info "检测到「未查看线索」弹窗：勾选今日不再提醒，按 Space 确认。"
-    find as $tip by contains "不再提醒"
+    find [fsjs_night].[clue_check] as $tip by contains "不再提醒"
     if $tip -> click $tip after wait (0.5, 0.8)
     press "space" after wait (0.4, 0.6)
     wait (0.6, 0.9)
@@ -149,7 +155,7 @@ def act_on_decision_desktop($index, $should_open, $reason)
         # 关掉后提示还在的话再按一次 Y。
         call $dismissed = dismiss_clue_dialog()
         if $dismissed > 0
-            find as $ask by contains_any $words_ask
+            find [fsjs_night].[prompt_bar] as $ask by contains_any $words_ask
             if $ask
                 log info "弹窗已关，重新按 Y 开门。"
                 press "y" after wait (0.6, 0.9)
@@ -171,21 +177,21 @@ end
 # 收尾：先匹配结算场景 → 写日志 → 按 F 再来一局 → 验证标准开局场景。
 #
 # 场景门禁（场景不对，不进行输入）：
-#   按 F 前必须同时看到「再来一局」和第二结算特征（Space 继续 / 客栈夜话），
+#   按 F 前必须同时看到「再来一局」和第二结算特征（客栈夜话 / 奖励），
 #   只有孤零零一个「再来一局」（比如公屏聊天里刷出来的）不算数，不按 F。
 #   连续多轮只看到「再来一局」、始终看不到第二特征时，为避免卡死，
 #   记警告后仍按 F（此时「再来一局」已持续在屏 8 秒以上，基本可确认是结算画面）。
 # 按 F 后多人模式若有「确认进入」匹配框，由 wait_standard_scene 点掉再验证开局场景。
 def finish_night_desktop()
-    global $words_settle
-    global $words_settle2
+    global $settle_title_words
+    global $settle_again_words
     eval $waited = 0
     eval $gate_tries = 0
     loop while $waited < 40
-        find as $again by contains "再来一局"
+        find [fsjs_night].[again_btn] as $again by contains_any $settle_again_words
         if $again
             # 场景门禁：结算特征必须齐全才允许按 F。
-            find as $mark by contains_any $words_settle2
+            find [fsjs_night].[settle_title] as $mark by contains_any $settle_title_words
             if $mark
                 log info "【结算】场景匹配成功（「再来一局」+「" + $mark.text + "」），按 F 再来一局。"
                 press "f" after wait (0.6, 0.9)
@@ -199,14 +205,14 @@ def finish_night_desktop()
             end
             eval $gate_tries = $gate_tries + 1
             if $gate_tries >= 4
-                log warn "【结算】连续 4 次只看到「再来一局」、始终看不到第二结算特征（Space 继续/客栈夜话），判定场景大致正确，仍按 F。"
+                log warn "【结算】连续 4 次只看到「再来一局」、始终看不到第二结算特征（客栈夜话/奖励），判定场景大致正确，仍按 F。"
                 press "f" after wait (0.6, 0.9)
                 call wait_standard_scene()
                 return 0
             end
-            log info "【结算】看到「再来一局」但结算场景特征不全（缺 Space 继续/客栈夜话），暂不按 F，继续确认场景。"
+            log info "【结算】看到「再来一局」但结算场景特征不全（客栈夜话/奖励），暂不按 F，继续确认场景。"
         end
-        find as $settle by contains_any $words_settle
+        find [fsjs_night].[settle_title] as $settle by contains_any $settle_title_words
         if $settle
             # 只看到第二特征、没看到「再来一局」：先记着，继续等下一帧补齐。
             eval $gate_tries = $gate_tries + 1
@@ -216,6 +222,6 @@ def finish_night_desktop()
         eval $waited = $waited + 1
     end
     screenshot from last
-    log warn "【结算】等了 40 秒场景始终不匹配（需要：再来一局 + Space 继续/客栈夜话），已截图，不按 F。下一轮将尝试正常住店流程。"
+    log warn "【结算】等了 40 秒场景始终不匹配（需要：再来一局 + 客栈夜话/奖励），已截图，不按 F。下一轮将尝试正常住店流程。"
     return 0
 end

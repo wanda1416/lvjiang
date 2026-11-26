@@ -1,0 +1,8 @@
+schema_version: 1
+id: fengshajiusi
+name: 风沙酒肆
+entry: fengsha_jiushi_night.wf
+version: 1.0.0
+author: ''
+min_app_version: ''
+description: 风沙酒肆·夜宿谜影：客栈守夜、接待 5 位访客并按策略开门。场景与两平台布局随包自带，不写入全局 scenes/layouts。

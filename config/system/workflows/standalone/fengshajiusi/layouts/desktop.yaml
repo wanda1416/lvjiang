@@ -1,0 +1,9 @@
+name: 桌面布局
+env: desktop
+canvas:
+  x_ratio: 0.0041322314049587
+  y_ratio: 0.0277033065236819
+  w_ratio: 0.9917355371900827
+  h_ratio: 0.9651474530831099
+aspect: '16:9'
+aspect_tolerance: 0.02

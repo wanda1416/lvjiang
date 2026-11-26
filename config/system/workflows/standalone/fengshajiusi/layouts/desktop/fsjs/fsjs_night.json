@@ -1,0 +1,75 @@
+{
+  "regions": [
+    {
+      "key": "quest_track",
+      "x_ratio": 0.012,
+      "y_ratio": 0.205,
+      "w_ratio": 0.125,
+      "h_ratio": 0.09
+    },
+    {
+      "key": "lie_down",
+      "x_ratio": 0.615,
+      "y_ratio": 0.465,
+      "w_ratio": 0.085,
+      "h_ratio": 0.07
+    },
+    {
+      "key": "prompt_bar",
+      "x_ratio": 0.7,
+      "y_ratio": 0.07,
+      "w_ratio": 0.27,
+      "h_ratio": 0.098
+    },
+    {
+      "key": "open_btn",
+      "x_ratio": 0.735,
+      "y_ratio": 0.168,
+      "w_ratio": 0.215,
+      "h_ratio": 0.052
+    },
+    {
+      "key": "refuse_btn",
+      "x_ratio": 0.735,
+      "y_ratio": 0.232,
+      "w_ratio": 0.215,
+      "h_ratio": 0.05
+    },
+    {
+      "key": "listen_btn",
+      "disabled": true
+    },
+    {
+      "key": "settle_title",
+      "x_ratio": 0.445,
+      "y_ratio": 0.355,
+      "w_ratio": 0.13,
+      "h_ratio": 0.06
+    },
+    {
+      "key": "again_btn",
+      "x_ratio": 0.808,
+      "y_ratio": 0.9,
+      "w_ratio": 0.09,
+      "h_ratio": 0.058
+    },
+    {
+      "key": "clue_tip",
+      "x_ratio": 0.32,
+      "y_ratio": 0.425,
+      "w_ratio": 0.29,
+      "h_ratio": 0.045
+    },
+    {
+      "key": "clue_check",
+      "x_ratio": 0.325,
+      "y_ratio": 0.47,
+      "w_ratio": 0.145,
+      "h_ratio": 0.05
+    },
+    {
+      "key": "clue_confirm",
+      "disabled": true
+    }
+  ]
+}

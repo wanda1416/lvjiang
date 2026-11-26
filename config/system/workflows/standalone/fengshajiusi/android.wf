@@ -4,17 +4,22 @@
 # 安卓端平台过程：全部交互改为点按与摇杆拖拽，无键盘依赖
 # （设备端输入后端只表达 ESC/HOME，press 其他键会直接报错）。
 #
-# 词表、序号表与 $records 由入口 standalone/fengsha_jiushi_night.wf 初始化：
+# 词表、序号表与 $records 由入口 fengsha_jiushi_night.wf 初始化：
 # import 只合并 def，本文件顶层的语句不会执行，所以这里只放过程。
+#
+# 所有识别都限定在任务包私有场景 [fsjs_night] 的区域里（scenes/fsjs/
+# fsjs_night.yaml，坐标见 layouts/android/fsjs/fsjs_night.json），不再整屏 OCR。
 
 # ─── click_first_word_android ─────────────────────────────────────────
-# 按优先级逐个词找屏幕文字，找到就点。全屏 find 只返回读到的第一处文字，
-# 标题、说明里也可能带关键字，所以按钮类目标要按词逐个找。
+# 在给定区域里按优先级逐个词找文字，找到就点。区域里只该有这一类按钮，
+# 所以「找到的第一个词」就是目标按钮；标题、说明里同样的字不会混进来。
 #
+# 参数：$area — 场景区域引用（如 [fsjs_night].[clue_confirm]）；
+#       $words — 关键字列表。
 # 返回：1=已点击；0=一个词都没找到。
-def click_first_word_android($words)
+def click_first_word_android($area, $words)
     for word in $words
-        find as $hit by contains $word
+        find $area as $hit by contains $word
         if $hit
             click $hit after wait (1.4, 2.0)
             return 1
@@ -30,7 +35,7 @@ end
 #
 # 返回：1=已点过；0=画面上没有「躺下」按钮。
 def lie_down_android()
-    find as $lie by contains "躺下"
+    find [fsjs_night].[lie_down] as $lie by contains "躺下"
     if not $lie -> return 0
     log info "看到「躺下」提示，点击（只点一次，重复点会起身。OCR 读到：" + $lie.text + "）。"
     click $lie after wait (1.0, 1.0)
@@ -116,10 +121,10 @@ def dismiss_clue_dialog_android()
     global $words_confirm
     # 真的弹窗一定会带「未查看的线索 / 请先查看」这类提示文案；
     # 「今日不再提醒」单独出现（比如公屏聊天）不算弹窗。
-    find as $head by contains_any $words_clue_head
+    find [fsjs_night].[clue_tip] as $head by contains_any $words_clue_head
     if not $head -> return 0
     log info "检测到弹窗「" + $head.text + "」：勾选今日不再提醒，点确认按钮。"
-    find as $tip by contains "不再提醒"
+    find [fsjs_night].[clue_check] as $tip by contains "不再提醒"
     if $tip
         log info "勾选「" + $tip.text + "」。"
         click $tip after wait (0.5, 0.8)
@@ -127,7 +132,7 @@ def dismiss_clue_dialog_android()
     eval $ok = 0
     eval $try = 0
     loop while $try < 2
-        call $ok = click_first_word_android($words_confirm)
+        call $ok = click_first_word_android([fsjs_night].[clue_confirm], $words_confirm)
         if $ok > 0
             log info "已点确认按钮。"
             break
@@ -137,12 +142,12 @@ def dismiss_clue_dialog_android()
     end
     wait (0.6, 0.9)
     # 验证：弹窗还在就点空白处再确认一次。
-    find as $still by contains_any $words_clue_head
+    find [fsjs_night].[clue_tip] as $still by contains_any $words_clue_head
     if $still
         log warn "确认后弹窗仍在，点空白处并再点一次确认。"
         click (0.5, 0.88)
         wait (0.5, 0.8)
-        call click_first_word_android($words_confirm)
+        call click_first_word_android([fsjs_night].[clue_confirm], $words_confirm)
         wait (0.6, 0.9)
     else
         log info "弹窗已关闭。"
@@ -153,30 +158,29 @@ end
 
 # ─── click_open_button_android / click_refuse_button_android ──────────
 # 点「开门」/「不开」按钮。真实 UI 文案带人数后缀：「开门（1人选择）」「不开（0人选择）」。
-# ⚠️ 全屏 find 按从上到下顺序返回第一条命中，而按钮上方的「是否开门?」提示也含「开门」，
-#    所以开门绝不能用裸 contains "开门"（会点到提示文字）——只认带人数后缀的形态。
+# 按钮各自有区域（[open_btn] / [refuse_btn]），区域里只有这一个按钮，
+# 「是否开门?」提示在 [prompt_bar] 里，不会被当成按钮点到。
 #
 # 开门匹配顺序：
 #   ① equals 精确匹配（兼容无后缀的旧版文案）；
 #   ② equals_any 关键字表；
 #   ③ contains_any 后缀形态（全角/半角括号、空格、直接跟数字）。
-# 不开没有歧义（提示与任务栏都不含「不开」），最后可直接 contains 兜底。
 #
 # 返回：1=已点击；0=没找到按钮。
 def click_open_button_android()
     global $open_list
     global $open_suffix
-    find as $a by equals "开门"
+    find [fsjs_night].[open_btn] as $a by equals "开门"
     if $a
         click $a after wait (1.4, 2.0)
         return 1
     end
-    find as $b by equals_any $open_list
+    find [fsjs_night].[open_btn] as $b by equals_any $open_list
     if $b
         click $b after wait (1.4, 2.0)
         return 1
     end
-    find as $c by contains_any $open_suffix
+    find [fsjs_night].[open_btn] as $c by contains_any $open_suffix
     if $c
         log info "命中「开门」按钮（OCR 读到：" + $c.text + "）。"
         click $c after wait (1.4, 2.0)
@@ -187,17 +191,17 @@ end
 
 def click_refuse_button_android()
     global $refuse_list
-    find as $a by equals "不开门"
+    find [fsjs_night].[refuse_btn] as $a by equals "不开门"
     if $a
         click $a after wait (1.4, 2.0)
         return 1
     end
-    find as $b by equals_any $refuse_list
+    find [fsjs_night].[refuse_btn] as $b by equals_any $refuse_list
     if $b
         click $b after wait (1.4, 2.0)
         return 1
     end
-    find as $c by contains_any $refuse_list
+    find [fsjs_night].[refuse_btn] as $c by contains_any $refuse_list
     if $c
         log info "命中「不开」按钮（OCR 读到：" + $c.text + "）。"
         click $c after wait (1.4, 2.0)
@@ -222,7 +226,7 @@ def act_on_decision_android($index, $should_open, $reason)
             # 关掉后提示还在的话再点一次开门。
             call $dismissed = dismiss_clue_dialog()
             if $dismissed > 0
-                find as $ask by contains_any $words_ask
+                find [fsjs_night].[prompt_bar] as $ask by contains_any $words_ask
                 if $ask
                     log info "弹窗已关，重新点「开门」。"
                     call click_open_button_android()
@@ -252,23 +256,23 @@ end
 # 收尾：先匹配结算场景 → 写日志 → 点「再来一局」→ 验证标准开局场景。
 #
 # 场景门禁（场景不对，不进行输入）：
-#   点击前必须同时看到「再来一局」和第二结算特征（Space 继续 / 客栈夜话），
+#   点击前必须同时看到「再来一局」和第二结算特征（客栈夜话 / 奖励），
 #   只有孤零零一个「再来一局」（比如公屏聊天里刷出来的）不算数，不点。
 #   连续 4 次不全时为避免卡死，记警告后仍点一次。
 # 点完验证标准开局场景（左上角「来到客栈 / 下榻休息: 0/1」），没等到补点一次。
 def finish_night_android()
-    global $words_settle
-    global $words_settle2
+    global $settle_title_words
+    global $settle_again_words
     eval $waited = 0
     eval $gate_tries = 0
     loop while $waited < 40
         # 结算画面上偶尔压着「未查看线索」弹窗，先清掉再判断场景。
         call dismiss_clue_dialog()
 
-        find as $again by contains "再来一局"
+        find [fsjs_night].[again_btn] as $again by contains_any $settle_again_words
         if $again
             # 场景门禁：结算特征必须齐全才允许点。
-            find as $mark by contains_any $words_settle2
+            find [fsjs_night].[settle_title] as $mark by contains_any $settle_title_words
             if $mark
                 log info "【结算】场景匹配成功（「再来一局」+「" + $mark.text + "」），点「再来一局」。"
                 click $again after wait (0.6, 0.9)
@@ -276,21 +280,21 @@ def finish_night_android()
                 call $ok = wait_standard_scene()
                 if $ok > 0 -> return 0
                 log warn "【结算】没等到标准开局场景，补点一次「再来一局」再验一次。"
-                find as $again2 by contains "再来一局"
+                find [fsjs_night].[again_btn] as $again2 by contains_any $settle_again_words
                 if $again2 -> click $again2 after wait (0.5, 0.8)
                 call wait_standard_scene()
                 return 0
             end
             eval $gate_tries = $gate_tries + 1
             if $gate_tries >= 4
-                log warn "【结算】连续 4 次只看到「再来一局」、始终看不到第二结算特征（Space/客栈夜话），判定场景大致正确，仍点一次。"
+                log warn "【结算】连续 4 次只看到「再来一局」、始终看不到第二结算特征（客栈夜话/奖励），判定场景大致正确，仍点一次。"
                 click $again after wait (0.6, 0.9)
                 call wait_standard_scene()
                 return 0
             end
-            log info "【结算】看到「再来一局」但结算场景特征不全（缺 Space/客栈夜话），暂不点击，继续确认场景。"
+            log info "【结算】看到「再来一局」但结算场景特征不全（缺客栈夜话/奖励），暂不点击，继续确认场景。"
         end
-        find as $settle by contains_any $words_settle
+        find [fsjs_night].[settle_title] as $settle by contains_any $settle_title_words
         if $settle
             # 只看到第二特征、没看到「再来一局」：先记着，继续等下一帧补齐。
             eval $gate_tries = $gate_tries + 1
@@ -300,6 +304,6 @@ def finish_night_android()
         eval $waited = $waited + 1
     end
     screenshot from last
-    log warn "【结算】等了 40 秒场景始终不匹配（需要：再来一局 + Space/客栈夜话），已截图，不点任何按钮。下一轮将重新找床。"
+    log warn "【结算】等了 40 秒场景始终不匹配（需要：再来一局 + 客栈夜话/奖励），已截图，不点任何按钮。下一轮将重新找床。"
     return 0
 end

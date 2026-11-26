@@ -1,0 +1,10 @@
+{
+  "groups": [
+    {
+      "key": "fsjs",
+      "scenes": [
+        "fsjs_night"
+      ]
+    }
+  ]
+}

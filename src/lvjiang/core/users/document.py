@@ -1,7 +1,10 @@
-"""用户目录与用户资料持久化。
+"""用户目录与用户配置（资料）持久化。
 
-``session.json`` 只保存用户名顺序；每个用户的资料保存在
+``session.json`` 只保存用户名顺序；每个用户的配置与资料保存在
 ``users/{username}.json``，工作流 Session 另存为 ``{username}.session.json``。
+
+隐私边界：``attributes``（用户配置）常含登录账号、角色、尾号等个人隐私信息，
+云端同步走端到端加密（``users_sync.py``），严禁写入公开日志或纳入任何对外分享快照。
 """
 from __future__ import annotations
 
@@ -492,7 +495,7 @@ class UserConfigManager:
                     continue
                 current = latest.attributes.get(key)
                 if current != before and current != after:
-                    raise UserMetadataConflictError(f"用户属性保存冲突: {key}")
+                    raise UserMetadataConflictError(f"用户配置保存冲突: {key}")
                 if key in desired:
                     latest.attributes[key] = desired[key]
                 else:

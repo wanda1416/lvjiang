@@ -326,7 +326,13 @@ class UserManagerDialog(QDialog):
         attr_layout = QVBoxLayout(attr_card)
         attr_layout.setContentsMargins(20, 16, 20, 16)
         attr_layout.setSpacing(10)
-        attr_layout.addWidget(self._section_title(tr("用户属性")))
+        attr_layout.addWidget(self._section_title(tr("用户配置")))
+        attr_privacy_hint = QLabel(
+            tr("高隐私配置（如账号、角色、尾号等）：云同步端到端加密，绝不随备战方案对外分享")
+        )
+        attr_privacy_hint.setWordWrap(True)
+        attr_privacy_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        attr_layout.addWidget(attr_privacy_hint)
         self._attribute_table = QTableWidget(0, 2)
         self._attribute_table.setHorizontalHeaderLabels(["Key", "Value"])
         self._attribute_table.setSelectionBehavior(
@@ -346,8 +352,8 @@ class UserManagerDialog(QDialog):
         attr_vertical_header.setVisible(False)
         attr_layout.addWidget(self._attribute_table)
         attr_actions = QHBoxLayout()
-        self._btn_add_attribute = QPushButton(tr("新增属性"))
-        self._btn_delete_attribute = QPushButton(tr("删除属性"))
+        self._btn_add_attribute = QPushButton(tr("新增配置"))
+        self._btn_delete_attribute = QPushButton(tr("删除配置"))
         self._btn_add_attribute.clicked.connect(self._add_attribute)
         self._btn_delete_attribute.clicked.connect(self._delete_attributes)
         self._btn_add_attribute.setStyleSheet(_STYLE_BTN_GHOST)
@@ -355,7 +361,7 @@ class UserManagerDialog(QDialog):
         attr_actions.addWidget(self._btn_add_attribute)
         attr_actions.addWidget(self._btn_delete_attribute)
         attr_actions.addStretch()
-        self._btn_save_attributes = QPushButton(tr("保存属性"))
+        self._btn_save_attributes = QPushButton(tr("保存配置"))
         self._btn_save_attributes.setStyleSheet(_style_btn_primary())
         self._btn_save_attributes.clicked.connect(self._save_attributes)
         attr_actions.addWidget(self._btn_save_attributes)
@@ -532,7 +538,7 @@ class UserManagerDialog(QDialog):
             return
         if saved:
             self._attribute_baseline = dict(values)
-            logger.info(f"用户属性已更新: {name}")
+            logger.info(f"用户配置已更新: {name}")
 
     def _open_avatar_editor(self):
         name = self._current_user_name()

@@ -255,7 +255,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self.run_username: str = ""
         # 用户资料目录可由批量执行器绑定，供 user_get() 读取同一套快照来源。
         self.users_dir: Path | None = None
-        # 启动时冻结的用户属性；user_get() 优先读取此快照。
+        # 启动时冻结的用户配置（高隐私数据，不输出日志）；user_get() 优先读取此快照。
         self.user_attributes_snapshot: dict[str, dict[str, str]] | None = None
         # 专用实现需要的完整工作流配置，同样在启动时冻结。
         self.workflow_config_snapshot: dict | None = None

@@ -1,9 +1,12 @@
 """Per-user sticky-note persistence.
 
-Sticky notes are user-authored content, not Profile fields and not workflow
-session state.  Each user therefore gets an independent
-``users/{username}.notes.json`` file so workflow snapshot saves cannot overwrite
-notes edited from the UI.
+Sticky notes are private user-authored content (often containing sensitive personal
+reminders), not Profile fields and not workflow session state.  Each user therefore
+gets an independent ``users/{username}.notes.json`` file so workflow snapshot saves
+cannot overwrite notes edited from the UI.
+
+Privacy boundary: cloud sync MUST encrypt ``notes`` end-to-end, and sticky notes MUST
+NEVER be printed to public logs or included in any external share snapshot.
 """
 
 from __future__ import annotations

@@ -1101,10 +1101,27 @@ class WorkbenchUi(
                 if (reasons.length() > 0) text(summary, (0 until reasons.length()).joinToString("\n") { reasons.optString(it) })
                 val selectors = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
                 summary.addView(selectors)
-                fun selector(label: String, current: String, values: JSONArray?, selected: (String) -> Unit) {
-                    val names = if (values == null) emptyList() else (0 until values.length()).map { values.optString(it) }
-                    button(selectors, current.ifEmpty { "选择$label" }) {
-                        MaterialAlertDialogBuilder(activity).setTitle(label).setSingleChoiceItems(names.toTypedArray(), names.indexOf(current)) { dialog, index ->
+                fun selector(label: String, current: String, values: JSONArray?, currentLabel: String = current, optionObjects: JSONArray? = null, selected: (String) -> Unit) {
+                    val items = if (optionObjects != null) {
+                        (0 until optionObjects.length()).mapNotNull { i ->
+                            val obj = optionObjects.optJSONObject(i) ?: return@mapNotNull null
+                            val value = obj.optString("value")
+                            val display = obj.optString("label").ifEmpty { value }
+                            value to display
+                        }
+                    } else if (values != null) {
+                        (0 until values.length()).map {
+                            val name = values.optString(it)
+                            name to name
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    val names = items.map { it.first }
+                    val labels = items.map { it.second }
+                    val displayCurrent = items.firstOrNull { it.first == current }?.second ?: currentLabel
+                    button(selectors, displayCurrent.ifEmpty { "选择$label" }) {
+                        MaterialAlertDialogBuilder(activity).setTitle(label).setSingleChoiceItems(labels.toTypedArray(), names.indexOf(current)) { dialog, index ->
                             dialog.dismiss(); selected(names[index]); show("USERS")
                         }.setNegativeButton("取消", null).show()
                     }.apply {
@@ -1115,7 +1132,13 @@ class WorkbenchUi(
                     }
                 }
                 selector("计算方案", result.optString("scheme"), result.optJSONArray("schemes")) { loadoutScheme = it }
-                selector("基础属性", result.optString("base_attribute"), result.optJSONArray("base_attributes")) { loadoutBase = it }
+                selector(
+                    "基础属性",
+                    result.optString("base_attribute"),
+                    result.optJSONArray("base_attributes"),
+                    currentLabel = result.optString("base_attribute_label").ifEmpty { result.optString("base_attribute") },
+                    optionObjects = result.optJSONArray("base_attribute_options"),
+                ) { loadoutBase = it }
                 if ((result.optJSONArray("schemes")?.length() ?: 0) == 0) text(summary, "请同步适用计算模型。", 12f)
                 val equipment = card(content)
                 sectionTitle(equipment, "方案装备")

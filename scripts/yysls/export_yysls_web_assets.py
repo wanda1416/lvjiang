@@ -221,7 +221,7 @@ def _playstyle_affix_table(gc) -> dict[str, list[str]]:
 
 
 def _base_attributes_table(gc) -> dict[str, list[dict]]:
-    """导出 system 层预置基础属性（仅 system，不混入本机 local 覆盖）。"""
+    """导出 system 层预置基础属性（直接读取 system 层，避免被本机 local 覆盖遮蔽）。"""
     table: dict[str, list[dict]] = {}
     for school in gc.get_schools():
         presets = [
@@ -233,8 +233,7 @@ def _base_attributes_table(gc) -> dict[str, list[dict]]:
                 "label": preset.label,
                 "stats": dict(preset.stats),
             }
-            for preset in get_base_attribute_presets(school)
-            if preset.source == "system"
+            for preset in get_base_attribute_presets(school, layer="system")
         ]
         if presets:
             table[school] = presets
@@ -362,12 +361,15 @@ def build_assets() -> dict[str, bytes]:
         shard = f"{_MODELS_DIR}/{ref.level}-{sequence:02d}.json"
         payload = _dump(load_model(ref.rel_path))
         models[shard] = payload
-        index.append({
+        entry_meta: dict[str, object] = {
             "school": ref.school, "scheme": ref.scheme,
             "level": ref.level, "stage": ref.stage, "version": ref.version,
             "path": shard, "bytes": len(payload),
             "sha256": hashlib.sha256(payload).hexdigest()[:16],
-        })
+        }
+        if ref.default_base_attribute:
+            entry_meta["default_base_attribute"] = ref.default_base_attribute
+        index.append(entry_meta)
     payloads: dict[str, bytes] = {_CONFIG_NAME: _dump(config), **models}
     manifest = {
         "_generated_by": "scripts/export_yysls_web_assets.py",

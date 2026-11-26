@@ -161,7 +161,7 @@
       "path": "10-domain/01-yysls/20-translation/08-i18n-language-status.md",
       "title": "多语言词表现状与日文术语生成",
       "category": "10-game",
-      "sha256": "0efed9bd1755a7a19fbca8b43ec4e99898f6da01af02fdcda26a0e4775cf285c"
+      "sha256": "09fae355789e9a713e3ac779502bd285697e370b5f344df688170f0865380e12"
     },
     {
       "id": "10-domain:01-yysls:20-translation:README",
@@ -301,7 +301,7 @@
       "path": "30-design/01-architecture/03-models/03-session-and-context.md",
       "title": "Session 与 Context 数据模型",
       "category": "30-architecture",
-      "sha256": "99eb641ef74c81486674e9b2c9fa197b2d21359f8944a2ebbf75fbcb32fad1ab"
+      "sha256": "02f855268c4e7454b9015384ef168656b3f6df9f845210c59207e2b841d4e1cc"
     },
     {
       "id": "30-design:01-architecture:03-models:04-profile",
@@ -322,7 +322,7 @@
       "path": "30-design/01-architecture/03-models/06-base-attr-model.md",
       "title": "基础属性来源模型",
       "category": "30-architecture",
-      "sha256": "3caa1b5d4c4ccd113e5bec9ca25188a865b04d83e48d783b1abb0f66afda61b5"
+      "sha256": "eb175f71d018789770fd6cb7930f9857155eed341f8436faf49447a7ab2411f9"
     },
     {
       "id": "30-design:01-architecture:03-models:README",
@@ -364,7 +364,7 @@
       "path": "30-design/01-architecture/05-platform/01-device-agent-protocol.md",
       "title": "设备端代理协议（PC ↔ 律匠 app）",
       "category": "30-architecture",
-      "sha256": "438e120de5b65c1c012c8ecac5520544a38ac1216108db6d4f5282e03cd6119b"
+      "sha256": "7858c8cbd3d6164aa2fcae5b3c8f3519b84d60dcda3734ecd88f0d3a32521af9"
     },
     {
       "id": "30-design:01-architecture:05-platform:02-instance-access",
@@ -392,7 +392,7 @@
       "path": "30-design/01-architecture/05-platform/08-i18n.md",
       "title": "国际化模块与翻译查找契约",
       "category": "30-architecture",
-      "sha256": "b91a2a3adddea703975928d5819fd4b42cfde3332a957e0dd11bbb8dedf0e5f6"
+      "sha256": "126c77956d8303a0a0aa2a1e5fb31a8c40194360a28ab1ccd1a8906145a42db4"
     },
     {
       "id": "30-design:01-architecture:05-platform:09-android-workbench",
@@ -752,6 +752,13 @@
       "sha256": "7fd7cb635d60129661febfcece11983f92f78f79fe26a3ffb02342e2f54af89d"
     },
     {
+      "id": "30-design:02-decisions:03-equipment:04-preset-base-attributes-and-stages",
+      "path": "30-design/02-decisions/03-equipment/04-preset-base-attributes-and-stages.md",
+      "title": "预置基础属性分层与毕业率多阶段模型",
+      "category": "30-architecture",
+      "sha256": "70f031a001c636addf620c74a7912e94eaf1f4be817847b0ffcaa1932e472131"
+    },
+    {
       "id": "30-design:02-decisions:04-platform:03-input-timeline",
       "path": "30-design/02-decisions/04-platform/03-input-timeline.md",
       "title": "输入时间线 — 描述严格并发的操作序列",
@@ -1015,7 +1022,7 @@
       "path": "30-design/02-decisions/README.md",
       "title": "决策与规格记录（已实现需求）",
       "category": "30-architecture",
-      "sha256": "b46cff52b758ddfb5148ede0d3c035fac44e19142650061122c02762c3059d3e"
+      "sha256": "bcb81c29f95435cb045eddc430c095b9eeef990f748d8fd1ef3f5d16f0868fb0"
     },
     {
       "id": "40-reference:01-config:01-contract",
@@ -1029,7 +1036,7 @@
       "path": "40-reference/01-config/02-config-layering.md",
       "title": "配置分层：system / local",
       "category": "30-architecture",
-      "sha256": "3015a5115231ba3fc0f9425e1bfbe07c31b926a590a5857d5ed27aecb8524041"
+      "sha256": "0f968be18f1faea6942866e414b857ca93531ccabd15f9d74b66ada53564ad50"
     },
     {
       "id": "40-reference:01-config:03-content-cache",
@@ -1043,7 +1050,7 @@
       "path": "40-reference/01-config/04-session-data-map.md",
       "title": "config/session 数据划分与读写方",
       "category": "30-architecture",
-      "sha256": "0df7028b3a7b72b8032755421697a6eefdcc0da6cfe048a795d137812271b5b5"
+      "sha256": "ba5d2199f9509a8a51745ecfd20213ed4c83b013d701e76e422383dfa7b26acd"
     },
     {
       "id": "40-reference:02-dsl:01-basics",
@@ -1414,7 +1421,7 @@
       "path": "60-guide/03-automation/06-workflows.md",
       "title": "6. 工作流与日常任务",
       "category": "60-userguide",
-      "sha256": "4327e75e84d645b2a23e202e161227a390e9405d8b3b54c64b300de232870c65"
+      "sha256": "31a429fdc9707b41e91489e7b139eff59ecdd0555831b89331f1b6e3aa061c8c"
     },
     {
       "id": "60-guide:03-automation:06.07-system-scripts",

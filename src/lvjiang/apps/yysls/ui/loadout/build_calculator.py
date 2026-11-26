@@ -1254,6 +1254,7 @@ class BuildListPanel(QWidget):
 
 def open_build_calculator(host, parent):
     """只在打开时读取角色上下文；后续模拟不跟随外部用户/方案切换。"""
+    from ...config import format_base_attribute_label
     from ...core.combat.equipment import EquipmentInventory
     from ...core.graduation.context import PlanContextError
 
@@ -1269,7 +1270,11 @@ def open_build_calculator(host, parent):
         gc = get_game_config()
         context = PlanScoringContext.from_plan(
             plan, game_config=gc, world_level=inventory.state.effective_world_level(gc.current_equip_level()))
-        dialog = BuildCalculatorDialog(plan.playstyle, user_label=user, base_label=plan.base_attribute, context=context,
+        base_label = format_base_attribute_label(
+            context.school, plan.base_attribute,
+            preset_tag=tr("预置"), local_tag=tr("本地预置"),
+        )
+        dialog = BuildCalculatorDialog(plan.playstyle, user_label=user, base_label=base_label, context=context,
                                         equipped=inventory.equipped, host=host,
                                         parent=parent)
         dialog.exec()

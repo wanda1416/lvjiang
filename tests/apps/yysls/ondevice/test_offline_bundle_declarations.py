@@ -21,6 +21,8 @@ def test_yysls_offline_declarations_select_its_own_files(monkeypatch, tmp_path):
     included = {
         "local/yysls/tuning_rules/custom.yaml", "local/yysls/gear_sets/custom.yaml",
         "system/yysls/game_config/base.yaml", "local/yysls/attr_model/nested/model.yaml",
+        "system/yysls/base_attributes/鸣金·虹.yaml",
+        "local/yysls/base_attributes/鸣金·虹.yaml",
         "session/yysls/play_styles.json",
     }
     excluded = {"session/yysls/unknown.json", "local/yysls/notes/unknown.yaml"}

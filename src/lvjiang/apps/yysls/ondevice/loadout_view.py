@@ -96,7 +96,7 @@ def equipment_pool(username: str, offset: int = 0) -> str:
 
 
 def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str = "", assumptions: str = "{}") -> str:
-    from ..config import get_game_config
+    from ..config import format_base_attribute_label, get_game_config
     from ..config.base_attributes import list_all_base_attributes
     from ..config.equipment_slots import SLOT_SPECS
     from ..core.combat.combat_attrs import (
@@ -190,9 +190,23 @@ def plan_view(username: str, plan_id: str, scheme: str = "", base_attribute: str
             problems.append(exc.reason)
         except Exception as exc:
             problems.append(f"毕业率计算失败：{exc}")
+        sorted_bases = sorted(bases)
+        base_label = (
+            format_base_attribute_label(school, plan.base_attribute)
+            if school else plan.base_attribute
+        )
+        base_options = [
+            {
+                "value": key,
+                "label": format_base_attribute_label(school, key) if school else key,
+            }
+            for key in sorted_bases
+        ]
         return _json({"ok": True, "plan_name": plan.name, "school": school, "world_level": level,
                       "scheme": plan.graduation_scheme, "schemes": schemes, "base_attribute": plan.base_attribute,
-                      "base_attributes": sorted(bases), "model": asdict(model) if model else None,
+                      "base_attribute_label": base_label,
+                      "base_attributes": sorted_bases, "base_attribute_options": base_options,
+                      "model": asdict(model) if model else None,
                       "result": result, "reasons": problems, "slots": slots,
                       "assumptions": options, "assumption_labels": hypothesis.labels(), "combat_attributes": combat,
                       "combat_cards": _combat_cards(combat),

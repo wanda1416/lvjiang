@@ -51,10 +51,15 @@ from lvjiang.ui.widgets.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr, tr_label
 from ...config import (
+    format_base_attribute_label,
+    get_base_attribute_presets,
     get_derivation,
     get_game_config,
     get_loadout,
     get_play_styles,
+    make_preset_ref,
+    parse_preset_ref,
+    resolve_base_attribute_data,
     save_loadout,
     save_play_style,
 )
@@ -308,7 +313,14 @@ class AttrDerivePanel(QWidget):
         self._combo_reference.blockSignals(True)
         self._combo_reference.clear()
         self._combo_reference.addItem(tr("（不对照）"), "")
-        for name in get_play_styles(self._school()):
+        school = self._school()
+        for preset in get_base_attribute_presets(school):
+            ref = make_preset_ref(preset.id)
+            label = format_base_attribute_label(
+                school, ref, preset_tag=tr("预置"), local_tag=tr("本地预置"),
+            )
+            self._combo_reference.addItem(label, ref)
+        for name in get_play_styles(school):
             self._combo_reference.addItem(name, name)
         fit_combo_to_contents(self._combo_reference, minimum=180)
         self._combo_reference.blockSignals(False)
@@ -368,12 +380,15 @@ class AttrDerivePanel(QWidget):
     def _on_reference_changed(self) -> None:
         """选中一套基础属性时，把它当时的装配也调出来。
 
-        没有记录的（多半是抄面板反推的）保持当前装配不动。
+        没有记录的（预置或抄面板反推的）保持当前装配不动。
         """
         if self._loading:
             return
         name = self._combo_reference.currentData()
-        stored = get_derivation(self._school(), name) if name else {}
+        stored = (
+            get_derivation(self._school(), name)
+            if name and parse_preset_ref(name) is None else {}
+        )
         if stored:
             self._loading = True
             self._apply_loadout(AttrLoadout.from_dict(stored))
@@ -402,7 +417,7 @@ class AttrDerivePanel(QWidget):
         name = self._combo_reference.currentData()
         if not name:
             return None
-        stored = get_play_styles(self._school()).get(name) or {}
+        stored = resolve_base_attribute_data(self._school(), name) or {}
         known = set(CombatAttributes.__dataclass_fields__)
         reference = CombatAttributes()
         for key, value in stored.items():
@@ -418,7 +433,10 @@ class AttrDerivePanel(QWidget):
             }
         # 推导保存的是战斗值；对照和补足使用面板值。保存时记录差集，
         # 避免来源数据更新或改装后，用新加成反减旧快照。
-        derivation = get_derivation(self._school(), name)
+        derivation = (
+            get_derivation(self._school(), name)
+            if parse_preset_ref(name) is None else {}
+        )
         if derivation:
             delta_data = derivation.get("combat_delta")
             if isinstance(delta_data, dict):

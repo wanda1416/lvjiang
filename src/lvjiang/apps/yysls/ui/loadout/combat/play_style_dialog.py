@@ -160,8 +160,16 @@ class PlayStyleDialogMixin:
                 )
             return
 
+        from ....config import PRESET_REF_PREFIX, get_play_styles
+        if name.startswith(PRESET_REF_PREFIX):
+            msg = tr("基础属性名称不能以 {prefix} 开头").format(prefix=PRESET_REF_PREFIX)
+            if workflow_triggered:
+                self._show_workflow_message(QMessageBox.Icon.Warning, tr("无法保存"), msg)
+            else:
+                QMessageBox.warning(self._play_style_dialog_parent(), tr("无法保存"), msg)
+            return
+
         # 检查重名
-        from ....config import get_play_styles
         existing = get_play_styles(school)
         if name in existing:
             message = tr("基础属性「{name}」已存在，是否覆盖？").format(

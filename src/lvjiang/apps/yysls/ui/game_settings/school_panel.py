@@ -894,7 +894,12 @@ class SchoolPanel(QWidget):
         school = self._current_school()
         if not school:
             return
-        from ...config import get_game_config, get_play_styles, save_play_style
+        from ...config import (
+            PRESET_REF_PREFIX,
+            get_game_config,
+            get_play_styles,
+            save_play_style,
+        )
 
         dialog = _PlayStyleEditDialog(
             self, school_attr=get_game_config().get_school_attr(school),
@@ -902,6 +907,12 @@ class SchoolPanel(QWidget):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         name = dialog.get_name()
+        if name.startswith(PRESET_REF_PREFIX):
+            QMessageBox.warning(
+                self, tr("无法保存"),
+                tr("基础属性名称不能以 {prefix} 开头").format(prefix=PRESET_REF_PREFIX),
+            )
+            return
         if name in get_play_styles(school):
             QMessageBox.warning(
                 self, tr("名称已存在"),
@@ -1033,14 +1044,20 @@ class SchoolPanel(QWidget):
             return
         preset_id = str(item.data(Qt.ItemDataRole.UserRole) or "")
         source = str(item.data(Qt.ItemDataRole.UserRole + 1) or "system")
+        from .factory_guard import READONLY_HINT, is_user_mode
+
         menu = QMenu(self)
+        menu.setToolTipsVisible(True)
         edit_meta_action = menu.addAction(tr("编辑元信息…"))
         del_label = tr("删除 / 还原默认") if source == "local" else tr("删除")
         del_action = menu.addAction(del_label)
+        if del_action is not None and is_user_mode() and source == "system":
+            del_action.setEnabled(False)
+            del_action.setToolTip(READONLY_HINT)
         action = menu.exec(self._preset_list.mapToGlobal(pos))
         if action == edit_meta_action:
             self._do_edit_preset_meta(preset_id)
-        elif action == del_action:
+        elif del_action is not None and action == del_action and del_action.isEnabled():
             self._do_delete_preset(preset_id)
 
     def _do_edit_preset_meta(self, preset_id: str) -> None:
@@ -1541,25 +1558,25 @@ class SchoolPanel(QWidget):
         return root
 
     def _on_ps_field_changed(self, field_name: str, unit: str):
-        """任一字段变更 → 按当前选中来源自动保存到预置或个人基础属性"""
+        """任一字段变更 → 按当前选中来源自动保存该字段到预置或个人基础属性。"""
         school = self._current_school()
-        if not school or not self._edit_source:
+        edit = self._ps_edits.get(field_name)
+        if not school or not self._edit_source or edit is None:
             return
 
-        def _apply_edits(base: dict) -> dict[str, float]:
+        def _apply_single_edit(base: dict) -> dict[str, float]:
             attrs = dict(base)
-            for fn, edit in self._ps_edits.items():
-                try:
-                    v = float(edit.text())
-                except (ValueError, TypeError):
-                    v = 0.0
-                fn_unit = self._find_field_unit(fn)
-                if fn_unit == "%":
-                    v = v / 100.0
-                if v:
-                    attrs[fn] = v
-                else:
-                    attrs.pop(fn, None)
+            try:
+                v = float(edit.text())
+            except (ValueError, TypeError):
+                v = 0.0
+            fn_unit = unit or self._find_field_unit(field_name)
+            if fn_unit == "%":
+                v = v / 100.0
+            if v:
+                attrs[field_name] = v
+            else:
+                attrs.pop(field_name, None)
             return attrs
 
         if self._edit_source == "preset":
@@ -1576,7 +1593,7 @@ class SchoolPanel(QWidget):
             preset = get_base_attribute_preset(school, preset_id)
             if preset is None:
                 return
-            updated = replace(preset, stats=_apply_edits(preset.stats))
+            updated = replace(preset, stats=_apply_single_edit(preset.stats))
             try:
                 save_base_attribute_preset(school, updated)
             except Exception as exc:
@@ -1599,7 +1616,7 @@ class SchoolPanel(QWidget):
         from ...config import get_play_styles, save_play_style
 
         styles = get_play_styles(school)
-        save_play_style(school, name, _apply_edits(styles.get(name, {})))
+        save_play_style(school, name, _apply_single_edit(styles.get(name, {})))
 
     def _find_field_unit(self, field_name: str) -> str:
         """查找字段单位"""
@@ -1834,8 +1851,17 @@ class _PlayStyleEditDialog(QDialog):
                 return
             self.accept()
             return
-        if not self._edit_name.text().strip():
+        name = self._edit_name.text().strip()
+        if not name:
             QMessageBox.warning(self, tr("名称为空"), tr("基础属性名称不能为空"))
+            return
+        from ...config import PRESET_REF_PREFIX
+
+        if name.startswith(PRESET_REF_PREFIX):
+            QMessageBox.warning(
+                self, tr("无法保存"),
+                tr("基础属性名称不能以 {prefix} 开头").format(prefix=PRESET_REF_PREFIX),
+            )
             return
         self.accept()
 

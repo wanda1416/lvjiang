@@ -273,3 +273,157 @@ def test_school_panel_preset_list_scheme_default_col_and_card_height(qtbot, tmp_
     assert isinstance(gain_grid, QGridLayout)
     assert attack_grid.rowCount() == 6
     assert gain_grid.rowCount() == 6
+
+
+def test_system_layer_read_and_label_formatting(tmp_path, monkeypatch):
+    """存在同 ID local 覆盖时 layer='system' 仍返回系统原值，且格式化标签隐藏 preset: 前缀。"""
+    from lvjiang.apps.yysls.config import (
+        format_base_attribute_label,
+        save_base_attribute_preset,
+    )
+
+    _isolate_resolver(tmp_path, monkeypatch, dev_mode=True)
+    save_base_attribute_preset(
+        "鸣金·虹",
+        BaseAttributePreset(
+            id="115_s1", school="鸣金·虹", level=115, stage=1, playstyle=None,
+            label="系统默认", stats={"min_outer": 1417.815},
+        ),
+        layer="system",
+    )
+    save_base_attribute_preset(
+        "鸣金·虹",
+        BaseAttributePreset(
+            id="115_s1", school="鸣金·虹", level=115, stage=1, playstyle=None,
+            label="本地微调", stats={"min_outer": 1500.0},
+        ),
+        layer="local",
+    )
+
+    sys_only = get_base_attribute_presets("鸣金·虹", layer="system")
+    assert len(sys_only) == 1
+    assert sys_only[0].source == "system"
+    assert sys_only[0].stats["min_outer"] == pytest.approx(1417.815)
+
+    merged = get_base_attribute_presets("鸣金·虹")
+    assert len(merged) == 1
+    assert merged[0].source == "local"
+
+    assert format_base_attribute_label("鸣金·虹", "preset:115_s1") == "[本地预置] 本地微调"
+    assert format_base_attribute_label("鸣金·虹", "preset:missing") == "[预置] missing"
+    assert format_base_attribute_label("鸣金·虹", "个人实测") == "个人实测"
+
+
+def test_school_panel_single_field_edit_preserves_unmodified_precision_and_user_guard(
+    qtbot, tmp_path, monkeypatch,
+):
+    """单字段编辑不截断未改动字段的三位小数；用户模式下系统预置右键删除禁用。"""
+    from PyQt6.QtWidgets import QMenu
+
+    from lvjiang.apps.yysls.config import (
+        get_base_attribute_preset,
+        save_base_attribute_preset,
+    )
+    from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
+
+    _isolate_resolver(tmp_path, monkeypatch, dev_mode=True)
+    save_base_attribute_preset(
+        "鸣金·虹",
+        BaseAttributePreset(
+            id="115_s1", school="鸣金·虹", level=115, stage=1, playstyle=None,
+            label="115级 1阶段（默认）",
+            stats={"min_outer": 1417.815, "max_outer": 3053.374, "mingjin_bonus": 0.15},
+        ),
+        layer="system",
+    )
+
+    panel = SchoolPanel(
+        data={
+            "schools": {
+                "鸣金·虹": {
+                    "attr": "鸣金",
+                    "main": {"weapon": "剑", "martial_art": "无名剑法"},
+                    "sub": {"weapon": "枪", "martial_art": "无名枪法"},
+                }
+            }
+        }
+    )
+    qtbot.addWidget(panel)
+    panel.select_school_base_attr("鸣金·虹", "preset:115_s1")
+
+    # 只改 max_outer，未改动的 min_outer 必须保留 1417.815 三位小数
+    panel._ps_edits["max_outer"].setText("3100.00")
+    reloaded = get_base_attribute_preset("鸣金·虹", "115_s1")
+    assert reloaded is not None
+    assert reloaded.stats["min_outer"] == pytest.approx(1417.815, abs=1e-6)
+    assert reloaded.stats["max_outer"] == pytest.approx(3100.0, abs=1e-6)
+    assert reloaded.stats["mingjin_bonus"] == pytest.approx(0.15, abs=1e-6)
+
+    # 切到用户模式，系统预置右键删除应禁用而不弹窗报错
+    _isolate_resolver(tmp_path, monkeypatch, dev_mode=False)
+    save_base_attribute_preset(
+        "鸣金·虹",
+        BaseAttributePreset(
+            id="115_s1", school="鸣金·虹", level=115, stage=1, playstyle=None,
+            label="115级 1阶段（默认）",
+            stats={"min_outer": 1417.815},
+        ),
+        layer="local",
+    )
+    # 先测试纯 system 条目的右键守卫
+    delete_base_attribute_preset("鸣金·虹", "115_s1")
+    panel._refresh_presets()
+    rect = panel._preset_list.visualItemRect(panel._preset_list.item(0))
+    captured: list[tuple[str, bool]] = []
+
+    def fake_exec(menu_self, _pos):
+        for act in menu_self.actions():
+            captured.append((act.text(), act.isEnabled()))
+        return None
+
+    monkeypatch.setattr(QMenu, "exec", fake_exec)
+    panel._on_preset_context_menu(rect.center())
+    assert any("删除" in text and not enabled for text, enabled in captured)
+
+
+def test_ondevice_loadout_view_exposes_readable_base_attribute_options(tmp_path, monkeypatch):
+    """手机端备战视图返回可读的 base_attribute_label 与 base_attribute_options。"""
+    from lvjiang import constants
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.core.loadout.models import LoadoutPlan, LoadoutState
+    from lvjiang.apps.yysls.ondevice import loadout_view
+    from lvjiang.core.ondevice import task_runner
+
+    preset = BaseAttributePreset(
+        id="115_s1", school="鸣金·虹", level=115, stage=1, playstyle=None,
+        label="115级 1阶段（默认）", stats={"min_outer": 1400.0}, source="system",
+    )
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.base_attributes.get_base_attribute_presets",
+        lambda school, **_kwargs: [preset] if school == "鸣金·虹" else [],
+    )
+    monkeypatch.setattr(constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(task_runner, "_local_user_names", lambda: ["viewer"])
+    monkeypatch.setattr("lvjiang.apps.yysls.config.play_styles.get_play_styles", lambda _s: {})
+
+    gc = get_game_config()
+    arts = gc.get_schools()["鸣金·虹"]
+    plan = LoadoutPlan(
+        id="p1", name="默认",
+        main_martial_art=arts["main"]["martial_art"],
+        sub_martial_art=arts["sub"]["martial_art"],
+        base_attribute="preset:115_s1",
+        graduation_scheme="基础方案",
+    )
+    state = LoadoutState(world_level=115, active_plan_id="p1", plans={"p1": plan}, equipment_items={})
+    (tmp_path / "viewer.loadouts.json").write_text(
+        json.dumps(state.to_dict(), ensure_ascii=False), encoding="utf-8",
+    )
+
+    result = json.loads(loadout_view.plan_view("viewer", "p1"))
+    assert result["ok"]
+    assert result["base_attribute"] == "preset:115_s1"
+    assert result["base_attribute_label"] == "[预置] 115级 1阶段（默认）"
+    assert result["base_attribute_options"] == [
+        {"value": "preset:115_s1", "label": "[预置] 115级 1阶段（默认）"},
+    ]

@@ -139,25 +139,52 @@ def _read_layer_presets(path: Path, school: str, *, source: str) -> list[BaseAtt
     return result
 
 
-def get_base_attribute_presets(school: str) -> list[BaseAttributePreset]:
-    """获取指定流派合并后的预置基础属性列表（local 同 id 覆盖 system）。
+def get_base_attribute_presets(
+    school: str, *, layer: str | None = None,
+) -> list[BaseAttributePreset]:
+    """获取指定流派的预置基础属性列表。
 
+    ``layer`` 缺省时合并 ``system ← local``（local 同 id 覆盖 system）；
+    传入 ``"system"`` 或 ``"local"`` 时仅读取对应单层，不做合并。
     排序：按最高 ``level`` → 最高 ``stage`` → 流派默认优先于玩法专属 → ``id``。
     """
+    if layer is not None and layer not in (LAYER_SYSTEM, LAYER_LOCAL):
+        raise ValueError(f"不支持的配置层: {layer!r}")
     if not school:
         return []
     resolver = get_resolver()
     rel = preset_rel_path(school)
     merged: dict[str, BaseAttributePreset] = {}
-    for preset in _read_layer_presets(resolver.system_dir / rel, school, source="system"):
-        merged[preset.id] = preset
-    if resolver.local_dir != resolver.system_dir:
-        for preset in _read_layer_presets(resolver.local_dir / rel, school, source="local"):
+    if layer in (None, LAYER_SYSTEM):
+        for preset in _read_layer_presets(resolver.system_dir / rel, school, source=LAYER_SYSTEM):
+            merged[preset.id] = preset
+    if layer == LAYER_LOCAL or (layer is None and resolver.local_dir != resolver.system_dir):
+        for preset in _read_layer_presets(resolver.local_dir / rel, school, source=LAYER_LOCAL):
             merged[preset.id] = preset
     return sorted(
         merged.values(),
         key=lambda p: (-p.level, -p.stage, 0 if p.playstyle is None else 1, p.playstyle or "", p.id),
     )
+
+
+def format_base_attribute_label(
+    school: str,
+    base_attr_ref: str,
+    *,
+    preset_tag: str = "预置",
+    local_tag: str = "本地预置",
+) -> str:
+    """将基础属性引用键格式化为面向用户展示的标签（隐藏 ``preset:`` 前缀）。"""
+    if not base_attr_ref:
+        return ""
+    preset_id = parse_preset_ref(base_attr_ref)
+    if preset_id is None:
+        return base_attr_ref
+    preset = get_base_attribute_preset(school, preset_id) if school else None
+    if preset is None:
+        return f"[{preset_tag}] {preset_id}"
+    tag = local_tag if preset.source == LAYER_LOCAL else preset_tag
+    return f"[{tag}] {preset.label}"
 
 
 def get_base_attribute_preset(school: str, preset_id: str) -> BaseAttributePreset | None:

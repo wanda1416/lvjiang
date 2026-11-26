@@ -674,13 +674,7 @@ yysls:
   确定: Xác nhận
   确定要删除分组_{name}_吗: Xác nhận xóa nhóm '{name}'?
   自定义增减_{label}: Tùy chỉnh tăng/giảm - {label}
-  ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
-
-    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
-  : 'Đánh dấu: xử lý theo ngữ nghĩa action, kích hoạt đồng bộ sync_targets đã cấu
-    hình.
-
-    Bỏ chọn: chỉ ghi đè thuần key này, không kích hoạt bất kỳ đồng bộ nào.'
+  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Đánh dấu: xử lý theo ngữ nghĩa action, kích hoạt đồng bộ sync_targets đã cấu hình.\nBỏ chọn: chỉ ghi đè thuần key này, không kích hoạt bất kỳ đồng bộ nào."
   至少保留一个分组: Giữ lại ít nhất một nhóm
   覆写_{label}: Ghi đè - {label}
   该数值已被其他进程更新_本次增减未写入_请刷新后重试: Giá trị này đã được tiến trình khác cập nhật, thay đổi
@@ -1381,12 +1375,7 @@ auto_strings:
     đặt quy tắc'
   全部规则: Tất cả quy tắc
   全部规则（默认配置）: Tất cả quy tắc (cấu hình mặc định)
-  ? '其他增益：
-
-    '
-  : 'Tăng ích khác:
-
-    '
+  "其他增益：\n": "Tăng ích khác:\n"
   冠胄: Mũ giáp
   冠胄 · 胸甲: Mũ giáp · Áo giáp
   冲突: Xung đột
@@ -1440,16 +1429,7 @@ auto_strings:
   名称为空: Tên đang trống
   否: Không
   命中: Trúng
-  ? '命中条件：装备任一条题名属于勾选词条
-
-    （勾选仅首词条时只判定装备首词条）；
-
-    自选词条语义不跑潜力判定'
-  : 'Điều kiện khớp: bất kỳ dòng thuộc tính nào của trang bị thuộc các dòng đã chọn
-
-    (khi đánh dấu Chỉ dòng đầu thì chỉ xét dòng đầu);
-
-    ngữ nghĩa Dòng thuộc tính tự chọn không chạy phán định tiềm năng'
+  "命中条件：装备任一条题名属于勾选词条\n（勾选仅首词条时只判定装备首词条）；\n自选词条语义不跑潜力判定": "Điều kiện khớp: bất kỳ dòng thuộc tính nào của trang bị thuộc các dòng đã chọn\n(khi đánh dấu Chỉ dòng đầu thì chỉ xét dòng đầu);\nngữ nghĩa Dòng thuộc tính tự chọn không chạy phán định tiềm năng"
   命中条件：预期评级属于勾选档位（全选 = 不限，不取评级）: 'Điều kiện khớp: đánh giá dự kiến thuộc các bậc đã
     chọn (Chọn tất cả = Không giới hạn, không lấy đánh giá)'
   命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）: 'Điều kiện khớp: chỉ số ban đầu
@@ -1644,16 +1624,7 @@ auto_strings:
   新建方案: Tạo phương án mới
   方案: Phương án
   方案 ADPS: ADPS phương án
-  ? '方案「{name}」已生成。
-
-    DPS：{dps:.2f}
-
-    文件：{path}'
-  : 'Đã tạo phương án "{name}".
-
-    DPS: {dps:.2f}
-
-    Tệp: {path}'
+  "方案「{name}」已生成。\nDPS：{dps:.2f}\n文件：{path}": "Đã tạo phương án \"{name}\".\nDPS: {dps:.2f}\nTệp: {path}"
   方案名称: Tên phương án
   方案数值读取失败：{error}: 'Đọc chỉ số phương án thất bại: {error}'
   方案管理: Quản lý phương án
@@ -1728,17 +1699,7 @@ auto_strings:
     vị trí ở trang Điều Luật
   本件已重置过一次，冷却期内不再重置: Món này đã đặt lại một lần, không đặt lại thêm trong thời gian
     chờ
-  ? '本条规则取评级时只注入首词条，忽略已有的其他词条
-
-    （其余槽视作空槽由潜力判定自由填充）；避免回收掉
-
-    非首词条已成垃圾但可重置调律的装备'
-  : 'Khi tính đánh giá, quy tắc này chỉ nạp dòng đầu và bỏ qua các dòng hiện có khác
-
-    (các ô còn lại coi là ô trống để phán định tiềm năng tự do điền); tránh thu hồi
-    nhầm
-
-    trang bị có dòng phụ rác nhưng vẫn có thể đặt lại Điều Luật'
+  "本条规则取评级时只注入首词条，忽略已有的其他词条\n（其余槽视作空槽由潜力判定自由填充）；避免回收掉\n非首词条已成垃圾但可重置调律的装备": "Khi tính đánh giá, quy tắc này chỉ nạp dòng đầu và bỏ qua các dòng hiện có khác\n(các ô còn lại coi là ô trống để phán định tiềm năng tự do điền); tránh thu hồi nhầm\ntrang bị có dòng phụ rác nhưng vẫn có thể đặt lại Điều Luật"
   本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；自选规则=弹窗勾选；自选词条=判定结果列改勾词条，按装备词条名匹配，不跑潜力判定: 'Cách phán
     định của quy tắc này: Quy tắc truyền vào = quy tắc đã chọn khi chạy; Tất cả quy
     tắc; Quy tắc tự chọn = chọn trong hộp thoại; Dòng thuộc tính tự chọn = chọn dòng
@@ -1758,13 +1719,7 @@ auto_strings:
     hủy trong khi tìm kiếm.
   正在读取候选装备…: Đang đọc trang bị ứng viên…
   正常完成: Hoàn thành bình thường
-  ? '武器【{type}】与当前方案的武学不匹配（主武学武器：{main}，副武学武器：{sub}）。
-
-    如需使用该武器，请新建对应流派的方案。'
-  : 'Vũ khí [{type}] không khớp với võ học của phương án hiện tại (vũ khí võ học chính:
-    {main}, vũ khí võ học phụ: {sub}).
-
-    Để dùng vũ khí này, vui lòng tạo phương án mới cho lưu phái tương ứng.'
+  "武器【{type}】与当前方案的武学不匹配（主武学武器：{main}，副武学武器：{sub}）。\n如需使用该武器，请新建对应流派的方案。": "Vũ khí [{type}] không khớp với võ học của phương án hiện tại (vũ khí võ học chính: {main}, vũ khí võ học phụ: {sub}).\nĐể dùng vũ khí này, vui lòng tạo phương án mới cho lưu phái tương ứng."
   武器类: Nhóm vũ khí
   攻具套装: Bộ trang bị công
   攻具套装定义: Định nghĩa bộ trang bị công
@@ -1811,18 +1766,8 @@ auto_strings:
   用户中断: Người dùng gián đoạn
   破竹: Phá Trúc
   确定删除基础属性「{name}」？: Xác nhận xóa thuộc tính cơ bản "{name}"?
-  ? '确定要从背包中删除【{name}】吗？
-
-    此操作不可撤销。'
-  : 'Xác nhận xóa [{name}] khỏi túi đồ?
-
-    Thao tác này không thể hoàn tác.'
-  ? '确定要删除模拟装备【{name}】吗？
-
-    此操作不可撤销。'
-  : 'Xác nhận xóa trang bị mô phỏng [{name}]?
-
-    Thao tác này không thể hoàn tác.'
+  "确定要从背包中删除【{name}】吗？\n此操作不可撤销。": "Xác nhận xóa [{name}] khỏi túi đồ?\nThao tác này không thể hoàn tác."
+  "确定要删除模拟装备【{name}】吗？\n此操作不可撤销。": "Xác nhận xóa trang bị mô phỏng [{name}]?\nThao tác này không thể hoàn tác."
   确认跟随: Xác nhận theo
   神力词条「{name}」不能是转律产出：转律不会产出神力词条: 'Dòng Thần Lực "{name}" không thể tạo từ Chuyển
     Luật: Chuyển Luật không bao giờ sinh ra dòng Thần Lực'
@@ -1984,16 +1929,7 @@ auto_strings:
   轴序: Thứ tự trục
   轴行: Hàng trục
   输入基础属性名称: Nhập tên thuộc tính cơ bản
-  ? '运行时覆盖基础规则中的等级门槛；
-
-    「默认」使用基础规则定义的 min_level，
-
-    选择具体等级后以该值为准。'
-  : 'Ghi đè ngưỡng cấp trong quy tắc cơ bản khi chạy;
-
-    "Mặc định" dùng min_level của quy tắc cơ bản,
-
-    chọn cấp cụ thể sẽ áp dụng theo giá trị đó.'
+  "运行时覆盖基础规则中的等级门槛；\n「默认」使用基础规则定义的 min_level，\n选择具体等级后以该值为准。": "Ghi đè ngưỡng cấp trong quy tắc cơ bản khi chạy;\n\"Mặc định\" dùng min_level của quy tắc cơ bản,\nchọn cấp cụ thể sẽ áp dụng theo giá trị đó."
   进调律前的行为点）：未达调律门槛的装备按下表处置，自上而下首条命中即生效并阻断后续规则；无命中 = 保留: 'điểm hành vi trước khi vào
     Điều Luật): trang bị chưa đạt ngưỡng Điều Luật sẽ xử lý theo bảng dưới, khớp từ
     trên xuống dưới, dòng đầu khớp có hiệu lực và chặn quy tắc sau; không khớp = giữ
@@ -2005,19 +1941,7 @@ auto_strings:
   选择首词条: Chọn dòng đầu
   通用: Chung
   通用判定: Phán định chung
-  ? '重命名会修改规则 id（YAML 文件名），
-
-    可能影响直接引用该 key 的代码/工作流配置，请确认。
-
-
-    新 key（小写字母开头的英文/数字/下划线）：'
-  : 'Đổi tên sẽ thay đổi id quy tắc (tên tệp YAML),
-
-    có thể ảnh hưởng đến mã/cấu hình quy trình tham chiếu trực tiếp key này, vui lòng
-    xác nhận.
-
-
-    key mới (chữ thường tiếng Anh ở đầu, gồm chữ/số/gạch dưới):'
+  "重命名会修改规则 id（YAML 文件名），\n可能影响直接引用该 key 的代码/工作流配置，请确认。\n\n新 key（小写字母开头的英文/数字/下划线）：": "Đổi tên sẽ thay đổi id quy tắc (tên tệp YAML),\ncó thể ảnh hưởng đến mã/cấu hình quy trình tham chiếu trực tiếp key này, vui lòng xác nhận.\n\nkey mới (chữ thường tiếng Anh ở đầu, gồm chữ/số/gạch dưới):"
   重命名词条名: Đổi tên dòng thuộc tính
   重新计算: Tính lại
   重置二次确认识别失败，跳过该装备: Nhận diện xác nhận đặt lại lần hai thất bại, bỏ qua trang bị này
@@ -2310,28 +2234,7 @@ auto_strings:
   另有 {n} 项仅战斗内生效，不进本表: Còn {n} mục chỉ có hiệu lực trong chiến đấu, không hiện trong
     bảng này
   同一门心法不能装在多个槽位: Không thể lắp cùng một tâm pháp vào nhiều ô
-  ? '名字 = 调律 Tab 勾选项；
-
-    增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；
-
-    属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；
-
-    绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；
-
-    武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。'
-  : 'Tên = mục đánh dấu ở thẻ Điều Luật;
-
-    Dòng tăng sát thương để trống / chọn "- Không cần tăng sát thương -" = phía đó
-    không cần tăng sát thương;
-
-    Thuộc tính = lưu phái thuộc tính công của lối chơi (vị trí phi vũ khí dùng để
-    quy đổi thuộc tính công → Vô Tướng);
-
-    Công tắc liên kết = khi phán định lối chơi này tương đương bật công tắc đó (ghi
-    đè trạng thái toàn cục);
-
-    Ứng viên vũ khí/dòng lấy từ Cấu hình trò chơi, ứng viên tăng sát thương thu hẹp
-    theo vũ khí cùng phía.'
+  "名字 = 调律 Tab 勾选项；\n增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。": "Tên = mục đánh dấu ở thẻ Điều Luật;\nDòng tăng sát thương để trống / chọn \"- Không cần tăng sát thương -\" = phía đó không cần tăng sát thương;\nThuộc tính = lưu phái thuộc tính công của lối chơi (vị trí phi vũ khí dùng để quy đổi thuộc tính công → Vô Tướng);\nCông tắc liên kết = khi phán định lối chơi này tương đương bật công tắc đó (ghi đè trạng thái toàn cục);\nỨng viên vũ khí/dòng lấy từ Cấu hình trò chơi, ứng viên tăng sát thương thu hẹp theo vũ khí cùng phía."
   基础属性推导: Suy diễn thuộc tính cơ bản
   存为基础属性: Lưu thành thuộc tính cơ bản
   对照值: Giá trị đối chiếu
@@ -2420,13 +2323,7 @@ auto_strings:
   （空）: (Trống)
   玩法名称: Tên lối chơi
   武学名称: Tên võ học
-  ? '同一份配置里有引用，删除后会显示为未知套装：
-
-    {items}'
-  : 'Đang có tham chiếu trong cùng cấu hình, sau khi xóa sẽ hiển thị là bộ không xác
-    định:
-
-    {items}'
+  "同一份配置里有引用，删除后会显示为未知套装：\n{items}": "Đang có tham chiếu trong cùng cấu hình, sau khi xóa sẽ hiển thị là bộ không xác định:\n{items}"
   ' 级': ' cấp'
   F6 调律配置可新增/编辑规则组: F6 Cấu hình Điều Luật để thêm/sửa nhóm quy tắc
   MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。: Dịch vụ MCP đã khởi động, cấu hình kết nối
@@ -2558,15 +2455,7 @@ auto_strings:
     trang bị sẽ tự động đánh dấu Thừa Âm
   删除备战方案: Xóa phương án xuất chiến
   删除套装: Xóa bộ trang bị
-  ? '删除套装「{name}」？
-
-
-    备战方案和装备记录里引用它的部位，删除后会按未知套装处理，不会自动清空。{detail}'
-  : 'Xóa bộ trang bị "{name}"?
-
-
-    Các vị trí trong phương án xuất chiến và bản ghi trang bị tham chiếu bộ này sẽ
-    hiển thị là bộ không xác định sau khi xóa, không tự động xóa trắng.{detail}'
+  "删除套装「{name}」？\n\n备战方案和装备记录里引用它的部位，删除后会按未知套装处理，不会自动清空。{detail}": "Xóa bộ trang bị \"{name}\"?\n\nCác vị trí trong phương án xuất chiến và bản ghi trang bị tham chiếu bộ này sẽ hiển thị là bộ không xác định sau khi xóa, không tự động xóa trắng.{detail}"
   删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择: Xóa toàn bộ phiên bản cũ bên trái và chuyển tham
     chiếu phương án xuất chiến sang phiên bản bên phải; các nhóm xung đột loại trừ
     lẫn nhau
@@ -2709,26 +2598,7 @@ auto_strings:
   导出文件: Xuất tệp
   导出路径需为绝对路径或以 ~/ 开头: Đường dẫn xuất phải là đường dẫn tuyệt đối hoặc bắt đầu bằng
     ~/
-  ? '将出装搭配「{build}」导入备战方案「{plan}」，替换八个槽位的装备。
-
-    原装备保留在当前用户装备库中，不会删除，也不会影响其他备战方案。
-
-    同时应用该搭配的弓玦，战斗类型设为 PVE：
-
-    {details}
-
-    是否继续？'
-  : 'Nhập phối trang bị "{build}" vào phương án xuất chiến "{plan}", thay thế cả 8
-    ô trang bị.
-
-    Trang bị gốc vẫn giữ trong kho trang bị của người dùng hiện tại, không bị xóa
-    và không ảnh hưởng phương án khác.
-
-    Đồng thời áp dụng Cung Quyết của phối này và đặt loại chiến đấu thành PVE:
-
-    {details}
-
-    Tiếp tục?'
+  "将出装搭配「{build}」导入备战方案「{plan}」，替换八个槽位的装备。\n原装备保留在当前用户装备库中，不会删除，也不会影响其他备战方案。\n同时应用该搭配的弓玦，战斗类型设为 PVE：\n{details}\n是否继续？": "Nhập phối trang bị \"{build}\" vào phương án xuất chiến \"{plan}\", thay thế cả 8 ô trang bị.\nTrang bị gốc vẫn giữ trong kho trang bị của người dùng hiện tại, không bị xóa và không ảnh hưởng phương án khác.\nĐồng thời áp dụng Cung Quyết của phối này và đặt loại chiến đấu thành PVE:\n{details}\nTiếp tục?"
   将承音装备的普通词条数值视为承音上限参与计算: Coi chỉ số dòng thường của trang bị Thừa Âm là giới hạn
     Thừa Âm để tham gia tính toán
   尚无内置角色属性表: Chưa có bảng thuộc tính nhân vật tích hợp
@@ -2829,20 +2699,7 @@ auto_strings:
   新增武器重启后方可参与识别；被流派配置引用的武器不可删除: Vũ khí mới thêm chỉ tham gia nhận diện sau khi khởi
     động lại; vũ khí đang được cấu hình lưu phái tham chiếu không thể xóa
   新建属性…: Tạo thuộc tính mới…
-  ? '方案极限：原穿戴方案按满等级、满承音、满定音计算；
-
-    当前实值：备战方案当前八件的实际毕业率，仅供参考；
-
-    七件极限：排除当前部位后，其余装备按三项全满计算；
-
-    候选极限：替换当前装备后，整套方案按三项全满计算。'
-  : 'Giới hạn phương án: phương án gốc tính ở mức Đầy cấp, Đầy Thừa Âm, Đầy Định Âm;
-
-    Thực tế hiện tại: tỷ lệ tốt nghiệp thực tế của 8 món hiện có, chỉ để tham khảo;
-
-    Giới hạn 7 món: loại trừ vị trí này, các món còn lại tính ở mức tối đa 3 chỉ số;
-
-    Giới hạn ứng viên: sau khi thay món này, cả bộ tính ở mức tối đa 3 chỉ số.'
+  "方案极限：原穿戴方案按满等级、满承音、满定音计算；\n当前实值：备战方案当前八件的实际毕业率，仅供参考；\n七件极限：排除当前部位后，其余装备按三项全满计算；\n候选极限：替换当前装备后，整套方案按三项全满计算。": "Giới hạn phương án: phương án gốc tính ở mức Đầy cấp, Đầy Thừa Âm, Đầy Định Âm;\nThực tế hiện tại: tỷ lệ tốt nghiệp thực tế của 8 món hiện có, chỉ để tham khảo;\nGiới hạn 7 món: loại trừ vị trí này, các món còn lại tính ở mức tối đa 3 chỉ số;\nGiới hạn ứng viên: sau khi thay món này, cả bộ tính ở mức tối đa 3 chỉ số."
   方案等级: Cấp phương án
   方案：{name} · {level}级 v{version}（满值属性，不含食物加成）: 'Phương án: {name} · Cấp {level} v{version}
     (thuộc tính tối đa, chưa gồm tăng ích thức ăn)'
@@ -3003,12 +2860,7 @@ auto_strings:
   确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，公共装备池中的装备不会删除，保存后才会生效。: Xác nhận xóa "{name}"?
     {count} tham chiếu trang bị trong phương án này sẽ bị gỡ, trang bị trong kho chung
     không bị xóa, có hiệu lực sau khi lưu.
-  ? '确定删除方案「{name}」的 {level}级 v{version}？
-
-    对应的 JSON 文件也会被删除。'
-  : 'Xác nhận xóa phương án "{name}" cấp {level} v{version}?
-
-    Tệp JSON tương ứng cũng sẽ bị xóa.'
+  "确定删除方案「{name}」的 {level}级 v{version}？\n对应的 JSON 文件也会被删除。": "Xác nhận xóa phương án \"{name}\" cấp {level} v{version}?\nTệp JSON tương ứng cũng sẽ bị xóa."
   确定删除武器类型「{name}」？: Xác nhận xóa loại vũ khí "{name}"?
   确定删除流派「{name}」？: Xác nhận xóa lưu phái "{name}"?
   确定删除规则组「{name}」？该操作不可恢复。: Xác nhận xóa nhóm quy tắc "{name}"? Thao tác này không
@@ -3033,18 +2885,7 @@ auto_strings:
   等级门槛 + 调律门槛 + 扫描/材料/调律处理，一组一套可切换；流派规则全局不受影响: Ngưỡng cấp + Ngưỡng Điều Luật + Xử
     lý quét/nguyên liệu/Điều Luật, mỗi nhóm một bộ có thể chuyển đổi; quy tắc lưu
     phái áp dụng toàn cục không bị ảnh hưởng
-  ? '筛选已生效，但保存到用户资料失败：{error}
-
-
-    本次浏览不受影响，下次操作会再尝试保存。
-
-    筛选条件未保存'
-  : 'Bộ lọc đã áp dụng, nhưng lưu vào hồ sơ người dùng thất bại: {error}
-
-
-    Phiên xem này không bị ảnh hưởng, thao tác sau sẽ thử lưu lại.
-
-    Chưa lưu điều kiện lọc'
+  "筛选已生效，但保存到用户资料失败：{error}\n\n本次浏览不受影响，下次操作会再尝试保存。\n筛选条件未保存": "Bộ lọc đã áp dụng, nhưng lưu vào hồ sơ người dùng thất bại: {error}\n\nPhiên xem này không bị ảnh hưởng, thao tác sau sẽ thử lưu lại.\nChưa lưu điều kiện lọc"
   筛选条件未保存: Chưa lưu điều kiện lọc
   筛选设置: Cài đặt bộ lọc
   系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force: 'Hệ
@@ -3076,26 +2917,7 @@ auto_strings:
     thành dòng mục tiêu; chỉ ảnh hưởng dự phóng nâng cấp, không đổi kết quả quét thật
   装备无相穿透已折算至当前流派属攻穿透。: Xuyên thấu Vô Tướng của trang bị đã được quy đổi sang xuyên
     thấu thuộc tính của lưu phái hiện tại.
-  ? '装备至少完成一轮调律后，若词条已满且明确命中
-
-    "继续调律或锁定"规则，并且传入规则的最终评级达到
-
-    优秀或顶级，返回装备详情页后自动锁定。
-
-    无规则命中只结束并保留，不会自动锁定。
-
-    已锁定装备不会再点击，避免误解锁。'
-  : 'Sau khi trang bị hoàn tất ít nhất một vòng Điều Luật, nếu đã đủ dòng và khớp
-    rõ ràng
-
-    quy tắc "Tiếp tục Điều Luật hoặc khóa", đồng thời đánh giá cuối của quy tắc truyền
-    vào đạt
-
-    Xuất sắc hoặc Đỉnh cấp, sẽ tự động khóa khi quay lại trang chi tiết trang bị.
-
-    Không khớp quy tắc chỉ kết thúc và giữ lại, không tự động khóa.
-
-    Trang bị đã khóa sẽ không nhấn lại để tránh mở khóa nhầm.'
+  "装备至少完成一轮调律后，若词条已满且明确命中\n\"继续调律或锁定\"规则，并且传入规则的最终评级达到\n优秀或顶级，返回装备详情页后自动锁定。\n无规则命中只结束并保留，不会自动锁定。\n已锁定装备不会再点击，避免误解锁。": "Sau khi trang bị hoàn tất ít nhất một vòng Điều Luật, nếu đã đủ dòng và khớp rõ ràng\nquy tắc \"Tiếp tục Điều Luật hoặc khóa\", đồng thời đánh giá cuối của quy tắc truyền vào đạt\nXuất sắc hoặc Đỉnh cấp, sẽ tự động khóa khi quay lại trang chi tiết trang bị.\nKhông khớp quy tắc chỉ kết thúc và giữ lại, không tự động khóa.\nTrang bị đã khóa sẽ không nhấn lại để tránh mở khóa nhầm."
   装备贡献字段: Trường đóng góp trang bị
   装备输入预览: Xem trước nhập trang bị
   装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效: Trang bị cần có ít nhất một lối chơi đã chọn đánh
@@ -3206,14 +3028,7 @@ auto_strings:
     học tương ứng; muốn phối tự do hãy chọn "Không chọn lưu phái"
   选择调律玩法: Chọn lối chơi Điều Luật
   选择转律词条库（{school}）: Chọn kho dòng Chuyển Luật ({school})
-  ? '选项已生效，但保存到用户资料失败：{error}
-
-
-    本次操作不受影响，下次操作会再尝试保存。'
-  : 'Tùy chọn đã áp dụng, nhưng lưu vào hồ sơ người dùng thất bại: {error}
-
-
-    Thao tác này không bị ảnh hưởng, lần thao tác sau sẽ thử lưu lại.'
+  "选项已生效，但保存到用户资料失败：{error}\n\n本次操作不受影响，下次操作会再尝试保存。": "Tùy chọn đã áp dụng, nhưng lưu vào hồ sơ người dùng thất bại: {error}\n\nThao tác này không bị ảnh hưởng, lần thao tác sau sẽ thử lưu lại."
   通用判定：这里的条件对所有部位都生效: 'Phán định chung: các điều kiện tại đây áp dụng cho mọi vị trí'
   部位与金/紫品阶均有候选规则。判定结果和首词条条件仍可能使规则不命中。: Các vị trí và phẩm chất vàng/tím đều có quy
     tắc ứng viên. Kết quả phán định và điều kiện dòng đầu vẫn có thể khiến quy tắc
@@ -3262,124 +3077,22 @@ auto_strings:
   （须大于 0）: (Phải lớn hơn 0)
   ＋ 新增规则: ＋ Thêm quy tắc
   ；强制要求未满足：: '; yêu cầu bắt buộc chưa đạt: '
-  ? '「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。
-
-
-    现有可用等级：{levels}。'
-  : '"{target}" chưa có phương án tỷ lệ tốt nghiệp ở cấp {level}, tạm chưa thể so
-    sánh tổ hợp tối ưu.
-
-
-    Các cấp hiện có: {levels}.'
+  "「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。\n\n现有可用等级：{levels}。": "\"{target}\" chưa có phương án tỷ lệ tốt nghiệp ở cấp {level}, tạm chưa thể so sánh tổ hợp tối ưu.\n\nCác cấp hiện có: {levels}."
   「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。: '"{target}" chưa có phương án tỷ lệ tốt nghiệp
     khả dụng, hãy nhập trước để so sánh tổ hợp tối ưu.'
-  ? '只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。
-
-    不会改写装备；进入后的调律处理仍使用完整实际词条。'
-  : 'Chỉ bỏ qua các dòng hiện có khác khi kiểm tra ngưỡng Điều Luật, dùng tiềm năng
-    tối đa của dòng đầu để quyết định có vào quy trình Điều Luật hay không.
-
-    Không ghi đè trang bị; sau khi vào xử lý Điều Luật vẫn dùng đầy đủ dòng thuộc
-    tính thực tế.'
-  ? '本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。
-
-    这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。'
-  : 'Cấp trang bị thấp nhất vẫn còn có thể Thừa Âm trong mùa giải này. Trang bị thấp
-    hơn cấp này đã bị loại trong mùa hiện tại, không thể Thừa Âm tại chỗ hay lên bậc
-    tiếp theo, nên không tham gia giả định Đầy cấp/Đầy Thừa Âm.
-
-    Mục này khác với "Hỗ trợ Thừa Âm" trong Cấu hình cấp: mục sau mô tả trang bị ở
-    cấp đó trước đây có cho phép Thừa Âm hay không.'
-  ? '
-
-
-    同一份配置里有引用，删除后会显示为未知套装：
-
-    {items}'
-  : '
-
-
-    Đang có tham chiếu trong cùng cấu hình, sau khi xóa sẽ hiển thị là bộ không xác
-    định:
-
-    {items}'
-  ? '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值
-
-    {notes}'
-  : '{school} · {sources} nguồn · {pending} mục chờ bổ sung/nhập một phần · {declared}
-    hiệu ứng đã khai báo, chưa tính
-
-    {notes}'
-  ? '发现 {count} 处部位/品阶无启用规则覆盖：
-
-    '
-  : 'Phát hiện {count} tổ hợp vị trí/phẩm chất chưa có quy tắc đang bật bao phủ:
-
-    '
-  ? '筛选已生效，但保存到用户资料失败：{error}
-
-
-    本次浏览不受影响，下次操作会再尝试保存。'
-  : 'Bộ lọc đã áp dụng, nhưng lưu vào hồ sơ người dùng thất bại: {error}
-
-
-    Phiên xem này không bị ảnh hưởng, thao tác sau sẽ thử lưu lại.'
-  ? '紫装区
-
-    回收累计返还'
-  : 'Khu trang bị tím
-
-    Hoàn trả cộng dồn khi thu hồi'
-  ? '紫装区
-
-    调律消耗'
-  : 'Khu trang bị tím
-
-    Tiêu hao Điều Luật'
-  ? '紫装区
-
-    重置累计返还'
-  : 'Khu trang bị tím
-
-    Hoàn trả cộng dồn khi đặt lại'
-  ? '装备至少完成一轮调律后，若词条已满且明确命中
-
-    “继续调律或锁定”规则，并且传入规则的最终评级达到
-
-    优秀或顶级，返回装备详情页后自动锁定。
-
-    无规则命中只结束并保留，不会自动锁定。
-
-    已锁定装备不会再点击，避免误解锁。'
-  : 'Sau khi trang bị hoàn tất ít nhất một vòng Điều Luật, nếu đã đủ dòng và khớp
-    rõ ràng
-
-    quy tắc "Tiếp tục Điều Luật hoặc khóa", đồng thời đánh giá cuối của quy tắc truyền
-    vào đạt
-
-    Xuất sắc hoặc Đỉnh cấp, sẽ tự động khóa khi quay lại trang chi tiết trang bị.
-
-    Không khớp quy tắc chỉ kết thúc và giữ lại, không tự động khóa.
-
-    Trang bị đã khóa sẽ không nhấn lại để tránh mở khóa nhầm.'
-  ? '金装区
-
-    回收累计返还'
-  : 'Khu trang bị vàng
-
-    Hoàn trả cộng dồn khi thu hồi'
-  ? '金装区
-
-    调律消耗'
-  : 'Khu trang bị vàng
-
-    Tiêu hao Điều Luật'
-  ? '金装区
-
-    重置累计返还'
-  : 'Khu trang bị vàng
-
-    Hoàn trả cộng dồn khi đặt lại'
+  "只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。\n不会改写装备；进入后的调律处理仍使用完整实际词条。": "Chỉ bỏ qua các dòng hiện có khác khi kiểm tra ngưỡng Điều Luật, dùng tiềm năng tối đa của dòng đầu để quyết định có vào quy trình Điều Luật hay không.\nKhông ghi đè trang bị; sau khi vào xử lý Điều Luật vẫn dùng đầy đủ dòng thuộc tính thực tế."
+  "本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。\n这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。": "Cấp trang bị thấp nhất vẫn còn có thể Thừa Âm trong mùa giải này. Trang bị thấp hơn cấp này đã bị loại trong mùa hiện tại, không thể Thừa Âm tại chỗ hay lên bậc tiếp theo, nên không tham gia giả định Đầy cấp/Đầy Thừa Âm.\nMục này khác với \"Hỗ trợ Thừa Âm\" trong Cấu hình cấp: mục sau mô tả trang bị ở cấp đó trước đây có cho phép Thừa Âm hay không."
+  "\n\n同一份配置里有引用，删除后会显示为未知套装：\n{items}": "\n\nĐang có tham chiếu trong cùng cấu hình, sau khi xóa sẽ hiển thị là bộ không xác định:\n{items}"
+  "{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值\n{notes}": "{school} · {sources} nguồn · {pending} mục chờ bổ sung/nhập một phần · {declared} hiệu ứng đã khai báo, chưa tính\n{notes}"
+  "发现 {count} 处部位/品阶无启用规则覆盖：\n": "Phát hiện {count} tổ hợp vị trí/phẩm chất chưa có quy tắc đang bật bao phủ:\n"
+  "筛选已生效，但保存到用户资料失败：{error}\n\n本次浏览不受影响，下次操作会再尝试保存。": "Bộ lọc đã áp dụng, nhưng lưu vào hồ sơ người dùng thất bại: {error}\n\nPhiên xem này không bị ảnh hưởng, thao tác sau sẽ thử lưu lại."
+  "紫装区\n回收累计返还": "Khu trang bị tím\nHoàn trả cộng dồn khi thu hồi"
+  "紫装区\n调律消耗": "Khu trang bị tím\nTiêu hao Điều Luật"
+  "紫装区\n重置累计返还": "Khu trang bị tím\nHoàn trả cộng dồn khi đặt lại"
+  "装备至少完成一轮调律后，若词条已满且明确命中\n“继续调律或锁定”规则，并且传入规则的最终评级达到\n优秀或顶级，返回装备详情页后自动锁定。\n无规则命中只结束并保留，不会自动锁定。\n已锁定装备不会再点击，避免误解锁。": "Sau khi trang bị hoàn tất ít nhất một vòng Điều Luật, nếu đã đủ dòng và khớp rõ ràng\nquy tắc \"Tiếp tục Điều Luật hoặc khóa\", đồng thời đánh giá cuối của quy tắc truyền vào đạt\nXuất sắc hoặc Đỉnh cấp, sẽ tự động khóa khi quay lại trang chi tiết trang bị.\nKhông khớp quy tắc chỉ kết thúc và giữ lại, không tự động khóa.\nTrang bị đã khóa sẽ không nhấn lại để tránh mở khóa nhầm."
+  "金装区\n回收累计返还": "Khu trang bị vàng\nHoàn trả cộng dồn khi thu hồi"
+  "金装区\n调律消耗": "Khu trang bị vàng\nTiêu hao Điều Luật"
+  "金装区\n重置累计返还": "Khu trang bị vàng\nHoàn trả cộng dồn khi đặt lại"
   别名（每行一个）: Bí danh (mỗi dòng một mục)
   原始词条名称: Tên dòng thuộc tính gốc
   心法名（六重自动建好）: Tên tâm pháp (tự động tạo 6 tầng)

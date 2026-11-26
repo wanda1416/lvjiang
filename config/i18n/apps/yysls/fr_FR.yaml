@@ -684,12 +684,7 @@ yysls:
   确定: OK
   确定要删除分组_{name}_吗: Voulez-vous vraiment supprimer le groupe '{name}' ?
   自定义增减_{label}: Variation personnalisée - {label}
-  ? '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
-
-    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
-  : 'Coché : applique la sémantique d''action et déclenche la synchro de sync_targets.
-
-    Décoché : écrase uniquement cette clé sans déclencher aucune synchronisation.'
+  "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。": "Coché : applique la sémantique d'action et déclenche la synchro de sync_targets.\nDécoché : écrase uniquement cette clé sans déclencher aucune synchronisation."
   至少保留一个分组: Conserver au moins un groupe
   覆写_{label}: Écraser - {label}
   该数值已被其他进程更新_本次增减未写入_请刷新后重试: Cette valeur a été modifiée par un autre processus ;
@@ -1396,12 +1391,7 @@ auto_strings:
     « Décision par défaut » : réglable par emplacement ou suit les paramètres de règle'
   全部规则: Toutes les règles
   全部规则（默认配置）: Toutes les règles (config par défaut)
-  ? '其他增益：
-
-    '
-  : 'Autres bonus :
-
-    '
+  "其他增益：\n": "Autres bonus :\n"
   冠胄: Casque
   冠胄 · 胸甲: Casque · Cuirasse
   冲突: Conflit
@@ -1454,17 +1444,7 @@ auto_strings:
   名称为空: Nom vide
   否: Non
   命中: Correspondance
-  ? '命中条件：装备任一条题名属于勾选词条
-
-    （勾选仅首词条时只判定装备首词条）；
-
-    自选词条语义不跑潜力判定'
-  : 'Condition : au moins un affixe de l''équipement fait partie des affixes cochés
-
-    (si « Premier affixe uniquement » est coché, seul le premier affixe est évalué)
-    ;
-
-    la sémantique « Affixes personnalisés » ignore l''évaluation de potentiel'
+  "命中条件：装备任一条题名属于勾选词条\n（勾选仅首词条时只判定装备首词条）；\n自选词条语义不跑潜力判定": "Condition : au moins un affixe de l'équipement fait partie des affixes cochés\n(si « Premier affixe uniquement » est coché, seul le premier affixe est évalué) ;\nla sémantique « Affixes personnalisés » ignore l'évaluation de potentiel"
   命中条件：预期评级属于勾选档位（全选 = 不限，不取评级）: 'Condition : la note attendue appartient aux paliers
     cochés (Tout sélectionner = illimité, sans évaluer la note)'
   命中条件：首词条初始数值按方向比较该值；≤ 100 / ≥ 0 = 不限（识别失败视为不达标）: 'Condition : compare la valeur
@@ -1661,16 +1641,7 @@ auto_strings:
   新建方案: Nouveau plan
   方案: Plan
   方案 ADPS: ADPS du plan
-  ? '方案「{name}」已生成。
-
-    DPS：{dps:.2f}
-
-    文件：{path}'
-  : 'Plan « {name} » généré.
-
-    DPS : {dps:.2f}
-
-    Fichier : {path}'
+  "方案「{name}」已生成。\nDPS：{dps:.2f}\n文件：{path}": "Plan « {name} » généré.\nDPS : {dps:.2f}\nFichier : {path}"
   方案名称: Nom du plan
   方案数值读取失败：{error}: 'Échec de lecture des valeurs du plan : {error}'
   方案管理: Gestion des plans
@@ -1744,18 +1715,7 @@ auto_strings:
     au moins un dans l'onglet Accordage
   本件已重置过一次，冷却期内不再重置: Cette pièce a déjà été réinitialisée une fois ; plus aucune réinitialisation
     pendant la recharge
-  ? '本条规则取评级时只注入首词条，忽略已有的其他词条
-
-    （其余槽视作空槽由潜力判定自由填充）；避免回收掉
-
-    非首词条已成垃圾但可重置调律的装备'
-  : 'Pour noter cette règle, seul le premier affixe est injecté, les autres sont ignorés
-
-    (les emplacements restants sont traités comme vides et remplis librement par l''évaluation
-    de potentiel) ; évite de recycler
-
-    un équipement dont les affixes secondaires sont mauvais mais qui peut encore être
-    réinitialisé'
+  "本条规则取评级时只注入首词条，忽略已有的其他词条\n（其余槽视作空槽由潜力判定自由填充）；避免回收掉\n非首词条已成垃圾但可重置调律的装备": "Pour noter cette règle, seul le premier affixe est injecté, les autres sont ignorés\n(les emplacements restants sont traités comme vides et remplis librement par l'évaluation de potentiel) ; évite de recycler\nun équipement dont les affixes secondaires sont mauvais mais qui peut encore être réinitialisé"
   本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；自选规则=弹窗勾选；自选词条=判定结果列改勾词条，按装备词条名匹配，不跑潜力判定: 'Mode d''évaluation
     : Règles transmises = cochées à l''exécution ; Toutes les règles ; Règles personnalisées
     = choisies en fenêtre ; Affixes personnalisés = affixes cochés dans la colonne
@@ -1774,13 +1734,7 @@ auto_strings:
     vous pouvez toujours annuler pendant la recherche.
   正在读取候选装备…: Lecture des équipements candidats…
   正常完成: Terminé normalement
-  ? '武器【{type}】与当前方案的武学不匹配（主武学武器：{main}，副武学武器：{sub}）。
-
-    如需使用该武器，请新建对应流派的方案。'
-  : 'L''arme [{type}] ne correspond pas aux arts de ce plan (Art principal : {main},
-    Art secondaire : {sub}).
-
-    Pour utiliser cette arme, créez un plan pour le style correspondant.'
+  "武器【{type}】与当前方案的武学不匹配（主武学武器：{main}，副武学武器：{sub}）。\n如需使用该武器，请新建对应流派的方案。": "L'arme [{type}] ne correspond pas aux arts de ce plan (Art principal : {main}, Art secondaire : {sub}).\nPour utiliser cette arme, créez un plan pour le style correspondant."
   武器类: Armes
   攻具套装: Ensemble d'équipement offensif
   攻具套装定义: Définitions d'ensemble offensif
@@ -1827,18 +1781,8 @@ auto_strings:
   用户中断: Interrompu par l'utilisateur
   破竹: Fend-bambou
   确定删除基础属性「{name}」？: Supprimer les attributs de base « {name} » ?
-  ? '确定要从背包中删除【{name}】吗？
-
-    此操作不可撤销。'
-  : 'Voulez-vous vraiment supprimer [{name}] de votre sac ?
-
-    Cette action est irréversible.'
-  ? '确定要删除模拟装备【{name}】吗？
-
-    此操作不可撤销。'
-  : 'Voulez-vous vraiment supprimer l''équipement simulé [{name}] ?
-
-    Cette action est irréversible.'
+  "确定要从背包中删除【{name}】吗？\n此操作不可撤销。": "Voulez-vous vraiment supprimer [{name}] de votre sac ?\nCette action est irréversible."
+  "确定要删除模拟装备【{name}】吗？\n此操作不可撤销。": "Voulez-vous vraiment supprimer l'équipement simulé [{name}] ?\nCette action est irréversible."
   确认跟随: Confirmer le suivi
   神力词条「{name}」不能是转律产出：转律不会产出神力词条: 'L''affixe divin « {name} » ne peut pas provenir
     d''une transmutation : la transmutation n''en produit jamais'
@@ -2002,16 +1946,7 @@ auto_strings:
   轴序: Ordre de rotation
   轴行: Ligne de rotation
   输入基础属性名称: Saisissez un nom d'attributs de base
-  ? '运行时覆盖基础规则中的等级门槛；
-
-    「默认」使用基础规则定义的 min_level，
-
-    选择具体等级后以该值为准。'
-  : 'Remplace le seuil de niveau de la règle de base à l''exécution ;
-
-    « Par défaut » utilise min_level de la règle de base,
-
-    choisir un niveau précis applique cette valeur.'
+  "运行时覆盖基础规则中的等级门槛；\n「默认」使用基础规则定义的 min_level，\n选择具体等级后以该值为准。": "Remplace le seuil de niveau de la règle de base à l'exécution ;\n« Par défaut » utilise min_level de la règle de base,\nchoisir un niveau précis applique cette valeur."
   进调律前的行为点）：未达调律门槛的装备按下表处置，自上而下首条命中即生效并阻断后续规则；无命中 = 保留: 'Point d''action avant accordage)
     : les équipements sous le seuil suivent la table ci-dessous, de haut en bas, la
     première correspondance s''applique et bloque la suite ; sans correspondance =
@@ -2024,19 +1959,7 @@ auto_strings:
   选择首词条: Sélectionner le premier affixe
   通用: Général
   通用判定: Évaluation générale
-  ? '重命名会修改规则 id（YAML 文件名），
-
-    可能影响直接引用该 key 的代码/工作流配置，请确认。
-
-
-    新 key（小写字母开头的英文/数字/下划线）：'
-  : 'Renommer modifie l''ID de règle (nom du fichier YAML),
-
-    ce qui peut affecter le code ou les workflows qui référencent cette clé ; veuillez
-    confirmer.
-
-
-    Nouvelle clé (commence par une minuscule, lettres/chiffres/tirets bas) :'
+  "重命名会修改规则 id（YAML 文件名），\n可能影响直接引用该 key 的代码/工作流配置，请确认。\n\n新 key（小写字母开头的英文/数字/下划线）：": "Renommer modifie l'ID de règle (nom du fichier YAML),\nce qui peut affecter le code ou les workflows qui référencent cette clé ; veuillez confirmer.\n\nNouvelle clé (commence par une minuscule, lettres/chiffres/tirets bas) :"
   重命名词条名: Renommer le nom d'affixe
   重新计算: Recalculer
   重置二次确认识别失败，跳过该装备: Échec de reconnaissance de la seconde confirmation de réinitialisation,
@@ -2337,27 +2260,7 @@ auto_strings:
   另有 {n} 项仅战斗内生效，不进本表: '{n} autres ne s''appliquent qu''en combat et n''apparaissent
     pas ici'
   同一门心法不能装在多个槽位: Une même Voie intérieure ne peut pas occuper plusieurs emplacements
-  ? '名字 = 调律 Tab 勾选项；
-
-    增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；
-
-    属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；
-
-    绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；
-
-    武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。'
-  : 'Nom = case à cocher de l''onglet Accordage ;
-
-    Affixe de dégâts vide / « - Aucun bonus - » = aucun bonus requis de ce côté ;
-
-    Attribut = élément du mode (les pièces hors arme convertissent attribut→sans forme)
-    ;
-
-    Interrupteur lié = évaluer ce mode équivaut à activer cet interrupteur (surcharge
-    l''état global) ;
-
-    Les armes/affixes viennent de Config du jeu ; les bonus sont filtrés selon l''arme
-    du même côté.'
+  "名字 = 调律 Tab 勾选项；\n增伤词条留空/选「- 无需增伤 -」= 该侧不需要增伤；\n属性 = 玩法属攻流派（非武器部位据此做属攻→无相等价）；\n绑定开关 = 该玩法判定时等价于激活该开关（覆盖全局状态）；\n武器/词条候选来自游戏配置，增伤候选随同侧武器绑定收窄。": "Nom = case à cocher de l'onglet Accordage ;\nAffixe de dégâts vide / « - Aucun bonus - » = aucun bonus requis de ce côté ;\nAttribut = élément du mode (les pièces hors arme convertissent attribut→sans forme) ;\nInterrupteur lié = évaluer ce mode équivaut à activer cet interrupteur (surcharge l'état global) ;\nLes armes/affixes viennent de Config du jeu ; les bonus sont filtrés selon l'arme du même côté."
   基础属性推导: Dérivation des attributs de base
   存为基础属性: Enregistrer comme attributs de base
   对照值: Valeur de référence
@@ -2448,13 +2351,7 @@ auto_strings:
   （空）: (Vide)
   玩法名称: Nom du mode
   武学名称: Nom de l'art martial
-  ? '同一份配置里有引用，删除后会显示为未知套装：
-
-    {items}'
-  : 'Référencé dans la même config ; après suppression, apparaîtra comme ensemble
-    inconnu :
-
-    {items}'
+  "同一份配置里有引用，删除后会显示为未知套装：\n{items}": "Référencé dans la même config ; après suppression, apparaîtra comme ensemble inconnu :\n{items}"
   ' 级': ' Niv.'
   F6 调律配置可新增/编辑规则组: F6 Config d'accordage pour ajouter/modifier des groupes de règles
   MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。: Service MCP démarré, config de connexion {agent}
@@ -2584,15 +2481,7 @@ auto_strings:
     d'affixes et Pierres Chuanlv ; choisir le niveau cible Chengyin coche aussi Chengyin
   删除备战方案: Supprimer la configuration
   删除套装: Supprimer l'ensemble
-  ? '删除套装「{name}」？
-
-
-    备战方案和装备记录里引用它的部位，删除后会按未知套装处理，不会自动清空。{detail}'
-  : 'Supprimer l''ensemble « {name} » ?
-
-
-    Les emplacements des configurations et équipements qui le référencent s''afficheront
-    comme ensemble inconnu ; rien n''est effacé automatiquement.{detail}'
+  "删除套装「{name}」？\n\n备战方案和装备记录里引用它的部位，删除后会按未知套装处理，不会自动清空。{detail}": "Supprimer l'ensemble « {name} » ?\n\nLes emplacements des configurations et équipements qui le référencent s'afficheront comme ensemble inconnu ; rien n'est effacé automatiquement.{detail}"
   删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择: Supprime toutes les anciennes versions à gauche
     et migre les références vers la droite ; choix mutuellement exclusif en cas de
     conflit
@@ -2732,27 +2621,7 @@ auto_strings:
   导入毕业率方案: Importer un plan d'optimisation
   导出文件: Exporter le fichier
   导出路径需为绝对路径或以 ~/ 开头: Le chemin d'exportation doit être absolu ou commencer par ~/
-  ? '将出装搭配「{build}」导入备战方案「{plan}」，替换八个槽位的装备。
-
-    原装备保留在当前用户装备库中，不会删除，也不会影响其他备战方案。
-
-    同时应用该搭配的弓玦，战斗类型设为 PVE：
-
-    {details}
-
-    是否继续？'
-  : 'Importer le build « {build} » dans la configuration « {plan} » et remplacer les
-    huit emplacements ?
-
-    Les équipements d''origine restent dans la bibliothèque de l''utilisateur sans
-    suppression ni impact sur les autres configurations.
-
-    L''ensemble Arc/Jade du build sera appliqué et le type de combat passera en PVE
-    :
-
-    {details}
-
-    Continuer ?'
+  "将出装搭配「{build}」导入备战方案「{plan}」，替换八个槽位的装备。\n原装备保留在当前用户装备库中，不会删除，也不会影响其他备战方案。\n同时应用该搭配的弓玦，战斗类型设为 PVE：\n{details}\n是否继续？": "Importer le build « {build} » dans la configuration « {plan} » et remplacer les huit emplacements ?\nLes équipements d'origine restent dans la bibliothèque de l'utilisateur sans suppression ni impact sur les autres configurations.\nL'ensemble Arc/Jade du build sera appliqué et le type de combat passera en PVE :\n{details}\nContinuer ?"
   将承音装备的普通词条数值视为承音上限参与计算: Considérer les affixes ordinaires des équipements Chengyin
     au plafond Chengyin dans le calcul
   尚无内置角色属性表: Aucune table d'attributs de personnage intégrée
@@ -2853,22 +2722,7 @@ auto_strings:
   新增武器重启后方可参与识别；被流派配置引用的武器不可删除: Les nouvelles armes participent à la reconnaissance
     après redémarrage ; les armes référencées par un style ne peuvent pas être supprimées
   新建属性…: Nouvel attribut…
-  ? '方案极限：原穿戴方案按满等级、满承音、满定音计算；
-
-    当前实值：备战方案当前八件的实际毕业率，仅供参考；
-
-    七件极限：排除当前部位后，其余装备按三项全满计算；
-
-    候选极限：替换当前装备后，整套方案按三项全满计算。'
-  : 'Limite du plan : configuration d''origine à niveau max, plein Chengyin et pleine
-    harmonisation ;
-
-    Valeur réelle actuelle : taux d''optimisation réel des huit pièces actuelles,
-    à titre indicatif ;
-
-    Limite 7 pièces : hors cet emplacement, les autres pièces en triple max ;
-
-    Limite candidat : après remplacement par cette pièce, tout le plan en triple max.'
+  "方案极限：原穿戴方案按满等级、满承音、满定音计算；\n当前实值：备战方案当前八件的实际毕业率，仅供参考；\n七件极限：排除当前部位后，其余装备按三项全满计算；\n候选极限：替换当前装备后，整套方案按三项全满计算。": "Limite du plan : configuration d'origine à niveau max, plein Chengyin et pleine harmonisation ;\nValeur réelle actuelle : taux d'optimisation réel des huit pièces actuelles, à titre indicatif ;\nLimite 7 pièces : hors cet emplacement, les autres pièces en triple max ;\nLimite candidat : après remplacement par cette pièce, tout le plan en triple max."
   方案等级: Niveau du plan
   方案：{name} · {level}级 v{version}（满值属性，不含食物加成）: 'Plan : {name} · Niv. {level} v{version}
     (attributs max, hors bonus de nourriture)'
@@ -3035,12 +2889,7 @@ auto_strings:
   确定删除「{name}」吗？该方案的 {count} 个装备引用会解除，公共装备池中的装备不会删除，保存后才会生效。: Supprimer « {name} »
     ? Les {count} références d'équipement de ce plan seront détachées sans supprimer
     les pièces du stock partagé ; effectif après enregistrement.
-  ? '确定删除方案「{name}」的 {level}级 v{version}？
-
-    对应的 JSON 文件也会被删除。'
-  : 'Supprimer le plan « {name} » Niv. {level} v{version} ?
-
-    Le fichier JSON correspondant sera aussi supprimé.'
+  "确定删除方案「{name}」的 {level}级 v{version}？\n对应的 JSON 文件也会被删除。": "Supprimer le plan « {name} » Niv. {level} v{version} ?\nLe fichier JSON correspondant sera aussi supprimé."
   确定删除武器类型「{name}」？: Supprimer le type d'arme « {name} » ?
   确定删除流派「{name}」？: Supprimer le style « {name} » ?
   确定删除规则组「{name}」？该操作不可恢复。: Supprimer le groupe de règles « {name} » ? Cette action
@@ -3065,18 +2914,7 @@ auto_strings:
   等级门槛 + 调律门槛 + 扫描/材料/调律处理，一组一套可切换；流派规则全局不受影响: Seuil de niveau + seuil d'accordage
     + traitement scan/matériaux/accordage, un jeu par groupe commutable ; les règles
     de style restent globales
-  ? '筛选已生效，但保存到用户资料失败：{error}
-
-
-    本次浏览不受影响，下次操作会再尝试保存。
-
-    筛选条件未保存'
-  : 'Filtre appliqué, mais échec d''enregistrement dans le profil utilisateur : {error}
-
-
-    Cette session n''est pas affectée ; la prochaine opération réessaiera.
-
-    Filtres non enregistrés'
+  "筛选已生效，但保存到用户资料失败：{error}\n\n本次浏览不受影响，下次操作会再尝试保存。\n筛选条件未保存": "Filtre appliqué, mais échec d'enregistrement dans le profil utilisateur : {error}\n\nCette session n'est pas affectée ; la prochaine opération réessaiera.\nFiltres non enregistrés"
   筛选条件未保存: Filtres non enregistrés
   筛选设置: Paramètres de filtre
   系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force: 'Coefficients
@@ -3109,24 +2947,7 @@ auto_strings:
     réel
   装备无相穿透已折算至当前流派属攻穿透。: La pénétration sans forme de l'équipement a été convertie en
     pénétration d'attribut du style actuel.
-  ? '装备至少完成一轮调律后，若词条已满且明确命中
-
-    "继续调律或锁定"规则，并且传入规则的最终评级达到
-
-    优秀或顶级，返回装备详情页后自动锁定。
-
-    无规则命中只结束并保留，不会自动锁定。
-
-    已锁定装备不会再点击，避免误解锁。'
-  : 'Après au moins un tour d''accordage, si les affixes sont complets et que
-
-    la règle « Continuer l''accordage ou verrouiller » est déclenchée, avec une
-
-    note finale Excellent ou Sommet, verrouille automatiquement au retour.
-
-    Sans correspondance, arrête et conserve sans verrouiller.
-
-    Un équipement déjà verrouillé n''est pas recliqué pour éviter tout déverrouillage.'
+  "装备至少完成一轮调律后，若词条已满且明确命中\n\"继续调律或锁定\"规则，并且传入规则的最终评级达到\n优秀或顶级，返回装备详情页后自动锁定。\n无规则命中只结束并保留，不会自动锁定。\n已锁定装备不会再点击，避免误解锁。": "Après au moins un tour d'accordage, si les affixes sont complets et que\nla règle « Continuer l'accordage ou verrouiller » est déclenchée, avec une\nnote finale Excellent ou Sommet, verrouille automatiquement au retour.\nSans correspondance, arrête et conserve sans verrouiller.\nUn équipement déjà verrouillé n'est pas recliqué pour éviter tout déverrouillage."
   装备贡献字段: Champs de contribution d'équipement
   装备输入预览: Aperçu de saisie d'équipement
   装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效: L'équipement doit obtenir au moins cette note
@@ -3235,14 +3056,7 @@ auto_strings:
     les deux arts martiaux ; choisissez « Aucun style » pour une combinaison libre
   选择调律玩法: Sélectionner le mode d'accordage
   选择转律词条库（{school}）: Sélectionner la réserve d'affixes de transmutation ({school})
-  ? '选项已生效，但保存到用户资料失败：{error}
-
-
-    本次操作不受影响，下次操作会再尝试保存。'
-  : 'Option appliquée, mais échec d''enregistrement dans le profil utilisateur : {error}
-
-
-    Cette opération n''est pas affectée ; la suivante réessaiera.'
+  "选项已生效，但保存到用户资料失败：{error}\n\n本次操作不受影响，下次操作会再尝试保存。": "Option appliquée, mais échec d'enregistrement dans le profil utilisateur : {error}\n\nCette opération n'est pas affectée ; la suivante réessaiera."
   通用判定：这里的条件对所有部位都生效: 'Évaluation commune : ces conditions s''appliquent à tous les
     emplacements'
   部位与金/紫品阶均有候选规则。判定结果和首词条条件仍可能使规则不命中。: Tous les emplacements et qualités Or/Violet
@@ -3295,122 +3109,22 @@ auto_strings:
   （须大于 0）: (Doit être > 0)
   ＋ 新增规则: ＋ Nouvelle règle
   ；强制要求未满足：: ' ; exigences obligatoires non satisfaites : '
-  ? '「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。
-
-
-    现有可用等级：{levels}。'
-  : '« {target} » n''a pas encore de plan d''optimisation au Niv. {level} ; comparaison
-    optimale indisponible.
-
-
-    Niveaux disponibles : {levels}.'
+  "「{target}」在 {level} 级还没有毕业率方案，暂时无法比较最优组合。\n\n现有可用等级：{levels}。": "« {target} » n'a pas encore de plan d'optimisation au Niv. {level} ; comparaison optimale indisponible.\n\nNiveaux disponibles : {levels}."
   「{target}」还没有可用的毕业率方案，导入后才能比较最优组合。: « {target} » n'a pas encore de plan d'optimisation
     disponible ; importez-en un pour comparer les combinaisons optimales.
-  ? '只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。
-
-    不会改写装备；进入后的调律处理仍使用完整实际词条。'
-  : 'Ignore les autres affixes uniquement lors du contrôle du seuil d''accordage,
-    en évaluant le potentiel maximal à partir du premier affixe.
-
-    Ne modifie pas l''équipement ; le traitement d''accordage utilise ensuite tous
-    les affixes réels.'
-  ? '本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。
-
-    这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。'
-  : 'Niveau minimal encore éligible à Chengyin cette saison. En dessous, l''équipement
-    est abandonné cette saison (ni Chengyin sur place ni vers le palier suivant) et
-    exclu des hypothèses niveau max/plein Chengyin.
-
-    Ceci diffère de « Compatible Chengyin » dans la config de niveau, qui indique
-    si ce niveau autorisait Chengyin à sa sortie.'
-  ? '
-
-
-    同一份配置里有引用，删除后会显示为未知套装：
-
-    {items}'
-  : '
-
-
-    Référencé dans la même config ; après suppression, apparaîtra comme ensemble inconnu
-    :
-
-    {items}'
-  ? '{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值
-
-    {notes}'
-  : '{school} · {sources} sources · {pending} en attente/partielles · {declared} déclarées
-    non évaluées
-
-    {notes}'
-  ? '发现 {count} 处部位/品阶无启用规则覆盖：
-
-    '
-  : '{count} combinaison(s) emplacement/qualité sans règle active :
-
-    '
-  ? '筛选已生效，但保存到用户资料失败：{error}
-
-
-    本次浏览不受影响，下次操作会再尝试保存。'
-  : 'Filtre appliqué, mais échec d''enregistrement dans le profil utilisateur : {error}
-
-
-    Cette session n''est pas affectée ; la prochaine opération réessaiera.'
-  ? '紫装区
-
-    回收累计返还'
-  : 'Zone Violet
-
-    Retour cumulé recyclage'
-  ? '紫装区
-
-    调律消耗'
-  : 'Zone Violet
-
-    Coût d''accordage'
-  ? '紫装区
-
-    重置累计返还'
-  : 'Zone Violet
-
-    Retour cumulé réinitialisation'
-  ? '装备至少完成一轮调律后，若词条已满且明确命中
-
-    “继续调律或锁定”规则，并且传入规则的最终评级达到
-
-    优秀或顶级，返回装备详情页后自动锁定。
-
-    无规则命中只结束并保留，不会自动锁定。
-
-    已锁定装备不会再点击，避免误解锁。'
-  : 'Après au moins un tour d''accordage, si les affixes sont complets et que
-
-    la règle « Continuer l''accordage ou verrouiller » est déclenchée, avec une
-
-    note finale Excellent ou Sommet, verrouille automatiquement au retour.
-
-    Sans correspondance, arrête et conserve sans verrouiller.
-
-    Un équipement déjà verrouillé n''est pas recliqué pour éviter tout déverrouillage.'
-  ? '金装区
-
-    回收累计返还'
-  : 'Zone Or
-
-    Retour cumulé recyclage'
-  ? '金装区
-
-    调律消耗'
-  : 'Zone Or
-
-    Coût d''accordage'
-  ? '金装区
-
-    重置累计返还'
-  : 'Zone Or
-
-    Retour cumulé réinitialisation'
+  "只在调律门槛判定时忽略已有的其他词条，以首词条胚子的最大潜力决定是否进入调律流程。\n不会改写装备；进入后的调律处理仍使用完整实际词条。": "Ignore les autres affixes uniquement lors du contrôle du seuil d'accordage, en évaluant le potentiel maximal à partir du premier affixe.\nNe modifie pas l'équipement ; le traitement d'accordage utilise ensuite tous les affixes réels."
+  "本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。\n这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备当年是否允许承音。": "Niveau minimal encore éligible à Chengyin cette saison. En dessous, l'équipement est abandonné cette saison (ni Chengyin sur place ni vers le palier suivant) et exclu des hypothèses niveau max/plein Chengyin.\nCeci diffère de « Compatible Chengyin » dans la config de niveau, qui indique si ce niveau autorisait Chengyin à sa sortie."
+  "\n\n同一份配置里有引用，删除后会显示为未知套装：\n{items}": "\n\nRéférencé dans la même config ; après suppression, apparaîtra comme ensemble inconnu :\n{items}"
+  "{school} · {sources} 项来源 · {pending} 项待补/部分录入 · {declared} 项效果已声明、未求值\n{notes}": "{school} · {sources} sources · {pending} en attente/partielles · {declared} déclarées non évaluées\n{notes}"
+  "发现 {count} 处部位/品阶无启用规则覆盖：\n": "{count} combinaison(s) emplacement/qualité sans règle active :\n"
+  "筛选已生效，但保存到用户资料失败：{error}\n\n本次浏览不受影响，下次操作会再尝试保存。": "Filtre appliqué, mais échec d'enregistrement dans le profil utilisateur : {error}\n\nCette session n'est pas affectée ; la prochaine opération réessaiera."
+  "紫装区\n回收累计返还": "Zone Violet\nRetour cumulé recyclage"
+  "紫装区\n调律消耗": "Zone Violet\nCoût d'accordage"
+  "紫装区\n重置累计返还": "Zone Violet\nRetour cumulé réinitialisation"
+  "装备至少完成一轮调律后，若词条已满且明确命中\n“继续调律或锁定”规则，并且传入规则的最终评级达到\n优秀或顶级，返回装备详情页后自动锁定。\n无规则命中只结束并保留，不会自动锁定。\n已锁定装备不会再点击，避免误解锁。": "Après au moins un tour d'accordage, si les affixes sont complets et que\nla règle « Continuer l'accordage ou verrouiller » est déclenchée, avec une\nnote finale Excellent ou Sommet, verrouille automatiquement au retour.\nSans correspondance, arrête et conserve sans verrouiller.\nUn équipement déjà verrouillé n'est pas recliqué pour éviter tout déverrouillage."
+  "金装区\n回收累计返还": "Zone Or\nRetour cumulé recyclage"
+  "金装区\n调律消耗": "Zone Or\nCoût d'accordage"
+  "金装区\n重置累计返还": "Zone Or\nRetour cumulé réinitialisation"
   别名（每行一个）: Alias (un par ligne)
   原始词条名称: Nom d'affixe d'origine
   心法名（六重自动建好）: Nom de Voie intérieure (rangs 1 à 6 créés automatiquement)

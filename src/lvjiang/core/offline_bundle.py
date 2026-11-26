@@ -36,15 +36,11 @@ from .users.document import is_valid_username
 
 FORMAT_VERSION = 3
 MAX_BUNDLE_BYTES = 256 << 20
-# 同步契约按消费者登记；新增目录默认不下发，不能递归复制整个配置层。
-_LAYER_PATTERNS = (
-    "app.yaml", "ocr.yaml",
-    "scenes/_meta.json", "scenes/*.yaml", "scenes/**/*.yaml",
-    "layouts/_meta.json", "layouts/*.yaml",
-    "workflows/**/*.wf",
-    "references/*.yaml", "references/**/*.png", "templates/**/*.png",
-    "maps/*/map.yaml", "maps/*/*.png",
-)
+# system / local 两层默认全量递归打包，不再按目录或后缀维护白名单；
+# 仅对顶层 layouts/ 按同步方案的布局依赖过滤、对顶层 references/ 按方案图库空间过滤，
+# 并跳过隐藏目录（如 .git/.migrations）、Python 缓存与本机授权文件。
+_IGNORED_DIR_NAMES = frozenset({"__pycache__"})
+_IGNORED_SUFFIXES = frozenset({".pyc", ".pyo"})
 _SESSION_FILES = ("session.json", "interface.json", "batch.json", "workflow.json")
 
 #: profile.db 不进离线包：总览数据由账号云端同步；其余数据库由 app 钩子声明。
@@ -69,27 +65,65 @@ def _database_files() -> tuple[str, ...]:
         for name in app.offline_database_files))))
 
 
-def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple[Path, Path]]:
+def _include_layer_file(
+    rel_in_layer: Path,
+    layout_scope: set[str],
+    reference_scope: set[str] | None,
+) -> bool:
+    """判定 system / local 层内文件是否随离线包下发。
+
+    除顶层 ``layouts/``（按所选布局及继承链过滤）与顶层 ``references/``（按所选方案
+    图库空间过滤）外，其余目录与文件（含独立任务包的 manifest/scenes/layouts/templates
+    及插件配置）一律全部打包。
+    """
+    parts = rel_in_layer.parts
+    if not parts:
+        return False
+    if any(part.startswith(".") or part in _IGNORED_DIR_NAMES for part in parts):
+        return False
+    if rel_in_layer.suffix.lower() in _IGNORED_SUFFIXES:
+        return False
+
+    top = parts[0]
+    if top == "layouts":
+        if len(parts) == 2:
+            if parts[1] == "_meta.json":
+                return True
+            if rel_in_layer.suffix == ".yaml":
+                return rel_in_layer.stem in layout_scope
+            return True
+        return parts[1] in layout_scope
+
+    if top == "references" and reference_scope is not None:
+        if len(parts) == 2:
+            if rel_in_layer.suffix == ".yaml":
+                return rel_in_layer.stem in reference_scope
+            return True
+        return parts[1] in reference_scope
+
+    return True
+
+
+def _configuration_files(
+    config: Path,
+    layout_scope: set[str],
+    reference_scope: set[str] | None = None,
+) -> Iterator[tuple[Path, Path]]:
     hooks = get_registered_hooks()
-    patterns = (*_LAYER_PATTERNS, *(
-        pattern for app in hooks for pattern in app.offline_configuration_patterns))
+    from .license_files import is_private_license_file
     for layer, root in (("system", get_config_system_dir(config)), ("local", get_config_local_dir(config))):
-        paths = {path for pattern in patterns for path in root.glob(pattern)}
-        # 布局清单按同步范围过滤：未选中布局的清单不进包（坐标目录本就只
-        # 收集 scope 内的布局）。
-        layouts_root = root / "layouts"
-        paths = {
-            path for path in paths
-            if not (path.parent == layouts_root and path.suffix == ".yaml"
-                    and path.name != "_meta.json" and path.stem not in layout_scope)
-        }
-        for layout in layout_scope:
-            paths.update((root / "layouts" / layout).glob("*.yaml"))
-            paths.update((root / "layouts" / layout).glob("*/*.json"))
-            paths.update((root / "layouts" / layout).glob("*.json"))
-        from .license_files import is_private_license_file
-        yield from ((Path(layer) / path.relative_to(root), path)
-                    for path in sorted(paths) if not is_private_license_file(path.name))
+        if not root.is_dir():
+            continue
+        paths: list[Path] = []
+        for path in root.rglob("*"):
+            if not path.is_file() or path.is_symlink():
+                continue
+            rel_in_layer = path.relative_to(root)
+            if is_private_license_file(path.name):
+                continue
+            if _include_layer_file(rel_in_layer, layout_scope, reference_scope):
+                paths.append(path)
+        yield from ((Path(layer) / path.relative_to(root), path) for path in sorted(paths))
     session = session_directory(config)
     yield from ((Path("session") / name, session / name) for name in _SESSION_FILES)
     yield from ((Path("session/users") / path.name, path) for path in sorted((session / "users").glob("*.json")))
@@ -98,15 +132,42 @@ def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[tuple
             yield from ((Path("session") / name, session / name) for name in app.offline_session_files())
 
 
-def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str) -> dict:
+def build_offline_bundle(
+    root: Path,
+    destination: Path,
+    *,
+    username: str,
+    plan_id: str | None = None,
+    layout: str = "",
+    space: str = "",
+) -> dict:
     """构造配置副本和 SQLite backup 快照；不修改 PC 的活动选择或数据库。
 
-    profile（总览数据与定义）不进离线包：手机登录后由账号云端同步，
-    与 PC 在线行为一致。
+    - 传入 ``plan_id`` 时：仅允许打包包含安卓环境（``env == "android"``）的方案，
+      自动从方案提取 ``layout`` 与图库 ``space``，同时过滤顶层 ``layouts/`` 与 ``references/``。
+    - 仅传 ``layout``（兼容底层调用/测试）时：按 ``layout`` 过滤 ``layouts/``，
+      可选传 ``space`` 过滤 ``references/``。
+    - 除 ``layouts/`` 与 ``references/`` 外，``system/`` 与 ``local/`` 其余文件全部打包。
+    - profile（总览数据与定义）不进离线包：手机登录后由账号云端同步。
     """
-    if not is_valid_username(username) or not layout:
-        raise ValueError("请选择有效执行用户和安卓布局")
+    if not is_valid_username(username) or (not plan_id and not layout):
+        raise ValueError("请选择有效执行用户和同步方案")
     config = config_directory(root)
+    selected_plan = None
+    if plan_id:
+        from .config.plans import load_plans_from_config
+
+        plans = load_plans_from_config(config)
+        selected_plan = next((p for p in plans if p.id == plan_id), None)
+        if selected_plan is None:
+            raise ValueError("所选同步方案不存在")
+        if selected_plan.env != "android":
+            raise ValueError("所选同步方案不包含安卓环境，无法同步到手机")
+        if not selected_plan.layout:
+            raise ValueError("所选同步方案未指定布局")
+        layout = selected_plan.layout
+        space = selected_plan.space
+
     session_root = session_directory(config)
     with locked_paths(session_root / "session.json", session_root / "workflow.json"):
         workflow_source = read_workflow_source(session_root / "session.json", session_root / "workflow.json")
@@ -117,9 +178,21 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     entries = layout_doc["layouts"]
     if layout not in entries:
         raise ValueError("所选同步布局不存在")
+    if selected_plan is not None:
+        layout_env = str(entries[layout].get("env") or "").strip()
+        if layout_env not in ("", "android"):
+            raise ValueError("所选同步方案绑定的布局不支持安卓环境")
+        if space:
+            has_space = any(
+                (base / "references" / f"{space}.yaml").is_file()
+                for base in (get_config_system_dir(config), get_config_local_dir(config))
+            )
+            if not has_space:
+                raise ValueError(f"所选同步方案指定的图库不存在：{space}")
     layout_scope = {layout}
     if entries[layout].get("extends"):
         layout_scope.add(entries[layout]["extends"])
+    reference_scope = {space} if space else None
     if not (session_directory(config) / "users" / f"{username}.json").is_file():
         raise ValueError("执行用户资料不存在")
     manifest: dict[str, Any] = {
@@ -130,6 +203,11 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
         "profile": False,
         "files": {},
     }
+    if selected_plan is not None:
+        manifest["plan"] = selected_plan.id
+        manifest["plan_name"] = selected_plan.name
+    if space:
+        manifest["space"] = space
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:
         snapshots = []
         for name in _database_files():
@@ -149,7 +227,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                 manifest["files"][name] = hashlib.sha256(data).hexdigest()
                 archive.writestr(name, data)
 
-            for rel, path in _configuration_files(config, layout_scope):
+            for rel, path in _configuration_files(config, layout_scope, reference_scope):
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
                     continue
@@ -162,10 +240,14 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                     data = formatted_json_bytes(session_data)
                 if rel.as_posix() == "session/interface.json":
                     # 手机端只认「当前在用哪个」这一层：直接给到同步清单里的
-                    # 执行用户与布局，环境固定为安卓。
+                    # 执行用户、布局及方案/图库，环境固定为安卓。
                     interface = json.loads(data)
-                    interface.setdefault("actives", {}).update(
-                        user=username, layout=layout, env="android")
+                    actives = interface.setdefault("actives", {})
+                    actives.update(user=username, layout=layout, env="android")
+                    if selected_plan is not None:
+                        actives["plan"] = selected_plan.id
+                    if space:
+                        actives["space"] = space
                     data = formatted_json_bytes(interface)
                 add("config/" + rel.as_posix(), data)
             if workflow_source.document is not None:
@@ -254,6 +336,7 @@ def _write_mirrored_layers(target: Path, staged: Path, files: dict[str, str]) ->
 
 def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
                    username: str, layout: str,
+                   plan_id: str = "", space: str = "",
                    preserve_task_params: bool, preserve_batch_config: bool,
                    phone_workflow: WorkflowSource, incoming_workflow: WorkflowSource) -> None:
     """``session`` 只按清单覆盖：同目录里不在清单的文件一律不动。
@@ -333,6 +416,10 @@ def _apply_session(target: Path, staged: Path, files: dict[str, str], *,
         if not isinstance(actives, dict):
             actives = {}
         actives.update(user=username, layout=layout, env="android")
+        if plan_id:
+            actives["plan"] = plan_id
+        if space:
+            actives["space"] = space
         phone_actives = phone_interface.get("actives")
         if preserve_task_params and isinstance(phone_actives, dict):
             active_user = phone_actives.get("user")
@@ -416,7 +503,9 @@ def install_offline_bundle(
         actives = interface_data.get("actives") if isinstance(interface_data, dict) else {}
         actives = actives if isinstance(actives, dict) else {}
         if (actives.get("user") != manifest["username"]
-                or actives.get("layout") != manifest["layout"]):
+                or actives.get("layout") != manifest["layout"]
+                or (manifest.get("plan") and actives.get("plan") != manifest["plan"])
+                or (manifest.get("space") and actives.get("space") != manifest["space"])):
             raise ValueError("同步包活动选择与清单不一致")
         for database in (staged / "session").rglob("*.db"):
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
@@ -439,6 +528,8 @@ def install_offline_bundle(
             _write_mirrored_layers(target, staged, files)
             _apply_session(target, staged, files, username=manifest["username"],
                            layout=manifest["layout"],
+                           plan_id=str(manifest.get("plan") or ""),
+                           space=str(manifest.get("space") or ""),
                            preserve_task_params=preserve_task_params,
                            preserve_batch_config=preserve_batch_config,
                            phone_workflow=phone_workflow, incoming_workflow=incoming_workflow)

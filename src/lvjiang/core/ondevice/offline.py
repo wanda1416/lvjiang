@@ -37,6 +37,8 @@ def configuration_status() -> dict:
     return {**sync, "ready": ready, "source": "pc" if sync.get("synced") else "preset",
             "execution_username": resolve_active_username(),
             "layout": store.get_active("layout", sync.get("layout", "")),
+            "plan": store.get_active("plan", sync.get("plan", "")),
+            "space": store.get_active("space", sync.get("space", "")),
             "message": "使用应用预置配置" if preset_ready and not sync.get("synced") else
                 sync.get("message", "") if ready else "预置配置未就绪，请重新打开或更新应用"}
 

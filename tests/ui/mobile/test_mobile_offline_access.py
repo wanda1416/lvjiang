@@ -9,7 +9,12 @@ from lvjiang.ui.mobile import offline
 def test_sync_is_disabled_but_existing_task_controls_remain_available(qapp, monkeypatch):
     monkeypatch.setattr(offline, "has_feature", lambda _level: False)
     monkeypatch.setattr(transfer, "has_feature", lambda _level: False)
-    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android", env="")})
+    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android", env="android"), "desktop": SimpleNamespace(name="Desktop", env="desktop")})
+    monkeypatch.setattr(offline, "load_plans", lambda: [
+        SimpleNamespace(id="plan-android", name="手游", space="android", env="android", layout="android"),
+        SimpleNamespace(id="plan-desktop", name="端游", space="desktop", env="desktop", layout="desktop"),
+    ])
+    monkeypatch.setattr(offline, "get_active_plan_id", lambda: "plan-android")
     manager = SimpleNamespace(list_users=lambda: ["tester"], get_active_user_name=lambda: "tester")
     page = offline.OfflineControlPage(SimpleNamespace(user_manager=manager), lambda: "", lambda _: None)
     try:
@@ -28,6 +33,8 @@ def test_sync_is_disabled_but_existing_task_controls_remain_available(qapp, monk
         monkeypatch.setattr(offline, "has_feature", lambda _level: True)
         page._state = "idle"
         page._update_buttons()
+        assert page.plan_choice.count() == 1
+        assert page.plan_choice.itemData(0) == "plan-android"
         assert page.buttons["sync"].isEnabled()
         assert page.buttons["sync"].text() == "下发配置"
         assert page.preserve_task_params.isChecked()
@@ -68,7 +75,12 @@ def test_unlicensed_worker_cannot_connect_or_build_snapshot(qapp, monkeypatch):
 
 def test_sync_scope_is_independent_of_remote_user_and_task_choices(qapp, monkeypatch):
     monkeypatch.setattr(offline, "has_feature", lambda _level: True)
-    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android", env="")})
+    monkeypatch.setattr(offline, "load_layout_entries", lambda: {"android": SimpleNamespace(name="Android", env="android"), "desktop": SimpleNamespace(name="Desktop", env="desktop")})
+    monkeypatch.setattr(offline, "load_plans", lambda: [
+        SimpleNamespace(id="plan-android", name="手游", space="android", env="android", layout="android"),
+        SimpleNamespace(id="plan-desktop", name="端游", space="desktop", env="desktop", layout="desktop"),
+    ])
+    monkeypatch.setattr(offline, "get_active_plan_id", lambda: "plan-android")
     manager = SimpleNamespace(get_active_user_name=lambda: "pc_user")
     page = offline.OfflineControlPage(SimpleNamespace(user_manager=manager), lambda: "fake-device", lambda _: None)
     try:
@@ -95,6 +107,8 @@ def test_history_choices_are_device_specific_and_independent_of_downstream(qapp,
     interface.reset_interface_store()
     monkeypatch.setattr(offline, "has_feature", lambda _: False)
     monkeypatch.setattr(offline, "load_layout_entries", dict)
+    monkeypatch.setattr(offline, "load_plans", list)
+    monkeypatch.setattr(offline, "get_active_plan_id", lambda: "")
     serial = ["device-a"]
     page = offline.OfflineControlPage(None, lambda: serial[0], lambda _: None)
     try:

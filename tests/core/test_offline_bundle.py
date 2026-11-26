@@ -91,7 +91,8 @@ def test_sync_installs_config_only_and_keeps_phone_profile(bundle, tmp_path):
     assert (old / "old.json").read_text() == "previous"
     assert not (phone / "offline-backup").exists()
     with zipfile.ZipFile(archive) as package:
-        assert all(".git" not in name and "diagnostics" not in name for name in package.namelist())
+        assert all(".git" not in name for name in package.namelist())
+        assert "config/local/diagnostics/private.log" in package.namelist()
         assert "config/local/license.txt" not in package.namelist()
         # 打包侧契约：总览数据与结构一个都不进包，manifest 显式声明。
         assert "config/session/profile.db" not in package.namelist()
@@ -99,31 +100,42 @@ def test_sync_installs_config_only_and_keeps_phone_profile(bundle, tmp_path):
         assert json.loads(package.read("manifest.json"))["profile"] is False
 
 
-def test_bundle_whitelist_preserves_runtime_assets_not_editor_files(bundle, tmp_path):
+def test_bundle_packs_all_system_and_local_assets_including_task_packages(bundle, tmp_path):
     source, _ = bundle
     included = {
-        "local/workflows/custom.wf", "local/scenes/custom.yaml",
-        "local/references/custom.yaml", "local/references/custom/bucket/reference.png",
-        "system/templates/android/scene/match.png", "local/maps/custom/map.yaml",
-        "local/maps/custom/base.png", "local/demo_app/rules/custom.yaml",
-        "system/demo_app/rules/base.yaml", "session/users/tester.session.json",
+        "local/workflows/custom.wf",
+        "local/workflows/script.py",
+        "system/workflows/standalone/fengshajiusi/manifest.yaml",
+        "system/workflows/standalone/fengshajiusi/scenes/_meta.json",
+        "system/workflows/standalone/fengshajiusi/scenes/fsjs/fsjs_night.yaml",
+        "system/workflows/standalone/fengshajiusi/layouts/android/fsjs/fsjs_night.json",
+        "system/workflows/standalone/fengshajiusi/templates/icon.png",
+        "local/scenes/custom.yaml",
+        "local/references/custom.yaml",
+        "local/references/custom/bucket/reference.png",
+        "system/templates/android/scene/match.png",
+        "local/maps/custom/map.yaml",
+        "local/maps/custom/base.png",
+        "local/demo_app/rules/custom.yaml",
+        "local/demo_app/other/extra.yaml",
+        "system/demo_app/rules/base.yaml",
+        "local/new_directory/extra.yaml",
+        "system/new_directory/extra.yaml",
+        "session/users/tester.session.json",
         "session/demo_app/state.json",
     }
     excluded = {
         "session/profile.yaml", "session/profile.json",
         "session/screenshots/android/scene.png", "session/output/report.json",
         "session/demo_app/unknown.json", "session/unknown.json",
-        "local/demo_app/other/unknown.yaml",
-        "local/data/calculator/screenshot.png", "local/data/notes.xlsx",
-        "local/data/axis.json", "local/new_directory/unknown.yaml",
-        "system/new_directory/unknown.yaml", "remote/new_directory/unknown.yaml",
-        "local/workflows/script.py", "local/references/custom/bucket/notes.txt",
+        "remote/new_directory/unknown.yaml",
+        "local/__pycache__/cached.pyc",
     }
     for relative in included | excluded:
         path = source / "config" / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"synthetic")
-    archive = tmp_path / "whitelist.zip"
+    archive = tmp_path / "full_layers.zip"
     build_offline_bundle(source, archive, username="tester", layout="android")
     with zipfile.ZipFile(archive) as package:
         names = set(package.namelist())
@@ -571,8 +583,8 @@ def test_downstream_preserves_phone_history_and_result_files(bundle, tmp_path):
         assert "config/session/demo_history.db" not in package.namelist()
 
 
-def test_plugin_declarations_are_the_only_extension_of_the_whitelist(monkeypatch, tmp_path):
-    """没有插件声明时，插件目录一个文件都不进包；声明后只进声明的范围。"""
+def test_plugin_layers_packed_directly_while_session_remains_explicit(monkeypatch, tmp_path):
+    """system/local 下的插件目录直接全量打包；session 层仍只同步显式声明的会话文件。"""
     source = tmp_path / "pc"
     (source / "config/system/layouts").mkdir(parents=True)
     (source / "config/system/layouts/android.yaml").write_text(
@@ -586,9 +598,97 @@ def test_plugin_declarations_are_the_only_extension_of_the_whitelist(monkeypatch
     use_registered_hooks(monkeypatch)
     build_offline_bundle(source, tmp_path / "bare.zip", username="tester", layout="android")
     with zipfile.ZipFile(tmp_path / "bare.zip") as package:
-        assert not any("demo_app" in name for name in package.namelist())
+        names = set(package.namelist())
+        assert "config/local/demo_app/rules/custom.yaml" in names
+        assert "config/session/demo_app/state.json" not in names
     use_registered_hooks(monkeypatch, DEMO_HOOKS)
     build_offline_bundle(source, tmp_path / "declared.zip", username="tester", layout="android")
     with zipfile.ZipFile(tmp_path / "declared.zip") as package:
         assert {"config/local/demo_app/rules/custom.yaml",
                 "config/session/demo_app/state.json"} <= set(package.namelist())
+
+
+def test_bundle_by_android_plan_filters_layout_and_references_and_rejects_desktop(bundle, tmp_path):
+    """按同步方案打包：仅允许安卓方案，同时过滤顶层布局与图库空间，其余全部打包。"""
+    import yaml
+
+    source, _ = bundle
+    config = source / "config"
+    (config / "system/app.yaml").write_text(yaml.safe_dump({
+        "plans": [
+            {"id": "plan-android", "name": "手游投屏", "space": "android", "env": "android", "layout": "cast"},
+            {"id": "plan-desktop", "name": "端游", "space": "desktop", "env": "desktop", "layout": "desktop"},
+        ]
+    }, allow_unicode=True), encoding="utf-8")
+    for key, entry in (
+        ("android", {"name": "Android", "env": "android"}),
+        ("cast", {"name": "Cast", "extends": "android", "env": "android"}),
+        ("desktop", {"name": "Desktop", "env": "desktop"}),
+    ):
+        (config / "system/layouts" / f"{key}.yaml").write_text(
+            yaml.safe_dump(entry, allow_unicode=True), encoding="utf-8")
+        folder = config / "system/layouts" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "scene.json").write_text("{}", encoding="utf-8")
+    (config / "system/layouts/_meta.json").write_text(
+        '{"layouts": ["android", "cast", "desktop"]}', encoding="utf-8")
+    for space in ("android", "desktop"):
+        (config / "system/references").mkdir(parents=True, exist_ok=True)
+        (config / "system/references" / f"{space}.yaml").write_text(f"name: {space}\n", encoding="utf-8")
+        img = config / "system/references" / space / "group" / "item.png"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"png")
+    pkg_manifest = config / "system/workflows/standalone/fengshajiusi/manifest.yaml"
+    pkg_manifest.parent.mkdir(parents=True, exist_ok=True)
+    pkg_manifest.write_text("id: fengshajiusi\nentry: fengsha_jiushi_night.wf\n", encoding="utf-8")
+
+    # 非安卓方案直接拒绝
+    with pytest.raises(ValueError, match="安卓环境"):
+        build_offline_bundle(source, tmp_path / "desktop.zip", username="tester", plan_id="plan-desktop")
+
+    archive = tmp_path / "plan_android.zip"
+    summary = build_offline_bundle(source, archive, username="tester", plan_id="plan-android")
+    assert summary["plan"] == "plan-android"
+    assert summary["layout"] == "cast"
+    assert summary["space"] == "android"
+    with zipfile.ZipFile(archive) as package:
+        names = set(package.namelist())
+        assert "config/system/layouts/android.yaml" in names
+        assert "config/system/layouts/cast.yaml" in names
+        assert "config/system/layouts/android/scene.json" in names
+        assert "config/system/layouts/desktop.yaml" not in names
+        assert "config/system/layouts/desktop/scene.json" not in names
+        assert "config/system/references/android.yaml" in names
+        assert "config/system/references/android/group/item.png" in names
+        assert "config/system/references/desktop.yaml" not in names
+        assert "config/system/references/desktop/group/item.png" not in names
+        assert "config/system/workflows/standalone/fengshajiusi/manifest.yaml" in names
+
+    phone = tmp_path / "phone"
+    install_offline_bundle(archive, phone)
+    actives = json.loads((phone / "config/session/interface.json").read_text(encoding="utf-8"))["actives"]
+    assert actives["plan"] == "plan-android"
+    assert actives["space"] == "android"
+    assert actives["layout"] == "cast"
+    assert actives["env"] == "android"
+def test_bundle_rejects_plan_with_desktop_layout_or_missing_reference_space(bundle, tmp_path):
+    """方案绑定非安卓布局或不存在的图库空间时，打包期直接报错拦截。"""
+    import yaml
+
+    source, _ = bundle
+    config = source / "config"
+    (config / "system/app.yaml").write_text(yaml.safe_dump({
+        "plans": [
+            {"id": "bad-layout", "name": "误绑桌面", "space": "android", "env": "android", "layout": "desktop"},
+            {"id": "bad-space", "name": "缺失图库", "space": "missing_space", "env": "android", "layout": "android"},
+        ]
+    }, allow_unicode=True), encoding="utf-8")
+    (config / "system/layouts/desktop.yaml").write_text("name: Desktop\nenv: desktop\n", encoding="utf-8")
+    (config / "system/layouts/android.yaml").write_text("name: Android\nenv: android\n", encoding="utf-8")
+    (config / "system/references").mkdir(parents=True, exist_ok=True)
+    (config / "system/references/android.yaml").write_text("name: android\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="布局不支持安卓环境"):
+        build_offline_bundle(source, tmp_path / "bad_layout.zip", username="tester", plan_id="bad-layout")
+    with pytest.raises(ValueError, match="图库不存在"):
+        build_offline_bundle(source, tmp_path / "bad_space.zip", username="tester", plan_id="bad-space")

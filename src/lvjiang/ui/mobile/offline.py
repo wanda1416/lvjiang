@@ -27,8 +27,9 @@ from ...core.android.device import AdbDevice
 from ...core.android.history_transfer import pull_history
 from ...core.android.offline import require_offline_sync_access, sync_offline_bundle
 from ...core.config.interface import load_ui_page_state, update_ui_page_state
+from ...core.config.plans import android_plans, get_active_plan_id, load_plans
 from ...core.history.transfer import history_channels
-from ...core.layout.config import layouts_for_env, load_layout_entries
+from ...core.layout.config import load_layout_entries
 from ...core.license import has_feature
 from ...core.offline_bundle import build_offline_bundle
 from ...i18n import tr
@@ -43,12 +44,12 @@ class _OfflineWorker(QThread):
     done = pyqtSignal(object, str)
     progress = pyqtSignal(int, int)
 
-    def __init__(self, serial: str, action: str, username: str, layout: str, task_id: str, parent=None,
+    def __init__(self, serial: str, action: str, username: str, plan_id: str, task_id: str, parent=None,
                  *, preserve_task_params: bool = True, preserve_batch_config: bool = True,
                  history_selected: list[str] | None = None):
         super().__init__(parent)
         self.serial, self.action = serial, action
-        self.username, self.layout, self.task_id = username, layout, task_id
+        self.username, self.plan_id, self.task_id = username, plan_id, task_id
         self.preserve_task_params = preserve_task_params
         self.preserve_batch_config = preserve_batch_config
         self.history_selected = history_selected or []
@@ -70,7 +71,7 @@ class _OfflineWorker(QThread):
                     raise RuntimeError(tr("请先更新 APK：旧版本不支持独立保留任务参数和批量配置"))
                 with tempfile.TemporaryDirectory(prefix="lvjiang-offline-sync-") as temp:
                     archive = Path(temp) / "snapshot.zip"
-                    build_offline_bundle(PROJECT_ROOT, archive, username=self.username, layout=self.layout)
+                    build_offline_bundle(PROJECT_ROOT, archive, username=self.username, plan_id=self.plan_id)
                     data["operation"] = sync_offline_bundle(
                         agent, archive, cancelled=self.isInterruptionRequested, progress=self.progress.emit,
                         preserve_task_params=self.preserve_task_params, preserve_batch_config=self.preserve_batch_config)
@@ -122,19 +123,12 @@ class OfflineControlPage(QWidget):
         sync_group = QGroupBox(tr("同步配置"))
         sync_layout = QVBoxLayout(sync_group)
         sync_form = QFormLayout()
-        self.layout_choice = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
-        # 手机固定运行在 android 环境：声明了其他适配环境的布局直接不出现，
-        # 防止把桌面布局发到手机上后 wf 静态检查全炸（ditu 事件）。
-        for key, entry in layouts_for_env(load_layout_entries(), "android").items():
-            self.layout_choice.addItem(entry.name, key)
-        if host is not None and hasattr(host, "layout_combo"):
-            index = self.layout_choice.findData(host.layout_combo.currentData())
-            if index >= 0:
-                self.layout_choice.setCurrentIndex(index)
+        self.plan_choice = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
+        self._reload_plan_choices()
         self.task = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
-        sync_form.addRow(tr("同步布局"), self.layout_choice)
+        sync_form.addRow(tr("同步方案"), self.plan_choice)
         sync_layout.addLayout(sync_form)
-        scope = QLabel(tr("下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。"))
+        scope = QLabel(tr("下发全部配置、脚本与用户资料，仅按所选方案过滤布局与图库；保留手机历史、日志和结果。"))
         scope.setWordWrap(True)
         sync_layout.addWidget(scope)
         self.preserve_task_params = QCheckBox(tr("保留手机任务参数"))
@@ -195,8 +189,41 @@ class OfflineControlPage(QWidget):
         root.addWidget(self.report, 1)
         self.task.currentIndexChanged.connect(lambda _: self._update_buttons())
         self.user.currentIndexChanged.connect(lambda _: self._update_buttons())
-        self.layout_choice.currentIndexChanged.connect(lambda _: self._update_buttons())
+        self.plan_choice.currentIndexChanged.connect(lambda _: self._update_buttons())
         self._update_buttons()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._reload_plan_choices()
+        self._update_buttons()
+
+    def _reload_plan_choices(self) -> None:
+        """重新加载包含安卓环境且布局有效的同步方案，保留当前选中项。"""
+        previous = str(self.plan_choice.currentData() or "")
+        layout_entries = load_layout_entries()
+        eligible_plans = [
+            plan for plan in android_plans(load_plans())
+            if plan.layout in layout_entries
+            and str(getattr(layout_entries[plan.layout], "env", "") or "") in ("", "android")
+        ]
+        self.plan_choice.blockSignals(True)
+        self.plan_choice.clear()
+        for idx, plan in enumerate(eligible_plans):
+            self.plan_choice.addItem(plan.name, plan.id)
+            layout_name = getattr(layout_entries[plan.layout], "name", plan.layout)
+            tip = f"{plan.name}（{layout_name}" + (f" / {plan.space}" if plan.space else "") + "）"
+            self.plan_choice.setItemData(idx, tip, 3)  # Qt.ItemDataRole.ToolTipRole
+        preferred = previous or get_active_plan_id()
+        selected_index = self.plan_choice.findData(preferred) if preferred else -1
+        if selected_index < 0 and self._host is not None and hasattr(self._host, "layout_combo"):
+            host_layout = str(self._host.layout_combo.currentData() or "")
+            for idx, plan in enumerate(eligible_plans):
+                if plan.layout == host_layout:
+                    selected_index = idx
+                    break
+        if selected_index >= 0:
+            self.plan_choice.setCurrentIndex(selected_index)
+        self.plan_choice.blockSignals(False)
 
     def _update_buttons(self) -> None:
         busy = self._worker is not None and self._worker.isRunning()
@@ -211,7 +238,7 @@ class OfflineControlPage(QWidget):
             check.setEnabled(not busy)
         sync_allowed = has_feature("lv1")
         self.buttons["sync"].setEnabled(sync_allowed and not busy and not active
-                                        and bool(self.layout_choice.currentData()) and bool(self._sync_username()))
+                                        and bool(self.plan_choice.currentData()) and bool(self._sync_username()))
         # 禁用按钮的 tooltip 在部分平台不显示，激活门禁必须写进按钮文案本身。
         self.buttons["sync"].setText(
             tr("下发配置") if sync_allowed else tr("下发配置（需激活功能）"))
@@ -224,7 +251,7 @@ class OfflineControlPage(QWidget):
         self.buttons["stop"].setEnabled(not busy and active and self._state != "stopping")
         self.user.setEnabled(not busy and not active)
         self.task.setEnabled(not busy and not active)
-        self.layout_choice.setEnabled(not busy and not active)
+        self.plan_choice.setEnabled(not busy and not active)
         self.preserve_task_params.setEnabled(not busy and not active)
         self.preserve_batch_config.setEnabled(not busy and not active)
 
@@ -288,7 +315,7 @@ class OfflineControlPage(QWidget):
                 return
         worker = _OfflineWorker(
             serial, action, self._sync_username() if action == "sync" else str(self.user.currentData() or ""),
-            str(self.layout_choice.currentData() or ""), str(self.task.currentData() or ""), self,
+            str(self.plan_choice.currentData() or ""), str(self.task.currentData() or ""), self,
             preserve_task_params=self.preserve_task_params.isChecked(),
             preserve_batch_config=self.preserve_batch_config.isChecked(),
             history_selected=[key for key, check in self.history_choices.items() if check.isChecked()])

@@ -242,3 +242,39 @@ def get_active_plan() -> Plan | None:
         if plan.id == plan_id:
             return plan
     return None
+def load_plans_from_config(config_dir) -> list[Plan]:
+    """从指定 ``config/`` 目录读取全部方案（不依赖全局单例，供离线打包与测试使用）。"""
+    import json
+    from pathlib import Path
+
+    from .resolver import ConfigResolver
+
+    config_path = Path(config_dir)
+    resolver = ConfigResolver(config_dir=config_path)
+    try:
+        app_data = resolver.load_merged("app.yaml")
+    except Exception as exc:  # noqa: BLE001 配置缺失/损坏时退回空表
+        logger.warning(f"从 {config_path} 读取 app.yaml 失败: {exc}")
+        app_data = {}
+    distributed_raw = app_data.get(_APP_PLANS_KEY) if isinstance(app_data, dict) else None
+
+    session_file = config_path / "session" / "session.json"
+    local_raw = None
+    if session_file.is_file():
+        try:
+            session_data = json.loads(session_file.read_text(encoding="utf-8"))
+            if isinstance(session_data, dict):
+                local_raw = session_data.get(_PLANS_NODE)
+        except (OSError, ValueError):
+            local_raw = None
+
+    seen: set[str] = set()
+    return (
+        _parse_plans(distributed_raw, distributed=True, seen=seen)
+        + _parse_plans(local_raw, distributed=False, seen=seen)
+    )
+
+
+def android_plans(plans: Sequence[Plan]) -> list[Plan]:
+    """筛出可用于手机同步的方案：必须为安卓环境且指定了布局。"""
+    return [plan for plan in plans if plan.env == "android" and bool(plan.layout)]

@@ -746,7 +746,6 @@ mobile:
   '✅ 支持输入时间线（并发手势）：声明 #% requires: [device_gesture] 的脚本可以运行': '✅ Linha do tempo de entrada suportada (gestos simultâneos): scripts que declaram #% requires: [device_gesture] podem ser executados'
   '❌ 不支持输入时间线：声明 #% requires: [device_gesture] 的脚本会在加载时被拒绝，需要先开启无障碍服务': '❌ Linha do tempo de entrada não suportada: scripts que declaram #% requires: [device_gesture] serão rejeitados ao carregar; ative o serviço de acessibilidade primeiro'
   上一设备操作已完成；当前设备已切换，请刷新状态: A operação do dispositivo anterior foi concluída; o dispositivo atual mudou — atualize o status
-  下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。: Envia todos os usuários, configurações de tarefas e Profile, levando apenas o layout selecionado e suas dependências herdadas; mantém o histórico, logs e resultados do celular.
   下发配置: Enviar configuração
   下发配置（需激活功能）: Enviar configuração (requer ativação)
   下载 APK 到本机: Baixar APK para este PC

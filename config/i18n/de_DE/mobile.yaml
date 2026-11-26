@@ -21,7 +21,7 @@ mobile:
     nicht unterstützt: Skripte mit #% requires: [device_gesture] werden beim Laden
     abgelehnt; aktivieren Sie zuerst den Bedienungshilfen-Dienst'
   "上一设备操作已完成；当前设备已切换，请刷新状态": "Der vorherige Gerätevorgang ist abgeschlossen; das aktuelle Gerät hat gewechselt – bitte Status aktualisieren"
-  "下发全部用户、任务配置和 Profile，仅携带所选布局及其继承依赖；保留手机历史、日志和结果。": "Überträgt alle Benutzer, Aufgabenkonfigurationen und Profile, jedoch nur das ausgewählte Layout und dessen geerbte Abhängigkeiten; Verlauf, Protokolle und Ergebnisse auf dem Telefon bleiben erhalten."
+  "下发全部配置、脚本与用户资料，仅按所选方案过滤布局与图库；保留手机历史、日志和结果。": "Überträgt alle Konfigurationen, Skripte und Benutzerdaten und filtert nur Layouts und Referenzbibliotheken nach dem gewählten Plan; Verlauf, Protokolle und Ergebnisse auf dem Telefon bleiben erhalten."
   下发配置: Konfiguration übertragen
   下发配置（需激活功能）: Konfiguration übertragen (Aktivierung erforderlich)
   下载 APK 到本机: APK auf PC herunterladen
@@ -163,5 +163,5 @@ mobile:
   选择本地 APK…: Lokale APK auswählen…
   重新扫描: Erneut scannen
   "除本窗口外还有 {n} 路连接连着这台手机，可能来自另一个窗口或另一台电脑，操作会互相打断": "Neben diesem Fenster bestehen {n} weitere Verbindungen zu diesem Telefon – möglicherweise von einem anderen Fenster oder Computer; Vorgänge können sich gegenseitig unterbrechen"
-  同步布局: Layouts synchronisieren
+  同步方案: Synchronisationsplan
   "将更新脚本、布局和用户数据；总览数据不随包下发，由手机账号云端同步。": "Aktualisiert Skripte, Layouts und Benutzerdaten; Übersichtsdaten werden nicht im Paket übertragen, sondern über die Cloud des Telefonkontos synchronisiert."

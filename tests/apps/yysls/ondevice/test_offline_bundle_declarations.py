@@ -24,8 +24,9 @@ def test_yysls_offline_declarations_select_its_own_files(monkeypatch, tmp_path):
         "system/yysls/base_attributes/鸣金·虹.yaml",
         "local/yysls/base_attributes/鸣金·虹.yaml",
         "session/yysls/play_styles.json",
+        "local/yysls/notes/unknown.yaml",
     }
-    excluded = {"session/yysls/unknown.json", "local/yysls/notes/unknown.yaml"}
+    excluded = {"session/yysls/unknown.json"}
     for relative in included | excluded:
         path = source / "config" / relative
         path.parent.mkdir(parents=True, exist_ok=True)

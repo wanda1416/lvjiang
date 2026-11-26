@@ -38,6 +38,7 @@ from lvjiang.apps.yysls.config import (  # noqa: E402
     EQUIP_PART_NAMES,
     POOL_DINGYIN,
     WUXUE_CATEGORY,
+    get_base_attribute_presets,
     get_game_config,
 )
 from lvjiang.apps.yysls.core.graduation.model_registry import (  # noqa: E402
@@ -219,6 +220,27 @@ def _playstyle_affix_table(gc) -> dict[str, list[str]]:
     return table
 
 
+def _base_attributes_table(gc) -> dict[str, list[dict]]:
+    """导出 system 层预置基础属性（仅 system，不混入本机 local 覆盖）。"""
+    table: dict[str, list[dict]] = {}
+    for school in gc.get_schools():
+        presets = [
+            {
+                "id": preset.id,
+                "level": preset.level,
+                "stage": preset.stage,
+                "playstyle": preset.playstyle,
+                "label": preset.label,
+                "stats": dict(preset.stats),
+            }
+            for preset in get_base_attribute_presets(school)
+            if preset.source == "system"
+        ]
+        if presets:
+            table[school] = presets
+    return table
+
+
 def build_config() -> dict:
     """算出完整规则表（不落盘）——测试用它重新算一份与提交的产物比对。"""
     gc = get_game_config()
@@ -292,6 +314,7 @@ def build_config() -> dict:
         **_affix_tables(gc),
         **distribution_tables,
         "base_attrs": _base_attr_table(gc),
+        "base_attributes": _base_attributes_table(gc),
         **_season_table(gc),
         "equipment_sets": gc.get_equipment_sets(),
         "gongjue_bonuses": gc.get_gongjue_bonuses(),
@@ -332,7 +355,7 @@ def build_assets() -> dict[str, bytes]:
     per_level: dict[int, int] = {}
     for ref in sorted(
         list_graduation_models(),
-        key=lambda item: (item.level, item.school, item.scheme, item.version),
+        key=lambda item: (item.level, item.school, item.scheme, item.stage, item.version),
     ):
         sequence = per_level.get(ref.level, 0) + 1
         per_level[ref.level] = sequence
@@ -341,7 +364,7 @@ def build_assets() -> dict[str, bytes]:
         models[shard] = payload
         index.append({
             "school": ref.school, "scheme": ref.scheme,
-            "level": ref.level, "version": ref.version,
+            "level": ref.level, "stage": ref.stage, "version": ref.version,
             "path": shard, "bytes": len(payload),
             "sha256": hashlib.sha256(payload).hexdigest()[:16],
         })

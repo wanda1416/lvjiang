@@ -9,6 +9,8 @@
 `config/system/yysls/attr_model/`。装备词条依旧走原有的
 `equipment_attrs` 通道，既有模块零改动。
 
+> 与预置基础属性的分工：本模块（`attr_model/`）负责按心法/武学/奇物等来源做**正向推导**；供 PC 默认绑定与 Web 无扫描直接使用的随包满养成快照存放在 `config/system/yysls/base_attributes/`，与 `session/yysls/play_styles.json` 的双源解析及多阶段（`stage`）约定见 [预置基础属性分层与毕业率多阶段模型](../../02-decisions/03-equipment/04-preset-base-attributes-and-stages.md)。
+
 > 注意两套五维口径：DIY 计算器的角色底子与装备词条在「最小外功」这一项上系数不同，
 > 其余已知转换系数相同。具体数值见
 > [游戏机制约定](../../../10-domain/01-yysls/06-mechanics-conventions.md) 的 A1。

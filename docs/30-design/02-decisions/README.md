@@ -25,6 +25,7 @@
 | [01-loadout-management.md](03-equipment/01-loadout-management.md) | 跨用户备战方案管理、显式排序与主页面只读边界 |
 | [02-build-calculator.md](03-equipment/02-build-calculator.md) | 出装搭配、角色模拟计算器及总词条合法分配 |
 | [03-combat-attribute-sources.md](03-equipment/03-combat-attribute-sources.md) | 当前方案战斗属性来源、逐词条明细与白字黄字对照 |
+| [04-preset-base-attributes-and-stages.md](03-equipment/04-preset-base-attributes-and-stages.md) | 预置基础属性分层（`base_attributes`）、毕业率多阶段（`stage`）与 PC/Web 无扫描双源闭环 |
 
 ## batch（批量域：可执行性判定、调度单元、无人值守、状态分层）
 

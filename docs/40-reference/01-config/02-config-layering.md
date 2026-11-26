@@ -55,6 +55,7 @@ local 文件可直接删除；system 官方文件不允许用户删除，也不�
 | `yysls/base_groups/*.yaml` | 基础规则组（材料/扫描处置） |
 | `yysls/gear_sets/*.yaml` | 一搭配一文件，约束随搭配保存，同路径 local 整体覆盖 |
 | `yysls/graduation/*.json` | 毕业率方案 |
+| `yysls/base_attributes/*.yaml` | 流派/玩法预置基础属性（按等级与阶段，同 `id` 由 local 覆盖 system） |
 | `references/**/*.png` | 参考图 |
 
 ### 聚合键值文件（一文件多条目）

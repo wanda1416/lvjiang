@@ -24,6 +24,7 @@ class GraduationModelRef:
     version: int
     rel_path: str
     stage: int = 1
+    default_base_attribute: str = ""
 
 
 def level_dirname(level: int) -> str:
@@ -84,7 +85,16 @@ def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
             or version <= 0):
         logger.warning(f"毕业率模型身份不完整，已忽略: {rel_path}")
         return None
-    return GraduationModelRef(school, scheme, level, version, rel_path, stage=stage)
+    default_base_attribute = str(data.get("default_base_attribute") or "").strip()
+    return GraduationModelRef(
+        school,
+        scheme,
+        level,
+        version,
+        rel_path,
+        stage=stage,
+        default_base_attribute=default_base_attribute,
+    )
 
 
 @lru_cache(maxsize=1)

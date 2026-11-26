@@ -485,16 +485,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._save_selection()
 
     def _on_edit_play_style(self) -> None:
-        """打开流派配置；存在已选个人属性时定位到该属性。"""
-        from ....config import parse_preset_ref
-
+        """打开流派配置；存在已选预置或个人属性时自动定位到对应条目。"""
         school = self._get_current_school()
         selected_ref = self._current_base_attr_ref()
-        play_style = "" if parse_preset_ref(selected_ref) else selected_ref
         from ...game_settings import GameConfigDialog
 
         dialog = GameConfigDialog(parent=self._host)
-        dialog.select_school_base_attr(school, play_style)
+        dialog.select_school_base_attr(school, selected_ref)
         dialog.exec()
         if not school:
             return
@@ -795,25 +792,40 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 self._combo_play_style.setCurrentIndex(_find_idx(play_style))
             else:
                 from ....config import make_preset_ref, resolve_default_preset
+                from ....core.graduation.model_registry import select_graduation_model
 
                 world_lv_fn = getattr(self, "_effective_world_level", None)
                 world_lv = int(world_lv_fn()) if callable(world_lv_fn) else None
-                default_preset = (
-                    resolve_default_preset(
-                        school,
-                        playstyle=getattr(plan, "playstyle", "") or "",
-                        level=world_lv,
-                    )
-                    if school else None
-                )
                 matched_preset = False
-                if default_preset is not None:
-                    preset_ref = make_preset_ref(default_preset.id)
-                    idx = _find_idx(preset_ref)
-                    if idx >= 0:
-                        self._combo_play_style.setCurrentIndex(idx)
-                        defaults["base_attribute"] = preset_ref
-                        matched_preset = True
+                scheme_name = (
+                    getattr(plan, "graduation_scheme", "") or ""
+                )
+                if school and scheme_name:
+                    model_ref = select_graduation_model(
+                        school, scheme_name, world_lv or 0,
+                    )
+                    if model_ref and model_ref.default_base_attribute:
+                        idx = _find_idx(model_ref.default_base_attribute)
+                        if idx >= 0:
+                            self._combo_play_style.setCurrentIndex(idx)
+                            defaults["base_attribute"] = model_ref.default_base_attribute
+                            matched_preset = True
+                if not matched_preset:
+                    default_preset = (
+                        resolve_default_preset(
+                            school,
+                            playstyle=getattr(plan, "playstyle", "") or "",
+                            level=world_lv,
+                        )
+                        if school else None
+                    )
+                    if default_preset is not None:
+                        preset_ref = make_preset_ref(default_preset.id)
+                        idx = _find_idx(preset_ref)
+                        if idx >= 0:
+                            self._combo_play_style.setCurrentIndex(idx)
+                            defaults["base_attribute"] = preset_ref
+                            matched_preset = True
                 if not matched_preset and _cur_ref():
                     defaults["base_attribute"] = _cur_ref()
 

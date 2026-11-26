@@ -41,10 +41,12 @@ from PyQt6.QtWidgets import (
     QLayout,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -209,7 +211,7 @@ class SchoolPanel(QWidget):
 
         right_layout.addWidget(transmute_group)
 
-        # ── 方案管理 / 基础属性：同一行、等高双栏 ──
+        # ── 方案管理 / 预置基础属性 / 个人基础属性：同一行、等高三栏 ──
         management_layout = QHBoxLayout()
         management_layout.setSpacing(10)
 
@@ -220,13 +222,14 @@ class SchoolPanel(QWidget):
         self._btn_import_scheme = QPushButton(tr("导入 Excel…"))
         self._btn_import_scheme.clicked.connect(self._on_import_scheme)
         apply_button_style(self._btn_import_scheme, variant="neutral")
-        self._scheme_list = QTableWidget(0, 3)
+        self._scheme_list = QTableWidget(0, 4)
         self._scheme_list.setHorizontalHeaderLabels([
-            tr("方案等级"), tr("方案名称"), tr("版本号")])
+            tr("方案等级"), tr("方案名称"), tr("默认属性"), tr("版本号")])
         header = self._scheme_list.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self._scheme_list.verticalHeader().setVisible(False)
         self._scheme_list.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
@@ -236,11 +239,27 @@ class SchoolPanel(QWidget):
         self._scheme_list.customContextMenuRequested.connect(self._on_scheme_context_menu)
         self._scheme_list.currentCellChanged.connect(
             lambda row, _col, _old_row, _old_col: self._on_scheme_selected(row))
+        self._scheme_list.cellDoubleClicked.connect(self._on_scheme_double_clicked)
         scheme_layout.addWidget(self._scheme_list, stretch=1)
         scheme_layout.addWidget(self._btn_import_scheme)
-        management_layout.addWidget(scheme_group, stretch=1)
+        management_layout.addWidget(scheme_group, stretch=2)
 
-        ps_group = QGroupBox(tr("基础属性"))
+        preset_group = QGroupBox(tr("预置基础属性"))
+        self._preset_group = preset_group
+        preset_group.setMinimumHeight(150)
+        preset_layout = QVBoxLayout(preset_group)
+        self._preset_list = QListWidget()
+        self._preset_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._preset_list.customContextMenuRequested.connect(self._on_preset_context_menu)
+        self._preset_list.currentRowChanged.connect(self._on_preset_selected)
+        preset_layout.addWidget(self._preset_list, stretch=1)
+        self._btn_add_preset = QPushButton(tr("新建预置…"))
+        self._btn_add_preset.clicked.connect(self._on_add_preset)
+        apply_button_style(self._btn_add_preset, variant="neutral")
+        preset_layout.addWidget(self._btn_add_preset)
+        management_layout.addWidget(preset_group, stretch=1)
+
+        ps_group = QGroupBox(tr("个人基础属性"))
         self._base_attrs_group = ps_group
         ps_group.setMinimumHeight(150)
         ps_layout = QVBoxLayout(ps_group)
@@ -256,7 +275,7 @@ class SchoolPanel(QWidget):
         management_layout.addWidget(ps_group, stretch=1)
         right_layout.addLayout(management_layout)
 
-        # ── 数值展示：方案为只读满值，基础属性保留可编辑能力 ──
+        # ── 数值展示：方案为只读满值，预置与个人基础属性复用可编辑能力 ──
         value_group = QGroupBox(tr("数值展示"))
         value_layout = QVBoxLayout(value_group)
         self._value_group_layout = value_layout
@@ -268,7 +287,9 @@ class SchoolPanel(QWidget):
         self._value_content_layout.setContentsMargins(4, 4, 4, 4)
         self._value_content_layout.setSpacing(6)
         self._ps_edits: dict[str, QLineEdit] = {}
-        self._ps_current_name: str = ""  # 当前编辑的基础属性名
+        self._edit_source: str = ""      # "preset" | "session" | ""
+        self._edit_preset_id: str = ""   # 当前编辑的预置基础属性 ID
+        self._ps_current_name: str = ""  # 当前编辑的个人基础属性名
         self._scheme_baseline_edit: QLineEdit | None = None
         value_layout.addWidget(self._value_content_widget)
         right_layout.addWidget(value_group)
@@ -378,9 +399,19 @@ class SchoolPanel(QWidget):
     def select_school_base_attr(
         self, school: str | None, base_attr: str | None,
     ) -> None:
-        """供外部跳转：有指定流派和基础属性时才定位。"""
+        """供外部跳转：支持定位预置（preset:<id>）或个人基础属性。"""
         self._refresh_list(select=school)
         if not base_attr:
+            return
+        from ...config import parse_preset_ref
+
+        preset_id = parse_preset_ref(base_attr)
+        if preset_id:
+            for row in range(self._preset_list.count()):
+                item = self._preset_list.item(row)
+                if item is not None and item.data(Qt.ItemDataRole.UserRole) == preset_id:
+                    self._preset_list.setCurrentRow(row)
+                    return
             return
         matches = self._ps_list.findItems(
             base_attr, Qt.MatchFlag.MatchExactly,
@@ -395,6 +426,7 @@ class SchoolPanel(QWidget):
                              hint=READONLY_HINT)
         self._btn_del.setEnabled(name is not None and ok)
         self._btn_del.setToolTip(hint)
+        self._btn_add_preset.setEnabled(name is not None)
         self._btn_add_play_style.setEnabled(name is not None)
         cfg = (self._schools().get(name) or {}) if name else {}
         main = cfg.get("main") or {}
@@ -421,9 +453,12 @@ class SchoolPanel(QWidget):
         self._loading = prev_loading
         self._refresh_transmute_pool(cfg)
         self._refresh_schemes()
+        self._refresh_presets()
         self._refresh_play_styles()
         if self._scheme_list.rowCount():
             self._scheme_list.selectRow(0)
+        elif self._preset_list.count():
+            self._preset_list.setCurrentRow(0)
         elif self._ps_list.count():
             self._ps_list.setCurrentRow(0)
         else:
@@ -599,6 +634,23 @@ class SchoolPanel(QWidget):
 
     # ── 方案管理 ──────────────────────────────────────────────
 
+    def _format_default_base_attr_cell(
+        self, school: str, default_ref: str,
+    ) -> tuple[str, str]:
+        """返回方案默认属性列的展示文本与提示。"""
+        if not default_ref:
+            return tr("自动"), tr("双击设置方案绑定的预置基础属性")
+        from ...config import get_base_attribute_preset, parse_preset_ref
+
+        preset_id = parse_preset_ref(default_ref)
+        if preset_id:
+            preset = get_base_attribute_preset(school, preset_id)
+            if preset is not None:
+                tag = tr("本地") if preset.source == "local" else tr("系统")
+                return f"[{tag}] {preset.label}", default_ref
+            return tr("{id}（缺失）").format(id=preset_id), default_ref
+        return default_ref, default_ref
+
     def _refresh_schemes(self):
         self._scheme_list.setRowCount(0)
         school = self._current_school()
@@ -609,19 +661,101 @@ class SchoolPanel(QWidget):
         from ...core.graduation.model_registry import available_models
         for ref in sorted(
             available_models(school),
-            key=lambda ref: (-ref.level, -ref.version, ref.scheme),
+            key=lambda ref: (-ref.level, -ref.stage, -ref.version, ref.scheme),
         ):
             row = self._scheme_list.rowCount()
             self._scheme_list.insertRow(row)
-            level_item = QTableWidgetItem(
-                tr("{level}级").format(level=ref.level))
+            level_text = (
+                tr("{level}级 S{stage}").format(level=ref.level, stage=ref.stage)
+                if ref.stage > 1
+                else tr("{level}级").format(level=ref.level)
+            )
+            level_item = QTableWidgetItem(level_text)
             # ref 挂在首列：_selected_model_ref 按首列取，列序调整时跟着走。
             level_item.setData(Qt.ItemDataRole.UserRole, ref)
             self._scheme_list.setItem(row, 0, level_item)
             self._scheme_list.setItem(row, 1, QTableWidgetItem(ref.scheme))
+            default_text, default_tip = self._format_default_base_attr_cell(
+                school, ref.default_base_attribute,
+            )
+            default_item = QTableWidgetItem(default_text)
+            default_item.setToolTip(default_tip)
+            if not ref.default_base_attribute:
+                default_item.setForeground(self.palette().mid())
+            self._scheme_list.setItem(row, 2, default_item)
             self._scheme_list.setItem(
-                row, 2,
+                row, 3,
                 QTableWidgetItem(tr("v{version}").format(version=ref.version)))
+
+    def _on_scheme_double_clicked(self, row: int, _col: int) -> None:
+        """双击方案行 → 编辑该方案的默认预置基础属性。"""
+        self._edit_scheme_default_base_attr(row)
+
+    def _edit_scheme_default_base_attr(self, row: int) -> None:
+        school = self._current_school()
+        item = self._scheme_list.item(row, 0) if row >= 0 else None
+        ref = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if not school or ref is None:
+            return
+        from ...config import get_base_attribute_presets, make_preset_ref
+        from ...core.graduation import set_graduation_default_base_attribute
+
+        presets = get_base_attribute_presets(school)
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("设置方案默认属性"))
+        dialog.setMinimumWidth(340)
+        form = QFormLayout(dialog)
+        info = QLabel(
+            tr("{scheme} · {level}级 v{version}").format(
+                scheme=ref.scheme, level=ref.level, version=ref.version,
+            )
+        )
+        info.setStyleSheet("font-weight: 600;")
+        form.addRow(tr_label("方案"), info)
+        combo = AutoWidthComboBox()
+        combo.addItem(tr("自动匹配（按等级与阶段）"), "")
+        for preset in presets:
+            tag = tr("本地") if preset.source == "local" else tr("系统")
+            combo.addItem(f"[{tag}] {preset.label}", make_preset_ref(preset.id))
+        cur_idx = combo.findData(ref.default_base_attribute or "")
+        if cur_idx < 0 and ref.default_base_attribute:
+            combo.addItem(ref.default_base_attribute, ref.default_base_attribute)
+            cur_idx = combo.count() - 1
+        combo.setCurrentIndex(max(0, cur_idx))
+        form.addRow(tr_label("默认预置属性"), combo)
+        if not presets:
+            hint = QLabel(tr("当前流派暂无预置基础属性，可先在右侧「预置基础属性」中新建。"))
+            hint.setStyleSheet("color: palette(mid); font-size: 12px;")
+            hint.setWordWrap(True)
+            form.addRow(hint)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected_ref = str(combo.currentData() or "")
+        try:
+            set_graduation_default_base_attribute(
+                school, ref.scheme, selected_ref, model_ref=ref,
+            )
+        except Exception as exc:
+            logger.error(f"保存方案默认属性失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            return
+        self._refresh_schemes()
+        for r in range(self._scheme_list.rowCount()):
+            r_item = self._scheme_list.item(r, 0)
+            r_ref = r_item.data(Qt.ItemDataRole.UserRole) if r_item is not None else None
+            if (r_ref is not None
+                    and r_ref.scheme == ref.scheme
+                    and r_ref.level == ref.level
+                    and r_ref.stage == ref.stage
+                    and r_ref.version == ref.version):
+                self._scheme_list.selectRow(r)
+                break
 
     def _selected_model_ref(self):
         row = self._scheme_list.currentRow()
@@ -687,14 +821,18 @@ class SchoolPanel(QWidget):
         )
 
     def _on_scheme_context_menu(self, pos):
-        """方案列表右键菜单：删除"""
+        """方案列表右键菜单：设置默认属性 / 删除"""
         item = self._scheme_list.itemAt(pos)
         if not item:
             return
         menu = QMenu(self)
+        default_action = menu.addAction(tr("设置默认属性…"))
         del_action = menu.addAction(tr("删除"))
         action = menu.exec(self._scheme_list.mapToGlobal(pos))
-        if action == del_action:
+        if action == default_action:
+            self._scheme_list.selectRow(item.row())
+            self._edit_scheme_default_base_attr(item.row())
+        elif action == del_action:
             self._scheme_list.selectRow(item.row())
             self._do_delete_scheme()
 
@@ -771,9 +909,231 @@ class SchoolPanel(QWidget):
         for name in sorted(styles.keys()):
             self._ps_list.addItem(name)
 
+    # ── 预置基础属性管理 ──────────────────────────────────────
+
+    def _refresh_presets(self, select_id: str | None = None):
+        """刷新当前流派的预置基础属性列表（system + local 合并视图）。"""
+        school = self._current_school()
+        self._preset_list.blockSignals(True)
+        self._preset_list.clear()
+        self._preset_list.blockSignals(False)
+        if not school:
+            return
+        from ...config import get_base_attribute_presets
+
+        target_row = -1
+        for idx, preset in enumerate(get_base_attribute_presets(school)):
+            tag = tr("本地") if preset.source == "local" else tr("系统")
+            item = QListWidgetItem(f"[{tag}] {preset.label}")
+            item.setData(Qt.ItemDataRole.UserRole, preset.id)
+            item.setData(Qt.ItemDataRole.UserRole + 1, preset.source)
+            item.setToolTip(
+                tr("ID: {id} · {level}级 {stage}阶段 · 来源：{source}").format(
+                    id=preset.id,
+                    level=preset.level,
+                    stage=preset.stage,
+                    source=tag,
+                )
+            )
+            self._preset_list.addItem(item)
+            if select_id and preset.id == select_id:
+                target_row = idx
+        if target_row >= 0:
+            self._preset_list.setCurrentRow(target_row)
+
+    def _on_add_preset(self) -> None:
+        """在当前流派中新建预置基础属性（复用属性编辑弹窗）。"""
+        school = self._current_school()
+        if not school:
+            return
+        from ...config import (
+            get_base_attribute_preset,
+            get_game_config,
+            save_base_attribute_preset,
+        )
+
+        gc = get_game_config()
+        dialog = _PlayStyleEditDialog(
+            self,
+            school_attr=gc.get_school_attr(school),
+            preset_mode=True,
+            level=gc.current_equip_level() or 115,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        preset = dialog.get_preset(school)
+        if get_base_attribute_preset(school, preset.id) is not None:
+            QMessageBox.warning(
+                self, tr("预置已存在"),
+                tr("预置基础属性「{id}」已存在，请使用其他 ID。").format(id=preset.id),
+            )
+            return
+        try:
+            save_base_attribute_preset(school, preset)
+        except Exception as exc:
+            logger.error(f"保存预置基础属性失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            return
+        self._refresh_presets(select_id=preset.id)
+        self._refresh_schemes()
+
+    def _on_preset_selected(self, row: int) -> None:
+        """选中预置基础属性 → 复用标准数值展示与编辑卡片。"""
+        school = self._current_school()
+        if not school or row < 0:
+            return
+        item = self._preset_list.item(row)
+        if item is None:
+            return
+        preset_id = str(item.data(Qt.ItemDataRole.UserRole) or "")
+        from ...config import get_base_attribute_preset
+
+        preset = get_base_attribute_preset(school, preset_id)
+        if preset is None:
+            return
+        self._scheme_list.blockSignals(True)
+        self._scheme_list.setCurrentCell(-1, -1)
+        self._scheme_list.clearSelection()
+        self._scheme_list.blockSignals(False)
+        self._ps_list.blockSignals(True)
+        self._ps_list.setCurrentRow(-1)
+        self._ps_list.blockSignals(False)
+        tag = tr("本地预置") if preset.source == "local" else tr("系统预置")
+        self._show_editable_base_attrs(
+            school,
+            preset.stats,
+            title=tr("{tag}：{label}（{id}）").format(
+                tag=tag, label=preset.label, id=preset.id,
+            ),
+            source="preset",
+            key=preset.id,
+        )
+
+    def _on_preset_context_menu(self, pos) -> None:
+        """预置基础属性列表右键菜单：编辑元信息 / 删除或还原默认。"""
+        item = self._preset_list.itemAt(pos)
+        if not item:
+            return
+        preset_id = str(item.data(Qt.ItemDataRole.UserRole) or "")
+        source = str(item.data(Qt.ItemDataRole.UserRole + 1) or "system")
+        menu = QMenu(self)
+        edit_meta_action = menu.addAction(tr("编辑元信息…"))
+        del_label = tr("删除 / 还原默认") if source == "local" else tr("删除")
+        del_action = menu.addAction(del_label)
+        action = menu.exec(self._preset_list.mapToGlobal(pos))
+        if action == edit_meta_action:
+            self._do_edit_preset_meta(preset_id)
+        elif action == del_action:
+            self._do_delete_preset(preset_id)
+
+    def _do_edit_preset_meta(self, preset_id: str) -> None:
+        school = self._current_school()
+        if not school:
+            return
+        from ...config import (
+            get_base_attribute_preset,
+            get_game_config,
+            save_base_attribute_preset,
+        )
+
+        preset = get_base_attribute_preset(school, preset_id)
+        if preset is None:
+            return
+        dialog = _PlayStyleEditDialog(
+            self,
+            name=preset.label,
+            attrs=dict(preset.stats),
+            school_attr=get_game_config().get_school_attr(school),
+            preset_mode=True,
+            level=preset.level,
+            stage=preset.stage,
+            playstyle=preset.playstyle or "",
+            preset_id=preset.id,
+            lock_preset_id=True,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        updated = dialog.get_preset(school)
+        try:
+            save_base_attribute_preset(school, updated)
+        except Exception as exc:
+            logger.error(f"更新预置基础属性失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            return
+        self._refresh_presets(select_id=updated.id)
+        self._refresh_schemes()
+
+    def _do_delete_preset(self, preset_id: str) -> None:
+        school = self._current_school()
+        if not school:
+            return
+        ret = QMessageBox.question(
+            self, tr("确认删除"),
+            tr("确定删除预置基础属性「{id}」？（普通模式下本地覆盖将还原为系统默认）").format(
+                id=preset_id,
+            ),
+        )
+        if ret != QMessageBox.StandardButton.Yes:
+            return
+        from ...config import delete_base_attribute_preset
+
+        try:
+            delete_base_attribute_preset(school, preset_id)
+        except Exception as exc:
+            logger.warning(f"删除预置基础属性失败: {exc}")
+            QMessageBox.warning(self, tr("删除失败"), str(exc))
+            return
+        self._refresh_presets()
+        self._refresh_schemes()
+        if self._edit_source == "preset" and self._edit_preset_id == preset_id:
+            self._clear_ps_editor()
+            self._value_source_label.setText(tr("请选择方案或基础属性"))
+
+    def _do_save_play_style_as_preset(self, name: str) -> None:
+        """将一条个人基础属性另存为预置基础属性。"""
+        school = self._current_school()
+        if not school:
+            return
+        from ...config import (
+            get_base_attribute_preset,
+            get_game_config,
+            get_play_styles,
+            save_base_attribute_preset,
+        )
+
+        attrs = dict(get_play_styles(school).get(name, {}))
+        gc = get_game_config()
+        dialog = _PlayStyleEditDialog(
+            self,
+            attrs=attrs,
+            school_attr=gc.get_school_attr(school),
+            preset_mode=True,
+            level=gc.current_equip_level() or 115,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        preset = dialog.get_preset(school)
+        if get_base_attribute_preset(school, preset.id) is not None:
+            ret = QMessageBox.question(
+                self, tr("覆盖确认"),
+                tr("预置基础属性「{id}」已存在，是否覆盖？").format(id=preset.id),
+            )
+            if ret != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            save_base_attribute_preset(school, preset)
+        except Exception as exc:
+            logger.error(f"另存为预置基础属性失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            return
+        self._refresh_presets(select_id=preset.id)
+        self._refresh_schemes()
+
     def _clear_ps_editor(self):
         """清空共享数值展示区。"""
         self._ps_edits.clear()
+        self._edit_source = ""
+        self._edit_preset_id = ""
         self._ps_current_name = ""
         self._scheme_baseline_edit = None
         self._replace_value_content([])
@@ -805,10 +1165,15 @@ class SchoolPanel(QWidget):
         school = self._current_school()
         if not school or row < 0:
             return
+        self._preset_list.blockSignals(True)
+        self._preset_list.setCurrentRow(-1)
+        self._preset_list.blockSignals(False)
         self._ps_list.blockSignals(True)
         self._ps_list.setCurrentRow(-1)
         self._ps_list.blockSignals(False)
         self._ps_edits.clear()
+        self._edit_source = ""
+        self._edit_preset_id = ""
         self._ps_current_name = ""
         self._scheme_baseline_edit = None
         item = self._scheme_list.item(row, 0)
@@ -906,8 +1271,35 @@ class SchoolPanel(QWidget):
             except Exception:
                 pass
 
+    def _show_editable_base_attrs(
+        self,
+        school: str,
+        attrs: dict,
+        *,
+        title: str,
+        source: str,
+        key: str,
+    ) -> None:
+        """预置基础属性与个人基础属性共用的标准卡片展示与编辑入口。"""
+        from ...config import get_game_config
+        from ...core.combat.combat_attrs import CombatAttributes
+
+        self._ps_edits.clear()
+        self._scheme_baseline_edit = None
+        self._edit_source = source
+        self._edit_preset_id = key if source == "preset" else ""
+        self._ps_current_name = key if source == "session" else ""
+        self._value_source_label.setText(title)
+
+        school_attr = get_game_config().get_school_attr(school)
+        combat_attrs = CombatAttributes.from_dict(attrs)
+        card = self._create_standard_attrs_widget(
+            combat_attrs, school_attr, editable=True,
+        )
+        self._replace_value_content([card])
+
     def _on_ps_selected(self, row: int):
-        """选中基础属性 → 在右侧显示可编辑卡片"""
+        """选中个人基础属性 → 复用标准可编辑卡片"""
         school = self._current_school()
         if not school or row < 0:
             return
@@ -915,26 +1307,20 @@ class SchoolPanel(QWidget):
         self._scheme_list.setCurrentCell(-1, -1)
         self._scheme_list.clearSelection()
         self._scheme_list.blockSignals(False)
-        from ...config import get_game_config, get_play_styles
+        self._preset_list.blockSignals(True)
+        self._preset_list.setCurrentRow(-1)
+        self._preset_list.blockSignals(False)
+        from ...config import get_play_styles
+
         styles = get_play_styles(school)
         name = self._ps_list.item(row).text()
-        attrs = styles.get(name, {})
-        self._ps_edits.clear()
-        self._scheme_baseline_edit = None
-        self._ps_current_name = name
-        self._value_source_label.setText(
-            tr("基础属性：{name}").format(name=name))
-
-        gc = get_game_config()
-        school_attr = gc.get_school_attr(school)
-        from ...core.combat.combat_attrs import CombatAttributes
-
-        # 基础属性也进入标准战斗属性模型，再按战斗属性面板结构展示。
-        combat_attrs = CombatAttributes.from_dict(attrs)
-        card = self._create_standard_attrs_widget(
-            combat_attrs, school_attr, editable=True,
+        self._show_editable_base_attrs(
+            school,
+            styles.get(name, {}),
+            title=tr("个人基础属性：{name}").format(name=name),
+            source="session",
+            key=name,
         )
-        self._replace_value_content([card])
 
     def _create_standard_attrs_widget(
         self, attrs, school_attr: str | None, *, editable: bool,
@@ -1003,7 +1389,7 @@ class SchoolPanel(QWidget):
                 line_edit = QLineEdit()
                 value_widget: QWidget = line_edit
                 line_edit.setAlignment(Qt.AlignmentFlag.AlignRight)
-                line_edit.setMinimumHeight(26)
+                line_edit.setFixedHeight(26)
                 line_edit.setValidator(
                     QDoubleValidator(-999999.0, 999999.0, 4, line_edit)
                 )
@@ -1041,10 +1427,10 @@ class SchoolPanel(QWidget):
                 if cell_args is not None:
                     widget = make_cell(*cell_args)
                 else:
-                    # 空属性仍占据一个标准数据单元高度。基础属性没有武器武学
-                    # 增效或指定技能增效时，稳定保留对应的两行空白。
+                    # 空属性仍占据与真实行一致的标准数据单元高度（编辑态 26px，只读态 24px），
+                    # 保证攻击属性与增益效果行数一致、下方判定属性与伤害加成严格对齐。
                     widget = QWidget()
-                    widget.setFixedHeight(24)
+                    widget.setFixedHeight(26 if editable else 24)
                 grid.addWidget(widget, index // 2, index % 2)
             grid.setColumnStretch(0, 1)
             grid.setColumnStretch(1, 1)
@@ -1052,7 +1438,7 @@ class SchoolPanel(QWidget):
 
         pen_tip = tooltip("穿透")
         bonus_tip = tooltip("伤害加成")
-        attack_cells = [
+        attack_cells: list[tuple | None] = [
             ("min_outer", "最小外功攻击", ""),
             ("max_outer", "最大外功攻击", ""),
             ("min_mingjin", "最小鸣金攻击", ""),
@@ -1103,6 +1489,15 @@ class SchoolPanel(QWidget):
             skill_cell,
             None,
         ]
+        # 增益效果与攻击属性（默认 6 行 = 12 格）保持相同行数，不足补空位，
+        # 确保下方的「判定属性」与「伤害加成」卡片顶部严格对齐。
+        target_top_cells = max(len(attack_cells), len(gain_cells), 12)
+        if target_top_cells % 2:
+            target_top_cells += 1
+        if len(attack_cells) < target_top_cells:
+            attack_cells.extend([None] * (target_top_cells - len(attack_cells)))
+        if len(gain_cells) < target_top_cells:
+            gain_cells.extend([None] * (target_top_cells - len(gain_cells)))
         damage_cells = [
             ("crit_dmg", "会心伤害加成", "%"),
             ("intent_dmg", "会意伤害加成", "%"),
@@ -1129,28 +1524,65 @@ class SchoolPanel(QWidget):
         return root
 
     def _on_ps_field_changed(self, field_name: str, unit: str):
-        """任一字段变更 → 自动保存到当前基础属性"""
+        """任一字段变更 → 按当前选中来源自动保存到预置或个人基础属性"""
         school = self._current_school()
+        if not school or not self._edit_source:
+            return
+
+        def _apply_edits(base: dict) -> dict[str, float]:
+            attrs = dict(base)
+            for fn, edit in self._ps_edits.items():
+                try:
+                    v = float(edit.text())
+                except (ValueError, TypeError):
+                    v = 0.0
+                fn_unit = self._find_field_unit(fn)
+                if fn_unit == "%":
+                    v = v / 100.0
+                if v:
+                    attrs[fn] = v
+                else:
+                    attrs.pop(fn, None)
+            return attrs
+
+        if self._edit_source == "preset":
+            preset_id = self._edit_preset_id
+            if not preset_id:
+                return
+            from dataclasses import replace
+
+            from ...config import (
+                get_base_attribute_preset,
+                save_base_attribute_preset,
+            )
+
+            preset = get_base_attribute_preset(school, preset_id)
+            if preset is None:
+                return
+            updated = replace(preset, stats=_apply_edits(preset.stats))
+            try:
+                save_base_attribute_preset(school, updated)
+            except Exception as exc:
+                logger.error(f"自动保存预置基础属性失败: {exc}")
+                return
+            # 若普通用户首次覆盖系统预置，刷新列表标签为 [本地]
+            refreshed = get_base_attribute_preset(school, preset_id)
+            if refreshed is not None and refreshed.source != preset.source:
+                cur_item = self._preset_list.currentItem()
+                if cur_item is not None and cur_item.data(Qt.ItemDataRole.UserRole) == preset_id:
+                    tag = tr("本地") if refreshed.source == "local" else tr("系统")
+                    cur_item.setText(f"[{tag}] {refreshed.label}")
+                    cur_item.setData(Qt.ItemDataRole.UserRole + 1, refreshed.source)
+                    self._refresh_schemes()
+            return
+
         name = self._ps_current_name
-        if not school or not name:
+        if not name:
             return
         from ...config import get_play_styles, save_play_style
+
         styles = get_play_styles(school)
-        attrs = dict(styles.get(name, {}))
-        for fn, edit in self._ps_edits.items():
-            try:
-                v = float(edit.text())
-            except (ValueError, TypeError):
-                v = 0.0
-            # 判断 unit：从当前 resolved fields 中查找
-            fn_unit = self._find_field_unit(fn)
-            if fn_unit == "%":
-                v = v / 100.0
-            if v:
-                attrs[fn] = v
-            else:
-                attrs.pop(fn, None)
-        save_play_style(school, name, attrs)
+        save_play_style(school, name, _apply_edits(styles.get(name, {})))
 
     def _find_field_unit(self, field_name: str) -> str:
         """查找字段单位"""
@@ -1161,14 +1593,17 @@ class SchoolPanel(QWidget):
         return ""
 
     def _on_ps_context_menu(self, pos):
-        """基础属性列表右键菜单：删除"""
+        """个人基础属性列表右键菜单：另存为预置 / 删除"""
         item = self._ps_list.itemAt(pos)
         if not item:
             return
         menu = QMenu(self)
+        as_preset_action = menu.addAction(tr("另存为预置…"))
         del_action = menu.addAction(tr("删除"))
         action = menu.exec(self._ps_list.mapToGlobal(pos))
-        if action == del_action:
+        if action == as_preset_action:
+            self._do_save_play_style_as_preset(item.text())
+        elif action == del_action:
             self._do_delete_play_style(item.text())
 
     def _do_delete_play_style(self, name: str):
@@ -1188,13 +1623,36 @@ class SchoolPanel(QWidget):
 
 
 class _PlayStyleEditDialog(QDialog):
-    """编辑/创建基础属性对话框。"""
+    """编辑/创建基础属性对话框（个人属性与预置属性共用同一套属性表单）。"""
 
-    def __init__(self, parent=None, name: str = "", attrs: dict | None = None,
-                 school_attr: str | None = None):
+    def __init__(
+        self,
+        parent=None,
+        name: str = "",
+        attrs: dict | None = None,
+        school_attr: str | None = None,
+        *,
+        preset_mode: bool = False,
+        level: int = 115,
+        stage: int = 1,
+        playstyle: str = "",
+        preset_id: str = "",
+        lock_preset_id: bool = False,
+    ):
         super().__init__(parent)
-        self.setWindowTitle(tr("编辑基础属性") if name else tr("创建基础属性"))
-        self.setMinimumWidth(400)
+        self._preset_mode = preset_mode
+        self._preset_level = level or 115
+        self._preset_stage = max(1, stage)
+        self._preset_playstyle = playstyle
+        self._preset_id = preset_id
+        self._lock_preset_id = lock_preset_id
+        self._id_manually_edited = bool(preset_id)
+        if preset_mode:
+            title = tr("编辑预置基础属性") if preset_id else tr("创建预置基础属性")
+        else:
+            title = tr("编辑基础属性") if name else tr("创建基础属性")
+        self.setWindowTitle(title)
+        self.setMinimumWidth(420)
         self._school_attr = school_attr
         self._spins: dict[str, QDoubleSpinBox] = {}
         self._setup_ui(name, attrs or {})
@@ -1283,15 +1741,45 @@ class _PlayStyleEditDialog(QDialog):
         scroll.setWidget(form_widget)
         layout.addWidget(scroll, stretch=1)
 
-        # 名称
-        name_row = QHBoxLayout()
-        name_row.addWidget(QLabel(tr("基础属性名称")))
-        self._edit_name = QLineEdit()
-        self._edit_name.setText(name)
-        self._edit_name.setPlaceholderText(tr("输入基础属性名称"))
-        self._edit_name.setMaxLength(20)
-        name_row.addWidget(self._edit_name)
-        layout.addLayout(name_row)
+        if self._preset_mode:
+            meta_form = QFormLayout()
+            self._spin_level = QSpinBox()
+            self._spin_level.setRange(1, 999)
+            self._spin_level.setValue(self._preset_level)
+            self._spin_stage = QSpinBox()
+            self._spin_stage.setRange(1, 99)
+            self._spin_stage.setValue(self._preset_stage)
+            self._edit_playstyle = QLineEdit(self._preset_playstyle)
+            self._edit_playstyle.setPlaceholderText(tr("留空表示流派默认（如 PVE / PVP）"))
+            self._edit_name = QLineEdit(name)
+            self._edit_name.setPlaceholderText(tr("留空自动生成，如：115级 1阶段（默认）"))
+            self._edit_preset_id = QLineEdit(self._preset_id or self._suggest_preset_id())
+            self._edit_preset_id.setReadOnly(self._lock_preset_id)
+            self._edit_preset_id.textEdited.connect(self._on_preset_id_edited)
+            self._spin_level.valueChanged.connect(self._sync_auto_preset_id)
+            self._spin_stage.valueChanged.connect(self._sync_auto_preset_id)
+            self._edit_playstyle.textChanged.connect(self._sync_auto_preset_id)
+
+            lv_row = QHBoxLayout()
+            lv_row.addWidget(self._spin_level)
+            lv_row.addWidget(QLabel(tr("阶段")))
+            lv_row.addWidget(self._spin_stage)
+            lv_row.addStretch()
+            meta_form.addRow(tr_label("等级"), lv_row)
+            meta_form.addRow(tr_label("玩法（可选）"), self._edit_playstyle)
+            meta_form.addRow(tr_label("显示名称"), self._edit_name)
+            meta_form.addRow(tr_label("预置 ID"), self._edit_preset_id)
+            layout.addLayout(meta_form)
+        else:
+            # 名称
+            name_row = QHBoxLayout()
+            name_row.addWidget(QLabel(tr("基础属性名称")))
+            self._edit_name = QLineEdit()
+            self._edit_name.setText(name)
+            self._edit_name.setPlaceholderText(tr("输入基础属性名称"))
+            self._edit_name.setMaxLength(20)
+            name_row.addWidget(self._edit_name)
+            layout.addLayout(name_row)
 
         # 按钮
         btn_row = QHBoxLayout()
@@ -1306,7 +1794,29 @@ class _PlayStyleEditDialog(QDialog):
         apply_button_style(btn_cancel, variant="neutral")
         layout.addLayout(btn_row)
 
+    def _suggest_preset_id(self) -> str:
+        lv = self._spin_level.value()
+        st = self._spin_stage.value()
+        ps = self._edit_playstyle.text().strip()
+        if ps:
+            safe_ps = ps.lower().replace(" ", "_")
+            return f"{lv}_s{st}_{safe_ps}"
+        return f"{lv}_s{st}"
+
+    def _on_preset_id_edited(self, _text: str) -> None:
+        self._id_manually_edited = True
+
+    def _sync_auto_preset_id(self, *_args) -> None:
+        if not self._lock_preset_id and not self._id_manually_edited:
+            self._edit_preset_id.setText(self._suggest_preset_id())
+
     def _on_save(self):
+        if self._preset_mode:
+            if not self._edit_preset_id.text().strip():
+                QMessageBox.warning(self, tr("ID 为空"), tr("预置 ID 不能为空"))
+                return
+            self.accept()
+            return
         if not self._edit_name.text().strip():
             QMessageBox.warning(self, tr("名称为空"), tr("基础属性名称不能为空"))
             return
@@ -1314,6 +1824,26 @@ class _PlayStyleEditDialog(QDialog):
 
     def get_name(self) -> str:
         return self._edit_name.text().strip()
+
+    def get_preset(self, school: str):
+        from ...config import BaseAttributePreset
+
+        level = self._spin_level.value()
+        stage = self._spin_stage.value()
+        playstyle = self._edit_playstyle.text().strip() or None
+        label = self._edit_name.text().strip() or (
+            f"{level}级 {stage}阶段（{playstyle}）"
+            if playstyle else f"{level}级 {stage}阶段（默认）"
+        )
+        return BaseAttributePreset(
+            school=school,
+            id=self._edit_preset_id.text().strip(),
+            level=level,
+            stage=stage,
+            playstyle=playstyle,
+            label=label,
+            stats=self.get_attrs(),
+        )
 
     def get_attrs(self) -> dict:
         result = {}

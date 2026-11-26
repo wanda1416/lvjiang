@@ -181,6 +181,34 @@ def set_graduation_baseline_dps(
     invalidate_graduation_cache()
 
 
+def set_graduation_default_base_attribute(
+    school_name: str, scheme_name: str, base_attribute: str,
+    world_level: int | None = None,
+    *, model_ref: GraduationModelRef | None = None,
+) -> None:
+    """设置毕业率方案绑定的默认预置基础属性引用（如 preset:115_s1；空串清除）。"""
+    import json
+
+    from .....core.config.resolver import get_resolver
+
+    ref = model_ref or _selected_model(school_name, scheme_name, world_level)
+    resolver = get_resolver()
+    path = resolver.resolve_read(ref.rel_path)
+    if path is None:
+        raise FileNotFoundError(f"毕业率模型文件不存在: {ref.rel_path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    cleaned = str(base_attribute or "").strip()
+    if cleaned:
+        data["default_base_attribute"] = cleaned
+    else:
+        data.pop("default_base_attribute", None)
+    resolver.write_entity(
+        ref.rel_path,
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+    )
+    invalidate_graduation_cache()
+
+
 def get_graduation_calculator(
     school_name: str, scheme_name: str = "基础方案",
     world_level: int | None = None,

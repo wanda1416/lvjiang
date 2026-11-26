@@ -151,3 +151,119 @@ def test_graduation_model_registry_supports_multi_stage_selection(tmp_path, monk
     # 指定 stage=1 时选到 stage=1 v4
     s1 = select_graduation_model("鸣金·虹", "基础方案", 115, stage=1)
     assert s1 is not None and (s1.level, s1.stage, s1.version) == (115, 1, 4)
+
+
+def test_graduation_model_default_base_attribute_roundtrip(tmp_path, monkeypatch):
+    """方案绑定默认预置基础属性：写入、读取与清除。"""
+    from lvjiang.apps.yysls.core.graduation import (
+        invalidate_graduation_cache,
+        set_graduation_default_base_attribute,
+    )
+    from lvjiang.apps.yysls.core.graduation.model_registry import available_models
+
+    resolver = _isolate_resolver(tmp_path, monkeypatch, dev_mode=False)
+    rel = "yysls/graduation/115级/鸣金·虹_基础方案_v1.json"
+    sys_file = resolver.system_dir / rel
+    sys_file.parent.mkdir(parents=True, exist_ok=True)
+    sys_file.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "school": "鸣金·虹",
+                "scheme": "基础方案",
+                "model_level": 115,
+                "model_version": 1,
+                "stage": 1,
+                "reference": {"dps": 10000.0},
+                "graduation_baseline_dps": 10000.0,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    invalidate_graduation_cache()
+
+    refs = available_models("鸣金·虹", "基础方案")
+    assert len(refs) == 1
+    assert refs[0].default_base_attribute == ""
+
+    set_graduation_default_base_attribute(
+        "鸣金·虹", "基础方案", "preset:115_s1", model_ref=refs[0],
+    )
+    refs_after = available_models("鸣金·虹", "基础方案")
+    assert refs_after[0].default_base_attribute == "preset:115_s1"
+
+    set_graduation_default_base_attribute(
+        "鸣金·虹", "基础方案", "", model_ref=refs_after[0],
+    )
+    refs_cleared = available_models("鸣金·虹", "基础方案")
+    assert refs_cleared[0].default_base_attribute == ""
+
+
+def test_school_panel_preset_list_scheme_default_col_and_card_height(qtbot, tmp_path, monkeypatch):
+    """SchoolPanel 预置/个人分离列表、方案管理第3列默认属性与增益效果6行对齐。"""
+    from PyQt6.QtWidgets import QGridLayout, QGroupBox
+
+    from lvjiang.apps.yysls.config import (
+        BaseAttributePreset,
+        get_base_attribute_preset,
+        save_base_attribute_preset,
+    )
+    from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
+
+    _isolate_resolver(tmp_path, monkeypatch, dev_mode=True)
+    save_base_attribute_preset(
+        "鸣金·虹",
+        BaseAttributePreset(
+            school="鸣金·虹",
+            id="115_s1",
+            level=115,
+            stage=1,
+            playstyle=None,
+            label="115级 1阶段（默认）",
+            stats={"min_outer": 1417.815, "max_outer": 3053.374, "mingjin_pen": 36.0},
+        ),
+        layer="system",
+    )
+
+    panel = SchoolPanel(
+        data={
+            "schools": {
+                "鸣金·虹": {
+                    "attr": "鸣金",
+                    "main": {"weapon": "剑", "martial_art": "无名剑法"},
+                    "sub": {"weapon": "枪", "martial_art": "无名枪法"},
+                }
+            }
+        }
+    )
+    qtbot.addWidget(panel)
+
+    # 1. 方案管理 4 列，第 3 列为「默认属性」
+    assert panel._scheme_list.columnCount() == 4
+    assert panel._scheme_list.horizontalHeaderItem(2).text() == "默认属性"
+
+    # 2. 预置基础属性与个人基础属性分离，且支持通过 preset:<id> 定位
+    panel.select_school_base_attr("鸣金·虹", "preset:115_s1")
+    assert panel._preset_list.count() == 1
+    assert panel._preset_list.currentRow() == 0
+    assert panel._ps_list.currentRow() == -1
+    assert "[系统]" in panel._preset_list.item(0).text()
+
+    # 3. 复用数值展示与实时编辑逻辑：改字段自动写回预置
+    panel._ps_edits["max_outer"].setText("3100.00")
+    reloaded = get_base_attribute_preset("鸣金·虹", "115_s1")
+    assert reloaded is not None
+    assert abs(reloaded.stats["max_outer"] - 3100.0) < 1e-4
+
+    # 4. 攻击属性与增益效果卡片均保持 6 行（12 格），确保判定属性与伤害加成对齐
+    cards = {
+        box.title(): box
+        for box in panel._value_content_widget.findChildren(QGroupBox)
+    }
+    attack_grid = cards["攻击属性"].layout()
+    gain_grid = cards["增益效果"].layout()
+    assert isinstance(attack_grid, QGridLayout)
+    assert isinstance(gain_grid, QGridLayout)
+    assert attack_grid.rowCount() == 6
+    assert gain_grid.rowCount() == 6

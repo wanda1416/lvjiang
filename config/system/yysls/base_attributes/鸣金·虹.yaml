@@ -7,18 +7,17 @@ presets:
   playstyle: null
   label: 115级 1阶段（默认）
   stats:
-    min_outer: 1466.3125
-    max_outer: 3006.94
-    min_mingjin: 563.0
-    max_mingjin: 1126.8
+    min_outer: 1417.815
+    max_outer: 3053.374
+    min_mingjin: 587.0
+    max_mingjin: 1174.8
     min_wuxiang: 92.0
-    max_wuxiang: 118.3
+    max_wuxiang: 118.6
     precision: 1.153
     crit_rate: 0.529
-    direct_crit: 0.046
-    intent_rate: 0.4176
-    direct_intent: 0.023
-    mingjin_pen: 30.0
+    intent_rate: 0.418
+    direct_intent: 0.046
+    mingjin_pen: 36.0
     crit_dmg: 0.5
     intent_dmg: 0.402
     mingjin_bonus: 0.15

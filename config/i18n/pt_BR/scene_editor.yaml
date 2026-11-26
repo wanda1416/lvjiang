@@ -184,6 +184,7 @@ scene_editor:
   截取模版: Capturar modelo
   截图尺寸不匹配: Tamanho da captura incompatível
   截图管理: Gerenciar capturas
+  "截图 {cur}/{total}": "Captura {cur}/{total}"
   截图：—　　画布：—: 'Captura: —　　Tela: —'
   所有引用都已绑定，或尚未创建引用。: Todas as referências já estão vinculadas ou nenhuma referência foi criada ainda.
   拖拽名称可调整 YAML 定义顺序: Arraste os nomes para reordenar as definições no YAML
@@ -239,6 +240,7 @@ scene_editor:
   激活布局不可删除: O layout ativo não pode ser excluído
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Clique em "Reconhecer todos os campos" para ver os resultados de OCR ou em "Reconhecer todas as imagens de referência" para ver as correspondências
   点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: 'Modo de calibração de toque: selecione uma região e arraste dentro dela para definir a área de toque; pressione Delete para voltar ao padrão'
+  "画布": "Tela"
   画布尺寸: Tamanho da tela
   画布尺寸无效: Tamanho da tela inválido
   画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Modo de edição de tela: arraste ou redimensione o quadro amarelo para excluir as bordas da janela'

@@ -140,7 +140,7 @@ class UserSettingsActivity : AppCompatActivity() {
         title = "用户资料"
         contextLine()
         content.removeAllViews()
-        if (attributes.length() == 0) content.addView(SettingsUi.label(this, "暂无属性。只在任务需要时填写，与电脑端通用用户属性一致。"))
+        if (attributes.length() == 0) content.addView(SettingsUi.label(this, "暂无配置。只在任务需要时填写，与电脑端用户配置一致。"))
         attributes.keys().asSequence().toList().sorted().forEach { key ->
             content.addView(SettingsUi.row(this, key, attributes.optString(key)).apply {
                 setOnClickListener { editAttribute(key) }

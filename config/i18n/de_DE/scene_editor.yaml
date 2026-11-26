@@ -184,6 +184,7 @@ scene_editor:
   截取模版: Vorlage erfassen
   截图尺寸不匹配: Screenshot-Größe stimmt nicht überein
   截图管理: Screenshot-Verwaltung
+  "截图 {cur}/{total}": "Bildschirmfoto {cur}/{total}"
   截图：—　　画布：—: 'Screenshot: —　　Leinwand: —'
   所有引用都已绑定，或尚未创建引用。: Alle Referenzen sind bereits gebunden oder es wurden noch keine erstellt.
   拖拽名称可调整 YAML 定义顺序: Namen ziehen, um die Reihenfolge der YAML-Definitionen zu ändern
@@ -239,6 +240,7 @@ scene_editor:
   激活布局不可删除: Das aktive Layout kann nicht gelöscht werden
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Klicken Sie auf „Alle Felder erkennen“ für OCR-Ergebnisse oder auf „Alle Referenzbilder erkennen“ für Abgleichergebnisse
   点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: 'Klickbereich-Kalibrierung: Bereich auswählen und darin den Klickbereich aufziehen; Entf setzt auf den Standard zurück'
+  "画布": "Leinwand"
   画布尺寸: Leinwandgröße
   画布尺寸无效: Ungültige Leinwandgröße
   画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Leinwand-Bearbeitungsmodus: Gelben Leinwandrahmen ziehen/skalieren, um Fensterrahmen auszuschließen'

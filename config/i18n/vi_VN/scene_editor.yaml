@@ -184,6 +184,7 @@ scene_editor:
   截取模版: Chụp mẫu
   截图尺寸不匹配: Kích thước ảnh chụp không khớp
   截图管理: Quản lý ảnh chụp
+  "截图 {cur}/{total}": "Ảnh chụp {cur}/{total}"
   截图：—　　画布：—: "Ảnh chụp: —　　Khung vẽ: —"
   所有引用都已绑定，或尚未创建引用。: "Tất cả tham chiếu đều đã liên kết, hoặc chưa tạo tham chiếu nào."
   拖拽名称可调整 YAML 定义顺序: Kéo tên để sắp xếp lại thứ tự định nghĩa YAML
@@ -239,6 +240,7 @@ scene_editor:
   激活布局不可删除: Không thể xóa bố cục đang kích hoạt
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: "Nhấp \"Nhận diện tất cả trường\" để xem kết quả OCR, nhấp \"Nhận diện tất cả ảnh tham chiếu\" để xem kết quả khớp"
   点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: "Chế độ hiệu chuẩn vùng nhấp: chọn vùng rồi kéo thả bên trong để khoanh phạm vi điểm rơi, nhấn Delete để xóa về mặc định"
+  "画布": "Khung vẽ"
   画布尺寸: Kích thước khung vẽ
   画布尺寸无效: Kích thước khung vẽ không hợp lệ
   画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: "Chế độ chỉnh sửa khung vẽ: kéo/thu phóng khung vàng để loại trừ viền cửa sổ"

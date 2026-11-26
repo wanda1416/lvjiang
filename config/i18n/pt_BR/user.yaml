@@ -41,20 +41,16 @@ user_avatar:
   "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。": "Este avatar está em uso pelos seguintes usuários e não pode ser excluído:\n{users}\n\nTroque ou remova o avatar desses usuários primeiro."
   选择之前保存的头像，或导入一张新图片: Escolha um avatar salvo anteriormente ou importe uma nova imagem
 user_manager:
-  保存属性: Salvar atributos
-  删除属性: Excluir atributos
   同步全部头像: Sincronizar todos os avatares
   属性 Key 不能为空: A chave do atributo não pode ficar vazia
   属性 Key 不能重复：{key}: 'Chave de atributo duplicada: {key}'
   悬浮点击编辑，或双击头像: Passe o mouse e clique para editar, ou clique duas vezes no avatar
   把本机与云端的头像做一次双向合并；不参与日常自动同步: Faz uma mesclagem bidirecional única entre avatares locais e na nuvem; não participa da sincronização automática diária
-  新增属性: Adicionar atributo
   新建用户: Novo usuário
   无法删除该用户: Não é possível excluir este usuário
   正在同步头像…: Sincronizando avatares…
   用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: O nome de usuário pode conter caracteres chineses, letras, números, sublinhados e hífens, com até 32 caracteres.
   用户名已存在: Nome de usuário já existe
-  用户属性: Atributos do usuário
   "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Excluir o usuário \"{name}\"?\nO usuário será removido da lista atual e das configurações em lote, mas os arquivos de dados associados serão mantidos; basta adicionar novamente com o mesmo nome para restaurar."
   ＋ 新建用户: ＋ Novo usuário
 user_toolbar:

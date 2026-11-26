@@ -2123,21 +2123,17 @@ user_avatar:
   选择之前保存的头像，或导入一张新图片: Chọn ảnh đại diện đã lưu trước đó hoặc nhập một hình ảnh mới
   重置: Đặt lại
 user_manager:
-  保存属性: Lưu thuộc tính
-  删除属性: Xóa thuộc tính
   同步全部头像: Đồng bộ tất cả ảnh đại diện
   属性 Key 不能为空: Key thuộc tính không được để trống
   属性 Key 不能重复：{key}: 'Key thuộc tính không được trùng lặp: {key}'
   当前用户: Người dùng hiện tại
   悬浮点击编辑，或双击头像: Di chuột rồi nhấp để sửa, hoặc nhấp đúp vào ảnh đại diện
   把本机与云端的头像做一次双向合并；不参与日常自动同步: Gộp hai chiều ảnh đại diện giữa máy cục bộ và đám mây một lần; không tham gia đồng bộ tự động hằng ngày
-  新增属性: Thêm thuộc tính
   新建用户: Tạo người dùng mới
   无法删除该用户: Không thể xóa người dùng này
   正在同步头像…: Đang đồng bộ ảnh đại diện…
   用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Tên người dùng chỉ được chứa chữ Hán, chữ cái, chữ số, dấu gạch dưới và dấu gạch nối, tối đa 32 ký tự.
   用户名已存在: Tên người dùng đã tồn tại
-  用户属性: Thuộc tính người dùng
   "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Bạn có chắc muốn xóa người dùng \"{name}\" không?\nNgười dùng sẽ bị gỡ khỏi danh sách hiện tại và cấu hình hàng loạt, các tệp dữ liệu liên quan vẫn được giữ lại; sau này thêm lại người dùng cùng tên sẽ khôi phục được."
   ＋ 新建用户: ＋ Tạo người dùng mới
 user_toolbar:

@@ -184,6 +184,7 @@ scene_editor:
   截取模版: Capturar plantilla
   截图尺寸不匹配: El tamaño de la captura no coincide
   截图管理: Gestor de capturas
+  "截图 {cur}/{total}": "Captura {cur}/{total}"
   截图：—　　画布：—: 'Captura: —　　Lienzo: —'
   所有引用都已绑定，或尚未创建引用。: Todas las referencias ya están vinculadas o aún no se ha creado ninguna.
   拖拽名称可调整 YAML 定义顺序: Arrastra los nombres para reordenar las definiciones YAML
@@ -239,6 +240,7 @@ scene_editor:
   激活布局不可删除: No se puede eliminar el diseño activo
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Haz clic en «Reconocer todos los campos» para ver los resultados de OCR o en «Reconocer todas las referencias» para ver las coincidencias
   点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: 'Modo de calibración de clic: selecciona una región y arrastra dentro para delimitar el área de clic; pulsa Supr para restablecer'
+  "画布": "Lienzo"
   画布尺寸: Tamaño del lienzo
   画布尺寸无效: Tamaño de lienzo no válido
   画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Modo de edición de lienzo: arrastra o redimensiona el marco amarillo para excluir los bordes de la ventana'

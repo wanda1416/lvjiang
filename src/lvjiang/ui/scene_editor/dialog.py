@@ -1122,15 +1122,16 @@ class SceneEditorDialog(
 
         ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
         cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
+        shot_txt = tr("截图 {cur}/{total}").format(cur=cur, total=total)
 
         muted = get_theme_manager().tokens.text_muted
         self._info_label.setText(
             f'<b style="color:#4da6ff;">{ss_txt}</b>'
             f'<span style="color:{muted};"> │ </span>'
-            f'<span style="color:{muted};">画布</span> '
+            f'<span style="color:{muted};">{tr("画布")}</span> '
             f'<b style="color:#ffc850;">{cv_txt}</b>'
             f'<span style="color:{muted};"> │ </span>'
-            f'<span style="color:{muted};">截图 {cur}/{total}</span>'
+            f'<span style="color:{muted};">{shot_txt}</span>'
         )
 
     def _set_empty_info_label(self) -> None:

@@ -184,6 +184,7 @@ scene_editor:
   截取模版: Capturer le modèle
   截图尺寸不匹配: Taille de capture incompatible
   截图管理: Gestionnaire de captures
+  "截图 {cur}/{total}": "Capture {cur}/{total}"
   截图：—　　画布：—: 'Capture : —　　Canevas : —'
   所有引用都已绑定，或尚未创建引用。: Toutes les références sont déjà liées, ou aucune n'a encore été créée.
   拖拽名称可调整 YAML 定义顺序: Faites glisser les noms pour réorganiser l'ordre des définitions YAML
@@ -239,6 +240,7 @@ scene_editor:
   激活布局不可删除: La mise en page active ne peut pas être supprimée
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: Cliquez sur « Reconnaître tous les champs » pour voir les résultats OCR, ou sur « Reconnaître toutes les images de référence » pour voir les correspondances
   点击标定模式：选中区域后在其内部拖拽框定落点范围，Delete 清除标定回到默认: 'Mode de calibrage de clic : sélectionnez une zone puis glissez à l''intérieur pour définir la zone de clic ; Suppr réinitialise au réglage par défaut'
+  "画布": "Canevas"
   画布尺寸: Taille du canevas
   画布尺寸无效: Taille de canevas invalide
   画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框: 'Mode d''édition du canevas : déplacez/redimensionnez le cadre jaune pour exclure les bordures de fenêtre'

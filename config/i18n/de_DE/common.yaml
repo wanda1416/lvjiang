@@ -2123,21 +2123,17 @@ user_avatar:
   选择之前保存的头像，或导入一张新图片: Einen zuvor gespeicherten Avatar wählen oder ein neues Bild importieren
   重置: Zurücksetzen
 user_manager:
-  保存属性: Attribute speichern
-  删除属性: Attribute löschen
   同步全部头像: Alle Avatare synchronisieren
   属性 Key 不能为空: Attributschlüssel darf nicht leer sein
   属性 Key 不能重复：{key}: 'Doppelter Attributschlüssel: {key}'
   当前用户: Aktueller Benutzer
   悬浮点击编辑，或双击头像: Zum Bearbeiten darüberfahren und klicken oder Avatar doppelklicken
   把本机与云端的头像做一次双向合并；不参与日常自动同步: Führt lokale und Cloud-Avatare einmalig beidseitig zusammen; nicht Teil der täglichen automatischen Synchronisierung
-  新增属性: Attribut hinzufügen
   新建用户: Neuer Benutzer
   无法删除该用户: Dieser Benutzer kann nicht gelöscht werden
   正在同步头像…: Avatare werden synchronisiert…
   用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。: Benutzernamen dürfen chinesische Zeichen, Buchstaben, Ziffern, Unterstriche und Bindestriche enthalten, maximal 32 Zeichen.
   用户名已存在: Benutzername existiert bereits
-  用户属性: Benutzerattribute
   "确定要删除用户「{name}」吗？\n用户将从当前列表和批量配置中移除，关联数据文件会保留；以后添加同名用户即可恢复。": "Benutzer „{name}“ wirklich löschen?\nDer Benutzer wird aus der aktuellen Liste und den Stapelkonfigurationen entfernt; zugehörige Datendateien bleiben erhalten und lassen sich durch erneutes Anlegen desselben Namens wiederherstellen."
   ＋ 新建用户: ＋ Neuer Benutzer
 user_toolbar:

@@ -138,7 +138,7 @@ settings_dialog:
   "永久": "Permanent"
   "添加参数": "Add Parameter"
   "添加应用": "Add App"
-  "添加环境": "Add Environment\nSave first?'"
+  "添加环境": "Add Environment"
   "清除后本地高级功能将不可用。可以再次填入激活码，重新检查本地与在线授权状态。": "Clearing disables local advanced features. You can paste an activation code again to re-check local and online authorization."
   "清除激活": "Clear Activation"
   "激活": "Activate"

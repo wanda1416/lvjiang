@@ -1,11 +1,11 @@
-content_version: 1
+content_version: 2
 school: 鸣金·虹
 presets:
-- id: 115_s1
+- id: 115_s2
   level: 115
-  stage: 1
+  stage: 2
   playstyle: null
-  label: 115级 1阶段（默认）
+  label: 115级 2阶段（默认）
   stats:
     min_outer: 1417.815
     max_outer: 3053.374

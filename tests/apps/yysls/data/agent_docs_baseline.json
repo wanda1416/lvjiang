@@ -756,7 +756,7 @@
       "path": "30-design/02-decisions/03-equipment/04-preset-base-attributes-and-stages.md",
       "title": "预置基础属性分层与毕业率多阶段模型",
       "category": "30-architecture",
-      "sha256": "70f031a001c636addf620c74a7912e94eaf1f4be817847b0ffcaa1932e472131"
+      "sha256": "1faa044345daabfc8883666e243ec4e0d51c4ba9ce8c41f7bd6582b65e9f11f4"
     },
     {
       "id": "30-design:02-decisions:04-platform:03-input-timeline",

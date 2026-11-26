@@ -22,13 +22,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QLocale, Qt
 from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QFrame,
@@ -1656,6 +1655,14 @@ class SchoolPanel(QWidget):
         self._refresh_play_styles()
 
 
+def _format_attr_input(value: float) -> str:
+    """格式化基础属性数值到输入框文本（零值留空，非零去多余尾零）。"""
+    if not value:
+        return ""
+    text = f"{value:.4f}".rstrip("0").rstrip(".")
+    return "0" if text == "-0" else text
+
+
 class _PlayStyleEditDialog(QDialog):
     """编辑/创建基础属性对话框（个人属性与预置属性共用同一套属性表单）。"""
 
@@ -1686,9 +1693,8 @@ class _PlayStyleEditDialog(QDialog):
         else:
             title = tr("编辑基础属性") if name else tr("创建基础属性")
         self.setWindowTitle(title)
-        self.setMinimumWidth(420)
         self._school_attr = school_attr
-        self._spins: dict[str, QDoubleSpinBox] = {}
+        self._edits: dict[str, QLineEdit] = {}
         self._setup_ui(name, attrs or {})
 
     def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
@@ -1728,52 +1734,56 @@ class _PlayStyleEditDialog(QDialog):
 
     def _setup_ui(self, name: str, attrs: dict):
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(12)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
-        # 属性表单（分组同行显示）
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        form_widget = QWidget()
-        form = QFormLayout(form_widget)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        # 属性表单：统一 6 列网格按内容自然包裹，不用滚动区、不预填 0
+        form_frame = QFrame()
+        form_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        grid = QGridLayout(form_frame)
+        grid.setContentsMargins(12, 10, 12, 10)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        grid.setColumnMinimumWidth(3, 20)
 
         resolved_groups = self._get_resolved_fields()
-        for group_label, fields in resolved_groups:
-            row_widget = QWidget()
-            row_layout = QHBoxLayout(row_widget)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(6)
+        for row_idx, (group_label, fields) in enumerate(resolved_groups):
+            if group_label:
+                grp = QLabel(tr(group_label))
+                grp.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                grp.setStyleSheet("font-weight: 600;")
+                grid.addWidget(grp, row_idx, 0)
 
-            for field_name, display_label, unit in fields:
+            for col_idx, (field_name, display_label, unit) in enumerate(fields[:2]):
                 if unit:
                     display_label = tr("{label}（{unit}）").format(
                         label=tr(display_label), unit=unit,
                     )
-                row_layout.addWidget(QLabel(tr(display_label)))
-                spin = QDoubleSpinBox()
-                spin.setRange(-999999, 999999)
-                spin.setDecimals(4)
-                spin.setSingleStep(0.1)
-                spin.setMinimumWidth(140)
+                label = QLabel(tr(display_label))
+                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                edit = QLineEdit()
+                edit.setAlignment(Qt.AlignmentFlag.AlignRight)
+                edit.setMinimumWidth(120)
+                edit.setMinimumHeight(26)
+                validator = QDoubleValidator(-999999.0, 999999.0, 4, edit)
+                validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+                validator.setLocale(QLocale.c())
+                edit.setValidator(validator)
+                edit.setPlaceholderText("")
                 if field_name in attrs:
                     v = attrs[field_name]
-                    if unit == "%":
-                        spin.setValue(v * 100)
-                    else:
-                        spin.setValue(v)
-                else:
-                    # 新建时不要让一整页 0 / 0.00% 抢占输入焦点；空白仍按
-                    # 零值保存语义处理，用户可以直接键入需要的数值。
-                    editor = spin.lineEdit()
-                    if editor is not None:
-                        editor.clear()
-                row_layout.addWidget(spin)
-                self._spins[field_name] = spin
+                    if isinstance(v, (int, float)) and not isinstance(v, bool) and v:
+                        edit.setText(_format_attr_input(float(v) * 100.0 if unit == "%" else float(v)))
+                label_col = 1 if col_idx == 0 else 4
+                edit_col = 2 if col_idx == 0 else 5
+                grid.addWidget(label, row_idx, label_col)
+                grid.addWidget(edit, row_idx, edit_col)
+                self._edits[field_name] = edit
 
-            row_layout.addStretch()
-            form.addRow(QLabel(tr(group_label)) if group_label else QLabel(""), row_widget)
-
-        scroll.setWidget(form_widget)
-        layout.addWidget(scroll, stretch=1)
+        grid.setColumnStretch(2, 1)
+        grid.setColumnStretch(5, 1)
+        layout.addWidget(form_frame)
 
         if self._preset_mode:
             meta_form = QFormLayout()
@@ -1827,6 +1837,7 @@ class _PlayStyleEditDialog(QDialog):
         apply_button_style(btn_save)
         apply_button_style(btn_cancel, variant="neutral")
         layout.addLayout(btn_row)
+        self.adjustSize()
 
     def _suggest_preset_id(self) -> str:
         lv = self._spin_level.value()
@@ -1892,10 +1903,16 @@ class _PlayStyleEditDialog(QDialog):
         result = {}
         for _, fields in self._get_resolved_fields():
             for fn, _, unit in fields:
-                spin = self._spins.get(fn)
-                if not spin:
+                edit = self._edits.get(fn)
+                if not edit:
                     continue
-                v = spin.value()
+                text = edit.text().strip()
+                if not text:
+                    continue
+                try:
+                    v = float(text)
+                except ValueError:
+                    continue
                 if unit == "%":
                     v = v / 100.0
                 if v:

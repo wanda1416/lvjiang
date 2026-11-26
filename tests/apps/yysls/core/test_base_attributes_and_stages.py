@@ -427,3 +427,66 @@ def test_ondevice_loadout_view_exposes_readable_base_attribute_options(tmp_path,
     assert result["base_attribute_options"] == [
         {"value": "preset:115_s1", "label": "[预置] 115级 1阶段（默认）"},
     ]
+
+
+def test_shipped_115_preset_is_stage_2():
+    """随包 115 级系统预置基础属性应明确为 stage 2（115_s2），不留 s1。"""
+    presets = get_base_attribute_presets("鸣金·虹", layer="system")
+    assert [p.id for p in presets] == ["115_s2"]
+    assert presets[0].level == 115
+    assert presets[0].stage == 2
+
+
+@pytest.mark.parametrize("preset_mode", [False, True])
+def test_play_style_edit_dialog_layout_alignment_and_empty_defaults(qtbot, preset_mode):
+    """创建基础属性与新建预置弹窗：空白无 0.0000、无滚动条包裹内容、第 2 列左端对齐。"""
+    from PyQt6.QtWidgets import QDoubleSpinBox, QGridLayout, QLabel, QScrollArea
+
+    from lvjiang.apps.yysls.ui.game_settings.school_panel import _PlayStyleEditDialog
+
+    dlg = _PlayStyleEditDialog(school_attr="鸣金", preset_mode=preset_mode)
+    qtbot.addWidget(dlg)
+    dlg.show()
+    assert dlg.layout() is not None
+    dlg.layout().activate()
+
+    # 1. 无 QScrollArea、无 QDoubleSpinBox，尺寸紧贴 sizeHint
+    assert dlg.findChildren(QScrollArea) == []
+    assert dlg.findChildren(QDoubleSpinBox) == []
+    assert dlg.size() == dlg.sizeHint()
+
+    # 2. 初始输入框全为空串，不填即按空 dict 处理
+    assert dlg._edits
+    assert all(edit.text() == "" for edit in dlg._edits.values())
+    assert dlg.get_attrs() == {}
+
+    # 3. 填入数值与百分比，回读与再打开均无多余尾零
+    dlg._edits["min_outer"].setText("1417.815")
+    dlg._edits["mingjin_bonus"].setText("15")
+    attrs = dlg.get_attrs()
+    assert attrs == {"min_outer": 1417.815, "mingjin_bonus": 0.15}
+
+    reopened = _PlayStyleEditDialog(
+        attrs=attrs, school_attr="鸣金", preset_mode=preset_mode,
+    )
+    qtbot.addWidget(reopened)
+    assert reopened._edits["min_outer"].text() == "1417.815"
+    assert reopened._edits["mingjin_bonus"].text() == "15"
+    assert reopened._edits["max_outer"].text() == ""
+
+    # 4. 第 2 列全部标签在同一列左端对齐
+    grids = [g for g in dlg.findChildren(QGridLayout)]
+    assert len(grids) == 1
+    grid = grids[0]
+    col4_labels = [
+        grid.itemAtPosition(row, 4).widget()
+        for row in range(grid.rowCount())
+        if grid.itemAtPosition(row, 4) is not None
+    ]
+    assert len(col4_labels) >= 6
+    assert all(isinstance(lbl, QLabel) for lbl in col4_labels)
+    x_positions = {lbl.geometry().x() for lbl in col4_labels}
+    assert len(x_positions) == 1
+    col4_texts = [lbl.text() for lbl in col4_labels]
+    for expected_prefix in ("最大", "直接会心率", "属攻穿透", "会意伤害加成"):
+        assert any(expected_prefix in text for text in col4_texts)

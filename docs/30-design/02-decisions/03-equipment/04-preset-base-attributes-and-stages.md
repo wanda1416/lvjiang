@@ -1,6 +1,6 @@
 # 预置基础属性分层与毕业率多阶段模型
 
-> 状态：已实现（涵盖 PC 配置层、流派配置双子页/三栏编辑、方案默认属性绑定、备战方案双源展示、Web 资产导出与无扫描反推试算；当前系统随包内置已校验的 `鸣金·虹` 115 级 1 阶段预置，其余流派待校验补齐）。
+> 状态：已实现（涵盖 PC 配置层、流派配置双子页/三栏编辑、方案默认属性绑定、备战方案双源展示、Web 资产导出与无扫描反推试算；当前系统随包内置已校验的 `鸣金·虹` `115_s2`（115 级 2 阶段）预置，115 级上半赛季 `s1` 已结束、不再补录 `s1`）。
 
 ## 1. 背景与设计目标
 
@@ -30,14 +30,14 @@
 - **版本化与合并**：在 `apps/yysls/config/merge_policy.py` 注册为 `depth=1` 的版本化实体目录（带 `content_version`，参与在线配置下发）。读取时按 `preset.id` 做 `system ← local` 同键覆盖合并；开发模式保存落 `system`，用户模式落 `local`，用户模式删除系统预置抛 `SystemContentProtected`，删除本地覆盖时经 `revert_entity_to_system` 回落系统层。
 - **文件结构**：
   ```yaml
-  content_version: 1
+  content_version: 2
   school: 牵丝·霖
   presets:
-    - id: "115_s1"
+    - id: "115_s2"
       level: 115
-      stage: 1
+      stage: 2
       playstyle: null
-      label: "115级 1阶段（默认）"
+      label: "115级 2阶段（默认）"
       stats:
         min_outer: 1500.0
         max_outer: 2800.0
@@ -46,7 +46,7 @@
 
 ### 3.2 毕业率模型多阶段扩展（`yysls/graduation/`）
 
-- 模型 JSON 顶层支持可选整数 `"stage"`（缺省兼容为 `1`，存量 110/115 模型零改动即可加载）与可选 `"default_base_attribute"`（绑定该方案的默认预置引用，如 `preset:115_s1`）。
+- 模型 JSON 顶层支持可选整数 `"stage"`（缺省兼容为 `1`，110/115 级随版本更新自然推进的方案无需额外写 `stage`）与可选 `"default_base_attribute"`（绑定该方案的默认预置引用，如 `preset:115_s2`）。
 - `model_filename(school, scheme, version, stage=...)` 在 `stage == 1` 时保持 `{流派}_{方案名}_v{version}.json`，`stage > 1` 时生成 `{流派}_{方案名}_s{stage}_v{version}.json`。
 - `list_graduation_models` 与 `select_graduation_model` 按 `(school, scheme, level, stage, version)` 去重与排序，默认自动选出不超过世界等级的最高 `(level, stage, version)`，并支持按 `stage` 显式筛选。
 
@@ -55,7 +55,7 @@
 ### 4.1 引用键约定
 
 - **个人实测（`config/session/yysls/play_styles.json`）**：保持原有裸名称字符串，存量方案零迁移（新建个人名称禁止以 `preset:` 开头）；
-- **系统/本地预置（`yysls/base_attributes/*.yaml`）**：使用稳定前缀 **`preset:<id>`**（例如 `preset:115_s1`、`preset:115_s2_纯奶`）。
+- **系统/本地预置（`yysls/base_attributes/*.yaml`）**：使用稳定前缀 **`preset:<id>`**（例如 `preset:115_s2`、`preset:115_s2_纯奶`）。
 
 ### 4.2 PC 端双源展示与自动绑定
 
@@ -70,5 +70,5 @@
 
 ## 5. 已知基线与后续边界
 
-- 当前系统随包内置已校验的 `鸣金·虹` `115_s1` 预置；其余 11 个流派待结合实测样本与 [基础属性来源模型](../../01-architecture/03-models/06-base-attr-model.md) 校验后逐一补齐。
+- 当前系统随包内置已校验的 `鸣金·虹` `115_s2`（115 级 2 阶段）预置；115 级上半赛季（`s1`）已结束，不再补录 `s1`，其余 11 个流派待结合 `s2` 实测样本与 [基础属性来源模型](../../01-architecture/03-models/06-base-attr-model.md) 校验后逐一补齐。毕业率方案本身随下半赛季更新自然推进，不再按 `s1`/`s2` 拆分或写死阶段字段。
 - 后续可在 Web 端继续扩展纯浏览器本地角色/装备池与显式 `stage` 切换控件，本决策已为两者预留数据结构与解析接口。

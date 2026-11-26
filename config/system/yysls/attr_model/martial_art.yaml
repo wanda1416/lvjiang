@@ -1,18 +1,18 @@
 # 来源类别: martial_art
-# 数值来自 DIY 计算器 0.10.1 的“武学天赋”页。
+# 数值来自 DIY 计算器 0.10.6 的“武学天赋”页。
 # 表格按流派给出两门武学的累计静态属性，因此累计值统一登记在主武学；
 # 副武学条目只声明已合并，避免流派自动选择两门武学时重复计算。
-# 天赋攻击/三率按基础五维 492 达到表格上限；属攻穿透/加成按表格阈值封顶。
+# 天赋攻击/三率按基础五维 528 达到表格上限（139.4 / 16% / 8%）；属攻穿透/加成按表格阈值封顶。
 kind: martial_art
 entries:
   无名剑法·天赋:
     group: 无名剑法
     label: 鸣金·虹武学天赋汇总
     stats:
-      max_outer: {formula: {source: dim_shi, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      intent_rate: {formula: {source: dim_shi, multiplier: 0.0001524390243902439, min: 0, max: 0.075}}
-      min_mingjin: 328
-      max_mingjin: 656
+      max_outer: {formula: {source: dim_shi, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      intent_rate: {formula: {source: dim_shi, multiplier: 0.00015151515151515, min: 0, max: 0.08}}
+      min_mingjin: 352
+      max_mingjin: 704
       mingjin_pen: {formula: {source: max_mingjin, multiplier: 0.0335946248600224, min: 0, max: 30}}
       mingjin_bonus: {formula: {source: max_mingjin, multiplier: 0.000167973124300112, min: 0, max: 0.15}}
   无名枪法·天赋:
@@ -23,10 +23,10 @@ entries:
     group: 积矩九剑
     label: 鸣金·影武学天赋汇总
     stats:
-      max_outer: {formula: {source: dim_jin, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      intent_rate: {formula: {source: dim_jin, multiplier: 0.0001524390243902439, min: 0, max: 0.075}}
-      min_mingjin: 328
-      max_mingjin: 656
+      max_outer: {formula: {source: dim_jin, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      intent_rate: {formula: {source: dim_jin, multiplier: 0.00015151515151515, min: 0, max: 0.08}}
+      min_mingjin: 352
+      max_mingjin: 704
       mingjin_pen: {formula: {source: max_mingjin, multiplier: 0.0335946248600224, min: 0, max: 30}}
       mingjin_bonus: {formula: {source: max_mingjin, multiplier: 0.000167973124300112, min: 0, max: 0.15}}
   九曲惊神枪·天赋:
@@ -45,10 +45,10 @@ entries:
     group: 嗟夫刀法
     label: 裂石·威武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_jin, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      max_outer: {formula: {source: dim_jin, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      min_lieshi: 328
-      max_lieshi: 656
+      min_outer: {formula: {source: dim_jin, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      max_outer: {formula: {source: dim_jin, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      min_lieshi: 352
+      max_lieshi: 704
       lieshi_pen: {formula: {source: min_lieshi, multiplier: 0.06711409395973154, min: 0, max: 30}}
       lieshi_bonus: {formula: {source: min_lieshi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   八方风雷枪·天赋:
@@ -59,10 +59,10 @@ entries:
     group: 斩雪刀法
     label: 裂石·钧武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_lieshi: 328
-      max_lieshi: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_lieshi: 352
+      max_lieshi: 704
       lieshi_pen: {formula: {source: min_lieshi, multiplier: 0.06711409395973154, min: 0, max: 30}}
       lieshi_bonus: {formula: {source: min_lieshi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   十方破阵·天赋:
@@ -73,10 +73,10 @@ entries:
     group: 九重春色
     label: 牵丝·玉武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_qiansi: 328
-      max_qiansi: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_qiansi: 352
+      max_qiansi: 704
       qiansi_pen: {formula: {source: min_qiansi, multiplier: 0.06711409395973154, min: 0, max: 30}}
       qiansi_bonus: {formula: {source: min_qiansi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   青山执笔·天赋:
@@ -87,10 +87,10 @@ entries:
     group: 文动霓裳
     label: 牵丝·翊武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_qiansi: 328
-      max_qiansi: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_qiansi: 352
+      max_qiansi: 704
       qiansi_pen: {formula: {source: min_qiansi, multiplier: 0.06711409395973154, min: 0, max: 30}}
       qiansi_bonus: {formula: {source: min_qiansi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   杏游草野·天赋:
@@ -109,10 +109,10 @@ entries:
     group: 泥犁三垢
     label: 破竹·风武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_pozhu: 328
-      max_pozhu: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_pozhu: 352
+      max_pozhu: 704
       pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
       pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   粟子游尘·天赋:
@@ -123,10 +123,10 @@ entries:
     group: 醉梦游春
     label: 破竹·尘武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_pozhu: 328
-      max_pozhu: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_pozhu: 352
+      max_pozhu: 704
       pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
       pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   粟子行云·天赋:
@@ -137,10 +137,10 @@ entries:
     group: 天志垂象
     label: 破竹·鸢武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_pozhu: 328
-      max_pozhu: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_pozhu: 352
+      max_pozhu: 704
       pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
       pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   千机索天·天赋:
@@ -151,10 +151,10 @@ entries:
     group: 悬身拳法
     label: 破竹·樽武学天赋汇总
     stats:
-      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
-      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
-      min_pozhu: 328
-      max_pozhu: 656
+      min_outer: {formula: {source: dim_min, multiplier: 0.2640151515151515, min: 0, max: 139.4}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003030303030303, min: 0, max: 0.16}}
+      min_pozhu: 352
+      max_pozhu: 704
       pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
       pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
   断水双诀·天赋:

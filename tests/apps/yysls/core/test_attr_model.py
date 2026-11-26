@@ -361,16 +361,16 @@ def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> No
         loadout, school_attr="破竹", martial_arts=("天志垂象", "千机索天"))
 
     attrs = result.panel_attrs
-    # 未央城 P1 收集按 DIY 计算器 0.10.3 计入（小外 12），基线随之 +12。
-    assert attrs.min_outer == pytest.approx(2123.64341463415)
-    assert attrs.max_outer == pytest.approx(3339.64)
-    assert attrs.precision == pytest.approx(1.254)
-    assert attrs.crit_rate == pytest.approx(0.738722926829268)
+    # 与 DIY 计算器 0.10.6 的面板逐项一致（含装备固有 380/757）。
+    assert attrs.min_outer == pytest.approx(2213.35697)
+    assert attrs.max_outer == pytest.approx(3498.18)
+    assert attrs.precision == pytest.approx(1.282)
+    assert attrs.crit_rate == pytest.approx(0.773674)
     assert attrs.direct_crit == pytest.approx(0.133)
     assert attrs.crit_dmg == pytest.approx(0.54)
-    assert attrs.intent_rate == pytest.approx(0.25552)
-    assert attrs.min_pozhu == pytest.approx(539)
-    assert attrs.max_pozhu == pytest.approx(1079)
+    assert attrs.intent_rate == pytest.approx(0.26464)
+    assert attrs.min_pozhu == pytest.approx(563)
+    assert attrs.max_pozhu == pytest.approx(1127)
     # 工作簿 B26 的 77.6 是计算器穿透数值，不是系统保存的基础穿透百分比。
     assert attrs.outer_pen == pytest.approx(0)
     assert attrs.pozhu_pen == pytest.approx(30)
@@ -409,17 +409,16 @@ def test_representative_calculator_templates_match_the_115_baseline(
     )
     attrs = result.panel_attrs
 
-    ratio = result.panel.values[required_dim] / 492
-    talent_attack = 129.9 * ratio
-    # 未央城 P1 收集按 DIY 计算器 0.10.3 计入（小外 12）。
+    ratio = result.panel.values[required_dim] / 528
+    talent_attack = 139.4 * ratio
     assert attrs.min_outer == pytest.approx(
-        1237.88 + (talent_attack if template in ("tank", "crit") else 0))
+        1264.76 + (talent_attack if template in ("tank", "crit") else 0))
     assert attrs.max_outer == pytest.approx(
-        2270.84 + (talent_attack if template in ("tank", "intent") else 0))
+        2337.08 + (talent_attack if template in ("tank", "intent") else 0))
     assert attrs.crit_rate == pytest.approx(
-        0.51104 + (0.15 * ratio if template == "crit" else 0))
+        0.52928 + (0.16 * ratio if template == "crit" else 0))
     assert attrs.intent_rate == pytest.approx(
-        0.25552 + (0.075 * ratio if template == "intent" else 0))
+        0.26464 + (0.08 * ratio if template == "intent" else 0))
 
     attr_fields = {
         "鸣金": ("min_mingjin", "max_mingjin", "mingjin_pen", "mingjin_bonus"),
@@ -427,8 +426,8 @@ def test_representative_calculator_templates_match_the_115_baseline(
         "牵丝": ("min_qiansi", "max_qiansi", "qiansi_pen", "qiansi_bonus"),
         "破竹": ("min_pozhu", "max_pozhu", "pozhu_pen", "pozhu_bonus"),
     }[school_attr]
-    assert getattr(attrs, attr_fields[0]) == pytest.approx(539)
-    assert getattr(attrs, attr_fields[1]) == pytest.approx(1079)
+    assert getattr(attrs, attr_fields[0]) == pytest.approx(563)
+    assert getattr(attrs, attr_fields[1]) == pytest.approx(1127)
     assert getattr(attrs, attr_fields[2]) == pytest.approx(30)
     assert getattr(attrs, attr_fields[3]) == pytest.approx(0.15)
 

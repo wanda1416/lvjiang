@@ -1,29 +1,35 @@
 # 来源类别: gear_set
-# 每项已经包含四件攻具的叠音累计 370 / 738，选择一套即可。
+# 每项已经包含四件攻具的叠音累计 392 / 780（DIY 0.10.6），选择一套即可。
 # 套装只登记 DIY 计算器能够证明的常驻静态属性，条件效果留给伤害模型。
 kind: gear_set
 entries:
   飞隼:
     label: 飞隼（含四条叠音）
-    stats: {min_outer: 370, max_outer: 738, intent_rate: 0.08}
+    stats: {min_outer: 392, max_outer: 780, intent_rate: 0.08}
   时雨:
     label: 时雨（含四条叠音）
-    stats: {min_outer: 370, max_outer: 738, precision: 0.163, crit_dmg: 0.10}
+    stats: {min_outer: 392, max_outer: 780, precision: 0.143, crit_dmg: 0.10}
   撼天:
     label: 撼天（含四条叠音）
-    stats: {min_outer: 510, max_outer: 738}
+    stats: {min_outer: 532, max_outer: 780}
   连星:
     label: 连星（含四条叠音）
-    stats: {min_outer: 510, max_outer: 738}
+    stats: {min_outer: 532, max_outer: 780}
   玉斗:
     label: 玉斗（含四条叠音）
-    stats: {min_outer: 370, max_outer: 878}
+    stats: {min_outer: 392, max_outer: 920}
   裁云:
     label: 裁云（含四条叠音）
-    stats: {min_outer: 510, max_outer: 738}
+    stats: {min_outer: 532, max_outer: 780}
   断岳:
     label: 断岳（含四条叠音）
-    stats: {min_outer: 510, max_outer: 738}
+    stats: {min_outer: 532, max_outer: 780}
   燕归:
     label: 燕归（含四条叠音）
-    stats: {min_outer: 510, max_outer: 738}
+    stats: {min_outer: 532, max_outer: 780}
+  浣花:
+    label: 浣花（含四条叠音）
+    stats: {min_outer: 392, max_outer: 780, crit_rate: 0.161}
+  烟柳:
+    label: 烟柳（含四条叠音）
+    stats: {min_outer: 392, max_outer: 780, precision: 0.143}

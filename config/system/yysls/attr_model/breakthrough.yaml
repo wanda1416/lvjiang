@@ -1,9 +1,9 @@
 # 来源类别: breakthrough
-# DIY 计算器 0.10.1 只给出当前满突破累计值，详细阶段后续补充。
+# DIY 计算器 0.10.6 只给出当前满突破累计值，详细阶段后续补充。
 kind: breakthrough
 entries:
   南吕相和·满突破:
     label: 满突破
     stats:
-      min_outer: 122
-      max_outer: 244
+      min_outer: 144
+      max_outer: 288

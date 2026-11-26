@@ -1,5 +1,5 @@
 # 来源类别: 心法
-# 名册及当前赛季满重属性以 DIY 计算器 0.10.1 的「心法」表为准，共 38 门。
+# 名册及当前赛季满重属性以 DIY 计算器 0.10.6 的「心法」表为准。
 # 每门一至六重各一条，按 group/tier 配装累计；不另建数据来源分组。
 # 表格不含逐重归属。威猛歌、千山法、凝神章沿用角色资料的二/五重位置，
 # 数值采用计算器满重基线；其余总量暂记六重并明确标注，低重数保持待填。
@@ -31,7 +31,7 @@ entries:
     tier: 6
     label: 千营一呼·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.15
+      crit_rate: 0.161
       outer_bonus: 0.028
   易水歌·一重:
     group: 易水歌
@@ -58,8 +58,8 @@ entries:
     tier: 6
     label: 易水歌·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 43.4
-      max_outer: 86.8
+      min_outer: 46.5
+      max_outer: 93.1
       direct_crit: 0.046
   征人归·一重:
     group: 征人归
@@ -86,7 +86,7 @@ entries:
     tier: 6
     label: 征人归·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 117.1
+      min_outer: 125.6
       outer_pen: 5.1
   断石之构·一重:
     group: 断石之构
@@ -113,7 +113,7 @@ entries:
     tier: 6
     label: 断石之构·六重（满重累计，重数归属待补）
     stats:
-      precision: 0.12
+      precision: 0.129
       direct_crit: 0.041
   绳舟行木·一重:
     group: 绳舟行木
@@ -140,7 +140,7 @@ entries:
     tier: 6
     label: 绳舟行木·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 117.1
+      min_outer: 125.6
       outer_pen: 5.1
   大唐歌·一重:
     group: 大唐歌
@@ -167,7 +167,7 @@ entries:
     tier: 6
     label: 大唐歌·六重（满重累计，重数归属待补）
     stats:
-      precision: 0.12
+      precision: 0.129
       crit_dmg: 0.04
   极乐泣血·一重:
     group: 极乐泣血
@@ -194,7 +194,7 @@ entries:
     tier: 6
     label: 极乐泣血·六重（满重累计，重数归属待补）
     stats:
-      max_outer: 104.1
+      max_outer: 111.6
       crit_dmg: 0.035
   心弥泥鱼·一重:
     group: 心弥泥鱼
@@ -221,7 +221,7 @@ entries:
     tier: 6
     label: 心弥泥鱼·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 117.1
+      min_outer: 125.6
       outer_pen: 5.1
   忘川绝响·一重:
     group: 忘川绝响
@@ -248,7 +248,7 @@ entries:
     tier: 6
     label: 忘川绝响·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.15
+      crit_rate: 0.161
       crit_dmg: 0.044
   花上月令·一重:
     group: 花上月令
@@ -275,7 +275,7 @@ entries:
     tier: 6
     label: 花上月令·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.15
+      crit_rate: 0.161
       direct_crit: 0.046
   剑气纵横·一重:
     group: 剑气纵横
@@ -302,7 +302,7 @@ entries:
     tier: 6
     label: 剑气纵横·六重（满重累计，重数归属待补）
     stats:
-      max_outer: 130.1
+      max_outer: 139.5
       direct_intent: 0.023
   明晦同尘·一重:
     group: 明晦同尘
@@ -329,8 +329,8 @@ entries:
     tier: 6
     label: 明晦同尘·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 39.0
-      max_outer: 78.0
+      min_outer: 41.9
+      max_outer: 83.7
       outer_pen: 5.1
   所恨年年·一重:
     group: 所恨年年
@@ -357,7 +357,7 @@ entries:
     tier: 6
     label: 所恨年年·六重（满重累计，重数归属待补）
     stats:
-      precision: 0.12
+      precision: 0.129
       outer_bonus: 0.025
   山河绝韵·一重:
     group: 山河绝韵
@@ -384,7 +384,7 @@ entries:
     tier: 6
     label: 山河绝韵·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.15
+      crit_rate: 0.161
       crit_dmg: 0.044
   威猛歌·一重:
     group: 威猛歌
@@ -394,7 +394,7 @@ entries:
     group: 威猛歌
     tier: 2
     stats:
-      intent_rate: 0.067
+      intent_rate: 0.072
   威猛歌·三重:
     group: 威猛歌
     tier: 3
@@ -437,7 +437,7 @@ entries:
     tier: 6
     label: 无名剑法·六重（满重累计，重数归属待补）
     stats:
-      max_outer: 121.3
+      max_outer: 139.5
       direct_intent: 0.023
   千山法·一重:
     group: 千山法
@@ -447,8 +447,8 @@ entries:
     group: 千山法
     tier: 2
     stats:
-      min_mingjin: 22.1
-      max_mingjin: 44.3
+      min_mingjin: 23.7
+      max_mingjin: 47.5
   千山法·三重:
     group: 千山法
     tier: 3
@@ -491,7 +491,7 @@ entries:
     tier: 6
     label: 逐狼心经·六重（满重累计，重数归属待补）
     stats:
-      intent_rate: 0.067
+      intent_rate: 0.072
       intent_dmg: 0.052
   纵地摘星·一重:
     group: 纵地摘星
@@ -518,8 +518,8 @@ entries:
     tier: 6
     label: 纵地摘星·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 39.0
-      max_outer: 78.0
+      min_outer: 41.9
+      max_outer: 83.7
       outer_pen: 5.1
   春雷篇·一重:
     group: 春雷篇
@@ -546,8 +546,8 @@ entries:
     tier: 6
     label: 春雷篇·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 39.0
-      max_outer: 78.0
+      min_outer: 41.9
+      max_outer: 83.7
       outer_bonus: 0.025
   霜天百夜·一重:
     group: 霜天百夜
@@ -574,7 +574,7 @@ entries:
     tier: 6
     label: 霜天百夜·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 130.1
+      min_outer: 139.5
       direct_crit: 0.046
   孤忠不辞·一重:
     group: 孤忠不辞
@@ -601,7 +601,7 @@ entries:
     tier: 6
     label: 孤忠不辞·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.135
+      crit_rate: 0.145
       crit_dmg: 0.04
   穿喉决·一重:
     group: 穿喉决
@@ -628,8 +628,8 @@ entries:
     tier: 6
     label: 穿喉决·六重（满重累计，重数归属待补）
     stats:
-      min_lieshi: 22.1
-      max_lieshi: 44.3
+      min_lieshi: 23.7
+      max_lieshi: 47.5
       lieshi_pen: 6.0
   抗造大法·一重:
     group: 抗造大法
@@ -656,8 +656,8 @@ entries:
     tier: 6
     label: 抗造大法·六重（满重累计，重数归属待补）
     stats:
-      min_lieshi: 22.1
-      max_lieshi: 44.3
+      min_lieshi: 23.7
+      max_lieshi: 47.5
       lieshi_pen: 6.0
   移经易武·一重:
     group: 移经易武
@@ -684,7 +684,7 @@ entries:
     tier: 6
     label: 移经易武·六重（满重累计，重数归属待补）
     stats:
-      max_mingjin: 66.4
+      max_mingjin: 71.2
       mingjin_bonus: 0.03
   扶摇直上·一重:
     group: 扶摇直上
@@ -711,7 +711,7 @@ entries:
     tier: 6
     label: 扶摇直上·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 130.1
+      min_outer: 139.5
       direct_crit: 0.046
   擒天势·一重:
     group: 擒天势
@@ -738,7 +738,7 @@ entries:
     tier: 6
     label: 擒天势·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.135
+      crit_rate: 0.145
       crit_dmg: 0.04
   三穷致知·一重:
     group: 三穷致知
@@ -765,8 +765,8 @@ entries:
     tier: 6
     label: 三穷致知·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 39.0
-      max_outer: 78.0
+      min_outer: 41.9
+      max_outer: 83.7
       outer_bonus: 0.025
   君臣药·一重:
     group: 君臣药
@@ -793,7 +793,7 @@ entries:
     tier: 6
     label: 君臣药·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.15
+      crit_rate: 0.161
       direct_crit: 0.046
   凝神章·一重:
     group: 凝神章
@@ -803,8 +803,8 @@ entries:
     group: 凝神章
     tier: 2
     stats:
-      min_outer: 39
-      max_outer: 78
+      min_outer: 41.9
+      max_outer: 83.7
   凝神章·三重:
     group: 凝神章
     tier: 3
@@ -847,7 +847,7 @@ entries:
     tier: 6
     label: 相和歌·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 130.1
+      min_outer: 139.5
       direct_crit: 0.046
   弦墨篇·一重:
     group: 弦墨篇
@@ -874,8 +874,8 @@ entries:
     tier: 6
     label: 弦墨篇·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 39.0
-      max_outer: 78.0
+      min_outer: 41.9
+      max_outer: 83.7
       outer_bonus: 0.025
   风知意·一重:
     group: 风知意
@@ -902,7 +902,7 @@ entries:
     tier: 6
     label: 风知意·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.135
+      crit_rate: 0.145
       crit_dmg: 0.04
   四时无常·一重:
     group: 四时无常
@@ -957,7 +957,7 @@ entries:
     tier: 6
     label: 一醉千秋·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 130.1
+      min_outer: 139.5
       direct_crit: 0.046
   飞仙醉言·一重:
     group: 飞仙醉言
@@ -984,7 +984,7 @@ entries:
     tier: 6
     label: 飞仙醉言·六重（满重累计，重数归属待补）
     stats:
-      crit_rate: 0.135
+      crit_rate: 0.145
       crit_dmg: 0.04
   燕别云岫·一重:
     group: 燕别云岫
@@ -1011,8 +1011,8 @@ entries:
     tier: 6
     label: 燕别云岫·六重（满重累计，重数归属待补）
     stats:
-      min_outer: 39.0
-      max_outer: 78.0
+      min_outer: 41.9
+      max_outer: 83.7
       outer_bonus: 0.025
   大卷微身·一重:
     group: 大卷微身
@@ -1039,6 +1039,115 @@ entries:
     tier: 6
     label: 大卷微身·六重（满重累计，重数归属待补）
     stats:
-      min_wuxiang: 22.1
-      max_wuxiang: 44.3
+      min_wuxiang: 23.7
+      max_wuxiang: 47.5
       wuxiang_pen: 6.0
+  神断青锋·一重:
+    group: 神断青锋
+    tier: 1
+    modeled: false
+  神断青锋·二重:
+    group: 神断青锋
+    tier: 2
+    modeled: false
+  神断青锋·三重:
+    group: 神断青锋
+    tier: 3
+    modeled: false
+  神断青锋·四重:
+    group: 神断青锋
+    tier: 4
+    modeled: false
+  神断青锋·五重:
+    group: 神断青锋
+    tier: 5
+    modeled: false
+  神断青锋·六重:
+    group: 神断青锋
+    tier: 6
+    label: 神断青锋·六重（满重累计，重数归属待补）
+    stats:
+      max_outer: 139.5
+      direct_intent: 0.023
+  浮梁一夜·一重:
+    group: 浮梁一夜
+    tier: 1
+    modeled: false
+  浮梁一夜·二重:
+    group: 浮梁一夜
+    tier: 2
+    modeled: false
+  浮梁一夜·三重:
+    group: 浮梁一夜
+    tier: 3
+    modeled: false
+  浮梁一夜·四重:
+    group: 浮梁一夜
+    tier: 4
+    modeled: false
+  浮梁一夜·五重:
+    group: 浮梁一夜
+    tier: 5
+    modeled: false
+  浮梁一夜·六重:
+    group: 浮梁一夜
+    tier: 6
+    label: 浮梁一夜·六重（满重累计，重数归属待补）
+    stats:
+      intent_rate: 0.072
+      intent_dmg: 0.052
+  明非通判·一重:
+    group: 明非通判
+    tier: 1
+    modeled: false
+  明非通判·二重:
+    group: 明非通判
+    tier: 2
+    modeled: false
+  明非通判·三重:
+    group: 明非通判
+    tier: 3
+    modeled: false
+  明非通判·四重:
+    group: 明非通判
+    tier: 4
+    modeled: false
+  明非通判·五重:
+    group: 明非通判
+    tier: 5
+    modeled: false
+  明非通判·六重:
+    group: 明非通判
+    tier: 6
+    label: 明非通判·六重（满重累计，重数归属待补）
+    stats:
+      min_outer: 41.9
+      max_outer: 83.7
+      outer_bonus: 0.025
+  月涌方圆·一重:
+    group: 月涌方圆
+    tier: 1
+    modeled: false
+  月涌方圆·二重:
+    group: 月涌方圆
+    tier: 2
+    modeled: false
+  月涌方圆·三重:
+    group: 月涌方圆
+    tier: 3
+    modeled: false
+  月涌方圆·四重:
+    group: 月涌方圆
+    tier: 4
+    modeled: false
+  月涌方圆·五重:
+    group: 月涌方圆
+    tier: 5
+    modeled: false
+  月涌方圆·六重:
+    group: 月涌方圆
+    tier: 6
+    label: 月涌方圆·六重（满重累计，重数归属待补）
+    stats:
+      max_outer: 139.5
+      direct_intent: 0.023

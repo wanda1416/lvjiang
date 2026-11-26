@@ -61,6 +61,11 @@ config/system/yysls/attr_model/*.yaml   一类来源一个文件
 | 武学天赋 | DIY 计算器 | 由流派的两门武学自动派生 |
 | 弓玦 | 对应等级词条上限 | 类型、等级独立选择；南吕相和现为 115 |
 
+`武学天赋` 有两处投影，改动必须同步：推导页用本目录 `attr_model/martial_art.yaml`
+（按武学登记、按五维公式），评分链补算用的是 `game_config/schools.yaml` 的
+`talent_scaling`（按流派登记、`base_dim` 528）。两者同源——攻击 139.4、会心 16%、
+会意 8%、属攻 352 / 704——分别由 `test_attr_model.py` 与预置回归守住。
+
 ## 取值三形态
 
 ```yaml
@@ -72,7 +77,7 @@ entries:
     group: 易水歌
     tier: 6
     label: 易水歌·六重（满重累计，重数归属待补）
-    stats: { min_outer: 43.4, max_outer: 86.8, direct_crit: 0.046 }
+    stats: { min_outer: 46.5, max_outer: 93.1, direct_crit: 0.046 }
   某武学·外功增幅:
     stats:
       min_outer:                  # 公式
@@ -214,7 +219,7 @@ entries:
 | 心法 | DIY 计算器名册，统一登记在 `inner_way.yaml` | 可增删。「+ 心法」输入门名，一次建满六重 |
 | 武学 | `game_config/martial_arts.yaml` 的 `martial_arts` | 增删按钮禁用，去武学配置改 |
 
-内置心法名册以 DIY 计算器 0.10.1 的「心法」表为准，共 38 门，统一登记在
+内置心法名册以 DIY 计算器 0.10.6 的「心法」表为准，共 42 门，统一登记在
 `inner_way.yaml`；不保留另一份社区名册，不创建“DIY计算器”分组。表格未提供逐重
 归属的满重总量放在该心法的六重条目并明确标注，其他重数仍待填；有依据的二、五重
 位置保留。角色资料快照独立保存，不反向补入公共名册。

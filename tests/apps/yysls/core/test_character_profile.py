@@ -210,11 +210,11 @@ def test_current_max_base_is_independent_from_the_level_23_profile(profile):
         AttrLoadout(level=110, school="鸣金·虹"), school_attr="鸣金")
     profile_result = evaluate_profile(profile)
     for name in ("dim_jin", "dim_shi", "dim_min", "dim_ti", "dim_yu"):
-        assert result.panel.values[name] == 304
+        assert result.panel.values[name] == 328
         assert profile_result.resolved.panel.values[name] == 283
-    # 未央城 P1 收集按 DIY 计算器 0.10.3 计入（小外 12），基线随之 +12。
-    assert result.panel.values["min_outer"] == pytest.approx(857.88)
-    assert result.panel.values["max_outer"] == pytest.approx(1513.84)
-    assert result.panel.values["intent_rate"] == pytest.approx(.25552)
-    assert result.panel.values["crit_rate"] == pytest.approx(.51104)
-    assert result.combat_attrs.min_outer == pytest.approx(857.88)
+    # 底子随 DIY 计算器 0.10.6 上调（五维 304→328、叠音/突破/心法同步）。
+    assert result.panel.values["min_outer"] == pytest.approx(884.76)
+    assert result.panel.values["max_outer"] == pytest.approx(1580.08)
+    assert result.panel.values["intent_rate"] == pytest.approx(.26464)
+    assert result.panel.values["crit_rate"] == pytest.approx(.52928)
+    assert result.combat_attrs.min_outer == pytest.approx(884.76)

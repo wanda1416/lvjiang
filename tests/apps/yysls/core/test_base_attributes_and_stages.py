@@ -239,6 +239,12 @@ def test_school_panel_preset_list_scheme_default_col_and_card_height(qtbot, tmp_
     )
     qtbot.addWidget(panel)
 
+    # 0. 右侧拆分为「流派方案」（首页）与「流派属性」两个子 Tab
+    assert panel._sub_tabs.count() == 2
+    assert panel._sub_tabs.tabText(0) == "流派方案"
+    assert panel._sub_tabs.tabText(1) == "流派属性"
+    assert panel._sub_tabs.currentIndex() == 0
+
     # 1. 方案管理 4 列，第 3 列为「默认属性」
     assert panel._scheme_list.columnCount() == 4
     assert panel._scheme_list.horizontalHeaderItem(2).text() == "默认属性"

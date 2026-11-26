@@ -50,6 +50,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -120,21 +121,33 @@ class SchoolPanel(QWidget):
 
         splitter.addWidget(left_widget)
 
-        # ── 右侧：整套流派详情共用滚动区，数值卡片不再单独滚动 ──
-        right_scroll = QScrollArea()
-        right_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self._details_widget = QWidget()
-        right_layout = QVBoxLayout(self._details_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        # ── 右侧：参考词组配置拆分为「流派方案」（默认首屏）与「流派属性」两个子 Tab ──
+        right_widget = QWidget()
+        right_outer = QVBoxLayout(right_widget)
+        right_outer.setContentsMargins(0, 0, 0, 0)
+
+        self._sub_tabs = QTabWidget()
+
+        def _make_scroll_page() -> tuple[QScrollArea, QWidget, QVBoxLayout]:
+            scroll = QScrollArea()
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setWidgetResizable(True)
+            scroll.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            page = QWidget()
+            lay = QVBoxLayout(page)
+            lay.setContentsMargins(6, 6, 6, 6)
+            lay.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+            scroll.setWidget(page)
+            return scroll, page, lay
+
+        self._scheme_scroll, self._details_widget, scheme_page_layout = _make_scroll_page()
+        self._attr_scroll, self._attr_page, attr_page_layout = _make_scroll_page()
 
         hint = QLabel(tr("武器候选来自装备配置的武器类型。武学增效已移至装备配置的武器类型中。"))
         hint.setStyleSheet("color: palette(mid);")
-        right_layout.addWidget(hint)
+        attr_page_layout.addWidget(hint)
 
         # ── 武学属性 ──
         attr_group = QGroupBox(tr("武学属性"))
@@ -192,7 +205,7 @@ class SchoolPanel(QWidget):
         for edit in self._edits():
             edit.textChanged.connect(self._on_field_changed)
 
-        right_layout.addWidget(attr_group)
+        attr_page_layout.addWidget(attr_group)
 
         # ── 转律词条库（流派级：转律只能转入库内词条，序即转入优先级） ──
         transmute_group = QGroupBox(tr("转律词条库"))
@@ -209,7 +222,8 @@ class SchoolPanel(QWidget):
         pool_row.addWidget(self._btn_pool_edit)
         transmute_layout.addLayout(pool_row)
 
-        right_layout.addWidget(transmute_group)
+        attr_page_layout.addWidget(transmute_group)
+        attr_page_layout.addStretch()
 
         # ── 方案管理 / 预置基础属性 / 个人基础属性：同一行、等高三栏 ──
         management_layout = QHBoxLayout()
@@ -273,7 +287,7 @@ class SchoolPanel(QWidget):
         apply_button_style(self._btn_add_play_style, variant="neutral")
         ps_layout.addWidget(self._btn_add_play_style)
         management_layout.addWidget(ps_group, stretch=1)
-        right_layout.addLayout(management_layout)
+        scheme_page_layout.addLayout(management_layout)
 
         # ── 数值展示：方案为只读满值，预置与个人基础属性复用可编辑能力 ──
         value_group = QGroupBox(tr("数值展示"))
@@ -292,11 +306,13 @@ class SchoolPanel(QWidget):
         self._ps_current_name: str = ""  # 当前编辑的个人基础属性名
         self._scheme_baseline_edit: QLineEdit | None = None
         value_layout.addWidget(self._value_content_widget)
-        right_layout.addWidget(value_group)
-        right_layout.addStretch()
+        scheme_page_layout.addWidget(value_group)
+        scheme_page_layout.addStretch()
 
-        right_scroll.setWidget(self._details_widget)
-        splitter.addWidget(right_scroll)
+        self._sub_tabs.addTab(self._scheme_scroll, tr("流派方案"))
+        self._sub_tabs.addTab(self._attr_scroll, tr("流派属性"))
+        right_outer.addWidget(self._sub_tabs)
+        splitter.addWidget(right_widget)
         splitter.setChildrenCollapsible(False)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -400,6 +416,7 @@ class SchoolPanel(QWidget):
         self, school: str | None, base_attr: str | None,
     ) -> None:
         """供外部跳转：支持定位预置（preset:<id>）或个人基础属性。"""
+        self._sub_tabs.setCurrentIndex(0)
         self._refresh_list(select=school)
         if not base_attr:
             return

@@ -29,7 +29,7 @@ class GameConfigDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("游戏配置"))
         self.setMinimumSize(900, 700)
-        self.resize(1200, 800)
+        self.resize(1200, 900)
         self.setWindowFlags(
             self.windowFlags()
             | Qt.WindowType.WindowMinimizeButtonHint

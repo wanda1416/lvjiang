@@ -102,7 +102,7 @@ def test_dual_source_resolution_and_user_mode_delete_protection(tmp_path, monkey
 
     # 模拟 session/play_styles.json 里存在个人条目
     monkeypatch.setattr(
-        "lvjiang.apps.yysls.config.base_attributes.get_play_styles",
+        "lvjiang.apps.yysls.config.play_styles.get_play_styles",
         lambda school: {"个人实测": {"max_outer": 4800.0}} if school == "鸣金·虹" else {},
     )
 

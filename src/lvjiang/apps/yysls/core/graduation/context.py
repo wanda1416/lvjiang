@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...config.base_attributes import resolve_base_attribute_data
+from ...config.base_attributes import parse_preset_ref, resolve_base_attribute_data
+from ...config.play_styles import get_play_styles
 from ..combat.combat_attrs import (
     CombatAttributes,
     GraduationAttrContext,
@@ -107,7 +108,10 @@ class PlanScoringContext:
         if not plan.base_attribute:
             problems.append("当前备战方案未选择角色基础属性")
         else:
-            base_data = resolve_base_attribute_data(school, plan.base_attribute)
+            if parse_preset_ref(plan.base_attribute) is not None:
+                base_data = resolve_base_attribute_data(school, plan.base_attribute)
+            else:
+                base_data = get_play_styles(school).get(plan.base_attribute)
             if not isinstance(base_data, dict):
                 problems.append(f"角色基础属性「{plan.base_attribute}」在流派「{school}」下不存在")
         if problems:

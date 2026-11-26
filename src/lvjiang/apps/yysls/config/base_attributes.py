@@ -28,7 +28,7 @@ from ....core.config.resolver import (
     SystemContentProtected,
     get_resolver,
 )
-from .play_styles import get_play_styles
+from . import play_styles as _play_styles_mod
 
 BASE_ATTRIBUTES_DIR = "yysls/base_attributes"
 PRESET_REF_PREFIX = "preset:"
@@ -210,7 +210,7 @@ def resolve_base_attribute_data(school: str, base_attr_ref: str) -> dict[str, fl
     if preset_id is not None:
         preset = get_base_attribute_preset(school, preset_id)
         return dict(preset.stats) if preset is not None else None
-    stored = get_play_styles(school).get(base_attr_ref)
+    stored = _play_styles_mod.get_play_styles(school).get(base_attr_ref)
     return dict(stored) if isinstance(stored, dict) else None
 
 
@@ -221,7 +221,7 @@ def list_all_base_attributes(school: str) -> dict[str, dict[str, float]]:
         return result
     for preset in get_base_attribute_presets(school):
         result[make_preset_ref(preset.id)] = dict(preset.stats)
-    for name, attrs in get_play_styles(school).items():
+    for name, attrs in _play_styles_mod.get_play_styles(school).items():
         if isinstance(attrs, dict):
             result[name] = dict(attrs)
     return result

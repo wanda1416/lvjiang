@@ -774,28 +774,48 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             self._refresh_schemes()
 
             # 恢复基础属性：未指定时优先按玩法/流派自动绑定最新 (level, stage) 预置
+            def _find_idx(ref: str) -> int:
+                finder = getattr(self, "_find_base_attr_index", None)
+                if callable(finder):
+                    return int(finder(ref))
+                find_data = getattr(self._combo_play_style, "findData", None)
+                if callable(find_data):
+                    found = int(find_data(ref))
+                    if found >= 0:
+                        return found
+                return int(self._combo_play_style.findText(ref))
+
+            def _cur_ref() -> str:
+                getter = getattr(self, "_current_base_attr_ref", None)
+                if callable(getter):
+                    return str(getter())
+                return str(self._combo_play_style.currentText() or "")
+
             if play_style:
-                idx = self._find_base_attr_index(play_style)
-                self._combo_play_style.setCurrentIndex(idx)
+                self._combo_play_style.setCurrentIndex(_find_idx(play_style))
             else:
                 from ....config import make_preset_ref, resolve_default_preset
 
+                world_lv_fn = getattr(self, "_effective_world_level", None)
+                world_lv = int(world_lv_fn()) if callable(world_lv_fn) else None
                 default_preset = (
                     resolve_default_preset(
                         school,
                         playstyle=getattr(plan, "playstyle", "") or "",
-                        level=self._effective_world_level(),
+                        level=world_lv,
                     )
                     if school else None
                 )
+                matched_preset = False
                 if default_preset is not None:
                     preset_ref = make_preset_ref(default_preset.id)
-                    idx = self._find_base_attr_index(preset_ref)
+                    idx = _find_idx(preset_ref)
                     if idx >= 0:
                         self._combo_play_style.setCurrentIndex(idx)
                         defaults["base_attribute"] = preset_ref
-                elif self._current_base_attr_ref():
-                    defaults["base_attribute"] = self._current_base_attr_ref()
+                        matched_preset = True
+                if not matched_preset and _cur_ref():
+                    defaults["base_attribute"] = _cur_ref()
 
             # 恢复弓玦
             idx = self._combo_gongjue.findData(gongjue)

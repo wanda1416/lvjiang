@@ -392,4 +392,4 @@ task_diagnostics_dialog:
   跟踪最新: Theo dõi mới nhất
   "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Bản xem trước cho nhà phát triển: mặc định tắt và tắt lại sau khi khởi động lại. Thay đổi chỉ áp dụng cho tác vụ hoặc lô kế tiếp bạn khởi chạy; tác vụ đang chạy không bị ảnh hưởng."
 "无界面启动本地控制面服务（供薄壳 lvjiang-cli 提交任务）": "Khởi chạy máy chủ điều khiển cục bộ không giao diện (cho lvjiang-cli)"
-"无头服务空闲退出秒数（0 表示常驻，默认 30）": "Số giây nhàn rỗi trước khi thoát máy chủ không giao diện (0 = chạy liên tục, mặc định 30)"
+"无头服务空闲退出秒数（0 表示跑完首单即退，负数表示常驻，默认 30）": "Số giây nhàn rỗi trước khi thoát máy chủ không giao diện (0 = thoát sau tác vụ đầu tiên, số âm = chạy liên tục, mặc định 30)"

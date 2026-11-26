@@ -1521,12 +1521,17 @@ class MainWindow(
         if self._close_cleanup_started:
             super().closeEvent(event)
             return
+        from ...core.control import get_active_control_server, stop_control_server
+
         active_runs = self._run_manager.all_runs()
-        if active_runs:
+        control_srv = get_active_control_server()
+        control_busy = bool(control_srv is not None and control_srv.has_active_job())
+        if active_runs or control_busy:
+            total_busy = len(active_runs) + (1 if control_busy else 0)
             reply = QMessageBox.question(
                 self, tr("工作流运行中"),
                 tr("当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n"
-                   "确定要退出吗？").format(count=len(active_runs)),
+                   "确定要退出吗？").format(count=total_busy),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -1538,6 +1543,8 @@ class MainWindow(
         if not self._close_modeless_tools():
             event.ignore()
             return
+        if control_busy:
+            stop_control_server()
         if active_runs:
             runs = self._run_manager.request_stop_all()
             for run in runs:

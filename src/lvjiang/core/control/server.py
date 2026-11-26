@@ -5,7 +5,7 @@
 - 所有请求强制校验 Authorization: Bearer <token>；
 - 仅维护一个当前活跃自动化槽位：空闲则接单（202），繁忙直接返回 409 Conflict（不建队）；
 - 捕获执行线程产生的 loguru 日志并经 SSE 推送给薄壳 CLI；
-- 支持 headless 模式的空闲自动退出（idle_exit > 0）。
+- 支持 headless 模式的空闲自动退出（idle_exit >= 0；0 表示首单跑完即退，负数表示常驻）。
 """
 from __future__ import annotations
 

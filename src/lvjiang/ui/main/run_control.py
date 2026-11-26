@@ -229,8 +229,15 @@ class RunControlMixin(_RunSelectorsMixin, _AndroidRecoveryMixin):
         check_device_busy: bool = True,
     ) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
+        from ...core.control import get_active_control_server
+
+        control_srv = get_active_control_server()
         hk = self._user_config.hotkeys
-        if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
+        if (
+            self._running
+            or (self._current_worker is not None and self._current_worker.isRunning())
+            or (control_srv is not None and control_srv.has_active_job())
+        ):
             self.append_log(self._hotkey_status(
                 tr("[拒绝] 已有自动化在运行中，请等待结束"),
                 (hk.stop, tr("停止"))))

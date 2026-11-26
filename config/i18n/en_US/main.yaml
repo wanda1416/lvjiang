@@ -391,4 +391,4 @@ task_diagnostics_dialog:
   跟踪最新: Follow latest
   "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Developer preview: off by default, off again after a restart. Changes apply only to the next task or batch you start; running tasks are unaffected."
 "无界面启动本地控制面服务（供薄壳 lvjiang-cli 提交任务）": "Start the local control-plane server headlessly (for thin lvjiang-cli)"
-"无头服务空闲退出秒数（0 表示常驻，默认 30）": "Idle exit timeout in seconds for headless server (0 to stay running, default 30)"
+"无头服务空闲退出秒数（0 表示跑完首单即退，负数表示常驻，默认 30）": "Idle exit timeout in seconds for headless server (0 to exit after first job, negative to stay running, default 30)"

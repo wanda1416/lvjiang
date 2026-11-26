@@ -233,13 +233,12 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
 
     if not is_readonly():
         remote_config.start_background_sync()
+        run_manager = _window._run_manager if _window is not None else None
         try:
             start_control_server(
                 mode="gui",
-                external_busy_check=lambda: bool(
-                    _window is not None
-                    and not sip.isdeleted(_window)
-                    and _window._run_manager.is_any_running()
+                external_busy_check=(
+                    run_manager.is_any_running if run_manager is not None else None
                 ),
             )
         except Exception as exc:  # noqa: BLE001

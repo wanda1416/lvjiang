@@ -392,4 +392,4 @@ task_diagnostics_dialog:
   跟踪最新: Seguir último
   "开发预览：默认关闭，重启程序后恢复关闭。修改仅对下次启动的任务或批次生效；不改变正在运行的任务。": "Prévia para desenvolvedores: desativado por padrão e volta a ficar desativado ao reiniciar. As alterações valem apenas para a próxima tarefa ou lote iniciado; tarefas em execução não mudam."
 "无界面启动本地控制面服务（供薄壳 lvjiang-cli 提交任务）": "Iniciar o servidor de controle local sem interface (para lvjiang-cli)"
-"无头服务空闲退出秒数（0 表示常驻，默认 30）": "Tempo ocioso em segundos para sair do servidor sem interface (0 = permanente, padrão 30)"
+"无头服务空闲退出秒数（0 表示跑完首单即退，负数表示常驻，默认 30）": "Segundos de inatividade para encerrar o servidor headless (0 = sair após a primeira tarefa, negativo = permanente, padrão 30)"

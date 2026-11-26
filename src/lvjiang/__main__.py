@@ -165,7 +165,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=float,
         default=30.0,
         dest="idle_exit",
-        help=tr("无头服务空闲退出秒数（0 表示常驻，默认 30）"),
+        help=tr("无头服务空闲退出秒数（0 表示跑完首单即退，负数表示常驻，默认 30）"),
     )
     return parser.parse_args(argv)
 

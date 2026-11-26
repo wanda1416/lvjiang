@@ -168,6 +168,7 @@ def _spawn_headless_server(root: Path, *, idle_exit: float) -> None:
         str(idle_exit),
     ]
     env = dict(os.environ)
+    env["LVJIANG_ROOT"] = str(root)
     env.pop("_MEIPASS2", None)
     orig_ld = env.pop("LD_LIBRARY_PATH_ORIG", None)
     if orig_ld is not None:
@@ -686,11 +687,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ValueError as exc:
             sys.stderr.write(f"[错误] {exc}\n")
             return EXIT_USAGE
+        script_file = (
+            str(Path(args.file).expanduser().resolve())
+            if args.file else None
+        )
         payload: dict[str, Any] = {
             "kind": "run",
             "script_id": args.id,
             "script_name": args.name,
-            "script_file": args.file,
+            "script_file": script_file,
             "user": args.user,
             "layout": args.layout,
             "target": args.target,

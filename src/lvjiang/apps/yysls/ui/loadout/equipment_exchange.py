@@ -119,10 +119,16 @@ WEAPON_NAME_ALIASES: dict[str, str] = {
     "鼓": "鼓",
 }
 
-#: 词条筛选：全部 / 只导出带定音的装备 / 只导出满调律装备
+#: 词条筛选：全部 / 只导出带定音的装备 / 只导出满调律装备 / 只导出未满调律装备
 AFFIX_FILTER_ALL = "all"
 AFFIX_FILTER_DINGYIN = "dingyin"
 AFFIX_FILTER_FULL_TUNING = "full_tuning"
+AFFIX_FILTER_NOT_FULL_TUNING = "not_full_tuning"
+
+
+def _is_mock_equip(equip: dict) -> bool:
+    fp = str(equip.get("_fp") or "")
+    return fp.startswith("mock_") or bool((equip.get("_extra") or {}).get("is_mock"))
 
 
 @dataclass(frozen=True)
@@ -172,6 +178,12 @@ def _passes_filters(equip: dict, *, level_threshold: int, affix_filter: str) -> 
             and equip[f"affix_{index}"].get("name")
             for index in range(1, 6)
         )
+    if affix_filter == AFFIX_FILTER_NOT_FULL_TUNING:
+        return not all(
+            isinstance(equip.get(f"affix_{index}"), dict)
+            and equip[f"affix_{index}"].get("name")
+            for index in range(1, 6)
+        )
     return True
 
 
@@ -183,26 +195,38 @@ def iter_export_entries(
 ) -> list[ExchangeEntry]:
     """收集参与导出的装备：已穿戴全部导出，背包按等级与词条筛选。
 
-    已穿戴装备不受筛选影响；类型缺失（OCR 未识别）的背包装备跳过。
+    已穿戴真实装备与背包共用同一份装备池，需按 ``_fp`` 去重，且始终跳过模拟装备；
+    类型缺失（OCR 未识别）的背包装备跳过。
     """
     entries: list[ExchangeEntry] = []
+    seen_fps: set[str] = set()
     for slot_key, equip in (session_data.get("equipped") or {}).items():
-        if not isinstance(equip, dict):
+        if not isinstance(equip, dict) or _is_mock_equip(equip):
             continue
         slot = EQUIPPED_SLOT_PARTS.get(str(slot_key))
         if slot is None:
             continue
+        fp = str(equip.get("_fp") or "")
+        if fp:
+            if fp in seen_fps:
+                continue
+            seen_fps.add(fp)
         entries.append(ExchangeEntry(slot=slot, equip=equip))
 
-    for group in (session_data.get("bag_items") or {}).values():
+    for _fp_key, group in (session_data.get("bag_items") or {}).items():
         if not isinstance(group, dict):
             continue
-        for equip in group.values():
-            if not isinstance(equip, dict):
+        for map_fp, equip in group.items():
+            if not isinstance(equip, dict) or str(map_fp).startswith("mock_") or _is_mock_equip(equip):
                 continue
             slot = part_of_type(equip.get("type"))
             if slot is None:
                 continue
+            fp = str(equip.get("_fp") or map_fp or "")
+            if fp:
+                if fp in seen_fps:
+                    continue
+                seen_fps.add(fp)
             if not _passes_filters(
                 equip, level_threshold=level_threshold, affix_filter=affix_filter
             ):

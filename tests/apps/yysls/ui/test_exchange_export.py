@@ -156,3 +156,50 @@ def test_leoq7_text_keeps_v2_header_and_decodes() -> None:
     ]
     assert payload["items"][0]["pitch"] == [{"key": "EXTERNAL_PENETRATION", "value": 16.8}]
     assert payload["items"][1]["type"] == "cloth"
+
+
+def test_bingjian_dedups_equipped_and_skips_mock_and_supports_not_full_tuning() -> None:
+    """已穿戴真实件不与背包重复导出、已穿戴模拟件不泄漏，且支持未满调律筛选。"""
+    equipped_weapon = _weapon(_fp="fp-equipped-weapon", name="已穿戴长剑")
+    equipped_mock = _weapon(
+        _fp="mock_1",
+        name="已穿戴模拟件",
+        _extra={"is_mock": True},
+    )
+    bag_not_full = {
+        "_fp": "fp-not-full",
+        "type": "环",
+        "name": "未满四词条环",
+        "level": 115,
+        "affix_1": {"name": "劲", "value": 30},
+    }
+    bag_full = {
+        "_fp": "fp-full",
+        "type": "佩",
+        "name": "满五词条佩",
+        "level": 115,
+        "affix_1": {"name": "劲", "value": 30},
+        "affix_2": {"name": "敏", "value": 30},
+        "affix_3": {"name": "势", "value": 30},
+        "affix_4": {"name": "会心率", "value": 5},
+        "affix_5": {"name": "会意率", "value": 5},
+    }
+    session = {
+        "equipped": {
+            "main_weapon": equipped_weapon,
+            "sub_weapon": equipped_mock,
+        },
+        "bag_items": {
+            "weapon": {"fp-equipped-weapon": dict(equipped_weapon)},
+            "ring": {"fp-not-full": bag_not_full},
+            "pendant": {"fp-full": bag_full},
+        },
+    }
+
+    all_items = json.loads(export_bingjian(session, "测试角色"))["items"]
+    assert [i["name"] for i in all_items] == ["已穿戴长剑", "未满四词条环", "满五词条佩"]
+
+    not_full_items = json.loads(
+        export_bingjian(session, "测试角色", affix_filter="not_full_tuning")
+    )["items"]
+    assert [i["name"] for i in not_full_items] == ["已穿戴长剑", "未满四词条环"]

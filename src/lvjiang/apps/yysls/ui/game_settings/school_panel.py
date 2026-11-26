@@ -677,16 +677,11 @@ class SchoolPanel(QWidget):
         from ...core.graduation.model_registry import available_models
         for ref in sorted(
             available_models(school),
-            key=lambda ref: (-ref.level, -ref.stage, -ref.version, ref.scheme),
+            key=lambda ref: (-ref.level, -ref.version, ref.scheme),
         ):
             row = self._scheme_list.rowCount()
             self._scheme_list.insertRow(row)
-            level_text = (
-                tr("{level}级 S{stage}").format(level=ref.level, stage=ref.stage)
-                if ref.stage > 1
-                else tr("{level}级").format(level=ref.level)
-            )
-            level_item = QTableWidgetItem(level_text)
+            level_item = QTableWidgetItem(tr("{level}级").format(level=ref.level))
             # ref 挂在首列：_selected_model_ref 按首列取，列序调整时跟着走。
             level_item.setData(Qt.ItemDataRole.UserRole, ref)
             self._scheme_list.setItem(row, 0, level_item)
@@ -768,7 +763,6 @@ class SchoolPanel(QWidget):
             if (r_ref is not None
                     and r_ref.scheme == ref.scheme
                     and r_ref.level == ref.level
-                    and r_ref.stage == ref.stage
                     and r_ref.version == ref.version):
                 self._scheme_list.selectRow(r)
                 break
@@ -1271,7 +1265,10 @@ class SchoolPanel(QWidget):
         edit.setObjectName("graduationBaselineDpsEdit")
         edit.setAlignment(Qt.AlignmentFlag.AlignRight)
         edit.setFixedSize(130, 24)
-        edit.setValidator(QDoubleValidator(0.01, 999999999.0, 2, edit))
+        baseline_validator = QDoubleValidator(0.01, 999999999.0, 2, edit)
+        baseline_validator.setLocale(QLocale.c())
+        baseline_validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+        edit.setValidator(baseline_validator)
         edit.setToolTip(tr("修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算"))
         edit.editingFinished.connect(
             lambda: self._save_scheme_baseline_dps(
@@ -1423,9 +1420,10 @@ class SchoolPanel(QWidget):
                 value_widget: QWidget = line_edit
                 line_edit.setAlignment(Qt.AlignmentFlag.AlignRight)
                 line_edit.setFixedHeight(26)
-                line_edit.setValidator(
-                    QDoubleValidator(-999999.0, 999999.0, 4, line_edit)
-                )
+                field_validator = QDoubleValidator(-999999.0, 999999.0, 4, line_edit)
+                field_validator.setLocale(QLocale.c())
+                field_validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+                line_edit.setValidator(field_validator)
                 line_edit.setText(
                     f"{value * 100:.2f}" if unit == "%" else f"{value:.2f}"
                 )
@@ -1433,7 +1431,7 @@ class SchoolPanel(QWidget):
                 text_width = line_edit.fontMetrics().horizontalAdvance(line_edit.text())
                 line_edit.setMaximumWidth(max(72, min(text_width + 30, 112)))
                 line_edit.textChanged.connect(
-                    lambda _text, fn=field_name: self._on_ps_field_changed(fn, unit)
+                    lambda _text, fn=field_name, u=unit: self._on_ps_field_changed(fn, u)
                 )
                 self._ps_edits[field_name] = line_edit
             else:
@@ -1561,6 +1559,8 @@ class SchoolPanel(QWidget):
         school = self._current_school()
         edit = self._ps_edits.get(field_name)
         if not school or not self._edit_source or edit is None:
+            return
+        if edit.text().strip() in ("-", "+", ".", "-.", "+."):
             return
 
         def _apply_single_edit(base: dict) -> dict[str, float]:
@@ -1694,8 +1694,9 @@ class _PlayStyleEditDialog(QDialog):
             title = tr("编辑基础属性") if name else tr("创建基础属性")
         self.setWindowTitle(title)
         self._school_attr = school_attr
+        self._initial_attrs = dict(attrs or {})
         self._edits: dict[str, QLineEdit] = {}
-        self._setup_ui(name, attrs or {})
+        self._setup_ui(name, self._initial_attrs)
 
     def _get_resolved_fields(self) -> list[tuple[str, list[tuple[str, str, str]]]]:
         """解析占位符字段，返回实际字段列表"""
@@ -1900,7 +1901,7 @@ class _PlayStyleEditDialog(QDialog):
         )
 
     def get_attrs(self) -> dict:
-        result = {}
+        result = dict(self._initial_attrs)
         for _, fields in self._get_resolved_fields():
             for fn, _, unit in fields:
                 edit = self._edits.get(fn)
@@ -1908,6 +1909,7 @@ class _PlayStyleEditDialog(QDialog):
                     continue
                 text = edit.text().strip()
                 if not text:
+                    result.pop(fn, None)
                     continue
                 try:
                     v = float(text)
@@ -1917,4 +1919,6 @@ class _PlayStyleEditDialog(QDialog):
                     v = v / 100.0
                 if v:
                     result[fn] = v
+                else:
+                    result.pop(fn, None)
         return result

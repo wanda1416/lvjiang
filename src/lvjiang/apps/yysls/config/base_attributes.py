@@ -278,25 +278,43 @@ def list_all_base_attributes(
     return result
 
 
-def _serialize_presets_doc(school: str, presets: list[BaseAttributePreset]) -> dict[str, Any]:
+def _read_raw_doc(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def _serialize_presets_doc(
+    school: str,
+    presets: list[BaseAttributePreset],
+    existing_doc: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     ordered = sorted(
         presets,
         key=lambda p: (-p.level, -p.stage, 0 if p.playstyle is None else 1, p.playstyle or "", p.id),
     )
-    return {
-        "school": school,
-        "presets": [
-            {
-                "id": p.id,
-                "level": p.level,
-                "stage": p.stage,
-                "playstyle": p.playstyle,
-                "label": p.label,
-                "stats": dict(p.stats),
-            }
-            for p in ordered
-        ],
-    }
+    doc: dict[str, Any] = {}
+    if isinstance(existing_doc, dict) and "content_version" in existing_doc:
+        doc["content_version"] = existing_doc["content_version"]
+    doc["school"] = school
+    if isinstance(existing_doc, dict) and "snapshot" in existing_doc:
+        doc["snapshot"] = existing_doc["snapshot"]
+    doc["presets"] = [
+        {
+            "id": p.id,
+            "level": p.level,
+            "stage": p.stage,
+            "playstyle": p.playstyle,
+            "label": p.label,
+            "stats": dict(p.stats),
+        }
+        for p in ordered
+    ]
+    return doc
 
 
 def save_base_attribute_preset(
@@ -312,7 +330,9 @@ def save_base_attribute_preset(
     if effective_layer is None:
         effective_layer = LAYER_SYSTEM if resolver.is_dev_mode() else LAYER_LOCAL
     root = resolver.system_dir if effective_layer == LAYER_SYSTEM else resolver.local_dir
-    existing = _read_layer_presets(root / rel, school, source=effective_layer)
+    path = root / rel
+    existing_doc = _read_raw_doc(path)
+    existing = _read_layer_presets(path, school, source=effective_layer)
     by_id = {p.id: p for p in existing}
     by_id[preset.id] = BaseAttributePreset(
         id=preset.id,
@@ -324,7 +344,7 @@ def save_base_attribute_preset(
         stats=dict(preset.stats),
         source=effective_layer,
     )
-    doc = _serialize_presets_doc(school, list(by_id.values()))
+    doc = _serialize_presets_doc(school, list(by_id.values()), existing_doc=existing_doc)
     resolver.write_entity(rel, dump_yaml(doc), layer=layer)
     logger.debug(f"已保存预置基础属性 ({effective_layer}): {school}/{preset.id}")
 
@@ -342,7 +362,9 @@ def delete_base_attribute_preset(
     if effective_layer is None:
         effective_layer = LAYER_SYSTEM if resolver.is_dev_mode() else LAYER_LOCAL
     root = resolver.system_dir if effective_layer == LAYER_SYSTEM else resolver.local_dir
-    existing = _read_layer_presets(root / rel, school, source=effective_layer)
+    path = root / rel
+    existing_doc = _read_raw_doc(path)
+    existing = _read_layer_presets(path, school, source=effective_layer)
     remaining = [p for p in existing if p.id != preset_id]
     if len(remaining) == len(existing):
         if not resolver.is_dev_mode():
@@ -355,7 +377,7 @@ def delete_base_attribute_preset(
                 )
         return False
     if remaining:
-        doc = _serialize_presets_doc(school, remaining)
+        doc = _serialize_presets_doc(school, remaining, existing_doc=existing_doc)
         resolver.write_entity(rel, dump_yaml(doc), layer=layer)
     elif not resolver.is_dev_mode() and resolver.is_system_entity(rel):
         resolver.revert_entity_to_system(rel)

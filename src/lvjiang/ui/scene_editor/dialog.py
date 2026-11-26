@@ -1100,25 +1100,27 @@ class SceneEditorDialog(
         canvas_w = max(1, round(cfg.w_ratio * img_w))
         canvas_h = max(1, round(cfg.h_ratio * img_h))
 
-        # 多截图时显示序号（如 "2/3"）
-        ss_label = "截图"
+        # 截图序号（始终显示 N/M，单张截图也显示 1/1）
+        cur, total = 1, 1
         if self._current_layout is not None:
             indices = list_scene_screenshots(
                 self._current_layout.key, tab.scene_key, tab.current_view)
-            if len(indices) > 1:
-                cur = tab.current_screenshot_index
-                ss_label = f"截图 {cur}/{len(indices)}"
+            if indices:
+                total = len(indices)
+                idx = tab.current_screenshot_index
+                cur = indices.index(idx) + 1 if idx in indices else 1
 
         ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
         cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
 
         muted = get_theme_manager().tokens.text_muted
         self._info_label.setText(
-            f'<span style="color:{muted};">{ss_label}</span> '
             f'<b style="color:#4da6ff;">{ss_txt}</b>'
             f'<span style="color:{muted};"> │ </span>'
             f'<span style="color:{muted};">画布</span> '
             f'<b style="color:#ffc850;">{cv_txt}</b>'
+            f'<span style="color:{muted};"> │ </span>'
+            f'<span style="color:{muted};">截图 {cur}/{total}</span>'
         )
 
     def _set_empty_info_label(self) -> None:

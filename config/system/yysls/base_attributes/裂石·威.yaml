@@ -1,0 +1,40 @@
+content_version: 1
+school: 裂石·威
+snapshot:
+  inner_ways:
+  - 山河绝韵
+  - 易水歌
+  - 穿喉决
+  - 抗造大法
+  arsenal: 本系
+  excludes:
+  - 装备固有主属性
+  - 词条与定音
+  - 装备套装（两件套）
+  - 弓玦
+presets:
+- id: 115_s2
+  level: 115
+  stage: 2
+  playstyle: null
+  label: 115级 2阶段（默认）
+  stats:
+    min_outer: 1553.857
+    max_outer: 2827.777
+    min_lieshi: 610.4
+    max_lieshi: 1222.0
+    min_wuxiang: 92.4
+    max_wuxiang: 118.8
+    precision: 1.153
+    crit_rate: 0.6903
+    intent_rate: 0.2646
+    direct_crit: 0.046
+    crit_dmg: 0.544
+    intent_dmg: 0.35
+    lieshi_pen: 42.0
+    lieshi_bonus: 0.15
+    dim_jin: 328.0
+    dim_min: 328.0
+    dim_shi: 328.0
+    dim_ti: 328.0
+    dim_yu: 328.0

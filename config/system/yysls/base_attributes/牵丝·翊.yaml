@@ -1,0 +1,40 @@
+content_version: 1
+school: 牵丝·翊
+snapshot:
+  inner_ways:
+  - 相和歌
+  - 风知意
+  - 易水歌
+  - 断石之构
+  arsenal: 本系
+  excludes:
+  - 装备固有主属性
+  - 词条与定音
+  - 装备套装（两件套）
+  - 弓玦
+presets:
+- id: 115_s2
+  level: 115
+  stage: 2
+  playstyle: null
+  label: 115级 2阶段（默认）
+  stats:
+    min_outer: 1693.357
+    max_outer: 2741.18
+    min_qiansi: 563.0
+    max_qiansi: 1127.0
+    min_wuxiang: 92.4
+    max_wuxiang: 118.8
+    precision: 1.282
+    crit_rate: 0.7737
+    intent_rate: 0.2646
+    direct_crit: 0.133
+    crit_dmg: 0.54
+    intent_dmg: 0.35
+    qiansi_pen: 30.0
+    qiansi_bonus: 0.15
+    dim_jin: 328.0
+    dim_min: 328.0
+    dim_shi: 328.0
+    dim_ti: 328.0
+    dim_yu: 328.0

@@ -529,9 +529,22 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         ``#% env`` 在这里只校验声明本身，不与 ``run_env`` 比对：
         编辑器和 CI 并没有「本次真实执行环境」。真正执行时仍在
         ``_load_and_validate`` 的引擎边界强制环境契约。
+
+        独立任务包（同级 ``manifest.yaml``）与执行期走同一套作用域：先合并包内
+        场景与同名根布局再校验。否则包私有场景在全局布局里当然「未绑定坐标」，
+        预检与 CI 门禁会把能跑的包判成坏的。普通任务的作用域是空操作，判据不变。
         """
-        self._load_and_validate(
-            Path(wf_path).resolve(), reachable_only=False, enforce_run_env=False)
+        from ..package import task_package_runtime_scope
+
+        resolved = Path(wf_path).resolve()
+        prev_layout = self._layout
+        with task_package_runtime_scope(resolved, prev_layout) as active_layout:
+            self._layout = active_layout
+            try:
+                self._load_and_validate(
+                    resolved, reachable_only=False, enforce_run_env=False)
+            finally:
+                self._layout = prev_layout
 
     #: 能力名 → 满足它的输入后端。并发输入只有 a11y 手势能落地：
     #: ADB shell input 单指，keyevent 也不可能真正保持。

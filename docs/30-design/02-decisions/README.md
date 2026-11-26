@@ -100,3 +100,4 @@
 | [10-script-groups.md](02-editor/10-script-groups.md) | 脚本展示分组、刷新加载及名称覆盖标记 |
 | [11-execution-feedback.md](02-editor/11-execution-feedback.md) | 四类任务入口的就地状态与启动失败提示 |
 | [12-parameter-save-boundaries.md](02-editor/12-parameter-save-boundaries.md) | 日常参数字段合并、连续输入保存及运行快照边界 |
+| [13-standalone-task-package.md](02-editor/13-standalone-task-package.md) | 独立任务包合并运行、场景管理双模式与首个真实包（风沙酒肆） |

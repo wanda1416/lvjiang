@@ -427,3 +427,100 @@ def test_scene_editor_dual_mode_switch_and_restore(isolated_env, qtbot):
     finally:
         dlg.close()
 
+def _global_only_layout() -> Layout:
+    """只有全局主场景的布局：不含任何任务包私有场景。"""
+    return Layout(
+        key="desktop",
+        name="桌面端",
+        canvas=CanvasConfig(),
+        regions={"game_main_page": [
+            Region(key="enter_btn", x_ratio=0.1, y_ratio=0.1, w_ratio=0.2, h_ratio=0.1)
+        ]},
+    )
+
+
+def test_validate_only_merges_package_layout(isolated_env):
+    """预检要能吃下包私有场景：全局布局里没有该场景，仍应校验通过。
+
+    回归点：``validate_only`` 不进任务包作用域时，CLI ``--dry-run``、编辑器
+    「检查」与 CI 门禁都会把能跑的包判成「场景未绑定任何坐标」。
+    """
+    from lvjiang.workflows.engine import WorkflowEngine
+
+    _, _, loc_dir, root_resolver, base_registry = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    wf.write_text(
+        "#% id: fsjs_demo\n"
+        "#% name: 风沙酒肆\n"
+        "#% runnable: true\n"
+        "if false\n"
+        "    click [fsjs_lobby].[drink_btn]\n"
+        "    find [fsjs_lobby].[drink_btn] as $hit by contains \"喝酒\"\n"
+        "end\n"
+        "return 0\n",
+        encoding="utf-8",
+    )
+
+    layout = _global_only_layout()
+    engine = WorkflowEngine(capture=None, ocr=None, input_ctrl=None,
+                            layout=layout, run_env="desktop")
+    engine.validate_only(wf)
+
+    # 作用域已释放：布局、解析器与全局注册表都没被改动
+    assert engine._layout is layout
+    assert "fsjs_lobby" not in layout.regions
+    assert get_resolver() is root_resolver
+    assert get_registry() is base_registry
+    assert base_registry.get_scene("fsjs_lobby") is None
+
+
+def test_validate_only_reports_missing_package_region(isolated_env):
+    """包内场景漏标区域仍要报错：合并不能变成「只要有个包就放行」。"""
+    from lvjiang.workflows.engine import WorkflowEngine
+
+    _, _, loc_dir, _, _ = isolated_env
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    wf.write_text(
+        "#% id: fsjs_demo\n"
+        "#% name: 风沙酒肆\n"
+        "#% runnable: true\n"
+        "find [fsjs_lobby].[drink_btn] as $hit by contains \"喝酒\"\n"
+        "return 0\n",
+        encoding="utf-8",
+    )
+    # 把包布局里那个区域删掉
+    _write_json(
+        loc_dir / "workflows" / "standalone" / "fengshajiusi"
+        / "layouts" / "desktop" / "fsjs" / "fsjs_lobby.json",
+        {"regions": []},
+    )
+
+    engine = WorkflowEngine(capture=None, ocr=None, input_ctrl=None,
+                            layout=_global_only_layout(), run_env="desktop")
+    with pytest.raises(WorkflowUserError) as excinfo:
+        engine.validate_only(wf)
+    assert "fsjs_lobby" in str(excinfo.value)
+
+
+def test_validate_only_ordinary_task_keeps_global_scope(isolated_env):
+    """普通脚本（同级无 manifest.yaml）预检不合并任何东西，作用域零变化。"""
+    from lvjiang.workflows.engine import WorkflowEngine
+
+    _, sys_dir, _, root_resolver, base_registry = isolated_env
+    ordinary = sys_dir / "workflows" / "daily" / "ordinary.wf"
+    ordinary.parent.mkdir(parents=True, exist_ok=True)
+    ordinary.write_text(
+        "#% name: 普通任务\n"
+        "#% runnable: true\n"
+        "find [game_main_page].[enter_btn] as $hit by contains \"进入\"\n"
+        "return 0\n",
+        encoding="utf-8",
+    )
+
+    layout = _global_only_layout()
+    engine = WorkflowEngine(capture=None, ocr=None, input_ctrl=None,
+                            layout=layout, run_env="desktop")
+    engine.validate_only(ordinary)
+    assert engine._layout is layout
+    assert get_resolver() is root_resolver
+    assert get_registry() is base_registry

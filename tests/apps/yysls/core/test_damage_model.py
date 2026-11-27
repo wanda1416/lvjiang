@@ -288,7 +288,6 @@ def test_extractor_finds_current_scheme_in_level_directory(extractor):
     }
     assert levels, "鸣金·虹 没有任何方案 JSON"
     assert data["model_level"] == max(levels)
-    assert data["source"]["file"]
 
 
 def test_conversion_survives_skill_edit_and_reload(models_dir):

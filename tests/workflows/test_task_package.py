@@ -652,3 +652,20 @@ def test_loader_ignores_task_package_scope(isolated_env):
     finally:
         reset_scoped_resolver(token)
     assert get_resolver() is root_resolver
+def test_in_package_scope_truncates_qt_args_for_kwonly_and_kwargs():
+    """Qt 信号多传位置参数时，含仅关键字参数或 **kwargs 的槽函数也应正确截断。"""
+    from lvjiang.ui.scene_editor.task_package_ops import bind_package_scope
+
+    class Dummy:
+        _package_scope_state = None
+
+        def kwonly(self, *, flag: bool = True):
+            return flag
+
+        def with_kwargs(self, value: int = 1, **kwargs):
+            return value, kwargs
+
+    bind_package_scope(Dummy)
+    obj = Dummy()
+    assert obj.kwonly(False) is True
+    assert obj.with_kwargs(42, "extra_qt_arg") == (42, {})

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QTextEdit,
 )
 
-from ...core.config.resolver import get_resolver
+from ...core.config.resolver import get_root_resolver
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style
 from .task_package_ops import bind_package_scope
@@ -90,7 +90,7 @@ class ScriptOpsMixin:
 
     def _auto_load_script(self):
         """自动加载 _editor_run.wf 到脚本编辑器（local 影子优先）"""
-        script_path = get_resolver().resolve_read("workflows/_editor_run.wf")
+        script_path = get_root_resolver().resolve_read("workflows/_editor_run.wf")
         if script_path is not None:
             content = script_path.read_text(encoding="utf-8")
             self._script_text.setPlainText(content)
@@ -100,7 +100,7 @@ class ScriptOpsMixin:
         """加载 .wf 文件到脚本编辑器"""
         path, _ = QFileDialog.getOpenFileName(
             self, tr("选择脚本文件"),
-            str(get_resolver().write_dir("workflows")),
+            str(get_root_resolver().write_dir("workflows")),
             tr("工作流文件 (*.wf);;所有文件 (*)"),
         )
         if not path:
@@ -118,7 +118,7 @@ class ScriptOpsMixin:
             return
         path, _ = QFileDialog.getSaveFileName(
             self, tr("保存脚本文件"),
-            str(get_resolver().write_dir("workflows")),
+            str(get_root_resolver().write_dir("workflows")),
             tr("工作流文件 (*.wf)"),
         )
         if not path:

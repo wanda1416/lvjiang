@@ -22,7 +22,7 @@ from ...core.config import (
     InputSimConfig,
     parse_android_apps,
 )
-from ...core.config.resolver import get_resolver
+from ...core.config.resolver import get_resolver, get_root_resolver
 from ...core.input.base import InputBackend, InputBackendKind
 from ...core.input.capture_base import CaptureBackend
 from ...core.input.trace import InputTrace, InputTraceError, load_input_trace
@@ -799,7 +799,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """
         path = Path(wf_path)
         if not path.is_absolute():
-            found = get_resolver().resolve_read(f"workflows/{path.as_posix()}")
+            found = get_root_resolver().resolve_read(f"workflows/{path.as_posix()}")
             if found is None:
                 raise WorkflowUserError(
                     f"load_subcalls: 找不到子过程文件 workflows/{path.as_posix()}")
@@ -1070,7 +1070,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             if rel.endswith(".py"):
                 self._resolve_script_import(rel, imported_files)
                 continue
-            resolved = get_resolver().resolve_read(f"workflows/{rel}")
+            resolved = get_root_resolver().resolve_read(f"workflows/{rel}")
             if resolved is None:
                 raise WorkflowUserError(
                     f"import 找不到文件: {rel}"

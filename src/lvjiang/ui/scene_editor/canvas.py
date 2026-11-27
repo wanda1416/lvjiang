@@ -1422,3 +1422,8 @@ class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
         if self._pixmap:
             self._zoom = 1.0
             self._recalc_display()
+
+
+from .task_package_ops import bind_package_scope  # noqa: E402
+
+bind_package_scope(RegionCanvas)

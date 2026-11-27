@@ -50,7 +50,6 @@ from ...workflows.package import (
 from ..widgets.button_styles import apply_button_style
 
 if TYPE_CHECKING:
-    from PyQt6.QtWidgets import QWidget
 
     from ...core.layout.models import Layout
 
@@ -117,7 +116,6 @@ class TaskPackageOpsMixin:
         self._package_scope_state = None
         self._scope_depth = 0
         self._saved_main_state = None
-        self._disabled_parent_for_task_pkg: QWidget | None = None
 
     @contextmanager
     def _package_scope(self):
@@ -201,12 +199,6 @@ class TaskPackageOpsMixin:
         self._package_scope_state = (pkg_resolver, pkg_registry, pkg_screenshots)
         self._active_task_package = pkg
 
-        # 冻结父窗口交互：避免任务场景模式占用主线程 ContextVar 期间在主窗口并发操作全局配置
-        parent_widget = self.parentWidget()
-        if (parent_widget is not None and parent_widget.isEnabled()
-                and self._disabled_parent_for_task_pkg is None):
-            parent_widget.setEnabled(False)
-            self._disabled_parent_for_task_pkg = parent_widget
         self._manager = LayoutConfigManager()
 
         self._mark_all_scenes_clean()
@@ -232,13 +224,7 @@ class TaskPackageOpsMixin:
 
     def _release_task_scope_tokens(self) -> None:
         self._package_scope_state = None
-        disabled_parent = getattr(self, "_disabled_parent_for_task_pkg", None)
-        if disabled_parent is not None:
-            self._disabled_parent_for_task_pkg = None
-            try:
-                disabled_parent.setEnabled(True)
-            except RuntimeError:
-                pass  # 父窗口已销毁
+
 
     def _exit_task_package_mode(
         self, *, restore_ui: bool = True,
@@ -315,7 +301,14 @@ def _in_package_scope(method):
     # `x.clicked` 传进来的 checked 会把无参槽打成 TypeError。
     params = list(inspect.signature(method).parameters.values())
     variadic = any(p.kind is p.VAR_POSITIONAL for p in params)
-    limit = None if variadic else max(len(params) - 1, 0)   # 减去 self
+    positional = sum(
+        1 for p in params
+        if p.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    )
+    limit = None if variadic else max(positional - 1, 0)   # 减去 self
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):

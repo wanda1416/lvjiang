@@ -207,9 +207,9 @@ class AgentTaskBridge(QObject):
             raise ValueError("执行用户已不存在")
         self.runtime.select_target(target.id)
         if operation == "scan":
-            from .....core.config.resolver import get_resolver
+            from .....core.config.resolver import get_root_resolver
             from .....workflows.metadata import build_flow_config
-            path = get_resolver().resolve_read("workflows/scan_all_loadouts.wf")
+            path = get_root_resolver().resolve_read("workflows/scan_all_loadouts.wf")
             if path is None:
                 raise ValueError("全部备战方案扫描未安装")
             config = build_flow_config(path)

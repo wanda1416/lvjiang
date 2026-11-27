@@ -165,7 +165,6 @@ def app_config(tmp_path, monkeypatch):
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
     monkeypatch.setattr(resolver_mod, "get_resolver", lambda: resolver)
     monkeypatch.setattr(resolver_mod, "_resolver", resolver)
-    monkeypatch.setattr(resolver_mod, "_resolver", resolver)
     return system
 
 

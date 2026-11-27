@@ -1,9 +1,7 @@
 """Convert graduation workbooks into executable, named JSON schemes."""
 from __future__ import annotations
 
-import hashlib
 import os
-import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -271,11 +269,6 @@ def _json_value(value: Any) -> Any:
     return str(value)
 
 
-def _version(filename: str) -> str:
-    match = re.search(r"(\d+\.\d+)\.xlsx$", filename)
-    return match.group(1) if match else "unknown"
-
-
 def _affix_input_names(
     workbook, school: str, inputs: dict[str, str], config: dict[str, Any],
 ) -> dict[str, list[str]]:
@@ -485,11 +478,12 @@ def _compile_v2(
     graduation_baseline_dps = (
         reference["dps"] / reference["graduation_rate"]
     )
+    # 不写 source 溯源字段：模型正确性由 validate_model 对账保证，
+    # 手工导入/改值的模型也没有 Excel 指纹可写（schema 契约已退役该字段）。
     return {
         "content_version": 1,
         "schema_version": MODEL_SCHEMA_VERSION,
         "school": school,
-        "source": workbook_model["model"]["source"],
         "baseline_attrs": baseline_attrs,
         "environment": environment,
         "reference": reference,
@@ -548,16 +542,11 @@ def convert_workbook(
                 },
                 "cells": cells,
             }
-        source_bytes = path.read_bytes()
         workbook_model = {
             "schema_version": "1.0",
             "formula_language": "excel_subset_v1",
             "model": {
                 "id": school.replace("·", ""), "school": school,
-                "source": {
-                    "file": path.name, "version": _version(path.name),
-                    "sha256": hashlib.sha256(source_bytes).hexdigest(),
-                },
                 "formula_count": formula_count,
             },
             "inputs": {

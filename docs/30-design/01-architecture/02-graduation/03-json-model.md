@@ -24,10 +24,10 @@ config/system/yysls/graduation/{流派}_{方案}_{等级}_v{版本}.json
   "scheme": "基础方案",
   "model_level": 110,
   "model_version": 1,
-  "source": { ... },
   "baseline_attrs": { ... },
   "environment": { ... },
   "reference": { ... },
+  "graduation_baseline_dps": 173379.0965,
   "program": { ... }
 }
 ```
@@ -46,23 +46,13 @@ config/system/yysls/graduation/{流派}_{方案}_{等级}_v{版本}.json
 `model_level`，再选择该等级最大的 `model_version`。文件名便于人工审计，加载和选择以
 JSON 元数据为准。
 
-### source
+### source（已退役）
 
-Excel 源文件溯源信息：
-
-```json
-{
-  "file": "鸣金虹110级基础期望毕业率计算标准模板1.3.xlsx",
-  "version": "1.3",
-  "sha256": "70815ec8..."
-}
-```
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `file` | string | 原始 Excel 文件名 |
-| `version` | string | 从文件名提取的版本号（如 `"1.3"`） |
-| `sha256` | string | 文件内容的 SHA-256 哈希 |
+`source` 溯源字段（`file` / `version` / `sha256`）已从 schema 契约中移除：模型
+的正确性由 `validate_model()`（用 `baseline_attrs` 重算并与 `reference` 对账）保证，
+不再依赖 Excel 源文件指纹。`convert_workbook` 也不再写入该字段；手工导入或改值的
+模型可以不带 `source`。带 `source` 的存量文件仍可正常加载（多余字段不参与校验），
+存量清理时删除即可。
 
 ## baseline_attrs
 

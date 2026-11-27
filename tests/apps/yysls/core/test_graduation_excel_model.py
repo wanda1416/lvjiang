@@ -21,7 +21,10 @@ from lvjiang.apps.yysls.core.graduation import (
     set_graduation_baseline_dps,
 )
 from lvjiang.apps.yysls.core.graduation.excel_formula import parse_formula
-from lvjiang.apps.yysls.core.graduation.graduation_converter import convert_workbook
+from lvjiang.apps.yysls.core.graduation.graduation_converter import (
+    convert_workbook,
+    validate_model,
+)
 from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
 from tests.case_matrix import case_matrix
 
@@ -189,7 +192,8 @@ def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     assert model["scheme"] == "基础方案"
     assert model["model_level"] == 110
     assert model["model_version"] == 1
-    assert model["source"]["sha256"]
+    # source 已从 schema 契约退役：带 source 的存量文件仍可加载（多余字段
+    # 不参与校验），但新转换/导入的模型不得再写入该字段。
     assert "sheets" not in model
     baseline = model["baseline_attrs"]
     extra = baseline.get("extra_attrs", {})
@@ -218,6 +222,23 @@ def test_runtime_uses_non_mingjin_element_inputs() -> None:
     high = CombatAttributes(min_outer=3000, max_outer=3000,
                             min_pozhu=1000, max_pozhu=1000)
     assert calculator.calculate(high).dps > calculator.calculate(low).dps
+
+
+def test_sourceless_model_loads_and_validates() -> None:
+    """不带 source 溯源字段的模型必须能正常加载与校验。
+
+    source 已从 schema 契约退役（模型正确性由 validate_model 对账保证）；
+    手工导入或改值的模型没有 Excel 指纹。这里用 115 级鸣金·虹 v3（已无
+    source）走完整的注册表加载 → 校验 → 求值链。
+    """
+    model = json.loads(
+        (DATA_DIR / "115级" / "鸣金·虹_基础方案_v3.json").read_text(encoding="utf-8")
+    )
+    assert "source" not in model
+    validate_model(model)
+    calculator = get_graduation_calculator("鸣金·虹", "基础方案", 115)
+    assert calculator is not None
+    assert calculator.baseline_dps() == pytest.approx(173379.0965)
 
 
 def test_new_school_needs_only_a_model_not_a_code_list() -> None:

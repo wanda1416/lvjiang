@@ -143,3 +143,30 @@ def test_heartbeat_loop_keeps_running_after_unexpected_error(monkeypatch):
 
     assert len(rounds) >= 3          # 抛了三次异常仍然在跑
     assert not loop.is_alive()
+def test_heartbeat_fires_immediately_on_foreground_and_throttles_across_restarts(monkeypatch):
+    """进前台立即上报一次心跳，短时间反复切前后台不重复刷，满 10 分钟后再跳。
+
+    回归点：旧实现用局部变量 ticks % 10 == 0 触发 heartbeat，每次 onPause 停掉线程
+    ticks 就归零，只要未连续停在主界面满 10 分钟就永远发不出 POST /api/heartbeat，
+    导致同步水位持续更新但设备一直显示「最后在线 N 天前」。
+    """
+    session = _Session(token="access")
+    now = [1000.0]
+    monkeypatch.setattr(account_api, "_session", lambda: session)
+    monkeypatch.setattr(account_api, "_LAST_HEARTBEAT_AT", 0.0)
+    monkeypatch.setattr(account_api.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(account_api, "_sync", lambda token, **_kwargs: {"synced": True})
+
+    # 1. 首次进前台（模拟只停 1 分钟就切走）：立刻上报 1 次
+    assert account_api._heartbeat_tick(0) == 1
+    assert session.beats == 1
+
+    # 2. 3 分钟后重新 onResume（ticks 从 0 重新开始）：未满 10 分钟不重复发
+    now[0] += 180.0
+    assert account_api._heartbeat_tick(0) == 1
+    assert session.beats == 1
+
+    # 3. 距上次心跳满 10 分钟后，即便 ticks 再次从 0 开始也会立即上报
+    now[0] += account_api.HEARTBEAT_INTERVAL_S
+    assert account_api._heartbeat_tick(0) == 1
+    assert session.beats == 2

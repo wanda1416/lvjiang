@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from datetime import datetime
 
 from loguru import logger
@@ -338,6 +339,7 @@ def account_logout() -> str:
         return json.dumps({"ok": False, "message": str(error)}, ensure_ascii=False)
     _remember_status({"ok": True, "logged_in": False})
     _forget_last_sync()
+    _reset_heartbeat_clock()
     return json.dumps({"ok": True}, ensure_ascii=False)
 
 
@@ -366,6 +368,7 @@ def account_sync() -> str:
         return json.dumps({"ok": False, "message": "另一轮同步正在进行，请稍候再试"},
                           ensure_ascii=False)
     _remember_sync_result(result, trigger="手动")
+    _maybe_heartbeat(session)
     _set_online(True)
     return json.dumps({"ok": True, **result}, ensure_ascii=False)
 
@@ -377,11 +380,22 @@ def account_sync() -> str:
 
 SYNC_INTERVAL_S = 60
 HEARTBEAT_EVERY_N_SYNC = 10            # 60s × 10 = 10 分钟一跳
+HEARTBEAT_INTERVAL_S = SYNC_INTERVAL_S * HEARTBEAT_EVERY_N_SYNC
 #: 手动「立即同步」等前台心跳让路的时长（秒）：一轮 idle 同步通常 1~3 秒，
 #: 等这么久还拿不到锁说明心跳正卡在网络上，让用户重试比无声干等更好。
 _MANUAL_SYNC_WAIT_S = 5.0
 _heartbeat_stop = threading.Event()
 _heartbeat_thread: threading.Thread | None = None
+#: 上次成功上报 POST /api/heartbeat 的单调时钟（0 表示尚未上报）。
+#: 不能用循环局部变量 ticks % 10 计数：Android 每次 onPause（切游戏、开设置页、锁屏）
+#: 都会停掉节拍线程，ticks 归零导致只要未连续停在主界面满 10 分钟就永远发不出心跳。
+_LAST_HEARTBEAT_AT: float = 0.0
+_HEARTBEAT_LOCK = threading.Lock()
+
+
+def _reset_heartbeat_clock() -> None:
+    global _LAST_HEARTBEAT_AT
+    _LAST_HEARTBEAT_AT = 0.0
 
 
 def _ensure_access_token() -> str:
@@ -399,6 +413,31 @@ def _ensure_access_token() -> str:
     return session.access_token or ""
 
 
+def _maybe_heartbeat(session: AccountSession | None = None) -> bool:
+    """按单调时钟节流上报在线心跳（间隔 HEARTBEAT_INTERVAL_S，首次立即上报）。"""
+    global _LAST_HEARTBEAT_AT
+    now = time.monotonic()
+    if _LAST_HEARTBEAT_AT > 0.0 and (now - _LAST_HEARTBEAT_AT) < HEARTBEAT_INTERVAL_S:
+        return False
+    if not _HEARTBEAT_LOCK.acquire(blocking=False):
+        return False
+    try:
+        now = time.monotonic()
+        if _LAST_HEARTBEAT_AT > 0.0 and (now - _LAST_HEARTBEAT_AT) < HEARTBEAT_INTERVAL_S:
+            return False
+        target = session or _session()
+        if not target.access_token and not _ensure_access_token():
+            return False
+        try:
+            target.heartbeat()
+        except AccountError:
+            return False                  # 弱网抖动静默，下次再试
+        _LAST_HEARTBEAT_AT = time.monotonic()
+        return True
+    finally:
+        _HEARTBEAT_LOCK.release()
+
+
 def _heartbeat_tick(ticks: int) -> int:
     """跑一轮前台同步。没有令牌时计数不变，调用方据此跳过这一分钟。"""
     session = _session()
@@ -406,11 +445,7 @@ def _heartbeat_tick(ticks: int) -> int:
     if not token:
         return ticks
     ticks += 1
-    if ticks % HEARTBEAT_EVERY_N_SYNC == 0:
-        try:
-            session.heartbeat()
-        except AccountError:
-            pass                          # 弱网抖动静默，下轮再试
+    _maybe_heartbeat(session)
     try:
         # 拿不到锁（用户正在手动同步）= 这一分钟跳过，不排队
         result = _sync(token, wait=0)
@@ -422,6 +457,12 @@ def _heartbeat_tick(ticks: int) -> int:
 
 
 def _heartbeat_loop() -> None:
+    # 进前台立刻补一次心跳（受 10 分钟单调时钟节流保护），避免短暂停留主界面
+    # 永远凑不满 10 分钟导致设备一直显示「最后在线 N 天前」。
+    try:
+        _maybe_heartbeat()
+    except Exception:                     # noqa: BLE001
+        logger.exception("[account] 前台启动心跳异常")
     ticks = 0
     while not _heartbeat_stop.wait(SYNC_INTERVAL_S):
         try:

@@ -46,7 +46,9 @@ from ...workflows.package import (
 from ..widgets.button_styles import apply_button_style
 
 if TYPE_CHECKING:
-    from .dialog import SceneEditorDialog
+    from PyQt6.QtWidgets import QWidget
+
+    from ...core.layout.models import Layout
 
 
 class _TaskPackagePickerDialog(QDialog):
@@ -105,17 +107,17 @@ class TaskPackageOpsMixin:
     _task_scope_tokens: tuple[object, object, object] | None
     _saved_main_state: dict | None
 
-    def _init_task_package_state(self: SceneEditorDialog) -> None:
+    def _init_task_package_state(self) -> None:
         self._active_task_package = None
         self._task_scope_tokens = None
         self._saved_main_state = None
-        self._disabled_parent_for_task_pkg = None
+        self._disabled_parent_for_task_pkg: QWidget | None = None
 
     @property
-    def active_task_package(self: SceneEditorDialog) -> TaskPackage | None:
+    def active_task_package(self) -> TaskPackage | None:
         return self._active_task_package
 
-    def _on_toggle_task_package(self: SceneEditorDialog) -> None:
+    def _on_toggle_task_package(self) -> None:
         """顶栏右上角按钮回调：主场景模式下加载任务场景，任务模式下退出任务场景。"""
         if self._active_task_package is not None:
             self._exit_task_package_mode(restore_ui=True)
@@ -124,7 +126,7 @@ class TaskPackageOpsMixin:
         packages = discover_task_packages()
         if not packages:
             QMessageBox.information(
-                self,
+                self,  # type: ignore[arg-type]
                 tr("未找到独立任务包"),
                 tr(
                     "当前 workflows 目录下未发现包含 manifest.yaml 的独立任务包。\n"
@@ -140,7 +142,7 @@ class TaskPackageOpsMixin:
         if pkg is not None:
             self._enter_task_package_mode(pkg)
 
-    def _enter_task_package_mode(self: SceneEditorDialog, pkg: TaskPackage) -> bool:
+    def _enter_task_package_mode(self, pkg: TaskPackage) -> bool:
         """切入指定独立任务包的场景编辑模式。"""
         if not self._confirm_discard_changes(tr("加载任务场景")):
             return False
@@ -153,7 +155,8 @@ class TaskPackageOpsMixin:
             pkg_screenshots = SCREENSHOTS_DIR / "_packages" / pkg.id
         except Exception as exc:  # noqa: BLE001
             logger.exception("加载任务场景失败")
-            QMessageBox.warning(self, tr("加载任务场景失败"), str(exc))
+            # Mixin 宿主实际是 QDialog，静态视角下 self 只是本 mixin 类型
+            QMessageBox.warning(self, tr("加载任务场景失败"), str(exc))  # type: ignore[arg-type]
             return False
 
         if self._saved_main_state is None:
@@ -185,7 +188,7 @@ class TaskPackageOpsMixin:
         self._img_cache.clear()
         self._loaded_scenes.clear()
         self._scene_layout_paths.clear()
-        self._current_layout = None
+        self._current_layout: Layout | None = None
 
         self._rebuild_group_tabs()
         self._auto_load_active("")
@@ -202,7 +205,7 @@ class TaskPackageOpsMixin:
         logger.info("场景管理已切入任务场景模式: {} ({})", pkg.name, pkg.id)
         return True
 
-    def _release_task_scope_tokens(self: SceneEditorDialog) -> None:
+    def _release_task_scope_tokens(self) -> None:
         tokens = self._task_scope_tokens
         if tokens is not None:
             res_tok, reg_tok, shot_tok = tokens
@@ -219,7 +222,7 @@ class TaskPackageOpsMixin:
                 pass  # 父窗口已销毁
 
     def _exit_task_package_mode(
-        self: SceneEditorDialog, *, restore_ui: bool = True,
+        self, *, restore_ui: bool = True,
     ) -> bool:
         """退出任务场景模式，恢复主场景作用域与界面状态。"""
         if self._active_task_package is None:

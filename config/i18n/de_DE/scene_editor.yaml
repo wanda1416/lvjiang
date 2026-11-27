@@ -366,6 +366,17 @@ scene_editor:
   选择要放置的坐标点: Zu platzierenden Punkt auswählen
   输入新的方向 key（小写字母开头）: Neuer Richtungs-Key (beginnt mit Kleinbuchstaben)
   新坐标绑定哪个坐标点？（沿用源半径）: An welchen Punkt soll die neue Koordinate gebunden werden? (übernimmt Quellradius)
+  "任务场景": "Aufgabenszene"
+  "加载任务场景": "Aufgabenszene laden"
+  "加载任务场景失败": "Aufgabenszene konnte nicht geladen werden"
+  "加载独立任务包的场景与布局进行查看和调试": "Szenen und Layouts eines eigenständigen Aufgabenpakets zum Ansehen und Debuggen laden"
+  "已加载任务场景：{name}": "Aufgabenszene geladen: {name}"
+  "已退出任务场景，恢复主场景": "Aufgabenszene verlassen, Hauptszene wiederhergestellt"
+  "当前 workflows 目录下未发现包含 manifest.yaml 的独立任务包。\n请将任务包文件夹放入 config/local/workflows/ 或 config/system/workflows/ 下后重试。": "Unter den workflows-Verzeichnissen wurde kein eigenständiges Aufgabenpaket mit manifest.yaml gefunden.\nLegen Sie den Paketordner unter config/local/workflows/ oder config/system/workflows/ ab und versuchen Sie es erneut."
+  "未找到独立任务包": "Kein eigenständiges Aufgabenpaket gefunden"
+  "退出任务场景": "Aufgabenszene verlassen"
+  "退出当前任务场景并返回全局主场景": "Aktuelle Aufgabenszene verlassen und zur globalen Hauptszene zurückkehren"
+  "选择包含 manifest.yaml 的独立任务包以查看和编辑其场景与布局：": "Wählen Sie ein eigenständiges Aufgabenpaket mit manifest.yaml, um dessen Szenen und Layouts anzusehen und zu bearbeiten:"
 story_dialog:
   」: “
 user_manager:

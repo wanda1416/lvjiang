@@ -366,6 +366,17 @@ scene_editor:
   选择要放置的坐标点: Chọn điểm tọa độ cần đặt
   输入新的方向 key（小写字母开头）: Nhập khóa hướng mới (bắt đầu bằng chữ thường)
   新坐标绑定哪个坐标点？（沿用源半径）: "Tọa độ mới liên kết với điểm tọa độ nào? (giữ nguyên bán kính gốc)"
+  "任务场景": "Cảnh tác vụ"
+  "加载任务场景": "Tải cảnh tác vụ"
+  "加载任务场景失败": "Tải cảnh tác vụ thất bại"
+  "加载独立任务包的场景与布局进行查看和调试": "Tải cảnh và bố cục của gói tác vụ độc lập để xem và gỡ lỗi"
+  "已加载任务场景：{name}": "Đã tải cảnh tác vụ: {name}"
+  "已退出任务场景，恢复主场景": "Đã thoát cảnh tác vụ, khôi phục cảnh chính"
+  "当前 workflows 目录下未发现包含 manifest.yaml 的独立任务包。\n请将任务包文件夹放入 config/local/workflows/ 或 config/system/workflows/ 下后重试。": "Không tìm thấy gói tác vụ độc lập nào chứa manifest.yaml trong các thư mục workflows.\nHãy đặt thư mục gói vào config/local/workflows/ hoặc config/system/workflows/ rồi thử lại."
+  "未找到独立任务包": "Không tìm thấy gói tác vụ độc lập"
+  "退出任务场景": "Thoát cảnh tác vụ"
+  "退出当前任务场景并返回全局主场景": "Thoát cảnh tác vụ hiện tại và quay lại cảnh chính toàn cục"
+  "选择包含 manifest.yaml 的独立任务包以查看和编辑其场景与布局：": "Chọn gói tác vụ độc lập có manifest.yaml để xem và chỉnh sửa cảnh và bố cục của nó:"
 story_dialog:
   」: ”
 user_manager:

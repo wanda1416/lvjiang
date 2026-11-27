@@ -366,6 +366,17 @@ scene_editor:
   选择要放置的坐标点: Selecciona el punto de coordenada a colocar
   输入新的方向 key（小写字母开头）: Introduce la nueva clave de dirección (empieza por minúscula)
   新坐标绑定哪个坐标点？（沿用源半径）: ¿A qué punto de coordenada vincular el nuevo punto? (mantiene el radio original)
+  "任务场景": "Escena de tarea"
+  "加载任务场景": "Cargar escena de tarea"
+  "加载任务场景失败": "No se pudo cargar la escena de tarea"
+  "加载独立任务包的场景与布局进行查看和调试": "Cargar las escenas y diseños de un paquete de tareas independiente para revisarlos y depurarlos"
+  "已加载任务场景：{name}": "Escena de tarea cargada: {name}"
+  "已退出任务场景，恢复主场景": "Se salió de la escena de tarea; escena principal restaurada"
+  "当前 workflows 目录下未发现包含 manifest.yaml 的独立任务包。\n请将任务包文件夹放入 config/local/workflows/ 或 config/system/workflows/ 下后重试。": "No se encontró ningún paquete de tareas independiente con manifest.yaml en los directorios workflows.\nColoca la carpeta del paquete en config/local/workflows/ o config/system/workflows/ e inténtalo de nuevo."
+  "未找到独立任务包": "No se encontró el paquete de tareas independiente"
+  "退出任务场景": "Salir de la escena de tarea"
+  "退出当前任务场景并返回全局主场景": "Salir de la escena de tarea actual y volver a la escena principal global"
+  "选择包含 manifest.yaml 的独立任务包以查看和编辑其场景与布局：": "Elige un paquete de tareas independiente que contenga manifest.yaml para ver y editar sus escenas y diseños:"
 story_dialog:
   」: »
 user_manager:

@@ -367,6 +367,17 @@ scene_editor:
   "选择要放置的坐标点": "Select the Point to Place"
   "输入新的方向 key（小写字母开头）": "New direction key (starts with a lowercase letter)"
   "新坐标绑定哪个坐标点？（沿用源半径）": "Which point should the new coordinate bind to? (keeps the source radius)"
+  "任务场景": "Task scene"
+  "加载任务场景": "Load task scene"
+  "加载任务场景失败": "Failed to load task scene"
+  "加载独立任务包的场景与布局进行查看和调试": "Load a standalone task package's scenes and layouts for inspection and debugging"
+  "已加载任务场景：{name}": "Task scene loaded: {name}"
+  "已退出任务场景，恢复主场景": "Exited task scene; main scene restored"
+  "当前 workflows 目录下未发现包含 manifest.yaml 的独立任务包。\n请将任务包文件夹放入 config/local/workflows/ 或 config/system/workflows/ 下后重试。": "No standalone task package containing manifest.yaml was found under the workflows directories.\nPut the package folder into config/local/workflows/ or config/system/workflows/ and try again."
+  "未找到独立任务包": "No standalone task package found"
+  "退出任务场景": "Exit task scene"
+  "退出当前任务场景并返回全局主场景": "Exit the current task scene and return to the global main scene"
+  "选择包含 manifest.yaml 的独立任务包以查看和编辑其场景与布局：": "Choose a standalone task package containing manifest.yaml to view and edit its scenes and layouts:"
 story_dialog:
   "」": "”"
 user_manager:

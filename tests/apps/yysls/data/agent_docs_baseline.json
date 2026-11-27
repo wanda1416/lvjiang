@@ -42,7 +42,7 @@
       "path": "10-domain/01-yysls/06-mechanics-conventions.md",
       "title": "游戏机制约定（代码内写死项登记）",
       "category": "10-game",
-      "sha256": "09266b723e745eb2b48cfb8177de2e870d77c0e12922884f9a4e942fc79b11e5"
+      "sha256": "cddbd90203846e8dd0b90de6eb48fd7f60570aff824747fe3ef891e7844afe80"
     },
     {
       "id": "10-domain:01-yysls:07-nanlu-season",
@@ -301,7 +301,7 @@
       "path": "30-design/01-architecture/03-models/02-scene-implementations.md",
       "title": "场景实现定义",
       "category": "30-architecture",
-      "sha256": "a332d657c1b8e3f484fcd5da135cd4a3f21dfd470bad8253c576da21fd29e8a1"
+      "sha256": "2ee3e5eb645237ec515c16f4ab50fc2850fe6174be8379b6e6eb6386c5877b45"
     },
     {
       "id": "30-design:01-architecture:03-models:03-session-and-context",
@@ -329,7 +329,7 @@
       "path": "30-design/01-architecture/03-models/06-base-attr-model.md",
       "title": "基础属性来源模型",
       "category": "30-architecture",
-      "sha256": "eb175f71d018789770fd6cb7930f9857155eed341f8436faf49447a7ab2411f9"
+      "sha256": "9f58f2f0b0a96da1daa54b1f7bb0165132f8af92dec8e20514ef6d6e7504036d"
     },
     {
       "id": "30-design:01-architecture:03-models:README",
@@ -609,7 +609,7 @@
       "path": "30-design/01-architecture/09-workflows/README.md",
       "title": "流程编排（Workflows）",
       "category": "30-architecture",
-      "sha256": "8e3366f3d9321d974bb12b8586153e6786f1fee8e21e0a791fde6e54e93e82d5"
+      "sha256": "03ede74af38af16218966a9f3bb6f6afb517a2de69ca321e94a06a3b3bd0c2ff"
     },
     {
       "id": "architecture",
@@ -738,6 +738,13 @@
       "sha256": "24c7a223454c2c8baa64ce48b9b846c7d091aac1468e2d2eeb3044f0aca1d2ee"
     },
     {
+      "id": "30-design:02-decisions:02-editor:13-standalone-task-package",
+      "path": "30-design/02-decisions/02-editor/13-standalone-task-package.md",
+      "title": "独立任务包（Standalone Task Package）与场景管理双模式设计",
+      "category": "30-architecture",
+      "sha256": "da3566c0aa29716e691e4adfb27acac405555ee29a42b3428fd3063b161c72a1"
+    },
+    {
       "id": "30-design:02-decisions:03-equipment:01-loadout-management",
       "path": "30-design/02-decisions/03-equipment/01-loadout-management.md",
       "title": "备战方案管理",
@@ -763,7 +770,7 @@
       "path": "30-design/02-decisions/03-equipment/04-preset-base-attributes-and-stages.md",
       "title": "预置基础属性分层与毕业率多阶段模型",
       "category": "30-architecture",
-      "sha256": "19a5b2e107ef86b74b4a29d7a7f135b12d4be05b67d33049fc8cc2feb1c829dc"
+      "sha256": "215abb8ad114f42fedcd9083384990673a7486368afc90726cf92c55492a6581"
     },
     {
       "id": "30-design:02-decisions:04-platform:03-input-timeline",
@@ -1029,7 +1036,7 @@
       "path": "30-design/02-decisions/README.md",
       "title": "决策与规格记录（已实现需求）",
       "category": "30-architecture",
-      "sha256": "bcb81c29f95435cb045eddc430c095b9eeef990f748d8fd1ef3f5d16f0868fb0"
+      "sha256": "da84ba8adb12e834cd9f15e0cc63aa4a35aef1e46f50aaadab69bc34b4ee39dc"
     },
     {
       "id": "40-reference:01-config:01-contract",
@@ -1400,7 +1407,7 @@
       "path": "60-guide/03-automation/05.04-base-attributes-and-graduation.md",
       "title": "5.4 角色基础属性与真实毕业率",
       "category": "60-userguide",
-      "sha256": "8ed6f1163135928d4aad496110b259609781275163b87119b49172ed89558989"
+      "sha256": "1361b1bca54c79044bb097b0b7137b23d543d853a415406dbd0675206b01aa0b"
     },
     {
       "id": "60-guide:03-automation:05.05-school-rule-filtering",
@@ -1442,7 +1449,7 @@
       "path": "60-guide/03-automation/06.07-system-scripts.md",
       "title": "6.7 系统脚本与工作流清单",
       "category": "60-userguide",
-      "sha256": "d0be5eb8b359bc3ce00756cceecbdeb47dde8e5a9d3dab34679baab90c7e7128"
+      "sha256": "b77a7456f0340f2337fd3426ac9a80f8c1af74dc62d1a367f2ab1940cb222b45"
     },
     {
       "id": "60-guide:04-desktop:01-quick-start",

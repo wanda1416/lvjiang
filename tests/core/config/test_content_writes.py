@@ -72,6 +72,18 @@ def test_new_layout_keeps_own_baselines_and_batches_multi_file_save(tmp_path, mo
     resolver = ConfigResolver(config_dir=tmp_path, dev_mode=True)
     monkeypatch.setattr(resolver_module, "_resolver", resolver)
     monkeypatch.setattr(scene_registry, "SCENE_REGIONS", {"first": [], "second": []})
+    # 新建布局的区域来自场景注册表（含独立任务包新增的 gameplay 场景），
+    # 这里把「全部场景键」收窄成两个，避免断言随场景增删漂移；其余查询仍走真实注册表。
+    _real_registry = scene_registry.get_registry()
+
+    class _TwoSceneRegistry:
+        def __getattr__(self, name):
+            return getattr(_real_registry, name)
+
+        def all_scene_keys(self):
+            return ["first", "second"]
+
+    monkeypatch.setattr(scene_registry, "get_registry", lambda: _TwoSceneRegistry())
     rebuild = Mock(wraps=content.content_changed)
     monkeypatch.setattr(content, "content_changed", rebuild)
     manager = layout_manager.LayoutConfigManager()

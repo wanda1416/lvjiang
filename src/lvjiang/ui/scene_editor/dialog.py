@@ -123,6 +123,8 @@ class SceneEditorDialog(
         self._scene_layout_paths: dict[str, str] = {}
         self._applying_layout = False
         self._click_rect_mode = False
+        # 关闭闸门：None=本次关闭还没判定，flowed=确认通过，blocked=用户取消
+        self._close_gate: str | None = None
         self._init_task_package_state()
 
         self._setup_ui()
@@ -193,9 +195,22 @@ class SceneEditorDialog(
             logger.warning(f"保存场景编辑器窗口大小失败: {e}")
 
     def closeEvent(self, event):
+        # 可见对话框的 super().closeEvent 会同步调用 reject()，确认逻辑在那里；
+        # 但 QDialog 对 closeEvent 总是 accept()，不能用 event.isAccepted() 判断
+        # 用户是否取消，否则取消关闭也会释放任务场景作用域。
+        self._close_gate = None
         super().closeEvent(event)
-        if not event.isAccepted():
+        if self._close_gate == "blocked":
+            event.ignore()
             return
+        if self._close_gate is None:
+            # 从未显示过的对话框直接 close() 不会走 reject()，这里补同一道确认。
+            if not self._confirm_script_stopped_before_close():
+                event.ignore()
+                return
+            if not self._confirm_discard_changes(tr("关闭场景编辑器")):
+                event.ignore()
+                return
         self._exit_task_package_mode(restore_ui=False)
         self._save_window_size()
         # 显式断开应用级信号：它活得比本对话框久，留着就是在已销毁的控件上回调
@@ -1093,9 +1108,12 @@ class SceneEditorDialog(
         通过确认后再释放任务场景作用域，避免取消关闭时提前切回全局或按 Esc 泄漏作用域。
         """
         if not self._confirm_script_stopped_before_close():
+            self._close_gate = "blocked"
             return
         if not self._confirm_discard_changes(tr("关闭场景编辑器")):
+            self._close_gate = "blocked"
             return
+        self._close_gate = "flowed"
         self._exit_task_package_mode(restore_ui=False)
         super().reject()
 

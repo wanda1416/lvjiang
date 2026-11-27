@@ -270,6 +270,31 @@ def public_content(kind: str, refresh: bool = False) -> str:
             from ..about import RELEASES_URL
             from ..version_info import get_version
             return _json({"ok": True, "version": get_version(), "url": RELEASES_URL})
+        if kind == "check_update":
+            from ..android.apk_release import apk_asset_name, apk_download_url
+            from ..updates.release import fetch_latest_release, is_newer_version
+            from ..version_info import get_version
+
+            current = get_version()
+            release = fetch_latest_release(platform="android")
+            has_update = is_newer_version(release.version, current)
+            apk_url = (
+                release.download_url
+                if release.download_url.lower().endswith(".apk")
+                else apk_download_url(release.version)
+            )
+            return _json({
+                "ok": True,
+                "has_update": has_update,
+                "current_version": current,
+                "latest_version": release.version,
+                "title": release.title,
+                "body": release.body,
+                "published_at": release.published_at,
+                "release_url": release.release_url,
+                "apk_url": apk_url,
+                "apk_name": apk_asset_name(release.version),
+            })
         raise ValueError("内容类型不可用")
     except Exception as exc:
         return _json({"ok": False, "message": str(exc)})

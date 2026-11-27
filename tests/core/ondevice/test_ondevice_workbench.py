@@ -208,3 +208,38 @@ def test_batch_task_detail_is_available_outside_recent_page(tmp_path, monkeypatc
     monkeypatch.setattr(task_runner, "_STATE", task_runner._TaskState())
     assert len(json.loads(workbench.task_history())["records"]) == 100
     assert json.loads(workbench.task_history(oldest))["record"]["task_run_id"] == oldest
+def test_public_content_check_update_reports_available_and_latest(monkeypatch):
+    from lvjiang.core.updates import release as release_mod
+    from lvjiang.core.updates.release import ReleaseInfo
+
+    monkeypatch.setattr("lvjiang.core.version_info.get_version", lambda: "0.15.21")
+
+    newer = ReleaseInfo(
+        version="0.15.22",
+        title="v0.15.22",
+        body="- 修复若干问题",
+        published_at="2026-11-27T00:00:00Z",
+        release_url="https://github.com/wanda1416/lvjiang/releases/tag/v0.15.22",
+        download_url="https://github.com/wanda1416/lvjiang/releases/download/v0.15.22/lvjiang-v0.15.22.apk",
+    )
+    monkeypatch.setattr(release_mod, "fetch_latest_release", lambda platform=None: newer)
+    res_new = json.loads(workbench.public_content("check_update"))
+    assert res_new["ok"] is True
+    assert res_new["has_update"] is True
+    assert res_new["current_version"] == "0.15.21"
+    assert res_new["latest_version"] == "0.15.22"
+    assert res_new["apk_url"].endswith("lvjiang-v0.15.22.apk")
+    assert res_new["apk_name"] == "lvjiang-v0.15.22.apk"
+
+    same = ReleaseInfo(
+        version="0.15.21",
+        title="v0.15.21",
+        body="",
+        published_at="2026-11-26T00:00:00Z",
+        release_url="https://github.com/wanda1416/lvjiang/releases/tag/v0.15.21",
+        download_url="https://github.com/wanda1416/lvjiang/releases/tag/v0.15.21",
+    )
+    monkeypatch.setattr(release_mod, "fetch_latest_release", lambda platform=None: same)
+    res_same = json.loads(workbench.public_content("check_update"))
+    assert res_same["ok"] is True
+    assert res_same["has_update"] is False

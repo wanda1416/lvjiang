@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Android 13+ 通知权限（前台服务通知） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 应用内检查更新下载 APK 后拉起系统安装器 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".App"
@@ -98,6 +100,17 @@
             android:authorities="${applicationId}.selftest"
             android:exported="true"
             tools:ignore="ExportedContentProvider" />
+
+        <!-- 应用内更新 APK 分享给系统安装器（Android 7.0+ 必需） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

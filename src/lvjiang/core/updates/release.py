@@ -53,7 +53,23 @@ def _select_download_url(data: dict[str, Any], platform: str) -> str:
     """优先选择适合当前平台的 Release 附件。"""
     release_url = str(data.get("html_url") or GITHUB_RELEASES_URL)
     assets = data.get("assets")
-    if platform != "win32" or not isinstance(assets, list):
+    if not isinstance(assets, list):
+        return release_url
+
+    if platform == "android":
+        apk_candidates: list[tuple[int, str]] = []
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
+            name = str(asset.get("name") or "").lower()
+            url = str(asset.get("browser_download_url") or "")
+            if not name or not url or not name.endswith(".apk"):
+                continue
+            priority = 0 if name.startswith("lvjiang-") else 1
+            apk_candidates.append((priority, url))
+        return min(apk_candidates, default=(99, release_url))[1]
+
+    if platform != "win32":
         return release_url
 
     candidates: list[tuple[int, str]] = []
@@ -158,7 +174,7 @@ class UpdateCheckError(RuntimeError):
     """更新检查失败；界面或无 GUI 调用方自行展示。"""
 
 
-def fetch_latest_release() -> ReleaseInfo:
+def fetch_latest_release(platform: str | None = None) -> ReleaseInfo:
     """检查正式发行版本，不依赖线程或 GUI。"""
     from ..telemetry.consent import is_offline_mode
     if is_offline_mode():
@@ -173,7 +189,7 @@ def fetch_latest_release() -> ReleaseInfo:
         with urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
 
-        release = parse_release_info(data)
+        release = parse_release_info(data, platform=platform)
         if release:
             return release
         else:

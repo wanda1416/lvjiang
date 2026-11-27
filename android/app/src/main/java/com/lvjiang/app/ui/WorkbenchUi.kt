@@ -1248,20 +1248,28 @@ class WorkbenchUi(
         request({ PyBridge.accountProfileStatus(activity) }) { updateProfileSourceSummary(it) }
         val about = card()
         sectionTitle(about, "关于与反馈")
-        val versionRow = SettingsUi.row(activity, "版本与发布说明", "正在读取版本…")
-        about.addView(versionRow)
-        versionRow.isEnabled = false
-        val version = (versionRow.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        val releaseNotesRow = SettingsUi.row(activity, "发布说明", "正在读取版本…")
+        about.addView(releaseNotesRow)
+        releaseNotesRow.isEnabled = false
+        val releaseNotesSummary = summaryText(releaseNotesRow)
         request({ PyBridge.publicContent(activity, "version") }) { result ->
-            version.text = if (result.optBoolean("ok")) "当前版本 ${result.optString("version")}" else result.optString("message")
+            releaseNotesSummary.text = if (result.optBoolean("ok")) {
+                "当前版本 ${result.optString("version")}，查看发布记录"
+            } else {
+                result.optString("message")
+            }
             if (result.optBoolean("ok")) {
-                versionRow.isEnabled = true
-                versionRow.setOnClickListener {
+                releaseNotesRow.isEnabled = true
+                releaseNotesRow.setOnClickListener {
                     runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.optString("url")))) }
                         .onFailure { toast("未找到可打开链接的浏览器") }
                 }
             }
         }
+        val checkUpdateRow = SettingsUi.row(activity, "检查更新", "当前版本 ${BuildConfig.VERSION_NAME}，点击检查更新")
+        about.addView(checkUpdateRow)
+        val checkUpdateSummary = summaryText(checkUpdateRow)
+        checkUpdateRow.setOnClickListener { checkForUpdate(checkUpdateRow, checkUpdateSummary) }
         entry(about, "公告", "查看适用于当前版本的公告") { publicContent("notices") }
         entry(about, "反馈联系", "查看联系二维码，可手动刷新") { publicContent("qrcode") }
         entry(about, "关于", "律匠 · ${BuildConfig.VERSION_NAME}") { showAbout() }
@@ -1704,7 +1712,8 @@ class WorkbenchUi(
             text(content, result.optString("usage_notice") + result.optString("warranty_notice"), 12f)
             val links = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER }
             content.addView(links)
-            for ((label, key) in listOf("检查更新" to "releases_url", "GitHub" to "repository_url", "许可证" to "license_url")) {
+            button(links, "检查更新") { checkForUpdate() }
+            for ((label, key) in listOf("GitHub" to "repository_url", "许可证" to "license_url")) {
                 button(links, label) { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.optString(key)))) }.onFailure { toast("未找到可打开链接的浏览器") } }
             }
             text(content, result.optString("copyright"), 12f).gravity = android.view.Gravity.CENTER
@@ -1733,5 +1742,74 @@ class WorkbenchUi(
                     .setPositiveButton("关闭", null).show()
             }
         }
+    }
+
+    private fun checkForUpdate(row: LinearLayout? = null, summary: TextView? = null) {
+        val previousText = summary?.text?.toString()
+        row?.isEnabled = false
+        summary?.text = "正在检查更新…"
+        toast("正在检查更新…")
+        request({ PyBridge.publicContent(activity, "check_update") }) { result ->
+            row?.isEnabled = true
+            if (!result.optBoolean("ok")) {
+                summary?.text = previousText ?: "点击检查更新"
+                toast("检查更新失败：${result.optString("message").ifBlank { "请稍后重试" }}")
+                return@request
+            }
+            val current = result.optString("current_version").ifBlank { BuildConfig.VERSION_NAME }
+            val latest = result.optString("latest_version")
+            if (!result.optBoolean("has_update")) {
+                summary?.text = "当前已是最新版本（v$current）"
+                toast("当前已是最新版本")
+                return@request
+            }
+            summary?.text = "发现新版本 v$latest"
+            showUpdateAvailableDialog(result, current, latest)
+        }
+    }
+
+    private fun showUpdateAvailableDialog(result: JSONObject, current: String, latest: String) {
+        val releaseUrl = result.optString("release_url")
+        val apkUrl = result.optString("apk_url")
+        val apkName = result.optString("apk_name")
+        val publishedAt = result.optString("published_at").take(10)
+        val releaseBody = result.optString("body").trim()
+
+        val content = SettingsUi.dialogContent(activity)
+        val versionLine = buildString {
+            append("发现新版本 v$latest（当前版本 v$current）")
+            if (publishedAt.isNotEmpty()) append("
+发布日期：$publishedAt")
+        }
+        text(content, versionLine, 14f)
+        if (releaseBody.isNotEmpty()) {
+            text(content, "更新内容：
+$releaseBody", 13f)
+        } else {
+            text(content, "建议及时更新以获得最新功能与问题修复。", 13f)
+        }
+        text(content, "点击「立即更新」后将在后台下载安装包，下载完成后自动拉起安装。", 12f)
+
+        val builder = MaterialAlertDialogBuilder(activity)
+            .setTitle("发现新版本 v$latest")
+            .setView(SettingsUi.dialogScroll(activity, content))
+            .setPositiveButton("立即更新") { _, _ ->
+                if (apkUrl.isNotBlank()) {
+                    ApkUpdater.downloadAndInstall(activity, apkUrl, apkName, latest) { toast(it) }
+                } else if (releaseUrl.isNotBlank()) {
+                    runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))) }
+                        .onFailure { toast("未找到可打开链接的浏览器") }
+                } else {
+                    toast("未找到可用的更新包下载地址")
+                }
+            }
+            .setNegativeButton("暂不更新", null)
+        if (releaseUrl.isNotBlank()) {
+            builder.setNeutralButton("查看发布页") { _, _ ->
+                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))) }
+                    .onFailure { toast("未找到可打开链接的浏览器") }
+            }
+        }
+        builder.show()
     }
 }

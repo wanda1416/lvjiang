@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from ...core.config.resolver import get_resolver
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style
+from .task_package_ops import bind_package_scope
 
 
 def _format_value(value) -> str:
@@ -374,3 +375,6 @@ class ScriptOpsMixin:
         self._result_text.setPlainText("\n".join(lines))
         self._status_bar.showMessage(
             tr("脚本已结束运行") if stopped else tr("脚本测试完成"))
+
+
+bind_package_scope(ScriptOpsMixin)

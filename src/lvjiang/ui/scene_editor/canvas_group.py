@@ -26,6 +26,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 
 from ...i18n import tr
+from .task_package_ops import bind_package_scope
 
 #: 组成员高亮：描边色与填充色
 GROUP_MEMBER_COLOR = QColor(80, 255, 170)
@@ -337,3 +338,6 @@ class CanvasGroupMixin:
             painter.setBrush(GROUP_BAND_FILL)
             painter.drawRect(band)
         painter.restore()
+
+
+bind_package_scope(CanvasGroupMixin)

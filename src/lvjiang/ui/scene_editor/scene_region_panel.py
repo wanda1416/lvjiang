@@ -54,6 +54,7 @@ from .scene_select import (
     prompt_reference_views,
     prompt_scene_area_references,
 )
+from .task_package_ops import bind_package_scope
 
 
 class RegionPanelMixin:
@@ -876,3 +877,6 @@ class RegionPanelMixin:
             callback(self._scene_key, ref.scene, ref.entity)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
+
+
+bind_package_scope(RegionPanelMixin)

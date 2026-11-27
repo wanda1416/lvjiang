@@ -9,6 +9,7 @@ from ...core.scene.registry import (
     get_scene_name,
 )
 from ...i18n import tr
+from .task_package_ops import bind_package_scope
 
 
 class RecognitionOpsMixin:
@@ -307,3 +308,6 @@ class RecognitionOpsMixin:
 
         self._status_bar.showMessage(f"面板参考图识别完成，共 {total_cells} 个 cell")
         logger.info(f"面板参考图识别完成 (场景={get_scene_name(current_tab.scene_key)}, 面板数={len(panels)})")
+
+
+bind_package_scope(RecognitionOpsMixin)

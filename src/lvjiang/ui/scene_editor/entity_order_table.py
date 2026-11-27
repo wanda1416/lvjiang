@@ -4,6 +4,8 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDropEvent
 from PyQt6.QtWidgets import QAbstractItemView, QTableWidget
 
+from .task_package_ops import bind_package_scope
+
 
 class EntityOrderTable(QTableWidget):
     """不移动表格单元格，只发出拖拽后的实体 key 顺序。
@@ -104,3 +106,6 @@ class EntityOrderTable(QTableWidget):
             0,
             lambda: self.entity_order_changed.emit(new_order, moved_key),
         )
+
+
+bind_package_scope(EntityOrderTable)

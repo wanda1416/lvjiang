@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 from ...core.layout.models import Arrow, Point
 from ...core.scene.registry import get_point_name
 from ...i18n import tr, tr_label
+from .task_package_ops import bind_package_scope
 
 # ─── 常量 ────────────────────────────────────────────────
 
@@ -912,3 +913,6 @@ class CanvasPoiMixin:
         painter.setBrush(QBrush(color))
         painter.drawPolygon(QPolygonF([end, p1, p2]))
         painter.restore()
+
+
+bind_package_scope(CanvasPoiMixin)

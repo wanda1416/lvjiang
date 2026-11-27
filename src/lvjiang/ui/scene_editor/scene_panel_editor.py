@@ -41,6 +41,7 @@ from .scene_select import (
     checklist_views_value,
     connect_scene_views_sync,
 )
+from .task_package_ops import bind_package_scope
 
 
 class PanelEditorMixin:
@@ -527,3 +528,6 @@ class PanelEditorMixin:
         buttons.rejected.connect(dialog.reject)
         outer.addWidget(buttons)
         dialog.exec()
+
+
+bind_package_scope(PanelEditorMixin)

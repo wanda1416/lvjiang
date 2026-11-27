@@ -16,6 +16,7 @@ from ...core.layout.models import (
 )
 from ...i18n import tr
 from .canvas_coords import CanvasCoordMixin
+from .task_package_ops import bind_package_scope
 
 # ─── 枚举定义 ────────────────────────────────────────────
 
@@ -1531,3 +1532,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         """仅选中态变化（刷新列表高亮用），不代表数据修改"""
         if self.on_selection_changed:
             self.on_selection_changed()
+
+
+bind_package_scope(CanvasInteractionMixin)

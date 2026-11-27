@@ -57,6 +57,7 @@ from .scene_select import (
     prompt_reference_views,
     prompt_scene_area_references,
 )
+from .task_package_ops import bind_package_scope
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -809,3 +810,6 @@ class PoiPanelMixin:
         if callback:
             callback(self._scene_key, added)
         self._refresh_lists()
+
+
+bind_package_scope(PoiPanelMixin)

@@ -21,6 +21,7 @@ from ...core.scene.definition import BASE_VIEW_KEY
 from ...core.scene.registry import get_registry, get_scene_views, is_view_visible
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style
+from .task_package_ops import bind_package_scope
 
 
 def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:
@@ -611,3 +612,8 @@ def add_transition_row(form: QFormLayout, current_scene: str,
     picker._available_from.setPlaceholderText(tr("留空为本地入口；* 为全局，或逗号分隔场景 key"))
     form.addRow(tr_label('入口作用范围'), picker._available_from)
     return picker
+
+
+bind_package_scope(ViewChecklist)
+bind_package_scope(SceneAreaReferenceBatchPicker)
+bind_package_scope(TransitionPicker)

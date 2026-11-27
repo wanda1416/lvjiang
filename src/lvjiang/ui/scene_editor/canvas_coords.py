@@ -9,6 +9,7 @@ from ...core.layout.models import (
     SubsceneRef,
     effective_click_rect,
 )
+from .task_package_ops import bind_package_scope
 
 
 class CanvasCoordMixin:
@@ -168,3 +169,6 @@ class CanvasCoordMixin:
         rect = self._canvas_rect_widget()
         base = min(rect.width(), rect.height())
         return p.r_ratio * base
+
+
+bind_package_scope(CanvasCoordMixin)

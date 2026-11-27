@@ -574,8 +574,13 @@ def test_delete_scene_across_all_layouts_respects_scoped_screenshots_dir(isolate
     assert global_img.exists()
 
 
-def test_scene_editor_cancel_close_keeps_scope_and_reject_releases_scope(isolated_env, qtbot, monkeypatch):
-    """点 X 取消关闭不提前释放任务包作用域；按 Esc（reject）通过确认后彻底释放。"""
+def test_scene_editor_cancel_close_keeps_mode_and_reject_releases(
+        isolated_env, qtbot, monkeypatch):
+    """点 X 取消关闭不退出任务场景；按 Esc 确认后彻底退出。
+
+    关键契约：编辑器的作用域只在它自己的操作期间生效——进入任务场景后环境里
+    仍是全局解析器/注册表，所以主窗口的脚本发现、工作流解析不会被切走。
+    """
     from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
 
     _, _, loc_dir, root_resolver, base_registry = isolated_env
@@ -587,18 +592,63 @@ def test_scene_editor_cancel_close_keeps_scope_and_reject_releases_scope(isolate
     qtbot.addWidget(dlg)
     try:
         assert dlg._enter_task_package_mode(pkg) is True
-        # 1. 模拟用户点 X 后在未保存确认框点「取消」
+        # 编辑器视图切到包内场景，但环境作用域仍指向全局
+        assert "fsjs_lobby" in dlg._tabs
+        assert get_resolver() is root_resolver
+        assert get_registry() is base_registry
+        assert root_resolver.resolve_read("scenes/general/game_main_page.yaml") is not None
+
+        # 1. 点 X 后在未保存确认框点「取消」：仍在任务场景模式，作用域依然全局
         monkeypatch.setattr(dlg, "_confirm_discard_changes", lambda _action: False)
         dlg.close()
         assert dlg.active_task_package == pkg
-        assert get_registry().get_scene("fsjs_lobby") is not None
-        assert get_resolver() is not root_resolver
+        assert "fsjs_lobby" in dlg._tabs
+        assert get_resolver() is root_resolver
+        assert get_registry() is base_registry
 
-        # 2. 模拟用户按 Esc（直接走 reject）并确认放弃
+        # 2. 按 Esc（reject）并确认放弃：彻底退出，主场景与全局作用域照常
         monkeypatch.setattr(dlg, "_confirm_discard_changes", lambda _action: True)
         dlg.reject()
         assert dlg.active_task_package is None
+        # 关闭路径走 restore_ui=False，界面还原由 test_scene_editor_dual_mode_switch_and_restore
+        # 覆盖；这里只保证作用域已归还全局。
         assert get_resolver() is root_resolver
         assert get_registry() is base_registry
     finally:
         dlg.close()
+
+
+def test_loader_ignores_task_package_scope(isolated_env):
+    """任务包作用域内，脚本发现与工作流解析仍锁死全局 config（local→system）。
+
+    回归点：场景管理进入任务场景模式后曾把线程级 ContextVar 常驻切到包目录，
+    主窗口再解析 wf 就成了「工作流文件不存在」，脚本列表也变成 0。
+    """
+    from lvjiang.core.config.resolver import (
+        load_app_config,
+        reset_scoped_resolver,
+        set_scoped_resolver,
+    )
+    from lvjiang.workflows.discovery import discover_scripts, resolve_workflow_path
+
+    _, sys_dir, loc_dir, root_resolver, _ = isolated_env
+    _write_yaml(
+        sys_dir / "app.yaml",
+        {"envs": [{"key": "desktop", "name": "桌面"}, {"key": "android", "name": "安卓"}]},
+    )
+    wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
+    pkg = find_task_package_for_wf(wf)
+    assert pkg is not None
+
+    global_ids = [cfg["id"] for cfg in discover_scripts()]
+    token = set_scoped_resolver(create_package_resolver(pkg))
+    try:
+        assert [cfg["id"] for cfg in discover_scripts()] == global_ids
+        path, used = resolve_workflow_path("standalone/fengshajiusi/fengshajiusi.wf")
+        assert path is not None and path.is_file()
+        assert used == "standalone/fengshajiusi/fengshajiusi.wf"
+        # app.yaml 的环境列表属于全局配置事实，不能被包作用域切走
+        assert [item["key"] for item in load_app_config()["envs"]] == ["desktop", "android"]
+    finally:
+        reset_scoped_resolver(token)
+    assert get_resolver() is root_resolver

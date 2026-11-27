@@ -33,6 +33,7 @@ from ..widgets.button_styles import (
     apply_dialog_button_box_style,
     fit_button_width,
 )
+from .task_package_ops import bind_package_scope
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -625,3 +626,6 @@ class ViewManagerDialog(QDialog):
         self._registry.save_scene_views(self._scene_key)
         self._changed = True
         self._refresh()
+
+
+bind_package_scope(ViewManagerDialog)

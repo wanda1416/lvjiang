@@ -32,6 +32,7 @@ from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_dialog_button_box_style
 from .scene_tab import SceneTab
 from .tab_add_bar import InlineAddTabWidget
+from .task_package_ops import bind_package_scope
 
 # key 格式校验：小写字母开头，仅含小写字母/数字/下划线
 _RE_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -773,3 +774,6 @@ def _scene_entity_rel(resolver, scene_key: str) -> str:
     from ...core.scene.registry import get_scene_group
     group = get_scene_group(scene_key)
     return scene_rel(group, scene_key) if group else f"scenes/{scene_key}.yaml"
+
+
+bind_package_scope(SceneOpsMixin)

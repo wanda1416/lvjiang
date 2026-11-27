@@ -25,6 +25,7 @@ from ...core.scene.registry import (
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style, apply_dialog_button_box_style
 from .entity_order_table import EntityOrderTable
+from .task_package_ops import bind_package_scope
 
 
 class SceneReferenceEditorMixin:
@@ -213,3 +214,6 @@ class SceneReferenceEditorMixin:
         self._canvas.set_subscene_refs(refs)
         self._canvas._notify_subscene_ref_changed()
         self._refresh_reference_list()
+
+
+bind_package_scope(SceneReferenceEditorMixin)

@@ -56,6 +56,7 @@ from .scene_poi_panel import PoiPanelMixin
 from .scene_reference_editor import SceneReferenceEditorMixin
 from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
+from .task_package_ops import bind_package_scope
 
 
 class _UniformWidthTabBar(QTabBar):
@@ -786,3 +787,6 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._refresh_region_list(preserve_current=False)
         self._on_poi_changed()
         self._refresh_panel_list()
+
+
+bind_package_scope(SceneTab)

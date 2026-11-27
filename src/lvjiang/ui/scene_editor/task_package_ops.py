@@ -7,6 +7,10 @@
 """
 from __future__ import annotations
 
+import functools
+import inspect
+import types
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -104,14 +108,41 @@ class TaskPackageOpsMixin:
     """场景编辑器主场景 / 任务场景双模式切换混入。"""
 
     _active_task_package: TaskPackage | None
-    _task_scope_tokens: tuple[object, object, object] | None
+    #: 任务包的（解析器, 注册表, 截图目录）三元组；只在编辑器自身的操作期间生效
+    _package_scope_state: tuple[object, object, object] | None
     _saved_main_state: dict | None
 
     def _init_task_package_state(self) -> None:
         self._active_task_package = None
-        self._task_scope_tokens = None
+        self._package_scope_state = None
+        self._scope_depth = 0
         self._saved_main_state = None
         self._disabled_parent_for_task_pkg: QWidget | None = None
+
+    @contextmanager
+    def _package_scope(self):
+        """在本次操作期间切到任务包作用域，操作结束立刻还原为全局。
+
+        ContextVar 是线程级状态：常驻会把整个主线程（主窗口的运行页、批量页、
+        脚本发现）一起切走，表现为「打开任务场景后所有脚本都不见了」。所以作用域
+        只在编辑器的调用栈内存在，退出即归还。
+        """
+        state = self._package_scope_state
+        if state is None or self._scope_depth:
+            yield
+            return
+        pkg_resolver, pkg_registry, pkg_screenshots = state
+        res_tok = set_scoped_resolver(pkg_resolver)
+        reg_tok = set_scoped_registry(pkg_registry)
+        shot_tok = set_scoped_screenshots_dir(pkg_screenshots)
+        self._scope_depth = 1
+        try:
+            yield
+        finally:
+            self._scope_depth = 0
+            reset_scoped_screenshots_dir(shot_tok)
+            reset_scoped_registry(reg_tok)
+            reset_scoped_resolver(res_tok)
 
     @property
     def active_task_package(self) -> TaskPackage | None:
@@ -166,14 +197,8 @@ class TaskPackageOpsMixin:
                 "scene_key": self._get_current_scene_key(),
             }
 
-        # 新包就绪后再释放旧作用域并切入新作用域
-        if self._active_task_package is not None:
-            self._release_task_scope_tokens()
-
-        res_tok = set_scoped_resolver(pkg_resolver)
-        reg_tok = set_scoped_registry(pkg_registry)
-        shot_tok = set_scoped_screenshots_dir(pkg_screenshots)
-        self._task_scope_tokens = (res_tok, reg_tok, shot_tok)
+        # 新包就绪后替换作用域；作用域不常驻，只在编辑器各次操作期间按需生效
+        self._package_scope_state = (pkg_resolver, pkg_registry, pkg_screenshots)
         self._active_task_package = pkg
 
         # 冻结父窗口交互：避免任务场景模式占用主线程 ContextVar 期间在主窗口并发操作全局配置
@@ -206,13 +231,7 @@ class TaskPackageOpsMixin:
         return True
 
     def _release_task_scope_tokens(self) -> None:
-        tokens = self._task_scope_tokens
-        if tokens is not None:
-            res_tok, reg_tok, shot_tok = tokens
-            self._task_scope_tokens = None
-            reset_scoped_screenshots_dir(shot_tok)
-            reset_scoped_registry(reg_tok)
-            reset_scoped_resolver(res_tok)
+        self._package_scope_state = None
         disabled_parent = getattr(self, "_disabled_parent_for_task_pkg", None)
         if disabled_parent is not None:
             self._disabled_parent_for_task_pkg = None
@@ -265,3 +284,62 @@ class TaskPackageOpsMixin:
         self._status_bar.showMessage(tr("已退出任务场景，恢复主场景"))
         logger.info("场景管理已退出任务场景模式: {} ({})", exited_pkg.name, exited_pkg.id)
         return True
+
+
+#: 这些方法自己管理作用域（进入/退出/toggle），不能再包一层
+_SCOPE_FREE = frozenset({
+    "_enter_task_package_mode",
+    "_exit_task_package_mode",
+    "_on_toggle_task_package",
+    "_init_task_package_state",
+    "_package_scope",
+    "_release_task_scope_tokens",
+})
+
+
+def scope_owner(widget):
+    """向上找到持有任务包作用域的编辑器；没有则返回 None。"""
+    seen: set[int] = set()
+    node = widget
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        if getattr(node, "_package_scope_state", None) is not None:
+            return node
+        node = node.parentWidget() if hasattr(node, "parentWidget") else None
+    return None
+
+
+def _in_package_scope(method):
+    # PyQt 会把信号参数一并转发给槽函数，多余参数原本由 Qt 截断；包了 *args
+    # 之后这一层变透明，必须自己按原方法的形参个数截断，否则
+    # `x.clicked` 传进来的 checked 会把无参槽打成 TypeError。
+    params = list(inspect.signature(method).parameters.values())
+    variadic = any(p.kind is p.VAR_POSITIONAL for p in params)
+    limit = None if variadic else max(len(params) - 1, 0)   # 减去 self
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if limit is not None and len(args) > limit:
+            args = args[:limit]
+        owner = scope_owner(self)
+        if owner is None:
+            return method(self, *args, **kwargs)
+        with owner._package_scope():
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
+def bind_package_scope(cls):
+    """把编辑器的每个方法包进任务包作用域（无任务场景模式时零开销）。
+
+    场景管理只改自己作用域：任务场景模式下它读写的都是包内解析器/注册表，
+    调用结束立刻还原，主线程其余部分永远看到全局配置。
+    """
+    for name, attr in list(vars(cls).items()):
+        if name in _SCOPE_FREE or name.startswith("__"):
+            continue
+        if not isinstance(attr, types.FunctionType):
+            continue
+        setattr(cls, name, _in_package_scope(attr))
+    return cls

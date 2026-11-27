@@ -28,6 +28,7 @@ from ...core.layout.manager import (
 from ...core.scene.registry import get_scene_name
 from ...i18n import tr, tr_label
 from ..widgets.button_styles import apply_button_style, fit_button_width
+from .task_package_ops import bind_package_scope
 
 _PREVIEW_HEIGHT = 200
 
@@ -296,3 +297,6 @@ class ScreenshotManagerDialog(QDialog):
                     break
         else:
             self._list.setCurrentItem(moved[0])
+
+
+bind_package_scope(ScreenshotManagerDialog)

@@ -39,6 +39,7 @@ from ...core.scene.registry import get_registry
 from ...i18n import tr
 from ..widgets.button_styles import apply_button_style, fit_button_width
 from ..widgets.combo_box import AutoWidthComboBox, ComboWidthMode
+from .task_package_ops import bind_package_scope
 
 
 class LayoutOpsMixin:
@@ -740,3 +741,6 @@ class LayoutOpsMixin:
         else:
             self._status_bar.showMessage(
                 f"删除失败：布局「{name}」不存在或被别名布局引用")
+
+
+bind_package_scope(LayoutOpsMixin)

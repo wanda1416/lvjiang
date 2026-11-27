@@ -51,7 +51,7 @@ from .scene_ops import SceneOpsMixin
 from .scene_tab import SceneTab
 from .script_ops import ScriptOpsMixin, _InsertEntityButton
 from .tab_add_bar import InlineAddTabWidget
-from .task_package_ops import TaskPackageOpsMixin
+from .task_package_ops import TaskPackageOpsMixin, bind_package_scope
 
 _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY = 8
 
@@ -1187,3 +1187,6 @@ class SceneEditorDialog(
             if isinstance(scene_widget, SceneTab):
                 return scene_widget
         return None
+
+
+bind_package_scope(SceneEditorDialog)

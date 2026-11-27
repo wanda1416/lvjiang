@@ -12,38 +12,52 @@
 - windows_capture（后台截图）只在用到时才 import，静态分析收不到，且它带一个原生
   .pyd —— collect_all 整包收集。没装时跳过：非 Windows 本来就不会打包。
 """
+import sys
+import tomllib
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 # 图标资产与 exe 图标同源（src/lvjiang/assets，由 scripts/one_off/make_app_icon.py 生成）。
 # 运行时按包目录加载，所以 datas 的落点是 lvjiang/assets。
-from pathlib import Path
-
 _ASSETS = Path(SPECPATH) / ".." / "src" / "lvjiang" / "assets"
-_APP_ICON = str(_ASSETS / "icon.ico")
+if sys.platform == "win32":
+    _APP_ICON = str(_ASSETS / "icon.ico")
+elif sys.platform == "darwin":
+    _icns = _ASSETS / "icon.icns"
+    _APP_ICON = str(_icns if _icns.is_file() else _ASSETS / "icon.png")
+else:
+    _APP_ICON = str(_ASSETS / "icon.png")
 
 datas, binaries, hiddenimports = collect_all("rapidocr_onnxruntime")
 datas += [("../src/lvjiang/workflows/grammar", "lvjiang/workflows/grammar")]
 datas += [(str(_ASSETS / "icon.png"), "lvjiang/assets")]
 hiddenimports += collect_submodules("lvjiang")
-# keyring 通过运行时发现加载 Windows 凭据后端。
-hiddenimports += ["keyring.backends.Windows"]
+# keyring 通过运行时发现加载各平台凭据后端。
+if sys.platform == "win32":
+    hiddenimports += ["keyring.backends.Windows"]
+elif sys.platform == "darwin":
+    hiddenimports += ["keyring.backends.macOS"]
+else:
+    hiddenimports += ["keyring.backends.SecretService", "keyring.backends.kwallet"]
 hiddenimports += collect_submodules("uvicorn")
 datas += copy_metadata("keyring")
 datas += copy_metadata("mcp")
 datas += collect_data_files("jsonschema_specifications")
 
-try:
-    wc_datas, wc_binaries, wc_hidden = collect_all("windows_capture")
-except Exception as exc:  # noqa: BLE001 - 打包脚本，缺包只需跳过并提示
-    print(f"[spec] 未收集 windows_capture（后台截图将不可用）: {exc}")
-else:
-    datas += wc_datas
-    binaries += wc_binaries
-    hiddenimports += wc_hidden
+if sys.platform == "win32":
+    try:
+        wc_datas, wc_binaries, wc_hidden = collect_all("windows_capture")
+    except Exception as exc:  # noqa: BLE001 - 打包脚本，缺包只需跳过并提示
+        print(f"[spec] 未收集 windows_capture（后台截图将不可用）: {exc}")
+    else:
+        datas += wc_datas
+        binaries += wc_binaries
+        hiddenimports += wc_hidden
 
 a = Analysis(
     ["launcher.py"],
-    pathex=["../src"],
+    pathex=[str((Path(SPECPATH) / ".." / "src").resolve())],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -75,10 +89,10 @@ exe = EXE(
 # 仅通过 127.0.0.1 本地控制面与运行中的 lvjiang 主实例（或自动拉起的无头实例）通信。
 cli_a = Analysis(
     ["cli_launcher.py"],
-    pathex=["../src/lvjiang"],
+    pathex=[str((Path(SPECPATH) / ".." / "src" / "lvjiang").resolve())],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=["cli_client"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -132,3 +146,20 @@ coll = COLLECT(
     upx=False,
     name="lvjiang",
 )
+
+if sys.platform == "darwin":
+    _app_version = tomllib.loads(
+        (Path(SPECPATH) / ".." / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    app = BUNDLE(
+        coll,
+        name="Lvjiang.app",
+        icon=_APP_ICON,
+        bundle_identifier="com.lvjiang.app",
+        info_plist={
+            "CFBundleDisplayName": "律匠",
+            "CFBundleShortVersionString": _app_version,
+            "CFBundleVersion": _app_version,
+            "NSHighResolutionCapable": True,
+        },
+    )

@@ -25,8 +25,25 @@ def _project_root() -> Path:
     override = os.environ.get("LVJIANG_ROOT")
     if override:
         return Path(override)
-    if getattr(sys, "frozen", False):  # PyInstaller 打包：根 = exe 所在目录
-        return Path(sys.executable).parent
+    if getattr(sys, "frozen", False):  # PyInstaller 打包
+        exe_dir = Path(sys.executable).parent
+        # Windows 始终保持 exe 同级目录（便携版与安装版行为不变）。
+        if sys.platform == "win32":
+            return exe_dir
+        # macOS .app Bundle（位于 /Applications 或 App Translocation）为只读，
+        # 切到标准用户目录；Linux 若处于只读安装目录（AppImage / /opt）同理，
+        # 可写目录（tar.gz 解压到用户目录）保持绿色便携语义。
+        if sys.platform == "darwin":
+            if exe_dir.name == "MacOS" and exe_dir.parent.name == "Contents":
+                return Path.home() / "Library" / "Application Support" / "lvjiang"
+            if not os.access(exe_dir, os.W_OK):
+                return Path.home() / "Library" / "Application Support" / "lvjiang"
+            return exe_dir
+        if not os.access(exe_dir, os.W_OK):
+            xdg = os.environ.get("XDG_DATA_HOME")
+            base = Path(xdg) if xdg else (Path.home() / ".local" / "share")
+            return base / "lvjiang"
+        return exe_dir
     if hasattr(sys, "getandroidapilevel"):
         return Path(os.environ["HOME"]) / "lvjiang"
     return Path(__file__).parent.parent.parent

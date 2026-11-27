@@ -69,6 +69,58 @@ def _select_download_url(data: dict[str, Any], platform: str) -> str:
             apk_candidates.append((priority, url))
         return min(apk_candidates, default=(99, release_url))[1]
 
+    if platform == "darwin":
+        import platform as _platform
+
+        machine = _platform.machine().lower()
+        prefer_arm = machine in ("arm64", "aarch64")
+        mac_candidates: list[tuple[int, str]] = []
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
+            name = str(asset.get("name") or "").lower()
+            url = str(asset.get("browser_download_url") or "")
+            if not name or not url or ("macos" not in name and "darwin" not in name and not name.endswith(".dmg")):
+                continue
+            is_arm = "arm64" in name or "aarch64" in name
+            is_x64 = "x86_64" in name or "amd64" in name or "intel" in name
+            arch_match = (is_arm and prefer_arm) or (is_x64 and not prefer_arm)
+            if name.endswith(".dmg"):
+                priority = 0 if arch_match else (1 if not (is_arm or is_x64) else 2)
+            elif name.endswith(".zip"):
+                priority = 3 if arch_match else 4
+            else:
+                continue
+            mac_candidates.append((priority, url))
+        return min(mac_candidates, default=(99, release_url))[1]
+
+    if platform == "linux":
+        import platform as _platform
+
+        machine = _platform.machine().lower()
+        prefer_arm = machine in ("arm64", "aarch64")
+        linux_candidates: list[tuple[int, str]] = []
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
+            name = str(asset.get("name") or "").lower()
+            url = str(asset.get("browser_download_url") or "")
+            if not name or not url:
+                continue
+            if not ("linux" in name or name.endswith(".appimage")):
+                continue
+            is_arm = "arm64" in name or "aarch64" in name
+            is_x64 = "x86_64" in name or "amd64" in name
+            arch_match = (is_arm and prefer_arm) or (is_x64 and not prefer_arm)
+            if name.endswith(".appimage"):
+                priority = 0 if arch_match else 1
+            elif name.endswith((".tar.gz", ".tgz")):
+                priority = 2 if arch_match else 3
+            else:
+                continue
+            linux_candidates.append((priority, url))
+        return min(linux_candidates, default=(99, release_url))[1]
+
     if platform != "win32":
         return release_url
 

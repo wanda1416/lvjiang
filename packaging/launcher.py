@@ -15,13 +15,66 @@
 """
 import multiprocessing
 import os
+import shutil
 import sys
 from pathlib import Path
+
+_BUNDLE_SYNC_DIRS = ("config/system", "config/i18n", "data/adb", "docs", "plugins")
+_BUNDLE_SYNC_FILES = ("LICENSE.txt",)
+
+
+def _resolve_frozen_root(exe_dir: Path) -> Path:
+    override = os.environ.get("LVJIANG_ROOT")
+    if override:
+        return Path(override)
+    if sys.platform == "win32":
+        return exe_dir
+    if sys.platform == "darwin":
+        if (exe_dir.name == "MacOS" and exe_dir.parent.name == "Contents") or not os.access(exe_dir, os.W_OK):
+            return Path.home() / "Library" / "Application Support" / "lvjiang"
+        return exe_dir
+    if not os.access(exe_dir, os.W_OK):
+        xdg = os.environ.get("XDG_DATA_HOME")
+        base = Path(xdg) if xdg else (Path.home() / ".local" / "share")
+        return base / "lvjiang"
+    return exe_dir
+
+
+def _sync_bundle_assets(bundle_root: Path, user_root: Path) -> None:
+    """将只读 Bundle 中的出厂只读资产增量同步到用户数据目录，绝不触碰 local/session/logs。"""
+    marker_src = bundle_root / ".bundle_version"
+    marker_dst = user_root / ".bundle_version"
+    src_ver = marker_src.read_text(encoding="utf-8").strip() if marker_src.is_file() else ""
+    dst_ver = marker_dst.read_text(encoding="utf-8").strip() if marker_dst.is_file() else ""
+    if src_ver and src_ver == dst_ver and (user_root / "config/system").is_dir():
+        return
+    user_root.mkdir(parents=True, exist_ok=True)
+    for rel in _BUNDLE_SYNC_DIRS:
+        src = bundle_root / rel
+        if not src.is_dir():
+            continue
+        dst = user_root / rel
+        if dst.exists():
+            shutil.rmtree(dst)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dst)
+    for rel in _BUNDLE_SYNC_FILES:
+        src = bundle_root / rel
+        if src.is_file():
+            shutil.copy2(src, user_root / rel)
+    if src_ver:
+        marker_dst.write_text(f"{src_ver}\n", encoding="utf-8")
+
 
 multiprocessing.freeze_support()
 
 if getattr(sys, "frozen", False):
-    os.chdir(Path(sys.executable).parent)
+    _exe_dir = Path(sys.executable).parent
+    _work_dir = _resolve_frozen_root(_exe_dir)
+    if _work_dir != _exe_dir:
+        _sync_bundle_assets(_exe_dir, _work_dir)
+    _work_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(_work_dir)
     if sys.stdout is None:
         sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
     if sys.stderr is None:

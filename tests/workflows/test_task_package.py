@@ -669,3 +669,76 @@ def test_in_package_scope_truncates_qt_args_for_kwonly_and_kwargs():
     obj = Dummy()
     assert obj.kwonly(False) is True
     assert obj.with_kwargs(42, "extra_qt_arg") == (42, {})
+def test_scene_tab_view_switch_and_manage_keep_task_package_scope(isolated_env, qtbot, monkeypatch):
+    """任务场景下切换多视图及点「场景管理」必须能沿 parentWidget 链找到宿主作用域。
+
+    回归点：scope_owner 曾只记录 id(node) 未保活 PyQt 临时 QStackedWidget 包装对象，
+    经过两层 QTabWidget 时第二个临时对象复用第一个的 id() 被误判成环提前返回 None，
+    导致切视图清空画布与区域列表、「场景管理」按钮因查不到场景直接退出。
+    """
+    from PyQt6.QtWidgets import QDialog
+
+    from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
+    from lvjiang.ui.scene_editor.task_package_ops import scope_owner
+
+    _, _, loc_dir, _, _ = isolated_env
+    pkg_dir = loc_dir / "workflows" / "standalone" / "fengshajiusi"
+    wf = _seed_task_package(pkg_dir)
+    _write_yaml(
+        pkg_dir / "scenes" / "fsjs" / "fsjs_lobby.yaml",
+        {
+            "key": "fsjs_lobby",
+            "name": "风沙酒肆",
+            "views": [
+                {"key": "base", "name": "客栈房间"},
+                {"key": "watch", "name": "守夜"},
+                {"key": "settle", "name": "结算"},
+            ],
+            "hide_all_views": True,
+            "regions": [
+                {"key": "r_base_1", "name": "任务栏", "views": ["base", "watch"]},
+                {"key": "r_base_2", "name": "躺下", "view": "base"},
+                {"key": "r_watch_1", "name": "开门", "view": "watch"},
+                {"key": "r_watch_2", "name": "不开", "view": "watch"},
+                {"key": "r_settle_1", "name": "再来一局", "view": "settle"},
+            ],
+            "points": [],
+            "panels": [],
+        },
+    )
+    pkg = find_task_package_for_wf(wf)
+    assert pkg is not None
+
+    dlg = SceneEditorDialog()
+    qtbot.addWidget(dlg)
+    try:
+        assert dlg._enter_task_package_mode(pkg) is True
+        tab = dlg._tabs["fsjs_lobby"]
+        assert scope_owner(tab) is dlg
+
+        # 初始基底视图：2 个区域
+        assert tab.current_view == "base"
+        assert tab._region_table.rowCount() == 2
+
+        # 切到守夜视图：3 个区域（r_base_1 + r_watch_1 + r_watch_2）
+        tab._view_combo.setCurrentIndex(tab._view_combo.findData("watch"))
+        assert tab.current_view == "watch"
+        assert tab._region_table.rowCount() == 3
+
+        # 切到结算视图：1 个区域
+        tab._view_combo.setCurrentIndex(tab._view_combo.findData("settle"))
+        assert tab.current_view == "settle"
+        assert tab._region_table.rowCount() == 1
+
+        # 切回基底视图：仍能完整看到原来的 2 个区域
+        tab._view_combo.setCurrentIndex(tab._view_combo.findData("base"))
+        assert tab.current_view == "base"
+        assert tab._region_table.rowCount() == 2
+
+        # 「场景管理」按钮能够找到包内场景并打开弹窗（不会提前 return）
+        opened: list[str] = []
+        monkeypatch.setattr(QDialog, "exec", lambda self: opened.append(self.windowTitle()) or 0)
+        tab._on_scene_manage()
+        assert opened == ["场景管理"]
+    finally:
+        dlg.close()

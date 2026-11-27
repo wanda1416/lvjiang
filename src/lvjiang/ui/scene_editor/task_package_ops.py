@@ -285,9 +285,13 @@ _SCOPE_FREE = frozenset({
 
 def scope_owner(widget):
     """向上找到持有任务包作用域的编辑器；没有则返回 None。"""
+    visited: list[object] = []
     seen: set[int] = set()
     node = widget
     while node is not None and id(node) not in seen:
+        # 持有强引用，防止 PyQt 临时包装对象（如两层 QTabWidget 的内部 QStackedWidget）
+        # 在遍历期间被 GC 立刻回收并复用同一 id()，导致误判成环提前终止。
+        visited.append(node)
         seen.add(id(node))
         if getattr(node, "_package_scope_state", None) is not None:
             return node

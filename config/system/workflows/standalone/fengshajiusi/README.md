@@ -25,7 +25,7 @@ config/local/workflows/standalone/fengshajiusi/
 | `manifest.yaml` | 任务包标识与入口元信息（id `fengshajiusi`） |
 | `fengsha_jiushi_night.wf` | 入口脚本：参数、词表、主流程与两端通用的过程 |
 | `desktop.wf` / `android.wf` | 平台过程：键盘（W/A/S/D、Y/N、Space）与点按/摇杆 |
-| `scenes/` | 私有场景 `fsjs_night`「夜宿谜影」（按阶段分 base / watch / settle / clue_dialog 四个视图） |
+| `scenes/` | 私有场景 `fsjs_night`「风沙酒肆」（按阶段分 base / watch / settle / clue_dialog 四个视图） |
 | `layouts/desktop|android/` | 两套实机标定的区域坐标 |
 
 识别只在场景区域内做（不再整屏 OCR），所以跑之前**不要改窗口比例**：桌面布局按 16:9、

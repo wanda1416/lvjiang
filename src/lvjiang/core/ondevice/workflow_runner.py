@@ -20,7 +20,7 @@ from loguru import logger
 
 from ...core.config import load_user_config
 from ...core.config.interface import get_interface_store
-from ...core.config.resolver import get_resolver
+from ...core.config.resolver import get_root_resolver
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..input.base import InputBackend
@@ -172,7 +172,7 @@ def run_workflow(
         if not wf_path.exists():
             raise FileNotFoundError(f"工作流文件不存在: {wf_path}")
     else:
-        wf_path = get_resolver().resolve_read(f"workflows/{wf_name}")
+        wf_path = get_root_resolver().resolve_read(f"workflows/{wf_name}")
         if wf_path is None:
             raise FileNotFoundError(f"工作流文件不存在: {wf_name}")
 

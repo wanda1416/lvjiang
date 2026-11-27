@@ -87,10 +87,10 @@ def _state(group_id: str = ""):
     from pathlib import Path
 
     from ...workflows.metadata import metadata_for_script_config
-    from ..config.resolver import get_resolver
+    from ..config.resolver import get_root_resolver
     labels = {}
     for phase, name in item.workflows.to_dict().items():
-        path = get_resolver().resolve_read(f"workflows/{name}") if name else None
+        path = get_root_resolver().resolve_read(f"workflows/{name}") if name else None
         meta, _ = metadata_for_script_config(path) if path else ({}, "")
         labels[phase] = meta.get("name") or (Path(name).stem if name else "")
     view["workflow_names"] = labels
@@ -212,9 +212,9 @@ def _plan(group_id: str):
         raise ValueError("请至少选择一个任务和一个执行单元")
     if item.execution_unit_key != "user" and not declares_unit_prepare(item.workflows.prepare_item):
         raise ValueError("属性单元需要声明支持选人协议的条目准备工作流")
-    from ..config.resolver import get_resolver
+    from ..config.resolver import get_root_resolver
     for phase, name in item.workflows.to_dict().items():
-        if name and get_resolver().resolve_read(f"workflows/{name}") is None:
+        if name and get_root_resolver().resolve_read(f"workflows/{name}") is None:
             raise ValueError(f"生命周期工作流不存在：{phase}")
     scripts = [BatchScript(id=i, name=script_display_name(catalog[i]), wf_file=catalog[i].get("wf_file", ""),
                            class_name=catalog[i].get("class", ""), scope=catalog[i].get("scope", "daily"),
@@ -384,7 +384,7 @@ def editor(group_id: str = "") -> str:
             from ...workflows.file_tree import list_workflow_files
             from ...workflows.metadata import metadata_for_script_config
             from ..batch.config import BatchConfigItem
-            from ..config.resolver import get_resolver
+            from ..config.resolver import get_root_resolver
             from ..profile.schema import get_profile_config
             from ..users.document import load_user_metadata
             from .plugins import ensure_loaded
@@ -408,7 +408,7 @@ def editor(group_id: str = "") -> str:
                 fields.setdefault(item.execution_unit_key, item.execution_unit_key)
             workflows = []
             for file in list_workflow_files():
-                path = get_resolver().resolve_read(f"workflows/{file.rel_path}")
+                path = get_root_resolver().resolve_read(f"workflows/{file.rel_path}")
                 if path is None:
                     continue
                 meta, _ = metadata_for_script_config(path)

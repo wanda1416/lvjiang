@@ -164,6 +164,8 @@ def app_config(tmp_path, monkeypatch):
         yaml.safe_dump(SHIPPED_APP, allow_unicode=True), encoding="utf-8")
     resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
     monkeypatch.setattr(resolver_mod, "get_resolver", lambda: resolver)
+    monkeypatch.setattr(resolver_mod, "_resolver", resolver)
+    monkeypatch.setattr(resolver_mod, "_resolver", resolver)
     return system
 
 
@@ -213,6 +215,7 @@ class TestShippedAppYaml:
             dev_mode=True,
         )
         monkeypatch.setattr(resolver_mod, "get_resolver", lambda: resolver)
+        monkeypatch.setattr(resolver_mod, "_resolver", resolver)
         return load_app_config()
 
     def test_env_and_plan_names_are_bilingual(self, shipped):
@@ -244,6 +247,7 @@ class TestUserModeOverlay:
         shutil.copy(get_config_system_dir() / "app.yaml", system / "app.yaml")
         resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=False)
         monkeypatch.setattr(resolver_mod, "get_resolver", lambda: resolver)
+        monkeypatch.setattr(resolver_mod, "_resolver", resolver)
         return local
 
     @staticmethod

@@ -197,12 +197,12 @@ def lifecycle_parameter_definitions(
 ) -> dict[str, list[dict]]:
     """读取四个生命周期工作流声明的参数定义。"""
     from ...workflows.metadata import metadata_for_script_config
-    from ..config.resolver import get_resolver
+    from ..config.resolver import get_root_resolver
 
     definitions: dict[str, list[dict]] = {}
     for phase in WORKFLOW_PHASES:
         wf_name = getattr(workflows, phase)
-        path = (get_resolver().resolve_read(f"workflows/{wf_name}")
+        path = (get_root_resolver().resolve_read(f"workflows/{wf_name}")
                 if wf_name else None)
         if path is None:
             definitions[phase] = []
@@ -221,11 +221,11 @@ def declares_unit_prepare(wf_name: str) -> bool:
     在开始前拦截，而不是靠猜 wf 内容或写死文件名——用户自写的准备 wf 同样可以声明。
     """
     from ...workflows.metadata import metadata_for_script_config
-    from ..config.resolver import get_resolver
+    from ..config.resolver import get_root_resolver
 
     if not wf_name:
         return False
-    path = get_resolver().resolve_read(f"workflows/{wf_name}")
+    path = get_root_resolver().resolve_read(f"workflows/{wf_name}")
     if path is None:
         return False
     metadata, _warning = metadata_for_script_config(path)

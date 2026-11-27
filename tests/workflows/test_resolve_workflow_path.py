@@ -24,7 +24,7 @@ def _setup(tmp_path, monkeypatch, *, discovered):
     wf_path.parent.mkdir(parents=True)
     wf_path.write_text("log 'ok'\n", encoding="utf-8")
     monkeypatch.setattr(
-        "lvjiang.workflows.discovery.get_resolver",
+        "lvjiang.workflows.discovery.get_root_resolver",
         lambda: _Resolver({"workflows/standalone/demo.wf": wf_path}),
     )
     monkeypatch.setattr(

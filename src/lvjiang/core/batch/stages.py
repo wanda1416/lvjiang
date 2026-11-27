@@ -24,7 +24,7 @@ from ...workflows.result_protocol import (
     RESULT_SUCCESS,
 )
 from ..android.recovery import ChannelFaultError
-from ..config.resolver import get_resolver
+from ..config.resolver import get_root_resolver
 from .models import (
     _RESULT_STATUSES,
     ST_FAILED,
@@ -184,7 +184,7 @@ class StageExecutionMixin:
         """执行一个生命周期 wf，并统一校验其返回协议。"""
         if not wf_name:
             return BatchStageResult(state=batch_state)
-        wf_path = get_resolver().resolve_read(f"workflows/{wf_name}")
+        wf_path = get_root_resolver().resolve_read(f"workflows/{wf_name}")
         if wf_path is None:
             return BatchStageResult(
                 status=RESULT_FAILED,

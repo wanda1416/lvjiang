@@ -792,9 +792,13 @@ _APP_CONFIG_REL = "app.yaml"
 
 
 def load_app_config() -> dict:
-    """读取 app.yaml 的 system←local 合并视图（解析失败返回空 dict）"""
+    """读取 app.yaml 的 system←local 合并视图（解析失败返回空 dict）
+
+    一律走根解析器：环境列表、方案、Agent 等是**全局配置事实**，不能被某个
+    编辑器/任务包的临时作用域切走（否则任务包打开期间脚本的 env 校验会全部失效）。
+    """
     try:
-        return get_resolver().load_merged(_APP_CONFIG_REL)
+        return get_root_resolver().load_merged(_APP_CONFIG_REL)
     except Exception as e:  # noqa: BLE001 配置缺失/损坏不应阻断启动
         logger.error(f"加载 app.yaml 失败: {e}")
         return {}
@@ -827,7 +831,7 @@ def save_app_config(
         data["apps"] = android_apps
         # 保存一次即完成旧键迁移。
         data.pop("android_apps", None)
-    get_resolver().save_merged(_APP_CONFIG_REL, data)
+    get_root_resolver().save_merged(_APP_CONFIG_REL, data)
 
 
 def save_app_config_node(key: str, value: object) -> None:
@@ -838,7 +842,7 @@ def save_app_config_node(key: str, value: object) -> None:
     """
     data = load_app_config()
     data[key] = value
-    get_resolver().save_merged(_APP_CONFIG_REL, data)
+    get_root_resolver().save_merged(_APP_CONFIG_REL, data)
 
 
 def load_available_envs() -> list[tuple[str, str]]:

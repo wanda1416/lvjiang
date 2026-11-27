@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from ..core.config.resolver import (
     LAYER_LOCAL,
     LAYER_SYSTEM,
-    get_resolver,
+    get_root_resolver,
 )
 
 #: 工作流根（相对配置层根）
@@ -71,7 +71,7 @@ def list_workflow_files() -> list[WorkflowFile]:
 
     不过滤：``_`` 前缀、``archived/`` 等一律照实展示。
     """
-    resolver = get_resolver()
+    resolver = get_root_resolver()
     files: list[WorkflowFile] = []
     for rel in resolver.enumerate_entity_tree(
             WORKFLOWS_DIR, _PATTERN, include_internal=True):

@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from tempfile import mkstemp
 
-from ..core.config.resolver import LAYER_LOCAL, get_resolver
+from ..core.config.resolver import LAYER_LOCAL, get_root_resolver
 
 EDITOR_RUN_REL = "workflows/_editor_run.wf"
 
@@ -19,7 +19,7 @@ def save_editor_snapshot(text: str) -> Path:
     The draft is private state, not official configuration: always write the
     local layer, even in dev mode where ordinary saves go to system.
     """
-    return get_resolver().write_entity(
+    return get_root_resolver().write_entity(
         EDITOR_RUN_REL, _normalized_source(text), layer=LAYER_LOCAL)
 
 
@@ -29,7 +29,7 @@ def runtime_source(text: str):
     # Keep relative input-trace references working, but never reuse a shared filename.
     # Run sources are private too: writing them to system leaves `_editor_run_*.wf`
     # debris in the preset whenever a crash skips the unlink.
-    directory = get_resolver().local_dir / "workflows"
+    directory = get_root_resolver().local_dir / "workflows"
     directory.mkdir(parents=True, exist_ok=True)
     fd, filename = mkstemp(dir=directory, prefix="_editor_run_", suffix=".wf")
     path = Path(filename)

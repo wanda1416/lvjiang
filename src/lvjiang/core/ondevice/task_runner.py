@@ -684,9 +684,9 @@ def _build_source(task: dict, engine):
             pause_event=_PAUSE_GATE,
         )
 
-    from ..config.resolver import get_resolver
+    from ..config.resolver import get_root_resolver
 
-    wf_path = get_resolver().resolve_read(f"workflows/{task['wf_file']}")
+    wf_path = get_root_resolver().resolve_read(f"workflows/{task['wf_file']}")
     if wf_path is None:
         raise FileNotFoundError(f"工作流文件不存在: {task['wf_file']}")
     return wf_path

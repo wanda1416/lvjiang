@@ -25,7 +25,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from ..core.config.resolver import get_resolver
+from ..core.config.resolver import get_root_resolver
 from . import implementations
 from .file_tree import WORKFLOWS_DIR
 from .metadata import SCRIPT_ID_RE, metadata_for_script_config, script_traits
@@ -114,7 +114,7 @@ def _discover_wf_scripts(
     result: dict[str, dict] = {}
     if problems is None:
         problems = []
-    resolver = get_resolver()
+    resolver = get_root_resolver()
     for rel in resolver.enumerate_entity_tree(WORKFLOWS_DIR, "*.wf"):
         if Policy.is_internal(rel):
             continue
@@ -289,7 +289,7 @@ def resolve_workflow_path(
     可能还攥着迁移前的路径，重新发现能把同一脚本 ID 校正到新目录，同时不
     掩盖文件确实缺失的情况（两次都找不到就返回 ``None``）。
     """
-    resolver = get_resolver()
+    resolver = get_root_resolver()
 
     def _resolve(candidate: str) -> Path | None:
         if not candidate:

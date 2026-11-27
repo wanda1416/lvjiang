@@ -317,7 +317,7 @@ class TestSaveAppConfig:
                 "delay_params": self.DELAY_PARAMS,
             })
         monkeypatch.setattr(
-            "lvjiang.core.config.resolver.get_resolver",
+            "lvjiang.core.config.resolver.get_root_resolver",
             lambda: type("R", (), {"save_merged": fake_save_merged})())
 
         save_app_config(self.INPUT_SIM, self.DELAY_PARAMS)

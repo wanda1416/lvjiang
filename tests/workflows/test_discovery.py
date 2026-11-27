@@ -45,7 +45,7 @@ def _patch_resolver(monkeypatch, files, layers=None):
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.implementations.list_workflows", lambda: [])
     monkeypatch.setattr(
-        "lvjiang.workflows.discovery.get_resolver",
+        "lvjiang.workflows.discovery.get_root_resolver",
         lambda: _fake_resolver(files, layers),
     )
 

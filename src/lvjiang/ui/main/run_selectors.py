@@ -7,7 +7,7 @@ from typing import Any
 from loguru import logger
 from PyQt6.QtCore import Qt
 
-from ...core.config.resolver import get_resolver
+from ...core.config.resolver import get_root_resolver
 from ...i18n import tr
 
 # 顶部上下文选择器的锁定原因。定义在这里而不是 window.py：window 已经
@@ -195,7 +195,7 @@ class _RunSelectorsMixin:
 
         from ...workflows.metadata import build_flow_config
         path, _ = QFileDialog.getOpenFileName(
-            self, tr("加载工作流文件"), str(get_resolver().write_dir("workflows")),
+            self, tr("加载工作流文件"), str(get_root_resolver().write_dir("workflows")),
             tr("工作流文件 (*.wf);;所有文件 (*)"),
         )
         if not path:

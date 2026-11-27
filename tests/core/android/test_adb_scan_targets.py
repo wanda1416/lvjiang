@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from lvjiang.core import platforms as platforms_module
 from lvjiang.core.android import device as device_module
 from lvjiang.core.android import wireless as w
 
@@ -46,8 +47,10 @@ lo0: flags=8049<UP,LOOPBACK,RUNNING> mtu 16384
 
 
 class _Completed:
-    def __init__(self, stdout: str):
+    def __init__(self, stdout: str, returncode: int = 0, stderr: str = ""):
         self.stdout = stdout
+        self.returncode = returncode
+        self.stderr = stderr
 
 
 def _fake_run(out_by_cmd: dict[str, str]):
@@ -380,3 +383,88 @@ def test_adb_shell_normalizes_missing_process_output(monkeypatch):
         device_module.subprocess, "run", lambda *args, **kwargs: Result())
 
     assert device_module.AdbDevice("serial").shell("dumpsys", "activity") == ""
+
+
+def test_resolve_adb_path_prefers_bundled_only_on_linux_frozen(monkeypatch, tmp_path):
+    adb_dir = tmp_path / "adb"
+    adb_dir.mkdir()
+    linux_bundled = adb_dir / "adb"
+    linux_bundled.write_text("", encoding="utf-8")
+    win_bundled = adb_dir / "adb.exe"
+    win_bundled.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(device_module, "data_directory", lambda: tmp_path)
+
+    # Linux frozen：优先随包 data/adb/adb，高于 PATH
+    monkeypatch.setattr(device_module.os, "name", "posix")
+    monkeypatch.setattr(device_module.sys, "platform", "linux")
+    monkeypatch.setattr(device_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(device_module.shutil, "which", lambda _name: "/usr/bin/adb")
+    assert device_module.resolve_adb_path() == str(linux_bundled)
+    assert w.resolve_adb() == str(linux_bundled)
+
+    # Linux 源码态：保持 PATH 优先
+    monkeypatch.setattr(device_module.sys, "frozen", False, raising=False)
+    assert device_module.resolve_adb_path() == "/usr/bin/adb"
+    assert w.resolve_adb() == "/usr/bin/adb"
+
+    # Windows frozen：保持 PATH 优先（不改变 Windows 既有行为）
+    monkeypatch.setattr(device_module.os, "name", "nt")
+    monkeypatch.setattr(device_module.sys, "platform", "win32")
+    monkeypatch.setattr(device_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(device_module.shutil, "which", lambda _name: r"C:\Android\adb.exe")
+    assert device_module.resolve_adb_path() == r"C:\Android\adb.exe"
+    assert w.resolve_adb() == r"C:\Android\adb.exe"
+
+
+def test_list_adb_devices_logs_nonzero_exit_and_cleans_linux_frozen_env(monkeypatch):
+    captured_kwargs: dict = {}
+
+    class Process:
+        returncode = 1
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, timeout=None):
+            return "", "/usr/bin/adb: version `GLIBCXX_3.4.31' not found"
+
+    def fake_popen(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return Process()
+
+    monkeypatch.setattr(platforms_module, "IS_WINDOWS", False)
+    monkeypatch.setattr(device_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(device_module.sys, "_MEIPASS", "/opt/lvjiang/_internal", raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/lvjiang/_internal")
+    monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
+    monkeypatch.setattr(device_module.subprocess, "Popen", fake_popen)
+
+    records: list[str] = []
+    token = device_module.logger.add(records.append, level="ERROR")
+    try:
+        devices = device_module.list_adb_devices("/usr/bin/adb")
+    finally:
+        device_module.logger.remove(token)
+
+    assert devices == []
+    assert "env" in captured_kwargs
+    assert "LD_LIBRARY_PATH" not in captured_kwargs["env"]
+    assert any("GLIBCXX_3.4.31" in msg and "rc=1" in msg for msg in records)
+
+
+def test_mdns_discover_adb_logs_warning_on_nonzero_exit(monkeypatch):
+    monkeypatch.setattr(
+        w.subprocess,
+        "run",
+        lambda *a, **k: _Completed("", returncode=1, stderr="GLIBCXX_3.4.32 not found"),
+    )
+    records: list[str] = []
+    token = w.logger.add(records.append, level="WARNING")
+    try:
+        endpoints = w.mdns_discover_adb("/usr/bin/adb")
+    finally:
+        w.logger.remove(token)
+
+    assert endpoints == []
+    assert any("GLIBCXX_3.4.32" in msg and "rc=1" in msg for msg in records)

@@ -16,6 +16,8 @@ import subprocess
 from collections.abc import Collection, Iterable
 from pathlib import Path
 
+from ..platforms import subprocess_clean_env_kwargs
+
 # 与 .gitattributes 的 eol=lf 规则配套；tests/core/test_preset_sources.py 校验
 # 两处不漂移——漏一个后缀，跨机器摘要就又开始飘。
 TEXT_SUFFIXES = frozenset({".json", ".yaml", ".yml", ".wf", ".sh", ".md", ".txt"})
@@ -36,6 +38,7 @@ def tracked_files(root: Path, relative: str) -> list[str] | None:
             ["git", "-C", str(root), "ls-files", "-z", "--", relative],
             capture_output=True,
             check=False,
+            **subprocess_clean_env_kwargs(),
         )
     except OSError:
         return None

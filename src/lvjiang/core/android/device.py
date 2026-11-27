@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from ..platforms import (
     SUBPROCESS_NO_WINDOW,
     SUBPROCESS_TEXT,
     adb_path_candidates,
+    subprocess_clean_env_kwargs,
 )
 from .recovery import AdbConnectionError as AdbConnectionError
 from .recovery import AndroidRecovery
@@ -31,17 +33,20 @@ class AndroidDeviceIdentity:
     stable: bool
 
 
-def _resolve_adb_path() -> str:
-    """解析 adb 可执行路径
+def resolve_adb_path() -> str:
+    """解析 adb 可执行路径。
 
-    优先级：PATH → 随包内置（data/adb，打包端免装 adb）→ 平台常见安装位置，
-    均未命中返回 'adb'。
+    Linux frozen 打包态优先随包内置（data/adb/adb），避免命中系统动态链接 adb
+    受 PyInstaller LD_LIBRARY_PATH 影响；其余平台/源码态保持 PATH 优先：
+    PATH → 随包内置（data/adb）→ 平台常见安装位置，均未命中返回 'adb'。
     """
+    bundled = data_directory() / "adb" / ("adb.exe" if os.name == "nt" else "adb")
+    if sys.platform.startswith("linux") and getattr(sys, "frozen", False) and bundled.is_file():
+        return str(bundled)
     found = shutil.which("adb")
     if found:
         return found
-    bundled = data_directory() / "adb" / ("adb.exe" if os.name == "nt" else "adb")
-    if bundled.exists():
+    if bundled.is_file():
         return str(bundled)
     for c in adb_path_candidates():
         if c and "%" not in c and os.path.exists(c):
@@ -59,7 +64,7 @@ def list_adb_devices(
     Returns:
         [{"serial": str, "model": str}, ...]
     """
-    adb = adb_path or _resolve_adb_path()
+    adb = adb_path or resolve_adb_path()
     try:
         process = subprocess.Popen(
             [adb, "devices", "-l"],
@@ -67,6 +72,7 @@ def list_adb_devices(
             stderr=subprocess.PIPE,
             **SUBPROCESS_TEXT,
             **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         deadline = time.monotonic() + 10.0
         while process.poll() is None:
@@ -83,7 +89,12 @@ def list_adb_devices(
                 process.communicate()
                 raise subprocess.TimeoutExpired([adb, "devices", "-l"], 10)
             time.sleep(0.05)
-        out, _stderr = process.communicate()
+        out, stderr = process.communicate()
+        if process.returncode != 0:
+            logger.error(
+                f"adb devices 执行失败 (rc={process.returncode}, adb={adb}): "
+                f"{(stderr or '').strip()}"
+            )
     except Exception as e:
         logger.error(f"adb devices 执行失败: {e}")
         return []
@@ -115,7 +126,7 @@ class AdbDevice:
     """
 
     def __init__(self, serial: str | None = None, adb_path: str | None = None):
-        self.adb_path = adb_path or _resolve_adb_path()
+        self.adb_path = adb_path or resolve_adb_path()
         self.serial = serial
         self._resolution: tuple[int, int] | None = None
         self._abi: str | None = None
@@ -194,7 +205,8 @@ class AdbDevice:
         """只恢复当前 transport，不 kill-server，不发任何游戏输入。"""
         def run(args):
             return subprocess.run(args, capture_output=True, timeout=3.0,
-                                  **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW)
+                                  **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+                                  **subprocess_clean_env_kwargs())
         def probe():
             result = run([*self._base(), "shell", "echo", "lvjiang-ready"])
             return result.returncode == 0 and (result.stdout or "").strip() == "lvjiang-ready"
@@ -234,6 +246,7 @@ class AdbDevice:
                     [*self._base(), "shell", *args],
                     capture_output=True, timeout=timeout,
                     **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+                    **subprocess_clean_env_kwargs(),
                 )
                 if r.returncode != 0:
                     # 某些打包/代理环境在命令没有对应输出流时会返回 None。
@@ -275,6 +288,7 @@ class AdbDevice:
                     [*self._base(), *args],
                     capture_output=True, timeout=timeout,
                     **SUBPROCESS_NO_WINDOW,
+                    **subprocess_clean_env_kwargs(),
                 )
                 if r.returncode != 0:
                     stderr_msg = r.stderr.strip()
@@ -299,6 +313,7 @@ class AdbDevice:
             [*self._base(), "forward", local, remote],
             capture_output=True, timeout=10,
             **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         if r.returncode != 0:
             logger.error(f"adb forward {local} {remote} 失败: {r.stderr.strip()}")
@@ -316,6 +331,7 @@ class AdbDevice:
             [*self._base(), "forward", "tcp:0", remote],
             capture_output=True, timeout=10,
             **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         output = (r.stdout or "").strip()
         if r.returncode != 0:
@@ -337,6 +353,7 @@ class AdbDevice:
             subprocess.run(
                 [*self._base(), "forward", "--remove", local],
                 capture_output=True, timeout=10, **SUBPROCESS_NO_WINDOW,
+                **subprocess_clean_env_kwargs(),
             )
         except Exception:
             pass
@@ -347,6 +364,7 @@ class AdbDevice:
             [*self._base(), "push", local_path, remote_path],
             capture_output=True, timeout=60,
             **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         if r.returncode != 0:
             logger.error(f"adb push {local_path} 失败: {r.stderr.strip()}")
@@ -375,6 +393,7 @@ class AdbDevice:
             stderr=subprocess.PIPE,
             **SUBPROCESS_TEXT,
             **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         deadline = time.monotonic() + timeout
         while process.poll() is None:
@@ -404,6 +423,7 @@ class AdbDevice:
             [*self._base(), "shell", *args],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
 
     # ─── 设备属性（带缓存）─────────────────────────────────

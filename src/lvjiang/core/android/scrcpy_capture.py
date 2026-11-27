@@ -36,7 +36,11 @@ from loguru import logger
 from ...i18n import tr
 from ..input.capture_base import CaptureBackend
 from ..paths import data_directory
-from ..platforms import SUBPROCESS_NO_WINDOW, SUBPROCESS_TEXT
+from ..platforms import (
+    SUBPROCESS_NO_WINDOW,
+    SUBPROCESS_TEXT,
+    subprocess_clean_env_kwargs,
+)
 from .device import AdbDevice
 from .recovery import ChannelFaultError
 
@@ -680,6 +684,7 @@ class AndroidStreamCapture(CaptureBackend):
                     [*self._device._base(), "shell",
                      "pkill", "-f", f"scid={scid:08x}"],
                     capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
+                    **subprocess_clean_env_kwargs(),
                 )
             except Exception as exc:  # noqa: BLE001 - 断连停流时 pkill 失败不得阻断清理与重建
                 logger.debug(f"[AndroidStream] 清理远端 scrcpy 进程失败（已忽略）: {exc}")
@@ -798,6 +803,7 @@ class AndroidStreamCapture(CaptureBackend):
             [*self._device._base(), "push", str(self._jar_local), _REMOTE_JAR_PATH],
             capture_output=True, timeout=30,
             **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         if r.returncode != 0:
             self._fail(tr("推送 scrcpy-server.jar 失败：{detail}").format(
@@ -824,6 +830,7 @@ class AndroidStreamCapture(CaptureBackend):
                 [*self._device._base(), "shell", shell_cmd],
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                 **SUBPROCESS_NO_WINDOW,
+                **subprocess_clean_env_kwargs(),
             )
             proc = self._server_proc
             self._stderr_thread = threading.Thread(

@@ -5,7 +5,6 @@
 """
 from __future__ import annotations
 
-import os
 import sys
 import threading
 import time
@@ -16,6 +15,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
+from .core.platforms import clean_subprocess_env
 from .ui.main import MainWindow
 from .ui.widgets.misc import install_wheel_guard
 from .ui.widgets.theme import get_theme_manager, reset_theme_manager
@@ -115,14 +115,7 @@ def build_restart_command() -> list[str]:
 
 def build_restart_env() -> dict[str, str]:
     """清理 PyInstaller 注入的环境变量，防止子进程继承旧 bootloader 状态。"""
-    env = dict(os.environ)
-    env.pop("_MEIPASS2", None)
-    orig_ld = env.pop("LD_LIBRARY_PATH_ORIG", None)
-    if orig_ld is not None:
-        env["LD_LIBRARY_PATH"] = orig_ld
-    elif getattr(sys, "frozen", False):
-        env.pop("LD_LIBRARY_PATH", None)
-    return env
+    return clean_subprocess_env()
 
 
 def spawn_restarted_process():

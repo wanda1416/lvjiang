@@ -171,9 +171,9 @@ def _spawn_headless_server(root: Path, *, idle_exit: float) -> None:
     env["LVJIANG_ROOT"] = str(root)
     env.pop("_MEIPASS2", None)
     orig_ld = env.pop("LD_LIBRARY_PATH_ORIG", None)
-    if orig_ld is not None:
+    if orig_ld:
         env["LD_LIBRARY_PATH"] = orig_ld
-    elif getattr(sys, "frozen", False):
+    elif orig_ld is not None or getattr(sys, "frozen", False):
         env.pop("LD_LIBRARY_PATH", None)
 
     kwargs: dict[str, Any] = {

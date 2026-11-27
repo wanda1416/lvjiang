@@ -15,7 +15,6 @@
 
 import os
 import re
-import shutil
 import socket
 import subprocess
 import time
@@ -29,27 +28,14 @@ from ..platforms import (
     SUBPROCESS_NO_WINDOW,
     SUBPROCESS_TEXT,
     SUBPROCESS_TEXT_OEM,
-    adb_path_candidates,
+    subprocess_clean_env_kwargs,
 )
+from .device import resolve_adb_path
 
 
 def resolve_adb() -> str:
-    """解析 adb 可执行路径
-
-    优先级：PATH → 随包内置（data/adb）→ 平台常见安装位置，均未命中返回 'adb'。
-    """
-    found = shutil.which("adb")
-    if found:
-        return found
-
-    from ..paths import data_directory
-    bundled = data_directory() / "adb" / ("adb.exe" if os.name == "nt" else "adb")
-    if bundled.exists():
-        return str(bundled)
-    for c in adb_path_candidates():
-        if c and "%" not in c and os.path.exists(c):
-            return c
-    return "adb"
+    """解析 adb 可执行路径（委托给 device.resolve_adb_path）。"""
+    return resolve_adb_path()
 
 
 def run_adb(adb: str, *args: str, timeout: float = 10) -> str:
@@ -58,6 +44,7 @@ def run_adb(adb: str, *args: str, timeout: float = 10) -> str:
         [adb, *args],
         capture_output=True, timeout=timeout,
         **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+        **subprocess_clean_env_kwargs(),
     )
     return r.stdout.strip()
 
@@ -188,6 +175,7 @@ def _iter_unix_interfaces() -> list[tuple[str, str]]:
         try:
             out = subprocess.run(
                 [*cmd], capture_output=True, timeout=5, **SUBPROCESS_TEXT,
+                **subprocess_clean_env_kwargs(),
             ).stdout
         except Exception:
             continue
@@ -284,6 +272,7 @@ def _ping_host(ip: str, timeout: float = 0.02) -> bool:
         result = subprocess.run(
             cmd, capture_output=True, timeout=timeout + 0.5,
             **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
         return result.returncode == 0
     except Exception:
@@ -423,7 +412,15 @@ def mdns_discover_adb(
             [adb, "mdns", "services"],
             capture_output=True, timeout=timeout,
             **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         )
+        rc = getattr(result, "returncode", 0)
+        if rc != 0:
+            logger.warning(
+                f"[mDNS] adb mdns services 执行失败 (rc={rc}, adb={adb}): "
+                f"{(getattr(result, 'stderr', '') or '').strip()}"
+            )
+            return []
         out = result.stdout or ""
     except Exception as exc:  # noqa: BLE001 - 发现失败只降级，不影响整体扫描
         logger.debug(f"[mDNS] 调用 adb mdns services 失败: {exc}")
@@ -485,6 +482,7 @@ def _read_neighbor_table(timeout: float = 5) -> str:
             result = subprocess.run(
                 cmd, capture_output=True, timeout=timeout,
                 **text_kwargs, **SUBPROCESS_NO_WINDOW,
+                **subprocess_clean_env_kwargs(),
             )
         except Exception:
             continue
@@ -586,7 +584,8 @@ def connect_wireless(adb: str, ip: str, port: int, timeout: float = 5) -> bool:
         out = subprocess.run(
             [adb, "connect", target],
             capture_output=True, timeout=timeout,
-        **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+            **subprocess_clean_env_kwargs(),
         ).stdout.strip()
         return "connected" in out.lower()
     except Exception:
@@ -626,6 +625,7 @@ def get_device_ip(adb: str, serial: str) -> str | None:
                 [adb, "-s", serial, *cmd_args],
                 capture_output=True, timeout=5,
                 **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
+                **subprocess_clean_env_kwargs(),
             ).stdout
             m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", out)
             if m:

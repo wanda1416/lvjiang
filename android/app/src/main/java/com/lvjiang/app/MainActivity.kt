@@ -430,6 +430,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        ApkUpdater.resumeInterruptedInstall(this)
         ApkUpdater.resumePendingInstallIfAllowed(this)
         // 心跳跟随前台：在线状态 + 跳成功后自动同步（后台不跳，省电）
         executor.execute { PyBridge.accountHeartbeatStart(this) }

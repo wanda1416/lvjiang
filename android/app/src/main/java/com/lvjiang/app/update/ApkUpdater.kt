@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -16,6 +18,7 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * 应用内 APK 后台下载与自动安装管理器。
@@ -29,8 +32,16 @@ object ApkUpdater {
     private const val TAG = "ApkUpdater"
     private const val APK_MIME = "application/vnd.android.package-archive"
 
+    /** 断点状态：应用被杀后重新进前台还能续做「校验 + 安装」。 */
+    private const val PREFS_NAME = "apk_update"
+    private const val KEY_DOWNLOAD_ID = "download_id"
+    private const val KEY_VERSION = "version"
+    private const val KEY_FILE = "file"
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val lock = Any()
+    /** 校验要算哈希并可能联网取 SHA256SUMS，放后台线程做，避免卡 UI。 */
+    private val verifyExecutor = Executors.newSingleThreadExecutor()
 
     private var activeDownloadId: Long = -1L
     private var activeVersion: String = ""
@@ -98,6 +109,7 @@ object ApkUpdater {
 
             activeDownloadId = downloadId
             activeVersion = version
+            rememberDownload(appContext, downloadId, version, targetFile)
 
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context, intent: Intent) {
@@ -117,6 +129,110 @@ object ApkUpdater {
         }
 
         onMessage("已开始后台下载 v$version，完成后将自动拉起安装")
+    }
+
+    /**
+     * 下载在应用被杀之后才完成的情况：重新进前台时按断点记录补做「校验 + 安装」。
+     *
+     * 运行时广播只在进程活着时送达，断点记录是这条路径的唯一兜底。
+     */
+    fun resumeInterruptedInstall(context: Context) {
+        val appContext = context.applicationContext
+        val store = prefs(appContext)
+        val downloadId = store.getLong(KEY_DOWNLOAD_ID, -1L)
+        if (downloadId <= 0L) return
+        val version = store.getString(KEY_VERSION, "").orEmpty()
+        val file = File(store.getString(KEY_FILE, "").orEmpty())
+        val downloadManager = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+        if (downloadManager == null || !file.isAbsolute) {
+            forgetDownload(appContext)
+            return
+        }
+
+        var status = DownloadManager.STATUS_FAILED
+        var reason = 0
+        runCatching {
+            downloadManager.query(DownloadManager.Query().setFilterById(downloadId))?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                    reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                }
+            }
+        }
+
+        when {
+            status == DownloadManager.STATUS_SUCCESSFUL && file.isFile -> {
+                forgetDownload(appContext)
+                showToast(appContext, "v$version 下载完成，正在校验安装包…")
+                verifyThenInstall(appContext, file, version)
+            }
+            // 下载失败或记录已失效：清掉断点，避免每次进前台都空跑
+            status == DownloadManager.STATUS_FAILED -> {
+                Log.w(TAG, "续装失败: 下载未成功 status=$status reason=$reason")
+                forgetDownload(appContext)
+            }
+            // 仍在下载/排队：等下载完成后的广播，或下次进前台再查
+            else -> Unit
+        }
+    }
+
+    /** 当前是否处于漫游网络。只用于下载前提示，不改变是否允许下载。 */
+    fun isRoaming(context: Context): Boolean {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        return !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)
+    }
+
+    /**
+     * 安装前校验：（后台线程）本地 SHA-256 + 官方 `SHA256SUMS.txt` 比对，
+     * 校验和不匹配就删包拒装；取不到官方校验和只提示、不拦着装。
+     */
+    private fun verifyThenInstall(appContext: Context, apkFile: File, version: String) {
+        verifyExecutor.execute {
+            val result = runCatching {
+                PyBridge.verifyApk(appContext, apkFile.absolutePath, version)
+            }.onFailure { Log.w(TAG, "校验安装包失败: ${apkFile.absolutePath}", it) }.getOrNull()
+            mainHandler.post {
+                if (result == null || !result.optBoolean("ok")) {
+                    val reason = result?.optString("message")?.takeIf { it.isNotBlank() }
+                        ?: "更新包校验失败"
+                    showToast(appContext, "$reason，请重新下载")
+                    apkFile.delete()
+                    return@post
+                }
+                val verified = if (result.isNull("verified")) null else result.optBoolean("verified")
+                val message = result.optString("message")
+                if (verified == false) {
+                    showToast(appContext, message.ifBlank { "更新包校验和不匹配，已放弃安装" })
+                    apkFile.delete()
+                    return@post
+                }
+                if (message.isNotBlank()) showToast(appContext, message)
+                installApk(appContext, apkFile)
+            }
+        }
+    }
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun rememberDownload(context: Context, downloadId: Long, version: String, file: File) {
+        prefs(context).edit()
+            .putLong(KEY_DOWNLOAD_ID, downloadId)
+            .putString(KEY_VERSION, version)
+            .putString(KEY_FILE, file.absolutePath)
+            .apply()
+    }
+
+    private fun forgetDownload(context: Context) {
+        prefs(context).edit()
+            .remove(KEY_DOWNLOAD_ID)
+            .remove(KEY_VERSION)
+            .remove(KEY_FILE)
+            .apply()
     }
 
     /** 用户在系统设置授予「安装未知应用」权限返回前台时，自动续接安装。 */
@@ -163,12 +279,14 @@ object ApkUpdater {
 
         if (status != DownloadManager.STATUS_SUCCESSFUL || !targetFile.isFile || targetFile.length() <= 0L) {
             Log.w(TAG, "APK 下载未成功: status=$status reason=$reason file=${targetFile.absolutePath}")
+            forgetDownload(appContext)
             showToast(appContext, "更新包下载失败（错误码 $reason），请重试或前往发布页下载")
             return
         }
 
-        showToast(appContext, "v$version 下载完成，正在启动安装…")
-        installApk(appContext, targetFile)
+        forgetDownload(appContext)
+        showToast(appContext, "v$version 下载完成，正在校验安装包…")
+        verifyThenInstall(appContext, targetFile, version)
     }
 
     private fun installApk(appContext: Context, apkFile: File) {

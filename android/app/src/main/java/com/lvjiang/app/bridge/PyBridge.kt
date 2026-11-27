@@ -30,6 +30,7 @@ object PyBridge {
     private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
     private const val OFFLINE_MODULE = "lvjiang.core.ondevice.offline"
     private const val ACCOUNT_MODULE = "lvjiang.core.ondevice.account_api"
+    private const val UPDATE_MODULE = "lvjiang.core.ondevice.update_api"
 
     @Volatile
     private var startFailure: String? = null
@@ -241,6 +242,10 @@ object PyBridge {
         callJson(context, "task_history", runId, moduleName = WORKBENCH_MODULE)
     fun publicContent(context: Context, kind: String, refresh: Boolean = false): JSONObject =
         callJson(context, "public_content", kind, refresh, moduleName = WORKBENCH_MODULE)
+    /** 应用内更新：校验下载到的 APK（三态 verified: true/false/null）。 */
+    fun verifyApk(context: Context, path: String, version: String): JSONObject =
+        callJson(context, "verify_apk", path, version, moduleName = UPDATE_MODULE)
+
     fun respondInteraction(context: Context, requestId: String, accepted: Boolean): JSONObject =
         callJson(context, "respond_interaction", requestId, accepted)
 

@@ -1768,6 +1768,37 @@ class WorkbenchUi(
         }
     }
 
+    /** 开始下载更新包；漫游网络下先提示一次流量费用，不拦截蜂窝网络。 */
+    private fun startUpdateDownload(
+        apkUrl: String,
+        apkName: String,
+        version: String,
+        releaseUrl: String,
+    ) {
+        val begin = {
+            ApkUpdater.downloadAndInstall(activity, apkUrl, apkName, version) { toast(it) }
+        }
+        if (apkUrl.isBlank()) {
+            if (releaseUrl.isNotBlank()) {
+                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))) }
+                    .onFailure { toast("未找到可打开链接的浏览器") }
+            } else {
+                toast("未找到可用的更新包下载地址")
+            }
+            return
+        }
+        if (!ApkUpdater.isRoaming(activity)) {
+            begin()
+            return
+        }
+        MaterialAlertDialogBuilder(activity)
+            .setTitle("当前处于漫游网络")
+            .setMessage("正在使用漫游网络下载更新包，可能产生额外流量费用。是否继续？")
+            .setPositiveButton("继续更新") { _, _ -> begin() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     private fun showUpdateAvailableDialog(result: JSONObject, current: String, latest: String) {
         val releaseUrl = result.optString("release_url")
         val apkUrl = result.optString("apk_url")
@@ -1778,13 +1809,11 @@ class WorkbenchUi(
         val content = SettingsUi.dialogContent(activity)
         val versionLine = buildString {
             append("发现新版本 v$latest（当前版本 v$current）")
-            if (publishedAt.isNotEmpty()) append("
-发布日期：$publishedAt")
+            if (publishedAt.isNotEmpty()) append("\n发布日期：$publishedAt")
         }
         text(content, versionLine, 14f)
         if (releaseBody.isNotEmpty()) {
-            text(content, "更新内容：
-$releaseBody", 13f)
+            text(content, "更新内容：\n$releaseBody", 13f)
         } else {
             text(content, "建议及时更新以获得最新功能与问题修复。", 13f)
         }
@@ -1794,14 +1823,7 @@ $releaseBody", 13f)
             .setTitle("发现新版本 v$latest")
             .setView(SettingsUi.dialogScroll(activity, content))
             .setPositiveButton("立即更新") { _, _ ->
-                if (apkUrl.isNotBlank()) {
-                    ApkUpdater.downloadAndInstall(activity, apkUrl, apkName, latest) { toast(it) }
-                } else if (releaseUrl.isNotBlank()) {
-                    runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))) }
-                        .onFailure { toast("未找到可打开链接的浏览器") }
-                } else {
-                    toast("未找到可用的更新包下载地址")
-                }
+                startUpdateDownload(apkUrl, apkName, latest, releaseUrl)
             }
             .setNegativeButton("暂不更新", null)
         if (releaseUrl.isNotBlank()) {

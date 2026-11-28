@@ -46,6 +46,7 @@ from ...core.config import (
     save_app_config,
     save_settings,
 )
+from ...core.reserved_names import ensure_name_not_reserved
 from ...i18n import tr, tr_in, tr_label
 from ..widgets.button_styles import (
     apply_button_style,
@@ -1958,14 +1959,19 @@ class SettingsDialog(QDialog):
             }
         return custom
 
-    def _collect_envs(self) -> list[dict]:
-        """收集环境配置，返回 [{key, name}, ...]"""
+    def _collect_envs(self) -> list[dict] | None:
+        """收集环境配置，返回 [{key, name}, ...]；key 撞保留名时提示并返回 None"""
         envs = []
         seen_keys = set()
         for entry in self._env_rows:
             key = entry["key"].text().strip()
             if not key:
                 continue
+            try:
+                ensure_name_not_reserved(key, kind=tr("环境"))
+            except ValueError as exc:
+                QMessageBox.warning(self, tr("目标环境"), str(exc))
+                return None
             if key in seen_keys:
                 continue
             seen_keys.add(key)
@@ -2042,6 +2048,10 @@ class SettingsDialog(QDialog):
         android_apps = self._collect_android_apps()
         if android_apps is None:
             return False
+        # 在所有写盘动作之前收敛：环境 key 撞保留名时不能留下半套已保存的配置
+        envs = self._collect_envs()
+        if envs is None:
+            return False
         settings = {
             "android_recovery": {
                 "allow_adb_fallback": self._adb_fallback_cb.isChecked(),
@@ -2077,7 +2087,6 @@ class SettingsDialog(QDialog):
         input_sim["click_random_offset"] = self._offset_spin.value()
         input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
         input_sim["clamp_out_of_bounds"] = self._clamp_oob_cb.isChecked()
-        envs = self._collect_envs()
         save_app_config(input_sim, delay_params, envs, android_apps)
         from ...core.config.plans import save_plans
         save_plans(self._collect_plans())

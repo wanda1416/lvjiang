@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from ..config.resolver import ConfigResolver, get_resolver
+from ..reserved_names import ensure_name_not_reserved
 
 if TYPE_CHECKING:
     from .models import Layout
@@ -171,7 +172,9 @@ def validate_layout_key(key: str) -> str:
         raise ValueError(
             "布局 key 必须以小写字母开头，且只能包含小写字母、数字和下划线"
         )
-    return value
+    # 语法合法不代表可用：截图目录按布局 key 建子目录，与任务包的
+    # ``screenshots/packages/`` 同级的名字会互相踩。
+    return ensure_name_not_reserved(value, kind="布局")
 
 
 # ─── 目录化清单读取 ──────────────────────────────────────

@@ -242,6 +242,22 @@ class TestListLayouts:
         with pytest.raises(ValueError, match="布局名称已存在"):
             mgr.validate_new_identity("mobile_copy", "我的手机布局")
 
+    def test_reserved_packages_key_is_rejected_despite_valid_syntax(self, env):
+        """`packages` 语法合法但会撞任务包截图目录，必须挡住。
+
+        ``screenshots/<布局 key>/`` 与 ``screenshots/packages/<任务包 id>/`` 同级：
+        一个叫 packages 的布局会和所有任务包的底图共用一个目录树，互相覆盖。
+        """
+        mgr = LayoutConfigManager()
+        with pytest.raises(ValueError, match="保留名"):
+            mgr.validate_new_identity("packages", "任务包截图")
+        with pytest.raises(ValueError, match="保留名"):
+            mgr.new_layout("packages", "任务包截图")
+
+        # 只是不叫这个名字的一切照旧，别把规则扩大到无关 key
+        mgr.validate_new_identity("packages_copy", "任务包截图副本")
+        assert mgr.new_layout("packages_copy", "任务包截图副本").key == "packages_copy"
+
     def test_stale_active_layout_falls_back_to_first_valid_key(self, env):
         mgr = LayoutConfigManager()
         assert mgr.save_layout(_make_layout("android"))

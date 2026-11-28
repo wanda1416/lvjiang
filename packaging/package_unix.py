@@ -23,6 +23,50 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DIST_DIR = ROOT / "dist"
 
+#: 安装到当前用户应用菜单的桌面入口。Exec 与 Icon 需要解压后的绝对路径，
+#: 因此由随包脚本在安装时生成，包里不放写死路径的 .desktop。
+#: 文件名必须与 src/lvjiang/ui/widgets/app_icon.py 的 DESKTOP_FILE_NAME 一致。
+_LINUX_DESKTOP_INSTALLER = """#!/bin/sh
+# 把律匠注册到当前用户的应用菜单，并让任务栏 / Dock 使用随包图标。
+# Wayland 下窗口图标只由桌面入口决定，因此需要运行一次本脚本。
+set -eu
+
+APP_DIR=$(cd "$(dirname "$0")" && pwd)
+DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
+APPS_DIR=$DATA_HOME/applications
+ICON_DIR=$DATA_HOME/icons/hicolor/256x256/apps
+
+if [ ! -x "$APP_DIR/lvjiang" ]; then
+    echo "未在 $APP_DIR 找到 lvjiang，请在解压后的目录中运行本脚本。" >&2
+    exit 1
+fi
+
+mkdir -p "$APPS_DIR" "$ICON_DIR"
+cp "$APP_DIR/_internal/lvjiang/assets/icon.png" "$ICON_DIR/lvjiang.png"
+
+cat > "$APPS_DIR/lvjiang.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=律匠
+Name[en_US]=Lvjiang
+Comment=律匠桌面客户端
+Comment[en_US]=Lvjiang desktop client
+Exec="$APP_DIR/lvjiang"
+Icon=lvjiang
+Terminal=false
+Categories=Utility;
+StartupWMClass=lvjiang
+EOF
+
+chmod 644 "$APPS_DIR/lvjiang.desktop"
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+fi
+echo "已安装桌面入口：$APPS_DIR/lvjiang.desktop"
+echo "若应用菜单没有立即刷新，请重新登录桌面会话。"
+"""
+
 
 def _read_version() -> str:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -116,9 +160,18 @@ def _write_linux_readme(target_root: Path, version: str) -> None:
         "   - 本机桌面窗口自动化仅支持 Windows。\n\n"
         "3. 常见依赖提示（Ubuntu / Debian）：\n"
         "   若首次启动报 Qt 平台插件缺少库，请安装：\n"
-        "   sudo apt-get install -y libxcb-cursor0 libgl1 libegl1 libxkbcommon-x11-0\n"
+        "   sudo apt-get install -y libxcb-cursor0 libgl1 libegl1 libxkbcommon-x11-0\n\n"
+        "4. 桌面图标（可选）：\n"
+        "   解压后运行一次 ./install-desktop.sh，把应用加入菜单并在任务栏 / Dock 显示图标；\n"
+        "   Wayland 下窗口图标由桌面入口决定，不运行该脚本会显示通用图标。\n"
     )
     (target_root / "README-linux.txt").write_text(text, encoding="utf-8")
+
+
+def _write_linux_desktop_installer(target_root: Path) -> None:
+    script = target_root / "install-desktop.sh"
+    script.write_text(_LINUX_DESKTOP_INSTALLER, encoding="utf-8", newline="\n")
+    script.chmod(0o755)
 
 
 def _build_linux(version: str, adb_bin: Path | None) -> Path:
@@ -128,6 +181,7 @@ def _build_linux(version: str, adb_bin: Path | None) -> Path:
 
     _populate_factory_assets(target_dir, version, adb_bin)
     _write_linux_readme(target_dir, version)
+    _write_linux_desktop_installer(target_dir)
 
     arch = _normalized_arch()
     archive = DIST_DIR / f"lvjiang-v{version}-linux-{arch}.tar.gz"

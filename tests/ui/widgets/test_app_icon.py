@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QGuiApplication, QIcon
 
 from lvjiang.ui.widgets.app_icon import (
+    DESKTOP_FILE_NAME,
     ICON_FILE,
     apply_app_icon,
     icon_path,
+    set_linux_desktop_file_name,
     set_windows_app_user_model_id,
 )
 
@@ -53,6 +55,16 @@ def test_missing_asset_is_not_fatal(monkeypatch, tmp_path):
 
     assert icon_path() is None
     assert apply_app_icon(object()) is False
+
+
+def test_linux_desktop_file_name_matches_packaged_entry(qapp, monkeypatch):
+    """Wayland 只按 app_id 找桌面入口，名字必须与随包的 lvjiang.desktop 一致。"""
+    monkeypatch.setattr("lvjiang.ui.widgets.app_icon.sys.platform", "linux")
+
+    set_linux_desktop_file_name()
+
+    assert DESKTOP_FILE_NAME == "lvjiang"
+    assert QGuiApplication.desktopFileName() == DESKTOP_FILE_NAME
 
 
 def test_windows_app_user_model_id_is_noop_off_windows(monkeypatch):

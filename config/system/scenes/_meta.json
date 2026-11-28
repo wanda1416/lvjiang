@@ -1,5 +1,5 @@
 {
-  "content_version": 5,
+  "content_version": 6,
   "groups": [
     {
       "key": "general",
@@ -61,9 +61,7 @@
         "activity_jianghu",
         "activity_huoyun",
         "activity_fujingxingzhou",
-        "activity_mengzhu",
-        "activity_jianghuyi",
-        "shop_bayinqiao"
+        "activity_jianghuyi"
       ]
     },
     {

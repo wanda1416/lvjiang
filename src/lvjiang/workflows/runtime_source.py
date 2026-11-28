@@ -6,7 +6,11 @@ from tempfile import mkstemp
 
 from ..core.config.resolver import LAYER_LOCAL, get_root_resolver
 
-EDITOR_RUN_REL = "workflows/_editor_run.wf"
+#: 编辑器草稿与试运行临时文件统一收进 ``_scratch/``：``workflows/`` 根层只留
+#: 目录，不给「最外层平铺一堆 .wf」留先例。``_`` 前缀既让发现层跳过，也让它
+#: 天然落在 local 层被忽略的 ``workflows/_*`` 规则里。
+SCRATCH_DIR_REL = "workflows/_scratch"
+EDITOR_RUN_REL = f"{SCRATCH_DIR_REL}/editor_run.wf"
 
 
 def _normalized_source(text: str) -> str:
@@ -29,9 +33,9 @@ def runtime_source(text: str):
     # Keep relative input-trace references working, but never reuse a shared filename.
     # Run sources are private too: writing them to system leaves `_editor_run_*.wf`
     # debris in the preset whenever a crash skips the unlink.
-    directory = get_root_resolver().local_dir / "workflows"
+    directory = get_root_resolver().local_dir / SCRATCH_DIR_REL
     directory.mkdir(parents=True, exist_ok=True)
-    fd, filename = mkstemp(dir=directory, prefix="_editor_run_", suffix=".wf")
+    fd, filename = mkstemp(dir=directory, prefix="editor_run_", suffix=".wf")
     path = Path(filename)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:

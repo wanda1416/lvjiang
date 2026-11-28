@@ -38,11 +38,9 @@ from PyQt6.QtWidgets import (
 )
 
 from ...i18n import tr
+from ...workflows.runtime_source import EDITOR_RUN_REL
 from ..ocr.pick_canvas import PickCanvas
 from ..widgets.button_styles import apply_button_style
-
-#: 临时运行文件（与场景编辑器试运行共用；``_`` 前缀不会被发现层当成正式脚本）
-EDITOR_RUN_REL = "workflows/_editor_run.wf"
 
 
 def format_value(value) -> str:

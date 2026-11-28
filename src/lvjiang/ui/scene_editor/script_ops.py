@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.config.resolver import get_root_resolver
 from ...i18n import tr, tr_label
+from ...workflows.runtime_source import EDITOR_RUN_REL
 from ..widgets.button_styles import apply_button_style
 from .task_package_ops import bind_package_scope
 
@@ -89,8 +90,8 @@ class ScriptOpsMixin:
     # ─── 脚本文件 ────────────────────────────────────────
 
     def _auto_load_script(self):
-        """自动加载 _editor_run.wf 到脚本编辑器（local 影子优先）"""
-        script_path = get_root_resolver().resolve_read("workflows/_editor_run.wf")
+        """自动加载编辑器草稿到脚本编辑器（local 影子优先）"""
+        script_path = get_root_resolver().resolve_read(EDITOR_RUN_REL)
         if script_path is not None:
             content = script_path.read_text(encoding="utf-8")
             self._script_text.setPlainText(content)

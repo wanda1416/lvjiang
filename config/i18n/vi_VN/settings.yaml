@@ -164,6 +164,7 @@ settings_dialog:
   "仅在窗口内生效，窗口失焦时不抢游戏按键。": "Chỉ hoạt động khi cửa sổ đang được chọn, không chiếm phím game khi mất tiêu điểm."
   界面语言: Ngôn ngữ giao diện
   留空自动解析 Launcher: Để trống để tự động phân giải Launcher
+  目标环境: Môi trường đích
   目标环境决定 DSL 中 env() 的返回值，用于区分 PC 游戏与手游的导航策略。指游戏运行的目标环境，非本机系统环境。: "Môi trường đích quyết định giá trị trả về của env() trong DSL, dùng để phân biệt chiến lược điều hướng giữa game PC và game di động. Đây là môi trường nơi trò chơi chạy, không phải hệ điều hành của máy này."
   "确定删除方案「{name}」吗？": "Bạn có chắc muốn xóa phương án \"{name}\" không?"
   空串不自动定位窗口: Để trống để tắt tự động định vị cửa sổ

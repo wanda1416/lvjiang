@@ -1,19 +1,13 @@
 """购买袅袅之音·绑的数量决策回归测试。"""
 
-from pathlib import Path
 
 import pytest
 
 from lvjiang.workflows.grammar import parse_file
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import make_engine
 
-_WORKFLOW = (
-    Path(__file__).parents[2]
-    / "config"
-    / "system"
-    / "workflows"
-    / "purchase_niaoniao.wf"
-)
+_WORKFLOW = wf_path("purchase_niaoniao")
 
 
 @pytest.mark.parametrize(

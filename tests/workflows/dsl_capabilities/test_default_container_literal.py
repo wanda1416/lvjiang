@@ -18,15 +18,12 @@ AST 节点本身，不是布尔值。
 两者必须一致。
 """
 
-from pathlib import Path
 
 from lvjiang.workflows.metadata import parse_metadata_file
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import run
 
-_PURCHASE_BUGAN = (
-    Path(__file__).parents[3]
-    / "config" / "system" / "workflows" / "purchase_bugan.wf"
-)
+_PURCHASE_BUGAN = wf_path("purchase_bugan")
 
 
 def _parameter_defaults_preamble(source: str) -> str:

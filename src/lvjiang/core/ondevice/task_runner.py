@@ -684,9 +684,12 @@ def _build_source(task: dict, engine):
             pause_event=_PAUSE_GATE,
         )
 
-    from ..config.resolver import get_root_resolver
+    from ...workflows.discovery import resolve_workflow_reference
 
-    wf_path = get_root_resolver().resolve_read(f"workflows/{task['wf_file']}")
+    # 任务里存的是发现层的 wf_file 快照；结构或版本变动后可能已失效，
+    # 因此按「路径 → id → 文件名」解析，而不是死认那一条字符串。
+    wf_path = resolve_workflow_reference(
+        str(task.get("wf_file") or task.get("id") or ""))
     if wf_path is None:
         raise FileNotFoundError(f"工作流文件不存在: {task['wf_file']}")
     return wf_path

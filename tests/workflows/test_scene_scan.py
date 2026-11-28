@@ -19,6 +19,7 @@ from lvjiang.workflows.analysis.workflow_references import (
 )
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
+from tests._wf_paths import wf_path
 from tests.case_matrix import case_matrix
 
 from .conftest import make_engine
@@ -185,7 +186,7 @@ def test_ref_line_no_matches_source():
 ])
 def test_daily_jianghu_claim_guard_executes(reward_state, expected_clicks):
     """实际执行领奖过程，已领和不确定状态都不能点击。"""
-    text = (get_config_system_dir() / "workflows" / "daily_jianghu.wf").read_text(
+    text = (wf_path("daily_jianghu")).read_text(
         encoding="utf-8")
     claim = text[text.index("def claim_completed_reward("):
                  text.index("def sync_haoling_of_week(")]
@@ -226,7 +227,7 @@ def test_daily_jianghu_restores_single_mode_only_after_switching():
 
     单人 / 多人两个方向结构对称，只保留一个按目标参数化的切换过程。
     """
-    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    wf = wf_path("daily_jianghu")
     text = wf.read_text(encoding="utf-8")
     assert "switch_to_multi_mode" not in text
     assert "def switch_game_mode($target)" in text
@@ -266,7 +267,7 @@ def test_daily_jianghu_reads_mode_label_before_switching():
 
     菜单已经打开，读标签不额外点击；据此在收尾免掉一次「开菜单再关」。
     """
-    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    wf = wf_path("daily_jianghu")
     text = wf.read_text(encoding="utf-8")
 
     detect = text[text.index("def detect_game_mode()"):text.index("def switch_game_mode(")]
@@ -287,7 +288,7 @@ def test_daily_jianghu_keep_multiplayer_defaults_to_returning_single():
     """「多人模式保持」默认不勾选：结束后统一回单人，勾选才尊重原有模式。"""
     from lvjiang.workflows.metadata import parse_metadata_file
 
-    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    wf = wf_path("daily_jianghu")
     params = {p["name"]: p for p in parse_metadata_file(wf).get("parameters") or []}
     assert params["keep_multiplayer"]["type"] == "bool"
     assert params["keep_multiplayer"]["default"] is False
@@ -302,7 +303,7 @@ def test_daily_jianghu_keep_multiplayer_defaults_to_returning_single():
 
 def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
     """未找到黄泉酿时先正常收尾，再跳过任务完成扫描与领奖。"""
-    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    wf = wf_path("daily_jianghu")
     text = wf.read_text(encoding="utf-8")
     outer_loop = text[
         text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
@@ -329,7 +330,7 @@ def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
 
 def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
     """任务文字会保留；刷新按钮消失才表示完成，首轮至多触发一次补扫。"""
-    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    wf = wf_path("daily_jianghu")
     text = wf.read_text(encoding="utf-8")
 
     outer_loop = text[
@@ -384,7 +385,7 @@ def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
 
 def test_daily_jianghu_uses_layer_specific_back_regions():
     """任务浮层/情境逐层返回；基底 back 只用于退出号令页。"""
-    wf = get_config_system_dir() / "workflows" / "daily_jianghu.wf"
+    wf = wf_path("daily_jianghu")
     text = wf.read_text(encoding="utf-8")
 
     huanzhuang = text[

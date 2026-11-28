@@ -1,7 +1,6 @@
 """自动购买心法工作流的背包心得预处理合同。"""
 
 from dataclasses import fields, is_dataclass
-from pathlib import Path
 
 import pytest
 
@@ -20,12 +19,10 @@ from lvjiang.workflows.grammar.ast_nodes import (
     WhileLoop,
 )
 from lvjiang.workflows.metadata import parse_metadata_file
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import make_engine
 
-_WORKFLOW = (
-    Path(__file__).parents[4]
-    / "config/system/workflows/purchase_xinfa.wf"
-)
+_WORKFLOW = wf_path("purchase_xinfa")
 
 
 def _walk(value):

@@ -21,12 +21,13 @@ batchable, batch_check, scope, hidden, source_layer}``。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from loguru import logger
 
 from ..core.config.resolver import get_root_resolver
 from . import implementations
+from .errors import WorkflowUserError
 from .file_tree import WORKFLOWS_DIR
 from .metadata import SCRIPT_ID_RE, metadata_for_script_config, script_traits
 from .policy import WorkflowDiscoveryPolicy as Policy
@@ -321,3 +322,69 @@ def resolve_workflow_path(
     if fresh_file != wf_file:
         logger.info(f"工作流路径已刷新: {wf_file or '<空>'} -> {fresh_file}")
     return path, fresh_file
+
+
+def resolve_workflow_reference(reference: str | Path) -> Path | None:
+    """按「相对路径 → 脚本 id → 文件名」解析 ``.wf`` 的实际路径。
+
+    脚本以 ``#% id`` 被引用，**目录只是组织方式**，所以调用方手里可能是
+    rel 路径、脚本 id 或裸文件名（含 ``.wf`` 与不含都行）。三种写法都落到
+    同一份文件上，搬动目录才不需要改调用点；否则每次调整结构都要在
+    Python 里跟着改一遍字符串路径，漏一处就是运行期 FileNotFoundError。
+
+    绝对路径只按文件本身判断，不参与 id 回退：调用方明确给了绝对路径时，
+    找不到就是找不到，不能悄悄换成另一份文件。
+
+    Returns:
+        解析到的路径；找不到返回 ``None``。同名候选多于一个时抛
+        :class:`WorkflowUserError` 并列出候选，让调用方补全路径，而不是
+        让"先找到谁用谁"决定行为。
+    """
+    ref = str(reference or "").strip().replace("\\", "/")
+    if not ref:
+        return None
+    as_path = Path(ref)
+    if as_path.is_absolute():
+        return as_path if as_path.is_file() else None
+
+    resolver = get_root_resolver()
+
+    def _read(rel: str) -> Path | None:
+        found = resolver.resolve_read(f"{WORKFLOWS_DIR}/{rel}")
+        if found is None:
+            return None
+        path = Path(found)
+        return path if path.is_file() else None
+
+    # 1) 当作 workflows 根相对路径（含子目录或根层的旧路径）
+    direct = _read(ref)
+    if direct is not None:
+        return direct
+
+    stem = PurePosixPath(ref).stem
+    if not stem:
+        return None
+
+    # 2) 当作脚本 id：走发现层，天然带 local > class > system 的仲裁
+    fresh = next(
+        (cfg for cfg in discover_scripts()
+         if cfg.get("id") == stem and cfg.get("wf_file")),
+        None,
+    )
+    if fresh is not None:
+        from_id = _read(str(fresh["wf_file"]))
+        if from_id is not None:
+            return from_id
+
+    # 3) 全树同名兜底：过程库与生命周期钩子没有 id，只能按文件名找
+    matches = sorted(
+        rel for rel in resolver.enumerate_entity_tree(WORKFLOWS_DIR, "*.wf")
+        if PurePosixPath(rel).stem == stem
+    )
+    if not matches:
+        return None
+    if len(matches) > 1:
+        raise WorkflowUserError(
+            f"工作流名 {stem!r} 有多个候选，请改用相对路径："
+            + "、".join(matches))
+    return _read(matches[0])

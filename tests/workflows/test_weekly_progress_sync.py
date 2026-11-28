@@ -4,6 +4,7 @@ from pathlib import Path
 
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import Eval
+from tests._wf_paths import wf_path
 
 _ROOT = Path(__file__).parents[2]
 _WORKFLOWS = _ROOT / "config" / "system" / "workflows"
@@ -34,10 +35,10 @@ def test_weekly_progress_uses_one_shared_parser_and_sync_path():
     common = (_WORKFLOWS / "subcall" / "game_profile.wf").read_text(
         encoding="utf-8"
     )
-    daily = (_WORKFLOWS / "daily_jianghu.wf").read_text(encoding="utf-8")
-    purchase = (_WORKFLOWS / "purchase_bugan.wf").read_text(encoding="utf-8")
-    xinfa = (_WORKFLOWS / "purchase_xinfa.wf").read_text(encoding="utf-8")
-    wallet = (_WORKFLOWS / "scan_wallet.wf").read_text(encoding="utf-8")
+    daily = wf_path("daily_jianghu").read_text(encoding="utf-8")
+    purchase = wf_path("purchase_bugan").read_text(encoding="utf-8")
+    xinfa = wf_path("purchase_xinfa").read_text(encoding="utf-8")
+    wallet = wf_path("scan_wallet").read_text(encoding="utf-8")
 
     assert "def sync_weekly_progress(" in common
     assert "extract_progress($raw)" in common

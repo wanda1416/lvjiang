@@ -9,18 +9,16 @@
 
 典型用法：
     from .workflow_runner import run_workflow
-    result = run_workflow("scan_equipped.wf")
+    result = run_workflow("scan_equipped")   # 脚本 id；也可传文件名或路径
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Callable
 
 from loguru import logger
 
 from ...core.config import load_user_config
 from ...core.config.interface import get_interface_store
-from ...core.config.resolver import get_root_resolver
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..input.base import InputBackend
@@ -158,23 +156,20 @@ def run_workflow(
     """运行指定工作流
 
     Args:
-        wf_name: 工作流文件名（如 "scan_equipped.wf"）或完整路径
+        wf_name: 脚本 id、工作流文件名（如 "scan_equipped.wf"）或 rel/绝对路径。
+            任务的位置不是契约，改目录后旧的 id 与旧路径都仍能落到同一份文件。
         layout_name: 布局名称，None 则用 session 活动布局/名册首个布局
         initial_variables: 初始变量
 
     Returns:
         collect 累积的结果字典
     """
-    # 解析工作流路径（跨层：local 影子优先 → system）
-    wf_path: Path | None
-    if Path(wf_name).is_absolute():
-        wf_path = Path(wf_name)
-        if not wf_path.exists():
-            raise FileNotFoundError(f"工作流文件不存在: {wf_path}")
-    else:
-        wf_path = get_root_resolver().resolve_read(f"workflows/{wf_name}")
-        if wf_path is None:
-            raise FileNotFoundError(f"工作流文件不存在: {wf_name}")
+    # 解析工作流路径（跨层：local 影子优先 → system；允许只给脚本 id）
+    from ...workflows.discovery import resolve_workflow_reference
+
+    wf_path = resolve_workflow_reference(wf_name)
+    if wf_path is None:
+        raise FileNotFoundError(f"工作流文件不存在: {wf_name}")
 
     engine = create_engine(layout_name)
     logger.info(f"开始执行工作流: {wf_path.name}")

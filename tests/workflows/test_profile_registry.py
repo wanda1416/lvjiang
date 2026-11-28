@@ -10,6 +10,7 @@ import yaml
 
 from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.grammar.ast_nodes import CallProc
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import make_engine
 
 _ROOT = Path(__file__).parents[2]
@@ -123,7 +124,7 @@ def test_profile_consumers_use_the_central_registry() -> None:
     }
 
     for filename, keys in dependencies.items():
-        source = (_WORKFLOWS / filename).read_text(encoding="utf-8")
+        source = wf_path(filename).read_text(encoding="utf-8")
         assert 'import "subcall/profile_registry.wf"' in source
         assert _declared_keys(source) == keys
         assert "profile_declare(" not in source

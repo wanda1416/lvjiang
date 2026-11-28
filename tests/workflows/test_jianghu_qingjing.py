@@ -2,8 +2,8 @@
 
 import pytest
 
-from lvjiang.core.paths import get_config_system_dir
 from lvjiang.workflows.grammar import parse_text
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import make_engine
 
 
@@ -14,7 +14,7 @@ from tests.workflows.conftest import make_engine
 def test_qingjing_handles_unsaved_exit_before_leaving_layers(
     monkeypatch, prompt, in_appearance,
 ):
-    source = (get_config_system_dir() / "workflows/daily_jianghu.wf").read_text(
+    source = wf_path("daily_jianghu").read_text(
         encoding="utf-8",
     )
     program = parse_text(source)

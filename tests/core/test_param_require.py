@@ -12,6 +12,7 @@ from lvjiang.core.task_params import (
     parameters_for_values,
 )
 from lvjiang.workflows.metadata import WorkflowMetadataError, parse_metadata
+from tests._wf_paths import wf_path
 
 _DEFS = [
     {"name": "skip_online_role", "type": "bool", "default": True},
@@ -292,12 +293,9 @@ class TestMetadataIntegration:
         self, wf, switch, dependent,
     ):
         """开关关着时依赖参数不展示，打开后出现。"""
-        from pathlib import Path
-
         from lvjiang.workflows.metadata import parse_metadata_file
 
-        defs = parse_metadata_file(
-            Path("config/system/workflows") / wf)["parameters"]
+        defs = parse_metadata_file(wf_path(wf))["parameters"]
         switch_def = next(item for item in defs if item["name"] == switch)
         assert switch_def.get("default") is False, "依赖开关默认应当是关的"
         off = {item["name"] for item in parameters_for_values(defs, {switch: False})}

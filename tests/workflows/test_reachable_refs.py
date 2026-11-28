@@ -24,6 +24,7 @@ from lvjiang.workflows.grammar.ast_nodes import (
     Scan,
     Try,
 )
+from tests._wf_paths import wf_path
 
 
 def _scan(scene: str, key: str, line: int = 1) -> Scan:
@@ -97,8 +98,9 @@ class TestRealWorkflowScope:
         from lvjiang.workflows.grammar import parse_file
 
         root = Path(__file__).parents[2] / "config" / "system" / "workflows"
-        entry = root / "scan_equipped.wf"
-        if not entry.exists():
+        try:
+            entry = wf_path("scan_equipped")
+        except FileNotFoundError:
             import pytest
             pytest.skip("系统脚本不在仓库内")
 

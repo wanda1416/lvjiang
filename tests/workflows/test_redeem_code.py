@@ -1,6 +1,5 @@
 """真实 DSL 控制流配合模拟游戏页面验证兑换码状态机，不调用设备。"""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,8 +9,9 @@ from lvjiang.core.config import load_user_config
 from lvjiang.core.layout.manager import load_layout_by_key
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.metadata import parse_metadata
+from tests._wf_paths import wf_path
 
-WORKFLOW_PATH = Path(__file__).resolve().parents[2] / "config/system/workflows/redeem_code.wf"
+WORKFLOW_PATH = wf_path("redeem_code")
 
 
 class RedeemGame:

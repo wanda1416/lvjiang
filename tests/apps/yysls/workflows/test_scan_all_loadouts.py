@@ -26,6 +26,7 @@ from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import CallProc
 from lvjiang.workflows.metadata import parse_metadata_file
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import make_engine
 
 #: 一份通过全部完整性校验的角色面板 OCR 结果。
@@ -303,7 +304,7 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
 
 
 def test_batch_skips_all_existing_plans_before_switching(monkeypatch):
-    workflow_path = Path("config/system/workflows/scan_all_loadouts.wf")
+    workflow_path = wf_path("scan_all_loadouts")
     workflow = parse_file(workflow_path)
     params = {item["name"]: item for item in
               parse_metadata_file(workflow_path)["parameters"]}
@@ -344,7 +345,7 @@ def test_batch_skips_all_existing_plans_before_switching(monkeypatch):
 
 
 def test_batch_continues_after_one_plan_base_attr_failure(monkeypatch):
-    workflow = parse_file(Path("config/system/workflows/scan_all_loadouts.wf"))
+    workflow = parse_file(wf_path("scan_all_loadouts"))
     engine = make_engine()
     calls = []
 
@@ -667,7 +668,7 @@ def test_batch_retries_next_plan_without_reentering_after_safe_failure(
 
     monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
     monkeypatch.setattr(engine, "_exec_eval", fake_eval)
-    workflow = parse_file(Path("config/system/workflows/scan_all_loadouts.wf"))
+    workflow = parse_file(wf_path("scan_all_loadouts"))
     with pytest.raises(_ReturnSignal) as returned:
         engine._exec_body(workflow.body)
     assert returned.value.value == expected_result

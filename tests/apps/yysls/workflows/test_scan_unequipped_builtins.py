@@ -1,12 +1,12 @@
 """装备全量扫描的窗口级背包游标测试。"""
 
-from pathlib import Path
 
 import pytest
 
 # 导入以注册内置函数
 import lvjiang.apps.yysls.workflows.builtins.equip_funcs as equip_funcs
 from lvjiang.workflows.builtins import get_function
+from tests._wf_paths import wf_path
 
 
 def _fn(name):
@@ -135,9 +135,7 @@ class TestBagCursorFinishWindow:
 
 def test_scan_unequipped_only_truncates_on_confirmed_empty_cells():
     """OCR 扫到任意详情文本时不触发新增截断，继续沿用旧游标规则。"""
-    root = Path(__file__).resolve().parents[4]
-    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
-        encoding="utf-8")
+    text = wf_path("scan_unequipped").read_text(encoding="utf-8")
 
     assert "eval $hit_confirmed_empty = 0" in text
     assert text.count("eval $hit_confirmed_empty = 1") == 2
@@ -146,9 +144,7 @@ def test_scan_unequipped_only_truncates_on_confirmed_empty_cells():
 
 
 def test_scan_unequipped_level_threshold_ends_current_slot_without_cast():
-    root = Path(__file__).resolve().parents[4]
-    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
-        encoding="utf-8")
+    text = wf_path("scan_unequipped").read_text(encoding="utf-8")
     assert "int($equip.level)" not in text
     assert "$equip.level < $min_level" in text
     assert 'eval $signal = "level_end"' in text
@@ -156,18 +152,14 @@ def test_scan_unequipped_level_threshold_ends_current_slot_without_cast():
 
 
 def test_each_item_is_persisted_immediately():
-    root = Path(__file__).resolve().parents[4]
-    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
-        encoding="utf-8")
+    text = wf_path("scan_unequipped").read_text(encoding="utf-8")
     collect_at = text.index("eval $items.$fp = $equip")
     write_at = text.index("eval write_bag_item($group, $equip)", collect_at)
     assert write_at > collect_at
 
 
 def test_min_affix_count_filters_only_persistence_not_scan_dedup():
-    root = Path(__file__).resolve().parents[4]
-    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
-        encoding="utf-8")
+    text = wf_path("scan_unequipped").read_text(encoding="utf-8")
 
     assert "default $min_affix_count = 0" in text
     assert text.count(

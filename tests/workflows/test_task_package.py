@@ -339,7 +339,7 @@ def test_runtime_scope_merges_same_named_layouts_and_releases_on_exit(isolated_e
 
 
 def test_screenshots_isolated_per_task_package(isolated_env, tmp_path: Path):
-    """任务包截图目录隔离在 _packages/<id>/ 下，不与全局 desktop 截图目录冲突。"""
+    """任务包截图目录隔离在 packages/<id>/ 下，不与全局 desktop 截图目录冲突。"""
     _, _, loc_dir, _, _ = isolated_env
     wf = _seed_task_package(loc_dir / "workflows" / "standalone" / "fengshajiusi")
     pkg = find_task_package_for_wf(wf)
@@ -351,7 +351,7 @@ def test_screenshots_isolated_per_task_package(isolated_env, tmp_path: Path):
         pkg_root = package_screenshots_dir(pkg)
         with use_screenshots_dir(pkg_root):
             pkg_desktop_dir = layout_screenshots_dir("desktop")
-        assert pkg_desktop_dir == fake_shots / "_packages" / "fengshajiusi" / "desktop"
+        assert pkg_desktop_dir == fake_shots / "packages" / "fengshajiusi" / "desktop"
         assert pkg_desktop_dir != main_desktop_dir
         assert layout_screenshots_dir("desktop") == main_desktop_dir
 

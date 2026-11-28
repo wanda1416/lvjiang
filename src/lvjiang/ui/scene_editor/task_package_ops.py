@@ -181,7 +181,7 @@ class TaskPackageOpsMixin:
             pkg_resolver = create_package_resolver(pkg)
             pkg_registry = build_package_registry(pkg, pkg_resolver)
             from ...core.layout.screenshots import SCREENSHOTS_DIR
-            pkg_screenshots = SCREENSHOTS_DIR / "_packages" / pkg.id
+            pkg_screenshots = SCREENSHOTS_DIR / "packages" / pkg.id
         except Exception as exc:  # noqa: BLE001
             logger.exception("加载任务场景失败")
             # Mixin 宿主实际是 QDialog，静态视角下 self 只是本 mixin 类型

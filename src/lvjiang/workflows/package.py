@@ -309,8 +309,13 @@ def create_package_resolver(
 
 
 def package_screenshots_dir(pkg: TaskPackage) -> Path:
-    """独立任务包专属的截图隔离目录（位于 session/screenshots/_packages/<id>）。"""
-    return get_screenshots_root() / "_packages" / pkg.id
+    """独立任务包专属的截图隔离目录（位于 session/screenshots/packages/<id>）。
+
+    目录名刻意不带下划线：``config/session/.gitignore`` 用 ``_*/`` 挡掉本地备份
+    目录，而包内标定底图和全局 ``screenshots/<布局>/`` 一样是要入库的资产，不能被
+    那条规则一起忽略掉。
+    """
+    return get_screenshots_root() / "packages" / pkg.id
 
 
 def build_package_registry(

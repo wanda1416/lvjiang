@@ -49,7 +49,7 @@ min_app_version: ""
 - **退出释放**：基于线程级 `ContextVar` 与 `try ... finally` 释放作用域，绝不修改进程全局 `_registry` 单例或污染下一个任务。
 
 ### 3. 场景管理编辑态（纯切根，零合并）
-- 点击「加载任务场景」后，先做主场景脏检查，再通过 `ContextVar` 将编辑器作用域切换到指向任务包目录的独立 `ConfigResolver`、独立 `SceneRegistry` 与独立截图目录（`config/session/screenshots/_packages/{pkg_id}/`）。
+- 点击「加载任务场景」后，先做主场景脏检查，再通过 `ContextVar` 将编辑器作用域切换到指向任务包目录的独立 `ConfigResolver`、独立 `SceneRegistry` 与独立截图目录（`config/session/screenshots/packages/{pkg_id}/`）。目录名不带下划线前缀，是为了不被 `config/session/.gitignore` 的 `_*/`（本地备份目录）规则连坐——包内标定底图要和全局截图一样入库。
 - 顶栏右侧按钮切换为「退出任务场景」，窗口标题显示 `[任务场景：{name}]`；左侧布局下拉框、增删改、画布标定、截图与识别测试全部原样复用。
 - 点击「退出任务场景」或关闭窗口时，恢复原 `ContextVar` 作用域与主场景布局/Tab 状态，确保不泄漏到主界面。
 

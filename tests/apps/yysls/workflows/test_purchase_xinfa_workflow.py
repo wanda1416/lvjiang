@@ -66,7 +66,7 @@ def test_bag_xinfa_limit_stops_repeated_item_and_continues_purchase(monkeypatch)
     engine = make_engine(run_env="desktop")
     engine.variables.update({"open_bag_xinfa": True, "max_xinfa_boxes": 1})
     engine._procs = dict(program.procs)
-    helpers = _WORKFLOW.parent / "subcall/result_records.wf"
+    helpers = wf_path("subcall/result_records")
     engine._procs.update(parse_file(helpers).procs)
     engine._procs.update(parse_text(
         'def declare_profiles($keys)\nreturn 0\nend\n'

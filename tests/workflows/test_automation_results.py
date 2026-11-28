@@ -6,6 +6,7 @@ import pytest
 from lvjiang.workflows.builtins._registry import _FUNCTION_REGISTRY
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
+from tests._wf_paths import wf_path
 from tests.workflows.conftest import make_engine
 from tests.workflows.test_redeem_code import RedeemGame
 
@@ -15,7 +16,7 @@ HELPERS = parse_text(
 
 
 def prepare(name, **variables):
-    program = parse_text((WORKFLOWS / f"{name}.wf").read_text(encoding="utf-8"))
+    program = parse_text(wf_path(name).read_text(encoding="utf-8"))
     engine = make_engine()
     engine.variables.update(variables)
     engine._procs = {**program.procs, **HELPERS}

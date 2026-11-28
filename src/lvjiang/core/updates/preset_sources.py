@@ -16,7 +16,9 @@ import subprocess
 from collections.abc import Collection, Iterable
 from pathlib import Path
 
-from ..platforms import subprocess_clean_env_kwargs
+# 只经 core.subprocess_env 取清洗参数：打包主机构建预置时不能导入 platforms
+# （它拉着 loguru 与 i18n，构建主机不装运行时依赖）。
+from ..subprocess_env import subprocess_clean_env_kwargs
 
 # 与 .gitattributes 的 eol=lf 规则配套；tests/core/test_preset_sources.py 校验
 # 两处不漂移——漏一个后缀，跨机器摘要就又开始飘。

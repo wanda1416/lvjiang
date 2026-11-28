@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from lvjiang.core import platforms as platforms_module
+from lvjiang.core import subprocess_env as subprocess_env_module
 from lvjiang.core.android import device as device_module
 from lvjiang.core.android import wireless as w
 
@@ -433,7 +433,7 @@ def test_list_adb_devices_logs_nonzero_exit_and_cleans_linux_frozen_env(monkeypa
         captured_kwargs.update(kwargs)
         return Process()
 
-    monkeypatch.setattr(platforms_module, "IS_WINDOWS", False)
+    monkeypatch.setattr(subprocess_env_module, "IS_WINDOWS", False)
     monkeypatch.setattr(device_module.sys, "frozen", True, raising=False)
     monkeypatch.setattr(device_module.sys, "_MEIPASS", "/opt/lvjiang/_internal", raising=False)
     monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/lvjiang/_internal")

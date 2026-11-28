@@ -10,15 +10,21 @@
 from __future__ import annotations
 
 import os
-import posixpath
 import subprocess
 import sys
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
 from ..i18n import tr
+
+# 子进程环境清洗只在标准库层面实现（见 core.subprocess_env）；在这里重新导出，
+# 是为了让既有 `platforms.clean_subprocess_env` / `platforms.subprocess_clean_env_kwargs`
+# 调用点保持不变。打包主机的预置构建直接导入 core.subprocess_env，不经过本模块。
+from .subprocess_env import (  # noqa: F401
+    clean_subprocess_env,
+    subprocess_clean_env_kwargs,
+)
 
 if TYPE_CHECKING:
     from pynput.keyboard import GlobalHotKeys
@@ -122,61 +128,6 @@ SUBPROCESS_TEXT_OEM: dict = (
     {"text": True, "encoding": "oem", "errors": "replace"} if IS_WINDOWS
     else SUBPROCESS_TEXT
 )
-
-
-def _strip_meipass_from_ld_library_path(raw: str, meipass: str) -> str:
-    """从 POSIX 冒号分隔的 LD_LIBRARY_PATH 中移除 PyInstaller 内部目录。"""
-    if not raw or not meipass:
-        return raw
-    norm_target = posixpath.normpath(meipass)
-    real_target = os.path.realpath(meipass) if (not IS_WINDOWS and os.path.exists(meipass)) else None
-    kept: list[str] = []
-    for entry in raw.split(":"):
-        if not entry:
-            continue
-        if posixpath.normpath(entry) == norm_target:
-            continue
-        if real_target is not None and os.path.exists(entry) and os.path.realpath(entry) == real_target:
-            continue
-        kept.append(entry)
-    return ":".join(kept)
-
-
-def clean_subprocess_env(base_env: Mapping[str, str] | None = None) -> dict[str, str]:
-    """清理 PyInstaller 注入的环境变量，防止外部子进程加载包内旧动态库。"""
-    env = dict(os.environ if base_env is None else base_env)
-    env.pop("_MEIPASS2", None)
-    orig_ld = env.pop("LD_LIBRARY_PATH_ORIG", None)
-    if orig_ld:
-        env["LD_LIBRARY_PATH"] = orig_ld
-    elif orig_ld is not None:
-        env.pop("LD_LIBRARY_PATH", None)
-    elif getattr(sys, "frozen", False):
-        meipass = getattr(sys, "_MEIPASS", "")
-        if meipass:
-            cleaned_ld = _strip_meipass_from_ld_library_path(
-                env.get("LD_LIBRARY_PATH", ""), str(meipass),
-            )
-            if cleaned_ld:
-                env["LD_LIBRARY_PATH"] = cleaned_ld
-            else:
-                env.pop("LD_LIBRARY_PATH", None)
-        else:
-            env.pop("LD_LIBRARY_PATH", None)
-    return env
-
-
-def subprocess_clean_env_kwargs() -> dict[str, Any]:
-    """非 Windows 冻结态或存在 PyInstaller 环境变量时，返回清洗后的 env 字典。"""
-    if IS_WINDOWS:
-        return {}
-    if not (
-        getattr(sys, "frozen", False)
-        or "LD_LIBRARY_PATH_ORIG" in os.environ
-        or "_MEIPASS2" in os.environ
-    ):
-        return {}
-    return {"env": clean_subprocess_env()}
 
 
 # ─── 桌面输入后端 ─────────────────────────────────────────

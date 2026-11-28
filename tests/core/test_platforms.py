@@ -6,7 +6,7 @@ import os
 import sys
 from types import SimpleNamespace
 
-from lvjiang.core import platforms
+from lvjiang.core import platforms, subprocess_env
 
 
 class _Function:
@@ -107,12 +107,12 @@ def test_subprocess_clean_env_kwargs_platform_and_frozen_gates(monkeypatch):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", "/opt/lvjiang/_internal", raising=False)
 
-    # Windows 上保持空字典，零行为变化
-    monkeypatch.setattr(platforms, "IS_WINDOWS", True)
+    # Windows 上保持空字典，零行为变化（门控常量在实现所在模块上打桩）
+    monkeypatch.setattr(subprocess_env, "IS_WINDOWS", True)
     assert platforms.subprocess_clean_env_kwargs() == {}
 
     # 非 Windows frozen 返回清洗后的 env
-    monkeypatch.setattr(platforms, "IS_WINDOWS", False)
+    monkeypatch.setattr(subprocess_env, "IS_WINDOWS", False)
     kwargs = platforms.subprocess_clean_env_kwargs()
     assert "env" in kwargs
     assert "LD_LIBRARY_PATH" not in kwargs["env"]
